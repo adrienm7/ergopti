@@ -8,28 +8,27 @@
                     {
                         "name": "Qwen3-Coder-30B-A3B-Instruct",
                         "type": "chat",
-                        "last_updated": "2025-12-03",
+                        "last_updated": "Unknown",
                         "parameters": {
-                            "total": "30.53B",
+                            "total": "30B",
                             "active": "3B"
                         },
                         "capabilities": {
                             "speed_tok_s": 80,
                             "speed_tier": "Very Fast",
                             "tags": [
-                                "conversational",
-                                "text",
-                                "text-generation"
+                                "dense",
+                                "text"
                             ]
                         },
                         "hardware_requirements": {
                             "mlx": {
-                                "download_gb": 16.02,
-                                "ram_gb": 17.3
+                                "download_gb": null,
+                                "ram_gb": 17.0
                             },
                             "ollama": {
-                                "download_gb": 19.0,
-                                "ram_gb": 17.3
+                                "download_gb": null,
+                                "ram_gb": 17.0
                             }
                         },
                         "urls": {
@@ -46,28 +45,27 @@
                     {
                         "name": "Qwen3-Coder-Next-Base",
                         "type": "completion",
-                        "last_updated": "2026-02-03",
+                        "last_updated": "Unknown",
                         "parameters": {
-                            "total": "79.67B",
-                            "active": "79.67B"
+                            "total": "N/A",
+                            "active": "N/A"
                         },
                         "capabilities": {
-                            "speed_tok_s": 3,
-                            "speed_tier": "Very Slow",
+                            "speed_tok_s": 50,
+                            "speed_tier": "Unknown",
                             "tags": [
-                                "conversational",
-                                "text",
-                                "text-generation"
+                                "dense",
+                                "text"
                             ]
                         },
                         "hardware_requirements": {
                             "mlx": {
                                 "download_gb": null,
-                                "ram_gb": 44.3
+                                "ram_gb": null
                             },
                             "ollama": {
                                 "download_gb": null,
-                                "ram_gb": 44.3
+                                "ram_gb": null
                             }
                         },
                         "urls": {
@@ -79,28 +77,27 @@
                     {
                         "name": "Qwen3-Coder-Next",
                         "type": "chat",
-                        "last_updated": "2026-02-03",
+                        "last_updated": "Unknown",
                         "parameters": {
-                            "total": "79.67B",
-                            "active": "79.67B"
+                            "total": "N/A",
+                            "active": "N/A"
                         },
                         "capabilities": {
-                            "speed_tok_s": 3,
-                            "speed_tier": "Very Slow",
+                            "speed_tok_s": 50,
+                            "speed_tier": "Unknown",
                             "tags": [
-                                "conversational",
-                                "text",
-                                "text-generation"
+                                "dense",
+                                "text"
                             ]
                         },
                         "hardware_requirements": {
                             "mlx": {
-                                "download_gb": 41.78,
-                                "ram_gb": 44.3
+                                "download_gb": null,
+                                "ram_gb": null
                             },
                             "ollama": {
-                                "download_gb": 52.0,
-                                "ram_gb": 44.3
+                                "download_gb": null,
+                                "ram_gb": null
                             }
                         },
                         "urls": {
@@ -117,27 +114,27 @@
                     {
                         "name": "Qwen3.5-0.8B-Base",
                         "type": "completion",
-                        "last_updated": "2026-03-02",
+                        "last_updated": "Unknown",
                         "parameters": {
-                            "total": "0.87B",
-                            "active": "0.87B"
+                            "total": "0.8B",
+                            "active": "0.8B"
                         },
                         "capabilities": {
                             "speed_tok_s": 80,
                             "speed_tier": "Very Fast",
                             "tags": [
-                                "conversational",
+                                "dense",
                                 "text"
                             ]
                         },
                         "hardware_requirements": {
                             "mlx": {
                                 "download_gb": null,
-                                "ram_gb": 1.0
+                                "ram_gb": 0.9
                             },
                             "ollama": {
                                 "download_gb": null,
-                                "ram_gb": 1.0
+                                "ram_gb": 0.9
                             }
                         },
                         "urls": {
@@ -149,27 +146,27 @@
                     {
                         "name": "Qwen3.5-0.8B",
                         "type": "chat",
-                        "last_updated": "2026-03-02",
+                        "last_updated": "Unknown",
                         "parameters": {
-                            "total": "0.87B",
-                            "active": "0.87B"
+                            "total": "0.8B",
+                            "active": "0.8B"
                         },
                         "capabilities": {
                             "speed_tok_s": 80,
                             "speed_tier": "Very Fast",
                             "tags": [
-                                "conversational",
+                                "dense",
                                 "text"
                             ]
                         },
                         "hardware_requirements": {
                             "mlx": {
-                                "download_gb": 0.61,
-                                "ram_gb": 1.0
+                                "download_gb": null,
+                                "ram_gb": 0.9
                             },
                             "ollama": {
-                                "download_gb": 1.0,
-                                "ram_gb": 1.0
+                                "download_gb": null,
+                                "ram_gb": 0.9
                             }
                         },
                         "urls": {
@@ -181,27 +178,27 @@
                     {
                         "name": "Qwen3.5-2B-Base",
                         "type": "completion",
-                        "last_updated": "2026-03-02",
+                        "last_updated": "Unknown",
                         "parameters": {
-                            "total": "2.27B",
-                            "active": "2.27B"
+                            "total": "2B",
+                            "active": "2B"
                         },
                         "capabilities": {
                             "speed_tok_s": 80,
                             "speed_tier": "Very Fast",
                             "tags": [
-                                "conversational",
+                                "dense",
                                 "text"
                             ]
                         },
                         "hardware_requirements": {
                             "mlx": {
                                 "download_gb": null,
-                                "ram_gb": 1.7
+                                "ram_gb": 1.6
                             },
                             "ollama": {
                                 "download_gb": null,
-                                "ram_gb": 1.7
+                                "ram_gb": 1.6
                             }
                         },
                         "urls": {
@@ -213,27 +210,27 @@
                     {
                         "name": "Qwen3.5-2B",
                         "type": "chat",
-                        "last_updated": "2026-03-02",
+                        "last_updated": "Unknown",
                         "parameters": {
-                            "total": "2.27B",
-                            "active": "2.27B"
+                            "total": "2B",
+                            "active": "2B"
                         },
                         "capabilities": {
                             "speed_tok_s": 80,
                             "speed_tier": "Very Fast",
                             "tags": [
-                                "conversational",
+                                "dense",
                                 "text"
                             ]
                         },
                         "hardware_requirements": {
                             "mlx": {
-                                "download_gb": 1.63,
-                                "ram_gb": 1.7
+                                "download_gb": null,
+                                "ram_gb": 1.6
                             },
                             "ollama": {
-                                "download_gb": 2.7,
-                                "ram_gb": 1.7
+                                "download_gb": null,
+                                "ram_gb": 1.6
                             }
                         },
                         "urls": {
@@ -245,27 +242,27 @@
                     {
                         "name": "Qwen3.5-4B-Base",
                         "type": "completion",
-                        "last_updated": "2026-03-02",
+                        "last_updated": "Unknown",
                         "parameters": {
-                            "total": "4.66B",
-                            "active": "4.66B"
+                            "total": "4B",
+                            "active": "4B"
                         },
                         "capabilities": {
-                            "speed_tok_s": 50,
-                            "speed_tier": "Fast",
+                            "speed_tok_s": 80,
+                            "speed_tier": "Very Fast",
                             "tags": [
-                                "conversational",
+                                "dense",
                                 "text"
                             ]
                         },
                         "hardware_requirements": {
                             "mlx": {
                                 "download_gb": null,
-                                "ram_gb": 3.1
+                                "ram_gb": 2.7
                             },
                             "ollama": {
                                 "download_gb": null,
-                                "ram_gb": 3.1
+                                "ram_gb": 2.7
                             }
                         },
                         "urls": {
@@ -277,27 +274,27 @@
                     {
                         "name": "Qwen3.5-4B",
                         "type": "chat",
-                        "last_updated": "2026-03-02",
+                        "last_updated": "Unknown",
                         "parameters": {
-                            "total": "4.66B",
-                            "active": "4.66B"
+                            "total": "4B",
+                            "active": "4B"
                         },
                         "capabilities": {
-                            "speed_tok_s": 50,
-                            "speed_tier": "Fast",
+                            "speed_tok_s": 80,
+                            "speed_tier": "Very Fast",
                             "tags": [
-                                "conversational",
+                                "dense",
                                 "text"
                             ]
                         },
                         "hardware_requirements": {
                             "mlx": {
-                                "download_gb": 2.85,
-                                "ram_gb": 3.1
+                                "download_gb": null,
+                                "ram_gb": 2.7
                             },
                             "ollama": {
-                                "download_gb": 3.4,
-                                "ram_gb": 3.1
+                                "download_gb": null,
+                                "ram_gb": 2.7
                             }
                         },
                         "urls": {
@@ -309,27 +306,27 @@
                     {
                         "name": "Qwen3.5-9B-Base",
                         "type": "completion",
-                        "last_updated": "2026-03-02",
+                        "last_updated": "Unknown",
                         "parameters": {
-                            "total": "9.65B",
-                            "active": "9.65B"
+                            "total": "9B",
+                            "active": "9B"
                         },
                         "capabilities": {
                             "speed_tok_s": 50,
                             "speed_tier": "Fast",
                             "tags": [
-                                "conversational",
+                                "dense",
                                 "text"
                             ]
                         },
                         "hardware_requirements": {
                             "mlx": {
                                 "download_gb": null,
-                                "ram_gb": 5.8
+                                "ram_gb": 5.5
                             },
                             "ollama": {
                                 "download_gb": null,
-                                "ram_gb": 5.8
+                                "ram_gb": 5.5
                             }
                         },
                         "urls": {
@@ -341,27 +338,27 @@
                     {
                         "name": "Qwen3.5-9B",
                         "type": "chat",
-                        "last_updated": "2026-03-02",
+                        "last_updated": "Unknown",
                         "parameters": {
-                            "total": "9.65B",
-                            "active": "9.65B"
+                            "total": "9B",
+                            "active": "9B"
                         },
                         "capabilities": {
                             "speed_tok_s": 50,
                             "speed_tier": "Fast",
                             "tags": [
-                                "conversational",
+                                "dense",
                                 "text"
                             ]
                         },
                         "hardware_requirements": {
                             "mlx": {
-                                "download_gb": 5.57,
-                                "ram_gb": 5.8
+                                "download_gb": null,
+                                "ram_gb": 5.5
                             },
                             "ollama": {
-                                "download_gb": 6.6,
-                                "ram_gb": 5.8
+                                "download_gb": null,
+                                "ram_gb": 5.5
                             }
                         },
                         "urls": {
@@ -373,27 +370,27 @@
                     {
                         "name": "Qwen3.5-27B",
                         "type": "chat",
-                        "last_updated": "2026-02-25",
+                        "last_updated": "Unknown",
                         "parameters": {
-                            "total": "27.78B",
-                            "active": "27.78B"
+                            "total": "27B",
+                            "active": "27B"
                         },
                         "capabilities": {
                             "speed_tok_s": 25,
                             "speed_tier": "Moderate",
                             "tags": [
-                                "conversational",
+                                "dense",
                                 "text"
                             ]
                         },
                         "hardware_requirements": {
                             "mlx": {
-                                "download_gb": 14.98,
-                                "ram_gb": 15.8
+                                "download_gb": null,
+                                "ram_gb": 15.4
                             },
                             "ollama": {
-                                "download_gb": 17.0,
-                                "ram_gb": 15.8
+                                "download_gb": null,
+                                "ram_gb": 15.4
                             }
                         },
                         "urls": {
@@ -405,27 +402,27 @@
                     {
                         "name": "Qwen3.5-35B-A3B-Base",
                         "type": "completion",
-                        "last_updated": "2026-03-02",
+                        "last_updated": "Unknown",
                         "parameters": {
-                            "total": "35.95B",
+                            "total": "35B",
                             "active": "3B"
                         },
                         "capabilities": {
                             "speed_tok_s": 80,
                             "speed_tier": "Very Fast",
                             "tags": [
-                                "conversational",
+                                "dense",
                                 "text"
                             ]
                         },
                         "hardware_requirements": {
                             "mlx": {
                                 "download_gb": null,
-                                "ram_gb": 20.3
+                                "ram_gb": 19.8
                             },
                             "ollama": {
                                 "download_gb": null,
-                                "ram_gb": 20.3
+                                "ram_gb": 19.8
                             }
                         },
                         "urls": {
@@ -437,27 +434,27 @@
                     {
                         "name": "Qwen3.5-35B-A3B",
                         "type": "chat",
-                        "last_updated": "2026-02-27",
+                        "last_updated": "Unknown",
                         "parameters": {
-                            "total": "35.95B",
+                            "total": "35B",
                             "active": "3B"
                         },
                         "capabilities": {
                             "speed_tok_s": 80,
                             "speed_tier": "Very Fast",
                             "tags": [
-                                "conversational",
+                                "dense",
                                 "text"
                             ]
                         },
                         "hardware_requirements": {
                             "mlx": {
-                                "download_gb": 19.02,
-                                "ram_gb": 20.3
+                                "download_gb": null,
+                                "ram_gb": 19.8
                             },
                             "ollama": {
-                                "download_gb": 24.0,
-                                "ram_gb": 20.3
+                                "download_gb": null,
+                                "ram_gb": 19.8
                             }
                         },
                         "urls": {
@@ -479,26 +476,26 @@
                     {
                         "name": "starcoder2-3b",
                         "type": "completion",
-                        "last_updated": "2024-03-04",
+                        "last_updated": "Unknown",
                         "parameters": {
-                            "total": "3.03B",
-                            "active": "3.03B"
+                            "total": "3B",
+                            "active": "3B"
                         },
                         "capabilities": {
                             "speed_tok_s": 80,
                             "speed_tier": "Very Fast",
                             "tags": [
-                                "text",
-                                "text-generation"
+                                "dense",
+                                "text"
                             ]
                         },
                         "hardware_requirements": {
                             "mlx": {
-                                "download_gb": 1.79,
+                                "download_gb": null,
                                 "ram_gb": 2.2
                             },
                             "ollama": {
-                                "download_gb": 1.7,
+                                "download_gb": null,
                                 "ram_gb": 2.2
                             }
                         },
@@ -511,26 +508,26 @@
                     {
                         "name": "starcoder2-7b",
                         "type": "completion",
-                        "last_updated": "2024-06-11",
+                        "last_updated": "Unknown",
                         "parameters": {
-                            "total": "7.17B",
-                            "active": "7.17B"
+                            "total": "7B",
+                            "active": "7B"
                         },
                         "capabilities": {
                             "speed_tok_s": 50,
                             "speed_tier": "Fast",
                             "tags": [
-                                "text",
-                                "text-generation"
+                                "dense",
+                                "text"
                             ]
                         },
                         "hardware_requirements": {
                             "mlx": {
-                                "download_gb": 4.07,
+                                "download_gb": null,
                                 "ram_gb": 4.4
                             },
                             "ollama": {
-                                "download_gb": 4.0,
+                                "download_gb": null,
                                 "ram_gb": 4.4
                             }
                         },
@@ -543,7 +540,7 @@
                     {
                         "name": "starcoder2-15b",
                         "type": "completion",
-                        "last_updated": "2024-06-05",
+                        "last_updated": "Unknown",
                         "parameters": {
                             "total": "15B",
                             "active": "15B"
@@ -552,17 +549,17 @@
                             "speed_tok_s": 25,
                             "speed_tier": "Moderate",
                             "tags": [
-                                "text",
-                                "text-generation"
+                                "dense",
+                                "text"
                             ]
                         },
                         "hardware_requirements": {
                             "mlx": {
-                                "download_gb": 12.83,
+                                "download_gb": null,
                                 "ram_gb": 8.8
                             },
                             "ollama": {
-                                "download_gb": 9.1,
+                                "download_gb": null,
                                 "ram_gb": 8.8
                             }
                         },
@@ -585,28 +582,27 @@
                     {
                         "name": "DeepSeek-V2-Lite-Chat",
                         "type": "chat",
-                        "last_updated": "2024-06-25",
+                        "last_updated": "Unknown",
                         "parameters": {
-                            "total": "15.71B",
-                            "active": "2.4B"
+                            "total": "N/A",
+                            "active": "N/A"
                         },
                         "capabilities": {
-                            "speed_tok_s": 80,
-                            "speed_tier": "Very Fast",
+                            "speed_tok_s": 50,
+                            "speed_tier": "Unknown",
                             "tags": [
-                                "conversational",
-                                "text",
-                                "text-generation"
+                                "dense",
+                                "text"
                             ]
                         },
                         "hardware_requirements": {
                             "mlx": {
-                                "download_gb": 8.24,
-                                "ram_gb": 9.1
+                                "download_gb": null,
+                                "ram_gb": null
                             },
                             "ollama": {
-                                "download_gb": 8.9,
-                                "ram_gb": 9.1
+                                "download_gb": null,
+                                "ram_gb": null
                             }
                         },
                         "urls": {
@@ -623,34 +619,102 @@
                     {
                         "name": "DeepSeek-V2.5-1210",
                         "type": "chat",
-                        "last_updated": "2024-12-11",
+                        "last_updated": "Unknown",
                         "parameters": {
-                            "total": "235.74B",
-                            "active": "235.74B"
+                            "total": "N/A",
+                            "active": "N/A"
                         },
                         "capabilities": {
-                            "speed_tok_s": 3,
-                            "speed_tier": "Very Slow",
+                            "speed_tok_s": 50,
+                            "speed_tier": "Unknown",
                             "tags": [
-                                "conversational",
-                                "text",
-                                "text-generation"
+                                "dense",
+                                "text"
                             ]
                         },
                         "hardware_requirements": {
                             "mlx": {
-                                "download_gb": 123.57,
-                                "ram_gb": 130.2
+                                "download_gb": null,
+                                "ram_gb": null
                             },
                             "ollama": {
-                                "download_gb": 47.0,
-                                "ram_gb": 130.2
+                                "download_gb": null,
+                                "ram_gb": null
                             }
                         },
                         "urls": {
                             "hf": "https://huggingface.co/deepseek-ai/DeepSeek-V2.5-1210",
                             "mlx": "https://huggingface.co/mlx-community/DeepSeek-V2.5-1210-4bit",
                             "ollama": "https://ollama.com/milkey/deepseek-v2.5-1210:IQ1_S"
+                        }
+                    }
+                ]
+            },
+            {
+                "label": "DeepSeekCoder V2",
+                "models": [
+                    {
+                        "name": "DeepSeek-Coder-V2-Lite-Base",
+                        "type": "completion",
+                        "last_updated": "Unknown",
+                        "parameters": {
+                            "total": "N/A",
+                            "active": "N/A"
+                        },
+                        "capabilities": {
+                            "speed_tok_s": 50,
+                            "speed_tier": "Unknown",
+                            "tags": [
+                                "dense",
+                                "text"
+                            ]
+                        },
+                        "hardware_requirements": {
+                            "mlx": {
+                                "download_gb": null,
+                                "ram_gb": null
+                            },
+                            "ollama": {
+                                "download_gb": null,
+                                "ram_gb": null
+                            }
+                        },
+                        "urls": {
+                            "hf": "https://huggingface.co/deepseek-ai/DeepSeek-Coder-V2-Lite-Base",
+                            "mlx": "",
+                            "ollama": ""
+                        }
+                    },
+                    {
+                        "name": "DeepSeek-Coder-V2-Lite-Instruct",
+                        "type": "chat",
+                        "last_updated": "Unknown",
+                        "parameters": {
+                            "total": "N/A",
+                            "active": "N/A"
+                        },
+                        "capabilities": {
+                            "speed_tok_s": 50,
+                            "speed_tier": "Unknown",
+                            "tags": [
+                                "dense",
+                                "text"
+                            ]
+                        },
+                        "hardware_requirements": {
+                            "mlx": {
+                                "download_gb": null,
+                                "ram_gb": null
+                            },
+                            "ollama": {
+                                "download_gb": null,
+                                "ram_gb": null
+                            }
+                        },
+                        "urls": {
+                            "hf": "https://huggingface.co/deepseek-ai/DeepSeek-Coder-V2-Lite-Instruct",
+                            "mlx": "https://huggingface.co/mlx-community/DeepSeek-Coder-V2-Lite-Instruct-4bit-mlx",
+                            "ollama": "https://ollama.com/library/deepseek-coder-v2:lite"
                         }
                     }
                 ]
@@ -666,9 +730,9 @@
                     {
                         "name": "gemma-4-E2B",
                         "type": "completion",
-                        "last_updated": "2026-04-02",
+                        "last_updated": "Unknown",
                         "parameters": {
-                            "total": "5.12B",
+                            "total": "2B",
                             "active": "2B"
                         },
                         "capabilities": {
@@ -681,12 +745,12 @@
                         },
                         "hardware_requirements": {
                             "mlx": {
-                                "download_gb": 4.0,
-                                "ram_gb": 3.3
+                                "download_gb": null,
+                                "ram_gb": 1.6
                             },
                             "ollama": {
                                 "download_gb": null,
-                                "ram_gb": 3.3
+                                "ram_gb": 1.6
                             }
                         },
                         "urls": {
@@ -698,9 +762,9 @@
                     {
                         "name": "gemma-4-E2B-it",
                         "type": "chat",
-                        "last_updated": "2026-04-10",
+                        "last_updated": "Unknown",
                         "parameters": {
-                            "total": "5.12B",
+                            "total": "2B",
                             "active": "2B"
                         },
                         "capabilities": {
@@ -713,12 +777,12 @@
                         },
                         "hardware_requirements": {
                             "mlx": {
-                                "download_gb": 4.0,
-                                "ram_gb": 3.3
+                                "download_gb": null,
+                                "ram_gb": 1.6
                             },
                             "ollama": {
-                                "download_gb": 7.2,
-                                "ram_gb": 3.3
+                                "download_gb": null,
+                                "ram_gb": 1.6
                             }
                         },
                         "urls": {
@@ -730,9 +794,9 @@
                     {
                         "name": "gemma-4-E4B",
                         "type": "completion",
-                        "last_updated": "2026-04-02",
+                        "last_updated": "Unknown",
                         "parameters": {
-                            "total": "8B",
+                            "total": "4B",
                             "active": "4B"
                         },
                         "capabilities": {
@@ -745,12 +809,12 @@
                         },
                         "hardware_requirements": {
                             "mlx": {
-                                "download_gb": 4.89,
-                                "ram_gb": 4.9
+                                "download_gb": null,
+                                "ram_gb": 2.7
                             },
                             "ollama": {
                                 "download_gb": null,
-                                "ram_gb": 4.9
+                                "ram_gb": 2.7
                             }
                         },
                         "urls": {
@@ -762,9 +826,9 @@
                     {
                         "name": "gemma-4-E4B-it",
                         "type": "chat",
-                        "last_updated": "2026-04-10",
+                        "last_updated": "Unknown",
                         "parameters": {
-                            "total": "8B",
+                            "total": "4B",
                             "active": "4B"
                         },
                         "capabilities": {
@@ -777,12 +841,12 @@
                         },
                         "hardware_requirements": {
                             "mlx": {
-                                "download_gb": 6.31,
-                                "ram_gb": 4.9
+                                "download_gb": null,
+                                "ram_gb": 2.7
                             },
                             "ollama": {
-                                "download_gb": 9.6,
-                                "ram_gb": 4.9
+                                "download_gb": null,
+                                "ram_gb": 2.7
                             }
                         },
                         "urls": {
@@ -794,9 +858,9 @@
                     {
                         "name": "gemma-4-26B-A4B",
                         "type": "completion",
-                        "last_updated": "2026-04-02",
+                        "last_updated": "Unknown",
                         "parameters": {
-                            "total": "26.54B",
+                            "total": "26B",
                             "active": "4B"
                         },
                         "capabilities": {
@@ -809,12 +873,12 @@
                         },
                         "hardware_requirements": {
                             "mlx": {
-                                "download_gb": 13.85,
-                                "ram_gb": 15.1
+                                "download_gb": null,
+                                "ram_gb": 14.8
                             },
                             "ollama": {
                                 "download_gb": null,
-                                "ram_gb": 15.1
+                                "ram_gb": 14.8
                             }
                         },
                         "urls": {
@@ -826,27 +890,27 @@
                     {
                         "name": "gemma-4-26B-A4B-it",
                         "type": "chat",
-                        "last_updated": "2026-04-10",
+                        "last_updated": "Unknown",
                         "parameters": {
-                            "total": "26.54B",
+                            "total": "26B",
                             "active": "4B"
                         },
                         "capabilities": {
                             "speed_tok_s": 80,
                             "speed_tier": "Very Fast",
                             "tags": [
-                                "conversational",
+                                "dense",
                                 "text"
                             ]
                         },
                         "hardware_requirements": {
                             "mlx": {
-                                "download_gb": 13.85,
-                                "ram_gb": 15.1
+                                "download_gb": null,
+                                "ram_gb": 14.8
                             },
                             "ollama": {
-                                "download_gb": 18.0,
-                                "ram_gb": 15.1
+                                "download_gb": null,
+                                "ram_gb": 14.8
                             }
                         },
                         "urls": {
@@ -858,10 +922,10 @@
                     {
                         "name": "gemma-4-31B",
                         "type": "completion",
-                        "last_updated": "2026-04-02",
+                        "last_updated": "Unknown",
                         "parameters": {
-                            "total": "32.68B",
-                            "active": "32.68B"
+                            "total": "31B",
+                            "active": "31B"
                         },
                         "capabilities": {
                             "speed_tok_s": 25,
@@ -873,12 +937,12 @@
                         },
                         "hardware_requirements": {
                             "mlx": {
-                                "download_gb": 16.28,
-                                "ram_gb": 18.5
+                                "download_gb": null,
+                                "ram_gb": 17.6
                             },
                             "ollama": {
                                 "download_gb": null,
-                                "ram_gb": 18.5
+                                "ram_gb": 17.6
                             }
                         },
                         "urls": {
@@ -890,27 +954,27 @@
                     {
                         "name": "gemma-4-31B-it",
                         "type": "chat",
-                        "last_updated": "2026-04-10",
+                        "last_updated": "Unknown",
                         "parameters": {
-                            "total": "32.68B",
-                            "active": "32.68B"
+                            "total": "31B",
+                            "active": "31B"
                         },
                         "capabilities": {
                             "speed_tok_s": 25,
                             "speed_tier": "Moderate",
                             "tags": [
-                                "conversational",
+                                "dense",
                                 "text"
                             ]
                         },
                         "hardware_requirements": {
                             "mlx": {
-                                "download_gb": 16.28,
-                                "ram_gb": 18.5
+                                "download_gb": null,
+                                "ram_gb": 17.6
                             },
                             "ollama": {
-                                "download_gb": 20.0,
-                                "ram_gb": 18.5
+                                "download_gb": null,
+                                "ram_gb": 17.6
                             }
                         },
                         "urls": {
@@ -932,17 +996,17 @@
                     {
                         "name": "SmolLM3-3B-Base",
                         "type": "completion",
-                        "last_updated": "2025-08-14",
+                        "last_updated": "Unknown",
                         "parameters": {
-                            "total": "3.08B",
-                            "active": "3.08B"
+                            "total": "3B",
+                            "active": "3B"
                         },
                         "capabilities": {
                             "speed_tok_s": 80,
                             "speed_tier": "Very Fast",
                             "tags": [
-                                "text",
-                                "text-generation"
+                                "dense",
+                                "text"
                             ]
                         },
                         "hardware_requirements": {
@@ -964,27 +1028,26 @@
                     {
                         "name": "SmolLM3-3B",
                         "type": "chat",
-                        "last_updated": "2025-09-10",
+                        "last_updated": "Unknown",
                         "parameters": {
-                            "total": "3.08B",
-                            "active": "3.08B"
+                            "total": "3B",
+                            "active": "3B"
                         },
                         "capabilities": {
                             "speed_tok_s": 80,
                             "speed_tier": "Very Fast",
                             "tags": [
-                                "conversational",
-                                "text",
-                                "text-generation"
+                                "dense",
+                                "text"
                             ]
                         },
                         "hardware_requirements": {
                             "mlx": {
-                                "download_gb": 1.63,
+                                "download_gb": null,
                                 "ram_gb": 2.2
                             },
                             "ollama": {
-                                "download_gb": 1.9,
+                                "download_gb": null,
                                 "ram_gb": 2.2
                             }
                         },
@@ -1007,7 +1070,7 @@
                     {
                         "name": "granite-4.0-350m-base",
                         "type": "completion",
-                        "last_updated": "2025-10-23",
+                        "last_updated": "Unknown",
                         "parameters": {
                             "total": "0.35B",
                             "active": "0.35B"
@@ -1016,8 +1079,8 @@
                             "speed_tok_s": 80,
                             "speed_tier": "Very Fast",
                             "tags": [
-                                "text",
-                                "text-generation"
+                                "dense",
+                                "text"
                             ]
                         },
                         "hardware_requirements": {
@@ -1039,17 +1102,17 @@
                     {
                         "name": "granite-4.0-h-350m-base",
                         "type": "completion",
-                        "last_updated": "2025-10-23",
+                        "last_updated": "Unknown",
                         "parameters": {
-                            "total": "0.34B",
-                            "active": "0.34B"
+                            "total": "0.35B",
+                            "active": "0.35B"
                         },
                         "capabilities": {
                             "speed_tok_s": 80,
                             "speed_tier": "Very Fast",
                             "tags": [
-                                "text",
-                                "text-generation"
+                                "dense",
+                                "text"
                             ]
                         },
                         "hardware_requirements": {
@@ -1071,7 +1134,7 @@
                     {
                         "name": "granite-4.0-350m",
                         "type": "chat",
-                        "last_updated": "2025-10-23",
+                        "last_updated": "Unknown",
                         "parameters": {
                             "total": "0.35B",
                             "active": "0.35B"
@@ -1080,9 +1143,8 @@
                             "speed_tok_s": 80,
                             "speed_tier": "Very Fast",
                             "tags": [
-                                "conversational",
-                                "text",
-                                "text-generation"
+                                "dense",
+                                "text"
                             ]
                         },
                         "hardware_requirements": {
@@ -1091,7 +1153,7 @@
                                 "ram_gb": 0.7
                             },
                             "ollama": {
-                                "download_gb": 0.69,
+                                "download_gb": null,
                                 "ram_gb": 0.7
                             }
                         },
@@ -1104,7 +1166,7 @@
                     {
                         "name": "granite-4.0-h-350m",
                         "type": "chat",
-                        "last_updated": "2025-10-23",
+                        "last_updated": "Unknown",
                         "parameters": {
                             "total": "0.35B",
                             "active": "0.35B"
@@ -1113,9 +1175,8 @@
                             "speed_tok_s": 80,
                             "speed_tier": "Very Fast",
                             "tags": [
-                                "conversational",
-                                "text",
-                                "text-generation"
+                                "dense",
+                                "text"
                             ]
                         },
                         "hardware_requirements": {
@@ -1124,7 +1185,7 @@
                                 "ram_gb": 0.7
                             },
                             "ollama": {
-                                "download_gb": 0.36,
+                                "download_gb": null,
                                 "ram_gb": 0.7
                             }
                         },
@@ -1137,27 +1198,27 @@
                     {
                         "name": "granite-4.0-1b-base",
                         "type": "completion",
-                        "last_updated": "2025-10-23",
+                        "last_updated": "Unknown",
                         "parameters": {
-                            "total": "1.63B",
-                            "active": "1.63B"
+                            "total": "1B",
+                            "active": "1B"
                         },
                         "capabilities": {
                             "speed_tok_s": 80,
                             "speed_tier": "Very Fast",
                             "tags": [
-                                "text",
-                                "text-generation"
+                                "dense",
+                                "text"
                             ]
                         },
                         "hardware_requirements": {
                             "mlx": {
                                 "download_gb": null,
-                                "ram_gb": 1.4
+                                "ram_gb": 1.1
                             },
                             "ollama": {
                                 "download_gb": null,
-                                "ram_gb": 1.4
+                                "ram_gb": 1.1
                             }
                         },
                         "urls": {
@@ -1169,27 +1230,27 @@
                     {
                         "name": "granite-4.0-h-1b-base",
                         "type": "completion",
-                        "last_updated": "2025-10-23",
+                        "last_updated": "Unknown",
                         "parameters": {
-                            "total": "1.46B",
-                            "active": "1.46B"
+                            "total": "1B",
+                            "active": "1B"
                         },
                         "capabilities": {
                             "speed_tok_s": 80,
                             "speed_tier": "Very Fast",
                             "tags": [
-                                "text",
-                                "text-generation"
+                                "dense",
+                                "text"
                             ]
                         },
                         "hardware_requirements": {
                             "mlx": {
-                                "download_gb": 0.78,
-                                "ram_gb": 1.3
+                                "download_gb": null,
+                                "ram_gb": 1.1
                             },
                             "ollama": {
                                 "download_gb": null,
-                                "ram_gb": 1.3
+                                "ram_gb": 1.1
                             }
                         },
                         "urls": {
@@ -1201,7 +1262,7 @@
                     {
                         "name": "granite-4.0-1b",
                         "type": "chat",
-                        "last_updated": "2025-10-23",
+                        "last_updated": "Unknown",
                         "parameters": {
                             "total": "1B",
                             "active": "1B"
@@ -1210,9 +1271,8 @@
                             "speed_tok_s": 80,
                             "speed_tier": "Very Fast",
                             "tags": [
-                                "conversational",
-                                "text",
-                                "text-generation"
+                                "dense",
+                                "text"
                             ]
                         },
                         "hardware_requirements": {
@@ -1221,7 +1281,7 @@
                                 "ram_gb": 1.1
                             },
                             "ollama": {
-                                "download_gb": 3.3,
+                                "download_gb": null,
                                 "ram_gb": 1.1
                             }
                         },
@@ -1234,28 +1294,27 @@
                     {
                         "name": "granite-4.0-h-1b",
                         "type": "chat",
-                        "last_updated": "2025-10-23",
+                        "last_updated": "Unknown",
                         "parameters": {
-                            "total": "1.46B",
-                            "active": "1.46B"
+                            "total": "1B",
+                            "active": "1B"
                         },
                         "capabilities": {
                             "speed_tok_s": 80,
                             "speed_tier": "Very Fast",
                             "tags": [
-                                "conversational",
-                                "text",
-                                "text-generation"
+                                "dense",
+                                "text"
                             ]
                         },
                         "hardware_requirements": {
                             "mlx": {
-                                "download_gb": 0.78,
-                                "ram_gb": 1.3
+                                "download_gb": null,
+                                "ram_gb": 1.1
                             },
                             "ollama": {
-                                "download_gb": 1.6,
-                                "ram_gb": 1.3
+                                "download_gb": null,
+                                "ram_gb": 1.1
                             }
                         },
                         "urls": {
@@ -1272,27 +1331,27 @@
                     {
                         "name": "granite-4.0-micro-base",
                         "type": "completion",
-                        "last_updated": "2025-11-03",
+                        "last_updated": "Unknown",
                         "parameters": {
-                            "total": "3.4B",
-                            "active": "3.4B"
+                            "total": "N/A",
+                            "active": "N/A"
                         },
                         "capabilities": {
-                            "speed_tok_s": 80,
-                            "speed_tier": "Very Fast",
+                            "speed_tok_s": 50,
+                            "speed_tier": "Unknown",
                             "tags": [
-                                "text",
-                                "text-generation"
+                                "dense",
+                                "text"
                             ]
                         },
                         "hardware_requirements": {
                             "mlx": {
                                 "download_gb": null,
-                                "ram_gb": 2.4
+                                "ram_gb": null
                             },
                             "ollama": {
                                 "download_gb": null,
-                                "ram_gb": 2.4
+                                "ram_gb": null
                             }
                         },
                         "urls": {
@@ -1304,27 +1363,27 @@
                     {
                         "name": "granite-4.0-h-micro-base",
                         "type": "completion",
-                        "last_updated": "2025-11-03",
+                        "last_updated": "Unknown",
                         "parameters": {
-                            "total": "3.19B",
-                            "active": "3.19B"
+                            "total": "N/A",
+                            "active": "N/A"
                         },
                         "capabilities": {
-                            "speed_tok_s": 80,
-                            "speed_tier": "Very Fast",
+                            "speed_tok_s": 50,
+                            "speed_tier": "Unknown",
                             "tags": [
-                                "text",
-                                "text-generation"
+                                "dense",
+                                "text"
                             ]
                         },
                         "hardware_requirements": {
                             "mlx": {
                                 "download_gb": null,
-                                "ram_gb": 2.3
+                                "ram_gb": null
                             },
                             "ollama": {
                                 "download_gb": null,
-                                "ram_gb": 2.3
+                                "ram_gb": null
                             }
                         },
                         "urls": {
@@ -1336,7 +1395,7 @@
                     {
                         "name": "granite-4.0-micro",
                         "type": "chat",
-                        "last_updated": "2025-11-03",
+                        "last_updated": "Unknown",
                         "parameters": {
                             "total": "N/A",
                             "active": "N/A"
@@ -1345,18 +1404,17 @@
                             "speed_tok_s": 50,
                             "speed_tier": "Unknown",
                             "tags": [
-                                "conversational",
-                                "text",
-                                "text-generation"
+                                "dense",
+                                "text"
                             ]
                         },
                         "hardware_requirements": {
                             "mlx": {
-                                "download_gb": 3.38,
+                                "download_gb": null,
                                 "ram_gb": null
                             },
                             "ollama": {
-                                "download_gb": 2.1,
+                                "download_gb": null,
                                 "ram_gb": null
                             }
                         },
@@ -1369,28 +1427,27 @@
                     {
                         "name": "granite-4.0-h-micro",
                         "type": "chat",
-                        "last_updated": "2025-11-03",
+                        "last_updated": "Unknown",
                         "parameters": {
-                            "total": "3.19B",
-                            "active": "3.19B"
+                            "total": "N/A",
+                            "active": "N/A"
                         },
                         "capabilities": {
-                            "speed_tok_s": 80,
-                            "speed_tier": "Very Fast",
+                            "speed_tok_s": 50,
+                            "speed_tier": "Unknown",
                             "tags": [
-                                "conversational",
-                                "text",
-                                "text-generation"
+                                "dense",
+                                "text"
                             ]
                         },
                         "hardware_requirements": {
                             "mlx": {
-                                "download_gb": 3.17,
-                                "ram_gb": 2.3
+                                "download_gb": null,
+                                "ram_gb": null
                             },
                             "ollama": {
-                                "download_gb": 1.9,
-                                "ram_gb": 2.3
+                                "download_gb": null,
+                                "ram_gb": null
                             }
                         },
                         "urls": {
@@ -1402,27 +1459,27 @@
                     {
                         "name": "granite-4.0-h-tiny-base",
                         "type": "completion",
-                        "last_updated": "2025-11-03",
+                        "last_updated": "Unknown",
                         "parameters": {
-                            "total": "6.94B",
-                            "active": "6.94B"
+                            "total": "N/A",
+                            "active": "N/A"
                         },
                         "capabilities": {
                             "speed_tok_s": 50,
-                            "speed_tier": "Fast",
+                            "speed_tier": "Unknown",
                             "tags": [
-                                "text",
-                                "text-generation"
+                                "dense",
+                                "text"
                             ]
                         },
                         "hardware_requirements": {
                             "mlx": {
                                 "download_gb": null,
-                                "ram_gb": 4.3
+                                "ram_gb": null
                             },
                             "ollama": {
                                 "download_gb": null,
-                                "ram_gb": 4.3
+                                "ram_gb": null
                             }
                         },
                         "urls": {
@@ -1434,27 +1491,27 @@
                     {
                         "name": "granite-4.0-tiny-base-preview",
                         "type": "completion",
-                        "last_updated": "2025-11-03",
+                        "last_updated": "Unknown",
                         "parameters": {
-                            "total": "6.67B",
-                            "active": "6.67B"
+                            "total": "N/A",
+                            "active": "N/A"
                         },
                         "capabilities": {
                             "speed_tok_s": 50,
-                            "speed_tier": "Fast",
+                            "speed_tier": "Unknown",
                             "tags": [
-                                "text",
-                                "text-generation"
+                                "dense",
+                                "text"
                             ]
                         },
                         "hardware_requirements": {
                             "mlx": {
                                 "download_gb": null,
-                                "ram_gb": 4.2
+                                "ram_gb": null
                             },
                             "ollama": {
                                 "download_gb": null,
-                                "ram_gb": 4.2
+                                "ram_gb": null
                             }
                         },
                         "urls": {
@@ -1466,7 +1523,7 @@
                     {
                         "name": "granite-4.0-tiny-preview",
                         "type": "chat",
-                        "last_updated": "2025-11-03",
+                        "last_updated": "Unknown",
                         "parameters": {
                             "total": "N/A",
                             "active": "N/A"
@@ -1475,14 +1532,13 @@
                             "speed_tok_s": 50,
                             "speed_tier": "Unknown",
                             "tags": [
-                                "conversational",
-                                "text",
-                                "text-generation"
+                                "dense",
+                                "text"
                             ]
                         },
                         "hardware_requirements": {
                             "mlx": {
-                                "download_gb": 3.5,
+                                "download_gb": null,
                                 "ram_gb": null
                             },
                             "ollama": {
@@ -1499,28 +1555,27 @@
                     {
                         "name": "granite-4.0-h-tiny",
                         "type": "chat",
-                        "last_updated": "2025-11-03",
+                        "last_updated": "Unknown",
                         "parameters": {
-                            "total": "6.94B",
-                            "active": "6.94B"
+                            "total": "N/A",
+                            "active": "N/A"
                         },
                         "capabilities": {
                             "speed_tok_s": 50,
-                            "speed_tier": "Fast",
+                            "speed_tier": "Unknown",
                             "tags": [
-                                "conversational",
-                                "text",
-                                "text-generation"
+                                "dense",
+                                "text"
                             ]
                         },
                         "hardware_requirements": {
                             "mlx": {
-                                "download_gb": 6.88,
-                                "ram_gb": 4.3
+                                "download_gb": null,
+                                "ram_gb": null
                             },
                             "ollama": {
-                                "download_gb": 4.2,
-                                "ram_gb": 4.3
+                                "download_gb": null,
+                                "ram_gb": null
                             }
                         },
                         "urls": {
@@ -1532,14 +1587,14 @@
                     {
                         "name": "granite-4.0-h-small-base",
                         "type": "completion",
-                        "last_updated": "2025-11-03",
+                        "last_updated": "Unknown",
                         "parameters": {
-                            "total": "32.21B",
-                            "active": "32.21B"
+                            "total": "N/A",
+                            "active": "N/A"
                         },
                         "capabilities": {
-                            "speed_tok_s": 25,
-                            "speed_tier": "Moderate",
+                            "speed_tok_s": 50,
+                            "speed_tier": "Unknown",
                             "tags": [
                                 "dense",
                                 "text"
@@ -1548,11 +1603,11 @@
                         "hardware_requirements": {
                             "mlx": {
                                 "download_gb": null,
-                                "ram_gb": 18.2
+                                "ram_gb": null
                             },
                             "ollama": {
                                 "download_gb": null,
-                                "ram_gb": 18.2
+                                "ram_gb": null
                             }
                         },
                         "urls": {
@@ -1564,7 +1619,7 @@
                     {
                         "name": "granite-4.0-h-small",
                         "type": "chat",
-                        "last_updated": "2025-11-03",
+                        "last_updated": "Unknown",
                         "parameters": {
                             "total": "N/A",
                             "active": "N/A"
@@ -1573,18 +1628,17 @@
                             "speed_tok_s": 50,
                             "speed_tier": "Unknown",
                             "tags": [
-                                "conversational",
-                                "text",
-                                "text-generation"
+                                "dense",
+                                "text"
                             ]
                         },
                         "hardware_requirements": {
                             "mlx": {
-                                "download_gb": 16.89,
+                                "download_gb": null,
                                 "ram_gb": null
                             },
                             "ollama": {
-                                "download_gb": 19.0,
+                                "download_gb": null,
                                 "ram_gb": null
                             }
                         },
@@ -1607,7 +1661,7 @@
                     {
                         "name": "LFM2.5-350M",
                         "type": "chat",
-                        "last_updated": "2026-04-01",
+                        "last_updated": "Unknown",
                         "parameters": {
                             "total": "0.35B",
                             "active": "0.35B"
@@ -1616,18 +1670,17 @@
                             "speed_tok_s": 80,
                             "speed_tier": "Very Fast",
                             "tags": [
-                                "conversational",
-                                "text",
-                                "text-generation"
+                                "dense",
+                                "text"
                             ]
                         },
                         "hardware_requirements": {
                             "mlx": {
-                                "download_gb": 0.38,
+                                "download_gb": null,
                                 "ram_gb": 0.7
                             },
                             "ollama": {
-                                "download_gb": 0.37,
+                                "download_gb": null,
                                 "ram_gb": 0.7
                             }
                         },
@@ -1640,28 +1693,27 @@
                     {
                         "name": "LFM2.5-1.2B-Base",
                         "type": "completion",
-                        "last_updated": "2026-03-30",
+                        "last_updated": "Unknown",
                         "parameters": {
-                            "total": "1.17B",
-                            "active": "1.17B"
+                            "total": "1.2B",
+                            "active": "1.2B"
                         },
                         "capabilities": {
                             "speed_tok_s": 80,
                             "speed_tier": "Very Fast",
                             "tags": [
-                                "conversational",
-                                "text",
-                                "text-generation"
+                                "dense",
+                                "text"
                             ]
                         },
                         "hardware_requirements": {
                             "mlx": {
                                 "download_gb": null,
-                                "ram_gb": 1.1
+                                "ram_gb": 1.2
                             },
                             "ollama": {
                                 "download_gb": null,
-                                "ram_gb": 1.1
+                                "ram_gb": 1.2
                             }
                         },
                         "urls": {
@@ -1673,28 +1725,27 @@
                     {
                         "name": "LFM2.5-1.2B-Instruct",
                         "type": "chat",
-                        "last_updated": "2026-03-30",
+                        "last_updated": "Unknown",
                         "parameters": {
-                            "total": "1.17B",
-                            "active": "1.17B"
+                            "total": "1.2B",
+                            "active": "1.2B"
                         },
                         "capabilities": {
                             "speed_tok_s": 80,
                             "speed_tier": "Very Fast",
                             "tags": [
-                                "conversational",
-                                "text",
-                                "text-generation"
+                                "dense",
+                                "text"
                             ]
                         },
                         "hardware_requirements": {
                             "mlx": {
-                                "download_gb": 1.16,
-                                "ram_gb": 1.1
+                                "download_gb": null,
+                                "ram_gb": 1.2
                             },
                             "ollama": {
-                                "download_gb": 1.2,
-                                "ram_gb": 1.1
+                                "download_gb": null,
+                                "ram_gb": 1.2
                             }
                         },
                         "urls": {
@@ -1716,22 +1767,22 @@
                     {
                         "name": "Llama-3.1-8B",
                         "type": "completion",
-                        "last_updated": "2024-10-16",
+                        "last_updated": "Unknown",
                         "parameters": {
-                            "total": "8.03B",
-                            "active": "8.03B"
+                            "total": "8B",
+                            "active": "8B"
                         },
                         "capabilities": {
                             "speed_tok_s": 50,
                             "speed_tier": "Fast",
                             "tags": [
-                                "text",
-                                "text-generation"
+                                "dense",
+                                "text"
                             ]
                         },
                         "hardware_requirements": {
                             "mlx": {
-                                "download_gb": 4.22,
+                                "download_gb": null,
                                 "ram_gb": 4.9
                             },
                             "ollama": {
@@ -1748,27 +1799,26 @@
                     {
                         "name": "Llama-3.1-8B-Instruct",
                         "type": "chat",
-                        "last_updated": "2024-09-25",
+                        "last_updated": "Unknown",
                         "parameters": {
-                            "total": "8.03B",
-                            "active": "8.03B"
+                            "total": "8B",
+                            "active": "8B"
                         },
                         "capabilities": {
                             "speed_tok_s": 50,
                             "speed_tier": "Fast",
                             "tags": [
-                                "conversational",
-                                "text",
-                                "text-generation"
+                                "dense",
+                                "text"
                             ]
                         },
                         "hardware_requirements": {
                             "mlx": {
-                                "download_gb": 4.22,
+                                "download_gb": null,
                                 "ram_gb": 4.9
                             },
                             "ollama": {
-                                "download_gb": 4.9,
+                                "download_gb": null,
                                 "ram_gb": 4.9
                             }
                         },
@@ -1781,27 +1831,27 @@
                     {
                         "name": "Llama-3.1-70B",
                         "type": "completion",
-                        "last_updated": "2024-09-25",
+                        "last_updated": "Unknown",
                         "parameters": {
-                            "total": "70.55B",
-                            "active": "70.55B"
+                            "total": "70B",
+                            "active": "70B"
                         },
                         "capabilities": {
                             "speed_tok_s": 10,
                             "speed_tier": "Slow",
                             "tags": [
-                                "text",
-                                "text-generation"
+                                "dense",
+                                "text"
                             ]
                         },
                         "hardware_requirements": {
                             "mlx": {
-                                "download_gb": 36.97,
-                                "ram_gb": 39.3
+                                "download_gb": null,
+                                "ram_gb": 39.0
                             },
                             "ollama": {
-                                "download_gb": 43.0,
-                                "ram_gb": 39.3
+                                "download_gb": null,
+                                "ram_gb": 39.0
                             }
                         },
                         "urls": {
@@ -1813,28 +1863,27 @@
                     {
                         "name": "Llama-3.1-70B-Instruct",
                         "type": "chat",
-                        "last_updated": "2024-12-15",
+                        "last_updated": "Unknown",
                         "parameters": {
-                            "total": "70.55B",
-                            "active": "70.55B"
+                            "total": "70B",
+                            "active": "70B"
                         },
                         "capabilities": {
                             "speed_tok_s": 10,
                             "speed_tier": "Slow",
                             "tags": [
-                                "conversational",
-                                "text",
-                                "text-generation"
+                                "dense",
+                                "text"
                             ]
                         },
                         "hardware_requirements": {
                             "mlx": {
-                                "download_gb": 36.97,
-                                "ram_gb": 39.3
+                                "download_gb": null,
+                                "ram_gb": 39.0
                             },
                             "ollama": {
                                 "download_gb": null,
-                                "ram_gb": 39.3
+                                "ram_gb": 39.0
                             }
                         },
                         "urls": {
@@ -1851,27 +1900,27 @@
                     {
                         "name": "Llama-3.2-1B",
                         "type": "completion",
-                        "last_updated": "2024-10-24",
+                        "last_updated": "Unknown",
                         "parameters": {
-                            "total": "1.24B",
-                            "active": "1.24B"
+                            "total": "1B",
+                            "active": "1B"
                         },
                         "capabilities": {
                             "speed_tok_s": 80,
                             "speed_tier": "Very Fast",
                             "tags": [
-                                "text",
-                                "text-generation"
+                                "dense",
+                                "text"
                             ]
                         },
                         "hardware_requirements": {
                             "mlx": {
                                 "download_gb": null,
-                                "ram_gb": 1.2
+                                "ram_gb": 1.1
                             },
                             "ollama": {
                                 "download_gb": null,
-                                "ram_gb": 1.2
+                                "ram_gb": 1.1
                             }
                         },
                         "urls": {
@@ -1883,28 +1932,27 @@
                     {
                         "name": "Llama-3.2-1B-Instruct",
                         "type": "chat",
-                        "last_updated": "2024-10-24",
+                        "last_updated": "Unknown",
                         "parameters": {
-                            "total": "1.24B",
-                            "active": "1.24B"
+                            "total": "1B",
+                            "active": "1B"
                         },
                         "capabilities": {
                             "speed_tok_s": 80,
                             "speed_tier": "Very Fast",
                             "tags": [
-                                "conversational",
-                                "text",
-                                "text-generation"
+                                "dense",
+                                "text"
                             ]
                         },
                         "hardware_requirements": {
                             "mlx": {
-                                "download_gb": 0.66,
-                                "ram_gb": 1.2
+                                "download_gb": null,
+                                "ram_gb": 1.1
                             },
                             "ollama": {
-                                "download_gb": 1.3,
-                                "ram_gb": 1.2
+                                "download_gb": null,
+                                "ram_gb": 1.1
                             }
                         },
                         "urls": {
@@ -1916,27 +1964,27 @@
                     {
                         "name": "Llama-3.2-3B",
                         "type": "completion",
-                        "last_updated": "2024-10-24",
+                        "last_updated": "Unknown",
                         "parameters": {
-                            "total": "3.21B",
-                            "active": "3.21B"
+                            "total": "3B",
+                            "active": "3B"
                         },
                         "capabilities": {
                             "speed_tok_s": 80,
                             "speed_tier": "Very Fast",
                             "tags": [
-                                "text",
-                                "text-generation"
+                                "dense",
+                                "text"
                             ]
                         },
                         "hardware_requirements": {
                             "mlx": {
-                                "download_gb": 3.19,
-                                "ram_gb": 2.3
+                                "download_gb": null,
+                                "ram_gb": 2.2
                             },
                             "ollama": {
                                 "download_gb": null,
-                                "ram_gb": 2.3
+                                "ram_gb": 2.2
                             }
                         },
                         "urls": {
@@ -1948,28 +1996,27 @@
                     {
                         "name": "Llama-3.2-3B-Instruct",
                         "type": "chat",
-                        "last_updated": "2024-10-24",
+                        "last_updated": "Unknown",
                         "parameters": {
-                            "total": "3.21B",
-                            "active": "3.21B"
+                            "total": "3B",
+                            "active": "3B"
                         },
                         "capabilities": {
                             "speed_tok_s": 80,
                             "speed_tier": "Very Fast",
                             "tags": [
-                                "conversational",
-                                "text",
-                                "text-generation"
+                                "dense",
+                                "text"
                             ]
                         },
                         "hardware_requirements": {
                             "mlx": {
-                                "download_gb": 1.7,
-                                "ram_gb": 2.3
+                                "download_gb": null,
+                                "ram_gb": 2.2
                             },
                             "ollama": {
-                                "download_gb": 2.0,
-                                "ram_gb": 2.3
+                                "download_gb": null,
+                                "ram_gb": 2.2
                             }
                         },
                         "urls": {
@@ -1986,28 +2033,27 @@
                     {
                         "name": "Llama-3.3-70B-Instruct",
                         "type": "chat",
-                        "last_updated": "2024-12-21",
+                        "last_updated": "Unknown",
                         "parameters": {
-                            "total": "70.55B",
-                            "active": "70.55B"
+                            "total": "70B",
+                            "active": "70B"
                         },
                         "capabilities": {
                             "speed_tok_s": 10,
                             "speed_tier": "Slow",
                             "tags": [
-                                "conversational",
-                                "text",
-                                "text-generation"
+                                "dense",
+                                "text"
                             ]
                         },
                         "hardware_requirements": {
                             "mlx": {
-                                "download_gb": 28.77,
-                                "ram_gb": 39.3
+                                "download_gb": null,
+                                "ram_gb": 39.0
                             },
                             "ollama": {
-                                "download_gb": 43.0,
-                                "ram_gb": 39.3
+                                "download_gb": null,
+                                "ram_gb": 39.0
                             }
                         },
                         "urls": {
@@ -2024,7 +2070,7 @@
                     {
                         "name": "Llama-4-Scout-17B-16E",
                         "type": "completion",
-                        "last_updated": "2025-04-09",
+                        "last_updated": "Unknown",
                         "parameters": {
                             "total": "17B",
                             "active": "17B"
@@ -2033,13 +2079,13 @@
                             "speed_tok_s": 25,
                             "speed_tier": "Moderate",
                             "tags": [
-                                "conversational",
+                                "dense",
                                 "text"
                             ]
                         },
                         "hardware_requirements": {
                             "mlx": {
-                                "download_gb": 56.48,
+                                "download_gb": null,
                                 "ram_gb": 9.9
                             },
                             "ollama": {
@@ -2056,7 +2102,7 @@
                     {
                         "name": "Llama-4-Scout-17B-16E-Instruct",
                         "type": "chat",
-                        "last_updated": "2025-05-22",
+                        "last_updated": "Unknown",
                         "parameters": {
                             "total": "17B",
                             "active": "17B"
@@ -2065,17 +2111,17 @@
                             "speed_tok_s": 25,
                             "speed_tier": "Moderate",
                             "tags": [
-                                "conversational",
+                                "dense",
                                 "text"
                             ]
                         },
                         "hardware_requirements": {
                             "mlx": {
-                                "download_gb": 56.94,
+                                "download_gb": null,
                                 "ram_gb": 9.9
                             },
                             "ollama": {
-                                "download_gb": 67.0,
+                                "download_gb": null,
                                 "ram_gb": 9.9
                             }
                         },
@@ -2098,7 +2144,7 @@
                     {
                         "name": "Phi-4-mini-instruct",
                         "type": "chat",
-                        "last_updated": "2025-12-10",
+                        "last_updated": "Unknown",
                         "parameters": {
                             "total": "N/A",
                             "active": "N/A"
@@ -2107,18 +2153,17 @@
                             "speed_tok_s": 50,
                             "speed_tier": "Unknown",
                             "tags": [
-                                "conversational",
-                                "text",
-                                "text-generation"
+                                "dense",
+                                "text"
                             ]
                         },
                         "hardware_requirements": {
                             "mlx": {
-                                "download_gb": 2.03,
+                                "download_gb": null,
                                 "ram_gb": null
                             },
                             "ollama": {
-                                "download_gb": 2.5,
+                                "download_gb": null,
                                 "ram_gb": null
                             }
                         },
@@ -2131,7 +2176,7 @@
                     {
                         "name": "phi-4",
                         "type": "chat",
-                        "last_updated": "2025-11-24",
+                        "last_updated": "Unknown",
                         "parameters": {
                             "total": "N/A",
                             "active": "N/A"
@@ -2140,18 +2185,17 @@
                             "speed_tok_s": 50,
                             "speed_tier": "Unknown",
                             "tags": [
-                                "conversational",
-                                "text",
-                                "text-generation"
+                                "dense",
+                                "text"
                             ]
                         },
                         "hardware_requirements": {
                             "mlx": {
-                                "download_gb": 7.69,
+                                "download_gb": null,
                                 "ram_gb": null
                             },
                             "ollama": {
-                                "download_gb": 9.1,
+                                "download_gb": null,
                                 "ram_gb": null
                             }
                         },
@@ -2169,28 +2213,27 @@
                     {
                         "name": "NextCoder-7B",
                         "type": "chat",
-                        "last_updated": "2025-06-12",
+                        "last_updated": "Unknown",
                         "parameters": {
-                            "total": "7.62B",
-                            "active": "7.62B"
+                            "total": "7B",
+                            "active": "7B"
                         },
                         "capabilities": {
                             "speed_tok_s": 50,
                             "speed_tier": "Fast",
                             "tags": [
-                                "conversational",
-                                "text",
-                                "text-generation"
+                                "dense",
+                                "text"
                             ]
                         },
                         "hardware_requirements": {
                             "mlx": {
-                                "download_gb": 4.45,
-                                "ram_gb": 4.7
+                                "download_gb": null,
+                                "ram_gb": 4.4
                             },
                             "ollama": {
                                 "download_gb": null,
-                                "ram_gb": 4.7
+                                "ram_gb": 4.4
                             }
                         },
                         "urls": {
@@ -2202,28 +2245,27 @@
                     {
                         "name": "NextCoder-14B",
                         "type": "chat",
-                        "last_updated": "2025-06-12",
+                        "last_updated": "Unknown",
                         "parameters": {
-                            "total": "14.77B",
-                            "active": "14.77B"
+                            "total": "14B",
+                            "active": "14B"
                         },
                         "capabilities": {
                             "speed_tok_s": 25,
                             "speed_tier": "Moderate",
                             "tags": [
-                                "conversational",
-                                "text",
-                                "text-generation"
+                                "dense",
+                                "text"
                             ]
                         },
                         "hardware_requirements": {
                             "mlx": {
-                                "download_gb": 7.75,
-                                "ram_gb": 8.6
+                                "download_gb": null,
+                                "ram_gb": 8.2
                             },
                             "ollama": {
                                 "download_gb": null,
-                                "ram_gb": 8.6
+                                "ram_gb": 8.2
                             }
                         },
                         "urls": {
@@ -2235,33 +2277,74 @@
                     {
                         "name": "NextCoder-32B",
                         "type": "chat",
-                        "last_updated": "2025-06-12",
+                        "last_updated": "Unknown",
                         "parameters": {
-                            "total": "32.76B",
-                            "active": "32.76B"
+                            "total": "32B",
+                            "active": "32B"
                         },
                         "capabilities": {
                             "speed_tok_s": 25,
                             "speed_tier": "Moderate",
                             "tags": [
-                                "conversational",
-                                "text",
-                                "text-generation"
+                                "dense",
+                                "text"
                             ]
                         },
                         "hardware_requirements": {
                             "mlx": {
-                                "download_gb": 19.09,
-                                "ram_gb": 18.5
+                                "download_gb": null,
+                                "ram_gb": 18.1
                             },
                             "ollama": {
                                 "download_gb": null,
-                                "ram_gb": 18.5
+                                "ram_gb": 18.1
                             }
                         },
                         "urls": {
                             "hf": "https://huggingface.co/microsoft/NextCoder-32B",
                             "mlx": "https://huggingface.co/jedisct1/NextCoder-32B-q4-mlx",
+                            "ollama": ""
+                        }
+                    }
+                ]
+            }
+        ]
+    },
+    {
+        "label": "MiniMax",
+        "families": [
+            {
+                "label": "MiniMax-M2.7",
+                "models": [
+                    {
+                        "name": "MiniMax-M2.7",
+                        "type": "chat",
+                        "last_updated": "Unknown",
+                        "parameters": {
+                            "total": "N/A",
+                            "active": "N/A"
+                        },
+                        "capabilities": {
+                            "speed_tok_s": 50,
+                            "speed_tier": "Unknown",
+                            "tags": [
+                                "dense",
+                                "text"
+                            ]
+                        },
+                        "hardware_requirements": {
+                            "mlx": {
+                                "download_gb": null,
+                                "ram_gb": null
+                            },
+                            "ollama": {
+                                "download_gb": null,
+                                "ram_gb": null
+                            }
+                        },
+                        "urls": {
+                            "hf": "https://huggingface.co/MiniMaxAI/MiniMax-M2.7",
+                            "mlx": "https://huggingface.co/mlx-community/MiniMax-M2.7-4bit",
                             "ollama": ""
                         }
                     }
@@ -2278,10 +2361,10 @@
                     {
                         "name": "Mistral-7B-Instruct-v0.3",
                         "type": "chat",
-                        "last_updated": "2025-12-03",
+                        "last_updated": "Unknown",
                         "parameters": {
-                            "total": "7.25B",
-                            "active": "7.25B"
+                            "total": "7B",
+                            "active": "7B"
                         },
                         "capabilities": {
                             "speed_tok_s": 50,
@@ -2293,12 +2376,12 @@
                         },
                         "hardware_requirements": {
                             "mlx": {
-                                "download_gb": 3.8,
-                                "ram_gb": 4.5
+                                "download_gb": null,
+                                "ram_gb": 4.4
                             },
                             "ollama": {
-                                "download_gb": 4.4,
-                                "ram_gb": 4.5
+                                "download_gb": null,
+                                "ram_gb": 4.4
                             }
                         },
                         "urls": {
@@ -2315,39 +2398,7 @@
                     {
                         "name": "Ministral-3-3B-Base-2512",
                         "type": "completion",
-                        "last_updated": "2026-01-15",
-                        "parameters": {
-                            "total": "4.25B",
-                            "active": "4.25B"
-                        },
-                        "capabilities": {
-                            "speed_tok_s": 50,
-                            "speed_tier": "Fast",
-                            "tags": [
-                                "dense",
-                                "text"
-                            ]
-                        },
-                        "hardware_requirements": {
-                            "mlx": {
-                                "download_gb": null,
-                                "ram_gb": 2.8
-                            },
-                            "ollama": {
-                                "download_gb": null,
-                                "ram_gb": 2.8
-                            }
-                        },
-                        "urls": {
-                            "hf": "https://huggingface.co/mistralai/Ministral-3-3B-Base-2512",
-                            "mlx": "",
-                            "ollama": ""
-                        }
-                    },
-                    {
-                        "name": "Ministral-3-3B-Instruct-2512",
-                        "type": "chat",
-                        "last_updated": "2026-01-15",
+                        "last_updated": "Unknown",
                         "parameters": {
                             "total": "3B",
                             "active": "3B"
@@ -2362,11 +2413,43 @@
                         },
                         "hardware_requirements": {
                             "mlx": {
-                                "download_gb": 6.4,
+                                "download_gb": null,
                                 "ram_gb": 2.2
                             },
                             "ollama": {
-                                "download_gb": 3.0,
+                                "download_gb": null,
+                                "ram_gb": 2.2
+                            }
+                        },
+                        "urls": {
+                            "hf": "https://huggingface.co/mistralai/Ministral-3-3B-Base-2512",
+                            "mlx": "",
+                            "ollama": ""
+                        }
+                    },
+                    {
+                        "name": "Ministral-3-3B-Instruct-2512",
+                        "type": "chat",
+                        "last_updated": "Unknown",
+                        "parameters": {
+                            "total": "3B",
+                            "active": "3B"
+                        },
+                        "capabilities": {
+                            "speed_tok_s": 80,
+                            "speed_tier": "Very Fast",
+                            "tags": [
+                                "dense",
+                                "text"
+                            ]
+                        },
+                        "hardware_requirements": {
+                            "mlx": {
+                                "download_gb": null,
+                                "ram_gb": 2.2
+                            },
+                            "ollama": {
+                                "download_gb": null,
                                 "ram_gb": 2.2
                             }
                         },
@@ -2379,10 +2462,10 @@
                     {
                         "name": "Ministral-3-8B-Base-2512",
                         "type": "completion",
-                        "last_updated": "2026-01-15",
+                        "last_updated": "Unknown",
                         "parameters": {
-                            "total": "8.92B",
-                            "active": "8.92B"
+                            "total": "8B",
+                            "active": "8B"
                         },
                         "capabilities": {
                             "speed_tok_s": 50,
@@ -2395,11 +2478,11 @@
                         "hardware_requirements": {
                             "mlx": {
                                 "download_gb": null,
-                                "ram_gb": 5.4
+                                "ram_gb": 4.9
                             },
                             "ollama": {
                                 "download_gb": null,
-                                "ram_gb": 5.4
+                                "ram_gb": 4.9
                             }
                         },
                         "urls": {
@@ -2411,10 +2494,10 @@
                     {
                         "name": "Ministral-3-8B-Instruct-2512",
                         "type": "chat",
-                        "last_updated": "2026-01-15",
+                        "last_updated": "Unknown",
                         "parameters": {
-                            "total": "8.92B",
-                            "active": "8.92B"
+                            "total": "8B",
+                            "active": "8B"
                         },
                         "capabilities": {
                             "speed_tok_s": 50,
@@ -2426,12 +2509,12 @@
                         },
                         "hardware_requirements": {
                             "mlx": {
-                                "download_gb": 5.24,
-                                "ram_gb": 5.4
+                                "download_gb": null,
+                                "ram_gb": 4.9
                             },
                             "ollama": {
-                                "download_gb": 6.0,
-                                "ram_gb": 5.4
+                                "download_gb": null,
+                                "ram_gb": 4.9
                             }
                         },
                         "urls": {
@@ -2443,7 +2526,7 @@
                     {
                         "name": "Ministral-3-14B-Base-2512",
                         "type": "completion",
-                        "last_updated": "2026-01-15",
+                        "last_updated": "Unknown",
                         "parameters": {
                             "total": "14B",
                             "active": "14B"
@@ -2475,7 +2558,7 @@
                     {
                         "name": "Ministral-3-14B-Instruct-2512",
                         "type": "chat",
-                        "last_updated": "2026-01-15",
+                        "last_updated": "Unknown",
                         "parameters": {
                             "total": "14B",
                             "active": "14B"
@@ -2490,11 +2573,11 @@
                         },
                         "hardware_requirements": {
                             "mlx": {
-                                "download_gb": 7.88,
+                                "download_gb": null,
                                 "ram_gb": 8.2
                             },
                             "ollama": {
-                                "download_gb": 9.1,
+                                "download_gb": null,
                                 "ram_gb": 8.2
                             }
                         },
@@ -2531,7 +2614,7 @@
                                 "ram_gb": 12.6
                             },
                             "ollama": {
-                                "download_gb": 13.0,
+                                "download_gb": null,
                                 "ram_gb": 12.6
                             }
                         },
@@ -2544,7 +2627,7 @@
                     {
                         "name": "Mistral-Small-3.2-24B-Instruct-2506",
                         "type": "chat",
-                        "last_updated": "2025-12-22",
+                        "last_updated": "Unknown",
                         "parameters": {
                             "total": "24B",
                             "active": "24B"
@@ -2559,11 +2642,11 @@
                         },
                         "hardware_requirements": {
                             "mlx": {
-                                "download_gb": 12.37,
+                                "download_gb": null,
                                 "ram_gb": 13.7
                             },
                             "ollama": {
-                                "download_gb": 15.0,
+                                "download_gb": null,
                                 "ram_gb": 13.7
                             }
                         },
@@ -2581,7 +2664,7 @@
                     {
                         "name": "Mistral-Large-Instruct-2411",
                         "type": "chat",
-                        "last_updated": "2025-07-28",
+                        "last_updated": "Unknown",
                         "parameters": {
                             "total": "N/A",
                             "active": "N/A"
@@ -2596,11 +2679,11 @@
                         },
                         "hardware_requirements": {
                             "mlx": {
-                                "download_gb": 42.83,
+                                "download_gb": null,
                                 "ram_gb": null
                             },
                             "ollama": {
-                                "download_gb": 73.0,
+                                "download_gb": null,
                                 "ram_gb": null
                             }
                         },
@@ -2618,74 +2701,10 @@
                     {
                         "name": "Mixtral-8x7B-v0.1",
                         "type": "completion",
-                        "last_updated": "2025-07-24",
+                        "last_updated": "Unknown",
                         "parameters": {
-                            "total": "46.7B",
-                            "active": "46.7B"
-                        },
-                        "capabilities": {
-                            "speed_tok_s": 10,
-                            "speed_tier": "Slow",
-                            "tags": [
-                                "mixture_of_experts",
-                                "moe"
-                            ]
-                        },
-                        "hardware_requirements": {
-                            "mlx": {
-                                "download_gb": null,
-                                "ram_gb": 26.2
-                            },
-                            "ollama": {
-                                "download_gb": null,
-                                "ram_gb": 26.2
-                            }
-                        },
-                        "urls": {
-                            "hf": "https://huggingface.co/mistralai/Mixtral-8x7B-v0.1",
-                            "mlx": "",
-                            "ollama": ""
-                        }
-                    },
-                    {
-                        "name": "Mixtral-8x7B-Instruct-v0.1",
-                        "type": "chat",
-                        "last_updated": "2025-07-24",
-                        "parameters": {
-                            "total": "46.7B",
-                            "active": "46.7B"
-                        },
-                        "capabilities": {
-                            "speed_tok_s": 10,
-                            "speed_tier": "Slow",
-                            "tags": [
-                                "dense",
-                                "text"
-                            ]
-                        },
-                        "hardware_requirements": {
-                            "mlx": {
-                                "download_gb": 86.99,
-                                "ram_gb": 26.2
-                            },
-                            "ollama": {
-                                "download_gb": 26.0,
-                                "ram_gb": 26.2
-                            }
-                        },
-                        "urls": {
-                            "hf": "https://huggingface.co/mistralai/Mixtral-8x7B-Instruct-v0.1",
-                            "mlx": "https://huggingface.co/mlx-community/Mixtral-8x7B-Instruct-v0.1",
-                            "ollama": "https://ollama.com/library/mixtral:8x7b"
-                        }
-                    },
-                    {
-                        "name": "Mixtral-8x22B-Instruct-v0.1",
-                        "type": "chat",
-                        "last_updated": "2025-07-24",
-                        "parameters": {
-                            "total": "140.63B",
-                            "active": "140.63B"
+                            "total": "8X7B",
+                            "active": "8X7B"
                         },
                         "capabilities": {
                             "speed_tok_s": 3,
@@ -2697,12 +2716,76 @@
                         },
                         "hardware_requirements": {
                             "mlx": {
-                                "download_gb": 73.94,
-                                "ram_gb": 77.8
+                                "download_gb": null,
+                                "ram_gb": 26.7
                             },
                             "ollama": {
-                                "download_gb": 80.0,
-                                "ram_gb": 77.8
+                                "download_gb": null,
+                                "ram_gb": 26.7
+                            }
+                        },
+                        "urls": {
+                            "hf": "https://huggingface.co/mistralai/Mixtral-8x7B-v0.1",
+                            "mlx": "",
+                            "ollama": ""
+                        }
+                    },
+                    {
+                        "name": "Mixtral-8x7B-Instruct-v0.1",
+                        "type": "chat",
+                        "last_updated": "Unknown",
+                        "parameters": {
+                            "total": "8X7B",
+                            "active": "8X7B"
+                        },
+                        "capabilities": {
+                            "speed_tok_s": 3,
+                            "speed_tier": "Very Slow",
+                            "tags": [
+                                "dense",
+                                "text"
+                            ]
+                        },
+                        "hardware_requirements": {
+                            "mlx": {
+                                "download_gb": null,
+                                "ram_gb": 26.7
+                            },
+                            "ollama": {
+                                "download_gb": null,
+                                "ram_gb": 26.7
+                            }
+                        },
+                        "urls": {
+                            "hf": "https://huggingface.co/mistralai/Mixtral-8x7B-Instruct-v0.1",
+                            "mlx": "https://huggingface.co/mlx-community/Mixtral-8x7B-Instruct-v0.1",
+                            "ollama": "https://ollama.com/library/mixtral:8x7b"
+                        }
+                    },
+                    {
+                        "name": "Mixtral-8x22B-Instruct-v0.1",
+                        "type": "chat",
+                        "last_updated": "Unknown",
+                        "parameters": {
+                            "total": "8X22B",
+                            "active": "8X22B"
+                        },
+                        "capabilities": {
+                            "speed_tok_s": 3,
+                            "speed_tier": "Very Slow",
+                            "tags": [
+                                "dense",
+                                "text"
+                            ]
+                        },
+                        "hardware_requirements": {
+                            "mlx": {
+                                "download_gb": null,
+                                "ram_gb": 82.8
+                            },
+                            "ollama": {
+                                "download_gb": null,
+                                "ram_gb": 82.8
                             }
                         },
                         "urls": {
@@ -2719,39 +2802,7 @@
                     {
                         "name": "Mistral-Nemo-Base-2407",
                         "type": "completion",
-                        "last_updated": "2025-07-28",
-                        "parameters": {
-                            "total": "12.25B",
-                            "active": "12.25B"
-                        },
-                        "capabilities": {
-                            "speed_tok_s": 25,
-                            "speed_tier": "Moderate",
-                            "tags": [
-                                "dense",
-                                "text"
-                            ]
-                        },
-                        "hardware_requirements": {
-                            "mlx": {
-                                "download_gb": 6.43,
-                                "ram_gb": 7.2
-                            },
-                            "ollama": {
-                                "download_gb": null,
-                                "ram_gb": 7.2
-                            }
-                        },
-                        "urls": {
-                            "hf": "https://huggingface.co/mistralai/Mistral-Nemo-Base-2407",
-                            "mlx": "https://huggingface.co/mlx-community/Mistral-Nemo-Base-2407-4bit",
-                            "ollama": ""
-                        }
-                    },
-                    {
-                        "name": "Mistral-Nemo-Instruct-2407",
-                        "type": "chat",
-                        "last_updated": "2025-07-28",
+                        "last_updated": "Unknown",
                         "parameters": {
                             "total": "N/A",
                             "active": "N/A"
@@ -2766,11 +2817,43 @@
                         },
                         "hardware_requirements": {
                             "mlx": {
-                                "download_gb": 6.43,
+                                "download_gb": null,
                                 "ram_gb": null
                             },
                             "ollama": {
-                                "download_gb": 7.1,
+                                "download_gb": null,
+                                "ram_gb": null
+                            }
+                        },
+                        "urls": {
+                            "hf": "https://huggingface.co/mistralai/Mistral-Nemo-Base-2407",
+                            "mlx": "https://huggingface.co/mlx-community/Mistral-Nemo-Base-2407-4bit",
+                            "ollama": ""
+                        }
+                    },
+                    {
+                        "name": "Mistral-Nemo-Instruct-2407",
+                        "type": "chat",
+                        "last_updated": "Unknown",
+                        "parameters": {
+                            "total": "N/A",
+                            "active": "N/A"
+                        },
+                        "capabilities": {
+                            "speed_tok_s": 50,
+                            "speed_tier": "Unknown",
+                            "tags": [
+                                "dense",
+                                "text"
+                            ]
+                        },
+                        "hardware_requirements": {
+                            "mlx": {
+                                "download_gb": null,
+                                "ram_gb": null
+                            },
+                            "ollama": {
+                                "download_gb": null,
                                 "ram_gb": null
                             }
                         },
@@ -2788,10 +2871,10 @@
                     {
                         "name": "Codestral-22B-v0.1",
                         "type": "chat",
-                        "last_updated": "2025-07-24",
+                        "last_updated": "Unknown",
                         "parameters": {
-                            "total": "22.25B",
-                            "active": "22.25B"
+                            "total": "22B",
+                            "active": "22B"
                         },
                         "capabilities": {
                             "speed_tok_s": 25,
@@ -2803,12 +2886,12 @@
                         },
                         "hardware_requirements": {
                             "mlx": {
-                                "download_gb": 11.66,
-                                "ram_gb": 12.7
+                                "download_gb": null,
+                                "ram_gb": 12.6
                             },
                             "ollama": {
-                                "download_gb": 13.0,
-                                "ram_gb": 12.7
+                                "download_gb": null,
+                                "ram_gb": 12.6
                             }
                         },
                         "urls": {
@@ -2830,28 +2913,27 @@
                     {
                         "name": "Kimi-Linear-48B-A3B-Base",
                         "type": "completion",
-                        "last_updated": "2026-01-30",
+                        "last_updated": "Unknown",
                         "parameters": {
-                            "total": "49.12B",
+                            "total": "48B",
                             "active": "3B"
                         },
                         "capabilities": {
                             "speed_tok_s": 80,
                             "speed_tier": "Very Fast",
                             "tags": [
-                                "conversational",
-                                "text",
-                                "text-generation"
+                                "dense",
+                                "text"
                             ]
                         },
                         "hardware_requirements": {
                             "mlx": {
                                 "download_gb": null,
-                                "ram_gb": 27.5
+                                "ram_gb": 26.9
                             },
                             "ollama": {
                                 "download_gb": null,
-                                "ram_gb": 27.5
+                                "ram_gb": 26.9
                             }
                         },
                         "urls": {
@@ -2863,28 +2945,27 @@
                     {
                         "name": "Kimi-Linear-48B-A3B-Instruct",
                         "type": "chat",
-                        "last_updated": "2025-12-16",
+                        "last_updated": "Unknown",
                         "parameters": {
-                            "total": "49.12B",
+                            "total": "48B",
                             "active": "3B"
                         },
                         "capabilities": {
                             "speed_tok_s": 80,
                             "speed_tier": "Very Fast",
                             "tags": [
-                                "conversational",
-                                "text",
-                                "text-generation"
+                                "dense",
+                                "text"
                             ]
                         },
                         "hardware_requirements": {
                             "mlx": {
-                                "download_gb": 25.75,
-                                "ram_gb": 27.5
+                                "download_gb": null,
+                                "ram_gb": 26.9
                             },
                             "ollama": {
                                 "download_gb": null,
-                                "ram_gb": 27.5
+                                "ram_gb": 26.9
                             }
                         },
                         "urls": {
@@ -2901,18 +2982,17 @@
                     {
                         "name": "Moonlight-16B-A3B",
                         "type": "completion",
-                        "last_updated": "2026-01-30",
+                        "last_updated": "Unknown",
                         "parameters": {
-                            "total": "15.96B",
+                            "total": "16B",
                             "active": "3B"
                         },
                         "capabilities": {
                             "speed_tok_s": 80,
                             "speed_tier": "Very Fast",
                             "tags": [
-                                "conversational",
-                                "text",
-                                "text-generation"
+                                "dense",
+                                "text"
                             ]
                         },
                         "hardware_requirements": {
@@ -2934,23 +3014,22 @@
                     {
                         "name": "Moonlight-16B-A3B-Instruct",
                         "type": "chat",
-                        "last_updated": "2026-01-30",
+                        "last_updated": "Unknown",
                         "parameters": {
-                            "total": "15.96B",
+                            "total": "16B",
                             "active": "3B"
                         },
                         "capabilities": {
                             "speed_tok_s": 80,
                             "speed_tier": "Very Fast",
                             "tags": [
-                                "conversational",
-                                "text",
-                                "text-generation"
+                                "dense",
+                                "text"
                             ]
                         },
                         "hardware_requirements": {
                             "mlx": {
-                                "download_gb": 8.37,
+                                "download_gb": null,
                                 "ram_gb": 9.3
                             },
                             "ollama": {
@@ -2977,29 +3056,27 @@
                     {
                         "name": "Hermes-3-Llama-3.2-3B",
                         "type": "chat",
-                        "last_updated": "2024-12-18",
+                        "last_updated": "Unknown",
                         "parameters": {
-                            "total": "3.21B",
-                            "active": "3.21B"
+                            "total": "3B",
+                            "active": "3B"
                         },
                         "capabilities": {
                             "speed_tok_s": 80,
                             "speed_tier": "Very Fast",
                             "tags": [
-                                "conversational",
-                                "instruct",
-                                "text",
-                                "text-generation"
+                                "dense",
+                                "text"
                             ]
                         },
                         "hardware_requirements": {
                             "mlx": {
-                                "download_gb": 1.7,
-                                "ram_gb": 2.3
+                                "download_gb": null,
+                                "ram_gb": 2.2
                             },
                             "ollama": {
-                                "download_gb": 2.0,
-                                "ram_gb": 2.3
+                                "download_gb": null,
+                                "ram_gb": 2.2
                             }
                         },
                         "urls": {
@@ -3011,28 +3088,26 @@
                     {
                         "name": "Hermes-3-Llama-3.1-8B",
                         "type": "chat",
-                        "last_updated": "2024-09-08",
+                        "last_updated": "Unknown",
                         "parameters": {
-                            "total": "8.03B",
-                            "active": "8.03B"
+                            "total": "8B",
+                            "active": "8B"
                         },
                         "capabilities": {
                             "speed_tok_s": 50,
                             "speed_tier": "Fast",
                             "tags": [
-                                "conversational",
-                                "instruct",
-                                "text",
-                                "text-generation"
+                                "dense",
+                                "text"
                             ]
                         },
                         "hardware_requirements": {
                             "mlx": {
-                                "download_gb": 4.22,
+                                "download_gb": null,
                                 "ram_gb": 4.9
                             },
                             "ollama": {
-                                "download_gb": 4.7,
+                                "download_gb": null,
                                 "ram_gb": 4.9
                             }
                         },
@@ -3045,29 +3120,27 @@
                     {
                         "name": "Hermes-3-Llama-3.1-70B",
                         "type": "chat",
-                        "last_updated": "2024-09-08",
+                        "last_updated": "Unknown",
                         "parameters": {
-                            "total": "70.55B",
-                            "active": "70.55B"
+                            "total": "70B",
+                            "active": "70B"
                         },
                         "capabilities": {
                             "speed_tok_s": 10,
                             "speed_tier": "Slow",
                             "tags": [
-                                "conversational",
-                                "instruct",
-                                "text",
-                                "text-generation"
+                                "dense",
+                                "text"
                             ]
                         },
                         "hardware_requirements": {
                             "mlx": {
-                                "download_gb": 36.97,
-                                "ram_gb": 39.3
+                                "download_gb": null,
+                                "ram_gb": 39.0
                             },
                             "ollama": {
-                                "download_gb": 40.0,
-                                "ram_gb": 39.3
+                                "download_gb": null,
+                                "ram_gb": 39.0
                             }
                         },
                         "urls": {
@@ -3084,7 +3157,7 @@
                     {
                         "name": "Hermes-4-14B",
                         "type": "chat",
-                        "last_updated": "2026-01-09",
+                        "last_updated": "Unknown",
                         "parameters": {
                             "total": "14B",
                             "active": "14B"
@@ -3093,16 +3166,13 @@
                             "speed_tok_s": 25,
                             "speed_tier": "Moderate",
                             "tags": [
-                                "conversational",
-                                "instruct",
-                                "reasoning",
-                                "text",
-                                "text-generation"
+                                "dense",
+                                "text"
                             ]
                         },
                         "hardware_requirements": {
                             "mlx": {
-                                "download_gb": 7.75,
+                                "download_gb": null,
                                 "ram_gb": 8.2
                             },
                             "ollama": {
@@ -3119,7 +3189,7 @@
                     {
                         "name": "Hermes-4.3-36B",
                         "type": "chat",
-                        "last_updated": "2025-12-06",
+                        "last_updated": "Unknown",
                         "parameters": {
                             "total": "36B",
                             "active": "36B"
@@ -3128,16 +3198,13 @@
                             "speed_tok_s": 10,
                             "speed_tier": "Slow",
                             "tags": [
-                                "conversational",
-                                "instruct",
-                                "reasoning",
-                                "text",
-                                "text-generation"
+                                "dense",
+                                "text"
                             ]
                         },
                         "hardware_requirements": {
                             "mlx": {
-                                "download_gb": 18.95,
+                                "download_gb": null,
                                 "ram_gb": 20.3
                             },
                             "ollama": {
@@ -3154,7 +3221,7 @@
                     {
                         "name": "Hermes-4-70B",
                         "type": "chat",
-                        "last_updated": "2025-09-02",
+                        "last_updated": "Unknown",
                         "parameters": {
                             "total": "70B",
                             "active": "70B"
@@ -3163,16 +3230,13 @@
                             "speed_tok_s": 10,
                             "speed_tier": "Slow",
                             "tags": [
-                                "conversational",
-                                "instruct",
-                                "reasoning",
-                                "text",
-                                "text-generation"
+                                "dense",
+                                "text"
                             ]
                         },
                         "hardware_requirements": {
                             "mlx": {
-                                "download_gb": 36.98,
+                                "download_gb": null,
                                 "ram_gb": 39.0
                             },
                             "ollama": {
@@ -3199,7 +3263,7 @@
                     {
                         "name": "NVIDIA-Nemotron-3-Nano-4B-BF16",
                         "type": "chat",
-                        "last_updated": "2026-03-20",
+                        "last_updated": "Unknown",
                         "parameters": {
                             "total": "4B",
                             "active": "4B"
@@ -3208,18 +3272,17 @@
                             "speed_tok_s": 80,
                             "speed_tier": "Very Fast",
                             "tags": [
-                                "conversational",
-                                "text",
-                                "text-generation"
+                                "dense",
+                                "text"
                             ]
                         },
                         "hardware_requirements": {
                             "mlx": {
-                                "download_gb": 2.1,
+                                "download_gb": null,
                                 "ram_gb": 2.7
                             },
                             "ollama": {
-                                "download_gb": 2.8,
+                                "download_gb": null,
                                 "ram_gb": 2.7
                             }
                         },
@@ -3232,27 +3295,27 @@
                     {
                         "name": "NVIDIA-Nemotron-3-Nano-30B-A3B-Base-BF16",
                         "type": "completion",
-                        "last_updated": "2026-03-15",
+                        "last_updated": "Unknown",
                         "parameters": {
-                            "total": "31.58B",
+                            "total": "30B",
                             "active": "3B"
                         },
                         "capabilities": {
                             "speed_tok_s": 80,
                             "speed_tier": "Very Fast",
                             "tags": [
-                                "text",
-                                "text-generation"
+                                "dense",
+                                "text"
                             ]
                         },
                         "hardware_requirements": {
                             "mlx": {
                                 "download_gb": null,
-                                "ram_gb": 17.9
+                                "ram_gb": 17.0
                             },
                             "ollama": {
                                 "download_gb": null,
-                                "ram_gb": 17.9
+                                "ram_gb": 17.0
                             }
                         },
                         "urls": {
@@ -3264,28 +3327,27 @@
                     {
                         "name": "NVIDIA-Nemotron-3-Nano-30B-A3B-BF16",
                         "type": "chat",
-                        "last_updated": "2026-03-15",
+                        "last_updated": "Unknown",
                         "parameters": {
-                            "total": "31.58B",
+                            "total": "30B",
                             "active": "3B"
                         },
                         "capabilities": {
                             "speed_tok_s": 80,
                             "speed_tier": "Very Fast",
                             "tags": [
-                                "conversational",
-                                "text",
-                                "text-generation"
+                                "dense",
+                                "text"
                             ]
                         },
                         "hardware_requirements": {
                             "mlx": {
-                                "download_gb": 16.57,
-                                "ram_gb": 17.9
+                                "download_gb": null,
+                                "ram_gb": 17.0
                             },
                             "ollama": {
-                                "download_gb": 24.0,
-                                "ram_gb": 17.9
+                                "download_gb": null,
+                                "ram_gb": 17.0
                             }
                         },
                         "urls": {
@@ -3297,27 +3359,27 @@
                     {
                         "name": "NVIDIA-Nemotron-3-Super-120B-A12B-Base-BF16",
                         "type": "completion",
-                        "last_updated": "2026-03-14",
+                        "last_updated": "Unknown",
                         "parameters": {
-                            "total": "123.61B",
+                            "total": "120B",
                             "active": "12B"
                         },
                         "capabilities": {
                             "speed_tok_s": 25,
                             "speed_tier": "Moderate",
                             "tags": [
-                                "text",
-                                "text-generation"
+                                "dense",
+                                "text"
                             ]
                         },
                         "hardware_requirements": {
                             "mlx": {
                                 "download_gb": null,
-                                "ram_gb": 68.5
+                                "ram_gb": 66.5
                             },
                             "ollama": {
                                 "download_gb": null,
-                                "ram_gb": 68.5
+                                "ram_gb": 66.5
                             }
                         },
                         "urls": {
@@ -3329,28 +3391,27 @@
                     {
                         "name": "NVIDIA-Nemotron-3-Super-120B-A12B-BF16",
                         "type": "chat",
-                        "last_updated": "2026-04-10",
+                        "last_updated": "Unknown",
                         "parameters": {
-                            "total": "123.61B",
+                            "total": "120B",
                             "active": "12B"
                         },
                         "capabilities": {
                             "speed_tok_s": 25,
                             "speed_tier": "Moderate",
                             "tags": [
-                                "conversational",
-                                "text",
-                                "text-generation"
+                                "dense",
+                                "text"
                             ]
                         },
                         "hardware_requirements": {
                             "mlx": {
-                                "download_gb": 63.35,
-                                "ram_gb": 68.5
+                                "download_gb": null,
+                                "ram_gb": 66.5
                             },
                             "ollama": {
-                                "download_gb": 87.0,
-                                "ram_gb": 68.5
+                                "download_gb": null,
+                                "ram_gb": 66.5
                             }
                         },
                         "urls": {
@@ -3372,28 +3433,27 @@
                     {
                         "name": "gpt-oss-20b",
                         "type": "chat",
-                        "last_updated": "2025-08-26",
+                        "last_updated": "Unknown",
                         "parameters": {
-                            "total": "21.51B",
-                            "active": "5.1B"
+                            "total": "20B",
+                            "active": "20B"
                         },
                         "capabilities": {
-                            "speed_tok_s": 50,
-                            "speed_tier": "Fast",
+                            "speed_tok_s": 25,
+                            "speed_tier": "Moderate",
                             "tags": [
-                                "conversational",
-                                "text",
-                                "text-generation"
+                                "dense",
+                                "text"
                             ]
                         },
                         "hardware_requirements": {
                             "mlx": {
-                                "download_gb": 11.27,
-                                "ram_gb": 12.3
+                                "download_gb": null,
+                                "ram_gb": 11.5
                             },
                             "ollama": {
-                                "download_gb": 14.0,
-                                "ram_gb": 12.3
+                                "download_gb": null,
+                                "ram_gb": 11.5
                             }
                         },
                         "urls": {
@@ -3405,28 +3465,27 @@
                     {
                         "name": "gpt-oss-120b",
                         "type": "chat",
-                        "last_updated": "2025-08-26",
+                        "last_updated": "Unknown",
                         "parameters": {
-                            "total": "120.41B",
-                            "active": "5.1B"
+                            "total": "120B",
+                            "active": "120B"
                         },
                         "capabilities": {
-                            "speed_tok_s": 50,
-                            "speed_tier": "Fast",
+                            "speed_tok_s": 3,
+                            "speed_tier": "Very Slow",
                             "tags": [
-                                "conversational",
-                                "text",
-                                "text-generation"
+                                "dense",
+                                "text"
                             ]
                         },
                         "hardware_requirements": {
                             "mlx": {
-                                "download_gb": 59.06,
-                                "ram_gb": 66.7
+                                "download_gb": null,
+                                "ram_gb": 66.5
                             },
                             "ollama": {
-                                "download_gb": 65.0,
-                                "ram_gb": 66.7
+                                "download_gb": null,
+                                "ram_gb": 66.5
                             }
                         },
                         "urls": {
@@ -3448,17 +3507,17 @@
                     {
                         "name": "SOLAR-10.7B-v1.0",
                         "type": "completion",
-                        "last_updated": "2024-09-10",
+                        "last_updated": "Unknown",
                         "parameters": {
-                            "total": "10.73B",
-                            "active": "10.73B"
+                            "total": "10.7B",
+                            "active": "10.7B"
                         },
                         "capabilities": {
                             "speed_tok_s": 25,
                             "speed_tier": "Moderate",
                             "tags": [
-                                "text",
-                                "text-generation"
+                                "dense",
+                                "text"
                             ]
                         },
                         "hardware_requirements": {
@@ -3480,27 +3539,26 @@
                     {
                         "name": "SOLAR-10.7B-Instruct-v1.0",
                         "type": "chat",
-                        "last_updated": "2024-09-10",
+                        "last_updated": "Unknown",
                         "parameters": {
-                            "total": "10.73B",
-                            "active": "10.73B"
+                            "total": "10.7B",
+                            "active": "10.7B"
                         },
                         "capabilities": {
                             "speed_tok_s": 25,
                             "speed_tier": "Moderate",
                             "tags": [
-                                "conversational",
-                                "text",
-                                "text-generation"
+                                "dense",
+                                "text"
                             ]
                         },
                         "hardware_requirements": {
                             "mlx": {
-                                "download_gb": 5.8,
+                                "download_gb": null,
                                 "ram_gb": 6.4
                             },
                             "ollama": {
-                                "download_gb": 6.1,
+                                "download_gb": null,
                                 "ram_gb": 6.4
                             }
                         },
@@ -3518,28 +3576,27 @@
                     {
                         "name": "solar-pro-preview-pretrained",
                         "type": "completion",
-                        "last_updated": "2024-09-09",
+                        "last_updated": "Unknown",
                         "parameters": {
-                            "total": "22.14B",
-                            "active": "22.14B"
+                            "total": "N/A",
+                            "active": "N/A"
                         },
                         "capabilities": {
-                            "speed_tok_s": 25,
-                            "speed_tier": "Moderate",
+                            "speed_tok_s": 50,
+                            "speed_tier": "Unknown",
                             "tags": [
-                                "conversational",
-                                "text",
-                                "text-generation"
+                                "dense",
+                                "text"
                             ]
                         },
                         "hardware_requirements": {
                             "mlx": {
                                 "download_gb": null,
-                                "ram_gb": 12.7
+                                "ram_gb": null
                             },
                             "ollama": {
                                 "download_gb": null,
-                                "ram_gb": 12.7
+                                "ram_gb": null
                             }
                         },
                         "urls": {
@@ -3551,7 +3608,7 @@
                     {
                         "name": "solar-pro-preview-instruct",
                         "type": "chat",
-                        "last_updated": "2024-09-20",
+                        "last_updated": "Unknown",
                         "parameters": {
                             "total": "N/A",
                             "active": "N/A"
@@ -3560,9 +3617,8 @@
                             "speed_tok_s": 50,
                             "speed_tier": "Unknown",
                             "tags": [
-                                "conversational",
-                                "text",
-                                "text-generation"
+                                "dense",
+                                "text"
                             ]
                         },
                         "hardware_requirements": {
@@ -3571,7 +3627,7 @@
                                 "ram_gb": null
                             },
                             "ollama": {
-                                "download_gb": 13.0,
+                                "download_gb": null,
                                 "ram_gb": null
                             }
                         },
@@ -3589,29 +3645,26 @@
                     {
                         "name": "Solar-Open-100B",
                         "type": "chat",
-                        "last_updated": "2026-01-30",
+                        "last_updated": "Unknown",
                         "parameters": {
                             "total": "100B",
-                            "active": "12B"
+                            "active": "100B"
                         },
                         "capabilities": {
-                            "speed_tok_s": 25,
-                            "speed_tier": "Moderate",
+                            "speed_tok_s": 3,
+                            "speed_tier": "Very Slow",
                             "tags": [
-                                "conversational",
-                                "mixture_of_experts",
-                                "moe",
-                                "text",
-                                "text-generation"
+                                "dense",
+                                "text"
                             ]
                         },
                         "hardware_requirements": {
                             "mlx": {
-                                "download_gb": 53.83,
+                                "download_gb": null,
                                 "ram_gb": 55.5
                             },
                             "ollama": {
-                                "download_gb": 62.0,
+                                "download_gb": null,
                                 "ram_gb": 55.5
                             }
                         },
@@ -3634,34 +3687,75 @@
                     {
                         "name": "GLM-4.7-Flash",
                         "type": "chat",
-                        "last_updated": "2026-01-29",
+                        "last_updated": "Unknown",
                         "parameters": {
-                            "total": "31.22B",
-                            "active": "31.22B"
+                            "total": "N/A",
+                            "active": "N/A"
                         },
                         "capabilities": {
-                            "speed_tok_s": 25,
-                            "speed_tier": "Moderate",
+                            "speed_tok_s": 50,
+                            "speed_tier": "Unknown",
                             "tags": [
-                                "conversational",
-                                "text",
-                                "text-generation"
+                                "dense",
+                                "text"
                             ]
                         },
                         "hardware_requirements": {
                             "mlx": {
                                 "download_gb": null,
-                                "ram_gb": 17.7
+                                "ram_gb": null
                             },
                             "ollama": {
-                                "download_gb": 19.0,
-                                "ram_gb": 17.7
+                                "download_gb": null,
+                                "ram_gb": null
                             }
                         },
                         "urls": {
                             "hf": "https://huggingface.co/zai-org/GLM-4.7-Flash",
                             "mlx": "",
                             "ollama": "https://ollama.com/library/glm-4.7-flash:q4_K_M"
+                        }
+                    }
+                ]
+            }
+        ]
+    },
+    {
+        "label": "Other models",
+        "families": [
+            {
+                "label": "Qwopus",
+                "models": [
+                    {
+                        "name": "Qwen3.5-27B-Claude-4.6-Opus-Reasoning-Distilled",
+                        "type": "chat",
+                        "last_updated": "Unknown",
+                        "parameters": {
+                            "total": "27B",
+                            "active": "27B"
+                        },
+                        "capabilities": {
+                            "speed_tok_s": 25,
+                            "speed_tier": "Moderate",
+                            "tags": [
+                                "dense",
+                                "text"
+                            ]
+                        },
+                        "hardware_requirements": {
+                            "mlx": {
+                                "download_gb": null,
+                                "ram_gb": 15.4
+                            },
+                            "ollama": {
+                                "download_gb": null,
+                                "ram_gb": 15.4
+                            }
+                        },
+                        "urls": {
+                            "hf": "https://huggingface.co/Jackrong/Qwen3.5-27B-Claude-4.6-Opus-Reasoning-Distilled",
+                            "mlx": "https://huggingface.co/mlx-community/Qwen3.5-27B-Claude-4.6-Opus-Distilled-MLX-4bit",
+                            "ollama": "https://ollama.com/yolo0perris/Qwen3.5-27B-Claude-4.6-Opus-Reasoning-Distilled-GGUF_Q3_K_M"
                         }
                     }
                 ]

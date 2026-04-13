@@ -212,6 +212,29 @@
 						}
 					}
 				]
+			},
+			{
+				"family": "DeepSeekCoder V2",
+				"models": [
+					{
+						"name": "DeepSeek-Coder-V2-Lite-Base",
+						"type": "completion",
+						"urls": {
+							"hf": "https://huggingface.co/deepseek-ai/DeepSeek-Coder-V2-Lite-Base",
+							"mlx": "",
+							"ollama": ""
+						}
+					},
+					{
+						"name": "DeepSeek-Coder-V2-Lite-Instruct",
+						"type": "chat",
+						"urls": {
+							"hf": "https://huggingface.co/deepseek-ai/DeepSeek-Coder-V2-Lite-Instruct",
+							"mlx": "https://huggingface.co/mlx-community/DeepSeek-Coder-V2-Lite-Instruct-4bit-mlx",
+							"ollama": "https://ollama.com/library/deepseek-coder-v2:lite"
+						}
+					}
+				]
 			}
 		]
 	},
@@ -724,6 +747,25 @@
 		]
 	},
 	{
+		"provider": "MiniMax",
+		"families": [
+			{
+				"family": "MiniMax-M2.7",
+				"models": [
+					{
+						"name": "MiniMax-M2.7",
+						"type": "chat",
+						"urls": {
+							"hf": "https://huggingface.co/MiniMaxAI/MiniMax-M2.7",
+							"mlx": "https://huggingface.co/mlx-community/MiniMax-M2.7-4bit",
+							"ollama": ""
+						}
+					}
+				]
+			}
+		]
+	},
+	{
 		"provider": "Mistral AI",
 		"families": [
 			{
@@ -1188,6 +1230,25 @@
 							"hf": "https://huggingface.co/zai-org/GLM-4.7-Flash",
 							"mlx": "",
 							"ollama": "https://ollama.com/library/glm-4.7-flash:q4_K_M"
+						}
+					}
+				]
+			}
+		]
+	},
+	{
+		"provider": "Other models",
+		"families": [
+			{
+				"family": "Qwopus",
+				"models": [
+					{
+						"name": "Qwen3.5-27B-Claude-4.6-Opus-Reasoning-Distilled",
+						"type": "chat",
+						"urls": {
+							"hf": "https://huggingface.co/Jackrong/Qwen3.5-27B-Claude-4.6-Opus-Reasoning-Distilled",
+							"mlx": "https://huggingface.co/mlx-community/Qwen3.5-27B-Claude-4.6-Opus-Distilled-MLX-4bit",
+							"ollama": "https://ollama.com/yolo0perris/Qwen3.5-27B-Claude-4.6-Opus-Reasoning-Distilled-GGUF_Q3_K_M"
 						}
 					}
 				]
