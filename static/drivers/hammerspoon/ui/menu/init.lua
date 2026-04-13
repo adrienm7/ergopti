@@ -568,8 +568,13 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 			quit            = function() hs.timer.doAfter(0.1, function() os.exit(0) end) end,
 		}
 
-		local items = Builder.generate(ctx, menu_mods, actions)
-		pcall(function() myMenu:setMenu(function() return items end) end)
+		-- Refresh menu on each click on the icon
+		pcall(function()
+			myMenu:setMenu(function()
+				updateMenu()
+				return Builder.generate(ctx, menu_mods, actions)
+			end)
+		end)
 	end
 
 	updateMenu()
