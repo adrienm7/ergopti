@@ -3,6 +3,7 @@
 	<head>
 		<meta charset="UTF-8" />
 		<title>Temps sur les applications</title>
+		<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 		<link rel="stylesheet" href="style.css" />
 	</head>
 	<body>
@@ -10,48 +11,132 @@
 			<div class="header">
 				<h1>Temps sur les applications</h1>
 			</div>
-			<div class="filters-bar">
-				<label for="date-select">Jour :</label>
-				<select id="date-select"></select>
+			<div class="filters-bar" style="display: flex; gap: 15px; align-items: center">
+				<div>
+					<label for="period-select">Période :</label>
+					<select id="period-select">
+						<option value="day" selected>Jour</option>
+						<option value="week">7 derniers jours</option>
+						<option value="month">30 derniers jours</option>
+						<option value="year">Année</option>
+						<option value="all">Tout</option>
+					</select>
+				</div>
+				<div id="date-select-container">
+					<label for="date-select">Le :</label>
+					<select id="date-select"></select>
+				</div>
+				<div style="flex-grow: 1"></div>
 				<button class="filter-btn active" id="btn-refresh">Rafraîchir</button>
 				<button class="filter-btn" id="btn-add-app">Classer une application…</button>
 			</div>
+
 			<div class="stats-grid">
 				<div class="stat-card card-global">
-					<h2>Temps d’écran total</h2>
+					<h2>Temps d’écran</h2>
 					<div class="stat-value" id="kpi-total-time">--</div>
-					<div class="stat-details">Activité globale de la journée</div>
+					<div class="stat-details">Activité globale enregistrée</div>
 				</div>
 				<div class="stat-card card-hs">
-					<h2>Application principale</h2>
-					<div class="stat-value" id="kpi-top-app">--</div>
-					<div class="stat-details">Temps passé : <strong id="kpi-top-app-time">--</strong></div>
+					<h2>Indice de productivité</h2>
+					<div class="stat-value" id="kpi-productivity">--</div>
+					<div class="stat-details" id="kpi-productivity-desc">
+						Score calculé selon vos catégories
+					</div>
 				</div>
-				<div class="stat-card card-llm">
-					<h2>Changements de contexte</h2>
-					<div class="stat-value" id="kpi-switches">--</div>
-					<div class="stat-details">Bascules entre applications</div>
+				<div
+					class="stat-card card-llm"
+					style="display: flex; flex-direction: column; justify-content: center"
+				>
+					<div style="display: flex; justify-content: space-between; margin-bottom: 8px">
+						<span style="font-size: 0.85em; color: var(--text-muted)">Bascules :</span>
+						<strong id="kpi-switches" style="color: #fff">--</strong>
+					</div>
+					<div style="display: flex; justify-content: space-between; margin-bottom: 8px">
+						<span style="font-size: 0.85em; color: var(--text-muted)">Déverrouillages :</span>
+						<strong id="kpi-unlocks" style="color: #fff">--</strong>
+					</div>
+					<div style="display: flex; justify-content: space-between">
+						<span style="font-size: 0.85em; color: var(--text-muted)">Top WiFi :</span>
+						<strong id="kpi-wifi" style="color: #fff">--</strong>
+					</div>
 				</div>
 			</div>
 		</div>
 
 		<div class="main-content">
+			<div style="display: flex; gap: 20px; margin-bottom: 20px">
+				<div
+					class="chart-container"
+					style="
+						flex: 2;
+						height: 260px;
+						background: rgba(30, 30, 30, 0.4);
+						border: 1px solid rgba(255, 255, 255, 0.1);
+						border-radius: 10px;
+						padding: 15px;
+					"
+				>
+					<h3 style="margin: 0 0 10px 0; font-size: 14px; color: #fff">
+						Top 7 Applications (Temps)
+					</h3>
+					<div style="position: relative; height: 210px">
+						<canvas id="apps_bar_chart"></canvas>
+					</div>
+				</div>
+				<div
+					class="chart-container"
+					style="
+						flex: 1;
+						height: 260px;
+						background: rgba(30, 30, 30, 0.4);
+						border: 1px solid rgba(255, 255, 255, 0.1);
+						border-radius: 10px;
+						padding: 15px;
+					"
+				>
+					<h3 style="margin: 0 0 10px 0; font-size: 14px; color: #fff">Temps par Catégorie</h3>
+					<div style="position: relative; height: 210px">
+						<canvas id="category_pie_chart"></canvas>
+					</div>
+				</div>
+			</div>
+
+			<div
+				class="chart-container"
+				style="
+					height: 260px;
+					background: rgba(30, 30, 30, 0.4);
+					border: 1px solid rgba(255, 255, 255, 0.1);
+					border-radius: 10px;
+					padding: 15px;
+					margin-bottom: 20px;
+				"
+			>
+				<h3 id="timeline_chart_title" style="margin: 0 0 10px 0; font-size: 14px; color: #fff">
+					Évolution Chronologique
+				</h3>
+				<div style="position: relative; height: 210px">
+					<canvas id="timeline_stacked_chart"></canvas>
+				</div>
+			</div>
+
 			<div class="table-container">
 				<table id="apps-table">
 					<thead>
 						<tr>
 							<th>Application</th>
+							<th>Catégorie</th>
 							<th>Temps actif</th>
-							<th>Proportion de frappe</th>
+							<th>Frappe %</th>
 							<th>Principales destinations</th>
 						</tr>
 					</thead>
 					<tbody id="apps-tbody">
 						<tr>
-							<td class="app-name-cell">--</td>
-							<td class="app-time-cell">--</td>
-							<td class="app-type-cell">--</td>
-							<td class="app-dest-cell">--</td>
+							<td class="app-name-cell" colspan="5" style="text-align: center">
+								Chargement des données...
+							</td>
 						</tr>
 					</tbody>
 				</table>

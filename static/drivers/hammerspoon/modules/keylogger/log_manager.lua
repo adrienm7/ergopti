@@ -11,6 +11,7 @@
 --- 2. Native Categorization: Dynamically queries macOS for official app categories.
 --- 3. Instant UI Ready: Pushes live updates directly to Webview contexts.
 --- 4. Built-in Security: Transparent encryption of the historical SQLite database.
+--- 5. Persistent N-Grams: Prevents real-time UI flushing from destroying bigrams.
 --- ==============================================================================
 
 local hs      = hs
@@ -40,9 +41,34 @@ local FORCE_SAVE_INTERVAL_MS = 10000
 -- ===================================
 -- ===================================
 
+local MAC_CATEGORIES_FR = {
+	["Productivity"] = "Productivité",
+	["Social networking"] = "Réseaux sociaux",
+	["Games"] = "Jeux",
+	["Entertainment"] = "Divertissement",
+	["Utilities"] = "Utilitaires",
+	["Education"] = "Éducation",
+	["Finance"] = "Finance",
+	["Business"] = "Business",
+	["Graphics design"] = "Design graphique",
+	["Photography"] = "Photographie",
+	["Video"] = "Vidéo",
+	["Music"] = "Musique",
+	["Medical"] = "Médical",
+	["Health fitness"] = "Santé & Forme",
+	["Lifestyle"] = "Style de vie",
+	["News"] = "Actualités",
+	["Weather"] = "Météo",
+	["Sports"] = "Sport",
+	["Travel"] = "Voyage",
+	["Navigation"] = "Navigation",
+	["Reference"] = "Références",
+	["Developer tools"] = "Développement"
+}
+
 --- Fetches the native macOS category for a given application dynamically.
 --- @param app_name string The name of the application.
---- @return string The formatted native category.
+--- @return string The formatted native category in French.
 function M.get_native_app_category(app_name)
 	local app = hs.application.get(app_name)
 	if app then
@@ -50,19 +76,21 @@ function M.get_native_app_category(app_name)
 		if info and info.LSApplicationCategoryType then
 			local cat = info.LSApplicationCategoryType:gsub("public%.app%-category%.", "")
 			cat = cat:gsub("%-", " ")
-			return cat:sub(1, 1):upper() .. cat:sub(2)
+			local cap = cat:sub(1, 1):upper() .. cat:sub(2)
+			return MAC_CATEGORIES_FR[cap] or cap
 		end
 	end
-	return "Unknown"
+	return "Général"
 end
 
---- Removes the last UTF-8 character from a string.
+--- Removes the last UTF-8 character from a string safely.
 --- @param input_string string The input string.
 --- @return string The string without the last character.
 local function pop_utf8(input_string)
 	if #input_string == 0 then return input_string end
-	local offset = utf8.offset(input_string, -1)
-	return offset and input_string:sub(1, offset - 1) or ""
+	local ok, offset = pcall(utf8.offset, input_string, -1)
+	if ok and offset then return input_string:sub(1, offset - 1) end
+	return ""
 end
 
 --- Adds a metric count to the dictionary using an optimized schema.
@@ -117,7 +145,7 @@ end
 -- ===================================
 -- ===================================
 
---- Compiles raw events into aggregated dictionaries safely.
+--- Compiles raw events into aggregated dictionaries safely and persists n-grams globally.
 --- @param events table Raw key array.
 --- @param app_name string Focus app.
 --- @param date_str string Day identifier.
@@ -136,7 +164,7 @@ function M.aggregate_events(events, app_name, date_str)
 	
 	local m_app = m_day[app_name]
 	if type(m_app) ~= "table" then 
-		m_app = { chars = 0, time = 0, think_time = 0, sent = 0, sent_time = 0, sent_chars = 0, hs_chars = 0, llm_chars = 0, hs_triggers = 0, llm_triggers = 0, hs_suggested = 0, llm_suggested = 0, hourly = {}, app_time_ms = 0, switches_to = {}, category = M.get_native_app_category(app_name) }
+		m_app = { chars = 0, pauses = 0, time = 0, think_time = 0, sent = 0, sent_time = 0, sent_chars = 0, hs_chars = 0, llm_chars = 0, hs_triggers = 0, llm_triggers = 0, hs_suggested = 0, llm_suggested = 0, hourly = {}, app_time_ms = 0, switches_to = {}, category = M.get_native_app_category(app_name) }
 		m_day[app_name] = m_app 
 	end
 	
@@ -146,10 +174,15 @@ function M.aggregate_events(events, app_name, date_str)
 	m_app.hourly[current_hour].em = m_app.hourly[current_hour].em or 0
 	m_app.hourly[current_hour].es = m_app.hourly[current_hour].es or 0
 
-	local p1, p2, p3, p4, p5, p6 = nil, nil, nil, nil, nil, nil
-	local cur_word = ""
-	local word_err = false
-	local hist = {}
+	-- Restore persistent N-Gram context so real-time UI flushing doesn't break bigrams!
+	_state.ngram_context = _state.ngram_context or { p1=nil, p2=nil, p3=nil, p4=nil, p5=nil, p6=nil, cur_word="", word_err=false, hist={} }
+	local ctx = _state.ngram_context
+	
+	local p1, p2, p3, p4, p5, p6 = ctx.p1, ctx.p2, ctx.p3, ctx.p4, ctx.p5, ctx.p6
+	local cur_word = ctx.cur_word
+	local word_err = ctx.word_err
+	local hist = ctx.hist
+	
 	local MAX_DELAY = 5000
 	local prev_stype = "none"
 
@@ -166,103 +199,129 @@ function M.aggregate_events(events, app_name, date_str)
 			add_metric(a.sc, shortcut_key, delay, false, "none")
 		else
 
-		if is_synth and stype ~= "none" and stype ~= prev_stype then
-			if stype == "hotstring" then m_app.hs_triggers = (m_app.hs_triggers or 0) + 1 end
-			if stype == "llm" then m_app.llm_triggers = (m_app.llm_triggers or 0) + 1 end
-		end
-		prev_stype = is_synth and stype or "none"
-
-		if is_bs then
-			if is_synth then
-				if stype == "hotstring" then m_app.hs_chars = math.max(0, (m_app.hs_chars or 0) - 1)
-				elseif stype == "llm" then m_app.llm_chars = math.max(0, (m_app.llm_chars or 0) - 1) end
+			if delay >= MAX_DELAY and not is_synth then
+				p1, p2, p3, p4, p5, p6 = nil, nil, nil, nil, nil, nil
+				hist = {}
+				if #cur_word > 0 then
+					add_metric(a.w, cur_word, 0, word_err, "none")
+				end
+				cur_word = ""
+				word_err = false
 			end
-			
-			-- Always pop char to reflect screen accurately
-			cur_word = pop_utf8(cur_word)
 
-			if #hist > 0 then
-				local l = table.remove(hist)
-				if l.c then add_metric(a.c, l.c, 0, true) end
-				if l.bg then add_metric(a.bg, l.bg, 0, true) end
-				if l.tg then add_metric(a.tg, l.tg, 0, true) end
-				if l.qg then add_metric(a.qg, l.qg, 0, true) end
-				if l.pg then add_metric(a.pg, l.pg, 0, true) end
-				if l.hx then add_metric(a.hx, l.hx, 0, true) end
-				if l.hp then add_metric(a.hp, l.hp, 0, true) end
+			if is_synth and stype ~= "none" and stype ~= prev_stype then
+				if stype == "hotstring" then m_app.hs_triggers = (m_app.hs_triggers or 0) + 1 end
+				if stype == "llm" then m_app.llm_triggers = (m_app.llm_triggers or 0) + 1 end
 			end
-			word_err = true
-			if is_synth then
-				m_app.hourly[current_hour].es = (m_app.hourly[current_hour].es or 0) + 1
-			else
-				m_app.hourly[current_hour].e = (m_app.hourly[current_hour].e or 0) + 1
-				m_app.hourly[current_hour].em = (m_app.hourly[current_hour].em or 0) + 1
-			end
-			
-			local h_obj = {}
-			add_metric(a.c, "[BS]", delay, false, stype); h_obj.c = "[BS]"
-			if p1 then add_metric(a.bg, p1 .. "[BS]", delay, false, stype); h_obj.bg = p1 .. "[BS]" end
-			if p2 then add_metric(a.tg, p2 .. p1 .. "[BS]", delay, false, stype); h_obj.tg = p2 .. p1 .. "[BS]" end
-			
-			if not is_synth then
-				m_app.chars = (m_app.chars or 0) + 1
-				if delay > 1000 then m_app.think_time = (m_app.think_time or 0) + delay else m_app.time = (m_app.time or 0) + delay end
-			else
-				if stype == "hotstring" then m_app.hs_chars = (m_app.hs_chars or 0) + 1
-				elseif stype == "llm" then m_app.llm_chars = (m_app.llm_chars or 0) + 1 end
-			end
-			
-			table.insert(hist, h_obj)
-			p6 = p5; p5 = p4; p4 = p3; p3 = p2; p2 = p1; p1 = "[BS]"
-		else
-			local k_c = char
-			local k_bg = p1 and (p1 .. k_c) or nil
-			local k_tg = p2 and (p2 .. p1 .. k_c) or nil
-			local k_qg = p3 and (p3 .. p2 .. p1 .. k_c) or nil
-			local k_pg = p4 and (p4 .. p3 .. p2 .. p1 .. k_c) or nil
-			local k_hx = p5 and (p5 .. p4 .. p3 .. p2 .. p1 .. k_c) or nil
-			local k_hp = p6 and (p6 .. p5 .. p4 .. p3 .. p2 .. p1 .. k_c) or nil
+			prev_stype = is_synth and stype or "none"
 
-			local h_obj = {}
-			if is_synth or (delay < MAX_DELAY) then
-				add_metric(a.c, k_c, delay, false, stype); h_obj.c = k_c
-				if k_bg then add_metric(a.bg, k_bg, delay, false, stype); h_obj.bg = k_bg end
-				if k_tg then add_metric(a.tg, k_tg, delay, false, stype); h_obj.tg = k_tg end
-				if k_qg then add_metric(a.qg, k_qg, delay, false, stype); h_obj.qg = k_qg end
-				if k_pg then add_metric(a.pg, k_pg, delay, false, stype); h_obj.pg = k_pg end
-				if k_hx then add_metric(a.hx, k_hx, delay, false, stype); h_obj.hx = k_hx end
-				if k_hp then add_metric(a.hp, k_hp, delay, false, stype); h_obj.hp = k_hp end
+			if is_bs then
+				if is_synth then
+					if stype == "hotstring" then m_app.hs_chars = math.max(0, (m_app.hs_chars or 0) - 1)
+					elseif stype == "llm" then m_app.llm_chars = math.max(0, (m_app.llm_chars or 0) - 1) end
+				end
+				
+				cur_word = pop_utf8(cur_word)
 
+				if #hist > 0 then
+					local l = table.remove(hist)
+					if l.c ~= "[BS]" then
+						if l.c then add_metric(a.c, l.c, 0, true) end
+						if l.bg then add_metric(a.bg, l.bg, 0, true) end
+						if l.tg then add_metric(a.tg, l.tg, 0, true) end
+						if l.qg then add_metric(a.qg, l.qg, 0, true) end
+						if l.pg then add_metric(a.pg, l.pg, 0, true) end
+						if l.hx then add_metric(a.hx, l.hx, 0, true) end
+						if l.hp then add_metric(a.hp, l.hp, 0, true) end
+					end
+				end
+				word_err = true
+				
+				if is_synth then
+					m_app.hourly[current_hour].es = (m_app.hourly[current_hour].es or 0) + 1
+				else
+					m_app.hourly[current_hour].e = (m_app.hourly[current_hour].e or 0) + 1
+					m_app.hourly[current_hour].em = (m_app.hourly[current_hour].em or 0) + 1
+				end
+				
+				local h_obj = {}
+				add_metric(a.c, "[BS]", delay, false, stype); h_obj.c = "[BS]"
+				if p1 then add_metric(a.bg, p1 .. "[BS]", delay, false, stype); h_obj.bg = p1 .. "[BS]" end
+				if p2 then add_metric(a.tg, p2 .. p1 .. "[BS]", delay, false, stype); h_obj.tg = p2 .. p1 .. "[BS]" end
+				
 				if not is_synth then
 					m_app.chars = (m_app.chars or 0) + 1
-					m_app.hourly[current_hour].c = (m_app.hourly[current_hour].c or 0) + 1
-					if delay > 1000 then m_app.think_time = (m_app.think_time or 0) + delay else m_app.time = (m_app.time or 0) + delay end
-					m_app.sent_chars = (m_app.sent_chars or 0) + 1
-					m_app.sent_time = (m_app.sent_time or 0) + delay
+					if delay > 2000 then 
+						m_app.think_time = (m_app.think_time or 0) + delay 
+						m_app.pauses = (m_app.pauses or 0) + 1
+					else 
+						m_app.time = (m_app.time or 0) + delay 
+					end
 				else
 					if stype == "hotstring" then m_app.hs_chars = (m_app.hs_chars or 0) + 1
 					elseif stype == "llm" then m_app.llm_chars = (m_app.llm_chars or 0) + 1 end
 				end
+				
+				table.insert(hist, h_obj)
+				p6 = p5; p5 = p4; p4 = p3; p3 = p2; p2 = p1; p1 = "[BS]"
+			else
+				local k_c = char
+				local k_bg = p1 and (p1 .. k_c) or nil
+				local k_tg = p2 and (p2 .. p1 .. k_c) or nil
+				local k_qg = p3 and (p3 .. p2 .. p1 .. k_c) or nil
+				local k_pg = p4 and (p4 .. p3 .. p2 .. p1 .. k_c) or nil
+				local k_hx = p5 and (p5 .. p4 .. p3 .. p2 .. p1 .. k_c) or nil
+				local k_hp = p6 and (p6 .. p5 .. p4 .. p3 .. p2 .. p1 .. k_c) or nil
 
-				local is_separator = k_c:match("[%s.,!?;:\"()%%]") or k_c == "\n" or k_c == "\194\160" or k_c == "\226\128\175"
-				if is_separator then
-					if #cur_word > 0 then
-						if cur_word:match("[%w\128-\255]") then
-							add_metric(a.w, cur_word, 0, word_err, "none")
+				local h_obj = {}
+				if is_synth or (delay < MAX_DELAY) then
+					add_metric(a.c, k_c, delay, false, stype); h_obj.c = k_c
+					if k_bg then add_metric(a.bg, k_bg, delay, false, stype); h_obj.bg = k_bg end
+					if k_tg then add_metric(a.tg, k_tg, delay, false, stype); h_obj.tg = k_tg end
+					if k_qg then add_metric(a.qg, k_qg, delay, false, stype); h_obj.qg = k_qg end
+					if k_pg then add_metric(a.pg, k_pg, delay, false, stype); h_obj.pg = k_pg end
+					if k_hx then add_metric(a.hx, k_hx, delay, false, stype); h_obj.hx = k_hx end
+					if k_hp then add_metric(a.hp, k_hp, delay, false, stype); h_obj.hp = k_hp end
+
+					if not is_synth then
+						m_app.chars = (m_app.chars or 0) + 1
+						m_app.hourly[current_hour].c = (m_app.hourly[current_hour].c or 0) + 1
+						if delay > 2000 then 
+							m_app.think_time = (m_app.think_time or 0) + delay 
+							m_app.pauses = (m_app.pauses or 0) + 1
+						else 
+							m_app.time = (m_app.time or 0) + delay 
 						end
-						cur_word = ""
-						word_err = false
+						m_app.sent_chars = (m_app.sent_chars or 0) + 1
+						m_app.sent_time = (m_app.sent_time or 0) + delay
+					else
+						if stype == "hotstring" then m_app.hs_chars = (m_app.hs_chars or 0) + 1
+						elseif stype == "llm" then m_app.llm_chars = (m_app.llm_chars or 0) + 1 end
 					end
-				else
-					cur_word = cur_word .. k_c
-				end
-			end
 
-			table.insert(hist, h_obj)
-			p6 = p5; p5 = p4; p4 = p3; p3 = p2; p2 = p1; p1 = k_c
-		end
+					local is_separator = k_c:match("[%s.,!?;:\"'()%%{}%[%]<>=+*/\\|%-]") ~= nil or k_c == "\n" or k_c == "\194\160" or k_c == "\226\128\175"
+					if is_separator then
+						if #cur_word > 0 then
+							add_metric(a.w, cur_word, 0, word_err, "none")
+							cur_word = ""
+							word_err = false
+						end
+					else
+						cur_word = cur_word .. k_c
+					end
+				end
+
+				table.insert(hist, h_obj)
+				p6 = p5; p5 = p4; p4 = p3; p3 = p2; p2 = p1; p1 = k_c
+			end
 		end
 	end
+
+	-- Persist context back to state
+	ctx.p1, ctx.p2, ctx.p3, ctx.p4, ctx.p5, ctx.p6 = p1, p2, p3, p4, p5, p6
+	ctx.cur_word = cur_word
+	ctx.word_err = word_err
+	ctx.hist = hist
 end
 
 
@@ -351,7 +410,7 @@ function M.rebuild_today_from_raw_log()
 				local m_day = _state.manifest[day_dash]
 				local m_app = m_day[prev_app]
 				if type(m_app) ~= "table" then
-					m_app = { chars = 0, time = 0, think_time = 0, sent = 0, sent_time = 0, sent_chars = 0, hs_chars = 0, llm_chars = 0, hs_triggers = 0, llm_triggers = 0, hs_suggested = 0, llm_suggested = 0, hourly = {}, app_time_ms = 0, switches_to = {}, category = M.get_native_app_category(prev_app) }
+					m_app = { chars = 0, pauses = 0, time = 0, think_time = 0, sent = 0, sent_time = 0, sent_chars = 0, hs_chars = 0, llm_chars = 0, hs_triggers = 0, llm_triggers = 0, hs_suggested = 0, llm_suggested = 0, hourly = {}, app_time_ms = 0, switches_to = {}, category = M.get_native_app_category(prev_app) }
 					m_day[prev_app] = m_app
 				end
 				m_app.app_time_ms = (m_app.app_time_ms or 0) + duration_ms
@@ -362,7 +421,7 @@ function M.rebuild_today_from_raw_log()
 				local m_day = _state.manifest[day_dash]
 				local m_app = m_day[app_name]
 				if type(m_app) ~= "table" then
-					m_app = { chars = 0, time = 0, think_time = 0, sent = 0, sent_time = 0, sent_chars = 0, hs_chars = 0, llm_chars = 0, hs_triggers = 0, llm_triggers = 0, hs_suggested = 0, llm_suggested = 0, hourly = {}, app_time_ms = 0, switches_to = {}, category = M.get_native_app_category(app_name) }
+					m_app = { chars = 0, pauses = 0, time = 0, think_time = 0, sent = 0, sent_time = 0, sent_chars = 0, hs_chars = 0, llm_chars = 0, hs_triggers = 0, llm_triggers = 0, hs_suggested = 0, llm_suggested = 0, hourly = {}, app_time_ms = 0, switches_to = {}, category = M.get_native_app_category(app_name) }
 					m_day[app_name] = m_app
 				end
 				if entry.type == "hotstring_suggested" then
@@ -430,7 +489,6 @@ function M.rebuild_index_if_needed()
 		if ok then Logger.info(LOG, "Today's metrics were rebuilt from raw logs.") end
 	end
 
-	-- Look for old orphan .idx files and merge them into the DB
 	for f_name in hs.fs.dir(_state.LOG_DIR) do
 		local y, m, d = f_name:match("^(%d%d%d%d)_(%d%d)_(%d%d)%.idx$")
 		if y and m and d then
@@ -463,7 +521,7 @@ end
 -- ====================================
 -- ======= 4/ Encrypted DB Core =======
 -- ====================================
--- ====================================
+-- =====================================
 
 --- Securely opens, merges a day, and re-encrypts the SQLite DB.
 --- @param date_str string The date string (YYYY-MM-DD).
@@ -527,25 +585,17 @@ end
 --- Increments a simple stat in the fast manifest immediately.
 --- @param app_name string Focus app.
 --- @param stat_key string The metric to increment.
+--- @param amount number Value to increment by.
 function M.increment_manifest_stat(app_name, stat_key, amount)
 	local date_str = os.date("%Y-%m-%d")
 	local m_day = _state.manifest[date_str]
 	if type(m_day) ~= "table" then m_day = {}; _state.manifest[date_str] = m_day end
 	local m_app = m_day[app_name or "Unknown"]
-	if type(m_app) ~= "table" then m_app = { chars = 0, time = 0, think_time = 0, sent = 0, sent_time = 0, sent_chars = 0, hs_chars = 0, llm_chars = 0, hs_triggers = 0, llm_triggers = 0, hs_suggested = 0, llm_suggested = 0, hourly = {}, app_time_ms = 0, switches_to = {}, category = M.get_native_app_category(app_name) }; m_day[app_name or "Unknown"] = m_app end
+	if type(m_app) ~= "table" then m_app = { chars = 0, pauses = 0, time = 0, think_time = 0, sent = 0, sent_time = 0, sent_chars = 0, hs_chars = 0, llm_chars = 0, hs_triggers = 0, llm_triggers = 0, hs_suggested = 0, llm_suggested = 0, hourly = {}, app_time_ms = 0, switches_to = {}, category = M.get_native_app_category(app_name) }; m_day[app_name or "Unknown"] = m_app end
 	local inc = tonumber(amount) or 1
 	m_app[stat_key] = (m_app[stat_key] or 0) + inc
 	debounced_save()
 
-	-- Push real-time manifest update to any open Apps metrics UI so
-	-- acceptance/suggestion counters appear immediately.
-	local ok_apps, apps_time = pcall(require, "ui.metrics_apps.init")
-	if ok_apps and type(apps_time.push_live_update) == "function" then
-		pcall(function() apps_time.push_live_update(_state.manifest) end)
-	end
-
-	-- Push real-time manifest update to any open Apps metrics UI so
-	-- acceptance/suggestion counters appear immediately.
 	local ok_apps, apps_time = pcall(require, "ui.metrics_apps.init")
 	if ok_apps and type(apps_time.push_live_update) == "function" then
 		pcall(function() apps_time.push_live_update(_state.manifest) end)
@@ -563,7 +613,7 @@ function M.log_app_switch(prev_app, next_app, duration_ms)
 
 	local m_app = m_day[prev_app or "Unknown"]
 	if type(m_app) ~= "table" then
-		m_app = { chars = 0, time = 0, think_time = 0, sent = 0, sent_time = 0, sent_chars = 0, hs_chars = 0, llm_chars = 0, hs_triggers = 0, llm_triggers = 0, hs_suggested = 0, llm_suggested = 0, hourly = {}, app_time_ms = 0, switches_to = {}, category = M.get_native_app_category(prev_app) }
+		m_app = { chars = 0, pauses = 0, time = 0, think_time = 0, sent = 0, sent_time = 0, sent_chars = 0, hs_chars = 0, llm_chars = 0, hs_triggers = 0, llm_triggers = 0, hs_suggested = 0, llm_suggested = 0, hourly = {}, app_time_ms = 0, switches_to = {}, category = M.get_native_app_category(prev_app) }
 		m_day[prev_app or "Unknown"] = m_app
 	end
 
@@ -575,10 +625,15 @@ function M.log_app_switch(prev_app, next_app, duration_ms)
 	debounced_save()
 end
 
---- Records system-level activities like waking or sleeping.
---- @param event_type string Identifier for the event ("sleep", "wake").
-function M.log_system_event(event_type)
-	M.append_log({ type = "system_event", action = event_type })
+--- Records system-level activities with optional metadata.
+--- @param event_type string Identifier for the event ("sleep", "wake", "wifi_change").
+--- @param metadata table Extraneous information to append.
+function M.log_system_event(event_type, metadata)
+	local entry = { type = "system_event", action = event_type }
+	if type(metadata) == "table" then
+		for k, v in pairs(metadata) do entry[k] = v end
+	end
+	M.append_log(entry)
 end
 
 --- Records a single keyboard shortcut immediately into the index and the log file.
@@ -659,22 +714,23 @@ function M.flush_buffer()
 	end
 
 	M.append_log({ 
-		type            = "typing", 
-		text            = _state.buffer_text, 
-		rich_text       = rich_str, 
-		app             = _state.session_app_name, 
-		title           = _state.session_win_title, 
-		url             = _state.session_url,
-		field_role      = _state.session_field_role, 
-		layout          = _state.session_layout,
-		document_path   = _state.session_document_path,
-		is_fullscreen   = _state.is_fullscreen,
-		in_meeting      = _state.in_meeting,
-		mouse_clicks    = _state.session_mouse_clicks,
-		mouse_scrolls   = _state.session_mouse_scrolls,
-		pause_before_ms = _state.current_session_pause,
-		wpm             = tonumber(string.format("%.1f", wpm)), 
-		events          = _state.buffer_events 
+		type               = "typing", 
+		text               = _state.buffer_text, 
+		rich_text          = rich_str, 
+		app                = _state.session_app_name, 
+		title              = _state.session_win_title, 
+		url                = _state.session_url,
+		field_role         = _state.session_field_role, 
+		layout             = _state.session_layout,
+		document_path      = _state.session_document_path,
+		is_fullscreen      = _state.is_fullscreen,
+		in_meeting         = _state.in_meeting,
+		mouse_clicks       = _state.session_mouse_clicks,
+		mouse_scrolls      = _state.session_mouse_scrolls,
+		mouse_distance_px  = math.floor(_state.mouse_distance_px),
+		pause_before_ms    = _state.current_session_pause,
+		wpm                = tonumber(string.format("%.1f", wpm)), 
+		events             = _state.buffer_events 
 	})
 
 	local ok, err = pcall(function()
@@ -684,7 +740,6 @@ function M.flush_buffer()
 	
 	if not ok then Logger.error(LOG, string.format("Aggregation failure: %s.", tostring(err))) end
 	
-	-- Push Real-Time Updates to Open WebViews
 	local ok_metrics, metrics = pcall(require, "ui.metrics_typing.init")
 	if ok_metrics and type(metrics.push_live_update) == "function" then
 		metrics.push_live_update(_state.today_idx)
@@ -702,6 +757,7 @@ function M.flush_buffer()
 	_state.pending_keyup = {}
 	_state.session_mouse_clicks = 0
 	_state.session_mouse_scrolls = 0
+	_state.mouse_distance_px = 0
 	_state.last_flush_time = hs.timer.absoluteTime() / 1000000
 	Logger.info(LOG, "Event buffer flushed successfully.")
 end

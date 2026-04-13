@@ -8,9 +8,9 @@
 ---
 --- FEATURES & RATIONALE:
 --- 1. Precision Profiling: Captures the exact millisecond delay between keys.
---- 2. Zero-Lag Architecture: Lazy loads metrics UI using daily fragments.
---- 3. Accurate Synthetic Tracking: Synchronizes backspaces and text for net metrics.
---- 4. Active Time Tracking: Records app focus and system sleep cycles.
+--- 2. Environmental Context: Tracks WiFi, battery, system load, and mouse distance.
+--- 3. Accurate Synthetic Tracking: Differentiates physical vs effective typing speeds.
+--- 4. Active Time Tracking: Records app focus, micro-idles, and system sleep cycles.
 --- 5. Global Productivity Tracking: Tracks mouse events, locks, and meeting states.
 --- ==============================================================================
 
@@ -74,15 +74,19 @@ local CoreState = {
 	session_time_ms        = 0,
 	session_start_time     = 0,
 	session_last_active    = 0,
+	is_micro_idle          = false,
 	
 	-- Productivity context
 	session_mouse_clicks   = 0,
 	session_mouse_scrolls  = 0,
+	mouse_distance_px      = 0,
+	last_mouse_pos         = nil,
 	in_meeting             = false,
 	is_fullscreen          = false,
 	session_document_path  = nil,
 	
-	recent_typing          = {},
+	recent_typing_eff      = {},
+	recent_typing_phys     = {},
 	last_source_type       = "none",
 	last_source_variant    = "none",
 	last_source_time       = 0,
@@ -147,34 +151,23 @@ local _maintenance_timer  = nil
 local _app_watcher        = nil
 local _win_filter         = nil
 local _caffeinate_watcher = nil
+local _wifi_watcher       = nil
+local _battery_watcher    = nil
+local _spaces_watcher     = nil
 local _audio_watcher      = nil
 local _current_day        = os.date("%Y-%m-%d")
 
 local MODIFIER_KEYCODES = {
-	[54] = true,
-	[55] = true,
-	[56] = true,
-	[57] = true,
-	[58] = true,
-	[59] = true,
-	[60] = true,
-	[61] = true,
-	[62] = true,
-	[63] = true,
+	[54] = true, [55] = true, [56] = true, [57] = true,
+	[58] = true, [59] = true, [60] = true, [61] = true,
+	[62] = true, [63] = true,
 }
 
 local MODIFIER_ORDER = { "cmd", "ctrl", "alt", "shift", "fn" }
 local MODIFIER_LABELS = { cmd = "Cmd", ctrl = "Ctrl", alt = "Alt", shift = "Shift", fn = "Fn" }
 local KEY_LABELS = {
-	[36] = "Enter",
-	[48] = "Tab",
-	[49] = "Space",
-	[51] = "Backspace",
-	[53] = "Escape",
-	[123] = "Left",
-	[124] = "Right",
-	[125] = "Down",
-	[126] = "Up",
+	[36] = "Enter", [48] = "Tab", [49] = "Space", [51] = "Backspace",
+	[53] = "Escape", [123] = "Left", [124] = "Right", [125] = "Down", [126] = "Up",
 }
 local _keycode_to_name = nil
 
@@ -209,17 +202,14 @@ end
 local function is_shortcut_candidate(flags, keycode)
 	if MODIFIER_KEYCODES[keycode] then return false end
 
-	local has_cmd = flags.cmd or false
-	local has_ctrl = flags.ctrl or false
-	local has_alt = flags.alt or false
-	local has_fn = flags.fn or false
+	if flags.cmd then return true end
+	
+	-- Allow AltGr (Ctrl + Alt) to pass through as a normal typing layer
+	if flags.ctrl and not flags.alt then return true end
+	
+	if flags.fn then return true end
 
-	if not (has_cmd or has_ctrl or has_alt or has_fn) then return false end
-
-	-- Option alone, or Shift+Option, are symbol layers and should not be counted as shortcuts
-	if has_alt and not (has_cmd or has_ctrl or has_fn) then return false end
-
-	return true
+	return false
 end
 
 --- Constructs a canonical string representation of a shortcut.
@@ -275,7 +265,11 @@ local function handle_key(event_obj)
 		local evt_type = event_obj:getType()
 		local now = hs.timer.absoluteTime() / 1000000
 
-		-- Track mouse activity for productivity scoring instead of ignoring it
+		if CoreState.is_micro_idle then
+			CoreState.is_micro_idle = false
+			LogManager.append_log({ type = "idle_end", duration_ms = math.max(0, now - (CoreState.session_last_active + 30000)) })
+		end
+
 		if evt_type == hs.eventtap.event.types.leftMouseDown or 
 		   evt_type == hs.eventtap.event.types.rightMouseDown then
 			CoreState.session_mouse_clicks = CoreState.session_mouse_clicks + 1
@@ -313,9 +307,6 @@ local function handle_key(event_obj)
 		local flags = event_obj:getFlags() or {}
 		local keycode = event_obj:getKeyCode()
 
-		-- Shortcut detection runs FIRST — before any early-exit that would silently
-		-- drop candidates like Cmd+A (keycode 0). Shortcuts bypass the typing buffer
-		-- entirely and are persisted immediately via a dedicated log entry.
 		if is_shortcut_candidate(flags, keycode) then
 			LogManager.flush_buffer()
 			local app_sc = hs.application.frontmostApplication()
@@ -323,21 +314,11 @@ local function handle_key(event_obj)
 			return false
 		end
 
-		-- F1-F12 keys, Escape, Modifiers etc. flush the buffer to ensure continuous tracking across window switches
-		if keycode >= 96 and keycode <= 122 then
-			LogManager.flush_buffer()
-			return false
-		end
-
-		if flags.cmd and keycode == 0 then LogManager.flush_buffer(); return end
-		if flags.shift and (keycode >= 123 and keycode <= 126) then LogManager.flush_buffer(); return end
-
-		local chars = event_obj:getCharacters(true)
-		if keycode ~= 51 and keycode ~= 48 and keycode ~= 36 and keycode ~= 53 then
-			if not chars or chars == "" then return end
-			if chars:match("[%z\1-\31\127]") then return end
-			for _, code in utf8.codes(chars) do if code >= 0xF700 and code <= 0xF8FF then return end end
-		end
+		-- Absolute trust in the OS character resolution
+		local chars = event_obj:getCharacters(false)
+		
+		-- Wait for dead key composition to yield a character on the next stroke
+		if not chars or chars == "" then return false end
 
 		local delay = CoreState.last_time > 0 and math.floor(now - CoreState.last_time) or 0
 		CoreState.last_time = now
@@ -372,27 +353,13 @@ local function handle_key(event_obj)
 						end
 					end
 				end
-				
-				if not is_secure_field then
-					local script = ""
-					if CoreState.session_app_name == "Safari" then script = "tell application \"Safari\" to return URL of front document"
-					elseif CoreState.session_app_name == "Google Chrome" or CoreState.session_app_name == "Brave Browser" or CoreState.session_app_name == "Microsoft Edge" or CoreState.session_app_name == "Arc" then
-						script = "tell application \"" .. CoreState.session_app_name .. "\" to return URL of active tab of front window"
-					end
-					if script ~= "" then
-						pcall(hs.osascript.applescript, script, function(succ, res) if succ and type(res) == "string" then CoreState.session_url = res end end)
-					end
-				end
 			end)
 		end
 
 		if is_secure_field then return end
 
-		local raw_chars = event_obj:getCharacters(false) or chars
 		local is_synth = false
 		local synth_type = "none"
-		local is_dead_key = false
-		local is_composed = false
 
 		if keycode == 51 then
 			if #CoreState.synth_queue > 0 and CoreState.synth_queue[1].char == "[BS]" then
@@ -403,7 +370,7 @@ local function handle_key(event_obj)
 		else
 			if #CoreState.synth_queue > 0 then
 				local next_synth = CoreState.synth_queue[1]
-				if raw_chars == next_synth.char then
+				if chars == next_synth.char then
 					is_synth = true; synth_type = next_synth.type; table.remove(CoreState.synth_queue, 1)
 				elseif delay < 3 then
 					is_synth = true; synth_type = next_synth.type
@@ -411,25 +378,11 @@ local function handle_key(event_obj)
 			end
 		end
 
-		-- Only count real (non-synthetic) non-BS chars: they represent effective net output
 		if not is_synth and keycode ~= 51 then
-			table.insert(CoreState.recent_typing, now)
+			table.insert(CoreState.recent_typing_eff, now)
+			table.insert(CoreState.recent_typing_phys, now)
 		end
 		CoreState.session_last_active = now
-		
-		if not is_synth then
-			if keycode ~= 51 and keycode ~= 48 and keycode ~= 36 and keycode ~= 53 then
-				local raw = event_obj:getCharacters(false) or ""
-				local cooked = event_obj:getCharacters(true) or ""
-				
-				if cooked == "" and raw ~= "" then
-					is_dead_key = true
-					chars = raw
-				elseif cooked ~= raw and #cooked > 0 then
-					is_composed = true
-				end
-			end
-		end
 
 		local mods = {}
 		for k, v in pairs(flags) do if v and k ~= "capslock" then table.insert(mods, k) end end
@@ -437,13 +390,13 @@ local function handle_key(event_obj)
 
 		local ok_km, keymap_mod = pcall(require, "modules.keymap")
 		local shift_side = flags.capslock and "capslock" or ((ok_km and type(keymap_mod.get_shift_side) == "function") and keymap_mod.get_shift_side() or "none")
-		local meta = { s = is_synth, st = synth_type, c = flags.capslock or false, ss = shift_side, r = raw_chars, m = table.concat(mods, ","), h = 0, d = delay, dk = is_dead_key, cp = is_composed }
+		
+		local meta = { s = is_synth, st = synth_type, c = flags.capslock or false, ss = shift_side, r = chars, m = table.concat(mods, ","), h = 0, d = delay, dk = false, cp = false }
 
 		local ev_entry = nil
 
 		if keycode == 51 then
-			-- A real BS erases a char previously counted as effective output
-			if not is_synth and #CoreState.recent_typing > 0 then table.remove(CoreState.recent_typing) end
+			if not is_synth and #CoreState.recent_typing_eff > 0 then table.remove(CoreState.recent_typing_eff) end
 			local deleted_char = ""
 			if not is_synth and #CoreState.buffer_text > 0 then
 				local last_char_pos = utf8.offset(CoreState.buffer_text, -1)
@@ -467,22 +420,89 @@ local function handle_key(event_obj)
 			ev_entry = {typed_char, delay, meta}; table.insert(CoreState.buffer_events, ev_entry)
 			table.insert(CoreState.rich_chunks, { type = is_synth and synth_type or "text", text = typed_char })
 			
-			-- Flush trigger on punctuation and spaces
 			if typed_char:match("[.?!]") or keycode == 49 then LogManager.flush_buffer() end
 		end
 
 		if ev_entry then CoreState.pending_keyup[keycode] = { down_time = now, event = ev_entry } end
 
-		-- Metrics webview requires near-real-time updates: flush each key so the
-		-- table reflects typed characters immediately (including search field typing).
-		local title = CoreState.session_win_title or ""
-		if CoreState.session_app_name == "Hammerspoon" and (title:find("Métriques", 1, true) or title:find("Metrics", 1, true)) then
+		-- Live visual update check (instant sync with UI)
+		local ok_m, m = pcall(require, "ui.metrics_typing.init")
+		if ok_m and type(m) == "table" and m._wv ~= nil then
 			LogManager.flush_buffer()
 		end
+
 	end)
 	
 	if not ok then Logger.warn(LOG, string.format("Keyboard lock avoidance triggered: %s.", tostring(err))) end
 	return false
+end
+
+
+
+
+
+-- ========================================
+-- ========================================
+-- ======= 4/ Watchers And Hardware =======
+-- ========================================
+-- ========================================
+
+--- Initializes hardware sensors and state watchers for productivity context.
+local function init_hardware_watchers()
+	Logger.debug(LOG, "Initializing hardware watchers…")
+	if hs.wifi and hs.wifi.watcher then
+		_wifi_watcher = hs.wifi.watcher.new(function()
+			local ssid = hs.wifi.currentNetwork()
+			LogManager.log_system_event("wifi_change", { ssid = ssid or "Disconnected" })
+		end)
+		_wifi_watcher:start()
+	end
+
+	if hs.battery and hs.battery.watcher then
+		_battery_watcher = hs.battery.watcher.new(function()
+			local power_source = hs.battery.powerSource()
+			LogManager.log_system_event("power_change", { source = power_source })
+		end)
+		_battery_watcher:start()
+	end
+
+	if hs.spaces and hs.spaces.watcher then
+		pcall(function()
+			_spaces_watcher = hs.spaces.watcher.new(function(space_id)
+				LogManager.log_system_event("space_change", { space_id = space_id })
+			end)
+			_spaces_watcher:start()
+		end)
+	end
+end
+
+--- Stops all background hardware watchers to free memory.
+local function stop_hardware_watchers()
+	if _wifi_watcher then _wifi_watcher:stop(); _wifi_watcher = nil end
+	if _battery_watcher then _battery_watcher:stop(); _battery_watcher = nil end
+	if _spaces_watcher then pcall(function() _spaces_watcher:stop() end); _spaces_watcher = nil end
+end
+
+--- Polls the current mouse distance incrementally to evaluate physical activity.
+local function poll_mouse_distance()
+	local current_pos = hs.mouse.absolutePosition()
+	if CoreState.last_mouse_pos then
+		local dx = current_pos.x - CoreState.last_mouse_pos.x
+		local dy = current_pos.y - CoreState.last_mouse_pos.y
+		local dist = math.sqrt(dx * dx + dy * dy)
+		if dist > 0 then CoreState.mouse_distance_px = CoreState.mouse_distance_px + dist end
+	end
+	CoreState.last_mouse_pos = current_pos
+end
+
+--- Polls the CPU and memory load occasionally to correlate with typing speeds.
+local function poll_system_load()
+	pcall(function()
+		hs.task.new("/usr/bin/top", function(exitCode, stdOut, stdErr)
+			local cpu = stdOut:match("CPU usage: ([%d%.]+)%% user")
+			if cpu then LogManager.log_system_event("system_load", { cpu_user_percent = tonumber(cpu) }) end
+		end, {"-l", "1", "-n", "0"}):start()
+	end)
 end
 
 --- Intercepts system sleep/wake actions to record true activity boundaries.
@@ -512,26 +532,13 @@ local function caffeinate_cb(event)
 	end
 end
 
---- Polls microphone status to detect active communication sessions.
-local function check_meeting_status()
-	local in_use = false
-	local dev = hs.audiodevice.defaultInputDevice()
-	if dev and dev:inUse() then
-		in_use = true
-	end
-	if in_use ~= CoreState.in_meeting then
-		CoreState.in_meeting = in_use
-		LogManager.log_system_event(in_use and "meeting_start" or "meeting_end")
-	end
-end
-
 
 
 
 
 -- ==================================
 -- ==================================
--- ======= 4/ Public Core API =======
+-- ======= 5/ Public Core API =======
 -- ==================================
 -- ==================================
 
@@ -554,15 +561,15 @@ function M.set_buffer(text) CoreState.buffer_text = type(text) == "string" and t
 --- @param source_type string Origin identifier.
 --- @param deletes number Quantity of backspaces issued before the text.
 --- @param source_variant string|nil Optional source variant for UI coloring.
-function M.notify_synthetic(text, source_type, deletes, source_variant)
+--- @param deleted_text string|nil The actual text that was erased by the deletes.
+function M.notify_synthetic(text, source_type, deletes, source_variant, deleted_text)
 	Logger.debug(LOG, string.format("Queuing synthetic text from source: %s…", source_type))
 	if deletes and deletes > 0 then
 		for i = 1, deletes do
 			table.insert(CoreState.synth_queue, { char = "[BS]", type = source_type })
 		end
-		-- Debit the trigger chars that were previously counted as effective output
 		for i = 1, deletes do
-			if #CoreState.recent_typing > 0 then table.remove(CoreState.recent_typing) end
+			if #CoreState.recent_typing_eff > 0 then table.remove(CoreState.recent_typing_eff) end
 		end
 	end
 
@@ -570,16 +577,13 @@ function M.notify_synthetic(text, source_type, deletes, source_variant)
 		for _, code in utf8.codes(text) do
 			table.insert(CoreState.synth_queue, { char = utf8.char(code), type = source_type })
 		end
-		-- Credit the output chars to the effective MPM counter
 		local now_ms = hs.timer.absoluteTime() / 1000000
 		local out_len = utf8.len(text) or 0
 		for i = 1, out_len do
-			table.insert(CoreState.recent_typing, now_ms)
+			table.insert(CoreState.recent_typing_eff, now_ms)
 		end
 		CoreState.session_last_active = now_ms
-		if CoreState.session_start_time == 0 then
-			CoreState.session_start_time = now_ms
-		end
+		if CoreState.session_start_time == 0 then CoreState.session_start_time = now_ms end
 	end
 	
 	CoreState.last_source_type = source_type
@@ -589,38 +593,57 @@ function M.notify_synthetic(text, source_type, deletes, source_variant)
 end
 
 --- Extracts the rolling array to compute current Words-Per-Minute immediately.
---- @return table Dictionary with `wpm` integer property.
+--- @return table Dictionary with `wpm` (effective) and `wpm_physical` properties.
 function M.get_live_stats()
 	local now = hs.timer.absoluteTime() / 1000000
-	while #CoreState.recent_typing > 0 and (now - CoreState.recent_typing[1]) > 15000 do
-		table.remove(CoreState.recent_typing, 1)
-	end
+	while #CoreState.recent_typing_eff > 0 and (now - CoreState.recent_typing_eff[1]) > 15000 do table.remove(CoreState.recent_typing_eff, 1) end
+	while #CoreState.recent_typing_phys > 0 and (now - CoreState.recent_typing_phys[1]) > 15000 do table.remove(CoreState.recent_typing_phys, 1) end
 	
 	local is_idle = (CoreState.session_last_active == 0) or ((now - CoreState.session_last_active) > 5000)
-	local display_wpm = 0
+	local display_wpm_eff, display_wpm_phys = 0, 0
 	
-	if not is_idle and #CoreState.recent_typing > 1 then
-		local duration_ms = now - CoreState.recent_typing[1]
-		if duration_ms < 2000 then duration_ms = 2000 end
-		display_wpm = math.floor(((#CoreState.recent_typing / 5) / (duration_ms / 60000)) + 0.5)
+	if not is_idle then
+		if #CoreState.recent_typing_eff > 1 then
+			local d_eff = now - CoreState.recent_typing_eff[1]
+			if d_eff < 2000 then d_eff = 2000 end
+			display_wpm_eff = math.floor(((#CoreState.recent_typing_eff / 5) / (d_eff / 60000)) + 0.5)
+		end
+		if #CoreState.recent_typing_phys > 1 then
+			local d_phys = now - CoreState.recent_typing_phys[1]
+			if d_phys < 2000 then d_phys = 2000 end
+			display_wpm_phys = math.floor(((#CoreState.recent_typing_phys / 5) / (d_phys / 60000)) + 0.5)
+		end
 	end
 	
 	return { 
-		wpm = display_wpm, 
+		wpm = display_wpm_eff, 
+		wpm_physical = display_wpm_phys,
 		source = CoreState.last_source_type, 
 		source_variant = CoreState.last_source_variant,
 		source_time = CoreState.last_source_time 
 	}
 end
 
---- Cleans up sessions if typing is abandoned for a while.
+--- Cleans up sessions if typing is abandoned for a while and checks for micro-idles.
 local function check_idle()
 	local now = hs.timer.absoluteTime() / 1000000
+	
+	if CoreState.session_last_active > 0 then
+		local idle_duration = now - CoreState.session_last_active
+		if not CoreState.is_micro_idle and idle_duration > 30000 and idle_duration <= (5 * 60 * 1000) then
+			CoreState.is_micro_idle = true
+			LogManager.append_log({ type = "idle_start" })
+		end
+	end
+
 	if CoreState.session_last_active > 0 and (now - CoreState.session_last_active) > (5 * 60 * 1000) then
 		if #CoreState.buffer_events > 0 then LogManager.flush_buffer() end
 		LogManager.append_log({ type = "session_end", duration_ms = CoreState.session_last_active - CoreState.session_start_time })
 		CoreState.session_last_active = 0; CoreState.session_start_time = 0
+		CoreState.is_micro_idle = false
 	end
+
+	poll_system_load()
 end
 
 --- Routinely verifies log rotations and merges local days to the encrypted DB.
@@ -630,9 +653,7 @@ local function perform_maintenance()
 		Logger.debug(LOG, "Performing daily log rotation and maintenance…")
 		LogManager.flush_buffer()
 		LogManager.save_today_index()
-		
 		LogManager.merge_day_to_db(_current_day, CoreState.today_idx, CoreState.manifest[_current_day])
-		
 		CoreState.today_idx = {}
 		_current_day = today
 		Logger.info(LOG, "Daily log rotation completed.")
@@ -651,9 +672,6 @@ function M.start(script_control)
 		if not _app_watcher then _app_watcher = hs.application.watcher.new(ContextTracker.app_watcher_cb) end
 		_app_watcher:start()
 
-		-- Defer window.filter init: hs.window.filter.new() enumerates all windows
-		-- synchronously via AX, taking ~10s at startup. Running after the event loop
-		-- starts makes it non-blocking
 		hs.timer.doAfter(0, function()
 			if not _win_filter then
 				local target_browsers = { "Safari", "Google Chrome", "Firefox", "Microsoft Edge", "Brave Browser", "Arc", "Opera", "Vivaldi" }
@@ -663,16 +681,10 @@ function M.start(script_control)
 			ContextTracker.update_private_status()
 		end)
 
-		if not _caffeinate_watcher then
-			_caffeinate_watcher = hs.caffeinate.watcher.new(caffeinate_cb)
-		end
+		if not _caffeinate_watcher then _caffeinate_watcher = hs.caffeinate.watcher.new(caffeinate_cb) end
 		_caffeinate_watcher:start()
 		
-        -- breaks the wpm widget !!!
-		-- if not _audio_watcher then
-		-- 	_audio_watcher = hs.audiodevice.watcher.setCallback(check_meeting_status)
-		-- end
-		-- _audio_watcher:start()
+		init_hardware_watchers()
 
 		if not _tap then 
 			_tap = hs.eventtap.new({ 
@@ -683,14 +695,17 @@ function M.start(script_control)
 		end
 		_tap:start()
 
-		if not _idle_timer then _idle_timer = hs.timer.new(60, check_idle) end
+		if not _idle_timer then _idle_timer = hs.timer.new(10, check_idle) end
 		_idle_timer:start()
 
-		if not _maintenance_timer then _maintenance_timer = hs.timer.new(1.0, perform_maintenance) end
+		if not _maintenance_timer then 
+			_maintenance_timer = hs.timer.new(1.0, function()
+				perform_maintenance()
+				poll_mouse_distance()
+			end) 
+		end
 		_maintenance_timer:start()
 
-		-- Defer AX observer init: hs.axuielement.applicationElement() enumerates the full
-		-- accessibility tree of the frontmost app synchronously, blocking ~9s at startup
 		hs.timer.doAfter(0, function()
 			local current_app = hs.application.frontmostApplication()
 			if current_app then
@@ -701,9 +716,6 @@ function M.start(script_control)
 			Logger.info(LOG, "Keylogger engine started successfully.")
 		end)
 
-		-- Defer heavy log maintenance: rebuild_index_if_needed() decompresses and parses
-		-- all un-indexed log files (io.popen gzip per file), and ensure_dir_and_rotate()
-		-- gzip-compresses old logs — both block the main thread for several seconds
 		hs.timer.doAfter(2, function()
 			pcall(LogManager.ensure_dir_and_rotate)
 			pcall(LogManager.rebuild_index_if_needed)
@@ -725,6 +737,7 @@ function M.stop()
 		if _idle_timer then _idle_timer:stop() end
 		if _maintenance_timer then _maintenance_timer:stop() end
 		if CoreState.ax_observer then CoreState.ax_observer:stop(); CoreState.ax_observer = nil end
+		stop_hardware_watchers()
 		Logger.info(LOG, "Keylogger engine safely stopped.")
 	end
 end
@@ -732,16 +745,19 @@ end
 --- Captures shortcut expansion cleanly.
 --- @param trigger string Sequence trigger.
 --- @param replacement string Resulting string.
-function M.log_hotstring(trigger, replacement)
+--- @param h_type string Type of hotstring (e.g. "star", "autocorrect", "personal").
+function M.log_hotstring(trigger, replacement, h_type)
 	if not CoreState.is_enabled then return end
 	LogManager.flush_buffer()
-	LogManager.append_log({ type = "hotstring", app = CoreState.session_app_name, trigger = trigger, replacement = replacement, tag = "<hotstring>" .. replacement .. "</hotstring>" })
+	local saved = utf8.len(replacement) - utf8.len(trigger)
+	LogManager.append_log({ type = "hotstring", app = CoreState.session_app_name, trigger = trigger, replacement = replacement, h_type = h_type or "unknown", net_saved_chars = saved, tag = "<hotstring>" .. replacement .. "</hotstring>" })
 	CoreState.last_flush_time = hs.timer.absoluteTime() / 1000000
 end
 
---- Captures LLM generations.
+--- Captures LLM generations context.
 --- @param context string Previous words.
 --- @param results table Options generated.
+--- @param app_name string Focus app.
 function M.log_llm(context, results, app_name)
 	if not CoreState.is_enabled then return end
 	LogManager.flush_buffer()
@@ -752,19 +768,30 @@ function M.log_llm(context, results, app_name)
 	CoreState.last_flush_time = hs.timer.absoluteTime() / 1000000
 end
 
---- Persists a shortcut trigger immediately (used by modules.shortcuts bindings).
---- @param shortcut_key string Canonical label (e.g. "Ctrl+S").
+--- Persists a shortcut trigger immediately.
+--- @param shortcut_key string Canonical label.
 --- @param app_name string Frontmost application name.
 function M.log_shortcut(shortcut_key, app_name)
 	LogManager.log_shortcut(shortcut_key, app_name or CoreState.session_app_name)
 end
 
 --- Logs that a Hotstring was proposed to the user but not necessarily executed.
-function M.log_hotstring_suggested(app_name)
+--- @param app_name string Focus app.
+--- @param trigger string Trigger text.
+--- @param replacement string Offered replacement text.
+--- @param h_type string Hotstring type.
+function M.log_hotstring_suggested(app_name, trigger, replacement, h_type)
 	if not CoreState.is_enabled then return end
 	local target_app = (type(app_name) == "string" and app_name ~= "") and app_name or CoreState.session_app_name
-	LogManager.append_log({ type = "hotstring_suggested", app = target_app })
+	LogManager.append_log({ type = "hotstring_suggested", app = target_app, trigger = trigger, replacement = replacement, h_type = h_type })
 	LogManager.increment_manifest_stat(target_app, "hs_suggested")
+end
+
+--- Logs that a Hotstring tooltip was dismissed by the user.
+function M.log_hotstring_dismissed(app_name, trigger, replacement, h_type)
+	if not CoreState.is_enabled then return end
+	local target_app = (type(app_name) == "string" and app_name ~= "") and app_name or CoreState.session_app_name
+	LogManager.append_log({ type = "hotstring_dismissed", app = target_app, trigger = trigger, replacement = replacement, h_type = h_type })
 end
 
 --- Logs that an LLM string was proposed to the user.
@@ -776,12 +803,30 @@ function M.log_llm_suggested(app_name, count)
 	LogManager.increment_manifest_stat(target_app, "llm_suggested", c)
 end
 
+--- Logs that an LLM tooltip was dismissed.
+function M.log_llm_dismissed(app_name, all_predictions)
+	if not CoreState.is_enabled then return end
+	local target_app = (type(app_name) == "string" and app_name ~= "") and app_name or CoreState.session_app_name
+	LogManager.append_log({ type = "llm_dismissed", app = target_app, all_predictions = all_predictions or {} })
+end
+
 --- Logs that an LLM prediction was accepted/applied by the user.
-function M.log_llm_accepted(prediction_text, app_name)
+function M.log_llm_accepted(prediction_text, app_name, all_predictions, chosen_index, deletes, deleted_text)
 	if not CoreState.is_enabled then return end
 	local target_app = (type(app_name) == "string" and app_name ~= "") and app_name or CoreState.session_app_name
 	LogManager.increment_manifest_stat(target_app, "llm_triggers")
-	LogManager.append_log({ type = "llm_accepted", app = target_app, prediction = prediction_text or "" })
+	
+	local net_saved = utf8.len(prediction_text or "") - (deletes or 0)
+	LogManager.append_log({ 
+		type            = "llm_accepted", 
+		app             = target_app, 
+		prediction      = prediction_text or "",
+		all_predictions = all_predictions or {},
+		chosen_index    = chosen_index or 1,
+		deletes         = deletes or 0,
+		deleted_text    = deleted_text or "",
+		net_saved_chars = net_saved
+	})
 	CoreState.last_flush_time = hs.timer.absoluteTime() / 1000000
 end
 

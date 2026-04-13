@@ -21,8 +21,8 @@ local Logger    = require("lib.logger")
 
 local LOG = "wpm_menubar"
 
-local _menubar = nil
-local _timer   = nil
+local _menubar           = nil
+local _timer             = nil
 local _use_source_colors = true
 
 
@@ -56,7 +56,9 @@ local function update_menubar()
 		
 		-- Add a translucent background to preserve readability in the menubar
 		local bg_color = nil
-		if _use_source_colors and active_source ~= "none" then bg_color = WPMShared.get_source_color(active_source, 0.5) end
+		if _use_source_colors and active_source ~= "none" then
+			bg_color = WPMShared.get_source_color(active_source, 0.5)
+		end
 		
 		local attrs = { 
 			font = { name = ".AppleSystemUIFont", size = 13 }, 

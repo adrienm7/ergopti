@@ -77,9 +77,9 @@ end
 --- @param default_cat string The default category to pre-fill.
 --- @param default_score number The default score to pre-fill.
 function M.prompt_category(app_name, default_cat, default_score)
-	local button, new_cat = hs.dialog.textPrompt("Catégorie", "Nouvelle catégorie pour " .. app_name .. " :", default_cat or "Général", "OK", "Annuler")
+	local button, new_cat = hs.dialog.textPrompt("Catégorie", "Nouvelle catégorie pour " .. app_name .. " (ex: Code, Bureautique, Loisir) :", default_cat or "Général", "OK", "Annuler")
 	if button == "OK" and new_cat ~= "" then
-		local btn2, new_score_str = hs.dialog.textPrompt("Score", "Nouveau score pour " .. app_name .. " (de -2 à 2) :", tostring(default_score or 0), "OK", "Annuler")
+		local btn2, new_score_str = hs.dialog.textPrompt("Score", "Nouveau score de productivité pour " .. app_name .. "\n(-2 très distrayant à 2 très productif) :", tostring(default_score or 0), "OK", "Annuler")
 		if btn2 == "OK" then
 			local score = tonumber(new_score_str) or 0
 			if score >= -2 and score <= 2 then
@@ -107,6 +107,31 @@ hs.urlevent.bind("metricsAppsAction", function(eventName, params)
 		local score = tonumber(params.score) or 0
 		M.prompt_category(app_name, cat, score)
 	elseif action == "pick" then
+		
+		-- Failsafe native app chooser if external module is missing
+		local function launch_fallback_chooser()
+			local apps = hs.application.runningApplications()
+			local choices = {}
+			local seen = {}
+			for _, app in ipairs(apps) do
+				local title = app:title()
+				if title and title ~= "" and not seen[title] then
+					seen[title] = true
+					table.insert(choices, { text = title, subText = app:bundleID() })
+				end
+			end
+			table.sort(choices, function(a,b) return a.text < b.text end)
+			local chooser = hs.chooser.new(function(choice)
+				if choice then
+					local cats = load_categories()
+					local current = cats[choice.text] or { type = "Général", score = 0 }
+					M.prompt_category(choice.text, current.type, current.score)
+				end
+			end)
+			chooser:choices(choices)
+			chooser:show()
+		end
+
 		local ok, app_picker = pcall(require, "lib.app_picker")
 		if ok and type(app_picker.show) == "function" then
 			app_picker.show(function(app)
@@ -118,7 +143,7 @@ hs.urlevent.bind("metricsAppsAction", function(eventName, params)
 				end
 			end)
 		else
-			Logger.warn(LOG, "App picker module not found or unsupported.")
+			launch_fallback_chooser()
 		end
 	end
 end)
@@ -152,7 +177,6 @@ function M.show(log_dir)
 	local enc_path = log_dir .. "/metrics.sqlite.enc"
 	local pwd = log_manager.get_mac_serial():gsub("\"", "\\\"")
 
-	-- Extract historical manifest data from encrypted database
 	if fs.attributes(enc_path) then
 		Logger.debug(LOG, "Extracting historical manifest data from encrypted DB…")
 		local tmp_path = os.tmpname()
@@ -170,7 +194,6 @@ function M.show(log_dir)
 		os.remove(tmp_path)
 	end
 	
-	-- Merge any un-saved today manifest data gracefully
 	local manifest_file = log_dir .. "/manifest.json"
 	local mf = io.open(manifest_file, "r")
 	if mf then
@@ -183,7 +206,6 @@ function M.show(log_dir)
 		end
 	end
 
-	-- Prepare runtime payload for direct injection into the webview
 	local user_cats = load_categories()
 
 	M._wv = ui_builder.show_webview({

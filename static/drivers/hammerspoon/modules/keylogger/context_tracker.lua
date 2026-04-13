@@ -10,7 +10,8 @@
 --- 1. Context Awareness: Captures window titles and roles to tag events correctly.
 --- 2. Autocorrect Detection: Isolates macOS text substitution events to prevent log errors.
 --- 3. Time Tracking: Monitors app active times and context switches.
---- 4. Document Paths: Identifies local file paths for deep work categorization.
+--- 4. Intra-App Tracking: Records tab and window switches within the same application.
+--- 5. Document Paths: Identifies local file paths for deep work categorization.
 --- ==============================================================================
 
 local hs     = hs
@@ -23,6 +24,8 @@ local _log_manager = nil
 
 local _last_focused_element = nil
 local _last_ax_value        = ""
+local _last_win_title       = nil
+local _last_win_time        = 0
 
 
 
@@ -45,10 +48,8 @@ local function handle_ax_value_changed(element, event, watcher, user_data)
 		if ok and type(val) == "string" then
 			local now = hs.timer.absoluteTime() / 1000000
 			
-			-- If the value changed significantly but no physical keys were pressed in the last 100ms
-			-- it is highly likely macOS triggered a native text replacement or autocorrect
 			if (now - _state.last_time) > 100 and #val > 0 and #_last_ax_value > 0 and math.abs(#val - #_last_ax_value) > 1 then
-				Logger.debug(LOG, string.format("System autocorrect detected for app: %s.", _state.session_app_name))
+				Logger.debug(LOG, string.format("System autocorrect detected for app: %s…", _state.session_app_name))
 				_log_manager.flush_buffer()
 				_log_manager.append_log({
 					type  = "sys_autocorrect",
@@ -80,7 +81,6 @@ function M.update_ax_observer(app_pid)
 		if app_element then
 			_state.ax_observer:addWatcher(app_element, "AXFocusedUIElementChanged")
 			
-			-- Instantly hook the currently focused sub-element
 			local focused = app_element:attributeValue("AXFocusedUIElement")
 			if focused then
 				pcall(function() _state.ax_observer:addWatcher(focused, "AXValueChanged") end)
@@ -129,6 +129,23 @@ function M.update_private_status()
 		_state.is_fullscreen = win:isFullScreen()
 		
 		local title = win:title()
+		local now = hs.timer.absoluteTime() / 1000000
+		
+		if _last_win_title and _last_win_title ~= title and _state.active_app_name then
+			local duration = now - _last_win_time
+			if duration > 1000 then 
+				_log_manager.append_log({
+					type        = "window_switch",
+					app         = _state.active_app_name,
+					prev_title  = _last_win_title,
+					next_title  = title,
+					duration_ms = math.floor(duration)
+				})
+			end
+		end
+		_last_win_title = title
+		_last_win_time = now
+
 		local keywords = { "Navigation privée", "Private Browsing", "Incognito", "InPrivate", "Anonymous" }
 		for _, kw in ipairs(keywords) do
 			if title:find(kw) then 
@@ -138,12 +155,13 @@ function M.update_private_status()
 			end
 		end
 		
-		-- Retrieve AXDocument for local file path tracking (e.g. VSCode, Word)
 		local ok_ax, ax_win = pcall(hs.axuielement.windowElement, win)
 		if ok_ax and ax_win then
 			local doc_url = ax_win:attributeValue("AXDocument")
 			if doc_url and type(doc_url) == "string" and doc_url:sub(1, 7) == "file://" then
-				_state.session_document_path = hs.http.urlDecode(doc_url:sub(8))
+				-- Safe Pure Lua URL Decode to avoid hs.http nil errors
+				local path = doc_url:sub(8)
+				_state.session_document_path = path:gsub("+", " "):gsub("%%(%x%x)", function(h) return string.char(tonumber(h, 16)) end)
 			end
 		end
 	end
@@ -161,7 +179,6 @@ function M.app_watcher_cb(app_name, event_type, app_object)
 		local new_pid    = app_object:pid()
 		local new_name   = app_name
 
-		-- Track the time spent in the previous application before switching
 		if _state.active_app_name and _state.active_app_name ~= new_name then
 			local duration = now - (_state.active_app_start or now)
 			if _log_manager and type(_log_manager.log_app_switch) == "function" then
@@ -175,6 +192,9 @@ function M.app_watcher_cb(app_name, event_type, app_object)
 		_state.active_app_bundle = new_bundle
 		_state.active_app_path   = new_path
 		_state.active_app_pid    = new_pid
+		
+		_last_win_title = nil
+		_last_win_time  = now
 
 		M.update_private_status()
 		M.update_ax_observer(_state.active_app_pid)

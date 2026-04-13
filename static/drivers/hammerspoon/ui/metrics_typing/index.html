@@ -63,6 +63,18 @@
 					>
 						Sensible à la casse
 					</button>
+
+					<select
+						id="pause_threshold"
+						class="filter-btn"
+						onchange="apply_date_app_filters()"
+						style="margin-left: 10px"
+					>
+						<option value="1000">Ignorer pauses > 1s</option>
+						<option value="2000" selected>Ignorer pauses > 2s</option>
+						<option value="3000">Ignorer pauses > 3s</option>
+						<option value="5000">Ignorer pauses > 5s</option>
+					</select>
 				</div>
 
 				<button class="filter-btn filter-reset" onclick="reset_filters()">Réinitialiser</button>
@@ -77,9 +89,9 @@
 
 					<div class="stat-details" id="hs_loading">Calcul en cours...</div>
 					<div class="stat-details-split" id="hs_details" style="display: none">
-						<div class="split-col">
-							<div class="split-label">Ajout net</div>
-							<div class="split-val"><strong id="hs_net_val">0</strong> touches</div>
+						<div class="split-col" title="Différence nette entre caractères tapés et générés">
+							<div class="split-label">Économisées</div>
+							<div class="split-val"><strong id="hs_net_val">0</strong> frappes</div>
 						</div>
 						<div class="split-col">
 							<div class="split-label">Acceptés</div>
@@ -99,9 +111,9 @@
 
 					<div class="stat-details" id="llm_loading">Calcul en cours...</div>
 					<div class="stat-details-split" id="llm_details" style="display: none">
-						<div class="split-col">
-							<div class="split-label">Ajout net</div>
-							<div class="split-val"><strong id="llm_net_val">0</strong> touches</div>
+						<div class="split-col" title="Différence nette entre caractères effacés et générés">
+							<div class="split-label">Économisées</div>
+							<div class="split-val"><strong id="llm_net_val">0</strong> frappes</div>
 						</div>
 						<div class="split-col">
 							<div class="split-label">Acceptés</div>

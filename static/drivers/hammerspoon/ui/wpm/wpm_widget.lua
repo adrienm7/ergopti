@@ -11,6 +11,7 @@
 ---    without the need for an embedded webview.
 --- 2. Autonomous Polling: Manages its own lifecycle and history array.
 --- 3. Dynamic Styling: Visual feedback changes color based on the typing source.
+--- 4. Effective WPM: Displays the net typing speed, visualizing productivity spikes.
 --- ==============================================================================
 
 local M = {}
@@ -43,7 +44,7 @@ local CONFIG = {
 	border_color          = { white = 1, alpha = 0.4 },
 	border_width          = 1,
 	text_color            = { white = 1, alpha = 1 },
-	text_size             = 14, -- Adjustable font size
+	text_size             = 14,
 	compact_padding_x     = 16,
 	compact_padding_y     = 8,
 	compact_color_mix     = 0.8,
@@ -96,7 +97,6 @@ local function update_widget()
 	table.insert(_wpm_history, { v = display_wpm, s = active_source })
 	if #_wpm_history > 60 then table.remove(_wpm_history, 1) end
 	
-	-- Keep the widget visible while typing, while tooltip is visible, or right after injection
 	if display_wpm > 0 or tooltip_visible or (active_source ~= "none") then
 		local screen = hs.screen.mainScreen()
 		local full_frame = screen:fullFrame()
@@ -115,7 +115,6 @@ local function update_widget()
 			target_x = full_frame.x + full_frame.w - canvas_width - graph_margin
 			target_y = full_frame.y + full_frame.h - canvas_height - graph_margin
 		else
-			-- Compact mode uses measured text size plus padding
 			local text_measure = hs.drawing.getTextDrawingSize(wpm_str, { size = CONFIG.text_size, font = ".AppleSystemUIFont" })
 			local text_width = (text_measure and text_measure.w) or math.floor(#wpm_str * CONFIG.text_size * 0.62)
 			local text_height = (text_measure and text_measure.h) or (CONFIG.text_size + 6)
@@ -127,7 +126,7 @@ local function update_widget()
 			target_x = full_frame.x + full_frame.w - canvas_width - margin_bottom
 		end
 		
-		local bg_radius = 10 -- Standard macOS window radius
+		local bg_radius = 10
 		local text_size = CONFIG.text_size
 		
 		if not _canvas then
@@ -152,7 +151,6 @@ local function update_widget()
 			local graph_h = canvas_height - (text_size * 2) 
 			local step = graph_w / math.max(1, #_wpm_history - 1)
 			
-			-- Color switches only when an effective injected source is active
 			local current_color = _use_source_colors
 				and WPMShared.get_source_color(active_source, 0.8)
 				or WPMShared.get_source_color("manual", 0.8)
