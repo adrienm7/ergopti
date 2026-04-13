@@ -64,5 +64,6 @@ M.is_paused             = ScriptControl.is_paused
 M.set_shortcut_action   = ScriptControl.set_shortcut_action
 M.set_on_pause_change   = ScriptControl.set_on_pause_change
 M.set_extras            = ScriptControl.set_extras
+M.toggle_script_control = ScriptControl.toggle
 
 return M

@@ -335,4 +335,13 @@ function M.set_extras(tbl)
 	_extras = type(tbl) == "table" and tbl or {}
 end
 
+
+
+--- Public: Toggle the paused state programmatically.
+--- This proxies the existing dispatch_action("pause") behaviour so
+--- callers can toggle pause without synthesizing key events.
+function M.toggle()
+	pcall(dispatch_action, "pause")
+end
+
 return M
