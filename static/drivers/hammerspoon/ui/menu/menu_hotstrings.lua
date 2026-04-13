@@ -489,14 +489,15 @@ function M.build_management(ctx)
 		local cur_val = is_base and state.expansion_delay or (state.delays[key] or default_val)
 		local cur_ms = math.floor(cur_val * 1000 + 0.5)
 		local def_ms = math.floor(default_val * 1000 + 0.5)
+		local display_ms = (cur_ms == 0) and "Infini (0)" or (cur_ms .. " ms")
 		
 		return {
-			title    = title .. " : " .. cur_ms .. " ms" .. (cur_ms == def_ms and " (défaut)" or ""),
+			title    = title .. " : " .. display_ms .. (cur_ms == def_ms and " (défaut)" or ""),
 			disabled = paused or nil,
 			fn       = not paused and function()
 				local ok_p, btn, raw = pcall(hs.dialog.textPrompt,
 					title,
-					"Entrez le délai en millisecondes (entier ≥ 0) :",
+					"Entrez le délai en millisecondes (entier ≥ 0).\nMettez 0 pour un délai infini (aucune limite de temps) :",
 					tostring(cur_ms), "OK", "Annuler"
 				)
 				if not ok_p or btn ~= "OK" then return end
@@ -531,6 +532,7 @@ function M.build_management(ctx)
 	end
 
 	table.insert(delay_menu, make_delay_item("Touche ★", "STAR_TRIGGER", def_delays.STAR_TRIGGER, false))
+	table.insert(delay_menu, make_delay_item("Intelligence Artificielle (Acceptation)", "llm_prediction", def_delays.llm_prediction, false))
 	table.insert(delay_menu, make_delay_item("Auto-complétions (ex: numéros)", "dynamichotstrings", def_delays.dynamichotstrings, false))
 	table.insert(delay_menu, make_delay_item("Autocorrections", "autocorrection", def_delays.autocorrection, false))
 	table.insert(delay_menu, make_delay_item("Roulements", "rolls", def_delays.rolls, false))

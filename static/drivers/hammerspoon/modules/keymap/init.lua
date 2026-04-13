@@ -53,6 +53,7 @@ M.DELAYS_DEFAULT = {
 	rolls              = 0.25, -- Rolls (e.g. sx -> sk)
 	sfbsreduction      = 0.25, -- Comma combos (e.g. ,t -> pt)
 	distancesreduction = 0.25, -- Dead keys and suffixes
+	llm_prediction     = 20.0, -- AI prediction tooltip timeout
 }
 
 -- Default state in the menu
@@ -93,6 +94,7 @@ local CoreState = {
 	WORD_TIMEOUT_SEC           = 5.0,
 	BASE_DELAY_SEC             = M.BASE_DELAY_SEC_DEFAULT,
 	DELAYS                     = {},
+	DELAYS_DEFAULT             = M.DELAYS_DEFAULT,
 	current_group              = nil,
 	group_post_load_hooks      = {},
 	ignored_window_titles      = {},
@@ -112,7 +114,14 @@ end
 CoreState.is_repeat_feature_enabled = Registry.is_repeat_feature_enabled
 
 -- Seed the initial delays
-for k, v in pairs(M.DELAYS_DEFAULT) do CoreState.DELAYS[k] = v end
+local has_infinite = false
+local max_delay = 0
+for k, v in pairs(M.DELAYS_DEFAULT) do 
+	CoreState.DELAYS[k] = v 
+	if v == 0 then has_infinite = true end
+	if v > max_delay then max_delay = v end
+end
+CoreState.WORD_TIMEOUT_SEC = has_infinite and 0 or (max_delay + 0.5)
 
 -- Mount dependencies
 Registry.init(CoreState)
@@ -162,12 +171,16 @@ function M.set_delay(key, val)
 	if M.DELAYS_DEFAULT[key] ~= nil then
 		CoreState.DELAYS[key] = tonumber(val) or M.DELAYS_DEFAULT[key]
 		
-		-- Recalculate word timeout based on max delay
-		local max_delay = 0
+		-- Recalculate word timeout based on max delay and evaluate infinite triggers
+		local has_inf = false
+		local max_d = 0
 		for _, v in pairs(CoreState.DELAYS) do
-			if type(v) == "number" and v > max_delay then max_delay = v end
+			if type(v) == "number" then
+				if v == 0 then has_inf = true end
+				if v > max_d then max_d = v end
+			end
 		end
-		CoreState.WORD_TIMEOUT_SEC = math.min(5.0, max_delay + 0.5)
+		CoreState.WORD_TIMEOUT_SEC = has_inf and 0 or (max_d + 0.5)
 	end
 end
 
@@ -282,7 +295,7 @@ local function onKeyDownRaw(e)
 	end
 
 	-- Word timeout: clear the buffer if the user took a long pause
-	if dt > CoreState.WORD_TIMEOUT_SEC then
+	if CoreState.WORD_TIMEOUT_SEC > 0 and dt > CoreState.WORD_TIMEOUT_SEC then
 		CoreState.buffer = ""
 		LLMBridge.reset_predictions()
 	end
@@ -386,6 +399,7 @@ local function onKeyDownRaw(e)
 	
 	if suppress_triggers or rescan_suppressed() then return false end
 	
+    -- If the roll is complex (involves a modifier), we allow a longer delay (×2) to accommodate the extra finger movement
 	local is_complex    = flags.shift or flags.alt
 	local complex_mult  = (is_complex or CoreState.last_key_was_complex) and 2 or 1
 	CoreState.last_key_was_complex = is_complex
@@ -410,14 +424,15 @@ local function onKeyDownRaw(e)
 				local allowed_delay = allow_complex_delay and (specific_delay * complex_mult) or specific_delay
 
 				-- B. Check if the time gap (dt) with the previous key is valid
-				if dt <= allowed_delay then
+				if allowed_delay == 0 or dt <= allowed_delay then
 					if m.auto and Expander.try_auto_expand(m, char_len, is_ignored) then return true end
 					if not m.auto and Expander.try_terminator_expand(m, chars, char_len, is_ignored) then return true end
 				end
 			end
 		end
 		
-		if dt <= (CoreState.DELAYS.STAR_TRIGGER * complex_mult) then
+		local star_allowed = CoreState.DELAYS.STAR_TRIGGER * complex_mult
+		if star_allowed == 0 or dt <= star_allowed then
 			if Expander.try_repeat_feature(chars, is_ignored) then return true end
 		end
 		
