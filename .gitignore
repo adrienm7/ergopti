@@ -29,3 +29,4 @@ static/drivers/hotstrings/personal.toml
 static/drivers/karabiner/pid/
 static/drivers/karabiner/log/
 
+.claude/settings.local.json
