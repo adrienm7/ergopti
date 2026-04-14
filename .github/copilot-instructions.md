@@ -209,6 +209,63 @@ llm_request_counter = llm_request_counter + 1
 llm_request_counter = llm_request_counter + 1
 ```
 
+### 5.8 Module Initialization Pattern
+
+Every stateful Lua module (one that holds injected dependencies) **must** follow this exact pattern:
+
+1. **Declare a module-level `_state = nil`** (or equivalent). Never initialize it from another module at call time — only inside `M.init()`.
+2. **Expose a single `M.init()`** function that validates its arguments, logs `ERROR` and returns immediately on invalid input, and uses a `Logger.start`/`Logger.success` pair.
+3. **Gate every public function** with a `require_state` helper — **this is the canonical name, always use it**:
+
+```lua
+local function require_state(func_name)
+	if not _state then
+		Logger.error(LOG, "'%s' called before M.init() — shared state not initialized.", func_name)
+		return false
+	end
+	return true
+end
+```
+
+4. When a module depends on **multiple injected objects** (e.g., `_state`, `_registry`, `_llm`), check them all in the same guard:
+
+```lua
+local function require_state(func_name)
+	if not _state or not _registry or not _llm then
+		Logger.error(LOG, "'%s' called before M.init() — dependencies not initialized.", func_name)
+		return false
+	end
+	return true
+end
+```
+
+5. **Prevent duplicate initialization** — warn and return early if `M.init()` is called a second time.
+6. **Lifecycle functions** (`M.init`, `M.start`, `M.stop`) are significant actions → `Logger.start`/`Logger.success` pairs.
+   Internal helpers (emit, sort, rebuild) use `Logger.trace`/`Logger.done` instead.
+
+```lua
+-- Good — full lifecycle pattern
+function M.init(core_state)
+	Logger.start(LOG, "Initializing…")
+	if type(core_state) ~= "table" then
+		Logger.error(LOG, "M.init(): core_state must be a table — module non-functional.")
+		return
+	end
+	if _state then
+		Logger.warn(LOG, "M.init() called more than once — ignoring duplicate call.")
+		return
+	end
+	_state = core_state
+	Logger.success(LOG, "Initialized (%d item(s)).", #_state.items)
+end
+
+function M.start()
+	Logger.start(LOG, "Starting…")
+	-- … actual start work …
+	Logger.success(LOG, "Started.")
+end
+```
+
 ## 6. Language-Specific Guidelines
 
 ### JavaScript / SvelteKit (`.js`, `.svelte`)
@@ -270,6 +327,21 @@ function showAlertModal(message) {
 - Use `local` for variables and functions to prevent global scope pollution.
 - Use `pcall` (protected call) for any OS-level interaction, file system manipulation, or event interception to prevent silent crashes or keyboard lockups.
 - Document functions using `EmmyLua` annotations (`---`).
+- For **optional dependencies** (modules that may be absent in some deployments), use `pcall` at the top of the file and assign `nil` on failure:
+
+```lua
+local ok_mod, optional_mod = pcall(require, "modules.optional_thing")
+if not ok_mod then optional_mod = nil end
+```
+
+- The **Lua `utf8` standard library** (`utf8.offset`, `utf8.len`, etc.) can return `nil` on malformed sequences. Always wrap in `pcall` or nil-check the result:
+
+```lua
+-- Safe utf8.offset usage
+local ok, offset = pcall(utf8.offset, s, -1)
+if not ok or not offset then ... end
+```
+
 
 **Example:**
 
