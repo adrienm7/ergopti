@@ -81,6 +81,7 @@ M.DEFAULT_STATE = {
     llm_profile_shortcuts = {},
     llm_trigger_shortcut  = false,
     llm_after_hotstring   = false,
+    llm_auto_raise_temp   = llm_mod.DEFAULT_STATE.llm_auto_raise_temp,
     llm_min_words         = llm_mod.DEFAULT_STATE.llm_min_words,
 }
 
@@ -1121,6 +1122,18 @@ function M.create(deps)
         if state.llm_temperature ~= llm_mod.DEFAULT_STATE.llm_temperature then
             table.insert(main_menu, { title = "  ↳ Réinitialiser (défaut : " .. tostring(llm_mod.DEFAULT_STATE.llm_temperature) .. ")", disabled = is_disabled or nil, fn = settings_mgr.reset_temperature })
         end
+        table.insert(main_menu, {
+            title    = "  ↳ Hausser la temp. automatiquement (+0.1 par suggestion)",
+            checked  = state.llm_auto_raise_temp,
+            disabled = (is_disabled or (tonumber(state.llm_num_predictions) or 1) < 2) or nil,
+            fn       = function()
+                state.llm_auto_raise_temp = not state.llm_auto_raise_temp
+                if keymap and type(keymap.set_llm_auto_raise_temp) == "function" then
+                    pcall(keymap.set_llm_auto_raise_temp, state.llm_auto_raise_temp)
+                end
+                save_prefs(); update_menu()
+            end
+        })
 
         -- ================= AFFICHAGE & NAV =================
         table.insert(main_menu, { title = "-" })

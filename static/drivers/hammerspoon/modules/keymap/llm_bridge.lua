@@ -3,771 +3,544 @@
 --- ==============================================================================
 --- MODULE: Keymap LLM Bridge
 --- DESCRIPTION:
---- Manages the interaction between the active keymap buffer, the visual UI
---- tooltips, and the asynchronous Ollama LLM engine.
+--- Thin orchestrator that connects the keymap core to the LLM prediction engine.
+--- Handles the keymap-specific concerns that do not belong in modules/llm/:
+--- hotstring detection and preview, keystroke routing, and buffer management on
+--- navigation or escape events.
 ---
---- FEATURES & RATIONALE:
---- 1. Asynchronous Debounce: Timer delays to avoid flooding the LLM API.
---- 2. Seamless Injections: Passes backspace data for true Net productivity stats.
---- 3. Granular Tracking: Logs dismissed predictions and orthographic corrections.
+--- RESPONSIBILITIES:
+--- 1. Hotstring preview: each keystroke calls update_preview(), which decides
+---    whether to show a hotstring tooltip or arm the inactivity debounce timer.
+--- 2. Prediction acceptance: apply_prediction() types the selected completion,
+---    updates the in-memory buffer, and delegates chain arming to the engine.
+--- 3. Keystroke routing: intercepts arrow keys, Enter, and modifier+digit combos
+---    to navigate, accept, or dismiss predictions without disturbing the buffer.
+--- 4. Forward all LLM configuration from the menu to the prediction engine.
+---
+--- The actual LLM request, streaming, deduplication, app exclusion, and state
+--- management all live in modules/llm/prediction_engine.lua.
 --- ==============================================================================
 
 local M = {}
 
-local hs         = hs
-local keyStrokes = hs.eventtap.keyStrokes
-local keyStroke  = hs.eventtap.keyStroke
+local hs        = hs
+local keyStroke = hs.eventtap.keyStroke
 
 local km_utils   = require("modules.keymap.utils")
 local text_utils = require("lib.text_utils")
 local core_llm   = require("modules.llm")
 local Logger     = require("lib.logger")
+local keylogger  = require("modules.keylogger")
+local tooltip    = require("ui.tooltip")
+local engine     = require("modules.llm.prediction_engine")
 
-local LOG = "keymap.llm_bridge"
-
-local ok_kl, keylogger = pcall(require, "modules.keylogger")
-if not ok_kl then keylogger = nil end
-
-local ok_tt, tooltip = pcall(require, "ui.tooltip")
-if not ok_tt then
-	Logger.warn(LOG, "❌ Module ui.tooltip failed to load! LLM predictions will NOT display.")
-	tooltip = { 
-		show = function() end, 
-		hide = function() end,
-		show_predictions = function() end, 
-		navigate = function() end,
-		get_current_index = function() return 1 end,
-		make_diff_styled = function() return true end,
-		set_timeout = function() end,
-		set_navigate_callback = function() end,
-		set_accept_callback = function() end
-	}
-end
-
-local _state = nil
+local LOG    = "keymap.llm_bridge"
+local _state = nil  -- Shared core state, injected at startup via M.init()
 
 
 
 
+-- ===================================
+-- ===================================
+-- ======= 1/ Module Constants =======
+-- ===================================
+-- ===================================
 
--- ====================================
--- ====================================
--- ======= 1/ Constants & State =======
--- ====================================
--- ====================================
+-- ── macOS key codes ──────────────────────────────────────────────────────────
+-- Named to avoid magic numbers scattered throughout the keystroke handler.
 
-local NUM_KEYCODES = {
-	[18]=1, [19]=2, [20]=3, [21]=4, [23]=5,
-	[22]=6, [26]=7, [28]=8, [25]=9, [29]=10,
+-- Digit row 1–0 mapped to prediction slot indices 1–10
+local KEYCODE_DIGITS = {
+	[18] = 1, [19] = 2, [20] = 3, [21] = 4, [23] = 5,
+	[22] = 6, [26] = 7, [28] = 8, [25] = 9, [29] = 10,
 }
 
-local _pending_predictions     = {}
-local _predictions_active      = false
-local _enter_validates_pred    = false 
-local _llm_request_id          = 0
-local _llm_fetch_request_id    = 0
-local _last_suggested_hs       = nil
-local _last_llm_input_signature = nil
+local KEYCODE_RETURN    = 36   -- Main Return key (accepts active prediction)
+local KEYCODE_ENTER     = 76   -- Numpad Enter (also accepts active prediction)
+local KEYCODE_ARROW_MIN = 123  -- Lowest arrow keycode (left arrow)
+local KEYCODE_ARROW_MAX = 126  -- Highest arrow keycode (up arrow); range covers all four directions
 
-local current_llm_backend_name = nil
+-- ── UI / display parameters ──────────────────────────────────────────────────
 
-local llm_enabled              = core_llm.DEFAULT_LLM_ENABLED
-local current_llm_model        = core_llm.DEFAULT_LLM_MODEL
-local current_llm_display_name = core_llm.DEFAULT_LLM_MODEL
-local preview_star_enabled        = true
-local preview_autocorrect_enabled = true
-local preview_ai_enabled          = true
-local preview_colored_tooltips    = true
+-- When a hotstring's display delay is 0 it means "never auto-dismiss."
+-- We substitute a 24-hour timeout so the tooltip module still has a concrete number.
+local INFINITE_TOOLTIP_SEC       = 86400  -- 24h stand-in for "never auto-dismiss"
+local MIN_TOOLTIP_DURATION_SEC   = 0.05   -- Minimum visible duration for any hotstring tooltip
+-- Small offset added to tooltip_timeout when scheduling the LLM chain after a hotstring
+local HOTSTRING_CHAIN_OFFSET_SEC = 0.05
 
-local C_TINT_STAR_DEFAULT        = { red = 1.00, green = 0.00, blue = 0.00, alpha = 1.0 }
-local C_TINT_AUTOCORRECT_DEFAULT = { red = 0.00, green = 0.80, blue = 0.00, alpha = 1.0 }
-local C_TINT_PERSONAL_DEFAULT    = { red = 0.20, green = 0.55, blue = 1.00, alpha = 1.0 }
-local C_TINT_AI_LOADING          = { red = 0.68, green = 0.38, blue = 1.00, alpha = 1.0 }
-
-local preview_star_color        = C_TINT_STAR_DEFAULT
-local preview_autocorrect_color = C_TINT_AUTOCORRECT_DEFAULT
-local preview_ai_color          = nil
-
-local llm_after_hotstring_enabled = false
-
-local llm_debounce_time        = 0.5
-local llm_context_length       = 500
-local llm_reset_on_nav         = true
-local llm_temperature          = 0.1
-local llm_min_words            = tonumber(hs.settings.get("llm_min_words")) or core_llm.DEFAULT_STATE.llm_min_words
-local llm_max_words            = tonumber(hs.settings.get("llm_max_words")) or core_llm.DEFAULT_STATE.llm_max_words
-local llm_num_predictions      = 3
-local llm_pred_indent          = -3
-local llm_val_modifiers        = {"alt"}
-local llm_nav_modifiers        = {}
-
-local llm_excluded_apps        = {}
-local llm_show_info_bar        = true
-local llm_sequential_mode      = false
-
-M._llm_chain_pending           = false
-M._chain_timer                 = nil
+-- Reference to the LLM defaults used to seed bridge-owned behavioral flags
+local LLM_DEFAULTS = core_llm.DEFAULT_STATE
 
 
 
 
+-- ================================
+-- ================================
+-- ======= 2/ Mutable State =======
+-- ================================
+-- ================================
 
--- ===========================================
--- ===========================================
--- ======= 2/ Configuration Management =======
--- ===========================================
--- ===========================================
+-- The last hotstring suggestion shown; kept so dismissal can be logged correctly
+local last_shown_hotstring = nil
 
---- Parses modifier keys into a structured table.
---- @param mod_input string|table The modifier string or table.
---- @param default table The fallback table.
---- @return table The resolved modifier table.
-local function parse_mods(mod_input, default)
-	if type(mod_input) == "string" then return {mod_input} end
-	if type(mod_input) == "table" then return mod_input end
-	return default
+-- ── Preview visibility toggles ────────────────────────────────────────────────
+-- Defaults mirror menu_hotstrings.DEFAULT_STATE.preview_*_enabled.
+-- The menu overrides all three via set_preview_*_enabled() at startup.
+
+local is_star_preview_enabled        = true
+local is_autocorrect_preview_enabled = true
+
+-- ── Behavioral flags ──────────────────────────────────────────────────────────
+-- Sourced from LLM_DEFAULTS so both this module and menu_llm share the same factory value.
+
+-- Chain LLM right after a hotstring tooltip (used in update_preview)
+local fire_llm_after_hotstring   = LLM_DEFAULTS.llm_after_hotstring
+-- Clear buffer when the user presses an arrow key or Escape outside prediction mode
+local reset_buffer_on_navigation = LLM_DEFAULTS.llm_reset_on_nav
+
+
+
+
+-- ==========================================
+-- ==========================================
+-- ======= 3/ Configuration Setters =========
+-- ==========================================
+-- ==========================================
+
+
+-- ================================
+-- ===== 3.1) Preview Toggles =====
+-- ================================
+
+function M.set_preview_star_enabled(v)
+	is_star_preview_enabled = (v == true)
+	Logger.debug(LOG, "Star preview: %s.", is_star_preview_enabled and "on" or "off")
+	if not v then tooltip.hide() end
 end
 
-function M.set_llm_model(m)
-	local model_name = tostring(m)
-	local backend = type(core_llm.get_backend) == "function" and core_llm.get_backend() or "ollama"
-	if backend == "mlx" then
-		if type(core_llm.set_llm_model_mlx) == "function" then core_llm.set_llm_model_mlx(model_name) end
-	else
-		if type(core_llm.set_llm_model_ollama) == "function" then core_llm.set_llm_model_ollama(model_name) end
-	end
-	current_llm_model = model_name
+function M.set_preview_autocorrect_enabled(v)
+	is_autocorrect_preview_enabled = (v == true)
+	Logger.debug(LOG, "Autocorrect preview: %s.", is_autocorrect_preview_enabled and "on" or "off")
+	if not v then tooltip.hide() end
 end
 
-function M.set_llm_backend_name(n)        current_llm_backend_name = (type(n) == "string") and n or nil end
-function M.set_llm_context_length(l)      llm_context_length     = math.max(1, tonumber(l) or 500) end
-function M.set_llm_display_model_name(n)  if type(n) == "string" and n ~= "" then current_llm_display_name = n end end
-function M.set_llm_reset_on_nav(r)        llm_reset_on_nav       = (r == true) end
-function M.set_llm_temperature(t)         llm_temperature        = math.max(0, tonumber(t) or 0.1) end
-function M.set_llm_min_words(w)           llm_min_words = math.max(0, tonumber(w) or core_llm.DEFAULT_STATE.llm_min_words); hs.settings.set("llm_min_words", llm_min_words) end
-function M.set_llm_max_words(w)           llm_max_words = math.max(0, tonumber(w) or core_llm.DEFAULT_STATE.llm_max_words); hs.settings.set("llm_max_words", llm_max_words) end
-function M.set_llm_num_predictions(n)     llm_num_predictions    = math.max(1, tonumber(n) or 3) end
-function M.set_llm_show_info_bar(v)       llm_show_info_bar      = (v == true) end
-function M.set_llm_pred_indent(v)         llm_pred_indent        = math.floor(tonumber(v) or -3) end
-function M.set_llm_sequential_mode(v)     llm_sequential_mode    = (v == true) end
-function M.set_llm_val_modifiers(mods)    llm_val_modifiers      = parse_mods(mods, {"alt"}) end
-function M.set_llm_nav_modifiers(mods)    llm_nav_modifiers      = parse_mods(mods, {}) end
-function M.get_llm_enabled()              return llm_enabled end
-function M.set_llm_disabled_apps(apps)    llm_excluded_apps = type(apps) == "table" and apps or {} end
-
-function M.set_llm_enabled(enabled)
-	llm_enabled = (enabled == true)
-	if not llm_enabled then M.reset_predictions() end
+--- Delegates to the prediction engine for AI preview visibility.
+--- @param v boolean True to show AI prediction tooltips.
+function M.set_preview_ai_enabled(v)
+	engine.set_preview_ai_enabled(v)
 end
 
-function M.set_preview_star_enabled(v)        preview_star_enabled = (v == true); if not v and tooltip.hide then tooltip.hide() end end
-function M.set_preview_autocorrect_enabled(v) preview_autocorrect_enabled = (v == true); if not v and tooltip.hide then tooltip.hide() end end
-function M.set_preview_ai_enabled(v)          preview_ai_enabled = (v == true); if not v and tooltip.hide then tooltip.hide() end end
-function M.set_preview_colored_tooltips(v)    preview_colored_tooltips = (v == true); if tooltip.hide then tooltip.hide() end end
-function M.set_preview_star_color(c)          preview_star_color = (type(c) == "table") and c or C_TINT_STAR_DEFAULT end
-function M.set_preview_autocorrect_color(c)   preview_autocorrect_color = (type(c) == "table") and c or C_TINT_AUTOCORRECT_DEFAULT end
-function M.set_preview_ai_color(_)            end
-function M.set_llm_after_hotstring(v)         llm_after_hotstring_enabled = (v == true) end
-
+--- Enables or disables all non-LLM preview types simultaneously.
+--- @param enabled boolean True to show hotstring tooltips, false to suppress them.
 function M.set_preview_enabled(enabled)
-	preview_star_enabled = (enabled == true)
-	preview_autocorrect_enabled = (enabled == true)
-	if not enabled and tooltip.hide then tooltip.hide() end
+	is_star_preview_enabled        = (enabled == true)
+	is_autocorrect_preview_enabled = (enabled == true)
+	Logger.debug(LOG, "Hotstring tooltips: %s.", enabled and "on" or "off")
+	if not enabled then tooltip.hide() end
 end
 
-function M.set_llm_debounce(seconds)
-	llm_debounce_time = math.max(0, tonumber(seconds) or 0.5)
-	if M._llm_timer and type(M._llm_timer.stop) == "function" then M._llm_timer:stop() end
-	M._llm_timer = hs.timer.delayed.new(llm_debounce_time, M._perform_llm_check)
+--- Enables or disables background tinting across all tooltip types.
+--- Delegates to the tooltip module, which is the single owner of colorization state.
+--- @param v boolean True to enable tinted backgrounds.
+function M.set_preview_colored_tooltips(v)
+	tooltip.set_colorization_enabled(v == true)
+	Logger.debug(LOG, "Colored tooltips: %s.", v and "on" or "off")
+	tooltip.hide()
 end
 
-function M.start_timer(delay)
-	if llm_enabled and llm_debounce_time >= 0 and M._llm_timer and type(M._llm_timer.start) == "function" then
-		if delay then M._llm_timer:start(delay) else M._llm_timer:start() end
+--- Overrides the accent tint for ★ (star / magic-key) hotstring tooltips.
+--- @param color table|nil RGBA table, or nil to restore the module default.
+function M.set_preview_star_color(color)
+	tooltip.set_accent_color("hotstring_star", color)
+end
+
+--- Overrides the accent tint for autocorrect hotstring tooltips.
+--- @param color table|nil RGBA table, or nil to restore the module default.
+function M.set_preview_autocorrect_color(color)
+	tooltip.set_accent_color("hotstring_autocorrect", color)
+end
+
+--- Overrides the accent tint for AI prediction tooltips.
+--- @param color table|nil RGBA table, or nil to restore the module default.
+function M.set_preview_ai_color(color)
+	engine.set_preview_ai_color(color)
+end
+
+
+-- =============================================
+-- ===== 3.2) LLM Settings Forwarding ==========
+-- =============================================
+-- All LLM configuration is owned by the prediction engine; the bridge
+-- forwards these calls so the menu's public API surface does not change.
+
+function M.set_llm_enabled(v)           engine.set_llm_enabled(v) end
+function M.get_llm_enabled()            return engine.get_llm_enabled() end
+function M.set_llm_model(name)          engine.set_llm_model(name) end
+function M.set_llm_display_model_name(name) engine.set_llm_display_model_name(name) end
+function M.set_llm_show_model_name(name)    engine.set_llm_show_model_name(name) end
+function M.set_llm_backend_name(label)  engine.set_llm_backend_name(label) end
+function M.set_llm_context_length(l)    engine.set_llm_context_length(l) end
+function M.set_llm_temperature(t)       engine.set_llm_temperature(t) end
+function M.set_llm_num_predictions(n)   engine.set_llm_num_predictions(n) end
+function M.set_llm_pred_indent(v)       engine.set_llm_pred_indent(v) end
+function M.set_llm_show_info_bar(v)     engine.set_llm_show_info_bar(v) end
+function M.set_llm_sequential_mode(v)   engine.set_llm_sequential_mode(v) end
+function M.set_llm_auto_raise_temp(v)   engine.set_llm_auto_raise_temp(v) end
+function M.set_llm_disabled_apps(apps)  engine.set_llm_disabled_apps(apps) end
+function M.set_llm_val_modifiers(mods)  engine.set_llm_val_modifiers(mods) end
+function M.set_llm_nav_modifiers(mods)  engine.set_llm_nav_modifiers(mods) end
+function M.set_llm_min_words(w)         engine.set_llm_min_words(w) end
+function M.set_llm_max_words(w)         engine.set_llm_max_words(w) end
+function M.set_llm_debounce(seconds)    engine.set_llm_debounce(seconds) end
+
+--- Sets the "chain LLM after hotstring" flag, owned by the bridge since
+--- update_preview() consumes it directly.
+function M.set_llm_after_hotstring(v)
+	fire_llm_after_hotstring = (v == true)
+	Logger.debug(LOG, "LLM after hotstring: %s.", fire_llm_after_hotstring and "on" or "off")
+end
+
+--- Sets the "reset buffer on navigation" flag, owned by the bridge since
+--- check_escape_reset() and check_nav_reset() consume it directly.
+function M.set_llm_reset_on_nav(v)
+	reset_buffer_on_navigation = (v == true)
+	Logger.debug(LOG, "Reset buffer on nav: %s.", reset_buffer_on_navigation and "yes" or "no")
+end
+
+
+
+
+-- ====================================
+-- ====================================
+-- ======= 4/ Hotstring Preview =======
+-- ====================================
+-- ====================================
+
+--- Refreshes the preview tooltip from the current buffer content.
+---
+--- Decision tree:
+---   1. If the buffer ends with a hotstring trigger → show the hotstring tooltip.
+---   2. Otherwise → reset any active predictions and arm the inactivity timer.
+---
+--- The hotstring display timeout comes from the keymap delay table for that mapping type.
+--- When fire_llm_after_hotstring is enabled, the inactivity timer is pre-armed to fire
+--- immediately after the hotstring window closes instead of waiting for the next keystroke.
+---
+--- @param buf string The current typed buffer.
+function M.update_preview(buf)
+	if not _state then
+		Logger.error(LOG, "'update_preview' called before M.init() — shared state not initialized.")
+		return
 	end
-end
+	engine.stop_timer()
 
-function M.stop_timer()
-	if M._llm_timer and type(M._llm_timer.stop) == "function" then M._llm_timer:stop() end
-end
+	-- True when the buffer ends with the given trigger (with optional word-boundary enforcement)
+	local function ends_with_trigger(buffer, trigger, is_word)
+		if type(buffer) ~= "string" or type(trigger) ~= "string" or trigger == "" then return false end
+		if #buffer < #trigger or buffer:sub(-#trigger) ~= trigger then return false end
+		if is_word ~= true then return true end
+		local before      = buffer:sub(1, #buffer - #trigger)
+		if #before == 0 then return true end
+		local prev_offset = utf8.offset(before, -1)
+		local prev_char   = prev_offset and before:sub(prev_offset) or ""
+		-- Block the match when the character immediately before the trigger is a letter or "@"
+		if prev_char == "@" or text_utils.is_letter_char(prev_char) then return false end
+		return true
+	end
 
+	if not buf or #buf == 0 then
+		Logger.debug(LOG, "Empty buffer — predictions cleared.")
+		M.reset_predictions()
+		return
+	end
 
+	local last_word = buf:match("([^%s]+)$")
+	if not last_word then
+		M.reset_predictions()
+		engine.start_timer()
+		return
+	end
 
+	local matched_repl, matched_input, match_type, match_group = nil, nil, nil, nil
 
+	-- Custom preview providers take precedence over the static mapping lookup
+	for _, provider in ipairs(_state.preview_providers) do
+		local ok, res = pcall(provider, buf)
+		if ok and res then matched_repl = res; match_type = "provider"; break end
+	end
 
--- ======================================
--- ======================================
--- ======= 3/ Engine & Validation =======
--- ======================================
--- ======================================
+	-- Walk static mappings to find a hotstring match
+	if not matched_repl then
+		for _, mapping in ipairs(_state.mappings) do
+			local group_active = not mapping.group
+				or not _state.groups[mapping.group]
+				or _state.groups[mapping.group].enabled
+			if not group_active then goto continue end
 
---- Safely resets the prediction engine state and logs dismissals if necessary.
-function M.reset_predictions()
-	if _predictions_active and type(_pending_predictions) == "table" and #_pending_predictions > 0 then
-		if keylogger and type(keylogger.log_llm_dismissed) == "function" then
-			pcall(keylogger.log_llm_dismissed, nil, _pending_predictions)
+			local magic_len = #_state.magic_key
+			local has_magic = magic_len > 0 and mapping.trigger:sub(-magic_len) == _state.magic_key
+			local star_base = has_magic and mapping.trigger:sub(1, #mapping.trigger - magic_len) or nil
+
+			if star_base and star_base ~= "" and ends_with_trigger(buf, star_base, mapping.is_word) then
+				local plain = km_utils.plain_text(km_utils.tokens_from_repl(mapping.repl))
+				if plain ~= star_base then
+					matched_repl  = mapping.repl
+					match_type    = "star"
+					match_group   = mapping.group
+					matched_input = star_base
+					break
+				end
+			elseif ends_with_trigger(buf, mapping.trigger, mapping.is_word)
+				and not (mapping.is_word == false and mapping.auto == true)
+			then
+				local plain = km_utils.plain_text(km_utils.tokens_from_repl(mapping.repl))
+				if plain ~= mapping.trigger then
+					matched_repl  = mapping.repl
+					match_type    = "autocorrect"
+					match_group   = mapping.group
+					matched_input = mapping.trigger
+					break
+				end
+			end
+			::continue::
 		end
 	end
 
-	if _last_suggested_hs then
-		if keylogger and type(keylogger.log_hotstring_dismissed) == "function" then
-			pcall(keylogger.log_hotstring_dismissed, nil, _last_suggested_hs.trigger, _last_suggested_hs.replacement, _last_suggested_hs.h_type)
-		end
+	-- Anti-loop guard: discard mappings whose expansion is just the trigger + one repeated char
+	local is_repetition = false
+	if matched_repl and _state.is_repeat_feature_enabled() then
+		local plain  = km_utils.plain_text(km_utils.tokens_from_repl(matched_repl))
+		local ref    = matched_input or last_word
+		local offset = utf8.offset(ref, -1)
+		if offset then is_repetition = (plain == ref .. ref:sub(offset)) end
 	end
 
-	_pending_predictions  = {}
-	_predictions_active   = false
-	_enter_validates_pred = false
-	_last_suggested_hs    = nil
-	_last_llm_input_signature = nil
-	
-	_llm_request_id       = _llm_request_id + 1
-	_llm_fetch_request_id = _llm_fetch_request_id + 1
-	
-	if tooltip.hide then tooltip.hide() end
-	M.stop_timer()
-	if M._watchdog_timer then M._watchdog_timer:stop() end
-	if M._ai_dismiss_timer then M._ai_dismiss_timer:stop(); M._ai_dismiss_timer = nil end
+	if matched_repl and not is_repetition then
+		-- Hotstring matched — show its tooltip and optionally chain the LLM afterwards
+		M.reset_predictions(true)
+
+		local display_text = km_utils.plain_text(km_utils.tokens_from_repl(matched_repl))
+		local is_star      = (match_type == "star")
+
+		-- Resolve accent tint: type order is personal/custom/provider → star → autocorrect
+		local accent_color
+		if match_group == "personal" or match_group == "custom" or match_type == "provider" then
+			accent_color = tooltip.tint("hotstring_personal")
+		elseif is_star then
+			accent_color = tooltip.tint("hotstring_star")
+		else
+			accent_color = tooltip.tint("hotstring_autocorrect")
+		end
+
+		-- Explicit branch: the ternary idiom `A and B or C` fails when B is false,
+		-- so we cannot use it here — each flag must be tested against its own is_star condition
+		local is_enabled = is_star and is_star_preview_enabled or (not is_star and is_autocorrect_preview_enabled)
+		local type_str   = is_star and "star" or (match_type == "autocorrect" and "autocorrect" or "personal")
+		local delay_key  = is_star and "STAR_TRIGGER"
+			or (match_type == "autocorrect" and "autocorrection" or "dynamichotstrings")
+		local raw_delay  = _state.DELAYS[delay_key] or 0
+
+		-- A raw_delay of 0 means "never auto-fire"; substitute a large finite value
+		local tooltip_timeout = raw_delay == 0 and INFINITE_TOOLTIP_SEC
+			or math.max(MIN_TOOLTIP_DURATION_SEC, raw_delay)
+
+		Logger.debug(LOG, "Hotstring '%s' → '%s' [%s | timeout: %gs].",
+			tostring(matched_input), tostring(display_text), type_str, tooltip_timeout)
+
+		tooltip.set_timeout(tooltip_timeout)
+		tooltip.show(display_text, false, is_enabled, accent_color)
+
+		-- When chaining is active, arm the LLM timer to fire right as the hotstring window closes
+		if fire_llm_after_hotstring then
+			Logger.debug(LOG, "LLM chain after hotstring scheduled in %gs.", tooltip_timeout + HOTSTRING_CHAIN_OFFSET_SEC)
+			engine.start_timer(tooltip_timeout + HOTSTRING_CHAIN_OFFSET_SEC)
+		end
+
+		local trigger_key = matched_input or last_word
+		if not last_shown_hotstring or last_shown_hotstring.trigger ~= trigger_key then
+			last_shown_hotstring = { trigger = trigger_key, replacement = matched_repl, h_type = type_str }
+			keylogger.log_hotstring_suggested(nil, trigger_key, matched_repl, type_str)
+		end
+	else
+		-- No hotstring match — reset and let the inactivity timer trigger the LLM
+		Logger.debug(LOG, "No hotstring for '%s' — LLM timer armed.", tostring(last_word))
+		M.reset_predictions()
+		engine.start_timer()
+	end
 end
 
---- Validates and applies the selected LLM prediction with robust fail-safes.
---- @param idx number The index of the prediction to apply.
---- @return boolean True if applied, false otherwise.
+
+
+
+-- ================================================
+-- ================================================
+-- ======= 5/ Buffer & Keystroke Handlers ==========
+-- ================================================
+-- ================================================
+
+--- Clears all active predictions, handles hotstring dismissal telemetry, and delegates
+--- the LLM state reset to the prediction engine.
+--- @param keep_hotstring_log boolean If true, does not emit a hotstring-dismissed telemetry event.
+function M.reset_predictions(keep_hotstring_log)
+	if not keep_hotstring_log and last_shown_hotstring then
+		keylogger.log_hotstring_dismissed(nil,
+			last_shown_hotstring.trigger,
+			last_shown_hotstring.replacement,
+			last_shown_hotstring.h_type)
+		last_shown_hotstring = nil
+	end
+	engine.reset()
+end
+
+--- Applies the selected prediction: types the necessary deletions and completion text,
+--- updates the in-memory buffer, and arms the chained LLM request.
+--- @param idx number The 1-based index of the prediction to apply.
+--- @return boolean True if the prediction was applied, false if the index was invalid.
 function M.apply_prediction(idx)
-	local pred = _pending_predictions[idx]
+	if not _state then
+		Logger.error(LOG, "'apply_prediction' called before M.init() — shared state not initialized.")
+		return false
+	end
+
+	local pred, all_preds = engine.consume(idx)
 	if not pred then return false end
-	
-	-- Keep local copies for logging before wiping state
-	local deletes = pred.deletes or 0
-	local to_type = pred.to_type or ""
-	local all_preds = _pending_predictions
-	
-	-- Extract the text that will be deleted to evaluate spell-checking improvements
+
+	local delete_count = pred.deletes or 0
+	local text_to_type = pred.to_type or ""
+
+	Logger.start(LOG, "Applying prediction #%d: '%s' (%d deletion(s)).",
+		idx, tostring(text_to_type), delete_count)
+
+	-- Capture the text about to be erased for telemetry
 	local deleted_text = ""
-	if deletes > 0 and _state.buffer and #_state.buffer > 0 then
-		local offset = utf8.offset(_state.buffer, -deletes)
+	if delete_count > 0 and _state.buffer and #_state.buffer > 0 then
+		local offset = utf8.offset(_state.buffer, -delete_count)
 		if offset then deleted_text = _state.buffer:sub(offset) end
 	end
-	
-	-- By-pass the dismiss logger
-	_predictions_active = false
+
 	M.reset_predictions()
 
-	_state.expected_synthetic_deletes = _state.expected_synthetic_deletes + deletes
-	for _ = 1, deletes do keyStroke({}, "delete", 0) end
-	
-	local emitted_str = ""
-	local ok_emit = pcall(function()
-		if km_utils and type(km_utils.emit_text) == "function" then _, emitted_str = km_utils.emit_text(to_type)
-		else keyStrokes(to_type); emitted_str = to_type end
-	end)
-	
-	if not ok_emit then
-		keyStrokes(to_type)
-		emitted_str = to_type
-	end
-	
+	-- Inject deletions then the completion text into the HID event queue
+	_state.expected_synthetic_deletes = _state.expected_synthetic_deletes + delete_count
+	for _ = 1, delete_count do keyStroke({}, "delete", 0) end
+
+	local _, emitted_str = km_utils.emit_text(text_to_type)
 	_state.expected_synthetic_chars = _state.expected_synthetic_chars .. emitted_str
-	
-	if keylogger and type(keylogger.notify_synthetic) == "function" and emitted_str ~= "" then
-		keylogger.notify_synthetic(emitted_str, "llm", deletes)
-	end
 
-	if keylogger and type(keylogger.log_llm_accepted) == "function" then
-		pcall(keylogger.log_llm_accepted, to_type, nil, all_preds, idx, deletes, deleted_text)
-	end
+	if emitted_str ~= "" then keylogger.notify_synthetic(emitted_str, "llm", delete_count) end
+	keylogger.log_llm_accepted(text_to_type, nil, all_preds, idx, delete_count, deleted_text)
 
-	if deletes == 0 then
-		_state.buffer = _state.buffer .. to_type
+	-- Manually update the in-memory buffer to reflect the typed completion
+	if delete_count == 0 then
+		_state.buffer = _state.buffer .. text_to_type
 	else
-		local ok_offset, start = pcall(function()
-			if deletes >= #_state.buffer then return 1 end
-			local o = utf8.offset(_state.buffer, -deletes)
-			return o or 1
-		end)
-		if not ok_offset then start = 1 end
-		_state.buffer = (start and _state.buffer:sub(1, start - 1) or "") .. to_type
+		local start_pos = utf8.offset(_state.buffer, -delete_count)
+		if delete_count >= #_state.buffer then start_pos = 1 end
+		_state.buffer = (start_pos and _state.buffer:sub(1, start_pos - 1) or "") .. text_to_type
 	end
+	keylogger.set_buffer(_state.buffer)
 
-	if keylogger and type(keylogger.set_buffer) == "function" then keylogger.set_buffer(_state.buffer) end
+	Logger.success(LOG, "Prediction #%d applied — buffer updated.", idx)
 
-	M._llm_chain_pending = true
-	_state.suppress_rescan_keep_buffer(2.0)
-	
-	if M._llm_timer and type(M._llm_timer.stop) == "function" then M._llm_timer:stop() end
-	if M._chain_timer and type(M._chain_timer.stop) == "function" then M._chain_timer:stop() end
-	
-	M._chain_timer = hs.timer.doAfter(2.0, function()
-		if M._llm_chain_pending then
-			M._llm_chain_pending = false
-			M._perform_llm_check(true)
-		end
-	end)
-	
+	-- Chain trigger: re-run the LLM so the next prediction is ready immediately.
+	--
+	-- F20 is injected after all deletion and text keystrokes. The HID event queue is
+	-- ordered, so by the time handle_llm_keys() receives F20 all previous keystrokes
+	-- have already been delivered to the target application.
+	--
+	-- engine.CHAIN_FALLBACK_SEC fires only if F20 is somehow missed (e.g., intercepted
+	-- by another eventtap before it reaches handle_llm_keys).
+	engine.arm_chain()
+
+	Logger.debug(LOG, "F20 signal sent — LLM chain pending.")
 	hs.eventtap.keyStroke({}, "f20", 0)
 	return true
 end
 
-if tooltip.set_accept_callback then tooltip.set_accept_callback(function(idx) M.apply_prediction(idx) end) end
-if tooltip.set_navigate_callback then tooltip.set_navigate_callback(function(idx) _enter_validates_pred = true; if tooltip.set_enter_validates then tooltip.set_enter_validates(true) end end) end
-if tooltip.set_cancel_callback then tooltip.set_cancel_callback(function() M.reset_predictions() end) end
-
-
-
-
-
--- ========================================
--- ========================================
--- ======= 4/ Execution Constraints =======
--- ========================================
--- ========================================
-
---- Builds a stable deduplication key from the final text effectively shown in the tooltip.
---- @param pred table The final prediction payload.
---- @return string The normalized display key.
-local function build_tooltip_dedup_key(pred)
-	if type(pred) ~= "table" then return "" end
-	local chunks = pred.chunks
-	local nw = tostring(pred.nw or "")
-	local first_done = false
-	local last_char = ""
-	local parts = {}
-
-	local function clean_first(s)
-		local str = tostring(s or "")
-		if not first_done and str ~= "" then str = str:gsub("^%s+", ""); if str ~= "" then first_done = true end end
-		return str
-	end
-
-	if type(chunks) == "table" and #chunks > 0 then
-		for _, chunk in ipairs(chunks) do
-			if type(chunk) == "table" then
-				local s = clean_first(chunk.text)
-				if s ~= "" then table.insert(parts, s); last_char = s:sub(-1) end
-			end
-		end
-	end
-
-	local s_nw = clean_first(nw)
-	if s_nw ~= "" then
-		if last_char ~= "" and not last_char:match("%s") and not s_nw:match("^%s") then s_nw = " " .. s_nw end
-		table.insert(parts, s_nw)
-	end
-	return table.concat(parts):gsub("%s+", " "):gsub("^%s+", ""):gsub("%s+$", "")
-end
-
---- Verifies if the active window is blacklisted from generating LLM predictions.
---- @return boolean True if excluded, false otherwise.
-local function llm_suppressed_for_app()
-	if km_utils and type(km_utils.is_ignored_window) == "function" then
-		if km_utils.is_ignored_window(_state.ignored_window_titles, _state.ignored_window_patterns) then return true end
-	end
-	local frontApp = hs.application.frontmostApplication()
-	if not frontApp then return false end
-	
-	local bid  = type(frontApp.bundleID) == "function" and frontApp:bundleID() or ""
-	local path = type(frontApp.path) == "function" and frontApp:path() or ""
-	
-	for _, app in ipairs(llm_excluded_apps) do
-		if type(app) == "table" and ((app.bundleID and app.bundleID == bid) or (app.appPath and app.appPath == path)) then return true end
-	end
-	return false
-end
-
---- Returns the prompt title part before the first em dash for compact display.
---- @param prompt_title string|nil Prompt title to shorten.
---- @return string|nil Short prompt title.
-local function trim_prompt_title(prompt_title)
-	if type(prompt_title) ~= "string" then return nil end
-	local clean = prompt_title:gsub("^%s+", ""):gsub("%s+$", "")
-	if clean == "" then return nil end
-	local head = clean:match("^(.-)%s*—")
-	if type(head) == "string" and head ~= "" then return head:gsub("%s+$", "") end
-	return clean
-end
-
---- Generates the string for the information bar tooltip with strict ordering: Model -> Backend -> Prompt -> Time
---- @param model_name string Model identifier.
---- @param elapsed_ms number Milliseconds taken for generation.
---- @param backend_name string|nil The active backend string.
---- @param profile_name string|nil Profile/prompt name for display.
---- @return string Formatted string.
-local function build_info_bar(model_name, elapsed_ms, backend_name, profile_name)
-	if not model_name or model_name == "" then return nil end
-	local parts = { model_name }
-	if type(backend_name) == "string" and backend_name ~= "" then table.insert(parts, backend_name) end
-	local profile_short = trim_prompt_title(profile_name)
-	if profile_short then table.insert(parts, profile_short) end
-	if elapsed_ms and elapsed_ms > 0 then
-		local secs = elapsed_ms / 1000
-		table.insert(parts, "⏱️ " .. (secs < 10 and string.format("%.1fs", secs) or string.format("%ds", math.floor(secs + 0.5))))
-	end
-	return table.concat(parts, " — ")
-end
-
---- Core routine to evaluate buffer state and dispatch API calls if suitable.
---- @param force_trigger boolean Ignore contextual bounds and fetch directly.
---- @param profile_name string Evaluated override profile string.
-function M._perform_llm_check(force_trigger, profile_name)
-	force_trigger = force_trigger == true
-	if not llm_enabled or llm_suppressed_for_app() then return end
-
-	local clean_buffer = _state.buffer
-	local words = {}
-	for w in clean_buffer:gmatch("%S+%s*") do table.insert(words, w) end
-	if #words == 0 and not force_trigger then return end
-	
-	local tail = table.concat(words, "", math.max(1, #words - 4))
-	if (not tail or #tail < 2) and not force_trigger then return end
-
-	local llm_input_signature = clean_buffer .. "\n" .. tail
-	if not force_trigger and _last_llm_input_signature == llm_input_signature then return end
-	_last_llm_input_signature = llm_input_signature
-
-	if tooltip.show then tooltip.show("⏳ Génération en cours…", true, preview_ai_enabled, C_TINT_AI_LOADING) end
-
-	local num_pred = llm_num_predictions
-	local req_temperature = llm_temperature
-
-	_llm_request_id = _llm_request_id + 1
-	_llm_fetch_request_id = _llm_fetch_request_id + 1
-	local my_request_id = _llm_fetch_request_id
-
-	if type(core_llm.fetch_llm_prediction) == "function" then
-		local backend = type(core_llm.get_backend) == "function" and core_llm.get_backend() or "inconnu"
-		local model_to_use = type(core_llm.get_current_model) == "function" and core_llm.get_current_model() or current_llm_model
-		
-		local max_predict_tokens = 150
-		local effective_max_words = llm_max_words
-		if effective_max_words > 0 and effective_max_words < llm_min_words then effective_max_words = llm_min_words end
-
-		if backend == "mlx" then
-			max_predict_tokens = effective_max_words > 0 and math.max(15, math.floor(effective_max_words * 6 + 10)) or 100
-		elseif effective_max_words > 0 then
-			max_predict_tokens = math.max(15, math.floor(effective_max_words * 6 + 10))
-		end
-		
-		local effective_num_pred = num_pred
-		if effective_num_pred > 1 and req_temperature < 0.6 then req_temperature = 0.7 end
-		
-		if M._watchdog_timer then M._watchdog_timer:stop() end
-		M._watchdog_timer = hs.timer.doAfter(12, function()
-			if _llm_fetch_request_id == my_request_id and _predictions_active then
-				local b_name = current_llm_backend_name
-				if not b_name or b_name == "" then b_name = (backend == "mlx") and "MLX 🚀" or (backend == "ollama" and "Ollama 🦙" or "") end
-				local info = llm_show_info_bar and build_info_bar(current_llm_display_name, nil, b_name, "Timeout partiel") or nil
-				local val_mods = llm_val_modifiers
-				local val_mod_str = (#val_mods == 1 and val_mods[1] == "none") and "none" or ((#val_mods == 0) and "\226\128\139" or table.concat(val_mods, "+"))
-				if tooltip.show_predictions then tooltip.show_predictions(_pending_predictions, 1, preview_ai_enabled, info, val_mod_str, llm_pred_indent, llm_nav_modifiers, preview_ai_color, nil, #_pending_predictions) end
-			end
-		end)
-		
-		core_llm.fetch_llm_prediction(
-			clean_buffer, tail, model_to_use, req_temperature, max_predict_tokens, effective_num_pred,
-			function(predictions, elapsed_ms, is_final)
-				if _llm_fetch_request_id ~= my_request_id then return end
-				if is_final == true and M._watchdog_timer then M._watchdog_timer:stop(); M._watchdog_timer = nil end
-
-				local ok_app, front_app = pcall(function() return hs.application.frontmostApplication() end)
-				local app_name = (ok_app and front_app) and (pcall(function() return front_app:title() end) and front_app:title() or nil) or nil
-
-				if keylogger and type(keylogger.log_llm) == "function" then pcall(keylogger.log_llm, clean_buffer, predictions, app_name) end
-
-				local function get_pred_key(pred)
-					if type(pred) ~= "table" then return "" end
-					local k = build_tooltip_dedup_key(pred)
-					return k ~= "" and k or tostring(pred.to_type or ""):gsub("%s+$", "")
-				end
-				
-				local valid_preds, seen_tooltip_texts = {}, {}
-				
-				for _, p_raw in ipairs(predictions) do
-					local p = {}
-					for k, v in pairs(p_raw) do p[k] = v end
-
-					if p.to_type then
-						local tt, tt_norm = p.to_type, p.to_type:lower()
-						local clean_norm = clean_buffer:lower()
-						local prev_non_space = clean_buffer:match(".*(%S)")
-						local first_char = tt:match("^%s*(.)") or ""
-						local starts_upper_ascii = first_char:match("[A-Z]") ~= nil
-						local prev_ends_sentence = prev_non_space and prev_non_space:match("[%.%!%?…:;]") ~= nil
-
-						local is_noise = tt_norm:match("^%s*suite%s+finale") or tt_norm:match("^%s*</")
-							or tt_norm:match("^%s*vous avez besoin de plus") or tt_norm:match("^%s*vous etes les plus")
-							or (tt_norm:match("^%s*vous%s") and not clean_norm:match("vous"))
-							or (starts_upper_ascii and not prev_ends_sentence) or tt:find(":", 1, true) ~= nil
-
-						if tt:gsub("[%s%.…]", "") ~= "" and not is_noise then
-							p.to_type = tt
-							local has_visual = type(tooltip.make_diff_styled) == "function" and (tooltip.make_diff_styled(p.chunks, p.nw) ~= nil) or true
-							
-							if has_visual then
-								local dedup_key = build_tooltip_dedup_key(p)
-								if dedup_key ~= "" and not seen_tooltip_texts[dedup_key] then
-									seen_tooltip_texts[dedup_key] = true
-									table.insert(valid_preds, p)
-								elseif dedup_key == "" then table.insert(valid_preds, p) end
-							end
-						end
-					end
-				end
-
-				if _predictions_active and type(_pending_predictions) == "table" and #_pending_predictions > 0 then
-					local merged_preds, seen_merge = {}, {}
-					for _, ep in ipairs(_pending_predictions) do
-						local key = get_pred_key(ep)
-						if key == "" or not seen_merge[key] then if key ~= "" then seen_merge[key] = true end; table.insert(merged_preds, ep) end
-					end
-					for _, np in ipairs(valid_preds) do
-						local key = get_pred_key(np)
-						if key == "" or not seen_merge[key] then if key ~= "" then seen_merge[key] = true end; table.insert(merged_preds, np) end
-					end
-					valid_preds = merged_preds
-				end
-
-				if #valid_preds == 0 then
-					if is_final == true and not _predictions_active and tooltip.hide then tooltip.hide() end
-					return
-				end
-
-				if keylogger and type(keylogger.log_llm_suggested) == "function" then pcall(keylogger.log_llm_suggested, app_name, #valid_preds) end
-				
-				_pending_predictions = valid_preds
-				_predictions_active  = true
-				
-				local display_profile_name = profile_name or (type(core_llm.get_active_profile) == "function" and core_llm.get_active_profile() and core_llm.get_active_profile().label or nil)
-				local display_model = (current_llm_display_name ~= "" and current_llm_display_name) or (type(core_llm.get_current_model) == "function" and core_llm.get_current_model()) or current_llm_model
-				local b_name = current_llm_backend_name or ((backend == "mlx") and "MLX 🚀" or (backend == "ollama" and "Ollama 🦙" or ""))
-				local info = llm_show_info_bar and build_info_bar(display_model, elapsed_ms, b_name, display_profile_name) or nil
-				
-				local loading_text = nil
-				if is_final ~= true and #valid_preds < llm_num_predictions then
-					local spinner_frames = { "◐", "◓", "◑", "◒" }
-					local idx = (math.floor(hs.timer.secondsSinceEpoch() * 6) % #spinner_frames) + 1
-					loading_text = string.format("%s Enrichissement… %d/%d", spinner_frames[idx], #valid_preds, llm_num_predictions)
-				end
-				
-				local reserved_count = (is_final == true) and #valid_preds or effective_num_pred
-				local val_mods = llm_val_modifiers
-				local val_mod_str = (#val_mods == 1 and val_mods[1] == "none") and "none" or ((#val_mods == 0) and "\226\128\139" or table.concat(val_mods, "+"))
-
-				local selected_index = 1
-				if _predictions_active and type(tooltip.get_current_index) == "function" then selected_index = math.max(1, math.floor(tooltip.get_current_index() or 1)) end
-				selected_index = math.min(selected_index, #valid_preds)
-
-				if tooltip.show_predictions then 
-					tooltip.show_predictions(valid_preds, selected_index, preview_ai_enabled, info, val_mod_str, llm_pred_indent, llm_nav_modifiers, preview_ai_color, loading_text, reserved_count) 
-					
-					if is_final == true then
-						local defs = type(_state.DELAYS_DEFAULT) == "table" and _state.DELAYS_DEFAULT or {}
-						local ai_timeout = type(_state.DELAYS) == "table" and _state.DELAYS.llm_prediction or defs.llm_prediction or 20.0
-						if ai_timeout > 0 then
-							if M._ai_dismiss_timer then M._ai_dismiss_timer:stop() end
-							M._ai_dismiss_timer = hs.timer.doAfter(ai_timeout, function()
-								if _predictions_active then M.reset_predictions() end
-							end)
-						end
-					end
-				end
-			end,
-			function() if _llm_fetch_request_id == my_request_id and not _predictions_active and tooltip.hide then tooltip.hide() end end,
-			llm_sequential_mode, force_trigger, function() return _llm_fetch_request_id end
-		)
-	end
-end
-
-M._llm_timer = hs.timer.delayed.new(llm_debounce_time, M._perform_llm_check)
-
---- Synchronizes state and invalidates previews when typing alters context.
---- @param buf string The current buffer context.
-function M.update_preview(buf)
-	M.stop_timer()
-
-	local function buffer_ends_with_trigger(buffer, trigger, is_word)
-		if type(buffer) ~= "string" or type(trigger) ~= "string" or trigger == "" then return false end
-		if #buffer < #trigger then return false end
-		if buffer:sub(-#trigger) ~= trigger then return false end
-		if is_word ~= true then return true end
-
-		local start_idx = #buffer - #trigger + 1
-		if start_idx <= 1 then return true end
-
-		local before = buffer:sub(1, start_idx - 1)
-		local prev_offset = utf8.offset(before, -1)
-		local prev_char = prev_offset and before:sub(prev_offset) or ""
-
-		if prev_char == "@" then return false end
-		if text_utils and type(text_utils.is_letter_char) == "function" and text_utils.is_letter_char(prev_char) then return false end
-		return true
-	end
-
-	if not buf or #buf == 0 then 
-		_last_llm_input_signature = nil
-		M.reset_predictions()
-		return 
-	end
-	
-	local last_word = buf:match("([^%s]+)$")
-	if not last_word then 
-		M.reset_predictions()
-		M.start_timer()
-		return 
-	end
-
-	local match_repl, matched_input, match_type, match_group = nil, nil, nil, nil
-	for _, provider in ipairs(_state.preview_providers) do
-		local ok, res = pcall(provider, buf)
-		if ok and res then match_repl = res; match_type = "provider"; break end
-	end
-	
-	if not match_repl then
-		for _, m in ipairs(_state.mappings) do
-			local group_active = not m.group or not _state.groups[m.group] or _state.groups[m.group].enabled
-			if group_active then
-				local magic_len = #_state.magic_key
-				local has_magic_suffix = magic_len > 0 and m.trigger:sub(-magic_len) == _state.magic_key
-				local star_base = has_magic_suffix and m.trigger:sub(1, #m.trigger - magic_len) or nil
-
-				if star_base and star_base ~= "" and buffer_ends_with_trigger(buf, star_base, m.is_word) then
-					local clean = km_utils and type(km_utils.tokens_from_repl) == "function" and km_utils.plain_text(km_utils.tokens_from_repl(m.repl)) or m.repl
-					if clean ~= star_base then match_repl = m.repl; match_type = "star"; match_group = m.group; matched_input = star_base; break end
-				elseif buffer_ends_with_trigger(buf, m.trigger, m.is_word) then
-					if not (m.is_word == false and m.auto == true) then
-						local clean = km_utils and type(km_utils.tokens_from_repl) == "function" and km_utils.plain_text(km_utils.tokens_from_repl(m.repl)) or m.repl
-						if clean ~= m.trigger then match_repl = m.repl; match_type = "autocorrect"; match_group = m.group; matched_input = m.trigger; break end
-					end
-				end
-			end
-		end
-	end
-
-	local is_fallback_repetition = false
-	if match_repl and _state.is_repeat_feature_enabled() then
-		local clean = km_utils and type(km_utils.tokens_from_repl) == "function" and km_utils.plain_text(km_utils.tokens_from_repl(match_repl)) or match_repl
-		local input_for_repeat = matched_input or last_word
-		local last_char_offset = utf8.offset(input_for_repeat, -1)
-		if last_char_offset then
-			local last_char = input_for_repeat:sub(last_char_offset)
-			if clean == input_for_repeat .. last_char then is_fallback_repetition = true end
-		end
-	end
-
-	if match_repl and not is_fallback_repetition then
-		_llm_request_id = _llm_request_id + 1
-		local display_text = km_utils and type(km_utils.tokens_from_repl) == "function" and km_utils.plain_text(km_utils.tokens_from_repl(match_repl)) or match_repl
-
-		local is_star = (match_type == "star")
-		local hs_enabled = is_star and preview_star_enabled or preview_autocorrect_enabled
-		local hs_color = nil
-		local hs_type_str = "unknown"
-		
-		if match_type == "star" then hs_type_str = "star"
-		elseif match_type == "autocorrect" then hs_type_str = "autocorrect"
-		elseif match_type == "provider" then hs_type_str = "personal" end
-
-		if preview_colored_tooltips then
-			if match_group == "personal" or match_group == "custom" or match_type == "provider" then hs_color = C_TINT_PERSONAL_DEFAULT
-			else hs_color = is_star and preview_star_color or preview_autocorrect_color end
-		end
-
-		local defs = type(_state.DELAYS_DEFAULT) == "table" and _state.DELAYS_DEFAULT or {}
-		local hs_delay
-		if match_type == "star" then hs_delay = type(_state.DELAYS) == "table" and _state.DELAYS.STAR_TRIGGER or defs.STAR_TRIGGER or 2.0
-		elseif match_type == "autocorrect" then hs_delay = type(_state.DELAYS) == "table" and _state.DELAYS.autocorrection or defs.autocorrection or 0.5
-		else hs_delay = type(_state.DELAYS) == "table" and _state.DELAYS.dynamichotstrings or defs.dynamichotstrings or 2.0 end
-		
-		if tooltip.set_timeout then 
-			tooltip.set_timeout(hs_delay == 0 and 86400 or math.max(0.05, hs_delay)) 
-		end
-		
-		if tooltip.show then tooltip.show(display_text, false, hs_enabled, hs_color) end
-
-		if llm_after_hotstring_enabled then M.start_timer(math.max(0.1, _state.WORD_TIMEOUT_SEC - 0.3)) end
-		
-		local suggested_key = matched_input or last_word
-		
-		if not _last_suggested_hs or _last_suggested_hs.trigger ~= suggested_key then
-			_last_suggested_hs = { trigger = suggested_key, replacement = match_repl, h_type = hs_type_str }
-			if keylogger and type(keylogger.log_hotstring_suggested) == "function" then
-				pcall(keylogger.log_hotstring_suggested, nil, suggested_key, match_repl, hs_type_str)
-			end
-		end
-	else
-		M.reset_predictions()
-		M.start_timer()
-	end
-end
-
-
-
-
-
--- =====================================
--- =====================================
--- ======= 5/ Execution Handlers =======
--- =====================================
--- =====================================
-
---- Main controller function that decides if the OS keyboard event affects the LLM.
---- @param keyCode number Keystroke numeric code.
---- @param flags table Keystroke modifier keys.
---- @param is_ignored boolean Disables functionality temporarily.
---- @return boolean Returns true if the key triggers an LLM injection.
+--- Routes keystrokes that interact with the prediction pipeline.
+--- Called from the main eventtap before any buffer logic runs.
+--- Returns true to consume the event and prevent it from reaching the buffer or expander.
+--- @param keyCode number The macOS key code of the pressed key.
+--- @param flags table The active modifier flags.
+--- @param is_ignored boolean True when the current app is on the keymap ignore list.
+--- @return boolean True if the event was consumed by the prediction pipeline.
 function M.handle_llm_keys(keyCode, flags, is_ignored)
-	if keyCode == 90 and M._llm_chain_pending then
-		M._llm_chain_pending = false
-		if M._chain_timer and type(M._chain_timer.stop) == "function" then M._chain_timer:stop() end
-		_state.suppress_rescan_keep_buffer(0.05)
-		M._perform_llm_check(true)
-		return true
-	end
+	-- F20: precise "typing complete" signal sent by apply_prediction().
+	-- All synthetic keystrokes are already in the target app by the time this fires.
+	if engine.handle_f20(keyCode) then return true end
 
-	if is_ignored or not _predictions_active then return false end
+	if is_ignored or not engine.is_visible() then return false end
 
-	if keyCode >= 123 and keyCode <= 126 then
-		local n_preds = type(_pending_predictions) == "table" and #_pending_predictions or 0
-		if n_preds > 1 then
-			local nav_mods = parse_mods(llm_nav_modifiers, {})
-			if core_llm.check_modifiers(flags, nav_mods) then
-				local nav_dir = (keyCode == 123 or keyCode == 126) and -1 or 1
-				if type(tooltip.navigate) == "function" then tooltip.navigate(nav_dir) end
-				_enter_validates_pred = true
-				return true
-			end
+	-- Arrow keys navigate through predictions.
+	-- We must return true to prevent the main eventtap from calling check_nav_reset(),
+	-- which would clear the buffer and dismiss the prediction tooltip.
+	local preds = engine.get_predictions()
+	if keyCode >= KEYCODE_ARROW_MIN and keyCode <= KEYCODE_ARROW_MAX and #preds > 1 then
+		if core_llm.check_modifiers(flags, engine.get_navigation_mods()) then
+			local delta = (keyCode == KEYCODE_ARROW_MIN or keyCode == KEYCODE_ARROW_MAX - 1) and -1 or 1
+			Logger.debug(LOG, "Prediction navigation: %+d.", delta)
+			engine.navigate(delta)
+			-- The dismiss timer is reset internally by tooltip.navigate()
+			return true
 		end
 	end
 
-	if keyCode == 36 or keyCode == 76 then
-		local idx = tooltip.get_current_index and tooltip.get_current_index() or 1
+	-- Return / Enter accepts the currently highlighted prediction
+	if keyCode == KEYCODE_RETURN or keyCode == KEYCODE_ENTER then
+		local idx = engine.get_current_index() or 1
+		Logger.debug(LOG, "Return pressed — accepting prediction #%d.", idx)
 		if not M.apply_prediction(idx) then M.reset_predictions() end
 		return true
 	end
 
-	local val_mods = parse_mods(llm_val_modifiers, M.LLM_VAL_MODIFIERS_DEFAULT)
-	if #_pending_predictions > 1 and core_llm.check_modifiers(flags, val_mods) then
-		local n = NUM_KEYCODES[keyCode]
-		if n and n <= #_pending_predictions then return M.apply_prediction(n) end
+	-- Modifier+digit selects a prediction by position (e.g., alt+2 → second prediction)
+	if #preds > 1 and core_llm.check_modifiers(flags, engine.get_validation_mods()) then
+		local n = KEYCODE_DIGITS[keyCode]
+		if n and n <= #preds then
+			Logger.debug(LOG, "Direct selection — prediction #%d.", n)
+			return M.apply_prediction(n)
+		end
 	end
 
 	return false
 end
 
---- Validates if LLM reset must happen upon escape keystroke.
---- @return boolean Indicates if the keystroke event was consumed.
+--- Handles Escape: dismisses predictions if visible; otherwise optionally clears the buffer.
+--- @return boolean True if predictions were active and were dismissed.
 function M.check_escape_reset()
-	if _predictions_active then M.reset_predictions(); return true end
-	if llm_reset_on_nav then _state.buffer = "" end
+	if not _state then
+		Logger.error(LOG, "'check_escape_reset' called before M.init() — shared state not initialized.")
+		return false
+	end
+	if engine.is_visible() then
+		Logger.debug(LOG, "Escape — visible predictions dismissed.")
+		M.reset_predictions()
+		return true
+	end
+	if reset_buffer_on_navigation then
+		Logger.debug(LOG, "Escape — buffer cleared.")
+		_state.buffer = ""
+	end
 	M.reset_predictions()
 	return false
 end
 
---- Verifies if navigational operations erase LLM memory.
+--- Handles navigation keys (arrows, Enter) outside prediction mode.
+--- Optionally clears the buffer depending on the reset_buffer_on_navigation setting.
 function M.check_nav_reset()
-	if llm_reset_on_nav then _state.buffer = "" end
+	if not _state then
+		Logger.error(LOG, "'check_nav_reset' called before M.init() — shared state not initialized.")
+		return
+	end
+	if reset_buffer_on_navigation then
+		if _state.buffer ~= "" then
+			Logger.debug(LOG, "Buffer cleared on navigation.")
+		end
+		_state.buffer = ""
+	end
 	M.reset_predictions()
 end
-
 
 
 
@@ -778,11 +551,39 @@ end
 -- =============================
 -- =============================
 
---- Mounts the shared state to the LLM bridge module.
---- @param core_state table The shared state object.
-function M.init(core_state)
-	_state = core_state
-	Logger.info(LOG, "Keymap LLM bridge initialized successfully.")
+--- Delegates to the prediction engine for external callers that reference _perform_llm_check.
+--- @param force_trigger boolean If true, bypasses the freshness and word-count guards.
+--- @param profile_name string|nil Optional profile label override shown in the info bar.
+function M._perform_llm_check(force_trigger, profile_name)
+	engine.perform_check(force_trigger, profile_name)
 end
+
+--- Public alias so the expander can re-arm the LLM timer after a text replacement.
+function M.start_timer()
+	engine.start_timer()
+end
+
+--- Initializes the bridge by injecting the shared keymap core state.
+--- Must be called exactly once before any other public function in this module.
+--- @param core_state table The shared state object from modules/keymap/init.lua.
+function M.init(core_state)
+	Logger.start(LOG, "Initializing LLM bridge…")
+
+	if type(core_state) ~= "table" then
+		Logger.error(LOG, "M.init(): invalid core_state (expected table, got %s) — bridge non-functional.", type(core_state))
+		return
+	end
+
+	_state = core_state
+	engine.init(core_state)
+
+	Logger.success(LOG, "LLM bridge initialized (buffer: '%s', %d mapping(s)).",
+		tostring(_state.buffer or ""), #(_state.mappings or {}))
+end
+
+-- Wire tooltip callbacks so the tooltip module can call back into the bridge.
+-- Closures ensure the functions are resolved at call time, not at bind time.
+tooltip.set_accept_callback(function(idx) M.apply_prediction(idx) end)
+tooltip.set_cancel_callback(function() M.reset_predictions() end)
 
 return M

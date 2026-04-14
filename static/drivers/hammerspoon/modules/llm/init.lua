@@ -47,6 +47,10 @@ M.DEFAULT_STATE = {
 	llm_val_modifiers     = {"alt"},
 	llm_pred_indent       = -3,
 	llm_active_profile    = "basic",
+	-- Bridge behavioral flags (read by llm_bridge, overridden by menu_llm at startup)
+	llm_reset_on_nav      = true,
+	llm_after_hotstring   = false,
+	llm_auto_raise_temp   = false,  -- Incrementally raise temperature for each extra prediction
 }
 
 local CoreState = {
