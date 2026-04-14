@@ -3,12 +3,16 @@
 --- ==============================================================================
 --- MODULE: Keymap Expander
 --- DESCRIPTION:
---- Handles the execution of text expansions, auto-corrections, and replacements
---- using the active buffer and the registry database.
+--- Executes text expansions: auto-expanding hotstrings, terminator-triggered
+--- hotstrings, and the magic-key "repeat last character" feature.
 ---
 --- FEATURES & RATIONALE:
---- 1. Safe Injection: Utilizes safe simulated keystrokes and text utilities.
---- 2. Intelligent Conflict Resolution: Identifies prefixes and trailing chars.
+--- 1. Fail Fast: A require_state guard prevents silent failures when a function
+---    is called before the module is initialized.
+--- 2. Intelligent Conflict Resolution: Common prefixes between the trigger and
+---    the replacement are kept to minimize the number of backspaces issued.
+--- 3. Async Execution in Ignored Windows: Expansions in ignored windows are
+---    deferred via hs.timer.doAfter(0) so they do not block the event queue.
 --- ==============================================================================
 
 local M = {}
@@ -22,16 +26,29 @@ local km_utils   = require("modules.keymap.utils")
 local Logger     = require("lib.logger")
 local LOG        = "keymap.expander"
 
+-- Optional modules — loaded with pcall because they are not required for core expansion.
 local ok_kl, keylogger = pcall(require, "modules.keylogger")
 if not ok_kl then keylogger = nil end
 
 local ok_tt, tooltip = pcall(require, "ui.tooltip")
 if not ok_tt then tooltip = { hide = function() end } end
 
-local _state    = nil
-local _registry = nil
-local _llm      = nil
+local _state    = nil  -- Shared CoreState injected via M.init().
+local _registry = nil  -- Registry module injected via M.init().
+local _llm      = nil  -- LLMBridge module injected via M.init().
 
+
+--- Guard: verifies that M.init() was called before any public function that
+--- depends on the injected dependencies. Logs an error and returns false on failure.
+--- @param func_name string Name of the calling function (for error messages).
+--- @return boolean True when all dependencies are ready.
+local function require_state(func_name)
+	if not _state or not _registry or not _llm then
+		Logger.error(LOG, "'%s' called before M.init() — dependencies not initialized.", func_name)
+		return false
+	end
+	return true
+end
 
 
 
@@ -42,48 +59,58 @@ local _llm      = nil
 -- ====================================
 -- ====================================
 
---- Internal helper executing character manipulation via backspaces and pasting.
---- @param deletes number Quantity of backspaces to issue.
---- @param emit_action function Routine to fire the text replacement.
---- @param buffer_action function Routine syncing the internal tracker logic.
---- @param is_final boolean Whether to pause predictions temporarily post execution.
---- @param is_ignored boolean Disables tooltip and AI reactions.
---- @param source_type string Specifies the module triggering the generation.
---- @param source_variant string|nil Optional subtype used by UI widgets.
+--- Issues backspaces, fires the emit callback, updates the buffer, and
+--- re-arms the LLM timer. This is the single choke-point through which
+--- every expansion passes, ensuring consistent logging and side-effects.
+---
+--- @param deletes number Number of backspaces to issue.
+--- @param emit_action function Called to type or paste the replacement text.
+---   Must return (emitted_count: number, emitted_str: string).
+--- @param buffer_action function Called to sync _state.buffer after emission.
+--- @param is_final boolean When true, suppresses re-scanning after completion.
+--- @param is_ignored boolean When true, skips tooltip and LLM side-effects.
+--- @param source_type string Telemetry label passed to the keylogger.
+--- @param source_variant string|nil Optional sub-type for the keylogger.
 function M.perform_text_replacement(deletes, emit_action, buffer_action, is_final, is_ignored, source_type, source_variant)
-	Logger.debug(LOG, "Performing text replacement…")
+	Logger.trace(LOG, "Performing replacement (%d deletion(s))…", deletes)
+
 	_state.expected_synthetic_deletes = _state.expected_synthetic_deletes + deletes
 	if not is_ignored and tooltip.hide then tooltip.hide() end
-	
+
 	for _ = 1, deletes do keyStroke({}, "delete", 0) end
-	local ok, _, emitted_str = pcall(emit_action)
-	if not ok then emitted_str = "" end
-	
-	_state.expected_synthetic_chars = _state.expected_synthetic_chars .. (emitted_str or "")
-	
+
+	local ok, emit_count, emitted_str = pcall(emit_action)
+	if not ok then
+		-- The emit failed — emitted_str contains the error message from pcall.
+		Logger.error(LOG, "emit_action failed: %s.", tostring(emit_count))
+		emitted_str = ""
+	end
+	emitted_str = emitted_str or ""
+
+	-- Track the emitted characters so the main event loop knows to skip them.
+	_state.expected_synthetic_chars = _state.expected_synthetic_chars .. emitted_str
+
 	if keylogger and type(keylogger.notify_synthetic) == "function" then
 		keylogger.notify_synthetic(emitted_str, source_type or "hotstring", deletes, source_variant)
 	end
-	
+
 	if type(buffer_action) == "function" then pcall(buffer_action) end
 
 	if keylogger and type(keylogger.set_buffer) == "function" then
 		keylogger.set_buffer(_state.buffer)
 	end
 
-	if not is_ignored and _llm and type(_llm.update_preview) == "function" then
-		-- Re-evaluate previews on the freshly expanded buffer to support chained autocorrections
-		_llm.update_preview(_state.buffer)
-	end
+	-- Re-evaluate preview on the updated buffer to support chained autocorrections.
+	if not is_ignored then _llm.update_preview(_state.buffer) end
 
 	if is_final then _state.suppress_rescan(1.0) end
 
 	if not is_ignored and _llm.get_llm_enabled() then
 		_llm.start_timer()
 	end
-	Logger.info(LOG, "Text replacement completed.")
-end
 
+	Logger.done(LOG, "Replacement complete.")
+end
 
 
 
@@ -94,55 +121,65 @@ end
 -- ======================================
 -- ======================================
 
---- Attempts to resolve and execute an auto-expanding hotstring sequence.
---- @param m table The dictionary mapping matched sequence.
---- @param char_len number Byte length of the latest character.
---- @param is_ignored boolean Silences auxiliary systems like the LLM when active.
---- @return boolean True if sequence resolved successfully.
+--- Attempts to auto-expand a hotstring when the buffer ends with its trigger.
+--- "Auto" hotstrings fire immediately on the last character, without a terminator.
+--- @param m table The mapping entry from the registry.
+--- @param char_len number UTF-8 length of the latest typed character.
+--- @param is_ignored boolean True when the current window suppresses LLM/tooltip.
+--- @return boolean True when the expansion fired.
 function M.try_auto_expand(m, char_len, is_ignored)
+	if not require_state("try_auto_expand") then return false end
+
 	local trigger = m.trigger
 	if not text_utils.utf8_ends_with(_state.buffer, trigger) then return false end
-	
-	if m.is_word and text_utils.utf8_len(_state.buffer) > text_utils.utf8_len(trigger)
-		and not trigger:match("^[ \194\160\226\128\175]") then
-		local tstart   = utf8.offset(_state.buffer, -text_utils.utf8_len(trigger))
-		local before   = tstart and _state.buffer:sub(1, tstart - 1) or ""
-		local last_ch  = utf8.offset(before, -1)
-		local prev_char = last_ch and before:sub(last_ch) or ""
-		
-		-- Treat the '@' prefix as word continuation to prevent collision with personal info triggers
+
+	-- Word-boundary check: reject the match when the trigger is preceded by a
+	-- letter or "@" (which is used as a personal-info trigger prefix).
+	if m.is_word
+		and text_utils.utf8_len(_state.buffer) > text_utils.utf8_len(trigger)
+		and not trigger:match("^[ \194\160\226\128\175]")
+	then
+		local tstart    = utf8.offset(_state.buffer, -text_utils.utf8_len(trigger))
+		local before    = tstart and _state.buffer:sub(1, tstart - 1) or ""
+		local prev_off  = utf8.offset(before, -1)
+		local prev_char = prev_off and before:sub(prev_off) or ""
 		if text_utils.is_letter_char(prev_char) or prev_char == "@" then
 			return false
 		end
 	end
 
-	local tokens    = km_utils and type(km_utils.tokens_from_repl) == "function" and km_utils.tokens_from_repl(m.repl) or {}
-	local repl_text = km_utils and type(km_utils.plain_text) == "function" and km_utils.plain_text(tokens) or m.repl
-	
+	local tokens    = km_utils.tokens_from_repl(m.repl)
+	local repl_text = km_utils.plain_text(tokens)
+
+	-- No-op guard: skip when the plain-text expansion equals the trigger.
 	if repl_text == trigger then
 		if m.final_result then _state.suppress_rescan() end
 		if not is_ignored and tooltip.hide then tooltip.hide() end
 		return true
 	end
 
+	-- Compute how many backspaces and what to type, keeping common prefix chars.
+	-- In an ignored window (char_len == 0) there is no "last char" to keep, so
+	-- we must erase the full trigger length.
 	local char_offset = is_ignored and 0 or char_len
 	local deletes, to_type = text_utils.utf8_len(trigger) - char_offset, repl_text
 
 	if repl_text == m.repl then
+		-- Simple text replacement: find the longest shared prefix to minimise backspaces.
 		local screen = text_utils.utf8_sub(trigger, 1, text_utils.utf8_len(trigger) - char_offset)
 		local common = text_utils.get_common_prefix_utf8(screen, repl_text)
 		deletes = text_utils.utf8_len(screen) - common
 		to_type = text_utils.utf8_sub(repl_text, common + 1)
 	end
 
-	M.perform_text_replacement(deletes, 
-		function() 
-			if repl_text == m.repl and km_utils and type(km_utils.emit_text) == "function" then
+	M.perform_text_replacement(
+		deletes,
+		function()
+			if repl_text == m.repl then
 				return km_utils.emit_text(to_type)
-			elseif km_utils and type(km_utils.emit_tokens) == "function" then
-				return km_utils.emit_tokens(tokens) 
+			else
+				return km_utils.emit_tokens(tokens)
 			end
-			return 0, ""
 		end,
 		function()
 			local tstart = utf8.offset(_state.buffer, -text_utils.utf8_len(trigger))
@@ -157,87 +194,101 @@ function M.try_auto_expand(m, char_len, is_ignored)
 	if keylogger and type(keylogger.log_hotstring) == "function" then
 		pcall(keylogger.log_hotstring, trigger, repl_text)
 	end
-	Logger.debug(LOG, "Hotstring auto-expand: '%s' -> '%s'", tostring(trigger), tostring(repl_text))
+	Logger.debug(LOG, "Auto-expand: '%s' → '%s'.", trigger, repl_text)
 	return true
 end
 
---- Attempts to resolve a non-automatic hotstring sequence triggered by a special trailing terminator.
---- @param m table The mapping dictionary entry to resolve against.
---- @param chars string The specific trailing trigger sequence injected.
---- @param char_len number UTF-8 token length of the trailing sequence.
---- @param is_ignored boolean Disables LLM AI checks for current context.
---- @return boolean True if triggered successfully, false otherwise.
+--- Attempts to expand a hotstring when the buffer ends with the trigger followed
+--- by an enabled terminator character (e.g., space, comma, ★).
+--- @param m table The mapping entry from the registry.
+--- @param chars string The latest typed character(s) (potential terminator).
+--- @param char_len number UTF-8 length of `chars`.
+--- @param is_ignored boolean True when the current window suppresses LLM/tooltip.
+--- @return boolean True when the expansion fired.
 function M.try_terminator_expand(m, chars, char_len, is_ignored)
+	if not require_state("try_terminator_expand") then return false end
+
 	if not _registry.is_terminator(chars) then return false end
 
-	local trigger = m.trigger
+	local trigger   = m.trigger
 	local buf_end   = utf8.offset(_state.buffer, -char_len) or (#_state.buffer + 1)
 	local trig_len  = text_utils.utf8_len(trigger)
 	local buf_start = utf8.offset(_state.buffer, -(char_len + trig_len))
-	local segment   = (buf_start and buf_start <= buf_end - 1) and _state.buffer:sub(buf_start, buf_end - 1) or nil
-	
+	local segment   = (buf_start and buf_start <= buf_end - 1)
+		and _state.buffer:sub(buf_start, buf_end - 1)
+		or nil
+
 	if segment ~= trigger then return false end
 
+	-- Word-boundary check: same logic as in try_auto_expand.
 	if m.is_word and not trigger:match("^[ \194\160\226\128\175]") then
 		local before    = buf_start and _state.buffer:sub(1, buf_start - 1) or ""
-		local last_ch   = utf8.offset(before, -1)
-		local prev_char = last_ch and before:sub(last_ch) or ""
-		
-		-- Treat the '@' prefix as word continuation to prevent collision with personal info triggers
+		local prev_off  = utf8.offset(before, -1)
+		local prev_char = prev_off and before:sub(prev_off) or ""
 		if text_utils.is_letter_char(prev_char) or prev_char == "@" then
 			return false
 		end
 	end
 
 	local consume_term = _registry.terminator_is_consumed(chars)
-	
+
+	-- No-op guard: skip when the plain-text expansion equals the trigger.
 	if m.repl == trigger then
 		if m.final_result then _state.suppress_rescan() end
 		if not is_ignored and tooltip.hide then tooltip.hide() end
 		return true
 	end
 
-	-- Records acceptance ONLY upon effective completion by a terminator (e.g. star)
+	-- Record a "suggestion shown" telemetry event for terminators that indicate
+	-- explicit user acceptance (e.g., ★ consumed as a deliberate trigger).
 	if keylogger and type(keylogger.log_hotstring_suggested) == "function" then
 		pcall(keylogger.log_hotstring_suggested)
 	end
 
 	local function do_expansion()
-		local tokens    = km_utils and type(km_utils.tokens_from_repl) == "function" and km_utils.tokens_from_repl(m.repl) or {}
-		local repl_text = km_utils and type(km_utils.plain_text) == "function" and km_utils.plain_text(tokens) or m.repl
+		local tokens    = km_utils.tokens_from_repl(m.repl)
+		local repl_text = km_utils.plain_text(tokens)
 		local deletes, to_type = trig_len, repl_text
-		
+
 		if repl_text == m.repl then
+			-- Simple text: keep common prefix to reduce backspaces.
 			local common = text_utils.get_common_prefix_utf8(trigger, repl_text)
 			deletes = trig_len - common
 			to_type = text_utils.utf8_sub(repl_text, common + 1)
 		end
-		
+
+		-- In an ignored window there is no "char" kept on screen — erase it too.
 		if is_ignored then deletes = deletes + char_len end
 
-		M.perform_text_replacement(deletes, 
+		M.perform_text_replacement(
+			deletes,
 			function()
-				local emitted_count, emitted_str = 0, ""
-				if repl_text == m.repl and km_utils and type(km_utils.emit_text) == "function" then
-					emitted_count, emitted_str = km_utils.emit_text(to_type)
-				elseif km_utils and type(km_utils.emit_tokens) == "function" then
-					emitted_count, emitted_str = km_utils.emit_tokens(tokens)
+				local c, s = 0, ""
+				if repl_text == m.repl then
+					c, s = km_utils.emit_text(to_type)
+				else
+					c, s = km_utils.emit_tokens(tokens)
 				end
-				
+
+				-- Re-type the terminator unless it should be consumed.
 				if not consume_term then
-					if chars == "\r" or chars == "\n" then keyStroke({}, "return", 0)
-					elseif chars == "\t" then keyStroke({}, "tab", 0)
-					else 
-						keyStrokes(chars) 
-						emitted_str = emitted_str .. chars
+					if chars == "\r" or chars == "\n" then
+						keyStroke({}, "return", 0)
+					elseif chars == "\t" then
+						keyStroke({}, "tab", 0)
+					else
+						keyStrokes(chars)
+						s = s .. chars
 					end
-					emitted_count = emitted_count + text_utils.utf8_len(chars)
+					c = c + text_utils.utf8_len(chars)
 				end
-				return emitted_count, emitted_str
+				return c, s
 			end,
 			function()
-				local tstart = utf8.offset(_state.buffer, -(char_len + trig_len))
-				_state.buffer = (tstart and _state.buffer:sub(1, tstart - 1) or "") .. repl_text .. (consume_term and "" or chars)
+				local tstart  = utf8.offset(_state.buffer, -(char_len + trig_len))
+				_state.buffer = (tstart and _state.buffer:sub(1, tstart - 1) or "")
+					.. repl_text
+					.. (consume_term and "" or chars)
 			end,
 			m.final_result,
 			is_ignored,
@@ -246,56 +297,76 @@ function M.try_terminator_expand(m, chars, char_len, is_ignored)
 		)
 
 		if keylogger and type(keylogger.log_hotstring) == "function" then
-			pcall(keylogger.log_hotstring, trigger, repl_text)
+			pcall(keylogger.log_hotstring, trigger, km_utils.plain_text(km_utils.tokens_from_repl(m.repl)))
 		end
-		Logger.debug(LOG, "Hotstring terminator-expand: '%s' -> '%s'", tostring(trigger), tostring(repl_text))
+		Logger.debug(LOG, "Terminator-expand: '%s' → '%s'.", trigger, m.repl)
 	end
 
+	-- Defer execution in ignored windows to avoid blocking the HID event queue.
 	if is_ignored then do_expansion() else hs.timer.doAfter(0, do_expansion) end
 	return true
 end
 
---- Validates and manages immediate repetition hotstrings natively.
---- @param chars string Keystroke trailing trigger.
---- @param is_ignored boolean Skips notification propagation on match.
---- @return boolean Valid repetition fired flag.
+--- Fires the magic-key "repeat last character" feature when the user types
+--- the trigger char twice: the first occurrence of the trigger is replaced by
+--- the character that immediately preceded it.
+---
+--- Example: the user types "a★" → "aa".
+---
+--- @param chars string The latest typed character(s) (potential magic key).
+--- @param is_ignored boolean True when the current window suppresses LLM/tooltip.
+--- @return boolean True when the repeat fired.
 function M.try_repeat_feature(chars, is_ignored)
-	if not _state.is_repeat_feature_enabled() or chars ~= _state.magic_key then return false end
+	if not require_state("try_repeat_feature") then return false end
+	if not _state.is_repeat_feature_enabled() then return false end
+	if chars ~= _state.magic_key then return false end
 
 	local char_len = text_utils.utf8_len(chars)
 	local buf_len  = text_utils.utf8_len(_state.buffer)
 	if buf_len <= char_len then return false end
 
-	local before = _state.buffer:sub(1, utf8.offset(_state.buffer, -char_len) - 1)
+	-- Find the offset of the magic-key in the buffer and isolate the text before it.
+	local magic_offset = utf8.offset(_state.buffer, -char_len)
+	if not magic_offset then
+		Logger.warn(LOG, "try_repeat_feature: utf8.offset returned nil — skipping.")
+		return false
+	end
+	local before = _state.buffer:sub(1, magic_offset - 1)
+
+	-- Read the last character before the magic key.
 	local last_char_offset = utf8.offset(before, -1)
 	if not last_char_offset then return false end
-
 	local last_char = before:sub(last_char_offset)
+
+	-- Refuse to repeat whitespace — repeating a space or newline is never useful.
 	if last_char == "" or last_char:match("^%s$") then return false end
 
 	if not is_ignored and tooltip.hide then tooltip.hide() end
-	if is_ignored then 
+
+	-- In ignored windows, the magic key is already on screen and must be deleted.
+	if is_ignored then
 		_state.expected_synthetic_deletes = _state.expected_synthetic_deletes + 1
-		keyStroke({}, "delete", 0) 
+		keyStroke({}, "delete", 0)
 	end
-	
+
 	_state.expected_synthetic_chars = _state.expected_synthetic_chars .. last_char
-	
+
 	if keylogger and type(keylogger.notify_synthetic) == "function" then
 		keylogger.notify_synthetic(last_char, "hotstring", is_ignored and 1 or 0)
 	end
 	keyStrokes(last_char)
 
-	local tstart = utf8.offset(_state.buffer, -char_len)
-	_state.buffer = (tstart and _state.buffer:sub(1, tstart - 1) or "") .. last_char
-	
+	-- Update the buffer: strip the magic key and append the repeated character.
+	local tstart      = utf8.offset(_state.buffer, -char_len)
+	_state.buffer     = (tstart and _state.buffer:sub(1, tstart - 1) or "") .. last_char
+
 	if not is_ignored and _llm.get_llm_enabled() then
 		_llm.start_timer()
 	end
-	
+
+	Logger.debug(LOG, "Repeat feature: repeated '%s'.", last_char)
 	return true
 end
-
 
 
 
@@ -306,16 +377,21 @@ end
 -- =============================
 -- =============================
 
---- Mounts the shared state and submodules to the expander module.
---- @param core_state table The shared state object.
---- @param registry_mod table The registry submodule reference.
---- @param llm_mod table The LLM bridge submodule reference.
+--- Injects the shared dependencies from keymap/init.lua.
+--- Must be called exactly once before any expansion function.
+--- @param core_state table The shared CoreState object.
+--- @param registry_mod table The registry module.
+--- @param llm_mod table The LLM bridge module.
 function M.init(core_state, registry_mod, llm_mod)
-	Logger.debug(LOG, "Initializing expander dependencies…")
+	if type(core_state)  ~= "table" then Logger.error(LOG, "M.init(): core_state must be a table."); return end
+	if type(registry_mod) ~= "table" then Logger.error(LOG, "M.init(): registry_mod must be a table."); return end
+	if type(llm_mod)     ~= "table" then Logger.error(LOG, "M.init(): llm_mod must be a table."); return end
+
+	Logger.start(LOG, "Initializing expander…")
 	_state    = core_state
 	_registry = registry_mod
 	_llm      = llm_mod
-	Logger.info(LOG, "Expander initialized successfully.")
+	Logger.success(LOG, "Expander initialized.")
 end
 
 return M

@@ -3,13 +3,17 @@
 --- ==============================================================================
 --- MODULE: Keymap Core
 --- DESCRIPTION:
---- Core engine for Ergopti+. Initializes the central eventtap loop, manages the
---- typing buffer, and routes interactions to the Registry, LLM Bridge, and Expander.
+--- Core engine for Ergopti+. Initializes the central eventtap loop, manages
+--- the typing buffer, and routes interactions to the Registry, LLM Bridge, and
+--- Expander. This module is the single source of truth for all keymap defaults.
 ---
 --- FEATURES & RATIONALE:
---- 1. Shared State: Centralizes state via CoreState without using globals.
---- 2. Zero-Latency Execution: Uses an ultra-fast event loop directly connected to the OS.
---- 3. Modularity: Defers specific responsibilities to specialized submodules.
+--- 1. Single Source of Truth: All keymap-wide defaults live in M.DEFAULT_STATE
+---    and M.DELAYS_DEFAULT. Menu modules read from here — never re-declare them.
+--- 2. Shared State: Centralizes runtime state via CoreState without globals.
+--- 3. Zero-Latency Execution: Uses an ultra-fast event loop directly connected
+---    to the OS, with a pcall safety wrapper to prevent keyboard lockups.
+--- 4. Modularity: Defers specific responsibilities to specialized submodules.
 --- ==============================================================================
 
 local hs         = hs
@@ -28,42 +32,36 @@ local LOG = "keymap"
 
 
 
-
 -- ================================
 -- ================================
 -- ======= 1/ Default State =======
 -- ================================
 -- ================================
 
--- Default constants initialization
-M.LLM_NAV_MODIFIERS_DEFAULT   = {}
-M.LLM_VAL_MODIFIERS_DEFAULT   = {"alt"}
-M.LLM_DEBOUNCE_DEFAULT        = 0.5
-M.LLM_CONTEXT_LENGTH_DEFAULT  = 500
-M.LLM_TEMPERATURE_DEFAULT     = 0.1
-M.LLM_MAX_WORDS_DEFAULT       = 5
-M.LLM_NUM_PREDICTIONS_DEFAULT = 5
-M.LLM_PRED_INDENT_DEFAULT     = -3
-M.BASE_DELAY_SEC_DEFAULT      = 0.75
-
+-- Per-group expansion delay thresholds (in seconds).
+-- A value of 0 means the expansion fires regardless of typing speed.
 M.DELAYS_DEFAULT = {
-	STAR_TRIGGER       = 2.0,  -- Manual expansions with ★ (Magickey)
+	STAR_TRIGGER       = 2.0,  -- Manual expansions with ★ (magic key)
 	dynamichotstrings  = 2.0,  -- Phone numbers, SSN, dates…
 	autocorrection     = 0.5,  -- Spell checking
-	rolls              = 0.25, -- Rolls (e.g. sx -> sk)
-	sfbsreduction      = 0.25, -- Comma combos (e.g. ,t -> pt)
+	rolls              = 0.25, -- Rolls (e.g. sx → sk)
+	sfbsreduction      = 0.25, -- Comma combos (e.g. ,t → pt)
 	distancesreduction = 0.25, -- Dead keys and suffixes
 	llm_prediction     = 20.0, -- AI prediction tooltip timeout
 }
 
--- Default state in the menu
+--- Canonical defaults exposed to menu modules (single source of truth).
+--- Menu modules MUST read from here instead of re-declaring their own values.
 M.DEFAULT_STATE = {
-	keymap          = true,
-	expansion_delay = M.BASE_DELAY_SEC_DEFAULT,
-	delays          = {},
-	trigger_char    = "★",
+	keymap                      = true,
+	expansion_delay             = 0.75,   -- Baseline inter-key delay threshold (seconds)
+	delays                      = {},     -- Per-group overrides; empty = use DELAYS_DEFAULT
+	trigger_char                = "★",
+	preview_star_enabled        = true,
+	preview_autocorrect_enabled = true,
+	preview_ai_enabled          = true,
+	preview_colored_tooltips    = true,
 }
-
 
 
 
@@ -74,10 +72,10 @@ M.DEFAULT_STATE = {
 -- ======================================
 -- ======================================
 
--- Central memory struct passed via reference to all sub-modules
+-- Central memory struct passed via reference to all sub-modules.
 local CoreState = {
 	buffer                     = "",
-	magic_key                  = "★",
+	magic_key                  = M.DEFAULT_STATE.trigger_char,
 	mappings                   = {},
 	mappings_lookup            = {},
 	groups                     = {},
@@ -92,7 +90,7 @@ local CoreState = {
 	last_key_was_complex       = false,
 	no_rescan_until            = 0,
 	WORD_TIMEOUT_SEC           = 5.0,
-	BASE_DELAY_SEC             = M.BASE_DELAY_SEC_DEFAULT,
+	BASE_DELAY_SEC             = M.DEFAULT_STATE.expansion_delay,
 	DELAYS                     = {},
 	DELAYS_DEFAULT             = M.DELAYS_DEFAULT,
 	current_group              = nil,
@@ -101,7 +99,7 @@ local CoreState = {
 	ignored_window_patterns    = {},
 }
 
--- Methods bound onto CoreState for submodules to call
+-- Methods bound onto CoreState for submodules to call.
 CoreState.suppress_rescan = function(duration)
 	CoreState.no_rescan_until = hs.timer.secondsSinceEpoch() + (tonumber(duration) or 0.5)
 	CoreState.buffer = ""
@@ -113,25 +111,26 @@ end
 
 CoreState.is_repeat_feature_enabled = Registry.is_repeat_feature_enabled
 
--- Seed the initial delays
+-- Seed the initial per-group delays from defaults and compute the word-timeout.
 local has_infinite = false
-local max_delay = 0
-for k, v in pairs(M.DELAYS_DEFAULT) do 
-	CoreState.DELAYS[k] = v 
+local max_delay    = 0
+for k, v in pairs(M.DELAYS_DEFAULT) do
+	CoreState.DELAYS[k] = v
 	if v == 0 then has_infinite = true end
 	if v > max_delay then max_delay = v end
 end
+-- WORD_TIMEOUT_SEC: how long the engine waits before wiping the buffer on inactivity.
+-- 0 means infinite (never wipe), which is needed when any delay is 0 (always-active trigger).
 CoreState.WORD_TIMEOUT_SEC = has_infinite and 0 or (max_delay + 0.5)
 
--- Mount dependencies
+-- Mount dependencies (order matters: Registry before Expander/LLMBridge).
 Registry.init(CoreState)
-LLMBridge.init(CoreState)
+LLMBridge.init(CoreState, M.DEFAULT_STATE)
 Expander.init(CoreState, Registry, LLMBridge)
 
 local tap       = nil
 local shift_tap = nil
 local mouse_tap = nil
-
 
 
 
@@ -142,82 +141,115 @@ local mouse_tap = nil
 -- ==========================================
 -- ==========================================
 
---- Retrieves the baseline delay configuration.
---- @return number The default expansion delay threshold.
-function M.get_base_delay()       return CoreState.BASE_DELAY_SEC end
+--- Returns the current baseline inter-key delay threshold.
+--- @return number The delay in seconds.
+function M.get_base_delay()
+	return CoreState.BASE_DELAY_SEC
+end
 
---- Adjusts the baseline delay configuration.
---- @param secs number The new target threshold.
-function M.set_base_delay(secs)   CoreState.BASE_DELAY_SEC = math.max(0, tonumber(secs) or M.BASE_DELAY_SEC_DEFAULT) end
+--- Sets the baseline inter-key delay threshold used for all unmapped groups.
+--- @param secs number The new threshold in seconds (clamped to ≥ 0).
+function M.set_base_delay(secs)
+	local v = math.max(0, tonumber(secs) or M.DEFAULT_STATE.expansion_delay)
+	CoreState.BASE_DELAY_SEC = v
+	Logger.debug(LOG, "Base delay: %.3fs.", v)
+end
 
---- Retrieves the side of the shift key pressed last.
---- @return string The shift key identity string.
-function M.get_shift_side()       return CoreState.shift_side end
+--- Returns the side of the last shift key pressed.
+--- @return string|nil "left", "right", or nil if Shift is not held.
+function M.get_shift_side()
+	return CoreState.shift_side
+end
 
---- Pauses eventtap processing cleanly.
-function M.pause_processing()     CoreState.processing_paused = true end
+--- Pauses eventtap processing — all keystrokes pass through unmodified.
+function M.pause_processing()
+	CoreState.processing_paused = true
+	Logger.debug(LOG, "Processing paused.")
+end
 
---- Resumes eventtap processing from pause.
-function M.resume_processing()    CoreState.processing_paused = false end
+--- Resumes eventtap processing after a pause.
+function M.resume_processing()
+	CoreState.processing_paused = false
+	Logger.debug(LOG, "Processing resumed.")
+end
 
---- Evaluates the processing pause status.
---- @return boolean True if currently paused.
-function M.is_processing_paused() return CoreState.processing_paused end
+--- Returns true when the eventtap is currently paused.
+--- @return boolean
+function M.is_processing_paused()
+	return CoreState.processing_paused
+end
 
---- Configures a specialized delay setting based on internal categories.
---- @param key string The delay group key identifier.
---- @param val number The new numeric threshold limit.
+--- Sets the per-group delay threshold for the given key.
+--- Only keys present in DELAYS_DEFAULT are accepted; unknown keys are silently ignored.
+--- @param key string The group identifier (must be a key of DELAYS_DEFAULT).
+--- @param val number The new threshold in seconds.
 function M.set_delay(key, val)
-	if M.DELAYS_DEFAULT[key] ~= nil then
-		CoreState.DELAYS[key] = tonumber(val) or M.DELAYS_DEFAULT[key]
-		
-		-- Recalculate word timeout based on max delay and evaluate infinite triggers
-		local has_inf = false
-		local max_d = 0
-		for _, v in pairs(CoreState.DELAYS) do
-			if type(v) == "number" then
-				if v == 0 then has_inf = true end
-				if v > max_d then max_d = v end
-			end
+	if M.DELAYS_DEFAULT[key] == nil then return end
+
+	CoreState.DELAYS[key] = tonumber(val) or M.DELAYS_DEFAULT[key]
+	Logger.debug(LOG, "Delay '%s': %.3fs.", key, CoreState.DELAYS[key])
+
+	-- Recompute WORD_TIMEOUT_SEC whenever any delay changes.
+	local has_inf = false
+	local max_d   = 0
+	for _, v in pairs(CoreState.DELAYS) do
+		if type(v) == "number" then
+			if v == 0     then has_inf = true end
+			if v > max_d  then max_d = v      end
 		end
-		CoreState.WORD_TIMEOUT_SEC = has_inf and 0 or (max_d + 0.5)
 	end
+	CoreState.WORD_TIMEOUT_SEC = has_inf and 0 or (max_d + 0.5)
 end
 
---- Globally reassigns the magic expansion key target value.
---- @param char string The targeted key code representation string.
+--- Globally reassigns the magic expansion key (the "★" character by default).
+--- @param char string The new trigger character (must be a non-empty string).
 function M.set_trigger_char(char)
-	if type(char) == "string" and char ~= "" then
-		CoreState.magic_key = char
-		Registry.update_trigger_char(char)
+	if type(char) ~= "string" or char == "" then
+		Logger.warn(LOG, "set_trigger_char: received an invalid value ('%s') — ignored.", tostring(char))
+		return
+	end
+	CoreState.magic_key = char
+	Registry.update_trigger_char(char)
+	Logger.debug(LOG, "Trigger char: '%s'.", char)
+end
+
+--- Ignores a specific window title from hotstring processing.
+--- @param title string The exact window title to ignore.
+function M.ignore_window_title(title)
+	if type(title) == "string" then
+		CoreState.ignored_window_titles[title] = true
 	end
 end
 
---- Ignores a specific window title string from interception processing natively.
---- @param title string The raw window string identifier.
-function M.ignore_window_title(title)     
-	if type(title) == "string" then CoreState.ignored_window_titles[title] = true end 
+--- Ignores windows whose title matches a Lua pattern.
+--- @param pattern string A Lua pattern matched against window titles.
+function M.ignore_window_pattern(pattern)
+	if type(pattern) == "string" then
+		table.insert(CoreState.ignored_window_patterns, pattern)
+	end
 end
 
---- Ignores windows matching an evaluated lua regular expression pattern natively.
---- @param pattern string The evaluation regex string.
-function M.ignore_window_pattern(pattern) 
-	if type(pattern) == "string" then table.insert(CoreState.ignored_window_patterns, pattern) end 
+--- Registers a keystroke interceptor called before the expansion engine.
+--- Return "consume" to swallow the event, "suppress" to skip triggers.
+--- @param fn function The interceptor callback.
+function M.register_interceptor(fn)
+	if type(fn) == "function" then
+		table.insert(CoreState.interceptors, fn)
+	end
 end
 
---- Injects an interceptor evaluation hook to preprocess key sequences directly.
---- @param fn function The callback script entity pointing.
-function M.register_interceptor(fn)      
-	if type(fn) == "function" then table.insert(CoreState.interceptors, fn) end      
+--- Registers a custom preview provider called by the LLM bridge on each keystroke.
+--- Return a non-nil value to display a custom tooltip; return nil to fall through.
+--- @param fn function The provider callback.
+function M.register_preview_provider(fn)
+	if type(fn) == "function" then
+		table.insert(CoreState.preview_providers, fn)
+	end
 end
 
---- Injects a preview rendering hook to surface context data locally inside the tooltip.
---- @param fn function The callback script entity pointing.
-function M.register_preview_provider(fn) 
-	if type(fn) == "function" then table.insert(CoreState.preview_providers, fn) end 
-end
 
--- Proxy Registry Methods
+-- ── Registry proxies ─────────────────────────────────────────────────────────
+
 M.add                   = Registry.add
 M.load_file             = Registry.load_file
 M.load_toml             = Registry.load_toml
@@ -235,39 +267,43 @@ M.register_lua_group    = Registry.register_lua_group
 M.enable_group          = Registry.enable_group
 M.sort_mappings         = Registry.sort_mappings
 
-M.set_terminator_enabled    = Registry.set_terminator_enabled
-M.is_terminator_enabled     = Registry.is_terminator_enabled
-M.get_terminator_defs       = Registry.get_terminator_defs
-M.add_custom_terminator     = Registry.add_custom_terminator
-M.remove_custom_terminator  = Registry.remove_custom_terminator
+M.set_terminator_enabled   = Registry.set_terminator_enabled
+M.is_terminator_enabled    = Registry.is_terminator_enabled
+M.get_terminator_defs      = Registry.get_terminator_defs
+M.add_custom_terminator    = Registry.add_custom_terminator
+M.remove_custom_terminator = Registry.remove_custom_terminator
 
--- Proxy LLM Bridge Methods
-M.set_llm_model           = LLMBridge.set_llm_model
+
+-- ── LLM bridge proxies ───────────────────────────────────────────────────────
+
+M.set_llm_model              = LLMBridge.set_llm_model
 M.set_llm_display_model_name = LLMBridge.set_llm_display_model_name
-M.set_llm_context_length  = LLMBridge.set_llm_context_length
-M.set_llm_reset_on_nav    = LLMBridge.set_llm_reset_on_nav
-M.set_llm_temperature     = LLMBridge.set_llm_temperature
-M.set_llm_max_words       = LLMBridge.set_llm_max_words
-M.set_llm_num_predictions = LLMBridge.set_llm_num_predictions
-M.set_llm_show_info_bar   = LLMBridge.set_llm_show_info_bar
-M.set_llm_pred_indent     = LLMBridge.set_llm_pred_indent
-M.set_llm_sequential_mode = LLMBridge.set_llm_sequential_mode
-M.set_llm_val_modifiers   = LLMBridge.set_llm_val_modifiers
-M.set_llm_nav_modifiers         = LLMBridge.set_llm_nav_modifiers
-M.get_llm_enabled               = LLMBridge.get_llm_enabled
-M.set_llm_show_model_name       = LLMBridge.set_llm_show_model_name
-M.set_llm_disabled_apps         = LLMBridge.set_llm_disabled_apps
-M.set_llm_enabled               = LLMBridge.set_llm_enabled
-M.set_preview_enabled           = LLMBridge.set_preview_enabled
-M.set_preview_star_enabled      = LLMBridge.set_preview_star_enabled
-M.set_preview_autocorrect_enabled = LLMBridge.set_preview_autocorrect_enabled
-M.set_preview_ai_enabled        = LLMBridge.set_preview_ai_enabled
-M.set_preview_colored_tooltips  = LLMBridge.set_preview_colored_tooltips
-M.set_llm_after_hotstring       = LLMBridge.set_llm_after_hotstring
-M.set_llm_debounce              = LLMBridge.set_llm_debounce
-M.trigger_prediction            = LLMBridge._perform_llm_check
-M.reset_predictions             = LLMBridge.reset_predictions
+M.set_llm_context_length     = LLMBridge.set_llm_context_length
+M.set_llm_reset_on_nav       = LLMBridge.set_llm_reset_on_nav
+M.set_llm_temperature        = LLMBridge.set_llm_temperature
+M.set_llm_max_words          = LLMBridge.set_llm_max_words
+M.set_llm_num_predictions    = LLMBridge.set_llm_num_predictions
+M.set_llm_show_info_bar      = LLMBridge.set_llm_show_info_bar
+M.set_llm_pred_indent        = LLMBridge.set_llm_pred_indent
+M.set_llm_sequential_mode    = LLMBridge.set_llm_sequential_mode
+M.set_llm_val_modifiers      = LLMBridge.set_llm_val_modifiers
+M.set_llm_nav_modifiers      = LLMBridge.set_llm_nav_modifiers
+M.get_llm_enabled            = LLMBridge.get_llm_enabled
+M.set_llm_show_model_name    = LLMBridge.set_llm_show_model_name
+M.set_llm_disabled_apps      = LLMBridge.set_llm_disabled_apps
+M.set_llm_enabled            = LLMBridge.set_llm_enabled
+M.set_llm_after_hotstring    = LLMBridge.set_llm_after_hotstring
+M.set_llm_debounce           = LLMBridge.set_llm_debounce
+M.set_llm_auto_raise_temp    = LLMBridge.set_llm_auto_raise_temp
 
+M.set_preview_enabled             = LLMBridge.set_preview_enabled
+M.set_preview_star_enabled        = LLMBridge.set_preview_star_enabled
+M.set_preview_autocorrect_enabled = LLMBridge.set_preview_autocorrect_enabled
+M.set_preview_ai_enabled          = LLMBridge.set_preview_ai_enabled
+M.set_preview_colored_tooltips    = LLMBridge.set_preview_colored_tooltips
+
+M.trigger_prediction = LLMBridge._perform_llm_check
+M.reset_predictions  = LLMBridge.reset_predictions
 
 
 
@@ -278,23 +314,25 @@ M.reset_predictions             = LLMBridge.reset_predictions
 -- =========================================
 -- =========================================
 
---- Master keyboard loop interceptor wrapped internally by eventtap.
---- @param e table The MacOS keystroke event entity payload.
---- @return boolean Always returns false to fall back out gracefully on system error.
+--- Inner keyboard handler — never called directly; always wrapped in a pcall.
+--- @param e table The macOS keystroke event payload.
+--- @return boolean True to consume the event, false to pass it through.
 local function onKeyDownRaw(e)
 	if CoreState.processing_paused then return false end
 
-	local now   = hs.timer.secondsSinceEpoch()
-	local dt    = now - CoreState.last_key_time
+	local now = hs.timer.secondsSinceEpoch()
+	local dt  = now - CoreState.last_key_time
 	CoreState.last_key_time = now
 
-	-- Automatically clean waiting lists to prevent deadlocks
+	-- Auto-reset stuck synthetic counters when typing resumes after a pause.
+	-- Without this, a missed synthetic event would permanently lock the engine.
 	if dt > 0.5 then
 		CoreState.expected_synthetic_deletes = 0
-		CoreState.expected_synthetic_chars = ""
+		CoreState.expected_synthetic_chars   = ""
 	end
 
-	-- Word timeout: clear the buffer if the user took a long pause
+	-- Wipe the buffer after the user pauses long enough that the next keystroke
+	-- cannot possibly belong to the same word.
 	if CoreState.WORD_TIMEOUT_SEC > 0 and dt > CoreState.WORD_TIMEOUT_SEC then
 		CoreState.buffer = ""
 		LLMBridge.reset_predictions()
@@ -302,149 +340,165 @@ local function onKeyDownRaw(e)
 
 	local keyCode = e:getKeyCode()
 	local flags   = e:getFlags()
-	
+
+	-- Determine whether the current window should suppress hotstring expansion.
 	local is_ignored = false
-	local frontApp = hs.application.frontmostApplication()
-	
+	local frontApp   = hs.application.frontmostApplication()
 	if frontApp and frontApp:name() == "Hammerspoon" then
+		-- Always ignore our own console to prevent feedback loops
 		is_ignored = true
-	elseif km_utils and type(km_utils.is_ignored_window) == "function" then
+	else
 		is_ignored = km_utils.is_ignored_window(CoreState.ignored_window_titles, CoreState.ignored_window_patterns)
 	end
 
-	-- 1. Ignore our own synthetic "Delete" keystrokes
+	-- 1. Ignore our own synthetic "Delete" keystrokes to prevent double-deletion.
 	if keyCode == 51 and CoreState.expected_synthetic_deletes > 0 then
 		CoreState.expected_synthetic_deletes = CoreState.expected_synthetic_deletes - 1
-		return false 
+		return false
 	end
 
-	-- 2. Handles LLM Prediction Execution (Enter / Numbers / Tab / Arrows)
+	-- 2. Route LLM prediction keys (Enter / digits / arrows) before buffer logic.
 	if LLMBridge.handle_llm_keys(keyCode, flags, is_ignored) then return true end
 
-	-- 3. Pass event through custom interceptors
+	-- 3. Run custom interceptors registered by external modules.
 	local suppress_triggers = false
 	for _, interceptor in ipairs(CoreState.interceptors) do
 		local ok, result = pcall(interceptor, e, CoreState.buffer)
 		if ok then
-			if result == "consume" then return true end
-			if result == "suppress" then suppress_triggers = true; break end
+			if result == "consume"   then return true end
+			if result == "suppress"  then suppress_triggers = true; break end
 		end
 	end
 
-	-- Ignore Karabiner layer and modified keys (F13-F20)
-	if keyCode == 105 or keyCode == 107 or keyCode == 113 or keyCode == 106 or keyCode == 64 or keyCode == 79 or keyCode == 80 or keyCode == 90 then
+	-- Ignore Karabiner synthetic layer keys and F13-F20 (used for signaling).
+	if keyCode == 105 or keyCode == 107 or keyCode == 113 or keyCode == 106
+		or keyCode == 64 or keyCode == 79 or keyCode == 80 or keyCode == 90 then
 		return false
 	end
 
-	-- 4. Clear states on escape, navigation and modifications shortcuts
+	-- 4. Handle Escape — dismiss predictions or optionally clear the buffer.
 	if keyCode == 53 then return LLMBridge.check_escape_reset() end
 
+	-- 5. Modifier shortcuts (Cmd/Ctrl) break the current word context.
 	if flags.cmd or flags.ctrl then
 		CoreState.buffer = ""
 		LLMBridge.check_nav_reset()
 		return false
 	end
 
-	-- Handle standard Backspace
+	-- 6. Handle Backspace.
 	if keyCode == 51 then
+		-- Cmd+Backspace / Alt+Backspace delete whole words — wipe the buffer.
 		if flags.cmd or flags.alt then
 			CoreState.buffer = ""
 			LLMBridge.check_nav_reset()
 			return false
 		end
 		if #CoreState.buffer > 0 then
-			local offset = utf8.offset(CoreState.buffer, -1)
-			CoreState.buffer = offset and CoreState.buffer:sub(1, offset - 1) or ""
+			-- Remove the last UTF-8 character from the buffer safely.
+			local ok, offset = pcall(utf8.offset, CoreState.buffer, -1)
+			CoreState.buffer = (ok and offset) and CoreState.buffer:sub(1, offset - 1) or ""
 			if not is_ignored then LLMBridge.update_preview(CoreState.buffer) end
 		end
 		return false
 	end
 
-	-- Handle Arrow Keys
+	-- 7. Arrow / navigation keys break word context; delegate to nav-reset handler.
 	if keyCode == 117 or keyCode == 115 or keyCode == 116 or keyCode == 119 or keyCode == 121
 		or (keyCode >= 123 and keyCode <= 126) then
-
 		LLMBridge.check_nav_reset()
 		return false
 	end
 
-	-- 5. Gather character
+	-- 8. Gather the character produced by this keystroke.
 	local chars = e:getCharacters(false)
 	if not chars or chars == "" then return false end
 
 	-- CRUCIAL SYNTHETIC FILTER:
-	-- Ignore the character if it is part of our requested synthetic typing.
-	-- It is emitted to the screen, BUT not added twice to the buffer.
+	-- When we typed a character programmatically, the OS sends it back to us as
+	-- a real event. Skip it here so it does not get added twice to the buffer.
 	if #CoreState.expected_synthetic_chars > 0 then
 		if CoreState.expected_synthetic_chars:sub(1, #chars) == chars then
 			CoreState.expected_synthetic_chars = CoreState.expected_synthetic_chars:sub(#chars + 1)
 			return false
 		elseif dt < 0.02 then
-			-- Tolerance for macOS UTF-8 decomposition
+			-- Tolerance window for macOS UTF-8 multi-event decomposition
 			return false
 		end
 	end
 
+	-- Append to the rolling buffer (capped at 500 chars to bound memory usage).
 	CoreState.buffer = CoreState.buffer .. chars
 	if #CoreState.buffer > 500 then
-		CoreState.buffer = CoreState.buffer:sub(utf8.offset(CoreState.buffer, -500) or 1)
+		local ok, off = pcall(utf8.offset, CoreState.buffer, -500)
+		CoreState.buffer = CoreState.buffer:sub((ok and off) or 1)
 	end
 
 	if not is_ignored then LLMBridge.update_preview(CoreState.buffer) end
 
-	-- 6. Trigger Checks
+	-- 9. Run expansion trigger checks.
 	local function rescan_suppressed()
 		return hs.timer.secondsSinceEpoch() < CoreState.no_rescan_until
 	end
-	
+
 	if suppress_triggers or rescan_suppressed() then return false end
-	
-    -- If the roll is complex (involves a modifier), we allow a longer delay (×2) to accommodate the extra finger movement
-	local is_complex    = flags.shift or flags.alt
-	local complex_mult  = (is_complex or CoreState.last_key_was_complex) and 2 or 1
+
+	-- Complex keystrokes (involving Shift or Alt) allow a wider timing window
+	-- to accommodate the extra finger movement required by the modifier.
+	local is_complex   = flags.shift or flags.alt
+	local complex_mult = (is_complex or CoreState.last_key_was_complex) and 2 or 1
 	CoreState.last_key_was_complex = is_complex
 
 	local function run_trigger_checks()
 		local char_len = text_utils.utf8_len(chars)
-		
+
 		for _, m in ipairs(CoreState.mappings) do
-			local group_active = not m.group or not CoreState.groups[m.group] or CoreState.groups[m.group].enabled
-			if group_active then
-				
-				-- A. Determine the maximum allowed delay for this specific shortcut
-				local specific_delay = CoreState.BASE_DELAY_SEC
-				
-				if m.trigger:sub(-#CoreState.magic_key) == CoreState.magic_key then
-					specific_delay = CoreState.DELAYS.STAR_TRIGGER
-				elseif m.group and CoreState.DELAYS[m.group] then
-					specific_delay = CoreState.DELAYS[m.group]
-				end
+			local group_active = not m.group
+				or not CoreState.groups[m.group]
+				or CoreState.groups[m.group].enabled
+			if not group_active then goto continue end
 
-				local allow_complex_delay = not (m.group == "autocorrection")
-				local allowed_delay = allow_complex_delay and (specific_delay * complex_mult) or specific_delay
-
-				-- B. Check if the time gap (dt) with the previous key is valid
-				if allowed_delay == 0 or dt <= allowed_delay then
-					if m.auto and Expander.try_auto_expand(m, char_len, is_ignored) then return true end
-					if not m.auto and Expander.try_terminator_expand(m, chars, char_len, is_ignored) then return true end
-				end
+			-- Determine the tightest applicable delay for this mapping.
+			local specific_delay
+			if m.trigger:sub(-#CoreState.magic_key) == CoreState.magic_key then
+				specific_delay = CoreState.DELAYS.STAR_TRIGGER
+			elseif m.group and CoreState.DELAYS[m.group] then
+				specific_delay = CoreState.DELAYS[m.group]
+			else
+				specific_delay = CoreState.BASE_DELAY_SEC
 			end
+
+			-- Autocorrections are never stretched for complex keystrokes (they
+			-- fire on letter combos, not on modifier+letter sequences).
+			local allow_complex_delay = (m.group ~= "autocorrection")
+			local allowed_delay       = allow_complex_delay and (specific_delay * complex_mult) or specific_delay
+
+			if allowed_delay == 0 or dt <= allowed_delay then
+				if m.auto     and Expander.try_auto_expand(m, char_len, is_ignored)       then return true end
+				if not m.auto and Expander.try_terminator_expand(m, chars, char_len, is_ignored) then return true end
+			end
+
+			::continue::
 		end
-		
+
 		local star_allowed = CoreState.DELAYS.STAR_TRIGGER * complex_mult
-		if star_allowed == 0 or dt <= star_allowed then
-			if Expander.try_repeat_feature(chars, is_ignored) then return true end
+		if (star_allowed == 0 or dt <= star_allowed)
+			and Expander.try_repeat_feature(chars, is_ignored) then
+			return true
 		end
-		
+
 		return false
 	end
 
+	-- In ignored windows we still want repeatable features to work,
+	-- but must run them asynchronously to avoid blocking the event queue.
 	if is_ignored then
 		hs.timer.doAfter(0, run_trigger_checks)
 	else
 		if run_trigger_checks() then return true end
 	end
 
+	-- Enter / Tab after a plain keystroke clears prediction state.
 	if keyCode == 36 or keyCode == 48 then
 		LLMBridge.check_nav_reset()
 	end
@@ -452,18 +506,17 @@ local function onKeyDownRaw(e)
 	return false
 end
 
---- Wrapper for raw key intercept catching arbitrary native OS errors cleanly.
+--- pcall wrapper around onKeyDownRaw to prevent keyboard lockups on uncaught errors.
 --- @param e table Event parameters.
---- @return boolean Return flag logic passed from raw.
+--- @return boolean Pass-through result from the inner handler.
 local function onKeyDown(e)
 	local ok, result = pcall(onKeyDownRaw, e)
 	if not ok then
-		Logger.error(LOG, string.format("Keyboard interception failure: %s.", tostring(result)))
+		Logger.error(LOG, "Keyboard interception failure: %s.", tostring(result))
 		return false
 	end
 	return result
 end
-
 
 
 
@@ -491,20 +544,20 @@ shift_tap = eventtap.new(
 			end
 			return false
 		end)
-		if not ok then 
-			Logger.error(LOG, string.format("Capitalization management failure: %s.", tostring(result)))
-			return false 
+		if not ok then
+			Logger.error(LOG, "Shift-side detection failure: %s.", tostring(result))
+			return false
 		end
 		return result
 	end
 )
 
 mouse_tap = eventtap.new(
-	{ 
-		eventtap.event.types.leftMouseDown, 
-		eventtap.event.types.rightMouseDown, 
+	{
+		eventtap.event.types.leftMouseDown,
+		eventtap.event.types.rightMouseDown,
 		eventtap.event.types.middleMouseDown,
-		eventtap.event.types.scrollWheel 
+		eventtap.event.types.scrollWheel,
 	},
 	function()
 		local ok, result = pcall(function()
@@ -512,31 +565,31 @@ mouse_tap = eventtap.new(
 			LLMBridge.reset_predictions()
 			return false
 		end)
-		if not ok then 
-			Logger.error(LOG, string.format("Mouse management failure: %s.", tostring(result)))
-			return false 
+		if not ok then
+			Logger.error(LOG, "Mouse event handler failure: %s.", tostring(result))
+			return false
 		end
 		return result
 	end
 )
 
---- Safely registers and mounts the daemon listeners to the OS framework.
+--- Starts the eventtap listeners and attaches them to the OS event queue.
 function M.start()
-	Logger.debug(LOG, "Starting keymap engine listeners…")
-	if tap then tap:start() end
-	if shift_tap then shift_tap:start() end
-	if mouse_tap then mouse_tap:start() end
-	Logger.info(LOG, "Keymap engine listeners started successfully.")
+	Logger.start(LOG, "Starting keymap engine…")
+	tap:start()
+	shift_tap:start()
+	mouse_tap:start()
+	Logger.success(LOG, "Keymap engine started.")
 end
 
---- Unhooks daemons gracefully preventing memory leaks.
+--- Stops the eventtap listeners and cleans up prediction state.
 function M.stop()
-	Logger.debug(LOG, "Stopping keymap engine listeners…")
-	if tap then tap:stop() end
-	if shift_tap then shift_tap:stop() end
-	if mouse_tap then mouse_tap:stop() end
+	Logger.start(LOG, "Stopping keymap engine…")
+	tap:stop()
+	shift_tap:stop()
+	mouse_tap:stop()
 	LLMBridge.reset_predictions()
-	Logger.info(LOG, "Keymap engine listeners stopped.")
+	Logger.success(LOG, "Keymap engine stopped.")
 end
 
 M.start()

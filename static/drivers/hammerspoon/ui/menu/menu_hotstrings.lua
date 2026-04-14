@@ -13,7 +13,9 @@ local notifications = require("lib.notifications")
 local LOG           = "menu_hotstrings"
 
 local dh_mod = require("modules.dynamic_hotstrings")
-
+-- Keymap is already loaded by init.lua before this module is required;
+-- require() returns the cached module with no side-effects.
+local keymap  = require("modules.keymap")
 
 
 
@@ -24,11 +26,17 @@ local dh_mod = require("modules.dynamic_hotstrings")
 -- ================================
 -- ================================
 
+-- Preview defaults are the canonical values owned by modules/keymap/init.lua.
+-- We read them here so there is a single source of truth — never re-declare them.
+local KM = keymap.DEFAULT_STATE
+
 M.DEFAULT_STATE = {
-	preview_star_enabled          = true,
-	preview_autocorrect_enabled   = true,
-	preview_ai_enabled            = true,
-	preview_colored_tooltips      = true,
+	-- Preview toggle defaults — read from keymap, never duplicated here.
+	preview_star_enabled          = KM.preview_star_enabled,
+	preview_autocorrect_enabled   = KM.preview_autocorrect_enabled,
+	preview_ai_enabled            = KM.preview_ai_enabled,
+	preview_colored_tooltips      = KM.preview_colored_tooltips,
+	-- Editor & UI preferences — owned by this menu module.
 	custom_close_on_add           = false,
 	custom_default_section        = nil,
 	custom_editor_shortcut        = nil,
@@ -37,6 +45,7 @@ M.DEFAULT_STATE = {
 	custom_terminators            = {},
 	hotstrings                    = {},
 	delays                        = {},
+	-- Dynamic hotstrings defaults — read from their canonical module.
 	personal_info                 = dh_mod.DEFAULT_STATE.personal_info,
 	dynamichotstrings_enabled     = dh_mod.DEFAULT_STATE.dynamichotstrings_enabled,
 }
