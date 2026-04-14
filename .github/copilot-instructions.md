@@ -16,7 +16,7 @@ Copilot is authorized to create, edit, and delete any file type in any directory
 - **Code is English, UI is French.**
 - ALL variables, function names, class names, parameters, internal comments, and docstrings **MUST be written in English**.
 - ONLY user-facing text (HTML content, UI labels, `hs.dialog.alert`, `alert()`, `print()` intended for the user) must be written in **French**.
-- **Typography & Quotes:** You MUST use the typographic apostrophe (`’`) in all comments and text displayed to the user. Always prefer double quotes (`"`) over single quotes (`'`) for strings. Double quotes are our standard; the goal is to have as few standard single quotes (`'`) as possible in the codebase.
+- **Typography & Quotes:** You MUST use the typographic apostrophe (`'`) in all comments and text displayed to the user. Always prefer double quotes (`"`) over single quotes (`'`) for strings. Double quotes are our standard; the goal is to have as few standard single quotes (`'`) as possible in the codebase.
 
 ## 2. Architecture & Spacing
 
@@ -61,14 +61,157 @@ more_code_here()
 
 ## 4. Logging Conventions
 
-- **Use Standard Logger:** Utilize the central logger system (e.g., `lib.logger` in Lua, equivalent systems elsewhere).
-- **Ongoing vs. Completed Actions:**
-  - When logging an action that is starting or in progress, use an ellipsis (`…`) (e.g., `Logger.debug(LOG, "Starting engine…")`).
-  - When logging a completed action or assertion, end with a period (`.`) (e.g., `Logger.info(LOG, "Engine started successfully.")`).
+Use the central logger system (`lib.logger` in Lua, equivalent elsewhere). **Log extensively** — a well-instrumented codebase is worth its weight. Every meaningful state change, lifecycle event, decision, and failure path must be logged. Future debugging depends on it.
 
-# Language-Specific Guidelines
+### 4.1 The Eight Variants
 
-## JavaScript / SvelteKit (`.js`, `.svelte`)
+The logger has **8 variants** organized on two axes: _importance_ and _lifecycle role_.
+
+| | Misc | Lifecycle Start | Lifecycle End |
+|---|---|---|---|
+| **DEBUG** | `DEBUG` (gray) | `TRACE` (dim cyan) | `DONE` (dim green) |
+| **INFO** | `INFO` (black) | `START` (bright cyan) | `SUCCESS` (bright green) |
+| **WARNING** | `WARNING` (orange) | — | — |
+| **ERROR** | `ERROR` (red) | — | — |
+
+**When to use each:**
+
+- `Logger.debug` — verbose detail: setter calls, state snapshots, per-keystroke events, anything fired at high frequency.
+- `Logger.trace` — start of a **routine internal operation** at debug granularity (e.g., arming a debounce timer). Pair with `Logger.done`.
+- `Logger.done` — successful end of a routine internal operation (e.g., timer stopped, cache hit). Pair with `Logger.trace`.
+- `Logger.info` — general status worth knowing: config loaded, feature toggled, model changed.
+- `Logger.start` — start of a **significant action** at INFO level (e.g., init, HTTP request, user-triggered operation). Pair with `Logger.success`. A `START` without a following `SUCCESS` in the logs immediately signals a silent failure.
+- `Logger.success` — successful completion of a significant action. Always pair with `Logger.start`.
+- `Logger.warn` — unexpected condition the code can recover from; must be investigated.
+- `Logger.error` — unrecoverable failure; execution should stop or degrade gracefully.
+
+### 4.2 Lifecycle Pairing Rule
+
+Lifecycle variants always come in pairs. **Never** log a `start`/`trace` without a corresponding `success`/`done`, and vice versa. If the pair is incomplete in the logs, something failed silently.
+
+```lua
+-- Good — matched pair at INFO level
+Logger.start(LOG, "Initializing LLM bridge…")
+-- … work …
+Logger.success(LOG, "LLM bridge initialized (%d mapping(s)).", count)
+
+-- Good — matched pair at DEBUG level
+Logger.trace(LOG, "Inactivity timer started (%.3fs).", delay)
+-- … later …
+Logger.done(LOG, "Inactivity timer stopped.")
+```
+
+### 4.3 Punctuation in Log Messages
+
+- **In-progress / starting:** end with `…` — `"Loading model…"`
+- **Completed / asserted:** end with `.` — `"Model loaded successfully."`
+- **Format strings:** follow the same rule on the static part.
+
+### 4.4 Language
+
+All log messages must be in **English**. Logs are developer-facing, not user-facing.
+
+### 4.5 Log Level Selection Guide
+
+Ask: "Would I need this line to diagnose a bug in production?" If yes → `info` or above. If only during active development → `debug`/`trace`/`done`. High-frequency events (per-keystroke, per-frame) → `debug` only.
+
+## 5. Code Quality Standards
+
+These rules were established to reach the level of professionalism demonstrated in `modules/keymap/llm_bridge.lua`. Apply them to every new or significantly modified file.
+
+### 5.1 No Magic Numbers
+
+Every literal value with non-obvious meaning MUST be a named constant. Group all constants at the **top of the file** (Section 1) with an explanatory comment for each. This includes timeouts, keycodes, ratios, thresholds, frame rates, buffer sizes — anything that is not self-evidently `0`, `1`, or `true`/`false`.
+
+```lua
+-- Bad
+hs.timer.doAfter(86400, dismiss)
+if keyCode == 90 then …
+
+-- Good (constants at top of file)
+local INFINITE_TOOLTIP_SEC = 86400  -- 24 h stand-in for "never auto-dismiss"
+local KEYCODE_F20          = 90     -- Synthetic "typing complete" signal
+…
+hs.timer.doAfter(INFINITE_TOOLTIP_SEC, dismiss)
+if keyCode == KEYCODE_F20 then …
+```
+
+### 5.2 Single Source of Truth for Defaults
+
+Default values must live in **exactly one place** — typically a `DEFAULT_STATE` table in the owning module. Other modules that need those defaults must read them from that source, never re-declare them.
+
+```lua
+-- Bad — value duplicated in two files
+-- llm_bridge.lua:   local temperature = 0.1
+-- menu_llm.lua:     local default_temp = 0.1
+
+-- Good — menu_llm reads from the canonical source
+local LLM_DEFAULTS = require("modules.llm").DEFAULT_STATE
+local temperature  = LLM_DEFAULTS.llm_temperature
+```
+
+### 5.3 Fail Fast — No Silent Failures
+
+Code must detect invalid state early and surface it loudly. **Never** mask errors with silent fallbacks buried in the middle of logic.
+
+- Use a **guard helper** (e.g., `require_state`) at the top of every public function that depends on injected state. Log an `ERROR` and return immediately if the precondition is not met.
+- Wrap OS-level calls and external APIs in `pcall`; log the failure explicitly.
+- Do **not** swallow errors in `pcall` without at minimum a `Logger.error` call.
+- A function that cannot complete its contract must say so — either via return value or log — never pretend it succeeded.
+
+```lua
+-- Good — guard helper pattern
+local function require_state(func_name)
+    if not _state then
+        Logger.error(LOG, "'%s' called before M.init() — shared state not initialized.", func_name)
+        return false
+    end
+    return true
+end
+
+function M.reset_predictions()
+    if not require_state("reset_predictions") then return end
+    -- … safe to proceed
+end
+```
+
+### 5.4 No Hardcoded Behavioral Fallbacks
+
+Values that the user can configure via a menu or settings must **always** come from that configuration. Never substitute a hardcoded fallback (e.g., `if temperature == nil then temperature = 0.1 end`) that would silently override the user's intent. If a required value is missing, fail fast (see 5.3).
+
+### 5.5 Setters Must Log
+
+Every public setter function must log its new value at `DEBUG` level. This makes it trivial to trace exactly what configuration was applied at startup.
+
+```lua
+function M.set_llm_temperature(t)
+    temperature = t
+    Logger.debug(LOG, "Temperature: %s.", tostring(t))
+end
+```
+
+### 5.6 No Unused Fallback Code
+
+Do not add backwards-compatibility shims, `_compat` aliases, or `-- removed` comments for removed functionality. If something is gone, remove it cleanly. Do not rename variables to `_unused_foo` — delete them.
+
+### 5.7 Comments Explain Why, Not What
+
+Inline comments must explain the _reason_ a decision was made, not re-state what the code does. If the code is obvious, no comment is needed.
+
+```lua
+-- Bad
+-- Increment counter
+llm_request_counter = llm_request_counter + 1
+
+-- Good — explains why
+-- Invalidate any in-flight callbacks by bumping the generation counter;
+-- stale async responses check this value and discard themselves
+llm_request_counter = llm_request_counter + 1
+```
+
+## 6. Language-Specific Guidelines
+
+### JavaScript / SvelteKit (`.js`, `.svelte`)
 
 - Use modern ES6+ syntax (`const`, `let`, arrow functions) where appropriate, but respect the existing codebase style if it uses standard `function` declarations for global UI bindings.
 - Always use `JSDoc` for function documentation.
@@ -122,7 +265,7 @@ function showAlertModal(message) {
 }
 ```
 
-## Hammerspoon / Lua (`.lua`)
+### Hammerspoon / Lua (`.lua`)
 
 - Use `local` for variables and functions to prevent global scope pollution.
 - Use `pcall` (protected call) for any OS-level interaction, file system manipulation, or event interception to prevent silent crashes or keyboard lockups.
@@ -149,7 +292,6 @@ local hs = hs
 
 
 
-
 -- ==============================
 -- ==============================
 -- ======= 1/ Core Engine =======
@@ -172,7 +314,7 @@ function M.start(script_control)
 end
 ```
 
-## Python (`.py`)
+### Python (`.py`)
 
 - Follow [PEP 8](https://peps.python.org/pep-0008/) coding conventions.
 - Use strict **Type Hinting** for all parameters and return types.
@@ -202,7 +344,6 @@ from typing import Optional
 
 
 
-
 # ==================================
 # ==================================
 # ======= 1/ File Processing =======
@@ -226,7 +367,7 @@ def parse_driver_config(file_path: str) -> Optional[dict]:
 	return {}
 ```
 
-## AutoHotkey (`.ahk`)
+### AutoHotkey (`.ahk`)
 
 - Maintain clean variable scoping.
 - Use `;` for comments and ensure the exact same spacing and banner rules apply to separate hotkey logic from UI/Tray logic.
@@ -243,7 +384,6 @@ def parse_driver_config(file_path: str) -> Optional[dict]:
 ; ==============================================================================
 
 global IsPaused := False
-
 
 
 
