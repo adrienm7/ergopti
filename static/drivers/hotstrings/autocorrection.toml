@@ -6,7 +6,7 @@
 description = "Autocorrection"
 sections_order = ["accents", "names", "caps", "-", "typographicapostrophe", "-", "errors", "ou", "multiplepunctuationmarks", "suffixesachaining", "-", "minus", "minusapostrophe", "-", "phonenumberautocomplete"]
 
-[_meta.sections]  
+[_meta.sections]
 typographicapostrophe = "L’apostrophe devient typographique lors de l’écriture de texte : m'a = m’a, it's = it’s, …"
 errors = "Correction de certaines fautes de frappe : OUi = Oui, aeu = eau, …"
 ou = "Taper [où ] puis un point ou une virgule supprime automatiquement l’espace ajouté avant"
