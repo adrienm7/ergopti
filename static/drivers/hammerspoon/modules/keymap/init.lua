@@ -342,14 +342,9 @@ local function onKeyDownRaw(e)
 	local flags   = e:getFlags()
 
 	-- Determine whether the current window should suppress hotstring expansion.
-	local is_ignored = false
-	local frontApp   = hs.application.frontmostApplication()
-	if frontApp and frontApp:name() == "Hammerspoon" then
-		-- Always ignore our own console to prevent feedback loops
-		is_ignored = true
-	else
-		is_ignored = km_utils.is_ignored_window(CoreState.ignored_window_titles, CoreState.ignored_window_patterns)
-	end
+	-- The Hammerspoon console check is inside is_ignored_window() and covered
+	-- by its 0.5s cache, avoiding a redundant frontmostApplication() call here.
+	local is_ignored = km_utils.is_ignored_window(CoreState.ignored_window_titles, CoreState.ignored_window_patterns)
 
 	-- 1. Ignore our own synthetic "Delete" keystrokes to prevent double-deletion.
 	if keyCode == 51 and CoreState.expected_synthetic_deletes > 0 then
@@ -451,6 +446,9 @@ local function onKeyDownRaw(e)
 
 	local function run_trigger_checks()
 		local char_len = text_utils.utf8_len(chars)
+		-- Pre-evaluate once: avoids a 20-entry linear scan inside try_terminator_expand
+		-- for every non-auto mapping — on a normal letter keystroke that saves ~300 calls
+		local chars_is_terminator = Registry.is_terminator(chars)
 
 		for _, m in ipairs(CoreState.mappings) do
 			local group_active = not m.group
@@ -475,7 +473,8 @@ local function onKeyDownRaw(e)
 
 			if allowed_delay == 0 or dt <= allowed_delay then
 				if m.auto     and Expander.try_auto_expand(m, char_len, is_ignored)       then return true end
-				if not m.auto and Expander.try_terminator_expand(m, chars, char_len, is_ignored) then return true end
+				if not m.auto and chars_is_terminator
+					and Expander.try_terminator_expand(m, chars, char_len, is_ignored) then return true end
 			end
 
 			::continue::

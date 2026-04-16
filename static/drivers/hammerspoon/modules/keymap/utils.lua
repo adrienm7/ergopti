@@ -364,7 +364,9 @@ local _ignored_win_cache_time  = 0
 local _ignored_win_cache_value = false
 
 --- Returns true when the frontmost window is on the ignore list.
---- Result is cached for 0.5s to avoid querying the OS on every keystroke.
+--- The Hammerspoon console check is folded in here so that the single
+--- frontmostApplication() call is covered by the 0.5s cache — previously
+--- a redundant uncached call was made in init.lua on every keystroke.
 --- @param ignored_titles table Hash map of exact window titles to ignore.
 --- @param ignored_patterns table Array of Lua patterns matched against window titles.
 --- @return boolean
@@ -377,6 +379,13 @@ function M.is_ignored_window(ignored_titles, ignored_patterns)
 
 	local app = hs.application.frontmostApplication()
 	if not app then return false end
+
+	-- Always ignore the Hammerspoon console to prevent feedback loops;
+	-- folded here so it benefits from the same 0.5s cache as the rest
+	if app:name() == "Hammerspoon" then
+		_ignored_win_cache_value = true
+		return true
+	end
 
 	local ok_win, win = pcall(function() return app:focusedWindow() end)
 	if not ok_win or not win then return false end
