@@ -1,4 +1,5 @@
 #!/usr/bin/env sh
+exit 0 # Hook disabled — remove this line to re-enable
 . "$(dirname -- "$0")/_/husky.sh"
 
 # Sync private AHK file to the public repo (no-op if .local_ahk_path absent)
