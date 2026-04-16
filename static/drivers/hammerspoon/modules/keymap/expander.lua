@@ -11,8 +11,9 @@
 ---    is called before the module is initialized.
 --- 2. Intelligent Conflict Resolution: Common prefixes between the trigger and
 ---    the replacement are kept to minimize the number of backspaces issued.
---- 3. Async Execution in Ignored Windows: Expansions in ignored windows are
----    deferred via hs.timer.doAfter(0) so they do not block the event queue.
+--- 3. Synchronous Terminator Execution: Expansions run directly inside the HID
+---    callback without deferral. CGEventPost() is non-blocking, so keyStroke()
+---    calls return immediately — identical to how auto-expand already behaves.
 --- ==============================================================================
 
 local M = {}
@@ -302,8 +303,10 @@ function M.try_terminator_expand(m, chars, char_len, is_ignored)
 		Logger.debug(LOG, "Terminator-expand: '%s' → '%s'.", trigger, m.repl)
 	end
 
-	-- Defer execution in ignored windows to avoid blocking the HID event queue.
-	if is_ignored then do_expansion() else hs.timer.doAfter(0, do_expansion) end
+	-- Run synchronously: CGEventPost() is non-blocking so calling keyStroke()
+	-- inside the HID callback is safe. expected_synthetic_chars is already
+	-- armed before events fire, preventing re-entrancy into the trigger loop.
+	do_expansion()
 	return true
 end
 
