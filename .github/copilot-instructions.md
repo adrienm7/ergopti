@@ -266,7 +266,51 @@ function M.start()
 end
 ```
 
-## 6. Language-Specific Guidelines
+## 6. Git & Commit Conventions
+
+- **Format:** All commits MUST follow the [Conventional Commits](https://www.conventionalcommits.org/) specification.
+- **Language:** Commit messages are always written in **English** (developer-facing, like logs).
+- **No co-author credits:** Never add `Co-Authored-By` trailers. Do not credit any LLM or tool in commit messages.
+
+### 6.1) Commit Types
+
+| Type | When to use |
+|---|---|
+| `feat` | New feature or user-visible behaviour |
+| `fix` | Bug fix |
+| `perf` | Performance improvement with no behaviour change |
+| `refactor` | Code restructuring with no behaviour change |
+| `style` | Formatting, whitespace, naming — no logic change |
+| `docs` | Documentation only |
+| `test` | Adding or updating tests |
+| `chore` | Build scripts, tooling, CI, dependency updates |
+
+### 6.2) Format Rules
+
+```
+<type>(<optional scope>): <short imperative description>
+
+<optional body — explain WHY, not WHAT>
+```
+
+- Subject line: lowercase, imperative mood, no trailing period, ≤ 72 chars.
+- Body: wrap at 72 chars, focus on motivation and context, not implementation details.
+- Breaking changes: append `!` after the type (`feat!:`) and document in the body.
+
+**Examples:**
+
+```
+feat(keymap): add per-group delay multiplier for complex keystrokes
+
+perf(keymap): run terminator expansions synchronously in HID callback
+
+fix(llm): prevent stale callbacks from updating the tooltip after reset
+
+refactor(keylogger): extract flush logic into dedicated log_manager module
+```
+
+
+## 7. Language-Specific Guidelines
 
 ### JavaScript / SvelteKit (`.js`, `.svelte`)
 
