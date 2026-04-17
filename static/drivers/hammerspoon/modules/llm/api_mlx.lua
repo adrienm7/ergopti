@@ -399,11 +399,16 @@ local function post_and_parse_streaming(model_name, system_prompt, full_text, ta
 
 	-- Parse one SSE line (data: {...} or data: [DONE]) and append its token to accumulated
 	local function process_sse_line(line)
+		Logger.debug(LOG, "[%s] #%d SSE line: '%s'", model_name, req_id, line:sub(1, 120))
 		if line:sub(1, 6) ~= "data: " then return end
 		local json_str = line:sub(7)
 		if json_str == "[DONE]" then return end
 		local ok_dec, obj = pcall(hs.json.decode, json_str)
-		if not ok_dec or type(obj) ~= "table" or type(obj.choices) ~= "table" or not obj.choices[1] then return end
+		if not ok_dec or type(obj) ~= "table" or type(obj.choices) ~= "table" or not obj.choices[1] then
+			Logger.debug(LOG, "[%s] #%d SSE decode fail: ok=%s type_obj=%s",
+				model_name, req_id, tostring(ok_dec), type(obj))
+			return
+		end
 		local choice = obj.choices[1]
 		local token  = nil
 		-- Chat completions streaming: delta.content
@@ -431,16 +436,22 @@ local function post_and_parse_streaming(model_name, system_prompt, full_text, ta
 	end
 
 	-- Streaming callback: fired each time curl writes a chunk to stdout
-	local function on_chunk(_, chunk, _)
+	local function on_chunk(_, chunk, stderr_chunk)
 		if not chunk or chunk == "" then return true end
+		Logger.debug(LOG, "[%s] #%d STREAM chunk (%d bytes): '%s'",
+			model_name, req_id, #chunk, chunk:sub(1, 120))
 		line_buf = line_buf .. chunk
 		flush_lines()
 		return true
 	end
 
 	-- Completion callback: fired when curl exits
-	local function on_done(_, remaining, _)
+	local function on_done(exit_code, remaining, stderr_out)
 		_active_stream_task = nil
+		Logger.debug(LOG, "[%s] #%d STREAM on_done: exit=%s remaining_len=%d stderr='%s'",
+			model_name, req_id, tostring(exit_code),
+			(remaining and #remaining or -1),
+			tostring((stderr_out or ""):sub(1, 200)))
 		if remaining and remaining ~= "" then
 			line_buf = line_buf .. remaining
 			flush_lines()
