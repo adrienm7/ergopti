@@ -83,6 +83,8 @@ M.DEFAULT_STATE = {
     llm_after_hotstring   = false,
     llm_auto_raise_temp   = llm_mod.DEFAULT_STATE.llm_auto_raise_temp,
     llm_min_words         = llm_mod.DEFAULT_STATE.llm_min_words,
+    llm_streaming         = llm_mod.DEFAULT_STATE.llm_streaming,
+    llm_streaming_multi   = llm_mod.DEFAULT_STATE.llm_streaming_multi,
 }
 
 
@@ -311,6 +313,12 @@ function M.create(deps)
     end
     if state.llm_min_words ~= nil and keymap and type(keymap.set_llm_min_words) == "function" then
         pcall(keymap.set_llm_min_words, state.llm_min_words)
+    end
+    if state.llm_streaming ~= nil and keymap and type(keymap.set_llm_streaming) == "function" then
+        pcall(keymap.set_llm_streaming, state.llm_streaming)
+    end
+    if state.llm_streaming_multi ~= nil and keymap and type(keymap.set_llm_streaming_multi) == "function" then
+        pcall(keymap.set_llm_streaming_multi, state.llm_streaming_multi)
     end
 
 
@@ -1148,6 +1156,35 @@ function M.create(deps)
                 if keymap and type(keymap.set_llm_show_info_bar) == "function" then pcall(keymap.set_llm_show_info_bar, state.llm_show_info_bar) end
                 save_prefs(); update_menu()
             end
+        })
+
+        -- Streaming is nil-safe: old configs without the key default to true (same as DEFAULT_STATE)
+        local streaming_on = (state.llm_streaming ~= false)
+        local streaming_multi_on = (state.llm_streaming_multi ~= false)
+        table.insert(main_menu, {
+            title    = "Suggestions en streaming (token par token)",
+            checked  = streaming_on,
+            disabled = is_disabled or nil,
+            fn       = not is_disabled and function()
+                state.llm_streaming = not streaming_on
+                if keymap and type(keymap.set_llm_streaming) == "function" then
+                    pcall(keymap.set_llm_streaming, state.llm_streaming)
+                end
+                save_prefs(); update_menu()
+            end or nil,
+        })
+        table.insert(main_menu, {
+            -- Greyed out when streaming is off (token streaming must be active to show partials)
+            title    = "  ↳ Afficher les suggestions au fur et à mesure (multi-prédictions)",
+            checked  = streaming_multi_on,
+            disabled = (is_disabled or not streaming_on or (tonumber(state.llm_num_predictions) or 1) < 2) or nil,
+            fn       = (not is_disabled and streaming_on and (tonumber(state.llm_num_predictions) or 1) >= 2) and function()
+                state.llm_streaming_multi = not streaming_multi_on
+                if keymap and type(keymap.set_llm_streaming_multi) == "function" then
+                    pcall(keymap.set_llm_streaming_multi, state.llm_streaming_multi)
+                end
+                save_prefs(); update_menu()
+            end or nil,
         })
 
         local nav_mods = hs.settings.get("llm_nav_modifiers")
