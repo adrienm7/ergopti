@@ -37,16 +37,19 @@ local _is_initialized = false
 -- ================================
 
 M.DEFAULT_STATE = {
-	keylogger_enabled        = kl_mod.DEFAULT_STATE.keylogger_enabled,
-	keylogger_disabled_apps  = kl_mod.DEFAULT_STATE.keylogger_disabled_apps,
-	keylogger_encrypt        = kl_mod.DEFAULT_STATE.keylogger_encrypt,
-	keylogger_menubar_wpm    = kl_mod.DEFAULT_STATE.keylogger_menubar_wpm,
-	keylogger_menubar_colors = kl_mod.DEFAULT_STATE.keylogger_menubar_colors,
-	keylogger_float_wpm      = kl_mod.DEFAULT_STATE.keylogger_float_wpm,
-	keylogger_float_graph    = kl_mod.DEFAULT_STATE.keylogger_float_graph,
-	keylogger_float_colors   = kl_mod.DEFAULT_STATE.keylogger_float_colors,
-	metrics_shortcut         = false,
-	apps_time_shortcut       = false,
+	keylogger_enabled                = kl_mod.DEFAULT_STATE.keylogger_enabled,
+	keylogger_disabled_apps          = kl_mod.DEFAULT_STATE.keylogger_disabled_apps,
+	keylogger_encrypt                = kl_mod.DEFAULT_STATE.keylogger_encrypt,
+	keylogger_menubar_wpm            = kl_mod.DEFAULT_STATE.keylogger_menubar_wpm,
+	keylogger_menubar_colors         = kl_mod.DEFAULT_STATE.keylogger_menubar_colors,
+	keylogger_float_wpm              = kl_mod.DEFAULT_STATE.keylogger_float_wpm,
+	keylogger_float_graph            = kl_mod.DEFAULT_STATE.keylogger_float_graph,
+	keylogger_float_colors           = kl_mod.DEFAULT_STATE.keylogger_float_colors,
+	keylogger_private_filter_enabled     = kl_mod.DEFAULT_STATE.keylogger_private_filter_enabled,
+	keylogger_secure_filter_enabled      = kl_mod.DEFAULT_STATE.keylogger_secure_filter_enabled,
+	keylogger_system_auth_filter_enabled = kl_mod.DEFAULT_STATE.keylogger_system_auth_filter_enabled,
+	metrics_shortcut                 = false,
+	apps_time_shortcut               = false,
 }
 
 
@@ -151,7 +154,16 @@ function M.build(ctx)
 			if type(Keylogger.set_disabled_apps) == "function" then
 				Keylogger.set_disabled_apps(state.keylogger_disabled_apps or {})
 			end
-			
+			if type(Keylogger.set_private_filter_enabled) == "function" then
+				Keylogger.set_private_filter_enabled(state.keylogger_private_filter_enabled ~= false)
+			end
+			if type(Keylogger.set_secure_field_filter_enabled) == "function" then
+				Keylogger.set_secure_field_filter_enabled(state.keylogger_secure_filter_enabled ~= false)
+			end
+			if type(Keylogger.set_system_auth_filter_enabled) == "function" then
+				Keylogger.set_system_auth_filter_enabled(state.keylogger_system_auth_filter_enabled ~= false)
+			end
+
 			Keylogger.start(script_control)
 			
 			if state.keylogger_menubar_wpm then 
@@ -366,6 +378,49 @@ function M.build(ctx)
 
 	table.insert(menu, { title = "-" })
 	table.insert(menu, { title = "-" })
+	table.insert(menu, { title = "— FILTRES DE CONFIDENTIALITÉ —", disabled = true })
+
+	table.insert(menu, {
+		title    = "Ignorer la navigation privée",
+		checked  = state.keylogger_private_filter_enabled,
+		disabled = not state.keylogger_enabled,
+		fn       = function()
+			state.keylogger_private_filter_enabled = not state.keylogger_private_filter_enabled
+			local Keylogger = require("modules.keylogger")
+			if type(Keylogger.set_private_filter_enabled) == "function" then
+				pcall(Keylogger.set_private_filter_enabled, state.keylogger_private_filter_enabled)
+			end
+			save_prefs(); updateMenu()
+		end
+	})
+
+	table.insert(menu, {
+		title    = "Ignorer les champs mot de passe",
+		checked  = state.keylogger_secure_filter_enabled,
+		disabled = not state.keylogger_enabled,
+		fn       = function()
+			state.keylogger_secure_filter_enabled = not state.keylogger_secure_filter_enabled
+			local Keylogger = require("modules.keylogger")
+			if type(Keylogger.set_secure_field_filter_enabled) == "function" then
+				pcall(Keylogger.set_secure_field_filter_enabled, state.keylogger_secure_filter_enabled)
+			end
+			save_prefs(); updateMenu()
+		end
+	})
+
+	table.insert(menu, {
+		title    = "Ignorer les boîtes de dialogue d'authentification système",
+		checked  = state.keylogger_system_auth_filter_enabled,
+		disabled = not state.keylogger_enabled,
+		fn       = function()
+			state.keylogger_system_auth_filter_enabled = not state.keylogger_system_auth_filter_enabled
+			local Keylogger = require("modules.keylogger")
+			if type(Keylogger.set_system_auth_filter_enabled) == "function" then
+				pcall(Keylogger.set_system_auth_filter_enabled, state.keylogger_system_auth_filter_enabled)
+			end
+			save_prefs(); updateMenu()
+		end
+	})
 
 	local disabled_count = #(type(state.keylogger_disabled_apps) == "table" and state.keylogger_disabled_apps or {})
 	local label = "Désactivé dans" .. (disabled_count > 0 and (" " .. disabled_count .. " application" .. (disabled_count > 1 and "s" or "")) or " ces applications")

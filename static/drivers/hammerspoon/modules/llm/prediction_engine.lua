@@ -73,6 +73,30 @@ local SPINNER_FPS = 6  -- Frames per second for the streaming progress spinner
 local STREAM_WATCHDOG_SEC = 12.0  -- Surface partial results after this many seconds of stream stall
 local CHAIN_FALLBACK_SEC  = 0.5   -- Fire chain LLM if the F20 signal is somehow missed
 
+-- ── URL-bar / app exclusion ───────────────────────────────────────────────────
+
+-- AXSubrole assigned by macOS to URL text fields in Safari and other native browser controls.
+local AX_URL_SUBROLE = "AXURLField"
+-- Lowercase substrings matched against AXIdentifier to detect Chrome/Brave/Opera omniboxes.
+-- Edge does not reliably expose an identifier, so a parent-toolbar fallback is used instead.
+local URL_BAR_ID_PATTERNS = { "address", "urlfield", "location", "omnibox", "url" }
+-- Bundle IDs of browsers for which an AXTextField inside an AXToolbar is always the URL bar.
+-- Used as a fallback when AXSubrole and AXIdentifier checks both come up empty.
+local BROWSER_BUNDLE_IDS = {
+	["com.apple.Safari"]                = true,
+	["com.google.Chrome"]               = true,
+	["com.google.Chrome.canary"]        = true,
+	["com.microsoft.edgemac"]           = true,
+	["com.microsoft.edgemac.Dev"]       = true,
+	["com.microsoft.edgemac.Canary"]    = true,
+	["org.mozilla.firefox"]             = true,
+	["com.brave.Browser"]               = true,
+	["com.brave.Browser.nightly"]       = true,
+	["com.operasoftware.Opera"]         = true,
+	["com.vivaldi.Vivaldi"]             = true,
+	["company.thebrowser.Browser"]      = true,  -- Arc
+}
+
 -- Reference to the LLM engine defaults, used once at module load to seed Section 2
 local LLM_DEFAULTS = core_llm.DEFAULT_STATE
 
@@ -137,8 +161,10 @@ local navigation_mods         = LLM_DEFAULTS.llm_nav_modifiers
 local show_info_bar           = LLM_DEFAULTS.llm_show_info_bar
 local sequential_mode         = LLM_DEFAULTS.llm_sequential_mode
 local inactivity_debounce_sec = LLM_DEFAULTS.llm_debounce
-local excluded_apps           = {}
-local is_ai_preview_enabled   = true
+local excluded_apps              = {}
+local is_ai_preview_enabled      = true
+local url_bar_filter_enabled     = true  -- When false, predictions are allowed inside browser URL bars
+local secure_field_filter_enabled = true  -- When false, predictions are allowed inside password/secure fields
 local auto_raise_temperature  = LLM_DEFAULTS.llm_auto_raise_temp
 local is_streaming_enabled       = LLM_DEFAULTS.llm_streaming
 -- When true, partial prediction batches are shown as each sequential variant completes;
@@ -267,6 +293,16 @@ end
 function M.set_llm_disabled_apps(apps)
 	excluded_apps = apps
 	Logger.debug(LOG, "Excluded apps: %d configured.", type(apps) == "table" and #apps or 0)
+end
+
+function M.set_llm_url_bar_filter_enabled(v)
+	url_bar_filter_enabled = (v ~= false)
+	Logger.debug(LOG, "URL bar filter: %s.", url_bar_filter_enabled and "on" or "off")
+end
+
+function M.set_llm_secure_field_filter_enabled(v)
+	secure_field_filter_enabled = (v ~= false)
+	Logger.debug(LOG, "Secure field filter: %s.", secure_field_filter_enabled and "on" or "off")
 end
 
 --- Accepts either a string ("alt") or a table ({"alt", "cmd"}) for convenience,
@@ -455,6 +491,89 @@ local function start_inactivity_timer(delay_override)
 	end
 end
 
+--- Returns the currently focused accessibility element, using the Hammerspoon-correct API.
+--- hs.axuielement.focusedElement() does not exist — the canonical way is to query
+--- AXFocusedUIElement from the application-level accessibility element.
+--- @param front userdata The frontmost hs.application.
+--- @return userdata|nil The focused AX element, or nil on failure.
+local function get_focused_element(front)
+	if not front then return nil end
+	local ok_ax, ax = pcall(hs.axuielement.applicationElementForPID, front:pid())
+	if not ok_ax or not ax then return nil end
+	local ok_fe, focused = pcall(function() return ax:attributeValue("AXFocusedUIElement") end)
+	return (ok_fe and focused) or nil
+end
+
+--- Returns true when the currently focused accessibility element is a secure text field
+--- (e.g. a password input). Works across all applications, not just browsers.
+--- @param front userdata|nil The frontmost hs.application.
+--- @return boolean True if a password/secure field has focus.
+local function is_secure_field_focused(front)
+	if not front then return false end
+	local focused = get_focused_element(front)
+	if not focused then return false end
+	local ok_role, role    = pcall(function() return focused:attributeValue("AXRole") end)
+	local ok_sub,  subrole = pcall(function() return focused:attributeValue("AXSubrole") end)
+	return (ok_role and role    == "AXSecureTextField")
+	    or (ok_sub  and subrole == "AXSecureTextField")
+end
+
+--- Returns true when the currently focused accessibility element is a browser URL bar.
+--- Prevents AI predictions from firing while the user is typing a URL or search query.
+---
+--- Detection strategy (three layers, each more expensive than the last):
+---   1. AXSubrole == "AXURLField" — Safari and native WebKit controls; definitive.
+---   2. AXIdentifier pattern match — Chrome, Brave, Opera; reliable when id is set.
+---   3. Ancestor toolbar check — Edge, Firefox, Arc; no identifier exposed, but a
+---      text field directly inside an AXToolbar in a known browser is always the URL bar.
+---      Only attempted when the frontmost app is a known browser bundle ID.
+---
+--- @param front userdata|nil The frontmost hs.application (passed from the caller to
+---              avoid a redundant frontmostApplication() call).
+--- @return boolean True if a URL-bar-type element has input focus.
+local function is_url_bar_focused(front)
+	if not front then return false end
+	-- Only check known browsers — avoids expensive AX calls for non-browser apps
+	local bid = front:bundleID() or ""
+	if not BROWSER_BUNDLE_IDS[bid] then return false end
+
+	local focused = get_focused_element(front)
+	if not focused then return false end
+
+	-- Only text fields can be URL bars — skip everything else early
+	local ok_role, role = pcall(function() return focused:attributeValue("AXRole") end)
+	if not ok_role or role ~= "AXTextField" then return false end
+
+	-- Layer 1 — Safari / WebKit: AXSubrole is explicitly "AXURLField"
+	local ok_sub, subrole = pcall(function() return focused:attributeValue("AXSubrole") end)
+	if ok_sub and subrole == AX_URL_SUBROLE then return true end
+
+	-- Layer 2 — Chrome / Brave / Opera: AXIdentifier contains a recognisable pattern
+	local ok_id, identifier = pcall(function() return focused:attributeValue("AXIdentifier") end)
+	if ok_id and type(identifier) == "string" and identifier ~= "" then
+		local id_lower = identifier:lower()
+		for _, pattern in ipairs(URL_BAR_ID_PATTERNS) do
+			if id_lower:find(pattern, 1, true) then return true end
+		end
+	end
+
+	-- Layer 3 — Edge / Firefox / Arc: no usable identifier; check the parent hierarchy.
+	-- Walk up two levels: input may be directly in the toolbar (Firefox) or wrapped in
+	-- an AXGroup inside the toolbar (Chromium / Edge omnibox structure).
+	local ok_p, parent = pcall(function() return focused:attributeValue("AXParent") end)
+	if ok_p and parent then
+		local ok_pr, parent_role = pcall(function() return parent:attributeValue("AXRole") end)
+		if ok_pr and parent_role == "AXToolbar" then return true end
+		local ok_gp, grandparent = pcall(function() return parent:attributeValue("AXParent") end)
+		if ok_gp and grandparent then
+			local ok_gr, gp_role = pcall(function() return grandparent:attributeValue("AXRole") end)
+			if ok_gr and gp_role == "AXToolbar" then return true end
+		end
+	end
+
+	return false
+end
+
 --- Returns true when LLM predictions should be suppressed for the current frontmost app.
 --- Checks both the keymap global window ignore list and the bridge per-app exclusion list.
 --- @return boolean True if the active window or app is on an exclusion list.
@@ -463,7 +582,18 @@ local function is_blocked_for_current_app()
 	if km_utils.is_ignored_window(_state.ignored_window_titles, _state.ignored_window_patterns) then
 		return true
 	end
+	-- Resolve the frontmost app once and reuse it for all AX checks below
 	local front = hs.application.frontmostApplication()
+	-- Password/secure fields in any application
+	if secure_field_filter_enabled and is_secure_field_focused(front) then
+		Logger.debug(LOG, "Secure field focused — LLM request skipped.")
+		return true
+	end
+	-- URL bars (address fields) in browsers: skip when the filter is enabled
+	if url_bar_filter_enabled and is_url_bar_focused(front) then
+		Logger.debug(LOG, "URL bar focused — LLM request skipped.")
+		return true
+	end
 	if not front then return false end
 	local bid  = front:bundleID() or ""
 	local path = front:path() or ""

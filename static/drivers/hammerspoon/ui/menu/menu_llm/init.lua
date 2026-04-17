@@ -24,6 +24,10 @@ local AppPickerLib  = require("lib.app_picker")
 
 local LOG = "menu_llm"
 
+-- Holds the active models manager so M.stop_mlx_server() can reach it from any context
+-- (e.g., the Hammerspoon shutdown callback) without requiring a reference chain.
+local _active_models_mgr = nil
+
 local MODEL_ADVANCED_PARAMS_THRESHOLD_B = 2
 local MODEL_BATCH_PARAMS_THRESHOLD_B = 4
 
@@ -76,7 +80,9 @@ M.DEFAULT_STATE = {
     llm_pred_indent       = llm_mod.DEFAULT_STATE.llm_pred_indent,
     llm_active_profile    = llm_mod.DEFAULT_STATE.llm_active_profile,
     llm_user_models       = {},
-    llm_disabled_apps     = {},
+    llm_disabled_apps          = {},
+    llm_url_bar_filter_enabled        = true,
+    llm_secure_field_filter_enabled   = true,
     llm_user_profiles     = {},
     llm_profile_shortcuts = {},
     llm_trigger_shortcut  = false,
@@ -87,6 +93,18 @@ M.DEFAULT_STATE = {
     llm_streaming_multi   = llm_mod.DEFAULT_STATE.llm_streaming_multi,
 }
 
+
+
+
+
+--- Stops the MLX server process if one is currently running.
+--- Safe to call even when no server is active or before M.create() has been called.
+--- Intended for the Hammerspoon shutdown callback to prevent orphaned Python processes.
+function M.stop_mlx_server()
+	if _active_models_mgr and type(_active_models_mgr.stop_mlx_server_if_needed) == "function" then
+		pcall(_active_models_mgr.stop_mlx_server_if_needed)
+	end
+end
 
 
 
@@ -149,7 +167,9 @@ function M.create(deps)
     llm_mod.set_backend(state.llm_backend)
 
     local models_mgr   = Models.new(deps)
-    
+    -- Register the manager so M.stop_mlx_server() can reach it from the shutdown callback
+    _active_models_mgr = models_mgr
+
     --- Calculates the raw power level of a model based on its size.
     local function get_effective_model_params(info)
         if type(info) ~= "table" then return 0, false, 0, 0 end
@@ -1092,6 +1112,32 @@ function M.create(deps)
         )
 
         table.insert(main_menu, { title = disabled_label, disabled = is_disabled or nil, menu = exclusion_menu })
+
+        table.insert(main_menu, {
+            title    = "Désactiver dans les barres d'adresse des navigateurs",
+            checked  = state.llm_url_bar_filter_enabled,
+            disabled = is_disabled or nil,
+            fn       = not is_disabled and function()
+                state.llm_url_bar_filter_enabled = not state.llm_url_bar_filter_enabled
+                if keymap and type(keymap.set_llm_url_bar_filter_enabled) == "function" then
+                    pcall(keymap.set_llm_url_bar_filter_enabled, state.llm_url_bar_filter_enabled)
+                end
+                save_prefs(); update_menu()
+            end or nil,
+        })
+
+        table.insert(main_menu, {
+            title    = "Désactiver dans les champs mot de passe",
+            checked  = state.llm_secure_field_filter_enabled,
+            disabled = is_disabled or nil,
+            fn       = not is_disabled and function()
+                state.llm_secure_field_filter_enabled = not state.llm_secure_field_filter_enabled
+                if keymap and type(keymap.set_llm_secure_field_filter_enabled) == "function" then
+                    pcall(keymap.set_llm_secure_field_filter_enabled, state.llm_secure_field_filter_enabled)
+                end
+                save_prefs(); update_menu()
+            end or nil,
+        })
 
         -- ================= GÉNÉRATION =================
         table.insert(main_menu, { title = "-" })
