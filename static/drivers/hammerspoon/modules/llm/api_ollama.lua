@@ -518,7 +518,26 @@ function M.fetch_batch(full_text, tail_text, model_name, temperature,
 		function(results)
 			local ms = math.floor((hs.timer.secondsSinceEpoch() - t0) * 1000)
 			ApiCommon.log_prediction_summary(Logger, LOG, "batch", num_predictions, dedup_stats, #results)
-			if type(on_success) == "function" then pcall(on_success, results, ms, true) end
+			-- With streaming OFF: reveal each prediction one by one (complete, no animation) so
+			-- the user sees slot 1 fill, then slot 2, etc. rather than all appearing at once.
+			-- Each doAfter(0) yields to the event loop so the tooltip renders between reveals.
+			-- With streaming ON: on_partial_cb already showed each pred token by token;
+			-- emit the final call directly to replace stream placeholders with diff colors.
+			if not streaming and #results > 1 then
+				local function reveal_next(idx)
+					if idx > #results then return end
+					local subset = {}
+					for j = 1, idx do subset[j] = results[j] end
+					local is_final = (idx == #results)
+					-- Pass is_batch_progressive=true so prediction_engine bypasses the
+					-- streaming_multi early-return for these intermediate calls
+					if type(on_success) == "function" then pcall(on_success, subset, ms, is_final, not is_final) end
+					if not is_final then hs.timer.doAfter(0, function() reveal_next(idx + 1) end) end
+				end
+				reveal_next(1)
+			else
+				if type(on_success) == "function" then pcall(on_success, results, ms, true) end
+			end
 		end,
 		on_fail,
 		dedup_stats,
@@ -589,9 +608,10 @@ function M.fetch_sequential(full_text, tail_text, model_name, temperature,
 		attempt_index        = attempt_index + 1
 		local variant_temp   = ApiCommon.get_diversity_temperature(base_temp, variant_index, 0.30)
 		local primary_tokens = tonumber(max_predict)
-		-- Stream partial updates only for the first variant; retries and diversity
-		-- variants run in the background without overwriting the growing preview
-		local variant_partial = (variant_index == 1) and on_partial or nil
+		-- Each variant streams its tokens via on_partial so the tooltip shows each
+		-- prediction building in its own slot; prediction_engine.lua keeps the cursor
+		-- at slot 1 (or wherever the user navigated) regardless of which slot streams
+		local variant_partial = on_partial
 
 		local function request_variant(attempt, tokens, temp)
 			local post_fn = streaming and post_and_parse_streaming or post_and_parse

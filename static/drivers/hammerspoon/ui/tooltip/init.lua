@@ -70,6 +70,17 @@ function M.show(content, is_llm_origin, is_enabled, background_color)
 	TooltipHotstring.show(content, is_llm_origin, is_enabled, background_color)
 end
 
+--- Displays a persistent loading indicator that will not auto-dismiss.
+--- Must be used instead of show() for LLM generation states so the indicator
+--- stays on screen until replaced in-place by the prediction results.
+--- @param content string|userdata The loading text to display.
+--- @param is_enabled boolean Guard clause to prevent rendering if disabled.
+--- @param background_color table|nil Optional background tint.
+function M.show_loading(content, is_enabled, background_color)
+	TooltipLLM.hide()
+	TooltipHotstring.show_loading(content, is_enabled, background_color)
+end
+
 --- Displays AI predictions with interactive navigation (LLM mode).
 --- @param predictions table List of AI choices.
 --- @param current_index number Selected index.
@@ -82,7 +93,9 @@ end
 --- @param loading_text string Text to show if loading.
 --- @param max_reserved_count number Skeleton slots to render.
 function M.show_predictions(predictions, current_index, is_enabled, info_bar, shortcut_modifier, indent, navigation_modifiers, background_color, loading_text, max_reserved_count)
-	TooltipHotstring.hide()
+	-- Reset hotstring state without hiding the shared canvas so the LLM render overwrites
+	-- the loading indicator in-place — no blank frame between the two tooltips.
+	TooltipHotstring.dismiss_silent()
 	TooltipLLM.show_predictions(predictions, current_index, is_enabled, info_bar, shortcut_modifier, indent, navigation_modifiers, background_color, loading_text, max_reserved_count)
 end
 

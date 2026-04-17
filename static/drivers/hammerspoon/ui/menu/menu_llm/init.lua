@@ -1158,31 +1158,31 @@ function M.create(deps)
             end
         })
 
-        -- Streaming flags are nil-safe: old configs without the key default to false (same as DEFAULT_STATE)
+        -- Streaming flags are nil-safe: old configs without these keys default to false
         local streaming_on       = (state.llm_streaming == true)
-        local streaming_multi_on = (state.llm_streaming_multi == true)
+        local streaming_multi_on = (state.llm_streaming_multi == true)  -- true = show predictions as they arrive (progressive/parallel)
         local num_preds_multi    = tonumber(state.llm_num_predictions) or 1
         table.insert(main_menu, {
-            title    = "Suggestions en streaming (token par token)",
-            checked  = streaming_on,
-            disabled = is_disabled or nil,
-            fn       = not is_disabled and function()
-                state.llm_streaming = not streaming_on
-                if keymap and type(keymap.set_llm_streaming) == "function" then
-                    pcall(keymap.set_llm_streaming, state.llm_streaming)
-                end
-                save_prefs(); update_menu()
-            end or nil,
-        })
-        table.insert(main_menu, {
             -- Independent of token streaming; only irrelevant when num_predictions < 2
-            title    = "Afficher les suggestions au fur et à mesure (multi-prédictions)",
-            checked  = streaming_multi_on,
+            title    = "Afficher toutes les prédictions d’un coup (multi-prédictions)",
+            checked  = not streaming_multi_on,
             disabled = (is_disabled or num_preds_multi < 2) or nil,
             fn       = (not is_disabled and num_preds_multi >= 2) and function()
                 state.llm_streaming_multi = not streaming_multi_on
                 if keymap and type(keymap.set_llm_streaming_multi) == "function" then
                     pcall(keymap.set_llm_streaming_multi, state.llm_streaming_multi)
+                end
+                save_prefs(); update_menu()
+            end or nil,
+        })
+        table.insert(main_menu, {
+            title    = "Afficher chaque suggestion en streaming (token par token)",
+            checked  = streaming_on,
+            disabled = (is_disabled or not streaming_multi_on) or nil,
+            fn       = not is_disabled and function()
+                state.llm_streaming = not streaming_on
+                if keymap and type(keymap.set_llm_streaming) == "function" then
+                    pcall(keymap.set_llm_streaming, state.llm_streaming)
                 end
                 save_prefs(); update_menu()
             end or nil,
