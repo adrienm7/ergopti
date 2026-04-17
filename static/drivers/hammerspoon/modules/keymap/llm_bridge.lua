@@ -439,6 +439,18 @@ function M.apply_prediction(idx)
 	local delete_count = pred.deletes or 0
 	local text_to_type = pred.to_type or ""
 
+	-- Resolve overlap between the buffer tail and the prediction to prevent ghost-text
+	-- duplication when the user is mid-word (e.g. typed "tex", prediction starts with "texte").
+	-- Also enforces correct spacing at the join point as a safety net for cases the
+	-- parser may not have handled (e.g. raw-mode output with no leading space).
+	-- This call was accidentally dropped during the 183effff refactor.
+	local ok_overlap, res_deletes, res_text = pcall(
+		km_utils.resolve_prediction_overlap, _state.buffer, delete_count, text_to_type)
+	if ok_overlap and res_deletes ~= nil and res_text ~= nil then
+		delete_count = res_deletes
+		text_to_type = res_text
+	end
+
 	Logger.start(LOG, "Applying prediction #%d: '%s' (%d deletion(s)).",
 		idx, tostring(text_to_type), delete_count)
 

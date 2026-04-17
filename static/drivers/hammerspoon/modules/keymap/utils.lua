@@ -242,7 +242,12 @@ end
 ---   2. Use a sliding window to find the longest suffix of the buffer that matches
 ---      a prefix of the prediction (overlap).
 ---   3. If an overlap is found, delete exactly those chars and type the rest.
----   4. Fix up leading-space logic so the result reads naturally.
+---   4. Fix up separator logic so the result reads naturally, handling:
+---      - Double-space prevention (buffer already ends with space).
+---      - Missing-space insertion (buffer ends with a word, prediction starts with a word).
+---      - Compound-word continuations (buffer ends with "-", no separator needed).
+---      - Contraction handling (buffer ends with apostrophe, no separator needed).
+---      - Punctuation that must not be preceded by a regular space.
 ---
 --- @param buffer string The current typing buffer.
 --- @param pred_deletes number The AI's suggested number of deletions.
@@ -334,15 +339,26 @@ function M.resolve_prediction_overlap(buffer, pred_deletes, pred_to_type)
 		local b_last  = text_utils.utf8_sub(buf_str, -1)
 		local p_first = text_utils.utf8_sub(to_type, 1, 1)
 
-		local ends_with_space   = b_last:match("[%s'']") or b_last == "\194\160" or b_last == "\226\128\175"
-		local starts_with_space = p_first:match("[%s]")  or p_first == "\194\160" or p_first == "\226\128\175"
-		local starts_with_punct = p_first:match("[.,;:%?!'\"%)%]]")
+		-- Characters after which no separator is needed before the prediction:
+		-- whitespace, apostrophes (contractions: "l'idée"), hyphens (compound
+		-- words: "anti-spam"), opening brackets (don't insert space inside them).
+		local ends_no_sep = b_last:match("[%s''%-%(%[]")
+			or b_last == "\194\160" or b_last == "\226\128\175"
 
-		if ends_with_space and starts_with_space then
-			-- Remove the leading space from the prediction to avoid double-space.
+		-- Prediction starts with whitespace — used to detect and remove double-spaces.
+		local starts_with_space = p_first:match("[%s]")
+			or p_first == "\194\160" or p_first == "\226\128\175"
+
+		-- Prediction starts with a character that must not be preceded by a regular
+		-- space: closing punctuation, hyphen (compound continuation), slash (paths).
+		local starts_no_sep = p_first:match("[.,;:%?!'\"%)%]%-%/]")
+
+		if ends_no_sep and starts_with_space then
+			-- Remove the leading space from the prediction to avoid double-space
+			-- (or unwanted space after a hyphen, apostrophe, etc.).
 			to_type = to_type:gsub("^[%s\194\160\226\128\175]+", "")
-		elseif not ends_with_space and not starts_with_space and not starts_with_punct then
-			-- Insert a separating space between the buffer and the completion.
+		elseif not ends_no_sep and not starts_with_space and not starts_no_sep then
+			-- Insert a separating space between the buffer word and the completion.
 			to_type = " " .. to_type
 		end
 	end
