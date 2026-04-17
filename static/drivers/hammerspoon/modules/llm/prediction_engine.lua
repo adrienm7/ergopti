@@ -601,7 +601,7 @@ function M.perform_check(force_trigger, profile_name)
 		local partial_pred = {
 			to_type = partial_raw,
 			deletes = 0,
-			chunks  = { { text = partial_raw, added = true } },
+			chunks  = { { type = "insert", text = partial_raw } },
 			nw      = "",
 		}
 		pending_predictions = { partial_pred }
