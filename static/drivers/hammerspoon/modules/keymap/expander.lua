@@ -149,8 +149,9 @@ function M.try_auto_expand(m, char_len, is_ignored)
 		end
 	end
 
-	local tokens    = km_utils.tokens_from_repl(m.repl)
-	local repl_text = km_utils.plain_text(tokens)
+	-- Use the precomputed plain_repl; tokens_from_repl() is only called below
+	-- when we actually need to emit tokens (replacements with {Token} directives)
+	local repl_text = m.plain_repl
 
 	-- No-op guard: skip when the plain-text expansion equals the trigger.
 	if repl_text == trigger then
@@ -179,7 +180,8 @@ function M.try_auto_expand(m, char_len, is_ignored)
 			if repl_text == m.repl then
 				return km_utils.emit_text(to_type)
 			else
-				return km_utils.emit_tokens(tokens)
+				-- Lazy: tokens_from_repl() only reached for {Token}-bearing replacements
+				return km_utils.emit_tokens(km_utils.tokens_from_repl(m.repl))
 			end
 		end,
 		function()
@@ -247,8 +249,9 @@ function M.try_terminator_expand(m, chars, char_len, is_ignored)
 	end
 
 	local function do_expansion()
-		local tokens    = km_utils.tokens_from_repl(m.repl)
-		local repl_text = km_utils.plain_text(tokens)
+		-- Use the precomputed plain_repl; tokens_from_repl() is only called below
+		-- when we actually need to emit tokens (replacements with {Token} directives)
+		local repl_text        = m.plain_repl
 		local deletes, to_type = trig_len, repl_text
 
 		if repl_text == m.repl then
@@ -268,7 +271,8 @@ function M.try_terminator_expand(m, chars, char_len, is_ignored)
 				if repl_text == m.repl then
 					c, s = km_utils.emit_text(to_type)
 				else
-					c, s = km_utils.emit_tokens(tokens)
+					-- Lazy: tokens_from_repl() only reached for {Token}-bearing replacements
+					c, s = km_utils.emit_tokens(km_utils.tokens_from_repl(m.repl))
 				end
 
 				-- Re-type the terminator unless it should be consumed.
@@ -298,7 +302,7 @@ function M.try_terminator_expand(m, chars, char_len, is_ignored)
 		)
 
 		if keylogger and type(keylogger.log_hotstring) == "function" then
-			pcall(keylogger.log_hotstring, trigger, km_utils.plain_text(km_utils.tokens_from_repl(m.repl)))
+			pcall(keylogger.log_hotstring, trigger, m.plain_repl)
 		end
 		Logger.debug(LOG, "Terminator-expand: '%s' → '%s'.", trigger, m.repl)
 	end

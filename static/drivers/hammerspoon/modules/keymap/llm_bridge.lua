@@ -283,14 +283,16 @@ function M.update_preview(buf)
 		return
 	end
 
-	local matched_repl, matched_input, match_type, match_group = nil, nil, nil, nil
+	local matched_repl, matched_plain_repl, matched_input, match_type, match_group = nil, nil, nil, nil, nil
 
 	-- Custom preview providers take precedence over the static mapping lookup.
 	for _, provider in ipairs(_state.preview_providers) do
 		local ok, res = pcall(provider, buf)
 		if ok and res then
-			matched_repl = res
-			match_type   = "provider"
+			matched_repl       = res
+			-- Providers return raw strings; plain_repl must be derived on the fly
+			matched_plain_repl = km_utils.plain_text(km_utils.tokens_from_repl(res))
+			match_type         = "provider"
 			break
 		end
 	end
@@ -308,23 +310,23 @@ function M.update_preview(buf)
 			local star_base = has_magic and mapping.trigger:sub(1, #mapping.trigger - magic_len) or nil
 
 			if star_base and star_base ~= "" and ends_with_trigger(buf, star_base, mapping.is_word) then
-				local plain = km_utils.plain_text(km_utils.tokens_from_repl(mapping.repl))
-				if plain ~= star_base then
-					matched_repl  = mapping.repl
-					match_type    = "star"
-					match_group   = mapping.group
-					matched_input = star_base
+				if mapping.plain_repl ~= star_base then
+					matched_repl       = mapping.repl
+					matched_plain_repl = mapping.plain_repl
+					match_type         = "star"
+					match_group        = mapping.group
+					matched_input      = star_base
 					break
 				end
 			elseif ends_with_trigger(buf, mapping.trigger, mapping.is_word)
 				and not (mapping.is_word == false and mapping.auto == true)
 			then
-				local plain = km_utils.plain_text(km_utils.tokens_from_repl(mapping.repl))
-				if plain ~= mapping.trigger then
-					matched_repl  = mapping.repl
-					match_type    = "autocorrect"
-					match_group   = mapping.group
-					matched_input = mapping.trigger
+				if mapping.plain_repl ~= mapping.trigger then
+					matched_repl       = mapping.repl
+					matched_plain_repl = mapping.plain_repl
+					match_type         = "autocorrect"
+					match_group        = mapping.group
+					matched_input      = mapping.trigger
 					break
 				end
 			end
@@ -337,17 +339,16 @@ function M.update_preview(buf)
 	-- to prevent the preview from showing a tooltip for the repeat feature itself.
 	local is_repetition = false
 	if matched_repl and _state.is_repeat_feature_enabled() then
-		local plain  = km_utils.plain_text(km_utils.tokens_from_repl(matched_repl))
 		local ref    = matched_input or last_word
 		local offset = utf8.offset(ref, -1)
-		if offset then is_repetition = (plain == ref .. ref:sub(offset)) end
+		if offset then is_repetition = (matched_plain_repl == ref .. ref:sub(offset)) end
 	end
 
 	if matched_repl and not is_repetition then
 		-- Hotstring match found — show the tooltip.
 		M.reset_predictions(true)
 
-		local display_text = km_utils.plain_text(km_utils.tokens_from_repl(matched_repl))
+		local display_text = matched_plain_repl
 		local is_star      = (match_type == "star")
 
 		-- Resolve accent tint based on hotstring type.

@@ -20,6 +20,7 @@ local M = {}
 
 local hs         = hs
 local text_utils = require("lib.text_utils")
+local km_utils   = require("modules.keymap.utils")
 local Logger     = require("lib.logger")
 
 local LOG    = "keymap.registry"
@@ -300,7 +301,8 @@ function M.add(trigger, replacement, opts)
 		local existing = _state.mappings_lookup[k]
 		if existing then
 			-- Update replacement in place so re-loading a file refreshes the database.
-			existing.repl = r
+			existing.repl       = r
+			existing.plain_repl = km_utils.plain_text(km_utils.tokens_from_repl(r))
 			if _state.current_group then existing.group = _state.current_group end
 			return
 		end
@@ -308,6 +310,9 @@ function M.add(trigger, replacement, opts)
 		local entry = {
 			trigger      = t,
 			repl         = r,
+			-- Precomputed once at load time; avoids tokens_from_repl() + plain_text()
+			-- being called on every keystroke in update_preview() and the expander
+			plain_repl   = km_utils.plain_text(km_utils.tokens_from_repl(r)),
 			is_word      = is_word,
 			auto         = a,
 			seq          = _state.seq_counter,
