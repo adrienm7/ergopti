@@ -450,6 +450,9 @@ local function onKeyDownRaw(e)
 		-- Pre-evaluate once: avoids a 20-entry linear scan inside try_terminator_expand
 		-- for every non-auto mapping — on a normal letter keystroke that saves ~300 calls
 		local chars_is_terminator = Registry.is_terminator(chars)
+		-- Cache outside the loop — magic_key never changes during a scan
+		local magic_key     = CoreState.magic_key
+		local magic_key_len = #magic_key
 
 		for _, m in ipairs(CoreState.mappings) do
 			local group_active = not m.group
@@ -459,7 +462,7 @@ local function onKeyDownRaw(e)
 
 			-- Determine the tightest applicable delay for this mapping.
 			local specific_delay
-			if m.trigger:sub(-#CoreState.magic_key) == CoreState.magic_key then
+			if m.trigger:sub(-magic_key_len) == magic_key then
 				specific_delay = CoreState.DELAYS.STAR_TRIGGER
 			elseif m.group and CoreState.DELAYS[m.group] then
 				specific_delay = CoreState.DELAYS[m.group]
