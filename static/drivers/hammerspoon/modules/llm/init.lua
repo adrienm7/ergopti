@@ -51,8 +51,13 @@ M.DEFAULT_STATE = {
 	llm_reset_on_nav      = true,
 	llm_after_hotstring   = false,
 	llm_auto_raise_temp   = false,  -- Incrementally raise temperature for each extra prediction
-	llm_streaming         = false,  -- Token-by-token streaming (tooltip fills as tokens arrive)
+	llm_streaming         = true,   -- Token-by-token streaming (tooltip fills as tokens arrive)
+	llm_streaming_multi   = true,   -- Show predictions as they arrive in multi-pred sequential mode
 }
+
+-- Single source of truth for the streaming flag; backends receive it as a parameter
+-- on each fetch call so they hold no state of their own for this flag
+local _streaming_enabled = M.DEFAULT_STATE.llm_streaming
 
 local CoreState = {
 	active_profile_id      = M.DEFAULT_STATE.llm_active_profile,
@@ -158,12 +163,12 @@ function M.set_active_profile(id)
 	end
 end
 
---- Enables or disables token-by-token streaming on both API backends simultaneously.
+--- Enables or disables token-by-token streaming.
+--- The flag is stored here and passed to backends at dispatch time — no backend state.
 --- @param v boolean True to enable streaming, false to disable.
 function M.set_llm_streaming(v)
-	ApiOllama.set_streaming(v)
-	ApiMlx.set_streaming(v)
-	Logger.debug(LOG, "Streaming set to %s on all backends.", tostring(v))
+	_streaming_enabled = (v == true)
+	Logger.debug(LOG, "Streaming: %s.", _streaming_enabled and "on" or "off")
 end
 
 --- Cancels the in-flight streaming task on the active backend, if any.
@@ -326,12 +331,12 @@ function M.fetch_llm_prediction(full_text, tail_text, model_name, temperature,
 
 	if type(profile) == "table" and (not profile.batch) then
 		if num_predictions > 1 and not sequential_mode then
-			api.fetch_parallel(full_text, tail_text, model_name, temperature, max_predict, num_predictions, profile, on_success, on_fail, request_id_provider, on_partial)
+			api.fetch_parallel(full_text, tail_text, model_name, temperature, max_predict, num_predictions, profile, on_success, on_fail, request_id_provider, _streaming_enabled, on_partial)
 		else
-			api.fetch_sequential(full_text, tail_text, model_name, temperature, max_predict, num_predictions, profile, on_success, on_fail, request_id_provider, on_partial)
+			api.fetch_sequential(full_text, tail_text, model_name, temperature, max_predict, num_predictions, profile, on_success, on_fail, request_id_provider, _streaming_enabled, on_partial)
 		end
 	else
-		api.fetch_batch(full_text, tail_text, model_name, temperature, max_predict, num_predictions, profile, on_success, on_fail, request_id_provider, on_partial)
+		api.fetch_batch(full_text, tail_text, model_name, temperature, max_predict, num_predictions, profile, on_success, on_fail, request_id_provider, _streaming_enabled, on_partial)
 	end
 end
 

@@ -23,19 +23,11 @@ local DEDUPLICATION_ENABLED = false
 local RETRY_FAILED_PREDICTION_ENABLED = true
 local RETRY_FAILED_PREDICTION_MAX_MULTIPLIER = 2
 
--- When true, requests use hs.task+curl streaming so the tooltip fills token by token.
--- When false (default), the existing hs.http.asyncPost path is used unchanged.
-local _streaming_enabled  = false
-local _active_stream_task = nil  -- Current in-flight hs.task; cancelled on new request
+-- Holds the current in-flight hs.task; cancelled when a new streaming request starts.
+-- The streaming flag itself is owned by modules/llm/init.lua and passed per-call.
+local _active_stream_task = nil
 
 -- M.is_thinking_model is injected by init.lua
-
---- Enables or disables token-by-token streaming for all subsequent requests.
---- @param v boolean
-function M.set_streaming(v)
-	_streaming_enabled = (v == true)
-	Logger.debug(LOG, "MLX streaming: %s.", _streaming_enabled and "on" or "off")
-end
 
 --- Terminates the in-flight streaming task if one is active.
 --- Called when a newer request supersedes the current one.
@@ -520,17 +512,18 @@ end
 --- @param on_success function Function to execute on success.
 --- @param on_fail function Function to execute on failure.
 --- @param request_id_provider function Callback returning the current request identifier.
+--- @param streaming boolean Whether to use token-by-token streaming (controlled by init.lua).
 --- @param on_partial function|nil Optional token-by-token streaming callback.
 function M.fetch_batch(full_text, tail_text, model_name, temperature,
-                             max_predict, num_predictions, profile,
-                             on_success, on_fail, request_id_provider, on_partial)
+                       max_predict, num_predictions, profile,
+                       on_success, on_fail, request_id_provider, streaming, on_partial)
 
 	local effective_temp = tonumber(temperature) or 0.1
 	local system_prompt  = Profiles.resolve_system_prompt(profile, num_predictions)
 	local tokens         = tonumber(max_predict) * num_predictions + (num_predictions * 5)
 	local is_batch       = profile.batch
 	local dedup_stats    = ApiCommon.new_dedup_stats()
-	local post_fn        = _streaming_enabled and post_and_parse_streaming or post_and_parse
+	local post_fn        = streaming and post_and_parse_streaming or post_and_parse
 
 	local t0 = hs.timer.secondsSinceEpoch()
 	post_fn(model_name, system_prompt, full_text, tail_text,
@@ -542,7 +535,7 @@ function M.fetch_batch(full_text, tail_text, model_name, temperature,
 		end,
 		on_fail,
 		dedup_stats,
-		_streaming_enabled and on_partial or nil)
+		streaming and on_partial or nil)
 end
 
 --- Dispatches multiple parallel API requests incrementing the temperature to aggregate predictions.
@@ -556,15 +549,16 @@ end
 --- @param on_success function Function to execute on success.
 --- @param on_fail function Function to execute on failure.
 --- @param request_id_provider function Callback returning the current request identifier.
+--- @param streaming boolean Whether to use token-by-token streaming.
 --- @param on_partial function|nil Optional token-by-token streaming callback.
 function M.fetch_parallel(full_text, tail_text, model_name, temperature,
                           max_predict, num_predictions, profile,
-                          on_success, on_fail, request_id_provider, on_partial)
+                          on_success, on_fail, request_id_provider, streaming, on_partial)
 	-- MLX can produce unstable outputs under parallel fan-out with some models
 	-- Force sequential dispatch for reliability while keeping the same public API
 	return M.fetch_sequential(full_text, tail_text, model_name, temperature,
 		max_predict, num_predictions, profile,
-		on_success, on_fail, request_id_provider, on_partial)
+		on_success, on_fail, request_id_provider, streaming, on_partial)
 end
 
 --- Dispatches multiple sequential API requests to avoid parallel connection dropping.
@@ -578,10 +572,11 @@ end
 --- @param on_success function Function to execute on success.
 --- @param on_fail function Function to execute on failure.
 --- @param request_id_provider function Callback returning the current request identifier.
+--- @param streaming boolean Whether to use token-by-token streaming.
 --- @param on_partial function|nil Optional token-by-token streaming callback.
 function M.fetch_sequential(full_text, tail_text, model_name, temperature,
                              max_predict, num_predictions, profile,
-                             on_success, on_fail, request_id_provider, on_partial)
+                             on_success, on_fail, request_id_provider, streaming, on_partial)
 
 	local system_prompt = Profiles.resolve_system_prompt(profile, 1)
 	local t0            = hs.timer.secondsSinceEpoch()
@@ -624,7 +619,7 @@ function M.fetch_sequential(full_text, tail_text, model_name, temperature,
 		local variant_partial = (variant_index == 1) and on_partial or nil
 
 		local function request_variant(attempt, tokens, temp)
-			local post_fn = _streaming_enabled and post_and_parse_streaming or post_and_parse
+			local post_fn = streaming and post_and_parse_streaming or post_and_parse
 			post_fn(model_name, system_prompt, full_text, tail_text,
 				temp, tokens, 1, false,
 				function(preds)
@@ -650,7 +645,7 @@ function M.fetch_sequential(full_text, tail_text, model_name, temperature,
 					do_next()
 				end,
 				dedup_stats,
-				_streaming_enabled and variant_partial or nil)
+				streaming and variant_partial or nil)
 		end
 
 		request_variant(1, primary_tokens, variant_temp)

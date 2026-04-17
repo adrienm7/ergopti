@@ -139,7 +139,10 @@ local inactivity_debounce_sec = LLM_DEFAULTS.llm_debounce
 local excluded_apps           = {}
 local is_ai_preview_enabled   = true
 local auto_raise_temperature  = LLM_DEFAULTS.llm_auto_raise_temp
-local is_streaming_enabled    = LLM_DEFAULTS.llm_streaming
+local is_streaming_enabled       = LLM_DEFAULTS.llm_streaming
+-- When true, partial prediction batches are shown as each sequential variant completes;
+-- when false, the tooltip only appears once the final batch with all predictions is ready
+local is_streaming_multi_enabled = LLM_DEFAULTS.llm_streaming_multi
 
 
 
@@ -253,6 +256,11 @@ function M.set_llm_streaming(v)
 	is_streaming_enabled = (v == true)
 	core_llm.set_llm_streaming(v)
 	Logger.debug(LOG, "Streaming: %s.", is_streaming_enabled and "on" or "off")
+end
+
+function M.set_llm_streaming_multi(v)
+	is_streaming_multi_enabled = (v == true)
+	Logger.debug(LOG, "Streaming multi: %s.", is_streaming_multi_enabled and "on" or "off")
 end
 
 function M.set_llm_disabled_apps(apps)
@@ -608,6 +616,9 @@ function M.perform_check(force_trigger, profile_name)
 	core_llm.fetch_llm_prediction(
 		buffer, tail, model_to_use, req_temperature, max_tokens, num_preds,
 		function(raw_predictions, elapsed_ms, is_final)
+			-- Suppress intermediate batches when streaming_multi is off — only show final
+			if not is_final and not is_streaming_multi_enabled then return end
+
 			-- Discard if a newer request superseded this one while we were waiting
 			if fetch_request_counter ~= my_fetch_id then
 				Logger.debug(LOG, "Stale LLM callback ignored (expected fetch_id=%d, current=%d).",
