@@ -174,7 +174,12 @@ end
 function M.set_llm_enabled(enabled)
 	is_llm_enabled = (enabled == true)
 	Logger.info(LOG, "LLM %s.", is_llm_enabled and "enabled" or "disabled")
-	if not is_llm_enabled then M.reset() end
+	if not is_llm_enabled then M.reset(); return end
+	-- Pre-load model weights into GPU when the user enables the LLM; deferred so
+	-- the rest of the startup sequence settles before the warmup request fires
+	if type(active_model) == "string" and active_model ~= "" then
+		hs.timer.doAfter(2, function() pcall(core_llm.warmup_model, active_model) end)
+	end
 end
 
 --- @return boolean
@@ -186,6 +191,11 @@ function M.set_llm_model(model_name)
 	else core_llm.set_llm_model_ollama(model_name) end
 	active_model = model_name
 	Logger.info(LOG, "Model set: '%s' (backend: %s).", tostring(model_name), tostring(backend))
+	-- Trigger a warmup only when LLM is already enabled (avoids spurious requests
+	-- during startup when set_llm_model fires before set_llm_enabled(true))
+	if is_llm_enabled then
+		hs.timer.doAfter(2, function() pcall(core_llm.warmup_model, model_name) end)
+	end
 end
 
 function M.set_llm_display_model_name(name)
