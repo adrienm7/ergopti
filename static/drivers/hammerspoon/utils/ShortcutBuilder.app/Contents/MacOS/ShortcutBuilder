@@ -1,0 +1,5 @@
+#!/bin/zsh
+# Launcher for the ShortcutBuilder app bundle
+APPROOT="$(cd "$(dirname "$0")/../.." && pwd)"
+osascript "$APPROOT/Contents/Resources/ShortcutBuilder.applescript" "$APPROOT"
+exit 0
