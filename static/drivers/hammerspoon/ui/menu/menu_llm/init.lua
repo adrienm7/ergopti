@@ -1158,9 +1158,9 @@ function M.create(deps)
             end
         })
 
-        -- Streaming flags are nil-safe: old configs without the key default to true (same as DEFAULT_STATE)
-        local streaming_on       = (state.llm_streaming ~= false)
-        local streaming_multi_on = (state.llm_streaming_multi ~= false)
+        -- Streaming flags are nil-safe: old configs without the key default to false (same as DEFAULT_STATE)
+        local streaming_on       = (state.llm_streaming == true)
+        local streaming_multi_on = (state.llm_streaming_multi == true)
         local num_preds_multi    = tonumber(state.llm_num_predictions) or 1
         table.insert(main_menu, {
             title    = "Suggestions en streaming (token par token)",
