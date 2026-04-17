@@ -270,6 +270,8 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 				{ fn = "set_llm_val_modifiers",           val = state.llm_val_modifiers },
 				{ fn = "set_llm_pred_indent",             val = state.llm_pred_indent },
 				{ fn = "set_llm_disabled_apps",           val = state.llm_disabled_apps },
+				{ fn = "set_llm_url_bar_filter_enabled",       val = state.llm_url_bar_filter_enabled },
+				{ fn = "set_llm_secure_field_filter_enabled",  val = state.llm_secure_field_filter_enabled },
 			}
 			for _, item in ipairs(map) do
 				if type(keymap[item.fn]) == "function" then pcall(keymap[item.fn], item.val) end

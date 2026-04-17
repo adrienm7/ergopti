@@ -15,6 +15,10 @@ local Config          = require("ui.tooltip.config")
 local TooltipLLM      = require("ui.tooltip.tooltip_llm")
 local TooltipHotstring = require("ui.tooltip.tooltip_hotstring")
 
+-- Callback fired when the tooltip transitions to visible state.
+-- Registered from llm_bridge to create the persistent Escape trap at HEAD.
+local _on_show_callback = nil
+
 
 
 
@@ -53,6 +57,13 @@ function M.is_visible()
 	return TooltipLLM.is_visible() or TooltipHotstring.is_visible()
 end
 
+--- Registers a callback invoked whenever any tooltip transitions to visible state.
+--- @param fn function|nil Callback with no arguments; pass nil to unregister.
+function M.set_on_show_callback(fn)
+	_on_show_callback = (type(fn) == "function") and fn or nil
+end
+
+
 
 
 
@@ -68,6 +79,7 @@ end
 function M.show(content, is_llm_origin, is_enabled, background_color)
 	TooltipLLM.hide()
 	TooltipHotstring.show(content, is_llm_origin, is_enabled, background_color)
+	if is_enabled and _on_show_callback then pcall(_on_show_callback) end
 end
 
 --- Displays a persistent loading indicator that will not auto-dismiss.
@@ -79,6 +91,7 @@ end
 function M.show_loading(content, is_enabled, background_color)
 	TooltipLLM.hide()
 	TooltipHotstring.show_loading(content, is_enabled, background_color)
+	if is_enabled and _on_show_callback then pcall(_on_show_callback) end
 end
 
 --- Displays AI predictions with interactive navigation (LLM mode).
@@ -97,6 +110,7 @@ function M.show_predictions(predictions, current_index, is_enabled, info_bar, sh
 	-- the loading indicator in-place — no blank frame between the two tooltips.
 	TooltipHotstring.dismiss_silent()
 	TooltipLLM.show_predictions(predictions, current_index, is_enabled, info_bar, shortcut_modifier, indent, navigation_modifiers, background_color, loading_text, max_reserved_count)
+	if is_enabled and _on_show_callback then pcall(_on_show_callback) end
 end
 
 function M.navigate(delta) TooltipLLM.navigate(delta) end

@@ -544,18 +544,12 @@ PY
 			if probe_status == 200 and probe_matches_target(body) then
 				obj._server_target = target_model
 				Logger.info(LOG, "MLX server already ready for model %s.", tostring(target_model))
-				if not silent_notifications then
-					pcall(notifications.notify, "✅ Serveur MLX prêt", "Modèle actif : " .. target_model)
-				end
 				if on_success then pcall(on_success) end
 				return
 			end
 
 			obj._server_target = target_model
 			Logger.info(LOG, "Starting MLX server process for model %s…", tostring(target_model))
-			if not silent_notifications then
-				pcall(notifications.notify, "🚀 Démarrage serveur MLX", "Chargement du modèle " .. target_model .. " en mémoire...")
-			end
 
 			local server_log_file = "/tmp/hs_mlx_server_" .. tostring(math.random(1000,9999)) .. ".log"
 			local startup_confirmed = false
@@ -564,9 +558,6 @@ PY
 			local function mark_server_ready()
 				if startup_confirmed or startup_closed then return end
 				startup_confirmed = true
-				if not silent_notifications then
-					pcall(notifications.notify, "✅ Serveur MLX prêt", "Modèle actif : " .. target_model)
-				end
 				if on_success then pcall(on_success) on_success = nil end
 			end
 
@@ -615,10 +606,8 @@ PY
 				end
 
 				if code == 0 and not startup_confirmed then
-					if not silent_notifications then
-						pcall(notifications.notify, "❌ Échec serveur MLX", "Modèle " .. target_model .. " non démarré: le processus s’est terminé avant disponibilité")
-					end
-					print("MLX server exited before readiness (code 0)")
+					-- Process exited cleanly before signalling readiness — this is unexpected
+					Logger.error(LOG, "MLX server for model ‘%s’ exited before readiness (code 0).", tostring(target_model))
 					return
 				end
 
@@ -653,14 +642,14 @@ PY
 						end
 					end
 
-					local detail = (error_msg ~= "") and ("\nDetail: " .. error_msg) or ""
-
-					if not silent_notifications then
-						pcall(notifications.notify, "❌ Échec serveur MLX", "Modèle " .. target_model .. " non démarré." .. detail)
+					if error_msg ~= "" then
+						Logger.error(LOG, "MLX server for model ‘%s’ crashed (code %d): %s", tostring(target_model), code, error_msg)
+					else
+						Logger.error(LOG, "MLX server for model ‘%s’ crashed (code %d).", tostring(target_model), code)
 					end
 				end
 
-				print("MLX server exited with code " .. code)
+				Logger.info(LOG, "MLX server process exited with code %d.", code)
 			end, function(_, stdout, stderr)
 				local out = (stdout or "") .. (stderr or "")
 				for line in out:gmatch("([^\n\r]+)") do
@@ -679,9 +668,7 @@ PY
 				pcall(function() task:start() end)
 				probe_server_ready(40)
 			else
-				if not silent_notifications then
-					pcall(notifications.notify, "Erreur MLX", "Impossible de démarrer le serveur MLX pour le modèle " .. target_model)
-				end
+				Logger.error(LOG, "Failed to create hs.task for MLX server — model ‘%s’ cannot start.", tostring(target_model))
 			end
 		end)
 	end

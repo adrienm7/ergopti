@@ -72,6 +72,13 @@ local mlx_deps_checker   = require("lib.mlx_deps_checker")
 local notifications      = require("lib.notifications")
 local ui_restore         = require("lib.ui_restore")
 
+-- Wire Logger.error → system notification so every ERROR surfaces to the user
+-- without any module needing to call notifications.notify() directly.
+-- Registered here (after notifications is loaded) to keep logger dependency-free.
+Logger.set_error_notification_handler(function(module_name, message)
+	pcall(notifications.notify, "⚠️ Erreur — " .. tostring(module_name), message)
+end)
+
 
 
 
@@ -413,6 +420,9 @@ hs.shutdownCallback = function()
 	else
 		Logger.warn(LOG, "restore_all_overrides indisponible — arrêt sans restauration")
 	end
+	-- Terminate any running MLX server process so no orphaned Python process lingers
+	-- after Hammerspoon exits. The require is cached, so this has no startup overhead.
+	pcall(function() require("ui.menu.menu_llm").stop_mlx_server() end)
 	Logger.info(LOG, "Hammerspoon arrêté")
 end
 

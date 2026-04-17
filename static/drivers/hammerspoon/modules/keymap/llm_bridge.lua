@@ -55,6 +55,7 @@ local KEYCODE_DIGITS = {
 	[22] = 6, [26] = 7, [28] = 8, [25] = 9, [29] = 10,
 }
 
+local KEYCODE_ESCAPE    = 53   -- Escape key consumed by the dynamic escape trap
 local KEYCODE_RETURN    = 36   -- Main Return key (accepts the active prediction)
 local KEYCODE_ENTER     = 76   -- Numpad Enter (same behaviour as Return)
 local KEYCODE_TAB       = 48   -- Tab: fast-accepts prediction #1 and stops all streaming
@@ -85,6 +86,11 @@ local LLM_DEFAULTS = core_llm.DEFAULT_STATE
 
 -- The most recently shown hotstring suggestion; kept for dismissal telemetry.
 local last_shown_hotstring = nil
+
+-- Persistent Escape trap, created lazily on first tooltip show.
+-- Inserting a new eventtap at HEAD ensures it fires before any pre-existing tap (e.g. Raycast).
+-- The trap checks tooltip.is_visible() at runtime so it never needs to be disarmed.
+local _escape_trap = nil
 
 -- ── Preview visibility toggles ────────────────────────────────────────────────
 -- Initial values are set in M.init() from the keymap defaults passed by keymap/init.lua.
@@ -226,7 +232,9 @@ function M.set_llm_pred_indent(v)           engine.set_llm_pred_indent(v)       
 function M.set_llm_show_info_bar(v)         engine.set_llm_show_info_bar(v)         end
 function M.set_llm_sequential_mode(v)       engine.set_llm_sequential_mode(v)       end
 function M.set_llm_auto_raise_temp(v)       engine.set_llm_auto_raise_temp(v)       end
-function M.set_llm_disabled_apps(apps)      engine.set_llm_disabled_apps(apps)      end
+function M.set_llm_disabled_apps(apps)           engine.set_llm_disabled_apps(apps)           end
+function M.set_llm_url_bar_filter_enabled(v)      engine.set_llm_url_bar_filter_enabled(v)      end
+function M.set_llm_secure_field_filter_enabled(v) engine.set_llm_secure_field_filter_enabled(v) end
 function M.set_llm_val_modifiers(mods)      engine.set_llm_val_modifiers(mods)      end
 function M.set_llm_nav_modifiers(mods)      engine.set_llm_nav_modifiers(mods)      end
 function M.set_llm_min_words(w)             engine.set_llm_min_words(w)             end
@@ -414,6 +422,36 @@ end
 -- ================================================
 -- ================================================
 
+
+
+-- ============================
+-- ===== 5.1) Escape Trap =====
+-- ============================
+
+--- Arms a single persistent eventtap that intercepts Escape before it reaches the
+--- underlying application, but only when a tooltip is actually visible.
+--- Creating the tap on first use inserts it at the head of the macOS event tap chain
+--- (kCGHeadInsertEventTap), so it fires before any pre-existing tap registered by apps
+--- such as Raycast. Once armed, the trap runs permanently — no disarm needed.
+--- The runtime check on tooltip.is_visible() handles all state transitions safely
+--- without any lifecycle coupling to the tooltip show/hide flow.
+local function arm_escape_trap()
+	if _escape_trap then return end
+	_escape_trap = hs.eventtap.new({ hs.eventtap.event.types.keyDown }, function(event)
+		if event:getKeyCode() ~= KEYCODE_ESCAPE then return false end
+		-- Let Escape through when no tooltip is on screen — Raycast (or the system)
+		-- should handle it normally in that case.
+		if not tooltip.is_visible() then return false end
+		Logger.debug(LOG, "Escape trap — Escape consumed, tooltip dismissed.")
+		M.reset_predictions()
+		return true
+	end)
+	_escape_trap:start()
+	Logger.debug(LOG, "Escape trap armed (persistent).")
+end
+
+
+
 --- Clears all active predictions and optionally emits hotstring-dismissed telemetry.
 --- @param keep_hotstring_log boolean When true, skips the dismiss telemetry event.
 function M.reset_predictions(keep_hotstring_log)
@@ -509,7 +547,10 @@ function M.handle_llm_keys(keyCode, flags, is_ignored)
 	-- F20: precise "typing complete" signal sent by apply_prediction().
 	if engine.handle_f20(keyCode) then return true end
 
-	if is_ignored or not engine.is_visible() then return false end
+	-- Always handle navigation when predictions are on screen, even in keymap-ignored apps
+	-- (e.g. Raycast): the user must be able to navigate/dismiss the tooltip regardless of context.
+	-- The is_ignored flag only suppresses hotstring expansion and buffer tracking, not LLM interaction.
+	if not engine.is_visible() then return false end
 
 	local preds = engine.get_predictions()
 
@@ -554,13 +595,18 @@ function M.handle_llm_keys(keyCode, flags, is_ignored)
 	return false
 end
 
---- Handles Escape: dismisses predictions when visible; otherwise optionally clears the buffer.
---- @return boolean True when predictions were active and dismissed.
+--- Handles Escape: dismisses any visible tooltip (hotstring, LLM loading indicator, or
+--- AI predictions), consuming the event so it never reaches the underlying application.
+--- Without this, apps like Raycast receive the Escape and reset their own state.
+--- @return boolean True when a tooltip was visible and the event was consumed.
 function M.check_escape_reset()
 	if not require_state("check_escape_reset") then return false end
 
-	if engine.is_visible() then
-		Logger.debug(LOG, "Escape — predictions dismissed.")
+	-- Use tooltip.is_visible() rather than engine.is_visible() so we also catch
+	-- the LLM loading spinner and hotstring previews, which are shown through the
+	-- tooltip module but do not set the prediction-engine "visible" flag.
+	if tooltip.is_visible() then
+		Logger.debug(LOG, "Escape — tooltip dismissed.")
 		M.reset_predictions()
 		return true
 	end
@@ -638,5 +684,10 @@ end
 -- Closures ensure the functions are resolved at call time, not at bind time.
 tooltip.set_accept_callback(function(idx) M.apply_prediction(idx) end)
 tooltip.set_cancel_callback(function() M.reset_predictions() end)
+-- Create the persistent Escape trap the first time any tooltip appears.
+-- This guarantees the tap is inserted at HEAD after Raycast (or any other app) has
+-- already registered its own tap, so our Escape always takes priority while a tooltip
+-- is visible. The trap is never destroyed — tooltip.is_visible() drives its behaviour.
+tooltip.set_on_show_callback(arm_escape_trap)
 
 return M

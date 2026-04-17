@@ -88,32 +88,42 @@ end
 function M.build_menu(current_apps, on_change, placeholder_text)
 	Logger.debug(LOG, "Building application exclusion menu…")
 	local apps = type(current_apps) == "table" and current_apps or {}
+	-- Sort a shallow copy by display name so the list is always alphabetical
+	local sorted_apps = {}
+	for _, a in ipairs(apps) do table.insert(sorted_apps, a) end
+	table.sort(sorted_apps, function(a, b)
+		return (a.name or ""):lower() < (b.name or ""):lower()
+	end)
 	local menu = {}
 
-	for i, app in ipairs(apps) do
+	for _, app in ipairs(sorted_apps) do
 		if type(app) == "table" then
 			local icon = nil
 			if app.bundleID then
 				local ok, img = pcall(hs.image.imageFromAppBundle, app.bundleID)
-				if ok and img then 
+				if ok and img then
 					pcall(function() img:setSize({w=16, h=16}) end)
-					icon = img 
+					icon = img
 				end
 			end
 
-			local idx = i
+			-- Capture identity by path so removal is order-independent after sort
+			local app_path   = app.appPath
+			local app_bundle = app.bundleID
 			local styled = hs.styledtext.new(
 				(app.name or "?") .. "\t✗",
 				{ paragraphStyle = { tabStops = {{location = 260, alignment = "right"}} } }
 			)
 
 			table.insert(menu, {
-				title = styled, 
+				title = styled,
 				image = icon,
 				fn    = function()
 					local new_apps = {}
-					for j, a in ipairs(apps) do
-						if j ~= idx then table.insert(new_apps, a) end
+					for _, a in ipairs(apps) do
+						local same = (app_path   and a.appPath   == app_path)
+						          or (app_bundle and a.bundleID  == app_bundle)
+						if not same then table.insert(new_apps, a) end
 					end
 					on_change(new_apps)
 				end,

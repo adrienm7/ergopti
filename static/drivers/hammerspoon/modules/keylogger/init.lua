@@ -99,6 +99,15 @@ local NAV_KEY_CODES = {
 	[116] = "PAGEUP",  [121] = "PAGEDOWN",
 }
 
+-- System processes that handle OS-level authentication prompts.
+-- Keystrokes in these processes must never be logged regardless of any other setting —
+-- the secure_field filter is a belt-and-suspenders complement (AX observer may attach too
+-- slowly to catch the very first keystrokes in a short-lived SecurityAgent window).
+local SYSTEM_AUTH_BUNDLE_IDS = {
+	["com.apple.SecurityAgent"] = true,  -- Admin/sudo password dialog
+	["com.apple.CoreAuthUI"]    = true,  -- Touch ID and biometric auth UI
+}
+
 
 
 
@@ -109,14 +118,17 @@ local NAV_KEY_CODES = {
 -- ================================
 
 M.DEFAULT_STATE = {
-	keylogger_enabled        = false,
-	keylogger_disabled_apps  = {},
-	keylogger_encrypt        = false,
-	keylogger_menubar_wpm    = false,
-	keylogger_menubar_colors = true,
-	keylogger_float_wpm      = false,
-	keylogger_float_graph    = false,
-	keylogger_float_colors   = true,
+	keylogger_enabled                = false,
+	keylogger_disabled_apps          = {},
+	keylogger_encrypt                = false,
+	keylogger_menubar_wpm            = false,
+	keylogger_menubar_colors         = true,
+	keylogger_float_wpm              = false,
+	keylogger_float_graph            = false,
+	keylogger_float_colors           = true,
+	keylogger_private_filter_enabled      = true,
+	keylogger_secure_filter_enabled       = true,
+	keylogger_system_auth_filter_enabled  = true,
 }
 
 
@@ -179,16 +191,20 @@ local CoreState = {
 	is_fullscreen         = false,
 
 	-- App tracking (updated by context_tracker)
-	disabled_apps         = {},
-	active_app_name       = nil,
-	active_app_start      = nil,
-	active_app_bundle     = nil,
-	active_app_path       = nil,
-	active_app_pid        = nil,
-	is_private_window     = false,
+	disabled_apps                = {},
+	active_app_name              = nil,
+	active_app_start             = nil,
+	active_app_bundle            = nil,
+	active_app_path              = nil,
+	active_app_pid               = nil,
+	is_private_window            = false,
+	-- Whether privacy context detection filters are active (user-configurable)
+	private_filter_enabled            = true,
+	secure_field_filter_enabled       = true,
+	system_auth_filter_enabled        = true,
 
 	-- Secure field flag: set by context_tracker's AX observer
-	is_secure_field       = false,
+	is_secure_field              = false,
 
 	-- Hardware snapshots (updated by sensor pollers)
 	current_battery_level = nil,
@@ -328,9 +344,12 @@ local function handle_key(event_obj)
 	local ok, err = pcall(function()
 		if not CoreState.is_enabled then return end
 
-		-- Fast-path guards: skip private/secure contexts entirely
-		if CoreState.is_private_window then return end
-		if CoreState.is_secure_field   then return end
+		-- Fast-path guards: skip private/secure contexts when the respective filter is enabled
+		if CoreState.private_filter_enabled and CoreState.is_private_window then return end
+		if CoreState.secure_field_filter_enabled and CoreState.is_secure_field then return end
+		-- System auth dialogs: belt-and-suspenders guard in case the AX observer attaches too late
+		if CoreState.system_auth_filter_enabled and CoreState.active_app_bundle
+		and SYSTEM_AUTH_BUNDLE_IDS[CoreState.active_app_bundle] then return end
 
 		-- Check the disabled-apps list
 		if CoreState.disabled_apps and #CoreState.disabled_apps > 0 then
@@ -880,6 +899,30 @@ end
 function M.set_disabled_apps(apps)
 	CoreState.disabled_apps = type(apps) == "table" and apps or {}
 	Logger.debug(LOG, "Disabled apps updated (%d entry(ies)).", #CoreState.disabled_apps)
+end
+
+--- Enables or disables the private-browsing keystroke filter.
+--- When disabled, keystrokes in private windows are recorded.
+--- @param v boolean
+function M.set_private_filter_enabled(v)
+	CoreState.private_filter_enabled = (v ~= false)
+	Logger.debug(LOG, "Private window filter: %s.", CoreState.private_filter_enabled and "on" or "off")
+end
+
+--- Enables or disables the secure/password-field keystroke filter.
+--- When disabled, keystrokes in password fields are recorded.
+--- @param v boolean
+function M.set_secure_field_filter_enabled(v)
+	CoreState.secure_field_filter_enabled = (v ~= false)
+	Logger.debug(LOG, "Secure field filter: %s.", CoreState.secure_field_filter_enabled and "on" or "off")
+end
+
+--- Enables or disables the system authentication dialog keystroke filter.
+--- When disabled, keystrokes typed into macOS admin/sudo prompts are recorded.
+--- @param v boolean
+function M.set_system_auth_filter_enabled(v)
+	CoreState.system_auth_filter_enabled = (v ~= false)
+	Logger.debug(LOG, "System auth filter: %s.", CoreState.system_auth_filter_enabled and "on" or "off")
 end
 
 --- Injects a string directly into the tracking buffer (used for testing).
