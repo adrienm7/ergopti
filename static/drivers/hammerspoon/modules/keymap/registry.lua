@@ -307,6 +307,11 @@ function M.add(trigger, replacement, opts)
 			return
 		end
 		_state.seq_counter = _state.seq_counter + 1
+		-- Precompute magic-key membership so the main event loop does not have to
+		-- recompute it on every keystroke; invalidated by update_trigger_char()
+		local mk        = _state.magic_key
+		local mkl       = #mk
+		local has_magic = mkl > 0 and t:sub(-mkl) == mk
 		local entry = {
 			trigger      = t,
 			repl         = r,
@@ -318,6 +323,8 @@ function M.add(trigger, replacement, opts)
 			seq          = _state.seq_counter,
 			tlen         = text_utils.utf8_len(t),
 			final_result = is_final,
+			has_magic    = has_magic,
+			star_base    = has_magic and t:sub(1, #t - mkl) or nil,
 		}
 		if _state.current_group then entry.group = _state.current_group end
 		table.insert(_state.mappings, entry)
@@ -718,7 +725,8 @@ function M.init(core_state)
 	Logger.debug(LOG, "Registry initialized.")
 end
 
---- Synchronizes the magic-key character in the terminator definitions.
+--- Synchronizes the magic-key character in the terminator definitions and
+--- recomputes the per-mapping has_magic / star_base precomputed fields.
 --- Called by keymap/init.lua whenever the trigger char is changed.
 --- @param char string The new trigger character.
 function M.update_trigger_char(char)
@@ -726,6 +734,16 @@ function M.update_trigger_char(char)
 		Logger.error(LOG, "update_trigger_char: char must be a non-empty string."); return
 	end
 	update_terminator_magic_key(char)
+	-- Recompute precomputed magic-key fields for all existing mappings so that
+	-- the event loop and preview scanner continue to see correct values
+	if _state then
+		local mkl = #char
+		for _, m in ipairs(_state.mappings) do
+			m.has_magic = mkl > 0 and m.trigger:sub(-mkl) == char
+			m.star_base = m.has_magic and m.trigger:sub(1, #m.trigger - mkl) or nil
+		end
+		Logger.debug(LOG, "Recomputed has_magic/star_base for %d mapping(s).", #_state.mappings)
+	end
 end
 
 return M
