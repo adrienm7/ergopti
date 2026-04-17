@@ -51,8 +51,9 @@ M.DEFAULT_STATE = {
 	llm_reset_on_nav      = true,
 	llm_after_hotstring   = false,
 	llm_auto_raise_temp   = false, -- Incrementally raise temperature for each extra prediction
-	llm_streaming         = true,  -- Token-by-token streaming
-	llm_streaming_multi   = true,  -- Show predictions as they arrive when num_predictions > 1 (otherwise wait for all to complete before showing any)
+	llm_streaming             = true,  -- Token-by-token streaming
+	llm_streaming_multi       = true,  -- Show predictions as they arrive when num_predictions > 1 (otherwise wait for all to complete before showing any)
+	llm_instant_on_word_end   = true,  -- Fire the LLM immediately when the buffer ends with whitespace (word just completed)
 }
 
 -- Single source of truth for the streaming flag; backends receive it as a parameter

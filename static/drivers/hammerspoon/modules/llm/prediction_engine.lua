@@ -170,6 +170,9 @@ local is_streaming_enabled       = LLM_DEFAULTS.llm_streaming
 -- When true, partial prediction batches are shown as each sequential variant completes;
 -- when false, the tooltip only appears once the final batch with all predictions is ready
 local is_streaming_multi_enabled = LLM_DEFAULTS.llm_streaming_multi
+-- When true, the debounce is bypassed (delay = 0) when the buffer ends with whitespace,
+-- meaning the user just completed a word and a suggestion can fire immediately
+local instant_on_word_end        = LLM_DEFAULTS.llm_instant_on_word_end
 
 
 
@@ -288,6 +291,11 @@ end
 function M.set_llm_streaming_multi(v)
 	is_streaming_multi_enabled = (v == true)
 	Logger.debug(LOG, "Streaming multi: %s.", is_streaming_multi_enabled and "on" or "off")
+end
+
+function M.set_llm_instant_on_word_end(v)
+	instant_on_word_end = (v == true)
+	Logger.debug(LOG, "Instant on word end: %s.", instant_on_word_end and "on" or "off")
 end
 
 function M.set_llm_disabled_apps(apps)
@@ -1078,6 +1086,17 @@ end
 --- @param delay_override number|nil Optional timer override in seconds.
 function M.start_timer(delay_override)
 	start_inactivity_timer(delay_override)
+end
+
+--- Arms the inactivity timer after a completed word (buffer ends with whitespace).
+--- When instant_on_word_end is enabled, bypasses the debounce entirely (delay = 0)
+--- so the prediction fires as soon as the word boundary is detected.
+function M.start_timer_word_end()
+	if instant_on_word_end then
+		start_inactivity_timer(0)
+	else
+		start_inactivity_timer()
+	end
 end
 
 --- Cancels the inactivity timer without firing the LLM check.
