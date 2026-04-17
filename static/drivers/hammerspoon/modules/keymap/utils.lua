@@ -375,6 +375,8 @@ local _ignored_win_cache_value = false
 --- @param now number Current epoch timestamp (seconds) from the caller.
 --- @return boolean
 function M.is_ignored_window(ignored_titles, ignored_patterns, now)
+	-- Fallback for callers that don't hold a pre-computed timestamp
+	if not now then now = hs.timer.secondsSinceEpoch() end
 	if now - _ignored_win_cache_time < 0.5 then return _ignored_win_cache_value end
 
 	_ignored_win_cache_time  = now
