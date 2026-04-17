@@ -303,16 +303,16 @@ function M.update_preview(buf)
 
 	-- Walk static mappings to find a hotstring match.
 	if not matched_repl then
-		-- Cache outside the loop — magic_key never changes during a scan
-		local magic_len = #_state.magic_key
 		for _, mapping in ipairs(_state.mappings) do
 			local group_active = not mapping.group
 				or not _state.groups[mapping.group]
 				or _state.groups[mapping.group].enabled
 			if not group_active then goto continue end
 
-			local has_magic = magic_len > 0 and mapping.trigger:sub(-magic_len) == _state.magic_key
-			local star_base = has_magic and mapping.trigger:sub(1, #mapping.trigger - magic_len) or nil
+			-- has_magic / star_base are precomputed at load time (and refreshed by
+			-- update_trigger_char), so no string operations are needed here
+			local has_magic = mapping.has_magic
+			local star_base = mapping.star_base
 
 			if star_base and star_base ~= "" and ends_with_trigger(buf, star_base, mapping.is_word) then
 				if mapping.plain_repl ~= star_base then
