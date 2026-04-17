@@ -450,18 +450,32 @@ local function post_and_parse_streaming(model_name, system_prompt, full_text, ta
 		if type(on_success) == "function" then pcall(on_success, results) end
 	end
 
-	-- Spawn curl with no-output-buffering (-N); payload delivered via stdin to
-	-- avoid shell argument length limits on large contexts
+	-- Write payload to a temp file so curl reads it directly — avoids the
+	-- stdin-pipe/streaming-callback conflict in hs.task
+	local tmp_path = os.tmpname() .. "_ollama_stream.json"
+	local fh = io.open(tmp_path, "w")
+	if not fh then
+		Logger.error(LOG, "Failed to open temp file '%s' for Ollama streaming payload.", tmp_path)
+		if type(on_fail) == "function" then pcall(on_fail) end
+		return
+	end
+	fh:write(encoded)
+	fh:close()
+
 	local task = hs.task.new("/usr/bin/curl", on_done, on_chunk, {
 		"-s", "-N", "-X", "POST",
 		"-H", "Content-Type: application/json",
-		"--data-binary", "@-",
+		"--data-binary", "@" .. tmp_path,
 		"http://127.0.0.1:11434/api/chat",
 	})
-	task:setInput(encoded)
 	task:start()
 	_active_stream_task = task
-	Logger.debug(LOG, "[%s] #%d STREAM task started.", model_name, req_id)
+	Logger.debug(LOG, "[%s] #%d STREAM task started (payload: %s).", model_name, req_id, tmp_path)
+
+	-- Clean up the temp file once the task has had time to read it
+	hs.timer.doAfter(10, function()
+		os.remove(tmp_path)
+	end)
 end
 
 
