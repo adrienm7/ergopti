@@ -343,8 +343,9 @@ local function onKeyDownRaw(e)
 
 	-- Determine whether the current window should suppress hotstring expansion.
 	-- The Hammerspoon console check is inside is_ignored_window() and covered
-	-- by its 0.5s cache, avoiding a redundant frontmostApplication() call here.
-	local is_ignored = km_utils.is_ignored_window(CoreState.ignored_window_titles, CoreState.ignored_window_patterns)
+	-- by its 0.5s cache. Pass `now` so the cache comparison reuses the timestamp
+	-- already computed above instead of making a second secondsSinceEpoch() call.
+	local is_ignored = km_utils.is_ignored_window(CoreState.ignored_window_titles, CoreState.ignored_window_patterns, now)
 
 	-- 1. Ignore our own synthetic "Delete" keystrokes to prevent double-deletion.
 	if keyCode == 51 and CoreState.expected_synthetic_deletes > 0 then

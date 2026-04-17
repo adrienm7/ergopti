@@ -367,11 +367,14 @@ local _ignored_win_cache_value = false
 --- The Hammerspoon console check is folded in here so that the single
 --- frontmostApplication() call is covered by the 0.5s cache — previously
 --- a redundant uncached call was made in init.lua on every keystroke.
+--- Accepts the current timestamp from the caller so that the
+--- secondsSinceEpoch() syscall is not duplicated when init.lua already
+--- holds a fresh `now` value.
 --- @param ignored_titles table Hash map of exact window titles to ignore.
 --- @param ignored_patterns table Array of Lua patterns matched against window titles.
+--- @param now number Current epoch timestamp (seconds) from the caller.
 --- @return boolean
-function M.is_ignored_window(ignored_titles, ignored_patterns)
-	local now = hs.timer.secondsSinceEpoch()
+function M.is_ignored_window(ignored_titles, ignored_patterns, now)
 	if now - _ignored_win_cache_time < 0.5 then return _ignored_win_cache_value end
 
 	_ignored_win_cache_time  = now
