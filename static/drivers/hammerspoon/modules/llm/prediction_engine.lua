@@ -139,6 +139,7 @@ local inactivity_debounce_sec = LLM_DEFAULTS.llm_debounce
 local excluded_apps           = {}
 local is_ai_preview_enabled   = true
 local auto_raise_temperature  = LLM_DEFAULTS.llm_auto_raise_temp
+local is_streaming_enabled    = LLM_DEFAULTS.llm_streaming
 
 
 
@@ -246,6 +247,12 @@ end
 function M.set_llm_auto_raise_temp(v)
 	auto_raise_temperature = (v == true)
 	Logger.debug(LOG, "Auto temperature raise: %s.", auto_raise_temperature and "on" or "off")
+end
+
+function M.set_llm_streaming(v)
+	is_streaming_enabled = (v == true)
+	core_llm.set_llm_streaming(v)
+	Logger.debug(LOG, "Streaming: %s.", is_streaming_enabled and "on" or "off")
 end
 
 function M.set_llm_disabled_apps(apps)
@@ -577,6 +584,27 @@ function M.perform_check(force_trigger, profile_name)
 			tooltip.tint("ai_prediction"), nil, #pending_predictions)
 	end)
 
+	-- When streaming is enabled, build a lightweight callback that renders partial tokens
+	-- as they arrive; the full parse pipeline still runs on the final complete result
+	local on_partial_cb = not is_streaming_enabled and nil or function(partial_raw)
+		-- Discard if superseded by a newer request
+		if fetch_request_counter ~= my_fetch_id then return end
+		if type(partial_raw) ~= "string" or partial_raw:gsub("%s", "") == "" then return end
+		local partial_pred = {
+			to_type = partial_raw,
+			deletes = 0,
+			chunks  = { { text = partial_raw, added = true } },
+			nw      = "",
+		}
+		pending_predictions = { partial_pred }
+		predictions_visible = true
+		tooltip.show_predictions(
+			{ partial_pred }, 1, is_ai_preview_enabled, nil,
+			nil, prediction_indent, normalize_mods(navigation_mods),
+			tooltip.tint("ai_prediction"), "⌛ …", 1
+		)
+	end
+
 	core_llm.fetch_llm_prediction(
 		buffer, tail, model_to_use, req_temperature, max_tokens, num_preds,
 		function(raw_predictions, elapsed_ms, is_final)
@@ -708,7 +736,8 @@ function M.perform_check(force_trigger, profile_name)
 				tooltip.hide()
 			end
 		end,
-		sequential_mode, force_trigger, function() return fetch_request_counter end
+		sequential_mode, force_trigger, function() return fetch_request_counter end,
+		on_partial_cb
 	)
 end
 
@@ -731,6 +760,8 @@ function M.reset()
 	tooltip.hide()
 	stop_inactivity_timer()
 	if _stream_watchdog_timer then _stream_watchdog_timer:stop() end
+	-- Cancel any in-flight streaming curl task so it doesn't fire stale callbacks
+	if is_streaming_enabled then pcall(core_llm.cancel_streaming) end
 
 	if was_visible then
 		Logger.debug(LOG, "Predictions cleared (were visible).")

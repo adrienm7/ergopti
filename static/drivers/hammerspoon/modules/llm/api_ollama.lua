@@ -19,10 +19,15 @@ if not ok_kl then keylogger = nil end
 
 local _req_counter = 0
 local _ollama_started = false
-local _model_cache = {}  
+local _model_cache = {}
 local DEDUPLICATION_ENABLED = ApiCommon.DEFAULT_DEDUPLICATION_ENABLED
 local RETRY_FAILED_PREDICTION_ENABLED = true
 local RETRY_FAILED_PREDICTION_MAX_MULTIPLIER = 2
+
+-- When true, requests use hs.task+curl streaming so the tooltip fills token by token.
+-- When false (default), the existing hs.http.asyncPost path is used unchanged.
+local _streaming_enabled  = false
+local _active_stream_task = nil  -- Current in-flight hs.task; cancelled on new request
 
 -- Ensure Ollama daemon is running with optimized background start
 local function ensure_ollama_running()
@@ -65,6 +70,23 @@ function M.warmup(model_name)
 			end
 		end
 	)
+end
+
+--- Enables or disables token-by-token streaming for all subsequent requests.
+--- @param v boolean
+function M.set_streaming(v)
+	_streaming_enabled = (v == true)
+	Logger.debug(LOG, "Ollama streaming: %s.", _streaming_enabled and "on" or "off")
+end
+
+--- Terminates the in-flight streaming task if one is active.
+--- Called when a newer request supersedes the current one.
+function M.cancel_streaming()
+	if _active_stream_task then
+		pcall(function() _active_stream_task:terminate() end)
+		_active_stream_task = nil
+		Logger.debug(LOG, "Active Ollama stream cancelled.")
+	end
 end
 
 
@@ -162,7 +184,45 @@ local function build_options(temperature, num_predict_tokens, model_name, is_bat
     return opts
 end
 
---- Posts data to the local LLM and parses the response.
+--- Resolves the system prompt template and builds the Ollama messages array.
+--- Shared by post_and_parse and post_and_parse_streaming to avoid duplication.
+--- @param system_prompt string|nil Raw prompt template.
+--- @param full_text string Full context string.
+--- @param tail_text string Tail context string.
+--- @param num_predictions number Substituted for {n} in the prompt.
+--- @param is_batch boolean Whether this is a batch request.
+--- @return table messages, boolean line_mode, string user_prompt_preview
+local function build_request_context(system_prompt, full_text, tail_text, num_predictions, is_batch)
+	local final_sys = system_prompt
+	if type(final_sys) == "string" then
+		final_sys = final_sys:gsub("%{n%}", tostring(num_predictions))
+	end
+	local user_prompt = ""
+	if type(final_sys) == "string" and final_sys:find("PREFIX") and final_sys:find("TAIL") then
+		user_prompt = string.format("PREFIX: \"%s\"\nTAIL: \"%s\"", full_text or "", tail_text or "")
+	else
+		local context_str = type(full_text) == "string" and full_text or ""
+		if type(final_sys) == "string" and final_sys:find("{context}", 1, true) then
+			final_sys = final_sys:gsub("%{context%}", function() return context_str end)
+			user_prompt = final_sys
+			final_sys   = nil
+		else
+			user_prompt = context_str
+		end
+	end
+	local is_advanced = type(final_sys) == "string" and (
+		final_sys:find("TAIL_CORRECTED", 1, true) or final_sys:find("NEXT_WORDS", 1, true)
+	)
+	local line_mode = (not is_batch) and (not is_advanced)
+	local messages  = {}
+	if final_sys and final_sys ~= "" then
+		table.insert(messages, { role = "system", content = final_sys })
+	end
+	table.insert(messages, { role = "user", content = user_prompt })
+	return messages, line_mode, user_prompt
+end
+
+--- Posts data to the local LLM and parses the response (non-streaming path).
 --- @param model_name string The LLM model name.
 --- @param system_prompt string The resolved instructions.
 --- @param full_text string The complete preceding document text.
@@ -179,36 +239,9 @@ local function post_and_parse(model_name, system_prompt, full_text, tail_text,
                                on_success, on_fail, dedup_stats)
     _req_counter = _req_counter + 1
     local req_id = _req_counter
-    local messages = {}
 
-	local final_sys = system_prompt
-	if type(final_sys) == "string" then
-		final_sys = final_sys:gsub("%{n%}", tostring(num_predictions))
-	end
-
-	local user_prompt = ""
-	if type(final_sys) == "string" and final_sys:find("PREFIX") and final_sys:find("TAIL") then
-		user_prompt = string.format("PREFIX: \"%s\"\nTAIL: \"%s\"", full_text or "", tail_text or "")
-	else
-		local context_str = type(full_text) == "string" and full_text or ""
-		if type(final_sys) == "string" and final_sys:find("{context}", 1, true) then
-			final_sys = final_sys:gsub("%{context%}", function() return context_str end)
-			user_prompt = final_sys
-			final_sys = nil
-		else
-			user_prompt = context_str
-		end
-	end
-
-    local is_advanced_prompt = type(final_sys) == "string" and (
-        final_sys:find("TAIL_CORRECTED", 1, true) or final_sys:find("NEXT_WORDS", 1, true)
-    )
-    local line_mode = (not is_batch) and (not is_advanced_prompt)
-
-    if final_sys and final_sys ~= "" then
-        table.insert(messages, { role = "system", content = final_sys })
-    end
-    table.insert(messages, { role = "user", content = user_prompt })
+    local messages, line_mode, user_prompt = build_request_context(
+        system_prompt, full_text, tail_text, num_predictions, is_batch)
 
     local t0_req = hs.timer.secondsSinceEpoch()
     Logger.debug(LOG, "[%s] #%d PROMPT (%d chars) mode_line=%s -> %s", model_name, req_id, #user_prompt, tostring(line_mode), user_prompt:sub(1, 250))
@@ -299,6 +332,146 @@ local function post_and_parse(model_name, system_prompt, full_text, tail_text,
     )
 end
 
+--- Streaming variant of post_and_parse using hs.task + curl -N.
+--- Calls on_partial(accumulated_raw_text) after each received token so the
+--- caller can update the UI incrementally. Calls on_success with the final
+--- parsed result when the stream ends.
+--- @param model_name string
+--- @param system_prompt string
+--- @param full_text string
+--- @param tail_text string
+--- @param temperature number
+--- @param num_predict_tokens number
+--- @param num_predictions number
+--- @param is_batch boolean
+--- @param on_success function Called once with final parsed results.
+--- @param on_fail function Called on error.
+--- @param dedup_stats table
+--- @param on_partial function|nil Called with accumulated raw text as each token arrives.
+local function post_and_parse_streaming(model_name, system_prompt, full_text, tail_text,
+                                         temperature, num_predict_tokens, num_predictions, is_batch,
+                                         on_success, on_fail, dedup_stats, on_partial)
+	-- Terminate any previous stream so resources are not leaked
+	if _active_stream_task then
+		pcall(function() _active_stream_task:terminate() end)
+		_active_stream_task = nil
+	end
+
+	_req_counter = _req_counter + 1
+	local req_id = _req_counter
+
+	local messages, line_mode, user_prompt = build_request_context(
+		system_prompt, full_text, tail_text, num_predictions, is_batch)
+
+	local t0_req = hs.timer.secondsSinceEpoch()
+	Logger.debug(LOG, "[%s] #%d STREAM_PROMPT (%d chars) -> %s",
+		model_name, req_id, #user_prompt, user_prompt:sub(1, 250))
+
+	local payload = {
+		model      = tostring(model_name),
+		messages   = messages,
+		stream     = true,
+		think      = false,
+		keep_alive = "30m",
+		options    = build_options(temperature, num_predict_tokens, model_name, is_batch, line_mode),
+	}
+
+	local ok, encoded = pcall(hs.json.encode, payload)
+	if not ok or not encoded then
+		Logger.error(LOG, "Failed to encode Ollama streaming payload.")
+		if type(on_fail) == "function" then pcall(on_fail) end
+		return
+	end
+
+	local accumulated = ""
+	local line_buf    = ""
+
+	-- Parse one complete NDJSON line and append its content to accumulated
+	local function process_line(line)
+		local ok_dec, obj = pcall(hs.json.decode, line)
+		if not ok_dec or type(obj) ~= "table" then return end
+		if type(obj.message) == "table" and type(obj.message.content) == "string" then
+			local token = obj.message.content
+			if token ~= "" then
+				accumulated = accumulated .. token
+				if type(on_partial) == "function" then pcall(on_partial, accumulated) end
+			end
+		end
+	end
+
+	-- Drain line_buf, processing every complete line found
+	local function flush_lines()
+		while true do
+			local nl = line_buf:find("\n", 1, true)
+			if not nl then break end
+			local line = line_buf:sub(1, nl - 1)
+			line_buf   = line_buf:sub(nl + 1)
+			if line ~= "" then process_line(line) end
+		end
+	end
+
+	-- Streaming callback: fired each time curl writes a chunk to stdout
+	local function on_chunk(_, chunk, _)
+		if not chunk or chunk == "" then return true end
+		line_buf = line_buf .. chunk
+		flush_lines()
+		return true
+	end
+
+	-- Completion callback: fired when curl exits
+	local function on_done(_, remaining, _)
+		_active_stream_task = nil
+		if remaining and remaining ~= "" then
+			line_buf = line_buf .. remaining
+			flush_lines()
+		end
+
+		if accumulated == "" then
+			Logger.warn(LOG, "[%s] #%d STREAM: empty accumulation — on_fail.", model_name, req_id)
+			if type(on_fail) == "function" then pcall(on_fail) end
+			return
+		end
+
+		local raw    = Parser.strip_thinking(accumulated)
+		local ms_req = math.floor((hs.timer.secondsSinceEpoch() - t0_req) * 1000)
+		Logger.debug(LOG, "[%s] #%d STREAM_DONE (%dms) -> %s", model_name, req_id, ms_req, raw:sub(1, 250))
+
+		local results = {}
+		if not is_batch then
+			local pred = Parser.process_prediction(full_text, tail_text, raw)
+			if pred then ApiCommon.insert_prediction(results, pred, dedup_stats, DEDUPLICATION_ENABLED, Logger, LOG) end
+		else
+			for _, block in ipairs(Parser.split_blocks(raw)) do
+				if #results >= num_predictions then break end
+				local pred = Parser.process_prediction(full_text, tail_text, block)
+				if pred then ApiCommon.insert_prediction(results, pred, dedup_stats, DEDUPLICATION_ENABLED, Logger, LOG) end
+			end
+		end
+
+		if #results == 0 then
+			Logger.debug(LOG, "[%s] #%d STREAM: parse yielded 0 result(s).", model_name, req_id)
+			if type(on_fail) == "function" then pcall(on_fail) end
+			return
+		end
+		Logger.debug(LOG, "[%s] #%d STREAM: %d result(s).", model_name, req_id, #results)
+		if keylogger and type(keylogger.log_llm) == "function" then pcall(keylogger.log_llm, full_text, results) end
+		if type(on_success) == "function" then pcall(on_success, results) end
+	end
+
+	-- Spawn curl with no-output-buffering (-N); payload delivered via stdin to
+	-- avoid shell argument length limits on large contexts
+	local task = hs.task.new("/usr/bin/curl", on_done, on_chunk, {
+		"-s", "-N", "-X", "POST",
+		"-H", "Content-Type: application/json",
+		"--data-binary", "@-",
+		"http://127.0.0.1:11434/api/chat",
+	})
+	task:setInput(encoded)
+	task:start()
+	_active_stream_task = task
+	Logger.debug(LOG, "[%s] #%d STREAM task started.", model_name, req_id)
+end
+
 
 
 
@@ -320,35 +493,39 @@ end
 --- @param on_success function Function to execute on success.
 --- @param on_fail function Function to execute on failure.
 --- @param request_id_provider function Callback returning the current request identifier.
+--- @param on_partial function|nil Optional token-by-token streaming callback.
 function M.fetch_batch(full_text, tail_text, model_name, temperature,
-                             max_predict, num_predictions, profile,
-                             on_success, on_fail, request_id_provider)
-                             
-    local effective_temp = tonumber(temperature) or 0.1
-    local system_prompt  = Profiles.resolve_system_prompt(profile, num_predictions)
-    local tokens         = tonumber(max_predict) * num_predictions + (num_predictions * 5)
-    local is_batch       = profile.batch
-    local dedup_stats    = ApiCommon.new_dedup_stats()
+                       max_predict, num_predictions, profile,
+                       on_success, on_fail, request_id_provider, on_partial)
 
-    local t0 = hs.timer.secondsSinceEpoch()
-    post_and_parse(model_name, system_prompt, full_text, tail_text,
-                   effective_temp, tokens, num_predictions, is_batch,
-                   function(results)
-                       local ms = math.floor((hs.timer.secondsSinceEpoch() - t0) * 1000)
-                       ApiCommon.log_prediction_summary(Logger, LOG, "batch", num_predictions, dedup_stats, #results)
-                       if type(on_success) == "function" then pcall(on_success, results, ms, true) end
-                   end,
-                   on_fail,
-                   dedup_stats)
+	local effective_temp = tonumber(temperature) or 0.1
+	local system_prompt  = Profiles.resolve_system_prompt(profile, num_predictions)
+	local tokens         = tonumber(max_predict) * num_predictions + (num_predictions * 5)
+	local is_batch       = profile.batch
+	local dedup_stats    = ApiCommon.new_dedup_stats()
+	local post_fn        = _streaming_enabled and post_and_parse_streaming or post_and_parse
+
+	local t0 = hs.timer.secondsSinceEpoch()
+	post_fn(model_name, system_prompt, full_text, tail_text,
+		effective_temp, tokens, num_predictions, is_batch,
+		function(results)
+			local ms = math.floor((hs.timer.secondsSinceEpoch() - t0) * 1000)
+			ApiCommon.log_prediction_summary(Logger, LOG, "batch", num_predictions, dedup_stats, #results)
+			if type(on_success) == "function" then pcall(on_success, results, ms, true) end
+		end,
+		on_fail,
+		dedup_stats,
+		_streaming_enabled and on_partial or nil)
 end
 
 --- Dispatches multiple sequential API requests.
+--- @param on_partial function|nil Optional token-by-token streaming callback.
 function M.fetch_parallel(full_text, tail_text, model_name, temperature,
-                                max_predict, num_predictions, profile,
-                                on_success, on_fail, request_id_provider)
-    return M.fetch_sequential(full_text, tail_text, model_name, temperature,
-                              max_predict, num_predictions, profile,
-                              on_success, on_fail, request_id_provider)
+                          max_predict, num_predictions, profile,
+                          on_success, on_fail, request_id_provider, on_partial)
+	return M.fetch_sequential(full_text, tail_text, model_name, temperature,
+		max_predict, num_predictions, profile,
+		on_success, on_fail, request_id_provider, on_partial)
 end
 
 --- Dispatches multiple sequential API requests to avoid parallel connection dropping.
@@ -362,76 +539,83 @@ end
 --- @param on_success function Function to execute on success.
 --- @param on_fail function Function to execute on failure.
 --- @param request_id_provider function Callback returning the current request identifier.
+--- @param on_partial function|nil Optional token-by-token streaming callback.
 function M.fetch_sequential(full_text, tail_text, model_name, temperature,
-                                  max_predict, num_predictions, profile,
-                                  on_success, on_fail, request_id_provider)
-                                
-    local system_prompt = Profiles.resolve_system_prompt(profile, 1)
-    local t0            = hs.timer.secondsSinceEpoch()
-    local results       = {}
-    local base_temp     = tonumber(temperature) or 0.1
-    local requested_predictions = math.max(1, math.floor(tonumber(num_predictions) or 1))
-    local max_attempts = requested_predictions
-    if RETRY_FAILED_PREDICTION_ENABLED == true then
-        max_attempts = math.max(requested_predictions, requested_predictions * math.max(1, math.floor(tonumber(RETRY_FAILED_PREDICTION_MAX_MULTIPLIER) or 2)))
-    end
-    local attempt_index = 1
-    local dedup_stats   = ApiCommon.new_dedup_stats()
-    local initial_request_id = type(request_id_provider) == "function" and request_id_provider() or nil
+                             max_predict, num_predictions, profile,
+                             on_success, on_fail, request_id_provider, on_partial)
 
-    local function do_next()
-        -- Check if this request batch was cancelled dynamically
-        if type(request_id_provider) == "function" then
-            local current_request_id = request_id_provider()
-            if initial_request_id ~= nil and current_request_id ~= initial_request_id then
-                Logger.debug(LOG, "Request batch cancelled: ID changed from %s to %s at step %d/%d", 
-                    tostring(initial_request_id), tostring(current_request_id), attempt_index, max_attempts)
-                return
-            end
-        end
+	local system_prompt = Profiles.resolve_system_prompt(profile, 1)
+	local t0            = hs.timer.secondsSinceEpoch()
+	local results       = {}
+	local base_temp     = tonumber(temperature) or 0.1
+	local requested_predictions = math.max(1, math.floor(tonumber(num_predictions) or 1))
+	local max_attempts = requested_predictions
+	if RETRY_FAILED_PREDICTION_ENABLED == true then
+		max_attempts = math.max(requested_predictions, requested_predictions * math.max(1, math.floor(tonumber(RETRY_FAILED_PREDICTION_MAX_MULTIPLIER) or 2)))
+	end
+	local attempt_index = 1
+	local dedup_stats   = ApiCommon.new_dedup_stats()
+	local initial_request_id = type(request_id_provider) == "function" and request_id_provider() or nil
 
-        if #results >= requested_predictions or attempt_index > max_attempts then
-            if #results == 0 then if type(on_fail) == "function" then pcall(on_fail) end return end
-            ApiCommon.log_prediction_summary(Logger, LOG, "sequential", requested_predictions, dedup_stats, #results)
-            local ms = math.floor((hs.timer.secondsSinceEpoch() - t0) * 1000)
-            if type(on_success) == "function" then pcall(on_success, results, ms, true) end
-            return
-        end
+	local function do_next()
+		-- Check if this request batch was cancelled dynamically
+		if type(request_id_provider) == "function" then
+			local current_request_id = request_id_provider()
+			if initial_request_id ~= nil and current_request_id ~= initial_request_id then
+				Logger.debug(LOG, "Request batch cancelled: ID changed from %s to %s at step %d/%d",
+					tostring(initial_request_id), tostring(current_request_id), attempt_index, max_attempts)
+				return
+			end
+		end
 
-        local variant_index = attempt_index
-        attempt_index = attempt_index + 1
+		if #results >= requested_predictions or attempt_index > max_attempts then
+			if #results == 0 then if type(on_fail) == "function" then pcall(on_fail) end return end
+			ApiCommon.log_prediction_summary(Logger, LOG, "sequential", requested_predictions, dedup_stats, #results)
+			local ms = math.floor((hs.timer.secondsSinceEpoch() - t0) * 1000)
+			if type(on_success) == "function" then pcall(on_success, results, ms, true) end
+			return
+		end
 
-        local variant_temp = ApiCommon.get_diversity_temperature(base_temp, variant_index, 0.30)
-        local primary_tokens = tonumber(max_predict)
+		local variant_index  = attempt_index
+		attempt_index        = attempt_index + 1
+		local variant_temp   = ApiCommon.get_diversity_temperature(base_temp, variant_index, 0.30)
+		local primary_tokens = tonumber(max_predict)
+		-- Stream partial updates only for the first variant; retries and diversity
+		-- variants run in the background without overwriting the growing preview
+		local variant_partial = (variant_index == 1) and on_partial or nil
 
-        local function request_variant(attempt, tokens, temp, force_line_mode)
-            post_and_parse(model_name, system_prompt, full_text, tail_text,
-                           temp, tokens, 1, false,
-                           function(preds)
-                               if type(preds) == "table" and type(preds[1]) == "table" then
-                                   if #results < requested_predictions then
-                                       ApiCommon.insert_prediction(results, preds[1], dedup_stats, DEDUPLICATION_ENABLED, Logger, LOG)
-                                       local ms = math.floor((hs.timer.secondsSinceEpoch() - t0) * 1000)
-                                       if type(on_success) == "function" then pcall(on_success, results, ms, false) end
-                                   end
-                               end
-                               do_next()
-                           end,
-                           function()
-                               if attempt < 2 then
-                                   local retry_tokens = tokens + 5
-                                   local retry_temp = math.min(1.30, (tonumber(temp) or 0.1) + 0.18)
-                                   Logger.debug(LOG, "[%s] Variant %d/%d quick chat retry: tokens=%d temp=%.2f", model_name, variant_index, max_attempts, retry_tokens, retry_temp)
-                                   request_variant(attempt + 1, retry_tokens, retry_temp, false)
-                                   return
-                               end
-                               do_next()
-                           end,
-                           dedup_stats)
-        end
+		local function request_variant(attempt, tokens, temp)
+			local post_fn = _streaming_enabled and post_and_parse_streaming or post_and_parse
+			post_fn(model_name, system_prompt, full_text, tail_text,
+				temp, tokens, 1, false,
+				function(preds)
+					if type(preds) == "table" and type(preds[1]) == "table" then
+						if #results < requested_predictions then
+							ApiCommon.insert_prediction(results, preds[1], dedup_stats, DEDUPLICATION_ENABLED, Logger, LOG)
+							local ms = math.floor((hs.timer.secondsSinceEpoch() - t0) * 1000)
+							if type(on_success) == "function" then pcall(on_success, results, ms, false) end
+						end
+					end
+					do_next()
+				end,
+				function()
+					if attempt < 2 then
+						local retry_tokens = tokens + 5
+						local retry_temp   = math.min(1.30, (tonumber(temp) or 0.1) + 0.18)
+						Logger.debug(LOG, "[%s] Variant %d/%d quick retry: tokens=%d temp=%.2f",
+							model_name, variant_index, max_attempts, retry_tokens, retry_temp)
+						-- Retry does not stream partial updates (would overwrite the growing preview)
+						request_variant(attempt + 1, retry_tokens, retry_temp)
+						return
+					end
+					do_next()
+				end,
+				dedup_stats,
+				_streaming_enabled and variant_partial or nil)
+		end
 
-        request_variant(1, primary_tokens, variant_temp, false)
-    end
+		request_variant(1, primary_tokens, variant_temp)
+	end
 
 	do_next()
 end
