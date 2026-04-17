@@ -397,8 +397,15 @@ function M.is_ignored_window(ignored_titles, ignored_patterns, now)
 	_ignored_win_cache_time  = now
 	_ignored_win_cache_value = false
 
-	local app = hs.application.frontmostApplication()
-	if not app then return false end
+	-- Use the focused window directly rather than frontmostApplication() so that
+	-- floating-panel apps (e.g. Raycast) that accept keystrokes without becoming
+	-- the NSWorkspace frontmost app are evaluated against their own window title,
+	-- not the title of the previously active app.
+	local ok_win, win = pcall(hs.window.focusedWindow)
+	if not ok_win or not win then return false end
+
+	local ok_app, app = pcall(function() return win:application() end)
+	if not ok_app or not app then return false end
 
 	-- Always ignore the Hammerspoon console to prevent feedback loops;
 	-- folded here so it benefits from the same 0.5s cache as the rest
@@ -406,9 +413,6 @@ function M.is_ignored_window(ignored_titles, ignored_patterns, now)
 		_ignored_win_cache_value = true
 		return true
 	end
-
-	local ok_win, win = pcall(function() return app:focusedWindow() end)
-	if not ok_win or not win then return false end
 
 	local ok_title, title = pcall(function() return win:title() end)
 	if not ok_title or type(title) ~= "string" then return false end

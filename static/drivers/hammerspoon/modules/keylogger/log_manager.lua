@@ -300,9 +300,9 @@ function M.aggregate_events(events, app_name, date_str)
 	local ctx = _state.ngram_context
 
 	local p1, p2, p3, p4, p5, p6 = ctx.p1, ctx.p2, ctx.p3, ctx.p4, ctx.p5, ctx.p6
-	local cur_word   = ctx.cur_word
-	local word_err   = ctx.word_err
-	local backtrack  = ctx.hist   -- history of recorded n-gram keys, for backspace undo
+	local cur_word   = ctx.cur_word or ""   -- guard: nil if context was persisted in an older format
+	local word_err   = ctx.word_err or false
+	local backtrack  = ctx.hist or {}       -- guard: nil if context was persisted in an older format
 	local prev_word  = ctx.prev_word
 	local prev_sc    = ctx.prev_sc
 	local prev_synth_type = "none"

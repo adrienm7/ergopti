@@ -428,15 +428,21 @@ end
 -- ===== 5.1) Escape Trap =====
 -- ============================
 
---- Arms a single persistent eventtap that intercepts Escape before it reaches the
---- underlying application, but only when a tooltip is actually visible.
---- Creating the tap on first use inserts it at the head of the macOS event tap chain
---- (kCGHeadInsertEventTap), so it fires before any pre-existing tap registered by apps
---- such as Raycast. Once armed, the trap runs permanently — no disarm needed.
---- The runtime check on tooltip.is_visible() handles all state transitions safely
---- without any lifecycle coupling to the tooltip show/hide flow.
+--- Re-arms the Escape eventtap at the head of the macOS event tap chain
+--- (kCGHeadInsertEventTap) every time a tooltip becomes visible.
+---
+--- WHY recreate rather than reuse: kCGHeadInsertEventTap always inserts at
+--- the head at the moment of creation. If an app such as Raycast opens AFTER
+--- our tap was first created, Raycast's own tap is inserted at the new head —
+--- ahead of ours. By destroying and recreating on every tooltip show we
+--- guarantee our Escape intercept is always the very first tap to fire,
+--- regardless of what other taps were registered in the meantime.
 local function arm_escape_trap()
-	if _escape_trap then return end
+	-- Tear down any previous instance so the new tap truly lands at HEAD
+	if _escape_trap then
+		pcall(function() _escape_trap:stop() end)
+		_escape_trap = nil
+	end
 	_escape_trap = hs.eventtap.new({ hs.eventtap.event.types.keyDown }, function(event)
 		if event:getKeyCode() ~= KEYCODE_ESCAPE then return false end
 		-- Let Escape through when no tooltip is on screen — Raycast (or the system)
@@ -447,7 +453,7 @@ local function arm_escape_trap()
 		return true
 	end)
 	_escape_trap:start()
-	Logger.debug(LOG, "Escape trap armed (persistent).")
+	Logger.debug(LOG, "Escape trap re-armed at HEAD.")
 end
 
 

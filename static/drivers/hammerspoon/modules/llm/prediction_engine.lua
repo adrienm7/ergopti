@@ -574,7 +574,24 @@ local function is_url_bar_focused(front)
 	return false
 end
 
---- Returns true when LLM predictions should be suppressed for the current frontmost app.
+--- Returns the application that currently has keyboard focus.
+--- Prefers the app owning the focused window because floating-panel launchers
+--- (e.g. Raycast) accept keyboard input without becoming the macOS frontmost
+--- application — using frontmostApplication() would return the previously
+--- active app and incorrectly inherit its exclusion rules.
+--- @return userdata|nil hs.application object, or nil on failure.
+local function get_focused_app()
+	-- focusedWindow() returns the window with keyboard focus regardless of
+	-- whether its parent app is the NSWorkspace frontmost application
+	local ok_fw, fw = pcall(hs.window.focusedWindow)
+	if ok_fw and fw then
+		local ok_app, app = pcall(function() return fw:application() end)
+		if ok_app and app then return app end
+	end
+	return hs.application.frontmostApplication()
+end
+
+--- Returns true when LLM predictions should be suppressed for the current app.
 --- Checks both the keymap global window ignore list and the bridge per-app exclusion list.
 --- @return boolean True if the active window or app is on an exclusion list.
 local function is_blocked_for_current_app()
@@ -582,8 +599,8 @@ local function is_blocked_for_current_app()
 	if km_utils.is_ignored_window(_state.ignored_window_titles, _state.ignored_window_patterns) then
 		return true
 	end
-	-- Resolve the frontmost app once and reuse it for all AX checks below
-	local front = hs.application.frontmostApplication()
+	-- Use the app that owns the focused window, not the macOS frontmost app
+	local front = get_focused_app()
 	-- Password/secure fields in any application
 	if secure_field_filter_enabled and is_secure_field_focused(front) then
 		Logger.debug(LOG, "Secure field focused — LLM request skipped.")
