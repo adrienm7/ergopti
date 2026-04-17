@@ -139,6 +139,19 @@ local function ends_with_trigger(buffer, trigger, is_word)
 	return true
 end
 
+--- Returns true when the buffer ends with a word-boundary character that signals the
+--- user has completed a word: punctuation or whitespace (whitespace is already handled
+--- separately by the last_word == nil branch, but punctuation reaches this path).
+--- @param buf string The current typed buffer.
+--- @return boolean
+local function is_word_boundary(buf)
+	if type(buf) ~= "string" or buf == "" then return false end
+	local last = buf:sub(-1)
+	return last == " " or last == "," or last == "." or last == "!"
+		or last == "?" or last == ";" or last == ":" or last == ")"
+		or last == "}" or last == "]" or last == "\n"
+end
+
 
 
 
@@ -235,6 +248,7 @@ function M.set_llm_auto_raise_temp(v)       engine.set_llm_auto_raise_temp(v)   
 function M.set_llm_disabled_apps(apps)           engine.set_llm_disabled_apps(apps)           end
 function M.set_llm_url_bar_filter_enabled(v)      engine.set_llm_url_bar_filter_enabled(v)      end
 function M.set_llm_secure_field_filter_enabled(v) engine.set_llm_secure_field_filter_enabled(v) end
+function M.set_llm_instant_on_word_end(v)         engine.set_llm_instant_on_word_end(v)         end
 function M.set_llm_val_modifiers(mods)      engine.set_llm_val_modifiers(mods)      end
 function M.set_llm_nav_modifiers(mods)      engine.set_llm_nav_modifiers(mods)      end
 function M.set_llm_min_words(w)             engine.set_llm_min_words(w)             end
@@ -294,7 +308,9 @@ function M.update_preview(buf)
 	local last_word = buf:match("([^%s]+)$")
 	if not last_word then
 		M.reset_predictions()
-		if llm_on then engine.start_timer() end
+		-- Buffer ends with whitespace: the user just finished a word or sentence.
+		-- start_timer_word_end() bypasses the debounce when instant_on_word_end is on.
+		if llm_on then engine.start_timer_word_end() end
 		return
 	end
 
@@ -409,7 +425,15 @@ function M.update_preview(buf)
 		-- No hotstring match — let the inactivity timer drive the LLM.
 		Logger.debug(LOG, "No hotstring for '%s' — LLM timer armed.", tostring(last_word))
 		M.reset_predictions()
-		if llm_on then engine.start_timer() end
+		if llm_on then
+			-- Punctuation after a word (comma, period, etc.) is a word boundary:
+			-- use the instant trigger path, same as the trailing-space branch above.
+			if is_word_boundary(buf) then
+				engine.start_timer_word_end()
+			else
+				engine.start_timer()
+			end
+		end
 	end
 end
 

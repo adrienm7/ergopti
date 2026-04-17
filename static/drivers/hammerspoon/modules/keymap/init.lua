@@ -299,6 +299,7 @@ M.set_llm_streaming              = LLMBridge.set_llm_streaming
 M.set_llm_streaming_multi        = LLMBridge.set_llm_streaming_multi
 M.set_llm_url_bar_filter_enabled      = LLMBridge.set_llm_url_bar_filter_enabled
 M.set_llm_secure_field_filter_enabled = LLMBridge.set_llm_secure_field_filter_enabled
+M.set_llm_instant_on_word_end         = LLMBridge.set_llm_instant_on_word_end
 
 M.set_preview_enabled             = LLMBridge.set_preview_enabled
 M.set_preview_star_enabled        = LLMBridge.set_preview_star_enabled

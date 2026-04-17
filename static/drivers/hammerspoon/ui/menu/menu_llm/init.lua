@@ -89,8 +89,9 @@ M.DEFAULT_STATE = {
     llm_after_hotstring   = false,
     llm_auto_raise_temp   = llm_mod.DEFAULT_STATE.llm_auto_raise_temp,
     llm_min_words         = llm_mod.DEFAULT_STATE.llm_min_words,
-    llm_streaming         = llm_mod.DEFAULT_STATE.llm_streaming,
-    llm_streaming_multi   = llm_mod.DEFAULT_STATE.llm_streaming_multi,
+    llm_streaming           = llm_mod.DEFAULT_STATE.llm_streaming,
+    llm_streaming_multi     = llm_mod.DEFAULT_STATE.llm_streaming_multi,
+    llm_instant_on_word_end = llm_mod.DEFAULT_STATE.llm_instant_on_word_end,
 }
 
 
@@ -1069,6 +1070,19 @@ function M.create(deps)
         if state.llm_debounce ~= llm_mod.DEFAULT_STATE.llm_debounce then
             table.insert(main_menu, { title = "  ↳ Réinitialiser (défaut : " .. math.floor((llm_mod.DEFAULT_STATE.llm_debounce or 0.5) * 1000) .. " ms)", disabled = is_disabled or nil, fn = settings_mgr.reset_debounce })
         end
+
+        table.insert(main_menu, {
+            title    = "Suggestion instantanée en fin de mot",
+            checked  = state.llm_instant_on_word_end,
+            disabled = is_disabled or nil,
+            fn       = not is_disabled and function()
+                state.llm_instant_on_word_end = not state.llm_instant_on_word_end
+                if keymap and type(keymap.set_llm_instant_on_word_end) == "function" then
+                    pcall(keymap.set_llm_instant_on_word_end, state.llm_instant_on_word_end)
+                end
+                save_prefs(); update_menu()
+            end or nil,
+        })
 
         table.insert(main_menu, {
             title    = "Prédiction IA après expiration des bulles hotstrings",
