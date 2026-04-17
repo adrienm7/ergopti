@@ -51,6 +51,7 @@ M.DEFAULT_STATE = {
 	llm_reset_on_nav      = true,
 	llm_after_hotstring   = false,
 	llm_auto_raise_temp   = false,  -- Incrementally raise temperature for each extra prediction
+	llm_streaming         = false,  -- Token-by-token streaming (tooltip fills as tokens arrive)
 }
 
 local CoreState = {
@@ -155,6 +156,20 @@ function M.set_active_profile(id)
 	if type(id) == "string" then
 		CoreState.active_profile_id = id
 	end
+end
+
+--- Enables or disables token-by-token streaming on both API backends simultaneously.
+--- @param v boolean True to enable streaming, false to disable.
+function M.set_llm_streaming(v)
+	ApiOllama.set_streaming(v)
+	ApiMlx.set_streaming(v)
+	Logger.debug(LOG, "Streaming set to %s on all backends.", tostring(v))
+end
+
+--- Cancels the in-flight streaming task on the active backend, if any.
+--- Called when a new request supersedes the current stream.
+function M.cancel_streaming()
+	pcall(function() get_api().cancel_streaming() end)
 end
 
 --- Sets the active LLM backend identifier.
@@ -282,8 +297,9 @@ end
 --- @param sequential_mode boolean Flag to enforce sequential API requests instead of parallel.
 --- @param force boolean If true, bypasses application exclusions.
 --- @param request_id_provider function Callback returning the current request identifier.
+--- @param on_partial function|nil Optional token-by-token streaming callback.
 function M.fetch_llm_prediction(full_text, tail_text, model_name, temperature,
-                                  max_predict, num_predictions, on_success, on_fail, sequential_mode, force, request_id_provider)
+                                  max_predict, num_predictions, on_success, on_fail, sequential_mode, force, request_id_provider, on_partial)
 
 	-- Prevent firing requests if the active application is blacklisted by user settings
 	if not force then
@@ -310,12 +326,12 @@ function M.fetch_llm_prediction(full_text, tail_text, model_name, temperature,
 
 	if type(profile) == "table" and (not profile.batch) then
 		if num_predictions > 1 and not sequential_mode then
-			api.fetch_parallel(full_text, tail_text, model_name, temperature, max_predict, num_predictions, profile, on_success, on_fail, request_id_provider)
+			api.fetch_parallel(full_text, tail_text, model_name, temperature, max_predict, num_predictions, profile, on_success, on_fail, request_id_provider, on_partial)
 		else
-			api.fetch_sequential(full_text, tail_text, model_name, temperature, max_predict, num_predictions, profile, on_success, on_fail, request_id_provider)
+			api.fetch_sequential(full_text, tail_text, model_name, temperature, max_predict, num_predictions, profile, on_success, on_fail, request_id_provider, on_partial)
 		end
 	else
-		api.fetch_batch(full_text, tail_text, model_name, temperature, max_predict, num_predictions, profile, on_success, on_fail, request_id_provider)
+		api.fetch_batch(full_text, tail_text, model_name, temperature, max_predict, num_predictions, profile, on_success, on_fail, request_id_provider, on_partial)
 	end
 end
 

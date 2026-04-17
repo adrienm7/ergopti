@@ -231,6 +231,7 @@ function M.set_llm_nav_modifiers(mods)      engine.set_llm_nav_modifiers(mods)  
 function M.set_llm_min_words(w)             engine.set_llm_min_words(w)             end
 function M.set_llm_max_words(w)             engine.set_llm_max_words(w)             end
 function M.set_llm_debounce(seconds)        engine.set_llm_debounce(seconds)        end
+function M.set_llm_streaming(v)             engine.set_llm_streaming(v)             end
 
 --- Sets the "chain LLM after hotstring" flag, owned here because
 --- update_preview() consumes it directly.

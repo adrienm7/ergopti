@@ -295,6 +295,7 @@ M.set_llm_enabled            = LLMBridge.set_llm_enabled
 M.set_llm_after_hotstring    = LLMBridge.set_llm_after_hotstring
 M.set_llm_debounce           = LLMBridge.set_llm_debounce
 M.set_llm_auto_raise_temp    = LLMBridge.set_llm_auto_raise_temp
+M.set_llm_streaming          = LLMBridge.set_llm_streaming
 
 M.set_preview_enabled             = LLMBridge.set_preview_enabled
 M.set_preview_star_enabled        = LLMBridge.set_preview_star_enabled
