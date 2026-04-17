@@ -113,6 +113,25 @@ local function require_state(func_name)
 	return true
 end
 
+--- Returns true when buf ends with the trigger (with optional word-boundary check).
+--- Defined at module level so it is not re-allocated as a closure on every keystroke.
+--- @param buffer string The current typed buffer.
+--- @param trigger string The hotstring trigger to match.
+--- @param is_word boolean When true, rejects matches preceded by a letter or "@".
+--- @return boolean
+local function ends_with_trigger(buffer, trigger, is_word)
+	if type(buffer) ~= "string" or type(trigger) ~= "string" or trigger == "" then return false end
+	if #buffer < #trigger or buffer:sub(-#trigger) ~= trigger then return false end
+	if is_word ~= true then return true end
+	local before      = buffer:sub(1, #buffer - #trigger)
+	if #before == 0 then return true end
+	local prev_offset = utf8.offset(before, -1)
+	local prev_char   = prev_offset and before:sub(prev_offset) or ""
+	-- Block when the character immediately before the trigger is a letter or "@".
+	if prev_char == "@" or text_utils.is_letter_char(prev_char) then return false end
+	return true
+end
+
 
 
 
@@ -254,24 +273,6 @@ function M.update_preview(buf)
 	-- ObjC dispatch calls that add up on every keystroke even when the engine is idle
 	local llm_on = engine.get_llm_enabled()
 	if llm_on then engine.stop_timer() end
-
-	--- Returns true when buf ends with the trigger (with optional word-boundary check).
-	--- @param buffer string
-	--- @param trigger string
-	--- @param is_word boolean
-	--- @return boolean
-	local function ends_with_trigger(buffer, trigger, is_word)
-		if type(buffer) ~= "string" or type(trigger) ~= "string" or trigger == "" then return false end
-		if #buffer < #trigger or buffer:sub(-#trigger) ~= trigger then return false end
-		if is_word ~= true then return true end
-		local before      = buffer:sub(1, #buffer - #trigger)
-		if #before == 0 then return true end
-		local prev_offset = utf8.offset(before, -1)
-		local prev_char   = prev_offset and before:sub(prev_offset) or ""
-		-- Block when the character immediately before the trigger is a letter or "@".
-		if prev_char == "@" or text_utils.is_letter_char(prev_char) then return false end
-		return true
-	end
 
 	if not buf or #buf == 0 then
 		Logger.debug(LOG, "Empty buffer — predictions cleared.")
