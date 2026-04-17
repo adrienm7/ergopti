@@ -531,25 +531,32 @@ function M.build_management(ctx)
 		}
 	end
 
-	local def_base = ctx.keymap and ctx.keymap.BASE_DELAY_SEC_DEFAULT
+	-- expansion_delay lives in keymap.DEFAULT_STATE; BASE_DELAY_SEC_DEFAULT is a legacy alias
+	local def_base = ctx.keymap and (
+		ctx.keymap.BASE_DELAY_SEC_DEFAULT
+		or (type(ctx.keymap.DEFAULT_STATE) == "table" and ctx.keymap.DEFAULT_STATE.expansion_delay)
+	)
 	if not def_base then
-		Logger.warn(LOG, "keymap.BASE_DELAY_SEC_DEFAULT missing — base delay undefined.")
+		Logger.warn(LOG, "keymap.DEFAULT_STATE.expansion_delay missing — base delay undefined.")
 	end
 	local def_delays = ctx.keymap and type(ctx.keymap.DELAYS_DEFAULT) == "table" and ctx.keymap.DELAYS_DEFAULT
 	if not def_delays then
 		Logger.warn(LOG, "keymap.DELAYS_DEFAULT missing — individual delays undefined.")
 	end
 
-	table.insert(delay_menu, make_delay_item("Touche ★", "STAR_TRIGGER", def_delays.STAR_TRIGGER, false))
-	table.insert(delay_menu, make_delay_item("Intelligence Artificielle (Acceptation)", "llm_prediction", def_delays.llm_prediction, false))
-	table.insert(delay_menu, make_delay_item("Auto-complétions (ex: numéros)", "dynamichotstrings", def_delays.dynamichotstrings, false))
-	table.insert(delay_menu, make_delay_item("Autocorrections", "autocorrection", def_delays.autocorrection, false))
-	table.insert(delay_menu, make_delay_item("Roulements", "rolls", def_delays.rolls, false))
-	table.insert(delay_menu, make_delay_item("Réductions de SFBs", "sfbsreduction", def_delays.sfbsreduction, false))
-	table.insert(delay_menu, make_delay_item("Réductions de distances", "distancesreduction", def_delays.distancesreduction, false))
-	
-	table.insert(delay_menu, { title = "-" })
-	table.insert(delay_menu, make_delay_item("Défaut (autres catégories)", nil, def_base, true))
+	if def_delays then
+		table.insert(delay_menu, make_delay_item("Touche ★", "STAR_TRIGGER", def_delays.STAR_TRIGGER, false))
+		table.insert(delay_menu, make_delay_item("Intelligence Artificielle (Acceptation)", "llm_prediction", def_delays.llm_prediction, false))
+		table.insert(delay_menu, make_delay_item("Auto-complétions (ex: numéros)", "dynamichotstrings", def_delays.dynamichotstrings, false))
+		table.insert(delay_menu, make_delay_item("Autocorrections", "autocorrection", def_delays.autocorrection, false))
+		table.insert(delay_menu, make_delay_item("Roulements", "rolls", def_delays.rolls, false))
+		table.insert(delay_menu, make_delay_item("Réductions de SFBs", "sfbsreduction", def_delays.sfbsreduction, false))
+		table.insert(delay_menu, make_delay_item("Réductions de distances", "distancesreduction", def_delays.distancesreduction, false))
+		table.insert(delay_menu, { title = "-" })
+	end
+	if def_base then
+		table.insert(delay_menu, make_delay_item("Défaut (autres catégories)", nil, def_base, true))
+	end
 
 	delays_item = { title = "Délais d’expansion", disabled = paused or nil, menu = delay_menu }
 
