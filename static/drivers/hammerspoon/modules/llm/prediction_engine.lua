@@ -209,10 +209,12 @@ function M.set_llm_enabled(enabled)
 	is_llm_enabled = (enabled == true)
 	Logger.info(LOG, "LLM %s.", is_llm_enabled and "enabled" or "disabled")
 	if not is_llm_enabled then M.reset(); return end
-	-- Pre-load model weights into GPU when the user enables the LLM; deferred so
-	-- the rest of the startup sequence settles before the warmup request fires
+	-- Pre-load model weights and prime the KV cache for the active profile's system
+	-- prompt; deferred so the rest of the startup sequence settles first
 	if type(active_model) == "string" and active_model ~= "" then
-		hs.timer.doAfter(2, function() pcall(core_llm.warmup_model, active_model) end)
+		hs.timer.doAfter(2, function()
+			pcall(core_llm.warmup_model, active_model, core_llm.get_active_profile())
+		end)
 	end
 end
 
@@ -228,7 +230,9 @@ function M.set_llm_model(model_name)
 	-- Trigger a warmup only when LLM is already enabled (avoids spurious requests
 	-- during startup when set_llm_model fires before set_llm_enabled(true))
 	if is_llm_enabled then
-		hs.timer.doAfter(2, function() pcall(core_llm.warmup_model, model_name) end)
+		hs.timer.doAfter(2, function()
+			pcall(core_llm.warmup_model, model_name, core_llm.get_active_profile())
+		end)
 	end
 end
 

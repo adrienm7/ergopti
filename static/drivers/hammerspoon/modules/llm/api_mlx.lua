@@ -40,23 +40,79 @@ function M.cancel_streaming()
 end
 
 --- Sends a minimal 1-token inference to load model weights into GPU memory.
---- Mirrors api_ollama.warmup() for the MLX backend.
---- @param model_name string The MLX model identifier (not used in the request, logged only).
-function M.warmup(model_name)
-	Logger.debug(LOG, "Warming up MLX model '%s'…", tostring(model_name))
-	local ok, encoded = pcall(hs.json.encode, {
-		prompt      = " ",
-		max_tokens  = 1,
-		temperature = 0,
-	})
-	if not ok then return end
-	hs.http.asyncPost(
-		"http://127.0.0.1:8080/v1/completions",
-		encoded,
-		{ ["Content-Type"] = "application/json" },
+--- Primes the MLX server KV cache with the static portion of the active profile's
+--- system prompt. MLX-LM caches computed KV states and reuses them when a subsequent
+--- request shares the same token prefix, so this warmup eliminates the prefill cost
+--- of the invariant tokens (up to ~350 tokens for the advanced profile) from the
+--- first real request onward.
+--- @param model_name string The MLX model identifier (logged only).
+--- @param profile table|nil The active profile object; falls back to a minimal ping.
+function M.warmup(model_name, profile)
+	Logger.debug(LOG, "Warming up MLX KV cache for model '%s'…", tostring(model_name))
+
+	local Profiles  = require("modules.llm.profiles")
+	local endpoint  = "http://127.0.0.1:8080/v1/completions"
+	local payload
+
+	-- Build the full prompt the server will actually see on real requests so that its
+	-- KV cache entry for the static prefix is immediately useful.
+	local sys = (type(profile) == "table")
+		and Profiles.resolve_system_prompt(profile, 1)
+		or  ""
+
+	if type(sys) == "string" and sys ~= "" then
+		-- Substitute template variables with minimal dummy values
+		sys = sys:gsub("{context}", "Bonjour")
+		         :gsub("{min_words}", "1")
+		         :gsub("{max_words}", "5")
+		         :gsub("{n}", "1")
+
+		local is_advanced  = sys:find("RÈGLES CRITIQUES", 1, true) ~= nil
+		local uses_pf_tail = sys:find("PREFIX") and sys:find("TAIL")
+
+		if is_advanced or uses_pf_tail then
+			-- Advanced / correction profiles use the chat endpoint with a separate
+			-- user message — prime the full static system block (~350 tokens).
+			local user_msg = uses_pf_tail and 'PREFIX: "Bonjour"\nTAIL: "Bonjour"' or "Bonjour"
+			local merged   = sys .. "\n\n" .. user_msg
+			endpoint = "http://127.0.0.1:8080/v1/chat/completions"
+			local ok_enc, enc = pcall(hs.json.encode, {
+				messages    = { { role = "user", content = merged } },
+				max_tokens  = 1,
+				temperature = 0,
+				stream      = false,
+			})
+			if ok_enc then payload = enc end
+		else
+			-- Basic / raw profiles fold the context into the system prompt; only the
+			-- static prefix before {context} is shared, so a completions ping suffices.
+			local ok_enc, enc = pcall(hs.json.encode, {
+				prompt      = sys,
+				max_tokens  = 1,
+				temperature = 0,
+				stream      = false,
+			})
+			if ok_enc then payload = enc end
+		end
+	end
+
+	-- Fallback: if profile resolution failed, send a minimal ping to confirm the model
+	-- is loaded without risking a crash.
+	if not payload then
+		local ok_enc, enc = pcall(hs.json.encode, {
+			prompt      = " ",
+			max_tokens  = 1,
+			temperature = 0,
+		})
+		if not ok_enc then return end
+		payload = enc
+	end
+
+	hs.http.asyncPost(endpoint, payload, { ["Content-Type"] = "application/json" },
 		function(status, _)
 			if status == 200 then
-				Logger.info(LOG, "MLX model '%s' warmed up — GPU cache ready.", tostring(model_name))
+				Logger.info(LOG, "MLX KV cache primed (profile: %s).",
+					(type(profile) == "table" and profile.id) or "default")
 			else
 				Logger.debug(LOG, "MLX warmup returned %s — model may not be loaded yet.", tostring(status))
 			end

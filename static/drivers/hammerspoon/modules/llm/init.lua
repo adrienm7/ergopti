@@ -135,13 +135,15 @@ function M.warm_up_connections()
 	end)
 end
 
---- Sends a minimal 1-token inference request to pre-load model weights into GPU.
---- Must be called after the model name is configured; the warmup runs async so
---- it does not block the caller. Skip when LLM is disabled to avoid spurious requests.
+--- Primes the backend model and its KV cache with the active profile's system prompt.
+--- Must be called after both model and profile are configured; runs async so it does
+--- not block the caller.
 --- @param model_name string The backend-specific model identifier.
-function M.warmup_model(model_name)
+--- @param profile table|nil The active profile object; omit to use a minimal ping.
+function M.warmup_model(model_name, profile)
 	if type(model_name) ~= "string" or model_name == "" then return end
-	pcall(function() get_api().warmup(model_name) end)
+	local resolved_profile = profile or M.get_active_profile()
+	pcall(function() get_api().warmup(model_name, resolved_profile) end)
 end
 
 -- Defer backend detection entirely off the synchronous init path
@@ -156,11 +158,17 @@ function M.get_active_profile()
 	return Profiles.get_active_profile(CoreState.active_profile_id, CoreState.user_profiles)
 end
 
---- Updates the active profile ID and logic state.
+--- Updates the active profile ID and re-primes the KV cache for the new profile's
+--- system prompt so the first request after a profile switch benefits from the cache.
 --- @param id string The ID of the profile to activate.
 function M.set_active_profile(id)
-	if type(id) == "string" then
-		CoreState.active_profile_id = id
+	if type(id) ~= "string" then return end
+	CoreState.active_profile_id = id
+	-- Re-prime the KV cache: the new profile may have a different static prompt prefix
+	local model = M.get_current_model()
+	if type(model) == "string" and model ~= "" then
+		local new_profile = M.get_active_profile()
+		hs.timer.doAfter(0, function() pcall(M.warmup_model, model, new_profile) end)
 	end
 end
 
