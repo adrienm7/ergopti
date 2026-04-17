@@ -250,7 +250,10 @@ end
 function M.update_preview(buf)
 	if not require_state("update_preview") then return end
 
-	engine.stop_timer()
+	-- Skip timer ops entirely when LLM is off: stop_timer()/start_timer() involve
+	-- ObjC dispatch calls that add up on every keystroke even when the engine is idle
+	local llm_on = engine.get_llm_enabled()
+	if llm_on then engine.stop_timer() end
 
 	--- Returns true when buf ends with the trigger (with optional word-boundary check).
 	--- @param buffer string
@@ -279,7 +282,7 @@ function M.update_preview(buf)
 	local last_word = buf:match("([^%s]+)$")
 	if not last_word then
 		M.reset_predictions()
-		engine.start_timer()
+		if llm_on then engine.start_timer() end
 		return
 	end
 
@@ -379,7 +382,7 @@ function M.update_preview(buf)
 		tooltip.show(display_text, false, is_enabled, accent_color)
 
 		-- Chain: arm the LLM timer so it fires just as the tooltip window closes.
-		if fire_llm_after_hotstring then
+		if fire_llm_after_hotstring and llm_on then
 			Logger.debug(LOG, "LLM chain scheduled in %.3gs.", tooltip_timeout + HOTSTRING_CHAIN_OFFSET_SEC)
 			engine.start_timer(tooltip_timeout + HOTSTRING_CHAIN_OFFSET_SEC)
 		end
@@ -393,7 +396,7 @@ function M.update_preview(buf)
 		-- No hotstring match — let the inactivity timer drive the LLM.
 		Logger.debug(LOG, "No hotstring for '%s' — LLM timer armed.", tostring(last_word))
 		M.reset_predictions()
-		engine.start_timer()
+		if llm_on then engine.start_timer() end
 	end
 end
 
