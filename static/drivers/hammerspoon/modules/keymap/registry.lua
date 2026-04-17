@@ -390,8 +390,9 @@ function M.add(trigger, replacement, opts)
 		end
 	end
 
-	Logger.debug(LOG, "Mapping added: '%s' → '%s'%s.",
-		trigger, replacement, is_auto and " [auto]" or "")
+    -- Log disabled because we have thousands of mappings
+	-- Logger.debug(LOG, "Mapping added: '%s' → '%s'%s.",
+	-- 	trigger, replacement, is_auto and " [auto]" or "")
 end
 
 

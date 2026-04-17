@@ -49,7 +49,7 @@ local WPM_MIN_DURATION_MS        = 2000
 -- How often the idle check and mouse-distance poll run (seconds)
 local IDLE_CHECK_INTERVAL_SEC    = 10
 -- How often the maintenance timer fires for day-rotation and mouse polling (seconds)
-local MAINTENANCE_INTERVAL_SEC   = 1
+local MAINTENANCE_INTERVAL_SEC   = 5
 -- Minimum gap between system-load polls to avoid spawning top too often (5 min)
 local SYSTEM_LOAD_POLL_INTERVAL_MS = 5 * 60 * 1000
 -- Delay before synthetic input is considered a match (very fast = synthetic)
@@ -68,11 +68,35 @@ local MODIFIER_KEYCODES = {
 local MODIFIER_ORDER  = { "cmd", "ctrl", "alt", "shift", "fn" }
 local MODIFIER_LABELS = { cmd = "Cmd", ctrl = "Ctrl", alt = "Alt", shift = "Shift", fn = "Fn" }
 
--- Human-readable labels for special keycodes
+-- Human-readable labels for special keycodes (used by build_shortcut_key)
 local SPECIAL_KEY_LABELS = {
-	[36]  = "Enter",     [48]  = "Tab",   [49] = "Space",
+	[36]  = "Enter",     [48]  = "Tab",      [49]  = "Space",
 	[51]  = "Backspace", [53]  = "Escape",
-	[123] = "Left",      [124] = "Right", [125] = "Down", [126] = "Up",
+	[123] = "Left",      [124] = "Right",    [125] = "Down",     [126] = "Up",
+	[117] = "Delete",    [115] = "Home",     [119] = "End",
+	[116] = "PageUp",    [121] = "PageDown",
+	[122] = "F1",  [120] = "F2",  [99]  = "F3",  [118] = "F4",
+	[96]  = "F5",  [97]  = "F6",  [98]  = "F7",  [100] = "F8",
+	[101] = "F9",  [109] = "F10", [103] = "F11", [111] = "F12",
+}
+
+-- Keycodes for F1–F12; excluded from the shortcut pipeline when no Cmd or Ctrl
+-- modifier is held so that standalone F-key presses log as "[F1]" etc. in the
+-- character dict instead of appearing as "Fn+F1" shortcut entries.
+local F_KEY_CODES = {
+	[122] = "F1",  [120] = "F2",  [99]  = "F3",  [118] = "F4",
+	[96]  = "F5",  [97]  = "F6",  [98]  = "F7",  [100] = "F8",
+	[101] = "F9",  [109] = "F10", [103] = "F11", [111] = "F12",
+}
+
+-- Keycodes for navigation keys (arrows + Delete, Home, End, PageUp, PageDown).
+-- These produce no character string from getCharacters(), so they are excluded
+-- from the early-return guard and logged explicitly as bracket markers so they
+-- appear in the characters tab and participate in n-gram tracking.
+local NAV_KEY_CODES = {
+	[123] = "LEFT",  [124] = "RIGHT",  [125] = "DOWN",  [126] = "UP",
+	[117] = "DELETE",  [115] = "HOME",  [119] = "END",
+	[116] = "PAGEUP",  [121] = "PAGEDOWN",
 }
 
 
@@ -242,11 +266,17 @@ end
 --- that should be indexed separately rather than as a typed character.
 --- AltGr (Ctrl+Alt) is intentionally excluded — it is a typing layer on
 --- international keyboards and should flow through as a normal character.
+--- F-keys without Cmd or Ctrl are also excluded: they are logged as bracket
+--- markers ("[F1]" etc.) rather than as "Fn+F1" shortcut entries.
 --- @param flags table The modifier flags from the key event.
 --- @param keycode number The raw keycode.
 --- @return boolean True when this event is a shortcut candidate.
 local function is_shortcut_candidate(flags, keycode)
 	if MODIFIER_KEYCODES[keycode] then return false end
+	-- Nav keys (arrows, Home, End…) are never shortcuts — always recorded as bracket markers
+	if NAV_KEY_CODES[keycode] then return false end
+	-- F-keys pressed with only the fn modifier are character events, not shortcuts
+	if F_KEY_CODES[keycode] and not flags.cmd and not flags.ctrl then return false end
 	if flags.cmd then return true end
 	-- Ctrl alone (not with Alt, to exclude AltGr)
 	if flags.ctrl and not flags.alt then return true end
@@ -337,10 +367,6 @@ local function handle_key(event_obj)
 			if #CoreState.buffer_events > 0 then LogManager.flush_buffer() end
 			return
 		end
-		if evt_type == hs.eventtap.event.types.mouseMoved then
-			if #CoreState.buffer_events > 0 then LogManager.flush_buffer() end
-			return
-		end
 
 		-- Key-up: record the hold duration for the corresponding key-down event
 		if evt_type == hs.eventtap.event.types.keyUp then
@@ -380,9 +406,14 @@ local function handle_key(event_obj)
 		end
 
 		-- getCharacters(false) returns the actual composed character for the current
-		-- keyboard layout; nil/empty means a dead-key that needs another stroke to resolve
+		-- keyboard layout; nil/empty means a dead-key that needs another stroke to resolve.
+		-- Capslock (57), F-keys, and navigation keys are exceptions: they produce no
+		-- character string but are logged explicitly as bracket markers below.
 		local chars = event_obj:getCharacters(false)
-		if not chars or chars == "" then return end
+		if (not chars or chars == "") and keycode ~= 57
+		   and not F_KEY_CODES[keycode] and not NAV_KEY_CODES[keycode]
+		then return end
+		chars = chars or ""
 
 		local delay = CoreState.last_time > 0 and math.floor(now - CoreState.last_time) or 0
 		CoreState.last_time = now
@@ -433,8 +464,12 @@ local function handle_key(event_obj)
 			end
 		end
 
-		-- Update rolling WPM buffers (physical keystrokes only)
-		if not is_synthetic and keycode ~= 51 then
+		-- Update rolling WPM buffers (physical typing keystrokes only).
+		-- F-keys and navigation keys are excluded: they are not typing characters
+		-- and would inflate WPM artificially if counted.
+		if not is_synthetic and keycode ~= 51
+		   and not F_KEY_CODES[keycode] and not NAV_KEY_CODES[keycode]
+		then
 			table.insert(CoreState.recent_typing_eff,  now)
 			table.insert(CoreState.recent_typing_phys, now)
 		end
@@ -463,6 +498,7 @@ local function handle_key(event_obj)
 			d  = delay,
 			dk = false,
 			cp = false,
+			kc = keycode,  -- raw virtual keycode for physical-key frequency analysis
 		}
 
 		local ev_entry = nil
@@ -486,14 +522,31 @@ local function handle_key(event_obj)
 				table.insert(CoreState.rich_chunks, { type = "correction", text = deleted_char })
 			end
 
-		elseif keycode == 48 or keycode == 53 then
-			-- Tab or Escape: flush the buffer (context switch)
+		elseif keycode == 48 then
+			-- Tab: log as bracket marker and flush (cursor navigation — breaks N-gram context)
+			ev_entry = { "[TAB]", delay, meta }
+			table.insert(CoreState.buffer_events, ev_entry)
 			LogManager.flush_buffer()
 
+		elseif keycode == 53 then
+			-- Escape: log then flush (cancel/navigation action, breaks N-gram context)
+			ev_entry = { "[ESC]", delay, meta }
+			table.insert(CoreState.buffer_events, ev_entry)
+			LogManager.flush_buffer()
+
+		elseif keycode == 57 then
+			-- Capslock toggle: log the state change (does not flush — no context break)
+			ev_entry = { "[CAPS]", delay, meta }
+			table.insert(CoreState.buffer_events, ev_entry)
+
 		elseif keycode == 36 then
-			-- Enter: append newline, flush (sentence boundary)
+			-- Enter: use bracket marker for n-gram tracking; keep "\n" only in
+			-- buffer_text and rich_chunks. The raw "\n" char (LF, code 10) is
+			-- stripped by the JS control-character filter, so it must never be
+			-- the event key — "[ENTER]" survives the filter and appears in the
+			-- characters tab.
 			CoreState.buffer_text = CoreState.buffer_text .. "\n"
-			ev_entry = { "\n", delay, meta }
+			ev_entry = { "[ENTER]", delay, meta }
 			table.insert(CoreState.buffer_events, ev_entry)
 			table.insert(CoreState.rich_chunks, {
 				type = is_synthetic and synth_type or "text",
@@ -501,20 +554,65 @@ local function handle_key(event_obj)
 			})
 			LogManager.flush_buffer()
 
-		else
-			-- Normal character
-			if not is_synthetic then
-				CoreState.buffer_text = CoreState.buffer_text .. chars
-			end
-			ev_entry = { chars, delay, meta }
+		elseif F_KEY_CODES[keycode] then
+			-- F1–F12: log as bracket marker and flush (context-breaking navigation)
+			ev_entry = { "[" .. F_KEY_CODES[keycode] .. "]", delay, meta }
 			table.insert(CoreState.buffer_events, ev_entry)
-			table.insert(CoreState.rich_chunks, {
-				type = is_synthetic and synth_type or "text",
-				text = chars,
-			})
-			-- Flush on sentence-ending punctuation or space
-			if chars:match("[.?!]") or keycode == 49 then
-				LogManager.flush_buffer()
+			LogManager.flush_buffer()
+
+		elseif NAV_KEY_CODES[keycode] then
+			-- Arrow keys and extended nav (Delete, Home, End, PageUp, PageDown): log as
+			-- bracket marker and flush — cursor moved, so N-gram context is broken
+			ev_entry = { "[" .. NAV_KEY_CODES[keycode] .. "]", delay, meta }
+			table.insert(CoreState.buffer_events, ev_entry)
+			LogManager.flush_buffer()
+
+		else
+			-- Normal character — a keylayout may map one physical key to a multi-codepoint
+			-- string (e.g. Option+A → NNBSP + "?"). Storing the whole string as a single
+			-- event key makes it unrecognisable in the chars tab (length ≠ 1) and breaks
+			-- bigram token counts. Split into one event per codepoint so each character is
+			-- recorded independently. Only the first codepoint carries the real delay; the
+			-- rest get 0 because they all originate from the same physical keystroke.
+			local ok_len, char_count = pcall(utf8.len, chars)
+			if ok_len and char_count and char_count > 1 then
+				local first = true
+				for _, code in utf8.codes(chars) do
+					local sub_char = utf8.char(code)
+					local ev_delay = first and delay or 0
+					if not is_synthetic then
+						CoreState.buffer_text = CoreState.buffer_text .. sub_char
+					end
+					local sub_entry = { sub_char, ev_delay, meta }
+					table.insert(CoreState.buffer_events, sub_entry)
+					table.insert(CoreState.rich_chunks, {
+						type = is_synthetic and synth_type or "text",
+						text = sub_char,
+					})
+					if sub_char:match("[.?!]") or sub_char == " " then
+						LogManager.flush_buffer()
+					end
+					-- Track only the first sub-char event for keyup matching
+					if first then
+						ev_entry = sub_entry
+						first    = false
+					end
+				end
+			else
+				-- Standard single-codepoint path
+				if not is_synthetic then
+					CoreState.buffer_text = CoreState.buffer_text .. chars
+				end
+				ev_entry = { chars, delay, meta }
+				table.insert(CoreState.buffer_events, ev_entry)
+				table.insert(CoreState.rich_chunks, {
+					type = is_synthetic and synth_type or "text",
+					text = chars,
+				})
+				-- Flush on sentence-ending punctuation or space
+				if chars:match("[.?!]") or keycode == 49 then
+					LogManager.flush_buffer()
+				end
 			end
 		end
 
@@ -1083,7 +1181,6 @@ function M.start(script_control)
 			hs.eventtap.event.types.leftMouseDown,
 			hs.eventtap.event.types.rightMouseDown,
 			hs.eventtap.event.types.scrollWheel,
-			hs.eventtap.event.types.mouseMoved,
 		}, handle_key)
 	end
 	_event_tap:start()

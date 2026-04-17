@@ -26,6 +26,7 @@ local M = {}
 local hs = hs
 
 local core_llm  = require("modules.llm")
+local Parser    = require("modules.llm.parser")
 local Logger    = require("lib.logger")
 local tooltip   = require("ui.tooltip")
 local keylogger = require("modules.keylogger")
@@ -592,22 +593,37 @@ function M.perform_check(force_trigger, profile_name)
 			tooltip.tint("ai_prediction"), nil, #pending_predictions)
 	end)
 
-	-- When streaming is enabled, build a lightweight callback that renders partial tokens
-	-- as they arrive; the full parse pipeline still runs on the final complete result
+	-- When streaming is enabled, parse each partial accumulation through the full pipeline
+	-- (so TAIL_CORRECTED/NEXT_WORDS labels are stripped), then display the result as a
+	-- single orange "insert" block — no diff colors, no gray context, no bold corrections.
+	-- Diff coloring is applied only once the final result arrives via on_success.
 	local on_partial_cb = is_streaming_enabled and function(partial_raw)
 		-- Discard if superseded by a newer request
 		if fetch_request_counter ~= my_fetch_id then return end
 		if type(partial_raw) ~= "string" or partial_raw:gsub("%s", "") == "" then return end
-		local partial_pred = {
-			to_type = partial_raw,
-			deletes = 0,
-			chunks  = { { type = "insert", text = partial_raw } },
-			nw      = "",
+		-- Strip any partial thinking block before attempting to parse
+		local stripped = Parser.strip_thinking(partial_raw)
+		if not stripped or stripped:gsub("%s", "") == "" then return end
+		-- Wait until the parser can produce a valid prediction (early tokens often can't)
+		local ok_parse, partial_pred = pcall(Parser.process_prediction, buffer, tail, stripped)
+		if not ok_parse or not partial_pred then return end
+		-- Build a display-only variant: use the parsed to_type/deletes for accept behaviour,
+		-- but replace all diff chunks with a single insert so only orange text is shown
+		local display_text = (type(partial_pred.nw) == "string" and partial_pred.nw ~= "" and partial_pred.nw)
+			or partial_pred.to_type
+		if not display_text or display_text:gsub("%s", "") == "" then return end
+		local stream_pred = {
+			to_type         = partial_pred.to_type,
+			deletes         = partial_pred.deletes,
+			chunks          = { { type = "insert", text = display_text } },
+			nw              = "",
+			has_corrections = false,
+			disable_bold    = true,
 		}
-		pending_predictions = { partial_pred }
+		pending_predictions = { stream_pred }
 		predictions_visible = true
 		tooltip.show_predictions(
-			{ partial_pred }, 1, is_ai_preview_enabled, nil,
+			{ stream_pred }, 1, is_ai_preview_enabled, nil,
 			nil, prediction_indent, normalize_mods(navigation_mods),
 			tooltip.tint("ai_prediction"), "⌛ …", 1
 		)

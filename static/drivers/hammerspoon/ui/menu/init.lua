@@ -17,6 +17,7 @@ local hs               = hs
 local notifications    = require("lib.notifications")
 local hotstring_editor = require("ui.hotstring_editor")
 local Logger           = require("lib.logger")
+local ui_restore       = require("lib.ui_restore")
 
 local Preferences = require("ui.menu.preferences")
 local Builder     = require("ui.menu.builder")
@@ -581,14 +582,17 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 	updateMenu()
 
 	local function reloadConfig(files)
-		-- Only reload for code files — config.json and runtime-generated files must never trigger a reload
+		-- HTML/CSS/JS are webview assets loaded at open-time — changing them
+		-- never requires hs.reload(); only .lua and .toml affect runtime behavior
 		if hs.timer.secondsSinceEpoch() < _suppress_watcher_until then return end
 		if type(files) == "table" then
 			for _, file in pairs(files) do
 				if type(file) == "string"
-					and (file:match("%.lua$") or file:match("%.html$") or file:match("%.css$") or file:match("%.js$") or file:match("%.toml$"))
+					and (file:match("%.lua$") or file:match("%.toml$"))
 					and not file:match("logs/") then
-					do_reload("watcher"); return
+					Logger.debug(LOG, "File change detected: %s", file)
+					ui_restore.defer_reload(function() do_reload("watcher") end)
+					return
 				end
 			end
 		end

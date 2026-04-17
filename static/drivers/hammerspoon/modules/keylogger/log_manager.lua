@@ -267,24 +267,35 @@ function M.aggregate_events(events, app_name, date_str)
 	-- Get-or-create the per-app index bucket
 	local app_idx = _state.today_idx[app_name]
 	if type(app_idx) ~= "table" then
-		app_idx = { c = {}, bg = {}, tg = {}, qg = {}, pg = {}, hx = {}, hp = {}, w = {}, sc = {} }
+		app_idx = { c = {}, bg = {}, tg = {}, qg = {}, pg = {}, hx = {}, hp = {}, w = {}, sc = {}, sc_bg = {}, w_bg = {}, kc = {} }
 		_state.today_idx[app_name] = app_idx
 	end
-	-- Ensure shortcuts sub-table always exists
-	app_idx.sc = type(app_idx.sc) == "table" and app_idx.sc or {}
+	-- Ensure secondary sub-tables always exist (for indexes loaded from older .idx files)
+	app_idx.sc    = type(app_idx.sc)    == "table" and app_idx.sc    or {}
+	app_idx.sc_bg = type(app_idx.sc_bg) == "table" and app_idx.sc_bg or {}
+	app_idx.w_bg  = type(app_idx.w_bg)  == "table" and app_idx.w_bg  or {}
 
 	local m_app = get_or_create_manifest_app(date_str, app_name)
 
-	local current_hour = tostring(os.date("%H"))
+	local t            = os.date("*t")
+	local current_hour = string.format("%02d", t.hour)
+	local current_min5 = string.format("%02d:%02d", t.hour, math.floor(t.min / 5) * 5)
+
 	m_app.hourly = type(m_app.hourly) == "table" and m_app.hourly or {}
 	if type(m_app.hourly[current_hour]) ~= "table" then
 		m_app.hourly[current_hour] = { c = 0, e = 0, em = 0, es = 0 }
 	end
 
+	m_app.hourly_min5 = type(m_app.hourly_min5) == "table" and m_app.hourly_min5 or {}
+	if type(m_app.hourly_min5[current_min5]) ~= "table" then
+		m_app.hourly_min5[current_min5] = { c = 0, e = 0, es = 0 }
+	end
+
 	-- Restore the persistent N-gram context so UI flushes don't break bigrams
 	_state.ngram_context = _state.ngram_context or {
 		p1 = nil, p2 = nil, p3 = nil, p4 = nil, p5 = nil, p6 = nil,
-		cur_word = "", word_err = false, hist = {}
+		cur_word = "", word_err = false, hist = {},
+		prev_word = nil, prev_sc = nil
 	}
 	local ctx = _state.ngram_context
 
@@ -292,6 +303,8 @@ function M.aggregate_events(events, app_name, date_str)
 	local cur_word   = ctx.cur_word
 	local word_err   = ctx.word_err
 	local backtrack  = ctx.hist   -- history of recorded n-gram keys, for backspace undo
+	local prev_word  = ctx.prev_word
+	local prev_sc    = ctx.prev_sc
 	local prev_synth_type = "none"
 
 	for _, ev in ipairs(events) do
@@ -305,18 +318,28 @@ function M.aggregate_events(events, app_name, date_str)
 
 		-- Shortcuts are indexed separately and do not participate in N-gram chains
 		if type(shortcut_key) == "string" and shortcut_key ~= "" then
+			if prev_sc then
+				add_metric(app_idx.sc_bg, prev_sc .. "→" .. shortcut_key, delay, false, "none")
+			end
 			add_metric(app_idx.sc, shortcut_key, delay, false, "none")
+			prev_sc = shortcut_key
 		else
 
 			-- A very long pause between keystrokes breaks N-gram continuity
 			if delay >= MAX_KEYSTROKE_DELAY_MS and not is_synthetic then
 				p1, p2, p3, p4, p5, p6 = nil, nil, nil, nil, nil, nil
 				backtrack = {}
+				-- Flush any in-progress word before resetting context
 				if #cur_word > 0 then
+					if prev_word then
+						add_metric(app_idx.w_bg, prev_word .. " " .. cur_word, 0, word_err, "none")
+					end
 					add_metric(app_idx.w, cur_word, 0, word_err, "none")
 				end
-				cur_word = ""
-				word_err = false
+				cur_word  = ""
+				word_err  = false
+				prev_word = nil
+				prev_sc   = nil
 			end
 
 			-- Count trigger events once per synthetic burst (avoids per-char inflation)
@@ -349,15 +372,17 @@ function M.aggregate_events(events, app_name, date_str)
 
 				-- Hourly error tracking (distinguish physical vs synthetic errors)
 				if is_synthetic then
-					m_app.hourly[current_hour].es = (m_app.hourly[current_hour].es or 0) + 1
+					m_app.hourly[current_hour].es     = (m_app.hourly[current_hour].es     or 0) + 1
+					m_app.hourly_min5[current_min5].es = (m_app.hourly_min5[current_min5].es or 0) + 1
 					if synth_type == "hotstring" then
 						m_app.hs_chars = math.max(0, (m_app.hs_chars or 0) - 1)
 					elseif synth_type == "llm" then
 						m_app.llm_chars = math.max(0, (m_app.llm_chars or 0) - 1)
 					end
 				else
-					m_app.hourly[current_hour].e  = (m_app.hourly[current_hour].e  or 0) + 1
-					m_app.hourly[current_hour].em = (m_app.hourly[current_hour].em or 0) + 1
+					m_app.hourly[current_hour].e      = (m_app.hourly[current_hour].e      or 0) + 1
+					m_app.hourly[current_hour].em     = (m_app.hourly[current_hour].em     or 0) + 1
+					m_app.hourly_min5[current_min5].e = (m_app.hourly_min5[current_min5].e or 0) + 1
 					m_app.chars     = (m_app.chars or 0) + 1
 					if delay > THINK_PAUSE_THRESHOLD_MS then
 						m_app.think_time = (m_app.think_time or 0) + delay
@@ -391,26 +416,36 @@ function M.aggregate_events(events, app_name, date_str)
 				local k_hx = p5 and (p5 .. p4 .. p3 .. p2 .. p1 .. k_c) or nil
 				local k_hp = p6 and (p6 .. p5 .. p4 .. p3 .. p2 .. p1 .. k_c) or nil
 
+				-- Bracket markers ([LEFT], [ENTER], [F1]…) represent genuine key presses that
+				-- are always worth recording regardless of how long the user paused before
+				-- pressing them. Navigation is typically done after reading pauses (> 5 s),
+				-- so without this exception they would be silently dropped. The delay is
+				-- clamped to 0 for bracket keys exceeding the threshold so the long pause
+				-- is not attributed to inter-key typing speed.
+				local is_bracket_key  = k_c:sub(1, 1) == "[" and k_c:sub(-1) == "]"
+				local record_delay    = delay < MAX_KEYSTROKE_DELAY_MS and delay or 0
+
 				local entry = {}
-				if is_synthetic or delay < MAX_KEYSTROKE_DELAY_MS then
-					add_metric(app_idx.c, k_c, delay, false, synth_type); entry.c = k_c
-					if k_bg then add_metric(app_idx.bg, k_bg, delay, false, synth_type); entry.bg = k_bg end
-					if k_tg then add_metric(app_idx.tg, k_tg, delay, false, synth_type); entry.tg = k_tg end
-					if k_qg then add_metric(app_idx.qg, k_qg, delay, false, synth_type); entry.qg = k_qg end
-					if k_pg then add_metric(app_idx.pg, k_pg, delay, false, synth_type); entry.pg = k_pg end
-					if k_hx then add_metric(app_idx.hx, k_hx, delay, false, synth_type); entry.hx = k_hx end
-					if k_hp then add_metric(app_idx.hp, k_hp, delay, false, synth_type); entry.hp = k_hp end
+				if is_synthetic or is_bracket_key or delay < MAX_KEYSTROKE_DELAY_MS then
+					add_metric(app_idx.c, k_c, record_delay, false, synth_type); entry.c = k_c
+					if k_bg then add_metric(app_idx.bg, k_bg, record_delay, false, synth_type); entry.bg = k_bg end
+					if k_tg then add_metric(app_idx.tg, k_tg, record_delay, false, synth_type); entry.tg = k_tg end
+					if k_qg then add_metric(app_idx.qg, k_qg, record_delay, false, synth_type); entry.qg = k_qg end
+					if k_pg then add_metric(app_idx.pg, k_pg, record_delay, false, synth_type); entry.pg = k_pg end
+					if k_hx then add_metric(app_idx.hx, k_hx, record_delay, false, synth_type); entry.hx = k_hx end
+					if k_hp then add_metric(app_idx.hp, k_hp, record_delay, false, synth_type); entry.hp = k_hp end
 
 					if not is_synthetic then
-						m_app.chars     = (m_app.chars or 0) + 1
+						m_app.chars      = (m_app.chars or 0) + 1
 						m_app.sent_chars = (m_app.sent_chars or 0) + 1
-						m_app.sent_time  = (m_app.sent_time or 0) + delay
-						m_app.hourly[current_hour].c = (m_app.hourly[current_hour].c or 0) + 1
-						if delay > THINK_PAUSE_THRESHOLD_MS then
-							m_app.think_time = (m_app.think_time or 0) + delay
+						m_app.sent_time  = (m_app.sent_time or 0) + record_delay
+						m_app.hourly[current_hour].c      = (m_app.hourly[current_hour].c      or 0) + 1
+						m_app.hourly_min5[current_min5].c = (m_app.hourly_min5[current_min5].c or 0) + 1
+						if record_delay > THINK_PAUSE_THRESHOLD_MS then
+							m_app.think_time = (m_app.think_time or 0) + record_delay
 							m_app.pauses     = (m_app.pauses or 0) + 1
 						else
-							m_app.time = (m_app.time or 0) + delay
+							m_app.time = (m_app.time or 0) + record_delay
 						end
 					else
 						if synth_type == "hotstring" then
@@ -425,9 +460,14 @@ function M.aggregate_events(events, app_name, date_str)
 						or k_c == "\n" or k_c == "\194\160" or k_c == "\226\128\175"
 					if is_separator then
 						if #cur_word > 0 then
+							-- Track consecutive word pair before committing the current word
+							if prev_word then
+								add_metric(app_idx.w_bg, prev_word .. " " .. cur_word, 0, word_err, "none")
+							end
 							add_metric(app_idx.w, cur_word, 0, word_err, "none")
-							cur_word = ""
-							word_err = false
+							prev_word = cur_word
+							cur_word  = ""
+							word_err  = false
 						end
 					else
 						cur_word = cur_word .. k_c
@@ -438,13 +478,24 @@ function M.aggregate_events(events, app_name, date_str)
 				p6 = p5; p5 = p4; p4 = p3; p3 = p2; p2 = p1; p1 = k_c
 			end
 		end
+
+		-- Log the physical keycode for every non-synthetic keystroke so the Keycodes
+		-- tab can show raw physical-key frequency independently of character encoding
+		if not is_synthetic then
+			local kc_num = meta.kc
+			if type(kc_num) == "number" then
+				add_metric(app_idx.kc, tostring(kc_num), delay, false, "none")
+			end
+		end
 	end
 
 	-- Persist N-gram context back to state for the next flush
 	ctx.p1, ctx.p2, ctx.p3, ctx.p4, ctx.p5, ctx.p6 = p1, p2, p3, p4, p5, p6
-	ctx.cur_word = cur_word
-	ctx.word_err = word_err
-	ctx.hist     = backtrack
+	ctx.cur_word  = cur_word
+	ctx.word_err  = word_err
+	ctx.hist      = backtrack
+	ctx.prev_word = prev_word
+	ctx.prev_sc   = prev_sc
 end
 
 
@@ -541,6 +592,8 @@ function M.rebuild_today_from_raw_log()
 	_state.ngram_context    = nil  -- reset N-gram context for clean replay
 
 	local typing_event_count = 0
+	-- Track the last shortcut per app to rebuild sc_bg (consecutive shortcut bigrams)
+	local prev_sc_by_app = {}
 
 	for line in fh:lines() do
 		local ok, entry = pcall(json.decode, line)
@@ -553,13 +606,23 @@ function M.rebuild_today_from_raw_log()
 			local app_name = (type(entry.app) == "string" and entry.app ~= "") and entry.app or "Unknown"
 			local app_idx  = _state.today_idx[app_name]
 			if type(app_idx) ~= "table" then
-				app_idx = { c = {}, bg = {}, tg = {}, qg = {}, pg = {}, hx = {}, hp = {}, w = {}, sc = {} }
+				app_idx = { c = {}, bg = {}, tg = {}, qg = {}, pg = {}, hx = {}, hp = {}, w = {}, sc = {}, sc_bg = {}, w_bg = {}, kc = {} }
 				_state.today_idx[app_name] = app_idx
 			end
-			app_idx.sc = type(app_idx.sc) == "table" and app_idx.sc or {}
+			app_idx.sc    = type(app_idx.sc)    == "table" and app_idx.sc    or {}
+			app_idx.sc_bg = type(app_idx.sc_bg) == "table" and app_idx.sc_bg or {}
+			app_idx.w_bg  = type(app_idx.w_bg)  == "table" and app_idx.w_bg  or {}
 			local sc_entry = app_idx.sc[entry.key] or {}
 			sc_entry.c = (sc_entry.c or 0) + 1
 			app_idx.sc[entry.key] = sc_entry
+			-- Rebuild consecutive shortcut bigrams (same logic as aggregate_events live path)
+			if type(prev_sc_by_app[app_name]) == "string" then
+				local bg_key  = prev_sc_by_app[app_name] .. "→" .. entry.key
+				local bg_entry = app_idx.sc_bg[bg_key] or {}
+				bg_entry.c = (bg_entry.c or 0) + 1
+				app_idx.sc_bg[bg_key] = bg_entry
+			end
+			prev_sc_by_app[app_name] = entry.key
 		elseif entry.type == "app_switch" then
 			local prev_app    = (type(entry.prev_app) == "string" and entry.prev_app ~= "") and entry.prev_app or "Unknown"
 			local next_app    = (type(entry.next_app) == "string" and entry.next_app ~= "") and entry.next_app or "Unknown"
@@ -1043,14 +1106,28 @@ function M.log_shortcut(shortcut_key, app_name)
 
 	local app_idx = _state.today_idx[safe_app]
 	if type(app_idx) ~= "table" then
-		app_idx = { c = {}, bg = {}, tg = {}, qg = {}, pg = {}, hx = {}, hp = {}, w = {}, sc = {} }
+		app_idx = { c = {}, bg = {}, tg = {}, qg = {}, pg = {}, hx = {}, hp = {}, w = {}, sc = {}, sc_bg = {}, w_bg = {}, kc = {} }
 		_state.today_idx[safe_app] = app_idx
 	end
-	app_idx.sc = type(app_idx.sc) == "table" and app_idx.sc or {}
+	app_idx.sc    = type(app_idx.sc)    == "table" and app_idx.sc    or {}
+	app_idx.sc_bg = type(app_idx.sc_bg) == "table" and app_idx.sc_bg or {}
+
+	-- Track consecutive shortcut bigram (shares the same prev_sc context as aggregate_events)
+	local ctx = _state.ngram_context
+	if ctx and type(ctx.prev_sc) == "string" then
+		add_metric(app_idx.sc_bg, ctx.prev_sc .. "→" .. shortcut_key, 0, false, "none")
+	end
 
 	local sc_entry = app_idx.sc[shortcut_key] or {}
 	sc_entry.c = (sc_entry.c or 0) + 1
 	app_idx.sc[shortcut_key] = sc_entry
+
+	-- Persist prev_sc so the next shortcut or typing-stream shortcut can form a bigram
+	if not _state.ngram_context then
+		_state.ngram_context = { prev_sc = shortcut_key }
+	else
+		_state.ngram_context.prev_sc = shortcut_key
+	end
 
 	M.append_log({ type = "shortcut", key = shortcut_key, app = safe_app })
 	debounced_save()

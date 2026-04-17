@@ -17,38 +17,75 @@
 			</div>
 
 			<div class="filters-bar">
-				<div class="filter-group-dates" style="display: flex; gap: 15px">
+				<div class="filter-group-dates">
 					<div>
-						<label>Du : </label
-						><input type="date" id="date_start" onchange="apply_date_app_filters()" />
+						<label>Du&nbsp;:</label
+						><input
+							type="date"
+							id="date_start"
+							onchange="app_state.hour_cutoff = null; apply_date_app_filters()"
+						/>
 					</div>
 					<div>
-						<label>Au : </label
-						><input type="date" id="date_end" onchange="apply_date_app_filters()" />
+						<label>Au&nbsp;:</label
+						><input
+							type="date"
+							id="date_end"
+							onchange="app_state.hour_cutoff = null; apply_date_app_filters()"
+						/>
 					</div>
+					<select
+						id="quick_range"
+						class="filter-btn"
+						onchange="apply_quick_date_range()"
+						title="Raccourci période"
+					>
+						<option value="">Période…</option>
+						<option value="last_hour">Dernière heure</option>
+						<option value="today">Aujourd'hui</option>
+						<option value="week">Cette semaine</option>
+						<option value="month">Ce mois</option>
+						<option value="3m">3 derniers mois</option>
+						<option value="6m">6 derniers mois</option>
+						<option value="year">Cette année</option>
+						<option value="all">Tout</option>
+					</select>
 				</div>
 
-				<div class="filter-group-buttons" style="display: flex; gap: 8px; margin: 0 auto">
+				<div class="filter-group-buttons">
 					<button class="filter-btn active" id="app_filter_btn" onclick="open_app_modal()">
 						Apps (Toutes)
 					</button>
+
+					<!-- Source toggles : indépendants — HS et IA peuvent être actifs séparément -->
+					<!-- Sans aucun toggle actif = uniquement les triggers manuels tapés -->
 					<button
-						class="filter-btn active"
-						id="btn_show_manual"
-						onclick="toggle_filter('btn_show_manual')"
+						class="filter-btn source-toggle active"
+						id="btn_toggle_hs"
+						onclick="toggle_hs_source()"
+						title="+ Hotstrings : inclure les caractères générés par les hotstrings (touche ★, abréviations…). Désactiver masquera aussi les caractères synthétiques comme NBSP/NNBSP générés par hotstrings."
 					>
-						Frappes brutes
-					</button>
-					<button class="filter-btn active" id="btn_show_hs" onclick="toggle_filter('btn_show_hs')">
-						Hotstrings
+						+ Hotstrings
 					</button>
 					<button
-						class="filter-btn active"
-						id="btn_show_llm"
-						onclick="toggle_filter('btn_show_llm')"
+						class="filter-btn source-toggle active"
+						id="btn_toggle_llm"
+						onclick="toggle_llm_source()"
+						title="+ IA : inclure les caractères générés par l'IA (complétion, correction…). Indépendant de Hotstrings."
 					>
-						IA
+						+ IA
 					</button>
+					<!-- Sans Ergopti+ : mode alternatif — montre le texte brut total inféré sans Ergopti+ -->
+					<!-- La vitesse est inférée à votre vitesse manuelle ; le volume inclut toutes les expansions -->
+					<button
+						class="filter-btn source-toggle"
+						id="btn_texte_final"
+						onclick="toggle_texte_final()"
+						title="Sans Ergopti+ : affiche le texte complet qui aurait été saisi sans Ergopti+. Le volume inclut hotstrings + IA ; la vitesse (MPM) est votre vitesse manuelle naturelle — les frappes synthétiques sont inférées à ce rythme."
+					>
+						Sans Ergopti+
+					</button>
+
 					<button
 						class="filter-btn active"
 						id="btn_show_spaces"
@@ -68,12 +105,17 @@
 						id="pause_threshold"
 						class="filter-btn"
 						onchange="apply_date_app_filters()"
-						style="margin-left: 10px"
+						title="Seuil de pause : délai au-delà duquel une interruption est ignorée dans le calcul de vitesse"
 					>
-						<option value="1000">Ignorer pauses > 1s</option>
-						<option value="2000" selected>Ignorer pauses > 2s</option>
-						<option value="3000">Ignorer pauses > 3s</option>
-						<option value="5000">Ignorer pauses > 5s</option>
+						<option value="1000">Pauses &gt; 1 s</option>
+						<option value="2000" selected>Pauses &gt; 2 s</option>
+						<option value="3000">Pauses &gt; 3 s</option>
+						<option value="5000">Pauses &gt; 5 s</option>
+						<option value="10000">Pauses &gt; 10 s</option>
+						<option value="20000">Pauses &gt; 20 s</option>
+						<option value="30000">Pauses &gt; 30 s</option>
+						<option value="60000">Pauses &gt; 1 min</option>
+						<option value="99999999">Sans filtrage</option>
 					</select>
 				</div>
 
@@ -94,7 +136,7 @@
 							<div class="split-val"><strong id="hs_net_val">0</strong> frappes</div>
 						</div>
 						<div class="split-col">
-							<div class="split-label">Acceptés</div>
+							<div class="split-label">Acceptées</div>
 							<div class="split-val">
 								<strong id="hs_acc_pct">0%</strong>
 								<span class="split-sub" id="hs_acc_raw">(0/0)</span>
@@ -116,7 +158,7 @@
 							<div class="split-val"><strong id="llm_net_val">0</strong> frappes</div>
 						</div>
 						<div class="split-col">
-							<div class="split-label">Acceptés</div>
+							<div class="split-label">Acceptées</div>
 							<div class="split-val">
 								<strong id="llm_acc_pct">0%</strong>
 								<span class="split-sub" id="llm_acc_raw">(0/0)</span>
@@ -136,6 +178,7 @@
 							<span class="stat-unit" style="font-size: 0.9em">touches tapées</span>
 						</div>
 					</div>
+					<div id="wpm_words_sub"></div>
 				</div>
 			</div>
 
@@ -149,16 +192,31 @@
 						border-color: var(--precision-border);
 					"
 				>
-					<h3
+					<div
 						style="
-							margin: 0;
-							font-size: 14px;
-							color: var(--kpi-precision-color);
+							display: flex;
+							justify-content: space-between;
+							align-items: center;
 							margin-bottom: 5px;
 						"
 					>
-						Précision (%)
-					</h3>
+						<div style="display: flex; align-items: baseline; gap: 10px">
+							<h3
+								id="precision_chart_title"
+								style="margin: 0; font-size: 14px; color: var(--kpi-precision-color)"
+							>
+								Précision (%)
+							</h3>
+							<div class="chart-help" style="margin: 0">Pincez (trackpad) pour zoomer.</div>
+						</div>
+						<button
+							class="tab-btn"
+							style="padding: 2px 8px; font-size: 11px"
+							onclick="reset_chart_zoom('precision')"
+						>
+							Restaurer le zoom
+						</button>
+					</div>
 					<div style="flex-grow: 1; position: relative; height: 100%">
 						<canvas id="precision_chart"></canvas>
 					</div>
@@ -182,7 +240,12 @@
 						"
 					>
 						<div style="display: flex; align-items: baseline; gap: 10px">
-							<h3 style="margin: 0; font-size: 14px; color: var(--kpi-wpm-color)">Vitesse (MPM)</h3>
+							<h3
+								id="wpm_chart_title"
+								style="margin: 0; font-size: 14px; color: var(--kpi-wpm-color)"
+							>
+								Vitesse (MPM)
+							</h3>
 							<div class="chart-help" style="margin: 0">Pincez (trackpad) pour zoomer.</div>
 						</div>
 						<button
@@ -190,7 +253,7 @@
 							style="padding: 2px 8px; font-size: 11px"
 							onclick="reset_chart_zoom('wpm')"
 						>
-							Restaurer zoom
+							Restaurer le zoom
 						</button>
 					</div>
 					<div style="flex-grow: 1; position: relative; height: 100%">
@@ -217,7 +280,7 @@
 					"
 				>
 					<div style="display: flex; align-items: baseline; gap: 10px">
-						<h3 style="margin: 0; font-size: 14px; color: var(--kpi-delegation-color)">
+						<h3 style="margin: 0; font-size: 14px; color: var(--text-color)">
 							Origine des frappes
 						</h3>
 						<div class="chart-help" style="margin: 0">Pincez (trackpad) pour zoomer.</div>
@@ -227,7 +290,7 @@
 						style="padding: 2px 8px; font-size: 11px"
 						onclick="reset_chart_zoom('delegation')"
 					>
-						Restaurer zoom
+						Restaurer le zoom
 					</button>
 				</div>
 				<div style="flex-grow: 1; position: relative; height: 100%">
@@ -235,41 +298,110 @@
 				</div>
 			</div>
 
-			<div class="tabs">
-				<button class="tab-btn active" onclick="switch_tab('c')">Touches</button>
-				<button class="tab-btn" onclick="switch_tab('bg')">Bigrammes</button>
-				<button class="tab-btn" onclick="switch_tab('tg')">Trigrammes</button>
-				<button class="tab-btn" onclick="switch_tab('qg')">Quadrigrammes</button>
-				<button class="tab-btn" onclick="switch_tab('pg')">Pentagrammes</button>
-				<button class="tab-btn" onclick="switch_tab('hx')">Hexagrammes</button>
-				<button class="tab-btn" onclick="switch_tab('hp')">Heptagrammes</button>
-				<button class="tab-btn" onclick="switch_tab('w')">Mots</button>
-				<button class="tab-btn" onclick="switch_tab('sc')">Raccourcis</button>
+			<!-- Expanded KPI row: Distance des doigts + Redoublements, placés sous le graphique
+			     Origine des frappes pour rester dans le contexte des données analysées. -->
+			<div class="expanded-kpi-row">
+				<div class="expanded-kpi-block card-dist" id="dist_card">
+					<div class="ekpi-header">
+						<h2>Distance des doigts</h2>
+						<div class="stat-value" id="dist_val">0 <span class="stat-unit">km</span></div>
+						<div class="stat-details" id="dist_loading">Calcul en cours...</div>
+						<div class="stat-details-split" id="dist_details" style="display: none">
+							<div
+								class="split-col"
+								title="Le doigt ayant parcouru la plus grande distance sur la période"
+							>
+								<div class="split-label">Doigt le + actif</div>
+								<div class="split-val"><strong id="dist_top_finger">—</strong></div>
+							</div>
+						</div>
+					</div>
+					<div class="ekpi-table-wrap" id="dist_fingers_container">
+						<!-- Table injected by render_dist_table() -->
+					</div>
+				</div>
+
+				<div class="expanded-kpi-block card-rep" id="rep_card">
+					<div class="ekpi-header">
+						<h2>Redoublements</h2>
+						<div class="stat-value" id="rep_val">
+							0 <span class="stat-unit">redoublements</span>
+						</div>
+						<div class="stat-details" id="rep_loading">Calcul en cours...</div>
+						<div class="stat-details-split" id="rep_details" style="display: none">
+							<div class="split-col" title="Part des bigrammes totaux qui sont des redoublements">
+								<div class="split-label">Des bigrammes</div>
+								<div class="split-val"><strong id="rep_pct">0%</strong></div>
+							</div>
+							<div
+								class="split-col"
+								title="Part des redoublements générés par la touche ★ (hotstring de répétition). Non nul uniquement en mode + Hotstrings ou + IA."
+							>
+								<div class="split-label">Via touche ★</div>
+								<div class="split-val">
+									<strong id="rep_hs_pct">0%</strong>
+									<span class="split-sub" id="rep_hs_raw"></span>
+								</div>
+							</div>
+						</div>
+					</div>
+					<div class="ekpi-table-wrap" id="rep_doublings_container">
+						<!-- Table injected by render_rep_table() -->
+					</div>
+				</div>
 			</div>
 
-			<div class="table-controls">
-				<input
-					type="text"
-					id="search_input"
-					placeholder="Rechercher une séquence..."
-					onkeyup="handle_search()"
-				/>
+			<div class="tabs">
+				<button class="tab-btn active" data-tab="c" onclick="switch_tab('c')">Caractères</button>
+				<button class="tab-btn" data-tab="bg" onclick="switch_tab('bg')">Bigrammes</button>
+				<button class="tab-btn" data-tab="tg" onclick="switch_tab('tg')">Trigrammes</button>
+				<button class="tab-btn" data-tab="qg" onclick="switch_tab('qg')">Quadrigrammes</button>
+				<button class="tab-btn" data-tab="pg" onclick="switch_tab('pg')">Pentagrammes</button>
+				<button class="tab-btn" data-tab="hx" onclick="switch_tab('hx')">Hexagrammes</button>
+				<button class="tab-btn" data-tab="hp" onclick="switch_tab('hp')">Heptagrammes</button>
+				<button class="tab-btn" data-tab="w" onclick="switch_tab('w')">Mots</button>
+				<button class="tab-btn" data-tab="kc" onclick="switch_tab('kc')">Keycodes</button>
+				<button class="tab-btn" data-tab="mods" onclick="switch_tab('mods')">Modificateurs</button>
+				<button class="tab-btn" data-tab="sc" onclick="switch_tab('sc')">Raccourcis</button>
+				<button class="tab-btn" data-tab="sc_bg" onclick="switch_tab('sc_bg')">
+					Séq. raccourcis
+				</button>
+				<button class="tab-btn" data-tab="w_bg" onclick="switch_tab('w_bg')">Bigrammes mots</button>
 			</div>
 
 			<div class="table-container">
 				<table id="metrics_table">
 					<thead>
 						<tr>
-							<th onclick="handle_sort('key')">Séquence ↕</th>
+							<th onclick="handle_sort('key')">
+								<div class="th-seq-header">
+									<div class="th-seq-title-row">
+										<span>Séquence ↕</span>
+										<input
+											type="text"
+											id="search_input"
+											placeholder="Rechercher…"
+											onclick="event.stopPropagation()"
+											onkeyup="handle_search()"
+										/>
+									</div>
+									<span id="total_rows" class="th-stat"></span>
+								</div>
+							</th>
 							<th onclick="handle_sort('count')">
 								Occurrences ↕<br />
-								<span
-									id="total_occurrences"
-									style="font-size: 0.85em; font-weight: normal; color: var(--text-muted)"
-								></span>
+								<span id="total_occurrences" class="th-stat"></span>
+							</th>
+							<th class="col-rep" onclick="handle_sort('rep')">Répétitions ↕</th>
+							<th onclick="handle_sort('km')">
+								Km doigts ↕<br />
+								<span id="col_global_km" class="th-stat"></span>
 							</th>
 							<th onclick="handle_sort('freq')">Fréq relative ↕</th>
-							<th onclick="handle_sort('avg')">Vitesse Moy. (ms) ↕</th>
+							<th onclick="handle_sort('avg')">
+								Temps moyen (ms) ↕<br />
+								<span id="col_global_avg" class="th-stat"></span>
+							</th>
 							<th onclick="handle_sort('wpm')">
 								Équiv. MPM
 								<div class="tooltip" onclick="event.stopPropagation()">
@@ -294,7 +426,8 @@
 										5 touches). Ne prend en compte QUE vos vraies frappes.</span
 									>
 								</div>
-								↕
+								↕<br />
+								<span id="col_global_wpm" class="th-stat"></span>
 							</th>
 							<th onclick="handle_sort('acc')">
 								Précision
@@ -320,14 +453,15 @@
 										sans utiliser la touche Effacer (Backspace).</span
 									>
 								</div>
-								↕
+								↕<br />
+								<span id="col_global_acc" class="th-stat"></span>
 							</th>
 						</tr>
 					</thead>
 					<tbody id="metrics_table_body">
 						<tr>
-							<td colspan="6" style="text-align: center; color: var(--text-muted); padding: 30px">
-								Chargement de l’interface...
+							<td colspan="8" style="text-align: center; color: var(--text-muted); padding: 30px">
+								Chargement de l'interface...
 							</td>
 						</tr>
 					</tbody>
@@ -359,6 +493,30 @@
 			</div>
 		</div>
 
-		<script src="script.js"></script>
+		<!-- Find-in-page bar (hidden by default, revealed via Cmd+F) -->
+		<div id="find_bar">
+			<span class="find-label">Rechercher dans la page</span>
+			<input type="text" id="find_input" placeholder="Rechercher…" autocomplete="off" />
+			<span id="find_status" class="find-status"></span>
+			<button class="find-nav-btn" onclick="find_in_page(false)" title="Précédent (Maj+Entrée)">
+				&#8249;
+			</button>
+			<button class="find-nav-btn" onclick="find_in_page(true)" title="Suivant (Entrée)">
+				&#8250;
+			</button>
+			<button class="find-close-btn" onclick="close_find_bar()" title="Fermer (Échap)">
+				&#x2715;
+			</button>
+		</div>
+
+		<!-- Load order matters: state/format first (no deps), then domain modules, then main -->
+		<script src="state.js"></script>
+		<script src="format.js"></script>
+		<script src="filters.js"></script>
+		<script src="modal.js"></script>
+		<script src="data.js"></script>
+		<script src="charts.js"></script>
+		<script src="table.js"></script>
+		<script src="main.js"></script>
 	</body>
 </html>

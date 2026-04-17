@@ -29,52 +29,54 @@ local LOG = "ui_builder"
 -- ===================================
 -- ===================================
 
---- Reads a file and escapes special characters for Lua string substitution.
+--- Reads a file from disk and returns its raw content.
 --- @param path string Full path to the file.
---- @return string The escaped file content.
-local function read_and_escape(path)
+--- @return string The file content, or empty string if unreadable.
+local function read_file(path)
 	local ok, fh = pcall(io.open, path, "r")
 	if not ok or not fh then return "" end
 	local content = fh:read("*a")
 	fh:close()
-	
-	-- Double the percent signs to prevent Lua pattern matching errors during injection
-	return content:gsub("%%", "%%%%")
+	return content
 end
 
---- Builds a self-contained HTML string from separate assets.
---- @param assets_dir string The directory containing the assets.
---- @param html_name string Optional name of the HTML file.
---- @param css_name string Optional name of the CSS file.
---- @param js_name string Optional name of the JS file.
---- @return string The complete HTML with injected styles and scripts.
-function M.build_injected_html(assets_dir, html_name, css_name, js_name)
+--- Builds a self-contained HTML string by inlining all local <script src> and
+--- <link rel="stylesheet"> tags found in the HTML file. External URLs (http/https)
+--- are kept as-is so CDN libraries still load from the network. Using function
+--- replacements in gsub avoids any % escaping issues with JS/CSS content.
+--- @param assets_dir string The directory containing the HTML and local assets.
+--- @param html_name string Optional name of the HTML file (default: "index.html").
+--- @return string The complete self-contained HTML string.
+function M.build_injected_html(assets_dir, html_name)
 	Logger.debug(LOG, "Building injected HTML assets…")
 	html_name = html_name or "index.html"
-	css_name  = css_name  or "style.css"
-	js_name   = js_name   or "script.js"
 
 	local html_path = assets_dir .. html_name
 	local ok, fh = pcall(io.open, html_path, "r")
-	if not ok or not fh then 
-		Logger.error(LOG, string.format("Failed to find HTML template: %s.", html_name))
-		return "<html><body><h1>Erreur de construction : " .. html_name .. " introuvable</h1></body></html>" 
+	if not ok or not fh then
+		Logger.error(LOG, "Failed to find HTML template: %s.", html_name)
+		return "<html><body><h1>Erreur de construction : " .. html_name .. " introuvable</h1></body></html>"
 	end
 	local html = fh:read("*a")
 	fh:close()
 
-	local css = read_and_escape(assets_dir .. css_name)
-	local js  = read_and_escape(assets_dir .. js_name)
+	-- Inline local <link rel="stylesheet" href="..."> tags; leave CDN URLs intact
+	html = html:gsub('<link%s+rel="stylesheet"%s+href="([^"]+)"%s*/>', function(href)
+		if href:match("^https?://") then
+			return '<link rel="stylesheet" href="' .. href .. '" />'
+		end
+		local css = read_file(assets_dir .. href)
+		return css ~= "" and ("<style>" .. css .. "</style>") or ""
+	end)
 
-	-- Inject the CSS right before the closing head tag ignoring case
-	if css ~= "" then
-		html = html:gsub("(</[Hh][Ee][Aa][Dd]>)", "<style>" .. css .. "</style>%1")
-	end
-
-	-- Inject the JavaScript right before the closing body tag ignoring case
-	if js ~= "" then
-		html = html:gsub("(</[Bb][Oo][Dd][Yy]>)", "<script>" .. js .. "</script>%1")
-	end
+	-- Inline local <script src="..."></script> tags; leave CDN URLs intact
+	html = html:gsub('<script%s+src="([^"]+)"%s*></script>', function(src)
+		if src:match("^https?://") then
+			return '<script src="' .. src .. '"></script>'
+		end
+		local js = read_file(assets_dir .. src)
+		return js ~= "" and ("<script>" .. js .. "</script>") or ""
+	end)
 
 	Logger.info(LOG, "Injected HTML assets built successfully.")
 	return html

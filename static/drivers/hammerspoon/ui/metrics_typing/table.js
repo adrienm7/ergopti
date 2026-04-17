@@ -1,0 +1,866 @@
+// ui/metrics_typing/table.js
+
+/**
+ * ==============================================================================
+ * MODULE: Table Rendering
+ * DESCRIPTION:
+ * Manages all n-gram/word/shortcut table interactions: tab switching, sorting,
+ * search, and row rendering.
+ *
+ * FEATURES & RATIONALE:
+ * 1. KPI Bug Fix: render_current_tab() no longer overwrites the global WPM
+ *    KPI card. The KPI is set exclusively by compute_manifest_metrics() in
+ *    data.js, ensuring it always reflects the full manifest period regardless
+ *    of which table section is active.
+ * 2. Repetition Filter: Same-character sequences (e.g. "aaa") can be hidden
+ *    via app_state.show_repetitions to declutter n-gram views.
+ * 3. requestAnimationFrame Batching: render_table() defers DOM writes to the
+ *    next animation frame to avoid blocking the main thread during live typing.
+ * 4. Column Rename: "Vitesse Moy. (ms)" is now "Temps moyen (ms)" — ms is a
+ *    duration unit, not a speed unit.
+ * 5. Control-Char Filtering: ASCII control characters (codes 0–31, 127, BOM)
+ *    are stripped from all text-based tabs so OS artifacts never appear in
+ *    the table, totals, or column KPIs.
+ * 9. Word Repetitions: for the words tab, consecutive identical words (separated
+ *    by space, tab, or enter as normalised by merge_dict) are detected by looking
+ *    up word+sep+word patterns directly in the word dict.
+ * 6. Characters-Tab Expansion: The "c" tab decomposes multi-token keys into
+ *    individual characters so that NBSP, NNBSP, and chars only found in combos
+ *    (e.g. NBSP+?) are surfaced as standalone entries. Bracket markers such as
+ *    [TAB] or [F1] count as single tokens and are shown with red chip styling.
+ * 7. Rich Search: build_searchable_key() augments raw keys with human-readable
+ *    aliases (nbsp, nnbsp, backspace, control-char names) so searching those
+ *    terms finds the corresponding entries.
+ * 8. Shift Modifier Inference: derive_modifier_usage() counts uppercase A–Z
+ *    presses from the raw cache to surface Shift usage in the Modifiers tab
+ *    even when case-insensitive mode folds them into lowercase.
+ * ==============================================================================
+ */
+
+
+// ==================================
+// ==================================
+// ======= 1/ Tab Navigation =======
+// ==================================
+// ==================================
+
+/**
+ * Switches the active tab, resets sort/search state, and re-renders the table.
+ * @param {string} tab_name - The tab key: c, bg, tg, qg, pg, hx, hp, w, sc, sc_bg, w_bg, mods, kc.
+ */
+function switch_tab(tab_name) {
+	app_state.current_tab = tab_name;
+
+	document.querySelectorAll(".tabs .tab-btn").forEach((btn) => btn.classList.remove("active"));
+	const active_btn = document.querySelector(`.tab-btn[data-tab="${tab_name}"]`);
+	if (active_btn) active_btn.classList.add("active");
+
+	// Reset table state to "most frequent first" when switching sections
+	app_state.sort_col    = "count";
+	app_state.sort_asc    = false;
+	app_state.search_query = "";
+
+	const search_input = document.getElementById("search_input");
+	if (search_input) search_input.value = "";
+
+	render_current_tab();
+}
+
+/**
+ * Updates the search query from the table header input and re-renders.
+ */
+function handle_search() {
+	app_state.search_query = (document.getElementById("search_input")?.value ?? "").toLowerCase();
+	render_table();
+}
+
+/**
+ * Toggles or sets the sort column for the current table and re-renders.
+ * @param {string} col_name - The sort key: key, count, freq, avg, wpm, acc.
+ */
+function handle_sort(col_name) {
+	if (app_state.sort_col === col_name) {
+		app_state.sort_asc = !app_state.sort_asc;
+	} else {
+		app_state.sort_col = col_name;
+		// Alphabetical sort defaults to ascending; all others default to descending
+		app_state.sort_asc = col_name === "key";
+	}
+	render_table();
+}
+
+
+// =========================================
+// =========================================
+// ======= 2/ Current Tab Processing =======
+// =========================================
+// =========================================
+
+/**
+ * Counts uppercase A–Z presses from the raw historical and live caches, applying
+ * the current HS/LLM/manual source filters. This is called independently of the
+ * case-sensitivity toggle so Shift usage is always visible in the Modifiers tab.
+ * @returns {number} Total number of inferred Shift presses from character data.
+ */
+function count_uppercase_shift() {
+	const { show_manual, show_hs, show_llm } = get_source_mode_flags();
+	let total = 0;
+
+	const add_from_c_dict = (c_dict) => {
+		if (!c_dict || typeof c_dict !== "object") return;
+		Object.entries(c_dict).forEach(([k, v]) => {
+			if (k.length !== 1) return;
+			const code = k.codePointAt(0);
+			// Only unambiguous uppercase ASCII A–Z, which require Shift on every layout
+			if (code < 65 || code > 90) return;
+			const total_c  = v.c   || 0;
+			const hs_c     = v.hs  || 0;
+			const llm_c    = v.llm || 0;
+			const other_c  = v.o   || 0;
+			const manual_c = Math.max(0, total_c - hs_c - llm_c - other_c);
+			// "other" chars always counted (no toggle for this source)
+			total += other_c;
+			if (show_manual) total += manual_c;
+			if (show_hs)     total += hs_c;
+			if (show_llm)    total += llm_c;
+		});
+	};
+
+	// Historical cache is already filtered by date/app at fetch time
+	add_from_c_dict(app_state.historical_cache?.c);
+
+	// Today's live data is per-app; apply the app selection filter
+	Object.entries(app_state.today_live_data || {}).forEach(([app_name, app_data]) => {
+		if (app_name !== "Unknown" && !app_state.selected_apps.has(app_name)) return;
+		add_from_c_dict(app_data?.c);
+	});
+
+	return total;
+}
+
+/**
+ * Derives modifier-combo usage by aggregating shortcut entries by their modifier pattern.
+ * Also infers Shift usage from uppercase letter presses in the character data so that
+ * Shift appears in the Modifiers tab even when case-insensitive mode is active.
+ * @param {Object} sc_dict - The processed shortcut dictionary from app_state.data.sc.
+ * @returns {Object} A new dict keyed by canonical modifier combo ("cmd", "cmd+shift", …)
+ *                   with count/time/errors summed across all matching shortcuts.
+ */
+function derive_modifier_usage(sc_dict) {
+	const result = {};
+
+	// Seed Shift from uppercase letter usage (read directly from raw cache, layout-safe)
+	const shift_count = count_uppercase_shift();
+	if (shift_count > 0) {
+		result["shift"] = { count: shift_count, time: 0, errors: 0, synth_hs: 0, synth_llm: 0, synth_other: 0 };
+	}
+
+	// Aggregate modifier combos from shortcuts, merging into any existing entry
+	Object.entries(sc_dict).forEach(([k, item]) => {
+		const parts = String(k).toLowerCase().split("+").map(p => p.trim()).filter(p => p.length > 0);
+		const mods  = parts.filter(p => MODIFIER_ORDER.includes(p));
+		if (mods.length === 0) return;
+
+		// Canonical sort so "shift+cmd" and "cmd+shift" collapse to the same key
+		mods.sort((a, b) => MODIFIER_ORDER.indexOf(a) - MODIFIER_ORDER.indexOf(b));
+		const mod_key = mods.join("+");
+
+		if (!result[mod_key]) {
+			result[mod_key] = { count: 0, time: 0, errors: 0, synth_hs: 0, synth_llm: 0, synth_other: 0 };
+		}
+		result[mod_key].count       += item.count       || 0;
+		result[mod_key].time        += item.time        || 0;
+		result[mod_key].errors      += item.errors      || 0;
+		result[mod_key].synth_hs    += item.synth_hs    || 0;
+		result[mod_key].synth_llm   += item.synth_llm   || 0;
+		result[mod_key].synth_other += item.synth_other || 0;
+	});
+
+	return result;
+}
+
+
+/**
+ * Returns true if a key string is a pure repetition (all code points identical).
+ * Used to hide/show entries like "aaa" or "bb" via the repetitions toggle.
+ * @param {string} key - The raw sequence key.
+ * @returns {boolean} Whether all characters in the sequence are the same.
+ */
+function is_repetition(key) {
+	// Normalize [BS] markers before the grapheme check
+	const clean = key.replace(/\[BS\]/gi, "");
+	const chars  = Array.from(clean);
+	if (chars.length <= 1) return false;
+	return chars.every((c) => c === chars[0]);
+}
+
+/**
+ * Counts the effective number of key tokens in a raw key string.
+ * Bracket markers such as [BS] or [LEFT] count as one token each;
+ * every other Unicode code point counts as one token.
+ * Used to validate that a key stored in the bigrams dict actually has 2
+ * tokens, the trigrams dict has 3, etc.
+ * @param {string} key - The raw key string (may contain bracket markers).
+ * @returns {number} The number of effective tokens.
+ */
+function count_key_tokens(key) {
+	const parts = key.split(/(\[[^\]]+\])/i).filter(p => p.length > 0);
+	return parts.reduce((sum, part) => {
+		if (/^\[[^\]]+\]$/i.test(part)) return sum + 1;
+		return sum + Array.from(part).length;
+	}, 0);
+}
+
+// Expected token count for each fixed-length n-gram tab
+const NGRAM_EXPECTED_LEN = { bg: 2, tg: 3, qg: 4, pg: 5, hx: 6, hp: 7 };
+
+
+
+// ===================================
+// ===================================
+// ===== 2.1) Km Per Key Helpers =====
+// ===================================
+
+/**
+ * Builds a map of lowercase key name → km of finger travel per single keystroke,
+ * computed from KEY_POSITIONS geometry. Used to populate the km column in every
+ * table section.
+ * @returns {Object} Map of string key → km (number).
+ */
+function build_char_km_map() {
+	const km_map     = {};
+	const kc_name_map = (window.keycode_layout && Object.keys(window.keycode_layout).length > 0)
+		? window.keycode_layout
+		: KEYCODE_NAMES;
+
+	Object.entries(KEY_POSITIONS).forEach(([kc_str, pos]) => {
+		const finger = KEY_FINGER[kc_str];
+		if (!finger) return;
+		const home = FINGER_HOME[finger];
+		if (!home) return;
+		const dx = pos.x - home.x;
+		const dy = pos.y - home.y;
+		// Round-trip distance (home → key → home) in km
+		const km = Math.sqrt(dx * dx + dy * dy) * 2 * KEY_UNIT_MM / 1_000_000;
+
+		const char_name = kc_name_map[kc_str];
+		if (!char_name) return;
+		km_map[char_name.toLowerCase()] = km;
+		// Also map the exact-case single character so "A" and "a" both resolve
+		if (char_name.length === 1) km_map[char_name] = km;
+	});
+
+	// Bridge bracket markers ("[ bs]" → km of "backspace") using the canonical
+	// name map so that accum_token-normalized keys like "[BS]" resolve correctly.
+	const BRACKET_TO_NAME = {
+		"[bs]": "backspace",  "[esc]":      "escape",     "[tab]":      "tab",
+		"[enter]": "return",  "[return]":   "return",     "[space]":    "space",
+		"[left]": "left",     "[right]":    "right",      "[up]":       "up",
+		"[down]": "down",     "[delete]":   "delete",     "[home]":     "home",
+		"[end]": "end",       "[pageup]":   "pageup",     "[pagedown]": "pagedown",
+		"[caps]": "capslock",
+		"[f1]":  "f1",  "[f2]":  "f2",  "[f3]":  "f3",  "[f4]":  "f4",
+		"[f5]":  "f5",  "[f6]":  "f6",  "[f7]":  "f7",  "[f8]":  "f8",
+		"[f9]":  "f9",  "[f10]": "f10", "[f11]": "f11", "[f12]": "f12",
+	};
+	Object.entries(BRACKET_TO_NAME).forEach(([bracket, name]) => {
+		if (km_map[name] !== undefined) km_map[bracket] = km_map[name];
+	});
+
+	return km_map;
+}
+
+/**
+ * Returns the km of finger travel per single occurrence of the given key sequence.
+ * For n-gram / word / character tabs: tokenizes the key and sums per-character km.
+ * For the shortcut tab: splits on "+" and looks up each key part separately.
+ * For the keycode tab: looks up directly from KEY_POSITIONS geometry.
+ * @param {string}  key          - The raw key string.
+ * @param {Object}  char_km_map  - Map from build_char_km_map().
+ * @param {boolean} is_kc_tab    - Whether the current tab is "kc".
+ * @param {boolean} is_sc_tab    - Whether the current tab is "sc" or "mods".
+ * @returns {number} Km per single occurrence.
+ */
+function compute_key_km_per_stroke(key, char_km_map, is_kc_tab, is_sc_tab) {
+	if (is_kc_tab) {
+		const pos    = KEY_POSITIONS[key];
+		const finger = KEY_FINGER[key];
+		if (!pos || !finger) return 0;
+		const home = FINGER_HOME[finger];
+		if (!home) return 0;
+		const dx = pos.x - home.x;
+		const dy = pos.y - home.y;
+		return Math.sqrt(dx * dx + dy * dy) * 2 * KEY_UNIT_MM / 1_000_000;
+	}
+
+	// For shortcut / modifier tabs, split by "+" separator; each part is a key name
+	const tokens = is_sc_tab
+		? String(key).split("+").map(p => p.trim().toLowerCase()).filter(p => p.length > 0)
+		: key.split(/(\[[^\]]+\])/i)
+			.filter(p => p.length > 0)
+			.flatMap(part => /^\[[^\]]+\]$/i.test(part) ? [part.toLowerCase()] : Array.from(part));
+
+	return tokens.reduce((sum, t) => sum + (char_km_map[t.toLowerCase()] ?? char_km_map[t] ?? 0), 0);
+}
+
+/**
+ * Converts the current tab's n-gram data into the rendered_list array and
+ * updates the occurrence count in the table header.
+ *
+ * IMPORTANT: This function intentionally does NOT update the global WPM/CPM
+ * KPI card. That responsibility belongs exclusively to compute_manifest_metrics()
+ * in data.js. Keeping them separate ensures the KPI is always stable and
+ * represents the full manifest period, not just the current tab's subset.
+ */
+function render_current_tab() {
+	// "mods" draws from sc data and derives modifier patterns; "sc"/"sc_bg"/"w_bg" show as-is
+	const source_key      = app_state.current_tab === "mods" ? "sc" : app_state.current_tab;
+	const source_dict_raw = app_state.data[source_key] || {};
+	const source_dict     = app_state.current_tab === "mods"
+		? derive_modifier_usage(source_dict_raw)
+		: source_dict_raw;
+	const pause_thresh = parseInt(document.getElementById("pause_threshold")?.value ?? "2000", 10) || 2000;
+
+	let data_arr = [];
+	let total_occ = 0;
+
+	// Text-based tabs should never show OS control characters (RS, SOH, BOM…).
+	// Shortcut and keycode tabs are exempt: raw keycodes and ctrl+key shortcuts
+	// are legitimate there. sc_bg uses "→" separator — also exempt.
+	const is_text_tab = !["sc", "sc_bg", "mods", "kc"].includes(app_state.current_tab);
+
+	// ── Characters tab: expand multi-token keys into individual entries ───────
+	// The keylogger sometimes records multi-char sequences (e.g. NBSP+?) in the
+	// character dict. We decompose each multi-token key so that NBSP, NNBSP, and
+	// every other char that only appeared in a combination is surfaced individually.
+	// Bracket markers such as [TAB], [F1] count as one token and are kept as-is.
+	// Single-token entries keep their full timing and error stats; synthesized ones
+	// receive count and source breakdown only (inter-key timing does not apply
+	// to individual characters derived from a bigram).
+	let effective_source = source_dict;
+	if (app_state.current_tab === "c") {
+		const char_accum = {};
+
+		const accum_token = (token, item, keep_timing) => {
+			// Normalize bracket markers to uppercase ("[bs]" → "[BS]") so that the \x08
+			// path through merge_dict (which yields "[BS]" after toLowerCase + replace) and
+			// a literal "[BS]" stored lowercase by merge_dict collapse into the same
+			// char_accum bucket, preventing duplicate rows for BackSpace and similar keys.
+			if (/^\[[^\]]+\]$/i.test(token)) token = token.toUpperCase();
+
+			// Bracket markers ([BS], [TAB], [ESC]…) are valid single-token representations;
+			// their ASCII bracket chars must not trigger the control-character filter
+			const is_bracket_marker = /^\[[^\]]+\]$/i.test(token);
+			if (!is_bracket_marker) {
+				// Control chars in plain text tokens are never meaningful character entries
+				const has_ctrl = Array.from(token).some((ch) => {
+					const cp = ch.codePointAt(0);
+					return cp < 32 || cp === 127 || cp === 0xFEFF;
+				});
+				if (has_ctrl) return;
+			}
+			if (!char_accum[token]) {
+				char_accum[token] = { count: 0, synth_hs: 0, synth_llm: 0, synth_other: 0, time: 0, errors: 0 };
+			}
+			char_accum[token].count       += item.count       || 0;
+			char_accum[token].synth_hs    += item.synth_hs    || 0;
+			char_accum[token].synth_llm   += item.synth_llm   || 0;
+			char_accum[token].synth_other += item.synth_other || 0;
+			if (keep_timing) {
+				char_accum[token].time   += item.time   || 0;
+				char_accum[token].errors += item.errors || 0;
+			}
+		};
+
+		Object.entries(source_dict).forEach(([k, item]) => {
+			// Skip keys containing raw ASCII control chars (e.g. literal \t, \x00)
+			const has_ctrl = Array.from(k).some((ch) => {
+				const cp = ch.codePointAt(0);
+				return cp < 32 || cp === 127 || cp === 0xFEFF;
+			});
+			if (has_ctrl) return;
+
+			// Tokenize: [BRACKET] markers → one token; everything else → per grapheme
+			const tokens = k.split(/(\[[^\]]+\])/i)
+				.filter(p => p.length > 0)
+				.flatMap(part => /^\[[^\]]+\]$/i.test(part) ? [part] : Array.from(part));
+
+			if (tokens.length === 1) {
+				// Single token: preserve full stats including timing
+				accum_token(k, item, true);
+			} else {
+				// Multi-token: propagate counts only; timing is not per-char here
+				tokens.forEach(t => accum_token(t, item, false));
+			}
+		});
+
+		// Pull standalone special keys from the sc dict into the characters tab.
+		// Navigation keys (arrows, Esc, Tab, Enter, F1–F15…) are logged as shortcuts
+		// (single key, no modifier) so they never appear in the raw "c" dict.
+		// Merging them here surfaces them with the same chip style as [BS] and NBSP.
+		// Keys that ARE in the c dict (Space, BackSpace, Tab, Enter, Escape) are
+		// normalized to their canonical c-dict form (e.g. "space" → " ") so they
+		// collapse into the existing char_accum bucket rather than creating a duplicate row.
+		const sc_for_chars = app_state.data.sc || {};
+		Object.entries(sc_for_chars).forEach(([sc_key, sc_item]) => {
+			// Only standalone keys — no "+" means no modifier combination
+			if (sc_key.includes("+")) return;
+			const sc_lower = sc_key.toLowerCase();
+			// Must be a known control/navigation key or a bracket marker
+			if (!CONTROL_KEY_LABELS.has(sc_lower) && !/^\[[^\]]+\]$/i.test(sc_key)) return;
+			// Normalize to canonical c-dict form (e.g. "backspace" → "[BS]", "space" → " ")
+			const sc_canonical = SC_TO_CHAR_CANONICAL[sc_lower] ?? sc_key;
+			// Skip if c dict already contributed this key — prevents double-counting for
+			// keys like Space/BackSpace that are recorded in both dicts
+			if (char_accum[sc_canonical]) return;
+			accum_token(sc_canonical, sc_item, true);
+		});
+
+		// Fallback pull from the kc (keycode) dict for control keys missing from sc.
+		// Some keylogger versions only populate kc for bare navigation/function keys,
+		// never sc. Checking after sc ensures no double-counting.
+		const kc_for_chars = app_state.data.kc || {};
+		const kc_name_map  = window.keycode_layout && Object.keys(window.keycode_layout).length > 0
+			? window.keycode_layout
+			: KEYCODE_NAMES;
+		Object.entries(kc_for_chars).forEach(([kc_str, kc_item]) => {
+			const key_name = kc_name_map[kc_str] ?? KEYCODE_NAMES[kc_str];
+			if (!key_name) return;
+			const key_lower = key_name.toLowerCase();
+			// Only navigation/control keys — skip regular printable keys
+			if (!CONTROL_KEY_LABELS.has(key_lower)) return;
+			// Normalize and skip if already present (c dict or sc dict is authoritative)
+			const key_canonical = SC_TO_CHAR_CANONICAL[key_lower] ?? key_name;
+			if (char_accum[key_canonical]) return;
+			accum_token(key_canonical, kc_item, true);
+		});
+
+		effective_source = char_accum;
+	}
+	// ─────────────────────────────────────────────────────────────────────────
+
+	Object.keys(effective_source).forEach((k) => {
+		// Strip control chars for text tabs; for "c" tab, already handled above
+		if (is_text_tab && app_state.current_tab !== "c") {
+			const has_ctrl = Array.from(k).some((ch) => {
+				const cp = ch.codePointAt(0);
+				return cp < 32 || cp === 127 || cp === 0xFEFF;
+			});
+			if (has_ctrl) return;
+		}
+
+		// Characters tab: effective_source only has single-token keys; this guard
+		// is purely defensive against any edge-case that slipped through.
+		// Named control keys (e.g. "escape", "left") are also valid single entries.
+		if (app_state.current_tab === "c") {
+			const is_bracket   = /^\[[^\]]+\]$/i.test(k);
+			const is_ctrl_name = CONTROL_KEY_LABELS.has(k.toLowerCase());
+			if (!is_bracket && !is_ctrl_name && Array.from(k).length !== 1) return;
+		}
+
+		// Filter n-gram tabs to only entries with the expected effective token count.
+		// Prevents trigramme keys that leaked into the bigrams dict from appearing, etc.
+		const expected_tokens = NGRAM_EXPECTED_LEN[app_state.current_tab];
+		if (expected_tokens !== undefined && count_key_tokens(k) !== expected_tokens) return;
+
+		const item         = effective_source[k];
+		const manual_count = Math.max(0, item.count - item.synth_hs - item.synth_llm - item.synth_other);
+		const avg          = manual_count > 0 ? item.time / manual_count : 0;
+
+		// Precision: [BS]-containing sequences are always 100%; others are 1 - error_rate
+		const acc = k.includes("[BS]") || k.toLowerCase() === "backspace"
+			? 100
+			: item.count > 0 ? ((item.count - item.errors) / item.count) * 100 : 0;
+
+		// Normalize any [BRACKET] marker to a single char before grapheme length computation.
+		// Keycode tab keys are numeric strings ("49") representing a single physical key.
+		const norm_key    = k.replace(/\[[^\]]+\]/gi, "B");
+		const display_len = app_state.current_tab === "kc" ? 1 : Math.max(1, Array.from(norm_key).length);
+
+		total_occ += item.count;
+
+		data_arr.push({
+			key:         k,
+			count:       item.count,
+			synth_hs:    item.synth_hs,
+			synth_llm:   item.synth_llm,
+			synth_other: item.synth_other,
+			manual_count,
+			// avg: mean delay between consecutive keystrokes (manual chars only)
+			avg: isNaN(avg) ? 0 : avg,
+			// wpm: estimated WPM if this sequence were typed continuously
+			wpm: (!["sc", "sc_bg", "mods"].includes(app_state.current_tab) && !isNaN(avg) && avg > 0 && avg <= pause_thresh)
+				? display_len / 5 / (avg / 60000)
+				: 0,
+			acc:      Math.max(0, acc),
+			freq:     0,
+			// rep/rep_rate/rep_star/rep_manual: filled below from the next n-gram level (null = not computable)
+			rep:        null,
+			rep_rate:   0,
+			rep_star:   null,
+			rep_manual: null,
+			// km: filled below from KEY_POSITIONS geometry (0 = home-row key or not mappable)
+			km: 0,
+		});
+	});
+
+	// Compute relative frequency after we know total_occ
+	data_arr.forEach((i) => { i.freq = total_occ > 0 ? (i.count / total_occ) * 100 : 0; });
+
+	// ── Repetition counts ─────────────────────────────────────────────────────
+	// For a given n-gram X, its repetition count = how many times XX was typed
+	// consecutively, which is the count of XX in the next n-gram level.
+	// Characters → bigrams["aa"], Bigrams → quadrigrams["abab"], Trigrams → hexagrams["abcabc"].
+	// Words: look up word+" "+word in the word-bigrams dict (w_bg stores consecutive
+	//   word pairs with a space separator regardless of the actual inter-word key).
+	// Shortcuts: look up "cmd+c→cmd+c" in the shortcut-bigrams dict (sc_bg), where
+	//   → (U+2192) is the separator used when logging consecutive shortcut pairs.
+	const rep_source_tab = { c: "bg", bg: "qg", tg: "hx" }[app_state.current_tab];
+	if (rep_source_tab) {
+		const rep_dict = app_state.data[rep_source_tab] || {};
+		data_arr.forEach((item) => {
+			const rep_key = item.key + item.key;
+			// Lowercase fallback handles bracket markers stored with mixed case
+			// (e.g. "[BS][BS]" vs "[bs][bs]" depending on raw data source path).
+			const rep_entry = rep_dict[rep_key] ?? rep_dict[rep_key.toLowerCase()];
+			if (rep_entry) {
+				item.rep        = rep_entry.count      || 0;
+				item.rep_star   = rep_entry.synth_hs   || 0;
+				const rep_llm   = rep_entry.synth_llm  || 0;
+				const rep_other = rep_entry.synth_other || 0;
+				// Manual = total minus all synthetic sources
+				item.rep_manual = Math.max(0, item.rep - item.rep_star - rep_llm - rep_other);
+			} else {
+				item.rep        = 0;
+				item.rep_star   = 0;
+				item.rep_manual = 0;
+			}
+			// Rate: fraction of total occurrences where this n-gram was immediately repeated.
+			// E.g. 10 "abab" out of 100 "ab" → 10 % of "ab" occurrences were a direct repeat.
+			item.rep_rate = item.count > 0 ? (item.rep / item.count) * 100 : 0;
+		});
+	} else if (app_state.current_tab === "w") {
+		// For words, a repetition is the same word appearing twice consecutively.
+		// Word bigrams are stored in w_bg with a space separator (the actual separator
+		// key — space, tab, enter — is normalised away when the pair is logged).
+		const wb_dict = app_state.data.w_bg || {};
+		data_arr.forEach((item) => {
+			const rep_key   = item.key + " " + item.key;
+			const rep_entry = wb_dict[rep_key] ?? wb_dict[rep_key.toLowerCase()];
+			const rep_total = rep_entry ? (rep_entry.count || 0) : 0;
+			item.rep        = rep_total;
+			item.rep_star   = 0;
+			item.rep_manual = rep_total;
+			item.rep_rate   = item.count > 0 ? (rep_total / item.count) * 100 : 0;
+		});
+	} else if (app_state.current_tab === "sc") {
+		// For shortcuts, a repetition is the same shortcut used twice consecutively.
+		// Consecutive shortcut pairs are stored in sc_bg with U+2192 (→) as separator:
+		// "cmd+c→cmd+c" is the consecutive-repeat entry for cmd+c.
+		const sc_bg_dict = app_state.data.sc_bg || {};
+		data_arr.forEach((item) => {
+			const rep_key   = item.key + "\u2192" + item.key;
+			const rep_entry = sc_bg_dict[rep_key] ?? sc_bg_dict[rep_key.toLowerCase()];
+			if (rep_entry) {
+				item.rep        = rep_entry.count      || 0;
+				item.rep_star   = rep_entry.synth_hs   || 0;
+				const rep_llm   = rep_entry.synth_llm  || 0;
+				const rep_other = rep_entry.synth_other || 0;
+				item.rep_manual = Math.max(0, item.rep - item.rep_star - rep_llm - rep_other);
+			} else {
+				item.rep        = 0;
+				item.rep_star   = 0;
+				item.rep_manual = 0;
+			}
+			item.rep_rate = item.count > 0 ? (item.rep / item.count) * 100 : 0;
+		});
+	}
+	// ─────────────────────────────────────────────────────────────────────────
+
+	// ── Km per sequence ───────────────────────────────────────────────────────
+	// Total finger travel per row = km_per_stroke × occurrence count.
+	// "mods" and "sc_bg" tabs are skipped: "mods" keys represent modifier patterns,
+	// "sc_bg" keys are two-shortcut sequences — per-keystroke geometry is ambiguous.
+	if (app_state.current_tab !== "mods" && app_state.current_tab !== "sc_bg") {
+		const char_km_map    = build_char_km_map();
+		const is_kc_tab_flag = app_state.current_tab === "kc";
+		const is_sc_tab_flag = app_state.current_tab === "sc";
+		data_arr.forEach((item) => {
+			const km_per_stroke = compute_key_km_per_stroke(item.key, char_km_map, is_kc_tab_flag, is_sc_tab_flag);
+			item.km = km_per_stroke * item.count;
+		});
+	}
+	// ─────────────────────────────────────────────────────────────────────────
+
+	app_state.rendered_list = data_arr;
+
+	// Update the occurrences subtitle in the table header (not the global KPI)
+	const occ_elem = document.getElementById("total_occurrences");
+	if (occ_elem) occ_elem.innerHTML = format_number(total_occ);
+
+	// Compute weighted global metrics for the column sub-headers
+	let g_time = 0, g_man = 0, g_wpm = 0, g_wpm_n = 0, g_acc = 0, g_acc_n = 0;
+	data_arr.forEach((item) => {
+		if (item.manual_count > 0 && item.avg > 0) { g_time += item.avg * item.manual_count; g_man += item.manual_count; }
+		if (item.wpm > 0)      { g_wpm += item.wpm; g_wpm_n++; }
+		if (item.count > 0)    { g_acc += item.acc * item.count; g_acc_n += item.count; }
+	});
+	const g_avg_val = g_man   > 0 ? g_time / g_man   : 0;
+	const g_wpm_val = g_wpm_n > 0 ? g_wpm  / g_wpm_n : 0;
+	const g_acc_val = g_acc_n > 0 ? g_acc  / g_acc_n : 0;
+
+	const set_col_stat = (id, val, suffix) => {
+		const el = document.getElementById(id);
+		if (el) el.innerHTML = val > 0 ? `~ ${format_number(Number(val.toFixed(1)))} ${suffix}` : "";
+	};
+	set_col_stat("col_global_avg", g_avg_val, "ms");
+	set_col_stat("col_global_wpm", g_wpm_val, "MPM");
+	set_col_stat("col_global_acc", g_acc_val, "%");
+
+	const g_km_total = data_arr.reduce((s, i) => s + (i.km || 0), 0);
+	const km_stat_el = document.getElementById("col_global_km");
+	if (km_stat_el) {
+		if (g_km_total >= 1) {
+			km_stat_el.innerHTML = `~ ${format_number(g_km_total.toFixed(2))} km`;
+		} else if (g_km_total > 0.0005) {
+			km_stat_el.innerHTML = `~ ${format_number((g_km_total * 1000).toFixed(1))}\u00A0m`;
+		} else {
+			km_stat_el.innerHTML = "";
+		}
+	}
+
+	render_table();
+}
+
+
+// ===================================
+// ===================================
+// ======= 3/ Table DOM Render =======
+// ===================================
+// ===================================
+
+/**
+ * Builds a searchable string for a key by augmenting the raw value with
+ * human-readable aliases for special characters. This allows typing "nbsp",
+ * "nnbsp", "backspace", or a control-char name (e.g. "rs") to match entries
+ * whose raw key is an invisible Unicode code point.
+ * @param {string} raw_key - The raw key string from the data dictionary.
+ * @returns {string} Lowercase composite string including all aliases.
+ */
+function build_searchable_key(raw_key) {
+	let s = raw_key.toLowerCase();
+	// Space character variants
+	if (raw_key.includes("\u00A0")) s += " nbsp";
+	if (raw_key.includes("\u202F")) s += " nnbsp";
+	// [BS] marker → backspace alias
+	if (/\[bs\]/i.test(raw_key)) s += " backspace";
+	// Single ASCII control characters → add their CONTROL_CHAR_NAMES abbreviation
+	if (raw_key.length === 1) {
+		const code = raw_key.charCodeAt(0);
+		if (CONTROL_CHAR_NAMES[code]) s += " " + CONTROL_CHAR_NAMES[code].toLowerCase();
+	}
+	// Keycode tab → add the resolved human-readable name (custom layout > static map)
+	if (app_state.current_tab === "kc") {
+		const kc_resolved = (window.keycode_layout && window.keycode_layout[raw_key])
+			|| KEYCODE_NAMES[raw_key];
+		if (kc_resolved) s += " " + kc_resolved.toLowerCase();
+	}
+	// Add the text label for the exact key (lowercased for case-insensitive search)
+	// so that typing "backspace", "left", "space", etc. finds the matching entries.
+	const exact_sym = CONTROL_KEY_SYMBOLS[raw_key.toLowerCase()];
+	if (exact_sym) {
+		const exact_lower = exact_sym.toLowerCase();
+		if (!s.includes(exact_lower)) s += " " + exact_lower;
+	}
+	// For sequences: also add labels for each embedded bracket marker (e.g. in bigrams)
+	const bracket_matches = raw_key.match(/\[[^\]]+\]/gi) || [];
+	bracket_matches.forEach(m => {
+		const m_sym = CONTROL_KEY_SYMBOLS[m.toLowerCase()];
+		if (m_sym) {
+			const m_lower = m_sym.toLowerCase();
+			if (!s.includes(m_lower)) s += " " + m_lower;
+		}
+	});
+	return s;
+}
+
+/**
+ * Renders the filtered and sorted row list into the table body via
+ * requestAnimationFrame to keep the main thread responsive.
+ */
+function render_table() {
+	if (app_state.render_timer) cancelAnimationFrame(app_state.render_timer);
+
+	app_state.render_timer = requestAnimationFrame(() => {
+		let arr = [...app_state.rendered_list];
+
+		// Apply search filter using enriched searchable key so special characters
+		// like NBSP, NNBSP, and [BS] can be found by typing their alias names
+		if (app_state.search_query) {
+			arr = arr.filter((i) => build_searchable_key(i.key).includes(app_state.search_query));
+		}
+
+		// Sort
+		arr.sort((a, b) => {
+			const v_a = a[app_state.sort_col] ?? 0;
+			const v_b = b[app_state.sort_col] ?? 0;
+			if (typeof v_a === "string") {
+				return app_state.sort_asc ? v_a.localeCompare(v_b) : v_b.localeCompare(v_a);
+			}
+			return app_state.sort_asc ? v_a - v_b : v_b - v_a;
+		});
+
+		// Reflect the visible row count in the Séquence column sub-header
+		const rows_elem = document.getElementById("total_rows");
+		if (rows_elem) {
+			rows_elem.innerHTML = arr.length > 0
+				? `${format_number(arr.length)} ligne${arr.length > 1 ? "s" : ""}`
+				: "";
+		}
+
+		const tbody = document.getElementById("metrics_table_body");
+		if (!tbody) return;
+
+		const is_kc_tab       = app_state.current_tab === "kc";
+		const is_shortcut_tab = ["sc", "sc_bg", "mods"].includes(app_state.current_tab);
+		// Repetition column is meaningful for chars, bigrams, trigrams, words, and shortcuts tabs
+		const rep_available   = ["c", "bg", "tg", "w", "sc"].includes(app_state.current_tab);
+		// Hide the repetition column entirely for n-grams with more than 3 tokens and
+		// for sc_bg/w_bg where consecutive-pair data doesn't apply
+		const show_rep_col    = !["qg", "pg", "hx", "hp", "sc_bg", "w_bg"].includes(app_state.current_tab);
+		const table_el        = document.getElementById("metrics_table");
+		if (table_el) table_el.classList.toggle("hide-rep", !show_rep_col);
+
+		const html = arr.map((item, row_idx) => {
+			const raw_lower = item.key.toLowerCase();
+
+			// Detect standalone non-printable ASCII characters (e.g. RS = 0x1E logged by the keylogger)
+			const single_code   = item.key.length === 1 ? item.key.charCodeAt(0) : -1;
+			const is_nonprint   = single_code >= 0 && (single_code < 32 || single_code === 127);
+
+			// Regular space (code 32) is printable but must still render as a "Space" chip so
+			// the cell is not blank. CONTROL_KEY_LABELS includes " " for this reason.
+			const is_ctrl_display = !is_shortcut_tab && !is_kc_tab &&
+				(CONTROL_KEY_LABELS.has(raw_lower) || CONTROL_KEY_LABELS.has(item.key) || is_nonprint);
+
+			let key_html;
+			if (is_kc_tab) {
+				// Prefer the custom layout injected by Lua (user's actual keyboard); fall back
+				// to KEYCODE_NAMES for standard macOS keys (F1–F12, arrows, Escape…) which
+				// are layout-independent and always have a known human name.
+				const has_custom_layout = window.keycode_layout && Object.keys(window.keycode_layout).length > 0;
+				const kc_name  = (has_custom_layout ? window.keycode_layout[item.key] : undefined)
+					?? KEYCODE_NAMES[item.key];
+				const kc_label = kc_name
+					? `kc ${item.key}&nbsp;<span class="kc-name">(${escape_html(kc_name)})</span>`
+					: `kc ${item.key}`;
+				key_html = `<span class="mono-space kc-chip">${kc_label}</span>`;
+			} else if (app_state.current_tab === "sc_bg") {
+				// Keys are "PrevShortcut→NextShortcut" — split on → and render each half
+				const sep_idx = item.key.indexOf("\u2192");
+				const sc1 = sep_idx !== -1 ? item.key.slice(0, sep_idx) : item.key;
+				const sc2 = sep_idx !== -1 ? item.key.slice(sep_idx + 1) : "";
+				key_html = `<span class="shortcut-seq">${format_shortcut_key(sc1)}` +
+					(sc2 ? `\u00A0<span style="color:var(--text-muted);">\u2192</span>\u00A0${format_shortcut_key(sc2)}` : "") +
+					`</span>`;
+			} else if (app_state.current_tab === "w_bg") {
+				// Keys are "word1 word2" — render as two plain-text chips with an arrow
+				const sp = item.key.indexOf(" ");
+				const w1 = sp !== -1 ? item.key.slice(0, sp) : item.key;
+				const w2 = sp !== -1 ? item.key.slice(sp + 1) : "";
+				key_html = `<span class="seq-chips"><span class="mono-space">${escape_html(w1)}</span>` +
+					(w2 ? `\u00A0<span style="color:var(--text-muted);">\u2192</span>\u00A0<span class="mono-space">${escape_html(w2)}</span>` : "") +
+					`</span>`;
+			} else if (is_shortcut_tab) {
+				key_html = `<span class="shortcut-seq">${format_shortcut_key(item.key)}</span>`;
+			} else if (is_ctrl_display) {
+				// Resolve the best label: pretty symbol > ASCII abbreviation > uppercase name
+				const label = CONTROL_KEY_SYMBOLS[raw_lower]
+					?? (is_nonprint ? (CONTROL_CHAR_NAMES[single_code] ?? `\\x${single_code.toString(16).toUpperCase().padStart(2, "0")}`) : null)
+					?? item.key.toUpperCase();
+				key_html = `<span class="shortcut-chip shortcut-key-control">${escape_html(label)}</span>`;
+			} else {
+				// N-gram tabs always render one chip per token for visual consistency.
+				// Characters/words/shortcuts stay as a single chip when there are no
+				// special markers, which avoids needless per-grapheme splitting for prose.
+				const is_ngram_tab = ["bg", "tg", "qg", "pg", "hx", "hp"].includes(app_state.current_tab);
+				if (is_ngram_tab || /\[|\u00A0|\u202F/.test(item.key)) {
+					key_html = `<span class="seq-chips">${format_seq_chips(item.key)}</span>`;
+				} else {
+					key_html = `<span class="mono-space">${format_display_key(item.key)}</span>`;
+				}
+			}
+
+			const synth_parts = [];
+			if (item.synth_hs  > 0) synth_parts.push(`${format_number(item.synth_hs)} HS`);
+			if (item.synth_llm > 0) synth_parts.push(`${format_number(item.synth_llm)} IA`);
+			const synth_str = synth_parts.length
+				? `<br><span style="font-size:10px;color:var(--text-muted);">(dont ${synth_parts.join(", ")})</span>`
+				: "";
+
+			const avg_str = item.avg > 0
+				? `${format_number(item.avg.toFixed(1))} ms`
+				: "-";
+
+			const wpm_color = item.wpm > 60 ? "#34c759" : (item.wpm > 0 && item.wpm < 30 ? "#ff3b30" : "inherit");
+			const wpm_str   = item.wpm > 0 ? `${format_number(item.wpm.toFixed(1))} MPM` : "-";
+
+			const acc_color = item.acc >= 95 ? "#34c759" : (item.acc < 80 ? "#ff3b30" : "#ffcc00");
+
+			// Repetition cell: show count · rate% on one line, breakdown below when ★ involved.
+			// null = tab type doesn't support rep (no next-level data); show "—".
+			// 0   = computable but entry not found in dict; show "0" to distinguish from
+			//       no-data tabs, so the user knows it was truly zero repetitions found.
+			let rep_html;
+			if (!rep_available || item.rep === null) {
+				rep_html = `<span style="color:var(--text-muted);">\u2014</span>`;
+			} else if (item.rep === 0) {
+				rep_html = `<span style="color:var(--text-muted);">0</span>`;
+			} else {
+				const rep_color  = item.rep_rate >= 20 ? "#ff3b30" : (item.rep_rate >= 10 ? "#ffcc00" : "inherit");
+				const rate_str   = format_number(item.rep_rate.toFixed(1)) + "\u00A0%";
+				// Show manual/★ breakdown only when the ★ key contributed — avoids the line when
+				// all repetitions are manual (the star column would just be "0" which adds no info).
+				const detail_str = item.rep_star > 0
+					? `<br><span style="font-size:10px;color:var(--text-muted);">` +
+					  `dont ${format_number(item.rep_manual)}\u00A0brutes, ${format_number(item.rep_star)}\u00A0\u2605</span>`
+					: "";
+				rep_html =
+					`<strong style="color:${rep_color}">${format_number(item.rep)}</strong>` +
+					`<span style="font-size:10px;color:var(--text-muted);"> \u00B7 ${rate_str}</span>` +
+					detail_str;
+			}
+
+			// Km cell: total finger distance for all occurrences of this sequence.
+			// "—" for home-row keys and sequences whose geometry can't be resolved.
+			let km_html;
+			if (item.km <= 0) {
+				km_html = `<span style="color:var(--text-muted);">\u2014</span>`;
+			} else if (item.km >= 1) {
+				km_html = `${format_number(item.km.toFixed(2))}\u00A0<span class="stat-unit">km</span>`;
+			} else {
+				km_html = `${format_number((item.km * 1000).toFixed(1))}\u00A0<span class="stat-unit">m</span>`;
+			}
+
+			return `<tr>
+				<td>
+					<div class="cell-seq">
+						<span class="row-num">${row_idx + 1}</span>
+						<span class="row-divider"></span>
+						${key_html}
+					</div>
+				</td>
+				<td>${format_number(item.count)}${synth_str}</td>
+				<td class="col-rep">${rep_html}</td>
+				<td>${km_html}</td>
+				<td>${format_number(item.freq.toFixed(2))} %</td>
+				<td>${avg_str}</td>
+				<td><strong style="color:${wpm_color}">${wpm_str}</strong></td>
+				<td><strong style="color:${acc_color}">${format_number(item.acc.toFixed(1))} %</strong></td>
+			</tr>`;
+		}).join("");
+
+		tbody.innerHTML = html ||
+			"<tr><td colspan=\"8\" style=\"text-align:center;\">Aucune donn\u00E9e</td></tr>";
+	});
+}
