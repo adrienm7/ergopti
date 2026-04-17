@@ -170,14 +170,19 @@ hotkey_defs.ctrl_o   = function()
 	return bind_log({"ctrl"}, "o", text_acts.surround_with_parens)
 end
 
+hotkey_labels.ctrl_p = "Basculer recopie / bureau étendu"
+hotkey_defs.ctrl_p   = function()
+	return bind_log({"ctrl"}, "p", sys_acts.toggle_display_mirror)
+end
+
 hotkey_labels.ctrl_s = "Ouvrir / Copier chemin"
 hotkey_defs.ctrl_s   = function()
 	return bind_log({"ctrl"}, "s", app_acts.copy_or_open_path)
 end
 
-hotkey_labels.ctrl_t = "Toggle Casse De Titre / minuscules"
+hotkey_labels.ctrl_t = "Téléporter la souris sur l'autre moniteur"
 hotkey_defs.ctrl_t   = function()
-	return bind_log({"ctrl"}, "t", text_acts.toggle_titlecase)
+	return bind_log({"ctrl"}, "t", sys_acts.teleport_mouse)
 end
 
 hotkey_labels.ctrl_u = "Toggle MAJUSCULES / minuscules"
@@ -193,6 +198,17 @@ end
 hotkey_labels.ctrl_x = "Copier la couleur hex du pixel sous le curseur"
 hotkey_defs.ctrl_x   = function()
 	return bind_log({"ctrl"}, "x", sys_acts.copy_pixel_color)
+end
+
+-- Punctuation shortcuts — after all letter-based ctrl shortcuts
+hotkey_labels.ctrl_period = "Toggle Casse De Titre / minuscules"
+hotkey_defs.ctrl_period   = function()
+	return bind_log({"ctrl"}, ".", text_acts.toggle_titlecase)
+end
+
+hotkey_labels.ctrl_quote = "Mettre la souris en surbrillance"
+hotkey_defs.ctrl_quote   = function()
+	return bind_log({"ctrl"}, "'", sys_acts.spotlight_mouse)
 end
 
 -- Cmd shortcuts — alphabetical by id
@@ -322,6 +338,21 @@ function M.is_enabled(name)
 	return hotkeys[name] ~= nil
 end
 
+--- Builds a sort key that groups shortcuts in display order:
+---   1) ctrl + single letter (ctrl_a … ctrl_z)
+---   2) ctrl + punctuation word (ctrl_period, ctrl_quote, …)
+---   3) cmd shortcuts (cmd_shift_v, cmd_star, …)
+---   4) everything else (at_hash, layer_scroll — extracted separately by the menu)
+--- Within each group items sort alphabetically by id.
+--- @param id string The shortcut identifier.
+--- @return string Opaque sort key.
+local function sort_key(id)
+	if id:match("^ctrl_%a$") then return "1_" .. id end
+	if id:match("^ctrl_")    then return "2_" .. id end
+	if id:match("^cmd_")     then return "3_" .. id end
+	return "4_" .. id
+end
+
 --- Returns a sorted array of all registered shortcuts with their current status.
 --- @return table Array of {id, label, enabled} tables.
 function M.list_shortcuts()
@@ -333,7 +364,7 @@ function M.list_shortcuts()
 			enabled = (hotkeys[name] ~= nil),
 		})
 	end
-	table.sort(out, function(a, b) return a.id < b.id end)
+	table.sort(out, function(a, b) return sort_key(a.id) < sort_key(b.id) end)
 	return out
 end
 

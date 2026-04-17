@@ -75,7 +75,8 @@ function M.build(ctx)
 
 	local cur_return = state.script_control_shortcuts.return_key or "none"
 	local cur_back   = state.script_control_shortcuts.backspace  or "none"
-	
+	local cur_escape = state.script_control_shortcuts.escape     or "none"
+
 	return {
 		title   = "Contrôle du script",
 		checked = (enabled and not paused) or nil,
@@ -85,9 +86,11 @@ function M.build(ctx)
 				if state.script_control_enabled then
 					pcall(sc_module.set_shortcut_action, "return_key", state.script_control_shortcuts.return_key)
 					pcall(sc_module.set_shortcut_action, "backspace",  state.script_control_shortcuts.backspace)
+					pcall(sc_module.set_shortcut_action, "escape",     state.script_control_shortcuts.escape)
 				else
 					pcall(sc_module.set_shortcut_action, "return_key", "none")
 					pcall(sc_module.set_shortcut_action, "backspace",  "none")
+					pcall(sc_module.set_shortcut_action, "escape",     "none")
 				end
 			end
 			ctx.save_prefs()
@@ -99,6 +102,8 @@ function M.build(ctx)
 			   disabled = not enabled or paused or nil, menu = key_submenu("return_key") },
 			{ title = "Option droite + ⌫ : " .. get_label(cur_back),
 			   disabled = not enabled or paused or nil, menu = key_submenu("backspace") },
+			{ title = "Option droite + ⎋ : " .. get_label(cur_escape),
+			   disabled = not enabled or paused or nil, menu = key_submenu("escape") },
 			{ title = "-" },
 			{ title    = "Chemin du AHK…",
 			   disabled = paused or nil,

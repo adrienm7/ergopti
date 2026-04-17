@@ -495,9 +495,11 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 		if state.script_control_enabled then
 			pcall(core_mods.shortcuts_mod.set_shortcut_action, "return_key", state.script_control_shortcuts.return_key)
 			pcall(core_mods.shortcuts_mod.set_shortcut_action, "backspace",  state.script_control_shortcuts.backspace)
+			pcall(core_mods.shortcuts_mod.set_shortcut_action, "escape",     state.script_control_shortcuts.escape)
 		else
 			pcall(core_mods.shortcuts_mod.set_shortcut_action, "return_key", "none")
 			pcall(core_mods.shortcuts_mod.set_shortcut_action, "backspace",  "none")
+			pcall(core_mods.shortcuts_mod.set_shortcut_action, "escape",     "none")
 		end
 		pcall(core_mods.shortcuts_mod.set_extras, {
 			open_init = function() hs.timer.doAfter(0, function() _suppress_watcher_until = hs.timer.secondsSinceEpoch() + 8; pcall(hs.execute, "open \"" .. base_dir .. "init.lua\"") end) end,
