@@ -72,6 +72,8 @@ function M.build(ctx)
         
 		local key = parts[#parts]
 		if key == "star" or key == "asterisk" then key = state.trigger_char end
+		if key == "period" then key = "." end
+		if key == "quote"  then key = "'" end
         
 		local mods = {}
 		for i = 1, #parts - 1 do
@@ -211,6 +213,7 @@ function M.build(ctx)
 		end
 		local cur_return = state.script_control_shortcuts.return_key or "none"
 		local cur_back   = state.script_control_shortcuts.backspace  or "none"
+		local cur_escape = state.script_control_shortcuts.escape     or "none"
 		table.insert(s_menu, { title = "-" })
 		table.insert(s_menu, {
 			title    = "Option droite + ↩ : " .. get_label(cur_return),
@@ -221,6 +224,11 @@ function M.build(ctx)
 			title    = "Option droite + ⌫ : " .. get_label(cur_back),
 			disabled = not enabled or paused or nil,
 			menu     = key_submenu("backspace")
+		})
+		table.insert(s_menu, {
+			title    = "Option droite + ⎋ : " .. get_label(cur_escape),
+			disabled = not enabled or paused or nil,
+			menu     = key_submenu("escape")
 		})
 		table.insert(s_menu, {
 			title    = "Chemin du AHK…",

@@ -60,14 +60,15 @@ for _, def in ipairs(ACTION_DEFINITIONS) do
 	table.insert(ACTIONS_ORDER, def.id)
 end
 
--- Physical key codes for the two configurable key slots
+-- Physical key codes for the three configurable key slots
 local KEYCODE_RETURN    = 36
 local KEYCODE_BACKSPACE = 51
+local KEYCODE_ESCAPE    = 53
 
 -- Module-level state
 local _is_paused       = false
 local _tap             = nil
-local _key_actions     = {return_key = "pause", backspace = "reload"}
+local _key_actions     = {return_key = "pause", backspace = "reload", escape = "quit_hammerspoon"}
 local _on_pause_change = nil
 local _extras          = {}
 
@@ -231,6 +232,15 @@ local function handle_key(e)
 		return dispatch_action(_key_actions.backspace)
 	end
 
+	if code == KEYCODE_ESCAPE then
+		local ok_kl, kl = pcall(require, "modules.keylogger")
+		if ok_kl and kl and type(kl.log_shortcut) == "function" then
+			local app = hs.application.frontmostApplication()
+			pcall(kl.log_shortcut, "Alt+Escape", app and app:title() or "Unknown")
+		end
+		return dispatch_action(_key_actions.escape)
+	end
+
 	return false
 end
 
@@ -297,7 +307,7 @@ function M.is_paused()
 end
 
 --- Configures the action triggered by a specific key slot.
---- @param keyname string "return_key" or "backspace".
+--- @param keyname string "return_key", "backspace", or "escape".
 --- @param action string One of the recognised action ids.
 function M.set_shortcut_action(keyname, action)
 	if type(keyname) ~= "string" or type(action) ~= "string" then
