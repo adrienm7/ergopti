@@ -1158,9 +1158,10 @@ function M.create(deps)
             end
         })
 
-        -- Streaming is nil-safe: old configs without the key default to true (same as DEFAULT_STATE)
-        local streaming_on = (state.llm_streaming ~= false)
+        -- Streaming flags are nil-safe: old configs without the key default to true (same as DEFAULT_STATE)
+        local streaming_on       = (state.llm_streaming ~= false)
         local streaming_multi_on = (state.llm_streaming_multi ~= false)
+        local num_preds_multi    = tonumber(state.llm_num_predictions) or 1
         table.insert(main_menu, {
             title    = "Suggestions en streaming (token par token)",
             checked  = streaming_on,
@@ -1174,11 +1175,11 @@ function M.create(deps)
             end or nil,
         })
         table.insert(main_menu, {
-            -- Greyed out when streaming is off (token streaming must be active to show partials)
-            title    = "  ↳ Afficher les suggestions au fur et à mesure (multi-prédictions)",
+            -- Independent of token streaming; only irrelevant when num_predictions < 2
+            title    = "Afficher les suggestions au fur et à mesure (multi-prédictions)",
             checked  = streaming_multi_on,
-            disabled = (is_disabled or not streaming_on or (tonumber(state.llm_num_predictions) or 1) < 2) or nil,
-            fn       = (not is_disabled and streaming_on and (tonumber(state.llm_num_predictions) or 1) >= 2) and function()
+            disabled = (is_disabled or num_preds_multi < 2) or nil,
+            fn       = (not is_disabled and num_preds_multi >= 2) and function()
                 state.llm_streaming_multi = not streaming_multi_on
                 if keymap and type(keymap.set_llm_streaming_multi) == "function" then
                     pcall(keymap.set_llm_streaming_multi, state.llm_streaming_multi)
