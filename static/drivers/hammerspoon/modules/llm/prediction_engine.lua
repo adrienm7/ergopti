@@ -571,8 +571,9 @@ function M.perform_check(force_trigger, profile_name)
 	Logger.start(LOG, "LLM request — model: '%s' | temp: %.2f | %d pred(s) | max tokens: %d.",
 		tostring(model_to_use), req_temperature, num_preds, max_tokens)
 
-	-- Show the loading indicator immediately for snappy visual feedback
-	tooltip.show("⏳ Génération en cours…", true, is_ai_preview_enabled, tooltip.tint("ai_loading"))
+	-- Persistent loading indicator: no idle timer, no interaction watchers — stays until
+	-- replaced in-place by show_predictions() so there is no blank gap between the two.
+	tooltip.show_loading("⏳ Génération en cours…", is_ai_preview_enabled, tooltip.tint("ai_loading"))
 
 	-- Bump counters to discard any in-flight callbacks that are now stale
 	llm_request_counter   = llm_request_counter + 1
@@ -593,47 +594,114 @@ function M.perform_check(force_trigger, profile_name)
 			tooltip.tint("ai_prediction"), nil, #pending_predictions)
 	end)
 
-	-- When streaming is enabled, parse each partial accumulation through the full pipeline
-	-- (so TAIL_CORRECTED/NEXT_WORDS labels are stripped), then display the result as a
-	-- single orange "insert" block — no diff colors, no gray context, no bold corrections.
+	-- Shared noise gate used by both the streaming partial path and the final on_success
+	-- filter — keeps both in lockstep so no hallucination ever appears during streaming
+	-- that the final filter would later remove
+	local function is_noise_pred(to_type)
+		if not to_type or to_type:gsub("[%s%.…]", "") == "" then return true end
+		local text_lower = to_type:lower()
+		local prev_char  = buffer:match(".*(%S)")
+		local first_ch   = to_type:match("^%s*(.)") or ""
+		local ends_sent  = prev_char and prev_char:match("[%.%!%?…:;]") ~= nil
+		return (text_lower:match("^%s*suite%s+finale") ~= nil)
+			or (text_lower:match("^%s*</") ~= nil)
+			or (text_lower:match("^%s*vous avez besoin de plus") ~= nil)
+			or (text_lower:match("^%s*vous etes les plus") ~= nil)
+			or (text_lower:match("^%s*vous%s") ~= nil and buffer:lower():match("vous") == nil)
+			or (first_ch:match("[A-Z]") ~= nil and not ends_sent)
+			or (to_type:find(":", 1, true) ~= nil)
+	end
+
+	-- When streaming is enabled AND multi-streaming is on, parse each partial accumulation through
+	-- the full pipeline (so TAIL_CORRECTED/NEXT_WORDS labels are stripped), apply the same noise
+	-- filters as on_success, then display as a single orange block (nw color, no diff markup).
 	-- Diff coloring is applied only once the final result arrives via on_success.
-	local on_partial_cb = is_streaming_enabled and function(partial_raw)
+	-- When multi-streaming is off ("all at once" mode), the partial callback is suppressed entirely
+	-- so no tokens appear before the final batch — streaming and all-at-once are mutually exclusive.
+	local on_partial_cb = (is_streaming_enabled and is_streaming_multi_enabled) and function(partial_raw)
 		-- Discard if superseded by a newer request
 		if fetch_request_counter ~= my_fetch_id then return end
 		if type(partial_raw) ~= "string" or partial_raw:gsub("%s", "") == "" then return end
 		-- Strip any partial thinking block before attempting to parse
 		local stripped = Parser.strip_thinking(partial_raw)
 		if not stripped or stripped:gsub("%s", "") == "" then return end
-		-- Wait until the parser can produce a valid prediction (early tokens often can't)
-		local ok_parse, partial_pred = pcall(Parser.process_prediction, buffer, tail, stripped)
-		if not ok_parse or not partial_pred then return end
-		-- Build a display-only variant: use the parsed to_type/deletes for accept behaviour,
-		-- but replace all diff chunks with a single insert so only orange text is shown
-		local display_text = (type(partial_pred.nw) == "string" and partial_pred.nw ~= "" and partial_pred.nw)
-			or partial_pred.to_type
-		if not display_text or display_text:gsub("%s", "") == "" then return end
-		local stream_pred = {
-			to_type         = partial_pred.to_type,
-			deletes         = partial_pred.deletes,
-			chunks          = { { type = "insert", text = display_text } },
-			nw              = "",
-			has_corrections = false,
-			disable_bold    = true,
-		}
-		pending_predictions = { stream_pred }
+		-- Split on === to handle batch mode (all predictions in one prompt, separated by ===).
+		-- In single-prediction mode this returns one block; in batch mode each completed
+		-- block is a separate prediction. The last block is still streaming and may fail
+		-- to parse — that's fine, earlier complete blocks are shown immediately so the
+		-- user sees the tooltip fill line by line as each prediction is generated.
+		local raw_blocks = {}
+		for b in (stripped .. "==="):gmatch("(.-)===") do
+			local clean = b:gsub("^%s+", ""):gsub("%s+$", "")
+			if clean ~= "" then table.insert(raw_blocks, clean) end
+		end
+		if #raw_blocks == 0 then table.insert(raw_blocks, stripped) end
+
+		-- Parse each block; apply the same noise gate as on_success; build stream preds
+		local stream_preds = {}
+		for _, block_text in ipairs(raw_blocks) do
+			local ok_b, pred_b = pcall(Parser.process_prediction, buffer, tail, block_text)
+			if ok_b and pred_b and not is_noise_pred(pred_b.to_type) then
+				local display = (type(pred_b.nw) == "string" and pred_b.nw ~= "" and pred_b.nw)
+					or pred_b.to_type
+				if display and display:gsub("%s", "") ~= "" then
+					table.insert(stream_preds, {
+						to_type              = pred_b.to_type,
+						deletes              = pred_b.deletes,
+						chunks               = {},
+						nw                   = display,
+						has_corrections      = false,
+						disable_bold         = true,
+						_is_stream_placeholder = true,
+					})
+				end
+			end
+		end
+		if #stream_preds == 0 then return end
+
+		-- Preserve finalized predictions (non-placeholder) so earlier variants stay in
+		-- their slots while later ones are still streaming
+		local new_preds = {}
+		for _, p in ipairs(pending_predictions) do
+			if not p._is_stream_placeholder then
+				table.insert(new_preds, p)
+			end
+		end
+		-- Dedup stream preds against finalized and against each other so a duplicate
+		-- never appears as a separate slot (which would disappear at finalization)
+		local seen_to_type = {}
+		for _, fp in ipairs(new_preds) do
+			if fp.to_type and fp.to_type ~= "" then seen_to_type[fp.to_type] = true end
+		end
+		for _, sp in ipairs(stream_preds) do
+			local k = sp.to_type or ""
+			if k == "" or not seen_to_type[k] then
+				if k ~= "" then seen_to_type[k] = true end
+				table.insert(new_preds, sp)
+			end
+		end
+		pending_predictions = new_preds
 		predictions_visible = true
+		-- Keep cursor at its current position (or slot 1 at start); the streaming slot
+		-- is visible in its own slot but never forces the selection away from slot 1.
+		-- Always reserve num_preds slots with "…" for empty ones so the tooltip height
+		-- stays constant throughout generation instead of growing slot by slot.
+		local current = tooltip.get_current_index()
+		local display_idx = (current and math.min(math.max(1, current), #new_preds)) or 1
 		tooltip.show_predictions(
-			{ stream_pred }, 1, is_ai_preview_enabled, nil,
+			new_preds, display_idx, is_ai_preview_enabled, nil,
 			nil, prediction_indent, normalize_mods(navigation_mods),
-			tooltip.tint("ai_prediction"), "⌛ …", 1
+			tooltip.tint("ai_prediction"), "…", num_preds
 		)
 	end or nil
 
 	core_llm.fetch_llm_prediction(
 		buffer, tail, model_to_use, req_temperature, max_tokens, num_preds,
-		function(raw_predictions, elapsed_ms, is_final)
-			-- Suppress intermediate batches when streaming_multi is off — only show final
-			if not is_final and not is_streaming_multi_enabled then return end
+		function(raw_predictions, elapsed_ms, is_final, is_batch_progressive)
+			-- Suppress intermediate batches unless streaming_multi is on or this is a
+			-- batch progressive reveal (fetch_batch emits these for streaming=OFF mode so
+			-- each prediction appears complete one by one rather than all at once)
+			if not is_final and not is_streaming_multi_enabled and not is_batch_progressive then return end
 
 			-- Discard if a newer request superseded this one while we were waiting
 			if fetch_request_counter ~= my_fetch_id then
@@ -658,23 +726,9 @@ function M.perform_check(force_trigger, profile_name)
 				for k, v in pairs(raw_pred) do pred[k] = v end
 
 				if pred.to_type then
-					local text       = pred.to_type
-					local text_lower = text:lower()
-					local prev_char  = buffer:match(".*(%S)")
-					local first_ch   = text:match("^%s*(.)") or ""
-					local ends_sent  = prev_char and prev_char:match("[%.%!%?…:;]") ~= nil
+					local text = pred.to_type
 
-					-- Heuristic noise filter: discard common LLM hallucinations and artifacts
-					local is_noise = text_lower:match("^%s*suite%s+finale")
-						or text_lower:match("^%s*</")
-						or text_lower:match("^%s*vous avez besoin de plus")
-						or text_lower:match("^%s*vous etes les plus")
-						or (text_lower:match("^%s*vous%s") and not buffer:lower():match("vous"))
-						or (first_ch:match("[A-Z]") and not ends_sent)
-						or text:find(":", 1, true) ~= nil
-
-					if text:gsub("[%s%.…]", "") ~= ""
-						and not is_noise
+					if not is_noise_pred(text)
 						and tooltip.make_diff_styled(pred.chunks, pred.nw)
 					then
 						local key = build_dedup_key(pred)
@@ -686,22 +740,38 @@ function M.perform_check(force_trigger, profile_name)
 				end
 			end
 
-			-- ── Streaming merge: blend new batch with what is already on screen ──
-			-- Preserves predictions the user can see while progressively enriching the list
-			if predictions_visible and #pending_predictions > 0 then
-				local merged, merged_keys = {}, {}
-				for _, existing in ipairs(pending_predictions) do
-					local k = build_dedup_key(existing)
-					if k == "" or not merged_keys[k] then
-						if k ~= "" then merged_keys[k] = true end
-						table.insert(merged, existing)
-					end
+			-- ── Evict streaming placeholders left by on_partial_cb ────────────────
+			-- on_partial_cb inserts _is_stream_placeholder entries so finalized slots
+			-- are preserved across streaming calls. Finalized results (arriving here)
+			-- always supersede them, so they must be removed before the merge to prevent
+			-- ghost entries from accumulating and causing slot-count jumps at the end.
+			for i = #pending_predictions, 1, -1 do
+				if pending_predictions[i] and pending_predictions[i]._is_stream_placeholder then
+					table.remove(pending_predictions, i)
 				end
+			end
+
+			-- ── Streaming merge: blend new batch with what is already on screen ──
+			-- valid_preds leads (authoritative order from backend); pending_predictions
+			-- fills in only what the new batch has not yet superseded, so already-visible
+			-- slots stay occupied while remaining variants are still loading.
+			-- Skipped on the final batch so streaming placeholders are always fully replaced.
+			if not is_final and predictions_visible and #pending_predictions > 0 then
+				local merged, merged_keys = {}, {}
+				-- New batch first — defines order and replaces any streaming placeholders
 				for _, new_pred in ipairs(valid_preds) do
 					local k = build_dedup_key(new_pred)
 					if k == "" or not merged_keys[k] then
 						if k ~= "" then merged_keys[k] = true end
 						table.insert(merged, new_pred)
+					end
+				end
+				-- Append still-pending items not yet in this batch (avoids empty slots)
+				for _, existing in ipairs(pending_predictions) do
+					local k = build_dedup_key(existing)
+					if k == "" or not merged_keys[k] then
+						if k ~= "" then merged_keys[k] = true end
+						table.insert(merged, existing)
 					end
 				end
 				valid_preds = merged

@@ -50,9 +50,9 @@ M.DEFAULT_STATE = {
 	-- Bridge behavioral flags (read by llm_bridge, overridden by menu_llm at startup)
 	llm_reset_on_nav      = true,
 	llm_after_hotstring   = false,
-	llm_auto_raise_temp   = false,  -- Incrementally raise temperature for each extra prediction
-	llm_streaming         = false,  -- Token-by-token streaming (disabled by default until validated)
-	llm_streaming_multi   = false,  -- Show predictions as they arrive in multi-pred sequential mode
+	llm_auto_raise_temp   = false, -- Incrementally raise temperature for each extra prediction
+	llm_streaming         = true,  -- Token-by-token streaming
+	llm_streaming_multi   = true,  -- Show predictions as they arrive when num_predictions > 1 (otherwise wait for all to complete before showing any)
 }
 
 -- Single source of truth for the streaming flag; backends receive it as a parameter
