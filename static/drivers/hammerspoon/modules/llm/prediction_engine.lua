@@ -594,7 +594,7 @@ function M.perform_check(force_trigger, profile_name)
 
 	-- When streaming is enabled, build a lightweight callback that renders partial tokens
 	-- as they arrive; the full parse pipeline still runs on the final complete result
-	local on_partial_cb = not is_streaming_enabled and nil or function(partial_raw)
+	local on_partial_cb = is_streaming_enabled and function(partial_raw)
 		-- Discard if superseded by a newer request
 		if fetch_request_counter ~= my_fetch_id then return end
 		if type(partial_raw) ~= "string" or partial_raw:gsub("%s", "") == "" then return end
@@ -611,7 +611,7 @@ function M.perform_check(force_trigger, profile_name)
 			nil, prediction_indent, normalize_mods(navigation_mods),
 			tooltip.tint("ai_prediction"), "⌛ …", 1
 		)
-	end
+	end or nil
 
 	core_llm.fetch_llm_prediction(
 		buffer, tail, model_to_use, req_temperature, max_tokens, num_preds,
