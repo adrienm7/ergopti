@@ -25,6 +25,31 @@ local RETRY_FAILED_PREDICTION_MAX_MULTIPLIER = 2
 
 -- M.is_thinking_model is injected by init.lua
 
+--- Sends a minimal 1-token inference to load model weights into GPU memory.
+--- Mirrors api_ollama.warmup() for the MLX backend.
+--- @param model_name string The MLX model identifier (not used in the request, logged only).
+function M.warmup(model_name)
+	Logger.debug(LOG, "Warming up MLX model '%s'…", tostring(model_name))
+	local ok, encoded = pcall(hs.json.encode, {
+		prompt      = " ",
+		max_tokens  = 1,
+		temperature = 0,
+	})
+	if not ok then return end
+	hs.http.asyncPost(
+		"http://127.0.0.1:8080/v1/completions",
+		encoded,
+		{ ["Content-Type"] = "application/json" },
+		function(status, _)
+			if status == 200 then
+				Logger.info(LOG, "MLX model '%s' warmed up — GPU cache ready.", tostring(model_name))
+			else
+				Logger.debug(LOG, "MLX warmup returned %s — model may not be loaded yet.", tostring(status))
+			end
+		end
+	)
+end
+
 
 
 

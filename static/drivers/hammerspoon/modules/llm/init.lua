@@ -117,13 +117,24 @@ function M.auto_detect_backend(callback)
 	end)
 end
 
---- Pre-warms API connections to reduce first-request latency (async, non-blocking).
+--- Pre-warms TCP connections to both backends (async, non-blocking).
+--- This establishes the loopback socket but does NOT load the model into GPU memory.
+--- Call warmup_model() separately once the model name is known.
 function M.warm_up_connections()
 	pcall(function()
-		-- Parallel async pings to backends (fire-and-forget)
+		-- Parallel async pings to both backends (fire-and-forget)
 		hs.http.asyncGet("http://127.0.0.1:11434/api/version", {}, function() end)
-		hs.http.asyncGet("http://127.0.0.1:8080/v1/models", {}, function() end)
+		hs.http.asyncGet("http://127.0.0.1:8080/v1/models",   {}, function() end)
 	end)
+end
+
+--- Sends a minimal 1-token inference request to pre-load model weights into GPU.
+--- Must be called after the model name is configured; the warmup runs async so
+--- it does not block the caller. Skip when LLM is disabled to avoid spurious requests.
+--- @param model_name string The backend-specific model identifier.
+function M.warmup_model(model_name)
+	if type(model_name) ~= "string" or model_name == "" then return end
+	pcall(function() get_api().warmup(model_name) end)
 end
 
 -- Defer backend detection entirely off the synchronous init path

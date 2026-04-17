@@ -38,6 +38,35 @@ end
 -- Deferred off the synchronous require path to avoid blocking Hammerspoon startup
 hs.timer.doAfter(0, function() pcall(ensure_ollama_running) end)
 
+--- Sends a minimal 1-token inference to load model weights into GPU memory.
+--- Called once after the model is configured; subsequent real requests then
+--- skip the cold-start penalty (typically 1–3 s for a 2B model on Apple Silicon).
+--- @param model_name string The Ollama model identifier to pre-load.
+function M.warmup(model_name)
+	if type(model_name) ~= "string" or model_name == "" then return end
+	Logger.debug(LOG, "Warming up model '%s'…", model_name)
+	local ok, encoded = pcall(hs.json.encode, {
+		model      = model_name,
+		messages   = { { role = "user", content = " " } },
+		stream     = false,
+		keep_alive = "30m",
+		options    = { num_predict = 1, temperature = 0 },
+	})
+	if not ok then return end
+	hs.http.asyncPost(
+		"http://127.0.0.1:11434/api/chat",
+		encoded,
+		{ ["Content-Type"] = "application/json" },
+		function(status, _)
+			if status == 200 then
+				Logger.info(LOG, "Model '%s' warmed up — GPU cache ready.", model_name)
+			else
+				Logger.debug(LOG, "Warmup request returned %s — model may not be loaded yet.", tostring(status))
+			end
+		end
+	)
+end
+
 
 
 
