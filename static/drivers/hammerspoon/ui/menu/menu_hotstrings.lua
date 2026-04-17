@@ -495,6 +495,10 @@ function M.build_management(ctx)
 
 	local delay_menu = {}
 	local function make_delay_item(title, key, default_val, is_base)
+		if type(default_val) ~= "number" then
+			Logger.error(LOG, "make_delay_item(): default_val nil for '%s' — keymap.DELAYS_DEFAULT may be outdated.", title)
+			return { title = title .. " : (valeur manquante)", disabled = true }
+		end
 		local cur_val = is_base and state.expansion_delay or (state.delays[key] or default_val)
 		local cur_ms = math.floor(cur_val * 1000 + 0.5)
 		local def_ms = math.floor(default_val * 1000 + 0.5)

@@ -70,6 +70,7 @@ local menu               = require("ui.menu")
 local hotstring_editor   = require("ui.hotstring_editor")
 local mlx_deps_checker   = require("lib.mlx_deps_checker")
 local notifications      = require("lib.notifications")
+local ui_restore         = require("lib.ui_restore")
 
 
 
@@ -304,6 +305,15 @@ Logger.info(LOG, "User interface initialized successfully.")
 
 
 
+-- =======================================
+-- ===== 6.1) Post-reload UI Restore =====
+-- =======================================
+
+-- Reopen any UIs that were open before the last file-watcher-triggered reload
+ui_restore.restore()
+
+
+
 
 
 -- ================================
@@ -321,8 +331,13 @@ do
 	local function schedule_reload(msg)
 		if reload_timer then reload_timer:stop() end
 		reload_timer = hs.timer.doAfter(0.5, function()
-			pcall(notifications.notify, "Hammerspoon", msg or "Fichiers modifiés — rechargement…")
-			hs.reload()
+			ui_restore.defer_reload(function()
+				-- snapshot() is a safety net for any UI still open at reload time;
+				-- under normal deferral they are already closed so it saves nothing
+				ui_restore.snapshot()
+				pcall(notifications.notify, "Hammerspoon", msg or "Fichiers modifiés — rechargement…")
+				hs.reload()
+			end)
 		end)
 	end
 
@@ -344,7 +359,8 @@ do
 	dir_watcher:start()
 	table.insert(_G.script_watchers, dir_watcher)
 
-	-- Catches modifications on Lua and UI scripts (HTML, JS, CSS) for auto-reload
+	-- HTML/CSS/JS are webview assets loaded at open-time — only .lua changes
+	-- drive Hammerspoon runtime behavior and warrant a reload
 	Logger.debug(LOG, "Configuring file watchers for auto-reloading…")
 	local project_watcher = hs.pathwatcher.new(base_dir, function(paths)
 		for _, p in ipairs(paths) do
@@ -352,8 +368,9 @@ do
 			if p:find("^/tmp/") or p:find("hs_hf_token_") or p:find("hs_hf_login_") then
 				return
 			end
-			if p:match("%.lua$") or p:match("%.html$") or p:match("%.css$") or p:match("%.js$") then
-				schedule_reload("Interface ou script modifié — rechargement…")
+			if p:match("%.lua$") then
+				Logger.debug(LOG, "Lua file change detected: %s", p)
+				schedule_reload("Script modifié — rechargement…")
 				return
 			end
 		end
