@@ -320,11 +320,14 @@ function M.resolve_prediction_overlap(buffer, pred_deletes, pred_to_type)
 		-- When the original prediction started with a space and we trimmed it,
 		-- restore that space only if the context before the overlap has no space —
 		-- otherwise we would produce a double space.
+		-- Also skip restoration when the entire buffer is consumed by the overlap
+		-- (buffer_before_overlap would be empty, meaning there's no preceding context
+		-- that could need a separator).
 		local orig_starts_with_space = pred_to_type:match("^[%s\194\160\226\128\175]") ~= nil
 		if orig_starts_with_space then
 			local buffer_before_overlap = text_utils.utf8_sub(buf_str, 1, cb_len - best_overlap)
 			local ends_with_space       = buffer_before_overlap:match("[%s\194\160\226\128\175]$") ~= nil
-			if not ends_with_space then
+			if not ends_with_space and buffer_before_overlap ~= "" then
 				to_type = " " .. to_type
 			end
 		end
@@ -334,32 +337,28 @@ function M.resolve_prediction_overlap(buffer, pred_deletes, pred_to_type)
 		to_type = pred_to_type
 	end
 
-	-- Fix spacing at the join point: prevent double-spaces and missing spaces.
+	-- Fix spacing at the join point: remove double-spaces only.
+	-- Space insertion is the parser's responsibility — we must not add spaces here
+	-- or mid-word completions (e.g. "attentio" + "n suite") would get a spurious
+	-- space inserted before the continuation character.
 	if deletes == 0 and to_type ~= "" then
 		local b_last  = text_utils.utf8_sub(buf_str, -1)
 		local p_first = text_utils.utf8_sub(to_type, 1, 1)
 
-		-- Characters after which no separator is needed before the prediction:
+		-- Characters after which a leading space on the prediction is redundant:
 		-- whitespace, apostrophes (contractions: "l'idée"), hyphens (compound
 		-- words: "anti-spam"), opening brackets (don't insert space inside them).
 		local ends_no_sep = b_last:match("[%s''%-%(%[]")
 			or b_last == "\194\160" or b_last == "\226\128\175"
 
-		-- Prediction starts with whitespace — used to detect and remove double-spaces.
+		-- Prediction starts with whitespace — detect to remove double-spaces.
 		local starts_with_space = p_first:match("[%s]")
 			or p_first == "\194\160" or p_first == "\226\128\175"
 
-		-- Prediction starts with a character that must not be preceded by a regular
-		-- space: closing punctuation, hyphen (compound continuation), slash (paths).
-		local starts_no_sep = p_first:match("[.,;:%?!'\"%)%]%-%/]")
-
 		if ends_no_sep and starts_with_space then
-			-- Remove the leading space from the prediction to avoid double-space
-			-- (or unwanted space after a hyphen, apostrophe, etc.).
+			-- Strip the leading space to avoid double-space (or unwanted space after
+			-- a hyphen, apostrophe, etc.).
 			to_type = to_type:gsub("^[%s\194\160\226\128\175]+", "")
-		elseif not ends_no_sep and not starts_with_space and not starts_no_sep then
-			-- Insert a separating space between the buffer word and the completion.
-			to_type = " " .. to_type
 		end
 	end
 

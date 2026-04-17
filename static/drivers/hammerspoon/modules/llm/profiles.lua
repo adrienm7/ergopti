@@ -70,6 +70,12 @@ PREFIX: "def calculate_total(price, tax):"
 TAIL: "def calculate_total(price, tax):"
 TAIL_CORRECTED: def calculate_total(price, tax):
 NEXT_WORDS: return price * (1 + tax)
+
+Exemple 6 (Complétion en milieu de mot) :
+PREFIX: "Je fais très attentio"
+TAIL: "fais très attentio"
+TAIL_CORRECTED: fais très attention
+NEXT_WORDS: à ce que tu dis.
 ]]
 
 --- Generates a batch prompt for multiple predictions.
