@@ -28,6 +28,12 @@ local LOG    = "llm.parser"
 -- =======================================
 -- =======================================
 
+-- U+00A0: used before ":" in French typography
+local NBSP  = "\194\160"
+-- U+202F: used before "?", "!", ";" in French typography
+local NNBSP = "\226\128\175"
+
+
 --- Normalizes macOS NFD characters (decomposed) into standard NFC characters.
 --- @param s string The input string from the macOS buffer.
 --- @return string The normalized string.
@@ -50,6 +56,26 @@ local function normalize_nfd(s)
 	for nfd, nfc in pairs(nfd_map) do
 		s = s:gsub(nfd, nfc)
 	end
+	return s
+end
+
+--- Applies French typographic conventions to predicted output text.
+--- Converts straight apostrophes and replaces regular spaces before
+--- punctuation with the correct non-breaking space variant.
+--- @param s string The raw predicted string.
+--- @return string The typographically corrected string.
+local function apply_french_typography(s)
+	if type(s) ~= "string" then return s end
+	-- Straight apostrophe → typographic apostrophe
+	s = s:gsub("'", "\226\128\153")
+	-- Space before ?, !, ; → narrow no-break space (NNBSP)
+	s = s:gsub(" ([?!;])", NNBSP .. "%1")
+	-- Space before : → non-breaking space (NBSP)
+	s = s:gsub(" :", NBSP .. ":")
+	-- Space after opening guillemet → non-breaking space
+	s = s:gsub("\194\171 ", "\194\171" .. NBSP)
+	-- Space before closing guillemet → non-breaking space
+	s = s:gsub(" \194\187", NBSP .. "\194\187")
 	return s
 end
 
@@ -348,8 +374,8 @@ function M.process_prediction(full_text, tail_text, block)
 		tc = trim(tc:gsub("%s*%]$", ""):gsub("^\"", ""):gsub("\"$", ""))
 		nw = trim(nw:gsub("%s*%]$", ""):gsub("^\"", ""):gsub("\"$", ""))
 		
-		tc = tc:gsub("'", "’")
-		nw = nw:gsub("'", "’")
+		tc = apply_french_typography(tc)
+		nw = apply_french_typography(nw)
 		nw = nw:gsub("^[%s%.…]+", ""):gsub("[%s%.…]+$", "")
 
 		nw = enforce_word_limits(nw, max_w)
@@ -674,8 +700,8 @@ function M.process_prediction(full_text, tail_text, block)
 		nw = nw:gsub("^[Ss]uite%s+[Ff]inale%s*[:%.%-]*%s*", "")
 		nw = nw:gsub("^[-•*]+%s*", "")
 		nw = nw:gsub("^[%s%.…]+", ""):gsub("[%s%.…]+$", "")
-		nw = nw:gsub("'", "’")
-		
+		nw = apply_french_typography(nw)
+
 		if nw:find("www%.") or nw:find("http") or nw:find("</") then return nil end
 		
 		local full_words = {}
