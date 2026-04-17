@@ -57,6 +57,7 @@ local KEYCODE_DIGITS = {
 
 local KEYCODE_RETURN    = 36   -- Main Return key (accepts the active prediction)
 local KEYCODE_ENTER     = 76   -- Numpad Enter (same behaviour as Return)
+local KEYCODE_TAB       = 48   -- Tab: fast-accepts prediction #1 and stops all streaming
 local KEYCODE_ARROW_MIN = 123  -- Lowest arrow keycode (left arrow)
 local KEYCODE_ARROW_MAX = 126  -- Highest arrow keycode (up arrow); range covers all four
 
@@ -522,6 +523,15 @@ function M.handle_llm_keys(keyCode, flags, is_ignored)
 			engine.navigate(delta)
 			return true
 		end
+	end
+
+	-- Tab immediately accepts prediction #1, cancelling any in-flight streaming for
+	-- the other slots. This lets the user grab the first result as soon as it appears
+	-- without waiting for all parallel predictions to complete.
+	if keyCode == KEYCODE_TAB then
+		Logger.debug(LOG, "Tab — fast-accepting prediction #1.")
+		if not M.apply_prediction(1) then M.reset_predictions() end
+		return true
 	end
 
 	-- Return / Enter accepts the currently highlighted prediction.

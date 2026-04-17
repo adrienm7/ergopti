@@ -501,7 +501,9 @@ local function onKeyDownRaw(e)
 		if run_trigger_checks() then return true end
 	end
 
-	-- Enter / Tab after a plain keystroke clears prediction state.
+	-- Enter / Tab with no predictions visible clears prediction state.
+	-- When predictions ARE visible, Tab is consumed upstream by handle_llm_keys
+	-- (fast-accepts pred #1) and never reaches this point.
 	if keyCode == 36 or keyCode == 48 then
 		LLMBridge.check_nav_reset()
 	end
