@@ -118,7 +118,10 @@ local function clean_model_output(text)
 	text = text:gsub("%[[Nn][Ee][Xx][Tt]_[Ww][Oo][Rr][Dd][Ss]%]", "NEXT_WORDS:")
 	text = text:gsub("[Tt][Aa][Ii][Ll]_[Cc][Oo][Rr][Rr][Ee][Cc][Tt][Ee][Dd]%s*:", "TAIL_CORRECTED:")
 	text = text:gsub("[Nn][Ee][Xx][Tt]_[Ww][Oo][Rr][Dd][Ss]%s*:", "NEXT_WORDS:")
-	
+	-- Qwen 3.5 sometimes abbreviates "NEXT_WORDS:" to just "NEXT:" — normalize it
+	-- Pattern: line-start (after newline) followed by "NEXT" + optional space + colon
+	text = text:gsub("(\n)([Nn][Ee][Xx][Tt])%s*:", "%1NEXT_WORDS:")
+
 	return text
 end
 
@@ -670,12 +673,19 @@ function M.process_prediction(full_text, tail_text, block)
 				break
 			end
 		end
-		if only_equals then 
-			chunks = {} 
-			-- Protect against silent deletion if there are no visible corrections
+		if only_equals then
+			chunks = {}
+			-- Protect against silent deletion if there are no visible corrections.
+			-- Allow small deletions (≤ 10 chars) when the model appended valid content —
+			-- these are alignment artifacts from TAIL_CORRECTED extending slightly beyond
+			-- the original tail (e.g. model adds a word the user hasn't typed yet)
 			if true_deletes > 0 then
-				Logger.warn(LOG, string.format("Safety trip: Blocked silent deletion of %d chars due to orphaned gray chunks.", true_deletes))
-				return nil
+				local appended_len = utils.utf8_len(true_to_type)
+				if true_deletes > 10 or appended_len == 0 then
+					Logger.warn(LOG, string.format("Safety trip: Blocked silent deletion of %d chars due to orphaned gray chunks.", true_deletes))
+					return nil
+				end
+				Logger.debug(LOG, string.format("Minor alignment shift (%d del, %d append) — allowed.", true_deletes, appended_len))
 			end
 		end
 		

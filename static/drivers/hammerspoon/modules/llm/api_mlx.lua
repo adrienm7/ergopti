@@ -67,7 +67,7 @@ function M.warmup(model_name, profile)
 		         :gsub("{max_words}", "5")
 		         :gsub("{n}", "1")
 
-		local is_advanced  = sys:find("RÈGLES CRITIQUES", 1, true) ~= nil
+		local is_advanced  = sys:find("TAIL_CORRECTED", 1, true) ~= nil
 		local uses_pf_tail = sys:find("PREFIX") and sys:find("TAIL")
 
 		if is_advanced or uses_pf_tail then
@@ -159,7 +159,7 @@ end
 
 -- Builds the options payload for the OpenAI API format (MLX Server) - optimized
 local STOP_BASE_MLX  = { "<|eot_id|>", "<|im_end|>", "[/INST]", "PREFIX:" }
-local STOP_LINE_MLX  = { "<|eot_id|>", "<|im_end|>", "[/INST]", "PREFIX:", "\n\n", "\n", "\r", "</", "Suite finale", "SUITE", "NEXT_WORDS:" }
+local STOP_LINE_MLX  = { "<|eot_id|>", "<|im_end|>", "[/INST]", "PREFIX:", "\n\n", "</", "Suite finale", "SUITE", "NEXT_WORDS:" }
 
 local function build_options(temperature, num_predict_tokens, is_batch, line_mode)
     local opts = {
@@ -221,7 +221,7 @@ local function post_and_parse(model_name, system_prompt, full_text, tail_text,
     local t0_req = hs.timer.secondsSinceEpoch()
 
     -- Advanced mode is only the strict correction profile
-    local is_advanced_prompt = type(final_sys) == "string" and final_sys:find("RÈGLES CRITIQUES", 1, true) ~= nil
+    local is_advanced_prompt = type(final_sys) == "string" and final_sys:find("TAIL_CORRECTED", 1, true) ~= nil
     local line_mode = (force_line_mode == true) or ((not is_batch) and (not is_advanced_prompt))
 
     local opts = build_options(temperature, num_predict_tokens, is_batch, line_mode)
@@ -240,7 +240,7 @@ local function post_and_parse(model_name, system_prompt, full_text, tail_text,
             stream      = false,
             temperature = opts.temperature,
             max_tokens  = tonumber(opts.max_tokens) or 50,
-            stop        = { "\n", "\r", "</", "\"", "- " }
+            stop        = { "\n\n", "</", "\"", "- " }
         }
     else
         payload = {
@@ -409,7 +409,7 @@ local function post_and_parse_streaming(model_name, system_prompt, full_text, ta
 		merged_prompt = final_sys .. "\n\n" .. (user_prompt or "")
 	end
 
-	local is_advanced_prompt = type(final_sys) == "string" and final_sys:find("RÈGLES CRITIQUES", 1, true) ~= nil
+	local is_advanced_prompt = type(final_sys) == "string" and final_sys:find("TAIL_CORRECTED", 1, true) ~= nil
 	local line_mode = (not is_batch) and (not is_advanced_prompt)
 	local opts = build_options(temperature, num_predict_tokens, is_batch, line_mode)
 
@@ -424,7 +424,7 @@ local function post_and_parse_streaming(model_name, system_prompt, full_text, ta
 			stream      = true,
 			temperature = opts.temperature,
 			max_tokens  = tonumber(opts.max_tokens) or 50,
-			stop        = { "\n", "\r", "</", "\"", "- " },
+			stop        = { "\n\n", "</", "\"", "- " },
 		}
 	else
 		prompt_preview = merged_prompt
@@ -508,6 +508,14 @@ local function post_and_parse_streaming(model_name, system_prompt, full_text, ta
 			model_name, req_id, tostring(exit_code),
 			(remaining and #remaining or -1),
 			tostring((stderr_out or ""):sub(1, 200)))
+
+		-- SIGTERM (15) means a newer request killed this stream intentionally —
+		-- skip callbacks entirely to prevent the retry chain from cascading
+		if exit_code == 15 then
+			Logger.debug(LOG, "[%s] #%d STREAM: terminated by newer request — no callbacks.", model_name, req_id)
+			return
+		end
+
 		if remaining and remaining ~= "" then
 			line_buf = line_buf .. remaining
 			flush_lines()
@@ -736,7 +744,7 @@ function M.fetch_sequential(full_text, tail_text, model_name, temperature,
 				function()
 					if attempt < 2 then
 						local retry_tokens = tokens + 5
-						local retry_temp   = math.min(1.30, (tonumber(temp) or 0.1) + 0.18)
+						local retry_temp   = math.min(0.60, (tonumber(temp) or 0.1) + 0.10)
 						Logger.debug(LOG, "[%s] Variant %d/%d quick chat retry: tokens=%d temp=%.2f",
 							model_name, variant_index, max_attempts, retry_tokens, retry_temp)
 						-- Retry does not stream partial updates (would overwrite the growing preview)

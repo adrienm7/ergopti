@@ -32,46 +32,29 @@ C’EST UNE OBLIGATION ABSOLUE : Tu DOIS générer AU MINIMUM {min_words} mots e
 N’ajoute aucune explication, aucun commentaire, aucune liste, aucune puce, aucun guillemet, aucune reformulation du contexte.
 Retourne uniquement les mots à ajouter.]]
 
-local ADVANCED_PROMPT_SINGLE = [[Tu es un moteur strict de correction et de complétion de texte.
-RÈGLES CRITIQUES :
-1. Tu reçois un PREFIX (le contexte complet) et un TAIL (les ~5 à 7 derniers mots).
-2. Format : Deux lignes commençant par "TAIL_CORRECTED:" et "NEXT_WORDS:".
-3. TAIL_CORRECTED : Corrige l’orthographe, la grammaire et les accents UNIQUEMENT dans le TAIL. Ne modifie pas le sens. S’il n’y a pas de faute, recopie le TAIL EXACTEMENT à l’identique sans rien changer.
-4. NEXT_WORDS : Prédis STRICTEMENT la suite pour continuer la phrase de façon logique. OBLIGATION ABSOLUE : Tu DOIS générer AU MINIMUM {min_words} mots et AU MAXIMUM {max_words} mots. Laisse vide si la phrase est terminée. Ne dépasse JAMAIS la limite.
+-- Universal prompt: English instructions for cross-model reliability, minimal
+-- examples to reduce token overhead for small models (Qwen 3.5-4B, etc.)
+local ADVANCED_PROMPT_SINGLE = [[You are a text correction and completion engine.
+You receive PREFIX (full context) and TAIL (last few words).
+Reply with exactly two lines — nothing else:
+TAIL_CORRECTED: <corrected tail>
+NEXT_WORDS: <continuation>
 
-EXEMPLES :
+Rules:
+- TAIL_CORRECTED: fix spelling/grammar in TAIL only. If already correct, copy it exactly unchanged.
+- NEXT_WORDS: natural continuation, between {min_words} and {max_words} words. Empty if the sentence is complete.
+- No explanations, no markdown, no quotes.
 
-Exemple 1 (Correction Grammaticale) :
-PREFIX: "Il est aller à Paris"
-TAIL: "est aller à Paris"
-TAIL_CORRECTED: est allé à Paris
-NEXT_WORDS: 
-
-Exemple 2 (Correction + Prédiction) :
 PREFIX: "Je vous envoit ce mail pour vous dir"
 TAIL: "envoit ce mail pour vous dir"
 TAIL_CORRECTED: envoie ce mail pour vous dire
 NEXT_WORDS: que tout est prêt.
 
-Exemple 3 (Aucune Correction + Courte Prédiction) :
 PREFIX: "Salut, comment ça"
 TAIL: "Salut, comment ça"
 TAIL_CORRECTED: Salut, comment ça
 NEXT_WORDS: va ?
 
-Exemple 4 (Aucune Correction + Longue Prédiction) :
-PREFIX: "Je pense qu’il est important de"
-TAIL: "qu’il est important de"
-TAIL_CORRECTED: qu’il est important de
-NEXT_WORDS: prendre une décision rapidement.
-
-Exemple 5 (Code) :
-PREFIX: "def calculate_total(price, tax):"
-TAIL: "def calculate_total(price, tax):"
-TAIL_CORRECTED: def calculate_total(price, tax):
-NEXT_WORDS: return price * (1 + tax)
-
-Exemple 6 (Complétion en milieu de mot) :
 PREFIX: "Je fais très attentio"
 TAIL: "fais très attentio"
 TAIL_CORRECTED: fais très attention
@@ -83,19 +66,14 @@ NEXT_WORDS: à ce que tu dis.
 --- @return string The formatted prompt string.
 local function BATCH_ADVANCED_PROMPT(n)
 	return ADVANCED_PROMPT_SINGLE .. "\n\n" ..
-[[=========================================
-RÈGLE SPÉCIALE BATCH : Tu DOIS OBLIGATOIREMENT générer EXACTEMENT ]] .. tostring(n) .. [[ suites logiques différentes.
-Ne t’arrête SURTOUT PAS avant d’avoir donné les ]] .. tostring(n) .. [[ propositions.
-Sépare chaque proposition par `===`.
+[[BATCH MODE: Generate exactly ]] .. tostring(n) .. [[ different continuations.
+Separate each with `===`.
 
-Format strict à respecter scrupuleusement :
 TAIL_CORRECTED: <tail>
-NEXT_WORDS: <prédiction 1>
+NEXT_WORDS: <prediction 1>
 ===
 TAIL_CORRECTED: <tail>
-NEXT_WORDS: <prédiction 2>
-===
-(Continue ainsi jusqu’à la proposition ]] .. tostring(n) .. [[)
+NEXT_WORDS: <prediction 2>
 ===]]
 end
 

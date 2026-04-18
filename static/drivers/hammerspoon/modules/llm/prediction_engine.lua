@@ -63,15 +63,51 @@ local TOKEN_BUDGET_OVERHEAD = 10   -- Fixed overhead appended to the computed to
 
 local TEMP_DIVERSITY_CAP      = 1.0  -- Upper bound when auto_raise_temperature is active
 local TEMP_INCREMENT_PER_PRED = 0.1  -- Temperature step per extra prediction requested (+0.1 each)
+-- Greedy threshold: if num_predictions == 1 and temperature is at or below this value,
+-- force temperature → 0 (pure greedy). Avoids sampling noise with no diversity benefit.
+local GREEDY_TEMP_THRESHOLD   = 0.15
+
+-- ── Context truncation ───────────────────────────────────────────────────────
+
+-- Dynamic context cap: limit the context forwarded to the LLM proportionally to the
+-- max prediction length. Short predictions don't need 500 chars of history; reducing
+-- the context shrinks the prefill token count and cuts TTFT proportionally.
+local CONTEXT_CHARS_PER_WORD = 40   -- Chars of context allocated per predicted output word
+local CONTEXT_MIN_CHARS      = 100  -- Hard floor: always keep at least this many chars
 
 -- ── UI / display parameters ───────────────────────────────────────────────────
 
 local SPINNER_FPS = 6  -- Frames per second for the streaming progress spinner
 
+-- ── Adaptive debounce ─────────────────────────────────────────────────────────
+-- Adjust the inactivity delay based on live WPM so the timer fires sooner
+-- when the user is thinking and later when they are actively typing.
+
+local FAST_TYPING_WPM    = 55   -- Above this WPM, extend debounce (user still mid-burst)
+local SLOW_TYPING_WPM    = 20   -- Below this WPM, shorten debounce (user paused to think)
+local DEBOUNCE_FAST_MULT = 1.5  -- Multiplier applied when WPM is above FAST_TYPING_WPM
+local DEBOUNCE_SLOW_MULT = 0.5  -- Multiplier applied when WPM is below SLOW_TYPING_WPM
+-- Hard floor / ceiling so extreme WPM values don't produce unusable delays
+local DEBOUNCE_MIN_SEC   = 0.05
+local DEBOUNCE_MAX_SEC   = 0.6
+
+-- ── N-gram instant prediction ─────────────────────────────────────────────────
+-- Show a local word-bigram prediction immediately (< 1 ms) while the LLM warms up.
+-- Replaced in-place when the LLM response arrives, so the user always sees something.
+
+local NGRAM_MIN_COUNT = 2  -- Ignore words seen only once (noise / typos)
+local NGRAM_MAX_PREDS = 3  -- Maximum instant candidates to show before LLM responds
+
 -- ── Timing constants ──────────────────────────────────────────────────────────
 
 local STREAM_WATCHDOG_SEC = 12.0  -- Surface partial results after this many seconds of stream stall
 local CHAIN_FALLBACK_SEC  = 0.5   -- Fire chain LLM if the F20 signal is somehow missed
+
+-- ── Failure detection ─────────────────────────────────────────────────────────
+-- Track consecutive on_fail callbacks to surface a notification when failures are
+-- persistent — e.g. the MLX server crashed or is still loading weights.
+
+local CONSECUTIVE_FAIL_WARN_THRESHOLD = 4  -- Notify after this many consecutive failures without a success
 
 -- ── URL-bar / app exclusion ───────────────────────────────────────────────────
 
@@ -127,6 +163,15 @@ local fetch_request_counter = 0
 
 -- The last buffer+tail string sent to the LLM; prevents re-sending unchanged input
 local last_buffer_signature = nil
+
+-- Length of the buffer at the time of the last LLM request; used by the adaptive
+-- debounce to detect ongoing corrections (shrinking buffer = user still deleting)
+local _last_request_buffer_len = 0
+
+-- Consecutive on_fail callbacks without an intervening on_success.
+-- Reset on every successful response; triggers a user notification when it reaches
+-- CONSECUTIVE_FAIL_WARN_THRESHOLD (persistent failures → server issue or misconfiguration).
+local _consecutive_llm_failures = 0
 
 -- ── Timers ────────────────────────────────────────────────────────────────────
 
@@ -490,16 +535,41 @@ local function reset_llm_dismiss_timer()
 	Logger.debug(LOG, "LLM dismiss timer reset (delay: %gs).", delay)
 end
 
+--- Computes an adaptive debounce delay based on the user's current typing speed.
+--- Fast typing → extend delay (prediction would be stale before it arrives).
+--- Slow/paused → shorten delay (user is thinking, fire sooner).
+--- If the buffer shrank since the last request, the user is still correcting —
+--- keep the full configured delay to avoid sending a broken intermediate state.
+--- @return number The debounce delay in seconds to use for this timer start.
+local function compute_adaptive_debounce()
+	-- Correction guard: never reduce delay while the user is still deleting
+	local cur_len = (_state and type(_state.buffer) == "string") and #_state.buffer or 0
+	if cur_len < _last_request_buffer_len then
+		return inactivity_debounce_sec
+	end
+
+	local ok, stats = pcall(keylogger.get_live_stats)
+	local wpm = (ok and type(stats) == "table") and (tonumber(stats.wpm_physical) or 0) or 0
+
+	if wpm > FAST_TYPING_WPM then
+		return math.min(inactivity_debounce_sec * DEBOUNCE_FAST_MULT, DEBOUNCE_MAX_SEC)
+	elseif wpm > 0 and wpm < SLOW_TYPING_WPM then
+		return math.max(inactivity_debounce_sec * DEBOUNCE_SLOW_MULT, DEBOUNCE_MIN_SEC)
+	end
+	return inactivity_debounce_sec
+end
+
 --- Arms the inactivity debounce timer to fire perform_check() after silence.
---- @param delay_override number|nil Override in seconds; uses inactivity_debounce_sec if nil.
+--- @param delay_override number|nil Override in seconds; uses adaptive debounce if nil.
 local function start_inactivity_timer(delay_override)
 	if not is_llm_enabled or inactivity_debounce_sec < 0 or not _inactivity_timer then return end
 	if delay_override then
 		_inactivity_timer:start(delay_override)
 		Logger.trace(LOG, "Inactivity timer started (override: %.3fs).", delay_override)
 	else
-		_inactivity_timer:start()
-		Logger.trace(LOG, "Inactivity timer started (%.3fs).", inactivity_debounce_sec)
+		local delay = compute_adaptive_debounce()
+		_inactivity_timer:start(delay)
+		Logger.trace(LOG, "Inactivity timer started (adaptive: %.3fs).", delay)
 	end
 end
 
@@ -652,6 +722,86 @@ end
 -- ============================================
 -- ============================================
 
+
+--- Returns instant next-word candidates from the keylogger's in-memory word-bigram
+--- index, without any network call. Results are shown immediately while the LLM warms
+--- up and replaced in-place when the real response arrives.
+---
+--- Strategy:
+---   1. Extract the last complete word from the buffer (requires buffer to end with a
+---      word separator — no prediction at mid-word since the partial word constrains the
+---      result space better than bigrams do).
+---   2. Scan every app's w_bg (word-bigram) table for entries of the form "lastword X".
+---   3. Sort by frequency, deduplicate, cap at NGRAM_MAX_PREDS.
+---
+--- @param buffer string The current tracked context buffer.
+--- @return table Array of placeholder prediction objects (same shape as LLM predictions).
+local function ngram_predict(buffer)
+	-- Only meaningful at word boundaries — mid-word completion is the LLM's job
+	if not buffer:match("%s$") then return {} end
+
+	-- Extract the last completed word (skip trailing whitespace)
+	local last_word = buffer:match("(%S+)%s+$")
+	if not last_word or last_word == "" then return {} end
+	last_word = last_word:lower()
+
+	local ok_idx, today_idx = pcall(keylogger.get_ngram_index)
+	if not ok_idx or type(today_idx) ~= "table" then return {} end
+
+	-- Aggregate counts across all apps — more data = better signal, and the
+	-- prediction engine already has the per-app LLM exclusion layer above
+	local counts = {}
+	local prefix = last_word .. " "
+	for _, app_idx in pairs(today_idx) do
+		local w_bg = type(app_idx) == "table" and app_idx.w_bg
+		if type(w_bg) == "table" then
+			for key, entry in pairs(w_bg) do
+				if key:sub(1, #prefix) == prefix and type(entry) == "table" then
+					local next_word = key:sub(#prefix + 1)
+					if next_word ~= "" then
+						counts[next_word] = (counts[next_word] or 0) + (entry.c or 0)
+					end
+				end
+			end
+		end
+	end
+
+	-- Collect candidates above the noise floor
+	local candidates = {}
+	for word, count in pairs(counts) do
+		if count >= NGRAM_MIN_COUNT then
+			table.insert(candidates, { word = word, count = count })
+		end
+	end
+	if #candidates == 0 then return {} end
+
+	table.sort(candidates, function(a, b) return a.count > b.count end)
+
+	local result = {}
+	local seen   = {}
+	for _, c in ipairs(candidates) do
+		if not seen[c.word] and #result < NGRAM_MAX_PREDS then
+			seen[c.word] = true
+			-- Prediction appends a space + word after the cursor (no deletions needed)
+			table.insert(result, {
+				to_type              = " " .. c.word,
+				deletes              = 0,
+				chunks               = {},
+				nw                   = c.word,
+				has_corrections      = false,
+				disable_bold         = true,
+				-- Treated as a stream-placeholder so on_partial_cb and on_success
+				-- both evict it cleanly when real LLM tokens arrive
+				_is_stream_placeholder = true,
+			})
+		end
+	end
+
+	Logger.debug(LOG, "N-gram instant prediction: %d candidate(s) for '%s'.", #result, last_word)
+	return result
+end
+
+
 --- Runs the full LLM prediction pipeline against the current buffer state.
 ---
 --- Execution flow:
@@ -707,7 +857,31 @@ function M.perform_check(force_trigger, profile_name)
 		Logger.debug(LOG, "Buffer unchanged — LLM request skipped (freshness).")
 		return
 	end
-	last_buffer_signature = signature
+	last_buffer_signature    = signature
+	_last_request_buffer_len = #buffer
+
+	-- Pre-build a model/backend info bar for use during streaming and n-gram display.
+	-- elapsed_ms is omitted here (stream not yet complete); on_success will replace this
+	-- with the version that includes round-trip latency once the final batch arrives.
+	local active_profile_now   = core_llm.get_active_profile()
+	local display_profile_now  = profile_name or (active_profile_now and active_profile_now.label)
+	local streaming_info_bar   = show_info_bar
+		and build_info_bar_text(llm_display_name or core_llm.get_current_model(), nil, resolve_backend_label(), display_profile_now)
+		or nil
+
+	-- N-gram instant prediction (#4): show a local word-bigram candidate immediately
+	-- (< 1 ms) while the async LLM request is in flight. It is a stream-placeholder so
+	-- it gets evicted cleanly when the first streaming token or final on_success arrives.
+	local ngram_preds = ngram_predict(buffer)
+	if #ngram_preds > 0 then
+		pending_predictions = ngram_preds
+		predictions_visible = true
+		tooltip.show_predictions(
+			ngram_preds, 1, is_ai_preview_enabled, streaming_info_bar,
+			nil, prediction_indent, normalize_mods(navigation_mods),
+			tooltip.tint("ai_prediction"), "…", math.max(#ngram_preds, num_predictions)
+		)
+	end
 
 	-- Build request parameters
 	local model_to_use    = core_llm.get_current_model()
@@ -727,12 +901,43 @@ function M.perform_check(force_trigger, profile_name)
 		Logger.debug(LOG, "Temperature raised to %.2f for %d predictions.", req_temperature, num_preds)
 	end
 
+	-- Greedy decoding for single prediction: with only one variant requested, sampling
+	-- adds noise without any diversity benefit — forcing temp=0 enables deterministic
+	-- greedy decoding and avoids the softmax+sample step on the backend.
+	if num_preds == 1 and not auto_raise_temperature and req_temperature <= GREEDY_TEMP_THRESHOLD then
+		req_temperature = 0
+		Logger.debug(LOG, "Single prediction: greedy decoding applied (temp → 0).")
+	end
+
+	-- Dynamic context cap: keep only enough history to predict max_words output tokens.
+	-- Short predictions don't benefit from long context; trimming the prefix cuts prefill
+	-- time and reduces TTFT proportionally without affecting prediction quality.
+	local context_buffer
+	if max_words > 0 then
+		local effective_context_chars = math.min(
+			#buffer,
+			math.max(CONTEXT_MIN_CHARS, max_words * CONTEXT_CHARS_PER_WORD)
+		)
+		context_buffer = buffer:sub(-effective_context_chars)
+	else
+		context_buffer = buffer
+	end
+
 	Logger.start(LOG, "LLM request — model: '%s' | temp: %.2f | %d pred(s) | max tokens: %d.",
 		tostring(model_to_use), req_temperature, num_preds, max_tokens)
 
-	-- Persistent loading indicator: no idle timer, no interaction watchers — stays until
-	-- replaced in-place by show_predictions() so there is no blank gap between the two.
-	tooltip.show_loading("⏳ Génération en cours…", is_ai_preview_enabled, tooltip.tint("ai_loading"))
+	-- Loading indicator: only shown when nothing is already on screen (n-gram placeholder
+	-- or previous LLM predictions). Avoids the blank gap that the spinner creates —
+	-- existing content stays visible and is replaced in-place when new predictions arrive.
+	if not predictions_visible then
+		tooltip.show_loading("⏳ Génération en cours…", is_ai_preview_enabled, tooltip.tint("ai_loading"))
+	else
+		-- Mark any finalized predictions as placeholders so on_partial_cb evicts them
+		-- cleanly when streaming tokens start arriving, without needing to hide the tooltip.
+		for _, p in ipairs(pending_predictions) do
+			p._is_stream_placeholder = true
+		end
+	end
 
 	-- Bump counters to discard any in-flight callbacks that are now stale
 	llm_request_counter   = llm_request_counter + 1
@@ -847,16 +1052,21 @@ function M.perform_check(force_trigger, profile_name)
 		-- stays constant throughout generation instead of growing slot by slot.
 		local current = tooltip.get_current_index()
 		local display_idx = (current and math.min(math.max(1, current), #new_preds)) or 1
+		-- streaming_info_bar (no elapsed_ms yet) keeps the model label visible
+		-- while tokens arrive; on_success final will replace it with latency included
 		tooltip.show_predictions(
-			new_preds, display_idx, is_ai_preview_enabled, nil,
+			new_preds, display_idx, is_ai_preview_enabled, streaming_info_bar,
 			nil, prediction_indent, normalize_mods(navigation_mods),
 			tooltip.tint("ai_prediction"), "…", num_preds
 		)
 	end or nil
 
 	core_llm.fetch_llm_prediction(
-		buffer, tail, model_to_use, req_temperature, max_tokens, num_preds,
+		context_buffer, tail, model_to_use, req_temperature, max_tokens, num_preds,
 		function(raw_predictions, elapsed_ms, is_final, is_batch_progressive)
+			-- LLM responded — reset the persistent-failure counter regardless of content
+			_consecutive_llm_failures = 0
+
 			-- Suppress intermediate batches unless streaming_multi is on or this is a
 			-- batch progressive reveal (fetch_batch emits these for streaming=OFF mode so
 			-- each prediction appears complete one by one rather than all at once)
@@ -986,10 +1196,47 @@ function M.perform_check(force_trigger, profile_name)
 			if is_final then reset_llm_dismiss_timer() end
 		end,
 		function()
-			-- LLM failure callback: hide the loading indicator only if no predictions are shown yet
-			if fetch_request_counter == my_fetch_id and not predictions_visible then
-				Logger.error(LOG, "LLM request failed — loading indicator dismissed.")
+			if fetch_request_counter ~= my_fetch_id then return end
+
+			-- Track consecutive failures to detect persistent issues (e.g. server
+			-- crashed, still loading weights, or misconfigured endpoint)
+			_consecutive_llm_failures = _consecutive_llm_failures + 1
+			if _consecutive_llm_failures >= CONSECUTIVE_FAIL_WARN_THRESHOLD then
+				_consecutive_llm_failures = 0  -- Reset so the notification is not spammed
+				if core_llm.get_backend() == "mlx" then
+					Logger.warn(LOG, "Repeated MLX failures (%d consecutive) — server may be down or misconfigured.",
+						CONSECUTIVE_FAIL_WARN_THRESHOLD)
+					pcall(function()
+						hs.notify.new(nil, {
+							title            = "Prédictions LLM — Échecs répétés",
+							informativeText  = "Le serveur MLX ne répond pas. Vérifiez que le modèle est bien chargé et que le serveur tourne sur le port 8080.",
+							alwaysPresent    = false,
+							autoWithdraw     = true,
+						}):send()
+					end)
+				end
+			end
+
+			if not predictions_visible then
+				-- Nothing on screen: dismiss the loading spinner entirely.
+				-- WARN (not ERROR) so the notify module does not pop a system notification on every
+				-- failure — LLM failures are expected during warm-up or model loading.
+				Logger.warn(LOG, "LLM request failed — loading indicator dismissed.")
 				tooltip.hide()
+			else
+				-- N-gram (or prior) predictions are already on screen — the spinner "…"
+				-- placeholder is still in the last slot. Remove it so the tooltip looks
+				-- finalized and start the auto-dismiss countdown.
+				Logger.warn(LOG, "LLM request failed — n-gram placeholder retained, loading text cleared.")
+				local val_shortcut  = format_validation_shortcut(normalize_mods(validation_mods))
+				local nav_mods_norm = normalize_mods(navigation_mods)
+				local selected_idx  = math.max(1, tooltip.get_current_index() or 1)
+				tooltip.show_predictions(
+					pending_predictions, selected_idx, is_ai_preview_enabled, nil,
+					val_shortcut, prediction_indent, nav_mods_norm,
+					tooltip.tint("ai_prediction"), nil, #pending_predictions
+				)
+				reset_llm_dismiss_timer()
 			end
 		end,
 		sequential_mode, force_trigger, function() return fetch_request_counter end,
@@ -1007,11 +1254,12 @@ function M.reset()
 		keylogger.log_llm_dismissed(nil, pending_predictions)
 	end
 
-	pending_predictions   = {}
-	predictions_visible   = false
-	last_buffer_signature = nil
-	llm_request_counter   = llm_request_counter + 1
-	fetch_request_counter = fetch_request_counter + 1
+	pending_predictions        = {}
+	predictions_visible        = false
+	last_buffer_signature      = nil
+	llm_request_counter        = llm_request_counter + 1
+	fetch_request_counter      = fetch_request_counter + 1
+	_consecutive_llm_failures  = 0
 
 	tooltip.hide()
 	stop_inactivity_timer()
@@ -1104,8 +1352,12 @@ function M.start_timer_word_end()
 end
 
 --- Cancels the inactivity timer without firing the LLM check.
+--- Also terminates any in-flight streaming task: the GPU should not keep generating
+--- tokens for a request that is now stale. Without this, a new request queues behind
+--- the old curl process and the perceived TTFT is (old generation remaining) + (new TTFT).
 function M.stop_timer()
 	stop_inactivity_timer()
+	core_llm.cancel_streaming()
 end
 
 --- Consumes the F20 chain signal if a chain is pending.

@@ -1011,6 +1011,15 @@ function M.get_live_stats()
 	}
 end
 
+--- Exposes the in-memory today N-gram index for read-only access.
+--- Consumers (e.g. the LLM prediction engine) can use word-bigram data
+--- to surface instant local predictions without waiting for the LLM.
+--- The returned table is a live reference — callers must not mutate it.
+--- @return table The today_idx map keyed by app name.
+function M.get_ngram_index()
+	return CoreState.today_idx
+end
+
 --- Logs a hotstring expansion event.
 --- @param trigger string The typed trigger sequence.
 --- @param replacement string The expanded replacement text.
