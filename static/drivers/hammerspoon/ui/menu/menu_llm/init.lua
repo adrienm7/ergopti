@@ -479,24 +479,33 @@ function M.create(deps)
 
         Logger.debug(LOG, string.format("Recommended profile: %s (currently: %s)", rec_profile, cur_profile))
         if cur_profile ~= rec_profile then
-            local title = type(opts.dialog_title) == "string" and opts.dialog_title or "Changement de modèle"
-            Logger.debug(LOG, "Displaying profile suggestion dialog…")
-            pcall(hs.focus)
-            local msg = string.format(
-                "Modèle : %s\n%s\n\nPrompt actuel :\n%s\n\nPrompt conseillé :\n%s\n\nValider pour appliquer le prompt conseillé.",
-                display_model_name, power_desc, cur_label, rec_label
-            )
-            local ok, choice = pcall(hs.dialog.blockAlert, title, msg, "Valider", "Annuler", "informational")
-            Logger.debug(LOG, string.format("Dialog response: %s, choice=%s", tostring(ok), tostring(choice)))
-            if ok and choice == "Valider" then
-                Logger.info(LOG, string.format("Profile changed to %s (dialog accepted).", rec_profile))
+            -- Completion models have a single correct profile (no prompt wrapper at all).
+            -- Silently switch without prompting the user — no ambiguity, no decision to make.
+            if is_completion_model then
+                Logger.info(LOG, string.format("Completion model detected: silently switching profile %s → %s.", cur_profile, rec_profile))
                 state.llm_active_profile = rec_profile
                 llm_mod.set_active_profile(rec_profile)
                 save_prefs(); update_menu()
             else
-                Logger.info(LOG, string.format("Profile kept at %s (dialog refused).", cur_profile))
-                state.llm_active_profile = cur_profile
-                llm_mod.set_active_profile(cur_profile)
+                local title = type(opts.dialog_title) == "string" and opts.dialog_title or "Changement de modèle"
+                Logger.debug(LOG, "Displaying profile suggestion dialog…")
+                pcall(hs.focus)
+                local msg = string.format(
+                    "Modèle : %s\n%s\n\nPrompt actuel :\n%s\n\nPrompt conseillé :\n%s\n\nValider pour appliquer le prompt conseillé.",
+                    display_model_name, power_desc, cur_label, rec_label
+                )
+                local ok, choice = pcall(hs.dialog.blockAlert, title, msg, "Valider", "Annuler", "informational")
+                Logger.debug(LOG, string.format("Dialog response: %s, choice=%s", tostring(ok), tostring(choice)))
+                if ok and choice == "Valider" then
+                    Logger.info(LOG, string.format("Profile changed to %s (dialog accepted).", rec_profile))
+                    state.llm_active_profile = rec_profile
+                    llm_mod.set_active_profile(rec_profile)
+                    save_prefs(); update_menu()
+                else
+                    Logger.info(LOG, string.format("Profile kept at %s (dialog refused).", cur_profile))
+                    state.llm_active_profile = cur_profile
+                    llm_mod.set_active_profile(cur_profile)
+                end
             end
         elseif force_dialog then
             local title = type(opts.dialog_title) == "string" and opts.dialog_title or "Profil recommandé"
@@ -517,15 +526,33 @@ function M.create(deps)
 
     local function switch_model(new_model)
         Logger.debug(LOG, string.format("Executing switch_model('%s')…", new_model or "nil"))
+
+        -- For MLX backend, lock predictions while the server restarts — the old process
+        -- is killed immediately but weights can take 60–90 s to reload. Without the lock
+        -- every debounced request fires against a dead port, the user sees no feedback,
+        -- and repeated silent failures make the switch appear broken.
+        local mlx_was_enabled = state.llm_backend == "mlx" and state.llm_enabled
+        if mlx_was_enabled and keymap and type(keymap.set_llm_enabled) == "function" then
+            Logger.debug(LOG, "MLX model switch: locking predictions during server restart.")
+            pcall(keymap.set_llm_enabled, false)
+        end
+
+        local function unlock_predictions()
+            if mlx_was_enabled and keymap and type(keymap.set_llm_enabled) == "function" then
+                Logger.debug(LOG, "MLX model switch: predictions unlocked.")
+                pcall(keymap.set_llm_enabled, true)
+            end
+        end
+
         guarded_check_requirements(new_model, function()
             Logger.info(LOG, string.format("Model successfully switched to %s.", new_model))
             state.llm_model = new_model
-            
+
             -- Calculate and store model power level for instant access
             local model_power = get_model_power_level(new_model)
             state.llm_model_power = model_power
             Logger.debug(LOG, string.format("Model power cached: %d", model_power))
-            
+
             -- Resolve display name to actual backend model name and persist per backend
             local actual_backend_name = models_mgr.get_actual_model_name(new_model)
             if state.llm_backend == "mlx" then
@@ -537,7 +564,7 @@ function M.create(deps)
                 llm_mod.set_llm_model_ollama(actual_backend_name)
                 Logger.debug(LOG, string.format("Actual Ollama model: %s -> %s", new_model, actual_backend_name))
             end
-            
+
             if keymap and type(keymap.set_llm_model) == "function" then
                 local ok = pcall(keymap.set_llm_model, actual_backend_name)
                 Logger.debug(LOG, string.format("keymap.set_llm_model() execution -> %s", tostring(ok)))
@@ -551,7 +578,13 @@ function M.create(deps)
 
             -- Always persist and refresh the menu so the active model is visible immediately
             save_prefs(); update_menu()
+            unlock_predictions()
             apply_recommended_prompt_profile(new_model, { dialog_title = "Changement de modèle" })
+        end, function()
+            -- Requirements check failed (model not installed, cancelled, etc.) — restore
+            -- predictions with the previously running model so the user is not left stranded
+            Logger.warn(LOG, string.format("switch_model('%s') failed — restoring predictions.", tostring(new_model)))
+            unlock_predictions()
         end)
     end
 
@@ -1062,11 +1095,26 @@ function M.create(deps)
         -- ================= DÉCLENCHEMENT =================
         table.insert(main_menu, { title = "-" })
         table.insert(main_menu, { title = "— DÉCLENCHEMENT DE L’IA —", disabled = true })
-        
+
+        local sc_label = shortcut_ui.shortcut_to_label(state.llm_trigger_shortcut, "Aucun")
+        table.insert(main_menu, {
+            title    = "Raccourci pour générer manuellement : " .. sc_label,
+            disabled = is_disabled or nil,
+            fn       = function()
+                shortcut_ui.prompt_shortcut({
+                    title = "Raccourci génération IA",
+                    message = "Format : mods+touche  (ex : cmd+alt+p)\nMods disponibles : cmd, alt, ctrl, shift\nLaisser vide pour désactiver",
+                    current_shortcut = state.llm_trigger_shortcut,
+                    default_mods = {"ctrl"},
+                    on_apply = apply_llm_shortcut,
+                })
+            end
+        })
+
         local debounce_val = tonumber(state.llm_debounce) or llm_mod.DEFAULT_STATE.llm_debounce or 0.5
         local debounce_display = (debounce_val <= 0) and "Jamais" or (math.floor(debounce_val * 1000) .. " ms…")
         
-        table.insert(main_menu, { title = "Temps d’attente avant suggestion : " .. debounce_display, disabled = is_disabled or nil, fn = settings_mgr.set_debounce })
+        table.insert(main_menu, { title = "Temps d’inactivité avant suggestion : " .. debounce_display, disabled = is_disabled or nil, fn = settings_mgr.set_debounce })
         if state.llm_debounce ~= llm_mod.DEFAULT_STATE.llm_debounce then
             table.insert(main_menu, { title = "  ↳ Réinitialiser (défaut : " .. math.floor((llm_mod.DEFAULT_STATE.llm_debounce or 0.5) * 1000) .. " ms)", disabled = is_disabled or nil, fn = settings_mgr.reset_debounce })
         end
@@ -1085,7 +1133,7 @@ function M.create(deps)
         })
 
         table.insert(main_menu, {
-            title    = "Prédiction IA après expiration des bulles hotstrings",
+            title    = "Suggestion après expiration d'une bulle hotstring",
             checked  = state.llm_after_hotstring,
             disabled = is_disabled or nil,
             fn       = not is_disabled and function()
@@ -1095,21 +1143,6 @@ function M.create(deps)
                 end
                 save_prefs(); update_menu()
             end or nil,
-        })
-
-        local sc_label = shortcut_ui.shortcut_to_label(state.llm_trigger_shortcut, "Aucun")
-        table.insert(main_menu, {
-            title    = "Raccourci pour générer manuellement : " .. sc_label,
-            disabled = is_disabled or nil,
-            fn       = function()
-                shortcut_ui.prompt_shortcut({
-                    title = "Raccourci génération IA",
-                    message = "Format : mods+touche  (ex : cmd+alt+p)\nMods disponibles : cmd, alt, ctrl, shift\nLaisser vide pour désactiver",
-                    current_shortcut = state.llm_trigger_shortcut,
-                    default_mods = {"ctrl"},
-                    on_apply = apply_llm_shortcut,
-                })
-            end
         })
 
         local disabled_count = #(type(state.llm_disabled_apps) == "table" and state.llm_disabled_apps or {})
@@ -1124,8 +1157,6 @@ function M.create(deps)
             end,
             "Exclure de la génération IA automatique…"
         )
-
-        table.insert(main_menu, { title = disabled_label, disabled = is_disabled or nil, menu = exclusion_menu })
 
         table.insert(main_menu, {
             title    = "Désactiver dans les barres d'adresse des navigateurs",
@@ -1152,6 +1183,8 @@ function M.create(deps)
                 save_prefs(); update_menu()
             end or nil,
         })
+
+        table.insert(main_menu, { title = disabled_label, disabled = is_disabled or nil, menu = exclusion_menu })
 
         -- ================= GÉNÉRATION =================
         table.insert(main_menu, { title = "-" })
@@ -1224,7 +1257,7 @@ function M.create(deps)
         local num_preds_multi    = tonumber(state.llm_num_predictions) or 1
         table.insert(main_menu, {
             -- Independent of token streaming; only irrelevant when num_predictions < 2
-            title    = "Afficher toutes les prédictions d’un coup (multi-prédictions)",
+            title    = "Afficher toutes les suggestions d’un coup (multi-prédictions)",
             checked  = not streaming_multi_on,
             disabled = (is_disabled or num_preds_multi < 2) or nil,
             fn       = (not is_disabled and num_preds_multi >= 2) and function()
