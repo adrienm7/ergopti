@@ -1075,6 +1075,8 @@ function M.create(deps)
             table.insert(main_menu, { title = "  ↳ Info : Modèle thinking (réflexion masquée)", disabled = true })
         end
 
+        table.insert(main_menu, { title = "-" })
+
         local profiles_item = profiles_mgr.get_menu_item()
         profiles_item.disabled = is_disabled or nil
         table.insert(main_menu, profiles_item)
@@ -1092,12 +1094,15 @@ function M.create(deps)
             })
         end
 
-        -- ================= DÉCLENCHEMENT =================
         table.insert(main_menu, { title = "-" })
-        table.insert(main_menu, { title = "— DÉCLENCHEMENT DE L’IA —", disabled = true })
+
+
+        -- ===== Trigger submenu =====
+
+        local trigger_menu = {}
 
         local sc_label = shortcut_ui.shortcut_to_label(state.llm_trigger_shortcut, "Aucun")
-        table.insert(main_menu, {
+        table.insert(trigger_menu, {
             title    = "Raccourci pour générer manuellement : " .. sc_label,
             disabled = is_disabled or nil,
             fn       = function()
@@ -1113,13 +1118,13 @@ function M.create(deps)
 
         local debounce_val = tonumber(state.llm_debounce) or llm_mod.DEFAULT_STATE.llm_debounce or 0.5
         local debounce_display = (debounce_val <= 0) and "Jamais" or (math.floor(debounce_val * 1000) .. " ms…")
-        
-        table.insert(main_menu, { title = "Temps d’inactivité avant suggestion : " .. debounce_display, disabled = is_disabled or nil, fn = settings_mgr.set_debounce })
+
+        table.insert(trigger_menu, { title = "Temps d’inactivité avant suggestion : " .. debounce_display, disabled = is_disabled or nil, fn = settings_mgr.set_debounce })
         if state.llm_debounce ~= llm_mod.DEFAULT_STATE.llm_debounce then
-            table.insert(main_menu, { title = "  ↳ Réinitialiser (défaut : " .. math.floor((llm_mod.DEFAULT_STATE.llm_debounce or 0.5) * 1000) .. " ms)", disabled = is_disabled or nil, fn = settings_mgr.reset_debounce })
+            table.insert(trigger_menu, { title = "  ↳ Réinitialiser (défaut : " .. math.floor((llm_mod.DEFAULT_STATE.llm_debounce or 0.5) * 1000) .. " ms)", disabled = is_disabled or nil, fn = settings_mgr.reset_debounce })
         end
 
-        table.insert(main_menu, {
+        table.insert(trigger_menu, {
             title    = "Suggestion instantanée en fin de mot",
             checked  = state.llm_instant_on_word_end,
             disabled = is_disabled or nil,
@@ -1132,8 +1137,8 @@ function M.create(deps)
             end or nil,
         })
 
-        table.insert(main_menu, {
-            title    = "Suggestion après expiration d'une bulle hotstring",
+        table.insert(trigger_menu, {
+            title    = "Suggestion après expiration d’une bulle hotstring",
             checked  = state.llm_after_hotstring,
             disabled = is_disabled or nil,
             fn       = not is_disabled and function()
@@ -1144,6 +1149,8 @@ function M.create(deps)
                 save_prefs(); update_menu()
             end or nil,
         })
+
+        table.insert(trigger_menu, { title = "-" })
 
         local disabled_count = #(type(state.llm_disabled_apps) == "table" and state.llm_disabled_apps or {})
         local disabled_label = "Désactivé dans" .. (disabled_count > 0 and (" " .. disabled_count .. " application" .. (disabled_count > 1 and "s" or "")) or " ces applications")
@@ -1158,8 +1165,8 @@ function M.create(deps)
             "Exclure de la génération IA automatique…"
         )
 
-        table.insert(main_menu, {
-            title    = "Désactiver dans les barres d'adresse des navigateurs",
+        table.insert(trigger_menu, {
+            title    = "Désactiver dans les barres d’adresse des navigateurs",
             checked  = state.llm_url_bar_filter_enabled,
             disabled = is_disabled or nil,
             fn       = not is_disabled and function()
@@ -1171,7 +1178,7 @@ function M.create(deps)
             end or nil,
         })
 
-        table.insert(main_menu, {
+        table.insert(trigger_menu, {
             title    = "Désactiver dans les champs mot de passe",
             checked  = state.llm_secure_field_filter_enabled,
             disabled = is_disabled or nil,
@@ -1184,18 +1191,21 @@ function M.create(deps)
             end or nil,
         })
 
-        table.insert(main_menu, { title = disabled_label, disabled = is_disabled or nil, menu = exclusion_menu })
+        table.insert(trigger_menu, { title = disabled_label, disabled = is_disabled or nil, menu = exclusion_menu })
 
-        -- ================= GÉNÉRATION =================
-        table.insert(main_menu, { title = "-" })
-        table.insert(main_menu, { title = "— PARAMÈTRES DE GÉNÉRATION —", disabled = true })
+        table.insert(main_menu, { title = "Déclenchement de l’IA", disabled = is_disabled or nil, menu = trigger_menu })
 
-        table.insert(main_menu, { title = "Taille du contexte : " .. tostring(state.llm_context_length) .. " derniers caractères", disabled = is_disabled or nil, fn = settings_mgr.set_context_length })
+
+        -- ===== Generation settings submenu =====
+
+        local generation_menu = {}
+
+        table.insert(generation_menu, { title = "Taille du contexte : " .. tostring(state.llm_context_length) .. " derniers caractères", disabled = is_disabled or nil, fn = settings_mgr.set_context_length })
         if state.llm_context_length ~= llm_mod.DEFAULT_STATE.llm_context_length then
-            table.insert(main_menu, { title = "  ↳ Réinitialiser (défaut : " .. tostring(llm_mod.DEFAULT_STATE.llm_context_length) .. ")", disabled = is_disabled or nil, fn = settings_mgr.reset_context_length })
+            table.insert(generation_menu, { title = "  ↳ Réinitialiser (défaut : " .. tostring(llm_mod.DEFAULT_STATE.llm_context_length) .. ")", disabled = is_disabled or nil, fn = settings_mgr.reset_context_length })
         end
-        
-        table.insert(main_menu, {
+
+        table.insert(generation_menu, {
             title    = "Vider le contexte sur clic/navigation",
             checked  = state.llm_reset_on_nav,
             disabled = is_disabled or nil,
@@ -1207,23 +1217,23 @@ function M.create(deps)
         })
 
         local min_words_display = (state.llm_min_words and state.llm_min_words > 0) and tostring(state.llm_min_words) or "1"
-        table.insert(main_menu, { title = "Mots min par suggestion : " .. min_words_display, disabled = is_disabled or nil, fn = settings_mgr.set_min_words })
+        table.insert(generation_menu, { title = "Mots min par suggestion : " .. min_words_display, disabled = is_disabled or nil, fn = settings_mgr.set_min_words })
         if state.llm_min_words ~= llm_mod.DEFAULT_STATE.llm_min_words then
-            table.insert(main_menu, { title = "  ↳ Réinitialiser (défaut : " .. tostring(llm_mod.DEFAULT_STATE.llm_min_words) .. ")", disabled = is_disabled or nil, fn = settings_mgr.reset_min_words })
+            table.insert(generation_menu, { title = "  ↳ Réinitialiser (défaut : " .. tostring(llm_mod.DEFAULT_STATE.llm_min_words) .. ")", disabled = is_disabled or nil, fn = settings_mgr.reset_min_words })
         end
 
         local max_words_display = (state.llm_max_words and state.llm_max_words > 0) and tostring(state.llm_max_words) or "Illimité"
-        table.insert(main_menu, { title = "Mots max par suggestion : " .. max_words_display, disabled = is_disabled or nil, fn = settings_mgr.set_max_words })
+        table.insert(generation_menu, { title = "Mots max par suggestion : " .. max_words_display, disabled = is_disabled or nil, fn = settings_mgr.set_max_words })
         if state.llm_max_words ~= llm_mod.DEFAULT_STATE.llm_max_words then
             local def_w_disp = (llm_mod.DEFAULT_STATE.llm_max_words and llm_mod.DEFAULT_STATE.llm_max_words > 0) and tostring(llm_mod.DEFAULT_STATE.llm_max_words) or "Illimité"
-            table.insert(main_menu, { title = "  ↳ Réinitialiser (défaut : " .. def_w_disp .. ")", disabled = is_disabled or nil, fn = settings_mgr.reset_max_words })
+            table.insert(generation_menu, { title = "  ↳ Réinitialiser (défaut : " .. def_w_disp .. ")", disabled = is_disabled or nil, fn = settings_mgr.reset_max_words })
         end
-        
-        table.insert(main_menu, { title = "Température (Créativité) : " .. tostring(state.llm_temperature), disabled = is_disabled or nil, fn = settings_mgr.set_temperature })
+
+        table.insert(generation_menu, { title = "Température (Créativité) : " .. tostring(state.llm_temperature), disabled = is_disabled or nil, fn = settings_mgr.set_temperature })
         if state.llm_temperature ~= llm_mod.DEFAULT_STATE.llm_temperature then
-            table.insert(main_menu, { title = "  ↳ Réinitialiser (défaut : " .. tostring(llm_mod.DEFAULT_STATE.llm_temperature) .. ")", disabled = is_disabled or nil, fn = settings_mgr.reset_temperature })
+            table.insert(generation_menu, { title = "  ↳ Réinitialiser (défaut : " .. tostring(llm_mod.DEFAULT_STATE.llm_temperature) .. ")", disabled = is_disabled or nil, fn = settings_mgr.reset_temperature })
         end
-        table.insert(main_menu, {
+        table.insert(generation_menu, {
             title    = "  ↳ Hausser la temp. automatiquement (+0.1 par suggestion)",
             checked  = state.llm_auto_raise_temp,
             disabled = (is_disabled or (tonumber(state.llm_num_predictions) or 1) < 2) or nil,
@@ -1236,11 +1246,21 @@ function M.create(deps)
             end
         })
 
-        -- ================= AFFICHAGE & NAV =================
-        table.insert(main_menu, { title = "-" })
-        table.insert(main_menu, { title = "— AFFICHAGE & NAVIGATION —", disabled = true })
+        table.insert(main_menu, { title = "Paramètres de génération", disabled = is_disabled or nil, menu = generation_menu })
 
-        table.insert(main_menu, {
+
+        -- ===== Display submenu =====
+
+        local display_menu = {}
+
+        local num_preds_safe = tonumber(state.llm_num_predictions) or 1
+        table.insert(display_menu, {
+            title    = "Indentation de la suggestion sélectionnée",
+            disabled = (is_disabled or num_preds_safe < 2) or nil,
+            menu     = settings_mgr.build_indent_menu()
+        })
+
+        table.insert(display_menu, {
             title    = "Afficher la barre d’info (modèle et latence)",
             checked  = state.llm_show_info_bar,
             disabled = is_disabled or nil,
@@ -1255,7 +1275,19 @@ function M.create(deps)
         local streaming_on       = (state.llm_streaming == true)
         local streaming_multi_on = (state.llm_streaming_multi == true)  -- true = show predictions as they arrive (progressive/parallel)
         local num_preds_multi    = tonumber(state.llm_num_predictions) or 1
-        table.insert(main_menu, {
+        table.insert(display_menu, {
+            title    = "Afficher chaque suggestion en streaming (token par token)",
+            checked  = streaming_on,
+            disabled = (is_disabled or not streaming_multi_on) or nil,
+            fn       = not is_disabled and function()
+                state.llm_streaming = not streaming_on
+                if keymap and type(keymap.set_llm_streaming) == "function" then
+                    pcall(keymap.set_llm_streaming, state.llm_streaming)
+                end
+                save_prefs(); update_menu()
+            end or nil,
+        })
+        table.insert(display_menu, {
             -- Independent of token streaming; only irrelevant when num_predictions < 2
             title    = "Afficher toutes les suggestions d’un coup (multi-prédictions)",
             checked  = not streaming_multi_on,
@@ -1268,47 +1300,38 @@ function M.create(deps)
                 save_prefs(); update_menu()
             end or nil,
         })
-        table.insert(main_menu, {
-            title    = "Afficher chaque suggestion en streaming (token par token)",
-            checked  = streaming_on,
-            disabled = (is_disabled or not streaming_multi_on) or nil,
-            fn       = not is_disabled and function()
-                state.llm_streaming = not streaming_on
-                if keymap and type(keymap.set_llm_streaming) == "function" then
-                    pcall(keymap.set_llm_streaming, state.llm_streaming)
-                end
-                save_prefs(); update_menu()
-            end or nil,
-        })
+
+        table.insert(main_menu, { title = "Affichage", disabled = is_disabled or nil, menu = display_menu })
+
+
+        -- ===== Navigation submenu =====
+
+        local nav_menu_items = {}
 
         local nav_mods = hs.settings.get("llm_nav_modifiers")
         if nav_mods == nil then nav_mods = llm_mod.DEFAULT_STATE.llm_nav_modifiers end
         if keymap and type(keymap.set_llm_nav_modifiers) == "function" then pcall(keymap.set_llm_nav_modifiers, nav_mods) end
-        
+
         local val_mods = hs.settings.get("llm_val_modifiers")
         if val_mods == nil then val_mods = llm_mod.DEFAULT_STATE.llm_val_modifiers end
         if keymap and type(keymap.set_llm_val_modifiers) == "function" then pcall(keymap.set_llm_val_modifiers, val_mods) end
 
         local num_preds_safe = tonumber(state.llm_num_predictions) or 1
         local nav_title = format_shortcut_title("Naviguer dans les suggestions (↑/← et ↓/→)", nav_mods, "Flèches seules", "Flèches")
-        table.insert(main_menu, {
+        table.insert(nav_menu_items, {
             title    = nav_title,
             disabled = (is_disabled or num_preds_safe < 2) or nil,
             menu     = settings_mgr.build_nav_modifier_menu()
         })
 
         local val_title = format_shortcut_title("Sélectionner la suggestion n° (" .. ((num_preds_safe == 10) and "1-0" or ("1-" .. num_preds_safe)) .. ")", val_mods, "Chiffres seuls", "Chiffres")
-        table.insert(main_menu, {
+        table.insert(nav_menu_items, {
             title    = val_title,
             disabled = (is_disabled or num_preds_safe < 2) or nil,
             menu     = settings_mgr.build_val_modifier_menu()
         })
 
-        table.insert(main_menu, { 
-            title = "Indentation de la suggestion sélectionnée", 
-            disabled = (is_disabled or num_preds_safe < 2) or nil, 
-            menu = settings_mgr.build_indent_menu() 
-        })
+        table.insert(main_menu, { title = "Navigation", disabled = is_disabled or nil, menu = nav_menu_items })
 
         return {
             title   = "Intelligence Artificielle ✨",
