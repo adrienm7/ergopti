@@ -46,6 +46,13 @@ local DEBOUNCE_SAVE_SEC        = 1.5
 local FORCE_SAVE_INTERVAL_MS   = 10000
 -- Maximum per-event delay capped in WPM computation to avoid outlier inflation
 local WPM_MAX_EVENT_DELAY_MS   = 5000
+-- Number of raw-log lines processed per tick during async replay. Keeping the
+-- batch short (a few ms of work) lets the HID event tap run between chunks so
+-- keyboard input stays responsive on keylogger startup.
+local RAW_LOG_REPLAY_CHUNK_LINES = 500
+-- Absolute path to openssl, required because hs.task.new bypasses the shell
+-- and does not resolve $PATH. macOS ships openssl at /usr/bin/openssl.
+local OPENSSL_PATH               = "/usr/bin/openssl"
 
 -- French translations for macOS app category identifiers
 local MAC_CATEGORIES_FR = {
@@ -82,10 +89,14 @@ local MAC_CATEGORIES_FR = {
 -- ==============================
 -- ==============================
 
-local _state               = nil
-local _save_timer          = nil
-local _last_forced_save_ms = 0
-local _mac_serial_cache    = nil
+local _state                = nil
+local _save_timer           = nil
+local _last_forced_save_ms  = 0
+local _mac_serial_cache     = nil
+-- Guards M.rebuild_index_if_needed_async() against overlapping invocations.
+-- A second call while the async chain is still in flight would race on file
+-- removal (idx migration) and re-replay the raw log on top of itself.
+local _rebuild_in_progress  = false
 
 
 
@@ -215,6 +226,64 @@ local function get_or_create_manifest_app(date_str, app_name)
 		m_day[safe_name] = m_app
 	end
 	return m_app
+end
+
+--- Replays a single raw-log line into today's in-memory index and manifest.
+--- Extracted so the sync replay (M.rebuild_today_from_raw_log) and the chunked
+--- async replay (M.rebuild_today_from_raw_log_async) share the exact same
+--- per-line behaviour — drift between the two paths would silently skew metrics.
+--- @param line string A single JSON-encoded log line.
+--- @param today string The date key for today ("YYYY-MM-DD").
+--- @param prev_sc_by_app table Mutable lookup of the last shortcut seen per app, used to rebuild `sc_bg` bigrams across the replay.
+--- @return boolean True when the line was a valid typing event (for counter increment).
+local function process_replay_line(line, today, prev_sc_by_app)
+	local ok, entry = pcall(json.decode, line)
+	if not ok or type(entry) ~= "table" then
+		Logger.debug(LOG, "Skipping malformed log line during rebuild.")
+		return false
+	end
+	if entry.type == "typing" and type(entry.events) == "table" and #entry.events > 0 then
+		M.aggregate_events(entry.events, entry.app or "Unknown", today)
+		return true
+	elseif entry.type == "shortcut" then
+		local app_name = (type(entry.app) == "string" and entry.app ~= "") and entry.app or "Unknown"
+		local app_idx  = _state.today_idx[app_name]
+		if type(app_idx) ~= "table" then
+			app_idx = { c = {}, bg = {}, tg = {}, qg = {}, pg = {}, hx = {}, hp = {}, w = {}, sc = {}, sc_bg = {}, w_bg = {}, kc = {} }
+			_state.today_idx[app_name] = app_idx
+		end
+		app_idx.sc    = type(app_idx.sc)    == "table" and app_idx.sc    or {}
+		app_idx.sc_bg = type(app_idx.sc_bg) == "table" and app_idx.sc_bg or {}
+		app_idx.w_bg  = type(app_idx.w_bg)  == "table" and app_idx.w_bg  or {}
+		local sc_entry = app_idx.sc[entry.key] or {}
+		sc_entry.c = (sc_entry.c or 0) + 1
+		app_idx.sc[entry.key] = sc_entry
+		-- Rebuild consecutive shortcut bigrams (same logic as aggregate_events live path)
+		if type(prev_sc_by_app[app_name]) == "string" then
+			local bg_key  = prev_sc_by_app[app_name] .. "→" .. entry.key
+			local bg_entry = app_idx.sc_bg[bg_key] or {}
+			bg_entry.c = (bg_entry.c or 0) + 1
+			app_idx.sc_bg[bg_key] = bg_entry
+		end
+		prev_sc_by_app[app_name] = entry.key
+	elseif entry.type == "app_switch" then
+		local prev_app    = (type(entry.prev_app) == "string" and entry.prev_app ~= "") and entry.prev_app or "Unknown"
+		local next_app    = (type(entry.next_app) == "string" and entry.next_app ~= "") and entry.next_app or "Unknown"
+		local duration_ms = tonumber(entry.duration_ms) or 0
+		local m_app       = get_or_create_manifest_app(today, prev_app)
+		m_app.app_time_ms  = (m_app.app_time_ms or 0) + duration_ms
+		m_app.switches_to  = type(m_app.switches_to) == "table" and m_app.switches_to or {}
+		m_app.switches_to[next_app] = (m_app.switches_to[next_app] or 0) + 1
+	elseif entry.type == "hotstring_suggested" or entry.type == "llm_suggested" then
+		local app_name = (type(entry.app) == "string" and entry.app ~= "") and entry.app or "Unknown"
+		local m_app    = get_or_create_manifest_app(today, app_name)
+		if entry.type == "hotstring_suggested" then
+			m_app.hs_suggested = (m_app.hs_suggested or 0) + 1
+		else
+			m_app.llm_suggested = (m_app.llm_suggested or 0) + 1
+		end
+	end
+	return false
 end
 
 
@@ -569,6 +638,7 @@ end
 
 --- Replays today's raw .log file to rebuild the in-memory index from scratch.
 --- Called on boot when the .idx file is found to be empty or missing.
+--- Synchronous — blocks the caller until the full file has been replayed.
 --- @return boolean True when at least one typing event was successfully replayed.
 function M.rebuild_today_from_raw_log()
 	if not require_state("rebuild_today_from_raw_log") then return false end
@@ -596,49 +666,8 @@ function M.rebuild_today_from_raw_log()
 	local prev_sc_by_app = {}
 
 	for line in fh:lines() do
-		local ok, entry = pcall(json.decode, line)
-		if not ok or type(entry) ~= "table" then
-			Logger.debug(LOG, "Skipping malformed log line during rebuild.")
-		elseif entry.type == "typing" and type(entry.events) == "table" and #entry.events > 0 then
-			M.aggregate_events(entry.events, entry.app or "Unknown", today)
+		if process_replay_line(line, today, prev_sc_by_app) then
 			typing_event_count = typing_event_count + 1
-		elseif entry.type == "shortcut" then
-			local app_name = (type(entry.app) == "string" and entry.app ~= "") and entry.app or "Unknown"
-			local app_idx  = _state.today_idx[app_name]
-			if type(app_idx) ~= "table" then
-				app_idx = { c = {}, bg = {}, tg = {}, qg = {}, pg = {}, hx = {}, hp = {}, w = {}, sc = {}, sc_bg = {}, w_bg = {}, kc = {} }
-				_state.today_idx[app_name] = app_idx
-			end
-			app_idx.sc    = type(app_idx.sc)    == "table" and app_idx.sc    or {}
-			app_idx.sc_bg = type(app_idx.sc_bg) == "table" and app_idx.sc_bg or {}
-			app_idx.w_bg  = type(app_idx.w_bg)  == "table" and app_idx.w_bg  or {}
-			local sc_entry = app_idx.sc[entry.key] or {}
-			sc_entry.c = (sc_entry.c or 0) + 1
-			app_idx.sc[entry.key] = sc_entry
-			-- Rebuild consecutive shortcut bigrams (same logic as aggregate_events live path)
-			if type(prev_sc_by_app[app_name]) == "string" then
-				local bg_key  = prev_sc_by_app[app_name] .. "→" .. entry.key
-				local bg_entry = app_idx.sc_bg[bg_key] or {}
-				bg_entry.c = (bg_entry.c or 0) + 1
-				app_idx.sc_bg[bg_key] = bg_entry
-			end
-			prev_sc_by_app[app_name] = entry.key
-		elseif entry.type == "app_switch" then
-			local prev_app    = (type(entry.prev_app) == "string" and entry.prev_app ~= "") and entry.prev_app or "Unknown"
-			local next_app    = (type(entry.next_app) == "string" and entry.next_app ~= "") and entry.next_app or "Unknown"
-			local duration_ms = tonumber(entry.duration_ms) or 0
-			local m_app       = get_or_create_manifest_app(today, prev_app)
-			m_app.app_time_ms  = (m_app.app_time_ms or 0) + duration_ms
-			m_app.switches_to  = type(m_app.switches_to) == "table" and m_app.switches_to or {}
-			m_app.switches_to[next_app] = (m_app.switches_to[next_app] or 0) + 1
-		elseif entry.type == "hotstring_suggested" or entry.type == "llm_suggested" then
-			local app_name = (type(entry.app) == "string" and entry.app ~= "") and entry.app or "Unknown"
-			local m_app    = get_or_create_manifest_app(today, app_name)
-			if entry.type == "hotstring_suggested" then
-				m_app.hs_suggested = (m_app.hs_suggested or 0) + 1
-			else
-				m_app.llm_suggested = (m_app.llm_suggested or 0) + 1
-			end
 		end
 	end
 
@@ -649,6 +678,71 @@ function M.rebuild_today_from_raw_log()
 
 	Logger.info(LOG, "Rebuild from raw log complete (%d typing event(s) replayed).", typing_event_count)
 	return typing_event_count > 0
+end
+
+--- Asynchronous variant of M.rebuild_today_from_raw_log: reads the raw log in
+--- small chunks and yields back to the main Hammerspoon runloop between chunks
+--- so the HID event tap (and menu UI) stay responsive during a large replay.
+--- Called from the keylogger bootstrap, where blocking for tens of seconds
+--- would freeze the keyboard.
+--- @param on_done fun(did_replay: boolean)? Optional callback, invoked on the main thread once the replay has finished (successfully or not).
+function M.rebuild_today_from_raw_log_async(on_done)
+	if not require_state("rebuild_today_from_raw_log_async") then
+		if on_done then on_done(false) end
+		return
+	end
+	local today = os.date("%Y-%m-%d")
+	local raw_log_path = _state.LOG_DIR .. "/" .. today .. ".log"
+
+	if not fs.attributes(raw_log_path) then
+		Logger.debug(LOG, "No raw log found at '%s' — nothing to rebuild.", raw_log_path)
+		if on_done then on_done(false) end
+		return
+	end
+
+	local fh, err = io.open(raw_log_path, "r")
+	if not fh then
+		Logger.error(LOG, "Cannot open raw log '%s': %s.", raw_log_path, tostring(err))
+		if on_done then on_done(false) end
+		return
+	end
+
+	-- Reset in-memory state before replaying
+	_state.today_idx        = {}
+	_state.manifest[today]  = {}
+	_state.ngram_context    = nil  -- reset N-gram context for clean replay
+
+	local typing_event_count = 0
+	local prev_sc_by_app     = {}
+
+	Logger.trace(LOG, "Replaying raw log asynchronously (chunks of %d lines)…", RAW_LOG_REPLAY_CHUNK_LINES)
+
+	local function finalize()
+		fh:close()
+		M.save_today_index()
+		M.save_manifest()
+		_last_forced_save_ms = timer.absoluteTime() / 1000000
+		Logger.done(LOG, "Async raw log replay complete (%d typing event(s) replayed).", typing_event_count)
+		if on_done then on_done(typing_event_count > 0) end
+	end
+
+	local function process_chunk()
+		for _ = 1, RAW_LOG_REPLAY_CHUNK_LINES do
+			local line = fh:read("*l")
+			if not line then
+				finalize()
+				return
+			end
+			if process_replay_line(line, today, prev_sc_by_app) then
+				typing_event_count = typing_event_count + 1
+			end
+		end
+		-- Yield to the runloop; HID events, timers, and UI interactions can
+		-- now run before we resume with the next chunk on the next tick.
+		timer.doAfter(0, process_chunk)
+	end
+
+	process_chunk()
 end
 
 --- Returns true if today's in-memory index is empty (no character or n-gram data).
@@ -725,14 +819,17 @@ function M.rebuild_index_if_needed()
 
 	-- Migrate any previous-day .idx files into the encrypted database
 	-- Pattern matches "YYYY-MM-DD.idx" — the format used by save_today_index()
-	local dir_ok, dir_iter = pcall(fs.dir, _state.LOG_DIR)
-	if not dir_ok then
-		Logger.error(LOG, "Cannot iterate log directory '%s'.", _state.LOG_DIR)
+	-- hs.fs.dir returns (iter_fn, dir_state): the iterator is stateless and
+	-- the for loop hands dir_state back on every step. Dropping dir_state
+	-- causes "directory metatable expected, got nil" on the first iteration.
+	local dir_ok, dir_iter, dir_state = pcall(fs.dir, _state.LOG_DIR)
+	if not dir_ok or not dir_iter then
+		Logger.error(LOG, "Cannot iterate log directory '%s': %s.", _state.LOG_DIR, tostring(dir_iter))
 		Logger.success(LOG, "Index evaluation done (directory error during migration).")
 		return
 	end
 
-	for file_name in dir_iter do
+	for file_name in dir_iter, dir_state do
 		local y, mo, d = file_name:match("^(%d%d%d%d)-(%d%d)-(%d%d)%.idx$")
 		if y and mo and d then
 			local file_date = string.format("%s-%s-%s", y, mo, d)
@@ -760,6 +857,155 @@ function M.rebuild_index_if_needed()
 	end
 
 	Logger.success(LOG, "Index evaluation and migration complete.")
+end
+
+--- Asynchronous orchestrator for index rebuild and past-day migration.
+--- Performs the cheap synchronous setup (manifest load, today's idx load) on
+--- the main thread, then hands the two heavy phases to their async variants:
+---   • raw-log replay (chunked, M.rebuild_today_from_raw_log_async)
+---   • per-day migration into the encrypted DB (M.merge_day_to_db_async)
+--- past-day migrations are chained one at a time so no two openssl passes run
+--- concurrently — openssl is CPU-bound and doubling it up on a small machine
+--- only makes each pass slower.
+--- Guarded by _rebuild_in_progress against overlapping calls: re-entering while
+--- a migration is mid-flight would race on os.remove of the .idx files.
+--- @param on_done fun(success: boolean)? Optional callback, invoked on the main thread once every phase has completed (or been skipped).
+function M.rebuild_index_if_needed_async(on_done)
+	if not require_state("rebuild_index_if_needed_async") then
+		if on_done then on_done(false) end
+		return
+	end
+
+	if _rebuild_in_progress then
+		Logger.warn(LOG, "rebuild_index_if_needed_async() called while another rebuild is in flight — ignoring.")
+		if on_done then on_done(false) end
+		return
+	end
+
+	Logger.start(LOG, "Evaluating index state for rebuild (async)…")
+	_rebuild_in_progress = true
+
+	local function finish(success)
+		_rebuild_in_progress = false
+		if success then
+			Logger.success(LOG, "Async index evaluation and migration complete.")
+		end
+		if on_done then on_done(success and true or false) end
+	end
+
+	-- Ensure the log directory exists (cheap, synchronous)
+	if not fs.attributes(_state.LOG_DIR) then
+		local ok, err = pcall(fs.mkdir, _state.LOG_DIR)
+		if not ok then
+			Logger.error(LOG, "Cannot create log directory '%s': %s.", _state.LOG_DIR, tostring(err))
+			return finish(false)
+		end
+	end
+
+	-- Load persisted manifest (cheap)
+	local manifest_path = _state.LOG_DIR .. "/manifest.json"
+	local mf, _ = io.open(manifest_path, "r")
+	if mf then
+		local content = mf:read("*a")
+		mf:close()
+		local ok, decoded = pcall(json.decode, content)
+		if ok and type(decoded) == "table" then
+			_state.manifest = decoded
+		else
+			Logger.warn(LOG, "Manifest file could not be parsed — starting with empty manifest.")
+		end
+	end
+
+	-- Load today's persisted index (cheap)
+	local today = os.date("%Y-%m-%d")
+	local idx_path = _state.LOG_DIR .. "/" .. today .. ".idx"
+	local fi, _ = io.open(idx_path, "r")
+	if fi then
+		local content = fi:read("*a")
+		fi:close()
+		local ok, decoded = pcall(json.decode, content)
+		if ok and type(decoded) == "table" then
+			_state.today_idx = decoded
+		else
+			Logger.warn(LOG, "Today's index file could not be parsed — will attempt rebuild from raw log.")
+		end
+	end
+
+	--- Collects past-day .idx files on disk, then migrates them one by one
+	--- through the async merge. Called once the raw-log replay phase is done.
+	local function migrate_past_idx_files()
+		local dir_ok, dir_iter, dir_state = pcall(fs.dir, _state.LOG_DIR)
+		if not dir_ok or not dir_iter then
+			Logger.error(LOG, "Cannot iterate log directory '%s': %s.", _state.LOG_DIR, tostring(dir_iter))
+			return finish(true)
+		end
+
+		-- Gather pending files first so we don't keep the directory iterator
+		-- alive across async ticks (safer: the state table has a __gc that
+		-- would close the underlying dir handle mid-iteration otherwise).
+		local pending = {}
+		for file_name in dir_iter, dir_state do
+			local y, mo, d = file_name:match("^(%d%d%d%d)-(%d%d)-(%d%d)%.idx$")
+			if y and mo and d then
+				local file_date = string.format("%s-%s-%s", y, mo, d)
+				if file_date ~= today then
+					pending[#pending + 1] = { date = file_date, name = file_name }
+				end
+			end
+		end
+
+		if #pending == 0 then
+			return finish(true)
+		end
+
+		Logger.info(LOG, "Queued %d past-day .idx file(s) for async migration.", #pending)
+
+		local i = 0
+		local function process_next()
+			i = i + 1
+			if i > #pending then
+				return finish(true)
+			end
+			local entry     = pending[i]
+			local full_path = _state.LOG_DIR .. "/" .. entry.name
+			local f, err    = io.open(full_path, "r")
+			if not f then
+				Logger.warn(LOG, "Cannot open '%s' for migration: %s.", full_path, tostring(err))
+				return timer.doAfter(0, process_next)
+			end
+			local content = f:read("*a")
+			f:close()
+			local ok, old_idx = pcall(json.decode, content)
+			if not ok or type(old_idx) ~= "table" then
+				Logger.warn(LOG, "Could not parse '%s' — skipping migration.", entry.name)
+				return timer.doAfter(0, process_next)
+			end
+			local old_manifest = (_state.manifest[entry.date]) or {}
+			Logger.debug(LOG, "Migrating '%s' into encrypted database (async)…", entry.date)
+			M.merge_day_to_db_async(entry.date, old_idx, old_manifest, function(success)
+				if success then
+					os.remove(full_path)
+				end
+				-- Yield a tick before the next migration so UI/input can run.
+				timer.doAfter(0, process_next)
+			end)
+		end
+
+		process_next()
+	end
+
+	-- If today's index is sparse, replay the raw log asynchronously first,
+	-- THEN migrate past-day files. Sequencing matters: the raw log replay
+	-- rewrites today's .idx, which must land before any .sqlite read that
+	-- might follow the migration.
+	if is_today_idx_sparse() then
+		Logger.info(LOG, "Today's index is sparse — rebuilding from raw log asynchronously…")
+		M.rebuild_today_from_raw_log_async(function()
+			migrate_past_idx_files()
+		end)
+	else
+		migrate_past_idx_files()
+	end
 end
 
 
@@ -899,6 +1145,139 @@ function M.merge_day_to_db(date_str, idx_data, manifest_data)
 
 	os.remove(tmp_path)
 	Logger.success(LOG, "Merge of %s into encrypted database complete.", date_str)
+end
+
+--- Asynchronous variant of M.merge_day_to_db.
+--- Runs the two openssl passes (decrypt, re-encrypt) through hs.task.new so the
+--- main thread is never blocked by the PBKDF2 key derivation — which, on a
+--- multi-MB encrypted DB, can take several seconds per call and otherwise
+--- freezes the event tap. The SQLite work in between is fast enough to keep
+--- synchronous on the main thread.
+--- @param date_str string The date to archive ("YYYY-MM-DD").
+--- @param idx_data table The daily N-gram index for that date.
+--- @param manifest_data table The daily manifest for that date.
+--- @param on_done fun(success: boolean)? Optional callback, invoked on the main thread once the whole decrypt → SQLite → re-encrypt chain has finished.
+function M.merge_day_to_db_async(date_str, idx_data, manifest_data, on_done)
+	if not require_state("merge_day_to_db_async") then
+		if on_done then on_done(false) end
+		return
+	end
+	Logger.start(LOG, "Merging %s into encrypted database (async)…", date_str)
+
+	local db_path  = _state.LOG_DIR .. "/metrics.sqlite"
+	local enc_path = db_path .. ".enc"
+	local tmp_path = os.tmpname()
+	-- hs.task.new passes arguments straight to execvp, so no shell escaping is
+	-- needed on the password — unlike the sync path which concatenates into a
+	-- shell command string.
+	local pwd      = M.get_mac_serial()
+
+	local function finish(success)
+		if on_done then on_done(success and true or false) end
+	end
+
+	local function sqlite_work_and_reencrypt()
+		local db = sqlite3.open(tmp_path)
+		if not db then
+			Logger.error(LOG, "Failed to open SQLite database at '%s' — aborting merge for %s.", tmp_path, date_str)
+			os.remove(tmp_path)
+			return finish(false)
+		end
+
+		local schema_ok = db:exec([[
+			CREATE TABLE IF NOT EXISTS daily_manifest
+				(date TEXT, app_name TEXT, stats_json TEXT, UNIQUE(date, app_name));
+			CREATE TABLE IF NOT EXISTS daily_index
+				(date TEXT, app_name TEXT, index_json TEXT, UNIQUE(date, app_name));
+		]])
+		if schema_ok ~= sqlite3.OK then
+			Logger.error(LOG, "Schema creation failed (code %d) — aborting merge for %s.", schema_ok, date_str)
+			db:close()
+			os.remove(tmp_path)
+			return finish(false)
+		end
+
+		db:exec("BEGIN TRANSACTION;")
+
+		local stmt_idx = db:prepare("INSERT OR REPLACE INTO daily_index (date, app_name, index_json) VALUES (?, ?, ?)")
+		if stmt_idx then
+			for app_name, data in pairs(idx_data or {}) do
+				local ok, encoded = pcall(json.encode, data)
+				if ok then
+					stmt_idx:bind_values(date_str, app_name, encoded)
+					stmt_idx:step()
+					stmt_idx:reset()
+				else
+					Logger.warn(LOG, "Skipping index entry for app '%s' — JSON encode failed.", app_name)
+				end
+			end
+			stmt_idx:finalize()
+		else
+			Logger.error(LOG, "Failed to prepare daily_index INSERT statement for %s.", date_str)
+		end
+
+		local stmt_man = db:prepare("INSERT OR REPLACE INTO daily_manifest (date, app_name, stats_json) VALUES (?, ?, ?)")
+		if stmt_man then
+			for app_name, data in pairs(manifest_data or {}) do
+				local ok, encoded = pcall(json.encode, data)
+				if ok then
+					stmt_man:bind_values(date_str, app_name, encoded)
+					stmt_man:step()
+					stmt_man:reset()
+				else
+					Logger.warn(LOG, "Skipping manifest entry for app '%s' — JSON encode failed.", app_name)
+				end
+			end
+			stmt_man:finalize()
+		else
+			Logger.error(LOG, "Failed to prepare daily_manifest INSERT statement for %s.", date_str)
+		end
+
+		db:exec("COMMIT;")
+		db:close()
+
+		-- Re-encrypt asynchronously so the PBKDF2 run does not freeze the UI.
+		local enc_task = hs.task.new(OPENSSL_PATH, function(exit_code, _, stderr)
+			if exit_code ~= 0 then
+				Logger.error(LOG, "Re-encryption failed (exit %s) for %s: %s — unencrypted tmp left at '%s'.",
+					tostring(exit_code), date_str, tostring(stderr), tmp_path)
+				return finish(false)
+			end
+			os.remove(tmp_path)
+			Logger.success(LOG, "Merge of %s into encrypted database complete.", date_str)
+			finish(true)
+		end, {
+			"enc", "-aes-256-cbc", "-a", "-A", "-salt", "-pbkdf2",
+			"-pass", "pass:" .. pwd,
+			"-in",   tmp_path,
+			"-out",  enc_path,
+		})
+		if not enc_task or not enc_task:start() then
+			Logger.error(LOG, "Could not launch openssl re-encrypt task for %s — tmp left at '%s'.", date_str, tmp_path)
+			finish(false)
+		end
+	end
+
+	if fs.attributes(enc_path) then
+		local dec_task = hs.task.new(OPENSSL_PATH, function(exit_code, _, stderr)
+			if exit_code ~= 0 then
+				Logger.warn(LOG, "Decryption returned non-zero (exit %s) for %s: %s — DB may be new or corrupted; proceeding.",
+					tostring(exit_code), date_str, tostring(stderr))
+			end
+			sqlite_work_and_reencrypt()
+		end, {
+			"enc", "-d", "-aes-256-cbc", "-a", "-A", "-salt", "-pbkdf2",
+			"-pass", "pass:" .. pwd,
+			"-in",   enc_path,
+			"-out",  tmp_path,
+		})
+		if not dec_task or not dec_task:start() then
+			Logger.warn(LOG, "Could not launch openssl decrypt task for %s — proceeding with fresh DB.", date_str)
+			sqlite_work_and_reencrypt()
+		end
+	else
+		sqlite_work_and_reencrypt()
+	end
 end
 
 
