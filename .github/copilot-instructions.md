@@ -271,6 +271,10 @@ end
 - **Format:** All commits MUST follow the [Conventional Commits](https://www.conventionalcommits.org/) specification.
 - **Language:** Commit messages are always written in **English** (developer-facing, like logs).
 - **No co-author credits:** Never add `Co-Authored-By` trailers. Do not credit any LLM or tool in commit messages.
+- **Linear history:** The `main` and `dev` branches must always have a perfectly linear history. This means:
+  - **Never use merge commits** (`git merge`) when integrating a feature or fix branch. Always use `git merge --squash` followed by a single conventional commit, or rebase the branch before merging.
+  - **Squash on merge:** When a feature/fix branch is ready to land, squash all its commits into one clean conventional commit. The commit message must summarise the entire change set, not enumerate the squashed commits.
+  - **No `Merge branch '…'` lines** in the history of `main` or `dev`.
 
 ### 6.1) Commit Types
 
