@@ -8,6 +8,7 @@
 
 local M = {}
 local hs = hs
+local dialog        = require("lib.dialog_util")
 local shortcuts_mod = require("modules.shortcuts")
 
 
@@ -136,7 +137,7 @@ function M.build(ctx)
 							title    = "   ↳ Modifier l’URL ChatGPT…",
 							disabled = paused or nil,
 							fn       = not paused and function()
-								local ok_p, clicked, url = pcall(hs.dialog.textPrompt, "URL ChatGPT",
+								local ok_p, clicked, url = pcall(dialog.text_prompt, "URL ChatGPT",
 									"URL ouverte par Ctrl+G :",
 									state.chatgpt_url, "OK", "Annuler")
 								if ok_p and clicked == "OK" and type(url) == "string" and url ~= "" then
@@ -234,7 +235,7 @@ function M.build(ctx)
 			title    = "Chemin du AHK…",
 			disabled = paused or nil,
 			fn       = not paused and function()
-				local ok_p, btn, path = pcall(hs.dialog.textPrompt, "Script AHK",
+				local ok_p, btn, path = pcall(dialog.text_prompt, "Script AHK",
 					"Chemin du fichier AHK source :",
 					state.ahk_source_path, "OK", "Annuler")
 				if ok_p and btn == "OK" and type(path) == "string" then

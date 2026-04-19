@@ -21,6 +21,7 @@ local hs = hs
 local fs = require("hs.fs")
 
 local AppPickerLib = require("lib.app_picker")
+local dialog       = require("lib.dialog_util")
 local kl_mod       = require("modules.keylogger")
 
 local _prog_canvas = nil
@@ -116,7 +117,7 @@ local function process_files_with_ui(files_to_process, is_encrypt, password)
 			alert_msg = alert_msg .. "\n\n⚠️ Attention : Échec de déchiffrement détecté. Le mot de passe est potentiellement incorrect."
 		end
 
-		hs.dialog.blockAlert("Encryptor", alert_msg, "OK")
+		dialog.block_alert("Encryptor", alert_msg, "OK")
 	end
 
 	local log_manager = require("modules.keylogger.log_manager")
@@ -212,7 +213,7 @@ function M.build(ctx)
 			if type(state.metrics_shortcut) == "table" then
 				current_str = table.concat(state.metrics_shortcut.mods or {}, "+") .. "+" .. (state.metrics_shortcut.key or "")
 			end
-			local ok_p, btn, raw = pcall(hs.dialog.textPrompt,
+			local ok_p, btn, raw = pcall(dialog.text_prompt,
 				"Raccourci métriques de frappe",
 				"Format : mods+touche  (ex : cmd+alt+m)\nMods disponibles : cmd, alt, ctrl, shift\nLaisser vide pour désactiver",
 				current_str, "OK", "Annuler"
@@ -267,7 +268,7 @@ function M.build(ctx)
 			if type(state.apps_time_shortcut) == "table" then
 				current_str = table.concat(state.apps_time_shortcut.mods or {}, "+") .. "+" .. (state.apps_time_shortcut.key or "")
 			end
-			local ok_p, btn, raw = pcall(hs.dialog.textPrompt,
+			local ok_p, btn, raw = pcall(dialog.text_prompt,
 				"Raccourci temps apps",
 				"Format : mods+touche  (ex : cmd+alt+t)\nMods disponibles : cmd, alt, ctrl, shift\nLaisser vide pour désactiver",
 				current_str, "OK", "Annuler"
@@ -466,10 +467,10 @@ function M.build(ctx)
 
 			if not state.keylogger_encrypt then
 				local alert_msg = "L’activation va chiffrer tous vos anciens logs pour qu’ils soient illisibles sur le disque.\n\nConfirmer ?"
-				local res = hs.dialog.blockAlert("Protection des données", alert_msg, "Chiffrer", "Annuler")
+				local res = dialog.block_alert("Protection des données", alert_msg, "Chiffrer", "Annuler")
 				if res ~= "Chiffrer" then return end
 
-				local ok_prompt, btn, pwd = pcall(hs.dialog.textPrompt, "Clé de sécurité", "Veuillez définir la clé de chiffrement (par défaut: numéro de série du Mac) :", default_pwd, "OK", "Annuler")
+				local ok_prompt, btn, pwd = pcall(dialog.text_prompt, "Clé de sécurité", "Veuillez définir la clé de chiffrement (par défaut: numéro de série du Mac) :", default_pwd, "OK", "Annuler")
 				if not ok_prompt or btn ~= "OK" or type(pwd) ~= "string" or pwd == "" then return end
 
 				if type(log_manager.register_encryptor_app) == "function" then
@@ -497,10 +498,10 @@ function M.build(ctx)
 				end
 			else
 				local alert_msg = "Tous vos logs chiffrés vont être restaurés en clair sur le disque.\n\nConfirmer ?"
-				local res = hs.dialog.blockAlert("Désactivation", alert_msg, "Déchiffrer", "Annuler")
+				local res = dialog.block_alert("Désactivation", alert_msg, "Déchiffrer", "Annuler")
 				if res ~= "Déchiffrer" then return end
 
-				local ok_prompt, btn, pwd = pcall(hs.dialog.textPrompt, "Clé de sécurité", "Entrez la clé de sécurité nécessaire au déchiffrement :", default_pwd, "OK", "Annuler")
+				local ok_prompt, btn, pwd = pcall(dialog.text_prompt, "Clé de sécurité", "Entrez la clé de sécurité nécessaire au déchiffrement :", default_pwd, "OK", "Annuler")
 				if not ok_prompt or btn ~= "OK" or type(pwd) ~= "string" or pwd == "" then return end
 
 				local files_to_process = {}
@@ -533,7 +534,7 @@ function M.build(ctx)
 			if fs.attributes(app_path) then
 				hs.execute(string.format("open %q", app_path))
 			else
-				hs.dialog.blockAlert("Erreur", "L’application est introuvable. Veuillez d’abord générer l’application avec le script Python.", "OK")
+				dialog.block_alert("Erreur", "L’application est introuvable. Veuillez d’abord générer l’application avec le script Python.", "OK")
 			end
 		end
 	})
@@ -544,7 +545,7 @@ function M.build(ctx)
 		fn      = function()
 			if not state.keylogger_enabled then
 				local warnMsg = "ATTENTION : Vous êtes sur le point d’activer le keylogger.\n\nIl enregistre vos frappes au clavier à la milliseconde près.\nCes logs sont stockés dans le dossier Hammerspoon.\n\nBien que les champs de mots de passe soient ignorés automatiquement, il est recommandé de mettre le script en PAUSE lors de la saisie de données sensibles."
-				local res = hs.dialog.blockAlert("Avertissement de Sécurité", warnMsg, "Activer", "Annuler", "warning")
+				local res = dialog.block_alert("Avertissement de Sécurité", warnMsg, "Activer", "Annuler", "warning")
 				if res ~= "Activer" then return end
 			end
 

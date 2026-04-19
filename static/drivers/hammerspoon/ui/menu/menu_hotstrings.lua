@@ -9,6 +9,7 @@
 local M = {}
 local hs            = hs
 local Logger        = require("lib.logger")
+local dialog        = require("lib.dialog_util")
 local notifications = require("lib.notifications")
 local LOG           = "menu_hotstrings"
 
@@ -400,7 +401,7 @@ function M.build_management(ctx)
 				title    = "Supprimer cet expanseur…",
 				disabled = paused or nil,
 				fn       = not paused and (function(k) return function()
-					local res = hs.dialog.blockAlert(
+					local res = dialog.block_alert(
 						"Supprimer l’expanseur",
 						"Êtes-vous sûr de vouloir supprimer cet expanseur personnalisé ?",
 						"Supprimer", "Annuler"
@@ -437,7 +438,7 @@ function M.build_management(ctx)
 			-- 1. Ask for the trigger character (loop until exactly one character is entered)
 			local char
 			while true do
-				local ok_p, btn, char_raw = pcall(hs.dialog.textPrompt,
+				local ok_p, btn, char_raw = pcall(dialog.text_prompt,
 					"Nouvel expanseur de mots",
 					"Saisissez le caractère déclencheur (un seul caractère) :",
 					"", "OK", "Annuler"
@@ -449,11 +450,11 @@ function M.build_management(ctx)
 					char = first
 					break
 				end
-				hs.dialog.blockAlert("Saisie invalide", "Veuillez saisir exactement un seul caractère.", "Réessayer")
+				dialog.block_alert("Saisie invalide", "Veuillez saisir exactement un seul caractère.", "Réessayer")
 			end
 
 			-- 2. Ask consume behaviour (default: non consommé)
-			local consume_res = hs.dialog.blockAlert(
+			local consume_res = dialog.block_alert(
 				"Comportement du déclencheur",
 				"Voulez-vous que le caractère soit consommé (non tapé) lors de l’expansion ?",
 				"Non — taper le caractère", "Oui — consommer", "Annuler"
@@ -508,7 +509,7 @@ function M.build_management(ctx)
 			title    = title .. " : " .. display_ms .. (cur_ms == def_ms and " (défaut)" or ""),
 			disabled = paused or nil,
 			fn       = not paused and function()
-				local ok_p, btn, raw = pcall(hs.dialog.textPrompt,
+				local ok_p, btn, raw = pcall(dialog.text_prompt,
 					title,
 					"Entrez le délai en millisecondes (entier ≥ 0).\nMettez 0 pour un délai infini (aucune limite de temps) :",
 					tostring(cur_ms), "OK", "Annuler"
@@ -568,7 +569,7 @@ function M.build_management(ctx)
 		title    = "Touche magique : " .. state.trigger_char,
 		disabled = paused or nil,
 		fn       = not paused and function()
-			local ok_p, btn, raw = pcall(hs.dialog.textPrompt,
+			local ok_p, btn, raw = pcall(dialog.text_prompt,
 				"Touche magique",
 				"Entrez le caractère à utiliser pour remplacer le ★ :",
 				state.trigger_char, "OK", "Annuler"
@@ -844,7 +845,7 @@ function M.build_custom(ctx)
 					current_str = table.concat(state.custom_editor_shortcut.mods or {}, "+")
 						.. "+" .. (state.custom_editor_shortcut.key or "")
 				end
-				local ok_p, btn, raw = pcall(hs.dialog.textPrompt,
+				local ok_p, btn, raw = pcall(dialog.text_prompt,
 					"Raccourci personnalisé",
 					"Format : mods+touche  (ex : cmd+alt+p  ou  ctrl+shift+e)\n"
 						.. "Mods disponibles : cmd, alt, ctrl, shift\nLaisser vide pour désactiver",

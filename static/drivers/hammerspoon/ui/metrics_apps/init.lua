@@ -20,6 +20,7 @@ local json       = require("hs.json")
 local sqlite3    = require("hs.sqlite3")
 local ui_builder = require("ui.ui_builder")
 local Logger     = require("lib.logger")
+local dialog     = require("lib.dialog_util")
 
 local LOG = "metrics_apps"
 
@@ -77,9 +78,9 @@ end
 --- @param default_cat string The default category to pre-fill.
 --- @param default_score number The default score to pre-fill.
 function M.prompt_category(app_name, default_cat, default_score)
-	local button, new_cat = hs.dialog.textPrompt("Catégorie", "Nouvelle catégorie pour " .. app_name .. " (ex: Code, Bureautique, Loisir) :", default_cat or "Général", "OK", "Annuler")
+	local button, new_cat = dialog.text_prompt("Catégorie", "Nouvelle catégorie pour " .. app_name .. " (ex: Code, Bureautique, Loisir) :", default_cat or "Général", "OK", "Annuler")
 	if button == "OK" and new_cat ~= "" then
-		local btn2, new_score_str = hs.dialog.textPrompt("Score", "Nouveau score de productivité pour " .. app_name .. "\n(-2 très distrayant à 2 très productif) :", tostring(default_score or 0), "OK", "Annuler")
+		local btn2, new_score_str = dialog.text_prompt("Score", "Nouveau score de productivité pour " .. app_name .. "\n(-2 très distrayant à 2 très productif) :", tostring(default_score or 0), "OK", "Annuler")
 		if btn2 == "OK" then
 			local score = tonumber(new_score_str) or 0
 			if score >= -2 and score <= 2 then
@@ -92,7 +93,7 @@ function M.prompt_category(app_name, default_cat, default_score)
 					M._wv:evaluateJavaScript(string.format("window.updateUserCategories(%s);", json.encode(cats)))
 				end
 			else
-				hs.dialog.alert("Erreur", "Le score doit être compris entre -2 et 2.", "OK")
+				dialog.alert("Erreur", "Le score doit être compris entre -2 et 2.", "OK")
 			end
 		end
 	end

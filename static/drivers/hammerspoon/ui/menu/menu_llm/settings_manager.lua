@@ -13,6 +13,7 @@ local M = {}
 local hs      = hs
 local llm_mod = require("modules.llm")
 local Logger  = require("lib.logger")
+local dialog  = require("lib.dialog_util")
 
 local LOG = "menu_llm.settings"
 
@@ -38,7 +39,6 @@ local LOG = "menu_llm.settings"
 --- @param max_val number|nil Maximum allowed value.
 local function generic_numeric_prompt(deps, title, msg, key, factor, hs_fn, default_val, min_val, max_val)
 	local state = deps.state
-	pcall(hs.focus)
 
 	local current_val = tonumber(state[key])
 	if current_val == nil then current_val = tonumber(default_val) or 0 end
@@ -48,7 +48,7 @@ local function generic_numeric_prompt(deps, title, msg, key, factor, hs_fn, defa
 	local full_msg = tostring(msg) .. "\n\n(Laissez vide pour réinitialiser : " .. tostring(display_def) .. ")"
 
 	Logger.debug(LOG, string.format("Opening numeric prompt for %s…", key))
-	local ok_p, btn, raw = pcall(hs.dialog.textPrompt, 
+	local ok_p, btn, raw = pcall(dialog.text_prompt, 
 		tostring(title), 
 		full_msg, 
 		tostring(display_val), 
@@ -122,7 +122,6 @@ function M.new(deps)
 	--- Sets the idle delay before triggering the LLM.
 	function obj.set_debounce()
 		local state = deps.state
-		pcall(hs.focus)
 
 		local current_val = tonumber(state.llm_debounce)
 		if current_val == nil then current_val = llm_mod.DEFAULT_STATE.llm_debounce end
@@ -131,7 +130,7 @@ function M.new(deps)
 
 		local full_msg = "Délai de pause requis lors de la frappe (en ms) avant de solliciter l’IA :\n\n(Laissez vide pour réinitialiser : " .. display_def .. " ms)\n(Tapez \"Jamais\" ou -1 pour désactiver l’auto-génération)"
 
-		local ok_p, btn, raw = pcall(hs.dialog.textPrompt, "Temps d’attente", full_msg, tostring(display_val), "OK", "Annuler")
+		local ok_p, btn, raw = pcall(dialog.text_prompt, "Temps d’attente", full_msg, tostring(display_val), "OK", "Annuler")
 
 		if ok_p and btn == "OK" then
 			local new_val
@@ -164,14 +163,13 @@ function M.new(deps)
 	--- Sets the maximum number of words kept per prediction.
 	function obj.set_max_words()
 		local state = deps.state
-		pcall(hs.focus)
 
 		local current_val = tonumber(state.llm_max_words)
 		local display_val = (current_val and current_val > 0) and tostring(current_val) or "0"
 
 		local full_msg = "Nombre maximum de mots à conserver par suggestion (0 = illimité) :"
 
-		local ok_p, btn, raw = pcall(hs.dialog.textPrompt, "Mots max par suggestion", full_msg, display_val, "OK", "Annuler")
+		local ok_p, btn, raw = pcall(dialog.text_prompt, "Mots max par suggestion", full_msg, display_val, "OK", "Annuler")
 
 		if ok_p and btn == "OK" then
 			local digits = raw:match("^%s*(%d+)%s*$")
@@ -196,14 +194,13 @@ function M.new(deps)
 	--- Sets the minimum number of words generated per prediction.
 	function obj.set_min_words()
 		local state = deps.state
-		pcall(hs.focus)
 
 		local current_val = tonumber(state.llm_min_words)
 		local display_val = (current_val and current_val > 0) and tostring(current_val) or "1"
 
 		local full_msg = "Nombre minimum de mots à générer par suggestion :"
 
-		local ok_p, btn, raw = pcall(hs.dialog.textPrompt, "Mots min par suggestion", full_msg, display_val, "OK", "Annuler")
+		local ok_p, btn, raw = pcall(dialog.text_prompt, "Mots min par suggestion", full_msg, display_val, "OK", "Annuler")
 
 		if ok_p and btn == "OK" then
 			local digits = raw:match("^%s*(%d+)%s*$")

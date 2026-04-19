@@ -8,7 +8,8 @@
 --- ============================================================================== 
 
 local M = {}
-local hs = hs
+local hs     = hs
+local dialog = require("lib.dialog_util")
 
 
 
@@ -166,7 +167,7 @@ function M.prompt_shortcut(opts)
 		or "Format : mods+touche (ex : cmd+alt+p)\nMods disponibles : cmd, alt, ctrl, shift\nLaisser vide pour désactiver"
 
 	local current = M.shortcut_to_config_string(opts.current_shortcut)
-	local ok_prompt, button, raw = pcall(hs.dialog.textPrompt, title, message, current, "OK", "Annuler")
+	local ok_prompt, button, raw = pcall(dialog.text_prompt, title, message, current, "OK", "Annuler")
 	if not ok_prompt or button ~= "OK" or type(raw) ~= "string" then return false end
 
 	local cleaned = raw:match("^%s*(.-)%s*$")
@@ -181,7 +182,7 @@ function M.prompt_shortcut(opts)
 		return true
 	end
 
-	pcall(hs.dialog.alert, "Format invalide", "Utilisez le format mods+touche, par exemple cmd+shift+b")
+	pcall(dialog.alert, "Format invalide", "Utilisez le format mods+touche, par exemple cmd+shift+b")
 	return false
 end
 

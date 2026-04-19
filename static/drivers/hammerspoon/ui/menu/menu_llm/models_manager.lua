@@ -18,6 +18,7 @@ local hs        = hs
 local OllamaMgr = require("ui.menu.menu_llm.models_manager_ollama")
 local MlxMgr    = require("ui.menu.menu_llm.models_manager_mlx")
 local Logger    = require("lib.logger")
+local dialog    = require("lib.dialog_util")
 local llm_mod   = require("modules.llm")
 
 local LOG = "menu_llm.models"
@@ -310,7 +311,7 @@ function M.new(deps)
 				pcall(hs.focus)
 			end
 			if is_critical then
-				pcall(hs.dialog.blockAlert, "Téléchargement impossible", msg, "Fermer", nil, "critical")
+				pcall(dialog.block_alert, "Téléchargement impossible", msg, "Fermer", nil, "critical")
 				if type(on_cancel) == "function" then pcall(on_cancel) end return
 			end
 			
@@ -321,7 +322,7 @@ function M.new(deps)
 			end
 			body = body .. "\n\nVoulez-vous lancer le téléchargement ?"
 
-			local ok_c, choice = pcall(hs.dialog.blockAlert,
+			local ok_c, choice = pcall(dialog.block_alert,
 				"Configuration requise (" .. engine_name .. ")",
 				body, "Télécharger", "Annuler", msg:find("⚠️") and "warning" or "informational")
 				
