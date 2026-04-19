@@ -66,6 +66,7 @@ local gestures           = require("modules.gestures")
 local keymap             = require("modules.keymap")
 local shortcuts          = require("modules.shortcuts")
 local dynamic_hotstrings = require("modules.dynamic_hotstrings")
+local karabiner          = require("modules.karabiner")
 local menu               = require("ui.menu")
 local hotstring_editor   = require("ui.hotstring_editor")
 local mlx_deps_checker   = require("lib.mlx_deps_checker")
@@ -298,15 +299,20 @@ end
 -- =============================
 -- =============================
 
+-- Initialize the Karabiner bridge (starts trackpad watcher + loads feature flags)
+-- The module self-resolves its directory at load time — no path argument needed
+karabiner.init()
+
 Logger.debug(LOG, "Starting user interface components…")
 menu.start(
 	base_dir, hotfiles, gestures,
-	keymap, dynamic_hotstrings, module_sections
+	keymap, dynamic_hotstrings, module_sections,
+	karabiner
 )
 
 -- Script control is now managed through the shortcuts module
 Logger.debug(LOG, "Starting script control engine…")
-shortcuts.start_script_control(keymap, shortcuts, gestures)
+shortcuts.start_script_control(keymap, shortcuts, gestures, karabiner)
 
 Logger.info(LOG, "User interface initialized successfully.")
 

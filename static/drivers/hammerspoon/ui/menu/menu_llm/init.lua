@@ -98,6 +98,27 @@ M.DEFAULT_STATE = {
 
 
 
+-- Cached result of the last async server health check.
+-- nil = not yet checked, true = server responded, false = server unreachable.
+local _llm_health_status = nil
+
+--- Fires an async health probe against the active backend.
+--- Updates _llm_health_status and calls refresh_fn() when the result arrives.
+--- @param backend string "mlx" or "ollama".
+--- @param refresh_fn function Called with no args after the result is stored.
+local function probe_llm_health(backend, refresh_fn)
+	local url = (backend == "ollama")
+		and "http://127.0.0.1:11434/api/version"
+		or  "http://127.0.0.1:8080/v1/models"
+
+	hs.http.asyncGet(url, {}, function(status)
+		-- Any HTTP response (even 4xx) means the server is reachable
+		_llm_health_status = (type(status) == "number" and status > 0)
+		if type(refresh_fn) == "function" then pcall(refresh_fn) end
+	end)
+end
+
+
 --- Stops the MLX server process if one is currently running.
 --- Safe to call even when no server is active or before M.create() has been called.
 --- Intended for the Hammerspoon shutdown callback to prevent orphaned Python processes.
@@ -959,6 +980,25 @@ function M.create(deps)
         Logger.debug(LOG, string.format("Menu state: paused=%s, llm_enabled=%s, is_disabled=%s", tostring(paused), tostring(state.llm_enabled), tostring(is_disabled)))
         local main_menu = {}
 
+        -- When a download is running, offer a shortcut to bring the progress window back into view.
+        -- The window is easy to lose across Spaces; this item avoids having to hunt for it.
+        local _dl_active = deps.active_tasks and (deps.active_tasks["download"] or deps.active_tasks["download_tail"] or deps.active_tasks["install"])
+        if _dl_active then
+            local _dw = package.loaded["ui.download_window"]
+            table.insert(main_menu, {
+                title = "📥 Téléchargement en cours — Afficher la fenêtre",
+                fn = function()
+                    if _dw and type(_dw.focus) == "function" then
+                        pcall(_dw.focus)
+                    elseif _dw and type(_dw.is_active) == "function" and not _dw.is_active() then
+                        -- Window was closed without cancelling — re-open it (no-op, just notify)
+                        pcall(notifications.notify, "Fenêtre de téléchargement introuvable", "Le téléchargement est toujours en cours en arrière-plan.")
+                    end
+                end
+            })
+            table.insert(main_menu, { title = "-" })
+        end
+
         local backend_title_str = "Moteur IA (Backend) : "
         if state.llm_backend == "mlx" then backend_title_str = backend_title_str .. "MLX 🚀"
         elseif state.llm_backend == "ollama" then backend_title_str = backend_title_str .. "Ollama 🦙"
@@ -1058,13 +1098,30 @@ function M.create(deps)
             and string.format(" (%gB params, ~%d Go RAM)", info.params, math.ceil(ram))
             or string.format(" (~%d Go RAM)", math.ceil(ram))
         
-        local rich_model_title = "Modèle actif : "
+        -- Trigger a fresh async probe on every menu open so the indicator stays accurate.
+        -- The result arrives after the menu is shown; the next open will display it.
+        if state.llm_enabled and not paused then
+            probe_llm_health(state.llm_backend or "mlx", update_menu)
+        end
+
+        -- Health indicator: shown only when the feature is enabled.
+        -- 🟢 = server responded to last probe, 🔴 = unreachable or not yet checked.
+        local health_dot
+        if not state.llm_enabled or paused then
+            health_dot = ""
+        elseif _llm_health_status == true then
+            health_dot = "🟢 "
+        else
+            health_dot = "🔴 "
+        end
+
+        local rich_model_title = health_dot .. "Modèle actif : "
         if not state.llm_model or state.llm_model == "" then
             rich_model_title = rich_model_title .. "Aucun"
         else
             rich_model_title = rich_model_title .. string.format("%s%s%s", active_display_model, type_str, params_ram_str)
         end
-        
+
         table.insert(main_menu, {
             title    = rich_model_title,
             disabled = paused or nil,

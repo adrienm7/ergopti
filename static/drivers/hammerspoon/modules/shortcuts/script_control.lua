@@ -75,6 +75,7 @@ local _extras          = {}
 local _keymap    = nil
 local _shortcuts = nil
 local _gestures  = nil
+local _karabiner = nil
 
 
 
@@ -85,32 +86,46 @@ local _gestures  = nil
 -- =====================================
 -- =====================================
 
---- Returns true only when the event carries exclusively the right Option key.
---- Rejects left Option and any combination with Cmd, Ctrl, or Shift.
+--- Returns true when the event is triggered with only the right Option key held.
+--- Accepts two physical sources:
+---   • right_option directly  — normal operation with Karabiner running (right_command
+---     is remapped to right_option by KE's tap/hold rule).
+---   • right_command directly — fallback when Karabiner is paused/killed and the
+---     remapping is gone; physical right_command fires as cmd, not alt.
+--- Rejects left-side modifiers and any combination with Ctrl or Shift.
 --- @param e userdata The hs.eventtap.event object.
---- @return boolean True if only right Alt is held.
+--- @return boolean True if the AltGr modifier is the sole active modifier.
 local function is_right_alt_only(e)
 	if type(e) ~= "userdata" or type(e.getFlags) ~= "function" then return false end
 
 	local ok_flags, flags = pcall(function() return e:getFlags() end)
 	if not ok_flags or type(flags) ~= "table" then return false end
 
-	if not flags.alt or flags.cmd or flags.ctrl or flags.shift then return false end
+	if flags.ctrl or flags.shift then return false end
 
 	local ok_raw, raw = pcall(function() return e:rawFlags() end)
-	-- If rawFlags is unavailable, accept any alt (degraded but functional)
-	if not ok_raw or type(raw) ~= "number" then return true end
+	local masks = (ok_raw and type(raw) == "number") and hs.eventtap.event.rawFlagMasks or nil
 
-	local masks = hs.eventtap.event.rawFlagMasks
-	if type(masks) ~= "table" then return true end
+	-- Case 1: right_option present (Karabiner remapping active)
+	if flags.alt and not flags.cmd then
+		if not masks then return true end
+		local right_alt  = masks.deviceRightAlternate or 0
+		local left_alt   = masks.deviceLeftAlternate  or 0
+		if right_alt == 0 then return true end
+		return (raw & right_alt) ~= 0 and (raw & left_alt) == 0
+	end
 
-	local right_mask = masks.deviceRightAlternate or 0
-	local left_mask  = masks.deviceLeftAlternate  or 0
+	-- Case 2: right_command only (Karabiner paused — physical key fires as cmd)
+	-- Accept when cmd is set but alt is not, and rawFlags confirms right-side command.
+	if flags.cmd and not flags.alt then
+		if not masks then return false end
+		local right_cmd = masks.deviceRightCommand or 0
+		local left_cmd  = masks.deviceLeftCommand  or 0
+		if right_cmd == 0 then return false end
+		return (raw & right_cmd) ~= 0 and (raw & left_cmd) == 0
+	end
 
-	-- If the right-side mask is absent, we cannot distinguish sides; accept both
-	if right_mask == 0 then return true end
-
-	return (raw & right_mask) ~= 0 and (raw & left_mask) == 0
+	return false
 end
 
 
@@ -135,6 +150,9 @@ local function pause_all()
 	if _gestures and type(_gestures.disable_all) == "function" then
 		pcall(function() _gestures.disable_all() end)
 	end
+	if _karabiner and type(_karabiner.pause) == "function" then
+		pcall(function() _karabiner.pause() end)
+	end
 end
 
 --- Resumes all registered modules gracefully.
@@ -147,6 +165,9 @@ local function resume_all()
 	end
 	if _gestures and type(_gestures.enable_all) == "function" then
 		pcall(function() _gestures.enable_all() end)
+	end
+	if _karabiner and type(_karabiner.resume) == "function" then
+		pcall(function() _karabiner.resume() end)
 	end
 end
 
@@ -260,12 +281,14 @@ M.ACTION_LABELS = ACTION_LABELS
 --- @param keymap table Keymap module (must expose pause_processing / resume_processing).
 --- @param shortcuts table Shortcuts module (must expose start / stop).
 --- @param gestures table Gestures module (must expose enable_all / disable_all).
-function M.start(keymap, shortcuts, gestures)
+--- @param karabiner table|nil Optional Karabiner module (must expose pause / resume).
+function M.start(keymap, shortcuts, gestures, karabiner)
 	Logger.start(LOG, "Starting script control…")
 
 	_keymap    = type(keymap)    == "table" and keymap    or nil
 	_shortcuts = type(shortcuts) == "table" and shortcuts or nil
 	_gestures  = type(gestures)  == "table" and gestures  or nil
+	_karabiner = type(karabiner) == "table" and karabiner or nil
 
 	if not _keymap    then Logger.warn(LOG, "M.start(): keymap module not provided — pause/resume will be partial.") end
 	if not _shortcuts then Logger.warn(LOG, "M.start(): shortcuts module not provided — pause/resume will be partial.") end

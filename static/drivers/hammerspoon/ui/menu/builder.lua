@@ -133,12 +133,16 @@ function M.generate(ctx, menu_mods, actions)
 		Logger.warn(LOG, "Keylogger module missing.")
 	end
 
-	-- Gestures and shortcuts zone
-	if type(menu_mods.gestures) == "table" then
-		push("gestures.build", menu_mods.gestures.build, ctx)
-	end
 	if type(menu_mods.shortcuts) == "table" then
 		push("shortcuts.build", menu_mods.shortcuts.build, ctx)
+	end
+
+	-- Karabiner then Gestures — keyboard first, then trackpad
+	if type(menu_mods.karabiner) == "table" and type(menu_mods.karabiner.build) == "function" then
+		push("karabiner.build", menu_mods.karabiner.build, ctx)
+	end
+	if type(menu_mods.gestures) == "table" then
+		push("gestures.build", menu_mods.gestures.build, ctx)
 	end
 
 

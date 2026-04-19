@@ -1,0 +1,402 @@
+{
+    "description": "CapsWord — toggle and deactivation",
+    "manipulators": [
+
+        {
+            "description": "AltGr + CapsLock: enable CapsWord (no layer required)",
+            "conditions": [
+                { "name": "capsword", "type": "variable_unless", "value": 1 }
+            ],
+            "from": {
+                "key_code": "caps_lock",
+                "modifiers": { "mandatory": ["right_option"] }
+            },
+            "to": [
+                { "set_variable": { "name": "capsword", "value": 1 } },
+                { "key_code": "caps_lock" }
+            ],
+            "type": "basic"
+        },
+
+        {
+            "description": "Layer + CapsLock: enable CapsWord",
+            "conditions": [
+                { "name": "layer_active", "type": "variable_if",    "value": 1 },
+                { "name": "capsword",     "type": "variable_unless", "value": 1 }
+            ],
+            "from": {
+                "key_code": "caps_lock",
+                "modifiers": { "optional": ["any"] }
+            },
+            "to": [
+                { "set_variable": { "name": "capsword", "value": 1 } },
+                { "key_code": "caps_lock" }
+            ],
+            "type": "basic"
+        },
+
+        {
+            "description": "CapsLock: disable CapsWord (works with or without layer)",
+            "conditions": [
+                { "name": "capsword", "type": "variable_if", "value": 1 }
+            ],
+            "from": {
+                "key_code": "caps_lock",
+                "modifiers": { "optional": ["any"] }
+            },
+            "to": [
+                { "key_code": "caps_lock" },
+                { "set_variable": { "name": "capsword", "value": 0 } }
+            ],
+            "type": "basic"
+        },
+
+        {
+            "description": "CapsWord: disable on spacebar",
+            "conditions": [{ "name": "capsword", "type": "variable_if", "value": 1 }],
+            "from": { "key_code": "spacebar", "modifiers": { "optional": ["any"] } },
+            "to": [
+                { "key_code": "caps_lock" },
+                { "set_variable": { "name": "capsword", "value": 0 } },
+                { "key_code": "spacebar" }
+            ],
+            "type": "basic"
+        },
+
+        {
+            "description": "CapsWord: disable on Enter",
+            "conditions": [{ "name": "capsword", "type": "variable_if", "value": 1 }],
+            "from": { "key_code": "return_or_enter", "modifiers": { "optional": ["any"] } },
+            "to": [
+                { "key_code": "caps_lock" },
+                { "set_variable": { "name": "capsword", "value": 0 } },
+                { "key_code": "return_or_enter" }
+            ],
+            "type": "basic"
+        },
+
+        {
+            "description": "CapsWord: disable on Escape",
+            "conditions": [{ "name": "capsword", "type": "variable_if", "value": 1 }],
+            "from": { "key_code": "escape", "modifiers": { "optional": ["any"] } },
+            "to": [
+                { "key_code": "caps_lock" },
+                { "set_variable": { "name": "capsword", "value": 0 } },
+                { "key_code": "escape" }
+            ],
+            "type": "basic"
+        },
+
+        {
+            "description": "CapsWord: disable on Tab",
+            "conditions": [{ "name": "capsword", "type": "variable_if", "value": 1 }],
+            "from": { "key_code": "tab", "modifiers": { "optional": ["any"] } },
+            "to": [
+                { "key_code": "caps_lock" },
+                { "set_variable": { "name": "capsword", "value": 0 } },
+                { "key_code": "tab" }
+            ],
+            "type": "basic"
+        },
+
+        {
+            "description": "CapsWord: disable on Delete Forward",
+            "conditions": [{ "name": "capsword", "type": "variable_if", "value": 1 }],
+            "from": { "key_code": "delete_forward", "modifiers": { "optional": ["any"] } },
+            "to": [
+                { "key_code": "caps_lock" },
+                { "set_variable": { "name": "capsword", "value": 0 } },
+                { "key_code": "delete_forward" }
+            ],
+            "type": "basic"
+        },
+
+        {
+            "description": "CapsWord: disable on Up Arrow",
+            "conditions": [{ "name": "capsword", "type": "variable_if", "value": 1 }],
+            "from": { "key_code": "up_arrow", "modifiers": { "optional": ["any"] } },
+            "to": [
+                { "key_code": "caps_lock" },
+                { "set_variable": { "name": "capsword", "value": 0 } },
+                { "key_code": "up_arrow" }
+            ],
+            "type": "basic"
+        },
+
+        {
+            "description": "CapsWord: disable on Down Arrow",
+            "conditions": [{ "name": "capsword", "type": "variable_if", "value": 1 }],
+            "from": { "key_code": "down_arrow", "modifiers": { "optional": ["any"] } },
+            "to": [
+                { "key_code": "caps_lock" },
+                { "set_variable": { "name": "capsword", "value": 0 } },
+                { "key_code": "down_arrow" }
+            ],
+            "type": "basic"
+        },
+
+        {
+            "description": "CapsWord: disable on Left Arrow",
+            "conditions": [{ "name": "capsword", "type": "variable_if", "value": 1 }],
+            "from": { "key_code": "left_arrow", "modifiers": { "optional": ["any"] } },
+            "to": [
+                { "key_code": "caps_lock" },
+                { "set_variable": { "name": "capsword", "value": 0 } },
+                { "key_code": "left_arrow" }
+            ],
+            "type": "basic"
+        },
+
+        {
+            "description": "CapsWord: disable on Right Arrow",
+            "conditions": [{ "name": "capsword", "type": "variable_if", "value": 1 }],
+            "from": { "key_code": "right_arrow", "modifiers": { "optional": ["any"] } },
+            "to": [
+                { "key_code": "caps_lock" },
+                { "set_variable": { "name": "capsword", "value": 0 } },
+                { "key_code": "right_arrow" }
+            ],
+            "type": "basic"
+        },
+
+        {
+            "description": "CapsWord: disable on Page Up",
+            "conditions": [{ "name": "capsword", "type": "variable_if", "value": 1 }],
+            "from": { "key_code": "page_up", "modifiers": { "optional": ["any"] } },
+            "to": [
+                { "key_code": "caps_lock" },
+                { "set_variable": { "name": "capsword", "value": 0 } },
+                { "key_code": "page_up" }
+            ],
+            "type": "basic"
+        },
+
+        {
+            "description": "CapsWord: disable on Page Down",
+            "conditions": [{ "name": "capsword", "type": "variable_if", "value": 1 }],
+            "from": { "key_code": "page_down", "modifiers": { "optional": ["any"] } },
+            "to": [
+                { "key_code": "caps_lock" },
+                { "set_variable": { "name": "capsword", "value": 0 } },
+                { "key_code": "page_down" }
+            ],
+            "type": "basic"
+        },
+
+        {
+            "description": "CapsWord: disable on Home",
+            "conditions": [{ "name": "capsword", "type": "variable_if", "value": 1 }],
+            "from": { "key_code": "home", "modifiers": { "optional": ["any"] } },
+            "to": [
+                { "key_code": "caps_lock" },
+                { "set_variable": { "name": "capsword", "value": 0 } },
+                { "key_code": "home" }
+            ],
+            "type": "basic"
+        },
+
+        {
+            "description": "CapsWord: disable on End",
+            "conditions": [{ "name": "capsword", "type": "variable_if", "value": 1 }],
+            "from": { "key_code": "end", "modifiers": { "optional": ["any"] } },
+            "to": [
+                { "key_code": "caps_lock" },
+                { "set_variable": { "name": "capsword", "value": 0 } },
+                { "key_code": "end" }
+            ],
+            "type": "basic"
+        },
+
+        {
+            "description": "CapsWord: disable on F1",
+            "conditions": [{ "name": "capsword", "type": "variable_if", "value": 1 }],
+            "from": { "key_code": "f1", "modifiers": { "optional": ["any"] } },
+            "to": [
+                { "key_code": "caps_lock" },
+                { "set_variable": { "name": "capsword", "value": 0 } },
+                { "key_code": "f1" }
+            ],
+            "type": "basic"
+        },
+
+        {
+            "description": "CapsWord: disable on F2",
+            "conditions": [{ "name": "capsword", "type": "variable_if", "value": 1 }],
+            "from": { "key_code": "f2", "modifiers": { "optional": ["any"] } },
+            "to": [
+                { "key_code": "caps_lock" },
+                { "set_variable": { "name": "capsword", "value": 0 } },
+                { "key_code": "f2" }
+            ],
+            "type": "basic"
+        },
+
+        {
+            "description": "CapsWord: disable on F3",
+            "conditions": [{ "name": "capsword", "type": "variable_if", "value": 1 }],
+            "from": { "key_code": "f3", "modifiers": { "optional": ["any"] } },
+            "to": [
+                { "key_code": "caps_lock" },
+                { "set_variable": { "name": "capsword", "value": 0 } },
+                { "key_code": "f3" }
+            ],
+            "type": "basic"
+        },
+
+        {
+            "description": "CapsWord: disable on F4",
+            "conditions": [{ "name": "capsword", "type": "variable_if", "value": 1 }],
+            "from": { "key_code": "f4", "modifiers": { "optional": ["any"] } },
+            "to": [
+                { "key_code": "caps_lock" },
+                { "set_variable": { "name": "capsword", "value": 0 } },
+                { "key_code": "f4" }
+            ],
+            "type": "basic"
+        },
+
+        {
+            "description": "CapsWord: disable on F5",
+            "conditions": [{ "name": "capsword", "type": "variable_if", "value": 1 }],
+            "from": { "key_code": "f5", "modifiers": { "optional": ["any"] } },
+            "to": [
+                { "key_code": "caps_lock" },
+                { "set_variable": { "name": "capsword", "value": 0 } },
+                { "key_code": "f5" }
+            ],
+            "type": "basic"
+        },
+
+        {
+            "description": "CapsWord: disable on F6",
+            "conditions": [{ "name": "capsword", "type": "variable_if", "value": 1 }],
+            "from": { "key_code": "f6", "modifiers": { "optional": ["any"] } },
+            "to": [
+                { "key_code": "caps_lock" },
+                { "set_variable": { "name": "capsword", "value": 0 } },
+                { "key_code": "f6" }
+            ],
+            "type": "basic"
+        },
+
+        {
+            "description": "CapsWord: disable on F7",
+            "conditions": [{ "name": "capsword", "type": "variable_if", "value": 1 }],
+            "from": { "key_code": "f7", "modifiers": { "optional": ["any"] } },
+            "to": [
+                { "key_code": "caps_lock" },
+                { "set_variable": { "name": "capsword", "value": 0 } },
+                { "key_code": "f7" }
+            ],
+            "type": "basic"
+        },
+
+        {
+            "description": "CapsWord: disable on F8",
+            "conditions": [{ "name": "capsword", "type": "variable_if", "value": 1 }],
+            "from": { "key_code": "f8", "modifiers": { "optional": ["any"] } },
+            "to": [
+                { "key_code": "caps_lock" },
+                { "set_variable": { "name": "capsword", "value": 0 } },
+                { "key_code": "f8" }
+            ],
+            "type": "basic"
+        },
+
+        {
+            "description": "CapsWord: disable on F9",
+            "conditions": [{ "name": "capsword", "type": "variable_if", "value": 1 }],
+            "from": { "key_code": "f9", "modifiers": { "optional": ["any"] } },
+            "to": [
+                { "key_code": "caps_lock" },
+                { "set_variable": { "name": "capsword", "value": 0 } },
+                { "key_code": "f9" }
+            ],
+            "type": "basic"
+        },
+
+        {
+            "description": "CapsWord: disable on F10",
+            "conditions": [{ "name": "capsword", "type": "variable_if", "value": 1 }],
+            "from": { "key_code": "f10", "modifiers": { "optional": ["any"] } },
+            "to": [
+                { "key_code": "caps_lock" },
+                { "set_variable": { "name": "capsword", "value": 0 } },
+                { "key_code": "f10" }
+            ],
+            "type": "basic"
+        },
+
+        {
+            "description": "CapsWord: disable on F11",
+            "conditions": [{ "name": "capsword", "type": "variable_if", "value": 1 }],
+            "from": { "key_code": "f11", "modifiers": { "optional": ["any"] } },
+            "to": [
+                { "key_code": "caps_lock" },
+                { "set_variable": { "name": "capsword", "value": 0 } },
+                { "key_code": "f11" }
+            ],
+            "type": "basic"
+        },
+
+        {
+            "description": "CapsWord: disable on F12",
+            "conditions": [{ "name": "capsword", "type": "variable_if", "value": 1 }],
+            "from": { "key_code": "f12", "modifiers": { "optional": ["any"] } },
+            "to": [
+                { "key_code": "caps_lock" },
+                { "set_variable": { "name": "capsword", "value": 0 } },
+                { "key_code": "f12" }
+            ],
+            "type": "basic"
+        },
+
+        {
+            "description": "CapsWord: disable on dot (Ergopti key g)",
+            "conditions": [{ "name": "capsword", "type": "variable_if", "value": 1 }],
+            "from": { "key_code": "g", "modifiers": { "optional": ["any"] } },
+            "to": [
+                { "key_code": "caps_lock" },
+                { "set_variable": { "name": "capsword", "value": 0 } },
+                { "key_code": "g" }
+            ],
+            "type": "basic"
+        },
+
+        {
+            "description": "CapsWord: disable on comma (Ergopti key v)",
+            "conditions": [{ "name": "capsword", "type": "variable_if", "value": 1 }],
+            "from": { "key_code": "v", "modifiers": { "optional": ["any"] } },
+            "to": [
+                { "key_code": "caps_lock" },
+                { "set_variable": { "name": "capsword", "value": 0 } },
+                { "key_code": "v" }
+            ],
+            "type": "basic"
+        },
+
+        {
+            "description": "CapsWord: disable on left mouse button click",
+            "conditions": [{ "name": "capsword", "type": "variable_if", "value": 1 }],
+            "from": { "pointing_button": "button1" },
+            "to": [
+                { "key_code": "caps_lock" },
+                { "set_variable": { "name": "capsword", "value": 0 } },
+                { "pointing_button": "button1" }
+            ],
+            "type": "basic"
+        },
+
+        {
+            "description": "CapsWord: disable on right mouse button click",
+            "conditions": [{ "name": "capsword", "type": "variable_if", "value": 1 }],
+            "from": { "pointing_button": "button2" },
+            "to": [
+                { "key_code": "caps_lock" },
+                { "set_variable": { "name": "capsword", "value": 0 } },
+                { "pointing_button": "button2" }
+            ],
+            "type": "basic"
+        }
+    ]
+}
