@@ -21,9 +21,7 @@ local LOG = "menu_llm.mlx"
 local ok_dw, download_window = pcall(require, "ui.download_window")
 if not ok_dw then download_window = nil end
 
-local config_file = debug.getinfo(1, "S").source:sub(2):match("^(.*[/\\])") or "./"
-config_file = config_file:match("^(.*)/ui/") or "./"
-config_file = config_file .. "config.json"
+local HF_TOKEN_FILE = (os.getenv("HOME") or "") .. "/.huggingface/token"
 
 
 
@@ -82,35 +80,12 @@ function M.new(deps, presets)
 	end
 
 	local function read_hf_token()
-		local fh = io.open(config_file, "r")
+		local fh = io.open(HF_TOKEN_FILE, "r")
 		if not fh then return nil end
 		local raw = fh:read("*a")
 		fh:close()
-		local ok, cfg = pcall(hs.json.decode, raw)
-		if ok and type(cfg) == "table" and type(cfg.hf_token) == "string" then
-			return cfg.hf_token
-		end
-		return nil
-	end
-
-	local function write_hf_token(token)
-		local fh = io.open(config_file, "r")
-		local cfg = {}
-		if fh then
-			local raw = fh:read("*a")
-			fh:close()
-			local ok, decoded = pcall(hs.json.decode, raw)
-			if ok and type(decoded) == "table" then cfg = decoded end
-		end
-		cfg.hf_token = token
-		local ok, encoded = pcall(hs.json.encode, cfg, true)
-		if ok and encoded then
-			local fw = io.open(config_file, "w")
-			if fw then
-				fw:write(encoded)
-				fw:close()
-			end
-		end
+		local token = raw and raw:match("^%s*(.-)%s*$") or ""
+		return token ~= "" and token or nil
 	end
 
 	local function upgrade_mlx_stack(on_done)
@@ -353,28 +328,25 @@ if not token or len(token.strip()) == 0:
     sys.exit(1)
 
 try:
-    import urllib3
-    urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
-    
-    http = urllib3.PoolManager(
-        cert_reqs='CERT_NONE',
-        ca_certs=None
-    )
-    
-    headers = {
-        'User-Agent': 'huggingface/hub',
-        'Authorization': f'Bearer {token.strip()}'
-    }
-    
-    response = http.request(
-        'GET',
+    import urllib.request
+    import ssl
+
+    ctx = ssl.create_default_context()
+    req = urllib.request.Request(
         'https://huggingface.co/api/whoami-v2',
-        headers=headers,
-        timeout=10
+        headers={
+            'User-Agent': 'huggingface/hub',
+            'Authorization': f'Bearer {token.strip()}'
+        }
     )
-    
-    if response.status != 200:
-        print(f"Token validation failed: HTTP {response.status}", file=sys.stderr)
+    try:
+        resp = urllib.request.urlopen(req, timeout=10, context=ctx)
+        status = resp.status
+    except urllib.error.HTTPError as http_err:
+        status = http_err.code
+
+    if status != 200:
+        print(f"Token validation failed: HTTP {status}", file=sys.stderr)
         sys.exit(1)
     
     home = os.path.expanduser("~")
@@ -407,7 +379,7 @@ try:
     sys.exit(0)
 
 except Exception as e:
-	print(f"Erreur HuggingFace: {str(e)}", file=sys.stderr)
+    print(f"Erreur HuggingFace: {str(e)}", file=sys.stderr)
     sys.exit(1)
 PY
 		]]
@@ -416,11 +388,10 @@ PY
 			if deps.active_tasks then deps.active_tasks["hf_login"] = nil end
 
 			if code == 0 then
-				write_hf_token(token)
-				pcall(notifications.notify, "🔓 HuggingFace connecté", "Token sauvegardé. Vous pouvez maintenant télécharger les modèles gated")
+				pcall(notifications.notify, "🔓 HuggingFace connecté", "Token sauvegardé. Vous pouvez maintenant télécharger les modèles beaucoup plus rapidement !")
 				if type(on_done) == "function" then pcall(on_done, true) end
 			else
-				pcall(notifications.notify, "❌ Connexion HuggingFace", "Échec de connexion. Vérifiez votre token")
+				pcall(notifications.notify, "❌ Connexion HuggingFace", "Échec de connexion. Vérifiez votre token.")
 				if type(on_done) == "function" then pcall(on_done, false) end
 			end
 		end, function(_, stdout, stderr)
@@ -801,27 +772,43 @@ PY
 			py:write("    _write_exit(1); sys.exit(1)\n")
 			py:write("_hub_dir = os.path.expanduser('~/.cache/huggingface/hub')\n")
 			py:write("_model_cache = os.path.join(_hub_dir, " .. string.format("%q", safe_repo_bash) .. ")\n")
-			py:write("_stop_evt = threading.Event()\n")
+			-- Snapshot existing blobs before the download starts so the watcher only counts NEW ones.
+			-- This prevents pre-cached or previously-downloaded blobs from inflating the counter.
 			py:write("_WEIGHT_EXTS = ('.safetensors', '.bin', '.gguf')\n")
-			py:write("_WEIGHT_MIN_BYTES = 52428800\n")
+			py:write("_blobs_dir = os.path.join(_model_cache, 'blobs')\n")
+			py:write("_initial_blobs = set()\n")
+			py:write("if os.path.isdir(_blobs_dir):\n")
+			py:write("    for _fn in os.listdir(_blobs_dir):\n")
+			py:write("        if not _fn.endswith('.lock'):\n")
+			py:write("            _fp = os.path.join(_blobs_dir, _fn)\n")
+			py:write("            if not os.path.islink(_fp):\n")
+			py:write("                try:\n")
+			py:write("                    if os.path.getsize(_fp) > 0: _initial_blobs.add(_fn)\n")
+			py:write("                except: pass\n")
+			py:write("_stop_evt = threading.Event()\n")
 			py:write("def _size_watcher():\n")
 			py:write("    while True:\n")
 			py:write("        try:\n")
 			py:write("            _total = 0\n")
-			py:write("            _done_files = 0\n")
 			py:write("            for _dp, _, _fns in os.walk(_model_cache, followlinks=False):\n")
 			py:write("                for _fn in _fns:\n")
 			py:write("                    _fp = os.path.join(_dp, _fn)\n")
 			py:write("                    if not os.path.islink(_fp):\n")
-			py:write("                        try:\n")
-			py:write("                            _sz = os.path.getsize(_fp)\n")
-			py:write("                            _total += _sz\n")
-			py:write("                            if _fn.endswith(_WEIGHT_EXTS) and _sz >= _WEIGHT_MIN_BYTES:\n")
-			py:write("                                _done_files += 1\n")
+			py:write("                        try: _total += os.path.getsize(_fp)\n")
 			py:write("                        except: pass\n")
 			py:write("            print('__BYTES__:' + str(_total), flush=True)\n")
-			py:write("            if _done_files > 0:\n")
-			py:write("                print('__FILECOUNT__:' + str(_done_files), flush=True)\n")
+			-- Count only NEW blobs (not in _initial_blobs): completed files + in-progress temp files
+			-- (size > 0). +1 gives the 1-based index of the file currently being downloaded.
+			py:write("            _done_blobs = 0\n")
+			py:write("            if os.path.isdir(_blobs_dir):\n")
+			py:write("                for _fn in os.listdir(_blobs_dir):\n")
+			py:write("                    if not _fn.endswith('.lock') and _fn not in _initial_blobs:\n")
+			py:write("                        _fp = os.path.join(_blobs_dir, _fn)\n")
+			py:write("                        if not os.path.islink(_fp):\n")
+			py:write("                            try:\n")
+			py:write("                                if os.path.getsize(_fp) > 0: _done_blobs += 1\n")
+			py:write("                            except: pass\n")
+			py:write("            print('__FILECOUNT__:' + str(_done_blobs + 1), flush=True)\n")
 			py:write("        except Exception as _e:\n")
 			py:write("            print('__BYTES__:ERROR:' + str(_e), flush=True)\n")
 			py:write("        if _stop_evt.wait(2): break\n")
@@ -1119,7 +1106,23 @@ PY
 				-- Parse __DLPID__ here — completion callback gets empty strings when streaming is active
 				if not _dl_pid then
 					local pid_str = out:match("__DLPID__:(%d+)")
-					if pid_str then _dl_pid = tonumber(pid_str) end
+					if pid_str then
+						_dl_pid = tonumber(pid_str)
+						-- Persist PID so a post-reload reattach can check liveness and cancel cleanly
+						local sf = io.open("/tmp/hs_mlx_active_download.json", "r")
+						if sf then
+							local raw = sf:read("*a"); sf:close()
+							local ok_j, sess = pcall(hs.json.decode, raw)
+							if ok_j and type(sess) == "table" then
+								sess.pid = _dl_pid
+								local ok_e, enc = pcall(hs.json.encode, sess)
+								if ok_e and enc then
+									local wf = io.open("/tmp/hs_mlx_active_download.json", "w")
+									if wf then wf:write(enc); wf:close() end
+								end
+							end
+						end
+					end
 				end
 				-- Strip the sentinel line before forwarding to the download window log
 				local clean = out:gsub("__DLPID__:%d+\n?", "")
@@ -1139,6 +1142,152 @@ PY
 			_internal_pull()
 		end)
 	end
+
+	--- Reattaches the download UI and log tail to an already-running detached Python download.
+	--- Called after a Hammerspoon reload when /tmp/hs_mlx_active_download.json exists.
+	--- @param session table Decoded JSON session: { model, log_path, exit_path, pid, repo }.
+	function obj.reattach_download(session)
+		local model     = session.model     or "?"
+		local log_path  = session.log_path  or ""
+		local exit_path = session.exit_path or ""
+		local pid       = session.pid
+
+		Logger.start(LOG, "Reattaching download UI for '%s' (PID %s)…", model, tostring(pid))
+
+		-- Check whether the download finished during the reload window
+		local ef = io.open(exit_path, "r")
+		if ef then
+			local raw = ef:read("*l"); ef:close()
+			local code = tonumber(raw) or 1
+			os.execute("rm -f " .. exit_path .. " 2>/dev/null")
+			os.execute("rm -f /tmp/hs_mlx_active_download.json 2>/dev/null")
+			if code == 0 then
+				pcall(notifications.notify, "🟢 MODÈLE MLX INSTALLÉ", model .. " est prêt !")
+			else
+				pcall(notifications.notify, "❌ Échec MLX", "Le téléchargement de " .. model .. " a échoué pendant le rechargement.")
+			end
+			Logger.info(LOG, "Reattach: download already finished (exit=%d) — no tail needed.", code)
+			return
+		end
+
+		-- Check liveness via kill -0 (no signal sent, just checks if PID exists)
+		if pid then
+			local alive = os.execute("kill -0 " .. tostring(pid) .. " 2>/dev/null")
+			if not alive then
+				os.execute("rm -f /tmp/hs_mlx_active_download.json 2>/dev/null")
+				pcall(notifications.notify, "❌ Téléchargement interrompu", "Le processus de téléchargement de " .. model .. " s'est arrêté pendant le rechargement.")
+				Logger.warn(LOG, "Reattach: PID %d no longer alive — aborting reattach.", pid)
+				return
+			end
+		end
+
+		-- Re-register in active_tasks so the menu item and icon stay active
+		if deps.active_tasks then deps.active_tasks["download_tail"] = true end
+		pcall(deps.update_icon, "📥 …")
+
+		local _tail_task = nil
+
+		local function do_cancel_reattached(silent)
+			if _tail_task then pcall(function() _tail_task:terminate() end); _tail_task = nil end
+			if pid then os.execute("kill -TERM " .. tostring(pid) .. " 2>/dev/null") end
+			if deps.active_tasks then
+				deps.active_tasks["download"]      = nil
+				deps.active_tasks["download_tail"] = nil
+			end
+			pcall(deps.update_icon)
+			os.execute("rm -f /tmp/hs_mlx_active_download.json 2>/dev/null")
+			if not silent then
+				pcall(notifications.notify, "🛑 Annulé", "Téléchargement de " .. model .. " interrompu.")
+				if download_window then pcall(download_window.complete, false, model) end
+			end
+		end
+
+		local function handle_done_reattached()
+			if deps.active_tasks then
+				deps.active_tasks["download"]      = nil
+				deps.active_tasks["download_tail"] = nil
+			end
+			pcall(deps.update_icon)
+			os.execute("rm -f /tmp/hs_mlx_active_download.json 2>/dev/null")
+			local ef2 = io.open(exit_path, "r")
+			local exit_code = 1
+			if ef2 then
+				local raw = ef2:read("*l"); ef2:close()
+				exit_code = tonumber(raw) or 1
+				os.execute("rm -f " .. exit_path .. " 2>/dev/null")
+			end
+			if exit_code == 0 then
+				pcall(notifications.notify, "🟢 MODÈLE MLX INSTALLÉ", model .. " est prêt !")
+				if download_window then pcall(download_window.complete, true, model) end
+				pcall(deps.save_prefs)
+			else
+				if download_window then pcall(download_window.complete, false, model) end
+				pcall(notifications.notify, "❌ Échec MLX", "Vérifiez les logs dans la fenêtre.")
+			end
+		end
+
+		local function process_stream_reattached(out)
+			if not out or out == "" then return end
+			local _bytes_done, _bytes_total, _current_pct = 0, 0, 0
+			local max_bytes = 0
+			for b_str in out:gmatch("__BYTES__:(%d+)") do
+				local b = tonumber(b_str)
+				if b and b > max_bytes then max_bytes = b end
+			end
+			if max_bytes > 0 then _bytes_done = max_bytes end
+			local _python_file_count = nil
+			for fc_str in out:gmatch("__FILECOUNT__:(%d+)") do
+				local fc = tonumber(fc_str)
+				if fc and fc > 0 then _python_file_count = fc end
+			end
+			local icon_pct = math.min(tonumber(out:match("(%d+)%%") or 0) or 0, 99)
+			if icon_pct > 0 then pcall(deps.update_icon, "📥 " .. icon_pct .. "%") end
+			if download_window then
+				pcall(download_window.update, icon_pct, _bytes_done, _bytes_total, out, _python_file_count)
+			end
+		end
+
+		-- Open (or re-focus) the download window
+		if download_window then
+			pcall(download_window.show, model, do_cancel_reattached, "tail -f " .. log_path, nil, {
+				on_retry = function()
+					do_cancel_reattached(true)
+					hs.timer.doAfter(0.05, function()
+						local repo = session.repo or ""
+						if repo ~= "" then obj.pull_model(model, repo, nil) end
+					end)
+				end,
+			})
+		end
+
+		-- Start a new tail -f on the existing log file
+		_tail_task = hs.task.new("/usr/bin/tail", function()
+			hs.timer.doAfter(0.5, function()
+				local ef3 = io.open(exit_path, "r")
+				if ef3 then ef3:close(); handle_done_reattached() end
+			end)
+		end, function(_, stdout, stderr)
+			process_stream_reattached((stdout or "") .. (stderr or ""))
+			return true
+		end, {"-F", "-n", "+1", log_path})
+
+		if _tail_task then
+			deps.active_tasks["download_tail"] = _tail_task
+			pcall(function() _tail_task:start() end)
+		end
+
+		-- Poll for exit file in case tail misses the final flush
+		local function poll_exit_reattached()
+			if not (deps.active_tasks and deps.active_tasks["download_tail"]) then return end
+			local ef4 = io.open(exit_path, "r")
+			if ef4 then ef4:close(); handle_done_reattached()
+			else hs.timer.doAfter(3, poll_exit_reattached) end
+		end
+		hs.timer.doAfter(3, poll_exit_reattached)
+
+		Logger.success(LOG, "Reattached download tail for '%s'.", model)
+	end
+
 
 	function obj.check_requirements(target_model, on_success, on_cancel, opts)
 		if not target_model or target_model == "" then 
