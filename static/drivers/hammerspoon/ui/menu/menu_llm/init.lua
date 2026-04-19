@@ -624,18 +624,12 @@ function M.create(deps)
         local active_backend = state.llm_backend
         local active_display_model = get_display_model_name(state.llm_model, presets)
 
-        local config_file = debug.getinfo(1, "S").source:sub(2):match("^(.*[/\\])") or "./"
-        config_file = config_file:match("^(.*)/ui/") or "./"
-        config_file = config_file .. "config.json"
+        local hf_token_file = (os.getenv("HOME") or "") .. "/.huggingface/token"
         local has_hf_token = false
-        
-        local fh = io.open(config_file, "r")
+        local fh = io.open(hf_token_file, "r")
         if fh then
             local raw = fh:read("*a"); fh:close()
-            local ok, cfg = pcall(hs.json.decode, raw)
-            if ok and type(cfg) == "table" and type(cfg.hf_token) == "string" and cfg.hf_token ~= "" then
-                has_hf_token = true
-            end
+            has_hf_token = type(raw) == "string" and raw:match("^%s*(.-)%s*$") ~= ""
         end
 
         table.insert(menu, {
@@ -980,24 +974,6 @@ function M.create(deps)
         Logger.debug(LOG, string.format("Menu state: paused=%s, llm_enabled=%s, is_disabled=%s", tostring(paused), tostring(state.llm_enabled), tostring(is_disabled)))
         local main_menu = {}
 
-        -- When a download is running, offer a shortcut to bring the progress window back into view.
-        -- The window is easy to lose across Spaces; this item avoids having to hunt for it.
-        local _dl_active = deps.active_tasks and (deps.active_tasks["download"] or deps.active_tasks["download_tail"] or deps.active_tasks["install"])
-        if _dl_active then
-            local _dw = package.loaded["ui.download_window"]
-            table.insert(main_menu, {
-                title = "📥 Téléchargement en cours — Afficher la fenêtre",
-                fn = function()
-                    if _dw and type(_dw.focus) == "function" then
-                        pcall(_dw.focus)
-                    elseif _dw and type(_dw.is_active) == "function" and not _dw.is_active() then
-                        -- Window was closed without cancelling — re-open it (no-op, just notify)
-                        pcall(notifications.notify, "Fenêtre de téléchargement introuvable", "Le téléchargement est toujours en cours en arrière-plan.")
-                    end
-                end
-            })
-            table.insert(main_menu, { title = "-" })
-        end
 
         local backend_title_str = "Moteur IA (Backend) : "
         if state.llm_backend == "mlx" then backend_title_str = backend_title_str .. "MLX 🚀"
@@ -1423,7 +1399,23 @@ function M.create(deps)
 
     check_startup = function()
         Logger.info(LOG, "═══════════════ Starting menu_llm ═══════════════")
-        
+
+        -- Reattach a download that was running before a Hammerspoon reload
+        hs.timer.doAfter(0.5, function()
+            local sf = io.open("/tmp/hs_mlx_active_download.json", "r")
+            if sf then
+                local raw = sf:read("*a"); sf:close()
+                local ok_j, sess = pcall(hs.json.decode, raw)
+                if ok_j and type(sess) == "table" and type(sess.log_path) == "string" then
+                    Logger.info(LOG, "Active download session found after reload — reattaching.")
+                    if models_mgr and type(models_mgr.reattach_download) == "function" then
+                        pcall(models_mgr.reattach_download, sess)
+                        if type(deps.update_menu) == "function" then pcall(deps.update_menu) end
+                    end
+                end
+            end
+        end)
+
         _startup_silence = true
         
         if type(state.llm_trigger_shortcut) == "table" then
@@ -1573,9 +1565,33 @@ function M.create(deps)
         Logger.info(LOG, "═══════════════ Startup completed for menu_llm ═══════════════")
     end
 
-    return { 
-        build_item    = build_item, 
-        check_startup = check_startup 
+    --- Returns a menu item for the active download progress shortcut, or nil if no download is running.
+    --- @return table|nil The menu item, or nil.
+    local function build_download_item()
+        local is_active = deps.active_tasks and (
+            deps.active_tasks["download"] or
+            deps.active_tasks["download_tail"] or
+            deps.active_tasks["install"]
+        )
+        if not is_active then return nil end
+        local _dw = package.loaded["ui.download_window"]
+        return {
+            title = "📥 Téléchargement en cours — Afficher la fenêtre",
+            fn = function()
+                if _dw and type(_dw.focus) == "function" then
+                    pcall(_dw.focus)
+                elseif _dw and type(_dw.is_active) == "function" and not _dw.is_active() then
+                    -- Window was closed without cancelling — download still runs in background
+                    pcall(notifications.notify, "Fenêtre de téléchargement introuvable", "Le téléchargement est toujours en cours en arrière-plan.")
+                end
+            end
+        }
+    end
+
+    return {
+        build_item          = build_item,
+        build_download_item = build_download_item,
+        check_startup       = check_startup
     }
 end
 
