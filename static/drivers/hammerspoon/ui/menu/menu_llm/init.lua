@@ -16,6 +16,7 @@ local hs            = hs
 local llm_mod       = require("modules.llm")
 local shortcut_ui   = require("ui.menu.shortcut_utils")
 local Logger        = require("lib.logger")
+local dialog        = require("lib.dialog_util")
 local notifications = require("lib.notifications")
 local Models        = require("ui.menu.menu_llm.models_manager")
 local Profiles      = require("ui.menu.menu_llm.profiles_manager")
@@ -510,12 +511,11 @@ function M.create(deps)
             else
                 local title = type(opts.dialog_title) == "string" and opts.dialog_title or "Changement de modèle"
                 Logger.debug(LOG, "Displaying profile suggestion dialog…")
-                pcall(hs.focus)
                 local msg = string.format(
                     "Modèle : %s\n%s\n\nPrompt actuel :\n%s\n\nPrompt conseillé :\n%s\n\nValider pour appliquer le prompt conseillé.",
                     display_model_name, power_desc, cur_label, rec_label
                 )
-                local ok, choice = pcall(hs.dialog.blockAlert, title, msg, "Valider", "Annuler", "informational")
+                local ok, choice = pcall(dialog.block_alert, title, msg, "Valider", "Annuler", "informational")
                 Logger.debug(LOG, string.format("Dialog response: %s, choice=%s", tostring(ok), tostring(choice)))
                 if ok and choice == "Valider" then
                     Logger.info(LOG, string.format("Profile changed to %s (dialog accepted).", rec_profile))
@@ -530,12 +530,11 @@ function M.create(deps)
             end
         elseif force_dialog then
             local title = type(opts.dialog_title) == "string" and opts.dialog_title or "Profil recommandé"
-            pcall(hs.focus)
             local msg = string.format(
                 "Modèle : %s\n%s\n\nPrompt actuel :\n%s\n\nPrompt conseillé :\n%s\n\nCe profil est déjà adapté à ce modèle.",
                 display_model_name, power_desc, cur_label, rec_label
             )
-            pcall(hs.dialog.blockAlert, title, msg, "Valider", "Annuler", "informational")
+            pcall(dialog.block_alert, title, msg, "Valider", "Annuler", "informational")
         else
             Logger.debug(LOG, "Recommended profile is already the current profile.")
         end
@@ -717,7 +716,7 @@ function M.create(deps)
                         table.insert(model_submenu, {
                             title = "🗑️ Supprimer ce modèle du cache",
                             fn = function()
-                                local ok, choice = pcall(hs.dialog.blockAlert, "Supprimer le modèle ?", "Voulez-vous vraiment supprimer le modèle \"" .. m_name .. "\" du cache local ?", "Supprimer", "Annuler", "warning")
+                                local ok, choice = pcall(dialog.block_alert, "Supprimer le modèle ?", "Voulez-vous vraiment supprimer le modèle \"" .. m_name .. "\" du cache local ?", "Supprimer", "Annuler", "warning")
                                 if ok and choice == "Supprimer" then
                                     models_mgr.delete_model(m_name)
                                 end

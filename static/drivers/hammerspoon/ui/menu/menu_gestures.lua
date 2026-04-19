@@ -10,6 +10,7 @@ local M = {}
 local hs = hs
 
 local gestures_mod = require("modules.gestures")
+local dialog       = require("lib.dialog_util")
 
 
 
@@ -112,8 +113,7 @@ function M.build(ctx)
 						ctx.updateMenu()
 						if type(conflict) == "table" then
 							hs.timer.doAfter(0.3, function()
-								pcall(hs.focus)
-								local ok_c, clicked = pcall(hs.dialog.blockAlert,
+								local ok_c, clicked = pcall(dialog.block_alert,
 									"⚠️  Conflit potentiel", conflict.msg or "",
 									"Ouvrir Réglages", "Plus tard", "warning")
 								if ok_c and clicked == "Ouvrir Réglages" then
