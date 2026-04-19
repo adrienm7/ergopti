@@ -43,11 +43,12 @@ end
 
 -- Load isolated sub-menu builders safely
 local menu_mods = {
-	gestures   = safe_require("ui.menu.menu_gestures", "gestures menu"),
-	shortcuts  = safe_require("ui.menu.menu_shortcuts", "shortcuts menu"),
+	gestures   = safe_require("ui.menu.menu_gestures",   "gestures menu"),
+	shortcuts  = safe_require("ui.menu.menu_shortcuts",  "shortcuts menu"),
 	hotstrings = safe_require("ui.menu.menu_hotstrings", "hotstrings menu"),
-	llm        = safe_require("ui.menu.menu_llm", "AI menu"),
-	keylogger  = safe_require("ui.menu.menu_metrics", "metrics menu"),
+	llm        = safe_require("ui.menu.menu_llm",        "AI menu"),
+	keylogger  = safe_require("ui.menu.menu_metrics",    "metrics menu"),
+	karabiner  = safe_require("ui.menu.menu_karabiner",  "Karabiner menu"),
 }
 
 -- Load core modules
@@ -79,7 +80,7 @@ M._active_tasks = {}
 --- @param module_sections table Extra module sections definitions.
 --- @return table|nil myMenu The created menubar object.
 --- @return table|nil configWatcher The file watcher object.
-function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, module_sections)
+function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, module_sections, karabiner)
 	base_dir = type(base_dir) == "string" and base_dir or (hs.configdir .. "/")
 	core_mods.keymap = keymap
 	core_mods.gestures = gestures
@@ -543,25 +544,26 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 
 	updateMenu = function()
 		local ctx = {
-			state                  = state,
-			paused                 = core_mods.shortcuts_mod and type(core_mods.shortcuts_mod.is_paused) == "function" and core_mods.shortcuts_mod.is_paused() or false,
-			save_prefs             = save_prefs,
-			updateMenu             = updateMenu,
-			notify_feature         = notify_feature,
-			do_reload              = do_reload,
-			applyTriggerChar       = applyTriggerChar,
-			get_group_name         = Preferences.get_group_name,
-			keymap                 = keymap,
-			hotfiles               = hotfiles,
-			module_sections        = module_sections,
-			hotstring_editor       = hotstring_editor,
-			personal_info          = core_mods.dyn_hot_mod,
-			gestures               = gestures,
-			shortcuts              = core_mods.shortcuts_mod,
-			script_control         = core_mods.shortcuts_mod,
-			apply_metrics_shortcut = apply_metrics_shortcut,
+			state                    = state,
+			paused                   = core_mods.shortcuts_mod and type(core_mods.shortcuts_mod.is_paused) == "function" and core_mods.shortcuts_mod.is_paused() or false,
+			save_prefs               = save_prefs,
+			updateMenu               = updateMenu,
+			notify_feature           = notify_feature,
+			do_reload                = do_reload,
+			applyTriggerChar         = applyTriggerChar,
+			get_group_name           = Preferences.get_group_name,
+			keymap                   = keymap,
+			hotfiles                 = hotfiles,
+			module_sections          = module_sections,
+			hotstring_editor         = hotstring_editor,
+			personal_info            = core_mods.dyn_hot_mod,
+			gestures                 = gestures,
+			shortcuts                = core_mods.shortcuts_mod,
+			script_control           = core_mods.shortcuts_mod,
+			apply_metrics_shortcut   = apply_metrics_shortcut,
 			apply_apps_time_shortcut = apply_apps_time_shortcut,
-			llm_handler            = llm_handler,
+			llm_handler              = llm_handler,
+			karabiner                = karabiner,
 		}
 
 		local actions = {

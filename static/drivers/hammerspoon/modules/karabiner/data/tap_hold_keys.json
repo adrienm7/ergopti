@@ -1,0 +1,157 @@
+[
+    {
+        "id": "escape",
+        "label": "Échap",
+        "from": {
+            "key_code": "escape"
+        }
+    },
+    {
+        "id": "tab",
+        "label": "Tab",
+        "from": {
+            "key_code": "tab",
+            "modifiers": {
+                "optional": [
+                    "any"
+                ]
+            }
+        }
+    },
+    {
+        "id": "caps_lock",
+        "label": "CapsLock",
+        "from": {
+            "key_code": "caps_lock",
+            "modifiers": {
+                "optional": [
+                    "caps_lock",
+                    "left_command",
+                    "right_command",
+                    "left_control",
+                    "right_control",
+                    "left_option",
+                    "left_shift",
+                    "right_shift",
+                    "fn"
+                ]
+            }
+        }
+    },
+    {
+        "id": "left_shift",
+        "label": "Shift gauche",
+        "from": {
+            "key_code": "left_shift",
+            "modifiers": {
+                "optional": [
+                    "any"
+                ]
+            }
+        }
+    },
+    {
+        "id": "fn",
+        "label": "Fn",
+        "from": {
+            "key_code": "fn",
+            "modifiers": {
+                "optional": [
+                    "any"
+                ]
+            }
+        }
+    },
+    {
+        "id": "left_control",
+        "label": "Ctrl gauche",
+        "from": {
+            "key_code": "left_control"
+        }
+    },
+    {
+        "id": "left_option",
+        "label": "Option gauche",
+        "from": {
+            "key_code": "left_option",
+            "modifiers": {
+                "optional": [
+                    "shift",
+                    "control",
+                    "command",
+                    "caps_lock",
+                    "fn"
+                ]
+            }
+        }
+    },
+    {
+        "id": "left_command",
+        "label": "Cmd gauche",
+        "from": {
+            "key_code": "left_command",
+            "modifiers": {
+                "optional": [
+                    "any"
+                ]
+            }
+        }
+    },
+    {
+        "id": "spacebar",
+        "label": "Espace",
+        "from": {
+            "key_code": "spacebar"
+        }
+    },
+    {
+        "id": "right_command",
+        "label": "Cmd droit",
+        "from": {
+            "key_code": "right_command",
+            "modifiers": {
+                "optional": [
+                    "any"
+                ]
+            }
+        }
+    },
+    {
+        "id": "right_option",
+        "label": "Option droite",
+        "from": {
+            "key_code": "right_option",
+            "modifiers": {
+                "optional": [
+                    "any"
+                ]
+            }
+        }
+    },
+    {
+        "id": "right_shift",
+        "label": "Shift droit",
+        "from": {
+            "key_code": "right_shift",
+            "modifiers": {
+                "optional": [
+                    "any"
+                ]
+            }
+        }
+    },
+    {
+        "id": "return_or_enter",
+        "label": "Entrée",
+        "from": {
+            "key_code": "return_or_enter"
+        }
+    },
+    {
+        "id": "delete_or_backspace",
+        "label": "Suppr. arrière",
+        "from": {
+            "key_code": "delete_or_backspace"
+        }
+    }
+]
