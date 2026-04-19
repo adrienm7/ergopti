@@ -1258,8 +1258,13 @@ function M.start(script_control)
 		Logger.success(LOG, "Keylogger engine started.")
 	end)
 
+	-- Run the index evaluation asynchronously so the openssl PBKDF2 passes
+	-- (decrypt/re-encrypt, potentially several seconds each) and the raw-log
+	-- replay never block the HID event tap. Without this, reactivating the
+	-- keylogger on a machine with pending past-day .idx files froze keyboard
+	-- input and the Hammerspoon menu for tens of seconds.
 	hs.timer.doAfter(2, function()
-		local ok, err = pcall(LogManager.rebuild_index_if_needed)
+		local ok, err = pcall(LogManager.rebuild_index_if_needed_async)
 		if not ok then
 			Logger.error(LOG, "Index rebuild on startup failed: %s.", tostring(err))
 		end
