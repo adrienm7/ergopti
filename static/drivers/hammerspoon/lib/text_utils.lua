@@ -72,9 +72,10 @@ function M.utf8_sub(s, i, j)
 	if start_idx < 0 then start_idx = n + start_idx + 1 end
 	if end_idx < 0 then end_idx = n + end_idx + 1 end
 	
-	-- Clamp to bounds
+	-- Clamp to bounds (end_idx may legitimately be 0 — empty-range signal — and
+	-- must not be snapped up to 1, which would silently return a one-char slice).
 	start_idx = math.max(1, math.min(start_idx, n))
-	end_idx   = math.max(1, math.min(end_idx, n))
+	end_idx   = math.max(0, math.min(end_idx, n))
 	
 	if start_idx > end_idx then return "" end
 
