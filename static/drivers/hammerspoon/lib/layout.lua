@@ -26,7 +26,10 @@
 --- ==============================================================================
 
 local M = {}
-local hs = hs
+local hs     = hs
+local Logger = require("lib.logger")
+
+local LOG = "layout"
 
 
 
@@ -176,26 +179,50 @@ end
 --- Example: on Ergopti, physical "O" produces "c", so key_code_for_char("c")
 --- returns "o" — the value to use in Karabiner's key_code field.
 --- Falls back to char itself when the layout cannot be read (assumes QWERTY).
+---
+--- Uses direct indexing (map[char]) rather than pairs(map). Some Hammerspoon
+--- builds back hs.keycodes.map with a metatable __index that responds to
+--- direct lookups but does NOT enumerate via pairs(), which caused earlier
+--- revisions to silently fall through to the char fallback.
 --- @param char string Single character to resolve (e.g. "c").
 --- @return string QWERTY key_code name (e.g. "o").
 function M.key_code_for_char(char)
 	local map = get_map()
-	if not map then return char end
+	if not map then
+		Logger.warn(LOG, "hs.keycodes.map unavailable — falling back to '%s'.", tostring(char))
+		return char
+	end
 
-	-- Step 1: find the keycode number whose layout character matches char
-	local target_keycode = nil
-	for k, v in pairs(map) do
-		if type(k) == "number" and tostring(v) == char then
-			target_keycode = k
-			break
+	-- hs.keycodes.map[char] returns the keycode of the physical key that
+	-- produces `char` on the current layout.
+	local target_keycode = map[char]
+
+	-- Secondary fallback — iterate numeric keys for older HS builds without
+	-- the bidirectional string-key form.
+	if type(target_keycode) ~= "number" then
+		for k, v in pairs(map) do
+			if type(k) == "number" and tostring(v) == char then
+				target_keycode = k
+				break
+			end
 		end
 	end
 
-	if not target_keycode then return char end
+	if type(target_keycode) ~= "number" then
+		Logger.warn(LOG, "No keycode found for char '%s' — falling back to itself.", tostring(char))
+		return char
+	end
 
-	-- Step 2: resolve keycode → QWERTY name via the fixed table
+	-- Resolve keycode → QWERTY name via the fixed table
 	-- (NOT via hs.keycodes.map, which would loop back to the layout character)
-	return KEYCODE_TO_QWERTY_NAME[target_keycode] or char
+	local qwerty_name = KEYCODE_TO_QWERTY_NAME[target_keycode]
+	if not qwerty_name then
+		Logger.warn(LOG, "Keycode %d has no QWERTY name — falling back to char '%s'.",
+			target_keycode, tostring(char))
+		return char
+	end
+
+	return qwerty_name
 end
 
 

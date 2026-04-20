@@ -1030,11 +1030,84 @@ end
 
 
 
--- ======================================
--- ======================================
--- ======= 9/ Pause / Resume ============
--- ======================================
--- ======================================
+-- =======================================
+-- =======================================
+-- ======= 9/ Input Source Watcher =======
+-- =======================================
+-- =======================================
+
+-- macOS can emit two input-source change notifications in rapid succession
+-- during a layout switch — debouncing coalesces them into a single rebuild.
+local INPUT_SOURCE_DEBOUNCE_SEC = 0.25
+
+-- Holds the pending debounce timer so consecutive notifications within the
+-- window supersede the previous one instead of triggering parallel rebuilds.
+local _input_source_timer = nil
+
+--- Refreshes layout-aware action bindings (logical_char → physical key_code)
+--- and rebuilds karabiner.json if the bridge is enabled.
+--- Without this, actions like ⌘C that resolve via logical_char keep pointing
+--- at physical keys from the previous layout until HS is reloaded manually.
+local function on_input_source_changed()
+	local layout_name = "<unknown>"
+	local ok_layout, current = pcall(function() return hs.keycodes.currentLayout() end)
+	if ok_layout and current then layout_name = tostring(current) end
+
+	Logger.start(LOG, "Layout change detected — refreshing actions for layout '%s'…", layout_name)
+
+	-- Re-resolve logical_char entries against the new layout
+	load_available_actions()
+
+	if _state and _state.enabled then
+		M.regenerate()
+		Logger.success(LOG, "Layout-change rebuild complete — KE reloaded from '%s'.", KARABINER_OUT)
+	else
+		Logger.success(LOG, "Layout change processed — bridge disabled, no rebuild.")
+	end
+end
+
+--- Registers a debounced hs.keycodes.inputSourceChanged callback that
+--- triggers on_input_source_changed. The hs.keycodes callback slot is
+--- global — the module assumes exclusive ownership.
+local function start_input_source_watcher()
+	Logger.trace(LOG, "Registering input source watcher…")
+	hs.keycodes.inputSourceChanged(function()
+		Logger.debug(LOG, "Input source notification received — debouncing (%.0fms)…",
+			INPUT_SOURCE_DEBOUNCE_SEC * 1000)
+		if _input_source_timer then
+			pcall(function() _input_source_timer:stop() end)
+		end
+		_input_source_timer = hs.timer.doAfter(INPUT_SOURCE_DEBOUNCE_SEC, function()
+			_input_source_timer = nil
+			local ok, err = pcall(on_input_source_changed)
+			if not ok then
+				Logger.error(LOG, "Input source change handler failed: %s.", tostring(err))
+			end
+		end)
+	end)
+	Logger.done(LOG, "Input source watcher registered.")
+end
+
+--- Clears the hs.keycodes.inputSourceChanged callback and cancels any
+--- pending debounced rebuild.
+local function stop_input_source_watcher()
+	Logger.trace(LOG, "Stopping input source watcher…")
+	pcall(function() hs.keycodes.inputSourceChanged(nil) end)
+	if _input_source_timer then
+		pcall(function() _input_source_timer:stop() end)
+		_input_source_timer = nil
+	end
+	Logger.done(LOG, "Input source watcher stopped.")
+end
+
+
+
+
+-- =======================================
+-- =======================================
+-- ======= 10/ Pause / Resume ============
+-- =======================================
+-- =======================================
 
 -- Minimal karabiner.json deployed on pause: same profile structure as normal but
 -- with zero rules, so KE's FSEvents watcher reloads and applies no remapping.
@@ -1087,7 +1160,7 @@ end
 
 -- ==================================
 -- ==================================
--- ======= 10/ Lifecycle ============
+-- ======= 11/ Lifecycle ============
 -- ==================================
 -- ==================================
 
@@ -1144,6 +1217,7 @@ function M.init()
 	end
 
 	_state.watcher = start_gesture_watcher()
+	start_input_source_watcher()
 
 	local active_combos = 0
 	for _, combo_def in ipairs(M.MOD_COMBOS) do
@@ -1158,12 +1232,13 @@ function M.init()
 		#M.AVAILABLE_ACTIONS, active_combos)
 end
 
---- Stops the trackpad watcher.
+--- Stops the trackpad watcher and the input source watcher.
 function M.stop()
 	if not _state or not _state.watcher then return end
 	Logger.start(LOG, "Stopping Karabiner bridge…")
 	pcall(function() _state.watcher:stop() end)
 	_state.watcher = nil
+	stop_input_source_watcher()
 	Logger.success(LOG, "Karabiner bridge stopped.")
 end
 
