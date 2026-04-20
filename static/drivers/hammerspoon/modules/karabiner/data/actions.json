@@ -254,6 +254,36 @@
         ]
     },
     {
+        "id": "cmd_backspace",
+        "short_label": "Suppr. début de ligne",
+        "label": "⌘⌫ — Supprimer jusqu'au début de ligne",
+        "holdable": false,
+        "category": "Édition",
+        "karabiner_to": [
+            {
+                "key_code": "delete_or_backspace",
+                "modifiers": [
+                    "left_command"
+                ]
+            }
+        ]
+    },
+    {
+        "id": "cmd_delete_fwd",
+        "short_label": "Suppr. fin de ligne",
+        "label": "⌘⌦ — Supprimer jusqu'à la fin de ligne",
+        "holdable": false,
+        "category": "Édition",
+        "karabiner_to": [
+            {
+                "key_code": "delete_forward",
+                "modifiers": [
+                    "left_command"
+                ]
+            }
+        ]
+    },
+    {
         "id": "undo",
         "short_label": "Annuler",
         "label": "⌘Z — Annuler",

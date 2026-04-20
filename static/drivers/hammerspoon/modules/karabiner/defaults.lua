@@ -171,14 +171,17 @@ D.combos = {
     space_bsp                = { "none", "none" },
 
     -- Cmd droit
-    rcmd_esc                 = { "none", "none" },
-    rcmd_tab                 = { "none", "none" },
-    rcmd_caps                = { "none", "none" },
-    rcmd_lshift              = { "none", "none" },
-    rcmd_fn                  = { "none", "none" },
-    rcmd_lctrl               = { "none", "none" },
-    rcmd_lopt                = { "none", "none" },
-    rcmd_lcmd                = { "none", "none" },
+    -- rcmd_lcmd/rcmd_lopt: right_command held used to behave as cmd before the
+    -- tap-hold remap, so cmd+backspace and cmd+forward_delete were triggered
+    -- "for free" via the left tap actions. We define them explicitly now.
+    rcmd_esc                 = { "none",           "none" },
+    rcmd_tab                 = { "none",           "none" },
+    rcmd_caps                = { "none",           "none" },
+    rcmd_lshift              = { "none",           "none" },
+    rcmd_fn                  = { "none",           "none" },
+    rcmd_lctrl               = { "none",           "none" },
+    rcmd_lopt                = { "cmd_delete_fwd", "none" },
+    rcmd_lcmd                = { "cmd_backspace",  "none" },
     rcmd_space               = { "none", "none" },
     rcmd_ropt                = { "none", "none" },
     rcmd_rshift              = { "none", "none" },
