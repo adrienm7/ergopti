@@ -596,19 +596,59 @@ end
 
 tap = eventtap.new({ eventtap.event.types.keyDown }, onKeyDown)
 
+-- Per-side shift state. flagsChanged only tells us "shift is down or up" at
+-- the aggregate level; with both shifts pressed, the old single-slot tracker
+-- was rewritten to whichever side fired the event — including on release,
+-- which left shift_side pointing to the wrong side. We now track each shift
+-- key independently via its own keycode and derive shift_side from the pair.
+local SHIFT_KC_LEFT  = 56
+local SHIFT_KC_RIGHT = 60
+local _shift_left_down   = false
+local _shift_right_down  = false
+-- When both shifts are held simultaneously, shift_side reflects the most
+-- recently pressed one — that matches the user's "active" intent.
+local _shift_last_side   = nil
+
+local function update_shift_side()
+	if _shift_left_down and _shift_right_down then
+		CoreState.shift_side = _shift_last_side or "left"
+	elseif _shift_left_down then
+		CoreState.shift_side = "left"
+	elseif _shift_right_down then
+		CoreState.shift_side = "right"
+	else
+		CoreState.shift_side = nil
+	end
+end
+
 shift_tap = eventtap.new(
 	{ eventtap.event.types.flagsChanged },
 	function(e)
 		local ok, result = pcall(function()
 			local kc = e:getKeyCode()
 			local f  = e:getFlags()
-			if not f.shift then
-				CoreState.shift_side = nil
-			elseif kc == 56 then
-				CoreState.shift_side = "left"
-			elseif kc == 60 then
-				CoreState.shift_side = "right"
+
+			-- The keycode on a flagsChanged event identifies which modifier
+			-- just toggled. We flip the matching side's flag, then resync
+			-- against the aggregate f.shift at the end as a safety net in
+			-- case the watcher missed a release.
+			if kc == SHIFT_KC_LEFT then
+				_shift_left_down = not _shift_left_down
+				if _shift_left_down then _shift_last_side = "left" end
+			elseif kc == SHIFT_KC_RIGHT then
+				_shift_right_down = not _shift_right_down
+				if _shift_right_down then _shift_last_side = "right" end
 			end
+
+			-- Hard reconcile: if the OS says shift is not down, neither side
+			-- can be down — clears any drift from missed events.
+			if not f.shift then
+				_shift_left_down  = false
+				_shift_right_down = false
+				_shift_last_side  = nil
+			end
+
+			update_shift_side()
 			return false
 		end)
 		if not ok then
