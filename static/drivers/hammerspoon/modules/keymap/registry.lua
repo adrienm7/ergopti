@@ -58,6 +58,18 @@ local function tail_codepoint(s)
 	return s:sub(-1)
 end
 
+--- Returns the first UTF-8 codepoint of `s`. Used by terminator matching so
+--- that a multi-codepoint event (e.g. dead-key sequences, IME composition)
+--- whose first codepoint is a single-char terminator still triggers.
+--- @param s string The input string.
+--- @return string The first UTF-8 character, or "" when s is empty.
+local function first_codepoint(s)
+	if type(s) ~= "string" or s == "" then return "" end
+	local ok, off = pcall(utf8.offset, s, 2)
+	if ok and off then return s:sub(1, off - 1) end
+	return s:sub(1, 1)
+end
+
 
 
 
@@ -128,14 +140,18 @@ local function update_terminator_magic_key(magic_key)
 	end
 end
 
---- Returns true if `chars` matches an enabled terminator.
+--- Returns true if `chars` matches an enabled terminator. If `chars` is a
+--- multi-codepoint event, we also compare against its first codepoint so that
+--- dead-key / IME-composed sequences whose leading codepoint is a terminator
+--- still fire the expansion.
 --- @param chars string The typed character(s) to check.
 --- @return boolean
 function M.is_terminator(chars)
+	local first = (#chars > 0) and first_codepoint(chars) or chars
 	for _, def in ipairs(M.TERMINATOR_DEFS) do
 		if def.key and _terminator_enabled[def.key] and def.chars then
 			for _, c in ipairs(def.chars) do
-				if chars == c then return true end
+				if chars == c or first == c then return true end
 			end
 		end
 	end
@@ -143,14 +159,16 @@ function M.is_terminator(chars)
 end
 
 --- Returns true if `chars` matches an enabled terminator that should be consumed
---- (i.e., not re-typed after the expansion fires).
+--- (i.e., not re-typed after the expansion fires). Also recognises the first
+--- codepoint of multi-codepoint events for the same reason as is_terminator().
 --- @param chars string The typed character(s) to check.
 --- @return boolean
 function M.terminator_is_consumed(chars)
+	local first = (#chars > 0) and first_codepoint(chars) or chars
 	for _, def in ipairs(M.TERMINATOR_DEFS) do
 		if def.key and _terminator_enabled[def.key] and def.consume and def.chars then
 			for _, c in ipairs(def.chars) do
-				if chars == c then return true end
+				if chars == c or first == c then return true end
 			end
 		end
 	end
