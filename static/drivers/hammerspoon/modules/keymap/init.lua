@@ -84,6 +84,17 @@ local BUFFER_MAX_CHARS = 500
 -- scan entirely. This keeps the fast path to a single integer compare.
 local BUFFER_TRIM_BYTE_GATE = BUFFER_MAX_CHARS * 4
 
+-- Complex-keystroke delay multiplier. Shift- or Alt-held keystrokes take
+-- longer finger-path time than a bare letter, so we widen the expansion
+-- window for them by this factor.
+local COMPLEX_DELAY_MULT = 2
+
+-- How long after a complex keystroke the bonus multiplier still applies to
+-- the next keystroke — this covers the small lag between releasing Shift
+-- and pressing the next letter. Beyond this window the bonus is dropped so
+-- it cannot inadvertently stretch an expansion on an unrelated later key.
+local COMPLEX_CARRY_SEC = 0.3
+
 -- Central memory struct passed via reference to all sub-modules.
 local CoreState = {
 	buffer                     = "",
@@ -488,9 +499,14 @@ local function onKeyDownRaw(e)
 	end
 
 	-- Complex keystrokes (involving Shift or Alt) allow a wider timing window
-	-- to accommodate the extra finger movement required by the modifier.
-	local is_complex   = flags.shift or flags.alt
-	local complex_mult = (is_complex or CoreState.last_key_was_complex) and 2 or 1
+	-- to accommodate the extra finger movement required by the modifier. The
+	-- bonus also carries over to the NEXT keystroke to cover Shift-release lag
+	-- — but only within a short window (COMPLEX_CARRY_SEC). A long pause
+	-- between a complex key and the following one means the two are unrelated,
+	-- and we must not stretch an expansion delay across that gap.
+	local is_complex       = flags.shift or flags.alt
+	local carry_from_prev  = CoreState.last_key_was_complex and dt <= COMPLEX_CARRY_SEC
+	local complex_mult     = (is_complex or carry_from_prev) and COMPLEX_DELAY_MULT or 1
 	CoreState.last_key_was_complex = is_complex
 
 	local function run_trigger_checks()
