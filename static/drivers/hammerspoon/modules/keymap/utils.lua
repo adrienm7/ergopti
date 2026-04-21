@@ -43,6 +43,12 @@ local PASTE_THRESHOLD = 50
 -- user's previous contents. Large enough to let the target app receive the paste.
 local CLIPBOARD_RESTORE_SEC = 1.5
 
+-- Safety TTL (seconds) for the ignored-window cache. The cache is normally
+-- invalidated on focus-change events (hs.application.watcher + hs.window.filter),
+-- so this long TTL only acts as a net in the unlikely case the watcher misses an
+-- event. Keeping it large means near-zero syscalls per keystroke in steady state.
+local IGNORED_WIN_TTL_SEC = 5.0
+
 -- Mapping from {Placeholder} names inside replacement strings to hs.eventtap key names.
 local KEY_COMMANDS = {
 	Left      = "left",         Right     = "right",
@@ -377,11 +383,76 @@ end
 
 local _ignored_win_cache_time  = 0
 local _ignored_win_cache_value = false
+-- Cache dirty flag: true when the cached value can no longer be trusted
+-- (focus change, first call, or TTL elapsed). Watchers set this to true
+-- synchronously whenever the focused window/app is known to have changed.
+local _ignored_win_cache_dirty = true
+-- Lazy-init singletons for the focus-change watchers. Created on the first
+-- is_ignored_window() call so that module load never forces Hammerspoon to
+-- spin up the accessibility APIs when they are not needed yet.
+local _ignored_win_app_watcher = nil
+local _ignored_win_win_filter  = nil
+
+--- Invalidates the ignored-window cache. Called from focus-change watchers;
+--- also safe to call from anywhere else (tests, manual overrides).
+local function invalidate_ignored_win_cache()
+	_ignored_win_cache_dirty = true
+end
+
+--- Starts focus-change watchers on first use. Any failure is logged and
+--- falls back to the TTL-only cache behavior — the ignored-window logic
+--- must never crash the eventtap.
+local function ensure_ignored_win_watchers()
+	if _ignored_win_app_watcher and _ignored_win_win_filter then return end
+
+	-- Application-level: fires when a different app becomes/leaves frontmost.
+	if not _ignored_win_app_watcher then
+		local ok, watcher = pcall(function()
+			local w = hs.application.watcher.new(function(_name, event, _app)
+				if event == hs.application.watcher.activated
+					or event == hs.application.watcher.deactivated then
+					invalidate_ignored_win_cache()
+				end
+			end)
+			w:start()
+			return w
+		end)
+		if ok and watcher then
+			_ignored_win_app_watcher = watcher
+			Logger.debug(LOG, "Ignored-window cache: application watcher started.")
+		else
+			Logger.warn(LOG, "Ignored-window cache: application watcher setup failed — relying on TTL.")
+		end
+	end
+
+	-- Window-level: fires on intra-app focus changes and title changes (some apps
+	-- reuse one window but change its title between contexts we need to re-evaluate).
+	if not _ignored_win_win_filter then
+		local ok, filter = pcall(function()
+			local f = hs.window.filter.default
+			f:subscribe(
+				{ hs.window.filter.windowFocused, hs.window.filter.windowTitleChanged },
+				invalidate_ignored_win_cache
+			)
+			return f
+		end)
+		if ok and filter then
+			_ignored_win_win_filter = filter
+			Logger.debug(LOG, "Ignored-window cache: window filter subscribed.")
+		else
+			Logger.warn(LOG, "Ignored-window cache: window filter setup failed — relying on TTL.")
+		end
+	end
+end
 
 --- Returns true when the frontmost window is on the ignore list.
 --- The Hammerspoon console check is folded in here so that the single
---- frontmostApplication() call is covered by the 0.5s cache — previously
+--- frontmostApplication() call is covered by the cache — previously
 --- a redundant uncached call was made in init.lua on every keystroke.
+--- Cache invalidation is event-driven (hs.application.watcher +
+--- hs.window.filter), with a long TTL as a safety net. In steady state
+--- (user typing without switching apps/windows), this function performs
+--- zero syscalls.
 --- Accepts the current timestamp from the caller so that the
 --- secondsSinceEpoch() syscall is not duplicated when init.lua already
 --- holds a fresh `now` value.
@@ -392,9 +463,18 @@ local _ignored_win_cache_value = false
 function M.is_ignored_window(ignored_titles, ignored_patterns, now)
 	-- Fallback for callers that don't hold a pre-computed timestamp
 	if not now then now = hs.timer.secondsSinceEpoch() end
-	if now - _ignored_win_cache_time < 0.5 then return _ignored_win_cache_value end
+
+	-- Lazy-init on first use so module load never pays the watcher startup cost.
+	ensure_ignored_win_watchers()
+
+	-- Fast path: cache is clean and TTL has not elapsed.
+	local ttl_elapsed = (now - _ignored_win_cache_time) >= IGNORED_WIN_TTL_SEC
+	if not _ignored_win_cache_dirty and not ttl_elapsed then
+		return _ignored_win_cache_value
+	end
 
 	_ignored_win_cache_time  = now
+	_ignored_win_cache_dirty = false
 	_ignored_win_cache_value = false
 
 	-- Use the focused window directly rather than frontmostApplication() so that
@@ -408,7 +488,7 @@ function M.is_ignored_window(ignored_titles, ignored_patterns, now)
 	if not ok_app or not app then return false end
 
 	-- Always ignore the Hammerspoon console to prevent feedback loops;
-	-- folded here so it benefits from the same 0.5s cache as the rest
+	-- folded here so it benefits from the event-driven cache as the rest.
 	if app:name() == "Hammerspoon" then
 		_ignored_win_cache_value = true
 		return true
