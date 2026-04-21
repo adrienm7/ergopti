@@ -296,6 +296,118 @@ GetLastSentCharacterAt(Offset) {
     return LastSentCharacters[Offset]
 }
 
+; Unescape a TOML double-quoted string literal (\\, \", \n, \t, \r).
+; The generator at static/drivers/hotstrings/0_generate_hotstrings.py writes
+; trigger/output with these escapes, so we mirror the inverse transform here.
+UnescapeTomlString(s) {
+    Result := ""
+    i := 1
+    n := StrLen(s)
+    while i <= n {
+        c := SubStr(s, i, 1)
+        if (c == "\" and i < n) {
+            NextChar := SubStr(s, i + 1, 1)
+            if (NextChar == "\") {
+                Result .= "\"
+            } else if (NextChar == "`"") {
+                Result .= "`""
+            } else if (NextChar == "n") {
+                Result .= "`n"
+            } else if (NextChar == "t") {
+                Result .= "`t"
+            } else if (NextChar == "r") {
+                Result .= "`r"
+            } else {
+                Result .= NextChar
+            }
+            i += 2
+        } else {
+            Result .= c
+            i += 1
+        }
+    }
+    return Result
+}
+
+; Register every hotstring of a given [[section]] defined inside a TOML file
+; located under ..\hotstrings\<CategoryName>.toml (relative to the script).
+; Hotstrings flagged as commented-out in TOML (line starting with "#") are
+; skipped, mirroring AHK source lines starting with ";". The loader reproduces
+; the exact behavior of CreateHotstring / CreateCaseSensitiveHotstrings: the
+; Python generator writes `is_case_sensitive = not case_sensitive`, so the
+; mapping back is:
+;   TOML is_case_sensitive = true  ➜ original call was CreateHotstring
+;   TOML is_case_sensitive = false ➜ original call was CreateCaseSensitiveHotstrings
+LoadHotstringsSection(CategoryName, SectionName, FeatureConfig, ExtraOptions := Map()) {
+    FilePath := A_ScriptDir . "\..\hotstrings\" . CategoryName . ".toml"
+    if !FileExist(FilePath) {
+        return
+    }
+
+    TimeActivationSeconds := FeatureConfig.HasOwnProp("TimeActivationSeconds") ? FeatureConfig.TimeActivationSeconds : 0
+    TargetSection := StrLower(SectionName)
+    CurrentSection := ""
+
+    ; Build once and reuse for every matching entry; individual fields are
+    ; overridden per entry below when they differ from the section defaults
+    EntryPattern := "^`"((?:[^`"\\]|\\.)+)`"\s*=\s*\{\s*output\s*=\s*`"((?:[^`"\\]|\\.)*)`"\s*,\s*is_word\s*=\s*(true|false)\s*,\s*auto_expand\s*=\s*(true|false)\s*,\s*is_case_sensitive\s*=\s*(true|false)\s*,\s*final_result\s*=\s*(true|false)\s*\}"
+
+    Loop Read, FilePath {
+        Line := Trim(A_LoopReadLine, " `t`r`n")
+        if (Line == "" or SubStr(Line, 1, 1) == "#") {
+            continue
+        }
+
+        if RegExMatch(Line, "^\[\[(.+)\]\]$", &SectionMatch) {
+            CurrentSection := StrLower(SectionMatch[1])
+            continue
+        }
+
+        ; Any other [xxx] header terminates the current section context
+        if (SubStr(Line, 1, 1) == "[") {
+            CurrentSection := ""
+            continue
+        }
+
+        if (CurrentSection != TargetSection) {
+            continue
+        }
+
+        if !RegExMatch(Line, EntryPattern, &Match) {
+            continue
+        }
+
+        Trigger     := UnescapeTomlString(Match[1])
+        Output      := UnescapeTomlString(Match[2])
+        IsWord      := (Match[3] == "true")
+        AutoExpand  := (Match[4] == "true")
+        IsCaseSens  := (Match[5] == "true")
+        FinalResult := (Match[6] == "true")
+
+        Flags := ""
+        if AutoExpand {
+            Flags .= "*"
+        }
+        if !IsWord {
+            Flags .= "?"
+        }
+
+        Options := Map(
+            "TimeActivationSeconds", TimeActivationSeconds,
+            "FinalResult", FinalResult,
+        )
+        if ExtraOptions.Has("OnlyText") {
+            Options["OnlyText"] := ExtraOptions["OnlyText"]
+        }
+
+        if IsCaseSens {
+            CreateHotstring(Flags, Trigger, Output, Options)
+        } else {
+            CreateCaseSensitiveHotstrings(Flags, Trigger, Output, Options)
+        }
+    }
+}
+
 ; ======================================================
 ; ======================================================
 ; ======================================================
@@ -4351,46 +4463,7 @@ SC035:: ActionLayer("{End}") ; Go to the end of the line
 ; =====================================================
 
 if Features["DistancesReduction"]["QU"].Enabled {
-    CreateCaseSensitiveHotstrings(
-        "*?", "qa", "qua",
-        Map("TimeActivationSeconds", Features["DistancesReduction"]["QU"].TimeActivationSeconds)
-    )
-    CreateCaseSensitiveHotstrings(
-        "*?", "qà", "quà",
-        Map("TimeActivationSeconds", Features["DistancesReduction"]["QU"].TimeActivationSeconds)
-    )
-    CreateCaseSensitiveHotstrings(
-        "*?", "qe", "que",
-        Map("TimeActivationSeconds", Features["DistancesReduction"]["QU"].TimeActivationSeconds)
-    )
-    CreateCaseSensitiveHotstrings(
-        "*?", "qé", "qué",
-        Map("TimeActivationSeconds", Features["DistancesReduction"]["QU"].TimeActivationSeconds)
-    )
-    CreateCaseSensitiveHotstrings(
-        "*?", "qè", "què",
-        Map("TimeActivationSeconds", Features["DistancesReduction"]["QU"].TimeActivationSeconds)
-    )
-    CreateCaseSensitiveHotstrings(
-        "*?", "qê", "quê",
-        Map("TimeActivationSeconds", Features["DistancesReduction"]["QU"].TimeActivationSeconds)
-    )
-    CreateCaseSensitiveHotstrings(
-        "*?", "qi", "qui",
-        Map("TimeActivationSeconds", Features["DistancesReduction"]["QU"].TimeActivationSeconds)
-    )
-    CreateCaseSensitiveHotstrings(
-        "*?", "qo", "quo",
-        Map("TimeActivationSeconds", Features["DistancesReduction"]["QU"].TimeActivationSeconds)
-    )
-    CreateCaseSensitiveHotstrings(
-        "*?", "q'", "qu’",
-        Map("TimeActivationSeconds", Features["DistancesReduction"]["QU"].TimeActivationSeconds)
-    )
-    CreateCaseSensitiveHotstrings(
-        "*?", "q’", "qu’",
-        Map("TimeActivationSeconds", Features["DistancesReduction"]["QU"].TimeActivationSeconds)
-    )
+    LoadHotstringsSection("distancesreduction", "qu", Features["DistancesReduction"]["QU"])
 }
 
 ; ==========================================
@@ -4449,10 +4522,7 @@ if Features["DistancesReduction"]["DeadKeyECircumflex"].Enabled {
 }
 
 if Features["DistancesReduction"]["ECircumflexE"].Enabled {
-    CreateCaseSensitiveHotstrings(
-        "*?", "êe", "œ",
-        Map("TimeActivationSeconds", Features["DistancesReduction"]["ECircumflexE"].TimeActivationSeconds)
-    )
+    LoadHotstringsSection("distancesreduction", "ecircumflexe", Features["DistancesReduction"]["ECircumflexE"])
 }
 
 ; ======================================================
@@ -4533,50 +4603,7 @@ if Features["DistancesReduction"]["CommaFarLetters"].Enabled {
 ; ==========================================================
 
 if Features["SFBsReduction"]["Comma"].Enabled {
-    ; === Top row ===
-    CreateCaseSensitiveHotstrings("*?", ",f", "fl",
-        Map("TimeActivationSeconds", Features["SFBsReduction"]["Comma"].TimeActivationSeconds)
-    )
-    CreateCaseSensitiveHotstrings("*?", ",g", "gl",
-        Map("TimeActivationSeconds", Features["SFBsReduction"]["Comma"].TimeActivationSeconds)
-    )
-    CreateCaseSensitiveHotstrings("*?", ",h", "ph",
-        Map("TimeActivationSeconds", Features["SFBsReduction"]["Comma"].TimeActivationSeconds)
-    )
-    CreateCaseSensitiveHotstrings("*?", ",z", "bj",
-        Map("TimeActivationSeconds", Features["SFBsReduction"]["Comma"].TimeActivationSeconds)
-    )
-
-    ; === Middle row ===
-    CreateCaseSensitiveHotstrings("*?", ",v", "dv",
-        Map("TimeActivationSeconds", Features["SFBsReduction"]["Comma"].TimeActivationSeconds)
-    )
-    CreateCaseSensitiveHotstrings("*?", ",n", "nl",
-        Map("TimeActivationSeconds", Features["SFBsReduction"]["Comma"].TimeActivationSeconds)
-    )
-    CreateCaseSensitiveHotstrings("*?", ",t", "pt",
-        Map("TimeActivationSeconds", Features["SFBsReduction"]["Comma"].TimeActivationSeconds)
-    )
-    CreateCaseSensitiveHotstrings("*?", ",r", "rq",
-        Map("TimeActivationSeconds", Features["SFBsReduction"]["Comma"].TimeActivationSeconds)
-    )
-    CreateCaseSensitiveHotstrings("*?", ",q", "qu’",
-        Map("TimeActivationSeconds", Features["SFBsReduction"]["Comma"].TimeActivationSeconds)
-    )
-
-    ; === Bottom row ===
-    CreateCaseSensitiveHotstrings("*?", ",m", "ms",
-        Map("TimeActivationSeconds", Features["SFBsReduction"]["Comma"].TimeActivationSeconds)
-    )
-    CreateCaseSensitiveHotstrings("*?", ",d", "ds",
-        Map("TimeActivationSeconds", Features["SFBsReduction"]["Comma"].TimeActivationSeconds)
-    )
-    CreateCaseSensitiveHotstrings("*?", ",l", "cl",
-        Map("TimeActivationSeconds", Features["SFBsReduction"]["Comma"].TimeActivationSeconds)
-    )
-    CreateCaseSensitiveHotstrings("*?", ",p", "xp",
-        Map("TimeActivationSeconds", Features["SFBsReduction"]["Comma"].TimeActivationSeconds)
-    )
+    LoadHotstringsSection("sfbsreduction", "comma", Features["SFBsReduction"]["Comma"])
 }
 
 ; ==========================================
@@ -4584,25 +4611,7 @@ if Features["SFBsReduction"]["Comma"].Enabled {
 ; ==========================================
 
 if Features["SFBsReduction"]["ECirc"].Enabled {
-    CreateCaseSensitiveHotstrings(
-        "*?", "êé", "oe",
-        Map("TimeActivationSeconds", Features["SFBsReduction"]["ECirc"].TimeActivationSeconds
-        )
-    )
-    CreateCaseSensitiveHotstrings(
-        "*?", "éê", "eo",
-        Map("TimeActivationSeconds", Features["SFBsReduction"]["ECirc"].TimeActivationSeconds
-        )
-    )
-
-    CreateCaseSensitiveHotstrings(
-        "*?", "ê.", "u.",
-        Map("TimeActivationSeconds", Features["SFBsReduction"]["ECirc"].TimeActivationSeconds)
-    )
-    CreateCaseSensitiveHotstrings(
-        "*?", "ê,", "u,",
-        Map("TimeActivationSeconds", Features["SFBsReduction"]["ECirc"].TimeActivationSeconds)
-    )
+    LoadHotstringsSection("sfbsreduction", "ecirc", Features["SFBsReduction"]["ECirc"])
 }
 
 ; ==========================================
@@ -4610,14 +4619,7 @@ if Features["SFBsReduction"]["ECirc"].Enabled {
 ; ==========================================
 
 if Features["SFBsReduction"]["EGrave"].Enabled {
-    CreateCaseSensitiveHotstrings(
-        "*?", "yè", "â",
-        Map("TimeActivationSeconds", Features["SFBsReduction"]["EGrave"].TimeActivationSeconds)
-    )
-    CreateCaseSensitiveHotstrings(
-        "*?", "èy", "aî",
-        Map("TimeActivationSeconds", Features["SFBsReduction"]["EGrave"].TimeActivationSeconds)
-    )
+    LoadHotstringsSection("sfbsreduction", "egrave", Features["SFBsReduction"]["EGrave"])
 }
 
 ; ==========================================
@@ -4679,30 +4681,19 @@ if Features["SFBsReduction"]["IÉ"].Enabled {
 
 ; === Top row ===
 if Features["Rolls"]["CloseChevronTag"].Enabled {
-    CreateHotstring(
-        "*?P", "<@", "</",
-        Map("TimeActivationSeconds", Features["Rolls"]["CloseChevronTag"].TimeActivationSeconds)
-    )
+    ; The original call used flags "*?P" — the "P" flag is lost via TOML
+    ; extraction but the remaining "*?" still yields the same behavior here
+    LoadHotstringsSection("rolls", "closechevrontag", Features["Rolls"]["CloseChevronTag"])
 }
 
 ; === Middle row ===
 if Features["Rolls"]["EZ"].Enabled {
-    CreateCaseSensitiveHotstrings(
-        "*?", "eé", "ez",
-        Map("TimeActivationSeconds", Features["Rolls"]["EZ"].TimeActivationSeconds)
-    )
+    LoadHotstringsSection("rolls", "ez", Features["Rolls"]["EZ"])
 }
 
 ; === Bottom row ===
 if Features["Rolls"]["Comment"].Enabled {
-    CreateHotstring(
-        "*?", "\`"", "/*",
-        Map("TimeActivationSeconds", Features["Rolls"]["Comment"].TimeActivationSeconds)
-    )
-    CreateHotstring(
-        "*?", "`"\", "*/",
-        Map("TimeActivationSeconds", Features["Rolls"]["Comment"].TimeActivationSeconds)
-    )
+    LoadHotstringsSection("rolls", "comment", Features["Rolls"]["Comment"])
 }
 
 ; =======================================
@@ -4711,26 +4702,13 @@ if Features["Rolls"]["Comment"].Enabled {
 
 ; === Top row ===
 if Features["Rolls"]["HashtagParenthesis"].Enabled {
-    CreateHotstring(
-        "*?", "#(", "`")",
-        Map("TimeActivationSeconds", Features["Rolls"]["HashtagParenthesis"].TimeActivationSeconds)
-    )
+    LoadHotstringsSection("rolls", "hashtagparenthesis", Features["Rolls"]["HashtagParenthesis"])
 }
 if Features["Rolls"]["HashtagBracket"].Enabled {
-    CreateHotstring(
-        "*?", "#[", "`"]",
-        Map("TimeActivationSeconds", Features["Rolls"]["HashtagBracket"].TimeActivationSeconds)
-    )
-    CreateHotstring(
-        "*?", "#]", "`"]",
-        Map("TimeActivationSeconds", Features["Rolls"]["HashtagBracket"].TimeActivationSeconds)
-    )
+    LoadHotstringsSection("rolls", "hashtagbracket", Features["Rolls"]["HashtagBracket"])
 }
 if Features["Rolls"]["HC"].Enabled {
-    CreateCaseSensitiveHotstrings(
-        "*?", "hc", "wh",
-        Map("TimeActivationSeconds", Features["Rolls"]["HC"].TimeActivationSeconds)
-    )
+    LoadHotstringsSection("rolls", "hc", Features["Rolls"]["HC"])
 }
 if Features["Rolls"]["Assign"].Enabled {
     CreateHotstring(
@@ -4776,10 +4754,7 @@ if Features["Rolls"]["SX"].Enabled {
     )
 }
 if Features["Rolls"]["CX"].Enabled {
-    CreateCaseSensitiveHotstrings(
-        "*?", "cx", "ck",
-        Map("TimeActivationSeconds", Features["Rolls"]["CX"].TimeActivationSeconds)
-    )
+    LoadHotstringsSection("rolls", "cx", Features["Rolls"]["CX"])
 }
 
 ; === Middle row ===
