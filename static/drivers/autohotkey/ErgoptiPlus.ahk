@@ -1,4 +1,4 @@
-; Last modified on 2026-04-12 at 20:06 (UTC+2)
+﻿; Last modified on 2026-04-12 at 20:06 (UTC+2)
 #Requires Autohotkey v2.0+
 #SingleInstance Force ; Ensure that only one instance of the script can run at once
 SetWorkingDir(A_ScriptDir) ; Set the working directory where the script is located
@@ -777,7 +777,7 @@ SC138 & SC153::
 ; Putting everything in this part makes is easy to update your ErgoptiPlus version, as you will only need
 ; to paste this part into the « 2/ PERSONAL SHORTCUTS » part of the new version.
 
-#InputLevel 2 ; Mandatory for this section to work, it needs to be below the InputLevel of the key remappings
+; #InputLevel 2 ; Mandatory for this section to work, it needs to be below the InputLevel of the key remappings
 
 ; ========================================================
 ; ========================================================
@@ -787,7 +787,7 @@ SC138 & SC153::
 ; ========================================================
 ; ========================================================
 
-#InputLevel 2 ; Very important, we need to be at an higher InputLevel to remap the keys into something else.
+; #InputLevel 2 ; Very important, we need to be at an higher InputLevel to remap the keys into something else.
 ; It is because we will then remap keys we just remapped, so the InputLevel of those other shortcuts must be lower
 ; This is especially important for the "★" key, otherwise the hotstrings involving this key won’t trigger.
 
@@ -3734,7 +3734,8 @@ if Features["Autocorrection"]["OU"].Enabled {
 }
 
 if Features["Autocorrection"]["MultiplePunctuationMarks"].Enabled {
-    LoadHotstringsSection("autocorrection", "multiplepunctuationmarks", Features["Autocorrection"]["MultiplePunctuationMarks"])
+    LoadHotstringsSection("autocorrection", "multiplepunctuationmarks", Features["Autocorrection"][
+        "MultiplePunctuationMarks"])
 
     ; We can’t use the TimeActivationSeconds here, as previous character = current character = "."
     Hotstring(
@@ -4013,17 +4014,26 @@ if Features["MagicKey"]["TextExpansionSymbols"].Enabled {
 }
 
 if Features["MagicKey"]["TextExpansionSymbolsTypst"].Enabled {
-    LoadHotstringsSection("magickey", "textexpansionsymbolstypst", Features["MagicKey"]["TextExpansionSymbolsTypst"], Map("OnlyText", False))
+    LoadHotstringsSection("magickey", "textexpansionsymbolstypst", Features["MagicKey"]["TextExpansionSymbolsTypst"],
+        Map("OnlyText", False))
 }
 
 ; ===============================
 ; ======= 9.6) Repeat key =======
 ; ===============================
 
-#InputLevel 1 ; Mandatory for this section to work, it needs to be below the inputlevel of the key remappings
+; #InputLevel 1 ; Mandatory for this section to work, it needs to be below the inputlevel of the key remappings
 
 ; ★ becomes a repeat key. It will activate will the lowest priority of all hotstrings
 ; That means a letter will only be repeated if no hotstring defined above matches
 if Features["MagicKey"]["Repeat"].Enabled {
     LoadHotstringsSection("magickey", "repeat", Features["MagicKey"]["Repeat"])
 }
+
+:*:tc::
+{
+    SendEvent("{Text}OK_ENGINE_WORKS")
+}
+Hotstring(":*CB0O:pex", (*) => SendEvent("{Text}DIRECT_MAGIC_OK"))
+
+CreateHotstring("*", "clé" . ScriptInformation["MagicKey"], "🔑")

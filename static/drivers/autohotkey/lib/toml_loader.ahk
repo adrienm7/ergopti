@@ -21,9 +21,6 @@
 ;    (e.g. ``ie``) used in ``sections_order`` and ``[_meta.sections]``.
 ; ==============================================================================
 
-
-
-
 ; ========================================================
 ; ========================================================
 ; ======= 1/ TOML string and metadata load helpers =======
@@ -75,22 +72,34 @@ UnescapeTomlString(s) {
 LoadHotstringsSection(CategoryName, SectionName, FeatureConfig, ExtraOptions := Map()) {
     FilePath := A_ScriptDir . "\..\hotstrings\" . CategoryName . ".toml"
     if !FileExist(FilePath) {
+        MsgBox("LoadHotstringsSection: FILE NOT FOUND: " . FilePath)
         return
     }
 
-    TimeActivationSeconds := FeatureConfig.HasOwnProp("TimeActivationSeconds") ? FeatureConfig.TimeActivationSeconds : 0
+    TimeActivationSeconds := FeatureConfig.HasOwnProp("TimeActivationSeconds") ? FeatureConfig.TimeActivationSeconds :
+        0
     TargetSection := StrLower(SectionName)
     CurrentSection := ""
+    global _DebugLoadCounts
+    if !IsSet(_DebugLoadCounts) {
+        _DebugLoadCounts := Map()
+    }
+    MatchedEntries := 0
+    TotalLines := 0
+    SectionLines := 0
 
     ; Build once and reuse for every matching entry; individual fields are
     ; overridden per entry below when they differ from the section defaults.
     ; The trailing ``(?:,\s*is_case_sensitive_strict\s*=\s*(true|false)\s*)?``
     ; group makes the strict-case field optional — the generator only emits it
     ; when true, and a missing field must be treated as false by the loader.
-    EntryPattern := "^`"((?:[^`"\\]|\\.)+)`"\s*=\s*\{\s*output\s*=\s*`"((?:[^`"\\]|\\.)*)`"\s*,\s*is_word\s*=\s*(true|false)\s*,\s*auto_expand\s*=\s*(true|false)\s*,\s*is_case_sensitive\s*=\s*(true|false)\s*,\s*final_result\s*=\s*(true|false)\s*(?:,\s*is_case_sensitive_strict\s*=\s*(true|false)\s*)?\}"
+    EntryPattern :=
+        'i)^"([^"\\]*(?:\\.[^"\\]*)*)"\s*=\s*\{\s*output\s*=\s*"([^"\\]*(?:\\.[^"\\]*)*)"\s*,\s*is_word\s*=\s*(true|false)\s*,\s*auto_expand\s*=\s*(true|false)\s*,\s*is_case_sensitive\s*=\s*(true|false)\s*,\s*final_result\s*=\s*(true|false)(?:\s*,\s*is_case_sensitive_strict\s*=\s*(true|false))?\s*\}'
 
-    Loop Read, FilePath {
-        Line := Trim(A_LoopReadLine, " `t`r`n")
+    ; Lecture forcée en UTF-8 pour supporter les accents et la touche étoile ★
+    FileContent := FileRead(FilePath, "UTF-8")
+    loop parse, FileContent, "`n", "`r" {
+        Line := Trim(A_LoopField, " `t")
         if (Line == "" or SubStr(Line, 1, 1) == "#") {
             continue
         }
@@ -114,21 +123,21 @@ LoadHotstringsSection(CategoryName, SectionName, FeatureConfig, ExtraOptions := 
             continue
         }
 
-        Trigger     := UnescapeTomlString(Match[1])
-        Output      := UnescapeTomlString(Match[2])
+        Trigger := UnescapeTomlString(Match[1])
+        Output := UnescapeTomlString(Match[2])
         ; The TOML stores the magic key as the literal ``★`` character because
         ; that is the default; at runtime the user may have re-bound it via the
         ; tray menu, so translate it back to the current ``ScriptInformation``
         ; value before registering the hotstring.
         Trigger := StrReplace(Trigger, "★", ScriptInformation["MagicKey"])
-        IsWord      := (Match[3] == "true")
-        AutoExpand  := (Match[4] == "true")
-        IsCaseSens  := (Match[5] == "true")
+        IsWord := (Match[3] == "true")
+        AutoExpand := (Match[4] == "true")
+        IsCaseSens := (Match[5] == "true")
         FinalResult := (Match[6] == "true")
         ; RegExMatch leaves unmatched optional groups as an empty string in
         ; AHK v2, so compare against "true" — that correctly yields False when
         ; the field is absent from the TOML entry (the generator default).
-        StrictCase  := (Match.Count() >= 7 and Match[7] == "true")
+        StrictCase := (Match[7] == "true")
 
         Flags := ""
         if AutoExpand {
@@ -216,8 +225,10 @@ ApplyTomlMetadataToFeatures(CategoryName) {
     InMetaSections := false
     SectionsOrderRaw := ""
 
-    Loop Read, FilePath {
-        Line := Trim(A_LoopReadLine, " `t`r`n")
+    ; Lecture forcée en UTF-8 pour supporter les accents dans les descriptions
+    FileContent := FileRead(FilePath, "UTF-8")
+    loop parse, FileContent, "`n", "`r" {
+        Line := Trim(A_LoopField, " `t")
         if (Line == "" or SubStr(Line, 1, 1) == "#") {
             continue
         }
@@ -247,8 +258,8 @@ ApplyTomlMetadataToFeatures(CategoryName) {
         if InMetaSections {
             if RegExMatch(Line, "^([A-Za-z0-9_]+)\s*=\s*`"((?:[^`"\\]|\\.)*)`"\s*$", &DescMatch) {
                 LowerKey := StrLower(DescMatch[1])
-                DescRaw  := UnescapeTomlString(DescMatch[2])
-                DescRaw  := StrReplace(DescRaw, "★", ScriptInformation["MagicKey"])
+                DescRaw := UnescapeTomlString(DescMatch[2])
+                DescRaw := StrReplace(DescRaw, "★", ScriptInformation["MagicKey"])
                 if KeyByFolded.Has(LowerKey) {
                     ActualKey := KeyByFolded[LowerKey]
                     FeatureObj := Features[CategoryName][ActualKey]
