@@ -71,6 +71,29 @@ local function first_codepoint(s)
 end
 
 
+--- @class Mapping
+--- Single hotstring entry stored in _state.mappings. Every field is populated
+--- once in add_raw() so the per-keystroke hot path (expander + llm_bridge
+--- preview) does no allocation and no string math on already-known metadata.
+---
+--- @field trigger             string  UTF-8 hotstring the user types.
+--- @field repl                string  Raw replacement, possibly containing tokens.
+--- @field plain_repl          string  Replacement with tokens resolved to literal text; precomputed to skip tokens_from_repl() per keystroke.
+--- @field is_word             boolean True when the trigger must match only at a word boundary.
+--- @field auto                boolean True for auto-expansion triggers (fire without a terminator).
+--- @field seq                 integer Monotonic counter assigned at insertion; used as a stable tiebreaker in the sort.
+--- @field tlen                integer UTF-8 codepoint length of `trigger`.
+--- @field trigger_bytes       integer Byte length of `trigger`; replaces repeated `#trigger` calls in the hot path.
+--- @field tail_char           string  Last UTF-8 codepoint of `trigger`; keys into _state.mappings_by_tail_char.
+--- @field final_result        boolean True when the replacement is a finalized string (skip further substitution passes).
+--- @field has_magic           boolean True when `trigger` ends with the magic key.
+--- @field star_base           string|nil When has_magic, `trigger` minus the trailing magic key; nil otherwise.
+--- @field star_base_bytes     integer|nil Byte length of `star_base`; nil when not magic.
+--- @field star_base_tail_char string|nil Last UTF-8 codepoint of `star_base`; keys into _state.mappings_by_star_tail_char.
+--- @field group               string|nil Name of the owning group, when registered inside a load_file/load_toml scope.
+--- @field group_order         integer Load-order rank of the owning group; acts as the primary sort tiebreaker after trigger length.
+
+
 
 
 -- ====================================
