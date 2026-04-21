@@ -116,9 +116,54 @@ end
 
 
 
+-- ===================================
+-- ===================================
+-- ======= 2/ Shared Internals =======
+-- ===================================
+-- ===================================
+
+--- Returns true when an is_word mapping should be REJECTED because the
+--- character immediately before the trigger's start position is a letter
+--- (or "@", which marks personal-info triggers). Centralised here so auto
+--- and terminator expansion apply the exact same word-boundary policy.
+--- @param buffer string The current rolling buffer.
+--- @param trigger string The trigger whose match is being considered.
+--- @param trigger_start_byte number 1-based byte index where the trigger
+---   starts inside `buffer`. Must be >= 1.
+--- @return boolean True when the word boundary blocks the match.
+local function word_boundary_blocks(buffer, trigger, trigger_start_byte)
+	-- Triggers that start with whitespace carry their own boundary and skip this check.
+	if trigger:match("^[ \194\160\226\128\175]") then return false end
+	if trigger_start_byte <= 1 then return false end
+	local before    = buffer:sub(1, trigger_start_byte - 1)
+	local prev_off  = utf8.offset(before, -1)
+	local prev_char = prev_off and before:sub(prev_off) or ""
+	return text_utils.is_letter_char(prev_char) or prev_char == "@"
+end
+
+--- Chooses the right emitter for a mapping's replacement: plain_text uses
+--- emit_text (fast path, ascii/unicode typing); replacements carrying
+--- {Token} directives go through emit_tokens(tokens_from_repl(m.repl)).
+--- Extracted so both expansion paths share the exact same dispatch logic.
+--- @param m table The mapping entry.
+--- @param to_type string The text to emit when the replacement is plain.
+--- @return number emit_count The number of codepoints emitted.
+--- @return string emitted_str The bytes actually pushed to the OS.
+local function emit_dispatch(m, to_type)
+	if m.plain_repl == m.repl then
+		return km_utils.emit_text(to_type)
+	end
+	-- Lazy: tokens_from_repl() is only called for replacements that contain
+	-- {Token} directives — most hotstrings are plain text and never reach this.
+	return km_utils.emit_tokens(km_utils.tokens_from_repl(m.repl))
+end
+
+
+
+
 -- ======================================
 -- ======================================
--- ======= 2/ Expansion Scenarios =======
+-- ======= 3/ Expansion Scenarios =======
 -- ======================================
 -- ======================================
 
@@ -138,19 +183,11 @@ function M.try_auto_expand(m, char_len, is_ignored)
 	local tb = m.trigger_bytes
 	if #_state.buffer < tb or _state.buffer:sub(-tb) ~= trigger then return false end
 
-	-- Word-boundary check: reject the match when the trigger is preceded by a
-	-- letter or "@" (which is used as a personal-info trigger prefix).
-	if m.is_word
-		and text_utils.utf8_len(_state.buffer) > text_utils.utf8_len(trigger)
-		and not trigger:match("^[ \194\160\226\128\175]")
-	then
-		local tstart    = utf8.offset(_state.buffer, -text_utils.utf8_len(trigger))
-		local before    = tstart and _state.buffer:sub(1, tstart - 1) or ""
-		local prev_off  = utf8.offset(before, -1)
-		local prev_char = prev_off and before:sub(prev_off) or ""
-		if text_utils.is_letter_char(prev_char) or prev_char == "@" then
-			return false
-		end
+	-- Word-boundary check (delegated to shared helper). tstart_byte is the
+	-- 1-based byte index where the trigger begins inside the buffer.
+	local tstart_byte = #_state.buffer - tb + 1
+	if m.is_word and word_boundary_blocks(_state.buffer, trigger, tstart_byte) then
+		return false
 	end
 
 	-- Use the precomputed plain_repl; tokens_from_repl() is only called below
@@ -166,31 +203,26 @@ function M.try_auto_expand(m, char_len, is_ignored)
 
 	-- Compute how many backspaces and what to type, keeping common prefix chars.
 	-- In an ignored window (char_len == 0) there is no "last char" to keep, so
-	-- we must erase the full trigger length.
-	local char_offset = is_ignored and 0 or char_len
-	local deletes, to_type = text_utils.utf8_len(trigger) - char_offset, repl_text
+	-- we must erase the full trigger length. m.tlen is the precomputed UTF-8
+	-- length of the trigger (avoids three utf8_len calls per hot-path hit).
+	local trig_len         = m.tlen
+	local char_offset      = is_ignored and 0 or char_len
+	local screen_len       = trig_len - char_offset
+	local deletes, to_type = screen_len, repl_text
 
 	if repl_text == m.repl then
 		-- Simple text replacement: find the longest shared prefix to minimise backspaces.
-		local screen = text_utils.utf8_sub(trigger, 1, text_utils.utf8_len(trigger) - char_offset)
+		local screen = text_utils.utf8_sub(trigger, 1, screen_len)
 		local common = text_utils.get_common_prefix_utf8(screen, repl_text)
-		deletes = text_utils.utf8_len(screen) - common
+		deletes = screen_len - common
 		to_type = text_utils.utf8_sub(repl_text, common + 1)
 	end
 
 	M.perform_text_replacement(
 		deletes,
+		function() return emit_dispatch(m, to_type) end,
 		function()
-			if repl_text == m.repl then
-				return km_utils.emit_text(to_type)
-			else
-				-- Lazy: tokens_from_repl() only reached for {Token}-bearing replacements
-				return km_utils.emit_tokens(km_utils.tokens_from_repl(m.repl))
-			end
-		end,
-		function()
-			local tstart = utf8.offset(_state.buffer, -text_utils.utf8_len(trigger))
-			_state.buffer = (tstart and _state.buffer:sub(1, tstart - 1) or "") .. repl_text
+			_state.buffer = _state.buffer:sub(1, tstart_byte - 1) .. repl_text
 		end,
 		m.final_result,
 		is_ignored,
@@ -227,16 +259,12 @@ function M.try_terminator_expand(m, chars, char_len, is_ignored)
 	if #buf < tb + chars_bytes then return false end
 	local buf_start   = #buf - chars_bytes - tb + 1
 	if buf:sub(buf_start, buf_start + tb - 1) ~= trigger then return false end
-	local trig_len    = text_utils.utf8_len(trigger)
+	-- Precomputed trigger length; avoids a hot-path utf8.len call.
+	local trig_len    = m.tlen
 
-	-- Word-boundary check: same logic as in try_auto_expand.
-	if m.is_word and not trigger:match("^[ \194\160\226\128\175]") then
-		local before    = buf:sub(1, buf_start - 1)
-		local prev_off  = utf8.offset(before, -1)
-		local prev_char = prev_off and before:sub(prev_off) or ""
-		if text_utils.is_letter_char(prev_char) or prev_char == "@" then
-			return false
-		end
+	-- Word-boundary check (shared helper — same policy as try_auto_expand).
+	if m.is_word and word_boundary_blocks(buf, trigger, buf_start) then
+		return false
 	end
 
 	local consume_term = _registry.terminator_is_consumed(chars)
@@ -273,13 +301,7 @@ function M.try_terminator_expand(m, chars, char_len, is_ignored)
 		M.perform_text_replacement(
 			deletes,
 			function()
-				local c, s = 0, ""
-				if repl_text == m.repl then
-					c, s = km_utils.emit_text(to_type)
-				else
-					-- Lazy: tokens_from_repl() only reached for {Token}-bearing replacements
-					c, s = km_utils.emit_tokens(km_utils.tokens_from_repl(m.repl))
-				end
+				local c, s = emit_dispatch(m, to_type)
 
 				-- Re-type the terminator unless it should be consumed.
 				if not consume_term then
@@ -387,7 +409,7 @@ end
 
 -- =============================
 -- =============================
--- ======= 3/ Module API =======
+-- ======= 4/ Module API =======
 -- =============================
 -- =============================
 
