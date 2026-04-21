@@ -3,490 +3,1689 @@
     "manipulators": [
         {
             "description": "LEFT HAND - Top row: Q — Select to beginning of document",
-            "conditions": [{ "name": "layer_active", "type": "variable_if", "value": 1 }],
-            "from": { "key_code": "q", "modifiers": { "optional": ["any"] } },
-            "to": [{ "key_code": "up_arrow", "modifiers": ["command", "shift"] }],
+            "conditions": [
+                {
+                    "name": "layer_active",
+                    "type": "variable_if",
+                    "value": 1
+                }
+            ],
+            "from": {
+                "key_code": "q",
+                "modifiers": {
+                    "optional": [
+                        "any"
+                    ]
+                }
+            },
+            "to": [
+                {
+                    "key_code": "up_arrow",
+                    "modifiers": [
+                        "command",
+                        "shift"
+                    ]
+                }
+            ],
             "type": "basic"
         },
         {
             "description": "LEFT HAND - Top row: W — Go to beginning of document",
-            "conditions": [{ "name": "layer_active", "type": "variable_if", "value": 1 }],
-            "from": { "key_code": "w", "modifiers": { "optional": ["any"] } },
-            "to": [{ "key_code": "up_arrow", "modifiers": ["command"] }],
+            "conditions": [
+                {
+                    "name": "layer_active",
+                    "type": "variable_if",
+                    "value": 1
+                }
+            ],
+            "from": {
+                "key_code": "w",
+                "modifiers": {
+                    "optional": [
+                        "any"
+                    ]
+                }
+            },
+            "to": [
+                {
+                    "key_code": "up_arrow",
+                    "modifiers": [
+                        "command"
+                    ]
+                }
+            ],
             "type": "basic"
         },
         {
             "description": "LEFT HAND - Top row: E — Go to end of document",
-            "conditions": [{ "name": "layer_active", "type": "variable_if", "value": 1 }],
-            "from": { "key_code": "e", "modifiers": { "optional": ["any"] } },
-            "to": [{ "key_code": "down_arrow", "modifiers": ["command"] }],
+            "conditions": [
+                {
+                    "name": "layer_active",
+                    "type": "variable_if",
+                    "value": 1
+                }
+            ],
+            "from": {
+                "key_code": "e",
+                "modifiers": {
+                    "optional": [
+                        "any"
+                    ]
+                }
+            },
+            "to": [
+                {
+                    "key_code": "down_arrow",
+                    "modifiers": [
+                        "command"
+                    ]
+                }
+            ],
             "type": "basic"
         },
         {
             "description": "LEFT HAND - Top row: R — Select to end of document",
-            "conditions": [{ "name": "layer_active", "type": "variable_if", "value": 1 }],
-            "from": { "key_code": "r", "modifiers": { "optional": ["any"] } },
-            "to": [{ "key_code": "down_arrow", "modifiers": ["command", "shift"] }],
+            "conditions": [
+                {
+                    "name": "layer_active",
+                    "type": "variable_if",
+                    "value": 1
+                }
+            ],
+            "from": {
+                "key_code": "r",
+                "modifiers": {
+                    "optional": [
+                        "any"
+                    ]
+                }
+            },
+            "to": [
+                {
+                    "key_code": "down_arrow",
+                    "modifiers": [
+                        "command",
+                        "shift"
+                    ]
+                }
+            ],
             "type": "basic"
         },
         {
             "description": "LEFT HAND - Top row: T — F2",
-            "conditions": [{ "name": "layer_active", "type": "variable_if", "value": 1 }],
-            "from": { "key_code": "t", "modifiers": { "optional": ["any"] } },
-            "to": [{ "key_code": "f2" }],
+            "conditions": [
+                {
+                    "name": "layer_active",
+                    "type": "variable_if",
+                    "value": 1
+                }
+            ],
+            "from": {
+                "key_code": "t",
+                "modifiers": {
+                    "optional": [
+                        "any"
+                    ]
+                }
+            },
+            "to": [
+                {
+                    "key_code": "f2"
+                }
+            ],
             "type": "basic"
         },
         {
             "description": "LEFT HAND - Middle row: A — Select paragraph up",
-            "conditions": [{ "name": "layer_active", "type": "variable_if", "value": 1 }],
-            "from": { "key_code": "a", "modifiers": { "optional": ["any"] } },
-            "to": [{ "key_code": "up_arrow", "modifiers": ["command", "shift", "option"] }],
+            "conditions": [
+                {
+                    "name": "layer_active",
+                    "type": "variable_if",
+                    "value": 1
+                }
+            ],
+            "from": {
+                "key_code": "a",
+                "modifiers": {
+                    "optional": [
+                        "any"
+                    ]
+                }
+            },
+            "to": [
+                {
+                    "key_code": "up_arrow",
+                    "modifiers": [
+                        "command",
+                        "shift",
+                        "option"
+                    ]
+                }
+            ],
             "type": "basic"
         },
         {
             "description": "LEFT HAND - Middle row: S — Up arrow",
-            "conditions": [{ "name": "layer_active", "type": "variable_if", "value": 1 }],
-            "from": { "key_code": "s", "modifiers": { "optional": ["any"] } },
-            "to": [{ "key_code": "up_arrow" }],
+            "conditions": [
+                {
+                    "name": "layer_active",
+                    "type": "variable_if",
+                    "value": 1
+                }
+            ],
+            "from": {
+                "key_code": "s",
+                "modifiers": {
+                    "optional": [
+                        "any"
+                    ]
+                }
+            },
+            "to": [
+                {
+                    "key_code": "up_arrow"
+                }
+            ],
             "type": "basic"
         },
         {
             "description": "LEFT HAND - Middle row: D — Down arrow",
-            "conditions": [{ "name": "layer_active", "type": "variable_if", "value": 1 }],
-            "from": { "key_code": "d", "modifiers": { "optional": ["any"] } },
-            "to": [{ "key_code": "down_arrow" }],
+            "conditions": [
+                {
+                    "name": "layer_active",
+                    "type": "variable_if",
+                    "value": 1
+                }
+            ],
+            "from": {
+                "key_code": "d",
+                "modifiers": {
+                    "optional": [
+                        "any"
+                    ]
+                }
+            },
+            "to": [
+                {
+                    "key_code": "down_arrow"
+                }
+            ],
             "type": "basic"
         },
         {
             "description": "LEFT HAND - Middle row: F — Select paragraph down",
-            "conditions": [{ "name": "layer_active", "type": "variable_if", "value": 1 }],
-            "from": { "key_code": "f", "modifiers": { "optional": ["any"] } },
-            "to": [{ "key_code": "down_arrow", "modifiers": ["command", "shift", "option"] }],
+            "conditions": [
+                {
+                    "name": "layer_active",
+                    "type": "variable_if",
+                    "value": 1
+                }
+            ],
+            "from": {
+                "key_code": "f",
+                "modifiers": {
+                    "optional": [
+                        "any"
+                    ]
+                }
+            },
+            "to": [
+                {
+                    "key_code": "down_arrow",
+                    "modifiers": [
+                        "command",
+                        "shift",
+                        "option"
+                    ]
+                }
+            ],
             "type": "basic"
         },
         {
             "description": "LEFT HAND - Middle row: G — F12 (Go to definition)",
-            "conditions": [{ "name": "layer_active", "type": "variable_if", "value": 1 }],
-            "from": { "key_code": "g", "modifiers": { "optional": ["any"] } },
-            "to": [{ "key_code": "f12" }],
+            "conditions": [
+                {
+                    "name": "layer_active",
+                    "type": "variable_if",
+                    "value": 1
+                }
+            ],
+            "from": {
+                "key_code": "g",
+                "modifiers": {
+                    "optional": [
+                        "any"
+                    ]
+                }
+            },
+            "to": [
+                {
+                    "key_code": "f12"
+                }
+            ],
             "type": "basic"
         },
         {
             "description": "LEFT HAND - Bottom row: grave — Duplicate line up",
-            "conditions": [{ "name": "layer_active", "type": "variable_if", "value": 1 }],
-            "from": { "key_code": "grave_accent_and_tilde", "modifiers": { "optional": ["any"] } },
-            "to": [{ "key_code": "up_arrow", "modifiers": ["shift", "option"] }],
+            "conditions": [
+                {
+                    "name": "layer_active",
+                    "type": "variable_if",
+                    "value": 1
+                }
+            ],
+            "from": {
+                "key_code": "grave_accent_and_tilde",
+                "modifiers": {
+                    "optional": [
+                        "any"
+                    ]
+                }
+            },
+            "to": [
+                {
+                    "key_code": "up_arrow",
+                    "modifiers": [
+                        "shift",
+                        "option"
+                    ]
+                }
+            ],
             "type": "basic"
         },
         {
             "description": "LEFT HAND - Bottom row: Z — Move line up",
-            "conditions": [{ "name": "layer_active", "type": "variable_if", "value": 1 }],
-            "from": { "key_code": "z", "modifiers": { "optional": ["any"] } },
-            "to": [{ "key_code": "up_arrow", "modifiers": ["option"] }],
+            "conditions": [
+                {
+                    "name": "layer_active",
+                    "type": "variable_if",
+                    "value": 1
+                }
+            ],
+            "from": {
+                "key_code": "z",
+                "modifiers": {
+                    "optional": [
+                        "any"
+                    ]
+                }
+            },
+            "to": [
+                {
+                    "key_code": "up_arrow",
+                    "modifiers": [
+                        "option"
+                    ]
+                }
+            ],
             "type": "basic"
         },
         {
             "description": "LEFT HAND - Bottom row: X — Move line down",
-            "conditions": [{ "name": "layer_active", "type": "variable_if", "value": 1 }],
-            "from": { "key_code": "x", "modifiers": { "optional": ["any"] } },
-            "to": [{ "key_code": "down_arrow", "modifiers": ["option"] }],
+            "conditions": [
+                {
+                    "name": "layer_active",
+                    "type": "variable_if",
+                    "value": 1
+                }
+            ],
+            "from": {
+                "key_code": "x",
+                "modifiers": {
+                    "optional": [
+                        "any"
+                    ]
+                }
+            },
+            "to": [
+                {
+                    "key_code": "down_arrow",
+                    "modifiers": [
+                        "option"
+                    ]
+                }
+            ],
             "type": "basic"
         },
         {
             "description": "LEFT HAND - Bottom row: C — Duplicate line down",
-            "conditions": [{ "name": "layer_active", "type": "variable_if", "value": 1 }],
-            "from": { "key_code": "c", "modifiers": { "optional": ["any"] } },
-            "to": [{ "key_code": "down_arrow", "modifiers": ["shift", "option"] }],
+            "conditions": [
+                {
+                    "name": "layer_active",
+                    "type": "variable_if",
+                    "value": 1
+                }
+            ],
+            "from": {
+                "key_code": "c",
+                "modifiers": {
+                    "optional": [
+                        "any"
+                    ]
+                }
+            },
+            "to": [
+                {
+                    "key_code": "down_arrow",
+                    "modifiers": [
+                        "shift",
+                        "option"
+                    ]
+                }
+            ],
             "type": "basic"
         },
         {
             "description": "LEFT HAND - Bottom row: V — New line below",
-            "conditions": [{ "name": "layer_active", "type": "variable_if", "value": 1 }],
-            "from": { "key_code": "v", "modifiers": { "optional": ["any"] } },
+            "conditions": [
+                {
+                    "name": "layer_active",
+                    "type": "variable_if",
+                    "value": 1
+                }
+            ],
+            "from": {
+                "key_code": "v",
+                "modifiers": {
+                    "optional": [
+                        "any"
+                    ]
+                }
+            },
             "to": [
-                { "key_code": "right_arrow", "modifiers": ["command"] },
-                { "key_code": "return_or_enter" }
+                {
+                    "key_code": "right_arrow",
+                    "modifiers": [
+                        "command"
+                    ]
+                },
+                {
+                    "key_code": "return_or_enter"
+                }
             ],
             "type": "basic"
         },
         {
             "description": "RIGHT HAND - Top row: Y — Select to beginning of line",
-            "conditions": [{ "name": "layer_active", "type": "variable_if", "value": 1 }],
-            "from": { "key_code": "y", "modifiers": { "optional": ["any"] } },
-            "to": [{ "key_code": "left_arrow", "modifiers": ["command", "shift"] }],
+            "conditions": [
+                {
+                    "name": "layer_active",
+                    "type": "variable_if",
+                    "value": 1
+                }
+            ],
+            "from": {
+                "key_code": "y",
+                "modifiers": {
+                    "optional": [
+                        "any"
+                    ]
+                }
+            },
+            "to": [
+                {
+                    "key_code": "left_arrow",
+                    "modifiers": [
+                        "command",
+                        "shift"
+                    ]
+                }
+            ],
             "type": "basic"
         },
         {
             "description": "RIGHT HAND - Top row: U — Select previous word",
-            "conditions": [{ "name": "layer_active", "type": "variable_if", "value": 1 }],
-            "from": { "key_code": "u", "modifiers": { "optional": ["any"] } },
-            "to": [{ "key_code": "left_arrow", "modifiers": ["option", "shift"] }],
+            "conditions": [
+                {
+                    "name": "layer_active",
+                    "type": "variable_if",
+                    "value": 1
+                }
+            ],
+            "from": {
+                "key_code": "u",
+                "modifiers": {
+                    "optional": [
+                        "any"
+                    ]
+                }
+            },
+            "to": [
+                {
+                    "key_code": "left_arrow",
+                    "modifiers": [
+                        "option",
+                        "shift"
+                    ]
+                }
+            ],
             "type": "basic"
         },
         {
             "description": "RIGHT HAND - Top row: I — Select previous character",
-            "conditions": [{ "name": "layer_active", "type": "variable_if", "value": 1 }],
-            "from": { "key_code": "i", "modifiers": { "optional": ["any"] } },
-            "to": [{ "key_code": "left_arrow", "modifiers": ["shift"] }],
+            "conditions": [
+                {
+                    "name": "layer_active",
+                    "type": "variable_if",
+                    "value": 1
+                }
+            ],
+            "from": {
+                "key_code": "i",
+                "modifiers": {
+                    "optional": [
+                        "any"
+                    ]
+                }
+            },
+            "to": [
+                {
+                    "key_code": "left_arrow",
+                    "modifiers": [
+                        "shift"
+                    ]
+                }
+            ],
             "type": "basic"
         },
         {
             "description": "RIGHT HAND - Top row: O — Select next character",
-            "conditions": [{ "name": "layer_active", "type": "variable_if", "value": 1 }],
-            "from": { "key_code": "o", "modifiers": { "optional": ["any"] } },
-            "to": [{ "key_code": "right_arrow", "modifiers": ["shift"] }],
+            "conditions": [
+                {
+                    "name": "layer_active",
+                    "type": "variable_if",
+                    "value": 1
+                }
+            ],
+            "from": {
+                "key_code": "o",
+                "modifiers": {
+                    "optional": [
+                        "any"
+                    ]
+                }
+            },
+            "to": [
+                {
+                    "key_code": "right_arrow",
+                    "modifiers": [
+                        "shift"
+                    ]
+                }
+            ],
             "type": "basic"
         },
         {
             "description": "RIGHT HAND - Top row: P — Select next word",
-            "conditions": [{ "name": "layer_active", "type": "variable_if", "value": 1 }],
-            "from": { "key_code": "p", "modifiers": { "optional": ["any"] } },
-            "to": [{ "key_code": "right_arrow", "modifiers": ["option", "shift"] }],
+            "conditions": [
+                {
+                    "name": "layer_active",
+                    "type": "variable_if",
+                    "value": 1
+                }
+            ],
+            "from": {
+                "key_code": "p",
+                "modifiers": {
+                    "optional": [
+                        "any"
+                    ]
+                }
+            },
+            "to": [
+                {
+                    "key_code": "right_arrow",
+                    "modifiers": [
+                        "option",
+                        "shift"
+                    ]
+                }
+            ],
             "type": "basic"
         },
         {
             "description": "RIGHT HAND - Top row: open_bracket — Select to end of line",
-            "conditions": [{ "name": "layer_active", "type": "variable_if", "value": 1 }],
-            "from": { "key_code": "open_bracket", "modifiers": { "optional": ["any"] } },
-            "to": [{ "key_code": "right_arrow", "modifiers": ["command", "shift"] }],
+            "conditions": [
+                {
+                    "name": "layer_active",
+                    "type": "variable_if",
+                    "value": 1
+                }
+            ],
+            "from": {
+                "key_code": "open_bracket",
+                "modifiers": {
+                    "optional": [
+                        "any"
+                    ]
+                }
+            },
+            "to": [
+                {
+                    "key_code": "right_arrow",
+                    "modifiers": [
+                        "command",
+                        "shift"
+                    ]
+                }
+            ],
             "type": "basic"
         },
         {
             "description": "RIGHT HAND - Middle row: H — Move window to left monitor",
-            "conditions": [{ "name": "layer_active", "type": "variable_if", "value": 1 }],
-            "from": { "key_code": "h", "modifiers": { "optional": ["any"] } },
-            "to": [{ "key_code": "left_arrow", "modifiers": ["control", "option", "command"] }],
+            "conditions": [
+                {
+                    "name": "layer_active",
+                    "type": "variable_if",
+                    "value": 1
+                }
+            ],
+            "from": {
+                "key_code": "h",
+                "modifiers": {
+                    "optional": [
+                        "any"
+                    ]
+                }
+            },
+            "to": [
+                {
+                    "key_code": "left_arrow",
+                    "modifiers": [
+                        "control",
+                        "option",
+                        "command"
+                    ]
+                }
+            ],
             "type": "basic"
         },
         {
             "description": "RIGHT HAND - Middle row: J — Previous word",
-            "conditions": [{ "name": "layer_active", "type": "variable_if", "value": 1 }],
-            "from": { "key_code": "j", "modifiers": { "optional": ["any"] } },
-            "to": [{ "key_code": "left_arrow", "modifiers": ["option"] }],
+            "conditions": [
+                {
+                    "name": "layer_active",
+                    "type": "variable_if",
+                    "value": 1
+                }
+            ],
+            "from": {
+                "key_code": "j",
+                "modifiers": {
+                    "optional": [
+                        "any"
+                    ]
+                }
+            },
+            "to": [
+                {
+                    "key_code": "left_arrow",
+                    "modifiers": [
+                        "option"
+                    ]
+                }
+            ],
             "type": "basic"
         },
         {
             "description": "RIGHT HAND - Middle row: K — Left arrow",
-            "conditions": [{ "name": "layer_active", "type": "variable_if", "value": 1 }],
-            "from": { "key_code": "k", "modifiers": { "optional": ["any"] } },
-            "to": [{ "key_code": "left_arrow" }],
+            "conditions": [
+                {
+                    "name": "layer_active",
+                    "type": "variable_if",
+                    "value": 1
+                }
+            ],
+            "from": {
+                "key_code": "k",
+                "modifiers": {
+                    "optional": [
+                        "any"
+                    ]
+                }
+            },
+            "to": [
+                {
+                    "key_code": "left_arrow"
+                }
+            ],
             "type": "basic"
         },
         {
             "description": "RIGHT HAND - Middle row: L — Right arrow",
-            "conditions": [{ "name": "layer_active", "type": "variable_if", "value": 1 }],
-            "from": { "key_code": "l", "modifiers": { "optional": ["any"] } },
-            "to": [{ "key_code": "right_arrow" }],
+            "conditions": [
+                {
+                    "name": "layer_active",
+                    "type": "variable_if",
+                    "value": 1
+                }
+            ],
+            "from": {
+                "key_code": "l",
+                "modifiers": {
+                    "optional": [
+                        "any"
+                    ]
+                }
+            },
+            "to": [
+                {
+                    "key_code": "right_arrow"
+                }
+            ],
             "type": "basic"
         },
         {
             "description": "RIGHT HAND - Middle row: semicolon — Next word",
-            "conditions": [{ "name": "layer_active", "type": "variable_if", "value": 1 }],
-            "from": { "key_code": "semicolon", "modifiers": { "optional": ["any"] } },
-            "to": [{ "key_code": "right_arrow", "modifiers": ["option"] }],
+            "conditions": [
+                {
+                    "name": "layer_active",
+                    "type": "variable_if",
+                    "value": 1
+                }
+            ],
+            "from": {
+                "key_code": "semicolon",
+                "modifiers": {
+                    "optional": [
+                        "any"
+                    ]
+                }
+            },
+            "to": [
+                {
+                    "key_code": "right_arrow",
+                    "modifiers": [
+                        "option"
+                    ]
+                }
+            ],
             "type": "basic"
         },
         {
             "description": "RIGHT HAND - Middle row: quote — Move window to right monitor",
-            "conditions": [{ "name": "layer_active", "type": "variable_if", "value": 1 }],
-            "from": { "key_code": "quote", "modifiers": { "optional": ["any"] } },
-            "to": [{ "key_code": "right_arrow", "modifiers": ["control", "option", "command"] }],
+            "conditions": [
+                {
+                    "name": "layer_active",
+                    "type": "variable_if",
+                    "value": 1
+                }
+            ],
+            "from": {
+                "key_code": "quote",
+                "modifiers": {
+                    "optional": [
+                        "any"
+                    ]
+                }
+            },
+            "to": [
+                {
+                    "key_code": "right_arrow",
+                    "modifiers": [
+                        "control",
+                        "option",
+                        "command"
+                    ]
+                }
+            ],
             "type": "basic"
         },
         {
             "description": "RIGHT HAND - Bottom row: N — Maximize window",
-            "conditions": [{ "name": "layer_active", "type": "variable_if", "value": 1 }],
-            "from": { "key_code": "n", "modifiers": { "optional": ["any"] } },
-            "to_after_key_up": [{ "key_code": "y", "modifiers": ["fn", "control", "command"] }],
+            "conditions": [
+                {
+                    "name": "layer_active",
+                    "type": "variable_if",
+                    "value": 1
+                }
+            ],
+            "from": {
+                "key_code": "n",
+                "modifiers": {
+                    "optional": [
+                        "any"
+                    ]
+                }
+            },
+            "to_after_key_up": [
+                {
+                    "key_code": "y",
+                    "modifiers": [
+                        "fn",
+                        "control",
+                        "command"
+                    ]
+                }
+            ],
             "type": "basic"
         },
         {
             "description": "RIGHT HAND - Bottom row: M — Go to beginning of line",
-            "conditions": [{ "name": "layer_active", "type": "variable_if", "value": 1 }],
-            "from": { "key_code": "m", "modifiers": { "optional": ["any"] } },
-            "to": [{ "key_code": "left_arrow", "modifiers": ["command"] }],
+            "conditions": [
+                {
+                    "name": "layer_active",
+                    "type": "variable_if",
+                    "value": 1
+                }
+            ],
+            "from": {
+                "key_code": "m",
+                "modifiers": {
+                    "optional": [
+                        "any"
+                    ]
+                }
+            },
+            "to": [
+                {
+                    "key_code": "left_arrow",
+                    "modifiers": [
+                        "command"
+                    ]
+                }
+            ],
             "type": "basic"
         },
         {
             "description": "RIGHT HAND - Bottom row: comma — Move window to left",
-            "conditions": [{ "name": "layer_active", "type": "variable_if", "value": 1 }],
-            "from": { "key_code": "comma", "modifiers": { "optional": ["any"] } },
-            "to": [{ "key_code": "left_arrow", "modifiers": ["fn", "control"] }],
+            "conditions": [
+                {
+                    "name": "layer_active",
+                    "type": "variable_if",
+                    "value": 1
+                }
+            ],
+            "from": {
+                "key_code": "comma",
+                "modifiers": {
+                    "optional": [
+                        "any"
+                    ]
+                }
+            },
+            "to": [
+                {
+                    "key_code": "left_arrow",
+                    "modifiers": [
+                        "fn",
+                        "control"
+                    ]
+                }
+            ],
             "type": "basic"
         },
         {
             "description": "RIGHT HAND - Bottom row: period — Move window to right",
-            "conditions": [{ "name": "layer_active", "type": "variable_if", "value": 1 }],
-            "from": { "key_code": "period", "modifiers": { "optional": ["any"] } },
-            "to": [{ "key_code": "right_arrow", "modifiers": ["fn", "control"] }],
+            "conditions": [
+                {
+                    "name": "layer_active",
+                    "type": "variable_if",
+                    "value": 1
+                }
+            ],
+            "from": {
+                "key_code": "period",
+                "modifiers": {
+                    "optional": [
+                        "any"
+                    ]
+                }
+            },
+            "to": [
+                {
+                    "key_code": "right_arrow",
+                    "modifiers": [
+                        "fn",
+                        "control"
+                    ]
+                }
+            ],
             "type": "basic"
         },
         {
             "description": "RIGHT HAND - Bottom row: slash — Go to end of line",
-            "conditions": [{ "name": "layer_active", "type": "variable_if", "value": 1 }],
-            "from": { "key_code": "slash", "modifiers": { "optional": ["any"] } },
-            "to": [{ "key_code": "right_arrow", "modifiers": ["command"] }],
+            "conditions": [
+                {
+                    "name": "layer_active",
+                    "type": "variable_if",
+                    "value": 1
+                }
+            ],
+            "from": {
+                "key_code": "slash",
+                "modifiers": {
+                    "optional": [
+                        "any"
+                    ]
+                }
+            },
+            "to": [
+                {
+                    "key_code": "right_arrow",
+                    "modifiers": [
+                        "command"
+                    ]
+                }
+            ],
             "type": "basic"
         },
         {
             "description": "NUMBER ROW: Layer + 1 — F1 (fn+F1 when media mode)",
             "conditions": [
-                { "name": "layer_active", "type": "variable_if", "value": 1 },
-                { "name": "system.use_fkeys_as_standard_function_keys", "type": "variable_unless", "value": true }
+                {
+                    "name": "layer_active",
+                    "type": "variable_if",
+                    "value": 1
+                },
+                {
+                    "name": "system.use_fkeys_as_standard_function_keys",
+                    "type": "variable_unless",
+                    "value": true
+                }
             ],
-            "from": { "key_code": "1", "modifiers": { "optional": ["any"] } },
-            "to": [{ "key_code": "f1", "modifiers": ["fn"] }],
+            "from": {
+                "key_code": "1",
+                "modifiers": {
+                    "optional": [
+                        "any"
+                    ]
+                }
+            },
+            "to": [
+                {
+                    "key_code": "f1",
+                    "modifiers": [
+                        "fn"
+                    ]
+                }
+            ],
             "type": "basic"
         },
         {
             "description": "NUMBER ROW: Layer + 1 — F1 (standard mode)",
             "conditions": [
-                { "name": "layer_active", "type": "variable_if", "value": 1 },
-                { "name": "system.use_fkeys_as_standard_function_keys", "type": "variable_if", "value": true }
+                {
+                    "name": "layer_active",
+                    "type": "variable_if",
+                    "value": 1
+                },
+                {
+                    "name": "system.use_fkeys_as_standard_function_keys",
+                    "type": "variable_if",
+                    "value": true
+                }
             ],
-            "from": { "key_code": "1", "modifiers": { "optional": ["any"] } },
-            "to": [{ "key_code": "f1" }],
+            "from": {
+                "key_code": "1",
+                "modifiers": {
+                    "optional": [
+                        "any"
+                    ]
+                }
+            },
+            "to": [
+                {
+                    "key_code": "f1"
+                }
+            ],
             "type": "basic"
         },
         {
             "description": "NUMBER ROW: Layer + 2 — F2 (fn+F2 when media mode)",
             "conditions": [
-                { "name": "layer_active", "type": "variable_if", "value": 1 },
-                { "name": "system.use_fkeys_as_standard_function_keys", "type": "variable_unless", "value": true }
+                {
+                    "name": "layer_active",
+                    "type": "variable_if",
+                    "value": 1
+                },
+                {
+                    "name": "system.use_fkeys_as_standard_function_keys",
+                    "type": "variable_unless",
+                    "value": true
+                }
             ],
-            "from": { "key_code": "2", "modifiers": { "optional": ["any"] } },
-            "to": [{ "key_code": "f2", "modifiers": ["fn"] }],
+            "from": {
+                "key_code": "2",
+                "modifiers": {
+                    "optional": [
+                        "any"
+                    ]
+                }
+            },
+            "to": [
+                {
+                    "key_code": "f2",
+                    "modifiers": [
+                        "fn"
+                    ]
+                }
+            ],
             "type": "basic"
         },
         {
             "description": "NUMBER ROW: Layer + 2 — F2 (standard mode)",
             "conditions": [
-                { "name": "layer_active", "type": "variable_if", "value": 1 },
-                { "name": "system.use_fkeys_as_standard_function_keys", "type": "variable_if", "value": true }
+                {
+                    "name": "layer_active",
+                    "type": "variable_if",
+                    "value": 1
+                },
+                {
+                    "name": "system.use_fkeys_as_standard_function_keys",
+                    "type": "variable_if",
+                    "value": true
+                }
             ],
-            "from": { "key_code": "2", "modifiers": { "optional": ["any"] } },
-            "to": [{ "key_code": "f2" }],
+            "from": {
+                "key_code": "2",
+                "modifiers": {
+                    "optional": [
+                        "any"
+                    ]
+                }
+            },
+            "to": [
+                {
+                    "key_code": "f2"
+                }
+            ],
             "type": "basic"
         },
         {
             "description": "NUMBER ROW: Layer + 3 — F3 (fn+F3 when media mode)",
             "conditions": [
-                { "name": "layer_active", "type": "variable_if", "value": 1 },
-                { "name": "system.use_fkeys_as_standard_function_keys", "type": "variable_unless", "value": true }
+                {
+                    "name": "layer_active",
+                    "type": "variable_if",
+                    "value": 1
+                },
+                {
+                    "name": "system.use_fkeys_as_standard_function_keys",
+                    "type": "variable_unless",
+                    "value": true
+                }
             ],
-            "from": { "key_code": "3", "modifiers": { "optional": ["any"] } },
-            "to": [{ "key_code": "f3", "modifiers": ["fn"] }],
+            "from": {
+                "key_code": "3",
+                "modifiers": {
+                    "optional": [
+                        "any"
+                    ]
+                }
+            },
+            "to": [
+                {
+                    "key_code": "f3",
+                    "modifiers": [
+                        "fn"
+                    ]
+                }
+            ],
             "type": "basic"
         },
         {
             "description": "NUMBER ROW: Layer + 3 — F3 (standard mode)",
             "conditions": [
-                { "name": "layer_active", "type": "variable_if", "value": 1 },
-                { "name": "system.use_fkeys_as_standard_function_keys", "type": "variable_if", "value": true }
+                {
+                    "name": "layer_active",
+                    "type": "variable_if",
+                    "value": 1
+                },
+                {
+                    "name": "system.use_fkeys_as_standard_function_keys",
+                    "type": "variable_if",
+                    "value": true
+                }
             ],
-            "from": { "key_code": "3", "modifiers": { "optional": ["any"] } },
-            "to": [{ "key_code": "f3" }],
+            "from": {
+                "key_code": "3",
+                "modifiers": {
+                    "optional": [
+                        "any"
+                    ]
+                }
+            },
+            "to": [
+                {
+                    "key_code": "f3"
+                }
+            ],
             "type": "basic"
         },
         {
             "description": "NUMBER ROW: Layer + 4 — F4 (fn+F4 when media mode)",
             "conditions": [
-                { "name": "layer_active", "type": "variable_if", "value": 1 },
-                { "name": "system.use_fkeys_as_standard_function_keys", "type": "variable_unless", "value": true }
+                {
+                    "name": "layer_active",
+                    "type": "variable_if",
+                    "value": 1
+                },
+                {
+                    "name": "system.use_fkeys_as_standard_function_keys",
+                    "type": "variable_unless",
+                    "value": true
+                }
             ],
-            "from": { "key_code": "4", "modifiers": { "optional": ["any"] } },
-            "to": [{ "key_code": "f4", "modifiers": ["fn"] }],
+            "from": {
+                "key_code": "4",
+                "modifiers": {
+                    "optional": [
+                        "any"
+                    ]
+                }
+            },
+            "to": [
+                {
+                    "key_code": "f4",
+                    "modifiers": [
+                        "fn"
+                    ]
+                }
+            ],
             "type": "basic"
         },
         {
             "description": "NUMBER ROW: Layer + 4 — F4 (standard mode)",
             "conditions": [
-                { "name": "layer_active", "type": "variable_if", "value": 1 },
-                { "name": "system.use_fkeys_as_standard_function_keys", "type": "variable_if", "value": true }
+                {
+                    "name": "layer_active",
+                    "type": "variable_if",
+                    "value": 1
+                },
+                {
+                    "name": "system.use_fkeys_as_standard_function_keys",
+                    "type": "variable_if",
+                    "value": true
+                }
             ],
-            "from": { "key_code": "4", "modifiers": { "optional": ["any"] } },
-            "to": [{ "key_code": "f4" }],
+            "from": {
+                "key_code": "4",
+                "modifiers": {
+                    "optional": [
+                        "any"
+                    ]
+                }
+            },
+            "to": [
+                {
+                    "key_code": "f4"
+                }
+            ],
             "type": "basic"
         },
         {
             "description": "NUMBER ROW: Layer + 5 — F5 (fn+F5 when media mode)",
             "conditions": [
-                { "name": "layer_active", "type": "variable_if", "value": 1 },
-                { "name": "system.use_fkeys_as_standard_function_keys", "type": "variable_unless", "value": true }
+                {
+                    "name": "layer_active",
+                    "type": "variable_if",
+                    "value": 1
+                },
+                {
+                    "name": "system.use_fkeys_as_standard_function_keys",
+                    "type": "variable_unless",
+                    "value": true
+                }
             ],
-            "from": { "key_code": "5", "modifiers": { "optional": ["any"] } },
-            "to": [{ "key_code": "f5", "modifiers": ["fn"] }],
+            "from": {
+                "key_code": "5",
+                "modifiers": {
+                    "optional": [
+                        "any"
+                    ]
+                }
+            },
+            "to": [
+                {
+                    "key_code": "f5",
+                    "modifiers": [
+                        "fn"
+                    ]
+                }
+            ],
             "type": "basic"
         },
         {
             "description": "NUMBER ROW: Layer + 5 — F5 (standard mode)",
             "conditions": [
-                { "name": "layer_active", "type": "variable_if", "value": 1 },
-                { "name": "system.use_fkeys_as_standard_function_keys", "type": "variable_if", "value": true }
+                {
+                    "name": "layer_active",
+                    "type": "variable_if",
+                    "value": 1
+                },
+                {
+                    "name": "system.use_fkeys_as_standard_function_keys",
+                    "type": "variable_if",
+                    "value": true
+                }
             ],
-            "from": { "key_code": "5", "modifiers": { "optional": ["any"] } },
-            "to": [{ "key_code": "f5" }],
+            "from": {
+                "key_code": "5",
+                "modifiers": {
+                    "optional": [
+                        "any"
+                    ]
+                }
+            },
+            "to": [
+                {
+                    "key_code": "f5"
+                }
+            ],
             "type": "basic"
         },
         {
             "description": "NUMBER ROW: Layer + 6 — F6 (fn+F6 when media mode)",
             "conditions": [
-                { "name": "layer_active", "type": "variable_if", "value": 1 },
-                { "name": "system.use_fkeys_as_standard_function_keys", "type": "variable_unless", "value": true }
+                {
+                    "name": "layer_active",
+                    "type": "variable_if",
+                    "value": 1
+                },
+                {
+                    "name": "system.use_fkeys_as_standard_function_keys",
+                    "type": "variable_unless",
+                    "value": true
+                }
             ],
-            "from": { "key_code": "6", "modifiers": { "optional": ["any"] } },
-            "to": [{ "key_code": "f6", "modifiers": ["fn"] }],
+            "from": {
+                "key_code": "6",
+                "modifiers": {
+                    "optional": [
+                        "any"
+                    ]
+                }
+            },
+            "to": [
+                {
+                    "key_code": "f6",
+                    "modifiers": [
+                        "fn"
+                    ]
+                }
+            ],
             "type": "basic"
         },
         {
             "description": "NUMBER ROW: Layer + 6 — F6 (standard mode)",
             "conditions": [
-                { "name": "layer_active", "type": "variable_if", "value": 1 },
-                { "name": "system.use_fkeys_as_standard_function_keys", "type": "variable_if", "value": true }
+                {
+                    "name": "layer_active",
+                    "type": "variable_if",
+                    "value": 1
+                },
+                {
+                    "name": "system.use_fkeys_as_standard_function_keys",
+                    "type": "variable_if",
+                    "value": true
+                }
             ],
-            "from": { "key_code": "6", "modifiers": { "optional": ["any"] } },
-            "to": [{ "key_code": "f6" }],
+            "from": {
+                "key_code": "6",
+                "modifiers": {
+                    "optional": [
+                        "any"
+                    ]
+                }
+            },
+            "to": [
+                {
+                    "key_code": "f6"
+                }
+            ],
             "type": "basic"
         },
         {
             "description": "NUMBER ROW: Layer + 7 — F7 (fn+F7 when media mode)",
             "conditions": [
-                { "name": "layer_active", "type": "variable_if", "value": 1 },
-                { "name": "system.use_fkeys_as_standard_function_keys", "type": "variable_unless", "value": true }
+                {
+                    "name": "layer_active",
+                    "type": "variable_if",
+                    "value": 1
+                },
+                {
+                    "name": "system.use_fkeys_as_standard_function_keys",
+                    "type": "variable_unless",
+                    "value": true
+                }
             ],
-            "from": { "key_code": "7", "modifiers": { "optional": ["any"] } },
-            "to": [{ "key_code": "f7", "modifiers": ["fn"] }],
+            "from": {
+                "key_code": "7",
+                "modifiers": {
+                    "optional": [
+                        "any"
+                    ]
+                }
+            },
+            "to": [
+                {
+                    "key_code": "f7",
+                    "modifiers": [
+                        "fn"
+                    ]
+                }
+            ],
             "type": "basic"
         },
         {
             "description": "NUMBER ROW: Layer + 7 — F7 (standard mode)",
             "conditions": [
-                { "name": "layer_active", "type": "variable_if", "value": 1 },
-                { "name": "system.use_fkeys_as_standard_function_keys", "type": "variable_if", "value": true }
+                {
+                    "name": "layer_active",
+                    "type": "variable_if",
+                    "value": 1
+                },
+                {
+                    "name": "system.use_fkeys_as_standard_function_keys",
+                    "type": "variable_if",
+                    "value": true
+                }
             ],
-            "from": { "key_code": "7", "modifiers": { "optional": ["any"] } },
-            "to": [{ "key_code": "f7" }],
+            "from": {
+                "key_code": "7",
+                "modifiers": {
+                    "optional": [
+                        "any"
+                    ]
+                }
+            },
+            "to": [
+                {
+                    "key_code": "f7"
+                }
+            ],
             "type": "basic"
         },
         {
             "description": "NUMBER ROW: Layer + 8 — F8 (fn+F8 when media mode)",
             "conditions": [
-                { "name": "layer_active", "type": "variable_if", "value": 1 },
-                { "name": "system.use_fkeys_as_standard_function_keys", "type": "variable_unless", "value": true }
+                {
+                    "name": "layer_active",
+                    "type": "variable_if",
+                    "value": 1
+                },
+                {
+                    "name": "system.use_fkeys_as_standard_function_keys",
+                    "type": "variable_unless",
+                    "value": true
+                }
             ],
-            "from": { "key_code": "8", "modifiers": { "optional": ["any"] } },
-            "to": [{ "key_code": "f8", "modifiers": ["fn"] }],
+            "from": {
+                "key_code": "8",
+                "modifiers": {
+                    "optional": [
+                        "any"
+                    ]
+                }
+            },
+            "to": [
+                {
+                    "key_code": "f8",
+                    "modifiers": [
+                        "fn"
+                    ]
+                }
+            ],
             "type": "basic"
         },
         {
             "description": "NUMBER ROW: Layer + 8 — F8 (standard mode)",
             "conditions": [
-                { "name": "layer_active", "type": "variable_if", "value": 1 },
-                { "name": "system.use_fkeys_as_standard_function_keys", "type": "variable_if", "value": true }
+                {
+                    "name": "layer_active",
+                    "type": "variable_if",
+                    "value": 1
+                },
+                {
+                    "name": "system.use_fkeys_as_standard_function_keys",
+                    "type": "variable_if",
+                    "value": true
+                }
             ],
-            "from": { "key_code": "8", "modifiers": { "optional": ["any"] } },
-            "to": [{ "key_code": "f8" }],
+            "from": {
+                "key_code": "8",
+                "modifiers": {
+                    "optional": [
+                        "any"
+                    ]
+                }
+            },
+            "to": [
+                {
+                    "key_code": "f8"
+                }
+            ],
             "type": "basic"
         },
         {
             "description": "NUMBER ROW: Layer + 9 — F9 (fn+F9 when media mode)",
             "conditions": [
-                { "name": "layer_active", "type": "variable_if", "value": 1 },
-                { "name": "system.use_fkeys_as_standard_function_keys", "type": "variable_unless", "value": true }
+                {
+                    "name": "layer_active",
+                    "type": "variable_if",
+                    "value": 1
+                },
+                {
+                    "name": "system.use_fkeys_as_standard_function_keys",
+                    "type": "variable_unless",
+                    "value": true
+                }
             ],
-            "from": { "key_code": "9", "modifiers": { "optional": ["any"] } },
-            "to": [{ "key_code": "f9", "modifiers": ["fn"] }],
+            "from": {
+                "key_code": "9",
+                "modifiers": {
+                    "optional": [
+                        "any"
+                    ]
+                }
+            },
+            "to": [
+                {
+                    "key_code": "f9",
+                    "modifiers": [
+                        "fn"
+                    ]
+                }
+            ],
             "type": "basic"
         },
         {
             "description": "NUMBER ROW: Layer + 9 — F9 (standard mode)",
             "conditions": [
-                { "name": "layer_active", "type": "variable_if", "value": 1 },
-                { "name": "system.use_fkeys_as_standard_function_keys", "type": "variable_if", "value": true }
+                {
+                    "name": "layer_active",
+                    "type": "variable_if",
+                    "value": 1
+                },
+                {
+                    "name": "system.use_fkeys_as_standard_function_keys",
+                    "type": "variable_if",
+                    "value": true
+                }
             ],
-            "from": { "key_code": "9", "modifiers": { "optional": ["any"] } },
-            "to": [{ "key_code": "f9" }],
+            "from": {
+                "key_code": "9",
+                "modifiers": {
+                    "optional": [
+                        "any"
+                    ]
+                }
+            },
+            "to": [
+                {
+                    "key_code": "f9"
+                }
+            ],
             "type": "basic"
         },
         {
             "description": "NUMBER ROW: Layer + 0 — F10 (fn+F10 when media mode)",
             "conditions": [
-                { "name": "layer_active", "type": "variable_if", "value": 1 },
-                { "name": "system.use_fkeys_as_standard_function_keys", "type": "variable_unless", "value": true }
+                {
+                    "name": "layer_active",
+                    "type": "variable_if",
+                    "value": 1
+                },
+                {
+                    "name": "system.use_fkeys_as_standard_function_keys",
+                    "type": "variable_unless",
+                    "value": true
+                }
             ],
-            "from": { "key_code": "0", "modifiers": { "optional": ["any"] } },
-            "to": [{ "key_code": "f10", "modifiers": ["fn"] }],
+            "from": {
+                "key_code": "0",
+                "modifiers": {
+                    "optional": [
+                        "any"
+                    ]
+                }
+            },
+            "to": [
+                {
+                    "key_code": "f10",
+                    "modifiers": [
+                        "fn"
+                    ]
+                }
+            ],
             "type": "basic"
         },
         {
             "description": "NUMBER ROW: Layer + 0 — F10 (standard mode)",
             "conditions": [
-                { "name": "layer_active", "type": "variable_if", "value": 1 },
-                { "name": "system.use_fkeys_as_standard_function_keys", "type": "variable_if", "value": true }
+                {
+                    "name": "layer_active",
+                    "type": "variable_if",
+                    "value": 1
+                },
+                {
+                    "name": "system.use_fkeys_as_standard_function_keys",
+                    "type": "variable_if",
+                    "value": true
+                }
             ],
-            "from": { "key_code": "0", "modifiers": { "optional": ["any"] } },
-            "to": [{ "key_code": "f10" }],
+            "from": {
+                "key_code": "0",
+                "modifiers": {
+                    "optional": [
+                        "any"
+                    ]
+                }
+            },
+            "to": [
+                {
+                    "key_code": "f10"
+                }
+            ],
             "type": "basic"
         },
         {
             "description": "NUMBER ROW: Layer + hyphen — F11 (fn+F11 when media mode)",
             "conditions": [
-                { "name": "layer_active", "type": "variable_if", "value": 1 },
-                { "name": "system.use_fkeys_as_standard_function_keys", "type": "variable_unless", "value": true }
+                {
+                    "name": "layer_active",
+                    "type": "variable_if",
+                    "value": 1
+                },
+                {
+                    "name": "system.use_fkeys_as_standard_function_keys",
+                    "type": "variable_unless",
+                    "value": true
+                }
             ],
-            "from": { "key_code": "hyphen", "modifiers": { "optional": ["any"] } },
-            "to": [{ "key_code": "f11", "modifiers": ["fn"] }],
+            "from": {
+                "key_code": "hyphen",
+                "modifiers": {
+                    "optional": [
+                        "any"
+                    ]
+                }
+            },
+            "to": [
+                {
+                    "key_code": "f11",
+                    "modifiers": [
+                        "fn"
+                    ]
+                }
+            ],
             "type": "basic"
         },
         {
             "description": "NUMBER ROW: Layer + hyphen — F11 (standard mode)",
             "conditions": [
-                { "name": "layer_active", "type": "variable_if", "value": 1 },
-                { "name": "system.use_fkeys_as_standard_function_keys", "type": "variable_if", "value": true }
+                {
+                    "name": "layer_active",
+                    "type": "variable_if",
+                    "value": 1
+                },
+                {
+                    "name": "system.use_fkeys_as_standard_function_keys",
+                    "type": "variable_if",
+                    "value": true
+                }
             ],
-            "from": { "key_code": "hyphen", "modifiers": { "optional": ["any"] } },
-            "to": [{ "key_code": "f11" }],
+            "from": {
+                "key_code": "hyphen",
+                "modifiers": {
+                    "optional": [
+                        "any"
+                    ]
+                }
+            },
+            "to": [
+                {
+                    "key_code": "f11"
+                }
+            ],
             "type": "basic"
         },
         {
             "description": "NUMBER ROW: Layer + equal_sign — F12 (fn+F12 when media mode)",
             "conditions": [
-                { "name": "layer_active", "type": "variable_if", "value": 1 },
-                { "name": "system.use_fkeys_as_standard_function_keys", "type": "variable_unless", "value": true }
+                {
+                    "name": "layer_active",
+                    "type": "variable_if",
+                    "value": 1
+                },
+                {
+                    "name": "system.use_fkeys_as_standard_function_keys",
+                    "type": "variable_unless",
+                    "value": true
+                }
             ],
-            "from": { "key_code": "equal_sign", "modifiers": { "optional": ["any"] } },
-            "to": [{ "key_code": "f12", "modifiers": ["fn"] }],
+            "from": {
+                "key_code": "equal_sign",
+                "modifiers": {
+                    "optional": [
+                        "any"
+                    ]
+                }
+            },
+            "to": [
+                {
+                    "key_code": "f12",
+                    "modifiers": [
+                        "fn"
+                    ]
+                }
+            ],
             "type": "basic"
         },
         {
             "description": "NUMBER ROW: Layer + equal_sign — F12 (standard mode)",
             "conditions": [
-                { "name": "layer_active", "type": "variable_if", "value": 1 },
-                { "name": "system.use_fkeys_as_standard_function_keys", "type": "variable_if", "value": true }
+                {
+                    "name": "layer_active",
+                    "type": "variable_if",
+                    "value": 1
+                },
+                {
+                    "name": "system.use_fkeys_as_standard_function_keys",
+                    "type": "variable_if",
+                    "value": true
+                }
             ],
-            "from": { "key_code": "equal_sign", "modifiers": { "optional": ["any"] } },
-            "to": [{ "key_code": "f12" }],
+            "from": {
+                "key_code": "equal_sign",
+                "modifiers": {
+                    "optional": [
+                        "any"
+                    ]
+                }
+            },
+            "to": [
+                {
+                    "key_code": "f12"
+                }
+            ],
             "type": "basic"
         },
         {
             "description": "Layer + Space — Spotlight (Cmd+Space)",
-            "conditions": [{ "name": "layer_active", "type": "variable_if", "value": 1 }],
-            "from": { "key_code": "spacebar", "modifiers": { "optional": ["any"] } },
-            "to": [{ "key_code": "spacebar", "modifiers": ["command"] }],
+            "conditions": [
+                {
+                    "name": "layer_active",
+                    "type": "variable_if",
+                    "value": 1
+                }
+            ],
+            "from": {
+                "key_code": "spacebar",
+                "modifiers": {
+                    "optional": [
+                        "any"
+                    ]
+                }
+            },
+            "to": [
+                {
+                    "key_code": "spacebar",
+                    "modifiers": [
+                        "command"
+                    ]
+                }
+            ],
             "type": "basic"
         },
         {
-            "description": "Layer + Right Command — Escape",
-            "conditions": [{ "name": "layer_active", "type": "variable_if", "value": 1 }],
-            "from": { "key_code": "right_command", "modifiers": { "optional": ["any"] } },
-            "to": [{ "key_code": "escape" }],
+            "description": "Layer + Right Command — tap: Escape / hold: Option+Shift (symbol layer access)",
+            "conditions": [
+                {
+                    "name": "layer_active",
+                    "type": "variable_if",
+                    "value": 1
+                }
+            ],
+            "from": {
+                "key_code": "right_command",
+                "modifiers": {
+                    "optional": [
+                        "any"
+                    ]
+                }
+            },
+            "to_if_alone": [
+                {
+                    "key_code": "escape"
+                }
+            ],
+            "to": [
+                {
+                    "key_code": "left_shift",
+                    "modifiers": [
+                        "left_option"
+                    ]
+                }
+            ],
             "type": "basic"
         },
         {
             "description": "Layer + Tab — Cycle windows in app (Cmd+`)",
-            "conditions": [{ "name": "layer_active", "type": "variable_if", "value": 1 }],
-            "from": { "key_code": "tab", "modifiers": { "optional": ["any"] } },
-            "to": [{ "key_code": "non_us_backslash", "modifiers": ["command"] }],
+            "conditions": [
+                {
+                    "name": "layer_active",
+                    "type": "variable_if",
+                    "value": 1
+                }
+            ],
+            "from": {
+                "key_code": "tab",
+                "modifiers": {
+                    "optional": [
+                        "any"
+                    ]
+                }
+            },
+            "to": [
+                {
+                    "key_code": "non_us_backslash",
+                    "modifiers": [
+                        "command"
+                    ]
+                }
+            ],
             "type": "basic"
         }
     ]

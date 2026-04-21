@@ -60,9 +60,22 @@ for _, def in ipairs(ACTION_DEFINITIONS) do
 	table.insert(ACTIONS_ORDER, def.id)
 end
 
--- Physical key codes for the three configurable key slots
-local KEYCODE_RETURN    = 36
+-- Sentinel keycodes emitted by Karabiner's script-control rules
+-- (modules/karabiner/init.lua → build_script_control_sentinel_rules).
+-- These fire ONLY when the user physically presses right_command + one of the
+-- three target keys. Tap actions that happen to emit backspace/return/escape
+-- (e.g. left_command tap → backspace) can NEVER activate these sentinels,
+-- because rule outputs bypass Karabiner's rule engine.
+local KEYCODE_F18 = 79   -- Backspace slot
+local KEYCODE_F19 = 80   -- Return / enter slot
+local KEYCODE_F20 = 90   -- Escape slot
+
+-- Physical keycodes used in the Karabiner-paused fallback path below. When KE is
+-- running the sentinels above are the sole dispatch mechanism; this fallback
+-- only exists so the user can still un-pause by pressing right_command + key
+-- when KE's altgr remap is gone.
 local KEYCODE_BACKSPACE = 51
+local KEYCODE_RETURN    = 36
 local KEYCODE_ESCAPE    = 53
 
 -- Module-level state
@@ -86,46 +99,31 @@ local _karabiner = nil
 -- =====================================
 -- =====================================
 
---- Returns true when the event is triggered with only the right Option key held.
---- Accepts two physical sources:
----   • right_option directly  — normal operation with Karabiner running (right_command
----     is remapped to right_option by KE's tap/hold rule).
----   • right_command directly — fallback when Karabiner is paused/killed and the
----     remapping is gone; physical right_command fires as cmd, not alt.
---- Rejects left-side modifiers and any combination with Ctrl or Shift.
+--- Returns true when the event carries ONLY the right_command modifier — the
+--- KE-paused fallback path. When KE is running, right_command is remapped to
+--- right_option and physical script-control dispatch goes through the sentinel
+--- keycodes emitted by KE (F18/F19/F20). When KE is paused/killed the remap is
+--- gone, physical right_command fires as cmd, and this predicate lets the user
+--- still un-pause via the old right_cmd + key combination.
+--- Rejects any event that also has alt/ctrl/shift or left_command held.
 --- @param e userdata The hs.eventtap.event object.
---- @return boolean True if the AltGr modifier is the sole active modifier.
-local function is_right_alt_only(e)
+--- @return boolean True if the event is exactly right_command + key.
+local function is_right_cmd_only(e)
 	if type(e) ~= "userdata" or type(e.getFlags) ~= "function" then return false end
 
 	local ok_flags, flags = pcall(function() return e:getFlags() end)
 	if not ok_flags or type(flags) ~= "table" then return false end
 
-	if flags.ctrl or flags.shift then return false end
+	if flags.alt or flags.ctrl or flags.shift or not flags.cmd then return false end
 
 	local ok_raw, raw = pcall(function() return e:rawFlags() end)
 	local masks = (ok_raw and type(raw) == "number") and hs.eventtap.event.rawFlagMasks or nil
+	if not masks then return false end
 
-	-- Case 1: right_option present (Karabiner remapping active)
-	if flags.alt and not flags.cmd then
-		if not masks then return true end
-		local right_alt  = masks.deviceRightAlternate or 0
-		local left_alt   = masks.deviceLeftAlternate  or 0
-		if right_alt == 0 then return true end
-		return (raw & right_alt) ~= 0 and (raw & left_alt) == 0
-	end
-
-	-- Case 2: right_command only (Karabiner paused — physical key fires as cmd)
-	-- Accept when cmd is set but alt is not, and rawFlags confirms right-side command.
-	if flags.cmd and not flags.alt then
-		if not masks then return false end
-		local right_cmd = masks.deviceRightCommand or 0
-		local left_cmd  = masks.deviceLeftCommand  or 0
-		if right_cmd == 0 then return false end
-		return (raw & right_cmd) ~= 0 and (raw & left_cmd) == 0
-	end
-
-	return false
+	local right_cmd = masks.deviceRightCommand or 0
+	local left_cmd  = masks.deviceLeftCommand  or 0
+	if right_cmd == 0 then return false end
+	return (raw & right_cmd) ~= 0 and (raw & left_cmd) == 0
 end
 
 
@@ -207,7 +205,12 @@ local function dispatch_action(action)
 		return true
 
 	elseif action == "quit_hammerspoon" then
-		Logger.info(LOG, "Shutting down Hammerspoon.")
+		Logger.info(LOG, "Shutting down Hammerspoon and Karabiner-Elements.")
+		-- Kill KE synchronously before the exit timer fires; hs.execute blocks
+		-- briefly here but that is acceptable since we are about to exit anyway.
+		if _karabiner and type(_karabiner.kill) == "function" then
+			pcall(function() _karabiner.kill() end)
+		end
 		hs.timer.doAfter(0.1, function() os.exit(0) end)
 		return true
 
@@ -226,39 +229,63 @@ local function dispatch_action(action)
 	return false
 end
 
+--- Logs a shortcut activation via the keylogger if available.
+--- @param label string Human-readable shortcut label for the log.
+local function log_shortcut_if_available(label)
+	local ok_kl, kl = pcall(require, "modules.keylogger")
+	if ok_kl and kl and type(kl.log_shortcut) == "function" then
+		local app = hs.application.frontmostApplication()
+		pcall(kl.log_shortcut, label, app and app:title() or "Unknown")
+	end
+end
+
 --- Handles incoming keyDown events; consumes the event when it matches a configured slot.
+---
+--- Two independent dispatch paths:
+---   1. Sentinel keycodes (F18/F19/F20) — emitted by Karabiner's script-control
+---      rules on physical right_command + backspace/return/escape. This is the
+---      primary path when KE is running and cannot be spoofed by tap actions,
+---      because KE rule outputs bypass further rule matching.
+---   2. Right-command fallback — when KE is paused/killed, physical right_command
+---      fires as cmd (not alt), so we accept rcmd + backspace/return/escape
+---      directly so the user can still un-pause without reloading.
+---
 --- @param e userdata The hs.eventtap.event object.
 --- @return boolean True to consume the keystroke, false to pass it through.
 local function handle_key(e)
-	if not is_right_alt_only(e) then return false end
-
 	local ok, code = pcall(function() return e:getKeyCode() end)
 	if not ok or type(code) ~= "number" then return false end
 
-	if code == KEYCODE_RETURN then
-		local ok_kl, kl = pcall(require, "modules.keylogger")
-		if ok_kl and kl and type(kl.log_shortcut) == "function" then
-			local app = hs.application.frontmostApplication()
-			pcall(kl.log_shortcut, "Alt+Enter", app and app:title() or "Unknown")
-		end
-		return dispatch_action(_key_actions.return_key)
+	-- Primary path: sentinel keycodes from KE's script-control rules.
+	if code == KEYCODE_F18 then
+		log_shortcut_if_available("Alt+Backspace")
+		dispatch_action(_key_actions.backspace)
+		return true
 	end
+	if code == KEYCODE_F19 then
+		log_shortcut_if_available("Alt+Enter")
+		dispatch_action(_key_actions.return_key)
+		return true
+	end
+	if code == KEYCODE_F20 then
+		log_shortcut_if_available("Alt+Escape")
+		dispatch_action(_key_actions.escape)
+		return true
+	end
+
+	-- Fallback path: KE paused — physical right_command + target key.
+	if not is_right_cmd_only(e) then return false end
 
 	if code == KEYCODE_BACKSPACE then
-		local ok_kl, kl = pcall(require, "modules.keylogger")
-		if ok_kl and kl and type(kl.log_shortcut) == "function" then
-			local app = hs.application.frontmostApplication()
-			pcall(kl.log_shortcut, "Alt+Backspace", app and app:title() or "Unknown")
-		end
+		log_shortcut_if_available("Alt+Backspace")
 		return dispatch_action(_key_actions.backspace)
 	end
-
+	if code == KEYCODE_RETURN then
+		log_shortcut_if_available("Alt+Enter")
+		return dispatch_action(_key_actions.return_key)
+	end
 	if code == KEYCODE_ESCAPE then
-		local ok_kl, kl = pcall(require, "modules.keylogger")
-		if ok_kl and kl and type(kl.log_shortcut) == "function" then
-			local app = hs.application.frontmostApplication()
-			pcall(kl.log_shortcut, "Alt+Escape", app and app:title() or "Unknown")
-		end
+		log_shortcut_if_available("Alt+Escape")
 		return dispatch_action(_key_actions.escape)
 	end
 

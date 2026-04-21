@@ -1,5 +1,13 @@
 [
     {
+        "id": "none",
+        "short_label": "Rien",
+        "label": "— Rien (touche normale)",
+        "holdable": true,
+        "category": "Spécial",
+        "karabiner_to": []
+    },
+    {
         "id": "layer",
         "short_label": "Layer (hold)",
         "label": "🗂 Layer nav. — Actif tant que maintenu",
@@ -78,32 +86,6 @@
         ]
     },
     {
-        "id": "none",
-        "short_label": "Rien",
-        "label": "— Rien (touche normale)",
-        "holdable": true,
-        "category": "Spécial",
-        "karabiner_to": []
-    },
-    {
-        "id": "capsword",
-        "short_label": "CapsWord",
-        "label": "⇪★ CapsWord — Majuscules jusqu'au prochain espace",
-        "holdable": false,
-        "category": "Spécial",
-        "karabiner_to": [
-            {
-                "key_code": "caps_lock"
-            },
-            {
-                "set_variable": {
-                    "name": "capsword",
-                    "value": 1
-                }
-            }
-        ]
-    },
-    {
         "id": "backspace",
         "short_label": "Suppr. arrière",
         "label": "⌫ Suppr. arrière",
@@ -140,18 +122,6 @@
         ]
     },
     {
-        "id": "escape",
-        "short_label": "Échap",
-        "label": "⎋ Échap",
-        "holdable": false,
-        "category": "Touches",
-        "karabiner_to": [
-            {
-                "key_code": "escape"
-            }
-        ]
-    },
-    {
         "id": "tab",
         "short_label": "Tab",
         "label": "⇥ Tab",
@@ -176,6 +146,18 @@
         ]
     },
     {
+        "id": "escape",
+        "short_label": "Échap",
+        "label": "⎋ Échap",
+        "holdable": false,
+        "category": "Touches",
+        "karabiner_to": [
+            {
+                "key_code": "escape"
+            }
+        ]
+    },
+    {
         "id": "caps_lock",
         "short_label": "CapsLock",
         "label": "⇪ CapsLock — Verr. majuscules",
@@ -184,6 +166,31 @@
         "karabiner_to": [
             {
                 "key_code": "caps_lock"
+            }
+        ]
+    },
+    {
+        "id": "capsword",
+        "short_label": "CapsWord",
+        "label": "⇪★ CapsWord — Majuscules jusqu'au prochain espace",
+        "holdable": false,
+        "category": "Touches",
+        "karabiner_to": [
+            {
+                "key_code": "caps_lock"
+            },
+            {
+                "set_variable": {
+                    "name": "capsword",
+                    "value": 1
+                }
+            }
+        ],
+        "karabiner_rule_conditions": [
+            {
+                "name": "capsword",
+                "type": "variable_unless",
+                "value": 1
             }
         ]
     },
@@ -254,6 +261,36 @@
         ]
     },
     {
+        "id": "opt_backspace",
+        "short_label": "Suppr. mot arrière",
+        "label": "⌥⌫ — Supprimer le mot précédent",
+        "holdable": false,
+        "category": "Édition",
+        "karabiner_to": [
+            {
+                "key_code": "delete_or_backspace",
+                "modifiers": [
+                    "left_option"
+                ]
+            }
+        ]
+    },
+    {
+        "id": "opt_delete_fwd",
+        "short_label": "Suppr. mot avant",
+        "label": "⌥⌦ — Supprimer le mot suivant",
+        "holdable": false,
+        "category": "Édition",
+        "karabiner_to": [
+            {
+                "key_code": "delete_forward",
+                "modifiers": [
+                    "left_option"
+                ]
+            }
+        ]
+    },
+    {
         "id": "cmd_backspace",
         "short_label": "Suppr. début de ligne",
         "label": "⌘⌫ — Supprimer jusqu'au début de ligne",
@@ -296,8 +333,8 @@
     },
     {
         "id": "redo",
-        "short_label": "Refaire",
-        "label": "⌘⇧Z — Refaire",
+        "short_label": "Restaurer",
+        "label": "⌘⇧Z — Restaurer",
         "holdable": false,
         "category": "Édition",
         "logical_char": "z",
@@ -461,9 +498,21 @@
         ]
     },
     {
+        "id": "cycle_windows_in_app",
+        "short_label": "Fenêtres de l'app",
+        "label": "⌘` — Fenêtres de l'app courante",
+        "holdable": false,
+        "category": "Navigation",
+        "karabiner_to": [
+            {
+                "key_code": "f13"
+            }
+        ]
+    },
+    {
         "id": "shift",
-        "short_label": "Shift gauche",
-        "label": "⇧ Shift gauche",
+        "short_label": "Shift",
+        "label": "⇧ Shift",
         "holdable": true,
         "tappable": false,
         "category": "Modificateurs",
@@ -475,8 +524,8 @@
     },
     {
         "id": "ctrl",
-        "short_label": "Ctrl gauche",
-        "label": "⌃ Ctrl gauche",
+        "short_label": "Ctrl",
+        "label": "⌃ Ctrl",
         "holdable": true,
         "tappable": false,
         "category": "Modificateurs",
@@ -488,8 +537,8 @@
     },
     {
         "id": "cmd",
-        "short_label": "Cmd gauche",
-        "label": "⌘ Cmd gauche",
+        "short_label": "Cmd",
+        "label": "⌘ Cmd",
         "holdable": true,
         "tappable": false,
         "category": "Modificateurs",
@@ -501,8 +550,8 @@
     },
     {
         "id": "alt",
-        "short_label": "Option gauche",
-        "label": "⌥ Option gauche",
+        "short_label": "Option",
+        "label": "⌥ Option",
         "holdable": true,
         "tappable": false,
         "category": "Modificateurs",
@@ -514,9 +563,9 @@
     },
     {
         "id": "altgr",
-        "short_label": "Option droite",
-        "label": "⌥ Option droite",
-        "holdable": true,
+        "short_label": "AltGr",
+        "label": "⌥ AltGr (option droite — interne)",
+        "holdable": false,
         "tappable": false,
         "category": "Modificateurs",
         "karabiner_to": [
@@ -540,8 +589,8 @@
     },
     {
         "id": "sticky_shift",
-        "short_label": "Sticky Shift gauche",
-        "label": "📌 Sticky Shift gauche — one-shot, annulé après délai",
+        "short_label": "Sticky Shift",
+        "label": "📌 Sticky Shift — one-shot, annulé après délai",
         "holdable": false,
         "category": "Sticky Modificateurs",
         "karabiner_to": [
@@ -554,8 +603,8 @@
     },
     {
         "id": "sticky_ctrl",
-        "short_label": "Sticky Ctrl gauche",
-        "label": "📌 Sticky Ctrl gauche — one-shot, annulé après délai",
+        "short_label": "Sticky Ctrl",
+        "label": "📌 Sticky Ctrl — one-shot, annulé après délai",
         "holdable": false,
         "category": "Sticky Modificateurs",
         "karabiner_to": [
@@ -568,8 +617,8 @@
     },
     {
         "id": "sticky_cmd",
-        "short_label": "Sticky Cmd gauche",
-        "label": "📌 Sticky Cmd gauche — one-shot, annulé après délai",
+        "short_label": "Sticky Cmd",
+        "label": "📌 Sticky Cmd — one-shot, annulé après délai",
         "holdable": false,
         "category": "Sticky Modificateurs",
         "karabiner_to": [
@@ -582,8 +631,8 @@
     },
     {
         "id": "sticky_option",
-        "short_label": "Sticky Option gauche",
-        "label": "📌 Sticky Option gauche — one-shot, annulé après délai",
+        "short_label": "Sticky Option",
+        "label": "📌 Sticky Option — one-shot, annulé après délai",
         "holdable": false,
         "category": "Sticky Modificateurs",
         "karabiner_to": [
