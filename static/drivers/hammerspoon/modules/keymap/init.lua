@@ -723,6 +723,14 @@ mouse_tap = eventtap.new(
 --- Starts the eventtap listeners and attaches them to the OS event queue.
 function M.start()
 	Logger.start(LOG, "Starting keymap engine…")
+	-- Auto-arm latency sampling when the log level is already DEBUG so the user
+	-- gets measurements without any console intervention. In production (INFO or
+	-- WARNING) _enabled stays false and Perf.is_enabled() in onKeyDown short-circuits
+	-- in a single table read — zero steady-state cost.
+	if Logger.is_enabled(Logger.LEVELS.DEBUG) then
+		Perf.set_enabled(true)
+		Logger.info(LOG, "Perf sampling auto-enabled (DEBUG log level active).")
+	end
 	tap:start()
 	shift_tap:start()
 	mouse_tap:start()
