@@ -759,6 +759,34 @@ def _strip_ahk_inline_comment(line: str) -> str:
     return line
 
 
+def _extract_inline_comment(line: str) -> str:
+    """Return the AHK inline comment (without the leading ``;``) from *line*.
+
+    Uses the same string-literal-aware scan as :func:`_strip_ahk_inline_comment`
+    so semicolons inside quoted strings are not misread as comment starters.
+
+    Args:
+            line: A single AHK statement line (may already be stripped).
+
+    Returns:
+            The trimmed comment text, or an empty string when there is no
+            inline comment.
+    """
+    in_string = False
+    i = 0
+    while i < len(line):
+        ch = line[i]
+        if ch == "`" and in_string:
+            i += 2
+            continue
+        if ch == '"':
+            in_string = not in_string
+        elif ch == ";" and not in_string:
+            return line[i + 1 :].strip()
+        i += 1
+    return ""
+
+
 _AHK1_HOTSTRING_HEADER_RE = re.compile(r":([^:\n]*):([^:\n]+)::\s*\{")
 
 
@@ -896,16 +924,27 @@ def _extract_legacy_hotstrings(
     return results
 
 
+_COMMENTED_OUT_RE = re.compile(
+    r"^\s*;+\s*(?:CreateHotstring|CreateCaseSensitiveHotstrings)\s*\("
+)
+
+
 def parse_body(
     body: str,
     *,
     skip_identity: bool = True,
-) -> list[tuple[str, str, bool, bool, bool, bool]]:
+) -> list[tuple[str, str, bool, bool, bool, bool, str, bool]]:
     """Extract all hotstring entries from a block body.
 
     Section-header comments (``; === Name ===``) are ignored – every entry
     just goes into a flat list.  Duplicate triggers within the same body are
     silently dropped (first occurrence wins).
+
+    In addition to active ``CreateHotstring`` calls, single-line
+    **commented-out** hotstrings are also captured (and flagged as disabled
+    in the returned tuple) so that downstream callers can carry them over to
+    the TOML files.  Trailing ``; …`` comments on an active hotstring line
+    are preserved as well.
 
     Args:
             body: Raw body text of a ``Features[...][...]`` block.
@@ -923,9 +962,12 @@ def parse_body(
     Returns:
             Deduplicated list of
             ``(trigger, output, is_word, auto_expand, case_sensitive,
-            final_result)`` 6-tuples.
+            final_result, comment, is_disabled)`` 8-tuples where
+            ``comment`` is the trailing ``; …`` note (or empty string) and
+            ``is_disabled`` marks hotstrings that were commented out in
+            the AHK source.
     """
-    entries: list[tuple[str, str, bool, bool, bool, bool]] = []
+    entries: list[tuple[str, str, bool, bool, bool, bool, str, bool]] = []
     seen: set[str] = set()
 
     # First pass: extract AHK1-style :*:trigger:: { SendInstant(...) } blocks
@@ -937,14 +979,51 @@ def parse_body(
             continue
         if trig not in seen:
             seen.add(trig)
-            entries.append(legacy)
+            entries.append((trig, out, iw, ae, cs, fr, "", False))
 
     lines = body.split("\n")
     i = 0
 
     while i < len(lines):
-        line = lines[i].strip()
-        if not line or line.startswith(";"):
+        raw_line = lines[i]
+        line = raw_line.strip()
+        if not line:
+            i += 1
+            continue
+
+        # Handle single-line commented-out hotstrings (e.g. ``; CreateHotstring(...)``).
+        # Multi-line commented-out blocks are not supported: in practice every
+        # disabled entry in the AHK source fits on one line.
+        if _COMMENTED_OUT_RE.match(raw_line):
+            uncommented = re.sub(r"^\s*;+\s*", "", line, count=1)
+            disabled_reason = _extract_inline_comment(uncommented)
+            code_part = _strip_ahk_inline_comment(uncommented)
+            (
+                trigger,
+                output,
+                is_word,
+                auto_expand,
+                case_sensitive,
+                final_result,
+            ) = _extract_hotstring_from_line(code_part)
+            if trigger and output and trigger not in seen:
+                seen.add(trigger)
+                entries.append(
+                    (
+                        trigger,
+                        output,
+                        is_word,
+                        auto_expand,
+                        case_sensitive,
+                        final_result,
+                        disabled_reason,
+                        True,
+                    )
+                )
+            i += 1
+            continue
+
+        if line.startswith(";"):
             i += 1
             continue
 
@@ -955,6 +1034,10 @@ def parse_body(
             or "CreateHotstring(" in line
             or bool(re.search(r"(?<![A-Za-z])Hotstring\s*\(", line))
         )
+        # Track the last source line that contributed to the joined statement
+        # so we can extract the trailing ``; …`` comment from that specific
+        # line (the comment lives on the line carrying the closing parenthesis).
+        last_contrib_i = i
         if _is_open_call and not _strip_ahk_inline_comment(line).endswith(")"):
             j = i + 1
             while j < len(lines) and not _strip_ahk_inline_comment(
@@ -969,10 +1052,13 @@ def parse_body(
                     stripped_fragment = _strip_ahk_inline_comment(next_fragment)
                     if stripped_fragment:
                         line += " " + stripped_fragment
+                        last_contrib_i = j
                 j += 1
             i = j
         else:
             i += 1
+
+        tail_comment = _extract_inline_comment(lines[last_contrib_i])
 
         trigger, output, is_word, auto_expand, case_sensitive, final_result = (
             _extract_hotstring_from_line(line)
@@ -1000,6 +1086,8 @@ def parse_body(
                         auto_expand,
                         case_sensitive,
                         final_result,
+                        tail_comment,
+                        False,
                     )
                 )
         elif any(
@@ -1027,14 +1115,18 @@ def parse_body(
 
 
 def entries_to_toml_lines(
-    entries: list[tuple[str, str, bool, bool, bool, bool]],
+    entries: list[tuple[str, str, bool, bool, bool, bool, str, bool]],
 ) -> list[str]:
     """Render a list of hotstring entries as TOML assignment lines.
 
-    Each entry is a 6-tuple ``(trigger, output, is_word, auto_expand,
-    case_sensitive, final_result)``.  The ``final_result`` field is always
-    written (``true`` or ``false``) so that Hammerspoon can rely on its
-    presence without a default-value fallback.
+    Each entry is an 8-tuple ``(trigger, output, is_word, auto_expand,
+    case_sensitive, final_result, comment, is_disabled)``.  The
+    ``final_result`` field is always written (``true`` or ``false``) so that
+    Hammerspoon can rely on its presence without a default-value fallback.
+    A non-empty *comment* is appended as an inline ``# …`` note and
+    *is_disabled* entries are prefixed with ``# `` so the whole TOML
+    assignment becomes a comment (mirroring an AHK ``; CreateHotstring(...)``
+    line).
 
     Args:
             entries: Hotstring tuples produced by :func:`parse_body`.
@@ -1046,6 +1138,8 @@ def entries_to_toml_lines(
     for row in entries:
         trigger, output, is_word, auto_expand, case_sensitive = row[:5]
         final_result: bool = row[5] if len(row) > 5 else False  # type: ignore[index]
+        comment: str = row[6] if len(row) > 6 else ""  # type: ignore[index]
+        is_disabled: bool = row[7] if len(row) > 7 else False  # type: ignore[index]
         t = escape_toml_string(trigger)
         o = escape_toml_string(output)
         line = (
@@ -1056,13 +1150,19 @@ def entries_to_toml_lines(
             f", final_result = {str(final_result).lower()}"
             " }"
         )
+        if comment:
+            line += f"  # {comment}"
+        if is_disabled:
+            line = "# " + line
         lines.append(line)
     return lines
 
 
 def write_category_toml(
     category: str,
-    sub_blocks: dict[str, list[tuple[str, str, bool, bool, bool, bool]]],
+    sub_blocks: dict[
+        str, list[tuple[str, str, bool, bool, bool, bool, str, bool]]
+    ],
     section_descriptions: Optional[dict[str, str]] = None,
     section_order: Optional[list[str]] = None,
 ) -> int:
@@ -1187,7 +1287,7 @@ def write_category_toml(
 # ---------------------------------------------------------------------------
 
 
-def _comment_entries() -> list[tuple[str, str, bool, bool, bool, bool]]:
+def _comment_entries() -> list[tuple[str, str, bool, bool, bool, bool, str, bool]]:
     r"""Return entries for the Comment roll: ``\"`` ➜ ``/*`` and ``"\`` ➜ ``*/``.
 
     The AHK source uses backtick-escaped double-quotes inside the string
@@ -1196,8 +1296,8 @@ def _comment_entries() -> list[tuple[str, str, bool, bool, bool, bool]]:
     so they must be hand-crafted.
     """
     return [
-        ('\\"', "/*", False, True, False, _needs_final_result("/*")),
-        ('"\\', "*/", False, True, False, _needs_final_result("*/")),
+        ('\\"', "/*", False, True, False, _needs_final_result("/*"), "", False),
+        ('"\\', "*/", False, True, False, _needs_final_result("*/"), "", False),
     ]
 
 
@@ -1208,7 +1308,7 @@ _ECIRCUMFLEX_VOWEL_KEYS: frozenset[str] = frozenset("aAiIoOuUàÀèÈéÉêÊ")
 
 def _deadkey_ecircumflex_entries(
     circumflex_map: dict[str, str],
-) -> list[tuple[str, str, bool, bool, bool, bool]]:
+) -> list[tuple[str, str, bool, bool, bool, bool, str, bool]]:
     """Generate hotstring entries for all ``ê``+key combinations.
 
     Iterates the full ``DeadkeyMappingCircumflex`` and produces one
@@ -1247,13 +1347,15 @@ def _deadkey_ecircumflex_entries(
             True,
             False,
             _needs_final_result(value),
+            "",
+            False,
         )
         for key, value in circumflex_map.items()
         if key not in excluded
     ]
 
 
-def _hashtag_quote_entries() -> list[tuple[str, str, bool, bool, bool, bool]]:
+def _hashtag_quote_entries() -> list[tuple[str, str, bool, bool, bool, bool, str, bool]]:
     """Return entries for the HashtagQuote roll: (# ➜ (" and [# ➜ [\'.
 
     This roll is implemented via a ``#HotIf`` block in AHK (not a standard
@@ -1262,12 +1364,12 @@ def _hashtag_quote_entries() -> list[tuple[str, str, bool, bool, bool, bool]]:
     ``#`` key outputs a double-quote instead.
     """
     return [
-        ("(#", '("', False, True, False, _needs_final_result('("')),
-        ("[#", '["', False, True, False, _needs_final_result('["')),
+        ("(#", '("', False, True, False, _needs_final_result('("'), "", False),
+        ("[#", '["', False, True, False, _needs_final_result('["'), "", False),
     ]
 
 
-def _chevron_equal_entries() -> list[tuple[str, str, bool, bool, bool, bool]]:
+def _chevron_equal_entries() -> list[tuple[str, str, bool, bool, bool, bool, str, bool]]:
     """Return entries for the ChevronEqual roll: <% ➜ <= and >% ➜ >=.
 
     This roll is also implemented via a ``#HotIf`` block in AHK and is not
@@ -1275,12 +1377,12 @@ def _chevron_equal_entries() -> list[tuple[str, str, bool, bool, bool, bool]]:
     ``<`` or ``>``, pressing the AltGr-mapped ``%`` key outputs ``=``.
     """
     return [
-        ("<%", "<=", False, True, False, _needs_final_result("<=")),
-        (">%", ">=", False, True, False, _needs_final_result(">=")),
+        ("<%", "<=", False, True, False, _needs_final_result("<="), "", False),
+        (">%", ">=", False, True, False, _needs_final_result(">="), "", False),
     ]
 
 
-def _equal_string_entries() -> list[tuple[str, str, bool, bool, bool, bool]]:
+def _equal_string_entries() -> list[tuple[str, str, bool, bool, bool, bool, str, bool]]:
     """Return corrected entries for the EqualString roll: [) ➜ = "".
 
     The AHK source uses consecutive backtick-escaped double-quotes
@@ -1290,8 +1392,8 @@ def _equal_string_entries() -> list[tuple[str, str, bool, bool, bool, bool]]:
     entries override the broken parsed ones with the correct expansion.
     """
     return [
-        (" [)", ' = ""', False, True, False, _needs_final_result(' = ""')),
-        ("[)", ' = ""', False, True, False, _needs_final_result(' = ""')),
+        (" [)", ' = ""', False, True, False, _needs_final_result(' = ""'), "", False),
+        ("[)", ' = ""', False, True, False, _needs_final_result(' = ""'), "", False),
     ]
 
 
@@ -1309,7 +1411,11 @@ _MODULE_SECTIONS: dict[str, str] = {
 def build_handcrafted_sections(
     content: str,
 ) -> dict[
-    str, dict[str, tuple[list[tuple[str, str, bool, bool, bool, bool]], str]]
+    str,
+    dict[
+        str,
+        tuple[list[tuple[str, str, bool, bool, bool, bool, str, bool]], str],
+    ],
 ]:
     """Build the hand-crafted sections dict from the parsed AHK source.
 
@@ -1411,7 +1517,9 @@ def main(
 
     total_entries = 0
     for category, subs in all_blocks.items():
-        sub_entries: dict[str, list[tuple[str, str, bool, bool, bool]]] = {
+        sub_entries: dict[
+            str, list[tuple[str, str, bool, bool, bool, bool, str, bool]]
+        ] = {
             sub_name: parse_body(
                 body,
                 skip_identity=sub_name not in _IDENTITY_SECTIONS,
