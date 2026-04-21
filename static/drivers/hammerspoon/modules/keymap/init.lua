@@ -72,6 +72,18 @@ M.DEFAULT_STATE = {
 -- ======================================
 -- ======================================
 
+-- Maximum length of the rolling keystroke buffer, expressed in UTF-8
+-- CODEPOINTS (not bytes). Triggers are bounded well under this; the cap
+-- only exists to keep memory and per-keystroke work bounded for users
+-- who go an extraordinarily long time between resets.
+local BUFFER_MAX_CHARS = 500
+
+-- Byte-length gate for the trim path. A UTF-8 codepoint is at most 4 bytes,
+-- so when the raw byte length stays under this threshold the codepoint count
+-- is guaranteed to be under BUFFER_MAX_CHARS and we can skip the utf8.offset
+-- scan entirely. This keeps the fast path to a single integer compare.
+local BUFFER_TRIM_BYTE_GATE = BUFFER_MAX_CHARS * 4
+
 -- Central memory struct passed via reference to all sub-modules.
 local CoreState = {
 	buffer                     = "",
@@ -446,11 +458,20 @@ local function onKeyDownRaw(e)
 		end
 	end
 
-	-- Append to the rolling buffer (capped at 500 chars to bound memory usage).
+	-- Append to the rolling buffer and cap it at BUFFER_MAX_CHARS CODEPOINTS.
+	-- The cap used to be a byte-count cap (500 bytes) but that silently kept
+	-- far fewer actual characters when the buffer held multi-byte codepoints
+	-- (e.g. accented latin = 2 bytes/char, emoji = 4 bytes/char), and the
+	-- utf8.offset call against a count that didn't exist returned nil, leaving
+	-- the buffer untrimmed. The fast-path byte gate avoids paying for the
+	-- utf8 scan on every keystroke.
 	CoreState.buffer = CoreState.buffer .. chars
-	if #CoreState.buffer > 500 then
-		local ok, off = pcall(utf8.offset, CoreState.buffer, -500)
-		CoreState.buffer = CoreState.buffer:sub((ok and off) or 1)
+	if #CoreState.buffer > BUFFER_TRIM_BYTE_GATE then
+		local ok, off = pcall(utf8.offset, CoreState.buffer, -BUFFER_MAX_CHARS)
+		-- Fall back to empty on a failed offset (malformed UTF-8) rather than
+		-- keeping the full overgrown buffer — losing ≤500 chars of history is
+		-- acceptable, unbounded growth is not.
+		CoreState.buffer = (ok and off) and CoreState.buffer:sub(off) or ""
 	end
 
 	-- 9. Run expansion trigger checks. The LLM preview used to be refreshed
