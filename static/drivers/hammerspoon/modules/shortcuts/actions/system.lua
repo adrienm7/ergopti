@@ -56,24 +56,33 @@ local AWAKE_JITTER_X         = 120   -- Max horizontal pixel offset per tick
 local AWAKE_JITTER_Y         = 80    -- Max vertical pixel offset per tick
 local AWAKE_RETURN_DELAY_SEC = 0.2   -- Seconds to hold offset before returning to origin
 
+-- Spotlight ring color (circle on the screen that holds the cursor)
+local SPOTLIGHT_COLOR = {red = 1, green = 0.85, blue = 0}    -- Yellow
+
+-- Cross marker color (× shown on every screen NOT holding the cursor)
+local CROSS_COLOR     = {red = 0.9, green = 0.1, blue = 0.05} -- Red
+
+-- Shared stroke alpha for all overlay shapes (circle and crosses)
+local OVERLAY_STROKE_ALPHA = 0.9  -- High opacity so the border reads against any background
+
 -- Mouse spotlight ring parameters (circle shown on the screen that holds the cursor)
 local SPOTLIGHT_RADIUS_PX   = 60    -- Outer ring radius around the cursor center
 local SPOTLIGHT_STROKE_PX   = 6     -- Ring stroke width
-local SPOTLIGHT_FILL_ALPHA  = 0.40  -- Yellow fill opacity
-local SPOTLIGHT_DURATION_S  = 3     -- Max seconds before auto-dismiss (overridden by mouse move)
+local SPOTLIGHT_FILL_ALPHA  = 0.40  -- Fill opacity for the ring
+local SPOTLIGHT_DURATION_S  = 5     -- Max seconds before auto-dismiss (overridden by mouse move)
 local SPOTLIGHT_PADDING_PX  = 12    -- Canvas padding so the stroke is never clipped
 
 -- Cross marker parameters (shown centered on every screen that does NOT hold the cursor)
 local CROSS_ARM_HALF_PX  = 60   -- Half-length of each arm; total span = 120 px
 local CROSS_ARM_WIDTH_PX = 14   -- Thickness of each bar
 local CROSS_STROKE_PX    = 6    -- Border stroke width, matches the circle ring
-local CROSS_FILL_ALPHA   = 0.40 -- Yellow fill opacity, matches the circle fill
+local CROSS_FILL_ALPHA   = 0.40 -- Fill opacity for the cross markers
 local CROSS_PADDING_PX   = 12   -- Canvas padding so strokes are never clipped
 
 -- Tap and teleport timing
 local SPOTLIGHT_TAP_DELAY_SEC       = 0.05 -- Delay before arming the mouseMoved tap; prevents
-                                            -- a programmatic warp from immediately dismissing spotlight
-local SPOTLIGHT_TELEPORT_DURATION_S = 1.0  -- Shorter duration when triggered by teleport
+                                           -- a programmatic warp from immediately dismissing spotlight
+local SPOTLIGHT_TELEPORT_DURATION_S = 3    -- Shorter duration when triggered by teleport
 
 local awake_timer      = nil
 local awake_alert_id   = nil
@@ -89,11 +98,11 @@ local schedule_awake_tick
 
 
 
--- =============================================
--- =============================================
--- ======= 2/ Keep-Awake Implementation ========
--- =============================================
--- =============================================
+-- ============================================
+-- ============================================
+-- ======= 2/ Keep-Awake Implementation =======
+-- ============================================
+-- ============================================
 
 --- Schedules the next keep-awake tick at a random interval.
 --- Each tick moves the mouse slightly around the recorded origin, then returns.
@@ -309,11 +318,11 @@ end
 
 
 
--- ==========================================
--- ==========================================
--- ======= 4/ EventTap Factory Functions ====
--- ==========================================
--- ==========================================
+-- =============================================
+-- =============================================
+-- ======= 4/ EventTap Factory Functions =======
+-- =============================================
+-- =============================================
 
 --- Wraps an already-started eventtap in a fake-hotkey object with a :delete() method.
 --- This lets the bindings registry treat eventtaps and hs.hotkeys uniformly.
@@ -471,11 +480,11 @@ end
 
 
 
--- ==============================================
--- ==============================================
--- ======= 5/ Mouse & Display Utilities =========
--- ==============================================
--- ==============================================
+-- ============================================
+-- ============================================
+-- ======= 5/ Mouse & Display Utilities =======
+-- ============================================
+-- ============================================
 
 --- Teleports the mouse cursor to the center of the next screen (cycles through all screens).
 --- Shows a 1-second spotlight at the destination so the cursor is easy to locate.
@@ -614,10 +623,9 @@ local function create_cross_canvas(screen)
 		return nil
 	end
 
-	local yellow  = {red = 1, green = 0.85, blue = 0}
-	local ox      = side / 2
-	local oy      = side / 2
-	local sq2     = math.sqrt(2)
+	local ox  = side / 2
+	local oy  = side / 2
+	local sq2 = math.sqrt(2)
 
 	-- Each × arm points along a 45° diagonal. The arm tip edges are perpendicular
 	-- to that diagonal, so they are themselves diagonal — giving flat square ends.
@@ -648,8 +656,8 @@ local function create_cross_canvas(screen)
 		type        = "segments",
 		closed      = true,
 		action      = "strokeAndFill",
-		fillColor   = {red = yellow.red, green = yellow.green, blue = yellow.blue, alpha = CROSS_FILL_ALPHA},
-		strokeColor = {red = yellow.red, green = yellow.green, blue = yellow.blue, alpha = 0.9},
+		fillColor   = {red = CROSS_COLOR.red, green = CROSS_COLOR.green, blue = CROSS_COLOR.blue, alpha = CROSS_FILL_ALPHA},
+		strokeColor = {red = CROSS_COLOR.red, green = CROSS_COLOR.green, blue = CROSS_COLOR.blue, alpha = OVERLAY_STROKE_ALPHA},
 		strokeWidth = CROSS_STROKE_PX,
 		coordinates = pts,
 	}
@@ -697,11 +705,10 @@ function M.spotlight_mouse(duration_s)
 		return
 	end
 
-	local yellow = {red = 1, green = 0.85, blue = 0}
 	circle[1] = {
 		type        = "oval",
-		fillColor   = {red = yellow.red, green = yellow.green, blue = yellow.blue, alpha = SPOTLIGHT_FILL_ALPHA},
-		strokeColor = {red = yellow.red, green = yellow.green, blue = yellow.blue, alpha = 0.9},
+		fillColor   = {red = SPOTLIGHT_COLOR.red, green = SPOTLIGHT_COLOR.green, blue = SPOTLIGHT_COLOR.blue, alpha = SPOTLIGHT_FILL_ALPHA},
+		strokeColor = {red = SPOTLIGHT_COLOR.red, green = SPOTLIGHT_COLOR.green, blue = SPOTLIGHT_COLOR.blue, alpha = OVERLAY_STROKE_ALPHA},
 		strokeWidth = SPOTLIGHT_STROKE_PX,
 		frame       = {x = pad, y = pad, w = d, h = d},
 	}
