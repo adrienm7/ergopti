@@ -246,6 +246,10 @@ table.sort(remaining)
 for _, fname in ipairs(remaining) do table.insert(toml_fnames, fname) end
 
 local hotfiles = {}
+-- Defer sorting for the entire startup load: TOML files, dynamic hotstrings, and the
+-- custom group all feed into the same mappings list. A single flush_sort() at the end
+-- of section 5 collapses what used to be 8+ full O(N log N) passes into one.
+keymap.defer_sort()
 for _, fname in ipairs(toml_fnames) do
 	local name = fname:match("^(.-)%.toml$")
 	Logger.debug(LOG, string.format("Loading TOML file: %s…", name))
@@ -264,8 +268,6 @@ Logger.info(LOG, string.format("Loaded TOML hotstring files: %d files.", #toml_f
 -- ======= 5/ Post-load Hooks =======
 -- ==================================
 -- ==================================
-
-keymap.sort_mappings()
 
 -- Start the dynamic hotstrings module which handles personal info internally
 Logger.debug(LOG, "Starting dynamic hotstrings module…")
@@ -288,6 +290,9 @@ do
 	keymap.load_toml("custom", custom_path)
 	table.insert(hotfiles, "custom")
 end
+
+-- Single final sort covering TOML + dynamic + custom groups.
+keymap.flush_sort()
 
 
 

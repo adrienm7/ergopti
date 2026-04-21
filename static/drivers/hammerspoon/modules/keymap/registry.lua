@@ -26,6 +26,12 @@ local Logger     = require("lib.logger")
 local LOG    = "keymap.registry"
 local _state = nil  -- Injected via M.init(); required before all public functions.
 
+-- Deferred-sort machinery. When _sort_deferred is true, sort_mappings() becomes
+-- a no-op that only sets _sort_pending; flush_sort() then performs exactly one
+-- final sort. Used at startup so the 6 TOML loads sort only once together.
+local _sort_deferred = false
+local _sort_pending  = false
+
 
 --- Guard: verifies that M.init() was called before any public function that
 --- accesses _state. Logs an error and returns false when the guard fails.
@@ -229,8 +235,13 @@ end
 
 --- Sorts the mappings list: longest trigger first, then word-boundary, then insertion order.
 --- Longer triggers must be tested before shorter prefixes to prevent premature matches.
+--- While a defer_sort() is active, the actual sort is postponed until flush_sort().
 function M.sort_mappings()
 	if not require_state("sort_mappings") then return end
+	if _sort_deferred then
+		_sort_pending = true
+		return
+	end
 	Logger.trace(LOG, "Sorting %d mapping(s)…", #_state.mappings)
 	table.sort(_state.mappings, function(a, b)
 		if a.tlen ~= b.tlen then return a.tlen > b.tlen end
@@ -238,6 +249,26 @@ function M.sort_mappings()
 		return a.seq < b.seq
 	end)
 	Logger.done(LOG, "Mappings sorted.")
+end
+
+--- Suspends automatic re-sorting. Every subsequent call to sort_mappings() becomes
+--- a no-op that only marks a sort as pending. Paired with flush_sort() at the end
+--- of a batch (e.g. the initial TOML load loop) to avoid 6+ O(N log N) passes.
+function M.defer_sort()
+	_sort_deferred = true
+	_sort_pending  = false
+	Logger.debug(LOG, "Sort deferred.")
+end
+
+--- Resumes automatic sorting and performs one final sort if one was requested
+--- while sorting was deferred. Safe to call even when defer_sort() was not used.
+function M.flush_sort()
+	_sort_deferred = false
+	if _sort_pending then
+		_sort_pending = false
+		M.sort_mappings()
+	end
+	Logger.debug(LOG, "Sort flushed.")
 end
 
 --- Records the sequence numbers belonging to the current group after a load.
