@@ -428,12 +428,20 @@ local function onKeyDownRaw(e)
 	-- CRUCIAL SYNTHETIC FILTER:
 	-- When we typed a character programmatically, the OS sends it back to us as
 	-- a real event. Skip it here so it does not get added twice to the buffer.
+	-- Comparison is codepoint-aligned: we slice `expected_synthetic_chars` to
+	-- the same number of codepoints as the current event's `chars`, then byte-
+	-- compare. Byte-only slicing used to fail when a single event carried N
+	-- codepoints whose encoded byte length differed from our emitted bytes
+	-- (e.g. grouped multi-codepoint sequences, or unicode normalization by the
+	-- OS text-input stack).
 	if #CoreState.expected_synthetic_chars > 0 then
-		if CoreState.expected_synthetic_chars:sub(1, #chars) == chars then
-			CoreState.expected_synthetic_chars = CoreState.expected_synthetic_chars:sub(#chars + 1)
+		local chars_n = text_utils.utf8_len(chars)
+		local ok_cut, cut = pcall(utf8.offset, CoreState.expected_synthetic_chars, chars_n + 1)
+		if ok_cut and cut and CoreState.expected_synthetic_chars:sub(1, cut - 1) == chars then
+			CoreState.expected_synthetic_chars = CoreState.expected_synthetic_chars:sub(cut)
 			return false
 		elseif dt < 0.02 then
-			-- Tolerance window for macOS UTF-8 multi-event decomposition
+			-- Tolerance window for macOS UTF-8 multi-event decomposition / regrouping.
 			return false
 		end
 	end
