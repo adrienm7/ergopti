@@ -34,6 +34,7 @@ local Logger     = require("lib.logger")
 local keylogger  = require("modules.keylogger")
 local tooltip    = require("ui.tooltip")
 local engine     = require("modules.llm.prediction_engine")
+local Registry   = require("modules.keymap.registry")
 
 local LOG    = "keymap.llm_bridge"
 local _state = nil  -- Shared CoreState, injected via M.init().
@@ -328,42 +329,61 @@ function M.update_preview(buf)
 		end
 	end
 
-	-- Walk static mappings to find a hotstring match.
+	-- Walk static mappings via the tail-char indexes so we only visit the
+	-- handful of candidates whose trigger / star_base ends with the buffer's
+	-- last codepoint, instead of scanning all ~10-15k mappings.
 	if not matched_repl then
-		for _, mapping in ipairs(_state.mappings) do
-			local group_active = not mapping.group
+		local poff          = utf8.offset(buf, -1)
+		local buf_tail_char = poff and buf:sub(poff) or ""
+
+		local function group_active(mapping)
+			return not mapping.group
 				or not _state.groups[mapping.group]
 				or _state.groups[mapping.group].enabled
-			if not group_active then goto continue end
+		end
 
-			-- has_magic / star_base are precomputed at load time (and refreshed by
-			-- update_trigger_char), so no string operations are needed here
-			local has_magic = mapping.has_magic
-			local star_base = mapping.star_base
-
-			if star_base and star_base ~= "" and ends_with_trigger(buf, star_base, mapping.is_word) then
-				if mapping.plain_repl ~= star_base then
-					matched_repl       = mapping.repl
-					matched_plain_repl = mapping.plain_repl
-					match_type         = "star"
-					match_group        = mapping.group
-					matched_input      = star_base
-					break
-				end
-			elseif ends_with_trigger(buf, mapping.trigger, mapping.is_word)
-				and not (mapping.is_word == false and mapping.auto == true)
-			then
-				if mapping.plain_repl ~= mapping.trigger then
-					matched_repl       = mapping.repl
-					matched_plain_repl = mapping.plain_repl
-					match_type         = "autocorrect"
-					match_group        = mapping.group
-					matched_input      = mapping.trigger
-					break
+		-- Star-base path first: when a has_magic mapping's star_base matches,
+		-- its preview wins over a shorter non-magic trigger that happens to
+		-- end at the same character, matching the sort-order priority of the
+		-- original linear scan (longest trigger first).
+		local star_bucket = Registry.mappings_for_star_tail(buf_tail_char)
+		if star_bucket then
+			for _, mapping in ipairs(star_bucket) do
+				if group_active(mapping) then
+					local star_base = mapping.star_base
+					if star_base and star_base ~= ""
+						and ends_with_trigger(buf, star_base, mapping.is_word)
+						and mapping.plain_repl ~= star_base
+					then
+						matched_repl       = mapping.repl
+						matched_plain_repl = mapping.plain_repl
+						match_type         = "star"
+						match_group        = mapping.group
+						matched_input      = star_base
+						break
+					end
 				end
 			end
+		end
 
-			::continue::
+		if not matched_repl then
+			local tail_bucket = Registry.mappings_for_tail(buf_tail_char)
+			if tail_bucket then
+				for _, mapping in ipairs(tail_bucket) do
+					if group_active(mapping)
+						and not (mapping.is_word == false and mapping.auto == true)
+						and ends_with_trigger(buf, mapping.trigger, mapping.is_word)
+						and mapping.plain_repl ~= mapping.trigger
+					then
+						matched_repl       = mapping.repl
+						matched_plain_repl = mapping.plain_repl
+						match_type         = "autocorrect"
+						match_group        = mapping.group
+						matched_input      = mapping.trigger
+						break
+					end
+				end
+			end
 		end
 	end
 
