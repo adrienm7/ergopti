@@ -26,6 +26,7 @@ local Registry   = require("modules.keymap.registry")
 local Expander   = require("modules.keymap.expander")
 local LLMBridge  = require("modules.keymap.llm_bridge")
 local CoreStateM = require("modules.keymap.state")
+local Perf       = require("lib.perf")
 
 local M   = {}
 local LOG = "keymap"
@@ -299,6 +300,48 @@ M.trigger_prediction = LLMBridge._perform_llm_check
 M.reset_predictions  = LLMBridge.reset_predictions
 
 
+-- ── Perf telemetry proxies ───────────────────────────────────────────────────
+-- Exposed on M so the Hammerspoon console can toggle sampling and read the
+-- per-bucket p50/p99/max stats without having to `require("lib.perf")` by
+-- hand. Sampling defaults to disabled so production typing pays no cost;
+-- `M.perf_enable(true)` arms it, `M.perf_report_all()` emits the summary.
+
+--- Enables or disables latency sampling in the hot path.
+--- @param v boolean
+function M.perf_enable(v)
+	Perf.set_enabled(v == true)
+	Logger.info(LOG, "Perf sampling %s.", (v == true) and "enabled" or "disabled")
+end
+
+--- Returns true when samples are being recorded.
+--- @return boolean
+function M.perf_is_enabled()
+	return Perf.is_enabled()
+end
+
+--- Returns aggregate stats for a single bucket (e.g. "keymap_keydown"),
+--- or nil when no samples have been recorded yet.
+--- @param name string Bucket identifier.
+--- @return table|nil
+function M.perf_report(name)
+	return Perf.report(name)
+end
+
+--- Emits one INFO log line per populated bucket via the keymap logger.
+function M.perf_report_all()
+	Perf.report_all(function(_, fmt, ...)
+		Logger.info(LOG, fmt, ...)
+	end)
+end
+
+--- Clears the samples for `name`, or every bucket when `name` is nil.
+--- @param name string|nil
+function M.perf_reset(name)
+	Perf.reset(name)
+	Logger.debug(LOG, "Perf bucket reset: %s.", tostring(name or "<all>"))
+end
+
+
 
 
 -- =========================================
@@ -566,10 +609,15 @@ local function onKeyDownRaw(e)
 end
 
 --- pcall wrapper around onKeyDownRaw to prevent keyboard lockups on uncaught errors.
+--- Latency sampling is gated on Perf.is_enabled() so the measurement path adds
+--- no steady-state cost in production; when disabled the wrapper is a single
+--- `and` short-circuit before the pcall.
 --- @param e table Event parameters.
 --- @return boolean Pass-through result from the inner handler.
 local function onKeyDown(e)
+	local t0 = Perf.is_enabled() and Perf.now() or nil
 	local ok, result = pcall(onKeyDownRaw, e)
+	if t0 then Perf.sample("keymap_keydown", t0) end
 	if not ok then
 		Logger.error(LOG, "Keyboard interception failure: %s.", tostring(result))
 		return false
