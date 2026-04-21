@@ -795,25 +795,78 @@ function M.init(core_state)
 	Logger.debug(LOG, "Registry initialized.")
 end
 
---- Synchronizes the magic-key character in the terminator definitions and
---- recomputes the per-mapping has_magic / star_base precomputed fields.
---- Called by keymap/init.lua whenever the trigger char is changed.
+--- Reassigns the magic-key character across the terminator definitions AND
+--- every affected mapping. Triggers whose last character was the previous
+--- magic key are renamed, and every precomputed field (trigger_bytes,
+--- tail_char, star_base, star_base_bytes, star_base_tail_char, tlen) is
+--- recomputed so the event loop and preview scanner remain consistent.
+---
+--- Because trigger keys in _state.mappings_lookup embed m.trigger, the lookup
+--- is rebuilt after renaming. A final sort is issued because the byte length
+--- of the magic key (and therefore tlen) may have changed.
+---
+--- The write to _state.magic_key happens inside this function so that the
+--- old value is available during the rename pass. Callers must not pre-set
+--- _state.magic_key before invoking update_trigger_char.
+---
 --- @param char string The new trigger character.
 function M.update_trigger_char(char)
 	if type(char) ~= "string" or char == "" then
 		Logger.error(LOG, "update_trigger_char: char must be a non-empty string."); return
 	end
+	if not require_state("update_trigger_char") then return end
+
+	local old_char = _state.magic_key
 	update_terminator_magic_key(char)
-	-- Recompute precomputed magic-key fields for all existing mappings so that
-	-- the event loop and preview scanner continue to see correct values
-	if _state then
-		local mkl = #char
-		for _, m in ipairs(_state.mappings) do
-			m.has_magic = mkl > 0 and m.trigger:sub(-mkl) == char
-			m.star_base = m.has_magic and m.trigger:sub(1, #m.trigger - mkl) or nil
-		end
-		Logger.debug(LOG, "Recomputed has_magic/star_base for %d mapping(s).", #_state.mappings)
+
+	if old_char == char then
+		Logger.debug(LOG, "update_trigger_char: key unchanged ('%s') — skipping rename.", char)
+		return
 	end
+
+	Logger.start(LOG, "Renaming magic key '%s' → '%s' across %d mapping(s)…", old_char, char, #_state.mappings)
+
+	local old_len = #old_char
+	local new_len = #char
+	local renamed = 0
+	for _, m in ipairs(_state.mappings) do
+		-- A mapping carried the old magic key iff its trigger ended with it.
+		-- This check must use the OLD key (via m.trigger) before we rename, so
+		-- we never rely on the stale m.has_magic flag.
+		local had_magic = old_len > 0 and m.trigger:sub(-old_len) == old_char
+		if had_magic then
+			local base   = m.trigger:sub(1, #m.trigger - old_len)
+			local new_tr = base .. char
+			m.trigger             = new_tr
+			m.trigger_bytes       = #new_tr
+			m.tail_char           = tail_codepoint(new_tr)
+			m.tlen                = text_utils.utf8_len(new_tr)
+			m.has_magic           = true
+			m.star_base           = base
+			m.star_base_bytes     = #base
+			m.star_base_tail_char = tail_codepoint(base)
+			renamed = renamed + 1
+		else
+			-- Previously non-magic mappings must not suddenly gain has_magic
+			-- just because their trigger happens to end with the new key
+			-- (we cannot rewrite their replacement anyway). Keep them untouched.
+			m.has_magic = false
+			m.star_base = nil
+			m.star_base_bytes     = nil
+			m.star_base_tail_char = nil
+		end
+	end
+
+	_state.magic_key = char
+	rebuild_lookup()
+	M.sort_mappings()
+	-- Byte length of the magic key may have changed (★ is 3 bytes, § is 2),
+	-- so triggers shift in both byte length and tlen — resorting preserves
+	-- the longest-first invariant that the event loop depends on.
+	if new_len ~= old_len then
+		Logger.debug(LOG, "Magic-key byte length changed (%d → %d) — lookup rebuilt and mappings re-sorted.", old_len, new_len)
+	end
+	Logger.success(LOG, "Magic-key rename complete (%d mapping(s) renamed).", renamed)
 end
 
 return M

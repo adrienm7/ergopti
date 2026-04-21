@@ -202,13 +202,15 @@ function M.set_delay(key, val)
 end
 
 --- Globally reassigns the magic expansion key (the "★" character by default).
+--- Registry.update_trigger_char owns the write to CoreState.magic_key because
+--- it needs the previous value to rename every affected mapping. Do not
+--- pre-assign CoreState.magic_key here — Registry handles it atomically.
 --- @param char string The new trigger character (must be a non-empty string).
 function M.set_trigger_char(char)
 	if type(char) ~= "string" or char == "" then
 		Logger.warn(LOG, "set_trigger_char: received an invalid value ('%s') — ignored.", tostring(char))
 		return
 	end
-	CoreState.magic_key = char
 	Registry.update_trigger_char(char)
 	Logger.debug(LOG, "Trigger char: '%s'.", char)
 end
