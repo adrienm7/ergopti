@@ -427,6 +427,131 @@ LoadHotstringsSection(CategoryName, SectionName, FeatureConfig, ExtraOptions := 
     }
 }
 
+; Fold common French accented characters to their ASCII equivalent, then
+; lowercase. Used to match the lowercase-only TOML metadata keys (e.g.
+; ``ie``) against the PascalCase Features Map keys that may contain
+; accents (e.g. ``IÉ`` in SFBsReduction).
+FoldAsciiLower(Str) {
+    Result := StrLower(Str)
+    Result := StrReplace(Result, "à", "a")
+    Result := StrReplace(Result, "â", "a")
+    Result := StrReplace(Result, "ä", "a")
+    Result := StrReplace(Result, "é", "e")
+    Result := StrReplace(Result, "è", "e")
+    Result := StrReplace(Result, "ê", "e")
+    Result := StrReplace(Result, "ë", "e")
+    Result := StrReplace(Result, "î", "i")
+    Result := StrReplace(Result, "ï", "i")
+    Result := StrReplace(Result, "ô", "o")
+    Result := StrReplace(Result, "ö", "o")
+    Result := StrReplace(Result, "ù", "u")
+    Result := StrReplace(Result, "û", "u")
+    Result := StrReplace(Result, "ü", "u")
+    Result := StrReplace(Result, "ç", "c")
+    return Result
+}
+
+; Apply ``[_meta]`` metadata — section ordering and section descriptions —
+; from the category's TOML file onto the live Features Map, making the
+; TOML the single source of truth for menu titles and submenu ordering.
+; TOML keys are lowercase (and accent-stripped for French letters like
+; ``IÉ`` -> ``ie``) so they are resolved back to the actual Features key
+; by comparing their ``FoldAsciiLower`` form. The ``★`` placeholder in the
+; TOML is swapped for the user's configured ``ScriptInformation["MagicKey"]``
+; so that rebindings done via the tray menu are reflected in descriptions.
+ApplyTomlMetadataToFeatures(CategoryName) {
+    FilePath := A_ScriptDir . "\..\hotstrings\" . StrLower(CategoryName) . ".toml"
+    if !FileExist(FilePath) {
+        return
+    }
+    if !Features.Has(CategoryName) {
+        return
+    }
+
+    ; Build a reverse lookup ``folded lowercase -> actual PascalCase key``
+    ; from the existing Features Map, skipping the ``__Order`` sentinel.
+    KeyByFolded := Map()
+    for Key, Val in Features[CategoryName] {
+        if Key == "__Order" {
+            continue
+        }
+        KeyByFolded[FoldAsciiLower(Key)] := Key
+    }
+
+    InMeta := false
+    InMetaSections := false
+    SectionsOrderRaw := ""
+
+    Loop Read, FilePath {
+        Line := Trim(A_LoopReadLine, " `t`r`n")
+        if (Line == "" or SubStr(Line, 1, 1) == "#") {
+            continue
+        }
+
+        if RegExMatch(Line, "^\[([^\[\]]+)\]$", &HeaderMatch) {
+            Header := Trim(HeaderMatch[1])
+            InMeta := (Header == "_meta")
+            InMetaSections := (Header == "_meta.sections")
+            continue
+        }
+
+        ; Any ``[[…]]`` header closes the metadata zones and the reader can
+        ; stop scanning, the rest of the file is pure hotstring payload.
+        if (SubStr(Line, 1, 2) == "[[") {
+            break
+        }
+
+        ; Inside ``[_meta]`` — extract the ``sections_order`` raw body.
+        if (InMeta and SectionsOrderRaw == "") {
+            if RegExMatch(Line, "^sections_order\s*=\s*\[(.*)\]\s*$", &OrderMatch) {
+                SectionsOrderRaw := OrderMatch[1]
+            }
+            continue
+        }
+
+        ; Inside ``[_meta.sections]`` — ``key = "description"`` pairs.
+        if InMetaSections {
+            if RegExMatch(Line, "^([A-Za-z0-9_]+)\s*=\s*`"((?:[^`"\\]|\\.)*)`"\s*$", &DescMatch) {
+                LowerKey := StrLower(DescMatch[1])
+                DescRaw  := UnescapeTomlString(DescMatch[2])
+                DescRaw  := StrReplace(DescRaw, "★", ScriptInformation["MagicKey"])
+                if KeyByFolded.Has(LowerKey) {
+                    ActualKey := KeyByFolded[LowerKey]
+                    FeatureObj := Features[CategoryName][ActualKey]
+                    ; Menu titles are only read from plain object entries —
+                    ; nested sub-maps have their own Description fields per
+                    ; sub-feature and are outside the scope of this loader.
+                    if IsObject(FeatureObj) and !(Type(FeatureObj) == "Map") {
+                        FeatureObj.Description := DescRaw
+                    }
+                }
+            }
+        }
+    }
+
+    ; Rebuild ``__Order`` in the Features Map from the TOML sections_order,
+    ; preserving the ``-`` separators and translating lowercase TOML keys
+    ; back to the PascalCase keys used by the menu code. Entries with no
+    ; matching Features key are skipped silently so that a TOML mention of
+    ; an unimplemented feature cannot break menu creation.
+    if SectionsOrderRaw != "" {
+        NewOrder := []
+        Pos := 1
+        while (Pos <= StrLen(SectionsOrderRaw) and RegExMatch(SectionsOrderRaw, "`"([^`"]*)`"", &TokenMatch, Pos)) {
+            Token := StrLower(TokenMatch[1])
+            if Token == "-" {
+                NewOrder.Push("-")
+            } else if KeyByFolded.Has(Token) {
+                NewOrder.Push(KeyByFolded[Token])
+            }
+            Pos := TokenMatch.Pos + TokenMatch.Len
+        }
+        if NewOrder.Length > 0 {
+            Features[CategoryName]["__Order"] := NewOrder
+        }
+    }
+}
+
 ; ======================================================
 ; ======================================================
 ; ======================================================
@@ -516,325 +641,206 @@ global Features := Map(
         }
     ),
     "DistancesReduction", Map(
-        "__Order", [
-            "QU",
-            "SuffixesA",
-            "-",
-            "CommaJ",
-            "CommaFarLetters",
-            "-",
-            "DeadKeyECircumflex",
-            "ECircumflexE",
-            "-",
-            "SpaceAroundSymbols"
-        ],
         "QU", {
             Enabled: True,
-            Description: "Q devient QU quand elle est suivie d’une voyelle : qa = qua, qo = quo, …",
             TimeActivationSeconds: 1,
         },
         "SuffixesA", {
             Enabled: True,
-            Description: "À + lettre donne un suffixe : às = ement, àn = ation, àh = ight, …",
             TimeActivationSeconds: 1,
         },
         "CommaJ", {
             Enabled: True,
-            Description: "Virgule + Voyelle donne J : ,a = ja, ,o = jo, ,' = j’, …",
             TimeActivationSeconds: 1,
         },
         "CommaFarLetters", {
             Enabled: True,
-            Description: "Virgule permet de taper des lettres excentrées : ,è=z et ,y=k et ,c=ç et ,x=où et ,s=q",
             TimeActivationSeconds: 1,
         },
         "DeadKeyECircumflex", {
             Enabled: True,
-            Description: "Ê suivi d’une lettre agit comme une touche morte : êo = ô, êu = û, ês = ß…",
             TimeActivationSeconds: 1,
         },
         "ECircumflexE", {
             Enabled: True,
-            Description: "Ê suivi de E donne Œ",
             TimeActivationSeconds: 1,
         },
         "SpaceAroundSymbols", {
             Enabled: True,
-            Description: "Ajouter un espace avant et après les symboles obtenus par rolls ainsi qu’après la touche [où]",
             TimeActivationSeconds: 1,
         },
     ),
     "SFBsReduction", Map(
-        "__Order", [
-            "Comma",
-            "-",
-            "ECirc",
-            "EGrave",
-            "-",
-            "BU",
-            "IÉ"
-        ],
         "Comma", {
             Enabled: True,
-            Description: "Virgule + Consonne corrige de très nombreux SFBs : ,t = pt, ,d= ds, ,p = xp, …",
             TimeActivationSeconds: 1,
         },
         "ECirc", {
             Enabled: True,
-            Description: "Ê + touche sur la main gauche corrige 4 SFBs : êé = oe, éê = eo, ê, = u, et ê. = u.",
             TimeActivationSeconds: 1,
         },
         "EGrave", {
             Enabled: True,
-            Description: "È + touche Y corrige 2 SFBs : èy = aî et yè = â",
             TimeActivationSeconds: 1,
         },
         "BU", {
             Enabled: True,
-            Description: "À + " . ScriptInformation["MagicKey"] . "/U corrige 2 SFBs : à" . ScriptInformation[
-                "MagicKey"] . " = bu et àu = ub",
             TimeActivationSeconds: 1,
         },
         "IÉ", {
             Enabled: True,
-            Description: "À + É corrige 2 SFBs : éà = ié et àé = éi",
             TimeActivationSeconds: 1,
         },
     ),
     "Rolls", Map(
-        "__Order", ["HC", "SX", "CX", "EnglishNegation", "EZ", "CT",
-            "-",
-            "CloseChevronTag", "ChevronEqual", "Comment",
-            "-",
-            "Assign", "NotEqual",
-            "-",
-            "HashtagQuote", "HashtagParenthesis", "HashtagBracket", "EqualString",
-            "-",
-            "LeftArrow", "AssignArrowEqualRight", "AssignArrowEqualLeft", "AssignArrowMinusRight",
-            "AssignArrowMinusLeft"],
         "HC", {
             Enabled: True,
-            Description: "HC ➜ WH",
             TimeActivationSeconds: 0.5,
         },
         "SX", {
             Enabled: True,
-            Description: "SX ➜ SK",
             TimeActivationSeconds: 0.5,
         },
         "CX", {
             Enabled: True,
-            Description: "CX ➜ CK",
             TimeActivationSeconds: 0.5,
         },
         "EnglishNegation", {
             Enabled: True,
-            Description: "NT' ➜ = N’T",
             TimeActivationSeconds: 0.5,
         },
         "EZ", {
             Enabled: True,
-            Description: "EÉ ➜ EZ",
             TimeActivationSeconds: 0.5,
         },
         "CT", {
             Enabled: True,
-            Description: "P' ➜ CT",
             TimeActivationSeconds: 0.5,
         },
         "CloseChevronTag", {
             Enabled: True,
-            Description: "<@ ➜ </",
             TimeActivationSeconds: 0.5,
         },
         "ChevronEqual", {
             Enabled: True,
-            Description: "<% ➜ <= et >% ➜ >=",
             TimeActivationSeconds: 0.5,
         },
         "Comment", {
             Enabled: True,
-            Description: "\`" ➜ /* et `"\`" ➜ */",
             TimeActivationSeconds: 0.5,
         },
         "Assign", {
             Enabled: True,
-            Description: "#! ➜ :=",
             TimeActivationSeconds: 0.5,
         },
         "NotEqual", {
             Enabled: True,
-            Description: "!# ➜ !=",
             TimeActivationSeconds: 0.5,
         },
         "HashtagQuote", {
             Enabled: True,
-            Description: "(# ➜ (`" et [# ➜ [`"",
             TimeActivationSeconds: 1,
         },
         "HashtagParenthesis", {
             Enabled: True,
-            Description: "#( ➜ `")",
             TimeActivationSeconds: 0.5,
         },
         "HashtagBracket", {
             Enabled: True,
-            Description: "#[ ➜ `"] et #] ➜ `"]",
             TimeActivationSeconds: 0.5,
         },
         "EqualString", {
             Enabled: True,
-            Description: "[ ) ➜ = `" `"",
             TimeActivationSeconds: 0.5,
         },
         "LeftArrow", {
             Enabled: True,
-            Description: "=+ = ➜",
             TimeActivationSeconds: 0.5,
         },
         "AssignArrowEqualRight", {
             Enabled: True,
-            Description: "$= ➜ =>",
             TimeActivationSeconds: 0.5,
         },
         "AssignArrowEqualLeft", {
             Enabled: True,
-            Description: "=$ ➜ <=",
             TimeActivationSeconds: 0.5,
         },
         "AssignArrowMinusRight", {
             Enabled: True,
-            Description: "+? ➜ ->",
             TimeActivationSeconds: 0.5,
         },
         "AssignArrowMinusLeft", {
             Enabled: True,
-            Description: "?+ ➜ <-",
             TimeActivationSeconds: 0.5,
         },
     ),
     "Autocorrection", Map(
-        "__Order", [
-            "Accents",
-            "Names",
-            "Caps",
-            "-",
-            "TypographicApostrophe",
-            "-",
-            "Errors",
-            "OU",
-            "MultiplePunctuationMarks",
-            "SuffixesAChaining",
-            "-",
-            "Minus",
-            "MinusApostrophe",
-            "-",
-            "PhoneNumberAutoComplete",
-        ],
         "TypographicApostrophe", {
             Enabled: True,
-            Description: "L’apostrophe devient typographique lors de l’écriture de texte : m'a = m’a, it's = it’s, …",
             TimeActivationSeconds: 1,
         },
         "Errors", {
             Enabled: True,
-            Description: "Correction de certaines fautes de frappe : OUi = Oui, aeu = eau, …",
             TimeActivationSeconds: 1,
         },
         "SuffixesAChaining", {
             Enabled: True,
-            Description: "Enchaîner plusieurs fois des suffixes, comme aim|able|ement = aimablement",
             TimeActivationSeconds: 1,
         },
         "Accents", {
             Enabled: True,
-            Description: "Autocorrection des accents de très nombreux mots",
         },
         "Caps", {
             Enabled: True,
-            Description: "Majuscules automatiques : chatgpt = ChatGPT, powerpoint = PowerPoint, …",
         },
         "Names", {
             Enabled: True,
-            Description: "Autocorrection des accents sur les prénoms et les noms de pays : alexei = Alexeï, taiwan = Taïwan, …",
         },
         "Minus", {
             Enabled: True,
-            Description: "Évite de devoir taper des tirets : aije = ai-je, atil = a-t-il, … ",
         },
         "MinusApostrophe", {
             Enabled: True,
-            Description: "L’apostrophe agit comme un tiret : ai'je = ai-je, a't'il = a-t-il, … ",
         },
         "PhoneNumberAutoComplete", {
             Enabled: True,
-            Description: "Complétion automatique du n° de téléphone et numéro de sécu en tapant les premiers chiffres",
         },
         "OU", {
             Enabled: True,
-            Description: "Taper [où ] puis un point ou une virgule supprime automatiquement l’espace ajouté avant",
             TimeActivationSeconds: 1,
         },
         "MultiplePunctuationMarks", {
             Enabled: True,
-            Description: "Taper `"!`" ou `"?`" plusieurs fois d’affilée n’ajoute pas d’espace insécable entre chaque caractère",
             TimeActivationSeconds: 1,
         },
     ),
     "MagicKey", Map(
-        "__Order", [
-            "Replace",
-            "Repeat",
-            "-",
-            "TextExpansionDate",
-            "TextExpansion",
-            "TextExpansionAuto",
-            "TextExpansionEmojis",
-            "TextExpansionSymbols",
-            "TextExpansionSymbolsTypst",
-            "-",
-            "TextExpansionPersonalInformation",
-        ],
         "Replace", {
             Enabled: True,
-            Description: "Transformer la touche J en " . ScriptInformation["MagicKey"],
         },
         "Repeat", {
             Enabled: True,
-            Description: "La touche " . ScriptInformation["MagicKey"] . " permet la répétition",
         },
         "TextExpansion", {
             Enabled: True,
-            Description: "Expansion de texte : c" . ScriptInformation["MagicKey"] . " = c’est, gt" . ScriptInformation[
-                "MagicKey"] . " = j’étais, pex" . ScriptInformation["MagicKey"] . " = par exemple, …",
         },
         "TextExpansionAuto", {
             Enabled: True,
-            Description: "Expansion de texte sans touche " . ScriptInformation["MagicKey"] .
-                " : ju' = jusqu’, ya = y’a, …",
         },
         "TextExpansionEmojis", {
             Enabled: True,
-            Description: "Expansion de texte Emojis : voiture" . ScriptInformation["MagicKey"] . " = 🚗, koala" .
-                ScriptInformation["MagicKey"] . " = 🐨, …",
         },
         "TextExpansionSymbols", {
             Enabled: True,
-            Description: "Expansion de texte Symboles : -->" . ScriptInformation["MagicKey"] . " = ➜, (v)" .
-                ScriptInformation["MagicKey"] . " = ✓, …",
         },
         "TextExpansionSymbolsTypst", {
             Enabled: True,
-            Description: "Expansion de texte Symboles Typst : $eq.not$ = ≠, $PP$ = ℙ, $integral$ = ∫ …",
         },
         "TextExpansionDate", {
             Enabled: True,
-            Description: "Date du jour avec dt" . ScriptInformation["MagicKey"] . " → 19/01/2005",
         },
         "TextExpansionPersonalInformation", {
             Enabled: True,
-            Description: "Remplissage de formulaires avec le suffixe @ : @np" . ScriptInformation["MagicKey"] .
-                " = Nom ⇥ Prénom, etc.",
             PatternMaxLength: 1,
         },
     ),
@@ -1347,6 +1353,17 @@ ReadConfiguration() {
 }
 
 ReadConfiguration()
+
+; Pull menu titles and submenu ordering from the per-category TOML files so
+; that those hotstring files are the single source of truth for both the
+; hotstring payload and the feature descriptions shown in the tray menu.
+; Categories without a TOML (``Layout``, ``Shortcuts``, ``TapHolds``) keep
+; their hardcoded Descriptions and ``__Order`` arrays in the Features Map.
+ApplyTomlMetadataToFeatures("Autocorrection")
+ApplyTomlMetadataToFeatures("DistancesReduction")
+ApplyTomlMetadataToFeatures("MagicKey")
+ApplyTomlMetadataToFeatures("Rolls")
+ApplyTomlMetadataToFeatures("SFBsReduction")
 
 global SpaceAroundSymbols := Features["DistancesReduction"]["SpaceAroundSymbols"].Enabled ? " " : ""
 

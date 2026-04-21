@@ -4,7 +4,7 @@
 
 [_meta]
 description = "Réduction des distances"
-sections_order = ["qu", "suffixesa", "-", "commaj", "commafarletters", "-", "deadkeyecircumflex", "ecircumflexe", "-"]
+sections_order = ["qu", "suffixesa", "-", "commaj", "commafarletters", "-", "deadkeyecircumflex", "ecircumflexe", "-", "spacearoundsymbols"]
 
 [_meta.sections]
 qu = "Q devient QU quand elle est suivie d’une voyelle : qa = qua, qo = quo, …"
@@ -13,6 +13,7 @@ ecircumflexe = "Ê suivi de E donne Œ"
 commaj = "Virgule + Voyelle donne J : ,a = ja, ,o = jo, ,' = j’, …"
 commafarletters = "Virgule permet de taper des lettres excentrées : ,è=z et ,y=k et ,c=ç et ,x=où et ,s=q"
 suffixesa = "À + lettre donne un suffixe : às = ement, àn = ation, àh = ight, …"
+spacearoundsymbols = "Ajouter un espace avant et après les symboles obtenus par rolls ainsi qu’après la touche [où]"
 
 [[qu]]
 "qa" = { output = "qua", is_word = false, auto_expand = true, is_case_sensitive = false, final_result = false }
