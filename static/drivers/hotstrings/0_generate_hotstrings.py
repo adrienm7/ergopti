@@ -651,7 +651,7 @@ def find_all_blocks(content: str) -> dict[str, dict[str, str]]:
 
 def _extract_hotstring_from_line(
     line: str,
-) -> tuple[Optional[str], Optional[str], bool, bool, bool, bool]:
+) -> tuple[Optional[str], Optional[str], bool, bool, bool, bool, bool]:
     """Parse one (possibly multi-line-joined) AHK call and return its fields.
 
     Applies :func:`preprocess_ahk_line` first so that known AHK global
@@ -663,10 +663,17 @@ def _extract_hotstring_from_line(
 
     Returns:
             ``(trigger, output, is_word, auto_expand, case_sensitive,
-            final_result)`` where *trigger* and *output* are ``None`` when no
-            hotstring was found. ``final_result`` is extracted from an explicit
-            ``Map("FinalResult", True/False)`` argument if present, otherwise
-            derived automatically from the output via :func:`_needs_final_result`.
+            final_result, strict_case)`` where *trigger* and *output* are
+            ``None`` when no hotstring was found. ``final_result`` is extracted
+            from an explicit ``Map("FinalResult", True/False)`` argument if
+            present, otherwise derived automatically from the output via
+            :func:`_needs_final_result`. ``strict_case`` is ``True`` when the
+            original AHK flags contained a ``C`` modifier on a plain
+            ``CreateHotstring`` call — this indicates a case-sensitive match
+            that the AHK loader must reinstate by re-adding ``C`` to its
+            generated flag string (``CreateCaseSensitiveHotstrings`` already
+            emits per-variant hotstrings with their own ``C`` flag, so this
+            field is only meaningful when *case_sensitive* is ``False``).
     """
     # Resolve variables and collapse string concatenations upfront.
     line = preprocess_ahk_line(line)
@@ -701,6 +708,12 @@ def _extract_hotstring_from_line(
         output = process_autohotkey_escapes(m.group("out"))
         auto_expand = "*" in opts
         is_word = "?" not in opts
+        # ``C`` on a plain ``CreateHotstring`` call forces exact-case matching.
+        # We only track it when the call is NOT CreateCaseSensitiveHotstrings,
+        # since the latter already synthesises per-variant hotstrings, each
+        # carrying its own ``C`` flag — re-capturing ``C`` there would be
+        # redundant and would falsely collapse the multi-variant expansion.
+        strict_case = ("C" in opts) and not case_sensitive
 
         # --- NOUVELLE LOGIQUE POUR FINAL_RESULT ---
         # On cherche un argument "FinalResult", True|False|1|0 dans la suite de la ligne
@@ -724,9 +737,10 @@ def _extract_hotstring_from_line(
             auto_expand,
             case_sensitive,
             final_result,
+            strict_case,
         )
 
-    return None, None, False, False, False, False
+    return None, None, False, False, False, False, False
 
 
 def _strip_ahk_inline_comment(line: str) -> str:
@@ -844,7 +858,7 @@ def _extract_send_instant_output(block: str) -> str:
 
 def _extract_legacy_hotstrings(
     body: str,
-) -> list[tuple[str, str, bool, bool, bool, bool]]:
+) -> list[tuple[str, str, bool, bool, bool, bool, bool]]:
     """Parse AHK1-style ``:*:trigger:: { SendInstant(...) }`` hotstrings.
 
     These use the legacy AHK label syntax rather than ``CreateHotstring()``.
@@ -857,9 +871,13 @@ def _extract_legacy_hotstrings(
 
     Returns:
         List of ``(trigger, output, is_word, auto_expand, case_sensitive,
-        final_result)`` 6-tuples, one per discovered legacy hotstring.
+        final_result, strict_case)`` 7-tuples, one per discovered legacy
+        hotstring.  ``strict_case`` mirrors the ``_extract_hotstring_from_line``
+        contract but is always ``False`` here — legacy entries are funnelled
+        through ``CreateCaseSensitiveHotstrings`` whose per-variant synthesis
+        already handles case, so re-flagging ``C`` would be redundant.
     """
-    results: list[tuple[str, str, bool, bool, bool, bool]] = []
+    results: list[tuple[str, str, bool, bool, bool, bool, bool]] = []
     pos = 0
     while pos < len(body):
         header_m = _AHK1_HOTSTRING_HEADER_RE.search(body, pos)
@@ -918,6 +936,7 @@ def _extract_legacy_hotstrings(
                 auto_expand,
                 is_case_sensitive,
                 _needs_final_result(output),
+                False,
             )
         )
 
@@ -933,7 +952,7 @@ def parse_body(
     body: str,
     *,
     skip_identity: bool = True,
-) -> list[tuple[str, str, bool, bool, bool, bool, str, bool]]:
+) -> list[tuple[str, str, bool, bool, bool, bool, str, bool, bool]]:
     """Extract all hotstring entries from a block body.
 
     Section-header comments (``; === Name ===``) are ignored – every entry
@@ -962,24 +981,26 @@ def parse_body(
     Returns:
             Deduplicated list of
             ``(trigger, output, is_word, auto_expand, case_sensitive,
-            final_result, comment, is_disabled)`` 8-tuples where
-            ``comment`` is the trailing ``; …`` note (or empty string) and
+            final_result, comment, is_disabled, strict_case)`` 9-tuples where
+            ``comment`` is the trailing ``; …`` note (or empty string),
             ``is_disabled`` marks hotstrings that were commented out in
-            the AHK source.
+            the AHK source, and ``strict_case`` forwards the ``C`` flag bit
+            from :func:`_extract_hotstring_from_line` so downstream emitters
+            can re-apply it to the generated TOML.
     """
-    entries: list[tuple[str, str, bool, bool, bool, bool, str, bool]] = []
+    entries: list[tuple[str, str, bool, bool, bool, bool, str, bool, bool]] = []
     seen: set[str] = set()
 
     # First pass: extract AHK1-style :*:trigger:: { SendInstant(...) } blocks
     # before the line-by-line scan so those triggers are registered in `seen`
     # and their multi-line bodies do not confuse the CreateHotstring parser.
     for legacy in _extract_legacy_hotstrings(body):
-        trig, out, iw, ae, cs, fr = legacy
+        trig, out, iw, ae, cs, fr, sc = legacy
         if skip_identity and trig == out:
             continue
         if trig not in seen:
             seen.add(trig)
-            entries.append((trig, out, iw, ae, cs, fr, "", False))
+            entries.append((trig, out, iw, ae, cs, fr, "", False, sc))
 
     lines = body.split("\n")
     i = 0
@@ -1005,6 +1026,7 @@ def parse_body(
                 auto_expand,
                 case_sensitive,
                 final_result,
+                strict_case,
             ) = _extract_hotstring_from_line(code_part)
             if trigger and output and trigger not in seen:
                 seen.add(trigger)
@@ -1018,6 +1040,7 @@ def parse_body(
                         final_result,
                         disabled_reason,
                         True,
+                        strict_case,
                     )
                 )
             i += 1
@@ -1060,9 +1083,15 @@ def parse_body(
 
         tail_comment = _extract_inline_comment(lines[last_contrib_i])
 
-        trigger, output, is_word, auto_expand, case_sensitive, final_result = (
-            _extract_hotstring_from_line(line)
-        )
+        (
+            trigger,
+            output,
+            is_word,
+            auto_expand,
+            case_sensitive,
+            final_result,
+            strict_case,
+        ) = _extract_hotstring_from_line(line)
 
         if trigger and output:
             # Skip non-auto-expand identity hotstrings (trigger == output)
@@ -1088,6 +1117,7 @@ def parse_body(
                         final_result,
                         tail_comment,
                         False,
+                        strict_case,
                     )
                 )
         elif any(
@@ -1140,6 +1170,7 @@ def entries_to_toml_lines(
         final_result: bool = row[5] if len(row) > 5 else False  # type: ignore[index]
         comment: str = row[6] if len(row) > 6 else ""  # type: ignore[index]
         is_disabled: bool = row[7] if len(row) > 7 else False  # type: ignore[index]
+        strict_case: bool = row[8] if len(row) > 8 else False  # type: ignore[index]
         t = escape_toml_string(trigger)
         o = escape_toml_string(output)
         line = (
@@ -1148,8 +1179,13 @@ def entries_to_toml_lines(
             f", auto_expand = {str(auto_expand).lower()}"
             f", is_case_sensitive = {str(not case_sensitive).lower()}"
             f", final_result = {str(final_result).lower()}"
-            " }"
         )
+        # Emit the optional ``is_case_sensitive_strict`` flag only when set so
+        # the common case (default ``false``) stays untouched and TOML diffs
+        # remain minimal. The AHK loader treats a missing field as ``false``.
+        if strict_case:
+            line += ", is_case_sensitive_strict = true"
+        line += " }"
         if comment:
             line += f"  # {comment}"
         if is_disabled:

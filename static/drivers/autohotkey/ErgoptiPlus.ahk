@@ -349,8 +349,11 @@ LoadHotstringsSection(CategoryName, SectionName, FeatureConfig, ExtraOptions := 
     CurrentSection := ""
 
     ; Build once and reuse for every matching entry; individual fields are
-    ; overridden per entry below when they differ from the section defaults
-    EntryPattern := "^`"((?:[^`"\\]|\\.)+)`"\s*=\s*\{\s*output\s*=\s*`"((?:[^`"\\]|\\.)*)`"\s*,\s*is_word\s*=\s*(true|false)\s*,\s*auto_expand\s*=\s*(true|false)\s*,\s*is_case_sensitive\s*=\s*(true|false)\s*,\s*final_result\s*=\s*(true|false)\s*\}"
+    ; overridden per entry below when they differ from the section defaults.
+    ; The trailing ``(?:,\s*is_case_sensitive_strict\s*=\s*(true|false)\s*)?``
+    ; group makes the strict-case field optional — the generator only emits it
+    ; when true, and a missing field must be treated as false by the loader.
+    EntryPattern := "^`"((?:[^`"\\]|\\.)+)`"\s*=\s*\{\s*output\s*=\s*`"((?:[^`"\\]|\\.)*)`"\s*,\s*is_word\s*=\s*(true|false)\s*,\s*auto_expand\s*=\s*(true|false)\s*,\s*is_case_sensitive\s*=\s*(true|false)\s*,\s*final_result\s*=\s*(true|false)\s*(?:,\s*is_case_sensitive_strict\s*=\s*(true|false)\s*)?\}"
 
     Loop Read, FilePath {
         Line := Trim(A_LoopReadLine, " `t`r`n")
@@ -383,6 +386,10 @@ LoadHotstringsSection(CategoryName, SectionName, FeatureConfig, ExtraOptions := 
         AutoExpand  := (Match[4] == "true")
         IsCaseSens  := (Match[5] == "true")
         FinalResult := (Match[6] == "true")
+        ; RegExMatch leaves unmatched optional groups as an empty string in
+        ; AHK v2, so compare against "true" — that correctly yields False when
+        ; the field is absent from the TOML entry (the generator default).
+        StrictCase  := (Match.Count() >= 7 and Match[7] == "true")
 
         Flags := ""
         if AutoExpand {
@@ -390,6 +397,13 @@ LoadHotstringsSection(CategoryName, SectionName, FeatureConfig, ExtraOptions := 
         }
         if !IsWord {
             Flags .= "?"
+        }
+        ; Re-apply the original AHK ``C`` flag when the generator recorded a
+        ; strict case-sensitive match. Without this, a trigger like ``OUi``
+        ; would be matched case-insensitively at runtime and typing ``oui``
+        ; would erroneously fire the replacement.
+        if StrictCase {
+            Flags .= "C"
         }
 
         Options := Map(
@@ -4857,38 +4871,8 @@ if Features["Rolls"]["CT"].Enabled {
 ; ==============================================================================
 
 if Features["Autocorrection"]["TypographicApostrophe"].Enabled {
-    CreateCaseSensitiveHotstrings(
-        "*", "c'", "c’",
-        Map("TimeActivationSeconds", Features["Autocorrection"]["TypographicApostrophe"].TimeActivationSeconds)
-    )
-    CreateCaseSensitiveHotstrings(
-        "*", "d'", "d’",
-        Map("TimeActivationSeconds", Features["Autocorrection"]["TypographicApostrophe"].TimeActivationSeconds)
-    )
-    CreateCaseSensitiveHotstrings(
-        "*", "j'", "j’",
-        Map("TimeActivationSeconds", Features["Autocorrection"]["TypographicApostrophe"].TimeActivationSeconds)
-    )
-    CreateCaseSensitiveHotstrings(
-        "*", "l'", "l’",
-        Map("TimeActivationSeconds", Features["Autocorrection"]["TypographicApostrophe"].TimeActivationSeconds)
-    )
-    CreateCaseSensitiveHotstrings(
-        "*", "m'", "m’",
-        Map("TimeActivationSeconds", Features["Autocorrection"]["TypographicApostrophe"].TimeActivationSeconds)
-    )
-    CreateCaseSensitiveHotstrings(
-        "*", "n'", "n’",
-        Map("TimeActivationSeconds", Features["Autocorrection"]["TypographicApostrophe"].TimeActivationSeconds)
-    )
-    CreateCaseSensitiveHotstrings(
-        "*", "s'", "s’",
-        Map("TimeActivationSeconds", Features["Autocorrection"]["TypographicApostrophe"].TimeActivationSeconds)
-    )
-    CreateCaseSensitiveHotstrings(
-        "*", "t'", "t’",
-        Map("TimeActivationSeconds", Features["Autocorrection"]["TypographicApostrophe"].TimeActivationSeconds)
-    )
+    LoadHotstringsSection("autocorrection", "typographicapostrophe", Features["Autocorrection"][
+        "TypographicApostrophe"])
 
     ; Create all hotstrings y'a → y’a, y'b → y’b, etc.
     ; This prevents false positives like writing ['key'] ➜ ['key’]
@@ -4898,11 +4882,6 @@ if Features["Autocorrection"]["TypographicApostrophe"].Enabled {
             Map("TimeActivationSeconds", Features["Autocorrection"]["TypographicApostrophe"].TimeActivationSeconds)
         )
     }
-
-    CreateCaseSensitiveHotstrings(
-        "*?", "n't", "n’t",  ; words negated with -n’t in English
-        Map("TimeActivationSeconds", Features["Autocorrection"]["TypographicApostrophe"].TimeActivationSeconds)
-    )
 }
 
 ; ==========================================
