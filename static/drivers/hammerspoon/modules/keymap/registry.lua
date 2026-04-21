@@ -340,13 +340,17 @@ function M.add(trigger, replacement, opts)
 	--- @param t string The trigger.
 	--- @param r string The replacement.
 	--- @param a boolean True for auto-expand mode.
-	local function add_raw(t, r, a)
+	--- @param plain_r string Precomputed plain_text(tokens_from_repl(r)). The
+	---   caller computes this once per replacement variant and threads it
+	---   through all space-variant calls, so we never tokenize the same
+	---   replacement 3-4× at load time.
+	local function add_raw(t, r, a, plain_r)
 		local k        = t .. "\0" .. tostring(is_word) .. "\0" .. tostring(a)
 		local existing = _state.mappings_lookup[k]
 		if existing then
 			-- Update replacement in place so re-loading a file refreshes the database.
 			existing.repl       = r
-			existing.plain_repl = km_utils.plain_text(km_utils.tokens_from_repl(r))
+			existing.plain_repl = plain_r
 			if _state.current_group then existing.group = _state.current_group end
 			return
 		end
@@ -362,7 +366,7 @@ function M.add(trigger, replacement, opts)
 			repl         = r,
 			-- Precomputed once at load time; avoids tokens_from_repl() + plain_text()
 			-- being called on every keystroke in update_preview() and the expander
-			plain_repl   = km_utils.plain_text(km_utils.tokens_from_repl(r)),
+			plain_repl   = plain_r,
 			is_word      = is_word,
 			auto         = a,
 			seq          = _state.seq_counter,
@@ -388,34 +392,42 @@ function M.add(trigger, replacement, opts)
 		_state.mappings_lookup[k] = entry
 	end
 
-	--- Adds the trigger and its space-normalized variants (nbsp, nnbsp).
+	--- Adds the trigger and its space-normalized variants (nbsp, nnbsp). The
+	--- caller precomputes plain_r so it is not recomputed per space variant.
 	--- @param t string The trigger.
 	--- @param r string The replacement.
-	local function add_with_space_variants(t, r)
-		add_raw(t, r, is_auto)
+	--- @param plain_r string Precomputed plain_text of r.
+	local function add_with_space_variants(t, r, plain_r)
+		add_raw(t, r, is_auto, plain_r)
 		-- Only generate space variants for triggers that contain spaces but do not
 		-- *start* with a space (starting-space triggers are word-boundary guards).
 		local starts_with_space = t:match("^[ \194\160\226\128\175]") ~= nil
 		if not starts_with_space and t:match(" ") then
-			add_raw((t:gsub(" ", "\194\160")),   r, is_auto)  -- regular nbsp
-			add_raw((t:gsub(" ", "\226\128\175")), r, is_auto) -- narrow nbsp
+			add_raw((t:gsub(" ", "\194\160")),   r, is_auto, plain_r)  -- regular nbsp
+			add_raw((t:gsub(" ", "\226\128\175")), r, is_auto, plain_r) -- narrow nbsp
 		end
 	end
 
-	local lower_trig = text_utils.trig_lower(trigger)
-	local title_repl = text_utils.repl_title(replacement)
-	local upper_repl = text_utils.repl_upper(replacement)
+	-- Tokenize+plaintext each distinct replacement exactly once per M.add call.
+	-- Without this cache the same replacement text is re-tokenized for every
+	-- case and space variant (3-4× per entry × ~3.3k TOML rows at startup).
+	local lower_trig       = text_utils.trig_lower(trigger)
+	local title_repl       = text_utils.repl_title(replacement)
+	local upper_repl       = text_utils.repl_upper(replacement)
+	local plain_repl_base  = km_utils.plain_text(km_utils.tokens_from_repl(replacement))
+	local plain_repl_title = km_utils.plain_text(km_utils.tokens_from_repl(title_repl))
+	local plain_repl_upper = km_utils.plain_text(km_utils.tokens_from_repl(upper_repl))
 
 	if is_case_sensitive then
-		add_with_space_variants(trigger, replacement)
+		add_with_space_variants(trigger, replacement, plain_repl_base)
 	else
 		local title_trigs = text_utils.trig_title(lower_trig)
 		local upper_trigs = text_utils.trig_upper(lower_trig)
 
-		add_with_space_variants(lower_trig, replacement)
+		add_with_space_variants(lower_trig, replacement, plain_repl_base)
 
 		for _, tt in ipairs(title_trigs) do
-			if tt ~= lower_trig then add_with_space_variants(tt, title_repl) end
+			if tt ~= lower_trig then add_with_space_variants(tt, title_repl, plain_repl_title) end
 		end
 
 		for _, ut in ipairs(upper_trigs) do
@@ -425,7 +437,7 @@ function M.add(trigger, replacement, opts)
 				if ut == tt then is_title = true; break end
 			end
 			if ut ~= lower_trig and not is_title then
-				add_with_space_variants(ut, upper_repl)
+				add_with_space_variants(ut, upper_repl, plain_repl_upper)
 			end
 		end
 	end
@@ -437,11 +449,11 @@ function M.add(trigger, replacement, opts)
 	if first_char == "," then
 		local rest = lower_trig:sub(#first_char + 1)
 		if rest ~= "" then
-			add_with_space_variants(";" .. text_utils.trig_lower(rest), title_repl)
+			add_with_space_variants(";" .. text_utils.trig_lower(rest), title_repl, plain_repl_title)
 			for _, ru in ipairs(text_utils.trig_upper(rest)) do
 				local alias = ";" .. ru
 				if alias ~= ";" .. text_utils.trig_lower(rest) then
-					add_with_space_variants(alias, upper_repl)
+					add_with_space_variants(alias, upper_repl, plain_repl_upper)
 				end
 			end
 		end

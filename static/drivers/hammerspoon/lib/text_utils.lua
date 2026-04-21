@@ -382,34 +382,53 @@ function M.trig_lower(s)
 	end))
 end
 
+-- Memoization caches: both trig_upper and trig_title are pure functions of
+-- their input. At startup, M.add() calls trig_upper/trig_title on ~3.3k
+-- lowercase triggers and many short rests share identical values across
+-- entries, so caching eliminates a large fraction of the array allocations.
+-- Returned arrays must be treated as read-only by callers.
+local _trig_upper_cache = {}
+local _trig_title_cache = {}
+
+--- Clears the case-variant memoization caches. Call when the UPPER_TRIGGERS
+--- table or any lower/upper mapping changes (e.g., driver reconfiguration).
+function M.clear_trig_case_caches()
+	_trig_upper_cache = {}
+	_trig_title_cache = {}
+end
+
 --- Generates all possible uppercase variants of a trigger.
 --- @param s string The string to convert.
 --- @return table An array of possible uppercase variants.
 function M.trig_upper(s)
+	if type(s) ~= "string" then return {""} end
+
+	local cached = _trig_upper_cache[s]
+	if cached then return cached end
+
 	local results = {""}
-	if type(s) ~= "string" then return results end
-	
 	for c in s:gmatch("[%z\1-\127\194-\244][\128-\191]*") do
 		local map_val = M.UPPER_TRIGGERS[c]
 		local uppers = {}
-		
-		if type(map_val) == "table" then 
+
+		if type(map_val) == "table" then
 			uppers = map_val
-		elseif type(map_val) == "string" then 
+		elseif type(map_val) == "string" then
 			table.insert(uppers, map_val)
-		else 
-			table.insert(uppers, string.upper(c)) 
+		else
+			table.insert(uppers, string.upper(c))
 		end
-		
+
 		local new_results = {}
 		for _, res in ipairs(results) do
-			for _, u in ipairs(uppers) do 
-				table.insert(new_results, res .. u) 
+			for _, u in ipairs(uppers) do
+				table.insert(new_results, res .. u)
 			end
 		end
 		results = new_results
 	end
-	
+
+	_trig_upper_cache[s] = results
 	return results
 end
 
@@ -418,18 +437,26 @@ end
 --- @return table An array of possible Title Case variants.
 function M.trig_title(s)
 	if type(s) ~= "string" then return {""} end
-	
+
+	local cached = _trig_title_cache[s]
+	if cached then return cached end
+
 	local first = s:match("^[%z\1-\127\194-\244][\128-\191]*")
-	if not first then return {s} end
-	
-	local first_uppers = M.trig_upper(first)
-	local rest = M.trig_lower(s:sub(#first + 1))
-	
-	local results = {}
-	for _, fu in ipairs(first_uppers) do 
-		table.insert(results, fu .. rest) 
+	if not first then
+		local fallback = {s}
+		_trig_title_cache[s] = fallback
+		return fallback
 	end
-	
+
+	local first_uppers = M.trig_upper(first)
+	local rest         = M.trig_lower(s:sub(#first + 1))
+
+	local results = {}
+	for _, fu in ipairs(first_uppers) do
+		table.insert(results, fu .. rest)
+	end
+
+	_trig_title_cache[s] = results
 	return results
 end
 
