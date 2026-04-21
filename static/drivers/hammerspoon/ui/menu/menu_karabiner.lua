@@ -278,8 +278,8 @@ end
 -- ==========================================
 -- ==========================================
 
---- Builds a single combo menu item with tap + hold sub-pickers.
---- Mirrors the tap / hold key layout: label  :  TapLabel  /  HoldLabel.
+--- Builds a single combo menu item with combo / tap / hold sub-pickers.
+--- Shows "ComboLabel  /  TapLabel  /  HoldLabel" next to the combo label.
 --- @param karabiner   table    The karabiner module.
 --- @param action_index table   id → action def map.
 --- @param update_menu function Callback to refresh the menu bar.
@@ -289,31 +289,45 @@ end
 local function build_one_combo_item(karabiner, action_index, update_menu, enabled, combo_def)
 	local cid = combo_def.id
 
-	local ok_tap,  current_tap  = pcall(karabiner.get_combo_tap_action,  cid)
-	local ok_hold, current_hold = pcall(karabiner.get_combo_hold_action, cid)
-	if not ok_tap  then current_tap  = "none" end
-	if not ok_hold then current_hold = "none" end
+	local ok_tap,   current_tap   = pcall(karabiner.get_combo_tap_action,   cid)
+	local ok_hold,  current_hold  = pcall(karabiner.get_combo_hold_action,  cid)
+	local ok_combo, current_combo = pcall(karabiner.get_combo_combo_action, cid)
+	if not ok_tap   then current_tap   = "none" end
+	if not ok_hold  then current_hold  = "none" end
+	if not ok_combo then current_combo = "none" end
 
-	local tap_slbl  = short_action_label(action_index, current_tap)
-	local hold_slbl = short_action_label(action_index, current_hold)
-	local is_active = (current_tap ~= "none" or current_hold ~= "none")
+	local tap_slbl   = short_action_label(action_index, current_tap)
+	local hold_slbl  = short_action_label(action_index, current_hold)
+	local combo_slbl = short_action_label(action_index, current_combo)
+	local is_empty   = (current_tap == "none" and current_hold == "none" and current_combo == "none")
+	local is_active  = not is_empty
 
-	local combo_label = (current_tap == "none" and current_hold == "none")
-		and NONE_DISPLAY
-		or  (tap_slbl .. "  /  " .. hold_slbl)
+	local combo_label = is_empty and NONE_DISPLAY
+		or string.format("%s  /  %s  /  %s", combo_slbl, tap_slbl, hold_slbl)
 
 	local combo_submenu = {
 		{
-			title    = "— Rien (effacer tap et hold) —",
-			disabled = (current_tap == "none" and current_hold == "none"),
+			title    = "— Rien (effacer combo, tap et hold) —",
+			disabled = is_empty,
 			fn       = function()
-				pcall(karabiner.set_combo_tap_action,  cid, "none")
-				pcall(karabiner.set_combo_hold_action, cid, "none")
+				pcall(karabiner.set_combo_combo_action, cid, "none")
+				pcall(karabiner.set_combo_tap_action,   cid, "none")
+				pcall(karabiner.set_combo_hold_action,  cid, "none")
 				pcall(karabiner.regenerate)
 				if update_menu then update_menu() end
 			end,
 		},
 		{ title = "-" },
+		{
+			title = string.format("Combo  :  %s", combo_slbl),
+			menu  = build_action_picker(
+				karabiner,
+				function(action_id) karabiner.set_combo_combo_action(cid, action_id) end,
+				current_combo,
+				update_menu,
+				"combo"
+			),
+		},
 		{
 			title = string.format("Tap  :  %s", tap_slbl),
 			menu  = build_action_picker(
@@ -355,10 +369,16 @@ end
 local function build_raccourcis_items(karabiner, action_index, update_menu, enabled)
 	local items         = {}
 	local current_group = nil
+	local is_symmetric  = karabiner.get_combo_symmetric()
+	local non_canonical = karabiner.NON_CANONICAL_COMBOS or {}
 
 	for _, combo_def in ipairs(karabiner.MOD_COMBOS) do
 		-- Skip combos handled elsewhere (e.g. script_control.lua shortcuts)
 		if combo_def.menu_hidden then goto continue end
+		-- In symmetric mode, non-canonical combos (reverse-order duplicates of a
+		-- canonical entry) are hidden: the canonical half configures the chord for
+		-- both press orders, so showing the reverse would confuse the user.
+		if is_symmetric and non_canonical[combo_def.id] then goto continue end
 
 		if combo_def.group ~= current_group then
 			items[#items + 1] = { title = "— " .. combo_def.group .. " —", disabled = true }
@@ -457,6 +477,67 @@ local function build_sticky_delay_item(karabiner, update_menu)
 	}
 end
 
+--- Builds the combo activation window item. Clicking opens a free-text input dialog.
+--- Controls `basic.simultaneous_threshold_milliseconds` — the maximum delay
+--- between the two keys of a shortcut for KE to fire the combo (chord) slot.
+--- @param karabiner   table    The karabiner module.
+--- @param update_menu function Callback to refresh the menu bar.
+--- @return table hs.menubar menu item.
+local function build_simultaneous_threshold_item(karabiner, update_menu)
+	local threshold_ms = karabiner.get_simultaneous_threshold()
+
+	return {
+		title = string.format("Délai d'activation des combos : %s", fmt_delay(threshold_ms)),
+		fn    = function()
+			hs.focus()
+			local script = string.format(
+				"display dialog \"Délai maximal (en millisecondes) entre la 1re\\n"
+				.. "et la 2e touche d'un raccourci pour déclencher le slot \\\"Combo\\\"\\n"
+				.. "(activation de type accord : touches pressées quasi en même temps).\\n\\n"
+				.. "(défaut : %d ms)\" "
+				.. "default answer \"%d\" "
+				.. "with title \"Karabiner — Délai d'activation des combos\" "
+				.. "buttons {\"Annuler\", \"OK\"} "
+				.. "default button \"OK\"",
+				karabiner.DEFAULT_SIMULTANEOUS_THRESHOLD_MS,
+				threshold_ms or karabiner.DEFAULT_SIMULTANEOUS_THRESHOLD_MS
+			)
+			local ok, result = hs.osascript.applescript(script)
+			Logger.debug(LOG, "Simultaneous threshold input: ok=%s result=%s.", tostring(ok), hs.inspect(result))
+			if not ok or type(result) ~= "table" then return end
+			local ms = tonumber(result["text returned"])
+			if not ms or ms <= 0 then
+				Logger.warn(LOG, "Invalid threshold '%s' — ignored.", tostring(result["text returned"]))
+				return
+			end
+			karabiner.set_simultaneous_threshold(math.floor(ms))
+			pcall(karabiner.regenerate)
+			if update_menu then update_menu() end
+		end,
+	}
+end
+
+--- Builds the symmetric-shortcut toggle item.
+--- When on, "touche 1 + touche 2" and "touche 2 + touche 1" fire the same action;
+--- the reverse half of each pair is hidden from the Raccourcis section to avoid duplicates.
+--- @param karabiner   table    The karabiner module.
+--- @param update_menu function Callback to refresh the menu bar.
+--- @return table hs.menubar menu item.
+local function build_combo_symmetric_item(karabiner, update_menu)
+	local is_symmetric = karabiner.get_combo_symmetric()
+
+	return {
+		title   = "Raccourcis symétriques (ordre des touches indifférent)",
+		checked = is_symmetric,
+		fn      = function()
+			karabiner.set_combo_symmetric(not is_symmetric)
+			pcall(karabiner.regenerate)
+			if update_menu then update_menu() end
+		end,
+	}
+end
+
+
 
 
 
@@ -550,18 +631,64 @@ function M.build(ctx)
 		}
 	end
 
-	-- Management actions
+	-- Management actions: clear-all first (destructive reset), then restore defaults,
+	-- then the tap→combo propagation helper.
 	submenu[#submenu + 1] = {
-		title = "↩  Remettre les valeurs par défaut",
+		title = "🧹  Tout vider (tap/hold et raccourcis)",
+		fn    = function()
+			Logger.start(LOG, "Clearing every tap/hold and combo slot…")
+			local cleared = 0
+			for _, key_def in ipairs(karabiner.TAP_HOLD_KEYS) do
+				pcall(karabiner.set_tap_action,  key_def.id, "none")
+				pcall(karabiner.set_hold_action, key_def.id, "none")
+				cleared = cleared + 1
+			end
+			for _, combo_def in ipairs(karabiner.MOD_COMBOS) do
+				pcall(karabiner.set_combo_combo_action, combo_def.id, "none")
+				pcall(karabiner.set_combo_tap_action,   combo_def.id, "none")
+				pcall(karabiner.set_combo_hold_action,  combo_def.id, "none")
+				cleared = cleared + 1
+			end
+			pcall(karabiner.regenerate)
+			Logger.success(LOG, "Cleared %d entry/entries — all slots are now 'none'.", cleared)
+			if update_menu then update_menu() end
+		end,
+	}
+	submenu[#submenu + 1] = {
+		title = "↩  Restaurer les valeurs par défaut",
 		fn    = function()
 			pcall(karabiner.reset_to_defaults)
+			pcall(karabiner.regenerate)
+			if update_menu then update_menu() end
+		end,
+	}
+	submenu[#submenu + 1] = {
+		title = "⇢  Copier Tap → Combo (tous les raccourcis)",
+		fn    = function()
+			Logger.start(LOG, "Propagating tap → combo for all modifier combos…")
+			local changed = 0
+			for _, combo_def in ipairs(karabiner.MOD_COMBOS) do
+				local cid              = combo_def.id
+				local ok_tap, tap_id   = pcall(karabiner.get_combo_tap_action,   cid)
+				local ok_cmb, combo_id = pcall(karabiner.get_combo_combo_action, cid)
+				if ok_tap and ok_cmb and tap_id ~= combo_id then
+					pcall(karabiner.set_combo_combo_action, cid, tap_id)
+					changed = changed + 1
+				end
+			end
+			pcall(karabiner.regenerate)
+			Logger.success(LOG, "Tap → combo propagation done (%d combo(s) updated).", changed)
 			if update_menu then update_menu() end
 		end,
 	}
 
-	-- Delay settings — separated from management, always configurable
+	-- Timing and shortcut behaviour — always configurable regardless of enabled state.
+	-- Trigger-side settings first (tap/hold delay, combo window, symmetry), then the
+	-- sticky-modifier delay at the bottom — the only one that acts on the output.
 	submenu[#submenu + 1] = { title = "-" }
 	submenu[#submenu + 1] = build_delay_item(karabiner, update_menu)
+	submenu[#submenu + 1] = build_simultaneous_threshold_item(karabiner, update_menu)
+	submenu[#submenu + 1] = build_combo_symmetric_item(karabiner, update_menu)
 	submenu[#submenu + 1] = build_sticky_delay_item(karabiner, update_menu)
 
 	submenu[#submenu + 1] = { title = "-" }

@@ -3,7 +3,12 @@
         "id": "escape",
         "label": "Échap",
         "from": {
-            "key_code": "escape"
+            "key_code": "escape",
+            "modifiers": {
+                "optional": [
+                    "any"
+                ]
+            }
         }
     },
     {
@@ -25,15 +30,7 @@
             "key_code": "caps_lock",
             "modifiers": {
                 "optional": [
-                    "caps_lock",
-                    "left_command",
-                    "right_command",
-                    "left_control",
-                    "right_control",
-                    "left_option",
-                    "left_shift",
-                    "right_shift",
-                    "fn"
+                    "any"
                 ]
             }
         }
@@ -66,7 +63,12 @@
         "id": "left_control",
         "label": "Ctrl gauche",
         "from": {
-            "key_code": "left_control"
+            "key_code": "left_control",
+            "modifiers": {
+                "optional": [
+                    "any"
+                ]
+            }
         }
     },
     {
@@ -101,7 +103,12 @@
         "id": "spacebar",
         "label": "Espace",
         "from": {
-            "key_code": "spacebar"
+            "key_code": "spacebar",
+            "modifiers": {
+                "optional": [
+                    "any"
+                ]
+            }
         }
     },
     {
@@ -144,14 +151,24 @@
         "id": "return_or_enter",
         "label": "Entrée",
         "from": {
-            "key_code": "return_or_enter"
+            "key_code": "return_or_enter",
+            "modifiers": {
+                "optional": [
+                    "any"
+                ]
+            }
         }
     },
     {
         "id": "delete_or_backspace",
         "label": "Suppr. arrière",
         "from": {
-            "key_code": "delete_or_backspace"
+            "key_code": "delete_or_backspace",
+            "modifiers": {
+                "optional": [
+                    "any"
+                ]
+            }
         }
     }
 ]

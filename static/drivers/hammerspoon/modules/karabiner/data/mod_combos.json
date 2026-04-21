@@ -1,3284 +1,3284 @@
 [
-	{
-		"id": "esc_tab",
-		"label": "Échap + Tab",
-		"group": "Échap",
-		"from": {
-			"simultaneous": [
-				{
-					"key_code": "escape"
-				},
-				{
-					"key_code": "tab"
-				}
-			],
-			"simultaneous_options": {
-				"key_down_order": "strict"
-			}
-		}
-	},
-	{
-		"id": "esc_caps",
-		"label": "Échap + CapsLock",
-		"group": "Échap",
-		"from": {
-			"simultaneous": [
-				{
-					"key_code": "escape"
-				},
-				{
-					"key_code": "caps_lock"
-				}
-			],
-			"simultaneous_options": {
-				"key_down_order": "strict"
-			}
-		}
-	},
-	{
-		"id": "esc_lshift",
-		"label": "Échap + Shift gauche",
-		"group": "Échap",
-		"from": {
-			"simultaneous": [
-				{
-					"key_code": "escape"
-				},
-				{
-					"key_code": "left_shift"
-				}
-			],
-			"simultaneous_options": {
-				"key_down_order": "strict"
-			}
-		}
-	},
-	{
-		"id": "esc_fn",
-		"label": "Échap + Fn",
-		"group": "Échap",
-		"from": {
-			"simultaneous": [
-				{
-					"key_code": "escape"
-				},
-				{
-					"key_code": "fn"
-				}
-			],
-			"simultaneous_options": {
-				"key_down_order": "strict"
-			}
-		}
-	},
-	{
-		"id": "esc_lctrl",
-		"label": "Échap + Ctrl gauche",
-		"group": "Échap",
-		"from": {
-			"simultaneous": [
-				{
-					"key_code": "escape"
-				},
-				{
-					"key_code": "left_control"
-				}
-			],
-			"simultaneous_options": {
-				"key_down_order": "strict"
-			}
-		}
-	},
-	{
-		"id": "esc_lopt",
-		"label": "Échap + Option gauche",
-		"group": "Échap",
-		"from": {
-			"simultaneous": [
-				{
-					"key_code": "escape"
-				},
-				{
-					"key_code": "left_option"
-				}
-			],
-			"simultaneous_options": {
-				"key_down_order": "strict"
-			}
-		}
-	},
-	{
-		"id": "esc_lcmd",
-		"label": "Échap + Cmd gauche",
-		"group": "Échap",
-		"from": {
-			"simultaneous": [
-				{
-					"key_code": "escape"
-				},
-				{
-					"key_code": "left_command"
-				}
-			],
-			"simultaneous_options": {
-				"key_down_order": "strict"
-			}
-		}
-	},
-	{
-		"id": "esc_space",
-		"label": "Échap + Espace",
-		"group": "Échap",
-		"from": {
-			"simultaneous": [
-				{
-					"key_code": "escape"
-				},
-				{
-					"key_code": "spacebar"
-				}
-			],
-			"simultaneous_options": {
-				"key_down_order": "strict"
-			}
-		}
-	},
-	{
-		"id": "esc_rcmd",
-		"label": "Échap + Cmd droit",
-		"group": "Échap",
-		"from": {
-			"simultaneous": [
-				{
-					"key_code": "escape"
-				},
-				{
-					"key_code": "right_command"
-				}
-			],
-			"simultaneous_options": {
-				"key_down_order": "strict"
-			}
-		}
-	},
-	{
-		"id": "esc_ropt",
-		"label": "Échap + Option droit",
-		"group": "Échap",
-		"from": {
-			"simultaneous": [
-				{
-					"key_code": "escape"
-				},
-				{
-					"key_code": "right_option"
-				}
-			],
-			"simultaneous_options": {
-				"key_down_order": "strict"
-			}
-		}
-	},
-	{
-		"id": "esc_rshift",
-		"label": "Échap + Shift droit",
-		"group": "Échap",
-		"from": {
-			"simultaneous": [
-				{
-					"key_code": "escape"
-				},
-				{
-					"key_code": "right_shift"
-				}
-			],
-			"simultaneous_options": {
-				"key_down_order": "strict"
-			}
-		}
-	},
-	{
-		"id": "esc_ret",
-		"label": "Échap + Entrée",
-		"group": "Échap",
-		"from": {
-			"simultaneous": [
-				{
-					"key_code": "escape"
-				},
-				{
-					"key_code": "return_or_enter"
-				}
-			],
-			"simultaneous_options": {
-				"key_down_order": "strict"
-			}
-		}
-	},
-	{
-		"id": "esc_bsp",
-		"label": "Échap + BackSpace",
-		"group": "Échap",
-		"from": {
-			"simultaneous": [
-				{
-					"key_code": "escape"
-				},
-				{
-					"key_code": "delete_or_backspace"
-				}
-			],
-			"simultaneous_options": {
-				"key_down_order": "strict"
-			}
-		}
-	},
-	{
-		"id": "tab_esc",
-		"label": "Tab + Échap",
-		"group": "Tab",
-		"from": {
-			"simultaneous": [
-				{
-					"key_code": "tab"
-				},
-				{
-					"key_code": "escape"
-				}
-			],
-			"simultaneous_options": {
-				"key_down_order": "strict"
-			}
-		}
-	},
-	{
-		"id": "tab_caps",
-		"label": "Tab + CapsLock",
-		"group": "Tab",
-		"from": {
-			"simultaneous": [
-				{
-					"key_code": "tab"
-				},
-				{
-					"key_code": "caps_lock"
-				}
-			],
-			"simultaneous_options": {
-				"key_down_order": "strict"
-			}
-		}
-	},
-	{
-		"id": "tab_lshift",
-		"label": "Tab + Shift gauche",
-		"group": "Tab",
-		"from": {
-			"simultaneous": [
-				{
-					"key_code": "tab"
-				},
-				{
-					"key_code": "left_shift"
-				}
-			],
-			"simultaneous_options": {
-				"key_down_order": "strict"
-			}
-		}
-	},
-	{
-		"id": "tab_fn",
-		"label": "Tab + Fn",
-		"group": "Tab",
-		"from": {
-			"simultaneous": [
-				{
-					"key_code": "tab"
-				},
-				{
-					"key_code": "fn"
-				}
-			],
-			"simultaneous_options": {
-				"key_down_order": "strict"
-			}
-		}
-	},
-	{
-		"id": "tab_lctrl",
-		"label": "Tab + Ctrl gauche",
-		"group": "Tab",
-		"from": {
-			"simultaneous": [
-				{
-					"key_code": "tab"
-				},
-				{
-					"key_code": "left_control"
-				}
-			],
-			"simultaneous_options": {
-				"key_down_order": "strict"
-			}
-		}
-	},
-	{
-		"id": "tab_lopt",
-		"label": "Tab + Option gauche",
-		"group": "Tab",
-		"from": {
-			"simultaneous": [
-				{
-					"key_code": "tab"
-				},
-				{
-					"key_code": "left_option"
-				}
-			],
-			"simultaneous_options": {
-				"key_down_order": "strict"
-			}
-		}
-	},
-	{
-		"id": "tab_lcmd",
-		"label": "Tab + Cmd gauche",
-		"group": "Tab",
-		"from": {
-			"simultaneous": [
-				{
-					"key_code": "tab"
-				},
-				{
-					"key_code": "left_command"
-				}
-			],
-			"simultaneous_options": {
-				"key_down_order": "strict"
-			}
-		}
-	},
-	{
-		"id": "tab_space",
-		"label": "Tab + Espace",
-		"group": "Tab",
-		"from": {
-			"simultaneous": [
-				{
-					"key_code": "tab"
-				},
-				{
-					"key_code": "spacebar"
-				}
-			],
-			"simultaneous_options": {
-				"key_down_order": "strict"
-			}
-		}
-	},
-	{
-		"id": "tab_rcmd",
-		"label": "Tab + Cmd droit",
-		"group": "Tab",
-		"from": {
-			"simultaneous": [
-				{
-					"key_code": "tab"
-				},
-				{
-					"key_code": "right_command"
-				}
-			],
-			"simultaneous_options": {
-				"key_down_order": "strict"
-			}
-		}
-	},
-	{
-		"id": "tab_ropt",
-		"label": "Tab + Option droit",
-		"group": "Tab",
-		"from": {
-			"simultaneous": [
-				{
-					"key_code": "tab"
-				},
-				{
-					"key_code": "right_option"
-				}
-			],
-			"simultaneous_options": {
-				"key_down_order": "strict"
-			}
-		}
-	},
-	{
-		"id": "tab_rshift",
-		"label": "Tab + Shift droit",
-		"group": "Tab",
-		"from": {
-			"simultaneous": [
-				{
-					"key_code": "tab"
-				},
-				{
-					"key_code": "right_shift"
-				}
-			],
-			"simultaneous_options": {
-				"key_down_order": "strict"
-			}
-		}
-	},
-	{
-		"id": "tab_ret",
-		"label": "Tab + Entrée",
-		"group": "Tab",
-		"from": {
-			"simultaneous": [
-				{
-					"key_code": "tab"
-				},
-				{
-					"key_code": "return_or_enter"
-				}
-			],
-			"simultaneous_options": {
-				"key_down_order": "strict"
-			}
-		}
-	},
-	{
-		"id": "tab_bsp",
-		"label": "Tab + BackSpace",
-		"group": "Tab",
-		"from": {
-			"simultaneous": [
-				{
-					"key_code": "tab"
-				},
-				{
-					"key_code": "delete_or_backspace"
-				}
-			],
-			"simultaneous_options": {
-				"key_down_order": "strict"
-			}
-		}
-	},
-	{
-		"id": "caps_esc",
-		"label": "CapsLock + Échap",
-		"group": "CapsLock",
-		"from": {
-			"simultaneous": [
-				{
-					"key_code": "caps_lock"
-				},
-				{
-					"key_code": "escape"
-				}
-			],
-			"simultaneous_options": {
-				"key_down_order": "strict"
-			}
-		}
-	},
-	{
-		"id": "caps_tab",
-		"label": "CapsLock + Tab",
-		"group": "CapsLock",
-		"from": {
-			"simultaneous": [
-				{
-					"key_code": "caps_lock"
-				},
-				{
-					"key_code": "tab"
-				}
-			],
-			"simultaneous_options": {
-				"key_down_order": "strict"
-			}
-		}
-	},
-	{
-		"id": "caps_lshift",
-		"label": "CapsLock + Shift gauche",
-		"group": "CapsLock",
-		"from": {
-			"simultaneous": [
-				{
-					"key_code": "caps_lock"
-				},
-				{
-					"key_code": "left_shift"
-				}
-			],
-			"simultaneous_options": {
-				"key_down_order": "strict"
-			}
-		}
-	},
-	{
-		"id": "caps_fn",
-		"label": "CapsLock + Fn",
-		"group": "CapsLock",
-		"from": {
-			"simultaneous": [
-				{
-					"key_code": "caps_lock"
-				},
-				{
-					"key_code": "fn"
-				}
-			],
-			"simultaneous_options": {
-				"key_down_order": "strict"
-			}
-		}
-	},
-	{
-		"id": "caps_lctrl",
-		"label": "CapsLock + Ctrl gauche",
-		"group": "CapsLock",
-		"from": {
-			"simultaneous": [
-				{
-					"key_code": "caps_lock"
-				},
-				{
-					"key_code": "left_control"
-				}
-			],
-			"simultaneous_options": {
-				"key_down_order": "strict"
-			}
-		}
-	},
-	{
-		"id": "caps_lopt",
-		"label": "CapsLock + Option gauche",
-		"group": "CapsLock",
-		"from": {
-			"simultaneous": [
-				{
-					"key_code": "caps_lock"
-				},
-				{
-					"key_code": "left_option"
-				}
-			],
-			"simultaneous_options": {
-				"key_down_order": "strict"
-			}
-		}
-	},
-	{
-		"id": "caps_lcmd",
-		"label": "CapsLock + Cmd gauche",
-		"group": "CapsLock",
-		"from": {
-			"simultaneous": [
-				{
-					"key_code": "caps_lock"
-				},
-				{
-					"key_code": "left_command"
-				}
-			],
-			"simultaneous_options": {
-				"key_down_order": "strict"
-			}
-		}
-	},
-	{
-		"id": "caps_space",
-		"label": "CapsLock + Espace",
-		"group": "CapsLock",
-		"from": {
-			"simultaneous": [
-				{
-					"key_code": "caps_lock"
-				},
-				{
-					"key_code": "spacebar"
-				}
-			],
-			"simultaneous_options": {
-				"key_down_order": "strict"
-			}
-		}
-	},
-	{
-		"id": "caps_rcmd",
-		"label": "CapsLock + Cmd droit",
-		"group": "CapsLock",
-		"from": {
-			"simultaneous": [
-				{
-					"key_code": "caps_lock"
-				},
-				{
-					"key_code": "right_command"
-				}
-			],
-			"simultaneous_options": {
-				"key_down_order": "strict"
-			}
-		}
-	},
-	{
-		"id": "caps_ropt",
-		"label": "CapsLock + Option droit",
-		"group": "CapsLock",
-		"from": {
-			"simultaneous": [
-				{
-					"key_code": "caps_lock"
-				},
-				{
-					"key_code": "right_option"
-				}
-			],
-			"simultaneous_options": {
-				"key_down_order": "strict"
-			}
-		}
-	},
-	{
-		"id": "caps_rshift",
-		"label": "CapsLock + Shift droit",
-		"group": "CapsLock",
-		"from": {
-			"simultaneous": [
-				{
-					"key_code": "caps_lock"
-				},
-				{
-					"key_code": "right_shift"
-				}
-			],
-			"simultaneous_options": {
-				"key_down_order": "strict"
-			}
-		}
-	},
-	{
-		"id": "caps_ret",
-		"label": "CapsLock + Entrée",
-		"group": "CapsLock",
-		"from": {
-			"simultaneous": [
-				{
-					"key_code": "caps_lock"
-				},
-				{
-					"key_code": "return_or_enter"
-				}
-			],
-			"simultaneous_options": {
-				"key_down_order": "strict"
-			}
-		}
-	},
-	{
-		"id": "caps_bsp",
-		"label": "CapsLock + BackSpace",
-		"group": "CapsLock",
-		"from": {
-			"simultaneous": [
-				{
-					"key_code": "caps_lock"
-				},
-				{
-					"key_code": "delete_or_backspace"
-				}
-			],
-			"simultaneous_options": {
-				"key_down_order": "strict"
-			}
-		}
-	},
-	{
-		"id": "lshift_esc",
-		"label": "Shift gauche + Échap",
-		"group": "Shift gauche",
-		"from": {
-			"simultaneous": [
-				{
-					"key_code": "left_shift"
-				},
-				{
-					"key_code": "escape"
-				}
-			],
-			"simultaneous_options": {
-				"key_down_order": "strict"
-			}
-		}
-	},
-	{
-		"id": "lshift_tab",
-		"label": "Shift gauche + Tab",
-		"group": "Shift gauche",
-		"from": {
-			"simultaneous": [
-				{
-					"key_code": "left_shift"
-				},
-				{
-					"key_code": "tab"
-				}
-			],
-			"simultaneous_options": {
-				"key_down_order": "strict"
-			}
-		}
-	},
-	{
-		"id": "lshift_caps",
-		"label": "Shift gauche + CapsLock",
-		"group": "Shift gauche",
-		"from": {
-			"simultaneous": [
-				{
-					"key_code": "left_shift"
-				},
-				{
-					"key_code": "caps_lock"
-				}
-			],
-			"simultaneous_options": {
-				"key_down_order": "strict"
-			}
-		}
-	},
-	{
-		"id": "lshift_fn",
-		"label": "Shift gauche + Fn",
-		"group": "Shift gauche",
-		"from": {
-			"simultaneous": [
-				{
-					"key_code": "left_shift"
-				},
-				{
-					"key_code": "fn"
-				}
-			],
-			"simultaneous_options": {
-				"key_down_order": "strict"
-			}
-		}
-	},
-	{
-		"id": "lshift_lctrl",
-		"label": "Shift gauche + Ctrl gauche",
-		"group": "Shift gauche",
-		"from": {
-			"simultaneous": [
-				{
-					"key_code": "left_shift"
-				},
-				{
-					"key_code": "left_control"
-				}
-			],
-			"simultaneous_options": {
-				"key_down_order": "strict"
-			}
-		}
-	},
-	{
-		"id": "lshift_lopt",
-		"label": "Shift gauche + Option gauche",
-		"group": "Shift gauche",
-		"from": {
-			"simultaneous": [
-				{
-					"key_code": "left_shift"
-				},
-				{
-					"key_code": "left_option"
-				}
-			],
-			"simultaneous_options": {
-				"key_down_order": "strict"
-			}
-		}
-	},
-	{
-		"id": "lshift_lcmd",
-		"label": "Shift gauche + Cmd gauche",
-		"group": "Shift gauche",
-		"from": {
-			"simultaneous": [
-				{
-					"key_code": "left_shift"
-				},
-				{
-					"key_code": "left_command"
-				}
-			],
-			"simultaneous_options": {
-				"key_down_order": "strict"
-			}
-		}
-	},
-	{
-		"id": "lshift_space",
-		"label": "Shift gauche + Espace",
-		"group": "Shift gauche",
-		"from": {
-			"simultaneous": [
-				{
-					"key_code": "left_shift"
-				},
-				{
-					"key_code": "spacebar"
-				}
-			],
-			"simultaneous_options": {
-				"key_down_order": "strict"
-			}
-		}
-	},
-	{
-		"id": "lshift_rcmd",
-		"label": "Shift gauche + Cmd droit",
-		"group": "Shift gauche",
-		"from": {
-			"simultaneous": [
-				{
-					"key_code": "left_shift"
-				},
-				{
-					"key_code": "right_command"
-				}
-			],
-			"simultaneous_options": {
-				"key_down_order": "strict"
-			}
-		}
-	},
-	{
-		"id": "lshift_ropt",
-		"label": "Shift gauche + Option droit",
-		"group": "Shift gauche",
-		"from": {
-			"simultaneous": [
-				{
-					"key_code": "left_shift"
-				},
-				{
-					"key_code": "right_option"
-				}
-			],
-			"simultaneous_options": {
-				"key_down_order": "strict"
-			}
-		}
-	},
-	{
-		"id": "lshift_rshift",
-		"label": "Shift gauche + Shift droit",
-		"group": "Shift gauche",
-		"from": {
-			"simultaneous": [
-				{
-					"key_code": "left_shift"
-				},
-				{
-					"key_code": "right_shift"
-				}
-			],
-			"simultaneous_options": {
-				"key_down_order": "strict"
-			}
-		}
-	},
-	{
-		"id": "lshift_ret",
-		"label": "Shift gauche + Entrée",
-		"group": "Shift gauche",
-		"from": {
-			"simultaneous": [
-				{
-					"key_code": "left_shift"
-				},
-				{
-					"key_code": "return_or_enter"
-				}
-			],
-			"simultaneous_options": {
-				"key_down_order": "strict"
-			}
-		}
-	},
-	{
-		"id": "lshift_bsp",
-		"label": "Shift gauche + BackSpace",
-		"group": "Shift gauche",
-		"from": {
-			"simultaneous": [
-				{
-					"key_code": "left_shift"
-				},
-				{
-					"key_code": "delete_or_backspace"
-				}
-			],
-			"simultaneous_options": {
-				"key_down_order": "strict"
-			}
-		}
-	},
-	{
-		"id": "fn_esc",
-		"label": "Fn + Échap",
-		"group": "Fn",
-		"from": {
-			"simultaneous": [
-				{
-					"key_code": "fn"
-				},
-				{
-					"key_code": "escape"
-				}
-			],
-			"simultaneous_options": {
-				"key_down_order": "strict"
-			}
-		}
-	},
-	{
-		"id": "fn_tab",
-		"label": "Fn + Tab",
-		"group": "Fn",
-		"from": {
-			"simultaneous": [
-				{
-					"key_code": "fn"
-				},
-				{
-					"key_code": "tab"
-				}
-			],
-			"simultaneous_options": {
-				"key_down_order": "strict"
-			}
-		}
-	},
-	{
-		"id": "fn_caps",
-		"label": "Fn + CapsLock",
-		"group": "Fn",
-		"from": {
-			"simultaneous": [
-				{
-					"key_code": "fn"
-				},
-				{
-					"key_code": "caps_lock"
-				}
-			],
-			"simultaneous_options": {
-				"key_down_order": "strict"
-			}
-		}
-	},
-	{
-		"id": "fn_lshift",
-		"label": "Fn + Shift gauche",
-		"group": "Fn",
-		"from": {
-			"simultaneous": [
-				{
-					"key_code": "fn"
-				},
-				{
-					"key_code": "left_shift"
-				}
-			],
-			"simultaneous_options": {
-				"key_down_order": "strict"
-			}
-		}
-	},
-	{
-		"id": "fn_lctrl",
-		"label": "Fn + Ctrl gauche",
-		"group": "Fn",
-		"from": {
-			"simultaneous": [
-				{
-					"key_code": "fn"
-				},
-				{
-					"key_code": "left_control"
-				}
-			],
-			"simultaneous_options": {
-				"key_down_order": "strict"
-			}
-		}
-	},
-	{
-		"id": "fn_lopt",
-		"label": "Fn + Option gauche",
-		"group": "Fn",
-		"from": {
-			"simultaneous": [
-				{
-					"key_code": "fn"
-				},
-				{
-					"key_code": "left_option"
-				}
-			],
-			"simultaneous_options": {
-				"key_down_order": "strict"
-			}
-		}
-	},
-	{
-		"id": "fn_lcmd",
-		"label": "Fn + Cmd gauche",
-		"group": "Fn",
-		"from": {
-			"simultaneous": [
-				{
-					"key_code": "fn"
-				},
-				{
-					"key_code": "left_command"
-				}
-			],
-			"simultaneous_options": {
-				"key_down_order": "strict"
-			}
-		}
-	},
-	{
-		"id": "fn_space",
-		"label": "Fn + Espace",
-		"group": "Fn",
-		"from": {
-			"simultaneous": [
-				{
-					"key_code": "fn"
-				},
-				{
-					"key_code": "spacebar"
-				}
-			],
-			"simultaneous_options": {
-				"key_down_order": "strict"
-			}
-		}
-	},
-	{
-		"id": "fn_rcmd",
-		"label": "Fn + Cmd droit",
-		"group": "Fn",
-		"from": {
-			"simultaneous": [
-				{
-					"key_code": "fn"
-				},
-				{
-					"key_code": "right_command"
-				}
-			],
-			"simultaneous_options": {
-				"key_down_order": "strict"
-			}
-		}
-	},
-	{
-		"id": "fn_ropt",
-		"label": "Fn + Option droit",
-		"group": "Fn",
-		"from": {
-			"simultaneous": [
-				{
-					"key_code": "fn"
-				},
-				{
-					"key_code": "right_option"
-				}
-			],
-			"simultaneous_options": {
-				"key_down_order": "strict"
-			}
-		}
-	},
-	{
-		"id": "fn_rshift",
-		"label": "Fn + Shift droit",
-		"group": "Fn",
-		"from": {
-			"simultaneous": [
-				{
-					"key_code": "fn"
-				},
-				{
-					"key_code": "right_shift"
-				}
-			],
-			"simultaneous_options": {
-				"key_down_order": "strict"
-			}
-		}
-	},
-	{
-		"id": "fn_ret",
-		"label": "Fn + Entrée",
-		"group": "Fn",
-		"from": {
-			"simultaneous": [
-				{
-					"key_code": "fn"
-				},
-				{
-					"key_code": "return_or_enter"
-				}
-			],
-			"simultaneous_options": {
-				"key_down_order": "strict"
-			}
-		}
-	},
-	{
-		"id": "fn_bsp",
-		"label": "Fn + BackSpace",
-		"group": "Fn",
-		"from": {
-			"simultaneous": [
-				{
-					"key_code": "fn"
-				},
-				{
-					"key_code": "delete_or_backspace"
-				}
-			],
-			"simultaneous_options": {
-				"key_down_order": "strict"
-			}
-		}
-	},
-	{
-		"id": "lctrl_esc",
-		"label": "Ctrl gauche + Échap",
-		"group": "Ctrl gauche",
-		"from": {
-			"simultaneous": [
-				{
-					"key_code": "left_control"
-				},
-				{
-					"key_code": "escape"
-				}
-			],
-			"simultaneous_options": {
-				"key_down_order": "strict"
-			}
-		}
-	},
-	{
-		"id": "lctrl_tab",
-		"label": "Ctrl gauche + Tab",
-		"group": "Ctrl gauche",
-		"from": {
-			"simultaneous": [
-				{
-					"key_code": "left_control"
-				},
-				{
-					"key_code": "tab"
-				}
-			],
-			"simultaneous_options": {
-				"key_down_order": "strict"
-			}
-		}
-	},
-	{
-		"id": "lctrl_caps",
-		"label": "Ctrl gauche + CapsLock",
-		"group": "Ctrl gauche",
-		"from": {
-			"simultaneous": [
-				{
-					"key_code": "left_control"
-				},
-				{
-					"key_code": "caps_lock"
-				}
-			],
-			"simultaneous_options": {
-				"key_down_order": "strict"
-			}
-		}
-	},
-	{
-		"id": "lctrl_lshift",
-		"label": "Ctrl gauche + Shift gauche",
-		"group": "Ctrl gauche",
-		"from": {
-			"simultaneous": [
-				{
-					"key_code": "left_control"
-				},
-				{
-					"key_code": "left_shift"
-				}
-			],
-			"simultaneous_options": {
-				"key_down_order": "strict"
-			}
-		}
-	},
-	{
-		"id": "lctrl_fn",
-		"label": "Ctrl gauche + Fn",
-		"group": "Ctrl gauche",
-		"from": {
-			"simultaneous": [
-				{
-					"key_code": "left_control"
-				},
-				{
-					"key_code": "fn"
-				}
-			],
-			"simultaneous_options": {
-				"key_down_order": "strict"
-			}
-		}
-	},
-	{
-		"id": "lctrl_lopt",
-		"label": "Ctrl gauche + Option gauche",
-		"group": "Ctrl gauche",
-		"from": {
-			"simultaneous": [
-				{
-					"key_code": "left_control"
-				},
-				{
-					"key_code": "left_option"
-				}
-			],
-			"simultaneous_options": {
-				"key_down_order": "strict"
-			}
-		}
-	},
-	{
-		"id": "lctrl_lcmd",
-		"label": "Ctrl gauche + Cmd gauche",
-		"group": "Ctrl gauche",
-		"from": {
-			"simultaneous": [
-				{
-					"key_code": "left_control"
-				},
-				{
-					"key_code": "left_command"
-				}
-			],
-			"simultaneous_options": {
-				"key_down_order": "strict"
-			}
-		}
-	},
-	{
-		"id": "lctrl_space",
-		"label": "Ctrl gauche + Espace",
-		"group": "Ctrl gauche",
-		"from": {
-			"simultaneous": [
-				{
-					"key_code": "left_control"
-				},
-				{
-					"key_code": "spacebar"
-				}
-			],
-			"simultaneous_options": {
-				"key_down_order": "strict"
-			}
-		}
-	},
-	{
-		"id": "lctrl_rcmd",
-		"label": "Ctrl gauche + Cmd droit",
-		"group": "Ctrl gauche",
-		"from": {
-			"simultaneous": [
-				{
-					"key_code": "left_control"
-				},
-				{
-					"key_code": "right_command"
-				}
-			],
-			"simultaneous_options": {
-				"key_down_order": "strict"
-			}
-		}
-	},
-	{
-		"id": "lctrl_ropt",
-		"label": "Ctrl gauche + Option droit",
-		"group": "Ctrl gauche",
-		"from": {
-			"simultaneous": [
-				{
-					"key_code": "left_control"
-				},
-				{
-					"key_code": "right_option"
-				}
-			],
-			"simultaneous_options": {
-				"key_down_order": "strict"
-			}
-		}
-	},
-	{
-		"id": "lctrl_rshift",
-		"label": "Ctrl gauche + Shift droit",
-		"group": "Ctrl gauche",
-		"from": {
-			"simultaneous": [
-				{
-					"key_code": "left_control"
-				},
-				{
-					"key_code": "right_shift"
-				}
-			],
-			"simultaneous_options": {
-				"key_down_order": "strict"
-			}
-		}
-	},
-	{
-		"id": "lctrl_ret",
-		"label": "Ctrl gauche + Entrée",
-		"group": "Ctrl gauche",
-		"from": {
-			"simultaneous": [
-				{
-					"key_code": "left_control"
-				},
-				{
-					"key_code": "return_or_enter"
-				}
-			],
-			"simultaneous_options": {
-				"key_down_order": "strict"
-			}
-		}
-	},
-	{
-		"id": "lctrl_bsp",
-		"label": "Ctrl gauche + BackSpace",
-		"group": "Ctrl gauche",
-		"from": {
-			"simultaneous": [
-				{
-					"key_code": "left_control"
-				},
-				{
-					"key_code": "delete_or_backspace"
-				}
-			],
-			"simultaneous_options": {
-				"key_down_order": "strict"
-			}
-		}
-	},
-	{
-		"id": "lopt_esc",
-		"label": "Option gauche + Échap",
-		"group": "Option gauche",
-		"from": {
-			"simultaneous": [
-				{
-					"key_code": "left_option"
-				},
-				{
-					"key_code": "escape"
-				}
-			],
-			"simultaneous_options": {
-				"key_down_order": "strict"
-			}
-		}
-	},
-	{
-		"id": "lopt_tab",
-		"label": "Option gauche + Tab",
-		"group": "Option gauche",
-		"from": {
-			"simultaneous": [
-				{
-					"key_code": "left_option"
-				},
-				{
-					"key_code": "tab"
-				}
-			],
-			"simultaneous_options": {
-				"key_down_order": "strict"
-			}
-		}
-	},
-	{
-		"id": "lopt_caps",
-		"label": "Option gauche + CapsLock",
-		"group": "Option gauche",
-		"from": {
-			"simultaneous": [
-				{
-					"key_code": "left_option"
-				},
-				{
-					"key_code": "caps_lock"
-				}
-			],
-			"simultaneous_options": {
-				"key_down_order": "strict"
-			}
-		}
-	},
-	{
-		"id": "lopt_lshift",
-		"label": "Option gauche + Shift gauche",
-		"group": "Option gauche",
-		"from": {
-			"simultaneous": [
-				{
-					"key_code": "left_option"
-				},
-				{
-					"key_code": "left_shift"
-				}
-			],
-			"simultaneous_options": {
-				"key_down_order": "strict"
-			}
-		}
-	},
-	{
-		"id": "lopt_fn",
-		"label": "Option gauche + Fn",
-		"group": "Option gauche",
-		"from": {
-			"simultaneous": [
-				{
-					"key_code": "left_option"
-				},
-				{
-					"key_code": "fn"
-				}
-			],
-			"simultaneous_options": {
-				"key_down_order": "strict"
-			}
-		}
-	},
-	{
-		"id": "lopt_lctrl",
-		"label": "Option gauche + Ctrl gauche",
-		"group": "Option gauche",
-		"from": {
-			"simultaneous": [
-				{
-					"key_code": "left_option"
-				},
-				{
-					"key_code": "left_control"
-				}
-			],
-			"simultaneous_options": {
-				"key_down_order": "strict"
-			}
-		}
-	},
-	{
-		"id": "lopt_lcmd",
-		"label": "Option gauche + Cmd gauche",
-		"group": "Option gauche",
-		"from": {
-			"simultaneous": [
-				{
-					"key_code": "left_option"
-				},
-				{
-					"key_code": "left_command"
-				}
-			],
-			"simultaneous_options": {
-				"key_down_order": "strict"
-			}
-		}
-	},
-	{
-		"id": "lopt_space",
-		"label": "Option gauche + Espace",
-		"group": "Option gauche",
-		"from": {
-			"simultaneous": [
-				{
-					"key_code": "left_option"
-				},
-				{
-					"key_code": "spacebar"
-				}
-			],
-			"simultaneous_options": {
-				"key_down_order": "strict"
-			}
-		}
-	},
-	{
-		"id": "lopt_rcmd",
-		"label": "Option gauche + Cmd droit",
-		"group": "Option gauche",
-		"from": {
-			"simultaneous": [
-				{
-					"key_code": "left_option"
-				},
-				{
-					"key_code": "right_command"
-				}
-			],
-			"simultaneous_options": {
-				"key_down_order": "strict"
-			}
-		}
-	},
-	{
-		"id": "lopt_ropt",
-		"label": "Option gauche + Option droit",
-		"group": "Option gauche",
-		"from": {
-			"simultaneous": [
-				{
-					"key_code": "left_option"
-				},
-				{
-					"key_code": "right_option"
-				}
-			],
-			"simultaneous_options": {
-				"key_down_order": "strict"
-			}
-		}
-	},
-	{
-		"id": "lopt_rshift",
-		"label": "Option gauche + Shift droit",
-		"group": "Option gauche",
-		"from": {
-			"simultaneous": [
-				{
-					"key_code": "left_option"
-				},
-				{
-					"key_code": "right_shift"
-				}
-			],
-			"simultaneous_options": {
-				"key_down_order": "strict"
-			}
-		}
-	},
-	{
-		"id": "lopt_ret",
-		"label": "Option gauche + Entrée",
-		"group": "Option gauche",
-		"from": {
-			"simultaneous": [
-				{
-					"key_code": "left_option"
-				},
-				{
-					"key_code": "return_or_enter"
-				}
-			],
-			"simultaneous_options": {
-				"key_down_order": "strict"
-			}
-		}
-	},
-	{
-		"id": "lopt_bsp",
-		"label": "Option gauche + BackSpace",
-		"group": "Option gauche",
-		"from": {
-			"simultaneous": [
-				{
-					"key_code": "left_option"
-				},
-				{
-					"key_code": "delete_or_backspace"
-				}
-			],
-			"simultaneous_options": {
-				"key_down_order": "strict"
-			}
-		}
-	},
-	{
-		"id": "lcmd_esc",
-		"label": "Cmd gauche + Échap",
-		"group": "Cmd gauche",
-		"from": {
-			"simultaneous": [
-				{
-					"key_code": "left_command"
-				},
-				{
-					"key_code": "escape"
-				}
-			],
-			"simultaneous_options": {
-				"key_down_order": "strict"
-			}
-		}
-	},
-	{
-		"id": "lcmd_tab",
-		"label": "Cmd gauche + Tab",
-		"group": "Cmd gauche",
-		"from": {
-			"simultaneous": [
-				{
-					"key_code": "left_command"
-				},
-				{
-					"key_code": "tab"
-				}
-			],
-			"simultaneous_options": {
-				"key_down_order": "strict"
-			}
-		}
-	},
-	{
-		"id": "lcmd_caps",
-		"label": "Cmd gauche + CapsLock",
-		"group": "Cmd gauche",
-		"from": {
-			"simultaneous": [
-				{
-					"key_code": "left_command"
-				},
-				{
-					"key_code": "caps_lock"
-				}
-			],
-			"simultaneous_options": {
-				"key_down_order": "strict"
-			}
-		}
-	},
-	{
-		"id": "lcmd_lshift",
-		"label": "Cmd gauche + Shift gauche",
-		"group": "Cmd gauche",
-		"from": {
-			"simultaneous": [
-				{
-					"key_code": "left_command"
-				},
-				{
-					"key_code": "left_shift"
-				}
-			],
-			"simultaneous_options": {
-				"key_down_order": "strict"
-			}
-		}
-	},
-	{
-		"id": "lcmd_fn",
-		"label": "Cmd gauche + Fn",
-		"group": "Cmd gauche",
-		"from": {
-			"simultaneous": [
-				{
-					"key_code": "left_command"
-				},
-				{
-					"key_code": "fn"
-				}
-			],
-			"simultaneous_options": {
-				"key_down_order": "strict"
-			}
-		}
-	},
-	{
-		"id": "lcmd_lctrl",
-		"label": "Cmd gauche + Ctrl gauche",
-		"group": "Cmd gauche",
-		"from": {
-			"simultaneous": [
-				{
-					"key_code": "left_command"
-				},
-				{
-					"key_code": "left_control"
-				}
-			],
-			"simultaneous_options": {
-				"key_down_order": "strict"
-			}
-		}
-	},
-	{
-		"id": "lcmd_lopt",
-		"label": "Cmd gauche + Option gauche",
-		"group": "Cmd gauche",
-		"from": {
-			"simultaneous": [
-				{
-					"key_code": "left_command"
-				},
-				{
-					"key_code": "left_option"
-				}
-			],
-			"simultaneous_options": {
-				"key_down_order": "strict"
-			}
-		}
-	},
-	{
-		"id": "lcmd_space",
-		"label": "Cmd gauche + Espace",
-		"group": "Cmd gauche",
-		"from": {
-			"simultaneous": [
-				{
-					"key_code": "left_command"
-				},
-				{
-					"key_code": "spacebar"
-				}
-			],
-			"simultaneous_options": {
-				"key_down_order": "strict"
-			}
-		}
-	},
-	{
-		"id": "lcmd_rcmd",
-		"label": "Cmd gauche + Cmd droit",
-		"group": "Cmd gauche",
-		"from": {
-			"simultaneous": [
-				{
-					"key_code": "left_command"
-				},
-				{
-					"key_code": "right_command"
-				}
-			],
-			"simultaneous_options": {
-				"key_down_order": "strict"
-			}
-		}
-	},
-	{
-		"id": "lcmd_ropt",
-		"label": "Cmd gauche + Option droit",
-		"group": "Cmd gauche",
-		"from": {
-			"simultaneous": [
-				{
-					"key_code": "left_command"
-				},
-				{
-					"key_code": "right_option"
-				}
-			],
-			"simultaneous_options": {
-				"key_down_order": "strict"
-			}
-		}
-	},
-	{
-		"id": "lcmd_rshift",
-		"label": "Cmd gauche + Shift droit",
-		"group": "Cmd gauche",
-		"from": {
-			"simultaneous": [
-				{
-					"key_code": "left_command"
-				},
-				{
-					"key_code": "right_shift"
-				}
-			],
-			"simultaneous_options": {
-				"key_down_order": "strict"
-			}
-		}
-	},
-	{
-		"id": "lcmd_ret",
-		"label": "Cmd gauche + Entrée",
-		"group": "Cmd gauche",
-		"from": {
-			"simultaneous": [
-				{
-					"key_code": "left_command"
-				},
-				{
-					"key_code": "return_or_enter"
-				}
-			],
-			"simultaneous_options": {
-				"key_down_order": "strict"
-			}
-		}
-	},
-	{
-		"id": "lcmd_bsp",
-		"label": "Cmd gauche + BackSpace",
-		"group": "Cmd gauche",
-		"from": {
-			"simultaneous": [
-				{
-					"key_code": "left_command"
-				},
-				{
-					"key_code": "delete_or_backspace"
-				}
-			],
-			"simultaneous_options": {
-				"key_down_order": "strict"
-			}
-		}
-	},
-	{
-		"id": "space_esc",
-		"label": "Espace + Échap",
-		"group": "Espace",
-		"from": {
-			"simultaneous": [
-				{
-					"key_code": "spacebar"
-				},
-				{
-					"key_code": "escape"
-				}
-			],
-			"simultaneous_options": {
-				"key_down_order": "strict"
-			}
-		}
-	},
-	{
-		"id": "space_tab",
-		"label": "Espace + Tab",
-		"group": "Espace",
-		"from": {
-			"simultaneous": [
-				{
-					"key_code": "spacebar"
-				},
-				{
-					"key_code": "tab"
-				}
-			],
-			"simultaneous_options": {
-				"key_down_order": "strict"
-			}
-		}
-	},
-	{
-		"id": "space_caps",
-		"label": "Espace + CapsLock",
-		"group": "Espace",
-		"from": {
-			"simultaneous": [
-				{
-					"key_code": "spacebar"
-				},
-				{
-					"key_code": "caps_lock"
-				}
-			],
-			"simultaneous_options": {
-				"key_down_order": "strict"
-			}
-		}
-	},
-	{
-		"id": "space_lshift",
-		"label": "Espace + Shift gauche",
-		"group": "Espace",
-		"from": {
-			"simultaneous": [
-				{
-					"key_code": "spacebar"
-				},
-				{
-					"key_code": "left_shift"
-				}
-			],
-			"simultaneous_options": {
-				"key_down_order": "strict"
-			}
-		}
-	},
-	{
-		"id": "space_fn",
-		"label": "Espace + Fn",
-		"group": "Espace",
-		"from": {
-			"simultaneous": [
-				{
-					"key_code": "spacebar"
-				},
-				{
-					"key_code": "fn"
-				}
-			],
-			"simultaneous_options": {
-				"key_down_order": "strict"
-			}
-		}
-	},
-	{
-		"id": "space_lctrl",
-		"label": "Espace + Ctrl gauche",
-		"group": "Espace",
-		"from": {
-			"simultaneous": [
-				{
-					"key_code": "spacebar"
-				},
-				{
-					"key_code": "left_control"
-				}
-			],
-			"simultaneous_options": {
-				"key_down_order": "strict"
-			}
-		}
-	},
-	{
-		"id": "space_lopt",
-		"label": "Espace + Option gauche",
-		"group": "Espace",
-		"from": {
-			"simultaneous": [
-				{
-					"key_code": "spacebar"
-				},
-				{
-					"key_code": "left_option"
-				}
-			],
-			"simultaneous_options": {
-				"key_down_order": "strict"
-			}
-		}
-	},
-	{
-		"id": "space_lcmd",
-		"label": "Espace + Cmd gauche",
-		"group": "Espace",
-		"from": {
-			"simultaneous": [
-				{
-					"key_code": "spacebar"
-				},
-				{
-					"key_code": "left_command"
-				}
-			],
-			"simultaneous_options": {
-				"key_down_order": "strict"
-			}
-		}
-	},
-	{
-		"id": "space_rcmd",
-		"label": "Espace + Cmd droit",
-		"group": "Espace",
-		"from": {
-			"simultaneous": [
-				{
-					"key_code": "spacebar"
-				},
-				{
-					"key_code": "right_command"
-				}
-			],
-			"simultaneous_options": {
-				"key_down_order": "strict"
-			}
-		}
-	},
-	{
-		"id": "space_ropt",
-		"label": "Espace + Option droit",
-		"group": "Espace",
-		"from": {
-			"simultaneous": [
-				{
-					"key_code": "spacebar"
-				},
-				{
-					"key_code": "right_option"
-				}
-			],
-			"simultaneous_options": {
-				"key_down_order": "strict"
-			}
-		}
-	},
-	{
-		"id": "space_rshift",
-		"label": "Espace + Shift droit",
-		"group": "Espace",
-		"from": {
-			"simultaneous": [
-				{
-					"key_code": "spacebar"
-				},
-				{
-					"key_code": "right_shift"
-				}
-			],
-			"simultaneous_options": {
-				"key_down_order": "strict"
-			}
-		}
-	},
-	{
-		"id": "space_ret",
-		"label": "Espace + Entrée",
-		"group": "Espace",
-		"from": {
-			"simultaneous": [
-				{
-					"key_code": "spacebar"
-				},
-				{
-					"key_code": "return_or_enter"
-				}
-			],
-			"simultaneous_options": {
-				"key_down_order": "strict"
-			}
-		}
-	},
-	{
-		"id": "space_bsp",
-		"label": "Espace + BackSpace",
-		"group": "Espace",
-		"from": {
-			"simultaneous": [
-				{
-					"key_code": "spacebar"
-				},
-				{
-					"key_code": "delete_or_backspace"
-				}
-			],
-			"simultaneous_options": {
-				"key_down_order": "strict"
-			}
-		}
-	},
-	{
-		"id": "rcmd_esc",
-		"label": "Cmd droit + Échap",
-		"group": "Cmd droit",
-		"from": {
-			"simultaneous": [
-				{
-					"key_code": "right_command"
-				},
-				{
-					"key_code": "escape"
-				}
-			],
-			"simultaneous_options": {
-				"key_down_order": "strict"
-			}
-		}
-	},
-	{
-		"id": "rcmd_tab",
-		"label": "Cmd droit + Tab",
-		"group": "Cmd droit",
-		"from": {
-			"simultaneous": [
-				{
-					"key_code": "right_command"
-				},
-				{
-					"key_code": "tab"
-				}
-			],
-			"simultaneous_options": {
-				"key_down_order": "strict"
-			}
-		}
-	},
-	{
-		"id": "rcmd_caps",
-		"label": "Cmd droit + CapsLock",
-		"group": "Cmd droit",
-		"from": {
-			"simultaneous": [
-				{
-					"key_code": "right_command"
-				},
-				{
-					"key_code": "caps_lock"
-				}
-			],
-			"simultaneous_options": {
-				"key_down_order": "strict"
-			}
-		}
-	},
-	{
-		"id": "rcmd_lshift",
-		"label": "Cmd droit + Shift gauche",
-		"group": "Cmd droit",
-		"from": {
-			"simultaneous": [
-				{
-					"key_code": "right_command"
-				},
-				{
-					"key_code": "left_shift"
-				}
-			],
-			"simultaneous_options": {
-				"key_down_order": "strict"
-			}
-		}
-	},
-	{
-		"id": "rcmd_fn",
-		"label": "Cmd droit + Fn",
-		"group": "Cmd droit",
-		"from": {
-			"simultaneous": [
-				{
-					"key_code": "right_command"
-				},
-				{
-					"key_code": "fn"
-				}
-			],
-			"simultaneous_options": {
-				"key_down_order": "strict"
-			}
-		}
-	},
-	{
-		"id": "rcmd_lctrl",
-		"label": "Cmd droit + Ctrl gauche",
-		"group": "Cmd droit",
-		"from": {
-			"simultaneous": [
-				{
-					"key_code": "right_command"
-				},
-				{
-					"key_code": "left_control"
-				}
-			],
-			"simultaneous_options": {
-				"key_down_order": "strict"
-			}
-		}
-	},
-	{
-		"id": "rcmd_lopt",
-		"label": "Cmd droit + Option gauche",
-		"group": "Cmd droit",
-		"from": {
-			"simultaneous": [
-				{
-					"key_code": "right_command"
-				},
-				{
-					"key_code": "left_option"
-				}
-			],
-			"simultaneous_options": {
-				"key_down_order": "strict"
-			}
-		}
-	},
-	{
-		"id": "rcmd_lcmd",
-		"label": "Cmd droit + Cmd gauche",
-		"group": "Cmd droit",
-		"from": {
-			"simultaneous": [
-				{
-					"key_code": "right_command"
-				},
-				{
-					"key_code": "left_command"
-				}
-			],
-			"simultaneous_options": {
-				"key_down_order": "strict"
-			}
-		}
-	},
-	{
-		"id": "rcmd_space",
-		"label": "Cmd droit + Espace",
-		"group": "Cmd droit",
-		"from": {
-			"simultaneous": [
-				{
-					"key_code": "right_command"
-				},
-				{
-					"key_code": "spacebar"
-				}
-			],
-			"simultaneous_options": {
-				"key_down_order": "strict"
-			}
-		}
-	},
-	{
-		"id": "rcmd_ropt",
-		"label": "Cmd droit + Option droit",
-		"group": "Cmd droit",
-		"from": {
-			"simultaneous": [
-				{
-					"key_code": "right_command"
-				},
-				{
-					"key_code": "right_option"
-				}
-			],
-			"simultaneous_options": {
-				"key_down_order": "strict"
-			}
-		}
-	},
-	{
-		"id": "rcmd_rshift",
-		"label": "Cmd droit + Shift droit",
-		"group": "Cmd droit",
-		"from": {
-			"simultaneous": [
-				{
-					"key_code": "right_command"
-				},
-				{
-					"key_code": "right_shift"
-				}
-			],
-			"simultaneous_options": {
-				"key_down_order": "strict"
-			}
-		}
-	},
-	{
-		"id": "rcmd_ret",
-		"label": "Cmd droit + Entrée",
-		"group": "Cmd droit",
-		"from": {
-			"simultaneous": [
-				{
-					"key_code": "right_command"
-				},
-				{
-					"key_code": "return_or_enter"
-				}
-			],
-			"simultaneous_options": {
-				"key_down_order": "strict"
-			}
-		}
-	},
-	{
-		"id": "rcmd_bsp",
-		"label": "Cmd droit + BackSpace",
-		"group": "Cmd droit",
-		"from": {
-			"simultaneous": [
-				{
-					"key_code": "right_command"
-				},
-				{
-					"key_code": "delete_or_backspace"
-				}
-			],
-			"simultaneous_options": {
-				"key_down_order": "strict"
-			}
-		}
-	},
-	{
-		"id": "ropt_esc",
-		"label": "Option droit + Échap",
-		"group": "Option droit",
-		"menu_hidden": true,
-		"menu_hidden_reason": "Handled by modules/shortcuts/script_control.lua — always active even when the script is paused",
-		"from": {
-			"simultaneous": [
-				{
-					"key_code": "right_option"
-				},
-				{
-					"key_code": "escape"
-				}
-			],
-			"simultaneous_options": {
-				"key_down_order": "strict"
-			}
-		}
-	},
-	{
-		"id": "ropt_tab",
-		"label": "Option droit + Tab",
-		"group": "Option droit",
-		"from": {
-			"simultaneous": [
-				{
-					"key_code": "right_option"
-				},
-				{
-					"key_code": "tab"
-				}
-			],
-			"simultaneous_options": {
-				"key_down_order": "strict"
-			}
-		}
-	},
-	{
-		"id": "ropt_caps",
-		"label": "Option droit + CapsLock",
-		"group": "Option droit",
-		"from": {
-			"simultaneous": [
-				{
-					"key_code": "right_option"
-				},
-				{
-					"key_code": "caps_lock"
-				}
-			],
-			"simultaneous_options": {
-				"key_down_order": "strict"
-			}
-		}
-	},
-	{
-		"id": "ropt_lshift",
-		"label": "Option droit + Shift gauche",
-		"group": "Option droit",
-		"from": {
-			"simultaneous": [
-				{
-					"key_code": "right_option"
-				},
-				{
-					"key_code": "left_shift"
-				}
-			],
-			"simultaneous_options": {
-				"key_down_order": "strict"
-			}
-		}
-	},
-	{
-		"id": "ropt_fn",
-		"label": "Option droit + Fn",
-		"group": "Option droit",
-		"from": {
-			"simultaneous": [
-				{
-					"key_code": "right_option"
-				},
-				{
-					"key_code": "fn"
-				}
-			],
-			"simultaneous_options": {
-				"key_down_order": "strict"
-			}
-		}
-	},
-	{
-		"id": "ropt_lctrl",
-		"label": "Option droit + Ctrl gauche",
-		"group": "Option droit",
-		"from": {
-			"simultaneous": [
-				{
-					"key_code": "right_option"
-				},
-				{
-					"key_code": "left_control"
-				}
-			],
-			"simultaneous_options": {
-				"key_down_order": "strict"
-			}
-		}
-	},
-	{
-		"id": "ropt_lopt",
-		"label": "Option droit + Option gauche",
-		"group": "Option droit",
-		"from": {
-			"simultaneous": [
-				{
-					"key_code": "right_option"
-				},
-				{
-					"key_code": "left_option"
-				}
-			],
-			"simultaneous_options": {
-				"key_down_order": "strict"
-			}
-		}
-	},
-	{
-		"id": "ropt_lcmd",
-		"label": "Option droit + Cmd gauche",
-		"group": "Option droit",
-		"from": {
-			"simultaneous": [
-				{
-					"key_code": "right_option"
-				},
-				{
-					"key_code": "left_command"
-				}
-			],
-			"simultaneous_options": {
-				"key_down_order": "strict"
-			}
-		}
-	},
-	{
-		"id": "ropt_space",
-		"label": "Option droit + Espace",
-		"group": "Option droit",
-		"from": {
-			"simultaneous": [
-				{
-					"key_code": "right_option"
-				},
-				{
-					"key_code": "spacebar"
-				}
-			],
-			"simultaneous_options": {
-				"key_down_order": "strict"
-			}
-		}
-	},
-	{
-		"id": "ropt_rcmd",
-		"label": "Option droit + Cmd droit",
-		"group": "Option droit",
-		"from": {
-			"simultaneous": [
-				{
-					"key_code": "right_option"
-				},
-				{
-					"key_code": "right_command"
-				}
-			],
-			"simultaneous_options": {
-				"key_down_order": "strict"
-			}
-		}
-	},
-	{
-		"id": "ropt_rshift",
-		"label": "Option droit + Shift droit",
-		"group": "Option droit",
-		"from": {
-			"simultaneous": [
-				{
-					"key_code": "right_option"
-				},
-				{
-					"key_code": "right_shift"
-				}
-			],
-			"simultaneous_options": {
-				"key_down_order": "strict"
-			}
-		}
-	},
-	{
-		"id": "ropt_ret",
-		"label": "Option droit + Entrée",
-		"group": "Option droit",
-		"menu_hidden": true,
-		"menu_hidden_reason": "Handled by modules/shortcuts/script_control.lua — always active even when the script is paused",
-		"from": {
-			"simultaneous": [
-				{
-					"key_code": "right_option"
-				},
-				{
-					"key_code": "return_or_enter"
-				}
-			],
-			"simultaneous_options": {
-				"key_down_order": "strict"
-			}
-		}
-	},
-	{
-		"id": "ropt_bsp",
-		"label": "Option droit + BackSpace",
-		"group": "Option droit",
-		"menu_hidden": true,
-		"menu_hidden_reason": "Handled by modules/shortcuts/script_control.lua — always active even when the script is paused",
-		"from": {
-			"simultaneous": [
-				{
-					"key_code": "right_option"
-				},
-				{
-					"key_code": "delete_or_backspace"
-				}
-			],
-			"simultaneous_options": {
-				"key_down_order": "strict"
-			}
-		}
-	},
-	{
-		"id": "rshift_esc",
-		"label": "Shift droit + Échap",
-		"group": "Shift droit",
-		"from": {
-			"simultaneous": [
-				{
-					"key_code": "right_shift"
-				},
-				{
-					"key_code": "escape"
-				}
-			],
-			"simultaneous_options": {
-				"key_down_order": "strict"
-			}
-		}
-	},
-	{
-		"id": "rshift_tab",
-		"label": "Shift droit + Tab",
-		"group": "Shift droit",
-		"from": {
-			"simultaneous": [
-				{
-					"key_code": "right_shift"
-				},
-				{
-					"key_code": "tab"
-				}
-			],
-			"simultaneous_options": {
-				"key_down_order": "strict"
-			}
-		}
-	},
-	{
-		"id": "rshift_caps",
-		"label": "Shift droit + CapsLock",
-		"group": "Shift droit",
-		"from": {
-			"simultaneous": [
-				{
-					"key_code": "right_shift"
-				},
-				{
-					"key_code": "caps_lock"
-				}
-			],
-			"simultaneous_options": {
-				"key_down_order": "strict"
-			}
-		}
-	},
-	{
-		"id": "rshift_lshift",
-		"label": "Shift droit + Shift gauche",
-		"group": "Shift droit",
-		"from": {
-			"simultaneous": [
-				{
-					"key_code": "right_shift"
-				},
-				{
-					"key_code": "left_shift"
-				}
-			],
-			"simultaneous_options": {
-				"key_down_order": "strict"
-			}
-		}
-	},
-	{
-		"id": "rshift_fn",
-		"label": "Shift droit + Fn",
-		"group": "Shift droit",
-		"from": {
-			"simultaneous": [
-				{
-					"key_code": "right_shift"
-				},
-				{
-					"key_code": "fn"
-				}
-			],
-			"simultaneous_options": {
-				"key_down_order": "strict"
-			}
-		}
-	},
-	{
-		"id": "rshift_lctrl",
-		"label": "Shift droit + Ctrl gauche",
-		"group": "Shift droit",
-		"from": {
-			"simultaneous": [
-				{
-					"key_code": "right_shift"
-				},
-				{
-					"key_code": "left_control"
-				}
-			],
-			"simultaneous_options": {
-				"key_down_order": "strict"
-			}
-		}
-	},
-	{
-		"id": "rshift_lopt",
-		"label": "Shift droit + Option gauche",
-		"group": "Shift droit",
-		"from": {
-			"simultaneous": [
-				{
-					"key_code": "right_shift"
-				},
-				{
-					"key_code": "left_option"
-				}
-			],
-			"simultaneous_options": {
-				"key_down_order": "strict"
-			}
-		}
-	},
-	{
-		"id": "rshift_lcmd",
-		"label": "Shift droit + Cmd gauche",
-		"group": "Shift droit",
-		"from": {
-			"simultaneous": [
-				{
-					"key_code": "right_shift"
-				},
-				{
-					"key_code": "left_command"
-				}
-			],
-			"simultaneous_options": {
-				"key_down_order": "strict"
-			}
-		}
-	},
-	{
-		"id": "rshift_space",
-		"label": "Shift droit + Espace",
-		"group": "Shift droit",
-		"from": {
-			"simultaneous": [
-				{
-					"key_code": "right_shift"
-				},
-				{
-					"key_code": "spacebar"
-				}
-			],
-			"simultaneous_options": {
-				"key_down_order": "strict"
-			}
-		}
-	},
-	{
-		"id": "rshift_rcmd",
-		"label": "Shift droit + Cmd droit",
-		"group": "Shift droit",
-		"from": {
-			"simultaneous": [
-				{
-					"key_code": "right_shift"
-				},
-				{
-					"key_code": "right_command"
-				}
-			],
-			"simultaneous_options": {
-				"key_down_order": "strict"
-			}
-		}
-	},
-	{
-		"id": "rshift_ropt",
-		"label": "Shift droit + Option droit",
-		"group": "Shift droit",
-		"from": {
-			"simultaneous": [
-				{
-					"key_code": "right_shift"
-				},
-				{
-					"key_code": "right_option"
-				}
-			],
-			"simultaneous_options": {
-				"key_down_order": "strict"
-			}
-		}
-	},
-	{
-		"id": "rshift_ret",
-		"label": "Shift droit + Entrée",
-		"group": "Shift droit",
-		"from": {
-			"simultaneous": [
-				{
-					"key_code": "right_shift"
-				},
-				{
-					"key_code": "return_or_enter"
-				}
-			],
-			"simultaneous_options": {
-				"key_down_order": "strict"
-			}
-		}
-	},
-	{
-		"id": "rshift_bsp",
-		"label": "Shift droit + BackSpace",
-		"group": "Shift droit",
-		"from": {
-			"simultaneous": [
-				{
-					"key_code": "right_shift"
-				},
-				{
-					"key_code": "delete_or_backspace"
-				}
-			],
-			"simultaneous_options": {
-				"key_down_order": "strict"
-			}
-		}
-	},
-	{
-		"id": "ret_esc",
-		"label": "Entrée + Échap",
-		"group": "Entrée",
-		"from": {
-			"simultaneous": [
-				{
-					"key_code": "return_or_enter"
-				},
-				{
-					"key_code": "escape"
-				}
-			],
-			"simultaneous_options": {
-				"key_down_order": "strict"
-			}
-		}
-	},
-	{
-		"id": "ret_tab",
-		"label": "Entrée + Tab",
-		"group": "Entrée",
-		"from": {
-			"simultaneous": [
-				{
-					"key_code": "return_or_enter"
-				},
-				{
-					"key_code": "tab"
-				}
-			],
-			"simultaneous_options": {
-				"key_down_order": "strict"
-			}
-		}
-	},
-	{
-		"id": "ret_caps",
-		"label": "Entrée + CapsLock",
-		"group": "Entrée",
-		"from": {
-			"simultaneous": [
-				{
-					"key_code": "return_or_enter"
-				},
-				{
-					"key_code": "caps_lock"
-				}
-			],
-			"simultaneous_options": {
-				"key_down_order": "strict"
-			}
-		}
-	},
-	{
-		"id": "ret_lshift",
-		"label": "Entrée + Shift gauche",
-		"group": "Entrée",
-		"from": {
-			"simultaneous": [
-				{
-					"key_code": "return_or_enter"
-				},
-				{
-					"key_code": "left_shift"
-				}
-			],
-			"simultaneous_options": {
-				"key_down_order": "strict"
-			}
-		}
-	},
-	{
-		"id": "ret_fn",
-		"label": "Entrée + Fn",
-		"group": "Entrée",
-		"from": {
-			"simultaneous": [
-				{
-					"key_code": "return_or_enter"
-				},
-				{
-					"key_code": "fn"
-				}
-			],
-			"simultaneous_options": {
-				"key_down_order": "strict"
-			}
-		}
-	},
-	{
-		"id": "ret_lctrl",
-		"label": "Entrée + Ctrl gauche",
-		"group": "Entrée",
-		"from": {
-			"simultaneous": [
-				{
-					"key_code": "return_or_enter"
-				},
-				{
-					"key_code": "left_control"
-				}
-			],
-			"simultaneous_options": {
-				"key_down_order": "strict"
-			}
-		}
-	},
-	{
-		"id": "ret_lopt",
-		"label": "Entrée + Option gauche",
-		"group": "Entrée",
-		"from": {
-			"simultaneous": [
-				{
-					"key_code": "return_or_enter"
-				},
-				{
-					"key_code": "left_option"
-				}
-			],
-			"simultaneous_options": {
-				"key_down_order": "strict"
-			}
-		}
-	},
-	{
-		"id": "ret_lcmd",
-		"label": "Entrée + Cmd gauche",
-		"group": "Entrée",
-		"from": {
-			"simultaneous": [
-				{
-					"key_code": "return_or_enter"
-				},
-				{
-					"key_code": "left_command"
-				}
-			],
-			"simultaneous_options": {
-				"key_down_order": "strict"
-			}
-		}
-	},
-	{
-		"id": "ret_space",
-		"label": "Entrée + Espace",
-		"group": "Entrée",
-		"from": {
-			"simultaneous": [
-				{
-					"key_code": "return_or_enter"
-				},
-				{
-					"key_code": "spacebar"
-				}
-			],
-			"simultaneous_options": {
-				"key_down_order": "strict"
-			}
-		}
-	},
-	{
-		"id": "ret_rcmd",
-		"label": "Entrée + Cmd droit",
-		"group": "Entrée",
-		"from": {
-			"simultaneous": [
-				{
-					"key_code": "return_or_enter"
-				},
-				{
-					"key_code": "right_command"
-				}
-			],
-			"simultaneous_options": {
-				"key_down_order": "strict"
-			}
-		}
-	},
-	{
-		"id": "ret_ropt",
-		"label": "Entrée + Option droit",
-		"group": "Entrée",
-		"from": {
-			"simultaneous": [
-				{
-					"key_code": "return_or_enter"
-				},
-				{
-					"key_code": "right_option"
-				}
-			],
-			"simultaneous_options": {
-				"key_down_order": "strict"
-			}
-		}
-	},
-	{
-		"id": "ret_rshift",
-		"label": "Entrée + Shift droit",
-		"group": "Entrée",
-		"from": {
-			"simultaneous": [
-				{
-					"key_code": "return_or_enter"
-				},
-				{
-					"key_code": "right_shift"
-				}
-			],
-			"simultaneous_options": {
-				"key_down_order": "strict"
-			}
-		}
-	},
-	{
-		"id": "ret_bsp",
-		"label": "Entrée + BackSpace",
-		"group": "Entrée",
-		"from": {
-			"simultaneous": [
-				{
-					"key_code": "return_or_enter"
-				},
-				{
-					"key_code": "delete_or_backspace"
-				}
-			],
-			"simultaneous_options": {
-				"key_down_order": "strict"
-			}
-		}
-	},
-	{
-		"id": "bsp_esc",
-		"label": "BackSpace + Échap",
-		"group": "BackSpace",
-		"from": {
-			"simultaneous": [
-				{
-					"key_code": "delete_or_backspace"
-				},
-				{
-					"key_code": "escape"
-				}
-			],
-			"simultaneous_options": {
-				"key_down_order": "strict"
-			}
-		}
-	},
-	{
-		"id": "bsp_tab",
-		"label": "BackSpace + Tab",
-		"group": "BackSpace",
-		"from": {
-			"simultaneous": [
-				{
-					"key_code": "delete_or_backspace"
-				},
-				{
-					"key_code": "tab"
-				}
-			],
-			"simultaneous_options": {
-				"key_down_order": "strict"
-			}
-		}
-	},
-	{
-		"id": "bsp_caps",
-		"label": "BackSpace + CapsLock",
-		"group": "BackSpace",
-		"from": {
-			"simultaneous": [
-				{
-					"key_code": "delete_or_backspace"
-				},
-				{
-					"key_code": "caps_lock"
-				}
-			],
-			"simultaneous_options": {
-				"key_down_order": "strict"
-			}
-		}
-	},
-	{
-		"id": "bsp_lshift",
-		"label": "BackSpace + Shift gauche",
-		"group": "BackSpace",
-		"from": {
-			"simultaneous": [
-				{
-					"key_code": "delete_or_backspace"
-				},
-				{
-					"key_code": "left_shift"
-				}
-			],
-			"simultaneous_options": {
-				"key_down_order": "strict"
-			}
-		}
-	},
-	{
-		"id": "bsp_fn",
-		"label": "BackSpace + Fn",
-		"group": "BackSpace",
-		"from": {
-			"simultaneous": [
-				{
-					"key_code": "delete_or_backspace"
-				},
-				{
-					"key_code": "fn"
-				}
-			],
-			"simultaneous_options": {
-				"key_down_order": "strict"
-			}
-		}
-	},
-	{
-		"id": "bsp_lctrl",
-		"label": "BackSpace + Ctrl gauche",
-		"group": "BackSpace",
-		"from": {
-			"simultaneous": [
-				{
-					"key_code": "delete_or_backspace"
-				},
-				{
-					"key_code": "left_control"
-				}
-			],
-			"simultaneous_options": {
-				"key_down_order": "strict"
-			}
-		}
-	},
-	{
-		"id": "bsp_lopt",
-		"label": "BackSpace + Option gauche",
-		"group": "BackSpace",
-		"from": {
-			"simultaneous": [
-				{
-					"key_code": "delete_or_backspace"
-				},
-				{
-					"key_code": "left_option"
-				}
-			],
-			"simultaneous_options": {
-				"key_down_order": "strict"
-			}
-		}
-	},
-	{
-		"id": "bsp_lcmd",
-		"label": "BackSpace + Cmd gauche",
-		"group": "BackSpace",
-		"from": {
-			"simultaneous": [
-				{
-					"key_code": "delete_or_backspace"
-				},
-				{
-					"key_code": "left_command"
-				}
-			],
-			"simultaneous_options": {
-				"key_down_order": "strict"
-			}
-		}
-	},
-	{
-		"id": "bsp_space",
-		"label": "BackSpace + Espace",
-		"group": "BackSpace",
-		"from": {
-			"simultaneous": [
-				{
-					"key_code": "delete_or_backspace"
-				},
-				{
-					"key_code": "spacebar"
-				}
-			],
-			"simultaneous_options": {
-				"key_down_order": "strict"
-			}
-		}
-	},
-	{
-		"id": "bsp_rcmd",
-		"label": "BackSpace + Cmd droit",
-		"group": "BackSpace",
-		"from": {
-			"simultaneous": [
-				{
-					"key_code": "delete_or_backspace"
-				},
-				{
-					"key_code": "right_command"
-				}
-			],
-			"simultaneous_options": {
-				"key_down_order": "strict"
-			}
-		}
-	},
-	{
-		"id": "bsp_ropt",
-		"label": "BackSpace + Option droit",
-		"group": "BackSpace",
-		"from": {
-			"simultaneous": [
-				{
-					"key_code": "delete_or_backspace"
-				},
-				{
-					"key_code": "right_option"
-				}
-			],
-			"simultaneous_options": {
-				"key_down_order": "strict"
-			}
-		}
-	},
-	{
-		"id": "bsp_rshift",
-		"label": "BackSpace + Shift droit",
-		"group": "BackSpace",
-		"from": {
-			"simultaneous": [
-				{
-					"key_code": "delete_or_backspace"
-				},
-				{
-					"key_code": "right_shift"
-				}
-			],
-			"simultaneous_options": {
-				"key_down_order": "strict"
-			}
-		}
-	},
-	{
-		"id": "bsp_ret",
-		"label": "BackSpace + Entrée",
-		"group": "BackSpace",
-		"from": {
-			"simultaneous": [
-				{
-					"key_code": "delete_or_backspace"
-				},
-				{
-					"key_code": "return_or_enter"
-				}
-			],
-			"simultaneous_options": {
-				"key_down_order": "strict"
-			}
-		}
-	}
+    {
+        "id": "esc_tab",
+        "label": "Échap + Tab",
+        "group": "Échap",
+        "from": {
+            "simultaneous": [
+                {
+                    "key_code": "escape"
+                },
+                {
+                    "key_code": "tab"
+                }
+            ],
+            "simultaneous_options": {
+                "key_down_order": "strict"
+            }
+        }
+    },
+    {
+        "id": "esc_caps",
+        "label": "Échap + CapsLock",
+        "group": "Échap",
+        "from": {
+            "simultaneous": [
+                {
+                    "key_code": "escape"
+                },
+                {
+                    "key_code": "caps_lock"
+                }
+            ],
+            "simultaneous_options": {
+                "key_down_order": "strict"
+            }
+        }
+    },
+    {
+        "id": "esc_lshift",
+        "label": "Échap + Shift gauche",
+        "group": "Échap",
+        "from": {
+            "simultaneous": [
+                {
+                    "key_code": "escape"
+                },
+                {
+                    "key_code": "left_shift"
+                }
+            ],
+            "simultaneous_options": {
+                "key_down_order": "strict"
+            }
+        }
+    },
+    {
+        "id": "esc_fn",
+        "label": "Échap + Fn",
+        "group": "Échap",
+        "from": {
+            "simultaneous": [
+                {
+                    "key_code": "escape"
+                },
+                {
+                    "key_code": "fn"
+                }
+            ],
+            "simultaneous_options": {
+                "key_down_order": "strict"
+            }
+        }
+    },
+    {
+        "id": "esc_lctrl",
+        "label": "Échap + Ctrl gauche",
+        "group": "Échap",
+        "from": {
+            "simultaneous": [
+                {
+                    "key_code": "escape"
+                },
+                {
+                    "key_code": "left_control"
+                }
+            ],
+            "simultaneous_options": {
+                "key_down_order": "strict"
+            }
+        }
+    },
+    {
+        "id": "esc_lopt",
+        "label": "Échap + Option gauche",
+        "group": "Échap",
+        "from": {
+            "simultaneous": [
+                {
+                    "key_code": "escape"
+                },
+                {
+                    "key_code": "left_option"
+                }
+            ],
+            "simultaneous_options": {
+                "key_down_order": "strict"
+            }
+        }
+    },
+    {
+        "id": "esc_lcmd",
+        "label": "Échap + Cmd gauche",
+        "group": "Échap",
+        "from": {
+            "simultaneous": [
+                {
+                    "key_code": "escape"
+                },
+                {
+                    "key_code": "left_command"
+                }
+            ],
+            "simultaneous_options": {
+                "key_down_order": "strict"
+            }
+        }
+    },
+    {
+        "id": "esc_space",
+        "label": "Échap + Espace",
+        "group": "Échap",
+        "from": {
+            "simultaneous": [
+                {
+                    "key_code": "escape"
+                },
+                {
+                    "key_code": "spacebar"
+                }
+            ],
+            "simultaneous_options": {
+                "key_down_order": "strict"
+            }
+        }
+    },
+    {
+        "id": "esc_rcmd",
+        "label": "Échap + Cmd droit",
+        "group": "Échap",
+        "from": {
+            "simultaneous": [
+                {
+                    "key_code": "escape"
+                },
+                {
+                    "key_code": "right_command"
+                }
+            ],
+            "simultaneous_options": {
+                "key_down_order": "strict"
+            }
+        }
+    },
+    {
+        "id": "esc_ropt",
+        "label": "Échap + Option droit",
+        "group": "Échap",
+        "from": {
+            "simultaneous": [
+                {
+                    "key_code": "escape"
+                },
+                {
+                    "key_code": "right_option"
+                }
+            ],
+            "simultaneous_options": {
+                "key_down_order": "strict"
+            }
+        }
+    },
+    {
+        "id": "esc_rshift",
+        "label": "Échap + Shift droit",
+        "group": "Échap",
+        "from": {
+            "simultaneous": [
+                {
+                    "key_code": "escape"
+                },
+                {
+                    "key_code": "right_shift"
+                }
+            ],
+            "simultaneous_options": {
+                "key_down_order": "strict"
+            }
+        }
+    },
+    {
+        "id": "esc_ret",
+        "label": "Échap + Entrée",
+        "group": "Échap",
+        "from": {
+            "simultaneous": [
+                {
+                    "key_code": "escape"
+                },
+                {
+                    "key_code": "return_or_enter"
+                }
+            ],
+            "simultaneous_options": {
+                "key_down_order": "strict"
+            }
+        }
+    },
+    {
+        "id": "esc_bsp",
+        "label": "Échap + BackSpace",
+        "group": "Échap",
+        "from": {
+            "simultaneous": [
+                {
+                    "key_code": "escape"
+                },
+                {
+                    "key_code": "delete_or_backspace"
+                }
+            ],
+            "simultaneous_options": {
+                "key_down_order": "strict"
+            }
+        }
+    },
+    {
+        "id": "tab_esc",
+        "label": "Tab + Échap",
+        "group": "Tab",
+        "from": {
+            "simultaneous": [
+                {
+                    "key_code": "tab"
+                },
+                {
+                    "key_code": "escape"
+                }
+            ],
+            "simultaneous_options": {
+                "key_down_order": "strict"
+            }
+        }
+    },
+    {
+        "id": "tab_caps",
+        "label": "Tab + CapsLock",
+        "group": "Tab",
+        "from": {
+            "simultaneous": [
+                {
+                    "key_code": "tab"
+                },
+                {
+                    "key_code": "caps_lock"
+                }
+            ],
+            "simultaneous_options": {
+                "key_down_order": "strict"
+            }
+        }
+    },
+    {
+        "id": "tab_lshift",
+        "label": "Tab + Shift gauche",
+        "group": "Tab",
+        "from": {
+            "simultaneous": [
+                {
+                    "key_code": "tab"
+                },
+                {
+                    "key_code": "left_shift"
+                }
+            ],
+            "simultaneous_options": {
+                "key_down_order": "strict"
+            }
+        }
+    },
+    {
+        "id": "tab_fn",
+        "label": "Tab + Fn",
+        "group": "Tab",
+        "from": {
+            "simultaneous": [
+                {
+                    "key_code": "tab"
+                },
+                {
+                    "key_code": "fn"
+                }
+            ],
+            "simultaneous_options": {
+                "key_down_order": "strict"
+            }
+        }
+    },
+    {
+        "id": "tab_lctrl",
+        "label": "Tab + Ctrl gauche",
+        "group": "Tab",
+        "from": {
+            "simultaneous": [
+                {
+                    "key_code": "tab"
+                },
+                {
+                    "key_code": "left_control"
+                }
+            ],
+            "simultaneous_options": {
+                "key_down_order": "strict"
+            }
+        }
+    },
+    {
+        "id": "tab_lopt",
+        "label": "Tab + Option gauche",
+        "group": "Tab",
+        "from": {
+            "simultaneous": [
+                {
+                    "key_code": "tab"
+                },
+                {
+                    "key_code": "left_option"
+                }
+            ],
+            "simultaneous_options": {
+                "key_down_order": "strict"
+            }
+        }
+    },
+    {
+        "id": "tab_lcmd",
+        "label": "Tab + Cmd gauche",
+        "group": "Tab",
+        "from": {
+            "simultaneous": [
+                {
+                    "key_code": "tab"
+                },
+                {
+                    "key_code": "left_command"
+                }
+            ],
+            "simultaneous_options": {
+                "key_down_order": "strict"
+            }
+        }
+    },
+    {
+        "id": "tab_space",
+        "label": "Tab + Espace",
+        "group": "Tab",
+        "from": {
+            "simultaneous": [
+                {
+                    "key_code": "tab"
+                },
+                {
+                    "key_code": "spacebar"
+                }
+            ],
+            "simultaneous_options": {
+                "key_down_order": "strict"
+            }
+        }
+    },
+    {
+        "id": "tab_rcmd",
+        "label": "Tab + Cmd droit",
+        "group": "Tab",
+        "from": {
+            "simultaneous": [
+                {
+                    "key_code": "tab"
+                },
+                {
+                    "key_code": "right_command"
+                }
+            ],
+            "simultaneous_options": {
+                "key_down_order": "strict"
+            }
+        }
+    },
+    {
+        "id": "tab_ropt",
+        "label": "Tab + Option droit",
+        "group": "Tab",
+        "from": {
+            "simultaneous": [
+                {
+                    "key_code": "tab"
+                },
+                {
+                    "key_code": "right_option"
+                }
+            ],
+            "simultaneous_options": {
+                "key_down_order": "strict"
+            }
+        }
+    },
+    {
+        "id": "tab_rshift",
+        "label": "Tab + Shift droit",
+        "group": "Tab",
+        "from": {
+            "simultaneous": [
+                {
+                    "key_code": "tab"
+                },
+                {
+                    "key_code": "right_shift"
+                }
+            ],
+            "simultaneous_options": {
+                "key_down_order": "strict"
+            }
+        }
+    },
+    {
+        "id": "tab_ret",
+        "label": "Tab + Entrée",
+        "group": "Tab",
+        "from": {
+            "simultaneous": [
+                {
+                    "key_code": "tab"
+                },
+                {
+                    "key_code": "return_or_enter"
+                }
+            ],
+            "simultaneous_options": {
+                "key_down_order": "strict"
+            }
+        }
+    },
+    {
+        "id": "tab_bsp",
+        "label": "Tab + BackSpace",
+        "group": "Tab",
+        "from": {
+            "simultaneous": [
+                {
+                    "key_code": "tab"
+                },
+                {
+                    "key_code": "delete_or_backspace"
+                }
+            ],
+            "simultaneous_options": {
+                "key_down_order": "strict"
+            }
+        }
+    },
+    {
+        "id": "caps_esc",
+        "label": "CapsLock + Échap",
+        "group": "CapsLock",
+        "from": {
+            "simultaneous": [
+                {
+                    "key_code": "caps_lock"
+                },
+                {
+                    "key_code": "escape"
+                }
+            ],
+            "simultaneous_options": {
+                "key_down_order": "strict"
+            }
+        }
+    },
+    {
+        "id": "caps_tab",
+        "label": "CapsLock + Tab",
+        "group": "CapsLock",
+        "from": {
+            "simultaneous": [
+                {
+                    "key_code": "caps_lock"
+                },
+                {
+                    "key_code": "tab"
+                }
+            ],
+            "simultaneous_options": {
+                "key_down_order": "strict"
+            }
+        }
+    },
+    {
+        "id": "caps_lshift",
+        "label": "CapsLock + Shift gauche",
+        "group": "CapsLock",
+        "from": {
+            "simultaneous": [
+                {
+                    "key_code": "caps_lock"
+                },
+                {
+                    "key_code": "left_shift"
+                }
+            ],
+            "simultaneous_options": {
+                "key_down_order": "strict"
+            }
+        }
+    },
+    {
+        "id": "caps_fn",
+        "label": "CapsLock + Fn",
+        "group": "CapsLock",
+        "from": {
+            "simultaneous": [
+                {
+                    "key_code": "caps_lock"
+                },
+                {
+                    "key_code": "fn"
+                }
+            ],
+            "simultaneous_options": {
+                "key_down_order": "strict"
+            }
+        }
+    },
+    {
+        "id": "caps_lctrl",
+        "label": "CapsLock + Ctrl gauche",
+        "group": "CapsLock",
+        "from": {
+            "simultaneous": [
+                {
+                    "key_code": "caps_lock"
+                },
+                {
+                    "key_code": "left_control"
+                }
+            ],
+            "simultaneous_options": {
+                "key_down_order": "strict"
+            }
+        }
+    },
+    {
+        "id": "caps_lopt",
+        "label": "CapsLock + Option gauche",
+        "group": "CapsLock",
+        "from": {
+            "simultaneous": [
+                {
+                    "key_code": "caps_lock"
+                },
+                {
+                    "key_code": "left_option"
+                }
+            ],
+            "simultaneous_options": {
+                "key_down_order": "strict"
+            }
+        }
+    },
+    {
+        "id": "caps_lcmd",
+        "label": "CapsLock + Cmd gauche",
+        "group": "CapsLock",
+        "from": {
+            "simultaneous": [
+                {
+                    "key_code": "caps_lock"
+                },
+                {
+                    "key_code": "left_command"
+                }
+            ],
+            "simultaneous_options": {
+                "key_down_order": "strict"
+            }
+        }
+    },
+    {
+        "id": "caps_space",
+        "label": "CapsLock + Espace",
+        "group": "CapsLock",
+        "from": {
+            "simultaneous": [
+                {
+                    "key_code": "caps_lock"
+                },
+                {
+                    "key_code": "spacebar"
+                }
+            ],
+            "simultaneous_options": {
+                "key_down_order": "strict"
+            }
+        }
+    },
+    {
+        "id": "caps_rcmd",
+        "label": "CapsLock + Cmd droit",
+        "group": "CapsLock",
+        "from": {
+            "simultaneous": [
+                {
+                    "key_code": "caps_lock"
+                },
+                {
+                    "key_code": "right_command"
+                }
+            ],
+            "simultaneous_options": {
+                "key_down_order": "strict"
+            }
+        }
+    },
+    {
+        "id": "caps_ropt",
+        "label": "CapsLock + Option droit",
+        "group": "CapsLock",
+        "from": {
+            "simultaneous": [
+                {
+                    "key_code": "caps_lock"
+                },
+                {
+                    "key_code": "right_option"
+                }
+            ],
+            "simultaneous_options": {
+                "key_down_order": "strict"
+            }
+        }
+    },
+    {
+        "id": "caps_rshift",
+        "label": "CapsLock + Shift droit",
+        "group": "CapsLock",
+        "from": {
+            "simultaneous": [
+                {
+                    "key_code": "caps_lock"
+                },
+                {
+                    "key_code": "right_shift"
+                }
+            ],
+            "simultaneous_options": {
+                "key_down_order": "strict"
+            }
+        }
+    },
+    {
+        "id": "caps_ret",
+        "label": "CapsLock + Entrée",
+        "group": "CapsLock",
+        "from": {
+            "simultaneous": [
+                {
+                    "key_code": "caps_lock"
+                },
+                {
+                    "key_code": "return_or_enter"
+                }
+            ],
+            "simultaneous_options": {
+                "key_down_order": "strict"
+            }
+        }
+    },
+    {
+        "id": "caps_bsp",
+        "label": "CapsLock + BackSpace",
+        "group": "CapsLock",
+        "from": {
+            "simultaneous": [
+                {
+                    "key_code": "caps_lock"
+                },
+                {
+                    "key_code": "delete_or_backspace"
+                }
+            ],
+            "simultaneous_options": {
+                "key_down_order": "strict"
+            }
+        }
+    },
+    {
+        "id": "lshift_esc",
+        "label": "Shift gauche + Échap",
+        "group": "Shift gauche",
+        "from": {
+            "simultaneous": [
+                {
+                    "key_code": "left_shift"
+                },
+                {
+                    "key_code": "escape"
+                }
+            ],
+            "simultaneous_options": {
+                "key_down_order": "strict"
+            }
+        }
+    },
+    {
+        "id": "lshift_tab",
+        "label": "Shift gauche + Tab",
+        "group": "Shift gauche",
+        "from": {
+            "simultaneous": [
+                {
+                    "key_code": "left_shift"
+                },
+                {
+                    "key_code": "tab"
+                }
+            ],
+            "simultaneous_options": {
+                "key_down_order": "strict"
+            }
+        }
+    },
+    {
+        "id": "lshift_caps",
+        "label": "Shift gauche + CapsLock",
+        "group": "Shift gauche",
+        "from": {
+            "simultaneous": [
+                {
+                    "key_code": "left_shift"
+                },
+                {
+                    "key_code": "caps_lock"
+                }
+            ],
+            "simultaneous_options": {
+                "key_down_order": "strict"
+            }
+        }
+    },
+    {
+        "id": "lshift_fn",
+        "label": "Shift gauche + Fn",
+        "group": "Shift gauche",
+        "from": {
+            "simultaneous": [
+                {
+                    "key_code": "left_shift"
+                },
+                {
+                    "key_code": "fn"
+                }
+            ],
+            "simultaneous_options": {
+                "key_down_order": "strict"
+            }
+        }
+    },
+    {
+        "id": "lshift_lctrl",
+        "label": "Shift gauche + Ctrl gauche",
+        "group": "Shift gauche",
+        "from": {
+            "simultaneous": [
+                {
+                    "key_code": "left_shift"
+                },
+                {
+                    "key_code": "left_control"
+                }
+            ],
+            "simultaneous_options": {
+                "key_down_order": "strict"
+            }
+        }
+    },
+    {
+        "id": "lshift_lopt",
+        "label": "Shift gauche + Option gauche",
+        "group": "Shift gauche",
+        "from": {
+            "simultaneous": [
+                {
+                    "key_code": "left_shift"
+                },
+                {
+                    "key_code": "left_option"
+                }
+            ],
+            "simultaneous_options": {
+                "key_down_order": "strict"
+            }
+        }
+    },
+    {
+        "id": "lshift_lcmd",
+        "label": "Shift gauche + Cmd gauche",
+        "group": "Shift gauche",
+        "from": {
+            "simultaneous": [
+                {
+                    "key_code": "left_shift"
+                },
+                {
+                    "key_code": "left_command"
+                }
+            ],
+            "simultaneous_options": {
+                "key_down_order": "strict"
+            }
+        }
+    },
+    {
+        "id": "lshift_space",
+        "label": "Shift gauche + Espace",
+        "group": "Shift gauche",
+        "from": {
+            "simultaneous": [
+                {
+                    "key_code": "left_shift"
+                },
+                {
+                    "key_code": "spacebar"
+                }
+            ],
+            "simultaneous_options": {
+                "key_down_order": "strict"
+            }
+        }
+    },
+    {
+        "id": "lshift_rcmd",
+        "label": "Shift gauche + Cmd droit",
+        "group": "Shift gauche",
+        "from": {
+            "simultaneous": [
+                {
+                    "key_code": "left_shift"
+                },
+                {
+                    "key_code": "right_command"
+                }
+            ],
+            "simultaneous_options": {
+                "key_down_order": "strict"
+            }
+        }
+    },
+    {
+        "id": "lshift_ropt",
+        "label": "Shift gauche + Option droit",
+        "group": "Shift gauche",
+        "from": {
+            "simultaneous": [
+                {
+                    "key_code": "left_shift"
+                },
+                {
+                    "key_code": "right_option"
+                }
+            ],
+            "simultaneous_options": {
+                "key_down_order": "strict"
+            }
+        }
+    },
+    {
+        "id": "lshift_rshift",
+        "label": "Shift gauche + Shift droit",
+        "group": "Shift gauche",
+        "from": {
+            "simultaneous": [
+                {
+                    "key_code": "left_shift"
+                },
+                {
+                    "key_code": "right_shift"
+                }
+            ],
+            "simultaneous_options": {
+                "key_down_order": "strict"
+            }
+        }
+    },
+    {
+        "id": "lshift_ret",
+        "label": "Shift gauche + Entrée",
+        "group": "Shift gauche",
+        "from": {
+            "simultaneous": [
+                {
+                    "key_code": "left_shift"
+                },
+                {
+                    "key_code": "return_or_enter"
+                }
+            ],
+            "simultaneous_options": {
+                "key_down_order": "strict"
+            }
+        }
+    },
+    {
+        "id": "lshift_bsp",
+        "label": "Shift gauche + BackSpace",
+        "group": "Shift gauche",
+        "from": {
+            "simultaneous": [
+                {
+                    "key_code": "left_shift"
+                },
+                {
+                    "key_code": "delete_or_backspace"
+                }
+            ],
+            "simultaneous_options": {
+                "key_down_order": "strict"
+            }
+        }
+    },
+    {
+        "id": "fn_esc",
+        "label": "Fn + Échap",
+        "group": "Fn",
+        "from": {
+            "simultaneous": [
+                {
+                    "key_code": "fn"
+                },
+                {
+                    "key_code": "escape"
+                }
+            ],
+            "simultaneous_options": {
+                "key_down_order": "strict"
+            }
+        }
+    },
+    {
+        "id": "fn_tab",
+        "label": "Fn + Tab",
+        "group": "Fn",
+        "from": {
+            "simultaneous": [
+                {
+                    "key_code": "fn"
+                },
+                {
+                    "key_code": "tab"
+                }
+            ],
+            "simultaneous_options": {
+                "key_down_order": "strict"
+            }
+        }
+    },
+    {
+        "id": "fn_caps",
+        "label": "Fn + CapsLock",
+        "group": "Fn",
+        "from": {
+            "simultaneous": [
+                {
+                    "key_code": "fn"
+                },
+                {
+                    "key_code": "caps_lock"
+                }
+            ],
+            "simultaneous_options": {
+                "key_down_order": "strict"
+            }
+        }
+    },
+    {
+        "id": "fn_lshift",
+        "label": "Fn + Shift gauche",
+        "group": "Fn",
+        "from": {
+            "simultaneous": [
+                {
+                    "key_code": "fn"
+                },
+                {
+                    "key_code": "left_shift"
+                }
+            ],
+            "simultaneous_options": {
+                "key_down_order": "strict"
+            }
+        }
+    },
+    {
+        "id": "fn_lctrl",
+        "label": "Fn + Ctrl gauche",
+        "group": "Fn",
+        "from": {
+            "simultaneous": [
+                {
+                    "key_code": "fn"
+                },
+                {
+                    "key_code": "left_control"
+                }
+            ],
+            "simultaneous_options": {
+                "key_down_order": "strict"
+            }
+        }
+    },
+    {
+        "id": "fn_lopt",
+        "label": "Fn + Option gauche",
+        "group": "Fn",
+        "from": {
+            "simultaneous": [
+                {
+                    "key_code": "fn"
+                },
+                {
+                    "key_code": "left_option"
+                }
+            ],
+            "simultaneous_options": {
+                "key_down_order": "strict"
+            }
+        }
+    },
+    {
+        "id": "fn_lcmd",
+        "label": "Fn + Cmd gauche",
+        "group": "Fn",
+        "from": {
+            "simultaneous": [
+                {
+                    "key_code": "fn"
+                },
+                {
+                    "key_code": "left_command"
+                }
+            ],
+            "simultaneous_options": {
+                "key_down_order": "strict"
+            }
+        }
+    },
+    {
+        "id": "fn_space",
+        "label": "Fn + Espace",
+        "group": "Fn",
+        "from": {
+            "simultaneous": [
+                {
+                    "key_code": "fn"
+                },
+                {
+                    "key_code": "spacebar"
+                }
+            ],
+            "simultaneous_options": {
+                "key_down_order": "strict"
+            }
+        }
+    },
+    {
+        "id": "fn_rcmd",
+        "label": "Fn + Cmd droit",
+        "group": "Fn",
+        "from": {
+            "simultaneous": [
+                {
+                    "key_code": "fn"
+                },
+                {
+                    "key_code": "right_command"
+                }
+            ],
+            "simultaneous_options": {
+                "key_down_order": "strict"
+            }
+        }
+    },
+    {
+        "id": "fn_ropt",
+        "label": "Fn + Option droit",
+        "group": "Fn",
+        "from": {
+            "simultaneous": [
+                {
+                    "key_code": "fn"
+                },
+                {
+                    "key_code": "right_option"
+                }
+            ],
+            "simultaneous_options": {
+                "key_down_order": "strict"
+            }
+        }
+    },
+    {
+        "id": "fn_rshift",
+        "label": "Fn + Shift droit",
+        "group": "Fn",
+        "from": {
+            "simultaneous": [
+                {
+                    "key_code": "fn"
+                },
+                {
+                    "key_code": "right_shift"
+                }
+            ],
+            "simultaneous_options": {
+                "key_down_order": "strict"
+            }
+        }
+    },
+    {
+        "id": "fn_ret",
+        "label": "Fn + Entrée",
+        "group": "Fn",
+        "from": {
+            "simultaneous": [
+                {
+                    "key_code": "fn"
+                },
+                {
+                    "key_code": "return_or_enter"
+                }
+            ],
+            "simultaneous_options": {
+                "key_down_order": "strict"
+            }
+        }
+    },
+    {
+        "id": "fn_bsp",
+        "label": "Fn + BackSpace",
+        "group": "Fn",
+        "from": {
+            "simultaneous": [
+                {
+                    "key_code": "fn"
+                },
+                {
+                    "key_code": "delete_or_backspace"
+                }
+            ],
+            "simultaneous_options": {
+                "key_down_order": "strict"
+            }
+        }
+    },
+    {
+        "id": "lctrl_esc",
+        "label": "Ctrl gauche + Échap",
+        "group": "Ctrl gauche",
+        "from": {
+            "simultaneous": [
+                {
+                    "key_code": "left_control"
+                },
+                {
+                    "key_code": "escape"
+                }
+            ],
+            "simultaneous_options": {
+                "key_down_order": "strict"
+            }
+        }
+    },
+    {
+        "id": "lctrl_tab",
+        "label": "Ctrl gauche + Tab",
+        "group": "Ctrl gauche",
+        "from": {
+            "simultaneous": [
+                {
+                    "key_code": "left_control"
+                },
+                {
+                    "key_code": "tab"
+                }
+            ],
+            "simultaneous_options": {
+                "key_down_order": "strict"
+            }
+        }
+    },
+    {
+        "id": "lctrl_caps",
+        "label": "Ctrl gauche + CapsLock",
+        "group": "Ctrl gauche",
+        "from": {
+            "simultaneous": [
+                {
+                    "key_code": "left_control"
+                },
+                {
+                    "key_code": "caps_lock"
+                }
+            ],
+            "simultaneous_options": {
+                "key_down_order": "strict"
+            }
+        }
+    },
+    {
+        "id": "lctrl_lshift",
+        "label": "Ctrl gauche + Shift gauche",
+        "group": "Ctrl gauche",
+        "from": {
+            "simultaneous": [
+                {
+                    "key_code": "left_control"
+                },
+                {
+                    "key_code": "left_shift"
+                }
+            ],
+            "simultaneous_options": {
+                "key_down_order": "strict"
+            }
+        }
+    },
+    {
+        "id": "lctrl_fn",
+        "label": "Ctrl gauche + Fn",
+        "group": "Ctrl gauche",
+        "from": {
+            "simultaneous": [
+                {
+                    "key_code": "left_control"
+                },
+                {
+                    "key_code": "fn"
+                }
+            ],
+            "simultaneous_options": {
+                "key_down_order": "strict"
+            }
+        }
+    },
+    {
+        "id": "lctrl_lopt",
+        "label": "Ctrl gauche + Option gauche",
+        "group": "Ctrl gauche",
+        "from": {
+            "simultaneous": [
+                {
+                    "key_code": "left_control"
+                },
+                {
+                    "key_code": "left_option"
+                }
+            ],
+            "simultaneous_options": {
+                "key_down_order": "strict"
+            }
+        }
+    },
+    {
+        "id": "lctrl_lcmd",
+        "label": "Ctrl gauche + Cmd gauche",
+        "group": "Ctrl gauche",
+        "from": {
+            "simultaneous": [
+                {
+                    "key_code": "left_control"
+                },
+                {
+                    "key_code": "left_command"
+                }
+            ],
+            "simultaneous_options": {
+                "key_down_order": "strict"
+            }
+        }
+    },
+    {
+        "id": "lctrl_space",
+        "label": "Ctrl gauche + Espace",
+        "group": "Ctrl gauche",
+        "from": {
+            "simultaneous": [
+                {
+                    "key_code": "left_control"
+                },
+                {
+                    "key_code": "spacebar"
+                }
+            ],
+            "simultaneous_options": {
+                "key_down_order": "strict"
+            }
+        }
+    },
+    {
+        "id": "lctrl_rcmd",
+        "label": "Ctrl gauche + Cmd droit",
+        "group": "Ctrl gauche",
+        "from": {
+            "simultaneous": [
+                {
+                    "key_code": "left_control"
+                },
+                {
+                    "key_code": "right_command"
+                }
+            ],
+            "simultaneous_options": {
+                "key_down_order": "strict"
+            }
+        }
+    },
+    {
+        "id": "lctrl_ropt",
+        "label": "Ctrl gauche + Option droit",
+        "group": "Ctrl gauche",
+        "from": {
+            "simultaneous": [
+                {
+                    "key_code": "left_control"
+                },
+                {
+                    "key_code": "right_option"
+                }
+            ],
+            "simultaneous_options": {
+                "key_down_order": "strict"
+            }
+        }
+    },
+    {
+        "id": "lctrl_rshift",
+        "label": "Ctrl gauche + Shift droit",
+        "group": "Ctrl gauche",
+        "from": {
+            "simultaneous": [
+                {
+                    "key_code": "left_control"
+                },
+                {
+                    "key_code": "right_shift"
+                }
+            ],
+            "simultaneous_options": {
+                "key_down_order": "strict"
+            }
+        }
+    },
+    {
+        "id": "lctrl_ret",
+        "label": "Ctrl gauche + Entrée",
+        "group": "Ctrl gauche",
+        "from": {
+            "simultaneous": [
+                {
+                    "key_code": "left_control"
+                },
+                {
+                    "key_code": "return_or_enter"
+                }
+            ],
+            "simultaneous_options": {
+                "key_down_order": "strict"
+            }
+        }
+    },
+    {
+        "id": "lctrl_bsp",
+        "label": "Ctrl gauche + BackSpace",
+        "group": "Ctrl gauche",
+        "from": {
+            "simultaneous": [
+                {
+                    "key_code": "left_control"
+                },
+                {
+                    "key_code": "delete_or_backspace"
+                }
+            ],
+            "simultaneous_options": {
+                "key_down_order": "strict"
+            }
+        }
+    },
+    {
+        "id": "lopt_esc",
+        "label": "Option gauche + Échap",
+        "group": "Option gauche",
+        "from": {
+            "simultaneous": [
+                {
+                    "key_code": "left_option"
+                },
+                {
+                    "key_code": "escape"
+                }
+            ],
+            "simultaneous_options": {
+                "key_down_order": "strict"
+            }
+        }
+    },
+    {
+        "id": "lopt_tab",
+        "label": "Option gauche + Tab",
+        "group": "Option gauche",
+        "from": {
+            "simultaneous": [
+                {
+                    "key_code": "left_option"
+                },
+                {
+                    "key_code": "tab"
+                }
+            ],
+            "simultaneous_options": {
+                "key_down_order": "strict"
+            }
+        }
+    },
+    {
+        "id": "lopt_caps",
+        "label": "Option gauche + CapsLock",
+        "group": "Option gauche",
+        "from": {
+            "simultaneous": [
+                {
+                    "key_code": "left_option"
+                },
+                {
+                    "key_code": "caps_lock"
+                }
+            ],
+            "simultaneous_options": {
+                "key_down_order": "strict"
+            }
+        }
+    },
+    {
+        "id": "lopt_lshift",
+        "label": "Option gauche + Shift gauche",
+        "group": "Option gauche",
+        "from": {
+            "simultaneous": [
+                {
+                    "key_code": "left_option"
+                },
+                {
+                    "key_code": "left_shift"
+                }
+            ],
+            "simultaneous_options": {
+                "key_down_order": "strict"
+            }
+        }
+    },
+    {
+        "id": "lopt_fn",
+        "label": "Option gauche + Fn",
+        "group": "Option gauche",
+        "from": {
+            "simultaneous": [
+                {
+                    "key_code": "left_option"
+                },
+                {
+                    "key_code": "fn"
+                }
+            ],
+            "simultaneous_options": {
+                "key_down_order": "strict"
+            }
+        }
+    },
+    {
+        "id": "lopt_lctrl",
+        "label": "Option gauche + Ctrl gauche",
+        "group": "Option gauche",
+        "from": {
+            "simultaneous": [
+                {
+                    "key_code": "left_option"
+                },
+                {
+                    "key_code": "left_control"
+                }
+            ],
+            "simultaneous_options": {
+                "key_down_order": "strict"
+            }
+        }
+    },
+    {
+        "id": "lopt_lcmd",
+        "label": "Option gauche + Cmd gauche",
+        "group": "Option gauche",
+        "from": {
+            "simultaneous": [
+                {
+                    "key_code": "left_option"
+                },
+                {
+                    "key_code": "left_command"
+                }
+            ],
+            "simultaneous_options": {
+                "key_down_order": "strict"
+            }
+        }
+    },
+    {
+        "id": "lopt_space",
+        "label": "Option gauche + Espace",
+        "group": "Option gauche",
+        "from": {
+            "simultaneous": [
+                {
+                    "key_code": "left_option"
+                },
+                {
+                    "key_code": "spacebar"
+                }
+            ],
+            "simultaneous_options": {
+                "key_down_order": "strict"
+            }
+        }
+    },
+    {
+        "id": "lopt_rcmd",
+        "label": "Option gauche + Cmd droit",
+        "group": "Option gauche",
+        "from": {
+            "simultaneous": [
+                {
+                    "key_code": "left_option"
+                },
+                {
+                    "key_code": "right_command"
+                }
+            ],
+            "simultaneous_options": {
+                "key_down_order": "strict"
+            }
+        }
+    },
+    {
+        "id": "lopt_ropt",
+        "label": "Option gauche + Option droit",
+        "group": "Option gauche",
+        "from": {
+            "simultaneous": [
+                {
+                    "key_code": "left_option"
+                },
+                {
+                    "key_code": "right_option"
+                }
+            ],
+            "simultaneous_options": {
+                "key_down_order": "strict"
+            }
+        }
+    },
+    {
+        "id": "lopt_rshift",
+        "label": "Option gauche + Shift droit",
+        "group": "Option gauche",
+        "from": {
+            "simultaneous": [
+                {
+                    "key_code": "left_option"
+                },
+                {
+                    "key_code": "right_shift"
+                }
+            ],
+            "simultaneous_options": {
+                "key_down_order": "strict"
+            }
+        }
+    },
+    {
+        "id": "lopt_ret",
+        "label": "Option gauche + Entrée",
+        "group": "Option gauche",
+        "from": {
+            "simultaneous": [
+                {
+                    "key_code": "left_option"
+                },
+                {
+                    "key_code": "return_or_enter"
+                }
+            ],
+            "simultaneous_options": {
+                "key_down_order": "strict"
+            }
+        }
+    },
+    {
+        "id": "lopt_bsp",
+        "label": "Option gauche + BackSpace",
+        "group": "Option gauche",
+        "from": {
+            "simultaneous": [
+                {
+                    "key_code": "left_option"
+                },
+                {
+                    "key_code": "delete_or_backspace"
+                }
+            ],
+            "simultaneous_options": {
+                "key_down_order": "strict"
+            }
+        }
+    },
+    {
+        "id": "lcmd_esc",
+        "label": "Cmd gauche + Échap",
+        "group": "Cmd gauche",
+        "from": {
+            "simultaneous": [
+                {
+                    "key_code": "left_command"
+                },
+                {
+                    "key_code": "escape"
+                }
+            ],
+            "simultaneous_options": {
+                "key_down_order": "strict"
+            }
+        }
+    },
+    {
+        "id": "lcmd_tab",
+        "label": "Cmd gauche + Tab",
+        "group": "Cmd gauche",
+        "from": {
+            "simultaneous": [
+                {
+                    "key_code": "left_command"
+                },
+                {
+                    "key_code": "tab"
+                }
+            ],
+            "simultaneous_options": {
+                "key_down_order": "strict"
+            }
+        }
+    },
+    {
+        "id": "lcmd_caps",
+        "label": "Cmd gauche + CapsLock",
+        "group": "Cmd gauche",
+        "from": {
+            "simultaneous": [
+                {
+                    "key_code": "left_command"
+                },
+                {
+                    "key_code": "caps_lock"
+                }
+            ],
+            "simultaneous_options": {
+                "key_down_order": "strict"
+            }
+        }
+    },
+    {
+        "id": "lcmd_lshift",
+        "label": "Cmd gauche + Shift gauche",
+        "group": "Cmd gauche",
+        "from": {
+            "simultaneous": [
+                {
+                    "key_code": "left_command"
+                },
+                {
+                    "key_code": "left_shift"
+                }
+            ],
+            "simultaneous_options": {
+                "key_down_order": "strict"
+            }
+        }
+    },
+    {
+        "id": "lcmd_fn",
+        "label": "Cmd gauche + Fn",
+        "group": "Cmd gauche",
+        "from": {
+            "simultaneous": [
+                {
+                    "key_code": "left_command"
+                },
+                {
+                    "key_code": "fn"
+                }
+            ],
+            "simultaneous_options": {
+                "key_down_order": "strict"
+            }
+        }
+    },
+    {
+        "id": "lcmd_lctrl",
+        "label": "Cmd gauche + Ctrl gauche",
+        "group": "Cmd gauche",
+        "from": {
+            "simultaneous": [
+                {
+                    "key_code": "left_command"
+                },
+                {
+                    "key_code": "left_control"
+                }
+            ],
+            "simultaneous_options": {
+                "key_down_order": "strict"
+            }
+        }
+    },
+    {
+        "id": "lcmd_lopt",
+        "label": "Cmd gauche + Option gauche",
+        "group": "Cmd gauche",
+        "from": {
+            "simultaneous": [
+                {
+                    "key_code": "left_command"
+                },
+                {
+                    "key_code": "left_option"
+                }
+            ],
+            "simultaneous_options": {
+                "key_down_order": "strict"
+            }
+        }
+    },
+    {
+        "id": "lcmd_space",
+        "label": "Cmd gauche + Espace",
+        "group": "Cmd gauche",
+        "from": {
+            "simultaneous": [
+                {
+                    "key_code": "left_command"
+                },
+                {
+                    "key_code": "spacebar"
+                }
+            ],
+            "simultaneous_options": {
+                "key_down_order": "strict"
+            }
+        }
+    },
+    {
+        "id": "lcmd_rcmd",
+        "label": "Cmd gauche + Cmd droit",
+        "group": "Cmd gauche",
+        "from": {
+            "simultaneous": [
+                {
+                    "key_code": "left_command"
+                },
+                {
+                    "key_code": "right_command"
+                }
+            ],
+            "simultaneous_options": {
+                "key_down_order": "strict"
+            }
+        }
+    },
+    {
+        "id": "lcmd_ropt",
+        "label": "Cmd gauche + Option droit",
+        "group": "Cmd gauche",
+        "from": {
+            "simultaneous": [
+                {
+                    "key_code": "left_command"
+                },
+                {
+                    "key_code": "right_option"
+                }
+            ],
+            "simultaneous_options": {
+                "key_down_order": "strict"
+            }
+        }
+    },
+    {
+        "id": "lcmd_rshift",
+        "label": "Cmd gauche + Shift droit",
+        "group": "Cmd gauche",
+        "from": {
+            "simultaneous": [
+                {
+                    "key_code": "left_command"
+                },
+                {
+                    "key_code": "right_shift"
+                }
+            ],
+            "simultaneous_options": {
+                "key_down_order": "strict"
+            }
+        }
+    },
+    {
+        "id": "lcmd_ret",
+        "label": "Cmd gauche + Entrée",
+        "group": "Cmd gauche",
+        "from": {
+            "simultaneous": [
+                {
+                    "key_code": "left_command"
+                },
+                {
+                    "key_code": "return_or_enter"
+                }
+            ],
+            "simultaneous_options": {
+                "key_down_order": "strict"
+            }
+        }
+    },
+    {
+        "id": "lcmd_bsp",
+        "label": "Cmd gauche + BackSpace",
+        "group": "Cmd gauche",
+        "from": {
+            "simultaneous": [
+                {
+                    "key_code": "left_command"
+                },
+                {
+                    "key_code": "delete_or_backspace"
+                }
+            ],
+            "simultaneous_options": {
+                "key_down_order": "strict"
+            }
+        }
+    },
+    {
+        "id": "space_esc",
+        "label": "Espace + Échap",
+        "group": "Espace",
+        "from": {
+            "simultaneous": [
+                {
+                    "key_code": "spacebar"
+                },
+                {
+                    "key_code": "escape"
+                }
+            ],
+            "simultaneous_options": {
+                "key_down_order": "strict"
+            }
+        }
+    },
+    {
+        "id": "space_tab",
+        "label": "Espace + Tab",
+        "group": "Espace",
+        "from": {
+            "simultaneous": [
+                {
+                    "key_code": "spacebar"
+                },
+                {
+                    "key_code": "tab"
+                }
+            ],
+            "simultaneous_options": {
+                "key_down_order": "strict"
+            }
+        }
+    },
+    {
+        "id": "space_caps",
+        "label": "Espace + CapsLock",
+        "group": "Espace",
+        "from": {
+            "simultaneous": [
+                {
+                    "key_code": "spacebar"
+                },
+                {
+                    "key_code": "caps_lock"
+                }
+            ],
+            "simultaneous_options": {
+                "key_down_order": "strict"
+            }
+        }
+    },
+    {
+        "id": "space_lshift",
+        "label": "Espace + Shift gauche",
+        "group": "Espace",
+        "from": {
+            "simultaneous": [
+                {
+                    "key_code": "spacebar"
+                },
+                {
+                    "key_code": "left_shift"
+                }
+            ],
+            "simultaneous_options": {
+                "key_down_order": "strict"
+            }
+        }
+    },
+    {
+        "id": "space_fn",
+        "label": "Espace + Fn",
+        "group": "Espace",
+        "from": {
+            "simultaneous": [
+                {
+                    "key_code": "spacebar"
+                },
+                {
+                    "key_code": "fn"
+                }
+            ],
+            "simultaneous_options": {
+                "key_down_order": "strict"
+            }
+        }
+    },
+    {
+        "id": "space_lctrl",
+        "label": "Espace + Ctrl gauche",
+        "group": "Espace",
+        "from": {
+            "simultaneous": [
+                {
+                    "key_code": "spacebar"
+                },
+                {
+                    "key_code": "left_control"
+                }
+            ],
+            "simultaneous_options": {
+                "key_down_order": "strict"
+            }
+        }
+    },
+    {
+        "id": "space_lopt",
+        "label": "Espace + Option gauche",
+        "group": "Espace",
+        "from": {
+            "simultaneous": [
+                {
+                    "key_code": "spacebar"
+                },
+                {
+                    "key_code": "left_option"
+                }
+            ],
+            "simultaneous_options": {
+                "key_down_order": "strict"
+            }
+        }
+    },
+    {
+        "id": "space_lcmd",
+        "label": "Espace + Cmd gauche",
+        "group": "Espace",
+        "from": {
+            "simultaneous": [
+                {
+                    "key_code": "spacebar"
+                },
+                {
+                    "key_code": "left_command"
+                }
+            ],
+            "simultaneous_options": {
+                "key_down_order": "strict"
+            }
+        }
+    },
+    {
+        "id": "space_rcmd",
+        "label": "Espace + Cmd droit",
+        "group": "Espace",
+        "from": {
+            "simultaneous": [
+                {
+                    "key_code": "spacebar"
+                },
+                {
+                    "key_code": "right_command"
+                }
+            ],
+            "simultaneous_options": {
+                "key_down_order": "strict"
+            }
+        }
+    },
+    {
+        "id": "space_ropt",
+        "label": "Espace + Option droit",
+        "group": "Espace",
+        "from": {
+            "simultaneous": [
+                {
+                    "key_code": "spacebar"
+                },
+                {
+                    "key_code": "right_option"
+                }
+            ],
+            "simultaneous_options": {
+                "key_down_order": "strict"
+            }
+        }
+    },
+    {
+        "id": "space_rshift",
+        "label": "Espace + Shift droit",
+        "group": "Espace",
+        "from": {
+            "simultaneous": [
+                {
+                    "key_code": "spacebar"
+                },
+                {
+                    "key_code": "right_shift"
+                }
+            ],
+            "simultaneous_options": {
+                "key_down_order": "strict"
+            }
+        }
+    },
+    {
+        "id": "space_ret",
+        "label": "Espace + Entrée",
+        "group": "Espace",
+        "from": {
+            "simultaneous": [
+                {
+                    "key_code": "spacebar"
+                },
+                {
+                    "key_code": "return_or_enter"
+                }
+            ],
+            "simultaneous_options": {
+                "key_down_order": "strict"
+            }
+        }
+    },
+    {
+        "id": "space_bsp",
+        "label": "Espace + BackSpace",
+        "group": "Espace",
+        "from": {
+            "simultaneous": [
+                {
+                    "key_code": "spacebar"
+                },
+                {
+                    "key_code": "delete_or_backspace"
+                }
+            ],
+            "simultaneous_options": {
+                "key_down_order": "strict"
+            }
+        }
+    },
+    {
+        "id": "rcmd_esc",
+        "label": "Cmd droit + Échap",
+        "group": "Cmd droit",
+        "from": {
+            "simultaneous": [
+                {
+                    "key_code": "right_command"
+                },
+                {
+                    "key_code": "escape"
+                }
+            ],
+            "simultaneous_options": {
+                "key_down_order": "strict"
+            }
+        }
+    },
+    {
+        "id": "rcmd_tab",
+        "label": "Cmd droit + Tab",
+        "group": "Cmd droit",
+        "from": {
+            "simultaneous": [
+                {
+                    "key_code": "right_command"
+                },
+                {
+                    "key_code": "tab"
+                }
+            ],
+            "simultaneous_options": {
+                "key_down_order": "strict"
+            }
+        }
+    },
+    {
+        "id": "rcmd_caps",
+        "label": "Cmd droit + CapsLock",
+        "group": "Cmd droit",
+        "from": {
+            "simultaneous": [
+                {
+                    "key_code": "right_command"
+                },
+                {
+                    "key_code": "caps_lock"
+                }
+            ],
+            "simultaneous_options": {
+                "key_down_order": "strict"
+            }
+        }
+    },
+    {
+        "id": "rcmd_lshift",
+        "label": "Cmd droit + Shift gauche",
+        "group": "Cmd droit",
+        "from": {
+            "simultaneous": [
+                {
+                    "key_code": "right_command"
+                },
+                {
+                    "key_code": "left_shift"
+                }
+            ],
+            "simultaneous_options": {
+                "key_down_order": "strict"
+            }
+        }
+    },
+    {
+        "id": "rcmd_fn",
+        "label": "Cmd droit + Fn",
+        "group": "Cmd droit",
+        "from": {
+            "simultaneous": [
+                {
+                    "key_code": "right_command"
+                },
+                {
+                    "key_code": "fn"
+                }
+            ],
+            "simultaneous_options": {
+                "key_down_order": "strict"
+            }
+        }
+    },
+    {
+        "id": "rcmd_lctrl",
+        "label": "Cmd droit + Ctrl gauche",
+        "group": "Cmd droit",
+        "from": {
+            "simultaneous": [
+                {
+                    "key_code": "right_command"
+                },
+                {
+                    "key_code": "left_control"
+                }
+            ],
+            "simultaneous_options": {
+                "key_down_order": "strict"
+            }
+        }
+    },
+    {
+        "id": "rcmd_lopt",
+        "label": "Cmd droit + Option gauche",
+        "group": "Cmd droit",
+        "from": {
+            "simultaneous": [
+                {
+                    "key_code": "right_command"
+                },
+                {
+                    "key_code": "left_option"
+                }
+            ],
+            "simultaneous_options": {
+                "key_down_order": "strict"
+            }
+        }
+    },
+    {
+        "id": "rcmd_lcmd",
+        "label": "Cmd droit + Cmd gauche",
+        "group": "Cmd droit",
+        "from": {
+            "simultaneous": [
+                {
+                    "key_code": "right_command"
+                },
+                {
+                    "key_code": "left_command"
+                }
+            ],
+            "simultaneous_options": {
+                "key_down_order": "strict"
+            }
+        }
+    },
+    {
+        "id": "rcmd_space",
+        "label": "Cmd droit + Espace",
+        "group": "Cmd droit",
+        "from": {
+            "simultaneous": [
+                {
+                    "key_code": "right_command"
+                },
+                {
+                    "key_code": "spacebar"
+                }
+            ],
+            "simultaneous_options": {
+                "key_down_order": "strict"
+            }
+        }
+    },
+    {
+        "id": "rcmd_ropt",
+        "label": "Cmd droit + Option droit",
+        "group": "Cmd droit",
+        "from": {
+            "simultaneous": [
+                {
+                    "key_code": "right_command"
+                },
+                {
+                    "key_code": "right_option"
+                }
+            ],
+            "simultaneous_options": {
+                "key_down_order": "strict"
+            }
+        }
+    },
+    {
+        "id": "rcmd_rshift",
+        "label": "Cmd droit + Shift droit",
+        "group": "Cmd droit",
+        "from": {
+            "simultaneous": [
+                {
+                    "key_code": "right_command"
+                },
+                {
+                    "key_code": "right_shift"
+                }
+            ],
+            "simultaneous_options": {
+                "key_down_order": "strict"
+            }
+        }
+    },
+    {
+        "id": "rcmd_ret",
+        "label": "Cmd droit + Entrée",
+        "group": "Cmd droit",
+        "from": {
+            "simultaneous": [
+                {
+                    "key_code": "right_command"
+                },
+                {
+                    "key_code": "return_or_enter"
+                }
+            ],
+            "simultaneous_options": {
+                "key_down_order": "strict"
+            }
+        }
+    },
+    {
+        "id": "rcmd_bsp",
+        "label": "Cmd droit + BackSpace",
+        "group": "Cmd droit",
+        "from": {
+            "simultaneous": [
+                {
+                    "key_code": "right_command"
+                },
+                {
+                    "key_code": "delete_or_backspace"
+                }
+            ],
+            "simultaneous_options": {
+                "key_down_order": "strict"
+            }
+        }
+    },
+    {
+        "id": "ropt_esc",
+        "label": "Option droit + Échap",
+        "group": "Option droit",
+        "menu_hidden": true,
+        "menu_hidden_reason": "Handled by modules/shortcuts/script_control.lua — always active even when the script is paused",
+        "from": {
+            "simultaneous": [
+                {
+                    "key_code": "right_option"
+                },
+                {
+                    "key_code": "escape"
+                }
+            ],
+            "simultaneous_options": {
+                "key_down_order": "strict"
+            }
+        }
+    },
+    {
+        "id": "ropt_tab",
+        "label": "Option droit + Tab",
+        "group": "Option droit",
+        "from": {
+            "simultaneous": [
+                {
+                    "key_code": "right_option"
+                },
+                {
+                    "key_code": "tab"
+                }
+            ],
+            "simultaneous_options": {
+                "key_down_order": "strict"
+            }
+        }
+    },
+    {
+        "id": "ropt_caps",
+        "label": "Option droit + CapsLock",
+        "group": "Option droit",
+        "from": {
+            "simultaneous": [
+                {
+                    "key_code": "right_option"
+                },
+                {
+                    "key_code": "caps_lock"
+                }
+            ],
+            "simultaneous_options": {
+                "key_down_order": "strict"
+            }
+        }
+    },
+    {
+        "id": "ropt_lshift",
+        "label": "Option droit + Shift gauche",
+        "group": "Option droit",
+        "from": {
+            "simultaneous": [
+                {
+                    "key_code": "right_option"
+                },
+                {
+                    "key_code": "left_shift"
+                }
+            ],
+            "simultaneous_options": {
+                "key_down_order": "strict"
+            }
+        }
+    },
+    {
+        "id": "ropt_fn",
+        "label": "Option droit + Fn",
+        "group": "Option droit",
+        "from": {
+            "simultaneous": [
+                {
+                    "key_code": "right_option"
+                },
+                {
+                    "key_code": "fn"
+                }
+            ],
+            "simultaneous_options": {
+                "key_down_order": "strict"
+            }
+        }
+    },
+    {
+        "id": "ropt_lctrl",
+        "label": "Option droit + Ctrl gauche",
+        "group": "Option droit",
+        "from": {
+            "simultaneous": [
+                {
+                    "key_code": "right_option"
+                },
+                {
+                    "key_code": "left_control"
+                }
+            ],
+            "simultaneous_options": {
+                "key_down_order": "strict"
+            }
+        }
+    },
+    {
+        "id": "ropt_lopt",
+        "label": "Option droit + Option gauche",
+        "group": "Option droit",
+        "from": {
+            "simultaneous": [
+                {
+                    "key_code": "right_option"
+                },
+                {
+                    "key_code": "left_option"
+                }
+            ],
+            "simultaneous_options": {
+                "key_down_order": "strict"
+            }
+        }
+    },
+    {
+        "id": "ropt_lcmd",
+        "label": "Option droit + Cmd gauche",
+        "group": "Option droit",
+        "from": {
+            "simultaneous": [
+                {
+                    "key_code": "right_option"
+                },
+                {
+                    "key_code": "left_command"
+                }
+            ],
+            "simultaneous_options": {
+                "key_down_order": "strict"
+            }
+        }
+    },
+    {
+        "id": "ropt_space",
+        "label": "Option droit + Espace",
+        "group": "Option droit",
+        "from": {
+            "simultaneous": [
+                {
+                    "key_code": "right_option"
+                },
+                {
+                    "key_code": "spacebar"
+                }
+            ],
+            "simultaneous_options": {
+                "key_down_order": "strict"
+            }
+        }
+    },
+    {
+        "id": "ropt_rcmd",
+        "label": "Option droit + Cmd droit",
+        "group": "Option droit",
+        "from": {
+            "simultaneous": [
+                {
+                    "key_code": "right_option"
+                },
+                {
+                    "key_code": "right_command"
+                }
+            ],
+            "simultaneous_options": {
+                "key_down_order": "strict"
+            }
+        }
+    },
+    {
+        "id": "ropt_rshift",
+        "label": "Option droit + Shift droit",
+        "group": "Option droit",
+        "from": {
+            "simultaneous": [
+                {
+                    "key_code": "right_option"
+                },
+                {
+                    "key_code": "right_shift"
+                }
+            ],
+            "simultaneous_options": {
+                "key_down_order": "strict"
+            }
+        }
+    },
+    {
+        "id": "ropt_ret",
+        "label": "Option droit + Entrée",
+        "group": "Option droit",
+        "menu_hidden": true,
+        "menu_hidden_reason": "Handled by modules/shortcuts/script_control.lua — always active even when the script is paused",
+        "from": {
+            "simultaneous": [
+                {
+                    "key_code": "right_option"
+                },
+                {
+                    "key_code": "return_or_enter"
+                }
+            ],
+            "simultaneous_options": {
+                "key_down_order": "strict"
+            }
+        }
+    },
+    {
+        "id": "ropt_bsp",
+        "label": "Option droit + BackSpace",
+        "group": "Option droit",
+        "menu_hidden": true,
+        "menu_hidden_reason": "Handled by modules/shortcuts/script_control.lua — always active even when the script is paused",
+        "from": {
+            "simultaneous": [
+                {
+                    "key_code": "right_option"
+                },
+                {
+                    "key_code": "delete_or_backspace"
+                }
+            ],
+            "simultaneous_options": {
+                "key_down_order": "strict"
+            }
+        }
+    },
+    {
+        "id": "rshift_esc",
+        "label": "Shift droit + Échap",
+        "group": "Shift droit",
+        "from": {
+            "simultaneous": [
+                {
+                    "key_code": "right_shift"
+                },
+                {
+                    "key_code": "escape"
+                }
+            ],
+            "simultaneous_options": {
+                "key_down_order": "strict"
+            }
+        }
+    },
+    {
+        "id": "rshift_tab",
+        "label": "Shift droit + Tab",
+        "group": "Shift droit",
+        "from": {
+            "simultaneous": [
+                {
+                    "key_code": "right_shift"
+                },
+                {
+                    "key_code": "tab"
+                }
+            ],
+            "simultaneous_options": {
+                "key_down_order": "strict"
+            }
+        }
+    },
+    {
+        "id": "rshift_caps",
+        "label": "Shift droit + CapsLock",
+        "group": "Shift droit",
+        "from": {
+            "simultaneous": [
+                {
+                    "key_code": "right_shift"
+                },
+                {
+                    "key_code": "caps_lock"
+                }
+            ],
+            "simultaneous_options": {
+                "key_down_order": "strict"
+            }
+        }
+    },
+    {
+        "id": "rshift_lshift",
+        "label": "Shift droit + Shift gauche",
+        "group": "Shift droit",
+        "from": {
+            "simultaneous": [
+                {
+                    "key_code": "right_shift"
+                },
+                {
+                    "key_code": "left_shift"
+                }
+            ],
+            "simultaneous_options": {
+                "key_down_order": "strict"
+            }
+        }
+    },
+    {
+        "id": "rshift_fn",
+        "label": "Shift droit + Fn",
+        "group": "Shift droit",
+        "from": {
+            "simultaneous": [
+                {
+                    "key_code": "right_shift"
+                },
+                {
+                    "key_code": "fn"
+                }
+            ],
+            "simultaneous_options": {
+                "key_down_order": "strict"
+            }
+        }
+    },
+    {
+        "id": "rshift_lctrl",
+        "label": "Shift droit + Ctrl gauche",
+        "group": "Shift droit",
+        "from": {
+            "simultaneous": [
+                {
+                    "key_code": "right_shift"
+                },
+                {
+                    "key_code": "left_control"
+                }
+            ],
+            "simultaneous_options": {
+                "key_down_order": "strict"
+            }
+        }
+    },
+    {
+        "id": "rshift_lopt",
+        "label": "Shift droit + Option gauche",
+        "group": "Shift droit",
+        "from": {
+            "simultaneous": [
+                {
+                    "key_code": "right_shift"
+                },
+                {
+                    "key_code": "left_option"
+                }
+            ],
+            "simultaneous_options": {
+                "key_down_order": "strict"
+            }
+        }
+    },
+    {
+        "id": "rshift_lcmd",
+        "label": "Shift droit + Cmd gauche",
+        "group": "Shift droit",
+        "from": {
+            "simultaneous": [
+                {
+                    "key_code": "right_shift"
+                },
+                {
+                    "key_code": "left_command"
+                }
+            ],
+            "simultaneous_options": {
+                "key_down_order": "strict"
+            }
+        }
+    },
+    {
+        "id": "rshift_space",
+        "label": "Shift droit + Espace",
+        "group": "Shift droit",
+        "from": {
+            "simultaneous": [
+                {
+                    "key_code": "right_shift"
+                },
+                {
+                    "key_code": "spacebar"
+                }
+            ],
+            "simultaneous_options": {
+                "key_down_order": "strict"
+            }
+        }
+    },
+    {
+        "id": "rshift_rcmd",
+        "label": "Shift droit + Cmd droit",
+        "group": "Shift droit",
+        "from": {
+            "simultaneous": [
+                {
+                    "key_code": "right_shift"
+                },
+                {
+                    "key_code": "right_command"
+                }
+            ],
+            "simultaneous_options": {
+                "key_down_order": "strict"
+            }
+        }
+    },
+    {
+        "id": "rshift_ropt",
+        "label": "Shift droit + Option droit",
+        "group": "Shift droit",
+        "from": {
+            "simultaneous": [
+                {
+                    "key_code": "right_shift"
+                },
+                {
+                    "key_code": "right_option"
+                }
+            ],
+            "simultaneous_options": {
+                "key_down_order": "strict"
+            }
+        }
+    },
+    {
+        "id": "rshift_ret",
+        "label": "Shift droit + Entrée",
+        "group": "Shift droit",
+        "from": {
+            "simultaneous": [
+                {
+                    "key_code": "right_shift"
+                },
+                {
+                    "key_code": "return_or_enter"
+                }
+            ],
+            "simultaneous_options": {
+                "key_down_order": "strict"
+            }
+        }
+    },
+    {
+        "id": "rshift_bsp",
+        "label": "Shift droit + BackSpace",
+        "group": "Shift droit",
+        "from": {
+            "simultaneous": [
+                {
+                    "key_code": "right_shift"
+                },
+                {
+                    "key_code": "delete_or_backspace"
+                }
+            ],
+            "simultaneous_options": {
+                "key_down_order": "strict"
+            }
+        }
+    },
+    {
+        "id": "ret_esc",
+        "label": "Entrée + Échap",
+        "group": "Entrée",
+        "from": {
+            "simultaneous": [
+                {
+                    "key_code": "return_or_enter"
+                },
+                {
+                    "key_code": "escape"
+                }
+            ],
+            "simultaneous_options": {
+                "key_down_order": "strict"
+            }
+        }
+    },
+    {
+        "id": "ret_tab",
+        "label": "Entrée + Tab",
+        "group": "Entrée",
+        "from": {
+            "simultaneous": [
+                {
+                    "key_code": "return_or_enter"
+                },
+                {
+                    "key_code": "tab"
+                }
+            ],
+            "simultaneous_options": {
+                "key_down_order": "strict"
+            }
+        }
+    },
+    {
+        "id": "ret_caps",
+        "label": "Entrée + CapsLock",
+        "group": "Entrée",
+        "from": {
+            "simultaneous": [
+                {
+                    "key_code": "return_or_enter"
+                },
+                {
+                    "key_code": "caps_lock"
+                }
+            ],
+            "simultaneous_options": {
+                "key_down_order": "strict"
+            }
+        }
+    },
+    {
+        "id": "ret_lshift",
+        "label": "Entrée + Shift gauche",
+        "group": "Entrée",
+        "from": {
+            "simultaneous": [
+                {
+                    "key_code": "return_or_enter"
+                },
+                {
+                    "key_code": "left_shift"
+                }
+            ],
+            "simultaneous_options": {
+                "key_down_order": "strict"
+            }
+        }
+    },
+    {
+        "id": "ret_fn",
+        "label": "Entrée + Fn",
+        "group": "Entrée",
+        "from": {
+            "simultaneous": [
+                {
+                    "key_code": "return_or_enter"
+                },
+                {
+                    "key_code": "fn"
+                }
+            ],
+            "simultaneous_options": {
+                "key_down_order": "strict"
+            }
+        }
+    },
+    {
+        "id": "ret_lctrl",
+        "label": "Entrée + Ctrl gauche",
+        "group": "Entrée",
+        "from": {
+            "simultaneous": [
+                {
+                    "key_code": "return_or_enter"
+                },
+                {
+                    "key_code": "left_control"
+                }
+            ],
+            "simultaneous_options": {
+                "key_down_order": "strict"
+            }
+        }
+    },
+    {
+        "id": "ret_lopt",
+        "label": "Entrée + Option gauche",
+        "group": "Entrée",
+        "from": {
+            "simultaneous": [
+                {
+                    "key_code": "return_or_enter"
+                },
+                {
+                    "key_code": "left_option"
+                }
+            ],
+            "simultaneous_options": {
+                "key_down_order": "strict"
+            }
+        }
+    },
+    {
+        "id": "ret_lcmd",
+        "label": "Entrée + Cmd gauche",
+        "group": "Entrée",
+        "from": {
+            "simultaneous": [
+                {
+                    "key_code": "return_or_enter"
+                },
+                {
+                    "key_code": "left_command"
+                }
+            ],
+            "simultaneous_options": {
+                "key_down_order": "strict"
+            }
+        }
+    },
+    {
+        "id": "ret_space",
+        "label": "Entrée + Espace",
+        "group": "Entrée",
+        "from": {
+            "simultaneous": [
+                {
+                    "key_code": "return_or_enter"
+                },
+                {
+                    "key_code": "spacebar"
+                }
+            ],
+            "simultaneous_options": {
+                "key_down_order": "strict"
+            }
+        }
+    },
+    {
+        "id": "ret_rcmd",
+        "label": "Entrée + Cmd droit",
+        "group": "Entrée",
+        "from": {
+            "simultaneous": [
+                {
+                    "key_code": "return_or_enter"
+                },
+                {
+                    "key_code": "right_command"
+                }
+            ],
+            "simultaneous_options": {
+                "key_down_order": "strict"
+            }
+        }
+    },
+    {
+        "id": "ret_ropt",
+        "label": "Entrée + Option droit",
+        "group": "Entrée",
+        "from": {
+            "simultaneous": [
+                {
+                    "key_code": "return_or_enter"
+                },
+                {
+                    "key_code": "right_option"
+                }
+            ],
+            "simultaneous_options": {
+                "key_down_order": "strict"
+            }
+        }
+    },
+    {
+        "id": "ret_rshift",
+        "label": "Entrée + Shift droit",
+        "group": "Entrée",
+        "from": {
+            "simultaneous": [
+                {
+                    "key_code": "return_or_enter"
+                },
+                {
+                    "key_code": "right_shift"
+                }
+            ],
+            "simultaneous_options": {
+                "key_down_order": "strict"
+            }
+        }
+    },
+    {
+        "id": "ret_bsp",
+        "label": "Entrée + BackSpace",
+        "group": "Entrée",
+        "from": {
+            "simultaneous": [
+                {
+                    "key_code": "return_or_enter"
+                },
+                {
+                    "key_code": "delete_or_backspace"
+                }
+            ],
+            "simultaneous_options": {
+                "key_down_order": "strict"
+            }
+        }
+    },
+    {
+        "id": "bsp_esc",
+        "label": "BackSpace + Échap",
+        "group": "BackSpace",
+        "from": {
+            "simultaneous": [
+                {
+                    "key_code": "delete_or_backspace"
+                },
+                {
+                    "key_code": "escape"
+                }
+            ],
+            "simultaneous_options": {
+                "key_down_order": "strict"
+            }
+        }
+    },
+    {
+        "id": "bsp_tab",
+        "label": "BackSpace + Tab",
+        "group": "BackSpace",
+        "from": {
+            "simultaneous": [
+                {
+                    "key_code": "delete_or_backspace"
+                },
+                {
+                    "key_code": "tab"
+                }
+            ],
+            "simultaneous_options": {
+                "key_down_order": "strict"
+            }
+        }
+    },
+    {
+        "id": "bsp_caps",
+        "label": "BackSpace + CapsLock",
+        "group": "BackSpace",
+        "from": {
+            "simultaneous": [
+                {
+                    "key_code": "delete_or_backspace"
+                },
+                {
+                    "key_code": "caps_lock"
+                }
+            ],
+            "simultaneous_options": {
+                "key_down_order": "strict"
+            }
+        }
+    },
+    {
+        "id": "bsp_lshift",
+        "label": "BackSpace + Shift gauche",
+        "group": "BackSpace",
+        "from": {
+            "simultaneous": [
+                {
+                    "key_code": "delete_or_backspace"
+                },
+                {
+                    "key_code": "left_shift"
+                }
+            ],
+            "simultaneous_options": {
+                "key_down_order": "strict"
+            }
+        }
+    },
+    {
+        "id": "bsp_fn",
+        "label": "BackSpace + Fn",
+        "group": "BackSpace",
+        "from": {
+            "simultaneous": [
+                {
+                    "key_code": "delete_or_backspace"
+                },
+                {
+                    "key_code": "fn"
+                }
+            ],
+            "simultaneous_options": {
+                "key_down_order": "strict"
+            }
+        }
+    },
+    {
+        "id": "bsp_lctrl",
+        "label": "BackSpace + Ctrl gauche",
+        "group": "BackSpace",
+        "from": {
+            "simultaneous": [
+                {
+                    "key_code": "delete_or_backspace"
+                },
+                {
+                    "key_code": "left_control"
+                }
+            ],
+            "simultaneous_options": {
+                "key_down_order": "strict"
+            }
+        }
+    },
+    {
+        "id": "bsp_lopt",
+        "label": "BackSpace + Option gauche",
+        "group": "BackSpace",
+        "from": {
+            "simultaneous": [
+                {
+                    "key_code": "delete_or_backspace"
+                },
+                {
+                    "key_code": "left_option"
+                }
+            ],
+            "simultaneous_options": {
+                "key_down_order": "strict"
+            }
+        }
+    },
+    {
+        "id": "bsp_lcmd",
+        "label": "BackSpace + Cmd gauche",
+        "group": "BackSpace",
+        "from": {
+            "simultaneous": [
+                {
+                    "key_code": "delete_or_backspace"
+                },
+                {
+                    "key_code": "left_command"
+                }
+            ],
+            "simultaneous_options": {
+                "key_down_order": "strict"
+            }
+        }
+    },
+    {
+        "id": "bsp_space",
+        "label": "BackSpace + Espace",
+        "group": "BackSpace",
+        "from": {
+            "simultaneous": [
+                {
+                    "key_code": "delete_or_backspace"
+                },
+                {
+                    "key_code": "spacebar"
+                }
+            ],
+            "simultaneous_options": {
+                "key_down_order": "strict"
+            }
+        }
+    },
+    {
+        "id": "bsp_rcmd",
+        "label": "BackSpace + Cmd droit",
+        "group": "BackSpace",
+        "from": {
+            "simultaneous": [
+                {
+                    "key_code": "delete_or_backspace"
+                },
+                {
+                    "key_code": "right_command"
+                }
+            ],
+            "simultaneous_options": {
+                "key_down_order": "strict"
+            }
+        }
+    },
+    {
+        "id": "bsp_ropt",
+        "label": "BackSpace + Option droit",
+        "group": "BackSpace",
+        "from": {
+            "simultaneous": [
+                {
+                    "key_code": "delete_or_backspace"
+                },
+                {
+                    "key_code": "right_option"
+                }
+            ],
+            "simultaneous_options": {
+                "key_down_order": "strict"
+            }
+        }
+    },
+    {
+        "id": "bsp_rshift",
+        "label": "BackSpace + Shift droit",
+        "group": "BackSpace",
+        "from": {
+            "simultaneous": [
+                {
+                    "key_code": "delete_or_backspace"
+                },
+                {
+                    "key_code": "right_shift"
+                }
+            ],
+            "simultaneous_options": {
+                "key_down_order": "strict"
+            }
+        }
+    },
+    {
+        "id": "bsp_ret",
+        "label": "BackSpace + Entrée",
+        "group": "BackSpace",
+        "from": {
+            "simultaneous": [
+                {
+                    "key_code": "delete_or_backspace"
+                },
+                {
+                    "key_code": "return_or_enter"
+                }
+            ],
+            "simultaneous_options": {
+                "key_down_order": "strict"
+            }
+        }
+    }
 ]
