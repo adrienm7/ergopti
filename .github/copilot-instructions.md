@@ -121,7 +121,7 @@ These rules were established to reach the level of professionalism demonstrated 
 
 ### 5.1 No Magic Numbers
 
-Every literal value with non-obvious meaning MUST be a named constant. Group all constants at the **top of the file** (Section 1) with an explanatory comment for each. This includes timeouts, keycodes, ratios, thresholds, frame rates, buffer sizes — anything that is not self-evidently `0`, `1`, or `true`/`false`.
+Every literal value with non-obvious meaning MUST be a named constant. Group all constants at the **top of the file** (Section 1) with an explanatory comment for each. This includes timeouts, keycodes, ratios, thresholds, frame rates, buffer sizes, **colors** (e.g. `{red = 1, green = 0.85, blue = 0}`) — anything that is not self-evidently `0`, `1`, or `true`/`false`.
 
 ```lua
 -- Bad
