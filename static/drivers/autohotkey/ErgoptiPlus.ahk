@@ -4766,11 +4766,7 @@ if Features["Rolls"]["NotEqual"].Enabled {
     )
 }
 if Features["Rolls"]["SX"].Enabled {
-    CreateCaseSensitiveHotstrings("*?", "xlsx", "xlsx") ; To not trigger the replacement in this particular case
-    CreateCaseSensitiveHotstrings(
-        "*?", "sx", "sk",
-        Map("TimeActivationSeconds", Features["Rolls"]["SX"].TimeActivationSeconds)
-    )
+    LoadHotstringsSection("rolls", "sx", Features["Rolls"]["SX"])
 }
 if Features["Rolls"]["CX"].Enabled {
     LoadHotstringsSection("rolls", "cx", Features["Rolls"]["CX"])
@@ -4853,14 +4849,7 @@ if Features["Rolls"]["AssignArrowMinusLeft"].Enabled {
     )
 }
 if Features["Rolls"]["CT"].Enabled {
-    CreateHotstring(
-        "*?C", "p ?", "p ?",
-        Map("TimeActivationSeconds", Features["Rolls"]["CT"].TimeActivationSeconds)
-    ) ; Fix "stp ?"
-    CreateCaseSensitiveHotstrings(
-        "*?", "p'", "ct",
-        Map("TimeActivationSeconds", Features["Rolls"]["CT"].TimeActivationSeconds)
-    )
+    LoadHotstringsSection("rolls", "ct", Features["Rolls"]["CT"])
 }
 
 ; ===================================================
