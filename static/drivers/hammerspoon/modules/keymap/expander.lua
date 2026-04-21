@@ -95,7 +95,15 @@ function M.perform_text_replacement(deletes, emit_action, buffer_action, is_fina
 		keylogger.notify_synthetic(emitted_str, source_type or "hotstring", deletes, source_variant)
 	end
 
-	if type(buffer_action) == "function" then pcall(buffer_action) end
+	if type(buffer_action) == "function" then
+		local ok_buf, buf_err = pcall(buffer_action)
+		if not ok_buf then
+			-- Buffer desync after an expansion leads to phantom chars or missed
+			-- triggers downstream; surfacing the failure loudly makes it
+			-- traceable instead of masking it as a silent inconsistency.
+			Logger.error(LOG, "buffer_action failed: %s.", tostring(buf_err))
+		end
+	end
 
 	if keylogger and type(keylogger.set_buffer) == "function" then
 		keylogger.set_buffer(_state.buffer)
@@ -270,7 +278,10 @@ function M.try_terminator_expand(m, chars, char_len, is_ignored)
 	local consume_term = _registry.terminator_is_consumed(chars)
 
 	-- No-op guard: skip when the plain-text expansion equals the trigger.
-	if m.repl == trigger then
+	-- Compares plain_repl (not raw repl) so a mapping whose repl contains
+	-- emission tokens but resolves to the same plain text as its trigger
+	-- is correctly treated as a no-op — matches try_auto_expand's policy.
+	if m.plain_repl == trigger then
 		if m.final_result then _state.suppress_rescan() end
 		if not is_ignored and tooltip.hide then tooltip.hide() end
 		return true

@@ -133,6 +133,10 @@ local _provider_plain_cache_size = 0
 --- @param raw string Raw replacement returned by a provider callback.
 --- @return string Plain text with tokens resolved.
 local function provider_plain(raw)
+	-- Defensive: providers are external callbacks, so nothing guarantees they
+	-- return a string. A non-string key in the cache would crash downstream
+	-- concatenation in plain_text; bail out early and return empty.
+	if type(raw) ~= "string" then return "" end
 	local cached = _provider_plain_cache[raw]
 	if cached ~= nil then return cached end
 	if _provider_plain_cache_size >= PROVIDER_CACHE_MAX then
@@ -184,10 +188,17 @@ end
 --- @return boolean
 local function is_word_boundary(buf)
 	if type(buf) ~= "string" or buf == "" then return false end
-	local last = buf:sub(-1)
+	-- Extract the last UTF-8 codepoint rather than the last byte, so that
+	-- multi-byte separators like NBSP (U+00A0, "\194\160") and NNBSP
+	-- (U+202F, "\226\128\175") — produced by French typography hotstrings —
+	-- are recognised as word boundaries instead of looking like stray
+	-- continuation bytes that never match any of the ASCII comparisons.
+	local ok, poff = pcall(utf8.offset, buf, -1)
+	local last = (ok and poff) and buf:sub(poff) or buf:sub(-1)
 	return last == " " or last == "," or last == "." or last == "!"
 		or last == "?" or last == ";" or last == ":" or last == ")"
 		or last == "}" or last == "]" or last == "\n"
+		or last == "\194\160" or last == "\226\128\175"
 end
 
 
