@@ -37,54 +37,74 @@ function M.utf8_chars(s)
 end
 
 --- Calculates the length of a common prefix between two UTF-8 strings.
+--- Walks both `utf8.codes` iterators in lockstep, so no intermediate character
+--- arrays are materialised — critical because this is called per expansion.
 --- @param s1 string First string.
 --- @param s2 string Second string.
 --- @return number The length of the common prefix in characters.
 function M.get_common_prefix_utf8(s1, s2)
 	if type(s1) ~= "string" or type(s2) ~= "string" then return 0 end
-	
-	local c1 = M.utf8_chars(s1)
-	local c2 = M.utf8_chars(s2)
-	
-	local i = 1
-	while i <= #c1 and i <= #c2 and c1[i] == c2[i] do
-		i = i + 1
-	end
-	
-	return i - 1
+	if s1 == "" or s2 == "" then return 0 end
+
+	-- pcall the whole walk so malformed UTF-8 cannot surface as an error;
+	-- worst case we stop early and report whatever prefix was already agreed.
+	local ok, count = pcall(function()
+		local iter1, inv1, ctrl1 = utf8.codes(s1)
+		local iter2, inv2, ctrl2 = utf8.codes(s2)
+		local matched = 0
+		while true do
+			local p1, c1 = iter1(inv1, ctrl1)
+			local p2, c2 = iter2(inv2, ctrl2)
+			if not p1 or not p2 or c1 ~= c2 then break end
+			ctrl1, ctrl2 = p1, p2
+			matched = matched + 1
+		end
+		return matched
+	end)
+	return (ok and count) and count or 0
 end
 
 --- Safely extracts a substring using UTF-8 character indexing.
+--- Uses `utf8.offset` for O(|i|+|j|) byte-position lookup instead of building
+--- a character array, so long buffers don't pay an allocation per slice.
 --- @param s string The input string.
 --- @param i number The starting index.
 --- @param j number|nil The ending index.
 --- @return string The extracted substring.
 function M.utf8_sub(s, i, j)
-	if type(s) ~= "string" then return "" end
-	
-	local chars = M.utf8_chars(s)
-	local n = #chars
-	
+	if type(s) ~= "string" or s == "" then return "" end
+
+	local n = M.utf8_len(s)
 	local start_idx = tonumber(i) or 1
 	local end_idx   = tonumber(j) or n
-	
-	-- Handle negative indices
+
+	-- Normalise negative indices to positives against the codepoint count.
 	if start_idx < 0 then start_idx = n + start_idx + 1 end
 	if end_idx < 0 then end_idx = n + end_idx + 1 end
-	
+
 	-- Clamp to bounds (end_idx may legitimately be 0 — empty-range signal — and
 	-- must not be snapped up to 1, which would silently return a one-char slice).
 	start_idx = math.max(1, math.min(start_idx, n))
 	end_idx   = math.max(0, math.min(end_idx, n))
-	
+
 	if start_idx > end_idx then return "" end
 
-	local res = {}
-	for k = start_idx, end_idx do
-		table.insert(res, chars[k])
+	-- Translate codepoint indices to byte offsets. start_byte is the first
+	-- byte of codepoint #start_idx; end_byte is the last byte of codepoint
+	-- #end_idx, i.e. one byte before the start of codepoint #(end_idx+1).
+	local ok_s, start_byte = pcall(utf8.offset, s, start_idx)
+	if not ok_s or not start_byte then return "" end
+
+	local end_byte
+	if end_idx == n then
+		end_byte = #s
+	else
+		local ok_e, next_byte = pcall(utf8.offset, s, end_idx + 1)
+		if not ok_e or not next_byte then return "" end
+		end_byte = next_byte - 1
 	end
-	
-	return table.concat(res)
+
+	return s:sub(start_byte, end_byte)
 end
 
 --- Safely measures the length of a UTF-8 string.
