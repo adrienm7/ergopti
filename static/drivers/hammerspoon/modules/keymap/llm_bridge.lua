@@ -73,6 +73,17 @@ local MIN_TOOLTIP_DURATION_SEC   = 0.05   -- Shortest visible duration for any h
 -- so the LLM fires just after the tooltip would normally close.
 local HOTSTRING_CHAIN_OFFSET_SEC = 0.05
 
+-- Upper bound on the raw→plain cache populated by provider callbacks. Previews
+-- run on every keystroke and each provider returns a raw replacement that
+-- needs tokens_from_repl() + plain_text() before it can be compared against
+-- the buffer. In practice providers emit a small handful of distinct raw
+-- strings, so a cache makes the per-keystroke work a single table lookup.
+-- The cap exists purely as a safety net: a pathological provider returning
+-- an unbounded set of unique strings would otherwise grow the table
+-- forever. When the cap is hit we reset the table — simpler than LRU
+-- bookkeeping and fine for a rare overflow.
+local PROVIDER_CACHE_MAX = 1024
+
 -- Canonical LLM defaults, owned by modules/llm; used to seed bridge-local flags.
 local LLM_DEFAULTS = core_llm.DEFAULT_STATE
 
@@ -107,6 +118,32 @@ local is_autocorrect_preview_enabled = nil  -- Set in M.init()
 local fire_llm_after_hotstring   = LLM_DEFAULTS.llm_after_hotstring
 -- Clear the buffer when the user presses an arrow key or Escape outside prediction mode.
 local reset_buffer_on_navigation = LLM_DEFAULTS.llm_reset_on_nav
+
+-- Memoization of plain-text projections for strings returned by preview
+-- providers. Each keystroke used to call tokens_from_repl() + plain_text()
+-- on the provider result, both of which scan the whole string; now we pay
+-- that cost exactly once per distinct raw value. See PROVIDER_CACHE_MAX
+-- for the overflow policy.
+local _provider_plain_cache      = {}
+local _provider_plain_cache_size = 0
+
+--- Returns the plain-text projection of a raw provider replacement, using a
+--- module-local memoization table so the per-keystroke preview path does no
+--- tokenization work for previously-seen strings.
+--- @param raw string Raw replacement returned by a provider callback.
+--- @return string Plain text with tokens resolved.
+local function provider_plain(raw)
+	local cached = _provider_plain_cache[raw]
+	if cached ~= nil then return cached end
+	if _provider_plain_cache_size >= PROVIDER_CACHE_MAX then
+		_provider_plain_cache      = {}
+		_provider_plain_cache_size = 0
+	end
+	local plain = km_utils.plain_text(km_utils.tokens_from_repl(raw))
+	_provider_plain_cache[raw] = plain
+	_provider_plain_cache_size = _provider_plain_cache_size + 1
+	return plain
+end
 
 
 --- Guard: verifies that M.init() was called before any public function that
@@ -322,8 +359,10 @@ function M.update_preview(buf)
 		local ok, res = pcall(provider, buf)
 		if ok and res then
 			matched_repl       = res
-			-- Providers return raw strings; plain_repl must be derived on the fly
-			matched_plain_repl = km_utils.plain_text(km_utils.tokens_from_repl(res))
+			-- Providers return raw strings; plain_repl must be derived on the
+			-- fly, but we memoize the projection so keystroke-frequency calls
+			-- with the same raw value become a single table lookup.
+			matched_plain_repl = provider_plain(res)
 			match_type         = "provider"
 			break
 		end
