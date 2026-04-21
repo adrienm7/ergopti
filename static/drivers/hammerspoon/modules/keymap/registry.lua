@@ -46,6 +46,19 @@ local function require_state(func_name)
 end
 
 
+--- Returns the last UTF-8 codepoint of a string, used to bucket mappings by
+--- tail character for O(1) lookup on keystroke. Falls back to the last byte
+--- on malformed UTF-8 so the resulting index is always non-empty.
+--- @param s string The input string.
+--- @return string The last UTF-8 character, or "" when s is empty.
+local function tail_codepoint(s)
+	if type(s) ~= "string" or s == "" then return "" end
+	local ok, off = pcall(utf8.offset, s, -1)
+	if ok and off then return s:sub(off) end
+	return s:sub(-1)
+end
+
+
 
 
 -- ====================================
@@ -343,6 +356,7 @@ function M.add(trigger, replacement, opts)
 		local mk        = _state.magic_key
 		local mkl       = #mk
 		local has_magic = mkl > 0 and t:sub(-mkl) == mk
+		local star_base = has_magic and t:sub(1, #t - mkl) or nil
 		local entry = {
 			trigger      = t,
 			repl         = r,
@@ -353,9 +367,21 @@ function M.add(trigger, replacement, opts)
 			auto         = a,
 			seq          = _state.seq_counter,
 			tlen         = text_utils.utf8_len(t),
+			-- Byte-length cache: the main event loop compares buffer suffixes
+			-- byte-by-byte, so #m.trigger is needed on every frame — caching saves
+			-- one C call per mapping per keystroke
+			trigger_bytes = #t,
+			-- Last UTF-8 codepoint of the trigger, used later to bucket mappings
+			-- by tail character so run_trigger_checks can skip any mapping whose
+			-- last char does not match the just-typed character
+			tail_char    = tail_codepoint(t),
 			final_result = is_final,
 			has_magic    = has_magic,
-			star_base    = has_magic and t:sub(1, #t - mkl) or nil,
+			star_base    = star_base,
+			-- Matching metadata for the preview path, where matches are tested
+			-- against star_base rather than the full trigger
+			star_base_bytes     = star_base and #star_base or nil,
+			star_base_tail_char = star_base and tail_codepoint(star_base) or nil,
 		}
 		if _state.current_group then entry.group = _state.current_group end
 		table.insert(_state.mappings, entry)
