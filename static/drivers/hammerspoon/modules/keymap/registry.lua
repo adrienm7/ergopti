@@ -119,6 +119,29 @@ for _, def in ipairs(M.TERMINATOR_DEFS) do
 	end
 end
 
+-- Cached O(1) lookup sets for the per-keystroke hot path. Every call to
+-- is_terminator() used to walk TERMINATOR_DEFS and each def's chars list
+-- (linear scan on every keydown); terminator_is_consumed() did the same.
+-- We rebuild these maps whenever terminator state changes (enable/disable,
+-- add/remove custom, magic-key rename) so the keystroke path stays O(1).
+local _terminator_chars_set   = {}
+local _terminator_consume_set = {}
+local function rebuild_terminator_cache()
+	_terminator_chars_set   = {}
+	_terminator_consume_set = {}
+	for _, def in ipairs(M.TERMINATOR_DEFS) do
+		if def.key and _terminator_enabled[def.key] and def.chars then
+			for _, c in ipairs(def.chars) do
+				if type(c) == "string" and c ~= "" then
+					_terminator_chars_set[c] = true
+					if def.consume then _terminator_consume_set[c] = true end
+				end
+			end
+		end
+	end
+end
+rebuild_terminator_cache()
+
 
 
 
@@ -138,22 +161,21 @@ local function update_terminator_magic_key(magic_key)
 			def.label = magic_key .. " : Touche magique"
 		end
 	end
+	rebuild_terminator_cache()
 end
 
 --- Returns true if `chars` matches an enabled terminator. If `chars` is a
 --- multi-codepoint event, we also compare against its first codepoint so that
 --- dead-key / IME-composed sequences whose leading codepoint is a terminator
---- still fire the expansion.
+--- still fire the expansion. Lookups go through a pre-built set so the hot
+--- path is O(1) regardless of how many terminator definitions exist.
 --- @param chars string The typed character(s) to check.
 --- @return boolean
 function M.is_terminator(chars)
-	local first = (#chars > 0) and first_codepoint(chars) or chars
-	for _, def in ipairs(M.TERMINATOR_DEFS) do
-		if def.key and _terminator_enabled[def.key] and def.chars then
-			for _, c in ipairs(def.chars) do
-				if chars == c or first == c then return true end
-			end
-		end
+	if _terminator_chars_set[chars] then return true end
+	if #chars > 0 then
+		local first = first_codepoint(chars)
+		if first ~= chars and _terminator_chars_set[first] then return true end
 	end
 	return false
 end
@@ -164,13 +186,10 @@ end
 --- @param chars string The typed character(s) to check.
 --- @return boolean
 function M.terminator_is_consumed(chars)
-	local first = (#chars > 0) and first_codepoint(chars) or chars
-	for _, def in ipairs(M.TERMINATOR_DEFS) do
-		if def.key and _terminator_enabled[def.key] and def.consume and def.chars then
-			for _, c in ipairs(def.chars) do
-				if chars == c or first == c then return true end
-			end
-		end
+	if _terminator_consume_set[chars] then return true end
+	if #chars > 0 then
+		local first = first_codepoint(chars)
+		if first ~= chars and _terminator_consume_set[first] then return true end
 	end
 	return false
 end
@@ -180,6 +199,7 @@ end
 --- @param en boolean True to enable, false to disable.
 function M.set_terminator_enabled(key, en)
 	_terminator_enabled[key] = (en ~= false)
+	rebuild_terminator_cache()
 	Logger.debug(LOG, "Terminator '%s': %s.", key, en and "enabled" or "disabled")
 end
 
@@ -214,6 +234,7 @@ function M.add_custom_terminator(key, char, label, consume)
 			def.chars   = { char }
 			def.label   = label
 			def.consume = consume or false
+			rebuild_terminator_cache()
 			Logger.debug(LOG, "Custom terminator '%s' updated.", key)
 			return
 		end
@@ -227,6 +248,7 @@ function M.add_custom_terminator(key, char, label, consume)
 		custom          = true,
 	})
 	_terminator_enabled[key] = true
+	rebuild_terminator_cache()
 	Logger.info(LOG, "Custom terminator '%s' added.", key)
 end
 
@@ -237,6 +259,7 @@ function M.remove_custom_terminator(key)
 		if def.key == key and def.custom then
 			table.remove(M.TERMINATOR_DEFS, i)
 			_terminator_enabled[key] = nil
+			rebuild_terminator_cache()
 			Logger.info(LOG, "Custom terminator '%s' removed.", key)
 			return
 		end
@@ -313,6 +336,13 @@ function M.sort_mappings()
 	table.sort(_state.mappings, function(a, b)
 		if a.tlen ~= b.tlen then return a.tlen > b.tlen end
 		if a.is_word ~= b.is_word then return a.is_word end
+		-- Stable cross-reload priority: groups keep their original insertion
+		-- order across disable/enable cycles, so two same-length triggers
+		-- cannot flip relative priority after a hot-reload (B3.6). `seq`
+		-- within a group stays monotonic by design.
+		local ao = a.group_order or 0
+		local bo = b.group_order or 0
+		if ao ~= bo then return ao < bo end
 		return a.seq < b.seq
 	end)
 	rebuild_tail_indexes()
@@ -359,6 +389,9 @@ function M.flush_sort()
 end
 
 --- Records the sequence numbers belonging to the current group after a load.
+--- Preserves the group's existing `group_order` across reloads so the sort
+--- tiebreaker stays stable (B3.6): disable_group + enable_group must not
+--- change the relative priority of same-length triggers.
 --- @param name string Group identifier.
 --- @param path string|nil File path (nil for programmatic groups).
 --- @param kind string "lua" or "toml".
@@ -367,7 +400,44 @@ local function record_group(name, path, kind)
 	for _, m in ipairs(_state.mappings) do
 		if m.group == name then table.insert(seqs, m.seq) end
 	end
-	_state.groups[name] = { path = path, seqs = seqs, enabled = true, kind = kind or "lua" }
+	local existing = _state.groups[name]
+	local group_order = (existing and existing.group_order)
+		or (_state.group_order_counter or 0) + 1
+	if not existing or not existing.group_order then
+		_state.group_order_counter = group_order
+	end
+	_state.groups[name] = {
+		path        = path,
+		seqs        = seqs,
+		enabled     = true,
+		kind        = kind or "lua",
+		group_order = group_order,
+	}
+end
+
+--- Ensures a group entry exists with a stable `group_order` before any of
+--- its mappings are added via add_raw. Called from the start of load_file /
+--- load_toml so that each entry can store the stable order at insertion time
+--- instead of having to back-fill it after record_group runs. Preserves any
+--- existing group_order on reload.
+--- @param name string Group identifier.
+local function ensure_group_order(name)
+	if not _state or not name or name == "" then return end
+	_state.group_order_counter = _state.group_order_counter or 0
+	local g = _state.groups[name]
+	if g and g.group_order then return end
+	_state.group_order_counter = _state.group_order_counter + 1
+	if g then
+		g.group_order = _state.group_order_counter
+	else
+		_state.groups[name] = {
+			path        = nil,
+			seqs        = {},
+			enabled     = true,
+			kind        = "pending",
+			group_order = _state.group_order_counter,
+		}
+	end
 end
 
 --- Registers a mapping entry with smart case-variant generation.
@@ -461,7 +531,16 @@ function M.add(trigger, replacement, opts)
 			star_base_bytes     = star_base and #star_base or nil,
 			star_base_tail_char = star_base and tail_codepoint(star_base) or nil,
 		}
-		if _state.current_group then entry.group = _state.current_group end
+		if _state.current_group then
+			entry.group = _state.current_group
+			local g = _state.groups[_state.current_group]
+			-- group_order is 0 for mappings added outside a load_file/load_toml
+			-- scope (e.g. ad-hoc M.add calls with no active group), which keeps
+			-- them at the head of the tiebreaker — same as before this change.
+			entry.group_order = (g and g.group_order) or 0
+		else
+			entry.group_order = 0
+		end
 		table.insert(_state.mappings, entry)
 		_state.mappings_lookup[k] = entry
 	end
@@ -560,6 +639,7 @@ function M.load_file(name, path)
 	end
 
 	Logger.start(LOG, "Loading Lua mapping file '%s'…", name)
+	ensure_group_order(name)
 	_state.current_group = name
 
 	local ok, err = pcall(dofile, path)
@@ -598,6 +678,7 @@ function M.load_toml(name, path)
 		return
 	end
 
+	ensure_group_order(name)
 	_state.current_group = name
 	local sections_info  = {}
 
@@ -732,10 +813,14 @@ function M.get_meta_description(name)
 end
 
 --- Manually sets the current group context used by M.add() to tag new entries.
---- Must be reset to nil after the relevant block of M.add() calls.
+--- Must be reset to nil after the relevant block of M.add() calls. When a
+--- non-nil group name is supplied, ensure_group_order stamps a stable
+--- group_order on the group so subsequent add_raw calls tag their entries
+--- with the same priority value that would survive a later reload.
 --- @param name string|nil Group name.
 function M.set_group_context(name)
 	if not require_state("set_group_context") then return end
+	if name and name ~= "" then ensure_group_order(name) end
 	_state.current_group = name
 end
 
