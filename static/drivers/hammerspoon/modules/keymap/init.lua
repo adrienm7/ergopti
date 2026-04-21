@@ -266,6 +266,8 @@ M.list_groups           = Registry.list_groups
 M.register_lua_group    = Registry.register_lua_group
 M.enable_group          = Registry.enable_group
 M.sort_mappings         = Registry.sort_mappings
+M.defer_sort            = Registry.defer_sort
+M.flush_sort            = Registry.flush_sort
 
 M.set_terminator_enabled   = Registry.set_terminator_enabled
 M.is_terminator_enabled    = Registry.is_terminator_enabled
