@@ -1,4 +1,4 @@
-; drivers/autohotkey/lib/features_config.ahk
+﻿; drivers/autohotkey/lib/features_config.ahk
 
 ; ==============================================================================
 ; MODULE: Features Configuration
