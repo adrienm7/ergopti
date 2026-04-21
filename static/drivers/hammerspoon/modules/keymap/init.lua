@@ -22,9 +22,10 @@ local text_utils = require("lib.text_utils")
 local km_utils   = require("modules.keymap.utils")
 local Logger     = require("lib.logger")
 
-local Registry  = require("modules.keymap.registry")
-local Expander  = require("modules.keymap.expander")
-local LLMBridge = require("modules.keymap.llm_bridge")
+local Registry   = require("modules.keymap.registry")
+local Expander   = require("modules.keymap.expander")
+local LLMBridge  = require("modules.keymap.llm_bridge")
+local CoreStateM = require("modules.keymap.state")
 
 local M   = {}
 local LOG = "keymap"
@@ -95,62 +96,16 @@ local COMPLEX_DELAY_MULT = 2
 -- it cannot inadvertently stretch an expansion on an unrelated later key.
 local COMPLEX_CARRY_SEC = 0.3
 
--- Central memory struct passed via reference to all sub-modules.
-local CoreState = {
-	buffer                     = "",
-	magic_key                  = M.DEFAULT_STATE.trigger_char,
-	mappings                   = {},
-	mappings_lookup            = {},
-	-- Hot-path lookup indexes. Each keystroke lands in exactly one bucket
-	-- (keyed by the last UTF-8 codepoint of the just-typed char or of the
-	-- char just before a terminator), so run_trigger_checks and update_preview
-	-- never have to re-scan the full ~10-15k entry list.
-	mappings_by_tail_char      = {},
-	mappings_by_star_tail_char = {},
-	groups                     = {},
-	seq_counter                = 0,
-	interceptors               = {},
-	preview_providers          = {},
-	expected_synthetic_chars   = "",
-	expected_synthetic_deletes = 0,
-	shift_side                 = nil,
-	processing_paused          = false,
-	last_key_time              = 0,
-	last_key_was_complex       = false,
-	no_rescan_until            = 0,
-	WORD_TIMEOUT_SEC           = 5.0,
-	BASE_DELAY_SEC             = M.DEFAULT_STATE.expansion_delay,
-	DELAYS                     = {},
-	DELAYS_DEFAULT             = M.DELAYS_DEFAULT,
-	current_group              = nil,
-	group_post_load_hooks      = {},
-	ignored_window_titles      = {},
-	ignored_window_patterns    = {},
-}
+-- Central memory struct passed via reference to all sub-modules. The shape,
+-- invariants, and default seeding live in modules/keymap/state.lua; keeping
+-- them out of init.lua prevents three separate files (Registry, Expander,
+-- LLMBridge) from silently assuming divergent field sets.
+local CoreState = CoreStateM.new(M.DEFAULT_STATE, M.DELAYS_DEFAULT)
 
--- Methods bound onto CoreState for submodules to call.
-CoreState.suppress_rescan = function(duration)
-	CoreState.no_rescan_until = hs.timer.secondsSinceEpoch() + (tonumber(duration) or 0.5)
-	CoreState.buffer = ""
-end
-
-CoreState.suppress_rescan_keep_buffer = function(duration)
-	CoreState.no_rescan_until = hs.timer.secondsSinceEpoch() + (tonumber(duration) or 0.3)
-end
-
+-- Registry exposes the repeat-feature toggle used by the event loop. Binding
+-- it after state.new() avoids a circular require (state.lua cannot reference
+-- Registry without pulling the full keymap module in).
 CoreState.is_repeat_feature_enabled = Registry.is_repeat_feature_enabled
-
--- Seed the initial per-group delays from defaults and compute the word-timeout.
-local has_infinite = false
-local max_delay    = 0
-for k, v in pairs(M.DELAYS_DEFAULT) do
-	CoreState.DELAYS[k] = v
-	if v == 0 then has_infinite = true end
-	if v > max_delay then max_delay = v end
-end
--- WORD_TIMEOUT_SEC: how long the engine waits before wiping the buffer on inactivity.
--- 0 means infinite (never wipe), which is needed when any delay is 0 (always-active trigger).
-CoreState.WORD_TIMEOUT_SEC = has_infinite and 0 or (max_delay + 0.5)
 
 -- Mount dependencies (order matters: Registry before Expander/LLMBridge).
 Registry.init(CoreState)
