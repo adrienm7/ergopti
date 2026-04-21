@@ -246,9 +246,45 @@ local function rebuild_lookup()
 	end
 end
 
+--- Rebuilds the per-tail-char bucket indexes from the (already sorted)
+--- _state.mappings list. Each mapping appears in mappings_by_tail_char
+--- under its last UTF-8 codepoint; has_magic mappings additionally appear
+--- in mappings_by_star_tail_char under their star_base's last codepoint.
+---
+--- Buckets preserve the insertion order, which matches the sort order of
+--- _state.mappings (longest trigger first). Callers iterate a single bucket
+--- per keystroke instead of the full list, collapsing the hot-path scan
+--- from ~10-15k entries to a handful.
+local function rebuild_tail_indexes()
+	if not _state then return end
+	local tail_idx = {}
+	local star_idx = {}
+	for _, m in ipairs(_state.mappings) do
+		local tc = m.tail_char
+		local bucket = tail_idx[tc]
+		if not bucket then
+			bucket = {}
+			tail_idx[tc] = bucket
+		end
+		bucket[#bucket + 1] = m
+		if m.has_magic and m.star_base_tail_char then
+			local sc = m.star_base_tail_char
+			local sbucket = star_idx[sc]
+			if not sbucket then
+				sbucket = {}
+				star_idx[sc] = sbucket
+			end
+			sbucket[#sbucket + 1] = m
+		end
+	end
+	_state.mappings_by_tail_char      = tail_idx
+	_state.mappings_by_star_tail_char = star_idx
+end
+
 --- Sorts the mappings list: longest trigger first, then word-boundary, then insertion order.
 --- Longer triggers must be tested before shorter prefixes to prevent premature matches.
 --- While a defer_sort() is active, the actual sort is postponed until flush_sort().
+--- Rebuilds the tail-char bucket indexes at the end so they stay in sync.
 function M.sort_mappings()
 	if not require_state("sort_mappings") then return end
 	if _sort_deferred then
@@ -261,7 +297,27 @@ function M.sort_mappings()
 		if a.is_word ~= b.is_word then return a.is_word end
 		return a.seq < b.seq
 	end)
+	rebuild_tail_indexes()
 	Logger.done(LOG, "Mappings sorted.")
+end
+
+--- Returns the bucket of mappings whose trigger ends with `tail_char`, in
+--- sort order (longest trigger first). Returns nil when the bucket is empty
+--- or the registry is not yet initialized; callers must handle that case.
+--- @param tail_char string Single-codepoint UTF-8 string.
+--- @return table|nil Array of mapping entries, or nil.
+function M.mappings_for_tail(tail_char)
+	if not _state then return nil end
+	return _state.mappings_by_tail_char[tail_char]
+end
+
+--- Returns the bucket of has_magic mappings whose star_base ends with
+--- `tail_char`, in sort order. Used by the LLM preview's star_base match path.
+--- @param tail_char string Single-codepoint UTF-8 string.
+--- @return table|nil Array of mapping entries, or nil.
+function M.mappings_for_star_tail(tail_char)
+	if not _state then return nil end
+	return _state.mappings_by_star_tail_char[tail_char]
 end
 
 --- Suspends automatic re-sorting. Every subsequent call to sort_mappings() becomes

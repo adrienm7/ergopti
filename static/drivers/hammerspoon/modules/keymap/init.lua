@@ -78,6 +78,12 @@ local CoreState = {
 	magic_key                  = M.DEFAULT_STATE.trigger_char,
 	mappings                   = {},
 	mappings_lookup            = {},
+	-- Hot-path lookup indexes. Each keystroke lands in exactly one bucket
+	-- (keyed by the last UTF-8 codepoint of the just-typed char or of the
+	-- char just before a terminator), so run_trigger_checks and update_preview
+	-- never have to re-scan the full ~10-15k entry list.
+	mappings_by_tail_char      = {},
+	mappings_by_star_tail_char = {},
 	groups                     = {},
 	seq_counter                = 0,
 	interceptors               = {},
@@ -460,14 +466,14 @@ local function onKeyDownRaw(e)
 		-- for every non-auto mapping — on a normal letter keystroke that saves ~300 calls
 		local chars_is_terminator = Registry.is_terminator(chars)
 
-		for _, m in ipairs(CoreState.mappings) do
-			local group_active = not m.group
-				or not CoreState.groups[m.group]
-				or CoreState.groups[m.group].enabled
-			if not group_active then goto continue end
-
-			-- Determine the tightest applicable delay for this mapping.
-			-- m.has_magic is precomputed at load time — no string ops needed here
+		--- Per-mapping delay + gate check, extracted so both the auto and
+		--- terminator buckets apply the exact same policy.
+		--- @param m table The mapping entry.
+		--- @return boolean True when the current timing/group state allows m to fire.
+		local function mapping_fires(m)
+			if m.group and CoreState.groups[m.group] and not CoreState.groups[m.group].enabled then
+				return false
+			end
 			local specific_delay
 			if m.has_magic then
 				specific_delay = CoreState.DELAYS.STAR_TRIGGER
@@ -476,19 +482,51 @@ local function onKeyDownRaw(e)
 			else
 				specific_delay = CoreState.BASE_DELAY_SEC
 			end
-
 			-- Autocorrections are never stretched for complex keystrokes (they
 			-- fire on letter combos, not on modifier+letter sequences).
 			local allow_complex_delay = (m.group ~= "autocorrection")
 			local allowed_delay       = allow_complex_delay and (specific_delay * complex_mult) or specific_delay
+			return allowed_delay == 0 or dt <= allowed_delay
+		end
 
-			if allowed_delay == 0 or dt <= allowed_delay then
-				if m.auto     and Expander.try_auto_expand(m, char_len, is_ignored)       then return true end
-				if not m.auto and chars_is_terminator
-					and Expander.try_terminator_expand(m, chars, char_len, is_ignored) then return true end
+		-- Auto candidates: triggers whose last codepoint equals the just-typed
+		-- char. Bucketed by Registry so we scan a handful of entries instead of
+		-- the full ~10-15k global list.
+		local auto_bucket = Registry.mappings_for_tail(chars)
+		if auto_bucket then
+			for _, m in ipairs(auto_bucket) do
+				if m.auto and mapping_fires(m)
+					and Expander.try_auto_expand(m, char_len, is_ignored)
+				then
+					return true
+				end
 			end
+		end
 
-			::continue::
+		-- Terminator candidates: triggers whose last codepoint equals the char
+		-- *before* the terminator that was just typed. Only meaningful when
+		-- chars is itself a terminator.
+		if chars_is_terminator then
+			local buf        = CoreState.buffer
+			local chars_b    = #chars
+			local before_end = #buf - chars_b
+			if before_end > 0 then
+				local prev_sub = buf:sub(1, before_end)
+				local poff     = utf8.offset(prev_sub, -1)
+				if poff then
+					local prev_char  = prev_sub:sub(poff)
+					local term_bucket = Registry.mappings_for_tail(prev_char)
+					if term_bucket then
+						for _, m in ipairs(term_bucket) do
+							if not m.auto and mapping_fires(m)
+								and Expander.try_terminator_expand(m, chars, char_len, is_ignored)
+							then
+								return true
+							end
+						end
+					end
+				end
+			end
 		end
 
 		local star_allowed = CoreState.DELAYS.STAR_TRIGGER * complex_mult
