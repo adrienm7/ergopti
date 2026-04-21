@@ -132,7 +132,11 @@ function M.try_auto_expand(m, char_len, is_ignored)
 	if not require_state("try_auto_expand") then return false end
 
 	local trigger = m.trigger
-	if not text_utils.utf8_ends_with(_state.buffer, trigger) then return false end
+	-- Byte-direct suffix match: two strings equal byte-for-byte are necessarily
+	-- UTF-8 equivalent, so utf8_ends_with's extra utf8.len/utf8.offset hops are
+	-- pure overhead on the hot path. m.trigger_bytes is precomputed at load time.
+	local tb = m.trigger_bytes
+	if #_state.buffer < tb or _state.buffer:sub(-tb) ~= trigger then return false end
 
 	-- Word-boundary check: reject the match when the trigger is preceded by a
 	-- letter or "@" (which is used as a personal-info trigger prefix).
@@ -213,19 +217,21 @@ function M.try_terminator_expand(m, chars, char_len, is_ignored)
 
 	if not _registry.is_terminator(chars) then return false end
 
-	local trigger   = m.trigger
-	local buf_end   = utf8.offset(_state.buffer, -char_len) or (#_state.buffer + 1)
-	local trig_len  = text_utils.utf8_len(trigger)
-	local buf_start = utf8.offset(_state.buffer, -(char_len + trig_len))
-	local segment   = (buf_start and buf_start <= buf_end - 1)
-		and _state.buffer:sub(buf_start, buf_end - 1)
-		or nil
-
-	if segment ~= trigger then return false end
+	-- Byte-direct segment match: byte equality implies UTF-8 equality, so we skip
+	-- the utf8.offset pair entirely. trigger_bytes is precomputed; #chars is the
+	-- byte length of the terminator character(s) that were just typed.
+	local trigger     = m.trigger
+	local tb          = m.trigger_bytes
+	local chars_bytes = #chars
+	local buf         = _state.buffer
+	if #buf < tb + chars_bytes then return false end
+	local buf_start   = #buf - chars_bytes - tb + 1
+	if buf:sub(buf_start, buf_start + tb - 1) ~= trigger then return false end
+	local trig_len    = text_utils.utf8_len(trigger)
 
 	-- Word-boundary check: same logic as in try_auto_expand.
 	if m.is_word and not trigger:match("^[ \194\160\226\128\175]") then
-		local before    = buf_start and _state.buffer:sub(1, buf_start - 1) or ""
+		local before    = buf:sub(1, buf_start - 1)
 		local prev_off  = utf8.offset(before, -1)
 		local prev_char = prev_off and before:sub(prev_off) or ""
 		if text_utils.is_letter_char(prev_char) or prev_char == "@" then
@@ -290,8 +296,9 @@ function M.try_terminator_expand(m, chars, char_len, is_ignored)
 				return c, s
 			end,
 			function()
-				local tstart  = utf8.offset(_state.buffer, -(char_len + trig_len))
-				_state.buffer = (tstart and _state.buffer:sub(1, tstart - 1) or "")
+				-- buf_start is a valid byte index into _state.buffer: the buffer
+				-- is only mutated by this very closure, which runs after emit.
+				_state.buffer = _state.buffer:sub(1, buf_start - 1)
 					.. repl_text
 					.. (consume_term and "" or chars)
 			end,
