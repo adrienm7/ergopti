@@ -64,6 +64,10 @@ end
 
 local gestures           = require("modules.gestures")
 local keymap             = require("modules.keymap")
+-- Expose keymap in the global table so the Hammerspoon console can call
+-- keymap.perf_report_all() / perf_enable() / perf_reset() without
+-- having to type out require("modules.keymap") each time.
+_G.keymap = keymap
 local shortcuts          = require("modules.shortcuts")
 local dynamic_hotstrings = require("modules.dynamic_hotstrings")
 local karabiner          = require("modules.karabiner")
