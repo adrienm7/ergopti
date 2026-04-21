@@ -445,14 +445,18 @@ local function onKeyDownRaw(e)
 		CoreState.buffer = CoreState.buffer:sub((ok and off) or 1)
 	end
 
-	if not is_ignored then LLMBridge.update_preview(CoreState.buffer) end
-
-	-- 9. Run expansion trigger checks.
-	local function rescan_suppressed()
-		return hs.timer.secondsSinceEpoch() < CoreState.no_rescan_until
+	-- 9. Run expansion trigger checks. The LLM preview used to be refreshed
+	-- unconditionally before this block, but when a trigger fires the
+	-- expander already re-evaluates the preview on the post-expansion
+	-- buffer (via perform_text_replacement), so the pre-expansion preview
+	-- was pure waste. We now defer the preview call to the branch below
+	-- that actually keeps the buffer unchanged.
+	local rescan_suppressed = now < CoreState.no_rescan_until
+	if suppress_triggers or rescan_suppressed then
+		-- Buffer didn't expand, so refresh the tooltip/predictions once here.
+		if not is_ignored then LLMBridge.update_preview(CoreState.buffer) end
+		return false
 	end
-
-	if suppress_triggers or rescan_suppressed() then return false end
 
 	-- Complex keystrokes (involving Shift or Alt) allow a wider timing window
 	-- to accommodate the extra finger movement required by the modifier.
@@ -545,6 +549,11 @@ local function onKeyDownRaw(e)
 	else
 		if run_trigger_checks() then return true end
 	end
+
+	-- No trigger fired — the buffer is still the one we appended `chars` to,
+	-- so refresh the preview now (expander.update_preview is only reached
+	-- when an expansion happens, which we just ruled out).
+	if not is_ignored then LLMBridge.update_preview(CoreState.buffer) end
 
 	-- Enter / Tab with no predictions visible clears prediction state.
 	-- When predictions ARE visible, Tab is consumed upstream by handle_llm_keys
