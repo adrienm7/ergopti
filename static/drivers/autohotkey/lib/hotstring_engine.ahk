@@ -31,9 +31,6 @@
 ; long as all files are part of the same script.
 ; ==============================================================================
 
-
-
-
 ; =======================================
 ; =======================================
 ; ======= 1/ Low-level send layer =======
@@ -111,9 +108,6 @@ MicrosoftApps() {
     or WinActive("ahk_exe EXCEL.EXE")
     or WinActive("ahk_exe POWERPNT.EXE")
 }
-
-
-
 
 ; ============================================
 ; ============================================
@@ -205,8 +199,8 @@ CreateCaseSensitiveHotstrings(Flags, Abbreviation, Replacement, options := Map()
     FlagsPortion := ":" Flags "CB0O:" ; O is to omit the ending character from the abbreviation
 
     UppercasedSymbols := Map(
-        ",", [" ;", " :"], ; Order matters, the nbsp abbreviations need to trigger first the engine, otherwise the nbsp won’t be deleted
-        "'", [" ?"]
+        ",", [" ;", " :"], ; Order matters, the nbsp abbreviations need to trigger first the engine, otherwise the nbsp won’t be deleted
+        "'", [" ?"]
     )
 
     AbbreviationLowerCase := StrLower(Abbreviation)
@@ -267,7 +261,7 @@ CreateCaseSensitiveHotstrings(Flags, Abbreviation, Replacement, options := Map()
         }
 
         ; Inverted titlecase: beginning lowercase, last letter uppercase
-        ; Currently deactivated because of some issues like typing [don]c ? that would give [don]ct
+        ; Currently deactivated because of some issues like typing [don]c ? that would give [don]ct
         ; if OptionPreferTitleCase {
         ;     if !(StrLower(lastChar) == StrUpper(lastChar)) {
         ;         Hotstring(
@@ -294,9 +288,6 @@ CreateCaseSensitiveHotstrings(Flags, Abbreviation, Replacement, options := Map()
         ; }
     }
 }
-
-
-
 
 ; ==========================================
 ; ==========================================
