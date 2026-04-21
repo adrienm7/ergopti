@@ -18,10 +18,11 @@
 
 local M = {}
 
-local hs         = hs
-local text_utils = require("lib.text_utils")
-local km_utils   = require("modules.keymap.utils")
-local Logger     = require("lib.logger")
+local hs          = hs
+local text_utils  = require("lib.text_utils")
+local km_utils    = require("modules.keymap.utils")
+local Logger      = require("lib.logger")
+local Terminators = require("modules.keymap.terminators")
 
 local LOG    = "keymap.registry"
 local _state = nil  -- Injected via M.init(); required before all public functions.
@@ -58,19 +59,6 @@ local function tail_codepoint(s)
 	return s:sub(-1)
 end
 
---- Returns the first UTF-8 codepoint of `s`. Used by terminator matching so
---- that a multi-codepoint event (e.g. dead-key sequences, IME composition)
---- whose first codepoint is a single-char terminator still triggers.
---- @param s string The input string.
---- @return string The first UTF-8 character, or "" when s is empty.
-local function first_codepoint(s)
-	if type(s) ~= "string" or s == "" then return "" end
-	local ok, off = pcall(utf8.offset, s, 2)
-	if ok and off then return s:sub(1, off - 1) end
-	return s:sub(1, 1)
-end
-
-
 --- @class Mapping
 --- Single hotstring entry stored in _state.mappings. Every field is populated
 --- once in add_raw() so the per-keystroke hot path (expander + llm_bridge
@@ -96,206 +84,33 @@ end
 
 
 
--- ====================================
--- ====================================
--- ======= 1/ Constants & State =======
--- ====================================
--- ====================================
+-- ==============================
+-- ==============================
+-- ======= 1/ Terminators =======
+-- ==============================
+-- ==============================
 
---- Built-in terminator definitions. Each entry with a key produces one entry
---- in the enable/disable table. Separators (type = "separator") are UI-only.
-M.TERMINATOR_DEFS = {
-	{ key = "space",                chars = { " " },          label = "␣ : Espace",                   default_enabled = true },
-	{ key = "nbsp",                 chars = { "\u{00A0}" },   label = "⍽ : Espace insécable",         default_enabled = true },
-	{ key = "nnbsp",                chars = { "\u{202F}" },   label = "⍽ : Espace fine insécable",    default_enabled = true },
-	{ key = "minus",                chars = { "-" },          label = "- : Tiret",                    default_enabled = false },
-	{ key = "underscore",           chars = { "_" },          label = "_ : Tiret bas",                default_enabled = false },
-	{ type = "separator" },
-	{ key = "tab",                  chars = { "\t" },         label = "⇥ : Tabulation",               default_enabled = false },
-	{ key = "enter",                chars = { "\r", "\n" },   label = "⏎ : Entrée",                   default_enabled = false },
-	{ key = "star",                 chars = { "★" },          label = "★ : Touche magique",           default_enabled = true, consume = true },
-	{ type = "separator" },
-	{ key = "comma",                chars = { "," },          label = ", : Virgule",                  default_enabled = true },
-	{ key = "period",               chars = { "." },          label = ". : Point",                    default_enabled = false },
-	{ key = "exclam",               chars = { "!" },          label = "! : Point d'exclamation",      default_enabled = false },
-	{ key = "question",             chars = { "?" },          label = "? : Point d'interrogation",    default_enabled = false },
-	{ key = "colon",                chars = { ":" },          label = ": : Deux-points",              default_enabled = false },
-	{ type = "separator" },
-	{ key = "parenright",           chars = { ")" },          label = ") : Parenthèse fermante",      default_enabled = false },
-	{ key = "braceright",           chars = { "}" },          label = "} : Accolade fermante",        default_enabled = false },
-	{ key = "bracketright",         chars = { "]" },          label = "] : Crochet fermant",          default_enabled = false },
-	{ key = "anglebracketright",    chars = { ">" },          label = "> : Guillemet fermant",        default_enabled = false },
-	{ type = "separator" },
-	{ key = "apostrophe_typo",      chars = { "'" },          label = "' : Apostrophe typographique", default_enabled = false },
-	{ key = "apostrophe_straight",  chars = { "'" },          label = "' : Apostrophe droite",        default_enabled = false },
-	{ key = "quote",                chars = { '"' },          label = '" : Guillemet double',         default_enabled = false },
-	{ key = "equal",                chars = { "=" },          label = "= : Égal",                     default_enabled = false },
-	{ key = "slash",                chars = { "/" },          label = "/ : Slash",                    default_enabled = false },
-	{ key = "backslash",            chars = { "\\" },         label = "\\ : Backslash",               default_enabled = false },
-}
+-- The catalogue, the O(1) lookup sets, and the enable/disable API all live in
+-- modules/keymap/terminators.lua — see that module for the full implementation
+-- and the rationale behind the hot-path caches. Registry re-exports the public
+-- surface under its historical names so the menu and expander callers keep
+-- working unchanged.
 
--- Flat enable/disable table keyed by terminator key, seeded from default_enabled.
-local _terminator_enabled = {}
-for _, def in ipairs(M.TERMINATOR_DEFS) do
-	if def.key then
-		_terminator_enabled[def.key] = (def.default_enabled ~= false)
-	end
-end
-
--- Cached O(1) lookup sets for the per-keystroke hot path. Every call to
--- is_terminator() used to walk TERMINATOR_DEFS and each def's chars list
--- (linear scan on every keydown); terminator_is_consumed() did the same.
--- We rebuild these maps whenever terminator state changes (enable/disable,
--- add/remove custom, magic-key rename) so the keystroke path stays O(1).
-local _terminator_chars_set   = {}
-local _terminator_consume_set = {}
-local function rebuild_terminator_cache()
-	_terminator_chars_set   = {}
-	_terminator_consume_set = {}
-	for _, def in ipairs(M.TERMINATOR_DEFS) do
-		if def.key and _terminator_enabled[def.key] and def.chars then
-			for _, c in ipairs(def.chars) do
-				if type(c) == "string" and c ~= "" then
-					_terminator_chars_set[c] = true
-					if def.consume then _terminator_consume_set[c] = true end
-				end
-			end
-		end
-	end
-end
-rebuild_terminator_cache()
-
-
-
-
--- =======================================
--- =======================================
--- ======= 2/ Terminator Utilities =======
--- =======================================
--- =======================================
-
---- Updates the magic-key label in the terminator definitions.
---- Called whenever the user changes the trigger character.
---- @param magic_key string The new trigger character.
-local function update_terminator_magic_key(magic_key)
-	for _, def in ipairs(M.TERMINATOR_DEFS) do
-		if def.key == "star" then
-			def.chars = { magic_key }
-			def.label = magic_key .. " : Touche magique"
-		end
-	end
-	rebuild_terminator_cache()
-end
-
---- Returns true if `chars` matches an enabled terminator. If `chars` is a
---- multi-codepoint event, we also compare against its first codepoint so that
---- dead-key / IME-composed sequences whose leading codepoint is a terminator
---- still fire the expansion. Lookups go through a pre-built set so the hot
---- path is O(1) regardless of how many terminator definitions exist.
---- @param chars string The typed character(s) to check.
---- @return boolean
-function M.is_terminator(chars)
-	if _terminator_chars_set[chars] then return true end
-	if #chars > 0 then
-		local first = first_codepoint(chars)
-		if first ~= chars and _terminator_chars_set[first] then return true end
-	end
-	return false
-end
-
---- Returns true if `chars` matches an enabled terminator that should be consumed
---- (i.e., not re-typed after the expansion fires). Also recognises the first
---- codepoint of multi-codepoint events for the same reason as is_terminator().
---- @param chars string The typed character(s) to check.
---- @return boolean
-function M.terminator_is_consumed(chars)
-	if _terminator_consume_set[chars] then return true end
-	if #chars > 0 then
-		local first = first_codepoint(chars)
-		if first ~= chars and _terminator_consume_set[first] then return true end
-	end
-	return false
-end
-
---- Enables or disables a terminator by key.
---- @param key string The terminator key identifier.
---- @param en boolean True to enable, false to disable.
-function M.set_terminator_enabled(key, en)
-	_terminator_enabled[key] = (en ~= false)
-	rebuild_terminator_cache()
-	Logger.debug(LOG, "Terminator '%s': %s.", key, en and "enabled" or "disabled")
-end
-
---- Returns true if the given terminator key is currently enabled.
---- @param key string The terminator key identifier.
---- @return boolean
-function M.is_terminator_enabled(key)
-	return _terminator_enabled[key] ~= false
-end
-
---- Returns the full terminator definitions table (by reference — do not mutate).
---- @return table
-function M.get_terminator_defs()
-	return M.TERMINATOR_DEFS
-end
-
---- Adds or updates a user-defined terminator.
---- Idempotent: calling with the same key updates the existing definition in place.
---- @param key string Unique identifier (e.g. "custom_dot").
---- @param char string The trigger character.
---- @param label string Human-readable label shown in the menu.
---- @param consume boolean Whether to swallow the character after expansion.
-function M.add_custom_terminator(key, char, label, consume)
-	if type(key) ~= "string" or type(char) ~= "string" then
-		Logger.error(LOG, "add_custom_terminator: invalid key or char (key='%s', char='%s').",
-			tostring(key), tostring(char))
-		return
-	end
-	-- Update in place if the key already exists (idempotent on reload).
-	for _, def in ipairs(M.TERMINATOR_DEFS) do
-		if def.key == key then
-			def.chars   = { char }
-			def.label   = label
-			def.consume = consume or false
-			rebuild_terminator_cache()
-			Logger.debug(LOG, "Custom terminator '%s' updated.", key)
-			return
-		end
-	end
-	table.insert(M.TERMINATOR_DEFS, {
-		key             = key,
-		chars           = { char },
-		label           = label,
-		consume         = consume or false,
-		default_enabled = true,
-		custom          = true,
-	})
-	_terminator_enabled[key] = true
-	rebuild_terminator_cache()
-	Logger.info(LOG, "Custom terminator '%s' added.", key)
-end
-
---- Removes a user-defined terminator (no-op on built-in terminators).
---- @param key string The unique identifier of the terminator to remove.
-function M.remove_custom_terminator(key)
-	for i, def in ipairs(M.TERMINATOR_DEFS) do
-		if def.key == key and def.custom then
-			table.remove(M.TERMINATOR_DEFS, i)
-			_terminator_enabled[key] = nil
-			rebuild_terminator_cache()
-			Logger.info(LOG, "Custom terminator '%s' removed.", key)
-			return
-		end
-	end
-	Logger.warn(LOG, "remove_custom_terminator: key '%s' not found or not custom.", tostring(key))
-end
+M.TERMINATOR_DEFS          = Terminators.TERMINATOR_DEFS
+M.is_terminator            = Terminators.is_terminator
+M.terminator_is_consumed   = Terminators.terminator_is_consumed
+M.set_terminator_enabled   = Terminators.set_terminator_enabled
+M.is_terminator_enabled    = Terminators.is_terminator_enabled
+M.get_terminator_defs      = Terminators.get_terminator_defs
+M.add_custom_terminator    = Terminators.add_custom_terminator
+M.remove_custom_terminator = Terminators.remove_custom_terminator
 
 
 
 
 -- ======================================
 -- ======================================
--- ======= 3/ Database Management =======
+-- ======= 2/ Database Management =======
 -- ======================================
 -- ======================================
 
@@ -645,7 +460,7 @@ end
 
 -- ================================
 -- ================================
--- ======= 4/ Group Loaders =======
+-- ======= 3/ Group Loaders =======
 -- ================================
 -- ================================
 
@@ -768,7 +583,7 @@ end
 
 -- =====================================
 -- =====================================
--- ======= 5/ Section Management =======
+-- ======= 4/ Section Management =======
 -- =====================================
 -- =====================================
 
@@ -957,7 +772,7 @@ end
 
 -- =============================
 -- =============================
--- ======= 6/ Module API =======
+-- ======= 5/ Module API =======
 -- =============================
 -- =============================
 
@@ -999,7 +814,7 @@ function M.update_trigger_char(char)
 	if not require_state("update_trigger_char") then return end
 
 	local old_char = _state.magic_key
-	update_terminator_magic_key(char)
+	Terminators.update_magic_key(char)
 
 	if old_char == char then
 		Logger.debug(LOG, "update_trigger_char: key unchanged ('%s') — skipping rename.", char)
