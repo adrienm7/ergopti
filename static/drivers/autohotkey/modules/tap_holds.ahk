@@ -686,7 +686,7 @@ OneShotShift() {
 	} else if (ihvText.EndKey == ScriptInformation["MagicKey"]) {
 		SpecialCharacter := "J" ; OneShotShift + ★ gives J directly
 	} else if (ihvText.EndKey == ",") {
-		SpecialCharacter := " ;"
+		SpecialCharacter := " " Chr(0x3B) ; Chr avoids AHK parser misreading ";" as comment
 	} else if (ihvText.EndKey == "'") {
 		SpecialCharacter := " ?"
 	} else if (ihvText.EndKey == " ") {
