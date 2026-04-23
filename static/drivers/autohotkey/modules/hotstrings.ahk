@@ -334,12 +334,9 @@ if Features["Rolls"]["EqualString"].Enabled {
 		)
 	)
 }
-if Features["Rolls"]["EnglishNegation"].Enabled and Features["Autocorrection"]["TypographicApostrophe"].Enabled {
-	CreateHotstring(
-		"*?", "nt'", "n't",
-		Map("TimeActivationSeconds", Features["Rolls"]["EnglishNegation"].TimeActivationSeconds)
-	)
-} else if Features["Rolls"]["EnglishNegation"].Enabled {
+if Features["Rolls"]["EnglishNegation"].Enabled {
+	; Works identically whether TypographicApostrophe is on or off — the
+	; straight apostrophe is converted downstream when relevant.
 	CreateHotstring(
 		"*?", "nt'", "n't",
 		Map("TimeActivationSeconds", Features["Rolls"]["EnglishNegation"].TimeActivationSeconds)
