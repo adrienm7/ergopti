@@ -119,16 +119,12 @@ GetSelection() {
     return Text
 }
 
-; Functions to change the behavior depending on the context
+; Returns true when the foreground window is a Microsoft Office app or Teams.
+; Backed by the 100 ms active-app cache so the eight-app check costs one
+; ``WinGetProcessName`` per cache window instead of one ``WinActive`` per app
+; per hotstring firing.
 MicrosoftApps() {
-    return WinActive("ahk_exe Teams.exe")
-    or WinActive("ahk_exe ms-teams.exe") ; New version
-    or WinActive("ahk_exe ONENOTE.exe")
-    or WinActive("ahk_exe olk.exe") ; New version
-    or WinActive("ahk_exe OUTLOOK.EXE")
-    or WinActive("ahk_exe WINWORD.EXE")
-    or WinActive("ahk_exe EXCEL.EXE")
-    or WinActive("ahk_exe POWERPNT.EXE")
+    return GetActiveApp().IsMicrosoftOffice
 }
 
 ; ============================================
@@ -166,7 +162,7 @@ HotstringHandler(Abbreviation, Replacement, EndChar, OnlyText := True, FinalResu
     ; consistently everywhere (URL bars, devtools) unlike AHK's auto-erase.
     NumberOfCharactersToDelete := StrLen(Abbreviation)
 
-    if WinActive("ahk_class Notepad") {
+    if GetActiveApp().IsNotepad {
         ; Windows 11 Notepad mis-handles hotstrings (Windows bug, not AHK),
         ; so we route replacement through the clipboard.
         SendNewResult("{BackSpace " . NumberOfCharactersToDelete . "}", False)
