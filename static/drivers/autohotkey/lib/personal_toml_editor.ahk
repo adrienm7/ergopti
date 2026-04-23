@@ -112,9 +112,10 @@ NormaliseOutput(s) {
 ;   .sections        — Map(name → {description, entries[]})
 ;   .meta_description — string
 ;
-; Two-pass design: pass 1 collects [_meta] sections_order and [_meta.sections]
-; descriptions; pass 2 collects [[section]] entries. This ensures the dropdown
-; order matches the TOML sections_order field regardless of [[section]] file order.
+; Strategy: normalise line endings to LF first so Trim and SubStr are reliable,
+; then parse line-by-line. sections_order and descriptions are extracted directly
+; from the raw file content with RegExMatch on the full string before the loop,
+; avoiding all CRLF / regex-anchor fragility.
 ReadPersonalToml() {
 	FilePath := PersonalTomlPath()
 	Result := Map(
@@ -126,78 +127,61 @@ ReadPersonalToml() {
 		return Result
 	}
 
+	Q := Chr(34)
 	EntryPattern :=
-		'i)^"([^"\\]*(?:\\.[^"\\]*)*)"\s*=\s*\{\s*output\s*=\s*"([^"\\]*(?:\\.[^"\\]*)*)"\s*,'
-		. '\s*is_word\s*=\s*(true|false)\s*,\s*auto_expand\s*=\s*(true|false)\s*,'
-		. '\s*is_case_sensitive\s*=\s*(true|false)\s*,\s*final_result\s*=\s*(true|false)'
+		'i)^' . Q . '([^' . Q . '\\]*(?:\\.[^' . Q . '\\]*)*)' . Q
+		. '\s*=\s*\{\s*output\s*=\s*' . Q . '([^' . Q . '\\]*(?:\\.[^' . Q . '\\]*)*)' . Q
+		. '\s*,\s*is_word\s*=\s*(true|false)\s*,\s*auto_expand\s*=\s*(true|false)'
+		. '\s*,\s*is_case_sensitive\s*=\s*(true|false)\s*,\s*final_result\s*=\s*(true|false)'
 		. '(?:\s*,\s*is_case_sensitive_strict\s*=\s*(true|false))?\s*\}'
 
-	FileContent  := FileRead(FilePath, "UTF-8")
+	; Normalise to LF so every line ends cleanly — eliminates CRLF anchor bugs
+	FileContent := StrReplace(FileRead(FilePath, "UTF-8"), "`r`n", "`n")
+	FileContent := StrReplace(FileContent, "`r", "`n")
 
-	; ── Pass 1: collect meta (sections_order + descriptions) ──
-	MetaOrder        := []    ; from sections_order = [...]
-	MetaDescriptions := Map() ; from [_meta.sections]
-	InMeta         := false
-	InMetaSections := false
+	; ── Extract sections_order directly from raw content ──
+	MetaOrder        := []
+	MetaDescriptions := Map()
 
-	loop parse, FileContent, "`n", "`r" {
-		Line := Trim(A_LoopField, " `t")
-		if (Line == "" or SubStr(Line, 1, 1) == "#") {
-			continue
-		}
-		; Stop scanning once we reach the first [[section]] block
-		if (SubStr(Line, 1, 2) == "[[") {
-			break
-		}
-		if RegExMatch(Line, "^\[([^\[\]]+)\]$", &HM) {
-			Header         := Trim(HM[1])
-			InMeta         := (Header == "_meta")
-			InMetaSections := (Header == "_meta.sections")
-			continue
-		}
-		if InMeta {
-			; Patterns built with Chr(34) so no quote escaping is needed in the string literal
-			Q := Chr(34)
-			if RegExMatch(Line, "^description\s*=\s*" . Q . "([^" . Q . "]*)" . Q, &DM) {
-				Result["meta_description"] := DM[1]
+	if RegExMatch(FileContent, "m)^sections_order\s*=\s*\[([^\]]+)\]", &OM) {
+		for _, Token in StrSplit(OM[1], ",") {
+			Token := Trim(Token, " `t`n" . Q)
+			if (Token != "") {
+				MetaOrder.Push(StrLower(Token))
 			}
-			; sections_order = ["a", "b", …] — split on comma, strip surrounding quotes
-			if (MetaOrder.Length == 0
-					and RegExMatch(Line, "^sections_order\s*=\s*\[(.+)\]", &OM)) {
-				for _, Token in StrSplit(OM[1], ",") {
-					Token := Trim(Token, " `t" . Q)
-					if (Token != "") {
-						MetaOrder.Push(StrLower(Token))
-					}
-				}
-			}
-			continue
-		}
-		if InMetaSections {
-			Q := Chr(34)
-			; key = "value" pairs — build pattern from parts to avoid quote escaping
-			KPat := "^([A-Za-z0-9_]+)\s*=\s*" . Q . "((?:[^" . Q . "\\]|\\.)*)" . Q
-			if RegExMatch(Line, KPat, &KM) {
-				MetaDescriptions[StrLower(KM[1])] := UnescapeTomlString(KM[2])
-			}
-			continue
 		}
 	}
 
-	; ── Pass 2: collect [[section]] entries ──
-	CurrentSection := ""
-	LineIndex      := 0
-	; Track sections seen in file order for any not listed in MetaOrder
+	if RegExMatch(FileContent, "m)^description\s*=\s*" . Q . "([^" . Q . "]*)" . Q, &DM) {
+		Result["meta_description"] := DM[1]
+	}
+
+	; ── Extract [_meta.sections] descriptions via multiline scan ──
+	; Locate the [_meta.sections] block and read until next [ header
+	if RegExMatch(FileContent, "m)^\[_meta\.sections\]\n((?:(?!\[).+\n?)*)", &MS) {
+		DescBlock := MS[1]
+		Pos := 1
+		KPat := "m)^([A-Za-z0-9_]+)\s*=\s*" . Q . "((?:[^" . Q . "\\]|\\.)*)" . Q
+		while RegExMatch(DescBlock, KPat, &KM, Pos) {
+			MetaDescriptions[StrLower(KM[1])] := UnescapeTomlString(KM[2])
+			Pos := KM.Pos + KM.Len
+		}
+	}
+
+	; ── Single pass: collect [[section]] entries ──
+	CurrentSection   := ""
+	LineIndex        := 0
 	FileSectionOrder := []
 
-	loop parse, FileContent, "`n", "`r" {
+	loop parse, FileContent, "`n" {
 		LineIndex++
 		Line := Trim(A_LoopField, " `t")
 		if (Line == "" or SubStr(Line, 1, 1) == "#") {
 			continue
 		}
-		if RegExMatch(Line, "^\[\[(.+)\]\]$", &SM) {
-			CurrentSection := StrLower(SM[1])
+		; [[section]] header
+		if (SubStr(Line, 1, 2) == "[[" and SubStr(Line, -1) == "]") {
+			CurrentSection := StrLower(SubStr(Line, 3, StrLen(Line) - 4))
 			if !Result["sections"].Has(CurrentSection) {
 				FileSectionOrder.Push(CurrentSection)
 				Result["sections"][CurrentSection] := Map(
@@ -210,8 +194,8 @@ ReadPersonalToml() {
 			}
 			continue
 		}
-		; Any [simple] header resets section context
-		if RegExMatch(Line, "^\[([^\[\]]+)\]$") {
+		; [simple] header — reset section context
+		if (SubStr(Line, 1, 1) == "[") {
 			CurrentSection := ""
 			continue
 		}
@@ -234,7 +218,7 @@ ReadPersonalToml() {
 		Result["sections"][CurrentSection]["entries"].Push(Entry)
 	}
 
-	; ── Build final sections_order: meta order first, then any unlisted sections ──
+	; ── Build final sections_order: meta order first, then unlisted sections ──
 	Seen := Map()
 	for _, SecName in MetaOrder {
 		if Result["sections"].Has(SecName) {
@@ -455,39 +439,29 @@ OpenPersonalEditor(DefaultSection := "") {
 	; ── Separator ──
 	W.Add("Text", "xm y+8 w860 h1 +0x10")   ; horizontal rule
 
-	; ── Form layout constants ──
-	; Left zone: labels (col 0) + inputs (col 1).  Right zone: flags (col 2).
-	; xm = 12.  Label width = 90.  Gap = 6.  Input left edge = 108.
-	; Flags column starts at x640 and is always fixed regardless of window width.
-	LabelW  := 90
-	InputX  := "x108"
-	FlagsX  := "x648"
-	InputW  := 520    ; width of text inputs in the left zone
+	; ── Form: two-column layout via AHK Section ──
+	; xs/ys save the current cursor; a later control with xs/ys restores it.
+	; Left col  (xm=12): label (w90) + Edit inputs.
+	; Right col (x660) : 4 flag checkboxes, anchored to the trigger row.
 
-	; ── Form: two-column layout ──
-	; Left col : label + inputs stacked vertically (trigger then output).
-	; Right col: 4 checkboxes with absolute Y anchored to the trigger row.
+	; Row 1 — trigger + right-col flags start here
+	W.Add("Text", "xm y+10 w90 h24 +0x200 Section", "Déclencheur :")
+	TriggerEdit := W.Add("Edit", "x+6 yp w530 h24")
 
-	; Row 1 — trigger
-	W.Add("Text", "xm y+10 w" . LabelW . " h24 +0x200", "Déclencheur :")
-	TriggerEdit := W.Add("Edit", InputX . " yp w" . InputW . " h24")
-	; Capture absolute Y of trigger row for the flags column
-	TriggerEdit.GetPos(, &TriggerY)
+	; Right column — start at x660, same Y as trigger row (ys restores Section Y)
+	ChkIsWord   := W.Add("CheckBox", "x660 ys     w170", "Mot complet")
+	ChkAutoExp  := W.Add("CheckBox", "x660 y+22   w170", "Auto-expand")
+	ChkCaseSens := W.Add("CheckBox", "x660 y+14   w170", "Sensible à la casse")
+	ChkFinal    := W.Add("CheckBox", "x660 y+14   w170", "Résultat final")
 
-	; Row 2 — output (multiline, immediately below trigger)
-	W.Add("Text", "xm y+6 w" . LabelW . " h24 +0x200", "Résultat :")
-	OutputEdit := W.Add("Edit", InputX . " yp w" . InputW . " h66 +Multi +WantReturn")
-
-	; Flags — right column, Y pinned to trigger row regardless of left-column cursor
-	ChkIsWord   := W.Add("CheckBox", FlagsX . " y" . TriggerY       . " w170", "Mot complet")
-	ChkAutoExp  := W.Add("CheckBox", FlagsX . " y" . (TriggerY + 10) . " w170", "Auto-expand")
-	ChkCaseSens := W.Add("CheckBox", FlagsX . " y" . (TriggerY + 20) . " w170", "Sensible à la casse")
-	ChkFinal    := W.Add("CheckBox", FlagsX . " y" . (TriggerY + 30) . " w170", "Résultat final")
+	; Row 2 — output, back to left col below trigger (xs restores Section X = xm)
+	W.Add("Text", "xs y+6 w90 h24 +0x200", "Résultat :")
+	OutputEdit := W.Add("Edit", "x+6 yp w530 h66 +Multi +WantReturn")
 
 	; Default flag values (mirrors AHK loader defaults: auto_expand on)
 	ChkAutoExp.Value := 1
 
-	; ── Token help — below the output/flags block ──
+	; ── Token help — below the taller of the two columns ──
 	W.Add("Text", "xm y+10 w860 cGray",
 		"Tokens : {Enter}  {Tab}  {Left}  {Right}  {Up}  {Down}  {BackSpace}  {Delete}  {Escape}  {Home}  {End}  {Space}  {PgUp}  {PgDn}  {Insert}")
 
@@ -855,10 +829,6 @@ _OnEditorClose() {
 
 _ResizeEditor(W, LV, OutputEdit, StatusText) {
 	W.GetClientPos(, , &CW, &CH)
-	Margin    := 24
-	FlagsColX := 648    ; must match the FlagsX constant above
-	LV.Move(, , CW - Margin, )
-	; Output field fills from x108 up to the flags column with a small gap
-	OutputEdit.Move(, , FlagsColX - 108 - 8, )
-	StatusText.Move(, CH - 26, CW - Margin, )
+	LV.Move(, , CW - 24, )
+	StatusText.Move(, CH - 26, CW - 24, )
 }
