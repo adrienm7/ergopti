@@ -208,7 +208,7 @@ CreateCaseSensitiveHotstrings(Flags, Abbreviation, Replacement, options := unset
 
     ; Order matters: nbsp abbreviations must trigger before bare punctuation
     ; so the engine can delete the preceding non-breaking space correctly.
-    static UppercasedSymbols := Map(",", [" ;", " :"], "'", [" ?"])
+    static UppercasedSymbols := Map(",", [" ;", " :"], Chr(0x27), [" ?"])
 
     AbbreviationLowerCase := StrLower(Abbreviation)
     AbbreviationTitleCase := StrTitle(Abbreviation)
