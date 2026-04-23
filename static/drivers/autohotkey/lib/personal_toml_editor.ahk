@@ -428,6 +428,7 @@ OpenPersonalEditor(DefaultSection := "") {
 	BtnDelSec.OnEvent("Click", (*) => _DeleteSection(W, SectionDrop))
 
 	_SelectDropDown(SectionDrop, _PersonalEditorSection)
+	MsgBox("DDL après Choose:`nValue=" . SectionDrop.Value . "`nText=" . SectionDrop.Text, "DDL post-select")
 
 	; ── Entry list ──
 	LV := W.Add("ListView",
