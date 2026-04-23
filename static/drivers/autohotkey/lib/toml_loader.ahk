@@ -100,8 +100,12 @@ LoadHotstringsSection(CategoryName, SectionName, FeatureConfig, ExtraOptions := 
         FilePath := A_ScriptDir . "\..\hotstrings\" . CategoryName . ".toml"
     }
     if !FileExist(FilePath) {
+        try LoggerWarn("TomlLoader", "Section [%s.%s]: file %s not found.",
+            CategoryName, SectionName, FilePath)
         return
     }
+    try LoggerTrace("TomlLoader", "Loading section [%s.%s]…", CategoryName, SectionName)
+    Loaded := 0
 
     TimeActivationSeconds := FeatureConfig.HasOwnProp("TimeActivationSeconds") ? FeatureConfig.TimeActivationSeconds :
         0
@@ -191,7 +195,10 @@ LoadHotstringsSection(CategoryName, SectionName, FeatureConfig, ExtraOptions := 
         } else {
             CreateCaseSensitiveHotstrings(Flags, Trigger, Output, Options)
         }
+        Loaded += 1
     }
+    try LoggerDone("TomlLoader", "Section [%s.%s]: %d entry(ies) loaded.",
+        CategoryName, SectionName, Loaded)
 }
 
 ; Fold common French accented characters to their ASCII equivalent, then

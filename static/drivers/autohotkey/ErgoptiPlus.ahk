@@ -25,6 +25,10 @@ ErgoptiGlobalErrorHandler(Exc, Mode) {
             SendEvent("{" ModKey " Up}")
         }
     }
+    ; Best-effort logging — guarded because the logger may not be initialised
+    ; yet when an early-boot error fires the handler.
+    try LoggerError("ErgoptiPlus", "Uncaught error: %s",
+        Exc.Message . (Exc.HasProp("Stack") ? " | " . Exc.Stack : ""))
     ; Surface the error to the user once, without blocking subsequent keys
     try {
         MsgBox("ErgoptiPlus — erreur interne capturée :`n`n" . Exc.Message . "`n`n" . (Exc.HasProp("Stack") ? Exc.Stack : ""), "ErgoptiPlus", "Icon!")
@@ -40,6 +44,11 @@ A_MaxHotkeysPerInterval := 150 ; Reduce messages saying too many hotkeys pressed
 SetKeyDelay(0) ; No delay between key presses
 SendMode("Event") ; Everything concerning hotstrings MUST use SendEvent and not SendInput which is the default
 ; Otherwise, we can't have a hotstring triggering another hotstring, triggering another hotstring, etc.
+
+; Logger pulled in first so every other lib/module can call it during init.
+; ``LoggerInit()`` is invoked after the configuration file is parsed so the
+; minimum log level can be honoured from the very first INFO/START line.
+#Include lib\logger.ahk
 
 ; Core hotstring engine (send primitives, hotstring builders, text helpers)
 ; and TOML reader helpers (UnescapeTomlString, LoadHotstringsSection,
@@ -156,6 +165,11 @@ ResolveConfigPath(RawValue, DefaultPath) {
 
 global _IniCache := ParseIniFile(ConfigurationFile)
 ReadScriptConfig(_IniCache)
+
+; Initialise the logger now that the ini cache is built and ScriptInformation
+; reflects user overrides — LoggerInit reads [Script] LogLevel from the ini.
+LoggerInit()
+LoggerStart("ErgoptiPlus", "Booting ErgoptiPlus driver…")
 
 ; Under this text is the configuration of the features, especially whether or not they are enabled.
 ; It is advised to modify which features are enabled by using the ErgoptiPlus_Configuration.ini file.
@@ -551,6 +565,7 @@ if Features.Has("Personal") {
 InitSubMenus()
 initMenu()
 UpdateTrayIcon()
+LoggerSuccess("ErgoptiPlus", "Tray menu built and icon set.")
 
 ; ========================================================
 ; ======= 1.4) Tray menu of the script — Functions =======
@@ -931,6 +946,7 @@ ToggleSuspend(*) {
         Pause(0) ; Unfreeze the thread
     }
     UpdateTrayIcon()
+    LoggerInfo("ErgoptiPlus", "Suspend toggled: %s.", SuspendScript ? "ON" : "OFF")
 }
 
 UpdateTrayIcon() {
@@ -948,10 +964,12 @@ UpdateTrayIcon() {
 }
 
 ActivateReload(*) {
+    LoggerInfo("ErgoptiPlus", "User-triggered reload.")
     Reload
 }
 
 ActivateExitApp(*) {
+    LoggerInfo("ErgoptiPlus", "User-triggered ExitApp.")
     ExitApp
 }
 
@@ -1088,3 +1106,8 @@ if Features.Has("Personal") {
 #Include modules\shortcuts.ahk
 #Include modules\tap_holds.ahk
 #Include modules\hotstrings.ahk
+
+; Final lifecycle marker — all hotkeys and hotstrings are registered, the
+; script is ready to handle keystrokes. A missing SUCCESS in the log file
+; pinpoints which #Include above failed silently.
+LoggerSuccess("ErgoptiPlus", "Driver fully initialised — ready.")
