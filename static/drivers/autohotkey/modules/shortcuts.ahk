@@ -1,4 +1,4 @@
-; static/drivers/autohotkey/lib/shortcuts.ahk
+﻿; static/drivers/autohotkey/lib/shortcuts.ahk
 
 ; ==============================================================================
 ; MODULE: Shortcuts
