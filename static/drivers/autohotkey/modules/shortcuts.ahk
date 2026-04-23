@@ -279,7 +279,7 @@ if Features["Shortcuts"]["TakeNote"].Enabled {
 			WinActivate(WinPattern)
 			WinWaitActive(WinPattern, , 3)
 		} else {
-			Run("notepad " . FilePath)
+			Run('notepad.exe "' . FilePath . '"')
 			WinWait(FileName, , 7)
 			WinActivate(FileName)
 			WinWaitActive(FileName, , 3)
