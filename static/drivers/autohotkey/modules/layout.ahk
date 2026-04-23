@@ -584,7 +584,7 @@ Hotkey("#SC02E", (*) => OpenPersonalEditor(), "I3")
 +SC02E:: SendNewResult("J")
 +SC02F:: {
 	ActivateHotstrings()
-	SendNewResult(" ;") ; Thin non-breaking space
+	SendNewResult(" " Chr(0x3B)) ; Thin non-breaking space + semicolon (Chr avoids AHK parser misreading ";")
 }
 +SC030:: SendNewResult("K")
 +SC031:: SendNewResult("M")
