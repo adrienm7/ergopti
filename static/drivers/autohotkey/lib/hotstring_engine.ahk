@@ -186,7 +186,7 @@ HotstringHandler(Abbreviation, Replacement, EndChar, OnlyText := True, FinalResu
 }
 
 IsTimeActivationExpired(PreviousCharacter, OptionTimeActivationSeconds) {
-    ; Don’t activate the hotstring if taped too slowly
+    ; Don't activate the hotstring if taped too slowly
     Now := A_TickCount
     CharacterSentTime := LastSentCharacterKeyTime.Has(PreviousCharacter) ? LastSentCharacterKeyTime[PreviousCharacter] :
         Now
