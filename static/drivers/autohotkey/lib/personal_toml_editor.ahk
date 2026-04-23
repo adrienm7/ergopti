@@ -414,7 +414,7 @@ OpenPersonalEditor(DefaultSection := "") {
 
 	; ── Top bar: section selector + section management buttons ──
 	W.Add("Text", "xm y12 w70 h24 +0x200", "Section :")
-	SectionDrop := W.Add("DropDownList", "x+6 yp w420 h24", _BuildSectionList(_PersonalEditorData))
+	SectionDrop := W.Add("DropDownList", "x+6 yp w420", _BuildSectionList(_PersonalEditorData))
 	W.Add("Button", "x+8 yp w90 h24", "Nouvelle…").OnEvent("Click", (*) => _NewSection(W, SectionDrop))
 	W.Add("Button", "x+4 yp w90 h24", "Renommer…").OnEvent("Click", (*) => _RenameSection(W, SectionDrop))
 	BtnDelSec := W.Add("Button", "x+4 yp w90 h24", "Supprimer")
