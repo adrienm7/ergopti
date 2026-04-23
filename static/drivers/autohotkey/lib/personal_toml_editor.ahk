@@ -466,8 +466,8 @@ OpenPersonalEditor(DefaultSection := "") {
 
 	; Token help — à droite du bouton Ajouter, aligné verticalement au centre
 	BtnAdd.GetPos(, &BtnAddY, , &BtnAddH)
-	TokenHelp := W.Add("Text", "x" . (W.MarginX + 260) . " y" . (BtnAddY + 6) . " w590 cGray",
-		"{Enter}  {Tab}  {Left}  {Right}  {Up}  {Down}  {BackSpace}  {Delete}  {Escape}  {Home}  {End}  {Space}  {PgUp}  {PgDn}")
+	TokenHelp := W.Add("Text", "x" . (W.MarginX + 260) . " y" . (BtnAddY + 6) . " w590 h26 cGray",
+		"{Enter}  {Tab}  {Left}  {Right}  {Up}  {Down}  {BackSpace}  {Delete}  {Escape}  {Home}  {End}")
 
 	; ── Separator ──
 	BtnAdd.GetPos(, , , &BtnAddH2)
