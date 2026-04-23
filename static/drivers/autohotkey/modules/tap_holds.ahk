@@ -800,37 +800,40 @@ SC013:: ActionLayer("^+{End}") ; Select to the end of the document
 SC014:: ActionLayer("{F2}")
 
 ; === Middle row ===
-SC03A:: ActionLayer(Format("{BackSpace {1}}", NumberOfRepetitions)) ; "CapsLock" becomes BackSpace
-SC01E:: ActionLayer(Format("^+{Up {1}}", NumberOfRepetitions))
-SC01F:: ActionLayer(Format("{Up {1}}", NumberOfRepetitions)) ; ⇧
-SC020:: ActionLayer(Format("{Down {1}}", NumberOfRepetitions)) ; ⇩
-SC021:: ActionLayer(Format("^+{Down {1}}", NumberOfRepetitions))
+; ``Format("{X {1}}", N)`` collapsed into direct concatenation — the call
+; ran on every navigation keystroke and ``Format`` parses its template each
+; time. Concatenation produces the same string with zero parsing overhead.
+SC03A:: ActionLayer("{BackSpace " . NumberOfRepetitions . "}") ; "CapsLock" becomes BackSpace
+SC01E:: ActionLayer("^+{Up " . NumberOfRepetitions . "}")
+SC01F:: ActionLayer("{Up " . NumberOfRepetitions . "}") ; ⇧
+SC020:: ActionLayer("{Down " . NumberOfRepetitions . "}") ; ⇩
+SC021:: ActionLayer("^+{Down " . NumberOfRepetitions . "}")
 SC022:: ActionLayer("{F12}")
 
 ; === Bottom row ===
-SC056:: ActionLayer(Format("!+{Up {1}}", NumberOfRepetitions))  ; Duplicate the line up
-SC02C:: ActionLayer(Format("!{Up {1}}", NumberOfRepetitions)) ; Move the line up
-SC02D:: ActionLayer(Format("!{Down {1}}", NumberOfRepetitions)) ; Move the line down
-SC02E:: ActionLayer(Format("!+{Down {1}}", NumberOfRepetitions)) ; Duplicate the line down
-SC02F:: ActionLayer(Format("{End}{Enter {1}}", NumberOfRepetitions)) ; Start a new line below the cursor
+SC056:: ActionLayer("!+{Up " . NumberOfRepetitions . "}")  ; Duplicate the line up
+SC02C:: ActionLayer("!{Up " . NumberOfRepetitions . "}") ; Move the line up
+SC02D:: ActionLayer("!{Down " . NumberOfRepetitions . "}") ; Move the line down
+SC02E:: ActionLayer("!+{Down " . NumberOfRepetitions . "}") ; Duplicate the line down
+SC02F:: ActionLayer("{End}{Enter " . NumberOfRepetitions . "}") ; Start a new line below the cursor
 ; SC030:: ; On K
 
 ; ======= Right hand =======
 
 ; === Top row ===
 SC015:: ActionLayer("+{Home}") ; Select everything to the beginning of the line
-SC016:: ActionLayer(Format("^+{Left {1}}", NumberOfRepetitions)) ; Select the previous word
-SC017:: ActionLayer(Format("+{Left {1}}", NumberOfRepetitions)) ; Select the previous character
-SC018:: ActionLayer(Format("+{Right {1}}", NumberOfRepetitions)) ; Select the next character
-SC019:: ActionLayer(Format("^+{Right {1}}", NumberOfRepetitions)) ; Select the next word
+SC016:: ActionLayer("^+{Left " . NumberOfRepetitions . "}") ; Select the previous word
+SC017:: ActionLayer("+{Left " . NumberOfRepetitions . "}") ; Select the previous character
+SC018:: ActionLayer("+{Right " . NumberOfRepetitions . "}") ; Select the next character
+SC019:: ActionLayer("^+{Right " . NumberOfRepetitions . "}") ; Select the next word
 SC01A:: ActionLayer("+{End}") ; Select everything to the end of the line
 
 ; === Middle row ===
 SC023:: ActionLayer("#+{Left}") ; Move the window to the left screen
-SC024:: ActionLayer(Format("^{Left {1}}", NumberOfRepetitions)) ; Move to the previous word
-SC025:: ActionLayer(Format("{Left {1}}", NumberOfRepetitions)) ; ⇦
-SC026:: ActionLayer(Format("{Right {1}}", NumberOfRepetitions)) ; ⇨
-SC027:: ActionLayer(Format("^{Right {1}}", NumberOfRepetitions)) ; Move to the next word
+SC024:: ActionLayer("^{Left " . NumberOfRepetitions . "}") ; Move to the previous word
+SC025:: ActionLayer("{Left " . NumberOfRepetitions . "}") ; ⇦
+SC026:: ActionLayer("{Right " . NumberOfRepetitions . "}") ; ⇨
+SC027:: ActionLayer("^{Right " . NumberOfRepetitions . "}") ; Move to the next word
 SC028:: ActionLayer("#+{Right}") ; Move the window to the right screen
 
 ; === Bottom row ===

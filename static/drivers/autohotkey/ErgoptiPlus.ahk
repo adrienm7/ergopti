@@ -50,6 +50,10 @@ SendMode("Event") ; Everything concerning hotstrings MUST use SendEvent and not 
 ; minimum log level can be honoured from the very first INFO/START line.
 #Include lib\logger.ahk
 
+; Active-app cache must come before hotstring_engine.ahk because both
+; ``HotstringHandler`` and ``MicrosoftApps`` consult ``GetActiveApp``.
+#Include lib\active_app_cache.ahk
+
 ; Core hotstring engine (send primitives, hotstring builders, text helpers)
 ; and TOML reader helpers (UnescapeTomlString, LoadHotstringsSection,
 ; FoldAsciiLower, ApplyTomlMetadataToFeatures) extracted into dedicated
