@@ -59,27 +59,22 @@ global ACTIVATE_HOTSTRINGS_DELAY_MS := 50
 ; =======================================
 ; =======================================
 
-SendNewResult(Text, options := Map()) {
-    ; Default values if not provided
-    OptionOnlyText := options.Has("OnlyText") ? options["OnlyText"] : True
-
-    ; Hotstrings will be triggered, so SendNewResult("a") can give a ➜ b ➜ c (final result)
-    if OptionOnlyText {
+; Hotstrings will still be triggered downstream, so SendNewResult("a") can
+; cascade a ➜ b ➜ c (final result). OnlyText=true wraps the payload in {Text}
+; to avoid modifier side effects on symbols like ', ", accents.
+SendNewResult(Text, OnlyText := True) {
+    if OnlyText {
         SendEvent("{Text}" Text)
-        ; We use Send("{Text}") because otherwise sending certain special characters like symbols will trigger modifiers, like Alt or AltGr, and may even stay locked in that state
-        ; An example is writing "c’est" with the windows Ergopti layout
     } else {
         SendEvent(Text)
     }
     UpdateLastSentCharacter(SubStr(Text, -1))
 }
 
-SendFinalResult(Text, options := Map()) {
-    ; Default values if not provided
-    OptionOnlyText := options.Has("OnlyText") ? options["OnlyText"] : False
-
-    ; SendInput prevents other hotstrings/hotkeys from activating, so this is the "final" result
-    if OptionOnlyText {
+; SendInput prevents other hotstrings/hotkeys from activating, so this is the
+; "final" result — used when we do not want cascading expansion.
+SendFinalResult(Text, OnlyText := False) {
+    if OnlyText {
         SendInput("{Text}" Text)
     } else {
         SendInput(Text)
@@ -104,7 +99,7 @@ SendInstant(Text) {
 ActivateHotstrings() {
     SendNewResult(" ")
     Sleep(ACTIVATE_HOTSTRINGS_DELAY_MS)
-    SendNewResult("{BackSpace}", Map("OnlyText", False))
+    SendNewResult("{BackSpace}", False)
 }
 
 GetSelection() {
@@ -142,61 +137,51 @@ MicrosoftApps() {
 ; ============================================
 ; ============================================
 
-CreateHotstring(Flags, Abbreviation, Replacement, options := Map()) {
-    ; Default values if not provided
-    OptionOnlyText := options.Has("OnlyText") ? options["OnlyText"] : True
-    OptionFinalResult := options.Has("FinalResult") ? options["FinalResult"] : False
-    OptionTimeActivationSeconds := options.Has("TimeActivationSeconds") ? options[
-        "TimeActivationSeconds"] : 0
+; Public hotstring factory. The Map-based options API is kept because this
+; runs once at startup (cold path); internally the options are decomposed
+; into positional booleans that the per-keystroke HotstringHandler closes
+; over without further Map lookups.
+CreateHotstring(Flags, Abbreviation, Replacement, options := unset) {
+    OnlyText := (IsSet(options) and options.Has("OnlyText")) ? options["OnlyText"] : True
+    FinalResult := (IsSet(options) and options.Has("FinalResult")) ? options["FinalResult"] : False
+    TimeActivationSeconds := (IsSet(options) and options.Has("TimeActivationSeconds")) ? options["TimeActivationSeconds"] : 0
 
-    HotstringOptions := Map("OnlyText", OptionOnlyText).Set("FinalResult", OptionFinalResult).Set(
-        "TimeActivationSeconds", OptionTimeActivationSeconds)
-
-    FlagsPortion := ":" Flags "B0O:" ; O is to omit the ending character from the abbreviation
+    FlagsPortion := ":" Flags "B0O:" ; O omits the ending character from the abbreviation
     Hotstring(
         FlagsPortion Abbreviation,
-        (*) => HotstringHandler(
-            Abbreviation,
-            Replacement,
-            A_EndChar,
-            HotstringOptions
-        )
+        (*) => HotstringHandler(Abbreviation, Replacement, A_EndChar, OnlyText, FinalResult, TimeActivationSeconds)
     )
 }
 
-HotstringHandler(Abbreviation, Replacement, EndChar, HotstringOptions := Map()) {
-    ; Default values if not provided
-    OnlyText := HotstringOptions.Has("OnlyText") ? HotstringOptions["OnlyText"] : True
-    FinalResult := HotstringOptions.Has("FinalResult") ? HotstringOptions["FinalResult"] : False
-    OptionTimeActivationSeconds := HotstringOptions.Has("TimeActivationSeconds") ? HotstringOptions[
-        "TimeActivationSeconds"] : 0
-
-    if IsTimeActivationExpired(SubStr(Abbreviation, -2, 1), OptionTimeActivationSeconds) {
+; Hot path — runs on every hotstring firing. Positional booleans avoid any
+; Map allocation here, which matters for frequent triggers.
+HotstringHandler(Abbreviation, Replacement, EndChar, OnlyText := True, FinalResult := False, TimeActivationSeconds := 0) {
+    if IsTimeActivationExpired(SubStr(Abbreviation, -2, 1), TimeActivationSeconds) {
         return
     }
 
     SendEvent("{SC138 Up}") ; Becomes necessary when we replaced the AltGr key by Kana
 
-    ; We pass the abbreviation as argument to delete it manually, as we use the B0 flag
-    ; This is to make it work everywhere, like in URL bar or in the code inspector inside navigators
-    ; Otherwise, typing hc to get wh gives hwh for example when trying to type "white"
+    ; B0 flag means we delete the abbreviation manually; this behaves
+    ; consistently everywhere (URL bars, devtools) unlike AHK's auto-erase.
     NumberOfCharactersToDelete := StrLen(Abbreviation)
 
     if WinActive("ahk_class Notepad") {
-        ; In Windows 11 Notepad, hotstrings don’t work properly, this is a Windows bug, not AutoHotkey one
-        SendNewResult("{BackSpace " . NumberOfCharactersToDelete . "}", Map("OnlyText", False))
+        ; Windows 11 Notepad mis-handles hotstrings (Windows bug, not AHK),
+        ; so we route replacement through the clipboard.
+        SendNewResult("{BackSpace " . NumberOfCharactersToDelete . "}", False)
         SendInstant(Replacement . EndChar)
         return
     }
 
     if FinalResult {
-        SendFinalResult("{BackSpace " . NumberOfCharactersToDelete . "}", Map("OnlyText", False))
-        SendFinalResult(Replacement, Map("OnlyText", OnlyText))
-        SendFinalResult(EndChar, Map("OnlyText", False))
+        SendFinalResult("{BackSpace " . NumberOfCharactersToDelete . "}", False)
+        SendFinalResult(Replacement, OnlyText)
+        SendFinalResult(EndChar, False)
     } else {
-        SendNewResult("{BackSpace " . NumberOfCharactersToDelete . "}", Map("OnlyText", False))
-        SendNewResult(Replacement, Map("OnlyText", OnlyText))
-        SendNewResult(EndChar, Map("OnlyText", False))
+        SendNewResult("{BackSpace " . NumberOfCharactersToDelete . "}", False)
+        SendNewResult(Replacement, OnlyText)
+        SendNewResult(EndChar, False)
     }
 }
 
@@ -214,76 +199,54 @@ IsTimeActivationExpired(PreviousCharacter, OptionTimeActivationSeconds) {
     return False
 }
 
-CreateCaseSensitiveHotstrings(Flags, Abbreviation, Replacement, options := Map()) {
-    ; Default values if not provided
-    OptionPreferTitleCase := options.Has("PreferTitleCase") ? options["PreferTitleCase"] : True
-    OptionOnlyText := options.Has("OnlyText") ? options["OnlyText"] : True
-    OptionFinalResult := options.Has("FinalResult") ? options["FinalResult"] : False
-    OptionTimeActivationSeconds := options.Has("TimeActivationSeconds") ? options["TimeActivationSeconds"] : 0
+CreateCaseSensitiveHotstrings(Flags, Abbreviation, Replacement, options := unset) {
+    OnlyText := (IsSet(options) and options.Has("OnlyText")) ? options["OnlyText"] : True
+    FinalResult := (IsSet(options) and options.Has("FinalResult")) ? options["FinalResult"] : False
+    TimeActivationSeconds := (IsSet(options) and options.Has("TimeActivationSeconds")) ? options["TimeActivationSeconds"] : 0
 
-    HotstringOptions := Map("OnlyText", OptionOnlyText).Set("FinalResult", OptionFinalResult).Set(
-        "TimeActivationSeconds", OptionTimeActivationSeconds)
-    FlagsPortion := ":" Flags "CB0O:" ; O is to omit the ending character from the abbreviation
+    FlagsPortion := ":" Flags "CB0O:" ; O omits the ending character from the abbreviation
 
-    UppercasedSymbols := Map(
-        ",", [" ;", " :"], ; Order matters, the nbsp abbreviations need to trigger first the engine, otherwise the nbsp won’t be deleted
-        "'", [" ?"]
-    )
+    ; Order matters: nbsp abbreviations must trigger before bare punctuation
+    ; so the engine can delete the preceding non-breaking space correctly.
+    static UppercasedSymbols := Map(",", [" ;", " :"], "'", [" ?"])
 
     AbbreviationLowerCase := StrLower(Abbreviation)
     AbbreviationTitleCase := StrTitle(Abbreviation)
-    AbbreviationInvertedTitleCase := StrLower(SubStr(Abbreviation, 1, -1)) . StrUpper(SubStr(Abbreviation, -1))
     AbbreviationUpperCase := StrUpper(Abbreviation)
-
     FirstChar := SubStr(Abbreviation, 1, 1)
-    LastChar := SubStr(Abbreviation, -1)
 
     ReplacementLowerCase := StrLower(Replacement)
     ReplacementTitleCase := StrTitle(Replacement)
     ReplacementUpperCase := StrUpper(Replacement)
 
-    ; Lowercase
-    Hotstring(
-        FlagsPortion AbbreviationLowerCase,
-        (*) => HotstringHandler(AbbreviationLowerCase, ReplacementLowerCase, A_EndChar, HotstringOptions)
+    ; Helper closure: installs one hotstring variant with positional args
+    ; baked in. Must be a fat-arrow lambda so it closes over the outer
+    ; locals (FlagsPortion, OnlyText…); nested `f() {}` functions in AHK v2
+    ; do not capture the enclosing scope.
+    RegisterVariant := (Abbr, Repl) => Hotstring(
+        FlagsPortion Abbr,
+        (*) => HotstringHandler(Abbr, Repl, A_EndChar, OnlyText, FinalResult, TimeActivationSeconds)
     )
+
+    RegisterVariant(AbbreviationLowerCase, ReplacementLowerCase)
 
     ; When an abbreviation is only one character, titlecase = uppercase
     if StrLen(RTrim(Abbreviation, ScriptInformation["MagicKey"])) == 1 {
-        ; Uppercase/Titlecase
-        Hotstring(
-            FlagsPortion AbbreviationTitleCase,
-            (*) => HotstringHandler(AbbreviationTitleCase, ReplacementTitleCase, A_EndChar, HotstringOptions)
-        )
+        RegisterVariant(AbbreviationTitleCase, ReplacementTitleCase)
         return
     }
 
     if (StrLen(Abbreviation) >= 2) {
-
-        ; Uppercase
         for _, variant in GenerateUppercaseVariants(AbbreviationUpperCase, UppercasedSymbols) {
-            v := variant ; Capture the value for this iteration (otherwise there is an error)
-            Hotstring(
-                FlagsPortion v,
-                (*) => HotstringHandler(v, ReplacementUpperCase, A_EndChar, HotstringOptions)
-            )
+            RegisterVariant(variant, ReplacementUpperCase)
         }
 
         ; Titlecase: first letter uppercase, rest lowercase
         if !(StrLower(FirstChar) == StrUpper(FirstChar)) {
-            Hotstring(
-                FlagsPortion AbbreviationTitleCase,
-                (*) => HotstringHandler(AbbreviationTitleCase, ReplacementTitleCase, A_EndChar, HotstringOptions)
-            )
-        } else if UppercasedSymbols.Has(firstChar) {
-            for UppercasedSymbol in UppercasedSymbols[firstChar] {
-                AbbreviationTitleCaseVariant := UppercasedSymbol . SubStr(AbbreviationLowerCase, 2)
-                Hotstring(
-                    FlagsPortion AbbreviationTitleCaseVariant,
-                    (*) => HotstringHandler(AbbreviationTitleCaseVariant, ReplacementTitleCase, A_EndChar,
-                        HotstringOptions
-                    )
-                )
+            RegisterVariant(AbbreviationTitleCase, ReplacementTitleCase)
+        } else if UppercasedSymbols.Has(FirstChar) {
+            for UppercasedSymbol in UppercasedSymbols[FirstChar] {
+                RegisterVariant(UppercasedSymbol . SubStr(AbbreviationLowerCase, 2), ReplacementTitleCase)
             }
         }
     }

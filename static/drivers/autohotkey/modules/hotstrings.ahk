@@ -72,10 +72,10 @@ if Features["DistancesReduction"]["DeadKeyECircumflex"].Enabled {
 			; For example to write 01/02 by using the / on the deadkey.
 			if (GetLastSentCharacterAt(-3) ~= "^[^A-Za-z★]$") { ; Everything except a letter
 				; Character at -1 is the key in the deadkey, character at -2 is "ê", character at -3 is character before using the deadkey
-				SendNewResult("{BackSpace 2}", Map("OnlyText", False))
+				SendNewResult("{BackSpace 2}", False)
 				SendNewResult(MappedValue)
 			} else if (GetLastSentCharacterAt(-3) ~= "^[nN]$" and GetLastSentCharacterAt(-1) == "c") { ; Special case of the º symbol
-				SendNewResult("{BackSpace 2}", Map("OnlyText", False))
+				SendNewResult("{BackSpace 2}", False)
 				SendNewResult(MappedValue)
 			}
 		}
@@ -446,7 +446,7 @@ if Features["Autocorrection"]["MultiplePunctuationMarks"].Enabled {
 		":*?B0:" . "...",
 		; Needs to be activated only after a word, otherwise can cause problem in code, like in js: [...a, ...b]
 		(*) => GetLastSentCharacterAt(-4) ~= "^[A-Za-z]$" ?
-			SendNewResult("{BackSpace 3}…", Map("OnlyText", False)) : ""
+			SendNewResult("{BackSpace 3}…", False) : ""
 	)
 }
 
@@ -690,7 +690,7 @@ if Features["MagicKey"]["TextExpansionDate"].Enabled {
 	Abbreviation := "dt" . MK
 	Hotstring(":*B0:" . Abbreviation, DateHotstringCallback.Bind(Abbreviation))
 	DateHotstringCallback(Abbr, *) {
-		SendFinalResult("{BackSpace " . StrLen(Abbr) . "}", Map("OnlyText", False))
+		SendFinalResult("{BackSpace " . StrLen(Abbr) . "}", False)
 		SendFinalResult(FormatTime(, "dd/MM/yyyy"))
 	}
 }
