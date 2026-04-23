@@ -232,18 +232,6 @@ ReadPersonalToml() {
 		}
 	}
 
-	; DEBUG — remove once dropdown is confirmed working
-	DbgMeta  := "MetaOrder (" . MetaOrder.Length . "): "
-	for _, v in MetaOrder
-		DbgMeta .= v . " | "
-	DbgFile  := "FileSectionOrder (" . FileSectionOrder.Length . "): "
-	for _, v in FileSectionOrder
-		DbgFile .= v . " | "
-	DbgFinal := "sections_order (" . Result["sections_order"].Length . "): "
-	for _, v in Result["sections_order"]
-		DbgFinal .= v . " | "
-	MsgBox(DbgMeta . "`n" . DbgFile . "`n" . DbgFinal . "`nFilePath: " . FilePath, "DEBUG ReadPersonalToml")
-
 	return Result
 }
 
@@ -426,13 +414,14 @@ OpenPersonalEditor(DefaultSection := "") {
 
 	; ── Top bar: section selector + section management buttons ──
 	W.Add("Text", "xm y12 w70 h24 +0x200", "Section :")
-	SectionDrop := W.Add("DropDownList", "x+6 yp w280 h24", _BuildSectionList(_PersonalEditorData))
+	; DropDownList third arg is the initial value string, NOT the item list — add items separately
+	SectionDrop := W.Add("DropDownList", "x+6 yp w280 h24")
+	SectionDrop.Add(_BuildSectionList(_PersonalEditorData))
 	W.Add("Button", "x+8 yp w90 h24", "Nouvelle…").OnEvent("Click", (*) => _NewSection(W, SectionDrop))
 	W.Add("Button", "x+4 yp w90 h24", "Renommer…").OnEvent("Click", (*) => _RenameSection(W, SectionDrop))
 	BtnDelSec := W.Add("Button", "x+4 yp w90 h24", "Supprimer")
 	BtnDelSec.OnEvent("Click", (*) => _DeleteSection(W, SectionDrop))
 
-	; Select the target section in the dropdown
 	_SelectDropDown(SectionDrop, _PersonalEditorSection)
 
 	; ── Entry list ──
