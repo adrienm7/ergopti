@@ -50,7 +50,12 @@ global NumberOfRepetitions := 1 ; Same as Vim where 3w does the w action 3 times
 global ActivitySimulation := False
 global OneShotShiftEnabled := False
 
-global ConfigurationFile := "ErgoptiPlus_Configuration.ini"
+; Read the configuration file path from a minimal bootstrap file so users can
+; store ErgoptiPlus_Configuration.ini outside the Ergopti repository.
+; The bootstrap file contains a single key: ConfigurationFilePath=<absolute path>
+global _BootstrapFile := A_ScriptDir . "\ErgoptiPlus_Bootstrap.ini"
+global ConfigurationFile := IniRead(_BootstrapFile, "Bootstrap", "ConfigurationFilePath",
+    A_ScriptDir . "\ErgoptiPlus_Configuration.ini")
 
 global ScriptInformation := Map(
     "MagicKey", "★",
@@ -61,6 +66,10 @@ global ScriptInformation := Map(
     ; The icon of the script when active or disabled
     "IconPath", "ErgoptiPlus_Icon.ico",
     "IconPathDisabled", "ErgoptiPlus_Icon_Disabled.ico",
+    ; Configurable file paths (overridable from the ini so users can keep their
+    ; personal files outside the Ergopti repository)
+    "PersonalAhkPath", A_ScriptDir . "\personal.ahk",
+    "PersonalTomlPath", A_ScriptDir . "\..\hotstrings\personal.toml",
 )
 
 global ConfigurationShortcutsList := [
@@ -76,6 +85,15 @@ ReadScriptConfig() {
             ScriptInformation[Information] := Value
         }
     }
+}
+
+; Resolve a configured path: expand %VARS% and fall back to DefaultPath when blank.
+ResolveConfigPath(RawValue, DefaultPath) {
+    Trimmed := Trim(RawValue)
+    if (Trimmed == "" or Trimmed == "_") {
+        return DefaultPath
+    }
+    return Trimmed
 }
 
 if FileExist(ConfigurationFile) {
@@ -382,6 +400,7 @@ initMenu() {
     A_TrayMenu.Add("Modifier les coordonnées personnelles", PersonalInformationEditor)
     A_TrayMenu.Add("Modifier les raccourcis sur les lettres accentuées", ShortcutsEditor)
     A_TrayMenu.Add("Modifier le lien ouvert par Win + G", GPTLinkEditor)
+    A_TrayMenu.Add("📂 Chemins des fichiers personnels", FilePathsEditor)
 
     ; Script management section
     A_TrayMenu.Add() ; Separating line
@@ -648,6 +667,85 @@ AllConfigurationShortcutsEnabled(*) {
     return True
 }
 
+FilePathsEditor(*) {
+    global ScriptInformation, ConfigurationFile, _BootstrapFile
+
+    W := Gui(, "Chemins des fichiers personnels")
+    W.SetFont("s10", "Segoe UI")
+    W.MarginX := 12
+    W.MarginY := 12
+
+    ; --- personal.ahk ---
+    W.Add("Text", "xm", "Fichier personal.ahk :")
+    AhkEdit := W.Add("Edit", "xm w480", ScriptInformation["PersonalAhkPath"])
+    W.Add("Button", "x+6 w80", "Parcourir…").OnEvent("Click", (*) => BrowseFile(
+        AhkEdit, "Fichiers AHK (*.ahk)", "*.ahk"))
+
+    ; --- personal.toml ---
+    W.Add("Text", "xm y+10", "Fichier personal.toml :")
+    TomlEdit := W.Add("Edit", "xm w480", ScriptInformation["PersonalTomlPath"])
+    W.Add("Button", "x+6 w80", "Parcourir…").OnEvent("Click", (*) => BrowseFile(
+        TomlEdit, "Fichiers TOML (*.toml)", "*.toml"))
+
+    ; --- ErgoptiPlus_Configuration.ini ---
+    W.Add("Text", "xm y+10", "Fichier de configuration (.ini) :")
+    IniEdit := W.Add("Edit", "xm w480", ConfigurationFile)
+    W.Add("Button", "x+6 w80", "Parcourir…").OnEvent("Click", (*) => BrowseFile(
+        IniEdit, "Fichiers INI (*.ini)", "*.ini"))
+
+    W.Add("Text", "xm y+14 cGray",
+        "Laissez un champ vide pour utiliser le chemin par défaut.")
+
+    W.Add("Button", "xm y+10 w80", "OK").OnEvent("Click", SaveFilePaths)
+    W.Add("Button", "x+6 w80", "Annuler").OnEvent("Click", (*) => W.Destroy())
+
+    BrowseFile(EditCtrl, FilterDesc, FilterExts) {
+        Selected := FileSelect(3, EditCtrl.Value, "Sélectionner un fichier", FilterDesc . " (" . FilterExts . ")")
+        if (Selected != "") {
+            EditCtrl.Value := Selected
+        }
+    }
+
+    SaveFilePaths(*) {
+        global ScriptInformation, ConfigurationFile, _BootstrapFile
+
+        NewAhkPath  := Trim(AhkEdit.Value)
+        NewTomlPath := Trim(TomlEdit.Value)
+        NewIniPath  := Trim(IniEdit.Value)
+
+        DefaultAhkPath  := A_ScriptDir . "\personal.ahk"
+        DefaultTomlPath := A_ScriptDir . "\..\hotstrings\personal.toml"
+        DefaultIniPath  := A_ScriptDir . "\ErgoptiPlus_Configuration.ini"
+
+        FinalAhkPath  := (NewAhkPath  == "") ? DefaultAhkPath  : NewAhkPath
+        FinalTomlPath := (NewTomlPath == "") ? DefaultTomlPath : NewTomlPath
+        FinalIniPath  := (NewIniPath  == "") ? DefaultIniPath  : NewIniPath
+
+        ; Persist the ini path in the bootstrap file (it cannot live in the ini itself)
+        IniWrite(FinalIniPath, _BootstrapFile, "Bootstrap", "ConfigurationFilePath")
+
+        ; Persist the two file paths in the ini under [Script]
+        IniWrite(FinalAhkPath,  FinalIniPath, "Script", "PersonalAhkPath")
+        IniWrite(FinalTomlPath, FinalIniPath, "Script", "PersonalTomlPath")
+
+        TomlChanged := (FinalTomlPath != ScriptInformation["PersonalTomlPath"])
+
+        ScriptInformation["PersonalAhkPath"]  := FinalAhkPath
+        ScriptInformation["PersonalTomlPath"] := FinalTomlPath
+        ConfigurationFile := FinalIniPath
+
+        W.Destroy()
+
+        if TomlChanged {
+            ; The TOML path changed — a full reload is required to re-register hotstrings
+            MsgBox("Le chemin du fichier TOML a changé.`nLe script va être rechargé.", "Rechargement", "Icon!")
+            Reload
+        }
+    }
+
+    W.Show("Center")
+}
+
 ActivateEdit(*) {
     Edit
 }
@@ -756,7 +854,7 @@ RAlt & Delete::
 SC138 & SC153::
 {
     if (GetKeyState("SC138", "P") and GetKeyState("SC153", "P")) {
-        PersonalAhkPath := A_ScriptDir . "\personal.ahk"
+        PersonalAhkPath := ScriptInformation["PersonalAhkPath"]
         if !FileExist(PersonalAhkPath) {
             FileAppend(
                 "; drivers/autohotkey/personal.ahk`r`n"
@@ -786,9 +884,6 @@ SC138 & SC001::
         SendInput("{Escape}")
     }
 }
-
-; Open personal hotstring editor with Ctrl + ★ (SC02E — physical key position of ★/j)
-^SC02E::OpenPersonalEditor()
 
 #SuspendExempt False
 
@@ -2162,6 +2257,9 @@ AltGrCapsLockShortcut() {
 ; ============================
 ; ======= 4.6) Windows =======
 ; ============================
+
+; Open personal TOML hotstring editor with Win + ★ (SC02E — physical key position of ★/j)
+#SC02E::OpenPersonalEditor()
 
 #HotIf Features["Shortcuts"]["WinCapsLock"].Enabled
 ; Win + "CapsLock" to toggle CapsLock

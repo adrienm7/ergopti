@@ -24,6 +24,8 @@ version.json
 # Personal configuration files
 .claude/settings.local.json
 static/drivers/autohotkey/personal.ahk
+# Bootstrap file is machine-specific (contains absolute path to user's ini)
+static/drivers/autohotkey/ErgoptiPlus_Bootstrap.ini
 static/drivers/hammerspoon/config.json
 static/drivers/hammerspoon/karabiner_user_config.json
 # Karabiner build artifact — generated at runtime by the HS bridge

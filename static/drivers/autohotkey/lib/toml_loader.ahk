@@ -70,7 +70,16 @@ UnescapeTomlString(s) {
 ;   TOML is_case_sensitive = true  ➜ original call was CreateHotstring
 ;   TOML is_case_sensitive = false ➜ original call was CreateCaseSensitiveHotstrings
 LoadHotstringsSection(CategoryName, SectionName, FeatureConfig, ExtraOptions := Map()) {
-    FilePath := A_ScriptDir . "\..\hotstrings\" . CategoryName . ".toml"
+    global ScriptInformation
+    ; For the personal category, honour the user-configured path so the file can
+    ; live outside the Ergopti repository (e.g. in a private config folder).
+    if (StrLower(CategoryName) == "personal"
+            and IsSet(ScriptInformation)
+            and ScriptInformation.Has("PersonalTomlPath")) {
+        FilePath := ScriptInformation["PersonalTomlPath"]
+    } else {
+        FilePath := A_ScriptDir . "\..\hotstrings\" . CategoryName . ".toml"
+    }
     if !FileExist(FilePath) {
         return
     }

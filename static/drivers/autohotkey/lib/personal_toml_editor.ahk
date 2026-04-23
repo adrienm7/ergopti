@@ -24,8 +24,14 @@
 ; ===========================================
 ; ===========================================
 
-; Return path to personal.toml relative to the AHK script directory.
+; Return the configured path to personal.toml.
+; Reads ScriptInformation["PersonalTomlPath"] when available, otherwise falls
+; back to the default location relative to the AHK script directory.
 PersonalTomlPath() {
+	global ScriptInformation
+	if IsSet(ScriptInformation) and ScriptInformation.Has("PersonalTomlPath") {
+		return ScriptInformation["PersonalTomlPath"]
+	}
 	return A_ScriptDir . "\..\hotstrings\personal.toml"
 }
 
