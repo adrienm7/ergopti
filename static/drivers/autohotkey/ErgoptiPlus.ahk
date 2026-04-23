@@ -775,6 +775,17 @@ SC138 & SC153::
 }
 #HotIf
 
+; Quit the script entirely with AltGr + Escape
+RAlt & Escape::
+SC138 & SC001::
+{
+    if (GetKeyState("SC138", "P") and GetKeyState("SC001", "P")) {
+        ExitApp
+    } else {
+        SendInput("{Escape}")
+    }
+}
+
 #SuspendExempt False
 
 ; =======================================================
