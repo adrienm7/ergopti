@@ -414,9 +414,9 @@ OpenPersonalEditor(DefaultSection := "") {
 
 	; ── Top bar: section selector + section management buttons ──
 	W.Add("Text", "xm y12 w70 h24 +0x200", "Section :")
-	; DDL items are pipe-delimited in the options string — simplest reliable AHK v2 approach
+	; DDL items are pipe-delimited in the text argument
 	SectionItems := ArrayJoin(_BuildSectionList(_PersonalEditorData), "|")
-	SectionDrop := W.Add("DropDownList", "x+6 yp w280 h24 Choose1 |" . SectionItems)
+	SectionDrop := W.Add("DropDownList", "x+6 yp w280 h24", SectionItems)
 	W.Add("Button", "x+8 yp w90 h24", "Nouvelle…").OnEvent("Click", (*) => _NewSection(W, SectionDrop))
 	W.Add("Button", "x+4 yp w90 h24", "Renommer…").OnEvent("Click", (*) => _RenameSection(W, SectionDrop))
 	BtnDelSec := W.Add("Button", "x+4 yp w90 h24", "Supprimer")
@@ -528,8 +528,7 @@ _BuildSectionList(Data) {
 ; Rebuild a DropDownList from scratch via pipe-delimited string.
 _RebuildDropdown(DDL, Data) {
 	DDL.Delete()
-	Items := ArrayJoin(_BuildSectionList(Data), "|")
-	DDL.Add("|" . Items)
+	DDL.Add(ArrayJoin(_BuildSectionList(Data), "|"))
 }
 
 ; Select the DDL entry whose index matches SectionName in sections_order.
