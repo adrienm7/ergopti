@@ -23,6 +23,7 @@ SendMode("Event") ; Everything concerning hotstrings MUST use SendEvent and not 
 ; submodules so the main file stays focused on ErgoptiPlus-specific logic.
 #Include lib\hotstring_engine.ahk
 #Include lib\toml_loader.ahk
+#Include lib\personal_toml_editor.ahk
 
 ; ======================================================
 ; ======================================================
@@ -785,6 +786,9 @@ SC138 & SC001::
         SendInput("{Escape}")
     }
 }
+
+; Open personal hotstring editor with Ctrl + ★ (SC02E — physical key position of ★/j)
+^SC02E::OpenPersonalEditor()
 
 #SuspendExempt False
 
