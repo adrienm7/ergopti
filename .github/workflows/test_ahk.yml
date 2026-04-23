@@ -1,0 +1,70 @@
+name: Test ErgoptiPlus AHK
+
+on:
+    push:
+        paths:
+            - "static/drivers/autohotkey/**"
+    pull_request:
+        paths:
+            - "static/drivers/autohotkey/**"
+    workflow_dispatch:
+
+permissions:
+    contents: read
+
+concurrency:
+    group: test-ahk-${{ github.ref }}
+    cancel-in-progress: true
+
+jobs:
+    test:
+        runs-on: windows-latest
+
+        steps:
+            - name: Checkout repository
+              uses: actions/checkout@v4
+
+            - name: Cache AutoHotkey runtime
+              id: cache-ahk
+              uses: actions/cache@v4
+              with:
+                  path: C:\AutoHotkey
+                  key: ahk-v2.0.19-windows
+
+            - name: Download AutoHotkey v2 runtime
+              if: steps.cache-ahk.outputs.cache-hit != 'true'
+              run: |
+                  Invoke-WebRequest -Uri "https://github.com/AutoHotkey/AutoHotkey/releases/download/v2.0.19/AutoHotkey_2.0.19.zip" -OutFile "$env:TEMP\AHK.zip" -UseBasicParsing
+                  Expand-Archive -Path "$env:TEMP\AHK.zip" -DestinationPath "C:\AutoHotkey" -Force
+              shell: pwsh
+
+            - name: Run AHK test suite
+              id: tests
+              run: |
+                  $ahk = Get-ChildItem "C:\AutoHotkey" -Filter "AutoHotkey64.exe" | Select-Object -First 1 -ExpandProperty FullName
+                  if (-not $ahk) {
+                      Write-Error "AutoHotkey64.exe not found in C:\AutoHotkey"
+                      exit 2
+                  }
+                  $runner = "${{ github.workspace }}\static\drivers\autohotkey\tests\run_all.ahk"
+                  if (-not (Test-Path $runner)) {
+                      Write-Error "Test runner not found at $runner"
+                      exit 2
+                  }
+                  Write-Host "AHK runtime : $ahk"
+                  Write-Host "Test runner : $runner"
+                  Write-Host "------------------------------------------------------------"
+                  # AHK does not write to the parent shell's stdout natively; we redirect
+                  # the runner's FileAppend("*") output via the standard streams of a
+                  # cmd.exe wrapper so the TAP report appears in the GitHub Actions log.
+                  $output = & cmd /c "`"$ahk`" `"$runner`" 2>&1"
+                  $exit = $LASTEXITCODE
+                  $output | ForEach-Object { Write-Host $_ }
+                  Write-Host "------------------------------------------------------------"
+                  Write-Host "AHK exit code: $exit"
+                  if ($exit -ne 0) {
+                      Write-Error "Test suite reported failures (exit code $exit)."
+                      exit $exit
+                  }
+              shell: pwsh
+              timeout-minutes: 5
