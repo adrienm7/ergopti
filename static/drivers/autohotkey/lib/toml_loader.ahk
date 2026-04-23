@@ -21,11 +21,30 @@
 ;    (e.g. ``ie``) used in ``sections_order`` and ``[_meta.sections]``.
 ; ==============================================================================
 
+; Holds the raw UTF-8 content of every TOML file that has been read this
+; session, keyed by absolute file path. Both LoadHotstringsSection and
+; ApplyTomlMetadataToFeatures resolve content through ReadTomlFile so that
+; large category files (autocorrection.toml, magickey.toml) are read at most
+; once even when many sections are loaded from the same file.
+global _TomlFileCache := Map()
+
+
 ; ========================================================
 ; ========================================================
 ; ======= 1/ TOML string and metadata load helpers =======
 ; ========================================================
 ; ========================================================
+
+; Return the cached content of a TOML file, reading it from disk on first access.
+ReadTomlFile(FilePath) {
+    global _TomlFileCache
+    if _TomlFileCache.Has(FilePath) {
+        return _TomlFileCache[FilePath]
+    }
+    Content := FileRead(FilePath, "UTF-8")
+    _TomlFileCache[FilePath] := Content
+    return Content
+}
 
 ; Unescape a TOML double-quoted string literal (\\, \", \n, \t, \r).
 ; The generator at static/drivers/hotstrings/0_generate_hotstrings.py writes
@@ -97,8 +116,7 @@ LoadHotstringsSection(CategoryName, SectionName, FeatureConfig, ExtraOptions := 
     EntryPattern :=
         'i)^"([^"\\]*(?:\\.[^"\\]*)*)"\s*=\s*\{\s*output\s*=\s*"([^"\\]*(?:\\.[^"\\]*)*)"\s*,\s*is_word\s*=\s*(true|false)\s*,\s*auto_expand\s*=\s*(true|false)\s*,\s*is_case_sensitive\s*=\s*(true|false)\s*,\s*final_result\s*=\s*(true|false)(?:\s*,\s*is_case_sensitive_strict\s*=\s*(true|false))?\s*\}'
 
-    ; Lecture forcée en UTF-8 pour supporter les accents et la touche étoile ★
-    FileContent := FileRead(FilePath, "UTF-8")
+    FileContent := ReadTomlFile(FilePath)
     loop parse, FileContent, "`n", "`r" {
         Line := Trim(A_LoopField, " `t")
         if (Line == "" or SubStr(Line, 1, 1) == "#") {
@@ -233,8 +251,7 @@ ApplyTomlMetadataToFeatures(CategoryName) {
     InMetaSections := false
     SectionsOrderRaw := ""
 
-    ; Lecture forcée en UTF-8 pour supporter les accents dans les descriptions
-    FileContent := FileRead(FilePath, "UTF-8")
+    FileContent := ReadTomlFile(FilePath)
     loop parse, FileContent, "`n", "`r" {
         Line := Trim(A_LoopField, " `t")
         if (Line == "" or SubStr(Line, 1, 1) == "#") {
