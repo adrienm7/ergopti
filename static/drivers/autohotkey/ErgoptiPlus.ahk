@@ -64,8 +64,8 @@ global ScriptInformation := Map(
     "ShortcutSaveReload", True,
     "ShortcutEdit", True,
     ; The icon of the script when active or disabled
-    "IconPath", "ErgoptiPlus_Icon.ico",
-    "IconPathDisabled", "ErgoptiPlus_Icon_Disabled.ico",
+    "IconPath", "icons\ErgoptiPlus_Icon.ico",
+    "IconPathDisabled", "icons\ErgoptiPlus_Icon_Disabled.ico",
     ; Configurable file paths (overridable from the ini so users can keep their
     ; personal files outside the Ergopti repository)
     "PersonalAhkPath", A_ScriptDir . "\personal.ahk",
@@ -418,7 +418,7 @@ initMenu() {
     A_TrayMenu.Add(MenuSuspend, ToggleSuspend)
     A_TrayMenu.Add("🔄 Recharger" . (ScriptInformation["ShortcutSaveReload"] ? " (AltGr + ⌫)" : ""),
     ActivateReload)
-    A_TrayMenu.Add("⏹ Quitter", ActivateExitApp)
+    A_TrayMenu.Add("⏹ Quitter (AltGr + ⎋)", ActivateExitApp)
 
     ; Debugging section
     A_TrayMenu.Add() ; Separating line
@@ -675,8 +675,14 @@ FilePathsEditor(*) {
     W.MarginX := 12
     W.MarginY := 12
 
+    ; --- ErgoptiPlus_Configuration.ini (first: all other paths are stored in it) ---
+    W.Add("Text", "xm", "Fichier de configuration (.ini) :")
+    IniEdit := W.Add("Edit", "xm w480", ConfigurationFile)
+    W.Add("Button", "x+6 w80", "Parcourir…").OnEvent("Click", (*) => BrowseFile(
+        IniEdit, "Fichiers INI (*.ini)", "*.ini"))
+
     ; --- personal.ahk ---
-    W.Add("Text", "xm", "Fichier personal.ahk :")
+    W.Add("Text", "xm y+10", "Fichier personal.ahk :")
     AhkEdit := W.Add("Edit", "xm w480", ScriptInformation["PersonalAhkPath"])
     W.Add("Button", "x+6 w80", "Parcourir…").OnEvent("Click", (*) => BrowseFile(
         AhkEdit, "Fichiers AHK (*.ahk)", "*.ahk"))
@@ -686,12 +692,6 @@ FilePathsEditor(*) {
     TomlEdit := W.Add("Edit", "xm w480", ScriptInformation["PersonalTomlPath"])
     W.Add("Button", "x+6 w80", "Parcourir…").OnEvent("Click", (*) => BrowseFile(
         TomlEdit, "Fichiers TOML (*.toml)", "*.toml"))
-
-    ; --- ErgoptiPlus_Configuration.ini ---
-    W.Add("Text", "xm y+10", "Fichier de configuration (.ini) :")
-    IniEdit := W.Add("Edit", "xm w480", ConfigurationFile)
-    W.Add("Button", "x+6 w80", "Parcourir…").OnEvent("Click", (*) => BrowseFile(
-        IniEdit, "Fichiers INI (*.ini)", "*.ini"))
 
     W.Add("Text", "xm y+14 cGray",
         "Laissez un champ vide pour utiliser le chemin par défaut.")
@@ -1441,6 +1441,11 @@ if Features["Layout"]["ErgoptiBase"].Enabled {
 if Features["MagicKey"]["Replace"].Enabled {
     RemapKey("SC02E", "j", ScriptInformation["MagicKey"])
 }
+
+; Win + ★ (SC02E) opens the personal TOML hotstring editor.
+; Registered at InputLevel 3 so it overrides the #SC02E → "#j" binding that
+; RemapKey installs at InputLevel 2 for the layout remapping.
+Hotkey("#SC02E", (*) => OpenPersonalEditor(), "I3")
 
 ; ==========================
 ; ======= 3.2) Shift =======
@@ -2257,9 +2262,6 @@ AltGrCapsLockShortcut() {
 ; ============================
 ; ======= 4.6) Windows =======
 ; ============================
-
-; Open personal TOML hotstring editor with Win + ★ (SC02E — physical key position of ★/j)
-#SC02E::OpenPersonalEditor()
 
 #HotIf Features["Shortcuts"]["WinCapsLock"].Enabled
 ; Win + "CapsLock" to toggle CapsLock
