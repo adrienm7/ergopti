@@ -342,7 +342,7 @@ GetCategoryTitle(Category) {
         case "Shortcuts":
             return "➆ Raccourcis"
         case "TapHolds":
-            return "➇ Tap-Holds"
+            return "➇ Tap-Holds ⌨️"
         default:
             return ""
     }
@@ -352,7 +352,6 @@ GetCategoryTitle(Category) {
 ; Main menu initialization
 ; =========================
 
-global MenuLayout := "Modification de la disposition clavier"
 global MenuHotstrings := "Hotstrings ⚡"
 global MenuScriptManagement := "Gestion du script"
 global MenuConfigurationShortcuts := "Raccourcis de gestion du script"
@@ -387,14 +386,12 @@ initMenu() {
 
     A_TrayMenu.Delete()
 
-    ; ── Disposition clavier (top-level, mirroring future HS "Disposition" section) ──
-    A_TrayMenu.Add(MenuLayout, NoAction)
-    A_TrayMenu.Disable(MenuLayout)
+    ; ── Disposition clavier 🎹 — mirrors the future HS layout section ──
+    LayoutMenu := Menu()
     for FeatureName in Features["Layout"]["__Order"] {
-        MenuAddItem(A_TrayMenu, "Layout", FeatureName)
+        MenuAddItem(LayoutMenu, "Layout", FeatureName)
     }
-
-    A_TrayMenu.Add() ; Separating line
+    A_TrayMenu.Add("Disposition clavier 🎹", LayoutMenu)
 
     ; ── Hotstrings ⚡ — single submenu grouping all hotstring categories ──
     HotstringsMenu := Menu()
@@ -411,11 +408,14 @@ initMenu() {
     HotstringsMenu.Add("☑ Activer tous les hotstrings", ToggleAllHotstringsOn)
     HotstringsMenu.Add("☐ Désactiver tous les hotstrings", ToggleAllHotstringsOff)
     HotstringsMenu.Add() ; Separating line
+    ; Magic key editor lives here — mirrors HS menu_hotstrings build_management placement
+    HotstringsMenu.Add("Touche magique : " . ScriptInformation["MagicKey"], MagicKeyEditor)
+    HotstringsMenu.Add() ; Separating line
     HotstringsMenu.Add("📝 Éditeur de hotstrings personnels (Win + " . ScriptInformation["MagicKey"] . ")",
         (*) => OpenPersonalEditor())
     A_TrayMenu.Add(MenuHotstrings, HotstringsMenu)
 
-    ; ── Raccourcis and Tap-Holds (standalone, like HS Shortcuts and Karabiner) ──
+    ; ── Raccourcis and Tap-Holds — standalone, like HS Raccourcis and Karabiner ──
     if SubMenus.Has("Shortcuts") {
         A_TrayMenu.Add(GetCategoryTitle("Shortcuts"), SubMenus["Shortcuts"])
     }
@@ -425,21 +425,20 @@ initMenu() {
 
     A_TrayMenu.Add() ; Separating line
 
-    ; ── Editors and settings (mirrors HS Preferences area) ──
-    A_TrayMenu.Add("Modifier la touche magique", MagicKeyEditor)
-    A_TrayMenu.Add("Modifier les coordonnées personnelles", PersonalInformationEditor)
-    A_TrayMenu.Add("Modifier les raccourcis sur les lettres accentuées", ShortcutsEditor)
-    A_TrayMenu.Add("Modifier le lien ouvert par Win + G", GPTLinkEditor)
-    A_TrayMenu.Add("📂 Chemins des fichiers personnels", FilePathsEditor)
-
-    A_TrayMenu.Add() ; Separating line
-
     ; ── Actions globales — mirrors HS "Actions globales" submenu ──
     GlobalActionsMenu := Menu()
     GlobalActionsMenu.Add("☑ Activer toutes les fonctionnalités", ToggleAllFeaturesOn)
     GlobalActionsMenu.Add("☐ Désactiver toutes les fonctionnalités", ToggleAllFeaturesOff)
     GlobalActionsMenu.Add("↺ Valeurs par défaut", ReloadWithDefaultConfig)
     A_TrayMenu.Add("Actions globales", GlobalActionsMenu)
+
+    ; ── Préférences — mirrors HS bottom items (Préférences, Console, open file…) ──
+    PrefsMenu := Menu()
+    PrefsMenu.Add("Modifier les coordonnées personnelles", PersonalInformationEditor)
+    PrefsMenu.Add("Modifier les raccourcis sur les lettres accentuées", ShortcutsEditor)
+    PrefsMenu.Add("Modifier le lien ouvert par Win + G", GPTLinkEditor)
+    PrefsMenu.Add("📂 Chemins des fichiers personnels", FilePathsEditor)
+    A_TrayMenu.Add("Préférences…", PrefsMenu)
 
     ; ── Script management section ──
     A_TrayMenu.Add() ; Separating line
