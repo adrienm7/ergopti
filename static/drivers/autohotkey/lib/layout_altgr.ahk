@@ -204,16 +204,18 @@ _BuildAltGrTables() {
 ; Run the Plain or Shifted callable from ``Table[SC]`` depending on the
 ; current Shift state. The ``*`` parameter swallows the hotkey name that
 ; AHK passes when invoking a hotkey callback.
+;
+; IMPORTANT: ``Entry.Plain`` is extracted into a local before the call so
+; AHK does not invoke it as a method on ``Entry`` and silently pass ``Entry``
+; as an implicit first argument — that would overflow BoundFuncs which
+; already have all positional parameters bound (e.g. ``WrapTextIfSelected``).
 AltGrShiftDispatch(SC, Table, *) {
     if !Table.Has(SC) {
         return
     }
     Entry := Table[SC]
-    if GetKeyState("Shift", "P") {
-        Entry.Shifted()
-    } else {
-        Entry.Plain()
-    }
+    Cb := GetKeyState("Shift", "P") ? Entry.Shifted : Entry.Plain
+    Cb()
 }
 
 CtrlAltDispatch(Combo, *) {

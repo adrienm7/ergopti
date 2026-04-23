@@ -107,10 +107,13 @@ _BuildShiftCapsTables() {
 
 ; Run the symbol override for ``SC`` if present, otherwise fall back to the
 ; shared uppercase letter from ``SHIFTED_LETTERS``. The trailing ``*`` swallows
-; the hotkey name AHK passes when invoking a hotkey callback.
+; the hotkey name AHK passes when invoking a hotkey callback. The callable is
+; extracted to a local before the call to defeat any ``obj.method`` implicit
+; first-arg passing that AHK applies for property-stored Funcs.
 LayerDispatch(SC, SymbolMap, *) {
 	if SymbolMap.Has(SC) {
-		SymbolMap[SC]()
+		Cb := SymbolMap[SC]
+		Cb()
 		return
 	}
 	if SHIFTED_LETTERS.Has(SC) {
