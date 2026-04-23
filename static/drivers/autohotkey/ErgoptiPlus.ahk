@@ -1014,17 +1014,13 @@ SC138 & SC001::
 ; TOML hotstrings are loaded here with maximum priority so they shadow any
 ; conflicting built-in entry (registered before the layout section below).
 if Features.Has("Personal") {
-    if Features["Personal"].Has("EmailShortcuts") and Features["Personal"]["EmailShortcuts"].Enabled {
-        LoadHotstringsSection("personal", "emailshortcuts", Features["Personal"]["EmailShortcuts"])
-    }
-    if Features["Personal"].Has("Code") and Features["Personal"]["Code"].Enabled {
-        LoadHotstringsSection("personal", "code", Features["Personal"]["Code"])
-    }
-    if Features["Personal"].Has("ProfessionalVocabulary") and Features["Personal"]["ProfessionalVocabulary"].Enabled {
-        LoadHotstringsSection("personal", "professionalvocabulary", Features["Personal"]["ProfessionalVocabulary"])
-    }
-    if Features["Personal"].Has("Autocorrection") and Features["Personal"]["Autocorrection"].Enabled {
-        LoadHotstringsSection("personal", "autocorrection", Features["Personal"]["Autocorrection"])
+    for SectionName, SectionConfig in Features["Personal"] {
+        if SectionName == "__Order" {
+            continue
+        }
+        if IsObject(SectionConfig) and SectionConfig.HasOwnProp("Enabled") and SectionConfig.Enabled {
+            LoadHotstringsSection("personal", FoldAsciiLower(SectionName), SectionConfig)
+        }
     }
 }
 
