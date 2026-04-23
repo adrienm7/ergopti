@@ -33,7 +33,29 @@
 
 ; =======================================
 ; =======================================
-; ======= 1/ Low-level send layer =======
+; ======= 1/ Constants =======
+; =======================================
+; =======================================
+
+; Delay (ms) after Ctrl+V in SendInstant to let the paste settle before
+; the clipboard is restored. 200 ms was tuned empirically and handles
+; slow paste targets (Teams/Word) without blocking perceptibly.
+global SEND_INSTANT_PASTE_DELAY_MS := 200
+
+; Timeout (s) for ClipWait in GetSelection. Most apps fill the clipboard
+; in <100 ms; 2 s is a conservative ceiling before we return an empty
+; string and restore the original clipboard.
+global GET_SELECTION_TIMEOUT_SEC := 2
+
+; Delay (ms) used by ActivateHotstrings between the Space poke and the
+; BackSpace. Kept explicit so we can tune it in one place without
+; chasing magic numbers across hot paths.
+global ACTIVATE_HOTSTRINGS_DELAY_MS := 50
+
+
+; =======================================
+; =======================================
+; ======= 2/ Low-level send layer =======
 ; =======================================
 ; =======================================
 
@@ -65,35 +87,40 @@ SendFinalResult(Text, options := Map()) {
 }
 
 SendInstant(Text) {
-    ; Function for sending immediately a big text without typing it letter by letter
-    OldClipboard := ClipboardAll()  ; Save the current clipboard
-
-    A_Clipboard := Text             ; Put the text into the clipboard
-    SendInput("^v")                 ; Paste into the active window
-    Sleep(200)                      ; Give time for the paste to finish
-
-    A_Clipboard := OldClipboard     ; Restore the original clipboard
-    OldClipboard := ""              ; Clear the variable holding old clipboard to free memory
+    ; Function for sending immediately a big text without typing it letter by letter.
+    ; Uses try/finally so the user's clipboard is restored even on error/crash.
+    OldClipboard := ClipboardAll()
+    try {
+        A_Clipboard := Text
+        SendInput("^v")
+        Sleep(SEND_INSTANT_PASTE_DELAY_MS)
+    } finally {
+        A_Clipboard := OldClipboard
+        OldClipboard := ""
+    }
 }
 
 ; Leave time to trigger hotstrings between sending a character and then another one
 ActivateHotstrings() {
     SendNewResult(" ")
-    Sleep(50) ; in ms
+    Sleep(ACTIVATE_HOTSTRINGS_DELAY_MS)
     SendNewResult("{BackSpace}", Map("OnlyText", False))
 }
 
 GetSelection() {
-    OldClipboard := ClipboardAll() ; Save entire clipboard content (including formats)
-    A_Clipboard := ""              ; Clear clipboard to detect new content
-    SendEvent("^c")                ; Copy selected text (using SendEvent for ClipWait reliability)
-    ClipWait(2)                    ; Wait up to 2 seconds for clipboard to contain data
-    Text := A_Clipboard            ; Retrieve copied text
-
-    ; Restore original clipboard content
-    A_Clipboard := OldClipboard
-    OldClipboard := "" ; Clear the variable holding old clipboard to free memory
-
+    ; Save/restore the user's clipboard around a Ctrl+C capture of the current selection.
+    ; Wrapped in try/finally so the clipboard is restored even on error/timeout.
+    OldClipboard := ClipboardAll()
+    Text := ""
+    try {
+        A_Clipboard := ""
+        SendEvent("^c")
+        ClipWait(GET_SELECTION_TIMEOUT_SEC)
+        Text := A_Clipboard
+    } finally {
+        A_Clipboard := OldClipboard
+        OldClipboard := ""
+    }
     return Text
 }
 
@@ -111,7 +138,7 @@ MicrosoftApps() {
 
 ; ============================================
 ; ============================================
-; ======= 2/ Hotstring builders & core =======
+; ======= 3/ Hotstring builders & core =======
 ; ============================================
 ; ============================================
 
@@ -291,7 +318,7 @@ CreateCaseSensitiveHotstrings(Flags, Abbreviation, Replacement, options := Map()
 
 ; ==========================================
 ; ==========================================
-; ======= 3/ Text & history helpers =======
+; ======= 4/ Text & history helpers =======
 ; ==========================================
 ; ==========================================
 

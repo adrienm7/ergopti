@@ -3,11 +3,34 @@
 #SingleInstance Force ; Ensure that only one instance of the script can run at once
 SetWorkingDir(A_ScriptDir) ; Set the working directory where the script is located
 
+; Keep default warnings in development; in production (.exe build) they stay
+; silent because MsgBoxes are not shown when the script is compiled with
+; #NoTrayIcon removed. VarUnset must be off to silence UIA-v2 noise.
 #Warn All
-#Warn VarUnset, Off ; Disable undefined variables warning. This removes the warnings caused by the import of UIA
+#Warn VarUnset, Off
 
 #Include *i lib\UIA.ahk ; UIA v2 library — bundled in lib\ (source: https://github.com/Descolada/UIA-v2)
 ; *i = no error if the file isn't found, as this library is not mandatory to run this script
+
+; ===== Global error net =====
+; Without this, any uncaught error pops an AHK dialog mid-keystroke and can
+; leave modifiers stuck down. We log and continue so one bad callback never
+; locks the keyboard. The handler must return true to consider the error
+; "handled" (suppressing the default dialog).
+ErgoptiGlobalErrorHandler(Exc, Mode) {
+    ; Release every modifier that could be stuck after the failed callback
+    for Mod in ["LControl", "RControl", "LShift", "RShift", "LAlt", "RAlt", "LWin", "RWin"] {
+        if GetKeyState(Mod, "P") {
+            SendEvent("{" Mod " Up}")
+        }
+    }
+    ; Surface the error to the user once, without blocking subsequent keys
+    try {
+        MsgBox("ErgoptiPlus — erreur interne capturée :`n`n" . Exc.Message . "`n`n" . (Exc.HasProp("Stack") ? Exc.Stack : ""), "ErgoptiPlus", "Icon!")
+    }
+    return true
+}
+OnError(ErgoptiGlobalErrorHandler)
 
 ; #Hotstring EndChars -()[]{}:;'"/\,.?!`n`s`t   ; Adds the no breaking spaces as hotstrings triggers
 A_MenuMaskKey := "vkff" ; Change the masking key to the void key
@@ -981,7 +1004,7 @@ SC138 & SC153::
                 "UTF-8-RAW"
             )
         }
-        Run("notepad.exe " . PersonalAhkPath)
+        Run('notepad.exe "' . PersonalAhkPath . '"')
     } else {
         SendInput("{Delete}")
     }
