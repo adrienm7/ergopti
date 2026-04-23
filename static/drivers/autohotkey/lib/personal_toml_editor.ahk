@@ -156,17 +156,16 @@ ReadPersonalToml() {
 			continue
 		}
 		if InMeta {
-			if RegExMatch(Line, '^description\s*=\s*"([^"]*)"', &DM) {
+			; Patterns built with Chr(34) so no quote escaping is needed in the string literal
+			Q := Chr(34)
+			if RegExMatch(Line, "^description\s*=\s*" . Q . "([^" . Q . "]*)" . Q, &DM) {
 				Result["meta_description"] := DM[1]
 			}
-			; Parse sections_order = ["a", "b", …]
-			; Strategy: strip everything outside the outer brackets, split on commas,
-			; then trim whitespace and the surrounding double-quote from each token.
-			; This avoids building a regex pattern containing literal quote chars.
+			; sections_order = ["a", "b", …] — split on comma, strip surrounding quotes
 			if (MetaOrder.Length == 0
-					and RegExMatch(Line, '^sections_order\s*=\s*\[(.+)\]', &OM)) {
+					and RegExMatch(Line, "^sections_order\s*=\s*\[(.+)\]", &OM)) {
 				for _, Token in StrSplit(OM[1], ",") {
-					Token := Trim(Token, " `t" . Chr(34))
+					Token := Trim(Token, " `t" . Q)
 					if (Token != "") {
 						MetaOrder.Push(StrLower(Token))
 					}
@@ -175,7 +174,10 @@ ReadPersonalToml() {
 			continue
 		}
 		if InMetaSections {
-			if RegExMatch(Line, '^([A-Za-z0-9_]+)\s*=\s*"((?:[^"\\]|\\.)*)"', &KM) {
+			Q := Chr(34)
+			; key = "value" pairs — build pattern from parts to avoid quote escaping
+			KPat := "^([A-Za-z0-9_]+)\s*=\s*" . Q . "((?:[^" . Q . "\\]|\\.)*)" . Q
+			if RegExMatch(Line, KPat, &KM) {
 				MetaDescriptions[StrLower(KM[1])] := UnescapeTomlString(KM[2])
 			}
 			continue
@@ -462,19 +464,25 @@ OpenPersonalEditor(DefaultSection := "") {
 	FlagsX  := "x648"
 	InputW  := 520    ; width of text inputs in the left zone
 
-	; ── Form: row 1 — trigger (single line) + flags anchored to same baseline ──
+	; ── Form: two-column layout ──
+	; Left col : label + inputs stacked vertically (trigger then output).
+	; Right col: 4 checkboxes with absolute Y anchored to the trigger row.
+
+	; Row 1 — trigger
 	W.Add("Text", "xm y+10 w" . LabelW . " h24 +0x200", "Déclencheur :")
 	TriggerEdit := W.Add("Edit", InputX . " yp w" . InputW . " h24")
+	; Capture absolute Y of trigger row for the flags column
+	TriggerEdit.GetPos(, &TriggerY)
 
-	; Flags column starts at the trigger row baseline
-	ChkIsWord   := W.Add("CheckBox", FlagsX . " yp+2   w170", "Mot complet")
-	ChkAutoExp  := W.Add("CheckBox", FlagsX . " y+10   w170", "Auto-expand")
-	ChkCaseSens := W.Add("CheckBox", FlagsX . " y+10   w170", "Sensible à la casse")
-	ChkFinal    := W.Add("CheckBox", FlagsX . " y+10   w170", "Résultat final")
-
-	; ── Form: row 2 — output (multiline) ──
-	W.Add("Text", "xm y+8 w" . LabelW . " h24 +0x200", "Résultat :")
+	; Row 2 — output (multiline, immediately below trigger)
+	W.Add("Text", "xm y+6 w" . LabelW . " h24 +0x200", "Résultat :")
 	OutputEdit := W.Add("Edit", InputX . " yp w" . InputW . " h66 +Multi +WantReturn")
+
+	; Flags — right column, Y pinned to trigger row regardless of left-column cursor
+	ChkIsWord   := W.Add("CheckBox", FlagsX . " y" . TriggerY       . " w170", "Mot complet")
+	ChkAutoExp  := W.Add("CheckBox", FlagsX . " y" . (TriggerY + 10) . " w170", "Auto-expand")
+	ChkCaseSens := W.Add("CheckBox", FlagsX . " y" . (TriggerY + 20) . " w170", "Sensible à la casse")
+	ChkFinal    := W.Add("CheckBox", FlagsX . " y" . (TriggerY + 30) . " w170", "Résultat final")
 
 	; Default flag values (mirrors AHK loader defaults: auto_expand on)
 	ChkAutoExp.Value := 1
