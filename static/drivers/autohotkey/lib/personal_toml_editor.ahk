@@ -414,9 +414,8 @@ OpenPersonalEditor(DefaultSection := "") {
 
 	; ── Top bar: section selector + section management buttons ──
 	W.Add("Text", "xm y12 w70 h24 +0x200", "Section :")
-	; Build the full list array first, then pass it in a single Add() call
-	SectionDrop := W.Add("DropDownList", "x+6 yp w280 h24")
-	SectionDrop.Add(_BuildSectionList(_PersonalEditorData))
+	; Pass the item array as the third arg to Gui.Add — this is the only reliable way
+	SectionDrop := W.Add("DropDownList", "x+6 yp w280 h24", _BuildSectionList(_PersonalEditorData))
 	W.Add("Button", "x+8 yp w90 h24", "Nouvelle…").OnEvent("Click", (*) => _NewSection(W, SectionDrop))
 	W.Add("Button", "x+4 yp w90 h24", "Renommer…").OnEvent("Click", (*) => _RenameSection(W, SectionDrop))
 	BtnDelSec := W.Add("Button", "x+4 yp w90 h24", "Supprimer")
@@ -452,20 +451,22 @@ OpenPersonalEditor(DefaultSection := "") {
 	W.Add("Text",  "xm y+6  w90 h22 +0x200", "Résultat :")
 	OutputEdit  := W.Add("Edit", "x108 yp w520 h62 +Multi +WantReturn")
 
-	; Token help placed right after OutputEdit so y+8 starts from its bottom
-	TokenHelp := W.Add("Text", "xm y+8 w860 cGray",
-		"Tokens : {Enter}  {Tab}  {Left}  {Right}  {Up}  {Down}  {BackSpace}  {Delete}  {Escape}  {Home}  {End}  {Space}  {PgUp}  {PgDn}  {Insert}")
-
-	; Flags — yp points to TokenHelp top.
-	; TriggerEdit top = TokenHelp top - (h22 + gap6 + h22 + h62 + gap8) = yp - 120
-	ChkIsWord   := W.Add("CheckBox", "x644 yp-120 w180", "Mot complet")
-	ChkAutoExp  := W.Add("CheckBox", "x644 y+11   w180", "Auto-expand")
-	ChkCaseSens := W.Add("CheckBox", "x644 y+11   w180", "Sensible à la casse")
-	ChkFinal    := W.Add("CheckBox", "x644 y+11   w180", "Résultat final")
+	; Flags — placed to the right of TriggerEdit, anchored at TriggerEdit top via yp
+	TriggerEdit.GetPos(, &TrigY)
+	ChkIsWord   := W.Add("CheckBox", "x644 y" . TrigY . " w180", "Mot complet")
+	ChkAutoExp  := W.Add("CheckBox", "x644 y+11 w180", "Auto-expand")
+	ChkCaseSens := W.Add("CheckBox", "x644 y+11 w180", "Sensible à la casse")
+	ChkFinal    := W.Add("CheckBox", "x644 y+11 w180", "Résultat final")
 	ChkAutoExp.Value := 1
 
-	; ── Separator ──
-	W.Add("Text", "xm y+6 w860 h1 +0x10")
+	; Token help placed under OutputEdit — anchor with absolute Y from OutputEdit position
+	OutputEdit.GetPos(, &OutY, , &OutH)
+	TokenHelp := W.Add("Text", "xm y" . (OutY + OutH + 8) . " w630 cGray",
+		"Tokens : {Enter}  {Tab}  {Left}  {Right}  {Up}  {Down}  {BackSpace}  {Delete}  {Escape}  {Home}  {End}  {Space}  {PgUp}  {PgDn}  {Insert}")
+
+	; ── Separator — anchored below TokenHelp ──
+	TokenHelp.GetPos(, &TokY, , &TokH)
+	W.Add("Text", "xm y" . (TokY + TokH + 6) . " w860 h1 +0x10")
 
 	; ── Action buttons row ──
 	BtnAdd   := W.Add("Button", "xm y+8 w100 h26", "➕ Ajouter")
