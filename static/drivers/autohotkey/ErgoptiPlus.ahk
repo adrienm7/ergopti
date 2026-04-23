@@ -20,9 +20,9 @@ SetWorkingDir(A_ScriptDir) ; Set the working directory where the script is locat
 ; "handled" (suppressing the default dialog).
 ErgoptiGlobalErrorHandler(Exc, Mode) {
     ; Release every modifier that could be stuck after the failed callback
-    for Mod in ["LControl", "RControl", "LShift", "RShift", "LAlt", "RAlt", "LWin", "RWin"] {
-        if GetKeyState(Mod, "P") {
-            SendEvent("{" Mod " Up}")
+    for ModKey in ["LControl", "RControl", "LShift", "RShift", "LAlt", "RAlt", "LWin", "RWin"] {
+        if GetKeyState(ModKey, "P") {
+            SendEvent("{" ModKey " Up}")
         }
     }
     ; Surface the error to the user once, without blocking subsequent keys
