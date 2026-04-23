@@ -32,7 +32,6 @@ M.DEFAULT_STATE = {
 	shortcuts                = true,
 	script_control_enabled   = true,
 	script_control_shortcuts = { return_key = "pause", backspace = "reload", escape = "quit_hammerspoon" },
-	ahk_source_path          = "",
 	chatgpt_url              = Bindings.DEFAULT_CHATGPT_URL,
 }
 

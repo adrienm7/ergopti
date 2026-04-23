@@ -24,7 +24,6 @@ local shortcuts_mod = require("modules.shortcuts")
 M.DEFAULT_STATE = {
 	script_control_enabled   = shortcuts_mod.DEFAULT_STATE.script_control_enabled,
 	script_control_shortcuts = shortcuts_mod.DEFAULT_STATE.script_control_shortcuts,
-	ahk_source_path          = shortcuts_mod.DEFAULT_STATE.ahk_source_path,
 }
 
 
@@ -105,19 +104,6 @@ function M.build(ctx)
 			   disabled = not enabled or paused or nil, menu = key_submenu("backspace") },
 			{ title = "Option droite + ⎋ : " .. get_label(cur_escape),
 			   disabled = not enabled or paused or nil, menu = key_submenu("escape") },
-			{ title = "-" },
-			{ title    = "Chemin du AHK…",
-			   disabled = paused or nil,
-			   fn       = not paused and function()
-				local ok_p, btn, path = pcall(dialog.text_prompt, "Script AHK",
-					"Chemin du fichier AHK source :",
-					state.ahk_source_path, "OK", "Annuler")
-				if ok_p and btn == "OK" and type(path) == "string" then
-					state.ahk_source_path = path
-					ctx.save_prefs()
-					ctx.updateMenu()
-				end
-			   end or nil },
 		},
 	}
 end
