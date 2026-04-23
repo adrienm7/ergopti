@@ -443,6 +443,13 @@ initMenu() {
     A_TrayMenu.Add("Historique des touches", ActivateKeyHistory)
 }
 
+; Personal file and TOML loaded here — before menu build — so Features["Personal"]
+; exists by the time InitSubMenus / initMenu run.
+#Include *i personal.ahk
+if Features.Has("Personal") {
+    ApplyTomlMetadataToFeatures("Personal")
+}
+
 InitSubMenus()
 initMenu()
 UpdateTrayIcon()
@@ -909,17 +916,11 @@ SC138 & SC001::
 ; =======================================================
 ; =======================================================
 
-; Personal shortcuts, hotkeys, and feature configuration live in personal.ahk
-; (not tracked by git). Drop your own hotkeys there; they override any
-; built-in definition because they are registered first.
-; Personal TOML hotstrings (hotstrings/personal.toml) are then loaded
-; immediately after so they also take priority over all other hotstrings.
-#Include *i personal.ahk
-
-; Load personal TOML hotstrings with maximum priority (defined before all
-; built-in hotstrings so they shadow any conflicting built-in entry).
+; personal.ahk is included earlier (before menu build) so Features["Personal"]
+; is populated before InitSubMenus/initMenu run.
+; TOML hotstrings are loaded here with maximum priority so they shadow any
+; conflicting built-in entry (registered before the layout section below).
 if Features.Has("Personal") {
-    ApplyTomlMetadataToFeatures("Personal")
     if Features["Personal"].Has("EmailShortcuts") and Features["Personal"]["EmailShortcuts"].Enabled {
         LoadHotstringsSection("personal", "emailshortcuts", Features["Personal"]["EmailShortcuts"])
     }
