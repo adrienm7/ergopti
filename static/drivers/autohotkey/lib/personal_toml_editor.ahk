@@ -160,16 +160,16 @@ ReadPersonalToml() {
 				Result["meta_description"] := DM[1]
 			}
 			; Parse sections_order = ["a", "b", …]
-			; Use Chr(34) for the quote character — backtick escapes do NOT work inside single-quoted strings
+			; Strategy: strip everything outside the outer brackets, split on commas,
+			; then trim whitespace and the surrounding double-quote from each token.
+			; This avoids building a regex pattern containing literal quote chars.
 			if (MetaOrder.Length == 0
 					and RegExMatch(Line, '^sections_order\s*=\s*\[(.+)\]', &OM)) {
-				Raw     := OM[1]
-				Q       := Chr(34)
-				QuotePat := Q . "([^" . Q . "]*)" . Q
-				Pos     := 1
-				while RegExMatch(Raw, QuotePat, &TM, Pos) {
-					MetaOrder.Push(StrLower(TM[1]))
-					Pos := TM.Pos + TM.Len
+				for _, Token in StrSplit(OM[1], ",") {
+					Token := Trim(Token, " `t" . Chr(34))
+					if (Token != "") {
+						MetaOrder.Push(StrLower(Token))
+					}
 				}
 			}
 			continue
@@ -462,19 +462,19 @@ OpenPersonalEditor(DefaultSection := "") {
 	FlagsX  := "x648"
 	InputW  := 520    ; width of text inputs in the left zone
 
-	; ── Form: row 1 — trigger (single line) ──
+	; ── Form: row 1 — trigger (single line) + flags anchored to same baseline ──
 	W.Add("Text", "xm y+10 w" . LabelW . " h24 +0x200", "Déclencheur :")
 	TriggerEdit := W.Add("Edit", InputX . " yp w" . InputW . " h24")
 
-	; ── Form: row 2 — output (multiline) + flags aligned to its top ──
+	; Flags column starts at the trigger row baseline
+	ChkIsWord   := W.Add("CheckBox", FlagsX . " yp+2   w170", "Mot complet")
+	ChkAutoExp  := W.Add("CheckBox", FlagsX . " y+10   w170", "Auto-expand")
+	ChkCaseSens := W.Add("CheckBox", FlagsX . " y+10   w170", "Sensible à la casse")
+	ChkFinal    := W.Add("CheckBox", FlagsX . " y+10   w170", "Résultat final")
+
+	; ── Form: row 2 — output (multiline) ──
 	W.Add("Text", "xm y+8 w" . LabelW . " h24 +0x200", "Résultat :")
 	OutputEdit := W.Add("Edit", InputX . " yp w" . InputW . " h66 +Multi +WantReturn")
-
-	; Flags column — anchored at fixed x, aligned to the top of OutputEdit
-	ChkIsWord   := W.Add("CheckBox", FlagsX . " yp     w170", "Mot complet")
-	ChkAutoExp  := W.Add("CheckBox", FlagsX . " y+20   w170", "Auto-expand")
-	ChkCaseSens := W.Add("CheckBox", FlagsX . " y+20   w170", "Sensible à la casse")
-	ChkFinal    := W.Add("CheckBox", FlagsX . " y+20   w170", "Résultat final")
 
 	; Default flag values (mirrors AHK loader defaults: auto_expand on)
 	ChkAutoExp.Value := 1
