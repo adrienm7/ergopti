@@ -414,8 +414,9 @@ OpenPersonalEditor(DefaultSection := "") {
 
 	; ── Top bar: section selector + section management buttons ──
 	W.Add("Text", "xm y12 w70 h24 +0x200", "Section :")
-	; Pass the item array as the third arg to Gui.Add — this is the only reliable way
-	SectionDrop := W.Add("DropDownList", "x+6 yp w280 h24", _BuildSectionList(_PersonalEditorData))
+	; DDL items are pipe-delimited in the options string — simplest reliable AHK v2 approach
+	SectionItems := ArrayJoin(_BuildSectionList(_PersonalEditorData), "|")
+	SectionDrop := W.Add("DropDownList", "x+6 yp w280 h24 Choose1 |" . SectionItems)
 	W.Add("Button", "x+8 yp w90 h24", "Nouvelle…").OnEvent("Click", (*) => _NewSection(W, SectionDrop))
 	W.Add("Button", "x+4 yp w90 h24", "Renommer…").OnEvent("Click", (*) => _RenameSection(W, SectionDrop))
 	BtnDelSec := W.Add("Button", "x+4 yp w90 h24", "Supprimer")
@@ -524,10 +525,11 @@ _BuildSectionList(Data) {
 	return List
 }
 
-; Rebuild a DropDownList from scratch with a single Add() call.
+; Rebuild a DropDownList from scratch via pipe-delimited string.
 _RebuildDropdown(DDL, Data) {
 	DDL.Delete()
-	DDL.Add(_BuildSectionList(Data))
+	Items := ArrayJoin(_BuildSectionList(Data), "|")
+	DDL.Add("|" . Items)
 }
 
 ; Select the DDL entry whose index matches SectionName in sections_order.
