@@ -9,11 +9,32 @@
 ; ==============================================================================
 
 
+; ==============================
+; ==============================
+; ======= 1/ Constants =======
+; ==============================
+; ==============================
+
+; Minimum duration (ms) a tap must last to count as intentional — filters
+; spurious firings when another key is chord-pressed with LShift or LCtrl.
+global TAP_MIN_DURATION_MS := 50
+
+; Initial delay (ms) before key-repeat starts when BackSpace is held on LAlt or RCtrl.
+global KEY_REPEAT_INITIAL_DELAY_MS := 300
+
+; Interval (ms) between successive BackSpace repeats while the key stays held.
+global KEY_REPEAT_INTERVAL_MS := 100
+
+; Timeout (s) for the OneShotShift InputHook: how long to wait for the next
+; character before giving up and leaving the shift state active.
+global ONE_SHOT_SHIFT_TIMEOUT_SEC := 2
+
+
 
 
 ; ==============================
 ; ==============================
-; ======= 1/ CAPSLOCK =======
+; ======= 2/ CAPSLOCK =======
 ; ==============================
 ; ==============================
 
@@ -116,7 +137,7 @@ CapsLockShortcut(CtrlActivated) {
 
 ; ==========================================
 ; ==========================================
-; ======= 2/ LSHIFT AND LCTRL =======
+; ======= 3/ LSHIFT AND LCTRL =======
 ; ==========================================
 ; ==========================================
 
@@ -130,7 +151,7 @@ CapsLockShortcut(CtrlActivated) {
 	tap := ((TimeAfter - TimeBefore) <= Features["TapHolds"]["LShiftCopy"].TimeActivationSeconds * 1000)
 	if (
 		tap
-		and (TimeAfter - TimeBefore) >= 50
+		and (TimeAfter - TimeBefore) >= TAP_MIN_DURATION_MS
 		and A_PriorKey == "LShift"
 	) { ; A_PriorKey is to be able to fire shortcuts very quickly, under the tap time
 		SendInput("{LCtrl Down}c{LCtrl Up}")
@@ -152,7 +173,7 @@ CapsLockShortcut(CtrlActivated) {
 	tap := ((TimeAfter - TimeBefore) <= Features["TapHolds"]["LCtrlPaste"].TimeActivationSeconds * 1000)
 	if (
 		tap
-		and (TimeAfter - TimeBefore) >= 50
+		and (TimeAfter - TimeBefore) >= TAP_MIN_DURATION_MS
 		and A_PriorKey == "LControl"
 		and not GetKeyState("SC03A", "P") ; "CapsLock"
 		and not GetKeyState("SC038", "P") ; "LAlt"
@@ -165,7 +186,7 @@ CapsLockShortcut(CtrlActivated) {
 
 ; ==============================
 ; ==============================
-; ======= 3/ LALT =======
+; ======= 4/ LALT =======
 ; ==============================
 ; ==============================
 
@@ -243,10 +264,10 @@ SC038::
 	if not BackSpaceActionWithModifiers {
 		; If no modifier was pressed
 		SendEvent("{BackSpace}") ; Event to be able to correct hostrings and still trigger them afterwards
-		Sleep(300) ; Delay before repeating the key
+		Sleep(KEY_REPEAT_INITIAL_DELAY_MS)
 		while GetKeyState("SC038", "P") {
 			SendEvent("{BackSpace}")
-			Sleep(100)
+			Sleep(KEY_REPEAT_INTERVAL_MS)
 		}
 	}
 }
@@ -335,7 +356,7 @@ BackSpaceLogic() {
 
 ; ==============================
 ; ==============================
-; ======= 4/ SPACE =======
+; ======= 5/ SPACE =======
 ; ==============================
 ; ==============================
 
@@ -427,7 +448,7 @@ SC039 Up:: {
 
 ; ==============================
 ; ==============================
-; ======= 5/ ALTGR =======
+; ======= 6/ ALTGR =======
 ; ==============================
 ; ==============================
 
@@ -492,7 +513,7 @@ RAlt Up:: {
 
 ; ==============================
 ; ==============================
-; ======= 6/ RCTRL =======
+; ======= 7/ RCTRL =======
 ; ==============================
 ; ==============================
 
@@ -507,10 +528,10 @@ SC11D::
 		SendInput("{Right}{BackSpace}") ; = Delete, but we cannot simply use Delete, as it would do Ctrl + Alt + Delete and Windows would interpret it
 	} else {
 		SendEvent("{BackSpace}") ; Event to be able to correct hostrings and still trigger them afterwards
-		Sleep(300) ; Delay before repeating the key
+		Sleep(KEY_REPEAT_INITIAL_DELAY_MS)
 		while GetKeyState("SC11D", "P") {
 			SendEvent("{BackSpace}")
-			Sleep(100)
+			Sleep(KEY_REPEAT_INTERVAL_MS)
 		}
 	}
 }
@@ -545,7 +566,7 @@ SC11D:: {
 
 ; ==============================
 ; ==============================
-; ======= 7/ TAB =======
+; ======= 8/ TAB =======
 ; ==============================
 ; ==============================
 
@@ -645,13 +666,13 @@ GetMonitorFromPoint(X, Y) {
 
 ; ========================================
 ; ========================================
-; ======= 8/ ONE-SHOT SHIFT =======
+; ======= 9/ ONE-SHOT SHIFT =======
 ; ========================================
 ; ========================================
 
 OneShotShift() {
 	global OneShotShiftEnabled := True
-	ihvText := InputHook("L1 T2 E", "=%$.', " . ScriptInformation["MagicKey"])
+	ihvText := InputHook("L1 T" . ONE_SHOT_SHIFT_TIMEOUT_SEC . " E", "=%$.', " . ScriptInformation["MagicKey"])
 	ihvText.KeyOpt("{BackSpace}{Enter}{Delete}", "E") ; End keys to not swallow
 	ihvText.Start()
 	ihvText.Wait()
@@ -712,11 +733,11 @@ ToggleCapsLock() {
 }
 
 
-; ==========================================
-; ==========================================
-; ======= 9/ NAVIGATION LAYER =======
-; ==========================================
-; ==========================================
+; ====================================
+; ====================================
+; ======= 10/ NAVIGATION LAYER =======
+; ====================================
+; ====================================
 
 ActivateLayer() {
 	global LayerEnabled := True
