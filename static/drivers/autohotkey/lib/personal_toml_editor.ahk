@@ -108,9 +108,13 @@ NormaliseOutput(s) {
 }
 
 ; Parse personal.toml into a structured object:
-;   .sections_order  — Array of section names in file order
+;   .sections_order  — Array of section names in meta order (or file order if no meta)
 ;   .sections        — Map(name → {description, entries[]})
 ;   .meta_description — string
+;
+; Two-pass design: pass 1 collects [_meta] sections_order and [_meta.sections]
+; descriptions; pass 2 collects [[section]] entries. This ensures the dropdown
+; order matches the TOML sections_order field regardless of [[section]] file order.
 ReadPersonalToml() {
 	FilePath := PersonalTomlPath()
 	Result := Map(
@@ -129,10 +133,57 @@ ReadPersonalToml() {
 		. '(?:\s*,\s*is_case_sensitive_strict\s*=\s*(true|false))?\s*\}'
 
 	FileContent  := FileRead(FilePath, "UTF-8")
-	CurrentSection := ""
+
+	; ── Pass 1: collect meta (sections_order + descriptions) ──
+	MetaOrder        := []    ; from sections_order = [...]
+	MetaDescriptions := Map() ; from [_meta.sections]
 	InMeta         := false
 	InMetaSections := false
+
+	loop parse, FileContent, "`n", "`r" {
+		Line := Trim(A_LoopField, " `t")
+		if (Line == "" or SubStr(Line, 1, 1) == "#") {
+			continue
+		}
+		; Stop scanning once we reach the first [[section]] block
+		if (SubStr(Line, 1, 2) == "[[") {
+			break
+		}
+		if RegExMatch(Line, "^\[([^\[\]]+)\]$", &HM) {
+			Header         := Trim(HM[1])
+			InMeta         := (Header == "_meta")
+			InMetaSections := (Header == "_meta.sections")
+			continue
+		}
+		if InMeta {
+			if RegExMatch(Line, '^description\s*=\s*"([^"]*)"', &DM) {
+				Result["meta_description"] := DM[1]
+			}
+			; Parse sections_order = ["a", "b", …]
+			if (MetaOrder.Length == 0
+					and RegExMatch(Line, '^sections_order\s*=\s*\[(.+)\]', &OM)) {
+				Raw := OM[1]
+				Pos := 1
+				while RegExMatch(Raw, '`"([^`"]*)`"', &TM, Pos) {
+					MetaOrder.Push(StrLower(TM[1]))
+					Pos := TM.Pos + TM.Len
+				}
+			}
+			continue
+		}
+		if InMetaSections {
+			if RegExMatch(Line, '^([A-Za-z0-9_]+)\s*=\s*"((?:[^"\\]|\\.)*)"', &KM) {
+				MetaDescriptions[StrLower(KM[1])] := UnescapeTomlString(KM[2])
+			}
+			continue
+		}
+	}
+
+	; ── Pass 2: collect [[section]] entries ──
+	CurrentSection := ""
 	LineIndex      := 0
+	; Track sections seen in file order for any not listed in MetaOrder
+	FileSectionOrder := []
 
 	loop parse, FileContent, "`n", "`r" {
 		LineIndex++
@@ -140,55 +191,25 @@ ReadPersonalToml() {
 		if (Line == "" or SubStr(Line, 1, 1) == "#") {
 			continue
 		}
-
-		; [_meta] or [_meta.sections]
-		if RegExMatch(Line, "^\[([^\[\]]+)\]$", &HM) {
-			Header := Trim(HM[1])
-			InMeta         := (Header == "_meta")
-			InMetaSections := (Header == "_meta.sections")
-			CurrentSection := ""
-			if InMeta and RegExMatch(Line, '^description\s*=\s*"([^"]*)"', &DM) {
-				Result["meta_description"] := DM[1]
-			}
-			continue
-		}
-
-		; [[section]] array-of-tables header
 		if RegExMatch(Line, "^\[\[(.+)\]\]$", &SM) {
 			CurrentSection := StrLower(SM[1])
-			InMeta         := false
-			InMetaSections := false
 			if !Result["sections"].Has(CurrentSection) {
-				Result["sections_order"].Push(CurrentSection)
+				FileSectionOrder.Push(CurrentSection)
 				Result["sections"][CurrentSection] := Map(
-					"description", CurrentSection,
-					"entries",     [],
-					"line_start",  LineIndex,
+					"description", MetaDescriptions.Has(CurrentSection)
+						? MetaDescriptions[CurrentSection]
+						: CurrentSection,
+					"entries",    [],
+					"line_start", LineIndex,
 				)
 			}
 			continue
 		}
-
-		; [_meta] key=value pairs
-		if InMeta {
-			if RegExMatch(Line, '^description\s*=\s*"([^"]*)"', &DM) {
-				Result["meta_description"] := DM[1]
-			}
+		; Any [simple] header resets section context
+		if RegExMatch(Line, "^\[([^\[\]]+)\]$") {
+			CurrentSection := ""
 			continue
 		}
-
-		; [_meta.sections] key = "description" pairs
-		if InMetaSections {
-			if RegExMatch(Line, '^([A-Za-z0-9_]+)\s*=\s*"((?:[^"\\]|\\.)*)"', &KM) {
-				SecKey := StrLower(KM[1])
-				if Result["sections"].Has(SecKey) {
-					Result["sections"][SecKey]["description"] := UnescapeTomlString(KM[2])
-				}
-			}
-			continue
-		}
-
-		; Entry line inside a [[section]]
 		if (CurrentSection == "") {
 			continue
 		}
@@ -196,17 +217,32 @@ ReadPersonalToml() {
 			continue
 		}
 		Entry := Map(
-			"trigger",    UnescapeTomlString(EM[1]),
-			"output",     UnescapeTomlString(EM[2]),
-			"is_word",    (EM[3] == "true"),
-			"auto_expand",(EM[4] == "true"),
+			"trigger",           UnescapeTomlString(EM[1]),
+			"output",            UnescapeTomlString(EM[2]),
+			"is_word",           (EM[3] == "true"),
+			"auto_expand",       (EM[4] == "true"),
 			"is_case_sensitive", (EM[5] == "true"),
 			"final_result",      (EM[6] == "true"),
 			"strict_case",       (EM[7] == "true"),
-			"line_index", LineIndex,
+			"line_index",        LineIndex,
 		)
 		Result["sections"][CurrentSection]["entries"].Push(Entry)
 	}
+
+	; ── Build final sections_order: meta order first, then any unlisted sections ──
+	Seen := Map()
+	for _, SecName in MetaOrder {
+		if Result["sections"].Has(SecName) {
+			Result["sections_order"].Push(SecName)
+			Seen[SecName] := true
+		}
+	}
+	for _, SecName in FileSectionOrder {
+		if !Seen.Has(SecName) {
+			Result["sections_order"].Push(SecName)
+		}
+	}
+
 	return Result
 }
 
@@ -382,17 +418,17 @@ OpenPersonalEditor(DefaultSection := "") {
 	}
 	_PersonalEditorSection := TargetSection
 
-	W := Gui("+Resize +MinSize640x500", "Éditeur de hotstrings personnels")
+	W := Gui("+Resize +MinSize700x560", "Éditeur de hotstrings personnels")
 	W.SetFont("s10", "Segoe UI")
-	W.MarginX := 10
+	W.MarginX := 12
 	W.MarginY := 10
 
 	; ── Top bar: section selector + section management buttons ──
-	W.Add("Text", "xm y10 w60 h23 +0x200", "Section :")
-	SectionDrop := W.Add("DropDownList", "x+5 w260 h23", _BuildSectionList(_PersonalEditorData))
-	W.Add("Button", "x+5 w80 h23", "Nouvelle…").OnEvent("Click", (*) => _NewSection(W, SectionDrop))
-	W.Add("Button", "x+5 w80 h23", "Renommer…").OnEvent("Click", (*) => _RenameSection(W, SectionDrop))
-	BtnDelSec := W.Add("Button", "x+5 w80 h23", "Supprimer")
+	W.Add("Text", "xm y12 w70 h24 +0x200", "Section :")
+	SectionDrop := W.Add("DropDownList", "x+6 yp w280 h24", _BuildSectionList(_PersonalEditorData))
+	W.Add("Button", "x+8 yp w90 h24", "Nouvelle…").OnEvent("Click", (*) => _NewSection(W, SectionDrop))
+	W.Add("Button", "x+4 yp w90 h24", "Renommer…").OnEvent("Click", (*) => _RenameSection(W, SectionDrop))
+	BtnDelSec := W.Add("Button", "x+4 yp w90 h24", "Supprimer")
 	BtnDelSec.OnEvent("Click", (*) => _DeleteSection(W, SectionDrop))
 
 	; Select the target section in the dropdown
@@ -400,50 +436,56 @@ OpenPersonalEditor(DefaultSection := "") {
 
 	; ── Entry list ──
 	LV := W.Add("ListView",
-		"xm y+8 w830 r10 -Multi +LV0x10000",
-		["Déclencheur", "Résultat", "is_word", "auto_exp", "sensible", "final"])
+		"xm y+10 w860 r12 -Multi +LV0x10000",
+		["Déclencheur", "Résultat", "Mot", "Auto", "Casse", "Final"])
 	LV.ModifyCol(1, 160)
-	LV.ModifyCol(2, 450)
-	LV.ModifyCol(3, 55)
-	LV.ModifyCol(4, 60)
-	LV.ModifyCol(5, 65)
-	LV.ModifyCol(6, 50)
+	LV.ModifyCol(2, 490)
+	LV.ModifyCol(3, 45)
+	LV.ModifyCol(4, 45)
+	LV.ModifyCol(5, 50)
+	LV.ModifyCol(6, 45)
 
 	_PopulateList(LV, _PersonalEditorData, _PersonalEditorSection)
 
-	; ── Form ──
-	W.Add("Text", "xm y+10 w80 h23 +0x200", "Déclencheur :")
-	TriggerEdit := W.Add("Edit", "x+5 w200 h23")
+	; ── Separator ──
+	W.Add("Text", "xm y+8 w860 h1 +0x10")   ; horizontal rule
 
-	W.Add("Text", "x+10 w55 h23 +0x200", "Résultat :")
-	OutputEdit := W.Add("Edit", "x+5 w300 h55 +Multi")
+	; ── Form: row 1 — trigger ──
+	W.Add("Text", "xm y+8 w90 h24 +0x200", "Déclencheur :")
+	TriggerEdit := W.Add("Edit", "x+6 yp w220 h24")
 
-	; Flags column
-	ChkIsWord   := W.Add("CheckBox", "x+12 y+0  w110", "Mot complet")
-	ChkAutoExp  := W.Add("CheckBox", "xp   y+22 w110", "Auto-expand")
-	ChkCaseSens := W.Add("CheckBox", "xp   y+22 w140", "Sensible à la casse")
-	ChkFinal    := W.Add("CheckBox", "xp   y+22 w110", "Résultat final")
+	; ── Form: row 2 — output (multiline) ──
+	W.Add("Text", "xm y+8 w90 h24 +0x200", "Résultat :")
+	OutputEdit := W.Add("Edit", "x+6 yp w540 h62 +Multi +WantReturn")
 
-	; Default flag values (mirrors AHK loader defaults: auto_expand on, rest off)
+	; ── Flags: 2×2 grid to the right of output ──
+	FlagsX := "x+10 yp"
+	ChkIsWord   := W.Add("CheckBox", FlagsX . " w160", "Mot complet")
+	ChkAutoExp  := W.Add("CheckBox", "xp y+20 w160",   "Auto-expand ★")
+	ChkCaseSens := W.Add("CheckBox", "xp y+20 w160",   "Sensible à la casse")
+	ChkFinal    := W.Add("CheckBox", "xp y+20 w160",   "Résultat final")
+
+	; Default flag values (mirrors AHK loader defaults: auto_expand on)
 	ChkAutoExp.Value := 1
 
-	; Token help label
-	W.Add("Text", "xm y+6 w600 cGray",
-		"Tokens : {Enter} {Tab} {Left} {Right} {Up} {Down} {BackSpace} {Delete} {Escape} {Home} {End} {Space}")
+	; ── Token help ──
+	W.Add("Text", "xm y+8 w860 cGray",
+		"Tokens : {Enter}  {Tab}  {Left}  {Right}  {Up}  {Down}  {BackSpace}  {Delete}  {Escape}  {Home}  {End}  {Space}  {PgUp}  {PgDn}  {Insert}")
 
-	; ── Action buttons ──
-	BtnAdd  := W.Add("Button", "xm y+8 w90",  "Ajouter")
-	BtnSave := W.Add("Button", "x+5  w90",    "Enregistrer")
-	BtnDel  := W.Add("Button", "x+5  w90",    "Supprimer")
-	BtnClear := W.Add("Button", "x+5 w90",    "Effacer form")
-	W.Add("Button", "x+5 w90", "Fermer").OnEvent("Click", (*) => W.Destroy())
+	; ── Separator ──
+	W.Add("Text", "xm y+6 w860 h1 +0x10")
 
-	; ── Preferences row ──
-	CloseOnAddChk := W.Add("CheckBox", "xm y+8 w200", "Fermer après ajout (raccourci)")
+	; ── Action buttons row ──
+	BtnAdd   := W.Add("Button", "xm y+8 w100 h26", "➕ Ajouter")
+	BtnSave  := W.Add("Button", "x+6 yp w100 h26", "💾 Enregistrer")
+	BtnDel   := W.Add("Button", "x+6 yp w100 h26", "🗑 Supprimer")
+	BtnClear := W.Add("Button", "x+6 yp w110 h26", "✖ Effacer form")
+	W.Add("Button", "x+6 yp w90 h26", "Fermer").OnEvent("Click", (*) => W.Destroy())
+	CloseOnAddChk := W.Add("CheckBox", "x+20 yp+4 w220", "Fermer après ajout")
 	CloseOnAddChk.Value := (_EditorPrefGet("CloseOnAdd", "0") == "1") ? 1 : 0
 
 	; ── Status bar ──
-	StatusText := W.Add("Text", "xm y+6 w600 cGray", "")
+	StatusText := W.Add("Text", "xm y+10 w860 h20 cGray", "")
 
 	; ── Wiring ──
 	BtnAdd.OnEvent("Click", (*) => _AddEntry(W, LV, TriggerEdit, OutputEdit,
@@ -467,7 +509,7 @@ OpenPersonalEditor(DefaultSection := "") {
 	W.OnEvent("Size",  (*) => _ResizeEditor(W, LV, OutputEdit, StatusText))
 
 	_PersonalEditorGui := W
-	W.Show("Center w860 h620")
+	W.Show("Center w900 h640")
 }
 
 
@@ -794,6 +836,10 @@ _OnEditorClose() {
 
 _ResizeEditor(W, LV, OutputEdit, StatusText) {
 	W.GetClientPos(, , &CW, &CH)
-	LV.Move(, , CW - 20, )
-	StatusText.Move(, CH - 28, CW - 20, )
+	Margin := 24
+	LV.Move(, , CW - Margin, )
+	; Keep output field proportional: fills width up to flags column (≈ 165 px)
+	LV.GetPos(&LVX, , &LVW, )
+	OutputEdit.Move(, , Max(200, LVW - 165 - 96 - 12), )
+	StatusText.Move(, CH - 26, CW - Margin, )
 }
