@@ -896,14 +896,14 @@ SC138 & SC013:: {
 }
 SC138 & SC014:: {
 	if GetKeyState("Shift", "P") {
-		SendNewResult(""")
+		SendNewResult(Chr(0x201C)) ; Left double quotation mark "
 	} else {
 		WrapTextIfSelected("« ", "« ", " »")
 	}
 }
 SC138 & SC015:: {
 	if GetKeyState("Shift", "P") {
-		SendNewResult(""")
+		SendNewResult(Chr(0x201D)) ; Right double quotation mark "
 	} else {
 		WrapTextIfSelected(" »", "« ", " »")
 	}
