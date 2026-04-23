@@ -50,6 +50,10 @@ SendMode("Event") ; Everything concerning hotstrings MUST use SendEvent and not 
 ; minimum log level can be honoured from the very first INFO/START line.
 #Include lib\logger.ahk
 
+; INI helpers extracted to their own lib so the test runner can ``#Include``
+; them without bootstrapping the rest of the driver.
+#Include lib\ini_helpers.ahk
+
 ; Active-app cache must come before hotstring_engine.ahk because both
 ; ``HotstringHandler`` and ``MicrosoftApps`` consult ``GetActiveApp``.
 #Include lib\active_app_cache.ahk
@@ -118,39 +122,8 @@ global ConfigurationShortcutsList := [
     "ShortcutEdit",
 ]
 
-; Read the entire INI file once into a nested Map[Section][Key]=Value so that
-; ReadConfiguration and ReadScriptConfig can do O(1) lookups instead of one
-; FileOpen per IniRead call (~475 calls at a typical startup).
-ParseIniFile(Path) {
-    Sections := Map()
-    if !FileExist(Path) {
-        return Sections
-    }
-    CurrentSection := ""
-    loop read Path {
-        Line := Trim(A_LoopReadLine)
-        if (SubStr(Line, 1, 1) == "[") {
-            ; Section header: [SectionName]
-            CurrentSection := SubStr(Line, 2, StrLen(Line) - 2)
-            if !Sections.Has(CurrentSection) {
-                Sections[CurrentSection] := Map()
-            }
-        } else if (CurrentSection != "" and InStr(Line, "=")) {
-            EqPos := InStr(Line, "=")
-            Key := Trim(SubStr(Line, 1, EqPos - 1))
-            Val := SubStr(Line, EqPos + 1)
-            Sections[CurrentSection][Key] := Val
-        }
-    }
-    return Sections
-}
-
-IniCacheGet(Cache, Section, Key, Default := "_") {
-    if Cache.Has(Section) and Cache[Section].Has(Key) {
-        return Cache[Section][Key]
-    }
-    return Default
-}
+; ParseIniFile / IniCacheGet / ResolveConfigPath are defined in lib/ini_helpers.ahk
+; (included above) so the test runner can exercise them in isolation.
 
 ReadScriptConfig(Cache) {
     for Information in ScriptInformation {
@@ -159,15 +132,6 @@ ReadScriptConfig(Cache) {
             ScriptInformation[Information] := Value
         }
     }
-}
-
-; Resolve a configured path: expand %VARS% and fall back to DefaultPath when blank.
-ResolveConfigPath(RawValue, DefaultPath) {
-    Trimmed := Trim(RawValue)
-    if (Trimmed == "" or Trimmed == "_") {
-        return DefaultPath
-    }
-    return Trimmed
 }
 
 global _IniCache := ParseIniFile(ConfigurationFile)
