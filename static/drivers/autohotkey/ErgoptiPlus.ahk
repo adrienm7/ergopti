@@ -101,9 +101,43 @@ global ConfigurationShortcutsList := [
     "ShortcutEdit",
 ]
 
-ReadScriptConfig() {
+; Read the entire INI file once into a nested Map[Section][Key]=Value so that
+; ReadConfiguration and ReadScriptConfig can do O(1) lookups instead of one
+; FileOpen per IniRead call (~475 calls at a typical startup).
+ParseIniFile(Path) {
+    Sections := Map()
+    if !FileExist(Path) {
+        return Sections
+    }
+    CurrentSection := ""
+    loop read Path {
+        Line := Trim(A_LoopReadLine)
+        if (SubStr(Line, 1, 1) == "[") {
+            ; Section header: [SectionName]
+            CurrentSection := SubStr(Line, 2, StrLen(Line) - 2)
+            if !Sections.Has(CurrentSection) {
+                Sections[CurrentSection] := Map()
+            }
+        } else if (CurrentSection != "" and InStr(Line, "=")) {
+            EqPos := InStr(Line, "=")
+            Key := Trim(SubStr(Line, 1, EqPos - 1))
+            Val := SubStr(Line, EqPos + 1)
+            Sections[CurrentSection][Key] := Val
+        }
+    }
+    return Sections
+}
+
+IniCacheGet(Cache, Section, Key, Default := "_") {
+    if Cache.Has(Section) and Cache[Section].Has(Key) {
+        return Cache[Section][Key]
+    }
+    return Default
+}
+
+ReadScriptConfig(Cache) {
     for Information in ScriptInformation {
-        Value := IniRead(ConfigurationFile, "Script", Information, "_")
+        Value := IniCacheGet(Cache, "Script", Information)
         if Value != "_" {
             ScriptInformation[Information] := Value
         }
@@ -119,9 +153,8 @@ ResolveConfigPath(RawValue, DefaultPath) {
     return Trimmed
 }
 
-if FileExist(ConfigurationFile) {
-    ReadScriptConfig()
-}
+global _IniCache := ParseIniFile(ConfigurationFile)
+ReadScriptConfig(_IniCache)
 
 ; Under this text is the configuration of the features, especially whether or not they are enabled.
 ; It is advised to modify which features are enabled by using the ErgoptiPlus_Configuration.ini file.
@@ -176,7 +209,7 @@ global PersonalInformationLetters := Map(
 ; ======= 1.2) Variables update if there is a configuration file =======
 ; ======================================================================
 
-ReadConfiguration() {
+ReadConfiguration(Cache) {
     Props := ["Enabled", "TimeActivationSeconds", "Letter", "PatternMaxLength", "Link", "DestinationFolder",
         "DatedNotes", "SearchEngine", "SearchEngineURLQuery"]
 
@@ -187,7 +220,7 @@ ReadConfiguration() {
                 for SubFeature, SubValue in Value {
                     for Prop in Props {
                         Name := SubFeature . "." . Prop
-                        RawValue := IniRead(ConfigurationFile, Category "." Feature, Name, "_")
+                        RawValue := IniCacheGet(Cache, Category "." Feature, Name)
                         if RawValue != "_" {
                             Features[Category][Feature][SubFeature].%Prop% := RawValue
                         }
@@ -196,7 +229,7 @@ ReadConfiguration() {
             } else {
                 for Prop in Props {
                     Name := Feature . "." . Prop
-                    RawValue := IniRead(ConfigurationFile, Category, Name, "_")
+                    RawValue := IniCacheGet(Cache, Category, Name)
                     if RawValue != "_" {
                         Features[Category][Feature].%Prop% := RawValue
                     }
@@ -206,21 +239,21 @@ ReadConfiguration() {
     }
 
     for Information in PersonalInformation {
-        Value := IniRead(ConfigurationFile, "PersonalInformation", Information, "_")
+        Value := IniCacheGet(Cache, "PersonalInformation", Information)
         if Value != "_" {
             PersonalInformation[Information] := Value
         }
     }
 
     for Information in ScriptInformation {
-        Value := IniRead(ConfigurationFile, "Script", Information, "_")
+        Value := IniCacheGet(Cache, "Script", Information)
         if Value != "_" {
             ScriptInformation[Information] := Value
         }
     }
 }
 
-ReadConfiguration()
+ReadConfiguration(_IniCache)
 
 ; Pull menu titles and submenu ordering from the per-category TOML files so
 ; that those hotstring files are the single source of truth for both the
