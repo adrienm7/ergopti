@@ -232,6 +232,18 @@ ReadPersonalToml() {
 		}
 	}
 
+	; DEBUG — remove once dropdown is confirmed working
+	DbgMeta  := "MetaOrder (" . MetaOrder.Length . "): "
+	for _, v in MetaOrder
+		DbgMeta .= v . " | "
+	DbgFile  := "FileSectionOrder (" . FileSectionOrder.Length . "): "
+	for _, v in FileSectionOrder
+		DbgFile .= v . " | "
+	DbgFinal := "sections_order (" . Result["sections_order"].Length . "): "
+	for _, v in Result["sections_order"]
+		DbgFinal .= v . " | "
+	MsgBox(DbgMeta . "`n" . DbgFile . "`n" . DbgFinal . "`nFilePath: " . FilePath, "DEBUG ReadPersonalToml")
+
 	return Result
 }
 
@@ -522,6 +534,12 @@ _BuildSectionList(Data) {
 	return List
 }
 
+; Rebuild a DropDownList from scratch — Add() requires an Array, not a string.
+_RebuildDropdown(DDL, Data) {
+	DDL.Delete()
+	DDL.Add(_BuildSectionList(Data))
+}
+
 _SelectDropDown(DDL, SectionName) {
 	global _PersonalEditorData
 	if (SectionName == "") {
@@ -735,11 +753,7 @@ _NewSection(W, SectionDrop) {
 	)
 	; Persist and rebuild dropdown
 	WritePersonalToml(_PersonalEditorData)
-	NewList := _BuildSectionList(_PersonalEditorData)
-	SectionDrop.Delete()
-	for _, Item in NewList {
-		SectionDrop.Add(Item)
-	}
+	_RebuildDropdown(SectionDrop, _PersonalEditorData)
 	_SelectDropDown(SectionDrop, SecName)
 	_PersonalEditorSection := SecName
 	_EditorPrefSet("DefaultSection", SecName)
@@ -760,12 +774,7 @@ _RenameSection(W, SectionDrop) {
 	}
 	_PersonalEditorData["sections"][_PersonalEditorSection]["description"] := Trim(Res.Value)
 	WritePersonalToml(_PersonalEditorData)
-	; Rebuild dropdown
-	NewList := _BuildSectionList(_PersonalEditorData)
-	SectionDrop.Delete()
-	for _, Item in NewList {
-		SectionDrop.Add(Item)
-	}
+	_RebuildDropdown(SectionDrop, _PersonalEditorData)
 	_SelectDropDown(SectionDrop, _PersonalEditorSection)
 }
 
@@ -795,13 +804,8 @@ _DeleteSection(W, SectionDrop) {
 	_PersonalEditorData["sections_order"] := NewOrder
 	_PersonalEditorData["sections"].Delete(_PersonalEditorSection)
 	WritePersonalToml(_PersonalEditorData)
-	; Switch to first remaining section
 	_PersonalEditorSection := NewOrder.Length > 0 ? NewOrder[1] : ""
-	NewList := _BuildSectionList(_PersonalEditorData)
-	SectionDrop.Delete()
-	for _, Item in NewList {
-		SectionDrop.Add(Item)
-	}
+	_RebuildDropdown(SectionDrop, _PersonalEditorData)
 	if (_PersonalEditorSection != "") {
 		_SelectDropDown(SectionDrop, _PersonalEditorSection)
 	}
