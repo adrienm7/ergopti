@@ -414,11 +414,9 @@ OpenPersonalEditor(DefaultSection := "") {
 
 	; ── Top bar: section selector + section management buttons ──
 	W.Add("Text", "xm y12 w70 h24 +0x200", "Section :")
-	; DropDownList third arg is the initial value string, NOT the item list — add items separately
+	; Build the full list array first, then pass it in a single Add() call
 	SectionDrop := W.Add("DropDownList", "x+6 yp w280 h24")
-	for _, Item in _BuildSectionList(_PersonalEditorData) {
-		SectionDrop.Add([Item])
-	}
+	SectionDrop.Add(_BuildSectionList(_PersonalEditorData))
 	W.Add("Button", "x+8 yp w90 h24", "Nouvelle…").OnEvent("Click", (*) => _NewSection(W, SectionDrop))
 	W.Add("Button", "x+4 yp w90 h24", "Renommer…").OnEvent("Click", (*) => _RenameSection(W, SectionDrop))
 	BtnDelSec := W.Add("Button", "x+4 yp w90 h24", "Supprimer")
@@ -461,9 +459,9 @@ OpenPersonalEditor(DefaultSection := "") {
 	; Flags — yp points to TokenHelp top.
 	; TriggerEdit top = TokenHelp top - (h22 + gap6 + h22 + h62 + gap8) = yp - 120
 	ChkIsWord   := W.Add("CheckBox", "x644 yp-120 w180", "Mot complet")
-	ChkAutoExp  := W.Add("CheckBox", "x644 y+22   w180", "Auto-expand")
-	ChkCaseSens := W.Add("CheckBox", "x644 y+22   w180", "Sensible à la casse")
-	ChkFinal    := W.Add("CheckBox", "x644 y+22   w180", "Résultat final")
+	ChkAutoExp  := W.Add("CheckBox", "x644 y+11   w180", "Auto-expand")
+	ChkCaseSens := W.Add("CheckBox", "x644 y+11   w180", "Sensible à la casse")
+	ChkFinal    := W.Add("CheckBox", "x644 y+11   w180", "Résultat final")
 	ChkAutoExp.Value := 1
 
 	; ── Separator ──
@@ -525,12 +523,10 @@ _BuildSectionList(Data) {
 	return List
 }
 
-; Rebuild a DropDownList from scratch — one Add([item]) call per entry.
+; Rebuild a DropDownList from scratch with a single Add() call.
 _RebuildDropdown(DDL, Data) {
 	DDL.Delete()
-	for _, Item in _BuildSectionList(Data) {
-		DDL.Add([Item])
-	}
+	DDL.Add(_BuildSectionList(Data))
 }
 
 ; Select the DDL entry whose index matches SectionName in sections_order.
