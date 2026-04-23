@@ -767,7 +767,7 @@ ReloadWithDefaultConfig(*) {
 ToggleConfigurationShortcuts(*) {
     NewValue := not AllConfigurationShortcutsEnabled()
     for Shortcut in ConfigurationShortcutsList {
-        ScriptInformation[Shortcut] := ToggleConfigurationShortcuts
+        ScriptInformation[Shortcut] := NewValue
         IniWrite(NewValue, ConfigurationFile, "Script", Shortcut)
     }
     Reload

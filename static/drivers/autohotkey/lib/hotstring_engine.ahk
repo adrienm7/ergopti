@@ -234,7 +234,7 @@ CreateCaseSensitiveHotstrings(Flags, Abbreviation, Replacement, options := Map()
     if (StrLen(Abbreviation) >= 2) {
 
         ; Uppercase
-        for _, variant in GenerateUppercaseVariants(AbbreviationUppercase, UppercasedSymbols) {
+        for _, variant in GenerateUppercaseVariants(AbbreviationUpperCase, UppercasedSymbols) {
             v := variant ; Capture the value for this iteration (otherwise there is an error)
             Hotstring(
                 FlagsPortion v,

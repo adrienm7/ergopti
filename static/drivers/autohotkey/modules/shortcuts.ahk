@@ -418,7 +418,7 @@ if Features["Shortcuts"]["Search"].Enabled {
 				"HKU", "HKEY_USERS",
 				"HKCC", "HKEY_CURRENT_CONFIG"
 			)
-			if KeyMap.HasKey(RootKey) {
+			if KeyMap.Has(RootKey) {
 				RegPath := StrReplace(RegPath, RootKey, KeyMap[RootKey], , , 1)
 			}
 		}
