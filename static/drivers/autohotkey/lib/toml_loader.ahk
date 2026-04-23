@@ -204,7 +204,14 @@ FoldAsciiLower(Str) {
 ; TOML is swapped for the user's configured ``ScriptInformation["MagicKey"]``
 ; so that rebindings done via the tray menu are reflected in descriptions.
 ApplyTomlMetadataToFeatures(CategoryName) {
-    FilePath := A_ScriptDir . "\..\hotstrings\" . StrLower(CategoryName) . ".toml"
+    global ScriptInformation
+    if (StrLower(CategoryName) == "personal"
+            and IsSet(ScriptInformation)
+            and ScriptInformation.Has("PersonalTomlPath")) {
+        FilePath := ScriptInformation["PersonalTomlPath"]
+    } else {
+        FilePath := A_ScriptDir . "\..\hotstrings\" . StrLower(CategoryName) . ".toml"
+    }
     if !FileExist(FilePath) {
         return
     }

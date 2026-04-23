@@ -6,7 +6,7 @@ SetWorkingDir(A_ScriptDir) ; Set the working directory where the script is locat
 #Warn All
 #Warn VarUnset, Off ; Disable undefined variables warning. This removes the warnings caused by the import of UIA
 
-#Include *i UIA\Lib\UIA.ahk ; Can be downloaded here : https://github.com/Descolada/UIA-v2/tree/main
+#Include *i lib\UIA.ahk ; UIA v2 library — bundled in lib\ (source: https://github.com/Descolada/UIA-v2)
 ; *i = no error if the file isn't found, as this library is not mandatory to run this script
 
 ; #Hotstring EndChars -()[]{}:;'"/\,.?!`n`s`t   ; Adds the no breaking spaces as hotstrings triggers
@@ -337,10 +337,12 @@ GetCategoryTitle(Category) {
             return "➃ Autocorrection"
         case "MagicKey":
             return "➄ Touche " . ScriptInformation["MagicKey"] . " et expansion de texte"
+        case "Personal":
+            return "➅ Hotstrings personnels"
         case "Shortcuts":
-            return "➅ Raccourcis"
+            return "➆ Raccourcis"
         case "TapHolds":
-            return "➆ Tap-Holds"
+            return "➇ Tap-Holds"
         default:
             return ""
     }
@@ -368,6 +370,13 @@ InitSubMenus() {
         SubMenus[Category] := SubMenu ; Only top-level category stored
         CreateSubMenusRecursive(SubMenu, Items, Category)
     }
+    ; Personal is defined in personal.ahk (not in the static Features map), so it
+    ; must be wired separately after the loop — only when the user's file loaded it.
+    if Features.Has("Personal") {
+        PersonalSubMenu := Menu()
+        SubMenus["Personal"] := PersonalSubMenu
+        CreateSubMenusRecursive(PersonalSubMenu, Features["Personal"], "Personal")
+    }
 }
 
 initMenu() {
@@ -391,6 +400,11 @@ initMenu() {
         SubMenu := SubMenus[Category]
         CategoryTitle := GetCategoryTitle(Category)
         A_TrayMenu.Add(CategoryTitle, SubMenu)
+        ; Inject the Personal submenu right after MagicKey so it sits between
+        ; ➄ MagicKey and ➆ Raccourcis, using the user’s personal.toml sections.
+        if (Category = "MagicKey" and Features.Has("Personal") and SubMenus.Has("Personal")) {
+            A_TrayMenu.Add(GetCategoryTitle("Personal"), SubMenus["Personal"])
+        }
     }
 
     A_TrayMenu.Add() ; Separating line
