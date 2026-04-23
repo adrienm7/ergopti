@@ -1,4 +1,4 @@
-; static/drivers/autohotkey/lib/layout.ahk
+﻿; static/drivers/autohotkey/lib/layout.ahk
 
 ; ==============================================================================
 ; MODULE: Layout
