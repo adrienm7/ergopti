@@ -353,11 +353,14 @@ GetCategoryTitle(Category) {
 ; =========================
 
 global MenuLayout := "Modification de la disposition clavier"
-global MenuAllFeatures := "Features Ergopti➕"
+global MenuHotstrings := "Hotstrings ⚡"
 global MenuScriptManagement := "Gestion du script"
 global MenuConfigurationShortcuts := "Raccourcis de gestion du script"
 global MenuSuspend := "⏸︎ Suspendre" . (ScriptInformation["ShortcutSuspend"] ? " (AltGr + ↩)" : "")
 global MenuDebugging := "⚠ Débogage"
+
+; Categories that live inside the Hotstrings submenu (ordered to match HS menu)
+global HotstringCategories := ["DistancesReduction", "SFBsReduction", "Rolls", "Autocorrection", "MagicKey"]
 
 InitSubMenus() {
     global Features, SubMenus
@@ -371,7 +374,7 @@ InitSubMenus() {
         CreateSubMenusRecursive(SubMenu, Items, Category)
     }
     ; Personal is defined in personal.ahk (not in the static Features map), so it
-    ; must be wired separately after the loop — only when the user's file loaded it.
+    ; must be wired separately after the loop — only when the user’s file loaded it.
     if Features.Has("Personal") {
         PersonalSubMenu := Menu()
         SubMenus["Personal"] := PersonalSubMenu
@@ -380,43 +383,65 @@ InitSubMenus() {
 }
 
 initMenu() {
-    global Features, SubMenus, A_TrayMenu
+    global Features, SubMenus, A_TrayMenu, HotstringCategories
+
     A_TrayMenu.Delete()
 
-    ; Layout section (top-level)
+    ; ── Disposition clavier (top-level, mirroring future HS "Disposition" section) ──
     A_TrayMenu.Add(MenuLayout, NoAction)
     A_TrayMenu.Disable(MenuLayout)
     for FeatureName in Features["Layout"]["__Order"] {
         MenuAddItem(A_TrayMenu, "Layout", FeatureName)
     }
-    A_TrayMenu.Add()
-    A_TrayMenu.Add(MenuAllFeatures, NoAction)
-    A_TrayMenu.Disable(MenuAllFeatures)
 
-    ; Add only top-level submenus to global tray menu
-    for Category in Features["__Order"] {
-        if Category = "Layout"
-            continue ; Don’t add this submenu as we already added it above
-        SubMenu := SubMenus[Category]
-        CategoryTitle := GetCategoryTitle(Category)
-        A_TrayMenu.Add(CategoryTitle, SubMenu)
-        ; Inject the Personal submenu right after MagicKey so it sits between
-        ; ➄ MagicKey and ➆ Raccourcis, using the user’s personal.toml sections.
-        if (Category = "MagicKey" and Features.Has("Personal") and SubMenus.Has("Personal")) {
-            A_TrayMenu.Add(GetCategoryTitle("Personal"), SubMenus["Personal"])
+    A_TrayMenu.Add() ; Separating line
+
+    ; ── Hotstrings ⚡ — single submenu grouping all hotstring categories ──
+    HotstringsMenu := Menu()
+    for Category in HotstringCategories {
+        if SubMenus.Has(Category) {
+            HotstringsMenu.Add(GetCategoryTitle(Category), SubMenus[Category])
         }
+    }
+    ; Personal hotstrings section — only shown when personal.ahk defines it
+    if (Features.Has("Personal") and SubMenus.Has("Personal")) {
+        HotstringsMenu.Add(GetCategoryTitle("Personal"), SubMenus["Personal"])
+    }
+    HotstringsMenu.Add() ; Separating line
+    HotstringsMenu.Add("☑ Activer tous les hotstrings", ToggleAllHotstringsOn)
+    HotstringsMenu.Add("☐ Désactiver tous les hotstrings", ToggleAllHotstringsOff)
+    HotstringsMenu.Add() ; Separating line
+    HotstringsMenu.Add("📝 Éditeur de hotstrings personnels (Win + " . ScriptInformation["MagicKey"] . ")",
+        (*) => OpenPersonalEditor())
+    A_TrayMenu.Add(MenuHotstrings, HotstringsMenu)
+
+    ; ── Raccourcis and Tap-Holds (standalone, like HS Shortcuts and Karabiner) ──
+    if SubMenus.Has("Shortcuts") {
+        A_TrayMenu.Add(GetCategoryTitle("Shortcuts"), SubMenus["Shortcuts"])
+    }
+    if SubMenus.Has("TapHolds") {
+        A_TrayMenu.Add(GetCategoryTitle("TapHolds"), SubMenus["TapHolds"])
     }
 
     A_TrayMenu.Add() ; Separating line
-    A_TrayMenu.Add("✔️ TOUT activer", ToggleAllFeaturesOn)
-    A_TrayMenu.Add("❌ TOUT désactiver", ToggleAllFeaturesOff)
+
+    ; ── Editors and settings (mirrors HS Preferences area) ──
     A_TrayMenu.Add("Modifier la touche magique", MagicKeyEditor)
     A_TrayMenu.Add("Modifier les coordonnées personnelles", PersonalInformationEditor)
     A_TrayMenu.Add("Modifier les raccourcis sur les lettres accentuées", ShortcutsEditor)
     A_TrayMenu.Add("Modifier le lien ouvert par Win + G", GPTLinkEditor)
     A_TrayMenu.Add("📂 Chemins des fichiers personnels", FilePathsEditor)
 
-    ; Script management section
+    A_TrayMenu.Add() ; Separating line
+
+    ; ── Actions globales — mirrors HS "Actions globales" submenu ──
+    GlobalActionsMenu := Menu()
+    GlobalActionsMenu.Add("☑ Activer toutes les fonctionnalités", ToggleAllFeaturesOn)
+    GlobalActionsMenu.Add("☐ Désactiver toutes les fonctionnalités", ToggleAllFeaturesOff)
+    GlobalActionsMenu.Add("↺ Valeurs par défaut", ReloadWithDefaultConfig)
+    A_TrayMenu.Add("Actions globales", GlobalActionsMenu)
+
+    ; ── Script management section ──
     A_TrayMenu.Add() ; Separating line
     A_TrayMenu.Add(MenuScriptManagement, NoAction)
     A_TrayMenu.Disable(MenuScriptManagement)
@@ -431,10 +456,10 @@ initMenu() {
     A_TrayMenu.Add("✎ Éditer" . (ScriptInformation["ShortcutEdit"] ? " (AltGr + ⌦)" : ""), ActivateEdit)
     A_TrayMenu.Add(MenuSuspend, ToggleSuspend)
     A_TrayMenu.Add("🔄 Recharger" . (ScriptInformation["ShortcutSaveReload"] ? " (AltGr + ⌫)" : ""),
-    ActivateReload)
+        ActivateReload)
     A_TrayMenu.Add("⏹ Quitter (AltGr + ⎋)", ActivateExitApp)
 
-    ; Debugging section
+    ; ── Debugging section ──
     A_TrayMenu.Add() ; Separating line
     A_TrayMenu.Add(MenuDebugging, NoAction)
     A_TrayMenu.Disable(MenuDebugging)
@@ -667,6 +692,51 @@ ToggleAllFeatures(Value) {
                 ; If Val is a Map without Enabled, we skip its children when enabling
             }
         }
+    }
+    Reload
+}
+
+ToggleAllHotstringsOn(*) {
+    ToggleAllHotstrings(1)
+}
+ToggleAllHotstringsOff(*) {
+    ToggleAllHotstrings(0)
+}
+ToggleAllHotstrings(Value) {
+    global Features, HotstringCategories
+    for Category in HotstringCategories {
+        if !Features.Has(Category) {
+            continue
+        }
+        for FeatureName, Val in Features[Category] {
+            if FeatureName == "__Order" {
+                continue
+            }
+            if IsObject(Val) and Val.HasOwnProp("Enabled") {
+                Val.Enabled := Value
+                IniWrite(Value, ConfigurationFile, Category, FeatureName . ".Enabled")
+            }
+        }
+    }
+    ; Also toggle the Personal category when present
+    if Features.Has("Personal") {
+        for FeatureName, Val in Features["Personal"] {
+            if FeatureName == "__Order" {
+                continue
+            }
+            if IsObject(Val) and Val.HasOwnProp("Enabled") {
+                Val.Enabled := Value
+                IniWrite(Value, ConfigurationFile, "Personal", FeatureName . ".Enabled")
+            }
+        }
+    }
+    Reload
+}
+
+ReloadWithDefaultConfig(*) {
+    ; Delete the ini so the next startup uses all default values, then reload
+    if FileExist(ConfigurationFile) {
+        FileDelete(ConfigurationFile)
     }
     Reload
 }
