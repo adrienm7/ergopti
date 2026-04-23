@@ -442,31 +442,29 @@ OpenPersonalEditor(DefaultSection := "") {
 	; ── Separator ──
 	W.Add("Text", "xm y+8 w860 h1 +0x10")   ; horizontal rule
 
-	; ── Form: two-column layout via AHK Section ──
-	; xs/ys save the current cursor; a later control with xs/ys restores it.
-	; Left col  (xm=12): label (w90) + Edit inputs.
-	; Right col (x660) : 4 flag checkboxes, anchored to the trigger row.
+	; ── Form layout ──
+	; Left col : Déclencheur (h22) then Résultat (h62), total left height ≈ 22+6+22+62 = 112
+	; Right col: 4 checkboxes h≈20 each with 4px gap = 4*20+3*4 = 92px
+	; Add left col first, then place flags with yp pointing back to TriggerEdit top.
+	; OutputEdit h=62, flags block h=92 → flags start at TriggerEdit top = OutputEdit top - 28.
+	; In AHK v2 yp after OutputEdit = OutputEdit top, so flags at yp-28 = TriggerEdit top.
 
-	; Row 1 — trigger + right-col flags start here
-	W.Add("Text", "xm y+10 w90 h24 +0x200 Section", "Déclencheur :")
-	TriggerEdit := W.Add("Edit", "x+6 yp w530 h24")
+	W.Add("Text",  "xm y+10 w90 h22 +0x200", "Déclencheur :")
+	TriggerEdit := W.Add("Edit", "x108 yp w520 h22")
+	W.Add("Text",  "xm y+6  w90 h22 +0x200", "Résultat :")
+	OutputEdit  := W.Add("Edit", "x108 yp w520 h62 +Multi +WantReturn")
 
-	; Right column — start at x660, same Y as trigger row (ys restores Section Y)
-	ChkIsWord   := W.Add("CheckBox", "x660 ys     w170", "Mot complet")
-	ChkAutoExp  := W.Add("CheckBox", "x660 y+22   w170", "Auto-expand")
-	ChkCaseSens := W.Add("CheckBox", "x660 y+14   w170", "Sensible à la casse")
-	ChkFinal    := W.Add("CheckBox", "x660 y+14   w170", "Résultat final")
-
-	; Row 2 — output, back to left col below trigger (xs restores Section X = xm)
-	W.Add("Text", "xs y+6 w90 h24 +0x200", "Résultat :")
-	OutputEdit := W.Add("Edit", "x+6 yp w530 h66 +Multi +WantReturn")
-
-	; Default flag values (mirrors AHK loader defaults: auto_expand on)
-	ChkAutoExp.Value := 1
-
-	; ── Token help — below the taller of the two columns ──
-	W.Add("Text", "xm y+10 w860 cGray",
+	; Token help placed right after OutputEdit so y+8 starts from its bottom
+	TokenHelp := W.Add("Text", "xm y+8 w860 cGray",
 		"Tokens : {Enter}  {Tab}  {Left}  {Right}  {Up}  {Down}  {BackSpace}  {Delete}  {Escape}  {Home}  {End}  {Space}  {PgUp}  {PgDn}  {Insert}")
+
+	; Flags — yp points to TokenHelp top.
+	; TriggerEdit top = TokenHelp top - (h22 + gap6 + h22 + h62 + gap8) = yp - 120
+	ChkIsWord   := W.Add("CheckBox", "x644 yp-120 w180", "Mot complet")
+	ChkAutoExp  := W.Add("CheckBox", "x644 y+22   w180", "Auto-expand")
+	ChkCaseSens := W.Add("CheckBox", "x644 y+22   w180", "Sensible à la casse")
+	ChkFinal    := W.Add("CheckBox", "x644 y+22   w180", "Résultat final")
+	ChkAutoExp.Value := 1
 
 	; ── Separator ──
 	W.Add("Text", "xm y+6 w860 h1 +0x10")
@@ -513,11 +511,13 @@ OpenPersonalEditor(DefaultSection := "") {
 ; Internal helpers
 ; ─────────────────────────────────────────────────────
 
+; Returns display labels for all sections. Kept separate from key names so the
+; DDL index always matches sections_order index 1:1.
 _BuildSectionList(Data) {
 	List := []
 	for _, SecName in Data["sections_order"] {
 		Desc := Data["sections"].Has(SecName) ? Data["sections"][SecName]["description"] : SecName
-		List.Push(Desc . " [" . SecName . "]")
+		List.Push(Desc)
 	}
 	if List.Length == 0 {
 		List.Push("(aucune section)")
@@ -525,7 +525,7 @@ _BuildSectionList(Data) {
 	return List
 }
 
-; Rebuild a DropDownList from scratch.
+; Rebuild a DropDownList from scratch — one Add([item]) call per entry.
 _RebuildDropdown(DDL, Data) {
 	DDL.Delete()
 	for _, Item in _BuildSectionList(Data) {
@@ -533,16 +533,22 @@ _RebuildDropdown(DDL, Data) {
 	}
 }
 
+; Select the DDL entry whose index matches SectionName in sections_order.
 _SelectDropDown(DDL, SectionName) {
 	global _PersonalEditorData
 	if (SectionName == "") {
+		DDL.Choose(1)
 		return
 	}
 	for i, SecName in _PersonalEditorData["sections_order"] {
-		if (StrLower(SecName) == StrLower(SectionName)) {
+		if (StrLower(Trim(SecName)) == StrLower(Trim(SectionName))) {
 			DDL.Choose(i)
 			return
 		}
+	}
+	; Fallback: select first item if name not found
+	if _PersonalEditorData["sections_order"].Length > 0 {
+		DDL.Choose(1)
 	}
 }
 
