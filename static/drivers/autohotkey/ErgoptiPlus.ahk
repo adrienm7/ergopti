@@ -57,6 +57,7 @@ SendMode("Event") ; Everything concerning hotstrings MUST use SendEvent and not 
 #Include lib\hotstring_engine.ahk
 #Include lib\toml_loader.ahk
 #Include lib\personal_toml_editor.ahk
+#Include lib\dispatchers.ahk
 
 ; ======================================================
 ; ======================================================

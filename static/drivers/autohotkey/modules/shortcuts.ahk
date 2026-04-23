@@ -49,27 +49,9 @@ SC038 & SC03A:: LAltCapsLockShortcut()
 #HotIf
 
 LAltCapsLockShortcut() {
-	if Features["Shortcuts"]["LAltCapsLock"]["BackSpace"].Enabled {
-		SendEvent("{BackSpace}")
-	} else if Features["Shortcuts"]["LAltCapsLock"]["CapsLock"].Enabled {
-		ToggleCapsLock()
-	} else if Features["Shortcuts"]["LAltCapsLock"]["CapsWord"].Enabled {
-		ToggleCapsWord()
-	} else if Features["Shortcuts"]["LAltCapsLock"]["CtrlBackSpace"].Enabled {
-		SendInput("^{BackSpace}")
-	} else if Features["Shortcuts"]["LAltCapsLock"]["CtrlDelete"].Enabled {
-		SendInput("^{Delete}")
-	} else if Features["Shortcuts"]["LAltCapsLock"]["Delete"].Enabled {
-		SendInput("{Delete}")
-	} else if Features["Shortcuts"]["LAltCapsLock"]["Enter"].Enabled {
-		SendInput("{Enter}")
-	} else if Features["Shortcuts"]["LAltCapsLock"]["Escape"].Enabled {
-		SendInput("{Escape}")
-	} else if Features["Shortcuts"]["LAltCapsLock"]["OneShotShift"].Enabled {
-		OneShotShift()
-	} else if Features["Shortcuts"]["LAltCapsLock"]["Tab"].Enabled {
-		SendInput("{Tab}")
-	}
+	; All ten possible actions are simple, no Shift inversion or modifier
+	; bracketing needed — delegate to the shared dispatcher.
+	RunFirstSimpleAction(Features["Shortcuts"]["LAltCapsLock"])
 }
 
 
@@ -101,18 +83,9 @@ if Features["Shortcuts"]["MicrosoftBold"].Enabled {
 ; ==================================
 ; ==================================
 
-#HotIf (
-	Features["Shortcuts"]["AltGrLAlt"]["BackSpace"].Enabled
-	or Features["Shortcuts"]["AltGrLAlt"]["CapsLock"].Enabled
-	or Features["Shortcuts"]["AltGrLAlt"]["CapsWord"].Enabled
-	or Features["Shortcuts"]["AltGrLAlt"]["CtrlBackSpace"].Enabled
-	or Features["Shortcuts"]["AltGrLAlt"]["CtrlDelete"].Enabled
-	or Features["Shortcuts"]["AltGrLAlt"]["Delete"].Enabled
-	or Features["Shortcuts"]["AltGrLAlt"]["Enter"].Enabled
-	or Features["Shortcuts"]["AltGrLAlt"]["Escape"].Enabled
-	or Features["Shortcuts"]["AltGrLAlt"]["OneShotShift"].Enabled
-	or Features["Shortcuts"]["AltGrLAlt"]["Tab"].Enabled
-)
+; Pre-computed at boot — evaluated once instead of 10 OR comparisons per key press.
+global _ALTGR_LALT_ENABLED := HasAnyEnabled(Features["Shortcuts"]["AltGrLAlt"])
+#HotIf _ALTGR_LALT_ENABLED
 SC138 & SC038:: AltGrLAltShortcut()
 #HotIf
 
@@ -164,43 +137,13 @@ AltGrLAltShortcut() {
 	}
 }
 
-#HotIf (
-	Features["Shortcuts"]["AltGrCapsLock"]["BackSpace"].Enabled
-	or Features["Shortcuts"]["AltGrCapsLock"]["CapsLock"].Enabled
-	or Features["Shortcuts"]["AltGrCapsLock"]["CapsWord"].Enabled
-	or Features["Shortcuts"]["AltGrCapsLock"]["CtrlBackSpace"].Enabled
-	or Features["Shortcuts"]["AltGrCapsLock"]["CtrlDelete"].Enabled
-	or Features["Shortcuts"]["AltGrCapsLock"]["Delete"].Enabled
-	or Features["Shortcuts"]["AltGrCapsLock"]["Enter"].Enabled
-	or Features["Shortcuts"]["AltGrCapsLock"]["Escape"].Enabled
-	or Features["Shortcuts"]["AltGrCapsLock"]["OneShotShift"].Enabled
-	or Features["Shortcuts"]["AltGrCapsLock"]["Tab"].Enabled
-)
+global _ALTGR_CAPSLOCK_ENABLED := HasAnyEnabled(Features["Shortcuts"]["AltGrCapsLock"])
+#HotIf _ALTGR_CAPSLOCK_ENABLED
 SC138 & SC03A:: AltGrCapsLockShortcut()
 #HotIf
 
 AltGrCapsLockShortcut() {
-	if Features["Shortcuts"]["AltGrCapsLock"]["BackSpace"].Enabled {
-		SendEvent("{BackSpace}")
-	} else if Features["Shortcuts"]["AltGrCapsLock"]["CapsLock"].Enabled {
-		ToggleCapsLock()
-	} else if Features["Shortcuts"]["AltGrCapsLock"]["CapsWord"].Enabled {
-		ToggleCapsWord()
-	} else if Features["Shortcuts"]["AltGrCapsLock"]["CtrlBackSpace"].Enabled {
-		SendInput("^{BackSpace}")
-	} else if Features["Shortcuts"]["AltGrCapsLock"]["CtrlDelete"].Enabled {
-		SendInput("^{Delete}")
-	} else if Features["Shortcuts"]["AltGrCapsLock"]["Delete"].Enabled {
-		SendInput("{Delete}")
-	} else if Features["Shortcuts"]["AltGrCapsLock"]["Enter"].Enabled {
-		SendInput("{Enter}")
-	} else if Features["Shortcuts"]["AltGrCapsLock"]["Escape"].Enabled {
-		SendInput("{Escape}")
-	} else if Features["Shortcuts"]["AltGrCapsLock"]["OneShotShift"].Enabled {
-		OneShotShift()
-	} else if Features["Shortcuts"]["AltGrCapsLock"]["Tab"].Enabled {
-		SendInput("{Tab}")
-	}
+	RunFirstSimpleAction(Features["Shortcuts"]["AltGrCapsLock"])
 }
 
 

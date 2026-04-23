@@ -452,21 +452,10 @@ SC039 Up:: {
 ; ==============================
 ; ==============================
 
-#HotIf (
-	not LayerEnabled
-	and (
-		Features["TapHolds"]["AltGr"]["BackSpace"].Enabled
-		or Features["TapHolds"]["AltGr"]["CapsLock"].Enabled
-		or Features["TapHolds"]["AltGr"]["CapsWord"].Enabled
-		or Features["TapHolds"]["AltGr"]["CtrlBackSpace"].Enabled
-		or Features["TapHolds"]["AltGr"]["CtrlDelete"].Enabled
-		or Features["TapHolds"]["AltGr"]["Delete"].Enabled
-		or Features["TapHolds"]["AltGr"]["Enter"].Enabled
-		or Features["TapHolds"]["AltGr"]["Escape"].Enabled
-		or Features["TapHolds"]["AltGr"]["OneShotShift"].Enabled
-		or Features["TapHolds"]["AltGr"]["Tab"].Enabled
-	)
-)
+; Pre-computed at boot to avoid evaluating ten ORs on every AltGr release.
+global _TAPHOLD_ALTGR_ENABLED := HasAnyEnabled(Features["TapHolds"]["AltGr"])
+
+#HotIf not LayerEnabled and _TAPHOLD_ALTGR_ENABLED
 ; Tap-hold on "AltGr"
 SC01D & ~SC138:: ; LControl & RAlt is the only way to make it fire on tap directly
 RAlt:: ; Necessary to work on layouts like QWERTY
@@ -474,33 +463,7 @@ RAlt:: ; Necessary to work on layouts like QWERTY
 	tap := KeyWait("RAlt", "T" . Features["TapHolds"]["AltGr"]["__Configuration"].TimeActivationSeconds)
 	if (tap and (A_PriorKey == "RAlt" or A_PriorKey == "^")) {
 		DisableCapsWord()
-		if Features["TapHolds"]["AltGr"]["BackSpace"].Enabled {
-			SendEvent("{Blind}{BackSpace}") ; SendEvent be able to trigger hotstrings
-			UpdateLastSentCharacter("BackSpace")
-		} else if Features["TapHolds"]["AltGr"]["CapsLock"].Enabled {
-			ToggleCapsLock()
-		} else if Features["TapHolds"]["AltGr"]["CapsWord"].Enabled {
-			ToggleCapsWord()
-		} else if Features["TapHolds"]["AltGr"]["CtrlBackSpace"].Enabled {
-			SendEvent("{Blind}^{BackSpace}")
-			UpdateLastSentCharacter("")
-		} else if Features["TapHolds"]["AltGr"]["CtrlDelete"].Enabled {
-			SendEvent("{Blind}^{Delete}")
-			UpdateLastSentCharacter("")
-		} else if Features["TapHolds"]["AltGr"]["Delete"].Enabled {
-			SendEvent("{Blind}{Delete}")
-			UpdateLastSentCharacter("Delete")
-		} else if Features["TapHolds"]["AltGr"]["Enter"].Enabled {
-			SendEvent("{Blind}{Enter}") ; SendEvent be able to trigger hotstrings with a Enter ending character
-			UpdateLastSentCharacter("Enter")
-		} else if Features["TapHolds"]["AltGr"]["Escape"].Enabled {
-			SendEvent("{Escape}")
-		} else if Features["TapHolds"]["AltGr"]["OneShotShift"].Enabled {
-			OneShotShift()
-		} else if Features["TapHolds"]["AltGr"]["Tab"].Enabled {
-			SendEvent("{Blind}{Tab}") ; SendEvent be able to trigger hotstrings with a Tab ending character
-			UpdateLastSentCharacter("Tab")
-		}
+		RunFirstAltGrTapHoldAction(Features["TapHolds"]["AltGr"])
 	}
 }
 
