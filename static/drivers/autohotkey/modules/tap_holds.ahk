@@ -1,4 +1,4 @@
-﻿; static/drivers/autohotkey/lib/tap_holds.ahk
+﻿; static/drivers/autohotkey/modules/tap_holds.ahk
 
 ; ==============================================================================
 ; MODULE: Tap-Holds, One-Shot Shift and Navigation Layer
