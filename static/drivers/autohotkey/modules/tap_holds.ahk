@@ -339,33 +339,55 @@ BackSpaceLogic() {
 ; ==============================
 ; ==============================
 
-#HotIf Features["TapHolds"]["Space"]["Ctrl"].Enabled and not LayerEnabled
-; Tap-hold on "Space" : Space on tap, Ctrl on hold
-SC039::
-{
-	ih := InputHook("L1 T" . Features["TapHolds"]["Space"]["Ctrl"].TimeActivationSeconds)
+; Shared tap logic for all Space tap-hold variants. Reads the next character
+; via InputHook; on tap it forwards the Space + next character (avoiding a
+; double-space when the next key is also Space). On timeout it delegates to
+; HoldFn, which is responsible for activating the held modifier and blocking
+; until SC039 is released. Returns true when the timeout (hold) branch fired.
+SpaceTapHold(FeatureKey, HoldFn) {
+	TimeoutSec := Features["TapHolds"]["Space"][FeatureKey].TimeActivationSeconds
+	ih := InputHook("L1 T" . TimeoutSec)
 	ih.Start()
 	ih.Wait()
 	if ih.EndReason != "Timeout" {
-		Text := ih.Input
-		if ih.Input == " " {
-			Text := "" ; To not send a double space
-		}
+		; Tap path: send the Space that was intercepted, then the captured character
+		; (omit it when it is itself a Space to avoid a double-space).
+		Text := (ih.Input == " ") ? "" : ih.Input
 		SendEvent("{Space}" Text)
-		; SendEvent is used to be able to do testt{BS}★ ➜ test★ that will trigger the hotstring.
-		; Otherwise, SendInput resets the hotstrings search
 		UpdateLastSentCharacter(" ")
-		return
+		return False
 	}
+	HoldFn()
+	return True
+}
 
+; Each #HotIf block maps exactly one SC039 condition to one hold action.
+; The SC039 Up companion sends a trailing Space when the key was released
+; before the InputHook timeout elapsed and no tap was already sent.
+
+_SpaceHoldCtrl() {
 	SendEvent("{LCtrl Down}")
 	KeyWait("SC039")
 	SendEvent("{LCtrl Up}")
 }
+_SpaceHoldLayer() {
+	ActivateLayer()
+	KeyWait("SC039")
+	DisableLayer()
+}
+_SpaceHoldShift() {
+	SendEvent("{LShift Down}")
+	KeyWait("SC039")
+	SendEvent("{LShift Up}")
+}
+
+#HotIf Features["TapHolds"]["Space"]["Ctrl"].Enabled and not LayerEnabled
+; Tap-hold on "Space" : Space on tap, Ctrl on hold
+SC039:: SpaceTapHold("Ctrl", _SpaceHoldCtrl)
 SC039 Up:: {
 	if (
 		A_PriorHotkey == "SC039"
-		and not CapsWordEnabled ; Solves a bug of 2 sent Spaces when exiting CapsWord with a Space
+		and not CapsWordEnabled
 		and A_TimeSinceThisHotkey <= Features["TapHolds"]["Space"]["Ctrl"].TimeActivationSeconds
 	) {
 		SendEvent("{Space}")
@@ -375,31 +397,11 @@ SC039 Up:: {
 
 #HotIf Features["TapHolds"]["Space"]["Layer"].Enabled and not LayerEnabled
 ; Tap-hold on "Space" : Space on tap, Layer on hold
-SC039::
-{
-	ih := InputHook("L1 T" . Features["TapHolds"]["Space"]["Layer"].TimeActivationSeconds)
-	ih.Start()
-	ih.Wait()
-	if ih.EndReason != "Timeout" {
-		Text := ih.Input
-		if ih.Input == " " {
-			Text := "" ; To not send a double space
-		}
-		SendEvent("{Space}" Text)
-		; SendEvent is used to be able to do testt{BS}★ ➜ test★ that will trigger the hotstring.
-		; Otherwise, SendInput resets the hotstrings search
-		UpdateLastSentCharacter(" ")
-		return
-	}
-
-	ActivateLayer()
-	KeyWait("SC039")
-	DisableLayer()
-}
+SC039:: SpaceTapHold("Layer", _SpaceHoldLayer)
 SC039 Up:: {
 	if (
 		A_PriorHotkey == "SC039"
-		and not CapsWordEnabled ; Solves a bug of 2 sent Spaces when exiting CapsWord with a Space
+		and not CapsWordEnabled
 		and A_TimeSinceThisHotkey <= Features["TapHolds"]["Space"]["Layer"].TimeActivationSeconds
 	) {
 		SendEvent("{Space}")
@@ -410,31 +412,11 @@ SC039 Up:: {
 
 #HotIf Features["TapHolds"]["Space"]["Shift"].Enabled and not LayerEnabled
 ; Tap-hold on "Space" : Space on tap, Shift on hold
-SC039::
-{
-	ih := InputHook("L1 T" . Features["TapHolds"]["Space"]["Shift"].TimeActivationSeconds)
-	ih.Start()
-	ih.Wait()
-	if ih.EndReason != "Timeout" {
-		Text := ih.Input
-		if ih.Input == " " {
-			Text := "" ; To not send a double space
-		}
-		SendEvent("{Space}" Text)
-		; SendEvent is used to be able to do testt{BS}★ ➜ test★ that will trigger the hotstring.
-		; Otherwise, SendInput resets the hotstrings search
-		UpdateLastSentCharacter(" ")
-		return
-	}
-
-	SendEvent("{LShift Down}")
-	KeyWait("SC039")
-	SendEvent("{LShift Up}")
-}
+SC039:: SpaceTapHold("Shift", _SpaceHoldShift)
 SC039 Up:: {
 	if (
 		A_PriorHotkey == "SC039"
-		and not CapsWordEnabled ; Solves a bug of 2 sent Spaces when exiting CapsWord with a Space
+		and not CapsWordEnabled
 		and A_TimeSinceThisHotkey <= Features["TapHolds"]["Space"]["Shift"].TimeActivationSeconds
 	) {
 		SendEvent("{Space}")
