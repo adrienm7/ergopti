@@ -467,14 +467,22 @@ OpenPersonalEditor(DefaultSection := "") {
 	TokenHelp.GetPos(, &TokY, , &TokH)
 	W.Add("Text", "xm y" . (TokY + TokH + 6) . " w860 h1 +0x10")
 
-	; ── Action buttons row ──
-	BtnAdd   := W.Add("Button", "xm y+8 w100 h26", "➕ Ajouter")
-	BtnSave  := W.Add("Button", "x+6 yp w100 h26", "💾 Enregistrer")
-	BtnDel   := W.Add("Button", "x+6 yp w100 h26", "🗑 Supprimer")
-	BtnClear := W.Add("Button", "x+6 yp w110 h26", "✖ Effacer form")
-	W.Add("Button", "x+6 yp w90 h26", "Fermer").OnEvent("Click", (*) => W.Destroy())
-	CloseOnAddChk := W.Add("CheckBox", "x+20 yp+4 w220", "Fermer après ajout")
+	; ── Action buttons — three visual groups ──
+	GB1 := W.Add("GroupBox", "xm y+10 w240 h54", "Créer")
+	GB1.GetPos(&GB1X, &GB1Y)
+	BtnAdd        := W.Add("Button",   "x" . (GB1X+10) . " y" . (GB1Y+22) . " w110 h26", "➕ Ajouter")
+	CloseOnAddChk := W.Add("CheckBox", "x" . (GB1X+128) . " y" . (GB1Y+26) . " w100",    "Fermer après")
 	CloseOnAddChk.Value := (_EditorPrefGet("CloseOnAdd", "0") == "1") ? 1 : 0
+
+	GB2 := W.Add("GroupBox", "x" . (GB1X+250) . " y" . GB1Y . " w360 h54", "Hotstring sélectionné")
+	GB2.GetPos(&GB2X, &GB2Y)
+	BtnSave  := W.Add("Button", "x" . (GB2X+10)  . " y" . (GB2Y+22) . " w106 h26", "💾 Modifier")
+	BtnDel   := W.Add("Button", "x" . (GB2X+122) . " y" . (GB2Y+22) . " w110 h26", "🗑 Supprimer")
+	BtnClear := W.Add("Button", "x" . (GB2X+238) . " y" . (GB2Y+22) . " w112 h26", "✖ Effacer form")
+
+	GB3 := W.Add("GroupBox", "x" . (GB2X+370) . " y" . GB1Y . " w120 h54", "Fenêtre")
+	GB3.GetPos(&GB3X, &GB3Y)
+	W.Add("Button", "x" . (GB3X+10) . " y" . (GB3Y+22) . " w100 h26", "Fermer").OnEvent("Click", (*) => W.Destroy())
 
 	; ── Status bar ──
 	StatusText := W.Add("Text", "xm y+10 w860 h20 cGray", "")
