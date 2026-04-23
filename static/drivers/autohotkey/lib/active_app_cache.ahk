@@ -81,16 +81,16 @@ GetActiveApp() {
 		return _ActiveAppCache
 	}
 
-	Class := ""
-	Exe := ""
-	try Class := WinGetClass("A")
-	try Exe := WinGetProcessName("A")
+	WindowClass := ""
+	WindowExe := ""
+	try WindowClass := WinGetClass("A")
+	try WindowExe := WinGetProcessName("A")
 
 	_ActiveAppCache.ts := Now
-	_ActiveAppCache.Class := Class
-	_ActiveAppCache.Exe := Exe
-	_ActiveAppCache.IsNotepad := (Class == "Notepad")
-	_ActiveAppCache.IsMicrosoftOffice := MICROSOFT_OFFICE_EXES.Has(Exe)
+	_ActiveAppCache.Class := WindowClass
+	_ActiveAppCache.Exe := WindowExe
+	_ActiveAppCache.IsNotepad := (WindowClass == "Notepad")
+	_ActiveAppCache.IsMicrosoftOffice := MICROSOFT_OFFICE_EXES.Has(WindowExe)
 	return _ActiveAppCache
 }
 
