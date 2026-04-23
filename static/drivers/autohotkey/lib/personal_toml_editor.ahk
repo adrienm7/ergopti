@@ -475,15 +475,10 @@ OpenPersonalEditor(DefaultSection := "") {
 	SepCtrl.GetPos(, &SepY, , &SepH)
 	RowY := SepY + SepH + 8
 
-	GB2 := W.Add("GroupBox", "xm y" . RowY . " w360 h54", "Hotstring sélectionné")
+	GB2 := W.Add("GroupBox", "xm y" . RowY . " w240 h54", "Hotstring sélectionné")
 	GB2.GetPos(&GB2X, &GB2Y)
-	BtnSave  := W.Add("Button", "x" . (GB2X+10)  . " y" . (GB2Y+22) . " w106 h26", "💾 Modifier")
-	BtnDel   := W.Add("Button", "x" . (GB2X+122) . " y" . (GB2Y+22) . " w110 h26", "🗑 Supprimer")
-	BtnClear := W.Add("Button", "x" . (GB2X+238) . " y" . (GB2Y+22) . " w112 h26", "✖ Effacer form")
-
-	GB3 := W.Add("GroupBox", "x" . (GB2X+370) . " y" . RowY . " w120 h54", "Fenêtre")
-	GB3.GetPos(&GB3X, &GB3Y)
-	W.Add("Button", "x" . (GB3X+10) . " y" . (GB3Y+22) . " w100 h26", "Fermer").OnEvent("Click", (*) => W.Destroy())
+	BtnSave := W.Add("Button", "x" . (GB2X+10)  . " y" . (GB2Y+22) . " w106 h26", "💾 Modifier")
+	BtnDel  := W.Add("Button", "x" . (GB2X+122) . " y" . (GB2Y+22) . " w106 h26", "🗑 Supprimer")
 
 	; ── Status bar ──
 	StatusText := W.Add("Text", "xm y+10 w860 h20 cGray", "")
@@ -493,9 +488,7 @@ OpenPersonalEditor(DefaultSection := "") {
 		ChkIsWord, ChkAutoExp, ChkCaseSens, ChkFinal, CloseOnAddChk, StatusText))
 	BtnSave.OnEvent("Click", (*) => _SaveEntry(W, LV, TriggerEdit, OutputEdit,
 		ChkIsWord, ChkAutoExp, ChkCaseSens, ChkFinal, StatusText))
-	BtnDel.OnEvent("Click",  (*) => _DeleteEntry(W, LV, StatusText))
-	BtnClear.OnEvent("Click", (*) => _ClearForm(TriggerEdit, OutputEdit,
-		ChkIsWord, ChkAutoExp, ChkCaseSens, ChkFinal))
+	BtnDel.OnEvent("Click", (*) => _DeleteEntry(W, LV, StatusText))
 
 	LV.OnEvent("ItemSelect", (*) => _FillFormFromSelection(LV, TriggerEdit, OutputEdit,
 		ChkIsWord, ChkAutoExp, ChkCaseSens, ChkFinal))
