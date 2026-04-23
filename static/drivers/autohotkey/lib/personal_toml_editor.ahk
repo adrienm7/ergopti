@@ -160,11 +160,14 @@ ReadPersonalToml() {
 				Result["meta_description"] := DM[1]
 			}
 			; Parse sections_order = ["a", "b", …]
+			; Use Chr(34) for the quote character — backtick escapes do NOT work inside single-quoted strings
 			if (MetaOrder.Length == 0
 					and RegExMatch(Line, '^sections_order\s*=\s*\[(.+)\]', &OM)) {
-				Raw := OM[1]
-				Pos := 1
-				while RegExMatch(Raw, '`"([^`"]*)`"', &TM, Pos) {
+				Raw     := OM[1]
+				Q       := Chr(34)
+				QuotePat := Q . "([^" . Q . "]*)" . Q
+				Pos     := 1
+				while RegExMatch(Raw, QuotePat, &TM, Pos) {
 					MetaOrder.Push(StrLower(TM[1]))
 					Pos := TM.Pos + TM.Len
 				}
@@ -450,26 +453,34 @@ OpenPersonalEditor(DefaultSection := "") {
 	; ── Separator ──
 	W.Add("Text", "xm y+8 w860 h1 +0x10")   ; horizontal rule
 
-	; ── Form: row 1 — trigger ──
-	W.Add("Text", "xm y+8 w90 h24 +0x200", "Déclencheur :")
-	TriggerEdit := W.Add("Edit", "x+6 yp w220 h24")
+	; ── Form layout constants ──
+	; Left zone: labels (col 0) + inputs (col 1).  Right zone: flags (col 2).
+	; xm = 12.  Label width = 90.  Gap = 6.  Input left edge = 108.
+	; Flags column starts at x640 and is always fixed regardless of window width.
+	LabelW  := 90
+	InputX  := "x108"
+	FlagsX  := "x648"
+	InputW  := 520    ; width of text inputs in the left zone
 
-	; ── Form: row 2 — output (multiline) ──
-	W.Add("Text", "xm y+8 w90 h24 +0x200", "Résultat :")
-	OutputEdit := W.Add("Edit", "x+6 yp w540 h62 +Multi +WantReturn")
+	; ── Form: row 1 — trigger (single line) ──
+	W.Add("Text", "xm y+10 w" . LabelW . " h24 +0x200", "Déclencheur :")
+	TriggerEdit := W.Add("Edit", InputX . " yp w" . InputW . " h24")
 
-	; ── Flags: 2×2 grid to the right of output ──
-	FlagsX := "x+10 yp"
-	ChkIsWord   := W.Add("CheckBox", FlagsX . " w160", "Mot complet")
-	ChkAutoExp  := W.Add("CheckBox", "xp y+20 w160",   "Auto-expand ★")
-	ChkCaseSens := W.Add("CheckBox", "xp y+20 w160",   "Sensible à la casse")
-	ChkFinal    := W.Add("CheckBox", "xp y+20 w160",   "Résultat final")
+	; ── Form: row 2 — output (multiline) + flags aligned to its top ──
+	W.Add("Text", "xm y+8 w" . LabelW . " h24 +0x200", "Résultat :")
+	OutputEdit := W.Add("Edit", InputX . " yp w" . InputW . " h66 +Multi +WantReturn")
+
+	; Flags column — anchored at fixed x, aligned to the top of OutputEdit
+	ChkIsWord   := W.Add("CheckBox", FlagsX . " yp     w170", "Mot complet")
+	ChkAutoExp  := W.Add("CheckBox", FlagsX . " y+20   w170", "Auto-expand")
+	ChkCaseSens := W.Add("CheckBox", FlagsX . " y+20   w170", "Sensible à la casse")
+	ChkFinal    := W.Add("CheckBox", FlagsX . " y+20   w170", "Résultat final")
 
 	; Default flag values (mirrors AHK loader defaults: auto_expand on)
 	ChkAutoExp.Value := 1
 
-	; ── Token help ──
-	W.Add("Text", "xm y+8 w860 cGray",
+	; ── Token help — below the output/flags block ──
+	W.Add("Text", "xm y+10 w860 cGray",
 		"Tokens : {Enter}  {Tab}  {Left}  {Right}  {Up}  {Down}  {BackSpace}  {Delete}  {Escape}  {Home}  {End}  {Space}  {PgUp}  {PgDn}  {Insert}")
 
 	; ── Separator ──
@@ -836,10 +847,10 @@ _OnEditorClose() {
 
 _ResizeEditor(W, LV, OutputEdit, StatusText) {
 	W.GetClientPos(, , &CW, &CH)
-	Margin := 24
+	Margin    := 24
+	FlagsColX := 648    ; must match the FlagsX constant above
 	LV.Move(, , CW - Margin, )
-	; Keep output field proportional: fills width up to flags column (≈ 165 px)
-	LV.GetPos(&LVX, , &LVW, )
-	OutputEdit.Move(, , Max(200, LVW - 165 - 96 - 12), )
+	; Output field fills from x108 up to the flags column with a small gap
+	OutputEdit.Move(, , FlagsColX - 108 - 8, )
 	StatusText.Move(, CH - 26, CW - Margin, )
 }
