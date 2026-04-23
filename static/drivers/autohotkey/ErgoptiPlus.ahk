@@ -750,12 +750,25 @@ SC138 & SC00E::
 #HotIf
 
 #HotIf ScriptInformation["ShortcutEdit"]
-; Edit the script with AltGr + Delete (Suppr.)
+; Open personal.ahk (user config file) with AltGr + Delete (Suppr.)
 RAlt & Delete::
 SC138 & SC153::
 {
     if (GetKeyState("SC138", "P") and GetKeyState("SC153", "P")) {
-        Edit
+        PersonalAhkPath := A_ScriptDir . "\personal.ahk"
+        if !FileExist(PersonalAhkPath) {
+            FileAppend(
+                "; drivers/autohotkey/personal.ahk`r`n"
+                . "; Fichier de configuration personnelle — non suivi par git.`r`n"
+                . "; Ajouter ici vos propres raccourcis clavier et hotstrings.`r`n"
+                . "; Ce fichier est chargé en priorité maximale par ErgoptiPlus.ahk.`r`n"
+                . "`r`n"
+                . "#Requires AutoHotkey v2.0`r`n",
+                PersonalAhkPath,
+                "UTF-8-RAW"
+            )
+        }
+        Run("notepad.exe " . PersonalAhkPath)
     } else {
         SendInput("{Delete}")
     }
@@ -772,10 +785,30 @@ SC138 & SC153::
 ; =======================================================
 ; =======================================================
 
-; Here you can add your own hotkeys and hotstrings.
-; As they are defined before everything else, they will override any existing definitions if there are duplicates
-; Putting everything in this part makes is easy to update your ErgoptiPlus version, as you will only need
-; to paste this part into the « 2/ PERSONAL SHORTCUTS » part of the new version.
+; Personal shortcuts, hotkeys, and feature configuration live in personal.ahk
+; (not tracked by git). Drop your own hotkeys there; they override any
+; built-in definition because they are registered first.
+; Personal TOML hotstrings (hotstrings/personal.toml) are then loaded
+; immediately after so they also take priority over all other hotstrings.
+#Include *i personal.ahk
+
+; Load personal TOML hotstrings with maximum priority (defined before all
+; built-in hotstrings so they shadow any conflicting built-in entry).
+if Features.Has("Personal") {
+    ApplyTomlMetadataToFeatures("Personal")
+    if Features["Personal"].Has("EmailShortcuts") and Features["Personal"]["EmailShortcuts"].Enabled {
+        LoadHotstringsSection("personal", "emailshortcuts", Features["Personal"]["EmailShortcuts"])
+    }
+    if Features["Personal"].Has("Code") and Features["Personal"]["Code"].Enabled {
+        LoadHotstringsSection("personal", "code", Features["Personal"]["Code"])
+    }
+    if Features["Personal"].Has("ProfessionalVocabulary") and Features["Personal"]["ProfessionalVocabulary"].Enabled {
+        LoadHotstringsSection("personal", "professionalvocabulary", Features["Personal"]["ProfessionalVocabulary"])
+    }
+    if Features["Personal"].Has("Autocorrection") and Features["Personal"]["Autocorrection"].Enabled {
+        LoadHotstringsSection("personal", "autocorrection", Features["Personal"]["Autocorrection"])
+    }
+}
 
 #InputLevel 2 ; Mandatory for this section to work, it needs to be below the InputLevel of the key remappings
 
