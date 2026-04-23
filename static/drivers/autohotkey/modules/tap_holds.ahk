@@ -41,7 +41,7 @@ global ONE_SHOT_SHIFT_TIMEOUT_SEC := 2
 ; Fix for using the LAltCapsLockShortcut with LAlt remapped to OneShotShift and CapsLock not remapped
 #HotIf (
 	Features["TapHolds"]["LAlt"]["OneShotShift"].Enabled
-	and not Features["TapHolds"]["CapsLock"]["BackSpace"]
+	and not Features["TapHolds"]["CapsLock"]["BackSpace"].Enabled
 	and not CapsLockRemappedCondition()
 	and not LayerEnabled
 )
@@ -696,7 +696,7 @@ OneShotShift() {
 		SpecialCharacter := "-"
 	}
 
-	if (ihvText == "Timeout") {
+	if (ihvText.EndReason == "Timeout") {
 		return
 	} else if SpecialCharacter != "" {
 		if OneShotShiftEnabled {

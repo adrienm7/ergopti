@@ -1,4 +1,4 @@
-﻿; static/drivers/autohotkey/lib/layout.ahk
+﻿; static/drivers/autohotkey/modules/layout.ahk
 
 ; ==============================================================================
 ; MODULE: Layout
@@ -62,7 +62,7 @@ global DeadkeyMappingCircumflex := Map(
 	"t", "!", "T", "¡",
 	"u", "û", "U", "Û",
 	"v", "✓", "V", "✔",
-	"w", "ù ", "W", "Ù",
+	"w", "ù", "W", "Ù",
 	"x", "✕", "X", "✖",
 	"y", "ŷ", "Y", "Ŷ",
 	"z", "ẑ", "Z", "Ẑ",
@@ -89,10 +89,8 @@ global DeadkeyMappingDiaresis := Map(
 	"e", "ë", "E", "Ë",
 	"h", "ḧ", "H", "Ḧ",
 	"i", "ï", "I", "Ï",
-	"n", " ", "N", " ",
 	"o", "ö", "O", "Ö",
 	"r", "®", "R", "®",
-	"s", " ", "S", " ",
 	"t", "™", "T", "™",
 	"u", "ü", "U", "Ü",
 	"w", "ẅ", "W", "Ẅ",
@@ -198,7 +196,7 @@ global DeadkeyMappingSubscript := Map(
 	"z", "", "Z", "ᴢ", ; There is no subscript z yet in Unicode
 	"[", "˻", "]", "˼",
 	"æ", "", "Æ", "ᴁ", ; There is no subscript æ yet in Unicode
-	"è", "ᵧ", "Y", "", ; There is no subscript capital ᵧ yet in Unicode
+	"è", "ᵧ", "È", "", ; There is no subscript capital ᵧ yet in Unicode
 	"ê", "ᵩ", "Ê", "", ; There is no subscript capital ᵩ yet in Unicode
 	"œ", "", "Œ", "ɶ", ; There is no subscript œ yet in Unicode
 )
