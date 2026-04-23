@@ -72,7 +72,6 @@ UnescapeTomlString(s) {
 LoadHotstringsSection(CategoryName, SectionName, FeatureConfig, ExtraOptions := Map()) {
     FilePath := A_ScriptDir . "\..\hotstrings\" . CategoryName . ".toml"
     if !FileExist(FilePath) {
-        MsgBox("LoadHotstringsSection: FILE NOT FOUND: " . FilePath)
         return
     }
 
@@ -80,13 +79,6 @@ LoadHotstringsSection(CategoryName, SectionName, FeatureConfig, ExtraOptions := 
         0
     TargetSection := StrLower(SectionName)
     CurrentSection := ""
-    global _DebugLoadCounts
-    if !IsSet(_DebugLoadCounts) {
-        _DebugLoadCounts := Map()
-    }
-    MatchedEntries := 0
-    TotalLines := 0
-    SectionLines := 0
 
     ; Build once and reuse for every matching entry; individual fields are
     ; overridden per entry below when they differ from the section defaults.

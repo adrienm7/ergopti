@@ -4030,10 +4030,4 @@ if Features["MagicKey"]["Repeat"].Enabled {
     LoadHotstringsSection("magickey", "repeat", Features["MagicKey"]["Repeat"])
 }
 
-:*:tc::
-{
-    SendEvent("{Text}OK_ENGINE_WORKS")
-}
-Hotstring(":*CB0O:pex", (*) => SendEvent("{Text}DIRECT_MAGIC_OK"))
-
 CreateHotstring("*", "clé" . ScriptInformation["MagicKey"], "🔑")
