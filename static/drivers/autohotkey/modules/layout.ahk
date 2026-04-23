@@ -516,84 +516,8 @@ Hotkey("#SC02E", (*) => OpenPersonalEditor(), "I3")
 ; ==============================
 ; ==============================
 
-#HotIf Features["Layout"]["ErgoptiBase"].Enabled
-; === Space bar ===
-+SC039:: WrapTextIfSelected("-", "-", "-")
-
-; === Number row ===
-+SC029:: {
-	ActivateHotstrings()
-	SendNewResult(" €") ; Thin non-breaking space
-}
-+SC002:: SendNewResult("1")
-+SC003:: SendNewResult("2")
-+SC004:: SendNewResult("3")
-+SC005:: SendNewResult("4")
-+SC006:: SendNewResult("5")
-+SC007:: SendNewResult("6")
-+SC008:: SendNewResult("7")
-+SC009:: SendNewResult("8")
-+SC00A:: SendNewResult("9")
-+SC00B:: SendNewResult("0")
-+SC00C:: {
-	ActivateHotstrings()
-	SendNewResult(" %") ; Thin non-breaking space
-}
-+SC00D:: SendNewResult("º")
-
-; === Top row ===
-+SC010:: SendNewResult("È")
-+SC011:: SendNewResult("Y")
-+SC012:: SendNewResult("O")
-+SC013:: SendNewResult("W")
-+SC014:: SendNewResult("B")
-+SC015:: SendNewResult("F")
-+SC016:: SendNewResult("G")
-+SC017:: SendNewResult("H")
-+SC018:: SendNewResult("C")
-+SC019:: SendNewResult("X")
-+SC01A:: SendNewResult("Z")
-+SC01B:: SendNewResult("_")
-
-; === Middle row ===
-+SC01E:: SendNewResult("A")
-+SC01F:: SendNewResult("I")
-+SC020:: SendNewResult("E")
-+SC021:: SendNewResult("U")
-+SC022:: {
-	ActivateHotstrings()
-	SendNewResult(" :") ; Non-breaking space
-}
-+SC023:: SendNewResult("V")
-+SC024:: SendNewResult("S")
-+SC025:: SendNewResult("N")
-+SC026:: SendNewResult("T")
-+SC027:: SendNewResult("R")
-+SC028:: SendNewResult("Q")
-+SC02B:: {
-	ActivateHotstrings()
-	SendNewResult(" !") ; Thin non-breaking space
-}
-
-; === Bottom row ===
-+SC056:: SendNewResult("Ê")
-+SC02C:: SendNewResult("É")
-+SC02D:: SendNewResult("À")
-+SC02E:: SendNewResult("J")
-+SC02F:: {
-	ActivateHotstrings()
-	SendNewResult(" " Chr(0x3B)) ; Thin non-breaking space + semicolon (Chr avoids AHK parser misreading ";")
-}
-+SC030:: SendNewResult("K")
-+SC031:: SendNewResult("M")
-+SC032:: SendNewResult("D")
-+SC033:: SendNewResult("L")
-+SC034:: SendNewResult("P")
-+SC035:: {
-	ActivateHotstrings()
-	SendNewResult(" ?") ; Thin non-breaking space
-}
-#HotIf
+; Shift layer — bindings registered table-driven via lib/layout_shift_caps.ahk.
+RegisterShiftLayer()
 
 
 ; =================================
@@ -606,67 +530,8 @@ GetCapsLockCondition() {
 	return GetKeyState("CapsLock", "T") and not LayerEnabled
 }
 
-#HotIf GetCapsLockCondition() and Features["MagicKey"]["Replace"].Enabled
-SC02E:: SendNewResult(ScriptInformation["MagicKey"])
-#HotIf
-
-#HotIf GetCapsLockCondition() and Features["Layout"]["ErgoptiBase"].Enabled
-; === Number row ===
-SC029:: SendNewResult("$")
-SC002:: SendNewResult("1")
-SC003:: SendNewResult("2")
-SC004:: SendNewResult("3")
-SC005:: SendNewResult("4")
-SC006:: SendNewResult("5")
-SC007:: SendNewResult("6")
-SC008:: SendNewResult("7")
-SC009:: SendNewResult("8")
-SC00A:: SendNewResult("9")
-SC00B:: SendNewResult("0")
-SC00C:: SendNewResult("%")
-SC00D:: SendNewResult("=")
-
-; === Top row ===
-SC010:: SendNewResult("È")
-SC011:: SendNewResult("Y")
-SC012:: SendNewResult("O")
-SC013:: SendNewResult("W")
-SC014:: SendNewResult("B")
-SC015:: SendNewResult("F")
-SC016:: SendNewResult("G")
-SC017:: SendNewResult("H")
-SC018:: SendNewResult("C")
-SC019:: SendNewResult("X")
-SC01A:: SendNewResult("Z")
-SC01B:: (InDeadKeySequence ? SendNewResult("¨") : DeadKey(DeadkeyMappingDiaresis))
-
-; === Middle row ===
-SC01E:: SendNewResult("A")
-SC01F:: SendNewResult("I")
-SC020:: SendNewResult("E")
-SC021:: SendNewResult("U")
-SC022:: SendNewResult(".")
-SC023:: SendNewResult("V")
-SC024:: SendNewResult("S")
-SC025:: SendNewResult("N")
-SC026:: SendNewResult("T")
-SC027:: SendNewResult("R")
-SC028:: SendNewResult("Q")
-SC02B:: (InDeadKeySequence ? SendNewResult("^") : DeadKey(DeadkeyMappingCircumflex))
-
-; === Bottom row ===
-SC056:: SendNewResult("Ê")
-SC02C:: SendNewResult("É")
-SC02D:: SendNewResult("À")
-SC02E:: SendNewResult("J")
-SC02F:: SendNewResult(",")
-SC030:: SendNewResult("K")
-SC031:: SendNewResult("M")
-SC032:: SendNewResult("D")
-SC033:: SendNewResult("L")
-SC034:: SendNewResult("P")
-SC035:: SendNewResult("'")
-#HotIf
+; CapsLock layer — bindings registered table-driven via lib/layout_shift_caps.ahk.
+RegisterCapsLockLayer()
 
 
 ; =============================================
