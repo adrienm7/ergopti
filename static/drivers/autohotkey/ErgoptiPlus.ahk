@@ -472,7 +472,7 @@ initMenu() {
     A_TrayMenu.Add("✎ Éditer" . (ScriptInformation["ShortcutEdit"] ? " (AltGr + ⌦)" : ""), ActivateEdit)
     A_TrayMenu.Add(MenuSuspend, ToggleSuspend)
     A_TrayMenu.Add("🔄 Recharger" . (ScriptInformation["ShortcutSaveReload"] ? " (AltGr + ⌫)" : ""),
-        ActivateReload)
+    ActivateReload)
     A_TrayMenu.Add("⏹ Quitter (AltGr + ⎋)", ActivateExitApp)
 
     ; ── Debugging section ──
@@ -823,28 +823,28 @@ FilePathsEditor(*) {
     SaveFilePaths(*) {
         global ScriptInformation, ConfigurationFile, _BootstrapFile
 
-        NewAhkPath  := Trim(AhkEdit.Value)
+        NewAhkPath := Trim(AhkEdit.Value)
         NewTomlPath := Trim(TomlEdit.Value)
-        NewIniPath  := Trim(IniEdit.Value)
+        NewIniPath := Trim(IniEdit.Value)
 
-        DefaultAhkPath  := A_ScriptDir . "\personal.ahk"
+        DefaultAhkPath := A_ScriptDir . "\personal.ahk"
         DefaultTomlPath := A_ScriptDir . "\..\hotstrings\personal.toml"
-        DefaultIniPath  := A_ScriptDir . "\ErgoptiPlus_Configuration.ini"
+        DefaultIniPath := A_ScriptDir . "\ErgoptiPlus_Configuration.ini"
 
-        FinalAhkPath  := (NewAhkPath  == "") ? DefaultAhkPath  : NewAhkPath
+        FinalAhkPath := (NewAhkPath == "") ? DefaultAhkPath : NewAhkPath
         FinalTomlPath := (NewTomlPath == "") ? DefaultTomlPath : NewTomlPath
-        FinalIniPath  := (NewIniPath  == "") ? DefaultIniPath  : NewIniPath
+        FinalIniPath := (NewIniPath == "") ? DefaultIniPath : NewIniPath
 
         ; Persist the ini path in the bootstrap file (it cannot live in the ini itself)
         IniWrite(FinalIniPath, _BootstrapFile, "Bootstrap", "ConfigurationFilePath")
 
         ; Persist the two file paths in the ini under [Script]
-        IniWrite(FinalAhkPath,  FinalIniPath, "Script", "PersonalAhkPath")
+        IniWrite(FinalAhkPath, FinalIniPath, "Script", "PersonalAhkPath")
         IniWrite(FinalTomlPath, FinalIniPath, "Script", "PersonalTomlPath")
 
         TomlChanged := (FinalTomlPath != ScriptInformation["PersonalTomlPath"])
 
-        ScriptInformation["PersonalAhkPath"]  := FinalAhkPath
+        ScriptInformation["PersonalAhkPath"] := FinalAhkPath
         ScriptInformation["PersonalTomlPath"] := FinalTomlPath
         ConfigurationFile := FinalIniPath
 
@@ -1031,7 +1031,7 @@ if Features.Has("Personal") {
 #InputLevel 2 ; Very important, we need to be at a higher InputLevel to remap the keys into something else.
 ; It is because we will then remap keys we just remapped, so the InputLevel of those other shortcuts must be lower.
 ; This is especially important for the "★" key, otherwise the hotstrings involving this key won't trigger.
-#Include lib\layout.ahk
-#Include lib\shortcuts.ahk
-#Include lib\tap_holds.ahk
-#Include lib\hotstrings.ahk
+#Include modules\layout.ahk
+#Include modules\shortcuts.ahk
+#Include modules\tap_holds.ahk
+#Include modules\hotstrings.ahk
