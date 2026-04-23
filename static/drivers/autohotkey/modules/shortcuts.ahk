@@ -20,19 +20,15 @@
 ; This function makes it possible to create a shortcut that works
 ; no matter the keyboard layout or the potential emulation of the Ergopti layout on top of it.
 ; If the keyboard layout changes, the script must be reloaded.
-AddShortcut(Modifier, Letter, BehaviorFunction) {
-	Scancode := RetrieveScancode(Letter)
-	Key := Modifier Scancode
-	Hotkey(Key, BehaviorFunction.Call())
+AddShortcut(Modifier, Letter, Callback) {
+	Hotkey(Modifier . RetrieveScancode(Letter), Callback)
 }
 
 RetrieveScancode(Letter) {
 	if RemappedList.Has(Letter) {
-		Scancode := RemappedList[Letter]
-	} else {
-		Scancode := Format("sc{:x}", GetKeySC(Letter))
+		return RemappedList[Letter]
 	}
-	return Scancode
+	return Format("sc{:x}", GetKeySC(Letter))
 }
 
 
@@ -84,17 +80,17 @@ LAltCapsLockShortcut() {
 ; =================================
 
 if Features["Shortcuts"]["Save"].Enabled {
-	AddShortcut("^", "j", (*) => (*) => SendFinalResult("^s"))
+	AddShortcut("^", "j", (*) => SendFinalResult("^s"))
 }
 if Features["Shortcuts"]["CtrlJ"].Enabled {
-	AddShortcut("^", "s", (*) => (*) => SendFinalResult("^j"))
+	AddShortcut("^", "s", (*) => SendFinalResult("^j"))
 }
 
 if Features["Shortcuts"]["MicrosoftBold"].Enabled {
 	; Makes it possible to use the standard shortcuts instead of their translation in Microsoft apps
 	AddShortcut(
 		"^", "b",
-		(*) => (*) => MicrosoftApps() ? SendFinalResult("^g") : SendFinalResult("^b")
+		(*) => MicrosoftApps() ? SendFinalResult("^g") : SendFinalResult("^b")
 	)
 }
 
@@ -221,7 +217,7 @@ AltGrCapsLockShortcut() {
 
 if Features["Shortcuts"]["SelectLine"].Enabled {
 	; Win + A (All)
-	AddShortcut("#", "a", (*) => SelectLine)
+	AddShortcut("#", "a", SelectLine)
 
 	SelectLine(*) {
 		SendFinalResult("{Home}{Shift Down}{End}{Shift Up}")
@@ -230,17 +226,17 @@ if Features["Shortcuts"]["SelectLine"].Enabled {
 
 if Features["Shortcuts"]["Screen"].Enabled {
 	; Win + H (ScreensHot)
-	AddShortcut("#", "h", (*) => (*) => SendFinalResult("#+s"))
+	AddShortcut("#", "h", (*) => SendFinalResult("#+s"))
 }
 
 if Features["Shortcuts"]["GPT"].Enabled {
 	; Win + G (GPT)
-	AddShortcut("#", "g", (*) => (*) => Run(Features["Shortcuts"]["GPT"].Link))
+	AddShortcut("#", "g", (*) => Run(Features["Shortcuts"]["GPT"].Link))
 }
 
 if Features["Shortcuts"]["GetHexValue"].Enabled {
 	; Win + X (heX)
-	AddShortcut("#", "x", (*) => GetHexValue)
+	AddShortcut("#", "x", GetHexValue)
 
 	GetHexValue(*) {
 		MouseGetPos(&MouseX, &MouseY)
@@ -254,7 +250,7 @@ if Features["Shortcuts"]["GetHexValue"].Enabled {
 
 if Features["Shortcuts"]["TakeNote"].Enabled {
 	; Win + N (Note)
-	AddShortcut("#", "n", (*) => TakeNote)
+	AddShortcut("#", "n", TakeNote)
 
 	TakeNote(*) {
 		; Determine the file name (with or without date)
@@ -299,7 +295,7 @@ if Features["Shortcuts"]["TakeNote"].Enabled {
 
 if Features["Shortcuts"]["Move"].Enabled {
 	; Win + M (Move)
-	AddShortcut("#", "m", (*) => (*) => ToggleActivitySimulation() SetTimer(SimulateActivity, Random(1000, 5000)))
+	AddShortcut("#", "m", (*) => (ToggleActivitySimulation(), SetTimer(SimulateActivity, Random(1000, 5000))))
 
 	ToggleActivitySimulation(*) {
 		global ActivitySimulation := not ActivitySimulation
@@ -319,12 +315,12 @@ if Features["Shortcuts"]["Move"].Enabled {
 }
 
 if Features["Shortcuts"]["SurroundWithParentheses"].Enabled {
-	AddShortcut("#", "o", (*) => (*) => SendFinalResult("{Home}({End}){Home}"))
+	AddShortcut("#", "o", (*) => SendFinalResult("{Home}({End}){Home}"))
 }
 
 if Features["Shortcuts"]["Search"].Enabled {
 	; Win + S (Search)
-	AddShortcut("#", "s", (*) => Search)
+	AddShortcut("#", "s", Search)
 
 	Search(*) {
 		SelectedText := Trim(GetSelection())
@@ -454,7 +450,7 @@ if Features["Shortcuts"]["Search"].Enabled {
 
 if Features["Shortcuts"]["TitleCase"].Enabled {
 	; Win + T (TitleCase)
-	AddShortcut("#", "t", (*) => ConvertToTitleCase)
+	AddShortcut("#", "t", ConvertToTitleCase)
 
 	ConvertToTitleCase(*) {
 		Text := GetSelection()
@@ -483,7 +479,7 @@ if Features["Shortcuts"]["TitleCase"].Enabled {
 
 if Features["Shortcuts"]["Uppercase"].Enabled {
 	; Win + U (Uppercase)
-	AddShortcut("#", "u", (*) => ConvertToUppercase)
+	AddShortcut("#", "u", ConvertToUppercase)
 
 	ConvertToUppercase(*) {
 		Text := GetSelection()
@@ -498,7 +494,7 @@ if Features["Shortcuts"]["Uppercase"].Enabled {
 
 if Features["Shortcuts"]["SelectWord"].Enabled {
 	; Win + W (Word)
-	AddShortcut("#", "w", (*) => SelectWord)
+	AddShortcut("#", "w", SelectWord)
 
 	SelectWord(*) {
 		SendFinalResult("^{Left}")
