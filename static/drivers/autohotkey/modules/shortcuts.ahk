@@ -1,4 +1,4 @@
-﻿; static/drivers/autohotkey/lib/shortcuts.ahk
+﻿; static/drivers/autohotkey/modules/shortcuts.ahk
 
 ; ==============================================================================
 ; MODULE: Shortcuts
@@ -269,26 +269,32 @@ if Features["Shortcuts"]["TakeNote"].Enabled {
 			FileAppend("", FilePath)
 		}
 
-		; Match the window title containing the file name
-		SetTitleMatchMode(2) ; Partial match
-		WinPattern := FileName
+		; Match the window title containing the file name. Save and restore the
+		; global title match mode so other code paths are not impacted.
+		PreviousTitleMatchMode := A_TitleMatchMode
+		try {
+			SetTitleMatchMode(2) ; Partial match
+			WinPattern := FileName
 
-		WindowAlreadyOpen := False
-		if WinExist(WinPattern) {
-			WindowAlreadyOpen := True
-			WinActivate(WinPattern)
-			WinWaitActive(WinPattern, , 3)
-		} else {
-			Run('notepad.exe "' . FilePath . '"')
-			WinWait(FileName, , 7)
-			WinActivate(FileName)
-			WinWaitActive(FileName, , 3)
-		}
+			WindowAlreadyOpen := False
+			if WinExist(WinPattern) {
+				WindowAlreadyOpen := True
+				WinActivate(WinPattern)
+				WinWaitActive(WinPattern, , 3)
+			} else {
+				Run('notepad.exe "' . FilePath . '"')
+				WinWait(FileName, , 7)
+				WinActivate(FileName)
+				WinWaitActive(FileName, , 3)
+			}
 
-		WinMaximize
-		Sleep(100)
-		if not WindowAlreadyOpen {
-			SendFinalResult("^{End}{Enter}") ; Jump to the end of the file and start a new line
+			WinMaximize
+			Sleep(100)
+			if not WindowAlreadyOpen {
+				SendFinalResult("^{End}{Enter}") ; Jump to the end of the file and start a new line
+			}
+		} finally {
+			SetTitleMatchMode(PreviousTitleMatchMode)
 		}
 	}
 }
