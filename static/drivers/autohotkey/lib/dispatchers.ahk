@@ -107,7 +107,11 @@ _RunFirstActionFromMap(FeatureGroup, ActionMap) {
 			and ActionMap.Has(ActionName)
 		) {
 			try LoggerDebug("Dispatch", "Firing action %s", ActionName)
-			ActionMap[ActionName]()
+			; Extract to local first to avoid AHK's obj.method() implicit
+			; first-arg passing for property-stored Funcs (would overflow
+			; BoundFuncs that already have all positional params bound).
+			Cb := ActionMap[ActionName]
+			Cb()
 			return true
 		}
 	}
