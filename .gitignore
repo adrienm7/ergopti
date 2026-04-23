@@ -17,6 +17,7 @@ __pycache__
 
 # Other files to exclude
 logs/
+*.log
 static/corpus/modifie/
 static/version.json
 version.json

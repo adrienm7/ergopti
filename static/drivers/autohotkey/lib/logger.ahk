@@ -188,7 +188,9 @@ _LoggerEmit(Level, Tag, Msg, Args*) {
         }
     }
     Stamp := FormatTime(, "yyyy-MM-dd HH:mm:ss")
-    Line := Format("{1} [{2,-7}] [{3}] {4}", Stamp, Level, Tag, Body)
+    ; AHK Format uses ``{N:flags width}`` (printf-like) and a colon — the
+    ; ``-7`` flag/width pair pads Level to 7 characters left-aligned.
+    Line := Format("{1} [{2:-7}] [{3}] {4}", Stamp, Level, Tag, Body)
     _LoggerPushRing(Line)
     if LOGGER_LOG_PATH != "" {
         try FileAppend(Line . "`r`n", LOGGER_LOG_PATH, "UTF-8")
