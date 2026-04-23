@@ -289,13 +289,13 @@ Logger.debug(LOG, "Initializing custom hotstrings…")
 -- ===== 5.1) Custom Hotstrings =====
 -- ==================================
 
--- Stored alongside config.json so it is easy to .gitignore independently
--- The file is created automatically if it does not exist yet
+-- Personal hotstrings are now stored in hotstrings/personal.toml, shared with
+-- the AHK driver. The file is created automatically if it does not exist yet.
 do
-	local custom_path = base_dir .. "custom.toml"
-	hotstring_editor.init(custom_path, keymap)
-	keymap.load_toml("custom", custom_path)
-	table.insert(hotfiles, "custom")
+	local personal_path = base_dir .. "../hotstrings/personal.toml"
+	hotstring_editor.init(personal_path, keymap)
+	keymap.load_toml("personal", personal_path)
+	table.insert(hotfiles, "personal")
 end
 
 -- Single final sort covering TOML + dynamic + custom groups.

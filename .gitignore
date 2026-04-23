@@ -25,7 +25,6 @@ version.json
 .claude/settings.local.json
 static/drivers/autohotkey/personal.ahk
 static/drivers/hammerspoon/config.json
-static/drivers/hammerspoon/custom.toml
 static/drivers/hammerspoon/karabiner_user_config.json
 # Karabiner build artifact — generated at runtime by the HS bridge
 static/drivers/hammerspoon/karabiner.json

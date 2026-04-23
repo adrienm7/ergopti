@@ -507,30 +507,10 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 		end
 		pcall(core_mods.shortcuts_mod.set_extras, {
 			open_init = function() hs.timer.doAfter(0, function() _suppress_watcher_until = hs.timer.secondsSinceEpoch() + 8; pcall(hs.execute, "open \"" .. base_dir .. "init.lua\"") end) end,
-			open_ahk = function()
-				hs.timer.doAfter(0, function()
-					local path = (state.ahk_source_path ~= "") and state.ahk_source_path or nil
-					if not path then path = os.getenv("LOCAL_AHK_PATH") end
-					if not path then
-						local ok_lf, lf = pcall(io.open, base_dir .. "../hotstrings/.local_ahk_path", "r")
-						if ok_lf and lf then
-							local raw = lf:read("*a")
-							pcall(function() lf:close() end)
-							raw = raw:match("^%s*(.-)%s*$")
-							if raw ~= "" then path = raw end
-						end
-					end
-					if not path then path = base_dir .. "../autohotkey/ErgoptiPlus.ahk" end
-					
-					local app_name = hs.execute(string.format("osascript -e 'tell application \"Finder\" to return name of (default application of (info for POSIX file \"%s\"))' 2>/dev/null", path))
-					app_name = type(app_name) == "string" and app_name:match("^%s*(.-)%s*$") or ""
-					if app_name ~= "" then pcall(hs.execute, string.format("open -a \"%s\" \"%s\"", app_name, path)) else pcall(hs.execute, string.format("open -t \"%s\"", path)) end
-				end)
-			end,
 			open_personal_toml = function()
 				hs.timer.doAfter(0, function()
-					local custom_path = base_dir .. "custom.toml"
-					pcall(hs.execute, "open \"" .. custom_path .. "\"")
+					local personal_path = base_dir .. "../hotstrings/personal.toml"
+					pcall(hs.execute, "open \"" .. personal_path .. "\"")
 				end)
 			end,
 			trigger_prediction = function() if keymap and type(keymap.trigger_prediction) == "function" then pcall(keymap.trigger_prediction) end end,

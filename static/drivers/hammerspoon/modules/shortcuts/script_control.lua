@@ -42,8 +42,7 @@ local ACTION_DEFINITIONS = {
 	{id = "open_console",       label = "Console Hammerspoon"},
 	{id = "quit_hammerspoon",   label = "Quitter Hammerspoon"},
 	{id = "open_init",          label = "Ouvrir init.lua"},
-	{id = "open_ahk",           label = "Ouvrir le fichier AHK"},
-	{id = "open_personal_toml", label = "Ouvrir le fichier custom.toml"},
+	{id = "open_personal_toml", label = "Ouvrir personal.toml"},
 	{id = "open_config",        label = "Ouvrir config.json"},
 	{id = "open_logs",          label = "Ouvrir le dossier de logs"},
 	{id = "add_hotstring",      label = "Ajouter un hotstring"},
@@ -215,7 +214,6 @@ local function dispatch_action(action)
 		return true
 
 	elseif action == "open_init"          then if type(_extras.open_init)          == "function" then pcall(_extras.open_init)          end; return true
-	elseif action == "open_ahk"           then if type(_extras.open_ahk)           == "function" then pcall(_extras.open_ahk)           end; return true
 	elseif action == "open_personal_toml" then if type(_extras.open_personal_toml) == "function" then pcall(_extras.open_personal_toml) end; return true
 	elseif action == "open_config"        then if type(_extras.open_config)        == "function" then pcall(_extras.open_config)        end; return true
 	elseif action == "open_logs"          then if type(_extras.open_logs)          == "function" then pcall(_extras.open_logs)          end; return true
