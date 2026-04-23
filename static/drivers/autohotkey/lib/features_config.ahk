@@ -37,7 +37,7 @@ global Features := Map(
         },
         "ErgoptiPlus", {
             Enabled: True,
-            Description: "Appliquer les légers changements en AltGr d’Ergopti➕",
+            Description: "Appliquer les légers changements en AltGr d'Ergopti➕",
         }
     ),
     "DistancesReduction", Map(
@@ -446,7 +446,7 @@ global Features := Map(
         },
         "Screen", {
             Enabled: True,
-            Description: "Win + H (screensHot) = Capture de l’écran (réalise le raccourci Win + Shift + S)",
+            Description: "Win + H (screensHot) = Capture de l'écran (réalise le raccourci Win + Shift + S)",
         },
         "GPT", {
             Enabled: True,
@@ -459,7 +459,7 @@ global Features := Map(
         },
         "TakeNote", {
             Enabled: True,
-            Description: "Win + N(ote) = Ouverture d’un fichier pour prendre des notes",
+            Description: "Win + N(ote) = Ouverture d'un fichier pour prendre des notes",
             DatedNotes: False,
             DestinationFolder: A_Desktop,
         },
@@ -469,11 +469,11 @@ global Features := Map(
         },
         "Move", {
             Enabled: True,
-            Description: "Win + M(ove) = Simulation d’une activité en bougeant la souris aléatoirement. Pour désactiver, réitérer le raccourci ou recharger le script",
+            Description: "Win + M(ove) = Simulation d'une activité en bougeant la souris aléatoirement. Pour désactiver, réitérer le raccourci ou recharger le script",
         },
         "Search", {
             Enabled: True,
-            Description: "Win + S(earch) = Recherche de la sélection sur Internet. Dans l’explorateur, récupération du chemin du fichier sélectionné",
+            Description: "Win + S(earch) = Recherche de la sélection sur Internet. Dans l'explorateur, récupération du chemin du fichier sélectionné",
             SearchEngine: "https://www.google.com",
             SearchEngineURLQuery: "https://www.google.com/search?q=",
         },

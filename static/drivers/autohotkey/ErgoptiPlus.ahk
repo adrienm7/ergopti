@@ -39,7 +39,7 @@ A_MaxHotkeysPerInterval := 150 ; Reduce messages saying too many hotkeys pressed
 
 SetKeyDelay(0) ; No delay between key presses
 SendMode("Event") ; Everything concerning hotstrings MUST use SendEvent and not SendInput which is the default
-; Otherwise, we can’t have a hotstring triggering another hotstring, triggering another hotstring, etc.
+; Otherwise, we can't have a hotstring triggering another hotstring, triggering another hotstring, etc.
 
 ; Core hotstring engine (send primitives, hotstring builders, text helpers)
 ; and TOML reader helpers (UnescapeTomlString, LoadHotstringsSection,
@@ -57,7 +57,7 @@ SendMode("Event") ; Everything concerning hotstrings MUST use SendEvent and not 
 ; ======================================================
 ; ======================================================
 
-; The code in this section shouldn’t be modified
+; The code in this section shouldn't be modified
 ; All features can be changed by using the configuration file
 
 ; =============================================
@@ -430,7 +430,7 @@ InitSubMenus() {
         CreateSubMenusRecursive(SubMenu, Items, Category)
     }
     ; Personal is defined in personal.ahk (not in the static Features map), so it
-    ; must be wired separately after the loop — only when the user’s file loaded it.
+    ; must be wired separately after the loop — only when the user's file loaded it.
     if Features.Has("Personal") {
         PersonalSubMenu := Menu()
         SubMenus["Personal"] := PersonalSubMenu
@@ -969,7 +969,7 @@ WindowSpy(*) {
     if FileExist(spyPath) {
         Run(spyPath)
     } else {
-        MsgBox("WindowSpy.ahk n’a pas été trouvé à l’emplacement suivant : " spyPath)
+        MsgBox("WindowSpy.ahk n'a pas été trouvé à l'emplacement suivant : " spyPath)
     }
 }
 
