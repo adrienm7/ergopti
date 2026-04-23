@@ -416,7 +416,9 @@ OpenPersonalEditor(DefaultSection := "") {
 	W.Add("Text", "xm y12 w70 h24 +0x200", "Section :")
 	; DropDownList third arg is the initial value string, NOT the item list — add items separately
 	SectionDrop := W.Add("DropDownList", "x+6 yp w280 h24")
-	SectionDrop.Add(_BuildSectionList(_PersonalEditorData))
+	for _, Item in _BuildSectionList(_PersonalEditorData) {
+		SectionDrop.Add([Item])
+	}
 	W.Add("Button", "x+8 yp w90 h24", "Nouvelle…").OnEvent("Click", (*) => _NewSection(W, SectionDrop))
 	W.Add("Button", "x+4 yp w90 h24", "Renommer…").OnEvent("Click", (*) => _RenameSection(W, SectionDrop))
 	BtnDelSec := W.Add("Button", "x+4 yp w90 h24", "Supprimer")
@@ -523,10 +525,12 @@ _BuildSectionList(Data) {
 	return List
 }
 
-; Rebuild a DropDownList from scratch — Add() requires an Array, not a string.
+; Rebuild a DropDownList from scratch.
 _RebuildDropdown(DDL, Data) {
 	DDL.Delete()
-	DDL.Add(_BuildSectionList(Data))
+	for _, Item in _BuildSectionList(Data) {
+		DDL.Add([Item])
+	}
 }
 
 _SelectDropDown(DDL, SectionName) {
