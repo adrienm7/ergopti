@@ -3,9 +3,10 @@
 #SingleInstance Force ; Ensure that only one instance of the script can run at once
 SetWorkingDir(A_ScriptDir) ; Set the working directory where the script is located
 
-; Keep default warnings in development; in production (.exe build) they stay
-; silent because MsgBoxes are not shown when the script is compiled with
-; #NoTrayIcon removed. VarUnset must be off to silence UIA-v2 noise.
+; #Warn directives apply to the whole compilation unit in AHK v2 — they
+; cannot be scoped to a single #Include. VarUnset is disabled globally
+; because UIA.ahk accesses optional properties that are intentionally
+; unset (that is by design in the UIA v2 library, not a bug here).
 #Warn All
 #Warn VarUnset, Off
 
