@@ -208,7 +208,9 @@ CreateCaseSensitiveHotstrings(Flags, Abbreviation, Replacement, options := unset
 
     ; Order matters: nbsp abbreviations must trigger before bare punctuation
     ; so the engine can delete the preceding non-breaking space correctly.
-    static UppercasedSymbols := Map(",", [" ;", " :"], Chr(0x27), [" ?"])
+    ; The apostrophe key uses Chr(0x27) via a helper because AHK v2 parses
+    ; a bare ' inside Map() as a string delimiter, causing a parse error.
+    static UppercasedSymbols := _BuildUppercasedSymbols()
 
     AbbreviationLowerCase := StrLower(Abbreviation)
     AbbreviationTitleCase := StrTitle(Abbreviation)
@@ -257,6 +259,16 @@ CreateCaseSensitiveHotstrings(Flags, Abbreviation, Replacement, options := unset
 ; ======= 4/ Text & history helpers =======
 ; ==========================================
 ; ==========================================
+
+; Build the UppercasedSymbols Map used by CreateCaseSensitiveHotstrings.
+; Extracted into a function so the apostrophe key can be written as Chr(0x27)
+; rather than a literal ' inside Map(), which AHK v2 would misparse as a
+; string delimiter.
+_BuildUppercasedSymbols() {
+    m := Map(",", [" " Chr(0x3B), " :"])
+    m[Chr(0x27)] := [" ?"]
+    return m
+}
 
 StrTitle(Text) {
     if (StrLen(Text) > 0) {
