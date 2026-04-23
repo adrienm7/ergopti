@@ -777,7 +777,7 @@ SC138 & SC153::
 ; Putting everything in this part makes is easy to update your ErgoptiPlus version, as you will only need
 ; to paste this part into the « 2/ PERSONAL SHORTCUTS » part of the new version.
 
-; #InputLevel 2 ; Mandatory for this section to work, it needs to be below the InputLevel of the key remappings
+#InputLevel 2 ; Mandatory for this section to work, it needs to be below the InputLevel of the key remappings
 
 ; ========================================================
 ; ========================================================
@@ -787,7 +787,7 @@ SC138 & SC153::
 ; ========================================================
 ; ========================================================
 
-; #InputLevel 2 ; Very important, we need to be at an higher InputLevel to remap the keys into something else.
+#InputLevel 2 ; Very important, we need to be at an higher InputLevel to remap the keys into something else.
 ; It is because we will then remap keys we just remapped, so the InputLevel of those other shortcuts must be lower
 ; This is especially important for the "★" key, otherwise the hotstrings involving this key won’t trigger.
 
@@ -4022,7 +4022,7 @@ if Features["MagicKey"]["TextExpansionSymbolsTypst"].Enabled {
 ; ======= 9.6) Repeat key =======
 ; ===============================
 
-; #InputLevel 1 ; Mandatory for this section to work, it needs to be below the inputlevel of the key remappings
+#InputLevel 1 ; Mandatory for this section to work, it needs to be below the inputlevel of the key remappings
 
 ; ★ becomes a repeat key. It will activate will the lowest priority of all hotstrings
 ; That means a letter will only be repeated if no hotstring defined above matches
