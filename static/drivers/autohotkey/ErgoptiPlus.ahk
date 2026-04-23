@@ -328,21 +328,21 @@ ToggleMenuVariableByPath(FullPath) {
 GetCategoryTitle(Category) {
     switch Category {
         case "DistancesReduction":
-            return "➀ Réduction des distances"
+            return "Réduction des distances"
         case "SFBsReduction":
-            return "➁ Réduction des SFBs"
+            return "Réduction des SFBs"
         case "Rolls":
-            return "➂ Roulements"
+            return "Roulements"
         case "Autocorrection":
-            return "➃ Autocorrection"
+            return "Autocorrection"
         case "MagicKey":
-            return "➄ Touche " . ScriptInformation["MagicKey"] . " et expansion de texte"
+            return "Touche " . ScriptInformation["MagicKey"] . " et expansion de texte"
         case "Personal":
-            return "➅ Hotstrings personnels"
+            return "Hotstrings personnels"
         case "Shortcuts":
-            return "➆ Raccourcis"
+            return "Raccourcis"
         case "TapHolds":
-            return "➇ Tap-Holds ⌨️"
+            return "Tap-Holds ⌨️"
         default:
             return ""
     }
@@ -400,7 +400,9 @@ initMenu() {
             HotstringsMenu.Add(GetCategoryTitle(Category), SubMenus[Category])
         }
     }
-    ; Personal hotstrings section — only shown when personal.ahk defines it
+    ; Personal hotstrings section — only shown when personal.ahk defines it.
+    ; Each TOML section gets its own submenu entry that opens the editor directly
+    ; on that section, mirroring the HS build_custom section navigation.
     if (Features.Has("Personal") and SubMenus.Has("Personal")) {
         HotstringsMenu.Add(GetCategoryTitle("Personal"), SubMenus["Personal"])
     }
@@ -408,11 +410,26 @@ initMenu() {
     HotstringsMenu.Add("☑ Activer tous les hotstrings", ToggleAllHotstringsOn)
     HotstringsMenu.Add("☐ Désactiver tous les hotstrings", ToggleAllHotstringsOff)
     HotstringsMenu.Add() ; Separating line
-    ; Magic key editor lives here — mirrors HS menu_hotstrings build_management placement
+    ; Magic key editor — mirrors HS menu_hotstrings build_management placement
     HotstringsMenu.Add("Touche magique : " . ScriptInformation["MagicKey"], MagicKeyEditor)
     HotstringsMenu.Add() ; Separating line
+    ; Editor entry with per-section submenu (mirrors HS build_custom section list)
+    PersonalEditorMenu := Menu()
+    PersonalEditorMenu.Add("Ouvrir l'éditeur", (*) => OpenPersonalEditor())
+    TomlData := ReadPersonalToml()
+    if TomlData["sections_order"].Length > 0 {
+        PersonalEditorMenu.Add() ; Separating line
+        for _, SecName in TomlData["sections_order"] {
+            SecDesc := TomlData["sections"].Has(SecName)
+                ? TomlData["sections"][SecName]["description"]
+                : SecName
+            ; Use a bound method to capture SecName by value — AHK v2 closures
+            ; capture variables by reference so the loop variable must be frozen.
+            PersonalEditorMenu.Add(SecDesc, _MakeOpenSectionFn(SecName))
+        }
+    }
     HotstringsMenu.Add("📝 Éditeur de hotstrings personnels (Win + " . ScriptInformation["MagicKey"] . ")",
-        (*) => OpenPersonalEditor())
+        PersonalEditorMenu)
     A_TrayMenu.Add(MenuHotstrings, HotstringsMenu)
 
     ; ── Raccourcis and Tap-Holds — standalone, like HS Raccourcis and Karabiner ──
@@ -481,6 +498,13 @@ UpdateTrayIcon()
 ; ========================================================
 ; ======= 1.4) Tray menu of the script — Functions =======
 ; ========================================================
+
+; Returns a bound callback that opens the personal editor on a specific section.
+; Wrapping in a function freezes SecName by value — AHK v2 closures capture by
+; reference so a direct lambda inside a loop would always use the last iteration value.
+_MakeOpenSectionFn(SecName) {
+    return (*) => OpenPersonalEditor(SecName)
+}
 
 MagicKeyEditor(*) {
     GuiToShow := Gui(, "Modifier la touche magique")
