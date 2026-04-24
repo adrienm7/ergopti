@@ -169,20 +169,20 @@ def emit_entry(out: list[str], trigger: str, entry: dict[str, Any]) -> None:
 	final_result = entry.get("final_result", False)
 
 	options_line = (
-		'\tOpts := Map("TimeActivationSeconds", TimeAct, "FinalResult", '
+		'\t_GenOpts := Map("TimeActivationSeconds", _GenTimeAct, "FinalResult", '
 		f"{ahk_bool(final_result)})"
 	)
 	out.append(options_line)
 	out.append(
 		'\tif IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {\n'
-		'\t\tOpts["OnlyText"] := ExtraOptions["OnlyText"]\n'
+		'\t\t_GenOpts["OnlyText"] := ExtraOptions["OnlyText"]\n'
 		"\t}"
 	)
 
 	fn = "CreateHotstring" if is_case_sens else "CreateCaseSensitiveHotstrings"
 	output_escaped = ahk_escape(output)
 	out.append(
-		f'\t{fn}("{flags}", {trigger_expr(trigger)}, "{output_escaped}", Opts)'
+		f'\t{fn}("{flags}", {trigger_expr(trigger)}, "{output_escaped}", _GenOpts)'
 	)
 
 
@@ -201,12 +201,13 @@ def emit_section(
 	fn_name = f"_GenLoad_{category}_{section}"
 	out.append(f"{fn_name}(FeatureConfig, ExtraOptions := unset) {{")
 	out.append("\tglobal ScriptInformation")
+	# Prefix every local with ``_Gen`` so ``#Warn LocalSameAsGlobal`` does not
+	# flag a clash with same-named top-level assignments elsewhere in the
+	# driver (``MK`` in modules/hotstrings.ahk, ``Opts`` in the Rolls block…).
 	out.append(
-		"\tTimeAct := FeatureConfig.HasOwnProp(\"TimeActivationSeconds\") "
+		"\t_GenTimeAct := FeatureConfig.HasOwnProp(\"TimeActivationSeconds\") "
 		"? FeatureConfig.TimeActivationSeconds : 0"
 	)
-	# Use a unique name so ``#Warn LocalSameAsGlobal`` does not flag a clash
-	# with the ``MK`` top-level assignment in modules/hotstrings.ahk.
 	out.append('\t_GenMK := ScriptInformation["MagicKey"]')
 	for entry_dict in entries:
 		# Each TOML ``[[section]]`` row is a single-key mapping in the parsed form.
