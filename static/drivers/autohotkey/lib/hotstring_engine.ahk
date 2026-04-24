@@ -52,6 +52,14 @@ global GET_SELECTION_TIMEOUT_SEC := 2
 ; chasing magic numbers across hot paths.
 global ACTIVATE_HOTSTRINGS_DELAY_MS := 50
 
+; ── Test seams (production = 0, tests can swap them with a recorder). ──
+; ``_HotstringRegistrar`` intercepts the AHK ``Hotstring()`` registration
+; call; ``_SendHook`` intercepts every send primitive (SendNewResult,
+; SendFinalResult, SendInstant). Both default to 0 so the production
+; runtime path is bit-for-bit identical to before.
+global _HotstringRegistrar := 0
+global _SendHook := 0
+
 
 ; =======================================
 ; =======================================
@@ -59,14 +67,32 @@ global ACTIVATE_HOTSTRINGS_DELAY_MS := 50
 ; =======================================
 ; =======================================
 
+; Internal — registers a hotstring through ``_HotstringRegistrar`` when the
+; test seam is installed, otherwise falls through to AHK's built-in
+; ``Hotstring()``. Centralised so CreateHotstring and the
+; CreateCaseSensitiveHotstrings RegisterVariant lambda share one indirection.
+_RegisterHotstring(TriggerSpec, Callback) {
+    if _HotstringRegistrar {
+        Reg := _HotstringRegistrar
+        Reg(TriggerSpec, Callback)
+    } else {
+        Hotstring(TriggerSpec, Callback)
+    }
+}
+
 ; Hotstrings will still be triggered downstream, so SendNewResult("a") can
 ; cascade a ➜ b ➜ c (final result). OnlyText=true wraps the payload in {Text}
 ; to avoid modifier side effects on symbols like ', ", accents.
 SendNewResult(Text, OnlyText := True) {
-    if OnlyText {
-        SendEvent("{Text}" Text)
+    if _SendHook {
+        Hook := _SendHook
+        Hook("SendNewResult", Text, OnlyText)
     } else {
-        SendEvent(Text)
+        if OnlyText {
+            SendEvent("{Text}" Text)
+        } else {
+            SendEvent(Text)
+        }
     }
     UpdateLastSentCharacter(SubStr(Text, -1))
 }
@@ -74,6 +100,11 @@ SendNewResult(Text, OnlyText := True) {
 ; SendInput prevents other hotstrings/hotkeys from activating, so this is the
 ; "final" result — used when we do not want cascading expansion.
 SendFinalResult(Text, OnlyText := False) {
+    if _SendHook {
+        Hook := _SendHook
+        Hook("SendFinalResult", Text, OnlyText)
+        return
+    }
     if OnlyText {
         SendInput("{Text}" Text)
     } else {
@@ -84,6 +115,11 @@ SendFinalResult(Text, OnlyText := False) {
 SendInstant(Text) {
     ; Function for sending immediately a big text without typing it letter by letter.
     ; Uses try/finally so the user's clipboard is restored even on error/crash.
+    if _SendHook {
+        Hook := _SendHook
+        Hook("SendInstant", Text)
+        return
+    }
     OldClipboard := ClipboardAll()
     try {
         A_Clipboard := Text
@@ -98,7 +134,9 @@ SendInstant(Text) {
 ; Leave time to trigger hotstrings between sending a character and then another one
 ActivateHotstrings() {
     SendNewResult(" ")
-    Sleep(ACTIVATE_HOTSTRINGS_DELAY_MS)
+    if !_SendHook {
+        Sleep(ACTIVATE_HOTSTRINGS_DELAY_MS)
+    }
     SendNewResult("{BackSpace}", False)
 }
 
@@ -143,7 +181,7 @@ CreateHotstring(Flags, Abbreviation, Replacement, options := unset) {
     TimeActivationSeconds := (IsSet(options) and options.Has("TimeActivationSeconds")) ? options["TimeActivationSeconds"] : 0
 
     FlagsPortion := ":" Flags "B0O:" ; O omits the ending character from the abbreviation
-    Hotstring(
+    _RegisterHotstring(
         FlagsPortion Abbreviation,
         (*) => HotstringHandler(Abbreviation, Replacement, A_EndChar, OnlyText, FinalResult, TimeActivationSeconds)
     )
@@ -221,7 +259,7 @@ CreateCaseSensitiveHotstrings(Flags, Abbreviation, Replacement, options := unset
     ; baked in. Must be a fat-arrow lambda so it closes over the outer
     ; locals (FlagsPortion, OnlyText…); nested `f() {}` functions in AHK v2
     ; do not capture the enclosing scope.
-    RegisterVariant := (Abbr, Repl) => Hotstring(
+    RegisterVariant := (Abbr, Repl) => _RegisterHotstring(
         FlagsPortion Abbr,
         (*) => HotstringHandler(Abbr, Repl, A_EndChar, OnlyText, FinalResult, TimeActivationSeconds)
     )

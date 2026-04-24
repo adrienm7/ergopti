@@ -37,12 +37,24 @@ global _Stub_LastChars := []         ; Recorded UpdateLastSentCharacter calls
 global _Stub_HotstringCalls := []    ; Recorded CreateHotstring / CreateCaseSensitiveHotstrings calls
 global _Stub_DeadKeyCalls := []      ; Recorded DeadKey calls
 
+; Recorders consumed by the production ``_HotstringRegistrar`` and ``_SendHook``
+; test seams. Populated by InstallHotstringHooks and reset by Reset*Hotstring*.
+global _Stub_HotstringRegistrations := []   ; { spec, callback }
+global _Stub_RecordedSends := []            ; { fn, args }
+
 ResetStubRecorders() {
 	global _Stub_SentText, _Stub_LastChars, _Stub_HotstringCalls, _Stub_DeadKeyCalls
 	_Stub_SentText := []
 	_Stub_LastChars := []
 	_Stub_HotstringCalls := []
 	_Stub_DeadKeyCalls := []
+}
+
+ResetHotstringRecorders() {
+	global _Stub_HotstringRegistrations, _Stub_RecordedSends, _Stub_LastChars
+	_Stub_HotstringRegistrations := []
+	_Stub_RecordedSends := []
+	_Stub_LastChars := []
 }
 
 
@@ -168,4 +180,74 @@ DisableCapsWord() {
 
 GetCapsLockCondition() {
 	return false
+}
+
+
+
+
+; ==========================================
+; ==========================================
+; ======= 4/ Hotstring engine hooks =======
+; ==========================================
+; ==========================================
+
+; Recorder consumed by ``_HotstringRegistrar`` once installed. Stores the
+; trigger spec (``:flags:abbrev``) and the callback so individual tests can
+; both count registrations and invoke the callback directly to drive
+; HotstringHandler with controlled inputs.
+_HOOK_RecordHotstring(TriggerSpec, Callback) {
+	global _Stub_HotstringRegistrations
+	_Stub_HotstringRegistrations.Push({ spec: TriggerSpec, callback: Callback })
+}
+
+; Recorder consumed by ``_SendHook``. Captures every send primitive call as
+; ``{ fn, args }`` where ``args`` is the variadic Array of positional
+; arguments after the function name. Tests assert on the ordered sequence
+; to verify backspace counts, replacement payloads and end-character emission.
+_HOOK_RecordSend(FnName, Args*) {
+	global _Stub_RecordedSends
+	_Stub_RecordedSends.Push({ fn: FnName, args: Args })
+}
+
+; Wire both hooks into the production globals so subsequent CreateHotstring /
+; HotstringHandler / Send* calls record instead of touching the OS.
+InstallHotstringHooks() {
+	global _HotstringRegistrar, _SendHook
+	_HotstringRegistrar := _HOOK_RecordHotstring
+	_SendHook := _HOOK_RecordSend
+}
+
+UninstallHotstringHooks() {
+	global _HotstringRegistrar, _SendHook
+	_HotstringRegistrar := 0
+	_SendHook := 0
+}
+
+; ── Active-app cache simulators — bypass GetActiveApp's WinGet* calls so the
+; ── Notepad / Office branches of HotstringHandler can be exercised in tests.
+SimulateNotepadActive() {
+	global _ActiveAppCache
+	_ActiveAppCache.ts := A_TickCount
+	_ActiveAppCache.Class := "Notepad"
+	_ActiveAppCache.Exe := "notepad.exe"
+	_ActiveAppCache.IsNotepad := true
+	_ActiveAppCache.IsMicrosoftOffice := false
+}
+
+SimulateRegularApp() {
+	global _ActiveAppCache
+	_ActiveAppCache.ts := A_TickCount
+	_ActiveAppCache.Class := "TestApp"
+	_ActiveAppCache.Exe := "test.exe"
+	_ActiveAppCache.IsNotepad := false
+	_ActiveAppCache.IsMicrosoftOffice := false
+}
+
+SimulateMicrosoftOffice() {
+	global _ActiveAppCache
+	_ActiveAppCache.ts := A_TickCount
+	_ActiveAppCache.Class := "OpusApp"
+	_ActiveAppCache.Exe := "WINWORD.EXE"
+	_ActiveAppCache.IsNotepad := false
+	_ActiveAppCache.IsMicrosoftOffice := true
 }
