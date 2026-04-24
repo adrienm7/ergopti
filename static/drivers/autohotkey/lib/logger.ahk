@@ -128,8 +128,11 @@ LoggerInit() {
 
 ; Drain the pending-lines queue into the log file in a single FileAppend.
 ; Called by the SetTimer installed in LoggerInit and synchronously by error /
-; warning emits that must survive a subsequent crash.
-_LoggerFlush() {
+; warning emits that must survive a subsequent crash. When ``ForceFlush`` is
+; true, the write goes through an explicit FileOpen → Write → Close sequence
+; so a subsequent hard crash (OS kill, power loss) cannot swallow the entry
+; sitting in the stdlib buffer — ``FileAppend`` provides no flush guarantee.
+_LoggerFlush(ForceFlush := false) {
     global _LOGGER_PENDING, LOGGER_LOG_PATH
     if _LOGGER_PENDING.Length == 0 {
         return
@@ -148,11 +151,23 @@ _LoggerFlush() {
     for _, Line in Pending {
         Blob .= Line . "`r`n"
     }
+    if ForceFlush {
+        try {
+            f := FileOpen(LOGGER_LOG_PATH, "a", "UTF-8")
+            if f {
+                f.Write(Blob)
+                f.Close()  ; Close forces a flush of the underlying buffer.
+            }
+        }
+        return
+    }
     try FileAppend(Blob, LOGGER_LOG_PATH, "UTF-8")
 }
 
 _LoggerOnExitFlush(ExitReason, ExitCode) {
-    _LoggerFlush()
+    ; Use the forced-flush path on exit too — a subsequent OS kill cannot
+    ; replay the buffered FileAppend.
+    _LoggerFlush(true)
     return 0
 }
 
@@ -307,11 +322,12 @@ _LoggerEmit(Level, Tag, Msg, Args*) {
     _LoggerPushRing(Line)
     if LOGGER_LOG_PATH != "" {
         _LOGGER_PENDING.Push(Line)
-        ; Force a synchronous flush for diagnostics that must survive a
-        ; subsequent crash — WARNING and ERROR only; the other levels can
-        ; tolerate the ~500 ms worst-case flush latency.
+        ; Force a synchronous, file-handle-closed flush for diagnostics that
+        ; must survive a subsequent crash — WARNING and ERROR only. Other
+        ; levels can tolerate the ~500 ms worst-case flush latency through
+        ; the buffered ``FileAppend`` path.
         if LOGGER_SEVERITY[Level] >= LOGGER_SEVERITY["WARNING"] {
-            _LoggerFlush()
+            _LoggerFlush(true)
         }
     }
 }
