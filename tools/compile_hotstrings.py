@@ -134,7 +134,7 @@ def trigger_expr(trigger: str) -> str:
 	"""
 	escaped = ahk_escape(trigger)
 	if MAGIC_KEY_MARKER in trigger:
-		return f'StrReplace("{escaped}", "★", MK)'
+		return f'StrReplace("{escaped}", "★", _GenMK)'
 	return f'"{escaped}"'
 
 
@@ -205,7 +205,9 @@ def emit_section(
 		"\tTimeAct := FeatureConfig.HasOwnProp(\"TimeActivationSeconds\") "
 		"? FeatureConfig.TimeActivationSeconds : 0"
 	)
-	out.append('\tMK := ScriptInformation["MagicKey"]')
+	# Use a unique name so ``#Warn LocalSameAsGlobal`` does not flag a clash
+	# with the ``MK`` top-level assignment in modules/hotstrings.ahk.
+	out.append('\t_GenMK := ScriptInformation["MagicKey"]')
 	for entry_dict in entries:
 		# Each TOML ``[[section]]`` row is a single-key mapping in the parsed form.
 		for trigger, data in entry_dict.items():
