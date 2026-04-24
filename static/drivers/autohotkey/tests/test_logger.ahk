@@ -196,3 +196,132 @@ TestLogger_LineHasTimestamp() {
 	AssertTrue(RegExMatch(LOGGER_RING_BUFFER[1], "^\d{4}-") > 0)
 }
 Test("Output line: contains a timestamp prefix", TestLogger_LineHasTimestamp)
+
+
+
+
+; ==========================
+; All eight variants emit
+; ==========================
+TestLogger_DebugEmits() {
+	_ResetLogger()
+	LoggerDebug("T", "dbg")
+	AssertEqual(1, LOGGER_RING_BUFFER.Length)
+	AssertContains(LOGGER_RING_BUFFER[1], "DEBUG")
+}
+Test("LoggerDebug: emits a DEBUG line", TestLogger_DebugEmits)
+
+TestLogger_TraceEmits() {
+	_ResetLogger()
+	LoggerTrace("T", "trc")
+	AssertEqual(1, LOGGER_RING_BUFFER.Length)
+	AssertContains(LOGGER_RING_BUFFER[1], "TRACE")
+}
+Test("LoggerTrace: emits a TRACE line", TestLogger_TraceEmits)
+
+TestLogger_DoneEmits() {
+	_ResetLogger()
+	LoggerDone("T", "done")
+	AssertEqual(1, LOGGER_RING_BUFFER.Length)
+	AssertContains(LOGGER_RING_BUFFER[1], "DONE")
+}
+Test("LoggerDone: emits a DONE line", TestLogger_DoneEmits)
+
+TestLogger_StartEmits() {
+	_ResetLogger()
+	LoggerStart("T", "start")
+	AssertEqual(1, LOGGER_RING_BUFFER.Length)
+	AssertContains(LOGGER_RING_BUFFER[1], "START")
+}
+Test("LoggerStart: emits a START line", TestLogger_StartEmits)
+
+TestLogger_SuccessEmits() {
+	_ResetLogger()
+	LoggerSuccess("T", "success")
+	AssertEqual(1, LOGGER_RING_BUFFER.Length)
+	AssertContains(LOGGER_RING_BUFFER[1], "SUCCESS")
+}
+Test("LoggerSuccess: emits a SUCCESS line", TestLogger_SuccessEmits)
+
+TestLogger_ErrorEmits() {
+	_ResetLogger()
+	LoggerError("T", "err")
+	AssertEqual(1, LOGGER_RING_BUFFER.Length)
+	AssertContains(LOGGER_RING_BUFFER[1], "ERROR")
+}
+Test("LoggerError: emits an ERROR line", TestLogger_ErrorEmits)
+
+
+
+
+; ==========================
+; Level filter — strict thresholds
+; ==========================
+TestLogger_LevelFilterDropTrace() {
+	global LOGGER_MIN_LEVEL
+	_ResetLogger()
+	LOGGER_MIN_LEVEL := "INFO"
+	LoggerTrace("T", "dropped")
+	AssertEqual(0, LOGGER_RING_BUFFER.Length)
+}
+Test("Level filter: TRACE is dropped when min level is INFO", TestLogger_LevelFilterDropTrace)
+
+TestLogger_LevelFilterDropDone() {
+	global LOGGER_MIN_LEVEL
+	_ResetLogger()
+	LOGGER_MIN_LEVEL := "INFO"
+	LoggerDone("T", "dropped")
+	AssertEqual(0, LOGGER_RING_BUFFER.Length)
+}
+Test("Level filter: DONE is dropped when min level is INFO", TestLogger_LevelFilterDropDone)
+
+TestLogger_LevelErrorThreshold() {
+	global LOGGER_MIN_LEVEL
+	_ResetLogger()
+	LOGGER_MIN_LEVEL := "ERROR"
+	LoggerWarn("T", "dropped")
+	LoggerInfo("T", "dropped")
+	LoggerError("T", "kept")
+	AssertEqual(1, LOGGER_RING_BUFFER.Length)
+	AssertContains(LOGGER_RING_BUFFER[1], "ERROR")
+}
+Test("Level filter: ERROR threshold drops WARN and INFO", TestLogger_LevelErrorThreshold)
+
+
+
+
+; ==========================
+; Ring buffer size constant
+; ==========================
+TestLogger_RingBufferSizePositive() {
+	AssertTrue(LOGGER_RING_BUFFER_SIZE > 0)
+}
+Test("LOGGER_RING_BUFFER_SIZE: positive constant defined", TestLogger_RingBufferSizePositive)
+
+TestLogger_RingBufferSizeReasonable() {
+	; Must be at least 10 to be useful, at most 10000 to avoid memory waste
+	AssertTrue(LOGGER_RING_BUFFER_SIZE >= 10)
+	AssertTrue(LOGGER_RING_BUFFER_SIZE <= 10000)
+}
+Test("LOGGER_RING_BUFFER_SIZE: between 10 and 10000", TestLogger_RingBufferSizeReasonable)
+
+
+
+
+; ==========================
+; Snapshot ordering — multiple wraps
+; ==========================
+TestLogger_SnapshotAfterDoubleWrap() {
+	_ResetLogger()
+	; Write 2× the buffer size to force two full wrap-arounds
+	Total := LOGGER_RING_BUFFER_SIZE * 2 + 3
+	loop Total {
+		LoggerInfo("Wrap2", "msg-" . A_Index)
+	}
+	Snap := LoggerRingBufferSnapshot()
+	AssertEqual(LOGGER_RING_BUFFER_SIZE, Snap.Length)
+	; The last message in the snapshot must be the very last emitted
+	AssertContains(Snap[Snap.Length], "msg-" . Total)
+}
+Test("Ring buffer: snapshot is correct after double wrap-around",
+	TestLogger_SnapshotAfterDoubleWrap)

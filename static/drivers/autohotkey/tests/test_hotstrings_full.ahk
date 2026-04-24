@@ -886,4 +886,148 @@ Test("MicrosoftApps: Notepad is not classified as an Office app",
 
 
 
+; ============================================
+; ============================================
+; ======= 8/ HotstringHandler — more boundary cases =======
+; ============================================
+; ============================================
+
+TestHH_StarMagicKeyAbbr() {
+	ResetHotstringRecorders()
+	SimulateRegularApp()
+	; Abbreviation ending with MagicKey "★" — StrLen("ab★") = 3
+	HotstringHandler("ab★", "x", "", true, false, 0)
+	AssertEqual("{BackSpace 3}", _Stub_RecordedSends[1].args[1])
+}
+Test("HotstringHandler: MagicKey in abbreviation is counted by StrLen",
+	TestHH_StarMagicKeyAbbr)
+
+TestHH_OnlyTextTruePropagation() {
+	ResetHotstringRecorders()
+	SimulateRegularApp()
+	; OnlyText=true must flow to the replacement send (second send).
+	HotstringHandler("ab", "x", "", true, false, 0)
+	AssertEqual(true, _Stub_RecordedSends[2].args[2])
+}
+Test("HotstringHandler: OnlyText=true flows to the replacement send",
+	TestHH_OnlyTextTruePropagation)
+
+TestHH_FinalResultBackspaceIsFinal() {
+	ResetHotstringRecorders()
+	SimulateRegularApp()
+	; FinalResult=true path — all three sends must use SendFinalResult.
+	HotstringHandler("xy", "hello", ".", true, true, 0)
+	AssertEqual("SendFinalResult", _Stub_RecordedSends[1].fn)
+	AssertEqual("{BackSpace 2}", _Stub_RecordedSends[1].args[1])
+	AssertEqual(false, _Stub_RecordedSends[1].args[2])
+}
+Test("HotstringHandler: FinalResult backspace uses SendFinalResult with OnlyText=false",
+	TestHH_FinalResultBackspaceIsFinal)
+
+TestHH_FinalResultEndCharIsFinal() {
+	ResetHotstringRecorders()
+	SimulateRegularApp()
+	HotstringHandler("xy", "hello", ".", true, true, 0)
+	AssertEqual("SendFinalResult", _Stub_RecordedSends[3].fn)
+	AssertEqual(".", _Stub_RecordedSends[3].args[1])
+}
+Test("HotstringHandler: FinalResult end character uses SendFinalResult",
+	TestHH_FinalResultEndCharIsFinal)
+
+TestHH_UnicodeReplacementPreserved() {
+	ResetHotstringRecorders()
+	SimulateRegularApp()
+	HotstringHandler("->", "→", "", true, false, 0)
+	AssertEqual("→", _Stub_RecordedSends[2].args[1])
+}
+Test("HotstringHandler: Unicode arrow replacement is preserved verbatim",
+	TestHH_UnicodeReplacementPreserved)
+
+TestHH_EmojisInReplacement() {
+	ResetHotstringRecorders()
+	SimulateRegularApp()
+	HotstringHandler("ok", "👍", "", true, false, 0)
+	AssertEqual("👍", _Stub_RecordedSends[2].args[1])
+}
+Test("HotstringHandler: emoji replacement is preserved verbatim",
+	TestHH_EmojisInReplacement)
+
+TestHH_MultiLineReplacement() {
+	ResetHotstringRecorders()
+	SimulateRegularApp()
+	Multi := "line1" . "`n" . "line2"
+	HotstringHandler("ml", Multi, "", true, false, 0)
+	AssertEqual(Multi, _Stub_RecordedSends[2].args[1])
+}
+Test("HotstringHandler: multi-line replacement is passed through unchanged",
+	TestHH_MultiLineReplacement)
+
+TestHH_NotepadAbbrWithUnicode() {
+	ResetHotstringRecorders()
+	SimulateNotepadActive()
+	; With Notepad + Unicode in abbr, BackSpace count must match StrLen("ab")
+	HotstringHandler("ab", "★", "!", true, false, 0)
+	AssertEqual("{BackSpace 2}", _Stub_RecordedSends[1].args[1])
+	AssertContains(_Stub_RecordedSends[2].args[1], "★")
+}
+Test("HotstringHandler: Notepad path with Unicode replacement preserves character",
+	TestHH_NotepadAbbrWithUnicode)
+
+
+
+
+; ============================================
+; ============================================
+; ======= 9/ CreateHotstring — options =======
+; ============================================
+; ============================================
+
+TestCH_OptionTimeActivationPropagates() {
+	ResetHotstringRecorders()
+	SimulateRegularApp()
+	; With a very short timeout and a very stale prior key, expansion must be blocked.
+	global LastSentCharacterKeyTime
+	LastSentCharacterKeyTime := Map("a", A_TickCount - 60000)
+	CreateHotstring("*?", "ab", "x", Map("TimeActivationSeconds", 1))
+	Cb := _Stub_HotstringRegistrations[1].callback
+	; Reset sends so we only count those from the callback
+	ResetHotstringRecorders()
+	Cb()
+	; Stale "a" → expired → no sends
+	AssertEqual(0, _Stub_RecordedSends.Length)
+}
+Test("CreateHotstring: TimeActivationSeconds option blocks expansion when prior key is stale",
+	TestCH_OptionTimeActivationPropagates)
+
+TestCH_OptionFinalResultPropagates() {
+	ResetHotstringRecorders()
+	SimulateRegularApp()
+	CreateHotstring("", "btw2", "by the way", Map("FinalResult", true))
+	Cb := _Stub_HotstringRegistrations[1].callback
+	ResetHotstringRecorders()
+	Cb()
+	; All sends must be SendFinalResult
+	for _, S in _Stub_RecordedSends {
+		AssertEqual("SendFinalResult", S.fn)
+	}
+}
+Test("CreateHotstring: FinalResult=true option propagates to every send in the callback",
+	TestCH_OptionFinalResultPropagates)
+
+TestCH_OptionOnlyTextFalse() {
+	ResetHotstringRecorders()
+	SimulateRegularApp()
+	CreateHotstring("*", "xk", "y", Map("OnlyText", false))
+	Cb := _Stub_HotstringRegistrations[1].callback
+	ResetHotstringRecorders()
+	Cb()
+	; OnlyText=false must flow to the replacement send (second send, index 2).
+	AssertEqual(false, _Stub_RecordedSends[2].args[2])
+}
+Test("CreateHotstring: OnlyText=false option propagates to the replacement send",
+	TestCH_OptionOnlyTextFalse)
+
+
+
+
 ; Hooks are torn down by run_all.ahk's own teardown if needed.

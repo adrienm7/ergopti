@@ -219,3 +219,211 @@ TestLT_LayerDispatchUnknown() {
 	AssertEqual(0, _Stub_LastChars.Length)
 }
 Test("LayerDispatch: unknown SC is silently ignored", TestLT_LayerDispatchUnknown)
+
+
+
+
+; ==========================
+; SHIFTED_LETTERS — spot-check key entries
+; ==========================
+TestLT_ShiftedLettersMiddleRow() {
+	AssertEqual("A",  SHIFTED_LETTERS["SC01E"])
+	AssertEqual("I",  SHIFTED_LETTERS["SC01F"])
+	AssertEqual("E",  SHIFTED_LETTERS["SC020"])
+	AssertEqual("U",  SHIFTED_LETTERS["SC021"])
+	AssertEqual("V",  SHIFTED_LETTERS["SC023"])
+	AssertEqual("S",  SHIFTED_LETTERS["SC024"])
+	AssertEqual("N",  SHIFTED_LETTERS["SC025"])
+	AssertEqual("T",  SHIFTED_LETTERS["SC026"])
+	AssertEqual("R",  SHIFTED_LETTERS["SC027"])
+	AssertEqual("Q",  SHIFTED_LETTERS["SC028"])
+}
+Test("SHIFTED_LETTERS: middle row letters are correct", TestLT_ShiftedLettersMiddleRow)
+
+TestLT_ShiftedLettersBottomRow() {
+	AssertEqual("Ê",  SHIFTED_LETTERS["SC056"])
+	AssertEqual("É",  SHIFTED_LETTERS["SC02C"])
+	AssertEqual("À",  SHIFTED_LETTERS["SC02D"])
+	AssertEqual("J",  SHIFTED_LETTERS["SC02E"])
+	AssertEqual("K",  SHIFTED_LETTERS["SC030"])
+	AssertEqual("M",  SHIFTED_LETTERS["SC031"])
+	AssertEqual("D",  SHIFTED_LETTERS["SC032"])
+	AssertEqual("L",  SHIFTED_LETTERS["SC033"])
+	AssertEqual("P",  SHIFTED_LETTERS["SC034"])
+}
+Test("SHIFTED_LETTERS: bottom row letters are correct", TestLT_ShiftedLettersBottomRow)
+
+TestLT_ShiftedLettersTopRow() {
+	AssertEqual("È",  SHIFTED_LETTERS["SC010"])
+	AssertEqual("Y",  SHIFTED_LETTERS["SC011"])
+	AssertEqual("O",  SHIFTED_LETTERS["SC012"])
+	AssertEqual("W",  SHIFTED_LETTERS["SC013"])
+	AssertEqual("B",  SHIFTED_LETTERS["SC014"])
+	AssertEqual("F",  SHIFTED_LETTERS["SC015"])
+	AssertEqual("G",  SHIFTED_LETTERS["SC016"])
+	AssertEqual("H",  SHIFTED_LETTERS["SC017"])
+	AssertEqual("C",  SHIFTED_LETTERS["SC018"])
+	AssertEqual("X",  SHIFTED_LETTERS["SC019"])
+	AssertEqual("Z",  SHIFTED_LETTERS["SC01A"])
+}
+Test("SHIFTED_LETTERS: top row letters are correct", TestLT_ShiftedLettersTopRow)
+
+TestLT_ShiftedLettersDigits() {
+	AssertEqual("1", SHIFTED_LETTERS["SC002"])
+	AssertEqual("2", SHIFTED_LETTERS["SC003"])
+	AssertEqual("9", SHIFTED_LETTERS["SC00A"])
+	AssertEqual("0", SHIFTED_LETTERS["SC00B"])
+}
+Test("SHIFTED_LETTERS: digit entries contain the correct digits",
+	TestLT_ShiftedLettersDigits)
+
+
+
+
+; ==========================
+; AltGr number row — value spot-checks
+; ==========================
+TestLT_AltGrEuroKey() {
+	; SC029 (tilde key) → € plain, DeadKey(Currency) shifted
+	AssertTrue(ALTGR_NUMBER_ROW.Has("SC029"))
+	Entry := ALTGR_NUMBER_ROW["SC029"]
+	AssertTrue(IsObject(Entry.Plain))
+	AssertTrue(IsObject(Entry.Shifted))
+}
+Test("ALTGR_NUMBER_ROW: SC029 (euro/currency) entry is present and callable",
+	TestLT_AltGrEuroKey)
+
+TestLT_AltGrSuperscriptRow() {
+	for _, SC in ["SC002", "SC003", "SC004", "SC005", "SC006",
+	              "SC007", "SC008", "SC009", "SC00A", "SC00B"] {
+		AssertTrue(ALTGR_NUMBER_ROW.Has(SC), "missing SC: " . SC)
+		Entry := ALTGR_NUMBER_ROW[SC]
+		AssertTrue(IsObject(Entry.Plain),   SC . " Plain not callable")
+		AssertTrue(IsObject(Entry.Shifted), SC . " Shifted not callable")
+	}
+}
+Test("ALTGR_NUMBER_ROW: SC002..SC00B all have callable Plain and Shifted",
+	TestLT_AltGrSuperscriptRow)
+
+TestLT_AltGrDegreeKey() {
+	AssertTrue(ALTGR_NUMBER_ROW.Has("SC00D"))
+}
+Test("ALTGR_NUMBER_ROW: SC00D (degree sign) is present", TestLT_AltGrDegreeKey)
+
+
+
+
+; ==========================
+; CtrlAltDispatch — no crash per entry
+; ==========================
+TestLT_CtrlAltDispatchAllEntries() {
+	ResetHotstringRecorders()
+	for Combo, _ in CTRL_ALT_NUMPAD {
+		try {
+			CtrlAltDispatch(Combo, "fake-hotkey-name")
+		} catch as e {
+			throw Error("CtrlAltDispatch crashed on " . Combo . ": " . e.Message)
+		}
+	}
+}
+Test("CtrlAltDispatch: no entry crashes when dispatched", TestLT_CtrlAltDispatchAllEntries)
+
+
+
+
+; ==========================
+; AltGr dispatch — Shift variant of each entry
+; ==========================
+TestLT_AltGrDispatchShiftedBaseRows() {
+	; Temporarily swap GetKeyState-like logic by calling AltGrShiftDispatch with
+	; shift=true. We just verify no crash — the stub absorbs all sends.
+	ResetStubRecorders()
+	for SC, Entry in ALTGR_BASE_ROWS {
+		try {
+			; Call with a non-existing shifted param: AltGrShiftDispatch uses
+			; GetKeyState("Shift","P") internally. Since we are not in a hotkey
+			; context, Shift is always reported as up — Plain fires.
+			; We explicitly exercise Shifted by calling the callable directly.
+			Cb := Entry.Shifted
+			Cb()
+		} catch as e {
+			throw Error("Entry.Shifted() crashed on " . SC . ": " . e.Message)
+		}
+	}
+}
+Test("ALTGR_BASE_ROWS: every Shifted callable runs without crashing",
+	TestLT_AltGrDispatchShiftedBaseRows)
+
+TestLT_AltGrDispatchPlainBaseRows() {
+	ResetStubRecorders()
+	for SC, Entry in ALTGR_BASE_ROWS {
+		try {
+			Cb := Entry.Plain
+			Cb()
+		} catch as e {
+			throw Error("Entry.Plain() crashed on " . SC . ": " . e.Message)
+		}
+	}
+}
+Test("ALTGR_BASE_ROWS: every Plain callable runs without crashing",
+	TestLT_AltGrDispatchPlainBaseRows)
+
+TestLT_AltGrNumberRowPlainNocrash() {
+	ResetStubRecorders()
+	for SC, Entry in ALTGR_NUMBER_ROW {
+		try {
+			Cb := Entry.Plain
+			Cb()
+		} catch as e {
+			throw Error("ALTGR_NUMBER_ROW Plain crashed on " . SC . ": " . e.Message)
+		}
+	}
+}
+Test("ALTGR_NUMBER_ROW: every Plain callable runs without crashing",
+	TestLT_AltGrNumberRowPlainNocrash)
+
+TestLT_AltGrNumberRowShiftedNocrash() {
+	ResetStubRecorders()
+	for SC, Entry in ALTGR_NUMBER_ROW {
+		try {
+			Cb := Entry.Shifted
+			Cb()
+		} catch as e {
+			throw Error("ALTGR_NUMBER_ROW Shifted crashed on " . SC . ": " . e.Message)
+		}
+	}
+}
+Test("ALTGR_NUMBER_ROW: every Shifted callable runs without crashing",
+	TestLT_AltGrNumberRowShiftedNocrash)
+
+
+
+
+; ==========================
+; SHIFT_SYMBOLS and CAPSLOCK_SYMBOLS — each callable runs
+; ==========================
+TestLT_ShiftSymbolsAllRun() {
+	ResetStubRecorders()
+	for SC, Cb in SHIFT_SYMBOLS {
+		try {
+			F := Cb
+			F()
+		} catch as e {
+			throw Error("SHIFT_SYMBOLS crashed on " . SC . ": " . e.Message)
+		}
+	}
+}
+Test("SHIFT_SYMBOLS: every entry runs without crashing", TestLT_ShiftSymbolsAllRun)
+
+TestLT_CapsLockSymbolsAllRun() {
+	ResetStubRecorders()
+	for SC, Cb in CAPSLOCK_SYMBOLS {
+		try {
+			F := Cb
+			F()
+		} catch as e {
+			throw Error("CAPSLOCK_SYMBOLS crashed on " . SC . ": " . e.Message)
+		}
+	}
+}
+Test("CAPSLOCK_SYMBOLS: every entry runs without crashing", TestLT_CapsLockSymbolsAllRun)

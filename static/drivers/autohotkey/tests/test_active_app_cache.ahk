@@ -71,3 +71,75 @@ TestAA_InvalidateForcesRefresh() {
 }
 Test("InvalidateActiveAppCache: forces a refresh on the next call",
 	TestAA_InvalidateForcesRefresh)
+
+
+
+
+; ==========================
+; Simulator helpers (from test_stubs.ahk)
+; ==========================
+TestAA_SimulateNotepad() {
+	SimulateNotepadActive()
+	App := GetActiveApp()
+	AssertTrue(App.IsNotepad)
+	AssertFalse(App.IsMicrosoftOffice)
+	AssertEqual("notepad.exe", App.Exe)
+}
+Test("SimulateNotepadActive: cache reflects Notepad flags", TestAA_SimulateNotepad)
+
+TestAA_SimulateRegularApp() {
+	SimulateRegularApp()
+	App := GetActiveApp()
+	AssertFalse(App.IsNotepad)
+	AssertFalse(App.IsMicrosoftOffice)
+}
+Test("SimulateRegularApp: cache reflects non-special app flags", TestAA_SimulateRegularApp)
+
+TestAA_SimulateMicrosoftOffice() {
+	SimulateMicrosoftOffice()
+	App := GetActiveApp()
+	AssertFalse(App.IsNotepad)
+	AssertTrue(App.IsMicrosoftOffice)
+	AssertEqual("WINWORD.EXE", App.Exe)
+}
+Test("SimulateMicrosoftOffice: cache reflects Office flags", TestAA_SimulateMicrosoftOffice)
+
+TestAA_SimulatorCachedWithinTTL() {
+	; Write a known state, immediately read back — must not re-query WinGet*
+	SimulateNotepadActive()
+	First := GetActiveApp()
+	; Mutate cache to test.exe to distinguish a re-fetch
+	SimulateRegularApp()
+	; Within TTL the old stamp is gone (SimulateRegularApp overwrites ts),
+	; so just confirm the flag is now false
+	Second := GetActiveApp()
+	AssertFalse(Second.IsNotepad)
+}
+Test("SimulateRegularApp after SimulateNotepad: GetActiveApp reflects new state",
+	TestAA_SimulatorCachedWithinTTL)
+
+
+
+
+; ==========================
+; MICROSOFT_OFFICE_EXES completeness
+; ==========================
+TestAA_OfficePowerPoint() {
+	AssertTrue(MICROSOFT_OFFICE_EXES.Has("POWERPNT.EXE"))
+}
+Test("MICROSOFT_OFFICE_EXES: includes PowerPoint", TestAA_OfficePowerPoint)
+
+TestAA_OfficeExcel() {
+	AssertTrue(MICROSOFT_OFFICE_EXES.Has("EXCEL.EXE"))
+}
+Test("MICROSOFT_OFFICE_EXES: includes Excel", TestAA_OfficeExcel)
+
+TestAA_OfficeOneNote() {
+	AssertTrue(MICROSOFT_OFFICE_EXES.Has("ONENOTE.exe"))
+}
+Test("MICROSOFT_OFFICE_EXES: includes OneNote", TestAA_OfficeOneNote)
+
+TestAA_OfficeNotNotepad() {
+	AssertFalse(MICROSOFT_OFFICE_EXES.Has("notepad.exe"))
+}
+Test("MICROSOFT_OFFICE_EXES: does not include notepad.exe", TestAA_OfficeNotNotepad)
