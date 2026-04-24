@@ -280,36 +280,37 @@ echo "Re-signing bottom-up (ad-hoc)…"
 
 PRESERVE="--preserve-metadata=entitlements,requirements,flags,runtime"
 
-# Every Mach-O file in the bundle (dylibs, .so, standalone binaries sitting in
-# MacOS/ like "Code.real", frameworks internals). Their own embedded signatures
-# reference the parent Info.plist hash — patching Info.plist invalidates every
-# one of them, so they all need a fresh ad-hoc signature.
-#
-# Fast path: pre-filter by extension + executable bit so we only hit ~hundreds
-# of candidates instead of every single file. Then parallelize the actual
-# `codesign` calls — signing 6500 resources sequentially was the hot spot.
-# macOS tools are thread-safe per file and this typically yields a 4-8x speedup
-# on Apple Silicon.
-{
-  find "$DEST/Contents" -type f \( -name "*.dylib" -o -name "*.so" -o -name "*.node" \) 2>/dev/null
-  find "$DEST/Contents/MacOS" -type f -perm +111 2>/dev/null
-  find "$DEST/Contents/Frameworks" -type f -perm +111 \
-       ! -name "*.dylib" ! -name "*.so" ! -name "*.node" 2>/dev/null
-} | sort -u | xargs -P 8 -I{} codesign --force --sign - "{}" 2>/dev/null || true
+# Strip quarantine + resource forks on every file so Gatekeeper doesn't flag
+# the clone as "downloaded". `xattr -r` isn't available in Apple's xattr, so
+# fan out via find. Run before signing — xattr changes don't invalidate seals,
+# but it's cleaner to do it first.
+find "$DEST" -exec xattr -c {} + 2>/dev/null || true
 
-# Nested .framework bundles — deepest first
+# Standalone Mach-O files directly in Contents/MacOS (e.g. "Code.real" created
+# by the OPEN_ARG wrapper). These sit outside any sub-bundle so no parent seals
+# them — they need their own signature pointing at the patched Info.plist hash.
+find "$DEST/Contents/MacOS" -type f -perm +111 2>/dev/null \
+  | while IFS= read -r f; do
+      codesign --force --sign - "$f" 2>/dev/null || true
+    done
+
+# Nested .framework bundles — deepest first, with --deep so every dylib/helper
+# inside is re-sealed atomically. `--deep` is reliable *within* a framework
+# (bounded scope, no races); it's only unreliable when applied to the whole
+# app tree. Parallelism across frameworks would race on shared inodes from
+# the APFS clone, so we go serial here.
 find "$DEST" -depth -type d -name "*.framework" 2>/dev/null \
   | while IFS= read -r fw; do
-      codesign --force --sign - $PRESERVE "$fw" 2>/dev/null \
-        || codesign --force --sign - "$fw" 2>/dev/null || true
+      codesign --force --deep --sign - $PRESERVE "$fw" 2>/dev/null \
+        || codesign --force --deep --sign - "$fw" 2>/dev/null || true
     done
 
 # Nested .app bundles (helpers, renderer processes) — deepest first, skip root
 find "$DEST" -depth -type d -name "*.app" 2>/dev/null \
   | while IFS= read -r nested; do
       [[ "$nested" == "$DEST" ]] && continue
-      codesign --force --sign - $PRESERVE "$nested" 2>/dev/null \
-        || codesign --force --sign - "$nested" 2>/dev/null || true
+      codesign --force --deep --sign - $PRESERVE "$nested" 2>/dev/null \
+        || codesign --force --deep --sign - "$nested" 2>/dev/null || true
     done
 
 # Main bundle last — preserves VSCode's hardened-runtime entitlement so Electron
