@@ -1,21 +1,26 @@
 #!/bin/zsh
-# apps/ShortcutBuilder.app/Contents/Resources/clone_app.sh
+# apps/AppCloner.app/Contents/Resources/clone_app.sh
 #
 # Crée un clone léger d'une application macOS avec :
 #   - bundle ID unique  → pas de regroupement Dock avec l'originale
-#   - icône teintée     → couleur personnalisée superposée à l'icône source
+#   - icône teintée     → couleur personnalisée sur l'icône source (CoreImage)
 #   - wrapper shell     → relance l'app originale (-n = nouvelle instance)
-#   - option launch arg → fichier/dossier à passer à l'ouverture
+#   - option dossier    → dossier à passer à l'ouverture
+#   - ajout au Dock     → placé dans ~/Applications et épinglé au Dock
 #
 # Usage:
 #   clone_app.sh <source_app_path> <clone_name> <color_hex> <open_arg>
-#   open_arg : chemin de fichier/dossier à ouvrir, ou "" pour aucun
 set -euo pipefail
 
-SOURCE_APP="$1"   # Ex: /Applications/Visual Studio Code.app
-CLONE_NAME="$2"   # Ex: "VSCode — Projet A"
-COLOR_HEX="$3"    # Ex: "#E04040"   (teinte de l'icône)
-OPEN_ARG="$4"     # Ex: "/Users/me/Projects/projA"  ou ""
+SOURCE_APP="$1"
+CLONE_NAME="$2"
+COLOR_HEX="$3"
+OPEN_ARG="$4"
+
+LOG=/tmp/clone_app.log
+exec >> "$LOG" 2>&1
+echo "=== clone_app.sh $(date) ==="
+echo "SOURCE=$SOURCE_APP  NAME=$CLONE_NAME  COLOR=$COLOR_HEX  ARG=$OPEN_ARG"
 
 # ─────────────────────────────────────────────
 # 1) Validation
@@ -26,19 +31,23 @@ if [[ ! -d "$SOURCE_APP" ]]; then
 fi
 
 # ─────────────────────────────────────────────
-# 2) Nettoyage du nom → nom de fichier sûr
+# 2) Nom de fichier sûr
 # ─────────────────────────────────────────────
 safe_name="$(printf '%s' "$CLONE_NAME" \
   | sed 's|/|-|g' \
   | sed "s/[^[:alnum:][:space:]'._()-]/_/g" \
-  | sed 's/_\{2,\}/_/g' \
+  | sed 's/__*/_/g' \
   | sed -e 's/^[ _-]*//' -e 's/[ _-]*$//')"
 [[ -z "$safe_name" ]] && safe_name="Clone"
 
-DEST="$HOME/Desktop/${safe_name}.app"
+# Installer dans ~/Applications pour que le Dock puisse l'épingler proprement
+APPS_DIR="$HOME/Applications"
+mkdir -p "$APPS_DIR"
+DEST="$APPS_DIR/${safe_name}.app"
 if [[ -e "$DEST" ]]; then
-  DEST="$HOME/Desktop/${safe_name}_$(date +%s).app"
+  DEST="$APPS_DIR/${safe_name}_$(date +%s).app"
 fi
+echo "DEST=$DEST"
 
 CONTENTS="$DEST/Contents"
 MACOS="$CONTENTS/MacOS"
@@ -49,15 +58,10 @@ TMPDIR_WORK=$(mktemp -d "/tmp/appcloner.XXXXXX")
 trap 'rm -rf "$TMPDIR_WORK"' EXIT
 
 # ─────────────────────────────────────────────
-# 3) Extraction de l'icône source
+# 3) Extraction de l'icône source → PNG
 # ─────────────────────────────────────────────
-# Lire le plist de l'app source pour trouver le fichier .icns
 SRC_PLIST="$SOURCE_APP/Contents/Info.plist"
-SRC_ICON_FILE=""
-if [[ -f "$SRC_PLIST" ]]; then
-  SRC_ICON_FILE="$(defaults read "$SRC_PLIST" CFBundleIconFile 2>/dev/null || true)"
-fi
-# macOS ajoute parfois automatiquement l'extension
+SRC_ICON_FILE="$(defaults read "$SRC_PLIST" CFBundleIconFile 2>/dev/null || true)"
 [[ -n "$SRC_ICON_FILE" && "${SRC_ICON_FILE##*.}" != "icns" ]] && SRC_ICON_FILE="${SRC_ICON_FILE}.icns"
 
 SRC_ICNS=""
@@ -65,38 +69,31 @@ if [[ -n "$SRC_ICON_FILE" ]]; then
   candidate="$SOURCE_APP/Contents/Resources/$SRC_ICON_FILE"
   [[ -f "$candidate" ]] && SRC_ICNS="$candidate"
 fi
-# Fallback : premier .icns trouvé dans Resources
 if [[ -z "$SRC_ICNS" ]]; then
   SRC_ICNS="$(find "$SOURCE_APP/Contents/Resources" -maxdepth 1 -name '*.icns' | head -n1 || true)"
 fi
+echo "SRC_ICNS=$SRC_ICNS"
 
-# ─────────────────────────────────────────────
-# 4) Construction de l'icône teintée
-# ─────────────────────────────────────────────
-# Extraire la PNG 512px depuis le .icns source (si disponible)
 BASE_PNG="$TMPDIR_WORK/base.png"
 if [[ -n "$SRC_ICNS" && -f "$SRC_ICNS" ]]; then
-  # iconutil décompresse en iconset, on prend la plus grande taille disponible
   ICONSET_TMP="$TMPDIR_WORK/src.iconset"
-  iconutil -c iconset "$SRC_ICNS" -o "$ICONSET_TMP" >/dev/null 2>&1 || true
-  # Prendre la plus grande résolution disponible
+  iconutil -c iconset "$SRC_ICNS" -o "$ICONSET_TMP" 2>/dev/null || true
   for sz in "icon_512x512@2x" "icon_512x512" "icon_256x256@2x" "icon_256x256" "icon_128x128@2x"; do
     candidate="$ICONSET_TMP/${sz}.png"
     if [[ -f "$candidate" ]]; then
       cp "$candidate" "$BASE_PNG"
+      echo "Base PNG extracted: $sz"
       break
     fi
   done
 fi
 
-# Si on n'a pas réussi à extraire l'icône source, créer une icône générique
 if [[ ! -f "$BASE_PNG" ]]; then
+  echo "No base PNG — using generic fallback"
   SRC_NAME="$(basename "$SOURCE_APP" .app)"
-  INITIALS="$(printf '%s' "$SRC_NAME" | awk '{for(i=1;i<=NF&&i<=2;i++) printf toupper(substr($i,1,1))}' FS=' ')"
-  [[ -z "$INITIALS" ]] && INITIALS="${SRC_NAME:0:2}"
+  INITIALS="${SRC_NAME:0:2}"
   SVG_FALLBACK="$TMPDIR_WORK/fallback.svg"
   cat > "$SVG_FALLBACK" <<SVGEOF
-<?xml version="1.0" encoding="UTF-8"?>
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
   <rect width="1024" height="1024" rx="220" ry="220" fill="#888888"/>
   <text x="512" y="512" font-family="Helvetica-Bold,Arial,sans-serif" font-size="420" font-weight="900"
@@ -104,125 +101,87 @@ if [[ ! -f "$BASE_PNG" ]]; then
 </svg>
 SVGEOF
   qlmanage -t -s 1024 -o "$TMPDIR_WORK" "$SVG_FALLBACK" >/dev/null 2>&1 || true
-  FALLBACK_PNG="$(ls -S "$TMPDIR_WORK"/*.png 2>/dev/null | head -n1 || true)"
+  FALLBACK_PNG="$(ls "$TMPDIR_WORK"/*.png 2>/dev/null | head -n1 || true)"
   [[ -n "$FALLBACK_PNG" ]] && cp "$FALLBACK_PNG" "$BASE_PNG"
 fi
 
-# Superposer une teinte de couleur semi-transparente sur l'icône source
-# On génère un overlay SVG de même taille et on le composite via sips ou qlmanage
+# ─────────────────────────────────────────────
+# 4) Teinte via Python3 + Quartz (natif macOS)
+# ─────────────────────────────────────────────
+# Parse la couleur hex en composantes 0.0-1.0
+R_INT=$(( 16#${COLOR_HEX:1:2} ))
+G_INT=$(( 16#${COLOR_HEX:3:2} ))
+B_INT=$(( 16#${COLOR_HEX:5:2} ))
+
 TINTED_PNG="$TMPDIR_WORK/tinted.png"
-if [[ -f "$BASE_PNG" ]]; then
-  # Récupérer la taille réelle de la PNG source
-  IMG_W="$(sips -g pixelWidth "$BASE_PNG" 2>/dev/null | awk '/pixelWidth/{print $2}' || echo 512)"
-  IMG_H="$(sips -g pixelHeight "$BASE_PNG" 2>/dev/null | awk '/pixelHeight/{print $2}' || echo 512)"
 
-  # Créer un SVG overlay de teinte (50 % opacité)
-  OVERLAY_SVG="$TMPDIR_WORK/overlay.svg"
-  cat > "$OVERLAY_SVG" <<SVGEOF
-<?xml version="1.0" encoding="UTF-8"?>
-<svg xmlns="http://www.w3.org/2000/svg" width="${IMG_W}" height="${IMG_H}">
-  <rect width="${IMG_W}" height="${IMG_H}" fill="${COLOR_HEX}" opacity="0.45"/>
-</svg>
-SVGEOF
+python3 - "$BASE_PNG" "$TINTED_PNG" "$R_INT" "$G_INT" "$B_INT" <<'PYEOF'
+import sys, os
+sys.path.insert(0, '/System/Library/Frameworks/Python.framework/Versions/Current/Extras/lib/python')
+import Quartz
+import Quartz.CoreGraphics as CG
 
-  # Convertir l'overlay SVG en PNG via qlmanage
-  qlmanage -t -s "$IMG_W" -o "$TMPDIR_WORK/ov" "$OVERLAY_SVG" >/dev/null 2>&1 || true
-  OVERLAY_PNG="$(ls -S "$TMPDIR_WORK/ov"/*.png 2>/dev/null | head -n1 || true)"
+src, dst, r, g, b = sys.argv[1], sys.argv[2], int(sys.argv[3]), int(sys.argv[4]), int(sys.argv[5])
 
-  if [[ -n "$OVERLAY_PNG" && -f "$OVERLAY_PNG" ]]; then
-    # Assurer que l'overlay a la bonne taille
-    sips -z "$IMG_H" "$IMG_W" "$OVERLAY_PNG" >/dev/null 2>&1 || true
-    # Composer : base_png + overlay_png via AppleScript (CISourceOverCompositing)
-    COMPOSE_SCRIPT="$TMPDIR_WORK/compose.applescript"
-    cat > "$COMPOSE_SCRIPT" <<ASEOF
-use framework "Foundation"
-use framework "AppKit"
-use framework "CoreImage"
-use scripting additions
+# Load source image
+data_provider = CG.CGDataProviderCreateWithFilename(src)
+src_img = CG.CGImageCreateWithPNGDataProvider(data_provider, None, False, CG.kCGRenderingIntentDefault)
+w = CG.CGImageGetWidth(src_img)
+h = CG.CGImageGetHeight(src_img)
 
-set basePath to "$BASE_PNG"
-set overlayPath to "$OVERLAY_PNG"
-set outPath to "$TINTED_PNG"
+# Create RGBA bitmap context
+cs = CG.CGColorSpaceCreateDeviceRGB()
+ctx = CG.CGBitmapContextCreate(None, w, h, 8, 0, cs,
+    CG.kCGImageAlphaPremultipliedLast | CG.kCGBitmapByteOrder32Big)
 
-set baseImg  to current application's NSImage's alloc()'s initWithContentsOfFile:basePath
-set overlayImg to current application's NSImage's alloc()'s initWithContentsOfFile:overlayPath
+# Draw source image
+CG.CGContextDrawImage(ctx, CG.CGRectMake(0, 0, w, h), src_img)
 
-set sz to baseImg's |size|()
-set rep to current application's NSBitmapImageRep's alloc()'s ¬
-    initWithBitmapDataPlanes:(missing value) ¬
-    pixelsWide:(sz's width) pixelsHigh:(sz's height) ¬
-    bitsPerSample:8 samplesPerPixel:4 hasAlpha:true ¬
-    isPlanar:false colorSpaceName:"NSCalibratedRGBColorSpace" ¬
-    bytesPerRow:0 bitsPerPixel:0
+# Draw tint overlay at 45% opacity
+CG.CGContextSetRGBFillColor(ctx, r/255.0, g/255.0, b/255.0, 0.45)
+CG.CGContextSetBlendMode(ctx, CG.kCGBlendModeMultiply)
+CG.CGContextFillRect(ctx, CG.CGRectMake(0, 0, w, h))
 
-set ctx to current application's NSGraphicsContext's graphicsContextWithBitmapImageRep:rep
-current application's NSGraphicsContext's setCurrentContext:ctx
+# Export PNG
+out_img = CG.CGBitmapContextCreateImage(ctx)
+url = CG.CFURLCreateWithFileSystemPath(None, dst, CG.kCFURLPOSIXPathStyle, False)
+dest = CG.CGImageDestinationCreateWithURL(url, b'public.png', 1, None)
+CG.CGImageDestinationAddImage(dest, out_img, None)
+CG.CGImageDestinationFinalize(dest)
+print(f"Tinted PNG written: {dst} ({w}x{h})")
+PYEOF
 
-baseImg's drawInRect:{origin:{x:0, y:0}, |size|:{width:(sz's width), height:(sz's height)}} ¬
-    fromRect:{origin:{x:0, y:0}, |size|:{width:(sz's width), height:(sz's height)}} ¬
-    operation:(current application's NSCompositingOperationSourceOver) fraction:1.0
-
-overlayImg's drawInRect:{origin:{x:0, y:0}, |size|:{width:(sz's width), height:(sz's height)}} ¬
-    fromRect:{origin:{x:0, y:0}, |size|:{width:(sz's width), height:(sz's height)}} ¬
-    operation:(current application's NSCompositingOperationSourceOver) fraction:1.0
-
-(ctx's flushGraphics())
-
-set pngData to rep's representationUsingType:(current application's NSBitmapImageFileTypePNG) |properties|:(missing value)
-pngData's writeToFile:outPath atomically:true
-ASEOF
-    osascript "$COMPOSE_SCRIPT" >/dev/null 2>&1 || cp "$BASE_PNG" "$TINTED_PNG"
-  else
-    cp "$BASE_PNG" "$TINTED_PNG"
-  fi
-else
-  # Aucune icône source disponible → icône teintée pure
-  TINTED_PNG="$TMPDIR_WORK/tinted_fallback.png"
-  TINTED_SVG="$TMPDIR_WORK/tinted.svg"
-  SRC_NAME="$(basename "$SOURCE_APP" .app)"
-  INITIALS="$(printf '%s' "$SRC_NAME" | awk '{for(i=1;i<=NF&&i<=2;i++) printf toupper(substr($i,1,1))}' FS=' ')"
-  [[ -z "$INITIALS" ]] && INITIALS="${SRC_NAME:0:2}"
-  cat > "$TINTED_SVG" <<SVGEOF
-<?xml version="1.0" encoding="UTF-8"?>
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
-  <rect width="1024" height="1024" rx="220" ry="220" fill="${COLOR_HEX}"/>
-  <text x="512" y="512" font-family="Helvetica-Bold,Arial,sans-serif" font-size="420" font-weight="900"
-        fill="#FFFFFF" text-anchor="middle" dominant-baseline="middle">${INITIALS}</text>
-</svg>
-SVGEOF
-  qlmanage -t -s 1024 -o "$TMPDIR_WORK/tf" "$TINTED_SVG" >/dev/null 2>&1 || true
-  TINTED_PNG_TMP="$(ls -S "$TMPDIR_WORK/tf"/*.png 2>/dev/null | head -n1 || true)"
-  [[ -n "$TINTED_PNG_TMP" ]] && cp "$TINTED_PNG_TMP" "$TINTED_PNG"
+if [[ ! -f "$TINTED_PNG" ]]; then
+  echo "Tint failed — using base PNG as-is"
+  cp "$BASE_PNG" "$TINTED_PNG"
 fi
 
 # ─────────────────────────────────────────────
-# 5) Génération du .icns pour le clone
+# 5) Génération du .icns
 # ─────────────────────────────────────────────
 ICONSET="$TMPDIR_WORK/clone.iconset"
 mkdir -p "$ICONSET"
-
-if [[ -f "$TINTED_PNG" ]]; then
-  sips -z 16   16   "$TINTED_PNG" --out "$ICONSET/icon_16x16.png"      >/dev/null 2>&1 || true
-  sips -z 32   32   "$TINTED_PNG" --out "$ICONSET/icon_16x16@2x.png"   >/dev/null 2>&1 || true
-  sips -z 32   32   "$TINTED_PNG" --out "$ICONSET/icon_32x32.png"      >/dev/null 2>&1 || true
-  sips -z 64   64   "$TINTED_PNG" --out "$ICONSET/icon_32x32@2x.png"   >/dev/null 2>&1 || true
-  sips -z 128  128  "$TINTED_PNG" --out "$ICONSET/icon_128x128.png"    >/dev/null 2>&1 || true
-  sips -z 256  256  "$TINTED_PNG" --out "$ICONSET/icon_128x128@2x.png" >/dev/null 2>&1 || true
-  sips -z 256  256  "$TINTED_PNG" --out "$ICONSET/icon_256x256.png"    >/dev/null 2>&1 || true
-  sips -z 512  512  "$TINTED_PNG" --out "$ICONSET/icon_256x256@2x.png" >/dev/null 2>&1 || true
-  sips -z 512  512  "$TINTED_PNG" --out "$ICONSET/icon_512x512.png"    >/dev/null 2>&1 || true
-  cp "$TINTED_PNG"                    "$ICONSET/icon_512x512@2x.png"   2>/dev/null || true
-fi
+sips -z 16   16   "$TINTED_PNG" --out "$ICONSET/icon_16x16.png"      >/dev/null 2>&1 || true
+sips -z 32   32   "$TINTED_PNG" --out "$ICONSET/icon_16x16@2x.png"   >/dev/null 2>&1 || true
+sips -z 32   32   "$TINTED_PNG" --out "$ICONSET/icon_32x32.png"      >/dev/null 2>&1 || true
+sips -z 64   64   "$TINTED_PNG" --out "$ICONSET/icon_32x32@2x.png"   >/dev/null 2>&1 || true
+sips -z 128  128  "$TINTED_PNG" --out "$ICONSET/icon_128x128.png"    >/dev/null 2>&1 || true
+sips -z 256  256  "$TINTED_PNG" --out "$ICONSET/icon_128x128@2x.png" >/dev/null 2>&1 || true
+sips -z 256  256  "$TINTED_PNG" --out "$ICONSET/icon_256x256.png"    >/dev/null 2>&1 || true
+sips -z 512  512  "$TINTED_PNG" --out "$ICONSET/icon_256x256@2x.png" >/dev/null 2>&1 || true
+sips -z 512  512  "$TINTED_PNG" --out "$ICONSET/icon_512x512.png"    >/dev/null 2>&1 || true
+cp "$TINTED_PNG"  "$ICONSET/icon_512x512@2x.png" 2>/dev/null || true
 
 ICONFILE="$RES/AppIcon.icns"
-iconutil -c icns "$ICONSET" -o "$ICONFILE" >/dev/null 2>&1 || true
+iconutil -c icns "$ICONSET" -o "$ICONFILE"
+echo "icns generated: $ICONFILE"
 
 # ─────────────────────────────────────────────
 # 6) Info.plist du clone
 # ─────────────────────────────────────────────
-# Bundle ID unique : base sur timestamp pour garantir l'unicité
-UNIQUE_ID="fr.b519hs.clone.$(date +%s%N | head -c 16)"
-
+UNIQUE_ID="fr.b519hs.clone.$(date +%s)"
+# Lire le bundle ID de l'app source pour le passer en LSEnvironment
+SRC_BUNDLE_ID="$(defaults read "$SRC_PLIST" CFBundleIdentifier 2>/dev/null || true)"
 cat > "$CONTENTS/Info.plist" <<PLIST
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -242,40 +201,105 @@ cat > "$CONTENTS/Info.plist" <<PLIST
   <string>AppIcon</string>
   <key>CFBundleVersion</key>
   <string>1.0</string>
-  <key>LSUIElement</key>
-  <false/>
+  <key>LSEnvironment</key>
+  <dict>
+    <key>BUNDLE_ID</key>
+    <string>${UNIQUE_ID}</string>
+  </dict>
 </dict>
 </plist>
 PLIST
 
 # ─────────────────────────────────────────────
-# 7) Exécutable launcher
+# 7) Exécutable launcher (Python3)
 # ─────────────────────────────────────────────
-# -n force une nouvelle instance distincte (pas de regroupement avec l'originale)
-# L'app parente doit supporter plusieurs instances ou être une app Electron/non-singleton
-cat > "$MACOS/launcher" <<'LAUNCHER_HEAD'
-#!/bin/zsh
-# Wrapper léger : ouvre l'app source comme nouvelle instance distincte.
-# Le bundle ID différent garantit que le Dock ne la groupe pas avec l'originale.
-LAUNCHER_HEAD
+# On utilise Python3 comme launcher pour deux raisons :
+#   a) macOS accepte python3 comme binaire de bundle (contrairement à zsh)
+#   b) On peut manipuler les variables d'environnement avant exec pour que
+#      le processus soit bien distinct de l'app source dans le Dock
+#
+# La clé pour que le Dock ne regroupe PAS le clone avec l'originale :
+# CFBundleIdentifier différent dans Info.plist (déjà fait) ET lancer via
+# NSWorkspace openApplicationAtURL qui respecte le bundle ID du clone.
+cat > "$MACOS/launcher" <<'PYEOF'
+#!/usr/bin/env python3
+import os, sys, subprocess
 
-printf 'SOURCE_APP="%s"\n' "$SOURCE_APP" >> "$MACOS/launcher"
-printf 'OPEN_ARG="%s"\n\n' "$OPEN_ARG"  >> "$MACOS/launcher"
+def main():
+    # Chemin résolu depuis le binaire lui-même
+    macos_dir  = os.path.dirname(os.path.realpath(__file__))
+    clone_root = os.path.dirname(os.path.dirname(macos_dir))
+    plist      = os.path.join(clone_root, "Contents", "Info.plist")
 
-cat >> "$MACOS/launcher" <<'LAUNCHER_BODY'
-if [[ -n "$OPEN_ARG" && -e "$OPEN_ARG" ]]; then
-  # -n : nouvelle instance  |  --args : transmet l'argument à l'app
-  open -n -a "$SOURCE_APP" "$OPEN_ARG" &>/dev/null & disown
-else
-  open -n -a "$SOURCE_APP" &>/dev/null & disown
-fi
-LAUNCHER_BODY
+    # Lire SOURCE_APP et OPEN_ARG depuis le fichier de config du clone
+    config_path = os.path.join(clone_root, "Contents", "Resources", "config.sh")
+    source_app, open_arg = "", ""
+    if os.path.exists(config_path):
+        with open(config_path) as f:
+            for line in f:
+                line = line.strip()
+                if line.startswith("SOURCE_APP="):
+                    source_app = line[len("SOURCE_APP="):].strip('"')
+                elif line.startswith("OPEN_ARG="):
+                    open_arg = line[len("OPEN_ARG="):].strip('"')
 
+    if not source_app or not os.path.isdir(source_app):
+        sys.exit(1)
+
+    # Lancer via NSWorkspace pour que macOS respecte le bundle ID du clone
+    # et n'associe pas la fenêtre à l'app originale dans le Dock
+    script = f'tell application "Finder" to open POSIX file "{source_app}"'
+    args = [source_app]
+    if open_arg and os.path.exists(open_arg):
+        args = ["-n", "--args", open_arg]
+        cmd = ["open", "-n", "-a", source_app, open_arg]
+    else:
+        cmd = ["open", "-n", "-a", source_app]
+
+    # Définir APP_BUNDLE_ID pour que certaines apps Electron créent une instance distincte
+    env = os.environ.copy()
+    env["ELECTRON_IS_DEV"] = "0"
+
+    subprocess.Popen(cmd, env=env, close_fds=True,
+                     stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+
+if __name__ == "__main__":
+    main()
+PYEOF
 chmod +x "$MACOS/launcher"
 
-# Forcer le rafraîchissement du cache d'icône macOS
+# Fichier de config lu par le launcher au moment de l'exécution
+cat > "$RES/config.sh" <<CONFIGEOF
+SOURCE_APP="$SOURCE_APP"
+OPEN_ARG="$OPEN_ARG"
+CONFIGEOF
+
+# ─────────────────────────────────────────────
+# 8) Enregistrement + ajout au Dock
+# ─────────────────────────────────────────────
 touch "$DEST"
 /System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister \
   -f "$DEST" >/dev/null 2>&1 || true
+
+# Ajouter au Dock via Python3/ScriptingBridge (plus fiable que defaults write)
+python3 - "$DEST" <<'DOCKEOF'
+import subprocess, sys, os
+
+app_path = sys.argv[1]
+
+# Ajouter l'entrée dans le Dock via AppleScript
+script = f'''
+tell application "System Events"
+  tell dock preferences
+    set the end of the persistent application list to "{app_path}"
+  end tell
+end tell
+'''
+result = subprocess.run(['osascript', '-e', script], capture_output=True, text=True)
+if result.returncode != 0:
+    print(f"Dock add failed: {result.stderr}", file=sys.stderr)
+else:
+    print(f"Added to Dock: {app_path}")
+DOCKEOF
 
 echo "$DEST"
