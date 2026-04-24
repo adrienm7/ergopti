@@ -595,23 +595,30 @@ initMenu() {
         ; Shortcut item — not yet customisable from AHK (HS handles it on macOS)
         PersonalMenu.Add("Raccourci : Win + " . ScriptInformation["MagicKey"], (*) => NoAction())
         PersonalMenu.Disable("Raccourci : Win + " . ScriptInformation["MagicKey"])
-        ; Default section — "Aucune" then one item per TOML section (flat, no submenu)
+        ; Default section — submenu with "Aucune" + one item per TOML section
         CurDefaultSec := _EditorPrefGet("DefaultSection", "")
-        PersonalMenu.Add("Catégorie par défaut : Aucune", (*) => _SetPersonalDefaultSection("", PersonalMenu, TomlData))
+        DefaultSectionMenu := Menu()
+        DefaultSectionMenu.Add("Aucune", (*) => _SetPersonalDefaultSection("", PersonalMenu, TomlData, DefaultSectionMenu))
         if (CurDefaultSec == "") {
-            PersonalMenu.Check("Catégorie par défaut : Aucune")
+            DefaultSectionMenu.Check("Aucune")
         }
+        DefaultSectionMenu.Add()
         for _, SecName in TomlData["sections_order"] {
             if (SecName == "-") {
                 continue
             }
             SecData  := TomlData["sections"][SecName]
-            SecLabel := "Catégorie par défaut : " . SecData["description"]
-            PersonalMenu.Add(SecLabel, _MakeSetDefaultSectionFn(SecName, PersonalMenu, TomlData))
+            SecLabel := SecData["description"]
+            DefaultSectionMenu.Add(SecLabel, _MakeSetDefaultSectionFn(SecName, PersonalMenu, TomlData, DefaultSectionMenu))
             if (CurDefaultSec == SecName) {
-                PersonalMenu.Check(SecLabel)
+                DefaultSectionMenu.Check(SecLabel)
             }
         }
+        ; Title reflects the currently selected section
+        CurDefaultLabel := (CurDefaultSec == "") ? "Aucune"
+            : (TomlData["sections"].Has(CurDefaultSec) ? TomlData["sections"][CurDefaultSec]["description"] : CurDefaultSec)
+        global _PrevDefaultLabel := CurDefaultLabel
+        PersonalMenu.Add("Catégorie par défaut : " . CurDefaultLabel, DefaultSectionMenu)
         ; Close-on-add toggle — mirrors HS "Fermer l'UI après ajout"
         PersonalMenu.Add("Fermer l'UI après ajout d'un hotstring par le raccourci",
             (*) => _TogglePersonalCloseOnAdd(PersonalMenu))
@@ -720,28 +727,34 @@ _MakeOpenSectionFn(SecName) {
     return (*) => OpenPersonalEditor(SecName)
 }
 
-; Sets the default section pref and refreshes checkmarks in the personal submenu.
-_SetPersonalDefaultSection(SecName, PersonalMenu, TomlData) {
+; Sets the default section pref and refreshes checkmarks + parent title.
+_SetPersonalDefaultSection(SecName, PersonalMenu, TomlData, DefaultSectionMenu) {
+    global _PrevDefaultLabel
     _EditorPrefSet("DefaultSection", SecName)
-    ; Uncheck all default-section items, then check the selected one
-    PersonalMenu.Uncheck("Catégorie par défaut : Aucune")
+    ; Refresh checkmarks inside the sub-menu
+    DefaultSectionMenu.Uncheck("Aucune")
     for _, SN in TomlData["sections_order"] {
         if (SN == "-") {
             continue
         }
         SD := TomlData["sections"][SN]
-        try PersonalMenu.Uncheck("Catégorie par défaut : " . SD["description"])
+        try DefaultSectionMenu.Uncheck(SD["description"])
     }
     if (SecName == "") {
-        PersonalMenu.Check("Catégorie par défaut : Aucune")
+        DefaultSectionMenu.Check("Aucune")
     } else if (TomlData["sections"].Has(SecName)) {
-        PersonalMenu.Check("Catégorie par défaut : " . TomlData["sections"][SecName]["description"])
+        DefaultSectionMenu.Check(TomlData["sections"][SecName]["description"])
     }
+    ; Rename the parent item to reflect the new selection
+    NewLabel := (SecName == "") ? "Aucune"
+        : (TomlData["sections"].Has(SecName) ? TomlData["sections"][SecName]["description"] : SecName)
+    try PersonalMenu.Rename("Catégorie par défaut : " . _PrevDefaultLabel, "Catégorie par défaut : " . NewLabel)
+    _PrevDefaultLabel := NewLabel
 }
 
-; Freezes SecName and the submenu reference by value for use inside a loop.
-_MakeSetDefaultSectionFn(SecName, PersonalMenu, TomlData) {
-    return (*) => _SetPersonalDefaultSection(SecName, PersonalMenu, TomlData)
+; Freezes all closure values for use inside a loop.
+_MakeSetDefaultSectionFn(SecName, PersonalMenu, TomlData, DefaultSectionMenu) {
+    return (*) => _SetPersonalDefaultSection(SecName, PersonalMenu, TomlData, DefaultSectionMenu)
 }
 
 ; Toggles the close-on-add pref and the corresponding checkmark.
