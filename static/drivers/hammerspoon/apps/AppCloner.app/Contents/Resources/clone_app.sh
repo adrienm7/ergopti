@@ -276,10 +276,18 @@ CONF
 # bundles (deepest first) → main bundle. `--preserve-metadata=...` keeps each
 # component's original entitlements + hardened-runtime flag, which is what
 # allows Electron's JIT + V8 to keep working after re-sign.
-# Write every codesign command output to /tmp/clone_sign.log for diagnostic
-SIGN_LOG=/tmp/clone_sign.log
-: > "$SIGN_LOG"
-echo "Re-signing bottom-up (ad-hoc)… (details in $SIGN_LOG)"
+# Single unified log for the whole clone operation — everything goes into
+# /tmp/clone_diag.log so the user only has to cat one file.
+DIAG=/tmp/clone_diag.log
+SIGN_LOG="$DIAG"
+: > "$DIAG"
+echo "============================================================" >> "$DIAG"
+echo "=== AppCloner — $(date)"                                     >> "$DIAG"
+echo "=== Clone: $DEST"                                            >> "$DIAG"
+echo "============================================================" >> "$DIAG"
+echo "" >> "$DIAG"
+echo "── Signing pass ────────────────────────────────────────────" >> "$DIAG"
+echo "Re-signing bottom-up (ad-hoc)… (details in $DIAG)"
 
 # Extract the ORIGINAL entitlements from each key executable of the source app
 # and stash them as plist files. Relying on `--preserve-metadata=entitlements`
@@ -294,19 +302,50 @@ ENT_MAIN="$TMPDIR_WORK/entitlements_main.plist"
 SRC_MAIN_EXE_NAME="$(/usr/libexec/PlistBuddy -c "Print :CFBundleExecutable" "$SOURCE_APP/Contents/Info.plist" 2>/dev/null || echo "")"
 SRC_MAIN_EXE="$SOURCE_APP/Contents/MacOS/$SRC_MAIN_EXE_NAME"
 if [[ -n "$SRC_MAIN_EXE_NAME" && -f "$SRC_MAIN_EXE" ]]; then
-  codesign -d --entitlements :- "$SRC_MAIN_EXE" > "$ENT_MAIN" 2>/dev/null || true
-  if [[ -s "$ENT_MAIN" ]]; then
-    echo "Extracted main entitlements ($(wc -c < "$ENT_MAIN") bytes)"
-    # Sanity: the plist must contain disable-library-validation — if it
-    # doesn't, dyld will reject our ad-hoc Electron Framework with team-id
-    # mismatch. Log the presence so we can see it in clone_diag.log.
+  # IMPORTANT: on macOS 12+, `codesign -d --entitlements :-` emits a binary
+  # blob (magic 0xfade7171 + length + XML), not plain XML. Passing that blob
+  # to `codesign --entitlements` silently ignores it. The `--xml` flag forces
+  # plain-XML output, which codesign can then apply correctly at re-sign time.
+  codesign -d --entitlements :- --xml "$SRC_MAIN_EXE" > "$ENT_MAIN" 2>/dev/null || true
+  # Fallback: older codesign doesn't support --xml. Strip the 8-byte magic
+  # header manually if the extraction started with 0xfade7171.
+  if [[ -s "$ENT_MAIN" ]] && head -c 4 "$ENT_MAIN" | xxd -p 2>/dev/null | grep -qi "fade7171"; then
+    echo "  → Detected binary blob header; stripping 8-byte prefix"          >> "$DIAG"
+    tail -c +9 "$ENT_MAIN" > "$ENT_MAIN.clean" && mv "$ENT_MAIN.clean" "$ENT_MAIN"
+  fi
+  # Validate with plutil — if the output isn't a valid plist, codesign will
+  # silently drop it again. plutil -lint tells us up front.
+  if [[ -s "$ENT_MAIN" ]] && plutil -lint "$ENT_MAIN" >/dev/null 2>&1; then
+    echo "Extracted main entitlements ($(wc -c < "$ENT_MAIN") bytes, valid plist)" >> "$DIAG"
     if grep -q "disable-library-validation" "$ENT_MAIN"; then
-      echo "  ✓ disable-library-validation present"
+      echo "  ✓ disable-library-validation present"                           >> "$DIAG"
     else
-      echo "  ✗ disable-library-validation MISSING — dyld will reject ad-hoc dylibs"
+      echo "  ✗ disable-library-validation MISSING — dyld will reject ad-hoc dylibs" >> "$DIAG"
+    fi
+    if grep -q "allow-jit" "$ENT_MAIN"; then
+      echo "  ✓ allow-jit present"                                            >> "$DIAG"
     fi
   else
-    echo "WARNING: could not extract entitlements from $SRC_MAIN_EXE"
+    echo "WARNING: entitlements plist from $SRC_MAIN_EXE is invalid or empty" >> "$DIAG"
+    # Last resort: synthesize a minimal plist that has exactly what we need.
+    # Electron requires allow-jit, allow-unsigned-executable-memory, and
+    # disable-library-validation to load ad-hoc-signed dylibs under hardened
+    # runtime. This fallback guarantees the clone still launches even when
+    # the source entitlement extraction fails.
+    cat > "$ENT_MAIN" <<'ENTFALLBACK'
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>com.apple.security.cs.allow-jit</key><true/>
+    <key>com.apple.security.cs.allow-unsigned-executable-memory</key><true/>
+    <key>com.apple.security.cs.disable-library-validation</key><true/>
+    <key>com.apple.security.cs.allow-dyld-environment-variables</key><true/>
+    <key>com.apple.security.cs.disable-executable-page-protection</key><true/>
+</dict>
+</plist>
+ENTFALLBACK
+    echo "  → Wrote fallback entitlements plist"                              >> "$DIAG"
   fi
 fi
 
@@ -489,15 +528,12 @@ DOCKEOF
 
 
 # ── 9) Auto-diagnostic launch ───────────────────────────────────────────────
-# Launch the clone once, wait, and if it crashed dump every relevant piece of
-# evidence into /tmp/clone_diag.log. Goal: never have to ask the user for
-# crash reports again — everything needed to diagnose a failed launch lands
-# in one file.
-DIAG=/tmp/clone_diag.log
+# Everything so far (signing + extraction) has already been appended to $DIAG.
+# Here we add post-signing checks + a test launch into the same single file.
 {
+  echo ""
   echo "============================================================"
-  echo "=== AppCloner auto-diagnostic — $(date)"
-  echo "=== Clone: $DEST"
+  echo "=== Post-signing diagnostic — $(date)"
   echo "============================================================"
 
   # Snapshot the DiagnosticReports directory BEFORE launch so we can tell
@@ -540,8 +576,13 @@ DIAG=/tmp/clone_diag.log
   done
 
   echo ""
-  echo "── Signing log (/tmp/clone_sign.log last 100 lines) ────────"
-  [[ -f /tmp/clone_sign.log ]] && tail -100 /tmp/clone_sign.log
+  echo "── Entitlements effectively present on Code.real ───────────"
+  CODE_REAL="$MACOS/Code.real"
+  [[ ! -f "$CODE_REAL" ]] && CODE_REAL="$MACOS/$(/usr/libexec/PlistBuddy -c 'Print :CFBundleExecutable' "$CONTENTS/Info.plist" 2>/dev/null)"
+  codesign -d --entitlements :- --xml "$CODE_REAL" 2>&1 | head -50 || true
+  echo ""
+  echo "── CS flags on main binary ─────────────────────────────────"
+  codesign -dvv "$CODE_REAL" 2>&1 | grep -iE "flag|runtime|entitl|CDHash|Identifier" || true
 
   echo ""
   echo "── LaunchServices registration check ───────────────────────"
@@ -617,7 +658,7 @@ DIAG=/tmp/clone_diag.log
 
   echo ""
   echo "=== End of diagnostic ==="
-} > "$DIAG" 2>&1
+} >> "$DIAG" 2>&1
 
 echo ""
 echo "Diagnostic written to $DIAG"
