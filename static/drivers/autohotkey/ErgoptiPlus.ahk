@@ -292,9 +292,9 @@ EnrichSectionDescriptionsWithCounts(Category) {
         if (FeatKey == "__Order" or !IsObject(FeatVal) or Type(FeatVal) == "Map") {
             continue
         }
-        ; SectionName in the TOML is the lowercase version of the AHK feature key
-        SectionName := FoldAsciiLower(FeatKey)
-        N := CountTomlSection(Category, SectionName)
+        ; TOML section name is the lowercase/accent-folded version of the AHK feature key
+        TomlSection := FoldAsciiLower(FeatKey)
+        N := CountTomlSection(Category, TomlSection)
         if (N > 0 and FeatVal.HasOwnProp("Description") and FeatVal.Description != "") {
             FeatVal.Description := FeatVal.Description . " (" . N . ")"
         }
