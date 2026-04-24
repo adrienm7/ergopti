@@ -78,6 +78,16 @@ global LOGGER_LOG_PATH := ""
 global LOGGER_RING_BUFFER := []
 global LOGGER_RING_CURSOR := 0
 
+; Pending-lines queue — each ``_LoggerEmit`` call pushes a line here; the
+; background ``_LoggerFlush`` (ticked by a SetTimer started in LoggerInit)
+; drains the queue with a single ``FileAppend`` every LOGGER_FLUSH_INTERVAL_MS.
+; This collapses N individual FileOpen/Write/Close round-trips per tick into
+; one. Errors and warnings force a synchronous flush so a crash that follows
+; cannot swallow the diagnostic line.
+global LOGGER_FLUSH_INTERVAL_MS := 500
+global _LOGGER_PENDING := []
+global _LOGGER_FLUSH_TIMER_STARTED := False
+
 
 
 
@@ -92,6 +102,7 @@ global LOGGER_RING_CURSOR := 0
 ; minimum level (e.g. after the user changes it via the menu).
 LoggerInit() {
     global LOGGER_LOG_PATH, LOGGER_MIN_LEVEL, LOGGER_DEFAULT_LEVEL, ConfigurationFile
+    global _LOGGER_FLUSH_TIMER_STARTED, LOGGER_FLUSH_INTERVAL_MS
     LOGGER_LOG_PATH := A_ScriptDir . "\ErgoptiPlus.log"
     LOGGER_MIN_LEVEL := LOGGER_DEFAULT_LEVEL
     if IsSet(ConfigurationFile) and FileExist(ConfigurationFile) {
@@ -103,6 +114,46 @@ LoggerInit() {
         }
     }
     _LoggerRefreshFastFlags()
+
+    ; Start the background flusher once. LoggerInit may be called again when
+    ; the user toggles the log level via the menu — we do not restart the
+    ; timer in that case. OnExit ensures any pending lines are flushed before
+    ; the driver terminates so crash diagnostics are not lost.
+    if !_LOGGER_FLUSH_TIMER_STARTED {
+        SetTimer(_LoggerFlush, LOGGER_FLUSH_INTERVAL_MS)
+        OnExit(_LoggerOnExitFlush)
+        _LOGGER_FLUSH_TIMER_STARTED := True
+    }
+}
+
+; Drain the pending-lines queue into the log file in a single FileAppend.
+; Called by the SetTimer installed in LoggerInit and synchronously by error /
+; warning emits that must survive a subsequent crash.
+_LoggerFlush() {
+    global _LOGGER_PENDING, LOGGER_LOG_PATH
+    if _LOGGER_PENDING.Length == 0 {
+        return
+    }
+    if LOGGER_LOG_PATH == "" {
+        ; No path resolved — drop the queue to avoid unbounded growth.
+        _LOGGER_PENDING := []
+        return
+    }
+    ; Swap-and-clear so a concurrent emit lands in a fresh queue while we
+    ; write. AHK v2 is single-threaded for our purposes but timers and hotkey
+    ; callbacks can interleave at well-defined points.
+    Pending := _LOGGER_PENDING
+    _LOGGER_PENDING := []
+    Blob := ""
+    for _, Line in Pending {
+        Blob .= Line . "`r`n"
+    }
+    try FileAppend(Blob, LOGGER_LOG_PATH, "UTF-8")
+}
+
+_LoggerOnExitFlush(ExitReason, ExitCode) {
+    _LoggerFlush()
+    return 0
 }
 
 ; Recompute the cached integer severity and per-level fast-path flags from
@@ -233,7 +284,7 @@ LoggerRingBufferSnapshot() {
 ; Format and emit a log line if the current level allows it. Best-effort —
 ; never raises so a logging failure cannot break the driver. Hot-path-safe.
 _LoggerEmit(Level, Tag, Msg, Args*) {
-    global LOGGER_LOG_PATH, LOGGER_MIN_LEVEL, LOGGER_SEVERITY
+    global LOGGER_LOG_PATH, LOGGER_MIN_LEVEL, LOGGER_SEVERITY, _LOGGER_PENDING
     if !LOGGER_SEVERITY.Has(Level) {
         return
     }
@@ -255,7 +306,13 @@ _LoggerEmit(Level, Tag, Msg, Args*) {
     Line := Format("{1} [{2:-7}] [{3}] {4}", Stamp, Level, Tag, Body)
     _LoggerPushRing(Line)
     if LOGGER_LOG_PATH != "" {
-        try FileAppend(Line . "`r`n", LOGGER_LOG_PATH, "UTF-8")
+        _LOGGER_PENDING.Push(Line)
+        ; Force a synchronous flush for diagnostics that must survive a
+        ; subsequent crash — WARNING and ERROR only; the other levels can
+        ; tolerate the ~500 ms worst-case flush latency.
+        if LOGGER_SEVERITY[Level] >= LOGGER_SEVERITY["WARNING"] {
+            _LoggerFlush()
+        }
     }
 }
 
