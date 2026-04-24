@@ -5572,8 +5572,8 @@ if Features["Autocorrection"]["Accents"].Enabled {
     CreateCaseSensitiveHotstrings("", "dument", "dûment")
 
     ; === E ===
-    CreateCaseSensitiveHotstrings("*", "écoeuré", "écoeuré")
-    CreateCaseSensitiveHotstrings("*", "écoeure", "écoeure")
+    CreateCaseSensitiveHotstrings("*", "écoeuré", "écœuré")
+    CreateCaseSensitiveHotstrings("*", "écoeure", "écœure")
     CreateCaseSensitiveHotstrings("*", "egoisme", "égoïsme")
     CreateCaseSensitiveHotstrings("*", "égoisme", "égoïsme")
     CreateCaseSensitiveHotstrings("*", "egoiste", "égoïste")
