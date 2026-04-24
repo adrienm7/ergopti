@@ -1,0 +1,854 @@
+           [DEBUG] [gestures.engine] Initializing gestures engine dependencies…
+ [INFO] [gestures.engine] Gestures engine dependencies initialized.
+ [START] [keylogger.log_manager] Initializing log manager…
+ [SUCCESS] [keylogger.log_manager] Log manager initialized.
+ [START] [keylogger.context_tracker] Initializing context tracker…
+ [SUCCESS] [keylogger.context_tracker] Context tracker initialized.
+           [DEBUG] [keymap.registry] Registry initialized.
+ [START] [keymap.llm_bridge] Initializing LLM bridge…
+           [DEBUG] [llm.prediction_engine] Prediction engine state injected (0 mapping(s)).
+ [SUCCESS] [keymap.llm_bridge] LLM bridge initialized (buffer: '', 0 mapping(s)).
+ [START] [keymap.expander] Initializing expander…
+ [SUCCESS] [keymap.expander] Expander initialized.
+ [START] [keymap] Starting keymap engine…
+ [INFO] [keymap] Perf sampling auto-enabled (DEBUG log level active).
+ [SUCCESS] [keymap] Keymap engine started.
+           [DEBUG] [menu] Module "gestures menu" loaded successfully (ui.menu.menu_gestures).
+           [DEBUG] [menu] Module "shortcuts menu" loaded successfully (ui.menu.menu_shortcuts).
+           [DEBUG] [menu] Module "hotstrings menu" loaded successfully (ui.menu.menu_hotstrings).
+           [DEBUG] [menu] Module "AI menu" loaded successfully (ui.menu.menu_llm).
+           [DEBUG] [menu] Module "metrics menu" loaded successfully (ui.menu.menu_metrics).
+           [DEBUG] [menu] Module "Karabiner menu" loaded successfully (ui.menu.menu_karabiner).
+           [DEBUG] [menu] Module "AI engine" loaded successfully (modules.llm).
+           [DEBUG] [menu] Module "metrics engine" loaded successfully (modules.keylogger).
+           [DEBUG] [menu] Module "shortcuts engine" loaded successfully (modules.shortcuts).
+           [DEBUG] [menu] Module "dynamic hotstrings engine" loaded successfully (modules.dynamic_hotstrings).
+           [DEBUG] [init] Starting gestures module…
+           [DEBUG] [gestures] Starting gestures module…
+           [DEBUG] [gestures] Trackpad listener created for device: 504403158265495662.
+ [INFO] [gestures] Gestures module started successfully.
+           [DEBUG] [init] Starting shortcuts module…
+ [START] [shortcuts.bindings] Starting shortcuts bindings…
+           [DEBUG] [shortcuts.bindings] Hotkey 'ctrl_e' bound.
+           [DEBUG] [shortcuts.bindings] Hotkey 'ctrl_i' bound.
+           [DEBUG] [shortcuts.bindings] Hotkey 'cmd_shift_v' bound.
+           [DEBUG] [shortcuts.bindings] Hotkey 'ctrl_s' bound.
+           [DEBUG] [shortcuts.bindings] Hotkey 'ctrl_h' bound.
+           [DEBUG] [shortcuts.bindings] Hotkey 'ctrl_quote' bound.
+           [DEBUG] [shortcuts.bindings] Hotkey 'ctrl_a' bound.
+           [DEBUG] [shortcuts.bindings] Hotkey 'ctrl_p' bound.
+           [DEBUG] [shortcuts.bindings] Hotkey 'ctrl_d' bound.
+           [DEBUG] [shortcuts.bindings] Hotkey 'cmd_star' bound.
+           [DEBUG] [shortcuts.bindings] Hotkey 'ctrl_w' bound.
+           [DEBUG] [shortcuts.bindings] Hotkey 'ctrl_period' bound.
+           [DEBUG] [shortcuts.bindings] Hotkey 'ctrl_o' bound.
+           [DEBUG] [shortcuts.bindings] Hotkey 'ctrl_u' bound.
+           [DEBUG] [shortcuts.bindings] Hotkey 'at_hash' bound.
+           [DEBUG] [shortcuts.bindings] Hotkey 'ctrl_g' bound.
+           [DEBUG] [shortcuts.bindings] Hotkey 'ctrl_m' bound.
+           [DEBUG] [shortcuts.bindings] Hotkey 'ctrl_t' bound.
+           [DEBUG] [shortcuts.bindings] Hotkey 'layer_scroll' bound.
+           [DEBUG] [shortcuts.bindings] Hotkey 'ctrl_x' bound.
+ [SUCCESS] [shortcuts.bindings] Shortcuts bindings started (20 hotkey(s)).
+ [INFO] [init] Main modules initialized successfully.
+           [DEBUG] [mlx_deps] Locating MLX dependency script…
+ [WARNING] [mlx_deps] Script ensure-mlx-deps.sh introuvable.
+ [INFO] [menu_paths] Paths module initialized (base: '/Users/b519hs/perso/ergopti/static/drivers/hammerspoon/').
+           [DEBUG] [keymap.registry] update_trigger_char: key unchanged ('★') — skipping rename.
+           [DEBUG] [keymap] Trigger char: '★'.
+           [DEBUG] [keymap.registry] Sort deferred.
+           [DEBUG] [init] Loading TOML file: personal…
+ [START] [keymap.registry] Loading TOML mapping file 'personal'…
+           [DEBUG] [toml_reader] Parsing TOML file…
+ [INFO] [toml_reader] TOML file parsed successfully.
+ [SUCCESS] [keymap.registry] TOML mapping file 'personal' loaded (0 total mapping(s)).
+           [DEBUG] [init] Loading TOML file: distancesreduction…
+ [START] [keymap.registry] Loading TOML mapping file 'distancesreduction'…
+           [DEBUG] [toml_reader] Parsing TOML file…
+ [INFO] [toml_reader] TOML file parsed successfully.
+ [SUCCESS] [keymap.registry] TOML mapping file 'distancesreduction' loaded (0 total mapping(s)).
+           [DEBUG] [init] Loading TOML file: sfbsreduction…
+ [START] [keymap.registry] Loading TOML mapping file 'sfbsreduction'…
+           [DEBUG] [toml_reader] Parsing TOML file…
+ [INFO] [toml_reader] TOML file parsed successfully.
+ [SUCCESS] [keymap.registry] TOML mapping file 'sfbsreduction' loaded (0 total mapping(s)).
+           [DEBUG] [init] Loading TOML file: rolls…
+ [START] [keymap.registry] Loading TOML mapping file 'rolls'…
+           [DEBUG] [toml_reader] Parsing TOML file…
+ [INFO] [toml_reader] TOML file parsed successfully.
+ [SUCCESS] [keymap.registry] TOML mapping file 'rolls' loaded (0 total mapping(s)).
+           [DEBUG] [init] Loading TOML file: autocorrection…
+ [START] [keymap.registry] Loading TOML mapping file 'autocorrection'…
+           [DEBUG] [toml_reader] Parsing TOML file…
+ [INFO] [toml_reader] TOML file parsed successfully.
+ [SUCCESS] [keymap.registry] TOML mapping file 'autocorrection' loaded (0 total mapping(s)).
+           [DEBUG] [init] Loading TOML file: magickey…
+ [START] [keymap.registry] Loading TOML mapping file 'magickey'…
+           [DEBUG] [toml_reader] Parsing TOML file…
+ [INFO] [toml_reader] TOML file parsed successfully.
+ [SUCCESS] [keymap.registry] TOML mapping file 'magickey' loaded (0 total mapping(s)).
+ [INFO] [init] Loaded 6 TOML hotstring file(s) in 59.7ms.
+           [DEBUG] [init] Starting dynamic hotstrings module…
+           [DEBUG] [dynamic_hotstrings] Starting the personal info tracker…
+           [DEBUG] [personal_info] Starting personal info tracker…
+           [DEBUG] [personal_info] Loading personal info from '/Users/b519hs/perso/ergopti/static/drivers/hammerspoon/../hotstrings/personal_info.toml'…
+ [INFO] [personal_info] personal_info.toml not found — using default values.
+ [INFO] [personal_info] Personal info tracker started successfully.
+           [DEBUG] [dynamic_hotstrings] Injecting personal data into the rules engine…
+           [DEBUG] [dynamic_hotstrings] Starting the dynamic rules engine…
+           [DEBUG] [dynamic_hotstrings.rules] Starting dynamic rules engine…
+           [DEBUG] [keymap.registry] Lua group 'dynamichotstrings' registered.
+ [INFO] [dynamic_hotstrings.rules] Dynamic rules engine started successfully.
+ [INFO] [dynamic_hotstrings] The dynamic hotstrings core initialized successfully.
+           [DEBUG] [init] Initializing custom hotstrings…
+ [START] [keymap.registry] Loading TOML mapping file 'personal'…
+           [DEBUG] [toml_reader] Parsing TOML file…
+ [INFO] [toml_reader] TOML file parsed successfully.
+ [SUCCESS] [keymap.registry] TOML mapping file 'personal' loaded (0 total mapping(s)).
+           [TRACE] [keymap.registry] Sorting 0 mapping(s)…
+           [DONE] [keymap.registry] Mappings sorted.
+           [DEBUG] [keymap.registry] Sort flushed.
+ [INFO] [init] Final mapping sort completed in 0.6ms.
+ [START] [karabiner] Initializing Karabiner bridge…
+2026-04-24 20:51:32: Welcome to the Hammerspoon Console!
+You can run any Lua code in here.
+
+2026-04-24 20:51:32: -- Lazy extension loading enabled
+2026-04-24 20:51:32: -- Loading ~/perso/ergopti/static/drivers/hammerspoon/init.lua
+2026-04-24 20:51:32: -- Loading extension: logger
+2026-04-24 20:51:32: -- Loading extension: notify
+2026-04-24 20:51:33: -- Loading extension: styledtext
+2026-04-24 20:51:33: -- Loading extension: console
+2026-04-24 20:51:33: -- Loading extension: eventtap
+2026-04-24 20:51:33: -- Loading extension: timer
+2026-04-24 20:51:33: -- Loading extension: canvas
+2026-04-24 20:51:33: -- Loading extension: settings
+2026-04-24 20:51:33: -- Loading extension: pasteboard
+2026-04-24 20:51:33: -- Loading extension: urlevent
+2026-04-24 20:51:33: -- Loading extension: http
+2026-04-24 20:51:34: -- Loading extension: webview
+2026-04-24 20:51:34: -- Loading extension: fs
+2026-04-24 20:51:34: -- Loading extension: hotkey
+2026-04-24 20:51:34: -- Loading extension: keycodes
+2026-04-24 20:51:34: -- Loading extension: json
+2026-04-24 20:51:34: -- Loading extension: osascript
+           [DEBUG] [karabiner] Login Items (System Events): 'utxt'("not_found").
+           [DEBUG] [karabiner] Action 'select_all': logical 'a' → key_code 'a'.
+           [DEBUG] [karabiner] Action 'copy': logical 'c' → key_code 'o'.
+           [DEBUG] [karabiner] Action 'find': logical 'f' → key_code 'y'.
+           [DEBUG] [karabiner] Action 'save': logical 's' → key_code 'j'.
+           [DEBUG] [karabiner] Action 'paste': logical 'v' → key_code 'h'.
+           [DEBUG] [karabiner] Action 'cut': logical 'x' → key_code 'p'.
+           [DEBUG] [karabiner] Action 'undo': logical 'z' → key_code 'open_bracket'.
+           [DEBUG] [karabiner] Action 'redo': logical 'z' → key_code 'open_bracket'.
+ [INFO] [karabiner] Loaded 70 action(s) from actions.json.
+ [INFO] [karabiner] Loaded 14 configurable tap / hold key(s).
+ [INFO] [karabiner] Loaded 182 modifier combo(s).
+           [DEBUG] [karabiner] Non-canonical combo: 'tab_esc' (reverse of 'esc_tab').
+           [DEBUG] [karabiner] Non-canonical combo: 'caps_esc' (reverse of 'esc_caps').
+           [DEBUG] [karabiner] Non-canonical combo: 'caps_tab' (reverse of 'tab_caps').
+           [DEBUG] [karabiner] Non-canonical combo: 'lshift_esc' (reverse of 'esc_lshift').
+           [DEBUG] [karabiner] Non-canonical combo: 'lshift_tab' (reverse of 'tab_lshift').
+           [DEBUG] [karabiner] Non-canonical combo: 'lshift_caps' (reverse of 'caps_lshift').
+           [DEBUG] [karabiner] Non-canonical combo: 'fn_esc' (reverse of 'esc_fn').
+           [DEBUG] [karabiner] Non-canonical combo: 'fn_tab' (reverse of 'tab_fn').
+           [DEBUG] [karabiner] Non-canonical combo: 'fn_caps' (reverse of 'caps_fn').
+           [DEBUG] [karabiner] Non-canonical combo: 'fn_lshift' (reverse of 'lshift_fn').
+           [DEBUG] [karabiner] Non-canonical combo: 'lctrl_esc' (reverse of 'esc_lctrl').
+           [DEBUG] [karabiner] Non-canonical combo: 'lctrl_tab' (reverse of 'tab_lctrl').
+           [DEBUG] [karabiner] Non-canonical combo: 'lctrl_caps' (reverse of 'caps_lctrl').
+           [DEBUG] [karabiner] Non-canonical combo: 'lctrl_lshift' (reverse of 'lshift_lctrl').
+           [DEBUG] [karabiner] Non-canonical combo: 'lctrl_fn' (reverse of 'fn_lctrl').
+           [DEBUG] [karabiner] Non-canonical combo: 'lopt_esc' (reverse of 'esc_lopt').
+           [DEBUG] [karabiner] Non-canonical combo: 'lopt_tab' (reverse of 'tab_lopt').
+           [DEBUG] [karabiner] Non-canonical combo: 'lopt_caps' (reverse of 'caps_lopt').
+           [DEBUG] [karabiner] Non-canonical combo: 'lopt_lshift' (reverse of 'lshift_lopt').
+           [DEBUG] [karabiner] Non-canonical combo: 'lopt_fn' (reverse of 'fn_lopt').
+           [DEBUG] [karabiner] Non-canonical combo: 'lopt_lctrl' (reverse of 'lctrl_lopt').
+           [DEBUG] [karabiner] Non-canonical combo: 'lcmd_esc' (reverse of 'esc_lcmd').
+           [DEBUG] [karabiner] Non-canonical combo: 'lcmd_tab' (reverse of 'tab_lcmd').
+           [DEBUG] [karabiner] Non-canonical combo: 'lcmd_caps' (reverse of 'caps_lcmd').
+           [DEBUG] [karabiner] Non-canonical combo: 'lcmd_lshift' (reverse of 'lshift_lcmd').
+           [DEBUG] [karabiner] Non-canonical combo: 'lcmd_fn' (reverse of 'fn_lcmd').
+           [DEBUG] [karabiner] Non-canonical combo: 'lcmd_lctrl' (reverse of 'lctrl_lcmd').
+           [DEBUG] [karabiner] Non-canonical combo: 'lcmd_lopt' (reverse of 'lopt_lcmd').
+           [DEBUG] [karabiner] Non-canonical combo: 'space_esc' (reverse of 'esc_space').
+           [DEBUG] [karabiner] Non-canonical combo: 'space_tab' (reverse of 'tab_space').
+           [DEBUG] [karabiner] Non-canonical combo: 'space_caps' (reverse of 'caps_space').
+           [DEBUG] [karabiner] Non-canonical combo: 'space_lshift' (reverse of 'lshift_space').
+           [DEBUG] [karabiner] Non-canonical combo: 'space_fn' (reverse of 'fn_space').
+           [DEBUG] [karabiner] Non-canonical combo: 'space_lctrl' (reverse of 'lctrl_space').
+           [DEBUG] [karabiner] Non-canonical combo: 'space_lopt' (reverse of 'lopt_space').
+           [DEBUG] [karabiner] Non-canonical combo: 'space_lcmd' (reverse of 'lcmd_space').
+           [DEBUG] [karabiner] Non-canonical combo: 'rcmd_esc' (reverse of 'esc_rcmd').
+           [DEBUG] [karabiner] Non-canonical combo: 'rcmd_tab' (reverse of 'tab_rcmd').
+           [DEBUG] [karabiner] Non-canonical combo: 'rcmd_caps' (reverse of 'caps_rcmd').
+           [DEBUG] [karabiner] Non-canonical combo: 'rcmd_lshift' (reverse of 'lshift_rcmd').
+           [DEBUG] [karabiner] Non-canonical combo: 'rcmd_fn' (reverse of 'fn_rcmd').
+           [DEBUG] [karabiner] Non-canonical combo: 'rcmd_lctrl' (reverse of 'lctrl_rcmd').
+           [DEBUG] [karabiner] Non-canonical combo: 'rcmd_lopt' (reverse of 'lopt_rcmd').
+           [DEBUG] [karabiner] Non-canonical combo: 'rcmd_lcmd' (reverse of 'lcmd_rcmd').
+           [DEBUG] [karabiner] Non-canonical combo: 'rcmd_space' (reverse of 'space_rcmd').
+           [DEBUG] [karabiner] Non-canonical combo: 'ropt_esc' (reverse of 'esc_ropt').
+           [DEBUG] [karabiner] Non-canonical combo: 'ropt_tab' (reverse of 'tab_ropt').
+           [DEBUG] [karabiner] Non-canonical combo: 'ropt_caps' (reverse of 'caps_ropt').
+           [DEBUG] [karabiner] Non-canonical combo: 'ropt_lshift' (reverse of 'lshift_ropt').
+           [DEBUG] [karabiner] Non-canonical combo: 'ropt_fn' (reverse of 'fn_ropt').
+           [DEBUG] [karabiner] Non-canonical combo: 'ropt_lctrl' (reverse of 'lctrl_ropt').
+           [DEBUG] [karabiner] Non-canonical combo: 'ropt_lopt' (reverse of 'lopt_ropt').
+           [DEBUG] [karabiner] Non-canonical combo: 'ropt_lcmd' (reverse of 'lcmd_ropt').
+           [DEBUG] [karabiner] Non-canonical combo: 'ropt_space' (reverse of 'space_ropt').
+           [DEBUG] [karabiner] Non-canonical combo: 'ropt_rcmd' (reverse of 'rcmd_ropt').
+           [DEBUG] [karabiner] Non-canonical combo: 'rshift_esc' (reverse of 'esc_rshift').
+           [DEBUG] [karabiner] Non-canonical combo: 'rshift_tab' (reverse of 'tab_rshift').
+           [DEBUG] [karabiner] Non-canonical combo: 'rshift_caps' (reverse of 'caps_rshift').
+           [DEBUG] [karabiner] Non-canonical combo: 'rshift_lshift' (reverse of 'lshift_rshift').
+           [DEBUG] [karabiner] Non-canonical combo: 'rshift_fn' (reverse of 'fn_rshift').
+           [DEBUG] [karabiner] Non-canonical combo: 'rshift_lctrl' (reverse of 'lctrl_rshift').
+           [DEBUG] [karabiner] Non-canonical combo: 'rshift_lopt' (reverse of 'lopt_rshift').
+           [DEBUG] [karabiner] Non-canonical combo: 'rshift_lcmd' (reverse of 'lcmd_rshift').
+           [DEBUG] [karabiner] Non-canonical combo: 'rshift_space' (reverse of 'space_rshift').
+           [DEBUG] [karabiner] Non-canonical combo: 'rshift_rcmd' (reverse of 'rcmd_rshift').
+           [DEBUG] [karabiner] Non-canonical combo: 'rshift_ropt' (reverse of 'ropt_rshift').
+           [DEBUG] [karabiner] Non-canonical combo: 'ret_esc' (reverse of 'esc_ret').
+           [DEBUG] [karabiner] Non-canonical combo: 'ret_tab' (reverse of 'tab_ret').
+           [DEBUG] [karabiner] Non-canonical combo: 'ret_caps' (reverse of 'caps_ret').
+           [DEBUG] [karabiner] Non-canonical combo: 'ret_lshift' (reverse of 'lshift_ret').
+           [DEBUG] [karabiner] Non-canonical combo: 'ret_fn' (reverse of 'fn_ret').
+           [DEBUG] [karabiner] Non-canonical combo: 'ret_lctrl' (reverse of 'lctrl_ret').
+           [DEBUG] [karabiner] Non-canonical combo: 'ret_lopt' (reverse of 'lopt_ret').
+           [DEBUG] [karabiner] Non-canonical combo: 'ret_lcmd' (reverse of 'lcmd_ret').
+           [DEBUG] [karabiner] Non-canonical combo: 'ret_space' (reverse of 'space_ret').
+           [DEBUG] [karabiner] Non-canonical combo: 'ret_rcmd' (reverse of 'rcmd_ret').
+           [DEBUG] [karabiner] Non-canonical combo: 'ret_ropt' (reverse of 'ropt_ret').
+           [DEBUG] [karabiner] Non-canonical combo: 'ret_rshift' (reverse of 'rshift_ret').
+           [DEBUG] [karabiner] Non-canonical combo: 'bsp_esc' (reverse of 'esc_bsp').
+           [DEBUG] [karabiner] Non-canonical combo: 'bsp_tab' (reverse of 'tab_bsp').
+           [DEBUG] [karabiner] Non-canonical combo: 'bsp_caps' (reverse of 'caps_bsp').
+           [DEBUG] [karabiner] Non-canonical combo: 'bsp_lshift' (reverse of 'lshift_bsp').
+           [DEBUG] [karabiner] Non-canonical combo: 'bsp_fn' (reverse of 'fn_bsp').
+           [DEBUG] [karabiner] Non-canonical combo: 'bsp_lctrl' (reverse of 'lctrl_bsp').
+           [DEBUG] [karabiner] Non-canonical combo: 'bsp_lopt' (reverse of 'lopt_bsp').
+           [DEBUG] [karabiner] Non-canonical combo: 'bsp_lcmd' (reverse of 'lcmd_bsp').
+           [DEBUG] [karabiner] Non-canonical combo: 'bsp_space' (reverse of 'space_bsp').
+           [DEBUG] [karabiner] Non-canonical combo: 'bsp_rcmd' (reverse of 'rcmd_bsp').
+           [DEBUG] [karabiner] Non-canonical combo: 'bsp_ropt' (reverse of 'ropt_bsp').
+           [DEBUG] [karabiner] Non-canonical combo: 'bsp_rshift' (reverse of 'rshift_bsp').
+           [DEBUG] [karabiner] Non-canonical combo: 'bsp_ret' (reverse of 'ret_bsp').
+           [DEBUG] [karabiner] Non-canonical combos computed: 91.
+ [INFO] [karabiner] User config loaded.
+           [DEBUG] [karabiner] Karabiner-Elements GUI suppressor active for 5s.
+ [INFO] [karabiner] Integration enabled — deploying config…
+           [DEBUG] [karabiner] Karabiner-Elements not running — bootstrapping daemon plists…
+ [START] [karabiner] Regenerating Karabiner config…
+           [DEBUG] [karabiner] Combo 'lcmd_rcmd': tap=none, hold=none, combo=opt_backspace (non_canonical=false).
+           [DEBUG] [karabiner]   → rule: Cmd gauche + Cmd droit: ⌥⌫ — Supprimer le mot précédent [chord]
+           [DEBUG] [karabiner] Combo 'rcmd_tab': tap=cycle_windows_in_app, hold=none, combo=cycle_windows_in_app (non_canonical=true).
+           [DEBUG] [karabiner]   → rule: Cmd droit + Tab: ⌘` — Fenêtres de l'app courante [chord]
+           [DEBUG] [karabiner]   → rule: Cmd droit + Tab (right_command→tab): ⌘` — Fenêtres de l'app courante (tap) / — Rien (touche normale) (hold) [var-based]
+           [DEBUG] [karabiner] Combo 'rcmd_caps': tap=capsword, hold=none, combo=capsword (non_canonical=true).
+           [DEBUG] [karabiner]   → rule: Cmd droit + CapsLock: ⇪★ CapsWord — Majuscules jusqu'au prochain espace [chord]
+           [DEBUG] [karabiner]   → rule: Cmd droit + CapsLock (right_command→caps_lock): ⇪★ CapsWord — Majuscules jusqu'au prochain espace (tap) / — Rien (touche normale) (hold) [var-based]
+           [DEBUG] [karabiner] Combo 'rcmd_fn': tap=caps_lock, hold=none, combo=caps_lock (non_canonical=true).
+           [DEBUG] [karabiner]   → rule: Cmd droit + Fn: ⇪ CapsLock — Verr. majuscules [chord]
+           [DEBUG] [karabiner]   → rule: Cmd droit + Fn (right_command→fn): ⇪ CapsLock — Verr. majuscules (tap) / — Rien (touche normale) (hold) [var-based]
+           [DEBUG] [karabiner] Combo 'rcmd_lopt': tap=opt_delete_fwd, hold=none, combo=opt_delete_fwd (non_canonical=true).
+           [DEBUG] [karabiner]   → rule: Cmd droit + Option gauche: ⌥⌦ — Supprimer le mot suivant [chord]
+           [DEBUG] [karabiner]   → rule: Cmd droit + Option gauche (right_command→left_option): ⌥⌦ — Supprimer le mot suivant (tap) / — Rien (touche normale) (hold) [var-based]
+           [DEBUG] [karabiner] Combo 'rcmd_lcmd': tap=opt_backspace, hold=option_shift, combo=opt_backspace (non_canonical=true).
+           [DEBUG] [karabiner]   → rule: Cmd droit + Cmd gauche: ⌥⌫ — Supprimer le mot précédent [chord]
+           [DEBUG] [karabiner]   → rule: Cmd droit + Cmd gauche (right_command→left_command): ⌥⌫ — Supprimer le mot précédent (tap) / ⌥⇧ — Option+Shift (hold) [var-based]
+           [DEBUG] [karabiner] Tap/hold 'right_option' sticky-equivalent to 'shift' — 8 companion(s) added.
+           [DEBUG] [karabiner] Building config: tap/hold=1000 ms, simultaneous=100 ms, symmetric=false, 31 rule(s).
+           [DEBUG] [karabiner] Merged HS rules into profile 1 of existing karabiner.json.
+           [TRACE] [karabiner] Stopping Karabiner-Elements before deploy…
+           [DONE] [karabiner] Karabiner-Elements stopped.
+           [TRACE] [karabiner] Deploy: '/Users/b519hs/perso/ergopti/static/drivers/hammerspoon/modules/karabiner/../../karabiner.json' → '/Users/b519hs/.config/karabiner/karabiner.json'…
+           [DEBUG] [karabiner] Deploy: read 125270 byte(s) from source.
+           [DONE] [karabiner] Deploy S1 (direct write) succeeded: '/Users/b519hs/.config/karabiner/karabiner.json'.
+           [DEBUG] [karabiner] Karabiner-Elements GUI suppressor active for 5s.
+           [TRACE] [karabiner] Relaunching Karabiner-Elements after deploy…
+           [DONE] [karabiner] Karabiner-Elements relaunch command issued.
+ [SUCCESS] [karabiner] Karabiner config regenerated: 6 combo(s) + 14 tap/hold key(s) deployed.
+ [SUCCESS] [karabiner] Trackpad CapsWord watcher started.
+           [TRACE] [karabiner] Registering cycle-windows hotkey (F13)…
+           [DONE] [karabiner] Cycle-windows hotkey registered.
+           [TRACE] [karabiner] Registering input source watcher…
+           [DONE] [karabiner] Input source watcher registered.
+ [SUCCESS] [karabiner] Karabiner bridge initialized (70 action(s), 6 combo(s) active).
+           [DEBUG] [init] Starting user interface components…
+ [INFO] [menu] Menubar created successfully.
+           [DEBUG] [keymap.terminators] Terminator 'enter': enabled.
+           [DEBUG] [keymap.terminators] Terminator 'nnbsp': enabled.
+           [DEBUG] [keymap.terminators] Terminator 'exclam': enabled.
+           [DEBUG] [keymap.terminators] Terminator 'star': enabled.
+           [DEBUG] [keymap.terminators] Terminator 'space': enabled.
+           [DEBUG] [keymap.terminators] Terminator 'quote': enabled.
+           [DEBUG] [keymap.terminators] Terminator 'comma': enabled.
+           [DEBUG] [keymap.terminators] Terminator 'underscore': enabled.
+           [DEBUG] [keymap.terminators] Terminator 'apostrophe_typo': enabled.
+           [DEBUG] [keymap.terminators] Terminator 'apostrophe_straight': enabled.
+           [DEBUG] [keymap.terminators] Terminator 'tab': enabled.
+           [DEBUG] [keymap.terminators] Terminator 'period': enabled.
+           [DEBUG] [keymap.terminators] Terminator 'bracketright': enabled.
+           [DEBUG] [keymap.terminators] Terminator 'equal': enabled.
+           [DEBUG] [keymap.terminators] Terminator 'anglebracketright': enabled.
+           [DEBUG] [keymap.terminators] Terminator 'minus': enabled.
+           [DEBUG] [keymap.terminators] Terminator 'backslash': enabled.
+           [DEBUG] [keymap.terminators] Terminator 'colon': enabled.
+           [DEBUG] [keymap.terminators] Terminator 'braceright': enabled.
+           [DEBUG] [keymap.terminators] Terminator 'parenright': enabled.
+           [DEBUG] [keymap.terminators] Terminator 'slash': enabled.
+           [DEBUG] [keymap.terminators] Terminator 'question': enabled.
+           [DEBUG] [keymap.terminators] Terminator 'nbsp': enabled.
+           [DEBUG] [keymap] Base delay: 0.750s.
+           [DEBUG] [keymap] Delay 'STAR_TRIGGER': 2.000s.
+           [DEBUG] [keymap] Delay 'dynamichotstrings': 2.000s.
+           [DEBUG] [keymap] Delay 'rolls': 0.250s.
+           [DEBUG] [keymap] Delay 'autocorrection': 0.500s.
+           [DEBUG] [keymap] Delay 'llm_prediction': 20.000s.
+           [DEBUG] [keymap] Delay 'distancesreduction': 0.250s.
+           [DEBUG] [keymap] Delay 'sfbsreduction': 0.250s.
+           [DEBUG] [gestures.conflicts] Evaluating all overrides for conflicts…
+ [WARNING] [gestures.conflicts] Active conflict: "Tap 3 doigts — Recherche & détection de données" — please disable it in System Settings.
+ [WARNING] [gestures.conflicts] Active conflict: "Glisser 4/5 doigts gauche/droite — Passer d’un espace à l’autre" — please disable it in System Settings.
+ [WARNING] [gestures.conflicts] Active conflict: "Glisser 4/5 doigts haut/bas — Mission Control & App Exposé" — please disable it in System Settings.
+ [INFO] [gestures.conflicts] Overrides conflict evaluation completed.
+           [DEBUG] [keymap.llm_bridge] Star preview: on.
+           [DEBUG] [keymap.llm_bridge] Autocorrect preview: on.
+           [DEBUG] [llm.prediction_engine] AI preview: on.
+ [INFO] [tooltip_config] Colorization explicitly set to: true.
+           [DEBUG] [keymap.llm_bridge] Colored tooltips: on.
+           [DEBUG] [keymap.llm_bridge] LLM chain after hotstring: on.
+           [DEBUG] [llm.prediction_engine] Auto temperature raise: on.
+ [INFO] [llm.prediction_engine] LLM enabled.
+           [DEBUG] [llm.prediction_engine] Inactivity timer rebuilt: 0.200s.
+ [INFO] [llm.prediction_engine] Model set: 'gemma-4-E2B-it' (backend: ollama).
+           [DEBUG] [keymap.registry] update_trigger_char: key unchanged ('★') — skipping rename.
+           [DEBUG] [keymap] Trigger char: '★'.
+           [DEBUG] [llm.prediction_engine] Context window: 500 chars.
+           [DEBUG] [keymap.llm_bridge] Buffer reset on nav: yes.
+           [DEBUG] [llm.prediction_engine] Temperature: 0.1.
+           [DEBUG] [llm.prediction_engine] Prediction count: 3.
+           [DEBUG] [llm.prediction_engine] Info bar: visible.
+           [DEBUG] [llm.prediction_engine] Validation modifiers: [alt].
+           [DEBUG] [llm.prediction_engine] Prediction indent: -3.
+           [DEBUG] [llm.prediction_engine] Excluded apps: 3 configured.
+           [DEBUG] [llm.prediction_engine] URL bar filter: on.
+           [DEBUG] [llm.prediction_engine] Secure field filter: on.
+           [DEBUG] [llm.prediction_engine] Instant on word end: on.
+           [DEBUG] [keylogger] Options updated.
+           [DEBUG] [keylogger] Disabled apps updated (0 entry(ies)).
+ [START] [keylogger] Starting keylogger engine…
+           [DEBUG] [keylogger] Keymap module cached for shift-side detection.
+           [TRACE] [keylogger] Starting hardware watchers…
+           [DONE] [keylogger] Hardware watchers started.
+ [START] [keymap] Starting keymap engine…
+ [INFO] [keymap] Perf sampling auto-enabled (DEBUG log level active).
+ [SUCCESS] [keymap] Keymap engine started.
+ [WARNING] [shortcuts.bindings] M.start() called more than once — ignoring duplicate call.
+           [DEBUG] [personal_info] Enabling personal info tracking…
+ [INFO] [personal_info] Personal info tracking enabled.
+           [DEBUG] [keymap.registry] Group 'sfbsreduction' disabled (0 mapping(s) remaining).
+           [DEBUG] [keymap.registry] Enabling group 'sfbsreduction' (kind: toml)…
+ [START] [keymap.registry] Loading TOML mapping file 'sfbsreduction'…
+           [DEBUG] [toml_reader] Parsing TOML file…
+ [INFO] [toml_reader] TOML file parsed successfully.
+           [TRACE] [keymap.registry] Sorting 189 mapping(s)…
+           [DONE] [keymap.registry] Mappings sorted.
+ [SUCCESS] [keymap.registry] TOML mapping file 'sfbsreduction' loaded (189 total mapping(s)).
+           [TRACE] [keymap.registry] Sorting 189 mapping(s)…
+           [DONE] [keymap.registry] Mappings sorted.
+           [DEBUG] [keymap.registry] Group 'rolls' disabled (189 mapping(s) remaining).
+           [DEBUG] [keymap.registry] Enabling group 'rolls' (kind: toml)…
+ [START] [keymap.registry] Loading TOML mapping file 'rolls'…
+           [DEBUG] [toml_reader] Parsing TOML file…
+ [INFO] [toml_reader] TOML file parsed successfully.
+           [TRACE] [keymap.registry] Sorting 239 mapping(s)…
+           [DONE] [keymap.registry] Mappings sorted.
+ [SUCCESS] [keymap.registry] TOML mapping file 'rolls' loaded (239 total mapping(s)).
+           [TRACE] [keymap.registry] Sorting 239 mapping(s)…
+           [DONE] [keymap.registry] Mappings sorted.
+           [DEBUG] [keymap.registry] Group 'personal' disabled (239 mapping(s) remaining).
+           [DEBUG] [keymap.registry] Enabling group 'personal' (kind: toml)…
+ [START] [keymap.registry] Loading TOML mapping file 'personal'…
+           [DEBUG] [toml_reader] Parsing TOML file…
+ [INFO] [toml_reader] TOML file parsed successfully.
+           [TRACE] [keymap.registry] Sorting 756 mapping(s)…
+           [DONE] [keymap.registry] Mappings sorted.
+ [SUCCESS] [keymap.registry] TOML mapping file 'personal' loaded (756 total mapping(s)).
+           [TRACE] [keymap.registry] Sorting 756 mapping(s)…
+           [DONE] [keymap.registry] Mappings sorted.
+           [DEBUG] [keymap.registry] Group 'dynamichotstrings' disabled (756 mapping(s) remaining).
+           [DEBUG] [keymap.registry] Enabling group 'dynamichotstrings' (kind: lua)…
+           [DEBUG] [dynamic_hotstrings.rules] Registering prefix-based dynamic hotstrings…
+           [TRACE] [keymap.registry] Sorting 780 mapping(s)…
+           [DONE] [keymap.registry] Mappings sorted.
+ [INFO] [dynamic_hotstrings.rules] Prefix-based dynamic hotstrings registered.
+           [TRACE] [keymap.registry] Sorting 780 mapping(s)…
+           [DONE] [keymap.registry] Mappings sorted.
+           [DEBUG] [keymap.registry] Group 'magickey' disabled (780 mapping(s) remaining).
+           [DEBUG] [keymap.registry] Enabling group 'magickey' (kind: toml)…
+ [START] [keymap.registry] Loading TOML mapping file 'magickey'…
+           [DEBUG] [toml_reader] Parsing TOML file…
+ [INFO] [toml_reader] TOML file parsed successfully.
+           [TRACE] [keymap.registry] Sorting 4063 mapping(s)…
+           [DONE] [keymap.registry] Mappings sorted.
+ [SUCCESS] [keymap.registry] TOML mapping file 'magickey' loaded (4063 total mapping(s)).
+           [TRACE] [keymap.registry] Sorting 4063 mapping(s)…
+           [DONE] [keymap.registry] Mappings sorted.
+           [DEBUG] [keymap.registry] Group 'distancesreduction' disabled (4063 mapping(s) remaining).
+           [DEBUG] [keymap.registry] Enabling group 'distancesreduction' (kind: toml)…
+ [START] [keymap.registry] Loading TOML mapping file 'distancesreduction'…
+           [DEBUG] [toml_reader] Parsing TOML file…
+ [INFO] [toml_reader] TOML file parsed successfully.
+           [TRACE] [keymap.registry] Sorting 4341 mapping(s)…
+           [DONE] [keymap.registry] Mappings sorted.
+ [SUCCESS] [keymap.registry] TOML mapping file 'distancesreduction' loaded (4341 total mapping(s)).
+           [TRACE] [keymap.registry] Sorting 4341 mapping(s)…
+           [DONE] [keymap.registry] Mappings sorted.
+           [DEBUG] [keymap.registry] Group 'autocorrection' disabled (4341 mapping(s) remaining).
+           [DEBUG] [keymap.registry] Enabling group 'autocorrection' (kind: toml)…
+ [START] [keymap.registry] Loading TOML mapping file 'autocorrection'…
+           [DEBUG] [toml_reader] Parsing TOML file…
+ [INFO] [toml_reader] TOML file parsed successfully.
+           [TRACE] [keymap.registry] Sorting 5945 mapping(s)…
+           [DONE] [keymap.registry] Mappings sorted.
+ [SUCCESS] [keymap.registry] TOML mapping file 'autocorrection' loaded (5945 total mapping(s)).
+           [TRACE] [keymap.registry] Sorting 5945 mapping(s)…
+           [DONE] [keymap.registry] Mappings sorted.
+           [DEBUG] [shortcuts.bindings] Hotkey 'ctrl_t' already enabled — skipping.
+           [DEBUG] [shortcuts.bindings] Hotkey 'ctrl_i' already enabled — skipping.
+           [DEBUG] [shortcuts.bindings] Hotkey 'cmd_shift_v' already enabled — skipping.
+           [DEBUG] [shortcuts.bindings] Hotkey 'ctrl_s' already enabled — skipping.
+           [DEBUG] [shortcuts.bindings] Hotkey 'ctrl_g' already enabled — skipping.
+           [DEBUG] [shortcuts.bindings] Hotkey 'ctrl_quote' already enabled — skipping.
+           [DEBUG] [shortcuts.bindings] Hotkey 'ctrl_a' already enabled — skipping.
+           [DEBUG] [shortcuts.bindings] Hotkey 'cmd_star' already enabled — skipping.
+           [DEBUG] [shortcuts.bindings] Hotkey 'ctrl_w' already enabled — skipping.
+           [DEBUG] [shortcuts.bindings] Hotkey 'ctrl_d' already enabled — skipping.
+           [DEBUG] [shortcuts.bindings] Hotkey 'ctrl_u' already enabled — skipping.
+           [DEBUG] [shortcuts.bindings] Hotkey 'ctrl_period' already enabled — skipping.
+           [DEBUG] [shortcuts.bindings] Hotkey 'ctrl_o' already enabled — skipping.
+           [DEBUG] [shortcuts.bindings] Hotkey 'ctrl_p' already enabled — skipping.
+           [DEBUG] [shortcuts.bindings] Hotkey 'at_hash' already enabled — skipping.
+           [DEBUG] [shortcuts.bindings] Hotkey 'ctrl_e' already enabled — skipping.
+           [DEBUG] [shortcuts.bindings] Hotkey 'ctrl_h' already enabled — skipping.
+           [DEBUG] [shortcuts.bindings] Hotkey 'ctrl_m' already enabled — skipping.
+           [DEBUG] [shortcuts.bindings] Hotkey 'layer_scroll' already enabled — skipping.
+           [DEBUG] [shortcuts.bindings] Hotkey 'ctrl_x' already enabled — skipping.
+           [DEBUG] [menu_llm] Resolving model name on startup: 'gemma-4-E2B-it' -> 'gemma-4-e2b-it-mxfp4'
+           [DEBUG] [llm.prediction_engine] Model display name: 'gemma-4-E2B-it'.
+           [DEBUG] [menu_llm] Model power on startup: 2
+           [DEBUG] [llm.prediction_engine] Prediction count: 3.
+           [DEBUG] [llm.prediction_engine] Max words: 20 (0 = unlimited).
+           [DEBUG] [llm.core] Streaming: on.
+           [DEBUG] [llm.prediction_engine] Streaming: on.
+           [DEBUG] [llm.prediction_engine] Streaming multi: on.
+ [INFO] [menu] LLM handler created successfully.
+ [INFO] [menu_llm] ═══════════════ Starting menu_llm ═══════════════
+           [DEBUG] [menu_llm] No global trigger shortcut configured.
+           [DEBUG] [menu_llm] Built-in profiles loaded: 4
+           [DEBUG] [menu_llm] User profiles loaded: 1
+ [INFO] [menu_llm] Profile shortcuts loaded: 0 entries
+           [DEBUG] [menu_llm] Activating bound hotkeys…
+ [INFO] [menu_llm] LLM enabled at startup, model: gemma-4-E2B-it
+           [DEBUG] [menu_llm] MLX mode: locking predictions during initialization.
+ [INFO] [llm.prediction_engine] LLM disabled.
+           [DONE] [llm.prediction_engine] Inactivity timer stopped.
+           [DEBUG] [menu_llm] Checking model requirements: gemma-4-E2B-it
+ [INFO] [menu_llm] ═══════════════ Startup completed for menu_llm ═══════════════
+           [DEBUG] [shortcuts.script_control] Pause-change callback registered.
+           [DEBUG] [shortcuts.script_control] Key slot 'return_key' → 'pause'.
+           [DEBUG] [shortcuts.script_control] Key slot 'backspace' → 'show_metrics'.
+           [DEBUG] [shortcuts.script_control] Key slot 'escape' → 'quit_hammerspoon'.
+           [DEBUG] [shortcuts.script_control] Extras table registered (8 handler(s)).
+ [INFO] [notify] Notification utilisateur: Ergopti+ | Script prêt ! 🚀
+ [INFO] [notifications] Notification dispatched successfully:
+           [DEBUG] [init] Starting script control engine…
+ [START] [shortcuts.script_control] Starting script control…
+ [SUCCESS] [shortcuts.script_control] Script control started.
+ [INFO] [init] User interface initialized successfully.
+           [DEBUG] [init] Configuring file watchers for auto-reloading…
+ [INFO] [init] ════════════════════════════════════════════════════════════
+ [INFO] [init] ✅ Hammerspoon boot SUCCESSFUL.
+ [INFO] [init] ════════════════════════════════════════════════════════════
+2026-04-24 20:51:34: -- Loading extension: spaces
+2026-04-24 20:51:34: -- Loading extension: application
+2026-04-24 20:51:35: -- Loading extension: menubar
+2026-04-24 20:51:35: -- Loading extension: image
+2026-04-24 20:51:35: -- Loading extension: caffeinate
+2026-04-24 20:51:35: -- Loading extension: wifi
+2026-04-24 20:51:35: -- Loading extension: battery
+2026-04-24 20:51:35: -- Loading extension: audiodevice
+2026-04-24 20:51:35: -- Loading extension: pathwatcher
+2026-04-24 20:51:35: -- Loading extension: distributednotifications
+2026-04-24 20:51:35: -- Done.
+           [DONE] [llm.prediction_engine] Inactivity timer stopped.
+2026-04-24 20:51:35: -- Loading extension: task
+[DONE] [logger]           ↑ 1 identical line suppressed
+           [DEBUG] [karabiner] Karabiner-Elements GUI appeared during suppression window — quitting…
+           [TRACE] [keylogger.context_tracker] Attaching accessibility observer to PID 26077…
+           [DONE] [keylogger.context_tracker] Accessibility observer attached to PID 26077.
+2026-04-24 20:51:36: -- Loading extension: window
+2026-04-24 20:51:36: -- Loading extension: axuielement
+           [DEBUG] [menu_llm.mlx] Scanning MLX installed models cache…
+           [DEBUG] [menu_llm.mlx] MLX model detected in cache: Qwen3.5-2B
+           [DEBUG] [menu_llm.mlx] MLX model detected in cache: Qwen3.5-4B
+           [DEBUG] [menu_llm.mlx] MLX model detected in cache: starcoder2-3b
+           [DEBUG] [menu_llm.mlx] MLX model detected in cache: gemma-4-E2B
+           [DEBUG] [menu_llm.mlx] MLX model detected in cache: gemma-4-E2B-it
+           [DEBUG] [menu_llm.mlx] MLX model detected in cache: gemma-4-E4B
+           [DEBUG] [menu_llm.mlx] MLX model detected in cache: gemma-4-E4B-it
+           [DEBUG] [menu_llm.mlx] MLX model detected in cache: SmolLM3-3B
+           [DEBUG] [menu_llm.mlx] MLX model detected in cache: granite-4.0-h-1b-base
+           [DEBUG] [menu_llm.mlx] MLX model detected in cache: granite-4.0-h-1b
+           [DEBUG] [menu_llm.mlx] MLX model detected in cache: LFM2.5-350M
+           [DEBUG] [menu_llm.mlx] MLX model detected in cache: LFM2.5-1.2B-Instruct
+           [DEBUG] [menu_llm.mlx] MLX model detected in cache: Llama-3.1-8B-Instruct
+           [DEBUG] [menu_llm.mlx] MLX model detected in cache: Llama-3.2-3B-Instruct
+           [DEBUG] [menu_llm.mlx] MLX model detected in cache: Mistral-7B-Instruct-v0.3
+           [DEBUG] [menu_llm.mlx] MLX model detected in cache: Hermes-3-Llama-3.2-3B
+           [DEBUG] [menu_llm.mlx] MLX model detected in cache: NVIDIA-Nemotron-3-Nano-4B-BF16
+           [DEBUG] [menu_llm.mlx] MLX installed models scan complete: 17 model(s).
+           [DEBUG] [menu_llm] Startup installed-models cache count: 17
+           [DEBUG] [menu_llm] Startup MLX mode: forcing MLX requirements check for model gemma-4-E2B-it
+           [DEBUG] [menu_llm.mlx] Checking MLX requirements for model gemma-4-E2B-it…
+           [DEBUG] [karabiner] Restoring Space after Karabiner-Elements GUI switch.
+           [DEBUG] [keylogger.context_tracker] App switch: 'Microsoft Edge' → 'Code' (933 ms).
+           [TRACE] [keylogger.context_tracker] Stopping previous accessibility observer…
+           [DONE] [keylogger.context_tracker] Previous accessibility observer stopped.
+           [TRACE] [keylogger.context_tracker] Attaching accessibility observer to PID 94469…
+           [DONE] [keylogger.context_tracker] Accessibility observer attached to PID 94469.
+2026-04-24 20:51:37: -- Some applications have alternate names which can also be checked if you enable Spotlight support with `hs.application.enableSpotlightForNameSearches(true)`.
+           [DEBUG] [menu_llm.mlx] Scanning MLX installed models cache…
+           [DEBUG] [menu_llm.mlx] MLX model detected in cache: Qwen3.5-2B
+           [DEBUG] [menu_llm.mlx] MLX model detected in cache: Qwen3.5-4B
+           [DEBUG] [menu_llm.mlx] MLX model detected in cache: starcoder2-3b
+           [DEBUG] [menu_llm.mlx] MLX model detected in cache: gemma-4-E2B
+           [DEBUG] [menu_llm.mlx] MLX model detected in cache: gemma-4-E2B-it
+           [DEBUG] [menu_llm.mlx] MLX model detected in cache: gemma-4-E4B
+           [DEBUG] [menu_llm.mlx] MLX model detected in cache: gemma-4-E4B-it
+           [DEBUG] [menu_llm.mlx] MLX model detected in cache: SmolLM3-3B
+           [DEBUG] [menu_llm.mlx] MLX model detected in cache: granite-4.0-h-1b-base
+           [DEBUG] [menu_llm.mlx] MLX model detected in cache: granite-4.0-h-1b
+           [DEBUG] [menu_llm.mlx] MLX model detected in cache: LFM2.5-350M
+           [DEBUG] [menu_llm.mlx] MLX model detected in cache: LFM2.5-1.2B-Instruct
+           [DEBUG] [menu_llm.mlx] MLX model detected in cache: Llama-3.1-8B-Instruct
+           [DEBUG] [menu_llm.mlx] MLX model detected in cache: Llama-3.2-3B-Instruct
+           [DEBUG] [menu_llm.mlx] MLX model detected in cache: Mistral-7B-Instruct-v0.3
+           [DEBUG] [menu_llm.mlx] MLX model detected in cache: Hermes-3-Llama-3.2-3B
+           [DEBUG] [menu_llm.mlx] MLX model detected in cache: NVIDIA-Nemotron-3-Nano-4B-BF16
+           [DEBUG] [menu_llm.mlx] MLX installed models scan complete: 17 model(s).
+ [INFO] [menu_llm.mlx] MLX model gemma-4-E2B-it is installed. Starting server…
+ [INFO] [menu_llm.mlx] Ensuring MLX server for model gemma-4-E2B-it…
+ [INFO] [menu_llm.mlx] Starting MLX server process for model gemma-4-E2B-it…
+           [DONE] [llm.prediction_engine] Inactivity timer stopped.
+[DONE] [logger]           ↑ 1 identical line suppressed
+           [DEBUG] [keylogger.context_tracker] App switch: 'Code' → 'Microsoft Edge' (653 ms).
+           [TRACE] [keylogger.context_tracker] Stopping previous accessibility observer…
+           [DONE] [keylogger.context_tracker] Previous accessibility observer stopped.
+           [TRACE] [keylogger.context_tracker] Attaching accessibility observer to PID 26077…
+           [DONE] [keylogger.context_tracker] Accessibility observer attached to PID 26077.
+           [DEBUG] [menu_llm] Startup MLX backup check fired for model gemma-4-E2B-it
+           [DEBUG] [menu_llm.mlx] Checking MLX requirements for model gemma-4-E2B-it…
+           [DONE] [llm.prediction_engine] Inactivity timer stopped.
+[DONE] [logger]           ↑ 1 identical line suppressed
+ [INFO] [menu_llm] Requirements verified for model gemma-4-E2B-it.
+           [DEBUG] [menu_llm] Reactivating MLX predictions.
+ [INFO] [llm.prediction_engine] LLM enabled.
+           [TRACE] [keylogger.log_manager] Executing debounced save…
+           [DONE] [keylogger.log_manager] Debounced save completed.
+           [DEBUG] [menu_llm.mlx] Scanning MLX installed models cache…
+           [DEBUG] [menu_llm.mlx] MLX model detected in cache: Qwen3.5-2B
+           [DEBUG] [menu_llm.mlx] MLX model detected in cache: Qwen3.5-4B
+           [DEBUG] [menu_llm.mlx] MLX model detected in cache: starcoder2-3b
+           [DEBUG] [menu_llm.mlx] MLX model detected in cache: gemma-4-E2B
+           [DEBUG] [menu_llm.mlx] MLX model detected in cache: gemma-4-E2B-it
+           [DEBUG] [menu_llm.mlx] MLX model detected in cache: gemma-4-E4B
+           [DEBUG] [menu_llm.mlx] MLX model detected in cache: gemma-4-E4B-it
+           [DEBUG] [menu_llm.mlx] MLX model detected in cache: SmolLM3-3B
+           [DEBUG] [menu_llm.mlx] MLX model detected in cache: granite-4.0-h-1b-base
+           [DEBUG] [menu_llm.mlx] MLX model detected in cache: granite-4.0-h-1b
+           [DEBUG] [menu_llm.mlx] MLX model detected in cache: LFM2.5-350M
+           [DEBUG] [menu_llm.mlx] MLX model detected in cache: LFM2.5-1.2B-Instruct
+           [DEBUG] [menu_llm.mlx] MLX model detected in cache: Llama-3.1-8B-Instruct
+           [DEBUG] [menu_llm.mlx] MLX model detected in cache: Llama-3.2-3B-Instruct
+           [DEBUG] [menu_llm.mlx] MLX model detected in cache: Mistral-7B-Instruct-v0.3
+           [DEBUG] [menu_llm.mlx] MLX model detected in cache: Hermes-3-Llama-3.2-3B
+           [DEBUG] [menu_llm.mlx] MLX model detected in cache: NVIDIA-Nemotron-3-Nano-4B-BF16
+           [DEBUG] [menu_llm.mlx] MLX installed models scan complete: 17 model(s).
+ [INFO] [menu_llm.mlx] MLX model gemma-4-E2B-it is installed. Starting server…
+ [INFO] [menu_llm.mlx] Ensuring MLX server for model gemma-4-E2B-it…
+ [INFO] [menu_llm] Startup MLX backup check succeeded for model gemma-4-E2B-it
+ [INFO] [llm.prediction_engine] LLM enabled.
+2026-04-24 20:51:40: -- Loading extension: mouse
+           [DONE] [llm.prediction_engine] Inactivity timer stopped.
+[DONE] [logger]           ↑ 2 identical lines suppressed
+           [DEBUG] [keymap.utils] Ignored-window cache: application watcher started.
+           [DEBUG] [keymap.utils] Ignored-window cache: window filter subscribed.
+           [DONE] [llm.prediction_engine] Inactivity timer stopped.
+[DONE] [logger]           ↑ 1 identical line suppressed
+           [DEBUG] [keymap.llm_bridge] Hotstring 'c' → 'c’est' [star | 2s].
+           [DEBUG] [keymap.llm_bridge] Escape trap armed (persistent).
+           [DEBUG] [keymap.llm_bridge] LLM chain scheduled in 2.05s.
+           [TRACE] [llm.prediction_engine] Inactivity timer started (override: 2.050s).
+2026-04-24 20:51:41: -- Loading extensions: window.filter
+           [DONE] [llm.prediction_engine] Inactivity timer stopped.
+[DONE] [logger]           ↑ 1 identical line suppressed
+           [DEBUG] [keymap.llm_bridge] Hotstring 'ct' → 'c’était' [star | 2s].
+           [DEBUG] [keymap.llm_bridge] LLM chain scheduled in 2.05s.
+           [TRACE] [llm.prediction_engine] Inactivity timer started (override: 2.050s).
+           [TRACE] [keymap.expander] Performing replacement (1 deletion(s))…
+           [TRACE] [keymap.utils] Emitting text ('’était')…
+           [DONE] [keymap.utils] Text emitted as keystrokes (6 char(s)).
+           [DEBUG] [keylogger] Queuing synthetic text from 'hotstring' (1 delete(s), 6 char(s))…
+           [DEBUG] [keylogger] Synthetic queue size: 7.
+           [DONE] [llm.prediction_engine] Inactivity timer stopped.
+           [DEBUG] [keymap.llm_bridge] No hotstring for 'c’était' — LLM timer armed.
+           [DONE] [llm.prediction_engine] Inactivity timer stopped.
+           [TRACE] [llm.prediction_engine] Inactivity timer started (adaptive: 0.100s).
+[TRACE] [logger]           ↑ 1 identical line suppressed
+           [DONE] [keymap.expander] Replacement complete.
+           [TRACE] [keylogger.log_manager] Flushing event buffer (2 event(s))…
+           [DONE] [keylogger.log_manager] Buffer flushed.
+           [DEBUG] [keymap.expander] Auto-expand: 'ct★' → 'c’était'.
+           [DEBUG] [llm.prediction_engine] Temperature raised to 0.30 for 3 predictions.
+ [START] [llm.prediction_engine] LLM request — model: 'gemma-4-e2b-it-mxfp4' | temp: 0.30 | 3 pred(s) | max tokens: 130.
+           [DEBUG] [llm.api_mlx] [gemma-4-e2b-it-mxfp4] #1 STREAM_PROMPT (905 chars) -> You are a text correction and completion engine.
+You receive PREFIX (full context) and TAIL (last few words).
+Reply with exactly two lines — nothing else:
+TAIL_CORRECTED: <corrected tail>
+NEXT_WORDS: <continuation>
+
+Rules:
+- TAIL_CORRECTED: fix spe
+           [DEBUG] [llm.api_mlx] [gemma-4-e2b-it-mxfp4] #1 STREAM task started (payload: /tmp/lua_Oh0WRS_mlx_stream.json).
+           [TRACE] [keylogger.log_manager] Flushing event buffer (8 event(s))…
+           [DONE] [keylogger.log_manager] Buffer flushed.
+           [DONE] [llm.prediction_engine] Inactivity timer stopped.
+[DONE] [logger]           ↑ 1 identical line suppressed
+           [TRACE] [llm.prediction_engine] Inactivity timer started (override: 0.000s).
+           [DEBUG] [llm.prediction_engine] Temperature raised to 0.30 for 3 predictions.
+ [START] [llm.prediction_engine] LLM request — model: 'gemma-4-e2b-it-mxfp4' | temp: 0.30 | 3 pred(s) | max tokens: 130.
+           [DEBUG] [llm.api_mlx] [gemma-4-e2b-it-mxfp4] #2 STREAM_PROMPT (907 chars) -> You are a text correction and completion engine.
+You receive PREFIX (full context) and TAIL (last few words).
+Reply with exactly two lines — nothing else:
+TAIL_CORRECTED: <corrected tail>
+NEXT_WORDS: <continuation>
+
+Rules:
+- TAIL_CORRECTED: fix spe
+           [DEBUG] [llm.api_mlx] [gemma-4-e2b-it-mxfp4] #2 STREAM task started (payload: /tmp/lua_QaYK0r_mlx_stream.json).
+           [DEBUG] [llm.api_mlx] [gemma-4-e2b-it-mxfp4] #1 STREAM on_done: exit=15 remaining_len=0 stderr=''
+           [DEBUG] [llm.api_mlx] [gemma-4-e2b-it-mxfp4] #1 STREAM: terminated by newer request — no callbacks.
+           [DONE] [llm.prediction_engine] Inactivity timer stopped.
+[DONE] [logger]           ↑ 1 identical line suppressed
+           [DEBUG] [keymap.llm_bridge] Hotstring 'c' → 'c’est' [star | 2s].
+           [DEBUG] [keymap.llm_bridge] LLM chain scheduled in 2.05s.
+           [TRACE] [llm.prediction_engine] Inactivity timer started (override: 2.050s).
+           [DONE] [llm.prediction_engine] Inactivity timer stopped.
+[DONE] [logger]           ↑ 1 identical line suppressed
+           [DEBUG] [keymap.llm_bridge] Hotstring 'ct' → 'c’était' [star | 2s].
+           [DEBUG] [keymap.llm_bridge] LLM chain scheduled in 2.05s.
+           [TRACE] [llm.prediction_engine] Inactivity timer started (override: 2.050s).
+           [TRACE] [keymap.expander] Performing replacement (1 deletion(s))…
+           [TRACE] [keymap.utils] Emitting text ('’était')…
+           [DONE] [keymap.utils] Text emitted as keystrokes (6 char(s)).
+           [DEBUG] [keylogger] Queuing synthetic text from 'hotstring' (1 delete(s), 6 char(s))…
+           [DEBUG] [keylogger] Synthetic queue size: 7.
+           [DONE] [llm.prediction_engine] Inactivity timer stopped.
+           [DEBUG] [keymap.llm_bridge] No hotstring for 'c’était' — LLM timer armed.
+           [DONE] [llm.prediction_engine] Inactivity timer stopped.
+           [TRACE] [llm.prediction_engine] Inactivity timer started (adaptive: 0.100s).
+[TRACE] [logger]           ↑ 1 identical line suppressed
+           [DONE] [keymap.expander] Replacement complete.
+           [TRACE] [keylogger.log_manager] Flushing event buffer (3 event(s))…
+           [DONE] [keylogger.log_manager] Buffer flushed.
+           [DEBUG] [keymap.expander] Auto-expand: 'ct★' → 'c’était'.
+           [DEBUG] [llm.prediction_engine] Temperature raised to 0.30 for 3 predictions.
+ [START] [llm.prediction_engine] LLM request — model: 'gemma-4-e2b-it-mxfp4' | temp: 0.30 | 3 pred(s) | max tokens: 130.
+           [DEBUG] [llm.api_mlx] [gemma-4-e2b-it-mxfp4] #3 STREAM_PROMPT (927 chars) -> You are a text correction and completion engine.
+You receive PREFIX (full context) and TAIL (last few words).
+Reply with exactly two lines — nothing else:
+TAIL_CORRECTED: <corrected tail>
+NEXT_WORDS: <continuation>
+
+Rules:
+- TAIL_CORRECTED: fix spe
+           [DEBUG] [llm.api_mlx] [gemma-4-e2b-it-mxfp4] #3 STREAM task started (payload: /tmp/lua_VZuFK3_mlx_stream.json).
+           [TRACE] [keylogger.log_manager] Flushing event buffer (8 event(s))…
+           [DONE] [keylogger.log_manager] Buffer flushed.
+           [DONE] [llm.prediction_engine] Inactivity timer stopped.
+[DONE] [logger]           ↑ 1 identical line suppressed
+           [TRACE] [llm.prediction_engine] Inactivity timer started (override: 0.000s).
+           [DEBUG] [llm.prediction_engine] Temperature raised to 0.30 for 3 predictions.
+ [START] [llm.prediction_engine] LLM request — model: 'gemma-4-e2b-it-mxfp4' | temp: 0.30 | 3 pred(s) | max tokens: 130.
+           [DEBUG] [llm.api_mlx] [gemma-4-e2b-it-mxfp4] #4 STREAM_PROMPT (929 chars) -> You are a text correction and completion engine.
+You receive PREFIX (full context) and TAIL (last few words).
+Reply with exactly two lines — nothing else:
+TAIL_CORRECTED: <corrected tail>
+NEXT_WORDS: <continuation>
+
+Rules:
+- TAIL_CORRECTED: fix spe
+           [DEBUG] [llm.api_mlx] [gemma-4-e2b-it-mxfp4] #4 STREAM task started (payload: /tmp/lua_5J9Pvr_mlx_stream.json).
+           [DEBUG] [llm.api_mlx] [gemma-4-e2b-it-mxfp4] #3 STREAM on_done: exit=15 remaining_len=0 stderr=''
+           [DEBUG] [llm.api_mlx] [gemma-4-e2b-it-mxfp4] #3 STREAM: terminated by newer request — no callbacks.
+           [DONE] [llm.prediction_engine] Inactivity timer stopped.
+[DONE] [logger]           ↑ 1 identical line suppressed
+           [DEBUG] [keymap.llm_bridge] Hotstring 'c' → 'c’est' [star | 2s].
+           [DEBUG] [keymap.llm_bridge] LLM chain scheduled in 2.05s.
+           [TRACE] [llm.prediction_engine] Inactivity timer started (override: 2.050s).
+           [DONE] [llm.prediction_engine] Inactivity timer stopped.
+           [DEBUG] [keymap.llm_bridge] No hotstring for 'ch' — LLM timer armed.
+           [DONE] [llm.prediction_engine] Inactivity timer stopped.
+           [TRACE] [llm.prediction_engine] Inactivity timer started (adaptive: 0.100s).
+           [DONE] [llm.prediction_engine] Inactivity timer stopped.
+[DONE] [logger]           ↑ 1 identical line suppressed
+           [DEBUG] [keymap.llm_bridge] Hotstring 'cha' → 'Charenton-le-Pont' [star | 2s].
+           [DEBUG] [keymap.llm_bridge] LLM chain scheduled in 2.05s.
+           [TRACE] [llm.prediction_engine] Inactivity timer started (override: 2.050s).
+           [DONE] [llm.prediction_engine] Inactivity timer stopped.
+[DONE] [logger]           ↑ 1 identical line suppressed
+           [DEBUG] [keymap.llm_bridge] Hotstring 'chat' → '🐈' [star | 2s].
+           [DEBUG] [keymap.llm_bridge] LLM chain scheduled in 2.05s.
+           [TRACE] [llm.prediction_engine] Inactivity timer started (override: 2.050s).
+           [DONE] [llm.prediction_engine] Inactivity timer stopped.
+           [DEBUG] [keymap.llm_bridge] No hotstring for 'chatg' — LLM timer armed.
+           [DONE] [llm.prediction_engine] Inactivity timer stopped.
+           [TRACE] [llm.prediction_engine] Inactivity timer started (adaptive: 0.100s).
+           [DEBUG] [llm.prediction_engine] Temperature raised to 0.30 for 3 predictions.
+ [START] [llm.prediction_engine] LLM request — model: 'gemma-4-e2b-it-mxfp4' | temp: 0.30 | 3 pred(s) | max tokens: 130.
+           [DEBUG] [llm.api_mlx] [gemma-4-e2b-it-mxfp4] #5 STREAM_PROMPT (939 chars) -> You are a text correction and completion engine.
+You receive PREFIX (full context) and TAIL (last few words).
+Reply with exactly two lines — nothing else:
+TAIL_CORRECTED: <corrected tail>
+NEXT_WORDS: <continuation>
+
+Rules:
+- TAIL_CORRECTED: fix spe
+           [DEBUG] [llm.api_mlx] [gemma-4-e2b-it-mxfp4] #5 STREAM task started (payload: /tmp/lua_CrQIzB_mlx_stream.json).
+           [DONE] [llm.prediction_engine] Inactivity timer stopped.
+           [DEBUG] [keymap.llm_bridge] No hotstring for 'chatgp' — LLM timer armed.
+           [DONE] [llm.prediction_engine] Inactivity timer stopped.
+           [TRACE] [llm.prediction_engine] Inactivity timer started (adaptive: 0.200s).
+           [DEBUG] [llm.prediction_engine] Temperature raised to 0.30 for 3 predictions.
+ [START] [llm.prediction_engine] LLM request — model: 'gemma-4-e2b-it-mxfp4' | temp: 0.30 | 3 pred(s) | max tokens: 130.
+           [DEBUG] [llm.api_mlx] [gemma-4-e2b-it-mxfp4] #6 STREAM_PROMPT (941 chars) -> You are a text correction and completion engine.
+You receive PREFIX (full context) and TAIL (last few words).
+Reply with exactly two lines — nothing else:
+TAIL_CORRECTED: <corrected tail>
+NEXT_WORDS: <continuation>
+
+Rules:
+- TAIL_CORRECTED: fix spe
+           [DEBUG] [llm.api_mlx] [gemma-4-e2b-it-mxfp4] #6 STREAM task started (payload: /tmp/lua_PJuAfo_mlx_stream.json).
+           [DEBUG] [llm.api_mlx] [gemma-4-e2b-it-mxfp4] #5 STREAM on_done: exit=15 remaining_len=0 stderr=''
+           [DEBUG] [llm.api_mlx] [gemma-4-e2b-it-mxfp4] #5 STREAM: terminated by newer request — no callbacks.
+           [DONE] [llm.prediction_engine] Inactivity timer stopped.
+           [DEBUG] [keymap.llm_bridge] No hotstring for 'chatgpt' — LLM timer armed.
+           [DONE] [llm.prediction_engine] Inactivity timer stopped.
+           [TRACE] [llm.prediction_engine] Inactivity timer started (adaptive: 0.200s).
+           [DEBUG] [llm.prediction_engine] Temperature raised to 0.30 for 3 predictions.
+ [START] [llm.prediction_engine] LLM request — model: 'gemma-4-e2b-it-mxfp4' | temp: 0.30 | 3 pred(s) | max tokens: 130.
+           [DEBUG] [llm.api_mlx] [gemma-4-e2b-it-mxfp4] #7 STREAM_PROMPT (943 chars) -> You are a text correction and completion engine.
+You receive PREFIX (full context) and TAIL (last few words).
+Reply with exactly two lines — nothing else:
+TAIL_CORRECTED: <corrected tail>
+NEXT_WORDS: <continuation>
+
+Rules:
+- TAIL_CORRECTED: fix spe
+           [DEBUG] [llm.api_mlx] [gemma-4-e2b-it-mxfp4] #7 STREAM task started (payload: /tmp/lua_RMqKWP_mlx_stream.json).
+           [TRACE] [keylogger.log_manager] Executing debounced save…
+           [DONE] [keylogger.log_manager] Debounced save completed.
+           [TRACE] [keylogger.log_manager] Flushing event buffer (8 event(s))…
+           [DONE] [keylogger.log_manager] Buffer flushed.
+           [DONE] [llm.prediction_engine] Inactivity timer stopped.
+[DONE] [logger]           ↑ 1 identical line suppressed
+           [TRACE] [llm.prediction_engine] Inactivity timer started (override: 0.000s).
+           [DEBUG] [llm.prediction_engine] Temperature raised to 0.30 for 3 predictions.
+ [START] [llm.prediction_engine] LLM request — model: 'gemma-4-e2b-it-mxfp4' | temp: 0.30 | 3 pred(s) | max tokens: 130.
+           [DEBUG] [llm.api_mlx] [gemma-4-e2b-it-mxfp4] #8 STREAM_PROMPT (945 chars) -> You are a text correction and completion engine.
+You receive PREFIX (full context) and TAIL (last few words).
+Reply with exactly two lines — nothing else:
+TAIL_CORRECTED: <corrected tail>
+NEXT_WORDS: <continuation>
+
+Rules:
+- TAIL_CORRECTED: fix spe
+           [DEBUG] [llm.api_mlx] [gemma-4-e2b-it-mxfp4] #8 STREAM task started (payload: /tmp/lua_RujW7C_mlx_stream.json).
+           [DEBUG] [llm.api_mlx] [gemma-4-e2b-it-mxfp4] #7 STREAM on_done: exit=15 remaining_len=0 stderr=''
+           [DEBUG] [llm.api_mlx] [gemma-4-e2b-it-mxfp4] #7 STREAM: terminated by newer request — no callbacks.
+           [TRACE] [keylogger.log_manager] Executing debounced save…
+           [DONE] [keylogger.log_manager] Debounced save completed.
+           [DEBUG] [keylogger] Micro-idle started (33321 ms since last keystroke).
+           [DEBUG] [keymap.llm_bridge] Buffer cleared on navigation.
+           [DONE] [llm.prediction_engine] Inactivity timer stopped.
+[DONE] [logger]           ↑ 1 identical line suppressed
+           [DEBUG] [builder] Building hotstrings submenu…
+           [DEBUG] [builder] Component 'hotstrings.build_groups' added successfully.
+           [DEBUG] [builder] Component 'hotstrings.build_custom' added successfully.
+           [DEBUG] [builder] Component 'hotstrings.build_management' added successfully.
+           [DEBUG] [builder] Building AI component…
+           [DEBUG] [menu_llm] Building LLM menu item (build_item)…
+           [DEBUG] [menu_llm] Menu state: paused=false, llm_enabled=true, is_disabled=false
+           [DEBUG] [menu_llm] Building models selection menu…
+           [DEBUG] [menu_llm.mlx] Scanning MLX installed models cache…
+           [DEBUG] [menu_llm.mlx] MLX model detected in cache: Qwen3.5-2B
+           [DEBUG] [menu_llm.mlx] MLX model detected in cache: Qwen3.5-4B
+           [DEBUG] [menu_llm.mlx] MLX model detected in cache: starcoder2-3b
+           [DEBUG] [menu_llm.mlx] MLX model detected in cache: gemma-4-E2B
+           [DEBUG] [menu_llm.mlx] MLX model detected in cache: gemma-4-E2B-it
+           [DEBUG] [menu_llm.mlx] MLX model detected in cache: gemma-4-E4B
+           [DEBUG] [menu_llm.mlx] MLX model detected in cache: gemma-4-E4B-it
+           [DEBUG] [menu_llm.mlx] MLX model detected in cache: SmolLM3-3B
+           [DEBUG] [menu_llm.mlx] MLX model detected in cache: granite-4.0-h-1b-base
+           [DEBUG] [menu_llm.mlx] MLX model detected in cache: granite-4.0-h-1b
+           [DEBUG] [menu_llm.mlx] MLX model detected in cache: LFM2.5-350M
+           [DEBUG] [menu_llm.mlx] MLX model detected in cache: LFM2.5-1.2B-Instruct
+           [DEBUG] [menu_llm.mlx] MLX model detected in cache: Llama-3.1-8B-Instruct
+           [DEBUG] [menu_llm.mlx] MLX model detected in cache: Llama-3.2-3B-Instruct
+           [DEBUG] [menu_llm.mlx] MLX model detected in cache: Mistral-7B-Instruct-v0.3
+           [DEBUG] [menu_llm.mlx] MLX model detected in cache: Hermes-3-Llama-3.2-3B
+           [DEBUG] [menu_llm.mlx] MLX model detected in cache: NVIDIA-Nemotron-3-Nano-4B-BF16
+           [DEBUG] [menu_llm.mlx] MLX installed models scan complete: 17 model(s).
+           [DEBUG] [menu_llm] Installed models detected: 17
+           [DEBUG] [menu_llm] Building prediction count menu…
+           [DEBUG] [app_picker] Building application exclusion menu…
+ [INFO] [app_picker] Application exclusion menu built successfully.
+           [DEBUG] [llm.prediction_engine] Navigation modifiers: [].
+           [DEBUG] [llm.prediction_engine] Validation modifiers: [alt].
+           [DEBUG] [builder] AI component added successfully.
+           [DEBUG] [keylogger] Options updated.
+           [DEBUG] [keylogger] Disabled apps updated (0 entry(ies)).
+           [DEBUG] [keylogger] Private window filter: on.
+           [DEBUG] [keylogger] Secure field filter: on.
+           [DEBUG] [keylogger] System auth filter: on.
+ [WARNING] [keylogger] M.start() called while already running — ignoring.
+           [DEBUG] [wpm_menubar] Starting WPM menubar widget…
+ [INFO] [wpm_menubar] WPM menubar widget started successfully.
+           [DEBUG] [wpm_widget] Starting floating WPM widget…
+ [INFO] [wpm_widget] Floating WPM widget started successfully.
+           [DEBUG] [app_picker] Building application exclusion menu…
+ [INFO] [app_picker] Application exclusion menu built successfully.
+           [DEBUG] [builder] Component 'keylogger.build' added successfully.
+           [DEBUG] [builder] Component 'shortcuts.build' added successfully.
+           [DEBUG] [builder] Component 'karabiner.build' added successfully.
+           [DEBUG] [builder] Component 'gestures.build' added successfully.
+2026-04-24 20:52:31: -- Loading extension: drawing
+2026-04-24 20:52:31: -- Loading extension: host
+           [DEBUG] [keylogger] Micro-idle started (43321 ms since last keystroke).
+           [DONE] [llm.prediction_engine] Inactivity timer stopped.
+[DONE] [logger]           ↑ 1 identical line suppressed
+           [DEBUG] [keylogger.context_tracker] App switch: 'Microsoft Edge' → 'Hammerspoon' (58126 ms).
+           [TRACE] [keylogger.context_tracker] Stopping previous accessibility observer…
+           [DONE] [keylogger.context_tracker] Previous accessibility observer stopped.
+           [TRACE] [keylogger.context_tracker] Attaching accessibility observer to PID 11525…
+           [DONE] [keylogger.context_tracker] Accessibility observer attached to PID 11525.
+           [DONE] [llm.prediction_engine] Inactivity timer stopped.
+[DONE] [logger]           ↑ 1 identical line suppressed
+           [TRACE] [keylogger.log_manager] Flushing event buffer (0 event(s))…
+           [DONE] [keylogger.log_manager] Buffer flushed.
+           [DONE] [llm.prediction_engine] Inactivity timer stopped.
