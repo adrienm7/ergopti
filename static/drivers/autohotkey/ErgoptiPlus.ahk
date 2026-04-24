@@ -406,7 +406,7 @@ CreateSubMenusRecursiveCommonCode(MenuParent, Key, Val, CategoryPath) {
         ; Mirror HS personal_info module_placeholder: add an editor shortcut
         ; below the "Remplissage de formulaires" toggle
         if (Key == "textexpansionpersonalinformation") {
-            MenuParent.Add("   ↳ Modifier les informations personnelles…", PersonalInformationEditor)
+            MenuParent.Add("   ↳ Modifier les informations…", PersonalInformationEditor)
         }
     }
 }
@@ -676,7 +676,6 @@ initMenu() {
 
     ; ── Préférences — mirrors HS bottom items (Préférences, Console, open file…) ──
     PrefsMenu := Menu()
-    PrefsMenu.Add("Modifier les coordonnées personnelles", PersonalInformationEditor)
     PrefsMenu.Add("Modifier les raccourcis sur les lettres accentuées", ShortcutsEditor)
     PrefsMenu.Add("Modifier le lien ouvert par Win + G", GPTLinkEditor)
     PrefsMenu.Add("📂 Chemins des fichiers personnels", FilePathsEditor)
