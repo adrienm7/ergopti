@@ -59,8 +59,8 @@ on run argv
 	set openArg to ""
 	if openArgAnswer is "Choisir…" then
 		try
-			set openAlias to choose file or folder ¬
-				with prompt "Fichier ou dossier à ouvrir avec le clone :"
+			set openAlias to choose folder ¬
+				with prompt "Dossier à ouvrir avec le clone :"
 			set openArg to POSIX path of openAlias
 			logmsg("openArg: " & openArg)
 		on error
