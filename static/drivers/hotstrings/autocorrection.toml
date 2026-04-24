@@ -1,6 +1,6 @@
 [_meta]
 description = "Autocorrection"
-sections_order = ["accents", "names", "caps", "-", "typographicapostrophe", "-", "errors", "ou", "multiplepunctuationmarks", "suffixesachaining", "-", "minus", "minusapostrophe", "-", "phonenumberautocomplete"]
+sections_order = ["accents", "names", "caps", "-", "typographicapostrophe", "-", "errors", "ou", "multiplepunctuationmarks", "suffixesachaining", "-", "minus", "minusapostrophe"]
 
 [_meta.sections]
 typographicapostrophe = "L’apostrophe devient typographique lors de l’écriture de texte : m'a = m’a, it's = it’s, …"
@@ -10,7 +10,6 @@ multiplepunctuationmarks = "Taper \"!\" ou \"?\" plusieurs fois d’affilée n�
 suffixesachaining = "Enchaîner plusieurs fois des suffixes, comme aim|able|ement = aimablement"
 minus = "Évite de devoir taper des tirets : aije = ai-je, atil = a-t-il, … "
 minusapostrophe = "L’apostrophe agit comme un tiret : ai'je = ai-je, a't'il = a-t-il, … "
-phonenumberautocomplete = "Complétion automatique du n° de téléphone et numéro de sécu en tapant les premiers chiffres"
 caps = "Majuscules automatiques : chatgpt = ChatGPT, powerpoint = PowerPoint, …"
 names = "Autocorrection des accents sur les prénoms et les noms de pays : alexei = Alexeï, taiwan = Taïwan, …"
 accents = "Autocorrection des accents de très nombreux mots"
