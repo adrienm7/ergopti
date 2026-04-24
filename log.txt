@@ -1,3 +1,6 @@
+Last login: Fri Apr 24 11:29:25 on ttys000
+❯ xattr -l ~/Documents/GitHub/ergopti/static/drivers/hammerspoon/apps/AppCloner.app/Contents/MacOS/AppCloner
+No such file: /Users/b519hs/Documents/GitHub/ergopti/static/drivers/hammerspoon/apps/AppCloner.app/Contents/MacOS/AppCloner
 ❯ xattr -l ~/perso/ergopti/static/drivers/hammerspoon/apps/AppCloner.app/Contents/MacOS/AppCloner
 com.apple.provenance:
 0000   01 02 00 D6 2C 49 8A 5C 9F 26 52                   ....,I...&R
@@ -5,6 +8,42 @@ com.apple.provenance:
 ❯ ~/perso/ergopti/static/drivers/hammerspoon/apps/AppCloner.app/Contents/MacOS/AppCloner
 ❯ ~/perso/ergopti/static/drivers/hammerspoon/apps/AppCloner.app/Contents/MacOS/AppCloner
 ❯ python3 ~/perso/ergopti/static/drivers/hammerspoon/apps/AppCloner.app/Contents/MacOS/AppCloner
+❯ cat /tmp/app_cloner.log
+cat: /tmp/app_cloner.log: No such file or directory
+❯ cat /tmp/appcloner.log
+Fri Apr 24 22:21:58 CEST 2026 APPROOT=/Users/b519hs/perso/ergopti/static/drivers/hammerspoon/apps/AppCloner.app
+/Users/b519hs/perso/ergopti/static/drivers/hammerspoon/apps/AppCloner.app/Contents/Resources/ShortcutBuilder.applescript:2406:2410: script error: fin de ligne prévu(s) mais « with » trouvé(s). (-2741)
+Fri Apr 24 22:21:58 CEST 2026 osascript exit=0
+[AppCloner] app_root=/Users/b519hs/perso/ergopti/static/drivers/hammerspoon/apps/AppCloner.app
+[AppCloner] applescript=/Users/b519hs/perso/ergopti/static/drivers/hammerspoon/apps/AppCloner.app/Contents/Resources/ShortcutBuilder.applescript
+[AppCloner] exit=1
+[AppCloner] stderr=/Users/b519hs/perso/ergopti/static/drivers/hammerspoon/apps/AppCloner.app/Contents/Resources/ShortcutBuilder.applescript:2406:2410: script error: fin de ligne prévu(s) mais « with » trouvé(s). (-2741)
 
-╭─     ~ ──────────────────────────────────────────────── ✔  22:32:57 
+[AppCloner] app_root=/Users/b519hs/perso/ergopti/static/drivers/hammerspoon/apps/AppCloner.app
+[AppCloner] applescript=/Users/b519hs/perso/ergopti/static/drivers/hammerspoon/apps/AppCloner.app/Contents/Resources/ShortcutBuilder.applescript
+[AppCloner] exit=1
+[AppCloner] stderr=/Users/b519hs/perso/ergopti/static/drivers/hammerspoon/apps/AppCloner.app/Contents/Resources/ShortcutBuilder.applescript:2406:2410: script error: fin de ligne prévu(s) mais « with » trouvé(s). (-2741)
+
+[AppCloner] app_root=/Users/b519hs/perso/ergopti/static/drivers/hammerspoon/apps/AppCloner.app
+[AppCloner] applescript=/Users/b519hs/perso/ergopti/static/drivers/hammerspoon/apps/AppCloner.app/Contents/Resources/ShortcutBuilder.applescript
+[AppCloner] exit=1
+[AppCloner] stderr=/Users/b519hs/perso/ergopti/static/drivers/hammerspoon/apps/AppCloner.app/Contents/Resources/ShortcutBuilder.applescript:2406:2410: script error: fin de ligne prévu(s) mais « with » trouvé(s). (-2741)
+
+[AppCloner] app_root=/Users/b519hs/perso/ergopti/static/drivers/hammerspoon/apps/AppCloner.app
+[AppCloner] applescript=/Users/b519hs/perso/ergopti/static/drivers/hammerspoon/apps/AppCloner.app/Contents/Resources/ShortcutBuilder.applescript
+[AppCloner] exit=1
+[AppCloner] stderr=/Users/b519hs/perso/ergopti/static/drivers/hammerspoon/apps/AppCloner.app/Contents/Resources/ShortcutBuilder.applescript:2406:2410: script error: fin de ligne prévu(s) mais « with » trouvé(s). (-2741)
+
+[AppCloner] app_root=/Users/b519hs/perso/ergopti/static/drivers/hammerspoon/apps/AppCloner.app
+[AppCloner] applescript=/Users/b519hs/perso/ergopti/static/drivers/hammerspoon/apps/AppCloner.app/Contents/Resources/ShortcutBuilder.applescript
+[AppCloner] exit=1
+[AppCloner] stderr=/Users/b519hs/perso/ergopti/static/drivers/hammerspoon/apps/AppCloner.app/Contents/Resources/ShortcutBuilder.applescript:2406:2410: script error: fin de ligne prévu(s) mais « with » trouvé(s). (-2741)
+
+[AppCloner] app_root=/Users/b519hs/perso/ergopti/static/drivers/hammerspoon/apps/AppCloner.app
+[AppCloner] applescript=/Users/b519hs/perso/ergopti/static/drivers/hammerspoon/apps/AppCloner.app/Contents/Resources/ShortcutBuilder.applescript
+[AppCloner] exit=1
+[AppCloner] stderr=/Users/b519hs/perso/ergopti/static/drivers/hammerspoon/apps/AppCloner.app/Contents/Resources/ShortcutBuilder.applescript:2406:2410: script error: fin de ligne prévu(s) mais « with » trouvé(s). (-2741)
+
+
+╭─     ~ ──────────────────────────────────────────────── ✔  22:34:24 
 ╰─
