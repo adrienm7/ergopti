@@ -24,13 +24,7 @@
 
 # Order in which hotstring categories appear in the driver menus.
 # Each entry must match a <name>.toml file in this directory.
-categories_order = [
-	"distancesreduction",
-	"sfbsreduction",
-	"rolls",
-	"autocorrection",
-	"magickey",
-]
+categories_order = ["distancesreduction", "sfbsreduction", "rolls", "autocorrection", "magickey"]
 
 
 # =========================================
