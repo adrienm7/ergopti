@@ -14,11 +14,11 @@ OPEN_ARG="${4:-}"
 
 echo "=== $(date) SOURCE=$SOURCE_APP NAME=$CLONE_NAME COLOR=$COLOR_HEX ARG=$OPEN_ARG ==="
 
-[[ -z "$SOURCE_APP" ]] && { echo "Erreur : SOURCE_APP manquant"; exit 1; }
-[[ ! -d "$SOURCE_APP" ]] && { echo "Erreur : source introuvable : $SOURCE_APP"; exit 1; }
+[[ -z "$SOURCE_APP" ]] && { echo "Error: SOURCE_APP missing"; exit 1; }
+[[ ! -d "$SOURCE_APP" ]] && { echo "Error: source not found: $SOURCE_APP"; exit 1; }
 
 
-# ── 1) Nom sûr ──────────────────────────────────────────────────────────────
+# ── 1) Safe name ────────────────────────────────────────────────────────────
 safe_name="$(printf '%s' "$CLONE_NAME" | tr ':/' '-' | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')"
 [[ -z "$safe_name" ]] && safe_name="Clone"
 
@@ -28,16 +28,27 @@ DEST="$APPS_DIR/${safe_name}.app"
 [[ -e "$DEST" ]] && DEST="$APPS_DIR/${safe_name}_$(date +%s).app"
 echo "DEST=$DEST"
 
+# APFS clone of the source bundle — copy-on-write, near-instant, no disk cost.
+# Required for Electron apps (VSCode, etc.): the process reads its own path via
+# _NSGetExecutablePath and must sit in a distinct bundle to avoid joining the
+# original instance. A binary symlink is not enough — macOS resolves the
+# symlink and the real bundle becomes the source again.
+cp -cR "$SOURCE_APP/" "$DEST/" 2>/dev/null || cp -R "$SOURCE_APP/" "$DEST/"
+echo "Bundle cloned"
+
 CONTENTS="$DEST/Contents"
 MACOS="$CONTENTS/MacOS"
 RES="$CONTENTS/Resources"
-mkdir -p "$MACOS" "$RES"
+
+# Strip any existing signature so Gatekeeper doesn't reject our modifications
+codesign --remove-signature "$DEST" 2>/dev/null || true
+rm -rf "$CONTENTS/_CodeSignature" 2>/dev/null || true
 
 TMPDIR_WORK=$(mktemp -d "/tmp/appcloner.XXXXXX")
 trap 'rm -rf "$TMPDIR_WORK"' EXIT
 
 
-# ── 2) Extraction icône source → PNG ────────────────────────────────────────
+# ── 2) Extract source icon → PNG ────────────────────────────────────────────
 SRC_PLIST="$SOURCE_APP/Contents/Info.plist"
 SRC_ICON_FILE="$(defaults read "$SRC_PLIST" CFBundleIconFile 2>/dev/null || true)"
 [[ -n "$SRC_ICON_FILE" && "${SRC_ICON_FILE##*.}" != "icns" ]] && SRC_ICON_FILE="${SRC_ICON_FILE}.icns"
@@ -58,7 +69,7 @@ if [[ -n "$SRC_ICNS" && -f "$SRC_ICNS" ]]; then
   done
 fi
 if [[ ! -f "$BASE_PNG" ]]; then
-  echo "Fallback générique"
+  echo "Fallback generic icon"
   SRC_INIT="${$(basename "$SOURCE_APP" .app):0:2}"
   cat > "$TMPDIR_WORK/fb.svg" <<SVG
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
@@ -72,9 +83,9 @@ SVG
 fi
 
 
-# ── 3) Teinte — rotation HSV pixel par pixel (Python stdlib pur) ─────────────
-# Pas d'AppleScript ni de dépendance externe. On lit/écrit le PNG via struct+zlib,
-# on tourne la teinte de chaque pixel coloré vers la cible, on préserve blanc/noir.
+# ── 3) Tint — pixel-by-pixel HSV rotation (pure Python stdlib) ──────────────
+# No AppleScript, no external dependency. Read/write PNG via struct+zlib,
+# rotate hue of every saturated pixel toward the target, preserve B/W regions.
 R_INT=$(( 16#${COLOR_HEX:1:2} ))
 G_INT=$(( 16#${COLOR_HEX:3:2} ))
 B_INT=$(( 16#${COLOR_HEX:5:2} ))
@@ -88,7 +99,7 @@ src, dst = sys.argv[1], sys.argv[2]
 r_int, g_int, b_int = int(sys.argv[3]), int(sys.argv[4]), int(sys.argv[5])
 target_h, target_s, _ = colorsys.rgb_to_hsv(r_int/255, g_int/255, b_int/255)
 
-# ── Lecture PNG brute (8-bit RGB ou RGBA uniquement) ────────────────────────
+# Raw PNG reader (8-bit RGB or RGBA only)
 def png_read(path):
     with open(path, "rb") as f:
         raw = f.read()
@@ -115,7 +126,7 @@ def png_read(path):
         base = y * stride
         filt = unfiltered[base]
         row = bytearray(unfiltered[base+1 : base+1+width*channels])
-        # Appliquer le filtre PNG de la ligne
+        # Apply the per-row PNG filter
         if filt == 1:   # Sub
             for i in range(channels, len(row)):
                 row[i] = (row[i] + row[i-channels]) & 0xFF
@@ -144,7 +155,7 @@ def png_read(path):
 
 rows, width, height, channels = png_read(src)
 
-# ── Rotation de teinte ───────────────────────────────────────────────────────
+# Hue rotation
 out_rows = []
 for row in rows:
     out_row = bytearray(len(row))
@@ -153,10 +164,10 @@ for row in rows:
         pr, pg, pb = row[i], row[i+1], row[i+2]
         pa = row[i+3] if channels == 4 else 255
         h, s, v = colorsys.rgb_to_hsv(pr/255, pg/255, pb/255)
-        # Préserver les zones neutres (faible saturation)
+        # Preserve near-neutral zones (low saturation)
         if s > 0.12 and v > 0.05:
             h = target_h
-            # Mixer la saturation vers la cible selon la saturation originale
+            # Blend saturation toward target, weighted by original saturation
             s = s * 0.3 + target_s * 0.7
         nr, ng, nb = colorsys.hsv_to_rgb(h, s, v)
         out_row[i]   = round(nr * 255)
@@ -166,7 +177,7 @@ for row in rows:
             out_row[i+3] = pa
     out_rows.append(out_row)
 
-# ── Écriture PNG ─────────────────────────────────────────────────────────────
+# PNG writer
 def png_write(path, rows, width, height, channels):
     def chunk(t, d):
         c = struct.pack(">I", len(d)) + t + d
@@ -189,10 +200,10 @@ png_write(dst, out_rows, width, height, channels)
 print(f"tint OK target_h={target_h:.3f}", flush=True)
 TINTEOF
 
-[[ ! -f "$TINTED_PNG" ]] && { echo "Teinte échouée — copie base PNG"; cp "$BASE_PNG" "$TINTED_PNG"; }
+[[ ! -f "$TINTED_PNG" ]] && { echo "Tint failed — copying base PNG"; cp "$BASE_PNG" "$TINTED_PNG"; }
 
 
-# ── 4) Génération .icns ─────────────────────────────────────────────────────
+# ── 4) Build .icns (overwrites the bundle's original icons) ─────────────────
 ICONSET="$TMPDIR_WORK/clone.iconset"
 mkdir -p "$ICONSET"
 for spec in "16:icon_16x16" "32:icon_16x16@2x" "32:icon_32x32" "64:icon_32x32@2x" \
@@ -202,56 +213,51 @@ for spec in "16:icon_16x16" "32:icon_16x16@2x" "32:icon_32x32" "64:icon_32x32@2x
   sips -z "$sz" "$sz" "$TINTED_PNG" --out "$ICONSET/${name}.png" >/dev/null 2>&1 || true
 done
 cp "$TINTED_PNG" "$ICONSET/icon_512x512@2x.png" 2>/dev/null || true
-iconutil -c icns "$ICONSET" -o "$RES/AppIcon.icns"
+iconutil -c icns "$ICONSET" -o "$TMPDIR_WORK/AppIcon.icns"
+
+# Overwrite every existing .icns in the bundle with the tinted version —
+# we don't know the exact name declared in the cloned Info.plist, so we
+# replace them all to be safe.
+for existing in "$RES"/*.icns(N); do
+  cp "$TMPDIR_WORK/AppIcon.icns" "$existing"
+done
+cp "$TMPDIR_WORK/AppIcon.icns" "$RES/AppIcon.icns"
 echo "icns OK"
 
 
-# ── 5) Info.plist ────────────────────────────────────────────────────────────
+# ── 5) Info.plist — edit in place (keep original CFBundleExecutable) ────────
+# The cloned bundle already has the source app's Info.plist. We don't rewrite
+# it from scratch (that would break Electron/Chromium-specific keys like
+# LSEnvironment, NSPrincipalClass, etc.) — only patch what we need.
 UNIQUE_ID="fr.b519hs.clone.$(date +%s)"
-cat > "$CONTENTS/Info.plist" <<PLIST
-<?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-<plist version="1.0">
-<dict>
-  <key>CFBundleExecutable</key><string>launcher</string>
-  <key>CFBundleIdentifier</key><string>${UNIQUE_ID}</string>
-  <key>CFBundleName</key><string>${safe_name}</string>
-  <key>CFBundleDisplayName</key><string>${safe_name}</string>
-  <key>CFBundlePackageType</key><string>APPL</string>
-  <key>CFBundleIconFile</key><string>AppIcon</string>
-  <key>CFBundleVersion</key><string>1.0</string>
-</dict>
-</plist>
-PLIST
+PLIST="$CONTENTS/Info.plist"
+/usr/libexec/PlistBuddy -c "Set :CFBundleIdentifier ${UNIQUE_ID}"      "$PLIST" 2>/dev/null \
+  || /usr/libexec/PlistBuddy -c "Add :CFBundleIdentifier string ${UNIQUE_ID}" "$PLIST"
+/usr/libexec/PlistBuddy -c "Set :CFBundleName ${safe_name}"            "$PLIST" 2>/dev/null \
+  || /usr/libexec/PlistBuddy -c "Add :CFBundleName string ${safe_name}" "$PLIST"
+/usr/libexec/PlistBuddy -c "Set :CFBundleDisplayName ${safe_name}"     "$PLIST" 2>/dev/null \
+  || /usr/libexec/PlistBuddy -c "Add :CFBundleDisplayName string ${safe_name}" "$PLIST"
+/usr/libexec/PlistBuddy -c "Set :CFBundleIconFile AppIcon"             "$PLIST" 2>/dev/null \
+  || /usr/libexec/PlistBuddy -c "Add :CFBundleIconFile string AppIcon" "$PLIST"
+/usr/libexec/PlistBuddy -c "Delete :CFBundleIconName"                  "$PLIST" 2>/dev/null || true
+echo "Info.plist patched: id=${UNIQUE_ID}"
 
 
-# ── 6) Exécutable : symlink vers le binaire source + wrapper open_arg ────────
-# Symlinker le vrai binaire source dans MacOS/ du clone avec le nom "launcher".
-# macOS identifie les apps par (binaire + bundle) — le même binaire dans un
-# bundle différent (CFBundleIdentifier unique) = app distincte dans le Dock.
-SRC_PLIST="$SOURCE_APP/Contents/Info.plist"
-SRC_EXE_NAME="$(defaults read "$SRC_PLIST" CFBundleExecutable 2>/dev/null || true)"
-SRC_EXE="$SOURCE_APP/Contents/MacOS/$SRC_EXE_NAME"
-
-if [[ -z "$SRC_EXE_NAME" || ! -f "$SRC_EXE" ]]; then
-  echo "Exécutable source introuvable : $SRC_EXE"
-  exit 1
-fi
-
-# Symlink du vrai binaire sous le nom attendu par Info.plist (launcher)
-ln -sf "$SRC_EXE" "$MACOS/launcher"
-echo "EXE_SYMLINK=$SRC_EXE -> $MACOS/launcher"
-
-# Script wrapper pour passer open_arg au démarrage si défini
+# ── 6) OPEN_ARG wrapper (optional) ──────────────────────────────────────────
+# If the user picked a file/folder to open, insert a thin zsh wrapper in front
+# of the real binary. Otherwise leave the bundle as-is.
 if [[ -n "$OPEN_ARG" ]]; then
-  # Remplacer le symlink par un wrapper shell qui relance le binaire avec l'arg
-  rm "$MACOS/launcher"
-  cat > "$MACOS/launcher" <<WRAPEOF
+  SRC_EXE_NAME="$(/usr/libexec/PlistBuddy -c "Print :CFBundleExecutable" "$PLIST" 2>/dev/null)"
+  REAL_EXE="$MACOS/$SRC_EXE_NAME"
+  if [[ -f "$REAL_EXE" ]]; then
+    mv "$REAL_EXE" "$REAL_EXE.real"
+    cat > "$REAL_EXE" <<WRAPEOF
 #!/bin/zsh
-exec "$SRC_EXE" "$OPEN_ARG" "\$@"
+exec "\${0}.real" "$OPEN_ARG" "\$@"
 WRAPEOF
-  chmod +x "$MACOS/launcher"
-  echo "WRAPPER with OPEN_ARG=$OPEN_ARG"
+    chmod +x "$REAL_EXE"
+    echo "WRAPPER with OPEN_ARG=$OPEN_ARG"
+  fi
 fi
 
 cat > "$RES/config.sh" <<CONF
@@ -260,12 +266,13 @@ OPEN_ARG="$OPEN_ARG"
 CONF
 
 
-# ── 7) Dock ──────────────────────────────────────────────────────────────────
+# ── 7) Dock ─────────────────────────────────────────────────────────────────
 touch "$DEST"
 LSR=/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister
 "$LSR" -f "$DEST" >/dev/null 2>&1 || true
 
-# Édition directe du plist Dock puis killall Dock + re-register pour icône correcte
+# Edit the Dock plist directly, then lsregister + killall Dock so the Dock
+# picks up the correct icon.
 python3 - "$DEST" <<'DOCKEOF'
 import sys, plistlib, os, subprocess, time
 
@@ -282,7 +289,7 @@ url  = app_path.rstrip('/') + '/'
 
 for e in apps:
     if e.get('tile-data', {}).get('file-data', {}).get('_CFURLString', '') == url:
-        print("Déjà dans le Dock")
+        print("Already in Dock")
         sys.exit(0)
 
 label = os.path.basename(app_path).removesuffix('.app')
@@ -301,11 +308,11 @@ dock['persistent-apps'] = apps
 with open(plist_path, 'wb') as f:
     plistlib.dump(dock, f)
 
-# Enregistrer le bundle AVANT de redémarrer le Dock pour qu'il lise la bonne icône
+# Register the bundle BEFORE restarting the Dock so it reads the right icon
 subprocess.run([lsr, '-f', app_path], capture_output=True)
 time.sleep(1)
 subprocess.run(['killall', 'Dock'], check=False)
-print(f"Ajouté au Dock : {app_path}")
+print(f"Added to Dock: {app_path}")
 DOCKEOF
 
 echo "$DEST"
