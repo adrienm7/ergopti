@@ -189,10 +189,9 @@ function M.build_groups(ctx)
 		local has_secs = type(sections) == "table" and #sections > 0
 
 		local total, has_count = 0, false
-		if enabled and has_secs then
+		if has_secs then
 			for _, sec in ipairs(sections) do
-				if type(sec) == "table" and sec.name ~= "-" and not sec.is_module_placeholder
-					and (ctx.keymap and type(ctx.keymap.is_section_enabled) == "function" and ctx.keymap.is_section_enabled(name, sec.name)) then
+				if type(sec) == "table" and sec.name ~= "-" and not sec.is_module_placeholder then
 					if sec.count ~= nil then has_count = true; total = total + tonumber(sec.count) end
 				end
 			end
@@ -613,135 +612,56 @@ function M.build_management(ctx)
 	return { title = "⚙️ Paramètres hotstrings", menu = menu }
 end
 
---- Builds the personal hotstrings section.
+--- Builds the unified personal hotstrings menu (personal.toml sections +
+--- custom/dynamic hotstrings), with editor button, shortcut, and per-section
+--- toggles and counts for both groups.
 --- @param ctx table Context.
 --- @return table|nil
-function M.build_personal(ctx)
-	local state  = ctx.state
-	local paused = ctx.paused
-	local name   = "personal"
-	
-	local found = false
-	for _, f in ipairs(type(ctx.hotfiles) == "table" and ctx.hotfiles or {}) do
-		if ctx.get_group_name(f) == name then found = true; break end
-	end
-	if not found then return nil end
-
-	local enabled  = groupEnabled(ctx, name)
-	local sections = ctx.keymap and type(ctx.keymap.get_sections) == "function" and ctx.keymap.get_sections(name) or nil
-	local has_secs = type(sections) == "table" and #sections > 0
-
-	local total, has_count = 0, false
-	if enabled and has_secs then
-		for _, sec in ipairs(sections) do
-			if type(sec) == "table" and sec.name ~= "-" and not sec.is_module_placeholder
-				and (ctx.keymap and type(ctx.keymap.is_section_enabled) == "function" and ctx.keymap.is_section_enabled(name, sec.name)) then
-				if sec.count ~= nil then has_count = true; total = total + tonumber(sec.count) end
-			end
-		end
-	end
-
-	local base_label = "Hotstrings personnels"
-	local item = {
-		title   = has_count and (base_label .. " (" .. fmt_count(total) .. ")") or base_label,
-		checked = (enabled and not paused) or nil,
-		fn      = toggleGroupFn(ctx, name),
-	}
-
-	if has_secs then
-		local override    = (type(state.sections_order_overrides) == "table" and state.sections_order_overrides)[name]
-		local ordered_secs
-
-		if type(override) == "table" then
-			local by_name = {}
-			for _, sec in ipairs(sections) do if type(sec) == "table" then by_name[sec.name] = sec end end
-			local seen = {}
-			ordered_secs = {}
-			for _, entry in ipairs(override) do
-				if entry == "-" then table.insert(ordered_secs, { name = "-" })
-				elseif by_name[entry] then
-					table.insert(ordered_secs, by_name[entry]); seen[entry] = true
-				end
-			end
-			for _, sec in ipairs(sections) do
-				if type(sec) == "table" and not seen[sec.name] and sec.name ~= "-" then
-					table.insert(ordered_secs, sec)
-				end
-			end
-		else
-			ordered_secs = sections
-		end
-
-		local sec_menu = {}
-		for _, sec in ipairs(ordered_secs) do
-			if type(sec) == "table" then
-				if sec.name == "-" then
-					sec_menu[#sec_menu + 1] = { title = "-" }
-				elseif sec.is_module_placeholder then
-					local ms       = type(ctx.module_sections) == "table" and ctx.module_sections[name]
-					local ms_entry = type(ms) == "table" and ms[sec.name]
-					local mod_id   = type(ms_entry) == "table" and ms_entry.mod_id or ms_entry
-					if mod_id == "personal_info" then
-						local ms_desc  = type(ms_entry) == "table" and ms_entry.description or nil
-						local pi_items = buildPersonalInfoItems(ctx, ms_desc)
-						if type(pi_items) == "table" then
-							for _, pi in ipairs(pi_items) do
-								if type(pi) == "table" then
-									if pi.checked ~= nil and paused then pi.checked = nil end
-									if not enabled or paused then pi.fn = nil; pi.disabled = true end
-									sec_menu[#sec_menu + 1] = pi
-								end
-							end
-						end
-					end
-				else
-					local sec_on = ctx.keymap and type(ctx.keymap.is_section_enabled) == "function" and ctx.keymap.is_section_enabled(name, sec.name) or false
-					local lbl    = (type(sec.description) == "string" and sec.description ~= "")
-								   and sec.description or tostring(sec.name):gsub("_", " ")
-					lbl = ctx.applyTriggerChar(lbl)
-					sec_menu[#sec_menu + 1] = {
-						title    = sec.count ~= nil and (lbl .. " (" .. fmt_count(sec.count) .. ")") or lbl,
-						checked  = (sec_on and not paused) or nil,
-						fn       = (enabled and not paused)
-								   and toggleSectionFn(ctx, name, sec.name, lbl) or nil,
-						disabled = not enabled or paused or nil,
-					}
-				end
-			end
-		end
-		item.menu = sec_menu
-	end
-	return item
-end
-
---- Builds the custom user hotstrings menu.
---- @param ctx table Context.
---- @return table
 function M.build_custom(ctx)
 	local state  = ctx.state
 	local paused = ctx.paused
-	local custom_sections = ctx.keymap and type(ctx.keymap.get_sections) == "function" and ctx.keymap.get_sections("custom") or nil
-	local custom_enabled  = groupEnabled(ctx, "custom")
 
+	-- Both groups contribute sections to this single menu entry
+	local personal_enabled = groupEnabled(ctx, "personal")
+	local custom_enabled   = groupEnabled(ctx, "custom")
+	local personal_secs    = ctx.keymap and type(ctx.keymap.get_sections) == "function" and ctx.keymap.get_sections("personal") or nil
+	local custom_secs      = ctx.keymap and type(ctx.keymap.get_sections) == "function" and ctx.keymap.get_sections("custom")   or nil
+
+	-- personal.toml group present in hotfiles?
+	local has_personal = false
+	for _, f in ipairs(type(ctx.hotfiles) == "table" and ctx.hotfiles or {}) do
+		if ctx.get_group_name(f) == "personal" then has_personal = true; break end
+	end
+
+	-- Total count across both groups (all sections, enabled or not, for display)
 	local total_count, has_count = 0, false
-	if custom_enabled and type(custom_sections) == "table" then
-		for _, sec in ipairs(custom_sections) do
+	local function add_counts(secs)
+		if type(secs) ~= "table" then return end
+		for _, sec in ipairs(secs) do
 			if type(sec) == "table" and sec.name ~= "-" and not sec.is_module_placeholder
-				and (ctx.keymap and type(ctx.keymap.is_section_enabled) == "function" and ctx.keymap.is_section_enabled("custom", sec.name)) then
-				if sec.count ~= nil then has_count = true; total_count = total_count + tonumber(sec.count) end
+				and sec.count ~= nil then
+				has_count = true
+				total_count = total_count + tonumber(sec.count)
 			end
 		end
 	end
+	add_counts(personal_secs)
+	add_counts(custom_secs)
 
 	local base_title = "Hotstrings personnels"
 	local title_str  = has_count
 		and (base_title .. " (" .. fmt_count(total_count) .. ")")
 		or  base_title
 
+
+	-- =====================
+	-- Shortcut helpers
+	-- =====================
+
 	local function default_sc()
 		return { mods = {"ctrl"}, key = state.trigger_char }
 	end
-	
+
 	local function sc_is_default(sc)
 		if not sc or sc == false or type(sc) ~= "table" then return false end
 		local def = default_sc()
@@ -749,19 +669,18 @@ function M.build_custom(ctx)
 		if #(sc.mods or {}) ~= 1 then return false end
 		return sc.mods[1] == "ctrl"
 	end
-	
+
 	local function sc_label()
 		local sc = state.custom_editor_shortcut
 		if not sc or sc == false then return "Aucun" end
 		if sc_is_default(sc) then
 			return "Ctrl + " .. state.trigger_char .. " (défaut)"
 		end
-
 		local mods_str = table.concat(sc.mods or {}, "+")
 		return mods_str ~= "" and (mods_str .. " + " .. (sc.key or "?"):upper())
 				or (sc.key or "?"):upper()
 	end
-	
+
 	local function apply_shortcut(mods, key)
 		if mods and key then
 			state.custom_editor_shortcut = { mods = mods, key = key }
@@ -773,69 +692,9 @@ function M.build_custom(ctx)
 		ctx.save_prefs(); ctx.updateMenu()
 	end
 
-	local function default_section_label()
-		if not state.custom_default_section then return "Aucune" end
-		if type(custom_sections) == "table" then
-			for _, sec in ipairs(custom_sections) do
-				if type(sec) == "table" and sec.name == state.custom_default_section then
-					local lbl = (type(sec.description) == "string" and sec.description ~= "")
-						and sec.description or tostring(sec.name):gsub("_", " ")
-					return ctx.applyTriggerChar(lbl)
-				end
-			end
-		end
-		return state.custom_default_section
-	end
-
-	local cat_menu = {}
-	table.insert(cat_menu, {
-		title   = "Aucune",
-		checked = (not state.custom_default_section) or nil,
-		fn      = function()
-			state.custom_default_section = nil
-			if ctx.hotstring_editor and type(ctx.hotstring_editor.set_default_section) == "function" then
-				pcall(ctx.hotstring_editor.set_default_section, nil)
-			end
-			ctx.save_prefs(); ctx.updateMenu()
-		end,
-	})
-	
-	if type(custom_sections) == "table" then
-		local has_real = false
-		for _, sec in ipairs(custom_sections) do
-			if type(sec) == "table" and sec.name ~= "-" and not sec.is_module_placeholder then has_real = true; break end
-		end
-		if has_real then
-			table.insert(cat_menu, { title = "-" })
-			for _, sec in ipairs(custom_sections) do
-				if type(sec) == "table" then
-					if sec.name == "-" then
-						table.insert(cat_menu, { title = "-" })
-					elseif not sec.is_module_placeholder then
-						local lbl  = (type(sec.description) == "string" and sec.description ~= "")
-							and sec.description or tostring(sec.name):gsub("_", " ")
-						lbl = ctx.applyTriggerChar(lbl)
-						local sname = sec.name
-						table.insert(cat_menu, {
-							title   = lbl,
-							checked = (state.custom_default_section == sname) or nil,
-							fn      = function()
-								state.custom_default_section = sname
-								if ctx.hotstring_editor and type(ctx.hotstring_editor.set_default_section) == "function" then
-									pcall(ctx.hotstring_editor.set_default_section, sname)
-								end
-								ctx.save_prefs(); ctx.updateMenu()
-							end,
-						})
-					end
-				end
-			end
-		end
-	end
-
 	local def_sc      = default_sc()
 	local already_def = sc_is_default(state.custom_editor_shortcut)
-	
+
 	local sc_menu = {
 		{
 			title = "Personnaliser…",
@@ -853,10 +712,7 @@ function M.build_custom(ctx)
 				)
 				if not ok_p or btn ~= "OK" or type(raw) ~= "string" then return end
 				raw = raw:match("^%s*(.-)%s*$"):lower()
-				if raw == "" then
-					apply_shortcut(nil, nil)
-					return
-				end
+				if raw == "" then apply_shortcut(nil, nil); return end
 				local parts = {}
 				for part in raw:gmatch("[^+]+") do table.insert(parts, part) end
 				if #parts < 1 then return end
@@ -870,31 +726,19 @@ function M.build_custom(ctx)
 				if #mods == 0 then mods = {"ctrl"} end
 				apply_shortcut(mods, key)
 			end,
-		}
+		},
 	}
-
 	if not already_def then
 		table.insert(sc_menu, {
-			title    = (function()
-				local def = def_sc
-				local mods = def.mods or {}
+			title = (function()
 				local mods_cap = {}
-				for i, m in ipairs(mods) do
-					mods_cap[i] = m:sub(1,1):upper() .. m:sub(2)
-				end
+				for i, m in ipairs(def_sc.mods or {}) do mods_cap[i] = m:sub(1,1):upper() .. m:sub(2) end
 				local mods_str = table.concat(mods_cap, "+")
-				local key_str = def.key or "?"
-				return "   ↳ Réinitialiser (défaut : " .. (mods_str ~= "" and (mods_str .. " + ") or "") .. key_str:upper() .. ")"
+				return "   ↳ Réinitialiser (défaut : " .. (mods_str ~= "" and (mods_str .. " + ") or "") .. (def_sc.key or "?"):upper() .. ")"
 			end)(),
-			fn       = function() apply_shortcut(def_sc.mods, def_sc.key) end,
+			fn = function() apply_shortcut(def_sc.mods, def_sc.key) end,
 		})
 	end
-
-	table.insert(sc_menu, {
-		title = "Catégorie par défaut : " .. default_section_label(),
-		menu  = cat_menu,
-	})
-
 	table.insert(sc_menu, {
 		title   = "Fermer l’UI après ajout d’un hotstring par le raccourci",
 		checked = state.custom_close_on_add or nil,
@@ -906,6 +750,53 @@ function M.build_custom(ctx)
 			ctx.save_prefs(); ctx.updateMenu()
 		end,
 	})
+
+
+	-- =====================
+	-- Build section rows
+	-- =====================
+
+	--- Appends section toggle rows for one group into a target list.
+	--- @param target table Destination list.
+	--- @param group_name string "personal" or "custom".
+	--- @param secs table Section list from keymap.get_sections().
+	--- @param group_enabled boolean Whether the group itself is on.
+	local function append_section_rows(target, group_name, secs, group_enabled)
+		if type(secs) ~= "table" then return end
+		local has_real = false
+		for _, sec in ipairs(secs) do
+			if type(sec) == "table" and sec.name ~= "-" and not sec.is_module_placeholder then
+				has_real = true; break
+			end
+		end
+		if not has_real then return end
+
+		for _, sec in ipairs(secs) do
+			if type(sec) ~= "table" then goto continue_sec end
+			if sec.name == "-" then
+				target[#target + 1] = { title = "-" }
+			elseif not sec.is_module_placeholder then
+				local sec_on = ctx.keymap and type(ctx.keymap.is_section_enabled) == "function"
+					and ctx.keymap.is_section_enabled(group_name, sec.name) or false
+				local lbl = (type(sec.description) == "string" and sec.description ~= "")
+					and sec.description or tostring(sec.name):gsub("_", " ")
+				lbl = ctx.applyTriggerChar(lbl)
+				target[#target + 1] = {
+					title    = sec.count ~= nil and (lbl .. " (" .. fmt_count(sec.count) .. ")") or lbl,
+					checked  = (sec_on and not paused) or nil,
+					fn       = (group_enabled and not paused)
+							   and toggleSectionFn(ctx, group_name, sec.name, lbl) or nil,
+					disabled = not group_enabled or paused or nil,
+				}
+			end
+			::continue_sec::
+		end
+	end
+
+
+	-- =====================
+	-- Assemble menu items
+	-- =====================
 
 	local menu_items = {
 		{
@@ -921,47 +812,47 @@ function M.build_custom(ctx)
 		},
 	}
 
-	if type(custom_sections) == "table" and #custom_sections > 0 then
-		local has_real = false
-		for _, sec in ipairs(custom_sections) do
-			if type(sec) == "table" and sec.name ~= "-" and not sec.is_module_placeholder then has_real = true; break end
-		end
-		if has_real then
+	-- personal.toml sections (group "personal")
+	if has_personal then
+		local personal_rows = {}
+		append_section_rows(personal_rows, "personal", personal_secs, personal_enabled)
+		if #personal_rows > 0 then
 			table.insert(menu_items, { title = "-" })
-			for _, sec in ipairs(custom_sections) do
-				if type(sec) == "table" then
-					if sec.name == "-" then
-						table.insert(menu_items, { title = "-" })
-					elseif not sec.is_module_placeholder then
-						local sec_on = ctx.keymap and type(ctx.keymap.is_section_enabled) == "function" and ctx.keymap.is_section_enabled("custom", sec.name) or false
-						local lbl    = (type(sec.description) == "string" and sec.description ~= "")
-									   and sec.description or tostring(sec.name):gsub("_", " ")
-						lbl = ctx.applyTriggerChar(lbl)
-						table.insert(menu_items, {
-							title    = sec.count ~= nil
-								and (lbl .. " (" .. fmt_count(sec.count) .. ")") or lbl,
-							checked  = (sec_on and not paused) or nil,
-							fn       = (custom_enabled and not paused)
-									   and toggleSectionFn(ctx, "custom", sec.name, lbl) or nil,
-							disabled = not custom_enabled or paused or nil,
-						})
-					end
-				end
-			end
+			for _, row in ipairs(personal_rows) do table.insert(menu_items, row) end
 		end
 	end
 
+	-- Custom/dynamic hotstrings sections (group "custom")
+	local custom_rows = {}
+	append_section_rows(custom_rows, "custom", custom_secs, custom_enabled)
+	if #custom_rows > 0 then
+		table.insert(menu_items, { title = "-" })
+		for _, row in ipairs(custom_rows) do table.insert(menu_items, row) end
+	end
+
+	-- Both groups toggle together when the user clicks the top-level item
+	local both_enabled = personal_enabled and custom_enabled
 	return {
 		title   = title_str,
-		checked = (custom_enabled and not paused) or nil,
+		checked = (both_enabled and not paused) or nil,
 		fn      = function()
-			local will_enable = not custom_enabled
+			local will_enable = not both_enabled
+			-- Toggle personal group
+			if has_personal then
+				state.hotstrings["personal"] = will_enable
+				if will_enable then
+					if ctx.keymap and type(ctx.keymap.enable_group) == "function" then pcall(ctx.keymap.enable_group, "personal") end
+				else
+					if ctx.keymap and type(ctx.keymap.disable_group) == "function" then pcall(ctx.keymap.disable_group, "personal") end
+				end
+			end
+			-- Toggle custom group
 			state.hotstrings["custom"] = will_enable
 			if will_enable then
 				if ctx.keymap and type(ctx.keymap.enable_group) == "function" then pcall(ctx.keymap.enable_group, "custom") end
-				if not state.keymap then 
+				if not state.keymap then
 					state.keymap = true
-					if ctx.keymap and type(ctx.keymap.start) == "function" then pcall(ctx.keymap.start) end 
+					if ctx.keymap and type(ctx.keymap.start) == "function" then pcall(ctx.keymap.start) end
 				end
 			else
 				if ctx.keymap and type(ctx.keymap.disable_group) == "function" then pcall(ctx.keymap.disable_group, "custom") end
