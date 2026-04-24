@@ -304,17 +304,66 @@ for _Cat in ["Autocorrection", "DistancesReduction", "MagicKey", "Rolls", "SFBsR
     EnrichSectionDescriptionsWithCounts(_Cat)
 }
 
+; Count the exact number of hotstrings that will be generated for a DynamicHotstrings
+; section — mirrors the same threshold logic used in hotstrings.ahk section 5.
+; This must stay in sync with the registration code whenever prefix rules change.
+CountDynamicSection(SectionName) {
+    global PersonalInformation
+    Phone  := PersonalInformation["PhoneNumber"]
+    FPhone := PersonalInformation["PhoneNumberClean"]
+    Ssn    := PersonalInformation["SocialSecurityNumber"]
+    Iban   := PersonalInformation["IBAN"]
+    SsnRaw  := StrReplace(Ssn,  " ", "")
+    IbanRaw := StrReplace(Iban, " ", "")
+
+    switch SectionName {
+        case "DateFr", "Date":
+            return 1
+        case "PhonePrefixes":
+            N := 0
+            if StrLen(Phone) >= 2
+                N += 2  ; phone[1:2]+★ and +33+phone[1:2]
+            if StrLen(Phone) >= 4
+                N += 2  ; phone[1:4] and +33+phone[2:4]
+            if StrLen(Phone) >= 6
+                N += 1  ; phone[2:5]
+            if StrLen(FPhone) >= 5
+                N += 1  ; fphone[1:5]
+            return N
+        case "SsnPrefixes":
+            return StrLen(SsnRaw) >= 5 ? 1 : 0
+        case "IbanPrefixes":
+            N := 0
+            if StrLen(IbanRaw) >= 7
+                N += 1
+            if StrLen(IbanRaw) >= 9
+                N += 1
+            return N
+        default:
+            return 0
+    }
+}
+
 ; Replace the static date placeholder in DynamicHotstrings descriptions with today's
-; actual date so the tray menu always shows the current value.
+; actual date and real hotstring counts so the tray menu always reflects live data.
 if Features.Has("DynamicHotstrings") {
     MK := ScriptInformation["MagicKey"]
-    if Features["DynamicHotstrings"].Has("DateFr") {
-        Features["DynamicHotstrings"]["DateFr"].Description
-            := "dt" . MK . " insère la date courante (" . FormatTime(, "dd/MM/yyyy") . ")"
-    }
-    if Features["DynamicHotstrings"].Has("Date") {
-        Features["DynamicHotstrings"]["Date"].Description
-            := "td" . MK . " insère la date courante (" . FormatTime(, "yyyy_MM_dd") . ")"
+    for _DynKey, _DynVal in Features["DynamicHotstrings"] {
+        if (_DynKey == "__Order" or !IsObject(_DynVal) or Type(_DynVal) == "Map") {
+            continue
+        }
+        N := CountDynamicSection(_DynKey)
+        CountSuffix := N > 0 ? " (" . N . ")" : ""
+        switch _DynKey {
+            case "DateFr":
+                _DynVal.Description := "dt" . MK . " insère la date courante (" . FormatTime(, "dd/MM/yyyy") . ")" . CountSuffix
+            case "Date":
+                _DynVal.Description := "td" . MK . " insère la date courante (" . FormatTime(, "yyyy_MM_dd") . ")" . CountSuffix
+            default:
+                if (_DynVal.HasOwnProp("Description") and _DynVal.Description != "" and N > 0) {
+                    _DynVal.Description := _DynVal.Description . CountSuffix
+                }
+        }
     }
 }
 
@@ -517,7 +566,16 @@ initMenu() {
     ; (currently only "date") with an enable/disable checkbox.
     if Features.Has("DynamicHotstrings") and SubMenus.Has("DynamicHotstrings") {
         DynMenu := SubMenus["DynamicHotstrings"]
-        HotstringsMenu.Add(GetCategoryTitle("DynamicHotstrings"), DynMenu)
+        DynTotal := 0
+        for _DSec in Features["DynamicHotstrings"]["__Order"] {
+            if (_DSec != "-" and Features["DynamicHotstrings"].Has(_DSec)
+                    and Features["DynamicHotstrings"][_DSec].Enabled) {
+                DynTotal += CountDynamicSection(_DSec)
+            }
+        }
+        DynTitle := GetCategoryTitle("DynamicHotstrings")
+            . (DynTotal > 0 ? " (" . DynTotal . ")" : "")
+        HotstringsMenu.Add(DynTitle, DynMenu)
     }
 
     ; Personal hotstrings — unified submenu that mirrors HS build_custom layout:
