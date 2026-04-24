@@ -1,4 +1,25 @@
-Si après ça codesign --verify --deep --strict dit encore "Electron Framework modified", envoie-moi le retour de :
-
-
-codesign -dv --verbose=4 ~/Applications/<clone>/Contents/Frameworks/Electron\ Framework.framework
+❯ codesign -dv --verbose=4 ~/Applications/Kubernetes.app/Contents/Frameworks/Electron\ Framework.framework
+Executable=/Users/b519hs/Applications/Kubernetes.app/Contents/Frameworks/Electron Framework.framework/Versions/Current/Electron Framework
+Identifier=com.github.Electron.framework
+Format=bundle with Mach-O universal (x86_64 arm64)
+CodeDirectory v=20500 size=322782 flags=0x10002(adhoc,runtime) hashes=10080+3 location=embedded
+VersionPlatform=1
+VersionMin=786432
+VersionSDK=1703936
+Hash type=sha256 size=32
+CandidateCDHash sha256=8ba92a450593b3a764c6a0b21a9ce09c7e0b5530
+CandidateCDHashFull sha256=8ba92a450593b3a764c6a0b21a9ce09c7e0b553040d343f9fe93ea6175d6beb9
+Hash choices=sha256
+CMSDigest=8ba92a450593b3a764c6a0b21a9ce09c7e0b553040d343f9fe93ea6175d6beb9
+CMSDigestType=2
+Executable Segment base=0
+Executable Segment limit=156450816
+Executable Segment flags=0x0
+Page size=16384
+CDHash=8ba92a450593b3a764c6a0b21a9ce09c7e0b5530
+Signature=adhoc
+Info.plist entries=13
+TeamIdentifier=not set
+Runtime Version=26.0.0
+Sealed Resources version=2 rules=13 files=234
+Internal requirements count=1 size=192
