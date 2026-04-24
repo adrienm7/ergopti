@@ -295,17 +295,24 @@ if [[ -n "$SRC_MAIN_EXE_NAME" && -f "$SRC_MAIN_EXE" ]]; then
   [[ -s "$ENT_MAIN" ]] && echo "Extracted main entitlements ($(wc -c < "$ENT_MAIN") bytes)"
 fi
 
-# Function: sign a Mach-O with runtime + extracted entitlements if we have them,
-# otherwise just ad-hoc. Used for Code.real and any other standalone binaries.
-sign_macho_with_entitlements() {
+# Function: ad-hoc sign a Mach-O, deliberately WITHOUT the hardened-runtime
+# flag. Reason: the source binary has hardened runtime + Library Validation
+# on, and VSCode's original disable-library-validation entitlement is only
+# meaningful under the *original* team signature. After we clone and re-sign
+# ad-hoc, every dylib (Electron Framework, Code Helper helpers) carries its
+# own original bundle identifier as its effective team-id — the main exe sees
+# those as "different team IDs" and LV kills the process at dyld map time.
+#
+# Dropping `--options runtime` on the main binary disables Library Validation
+# entirely for that process: macOS no longer cares whether loaded dylibs
+# share a team-id with the loader, which is exactly what we need for a
+# re-signed Electron bundle. JIT / allow-unsigned-memory still work because
+# those are only restricted UNDER hardened runtime — without it, the process
+# is fully permissive. Security posture on a local clone is unchanged
+# relative to "running VSCode source directly".
+sign_macho_without_runtime() {
   local target="$1"
-  local ent="$2"
-  if [[ -s "$ent" ]]; then
-    codesign --force --sign - --options runtime --entitlements "$ent" "$target" 2>/dev/null \
-      || codesign --force --sign - "$target" 2>/dev/null || true
-  else
-    codesign --force --sign - "$target" 2>/dev/null || true
-  fi
+  codesign --force --sign - "$target" 2>/dev/null || true
 }
 
 PRESERVE="--preserve-metadata=entitlements,requirements,flags,runtime"
@@ -329,7 +336,7 @@ find "$DEST/Contents/MacOS" -type f -perm +111 2>/dev/null \
       # Mach-O binaries (e.g. Code.real) need the source app's entitlements to
       # pass Library Validation. Shell scripts (our wrapper) don't take them.
       if file -b "$f" 2>/dev/null | grep -q "Mach-O"; then
-        sign_macho_with_entitlements "$f" "$ENT_MAIN"
+        sign_macho_without_runtime "$f"
       else
         codesign --force --sign - "$f" 2>/dev/null || true
       fi
