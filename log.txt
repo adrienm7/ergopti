@@ -1,7 +1,7 @@
 ❯ clear
 ❯ cat /tmp/clone_diag.log
 ============================================================
-=== AppCloner — Sat Apr 25 01:37:49 CEST 2026
+=== AppCloner — Sat Apr 25 01:42:01 CEST 2026
 === Clone: /Users/b519hs/Applications/Visual Studio Code — Clone.app
 ============================================================
 
@@ -17,7 +17,7 @@ Extracted main entitlements (     398 bytes, valid plist)
 	<key>com.apple.security.cs.allow-unsigned-executable-memory</key>
 	<key>com.apple.security.cs.disable-executable-page-protection</key>
 	<key>com.apple.security.cs.disable-library-validation</key>
->> sign_macho_with_runtime: /Users/b519hs/Applications/Visual Studio Code — Clone.app/Contents/MacOS/Code (ent=/tmp/appcloner.uRexAt/entitlements_main.plist)
+>> sign_macho_with_runtime: /Users/b519hs/Applications/Visual Studio Code — Clone.app/Contents/MacOS/Code (ent=/tmp/appcloner.Jip4Zf/entitlements_main.plist)
 /Users/b519hs/Applications/Visual Studio Code — Clone.app/Contents/MacOS/Code: replacing existing signature
 >> pre-sign mach-o in framework: /Users/b519hs/Applications/Visual Studio Code — Clone.app/Contents/Frameworks/Electron Framework.framework/Versions/A/Electron Framework
 /Users/b519hs/Applications/Visual Studio Code — Clone.app/Contents/Frameworks/Electron Framework.framework/Versions/A/Electron Framework: replacing existing signature
@@ -67,51 +67,51 @@ Extracted main entitlements (     398 bytes, valid plist)
 /Users/b519hs/Applications/Visual Studio Code — Clone.app: replacing existing signature
 
 ============================================================
-=== Post-signing diagnostic — Sat Apr 25 01:38:10 CEST 2026
+=== Post-signing diagnostic — Sat Apr 25 01:42:22 CEST 2026
 ============================================================
 
 ── codesign -dv ────────────────────────────────────────────
 Executable=/Users/b519hs/Applications/Visual Studio Code — Clone.app/Contents/MacOS/Code
-Identifier=fr.b519hs.clone.1777073869
+Identifier=fr.b519hs.clone.1777074121
 Format=app bundle with Mach-O universal (x86_64 arm64)
 CodeDirectory v=20500 size=475 flags=0x10002(adhoc,runtime) hashes=4+7 location=embedded
 VersionPlatform=1
 VersionMin=786432
 VersionSDK=1703936
 Hash type=sha256 size=32
-CandidateCDHash sha256=91a21d9b10064bdb7922a8f4e12e6c6337292df0
-CandidateCDHashFull sha256=91a21d9b10064bdb7922a8f4e12e6c6337292df03d981c810c9ebd0346a9238d
+CandidateCDHash sha256=ce9d20cdeb6ce235a259af38e8e73c6dfc5cc545
+CandidateCDHashFull sha256=ce9d20cdeb6ce235a259af38e8e73c6dfc5cc545c9f1760bd60f620a506be3e9
 Hash choices=sha256
-CMSDigest=91a21d9b10064bdb7922a8f4e12e6c6337292df03d981c810c9ebd0346a9238d
+CMSDigest=ce9d20cdeb6ce235a259af38e8e73c6dfc5cc545c9f1760bd60f620a506be3e9
 CMSDigestType=2
 Executable Segment base=0
 Executable Segment limit=8192
 Executable Segment flags=0x1
 Page size=4096
-CDHash=91a21d9b10064bdb7922a8f4e12e6c6337292df0
+CDHash=ce9d20cdeb6ce235a259af38e8e73c6dfc5cc545
 Signature=adhoc
 Notarization Ticket=stapled
-Info.plist entries=36
+Info.plist entries=35
 TeamIdentifier=not set
 Runtime Version=26.0.0
 Sealed Resources version=2 rules=13 files=6560
 Internal requirements count=0 size=12
 
 ── codesign --verify --deep --strict ───────────────────────
+--prepared:/Users/b519hs/Applications/Visual Studio Code — Clone.app/Contents/Frameworks/Code Helper (Renderer).app
 --prepared:/Users/b519hs/Applications/Visual Studio Code — Clone.app/Contents/Frameworks/Mantle.framework/Versions/Current/.
---prepared:/Users/b519hs/Applications/Visual Studio Code — Clone.app/Contents/Frameworks/Code Helper (Plugin).app
---prepared:/Users/b519hs/Applications/Visual Studio Code — Clone.app/Contents/Frameworks/Code Helper.app
 --prepared:/Users/b519hs/Applications/Visual Studio Code — Clone.app/Contents/Frameworks/Squirrel.framework/Versions/Current/.
+--prepared:/Users/b519hs/Applications/Visual Studio Code — Clone.app/Contents/Frameworks/Code Helper.app
+--prepared:/Users/b519hs/Applications/Visual Studio Code — Clone.app/Contents/Frameworks/Code Helper (Plugin).app
 --prepared:/Users/b519hs/Applications/Visual Studio Code — Clone.app/Contents/Frameworks/Code Helper (GPU).app
---validated:/Users/b519hs/Applications/Visual Studio Code — Clone.app/Contents/Frameworks/Code Helper (Plugin).app
+--validated:/Users/b519hs/Applications/Visual Studio Code — Clone.app/Contents/Frameworks/Code Helper (Renderer).app
 --validated:/Users/b519hs/Applications/Visual Studio Code — Clone.app/Contents/Frameworks/Mantle.framework/Versions/Current/.
 --validated:/Users/b519hs/Applications/Visual Studio Code — Clone.app/Contents/Frameworks/Code Helper.app
+--validated:/Users/b519hs/Applications/Visual Studio Code — Clone.app/Contents/Frameworks/Code Helper (Plugin).app
 --validated:/Users/b519hs/Applications/Visual Studio Code — Clone.app/Contents/Frameworks/Code Helper (GPU).app
 --prepared:/Users/b519hs/Applications/Visual Studio Code — Clone.app/Contents/Frameworks/ReactiveObjC.framework/Versions/Current/.
 --validated:/Users/b519hs/Applications/Visual Studio Code — Clone.app/Contents/Frameworks/Squirrel.framework/Versions/Current/.
 --validated:/Users/b519hs/Applications/Visual Studio Code — Clone.app/Contents/Frameworks/ReactiveObjC.framework/Versions/Current/.
---prepared:/Users/b519hs/Applications/Visual Studio Code — Clone.app/Contents/Frameworks/Code Helper (Renderer).app
---validated:/Users/b519hs/Applications/Visual Studio Code — Clone.app/Contents/Frameworks/Code Helper (Renderer).app
 --prepared:/Users/b519hs/Applications/Visual Studio Code — Clone.app/Contents/Frameworks/Electron Framework.framework/Versions/Current/.
 --prepared:/Users/b519hs/Applications/Visual Studio Code — Clone.app/Contents/Frameworks/Electron Framework.framework/Versions/Current/Helpers/chrome_crashpad_handler
 --validated:/Users/b519hs/Applications/Visual Studio Code — Clone.app/Contents/Frameworks/Electron Framework.framework/Versions/Current/Helpers/chrome_crashpad_handler
@@ -167,7 +167,7 @@ warning: Specifying ':' in the path is deprecated and will not work in a future 
 <?xml version="1.0" encoding="UTF-8"?><!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "https://www.apple.com/DTDs/PropertyList-1.0.dtd"><plist version="1.0"><dict><key>com.apple.security.automation.apple-events</key><true/><key>com.apple.security.cs.allow-dyld-environment-variables</key><true/><key>com.apple.security.cs.allow-jit</key><true/><key>com.apple.security.cs.allow-unsigned-executable-memory</key><true/><key>com.apple.security.cs.disable-executable-page-protection</key><true/><key>com.apple.security.cs.disable-library-validation</key><true/><key>com.apple.security.device.audio-input</key><true/><key>com.apple.security.device.camera</key><true/></dict></plist>
 
 ── CS flags on main binary ─────────────────────────────────
-Identifier=fr.b519hs.clone.1777073869
+Identifier=fr.b519hs.clone.1777074121
 CodeDirectory v=20500 size=475 flags=0x10002(adhoc,runtime) hashes=4+7 location=embedded
 TeamIdentifier=not set
 Runtime Version=26.0.0
@@ -184,27 +184,35 @@ localizedShortNames:        "af" = ?, "am" = ?, "ar" = ?, "bg" = ?, "bn" = ?, "c
 --
 
 --------------------------------------------------------------------------------
-bundle id:                  Visual Studio Code — Clone.app (0x2078)
+bundle id:                  Visual Studio Code — Clone.app (0x20a8)
 container:                  / (0x4)
 mount state:                mounted
 isOnRootVolume:             true
 isSystemManaged:            true
 isOnPrebootVolume:          false
-path:                       /Users/b519hs/.Trash/Visual Studio Code — Clone.app (0x3348)
+path:                       /Users/b519hs/.Trash/Visual Studio Code — Clone.app (0x3378)
 directory:                  ~
 platform:                   #
-Intents:                    0 values (46924 (0xb74c))
+Intents:                    0 values (47064 (0xb7d8))
                             {
                             }
 --
 isSystemManaged:            true
 isOnPrebootVolume:          false
-path:                       /Users/b519hs/Applications/Visual Studio Code — Clone.app (0x336c)
-directory:                  ~/Applications
+path:                       /Users/b519hs/.Trash/Visual Studio Code — Clone.app 01-41-21-026.app (0x3384)
+directory:                  ~
 name:                       Visual Studio Code — Clone
 displayName:                Visual Studio Code — Clone
 localizedNames:             "af" = ?, "am" = ?, "ar" = ?, "bg" = ?, "bn" = ?, "ca" = ?, "cs" = ?, "da" = ?, "de" = ?, "el" = ?, "en" = ?, "en_GB" = ?, "es" = ?, "es_419" = ?, "et" = ?, "fa" = ?, "fi" = ?, "fil" = ?, "fr" = ?, "gu" = ?, "he" = ?, "hi" = ?, "hr" = ?, "hu" = ?, "id" = ?, "it" = ?, "ja" = ?, "kn" = ?, "ko" = ?, "LSDefaultLocalizedValue" = "Visual Studio Code — Clone", "lt" = ?, "lv" = ?, "ml" = ?, "mr" = ?, "ms" = ?, "nb" = ?, "nl" = ?, "pl" = ?, "pt_BR" = ?, "pt_PT" = ?, "ro" = ?, "ru" = ?, "sk" = ?, "sl" = ?, "sr" = ?, "sv" = ?, "sw" = ?, "ta" = ?, "te" = ?, "th" = ?, "tr" = ?, "uk" = ?, "ur" = ?, "vi" = ?, "zh_CN" = ?, "zh_TW" = ?
 localizedShortNames:        "af" = ?, "am" = ?, "ar" = ?, "bg" = ?, "bn" = ?, "ca" = ?, "cs" = ?, "da" = ?, "de" = ?, "el" = ?, "en" = ?, "en_GB" = ?, "es" = ?, "es_419" = ?, "et" = ?, "fa" = ?, "fi" = ?, "fil" = ?, "fr" = ?, "gu" = ?, "he" = ?, "hi" = ?, "hr" = ?, "hu" = ?, "id" = ?, "it" = ?, "ja" = ?, "kn" = ?, "ko" = ?, "LSDefaultLocalizedValue" = "Visual Studio Code — Clone", "lt" = ?, "lv" = ?, "ml" = ?, "mr" = ?, "ms" = ?, "nb" = ?, "nl" = ?, "pl" = ?, "pt_BR" = ?, "pt_PT" = ?, "ro" = ?, "ru" = ?, "sk" = ?, "sl" = ?, "sr" = ?, "sv" = ?, "sw" = ?, "ta" = ?, "te" = ?, "th" = ?, "tr" = ?, "uk" = ?, "ur" = ?, "vi" = ?, "zh_CN" = ?, "zh_TW" = ?
+--
+isSystemManaged:            true
+isOnPrebootVolume:          false
+path:                       /Users/b519hs/Applications/Visual Studio Code — Clone.app (0x33a0)
+directory:                  ~/Applications
+name:                       Visual Studio Code — Clone
+displayName:                Visual Studio Code — Clone
+localizedNames:             "af" = ?, "am" = ?, "ar" = ?, "bg" = ?, "bn" = ?, "ca" = ?, "cs" = ?, "da" = ?, "de" = ?, "el" = ?, "en" = ?, "en_GB" = ?, "es" = ?, "es_419" = ?, "et" = ?, "fa" = ?, "fi" = ?, "fil" = ?, "fr" = ?, "gu" = ?, "he" = ?, "hi" = ?, "hr" = ?, "hu" = ?, "id" = ?, "it" = ?, "ja" = ?, "kn" = ?, "ko" = ?, "LSDefaultLocalizedValue" = "Visual Studio Code — Clone", "lt" = ?, "lv" = ?, "ml" = ?, "mr" = ?, "ms" = ?, "nb" = ?, "nl" = ?, "pl" = ?, "pt_BR" = ?, "pt_PT" = ?, "ro" = ?, "ru" = ?, "sk" = ?, "sl" = ?, "sr" = ?, "sv" = ?, "sw" = ?, "ta" = ?, "te" = ?, "th" = ?, "tr" = ?, "uk" = ?, "ur" = ?, "vi" = ?, "zh_CN" = ?, "zh_TW" = ?
 
 ── Spotlight metadata ──────────────────────────────────────
 kMDItemContentType = "com.apple.application-bundle"
@@ -224,8 +232,8 @@ LS_LAUNCH_RESULT=not_running
 
 ── New crash reports since launch ──────────────────────────
 
-── REPORT: Code-2026-04-25-013828.ips ──────────────────────────────────────
-{"app_name":"Code","timestamp":"2026-04-25 01:38:28.00 +0200","app_version":"1.117.0","slice_uuid":"4c4c449f-5555-3144-a10c-3b7f040ad26d","build_version":"1.117.0","platform":1,"bundleID":"fr.b519hs.clone.1777073869","share_with_app_devs":0,"is_first_party":0,"bug_type":"309","os_version":"macOS 26.3.1 (25D771280a)","roots_installed":0,"name":"Code","incident_id":"7D33F9CE-289E-40E3-81EB-C3AF60238D72"}
+── REPORT: Code-2026-04-25-014240.ips ──────────────────────────────────────
+{"app_name":"Code","timestamp":"2026-04-25 01:42:40.00 +0200","app_version":"1.117.0","slice_uuid":"4c4c449f-5555-3144-a10c-3b7f040ad26d","build_version":"1.117.0","platform":1,"bundleID":"fr.b519hs.clone.1777074121","share_with_app_devs":0,"is_first_party":0,"bug_type":"309","os_version":"macOS 26.3.1 (25D771280a)","roots_installed":0,"name":"Code","incident_id":"CEA57F6F-0332-4688-A1E3-EC122A6216F6"}
 {
   "uptime" : 260000,
   "procRole" : "Default",
@@ -233,32 +241,32 @@ LS_LAUNCH_RESULT=not_running
   "userID" : 502,
   "deployVersion" : 210,
   "modelCode" : "Mac16,7",
-  "coalitionID" : 74850,
+  "coalitionID" : 74897,
   "osVersion" : {
     "train" : "macOS 26.3.1",
     "build" : "25D771280a",
     "releaseType" : "User"
   },
-  "captureTime" : "2026-04-25 01:38:27.7636 +0200",
+  "captureTime" : "2026-04-25 01:42:39.7502 +0200",
   "codeSigningMonitor" : 2,
-  "incident" : "7D33F9CE-289E-40E3-81EB-C3AF60238D72",
-  "pid" : 22903,
+  "incident" : "CEA57F6F-0332-4688-A1E3-EC122A6216F6",
+  "pid" : 24691,
   "translated" : false,
   "cpuType" : "ARM-64",
-  "procLaunch" : "2026-04-25 01:38:27.6378 +0200",
-  "procStartAbsTime" : 6401146138485,
-  "procExitAbsTime" : 6401149154522,
+  "procLaunch" : "2026-04-25 01:42:39.6202 +0200",
+  "procStartAbsTime" : 6407193727825,
+  "procExitAbsTime" : 6407196838467,
   "procName" : "Code",
   "procPath" : "\/Users\/USER\/*\/Visual Studio Code — Clone.app\/Contents\/MacOS\/Code",
-  "bundleInfo" : {"CFBundleShortVersionString":"1.117.0","CFBundleVersion":"1.117.0","CFBundleIdentifier":"fr.b519hs.clone.1777073869"},
+  "bundleInfo" : {"CFBundleShortVersionString":"1.117.0","CFBundleVersion":"1.117.0","CFBundleIdentifier":"fr.b519hs.clone.1777074121"},
   "storeInfo" : {"deviceIdentifierForVendor":"C9FDF4AB-866A-50FF-9958-95C0035376A8","thirdParty":true},
   "parentProc" : "launchd",
   "parentPid" : 1,
-  "coalitionName" : "fr.b519hs.clone.1777073869",
+  "coalitionName" : "fr.b519hs.clone.1777074121",
   "crashReporterKey" : "C07A3DB2-0730-CF1A-36EC-DF8D14DCF2DE",
   "appleIntelligenceStatus" : {"state":"unavailable","reasons":["notOptedIn","assetIsNotReady"]},
   "developerMode" : 1,
-  "codeSigningID" : "fr.b519hs.clone.1777073869",
+  "codeSigningID" : "fr.b519hs.clone.1777074121",
   "codeSigningTeamID" : "",
   "codeSigningFlags" : 570491393,
   "codeSigningValidationCategory" : 10,
@@ -266,22 +274,22 @@ LS_LAUNCH_RESULT=not_running
   "codeSigningAuxiliaryInfo" : 0,
   "instructionByteStream" : {"beforePC":"RDGLmuADAJEDAQmLBQETiwkAAJTf\/\/8XQprJlKCTAbAAiA6RsopElw==","atPC":"AAAg1AAAQNQgACDU\/wMB0fRPAqn9ewOp\/cMAkeMTAanlGwCpEwBA+Q=="},
   "bootSessionUUID" : "700F49EE-280B-43A1-A733-1E9DC9344B67",
-  "wakeTime" : 5981,
+  "wakeTime" : 6233,
   "sleepWakeUUID" : "9043C30B-2273-44D0-850D-3D323DB70AA7",
   "sip" : "enabled",
-  "exception" : {"codes":"0x0000000000000001, 0x000000011a7dd768","rawCodes":[1,4739422056],"type":"EXC_BREAKPOINT","signal":"SIGTRAP"},
-  "termination" : {"flags":0,"code":5,"namespace":"SIGNAL","indicator":"Trace\/BPT trap: 5","byProc":"exc handler","byPid":22903},
+  "exception" : {"codes":"0x0000000000000001, 0x000000011a08d768","rawCodes":[1,4731754344],"type":"EXC_BREAKPOINT","signal":"SIGTRAP"},
+  "termination" : {"flags":0,"code":5,"namespace":"SIGNAL","indicator":"Trace\/BPT trap: 5","byProc":"exc handler","byPid":24691},
   "os_fault" : {"process":"Code"},
   "extMods" : {"caller":{"thread_create":0,"thread_set_state":0,"task_for_pid":0},"system":{"thread_create":0,"thread_set_state":0,"task_for_pid":0},"targeted":{"thread_create":0,"thread_set_state":0,"task_for_pid":0},"warnings":0},
   "faultingThread" : 0,
-  "threads" : [{"triggered":true,"id":20874652,"threadState":{"x":[{"value":4822548920},{"value":1168233728960},{"value":9},{"value":6447933936},{"value":6160427648},{"value":16},{"value":6160422912},{"value":176},{"value":0},{"value":0},{"value":0},{"value":2},{"value":0},{"value":0},{"value":6446331217,"symbolLocation":57,"symbol":"_OBJC_$_INSTANCE_METHODS_OS_object"},{"value":8262759328,"symbolLocation":0,"symbol":"OBJC_CLASS_$_OS_object"},{"value":6447884492,"symbolLocation":0,"symbol":"pthread_mutex_unlock"},{"value":8262742272,"symbolLocation":0,"symbol":"_main_thread"},{"value":0},{"value":104},{"value":6160429160},{"value":6160428648},{"value":4821725184,"symbolLocation":32216,"symbol":"v8_inspector::protocol::Debugger::API::Paused::ReasonEnum::Step"},{"value":1168233728864},{"value":2},{"value":105},{"value":105},{"value":72},{"value":1168233728864}],"flavor":"ARM_THREAD_STATE64","lr":{"value":4739421856},"cpsr":{"value":1610612736},"fp":{"value":6160428624},"sp":{"value":6160427552},"esr":{"value":4060086272,"description":"(Breakpoint) brk 0"},"pc":{"value":4739422056,"matchesCrashFrame":1},"far":{"value":0}},"queue":"com.apple.main-thread","frames":[{"imageOffset":80549736,"symbol":"ares_llist_node_first","symbolLocation":3304752,"imageIndex":1},{"imageOffset":80549536,"symbol":"ares_llist_node_first","symbolLocation":3304552,"imageIndex":1},{"imageOffset":14571512,"symbol":"v8::internal::OptimizingCompileTaskExecutor::OptimizingCompileTaskExecutor()","symbolLocation":43872,"imageIndex":1},{"imageOffset":80549920,"symbol":"ares_llist_node_first","symbolLocation":3304936,"imageIndex":1},{"imageOffset":21610092,"symbol":"node::PrincipalRealm::inspector_enable_network_tracking() const","symbolLocation":92252,"imageIndex":1},{"imageOffset":40637740,"symbol":"node::sqlite::UserDefinedFunction::xDestroy(void*)","symbolLocation":210948,"imageIndex":1},{"imageOffset":38839652,"symbol":"ElectronMain","symbolLocation":88,"imageIndex":1},{"imageOffset":36180,"symbol":"start","symbolLocation":7184,"imageIndex":6}]}],
+  "threads" : [{"triggered":true,"id":20898944,"threadState":{"x":[{"value":4814881208},{"value":1340032420800},{"value":9},{"value":6447933936},{"value":6171732608},{"value":16},{"value":6171727872},{"value":176},{"value":0},{"value":0},{"value":0},{"value":2},{"value":0},{"value":0},{"value":6446331217,"symbolLocation":57,"symbol":"_OBJC_$_INSTANCE_METHODS_OS_object"},{"value":8262759328,"symbolLocation":0,"symbol":"OBJC_CLASS_$_OS_object"},{"value":6447884492,"symbolLocation":0,"symbol":"pthread_mutex_unlock"},{"value":8262742272,"symbolLocation":0,"symbol":"_main_thread"},{"value":0},{"value":104},{"value":6171734120},{"value":6171733608},{"value":4814057472,"symbolLocation":32216,"symbol":"v8_inspector::protocol::Debugger::API::Paused::ReasonEnum::Step"},{"value":1340032420704},{"value":2},{"value":105},{"value":105},{"value":72},{"value":1340032420704}],"flavor":"ARM_THREAD_STATE64","lr":{"value":4731754144},"cpsr":{"value":1610612736},"fp":{"value":6171733584},"sp":{"value":6171732512},"esr":{"value":4060086272,"description":"(Breakpoint) brk 0"},"pc":{"value":4731754344,"matchesCrashFrame":1},"far":{"value":0}},"queue":"com.apple.main-thread","frames":[{"imageOffset":80549736,"symbol":"ares_llist_node_first","symbolLocation":3304752,"imageIndex":1},{"imageOffset":80549536,"symbol":"ares_llist_node_first","symbolLocation":3304552,"imageIndex":1},{"imageOffset":14571512,"symbol":"v8::internal::OptimizingCompileTaskExecutor::OptimizingCompileTaskExecutor()","symbolLocation":43872,"imageIndex":1},{"imageOffset":80549920,"symbol":"ares_llist_node_first","symbolLocation":3304936,"imageIndex":1},{"imageOffset":21610092,"symbol":"node::PrincipalRealm::inspector_enable_network_tracking() const","symbolLocation":92252,"imageIndex":1},{"imageOffset":40637740,"symbol":"node::sqlite::UserDefinedFunction::xDestroy(void*)","symbolLocation":210948,"imageIndex":1},{"imageOffset":38839652,"symbol":"ElectronMain","symbolLocation":88,"imageIndex":1},{"imageOffset":36180,"symbol":"start","symbolLocation":7184,"imageIndex":6}]}],
   "usedImages" : [
   {
     "source" : "P",
     "arch" : "arm64",
-    "base" : 4306452480,
+    "base" : 4295147520,
     "CFBundleShortVersionString" : "1.117.0",
-    "CFBundleIdentifier" : "fr.b519hs.clone.1777073869",
+    "CFBundleIdentifier" : "fr.b519hs.clone.1777074121",
     "size" : 16384,
     "uuid" : "4c4c449f-5555-3144-a10c-3b7f040ad26d",
     "path" : "\/Users\/USER\/*\/Visual Studio Code — Clone.app\/Contents\/MacOS\/Code",
@@ -291,7 +299,7 @@ LS_LAUNCH_RESULT=not_running
   {
     "source" : "P",
     "arch" : "arm64",
-    "base" : 4658872320,
+    "base" : 4651204608,
     "CFBundleIdentifier" : "com.github.Electron.framework",
     "size" : 156450816,
     "uuid" : "4c4c4464-5555-3144-a169-17724f20b460",
@@ -302,7 +310,7 @@ LS_LAUNCH_RESULT=not_running
   {
     "source" : "P",
     "arch" : "arm64",
-    "base" : 4306862080,
+    "base" : 4295557120,
     "CFBundleShortVersionString" : "1.0",
     "CFBundleIdentifier" : "com.github.Squirrel",
     "size" : 98304,
@@ -314,7 +322,7 @@ LS_LAUNCH_RESULT=not_running
   {
     "source" : "P",
     "arch" : "arm64",
-    "base" : 4307025920,
+    "base" : 4296523776,
     "CFBundleShortVersionString" : "3.1.0",
     "CFBundleIdentifier" : "com.electron.reactive",
     "size" : 278528,
@@ -326,7 +334,7 @@ LS_LAUNCH_RESULT=not_running
   {
     "source" : "P",
     "arch" : "arm64",
-    "base" : 4307419136,
+    "base" : 4295720960,
     "CFBundleShortVersionString" : "1.0",
     "CFBundleIdentifier" : "org.mantle.Mantle",
     "size" : 49152,
@@ -338,7 +346,7 @@ LS_LAUNCH_RESULT=not_running
   {
     "source" : "P",
     "arch" : "arm64",
-    "base" : 4312367104,
+    "base" : 4296916992,
     "size" : 1671168,
     "uuid" : "4c4c44ea-5555-3144-a108-1f0fe89bf9f5",
     "path" : "\/Users\/USER\/*\/Visual Studio Code — Clone.app\/Contents\/Frameworks\/Electron Framework.framework\/Versions\/A\/Libraries\/libffmpeg.dylib",
@@ -380,5 +388,5 @@ LS_LAUNCH_RESULT=not_running
 
 === End of diagnostic ===
 
-╭─     ~ ─────────────────────────────────────────────────────────────────────────────────────────── ✔  01:39:04 
+╭─     ~ ─────────────────────────────────────────────────────────────────────────────────────────── ✔  01:43:01 
 ╰─
