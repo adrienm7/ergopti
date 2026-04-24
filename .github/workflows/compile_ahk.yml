@@ -4,7 +4,9 @@ on:
     push:
         branches: ["main", "dev"]
         paths:
-            - "static/drivers/autohotkey/ErgoptiPlus.ahk"
+            - "static/drivers/autohotkey/**/*.ahk"
+            - "static/drivers/hotstrings/*.toml"
+            - "tools/compile_hotstrings.py"
 
     # Permet de lancer manuellement depuis l'onglet Actions
     workflow_dispatch:
@@ -29,6 +31,18 @@ jobs:
                   token: ${{ secrets.PAT_ERGOPTI }}
                   ref: ${{ github.ref_name }}
                   fetch-depth: 0
+
+            - name: Set up Python
+              uses: actions/setup-python@v5
+              with:
+                  python-version: "3.12"
+
+            - name: Regenerate hotstrings_generated.ahk from TOML
+              # Keep the generated file in sync with the bundled TOMLs. The
+              # .ahk output is committed so local dev builds do not require
+              # Python, but CI always regenerates to catch forgotten updates.
+              run: python tools/compile_hotstrings.py
+              shell: bash
 
             - name: Download AutoHotkey v2 runtime and Ahk2Exe
               run: |
@@ -62,6 +76,7 @@ jobs:
                   git config user.name  "github-actions[bot]"
                   git config user.email "github-actions[bot]@users.noreply.github.com"
                   git add static/drivers/autohotkey/ErgoptiPlus.exe
+                  git add static/drivers/autohotkey/lib/hotstrings_generated.ahk
                   if git diff --cached --quiet; then
                     echo "No changes to commit"
                     exit 0
