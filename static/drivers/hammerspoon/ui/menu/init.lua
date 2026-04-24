@@ -414,7 +414,17 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 			end
 		end
 
-		-- 3. Individual shortcut keys
+		-- 3. Preview tooltip toggles
+		if keymap then
+			state.preview_star_enabled        = enabled
+			state.preview_autocorrect_enabled = enabled
+			state.preview_ai_enabled          = enabled
+			if type(keymap.set_preview_star_enabled)        == "function" then pcall(keymap.set_preview_star_enabled,        enabled) end
+			if type(keymap.set_preview_autocorrect_enabled) == "function" then pcall(keymap.set_preview_autocorrect_enabled, enabled) end
+			if type(keymap.set_preview_ai_enabled)          == "function" then pcall(keymap.set_preview_ai_enabled,          enabled) end
+		end
+
+		-- 4. Individual shortcut keys
 		if core_mods.shortcuts_mod and type(core_mods.shortcuts_mod.list_shortcuts) == "function" then
 			local ok, list = pcall(core_mods.shortcuts_mod.list_shortcuts)
 			if ok and type(list) == "table" then
@@ -430,7 +440,7 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 			end
 		end
 		
-		-- 4. Sync engines and Save
+		-- 5. Sync engines and Save
 		sync_state_to_modules(state, false)
 		save_prefs()
 		
