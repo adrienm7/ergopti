@@ -468,7 +468,9 @@ initMenu() {
     HotstringsMenu := Menu()
     for Category in HotstringCategories {
         if SubMenus.Has(Category) {
-            HotstringsMenu.Add(GetCategoryTitle(Category), SubMenus[Category])
+            Total := CountTomlHotstrings(Category)
+            Title := GetCategoryTitle(Category) . (Total > 0 ? " (" . Total . ")" : "")
+            HotstringsMenu.Add(Title, SubMenus[Category])
         }
     }
     ; Personal hotstrings — unified submenu that mirrors HS build_custom layout:
