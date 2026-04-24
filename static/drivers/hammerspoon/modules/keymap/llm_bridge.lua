@@ -420,6 +420,16 @@ function M.update_preview(buf)
 			local tail_bucket = Registry.mappings_for_tail(buf_tail_char)
 			if tail_bucket then
 				for _, mapping in ipairs(tail_bucket) do
+					-- Diagnostic: trace why chatgpt does not match
+					if mapping.trigger == "chatgpt" then
+						Logger.debug(LOG, "DIAG chatgpt: group_active=%s auto_cond=%s ends_with=%s plain_ne_trig=%s buf_tail='%s' buf_end='%s'",
+							tostring(group_active(mapping)),
+							tostring(not (mapping.is_word == false and mapping.auto == true)),
+							tostring(ends_with_trigger(buf, mapping.trigger, mapping.is_word)),
+							tostring(mapping.plain_repl ~= mapping.trigger),
+							buf_tail_char,
+							buf:sub(-10))
+					end
 					if group_active(mapping)
 						and not (mapping.is_word == false and mapping.auto == true)
 						and ends_with_trigger(buf, mapping.trigger, mapping.is_word)
