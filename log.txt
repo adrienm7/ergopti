@@ -1,3 +1,10 @@
- xattr -l ~/perso/ergopti/static/drivers/hammerspoon/apps/AppCloner.app/Contents/MacOS/AppCloner
+❯ xattr -l ~/perso/ergopti/static/drivers/hammerspoon/apps/AppCloner.app/Contents/MacOS/AppCloner
 com.apple.provenance:
 0000   01 02 00 D6 2C 49 8A 5C 9F 26 52                   ....,I...&R
+
+❯ ~/perso/ergopti/static/drivers/hammerspoon/apps/AppCloner.app/Contents/MacOS/AppCloner
+❯ ~/perso/ergopti/static/drivers/hammerspoon/apps/AppCloner.app/Contents/MacOS/AppCloner
+❯ python3 ~/perso/ergopti/static/drivers/hammerspoon/apps/AppCloner.app/Contents/MacOS/AppCloner
+
+╭─     ~ ──────────────────────────────────────────────── ✔  22:32:57 
+╰─
