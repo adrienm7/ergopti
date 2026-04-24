@@ -228,30 +228,59 @@ PLIST
 # ── 6) Launcher ──────────────────────────────────────────────────────────────
 cat > "$MACOS/launcher" <<'PYEOF'
 #!/usr/bin/env python3
-import os, sys, subprocess
+import os, sys, subprocess, plistlib, glob
 
 macos_dir   = os.path.dirname(os.path.realpath(__file__))
 clone_root  = os.path.dirname(os.path.dirname(macos_dir))
 config_path = os.path.join(clone_root, "Contents", "Resources", "config.sh")
+clone_plist = os.path.join(clone_root, "Contents", "Info.plist")
 
 source_app, open_arg = "", ""
 if os.path.exists(config_path):
     for line in open(config_path):
         line = line.strip()
         if line.startswith("SOURCE_APP="):
-            source_app = line[11:].strip('"')
+            source_app = line[11:].strip('"').rstrip('/')
         elif line.startswith("OPEN_ARG="):
             open_arg = line[9:].strip('"')
 
 if not source_app or not os.path.isdir(source_app):
     sys.exit(1)
 
-source_app = source_app.rstrip("/")
-cmd = ["open", "-n", "-a", source_app]
-if open_arg and os.path.exists(open_arg):
-    cmd.append(open_arg)
+# Lire le bundle ID du clone pour l'injecter comme identité du process
+clone_bundle_id = ""
+if os.path.exists(clone_plist):
+    with open(clone_plist, "rb") as f:
+        info = plistlib.load(f)
+    clone_bundle_id = info.get("CFBundleIdentifier", "")
 
-subprocess.Popen(cmd, close_fds=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+# Trouver l'exécutable principal de la source
+src_plist_path = os.path.join(source_app, "Contents", "Info.plist")
+src_executable = ""
+if os.path.exists(src_plist_path):
+    with open(src_plist_path, "rb") as f:
+        src_info = plistlib.load(f)
+    exe_name = src_info.get("CFBundleExecutable", "")
+    exe_path = os.path.join(source_app, "Contents", "MacOS", exe_name)
+    if os.path.isfile(exe_path):
+        src_executable = exe_path
+
+if not src_executable:
+    sys.exit(1)
+
+# Construire la commande avec les args éventuels
+args = [src_executable]
+if open_arg and os.path.exists(open_arg):
+    args.append(open_arg)
+
+# Injecter le bundle ID du clone pour que le Dock affiche le clone, pas l'original
+env = os.environ.copy()
+if clone_bundle_id:
+    env["APP_SANDBOX_CONTAINER_ID"] = clone_bundle_id
+    env["__CFBundleIdentifier"] = clone_bundle_id
+
+subprocess.Popen(args, env=env, close_fds=True,
+                 stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 PYEOF
 chmod +x "$MACOS/launcher"
 
@@ -263,6 +292,10 @@ CONF
 
 # ── 7) Dock ──────────────────────────────────────────────────────────────────
 touch "$DEST"
+# Laisser le temps à LaunchServices d'indexer l'icns avant que le Dock le lise
+/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister \
+  -f "$DEST" >/dev/null 2>&1 || true
+sleep 1
 /System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister \
   -f "$DEST" >/dev/null 2>&1 || true
 
