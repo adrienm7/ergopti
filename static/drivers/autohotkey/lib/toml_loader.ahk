@@ -350,6 +350,45 @@ ApplyTomlMetadataToFeatures(CategoryName) {
     }
 }
 
+; Count hotstring entries inside a specific [[section]] of a TOML category file.
+; Returns 0 when the file or section does not exist.
+; Uses the same ReadTomlFile cache to avoid redundant disk reads.
+CountTomlSection(CategoryName, SectionName) {
+    global ScriptInformation
+    if (StrLower(CategoryName) == "personal"
+            and IsSet(ScriptInformation)
+            and ScriptInformation.Has("PersonalTomlPath")) {
+        FilePath := ScriptInformation["PersonalTomlPath"]
+    } else {
+        FilePath := A_ScriptDir . "\..\hotstrings\" . StrLower(CategoryName) . ".toml"
+    }
+    if !FileExist(FilePath) {
+        return 0
+    }
+    Count := 0
+    Q := Chr(34)
+    TargetSection := StrLower(SectionName)
+    CurrentSection := ""
+    loop parse, ReadTomlFile(FilePath), "`n", "`r" {
+        Line := Trim(A_LoopField, " `t")
+        if (Line == "" or SubStr(Line, 1, 1) == "#") {
+            continue
+        }
+        if RegExMatch(Line, "^\[\[(.+)\]\]$", &SectionMatch) {
+            CurrentSection := StrLower(SectionMatch[1])
+            continue
+        }
+        if (SubStr(Line, 1, 1) == "[") {
+            CurrentSection := ""
+            continue
+        }
+        if (CurrentSection == TargetSection and SubStr(Line, 1, 1) == Q and InStr(Line, "output")) {
+            Count++
+        }
+    }
+    return Count
+}
+
 ; Count all hotstring entries across every [[section]] in a TOML category file.
 ; Returns 0 when the file does not exist or contains no matching entries.
 ; Uses the same ReadTomlFile cache as the rest of the loader to avoid double I/O.

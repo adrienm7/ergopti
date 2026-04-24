@@ -281,6 +281,29 @@ ApplyTomlMetadataToFeatures("MagicKey")
 ApplyTomlMetadataToFeatures("Rolls")
 ApplyTomlMetadataToFeatures("SFBsReduction")
 
+; Append hotstring counts to section descriptions so the tray menu shows
+; "(N)" next to each section item — mirrors Hammerspoon's per-section display.
+EnrichSectionDescriptionsWithCounts(Category) {
+    global Features
+    if !Features.Has(Category) {
+        return
+    }
+    for FeatKey, FeatVal in Features[Category] {
+        if (FeatKey == "__Order" or !IsObject(FeatVal) or Type(FeatVal) == "Map") {
+            continue
+        }
+        ; SectionName in the TOML is the lowercase version of the AHK feature key
+        SectionName := FoldAsciiLower(FeatKey)
+        N := CountTomlSection(Category, SectionName)
+        if (N > 0 and FeatVal.HasOwnProp("Description") and FeatVal.Description != "") {
+            FeatVal.Description := FeatVal.Description . " (" . N . ")"
+        }
+    }
+}
+for _Cat in ["Autocorrection", "DistancesReduction", "MagicKey", "Rolls", "SFBsReduction"] {
+    EnrichSectionDescriptionsWithCounts(_Cat)
+}
+
 global SpaceAroundSymbols := Features["DistancesReduction"]["SpaceAroundSymbols"].Enabled ? " " : ""
 
 ; =============================================================
@@ -408,6 +431,8 @@ GetCategoryTitle(Category) {
             return "Autocorrection"
         case "MagicKey":
             return "Touche " . ScriptInformation["MagicKey"] . " et expansion de texte"
+        case "DynamicHotstrings":
+            return "Hotstrings dynamiques"
         case "Personal":
             return "Hotstrings personnels"
         case "Shortcuts":
@@ -473,6 +498,14 @@ initMenu() {
             HotstringsMenu.Add(Title, SubMenus[Category])
         }
     }
+    ; Dynamic hotstrings — date insertion and future rule-based expansions.
+    ; Mirrors HS build_custom's dynamichotstrings group: one item per section
+    ; (currently only "date") with an enable/disable checkbox.
+    if Features.Has("DynamicHotstrings") and SubMenus.Has("DynamicHotstrings") {
+        DynMenu := SubMenus["DynamicHotstrings"]
+        HotstringsMenu.Add(GetCategoryTitle("DynamicHotstrings"), DynMenu)
+    }
+
     ; Personal hotstrings — unified submenu that mirrors HS build_custom layout:
     ; editor button + shortcut hint up top, then per-section toggle checkboxes
     ; with hotstring counts, replacing the old separate editor-only submenu.
@@ -840,7 +873,18 @@ ToggleAllHotstrings(Value) {
             }
         }
     }
-    ; Also toggle the Personal category when present
+    ; Also toggle DynamicHotstrings and Personal categories
+    if Features.Has("DynamicHotstrings") {
+        for FeatureName, Val in Features["DynamicHotstrings"] {
+            if FeatureName == "__Order" {
+                continue
+            }
+            if IsObject(Val) and Val.HasOwnProp("Enabled") {
+                Val.Enabled := Value
+                Updates.Push({ Section: "DynamicHotstrings", Key: FeatureName . ".Enabled", Value: Value })
+            }
+        }
+    }
     if Features.Has("Personal") {
         for FeatureName, Val in Features["Personal"] {
             if FeatureName == "__Order" {
