@@ -722,29 +722,49 @@ function M.build_custom(ctx)
 		apply_shortcut(mods, key)
 	end
 
-	-- Build flat default-section rows: "Aucune" first, then one item per section
-	local function build_default_section_rows()
-		local rows = {}
-		rows[#rows + 1] = {
-			title   = "Catégorie par défaut : Aucune",
-			checked = (not state.custom_default_section) or nil,
-			fn      = function()
-				state.custom_default_section = nil
-				if ctx.hotstring_editor and type(ctx.hotstring_editor.set_default_section) == "function" then
-					pcall(ctx.hotstring_editor.set_default_section, nil)
+	-- Build the default-section sub-menu: "Aucune" first, then one item per personal section
+	local function default_section_label()
+		if not state.custom_default_section then return "Aucune" end
+		if type(personal_secs) == "table" then
+			for _, sec in ipairs(personal_secs) do
+				if type(sec) == "table" and sec.name == state.custom_default_section then
+					local lbl = (type(sec.description) == "string" and sec.description ~= "")
+						and sec.description or tostring(sec.name):gsub("_", " ")
+					return ctx.applyTriggerChar(lbl)
 				end
-				ctx.save_prefs(); ctx.updateMenu()
-			end,
-		}
-		if type(custom_secs) == "table" then
-			for _, sec in ipairs(custom_secs) do
+			end
+		end
+		return state.custom_default_section
+	end
+
+	local cat_menu = { {
+		title   = "Aucune",
+		checked = (not state.custom_default_section) or nil,
+		fn      = function()
+			state.custom_default_section = nil
+			if ctx.hotstring_editor and type(ctx.hotstring_editor.set_default_section) == "function" then
+				pcall(ctx.hotstring_editor.set_default_section, nil)
+			end
+			ctx.save_prefs(); ctx.updateMenu()
+		end,
+	} }
+	if type(personal_secs) == "table" then
+		local has_real = false
+		for _, sec in ipairs(personal_secs) do
+			if type(sec) == "table" and sec.name ~= "-" and not sec.is_module_placeholder then
+				has_real = true; break
+			end
+		end
+		if has_real then
+			table.insert(cat_menu, { title = "-" })
+			for _, sec in ipairs(personal_secs) do
 				if type(sec) == "table" and sec.name ~= "-" and not sec.is_module_placeholder then
 					local lbl   = (type(sec.description) == "string" and sec.description ~= "")
 						and sec.description or tostring(sec.name):gsub("_", " ")
 					lbl = ctx.applyTriggerChar(lbl)
 					local sname = sec.name
-					rows[#rows + 1] = {
-						title   = "Catégorie par défaut : " .. lbl,
+					table.insert(cat_menu, {
+						title   = lbl,
 						checked = (state.custom_default_section == sname) or nil,
 						fn      = function()
 							state.custom_default_section = sname
@@ -753,11 +773,10 @@ function M.build_custom(ctx)
 							end
 							ctx.save_prefs(); ctx.updateMenu()
 						end,
-					}
+					})
 				end
 			end
 		end
-		return rows
 	end
 
 
@@ -821,22 +840,23 @@ function M.build_custom(ctx)
 			disabled = paused or nil,
 			fn       = not paused and sc_fn or nil,
 		},
+		{
+			title = "Catégorie par défaut : " .. default_section_label(),
+			menu  = cat_menu,
+		},
+		{
+			title    = "Fermer l’UI après ajout d’un hotstring par le raccourci",
+			checked  = state.custom_close_on_add or nil,
+			fn       = not paused and function()
+				state.custom_close_on_add = not state.custom_close_on_add
+				if ctx.hotstring_editor and type(ctx.hotstring_editor.set_close_on_add) == "function" then
+					pcall(ctx.hotstring_editor.set_close_on_add, state.custom_close_on_add)
+				end
+				ctx.save_prefs(); ctx.updateMenu()
+			end or nil,
+			disabled = paused or nil,
+		},
 	}
-	for _, row in ipairs(build_default_section_rows()) do
-		table.insert(menu_items, row)
-	end
-	table.insert(menu_items, {
-		title   = "Fermer l’UI après ajout d’un hotstring par le raccourci",
-		checked = state.custom_close_on_add or nil,
-		fn      = not paused and function()
-			state.custom_close_on_add = not state.custom_close_on_add
-			if ctx.hotstring_editor and type(ctx.hotstring_editor.set_close_on_add) == "function" then
-				pcall(ctx.hotstring_editor.set_close_on_add, state.custom_close_on_add)
-			end
-			ctx.save_prefs(); ctx.updateMenu()
-		end or nil,
-		disabled = paused or nil,
-	})
 
 	-- personal.toml sections (group "personal")
 	if has_personal then
