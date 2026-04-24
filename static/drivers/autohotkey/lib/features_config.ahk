@@ -19,8 +19,15 @@
 ; ==============================================================================
 
 global Features := Map(
-    "__Order", ["Layout", "DistancesReduction", "SFBsReduction", "Rolls", "Autocorrection", "MagicKey", "Shortcuts",
-        "TapHolds"],
+    "__Order", ["Layout", "DistancesReduction", "SFBsReduction", "Rolls", "Autocorrection", "MagicKey",
+        "DynamicHotstrings", "Shortcuts", "TapHolds"],
+    "DynamicHotstrings", Map(
+        "__Order", ["Date"],
+        "Date", {
+            Enabled: True,
+            Description: "td★ insère la date courante (aaaa_mm_jj)",
+        },
+    ),
     "Layout", Map(
         "__Order", ["ErgoptiBase", "DirectAccessDigits", "ErgoptiAltGr", "ErgoptiPlus"],
         "ErgoptiBase", {

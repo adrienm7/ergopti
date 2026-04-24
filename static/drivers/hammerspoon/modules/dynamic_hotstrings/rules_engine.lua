@@ -201,11 +201,11 @@ function M.start(keymap_module)
 	end
 	_km = keymap_module
 
-	M.add_rule("dt", "date", function() return os.date("%d/%m/%Y") end)
+	M.add_rule("td", "date", function() return os.date("%Y_%m_%d") end)
 
 	-- Define French UI strings for the menu
 	local sections = {
-		{ name = "date",          description = "dt" .. _trigger .. " insère la date courante (jj/mm/aaaa)" },
+		{ name = "date",          description = "td" .. _trigger .. " insère la date courante (aaaa_mm_jj)" },
 		{ name = "phoneprefixes", description = "Saisir les premiers chiffres du numéro de téléphone le complète automatiquement" },
 		{ name = "ssnprefixes",   description = "Saisir les premiers chiffres du numéro de sécurité sociale le complète automatiquement" },
 	}

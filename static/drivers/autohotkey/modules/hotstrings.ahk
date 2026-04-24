@@ -663,3 +663,30 @@ if Features["MagicKey"]["Repeat"].Enabled {
 }
 
 CreateHotstring("*", "clé" . ScriptInformation["MagicKey"], "🔑")
+
+
+
+
+; =====================================
+; =====================================
+; ======= 5/ Dynamic hotstrings =======
+; =====================================
+; =====================================
+
+
+; =====================
+; ===== 5.1) Date =====
+; =====================
+
+; td★ inserts the current date in aaaa_mm_jj format.
+; Resolved at fire time so the date is always fresh — cannot be a static TOML entry.
+InsertCurrentDate(*) {
+	global ScriptInformation
+	DateStr := FormatTime(, "yyyy_MM_dd")
+	; Erase "td" + MagicKey then emit the formatted date
+	TriggerLen := StrLen("td" . ScriptInformation["MagicKey"])
+	SendEvent("{BackSpace " . TriggerLen . "}" . DateStr)
+}
+if Features.Has("DynamicHotstrings") and Features["DynamicHotstrings"]["Date"].Enabled {
+	Hotstring(":*:td" . ScriptInformation["MagicKey"], InsertCurrentDate)
+}

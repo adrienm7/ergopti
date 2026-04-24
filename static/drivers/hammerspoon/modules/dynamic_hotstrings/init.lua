@@ -5,7 +5,7 @@
 --- DESCRIPTION:
 --- Orchestrates dynamic expansions by coupling the Personal Info engine (which
 --- acts on "@" tags) and the Rules Engine (which acts on dynamic suffixes like
---- "dt" and generates real-time prefixes).
+--- "td" and generates real-time prefixes).
 ---
 --- FEATURES & RATIONALE:
 --- 1. Shared Data Pipeline: Extracts personal info automatically and passes it
