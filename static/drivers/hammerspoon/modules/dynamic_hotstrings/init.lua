@@ -53,11 +53,12 @@ M.DEFAULT_STATE = {
 --- Initializes both dynamic expansion engines and securely shares data between them.
 --- @param base_dir string Base configuration directory.
 --- @param keymap_module table The active keymap module reference.
-function M.start(base_dir, keymap_module)
+--- @param info_toml_path string|nil Absolute path to personal_info.toml.
+function M.start(base_dir, keymap_module, info_toml_path)
 	Logger.debug(LOG, "Starting the personal info tracker…")
-	
+
 	-- Start the personal info tracker
-	PersonalInfo.start(base_dir, keymap_module)
+	PersonalInfo.start(base_dir, keymap_module, info_toml_path)
 	
 	Logger.debug(LOG, "Injecting personal data into the rules engine…")
 	

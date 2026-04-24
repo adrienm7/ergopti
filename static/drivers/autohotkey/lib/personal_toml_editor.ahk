@@ -41,6 +41,15 @@ PersonalTomlPath() {
 	return A_ScriptDir . "\..\hotstrings\personal.toml"
 }
 
+; Return the configured path to personal_info.toml.
+PersonalInfoTomlPath() {
+	global ScriptInformation
+	if IsSet(ScriptInformation) and ScriptInformation.Has("PersonalInfoTomlPath") {
+		return ScriptInformation["PersonalInfoTomlPath"]
+	}
+	return A_ScriptDir . "\..\hotstrings\personal_info.toml"
+}
+
 
 
 
@@ -291,6 +300,78 @@ WritePersonalToml(Data) {
 
 	Content := ""
 	for i, L in Lines {
+		Content .= L . "`r`n"
+	}
+
+	FileObj := FileOpen(FilePath, "w", "UTF-8-RAW")
+	if !FileObj {
+		return False
+	}
+	FileObj.Write(Content)
+	FileObj.Close()
+	return True
+}
+
+; Read personal_info.toml and populate the global PersonalInformation Map.
+; Format:
+;   [info]
+;   FirstName = "Adrien"
+;   …
+;   [letters]
+;   a = "StreetAddress"
+;   …
+; Missing file is silently skipped (defaults remain).
+ReadPersonalInfoToml(FilePath) {
+	global PersonalInformation
+	if !FileExist(FilePath) {
+		return
+	}
+
+	Q            := Chr(34)
+	FileContent  := StrReplace(FileRead(FilePath, "UTF-8"), "`r`n", "`n")
+	FileContent  := StrReplace(FileContent, "`r", "`n")
+	CurrentSection := ""
+
+	loop parse, FileContent, "`n" {
+		Line := Trim(A_LoopField, " `t")
+		if (Line == "" or SubStr(Line, 1, 1) == "#") {
+			continue
+		}
+		; Section header
+		if RegExMatch(Line, "^\[([a-z_]+)\]$", &HM) {
+			CurrentSection := HM[1]
+			continue
+		}
+		; Key = "value" pair
+		if (CurrentSection == "info") and RegExMatch(Line, 'i)^(\w+)\s*=\s*"((?:[^"\\]|\\.)*)"', &KM) {
+			Key := KM[1]
+			Val := UnescapeTomlString(KM[2])
+			if PersonalInformation.Has(Key) {
+				PersonalInformation[Key] := Val
+			}
+		}
+	}
+}
+
+; Serialise PersonalInformation and PersonalInformationLetters to personal_info.toml.
+WritePersonalInfoToml(FilePath) {
+	global PersonalInformation, PersonalInformationLetters
+	Q     := Chr(34)
+	Lines := []
+
+	Lines.Push("[info]")
+	for Key, Val in PersonalInformation {
+		Lines.Push(Key . " = " . Q . EscapeTomlValue(Val) . Q)
+	}
+	Lines.Push("")
+	Lines.Push("[letters]")
+	for Letter, Key in PersonalInformationLetters {
+		Lines.Push(Letter . " = " . Q . EscapeTomlValue(Key) . Q)
+	}
+	Lines.Push("")
+
+	Content := ""
+	for _, L in Lines {
 		Content .= L . "`r`n"
 	}
 
