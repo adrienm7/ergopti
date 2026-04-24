@@ -289,9 +289,20 @@ find "$DEST" -exec xattr -c {} + 2>/dev/null || true
 # Standalone Mach-O files directly in Contents/MacOS (e.g. "Code.real" created
 # by the OPEN_ARG wrapper). These sit outside any sub-bundle so no parent seals
 # them — they need their own signature pointing at the patched Info.plist hash.
+#
+# Critical: keep the original entitlements, especially
+# `com.apple.security.cs.disable-library-validation`. Without it, hardened
+# runtime enforces Library Validation and refuses to load our ad-hoc-signed
+# dylibs (no team-id match) — Electron exits instantly with SIGKILL.
 find "$DEST/Contents/MacOS" -type f -perm +111 2>/dev/null \
   | while IFS= read -r f; do
-      codesign --force --sign - "$f" 2>/dev/null || true
+      # Skip shell scripts (our wrapper) — they have no entitlements to preserve
+      if file -b "$f" 2>/dev/null | grep -q "Mach-O"; then
+        codesign --force --sign - $PRESERVE "$f" 2>/dev/null \
+          || codesign --force --sign - "$f" 2>/dev/null || true
+      else
+        codesign --force --sign - "$f" 2>/dev/null || true
+      fi
     done
 
 # Nested .framework bundles — deepest first, with --deep so every dylib/helper
@@ -374,4 +385,90 @@ subprocess.run(['killall', 'Dock'], check=False)
 print(f"Added to Dock: {app_path}")
 DOCKEOF
 
+
+# ── 9) Auto-diagnostic launch ───────────────────────────────────────────────
+# Launch the clone once, wait, and if it crashed dump every relevant piece of
+# evidence into /tmp/clone_diag.log. Goal: never have to ask the user for
+# crash reports again — everything needed to diagnose a failed launch lands
+# in one file.
+DIAG=/tmp/clone_diag.log
+{
+  echo "============================================================"
+  echo "=== AppCloner auto-diagnostic — $(date)"
+  echo "=== Clone: $DEST"
+  echo "============================================================"
+
+  # Snapshot the DiagnosticReports directory BEFORE launch so we can tell
+  # which crash reports are new
+  DR_DIR="$HOME/Library/Logs/DiagnosticReports"
+  PRE_SNAPSHOT=$(mktemp)
+  ls -1 "$DR_DIR" 2>/dev/null > "$PRE_SNAPSHOT" || true
+
+  echo ""
+  echo "── codesign -dv ────────────────────────────────────────────"
+  codesign -dv --verbose=4 "$DEST" 2>&1 || true
+
+  echo ""
+  echo "── codesign --verify --deep --strict ───────────────────────"
+  codesign --verify --deep --strict --verbose=2 "$DEST" 2>&1 || true
+
+  echo ""
+  echo "── spctl -a -vv ────────────────────────────────────────────"
+  spctl -a -vv "$DEST" 2>&1 || true
+
+  echo ""
+  echo "── xattr -l ────────────────────────────────────────────────"
+  xattr -l "$DEST" 2>&1 || true
+
+  echo ""
+  echo "── Test launch ─────────────────────────────────────────────"
+  # Run the actual CFBundleExecutable directly so stderr is captured. Timeout
+  # after 5 s — if it survives that, it's not crashing on launch.
+  MAIN_EXE_NAME="$(/usr/libexec/PlistBuddy -c "Print :CFBundleExecutable" "$CONTENTS/Info.plist" 2>/dev/null || echo "")"
+  MAIN_EXE="$MACOS/$MAIN_EXE_NAME"
+  echo "Executing: $MAIN_EXE"
+  (
+    "$MAIN_EXE" 2>&1 &
+    LAUNCH_PID=$!
+    sleep 5
+    if kill -0 "$LAUNCH_PID" 2>/dev/null; then
+      echo ""
+      echo "── Still alive after 5 s — killing ───────────────────────"
+      kill "$LAUNCH_PID" 2>/dev/null || true
+      sleep 1
+      kill -9 "$LAUNCH_PID" 2>/dev/null || true
+      echo "LAUNCH_RESULT=alive"
+    else
+      wait "$LAUNCH_PID" 2>/dev/null
+      echo ""
+      echo "LAUNCH_RESULT=exited (exit_code=$?)"
+    fi
+  ) 2>&1 | head -200
+
+  echo ""
+  echo "── New crash reports since launch ──────────────────────────"
+  # Wait for ReportCrash to write the .ips file (can lag by a few seconds)
+  sleep 3
+  NEW_REPORTS=$(comm -13 <(sort "$PRE_SNAPSHOT") <(ls -1 "$DR_DIR" 2>/dev/null | sort))
+  rm -f "$PRE_SNAPSHOT"
+  if [[ -z "$NEW_REPORTS" ]]; then
+    echo "(no new crash reports)"
+  else
+    echo "$NEW_REPORTS" | while IFS= read -r report; do
+      echo ""
+      echo "── REPORT: $report ──────────────────────────────────────"
+      head -150 "$DR_DIR/$report" 2>/dev/null || true
+    done
+  fi
+
+  echo ""
+  echo "── Top 10 entitlements preserved on Code.real ──────────────"
+  codesign -d --entitlements :- "$MACOS/Code.real" 2>/dev/null | head -40 || true
+
+  echo ""
+  echo "=== End of diagnostic ==="
+} > "$DIAG" 2>&1
+
+echo ""
+echo "Diagnostic written to $DIAG"
 echo "$DEST"
