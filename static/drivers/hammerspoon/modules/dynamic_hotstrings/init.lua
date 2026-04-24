@@ -31,11 +31,12 @@ local LOG          = "dynamic_hotstrings"
 -- ================================
 
 M.DEFAULT_STATE = {
-	personal_info                   = true,
-	dynamichotstrings_enabled       = true,
-	dynamichotstrings_date          = true,
-	dynamichotstrings_phoneprefixes = true,
-	dynamichotstrings_ssnprefixes   = true,
+	personal_info                    = true,
+	dynamichotstrings_enabled        = true,
+	dynamichotstrings_datefr         = true,
+	dynamichotstrings_date           = true,
+	dynamichotstrings_phoneprefixes  = true,
+	dynamichotstrings_ssnprefixes    = true,
 }
 
 

@@ -304,6 +304,20 @@ for _Cat in ["Autocorrection", "DistancesReduction", "MagicKey", "Rolls", "SFBsR
     EnrichSectionDescriptionsWithCounts(_Cat)
 }
 
+; Replace the static date placeholder in DynamicHotstrings descriptions with today's
+; actual date so the tray menu always shows the current value.
+if Features.Has("DynamicHotstrings") {
+    MK := ScriptInformation["MagicKey"]
+    if Features["DynamicHotstrings"].Has("DateFr") {
+        Features["DynamicHotstrings"]["DateFr"].Description
+            := "dt" . MK . " insère la date courante (" . FormatTime(, "dd/MM/yyyy") . ")"
+    }
+    if Features["DynamicHotstrings"].Has("Date") {
+        Features["DynamicHotstrings"]["Date"].Description
+            := "td" . MK . " insère la date courante (" . FormatTime(, "yyyy_MM_dd") . ")"
+    }
+}
+
 global SpaceAroundSymbols := Features["DistancesReduction"]["SpaceAroundSymbols"].Enabled ? " " : ""
 
 ; =============================================================

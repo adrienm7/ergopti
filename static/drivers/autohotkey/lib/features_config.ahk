@@ -22,7 +22,11 @@ global Features := Map(
     "__Order", ["Layout", "DistancesReduction", "SFBsReduction", "Rolls", "Autocorrection", "MagicKey",
         "DynamicHotstrings", "Shortcuts", "TapHolds"],
     "DynamicHotstrings", Map(
-        "__Order", ["Date"],
+        "__Order", ["DateFr", "Date"],
+        "DateFr", {
+            Enabled: True,
+            Description: "dt★ insère la date courante (jj/mm/aaaa)",
+        },
         "Date", {
             Enabled: True,
             Description: "td★ insère la date courante (aaaa_mm_jj)",
@@ -241,9 +245,6 @@ global Features := Map(
             Enabled: True,
         },
         "TextExpansionSymbolsTypst", {
-            Enabled: True,
-        },
-        "TextExpansionDate", {
             Enabled: True,
         },
         "TextExpansionPersonalInformation", {

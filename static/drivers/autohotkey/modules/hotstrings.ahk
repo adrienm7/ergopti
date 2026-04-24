@@ -599,21 +599,6 @@ if Features["MagicKey"]["TextExpansionPersonalInformation"].Enabled {
 }
 
 
-; ==========================================
-; ===== 4.2.1) Date expansion with dt★ =====
-; ==========================================
-
-if Features["MagicKey"]["TextExpansionDate"].Enabled {
-	MK := ScriptInformation["MagicKey"]
-	Abbreviation := "dt" . MK
-	Hotstring(":*B0:" . Abbreviation, DateHotstringCallback.Bind(Abbreviation))
-	DateHotstringCallback(Abbr, *) {
-		SendFinalResult("{BackSpace " . StrLen(Abbr) . "}", False)
-		SendFinalResult(FormatTime(, "dd/MM/yyyy"))
-	}
-}
-
-
 ; ===========================================
 ; ===== 4.3) Text expansion with ★ =====
 ; ===========================================
@@ -678,15 +663,26 @@ CreateHotstring("*", "clé" . ScriptInformation["MagicKey"], "🔑")
 ; ===== 5.1) Date =====
 ; =====================
 
-; td★ inserts the current date in aaaa_mm_jj format.
-; Resolved at fire time so the date is always fresh — cannot be a static TOML entry.
-InsertCurrentDate(*) {
+; dt★ inserts today in jj/mm/aaaa format, td★ in aaaa_mm_jj format.
+; Both resolved at fire time — cannot be static TOML entries.
+InsertDateFr(*) {
+	global ScriptInformation
+	DateStr := FormatTime(, "dd/MM/yyyy")
+	TriggerLen := StrLen("dt" . ScriptInformation["MagicKey"])
+	SendEvent("{BackSpace " . TriggerLen . "}" . DateStr)
+}
+InsertDateIso(*) {
 	global ScriptInformation
 	DateStr := FormatTime(, "yyyy_MM_dd")
-	; Erase "td" + MagicKey then emit the formatted date
 	TriggerLen := StrLen("td" . ScriptInformation["MagicKey"])
 	SendEvent("{BackSpace " . TriggerLen . "}" . DateStr)
 }
-if Features.Has("DynamicHotstrings") and Features["DynamicHotstrings"]["Date"].Enabled {
-	Hotstring(":*:td" . ScriptInformation["MagicKey"], InsertCurrentDate)
+if Features.Has("DynamicHotstrings") {
+	MK := ScriptInformation["MagicKey"]
+	if Features["DynamicHotstrings"]["DateFr"].Enabled {
+		Hotstring(":*:dt" . MK, InsertDateFr)
+	}
+	if Features["DynamicHotstrings"]["Date"].Enabled {
+		Hotstring(":*:td" . MK, InsertDateIso)
+	}
 }
