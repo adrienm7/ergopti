@@ -87,6 +87,13 @@ SendMode("Event") ; Everything concerning hotstrings MUST use SendEvent and not 
 ; NOT TO MODIFY
 global RemappedList := Map()
 global LastSentCharacterKeyTime := Map() ; Tracks the time since a key was pressed
+; Any entry older than this many milliseconds is definitionally useless to the
+; time-activation check (no hotstring in the codebase uses a window close to
+; this). Kept as a constant so pruning is deterministic and easy to tune.
+global LAST_SENT_KEY_TIME_MAX_AGE_MS := 60000
+; Pruning triggers when the map exceeds this size. ~150 covers ASCII + French
+; accents + control-key sentinels ("LAlt", "BackSpace"…) with room to spare.
+global LAST_SENT_KEY_TIME_PRUNE_AT := 150
 ; LastSentCharacters ring buffer lives in lib/hotstring_engine.ahk (_LSC_*).
 ; Accessed only via UpdateLastSentCharacter / GetLastSentCharacterAt.
 global CapsWordEnabled := False ; If the keyboard layer is currently in CapsWord state
