@@ -2,7 +2,7 @@ name: Compile ErgoptiPlus AHK
 
 on:
     push:
-        branches: ["main", "dev"]
+        branches: ["main"]
         paths:
             - "static/drivers/autohotkey/**/*.ahk"
             - "static/drivers/hotstrings/*.toml"
