@@ -592,8 +592,32 @@ initMenu() {
         ; Build the unified personal submenu
         PersonalMenu := Menu()
         PersonalMenu.Add("Ouvrir l'éditeur de hotstrings", (*) => OpenPersonalEditor())
+        ; Shortcut item — not yet customisable from AHK (HS handles it on macOS)
         PersonalMenu.Add("Raccourci : Win + " . ScriptInformation["MagicKey"], (*) => NoAction())
         PersonalMenu.Disable("Raccourci : Win + " . ScriptInformation["MagicKey"])
+        ; Default section — "Aucune" then one item per TOML section (flat, no submenu)
+        CurDefaultSec := _EditorPrefGet("DefaultSection", "")
+        PersonalMenu.Add("Catégorie par défaut : Aucune", (*) => _SetPersonalDefaultSection("", PersonalMenu, TomlData))
+        if (CurDefaultSec == "") {
+            PersonalMenu.Check("Catégorie par défaut : Aucune")
+        }
+        for _, SecName in TomlData["sections_order"] {
+            if (SecName == "-") {
+                continue
+            }
+            SecData  := TomlData["sections"][SecName]
+            SecLabel := "Catégorie par défaut : " . SecData["description"]
+            PersonalMenu.Add(SecLabel, _MakeSetDefaultSectionFn(SecName, PersonalMenu, TomlData))
+            if (CurDefaultSec == SecName) {
+                PersonalMenu.Check(SecLabel)
+            }
+        }
+        ; Close-on-add toggle — mirrors HS "Fermer l'UI après ajout"
+        PersonalMenu.Add("Fermer l'UI après ajout d'un hotstring par le raccourci",
+            (*) => _TogglePersonalCloseOnAdd(PersonalMenu))
+        if (_EditorPrefGet("CloseOnAdd", "0") == "1") {
+            PersonalMenu.Check("Fermer l'UI après ajout d'un hotstring par le raccourci")
+        }
         if (Features["Personal"].Has("__Order") and Features["Personal"]["__Order"].Length > 0) {
             PersonalMenu.Add() ; Separating line
             for FeatName in Features["Personal"]["__Order"] {
@@ -694,6 +718,42 @@ LoggerSuccess("ErgoptiPlus", "Tray menu built and icon set.")
 ; reference so a direct lambda inside a loop would always use the last iteration value.
 _MakeOpenSectionFn(SecName) {
     return (*) => OpenPersonalEditor(SecName)
+}
+
+; Sets the default section pref and refreshes checkmarks in the personal submenu.
+_SetPersonalDefaultSection(SecName, PersonalMenu, TomlData) {
+    _EditorPrefSet("DefaultSection", SecName)
+    ; Uncheck all default-section items, then check the selected one
+    PersonalMenu.Uncheck("Catégorie par défaut : Aucune")
+    for _, SN in TomlData["sections_order"] {
+        if (SN == "-") {
+            continue
+        }
+        SD := TomlData["sections"][SN]
+        try PersonalMenu.Uncheck("Catégorie par défaut : " . SD["description"])
+    }
+    if (SecName == "") {
+        PersonalMenu.Check("Catégorie par défaut : Aucune")
+    } else if (TomlData["sections"].Has(SecName)) {
+        PersonalMenu.Check("Catégorie par défaut : " . TomlData["sections"][SecName]["description"])
+    }
+}
+
+; Freezes SecName and the submenu reference by value for use inside a loop.
+_MakeSetDefaultSectionFn(SecName, PersonalMenu, TomlData) {
+    return (*) => _SetPersonalDefaultSection(SecName, PersonalMenu, TomlData)
+}
+
+; Toggles the close-on-add pref and the corresponding checkmark.
+_TogglePersonalCloseOnAdd(PersonalMenu) {
+    Label := "Fermer l'UI après ajout d'un hotstring par le raccourci"
+    NewVal := (_EditorPrefGet("CloseOnAdd", "0") == "1") ? "0" : "1"
+    _EditorPrefSet("CloseOnAdd", NewVal)
+    if (NewVal == "1") {
+        PersonalMenu.Check(Label)
+    } else {
+        PersonalMenu.Uncheck(Label)
+    }
 }
 
 MagicKeyEditor(*) {

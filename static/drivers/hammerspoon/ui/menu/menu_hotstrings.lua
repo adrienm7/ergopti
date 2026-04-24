@@ -692,96 +692,59 @@ function M.build_custom(ctx)
 		ctx.save_prefs(); ctx.updateMenu()
 	end
 
-	local def_sc      = default_sc()
-	local already_def = sc_is_default(state.custom_editor_shortcut)
+	-- Shortcut item: clicking it opens the customisation dialog directly
+	local function sc_fn()
+		local current_str = ""
+		if type(state.custom_editor_shortcut) == "table" then
+			current_str = table.concat(state.custom_editor_shortcut.mods or {}, "+")
+				.. "+" .. (state.custom_editor_shortcut.key or "")
+		end
+		local ok_p, btn, raw = pcall(dialog.text_prompt,
+			"Raccourci personnalisé",
+			"Format : mods+touche  (ex : cmd+alt+p  ou  ctrl+shift+e)\n"
+				.. "Mods disponibles : cmd, alt, ctrl, shift\nLaisser vide pour désactiver",
+			current_str, "OK", "Annuler"
+		)
+		if not ok_p or btn ~= "OK" or type(raw) ~= "string" then return end
+		raw = raw:match("^%s*(.-)%s*$"):lower()
+		if raw == "" then apply_shortcut(nil, nil); return end
+		local parts = {}
+		for part in raw:gmatch("[^+]+") do table.insert(parts, part) end
+		if #parts < 1 then return end
+		local key  = parts[#parts]
+		local mods = {}
+		for i = 1, #parts - 1 do
+			local m = parts[i]
+			if m == "option" then m = "alt" end
+			table.insert(mods, m)
+		end
+		if #mods == 0 then mods = {"ctrl"} end
+		apply_shortcut(mods, key)
+	end
 
-	local sc_menu = {
-		{
-			title = "Personnaliser…",
-			fn    = function()
-				local current_str = ""
-				if type(state.custom_editor_shortcut) == "table" then
-					current_str = table.concat(state.custom_editor_shortcut.mods or {}, "+")
-						.. "+" .. (state.custom_editor_shortcut.key or "")
+	-- Build flat default-section rows: "Aucune" first, then one item per section
+	local function build_default_section_rows()
+		local rows = {}
+		rows[#rows + 1] = {
+			title   = "Catégorie par défaut : Aucune",
+			checked = (not state.custom_default_section) or nil,
+			fn      = function()
+				state.custom_default_section = nil
+				if ctx.hotstring_editor and type(ctx.hotstring_editor.set_default_section) == "function" then
+					pcall(ctx.hotstring_editor.set_default_section, nil)
 				end
-				local ok_p, btn, raw = pcall(dialog.text_prompt,
-					"Raccourci personnalisé",
-					"Format : mods+touche  (ex : cmd+alt+p  ou  ctrl+shift+e)\n"
-						.. "Mods disponibles : cmd, alt, ctrl, shift\nLaisser vide pour désactiver",
-					current_str, "OK", "Annuler"
-				)
-				if not ok_p or btn ~= "OK" or type(raw) ~= "string" then return end
-				raw = raw:match("^%s*(.-)%s*$"):lower()
-				if raw == "" then apply_shortcut(nil, nil); return end
-				local parts = {}
-				for part in raw:gmatch("[^+]+") do table.insert(parts, part) end
-				if #parts < 1 then return end
-				local key  = parts[#parts]
-				local mods = {}
-				for i = 1, #parts - 1 do
-					local m = parts[i]
-					if m == "option" then m = "alt" end
-					table.insert(mods, m)
-				end
-				if #mods == 0 then mods = {"ctrl"} end
-				apply_shortcut(mods, key)
+				ctx.save_prefs(); ctx.updateMenu()
 			end,
-		},
-	}
-	if not already_def then
-		table.insert(sc_menu, {
-			title = (function()
-				local mods_cap = {}
-				for i, m in ipairs(def_sc.mods or {}) do mods_cap[i] = m:sub(1,1):upper() .. m:sub(2) end
-				local mods_str = table.concat(mods_cap, "+")
-				return "   ↳ Réinitialiser (défaut : " .. (mods_str ~= "" and (mods_str .. " + ") or "") .. (def_sc.key or "?"):upper() .. ")"
-			end)(),
-			fn = function() apply_shortcut(def_sc.mods, def_sc.key) end,
-		})
-	end
-	-- Default section selector: pick the section pre-selected when the editor opens
-	local function default_section_label()
-		if not state.custom_default_section then return "Aucune" end
+		}
 		if type(custom_secs) == "table" then
-			for _, sec in ipairs(custom_secs) do
-				if type(sec) == "table" and sec.name == state.custom_default_section then
-					local lbl = (type(sec.description) == "string" and sec.description ~= "")
-						and sec.description or tostring(sec.name):gsub("_", " ")
-					return ctx.applyTriggerChar(lbl)
-				end
-			end
-		end
-		return state.custom_default_section
-	end
-
-	local cat_menu = { {
-		title   = "Aucune",
-		checked = (not state.custom_default_section) or nil,
-		fn      = function()
-			state.custom_default_section = nil
-			if ctx.hotstring_editor and type(ctx.hotstring_editor.set_default_section) == "function" then
-				pcall(ctx.hotstring_editor.set_default_section, nil)
-			end
-			ctx.save_prefs(); ctx.updateMenu()
-		end,
-	} }
-	if type(custom_secs) == "table" then
-		local has_real = false
-		for _, sec in ipairs(custom_secs) do
-			if type(sec) == "table" and sec.name ~= "-" and not sec.is_module_placeholder then
-				has_real = true; break
-			end
-		end
-		if has_real then
-			table.insert(cat_menu, { title = "-" })
 			for _, sec in ipairs(custom_secs) do
 				if type(sec) == "table" and sec.name ~= "-" and not sec.is_module_placeholder then
 					local lbl   = (type(sec.description) == "string" and sec.description ~= "")
 						and sec.description or tostring(sec.name):gsub("_", " ")
 					lbl = ctx.applyTriggerChar(lbl)
 					local sname = sec.name
-					table.insert(cat_menu, {
-						title   = lbl,
+					rows[#rows + 1] = {
+						title   = "Catégorie par défaut : " .. lbl,
 						checked = (state.custom_default_section == sname) or nil,
 						fn      = function()
 							state.custom_default_section = sname
@@ -790,27 +753,12 @@ function M.build_custom(ctx)
 							end
 							ctx.save_prefs(); ctx.updateMenu()
 						end,
-					})
+					}
 				end
 			end
 		end
+		return rows
 	end
-
-	table.insert(sc_menu, {
-		title = "Catégorie par défaut : " .. default_section_label(),
-		menu  = cat_menu,
-	})
-	table.insert(sc_menu, {
-		title   = "Fermer l’UI après ajout d’un hotstring par le raccourci",
-		checked = state.custom_close_on_add or nil,
-		fn      = function()
-			state.custom_close_on_add = not state.custom_close_on_add
-			if ctx.hotstring_editor and type(ctx.hotstring_editor.set_close_on_add) == "function" then
-				pcall(ctx.hotstring_editor.set_close_on_add, state.custom_close_on_add)
-			end
-			ctx.save_prefs(); ctx.updateMenu()
-		end,
-	})
 
 
 	-- =====================
@@ -868,10 +816,27 @@ function M.build_custom(ctx)
 			end or nil,
 		},
 		{
-			title = "Raccourci : " .. sc_label(),
-			menu  = sc_menu,
+			-- Clicking this item directly opens the shortcut customisation dialog
+			title    = "Raccourci : " .. sc_label(),
+			disabled = paused or nil,
+			fn       = not paused and sc_fn or nil,
 		},
 	}
+	for _, row in ipairs(build_default_section_rows()) do
+		table.insert(menu_items, row)
+	end
+	table.insert(menu_items, {
+		title   = "Fermer l’UI après ajout d’un hotstring par le raccourci",
+		checked = state.custom_close_on_add or nil,
+		fn      = not paused and function()
+			state.custom_close_on_add = not state.custom_close_on_add
+			if ctx.hotstring_editor and type(ctx.hotstring_editor.set_close_on_add) == "function" then
+				pcall(ctx.hotstring_editor.set_close_on_add, state.custom_close_on_add)
+			end
+			ctx.save_prefs(); ctx.updateMenu()
+		end or nil,
+		disabled = paused or nil,
+	})
 
 	-- personal.toml sections (group "personal")
 	if has_personal then
