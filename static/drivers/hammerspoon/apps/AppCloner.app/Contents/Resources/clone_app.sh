@@ -1,18 +1,21 @@
 #!/bin/zsh
 # apps/AppCloner.app/Contents/Resources/clone_app.sh
 # Usage: clone_app.sh <source_app_path> <clone_name> <color_hex> <open_arg>
-set -euo pipefail
-
-SOURCE_APP="$1"
-CLONE_NAME="$2"
-COLOR_HEX="$3"
-OPEN_ARG="$4"
 
 LOG=/tmp/clone_app.log
 exec >> "$LOG" 2>&1
-echo "=== $(date) SOURCE=$SOURCE_APP NAME=$CLONE_NAME COLOR=$COLOR_HEX ==="
 
-[[ ! -d "$SOURCE_APP" ]] && { echo "Source introuvable" >&2; exit 1; }
+set -euo pipefail
+
+SOURCE_APP="${1:-}"
+CLONE_NAME="${2:-}"
+COLOR_HEX="${3:-}"
+OPEN_ARG="${4:-}"
+
+echo "=== $(date) SOURCE=$SOURCE_APP NAME=$CLONE_NAME COLOR=$COLOR_HEX ARG=$OPEN_ARG ==="
+
+[[ -z "$SOURCE_APP" ]] && { echo "Erreur : SOURCE_APP manquant"; exit 1; }
+[[ ! -d "$SOURCE_APP" ]] && { echo "Erreur : source introuvable : $SOURCE_APP"; exit 1; }
 
 
 # ── 1) Nom sûr ──────────────────────────────────────────────────────────────
