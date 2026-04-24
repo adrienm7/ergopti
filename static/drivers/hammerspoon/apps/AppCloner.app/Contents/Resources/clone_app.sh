@@ -168,22 +168,17 @@ scpt.write(f'''use framework "Foundation"
 use framework "AppKit"
 use framework "CoreImage"
 use scripting additions
-set srcPath to "{src}"
-set dstPath to "{dst}"
+set srcURL to current application's NSURL's fileURLWithPath:"{src}"
+set dstURL to current application's NSURL's fileURLWithPath:"{dst}"
 set hueAngle to {delta_rad} as real
-set ciImg to current application's CIImage's imageWithContentsOfURL:(current application's NSURL's fileURLWithPath:srcPath)
+set srcImg to current application's NSImage's alloc()'s initWithContentsOfURL:srcURL
+set ciImg to current application's CIImage's imageWithData:(srcImg's TIFFRepresentation())
 set hueFilter to current application's CIFilter's filterWithName:"CIHueAdjust"
 hueFilter's setValue:ciImg forKey:"inputImage"
 hueFilter's setValue:hueAngle forKey:"inputAngle"
 set outCI to hueFilter's outputImage()
 set ciCtx to current application's CIContext's context()
-set colorSpace to current application's CGColorSpaceCreateDeviceRGB()
-set w to (ciImg's extent()'s |size|()'s width) as integer
-set h to (ciImg's extent()'s |size|()'s height) as integer
-set rep to current application's NSBitmapImageRep's alloc()'s initWithBitmapDataPlanes:(missing value) pixelsWide:w pixelsHigh:h bitsPerSample:8 samplesPerPixel:4 hasAlpha:true isPlanar:false colorSpaceName:"NSCalibratedRGBColorSpace" bytesPerRow:0 bitsPerPixel:0
-ciCtx's render:outCI toBitmap:(rep's bitmapData()) rowBytes:(rep's bytesPerRow()) bounds:(current application's CGRectMake(0, 0, w, h)) format:(current application's kCIFormatRGBA8) colorSpace:colorSpace
-set pngData to rep's representationUsingType:(current application's NSBitmapImageFileTypePNG) |properties|:(missing value)
-pngData's writeToFile:dstPath atomically:true
+ciCtx's writePNGRepresentationOfImage:outCI toURL:dstURL format:23 colorSpace:(current application's CGColorSpaceCreateDeviceRGB()) options:(current application's NSDictionary's dictionary()) |error|:(missing value)
 ''')
 scpt.close()
 
