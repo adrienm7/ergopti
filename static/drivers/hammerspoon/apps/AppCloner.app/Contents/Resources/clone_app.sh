@@ -72,61 +72,128 @@ SVG
 fi
 
 
-# ── 3) Teinte via osascript AppleScript + Core Image ────────────────────────
-# Core Image CIHueAdjust change seulement la teinte des pixels colorés.
-# Les zones neutres (blanc/gris/noir) ne sont pas affectées.
+# ── 3) Teinte via Core Image (Python + osascript) ───────────────────────────
+# CIHueAdjust tourne la roue chromatique d'un angle relatif en radians.
+# On calcule la rotation nécessaire pour amener la teinte dominante de l'icône
+# vers la couleur cible. Les zones neutres (blanc/noir/gris) ne sont pas affectées.
 R_INT=$(( 16#${COLOR_HEX:1:2} ))
 G_INT=$(( 16#${COLOR_HEX:3:2} ))
 B_INT=$(( 16#${COLOR_HEX:5:2} ))
 
 TINTED_PNG="$TMPDIR_WORK/tinted.png"
 
-# Convertir RGB → angle hue en radians via python3 (calcul pur, pas de module externe)
-HUE_RAD=$(python3 -c "
-import math, colorsys
-r,g,b = $R_INT/255.0, $G_INT/255.0, $B_INT/255.0
-h,s,v = colorsys.rgb_to_hsv(r,g,b)
-print(f'{h * 2 * math.pi:.4f}')
-")
-echo "HUE_RAD=$HUE_RAD"
+# Passer src/dst/couleur cible à Python qui écrit le script AppleScript dans
+# un fichier temporaire pour éviter tout problème d'encodage ou de continuation ¬
+python3 - "$BASE_PNG" "$TINTED_PNG" "$R_INT" "$G_INT" "$B_INT" <<'TINTEOF'
+import sys, subprocess, os, tempfile, math, colorsys, struct, zlib
 
-osascript <<ASEOF
-use framework "Foundation"
+src, dst = sys.argv[1], sys.argv[2]
+r_int, g_int, b_int = int(sys.argv[3]), int(sys.argv[4]), int(sys.argv[5])
+
+# Teinte cible en radians (0..2pi)
+target_h, _, _ = colorsys.rgb_to_hsv(r_int/255, g_int/255, b_int/255)
+target_rad = target_h * 2 * math.pi
+
+# Lire le PNG et calculer la teinte dominante sans dépendance externe
+def read_png_pixels(path):
+    with open(path, "rb") as f:
+        data = f.read()
+    # Trouver les chunks IHDR et IDAT
+    pos = 8  # skip PNG signature
+    width = height = 0
+    idat_chunks = []
+    while pos < len(data):
+        length = struct.unpack(">I", data[pos:pos+4])[0]
+        chunk_type = data[pos+4:pos+8]
+        chunk_data = data[pos+8:pos+8+length]
+        if chunk_type == b"IHDR":
+            width, height = struct.unpack(">II", chunk_data[:8])
+            bit_depth = chunk_data[8]
+            color_type = chunk_data[9]
+            if bit_depth != 8 or color_type not in (2, 6):
+                return None, 0, 0  # only support 8-bit RGB/RGBA
+        elif chunk_type == b"IDAT":
+            idat_chunks.append(chunk_data)
+        elif chunk_type == b"IEND":
+            break
+        pos += 12 + length
+    if not idat_chunks:
+        return None, 0, 0
+    raw = zlib.decompress(b"".join(idat_chunks))
+    channels = 4 if color_type == 6 else 3
+    stride = 1 + width * channels
+    pixels = []
+    for y in range(height):
+        row_start = y * stride + 1
+        for x in range(0, width * channels, channels):
+            r = raw[row_start + x]
+            g = raw[row_start + x + 1]
+            b = raw[row_start + x + 2]
+            a = raw[row_start + x + 3] if channels == 4 else 255
+            pixels.append((r, g, b, a))
+    return pixels, width, height
+
+pixels, w, h = read_png_pixels(src)
+
+sum_cos, sum_sin, total = 0.0, 0.0, 0.0
+if pixels:
+    step = max(1, len(pixels) // 4000)
+    for i in range(0, len(pixels), step):
+        pr, pg, pb, pa = pixels[i]
+        if pa < 10:
+            continue
+        ph, ps, pv = colorsys.rgb_to_hsv(pr/255, pg/255, pb/255)
+        if ps < 0.15:
+            continue
+        weight = ps * pv
+        angle = ph * 2 * math.pi
+        sum_cos += math.cos(angle) * weight
+        sum_sin += math.sin(angle) * weight
+        total += weight
+
+if total > 0:
+    src_rad = math.atan2(sum_sin / total, sum_cos / total)
+    if src_rad < 0:
+        src_rad += 2 * math.pi
+else:
+    src_rad = 0.0
+
+# Rotation relative : amène la teinte source vers la cible
+delta_rad = target_rad - src_rad
+print(f"src_hue_rad={src_rad:.4f} target_hue_rad={target_rad:.4f} delta={delta_rad:.4f}", flush=True)
+
+# Écrire le script AppleScript dans un fichier temporaire (évite les problèmes ¬ et encodage)
+scpt = tempfile.NamedTemporaryFile(suffix=".applescript", mode="w", delete=False)
+scpt.write(f'''use framework "Foundation"
 use framework "AppKit"
 use framework "CoreImage"
 use scripting additions
-
-set srcPath to "$BASE_PNG"
-set dstPath to "$TINTED_PNG"
-set hueAngle to $HUE_RAD as real
-
--- Charger l'image source
+set srcPath to "{src}"
+set dstPath to "{dst}"
+set hueAngle to {delta_rad} as real
 set ciImg to current application's CIImage's imageWithContentsOfURL:(current application's NSURL's fileURLWithPath:srcPath)
-
--- Appliquer CIHueAdjust : ne change que la teinte, préserve luminosité et blanc/noir
 set hueFilter to current application's CIFilter's filterWithName:"CIHueAdjust"
 hueFilter's setValue:ciImg forKey:"inputImage"
 hueFilter's setValue:hueAngle forKey:"inputAngle"
 set outCI to hueFilter's outputImage()
-
--- Rendre et sauvegarder
 set ciCtx to current application's CIContext's context()
 set colorSpace to current application's CGColorSpaceCreateDeviceRGB()
 set w to (ciImg's extent()'s |size|()'s width) as integer
 set h to (ciImg's extent()'s |size|()'s height) as integer
-
-set rep to current application's NSBitmapImageRep's alloc()'s ¬
-  initWithBitmapDataPlanes:(missing value) pixelsWide:w pixelsHigh:h ¬
-  bitsPerSample:8 samplesPerPixel:4 hasAlpha:true isPlanar:false ¬
-  colorSpaceName:"NSCalibratedRGBColorSpace" bytesPerRow:0 bitsPerPixel:0
-
-ciCtx's render:outCI toBitmap:(rep's bitmapData()) rowBytes:(rep's bytesPerRow()) ¬
-  bounds:(current application's CGRectMake(0, 0, w, h)) ¬
-  format:(current application's kCIFormatRGBA8) colorSpace:colorSpace
-
+set rep to current application's NSBitmapImageRep's alloc()'s initWithBitmapDataPlanes:(missing value) pixelsWide:w pixelsHigh:h bitsPerSample:8 samplesPerPixel:4 hasAlpha:true isPlanar:false colorSpaceName:"NSCalibratedRGBColorSpace" bytesPerRow:0 bitsPerPixel:0
+ciCtx's render:outCI toBitmap:(rep's bitmapData()) rowBytes:(rep's bytesPerRow()) bounds:(current application's CGRectMake(0, 0, w, h)) format:(current application's kCIFormatRGBA8) colorSpace:colorSpace
 set pngData to rep's representationUsingType:(current application's NSBitmapImageFileTypePNG) |properties|:(missing value)
 pngData's writeToFile:dstPath atomically:true
-ASEOF
+''')
+scpt.close()
+
+result = subprocess.run(["osascript", scpt.name], capture_output=True, text=True)
+os.unlink(scpt.name)
+if result.returncode != 0:
+    print(f"osascript error: {result.stderr.strip()}", flush=True)
+    sys.exit(1)
+print("tint OK", flush=True)
+TINTEOF
 
 [[ ! -f "$TINTED_PNG" ]] && { echo "Teinte échouée — copie base PNG"; cp "$BASE_PNG" "$TINTED_PNG"; }
 
