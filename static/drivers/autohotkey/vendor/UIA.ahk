@@ -5084,6 +5084,7 @@ class IUIAutomationNotCondition extends UIA.IUIAutomationCondition {
 
 class IUIAutomationCondition extends UIA.IUIAutomationBase {
     static __QueryCondition(pCond) {
+        local n
         for n in ["Property", "Bool", "And", "Or", "Not"] {
             try {
                 if ComObjQuery(pCond, UIA.IUIAutomation%n%Condition.__IID)
