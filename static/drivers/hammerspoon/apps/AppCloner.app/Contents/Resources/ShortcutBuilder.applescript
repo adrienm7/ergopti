@@ -94,21 +94,8 @@ on run argv
 		& " " & quoted form of openArg
 	logmsg("cmd: " & cmd)
 
-	-- Afficher une progress bar pendant la création (bloquante mais informative)
-	tell application "System Events"
-		set progressDescription to "Création du clone en cours…"
-		set progressAdditionalDescription to "Extraction de l'icône, application de la teinte, génération du bundle…"
-		set progress total steps to -1
-		set progress completed steps to 0
-		set progress description to progressDescription
-		set progress additional description to progressAdditionalDescription
-	end tell
-
 	try
 		set result_path to do shell script cmd
-		tell application "System Events"
-			set progress total steps to 0
-		end tell
 		logmsg("résultat: " & result_path)
 		set dlg to display dialog "Clone créé avec succès :" & return & result_path ¬
 			buttons {"Ouvrir Applications", "OK"} default button 2
@@ -116,9 +103,6 @@ on run argv
 			do shell script "open ~/Applications"
 		end if
 	on error errMsg
-		tell application "System Events"
-			set progress total steps to 0
-		end tell
 		logmsg("erreur: " & errMsg)
 		display dialog "Erreur lors de la création du clone :" & return & errMsg ¬
 			buttons {"OK"} default button 1
