@@ -192,9 +192,8 @@ Test("AltGrShiftDispatch: no entry overflows the BoundFunc signature (Number row
 ; LayerDispatch behaviour
 ; ==========================
 TestLT_LayerDispatchLetter() {
-	global LastSentCharacters
 	ResetStubRecorders()
-	LastSentCharacters := []
+	_LSCResetFrom([])
 	; SendNewResult("È") -> SendEvent(...) -> UpdateLastSentCharacter("È")
 	LayerDispatch("SC010", SHIFT_SYMBOLS)
 	AssertEqual("È", _Stub_LastChars[_Stub_LastChars.Length])
@@ -203,9 +202,8 @@ Test("LayerDispatch: shift letter pushes the uppercase letter via SendNewResult"
 	TestLT_LayerDispatchLetter)
 
 TestLT_LayerDispatchSymbol() {
-	global LastSentCharacters
 	ResetStubRecorders()
-	LastSentCharacters := []
+	_LSCResetFrom([])
 	; SC029 in SHIFT_SYMBOLS calls ActivateHotstrings then SendNewResult(" €")
 	LayerDispatch("SC029", SHIFT_SYMBOLS)
 	AssertTrue(_Stub_LastChars.Length >= 1)

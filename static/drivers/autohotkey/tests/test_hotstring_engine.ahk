@@ -41,23 +41,20 @@ Test("StrTitle: multi-character word capitalises first letter only", TestHE_StrT
 ; GetLastSentCharacterAt
 ; ==========================
 TestHE_LastSentEmpty() {
-	global LastSentCharacters
-	LastSentCharacters := []
+	_LSCResetFrom([])
 	AssertEqual("", GetLastSentCharacterAt(-1))
 }
 Test("GetLastSentCharacterAt: empty buffer returns empty string", TestHE_LastSentEmpty)
 
 TestHE_LastSentOffsets() {
-	global LastSentCharacters
-	LastSentCharacters := ["a", "b", "c"]
+	_LSCResetFrom(["a", "b", "c"])
 	AssertEqual("c", GetLastSentCharacterAt(-1))
 	AssertEqual("b", GetLastSentCharacterAt(-2))
 }
 Test("GetLastSentCharacterAt: returns offset value when available", TestHE_LastSentOffsets)
 
 TestHE_LastSentOverflow() {
-	global LastSentCharacters
-	LastSentCharacters := ["x"]
+	_LSCResetFrom(["x"])
 	AssertEqual("", GetLastSentCharacterAt(-3))
 }
 Test("GetLastSentCharacterAt: returns empty when offset exceeds buffer length",
@@ -185,8 +182,7 @@ Test("StrTitle: accented lowercase is capitalised correctly", TestHE_StrTitleAcc
 ; GetLastSentCharacterAt — boundary detail
 ; ==========================
 TestHE_LastSentPositiveOffset() {
-	global LastSentCharacters
-	LastSentCharacters := ["a", "b", "c"]
+	_LSCResetFrom(["a", "b", "c"])
 	; Positive index 1 is first element
 	AssertEqual("a", GetLastSentCharacterAt(1))
 }
@@ -194,8 +190,7 @@ Test("GetLastSentCharacterAt: positive offset 1 returns the first element",
 	TestHE_LastSentPositiveOffset)
 
 TestHE_LastSentSingleElement() {
-	global LastSentCharacters
-	LastSentCharacters := ["z"]
+	_LSCResetFrom(["z"])
 	AssertEqual("z", GetLastSentCharacterAt(-1))
 	AssertEqual("", GetLastSentCharacterAt(-2))
 }
@@ -203,8 +198,7 @@ Test("GetLastSentCharacterAt: single-element buffer, -1 ok, -2 empty",
 	TestHE_LastSentSingleElement)
 
 TestHE_LastSentExactLength() {
-	global LastSentCharacters
-	LastSentCharacters := ["a", "b", "c", "d", "e"]
+	_LSCResetFrom(["a", "b", "c", "d", "e"])
 	; offset -5 should reach the first element
 	AssertEqual("a", GetLastSentCharacterAt(-5))
 	; offset -6 should be out of range
@@ -212,6 +206,19 @@ TestHE_LastSentExactLength() {
 }
 Test("GetLastSentCharacterAt: offset at exact length boundary",
 	TestHE_LastSentExactLength)
+
+TestHE_LastSentRingOverwrite() {
+	; After pushing 8 chars into a 5-slot ring, only the last 5 remain.
+	_LSCResetFrom(["a", "b", "c", "d", "e", "f", "g", "h"])
+	AssertEqual("h", GetLastSentCharacterAt(-1))
+	AssertEqual("g", GetLastSentCharacterAt(-2))
+	AssertEqual("d", GetLastSentCharacterAt(-5))
+	AssertEqual("", GetLastSentCharacterAt(-6))
+	; Oldest is "d" (fifth from newest); +1 must return it.
+	AssertEqual("d", GetLastSentCharacterAt(1))
+}
+Test("GetLastSentCharacterAt: ring wrap keeps only the newest CAP entries",
+	TestHE_LastSentRingOverwrite)
 
 
 
@@ -298,8 +305,7 @@ Test("GenerateUppercaseVariants: single character with no symbol match",
 ; ==========================
 TestHE_SendNewResultHookCalled() {
 	ResetHotstringRecorders()
-	global LastSentCharacters
-	LastSentCharacters := []
+	_LSCResetFrom([])
 	; _SendHook is already installed (InstallHotstringHooks called in run_all.ahk)
 	SendNewResult("x")
 	AssertEqual(1, _Stub_RecordedSends.Length)
@@ -310,8 +316,7 @@ Test("SendNewResult: routes through _SendHook when installed",
 
 TestHE_SendNewResultUpdatesLastChar() {
 	ResetHotstringRecorders()
-	global LastSentCharacters
-	LastSentCharacters := []
+	_LSCResetFrom([])
 	SendNewResult("abc")
 	; UpdateLastSentCharacter is called with SubStr(Text, -1) = last char
 	AssertEqual("c", _Stub_LastChars[1])

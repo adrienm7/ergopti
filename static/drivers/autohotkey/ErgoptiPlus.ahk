@@ -87,7 +87,8 @@ SendMode("Event") ; Everything concerning hotstrings MUST use SendEvent and not 
 ; NOT TO MODIFY
 global RemappedList := Map()
 global LastSentCharacterKeyTime := Map() ; Tracks the time since a key was pressed
-global LastSentCharacters := [] ; Enables to modify the output of a key depending on the previous character sent
+; LastSentCharacters ring buffer lives in lib/hotstring_engine.ahk (_LSC_*).
+; Accessed only via UpdateLastSentCharacter / GetLastSentCharacterAt.
 global CapsWordEnabled := False ; If the keyboard layer is currently in CapsWord state
 global LayerEnabled := False ; If the keyboard layer is currently in navigation state
 global NumberOfRepetitions := 1 ; Same as Vim where 3w does the w action 3 times, we can do the same in the navigation layer

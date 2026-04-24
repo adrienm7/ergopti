@@ -25,10 +25,11 @@
 ; DEPENDENCIES:
 ; The engine references the following globals/functions provided by the main
 ; ErgoptiPlus script: ``ScriptInformation`` (for the magic key), the
-; ``UpdateLastSentCharacter`` function and its ``LastSentCharacters`` /
-; ``LastSentCharacterKeyTime`` backing globals. AHK v2 resolves these across
-; the whole compilation unit, so the ``#Include`` ordering is irrelevant as
-; long as all files are part of the same script.
+; ``UpdateLastSentCharacter`` function and its ``LastSentCharacterKeyTime``
+; backing global. The last-character ring buffer (``_LSC_*``) lives in this
+; file (see section 4). AHK v2 resolves these across the whole compilation
+; unit, so the ``#Include`` ordering is irrelevant as long as all files are
+; part of the same script.
 ; ==============================================================================
 
 ; =======================================
@@ -288,9 +289,59 @@ CreateCaseSensitiveHotstrings(Flags, Abbreviation, Replacement, options := unset
     }
 }
 
+; =====================================================
+; =====================================================
+; ======= 4/ Last-sent-character ring buffer =======
+; =====================================================
+; =====================================================
+
+; Fixed-capacity ring of the last N characters emitted by the driver, used by
+; hotstrings / rolls / deadkeys to peek at what the user just typed without
+; calling back into Win32. The ring avoids the O(n) ``RemoveAt(1)`` memmove
+; the previous Array-based implementation performed on every keystroke.
+;
+; Indexing contract (unchanged for callers of ``GetLastSentCharacterAt``):
+;   - Negative offset -k returns the k-th character from the NEWEST
+;     (offset -1 = just-pushed char, offset -2 = the one before, …).
+;   - Positive offset +k returns the k-th character from the OLDEST
+;     still in the buffer (offset +1 = oldest).
+;   - Any offset beyond the current fill count returns "".
+global _LSC_CAP := 5
+global _LSC_RING := ["", "", "", "", ""]
+global _LSC_CURSOR := 0  ; 1-based index of the most recently written slot
+global _LSC_LEN := 0     ; number of populated slots, saturates at _LSC_CAP
+
+; Push a new character; O(1), no reallocation after boot.
+_LSCPush(Char) {
+    global _LSC_RING, _LSC_CAP, _LSC_CURSOR, _LSC_LEN
+    _LSC_CURSOR := Mod(_LSC_CURSOR, _LSC_CAP) + 1
+    _LSC_RING[_LSC_CURSOR] := Char
+    if _LSC_LEN < _LSC_CAP {
+        _LSC_LEN += 1
+    }
+}
+
+; Reset the ring to a known sequence (oldest-first). Kept as a thin wrapper
+; so tests can seed state without reaching into globals.
+_LSCResetFrom(Chars) {
+    global _LSC_RING, _LSC_CAP, _LSC_CURSOR, _LSC_LEN
+    _LSC_RING := []
+    loop _LSC_CAP {
+        _LSC_RING.Push("")
+    }
+    _LSC_CURSOR := 0
+    _LSC_LEN := 0
+    for _, c in Chars {
+        _LSCPush(c)
+    }
+}
+
+
+
+
 ; ==========================================
 ; ==========================================
-; ======= 4/ Text & history helpers =======
+; ======= 5/ Text & history helpers =======
 ; ==========================================
 ; ==========================================
 
@@ -329,10 +380,26 @@ GenerateUppercaseVariants(AbbreviationUpperCase, UppercasedSymbols) {
 }
 
 GetLastSentCharacterAt(Offset) {
-    if !IsSet(LastSentCharacters)
+    global _LSC_RING, _LSC_CAP, _LSC_CURSOR, _LSC_LEN
+    if _LSC_LEN == 0 {
         return ""
-    Len := LastSentCharacters.Length
-    if Len < Abs(Offset)
-        return ""
-    return LastSentCharacters[Offset]
+    }
+    if Offset < 0 {
+        K := -Offset
+        if K > _LSC_LEN {
+            return ""
+        }
+        Idx := Mod(_LSC_CURSOR - K + _LSC_CAP, _LSC_CAP) + 1
+        return _LSC_RING[Idx]
+    }
+    if Offset > 0 {
+        if Offset > _LSC_LEN {
+            return ""
+        }
+        ; Oldest slot is cursor + 1 wrapped when the buffer is full, otherwise slot 1.
+        OldestIdx := (_LSC_LEN < _LSC_CAP) ? 1 : (Mod(_LSC_CURSOR, _LSC_CAP) + 1)
+        Idx := Mod(OldestIdx - 1 + (Offset - 1), _LSC_CAP) + 1
+        return _LSC_RING[Idx]
+    }
+    return ""
 }
