@@ -271,7 +271,8 @@ end
 
 local toml_set = {}
 for fname in hs.fs.dir(hotstrings_dir) do
-	if fname:match("%.toml$") then
+	-- Skip manifest/index files (prefixed with _) — they are metadata, not hotstring groups
+	if fname:match("%.toml$") and not fname:match("^_") then
 		toml_set[fname:match("^(.-)%.toml$")] = fname
 	end
 end
