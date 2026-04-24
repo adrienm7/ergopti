@@ -22,16 +22,23 @@ local _req_counter = 0
 local DEDUPLICATION_ENABLED = false
 local RETRY_FAILED_PREDICTION_ENABLED = true
 local RETRY_FAILED_PREDICTION_MAX_MULTIPLIER = 2
+local STREAM_CONNECT_TIMEOUT_SEC = 5    -- Fail fast if the MLX server does not accept the TCP connection
+local STREAM_HARD_TIMEOUT_SEC    = 30   -- Kill the task if the server accepts but never sends a token
 
 -- Holds the current in-flight hs.task; cancelled when a new streaming request starts.
 -- The streaming flag itself is owned by modules/llm/init.lua and passed per-call.
-local _active_stream_task = nil
+local _active_stream_task       = nil
+local _active_stream_timeout    = nil  -- Hard-timeout timer for the current stream task
 
 -- M.is_thinking_model is injected by init.lua
 
 --- Terminates the in-flight streaming task if one is active.
 --- Called when a newer request supersedes the current one.
 function M.cancel_streaming()
+	if _active_stream_timeout then
+		pcall(function() _active_stream_timeout:stop() end)
+		_active_stream_timeout = nil
+	end
 	if _active_stream_task then
 		pcall(function() _active_stream_task:terminate() end)
 		_active_stream_task = nil
@@ -494,6 +501,11 @@ local function post_and_parse_streaming(model_name, system_prompt, full_text, ta
 	-- Streaming callback: fired each time curl writes a chunk to stdout
 	local function on_chunk(_, chunk, stderr_chunk)
 		if not chunk or chunk == "" then return true end
+		-- First chunk received — server is alive, cancel the hard-timeout watchdog
+		if _active_stream_timeout then
+			pcall(function() _active_stream_timeout:stop() end)
+			_active_stream_timeout = nil
+		end
 		Logger.debug(LOG, "[%s] #%d STREAM chunk (%d bytes): '%s'",
 			model_name, req_id, #chunk, chunk:sub(1, 120))
 		line_buf = line_buf .. chunk
@@ -504,6 +516,10 @@ local function post_and_parse_streaming(model_name, system_prompt, full_text, ta
 	-- Completion callback: fired when curl exits
 	local function on_done(exit_code, remaining, stderr_out)
 		_active_stream_task = nil
+		if _active_stream_timeout then
+			pcall(function() _active_stream_timeout:stop() end)
+			_active_stream_timeout = nil
+		end
 		Logger.debug(LOG, "[%s] #%d STREAM on_done: exit=%s remaining_len=%d stderr='%s'",
 			model_name, req_id, tostring(exit_code),
 			(remaining and #remaining or -1),
@@ -565,15 +581,35 @@ local function post_and_parse_streaming(model_name, system_prompt, full_text, ta
 	fh:write(encoded)
 	fh:close()
 
+	if _active_stream_timeout then
+		pcall(function() _active_stream_timeout:stop() end)
+		_active_stream_timeout = nil
+	end
+
 	local task = hs.task.new("/usr/bin/curl", on_done, on_chunk, {
 		"-s", "-N", "-X", "POST",
 		"-H", "Content-Type: application/json",
+		"--connect-timeout", tostring(STREAM_CONNECT_TIMEOUT_SEC),
 		"--data-binary", "@" .. tmp_path,
 		endpoint,
 	})
 	task:start()
 	_active_stream_task = task
 	Logger.debug(LOG, "[%s] #%d STREAM task started (payload: %s).", model_name, req_id, tmp_path)
+
+	-- Hard-timeout: if no token has arrived within STREAM_HARD_TIMEOUT_SEC, the server
+	-- accepted the connection but is hung — terminate the task and fire on_fail so the
+	-- UI does not freeze indefinitely showing the loading spinner.
+	_active_stream_timeout = hs.timer.doAfter(STREAM_HARD_TIMEOUT_SEC, function()
+		_active_stream_timeout = nil
+		if _active_stream_task then
+			Logger.warn(LOG, "[%s] #%d STREAM hard timeout (%gs) — terminating hung task.",
+				model_name, req_id, STREAM_HARD_TIMEOUT_SEC)
+			pcall(function() _active_stream_task:terminate() end)
+			_active_stream_task = nil
+			if type(on_fail) == "function" then pcall(on_fail) end
+		end
+	end)
 
 	-- Clean up the temp file once the task has had time to read it
 	hs.timer.doAfter(10, function()
