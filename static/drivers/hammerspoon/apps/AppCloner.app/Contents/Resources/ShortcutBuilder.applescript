@@ -1,4 +1,4 @@
--- apps/ShortcutBuilder.app/Contents/Resources/ShortcutBuilder.applescript
+-- apps/AppCloner.app/Contents/Resources/ShortcutBuilder.applescript
 --
 -- Interface utilisateur pour App Cloner.
 -- Permet de créer un clone léger d'une application macOS existante avec :
@@ -21,12 +21,17 @@ on rgbToHex(r, g, b)
 end rgbToHex
 
 on run argv
-	-- argv[1] : répertoire du bundle ShortcutBuilder (passé par l'exécutable)
-	if argv is {} then
-		display dialog "Erreur interne : répertoire de l'application manquant." buttons {"OK"} default button 1
-		return
+	-- argv[1] : répertoire du bundle (passé par l'exécutable MacOS/AppCloner)
+	-- Quand l'app est lancée depuis le Dock, argv peut être vide : on le résout
+	-- via le chemin du script lui-même grâce à osascript
+	set appDir to ""
+	if argv is not {} then
+		set appDir to item 1 of argv
 	end if
-	set appDir to item 1 of argv
+	if appDir is "" then
+		-- Fallback : remonter depuis Resources/ → Contents/ → bundle root
+		set appDir to do shell script "dirname $(dirname $(osascript -e 'POSIX path of (path to me)'))"
+	end if
 	set cloneScript to appDir & "/Contents/Resources/clone_app.sh"
 
 	logmsg("--- App Cloner démarrage " & (do shell script "date"))
@@ -98,9 +103,9 @@ on run argv
 	try
 		set result_path to do shell script cmd
 		logmsg("résultat: " & result_path)
-		display dialog "Clone créé avec succès :" & return & result_path ¬
+		set dlg to display dialog "Clone créé avec succès :" & return & result_path ¬
 			buttons {"Ouvrir le Bureau", "OK"} default button 2
-		if button returned of result is "Ouvrir le Bureau" then
+		if button returned of dlg is "Ouvrir le Bureau" then
 			do shell script "open ~/Desktop"
 		end if
 	on error errMsg
