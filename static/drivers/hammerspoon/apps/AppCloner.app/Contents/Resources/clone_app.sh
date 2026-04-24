@@ -276,7 +276,10 @@ CONF
 # bundles (deepest first) → main bundle. `--preserve-metadata=...` keeps each
 # component's original entitlements + hardened-runtime flag, which is what
 # allows Electron's JIT + V8 to keep working after re-sign.
-echo "Re-signing bottom-up (ad-hoc)…"
+# Write every codesign command output to /tmp/clone_sign.log for diagnostic
+SIGN_LOG=/tmp/clone_sign.log
+: > "$SIGN_LOG"
+echo "Re-signing bottom-up (ad-hoc)… (details in $SIGN_LOG)"
 
 # Extract the ORIGINAL entitlements from each key executable of the source app
 # and stash them as plist files. Relying on `--preserve-metadata=entitlements`
@@ -312,7 +315,8 @@ fi
 # relative to "running VSCode source directly".
 sign_macho_without_runtime() {
   local target="$1"
-  codesign --force --sign - "$target" 2>/dev/null || true
+  echo ">> sign_macho_without_runtime: $target" >> "$SIGN_LOG"
+  codesign --force --sign - "$target" >> "$SIGN_LOG" 2>&1 || true
 }
 
 PRESERVE="--preserve-metadata=entitlements,requirements,flags,runtime"
@@ -349,21 +353,24 @@ find "$DEST/Contents/MacOS" -type f -perm +111 2>/dev/null \
 # the APFS clone, so we go serial here.
 find "$DEST" -depth -type d -name "*.framework" 2>/dev/null \
   | while IFS= read -r fw; do
-      codesign --force --deep --sign - $PRESERVE "$fw" 2>/dev/null \
-        || codesign --force --deep --sign - "$fw" 2>/dev/null || true
+      echo ">> sign framework: $fw" >> "$SIGN_LOG"
+      codesign --force --deep --sign - $PRESERVE "$fw" >> "$SIGN_LOG" 2>&1 \
+        || codesign --force --deep --sign - "$fw" >> "$SIGN_LOG" 2>&1 || true
     done
 
 # Nested .app bundles (helpers, renderer processes) — deepest first, skip root
 find "$DEST" -depth -type d -name "*.app" 2>/dev/null \
   | while IFS= read -r nested; do
       [[ "$nested" == "$DEST" ]] && continue
-      codesign --force --deep --sign - $PRESERVE "$nested" 2>/dev/null \
-        || codesign --force --deep --sign - "$nested" 2>/dev/null || true
+      echo ">> sign nested .app: $nested" >> "$SIGN_LOG"
+      codesign --force --deep --sign - $PRESERVE "$nested" >> "$SIGN_LOG" 2>&1 \
+        || codesign --force --deep --sign - "$nested" >> "$SIGN_LOG" 2>&1 || true
     done
 
 # Main bundle last — preserves VSCode's hardened-runtime entitlement so Electron
 # can still allocate JIT pages under ad-hoc signature
-codesign --force --sign - $PRESERVE "$DEST" 2>&1 | tail -3 || true
+echo ">> sign main bundle: $DEST" >> "$SIGN_LOG"
+codesign --force --sign - $PRESERVE "$DEST" >> "$SIGN_LOG" 2>&1 || true
 
 # Verify
 if codesign --verify --deep --strict "$DEST" 2>&1 | tail -3; then
@@ -415,9 +422,19 @@ dock['persistent-apps'] = apps
 with open(plist_path, 'wb') as f:
     plistlib.dump(dock, f)
 
-# Register the bundle BEFORE restarting the Dock so it reads the right icon
+# Force LaunchServices to fully re-index the bundle: unregister, register,
+# register again with recursion, then restart Dock. Single `lsregister -f`
+# followed by immediate `killall Dock` races in real-world usage — Dock reads
+# its cache before LS has finished indexing and displays the "?" placeholder.
+subprocess.run([lsr, '-u', app_path], capture_output=True)
+subprocess.run([lsr, '-f', '-r', app_path], capture_output=True)
+time.sleep(3)
+subprocess.run(['killall', 'Dock'], check=False)
+time.sleep(2)
+# Second killall after Dock has started regenerating its cache from LS —
+# ensures it picks up the freshly-registered bundle instead of any stale
+# snapshot it had just before the first kill
 subprocess.run([lsr, '-f', app_path], capture_output=True)
-time.sleep(1)
 subprocess.run(['killall', 'Dock'], check=False)
 print(f"Added to Dock: {app_path}")
 DOCKEOF
@@ -458,9 +475,39 @@ DIAG=/tmp/clone_diag.log
   xattr -l "$DEST" 2>&1 || true
 
   echo ""
-  echo "── Test launch ─────────────────────────────────────────────"
+  echo "── Per-nested-bundle verify (to pinpoint 'file modified') ──"
+  for sub in \
+      "$DEST/Contents/Frameworks/Electron Framework.framework" \
+      "$DEST/Contents/Frameworks/Code Helper.app" \
+      "$DEST/Contents/Frameworks/Code Helper (Renderer).app" \
+      "$DEST/Contents/Frameworks/Code Helper (GPU).app" \
+      "$DEST/Contents/Frameworks/Code Helper (Plugin).app" \
+      "$DEST/Contents/Frameworks/Mantle.framework" \
+      "$DEST/Contents/Frameworks/Squirrel.framework" \
+      "$DEST/Contents/Frameworks/ReactiveObjC.framework"; do
+    [[ ! -e "$sub" ]] && continue
+    echo ""
+    echo "-- $sub --"
+    codesign --verify --verbose=4 "$sub" 2>&1 | head -10 || true
+  done
+
+  echo ""
+  echo "── Signing log (/tmp/clone_sign.log last 100 lines) ────────"
+  [[ -f /tmp/clone_sign.log ]] && tail -100 /tmp/clone_sign.log
+
+  echo ""
+  echo "── LaunchServices registration check ───────────────────────"
+  /System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister \
+      -dump 2>/dev/null | grep -B 2 -A 5 "$(basename "$DEST")" | head -40 || true
+
+  echo ""
+  echo "── Spotlight metadata ──────────────────────────────────────"
+  mdls -name kMDItemContentType -name kMDItemDisplayName -name kMDItemKind "$DEST" 2>&1 || true
+
+  echo ""
+  echo "── Test launch (direct exec) ───────────────────────────────"
   # Run the actual CFBundleExecutable directly so stderr is captured. Timeout
-  # after 5 s — if it survives that, it's not crashing on launch.
+  # after 5 s — if it survives that, it's not crashing on direct exec.
   MAIN_EXE_NAME="$(/usr/libexec/PlistBuddy -c "Print :CFBundleExecutable" "$CONTENTS/Info.plist" 2>/dev/null || echo "")"
   MAIN_EXE="$MACOS/$MAIN_EXE_NAME"
   echo "Executing: $MAIN_EXE"
@@ -474,13 +521,31 @@ DIAG=/tmp/clone_diag.log
       kill "$LAUNCH_PID" 2>/dev/null || true
       sleep 1
       kill -9 "$LAUNCH_PID" 2>/dev/null || true
-      echo "LAUNCH_RESULT=alive"
+      echo "DIRECT_EXEC_RESULT=alive"
     else
       wait "$LAUNCH_PID" 2>/dev/null
       echo ""
-      echo "LAUNCH_RESULT=exited (exit_code=$?)"
+      echo "DIRECT_EXEC_RESULT=exited (exit_code=$?)"
     fi
   ) 2>&1 | head -200
+
+  echo ""
+  echo "── Test launch via LaunchServices (what Dock does) ─────────"
+  # Kill any prior instance first
+  pkill -f "$(basename "$DEST")" 2>/dev/null || true
+  sleep 1
+  # `open` uses LS — same code path as Dock click. Captures LS refusal reason.
+  open_out="$(open "$DEST" 2>&1)"
+  open_rc=$?
+  echo "open exit code: $open_rc"
+  echo "open output: $open_out"
+  sleep 4
+  if pgrep -f "$DEST/Contents/MacOS" >/dev/null; then
+    echo "LS_LAUNCH_RESULT=alive"
+    pkill -f "$DEST/Contents/MacOS" 2>/dev/null || true
+  else
+    echo "LS_LAUNCH_RESULT=not_running"
+  fi
 
   echo ""
   echo "── New crash reports since launch ──────────────────────────"
