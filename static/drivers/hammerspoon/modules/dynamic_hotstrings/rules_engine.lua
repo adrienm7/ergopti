@@ -201,13 +201,20 @@ function M.start(keymap_module)
 	end
 	_km = keymap_module
 
-	M.add_rule("td", "date", function() return os.date("%Y_%m_%d") end)
+	M.add_rule("td", "date",   function() return os.date("%Y_%m_%d") end)
+	M.add_rule("dt", "datefr", function() return os.date("%d/%m/%Y") end)
 
-	-- Define French UI strings for the menu
+	-- Descriptions show today's date so the user can immediately see the expected output.
+	local date_iso = os.date("%Y_%m_%d")
+	local date_fr  = os.date("%d/%m/%Y")
+
+	-- Define French UI strings for the menu; count = 1 per section so build_groups
+	-- can sum them for the category total (there is no static hotstring file to count).
 	local sections = {
-		{ name = "date",          description = "td" .. _trigger .. " insère la date courante (aaaa_mm_jj)" },
-		{ name = "phoneprefixes", description = "Saisir les premiers chiffres du numéro de téléphone le complète automatiquement" },
-		{ name = "ssnprefixes",   description = "Saisir les premiers chiffres du numéro de sécurité sociale le complète automatiquement" },
+		{ name = "datefr", description = "dt" .. _trigger .. " insère la date courante (" .. date_fr  .. ")", count = 1 },
+		{ name = "date",   description = "td" .. _trigger .. " insère la date courante (" .. date_iso .. ")", count = 1 },
+		{ name = "phoneprefixes", description = "Saisir les premiers chiffres du numéro de téléphone le complète automatiquement", count = 1 },
+		{ name = "ssnprefixes",   description = "Saisir les premiers chiffres du numéro de sécurité sociale le complète automatiquement", count = 1 },
 	}
 	
 	if _km.register_lua_group then
