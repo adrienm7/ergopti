@@ -89,7 +89,23 @@ UnescapeTomlString(s) {
 ;   TOML is_case_sensitive = true  ➜ original call was CreateHotstring
 ;   TOML is_case_sensitive = false ➜ original call was CreateCaseSensitiveHotstrings
 LoadHotstringsSection(CategoryName, SectionName, FeatureConfig, ExtraOptions := Map()) {
-    global ScriptInformation
+    global ScriptInformation, _GENERATED_HOTSTRINGS
+
+    ; Fast path — bundled categories were pre-compiled to literal AHK calls by
+    ; ``tools/compile_hotstrings.py``. The generated loader registers the
+    ; hotstrings directly without touching the TOML file or regex parser.
+    ; ``personal`` is deliberately excluded: it can live outside the repo.
+    LoaderKey := StrLower(CategoryName) . "." . StrLower(SectionName)
+    if (IsSet(_GENERATED_HOTSTRINGS)
+            and StrLower(CategoryName) != "personal"
+            and _GENERATED_HOTSTRINGS.Has(LoaderKey)) {
+        try LoggerTrace("TomlLoader", "Using generated loader for [%s.%s].",
+            CategoryName, SectionName)
+        GeneratedFn := _GENERATED_HOTSTRINGS[LoaderKey]
+        GeneratedFn(FeatureConfig, ExtraOptions)
+        return
+    }
+
     ; For the personal category, honour the user-configured path so the file can
     ; live outside the Ergopti repository (e.g. in a private config folder).
     if (StrLower(CategoryName) == "personal"

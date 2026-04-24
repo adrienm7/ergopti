@@ -69,6 +69,11 @@ SendMode("Event") ; Everything concerning hotstrings MUST use SendEvent and not 
 ; submodules so the main file stays focused on ErgoptiPlus-specific logic.
 #Include lib\hotstring_engine.ahk
 #Include lib\toml_loader.ahk
+; Auto-generated registrar for the bundled hotstring TOMLs. ``*i`` keeps the
+; driver runnable from a fresh clone before ``tools/compile_hotstrings.py`` has
+; been executed — ``LoadHotstringsSection`` falls back to the regex parser when
+; ``_GENERATED_HOTSTRINGS`` is undefined.
+#Include *i lib\hotstrings_generated.ahk
 #Include lib\personal_toml_editor.ahk
 #Include lib\dispatchers.ahk
 #Include lib\layout_altgr.ahk
