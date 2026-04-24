@@ -33,5 +33,6 @@ static/drivers/hammerspoon/config.json
 static/drivers/hammerspoon/karabiner_user_config.json
 # Karabiner build artifact — generated at runtime by the HS bridge
 static/drivers/hammerspoon/karabiner.json
-static/drivers/hotstrings/.local_ahk_path
+# Bootstrap file — machine-specific absolute paths, never committed
+static/drivers/hammerspoon/ergopti_bootstrap.json
 static/drivers/hotstrings/personal.toml

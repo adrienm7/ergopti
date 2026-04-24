@@ -1,0 +1,53 @@
+# static/drivers/hotstrings/_index.toml
+
+# ==============================================================================
+# MODULE: Hotstrings Index
+# DESCRIPTION:
+# Central manifest consumed by both the AutoHotkey and Hammerspoon drivers.
+# Defines category ordering and module-section metadata that both drivers read
+# at startup to build their tray / menu-bar UI identically.
+#
+# STRUCTURE:
+# [menu]            — display ordering for the driver menus
+# [module_sections] — per-group sections that map to built-in modules
+#                     (e.g. personal_info inside the magickey group)
+# ==============================================================================
+
+
+# ===========================
+# ===========================
+# ======= 1/ Ordering =======
+# ===========================
+# ===========================
+
+[menu]
+
+# Order in which hotstring categories appear in the driver menus.
+# Each entry must match a <name>.toml file in this directory.
+categories_order = [
+	"distancesreduction",
+	"sfbsreduction",
+	"rolls",
+	"autocorrection",
+	"magickey",
+]
+
+
+# =========================================
+# =========================================
+# ======= 2/ Built-in Module Sections =======
+# =========================================
+# =========================================
+
+# Sections inside a TOML group that are handled by a built-in module rather
+# than by static hotstrings.  Both drivers inject the appropriate UI widget
+# (toggle + editor button) in place of a static section list entry.
+#
+# Format:
+#   [module_sections.<group>.<section_id>]
+#   mod_id      = "<driver-agnostic module identifier>"
+#   description = "<label shown in the menu>"
+
+[module_sections.magickey.textexpansionpersonalinformation]
+mod_id      = "personal_info"
+description = "Remplissage de formulaires avec le suffixe @ : @np★ = Nom ⇥ Prénom, etc."

@@ -155,7 +155,7 @@ function M.generate(ctx, menu_mods, actions)
 			{ title = "↺ Réinitialiser les valeurs par défaut", fn = actions.reset_defaults }
 		}
 	})
-	table.insert(items, { title = "Préférences", fn = actions.open_prefs })
+	table.insert(items, { title = "Chemins des fichiers…", fn = actions.open_paths })
 	table.insert(items, { title = "Console", fn = actions.open_console })
 	table.insert(items, { title = "Ouvrir init.lua", fn = actions.open_init })
 	table.insert(items, { title = "Recharger", fn = actions.reload })
