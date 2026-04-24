@@ -70,19 +70,34 @@ local function discover_bundled_apps()
 
 			local icon = nil
 			-- Prefer bundle icon; fall back to SVG embedded in Resources/
+			-- setSize alone does not reliably constrain high-res images in menus;
+			-- draw into a fixed canvas to guarantee the rendered size
+			local function resize_to_menu_icon(img)
+				local c = hs.canvas.new({ x = 0, y = 0, w = 16, h = 16 })
+				c:appendElements({
+					type  = "image",
+					image = img,
+					frame = { x = 0, y = 0, w = 16, h = 16 },
+					imageScaling = "scaleToFit",
+				})
+				local out = c:imageFromCanvas()
+				c:delete()
+				return out
+			end
+
 			if bid then
 				local ok_img, img = pcall(hs.image.imageFromAppBundle, bid)
 				if ok_img and img then
-					pcall(function() img:setSize({ w = 16, h = 16 }) end)
-					icon = img
+					local ok_r, resized = pcall(resize_to_menu_icon, img)
+					icon = ok_r and resized or img
 				end
 			end
 			if not icon then
 				local svg_path = app_path .. "/Contents/Resources/AppIcon.svg"
 				local ok_svg, img_svg = pcall(hs.image.imageFromPath, svg_path)
 				if ok_svg and img_svg then
-					pcall(function() img_svg:setSize({ w = 16, h = 16 }) end)
-					icon = img_svg
+					local ok_r, resized = pcall(resize_to_menu_icon, img_svg)
+					icon = ok_r and resized or img_svg
 				end
 			end
 
