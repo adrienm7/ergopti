@@ -197,8 +197,9 @@ MicrosoftApps() {
 
 ; Public hotstring factory. The Map-based options API is kept because this
 ; runs once at startup (cold path); internally the options are decomposed
-; into positional booleans that the per-keystroke HotstringHandler closes
-; over without further Map lookups.
+; into positional booleans AND the per-firing string ``BackSpaceSeq`` is
+; pre-computed so the hot-path dispatcher ``_HotstringDispatch`` never has
+; to run ``StrLen`` or concatenate on every keystroke.
 CreateHotstring(Flags, Abbreviation, Replacement, options := unset) {
     OnlyText := (IsSet(options) and options.Has("OnlyText")) ? options["OnlyText"] : True
     FinalResult := (IsSet(options) and options.Has("FinalResult")) ? options["FinalResult"] : False
@@ -207,14 +208,25 @@ CreateHotstring(Flags, Abbreviation, Replacement, options := unset) {
     FlagsPortion := ":" Flags "B0O:" ; O omits the ending character from the abbreviation
     _RegisterHotstring(
         FlagsPortion Abbreviation,
-        (*) => HotstringHandler(Abbreviation, Replacement, A_EndChar, OnlyText, FinalResult, TimeActivationSeconds)
+        _MakeHotstringCallback(Replacement, Abbreviation, OnlyText, FinalResult, TimeActivationSeconds)
     )
 }
 
-; Hot path — runs on every hotstring firing. Positional booleans avoid any
-; Map allocation here, which matters for frequent triggers.
-HotstringHandler(Abbreviation, Replacement, EndChar, OnlyText := True, FinalResult := False, TimeActivationSeconds := 0) {
-    if IsTimeActivationExpired(SubStr(Abbreviation, -2, 1), TimeActivationSeconds) {
+; Builds the per-keystroke callback for a single hotstring variant. Computes
+; ``BackSpaceSeq`` / ``PrevCharKey`` once at registration time and closes
+; over both plus the positional option booleans. Each call produces a fresh
+; closure with its own captures — safe to call in a loop over variants.
+_MakeHotstringCallback(Replacement, Abbreviation, OnlyText, FinalResult, TimeActivationSeconds) {
+    BackSpaceSeq := "{BackSpace " . StrLen(Abbreviation) . "}"
+    PrevCharKey := SubStr(Abbreviation, -2, 1)
+    return (*) => _HotstringDispatch(Replacement, A_EndChar, BackSpaceSeq, PrevCharKey, OnlyText, FinalResult, TimeActivationSeconds)
+}
+
+; Hot path — runs on every hotstring firing. ``BackSpaceSeq`` and
+; ``PrevCharKey`` are pre-computed at registration time so this function
+; does zero allocation / string work before dispatching the three sends.
+_HotstringDispatch(Replacement, EndChar, BackSpaceSeq, PrevCharKey, OnlyText, FinalResult, TimeActivationSeconds) {
+    if IsTimeActivationExpired(PrevCharKey, TimeActivationSeconds) {
         return
     }
 
@@ -225,27 +237,33 @@ HotstringHandler(Abbreviation, Replacement, EndChar, OnlyText := True, FinalResu
         SendEvent("{SC138 Up}")
     }
 
-    ; B0 flag means we delete the abbreviation manually; this behaves
-    ; consistently everywhere (URL bars, devtools) unlike AHK's auto-erase.
-    NumberOfCharactersToDelete := StrLen(Abbreviation)
-
     if GetActiveApp().IsNotepad {
         ; Windows 11 Notepad mis-handles hotstrings (Windows bug, not AHK),
         ; so we route replacement through the clipboard.
-        SendNewResult("{BackSpace " . NumberOfCharactersToDelete . "}", False)
+        SendNewResult(BackSpaceSeq, False)
         SendInstant(Replacement . EndChar)
         return
     }
 
     if FinalResult {
-        SendFinalResult("{BackSpace " . NumberOfCharactersToDelete . "}", False)
+        SendFinalResult(BackSpaceSeq, False)
         SendFinalResult(Replacement, OnlyText)
         SendFinalResult(EndChar, False)
     } else {
-        SendNewResult("{BackSpace " . NumberOfCharactersToDelete . "}", False)
+        SendNewResult(BackSpaceSeq, False)
         SendNewResult(Replacement, OnlyText)
         SendNewResult(EndChar, False)
     }
+}
+
+; Compatibility shim preserving the pre-refactor signature so tests that
+; invoke ``HotstringHandler`` directly keep working. Computes the same
+; ``BackSpaceSeq`` / ``PrevCharKey`` values that ``CreateHotstring`` bakes
+; in at registration time.
+HotstringHandler(Abbreviation, Replacement, EndChar, OnlyText := True, FinalResult := False, TimeActivationSeconds := 0) {
+    BackSpaceSeq := "{BackSpace " . StrLen(Abbreviation) . "}"
+    PrevCharKey := SubStr(Abbreviation, -2, 1)
+    _HotstringDispatch(Replacement, EndChar, BackSpaceSeq, PrevCharKey, OnlyText, FinalResult, TimeActivationSeconds)
 }
 
 IsTimeActivationExpired(PreviousCharacter, OptionTimeActivationSeconds) {
@@ -285,12 +303,13 @@ CreateCaseSensitiveHotstrings(Flags, Abbreviation, Replacement, options := unset
     ReplacementUpperCase := StrUpper(Replacement)
 
     ; Helper closure: installs one hotstring variant with positional args
-    ; baked in. Must be a fat-arrow lambda so it closes over the outer
-    ; locals (FlagsPortion, OnlyText…); nested `f() {}` functions in AHK v2
-    ; do not capture the enclosing scope.
+    ; baked in, plus the pre-computed ``BackSpaceSeq`` / ``PrevCharKey`` so
+    ; ``_HotstringDispatch`` skips the StrLen + SubStr work on every firing.
+    ; Must be a fat-arrow lambda so it closes over the outer locals; nested
+    ; ``f() {}`` functions in AHK v2 do not capture the enclosing scope.
     RegisterVariant := (Abbr, Repl) => _RegisterHotstring(
         FlagsPortion Abbr,
-        (*) => HotstringHandler(Abbr, Repl, A_EndChar, OnlyText, FinalResult, TimeActivationSeconds)
+        _MakeHotstringCallback(Repl, Abbr, OnlyText, FinalResult, TimeActivationSeconds)
     )
 
     RegisterVariant(AbbreviationLowerCase, ReplacementLowerCase)
