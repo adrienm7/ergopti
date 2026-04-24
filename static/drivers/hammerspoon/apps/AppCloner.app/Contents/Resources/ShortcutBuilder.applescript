@@ -21,17 +21,12 @@ on rgbToHex(r, g, b)
 end rgbToHex
 
 on run argv
-	-- argv[1] : répertoire du bundle (passé par l'exécutable MacOS/AppCloner)
-	-- Quand l'app est lancée depuis le Dock, argv peut être vide : on le résout
-	-- via le chemin du script lui-même grâce à osascript
-	set appDir to ""
-	if argv is not {} then
-		set appDir to item 1 of argv
+	-- argv[1] : répertoire absolu du bundle, passé par MacOS/AppCloner via $APPROOT
+	if argv is {} or item 1 of argv is "" then
+		display dialog "Erreur : chemin du bundle manquant. Lancez l'app normalement." buttons {"OK"} default button 1
+		return
 	end if
-	if appDir is "" then
-		-- Fallback : remonter depuis Resources/ → Contents/ → bundle root
-		set appDir to do shell script "dirname $(dirname $(osascript -e 'POSIX path of (path to me)'))"
-	end if
+	set appDir to item 1 of argv
 	set cloneScript to appDir & "/Contents/Resources/clone_app.sh"
 
 	logmsg("--- App Cloner démarrage " & (do shell script "date"))

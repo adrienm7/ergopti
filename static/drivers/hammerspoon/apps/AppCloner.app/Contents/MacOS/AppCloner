@@ -1,5 +1,7 @@
 #!/bin/zsh
 # Launcher for the App Cloner bundle
 APPROOT="$(cd "$(dirname "$0")/../.." && pwd)"
-osascript "$APPROOT/Contents/Resources/ShortcutBuilder.applescript" "$APPROOT"
+echo "$(date) APPROOT=$APPROOT" >> /tmp/appcloner.log
+osascript "$APPROOT/Contents/Resources/ShortcutBuilder.applescript" "$APPROOT" 2>> /tmp/appcloner.log
+echo "$(date) osascript exit=$?" >> /tmp/appcloner.log
 exit 0
