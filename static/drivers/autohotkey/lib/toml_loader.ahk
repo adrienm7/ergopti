@@ -349,3 +349,30 @@ ApplyTomlMetadataToFeatures(CategoryName) {
         }
     }
 }
+
+; Count all hotstring entries across every [[section]] in a TOML category file.
+; Returns 0 when the file does not exist or contains no matching entries.
+; Uses the same ReadTomlFile cache as the rest of the loader to avoid double I/O.
+CountTomlHotstrings(CategoryName) {
+    global ScriptInformation
+    if (StrLower(CategoryName) == "personal"
+            and IsSet(ScriptInformation)
+            and ScriptInformation.Has("PersonalTomlPath")) {
+        FilePath := ScriptInformation["PersonalTomlPath"]
+    } else {
+        FilePath := A_ScriptDir . "\..\hotstrings\" . StrLower(CategoryName) . ".toml"
+    }
+    if !FileExist(FilePath) {
+        return 0
+    }
+    ; Count lines that look like a hotstring entry: start with a quoted trigger
+    Count := 0
+    Q := Chr(34)
+    loop parse, ReadTomlFile(FilePath), "`n", "`r" {
+        Line := Trim(A_LoopField, " `t")
+        if (SubStr(Line, 1, 1) == Q and InStr(Line, "output")) {
+            Count++
+        }
+    }
+    return Count
+}
