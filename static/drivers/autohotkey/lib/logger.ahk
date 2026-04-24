@@ -58,6 +58,17 @@ global LOGGER_DEFAULT_LEVEL := "INFO"
 ; Resolved at boot from the ini (Script.LogLevel) or LOGGER_DEFAULT_LEVEL.
 global LOGGER_MIN_LEVEL := LOGGER_DEFAULT_LEVEL
 
+; Cached severity threshold (integer) and per-level fast-path flags, refreshed
+; by LoggerInit whenever LOGGER_MIN_LEVEL changes. Hot-path callers (notably
+; LoggerDebug / LoggerTrace / LoggerDone invoked from per-keystroke dispatch)
+; check the flag before doing any work, so a disabled level collapses to a
+; single boolean test instead of a Map lookup + Format + FileAppend.
+global _LOGGER_MIN_SEVERITY := 20   ; INFO
+global _LOGGER_DEBUG_ENABLED := False   ; DEBUG / TRACE / DONE
+global _LOGGER_INFO_ENABLED := True     ; INFO / START / SUCCESS
+global _LOGGER_WARN_ENABLED := True     ; WARNING
+global _LOGGER_ERROR_ENABLED := True    ; ERROR
+
 ; Absolute path to the log file. Resolved lazily so the script directory is
 ; always correct even when running from a temporary copy.
 global LOGGER_LOG_PATH := ""
@@ -91,46 +102,97 @@ LoggerInit() {
             }
         }
     }
+    _LoggerRefreshFastFlags()
+}
+
+; Recompute the cached integer severity and per-level fast-path flags from
+; ``LOGGER_MIN_LEVEL``. Called once from LoggerInit and anywhere the minimum
+; level is mutated at runtime.
+_LoggerRefreshFastFlags() {
+    global LOGGER_MIN_LEVEL, LOGGER_SEVERITY
+    global _LOGGER_MIN_SEVERITY, _LOGGER_DEBUG_ENABLED, _LOGGER_INFO_ENABLED
+    global _LOGGER_WARN_ENABLED, _LOGGER_ERROR_ENABLED
+    _LOGGER_MIN_SEVERITY := LOGGER_SEVERITY.Has(LOGGER_MIN_LEVEL)
+        ? LOGGER_SEVERITY[LOGGER_MIN_LEVEL]
+        : 20
+    _LOGGER_DEBUG_ENABLED := (_LOGGER_MIN_SEVERITY <= 10)
+    _LOGGER_INFO_ENABLED  := (_LOGGER_MIN_SEVERITY <= 20)
+    _LOGGER_WARN_ENABLED  := (_LOGGER_MIN_SEVERITY <= 30)
+    _LOGGER_ERROR_ENABLED := (_LOGGER_MIN_SEVERITY <= 40)
 }
 
 ; Verbose detail — setter calls, state snapshots, per-keystroke events.
+; Short-circuits on the cached flag so disabled DEBUG collapses to a
+; single boolean test, no Format / FileAppend cost on the hot path.
 LoggerDebug(Tag, Msg, Args*) {
+    global _LOGGER_DEBUG_ENABLED
+    if !_LOGGER_DEBUG_ENABLED {
+        return
+    }
     _LoggerEmit("DEBUG", Tag, Msg, Args*)
 }
 
 ; Start of a routine internal operation (debug granularity). Pair with Done.
 LoggerTrace(Tag, Msg, Args*) {
+    global _LOGGER_DEBUG_ENABLED
+    if !_LOGGER_DEBUG_ENABLED {
+        return
+    }
     _LoggerEmit("TRACE", Tag, Msg, Args*)
 }
 
 ; Successful end of a routine internal operation. Pair with Trace.
 LoggerDone(Tag, Msg, Args*) {
+    global _LOGGER_DEBUG_ENABLED
+    if !_LOGGER_DEBUG_ENABLED {
+        return
+    }
     _LoggerEmit("DONE", Tag, Msg, Args*)
 }
 
 ; General status worth knowing — config loaded, feature toggled, model changed.
 LoggerInfo(Tag, Msg, Args*) {
+    global _LOGGER_INFO_ENABLED
+    if !_LOGGER_INFO_ENABLED {
+        return
+    }
     _LoggerEmit("INFO", Tag, Msg, Args*)
 }
 
 ; Start of a significant action (init, HTTP request, user-triggered op).
 ; Pair with Success — a missing Success in the logs flags a silent failure.
 LoggerStart(Tag, Msg, Args*) {
+    global _LOGGER_INFO_ENABLED
+    if !_LOGGER_INFO_ENABLED {
+        return
+    }
     _LoggerEmit("START", Tag, Msg, Args*)
 }
 
 ; Successful completion of a significant action. Pair with Start.
 LoggerSuccess(Tag, Msg, Args*) {
+    global _LOGGER_INFO_ENABLED
+    if !_LOGGER_INFO_ENABLED {
+        return
+    }
     _LoggerEmit("SUCCESS", Tag, Msg, Args*)
 }
 
 ; Unexpected condition the code can recover from; must be investigated.
 LoggerWarn(Tag, Msg, Args*) {
+    global _LOGGER_WARN_ENABLED
+    if !_LOGGER_WARN_ENABLED {
+        return
+    }
     _LoggerEmit("WARNING", Tag, Msg, Args*)
 }
 
 ; Unrecoverable failure; execution should stop or degrade gracefully.
 LoggerError(Tag, Msg, Args*) {
+    global _LOGGER_ERROR_ENABLED
+    if !_LOGGER_ERROR_ENABLED {
+        return
+    }
     _LoggerEmit("ERROR", Tag, Msg, Args*)
 }
 

@@ -18,12 +18,14 @@ LOGGER_LOG_PATH := A_ScriptDir . "\test_run.log"
 LOGGER_RING_BUFFER := []
 LOGGER_RING_CURSOR := 0
 LOGGER_MIN_LEVEL := "DEBUG"
+_LoggerRefreshFastFlags()
 
 _ResetLogger() {
 	global LOGGER_RING_BUFFER, LOGGER_RING_CURSOR, LOGGER_MIN_LEVEL
 	LOGGER_RING_BUFFER := []
 	LOGGER_RING_CURSOR := 0
 	LOGGER_MIN_LEVEL := "DEBUG"
+	_LoggerRefreshFastFlags()
 }
 
 
@@ -110,6 +112,7 @@ TestLogger_LevelFilterDropDebug() {
 	global LOGGER_MIN_LEVEL
 	_ResetLogger()
 	LOGGER_MIN_LEVEL := "INFO"
+	_LoggerRefreshFastFlags()
 	LoggerDebug("Test", "should-be-dropped")
 	AssertEqual(0, LOGGER_RING_BUFFER.Length)
 }
@@ -120,6 +123,7 @@ TestLogger_LevelFilterPassInfo() {
 	global LOGGER_MIN_LEVEL
 	_ResetLogger()
 	LOGGER_MIN_LEVEL := "INFO"
+	_LoggerRefreshFastFlags()
 	LoggerInfo("Test", "should-pass")
 	AssertEqual(1, LOGGER_RING_BUFFER.Length)
 }
@@ -130,6 +134,7 @@ TestLogger_LevelFilterPassWarnError() {
 	global LOGGER_MIN_LEVEL
 	_ResetLogger()
 	LOGGER_MIN_LEVEL := "INFO"
+	_LoggerRefreshFastFlags()
 	LoggerWarn("Test", "warn")
 	LoggerError("Test", "error")
 	AssertEqual(2, LOGGER_RING_BUFFER.Length)
@@ -261,6 +266,7 @@ TestLogger_LevelFilterDropTrace() {
 	global LOGGER_MIN_LEVEL
 	_ResetLogger()
 	LOGGER_MIN_LEVEL := "INFO"
+	_LoggerRefreshFastFlags()
 	LoggerTrace("T", "dropped")
 	AssertEqual(0, LOGGER_RING_BUFFER.Length)
 }
@@ -270,6 +276,7 @@ TestLogger_LevelFilterDropDone() {
 	global LOGGER_MIN_LEVEL
 	_ResetLogger()
 	LOGGER_MIN_LEVEL := "INFO"
+	_LoggerRefreshFastFlags()
 	LoggerDone("T", "dropped")
 	AssertEqual(0, LOGGER_RING_BUFFER.Length)
 }
@@ -279,6 +286,7 @@ TestLogger_LevelErrorThreshold() {
 	global LOGGER_MIN_LEVEL
 	_ResetLogger()
 	LOGGER_MIN_LEVEL := "ERROR"
+	_LoggerRefreshFastFlags()
 	LoggerWarn("T", "dropped")
 	LoggerInfo("T", "dropped")
 	LoggerError("T", "kept")
