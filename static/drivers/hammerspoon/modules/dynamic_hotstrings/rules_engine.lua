@@ -130,6 +130,11 @@ local function register_prefix_entries()
 	local phone  = type(_personal_data.PhoneNumber) == "string" and _personal_data.PhoneNumber or tostring(_personal_data.PhoneNumber or "")
 	local fphone = type(_personal_data.PhoneNumberFormatted) == "string" and _personal_data.PhoneNumberFormatted or tostring(_personal_data.PhoneNumberFormatted or "")
 	local ssn    = type(_personal_data.SocialSecurityNumber) == "string" and _personal_data.SocialSecurityNumber or tostring(_personal_data.SocialSecurityNumber or "")
+	local iban   = type(_personal_data.IBAN) == "string" and _personal_data.IBAN or tostring(_personal_data.IBAN or "")
+
+	-- Strip decorative spaces for prefix matching (SSN and IBAN contain spaces)
+	local ssn_raw  = ssn:gsub("%s+", "")
+	local iban_raw = iban:gsub("%s+", "")
 
 	if _km.set_group_context then _km.set_group_context(GROUP_NAME) end
 
@@ -153,8 +158,18 @@ local function register_prefix_entries()
 
 	-- Register SSN prefixes
 	if _km.is_section_enabled and _km.is_section_enabled(GROUP_NAME, "ssnprefixes") then
-		if #ssn >= 5 then
-			_km.add(ssn:sub(1, 5), ssn, opts)
+		if #ssn_raw >= 5 then
+			_km.add(ssn_raw:sub(1, 5), ssn, opts)
+		end
+	end
+
+	-- Register IBAN prefixes (7 and 9 raw chars, no spaces)
+	if _km.is_section_enabled and _km.is_section_enabled(GROUP_NAME, "ibanprefixes") then
+		if #iban_raw >= 7 then
+			_km.add(iban_raw:sub(1, 7), iban, opts)
+		end
+		if #iban_raw >= 9 then
+			_km.add(iban_raw:sub(1, 9), iban, opts)
 		end
 	end
 
@@ -208,13 +223,14 @@ function M.start(keymap_module)
 	local date_iso = os.date("%Y_%m_%d")
 	local date_fr  = os.date("%d/%m/%Y")
 
-	-- Define French UI strings for the menu; count = 1 per section so build_groups
-	-- can sum them for the category total (there is no static hotstring file to count).
+	-- Sections ordered identically to the AHK DynamicHotstrings feature map.
+	-- count = 1 per section so build_groups can sum them for the category total.
 	local sections = {
-		{ name = "datefr", description = "dt" .. _trigger .. " insère la date courante (" .. date_fr  .. ")", count = 1 },
-		{ name = "date",   description = "td" .. _trigger .. " insère la date courante (" .. date_iso .. ")", count = 1 },
+		{ name = "datefr",      description = "dt" .. _trigger .. " insère la date courante (" .. date_fr  .. ")", count = 1 },
+		{ name = "date",        description = "td" .. _trigger .. " insère la date courante (" .. date_iso .. ")", count = 1 },
 		{ name = "phoneprefixes", description = "Saisir les premiers chiffres du numéro de téléphone le complète automatiquement", count = 1 },
 		{ name = "ssnprefixes",   description = "Saisir les premiers chiffres du numéro de sécurité sociale le complète automatiquement", count = 1 },
+		{ name = "ibanprefixes",  description = "Saisir les premiers caractères de l'IBAN le complète automatiquement", count = 1 },
 	}
 	
 	if _km.register_lua_group then

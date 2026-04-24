@@ -22,7 +22,7 @@ global Features := Map(
     "__Order", ["Layout", "DistancesReduction", "SFBsReduction", "Rolls", "Autocorrection", "MagicKey",
         "DynamicHotstrings", "Shortcuts", "TapHolds"],
     "DynamicHotstrings", Map(
-        "__Order", ["DateFr", "Date"],
+        "__Order", ["DateFr", "Date", "PhonePrefixes", "SsnPrefixes", "IbanPrefixes"],
         "DateFr", {
             Enabled: True,
             Description: "dt★ insère la date courante (jj/mm/aaaa)",
@@ -30,6 +30,18 @@ global Features := Map(
         "Date", {
             Enabled: True,
             Description: "td★ insère la date courante (aaaa_mm_jj)",
+        },
+        "PhonePrefixes", {
+            Enabled: True,
+            Description: "Saisir les premiers chiffres du numéro de téléphone le complète automatiquement",
+        },
+        "SsnPrefixes", {
+            Enabled: True,
+            Description: "Saisir les premiers chiffres du numéro de sécurité sociale le complète automatiquement",
+        },
+        "IbanPrefixes", {
+            Enabled: True,
+            Description: "Saisir les premiers caractères de l'IBAN le complète automatiquement",
         },
     ),
     "Layout", Map(

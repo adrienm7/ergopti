@@ -37,6 +37,7 @@ M.DEFAULT_STATE = {
 	dynamichotstrings_date           = true,
 	dynamichotstrings_phoneprefixes  = true,
 	dynamichotstrings_ssnprefixes    = true,
+	dynamichotstrings_ibanprefixes   = true,
 }
 
 

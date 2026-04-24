@@ -635,36 +635,22 @@ if Features["MagicKey"]["TextExpansionSymbolsTypst"].Enabled {
 }
 
 
-; ==============================
-; ===== 4.6) Repeat key =====
-; ==============================
-
-#InputLevel 1 ; Mandatory for this section to work, it needs to be below the inputlevel of the key remappings
-
-; ★ becomes a repeat key. It will activate will the lowest priority of all hotstrings
-; That means a letter will only be repeated if no hotstring defined above matches
-if Features["MagicKey"]["Repeat"].Enabled {
-	LoadHotstringsSection("magickey", "repeat", Features["MagicKey"]["Repeat"])
-}
-
-CreateHotstring("*", "clé" . ScriptInformation["MagicKey"], "🔑")
-
-
-
-
 ; =====================================
 ; =====================================
 ; ======= 5/ Dynamic hotstrings =======
 ; =====================================
 ; =====================================
 
+; Dynamic hotstrings must be registered BEFORE the repeat section (#InputLevel 1)
+; so that e.g. "dt★" (3-char trigger) takes priority over "t★" (repeat, 2-char).
+; All Hotstring() calls here inherit the current #InputLevel 2.
+
 
 ; =====================
 ; ===== 5.1) Date =====
 ; =====================
 
-; dt★ inserts today in jj/mm/aaaa format, td★ in aaaa_mm_jj format.
-; Both resolved at fire time — cannot be static TOML entries.
+; dt★ and td★ resolved at fire time — cannot be static TOML entries.
 InsertDateFr(*) {
 	global ScriptInformation
 	DateStr := FormatTime(, "dd/MM/yyyy")
@@ -686,3 +672,74 @@ if Features.Has("DynamicHotstrings") {
 		Hotstring(":*:td" . MK, InsertDateIso)
 	}
 }
+
+
+; ===================================================
+; ===== 5.2) Phone, SSN and IBAN prefix expand =====
+; ===================================================
+
+; Prefix-based hotstrings derived from the user's personal data.
+; Registered once at startup from PersonalInformation — same logic as HS rules_engine.
+; Each trigger auto-expands without end-char (*) and is case-sensitive (C).
+if Features.Has("DynamicHotstrings") {
+	_DynFlags := ":*C:"
+	Phone  := PersonalInformation["PhoneNumber"]        ; e.g. "0606060606"
+	FPhone := PersonalInformation["PhoneNumberClean"]   ; e.g. "06 06 06 06 06"
+	Ssn    := PersonalInformation["SocialSecurityNumber"] ; e.g. "1 99 99 99 999 999 99"
+	Iban   := PersonalInformation["IBAN"]               ; e.g. "FR00 0000 0000 0000 0000 0000 000"
+
+	; Strip spaces for matching purposes (SSN / IBAN contain decorative spaces)
+	SsnRaw  := StrReplace(Ssn,  " ", "")
+	IbanRaw := StrReplace(Iban, " ", "")
+
+	if Features["DynamicHotstrings"]["PhonePrefixes"].Enabled {
+		; Mirrors HS: phone[1:2]+★, +33+phone[1:2], phone[1:4], +33+phone[2:4], phone[2:5], fphone[1:5]
+		MK := ScriptInformation["MagicKey"]
+		if StrLen(Phone) >= 2 {
+			Hotstring(_DynFlags . SubStr(Phone, 1, 2) . MK, (*) => SendFinalResult(Phone))
+			Hotstring(_DynFlags . "+33" . SubStr(Phone, 1, 2), (*) => SendFinalResult("+33" . SubStr(Phone, 2)))
+		}
+		if StrLen(Phone) >= 4 {
+			Hotstring(_DynFlags . SubStr(Phone, 1, 4), (*) => SendFinalResult(Phone))
+			Hotstring(_DynFlags . "+33" . SubStr(Phone, 2, 3), (*) => SendFinalResult("+33" . SubStr(Phone, 2)))
+		}
+		if StrLen(Phone) >= 6 {
+			Hotstring(_DynFlags . SubStr(Phone, 2, 4), (*) => SendFinalResult(Phone))
+		}
+		if StrLen(FPhone) >= 5 {
+			Hotstring(_DynFlags . SubStr(FPhone, 1, 5), (*) => SendFinalResult(FPhone))
+		}
+	}
+
+	if Features["DynamicHotstrings"]["SsnPrefixes"].Enabled {
+		; Mirrors HS: ssn[1:5] (raw digits, no spaces)
+		if StrLen(SsnRaw) >= 5 {
+			Hotstring(_DynFlags . SubStr(SsnRaw, 1, 5), (*) => SendFinalResult(Ssn))
+		}
+	}
+
+	if Features["DynamicHotstrings"]["IbanPrefixes"].Enabled {
+		; IBAN: first 7 chars (e.g. "FR00 00" before any space), then 9 chars
+		if StrLen(IbanRaw) >= 7 {
+			Hotstring(_DynFlags . SubStr(IbanRaw, 1, 7), (*) => SendFinalResult(Iban))
+		}
+		if StrLen(IbanRaw) >= 9 {
+			Hotstring(_DynFlags . SubStr(IbanRaw, 1, 9), (*) => SendFinalResult(Iban))
+		}
+	}
+}
+
+
+; ==============================
+; ===== 4.6) Repeat key =====
+; ==============================
+
+#InputLevel 1 ; Mandatory for this section to work, it needs to be below the inputlevel of the key remappings
+
+; ★ becomes a repeat key. It will activate will the lowest priority of all hotstrings
+; That means a letter will only be repeated if no hotstring defined above matches
+if Features["MagicKey"]["Repeat"].Enabled {
+	LoadHotstringsSection("magickey", "repeat", Features["MagicKey"]["Repeat"])
+}
+
+CreateHotstring("*", "clé" . ScriptInformation["MagicKey"], "🔑")
