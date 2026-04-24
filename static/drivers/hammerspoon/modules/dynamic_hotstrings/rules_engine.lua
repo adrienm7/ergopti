@@ -123,6 +123,24 @@ end
 -- ============================================
 -- ============================================
 
+--- Returns the shortest prefix of a spaced string containing exactly raw_count non-space characters.
+--- Used to build the "with spaces" trigger that expands to the formatted value.
+--- @param spaced string The full string containing decorative spaces.
+--- @param raw_count number The number of non-space characters to collect.
+--- @return string The prefix ending after the raw_count-th non-space character.
+local function spaced_prefix(spaced, raw_count)
+	local seen = 0
+	for i = 1, #spaced do
+		if spaced:sub(i, i) ~= " " then
+			seen = seen + 1
+		end
+		if seen >= raw_count then
+			return spaced:sub(1, i)
+		end
+	end
+	return spaced
+end
+
 --- Computes the real hotstring count for each prefix section given personal data.
 --- Returns a table keyed by section name with integer counts.
 --- Mirrors the exact threshold logic used in AHK hotstrings.ahk section 5.2.
@@ -133,11 +151,11 @@ local function compute_prefix_counts(phone, fphone, ssn_raw, iban_raw)
 	if #phone >= 6 then phone_n = phone_n + 1 end  -- phone[2:5]
 	if #fphone >= 5 then phone_n = phone_n + 1 end -- fphone[1:5]
 
-	local ssn_n = (#ssn_raw >= 5) and 1 or 0
+	-- No-space + spaced triggers — both fire when ssn_raw has >= 5 digits
+	local ssn_n = (#ssn_raw >= 5) and 2 or 0
 
-	local iban_n = 0
-	if #iban_raw >= 7 then iban_n = iban_n + 1 end
-	if #iban_raw >= 9 then iban_n = iban_n + 1 end
+	-- 6 raw chars (no-space, case-insensitive) and 7-char spaced trigger
+	local iban_n = (#iban_raw >= 6) and 2 or 0
 
 	return { phoneprefixes = phone_n, ssnprefixes = ssn_n, ibanprefixes = iban_n }
 end
@@ -188,20 +206,29 @@ local function register_prefix_entries()
 		end
 	end
 
-	-- Register SSN prefixes
+	-- Register SSN prefixes: no-space trigger → SSN without spaces; spaced → SSN with spaces
 	if _km.is_section_enabled and _km.is_section_enabled(GROUP_NAME, "ssnprefixes") then
 		if #ssn_raw >= 5 then
-			_km.add(ssn_raw:sub(1, 5), ssn, opts)
+			local ssn_raw_pfx    = ssn_raw:sub(1, 5)
+			local ssn_spaced_pfx = spaced_prefix(ssn, 5)
+			_km.add(ssn_raw_pfx, ssn_raw, opts)
+			if ssn_spaced_pfx ~= ssn_raw_pfx then
+				_km.add(ssn_spaced_pfx, ssn, opts)
+			end
 		end
 	end
 
-	-- Register IBAN prefixes (7 and 9 raw chars, no spaces)
+	-- Register IBAN prefixes: 6 raw chars (case-insensitive) → IBAN without spaces;
+	-- 7-char spaced trigger (e.g. "FR76 XX") → IBAN with spaces.
 	if _km.is_section_enabled and _km.is_section_enabled(GROUP_NAME, "ibanprefixes") then
-		if #iban_raw >= 7 then
-			_km.add(iban_raw:sub(1, 7), iban, opts)
-		end
-		if #iban_raw >= 9 then
-			_km.add(iban_raw:sub(1, 9), iban, opts)
+		if #iban_raw >= 6 then
+			local iban_raw_pfx    = iban_raw:sub(1, 6)
+			local iban_spaced_pfx = spaced_prefix(iban, 6)
+			local opts_ci = { is_word = false, auto_expand = true, is_case_sensitive = false }
+			_km.add(iban_raw_pfx,    iban:gsub("%s+", ""), opts_ci)
+			if iban_spaced_pfx ~= iban_raw_pfx then
+				_km.add(iban_spaced_pfx, iban, opts_ci)
+			end
 		end
 	end
 

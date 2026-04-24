@@ -331,14 +331,11 @@ CountDynamicSection(SectionName) {
                 N += 1  ; fphone[1:5]
             return N
         case "SsnPrefixes":
-            return StrLen(SsnRaw) >= 5 ? 1 : 0
+            ; No-space + spaced triggers — both fire when ssn_raw has >= 5 digits
+            return StrLen(SsnRaw) >= 5 ? 2 : 0
         case "IbanPrefixes":
-            N := 0
-            if StrLen(IbanRaw) >= 7
-                N += 1
-            if StrLen(IbanRaw) >= 9
-                N += 1
-            return N
+            ; 6 raw chars (no-space) and 7-char spaced trigger if iban_raw has >= 6 chars
+            return StrLen(IbanRaw) >= 6 ? 2 : 0
         default:
             return 0
     }
