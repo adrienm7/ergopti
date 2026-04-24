@@ -278,6 +278,36 @@ CONF
 # allows Electron's JIT + V8 to keep working after re-sign.
 echo "Re-signing bottom-up (ad-hoc)…"
 
+# Extract the ORIGINAL entitlements from each key executable of the source app
+# and stash them as plist files. Relying on `--preserve-metadata=entitlements`
+# is unreliable here: it silently drops entitlements when the prior signature
+# was stripped by `codesign --force`, or when certain flags combine. Explicit
+# --entitlements <file> always wins.
+#
+# The critical one for Electron is `com.apple.security.cs.disable-library-
+# validation` — without it, hardened runtime rejects every ad-hoc dylib with
+# "different Team IDs" and the process dies at dyld map time.
+ENT_MAIN="$TMPDIR_WORK/entitlements_main.plist"
+SRC_MAIN_EXE_NAME="$(/usr/libexec/PlistBuddy -c "Print :CFBundleExecutable" "$SOURCE_APP/Contents/Info.plist" 2>/dev/null || echo "")"
+SRC_MAIN_EXE="$SOURCE_APP/Contents/MacOS/$SRC_MAIN_EXE_NAME"
+if [[ -n "$SRC_MAIN_EXE_NAME" && -f "$SRC_MAIN_EXE" ]]; then
+  codesign -d --entitlements :- "$SRC_MAIN_EXE" > "$ENT_MAIN" 2>/dev/null || true
+  [[ -s "$ENT_MAIN" ]] && echo "Extracted main entitlements ($(wc -c < "$ENT_MAIN") bytes)"
+fi
+
+# Function: sign a Mach-O with runtime + extracted entitlements if we have them,
+# otherwise just ad-hoc. Used for Code.real and any other standalone binaries.
+sign_macho_with_entitlements() {
+  local target="$1"
+  local ent="$2"
+  if [[ -s "$ent" ]]; then
+    codesign --force --sign - --options runtime --entitlements "$ent" "$target" 2>/dev/null \
+      || codesign --force --sign - "$target" 2>/dev/null || true
+  else
+    codesign --force --sign - "$target" 2>/dev/null || true
+  fi
+}
+
 PRESERVE="--preserve-metadata=entitlements,requirements,flags,runtime"
 
 # Strip quarantine + resource forks on every file so Gatekeeper doesn't flag
@@ -296,10 +326,10 @@ find "$DEST" -exec xattr -c {} + 2>/dev/null || true
 # dylibs (no team-id match) — Electron exits instantly with SIGKILL.
 find "$DEST/Contents/MacOS" -type f -perm +111 2>/dev/null \
   | while IFS= read -r f; do
-      # Skip shell scripts (our wrapper) — they have no entitlements to preserve
+      # Mach-O binaries (e.g. Code.real) need the source app's entitlements to
+      # pass Library Validation. Shell scripts (our wrapper) don't take them.
       if file -b "$f" 2>/dev/null | grep -q "Mach-O"; then
-        codesign --force --sign - $PRESERVE "$f" 2>/dev/null \
-          || codesign --force --sign - "$f" 2>/dev/null || true
+        sign_macho_with_entitlements "$f" "$ENT_MAIN"
       else
         codesign --force --sign - "$f" 2>/dev/null || true
       fi
