@@ -266,7 +266,17 @@ OPEN_ARG="$OPEN_ARG"
 CONF
 
 
-# ── 7) Dock ─────────────────────────────────────────────────────────────────
+# ── 7) Ad-hoc re-sign ───────────────────────────────────────────────────────
+# Modern macOS refuses to launch a modified hardened-runtime bundle unless it
+# carries a valid signature. We stripped the original one; re-sign ad-hoc (no
+# identity, "-") and deeply so every nested framework/helper is covered.
+# Without this step, Electron apps (VSCode, Slack, etc.) silently fail to
+# launch and the Dock shows a "?" placeholder.
+codesign --force --deep --sign - "$DEST" 2>&1 | tail -5 || true
+echo "Bundle re-signed ad-hoc"
+
+
+# ── 8) Dock ─────────────────────────────────────────────────────────────────
 touch "$DEST"
 LSR=/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister
 "$LSR" -f "$DEST" >/dev/null 2>&1 || true
