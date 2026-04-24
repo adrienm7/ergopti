@@ -295,7 +295,19 @@ SRC_MAIN_EXE_NAME="$(/usr/libexec/PlistBuddy -c "Print :CFBundleExecutable" "$SO
 SRC_MAIN_EXE="$SOURCE_APP/Contents/MacOS/$SRC_MAIN_EXE_NAME"
 if [[ -n "$SRC_MAIN_EXE_NAME" && -f "$SRC_MAIN_EXE" ]]; then
   codesign -d --entitlements :- "$SRC_MAIN_EXE" > "$ENT_MAIN" 2>/dev/null || true
-  [[ -s "$ENT_MAIN" ]] && echo "Extracted main entitlements ($(wc -c < "$ENT_MAIN") bytes)"
+  if [[ -s "$ENT_MAIN" ]]; then
+    echo "Extracted main entitlements ($(wc -c < "$ENT_MAIN") bytes)"
+    # Sanity: the plist must contain disable-library-validation — if it
+    # doesn't, dyld will reject our ad-hoc Electron Framework with team-id
+    # mismatch. Log the presence so we can see it in clone_diag.log.
+    if grep -q "disable-library-validation" "$ENT_MAIN"; then
+      echo "  ✓ disable-library-validation present"
+    else
+      echo "  ✗ disable-library-validation MISSING — dyld will reject ad-hoc dylibs"
+    fi
+  else
+    echo "WARNING: could not extract entitlements from $SRC_MAIN_EXE"
+  fi
 fi
 
 # Function: ad-hoc sign a Mach-O, deliberately WITHOUT the hardened-runtime
@@ -319,6 +331,28 @@ sign_macho_without_runtime() {
   codesign --force --sign - "$target" >> "$SIGN_LOG" 2>&1 || true
 }
 
+sign_macho_with_runtime_and_entitlements() {
+  # V8 in recent Electron (30+) requires hardened runtime to be present at
+  # process startup — without it, OptimizingCompileTaskExecutor's init hits
+  # brk 0 (IMMEDIATE_CRASH) when setting up JIT thread pools. So we need:
+  #   --options runtime          : turn hardened runtime back on
+  #   --entitlements <plist>     : carry forward disable-library-validation
+  #                                (lets ad-hoc dylibs with mismatched team
+  #                                IDs load anyway) and allow-jit + friends.
+  local target="$1"
+  local ent="$2"
+  echo ">> sign_macho_with_runtime: $target (ent=$ent)" >> "$SIGN_LOG"
+  if [[ -s "$ent" ]]; then
+    codesign --force --sign - --options runtime \
+             --entitlements "$ent" "$target" >> "$SIGN_LOG" 2>&1 \
+      || codesign --force --sign - --options runtime "$target" >> "$SIGN_LOG" 2>&1 \
+      || codesign --force --sign - "$target" >> "$SIGN_LOG" 2>&1 || true
+  else
+    codesign --force --sign - --options runtime "$target" >> "$SIGN_LOG" 2>&1 \
+      || codesign --force --sign - "$target" >> "$SIGN_LOG" 2>&1 || true
+  fi
+}
+
 PRESERVE="--preserve-metadata=entitlements,requirements,flags,runtime"
 
 # Strip quarantine + resource forks on every file so Gatekeeper doesn't flag
@@ -340,7 +374,8 @@ find "$DEST/Contents/MacOS" -type f -perm +111 2>/dev/null \
       # Mach-O binaries (e.g. Code.real) need the source app's entitlements to
       # pass Library Validation. Shell scripts (our wrapper) don't take them.
       if file -b "$f" 2>/dev/null | grep -q "Mach-O"; then
-        sign_macho_without_runtime "$f"
+        # Code.real needs hardened runtime + entitlements for V8 to init
+        sign_macho_with_runtime_and_entitlements "$f" "$ENT_MAIN"
       else
         codesign --force --sign - "$f" 2>/dev/null || true
       fi
@@ -351,6 +386,19 @@ find "$DEST/Contents/MacOS" -type f -perm +111 2>/dev/null \
 # (bounded scope, no races); it's only unreliable when applied to the whole
 # app tree. Parallelism across frameworks would race on shared inodes from
 # the APFS clone, so we go serial here.
+# Pre-sign Mach-O files that live inside frameworks at depths beyond what
+# `--deep` reliably walks. chrome_crashpad_handler (in Electron Framework's
+# Helpers/) is the chronic offender: --deep on the framework skips it and the
+# framework's outer seal then fails with "file modified: chrome_crashpad_handler".
+find "$DEST" -type f -path "*/Frameworks/*" -perm +111 2>/dev/null \
+  | while IFS= read -r f; do
+      # Only actual Mach-O executables — skip scripts, text, etc.
+      if file -b "$f" 2>/dev/null | grep -q "Mach-O"; then
+        echo ">> pre-sign mach-o in framework: $f" >> "$SIGN_LOG"
+        codesign --force --sign - "$f" >> "$SIGN_LOG" 2>&1 || true
+      fi
+    done
+
 find "$DEST" -depth -type d -name "*.framework" 2>/dev/null \
   | while IFS= read -r fw; do
       echo ">> sign framework: $fw" >> "$SIGN_LOG"
