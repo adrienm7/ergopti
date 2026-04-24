@@ -40,9 +40,8 @@ CONTENTS="$DEST/Contents"
 MACOS="$CONTENTS/MacOS"
 RES="$CONTENTS/Resources"
 
-# Strip any existing signature so Gatekeeper doesn't reject our modifications
-codesign --remove-signature "$DEST" 2>/dev/null || true
-rm -rf "$CONTENTS/_CodeSignature" 2>/dev/null || true
+# Keep original signatures in place — we need their entitlements metadata
+# (hardened runtime, sandbox, etc.) to be preserved when we re-sign later.
 
 TMPDIR_WORK=$(mktemp -d "/tmp/appcloner.XXXXXX")
 trap 'rm -rf "$TMPDIR_WORK"' EXIT
@@ -266,14 +265,52 @@ OPEN_ARG="$OPEN_ARG"
 CONF
 
 
-# ── 7) Ad-hoc re-sign ───────────────────────────────────────────────────────
-# Modern macOS refuses to launch a modified hardened-runtime bundle unless it
-# carries a valid signature. We stripped the original one; re-sign ad-hoc (no
-# identity, "-") and deeply so every nested framework/helper is covered.
-# Without this step, Electron apps (VSCode, Slack, etc.) silently fail to
-# launch and the Dock shows a "?" placeholder.
-codesign --force --deep --sign - "$DEST" 2>&1 | tail -5 || true
-echo "Bundle re-signed ad-hoc"
+# ── 7) Bottom-up ad-hoc re-sign ─────────────────────────────────────────────
+# Electron apps (VSCode, Slack, etc.) ship with hardened runtime + notarized
+# signatures on every nested helper/framework. Modifying Info.plist invalidates
+# the main bundle's sealed-resources manifest, so macOS refuses to launch it
+# (crash "quit unexpectedly", Dock shows "?"). `codesign --deep --sign -` is
+# unreliable here: it often skips nested Mach-O binaries buried in frameworks.
+#
+# We re-sign manually bottom-up: dylibs → nested frameworks → nested .app
+# bundles (deepest first) → main bundle. `--preserve-metadata=...` keeps each
+# component's original entitlements + hardened-runtime flag, which is what
+# allows Electron's JIT + V8 to keep working after re-sign.
+echo "Re-signing bottom-up (ad-hoc)…"
+
+PRESERVE="--preserve-metadata=entitlements,requirements,flags,runtime"
+
+# Leaf Mach-O files (dylibs, *.so, standalone binaries inside Frameworks)
+find "$DEST/Contents/Frameworks" -type f \( -name "*.dylib" -o -name "*.so" \) 2>/dev/null \
+  | while IFS= read -r f; do
+      codesign --force --sign - "$f" 2>/dev/null || true
+    done
+
+# Nested .framework bundles — deepest first
+find "$DEST" -depth -type d -name "*.framework" 2>/dev/null \
+  | while IFS= read -r fw; do
+      codesign --force --sign - $PRESERVE "$fw" 2>/dev/null \
+        || codesign --force --sign - "$fw" 2>/dev/null || true
+    done
+
+# Nested .app bundles (helpers, renderer processes) — deepest first, skip root
+find "$DEST" -depth -type d -name "*.app" 2>/dev/null \
+  | while IFS= read -r nested; do
+      [[ "$nested" == "$DEST" ]] && continue
+      codesign --force --sign - $PRESERVE "$nested" 2>/dev/null \
+        || codesign --force --sign - "$nested" 2>/dev/null || true
+    done
+
+# Main bundle last — preserves VSCode's hardened-runtime entitlement so Electron
+# can still allocate JIT pages under ad-hoc signature
+codesign --force --sign - $PRESERVE "$DEST" 2>&1 | tail -3 || true
+
+# Verify
+if codesign --verify --deep --strict "$DEST" 2>&1 | tail -3; then
+  echo "Signature OK"
+else
+  echo "Signature verify reported issues (may still launch — see log above)"
+fi
 
 
 # ── 8) Dock ─────────────────────────────────────────────────────────────────
