@@ -61,6 +61,29 @@ global ACTIVATE_HOTSTRINGS_DELAY_MS := 50
 global _HotstringRegistrar := 0
 global _SendHook := 0
 
+; Boot-time resolution of whether AltGr needs the synthetic Up injection in
+; HotstringHandler. Reading ``ScriptInformation["AltGrIsKanaRemap"]`` once
+; at boot and caching as a plain bool lets the hot path skip both a Map
+; lookup and a truthy test on every hotstring firing. ErgoptiPlus.ahk calls
+; ``HotstringEngineInit`` after populating ``ScriptInformation`` from the
+; ini so the cached value reflects the user's configuration.
+global _ALTGR_KANA_FIXUP := False
+
+HotstringEngineInit() {
+    global _ALTGR_KANA_FIXUP
+    if !IsSet(ScriptInformation) {
+        return
+    }
+    if !ScriptInformation.Has("AltGrIsKanaRemap") {
+        return
+    }
+    Val := ScriptInformation["AltGrIsKanaRemap"]
+    ; INI values come back as strings; treat "true"/"1"/true as truthy.
+    if (Val == true or Val == 1 or Val == "1" or Val == "true" or Val == "True") {
+        _ALTGR_KANA_FIXUP := True
+    }
+}
+
 
 ; =======================================
 ; =======================================
@@ -195,7 +218,12 @@ HotstringHandler(Abbreviation, Replacement, EndChar, OnlyText := True, FinalResu
         return
     }
 
-    SendEvent("{SC138 Up}") ; Becomes necessary when we replaced the AltGr key by Kana
+    if _ALTGR_KANA_FIXUP {
+        ; Only needed when AltGr (SC138) is remapped to Kana at the driver
+        ; level — without that remap the Up is a wasted SendEvent on the
+        ; hottest path. ``HotstringEngineInit`` sets the flag at boot.
+        SendEvent("{SC138 Up}")
+    }
 
     ; B0 flag means we delete the abbreviation manually; this behaves
     ; consistently everywhere (URL bars, devtools) unlike AHK's auto-erase.

@@ -115,6 +115,12 @@ global ScriptInformation := Map(
     ; personal files outside the Ergopti repository)
     "PersonalAhkPath", A_ScriptDir . "\personal.ahk",
     "PersonalTomlPath", A_ScriptDir . "\..\hotstrings\personal.toml",
+    ; Set to True only when AltGr (SC138) has been remapped to Kana at the
+    ; driver level (KbdEdit, MSKLC). With that remap active, AHK still sees
+    ; the virtual AltGr-down bit stuck after a hotstring, and we need to
+    ; inject {SC138 Up} before sending the replacement. Default is False:
+    ; this spares one SendEvent per hotstring firing on standard setups.
+    "AltGrIsKanaRemap", False,
 )
 
 global ConfigurationShortcutsList := [
@@ -137,6 +143,11 @@ ReadScriptConfig(Cache) {
 
 global _IniCache := ParseIniFile(ConfigurationFile)
 ReadScriptConfig(_IniCache)
+
+; Resolve hot-path flags cached by the hotstring engine (AltGrIsKanaRemap)
+; now that ScriptInformation reflects the INI overrides. Must run before the
+; first hotstring fires.
+HotstringEngineInit()
 
 ; Initialise the logger now that the ini cache is built and ScriptInformation
 ; reflects user overrides — LoggerInit reads [Script] LogLevel from the ini.
