@@ -79,11 +79,13 @@ on run argv
 	logmsg("colorHex: " & colorHex)
 
 	-- ── 5) Confirmation et création ─────────────────────────────────────────
+	set openArgDisplay to "(aucun)"
+	if openArg is not "" then set openArgDisplay to openArg
 	set summary to "Récapitulatif :" & return & return ¬
 		& "• Source : " & sourcePath & return ¬
 		& "• Nom    : " & cloneName & return ¬
 		& "• Teinte : " & colorHex & return ¬
-		& "• Arg    : " & (openArg is not "" and openArg or "(aucun)")
+		& "• Arg    : " & openArgDisplay
 	set go to button returned of (display dialog summary ¬
 		buttons {"Annuler", "Créer le clone"} default button 2)
 	if go is "Annuler" then return

@@ -68,18 +68,26 @@ local function resize_to_menu_icon(img)
 end
 
 --- Loads the icon for a bundle, trying sources in priority order.
---- Priority: .icns declared in Info.plist → any .icns in Resources → AppIcon.svg.
---- Does NOT rely on bundle ID registration so it works before the first launch.
+--- Priority: AppIcon.svg (custom, always intentional) → declared .icns → any .icns.
+--- SVG is checked first because the system .icns in Automator-generated droplets
+--- is the generic Automator icon, whereas AppIcon.svg is our custom artwork.
 --- @param app_path string Absolute path to the .app bundle.
 --- @param info table|nil Parsed Info.plist table (may be nil).
 --- @return userdata|nil An hs.image sized to 16×16, or nil on failure.
 local function load_icon(app_path, info)
 	local resources = app_path .. "/Contents/Resources"
 
-	-- Try the declared icon file first
+	-- Custom SVG takes priority — it is always intentional artwork
+	local svg_path = resources .. "/AppIcon.svg"
+	local ok_svg, img_svg = pcall(hs.image.imageFromPath, svg_path)
+	if ok_svg and img_svg then
+		local ok_r, r = pcall(resize_to_menu_icon, img_svg)
+		return ok_r and r or img_svg
+	end
+
+	-- Try the .icns declared in Info.plist
 	local icon_file = type(info) == "table" and info.CFBundleIconFile or nil
 	if icon_file then
-		-- macOS omits the extension in the plist value half the time
 		local candidates = {
 			resources .. "/" .. icon_file,
 			resources .. "/" .. icon_file .. ".icns",
@@ -93,7 +101,7 @@ local function load_icon(app_path, info)
 		end
 	end
 
-	-- Scan for any .icns in Resources/
+	-- Last resort: any .icns found in Resources/
 	local ok_ls, ls = pcall(hs.execute, string.format(
 		"find %q -maxdepth 1 -name '*.icns' 2>/dev/null | head -1",
 		resources
@@ -107,14 +115,6 @@ local function load_icon(app_path, info)
 				return ok_r and r or img
 			end
 		end
-	end
-
-	-- SVG fallback
-	local svg_path = resources .. "/AppIcon.svg"
-	local ok_svg, img_svg = pcall(hs.image.imageFromPath, svg_path)
-	if ok_svg and img_svg then
-		local ok_r, r = pcall(resize_to_menu_icon, img_svg)
-		return ok_r and r or img_svg
 	end
 
 	return nil
