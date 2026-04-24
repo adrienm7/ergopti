@@ -37,3 +37,9 @@ SRC_ICNS=/Applications/Visual Studio Code.app//Contents/Resources/Code.icns
 PNG: icon_512x512@2x
 HUE_RAD=0.0000
 1317:1323: syntax error: fin de ligne, etc. prévu(s) mais propriété trouvé(s). (-2741)
+=== Fri Apr 24 23:28:34 CEST 2026 SOURCE=/Applications/Visual Studio Code.app/ NAME=Visual Studio Code — Clone COLOR=#CC0000 ARG= ===
+DEST=/Users/b519hs/Applications/Visual Studio Code — Clone_1777066114.app
+SRC_ICNS=/Applications/Visual Studio Code.app//Contents/Resources/Code.icns
+PNG: icon_512x512@2x
+src_hue_rad=0.0000 target_hue_rad=0.0000 delta=0.0000
+osascript error: /var/folders/j8/6707b4c95nz1ygz8g6s7m3fc0000gp/T/tmp3xpri0z4.applescript:1155:1161: script error: fin de ligne, etc. prévu(s) mais propriété trouvé(s). (-2741)
