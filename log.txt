@@ -1,23 +1,23 @@
-❯ cleaR
+❯ clear
 ❯ cat /tmp/clone_diag.log
 ============================================================
-=== AppCloner auto-diagnostic — Sat Apr 25 01:02:36 CEST 2026
-=== Clone: /Users/b519hs/Applications/Kubernetes.app
+=== AppCloner auto-diagnostic — Sat Apr 25 01:09:28 CEST 2026
+=== Clone: /Users/b519hs/Applications/Kub.app
 ============================================================
 
 ── codesign -dv ────────────────────────────────────────────
-Executable=/Users/b519hs/Applications/Kubernetes.app/Contents/MacOS/Code
-Identifier=fr.b519hs.clone.1777071742
+Executable=/Users/b519hs/Applications/Kub.app/Contents/MacOS/Code
+Identifier=fr.b519hs.clone.1777072155
 Format=app bundle with generic
 CodeDirectory v=20100 size=203 flags=0x2(adhoc) hashes=1+3 location=embedded
 Hash type=sha256 size=32
-CandidateCDHash sha256=25615ffeb0e2faa9ce2539b35b5c132ce8d14f1d
-CandidateCDHashFull sha256=25615ffeb0e2faa9ce2539b35b5c132ce8d14f1d1fe5994a6556e400a48e3868
+CandidateCDHash sha256=4429223ae3b223f8df521c93f11f5174c5e7c059
+CandidateCDHashFull sha256=4429223ae3b223f8df521c93f11f5174c5e7c0594afcf157d5a22d00263bb526
 Hash choices=sha256
-CMSDigest=25615ffeb0e2faa9ce2539b35b5c132ce8d14f1d1fe5994a6556e400a48e3868
+CMSDigest=4429223ae3b223f8df521c93f11f5174c5e7c0594afcf157d5a22d00263bb526
 CMSDigestType=2
 Page size=none
-CDHash=25615ffeb0e2faa9ce2539b35b5c132ce8d14f1d
+CDHash=4429223ae3b223f8df521c93f11f5174c5e7c059
 Signature=adhoc
 Notarization Ticket=stapled
 Info.plist entries=36
@@ -26,29 +26,36 @@ Sealed Resources version=2 rules=13 files=6561
 Internal requirements count=1 size=64
 
 ── codesign --verify --deep --strict ───────────────────────
---prepared:/Users/b519hs/Applications/Kubernetes.app/Contents/MacOS/Code.real
---validated:/Users/b519hs/Applications/Kubernetes.app/Contents/MacOS/Code.real
-/Users/b519hs/Applications/Kubernetes.app: nested code is modified or invalid
-file modified: /Users/b519hs/Applications/Kubernetes.app/Contents/Frameworks/Code Helper (Plugin).app
-file modified: /Users/b519hs/Applications/Kubernetes.app/Contents/Frameworks/Code Helper (Renderer).app
-file modified: /Users/b519hs/Applications/Kubernetes.app/Contents/Frameworks/Code Helper (GPU).app
-file modified: /Users/b519hs/Applications/Kubernetes.app/Contents/Frameworks/Code Helper.app
-file modified: /Users/b519hs/Applications/Kubernetes.app/Contents/Frameworks/Mantle.framework
-file modified: /Users/b519hs/Applications/Kubernetes.app/Contents/Frameworks/Squirrel.framework
-file modified: /Users/b519hs/Applications/Kubernetes.app/Contents/Frameworks/ReactiveObjC.framework
-file modified: /Users/b519hs/Applications/Kubernetes.app/Contents/Frameworks/Electron Framework.framework
+--prepared:/Users/b519hs/Applications/Kub.app/Contents/MacOS/Code.real
+--validated:/Users/b519hs/Applications/Kub.app/Contents/MacOS/Code.real
+/Users/b519hs/Applications/Kub.app: nested code is modified or invalid
+file modified: /Users/b519hs/Applications/Kub.app/Contents/Frameworks/Code Helper.app
+file modified: /Users/b519hs/Applications/Kub.app/Contents/Frameworks/Code Helper (GPU).app
+file modified: /Users/b519hs/Applications/Kub.app/Contents/Frameworks/Code Helper (Plugin).app
+file modified: /Users/b519hs/Applications/Kub.app/Contents/Frameworks/Mantle.framework
+file modified: /Users/b519hs/Applications/Kub.app/Contents/Frameworks/Squirrel.framework
+file modified: /Users/b519hs/Applications/Kub.app/Contents/Frameworks/Code Helper (Renderer).app
+file modified: /Users/b519hs/Applications/Kub.app/Contents/Frameworks/ReactiveObjC.framework
+file modified: /Users/b519hs/Applications/Kub.app/Contents/Frameworks/Electron Framework.framework
 
 ── spctl -a -vv ────────────────────────────────────────────
-/Users/b519hs/Applications/Kubernetes.app: nested code is modified or invalid
+/Users/b519hs/Applications/Kub.app: nested code is modified or invalid
 
 ── xattr -l ────────────────────────────────────────────────
 com.apple.provenance:
 
 ── Test launch ─────────────────────────────────────────────
-Executing: /Users/b519hs/Applications/Kubernetes.app/Contents/MacOS/Code
-dyld[9449]: Library not loaded: @rpath/Electron Framework.framework/Electron Framework
-  Referenced from: <4C4C443C-5555-3144-A118-EAA58808DF01> /Users/b519hs/Applications/Kubernetes.app/Contents/MacOS/Code.real
-  Reason: tried: '/Users/b519hs/Applications/Kubernetes.app/Contents/Frameworks/Electron Framework.framework/Electron Framework' (code signature in <4C4C4468-5555-3144-A126-AFDC5C58C175> '/Users/b519hs/Applications/Kubernetes.app/Contents/Frameworks/Electron Framework.framework/Versions/A/Electron Framework' not valid for use in process: mapping process and mapped file (non-platform) have different Team IDs), '/Users/b519hs/Applications/Kubernetes.app/Contents/Frameworks/Electron Framework.framework/Electron Framework' (code signature in <4C4C4468-5555-3144-A126-AFDC5C58C175> '/Users/b519hs/Applications/Kubernetes.app/Contents/Frameworks/Electron Framework.framework/Versions/A/Electron Framework' not valid for use in process: mapping process and mapped file (non-platform) have different Team IDs)
+Executing: /Users/b519hs/Applications/Kub.app/Contents/MacOS/Code
 
-╭─     ~ ─────────────────────────────────────────────────────────────────────────────────────────── ✔  01:05:18 
+── Still alive after 5 s — killing ───────────────────────
+LAUNCH_RESULT=alive
+
+── New crash reports since launch ──────────────────────────
+(no new crash reports)
+
+── Top 10 entitlements preserved on Code.real ──────────────
+
+=== End of diagnostic ===
+
+╭─     ~ ─────────────────────────────────────────────────────────────────────────────────────────── ✔  01:10:22 
 ╰─
