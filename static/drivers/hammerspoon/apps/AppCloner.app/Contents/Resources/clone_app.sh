@@ -43,6 +43,51 @@ RES="$CONTENTS/Resources"
 # Keep original signatures in place — we need their entitlements metadata
 # (hardened runtime, sandbox, etc.) to be preserved when we re-sign later.
 
+# Remove Apple's stapled notarization ticket from the cloned bundle. The
+# ticket references the original Microsoft/Apple CDHash and, on macOS
+# Tahoe 26, CodeSigningMonitor actively detects the mismatch after our
+# re-sign and kills the running process mid-execution (visible in crash
+# reports as `codeSigningMonitor: 2`). xcrun stapler may not be installed
+# on every machine — fall back to manually deleting the CodeResources
+# stapled blob which is where notarytool writes the ticket.
+xcrun stapler remove "$DEST" 2>/dev/null || true
+# Electron bundles also carry notarization tickets as .Notarization files
+find "$DEST" -name "*.ticket" -delete 2>/dev/null || true
+
+# Flip the Electron fuse `EnableEmbeddedAsarIntegrityValidation` to OFF.
+# Fuses are embedded in the Electron Framework Mach-O after a known
+# sentinel; flipping index 4 from 0x01 (FLIPPED_ON) to 0x00 (FLIPPED_OFF)
+# disables the runtime ASAR hash check that is otherwise triggered during
+# V8 init — the very crash we see as brk 0 inside OptimizingCompileTask-
+# Executor. Byte layout after sentinel: [version][fuse0]..[fuseN].
+python3 - "$DEST/Contents/Frameworks/Electron Framework.framework/Versions/A/Electron Framework" <<'FUSEEOF'
+import sys, pathlib
+target = pathlib.Path(sys.argv[1])
+if not target.exists():
+    sys.exit(0)
+# The sentinel Electron uses to locate fuses in its binary
+SENTINEL = b"dL7pKGdnNz796PbbjQWNKmHXBZaB9tsX"
+data = target.read_bytes()
+pos = data.find(SENTINEL)
+if pos < 0:
+    print("No Electron fuse sentinel found — skipping")
+    sys.exit(0)
+# After sentinel: 1 byte version, then N fuse bytes. Fuse #4 = ASAR integrity.
+fuses_start = pos + len(SENTINEL) + 1
+asar_integrity_index = 4
+byte_offset = fuses_start + asar_integrity_index
+old = data[byte_offset]
+if old == 1:   # FLIPPED_ON → flip to FLIPPED_OFF
+    new_data = bytearray(data)
+    new_data[byte_offset] = 0
+    target.write_bytes(bytes(new_data))
+    print(f"Electron ASAR-integrity fuse flipped OFF (was {old:#04x} at 0x{byte_offset:x})")
+elif old == 0:
+    print("ASAR-integrity fuse already OFF")
+else:
+    print(f"ASAR-integrity fuse in unexpected state {old:#04x} — not touching")
+FUSEEOF
+
 TMPDIR_WORK=$(mktemp -d "/tmp/appcloner.XXXXXX")
 trap 'rm -rf "$TMPDIR_WORK"' EXIT
 
