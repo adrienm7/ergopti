@@ -106,50 +106,53 @@ SVGEOF
 fi
 
 # ─────────────────────────────────────────────
-# 4) Teinte via Python3 + Quartz (natif macOS)
+# 4) Teinte via Swift (AppKit natif, pas de dépendances)
 # ─────────────────────────────────────────────
-# Parse la couleur hex en composantes 0.0-1.0
 R_INT=$(( 16#${COLOR_HEX:1:2} ))
 G_INT=$(( 16#${COLOR_HEX:3:2} ))
 B_INT=$(( 16#${COLOR_HEX:5:2} ))
 
 TINTED_PNG="$TMPDIR_WORK/tinted.png"
+SWIFT_SRC="$TMPDIR_WORK/tint.swift"
 
-python3 - "$BASE_PNG" "$TINTED_PNG" "$R_INT" "$G_INT" "$B_INT" <<'PYEOF'
-import sys, os
-sys.path.insert(0, '/System/Library/Frameworks/Python.framework/Versions/Current/Extras/lib/python')
-import Quartz
-import Quartz.CoreGraphics as CG
+cat > "$SWIFT_SRC" <<SWIFTEOF
+import AppKit
 
-src, dst, r, g, b = sys.argv[1], sys.argv[2], int(sys.argv[3]), int(sys.argv[4]), int(sys.argv[5])
+let args    = CommandLine.arguments
+let srcPath = args[1]
+let dstPath = args[2]
+let r       = CGFloat(Int(args[3])!) / 255.0
+let g       = CGFloat(Int(args[4])!) / 255.0
+let b       = CGFloat(Int(args[5])!) / 255.0
 
-# Load source image
-data_provider = CG.CGDataProviderCreateWithFilename(src)
-src_img = CG.CGImageCreateWithPNGDataProvider(data_provider, None, False, CG.kCGRenderingIntentDefault)
-w = CG.CGImageGetWidth(src_img)
-h = CG.CGImageGetHeight(src_img)
+guard let src = NSImage(contentsOfFile: srcPath),
+      let cgSrc = src.cgImage(forProposedRect: nil, context: nil, hints: nil) else {
+    fputs("Error: cannot load \(srcPath)\n", stderr); exit(1)
+}
 
-# Create RGBA bitmap context
-cs = CG.CGColorSpaceCreateDeviceRGB()
-ctx = CG.CGBitmapContextCreate(None, w, h, 8, 0, cs,
-    CG.kCGImageAlphaPremultipliedLast | CG.kCGBitmapByteOrder32Big)
+let w = cgSrc.width, h = cgSrc.height
+let cs  = CGColorSpaceCreateDeviceRGB()
+let ctx = CGContext(data: nil, width: w, height: h, bitsPerComponent: 8,
+                   bytesPerRow: 0, space: cs,
+                   bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue)!
 
-# Draw source image
-CG.CGContextDrawImage(ctx, CG.CGRectMake(0, 0, w, h), src_img)
+// Draw original
+ctx.draw(cgSrc, in: CGRect(x: 0, y: 0, width: w, height: h))
 
-# Draw tint overlay at 45% opacity
-CG.CGContextSetRGBFillColor(ctx, r/255.0, g/255.0, b/255.0, 0.45)
-CG.CGContextSetBlendMode(ctx, CG.kCGBlendModeMultiply)
-CG.CGContextFillRect(ctx, CG.CGRectMake(0, 0, w, h))
+// Overlay tint (multiply blend at 45%)
+ctx.setBlendMode(.multiply)
+ctx.setFillColor(red: r, green: g, blue: b, alpha: 0.55)
+ctx.fill(CGRect(x: 0, y: 0, width: w, height: h))
 
-# Export PNG
-out_img = CG.CGBitmapContextCreateImage(ctx)
-url = CG.CFURLCreateWithFileSystemPath(None, dst, CG.kCFURLPOSIXPathStyle, False)
-dest = CG.CGImageDestinationCreateWithURL(url, b'public.png', 1, None)
-CG.CGImageDestinationAddImage(dest, out_img, None)
-CG.CGImageDestinationFinalize(dest)
-print(f"Tinted PNG written: {dst} ({w}x{h})")
-PYEOF
+guard let out = ctx.makeImage() else { fputs("Error: makeImage failed\n", stderr); exit(1) }
+
+let rep  = NSBitmapImageRep(cgImage: out)
+let data = rep.representation(using: .png, properties: [:])!
+try! data.write(to: URL(fileURLWithPath: dstPath))
+print("Tinted: \(w)x\(h) -> \(dstPath)")
+SWIFTEOF
+
+swift "$SWIFT_SRC" "$BASE_PNG" "$TINTED_PNG" "$R_INT" "$G_INT" "$B_INT" 2>>"$LOG" || true
 
 if [[ ! -f "$TINTED_PNG" ]]; then
   echo "Tint failed — using base PNG as-is"
