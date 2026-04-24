@@ -162,8 +162,8 @@ IniBatchWrite(Path, Updates) {
 	; Single write. Use UTF-8 with BOM so downstream ``IniRead`` (Win32) sees
 	; the same encoding it would after a plain ``IniWrite`` call.
 	Blob := ""
-	for _, Ln in Out {
-		Blob .= Ln . "`r`n"
+	for _, LineOut in Out {
+		Blob .= LineOut . "`r`n"
 	}
 	try {
 		f := FileOpen(Path, "w", "UTF-8")

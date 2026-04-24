@@ -87,7 +87,7 @@ global _GENERATED_HOTSTRINGS := Map(
 _GenLoad_distancesreduction_qu(FeatureConfig, ExtraOptions := unset) {
 	global ScriptInformation
 	TimeAct := FeatureConfig.HasOwnProp("TimeActivationSeconds") ? FeatureConfig.TimeActivationSeconds : 0
-	MK := ScriptInformation["MagicKey"]
+	_GenMK := ScriptInformation["MagicKey"]
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
@@ -143,7 +143,7 @@ _GenLoad_distancesreduction_qu(FeatureConfig, ExtraOptions := unset) {
 _GenLoad_distancesreduction_suffixesa(FeatureConfig, ExtraOptions := unset) {
 	global ScriptInformation
 	TimeAct := FeatureConfig.HasOwnProp("TimeActivationSeconds") ? FeatureConfig.TimeActivationSeconds : 0
-	MK := ScriptInformation["MagicKey"]
+	_GenMK := ScriptInformation["MagicKey"]
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
@@ -269,7 +269,7 @@ _GenLoad_distancesreduction_suffixesa(FeatureConfig, ExtraOptions := unset) {
 _GenLoad_distancesreduction_commaj(FeatureConfig, ExtraOptions := unset) {
 	global ScriptInformation
 	TimeAct := FeatureConfig.HasOwnProp("TimeActivationSeconds") ? FeatureConfig.TimeActivationSeconds : 0
-	MK := ScriptInformation["MagicKey"]
+	_GenMK := ScriptInformation["MagicKey"]
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
@@ -320,7 +320,7 @@ _GenLoad_distancesreduction_commaj(FeatureConfig, ExtraOptions := unset) {
 _GenLoad_distancesreduction_commafarletters(FeatureConfig, ExtraOptions := unset) {
 	global ScriptInformation
 	TimeAct := FeatureConfig.HasOwnProp("TimeActivationSeconds") ? FeatureConfig.TimeActivationSeconds : 0
-	MK := ScriptInformation["MagicKey"]
+	_GenMK := ScriptInformation["MagicKey"]
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
@@ -351,7 +351,7 @@ _GenLoad_distancesreduction_commafarletters(FeatureConfig, ExtraOptions := unset
 _GenLoad_distancesreduction_deadkeyecircumflex(FeatureConfig, ExtraOptions := unset) {
 	global ScriptInformation
 	TimeAct := FeatureConfig.HasOwnProp("TimeActivationSeconds") ? FeatureConfig.TimeActivationSeconds : 0
-	MK := ScriptInformation["MagicKey"]
+	_GenMK := ScriptInformation["MagicKey"]
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
@@ -737,7 +737,7 @@ _GenLoad_distancesreduction_deadkeyecircumflex(FeatureConfig, ExtraOptions := un
 _GenLoad_distancesreduction_ecircumflexe(FeatureConfig, ExtraOptions := unset) {
 	global ScriptInformation
 	TimeAct := FeatureConfig.HasOwnProp("TimeActivationSeconds") ? FeatureConfig.TimeActivationSeconds : 0
-	MK := ScriptInformation["MagicKey"]
+	_GenMK := ScriptInformation["MagicKey"]
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
@@ -748,7 +748,7 @@ _GenLoad_distancesreduction_ecircumflexe(FeatureConfig, ExtraOptions := unset) {
 _GenLoad_sfbsreduction_comma(FeatureConfig, ExtraOptions := unset) {
 	global ScriptInformation
 	TimeAct := FeatureConfig.HasOwnProp("TimeActivationSeconds") ? FeatureConfig.TimeActivationSeconds : 0
-	MK := ScriptInformation["MagicKey"]
+	_GenMK := ScriptInformation["MagicKey"]
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
@@ -819,7 +819,7 @@ _GenLoad_sfbsreduction_comma(FeatureConfig, ExtraOptions := unset) {
 _GenLoad_sfbsreduction_ecirc(FeatureConfig, ExtraOptions := unset) {
 	global ScriptInformation
 	TimeAct := FeatureConfig.HasOwnProp("TimeActivationSeconds") ? FeatureConfig.TimeActivationSeconds : 0
-	MK := ScriptInformation["MagicKey"]
+	_GenMK := ScriptInformation["MagicKey"]
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
@@ -845,7 +845,7 @@ _GenLoad_sfbsreduction_ecirc(FeatureConfig, ExtraOptions := unset) {
 _GenLoad_sfbsreduction_egrave(FeatureConfig, ExtraOptions := unset) {
 	global ScriptInformation
 	TimeAct := FeatureConfig.HasOwnProp("TimeActivationSeconds") ? FeatureConfig.TimeActivationSeconds : 0
-	MK := ScriptInformation["MagicKey"]
+	_GenMK := ScriptInformation["MagicKey"]
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
@@ -861,62 +861,62 @@ _GenLoad_sfbsreduction_egrave(FeatureConfig, ExtraOptions := unset) {
 _GenLoad_sfbsreduction_bu(FeatureConfig, ExtraOptions := unset) {
 	global ScriptInformation
 	TimeAct := FeatureConfig.HasOwnProp("TimeActivationSeconds") ? FeatureConfig.TimeActivationSeconds : 0
-	MK := ScriptInformation["MagicKey"]
+	_GenMK := ScriptInformation["MagicKey"]
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("il a mà★", "★", MK), "il a mis à jour", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("il a mà★", "★", _GenMK), "il a mis à jour", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("la mà★", "★", MK), "la mise à jour", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("la mà★", "★", _GenMK), "la mise à jour", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("ta mà★", "★", MK), "ta mise à jour", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("ta mà★", "★", _GenMK), "ta mise à jour", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("ma mà★", "★", MK), "ma mise à jour", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("ma mà★", "★", _GenMK), "ma mise à jour", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*?", StrReplace("e mà★", "★", MK), "e mise à jour", Opts)
+	CreateCaseSensitiveHotstrings("*?", StrReplace("e mà★", "★", _GenMK), "e mise à jour", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*?", StrReplace("es mà★", "★", MK), "es mises à jour", Opts)
+	CreateCaseSensitiveHotstrings("*?", StrReplace("es mà★", "★", _GenMK), "es mises à jour", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("mà★", "★", MK), "mettre à jour", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("mà★", "★", _GenMK), "mettre à jour", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("mià★", "★", MK), "mise à jour", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("mià★", "★", _GenMK), "mise à jour", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("pià★", "★", MK), "pièce jointe", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("pià★", "★", _GenMK), "pièce jointe", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("tà★", "★", MK), "toujours", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("tà★", "★", _GenMK), "toujours", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*?", StrReplace("à★", "★", MK), "bu", Opts)
+	CreateCaseSensitiveHotstrings("*?", StrReplace("à★", "★", _GenMK), "bu", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
@@ -927,12 +927,12 @@ _GenLoad_sfbsreduction_bu(FeatureConfig, ExtraOptions := unset) {
 _GenLoad_sfbsreduction_ie(FeatureConfig, ExtraOptions := unset) {
 	global ScriptInformation
 	TimeAct := FeatureConfig.HasOwnProp("TimeActivationSeconds") ? FeatureConfig.TimeActivationSeconds : 0
-	MK := ScriptInformation["MagicKey"]
+	_GenMK := ScriptInformation["MagicKey"]
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*?", StrReplace("ié★", "★", MK), "ébu", Opts)
+	CreateCaseSensitiveHotstrings("*?", StrReplace("ié★", "★", _GenMK), "ébu", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
@@ -948,7 +948,7 @@ _GenLoad_sfbsreduction_ie(FeatureConfig, ExtraOptions := unset) {
 _GenLoad_rolls_hc(FeatureConfig, ExtraOptions := unset) {
 	global ScriptInformation
 	TimeAct := FeatureConfig.HasOwnProp("TimeActivationSeconds") ? FeatureConfig.TimeActivationSeconds : 0
-	MK := ScriptInformation["MagicKey"]
+	_GenMK := ScriptInformation["MagicKey"]
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
@@ -959,7 +959,7 @@ _GenLoad_rolls_hc(FeatureConfig, ExtraOptions := unset) {
 _GenLoad_rolls_sx(FeatureConfig, ExtraOptions := unset) {
 	global ScriptInformation
 	TimeAct := FeatureConfig.HasOwnProp("TimeActivationSeconds") ? FeatureConfig.TimeActivationSeconds : 0
-	MK := ScriptInformation["MagicKey"]
+	_GenMK := ScriptInformation["MagicKey"]
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
@@ -975,7 +975,7 @@ _GenLoad_rolls_sx(FeatureConfig, ExtraOptions := unset) {
 _GenLoad_rolls_cx(FeatureConfig, ExtraOptions := unset) {
 	global ScriptInformation
 	TimeAct := FeatureConfig.HasOwnProp("TimeActivationSeconds") ? FeatureConfig.TimeActivationSeconds : 0
-	MK := ScriptInformation["MagicKey"]
+	_GenMK := ScriptInformation["MagicKey"]
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
@@ -986,7 +986,7 @@ _GenLoad_rolls_cx(FeatureConfig, ExtraOptions := unset) {
 _GenLoad_rolls_englishnegation(FeatureConfig, ExtraOptions := unset) {
 	global ScriptInformation
 	TimeAct := FeatureConfig.HasOwnProp("TimeActivationSeconds") ? FeatureConfig.TimeActivationSeconds : 0
-	MK := ScriptInformation["MagicKey"]
+	_GenMK := ScriptInformation["MagicKey"]
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
@@ -997,7 +997,7 @@ _GenLoad_rolls_englishnegation(FeatureConfig, ExtraOptions := unset) {
 _GenLoad_rolls_ez(FeatureConfig, ExtraOptions := unset) {
 	global ScriptInformation
 	TimeAct := FeatureConfig.HasOwnProp("TimeActivationSeconds") ? FeatureConfig.TimeActivationSeconds : 0
-	MK := ScriptInformation["MagicKey"]
+	_GenMK := ScriptInformation["MagicKey"]
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
@@ -1008,7 +1008,7 @@ _GenLoad_rolls_ez(FeatureConfig, ExtraOptions := unset) {
 _GenLoad_rolls_ct(FeatureConfig, ExtraOptions := unset) {
 	global ScriptInformation
 	TimeAct := FeatureConfig.HasOwnProp("TimeActivationSeconds") ? FeatureConfig.TimeActivationSeconds : 0
-	MK := ScriptInformation["MagicKey"]
+	_GenMK := ScriptInformation["MagicKey"]
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
@@ -1024,7 +1024,7 @@ _GenLoad_rolls_ct(FeatureConfig, ExtraOptions := unset) {
 _GenLoad_rolls_closechevrontag(FeatureConfig, ExtraOptions := unset) {
 	global ScriptInformation
 	TimeAct := FeatureConfig.HasOwnProp("TimeActivationSeconds") ? FeatureConfig.TimeActivationSeconds : 0
-	MK := ScriptInformation["MagicKey"]
+	_GenMK := ScriptInformation["MagicKey"]
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", true)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
@@ -1035,7 +1035,7 @@ _GenLoad_rolls_closechevrontag(FeatureConfig, ExtraOptions := unset) {
 _GenLoad_rolls_chevronequal(FeatureConfig, ExtraOptions := unset) {
 	global ScriptInformation
 	TimeAct := FeatureConfig.HasOwnProp("TimeActivationSeconds") ? FeatureConfig.TimeActivationSeconds : 0
-	MK := ScriptInformation["MagicKey"]
+	_GenMK := ScriptInformation["MagicKey"]
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", true)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
@@ -1051,7 +1051,7 @@ _GenLoad_rolls_chevronequal(FeatureConfig, ExtraOptions := unset) {
 _GenLoad_rolls_comment(FeatureConfig, ExtraOptions := unset) {
 	global ScriptInformation
 	TimeAct := FeatureConfig.HasOwnProp("TimeActivationSeconds") ? FeatureConfig.TimeActivationSeconds : 0
-	MK := ScriptInformation["MagicKey"]
+	_GenMK := ScriptInformation["MagicKey"]
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", true)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
@@ -1067,7 +1067,7 @@ _GenLoad_rolls_comment(FeatureConfig, ExtraOptions := unset) {
 _GenLoad_rolls_assign(FeatureConfig, ExtraOptions := unset) {
 	global ScriptInformation
 	TimeAct := FeatureConfig.HasOwnProp("TimeActivationSeconds") ? FeatureConfig.TimeActivationSeconds : 0
-	MK := ScriptInformation["MagicKey"]
+	_GenMK := ScriptInformation["MagicKey"]
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", true)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
@@ -1093,7 +1093,7 @@ _GenLoad_rolls_assign(FeatureConfig, ExtraOptions := unset) {
 _GenLoad_rolls_notequal(FeatureConfig, ExtraOptions := unset) {
 	global ScriptInformation
 	TimeAct := FeatureConfig.HasOwnProp("TimeActivationSeconds") ? FeatureConfig.TimeActivationSeconds : 0
-	MK := ScriptInformation["MagicKey"]
+	_GenMK := ScriptInformation["MagicKey"]
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", true)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
@@ -1119,7 +1119,7 @@ _GenLoad_rolls_notequal(FeatureConfig, ExtraOptions := unset) {
 _GenLoad_rolls_hashtagquote(FeatureConfig, ExtraOptions := unset) {
 	global ScriptInformation
 	TimeAct := FeatureConfig.HasOwnProp("TimeActivationSeconds") ? FeatureConfig.TimeActivationSeconds : 0
-	MK := ScriptInformation["MagicKey"]
+	_GenMK := ScriptInformation["MagicKey"]
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", true)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
@@ -1135,7 +1135,7 @@ _GenLoad_rolls_hashtagquote(FeatureConfig, ExtraOptions := unset) {
 _GenLoad_rolls_hashtagparenthesis(FeatureConfig, ExtraOptions := unset) {
 	global ScriptInformation
 	TimeAct := FeatureConfig.HasOwnProp("TimeActivationSeconds") ? FeatureConfig.TimeActivationSeconds : 0
-	MK := ScriptInformation["MagicKey"]
+	_GenMK := ScriptInformation["MagicKey"]
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", true)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
@@ -1146,7 +1146,7 @@ _GenLoad_rolls_hashtagparenthesis(FeatureConfig, ExtraOptions := unset) {
 _GenLoad_rolls_hashtagbracket(FeatureConfig, ExtraOptions := unset) {
 	global ScriptInformation
 	TimeAct := FeatureConfig.HasOwnProp("TimeActivationSeconds") ? FeatureConfig.TimeActivationSeconds : 0
-	MK := ScriptInformation["MagicKey"]
+	_GenMK := ScriptInformation["MagicKey"]
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", true)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
@@ -1162,7 +1162,7 @@ _GenLoad_rolls_hashtagbracket(FeatureConfig, ExtraOptions := unset) {
 _GenLoad_rolls_equalstring(FeatureConfig, ExtraOptions := unset) {
 	global ScriptInformation
 	TimeAct := FeatureConfig.HasOwnProp("TimeActivationSeconds") ? FeatureConfig.TimeActivationSeconds : 0
-	MK := ScriptInformation["MagicKey"]
+	_GenMK := ScriptInformation["MagicKey"]
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", true)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
@@ -1178,7 +1178,7 @@ _GenLoad_rolls_equalstring(FeatureConfig, ExtraOptions := unset) {
 _GenLoad_rolls_leftarrow(FeatureConfig, ExtraOptions := unset) {
 	global ScriptInformation
 	TimeAct := FeatureConfig.HasOwnProp("TimeActivationSeconds") ? FeatureConfig.TimeActivationSeconds : 0
-	MK := ScriptInformation["MagicKey"]
+	_GenMK := ScriptInformation["MagicKey"]
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
@@ -1194,7 +1194,7 @@ _GenLoad_rolls_leftarrow(FeatureConfig, ExtraOptions := unset) {
 _GenLoad_rolls_assignarrowequalright(FeatureConfig, ExtraOptions := unset) {
 	global ScriptInformation
 	TimeAct := FeatureConfig.HasOwnProp("TimeActivationSeconds") ? FeatureConfig.TimeActivationSeconds : 0
-	MK := ScriptInformation["MagicKey"]
+	_GenMK := ScriptInformation["MagicKey"]
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", true)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
@@ -1210,7 +1210,7 @@ _GenLoad_rolls_assignarrowequalright(FeatureConfig, ExtraOptions := unset) {
 _GenLoad_rolls_assignarrowequalleft(FeatureConfig, ExtraOptions := unset) {
 	global ScriptInformation
 	TimeAct := FeatureConfig.HasOwnProp("TimeActivationSeconds") ? FeatureConfig.TimeActivationSeconds : 0
-	MK := ScriptInformation["MagicKey"]
+	_GenMK := ScriptInformation["MagicKey"]
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", true)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
@@ -1226,7 +1226,7 @@ _GenLoad_rolls_assignarrowequalleft(FeatureConfig, ExtraOptions := unset) {
 _GenLoad_rolls_assignarrowminusright(FeatureConfig, ExtraOptions := unset) {
 	global ScriptInformation
 	TimeAct := FeatureConfig.HasOwnProp("TimeActivationSeconds") ? FeatureConfig.TimeActivationSeconds : 0
-	MK := ScriptInformation["MagicKey"]
+	_GenMK := ScriptInformation["MagicKey"]
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", true)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
@@ -1242,7 +1242,7 @@ _GenLoad_rolls_assignarrowminusright(FeatureConfig, ExtraOptions := unset) {
 _GenLoad_rolls_assignarrowminusleft(FeatureConfig, ExtraOptions := unset) {
 	global ScriptInformation
 	TimeAct := FeatureConfig.HasOwnProp("TimeActivationSeconds") ? FeatureConfig.TimeActivationSeconds : 0
-	MK := ScriptInformation["MagicKey"]
+	_GenMK := ScriptInformation["MagicKey"]
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", true)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
@@ -1258,7 +1258,7 @@ _GenLoad_rolls_assignarrowminusleft(FeatureConfig, ExtraOptions := unset) {
 _GenLoad_autocorrection_accents(FeatureConfig, ExtraOptions := unset) {
 	global ScriptInformation
 	TimeAct := FeatureConfig.HasOwnProp("TimeActivationSeconds") ? FeatureConfig.TimeActivationSeconds : 0
-	MK := ScriptInformation["MagicKey"]
+	_GenMK := ScriptInformation["MagicKey"]
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
@@ -3079,7 +3079,7 @@ _GenLoad_autocorrection_accents(FeatureConfig, ExtraOptions := unset) {
 _GenLoad_autocorrection_names(FeatureConfig, ExtraOptions := unset) {
 	global ScriptInformation
 	TimeAct := FeatureConfig.HasOwnProp("TimeActivationSeconds") ? FeatureConfig.TimeActivationSeconds : 0
-	MK := ScriptInformation["MagicKey"]
+	_GenMK := ScriptInformation["MagicKey"]
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
@@ -3275,7 +3275,7 @@ _GenLoad_autocorrection_names(FeatureConfig, ExtraOptions := unset) {
 _GenLoad_autocorrection_caps(FeatureConfig, ExtraOptions := unset) {
 	global ScriptInformation
 	TimeAct := FeatureConfig.HasOwnProp("TimeActivationSeconds") ? FeatureConfig.TimeActivationSeconds : 0
-	MK := ScriptInformation["MagicKey"]
+	_GenMK := ScriptInformation["MagicKey"]
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
@@ -3881,7 +3881,7 @@ _GenLoad_autocorrection_caps(FeatureConfig, ExtraOptions := unset) {
 _GenLoad_autocorrection_typographicapostrophe(FeatureConfig, ExtraOptions := unset) {
 	global ScriptInformation
 	TimeAct := FeatureConfig.HasOwnProp("TimeActivationSeconds") ? FeatureConfig.TimeActivationSeconds : 0
-	MK := ScriptInformation["MagicKey"]
+	_GenMK := ScriptInformation["MagicKey"]
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
@@ -3932,7 +3932,7 @@ _GenLoad_autocorrection_typographicapostrophe(FeatureConfig, ExtraOptions := uns
 _GenLoad_autocorrection_errors(FeatureConfig, ExtraOptions := unset) {
 	global ScriptInformation
 	TimeAct := FeatureConfig.HasOwnProp("TimeActivationSeconds") ? FeatureConfig.TimeActivationSeconds : 0
-	MK := ScriptInformation["MagicKey"]
+	_GenMK := ScriptInformation["MagicKey"]
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
@@ -4063,7 +4063,7 @@ _GenLoad_autocorrection_errors(FeatureConfig, ExtraOptions := unset) {
 _GenLoad_autocorrection_ou(FeatureConfig, ExtraOptions := unset) {
 	global ScriptInformation
 	TimeAct := FeatureConfig.HasOwnProp("TimeActivationSeconds") ? FeatureConfig.TimeActivationSeconds : 0
-	MK := ScriptInformation["MagicKey"]
+	_GenMK := ScriptInformation["MagicKey"]
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
@@ -4079,7 +4079,7 @@ _GenLoad_autocorrection_ou(FeatureConfig, ExtraOptions := unset) {
 _GenLoad_autocorrection_multiplepunctuationmarks(FeatureConfig, ExtraOptions := unset) {
 	global ScriptInformation
 	TimeAct := FeatureConfig.HasOwnProp("TimeActivationSeconds") ? FeatureConfig.TimeActivationSeconds : 0
-	MK := ScriptInformation["MagicKey"]
+	_GenMK := ScriptInformation["MagicKey"]
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
@@ -4125,7 +4125,7 @@ _GenLoad_autocorrection_multiplepunctuationmarks(FeatureConfig, ExtraOptions := 
 _GenLoad_autocorrection_suffixesachaining(FeatureConfig, ExtraOptions := unset) {
 	global ScriptInformation
 	TimeAct := FeatureConfig.HasOwnProp("TimeActivationSeconds") ? FeatureConfig.TimeActivationSeconds : 0
-	MK := ScriptInformation["MagicKey"]
+	_GenMK := ScriptInformation["MagicKey"]
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
@@ -4191,7 +4191,7 @@ _GenLoad_autocorrection_suffixesachaining(FeatureConfig, ExtraOptions := unset) 
 _GenLoad_autocorrection_minus(FeatureConfig, ExtraOptions := unset) {
 	global ScriptInformation
 	TimeAct := FeatureConfig.HasOwnProp("TimeActivationSeconds") ? FeatureConfig.TimeActivationSeconds : 0
-	MK := ScriptInformation["MagicKey"]
+	_GenMK := ScriptInformation["MagicKey"]
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
@@ -4382,7 +4382,7 @@ _GenLoad_autocorrection_minus(FeatureConfig, ExtraOptions := unset) {
 _GenLoad_autocorrection_minusapostrophe(FeatureConfig, ExtraOptions := unset) {
 	global ScriptInformation
 	TimeAct := FeatureConfig.HasOwnProp("TimeActivationSeconds") ? FeatureConfig.TimeActivationSeconds : 0
-	MK := ScriptInformation["MagicKey"]
+	_GenMK := ScriptInformation["MagicKey"]
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
@@ -4488,7 +4488,7 @@ _GenLoad_autocorrection_minusapostrophe(FeatureConfig, ExtraOptions := unset) {
 _GenLoad_magickey_repeat(FeatureConfig, ExtraOptions := unset) {
 	global ScriptInformation
 	TimeAct := FeatureConfig.HasOwnProp("TimeActivationSeconds") ? FeatureConfig.TimeActivationSeconds : 0
-	MK := ScriptInformation["MagicKey"]
+	_GenMK := ScriptInformation["MagicKey"]
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
@@ -4563,1698 +4563,1698 @@ _GenLoad_magickey_repeat(FeatureConfig, ExtraOptions := unset) {
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*?", StrReplace("a★", "★", MK), "aa", Opts)
+	CreateCaseSensitiveHotstrings("*?", StrReplace("a★", "★", _GenMK), "aa", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*?", StrReplace("b★", "★", MK), "bb", Opts)
+	CreateCaseSensitiveHotstrings("*?", StrReplace("b★", "★", _GenMK), "bb", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*?", StrReplace("c★", "★", MK), "cc", Opts)
+	CreateCaseSensitiveHotstrings("*?", StrReplace("c★", "★", _GenMK), "cc", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*?", StrReplace("d★", "★", MK), "dd", Opts)
+	CreateCaseSensitiveHotstrings("*?", StrReplace("d★", "★", _GenMK), "dd", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*?", StrReplace("e★", "★", MK), "ee", Opts)
+	CreateCaseSensitiveHotstrings("*?", StrReplace("e★", "★", _GenMK), "ee", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*?", StrReplace("é★", "★", MK), "éé", Opts)
+	CreateCaseSensitiveHotstrings("*?", StrReplace("é★", "★", _GenMK), "éé", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*?", StrReplace("è★", "★", MK), "èè", Opts)
+	CreateCaseSensitiveHotstrings("*?", StrReplace("è★", "★", _GenMK), "èè", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*?", StrReplace("ê★", "★", MK), "êê", Opts)
+	CreateCaseSensitiveHotstrings("*?", StrReplace("ê★", "★", _GenMK), "êê", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*?", StrReplace("f★", "★", MK), "ff", Opts)
+	CreateCaseSensitiveHotstrings("*?", StrReplace("f★", "★", _GenMK), "ff", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*?", StrReplace("g★", "★", MK), "gg", Opts)
+	CreateCaseSensitiveHotstrings("*?", StrReplace("g★", "★", _GenMK), "gg", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*?", StrReplace("h★", "★", MK), "hh", Opts)
+	CreateCaseSensitiveHotstrings("*?", StrReplace("h★", "★", _GenMK), "hh", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*?", StrReplace("i★", "★", MK), "ii", Opts)
+	CreateCaseSensitiveHotstrings("*?", StrReplace("i★", "★", _GenMK), "ii", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*?", StrReplace("j★", "★", MK), "jj", Opts)
+	CreateCaseSensitiveHotstrings("*?", StrReplace("j★", "★", _GenMK), "jj", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*?", StrReplace("k★", "★", MK), "kk", Opts)
+	CreateCaseSensitiveHotstrings("*?", StrReplace("k★", "★", _GenMK), "kk", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*?", StrReplace("l★", "★", MK), "ll", Opts)
+	CreateCaseSensitiveHotstrings("*?", StrReplace("l★", "★", _GenMK), "ll", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*?", StrReplace("m★", "★", MK), "mm", Opts)
+	CreateCaseSensitiveHotstrings("*?", StrReplace("m★", "★", _GenMK), "mm", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*?", StrReplace("n★", "★", MK), "nn", Opts)
+	CreateCaseSensitiveHotstrings("*?", StrReplace("n★", "★", _GenMK), "nn", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*?", StrReplace("o★", "★", MK), "oo", Opts)
+	CreateCaseSensitiveHotstrings("*?", StrReplace("o★", "★", _GenMK), "oo", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*?", StrReplace("p★", "★", MK), "pp", Opts)
+	CreateCaseSensitiveHotstrings("*?", StrReplace("p★", "★", _GenMK), "pp", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*?", StrReplace("q★", "★", MK), "qq", Opts)
+	CreateCaseSensitiveHotstrings("*?", StrReplace("q★", "★", _GenMK), "qq", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*?", StrReplace("r★", "★", MK), "rr", Opts)
+	CreateCaseSensitiveHotstrings("*?", StrReplace("r★", "★", _GenMK), "rr", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*?", StrReplace("s★", "★", MK), "ss", Opts)
+	CreateCaseSensitiveHotstrings("*?", StrReplace("s★", "★", _GenMK), "ss", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*?", StrReplace("t★", "★", MK), "tt", Opts)
+	CreateCaseSensitiveHotstrings("*?", StrReplace("t★", "★", _GenMK), "tt", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*?", StrReplace("u★", "★", MK), "uu", Opts)
+	CreateCaseSensitiveHotstrings("*?", StrReplace("u★", "★", _GenMK), "uu", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*?", StrReplace("v★", "★", MK), "vv", Opts)
+	CreateCaseSensitiveHotstrings("*?", StrReplace("v★", "★", _GenMK), "vv", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*?", StrReplace("w★", "★", MK), "ww", Opts)
+	CreateCaseSensitiveHotstrings("*?", StrReplace("w★", "★", _GenMK), "ww", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*?", StrReplace("x★", "★", MK), "xx", Opts)
+	CreateCaseSensitiveHotstrings("*?", StrReplace("x★", "★", _GenMK), "xx", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*?", StrReplace("y★", "★", MK), "yy", Opts)
+	CreateCaseSensitiveHotstrings("*?", StrReplace("y★", "★", _GenMK), "yy", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*?", StrReplace("z★", "★", MK), "zz", Opts)
+	CreateCaseSensitiveHotstrings("*?", StrReplace("z★", "★", _GenMK), "zz", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*?", StrReplace("0★", "★", MK), "00", Opts)
+	CreateHotstring("*?", StrReplace("0★", "★", _GenMK), "00", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*?", StrReplace("1★", "★", MK), "11", Opts)
+	CreateHotstring("*?", StrReplace("1★", "★", _GenMK), "11", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*?", StrReplace("2★", "★", MK), "22", Opts)
+	CreateHotstring("*?", StrReplace("2★", "★", _GenMK), "22", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*?", StrReplace("3★", "★", MK), "33", Opts)
+	CreateHotstring("*?", StrReplace("3★", "★", _GenMK), "33", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*?", StrReplace("4★", "★", MK), "44", Opts)
+	CreateHotstring("*?", StrReplace("4★", "★", _GenMK), "44", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*?", StrReplace("5★", "★", MK), "55", Opts)
+	CreateHotstring("*?", StrReplace("5★", "★", _GenMK), "55", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*?", StrReplace("6★", "★", MK), "66", Opts)
+	CreateHotstring("*?", StrReplace("6★", "★", _GenMK), "66", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*?", StrReplace("7★", "★", MK), "77", Opts)
+	CreateHotstring("*?", StrReplace("7★", "★", _GenMK), "77", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*?", StrReplace("8★", "★", MK), "88", Opts)
+	CreateHotstring("*?", StrReplace("8★", "★", _GenMK), "88", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*?", StrReplace("9★", "★", MK), "99", Opts)
+	CreateHotstring("*?", StrReplace("9★", "★", _GenMK), "99", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*?", StrReplace("<★", "★", MK), "<<", Opts)
+	CreateHotstring("*?", StrReplace("<★", "★", _GenMK), "<<", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*?", StrReplace(">★", "★", MK), ">>", Opts)
+	CreateHotstring("*?", StrReplace(">★", "★", _GenMK), ">>", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*?", StrReplace("{★", "★", MK), "{{", Opts)
+	CreateHotstring("*?", StrReplace("{★", "★", _GenMK), "{{", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*?", StrReplace("}★", "★", MK), "}}", Opts)
+	CreateHotstring("*?", StrReplace("}★", "★", _GenMK), "}}", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*?", StrReplace("(★", "★", MK), "((", Opts)
+	CreateHotstring("*?", StrReplace("(★", "★", _GenMK), "((", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*?", StrReplace(")★", "★", MK), "))", Opts)
+	CreateHotstring("*?", StrReplace(")★", "★", _GenMK), "))", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*?", StrReplace("[★", "★", MK), "[[", Opts)
+	CreateHotstring("*?", StrReplace("[★", "★", _GenMK), "[[", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*?", StrReplace("]★", "★", MK), "]]", Opts)
+	CreateHotstring("*?", StrReplace("]★", "★", _GenMK), "]]", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*?", StrReplace("-★", "★", MK), "--", Opts)
+	CreateHotstring("*?", StrReplace("-★", "★", _GenMK), "--", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*?", StrReplace("_★", "★", MK), "__", Opts)
+	CreateHotstring("*?", StrReplace("_★", "★", _GenMK), "__", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*?", StrReplace(":★", "★", MK), "::", Opts)
+	CreateHotstring("*?", StrReplace(":★", "★", _GenMK), "::", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*?", StrReplace("`;★", "★", MK), "`;`;", Opts)
+	CreateHotstring("*?", StrReplace("`;★", "★", _GenMK), "`;`;", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*?", StrReplace("?★", "★", MK), "??", Opts)
+	CreateHotstring("*?", StrReplace("?★", "★", _GenMK), "??", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*?", StrReplace("!★", "★", MK), "!!", Opts)
+	CreateHotstring("*?", StrReplace("!★", "★", _GenMK), "!!", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*?", StrReplace("+★", "★", MK), "++", Opts)
+	CreateHotstring("*?", StrReplace("+★", "★", _GenMK), "++", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*?", StrReplace("^★", "★", MK), "^^", Opts)
+	CreateHotstring("*?", StrReplace("^★", "★", _GenMK), "^^", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*?", StrReplace("#★", "★", MK), "##", Opts)
+	CreateHotstring("*?", StrReplace("#★", "★", _GenMK), "##", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*?", StrReplace("``★", "★", MK), "````", Opts)
+	CreateHotstring("*?", StrReplace("``★", "★", _GenMK), "````", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*?", StrReplace("=★", "★", MK), "==", Opts)
+	CreateHotstring("*?", StrReplace("=★", "★", _GenMK), "==", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*?", StrReplace("/★", "★", MK), "//", Opts)
+	CreateHotstring("*?", StrReplace("/★", "★", _GenMK), "//", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*?", StrReplace("\★", "★", MK), "\\", Opts)
+	CreateHotstring("*?", StrReplace("\★", "★", _GenMK), "\\", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*?", StrReplace("|★", "★", MK), "||", Opts)
+	CreateHotstring("*?", StrReplace("|★", "★", _GenMK), "||", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*?", StrReplace("&★", "★", MK), "&&", Opts)
+	CreateHotstring("*?", StrReplace("&★", "★", _GenMK), "&&", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*?", StrReplace("$★", "★", MK), "$$", Opts)
+	CreateHotstring("*?", StrReplace("$★", "★", _GenMK), "$$", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", true)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*?", StrReplace("@★", "★", MK), "@@", Opts)
+	CreateHotstring("*?", StrReplace("@★", "★", _GenMK), "@@", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*?", StrReplace("~★", "★", MK), "~~", Opts)
+	CreateHotstring("*?", StrReplace("~★", "★", _GenMK), "~~", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*?", StrReplace("*★", "★", MK), "**", Opts)
+	CreateHotstring("*?", StrReplace("*★", "★", _GenMK), "**", Opts)
 }
 
 _GenLoad_magickey_textexpansion(FeatureConfig, ExtraOptions := unset) {
 	global ScriptInformation
 	TimeAct := FeatureConfig.HasOwnProp("TimeActivationSeconds") ? FeatureConfig.TimeActivationSeconds : 0
-	MK := ScriptInformation["MagicKey"]
+	_GenMK := ScriptInformation["MagicKey"]
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*?", StrReplace("ae★", "★", MK), "æ", Opts)
+	CreateCaseSensitiveHotstrings("*?", StrReplace("ae★", "★", _GenMK), "æ", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*?", StrReplace("oe★", "★", MK), "œ", Opts)
+	CreateCaseSensitiveHotstrings("*?", StrReplace("oe★", "★", _GenMK), "œ", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("1er★", "★", MK), "premier", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("1er★", "★", _GenMK), "premier", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("1ere★", "★", MK), "première", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("1ere★", "★", _GenMK), "première", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("2e★", "★", MK), "deuxième", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("2e★", "★", _GenMK), "deuxième", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("3e★", "★", MK), "troisième", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("3e★", "★", _GenMK), "troisième", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("4e★", "★", MK), "quatrième", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("4e★", "★", _GenMK), "quatrième", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("5e★", "★", MK), "cinquième", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("5e★", "★", _GenMK), "cinquième", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("6e★", "★", MK), "sixième", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("6e★", "★", _GenMK), "sixième", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("7e★", "★", MK), "septième", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("7e★", "★", _GenMK), "septième", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("8e★", "★", MK), "huitième", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("8e★", "★", _GenMK), "huitième", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("9e★", "★", MK), "neuvième", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("9e★", "★", _GenMK), "neuvième", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("10e★", "★", MK), "dixième", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("10e★", "★", _GenMK), "dixième", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("11e★", "★", MK), "onzième", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("11e★", "★", _GenMK), "onzième", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("12e★", "★", MK), "douzième", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("12e★", "★", _GenMK), "douzième", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("20e★", "★", MK), "vingtième", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("20e★", "★", _GenMK), "vingtième", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("100e★", "★", MK), "centième", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("100e★", "★", _GenMK), "centième", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("1000e★", "★", MK), "millième", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("1000e★", "★", _GenMK), "millième", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("2s★", "★", MK), "2 secondes", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("2s★", "★", _GenMK), "2 secondes", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("//★", "★", MK), "rapport", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("//★", "★", _GenMK), "rapport", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("+m★", "★", MK), "meilleur", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("+m★", "★", _GenMK), "meilleur", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("a★", "★", MK), "ainsi", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("a★", "★", _GenMK), "ainsi", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("abr★", "★", MK), "abréviation", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("abr★", "★", _GenMK), "abréviation", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("actu★", "★", MK), "actualité", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("actu★", "★", _GenMK), "actualité", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("add★", "★", MK), "addresse", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("add★", "★", _GenMK), "addresse", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("admin★", "★", MK), "administrateur", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("admin★", "★", _GenMK), "administrateur", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("afr★", "★", MK), "à faire", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("afr★", "★", _GenMK), "à faire", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("ah★", "★", MK), "aujourd’hui", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("ah★", "★", _GenMK), "aujourd’hui", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("ahk★", "★", MK), "autohotkey", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("ahk★", "★", _GenMK), "autohotkey", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("ajd★", "★", MK), "aujourd’hui", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("ajd★", "★", _GenMK), "aujourd’hui", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("algo★", "★", MK), "algorithme", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("algo★", "★", _GenMK), "algorithme", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("alpha★", "★", MK), "alphabétique", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("alpha★", "★", _GenMK), "alphabétique", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("amé★", "★", MK), "amélioration", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("amé★", "★", _GenMK), "amélioration", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("amélio★", "★", MK), "amélioration", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("amélio★", "★", _GenMK), "amélioration", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("anc★", "★", MK), "ancien", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("anc★", "★", _GenMK), "ancien", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("ano★", "★", MK), "anomalie", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("ano★", "★", _GenMK), "anomalie", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("anniv★", "★", MK), "anniversaire", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("anniv★", "★", _GenMK), "anniversaire", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("apm★", "★", MK), "après-midi", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("apm★", "★", _GenMK), "après-midi", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("apad★", "★", MK), "à partir de", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("apad★", "★", _GenMK), "à partir de", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("app★", "★", MK), "application", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("app★", "★", _GenMK), "application", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("appart★", "★", MK), "appartement", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("appart★", "★", _GenMK), "appartement", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("appli★", "★", MK), "application", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("appli★", "★", _GenMK), "application", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("approx★", "★", MK), "approximation", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("approx★", "★", _GenMK), "approximation", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("archi★", "★", MK), "architecture", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("archi★", "★", _GenMK), "architecture", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("arg★", "★", MK), "argument", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("arg★", "★", _GenMK), "argument", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("asso★", "★", MK), "association", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("asso★", "★", _GenMK), "association", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("asap★", "★", MK), "le plus rapidement possible", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("asap★", "★", _GenMK), "le plus rapidement possible", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("atd★", "★", MK), "attend", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("atd★", "★", _GenMK), "attend", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("att★", "★", MK), "attention", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("att★", "★", _GenMK), "attention", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("au★", "★", MK), "aujourd’hui", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("au★", "★", _GenMK), "aujourd’hui", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("aud★", "★", MK), "aujourd’hui", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("aud★", "★", _GenMK), "aujourd’hui", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("aug★", "★", MK), "augmentation", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("aug★", "★", _GenMK), "augmentation", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("auj★", "★", MK), "aujourd’hui", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("auj★", "★", _GenMK), "aujourd’hui", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("auto★", "★", MK), "automatique", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("auto★", "★", _GenMK), "automatique", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("av★", "★", MK), "avant", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("av★", "★", _GenMK), "avant", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("avv★", "★", MK), "avez-vous", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("avv★", "★", _GenMK), "avez-vous", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("avvd★", "★", MK), "avez-vous déjà", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("avvd★", "★", _GenMK), "avez-vous déjà", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("b★", "★", MK), "bonjour", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("b★", "★", _GenMK), "bonjour", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("bb★", "★", MK), "barbecue", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("bb★", "★", _GenMK), "barbecue", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("bc★", "★", MK), "because", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("bc★", "★", _GenMK), "because", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("bcp★", "★", MK), "beaucoup", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("bcp★", "★", _GenMK), "beaucoup", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("bdd★", "★", MK), "base de données", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("bdd★", "★", _GenMK), "base de données", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("bdds★", "★", MK), "bases de données", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("bdds★", "★", _GenMK), "bases de données", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("bea★", "★", MK), "beaucoup", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("bea★", "★", _GenMK), "beaucoup", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("bec★", "★", MK), "because", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("bec★", "★", _GenMK), "because", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("bib★", "★", MK), "bibliographie", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("bib★", "★", _GenMK), "bibliographie", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("biblio★", "★", MK), "bibliographie", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("biblio★", "★", _GenMK), "bibliographie", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("bjr★", "★", MK), "bonjour", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("bjr★", "★", _GenMK), "bonjour", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("brain★", "★", MK), "brainstorming", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("brain★", "★", _GenMK), "brainstorming", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("br★", "★", MK), "bonjour", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("br★", "★", _GenMK), "bonjour", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("bsr★", "★", MK), "bonsoir", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("bsr★", "★", _GenMK), "bonsoir", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("bv★", "★", MK), "bravo", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("bv★", "★", _GenMK), "bravo", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("bvd★", "★", MK), "boulevard", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("bvd★", "★", _GenMK), "boulevard", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("bvn★", "★", MK), "bienvenue", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("bvn★", "★", _GenMK), "bienvenue", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("bwe★", "★", MK), "bon week-end", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("bwe★", "★", _GenMK), "bon week-end", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("bwk★", "★", MK), "bon week-end", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("bwk★", "★", _GenMK), "bon week-end", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("c★", "★", MK), "c’est", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("c★", "★", _GenMK), "c’est", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("cad★", "★", MK), "c’est-à-dire", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("cad★", "★", _GenMK), "c’est-à-dire", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("camp★", "★", MK), "campagne", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("camp★", "★", _GenMK), "campagne", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("carac★", "★", MK), "caractère", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("carac★", "★", _GenMK), "caractère", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("caract★", "★", MK), "caractéristique", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("caract★", "★", _GenMK), "caractéristique", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("cb★", "★", MK), "combien", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("cb★", "★", _GenMK), "combien", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("cc★", "★", MK), "copier-coller", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("cc★", "★", _GenMK), "copier-coller", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("ccé★", "★", MK), "copié-collé", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("ccé★", "★", _GenMK), "copié-collé", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("ccl★", "★", MK), "conclusion", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("ccl★", "★", _GenMK), "conclusion", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*", StrReplace("cdg★", "★", MK), "Charles de Gaulle", Opts)
+	CreateHotstring("*", StrReplace("cdg★", "★", _GenMK), "Charles de Gaulle", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("cdt★", "★", MK), "cordialement", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("cdt★", "★", _GenMK), "cordialement", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("certif★", "★", MK), "certification", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("certif★", "★", _GenMK), "certification", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("chg★", "★", MK), "charge", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("chg★", "★", _GenMK), "charge", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("chap★", "★", MK), "chapitre", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("chap★", "★", _GenMK), "chapitre", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("chr★", "★", MK), "chercher", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("chr★", "★", _GenMK), "chercher", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("ci★", "★", MK), "ci-joint", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("ci★", "★", _GenMK), "ci-joint", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("cj★", "★", MK), "ci-joint", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("cj★", "★", _GenMK), "ci-joint", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("coeff★", "★", MK), "coefficient", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("coeff★", "★", _GenMK), "coefficient", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("cog★", "★", MK), "cognition", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("cog★", "★", _GenMK), "cognition", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("cogv★", "★", MK), "cognitive", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("cogv★", "★", _GenMK), "cognitive", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("comp★", "★", MK), "comprendre", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("comp★", "★", _GenMK), "comprendre", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("cond★", "★", MK), "condition", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("cond★", "★", _GenMK), "condition", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("conds★", "★", MK), "conditions", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("conds★", "★", _GenMK), "conditions", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("config★", "★", MK), "configuration", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("config★", "★", _GenMK), "configuration", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("conso★", "★", MK), "consommation", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("conso★", "★", _GenMK), "consommation", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("chgt★", "★", MK), "changement", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("chgt★", "★", _GenMK), "changement", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("cnp★", "★", MK), "ce n’est pas", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("cnp★", "★", _GenMK), "ce n’est pas", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("contrib★", "★", MK), "contribution", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("contrib★", "★", _GenMK), "contribution", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("couv★", "★", MK), "couverture", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("couv★", "★", _GenMK), "couverture", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("cpd★", "★", MK), "cependant", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("cpd★", "★", _GenMK), "cependant", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("cq★", "★", MK), "ce que", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("cq★", "★", _GenMK), "ce que", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("cr★", "★", MK), "compte-rendu", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("cr★", "★", _GenMK), "compte-rendu", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("ct★", "★", MK), "c’était", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("ct★", "★", _GenMK), "c’était", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("ctb★", "★", MK), "c’est très bien", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("ctb★", "★", _GenMK), "c’est très bien", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("cv★", "★", MK), "ça va ?", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("cv★", "★", _GenMK), "ça va ?", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("cvt★", "★", MK), "ça va toi ?", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("cvt★", "★", _GenMK), "ça va toi ?", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*", StrReplace("ctc★", "★", MK), "Est-ce que cela te convient ?", Opts)
+	CreateHotstring("*", StrReplace("ctc★", "★", _GenMK), "Est-ce que cela te convient ?", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", true)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*", StrReplace("cvc★", "★", MK), "Est-ce que cela vous convient ?", Opts)
+	CreateHotstring("*", StrReplace("cvc★", "★", _GenMK), "Est-ce que cela vous convient ?", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("dac★", "★", MK), "d’accord", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("dac★", "★", _GenMK), "d’accord", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("ddl★", "★", MK), "download", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("ddl★", "★", _GenMK), "download", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("dé★", "★", MK), "déjà", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("dé★", "★", _GenMK), "déjà", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("dê★", "★", MK), "d’être", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("dê★", "★", _GenMK), "d’être", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("déc★", "★", MK), "décembre", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("déc★", "★", _GenMK), "décembre", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("dec★", "★", MK), "décembre", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("dec★", "★", _GenMK), "décembre", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("dedt★", "★", MK), "d’emploi du temps", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("dedt★", "★", _GenMK), "d’emploi du temps", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("déf★", "★", MK), "définition", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("déf★", "★", _GenMK), "définition", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("def★", "★", MK), "définition", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("def★", "★", _GenMK), "définition", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("défs★", "★", MK), "définitions", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("défs★", "★", _GenMK), "définitions", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("démo★", "★", MK), "démonstration", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("démo★", "★", _GenMK), "démonstration", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("demo★", "★", MK), "démonstration", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("demo★", "★", _GenMK), "démonstration", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("dep★", "★", MK), "département", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("dep★", "★", _GenMK), "département", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("deux★", "★", MK), "deuxième", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("deux★", "★", _GenMK), "deuxième", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("desc★", "★", MK), "description", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("desc★", "★", _GenMK), "description", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("dev★", "★", MK), "développeur", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("dev★", "★", _GenMK), "développeur", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("dév★", "★", MK), "développeur", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("dév★", "★", _GenMK), "développeur", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("devt★", "★", MK), "développement", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("devt★", "★", _GenMK), "développement", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("dico★", "★", MK), "dictionnaire", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("dico★", "★", _GenMK), "dictionnaire", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("diff★", "★", MK), "différence", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("diff★", "★", _GenMK), "différence", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("difft★", "★", MK), "différent", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("difft★", "★", _GenMK), "différent", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("dim★", "★", MK), "dimension", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("dim★", "★", _GenMK), "dimension", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("dimi★", "★", MK), "diminution", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("dimi★", "★", _GenMK), "diminution", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("la dispo★", "★", MK), "la disposition", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("la dispo★", "★", _GenMK), "la disposition", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("ta dispo★", "★", MK), "ta disposition", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("ta dispo★", "★", _GenMK), "ta disposition", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("une dispo★", "★", MK), "une disposition", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("une dispo★", "★", _GenMK), "une disposition", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("dispo★", "★", MK), "disponible", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("dispo★", "★", _GenMK), "disponible", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("distri★", "★", MK), "distributeur", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("distri★", "★", _GenMK), "distributeur", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("distrib★", "★", MK), "distributeur", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("distrib★", "★", _GenMK), "distributeur", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("dj★", "★", MK), "déjà", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("dj★", "★", _GenMK), "déjà", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("dm★", "★", MK), "donne-moi", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("dm★", "★", _GenMK), "donne-moi", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("la doc★", "★", MK), "la documentation", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("la doc★", "★", _GenMK), "la documentation", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("une doc★", "★", MK), "une documentation", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("une doc★", "★", _GenMK), "une documentation", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("doc★", "★", MK), "document", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("doc★", "★", _GenMK), "document", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("docs★", "★", MK), "documents", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("docs★", "★", _GenMK), "documents", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("dp★", "★", MK), "de plus", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("dp★", "★", _GenMK), "de plus", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("dr★", "★", MK), "de rien", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("dr★", "★", _GenMK), "de rien", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("ds★", "★", MK), "data science", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("ds★", "★", _GenMK), "data science", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("dsl★", "★", MK), "désolé", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("dsl★", "★", _GenMK), "désolé", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("dst★", "★", MK), "data scientist", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("dst★", "★", _GenMK), "data scientist", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("dtm★", "★", MK), "détermine", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("dtm★", "★", _GenMK), "détermine", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("dvlp★", "★", MK), "développe", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("dvlp★", "★", _GenMK), "développe", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("e★", "★", MK), "est", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("e★", "★", _GenMK), "est", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("echant★", "★", MK), "échantillon", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("echant★", "★", _GenMK), "échantillon", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("echants★", "★", MK), "échantillons", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("echants★", "★", _GenMK), "échantillons", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("eco★", "★", MK), "économie", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("eco★", "★", _GenMK), "économie", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("ecq★", "★", MK), "est-ce que", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("ecq★", "★", _GenMK), "est-ce que", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("edt★", "★", MK), "emploi du temps", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("edt★", "★", _GenMK), "emploi du temps", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("eef★", "★", MK), "en effet", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("eef★", "★", _GenMK), "en effet", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("elt★", "★", MK), "élément", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("elt★", "★", _GenMK), "élément", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("elts★", "★", MK), "éléments", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("elts★", "★", _GenMK), "éléments", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("eo★", "★", MK), "en outre", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("eo★", "★", _GenMK), "en outre", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("enc★", "★", MK), "encore", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("enc★", "★", _GenMK), "encore", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("eng★", "★", MK), "english", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("eng★", "★", _GenMK), "english", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("enft★", "★", MK), "en fait", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("enft★", "★", _GenMK), "en fait", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("ens★", "★", MK), "ensemble", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("ens★", "★", _GenMK), "ensemble", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("ent★", "★", MK), "entreprise", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("ent★", "★", _GenMK), "entreprise", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("env★", "★", MK), "environ", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("env★", "★", _GenMK), "environ", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("ep★", "★", MK), "épisode", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("ep★", "★", _GenMK), "épisode", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("eps★", "★", MK), "épisodes", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("eps★", "★", _GenMK), "épisodes", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("eq★", "★", MK), "équation", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("eq★", "★", _GenMK), "équation", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("ety★", "★", MK), "étymologie", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("ety★", "★", _GenMK), "étymologie", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("eve★", "★", MK), "événement", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("eve★", "★", _GenMK), "événement", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("evtl★", "★", MK), "éventuel", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("evtl★", "★", _GenMK), "éventuel", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("evtle★", "★", MK), "éventuelle", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("evtle★", "★", _GenMK), "éventuelle", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("evtlt★", "★", MK), "éventuellement", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("evtlt★", "★", _GenMK), "éventuellement", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("ex★", "★", MK), "exemple", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("ex★", "★", _GenMK), "exemple", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("exo★", "★", MK), "exercice", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("exo★", "★", _GenMK), "exercice", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("exp★", "★", MK), "expérience", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("exp★", "★", _GenMK), "expérience", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("expo★", "★", MK), "exposition", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("expo★", "★", _GenMK), "exposition", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("é★", "★", MK), "écart", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("é★", "★", _GenMK), "écart", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("échant★", "★", MK), "échantillon", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("échant★", "★", _GenMK), "échantillon", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("échants★", "★", MK), "échantillons", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("échants★", "★", _GenMK), "échantillons", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("éco★", "★", MK), "économie", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("éco★", "★", _GenMK), "économie", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("ém★", "★", MK), "écris-moi", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("ém★", "★", _GenMK), "écris-moi", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("éq★", "★", MK), "équation", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("éq★", "★", _GenMK), "équation", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("ê★", "★", MK), "être", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("ê★", "★", _GenMK), "être", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("êt★", "★", MK), "es-tu", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("êt★", "★", _GenMK), "es-tu", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("f★", "★", MK), "faire", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("f★", "★", _GenMK), "faire", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("fam★", "★", MK), "famille", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("fam★", "★", _GenMK), "famille", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("fb★", "★", MK), "facebook", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("fb★", "★", _GenMK), "facebook", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("fc★", "★", MK), "fonction", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("fc★", "★", _GenMK), "fonction", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("fct★", "★", MK), "fonction", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("fct★", "★", _GenMK), "fonction", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("fea★", "★", MK), "feature", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("fea★", "★", _GenMK), "feature", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("feat★", "★", MK), "feature", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("feat★", "★", _GenMK), "feature", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("fev★", "★", MK), "février", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("fev★", "★", _GenMK), "février", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("fi★", "★", MK), "financier", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("fi★", "★", _GenMK), "financier", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("fiè★", "★", MK), "financière", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("fiè★", "★", _GenMK), "financière", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("ff★", "★", MK), "firefox", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("ff★", "★", _GenMK), "firefox", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("fig★", "★", MK), "figure", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("fig★", "★", _GenMK), "figure", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("fl★", "★", MK), "falloir", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("fl★", "★", _GenMK), "falloir", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("freq★", "★", MK), "fréquence", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("freq★", "★", _GenMK), "fréquence", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*", StrReplace("fr★", "★", MK), "France", Opts)
+	CreateHotstring("*", StrReplace("fr★", "★", _GenMK), "France", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("frs★", "★", MK), "français", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("frs★", "★", _GenMK), "français", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("ft★", "★", MK), "fine-tune", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("ft★", "★", _GenMK), "fine-tune", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("ftg★", "★", MK), "fine-tuning", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("ftg★", "★", _GenMK), "fine-tuning", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("fti★", "★", MK), "fine-tuning", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("fti★", "★", _GenMK), "fine-tuning", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("g★", "★", MK), "j’ai", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("g★", "★", _GenMK), "j’ai", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("g1r★", "★", MK), "j’ai une réunion", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("g1r★", "★", _GenMK), "j’ai une réunion", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("gar★", "★", MK), "garantie", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("gar★", "★", _GenMK), "garantie", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("gars★", "★", MK), "garanties", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("gars★", "★", _GenMK), "garanties", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("gd★", "★", MK), "grand", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("gd★", "★", _GenMK), "grand", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("gg★", "★", MK), "google", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("gg★", "★", _GenMK), "google", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("ges★", "★", MK), "gestion", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("ges★", "★", _GenMK), "gestion", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("gf★", "★", MK), "j’ai fait", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("gf★", "★", _GenMK), "j’ai fait", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("gh★", "★", MK), "github", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("gh★", "★", _GenMK), "github", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*", StrReplace("ghc★", "★", MK), "GitHub Copilot", Opts)
+	CreateHotstring("*", StrReplace("ghc★", "★", _GenMK), "GitHub Copilot", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("ght★", "★", MK), "j’ai acheté", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("ght★", "★", _GenMK), "j’ai acheté", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("gmag★", "★", MK), "j’ai mis à jour", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("gmag★", "★", _GenMK), "j’ai mis à jour", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("gov★", "★", MK), "government", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("gov★", "★", _GenMK), "government", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("gouv★", "★", MK), "gouvernement", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("gouv★", "★", _GenMK), "gouvernement", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("indiv★", "★", MK), "individuel", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("indiv★", "★", _GenMK), "individuel", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("gpa★", "★", MK), "je n’ai pas", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("gpa★", "★", _GenMK), "je n’ai pas", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("gt★", "★", MK), "j’étais", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("gt★", "★", _GenMK), "j’étais", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("gvt★", "★", MK), "gouvernement", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("gvt★", "★", _GenMK), "gouvernement", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("h★", "★", MK), "heure", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("h★", "★", _GenMK), "heure", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*", StrReplace("hf★", "★", MK), "Hugging Face", Opts)
+	CreateHotstring("*", StrReplace("hf★", "★", _GenMK), "Hugging Face", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("his★", "★", MK), "historique", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("his★", "★", _GenMK), "historique", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("histo★", "★", MK), "historique", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("histo★", "★", _GenMK), "historique", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("hs★", "★", MK), "hammerspoon", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("hs★", "★", _GenMK), "hammerspoon", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("htu★", "★", MK), "how to use", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("htu★", "★", _GenMK), "how to use", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("hyp★", "★", MK), "hypothèse", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("hyp★", "★", _GenMK), "hypothèse", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("ia★", "★", MK), "intelligence artificielle", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("ia★", "★", _GenMK), "intelligence artificielle", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("id★", "★", MK), "identifiant", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("id★", "★", _GenMK), "identifiant", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*", StrReplace("idf★", "★", MK), "Île-de-France", Opts)
+	CreateHotstring("*", StrReplace("idf★", "★", _GenMK), "Île-de-France", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*", StrReplace("idk★", "★", MK), "I don’t know", Opts)
+	CreateHotstring("*", StrReplace("idk★", "★", _GenMK), "I don’t know", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("ids★", "★", MK), "identifiants", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("ids★", "★", _GenMK), "identifiants", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("img★", "★", MK), "image", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("img★", "★", _GenMK), "image", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("imgs★", "★", MK), "images", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("imgs★", "★", _GenMK), "images", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("imm★", "★", MK), "immeuble", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("imm★", "★", _GenMK), "immeuble", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("imo★", "★", MK), "in my opinion", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("imo★", "★", _GenMK), "in my opinion", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("imp★", "★", MK), "impossible", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("imp★", "★", _GenMK), "impossible", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("inf★", "★", MK), "inférieur", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("inf★", "★", _GenMK), "inférieur", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("info★", "★", MK), "information", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("info★", "★", _GenMK), "information", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("infos★", "★", MK), "informations", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("infos★", "★", _GenMK), "informations", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("infra★", "★", MK), "infrastructure", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("infra★", "★", _GenMK), "infrastructure", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("insta★", "★", MK), "instagram", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("insta★", "★", _GenMK), "instagram", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("intart★", "★", MK), "intelligence artificielle", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("intart★", "★", _GenMK), "intelligence artificielle", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("inter★", "★", MK), "international", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("inter★", "★", _GenMK), "international", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("intro★", "★", MK), "introduction", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("intro★", "★", _GenMK), "introduction", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("j★", "★", MK), "bonjour", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("j★", "★", _GenMK), "bonjour", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("ja★", "★", MK), "jamais", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("ja★", "★", _GenMK), "jamais", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("janv★", "★", MK), "janvier", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("janv★", "★", _GenMK), "janvier", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("jm★", "★", MK), "j’aime", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("jm★", "★", _GenMK), "j’aime", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("jms★", "★", MK), "jamais", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("jms★", "★", _GenMK), "jamais", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("jnsp★", "★", MK), "je ne sais pas", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("jnsp★", "★", _GenMK), "je ne sais pas", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("js★", "★", MK), "je suis", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("js★", "★", _GenMK), "je suis", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("jsp★", "★", MK), "je ne sais pas", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("jsp★", "★", _GenMK), "je ne sais pas", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("jtm★", "★", MK), "je t’aime", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("jtm★", "★", _GenMK), "je t’aime", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("ju★", "★", MK), "jusque", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("ju★", "★", _GenMK), "jusque", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("ju'★", "★", MK), "jusqu’", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("ju'★", "★", _GenMK), "jusqu’", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("jus★", "★", MK), "jusque", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("jus★", "★", _GenMK), "jusque", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("jusq★", "★", MK), "jusqu’", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("jusq★", "★", _GenMK), "jusqu’", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("jus'★", "★", MK), "jusqu’", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("jus'★", "★", _GenMK), "jusqu’", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("jui★", "★", MK), "juillet", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("jui★", "★", _GenMK), "juillet", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("k★", "★", MK), "contacter", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("k★", "★", _GenMK), "contacter", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("kb★", "★", MK), "keyboard", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("kb★", "★", _GenMK), "keyboard", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("kbd★", "★", MK), "keyboard", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("kbd★", "★", _GenMK), "keyboard", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
@@ -6264,1278 +6264,1278 @@ _GenLoad_magickey_textexpansion(FeatureConfig, ExtraOptions := unset) {
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("kn★", "★", MK), "construction", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("kn★", "★", _GenMK), "construction", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("l★", "★", MK), "elle", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("l★", "★", _GenMK), "elle", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("la★", "★", MK), "Los Angeles", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("la★", "★", _GenMK), "Los Angeles", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("lê★", "★", MK), "l’être", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("lê★", "★", _GenMK), "l’être", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("ledt★", "★", MK), "l’emploi du temps", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("ledt★", "★", _GenMK), "l’emploi du temps", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("lex★", "★", MK), "l’exemple", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("lex★", "★", _GenMK), "l’exemple", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("lgb★", "★", MK), "lightgbm", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("lgb★", "★", _GenMK), "lightgbm", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("lim★", "★", MK), "limite", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("lim★", "★", _GenMK), "limite", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("llm★", "★", MK), "large language model", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("llm★", "★", _GenMK), "large language model", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("m★", "★", MK), "mais", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("m★", "★", _GenMK), "mais", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("ma★", "★", MK), "madame", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("ma★", "★", _GenMK), "madame", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("maj★", "★", MK), "mise à jour", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("maj★", "★", _GenMK), "mise à jour", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("majs★", "★", MK), "mises à jour", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("majs★", "★", _GenMK), "mises à jour", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("màj★", "★", MK), "mise à jour", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("màj★", "★", _GenMK), "mise à jour", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("màjs★", "★", MK), "mises à jour", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("màjs★", "★", _GenMK), "mises à jour", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("math★", "★", MK), "mathématique", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("math★", "★", _GenMK), "mathématique", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("manip★", "★", MK), "manipulation", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("manip★", "★", _GenMK), "manipulation", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("maths★", "★", MK), "mathématiques", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("maths★", "★", _GenMK), "mathématiques", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("max★", "★", MK), "maximum", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("max★", "★", _GenMK), "maximum", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("md★", "★", MK), "markdown", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("md★", "★", _GenMK), "markdown", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("mdav★", "★", MK), "merci d’avance", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("mdav★", "★", _GenMK), "merci d’avance", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("mdb★", "★", MK), "merci de bien vouloir", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("mdb★", "★", _GenMK), "merci de bien vouloir", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("mdl★", "★", MK), "modèle", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("mdl★", "★", _GenMK), "modèle", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("mdp★", "★", MK), "mot de passe", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("mdp★", "★", _GenMK), "mot de passe", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("mdps★", "★", MK), "mots de passe", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("mdps★", "★", _GenMK), "mots de passe", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("méthodo★", "★", MK), "méthodologie", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("méthodo★", "★", _GenMK), "méthodologie", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("min★", "★", MK), "minimum", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("min★", "★", _GenMK), "minimum", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("mio★", "★", MK), "million", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("mio★", "★", _GenMK), "million", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("mios★", "★", MK), "millions", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("mios★", "★", _GenMK), "millions", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("mjo★", "★", MK), "mettre à jour", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("mjo★", "★", _GenMK), "mettre à jour", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("ml★", "★", MK), "machine learning", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("ml★", "★", _GenMK), "machine learning", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("mle★", "★", MK), "machine learning engineer", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("mle★", "★", _GenMK), "machine learning engineer", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("mm★", "★", MK), "même", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("mm★", "★", _GenMK), "même", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("mme★", "★", MK), "madame", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("mme★", "★", _GenMK), "madame", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("modif★", "★", MK), "modification", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("modif★", "★", _GenMK), "modification", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("mom★", "★", MK), "moi-même", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("mom★", "★", _GenMK), "moi-même", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("mq★", "★", MK), "montre que", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("mq★", "★", _GenMK), "montre que", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("mr★", "★", MK), "monsieur", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("mr★", "★", _GenMK), "monsieur", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("mrc★", "★", MK), "merci", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("mrc★", "★", _GenMK), "merci", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("msg★", "★", MK), "message", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("msg★", "★", _GenMK), "message", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("mtn★", "★", MK), "maintenant", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("mtn★", "★", _GenMK), "maintenant", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("moy★", "★", MK), "moyenne", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("moy★", "★", _GenMK), "moyenne", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("mutu★", "★", MK), "mutualiser", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("mutu★", "★", _GenMK), "mutualiser", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("mvt★", "★", MK), "mouvement", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("mvt★", "★", _GenMK), "mouvement", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("n★", "★", MK), "nouveau", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("n★", "★", _GenMK), "nouveau", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("nav★", "★", MK), "navigation", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("nav★", "★", _GenMK), "navigation", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("nb★", "★", MK), "nombre", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("nb★", "★", _GenMK), "nombre", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("nean★", "★", MK), "néanmoins", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("nean★", "★", _GenMK), "néanmoins", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("new★", "★", MK), "nouveau", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("new★", "★", _GenMK), "nouveau", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("newe★", "★", MK), "nouvelle", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("newe★", "★", _GenMK), "nouvelle", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("nimp★", "★", MK), "n’importe", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("nimp★", "★", _GenMK), "n’importe", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("niv★", "★", MK), "niveau", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("niv★", "★", _GenMK), "niveau", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("norm★", "★", MK), "normalement", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("norm★", "★", _GenMK), "normalement", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("nota★", "★", MK), "notamment", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("nota★", "★", _GenMK), "notamment", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("notm★", "★", MK), "notamment", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("notm★", "★", _GenMK), "notamment", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("nouv★", "★", MK), "nouvelle", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("nouv★", "★", _GenMK), "nouvelle", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("nov★", "★", MK), "novembre", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("nov★", "★", _GenMK), "novembre", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("now★", "★", MK), "maintenant", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("now★", "★", _GenMK), "maintenant", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("np★", "★", MK), "ne pas", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("np★", "★", _GenMK), "ne pas", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("nrj★", "★", MK), "énergie", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("nrj★", "★", _GenMK), "énergie", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("ns★", "★", MK), "nous", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("ns★", "★", _GenMK), "nous", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("num★", "★", MK), "numéro", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("num★", "★", _GenMK), "numéro", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("ny★", "★", MK), "New York", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("ny★", "★", _GenMK), "New York", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("o-★", "★", MK), "au moins", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("o-★", "★", _GenMK), "au moins", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("o+★", "★", MK), "au plus", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("o+★", "★", _GenMK), "au plus", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("obj★", "★", MK), "objectif", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("obj★", "★", _GenMK), "objectif", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("obs★", "★", MK), "observation", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("obs★", "★", _GenMK), "observation", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("oct★", "★", MK), "octobre", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("oct★", "★", _GenMK), "octobre", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("odj★", "★", MK), "ordre du jour", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("odj★", "★", _GenMK), "ordre du jour", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("opé★", "★", MK), "opération", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("opé★", "★", _GenMK), "opération", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("oqp★", "★", MK), "occupé", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("oqp★", "★", _GenMK), "occupé", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("ordi★", "★", MK), "ordinateur", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("ordi★", "★", _GenMK), "ordinateur", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("org★", "★", MK), "organisation", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("org★", "★", _GenMK), "organisation", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("orga★", "★", MK), "organisation", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("orga★", "★", _GenMK), "organisation", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("ortho★", "★", MK), "orthographe", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("ortho★", "★", _GenMK), "orthographe", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*", StrReplace("out★", "★", MK), "Où es-tu ?", Opts)
+	CreateHotstring("*", StrReplace("out★", "★", _GenMK), "Où es-tu ?", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*", StrReplace("outv★", "★", MK), "Où êtes-vous ?", Opts)
+	CreateHotstring("*", StrReplace("outv★", "★", _GenMK), "Où êtes-vous ?", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("ouv★", "★", MK), "ouverture", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("ouv★", "★", _GenMK), "ouverture", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("p★", "★", MK), "prendre", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("p★", "★", _GenMK), "prendre", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("p//★", "★", MK), "par rapport", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("p//★", "★", _GenMK), "par rapport", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("par★", "★", MK), "paragraphe", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("par★", "★", _GenMK), "paragraphe", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("param★", "★", MK), "paramètre", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("param★", "★", _GenMK), "paramètre", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("params★", "★", MK), "paramètres", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("params★", "★", _GenMK), "paramètres", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("pè★", "★", MK), "problème", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("pè★", "★", _GenMK), "problème", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("pb★", "★", MK), "problème", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("pb★", "★", _GenMK), "problème", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("pcq★", "★", MK), "parce que", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("pcq★", "★", _GenMK), "parce que", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("pck★", "★", MK), "parce que", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("pck★", "★", _GenMK), "parce que", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("pckil★", "★", MK), "parce qu’il", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("pckil★", "★", _GenMK), "parce qu’il", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("pcquil★", "★", MK), "parce qu’il", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("pcquil★", "★", _GenMK), "parce qu’il", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("pcquon★", "★", MK), "parce qu’on", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("pcquon★", "★", _GenMK), "parce qu’on", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("pckon★", "★", MK), "parce qu’on", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("pckon★", "★", _GenMK), "parce qu’on", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("pd★", "★", MK), "pendant", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("pd★", "★", _GenMK), "pendant", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("pdt★", "★", MK), "pendant", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("pdt★", "★", _GenMK), "pendant", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("pdv★", "★", MK), "point de vue", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("pdv★", "★", _GenMK), "point de vue", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("pdvs★", "★", MK), "points de vue", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("pdvs★", "★", _GenMK), "points de vue", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("perf★", "★", MK), "performance", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("perf★", "★", _GenMK), "performance", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("perso★", "★", MK), "personne", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("perso★", "★", _GenMK), "personne", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("pê★", "★", MK), "peut-être", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("pê★", "★", _GenMK), "peut-être", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("péri★", "★", MK), "périmètre", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("péri★", "★", _GenMK), "périmètre", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("périm★", "★", MK), "périmètre", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("périm★", "★", _GenMK), "périmètre", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("peut-ê★", "★", MK), "peut-être", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("peut-ê★", "★", _GenMK), "peut-être", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("pex★", "★", MK), "par exemple", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("pex★", "★", _GenMK), "par exemple", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("pf★", "★", MK), "portefeuille", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("pf★", "★", _GenMK), "portefeuille", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("pg★", "★", MK), "pas grave", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("pg★", "★", _GenMK), "pas grave", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("pgm★", "★", MK), "programme", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("pgm★", "★", _GenMK), "programme", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("pi★", "★", MK), "pour information", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("pi★", "★", _GenMK), "pour information", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("pic★", "★", MK), "picture", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("pic★", "★", _GenMK), "picture", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("pics★", "★", MK), "pictures", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("pics★", "★", _GenMK), "pictures", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("piè★", "★", MK), "pièce jointe", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("piè★", "★", _GenMK), "pièce jointe", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("pj★", "★", MK), "pièce jointe", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("pj★", "★", _GenMK), "pièce jointe", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("pjs★", "★", MK), "pièces jointes", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("pjs★", "★", _GenMK), "pièces jointes", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("pk★", "★", MK), "pourquoi", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("pk★", "★", _GenMK), "pourquoi", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("pls★", "★", MK), "please", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("pls★", "★", _GenMK), "please", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("poc★", "★", MK), "proof of concept", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("poc★", "★", _GenMK), "proof of concept", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("poum★", "★", MK), "plus ou moins", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("poum★", "★", _GenMK), "plus ou moins", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("poss★", "★", MK), "possible", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("poss★", "★", _GenMK), "possible", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("pourcent★", "★", MK), "pourcentage", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("pourcent★", "★", _GenMK), "pourcentage", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("ppt★", "★", MK), "PowerPoint", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("ppt★", "★", _GenMK), "PowerPoint", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("pq★", "★", MK), "pourquoi", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("pq★", "★", _GenMK), "pourquoi", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("pr★", "★", MK), "pull request", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("pr★", "★", _GenMK), "pull request", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("prd★", "★", MK), "produit", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("prd★", "★", _GenMK), "produit", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("prem★", "★", MK), "premier", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("prem★", "★", _GenMK), "premier", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("prez★", "★", MK), "présentation", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("prez★", "★", _GenMK), "présentation", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("prg★", "★", MK), "programme", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("prg★", "★", _GenMK), "programme", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("prio★", "★", MK), "priorité", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("prio★", "★", _GenMK), "priorité", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("pro★", "★", MK), "professionnel", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("pro★", "★", _GenMK), "professionnel", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("prob★", "★", MK), "problème", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("prob★", "★", _GenMK), "problème", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("proba★", "★", MK), "probabilité", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("proba★", "★", _GenMK), "probabilité", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("prod★", "★", MK), "production", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("prod★", "★", _GenMK), "production", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("prof★", "★", MK), "professeur", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("prof★", "★", _GenMK), "professeur", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("prog★", "★", MK), "programme", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("prog★", "★", _GenMK), "programme", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("prop★", "★", MK), "propriété", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("prop★", "★", _GenMK), "propriété", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("propo★", "★", MK), "proposition", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("propo★", "★", _GenMK), "proposition", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("props★", "★", MK), "propriétés", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("props★", "★", _GenMK), "propriétés", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("pros★", "★", MK), "professionnels", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("pros★", "★", _GenMK), "professionnels", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("prot★", "★", MK), "professionnellement", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("prot★", "★", _GenMK), "professionnellement", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("prov★", "★", MK), "provision", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("prov★", "★", _GenMK), "provision", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("psycha★", "★", MK), "psychanalyse", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("psycha★", "★", _GenMK), "psychanalyse", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("psycho★", "★", MK), "psychologie", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("psycho★", "★", _GenMK), "psychologie", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("psb★", "★", MK), "possible", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("psb★", "★", _GenMK), "possible", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("psy★", "★", MK), "psychologie", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("psy★", "★", _GenMK), "psychologie", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("pt★", "★", MK), "point", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("pt★", "★", _GenMK), "point", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("ptf★", "★", MK), "portefeuille", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("ptf★", "★", _GenMK), "portefeuille", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("pts★", "★", MK), "points", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("pts★", "★", _GenMK), "points", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("pub★", "★", MK), "publicité", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("pub★", "★", _GenMK), "publicité", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("pvv★", "★", MK), "pouvez-vous", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("pvv★", "★", _GenMK), "pouvez-vous", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("py★", "★", MK), "python", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("py★", "★", _GenMK), "python", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("q★", "★", MK), "question", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("q★", "★", _GenMK), "question", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("qc★", "★", MK), "qu’est-ce", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("qc★", "★", _GenMK), "qu’est-ce", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("qcq★", "★", MK), "qu’est-ce que", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("qcq★", "★", _GenMK), "qu’est-ce que", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("qcq'★", "★", MK), "qu’est-ce qu’", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("qcq'★", "★", _GenMK), "qu’est-ce qu’", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("qq★", "★", MK), "quelque", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("qq★", "★", _GenMK), "quelque", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("qqch★", "★", MK), "quelque chose", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("qqch★", "★", _GenMK), "quelque chose", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("qqs★", "★", MK), "quelques", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("qqs★", "★", _GenMK), "quelques", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("qqn★", "★", MK), "quelqu’un", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("qqn★", "★", _GenMK), "quelqu’un", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("quasi★", "★", MK), "quasiment", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("quasi★", "★", _GenMK), "quasiment", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("ques★", "★", MK), "question", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("ques★", "★", _GenMK), "question", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("quid★", "★", MK), "qu’en est-il de", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("quid★", "★", _GenMK), "qu’en est-il de", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("r★", "★", MK), "rien", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("r★", "★", _GenMK), "rien", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("rapidt★", "★", MK), "rapidement", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("rapidt★", "★", _GenMK), "rapidement", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("rdc★", "★", MK), "rez-de-chaussée", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("rdc★", "★", _GenMK), "rez-de-chaussée", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("rdv★", "★", MK), "rendez-vous", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("rdv★", "★", _GenMK), "rendez-vous", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("ré★", "★", MK), "réunion", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("ré★", "★", _GenMK), "réunion", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("rés★", "★", MK), "réunions", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("rés★", "★", _GenMK), "réunions", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("rép★", "★", MK), "répertoire", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("rép★", "★", _GenMK), "répertoire", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("résil★", "★", MK), "résiliation", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("résil★", "★", _GenMK), "résiliation", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("reco★", "★", MK), "recommandation", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("reco★", "★", _GenMK), "recommandation", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("ref★", "★", MK), "référence", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("ref★", "★", _GenMK), "référence", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("rep★", "★", MK), "répertoire", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("rep★", "★", _GenMK), "répertoire", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("rex★", "★", MK), "retour d’expérience", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("rex★", "★", _GenMK), "retour d’expérience", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("rh★", "★", MK), "ressources humaines", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("rh★", "★", _GenMK), "ressources humaines", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("rmq★", "★", MK), "remarque", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("rmq★", "★", _GenMK), "remarque", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("rpz★", "★", MK), "représente", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("rpz★", "★", _GenMK), "représente", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("rs★", "★", MK), "résultat", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("rs★", "★", _GenMK), "résultat", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("seg★", "★", MK), "segment", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("seg★", "★", _GenMK), "segment", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("segm★", "★", MK), "segment", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("segm★", "★", _GenMK), "segment", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("sep★", "★", MK), "septembre", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("sep★", "★", _GenMK), "septembre", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("sept★", "★", MK), "septembre", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("sept★", "★", _GenMK), "septembre", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("simpl★", "★", MK), "simplement", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("simpl★", "★", _GenMK), "simplement", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("situ★", "★", MK), "situation", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("situ★", "★", _GenMK), "situation", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("smth★", "★", MK), "something", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("smth★", "★", _GenMK), "something", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("srx★", "★", MK), "sérieux", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("srx★", "★", _GenMK), "sérieux", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("sécu★", "★", MK), "sécurité", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("sécu★", "★", _GenMK), "sécurité", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("st★", "★", MK), "s’était", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("st★", "★", _GenMK), "s’était", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("stat★", "★", MK), "statistique", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("stat★", "★", _GenMK), "statistique", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("sth★", "★", MK), "something", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("sth★", "★", _GenMK), "something", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("stp★", "★", MK), "s’il te plaît", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("stp★", "★", _GenMK), "s’il te plaît", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("strat★", "★", MK), "stratégique", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("strat★", "★", _GenMK), "stratégique", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("stream★", "★", MK), "streaming", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("stream★", "★", _GenMK), "streaming", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("suff★", "★", MK), "suffisant", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("suff★", "★", _GenMK), "suffisant", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("sufft★", "★", MK), "suffisamment", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("sufft★", "★", _GenMK), "suffisamment", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("supé★", "★", MK), "supérieur", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("supé★", "★", _GenMK), "supérieur", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("surv★", "★", MK), "survenance", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("surv★", "★", _GenMK), "survenance", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("svp★", "★", MK), "s’il vous plaît", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("svp★", "★", _GenMK), "s’il vous plaît", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("svt★", "★", MK), "souvent", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("svt★", "★", _GenMK), "souvent", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("sya★", "★", MK), "s’il y a", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("sya★", "★", _GenMK), "s’il y a", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("syn★", "★", MK), "synonyme", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("syn★", "★", _GenMK), "synonyme", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("sync★", "★", MK), "synchronisation", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("sync★", "★", _GenMK), "synchronisation", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("syncro★", "★", MK), "synchronisation", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("syncro★", "★", _GenMK), "synchronisation", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("sys★", "★", MK), "système", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("sys★", "★", _GenMK), "système", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("t★", "★", MK), "très", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("t★", "★", _GenMK), "très", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("tb★", "★", MK), "très bien", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("tb★", "★", _GenMK), "très bien", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("temp★", "★", MK), "temporaire", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("temp★", "★", _GenMK), "temporaire", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("tes★", "★", MK), "tu es", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("tes★", "★", _GenMK), "tu es", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("tél★", "★", MK), "téléphone", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("tél★", "★", _GenMK), "téléphone", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("teq★", "★", MK), "telle que", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("teq★", "★", _GenMK), "telle que", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("teqs★", "★", MK), "telles que", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("teqs★", "★", _GenMK), "telles que", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("tfk★", "★", MK), "qu’est-ce que tu fais ?", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("tfk★", "★", _GenMK), "qu’est-ce que tu fais ?", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("tgh★", "★", MK), "together", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("tgh★", "★", _GenMK), "together", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("théo★", "★", MK), "théorie", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("théo★", "★", _GenMK), "théorie", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("thm★", "★", MK), "théorème", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("thm★", "★", _GenMK), "théorème", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("tj★", "★", MK), "toujours", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("tj★", "★", _GenMK), "toujours", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("tjr★", "★", MK), "toujours", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("tjr★", "★", _GenMK), "toujours", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("tlm★", "★", MK), "tout le monde", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("tlm★", "★", _GenMK), "tout le monde", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("tq★", "★", MK), "tel que", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("tq★", "★", _GenMK), "tel que", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("tqs★", "★", MK), "tels que", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("tqs★", "★", _GenMK), "tels que", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("tout★", "★", MK), "toutefois", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("tout★", "★", _GenMK), "toutefois", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("tra★", "★", MK), "travail", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("tra★", "★", _GenMK), "travail", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("trad★", "★", MK), "traduction", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("trad★", "★", _GenMK), "traduction", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("trav★", "★", MK), "travail", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("trav★", "★", _GenMK), "travail", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("trkl★", "★", MK), "tranquille", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("trkl★", "★", _GenMK), "tranquille", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("tt★", "★", MK), "télétravail", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("tt★", "★", _GenMK), "télétravail", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("ttm★", "★", MK), "time to market", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("ttm★", "★", _GenMK), "time to market", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("tv★", "★", MK), "télévision", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("tv★", "★", _GenMK), "télévision", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("ty★", "★", MK), "thank you", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("ty★", "★", _GenMK), "thank you", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("typo★", "★", MK), "typographie", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("typo★", "★", _GenMK), "typographie", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("une amé★", "★", MK), "une amélioration", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("une amé★", "★", _GenMK), "une amélioration", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("uniq★", "★", MK), "uniquement", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("uniq★", "★", _GenMK), "uniquement", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*", StrReplace("usa★", "★", MK), "États-Unis", Opts)
+	CreateHotstring("*", StrReplace("usa★", "★", _GenMK), "États-Unis", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("v★", "★", MK), "version", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("v★", "★", _GenMK), "version", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("var★", "★", MK), "variable", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("var★", "★", _GenMK), "variable", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("vav★", "★", MK), "vis-à-vis", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("vav★", "★", _GenMK), "vis-à-vis", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("verif★", "★", MK), "vérification", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("verif★", "★", _GenMK), "vérification", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("vérif★", "★", MK), "vérification", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("vérif★", "★", _GenMK), "vérification", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("vocab★", "★", MK), "vocabulaire", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("vocab★", "★", _GenMK), "vocabulaire", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("volat★", "★", MK), "volatilité", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("volat★", "★", _GenMK), "volatilité", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("vrm★", "★", MK), "vraiment", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("vrm★", "★", _GenMK), "vraiment", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("vrmt★", "★", MK), "vraiment", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("vrmt★", "★", _GenMK), "vraiment", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("vs★", "★", MK), "vous êtes", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("vs★", "★", _GenMK), "vous êtes", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*", StrReplace("vsc★", "★", MK), "VSCode", Opts)
+	CreateHotstring("*", StrReplace("vsc★", "★", _GenMK), "VSCode", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("w★", "★", MK), "with", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("w★", "★", _GenMK), "with", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("wd★", "★", MK), "windows", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("wd★", "★", _GenMK), "windows", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("wk★", "★", MK), "week-end", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("wk★", "★", _GenMK), "week-end", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("wknd★", "★", MK), "week-end", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("wknd★", "★", _GenMK), "week-end", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("wiki★", "★", MK), "wikipédia", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("wiki★", "★", _GenMK), "wikipédia", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("x★", "★", MK), "exemple", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("x★", "★", _GenMK), "exemple", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("xg★", "★", MK), "xgboost", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("xg★", "★", _GenMK), "xgboost", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("xgb★", "★", MK), "xgboost", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("xgb★", "★", _GenMK), "xgboost", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("xp★", "★", MK), "expérience", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("xp★", "★", _GenMK), "expérience", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("ya★", "★", MK), "il y a", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("ya★", "★", _GenMK), "il y a", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("yapa★", "★", MK), "il n’y a pas", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("yapa★", "★", _GenMK), "il n’y a pas", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("yatil★", "★", MK), "y a-t-il", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("yatil★", "★", _GenMK), "y a-t-il", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("yc★", "★", MK), "y compris", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("yc★", "★", _GenMK), "y compris", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", StrReplace("yt★", "★", MK), "youtube", Opts)
+	CreateCaseSensitiveHotstrings("*", StrReplace("yt★", "★", _GenMK), "youtube", Opts)
 }
 
 _GenLoad_magickey_textexpansionauto(FeatureConfig, ExtraOptions := unset) {
 	global ScriptInformation
 	TimeAct := FeatureConfig.HasOwnProp("TimeActivationSeconds") ? FeatureConfig.TimeActivationSeconds : 0
-	MK := ScriptInformation["MagicKey"]
+	_GenMK := ScriptInformation["MagicKey"]
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
@@ -7551,2109 +7551,2109 @@ _GenLoad_magickey_textexpansionauto(FeatureConfig, ExtraOptions := unset) {
 _GenLoad_magickey_textexpansionemojis(FeatureConfig, ExtraOptions := unset) {
 	global ScriptInformation
 	TimeAct := FeatureConfig.HasOwnProp("TimeActivationSeconds") ? FeatureConfig.TimeActivationSeconds : 0
-	MK := ScriptInformation["MagicKey"]
+	_GenMK := ScriptInformation["MagicKey"]
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*", StrReplace(":)★", "★", MK), "😀", Opts)
+	CreateHotstring("*", StrReplace(":)★", "★", _GenMK), "😀", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*", StrReplace(":))★", "★", MK), "😁", Opts)
+	CreateHotstring("*", StrReplace(":))★", "★", _GenMK), "😁", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*", StrReplace(":/★", "★", MK), "🫤", Opts)
+	CreateHotstring("*", StrReplace(":/★", "★", _GenMK), "🫤", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", true)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*", StrReplace(":(★", "★", MK), "☹️", Opts)
+	CreateHotstring("*", StrReplace(":(★", "★", _GenMK), "☹️", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*", StrReplace(":3★", "★", MK), "😗", Opts)
+	CreateHotstring("*", StrReplace(":3★", "★", _GenMK), "😗", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*", StrReplace(":D★", "★", MK), "😁", Opts)
+	CreateHotstring("*", StrReplace(":D★", "★", _GenMK), "😁", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*", StrReplace(":O★", "★", MK), "😮", Opts)
+	CreateHotstring("*", StrReplace(":O★", "★", _GenMK), "😮", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*", StrReplace(":P★", "★", MK), "😛", Opts)
+	CreateHotstring("*", StrReplace(":P★", "★", _GenMK), "😛", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*", StrReplace("abeille★", "★", MK), "🐝", Opts)
+	CreateHotstring("*", StrReplace("abeille★", "★", _GenMK), "🐝", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*", StrReplace("aigle★", "★", MK), "🦅", Opts)
+	CreateHotstring("*", StrReplace("aigle★", "★", _GenMK), "🦅", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", true)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*", StrReplace("araignée★", "★", MK), "🕷️", Opts)
+	CreateHotstring("*", StrReplace("araignée★", "★", _GenMK), "🕷️", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*", StrReplace("baleine★", "★", MK), "🐋", Opts)
+	CreateHotstring("*", StrReplace("baleine★", "★", _GenMK), "🐋", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*", StrReplace("canard★", "★", MK), "🦆", Opts)
+	CreateHotstring("*", StrReplace("canard★", "★", _GenMK), "🦆", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*", StrReplace("cerf★", "★", MK), "🦌", Opts)
+	CreateHotstring("*", StrReplace("cerf★", "★", _GenMK), "🦌", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*", StrReplace("chameau★", "★", MK), "🐪", Opts)
+	CreateHotstring("*", StrReplace("chameau★", "★", _GenMK), "🐪", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*", StrReplace("chat★", "★", MK), "🐈", Opts)
+	CreateHotstring("*", StrReplace("chat★", "★", _GenMK), "🐈", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*", StrReplace("chauve-souris★", "★", MK), "🦇", Opts)
+	CreateHotstring("*", StrReplace("chauve-souris★", "★", _GenMK), "🦇", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*", StrReplace("chèvre★", "★", MK), "🐐", Opts)
+	CreateHotstring("*", StrReplace("chèvre★", "★", _GenMK), "🐐", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*", StrReplace("cheval★", "★", MK), "🐎", Opts)
+	CreateHotstring("*", StrReplace("cheval★", "★", _GenMK), "🐎", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*", StrReplace("chien★", "★", MK), "🐕", Opts)
+	CreateHotstring("*", StrReplace("chien★", "★", _GenMK), "🐕", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*", StrReplace("cochon★", "★", MK), "🐖", Opts)
+	CreateHotstring("*", StrReplace("cochon★", "★", _GenMK), "🐖", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*", StrReplace("coq★", "★", MK), "🐓", Opts)
+	CreateHotstring("*", StrReplace("coq★", "★", _GenMK), "🐓", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*", StrReplace("crabe★", "★", MK), "🦀", Opts)
+	CreateHotstring("*", StrReplace("crabe★", "★", _GenMK), "🦀", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*", StrReplace("croco★", "★", MK), "🐊", Opts)
+	CreateHotstring("*", StrReplace("croco★", "★", _GenMK), "🐊", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*", StrReplace("crocodile★", "★", MK), "🐊", Opts)
+	CreateHotstring("*", StrReplace("crocodile★", "★", _GenMK), "🐊", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*", StrReplace("cygne★", "★", MK), "🦢", Opts)
+	CreateHotstring("*", StrReplace("cygne★", "★", _GenMK), "🦢", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*", StrReplace("dauphin★", "★", MK), "🐬", Opts)
+	CreateHotstring("*", StrReplace("dauphin★", "★", _GenMK), "🐬", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*", StrReplace("dragon★", "★", MK), "🐉", Opts)
+	CreateHotstring("*", StrReplace("dragon★", "★", _GenMK), "🐉", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", true)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*", StrReplace("écureuil★", "★", MK), "🐿️", Opts)
+	CreateHotstring("*", StrReplace("écureuil★", "★", _GenMK), "🐿️", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*", StrReplace("éléphant★", "★", MK), "🐘", Opts)
+	CreateHotstring("*", StrReplace("éléphant★", "★", _GenMK), "🐘", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*", StrReplace("escargot★", "★", MK), "🐌", Opts)
+	CreateHotstring("*", StrReplace("escargot★", "★", _GenMK), "🐌", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*", StrReplace("flamant★", "★", MK), "🦩", Opts)
+	CreateHotstring("*", StrReplace("flamant★", "★", _GenMK), "🦩", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*", StrReplace("fourmi★", "★", MK), "🐜", Opts)
+	CreateHotstring("*", StrReplace("fourmi★", "★", _GenMK), "🐜", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*", StrReplace("girafe★", "★", MK), "🦒", Opts)
+	CreateHotstring("*", StrReplace("girafe★", "★", _GenMK), "🦒", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*", StrReplace("gorille★", "★", MK), "🦍", Opts)
+	CreateHotstring("*", StrReplace("gorille★", "★", _GenMK), "🦍", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*", StrReplace("grenouille★", "★", MK), "🐸", Opts)
+	CreateHotstring("*", StrReplace("grenouille★", "★", _GenMK), "🐸", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*", StrReplace("hamster★", "★", MK), "🐹", Opts)
+	CreateHotstring("*", StrReplace("hamster★", "★", _GenMK), "🐹", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*", StrReplace("hérisson★", "★", MK), "🦔", Opts)
+	CreateHotstring("*", StrReplace("hérisson★", "★", _GenMK), "🦔", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*", StrReplace("hibou★", "★", MK), "🦉", Opts)
+	CreateHotstring("*", StrReplace("hibou★", "★", _GenMK), "🦉", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*", StrReplace("hippopotame★", "★", MK), "🦛", Opts)
+	CreateHotstring("*", StrReplace("hippopotame★", "★", _GenMK), "🦛", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*", StrReplace("homard★", "★", MK), "🦞", Opts)
+	CreateHotstring("*", StrReplace("homard★", "★", _GenMK), "🦞", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*", StrReplace("kangourou★", "★", MK), "🦘", Opts)
+	CreateHotstring("*", StrReplace("kangourou★", "★", _GenMK), "🦘", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*", StrReplace("koala★", "★", MK), "🐨", Opts)
+	CreateHotstring("*", StrReplace("koala★", "★", _GenMK), "🐨", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*", StrReplace("lama★", "★", MK), "🦙", Opts)
+	CreateHotstring("*", StrReplace("lama★", "★", _GenMK), "🦙", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*", StrReplace("lapin★", "★", MK), "🐇", Opts)
+	CreateHotstring("*", StrReplace("lapin★", "★", _GenMK), "🐇", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*", StrReplace("léopard★", "★", MK), "🐆", Opts)
+	CreateHotstring("*", StrReplace("léopard★", "★", _GenMK), "🐆", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*", StrReplace("licorne★", "★", MK), "🦄", Opts)
+	CreateHotstring("*", StrReplace("licorne★", "★", _GenMK), "🦄", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*", StrReplace("lion★", "★", MK), "🦁", Opts)
+	CreateHotstring("*", StrReplace("lion★", "★", _GenMK), "🦁", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*", StrReplace("loup★", "★", MK), "🐺", Opts)
+	CreateHotstring("*", StrReplace("loup★", "★", _GenMK), "🐺", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*", StrReplace("mouton★", "★", MK), "🐑", Opts)
+	CreateHotstring("*", StrReplace("mouton★", "★", _GenMK), "🐑", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*", StrReplace("octopus★", "★", MK), "🐙", Opts)
+	CreateHotstring("*", StrReplace("octopus★", "★", _GenMK), "🐙", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*", StrReplace("ours★", "★", MK), "🐻", Opts)
+	CreateHotstring("*", StrReplace("ours★", "★", _GenMK), "🐻", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*", StrReplace("panda★", "★", MK), "🐼", Opts)
+	CreateHotstring("*", StrReplace("panda★", "★", _GenMK), "🐼", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*", StrReplace("papillon★", "★", MK), "🦋", Opts)
+	CreateHotstring("*", StrReplace("papillon★", "★", _GenMK), "🦋", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*", StrReplace("paresseux★", "★", MK), "🦥", Opts)
+	CreateHotstring("*", StrReplace("paresseux★", "★", _GenMK), "🦥", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*", StrReplace("perroquet★", "★", MK), "🦜", Opts)
+	CreateHotstring("*", StrReplace("perroquet★", "★", _GenMK), "🦜", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*", StrReplace("pingouin★", "★", MK), "🐧", Opts)
+	CreateHotstring("*", StrReplace("pingouin★", "★", _GenMK), "🐧", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*", StrReplace("poisson★", "★", MK), "🐟", Opts)
+	CreateHotstring("*", StrReplace("poisson★", "★", _GenMK), "🐟", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*", StrReplace("poule★", "★", MK), "🐔", Opts)
+	CreateHotstring("*", StrReplace("poule★", "★", _GenMK), "🐔", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*", StrReplace("poussin★", "★", MK), "🐣", Opts)
+	CreateHotstring("*", StrReplace("poussin★", "★", _GenMK), "🐣", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*", StrReplace("renard★", "★", MK), "🦊", Opts)
+	CreateHotstring("*", StrReplace("renard★", "★", _GenMK), "🦊", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*", StrReplace("requin★", "★", MK), "🦈", Opts)
+	CreateHotstring("*", StrReplace("requin★", "★", _GenMK), "🦈", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*", StrReplace("rhinocéros★", "★", MK), "🦏", Opts)
+	CreateHotstring("*", StrReplace("rhinocéros★", "★", _GenMK), "🦏", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*", StrReplace("rhinoceros★", "★", MK), "🦏", Opts)
+	CreateHotstring("*", StrReplace("rhinoceros★", "★", _GenMK), "🦏", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*", StrReplace("sanglier★", "★", MK), "🐗", Opts)
+	CreateHotstring("*", StrReplace("sanglier★", "★", _GenMK), "🐗", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*", StrReplace("serpent★", "★", MK), "🐍", Opts)
+	CreateHotstring("*", StrReplace("serpent★", "★", _GenMK), "🐍", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*", StrReplace("singe★", "★", MK), "🐒", Opts)
+	CreateHotstring("*", StrReplace("singe★", "★", _GenMK), "🐒", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*", StrReplace("souris★", "★", MK), "🐁", Opts)
+	CreateHotstring("*", StrReplace("souris★", "★", _GenMK), "🐁", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*", StrReplace("tigre★", "★", MK), "🐅", Opts)
+	CreateHotstring("*", StrReplace("tigre★", "★", _GenMK), "🐅", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*", StrReplace("tortue★", "★", MK), "🐢", Opts)
+	CreateHotstring("*", StrReplace("tortue★", "★", _GenMK), "🐢", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*", StrReplace("trex★", "★", MK), "🦖", Opts)
+	CreateHotstring("*", StrReplace("trex★", "★", _GenMK), "🦖", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*", StrReplace("vache★", "★", MK), "🐄", Opts)
+	CreateHotstring("*", StrReplace("vache★", "★", _GenMK), "🐄", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*", StrReplace("zèbre★", "★", MK), "🦓", Opts)
+	CreateHotstring("*", StrReplace("zèbre★", "★", _GenMK), "🦓", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*", StrReplace("aimant★", "★", MK), "🧲", Opts)
+	CreateHotstring("*", StrReplace("aimant★", "★", _GenMK), "🧲", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*", StrReplace("ampoule★", "★", MK), "💡", Opts)
+	CreateHotstring("*", StrReplace("ampoule★", "★", _GenMK), "💡", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*", StrReplace("ancre★", "★", MK), "⚓", Opts)
+	CreateHotstring("*", StrReplace("ancre★", "★", _GenMK), "⚓", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*", StrReplace("arbre★", "★", MK), "🌲", Opts)
+	CreateHotstring("*", StrReplace("arbre★", "★", _GenMK), "🌲", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*", StrReplace("argent★", "★", MK), "💰", Opts)
+	CreateHotstring("*", StrReplace("argent★", "★", _GenMK), "💰", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", true)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*", StrReplace("attention★", "★", MK), "⚠️", Opts)
+	CreateHotstring("*", StrReplace("attention★", "★", _GenMK), "⚠️", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", true)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*", StrReplace("avion★", "★", MK), "✈️", Opts)
+	CreateHotstring("*", StrReplace("avion★", "★", _GenMK), "✈️", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", true)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*", StrReplace("balance★", "★", MK), "⚖️", Opts)
+	CreateHotstring("*", StrReplace("balance★", "★", _GenMK), "⚖️", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*", StrReplace("ballon★", "★", MK), "🎈", Opts)
+	CreateHotstring("*", StrReplace("ballon★", "★", _GenMK), "🎈", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*", StrReplace("batterie★", "★", MK), "🔋", Opts)
+	CreateHotstring("*", StrReplace("batterie★", "★", _GenMK), "🔋", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", true)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*", StrReplace("blanc★", "★", MK), "🏳️", Opts)
+	CreateHotstring("*", StrReplace("blanc★", "★", _GenMK), "🏳️", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*", StrReplace("bombe★", "★", MK), "💣", Opts)
+	CreateHotstring("*", StrReplace("bombe★", "★", _GenMK), "💣", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*", StrReplace("boussole★", "★", MK), "🧭", Opts)
+	CreateHotstring("*", StrReplace("boussole★", "★", _GenMK), "🧭", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*", StrReplace("brain★", "★", MK), "🧠", Opts)
+	CreateHotstring("*", StrReplace("brain★", "★", _GenMK), "🧠", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", true)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*", StrReplace("bougie★", "★", MK), "🕯️", Opts)
+	CreateHotstring("*", StrReplace("bougie★", "★", _GenMK), "🕯️", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*", StrReplace("cadeau★", "★", MK), "🎁", Opts)
+	CreateHotstring("*", StrReplace("cadeau★", "★", _GenMK), "🎁", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*", StrReplace("cadenas★", "★", MK), "🔒", Opts)
+	CreateHotstring("*", StrReplace("cadenas★", "★", _GenMK), "🔒", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*", StrReplace("calendrier★", "★", MK), "📅", Opts)
+	CreateHotstring("*", StrReplace("calendrier★", "★", _GenMK), "📅", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*", StrReplace("caméra★", "★", MK), "📷", Opts)
+	CreateHotstring("*", StrReplace("caméra★", "★", _GenMK), "📷", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*", StrReplace("cerveau★", "★", MK), "🧠", Opts)
+	CreateHotstring("*", StrReplace("cerveau★", "★", _GenMK), "🧠", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", true)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*", StrReplace("clavier★", "★", MK), "⌨️", Opts)
+	CreateHotstring("*", StrReplace("clavier★", "★", _GenMK), "⌨️", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", true)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*", StrReplace("check★", "★", MK), "✔️", Opts)
+	CreateHotstring("*", StrReplace("check★", "★", _GenMK), "✔️", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*", StrReplace("clé★", "★", MK), "🔑", Opts)
+	CreateHotstring("*", StrReplace("clé★", "★", _GenMK), "🔑", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*", StrReplace("cloche★", "★", MK), "🔔", Opts)
+	CreateHotstring("*", StrReplace("cloche★", "★", _GenMK), "🔔", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*", StrReplace("computer★", "★", MK), "💻", Opts)
+	CreateHotstring("*", StrReplace("computer★", "★", _GenMK), "💻", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*", StrReplace("couronne★", "★", MK), "👑", Opts)
+	CreateHotstring("*", StrReplace("couronne★", "★", _GenMK), "👑", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*", StrReplace("croix★", "★", MK), "❌", Opts)
+	CreateHotstring("*", StrReplace("croix★", "★", _GenMK), "❌", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*", StrReplace("danse★", "★", MK), "💃", Opts)
+	CreateHotstring("*", StrReplace("danse★", "★", _GenMK), "💃", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*", StrReplace("diamant★", "★", MK), "💎", Opts)
+	CreateHotstring("*", StrReplace("diamant★", "★", _GenMK), "💎", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*", StrReplace("drapeau★", "★", MK), "🏁", Opts)
+	CreateHotstring("*", StrReplace("drapeau★", "★", _GenMK), "🏁", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*", StrReplace("douche★", "★", MK), "🛁", Opts)
+	CreateHotstring("*", StrReplace("douche★", "★", _GenMK), "🛁", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*", StrReplace("éclair★", "★", MK), "⚡", Opts)
+	CreateHotstring("*", StrReplace("éclair★", "★", _GenMK), "⚡", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*", StrReplace("eau★", "★", MK), "💧", Opts)
+	CreateHotstring("*", StrReplace("eau★", "★", _GenMK), "💧", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*", StrReplace("email★", "★", MK), "📧", Opts)
+	CreateHotstring("*", StrReplace("email★", "★", _GenMK), "📧", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", true)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*", StrReplace("épée★", "★", MK), "⚔️", Opts)
+	CreateHotstring("*", StrReplace("épée★", "★", _GenMK), "⚔️", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*", StrReplace("étoile★", "★", MK), "⭐", Opts)
+	CreateHotstring("*", StrReplace("étoile★", "★", _GenMK), "⭐", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*", StrReplace("faux★", "★", MK), "❌", Opts)
+	CreateHotstring("*", StrReplace("faux★", "★", _GenMK), "❌", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*", StrReplace("feu★", "★", MK), "🔥", Opts)
+	CreateHotstring("*", StrReplace("feu★", "★", _GenMK), "🔥", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*", StrReplace("fete★", "★", MK), "🎉", Opts)
+	CreateHotstring("*", StrReplace("fete★", "★", _GenMK), "🎉", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*", StrReplace("fête★", "★", MK), "🎉", Opts)
+	CreateHotstring("*", StrReplace("fête★", "★", _GenMK), "🎉", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*", StrReplace("film★", "★", MK), "🎬", Opts)
+	CreateHotstring("*", StrReplace("film★", "★", _GenMK), "🎬", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*", StrReplace("fleur★", "★", MK), "🌸", Opts)
+	CreateHotstring("*", StrReplace("fleur★", "★", _GenMK), "🌸", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*", StrReplace("fusée★", "★", MK), "🚀", Opts)
+	CreateHotstring("*", StrReplace("fusée★", "★", _GenMK), "🚀", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*", StrReplace("guitare★", "★", MK), "🎸", Opts)
+	CreateHotstring("*", StrReplace("guitare★", "★", _GenMK), "🎸", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*", StrReplace("idée★", "★", MK), "💡", Opts)
+	CreateHotstring("*", StrReplace("idée★", "★", _GenMK), "💡", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*", StrReplace("idee★", "★", MK), "💡", Opts)
+	CreateHotstring("*", StrReplace("idee★", "★", _GenMK), "💡", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*", StrReplace("interdit★", "★", MK), "⛔", Opts)
+	CreateHotstring("*", StrReplace("interdit★", "★", _GenMK), "⛔", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*", StrReplace("journal★", "★", MK), "📰", Opts)
+	CreateHotstring("*", StrReplace("journal★", "★", _GenMK), "📰", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*", StrReplace("ko★", "★", MK), "❌", Opts)
+	CreateHotstring("*", StrReplace("ko★", "★", _GenMK), "❌", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*", StrReplace("livre★", "★", MK), "📖", Opts)
+	CreateHotstring("*", StrReplace("livre★", "★", _GenMK), "📖", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*", StrReplace("loupe★", "★", MK), "🔎", Opts)
+	CreateHotstring("*", StrReplace("loupe★", "★", _GenMK), "🔎", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*", StrReplace("lune★", "★", MK), "🌙", Opts)
+	CreateHotstring("*", StrReplace("lune★", "★", _GenMK), "🌙", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*", StrReplace("médaille★", "★", MK), "🥇", Opts)
+	CreateHotstring("*", StrReplace("médaille★", "★", _GenMK), "🥇", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*", StrReplace("medaille★", "★", MK), "🥇", Opts)
+	CreateHotstring("*", StrReplace("medaille★", "★", _GenMK), "🥇", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*", StrReplace("microphone★", "★", MK), "🎤", Opts)
+	CreateHotstring("*", StrReplace("microphone★", "★", _GenMK), "🎤", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*", StrReplace("montre★", "★", MK), "⌚", Opts)
+	CreateHotstring("*", StrReplace("montre★", "★", _GenMK), "⌚", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*", StrReplace("musique★", "★", MK), "🎵", Opts)
+	CreateHotstring("*", StrReplace("musique★", "★", _GenMK), "🎵", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*", StrReplace("noel★", "★", MK), "🎄", Opts)
+	CreateHotstring("*", StrReplace("noel★", "★", _GenMK), "🎄", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", true)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*", StrReplace("nuage★", "★", MK), "☁️", Opts)
+	CreateHotstring("*", StrReplace("nuage★", "★", _GenMK), "☁️", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*", StrReplace("ok★", "★", MK), "✅", Opts)
+	CreateHotstring("*", StrReplace("ok★", "★", _GenMK), "✅", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*", StrReplace("olaf★", "★", MK), "⛄", Opts)
+	CreateHotstring("*", StrReplace("olaf★", "★", _GenMK), "⛄", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*", StrReplace("ordi★", "★", MK), "💻", Opts)
+	CreateHotstring("*", StrReplace("ordi★", "★", _GenMK), "💻", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*", StrReplace("ordinateur★", "★", MK), "💻", Opts)
+	CreateHotstring("*", StrReplace("ordinateur★", "★", _GenMK), "💻", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", true)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*", StrReplace("parapluie★", "★", MK), "☂️", Opts)
+	CreateHotstring("*", StrReplace("parapluie★", "★", _GenMK), "☂️", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*", StrReplace("pc★", "★", MK), "💻", Opts)
+	CreateHotstring("*", StrReplace("pc★", "★", _GenMK), "💻", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*", StrReplace("piano★", "★", MK), "🎹", Opts)
+	CreateHotstring("*", StrReplace("piano★", "★", _GenMK), "🎹", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", true)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*", StrReplace("pirate★", "★", MK), "🏴‍☠️", Opts)
+	CreateHotstring("*", StrReplace("pirate★", "★", _GenMK), "🏴‍☠️", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", true)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*", StrReplace("pluie★", "★", MK), "🌧️", Opts)
+	CreateHotstring("*", StrReplace("pluie★", "★", _GenMK), "🌧️", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", true)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*", StrReplace("radioactif★", "★", MK), "☢️", Opts)
+	CreateHotstring("*", StrReplace("radioactif★", "★", _GenMK), "☢️", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*", StrReplace("regard★", "★", MK), "👀", Opts)
+	CreateHotstring("*", StrReplace("regard★", "★", _GenMK), "👀", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*", StrReplace("robot★", "★", MK), "🤖", Opts)
+	CreateHotstring("*", StrReplace("robot★", "★", _GenMK), "🤖", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*", StrReplace("rocket★", "★", MK), "🚀", Opts)
+	CreateHotstring("*", StrReplace("rocket★", "★", _GenMK), "🚀", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*", StrReplace("sacoche★", "★", MK), "💼", Opts)
+	CreateHotstring("*", StrReplace("sacoche★", "★", _GenMK), "💼", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*", StrReplace("smartphone★", "★", MK), "📱", Opts)
+	CreateHotstring("*", StrReplace("smartphone★", "★", _GenMK), "📱", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", true)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*", StrReplace("soleil★", "★", MK), "☀️", Opts)
+	CreateHotstring("*", StrReplace("soleil★", "★", _GenMK), "☀️", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*", StrReplace("terre★", "★", MK), "🌍", Opts)
+	CreateHotstring("*", StrReplace("terre★", "★", _GenMK), "🌍", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", true)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*", StrReplace("thermomètre★", "★", MK), "🌡️", Opts)
+	CreateHotstring("*", StrReplace("thermomètre★", "★", _GenMK), "🌡️", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", true)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*", StrReplace("timer★", "★", MK), "⏲️", Opts)
+	CreateHotstring("*", StrReplace("timer★", "★", _GenMK), "⏲️", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*", StrReplace("toilette★", "★", MK), "🧻", Opts)
+	CreateHotstring("*", StrReplace("toilette★", "★", _GenMK), "🧻", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*", StrReplace("trophee★", "★", MK), "🏆", Opts)
+	CreateHotstring("*", StrReplace("trophee★", "★", _GenMK), "🏆", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*", StrReplace("trophée★", "★", MK), "🏆", Opts)
+	CreateHotstring("*", StrReplace("trophée★", "★", _GenMK), "🏆", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*", StrReplace("trophy★", "★", MK), "🏆", Opts)
+	CreateHotstring("*", StrReplace("trophy★", "★", _GenMK), "🏆", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", true)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*", StrReplace("telephone★", "★", MK), "☎️", Opts)
+	CreateHotstring("*", StrReplace("telephone★", "★", _GenMK), "☎️", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", true)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*", StrReplace("téléphone★", "★", MK), "☎️", Opts)
+	CreateHotstring("*", StrReplace("téléphone★", "★", _GenMK), "☎️", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*", StrReplace("train★", "★", MK), "🚂", Opts)
+	CreateHotstring("*", StrReplace("train★", "★", _GenMK), "🚂", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*", StrReplace("vélo★", "★", MK), "🚲", Opts)
+	CreateHotstring("*", StrReplace("vélo★", "★", _GenMK), "🚲", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*", StrReplace("voiture★", "★", MK), "🚗", Opts)
+	CreateHotstring("*", StrReplace("voiture★", "★", _GenMK), "🚗", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*", StrReplace("yeux★", "★", MK), "👀", Opts)
+	CreateHotstring("*", StrReplace("yeux★", "★", _GenMK), "👀", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*", StrReplace("ananas★", "★", MK), "🍍", Opts)
+	CreateHotstring("*", StrReplace("ananas★", "★", _GenMK), "🍍", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*", StrReplace("aubergine★", "★", MK), "🍆", Opts)
+	CreateHotstring("*", StrReplace("aubergine★", "★", _GenMK), "🍆", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*", StrReplace("avocat★", "★", MK), "🥑", Opts)
+	CreateHotstring("*", StrReplace("avocat★", "★", _GenMK), "🥑", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*", StrReplace("banane★", "★", MK), "🍌", Opts)
+	CreateHotstring("*", StrReplace("banane★", "★", _GenMK), "🍌", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*", StrReplace("bière★", "★", MK), "🍺", Opts)
+	CreateHotstring("*", StrReplace("bière★", "★", _GenMK), "🍺", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*", StrReplace("brocoli★", "★", MK), "🥦", Opts)
+	CreateHotstring("*", StrReplace("brocoli★", "★", _GenMK), "🥦", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*", StrReplace("burger★", "★", MK), "🍔", Opts)
+	CreateHotstring("*", StrReplace("burger★", "★", _GenMK), "🍔", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*", StrReplace("café★", "★", MK), "☕", Opts)
+	CreateHotstring("*", StrReplace("café★", "★", _GenMK), "☕", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*", StrReplace("carotte★", "★", MK), "🥕", Opts)
+	CreateHotstring("*", StrReplace("carotte★", "★", _GenMK), "🥕", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*", StrReplace("cerise★", "★", MK), "🍒", Opts)
+	CreateHotstring("*", StrReplace("cerise★", "★", _GenMK), "🍒", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*", StrReplace("champignon★", "★", MK), "🍄", Opts)
+	CreateHotstring("*", StrReplace("champignon★", "★", _GenMK), "🍄", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*", StrReplace("chocolat★", "★", MK), "🍫", Opts)
+	CreateHotstring("*", StrReplace("chocolat★", "★", _GenMK), "🍫", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*", StrReplace("citron★", "★", MK), "🍋", Opts)
+	CreateHotstring("*", StrReplace("citron★", "★", _GenMK), "🍋", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*", StrReplace("coco★", "★", MK), "🥥", Opts)
+	CreateHotstring("*", StrReplace("coco★", "★", _GenMK), "🥥", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*", StrReplace("cookie★", "★", MK), "🍪", Opts)
+	CreateHotstring("*", StrReplace("cookie★", "★", _GenMK), "🍪", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*", StrReplace("croissant★", "★", MK), "🥐", Opts)
+	CreateHotstring("*", StrReplace("croissant★", "★", _GenMK), "🥐", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*", StrReplace("donut★", "★", MK), "🍩", Opts)
+	CreateHotstring("*", StrReplace("donut★", "★", _GenMK), "🍩", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*", StrReplace("fraise★", "★", MK), "🍓", Opts)
+	CreateHotstring("*", StrReplace("fraise★", "★", _GenMK), "🍓", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*", StrReplace("frites★", "★", MK), "🍟", Opts)
+	CreateHotstring("*", StrReplace("frites★", "★", _GenMK), "🍟", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*", StrReplace("fromage★", "★", MK), "🧀", Opts)
+	CreateHotstring("*", StrReplace("fromage★", "★", _GenMK), "🧀", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*", StrReplace("gâteau★", "★", MK), "🎂", Opts)
+	CreateHotstring("*", StrReplace("gâteau★", "★", _GenMK), "🎂", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*", StrReplace("glace★", "★", MK), "🍦", Opts)
+	CreateHotstring("*", StrReplace("glace★", "★", _GenMK), "🍦", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*", StrReplace("hamburger★", "★", MK), "🍔", Opts)
+	CreateHotstring("*", StrReplace("hamburger★", "★", _GenMK), "🍔", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*", StrReplace("hotdog★", "★", MK), "🌭", Opts)
+	CreateHotstring("*", StrReplace("hotdog★", "★", _GenMK), "🌭", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*", StrReplace("kebab★", "★", MK), "🥙", Opts)
+	CreateHotstring("*", StrReplace("kebab★", "★", _GenMK), "🥙", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*", StrReplace("kiwi★", "★", MK), "🥝", Opts)
+	CreateHotstring("*", StrReplace("kiwi★", "★", _GenMK), "🥝", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*", StrReplace("lait★", "★", MK), "🥛", Opts)
+	CreateHotstring("*", StrReplace("lait★", "★", _GenMK), "🥛", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*", StrReplace("maïs★", "★", MK), "🌽", Opts)
+	CreateHotstring("*", StrReplace("maïs★", "★", _GenMK), "🌽", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*", StrReplace("melon★", "★", MK), "🍈", Opts)
+	CreateHotstring("*", StrReplace("melon★", "★", _GenMK), "🍈", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*", StrReplace("miel★", "★", MK), "🍯", Opts)
+	CreateHotstring("*", StrReplace("miel★", "★", _GenMK), "🍯", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*", StrReplace("orange★", "★", MK), "🍊", Opts)
+	CreateHotstring("*", StrReplace("orange★", "★", _GenMK), "🍊", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*", StrReplace("pain★", "★", MK), "🍞", Opts)
+	CreateHotstring("*", StrReplace("pain★", "★", _GenMK), "🍞", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*", StrReplace("pastèque★", "★", MK), "🍉", Opts)
+	CreateHotstring("*", StrReplace("pastèque★", "★", _GenMK), "🍉", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*", StrReplace("pates★", "★", MK), "🍝", Opts)
+	CreateHotstring("*", StrReplace("pates★", "★", _GenMK), "🍝", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*", StrReplace("pêche★", "★", MK), "🍑", Opts)
+	CreateHotstring("*", StrReplace("pêche★", "★", _GenMK), "🍑", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*", StrReplace("pizza★", "★", MK), "🍕", Opts)
+	CreateHotstring("*", StrReplace("pizza★", "★", _GenMK), "🍕", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*", StrReplace("poire★", "★", MK), "🍐", Opts)
+	CreateHotstring("*", StrReplace("poire★", "★", _GenMK), "🍐", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*", StrReplace("pomme★", "★", MK), "🍎", Opts)
+	CreateHotstring("*", StrReplace("pomme★", "★", _GenMK), "🍎", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*", StrReplace("popcorn★", "★", MK), "🍿", Opts)
+	CreateHotstring("*", StrReplace("popcorn★", "★", _GenMK), "🍿", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*", StrReplace("raisin★", "★", MK), "🍇", Opts)
+	CreateHotstring("*", StrReplace("raisin★", "★", _GenMK), "🍇", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*", StrReplace("riz★", "★", MK), "🍚", Opts)
+	CreateHotstring("*", StrReplace("riz★", "★", _GenMK), "🍚", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*", StrReplace("salade★", "★", MK), "🥗", Opts)
+	CreateHotstring("*", StrReplace("salade★", "★", _GenMK), "🥗", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*", StrReplace("sandwich★", "★", MK), "🥪", Opts)
+	CreateHotstring("*", StrReplace("sandwich★", "★", _GenMK), "🥪", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*", StrReplace("spaghetti★", "★", MK), "🍝", Opts)
+	CreateHotstring("*", StrReplace("spaghetti★", "★", _GenMK), "🍝", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*", StrReplace("taco★", "★", MK), "🌮", Opts)
+	CreateHotstring("*", StrReplace("taco★", "★", _GenMK), "🌮", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*", StrReplace("tacos★", "★", MK), "🌮", Opts)
+	CreateHotstring("*", StrReplace("tacos★", "★", _GenMK), "🌮", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*", StrReplace("thé★", "★", MK), "🍵", Opts)
+	CreateHotstring("*", StrReplace("thé★", "★", _GenMK), "🍵", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*", StrReplace("tomate★", "★", MK), "🍅", Opts)
+	CreateHotstring("*", StrReplace("tomate★", "★", _GenMK), "🍅", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*", StrReplace("vin★", "★", MK), "🍷", Opts)
+	CreateHotstring("*", StrReplace("vin★", "★", _GenMK), "🍷", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*", StrReplace("amour★", "★", MK), "🥰", Opts)
+	CreateHotstring("*", StrReplace("amour★", "★", _GenMK), "🥰", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*", StrReplace("ange★", "★", MK), "👼", Opts)
+	CreateHotstring("*", StrReplace("ange★", "★", _GenMK), "👼", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*", StrReplace("bisou★", "★", MK), "😘", Opts)
+	CreateHotstring("*", StrReplace("bisou★", "★", _GenMK), "😘", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*", StrReplace("bouche★", "★", MK), "🤭", Opts)
+	CreateHotstring("*", StrReplace("bouche★", "★", _GenMK), "🤭", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*", StrReplace("caca★", "★", MK), "💩", Opts)
+	CreateHotstring("*", StrReplace("caca★", "★", _GenMK), "💩", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*", StrReplace("clap★", "★", MK), "👏", Opts)
+	CreateHotstring("*", StrReplace("clap★", "★", _GenMK), "👏", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*", StrReplace("clin★", "★", MK), "😉", Opts)
+	CreateHotstring("*", StrReplace("clin★", "★", _GenMK), "😉", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", true)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*", StrReplace("cœur★", "★", MK), "❤️", Opts)
+	CreateHotstring("*", StrReplace("cœur★", "★", _GenMK), "❤️", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", true)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*", StrReplace("coeur★", "★", MK), "❤️", Opts)
+	CreateHotstring("*", StrReplace("coeur★", "★", _GenMK), "❤️", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*", StrReplace("colère★", "★", MK), "😠", Opts)
+	CreateHotstring("*", StrReplace("colère★", "★", _GenMK), "😠", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*", StrReplace("cowboy★", "★", MK), "🤠", Opts)
+	CreateHotstring("*", StrReplace("cowboy★", "★", _GenMK), "🤠", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*", StrReplace("dégoût★", "★", MK), "🤮", Opts)
+	CreateHotstring("*", StrReplace("dégoût★", "★", _GenMK), "🤮", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*", StrReplace("délice★", "★", MK), "😋", Opts)
+	CreateHotstring("*", StrReplace("délice★", "★", _GenMK), "😋", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*", StrReplace("délicieux★", "★", MK), "😋", Opts)
+	CreateHotstring("*", StrReplace("délicieux★", "★", _GenMK), "😋", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*", StrReplace("diable★", "★", MK), "😈", Opts)
+	CreateHotstring("*", StrReplace("diable★", "★", _GenMK), "😈", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*", StrReplace("dislike★", "★", MK), "👎", Opts)
+	CreateHotstring("*", StrReplace("dislike★", "★", _GenMK), "👎", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*", StrReplace("dodo★", "★", MK), "😴", Opts)
+	CreateHotstring("*", StrReplace("dodo★", "★", _GenMK), "😴", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*", StrReplace("effroi★", "★", MK), "😱", Opts)
+	CreateHotstring("*", StrReplace("effroi★", "★", _GenMK), "😱", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*", StrReplace("facepalm★", "★", MK), "🤦", Opts)
+	CreateHotstring("*", StrReplace("facepalm★", "★", _GenMK), "🤦", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*", StrReplace("fatigue★", "★", MK), "😩", Opts)
+	CreateHotstring("*", StrReplace("fatigue★", "★", _GenMK), "😩", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*", StrReplace("fier★", "★", MK), "😤", Opts)
+	CreateHotstring("*", StrReplace("fier★", "★", _GenMK), "😤", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*", StrReplace("fort★", "★", MK), "💪", Opts)
+	CreateHotstring("*", StrReplace("fort★", "★", _GenMK), "💪", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*", StrReplace("fou★", "★", MK), "🤪", Opts)
+	CreateHotstring("*", StrReplace("fou★", "★", _GenMK), "🤪", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*", StrReplace("heureux★", "★", MK), "😊", Opts)
+	CreateHotstring("*", StrReplace("heureux★", "★", _GenMK), "😊", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*", StrReplace("innocent★", "★", MK), "😇", Opts)
+	CreateHotstring("*", StrReplace("innocent★", "★", _GenMK), "😇", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*", StrReplace("intello★", "★", MK), "🤓", Opts)
+	CreateHotstring("*", StrReplace("intello★", "★", _GenMK), "🤓", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*", StrReplace("larme★", "★", MK), "😢", Opts)
+	CreateHotstring("*", StrReplace("larme★", "★", _GenMK), "😢", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*", StrReplace("larmes★", "★", MK), "😭", Opts)
+	CreateHotstring("*", StrReplace("larmes★", "★", _GenMK), "😭", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*", StrReplace("like★", "★", MK), "👍", Opts)
+	CreateHotstring("*", StrReplace("like★", "★", _GenMK), "👍", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*", StrReplace("lol★", "★", MK), "😂", Opts)
+	CreateHotstring("*", StrReplace("lol★", "★", _GenMK), "😂", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*", StrReplace("lunettes★", "★", MK), "🤓", Opts)
+	CreateHotstring("*", StrReplace("lunettes★", "★", _GenMK), "🤓", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*", StrReplace("malade★", "★", MK), "🤒", Opts)
+	CreateHotstring("*", StrReplace("malade★", "★", _GenMK), "🤒", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*", StrReplace("masque★", "★", MK), "😷", Opts)
+	CreateHotstring("*", StrReplace("masque★", "★", _GenMK), "😷", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*", StrReplace("mdr★", "★", MK), "😂", Opts)
+	CreateHotstring("*", StrReplace("mdr★", "★", _GenMK), "😂", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*", StrReplace("mignon★", "★", MK), "🥺", Opts)
+	CreateHotstring("*", StrReplace("mignon★", "★", _GenMK), "🥺", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*", StrReplace("monocle★", "★", MK), "🧐", Opts)
+	CreateHotstring("*", StrReplace("monocle★", "★", _GenMK), "🧐", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*", StrReplace("mort★", "★", MK), "💀", Opts)
+	CreateHotstring("*", StrReplace("mort★", "★", _GenMK), "💀", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*", StrReplace("muscles★", "★", MK), "💪", Opts)
+	CreateHotstring("*", StrReplace("muscles★", "★", _GenMK), "💪", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*", StrReplace("(n)★", "★", MK), "👎", Opts)
+	CreateHotstring("*", StrReplace("(n)★", "★", _GenMK), "👎", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*", StrReplace("nice★", "★", MK), "👌", Opts)
+	CreateHotstring("*", StrReplace("nice★", "★", _GenMK), "👌", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*", StrReplace("ouf★", "★", MK), "😅", Opts)
+	CreateHotstring("*", StrReplace("ouf★", "★", _GenMK), "😅", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*", StrReplace("oups★", "★", MK), "😅", Opts)
+	CreateHotstring("*", StrReplace("oups★", "★", _GenMK), "😅", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*", StrReplace("parfait★", "★", MK), "👌", Opts)
+	CreateHotstring("*", StrReplace("parfait★", "★", _GenMK), "👌", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*", StrReplace("penser★", "★", MK), "🤔", Opts)
+	CreateHotstring("*", StrReplace("penser★", "★", _GenMK), "🤔", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*", StrReplace("pensif★", "★", MK), "🤔", Opts)
+	CreateHotstring("*", StrReplace("pensif★", "★", _GenMK), "🤔", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*", StrReplace("peur★", "★", MK), "😨", Opts)
+	CreateHotstring("*", StrReplace("peur★", "★", _GenMK), "😨", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*", StrReplace("pleur★", "★", MK), "😭", Opts)
+	CreateHotstring("*", StrReplace("pleur★", "★", _GenMK), "😭", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*", StrReplace("pleurer★", "★", MK), "😭", Opts)
+	CreateHotstring("*", StrReplace("pleurer★", "★", _GenMK), "😭", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*", StrReplace("pouce★", "★", MK), "👍", Opts)
+	CreateHotstring("*", StrReplace("pouce★", "★", _GenMK), "👍", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*", StrReplace("rage★", "★", MK), "😡", Opts)
+	CreateHotstring("*", StrReplace("rage★", "★", _GenMK), "😡", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*", StrReplace("rire★", "★", MK), "😂", Opts)
+	CreateHotstring("*", StrReplace("rire★", "★", _GenMK), "😂", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*", StrReplace("silence★", "★", MK), "🤫", Opts)
+	CreateHotstring("*", StrReplace("silence★", "★", _GenMK), "🤫", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*", StrReplace("snif★", "★", MK), "😢", Opts)
+	CreateHotstring("*", StrReplace("snif★", "★", _GenMK), "😢", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*", StrReplace("stress★", "★", MK), "😰", Opts)
+	CreateHotstring("*", StrReplace("stress★", "★", _GenMK), "😰", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*", StrReplace("strong★", "★", MK), "💪", Opts)
+	CreateHotstring("*", StrReplace("strong★", "★", _GenMK), "💪", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*", StrReplace("surprise★", "★", MK), "😲", Opts)
+	CreateHotstring("*", StrReplace("surprise★", "★", _GenMK), "😲", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*", StrReplace("timide★", "★", MK), "😳", Opts)
+	CreateHotstring("*", StrReplace("timide★", "★", _GenMK), "😳", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*", StrReplace("triste★", "★", MK), "😢", Opts)
+	CreateHotstring("*", StrReplace("triste★", "★", _GenMK), "😢", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", true)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*", StrReplace("victoire★", "★", MK), "✌️", Opts)
+	CreateHotstring("*", StrReplace("victoire★", "★", _GenMK), "✌️", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*", StrReplace("(y)★", "★", MK), "👍", Opts)
+	CreateHotstring("*", StrReplace("(y)★", "★", _GenMK), "👍", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*", StrReplace("zombie★", "★", MK), "🧟", Opts)
+	CreateHotstring("*", StrReplace("zombie★", "★", _GenMK), "🧟", Opts)
 }
 
 _GenLoad_magickey_textexpansionsymbols(FeatureConfig, ExtraOptions := unset) {
 	global ScriptInformation
 	TimeAct := FeatureConfig.HasOwnProp("TimeActivationSeconds") ? FeatureConfig.TimeActivationSeconds : 0
-	MK := ScriptInformation["MagicKey"]
+	_GenMK := ScriptInformation["MagicKey"]
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*C", StrReplace("1/★", "★", MK), "⅟", Opts)
+	CreateHotstring("*C", StrReplace("1/★", "★", _GenMK), "⅟", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*C", StrReplace("1/2★", "★", MK), "½", Opts)
+	CreateHotstring("*C", StrReplace("1/2★", "★", _GenMK), "½", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*C", StrReplace("0/3★", "★", MK), "↉", Opts)
+	CreateHotstring("*C", StrReplace("0/3★", "★", _GenMK), "↉", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*C", StrReplace("1/3★", "★", MK), "⅓", Opts)
+	CreateHotstring("*C", StrReplace("1/3★", "★", _GenMK), "⅓", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*C", StrReplace("2/3★", "★", MK), "⅔", Opts)
+	CreateHotstring("*C", StrReplace("2/3★", "★", _GenMK), "⅔", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*C", StrReplace("1/4★", "★", MK), "¼", Opts)
+	CreateHotstring("*C", StrReplace("1/4★", "★", _GenMK), "¼", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*C", StrReplace("3/4★", "★", MK), "¾", Opts)
+	CreateHotstring("*C", StrReplace("3/4★", "★", _GenMK), "¾", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*C", StrReplace("1/5★", "★", MK), "⅕", Opts)
+	CreateHotstring("*C", StrReplace("1/5★", "★", _GenMK), "⅕", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*C", StrReplace("2/5★", "★", MK), "⅖", Opts)
+	CreateHotstring("*C", StrReplace("2/5★", "★", _GenMK), "⅖", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*C", StrReplace("3/5★", "★", MK), "⅗", Opts)
+	CreateHotstring("*C", StrReplace("3/5★", "★", _GenMK), "⅗", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*C", StrReplace("4/5★", "★", MK), "⅘", Opts)
+	CreateHotstring("*C", StrReplace("4/5★", "★", _GenMK), "⅘", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*C", StrReplace("1/6★", "★", MK), "⅙", Opts)
+	CreateHotstring("*C", StrReplace("1/6★", "★", _GenMK), "⅙", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*C", StrReplace("5/6★", "★", MK), "⅚", Opts)
+	CreateHotstring("*C", StrReplace("5/6★", "★", _GenMK), "⅚", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*C", StrReplace("1/8★", "★", MK), "⅛", Opts)
+	CreateHotstring("*C", StrReplace("1/8★", "★", _GenMK), "⅛", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*C", StrReplace("3/8★", "★", MK), "⅜", Opts)
+	CreateHotstring("*C", StrReplace("3/8★", "★", _GenMK), "⅜", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*C", StrReplace("5/8★", "★", MK), "⅝", Opts)
+	CreateHotstring("*C", StrReplace("5/8★", "★", _GenMK), "⅝", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*C", StrReplace("7/8★", "★", MK), "⅞", Opts)
+	CreateHotstring("*C", StrReplace("7/8★", "★", _GenMK), "⅞", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*C", StrReplace("1/7★", "★", MK), "⅐", Opts)
+	CreateHotstring("*C", StrReplace("1/7★", "★", _GenMK), "⅐", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*C", StrReplace("1/9★", "★", MK), "⅑", Opts)
+	CreateHotstring("*C", StrReplace("1/9★", "★", _GenMK), "⅑", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*C", StrReplace("1/10★", "★", MK), "⅒", Opts)
+	CreateHotstring("*C", StrReplace("1/10★", "★", _GenMK), "⅒", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*C", StrReplace("(0)★", "★", MK), "🄋", Opts)
+	CreateHotstring("*C", StrReplace("(0)★", "★", _GenMK), "🄋", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*C", StrReplace("(1)★", "★", MK), "➀", Opts)
+	CreateHotstring("*C", StrReplace("(1)★", "★", _GenMK), "➀", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*C", StrReplace("(2)★", "★", MK), "➁", Opts)
+	CreateHotstring("*C", StrReplace("(2)★", "★", _GenMK), "➁", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*C", StrReplace("(3)★", "★", MK), "➂", Opts)
+	CreateHotstring("*C", StrReplace("(3)★", "★", _GenMK), "➂", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*C", StrReplace("(4)★", "★", MK), "➃", Opts)
+	CreateHotstring("*C", StrReplace("(4)★", "★", _GenMK), "➃", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*C", StrReplace("(5)★", "★", MK), "➄", Opts)
+	CreateHotstring("*C", StrReplace("(5)★", "★", _GenMK), "➄", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*C", StrReplace("(6)★", "★", MK), "➅", Opts)
+	CreateHotstring("*C", StrReplace("(6)★", "★", _GenMK), "➅", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*C", StrReplace("(7)★", "★", MK), "➆", Opts)
+	CreateHotstring("*C", StrReplace("(7)★", "★", _GenMK), "➆", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*C", StrReplace("(8)★", "★", MK), "➇", Opts)
+	CreateHotstring("*C", StrReplace("(8)★", "★", _GenMK), "➇", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*C", StrReplace("(9)★", "★", MK), "➈", Opts)
+	CreateHotstring("*C", StrReplace("(9)★", "★", _GenMK), "➈", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*C", StrReplace("(10)★", "★", MK), "➉", Opts)
+	CreateHotstring("*C", StrReplace("(10)★", "★", _GenMK), "➉", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*C", StrReplace("(0n)★", "★", MK), "🄌", Opts)
+	CreateHotstring("*C", StrReplace("(0n)★", "★", _GenMK), "🄌", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*C", StrReplace("(1n)★", "★", MK), "➊", Opts)
+	CreateHotstring("*C", StrReplace("(1n)★", "★", _GenMK), "➊", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*C", StrReplace("(2n)★", "★", MK), "➋", Opts)
+	CreateHotstring("*C", StrReplace("(2n)★", "★", _GenMK), "➋", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*C", StrReplace("(3n)★", "★", MK), "➌", Opts)
+	CreateHotstring("*C", StrReplace("(3n)★", "★", _GenMK), "➌", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*C", StrReplace("(4n)★", "★", MK), "➍", Opts)
+	CreateHotstring("*C", StrReplace("(4n)★", "★", _GenMK), "➍", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*C", StrReplace("(5n)★", "★", MK), "➎", Opts)
+	CreateHotstring("*C", StrReplace("(5n)★", "★", _GenMK), "➎", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*C", StrReplace("(6n)★", "★", MK), "➏", Opts)
+	CreateHotstring("*C", StrReplace("(6n)★", "★", _GenMK), "➏", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*C", StrReplace("(7n)★", "★", MK), "➐", Opts)
+	CreateHotstring("*C", StrReplace("(7n)★", "★", _GenMK), "➐", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*C", StrReplace("(8n)★", "★", MK), "➑", Opts)
+	CreateHotstring("*C", StrReplace("(8n)★", "★", _GenMK), "➑", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*C", StrReplace("(9n)★", "★", MK), "➒", Opts)
+	CreateHotstring("*C", StrReplace("(9n)★", "★", _GenMK), "➒", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*C", StrReplace("(10n)★", "★", MK), "➓", Opts)
+	CreateHotstring("*C", StrReplace("(10n)★", "★", _GenMK), "➓", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*C", StrReplace("(0b)★", "★", MK), "𝟎", Opts)
+	CreateHotstring("*C", StrReplace("(0b)★", "★", _GenMK), "𝟎", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*C", StrReplace("(1b)★", "★", MK), "𝟏", Opts)
+	CreateHotstring("*C", StrReplace("(1b)★", "★", _GenMK), "𝟏", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*C", StrReplace("(2b)★", "★", MK), "𝟐", Opts)
+	CreateHotstring("*C", StrReplace("(2b)★", "★", _GenMK), "𝟐", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*C", StrReplace("(3b)★", "★", MK), "𝟑", Opts)
+	CreateHotstring("*C", StrReplace("(3b)★", "★", _GenMK), "𝟑", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*C", StrReplace("(4b)★", "★", MK), "𝟒", Opts)
+	CreateHotstring("*C", StrReplace("(4b)★", "★", _GenMK), "𝟒", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*C", StrReplace("(5b)★", "★", MK), "𝟓", Opts)
+	CreateHotstring("*C", StrReplace("(5b)★", "★", _GenMK), "𝟓", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*C", StrReplace("(6b)★", "★", MK), "𝟔", Opts)
+	CreateHotstring("*C", StrReplace("(6b)★", "★", _GenMK), "𝟔", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*C", StrReplace("(7b)★", "★", MK), "𝟕", Opts)
+	CreateHotstring("*C", StrReplace("(7b)★", "★", _GenMK), "𝟕", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*C", StrReplace("(8b)★", "★", MK), "𝟖", Opts)
+	CreateHotstring("*C", StrReplace("(8b)★", "★", _GenMK), "𝟖", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*C", StrReplace("(9b)★", "★", MK), "𝟗", Opts)
+	CreateHotstring("*C", StrReplace("(9b)★", "★", _GenMK), "𝟗", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*C", StrReplace("(0g)★", "★", MK), "𝟬", Opts)
+	CreateHotstring("*C", StrReplace("(0g)★", "★", _GenMK), "𝟬", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*C", StrReplace("(1g)★", "★", MK), "𝟭", Opts)
+	CreateHotstring("*C", StrReplace("(1g)★", "★", _GenMK), "𝟭", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*C", StrReplace("(2g)★", "★", MK), "𝟮", Opts)
+	CreateHotstring("*C", StrReplace("(2g)★", "★", _GenMK), "𝟮", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*C", StrReplace("(3g)★", "★", MK), "𝟯", Opts)
+	CreateHotstring("*C", StrReplace("(3g)★", "★", _GenMK), "𝟯", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*C", StrReplace("(4g)★", "★", MK), "𝟰", Opts)
+	CreateHotstring("*C", StrReplace("(4g)★", "★", _GenMK), "𝟰", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*C", StrReplace("(5g)★", "★", MK), "𝟱", Opts)
+	CreateHotstring("*C", StrReplace("(5g)★", "★", _GenMK), "𝟱", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*C", StrReplace("(6g)★", "★", MK), "𝟲", Opts)
+	CreateHotstring("*C", StrReplace("(6g)★", "★", _GenMK), "𝟲", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*C", StrReplace("(7g)★", "★", MK), "𝟳", Opts)
+	CreateHotstring("*C", StrReplace("(7g)★", "★", _GenMK), "𝟳", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*C", StrReplace("(8g)★", "★", MK), "𝟴", Opts)
+	CreateHotstring("*C", StrReplace("(8g)★", "★", _GenMK), "𝟴", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*C", StrReplace("(9g)★", "★", MK), "𝟵", Opts)
+	CreateHotstring("*C", StrReplace("(9g)★", "★", _GenMK), "𝟵", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*C", StrReplace("(infini)★", "★", MK), "∞", Opts)
+	CreateHotstring("*C", StrReplace("(infini)★", "★", _GenMK), "∞", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*C", StrReplace("(product)★", "★", MK), "∏", Opts)
+	CreateHotstring("*C", StrReplace("(product)★", "★", _GenMK), "∏", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*C", StrReplace("(produit)★", "★", MK), "∏", Opts)
+	CreateHotstring("*C", StrReplace("(produit)★", "★", _GenMK), "∏", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*C", StrReplace("(coproduct)★", "★", MK), "∐", Opts)
+	CreateHotstring("*C", StrReplace("(coproduct)★", "★", _GenMK), "∐", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*C", StrReplace("(coproduit)★", "★", MK), "∐", Opts)
+	CreateHotstring("*C", StrReplace("(coproduit)★", "★", _GenMK), "∐", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*C", StrReplace("(forall)★", "★", MK), "∀", Opts)
+	CreateHotstring("*C", StrReplace("(forall)★", "★", _GenMK), "∀", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*C", StrReplace("(for all)★", "★", MK), "∀", Opts)
+	CreateHotstring("*C", StrReplace("(for all)★", "★", _GenMK), "∀", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*C", StrReplace("(pour tout)★", "★", MK), "∀", Opts)
+	CreateHotstring("*C", StrReplace("(pour tout)★", "★", _GenMK), "∀", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*C", StrReplace("(exist)★", "★", MK), "∃", Opts)
+	CreateHotstring("*C", StrReplace("(exist)★", "★", _GenMK), "∃", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*C", StrReplace("(exists)★", "★", MK), "∃", Opts)
+	CreateHotstring("*C", StrReplace("(exists)★", "★", _GenMK), "∃", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*C", StrReplace("(vide)★", "★", MK), "∅", Opts)
+	CreateHotstring("*C", StrReplace("(vide)★", "★", _GenMK), "∅", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*C", StrReplace("(ensemble vide)★", "★", MK), "∅", Opts)
+	CreateHotstring("*C", StrReplace("(ensemble vide)★", "★", _GenMK), "∅", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*C", StrReplace("(void)★", "★", MK), "∅", Opts)
+	CreateHotstring("*C", StrReplace("(void)★", "★", _GenMK), "∅", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*C", StrReplace("(empty)★", "★", MK), "∅", Opts)
+	CreateHotstring("*C", StrReplace("(empty)★", "★", _GenMK), "∅", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*C", StrReplace("(prop)★", "★", MK), "∝", Opts)
+	CreateHotstring("*C", StrReplace("(prop)★", "★", _GenMK), "∝", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*C", StrReplace("(proportionnel)★", "★", MK), "∝", Opts)
+	CreateHotstring("*C", StrReplace("(proportionnel)★", "★", _GenMK), "∝", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*C", StrReplace("(proportionnal)★", "★", MK), "∝", Opts)
+	CreateHotstring("*C", StrReplace("(proportionnal)★", "★", _GenMK), "∝", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*C", StrReplace("(union)★", "★", MK), "∪", Opts)
+	CreateHotstring("*C", StrReplace("(union)★", "★", _GenMK), "∪", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*C", StrReplace("(intersection)★", "★", MK), "⋂", Opts)
+	CreateHotstring("*C", StrReplace("(intersection)★", "★", _GenMK), "⋂", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*C", StrReplace("(appartient)★", "★", MK), "∈", Opts)
+	CreateHotstring("*C", StrReplace("(appartient)★", "★", _GenMK), "∈", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*C", StrReplace("(inclus)★", "★", MK), "⊂", Opts)
+	CreateHotstring("*C", StrReplace("(inclus)★", "★", _GenMK), "⊂", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*C", StrReplace("(non inclus)★", "★", MK), "⊄", Opts)
+	CreateHotstring("*C", StrReplace("(non inclus)★", "★", _GenMK), "⊄", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*C", StrReplace("(non appartient)★", "★", MK), "∉", Opts)
+	CreateHotstring("*C", StrReplace("(non appartient)★", "★", _GenMK), "∉", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*C", StrReplace("(n’appartient pas)★", "★", MK), "∉", Opts)
+	CreateHotstring("*C", StrReplace("(n’appartient pas)★", "★", _GenMK), "∉", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*C", StrReplace("(non)★", "★", MK), "¬", Opts)
+	CreateHotstring("*C", StrReplace("(non)★", "★", _GenMK), "¬", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*C", StrReplace("(et)★", "★", MK), "∧", Opts)
+	CreateHotstring("*C", StrReplace("(et)★", "★", _GenMK), "∧", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*C", StrReplace("(sqrt)★", "★", MK), "√", Opts)
+	CreateHotstring("*C", StrReplace("(sqrt)★", "★", _GenMK), "√", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*C", StrReplace("(racine)★", "★", MK), "√", Opts)
+	CreateHotstring("*C", StrReplace("(racine)★", "★", _GenMK), "√", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*C", StrReplace("(^)★", "★", MK), "∧", Opts)
+	CreateHotstring("*C", StrReplace("(^)★", "★", _GenMK), "∧", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*C", StrReplace("(delta)★", "★", MK), "∆", Opts)
+	CreateHotstring("*C", StrReplace("(delta)★", "★", _GenMK), "∆", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*C", StrReplace("(nabla)★", "★", MK), "∇", Opts)
+	CreateHotstring("*C", StrReplace("(nabla)★", "★", _GenMK), "∇", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*C", StrReplace("(<<)★", "★", MK), "≪", Opts)
+	CreateHotstring("*C", StrReplace("(<<)★", "★", _GenMK), "≪", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*C", StrReplace("(partial)★", "★", MK), "∂", Opts)
+	CreateHotstring("*C", StrReplace("(partial)★", "★", _GenMK), "∂", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*C", StrReplace("(end of proof)★", "★", MK), "∎", Opts)
+	CreateHotstring("*C", StrReplace("(end of proof)★", "★", _GenMK), "∎", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*C", StrReplace("(eop)★", "★", MK), "∎", Opts)
+	CreateHotstring("*C", StrReplace("(eop)★", "★", _GenMK), "∎", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*C", StrReplace("(int)★", "★", MK), "∫", Opts)
+	CreateHotstring("*C", StrReplace("(int)★", "★", _GenMK), "∫", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*C", StrReplace("(s)★", "★", MK), "∫", Opts)
+	CreateHotstring("*C", StrReplace("(s)★", "★", _GenMK), "∫", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*C", StrReplace("(so)★", "★", MK), "∮", Opts)
+	CreateHotstring("*C", StrReplace("(so)★", "★", _GenMK), "∮", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*C", StrReplace("(sso)★", "★", MK), "∯", Opts)
+	CreateHotstring("*C", StrReplace("(sso)★", "★", _GenMK), "∯", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*C", StrReplace("(sss)★", "★", MK), "∭", Opts)
+	CreateHotstring("*C", StrReplace("(sss)★", "★", _GenMK), "∭", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*C", StrReplace("(ssso)★", "★", MK), "∰", Opts)
+	CreateHotstring("*C", StrReplace("(ssso)★", "★", _GenMK), "∰", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*C", StrReplace("(=)★", "★", MK), "≡", Opts)
+	CreateHotstring("*C", StrReplace("(=)★", "★", _GenMK), "≡", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*C", StrReplace("(equivalent)★", "★", MK), "⇔", Opts)
+	CreateHotstring("*C", StrReplace("(equivalent)★", "★", _GenMK), "⇔", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*C", StrReplace("(équivalent)★", "★", MK), "⇔", Opts)
+	CreateHotstring("*C", StrReplace("(équivalent)★", "★", _GenMK), "⇔", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*C", StrReplace("(implique)★", "★", MK), "⇒", Opts)
+	CreateHotstring("*C", StrReplace("(implique)★", "★", _GenMK), "⇒", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*C", StrReplace("(impliqué)★", "★", MK), "⇒", Opts)
+	CreateHotstring("*C", StrReplace("(impliqué)★", "★", _GenMK), "⇒", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*C", StrReplace("(imply)★", "★", MK), "⇒", Opts)
+	CreateHotstring("*C", StrReplace("(imply)★", "★", _GenMK), "⇒", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*C", StrReplace("(non implique)★", "★", MK), "⇏", Opts)
+	CreateHotstring("*C", StrReplace("(non implique)★", "★", _GenMK), "⇏", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*C", StrReplace("(non impliqué)★", "★", MK), "⇏", Opts)
+	CreateHotstring("*C", StrReplace("(non impliqué)★", "★", _GenMK), "⇏", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*C", StrReplace("(non équivalent)★", "★", MK), "⇎", Opts)
+	CreateHotstring("*C", StrReplace("(non équivalent)★", "★", _GenMK), "⇎", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*C", StrReplace("(not equivalent)★", "★", MK), "⇎", Opts)
+	CreateHotstring("*C", StrReplace("(not equivalent)★", "★", _GenMK), "⇎", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*C", StrReplace(" -> ★", "★", MK), " ➜ ", Opts)
+	CreateHotstring("*C", StrReplace(" -> ★", "★", _GenMK), " ➜ ", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*C", StrReplace("-->★", "★", MK), " ➜ ", Opts)
+	CreateHotstring("*C", StrReplace("-->★", "★", _GenMK), " ➜ ", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*C", StrReplace(">★", "★", MK), "➢", Opts)
+	CreateHotstring("*C", StrReplace(">★", "★", _GenMK), "➢", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*C", StrReplace("==>★", "★", MK), "⇒", Opts)
+	CreateHotstring("*C", StrReplace("==>★", "★", _GenMK), "⇒", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*C", StrReplace("=/=>★", "★", MK), "⇏", Opts)
+	CreateHotstring("*C", StrReplace("=/=>★", "★", _GenMK), "⇏", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*C", StrReplace("<==★", "★", MK), "⇐", Opts)
+	CreateHotstring("*C", StrReplace("<==★", "★", _GenMK), "⇐", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*C", StrReplace("<==>★", "★", MK), "⇔", Opts)
+	CreateHotstring("*C", StrReplace("<==>★", "★", _GenMK), "⇔", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*C", StrReplace("<=/=>★", "★", MK), "⇎", Opts)
+	CreateHotstring("*C", StrReplace("<=/=>★", "★", _GenMK), "⇎", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*C", StrReplace("<=>★", "★", MK), "⇔", Opts)
+	CreateHotstring("*C", StrReplace("<=>★", "★", _GenMK), "⇔", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*C", StrReplace("^|★", "★", MK), "↑", Opts)
+	CreateHotstring("*C", StrReplace("^|★", "★", _GenMK), "↑", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*C", StrReplace("|^★", "★", MK), "↓", Opts)
+	CreateHotstring("*C", StrReplace("|^★", "★", _GenMK), "↓", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*C", StrReplace("->★", "★", MK), "→", Opts)
+	CreateHotstring("*C", StrReplace("->★", "★", _GenMK), "→", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*C", StrReplace("<-★", "★", MK), "←", Opts)
+	CreateHotstring("*C", StrReplace("<-★", "★", _GenMK), "←", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*C", StrReplace("->>★", "★", MK), "➡", Opts)
+	CreateHotstring("*C", StrReplace("->>★", "★", _GenMK), "➡", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*C", StrReplace("<<-★", "★", MK), "⬅", Opts)
+	CreateHotstring("*C", StrReplace("<<-★", "★", _GenMK), "⬅", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*C", StrReplace("|->★", "★", MK), "↪", Opts)
+	CreateHotstring("*C", StrReplace("|->★", "★", _GenMK), "↪", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*C", StrReplace("<-|★", "★", MK), "↩", Opts)
+	CreateHotstring("*C", StrReplace("<-|★", "★", _GenMK), "↩", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*C", StrReplace("^|-★", "★", MK), "⭮", Opts)
+	CreateHotstring("*C", StrReplace("^|-★", "★", _GenMK), "⭮", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*C", StrReplace("(v)★", "★", MK), "✓", Opts)
+	CreateHotstring("*C", StrReplace("(v)★", "★", _GenMK), "✓", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*C", StrReplace("(x)★", "★", MK), "✗", Opts)
+	CreateHotstring("*C", StrReplace("(x)★", "★", _GenMK), "✗", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*C", StrReplace("[v]★", "★", MK), "☑", Opts)
+	CreateHotstring("*C", StrReplace("[v]★", "★", _GenMK), "☑", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*C", StrReplace("[x]★", "★", MK), "☒", Opts)
+	CreateHotstring("*C", StrReplace("[x]★", "★", _GenMK), "☒", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*C", StrReplace("/!\★", "★", MK), "⚠", Opts)
+	CreateHotstring("*C", StrReplace("/!\★", "★", _GenMK), "⚠", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*C", StrReplace("**★", "★", MK), "⁂", Opts)
+	CreateHotstring("*C", StrReplace("**★", "★", _GenMK), "⁂", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*C", StrReplace("°C★", "★", MK), "℃", Opts)
+	CreateHotstring("*C", StrReplace("°C★", "★", _GenMK), "℃", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*C", StrReplace("(b)★", "★", MK), "•", Opts)
+	CreateHotstring("*C", StrReplace("(b)★", "★", _GenMK), "•", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*C", StrReplace("(c)★", "★", MK), "©", Opts)
+	CreateHotstring("*C", StrReplace("(c)★", "★", _GenMK), "©", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*", StrReplace("eme★", "★", MK), "ᵉ", Opts)
+	CreateHotstring("*", StrReplace("eme★", "★", _GenMK), "ᵉ", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*", StrReplace("ème★", "★", MK), "ᵉ", Opts)
+	CreateHotstring("*", StrReplace("ème★", "★", _GenMK), "ᵉ", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*", StrReplace("ieme★", "★", MK), "ᵉ", Opts)
+	CreateHotstring("*", StrReplace("ieme★", "★", _GenMK), "ᵉ", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*", StrReplace("ième★", "★", MK), "ᵉ", Opts)
+	CreateHotstring("*", StrReplace("ième★", "★", _GenMK), "ᵉ", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*C", StrReplace("(o)★", "★", MK), "•", Opts)
+	CreateHotstring("*C", StrReplace("(o)★", "★", _GenMK), "•", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*C", StrReplace("(r)★", "★", MK), "®", Opts)
+	CreateHotstring("*C", StrReplace("(r)★", "★", _GenMK), "®", Opts)
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*C", StrReplace("(tm)★", "★", MK), "™", Opts)
+	CreateHotstring("*C", StrReplace("(tm)★", "★", _GenMK), "™", Opts)
 }
 
 _GenLoad_magickey_textexpansionsymbolstypst(FeatureConfig, ExtraOptions := unset) {
 	global ScriptInformation
 	TimeAct := FeatureConfig.HasOwnProp("TimeActivationSeconds") ? FeatureConfig.TimeActivationSeconds : 0
-	MK := ScriptInformation["MagicKey"]
+	_GenMK := ScriptInformation["MagicKey"]
 	Opts := Map("TimeActivationSeconds", TimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		Opts["OnlyText"] := ExtraOptions["OnlyText"]
