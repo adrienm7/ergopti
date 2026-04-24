@@ -131,33 +131,45 @@ In architecture: x86_64
 Signature verify reported issues (may still launch — see log above)
 Added to Dock: /Users/b519hs/Applications/Ergopti.app
 /Users/b519hs/Applications/Ergopti.app
-❯ codesign -dv --verbose=4 /Users/b519hs/Applications/Ergopti.app
-Executable=/Users/b519hs/Applications/Ergopti.app/Contents/MacOS/Code
-Identifier=fr.b519hs.clone.1777069200
-Format=app bundle with generic
-CodeDirectory v=20100 size=203 flags=0x2(adhoc) hashes=1+3 location=embedded
-Hash type=sha256 size=32
-CandidateCDHash sha256=116ef4fe27bb6c0f0480523ef2571a66880bb0b1
-CandidateCDHashFull sha256=116ef4fe27bb6c0f0480523ef2571a66880bb0b12e6b6295f99e186ea734d9ae
-Hash choices=sha256
-CMSDigest=116ef4fe27bb6c0f0480523ef2571a66880bb0b12e6b6295f99e186ea734d9ae
-CMSDigestType=2
-Page size=none
-CDHash=116ef4fe27bb6c0f0480523ef2571a66880bb0b1
-Signature=adhoc
-Notarization Ticket=stapled
-Info.plist entries=36
-TeamIdentifier=not set
-Sealed Resources version=2 rules=13 files=6561
-Internal requirements count=1 size=64
+=== Sat Apr 25 00:27:27 CEST 2026 SOURCE=/Applications/Visual Studio Code.app/ NAME=Ergopti COLOR=#7700C2 ARG=/Users/b519hs/perso/ergopti/ ===
+DEST=/Users/b519hs/Applications/Ergopti.app
+Bundle cloned
+SRC_ICNS=/Applications/Visual Studio Code.app//Contents/Resources/Code.icns
+PNG: icon_512x512@2x
+tint OK target_h=0.769
+icns OK
+Info.plist patched: id=fr.b519hs.clone.1777069653
+WRAPPER with OPEN_ARG=/Users/b519hs/perso/ergopti/
+Re-signing bottom-up (ad-hoc)…
+Signature OK
+Added to Dock: /Users/b519hs/Applications/Ergopti.app
+/Users/b519hs/Applications/Ergopti.app
 ❯ codesign --verify --deep --strict --verbose=4 /Users/b519hs/Applications/Ergopti.app
-/Users/b519hs/Applications/Ergopti.app: invalid Info.plist (plist or signature have been modified)
-In subcomponent: /Users/b519hs/Applications/Ergopti.app/Contents/MacOS/Code.real
-In architecture: arm64
-❯ log show --predicate 'process=="Code" OR subsystem == "com.apple.launchservices"' --last 2m | grep -iE 'error|denied|invalid|reject'
-log: Could not open local log store: Operation not permitted
+--prepared:/Users/b519hs/Applications/Ergopti.app/Contents/MacOS/Code.real
+--validated:/Users/b519hs/Applications/Ergopti.app/Contents/MacOS/Code.real
+--prepared:/Users/b519hs/Applications/Ergopti.app/Contents/Frameworks/Code Helper (Plugin).app
+--prepared:/Users/b519hs/Applications/Ergopti.app/Contents/Frameworks/Code Helper.app
+--prepared:/Users/b519hs/Applications/Ergopti.app/Contents/Frameworks/Code Helper (GPU).app
+--prepared:/Users/b519hs/Applications/Ergopti.app/Contents/Frameworks/Code Helper (Renderer).app
+--prepared:/Users/b519hs/Applications/Ergopti.app/Contents/Frameworks/Squirrel.framework/Versions/Current/.
+--prepared:/Users/b519hs/Applications/Ergopti.app/Contents/Frameworks/Mantle.framework/Versions/Current/.
+--prepared:/Users/b519hs/Applications/Ergopti.app/Contents/Frameworks/ReactiveObjC.framework/Versions/Current/.
+--validated:/Users/b519hs/Applications/Ergopti.app/Contents/Frameworks/Code Helper (Plugin).app
+--validated:/Users/b519hs/Applications/Ergopti.app/Contents/Frameworks/Code Helper.app
+--validated:/Users/b519hs/Applications/Ergopti.app/Contents/Frameworks/Code Helper (Renderer).app
+--validated:/Users/b519hs/Applications/Ergopti.app/Contents/Frameworks/Code Helper (GPU).app
+--validated:/Users/b519hs/Applications/Ergopti.app/Contents/Frameworks/Mantle.framework/Versions/Current/.
+--validated:/Users/b519hs/Applications/Ergopti.app/Contents/Frameworks/ReactiveObjC.framework/Versions/Current/.
+--validated:/Users/b519hs/Applications/Ergopti.app/Contents/Frameworks/Squirrel.framework/Versions/Current/.
+--prepared:/Users/b519hs/Applications/Ergopti.app/Contents/Frameworks/Electron Framework.framework/Versions/Current/.
+--prepared:/Users/b519hs/Applications/Ergopti.app/Contents/Frameworks/Electron Framework.framework/Versions/Current/Helpers/chrome_crashpad_handler
+--validated:/Users/b519hs/Applications/Ergopti.app/Contents/Frameworks/Electron Framework.framework/Versions/Current/Helpers/chrome_crashpad_handler
+--validated:/Users/b519hs/Applications/Ergopti.app/Contents/Frameworks/Electron Framework.framework/Versions/Current/.
+/Users/b519hs/Applications/Ergopti.app: valid on disk
+/Users/b519hs/Applications/Ergopti.app: satisfies its Designated Requirement
 ❯ log show --predicate 'process=="Code" OR subsystem == "com.apple.launchservices"' --last 2m
-log: Could not open local log store: Operation not permitted
+❯ /usr/bin/log stream --predicate 'subsystem=="com.apple.launchservices" OR eventMessage CONTAINS[c] "code signature"' --info
+log: Must be admin to run 'stream' command
 
-╭─     ~ ───────────────────────────────────────────── 77 ✘  00:23:25 
+╭─     ~ ───────────────────────────────────────────── 77 ✘  00:33:07 
 ╰─
