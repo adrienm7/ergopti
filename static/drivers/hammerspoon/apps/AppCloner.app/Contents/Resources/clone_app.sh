@@ -225,64 +225,34 @@ cat > "$CONTENTS/Info.plist" <<PLIST
 PLIST
 
 
-# ── 6) Launcher ──────────────────────────────────────────────────────────────
-cat > "$MACOS/launcher" <<'PYEOF'
-#!/usr/bin/env python3
-import os, sys, subprocess, plistlib, glob
+# ── 6) Exécutable : symlink vers le binaire source + wrapper open_arg ────────
+# Symlinker le vrai binaire source dans MacOS/ du clone avec le nom "launcher".
+# macOS identifie les apps par (binaire + bundle) — le même binaire dans un
+# bundle différent (CFBundleIdentifier unique) = app distincte dans le Dock.
+SRC_PLIST="$SOURCE_APP/Contents/Info.plist"
+SRC_EXE_NAME="$(defaults read "$SRC_PLIST" CFBundleExecutable 2>/dev/null || true)"
+SRC_EXE="$SOURCE_APP/Contents/MacOS/$SRC_EXE_NAME"
 
-macos_dir   = os.path.dirname(os.path.realpath(__file__))
-clone_root  = os.path.dirname(os.path.dirname(macos_dir))
-config_path = os.path.join(clone_root, "Contents", "Resources", "config.sh")
-clone_plist = os.path.join(clone_root, "Contents", "Info.plist")
+if [[ -z "$SRC_EXE_NAME" || ! -f "$SRC_EXE" ]]; then
+  echo "Exécutable source introuvable : $SRC_EXE"
+  exit 1
+fi
 
-source_app, open_arg = "", ""
-if os.path.exists(config_path):
-    for line in open(config_path):
-        line = line.strip()
-        if line.startswith("SOURCE_APP="):
-            source_app = line[11:].strip('"').rstrip('/')
-        elif line.startswith("OPEN_ARG="):
-            open_arg = line[9:].strip('"')
+# Symlink du vrai binaire sous le nom attendu par Info.plist (launcher)
+ln -sf "$SRC_EXE" "$MACOS/launcher"
+echo "EXE_SYMLINK=$SRC_EXE -> $MACOS/launcher"
 
-if not source_app or not os.path.isdir(source_app):
-    sys.exit(1)
-
-# Lire le bundle ID du clone pour l'injecter comme identité du process
-clone_bundle_id = ""
-if os.path.exists(clone_plist):
-    with open(clone_plist, "rb") as f:
-        info = plistlib.load(f)
-    clone_bundle_id = info.get("CFBundleIdentifier", "")
-
-# Trouver l'exécutable principal de la source
-src_plist_path = os.path.join(source_app, "Contents", "Info.plist")
-src_executable = ""
-if os.path.exists(src_plist_path):
-    with open(src_plist_path, "rb") as f:
-        src_info = plistlib.load(f)
-    exe_name = src_info.get("CFBundleExecutable", "")
-    exe_path = os.path.join(source_app, "Contents", "MacOS", exe_name)
-    if os.path.isfile(exe_path):
-        src_executable = exe_path
-
-if not src_executable:
-    sys.exit(1)
-
-# Construire la commande avec les args éventuels
-args = [src_executable]
-if open_arg and os.path.exists(open_arg):
-    args.append(open_arg)
-
-# Injecter le bundle ID du clone pour que le Dock affiche le clone, pas l'original
-env = os.environ.copy()
-if clone_bundle_id:
-    env["APP_SANDBOX_CONTAINER_ID"] = clone_bundle_id
-    env["__CFBundleIdentifier"] = clone_bundle_id
-
-subprocess.Popen(args, env=env, close_fds=True,
-                 stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-PYEOF
-chmod +x "$MACOS/launcher"
+# Script wrapper pour passer open_arg au démarrage si défini
+if [[ -n "$OPEN_ARG" ]]; then
+  # Remplacer le symlink par un wrapper shell qui relance le binaire avec l'arg
+  rm "$MACOS/launcher"
+  cat > "$MACOS/launcher" <<WRAPEOF
+#!/bin/zsh
+exec "$SRC_EXE" "$OPEN_ARG" "\$@"
+WRAPEOF
+  chmod +x "$MACOS/launcher"
+  echo "WRAPPER with OPEN_ARG=$OPEN_ARG"
+fi
 
 cat > "$RES/config.sh" <<CONF
 SOURCE_APP="$SOURCE_APP"
@@ -292,19 +262,17 @@ CONF
 
 # ── 7) Dock ──────────────────────────────────────────────────────────────────
 touch "$DEST"
-# Laisser le temps à LaunchServices d'indexer l'icns avant que le Dock le lise
-/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister \
-  -f "$DEST" >/dev/null 2>&1 || true
-sleep 1
-/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister \
-  -f "$DEST" >/dev/null 2>&1 || true
+LSR=/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister
+"$LSR" -f "$DEST" >/dev/null 2>&1 || true
 
-# Édition directe du plist Dock — méthode fiable sans outil tiers
+# Édition directe du plist Dock puis killall Dock + re-register pour icône correcte
 python3 - "$DEST" <<'DOCKEOF'
 import sys, plistlib, os, subprocess, time
 
 app_path   = sys.argv[1]
 plist_path = os.path.expanduser("~/Library/Preferences/com.apple.dock.plist")
+lsr        = ("/System/Library/Frameworks/CoreServices.framework"
+              "/Frameworks/LaunchServices.framework/Support/lsregister")
 
 with open(plist_path, 'rb') as f:
     dock = plistlib.load(f)
@@ -312,7 +280,6 @@ with open(plist_path, 'rb') as f:
 apps = dock.get('persistent-apps', [])
 url  = app_path.rstrip('/') + '/'
 
-# Ne pas dupliquer
 for e in apps:
     if e.get('tile-data', {}).get('file-data', {}).get('_CFURLString', '') == url:
         print("Déjà dans le Dock")
@@ -334,6 +301,9 @@ dock['persistent-apps'] = apps
 with open(plist_path, 'wb') as f:
     plistlib.dump(dock, f)
 
+# Enregistrer le bundle AVANT de redémarrer le Dock pour qu'il lise la bonne icône
+subprocess.run([lsr, '-f', app_path], capture_output=True)
+time.sleep(1)
 subprocess.run(['killall', 'Dock'], check=False)
 print(f"Ajouté au Dock : {app_path}")
 DOCKEOF
