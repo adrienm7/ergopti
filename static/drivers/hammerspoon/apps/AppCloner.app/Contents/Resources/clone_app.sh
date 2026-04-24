@@ -317,14 +317,32 @@ if [[ -n "$SRC_MAIN_EXE_NAME" && -f "$SRC_MAIN_EXE" ]]; then
   # silently drop it again. plutil -lint tells us up front.
   if [[ -s "$ENT_MAIN" ]] && plutil -lint "$ENT_MAIN" >/dev/null 2>&1; then
     echo "Extracted main entitlements ($(wc -c < "$ENT_MAIN") bytes, valid plist)" >> "$DIAG"
-    if grep -q "disable-library-validation" "$ENT_MAIN"; then
-      echo "  ✓ disable-library-validation present"                           >> "$DIAG"
-    else
-      echo "  ✗ disable-library-validation MISSING — dyld will reject ad-hoc dylibs" >> "$DIAG"
+    # Source apps like VSCode ship WITHOUT disable-library-validation —
+    # their original sig has a real Apple team-id shared with every nested
+    # dylib, so Library Validation passes naturally. After we re-sign the
+    # clone ad-hoc with a different bundle ID, the nested dylibs become
+    # "different team" and dyld refuses to load them. We must inject
+    # disable-library-validation into the entitlements so hardened runtime
+    # skips the LV check for this process. Same for allow-unsigned-executable
+    # -memory (required for ad-hoc + hardened runtime + JIT).
+    if ! grep -q "disable-library-validation" "$ENT_MAIN"; then
+      echo "  → Injecting disable-library-validation (required for ad-hoc)"   >> "$DIAG"
+      /usr/libexec/PlistBuddy -c "Add :com.apple.security.cs.disable-library-validation bool true" "$ENT_MAIN" 2>/dev/null
     fi
-    if grep -q "allow-jit" "$ENT_MAIN"; then
-      echo "  ✓ allow-jit present"                                            >> "$DIAG"
+    if ! grep -q "allow-unsigned-executable-memory" "$ENT_MAIN"; then
+      echo "  → Injecting allow-unsigned-executable-memory"                   >> "$DIAG"
+      /usr/libexec/PlistBuddy -c "Add :com.apple.security.cs.allow-unsigned-executable-memory bool true" "$ENT_MAIN" 2>/dev/null
     fi
+    if ! grep -q "allow-dyld-environment-variables" "$ENT_MAIN"; then
+      echo "  → Injecting allow-dyld-environment-variables"                   >> "$DIAG"
+      /usr/libexec/PlistBuddy -c "Add :com.apple.security.cs.allow-dyld-environment-variables bool true" "$ENT_MAIN" 2>/dev/null
+    fi
+    if ! grep -q "disable-executable-page-protection" "$ENT_MAIN"; then
+      echo "  → Injecting disable-executable-page-protection"                 >> "$DIAG"
+      /usr/libexec/PlistBuddy -c "Add :com.apple.security.cs.disable-executable-page-protection bool true" "$ENT_MAIN" 2>/dev/null
+    fi
+    echo "  ✓ Final entitlements after injection:"                            >> "$DIAG"
+    grep -E "security\.cs\." "$ENT_MAIN"                                      >> "$DIAG"
   else
     echo "WARNING: entitlements plist from $SRC_MAIN_EXE is invalid or empty" >> "$DIAG"
     # Last resort: synthesize a minimal plist that has exactly what we need.
