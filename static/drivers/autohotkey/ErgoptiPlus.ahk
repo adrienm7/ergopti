@@ -10,7 +10,7 @@ SetWorkingDir(A_ScriptDir) ; Set the working directory where the script is locat
 #Warn All
 #Warn VarUnset, Off
 
-#Include *i lib\UIA.ahk ; UIA v2 library — bundled in lib\ (source: https://github.com/Descolada/UIA-v2)
+#Include *i vendor\UIA.ahk ; UIA v2 library — third-party, kept verbatim in vendor\ (source: https://github.com/Descolada/UIA-v2)
 ; *i = no error if the file isn't found, as this library is not mandatory to run this script
 
 ; ===== Global error net =====

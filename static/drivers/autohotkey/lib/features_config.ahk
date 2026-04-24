@@ -296,7 +296,7 @@ global Features := Map(
         },
         "WrapTextIfSelected", {
             Enabled: True,
-            Description: "Taper un symbole lors d'une sélection de texte va encadrer celle-ci par le symbole. Fonctionne si émulation et si UIA/Lib/UIA.ahk dans le dossier du script",
+            Description: "Taper un symbole lors d'une sélection de texte va encadrer celle-ci par le symbole. Fonctionne si émulation et si vendor/UIA.ahk est présent dans le dossier du script",
         },
         "MicrosoftBold", {
             Enabled: True,
