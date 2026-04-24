@@ -1,23 +1,23 @@
-❯ clear
+❯ cleaR
 ❯ cat /tmp/clone_diag.log
 ============================================================
-=== AppCloner auto-diagnostic — Sat Apr 25 00:56:33 CEST 2026
+=== AppCloner auto-diagnostic — Sat Apr 25 01:02:36 CEST 2026
 === Clone: /Users/b519hs/Applications/Kubernetes.app
 ============================================================
 
 ── codesign -dv ────────────────────────────────────────────
 Executable=/Users/b519hs/Applications/Kubernetes.app/Contents/MacOS/Code
-Identifier=fr.b519hs.clone.1777071379
+Identifier=fr.b519hs.clone.1777071742
 Format=app bundle with generic
 CodeDirectory v=20100 size=203 flags=0x2(adhoc) hashes=1+3 location=embedded
 Hash type=sha256 size=32
-CandidateCDHash sha256=11ca0efde5c40dc78d6ba7f2d4e48f6ab0be8272
-CandidateCDHashFull sha256=11ca0efde5c40dc78d6ba7f2d4e48f6ab0be8272636ce5e62787eb6dfff890a0
+CandidateCDHash sha256=25615ffeb0e2faa9ce2539b35b5c132ce8d14f1d
+CandidateCDHashFull sha256=25615ffeb0e2faa9ce2539b35b5c132ce8d14f1d1fe5994a6556e400a48e3868
 Hash choices=sha256
-CMSDigest=11ca0efde5c40dc78d6ba7f2d4e48f6ab0be8272636ce5e62787eb6dfff890a0
+CMSDigest=25615ffeb0e2faa9ce2539b35b5c132ce8d14f1d1fe5994a6556e400a48e3868
 CMSDigestType=2
 Page size=none
-CDHash=11ca0efde5c40dc78d6ba7f2d4e48f6ab0be8272
+CDHash=25615ffeb0e2faa9ce2539b35b5c132ce8d14f1d
 Signature=adhoc
 Notarization Ticket=stapled
 Info.plist entries=36
@@ -26,12 +26,13 @@ Sealed Resources version=2 rules=13 files=6561
 Internal requirements count=1 size=64
 
 ── codesign --verify --deep --strict ───────────────────────
+--prepared:/Users/b519hs/Applications/Kubernetes.app/Contents/MacOS/Code.real
+--validated:/Users/b519hs/Applications/Kubernetes.app/Contents/MacOS/Code.real
 /Users/b519hs/Applications/Kubernetes.app: nested code is modified or invalid
-file modified: /Users/b519hs/Applications/Kubernetes.app/Contents/MacOS/Code.real
 file modified: /Users/b519hs/Applications/Kubernetes.app/Contents/Frameworks/Code Helper (Plugin).app
-file modified: /Users/b519hs/Applications/Kubernetes.app/Contents/Frameworks/Code Helper.app
-file modified: /Users/b519hs/Applications/Kubernetes.app/Contents/Frameworks/Code Helper (GPU).app
 file modified: /Users/b519hs/Applications/Kubernetes.app/Contents/Frameworks/Code Helper (Renderer).app
+file modified: /Users/b519hs/Applications/Kubernetes.app/Contents/Frameworks/Code Helper (GPU).app
+file modified: /Users/b519hs/Applications/Kubernetes.app/Contents/Frameworks/Code Helper.app
 file modified: /Users/b519hs/Applications/Kubernetes.app/Contents/Frameworks/Mantle.framework
 file modified: /Users/b519hs/Applications/Kubernetes.app/Contents/Frameworks/Squirrel.framework
 file modified: /Users/b519hs/Applications/Kubernetes.app/Contents/Frameworks/ReactiveObjC.framework
@@ -45,9 +46,9 @@ com.apple.provenance:
 
 ── Test launch ─────────────────────────────────────────────
 Executing: /Users/b519hs/Applications/Kubernetes.app/Contents/MacOS/Code
-dyld[6977]: Library not loaded: @rpath/Electron Framework.framework/Electron Framework
+dyld[9449]: Library not loaded: @rpath/Electron Framework.framework/Electron Framework
   Referenced from: <4C4C443C-5555-3144-A118-EAA58808DF01> /Users/b519hs/Applications/Kubernetes.app/Contents/MacOS/Code.real
   Reason: tried: '/Users/b519hs/Applications/Kubernetes.app/Contents/Frameworks/Electron Framework.framework/Electron Framework' (code signature in <4C4C4468-5555-3144-A126-AFDC5C58C175> '/Users/b519hs/Applications/Kubernetes.app/Contents/Frameworks/Electron Framework.framework/Versions/A/Electron Framework' not valid for use in process: mapping process and mapped file (non-platform) have different Team IDs), '/Users/b519hs/Applications/Kubernetes.app/Contents/Frameworks/Electron Framework.framework/Electron Framework' (code signature in <4C4C4468-5555-3144-A126-AFDC5C58C175> '/Users/b519hs/Applications/Kubernetes.app/Contents/Frameworks/Electron Framework.framework/Versions/A/Electron Framework' not valid for use in process: mapping process and mapped file (non-platform) have different Team IDs)
 
-╭─     ~ ─────────────────────────────────────────────────────────────────────────────────────────── ✔  00:57:10 
+╭─     ~ ─────────────────────────────────────────────────────────────────────────────────────────── ✔  01:05:18 
 ╰─
