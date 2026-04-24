@@ -58,9 +58,8 @@ function M.generate(ctx, menu_mods, actions)
 	if type(menu_mods.hotstrings) == "table" then
 		Logger.debug(LOG, "Building hotstrings submenu…")
 		local hotstrings_menu = {}
-		push_into(hotstrings_menu, "hotstrings.build_groups",   menu_mods.hotstrings.build_groups,   ctx)
-		push_into(hotstrings_menu, "hotstrings.build_personal", menu_mods.hotstrings.build_personal, ctx)
-		push_into(hotstrings_menu, "hotstrings.build_custom",   menu_mods.hotstrings.build_custom,   ctx)
+		push_into(hotstrings_menu, "hotstrings.build_groups", menu_mods.hotstrings.build_groups, ctx)
+		push_into(hotstrings_menu, "hotstrings.build_custom", menu_mods.hotstrings.build_custom, ctx)
 		push_into(hotstrings_menu, "hotstrings.build_management", menu_mods.hotstrings.build_management, ctx)
 
 		-- Détection de l’état global : toutes les hotstrings activées ?

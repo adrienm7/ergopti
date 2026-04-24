@@ -471,11 +471,48 @@ initMenu() {
             HotstringsMenu.Add(GetCategoryTitle(Category), SubMenus[Category])
         }
     }
-    ; Personal hotstrings section — only shown when personal.ahk defines it.
-    ; Each TOML section gets its own submenu entry that opens the editor directly
-    ; on that section, mirroring the HS build_custom section navigation.
-    if (Features.Has("Personal") and SubMenus.Has("Personal")) {
-        HotstringsMenu.Add(GetCategoryTitle("Personal"), SubMenus["Personal"])
+    ; Personal hotstrings — unified submenu that mirrors HS build_custom layout:
+    ; editor button + shortcut hint up top, then per-section toggle checkboxes
+    ; with hotstring counts, replacing the old separate editor-only submenu.
+    if Features.Has("Personal") {
+        ; Read personal.toml once to get section order, descriptions, and counts
+        TomlData := ReadPersonalToml()
+        ; Enrich Features["Personal"] descriptions with entry counts so that
+        ; MenuAddItem / GetMenuTitleByPath display them alongside the checkbox
+        for _, SecName in TomlData["sections_order"] {
+            SecData  := TomlData["sections"][SecName]
+            Count    := SecData["entries"].Length
+            BaseDesc := SecData["description"]
+            ; Match lowercase TOML key to the PascalCase Features key
+            for FeatKey in Features["Personal"] {
+                if (FeatKey != "__Order" and StrLower(FeatKey) == SecName) {
+                    Features["Personal"][FeatKey].Description := BaseDesc . " (" . Count . ")"
+                }
+            }
+        }
+        ; Build the unified personal submenu
+        PersonalMenu := Menu()
+        PersonalMenu.Add("Ouvrir l'éditeur de hotstrings", (*) => OpenPersonalEditor())
+        PersonalMenu.Add("Raccourci : Win + " . ScriptInformation["MagicKey"], (*) => NoAction())
+        PersonalMenu.Disable("Raccourci : Win + " . ScriptInformation["MagicKey"])
+        if (Features["Personal"].Has("__Order") and Features["Personal"]["__Order"].Length > 0) {
+            PersonalMenu.Add() ; Separating line
+            for FeatName in Features["Personal"]["__Order"] {
+                if FeatName == "-" {
+                    PersonalMenu.Add()
+                } else if Features["Personal"].Has(FeatName) {
+                    MenuAddItem(PersonalMenu, "Personal", FeatName)
+                }
+            }
+        }
+        ; Compute total count for the top-level category title
+        TotalPersonal := 0
+        for _, SecData in TomlData["sections"] {
+            TotalPersonal += SecData["entries"].Length
+        }
+        PersonalTitle := GetCategoryTitle("Personal")
+            . (TotalPersonal > 0 ? " (" . TotalPersonal . ")" : "")
+        HotstringsMenu.Add(PersonalTitle, PersonalMenu)
     }
     HotstringsMenu.Add() ; Separating line
     HotstringsMenu.Add("☑ Activer tous les hotstrings", ToggleAllHotstringsOn)
@@ -483,24 +520,6 @@ initMenu() {
     HotstringsMenu.Add() ; Separating line
     ; Magic key editor — mirrors HS menu_hotstrings build_management placement
     HotstringsMenu.Add("Touche magique : " . ScriptInformation["MagicKey"], MagicKeyEditor)
-    HotstringsMenu.Add() ; Separating line
-    ; Editor entry with per-section submenu (mirrors HS build_custom section list)
-    PersonalEditorMenu := Menu()
-    PersonalEditorMenu.Add("Ouvrir l'éditeur", (*) => OpenPersonalEditor())
-    TomlData := ReadPersonalToml()
-    if TomlData["sections_order"].Length > 0 {
-        PersonalEditorMenu.Add() ; Separating line
-        for _, SecName in TomlData["sections_order"] {
-            SecDesc := TomlData["sections"].Has(SecName)
-                ? TomlData["sections"][SecName]["description"]
-                : SecName
-            ; Use a bound method to capture SecName by value — AHK v2 closures
-            ; capture variables by reference so the loop variable must be frozen.
-            PersonalEditorMenu.Add(SecDesc, _MakeOpenSectionFn(SecName))
-        }
-    }
-    HotstringsMenu.Add("📝 Éditeur de hotstrings personnels (Win + " . ScriptInformation["MagicKey"] . ")",
-        PersonalEditorMenu)
     A_TrayMenu.Add(MenuHotstrings, HotstringsMenu)
 
     ; ── Raccourcis and Tap-Holds — standalone, like HS Raccourcis and Karabiner ──
