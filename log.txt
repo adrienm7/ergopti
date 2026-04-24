@@ -1,0 +1,13 @@
+Le bit exécutable est bien 100755 dans Git — ce n'est pas le problème.
+
+Le vrai problème est la quarantaine macOS. Quand un fichier arrive via git clone ou git pull, macOS lui met parfois l'attribut com.apple.quarantine qui bloque l'exécution silencieusement. La solution permanente : ajouter un script d'installation qui retire la quarantaine, appelable depuis Hammerspoon.
+
+Mais plus pragmatique — donne-moi la sortie de cette commande sur ton Mac pour confirmer le diagnostic :
+
+
+xattr -l ~/Documents/GitHub/ergopti/static/drivers/hammerspoon/apps/AppCloner.app/Contents/MacOS/AppCloner
+Et essaie de lancer directement depuis le terminal :
+
+
+~/Documents/GitHub/ergopti/static/drivers/hammerspoon/apps/AppCloner.app/Contents/MacOS/AppCloner
+Ça permettra de voir l'erreur exacte. Si c'est bien la quarantaine, je peux ajouter l'appel xattr -rd dans init.lua de Hammerspoon pour la retirer automatiquement au démarrage.
