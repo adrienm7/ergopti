@@ -386,24 +386,6 @@ if Features["Autocorrection"]["MinusApostrophe"].Enabled {
 }
 
 
-; ====================================================================
-; ===== 3.3.1) Phone number & social security auto-complete =====
-; ====================================================================
-
-if Features["Autocorrection"]["PhoneNumberAutoComplete"].Enabled {
-	CreateHotstring("*", "+33" . SubStr(PersonalInformation["PhoneNumber"], 1, 2), "+33" . PersonalInformation[
-		"PhoneNumber"]) ; +3306X
-	CreateHotstring("*", "+33" . SubStr(PersonalInformation["PhoneNumber"], 2, 3), "+33" . PersonalInformation[
-		"PhoneNumber"]) ; +336X
-	CreateHotstring("*", SubStr(PersonalInformation["PhoneNumber"], 1, 4), PersonalInformation["PhoneNumber"]) ; 06XX
-	CreateHotstring("*", SubStr(PersonalInformation["PhoneNumber"], 2, 5), PersonalInformation["PhoneNumber"]) ; 6XXX
-
-	CreateHotstring("*", SubStr(PersonalInformation["PhoneNumberClean"], 1, 5), PersonalInformation["PhoneNumberClean"]) ; 06 XX
-	CreateHotstring("*", SubStr(PersonalInformation["PhoneNumberClean"], 2, 5), SubStr(PersonalInformation[
-		"PhoneNumberClean"], 2)) ; 6 XX
-	CreateHotstring("*", SubStr(PersonalInformation["SocialSecurityNumber"], 1, 5), PersonalInformation[
-		"SocialSecurityNumber"])
-}
 
 
 ; ==========================================
