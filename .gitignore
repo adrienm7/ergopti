@@ -36,3 +36,4 @@ static/drivers/hammerspoon/karabiner.json
 # Bootstrap file — machine-specific absolute paths, never committed
 static/drivers/hammerspoon/ergopti_bootstrap.json
 static/drivers/hotstrings/personal.toml
+static/drivers/hotstrings/personal_info.toml

@@ -351,7 +351,8 @@ Logger.info(LOG, string.format("Loaded %d TOML hotstring file(s) in %.1fms.",
 
 -- Start the dynamic hotstrings module which handles personal info internally
 Logger.debug(LOG, "Starting dynamic hotstrings module…")
-dynamic_hotstrings.start(base_dir, keymap)
+local personal_info_toml_path = menu_paths.get("PersonalInfoTomlPath")
+dynamic_hotstrings.start(base_dir, keymap, personal_info_toml_path)
 table.insert(hotfiles, "dynamichotstrings")
 
 Logger.debug(LOG, "Initializing custom hotstrings…")

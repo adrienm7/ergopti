@@ -29,6 +29,7 @@ local BOOTSTRAP_FILENAME = "ergopti_bootstrap.json"
 -- Keys present in the bootstrap file — mirrors AHK's ScriptInformation map.
 local PATH_KEYS = {
 	"PersonalTomlPath",
+	"PersonalInfoTomlPath",
 	"HotstringsDirPath",
 	"ConfigJsonPath",
 	"KarabinerConfigPath",
@@ -37,6 +38,7 @@ local PATH_KEYS = {
 -- Human labels shown in the dialog for each key (French, user-facing).
 local PATH_LABELS = {
 	PersonalTomlPath    = "Fichier personal.toml :",
+	PersonalInfoTomlPath = "Fichier personal_info.toml (coordonnées personnelles) :",
 	HotstringsDirPath   = "Dossier des hotstrings :",
 	ConfigJsonPath      = "Fichier de configuration (config.json) :",
 	KarabinerConfigPath = "Configuration Karabiner (karabiner_user_config.json) :",
@@ -44,10 +46,11 @@ local PATH_LABELS = {
 
 -- File-type filter hints for each key (used in the open-panel title).
 local PATH_FILTERS = {
-	PersonalTomlPath    = { kind = "file",   ext = "toml" },
-	HotstringsDirPath   = { kind = "folder"              },
-	ConfigJsonPath      = { kind = "file",   ext = "json" },
-	KarabinerConfigPath = { kind = "file",   ext = "json" },
+	PersonalTomlPath     = { kind = "file",   ext = "toml" },
+	PersonalInfoTomlPath = { kind = "file",   ext = "toml" },
+	HotstringsDirPath    = { kind = "folder"              },
+	ConfigJsonPath       = { kind = "file",   ext = "json" },
+	KarabinerConfigPath  = { kind = "file",   ext = "json" },
 }
 
 local _base_dir     = nil
@@ -68,10 +71,11 @@ local _bootstrap    = {}   -- in-memory cache of the loaded bootstrap table
 --- @return string The default absolute path.
 local function default_path(key)
 	local b = _base_dir or ""
-	if key == "PersonalTomlPath"    then return b .. "../hotstrings/personal.toml"           end
-	if key == "HotstringsDirPath"   then return b .. "../hotstrings/"                        end
-	if key == "ConfigJsonPath"      then return b .. "config.json"                           end
-	if key == "KarabinerConfigPath" then return b .. "karabiner_user_config.json"            end
+	if key == "PersonalTomlPath"     then return b .. "../hotstrings/personal.toml"           end
+	if key == "PersonalInfoTomlPath" then return b .. "../hotstrings/personal_info.toml"      end
+	if key == "HotstringsDirPath"    then return b .. "../hotstrings/"                        end
+	if key == "ConfigJsonPath"       then return b .. "config.json"                           end
+	if key == "KarabinerConfigPath"  then return b .. "karabiner_user_config.json"            end
 	return ""
 end
 

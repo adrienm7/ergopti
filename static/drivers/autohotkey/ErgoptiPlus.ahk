@@ -132,6 +132,7 @@ global ScriptInformation := Map(
     ; personal files outside the Ergopti repository)
     "PersonalAhkPath", A_ScriptDir . "\personal.ahk",
     "PersonalTomlPath", A_ScriptDir . "\..\hotstrings\personal.toml",
+    "PersonalInfoTomlPath", A_ScriptDir . "\..\hotstrings\personal_info.toml",
     ; Set to True only when AltGr (SC138) has been remapped to Kana at the
     ; driver level (KbdEdit, MSKLC). With that remap active, AHK still sees
     ; the virtual AltGr-down bit stuck after a hotstring, and we need to
@@ -253,13 +254,6 @@ ReadConfiguration(Cache) {
         }
     }
 
-    for Information in PersonalInformation {
-        Value := IniCacheGet(Cache, "PersonalInformation", Information)
-        if Value != "_" {
-            PersonalInformation[Information] := Value
-        }
-    }
-
     for Information in ScriptInformation {
         Value := IniCacheGet(Cache, "Script", Information)
         if Value != "_" {
@@ -269,6 +263,7 @@ ReadConfiguration(Cache) {
 }
 
 ReadConfiguration(_IniCache)
+ReadPersonalInfoToml(ScriptInformation["PersonalInfoTomlPath"])
 
 ; Pull menu titles and submenu ordering from the per-category TOML files so
 ; that those hotstring files are the single source of truth for both the
@@ -748,7 +743,7 @@ PersonalInformationEditor(*) {
     GuiToShow.Show("Center")
 }
 ProcessUserInput(gui, edits) {
-    global PersonalInformation, ConfigurationFile
+    global PersonalInformation, ScriptInformation
     changed := Map()
     for key, editControl in edits {
         NewValue := editControl.Text
@@ -756,8 +751,8 @@ ProcessUserInput(gui, edits) {
         if (NewValue != OldValue)
             changed[key] := True
         PersonalInformation[key] := NewValue
-        IniWrite(NewValue, ConfigurationFile, "PersonalInformation", key)
     }
+    WritePersonalInfoToml(ScriptInformation["PersonalInfoTomlPath"])
     gui.Destroy()
 
     PersonalInformationSummary := ""
@@ -1022,6 +1017,12 @@ FilePathsEditor(*) {
     W.Add("Button", "x+6 w80", "Parcourir…").OnEvent("Click", (*) => BrowseFile(
         TomlEdit, "Fichiers TOML (*.toml)", "*.toml"))
 
+    ; --- personal_info.toml ---
+    W.Add("Text", "xm y+10", "Fichier personal_info.toml (coordonnées personnelles) :")
+    InfoTomlEdit := W.Add("Edit", "xm w480", ScriptInformation["PersonalInfoTomlPath"])
+    W.Add("Button", "x+6 w80", "Parcourir…").OnEvent("Click", (*) => BrowseFile(
+        InfoTomlEdit, "Fichiers TOML (*.toml)", "*.toml"))
+
     W.Add("Text", "xm y+14 cGray",
         "Laissez un champ vide pour utiliser le chemin par défaut.")
 
@@ -1038,29 +1039,34 @@ FilePathsEditor(*) {
     SaveFilePaths(*) {
         global ScriptInformation, ConfigurationFile, _BootstrapFile
 
-        NewAhkPath := Trim(AhkEdit.Value)
-        NewTomlPath := Trim(TomlEdit.Value)
-        NewIniPath := Trim(IniEdit.Value)
+        NewAhkPath      := Trim(AhkEdit.Value)
+        NewTomlPath     := Trim(TomlEdit.Value)
+        NewInfoTomlPath := Trim(InfoTomlEdit.Value)
+        NewIniPath      := Trim(IniEdit.Value)
 
-        DefaultAhkPath := A_ScriptDir . "\personal.ahk"
-        DefaultTomlPath := A_ScriptDir . "\..\hotstrings\personal.toml"
-        DefaultIniPath := A_ScriptDir . "\ErgoptiPlus_Configuration.ini"
+        DefaultAhkPath      := A_ScriptDir . "\personal.ahk"
+        DefaultTomlPath     := A_ScriptDir . "\..\hotstrings\personal.toml"
+        DefaultInfoTomlPath := A_ScriptDir . "\..\hotstrings\personal_info.toml"
+        DefaultIniPath      := A_ScriptDir . "\ErgoptiPlus_Configuration.ini"
 
-        FinalAhkPath := (NewAhkPath == "") ? DefaultAhkPath : NewAhkPath
-        FinalTomlPath := (NewTomlPath == "") ? DefaultTomlPath : NewTomlPath
-        FinalIniPath := (NewIniPath == "") ? DefaultIniPath : NewIniPath
+        FinalAhkPath      := (NewAhkPath      == "") ? DefaultAhkPath      : NewAhkPath
+        FinalTomlPath     := (NewTomlPath     == "") ? DefaultTomlPath     : NewTomlPath
+        FinalInfoTomlPath := (NewInfoTomlPath == "") ? DefaultInfoTomlPath : NewInfoTomlPath
+        FinalIniPath      := (NewIniPath      == "") ? DefaultIniPath      : NewIniPath
 
         ; Persist the ini path in the bootstrap file (it cannot live in the ini itself)
         IniWrite(FinalIniPath, _BootstrapFile, "Bootstrap", "ConfigurationFilePath")
 
-        ; Persist the two file paths in the ini under [Script]
-        IniWrite(FinalAhkPath, FinalIniPath, "Script", "PersonalAhkPath")
-        IniWrite(FinalTomlPath, FinalIniPath, "Script", "PersonalTomlPath")
+        ; Persist the file paths in the ini under [Script]
+        IniWrite(FinalAhkPath,      FinalIniPath, "Script", "PersonalAhkPath")
+        IniWrite(FinalTomlPath,     FinalIniPath, "Script", "PersonalTomlPath")
+        IniWrite(FinalInfoTomlPath, FinalIniPath, "Script", "PersonalInfoTomlPath")
 
         TomlChanged := (FinalTomlPath != ScriptInformation["PersonalTomlPath"])
 
-        ScriptInformation["PersonalAhkPath"] := FinalAhkPath
-        ScriptInformation["PersonalTomlPath"] := FinalTomlPath
+        ScriptInformation["PersonalAhkPath"]      := FinalAhkPath
+        ScriptInformation["PersonalTomlPath"]     := FinalTomlPath
+        ScriptInformation["PersonalInfoTomlPath"] := FinalInfoTomlPath
         ConfigurationFile := FinalIniPath
 
         W.Destroy()
