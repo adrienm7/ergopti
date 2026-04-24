@@ -1,49 +1,27 @@
-Last login: Fri Apr 24 11:29:25 on ttys000
-❯ xattr -l ~/Documents/GitHub/ergopti/static/drivers/hammerspoon/apps/AppCloner.app/Contents/MacOS/AppCloner
-No such file: /Users/b519hs/Documents/GitHub/ergopti/static/drivers/hammerspoon/apps/AppCloner.app/Contents/MacOS/AppCloner
-❯ xattr -l ~/perso/ergopti/static/drivers/hammerspoon/apps/AppCloner.app/Contents/MacOS/AppCloner
-com.apple.provenance:
-0000   01 02 00 D6 2C 49 8A 5C 9F 26 52                   ....,I...&R
+❯ cat /tmp/clone_app.log
+=== clone_app.sh Fri Apr 24 22:41:55 CEST 2026 ===
+SOURCE=/Applications/Visual Studio Code.app/  NAME=Slimmer  COLOR=#CC0000  ARG=/Users/b519hs/dev/slimmer/
+DEST=/Users/b519hs/Applications/Slimmer.app
+SRC_ICNS=/Applications/Visual Studio Code.app//Contents/Resources/Code.icns
+Base PNG extracted: icon_512x512@2x
+Traceback (most recent call last):
+  File "<stdin>", line 3, in <module>
+ModuleNotFoundError: No module named 'Quartz'
+=== clone_app.sh Fri Apr 24 22:42:28 CEST 2026 ===
+SOURCE=/Applications/Visual Studio Code.app/  NAME=Visual Studio Code — Clone  COLOR=#CC0000  ARG=/Users/b519hs/dev/slimmer/
+DEST=/Users/b519hs/Applications/Visual Studio Code _ Clone.app
+SRC_ICNS=/Applications/Visual Studio Code.app//Contents/Resources/Code.icns
+Base PNG extracted: icon_512x512@2x
+Traceback (most recent call last):
+  File "<stdin>", line 3, in <module>
+ModuleNotFoundError: No module named 'Quartz'
+=== clone_app.sh Fri Apr 24 22:49:33 CEST 2026 ===
+SOURCE=/Applications/Visual Studio Code.app/  NAME=Slimmer  COLOR=#CC0000  ARG=/Users/b519hs/dev/slimmer/
+DEST=/Users/b519hs/Applications/Slimmer_1777063773.app
+SRC_ICNS=/Applications/Visual Studio Code.app//Contents/Resources/Code.icns
+Base PNG extracted: icon_512x512@2x
+Tinted: 1024x1024 -> /tmp/appcloner.PtEbgT/tinted.png
+icns generated: /Users/b519hs/Applications/Slimmer_1777063773.app/Contents/Resources/AppIcon.icns
+Dock add failed: 81:103: syntax error: « nom de classe » ne peut pas se trouver après « identificateur ». (-2740)
 
-❯ ~/perso/ergopti/static/drivers/hammerspoon/apps/AppCloner.app/Contents/MacOS/AppCloner
-❯ ~/perso/ergopti/static/drivers/hammerspoon/apps/AppCloner.app/Contents/MacOS/AppCloner
-❯ python3 ~/perso/ergopti/static/drivers/hammerspoon/apps/AppCloner.app/Contents/MacOS/AppCloner
-❯ cat /tmp/app_cloner.log
-cat: /tmp/app_cloner.log: No such file or directory
-❯ cat /tmp/appcloner.log
-Fri Apr 24 22:21:58 CEST 2026 APPROOT=/Users/b519hs/perso/ergopti/static/drivers/hammerspoon/apps/AppCloner.app
-/Users/b519hs/perso/ergopti/static/drivers/hammerspoon/apps/AppCloner.app/Contents/Resources/ShortcutBuilder.applescript:2406:2410: script error: fin de ligne prévu(s) mais « with » trouvé(s). (-2741)
-Fri Apr 24 22:21:58 CEST 2026 osascript exit=0
-[AppCloner] app_root=/Users/b519hs/perso/ergopti/static/drivers/hammerspoon/apps/AppCloner.app
-[AppCloner] applescript=/Users/b519hs/perso/ergopti/static/drivers/hammerspoon/apps/AppCloner.app/Contents/Resources/ShortcutBuilder.applescript
-[AppCloner] exit=1
-[AppCloner] stderr=/Users/b519hs/perso/ergopti/static/drivers/hammerspoon/apps/AppCloner.app/Contents/Resources/ShortcutBuilder.applescript:2406:2410: script error: fin de ligne prévu(s) mais « with » trouvé(s). (-2741)
-
-[AppCloner] app_root=/Users/b519hs/perso/ergopti/static/drivers/hammerspoon/apps/AppCloner.app
-[AppCloner] applescript=/Users/b519hs/perso/ergopti/static/drivers/hammerspoon/apps/AppCloner.app/Contents/Resources/ShortcutBuilder.applescript
-[AppCloner] exit=1
-[AppCloner] stderr=/Users/b519hs/perso/ergopti/static/drivers/hammerspoon/apps/AppCloner.app/Contents/Resources/ShortcutBuilder.applescript:2406:2410: script error: fin de ligne prévu(s) mais « with » trouvé(s). (-2741)
-
-[AppCloner] app_root=/Users/b519hs/perso/ergopti/static/drivers/hammerspoon/apps/AppCloner.app
-[AppCloner] applescript=/Users/b519hs/perso/ergopti/static/drivers/hammerspoon/apps/AppCloner.app/Contents/Resources/ShortcutBuilder.applescript
-[AppCloner] exit=1
-[AppCloner] stderr=/Users/b519hs/perso/ergopti/static/drivers/hammerspoon/apps/AppCloner.app/Contents/Resources/ShortcutBuilder.applescript:2406:2410: script error: fin de ligne prévu(s) mais « with » trouvé(s). (-2741)
-
-[AppCloner] app_root=/Users/b519hs/perso/ergopti/static/drivers/hammerspoon/apps/AppCloner.app
-[AppCloner] applescript=/Users/b519hs/perso/ergopti/static/drivers/hammerspoon/apps/AppCloner.app/Contents/Resources/ShortcutBuilder.applescript
-[AppCloner] exit=1
-[AppCloner] stderr=/Users/b519hs/perso/ergopti/static/drivers/hammerspoon/apps/AppCloner.app/Contents/Resources/ShortcutBuilder.applescript:2406:2410: script error: fin de ligne prévu(s) mais « with » trouvé(s). (-2741)
-
-[AppCloner] app_root=/Users/b519hs/perso/ergopti/static/drivers/hammerspoon/apps/AppCloner.app
-[AppCloner] applescript=/Users/b519hs/perso/ergopti/static/drivers/hammerspoon/apps/AppCloner.app/Contents/Resources/ShortcutBuilder.applescript
-[AppCloner] exit=1
-[AppCloner] stderr=/Users/b519hs/perso/ergopti/static/drivers/hammerspoon/apps/AppCloner.app/Contents/Resources/ShortcutBuilder.applescript:2406:2410: script error: fin de ligne prévu(s) mais « with » trouvé(s). (-2741)
-
-[AppCloner] app_root=/Users/b519hs/perso/ergopti/static/drivers/hammerspoon/apps/AppCloner.app
-[AppCloner] applescript=/Users/b519hs/perso/ergopti/static/drivers/hammerspoon/apps/AppCloner.app/Contents/Resources/ShortcutBuilder.applescript
-[AppCloner] exit=1
-[AppCloner] stderr=/Users/b519hs/perso/ergopti/static/drivers/hammerspoon/apps/AppCloner.app/Contents/Resources/ShortcutBuilder.applescript:2406:2410: script error: fin de ligne prévu(s) mais « with » trouvé(s). (-2741)
-
-
-╭─     ~ ──────────────────────────────────────────────── ✔  22:34:24 
-╰─
+/Users/b519hs/Applications/Slimmer_1777063773.app
