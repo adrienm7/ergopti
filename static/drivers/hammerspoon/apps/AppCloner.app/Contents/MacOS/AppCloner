@@ -1,7 +1,34 @@
-#!/bin/zsh
-# Launcher for the App Cloner bundle
-APPROOT="$(cd "$(dirname "$0")/../.." && pwd)"
-echo "$(date) APPROOT=$APPROOT" >> /tmp/appcloner.log
-osascript "$APPROOT/Contents/Resources/ShortcutBuilder.applescript" "$APPROOT" 2>> /tmp/appcloner.log
-echo "$(date) osascript exit=$?" >> /tmp/appcloner.log
-exit 0
+#!/usr/bin/env python3
+# Launcher for the App Cloner bundle.
+# Python is used instead of zsh because macOS refuses to execute a plain shell
+# script as the main binary of an .app bundle (no Mach-O header).
+import os
+import subprocess
+import sys
+
+def main():
+    script_path = os.path.realpath(__file__)
+    macos_dir   = os.path.dirname(script_path)
+    app_root    = os.path.dirname(os.path.dirname(macos_dir))
+    applescript = os.path.join(app_root, "Contents", "Resources", "ShortcutBuilder.applescript")
+    log_path    = "/tmp/appcloner.log"
+
+    with open(log_path, "a") as log:
+        log.write(f"[AppCloner] app_root={app_root}\n")
+        log.write(f"[AppCloner] applescript={applescript}\n")
+
+    result = subprocess.run(
+        ["osascript", applescript, app_root],
+        capture_output=True,
+        text=True,
+    )
+
+    with open(log_path, "a") as log:
+        log.write(f"[AppCloner] exit={result.returncode}\n")
+        if result.stdout:
+            log.write(f"[AppCloner] stdout={result.stdout}\n")
+        if result.stderr:
+            log.write(f"[AppCloner] stderr={result.stderr}\n")
+
+if __name__ == "__main__":
+    main()
