@@ -40,6 +40,9 @@ local _trigger        = "\u{2605}"
 local _is_injecting   = false
 local _rules          = {}
 local _personal_data  = nil
+-- Mutable section list kept as an upvalue so register_prefix_entries can
+-- update the real counts after personal data is injected.
+local _sections       = nil
 
 
 
@@ -120,13 +123,32 @@ end
 -- ============================================
 -- ============================================
 
+--- Computes the real hotstring count for each prefix section given personal data.
+--- Returns a table keyed by section name with integer counts.
+--- Mirrors the exact threshold logic used in AHK hotstrings.ahk section 5.2.
+local function compute_prefix_counts(phone, fphone, ssn_raw, iban_raw)
+	local phone_n = 0
+	if #phone >= 2 then phone_n = phone_n + 2 end  -- phone[1:2]+★ and +33+phone[1:2]
+	if #phone >= 4 then phone_n = phone_n + 2 end  -- phone[1:4] and +33+phone[2:4]
+	if #phone >= 6 then phone_n = phone_n + 1 end  -- phone[2:5]
+	if #fphone >= 5 then phone_n = phone_n + 1 end -- fphone[1:5]
+
+	local ssn_n = (#ssn_raw >= 5) and 1 or 0
+
+	local iban_n = 0
+	if #iban_raw >= 7 then iban_n = iban_n + 1 end
+	if #iban_raw >= 9 then iban_n = iban_n + 1 end
+
+	return { phoneprefixes = phone_n, ssnprefixes = ssn_n, ibanprefixes = iban_n }
+end
+
 --- Generates and registers all prefix-based hotstrings based on the user’s personal data.
 local function register_prefix_entries()
 	if not _km or type(_personal_data) ~= "table" then return end
 	Logger.debug(LOG, "Registering prefix-based dynamic hotstrings…")
 
 	local opts = { is_word = false, auto_expand = true, is_case_sensitive = true }
-	
+
 	local phone  = type(_personal_data.PhoneNumber) == "string" and _personal_data.PhoneNumber or tostring(_personal_data.PhoneNumber or "")
 	local fphone = type(_personal_data.PhoneNumberFormatted) == "string" and _personal_data.PhoneNumberFormatted or tostring(_personal_data.PhoneNumberFormatted or "")
 	local ssn    = type(_personal_data.SocialSecurityNumber) == "string" and _personal_data.SocialSecurityNumber or tostring(_personal_data.SocialSecurityNumber or "")
@@ -135,6 +157,16 @@ local function register_prefix_entries()
 	-- Strip decorative spaces for prefix matching (SSN and IBAN contain spaces)
 	local ssn_raw  = ssn:gsub("%s+", "")
 	local iban_raw = iban:gsub("%s+", "")
+
+	-- Update section counts in the registry so build_groups shows accurate totals.
+	local counts = compute_prefix_counts(phone, fphone, ssn_raw, iban_raw)
+	if type(_sections) == "table" then
+		for _, sec in ipairs(_sections) do
+			if type(sec) == "table" and counts[sec.name] ~= nil then
+				sec.count = counts[sec.name]
+			end
+		end
+	end
 
 	if _km.set_group_context then _km.set_group_context(GROUP_NAME) end
 
@@ -224,17 +256,18 @@ function M.start(keymap_module)
 	local date_fr  = os.date("%d/%m/%Y")
 
 	-- Sections ordered identically to the AHK DynamicHotstrings feature map.
-	-- count = 1 per section so build_groups can sum them for the category total.
-	local sections = {
-		{ name = "datefr",      description = "dt" .. _trigger .. " insère la date courante (" .. date_fr  .. ")", count = 1 },
-		{ name = "date",        description = "td" .. _trigger .. " insère la date courante (" .. date_iso .. ")", count = 1 },
-		{ name = "phoneprefixes", description = "Saisir les premiers chiffres du numéro de téléphone le complète automatiquement", count = 1 },
-		{ name = "ssnprefixes",   description = "Saisir les premiers chiffres du numéro de sécurité sociale le complète automatiquement", count = 1 },
-		{ name = "ibanprefixes",  description = "Saisir les premiers caractères de l'IBAN le complète automatiquement", count = 1 },
+	-- Prefix section counts start at 0; register_prefix_entries updates them with
+	-- the real values once personal data is injected.
+	_sections = {
+		{ name = "datefr",        description = "dt" .. _trigger .. " insère la date courante (" .. date_fr  .. ")", count = 1 },
+		{ name = "date",          description = "td" .. _trigger .. " insère la date courante (" .. date_iso .. ")", count = 1 },
+		{ name = "phoneprefixes", description = "Saisir les premiers chiffres du numéro de téléphone le complète automatiquement", count = 0 },
+		{ name = "ssnprefixes",   description = "Saisir les premiers chiffres du numéro de sécurité sociale le complète automatiquement", count = 0 },
+		{ name = "ibanprefixes",  description = "Saisir les premiers caractères de l'IBAN le complète automatiquement", count = 0 },
 	}
-	
+
 	if _km.register_lua_group then
-		_km.register_lua_group(GROUP_NAME, "Hotstrings dynamiques", sections)
+		_km.register_lua_group(GROUP_NAME, "Hotstrings dynamiques", _sections)
 	end
 
 	if _km.set_post_load_hook then
