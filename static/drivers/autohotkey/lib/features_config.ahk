@@ -225,9 +225,6 @@ global Features := Map(
         "MinusApostrophe", {
             Enabled: True,
         },
-        "PhoneNumberAutoComplete", {
-            Enabled: True,
-        },
         "OU", {
             Enabled: True,
             TimeActivationSeconds: 1,

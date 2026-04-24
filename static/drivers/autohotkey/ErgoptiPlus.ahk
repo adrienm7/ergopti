@@ -405,7 +405,7 @@ CreateSubMenusRecursiveCommonCode(MenuParent, Key, Val, CategoryPath) {
         MenuAddItem(MenuParent, CategoryPath, Key)
         ; Mirror HS personal_info module_placeholder: add an editor shortcut
         ; below the "Remplissage de formulaires" toggle
-        if (Key == "textexpansionpersonalinformation") {
+        if (StrLower(Key) == "textexpansionpersonalinformation") {
             MenuParent.Add("   ↳ Modifier les informations…", PersonalInformationEditor)
         }
     }
