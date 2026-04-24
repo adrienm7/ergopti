@@ -57,6 +57,8 @@ jobs:
                   # AHK does not write to the parent shell's stdout natively; we redirect
                   # the runner's FileAppend("*") output via the standard streams of a
                   # cmd.exe wrapper so the TAP report appears in the GitHub Actions log.
+                  # With #Warn All, StdOut in run_all.ahk, compiler warnings also arrive
+                  # on stderr (which 2>&1 merges into the same stream we capture here).
                   $output = & cmd /c "`"$ahk`" `"$runner`" 2>&1"
                   $exit = $LASTEXITCODE
                   $output | ForEach-Object { Write-Host $_ }
@@ -66,5 +68,25 @@ jobs:
                       Write-Error "Test suite reported failures (exit code $exit)."
                       exit $exit
                   }
+              shell: pwsh
+              timeout-minutes: 5
+
+            - name: Check for AHK compiler warnings
+              # #Warn All, StdOut causes AHK to emit warning lines to stdout.
+              # This step greps the saved output for the word "Warning:" and
+              # fails the build if any are found, catching shadow-variable and
+              # other static-analysis issues before they reach production.
+              run: |
+                  $ahk = Get-ChildItem "C:\AutoHotkey" -Filter "AutoHotkey64.exe" | Select-Object -First 1 -ExpandProperty FullName
+                  $runner = "${{ github.workspace }}\static\drivers\autohotkey\tests\run_all.ahk"
+                  $output = & cmd /c "`"$ahk`" `"$runner`" 2>&1"
+                  $warnings = $output | Where-Object { $_ -match "^Warning:" }
+                  if ($warnings) {
+                      Write-Host "AHK compiler warnings detected:"
+                      $warnings | ForEach-Object { Write-Host "  $_" }
+                      Write-Error "$($warnings.Count) AHK compiler warning(s) found — fix them before merging."
+                      exit 1
+                  }
+                  Write-Host "No AHK compiler warnings detected."
               shell: pwsh
               timeout-minutes: 5

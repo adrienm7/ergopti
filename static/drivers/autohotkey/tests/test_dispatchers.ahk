@@ -155,3 +155,138 @@ TestDisp_AltGrTapHoldOSS() {
 }
 Test("RunFirstAltGrTapHoldAction: OneShotShift action fires the stub",
 	TestDisp_AltGrTapHoldOSS)
+
+
+
+
+; ==========================
+; RunFirstSimpleAction — all 10 actions
+; ==========================
+TestDisp_ActionCapsWord() {
+	ResetStubRecorders()
+	G := Map("CapsWord", { Enabled: true })
+	AssertTrue(RunFirstSimpleAction(G))
+	AssertEqual("toggle_capsword", _Stub_SentText[1].kind)
+}
+Test("RunFirstSimpleAction: CapsWord action fires ToggleCapsWord stub",
+	TestDisp_ActionCapsWord)
+
+TestDisp_ActionOneShotShift() {
+	ResetStubRecorders()
+	G := Map("OneShotShift", { Enabled: true })
+	AssertTrue(RunFirstSimpleAction(G))
+	AssertEqual("one_shot_shift", _Stub_SentText[1].kind)
+}
+Test("RunFirstSimpleAction: OneShotShift action fires OneShotShift stub",
+	TestDisp_ActionOneShotShift)
+
+; BackSpace, Tab, Delete, Enter, Escape, CtrlBackSpace, CtrlDelete send via
+; SendInput which in test mode goes through _SendHook (no stub recording in
+; _Stub_SentText). We verify the function returns true and no exception is thrown.
+TestDisp_ActionBackSpace() {
+	ResetHotstringRecorders()
+	G := Map("BackSpace", { Enabled: true })
+	AssertTrue(RunFirstSimpleAction(G))
+}
+Test("RunFirstSimpleAction: BackSpace action returns true without crashing",
+	TestDisp_ActionBackSpace)
+
+TestDisp_ActionTab() {
+	ResetHotstringRecorders()
+	G := Map("Tab", { Enabled: true })
+	AssertTrue(RunFirstSimpleAction(G))
+}
+Test("RunFirstSimpleAction: Tab action returns true without crashing",
+	TestDisp_ActionTab)
+
+TestDisp_ActionDelete() {
+	ResetHotstringRecorders()
+	G := Map("Delete", { Enabled: true })
+	AssertTrue(RunFirstSimpleAction(G))
+}
+Test("RunFirstSimpleAction: Delete action returns true without crashing",
+	TestDisp_ActionDelete)
+
+TestDisp_ActionEnter() {
+	ResetHotstringRecorders()
+	G := Map("Enter", { Enabled: true })
+	AssertTrue(RunFirstSimpleAction(G))
+}
+Test("RunFirstSimpleAction: Enter action returns true without crashing",
+	TestDisp_ActionEnter)
+
+TestDisp_ActionEscape() {
+	ResetHotstringRecorders()
+	G := Map("Escape", { Enabled: true })
+	AssertTrue(RunFirstSimpleAction(G))
+}
+Test("RunFirstSimpleAction: Escape action returns true without crashing",
+	TestDisp_ActionEscape)
+
+TestDisp_ActionCtrlBackSpace() {
+	ResetHotstringRecorders()
+	G := Map("CtrlBackSpace", { Enabled: true })
+	AssertTrue(RunFirstSimpleAction(G))
+}
+Test("RunFirstSimpleAction: CtrlBackSpace action returns true without crashing",
+	TestDisp_ActionCtrlBackSpace)
+
+TestDisp_ActionCtrlDelete() {
+	ResetHotstringRecorders()
+	G := Map("CtrlDelete", { Enabled: true })
+	AssertTrue(RunFirstSimpleAction(G))
+}
+Test("RunFirstSimpleAction: CtrlDelete action returns true without crashing",
+	TestDisp_ActionCtrlDelete)
+
+
+
+
+; ==========================
+; Priority order — first wins
+; ==========================
+TestDisp_FirstEnabledWins() {
+	ResetStubRecorders()
+	; Both CapsLock and CapsWord enabled; CapsLock must fire because Map
+	; iteration order in AHK v2 is insertion order.
+	G := Map(
+		"CapsLock", { Enabled: true },
+		"CapsWord", { Enabled: true },
+	)
+	AssertTrue(RunFirstSimpleAction(G))
+	AssertEqual(1, _Stub_SentText.Length)
+	AssertEqual("toggle_capslock", _Stub_SentText[1].kind)
+}
+Test("RunFirstSimpleAction: stops after the first enabled action (no double-fire)",
+	TestDisp_FirstEnabledWins)
+
+TestDisp_SkipsDisabledThenFiresEnabled() {
+	ResetStubRecorders()
+	G := Map(
+		"CapsLock",   { Enabled: false },
+		"OneShotShift", { Enabled: true },
+	)
+	AssertTrue(RunFirstSimpleAction(G))
+	AssertEqual("one_shot_shift", _Stub_SentText[1].kind)
+}
+Test("RunFirstSimpleAction: skips disabled entries and fires first enabled one",
+	TestDisp_SkipsDisabledThenFiresEnabled)
+
+
+
+
+; ==========================
+; TAPHOLD_ALTGR_ACTIONS shape
+; ==========================
+TestDisp_AltGrAllCallable() {
+	_AssertAllCallable(TAPHOLD_ALTGR_ACTIONS)
+}
+Test("TAPHOLD_ALTGR_ACTIONS: every entry is callable", TestDisp_AltGrAllCallable)
+
+TestDisp_AltGrTabAction() {
+	ResetHotstringRecorders()
+	G := Map("Tab", { Enabled: true })
+	AssertTrue(RunFirstAltGrTapHoldAction(G))
+}
+Test("RunFirstAltGrTapHoldAction: Tab action returns true without crashing",
+	TestDisp_AltGrTabAction)

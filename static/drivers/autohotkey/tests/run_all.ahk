@@ -25,7 +25,7 @@
 #Requires Autohotkey v2.0+
 #SingleInstance Force
 SetWorkingDir(A_ScriptDir)
-#Warn All
+#Warn All, StdOut
 #Warn VarUnset, Off
 
 ; Test framework first — Assert / Test / RunTests must exist before any

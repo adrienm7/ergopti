@@ -156,3 +156,208 @@ TestHE_ConstActivateHotstringsPositive() {
 }
 Test("Constants: ACTIVATE_HOTSTRINGS_DELAY_MS is positive",
 	TestHE_ConstActivateHotstringsPositive)
+
+
+
+
+; ==========================
+; StrTitle — edge cases
+; ==========================
+TestHE_StrTitleDigit() {
+	AssertEqual("1hello", StrTitle("1hello"))
+}
+Test("StrTitle: digit-initial string keeps digit, lowercases rest", TestHE_StrTitleDigit)
+
+TestHE_StrTitleAlreadyTitle() {
+	AssertEqual("Hello", StrTitle("Hello"))
+}
+Test("StrTitle: already-title-case string is unchanged", TestHE_StrTitleAlreadyTitle)
+
+TestHE_StrTitleAccented() {
+	AssertEqual("Été", StrTitle("été"))
+}
+Test("StrTitle: accented lowercase is capitalised correctly", TestHE_StrTitleAccented)
+
+
+
+
+; ==========================
+; GetLastSentCharacterAt — boundary detail
+; ==========================
+TestHE_LastSentPositiveOffset() {
+	global LastSentCharacters
+	LastSentCharacters := ["a", "b", "c"]
+	; Positive index 1 is first element
+	AssertEqual("a", GetLastSentCharacterAt(1))
+}
+Test("GetLastSentCharacterAt: positive offset 1 returns the first element",
+	TestHE_LastSentPositiveOffset)
+
+TestHE_LastSentSingleElement() {
+	global LastSentCharacters
+	LastSentCharacters := ["z"]
+	AssertEqual("z", GetLastSentCharacterAt(-1))
+	AssertEqual("", GetLastSentCharacterAt(-2))
+}
+Test("GetLastSentCharacterAt: single-element buffer, -1 ok, -2 empty",
+	TestHE_LastSentSingleElement)
+
+TestHE_LastSentExactLength() {
+	global LastSentCharacters
+	LastSentCharacters := ["a", "b", "c", "d", "e"]
+	; offset -5 should reach the first element
+	AssertEqual("a", GetLastSentCharacterAt(-5))
+	; offset -6 should be out of range
+	AssertEqual("", GetLastSentCharacterAt(-6))
+}
+Test("GetLastSentCharacterAt: offset at exact length boundary",
+	TestHE_LastSentExactLength)
+
+
+
+
+; ==========================
+; IsTimeActivationExpired — boundary cases
+; ==========================
+TestHE_TimeoutMissingKey() {
+	global LastSentCharacterKeyTime
+	LastSentCharacterKeyTime := Map()
+	; Key not in map; implementation falls back to Now, so never expired
+	AssertFalse(IsTimeActivationExpired("x", 1))
+}
+Test("IsTimeActivationExpired: missing key in map never triggers expiry",
+	TestHE_TimeoutMissingKey)
+
+TestHE_TimeoutExactBoundary() {
+	global LastSentCharacterKeyTime
+	; Set timestamp to exactly TimeActivationSeconds * 1000 ms ago
+	LastSentCharacterKeyTime := Map("b", A_TickCount - 1000)
+	; Timeout = 1 s and key is exactly 1 s old: (Now - CharTime) == 1000
+	; The condition is strictly >, so exactly at boundary is NOT expired
+	AssertFalse(IsTimeActivationExpired("b", 1))
+}
+Test("IsTimeActivationExpired: exactly-at-boundary is not yet expired",
+	TestHE_TimeoutExactBoundary)
+
+TestHE_TimeoutSlightlyOver() {
+	global LastSentCharacterKeyTime
+	; 1001 ms > 1000 ms threshold — expired
+	LastSentCharacterKeyTime := Map("c", A_TickCount - 1001)
+	AssertTrue(IsTimeActivationExpired("c", 1))
+}
+Test("IsTimeActivationExpired: one millisecond over threshold is expired",
+	TestHE_TimeoutSlightlyOver)
+
+
+
+
+; ==========================
+; GenerateUppercaseVariants — more cases
+; ==========================
+TestHE_VariantsCommaTwoAlternatives() {
+	Symbols := Map(",", [" " . Chr(0x3B), " :"])
+	V := GenerateUppercaseVariants(",B", Symbols)
+	; Should contain original + 2 replacements = 3 variants
+	AssertEqual(3, V.Length)
+	; First variant is always the original
+	AssertEqual(",B", V[1])
+}
+Test("GenerateUppercaseVariants: comma generates exactly 2 extra variants",
+	TestHE_VariantsCommaTwoAlternatives)
+
+TestHE_VariantsNoSymbols() {
+	V := GenerateUppercaseVariants("ABC", Map())
+	AssertEqual(1, V.Length)
+	AssertEqual("ABC", V[1])
+}
+Test("GenerateUppercaseVariants: no matching symbols returns only original",
+	TestHE_VariantsNoSymbols)
+
+TestHE_VariantsApostropheOneAlternative() {
+	Sym := _BuildUppercasedSymbols()
+	V := GenerateUppercaseVariants(Chr(0x27) . "HELLO", Sym)
+	; apostrophe has 1 alternative (" ?") so total = 2 variants
+	AssertEqual(2, V.Length)
+}
+Test("GenerateUppercaseVariants: apostrophe generates 1 extra variant",
+	TestHE_VariantsApostropheOneAlternative)
+
+TestHE_VariantsSingleChar() {
+	V := GenerateUppercaseVariants("A", Map())
+	AssertEqual(1, V.Length)
+	AssertEqual("A", V[1])
+}
+Test("GenerateUppercaseVariants: single character with no symbol match",
+	TestHE_VariantsSingleChar)
+
+
+
+
+; ==========================
+; SendNewResult / _SendHook
+; ==========================
+TestHE_SendNewResultHookCalled() {
+	ResetHotstringRecorders()
+	global LastSentCharacters
+	LastSentCharacters := []
+	; _SendHook is already installed (InstallHotstringHooks called in run_all.ahk)
+	SendNewResult("x")
+	AssertEqual(1, _Stub_RecordedSends.Length)
+	AssertEqual("SendNewResult", _Stub_RecordedSends[1].fn)
+}
+Test("SendNewResult: routes through _SendHook when installed",
+	TestHE_SendNewResultHookCalled)
+
+TestHE_SendNewResultUpdatesLastChar() {
+	ResetHotstringRecorders()
+	global LastSentCharacters
+	LastSentCharacters := []
+	SendNewResult("abc")
+	; UpdateLastSentCharacter is called with SubStr(Text, -1) = last char
+	AssertEqual("c", _Stub_LastChars[1])
+}
+Test("SendNewResult: calls UpdateLastSentCharacter with the last character",
+	TestHE_SendNewResultUpdatesLastChar)
+
+TestHE_SendFinalResultHookCalled() {
+	ResetHotstringRecorders()
+	SendFinalResult("done")
+	AssertEqual(1, _Stub_RecordedSends.Length)
+	AssertEqual("SendFinalResult", _Stub_RecordedSends[1].fn)
+}
+Test("SendFinalResult: routes through _SendHook when installed",
+	TestHE_SendFinalResultHookCalled)
+
+TestHE_SendFinalResultNoUpdateLastChar() {
+	ResetHotstringRecorders()
+	SendFinalResult("done")
+	; SendFinalResult returns early after hook — no UpdateLastSentCharacter call
+	AssertEqual(0, _Stub_LastChars.Length)
+}
+Test("SendFinalResult: does NOT call UpdateLastSentCharacter (early return after hook)",
+	TestHE_SendFinalResultNoUpdateLastChar)
+
+TestHE_SendInstantHookCalled() {
+	ResetHotstringRecorders()
+	SendInstant("big payload")
+	AssertEqual(1, _Stub_RecordedSends.Length)
+	AssertEqual("SendInstant", _Stub_RecordedSends[1].fn)
+}
+Test("SendInstant: routes through _SendHook when installed", TestHE_SendInstantHookCalled)
+
+
+
+
+; ==========================
+; ActivateHotstrings
+; ==========================
+TestHE_ActivateHotstringsEmitsSpaceThenBackspace() {
+	ResetHotstringRecorders()
+	ActivateHotstrings()
+	; Expect exactly 2 sends: SendNewResult(" ") then SendNewResult("{BackSpace}", False)
+	AssertEqual(2, _Stub_RecordedSends.Length)
+	AssertEqual("SendNewResult", _Stub_RecordedSends[1].fn)
+	AssertEqual("SendNewResult", _Stub_RecordedSends[2].fn)
+}
+Test("ActivateHotstrings: emits space then backspace via SendNewResult",
+	TestHE_ActivateHotstringsEmitsSpaceThenBackspace)

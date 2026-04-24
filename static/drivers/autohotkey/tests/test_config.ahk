@@ -119,3 +119,101 @@ TestCfg_ResolvePass() {
 	AssertEqual("C:\path", ResolveConfigPath("C:\path", "/default"))
 }
 Test("ResolveConfigPath: real value passes through unchanged", TestCfg_ResolvePass)
+
+
+
+
+; ==========================
+; ParseIniFile — additional cases
+; ==========================
+TestCfg_EmptyFile() {
+	TmpPath := A_ScriptDir . "\test_ini_empty.ini"
+	if FileExist(TmpPath) {
+		FileDelete(TmpPath)
+	}
+	FileAppend("", TmpPath, "UTF-8")
+	Result := ParseIniFile(TmpPath)
+	AssertEqual(0, Result.Count)
+	FileDelete(TmpPath)
+}
+Test("ParseIniFile: empty file returns empty Map", TestCfg_EmptyFile)
+
+TestCfg_CommentsIgnored() {
+	TmpPath := A_ScriptDir . "\test_ini_comments.ini"
+	if FileExist(TmpPath) {
+		FileDelete(TmpPath)
+	}
+	FileAppend("[S]`r`n; this is a comment`r`nkey=value`r`n", TmpPath, "UTF-8")
+	Cache := ParseIniFile(TmpPath)
+	AssertTrue(Cache.Has("S"))
+	; Only "key" should be in the section — the comment line has no "="
+	; and the line is not a section header, so it's skipped as malformed
+	AssertEqual(1, Cache["S"].Count)
+	AssertEqual("value", Cache["S"]["key"])
+	FileDelete(TmpPath)
+}
+Test("ParseIniFile: comment lines (no =) are treated as malformed and skipped",
+	TestCfg_CommentsIgnored)
+
+TestCfg_MultipleValuesPerSection() {
+	TmpPath := A_ScriptDir . "\test_ini_multi.ini"
+	if FileExist(TmpPath) {
+		FileDelete(TmpPath)
+	}
+	FileAppend("[S]`r`na=1`r`nb=2`r`nc=3`r`n", TmpPath, "UTF-8")
+	Cache := ParseIniFile(TmpPath)
+	AssertEqual(3, Cache["S"].Count)
+	AssertEqual("1", Cache["S"]["a"])
+	AssertEqual("2", Cache["S"]["b"])
+	AssertEqual("3", Cache["S"]["c"])
+	FileDelete(TmpPath)
+}
+Test("ParseIniFile: reads multiple keys in a single section",
+	TestCfg_MultipleValuesPerSection)
+
+TestCfg_ValueWithEqualsSign() {
+	TmpPath := A_ScriptDir . "\test_ini_eq.ini"
+	if FileExist(TmpPath) {
+		FileDelete(TmpPath)
+	}
+	; Value itself contains an equals sign — split on the FIRST = only
+	FileAppend("[S]`r`nformula=a=b+c`r`n", TmpPath, "UTF-8")
+	Cache := ParseIniFile(TmpPath)
+	AssertEqual("a=b+c", Cache["S"]["formula"])
+	FileDelete(TmpPath)
+}
+Test("ParseIniFile: value containing '=' is preserved (split on first = only)",
+	TestCfg_ValueWithEqualsSign)
+
+
+
+
+; ==========================
+; IniCacheGet — type coercion
+; ==========================
+TestCfg_GetNumericValue() {
+	C := Map("S", Map("n", "42"))
+	; IniCacheGet returns strings; the caller must coerce if needed
+	AssertEqual("42", IniCacheGet(C, "S", "n", "0"))
+}
+Test("IniCacheGet: numeric values are returned as strings", TestCfg_GetNumericValue)
+
+TestCfg_GetEmptyValue() {
+	C := Map("S", Map("k", ""))
+	AssertEqual("", IniCacheGet(C, "S", "k", "default"))
+}
+Test("IniCacheGet: empty string value is returned as-is (not the default)",
+	TestCfg_GetEmptyValue)
+
+
+
+
+; ==========================
+; ResolveConfigPath — whitespace-only
+; ==========================
+TestCfg_ResolveWhitespaceOnly() {
+	; A string consisting only of spaces/tabs should fall back to default
+	AssertEqual("/default", ResolveConfigPath("   ", "/default"))
+}
+Test("ResolveConfigPath: whitespace-only string falls back to default after trim",
+	TestCfg_ResolveWhitespaceOnly)
