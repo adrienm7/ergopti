@@ -48,6 +48,12 @@ SetWorkingDir(A_ScriptDir)
 #Include ..\lib\layout_altgr.ahk
 #Include ..\lib\layout_shift_caps.ahk
 
+; Install the hotstring hooks for the entire test process so neither real
+; ``Hotstring()`` registrations nor real ``SendEvent`` keystrokes ever escape
+; into the CI environment. Stubs that need raw send semantics still observe
+; UpdateLastSentCharacter (the hook only intercepts the lower-level emission).
+InstallHotstringHooks()
+
 ; ── Per-module test files (each registers Test() cases) ──
 #Include test_logger.ahk
 #Include test_hotstring_engine.ahk
@@ -57,6 +63,7 @@ SetWorkingDir(A_ScriptDir)
 #Include test_layout_tables.ahk
 #Include test_active_app_cache.ahk
 #Include test_config.ahk
+#Include test_hotstrings_full.ahk
 
 ; Drive everything. RunTests prints a TAP-style report to stdout and exits
 ; with the appropriate code — control never returns from this call.
