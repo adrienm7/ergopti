@@ -21,6 +21,7 @@ local ui_restore       = require("lib.ui_restore")
 
 local Preferences = require("ui.menu.preferences")
 local Builder     = require("ui.menu.builder")
+local MenuPaths   = require("ui.menu.menu_paths")
 
 local LOG = "menu"
 local load_errors = {}
@@ -82,6 +83,11 @@ M._active_tasks = {}
 --- @return table|nil configWatcher The file watcher object.
 function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, module_sections, karabiner)
 	base_dir = type(base_dir) == "string" and base_dir or (hs.configdir .. "/")
+	-- MenuPaths was already initialized by init.lua before menu.start() is called;
+	-- call init() again only as a no-op safety net in case of standalone testing.
+	if not MenuPaths.is_initialized() then
+		MenuPaths.init(base_dir, function() hs.timer.doAfter(0.25, function() pcall(hs.reload) end) end)
+	end
 	core_mods.keymap = keymap
 	core_mods.gestures = gestures
 	core_mods.dyn_hot_mod = dynamic_hotstrings or core_mods.dyn_hot_mod
@@ -509,7 +515,7 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 			open_init = function() hs.timer.doAfter(0, function() _suppress_watcher_until = hs.timer.secondsSinceEpoch() + 8; pcall(hs.execute, "open \"" .. base_dir .. "init.lua\"") end) end,
 			open_personal_toml = function()
 				hs.timer.doAfter(0, function()
-					local personal_path = base_dir .. "../hotstrings/personal.toml"
+					local personal_path = MenuPaths.get("PersonalTomlPath")
 					pcall(hs.execute, "open \"" .. personal_path .. "\"")
 				end)
 			end,
@@ -552,7 +558,7 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 			reset_defaults  = function() reset_all_defaults() end,
 			open_console    = function() pcall(hs.openConsole) end,
 			open_init       = function() pcall(hs.execute, string.format("open \"%sinit.lua\"", base_dir)) end,
-			open_prefs      = function() pcall(hs.openPreferences) end,
+			open_paths      = function() hs.timer.doAfter(0.05, function() pcall(MenuPaths.open_editor) end) end,
 			reload          = function() do_reload("menu") end,
 			quit            = function() hs.timer.doAfter(0.1, function() os.exit(0) end) end,
 		}

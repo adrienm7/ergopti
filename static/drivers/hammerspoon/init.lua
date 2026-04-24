@@ -62,6 +62,7 @@ do
 	end
 end
 
+local menu_paths         = require("ui.menu.menu_paths")
 local gestures           = require("modules.gestures")
 local keymap             = require("modules.keymap")
 -- Expose keymap in the global table so the Hammerspoon console can call
@@ -122,8 +123,12 @@ if script_path:sub(1, 1) == "@" then script_path = script_path:sub(2) end
 local base_dir = script_path:match("^(.*[/\\])") or "./"
 if not base_dir:match("[/\\]$") then base_dir = base_dir .. "/" end
 
-local hotstrings_dir = base_dir .. "../hotstrings/"
-local config_file    = base_dir .. "config.json"
+-- Initialize the paths module early so every subsequent path lookup goes
+-- through it — the user may have relocated files via the paths editor.
+menu_paths.init(base_dir, function() hs.timer.doAfter(0.25, function() pcall(hs.reload) end) end)
+
+local hotstrings_dir = menu_paths.get("HotstringsDirPath")
+local config_file    = menu_paths.get("ConfigJsonPath")
 
 
 
@@ -185,14 +190,81 @@ local ordered_names   = nil
 local module_sections = nil
 
 do
-	local fh = io.open(hotstrings_dir .. "_index.json", "r")
+	-- Minimal TOML parser for _index.toml: handles the flat structure produced
+	-- by this file (string arrays, [section.sub.key] headers, key = "value").
+	-- A full TOML library is not available in Hammerspoon, so we parse only
+	-- the constructs actually present in the index manifest.
+	local function parse_index_toml(raw)
+		local result = {}
+		local current_path = {}   -- active dotted-section path as a list
+
+		local function set_nested(tbl, path, key, val)
+			local node = tbl
+			for _, p in ipairs(path) do
+				if type(node[p]) ~= "table" then node[p] = {} end
+				node = node[p]
+			end
+			node[key] = val
+		end
+
+		for line in raw:gmatch("[^\n]+") do
+			-- Strip comments and trim
+			local stripped = line:gsub("%s*#.*$", ""):match("^%s*(.-)%s*$")
+			if stripped == "" then goto continue end
+
+			-- Section header: [a.b.c]
+			local header = stripped:match("^%[([^%]]+)%]$")
+			if header then
+				current_path = {}
+				for part in header:gmatch("[^%.]+") do
+					current_path[#current_path + 1] = part
+				end
+				-- Ensure the section table exists
+				set_nested(result, {}, table.concat(current_path, "."), nil)
+				local node = result
+				for _, p in ipairs(current_path) do
+					if type(node[p]) ~= "table" then node[p] = {} end
+					node = node[p]
+				end
+				goto continue
+			end
+
+			-- key = ["a", "b", ...] — inline string array
+			local arr_key, arr_body = stripped:match('^([%w_]+)%s*=%s*%[(.-)%]$')
+			if arr_key and arr_body then
+				local arr = {}
+				for item in arr_body:gmatch('"([^"]*)"') do
+					arr[#arr + 1] = item
+				end
+				set_nested(result, current_path, arr_key, arr)
+				goto continue
+			end
+
+			-- key = "value"
+			local str_key, str_val = stripped:match('^([%w_]+)%s*=%s*"([^"]*)"$')
+			if str_key then
+				set_nested(result, current_path, str_key, str_val)
+				goto continue
+			end
+
+			::continue::
+		end
+		return result
+	end
+
+	local fh = io.open(hotstrings_dir .. "_index.toml", "r")
 	if fh then
 		local raw = fh:read("*a")
 		fh:close()
-		local ok, data = pcall(hs.json.decode, raw)
-		if ok and data then
-			if type(data.categories_order) == "table" then ordered_names   = data.categories_order end
-			if type(data.module_sections)  == "table" then module_sections = data.module_sections  end
+		local ok, data = pcall(parse_index_toml, raw)
+		if ok and type(data) == "table" then
+			local menu = data.menu
+			if type(menu) == "table" and type(menu.categories_order) == "table" then
+				ordered_names = menu.categories_order
+			end
+			if type(data.module_sections) == "table" then
+				module_sections = data.module_sections
+			end
 		end
 	end
 end
@@ -289,10 +361,10 @@ Logger.debug(LOG, "Initializing custom hotstrings…")
 -- ===== 5.1) Custom Hotstrings =====
 -- ==================================
 
--- Personal hotstrings are now stored in hotstrings/personal.toml, shared with
--- the AHK driver. The file is created automatically if it does not exist yet.
+-- Personal hotstrings are stored in personal.toml (path configurable via the
+-- paths editor — defaults to hotstrings/personal.toml next to the driver).
 do
-	local personal_path = base_dir .. "../hotstrings/personal.toml"
+	local personal_path = menu_paths.get("PersonalTomlPath")
 	hotstring_editor.init(personal_path, keymap)
 	keymap.load_toml("personal", personal_path)
 	table.insert(hotfiles, "personal")
