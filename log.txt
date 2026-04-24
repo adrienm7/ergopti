@@ -1,3 +1,20 @@
+icns generated: /Users/b519hs/Applications/Slimmer_1777063773.app/Contents/Resources/AppIcon.icns
+Dock add failed: 81:103: syntax error: « nom de classe » ne peut pas se trouver après « identificateur ». (-2740)
+
+/Users/b519hs/Applications/Slimmer_1777063773.app
+=== Fri Apr 24 23:18:18 CEST 2026 SOURCE=/Applications/Microsoft Edge.app/ NAME=Microsoft Edge — Clone COLOR=#CC0000 ===
+DEST=/Users/b519hs/Applications/Microsoft Edge — Clone.app
+SRC_ICNS=/Applications/Microsoft Edge.app//Contents/Resources/app.icns
+PNG: icon_512x512@2x
+HUE_RAD=0.0000
+1317:1323: syntax error: fin de ligne, etc. prévu(s) mais propriété trouvé(s). (-2741)
+=== Fri Apr 24 23:22:55 CEST 2026 SOURCE=/Applications/Visual Studio Code.app/ NAME=Visual Studio Code — Clone COLOR=#CC0000 ARG= ===
+DEST=/Users/b519hs/Applications/Visual Studio Code — Clone.app
+SRC_ICNS=/Applications/Visual Studio Code.app//Contents/Resources/Code.icns
+PNG: icon_512x512@2x
+HUE_RAD=0.0000
+1317:1323: syntax error: fin de ligne, etc. prévu(s) mais propriété trouvé(s). (-2741)
+❯ clear
 ❯ cat /tmp/clone_app.log
 === clone_app.sh Fri Apr 24 22:41:55 CEST 2026 ===
 SOURCE=/Applications/Visual Studio Code.app/  NAME=Slimmer  COLOR=#CC0000  ARG=/Users/b519hs/dev/slimmer/
@@ -43,3 +60,131 @@ SRC_ICNS=/Applications/Visual Studio Code.app//Contents/Resources/Code.icns
 PNG: icon_512x512@2x
 src_hue_rad=0.0000 target_hue_rad=0.0000 delta=0.0000
 osascript error: /var/folders/j8/6707b4c95nz1ygz8g6s7m3fc0000gp/T/tmp3xpri0z4.applescript:1155:1161: script error: fin de ligne, etc. prévu(s) mais propriété trouvé(s). (-2741)
+❯ cat /tmp/clone_app.log
+=== clone_app.sh Fri Apr 24 22:41:55 CEST 2026 ===
+SOURCE=/Applications/Visual Studio Code.app/  NAME=Slimmer  COLOR=#CC0000  ARG=/Users/b519hs/dev/slimmer/
+DEST=/Users/b519hs/Applications/Slimmer.app
+SRC_ICNS=/Applications/Visual Studio Code.app//Contents/Resources/Code.icns
+Base PNG extracted: icon_512x512@2x
+Traceback (most recent call last):
+  File "<stdin>", line 3, in <module>
+ModuleNotFoundError: No module named 'Quartz'
+=== clone_app.sh Fri Apr 24 22:42:28 CEST 2026 ===
+SOURCE=/Applications/Visual Studio Code.app/  NAME=Visual Studio Code — Clone  COLOR=#CC0000  ARG=/Users/b519hs/dev/slimmer/
+DEST=/Users/b519hs/Applications/Visual Studio Code _ Clone.app
+SRC_ICNS=/Applications/Visual Studio Code.app//Contents/Resources/Code.icns
+Base PNG extracted: icon_512x512@2x
+Traceback (most recent call last):
+  File "<stdin>", line 3, in <module>
+ModuleNotFoundError: No module named 'Quartz'
+=== clone_app.sh Fri Apr 24 22:49:33 CEST 2026 ===
+SOURCE=/Applications/Visual Studio Code.app/  NAME=Slimmer  COLOR=#CC0000  ARG=/Users/b519hs/dev/slimmer/
+DEST=/Users/b519hs/Applications/Slimmer_1777063773.app
+SRC_ICNS=/Applications/Visual Studio Code.app//Contents/Resources/Code.icns
+Base PNG extracted: icon_512x512@2x
+Tinted: 1024x1024 -> /tmp/appcloner.PtEbgT/tinted.png
+icns generated: /Users/b519hs/Applications/Slimmer_1777063773.app/Contents/Resources/AppIcon.icns
+Dock add failed: 81:103: syntax error: « nom de classe » ne peut pas se trouver après « identificateur ». (-2740)
+
+/Users/b519hs/Applications/Slimmer_1777063773.app
+=== Fri Apr 24 23:18:18 CEST 2026 SOURCE=/Applications/Microsoft Edge.app/ NAME=Microsoft Edge — Clone COLOR=#CC0000 ===
+DEST=/Users/b519hs/Applications/Microsoft Edge — Clone.app
+SRC_ICNS=/Applications/Microsoft Edge.app//Contents/Resources/app.icns
+PNG: icon_512x512@2x
+HUE_RAD=0.0000
+1317:1323: syntax error: fin de ligne, etc. prévu(s) mais propriété trouvé(s). (-2741)
+=== Fri Apr 24 23:22:55 CEST 2026 SOURCE=/Applications/Visual Studio Code.app/ NAME=Visual Studio Code — Clone COLOR=#CC0000 ARG= ===
+DEST=/Users/b519hs/Applications/Visual Studio Code — Clone.app
+SRC_ICNS=/Applications/Visual Studio Code.app//Contents/Resources/Code.icns
+PNG: icon_512x512@2x
+HUE_RAD=0.0000
+1317:1323: syntax error: fin de ligne, etc. prévu(s) mais propriété trouvé(s). (-2741)
+=== Fri Apr 24 23:28:34 CEST 2026 SOURCE=/Applications/Visual Studio Code.app/ NAME=Visual Studio Code — Clone COLOR=#CC0000 ARG= ===
+DEST=/Users/b519hs/Applications/Visual Studio Code — Clone_1777066114.app
+SRC_ICNS=/Applications/Visual Studio Code.app//Contents/Resources/Code.icns
+PNG: icon_512x512@2x
+src_hue_rad=0.0000 target_hue_rad=0.0000 delta=0.0000
+osascript error: /var/folders/j8/6707b4c95nz1ygz8g6s7m3fc0000gp/T/tmp3xpri0z4.applescript:1155:1161: script error: fin de ligne, etc. prévu(s) mais propriété trouvé(s). (-2741)
+=== Fri Apr 24 23:34:07 CEST 2026 SOURCE=/Applications/Visual Studio Code.app/ NAME=Visual Studio Code — Clone COLOR=#CC0000 ARG= ===
+DEST=/Users/b519hs/Applications/Visual Studio Code — Clone_1777066448.app
+SRC_ICNS=/Applications/Visual Studio Code.app//Contents/Resources/Code.icns
+PNG: icon_512x512@2x
+src_hue_rad=0.0000 target_hue_rad=0.0000 delta=0.0000
+tint OK
+Teinte échouée — copie base PNG
+icns OK
+Ajouté au Dock : /Users/b519hs/Applications/Visual Studio Code — Clone_1777066448.app
+/Users/b519hs/Applications/Visual Studio Code — Clone_1777066448.app
+=== Fri Apr 24 23:39:00 CEST 2026 SOURCE=/Applications/Visual Studio Code.app/ NAME=Visual Studio Code — Clone5 COLOR=#CC0000 ARG= ===
+DEST=/Users/b519hs/Applications/Visual Studio Code — Clone5.app
+SRC_ICNS=/Applications/Visual Studio Code.app//Contents/Resources/Code.icns
+PNG: icon_512x512@2x
+tint OK target_h=0.000
+icns OK
+Ajouté au Dock : /Users/b519hs/Applications/Visual Studio Code — Clone5.app
+/Users/b519hs/Applications/Visual Studio Code — Clone5.app
+=== Fri Apr 24 23:43:52 CEST 2026 SOURCE=/Applications/Visual Studio Code.app/ NAME=Slimmer COLOR=#CC0000 ARG=/Users/b519hs/dev/slimmer/ ===
+DEST=/Users/b519hs/Applications/Slimmer.app
+SRC_ICNS=/Applications/Visual Studio Code.app//Contents/Resources/Code.icns
+PNG: icon_512x512@2x
+tint OK target_h=0.000
+icns OK
+Ajouté au Dock : /Users/b519hs/Applications/Slimmer.app
+/Users/b519hs/Applications/Slimmer.app
+=== Fri Apr 24 23:50:44 CEST 2026 SOURCE=/Applications/Visual Studio Code.app/ NAME=Next Best Offer COLOR=#C56A00 ARG=/Users/b519hs/dev/next_best_offer/ ===
+DEST=/Users/b519hs/Applications/Next Best Offer.app
+SRC_ICNS=/Applications/Visual Studio Code.app//Contents/Resources/Code.icns
+PNG: icon_512x512@2x
+tint OK target_h=0.090
+icns OK
+EXE_SYMLINK=/Applications/Visual Studio Code.app//Contents/MacOS/Code -> /Users/b519hs/Applications/Next Best Offer.app/Contents/MacOS/launcher
+WRAPPER with OPEN_ARG=/Users/b519hs/dev/next_best_offer/
+Ajouté au Dock : /Users/b519hs/Applications/Next Best Offer.app
+/Users/b519hs/Applications/Next Best Offer.app
+=== Sat Apr 25 00:01:07 CEST 2026 SOURCE=/Applications/Visual Studio Code.app/ NAME=Ergopti COLOR=#000000 ARG=/Users/b519hs/perso/ergopti/ ===
+DEST=/Users/b519hs/Applications/Ergopti.app
+Bundle cloned
+SRC_ICNS=/Applications/Visual Studio Code.app//Contents/Resources/Code.icns
+PNG: icon_512x512@2x
+tint OK target_h=0.000
+icns OK
+Info.plist patched: id=fr.b519hs.clone.1777068073
+WRAPPER with OPEN_ARG=/Users/b519hs/perso/ergopti/
+Added to Dock: /Users/b519hs/Applications/Ergopti.app
+/Users/b519hs/Applications/Ergopti.app
+=== Sat Apr 25 00:07:00 CEST 2026 SOURCE=/Applications/Visual Studio Code.app/ NAME=Hammerspoon COLOR=#00C400 ARG=/Users/b519hs/perso/ergopti/static/drivers/hammerspoon/ ===
+DEST=/Users/b519hs/Applications/Hammerspoon.app
+Bundle cloned
+SRC_ICNS=/Applications/Visual Studio Code.app//Contents/Resources/Code.icns
+PNG: icon_512x512@2x
+tint OK target_h=0.333
+icns OK
+Info.plist patched: id=fr.b519hs.clone.1777068426
+WRAPPER with OPEN_ARG=/Users/b519hs/perso/ergopti/static/drivers/hammerspoon/
+Bundle re-signed ad-hoc
+Added to Dock: /Users/b519hs/Applications/Hammerspoon.app
+/Users/b519hs/Applications/Hammerspoon.app
+❯ codesign -dv --verbose=4 /Users/b519hs/Applications/Hammerspoon.app
+Executable=/Users/b519hs/Applications/Hammerspoon.app/Contents/MacOS/Code
+Identifier=fr.b519hs.clone.1777068426
+Format=app bundle with generic
+CodeDirectory v=20100 size=203 flags=0x2(adhoc) hashes=1+3 location=embedded
+Hash type=sha256 size=32
+CandidateCDHash sha256=94b4317fca489f4152390d9b315849e3df6bd29a
+CandidateCDHashFull sha256=94b4317fca489f4152390d9b315849e3df6bd29ac4cc07591182b5b9c6bfa189
+Hash choices=sha256
+CMSDigest=94b4317fca489f4152390d9b315849e3df6bd29ac4cc07591182b5b9c6bfa189
+CMSDigestType=2
+Page size=none
+CDHash=94b4317fca489f4152390d9b315849e3df6bd29a
+Signature=adhoc
+Notarization Ticket=stapled
+Info.plist entries=36
+TeamIdentifier=not set
+Sealed Resources version=2 rules=13 files=6561
+Internal requirements count=1 size=64
+❯ spctl -a -vv /Users/b519hs/Applications/Hammerspoon.app
+/Users/b519hs/Applications/Hammerspoon.app: rejected
+
+╭─     ~ ────────────────────────────────────────────── 3 ✘  00:09:40 
+╰─
