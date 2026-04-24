@@ -641,6 +641,19 @@ if Features["MagicKey"]["TextExpansionSymbolsTypst"].Enabled {
 ; =====================================
 ; =====================================
 
+; Returns the shortest prefix of a spaced string that contains exactly RawCount
+; non-space characters. Used to build the "spaced" trigger for SSN and IBAN.
+SpacedPrefix(SpacedStr, RawCount) {
+	Seen := 0
+	Loop Parse, SpacedStr {
+		if A_LoopField != " "
+			Seen++
+		if Seen >= RawCount
+			return SubStr(SpacedStr, 1, A_Index)
+	}
+	return SpacedStr  ; Fallback — fewer raw chars than requested
+}
+
 ; Dynamic hotstrings must be registered BEFORE the repeat section (#InputLevel 1)
 ; so that e.g. "dt★" (3-char trigger) takes priority over "t★" (repeat, 2-char).
 ; All Hotstring() calls here inherit the current #InputLevel 2.
@@ -712,19 +725,30 @@ if Features.Has("DynamicHotstrings") {
 	}
 
 	if Features["DynamicHotstrings"]["SsnPrefixes"].Enabled {
-		; Mirrors HS: ssn[1:5] (raw digits, no spaces)
+		; No-space trigger → SSN without spaces; spaced trigger → SSN with spaces.
+		; Both use the first 5 raw digits as the distinguishing prefix.
 		if StrLen(SsnRaw) >= 5 {
-			Hotstring(_DynFlags . SubStr(SsnRaw, 1, 5), (*) => SendFinalResult(Ssn))
+			SsnRawPrefix  := SubStr(SsnRaw, 1, 5)
+			SsnSpacedPfx  := SpacedPrefix(Ssn, 5)
+			Hotstring(_DynFlags . SsnRawPrefix,  (*) => SendFinalResult(SsnRaw))
+			if SsnSpacedPfx != SsnRawPrefix {
+				Hotstring(_DynFlags . SsnSpacedPfx, (*) => SendFinalResult(Ssn))
+			}
 		}
 	}
 
 	if Features["DynamicHotstrings"]["IbanPrefixes"].Enabled {
-		; IBAN: first 7 chars (e.g. "FR00 00" before any space), then 9 chars
-		if StrLen(IbanRaw) >= 7 {
-			Hotstring(_DynFlags . SubStr(IbanRaw, 1, 7), (*) => SendFinalResult(Iban))
-		}
-		if StrLen(IbanRaw) >= 9 {
-			Hotstring(_DynFlags . SubStr(IbanRaw, 1, 9), (*) => SendFinalResult(Iban))
+		; 6 raw chars (case-insensitive) → IBAN without spaces.
+		; 7 spaced chars (e.g. "FR76 XX") → IBAN with spaces.
+		; Both triggers fire at the 6th raw character typed.
+		_DynFlagsCI := ":*:"  ; No C flag = case-insensitive for letter prefix
+		if StrLen(IbanRaw) >= 6 {
+			IbanRawPrefix    := SubStr(IbanRaw, 1, 6)
+			IbanSpacedPfx    := SpacedPrefix(Iban, 6)
+			Hotstring(_DynFlagsCI . IbanRawPrefix,  (*) => SendFinalResult(StrReplace(Iban, " ", "")))
+			if IbanSpacedPfx != IbanRawPrefix {
+				Hotstring(_DynFlagsCI . IbanSpacedPfx, (*) => SendFinalResult(Iban))
+			}
 		}
 	}
 }
