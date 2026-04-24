@@ -3,14 +3,18 @@
 <plist version="1.0">
 <dict>
   <key>CFBundleName</key>
-  <string>ShortcutBuilder</string>
+  <string>App Cloner</string>
   <key>CFBundleDisplayName</key>
-  <string>ShortcutBuilder</string>
+  <string>App Cloner</string>
   <key>CFBundleIdentifier</key>
-  <string>fr.b519hs.shortcutbuilder</string>
+  <string>fr.b519hs.appcloner</string>
   <key>CFBundleVersion</key>
-  <string>1.0</string>
+  <string>2.0</string>
   <key>CFBundleExecutable</key>
   <string>ShortcutBuilder</string>
+  <key>CFBundlePackageType</key>
+  <string>APPL</string>
+  <key>CFBundleIconFile</key>
+  <string>AppIcon</string>
 </dict>
 </plist>
