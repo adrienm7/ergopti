@@ -99,7 +99,8 @@ global ConfigurationFile := A_ScriptDir . "\test_config.ini"
 global SpaceAroundSymbols := ""
 
 ; Hotstring engine globals normally maintained by modules/layout.ahk.
-global LastSentCharacters := []
+; The LastSentCharacters ring buffer is defined in lib/hotstring_engine.ahk;
+; tests seed it via _LSCResetFrom([...]) instead of touching it directly.
 global LastSentCharacterKeyTime := Map()
 global RemappedList := Map()
 global InDeadKeySequence := false
@@ -142,12 +143,9 @@ WrapTextIfSelected(Symbol, LeftSymbol, RightSymbol) {
 }
 
 UpdateLastSentCharacter(Character) {
-	global _Stub_LastChars, LastSentCharacters, LastSentCharacterKeyTime
+	global _Stub_LastChars, LastSentCharacterKeyTime
 	_Stub_LastChars.Push(Character)
-	LastSentCharacters.Push(Character)
-	if (LastSentCharacters.Length > 5) {
-		LastSentCharacters.RemoveAt(1)
-	}
+	_LSCPush(Character)
 	LastSentCharacterKeyTime[Character] := A_TickCount
 }
 

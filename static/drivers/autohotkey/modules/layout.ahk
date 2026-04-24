@@ -322,11 +322,9 @@ DeadKey(Mapping) {
 }
 
 UpdateLastSentCharacter(Character) {
-	global LastSentCharacters
-	LastSentCharacters.Push(Character)
-	; Keep only the last 5 keys to save memory
-	if (LastSentCharacters.Length > 5)
-		LastSentCharacters.RemoveAt(1)
+	; Ring-buffer push is O(1) and does not reallocate past boot — see
+	; ``_LSCPush`` in lib/hotstring_engine.ahk.
+	_LSCPush(Character)
 
 	global LastSentCharacterKeyTime
 	LastSentCharacterKeyTime[Character] := A_TickCount
