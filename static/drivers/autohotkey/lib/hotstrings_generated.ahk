@@ -1868,12 +1868,12 @@ _GenLoad_autocorrection_accents(FeatureConfig, ExtraOptions := unset) {
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		_GenOpts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", "écoeuré", "écoeuré", _GenOpts)
+	CreateCaseSensitiveHotstrings("*", "écoeuré", "écœuré", _GenOpts)
 	_GenOpts := Map("TimeActivationSeconds", _GenTimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		_GenOpts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", "écoeure", "écoeure", _GenOpts)
+	CreateCaseSensitiveHotstrings("*", "écoeure", "écœure", _GenOpts)
 	_GenOpts := Map("TimeActivationSeconds", _GenTimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		_GenOpts["OnlyText"] := ExtraOptions["OnlyText"]
