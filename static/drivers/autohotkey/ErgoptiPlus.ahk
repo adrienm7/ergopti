@@ -11,7 +11,12 @@ SetWorkingDir(A_ScriptDir) ; Set the working directory where the script is locat
 #Warn VarUnset, Off
 
 #Include *i vendor\UIA.ahk ; UIA v2 library — third-party, kept verbatim in vendor\ (source: https://github.com/Descolada/UIA-v2)
-; *i = no error if the file isn't found, as this library is not mandatory to run this script
+; *i = no error if the file isn't found. UIA is only used by WrapTextIfSelected
+; (a Shift/AltGr shortcut that wraps the selection with the typed symbol). If
+; that feature is disabled in your INI and you want to trim boot time / memory,
+; you can safely delete ``vendor\UIA.ahk``: WrapTextIfSelected falls back to
+; a plain SendNewResult via ``isSet(UIA)`` at the call site (see modules/layout.ahk).
+; AHK v2 resolves #Include at parse time, so there is no true runtime lazy-load.
 
 ; ===== Global error net =====
 ; Without this, any uncaught error pops an AHK dialog mid-keystroke and can
