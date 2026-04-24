@@ -239,6 +239,20 @@ PLIST="$CONTENTS/Info.plist"
 /usr/libexec/PlistBuddy -c "Set :CFBundleIconFile AppIcon"             "$PLIST" 2>/dev/null \
   || /usr/libexec/PlistBuddy -c "Add :CFBundleIconFile string AppIcon" "$PLIST"
 /usr/libexec/PlistBuddy -c "Delete :CFBundleIconName"                  "$PLIST" 2>/dev/null || true
+
+# Electron 22+ enforces ASAR integrity via a hash dictionary in Info.plist
+# under the key `ElectronAsarIntegrity`. When V8 starts, it verifies
+# app.asar against this hash. If the bundle has been modified in any way
+# (which we always do — Info.plist, icon, bundle ID), the check fails and
+# V8 aborts with `brk 0` inside OptimizingCompileTaskExecutor init. The
+# symptom looks like a V8 JIT crash but it's really the integrity fuse
+# blocking the process before the JS engine can even start.
+#
+# Removing the key entirely disables the check — Electron falls back to
+# launching without integrity validation. This is the standard technique
+# used by every Electron-app-cloning tool (Slack Theme Tweaks, Discord
+# custom icons, etc.).
+/usr/libexec/PlistBuddy -c "Delete :ElectronAsarIntegrity"             "$PLIST" 2>/dev/null || true
 echo "Info.plist patched: id=${UNIQUE_ID}"
 
 
