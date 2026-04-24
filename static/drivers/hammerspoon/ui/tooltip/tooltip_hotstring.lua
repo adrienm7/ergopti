@@ -115,6 +115,17 @@ function M.hide()
 	end)
 end
 
+--- Resets internal state and stops watchers without hiding the shared canvas.
+--- Used when transitioning to the LLM tooltip so the canvas content is overwritten
+--- in-place rather than first blanked then redrawn, which would produce a visible gap.
+function M.dismiss_silent()
+	pcall(function()
+		stop_watchers()
+		_state.bg_color = nil
+		_state.is_visible = false
+	end)
+end
+
 function M.show(content, is_llm_origin, is_enabled, background_color)
 	local ok, err = pcall(function()
 		if not is_enabled then return end
@@ -122,16 +133,45 @@ function M.show(content, is_llm_origin, is_enabled, background_color)
 
 		_state.bg_color = Config.settings.colorization_enabled and (type(background_color) == "table" and background_color or nil) or nil
 		_state.is_visible = true
-		
+
 		local styled_content = type(content) == "userdata" and content or hs.styledtext.new(tostring(content), {
 			font  = { name = Config.fonts.main, size = Config.sizes.main, traits = is_llm_origin and { italic = true } or {} },
 			color = is_llm_origin and { white = 0.80, alpha = 1.0 } or { white = 1.00, alpha = 1.0 },
 		})
-		
+
 		Renderer.render(styled_content, _state, start_watchers)
 	end)
-	
+
 	if not ok then Logger.error(LOG, "Crash during standard tooltip rendering: " .. tostring(err) .. ".") end
+end
+
+--- Shows a persistent loading indicator with no auto-dismiss timer and no interaction watchers.
+--- The indicator stays until explicitly replaced or hidden — it must never self-dismiss
+--- mid-generation, which would leave a blank gap before the prediction tooltip arrives.
+--- @param content string|userdata The loading text to display.
+--- @param is_enabled boolean Guard clause to prevent rendering if disabled.
+--- @param background_color table|nil Optional background tint.
+function M.show_loading(content, is_enabled, background_color)
+	local ok, err = pcall(function()
+		if not is_enabled then return end
+		if content == nil or tostring(content) == "" then M.hide(); return end
+
+		-- Stop any existing watchers/timers from a previous state before rendering
+		stop_watchers()
+
+		_state.bg_color = Config.settings.colorization_enabled and (type(background_color) == "table" and background_color or nil) or nil
+		_state.is_visible = true
+
+		local styled_content = type(content) == "userdata" and content or hs.styledtext.new(tostring(content), {
+			font  = { name = Config.fonts.main, size = Config.sizes.main, traits = { italic = true } },
+			color = { white = 0.80, alpha = 1.0 },
+		})
+
+		-- No start_watchers callback — the canvas stays up until replaced programmatically
+		Renderer.render(styled_content, _state, nil)
+	end)
+
+	if not ok then Logger.error(LOG, "Crash during loading indicator rendering: " .. tostring(err) .. ".") end
 end
 
 function M.is_visible()

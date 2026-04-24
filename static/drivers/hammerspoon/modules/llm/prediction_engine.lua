@@ -26,6 +26,7 @@ local M = {}
 local hs = hs
 
 local core_llm  = require("modules.llm")
+local Parser    = require("modules.llm.parser")
 local Logger    = require("lib.logger")
 local tooltip   = require("ui.tooltip")
 local keylogger = require("modules.keylogger")
@@ -62,15 +63,75 @@ local TOKEN_BUDGET_OVERHEAD = 10   -- Fixed overhead appended to the computed to
 
 local TEMP_DIVERSITY_CAP      = 1.0  -- Upper bound when auto_raise_temperature is active
 local TEMP_INCREMENT_PER_PRED = 0.1  -- Temperature step per extra prediction requested (+0.1 each)
+-- Greedy threshold: if num_predictions == 1 and temperature is at or below this value,
+-- force temperature → 0 (pure greedy). Avoids sampling noise with no diversity benefit.
+local GREEDY_TEMP_THRESHOLD   = 0.15
+
+-- ── Context truncation ───────────────────────────────────────────────────────
+
+-- Dynamic context cap: limit the context forwarded to the LLM proportionally to the
+-- max prediction length. Short predictions don't need 500 chars of history; reducing
+-- the context shrinks the prefill token count and cuts TTFT proportionally.
+local CONTEXT_CHARS_PER_WORD = 40   -- Chars of context allocated per predicted output word
+local CONTEXT_MIN_CHARS      = 100  -- Hard floor: always keep at least this many chars
 
 -- ── UI / display parameters ───────────────────────────────────────────────────
 
 local SPINNER_FPS = 6  -- Frames per second for the streaming progress spinner
 
+-- ── Adaptive debounce ─────────────────────────────────────────────────────────
+-- Adjust the inactivity delay based on live WPM so the timer fires sooner
+-- when the user is thinking and later when they are actively typing.
+
+local FAST_TYPING_WPM    = 55   -- Above this WPM, extend debounce (user still mid-burst)
+local SLOW_TYPING_WPM    = 20   -- Below this WPM, shorten debounce (user paused to think)
+local DEBOUNCE_FAST_MULT = 1.5  -- Multiplier applied when WPM is above FAST_TYPING_WPM
+local DEBOUNCE_SLOW_MULT = 0.5  -- Multiplier applied when WPM is below SLOW_TYPING_WPM
+-- Hard floor / ceiling so extreme WPM values don't produce unusable delays
+local DEBOUNCE_MIN_SEC   = 0.05
+local DEBOUNCE_MAX_SEC   = 0.6
+
+-- ── N-gram instant prediction ─────────────────────────────────────────────────
+-- Show a local word-bigram prediction immediately (< 1 ms) while the LLM warms up.
+-- Replaced in-place when the LLM response arrives, so the user always sees something.
+
+local NGRAM_MIN_COUNT = 2  -- Ignore words seen only once (noise / typos)
+local NGRAM_MAX_PREDS = 3  -- Maximum instant candidates to show before LLM responds
+
 -- ── Timing constants ──────────────────────────────────────────────────────────
 
 local STREAM_WATCHDOG_SEC = 12.0  -- Surface partial results after this many seconds of stream stall
 local CHAIN_FALLBACK_SEC  = 0.5   -- Fire chain LLM if the F20 signal is somehow missed
+
+-- ── Failure detection ─────────────────────────────────────────────────────────
+-- Track consecutive on_fail callbacks to surface a notification when failures are
+-- persistent — e.g. the MLX server crashed or is still loading weights.
+
+local CONSECUTIVE_FAIL_WARN_THRESHOLD = 4  -- Notify after this many consecutive failures without a success
+
+-- ── URL-bar / app exclusion ───────────────────────────────────────────────────
+
+-- AXSubrole assigned by macOS to URL text fields in Safari and other native browser controls.
+local AX_URL_SUBROLE = "AXURLField"
+-- Lowercase substrings matched against AXIdentifier to detect Chrome/Brave/Opera omniboxes.
+-- Edge does not reliably expose an identifier, so a parent-toolbar fallback is used instead.
+local URL_BAR_ID_PATTERNS = { "address", "urlfield", "location", "omnibox", "url" }
+-- Bundle IDs of browsers for which an AXTextField inside an AXToolbar is always the URL bar.
+-- Used as a fallback when AXSubrole and AXIdentifier checks both come up empty.
+local BROWSER_BUNDLE_IDS = {
+	["com.apple.Safari"]                = true,
+	["com.google.Chrome"]               = true,
+	["com.google.Chrome.canary"]        = true,
+	["com.microsoft.edgemac"]           = true,
+	["com.microsoft.edgemac.Dev"]       = true,
+	["com.microsoft.edgemac.Canary"]    = true,
+	["org.mozilla.firefox"]             = true,
+	["com.brave.Browser"]               = true,
+	["com.brave.Browser.nightly"]       = true,
+	["com.operasoftware.Opera"]         = true,
+	["com.vivaldi.Vivaldi"]             = true,
+	["company.thebrowser.Browser"]      = true,  -- Arc
+}
 
 -- Reference to the LLM engine defaults, used once at module load to seed Section 2
 local LLM_DEFAULTS = core_llm.DEFAULT_STATE
@@ -102,6 +163,15 @@ local fetch_request_counter = 0
 
 -- The last buffer+tail string sent to the LLM; prevents re-sending unchanged input
 local last_buffer_signature = nil
+
+-- Length of the buffer at the time of the last LLM request; used by the adaptive
+-- debounce to detect ongoing corrections (shrinking buffer = user still deleting)
+local _last_request_buffer_len = 0
+
+-- Consecutive on_fail callbacks without an intervening on_success.
+-- Reset on every successful response; triggers a user notification when it reaches
+-- CONSECUTIVE_FAIL_WARN_THRESHOLD (persistent failures → server issue or misconfiguration).
+local _consecutive_llm_failures = 0
 
 -- ── Timers ────────────────────────────────────────────────────────────────────
 
@@ -136,9 +206,18 @@ local navigation_mods         = LLM_DEFAULTS.llm_nav_modifiers
 local show_info_bar           = LLM_DEFAULTS.llm_show_info_bar
 local sequential_mode         = LLM_DEFAULTS.llm_sequential_mode
 local inactivity_debounce_sec = LLM_DEFAULTS.llm_debounce
-local excluded_apps           = {}
-local is_ai_preview_enabled   = true
+local excluded_apps              = {}
+local is_ai_preview_enabled      = true
+local url_bar_filter_enabled     = true  -- When false, predictions are allowed inside browser URL bars
+local secure_field_filter_enabled = true  -- When false, predictions are allowed inside password/secure fields
 local auto_raise_temperature  = LLM_DEFAULTS.llm_auto_raise_temp
+local is_streaming_enabled       = LLM_DEFAULTS.llm_streaming
+-- When true, partial prediction batches are shown as each sequential variant completes;
+-- when false, the tooltip only appears once the final batch with all predictions is ready
+local is_streaming_multi_enabled = LLM_DEFAULTS.llm_streaming_multi
+-- When true, the debounce is bypassed (delay = 0) when the buffer ends with whitespace,
+-- meaning the user just completed a word and a suggestion can fire immediately
+local instant_on_word_end        = LLM_DEFAULTS.llm_instant_on_word_end
 
 
 
@@ -174,7 +253,14 @@ end
 function M.set_llm_enabled(enabled)
 	is_llm_enabled = (enabled == true)
 	Logger.info(LOG, "LLM %s.", is_llm_enabled and "enabled" or "disabled")
-	if not is_llm_enabled then M.reset() end
+	if not is_llm_enabled then M.reset(); return end
+	-- Pre-load model weights and prime the KV cache for the active profile's system
+	-- prompt; deferred so the rest of the startup sequence settles first
+	if type(active_model) == "string" and active_model ~= "" then
+		hs.timer.doAfter(2, function()
+			pcall(core_llm.warmup_model, active_model, core_llm.get_active_profile())
+		end)
+	end
 end
 
 --- @return boolean
@@ -186,6 +272,13 @@ function M.set_llm_model(model_name)
 	else core_llm.set_llm_model_ollama(model_name) end
 	active_model = model_name
 	Logger.info(LOG, "Model set: '%s' (backend: %s).", tostring(model_name), tostring(backend))
+	-- Trigger a warmup only when LLM is already enabled (avoids spurious requests
+	-- during startup when set_llm_model fires before set_llm_enabled(true))
+	if is_llm_enabled then
+		hs.timer.doAfter(2, function()
+			pcall(core_llm.warmup_model, model_name, core_llm.get_active_profile())
+		end)
+	end
 end
 
 function M.set_llm_display_model_name(name)
@@ -238,9 +331,35 @@ function M.set_llm_auto_raise_temp(v)
 	Logger.debug(LOG, "Auto temperature raise: %s.", auto_raise_temperature and "on" or "off")
 end
 
+function M.set_llm_streaming(v)
+	is_streaming_enabled = (v == true)
+	core_llm.set_llm_streaming(v)
+	Logger.debug(LOG, "Streaming: %s.", is_streaming_enabled and "on" or "off")
+end
+
+function M.set_llm_streaming_multi(v)
+	is_streaming_multi_enabled = (v == true)
+	Logger.debug(LOG, "Streaming multi: %s.", is_streaming_multi_enabled and "on" or "off")
+end
+
+function M.set_llm_instant_on_word_end(v)
+	instant_on_word_end = (v == true)
+	Logger.debug(LOG, "Instant on word end: %s.", instant_on_word_end and "on" or "off")
+end
+
 function M.set_llm_disabled_apps(apps)
 	excluded_apps = apps
 	Logger.debug(LOG, "Excluded apps: %d configured.", type(apps) == "table" and #apps or 0)
+end
+
+function M.set_llm_url_bar_filter_enabled(v)
+	url_bar_filter_enabled = (v ~= false)
+	Logger.debug(LOG, "URL bar filter: %s.", url_bar_filter_enabled and "on" or "off")
+end
+
+function M.set_llm_secure_field_filter_enabled(v)
+	secure_field_filter_enabled = (v ~= false)
+	Logger.debug(LOG, "Secure field filter: %s.", secure_field_filter_enabled and "on" or "off")
 end
 
 --- Accepts either a string ("alt") or a table ({"alt", "cmd"}) for convenience,
@@ -416,20 +535,145 @@ local function reset_llm_dismiss_timer()
 	Logger.debug(LOG, "LLM dismiss timer reset (delay: %gs).", delay)
 end
 
+--- Computes an adaptive debounce delay based on the user's current typing speed.
+--- Fast typing → extend delay (prediction would be stale before it arrives).
+--- Slow/paused → shorten delay (user is thinking, fire sooner).
+--- If the buffer shrank since the last request, the user is still correcting —
+--- keep the full configured delay to avoid sending a broken intermediate state.
+--- @return number The debounce delay in seconds to use for this timer start.
+local function compute_adaptive_debounce()
+	-- Correction guard: never reduce delay while the user is still deleting
+	local cur_len = (_state and type(_state.buffer) == "string") and #_state.buffer or 0
+	if cur_len < _last_request_buffer_len then
+		return inactivity_debounce_sec
+	end
+
+	local ok, stats = pcall(keylogger.get_live_stats)
+	local wpm = (ok and type(stats) == "table") and (tonumber(stats.wpm_physical) or 0) or 0
+
+	if wpm > FAST_TYPING_WPM then
+		return math.min(inactivity_debounce_sec * DEBOUNCE_FAST_MULT, DEBOUNCE_MAX_SEC)
+	elseif wpm > 0 and wpm < SLOW_TYPING_WPM then
+		return math.max(inactivity_debounce_sec * DEBOUNCE_SLOW_MULT, DEBOUNCE_MIN_SEC)
+	end
+	return inactivity_debounce_sec
+end
+
 --- Arms the inactivity debounce timer to fire perform_check() after silence.
---- @param delay_override number|nil Override in seconds; uses inactivity_debounce_sec if nil.
+--- @param delay_override number|nil Override in seconds; uses adaptive debounce if nil.
 local function start_inactivity_timer(delay_override)
 	if not is_llm_enabled or inactivity_debounce_sec < 0 or not _inactivity_timer then return end
 	if delay_override then
 		_inactivity_timer:start(delay_override)
 		Logger.trace(LOG, "Inactivity timer started (override: %.3fs).", delay_override)
 	else
-		_inactivity_timer:start()
-		Logger.trace(LOG, "Inactivity timer started (%.3fs).", inactivity_debounce_sec)
+		local delay = compute_adaptive_debounce()
+		_inactivity_timer:start(delay)
+		Logger.trace(LOG, "Inactivity timer started (adaptive: %.3fs).", delay)
 	end
 end
 
---- Returns true when LLM predictions should be suppressed for the current frontmost app.
+--- Returns the currently focused accessibility element, using the Hammerspoon-correct API.
+--- hs.axuielement.focusedElement() does not exist — the canonical way is to query
+--- AXFocusedUIElement from the application-level accessibility element.
+--- @param front userdata The frontmost hs.application.
+--- @return userdata|nil The focused AX element, or nil on failure.
+local function get_focused_element(front)
+	if not front then return nil end
+	local ok_ax, ax = pcall(hs.axuielement.applicationElementForPID, front:pid())
+	if not ok_ax or not ax then return nil end
+	local ok_fe, focused = pcall(function() return ax:attributeValue("AXFocusedUIElement") end)
+	return (ok_fe and focused) or nil
+end
+
+--- Returns true when the currently focused accessibility element is a secure text field
+--- (e.g. a password input). Works across all applications, not just browsers.
+--- @param front userdata|nil The frontmost hs.application.
+--- @return boolean True if a password/secure field has focus.
+local function is_secure_field_focused(front)
+	if not front then return false end
+	local focused = get_focused_element(front)
+	if not focused then return false end
+	local ok_role, role    = pcall(function() return focused:attributeValue("AXRole") end)
+	local ok_sub,  subrole = pcall(function() return focused:attributeValue("AXSubrole") end)
+	return (ok_role and role    == "AXSecureTextField")
+	    or (ok_sub  and subrole == "AXSecureTextField")
+end
+
+--- Returns true when the currently focused accessibility element is a browser URL bar.
+--- Prevents AI predictions from firing while the user is typing a URL or search query.
+---
+--- Detection strategy (three layers, each more expensive than the last):
+---   1. AXSubrole == "AXURLField" — Safari and native WebKit controls; definitive.
+---   2. AXIdentifier pattern match — Chrome, Brave, Opera; reliable when id is set.
+---   3. Ancestor toolbar check — Edge, Firefox, Arc; no identifier exposed, but a
+---      text field directly inside an AXToolbar in a known browser is always the URL bar.
+---      Only attempted when the frontmost app is a known browser bundle ID.
+---
+--- @param front userdata|nil The frontmost hs.application (passed from the caller to
+---              avoid a redundant frontmostApplication() call).
+--- @return boolean True if a URL-bar-type element has input focus.
+local function is_url_bar_focused(front)
+	if not front then return false end
+	-- Only check known browsers — avoids expensive AX calls for non-browser apps
+	local bid = front:bundleID() or ""
+	if not BROWSER_BUNDLE_IDS[bid] then return false end
+
+	local focused = get_focused_element(front)
+	if not focused then return false end
+
+	-- Only text fields can be URL bars — skip everything else early
+	local ok_role, role = pcall(function() return focused:attributeValue("AXRole") end)
+	if not ok_role or role ~= "AXTextField" then return false end
+
+	-- Layer 1 — Safari / WebKit: AXSubrole is explicitly "AXURLField"
+	local ok_sub, subrole = pcall(function() return focused:attributeValue("AXSubrole") end)
+	if ok_sub and subrole == AX_URL_SUBROLE then return true end
+
+	-- Layer 2 — Chrome / Brave / Opera: AXIdentifier contains a recognisable pattern
+	local ok_id, identifier = pcall(function() return focused:attributeValue("AXIdentifier") end)
+	if ok_id and type(identifier) == "string" and identifier ~= "" then
+		local id_lower = identifier:lower()
+		for _, pattern in ipairs(URL_BAR_ID_PATTERNS) do
+			if id_lower:find(pattern, 1, true) then return true end
+		end
+	end
+
+	-- Layer 3 — Edge / Firefox / Arc: no usable identifier; check the parent hierarchy.
+	-- Walk up two levels: input may be directly in the toolbar (Firefox) or wrapped in
+	-- an AXGroup inside the toolbar (Chromium / Edge omnibox structure).
+	local ok_p, parent = pcall(function() return focused:attributeValue("AXParent") end)
+	if ok_p and parent then
+		local ok_pr, parent_role = pcall(function() return parent:attributeValue("AXRole") end)
+		if ok_pr and parent_role == "AXToolbar" then return true end
+		local ok_gp, grandparent = pcall(function() return parent:attributeValue("AXParent") end)
+		if ok_gp and grandparent then
+			local ok_gr, gp_role = pcall(function() return grandparent:attributeValue("AXRole") end)
+			if ok_gr and gp_role == "AXToolbar" then return true end
+		end
+	end
+
+	return false
+end
+
+--- Returns the application that currently has keyboard focus.
+--- Prefers the app owning the focused window because floating-panel launchers
+--- (e.g. Raycast) accept keyboard input without becoming the macOS frontmost
+--- application — using frontmostApplication() would return the previously
+--- active app and incorrectly inherit its exclusion rules.
+--- @return userdata|nil hs.application object, or nil on failure.
+local function get_focused_app()
+	-- focusedWindow() returns the window with keyboard focus regardless of
+	-- whether its parent app is the NSWorkspace frontmost application
+	local ok_fw, fw = pcall(hs.window.focusedWindow)
+	if ok_fw and fw then
+		local ok_app, app = pcall(function() return fw:application() end)
+		if ok_app and app then return app end
+	end
+	return hs.application.frontmostApplication()
+end
+
+--- Returns true when LLM predictions should be suppressed for the current app.
 --- Checks both the keymap global window ignore list and the bridge per-app exclusion list.
 --- @return boolean True if the active window or app is on an exclusion list.
 local function is_blocked_for_current_app()
@@ -437,7 +681,18 @@ local function is_blocked_for_current_app()
 	if km_utils.is_ignored_window(_state.ignored_window_titles, _state.ignored_window_patterns) then
 		return true
 	end
-	local front = hs.application.frontmostApplication()
+	-- Use the app that owns the focused window, not the macOS frontmost app
+	local front = get_focused_app()
+	-- Password/secure fields in any application
+	if secure_field_filter_enabled and is_secure_field_focused(front) then
+		Logger.debug(LOG, "Secure field focused — LLM request skipped.")
+		return true
+	end
+	-- URL bars (address fields) in browsers: skip when the filter is enabled
+	if url_bar_filter_enabled and is_url_bar_focused(front) then
+		Logger.debug(LOG, "URL bar focused — LLM request skipped.")
+		return true
+	end
 	if not front then return false end
 	local bid  = front:bundleID() or ""
 	local path = front:path() or ""
@@ -466,6 +721,86 @@ end
 -- ======= 5/ LLM Prediction Pipeline =========
 -- ============================================
 -- ============================================
+
+
+--- Returns instant next-word candidates from the keylogger's in-memory word-bigram
+--- index, without any network call. Results are shown immediately while the LLM warms
+--- up and replaced in-place when the real response arrives.
+---
+--- Strategy:
+---   1. Extract the last complete word from the buffer (requires buffer to end with a
+---      word separator — no prediction at mid-word since the partial word constrains the
+---      result space better than bigrams do).
+---   2. Scan every app's w_bg (word-bigram) table for entries of the form "lastword X".
+---   3. Sort by frequency, deduplicate, cap at NGRAM_MAX_PREDS.
+---
+--- @param buffer string The current tracked context buffer.
+--- @return table Array of placeholder prediction objects (same shape as LLM predictions).
+local function ngram_predict(buffer)
+	-- Only meaningful at word boundaries — mid-word completion is the LLM's job
+	if not buffer:match("%s$") then return {} end
+
+	-- Extract the last completed word (skip trailing whitespace)
+	local last_word = buffer:match("(%S+)%s+$")
+	if not last_word or last_word == "" then return {} end
+	last_word = last_word:lower()
+
+	local ok_idx, today_idx = pcall(keylogger.get_ngram_index)
+	if not ok_idx or type(today_idx) ~= "table" then return {} end
+
+	-- Aggregate counts across all apps — more data = better signal, and the
+	-- prediction engine already has the per-app LLM exclusion layer above
+	local counts = {}
+	local prefix = last_word .. " "
+	for _, app_idx in pairs(today_idx) do
+		local w_bg = type(app_idx) == "table" and app_idx.w_bg
+		if type(w_bg) == "table" then
+			for key, entry in pairs(w_bg) do
+				if key:sub(1, #prefix) == prefix and type(entry) == "table" then
+					local next_word = key:sub(#prefix + 1)
+					if next_word ~= "" then
+						counts[next_word] = (counts[next_word] or 0) + (entry.c or 0)
+					end
+				end
+			end
+		end
+	end
+
+	-- Collect candidates above the noise floor
+	local candidates = {}
+	for word, count in pairs(counts) do
+		if count >= NGRAM_MIN_COUNT then
+			table.insert(candidates, { word = word, count = count })
+		end
+	end
+	if #candidates == 0 then return {} end
+
+	table.sort(candidates, function(a, b) return a.count > b.count end)
+
+	local result = {}
+	local seen   = {}
+	for _, c in ipairs(candidates) do
+		if not seen[c.word] and #result < NGRAM_MAX_PREDS then
+			seen[c.word] = true
+			-- Prediction appends a space + word after the cursor (no deletions needed)
+			table.insert(result, {
+				to_type              = " " .. c.word,
+				deletes              = 0,
+				chunks               = {},
+				nw                   = c.word,
+				has_corrections      = false,
+				disable_bold         = true,
+				-- Treated as a stream-placeholder so on_partial_cb and on_success
+				-- both evict it cleanly when real LLM tokens arrive
+				_is_stream_placeholder = true,
+			})
+		end
+	end
+
+	Logger.debug(LOG, "N-gram instant prediction: %d candidate(s) for '%s'.", #result, last_word)
+	return result
+end
+
 
 --- Runs the full LLM prediction pipeline against the current buffer state.
 ---
@@ -522,7 +857,31 @@ function M.perform_check(force_trigger, profile_name)
 		Logger.debug(LOG, "Buffer unchanged — LLM request skipped (freshness).")
 		return
 	end
-	last_buffer_signature = signature
+	last_buffer_signature    = signature
+	_last_request_buffer_len = #buffer
+
+	-- Pre-build a model/backend info bar for use during streaming and n-gram display.
+	-- elapsed_ms is omitted here (stream not yet complete); on_success will replace this
+	-- with the version that includes round-trip latency once the final batch arrives.
+	local active_profile_now   = core_llm.get_active_profile()
+	local display_profile_now  = profile_name or (active_profile_now and active_profile_now.label)
+	local streaming_info_bar   = show_info_bar
+		and build_info_bar_text(llm_display_name or core_llm.get_current_model(), nil, resolve_backend_label(), display_profile_now)
+		or nil
+
+	-- N-gram instant prediction (#4): show a local word-bigram candidate immediately
+	-- (< 1 ms) while the async LLM request is in flight. It is a stream-placeholder so
+	-- it gets evicted cleanly when the first streaming token or final on_success arrives.
+	local ngram_preds = ngram_predict(buffer)
+	if #ngram_preds > 0 then
+		pending_predictions = ngram_preds
+		predictions_visible = true
+		tooltip.show_predictions(
+			ngram_preds, 1, is_ai_preview_enabled, streaming_info_bar,
+			nil, prediction_indent, normalize_mods(navigation_mods),
+			tooltip.tint("ai_prediction"), "…", math.max(#ngram_preds, num_predictions)
+		)
+	end
 
 	-- Build request parameters
 	local model_to_use    = core_llm.get_current_model()
@@ -542,11 +901,43 @@ function M.perform_check(force_trigger, profile_name)
 		Logger.debug(LOG, "Temperature raised to %.2f for %d predictions.", req_temperature, num_preds)
 	end
 
+	-- Greedy decoding for single prediction: with only one variant requested, sampling
+	-- adds noise without any diversity benefit — forcing temp=0 enables deterministic
+	-- greedy decoding and avoids the softmax+sample step on the backend.
+	if num_preds == 1 and not auto_raise_temperature and req_temperature <= GREEDY_TEMP_THRESHOLD then
+		req_temperature = 0
+		Logger.debug(LOG, "Single prediction: greedy decoding applied (temp → 0).")
+	end
+
+	-- Dynamic context cap: keep only enough history to predict max_words output tokens.
+	-- Short predictions don't benefit from long context; trimming the prefix cuts prefill
+	-- time and reduces TTFT proportionally without affecting prediction quality.
+	local context_buffer
+	if max_words > 0 then
+		local effective_context_chars = math.min(
+			#buffer,
+			math.max(CONTEXT_MIN_CHARS, max_words * CONTEXT_CHARS_PER_WORD)
+		)
+		context_buffer = buffer:sub(-effective_context_chars)
+	else
+		context_buffer = buffer
+	end
+
 	Logger.start(LOG, "LLM request — model: '%s' | temp: %.2f | %d pred(s) | max tokens: %d.",
 		tostring(model_to_use), req_temperature, num_preds, max_tokens)
 
-	-- Show the loading indicator immediately for snappy visual feedback
-	tooltip.show("⏳ Génération en cours…", true, is_ai_preview_enabled, tooltip.tint("ai_loading"))
+	-- Loading indicator: only shown when nothing is already on screen (n-gram placeholder
+	-- or previous LLM predictions). Avoids the blank gap that the spinner creates —
+	-- existing content stays visible and is replaced in-place when new predictions arrive.
+	if not predictions_visible then
+		tooltip.show_loading("⏳ Génération en cours…", is_ai_preview_enabled, tooltip.tint("ai_loading"))
+	else
+		-- Mark any finalized predictions as placeholders so on_partial_cb evicts them
+		-- cleanly when streaming tokens start arriving, without needing to hide the tooltip.
+		for _, p in ipairs(pending_predictions) do
+			p._is_stream_placeholder = true
+		end
+	end
 
 	-- Bump counters to discard any in-flight callbacks that are now stale
 	llm_request_counter   = llm_request_counter + 1
@@ -567,9 +958,120 @@ function M.perform_check(force_trigger, profile_name)
 			tooltip.tint("ai_prediction"), nil, #pending_predictions)
 	end)
 
+	-- Shared noise gate used by both the streaming partial path and the final on_success
+	-- filter — keeps both in lockstep so no hallucination ever appears during streaming
+	-- that the final filter would later remove
+	local function is_noise_pred(to_type)
+		if not to_type or to_type:gsub("[%s%.…]", "") == "" then return true end
+		local text_lower = to_type:lower()
+		local prev_char  = buffer:match(".*(%S)")
+		local first_ch   = to_type:match("^%s*(.)") or ""
+		local ends_sent  = prev_char and prev_char:match("[%.%!%?…:;]") ~= nil
+		return (text_lower:match("^%s*suite%s+finale") ~= nil)
+			or (text_lower:match("^%s*</") ~= nil)
+			or (text_lower:match("^%s*vous avez besoin de plus") ~= nil)
+			or (text_lower:match("^%s*vous etes les plus") ~= nil)
+			or (text_lower:match("^%s*vous%s") ~= nil and buffer:lower():match("vous") == nil)
+			or (first_ch:match("[A-Z]") ~= nil and not ends_sent)
+			or (to_type:find(":", 1, true) ~= nil)
+	end
+
+	-- When streaming is enabled AND multi-streaming is on, parse each partial accumulation through
+	-- the full pipeline (so TAIL_CORRECTED/NEXT_WORDS labels are stripped), apply the same noise
+	-- filters as on_success, then display as a single orange block (nw color, no diff markup).
+	-- Diff coloring is applied only once the final result arrives via on_success.
+	-- When multi-streaming is off ("all at once" mode), the partial callback is suppressed entirely
+	-- so no tokens appear before the final batch — streaming and all-at-once are mutually exclusive.
+	local on_partial_cb = (is_streaming_enabled and is_streaming_multi_enabled) and function(partial_raw)
+		-- Discard if superseded by a newer request
+		if fetch_request_counter ~= my_fetch_id then return end
+		if type(partial_raw) ~= "string" or partial_raw:gsub("%s", "") == "" then return end
+		-- Strip any partial thinking block before attempting to parse
+		local stripped = Parser.strip_thinking(partial_raw)
+		if not stripped or stripped:gsub("%s", "") == "" then return end
+		-- Split on === to handle batch mode (all predictions in one prompt, separated by ===).
+		-- In single-prediction mode this returns one block; in batch mode each completed
+		-- block is a separate prediction. The last block is still streaming and may fail
+		-- to parse — that's fine, earlier complete blocks are shown immediately so the
+		-- user sees the tooltip fill line by line as each prediction is generated.
+		local raw_blocks = {}
+		for b in (stripped .. "==="):gmatch("(.-)===") do
+			local clean = b:gsub("^%s+", ""):gsub("%s+$", "")
+			if clean ~= "" then table.insert(raw_blocks, clean) end
+		end
+		if #raw_blocks == 0 then table.insert(raw_blocks, stripped) end
+
+		-- Parse each block; apply the same noise gate as on_success; build stream preds
+		local stream_preds = {}
+		for _, block_text in ipairs(raw_blocks) do
+			local ok_b, pred_b = pcall(Parser.process_prediction, buffer, tail, block_text)
+			if ok_b and pred_b and not is_noise_pred(pred_b.to_type) then
+				local display = (type(pred_b.nw) == "string" and pred_b.nw ~= "" and pred_b.nw)
+					or pred_b.to_type
+				if display and display:gsub("%s", "") ~= "" then
+					table.insert(stream_preds, {
+						to_type              = pred_b.to_type,
+						deletes              = pred_b.deletes,
+						chunks               = {},
+						nw                   = display,
+						has_corrections      = false,
+						disable_bold         = true,
+						_is_stream_placeholder = true,
+					})
+				end
+			end
+		end
+		if #stream_preds == 0 then return end
+
+		-- Preserve finalized predictions (non-placeholder) so earlier variants stay in
+		-- their slots while later ones are still streaming
+		local new_preds = {}
+		for _, p in ipairs(pending_predictions) do
+			if not p._is_stream_placeholder then
+				table.insert(new_preds, p)
+			end
+		end
+		-- Dedup stream preds against finalized and against each other so a duplicate
+		-- never appears as a separate slot (which would disappear at finalization)
+		local seen_to_type = {}
+		for _, fp in ipairs(new_preds) do
+			if fp.to_type and fp.to_type ~= "" then seen_to_type[fp.to_type] = true end
+		end
+		for _, sp in ipairs(stream_preds) do
+			local k = sp.to_type or ""
+			if k == "" or not seen_to_type[k] then
+				if k ~= "" then seen_to_type[k] = true end
+				table.insert(new_preds, sp)
+			end
+		end
+		pending_predictions = new_preds
+		predictions_visible = true
+		-- Keep cursor at its current position (or slot 1 at start); the streaming slot
+		-- is visible in its own slot but never forces the selection away from slot 1.
+		-- Always reserve num_preds slots with "…" for empty ones so the tooltip height
+		-- stays constant throughout generation instead of growing slot by slot.
+		local current = tooltip.get_current_index()
+		local display_idx = (current and math.min(math.max(1, current), #new_preds)) or 1
+		-- streaming_info_bar (no elapsed_ms yet) keeps the model label visible
+		-- while tokens arrive; on_success final will replace it with latency included
+		tooltip.show_predictions(
+			new_preds, display_idx, is_ai_preview_enabled, streaming_info_bar,
+			nil, prediction_indent, normalize_mods(navigation_mods),
+			tooltip.tint("ai_prediction"), "…", num_preds
+		)
+	end or nil
+
 	core_llm.fetch_llm_prediction(
-		buffer, tail, model_to_use, req_temperature, max_tokens, num_preds,
-		function(raw_predictions, elapsed_ms, is_final)
+		context_buffer, tail, model_to_use, req_temperature, max_tokens, num_preds,
+		function(raw_predictions, elapsed_ms, is_final, is_batch_progressive)
+			-- LLM responded — reset the persistent-failure counter regardless of content
+			_consecutive_llm_failures = 0
+
+			-- Suppress intermediate batches unless streaming_multi is on or this is a
+			-- batch progressive reveal (fetch_batch emits these for streaming=OFF mode so
+			-- each prediction appears complete one by one rather than all at once)
+			if not is_final and not is_streaming_multi_enabled and not is_batch_progressive then return end
+
 			-- Discard if a newer request superseded this one while we were waiting
 			if fetch_request_counter ~= my_fetch_id then
 				Logger.debug(LOG, "Stale LLM callback ignored (expected fetch_id=%d, current=%d).",
@@ -593,23 +1095,9 @@ function M.perform_check(force_trigger, profile_name)
 				for k, v in pairs(raw_pred) do pred[k] = v end
 
 				if pred.to_type then
-					local text       = pred.to_type
-					local text_lower = text:lower()
-					local prev_char  = buffer:match(".*(%S)")
-					local first_ch   = text:match("^%s*(.)") or ""
-					local ends_sent  = prev_char and prev_char:match("[%.%!%?…:;]") ~= nil
+					local text = pred.to_type
 
-					-- Heuristic noise filter: discard common LLM hallucinations and artifacts
-					local is_noise = text_lower:match("^%s*suite%s+finale")
-						or text_lower:match("^%s*</")
-						or text_lower:match("^%s*vous avez besoin de plus")
-						or text_lower:match("^%s*vous etes les plus")
-						or (text_lower:match("^%s*vous%s") and not buffer:lower():match("vous"))
-						or (first_ch:match("[A-Z]") and not ends_sent)
-						or text:find(":", 1, true) ~= nil
-
-					if text:gsub("[%s%.…]", "") ~= ""
-						and not is_noise
+					if not is_noise_pred(text)
 						and tooltip.make_diff_styled(pred.chunks, pred.nw)
 					then
 						local key = build_dedup_key(pred)
@@ -621,22 +1109,38 @@ function M.perform_check(force_trigger, profile_name)
 				end
 			end
 
-			-- ── Streaming merge: blend new batch with what is already on screen ──
-			-- Preserves predictions the user can see while progressively enriching the list
-			if predictions_visible and #pending_predictions > 0 then
-				local merged, merged_keys = {}, {}
-				for _, existing in ipairs(pending_predictions) do
-					local k = build_dedup_key(existing)
-					if k == "" or not merged_keys[k] then
-						if k ~= "" then merged_keys[k] = true end
-						table.insert(merged, existing)
-					end
+			-- ── Evict streaming placeholders left by on_partial_cb ────────────────
+			-- on_partial_cb inserts _is_stream_placeholder entries so finalized slots
+			-- are preserved across streaming calls. Finalized results (arriving here)
+			-- always supersede them, so they must be removed before the merge to prevent
+			-- ghost entries from accumulating and causing slot-count jumps at the end.
+			for i = #pending_predictions, 1, -1 do
+				if pending_predictions[i] and pending_predictions[i]._is_stream_placeholder then
+					table.remove(pending_predictions, i)
 				end
+			end
+
+			-- ── Streaming merge: blend new batch with what is already on screen ──
+			-- valid_preds leads (authoritative order from backend); pending_predictions
+			-- fills in only what the new batch has not yet superseded, so already-visible
+			-- slots stay occupied while remaining variants are still loading.
+			-- Skipped on the final batch so streaming placeholders are always fully replaced.
+			if not is_final and predictions_visible and #pending_predictions > 0 then
+				local merged, merged_keys = {}, {}
+				-- New batch first — defines order and replaces any streaming placeholders
 				for _, new_pred in ipairs(valid_preds) do
 					local k = build_dedup_key(new_pred)
 					if k == "" or not merged_keys[k] then
 						if k ~= "" then merged_keys[k] = true end
 						table.insert(merged, new_pred)
+					end
+				end
+				-- Append still-pending items not yet in this batch (avoids empty slots)
+				for _, existing in ipairs(pending_predictions) do
+					local k = build_dedup_key(existing)
+					if k == "" or not merged_keys[k] then
+						if k ~= "" then merged_keys[k] = true end
+						table.insert(merged, existing)
 					end
 				end
 				valid_preds = merged
@@ -692,13 +1196,51 @@ function M.perform_check(force_trigger, profile_name)
 			if is_final then reset_llm_dismiss_timer() end
 		end,
 		function()
-			-- LLM failure callback: hide the loading indicator only if no predictions are shown yet
-			if fetch_request_counter == my_fetch_id and not predictions_visible then
-				Logger.error(LOG, "LLM request failed — loading indicator dismissed.")
+			if fetch_request_counter ~= my_fetch_id then return end
+
+			-- Track consecutive failures to detect persistent issues (e.g. server
+			-- crashed, still loading weights, or misconfigured endpoint)
+			_consecutive_llm_failures = _consecutive_llm_failures + 1
+			if _consecutive_llm_failures >= CONSECUTIVE_FAIL_WARN_THRESHOLD then
+				_consecutive_llm_failures = 0  -- Reset so the notification is not spammed
+				if core_llm.get_backend() == "mlx" then
+					Logger.warn(LOG, "Repeated MLX failures (%d consecutive) — server may be down or misconfigured.",
+						CONSECUTIVE_FAIL_WARN_THRESHOLD)
+					pcall(function()
+						hs.notify.new(nil, {
+							title            = "Prédictions LLM — Échecs répétés",
+							informativeText  = "Le serveur MLX ne répond pas. Vérifiez que le modèle est bien chargé et que le serveur tourne sur le port 8080.",
+							alwaysPresent    = false,
+							autoWithdraw     = true,
+						}):send()
+					end)
+				end
+			end
+
+			if not predictions_visible then
+				-- Nothing on screen: dismiss the loading spinner entirely.
+				-- WARN (not ERROR) so the notify module does not pop a system notification on every
+				-- failure — LLM failures are expected during warm-up or model loading.
+				Logger.warn(LOG, "LLM request failed — loading indicator dismissed.")
 				tooltip.hide()
+			else
+				-- N-gram (or prior) predictions are already on screen — the spinner "…"
+				-- placeholder is still in the last slot. Remove it so the tooltip looks
+				-- finalized and start the auto-dismiss countdown.
+				Logger.warn(LOG, "LLM request failed — n-gram placeholder retained, loading text cleared.")
+				local val_shortcut  = format_validation_shortcut(normalize_mods(validation_mods))
+				local nav_mods_norm = normalize_mods(navigation_mods)
+				local selected_idx  = math.max(1, tooltip.get_current_index() or 1)
+				tooltip.show_predictions(
+					pending_predictions, selected_idx, is_ai_preview_enabled, nil,
+					val_shortcut, prediction_indent, nav_mods_norm,
+					tooltip.tint("ai_prediction"), nil, #pending_predictions
+				)
+				reset_llm_dismiss_timer()
 			end
 		end,
-		sequential_mode, force_trigger, function() return fetch_request_counter end
+		sequential_mode, force_trigger, function() return fetch_request_counter end,
+		on_partial_cb
 	)
 end
 
@@ -712,15 +1254,18 @@ function M.reset()
 		keylogger.log_llm_dismissed(nil, pending_predictions)
 	end
 
-	pending_predictions   = {}
-	predictions_visible   = false
-	last_buffer_signature = nil
-	llm_request_counter   = llm_request_counter + 1
-	fetch_request_counter = fetch_request_counter + 1
+	pending_predictions        = {}
+	predictions_visible        = false
+	last_buffer_signature      = nil
+	llm_request_counter        = llm_request_counter + 1
+	fetch_request_counter      = fetch_request_counter + 1
+	_consecutive_llm_failures  = 0
 
 	tooltip.hide()
 	stop_inactivity_timer()
 	if _stream_watchdog_timer then _stream_watchdog_timer:stop() end
+	-- Cancel any in-flight streaming curl task so it doesn't fire stale callbacks
+	if is_streaming_enabled then pcall(core_llm.cancel_streaming) end
 
 	if was_visible then
 		Logger.debug(LOG, "Predictions cleared (were visible).")
@@ -795,9 +1340,24 @@ function M.start_timer(delay_override)
 	start_inactivity_timer(delay_override)
 end
 
+--- Arms the inactivity timer after a completed word (buffer ends with whitespace).
+--- When instant_on_word_end is enabled, bypasses the debounce entirely (delay = 0)
+--- so the prediction fires as soon as the word boundary is detected.
+function M.start_timer_word_end()
+	if instant_on_word_end then
+		start_inactivity_timer(0)
+	else
+		start_inactivity_timer()
+	end
+end
+
 --- Cancels the inactivity timer without firing the LLM check.
+--- Also terminates any in-flight streaming task: the GPU should not keep generating
+--- tokens for a request that is now stale. Without this, a new request queues behind
+--- the old curl process and the perceived TTFT is (old generation remaining) + (new TTFT).
 function M.stop_timer()
 	stop_inactivity_timer()
+	core_llm.cancel_streaming()
 end
 
 --- Consumes the F20 chain signal if a chain is pending.

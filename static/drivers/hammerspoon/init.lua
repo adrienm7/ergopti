@@ -64,12 +64,25 @@ end
 
 local gestures           = require("modules.gestures")
 local keymap             = require("modules.keymap")
+-- Expose keymap in the global table so the Hammerspoon console can call
+-- keymap.perf_report_all() / perf_enable() / perf_reset() without
+-- having to type out require("modules.keymap") each time.
+_G.keymap = keymap
 local shortcuts          = require("modules.shortcuts")
 local dynamic_hotstrings = require("modules.dynamic_hotstrings")
+local karabiner          = require("modules.karabiner")
 local menu               = require("ui.menu")
 local hotstring_editor   = require("ui.hotstring_editor")
 local mlx_deps_checker   = require("lib.mlx_deps_checker")
 local notifications      = require("lib.notifications")
+local ui_restore         = require("lib.ui_restore")
+
+-- Wire Logger.error → system notification so every ERROR surfaces to the user
+-- without any module needing to call notifications.notify() directly.
+-- Registered here (after notifications is loaded) to keep logger dependency-free.
+Logger.set_error_notification_handler(function(module_name, message)
+	pcall(notifications.notify, "⚠️ Erreur — " .. tostring(module_name), message)
+end)
 
 
 
@@ -237,14 +250,21 @@ table.sort(remaining)
 for _, fname in ipairs(remaining) do table.insert(toml_fnames, fname) end
 
 local hotfiles = {}
+-- Defer sorting for the entire startup load: TOML files, dynamic hotstrings, and the
+-- custom group all feed into the same mappings list. A single flush_sort() at the end
+-- of section 5 collapses what used to be 8+ full O(N log N) passes into one.
+keymap.defer_sort()
+local _toml_load_t0 = hs.timer.secondsSinceEpoch()
 for _, fname in ipairs(toml_fnames) do
 	local name = fname:match("^(.-)%.toml$")
 	Logger.debug(LOG, string.format("Loading TOML file: %s…", name))
 	keymap.load_toml(name, hotstrings_dir .. fname)
 	table.insert(hotfiles, name)
 end
-
-Logger.info(LOG, string.format("Loaded TOML hotstring files: %d files.", #toml_fnames))
+-- Visible at INFO so anyone watching the console can correlate launch time
+-- with TOML volume without having to enable perf sampling explicitly.
+Logger.info(LOG, string.format("Loaded %d TOML hotstring file(s) in %.1fms.",
+	#toml_fnames, (hs.timer.secondsSinceEpoch() - _toml_load_t0) * 1000))
 
 
 
@@ -255,8 +275,6 @@ Logger.info(LOG, string.format("Loaded TOML hotstring files: %d files.", #toml_f
 -- ======= 5/ Post-load Hooks =======
 -- ==================================
 -- ==================================
-
-keymap.sort_mappings()
 
 -- Start the dynamic hotstrings module which handles personal info internally
 Logger.debug(LOG, "Starting dynamic hotstrings module…")
@@ -271,14 +289,20 @@ Logger.debug(LOG, "Initializing custom hotstrings…")
 -- ===== 5.1) Custom Hotstrings =====
 -- ==================================
 
--- Stored alongside config.json so it is easy to .gitignore independently
--- The file is created automatically if it does not exist yet
+-- Personal hotstrings are now stored in hotstrings/personal.toml, shared with
+-- the AHK driver. The file is created automatically if it does not exist yet.
 do
-	local custom_path = base_dir .. "custom.toml"
-	hotstring_editor.init(custom_path, keymap)
-	keymap.load_toml("custom", custom_path)
-	table.insert(hotfiles, "custom")
+	local personal_path = base_dir .. "../hotstrings/personal.toml"
+	hotstring_editor.init(personal_path, keymap)
+	keymap.load_toml("personal", personal_path)
+	table.insert(hotfiles, "personal")
 end
+
+-- Single final sort covering TOML + dynamic + custom groups.
+local _sort_t0 = hs.timer.secondsSinceEpoch()
+keymap.flush_sort()
+Logger.info(LOG, string.format("Final mapping sort completed in %.1fms.",
+	(hs.timer.secondsSinceEpoch() - _sort_t0) * 1000))
 
 
 
@@ -290,17 +314,31 @@ end
 -- =============================
 -- =============================
 
+-- Initialize the Karabiner bridge (starts trackpad watcher + loads feature flags)
+-- The module self-resolves its directory at load time — no path argument needed
+karabiner.init()
+
 Logger.debug(LOG, "Starting user interface components…")
 menu.start(
 	base_dir, hotfiles, gestures,
-	keymap, dynamic_hotstrings, module_sections
+	keymap, dynamic_hotstrings, module_sections,
+	karabiner
 )
 
 -- Script control is now managed through the shortcuts module
 Logger.debug(LOG, "Starting script control engine…")
-shortcuts.start_script_control(keymap, shortcuts, gestures)
+shortcuts.start_script_control(keymap, shortcuts, gestures, karabiner)
 
 Logger.info(LOG, "User interface initialized successfully.")
+
+
+
+-- =======================================
+-- ===== 6.1) Post-reload UI Restore =====
+-- =======================================
+
+-- Reopen any UIs that were open before the last file-watcher-triggered reload
+ui_restore.restore()
 
 
 
@@ -321,8 +359,13 @@ do
 	local function schedule_reload(msg)
 		if reload_timer then reload_timer:stop() end
 		reload_timer = hs.timer.doAfter(0.5, function()
-			pcall(notifications.notify, "Hammerspoon", msg or "Fichiers modifiés — rechargement…")
-			hs.reload()
+			ui_restore.defer_reload(function()
+				-- snapshot() is a safety net for any UI still open at reload time;
+				-- under normal deferral they are already closed so it saves nothing
+				ui_restore.snapshot()
+				pcall(notifications.notify, "Hammerspoon", msg or "Fichiers modifiés — rechargement…")
+				hs.reload()
+			end)
 		end)
 	end
 
@@ -344,7 +387,8 @@ do
 	dir_watcher:start()
 	table.insert(_G.script_watchers, dir_watcher)
 
-	-- Catches modifications on Lua and UI scripts (HTML, JS, CSS) for auto-reload
+	-- HTML/CSS/JS are webview assets loaded at open-time — only .lua changes
+	-- drive Hammerspoon runtime behavior and warrant a reload
 	Logger.debug(LOG, "Configuring file watchers for auto-reloading…")
 	local project_watcher = hs.pathwatcher.new(base_dir, function(paths)
 		for _, p in ipairs(paths) do
@@ -352,8 +396,9 @@ do
 			if p:find("^/tmp/") or p:find("hs_hf_token_") or p:find("hs_hf_login_") then
 				return
 			end
-			if p:match("%.lua$") or p:match("%.html$") or p:match("%.css$") or p:match("%.js$") then
-				schedule_reload("Interface ou script modifié — rechargement…")
+			if p:match("%.lua$") then
+				Logger.debug(LOG, "Lua file change detected: %s", p)
+				schedule_reload("Script modifié — rechargement…")
 				return
 			end
 		end
@@ -396,6 +441,9 @@ hs.shutdownCallback = function()
 	else
 		Logger.warn(LOG, "restore_all_overrides indisponible — arrêt sans restauration")
 	end
+	-- Terminate any running MLX server process so no orphaned Python process lingers
+	-- after Hammerspoon exits. The require is cached, so this has no startup overhead.
+	pcall(function() require("ui.menu.menu_llm").stop_mlx_server() end)
 	Logger.info(LOG, "Hammerspoon arrêté")
 end
 

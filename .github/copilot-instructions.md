@@ -121,7 +121,7 @@ These rules were established to reach the level of professionalism demonstrated 
 
 ### 5.1 No Magic Numbers
 
-Every literal value with non-obvious meaning MUST be a named constant. Group all constants at the **top of the file** (Section 1) with an explanatory comment for each. This includes timeouts, keycodes, ratios, thresholds, frame rates, buffer sizes — anything that is not self-evidently `0`, `1`, or `true`/`false`.
+Every literal value with non-obvious meaning MUST be a named constant. Group all constants at the **top of the file** (Section 1) with an explanatory comment for each. This includes timeouts, keycodes, ratios, thresholds, frame rates, buffer sizes, **colors** (e.g. `{red = 1, green = 0.85, blue = 0}`) — anything that is not self-evidently `0`, `1`, or `true`/`false`.
 
 ```lua
 -- Bad
@@ -266,7 +266,55 @@ function M.start()
 end
 ```
 
-## 6. Language-Specific Guidelines
+## 6. Git & Commit Conventions
+
+- **Format:** All commits MUST follow the [Conventional Commits](https://www.conventionalcommits.org/) specification.
+- **Language:** Commit messages are always written in **English** (developer-facing, like logs).
+- **No co-author credits:** Never add `Co-Authored-By` trailers. Do not credit any LLM or tool in commit messages.
+- **Linear history:** The `main` and `dev` branches must always have a perfectly linear history. This means:
+  - **Never use merge commits** (`git merge`) when integrating a feature or fix branch. Always use `git merge --squash` followed by a single conventional commit, or rebase the branch before merging.
+  - **Squash on merge:** When a feature/fix branch is ready to land, squash all its commits into one clean conventional commit. The commit message must summarise the entire change set, not enumerate the squashed commits.
+  - **No `Merge branch '…'` lines** in the history of `main` or `dev`.
+
+### 6.1) Commit Types
+
+| Type | When to use |
+|---|---|
+| `feat` | New feature or user-visible behaviour |
+| `fix` | Bug fix |
+| `perf` | Performance improvement with no behaviour change |
+| `refactor` | Code restructuring with no behaviour change |
+| `style` | Formatting, whitespace, naming — no logic change |
+| `docs` | Documentation only |
+| `test` | Adding or updating tests |
+| `chore` | Build scripts, tooling, CI, dependency updates |
+
+### 6.2) Format Rules
+
+```
+<type>(<optional scope>): <short imperative description>
+
+<optional body — explain WHY, not WHAT>
+```
+
+- Subject line: lowercase, imperative mood, no trailing period, ≤ 72 chars.
+- Body: wrap at 72 chars, focus on motivation and context, not implementation details.
+- Breaking changes: append `!` after the type (`feat!:`) and document in the body.
+
+**Examples:**
+
+```
+feat(keymap): add per-group delay multiplier for complex keystrokes
+
+perf(keymap): run terminator expansions synchronously in HID callback
+
+fix(llm): prevent stale callbacks from updating the tooltip after reset
+
+refactor(keylogger): extract flush logic into dedicated log_manager module
+```
+
+
+## 7. Language-Specific Guidelines
 
 ### JavaScript / SvelteKit (`.js`, `.svelte`)
 

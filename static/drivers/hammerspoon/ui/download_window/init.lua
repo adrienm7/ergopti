@@ -157,6 +157,29 @@ end
 -- =============================
 -- =============================
 
+--- Returns true when the download window is currently open.
+--- @return boolean True if the webview is alive.
+function M.is_active()
+	return _wv ~= nil
+end
+
+--- Brings the download window to the front and focuses it.
+--- Safe to call even when no window is open (no-op in that case).
+function M.focus()
+	if not _wv then return end
+	-- bringToFront raises the webview above all other windows
+	if type(_wv.bringToFront) == "function" then
+		pcall(function() _wv:bringToFront(true) end)
+	end
+	-- makeFirstResponder ensures keyboard events reach the window
+	if type(_wv.hswindow) == "function" then
+		local win = _wv:hswindow()
+		if win and type(win.focus) == "function" then
+			pcall(function() win:focus() end)
+		end
+	end
+end
+
 --- Hides and destroys the download window.
 function M.hide()
     _is_hiding = true
@@ -275,8 +298,9 @@ end
 --- @param pct_str string|number Percentage complete.
 --- @param bytes_done number Bytes downloaded so far.
 --- @param bytes_total number Total bytes expected.
---- @param raw_line string The raw log line from Ollama to display.
-function M.update(pct_str, bytes_done, bytes_total, raw_line)
+--- @param raw_line string The raw log line from the download process to display.
+--- @param python_file_count number|nil Authoritative completed-file count from the Python watcher.
+function M.update(pct_str, bytes_done, bytes_total, raw_line, python_file_count)
     if not _wv then return end
     
     local pct = tonumber(pct_str) or 0
@@ -367,6 +391,20 @@ function M.update(pct_str, bytes_done, bytes_total, raw_line)
         end
     elseif M._last_file_count then
         file_count_str = M._last_file_count
+    end
+
+    -- The Python size-watcher emits __FILECOUNT__:N as (completed_weights + 1), i.e. the
+    -- 1-based index of the file currently being downloaded. Anti-regression: never go backwards.
+    if type(python_file_count) == "number" and python_file_count > 0 then
+        local display_count = python_file_count
+        local total_files   = M._total_files
+        if total_files and display_count > total_files then display_count = total_files end
+        local last_a = M._last_file_count and tonumber(M._last_file_count:match("^(%d+)")) or -1
+        if display_count > last_a then
+            local total_str = total_files and tostring(total_files) or "?"
+            file_count_str = tostring(display_count) .. "/" .. total_str
+            M._last_file_count = file_count_str
+        end
     end
 
     -- Cap at 99% during download: 100% is reserved exclusively for done()

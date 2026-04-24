@@ -50,8 +50,15 @@ M.DEFAULT_STATE = {
 	-- Bridge behavioral flags (read by llm_bridge, overridden by menu_llm at startup)
 	llm_reset_on_nav      = true,
 	llm_after_hotstring   = false,
-	llm_auto_raise_temp   = false,  -- Incrementally raise temperature for each extra prediction
+	llm_auto_raise_temp   = false, -- Incrementally raise temperature for each extra prediction
+	llm_streaming             = true,  -- Token-by-token streaming
+	llm_streaming_multi       = true,  -- Show predictions as they arrive when num_predictions > 1 (otherwise wait for all to complete before showing any)
+	llm_instant_on_word_end   = true,  -- Fire the LLM immediately when the buffer ends with whitespace (word just completed)
 }
+
+-- Single source of truth for the streaming flag; backends receive it as a parameter
+-- on each fetch call so they hold no state of their own for this flag
+local _streaming_enabled = M.DEFAULT_STATE.llm_streaming
 
 local CoreState = {
 	active_profile_id      = M.DEFAULT_STATE.llm_active_profile,
@@ -117,13 +124,26 @@ function M.auto_detect_backend(callback)
 	end)
 end
 
---- Pre-warms API connections to reduce first-request latency (async, non-blocking).
+--- Pre-warms TCP connections to both backends (async, non-blocking).
+--- This establishes the loopback socket but does NOT load the model into GPU memory.
+--- Call warmup_model() separately once the model name is known.
 function M.warm_up_connections()
 	pcall(function()
-		-- Parallel async pings to backends (fire-and-forget)
+		-- Parallel async pings to both backends (fire-and-forget)
 		hs.http.asyncGet("http://127.0.0.1:11434/api/version", {}, function() end)
-		hs.http.asyncGet("http://127.0.0.1:8080/v1/models", {}, function() end)
+		hs.http.asyncGet("http://127.0.0.1:8080/v1/models",   {}, function() end)
 	end)
+end
+
+--- Primes the backend model and its KV cache with the active profile's system prompt.
+--- Must be called after both model and profile are configured; runs async so it does
+--- not block the caller.
+--- @param model_name string The backend-specific model identifier.
+--- @param profile table|nil The active profile object; omit to use a minimal ping.
+function M.warmup_model(model_name, profile)
+	if type(model_name) ~= "string" or model_name == "" then return end
+	local resolved_profile = profile or M.get_active_profile()
+	pcall(function() get_api().warmup(model_name, resolved_profile) end)
 end
 
 -- Defer backend detection entirely off the synchronous init path
@@ -138,12 +158,32 @@ function M.get_active_profile()
 	return Profiles.get_active_profile(CoreState.active_profile_id, CoreState.user_profiles)
 end
 
---- Updates the active profile ID and logic state.
+--- Updates the active profile ID and re-primes the KV cache for the new profile's
+--- system prompt so the first request after a profile switch benefits from the cache.
 --- @param id string The ID of the profile to activate.
 function M.set_active_profile(id)
-	if type(id) == "string" then
-		CoreState.active_profile_id = id
+	if type(id) ~= "string" then return end
+	CoreState.active_profile_id = id
+	-- Re-prime the KV cache: the new profile may have a different static prompt prefix
+	local model = M.get_current_model()
+	if type(model) == "string" and model ~= "" then
+		local new_profile = M.get_active_profile()
+		hs.timer.doAfter(0, function() pcall(M.warmup_model, model, new_profile) end)
 	end
+end
+
+--- Enables or disables token-by-token streaming.
+--- The flag is stored here and passed to backends at dispatch time — no backend state.
+--- @param v boolean True to enable streaming, false to disable.
+function M.set_llm_streaming(v)
+	_streaming_enabled = (v == true)
+	Logger.debug(LOG, "Streaming: %s.", _streaming_enabled and "on" or "off")
+end
+
+--- Cancels the in-flight streaming task on the active backend, if any.
+--- Called when a new request supersedes the current stream.
+function M.cancel_streaming()
+	pcall(function() get_api().cancel_streaming() end)
 end
 
 --- Sets the active LLM backend identifier.
@@ -271,8 +311,9 @@ end
 --- @param sequential_mode boolean Flag to enforce sequential API requests instead of parallel.
 --- @param force boolean If true, bypasses application exclusions.
 --- @param request_id_provider function Callback returning the current request identifier.
+--- @param on_partial function|nil Optional token-by-token streaming callback.
 function M.fetch_llm_prediction(full_text, tail_text, model_name, temperature,
-                                  max_predict, num_predictions, on_success, on_fail, sequential_mode, force, request_id_provider)
+                                  max_predict, num_predictions, on_success, on_fail, sequential_mode, force, request_id_provider, on_partial)
 
 	-- Prevent firing requests if the active application is blacklisted by user settings
 	if not force then
@@ -299,12 +340,12 @@ function M.fetch_llm_prediction(full_text, tail_text, model_name, temperature,
 
 	if type(profile) == "table" and (not profile.batch) then
 		if num_predictions > 1 and not sequential_mode then
-			api.fetch_parallel(full_text, tail_text, model_name, temperature, max_predict, num_predictions, profile, on_success, on_fail, request_id_provider)
+			api.fetch_parallel(full_text, tail_text, model_name, temperature, max_predict, num_predictions, profile, on_success, on_fail, request_id_provider, _streaming_enabled, on_partial)
 		else
-			api.fetch_sequential(full_text, tail_text, model_name, temperature, max_predict, num_predictions, profile, on_success, on_fail, request_id_provider)
+			api.fetch_sequential(full_text, tail_text, model_name, temperature, max_predict, num_predictions, profile, on_success, on_fail, request_id_provider, _streaming_enabled, on_partial)
 		end
 	else
-		api.fetch_batch(full_text, tail_text, model_name, temperature, max_predict, num_predictions, profile, on_success, on_fail, request_id_provider)
+		api.fetch_batch(full_text, tail_text, model_name, temperature, max_predict, num_predictions, profile, on_success, on_fail, request_id_provider, _streaming_enabled, on_partial)
 	end
 end
 

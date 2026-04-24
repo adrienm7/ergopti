@@ -65,6 +65,11 @@ local VARIANTS = {
 --- Current active level — only messages at or above this level are printed.
 M.current_level = M.LEVELS.WARNING
 
+-- Optional hook set by the bootstrapper (init.lua) after all modules are loaded.
+-- Called with (module_name, formatted_message) on every Logger.error invocation.
+-- Kept nil by default so the logger has zero dependency on the notifications module.
+local _error_notification_handler = nil
+
 
 
 
@@ -73,6 +78,14 @@ M.current_level = M.LEVELS.WARNING
 -- ======= 2/ Public Configuration =======
 -- =======================================
 -- =======================================
+
+--- Registers a callback invoked on every Logger.error call to surface errors as
+--- system notifications. Set once from init.lua after all modules are loaded so the
+--- logger itself stays free of any dependency on the notifications module.
+--- @param fn function|nil Callback with signature fn(module_name, message).
+function M.set_error_notification_handler(fn)
+	_error_notification_handler = (type(fn) == "function") and fn or nil
+end
 
 --- Sets the active log level. Messages below this threshold are silently dropped.
 --- @param level number|string Numeric constant (M.LEVELS.DEBUG) or name ("DEBUG", "INFO", …).
@@ -215,10 +228,25 @@ function M.success(module_name, msg, ...) _log("SUCCESS", module_name, msg, ...)
 function M.warn(module_name, msg, ...) _log("WARNING", module_name, msg, ...) end
 
 --- Logs an ERROR message — a failure that requires attention.
+--- Also fires the registered notification handler (if any) so errors surface as
+--- system notifications in addition to the console log.
 --- @param module_name string Short module identifier.
 --- @param msg string Message or format string.
 --- @param ... any Optional format arguments.
-function M.error(module_name, msg, ...) _log("ERROR", module_name, msg, ...) end
+function M.error(module_name, msg, ...)
+	_log("ERROR", module_name, msg, ...)
+	if _error_notification_handler then
+		-- Build the formatted message independently from _log so the handler
+		-- receives a clean string without the console prefix/indentation.
+		local ok, base = pcall(tostring, msg)
+		local text = ok and base or "???"
+		if select("#", ...) > 0 then
+			local ok_f, formatted = pcall(string.format, text, ...)
+			text = ok_f and formatted or text
+		end
+		pcall(_error_notification_handler, tostring(module_name), text)
+	end
+end
 
 
 

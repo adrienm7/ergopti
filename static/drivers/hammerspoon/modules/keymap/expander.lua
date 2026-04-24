@@ -11,8 +11,9 @@
 ---    is called before the module is initialized.
 --- 2. Intelligent Conflict Resolution: Common prefixes between the trigger and
 ---    the replacement are kept to minimize the number of backspaces issued.
---- 3. Async Execution in Ignored Windows: Expansions in ignored windows are
----    deferred via hs.timer.doAfter(0) so they do not block the event queue.
+--- 3. Synchronous Terminator Execution: Expansions run directly inside the HID
+---    callback without deferral. CGEventPost() is non-blocking, so keyStroke()
+---    calls return immediately — identical to how auto-expand already behaves.
 --- ==============================================================================
 
 local M = {}
@@ -94,7 +95,15 @@ function M.perform_text_replacement(deletes, emit_action, buffer_action, is_fina
 		keylogger.notify_synthetic(emitted_str, source_type or "hotstring", deletes, source_variant)
 	end
 
-	if type(buffer_action) == "function" then pcall(buffer_action) end
+	if type(buffer_action) == "function" then
+		local ok_buf, buf_err = pcall(buffer_action)
+		if not ok_buf then
+			-- Buffer desync after an expansion leads to phantom chars or missed
+			-- triggers downstream; surfacing the failure loudly makes it
+			-- traceable instead of masking it as a silent inconsistency.
+			Logger.error(LOG, "buffer_action failed: %s.", tostring(buf_err))
+		end
+	end
 
 	if keylogger and type(keylogger.set_buffer) == "function" then
 		keylogger.set_buffer(_state.buffer)
@@ -115,9 +124,54 @@ end
 
 
 
+-- ===================================
+-- ===================================
+-- ======= 2/ Shared Internals =======
+-- ===================================
+-- ===================================
+
+--- Returns true when an is_word mapping should be REJECTED because the
+--- character immediately before the trigger's start position is a letter
+--- (or "@", which marks personal-info triggers). Centralised here so auto
+--- and terminator expansion apply the exact same word-boundary policy.
+--- @param buffer string The current rolling buffer.
+--- @param trigger string The trigger whose match is being considered.
+--- @param trigger_start_byte number 1-based byte index where the trigger
+---   starts inside `buffer`. Must be >= 1.
+--- @return boolean True when the word boundary blocks the match.
+local function word_boundary_blocks(buffer, trigger, trigger_start_byte)
+	-- Triggers that start with whitespace carry their own boundary and skip this check.
+	if trigger:match("^[ \194\160\226\128\175]") then return false end
+	if trigger_start_byte <= 1 then return false end
+	local before    = buffer:sub(1, trigger_start_byte - 1)
+	local prev_off  = utf8.offset(before, -1)
+	local prev_char = prev_off and before:sub(prev_off) or ""
+	return text_utils.is_letter_char(prev_char) or prev_char == "@"
+end
+
+--- Chooses the right emitter for a mapping's replacement: plain_text uses
+--- emit_text (fast path, ascii/unicode typing); replacements carrying
+--- {Token} directives go through emit_tokens(tokens_from_repl(m.repl)).
+--- Extracted so both expansion paths share the exact same dispatch logic.
+--- @param m table The mapping entry.
+--- @param to_type string The text to emit when the replacement is plain.
+--- @return number emit_count The number of codepoints emitted.
+--- @return string emitted_str The bytes actually pushed to the OS.
+local function emit_dispatch(m, to_type)
+	if m.plain_repl == m.repl then
+		return km_utils.emit_text(to_type)
+	end
+	-- Lazy: tokens_from_repl() is only called for replacements that contain
+	-- {Token} directives — most hotstrings are plain text and never reach this.
+	return km_utils.emit_tokens(km_utils.tokens_from_repl(m.repl))
+end
+
+
+
+
 -- ======================================
 -- ======================================
--- ======= 2/ Expansion Scenarios =======
+-- ======= 3/ Expansion Scenarios =======
 -- ======================================
 -- ======================================
 
@@ -131,25 +185,22 @@ function M.try_auto_expand(m, char_len, is_ignored)
 	if not require_state("try_auto_expand") then return false end
 
 	local trigger = m.trigger
-	if not text_utils.utf8_ends_with(_state.buffer, trigger) then return false end
+	-- Byte-direct suffix match: two strings equal byte-for-byte are necessarily
+	-- UTF-8 equivalent, so utf8_ends_with's extra utf8.len/utf8.offset hops are
+	-- pure overhead on the hot path. m.trigger_bytes is precomputed at load time.
+	local tb = m.trigger_bytes
+	if #_state.buffer < tb or _state.buffer:sub(-tb) ~= trigger then return false end
 
-	-- Word-boundary check: reject the match when the trigger is preceded by a
-	-- letter or "@" (which is used as a personal-info trigger prefix).
-	if m.is_word
-		and text_utils.utf8_len(_state.buffer) > text_utils.utf8_len(trigger)
-		and not trigger:match("^[ \194\160\226\128\175]")
-	then
-		local tstart    = utf8.offset(_state.buffer, -text_utils.utf8_len(trigger))
-		local before    = tstart and _state.buffer:sub(1, tstart - 1) or ""
-		local prev_off  = utf8.offset(before, -1)
-		local prev_char = prev_off and before:sub(prev_off) or ""
-		if text_utils.is_letter_char(prev_char) or prev_char == "@" then
-			return false
-		end
+	-- Word-boundary check (delegated to shared helper). tstart_byte is the
+	-- 1-based byte index where the trigger begins inside the buffer.
+	local tstart_byte = #_state.buffer - tb + 1
+	if m.is_word and word_boundary_blocks(_state.buffer, trigger, tstart_byte) then
+		return false
 	end
 
-	local tokens    = km_utils.tokens_from_repl(m.repl)
-	local repl_text = km_utils.plain_text(tokens)
+	-- Use the precomputed plain_repl; tokens_from_repl() is only called below
+	-- when we actually need to emit tokens (replacements with {Token} directives)
+	local repl_text = m.plain_repl
 
 	-- No-op guard: skip when the plain-text expansion equals the trigger.
 	if repl_text == trigger then
@@ -160,30 +211,26 @@ function M.try_auto_expand(m, char_len, is_ignored)
 
 	-- Compute how many backspaces and what to type, keeping common prefix chars.
 	-- In an ignored window (char_len == 0) there is no "last char" to keep, so
-	-- we must erase the full trigger length.
-	local char_offset = is_ignored and 0 or char_len
-	local deletes, to_type = text_utils.utf8_len(trigger) - char_offset, repl_text
+	-- we must erase the full trigger length. m.tlen is the precomputed UTF-8
+	-- length of the trigger (avoids three utf8_len calls per hot-path hit).
+	local trig_len         = m.tlen
+	local char_offset      = is_ignored and 0 or char_len
+	local screen_len       = trig_len - char_offset
+	local deletes, to_type = screen_len, repl_text
 
 	if repl_text == m.repl then
 		-- Simple text replacement: find the longest shared prefix to minimise backspaces.
-		local screen = text_utils.utf8_sub(trigger, 1, text_utils.utf8_len(trigger) - char_offset)
+		local screen = text_utils.utf8_sub(trigger, 1, screen_len)
 		local common = text_utils.get_common_prefix_utf8(screen, repl_text)
-		deletes = text_utils.utf8_len(screen) - common
+		deletes = screen_len - common
 		to_type = text_utils.utf8_sub(repl_text, common + 1)
 	end
 
 	M.perform_text_replacement(
 		deletes,
+		function() return emit_dispatch(m, to_type) end,
 		function()
-			if repl_text == m.repl then
-				return km_utils.emit_text(to_type)
-			else
-				return km_utils.emit_tokens(tokens)
-			end
-		end,
-		function()
-			local tstart = utf8.offset(_state.buffer, -text_utils.utf8_len(trigger))
-			_state.buffer = (tstart and _state.buffer:sub(1, tstart - 1) or "") .. repl_text
+			_state.buffer = _state.buffer:sub(1, tstart_byte - 1) .. repl_text
 		end,
 		m.final_result,
 		is_ignored,
@@ -210,30 +257,31 @@ function M.try_terminator_expand(m, chars, char_len, is_ignored)
 
 	if not _registry.is_terminator(chars) then return false end
 
-	local trigger   = m.trigger
-	local buf_end   = utf8.offset(_state.buffer, -char_len) or (#_state.buffer + 1)
-	local trig_len  = text_utils.utf8_len(trigger)
-	local buf_start = utf8.offset(_state.buffer, -(char_len + trig_len))
-	local segment   = (buf_start and buf_start <= buf_end - 1)
-		and _state.buffer:sub(buf_start, buf_end - 1)
-		or nil
+	-- Byte-direct segment match: byte equality implies UTF-8 equality, so we skip
+	-- the utf8.offset pair entirely. trigger_bytes is precomputed; #chars is the
+	-- byte length of the terminator character(s) that were just typed.
+	local trigger     = m.trigger
+	local tb          = m.trigger_bytes
+	local chars_bytes = #chars
+	local buf         = _state.buffer
+	if #buf < tb + chars_bytes then return false end
+	local buf_start   = #buf - chars_bytes - tb + 1
+	if buf:sub(buf_start, buf_start + tb - 1) ~= trigger then return false end
+	-- Precomputed trigger length; avoids a hot-path utf8.len call.
+	local trig_len    = m.tlen
 
-	if segment ~= trigger then return false end
-
-	-- Word-boundary check: same logic as in try_auto_expand.
-	if m.is_word and not trigger:match("^[ \194\160\226\128\175]") then
-		local before    = buf_start and _state.buffer:sub(1, buf_start - 1) or ""
-		local prev_off  = utf8.offset(before, -1)
-		local prev_char = prev_off and before:sub(prev_off) or ""
-		if text_utils.is_letter_char(prev_char) or prev_char == "@" then
-			return false
-		end
+	-- Word-boundary check (shared helper — same policy as try_auto_expand).
+	if m.is_word and word_boundary_blocks(buf, trigger, buf_start) then
+		return false
 	end
 
 	local consume_term = _registry.terminator_is_consumed(chars)
 
 	-- No-op guard: skip when the plain-text expansion equals the trigger.
-	if m.repl == trigger then
+	-- Compares plain_repl (not raw repl) so a mapping whose repl contains
+	-- emission tokens but resolves to the same plain text as its trigger
+	-- is correctly treated as a no-op — matches try_auto_expand's policy.
+	if m.plain_repl == trigger then
 		if m.final_result then _state.suppress_rescan() end
 		if not is_ignored and tooltip.hide then tooltip.hide() end
 		return true
@@ -246,8 +294,9 @@ function M.try_terminator_expand(m, chars, char_len, is_ignored)
 	end
 
 	local function do_expansion()
-		local tokens    = km_utils.tokens_from_repl(m.repl)
-		local repl_text = km_utils.plain_text(tokens)
+		-- Use the precomputed plain_repl; tokens_from_repl() is only called below
+		-- when we actually need to emit tokens (replacements with {Token} directives)
+		local repl_text        = m.plain_repl
 		local deletes, to_type = trig_len, repl_text
 
 		if repl_text == m.repl then
@@ -263,12 +312,7 @@ function M.try_terminator_expand(m, chars, char_len, is_ignored)
 		M.perform_text_replacement(
 			deletes,
 			function()
-				local c, s = 0, ""
-				if repl_text == m.repl then
-					c, s = km_utils.emit_text(to_type)
-				else
-					c, s = km_utils.emit_tokens(tokens)
-				end
+				local c, s = emit_dispatch(m, to_type)
 
 				-- Re-type the terminator unless it should be consumed.
 				if not consume_term then
@@ -285,8 +329,9 @@ function M.try_terminator_expand(m, chars, char_len, is_ignored)
 				return c, s
 			end,
 			function()
-				local tstart  = utf8.offset(_state.buffer, -(char_len + trig_len))
-				_state.buffer = (tstart and _state.buffer:sub(1, tstart - 1) or "")
+				-- buf_start is a valid byte index into _state.buffer: the buffer
+				-- is only mutated by this very closure, which runs after emit.
+				_state.buffer = _state.buffer:sub(1, buf_start - 1)
 					.. repl_text
 					.. (consume_term and "" or chars)
 			end,
@@ -297,13 +342,15 @@ function M.try_terminator_expand(m, chars, char_len, is_ignored)
 		)
 
 		if keylogger and type(keylogger.log_hotstring) == "function" then
-			pcall(keylogger.log_hotstring, trigger, km_utils.plain_text(km_utils.tokens_from_repl(m.repl)))
+			pcall(keylogger.log_hotstring, trigger, m.plain_repl)
 		end
 		Logger.debug(LOG, "Terminator-expand: '%s' → '%s'.", trigger, m.repl)
 	end
 
-	-- Defer execution in ignored windows to avoid blocking the HID event queue.
-	if is_ignored then do_expansion() else hs.timer.doAfter(0, do_expansion) end
+	-- Run synchronously: CGEventPost() is non-blocking so calling keyStroke()
+	-- inside the HID callback is safe. expected_synthetic_chars is already
+	-- armed before events fire, preventing re-entrancy into the trigger loop.
+	do_expansion()
 	return true
 end
 
@@ -373,7 +420,7 @@ end
 
 -- =============================
 -- =============================
--- ======= 3/ Module API =======
+-- ======= 4/ Module API =======
 -- =============================
 -- =============================
 

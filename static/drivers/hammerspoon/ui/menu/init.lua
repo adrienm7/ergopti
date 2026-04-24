@@ -17,6 +17,7 @@ local hs               = hs
 local notifications    = require("lib.notifications")
 local hotstring_editor = require("ui.hotstring_editor")
 local Logger           = require("lib.logger")
+local ui_restore       = require("lib.ui_restore")
 
 local Preferences = require("ui.menu.preferences")
 local Builder     = require("ui.menu.builder")
@@ -42,11 +43,12 @@ end
 
 -- Load isolated sub-menu builders safely
 local menu_mods = {
-	gestures   = safe_require("ui.menu.menu_gestures", "gestures menu"),
-	shortcuts  = safe_require("ui.menu.menu_shortcuts", "shortcuts menu"),
+	gestures   = safe_require("ui.menu.menu_gestures",   "gestures menu"),
+	shortcuts  = safe_require("ui.menu.menu_shortcuts",  "shortcuts menu"),
 	hotstrings = safe_require("ui.menu.menu_hotstrings", "hotstrings menu"),
-	llm        = safe_require("ui.menu.menu_llm", "AI menu"),
-	keylogger  = safe_require("ui.menu.menu_metrics", "metrics menu"),
+	llm        = safe_require("ui.menu.menu_llm",        "AI menu"),
+	keylogger  = safe_require("ui.menu.menu_metrics",    "metrics menu"),
+	karabiner  = safe_require("ui.menu.menu_karabiner",  "Karabiner menu"),
 }
 
 -- Load core modules
@@ -78,7 +80,7 @@ M._active_tasks = {}
 --- @param module_sections table Extra module sections definitions.
 --- @return table|nil myMenu The created menubar object.
 --- @return table|nil configWatcher The file watcher object.
-function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, module_sections)
+function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, module_sections, karabiner)
 	base_dir = type(base_dir) == "string" and base_dir or (hs.configdir .. "/")
 	core_mods.keymap = keymap
 	core_mods.gestures = gestures
@@ -269,6 +271,9 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 				{ fn = "set_llm_val_modifiers",           val = state.llm_val_modifiers },
 				{ fn = "set_llm_pred_indent",             val = state.llm_pred_indent },
 				{ fn = "set_llm_disabled_apps",           val = state.llm_disabled_apps },
+				{ fn = "set_llm_url_bar_filter_enabled",       val = state.llm_url_bar_filter_enabled },
+				{ fn = "set_llm_secure_field_filter_enabled",  val = state.llm_secure_field_filter_enabled },
+				{ fn = "set_llm_instant_on_word_end",          val = state.llm_instant_on_word_end },
 			}
 			for _, item in ipairs(map) do
 				if type(keymap[item.fn]) == "function" then pcall(keymap[item.fn], item.val) end
@@ -494,36 +499,18 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 		if state.script_control_enabled then
 			pcall(core_mods.shortcuts_mod.set_shortcut_action, "return_key", state.script_control_shortcuts.return_key)
 			pcall(core_mods.shortcuts_mod.set_shortcut_action, "backspace",  state.script_control_shortcuts.backspace)
+			pcall(core_mods.shortcuts_mod.set_shortcut_action, "escape",     state.script_control_shortcuts.escape)
 		else
 			pcall(core_mods.shortcuts_mod.set_shortcut_action, "return_key", "none")
 			pcall(core_mods.shortcuts_mod.set_shortcut_action, "backspace",  "none")
+			pcall(core_mods.shortcuts_mod.set_shortcut_action, "escape",     "none")
 		end
 		pcall(core_mods.shortcuts_mod.set_extras, {
 			open_init = function() hs.timer.doAfter(0, function() _suppress_watcher_until = hs.timer.secondsSinceEpoch() + 8; pcall(hs.execute, "open \"" .. base_dir .. "init.lua\"") end) end,
-			open_ahk = function()
-				hs.timer.doAfter(0, function()
-					local path = (state.ahk_source_path ~= "") and state.ahk_source_path or nil
-					if not path then path = os.getenv("LOCAL_AHK_PATH") end
-					if not path then
-						local ok_lf, lf = pcall(io.open, base_dir .. "../hotstrings/.local_ahk_path", "r")
-						if ok_lf and lf then
-							local raw = lf:read("*a")
-							pcall(function() lf:close() end)
-							raw = raw:match("^%s*(.-)%s*$")
-							if raw ~= "" then path = raw end
-						end
-					end
-					if not path then path = base_dir .. "../autohotkey/ErgoptiPlus.ahk" end
-					
-					local app_name = hs.execute(string.format("osascript -e 'tell application \"Finder\" to return name of (default application of (info for POSIX file \"%s\"))' 2>/dev/null", path))
-					app_name = type(app_name) == "string" and app_name:match("^%s*(.-)%s*$") or ""
-					if app_name ~= "" then pcall(hs.execute, string.format("open -a \"%s\" \"%s\"", app_name, path)) else pcall(hs.execute, string.format("open -t \"%s\"", path)) end
-				end)
-			end,
 			open_personal_toml = function()
 				hs.timer.doAfter(0, function()
-					local custom_path = base_dir .. "custom.toml"
-					pcall(hs.execute, "open \"" .. custom_path .. "\"")
+					local personal_path = base_dir .. "../hotstrings/personal.toml"
+					pcall(hs.execute, "open \"" .. personal_path .. "\"")
 				end)
 			end,
 			trigger_prediction = function() if keymap and type(keymap.trigger_prediction) == "function" then pcall(keymap.trigger_prediction) end end,
@@ -537,25 +524,26 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 
 	updateMenu = function()
 		local ctx = {
-			state                  = state,
-			paused                 = core_mods.shortcuts_mod and type(core_mods.shortcuts_mod.is_paused) == "function" and core_mods.shortcuts_mod.is_paused() or false,
-			save_prefs             = save_prefs,
-			updateMenu             = updateMenu,
-			notify_feature         = notify_feature,
-			do_reload              = do_reload,
-			applyTriggerChar       = applyTriggerChar,
-			get_group_name         = Preferences.get_group_name,
-			keymap                 = keymap,
-			hotfiles               = hotfiles,
-			module_sections        = module_sections,
-			hotstring_editor       = hotstring_editor,
-			personal_info          = core_mods.dyn_hot_mod,
-			gestures               = gestures,
-			shortcuts              = core_mods.shortcuts_mod,
-			script_control         = core_mods.shortcuts_mod,
-			apply_metrics_shortcut = apply_metrics_shortcut,
+			state                    = state,
+			paused                   = core_mods.shortcuts_mod and type(core_mods.shortcuts_mod.is_paused) == "function" and core_mods.shortcuts_mod.is_paused() or false,
+			save_prefs               = save_prefs,
+			updateMenu               = updateMenu,
+			notify_feature           = notify_feature,
+			do_reload                = do_reload,
+			applyTriggerChar         = applyTriggerChar,
+			get_group_name           = Preferences.get_group_name,
+			keymap                   = keymap,
+			hotfiles                 = hotfiles,
+			module_sections          = module_sections,
+			hotstring_editor         = hotstring_editor,
+			personal_info            = core_mods.dyn_hot_mod,
+			gestures                 = gestures,
+			shortcuts                = core_mods.shortcuts_mod,
+			script_control           = core_mods.shortcuts_mod,
+			apply_metrics_shortcut   = apply_metrics_shortcut,
 			apply_apps_time_shortcut = apply_apps_time_shortcut,
-			llm_handler            = llm_handler,
+			llm_handler              = llm_handler,
+			karabiner                = karabiner,
 		}
 
 		local actions = {
@@ -581,14 +569,17 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 	updateMenu()
 
 	local function reloadConfig(files)
-		-- Only reload for code files — config.json and runtime-generated files must never trigger a reload
+		-- HTML/CSS/JS are webview assets loaded at open-time — changing them
+		-- never requires hs.reload(); only .lua and .toml affect runtime behavior
 		if hs.timer.secondsSinceEpoch() < _suppress_watcher_until then return end
 		if type(files) == "table" then
 			for _, file in pairs(files) do
 				if type(file) == "string"
-					and (file:match("%.lua$") or file:match("%.html$") or file:match("%.css$") or file:match("%.js$") or file:match("%.toml$"))
+					and (file:match("%.lua$") or file:match("%.toml$"))
 					and not file:match("logs/") then
-					do_reload("watcher"); return
+					Logger.debug(LOG, "File change detected: %s", file)
+					ui_restore.defer_reload(function() do_reload("watcher") end)
+					return
 				end
 			end
 		end

@@ -9,6 +9,7 @@
 local M = {}
 local hs            = hs
 local Logger        = require("lib.logger")
+local dialog        = require("lib.dialog_util")
 local notifications = require("lib.notifications")
 local LOG           = "menu_hotstrings"
 
@@ -400,7 +401,7 @@ function M.build_management(ctx)
 				title    = "Supprimer cet expanseur…",
 				disabled = paused or nil,
 				fn       = not paused and (function(k) return function()
-					local res = hs.dialog.blockAlert(
+					local res = dialog.block_alert(
 						"Supprimer l’expanseur",
 						"Êtes-vous sûr de vouloir supprimer cet expanseur personnalisé ?",
 						"Supprimer", "Annuler"
@@ -437,7 +438,7 @@ function M.build_management(ctx)
 			-- 1. Ask for the trigger character (loop until exactly one character is entered)
 			local char
 			while true do
-				local ok_p, btn, char_raw = pcall(hs.dialog.textPrompt,
+				local ok_p, btn, char_raw = pcall(dialog.text_prompt,
 					"Nouvel expanseur de mots",
 					"Saisissez le caractère déclencheur (un seul caractère) :",
 					"", "OK", "Annuler"
@@ -449,11 +450,11 @@ function M.build_management(ctx)
 					char = first
 					break
 				end
-				hs.dialog.blockAlert("Saisie invalide", "Veuillez saisir exactement un seul caractère.", "Réessayer")
+				dialog.block_alert("Saisie invalide", "Veuillez saisir exactement un seul caractère.", "Réessayer")
 			end
 
 			-- 2. Ask consume behaviour (default: non consommé)
-			local consume_res = hs.dialog.blockAlert(
+			local consume_res = dialog.block_alert(
 				"Comportement du déclencheur",
 				"Voulez-vous que le caractère soit consommé (non tapé) lors de l’expansion ?",
 				"Non — taper le caractère", "Oui — consommer", "Annuler"
@@ -495,6 +496,10 @@ function M.build_management(ctx)
 
 	local delay_menu = {}
 	local function make_delay_item(title, key, default_val, is_base)
+		if type(default_val) ~= "number" then
+			Logger.error(LOG, "make_delay_item(): default_val nil for '%s' — keymap.DELAYS_DEFAULT may be outdated.", title)
+			return { title = title .. " : (valeur manquante)", disabled = true }
+		end
 		local cur_val = is_base and state.expansion_delay or (state.delays[key] or default_val)
 		local cur_ms = math.floor(cur_val * 1000 + 0.5)
 		local def_ms = math.floor(default_val * 1000 + 0.5)
@@ -504,7 +509,7 @@ function M.build_management(ctx)
 			title    = title .. " : " .. display_ms .. (cur_ms == def_ms and " (défaut)" or ""),
 			disabled = paused or nil,
 			fn       = not paused and function()
-				local ok_p, btn, raw = pcall(hs.dialog.textPrompt,
+				local ok_p, btn, raw = pcall(dialog.text_prompt,
 					title,
 					"Entrez le délai en millisecondes (entier ≥ 0).\nMettez 0 pour un délai infini (aucune limite de temps) :",
 					tostring(cur_ms), "OK", "Annuler"
@@ -531,25 +536,32 @@ function M.build_management(ctx)
 		}
 	end
 
-	local def_base = ctx.keymap and ctx.keymap.BASE_DELAY_SEC_DEFAULT
+	-- expansion_delay lives in keymap.DEFAULT_STATE; BASE_DELAY_SEC_DEFAULT is a legacy alias
+	local def_base = ctx.keymap and (
+		ctx.keymap.BASE_DELAY_SEC_DEFAULT
+		or (type(ctx.keymap.DEFAULT_STATE) == "table" and ctx.keymap.DEFAULT_STATE.expansion_delay)
+	)
 	if not def_base then
-		Logger.warn(LOG, "keymap.BASE_DELAY_SEC_DEFAULT missing — base delay undefined.")
+		Logger.warn(LOG, "keymap.DEFAULT_STATE.expansion_delay missing — base delay undefined.")
 	end
 	local def_delays = ctx.keymap and type(ctx.keymap.DELAYS_DEFAULT) == "table" and ctx.keymap.DELAYS_DEFAULT
 	if not def_delays then
 		Logger.warn(LOG, "keymap.DELAYS_DEFAULT missing — individual delays undefined.")
 	end
 
-	table.insert(delay_menu, make_delay_item("Touche ★", "STAR_TRIGGER", def_delays.STAR_TRIGGER, false))
-	table.insert(delay_menu, make_delay_item("Intelligence Artificielle (Acceptation)", "llm_prediction", def_delays.llm_prediction, false))
-	table.insert(delay_menu, make_delay_item("Auto-complétions (ex: numéros)", "dynamichotstrings", def_delays.dynamichotstrings, false))
-	table.insert(delay_menu, make_delay_item("Autocorrections", "autocorrection", def_delays.autocorrection, false))
-	table.insert(delay_menu, make_delay_item("Roulements", "rolls", def_delays.rolls, false))
-	table.insert(delay_menu, make_delay_item("Réductions de SFBs", "sfbsreduction", def_delays.sfbsreduction, false))
-	table.insert(delay_menu, make_delay_item("Réductions de distances", "distancesreduction", def_delays.distancesreduction, false))
-	
-	table.insert(delay_menu, { title = "-" })
-	table.insert(delay_menu, make_delay_item("Défaut (autres catégories)", nil, def_base, true))
+	if def_delays then
+		table.insert(delay_menu, make_delay_item("Touche ★", "STAR_TRIGGER", def_delays.STAR_TRIGGER, false))
+		table.insert(delay_menu, make_delay_item("Intelligence Artificielle (Acceptation)", "llm_prediction", def_delays.llm_prediction, false))
+		table.insert(delay_menu, make_delay_item("Auto-complétions (ex: numéros)", "dynamichotstrings", def_delays.dynamichotstrings, false))
+		table.insert(delay_menu, make_delay_item("Autocorrections", "autocorrection", def_delays.autocorrection, false))
+		table.insert(delay_menu, make_delay_item("Roulements", "rolls", def_delays.rolls, false))
+		table.insert(delay_menu, make_delay_item("Réductions de SFBs", "sfbsreduction", def_delays.sfbsreduction, false))
+		table.insert(delay_menu, make_delay_item("Réductions de distances", "distancesreduction", def_delays.distancesreduction, false))
+		table.insert(delay_menu, { title = "-" })
+	end
+	if def_base then
+		table.insert(delay_menu, make_delay_item("Défaut (autres catégories)", nil, def_base, true))
+	end
 
 	delays_item = { title = "Délais d’expansion", disabled = paused or nil, menu = delay_menu }
 
@@ -557,7 +569,7 @@ function M.build_management(ctx)
 		title    = "Touche magique : " .. state.trigger_char,
 		disabled = paused or nil,
 		fn       = not paused and function()
-			local ok_p, btn, raw = pcall(hs.dialog.textPrompt,
+			local ok_p, btn, raw = pcall(dialog.text_prompt,
 				"Touche magique",
 				"Entrez le caractère à utiliser pour remplacer le ★ :",
 				state.trigger_char, "OK", "Annuler"
@@ -833,7 +845,7 @@ function M.build_custom(ctx)
 					current_str = table.concat(state.custom_editor_shortcut.mods or {}, "+")
 						.. "+" .. (state.custom_editor_shortcut.key or "")
 				end
-				local ok_p, btn, raw = pcall(hs.dialog.textPrompt,
+				local ok_p, btn, raw = pcall(dialog.text_prompt,
 					"Raccourci personnalisé",
 					"Format : mods+touche  (ex : cmd+alt+p  ou  ctrl+shift+e)\n"
 						.. "Mods disponibles : cmd, alt, ctrl, shift\nLaisser vide pour désactiver",

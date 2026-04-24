@@ -21,6 +21,7 @@ local hs = hs
 local fs = require("hs.fs")
 
 local AppPickerLib = require("lib.app_picker")
+local dialog       = require("lib.dialog_util")
 local kl_mod       = require("modules.keylogger")
 
 local _prog_canvas = nil
@@ -37,16 +38,19 @@ local _is_initialized = false
 -- ================================
 
 M.DEFAULT_STATE = {
-	keylogger_enabled        = kl_mod.DEFAULT_STATE.keylogger_enabled,
-	keylogger_disabled_apps  = kl_mod.DEFAULT_STATE.keylogger_disabled_apps,
-	keylogger_encrypt        = kl_mod.DEFAULT_STATE.keylogger_encrypt,
-	keylogger_menubar_wpm    = kl_mod.DEFAULT_STATE.keylogger_menubar_wpm,
-	keylogger_menubar_colors = kl_mod.DEFAULT_STATE.keylogger_menubar_colors,
-	keylogger_float_wpm      = kl_mod.DEFAULT_STATE.keylogger_float_wpm,
-	keylogger_float_graph    = kl_mod.DEFAULT_STATE.keylogger_float_graph,
-	keylogger_float_colors   = kl_mod.DEFAULT_STATE.keylogger_float_colors,
-	metrics_shortcut         = false,
-	apps_time_shortcut       = false,
+	keylogger_enabled                = kl_mod.DEFAULT_STATE.keylogger_enabled,
+	keylogger_disabled_apps          = kl_mod.DEFAULT_STATE.keylogger_disabled_apps,
+	keylogger_encrypt                = kl_mod.DEFAULT_STATE.keylogger_encrypt,
+	keylogger_menubar_wpm            = kl_mod.DEFAULT_STATE.keylogger_menubar_wpm,
+	keylogger_menubar_colors         = kl_mod.DEFAULT_STATE.keylogger_menubar_colors,
+	keylogger_float_wpm              = kl_mod.DEFAULT_STATE.keylogger_float_wpm,
+	keylogger_float_graph            = kl_mod.DEFAULT_STATE.keylogger_float_graph,
+	keylogger_float_colors           = kl_mod.DEFAULT_STATE.keylogger_float_colors,
+	keylogger_private_filter_enabled     = kl_mod.DEFAULT_STATE.keylogger_private_filter_enabled,
+	keylogger_secure_filter_enabled      = kl_mod.DEFAULT_STATE.keylogger_secure_filter_enabled,
+	keylogger_system_auth_filter_enabled = kl_mod.DEFAULT_STATE.keylogger_system_auth_filter_enabled,
+	metrics_shortcut                 = false,
+	apps_time_shortcut               = false,
 }
 
 
@@ -113,7 +117,7 @@ local function process_files_with_ui(files_to_process, is_encrypt, password)
 			alert_msg = alert_msg .. "\n\n⚠️ Attention : Échec de déchiffrement détecté. Le mot de passe est potentiellement incorrect."
 		end
 
-		hs.dialog.blockAlert("Encryptor", alert_msg, "OK")
+		dialog.block_alert("Encryptor", alert_msg, "OK")
 	end
 
 	local log_manager = require("modules.keylogger.log_manager")
@@ -151,7 +155,16 @@ function M.build(ctx)
 			if type(Keylogger.set_disabled_apps) == "function" then
 				Keylogger.set_disabled_apps(state.keylogger_disabled_apps or {})
 			end
-			
+			if type(Keylogger.set_private_filter_enabled) == "function" then
+				Keylogger.set_private_filter_enabled(state.keylogger_private_filter_enabled ~= false)
+			end
+			if type(Keylogger.set_secure_field_filter_enabled) == "function" then
+				Keylogger.set_secure_field_filter_enabled(state.keylogger_secure_filter_enabled ~= false)
+			end
+			if type(Keylogger.set_system_auth_filter_enabled) == "function" then
+				Keylogger.set_system_auth_filter_enabled(state.keylogger_system_auth_filter_enabled ~= false)
+			end
+
 			Keylogger.start(script_control)
 			
 			if state.keylogger_menubar_wpm then 
@@ -200,7 +213,7 @@ function M.build(ctx)
 			if type(state.metrics_shortcut) == "table" then
 				current_str = table.concat(state.metrics_shortcut.mods or {}, "+") .. "+" .. (state.metrics_shortcut.key or "")
 			end
-			local ok_p, btn, raw = pcall(hs.dialog.textPrompt,
+			local ok_p, btn, raw = pcall(dialog.text_prompt,
 				"Raccourci métriques de frappe",
 				"Format : mods+touche  (ex : cmd+alt+m)\nMods disponibles : cmd, alt, ctrl, shift\nLaisser vide pour désactiver",
 				current_str, "OK", "Annuler"
@@ -255,7 +268,7 @@ function M.build(ctx)
 			if type(state.apps_time_shortcut) == "table" then
 				current_str = table.concat(state.apps_time_shortcut.mods or {}, "+") .. "+" .. (state.apps_time_shortcut.key or "")
 			end
-			local ok_p, btn, raw = pcall(hs.dialog.textPrompt,
+			local ok_p, btn, raw = pcall(dialog.text_prompt,
 				"Raccourci temps apps",
 				"Format : mods+touche  (ex : cmd+alt+t)\nMods disponibles : cmd, alt, ctrl, shift\nLaisser vide pour désactiver",
 				current_str, "OK", "Annuler"
@@ -366,6 +379,49 @@ function M.build(ctx)
 
 	table.insert(menu, { title = "-" })
 	table.insert(menu, { title = "-" })
+	table.insert(menu, { title = "— FILTRES DE CONFIDENTIALITÉ —", disabled = true })
+
+	table.insert(menu, {
+		title    = "Ignorer la navigation privée",
+		checked  = state.keylogger_private_filter_enabled,
+		disabled = not state.keylogger_enabled,
+		fn       = function()
+			state.keylogger_private_filter_enabled = not state.keylogger_private_filter_enabled
+			local Keylogger = require("modules.keylogger")
+			if type(Keylogger.set_private_filter_enabled) == "function" then
+				pcall(Keylogger.set_private_filter_enabled, state.keylogger_private_filter_enabled)
+			end
+			save_prefs(); updateMenu()
+		end
+	})
+
+	table.insert(menu, {
+		title    = "Ignorer les champs mot de passe",
+		checked  = state.keylogger_secure_filter_enabled,
+		disabled = not state.keylogger_enabled,
+		fn       = function()
+			state.keylogger_secure_filter_enabled = not state.keylogger_secure_filter_enabled
+			local Keylogger = require("modules.keylogger")
+			if type(Keylogger.set_secure_field_filter_enabled) == "function" then
+				pcall(Keylogger.set_secure_field_filter_enabled, state.keylogger_secure_filter_enabled)
+			end
+			save_prefs(); updateMenu()
+		end
+	})
+
+	table.insert(menu, {
+		title    = "Ignorer les boîtes de dialogue d'authentification système",
+		checked  = state.keylogger_system_auth_filter_enabled,
+		disabled = not state.keylogger_enabled,
+		fn       = function()
+			state.keylogger_system_auth_filter_enabled = not state.keylogger_system_auth_filter_enabled
+			local Keylogger = require("modules.keylogger")
+			if type(Keylogger.set_system_auth_filter_enabled) == "function" then
+				pcall(Keylogger.set_system_auth_filter_enabled, state.keylogger_system_auth_filter_enabled)
+			end
+			save_prefs(); updateMenu()
+		end
+	})
 
 	local disabled_count = #(type(state.keylogger_disabled_apps) == "table" and state.keylogger_disabled_apps or {})
 	local label = "Désactivé dans" .. (disabled_count > 0 and (" " .. disabled_count .. " application" .. (disabled_count > 1 and "s" or "")) or " ces applications")
@@ -411,10 +467,10 @@ function M.build(ctx)
 
 			if not state.keylogger_encrypt then
 				local alert_msg = "L’activation va chiffrer tous vos anciens logs pour qu’ils soient illisibles sur le disque.\n\nConfirmer ?"
-				local res = hs.dialog.blockAlert("Protection des données", alert_msg, "Chiffrer", "Annuler")
+				local res = dialog.block_alert("Protection des données", alert_msg, "Chiffrer", "Annuler")
 				if res ~= "Chiffrer" then return end
 
-				local ok_prompt, btn, pwd = pcall(hs.dialog.textPrompt, "Clé de sécurité", "Veuillez définir la clé de chiffrement (par défaut: numéro de série du Mac) :", default_pwd, "OK", "Annuler")
+				local ok_prompt, btn, pwd = pcall(dialog.text_prompt, "Clé de sécurité", "Veuillez définir la clé de chiffrement (par défaut: numéro de série du Mac) :", default_pwd, "OK", "Annuler")
 				if not ok_prompt or btn ~= "OK" or type(pwd) ~= "string" or pwd == "" then return end
 
 				if type(log_manager.register_encryptor_app) == "function" then
@@ -442,10 +498,10 @@ function M.build(ctx)
 				end
 			else
 				local alert_msg = "Tous vos logs chiffrés vont être restaurés en clair sur le disque.\n\nConfirmer ?"
-				local res = hs.dialog.blockAlert("Désactivation", alert_msg, "Déchiffrer", "Annuler")
+				local res = dialog.block_alert("Désactivation", alert_msg, "Déchiffrer", "Annuler")
 				if res ~= "Déchiffrer" then return end
 
-				local ok_prompt, btn, pwd = pcall(hs.dialog.textPrompt, "Clé de sécurité", "Entrez la clé de sécurité nécessaire au déchiffrement :", default_pwd, "OK", "Annuler")
+				local ok_prompt, btn, pwd = pcall(dialog.text_prompt, "Clé de sécurité", "Entrez la clé de sécurité nécessaire au déchiffrement :", default_pwd, "OK", "Annuler")
 				if not ok_prompt or btn ~= "OK" or type(pwd) ~= "string" or pwd == "" then return end
 
 				local files_to_process = {}
@@ -478,7 +534,7 @@ function M.build(ctx)
 			if fs.attributes(app_path) then
 				hs.execute(string.format("open %q", app_path))
 			else
-				hs.dialog.blockAlert("Erreur", "L’application est introuvable. Veuillez d’abord générer l’application avec le script Python.", "OK")
+				dialog.block_alert("Erreur", "L’application est introuvable. Veuillez d’abord générer l’application avec le script Python.", "OK")
 			end
 		end
 	})
@@ -489,7 +545,7 @@ function M.build(ctx)
 		fn      = function()
 			if not state.keylogger_enabled then
 				local warnMsg = "ATTENTION : Vous êtes sur le point d’activer le keylogger.\n\nIl enregistre vos frappes au clavier à la milliseconde près.\nCes logs sont stockés dans le dossier Hammerspoon.\n\nBien que les champs de mots de passe soient ignorés automatiquement, il est recommandé de mettre le script en PAUSE lors de la saisie de données sensibles."
-				local res = hs.dialog.blockAlert("Avertissement de Sécurité", warnMsg, "Activer", "Annuler", "warning")
+				local res = dialog.block_alert("Avertissement de Sécurité", warnMsg, "Activer", "Annuler", "warning")
 				if res ~= "Activer" then return end
 			end
 

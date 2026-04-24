@@ -1,0 +1,1083 @@
+[
+    {
+        "id": "none",
+        "short_label": "Rien",
+        "label": "— Rien (touche normale)",
+        "holdable": true,
+        "category": "Spécial",
+        "karabiner_to": []
+    },
+    {
+        "id": "layer",
+        "short_label": "Layer (hold)",
+        "label": "🗂 Layer nav. — Actif tant que maintenu",
+        "holdable": true,
+        "tappable": false,
+        "category": "Layer de navigation",
+        "karabiner_to": [
+            {
+                "set_variable": {
+                    "name": "layer_hold",
+                    "value": 1
+                }
+            },
+            {
+                "set_variable": {
+                    "name": "layer_active",
+                    "value": 1
+                }
+            }
+        ],
+        "karabiner_to_after_key_up": [
+            {
+                "set_variable": {
+                    "name": "layer_hold",
+                    "value": 0
+                }
+            },
+            {
+                "set_variable": {
+                    "name": "layer_active",
+                    "value": 0
+                }
+            }
+        ]
+    },
+    {
+        "id": "layer_on",
+        "short_label": "Layer ON",
+        "label": "🗂 Layer nav. ON",
+        "holdable": false,
+        "category": "Layer de navigation",
+        "karabiner_to": [
+            {
+                "set_variable": {
+                    "name": "layer_toggle",
+                    "value": 1
+                }
+            },
+            {
+                "set_variable": {
+                    "name": "layer_active",
+                    "value": 1
+                }
+            }
+        ]
+    },
+    {
+        "id": "layer_off",
+        "short_label": "Layer OFF",
+        "label": "🗂 Layer nav. OFF",
+        "holdable": false,
+        "category": "Layer de navigation",
+        "karabiner_to": [
+            {
+                "set_variable": {
+                    "name": "layer_toggle",
+                    "value": 0
+                }
+            },
+            {
+                "set_variable": {
+                    "name": "layer_active",
+                    "value": 0
+                }
+            }
+        ]
+    },
+    {
+        "id": "backspace",
+        "short_label": "Suppr. arrière",
+        "label": "⌫ Suppr. arrière",
+        "holdable": false,
+        "category": "Touches",
+        "karabiner_to": [
+            {
+                "key_code": "delete_or_backspace"
+            }
+        ]
+    },
+    {
+        "id": "delete_fwd",
+        "short_label": "Suppr. avant",
+        "label": "⌦ Suppr. avant",
+        "holdable": false,
+        "category": "Touches",
+        "karabiner_to": [
+            {
+                "key_code": "delete_forward"
+            }
+        ]
+    },
+    {
+        "id": "return",
+        "short_label": "Entrée",
+        "label": "↩ Entrée",
+        "holdable": false,
+        "category": "Touches",
+        "karabiner_to": [
+            {
+                "key_code": "return_or_enter"
+            }
+        ]
+    },
+    {
+        "id": "tab",
+        "short_label": "Tab",
+        "label": "⇥ Tab",
+        "holdable": false,
+        "category": "Touches",
+        "karabiner_to": [
+            {
+                "key_code": "tab"
+            }
+        ]
+    },
+    {
+        "id": "space",
+        "short_label": "Espace",
+        "label": "␣ Espace",
+        "holdable": false,
+        "category": "Touches",
+        "karabiner_to": [
+            {
+                "key_code": "spacebar"
+            }
+        ]
+    },
+    {
+        "id": "escape",
+        "short_label": "Échap",
+        "label": "⎋ Échap",
+        "holdable": false,
+        "category": "Touches",
+        "karabiner_to": [
+            {
+                "key_code": "escape"
+            }
+        ]
+    },
+    {
+        "id": "caps_lock",
+        "short_label": "CapsLock",
+        "label": "⇪ CapsLock — Verr. majuscules",
+        "holdable": false,
+        "category": "Touches",
+        "karabiner_to": [
+            {
+                "key_code": "caps_lock"
+            }
+        ]
+    },
+    {
+        "id": "capsword",
+        "short_label": "CapsWord",
+        "label": "⇪★ CapsWord — Majuscules jusqu'au prochain espace",
+        "holdable": false,
+        "category": "Touches",
+        "karabiner_to": [
+            {
+                "key_code": "caps_lock"
+            },
+            {
+                "set_variable": {
+                    "name": "capsword",
+                    "value": 1
+                }
+            }
+        ],
+        "karabiner_rule_conditions": [
+            {
+                "name": "capsword",
+                "type": "variable_unless",
+                "value": 1
+            }
+        ]
+    },
+    {
+        "id": "select_all",
+        "short_label": "Tout sélect.",
+        "label": "⌘A — Tout sélectionner",
+        "holdable": false,
+        "category": "Édition",
+        "logical_char": "a",
+        "karabiner_modifiers": [
+            "left_command"
+        ]
+    },
+    {
+        "id": "copy",
+        "short_label": "Copier",
+        "label": "⌘C — Copier",
+        "holdable": false,
+        "category": "Édition",
+        "logical_char": "c",
+        "karabiner_modifiers": [
+            "left_command"
+        ]
+    },
+    {
+        "id": "find",
+        "short_label": "Rechercher",
+        "label": "⌘F — Rechercher",
+        "holdable": false,
+        "category": "Édition",
+        "logical_char": "f",
+        "karabiner_modifiers": [
+            "left_command"
+        ]
+    },
+    {
+        "id": "save",
+        "short_label": "Enregistrer",
+        "label": "⌘S — Enregistrer",
+        "holdable": false,
+        "category": "Édition",
+        "logical_char": "s",
+        "karabiner_modifiers": [
+            "left_command"
+        ]
+    },
+    {
+        "id": "paste",
+        "short_label": "Coller",
+        "label": "⌘V — Coller",
+        "holdable": false,
+        "category": "Édition",
+        "logical_char": "v",
+        "karabiner_modifiers": [
+            "left_command"
+        ]
+    },
+    {
+        "id": "cut",
+        "short_label": "Couper",
+        "label": "⌘X — Couper",
+        "holdable": false,
+        "category": "Édition",
+        "logical_char": "x",
+        "karabiner_modifiers": [
+            "left_command"
+        ]
+    },
+    {
+        "id": "opt_backspace",
+        "short_label": "Suppr. mot arrière",
+        "label": "⌥⌫ — Supprimer le mot précédent",
+        "holdable": false,
+        "category": "Édition",
+        "karabiner_to": [
+            {
+                "key_code": "delete_or_backspace",
+                "modifiers": [
+                    "left_option"
+                ]
+            }
+        ]
+    },
+    {
+        "id": "opt_delete_fwd",
+        "short_label": "Suppr. mot avant",
+        "label": "⌥⌦ — Supprimer le mot suivant",
+        "holdable": false,
+        "category": "Édition",
+        "karabiner_to": [
+            {
+                "key_code": "delete_forward",
+                "modifiers": [
+                    "left_option"
+                ]
+            }
+        ]
+    },
+    {
+        "id": "cmd_backspace",
+        "short_label": "Suppr. début de ligne",
+        "label": "⌘⌫ — Supprimer jusqu'au début de ligne",
+        "holdable": false,
+        "category": "Édition",
+        "karabiner_to": [
+            {
+                "key_code": "delete_or_backspace",
+                "modifiers": [
+                    "left_command"
+                ]
+            }
+        ]
+    },
+    {
+        "id": "cmd_delete_fwd",
+        "short_label": "Suppr. fin de ligne",
+        "label": "⌘⌦ — Supprimer jusqu'à la fin de ligne",
+        "holdable": false,
+        "category": "Édition",
+        "karabiner_to": [
+            {
+                "key_code": "delete_forward",
+                "modifiers": [
+                    "left_command"
+                ]
+            }
+        ]
+    },
+    {
+        "id": "undo",
+        "short_label": "Annuler",
+        "label": "⌘Z — Annuler",
+        "holdable": false,
+        "category": "Édition",
+        "logical_char": "z",
+        "karabiner_modifiers": [
+            "left_command"
+        ]
+    },
+    {
+        "id": "redo",
+        "short_label": "Restaurer",
+        "label": "⌘⇧Z — Restaurer",
+        "holdable": false,
+        "category": "Édition",
+        "logical_char": "z",
+        "karabiner_modifiers": [
+            "left_command",
+            "left_shift"
+        ]
+    },
+    {
+        "id": "cmd_tab",
+        "short_label": "Alt-Tab",
+        "label": "⌘⇥ — Alt-Tab (bascule entre les 2 dernières apps)",
+        "holdable": false,
+        "category": "Navigation",
+        "karabiner_to": [
+            {
+                "key_code": "tab",
+                "modifiers": [
+                    "left_command"
+                ]
+            }
+        ]
+    },
+    {
+        "id": "cmd_shift_tab",
+        "short_label": "App précédente",
+        "label": "⌘⇧⇥ — App précédente (Cmd+Shift+Tab)",
+        "holdable": false,
+        "category": "Navigation",
+        "karabiner_to": [
+            {
+                "key_code": "tab",
+                "modifiers": [
+                    "left_command",
+                    "left_shift"
+                ]
+            }
+        ]
+    },
+    {
+        "id": "arrow_left",
+        "short_label": "← Gauche",
+        "label": "← — Flèche gauche",
+        "holdable": false,
+        "category": "Navigation",
+        "karabiner_to": [
+            {
+                "key_code": "left_arrow"
+            }
+        ]
+    },
+    {
+        "id": "arrow_right",
+        "short_label": "→ Droite",
+        "label": "→ — Flèche droite",
+        "holdable": false,
+        "category": "Navigation",
+        "karabiner_to": [
+            {
+                "key_code": "right_arrow"
+            }
+        ]
+    },
+    {
+        "id": "arrow_up",
+        "short_label": "↑ Haut",
+        "label": "↑ — Flèche haut",
+        "holdable": false,
+        "category": "Navigation",
+        "karabiner_to": [
+            {
+                "key_code": "up_arrow"
+            }
+        ]
+    },
+    {
+        "id": "arrow_down",
+        "short_label": "↓ Bas",
+        "label": "↓ — Flèche bas",
+        "holdable": false,
+        "category": "Navigation",
+        "karabiner_to": [
+            {
+                "key_code": "down_arrow"
+            }
+        ]
+    },
+    {
+        "id": "home",
+        "short_label": "Début de ligne",
+        "label": "⇱ Home — Début de ligne",
+        "holdable": false,
+        "category": "Navigation",
+        "karabiner_to": [
+            {
+                "key_code": "home"
+            }
+        ]
+    },
+    {
+        "id": "end",
+        "short_label": "Fin de ligne",
+        "label": "⇲ End — Fin de ligne",
+        "holdable": false,
+        "category": "Navigation",
+        "karabiner_to": [
+            {
+                "key_code": "end"
+            }
+        ]
+    },
+    {
+        "id": "page_up",
+        "short_label": "Page haut",
+        "label": "⇞ Page Up — Page haut",
+        "holdable": false,
+        "category": "Navigation",
+        "karabiner_to": [
+            {
+                "key_code": "page_up"
+            }
+        ]
+    },
+    {
+        "id": "page_down",
+        "short_label": "Page bas",
+        "label": "⇟ Page Down — Page bas",
+        "holdable": false,
+        "category": "Navigation",
+        "karabiner_to": [
+            {
+                "key_code": "page_down"
+            }
+        ]
+    },
+    {
+        "id": "spotlight",
+        "short_label": "Spotlight",
+        "label": "⌘␣ — Spotlight (Cmd+Espace)",
+        "holdable": false,
+        "category": "Navigation",
+        "karabiner_to": [
+            {
+                "key_code": "spacebar",
+                "modifiers": [
+                    "left_command"
+                ]
+            }
+        ]
+    },
+    {
+        "id": "mission_control",
+        "short_label": "Mission Control",
+        "label": "⊞ — Mission Control",
+        "holdable": false,
+        "category": "Navigation",
+        "karabiner_to": [
+            {
+                "key_code": "mission_control"
+            }
+        ]
+    },
+    {
+        "id": "cycle_windows_in_app",
+        "short_label": "Fenêtres de l'app",
+        "label": "⌘` — Fenêtres de l'app courante",
+        "holdable": false,
+        "category": "Navigation",
+        "karabiner_to": [
+            {
+                "key_code": "f13"
+            }
+        ]
+    },
+    {
+        "id": "shift",
+        "short_label": "Shift",
+        "label": "⇧ Shift",
+        "holdable": true,
+        "tappable": false,
+        "category": "Modificateurs",
+        "karabiner_to": [
+            {
+                "key_code": "left_shift"
+            }
+        ]
+    },
+    {
+        "id": "ctrl",
+        "short_label": "Ctrl",
+        "label": "⌃ Ctrl",
+        "holdable": true,
+        "tappable": false,
+        "category": "Modificateurs",
+        "karabiner_to": [
+            {
+                "key_code": "left_control"
+            }
+        ]
+    },
+    {
+        "id": "cmd",
+        "short_label": "Cmd",
+        "label": "⌘ Cmd",
+        "holdable": true,
+        "tappable": false,
+        "category": "Modificateurs",
+        "karabiner_to": [
+            {
+                "key_code": "left_command"
+            }
+        ]
+    },
+    {
+        "id": "alt",
+        "short_label": "Option",
+        "label": "⌥ Option",
+        "holdable": true,
+        "tappable": false,
+        "category": "Modificateurs",
+        "karabiner_to": [
+            {
+                "key_code": "left_option"
+            }
+        ]
+    },
+    {
+        "id": "altgr",
+        "short_label": "AltGr",
+        "label": "⌥ AltGr (option droite — interne)",
+        "holdable": false,
+        "tappable": false,
+        "category": "Modificateurs",
+        "karabiner_to": [
+            {
+                "key_code": "right_option"
+            }
+        ]
+    },
+    {
+        "id": "fn",
+        "short_label": "Fn",
+        "label": "Fn",
+        "holdable": true,
+        "tappable": false,
+        "category": "Modificateurs",
+        "karabiner_to": [
+            {
+                "key_code": "fn"
+            }
+        ]
+    },
+    {
+        "id": "sticky_shift",
+        "short_label": "Sticky Shift",
+        "label": "📌 Sticky Shift — one-shot, annulé après délai",
+        "holdable": false,
+        "category": "Sticky Modificateurs",
+        "karabiner_to": [
+            {
+                "sticky_modifier": {
+                    "left_shift": "toggle"
+                }
+            }
+        ]
+    },
+    {
+        "id": "sticky_ctrl",
+        "short_label": "Sticky Ctrl",
+        "label": "📌 Sticky Ctrl — one-shot, annulé après délai",
+        "holdable": false,
+        "category": "Sticky Modificateurs",
+        "karabiner_to": [
+            {
+                "sticky_modifier": {
+                    "left_control": "toggle"
+                }
+            }
+        ]
+    },
+    {
+        "id": "sticky_cmd",
+        "short_label": "Sticky Cmd",
+        "label": "📌 Sticky Cmd — one-shot, annulé après délai",
+        "holdable": false,
+        "category": "Sticky Modificateurs",
+        "karabiner_to": [
+            {
+                "sticky_modifier": {
+                    "left_command": "toggle"
+                }
+            }
+        ]
+    },
+    {
+        "id": "sticky_option",
+        "short_label": "Sticky Option",
+        "label": "📌 Sticky Option — one-shot, annulé après délai",
+        "holdable": false,
+        "category": "Sticky Modificateurs",
+        "karabiner_to": [
+            {
+                "sticky_modifier": {
+                    "left_option": "toggle"
+                }
+            }
+        ]
+    },
+    {
+        "id": "cmd_shift",
+        "short_label": "Cmd+Shift",
+        "label": "⌘⇧ — Cmd+Shift",
+        "holdable": true,
+        "tappable": false,
+        "category": "Combinaisons",
+        "karabiner_to": [
+            {
+                "key_code": "left_command",
+                "modifiers": [
+                    "left_shift"
+                ]
+            }
+        ]
+    },
+    {
+        "id": "cmd_option",
+        "short_label": "Cmd+Option",
+        "label": "⌘⌥ — Cmd+Option",
+        "holdable": true,
+        "tappable": false,
+        "category": "Combinaisons",
+        "karabiner_to": [
+            {
+                "key_code": "left_command",
+                "modifiers": [
+                    "left_option"
+                ]
+            }
+        ]
+    },
+    {
+        "id": "cmd_ctrl",
+        "short_label": "Cmd+Ctrl",
+        "label": "⌘⌃ — Cmd+Ctrl",
+        "holdable": true,
+        "tappable": false,
+        "category": "Combinaisons",
+        "karabiner_to": [
+            {
+                "key_code": "left_command",
+                "modifiers": [
+                    "left_control"
+                ]
+            }
+        ]
+    },
+    {
+        "id": "option_shift",
+        "short_label": "Option+Shift",
+        "label": "⌥⇧ — Option+Shift",
+        "holdable": true,
+        "tappable": false,
+        "category": "Combinaisons",
+        "karabiner_to": [
+            {
+                "key_code": "left_option",
+                "modifiers": [
+                    "left_shift"
+                ]
+            }
+        ]
+    },
+    {
+        "id": "option_ctrl",
+        "short_label": "Option+Ctrl",
+        "label": "⌥⌃ — Option+Ctrl",
+        "holdable": true,
+        "tappable": false,
+        "category": "Combinaisons",
+        "karabiner_to": [
+            {
+                "key_code": "left_option",
+                "modifiers": [
+                    "left_control"
+                ]
+            }
+        ]
+    },
+    {
+        "id": "ctrl_shift",
+        "short_label": "Ctrl+Shift",
+        "label": "⌃⇧ — Ctrl+Shift",
+        "holdable": true,
+        "tappable": false,
+        "category": "Combinaisons",
+        "karabiner_to": [
+            {
+                "key_code": "left_control",
+                "modifiers": [
+                    "left_shift"
+                ]
+            }
+        ]
+    },
+    {
+        "id": "fn_shift",
+        "short_label": "Fn+Shift",
+        "label": "Fn⇧ — Fn+Shift",
+        "holdable": true,
+        "tappable": false,
+        "category": "Combinaisons",
+        "karabiner_to": [
+            {
+                "key_code": "fn",
+                "modifiers": [
+                    "left_shift"
+                ]
+            }
+        ]
+    },
+    {
+        "id": "cmd_option_shift",
+        "short_label": "Cmd+Option+Shift",
+        "label": "⌘⌥⇧ — Cmd+Option+Shift",
+        "holdable": true,
+        "tappable": false,
+        "category": "Combinaisons",
+        "karabiner_to": [
+            {
+                "key_code": "left_command",
+                "modifiers": [
+                    "left_option",
+                    "left_shift"
+                ]
+            }
+        ]
+    },
+    {
+        "id": "cmd_option_ctrl",
+        "short_label": "Cmd+Option+Ctrl",
+        "label": "⌘⌥⌃ — Cmd+Option+Ctrl",
+        "holdable": true,
+        "tappable": false,
+        "category": "Combinaisons",
+        "karabiner_to": [
+            {
+                "key_code": "left_command",
+                "modifiers": [
+                    "left_option",
+                    "left_control"
+                ]
+            }
+        ]
+    },
+    {
+        "id": "cmd_shift_ctrl",
+        "short_label": "Cmd+Shift+Ctrl",
+        "label": "⌘⇧⌃ — Cmd+Shift+Ctrl",
+        "holdable": true,
+        "tappable": false,
+        "category": "Combinaisons",
+        "karabiner_to": [
+            {
+                "key_code": "left_command",
+                "modifiers": [
+                    "left_shift",
+                    "left_control"
+                ]
+            }
+        ]
+    },
+    {
+        "id": "option_shift_ctrl",
+        "short_label": "Option+Shift+Ctrl",
+        "label": "⌥⇧⌃ — Option+Shift+Ctrl",
+        "holdable": true,
+        "tappable": false,
+        "category": "Combinaisons",
+        "karabiner_to": [
+            {
+                "key_code": "left_option",
+                "modifiers": [
+                    "left_shift",
+                    "left_control"
+                ]
+            }
+        ]
+    },
+    {
+        "id": "hyper",
+        "short_label": "Hyper",
+        "label": "⌘⌥⇧⌃ — Hyper (tous les modificateurs)",
+        "holdable": true,
+        "tappable": false,
+        "category": "Combinaisons",
+        "karabiner_to": [
+            {
+                "key_code": "left_command",
+                "modifiers": [
+                    "left_option",
+                    "left_shift",
+                    "left_control"
+                ]
+            }
+        ]
+    },
+    {
+        "id": "sticky_cmd_shift",
+        "short_label": "Sticky Cmd+Shift",
+        "label": "📌 Sticky Cmd+Shift — one-shot, annulé après délai",
+        "holdable": false,
+        "category": "Sticky Combinaisons",
+        "karabiner_to": [
+            {
+                "sticky_modifier": {
+                    "left_command": "toggle"
+                }
+            },
+            {
+                "sticky_modifier": {
+                    "left_shift": "toggle"
+                }
+            }
+        ]
+    },
+    {
+        "id": "sticky_cmd_option",
+        "short_label": "Sticky Cmd+Option",
+        "label": "📌 Sticky Cmd+Option — one-shot, annulé après délai",
+        "holdable": false,
+        "category": "Sticky Combinaisons",
+        "karabiner_to": [
+            {
+                "sticky_modifier": {
+                    "left_command": "toggle"
+                }
+            },
+            {
+                "sticky_modifier": {
+                    "left_option": "toggle"
+                }
+            }
+        ]
+    },
+    {
+        "id": "sticky_cmd_ctrl",
+        "short_label": "Sticky Cmd+Ctrl",
+        "label": "📌 Sticky Cmd+Ctrl — one-shot, annulé après délai",
+        "holdable": false,
+        "category": "Sticky Combinaisons",
+        "karabiner_to": [
+            {
+                "sticky_modifier": {
+                    "left_command": "toggle"
+                }
+            },
+            {
+                "sticky_modifier": {
+                    "left_control": "toggle"
+                }
+            }
+        ]
+    },
+    {
+        "id": "sticky_option_shift",
+        "short_label": "Sticky Option+Shift",
+        "label": "📌 Sticky Option+Shift — one-shot, annulé après délai",
+        "holdable": false,
+        "category": "Sticky Combinaisons",
+        "karabiner_to": [
+            {
+                "sticky_modifier": {
+                    "left_option": "toggle"
+                }
+            },
+            {
+                "sticky_modifier": {
+                    "left_shift": "toggle"
+                }
+            }
+        ]
+    },
+    {
+        "id": "sticky_option_ctrl",
+        "short_label": "Sticky Option+Ctrl",
+        "label": "📌 Sticky Option+Ctrl — one-shot, annulé après délai",
+        "holdable": false,
+        "category": "Sticky Combinaisons",
+        "karabiner_to": [
+            {
+                "sticky_modifier": {
+                    "left_option": "toggle"
+                }
+            },
+            {
+                "sticky_modifier": {
+                    "left_control": "toggle"
+                }
+            }
+        ]
+    },
+    {
+        "id": "sticky_ctrl_shift",
+        "short_label": "Sticky Ctrl+Shift",
+        "label": "📌 Sticky Ctrl+Shift — one-shot, annulé après délai",
+        "holdable": false,
+        "category": "Sticky Combinaisons",
+        "karabiner_to": [
+            {
+                "sticky_modifier": {
+                    "left_control": "toggle"
+                }
+            },
+            {
+                "sticky_modifier": {
+                    "left_shift": "toggle"
+                }
+            }
+        ]
+    },
+    {
+        "id": "sticky_cmd_option_shift",
+        "short_label": "Sticky Cmd+Option+Shift",
+        "label": "📌 Sticky Cmd+Option+Shift — one-shot, annulé après délai",
+        "holdable": false,
+        "category": "Sticky Combinaisons",
+        "karabiner_to": [
+            {
+                "sticky_modifier": {
+                    "left_command": "toggle"
+                }
+            },
+            {
+                "sticky_modifier": {
+                    "left_option": "toggle"
+                }
+            },
+            {
+                "sticky_modifier": {
+                    "left_shift": "toggle"
+                }
+            }
+        ]
+    },
+    {
+        "id": "sticky_cmd_option_ctrl",
+        "short_label": "Sticky Cmd+Option+Ctrl",
+        "label": "📌 Sticky Cmd+Option+Ctrl — one-shot, annulé après délai",
+        "holdable": false,
+        "category": "Sticky Combinaisons",
+        "karabiner_to": [
+            {
+                "sticky_modifier": {
+                    "left_command": "toggle"
+                }
+            },
+            {
+                "sticky_modifier": {
+                    "left_option": "toggle"
+                }
+            },
+            {
+                "sticky_modifier": {
+                    "left_control": "toggle"
+                }
+            }
+        ]
+    },
+    {
+        "id": "sticky_cmd_shift_ctrl",
+        "short_label": "Sticky Cmd+Shift+Ctrl",
+        "label": "📌 Sticky Cmd+Shift+Ctrl — one-shot, annulé après délai",
+        "holdable": false,
+        "category": "Sticky Combinaisons",
+        "karabiner_to": [
+            {
+                "sticky_modifier": {
+                    "left_command": "toggle"
+                }
+            },
+            {
+                "sticky_modifier": {
+                    "left_shift": "toggle"
+                }
+            },
+            {
+                "sticky_modifier": {
+                    "left_control": "toggle"
+                }
+            }
+        ]
+    },
+    {
+        "id": "sticky_option_shift_ctrl",
+        "short_label": "Sticky Option+Shift+Ctrl",
+        "label": "📌 Sticky Option+Shift+Ctrl — one-shot, annulé après délai",
+        "holdable": false,
+        "category": "Sticky Combinaisons",
+        "karabiner_to": [
+            {
+                "sticky_modifier": {
+                    "left_option": "toggle"
+                }
+            },
+            {
+                "sticky_modifier": {
+                    "left_shift": "toggle"
+                }
+            },
+            {
+                "sticky_modifier": {
+                    "left_control": "toggle"
+                }
+            }
+        ]
+    },
+    {
+        "id": "sticky_hyper",
+        "short_label": "Sticky Hyper",
+        "label": "📌 Sticky Hyper — one-shot tous les modificateurs",
+        "holdable": false,
+        "category": "Sticky Combinaisons",
+        "karabiner_to": [
+            {
+                "sticky_modifier": {
+                    "left_command": "toggle"
+                }
+            },
+            {
+                "sticky_modifier": {
+                    "left_option": "toggle"
+                }
+            },
+            {
+                "sticky_modifier": {
+                    "left_shift": "toggle"
+                }
+            },
+            {
+                "sticky_modifier": {
+                    "left_control": "toggle"
+                }
+            }
+        ]
+    }
+]

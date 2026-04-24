@@ -17,16 +17,21 @@ __pycache__
 
 # Other files to exclude
 logs/
+*.log
 static/corpus/modifie/
 static/version.json
 version.json
 
 # Personal configuration files
+.claude/settings.local.json
+static/drivers/autohotkey/personal.ahk
+# Bootstrap file is machine-specific (contains absolute path to user's ini)
+static/drivers/autohotkey/ErgoptiPlus_Bootstrap.ini
+# Default ini location — user-specific, never committed
+static/drivers/autohotkey/ErgoptiPlus_Configuration.ini
 static/drivers/hammerspoon/config.json
-static/drivers/hammerspoon/custom.toml
+static/drivers/hammerspoon/karabiner_user_config.json
+# Karabiner build artifact — generated at runtime by the HS bridge
+static/drivers/hammerspoon/karabiner.json
 static/drivers/hotstrings/.local_ahk_path
 static/drivers/hotstrings/personal.toml
-static/drivers/karabiner/pid/
-static/drivers/karabiner/log/
-
-.claude/settings.local.json

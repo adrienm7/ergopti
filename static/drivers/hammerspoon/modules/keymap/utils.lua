@@ -43,6 +43,12 @@ local PASTE_THRESHOLD = 50
 -- user's previous contents. Large enough to let the target app receive the paste.
 local CLIPBOARD_RESTORE_SEC = 1.5
 
+-- Safety TTL (seconds) for the ignored-window cache. The cache is normally
+-- invalidated on focus-change events (hs.application.watcher + hs.window.filter),
+-- so this long TTL only acts as a net in the unlikely case the watcher misses an
+-- event. Keeping it large means near-zero syscalls per keystroke in steady state.
+local IGNORED_WIN_TTL_SEC = 5.0
+
 -- Mapping from {Placeholder} names inside replacement strings to hs.eventtap key names.
 local KEY_COMMANDS = {
 	Left      = "left",         Right     = "right",
@@ -242,7 +248,12 @@ end
 ---   2. Use a sliding window to find the longest suffix of the buffer that matches
 ---      a prefix of the prediction (overlap).
 ---   3. If an overlap is found, delete exactly those chars and type the rest.
----   4. Fix up leading-space logic so the result reads naturally.
+---   4. Fix up separator logic so the result reads naturally, handling:
+---      - Double-space prevention (buffer already ends with space).
+---      - Missing-space insertion (buffer ends with a word, prediction starts with a word).
+---      - Compound-word continuations (buffer ends with "-", no separator needed).
+---      - Contraction handling (buffer ends with apostrophe, no separator needed).
+---      - Punctuation that must not be preceded by a regular space.
 ---
 --- @param buffer string The current typing buffer.
 --- @param pred_deletes number The AI's suggested number of deletions.
@@ -315,11 +326,14 @@ function M.resolve_prediction_overlap(buffer, pred_deletes, pred_to_type)
 		-- When the original prediction started with a space and we trimmed it,
 		-- restore that space only if the context before the overlap has no space —
 		-- otherwise we would produce a double space.
+		-- Also skip restoration when the entire buffer is consumed by the overlap
+		-- (buffer_before_overlap would be empty, meaning there's no preceding context
+		-- that could need a separator).
 		local orig_starts_with_space = pred_to_type:match("^[%s\194\160\226\128\175]") ~= nil
 		if orig_starts_with_space then
 			local buffer_before_overlap = text_utils.utf8_sub(buf_str, 1, cb_len - best_overlap)
 			local ends_with_space       = buffer_before_overlap:match("[%s\194\160\226\128\175]$") ~= nil
-			if not ends_with_space then
+			if not ends_with_space and buffer_before_overlap ~= "" then
 				to_type = " " .. to_type
 			end
 		end
@@ -329,21 +343,28 @@ function M.resolve_prediction_overlap(buffer, pred_deletes, pred_to_type)
 		to_type = pred_to_type
 	end
 
-	-- Fix spacing at the join point: prevent double-spaces and missing spaces.
+	-- Fix spacing at the join point: remove double-spaces only.
+	-- Space insertion is the parser's responsibility — we must not add spaces here
+	-- or mid-word completions (e.g. "attentio" + "n suite") would get a spurious
+	-- space inserted before the continuation character.
 	if deletes == 0 and to_type ~= "" then
 		local b_last  = text_utils.utf8_sub(buf_str, -1)
 		local p_first = text_utils.utf8_sub(to_type, 1, 1)
 
-		local ends_with_space   = b_last:match("[%s'']") or b_last == "\194\160" or b_last == "\226\128\175"
-		local starts_with_space = p_first:match("[%s]")  or p_first == "\194\160" or p_first == "\226\128\175"
-		local starts_with_punct = p_first:match("[.,;:%?!'\"%)%]]")
+		-- Characters after which a leading space on the prediction is redundant:
+		-- whitespace, apostrophes (contractions: "l'idée"), hyphens (compound
+		-- words: "anti-spam"), opening brackets (don't insert space inside them).
+		local ends_no_sep = b_last:match("[%s''%-%(%[]")
+			or b_last == "\194\160" or b_last == "\226\128\175"
 
-		if ends_with_space and starts_with_space then
-			-- Remove the leading space from the prediction to avoid double-space.
+		-- Prediction starts with whitespace — detect to remove double-spaces.
+		local starts_with_space = p_first:match("[%s]")
+			or p_first == "\194\160" or p_first == "\226\128\175"
+
+		if ends_no_sep and starts_with_space then
+			-- Strip the leading space to avoid double-space (or unwanted space after
+			-- a hyphen, apostrophe, etc.).
 			to_type = to_type:gsub("^[%s\194\160\226\128\175]+", "")
-		elseif not ends_with_space and not starts_with_space and not starts_with_punct then
-			-- Insert a separating space between the buffer and the completion.
-			to_type = " " .. to_type
 		end
 	end
 
@@ -362,24 +383,116 @@ end
 
 local _ignored_win_cache_time  = 0
 local _ignored_win_cache_value = false
+-- Cache dirty flag: true when the cached value can no longer be trusted
+-- (focus change, first call, or TTL elapsed). Watchers set this to true
+-- synchronously whenever the focused window/app is known to have changed.
+local _ignored_win_cache_dirty = true
+-- Lazy-init singletons for the focus-change watchers. Created on the first
+-- is_ignored_window() call so that module load never forces Hammerspoon to
+-- spin up the accessibility APIs when they are not needed yet.
+local _ignored_win_app_watcher = nil
+local _ignored_win_win_filter  = nil
+
+--- Invalidates the ignored-window cache. Called from focus-change watchers;
+--- also safe to call from anywhere else (tests, manual overrides).
+local function invalidate_ignored_win_cache()
+	_ignored_win_cache_dirty = true
+end
+
+--- Starts focus-change watchers on first use. Any failure is logged and
+--- falls back to the TTL-only cache behavior — the ignored-window logic
+--- must never crash the eventtap.
+local function ensure_ignored_win_watchers()
+	if _ignored_win_app_watcher and _ignored_win_win_filter then return end
+
+	-- Application-level: fires when a different app becomes/leaves frontmost.
+	if not _ignored_win_app_watcher then
+		local ok, watcher = pcall(function()
+			local w = hs.application.watcher.new(function(_name, event, _app)
+				if event == hs.application.watcher.activated
+					or event == hs.application.watcher.deactivated then
+					invalidate_ignored_win_cache()
+				end
+			end)
+			w:start()
+			return w
+		end)
+		if ok and watcher then
+			_ignored_win_app_watcher = watcher
+			Logger.debug(LOG, "Ignored-window cache: application watcher started.")
+		else
+			Logger.warn(LOG, "Ignored-window cache: application watcher setup failed — relying on TTL.")
+		end
+	end
+
+	-- Window-level: fires on intra-app focus changes and title changes (some apps
+	-- reuse one window but change its title between contexts we need to re-evaluate).
+	if not _ignored_win_win_filter then
+		local ok, filter = pcall(function()
+			local f = hs.window.filter.default
+			f:subscribe(
+				{ hs.window.filter.windowFocused, hs.window.filter.windowTitleChanged },
+				invalidate_ignored_win_cache
+			)
+			return f
+		end)
+		if ok and filter then
+			_ignored_win_win_filter = filter
+			Logger.debug(LOG, "Ignored-window cache: window filter subscribed.")
+		else
+			Logger.warn(LOG, "Ignored-window cache: window filter setup failed — relying on TTL.")
+		end
+	end
+end
 
 --- Returns true when the frontmost window is on the ignore list.
---- Result is cached for 0.5s to avoid querying the OS on every keystroke.
+--- The Hammerspoon console check is folded in here so that the single
+--- frontmostApplication() call is covered by the cache — previously
+--- a redundant uncached call was made in init.lua on every keystroke.
+--- Cache invalidation is event-driven (hs.application.watcher +
+--- hs.window.filter), with a long TTL as a safety net. In steady state
+--- (user typing without switching apps/windows), this function performs
+--- zero syscalls.
+--- Accepts the current timestamp from the caller so that the
+--- secondsSinceEpoch() syscall is not duplicated when init.lua already
+--- holds a fresh `now` value.
 --- @param ignored_titles table Hash map of exact window titles to ignore.
 --- @param ignored_patterns table Array of Lua patterns matched against window titles.
+--- @param now number Current epoch timestamp (seconds) from the caller.
 --- @return boolean
-function M.is_ignored_window(ignored_titles, ignored_patterns)
-	local now = hs.timer.secondsSinceEpoch()
-	if now - _ignored_win_cache_time < 0.5 then return _ignored_win_cache_value end
+function M.is_ignored_window(ignored_titles, ignored_patterns, now)
+	-- Fallback for callers that don't hold a pre-computed timestamp
+	if not now then now = hs.timer.secondsSinceEpoch() end
+
+	-- Lazy-init on first use so module load never pays the watcher startup cost.
+	ensure_ignored_win_watchers()
+
+	-- Fast path: cache is clean and TTL has not elapsed.
+	local ttl_elapsed = (now - _ignored_win_cache_time) >= IGNORED_WIN_TTL_SEC
+	if not _ignored_win_cache_dirty and not ttl_elapsed then
+		return _ignored_win_cache_value
+	end
 
 	_ignored_win_cache_time  = now
+	_ignored_win_cache_dirty = false
 	_ignored_win_cache_value = false
 
-	local app = hs.application.frontmostApplication()
-	if not app then return false end
-
-	local ok_win, win = pcall(function() return app:focusedWindow() end)
+	-- Use the focused window directly rather than frontmostApplication() so that
+	-- floating-panel apps (e.g. Raycast) that accept keystrokes without becoming
+	-- the NSWorkspace frontmost app are evaluated against their own window title,
+	-- not the title of the previously active app.
+	local ok_win, win = pcall(hs.window.focusedWindow)
 	if not ok_win or not win then return false end
+
+	local ok_app, app = pcall(function() return win:application() end)
+	if not ok_app or not app then return false end
+
+	-- Always ignore the Hammerspoon console to prevent feedback loops;
+	-- folded here so it benefits from the event-driven cache as the rest.
+	if app:name() == "Hammerspoon" then
+		_ignored_win_cache_value = true
+		return true
+	end
 
 	local ok_title, title = pcall(function() return win:title() end)
 	if not ok_title or type(title) ~= "string" then return false end

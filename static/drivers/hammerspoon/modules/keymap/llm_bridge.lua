@@ -34,6 +34,7 @@ local Logger     = require("lib.logger")
 local keylogger  = require("modules.keylogger")
 local tooltip    = require("ui.tooltip")
 local engine     = require("modules.llm.prediction_engine")
+local Registry   = require("modules.keymap.registry")
 
 local LOG    = "keymap.llm_bridge"
 local _state = nil  -- Shared CoreState, injected via M.init().
@@ -55,8 +56,10 @@ local KEYCODE_DIGITS = {
 	[22] = 6, [26] = 7, [28] = 8, [25] = 9, [29] = 10,
 }
 
+local KEYCODE_ESCAPE    = 53   -- Escape key consumed by the dynamic escape trap
 local KEYCODE_RETURN    = 36   -- Main Return key (accepts the active prediction)
 local KEYCODE_ENTER     = 76   -- Numpad Enter (same behaviour as Return)
+local KEYCODE_TAB       = 48   -- Tab: fast-accepts prediction #1 and stops all streaming
 local KEYCODE_ARROW_MIN = 123  -- Lowest arrow keycode (left arrow)
 local KEYCODE_ARROW_MAX = 126  -- Highest arrow keycode (up arrow); range covers all four
 
@@ -69,6 +72,17 @@ local MIN_TOOLTIP_DURATION_SEC   = 0.05   -- Shortest visible duration for any h
 -- Tiny offset added on top of the tooltip timeout when chaining LLM after a hotstring,
 -- so the LLM fires just after the tooltip would normally close.
 local HOTSTRING_CHAIN_OFFSET_SEC = 0.05
+
+-- Upper bound on the raw→plain cache populated by provider callbacks. Previews
+-- run on every keystroke and each provider returns a raw replacement that
+-- needs tokens_from_repl() + plain_text() before it can be compared against
+-- the buffer. In practice providers emit a small handful of distinct raw
+-- strings, so a cache makes the per-keystroke work a single table lookup.
+-- The cap exists purely as a safety net: a pathological provider returning
+-- an unbounded set of unique strings would otherwise grow the table
+-- forever. When the cap is hit we reset the table — simpler than LRU
+-- bookkeeping and fine for a rare overflow.
+local PROVIDER_CACHE_MAX = 1024
 
 -- Canonical LLM defaults, owned by modules/llm; used to seed bridge-local flags.
 local LLM_DEFAULTS = core_llm.DEFAULT_STATE
@@ -85,6 +99,11 @@ local LLM_DEFAULTS = core_llm.DEFAULT_STATE
 -- The most recently shown hotstring suggestion; kept for dismissal telemetry.
 local last_shown_hotstring = nil
 
+-- Persistent Escape trap, created lazily on first tooltip show.
+-- Inserting a new eventtap at HEAD ensures it fires before any pre-existing tap (e.g. Raycast).
+-- The trap checks tooltip.is_visible() at runtime so it never needs to be disarmed.
+local _escape_trap = nil
+
 -- ── Preview visibility toggles ────────────────────────────────────────────────
 -- Initial values are set in M.init() from the keymap defaults passed by keymap/init.lua.
 -- The menu overrides them at startup via set_preview_*_enabled().
@@ -100,6 +119,36 @@ local fire_llm_after_hotstring   = LLM_DEFAULTS.llm_after_hotstring
 -- Clear the buffer when the user presses an arrow key or Escape outside prediction mode.
 local reset_buffer_on_navigation = LLM_DEFAULTS.llm_reset_on_nav
 
+-- Memoization of plain-text projections for strings returned by preview
+-- providers. Each keystroke used to call tokens_from_repl() + plain_text()
+-- on the provider result, both of which scan the whole string; now we pay
+-- that cost exactly once per distinct raw value. See PROVIDER_CACHE_MAX
+-- for the overflow policy.
+local _provider_plain_cache      = {}
+local _provider_plain_cache_size = 0
+
+--- Returns the plain-text projection of a raw provider replacement, using a
+--- module-local memoization table so the per-keystroke preview path does no
+--- tokenization work for previously-seen strings.
+--- @param raw string Raw replacement returned by a provider callback.
+--- @return string Plain text with tokens resolved.
+local function provider_plain(raw)
+	-- Defensive: providers are external callbacks, so nothing guarantees they
+	-- return a string. A non-string key in the cache would crash downstream
+	-- concatenation in plain_text; bail out early and return empty.
+	if type(raw) ~= "string" then return "" end
+	local cached = _provider_plain_cache[raw]
+	if cached ~= nil then return cached end
+	if _provider_plain_cache_size >= PROVIDER_CACHE_MAX then
+		_provider_plain_cache      = {}
+		_provider_plain_cache_size = 0
+	end
+	local plain = km_utils.plain_text(km_utils.tokens_from_repl(raw))
+	_provider_plain_cache[raw] = plain
+	_provider_plain_cache_size = _provider_plain_cache_size + 1
+	return plain
+end
+
 
 --- Guard: verifies that M.init() was called before any public function that
 --- depends on _state. Logs an error and returns false on failure.
@@ -111,6 +160,45 @@ local function require_state(func_name)
 		return false
 	end
 	return true
+end
+
+--- Returns true when buf ends with the trigger (with optional word-boundary check).
+--- Defined at module level so it is not re-allocated as a closure on every keystroke.
+--- @param buffer string The current typed buffer.
+--- @param trigger string The hotstring trigger to match.
+--- @param is_word boolean When true, rejects matches preceded by a letter or "@".
+--- @return boolean
+local function ends_with_trigger(buffer, trigger, is_word)
+	if type(buffer) ~= "string" or type(trigger) ~= "string" or trigger == "" then return false end
+	if #buffer < #trigger or buffer:sub(-#trigger) ~= trigger then return false end
+	if is_word ~= true then return true end
+	local before      = buffer:sub(1, #buffer - #trigger)
+	if #before == 0 then return true end
+	local prev_offset = utf8.offset(before, -1)
+	local prev_char   = prev_offset and before:sub(prev_offset) or ""
+	-- Block when the character immediately before the trigger is a letter or "@".
+	if prev_char == "@" or text_utils.is_letter_char(prev_char) then return false end
+	return true
+end
+
+--- Returns true when the buffer ends with a word-boundary character that signals the
+--- user has completed a word: punctuation or whitespace (whitespace is already handled
+--- separately by the last_word == nil branch, but punctuation reaches this path).
+--- @param buf string The current typed buffer.
+--- @return boolean
+local function is_word_boundary(buf)
+	if type(buf) ~= "string" or buf == "" then return false end
+	-- Extract the last UTF-8 codepoint rather than the last byte, so that
+	-- multi-byte separators like NBSP (U+00A0, "\194\160") and NNBSP
+	-- (U+202F, "\226\128\175") — produced by French typography hotstrings —
+	-- are recognised as word boundaries instead of looking like stray
+	-- continuation bytes that never match any of the ASCII comparisons.
+	local ok, poff = pcall(utf8.offset, buf, -1)
+	local last = (ok and poff) and buf:sub(poff) or buf:sub(-1)
+	return last == " " or last == "," or last == "." or last == "!"
+		or last == "?" or last == ";" or last == ":" or last == ")"
+		or last == "}" or last == "]" or last == "\n"
+		or last == "\194\160" or last == "\226\128\175"
 end
 
 
@@ -206,12 +294,17 @@ function M.set_llm_pred_indent(v)           engine.set_llm_pred_indent(v)       
 function M.set_llm_show_info_bar(v)         engine.set_llm_show_info_bar(v)         end
 function M.set_llm_sequential_mode(v)       engine.set_llm_sequential_mode(v)       end
 function M.set_llm_auto_raise_temp(v)       engine.set_llm_auto_raise_temp(v)       end
-function M.set_llm_disabled_apps(apps)      engine.set_llm_disabled_apps(apps)      end
+function M.set_llm_disabled_apps(apps)           engine.set_llm_disabled_apps(apps)           end
+function M.set_llm_url_bar_filter_enabled(v)      engine.set_llm_url_bar_filter_enabled(v)      end
+function M.set_llm_secure_field_filter_enabled(v) engine.set_llm_secure_field_filter_enabled(v) end
+function M.set_llm_instant_on_word_end(v)         engine.set_llm_instant_on_word_end(v)         end
 function M.set_llm_val_modifiers(mods)      engine.set_llm_val_modifiers(mods)      end
 function M.set_llm_nav_modifiers(mods)      engine.set_llm_nav_modifiers(mods)      end
 function M.set_llm_min_words(w)             engine.set_llm_min_words(w)             end
 function M.set_llm_max_words(w)             engine.set_llm_max_words(w)             end
 function M.set_llm_debounce(seconds)        engine.set_llm_debounce(seconds)        end
+function M.set_llm_streaming(v)             engine.set_llm_streaming(v)             end
+function M.set_llm_streaming_multi(v)       engine.set_llm_streaming_multi(v)       end
 
 --- Sets the "chain LLM after hotstring" flag, owned here because
 --- update_preview() consumes it directly.
@@ -250,25 +343,10 @@ end
 function M.update_preview(buf)
 	if not require_state("update_preview") then return end
 
-	engine.stop_timer()
-
-	--- Returns true when buf ends with the trigger (with optional word-boundary check).
-	--- @param buffer string
-	--- @param trigger string
-	--- @param is_word boolean
-	--- @return boolean
-	local function ends_with_trigger(buffer, trigger, is_word)
-		if type(buffer) ~= "string" or type(trigger) ~= "string" or trigger == "" then return false end
-		if #buffer < #trigger or buffer:sub(-#trigger) ~= trigger then return false end
-		if is_word ~= true then return true end
-		local before      = buffer:sub(1, #buffer - #trigger)
-		if #before == 0 then return true end
-		local prev_offset = utf8.offset(before, -1)
-		local prev_char   = prev_offset and before:sub(prev_offset) or ""
-		-- Block when the character immediately before the trigger is a letter or "@".
-		if prev_char == "@" or text_utils.is_letter_char(prev_char) then return false end
-		return true
-	end
+	-- Skip timer ops entirely when LLM is off: stop_timer()/start_timer() involve
+	-- ObjC dispatch calls that add up on every keystroke even when the engine is idle
+	local llm_on = engine.get_llm_enabled()
+	if llm_on then engine.stop_timer() end
 
 	if not buf or #buf == 0 then
 		Logger.debug(LOG, "Empty buffer — predictions cleared.")
@@ -279,57 +357,83 @@ function M.update_preview(buf)
 	local last_word = buf:match("([^%s]+)$")
 	if not last_word then
 		M.reset_predictions()
-		engine.start_timer()
+		-- Buffer ends with whitespace: the user just finished a word or sentence.
+		-- start_timer_word_end() bypasses the debounce when instant_on_word_end is on.
+		if llm_on then engine.start_timer_word_end() end
 		return
 	end
 
-	local matched_repl, matched_input, match_type, match_group = nil, nil, nil, nil
+	local matched_repl, matched_plain_repl, matched_input, match_type, match_group = nil, nil, nil, nil, nil
 
 	-- Custom preview providers take precedence over the static mapping lookup.
 	for _, provider in ipairs(_state.preview_providers) do
 		local ok, res = pcall(provider, buf)
 		if ok and res then
-			matched_repl = res
-			match_type   = "provider"
+			matched_repl       = res
+			-- Providers return raw strings; plain_repl must be derived on the
+			-- fly, but we memoize the projection so keystroke-frequency calls
+			-- with the same raw value become a single table lookup.
+			matched_plain_repl = provider_plain(res)
+			match_type         = "provider"
 			break
 		end
 	end
 
-	-- Walk static mappings to find a hotstring match.
+	-- Walk static mappings via the tail-char indexes so we only visit the
+	-- handful of candidates whose trigger / star_base ends with the buffer's
+	-- last codepoint, instead of scanning all ~10-15k mappings.
 	if not matched_repl then
-		for _, mapping in ipairs(_state.mappings) do
-			local group_active = not mapping.group
+		local poff          = utf8.offset(buf, -1)
+		local buf_tail_char = poff and buf:sub(poff) or ""
+
+		local function group_active(mapping)
+			return not mapping.group
 				or not _state.groups[mapping.group]
 				or _state.groups[mapping.group].enabled
-			if not group_active then goto continue end
+		end
 
-			local magic_len = #_state.magic_key
-			local has_magic = magic_len > 0 and mapping.trigger:sub(-magic_len) == _state.magic_key
-			local star_base = has_magic and mapping.trigger:sub(1, #mapping.trigger - magic_len) or nil
-
-			if star_base and star_base ~= "" and ends_with_trigger(buf, star_base, mapping.is_word) then
-				local plain = km_utils.plain_text(km_utils.tokens_from_repl(mapping.repl))
-				if plain ~= star_base then
-					matched_repl  = mapping.repl
-					match_type    = "star"
-					match_group   = mapping.group
-					matched_input = star_base
-					break
-				end
-			elseif ends_with_trigger(buf, mapping.trigger, mapping.is_word)
-				and not (mapping.is_word == false and mapping.auto == true)
-			then
-				local plain = km_utils.plain_text(km_utils.tokens_from_repl(mapping.repl))
-				if plain ~= mapping.trigger then
-					matched_repl  = mapping.repl
-					match_type    = "autocorrect"
-					match_group   = mapping.group
-					matched_input = mapping.trigger
-					break
+		-- Star-base path first: when a has_magic mapping's star_base matches,
+		-- its preview wins over a shorter non-magic trigger that happens to
+		-- end at the same character, matching the sort-order priority of the
+		-- original linear scan (longest trigger first).
+		local star_bucket = Registry.mappings_for_star_tail(buf_tail_char)
+		if star_bucket then
+			for _, mapping in ipairs(star_bucket) do
+				if group_active(mapping) then
+					local star_base = mapping.star_base
+					if star_base and star_base ~= ""
+						and ends_with_trigger(buf, star_base, mapping.is_word)
+						and mapping.plain_repl ~= star_base
+					then
+						matched_repl       = mapping.repl
+						matched_plain_repl = mapping.plain_repl
+						match_type         = "star"
+						match_group        = mapping.group
+						matched_input      = star_base
+						break
+					end
 				end
 			end
+		end
 
-			::continue::
+		if not matched_repl then
+			local tail_bucket = Registry.mappings_for_tail(buf_tail_char)
+			if tail_bucket then
+				for _, mapping in ipairs(tail_bucket) do
+					if group_active(mapping)
+						and not (mapping.is_word == false and mapping.auto == true)
+						and ends_with_trigger(buf, mapping.trigger, mapping.is_word)
+						and mapping.plain_repl ~= mapping.trigger
+					then
+						matched_repl       = mapping.repl
+						matched_plain_repl = mapping.plain_repl
+						match_type         = "autocorrect"
+						match_group        = mapping.group
+						matched_input      = mapping.trigger
+						break
+					end
+				end
+			end
 		end
 	end
 
@@ -337,17 +441,16 @@ function M.update_preview(buf)
 	-- to prevent the preview from showing a tooltip for the repeat feature itself.
 	local is_repetition = false
 	if matched_repl and _state.is_repeat_feature_enabled() then
-		local plain  = km_utils.plain_text(km_utils.tokens_from_repl(matched_repl))
 		local ref    = matched_input or last_word
 		local offset = utf8.offset(ref, -1)
-		if offset then is_repetition = (plain == ref .. ref:sub(offset)) end
+		if offset then is_repetition = (matched_plain_repl == ref .. ref:sub(offset)) end
 	end
 
 	if matched_repl and not is_repetition then
 		-- Hotstring match found — show the tooltip.
 		M.reset_predictions(true)
 
-		local display_text = km_utils.plain_text(km_utils.tokens_from_repl(matched_repl))
+		local display_text = matched_plain_repl
 		local is_star      = (match_type == "star")
 
 		-- Resolve accent tint based on hotstring type.
@@ -378,7 +481,7 @@ function M.update_preview(buf)
 		tooltip.show(display_text, false, is_enabled, accent_color)
 
 		-- Chain: arm the LLM timer so it fires just as the tooltip window closes.
-		if fire_llm_after_hotstring then
+		if fire_llm_after_hotstring and llm_on then
 			Logger.debug(LOG, "LLM chain scheduled in %.3gs.", tooltip_timeout + HOTSTRING_CHAIN_OFFSET_SEC)
 			engine.start_timer(tooltip_timeout + HOTSTRING_CHAIN_OFFSET_SEC)
 		end
@@ -392,7 +495,15 @@ function M.update_preview(buf)
 		-- No hotstring match — let the inactivity timer drive the LLM.
 		Logger.debug(LOG, "No hotstring for '%s' — LLM timer armed.", tostring(last_word))
 		M.reset_predictions()
-		engine.start_timer()
+		if llm_on then
+			-- Punctuation after a word (comma, period, etc.) is a word boundary:
+			-- use the instant trigger path, same as the trailing-space branch above.
+			if is_word_boundary(buf) then
+				engine.start_timer_word_end()
+			else
+				engine.start_timer()
+			end
+		end
 	end
 end
 
@@ -404,6 +515,41 @@ end
 -- ======= 5/ Buffer & Keystroke Handlers ==========
 -- ================================================
 -- ================================================
+
+
+
+-- ============================
+-- ===== 5.1) Escape Trap =====
+-- ============================
+
+--- Arms a single persistent eventtap that intercepts Escape before it reaches the
+--- underlying application, but only when a tooltip is actually visible.
+--- Creating the tap on first use inserts it at the head of the macOS event tap chain
+--- (kCGHeadInsertEventTap), so it fires before any pre-existing tap registered by apps
+--- such as Raycast. Once armed, the trap runs permanently — no disarm needed.
+--- The runtime check on tooltip.is_visible() handles all state transitions safely
+--- without any lifecycle coupling to the tooltip show/hide flow.
+---
+--- WHY not recreate on every tooltip show: creating an eventtap is synchronous and
+--- non-trivial. Doing so on every preview keystroke blows the macOS 50 ms HID-callback
+--- budget on the NEXT keystroke, causing the triggering key to leak through to the
+--- app (e.g. "hs★" → "hsammerspoon" because ★ reached the screen before our deletes).
+local function arm_escape_trap()
+	if _escape_trap then return end
+	_escape_trap = hs.eventtap.new({ hs.eventtap.event.types.keyDown }, function(event)
+		if event:getKeyCode() ~= KEYCODE_ESCAPE then return false end
+		-- Let Escape through when no tooltip is on screen — Raycast (or the system)
+		-- should handle it normally in that case.
+		if not tooltip.is_visible() then return false end
+		Logger.debug(LOG, "Escape trap — Escape consumed, tooltip dismissed.")
+		M.reset_predictions()
+		return true
+	end)
+	_escape_trap:start()
+	Logger.debug(LOG, "Escape trap armed (persistent).")
+end
+
+
 
 --- Clears all active predictions and optionally emits hotstring-dismissed telemetry.
 --- @param keep_hotstring_log boolean When true, skips the dismiss telemetry event.
@@ -430,6 +576,18 @@ function M.apply_prediction(idx)
 
 	local delete_count = pred.deletes or 0
 	local text_to_type = pred.to_type or ""
+
+	-- Resolve overlap between the buffer tail and the prediction to prevent ghost-text
+	-- duplication when the user is mid-word (e.g. typed "tex", prediction starts with "texte").
+	-- Also enforces correct spacing at the join point as a safety net for cases the
+	-- parser may not have handled (e.g. raw-mode output with no leading space).
+	-- This call was accidentally dropped during the 183effff refactor.
+	local ok_overlap, res_deletes, res_text = pcall(
+		km_utils.resolve_prediction_overlap, _state.buffer, delete_count, text_to_type)
+	if ok_overlap and res_deletes ~= nil and res_text ~= nil then
+		delete_count = res_deletes
+		text_to_type = res_text
+	end
 
 	Logger.start(LOG, "Applying prediction #%d: '%s' (%d deletion(s)).",
 		idx, tostring(text_to_type), delete_count)
@@ -488,7 +646,10 @@ function M.handle_llm_keys(keyCode, flags, is_ignored)
 	-- F20: precise "typing complete" signal sent by apply_prediction().
 	if engine.handle_f20(keyCode) then return true end
 
-	if is_ignored or not engine.is_visible() then return false end
+	-- Always handle navigation when predictions are on screen, even in keymap-ignored apps
+	-- (e.g. Raycast): the user must be able to navigate/dismiss the tooltip regardless of context.
+	-- The is_ignored flag only suppresses hotstring expansion and buffer tracking, not LLM interaction.
+	if not engine.is_visible() then return false end
 
 	local preds = engine.get_predictions()
 
@@ -502,6 +663,15 @@ function M.handle_llm_keys(keyCode, flags, is_ignored)
 			engine.navigate(delta)
 			return true
 		end
+	end
+
+	-- Tab immediately accepts prediction #1, cancelling any in-flight streaming for
+	-- the other slots. This lets the user grab the first result as soon as it appears
+	-- without waiting for all parallel predictions to complete.
+	if keyCode == KEYCODE_TAB then
+		Logger.debug(LOG, "Tab — fast-accepting prediction #1.")
+		if not M.apply_prediction(1) then M.reset_predictions() end
+		return true
 	end
 
 	-- Return / Enter accepts the currently highlighted prediction.
@@ -524,13 +694,18 @@ function M.handle_llm_keys(keyCode, flags, is_ignored)
 	return false
 end
 
---- Handles Escape: dismisses predictions when visible; otherwise optionally clears the buffer.
---- @return boolean True when predictions were active and dismissed.
+--- Handles Escape: dismisses any visible tooltip (hotstring, LLM loading indicator, or
+--- AI predictions), consuming the event so it never reaches the underlying application.
+--- Without this, apps like Raycast receive the Escape and reset their own state.
+--- @return boolean True when a tooltip was visible and the event was consumed.
 function M.check_escape_reset()
 	if not require_state("check_escape_reset") then return false end
 
-	if engine.is_visible() then
-		Logger.debug(LOG, "Escape — predictions dismissed.")
+	-- Use tooltip.is_visible() rather than engine.is_visible() so we also catch
+	-- the LLM loading spinner and hotstring previews, which are shown through the
+	-- tooltip module but do not set the prediction-engine "visible" flag.
+	if tooltip.is_visible() then
+		Logger.debug(LOG, "Escape — tooltip dismissed.")
 		M.reset_predictions()
 		return true
 	end
@@ -608,5 +783,10 @@ end
 -- Closures ensure the functions are resolved at call time, not at bind time.
 tooltip.set_accept_callback(function(idx) M.apply_prediction(idx) end)
 tooltip.set_cancel_callback(function() M.reset_predictions() end)
+-- Create the persistent Escape trap the first time any tooltip appears.
+-- This guarantees the tap is inserted at HEAD after Raycast (or any other app) has
+-- already registered its own tap, so our Escape always takes priority while a tooltip
+-- is visible. The trap is never destroyed — tooltip.is_visible() drives its behaviour.
+tooltip.set_on_show_callback(arm_escape_trap)
 
 return M

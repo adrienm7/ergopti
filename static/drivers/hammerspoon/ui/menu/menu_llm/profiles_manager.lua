@@ -15,6 +15,7 @@ local notifications = require("lib.notifications")
 local llm_mod       = require("modules.llm")
 local shortcut_ui   = require("ui.menu.shortcut_utils")
 local Logger        = require("lib.logger")
+local dialog        = require("lib.dialog_util")
 
 local LOG = "menu_llm.profiles"
 
@@ -222,8 +223,7 @@ local function build_profile_menu(deps, models_mgr)
 				{
 					title = "🗑️ Supprimer…",
 					fn    = function()
-						pcall(hs.focus)
-						local ok_c, choice = pcall(hs.dialog.blockAlert, 
+						local ok_c, choice = pcall(dialog.block_alert,
 							"Supprimer « " .. display_label .. " » ?", 
 							"Ce profil personnalisé sera supprimé définitivement.", 
 							"Supprimer", "Annuler", "critical")

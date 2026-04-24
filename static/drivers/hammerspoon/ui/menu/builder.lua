@@ -133,12 +133,16 @@ function M.generate(ctx, menu_mods, actions)
 		Logger.warn(LOG, "Keylogger module missing.")
 	end
 
-	-- Gestures and shortcuts zone
-	if type(menu_mods.gestures) == "table" then
-		push("gestures.build", menu_mods.gestures.build, ctx)
-	end
 	if type(menu_mods.shortcuts) == "table" then
 		push("shortcuts.build", menu_mods.shortcuts.build, ctx)
+	end
+
+	-- Karabiner then Gestures — keyboard first, then trackpad
+	if type(menu_mods.karabiner) == "table" and type(menu_mods.karabiner.build) == "function" then
+		push("karabiner.build", menu_mods.karabiner.build, ctx)
+	end
+	if type(menu_mods.gestures) == "table" then
+		push("gestures.build", menu_mods.gestures.build, ctx)
 	end
 
 
@@ -156,6 +160,16 @@ function M.generate(ctx, menu_mods, actions)
 	table.insert(items, { title = "Ouvrir init.lua", fn = actions.open_init })
 	table.insert(items, { title = "Recharger", fn = actions.reload })
 	table.insert(items, { title = "Quitter", fn = actions.quit })
+
+	-- Collect the download item now so it participates in canvas width calculation below
+	local _dl_item = nil
+	if type(ctx.llm_handler) == "table" and type(ctx.llm_handler.build_download_item) == "function" then
+		_dl_item = ctx.llm_handler.build_download_item()
+	end
+	if _dl_item then
+		table.insert(items, 1, { title = "-" })
+		table.insert(items, 1, _dl_item)
+	end
 
 	-- Calculate the required canvas width based on the longest root menu item
 	local max_text_width = 0

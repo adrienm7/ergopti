@@ -8,6 +8,7 @@
 
 local M = {}
 local hs = hs
+local dialog        = require("lib.dialog_util")
 local shortcuts_mod = require("modules.shortcuts")
 
 
@@ -72,6 +73,8 @@ function M.build(ctx)
         
 		local key = parts[#parts]
 		if key == "star" or key == "asterisk" then key = state.trigger_char end
+		if key == "period" then key = "." end
+		if key == "quote"  then key = "'" end
         
 		local mods = {}
 		for i = 1, #parts - 1 do
@@ -134,7 +137,7 @@ function M.build(ctx)
 							title    = "   ↳ Modifier l’URL ChatGPT…",
 							disabled = paused or nil,
 							fn       = not paused and function()
-								local ok_p, clicked, url = pcall(hs.dialog.textPrompt, "URL ChatGPT",
+								local ok_p, clicked, url = pcall(dialog.text_prompt, "URL ChatGPT",
 									"URL ouverte par Ctrl+G :",
 									state.chatgpt_url, "OK", "Annuler")
 								if ok_p and clicked == "OK" and type(url) == "string" and url ~= "" then
@@ -211,6 +214,7 @@ function M.build(ctx)
 		end
 		local cur_return = state.script_control_shortcuts.return_key or "none"
 		local cur_back   = state.script_control_shortcuts.backspace  or "none"
+		local cur_escape = state.script_control_shortcuts.escape     or "none"
 		table.insert(s_menu, { title = "-" })
 		table.insert(s_menu, {
 			title    = "Option droite + ↩ : " .. get_label(cur_return),
@@ -223,18 +227,9 @@ function M.build(ctx)
 			menu     = key_submenu("backspace")
 		})
 		table.insert(s_menu, {
-			title    = "Chemin du AHK…",
-			disabled = paused or nil,
-			fn       = not paused and function()
-				local ok_p, btn, path = pcall(hs.dialog.textPrompt, "Script AHK",
-					"Chemin du fichier AHK source :",
-					state.ahk_source_path, "OK", "Annuler")
-				if ok_p and btn == "OK" and type(path) == "string" then
-					state.ahk_source_path = path
-					ctx.save_prefs()
-					ctx.updateMenu()
-				end
-			end or nil
+			title    = "Option droite + ⎋ : " .. get_label(cur_escape),
+			disabled = not enabled or paused or nil,
+			menu     = key_submenu("escape")
 		})
 	end
 
