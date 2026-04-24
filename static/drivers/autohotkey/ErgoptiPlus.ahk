@@ -729,7 +729,11 @@ ToggleAllFeatures(Value) {
     ; Behavior:
     ; - If Value == 0 : set everything to 0 recursively (including sub-sub-menus)
     ; - If Value == 1 : set only first-level features (the defaults) to 1; do not enable nested choices
+    ; Collect all INI mutations into a single batch — writing them one by one
+    ; through IniWrite does 50+ FileOpen/Write/Close round-trips and produces a
+    ; visible delay in the tray menu.
     global Features
+    Updates := []
 
     ; Recursive setter used when Value == 0
     SetAllRecursive(Path, Items) {
@@ -743,7 +747,7 @@ ToggleAllFeatures(Value) {
                     ; The Enabled flag of the map itself is written in the parent section
                     parentSection := Path = "" ? Key : Path
                     Val.Enabled := Value
-                    IniWrite(Value, ConfigurationFile, parentSection, Key . ".Enabled")
+                    Updates.Push({ Section: parentSection, Key: Key . ".Enabled", Value: Value })
                 }
                 ; Recurse into nested entries to set their Enabled to Value
                 SetAllRecursive(NewPath, Val)
@@ -759,9 +763,9 @@ ToggleAllFeatures(Value) {
                 }
                 Val.Enabled := Value
                 if keyName = "" {
-                    IniWrite(Value, ConfigurationFile, section, Key . ".Enabled")
+                    Updates.Push({ Section: section, Key: Key . ".Enabled", Value: Value })
                 } else {
-                    IniWrite(Value, ConfigurationFile, section, keyName . ".Enabled")
+                    Updates.Push({ Section: section, Key: keyName . ".Enabled", Value: Value })
                 }
             }
         }
@@ -782,12 +786,13 @@ ToggleAllFeatures(Value) {
                 }
                 if IsObject(Val) and Val.HasOwnProp("Enabled") {
                     Val.Enabled := Value
-                    IniWrite(Value, ConfigurationFile, Category, FeatureName . ".Enabled")
+                    Updates.Push({ Section: Category, Key: FeatureName . ".Enabled", Value: Value })
                 }
                 ; If Val is a Map without Enabled, we skip its children when enabling
             }
         }
     }
+    IniBatchWrite(ConfigurationFile, Updates)
     Reload
 }
 
@@ -799,6 +804,7 @@ ToggleAllHotstringsOff(*) {
 }
 ToggleAllHotstrings(Value) {
     global Features, HotstringCategories
+    Updates := []
     for Category in HotstringCategories {
         if !Features.Has(Category) {
             continue
@@ -809,7 +815,7 @@ ToggleAllHotstrings(Value) {
             }
             if IsObject(Val) and Val.HasOwnProp("Enabled") {
                 Val.Enabled := Value
-                IniWrite(Value, ConfigurationFile, Category, FeatureName . ".Enabled")
+                Updates.Push({ Section: Category, Key: FeatureName . ".Enabled", Value: Value })
             }
         }
     }
@@ -821,10 +827,11 @@ ToggleAllHotstrings(Value) {
             }
             if IsObject(Val) and Val.HasOwnProp("Enabled") {
                 Val.Enabled := Value
-                IniWrite(Value, ConfigurationFile, "Personal", FeatureName . ".Enabled")
+                Updates.Push({ Section: "Personal", Key: FeatureName . ".Enabled", Value: Value })
             }
         }
     }
+    IniBatchWrite(ConfigurationFile, Updates)
     Reload
 }
 
@@ -838,10 +845,12 @@ ReloadWithDefaultConfig(*) {
 
 ToggleConfigurationShortcuts(*) {
     NewValue := not AllConfigurationShortcutsEnabled()
+    Updates := []
     for Shortcut in ConfigurationShortcutsList {
         ScriptInformation[Shortcut] := NewValue
-        IniWrite(NewValue, ConfigurationFile, "Script", Shortcut)
+        Updates.Push({ Section: "Script", Key: Shortcut, Value: NewValue })
     }
+    IniBatchWrite(ConfigurationFile, Updates)
     Reload
 }
 AllConfigurationShortcutsEnabled(*) {
