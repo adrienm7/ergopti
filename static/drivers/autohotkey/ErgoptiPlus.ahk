@@ -403,6 +403,11 @@ CreateSubMenusRecursiveCommonCode(MenuParent, Key, Val, CategoryPath) {
         CreateSubMenusRecursive(SubMenu, Val, FullPath)
     } else if IsObject(Val) and Val.HasOwnProp("Enabled") {
         MenuAddItem(MenuParent, CategoryPath, Key)
+        ; Mirror HS personal_info module_placeholder: add an editor shortcut
+        ; below the "Remplissage de formulaires" toggle
+        if (Key == "textexpansionpersonalinformation") {
+            MenuParent.Add("   ↳ Modifier les informations personnelles…", PersonalInformationEditor)
+        }
     }
 }
 
@@ -549,7 +554,7 @@ initMenu() {
     for Category in HotstringCategories {
         if SubMenus.Has(Category) {
             Total := CountTomlHotstrings(Category)
-            Title := GetCategoryTitle(Category) . (Total > 0 ? " (" . Total . ")" : "")
+            Title := GetCategoryTitle(Category) . (Total > 0 ? " (" . FmtCount(Total) . ")" : "")
             HotstringsMenu.Add(Title, SubMenus[Category])
         }
     }
@@ -566,7 +571,7 @@ initMenu() {
             }
         }
         DynTitle := GetCategoryTitle("DynamicHotstrings")
-            . (DynTotal > 0 ? " (" . DynTotal . ")" : "")
+            . (DynTotal > 0 ? " (" . FmtCount(DynTotal) . ")" : "")
         HotstringsMenu.Add(DynTitle, DynMenu)
     }
 
@@ -585,7 +590,7 @@ initMenu() {
             ; Match lowercase TOML key to the PascalCase Features key
             for FeatKey in Features["Personal"] {
                 if (FeatKey != "__Order" and StrLower(FeatKey) == SecName) {
-                    Features["Personal"][FeatKey].Description := BaseDesc . " (" . Count . ")"
+                    Features["Personal"][FeatKey].Description := BaseDesc . " (" . FmtCount(Count) . ")"
                 }
             }
         }
@@ -641,7 +646,7 @@ initMenu() {
             TotalPersonal += SecData["entries"].Length
         }
         PersonalTitle := GetCategoryTitle("Personal")
-            . (TotalPersonal > 0 ? " (" . TotalPersonal . ")" : "")
+            . (TotalPersonal > 0 ? " (" . FmtCount(TotalPersonal) . ")" : "")
         HotstringsMenu.Add(PersonalTitle, PersonalMenu)
     }
     HotstringsMenu.Add() ; Separating line
@@ -902,6 +907,20 @@ ModifyLink(gui, NewValue) {
 
     gui.Destroy()
     Reload
+}
+
+; Formats a number with spaces as thousands separators, matching HS fmt_count.
+FmtCount(N) {
+    S := String(Round(N))
+    Result := ""
+    Loop StrLen(S) {
+        Pos := StrLen(S) - A_Index + 1
+        Result := SubStr(S, Pos, 1) . Result
+        if (Mod(A_Index, 3) == 0 and A_Index < StrLen(S)) {
+            Result := " " . Result
+        }
+    }
+    return Result
 }
 
 NoAction(*) {
