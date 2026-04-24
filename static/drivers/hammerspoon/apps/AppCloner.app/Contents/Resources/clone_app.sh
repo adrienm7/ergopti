@@ -280,10 +280,15 @@ echo "Re-signing bottom-up (ad-hoc)…"
 
 PRESERVE="--preserve-metadata=entitlements,requirements,flags,runtime"
 
-# Leaf Mach-O files (dylibs, *.so, standalone binaries inside Frameworks)
-find "$DEST/Contents/Frameworks" -type f \( -name "*.dylib" -o -name "*.so" \) 2>/dev/null \
+# Every Mach-O file in the bundle (dylibs, .so, standalone binaries sitting in
+# MacOS/ like "Code.real", frameworks internals). Their own embedded signatures
+# reference the parent Info.plist hash — patching Info.plist invalidates every
+# one of them, so they all need a fresh ad-hoc signature.
+find "$DEST/Contents" -type f 2>/dev/null \
   | while IFS= read -r f; do
-      codesign --force --sign - "$f" 2>/dev/null || true
+      # Filter to executables/libraries only via `file` magic
+      file -b "$f" 2>/dev/null | grep -qE "Mach-O|dynamically linked shared library" \
+        && codesign --force --sign - "$f" 2>/dev/null || true
     done
 
 # Nested .framework bundles — deepest first
