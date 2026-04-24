@@ -4,11 +4,11 @@
 SetWorkingDir(A_ScriptDir) ; Set the working directory where the script is located
 
 ; #Warn directives apply to the whole compilation unit in AHK v2 — they
-; cannot be scoped to a single #Include. VarUnset is disabled globally
-; because UIA.ahk accesses optional properties that are intentionally
-; unset (that is by design in the UIA v2 library, not a bug here).
+; cannot be scoped to a single #Include. VarUnset and LocalSameAsGlobal are
+; disabled globally because UIA.ahk (third-party) triggers both intentionally.
 #Warn All
 #Warn VarUnset, Off
+#Warn LocalSameAsGlobal, Off
 
 #Include *i vendor\UIA.ahk ; UIA v2 library — third-party, kept verbatim in vendor\ (source: https://github.com/Descolada/UIA-v2)
 ; *i = no error if the file isn't found. UIA is only used by WrapTextIfSelected
