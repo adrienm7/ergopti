@@ -566,132 +566,232 @@ if [[ "$PWA_MODE" == "1" ]]; then
 	PWA_PROFILE_DIR="$HOME/Library/Application Support/AppCloner/${safe_name}_pwa"
 	mkdir -p "$PWA_PROFILE_DIR"
 
-	# Write the Swift helper that switches the active Space via private CGS API.
-	# Stored as a separate file — zsh does not support heredocs inside heredocs.
-	mkdir -p "${PWA_PROFILE_DIR}"
-	cat > "${PWA_PROFILE_DIR}/switch_space.swift" << 'SWIFTEOF'
-import CoreGraphics
+	# Compile a real Cocoa NSApplication launcher in Swift. This is the only
+	# reliable singleton mechanism for an .app bundle: macOS guarantees a single
+	# NSApplication instance per bundle-id and dispatches kAEReopenApplication
+	# events to it. A shell or Python script cannot intercept those events.
+	#
+	# The launcher also moves Edge windows to the target Space via the private
+	# CGSMoveWindowsToManagedSpace API — this overrides Edge's own Space pinning
+	# (Edge may be pinned to Space 1, but the cloned PWA window must land on
+	# the source app's Space, e.g. Teams' Space 2).
+	#
+	# We use a heredoc without quoting so shell expands ${PWA_PROFILE_DIR},
+	# ${PWA_BROWSER_EXE}, ${OPEN_ARG}, ${UNIQUE_ID} into the Swift source.
+	# Swift's string interpolation uses \(...) which the shell preserves verbatim.
+	SWIFT_SRC="$RES/launcher.swift"
+	cat > "$SWIFT_SRC" << SWIFTEOF
+import Cocoa
 import Foundation
-@_silgen_name("CGSCopySpaces")              func CGSCopySpaces(_ cid: Int32, _ mask: Int) -> CFArray
-@_silgen_name("CGSShowSpaces")              func CGSShowSpaces(_ cid: Int32, _ spaces: CFArray)
-@_silgen_name("CGSMainConnectionID")        func CGSMainConnectionID() -> Int32
-@_silgen_name("CGSManagedDisplayGetCurrentSpace") func CGSManagedDisplayGetCurrentSpace(_ cid: Int32, _ disp: CFString) -> Int
-@_silgen_name("CGSManagedDisplaySetCurrentSpace") func CGSManagedDisplaySetCurrentSpace(_ cid: Int32, _ disp: CFString, _ sid: Int)
-let targetUUID = CommandLine.arguments[1]
-let cid = CGSMainConnectionID()
-guard let spaces = CGSCopySpaces(cid, 0xF) as? [[String: Any]] else { exit(0) }
-guard let match = spaces.first(where: { ($0["uuid"] as? String) == targetUUID }),
-      let spaceID = match["ManagedSpaceID"] as? Int else { exit(0) }
-// CGSShowSpaces makes the Space visible in the switcher; CGSManagedDisplaySetCurrentSpace
-// actually moves the display to that Space — both calls are needed.
-CGSShowSpaces(cid, [spaceID] as CFArray)
-let display = CGMainDisplayID()
-CGSManagedDisplaySetCurrentSpace(cid, "\(display)" as CFString, spaceID)
+import CoreGraphics
+
+let PROFILE_DIR = "${PWA_PROFILE_DIR}"
+let BROWSER_EXE = "${PWA_BROWSER_EXE}"
+let OPEN_ARG    = "${OPEN_ARG}"
+let UNIQUE_ID   = "${UNIQUE_ID}"
+let LOG_FILE    = "/tmp/appcloner_pwa_\(UNIQUE_ID).log"
+let SPACE_HINT  = (PROFILE_DIR as NSString).appendingPathComponent("target_space_uuid")
+
+// Private CoreGraphics Services APIs for Space management.
+@_silgen_name("CGSMainConnectionID")
+func CGSMainConnectionID() -> Int32
+
+@_silgen_name("CGSCopySpaces")
+func CGSCopySpaces(_ cid: Int32, _ mask: Int) -> CFArray?
+
+@_silgen_name("CGSMoveWindowsToManagedSpace")
+func CGSMoveWindowsToManagedSpace(_ cid: Int32, _ wids: CFArray, _ sid: Int)
+
+// Look up the macOS-internal Space ID for a Space UUID stored in com.apple.spaces.
+func spaceID(forUUID uuid: String) -> Int? {
+	let cid = CGSMainConnectionID()
+	guard let raw = CGSCopySpaces(cid, 0xF) as? [[String: Any]] else { return nil }
+	for entry in raw {
+		if let u = entry["uuid"] as? String, u == uuid,
+		   let sid = entry["ManagedSpaceID"] as? Int { return sid }
+	}
+	return nil
+}
+
+// Find an Edge process already using our profile dir. Used to recover from
+// orphaned Edge instances after a launcher crash, so we never spawn a duplicate.
+func findEdgePID() -> pid_t? {
+	let task = Process()
+	task.executableURL = URL(fileURLWithPath: "/usr/bin/pgrep")
+	task.arguments = ["-f", "user-data-dir=\(PROFILE_DIR)"]
+	let pipe = Pipe()
+	task.standardOutput = pipe
+	task.standardError = Pipe()
+	do { try task.run() } catch { return nil }
+	task.waitUntilExit()
+	let data = pipe.fileHandleForReading.readDataToEndOfFile()
+	guard let s = String(data: data, encoding: .utf8) else { return nil }
+	return s.split(separator: "\n")
+		.compactMap { pid_t(\$0.trimmingCharacters(in: .whitespaces)) }
+		.first
+}
+
+class AppDelegate: NSObject, NSApplicationDelegate {
+	var edgeProcess: Process?
+	var edgePID: pid_t = 0
+
+	func applicationDidFinishLaunching(_ notification: Notification) {
+		try? FileManager.default.createDirectory(
+			atPath: PROFILE_DIR, withIntermediateDirectories: true
+		)
+
+		// Recovery path: orphaned Edge from a previous crashed launcher. Adopt
+		// it instead of spawning a second instance (which would open a new
+		// browser tab via Edge's IPC SingletonSocket).
+		if let pid = findEdgePID() {
+			edgePID = pid
+			NSRunningApplication(processIdentifier: pid)?.activate(
+				options: [.activateAllWindows, .activateIgnoringOtherApps]
+			)
+			// Watch the orphan; when it dies, we die too.
+			DispatchQueue.global(qos: .background).async {
+				while kill(pid, 0) == 0 { Thread.sleep(forTimeInterval: 1.0) }
+				DispatchQueue.main.async { NSApp.terminate(nil) }
+			}
+			return
+		}
+
+		// Read the Space hint written at clone-creation time. Consumed once
+		// on first launch, then deleted (subsequent launches let Edge remember
+		// its own window position).
+		var targetSpaceID: Int? = nil
+		if FileManager.default.fileExists(atPath: SPACE_HINT) {
+			if let raw = try? String(contentsOfFile: SPACE_HINT, encoding: .utf8) {
+				let trimmed = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+				targetSpaceID = spaceID(forUUID: trimmed)
+			}
+			try? FileManager.default.removeItem(atPath: SPACE_HINT)
+		}
+
+		// Launch Edge as a child process. __CFBundleIdentifier overrides Edge's
+		// own bundle-id so LaunchServices registers Edge under our clone's id —
+		// this prevents a duplicate Edge tile from appearing in the Dock alongside
+		// our cloned-app tile.
+		let p = Process()
+		p.executableURL = URL(fileURLWithPath: BROWSER_EXE)
+		p.arguments = [
+			"--app=\(OPEN_ARG)",
+			"--user-data-dir=\(PROFILE_DIR)",
+			"--no-first-run",
+			"--no-default-browser-check",
+			"--disable-features=DesktopPWAsLinkCapturing,WebAppEnableUrlHandling",
+			"--disable-default-apps",
+		]
+		var env = ProcessInfo.processInfo.environment
+		env["__CFBundleIdentifier"] = UNIQUE_ID
+		p.environment = env
+
+		if !FileManager.default.fileExists(atPath: LOG_FILE) {
+			FileManager.default.createFile(atPath: LOG_FILE, contents: nil)
+		}
+		if let h = try? FileHandle(forWritingTo: URL(fileURLWithPath: LOG_FILE)) {
+			h.seekToEndOfFile()
+			p.standardOutput = h
+			p.standardError = h
+		}
+
+		// When Edge exits, the launcher exits too — keeps the Dock tile lifecycle in sync.
+		p.terminationHandler = { _ in
+			DispatchQueue.main.async { NSApp.terminate(nil) }
+		}
+
+		do {
+			try p.run()
+			edgeProcess = p
+			edgePID = p.processIdentifier
+		} catch {
+			NSApp.terminate(nil)
+			return
+		}
+
+		// Move Edge's PWA window to the target Space once it appears. This overrides
+		// Edge's own Space pinning — the user's Edge stays on Space 1, but our cloned
+		// PWA window goes to Space 2 (Teams' Space). Polled because the window may
+		// take a moment to render after Edge starts.
+		if let sid = targetSpaceID {
+			let pid = edgePID
+			DispatchQueue.global(qos: .background).async {
+				for _ in 0..<60 {
+					Thread.sleep(forTimeInterval: 0.1)
+					let cid = CGSMainConnectionID()
+					guard let info = CGWindowListCopyWindowInfo(
+						[.optionAll], kCGNullWindowID
+					) as? [[String: Any]] else { continue }
+					let wids = info.compactMap { d -> Int? in
+						guard let owner = d[kCGWindowOwnerPID as String] as? Int,
+						      owner == Int(pid),
+						      let layer = d[kCGWindowLayer as String] as? Int,
+						      layer == 0,
+						      let num = d[kCGWindowNumber as String] as? Int
+						else { return nil }
+						return num
+					}
+					if !wids.isEmpty {
+						CGSMoveWindowsToManagedSpace(cid, wids as CFArray, sid)
+						DispatchQueue.main.async {
+							NSRunningApplication(processIdentifier: pid)?.activate(
+								options: [.activateAllWindows, .activateIgnoringOtherApps]
+							)
+						}
+						break
+					}
+				}
+			}
+		}
+	}
+
+	// Dock click while we are running — focus Edge, never spawn a new instance.
+	// This is THE method that fixes the singleton issue: macOS sends this event
+	// instead of relaunching the binary, so there is exactly one Edge child ever.
+	func applicationShouldHandleReopen(
+		_ sender: NSApplication, hasVisibleWindows flag: Bool
+	) -> Bool {
+		if edgePID > 0 {
+			NSRunningApplication(processIdentifier: edgePID)?.activate(
+				options: [.activateAllWindows, .activateIgnoringOtherApps]
+			)
+		}
+		return true
+	}
+
+	func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
+		return false
+	}
+
+	func applicationWillTerminate(_ notification: Notification) {
+		// Only terminate Edge if we spawned it (not if we adopted an orphan).
+		edgeProcess?.terminate()
+	}
+}
+
+let app = NSApplication.shared
+app.setActivationPolicy(.regular)
+let delegate = AppDelegate()
+app.delegate = delegate
+app.run()
 SWIFTEOF
 
-	# The PWA launcher — a Python script so we get a real NSApplication event
-	# loop that intercepts applicationShouldHandleReopen (the Dock-click event).
-	# This is the ONLY reliable singleton mechanism for a shell-script-backed
-	# .app bundle: the OS sends reopen events to the running NSApp instead of
-	# spawning a second process, so we never need to check lock files for the
-	# Dock-click case.  The lock file is still used as a belt-and-suspenders
-	# guard for the rare case where LaunchServices spawns a second binary.
-	cat > "$LAUNCHER" << PWAEOF
-#!/usr/bin/env python3
-# Generated by AppCloner (PWA mode). Do not edit — regenerated on each clone.
-import os, sys, subprocess, signal, threading
-
-PROFILE_DIR  = "${PWA_PROFILE_DIR}"
-BROWSER_EXE  = "${PWA_BROWSER_EXE}"
-OPEN_ARG     = "${OPEN_ARG}"
-UNIQUE_ID    = "${UNIQUE_ID}"
-LOCK_FILE    = os.path.join(PROFILE_DIR, "appcloner.lock")
-LOG_FILE     = f"/tmp/appcloner_pwa_{UNIQUE_ID}.log"
-SWIFT_HELPER = os.path.join(PROFILE_DIR, "switch_space.swift")
-SPACE_HINT   = os.path.join(PROFILE_DIR, "target_space_uuid")
-
-os.makedirs(PROFILE_DIR, exist_ok=True)
-
-# ── Singleton check ──────────────────────────────────────────────────────────
-# If Edge is already running with this profile, focus it and exit immediately.
-def edge_pid():
-    """Return PID of Edge process using our profile, or None."""
-    try:
-        out = subprocess.check_output(
-            ["pgrep", "-f", f"user-data-dir={PROFILE_DIR}"],
-            stderr=subprocess.DEVNULL, text=True
-        )
-        pids = [p.strip() for p in out.strip().splitlines() if p.strip()]
-        return pids[0] if pids else None
-    except subprocess.CalledProcessError:
-        return None
-
-def focus_edge(pid):
-    subprocess.run(
-        ["osascript", "-e",
-         f'tell application "System Events" to set frontmost of '
-         f'(first process whose unix id is {pid}) to true'],
-        capture_output=True
-    )
-
-existing = edge_pid()
-if existing:
-    focus_edge(existing)
-    sys.exit(0)
-
-# Check stale lock (belt-and-suspenders for non-Dock relaunches)
-if os.path.exists(LOCK_FILE):
-    try:
-        old_pid = int(open(LOCK_FILE).read().strip())
-        os.kill(old_pid, 0)   # raises if dead
-        # Process alive but Edge not found — focus whatever is there and exit
-        focus_edge(old_pid)
-        sys.exit(0)
-    except (ValueError, OSError):
-        os.remove(LOCK_FILE)
-
-# ── First launch ─────────────────────────────────────────────────────────────
-with open(LOCK_FILE, "w") as f:
-    f.write(str(os.getpid()))
-
-def cleanup(*_):
-    try: os.remove(LOCK_FILE)
-    except FileNotFoundError: pass
-
-import atexit, signal as _sig
-atexit.register(cleanup)
-for _s in (_sig.SIGTERM, _sig.SIGINT):
-    _sig.signal(_s, lambda *_: sys.exit(0))
-
-# Switch to the target Space before launching Edge
-if os.path.exists(SPACE_HINT) and os.path.exists(SWIFT_HELPER):
-    try:
-        uuid = open(SPACE_HINT).read().strip()
-        os.remove(SPACE_HINT)
-        subprocess.run(["swift", SWIFT_HELPER, uuid],
-                       capture_output=True, timeout=5)
-    except Exception:
-        pass
-
-# Launch Edge as subprocess and wait — this process stays alive so the Dock
-# tile is associated with our bundle-id (not Edge's com.microsoft.edgemac).
-with open(LOG_FILE, "a") as log:
-    proc = subprocess.Popen(
-        [BROWSER_EXE,
-         f"--app={OPEN_ARG}",
-         f"--user-data-dir={PROFILE_DIR}",
-         "--no-first-run",
-         "--no-default-browser-check",
-         "--disable-features=DesktopPWAsLinkCapturing,WebAppEnableUrlHandling",
-         "--disable-default-apps"],
-        stdout=log, stderr=log
-    )
-
-proc.wait()
-PWAEOF
+	# Compile the Swift launcher to a Mach-O binary. Falls back to script mode
+	# (#!/usr/bin/env swift) if swiftc is missing — slower startup but works.
+	if command -v swiftc >/dev/null 2>&1; then
+		if swiftc "$SWIFT_SRC" -o "$LAUNCHER" \
+		         -framework Cocoa -framework CoreGraphics 2>>"$DIAG"; then
+			log "Swift launcher compiled to native binary"
+		else
+			log "WARNING: swiftc failed — falling back to swift script mode"
+			{ echo "#!/usr/bin/env swift"; cat "$SWIFT_SRC"; } > "$LAUNCHER"
+		fi
+	else
+		log "swiftc not found — using swift script mode (install Xcode CLI tools for faster startup)"
+		{ echo "#!/usr/bin/env swift"; cat "$SWIFT_SRC"; } > "$LAUNCHER"
+	fi
 	chmod +x "$LAUNCHER"
 	log "PWA launcher written → ${PWA_BROWSER_EXE} --app=${OPEN_ARG}"
-	# Skip the standard launcher generation block below.
 	APPCLONER_PWA_DONE=1
 fi
 
