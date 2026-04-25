@@ -28,19 +28,19 @@ use scripting additions
 -- ─────────────────────────────────────────────────────────────────────────
 
 -- The script itself acts as the AppleScript-ObjC bridge target for NSButton
--- actions. setTarget:me + top-level `on btnXClicked:sender` handlers are the
+-- actions. setTarget:me + top-level ObjC selector handlers are the
 -- canonical pattern that works in plain osascript.
 -- AppleScript script objects can serve as Cocoa targets when their handler
--- names end with `:` — Cocoa dispatches `btnXClicked:` to handler
--- `btnXClicked:` on this object. We store the picked button index and the
+-- names end with a colon — Cocoa dispatches btnXClicked: to the matching
+-- handler on this object. We store the picked button index and the
 -- captured input/checkbox values here so customDialog() can read them back
 -- after the modal returns.
 -- Dialog state held as top-level properties of the running script. We use
--- `setTarget:me` for button actions — `me` (the script itself) is the
+-- setTarget:me for button actions — me (the script itself) is the
 -- canonical NSObject target that osascript exposes to Cocoa, and top-level
--- handlers `on btnXClicked:sender` are bridged 1:1 to Cocoa selectors of
--- the same name. Trying to wrap this in a `script Foo ... end script`
--- with `property parent : class "NSObject"` works in app bundles but
+-- ObjC selector handlers are bridged 1:1 to Cocoa selectors of
+-- the same name. Trying to wrap this in a script object
+-- with property parent set to NSObject works in app bundles but
 -- crashes when the file is run by raw osascript on macOS Tahoe — hence
 -- the flat top-level layout.
 property panelResult : 0          -- 1-based button index, 0 if cancelled
@@ -55,7 +55,7 @@ property tintPreviewColorWell : missing value
 property tintPreviewSourceImage : missing value
 
 on captureDialogValues()
-	-- `my` qualifier is mandatory inside handlers; without it, AppleScript
+	-- The my qualifier is mandatory inside handlers; without it, AppleScript
 	-- creates a local variable that shadows the script property, and the
 	-- caller never sees the captured value.
 	if (my panelInputView) is not missing value then
@@ -98,10 +98,6 @@ on btn4Clicked:sender
 	(current application's NSApplication's sharedApplication())'s stopModal()
 end btn4Clicked:
 
--- Repaints the icon preview using the current colour-well value. Pure
--- AppleScript handler so it can be invoked both directly (initial render)
--- and from the ObjC selector wrapper below — "my methodName:arg" is
--- syntactically fragile in osascript, so we go through a regular handler.
 on doUpdatePreview()
 	if (my tintPreviewColorWell) is missing value then return
 	if (my tintPreviewImageView) is missing value then return
@@ -113,9 +109,6 @@ on doUpdatePreview()
 	end try
 end doUpdatePreview
 
--- ObjC selector wrapper. NSTimer dispatches its callbacks via Objective-C
--- selectors, so the bridge needs a handler with `:` in the name. We just
--- forward to the regular handler.
 on updateTintPreview:sender
 	my doUpdatePreview()
 end updateTintPreview:
