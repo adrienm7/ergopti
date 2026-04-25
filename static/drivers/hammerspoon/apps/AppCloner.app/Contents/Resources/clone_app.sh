@@ -70,16 +70,44 @@ trap 'rm -rf "$TMPDIR_WORK"' EXIT
 
 UNIQUE_ID="fr.b519hs.clone.$(date +%s)"
 
-# Per-clone isolated user-data-dir. Each clone gets its own VSCode profile —
-# separate settings, extensions, window state, recent folders, etc. Stored
-# under Application Support so it survives across reboots and shows up in
-# macOS' standard per-app data conventions.
-USER_DATA_DIR="$HOME/Library/Application Support/AppCloner/$(echo "$UNIQUE_ID" | tr '.' '_')"
-mkdir -p "$USER_DATA_DIR"
-
 log "DEST=$DEST"
 log "UNIQUE_ID=$UNIQUE_ID"
+
+# Each clone gets its own user-data-dir (required: VSCode locks this dir,
+# two Electron processes can't share it). But we symlink the heavy/static
+# subdirectories from the main VSCode user-data-dir so the clone has
+# instant access to:
+#   - User/settings.json, keybindings.json, snippets/  (preferences)
+#   - User/globalStorage/                              (theme, color picks,
+#                                                       extension state)
+#   - User/profiles/                                   (custom profiles)
+# Plus we point --extensions-dir at the SHARED ~/.vscode/extensions so the
+# clone reuses already-installed extensions instead of reinstalling them
+# (this was the main source of the 10-second file-click lag).
+#
+# What stays per-clone (NOT symlinked):
+#   - workspaceStorage/    (per-folder window state, undo, git decoration)
+#   - logs/, CachedData/, GPUCache/, Code Cache/, Cache/
+# These are inherently per-instance — symlinking them would corrupt under
+# concurrent writes by two running Electron processes.
+USER_DATA_DIR="$HOME/Library/Application Support/AppCloner/${safe_name}"
+mkdir -p "$USER_DATA_DIR"
+MAIN_VSCODE_DATA="$HOME/Library/Application Support/Code"
+SHARED_EXT_DIR="$HOME/.vscode/extensions"
+
+if [[ -d "$MAIN_VSCODE_DATA/User" ]]; then
+	# Symlink the whole User dir at once — it contains settings, keybindings,
+	# snippets, globalStorage, profiles. Concurrent writes are rare (only on
+	# explicit user action like editing settings) and VSCode tolerates them.
+	# We only create the symlink if nothing's there yet to avoid clobbering
+	# a clone where the user has intentionally diverged.
+	if [[ ! -e "$USER_DATA_DIR/User" ]]; then
+		ln -s "$MAIN_VSCODE_DATA/User" "$USER_DATA_DIR/User"
+		log "Symlinked User/ → main VSCode user data"
+	fi
+fi
 log "USER_DATA_DIR=$USER_DATA_DIR"
+log "SHARED_EXT_DIR=$SHARED_EXT_DIR"
 
 
 
@@ -356,10 +384,21 @@ set -e
 # tinted icon instead of VSCode's default blue one beside ours.
 export __CFBundleIdentifier="${UNIQUE_ID}"
 
-# Build VSCode's argv. --user-data-dir gives this instance a fully isolated
-# profile (settings/extensions/windows). --new-window forces a fresh window
-# rather than focusing an existing one.
-ARGS=(--user-data-dir "${USER_DATA_DIR}" --new-window)
+# --user-data-dir : per-clone state (workspace storage, caches), required
+#                    so this Electron process is independent of the main
+#                    VSCode → distinct Dock tile.
+# --extensions-dir : SHARED with main VSCode (~/.vscode/extensions), so we
+#                    don't reinstall extensions on every clone. The 10s
+#                    file-click lag came from VSCode trying to set up
+#                    fresh extension installs on first launch.
+# The User/ subdirectory inside USER_DATA_DIR is itself a symlink to main
+# VSCode's User/ (created at clone time) → settings, keybindings, themes
+# all carry over.
+ARGS=(
+	--user-data-dir "${USER_DATA_DIR}"
+	--extensions-dir "${SHARED_EXT_DIR}"
+	--new-window
+)
 OPEN_ARG="${OPEN_ARG}"
 if [[ -n "\$OPEN_ARG" ]]; then
 	ARGS+=("\$OPEN_ARG")
