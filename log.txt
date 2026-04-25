@@ -1,9 +1,12 @@
-/Users/b519hs/Applications/Next Best Offer.app Best Offer.app
-[AppCloner] exit=0
-[AppCloner] app_root=/Users/b519hs/perso/ergopti/static/drivers/hammerspoon/apps/AppCloner.app
-[AppCloner] applescript=/Users/b519hs/perso/ergopti/static/drivers/hammerspoon/apps/AppCloner.app/Contents/Resources/ShortcutBuilder.applescript
---- App Cloner démarrage Sat Apr 25 03:02:34 CEST 2026
-appDir: /Users/b519hs/perso/ergopti/static/drivers/hammerspoon/apps/AppCloner.app
+App Cloner — Erreur de syntaxe AppleScript :
+
+/Users/b519hs/perso/ergopti/static/drivers/hammerspoon/apps/App Cloner.app/Contents/Resources/ShortcutBuilder.applescript:104: error: Expected end of line but found “(”. (-2741)
+
+Log complet : /tmp/appcloner.log
+
+
+
+p
 source: /Applications/Visual Studio Code.app/
 defaultName: Visual Studio Code
 cloneName: Ergopti
@@ -614,6 +617,10 @@ result: /Users/b519hs/Applications/Philippe.app
 [AppCloner] applescript=/Users/b519hs/perso/ergopti/static/drivers/hammerspoon/apps/App Cloner.app/Contents/Resources/ShortcutBuilder.applescript
 [AppCloner] PARSE ERROR (osacompile rc=1):
 /Users/b519hs/perso/ergopti/static/drivers/hammerspoon/apps/App Cloner.app/Contents/Resources/ShortcutBuilder.applescript:104: error: Expected end of line but found “(”. (-2741)
+[AppCloner] app_root=/Users/b519hs/perso/ergopti/static/drivers/hammerspoon/apps/App Cloner.app
+[AppCloner] applescript=/Users/b519hs/perso/ergopti/static/drivers/hammerspoon/apps/App Cloner.app/Contents/Resources/ShortcutBuilder.applescript
+[AppCloner] PARSE ERROR (osacompile rc=1):
+/Users/b519hs/perso/ergopti/static/drivers/hammerspoon/apps/App Cloner.app/Contents/Resources/ShortcutBuilder.applescript:104: error: Expected end of line but found “(”. (-2741)
 
-╭─     ~ ──────────────────────────────────────────────── ✔  00:38:50 
+╭─     ~ ──────────────────────────────────────────────── ✔  00:47:13 
 ╰─
