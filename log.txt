@@ -1,23 +1,37 @@
 App Cloner — Erreur de syntaxe AppleScript :
 
-/Users/b519hs/perso/ergopti/static/drivers/hammerspoon/apps/App Cloner.app/Contents/Resources/ShortcutBuilder.applescript:104: error: Expected end of line but found “(”. (-2741)
+/Users/b519hs/perso/ergopti/static/drivers/hammerspoon/apps/App Cloner.app/Contents/Resources/ShortcutBuilder.applescript:98: error: Expected end of line but found “(”. (-2741)
 
 Log complet : /tmp/appcloner.log
 
 
+commit 763c04313a26fe6179a33a0a6aba3343a34b6728 (HEAD -> feat/apps-menu, origin/feat/apps-menu)
+Author: Adrien MOYAUX <49562406+adrienm7@users.noreply.github.com>
+Date:   Sun Apr 26 00:50:36 2026 +0200
 
-p
-source: /Applications/Visual Studio Code.app/
-defaultName: Visual Studio Code
-cloneName: Ergopti
-openArg: /Users/b519hs/perso/ergopti/
-colorHex: #1D0053
-cmd: '/Users/b519hs/perso/ergopti/static/drivers/hammerspoon/apps/AppCloner.app/Contents/Resources/clone_app.sh' '/Applications/Visual Studio Code.app/' 'Ergopti' '#1D0053' '/Users/b519hs/perso/ergopti/'
-résultat: /Users/b519hs/Applications/Ergopti.app
-[AppCloner] exit=0
-[AppCloner] app_root=/Users/b519hs/perso/ergopti/static/drivers/hammerspoon/apps/AppCloner.app
-[AppCloner] applescript=/Users/b519hs/perso/ergopti/static/drivers/hammerspoon/apps/AppCloner.app/Contents/Resources/ShortcutBuilder.applescript
---- App Cloner démarrage Sat Apr 25 03:04:57 CEST 2026
+    fix(app-cloner): purge all backticks and quoted-colon patterns from AppleScript comments
+    
+    osacompile lexes quoted strings before checking comment context — a backtick
+    or double-quoted token containing a colon inside a -- comment can corrupt
+    the parser state and produce spurious -2741 errors on the following line.
+
+commit 70eb8b66aa3f99f81ff4e857da14ad614e8b3281
+Author: adrienm7 <moyaux.adrien@gmail.com>
+Date:   Sun Apr 26 00:47:20 2026 +0200
+
+    log
+
+commit 7ef62b5691de871fb16fc39b064734c31a9422ab
+Author: adrienm7 <moyaux.adrien@gmail.com>
+Date:   Sun Apr 26 00:39:00 2026 +0200
+
+    log
+
+commit ab4da395e24aabcf6eca9b0a435ac9b5a17331f0
+:
+
+
+
 appDir: /Users/b519hs/perso/ergopti/static/drivers/hammerspoon/apps/AppCloner.app
 source: /Applications/Visual Studio Code.app/
 defaultName: Visual Studio Code
@@ -621,6 +635,14 @@ result: /Users/b519hs/Applications/Philippe.app
 [AppCloner] applescript=/Users/b519hs/perso/ergopti/static/drivers/hammerspoon/apps/App Cloner.app/Contents/Resources/ShortcutBuilder.applescript
 [AppCloner] PARSE ERROR (osacompile rc=1):
 /Users/b519hs/perso/ergopti/static/drivers/hammerspoon/apps/App Cloner.app/Contents/Resources/ShortcutBuilder.applescript:104: error: Expected end of line but found “(”. (-2741)
+[AppCloner] app_root=/Users/b519hs/perso/ergopti/static/drivers/hammerspoon/apps/App Cloner.app
+[AppCloner] applescript=/Users/b519hs/perso/ergopti/static/drivers/hammerspoon/apps/App Cloner.app/Contents/Resources/ShortcutBuilder.applescript
+[AppCloner] PARSE ERROR (osacompile rc=1):
+/Users/b519hs/perso/ergopti/static/drivers/hammerspoon/apps/App Cloner.app/Contents/Resources/ShortcutBuilder.applescript:98: error: Expected end of line but found “(”. (-2741)
+[AppCloner] app_root=/Users/b519hs/perso/ergopti/static/drivers/hammerspoon/apps/App Cloner.app
+[AppCloner] applescript=/Users/b519hs/perso/ergopti/static/drivers/hammerspoon/apps/App Cloner.app/Contents/Resources/ShortcutBuilder.applescript
+[AppCloner] PARSE ERROR (osacompile rc=1):
+/Users/b519hs/perso/ergopti/static/drivers/hammerspoon/apps/App Cloner.app/Contents/Resources/ShortcutBuilder.applescript:98: error: Expected end of line but found “(”. (-2741)
 
-╭─     ~ ──────────────────────────────────────────────── ✔  00:47:13 
+╭─     ~ ──────────────────────────────────────────────── ✔  00:55:18 
 ╰─
