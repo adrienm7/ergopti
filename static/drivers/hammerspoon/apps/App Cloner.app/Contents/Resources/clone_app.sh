@@ -585,12 +585,13 @@ import Cocoa
 import Foundation
 import CoreGraphics
 
-let PROFILE_DIR = "${PWA_PROFILE_DIR}"
-let BROWSER_EXE = "${PWA_BROWSER_EXE}"
-let OPEN_ARG    = "${OPEN_ARG}"
-let UNIQUE_ID   = "${UNIQUE_ID}"
-let LOG_FILE    = "/tmp/appcloner_pwa_\(UNIQUE_ID).log"
-let SPACE_HINT  = (PROFILE_DIR as NSString).appendingPathComponent("target_space_uuid")
+let PROFILE_DIR        = "${PWA_PROFILE_DIR}"
+let BROWSER_EXE        = "${PWA_BROWSER_EXE}"
+let OPEN_ARG           = "${OPEN_ARG}"
+let UNIQUE_ID          = "${UNIQUE_ID}"
+let LOG_FILE           = "/tmp/appcloner_pwa_\(UNIQUE_ID).log"
+let SPACE_HINT         = (PROFILE_DIR as NSString).appendingPathComponent("target_space_uuid")
+let SOURCE_BUNDLE_FILE = (PROFILE_DIR as NSString).appendingPathComponent("source_bundle_id")
 
 // Private CoreGraphics Services APIs for Space management.
 @_silgen_name("CGSMainConnectionID")
@@ -599,18 +600,93 @@ func CGSMainConnectionID() -> Int32
 @_silgen_name("CGSCopySpaces")
 func CGSCopySpaces(_ cid: Int32, _ mask: Int) -> CFArray?
 
+// CGSMoveWindowsToManagedSpace expects a CFArray of pointers to uint32_t window
+// IDs (NOT a CFArray of CFNumber). The pointer-array dance is required for the
+// move to actually take effect — passing wids as CFArray silently no-ops.
 @_silgen_name("CGSMoveWindowsToManagedSpace")
-func CGSMoveWindowsToManagedSpace(_ cid: Int32, _ wids: CFArray, _ sid: Int)
+func CGSMoveWindowsToManagedSpace(_ cid: Int32, _ wids: CFArray, _ sid: UInt64)
 
 // Look up the macOS-internal Space ID for a Space UUID stored in com.apple.spaces.
-func spaceID(forUUID uuid: String) -> Int? {
+func spaceID(forUUID uuid: String) -> UInt64? {
 	let cid = CGSMainConnectionID()
 	guard let raw = CGSCopySpaces(cid, 0xF) as? [[String: Any]] else { return nil }
 	for entry in raw {
 		if let u = entry["uuid"] as? String, u == uuid,
-		   let sid = entry["ManagedSpaceID"] as? Int { return sid }
+		   let sid = entry["ManagedSpaceID"] as? UInt64 { return sid }
 	}
 	return nil
+}
+
+// Read com.apple.spaces.plist via plutil, find which Space currently hosts the
+// given source-app bundle-id. Lets the clone follow Teams if the user moves it
+// to a different Space later. Falls back to nil if the source app isn't pinned.
+func currentSpaceUUID(forSourceBundleID bid: String) -> String? {
+	let task = Process()
+	task.executableURL = URL(fileURLWithPath: "/usr/bin/plutil")
+	task.arguments = ["-convert", "json", "-o", "-",
+	                  "\(NSHomeDirectory())/Library/Preferences/com.apple.spaces.plist"]
+	let pipe = Pipe()
+	task.standardOutput = pipe
+	task.standardError = Pipe()
+	do { try task.run() } catch { return nil }
+	task.waitUntilExit()
+	let data = pipe.fileHandleForReading.readDataToEndOfFile()
+	guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+	      let displays = json["ManagedDisplaySpaces"] as? [[String: Any]] else { return nil }
+	for display in displays {
+		guard let spaces = display["Spaces"] as? [[String: Any]] else { continue }
+		for sp in spaces {
+			if let uuid = sp["uuid"] as? String,
+			   let apps = sp["apps"] as? [String], apps.contains(bid) { return uuid }
+		}
+	}
+	return nil
+}
+
+// Resolve the target Space ID by trying — in order — the static SPACE_HINT
+// (written at clone creation), then dynamic lookup of the source app's current
+// Space. Re-evaluated on every launch and every reopen click.
+func resolveTargetSpaceID() -> UInt64? {
+	if FileManager.default.fileExists(atPath: SPACE_HINT),
+	   let raw = try? String(contentsOfFile: SPACE_HINT, encoding: .utf8) {
+		let uuid = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+		if let sid = spaceID(forUUID: uuid) { return sid }
+	}
+	if FileManager.default.fileExists(atPath: SOURCE_BUNDLE_FILE),
+	   let raw = try? String(contentsOfFile: SOURCE_BUNDLE_FILE, encoding: .utf8) {
+		let bid = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+		if let uuid = currentSpaceUUID(forSourceBundleID: bid),
+		   let sid = spaceID(forUUID: uuid) { return sid }
+	}
+	return nil
+}
+
+// Move every window owned by a given PID to the target Space. The CFArray of
+// uint32 pointers is the magic incantation CGSMoveWindowsToManagedSpace needs.
+func moveAllWindows(ofPID pid: pid_t, toSpace sid: UInt64) {
+	let cid = CGSMainConnectionID()
+	guard let info = CGWindowListCopyWindowInfo([.optionAll], kCGNullWindowID)
+		as? [[String: Any]] else { return }
+	let wids: [UInt32] = info.compactMap { d in
+		guard let owner = d[kCGWindowOwnerPID as String] as? Int,
+		      owner == Int(pid),
+		      let num = d[kCGWindowNumber as String] as? Int
+		else { return nil }
+		return UInt32(num)
+	}
+	guard !wids.isEmpty else { return }
+	var values = wids
+	values.withUnsafeMutableBufferPointer { buf in
+		let count = buf.count
+		let ptrs = UnsafeMutablePointer<UnsafeRawPointer?>.allocate(capacity: count)
+		defer { ptrs.deallocate() }
+		for i in 0..<count {
+			ptrs[i] = UnsafeRawPointer(buf.baseAddress!.advanced(by: i))
+		}
+		if let arr = CFArrayCreate(nil, ptrs, count, nil) {
+			CGSMoveWindowsToManagedSpace(cid, arr, sid)
+		}
+	}
 }
 
 // Find an Edge process already using our profile dir. Used to recover from
@@ -656,17 +732,11 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 			return
 		}
 
-		// Read the Space hint written at clone-creation time. Consumed once
-		// on first launch, then deleted (subsequent launches let Edge remember
-		// its own window position).
-		var targetSpaceID: Int? = nil
-		if FileManager.default.fileExists(atPath: SPACE_HINT) {
-			if let raw = try? String(contentsOfFile: SPACE_HINT, encoding: .utf8) {
-				let trimmed = raw.trimmingCharacters(in: .whitespacesAndNewlines)
-				targetSpaceID = spaceID(forUUID: trimmed)
-			}
-			try? FileManager.default.removeItem(atPath: SPACE_HINT)
-		}
+		// Resolve target Space dynamically on every launch — Edge is pinned to
+		// its own Space (e.g. Space 1) and ignores __CFBundleIdentifier for
+		// window-Space association, so we MUST move the window ourselves every
+		// time. The hint file is no longer consumed; we read it forever.
+		let targetSpaceID = resolveTargetSpaceID()
 
 		// Launch Edge as a child process. __CFBundleIdentifier overrides Edge's
 		// own bundle-id so LaunchServices registers Edge under our clone's id —
@@ -709,50 +779,42 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 			return
 		}
 
-		// Move Edge's PWA window to the target Space once it appears. This overrides
-		// Edge's own Space pinning — the user's Edge stays on Space 1, but our cloned
-		// PWA window goes to Space 2 (Teams' Space). Polled because the window may
-		// take a moment to render after Edge starts.
+		// Move Edge's PWA window to the target Space. Edge is pinned to its own
+		// Space and creates the window there; we forcibly move it to where the
+		// source app lives. Polled continuously for 15s so we catch the splash
+		// window, the real PWA window, and any popup Edge creates during boot.
 		if let sid = targetSpaceID {
 			let pid = edgePID
 			DispatchQueue.global(qos: .background).async {
-				for _ in 0..<60 {
-					Thread.sleep(forTimeInterval: 0.1)
-					let cid = CGSMainConnectionID()
-					guard let info = CGWindowListCopyWindowInfo(
-						[.optionAll], kCGNullWindowID
-					) as? [[String: Any]] else { continue }
-					let wids = info.compactMap { d -> Int? in
-						guard let owner = d[kCGWindowOwnerPID as String] as? Int,
-						      owner == Int(pid),
-						      let layer = d[kCGWindowLayer as String] as? Int,
-						      layer == 0,
-						      let num = d[kCGWindowNumber as String] as? Int
-						else { return nil }
-						return num
-					}
-					if !wids.isEmpty {
-						CGSMoveWindowsToManagedSpace(cid, wids as CFArray, sid)
-						DispatchQueue.main.async {
-							NSRunningApplication(processIdentifier: pid)?.activate(
-								options: [.activateAllWindows, .activateIgnoringOtherApps]
-							)
-						}
-						break
-					}
+				// 75 iterations × 200ms = 15s of continuous re-application
+				for _ in 0..<75 {
+					moveAllWindows(ofPID: pid, toSpace: sid)
+					Thread.sleep(forTimeInterval: 0.2)
+				}
+				// Final activation so macOS auto-switches to the target Space
+				DispatchQueue.main.async {
+					NSRunningApplication(processIdentifier: pid)?.activate(
+						options: [.activateAllWindows, .activateIgnoringOtherApps]
+					)
 				}
 			}
 		}
 	}
 
-	// Dock click while we are running — focus Edge, never spawn a new instance.
-	// This is THE method that fixes the singleton issue: macOS sends this event
-	// instead of relaunching the binary, so there is exactly one Edge child ever.
+	// Dock click while we are running — focus Edge AND re-apply the Space move.
+	// Re-resolving the target on every reopen lets the clone follow the source
+	// app even if the user has moved Teams to a different Space since launch.
 	func applicationShouldHandleReopen(
 		_ sender: NSApplication, hasVisibleWindows flag: Bool
 	) -> Bool {
 		if edgePID > 0 {
-			NSRunningApplication(processIdentifier: edgePID)?.activate(
+			let pid = edgePID
+			if let sid = resolveTargetSpaceID() {
+				DispatchQueue.global(qos: .background).async {
+					moveAllWindows(ofPID: pid, toSpace: sid)
+				}
+			}
+			NSRunningApplication(processIdentifier: pid)?.activate(
 				options: [.activateAllWindows, .activateIgnoringOtherApps]
 			)
 		}
@@ -1042,21 +1104,25 @@ def copy_space_assignment(src_app_path, clone_bundle_id, browser_app_path, dock_
         dock_plist["workspaces-application-assignments"] = assignments
         print(f"Space assignment: {src_bundle_id} → {clone_bundle_id} (Space {space_uuid})")
 
-        # For PWA mode, we also write the Space UUID to a file in the PWA
-        # profile dir. The launcher reads it at startup, switches to that Space
-        # (so Edge opens there naturally), then removes it after first use —
-        # subsequent launches rely on the browser's own last-position memory.
-        # We never touch the browser's own Space assignment (it may already be
-        # pinned to a different Space by the user and we must not override it).
+        # For PWA mode, write two files into the profile dir that the Swift
+        # launcher reads on every click to enforce the Space pinning:
+        #   * target_space_uuid — static UUID of the source app's Space at clone
+        #     time. Used as the primary lookup; survives across reboots.
+        #   * source_bundle_id — fallback for dynamic resolution. If the user
+        #     moves Teams to a different Space later, the launcher uses this
+        #     bundle-id to query com.apple.spaces and follow the move.
+        # We never touch the browser's own Space assignment — Edge stays pinned
+        # wherever the user set it.
         if browser_app_path:
             profile_dir = os.path.expanduser(
                 f"~/Library/Application Support/AppCloner/{os.path.basename(app_path).removesuffix('.app')}_pwa"
             )
             os.makedirs(profile_dir, exist_ok=True)
-            space_hint = os.path.join(profile_dir, "target_space_uuid")
-            with open(space_hint, 'w') as fh:
+            with open(os.path.join(profile_dir, "target_space_uuid"), 'w') as fh:
                 fh.write(space_uuid)
-            print(f"Space hint written to {space_hint}")
+            with open(os.path.join(profile_dir, "source_bundle_id"), 'w') as fh:
+                fh.write(src_bundle_id)
+            print(f"Space hint written: uuid={space_uuid}  source={src_bundle_id}")
     except Exception as e:
         print(f"Space assignment copy skipped ({e})")
 
