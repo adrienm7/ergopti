@@ -555,40 +555,51 @@ TEAMSLAUNCHER
 	# Strip quarantine so Gatekeeper doesn't block the clone on first launch
 	xattr -cr "$DEST" 2>/dev/null || true
 
-	# Re-sign ad-hoc with a curated entitlements set. Three competing needs:
-	#   * Keep keychain-access-groups → Teams can open its «team2.spotlight.
-	#     encryption» keychain item (otherwise an error dialog blocks login).
-	#   * Strip com.apple.security.app-sandbox → without sandbox, the $HOME
-	#     override actually applies (sandbox would force the container path
-	#     and ignore our HOME).
-	#   * Do NOT enable the hardened runtime — macOS rejects shell-script
-	#     CFBundleExecutables under hardened runtime, so re-using Microsoft's
-	#     hardened flags via --preserve-metadata=flags would silently kill
-	#     the launcher at exec time.
+	# Re-signing strategy — three competing needs:
+	#   * Keep keychain-access-groups on the OUTER bundle → Teams can open
+	#     its «team2.spotlight.encryption» keychain item.
+	#   * Strip com.apple.security.app-sandbox → $HOME override applies
+	#     (sandbox would otherwise force the container path).
+	#   * Do NOT enable hardened runtime → macOS rejects shell-script
+	#     CFBundleExecutables under hardened runtime.
+	# Method: two-pass codesign. First pass `--deep` ad-hoc-signs every
+	# nested helper (WebView2, audio plugin, etc.) WITHOUT entitlements —
+	# applying the outer bundle's entitlements to nested helpers via --deep
+	# triggers AMFI rejection at first launch (the «Vérification» dialog
+	# then silent exit). Second pass re-signs ONLY the outer bundle with
+	# our curated entitlements, leaving nested signatures intact.
 	ENT_FILE="$TMPDIR_WORK/entitlements.plist"
+	ENT_OK=0
 	if codesign -d --entitlements - --xml "$SOURCE_APP" > "$ENT_FILE" 2>/dev/null && [[ -s "$ENT_FILE" ]]; then
-		# Some macOS versions prepend a binary blob length header — strip
+		# Some codesign versions prepend a binary length header — strip
 		# anything before the XML declaration so PlistBuddy can parse it.
-		python3 -c '
-import sys, re
+		python3 - "$ENT_FILE" <<'PYSTRIP' || true
+import sys
 p = sys.argv[1]
 data = open(p, "rb").read()
 i = data.find(b"<?xml")
 if i > 0:
 	open(p, "wb").write(data[i:])
-' "$ENT_FILE" || true
+PYSTRIP
 		/usr/libexec/PlistBuddy -c "Delete :com.apple.security.app-sandbox" "$ENT_FILE" 2>/dev/null || true
+		ENT_OK=1
 		log "Entitlements extracted and sandbox stripped"
-		codesign --force --deep --sign - --entitlements "$ENT_FILE" "$DEST" >> "$DIAG" 2>&1 \
-			|| log "codesign returned non-zero (often OK on Tahoe)"
 	else
-		# Fallback: sign with no entitlements file (loses keychain-access-groups
-		# but at least produces a launchable bundle).
-		log "Could not extract source entitlements — signing without them"
-		codesign --force --deep --sign - "$DEST" >> "$DIAG" 2>&1 \
-			|| log "codesign returned non-zero (often OK on Tahoe)"
+		log "Could not extract source entitlements — outer bundle will sign without them"
 	fi
-	log "Teams clone re-signed ad-hoc"
+
+	# Pass 1: ad-hoc sign everything inside, no entitlements applied broadly.
+	codesign --force --deep --sign - "$DEST" >> "$DIAG" 2>&1 \
+		|| log "codesign --deep returned non-zero (often OK on Tahoe)"
+
+	# Pass 2: re-sign ONLY the outer bundle with our curated entitlements.
+	# No --deep here — that's the whole point: entitlements stay on the
+	# outer bundle and don't leak to helpers.
+	if [[ "$ENT_OK" == "1" ]]; then
+		codesign --force --sign - --entitlements "$ENT_FILE" "$DEST" >> "$DIAG" 2>&1 \
+			|| log "outer codesign returned non-zero"
+	fi
+	log "Teams clone re-signed ad-hoc (outer entitlements: $ENT_OK)"
 
 	# Skip the stub-specific sections (5, 6, 7) — jump straight to
 	# LaunchServices registration + Dock add (section 8).
