@@ -26,6 +26,25 @@ def ensure_icon(resources_dir, log):
         log.write(f"[AppCloner] regenerating icon from {svg}\n")
         subprocess.run(["zsh", script], capture_output=True)
 
+def precompile(applescript, log):
+    """Run osacompile -o /dev/null to surface parse errors with line numbers.
+
+    osascript runs in two phases: compile then execute. When compile fails it
+    emits a precise `file:line:col: error:` message on stderr, but the dialog
+    in main() may truncate it. Running osacompile separately gives us the full
+    error text in the log even when we still try to run the script.
+    """
+    result = subprocess.run(
+        ["osacompile", "-o", "/dev/null", applescript],
+        capture_output=True, text=True,
+    )
+    if result.returncode != 0:
+        log.write(f"[AppCloner] PARSE ERROR (osacompile rc={result.returncode}):\n")
+        log.write((result.stderr or result.stdout or "").rstrip() + "\n")
+        return result.stderr or result.stdout or "Erreur de compilation inconnue."
+    log.write("[AppCloner] osacompile OK — no parse errors\n")
+    return None
+
 def main():
     script_path = os.path.realpath(__file__)
     macos_dir   = os.path.dirname(script_path)
@@ -38,6 +57,22 @@ def main():
         log.write(f"[AppCloner] app_root={app_root}\n")
         log.write(f"[AppCloner] applescript={applescript}\n")
         ensure_icon(resources, log)
+        # Surface parse errors with file:line:col precision before we even try
+        # to run the script. The dialog at the end may truncate; the log won't.
+        parse_err = precompile(applescript, log)
+
+    if parse_err:
+        # Show the FULL parse error including line/column info. Escape only
+        # backslashes and double quotes for the AppleScript dialog literal.
+        clean = parse_err.replace("\\", "\\\\").replace('"', '\\"').strip()
+        subprocess.run([
+            "osascript", "-e",
+            'display dialog "App Cloner — Erreur de syntaxe AppleScript :\\n\\n'
+            + clean
+            + '\\n\\nLog complet : /tmp/appcloner.log" '
+            'buttons {"OK"} default button 1',
+        ], capture_output=True)
+        return
 
     result = subprocess.run(
         ["osascript", applescript, app_root],
@@ -57,10 +92,13 @@ def main():
     # always AppleScript compilation failures that need to be diagnosed.
     if result.returncode not in (0, -128):
         err_text = (result.stderr or result.stdout or "Erreur inconnue.").strip()
+        clean = err_text.replace("\\", "\\\\").replace('"', '\\"')
         subprocess.run([
             "osascript", "-e",
-            f'display dialog "App Cloner — Erreur de démarrage:\\n\\n{err_text}" '
-            f'buttons {{"OK"}} default button 1',
+            'display dialog "App Cloner — Erreur de démarrage :\\n\\n'
+            + clean
+            + '\\n\\nLog : /tmp/appcloner.log" '
+            'buttons {"OK"} default button 1',
         ], capture_output=True)
 
 if __name__ == "__main__":

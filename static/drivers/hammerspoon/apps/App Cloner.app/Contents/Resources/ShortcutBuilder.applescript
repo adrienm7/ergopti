@@ -98,8 +98,11 @@ on btn4Clicked:sender
 	(current application's NSApplication's sharedApplication())'s stopModal()
 end btn4Clicked:
 
--- Timer callback — polls the NSColorWell every 80 ms and updates the icon preview.
-on updateTintPreview:sender
+-- Repaints the icon preview using the current colour-well value. Pure
+-- AppleScript handler so it can be invoked both directly (initial render)
+-- and from the ObjC selector wrapper below — `my methodName:arg` is
+-- syntactically fragile in osascript, so we go through a regular handler.
+on doUpdatePreview()
 	if (my tintPreviewColorWell) is missing value then return
 	if (my tintPreviewImageView) is missing value then return
 	if (my tintPreviewSourceImage) is missing value then return
@@ -108,6 +111,13 @@ on updateTintPreview:sender
 		set tinted to my tintedIconImage((my tintPreviewSourceImage), currentColor)
 		(my tintPreviewImageView)'s setImage:tinted
 	end try
+end doUpdatePreview
+
+-- ObjC selector wrapper. NSTimer dispatches its callbacks via Objective-C
+-- selectors, so the bridge needs a handler with `:` in the name. We just
+-- forward to the regular handler.
+on updateTintPreview:sender
+	my doUpdatePreview()
 end updateTintPreview:
 
 -- Strip leading and trailing whitespace (spaces, tabs, CR/LF). Pure
@@ -339,7 +349,8 @@ on customDialog(header, body, buttonList, hasInput, defaultText, lineCount, inpu
 	set headerFrame to current application's NSMakeRect(marginX, yCursor, panelWidth - (2 * marginX), headerHeight)
 	set headerLabel to current application's NSTextField's alloc()'s initWithFrame:headerFrame
 	headerLabel's setStringValue:header
-	headerLabel's setFont:(current application's NSFont's boldSystemFontOfSize:14)
+	set headerFont to current application's NSFont's boldSystemFontOfSize:14
+	headerLabel's setFont:headerFont
 	headerLabel's setBordered:false
 	headerLabel's setEditable:false
 	headerLabel's setSelectable:false
@@ -352,7 +363,8 @@ on customDialog(header, body, buttonList, hasInput, defaultText, lineCount, inpu
 		set bodyFrame to current application's NSMakeRect(marginX, yCursor, panelWidth - (2 * marginX), bodyHeight)
 		set bodyLabel to current application's NSTextField's alloc()'s initWithFrame:bodyFrame
 		bodyLabel's setStringValue:body
-		bodyLabel's setFont:(current application's NSFont's systemFontOfSize:12)
+		set bodyFont to current application's NSFont's systemFontOfSize:12
+		bodyLabel's setFont:bodyFont
 		bodyLabel's setBordered:false
 		bodyLabel's setEditable:false
 		bodyLabel's setSelectable:true
@@ -369,7 +381,8 @@ on customDialog(header, body, buttonList, hasInput, defaultText, lineCount, inpu
 		if lineCount = 1 or lineCount = -1 then
 			set inputView to current application's NSTextField's alloc()'s initWithFrame:inputFrame
 			inputView's setStringValue:defaultText
-			inputView's setFont:(current application's NSFont's systemFontOfSize:13)
+			set inputFont to current application's NSFont's systemFontOfSize:13
+			inputView's setFont:inputFont
 			-- lineCount=-1: enable word-wrap so long URLs wrap across the 3-row height
 			-- instead of scrolling horizontally out of view
 			if lineCount = -1 then
@@ -386,7 +399,8 @@ on customDialog(header, body, buttonList, hasInput, defaultText, lineCount, inpu
 			set textView to current application's NSTextView's alloc()'s initWithFrame:inputFrame
 			textView's setRichText:false
 			textView's setAllowsUndo:true
-			textView's setFont:(current application's NSFont's systemFontOfSize:13)
+			set textFont to current application's NSFont's systemFontOfSize:13
+			textView's setFont:textFont
 			textView's setString:defaultText
 			scrollView's setDocumentView:textView
 			contentView's addSubview:scrollView
@@ -434,7 +448,7 @@ on customDialog(header, body, buttonList, hasInput, defaultText, lineCount, inpu
 		else if i = 4 then
 			btn's setAction:"btn4Clicked:"
 		end if
-		if i = lastIdx then btn's setKeyEquivalent:return
+		if i = lastIdx then btn's setKeyEquivalent:(character id 13)
 		contentView's addSubview:btn
 		set xCursor to btnX - buttonGap
 	end repeat
@@ -507,7 +521,8 @@ on showTintColorPicker(appPath)
 	-- Header
 	set hLabel to current application's NSTextField's alloc()'s initWithFrame:(current application's NSMakeRect(16, pH - 42, pW - 32, 22))
 	hLabel's setStringValue:"Teinte de couleur"
-	hLabel's setFont:(current application's NSFont's boldSystemFontOfSize:14)
+	set pickerHeaderFont to current application's NSFont's boldSystemFontOfSize:14
+	hLabel's setFont:pickerHeaderFont
 	hLabel's setBordered:false
 	hLabel's setEditable:false
 	hLabel's setDrawsBackground:false
@@ -516,7 +531,8 @@ on showTintColorPicker(appPath)
 	-- Subtitle
 	set bLabel to current application's NSTextField's alloc()'s initWithFrame:(current application's NSMakeRect(16, pH - 62, pW - 32, 16))
 	bLabel's setStringValue:"Aperçu en temps réel — cliquez sur la couleur pour la modifier."
-	bLabel's setFont:(current application's NSFont's systemFontOfSize:11)
+	set pickerBodyFont to current application's NSFont's systemFontOfSize:11
+	bLabel's setFont:pickerBodyFont
 	bLabel's setBordered:false
 	bLabel's setEditable:false
 	bLabel's setDrawsBackground:false
@@ -553,7 +569,7 @@ on showTintColorPicker(appPath)
 	valBtn's setBezelStyle:1
 	valBtn's setTarget:me
 	valBtn's setAction:"btn2Clicked:"
-	valBtn's setKeyEquivalent:return
+	valBtn's setKeyEquivalent:(character id 13)
 	cv's addSubview:valBtn
 
 	set retBtn to current application's NSButton's alloc()'s initWithFrame:(current application's NSMakeRect(16, btnY, btnW, btnH))
@@ -565,7 +581,7 @@ on showTintColorPicker(appPath)
 	cv's addSubview:retBtn
 
 	-- Render initial preview before showing the panel
-	my updateTintPreview:(missing value)
+	my doUpdatePreview()
 
 	-- Start polling timer. NSRunLoopCommonModes includes NSModalPanelRunLoopMode
 	-- so the timer fires even while runModalForWindow: is blocking the thread.
@@ -904,7 +920,7 @@ on run argv
 						if chosenNSColor is not missing value then
 							-- Convert sRGB float components (0.0–1.0) to 16-bit integers for rgbToHex
 							set sRGBSpace to current application's NSColorSpace's sRGBColorSpace()
-						set rgbColor to chosenNSColor's colorUsingColorSpace:sRGBSpace
+							set rgbColor to chosenNSColor's colorUsingColorSpace:sRGBSpace
 							set r16 to (((rgbColor's redComponent()) * 65535.0) as integer)
 							set g16 to (((rgbColor's greenComponent()) * 65535.0) as integer)
 							set b16 to (((rgbColor's blueComponent()) * 65535.0) as integer)
