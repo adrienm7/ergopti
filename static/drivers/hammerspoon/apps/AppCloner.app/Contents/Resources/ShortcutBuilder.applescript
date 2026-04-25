@@ -2,9 +2,36 @@
 --
 -- Interface utilisateur pour App Cloner.
 -- Permet de créer un clone léger d'une application macOS existante avec :
---   • nom et icône personnalisés (teinte de couleur)
+--   • nom et icône personnalisés (teinte de couleur, N&B, ou image custom)
 --   • bundle ID unique (pas de regroupement Dock avec l'originale)
---   • argument d'ouverture optionnel (fichier ou dossier)
+--   • argument d'ouverture optionnel (fichier, dossier, ou URL scheme)
+
+use AppleScript version "2.4"
+use framework "Foundation"
+use framework "AppKit"
+use scripting additions
+
+-- Saisie texte via NSAlert + NSTextField. Contrairement à `display dialog with
+-- default answer` qui n'expose pas de menu Edit, NSTextField hérite de la
+-- responder chain Cocoa standard → Cmd+C/V/X/A fonctionnent nativement.
+on askText(prompt, defaultValue, dialogTitle)
+	set anAlert to current application's NSAlert's alloc()'s init()
+	anAlert's setMessageText:dialogTitle
+	anAlert's setInformativeText:prompt
+	set inputField to current application's NSTextField's alloc()'s initWithFrame:(current application's NSMakeRect(0, 0, 420, 24))
+	inputField's setStringValue:defaultValue
+	anAlert's setAccessoryView:inputField
+	anAlert's addButtonWithTitle:"OK"
+	anAlert's addButtonWithTitle:"Annuler"
+	-- Focus sur le champ texte au lieu du bouton, pour pouvoir coller direct
+	(anAlert's |window|()'s makeFirstResponder:inputField)
+	set response to anAlert's runModal()
+	if response = (current application's NSAlertFirstButtonReturn) then
+		return (inputField's stringValue() as text)
+	else
+		error number -128
+	end if
+end askText
 
 on logmsg(m)
 	try
@@ -21,6 +48,12 @@ on rgbToHex(r, g, b)
 end rgbToHex
 
 on run argv
+	-- Forcer App Cloner au premier plan (et changer de Space si besoin) à
+	-- chaque relance. Sans ça, après être allé dans Teams pour copier un
+	-- lien, cliquer sur l'icône AppCloner du Dock ne ramène pas la fenêtre
+	-- de saisie au premier plan.
+	tell me to activate
+
 	-- argv[1] : répertoire absolu du bundle, passé par MacOS/AppCloner via $APPROOT
 	if argv is {} or item 1 of argv is "" then
 		display dialog "Erreur : chemin du bundle manquant. Lancez l'app normalement." buttons {"OK"} default button 1
@@ -45,17 +78,16 @@ on run argv
 	logmsg("defaultName: " & defaultName)
 
 	-- ── 2) Nom du clone ─────────────────────────────────────────────────────
-	set cloneName to text returned of (display dialog ¬
-		"Nom du clone :" ¬
-		default answer (defaultName & " — Clone") ¬
-		buttons {"Annuler", "Suivant"} default button 2)
+	tell me to activate
+	set cloneName to my askText("Choisis un nom (apparaîtra sous l'icône du Dock) :", defaultName & " — Clone", "Nom du clone")
 	if cloneName is "" then set cloneName to defaultName & " Clone"
 	logmsg("cloneName: " & cloneName)
 
 	-- ── 3) Argument d'ouverture (optionnel) ─────────────────────────────────
 	-- Trois cas : rien, un dossier (VSCode), ou une URL/chemin libre. Les URLs
-	-- type msteams:/l/chat/… ou outlook://calendar permettent d'ouvrir Teams/
-	-- Outlook directement sur une conversation ou un onglet spécifique.
+	-- type msteams:/l/chat/… ou outlook://calendar permettent d'ouvrir Teams,
+	-- Outlook, Slack, Spotify, Notion… directement sur une vue spécifique.
+	tell me to activate
 	set openTypeAnswer to button returned of (display dialog ¬
 		"Ouvrir quelque chose de spécifique au lancement ?" ¬
 		buttons {"Rien", "Dossier", "URL ou chemin"} ¬
@@ -68,21 +100,31 @@ on run argv
 			set openArg to POSIX path of openAlias
 		end try
 	else if openTypeAnswer is "URL ou chemin" then
+		set urlPrompt to ¬
+			"Colle l'URL ou le chemin à ouvrir au lancement (Cmd+V supporté)." & return & return & ¬
+			"📅  Outlook calendrier :   ms-outlook://events" & return & ¬
+			"📨  Outlook mail :         ms-outlook://" & return & ¬
+			"💬  Teams (une conv) :     msteams:/l/chat/0/0?users=foo@bar.com" & return & ¬
+			"      → dans Teams : clic-droit sur la conv → « Get link to chat »" & return & ¬
+			"📅  Teams calendrier :     msteams:/l/calendar" & return & ¬
+			"💼  Slack (une chaîne) :   slack://channel?team=T1234&id=C5678" & return & ¬
+			"      → Slack → ⋮ d'une chaîne → « Copy » → « Copy link »" & return & ¬
+			"📝  Notion (une page) :    notion://www.notion.so/My-Page-abc123" & return & ¬
+			"      → Notion : … en haut de page → « Copy link »" & return & ¬
+			"🎵  Spotify (playlist) :   spotify:playlist:37i9dQZF1DXcBWIGoYBM5M" & return & ¬
+			"      → clic-droit sur playlist → Share → Copy Spotify URI" & return & ¬
+			"🎮  Discord (un salon) :   discord://discord.com/channels/SERVER/CHANNEL" & return & ¬
+			"      → Discord : clic-droit sur le salon → « Copy Link »" & return & ¬
+			"🌐  Tout site web :        https://example.com" & return & ¬
+			"📁  Dossier ou fichier :   /Users/moi/projet"
 		try
-			set openArg to text returned of (display dialog ¬
-				"URL ou chemin à ouvrir au lancement :" & return & return & ¬
-				"Exemples :" & return & ¬
-				"  • outlook://calendar" & return & ¬
-				"  • msteams:/l/chat/0/0?users=foo@bar.com" & return & ¬
-				"  • /Users/moi/projet" ¬
-				default answer "" ¬
-				buttons {"Annuler", "OK"} default button 2 ¬
-				with title "App Cloner")
+			set openArg to my askText(urlPrompt, "", "URL ou chemin")
 		end try
 	end if
 	logmsg("openArg: " & openArg)
 
 	-- ── 4) Type d'icône ─────────────────────────────────────────────────────
+	tell me to activate
 	set iconMode to "tint"
 	set iconPath to ""
 	set iconChoice to button returned of (display dialog ¬
@@ -133,6 +175,7 @@ on run argv
 		& "• Nom    : " & cloneName & return ¬
 		& "• Icône  : " & iconDisplay & return ¬
 		& "• Ouvre  : " & openArgDisplay
+	tell me to activate
 	set go to button returned of (display dialog summary ¬
 		buttons {"Annuler", "Créer le clone"} default button 2 ¬
 		with title "App Cloner")

@@ -175,6 +175,30 @@ if [[ ! -f "$BASE_PNG" && -n "$SRC_ICNS" && -f "$SRC_ICNS" ]]; then
 		[[ -f "$ICONSET_TMP/${sz}.png" ]] && cp "$ICONSET_TMP/${sz}.png" "$BASE_PNG" && log "PNG: $sz" && break
 	done
 fi
+
+# Fallback for apps that don't ship a plain .icns (notably the new Microsoft
+# Teams + most Mac App Store apps that pack icons into Assets.car). Ask
+# NSWorkspace for the icon as Finder displays it — this works regardless of
+# how the icon is stored (icns, asset catalog, doc-icon plugin…).
+if [[ ! -f "$BASE_PNG" ]]; then
+	log "No .icns found — falling back to NSWorkspace.iconForFile"
+	python3 - "$SOURCE_APP" "$BASE_PNG" <<'NSWSEOF' || true
+import sys
+from AppKit import NSWorkspace, NSBitmapImageRep, NSPNGFileType, NSMakeSize
+from Foundation import NSData
+
+src, dst = sys.argv[1], sys.argv[2]
+img = NSWorkspace.sharedWorkspace().iconForFile_(src)
+if img is None:
+	sys.exit(1)
+img.setSize_(NSMakeSize(1024, 1024))
+tiff = img.TIFFRepresentation()
+rep = NSBitmapImageRep.imageRepWithData_(tiff)
+png = rep.representationUsingType_properties_(NSPNGFileType, None)
+png.writeToFile_atomically_(dst, True)
+print(f"NSWorkspace icon extracted → {dst}", flush=True)
+NSWSEOF
+fi
 if [[ ! -f "$BASE_PNG" ]]; then
 	# Fallback: synthesize a generic placeholder icon from the app's first two letters
 	log "Fallback generic icon"
@@ -494,10 +518,13 @@ APP_PID=\$!
 
 if [[ -n "\$OPEN_ARG" && "\$OPEN_ARG" =~ \$URL_SCHEME_RE ]]; then
 	# Give the app ~1 s to register its URL handler with macOS, then
-	# dispatch the URL via \`open\` so the running instance navigates
-	# (e.g. Teams jumps to the chat, Outlook opens the calendar).
+	# dispatch the URL via \`open -a \$SOURCE_APP\` so the URL is opened
+	# specifically by the source app, not the system default handler.
+	# Without -a, msteams:/ URLs would go to whatever app is registered
+	# as URL handler on the user's system (often Edge or web Teams),
+	# bypassing the running clone entirely.
 	sleep 1
-	/usr/bin/open "\$OPEN_ARG"
+	/usr/bin/open -a "${SOURCE_APP}" "\$OPEN_ARG"
 fi
 
 wait "\$APP_PID"
