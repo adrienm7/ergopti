@@ -523,19 +523,34 @@ if [[ "$APP_FAMILY" == "teams" ]]; then
 	# Strip quarantine so Gatekeeper doesn't block the clone on first launch
 	xattr -cr "$DEST" 2>/dev/null || true
 
-	# Re-sign --deep ad-hoc with NO entitlements / flags preserved.
-	# Rationale: ad-hoc signatures have no team-id, but Microsoft's
-	# entitlements (keychain-access-groups, app-sandbox) are bound to
-	# UBF8T346G9. macOS rejects the launch when entitlements demand a
-	# team-id the signature doesn't actually have → "impossible d'ouvrir
-	# l'application". Stripping them yields a plain ad-hoc binary that
-	# launches cleanly. Trade-offs: no sandbox container (Teams writes
-	# under ~/Library/Application Support keyed off the new bundle id, so
-	# isolation still holds), and Teams may show one keychain warning at
-	# first launch — non-fatal, login completes via the default keychain.
-	codesign --force --deep --sign - "$DEST" >> "$DIAG" 2>&1 \
-		|| log "codesign returned non-zero (often OK on Tahoe)"
-	log "Teams clone re-signed ad-hoc (entitlements stripped)"
+	# Two-pass re-sign — different needs for helpers vs. outer bundle.
+	#
+	# Helpers (WebView2 in particular) MUST keep:
+	#   * hardened runtime → otherwise V8 / JIT engines refuse to start
+	#   * com.apple.security.cs.allow-jit → JavaScript engine needs to
+	#     allocate executable memory
+	#   * camera/microphone/network entitlements → Teams calls won't work
+	# Without these, Teams loads but the webview never finishes loading
+	# («Nous avons rencontré un problème»).
+	#
+	# Outer bundle MUST drop:
+	#   * keychain-access-groups → bound to Microsoft's team-id UBF8T346G9,
+	#     ad-hoc sig has no team-id → AMFI rejects the launch entirely
+	#   * com.apple.security.app-sandbox → same team-id binding issue
+	#
+	# Pass 1: --deep preserves entitlements + flags on EVERY binary, helpers
+	# included. Each helper keeps its own original entitlements (codesign
+	# reads them from each binary individually).
+	codesign --force --deep --sign - --preserve-metadata=entitlements,flags "$DEST" >> "$DIAG" 2>&1 \
+		|| log "pass-1 codesign returned non-zero"
+
+	# Pass 2: re-sign the OUTER bundle only, with no entitlements and no
+	# preserved flags. This drops the team-id-bound entitlements that AMFI
+	# was rejecting, while leaving every helper's signature from pass 1
+	# intact. No --deep here on purpose.
+	codesign --force --sign - "$DEST" >> "$DIAG" 2>&1 \
+		|| log "pass-2 codesign returned non-zero"
+	log "Teams clone re-signed (helpers: preserved, outer: stripped)"
 
 	# Skip the stub-specific sections (5, 6, 7) — jump straight to
 	# LaunchServices registration + Dock add (section 8).
