@@ -520,224 +520,315 @@ on run argv
 	logmsg("--- App Cloner start " & (do shell script "date"))
 	logmsg("appDir: " & appDir)
 
-	-- ===== 1) Pick the source application =====
-	-- `path to applications folder` returns an alias macOS treats as a proper
-	-- sidebar location, unlike POSIX file "/Applications" which the file picker
-	-- often ignores in favour of its last-visited location.
-	set appsFolder to path to applications folder
-	set sourceFile to choose file ¬
-		with prompt "Application à cloner" ¬
-		default location appsFolder ¬
-		of type {"com.apple.application-bundle"}
-	set sourcePath to POSIX path of sourceFile
-	logmsg("source: " & sourcePath)
-
-	-- Default clone name derived from the source app's basename
-	set defaultName to do shell script "basename " & quoted form of sourcePath & " .app"
-	logmsg("defaultName: " & defaultName)
-
-	-- ===== 2) Clone name =====
-	tell me to activate
-	-- Narrow single-line dialog: the name rarely exceeds 30 characters
-	set cloneName to my askText("Nom à afficher sous l'icône du Dock.", defaultName & " — Clone", "Nom du clone", 280, 1)
-	if cloneName is "" then set cloneName to defaultName & " Clone"
-	logmsg("cloneName: " & cloneName)
-
-	-- ===== 2.5) PWA mode detection + opt-in =====
-	-- Sandboxed apps (Teams new, Outlook for Mac, OneNote, …) cannot be
-	-- cloned at the binary level: their entitlements are bound to the
-	-- vendor's team-id and ad-hoc re-signing breaks them. The only reliable
-	-- way to run them in parallel with a separate Dock identity is to
-	-- clone the *web version* — Edge in --app= mode wrapped in our stub
-	-- bundle. We auto-detect this scenario and pre-tick the checkbox.
-	set sourceBundleId to my getBundleId(sourcePath)
-	set pwaSuggestion to my pwaSuggestionFor(sourceBundleId, sourcePath)
-	-- pwaSuggestion = {forced, defaultURL}: forced=true → recommended
-	set pwaForced to item 1 of pwaSuggestion
-	set pwaDefaultURL to item 2 of pwaSuggestion
+	-- Flow state — initialised here, mutated step by step
+	set sourcePath to ""
+	set defaultName to ""
+	set cloneName to ""
 	set pwaMode to false
 	set pwaURL to ""
-	if pwaForced then
-		-- Recommended: explain why, ask only «PWA web app» vs «Tenter quand même»
-		set pwaAnswer to my chooseButton("Mode PWA recommandé", ¬
-			"Cette app ne peut pas être clonée au niveau binaire" & return & ¬
-			"(sandbox + signature liée au fournisseur)." & return & return & ¬
-			"Le mode PWA installe une version web isolée via Edge / Chrome" & return & ¬
-			"avec sa propre fenêtre, son propre profil et son propre compte.", ¬
-			{"Annuler", "Tenter natif", "PWA (recommandé)"}, "App Cloner")
-		if pwaAnswer is "Annuler" then return
-		if pwaAnswer is "PWA (recommandé)" then set pwaMode to true
-	else
-		-- Not strictly required — opt-in dialog
-		set pwaAnswer to my chooseButton("Mode PWA ?", ¬
-			"Cloner via une web app (Edge / Chrome --app=URL)" & return & ¬
-			"au lieu de relancer l'app native." & return & return & ¬
-			"Utile pour avoir des comptes séparés sans dépendance au binaire.", ¬
-			{"Annuler", "PWA web app", "Cloner l'app native"}, "App Cloner")
-		if pwaAnswer is "Annuler" then return
-		if pwaAnswer is "PWA web app" then set pwaMode to true
-	end if
-
-	if pwaMode then
-		-- Prompt for URL with auto-prefill (Teams → teams.microsoft.com etc.)
-		repeat
-			try
-				set candidate to my askText(¬
-					"URL à ouvrir dans la PWA (Enter pour valider) :" & return & return & ¬
-					"── Microsoft Teams ──────────────────────────────" & return & ¬
-					"App entière : https://teams.microsoft.com/v2/" & return & ¬
-					"Conversation : Teams → conv → ⋯ → « Copier le lien » → https://teams.microsoft.com/l/chat/…" & return & ¬
-					"Canal : clic-droit canal → « Lien vers le canal » → https://teams.microsoft.com/l/channel/…" & return & return & ¬
-					"── Outlook ──────────────────────────────────────" & return & ¬
-					"Boîte de réception : https://outlook.office.com/mail/" & return & ¬
-					"Calendrier : https://outlook.office.com/calendar/", ¬
-					pwaDefaultURL, "URL PWA", 600, -1)
-			on error
-				return
-			end try
-			set candidate to my trim(candidate)
-			set pwaErr to my validatePWAURL(candidate)
-			if pwaErr is "" then
-				set pwaURL to candidate
-				exit repeat
-			else
-				display alert "URL invalide" message pwaErr as warning
-			end if
-		end repeat
-		-- In PWA mode the URL replaces the open-arg (passed as $4 to the
-		-- shell script). Skip the open-arg step entirely.
-		set openArg to pwaURL
-	end if
-
-	-- ===== 3) Optional launch argument (native clone only) =====
-	-- Three cases: nothing, a folder (VSCode), or a free URL/path. URLs like
-	-- msteams:/l/chat/… or ms-outlook://events let Teams/Outlook/Slack/Spotify/
-	-- Notion launch directly on a specific view (chat, calendar, channel…).
-	if pwaMode then
-		-- skip — openArg already set to the PWA URL
-	else
-	tell me to activate
-	set openTypeAnswer to my chooseButton("Élément à ouvrir au lancement", ¬
-		"Optionnel — laisser à « Rien » pour simplement lancer l'app.", ¬
-		{"Rien", "Dossier", "URL ou chemin"}, "App Cloner")
+	set pwaDefaultURL to ""
+	set pwaForced to false
 	set openArg to ""
-	if openTypeAnswer is "Dossier" then
-		try
-			set openAlias to choose folder with prompt "Dossier à ouvrir avec le clone"
-			set openArg to POSIX path of openAlias
-		end try
-	else if openTypeAnswer is "URL ou chemin" then
-		-- Each example separated by a blank line for readability. The how-to
-		-- hint sits on the line right under the URL it explains.
-		set urlPrompt to ¬
-			"Coller l'URL ou le chemin à ouvrir au lancement." & return & return & ¬
-			"📅  Outlook calendrier :   ms-outlook://events" & return & return & ¬
-			"📨  Outlook mail :         ms-outlook://" & return & return & ¬
-			"💬  Teams (une conv) :     msteams:/l/chat/0/0?users=foo@bar.com" & return & ¬
-			"        → dans Teams : clic-droit sur la conv → « Get link to chat »" & return & return & ¬
-			"📅  Teams calendrier :     msteams:/l/calendar" & return & return & ¬
-			"💼  Slack (une chaîne) :   slack://channel?team=T1234&id=C5678" & return & ¬
-			"        → Slack → ⋮ d'une chaîne → « Copy » → « Copy link »" & return & return & ¬
-			"📝  Notion (une page) :    notion://www.notion.so/My-Page-abc123" & return & ¬
-			"        → Notion : … en haut de page → « Copy link »" & return & return & ¬
-			"🎵  Spotify (playlist) :   spotify:playlist:37i9dQZF1DXcBWIGoYBM5M" & return & ¬
-			"        → clic-droit sur playlist → Share → Copy Spotify URI" & return & return & ¬
-			"🎮  Discord (un salon) :   discord://discord.com/channels/SERVER/CHANNEL" & return & ¬
-			"        → Discord : clic-droit sur le salon → « Copy Link »" & return & return & ¬
-			"🌐  Tout site web :        https://example.com" & return & return & ¬
-			"📁  Dossier ou fichier :   /Users/moi/projet"
-		-- Loop until we get a valid URL/path, or the user cancels the
-		-- whole flow. Single-line NSTextField (lineCount=1) so Enter
-		-- submits instead of inserting a newline.
-		repeat
-			try
-				set candidate to my askText(urlPrompt, "", "URL ou chemin", 560, 1)
-			on error
-				-- User cancelled the input dialog → abort the whole creation
-				return
-			end try
-			-- Trim leading/trailing whitespace
-			set candidate to my trim(candidate)
-			set validationError to my validateOpenArg(candidate, sourcePath)
-			if validationError is "" then
-				set openArg to candidate
-				exit repeat
-			else
-				-- Re-prompt after showing the specific error
-				display alert "Entrée invalide" message validationError as warning
-			end if
-		end repeat
-	end if
-	end if -- end pwaMode skip block
-	logmsg("openArg: " & openArg & "  pwaMode: " & (pwaMode as text))
-
-	-- ===== 4) Icon style =====
-	-- The whole step is wrapped in a loop so that cancelling a sub-prompt
-	-- (color picker, file picker) sends the user back to the style chooser
-	-- instead of silently falling through to a hardcoded default.
-	tell me to activate
 	set iconMode to ""
 	set iconPath to ""
 	set colorHex to ""
-	repeat while iconMode is ""
-		-- Leftmost button gets the Esc-key binding from customDialog. We put a
-		-- real "Annuler" there so pressing Esc actually aborts the whole flow.
-		set iconChoice to my chooseButton("Style d'icône", ¬
-			"  • Teinte couleur — applique une teinte sur l'icône d'origine." & return & ¬
-			"  • Noir & blanc — convertit l'icône d'origine en niveaux de gris." & return & ¬
-			"  • Personnalisée — utilise une image (PNG, ICNS, JPG…) en remplacement.", ¬
-			{"Annuler", "Personnalisée", "Noir & blanc", "Teinte couleur"}, "App Cloner")
-		if iconChoice is "Annuler" then return
-		if iconChoice is "Teinte couleur" then
+
+	-- Step machine: each step can go to step-1 (Retour) or step+1 (continue).
+	-- Closing a dialog via the X button throws -128, caught and treated as Retour.
+	-- The only true exit is step 1 (file picker cancel → return from on run).
+	set step to 1
+	repeat
+		-- ===== 1) Pick the source application =====
+		if step = 1 then
+			set appsFolder to path to applications folder
 			try
-				set colorList to choose color default color {52428, 0, 0}
-				set iconMode to "tint"
-				set colorHex to my rgbToHex(item 1 of colorList, item 2 of colorList, item 3 of colorList)
+				set sourceFile to choose file ¬
+					with prompt "Application à cloner" ¬
+					default location appsFolder ¬
+					of type {"com.apple.application-bundle"}
+				set sourcePath to POSIX path of sourceFile
+				logmsg("source: " & sourcePath)
+				set defaultName to do shell script "basename " & quoted form of sourcePath & " .app"
+				set cloneName to defaultName & " — Clone"
+				set step to 2
 			on error
-				-- User cancelled the color picker → re-loop to style chooser
+				-- File picker cancelled at step 1 → nothing to go back to
+				return
 			end try
-		else if iconChoice is "Noir & blanc" then
-			set iconMode to "bw"
-			-- Color ignored downstream but we still need a placeholder for the shell
-			set colorHex to "#808080"
-		else if iconChoice is "Personnalisée" then
+
+		-- ===== 2) Clone name =====
+		else if step = 2 then
+			tell me to activate
 			try
-				set iconAlias to choose file ¬
-					with prompt "Image à utiliser pour l'icône" ¬
-					of type {"public.image", "com.apple.icns"}
-				set iconPath to POSIX path of iconAlias
-				set iconMode to "custom"
-				set colorHex to "#000000"
+				set r to my customDialog("Nom du clone", "Nom à afficher sous l'icône du Dock.", ¬
+					{"Retour", "OK"}, true, cloneName, 1, 280, false, "")
+				if (chosenButton of r) is "Retour" then
+					set step to 1
+				else
+					set entered to my trim(inputText of r)
+					if entered is "" then set entered to defaultName & " Clone"
+					set cloneName to entered
+					logmsg("cloneName: " & cloneName)
+					set step to 3
+				end if
 			on error
-				-- User cancelled the file picker → re-loop to style chooser
+				set step to 1
+			end try
+
+		-- ===== 3) PWA mode detection + opt-in =====
+		-- Sandboxed apps (Teams, Outlook, OneNote…) cannot be cloned at the binary
+		-- level — their entitlements are bound to the vendor's team-id. The web
+		-- version wrapped in our launcher is the only reliable alternative.
+		else if step = 3 then
+			set sourceBundleId to my getBundleId(sourcePath)
+			set pwaSuggestion to my pwaSuggestionFor(sourceBundleId, sourcePath)
+			set pwaForced to item 1 of pwaSuggestion
+			set pwaDefaultURL to item 2 of pwaSuggestion
+			tell me to activate
+			try
+				if pwaForced then
+					set pwaAnswer to my chooseButton("Mode PWA recommandé", ¬
+						"Cette app ne peut pas être clonée au niveau binaire" & return & ¬
+						"(sandbox + signature liée au fournisseur)." & return & return & ¬
+						"Le mode PWA installe une version web isolée via un navigateur" & return & ¬
+						"avec sa propre fenêtre, son propre profil et son propre compte.", ¬
+						{"Retour", "Tenter natif", "PWA (recommandé)"}, "App Cloner")
+				else
+					set pwaAnswer to my chooseButton("Mode PWA ?", ¬
+						"Cloner via une web app (navigateur --app=URL)" & return & ¬
+						"au lieu de relancer l'app native." & return & return & ¬
+						"Utile pour avoir des comptes séparés sans dépendance au binaire.", ¬
+						{"Retour", "PWA web app", "Cloner l'app native"}, "App Cloner")
+				end if
+				if pwaAnswer is "Retour" then
+					set step to 2
+				else if pwaAnswer contains "PWA" then
+					set pwaMode to true
+					set pwaURL to pwaDefaultURL
+					set step to 4
+				else
+					set pwaMode to false
+					set openArg to ""
+					set step to 4
+				end if
+			on error
+				set step to 2
+			end try
+
+		-- ===== 4) URL / chemin ou URL PWA =====
+		else if step = 4 then
+			tell me to activate
+			if pwaMode then
+				-- PWA: single URL input, no folder picker needed
+				set urlBody to ¬
+					"URL à ouvrir dans la PWA (Entrée pour valider) :" & return & return & ¬
+					"── Microsoft Teams ──────────────────────────────" & return & ¬
+					"App entière : https://teams.microsoft.com/v2/" & return & ¬
+					"Conversation : Teams → conv → ⋯ → « Copier le lien »" & return & ¬
+					"Canal : clic-droit canal → « Lien vers le canal »" & return & return & ¬
+					"── Outlook ──────────────────────────────────────" & return & ¬
+					"Boîte de réception : https://outlook.office.com/mail/" & return & ¬
+					"Calendrier : https://outlook.office.com/calendar/"
+				try
+					set r to my customDialog("URL PWA", urlBody, ¬
+						{"Retour", "OK"}, true, pwaURL, -1, 600, false, "")
+					if (chosenButton of r) is "Retour" then
+						set step to 3
+					else
+						set candidate to my trim(inputText of r)
+						set pwaErr to my validatePWAURL(candidate)
+						if pwaErr is "" then
+							set pwaURL to candidate
+							set openArg to candidate
+							set step to 5
+						else
+							display alert "URL invalide" message pwaErr as warning
+							-- Stay on step 4 to re-prompt
+						end if
+					end if
+				on error
+					set step to 3
+				end try
+			else
+				-- Native clone: optional launch argument.
+				-- Sub-step 0 = choice dialog (Rien / URL ou chemin).
+				-- Sub-step 1 = text input with embedded Parcourir… button.
+				-- Retour in sub-step 0 → step 3; Retour in sub-step 1 → sub-step 0.
+				set nativeSubStep to 0
+				set nativeDone to false
+				repeat while not nativeDone
+					if nativeSubStep = 0 then
+						try
+							set openTypeAnswer to my chooseButton("Élément à ouvrir au lancement", ¬
+								"Optionnel — laisser à « Rien » pour simplement lancer l'app.", ¬
+								{"Retour", "Rien", "URL ou chemin"}, "App Cloner")
+							if openTypeAnswer is "Retour" then
+								set step to 3
+								set nativeDone to true
+							else if openTypeAnswer is "Rien" then
+								set openArg to ""
+								set step to 5
+								set nativeDone to true
+							else
+								-- Carry over any previously entered value as the default
+								set nativeSubStep to 1
+							end if
+						on error
+							set step to 3
+							set nativeDone to true
+						end try
+					else
+						-- URL / path input with an inline Parcourir… button that fills
+						-- the field with a folder path chosen via the system picker.
+						set urlPrompt to ¬
+							"Coller l'URL ou le chemin à ouvrir au lancement." & return & return & ¬
+							"📅  Outlook calendrier :   ms-outlook://events" & return & return & ¬
+							"📨  Outlook mail :         ms-outlook://" & return & return & ¬
+							"💬  Teams (une conv) :     msteams:/l/chat/0/0?users=foo@bar.com" & return & ¬
+							"     → Teams : clic-droit conv → « Get link to chat »" & return & return & ¬
+							"📅  Teams calendrier :     msteams:/l/calendar" & return & return & ¬
+							"💼  Slack (chaîne) :       slack://channel?team=T1234&id=C5678" & return & ¬
+							"     → Slack → ⋮ d'une chaîne → « Copy link »" & return & return & ¬
+							"📝  Notion (page) :        notion://www.notion.so/My-Page-abc123" & return & return & ¬
+							"🎵  Spotify (playlist) :   spotify:playlist:37i9dQZF1DXcBWIGoYBM5M" & return & return & ¬
+							"🎮  Discord (salon) :      discord://discord.com/channels/SERVER/CHANNEL" & return & return & ¬
+							"🌐  Tout site web :        https://example.com" & return & return & ¬
+							"📁  Dossier ou fichier :   /Users/moi/projet"
+						set inputDefault to openArg
+						set inputDone to false
+						repeat while not inputDone
+							try
+								set r to my customDialog("URL ou chemin", urlPrompt, ¬
+									{"Retour", "Parcourir…", "Valider"}, true, inputDefault, 1, 560, false, "")
+								set btnChosen to chosenButton of r
+								if btnChosen is "Retour" then
+									-- Go back to choice dialog (Rien / URL ou chemin)
+									set nativeSubStep to 0
+									set inputDone to true
+								else if btnChosen is "Parcourir…" then
+									-- Open folder picker and pre-fill the text field
+									try
+										set folderAlias to choose folder with prompt "Dossier à ouvrir avec le clone"
+										set inputDefault to POSIX path of folderAlias
+									on error
+										-- Picker cancelled — keep current inputDefault
+									end try
+								else
+									-- Valider
+									set candidate to my trim(inputText of r)
+									if candidate is "" then
+										display alert "Champ vide" message "Saisis une URL ou un chemin, ou clique sur Parcourir…" as warning
+									else
+										set validationError to my validateOpenArg(candidate, sourcePath)
+										if validationError is "" then
+											set openArg to candidate
+											set step to 5
+											set nativeDone to true
+											set inputDone to true
+										else
+											display alert "Entrée invalide" message validationError as warning
+											set inputDefault to candidate
+										end if
+									end if
+								end if
+							on error
+								-- X-close treated as Retour → back to choice dialog
+								set nativeSubStep to 0
+								set inputDone to true
+							end try
+						end repeat
+					end if
+				end repeat
+			end if
+
+		-- ===== 5) Icon style =====
+		else if step = 5 then
+			tell me to activate
+			set iconChosen to false
+			repeat while not iconChosen
+				try
+					set iconChoice to my chooseButton("Style d'icône", ¬
+						"  • Teinte couleur — applique une teinte sur l'icône d'origine." & return & ¬
+						"  • Noir & blanc — convertit l'icône d'origine en niveaux de gris." & return & ¬
+						"  • Personnalisée — utilise une image (PNG, ICNS, JPG…) en remplacement.", ¬
+						{"Retour", "Personnalisée", "Noir & blanc", "Teinte couleur"}, "App Cloner")
+					if iconChoice is "Retour" then
+						set step to 4
+						set iconChosen to true -- exit inner loop; outer repeat re-enters step 4
+					else if iconChoice is "Teinte couleur" then
+						try
+							set colorList to choose color default color {52428, 0, 0}
+							set iconMode to "tint"
+							set colorHex to my rgbToHex(item 1 of colorList, item 2 of colorList, item 3 of colorList)
+							set step to 6
+							set iconChosen to true
+						on error
+							-- Color picker cancelled → re-loop to style chooser
+						end try
+					else if iconChoice is "Noir & blanc" then
+						set iconMode to "bw"
+						-- Color ignored downstream but shell expects a non-empty placeholder
+						set colorHex to "#808080"
+						set step to 6
+						set iconChosen to true
+					else if iconChoice is "Personnalisée" then
+						try
+							set iconAlias to choose file ¬
+								with prompt "Image à utiliser pour l'icône" ¬
+								of type {"public.image", "com.apple.icns"}
+							set iconPath to POSIX path of iconAlias
+							set iconMode to "custom"
+							set colorHex to "#000000"
+							set step to 6
+							set iconChosen to true
+						on error
+							-- File picker cancelled → re-loop to style chooser
+						end try
+					end if
+				on error
+					-- X-close → back to step 4
+					set step to 4
+					set iconChosen to true
+				end try
+			end repeat
+
+		-- ===== 6) Confirmation and creation =====
+		else if step = 6 then
+			set openArgDisplay to "(aucun)"
+			if openArg is not "" then set openArgDisplay to openArg
+			set iconDisplay to ""
+			if iconMode is "tint" then
+				set iconDisplay to "Teinte " & colorHex
+			else if iconMode is "bw" then
+				set iconDisplay to "Noir & blanc"
+			else
+				set iconDisplay to "Personnalisée — " & iconPath
+			end if
+			set modeDisplay to "App native"
+			if pwaMode then set modeDisplay to "PWA web app (navigateur)"
+			set summary to "• Source :  " & sourcePath & return ¬
+				& "• Nom :     " & cloneName & return ¬
+				& "• Mode :    " & modeDisplay & return ¬
+				& "• Icône :   " & iconDisplay & return ¬
+				& "• Ouvre :   " & openArgDisplay
+			tell me to activate
+			try
+				set summaryResult to my customDialog("Récapitulatif", summary, ¬
+					{"Retour", "Créer le clone"}, false, "", 0, 380, false, "")
+				if (chosenButton of summaryResult) is "Retour" then
+					set step to 5
+				else
+					-- User confirmed — exit the step machine and proceed to creation
+					exit repeat
+				end if
+			on error
+				set step to 5
 			end try
 		end if
 	end repeat
-	logmsg("iconMode: " & iconMode & "  iconPath: " & iconPath & "  colorHex: " & colorHex)
 
-	-- ===== 5) Confirmation and creation =====
-	set openArgDisplay to "(aucun)"
-	if openArg is not "" then set openArgDisplay to openArg
-	set iconDisplay to ""
-	if iconMode is "tint" then
-		set iconDisplay to "Teinte " & colorHex
-	else if iconMode is "bw" then
-		set iconDisplay to "Noir & blanc"
-	else
-		set iconDisplay to "Personnalisée — " & iconPath
-	end if
-	set modeDisplay to "App native"
-	if pwaMode then set modeDisplay to "PWA web app (Edge / Chrome)"
-	set summary to "• Source : " & sourcePath & return ¬
-		& "• Nom : " & cloneName & return ¬
-		& "• Mode : " & modeDisplay & return ¬
-		& "• Icône : " & iconDisplay & return ¬
-		& "• Ouvre : " & openArgDisplay
-	tell me to activate
-	set summaryResult to my customDialog("Récapitulatif", summary, ¬
-		{"Annuler", "Créer le clone"}, false, "", 0, 380, false, "")
-	set go to chosenButton of summaryResult
-	if go is "Annuler" then return
+	logmsg("openArg: " & openArg & "  pwaMode: " & (pwaMode as text))
+	logmsg("iconMode: " & iconMode & "  iconPath: " & iconPath & "  colorHex: " & colorHex)
 
 	do shell script "chmod +x " & quoted form of cloneScript
 
