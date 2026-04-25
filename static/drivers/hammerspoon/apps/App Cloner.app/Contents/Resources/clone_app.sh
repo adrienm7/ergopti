@@ -74,6 +74,15 @@ trap 'rm -rf "$TMPDIR_WORK"' EXIT
 
 UNIQUE_ID="fr.b519hs.clone.$(date +%s)"
 
+# For sandboxed apps with strict parent-identifier checks (Teams' WebView2,
+# any Mac App Store app), deriving the clone id from the source app's own
+# bundle id keeps the namespace prefix that nested helpers expect. The full
+# id is still unique → macOS still creates a fresh sandbox container.
+SRC_BUNDLE_ID="$(/usr/libexec/PlistBuddy -c "Print :CFBundleIdentifier" "$SOURCE_APP/Contents/Info.plist" 2>/dev/null || echo "")"
+if [[ -n "$SRC_BUNDLE_ID" ]]; then
+	NAMESPACED_ID="${SRC_BUNDLE_ID}.clone.$(date +%s)"
+fi
+
 # Resolve source app's main executable name once, up front — needed by both
 # the family-detection and the launcher generation.
 SRC_EXE_NAME="$(/usr/libexec/PlistBuddy -c "Print :CFBundleExecutable" "$SOURCE_APP/Contents/Info.plist" 2>/dev/null || echo "")"
@@ -457,6 +466,13 @@ log "icns built"
 #      stripped in the process, so Teams runs unsandboxed under our HOME
 #      override — exactly what we want for isolation.
 if [[ "$APP_FAMILY" == "teams" ]]; then
+	# Use the source-app-derived namespaced id so Teams' WebView2 helper's
+	# parent-identifier validation passes. macOS still treats this as a new
+	# bundle id → fresh sandbox container = isolation preserved.
+	if [[ -n "${NAMESPACED_ID:-}" ]]; then
+		UNIQUE_ID="$NAMESPACED_ID"
+		log "Teams uses namespaced clone id: $UNIQUE_ID"
+	fi
 	log "Teams full-clone path: copying source bundle to $DEST…"
 
 	# Strategy — let macOS sandbox itself do the isolation work:
