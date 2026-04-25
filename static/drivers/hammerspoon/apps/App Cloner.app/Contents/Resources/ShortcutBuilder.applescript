@@ -124,12 +124,12 @@ on validateOpenArg(inputVal, sourceAppPath)
 
 	-- File-system path: must point to something that actually exists
 	if (inputVal starts with "/") or (inputVal starts with "~") then
-		set expanded to inputVal
-		if expanded starts with "~" then
-			set expanded to (POSIX path of (path to home folder)) & (text 2 thru -1 of inputVal)
+		set resolvedPath to inputVal
+		if resolvedPath starts with "~" then
+			set resolvedPath to (POSIX path of (path to home folder)) & (text 2 thru -1 of inputVal)
 		end if
 		try
-			do shell script "test -e " & quoted form of expanded
+			do shell script "test -e " & quoted form of resolvedPath
 		on error
 			return "Le chemin « " & inputVal & " » n'existe pas sur le disque."
 		end try
@@ -247,7 +247,7 @@ on customDialog(header, body, buttonList, hasInput, defaultText, lineCount, inpu
 	set marginX to 24
 	set marginYTop to 22
 	set marginYBottom to 18
-	set spacing to 14
+	set itemSpacing to 14
 	set headerHeight to 22
 	set bodyLineHeight to 16
 	set buttonHeight to 28
@@ -298,17 +298,17 @@ on customDialog(header, body, buttonList, hasInput, defaultText, lineCount, inpu
 	repeat with i from 1 to elemCount
 		set panelHeight to panelHeight + (item i of verticalElements)
 	end repeat
-	set panelHeight to panelHeight + ((elemCount - 1) * spacing)
+	set panelHeight to panelHeight + ((elemCount - 1) * itemSpacing)
 
 	-- Build panel: titled + closable, no resize, no minimise
-	set rect to current application's NSMakeRect(0, 0, panelWidth, panelHeight)
-	set styleMask to 3 -- NSWindowStyleMaskTitled (1) + Closable (2)
-	set win to current application's NSPanel's alloc()'s initWithContentRect:rect styleMask:styleMask backing:2 defer:false
-	win's setTitle:"App Cloner"
-	win's |center|()
-	win's setReleasedWhenClosed:false
+	set panelRect to current application's NSMakeRect(0, 0, panelWidth, panelHeight)
+	set panelStyle to 3 -- NSWindowStyleMaskTitled (1) + Closable (2)
+	set panelWin to current application's NSPanel's alloc()'s initWithContentRect:panelRect styleMask:panelStyle backing:2 defer:false
+	panelWin's setTitle:"App Cloner"
+	panelWin's |center|()
+	panelWin's setReleasedWhenClosed:false
 
-	set contentView to win's contentView()
+	set contentView to panelWin's contentView()
 
 	-- Layout top → bottom
 	set yCursor to panelHeight - marginYTop - headerHeight
@@ -326,7 +326,7 @@ on customDialog(header, body, buttonList, hasInput, defaultText, lineCount, inpu
 
 	-- Body (multi-line, selectable so users can copy text from prompts)
 	if bodyHeight > 0 then
-		set yCursor to yCursor - spacing - bodyHeight
+		set yCursor to yCursor - itemSpacing - bodyHeight
 		set bodyFrame to current application's NSMakeRect(marginX, yCursor, panelWidth - (2 * marginX), bodyHeight)
 		set bodyLabel to current application's NSTextField's alloc()'s initWithFrame:bodyFrame
 		bodyLabel's setStringValue:body
@@ -342,7 +342,7 @@ on customDialog(header, body, buttonList, hasInput, defaultText, lineCount, inpu
 
 	-- Input (optional)
 	if hasInput then
-		set yCursor to yCursor - spacing - inputHeight
+		set yCursor to yCursor - itemSpacing - inputHeight
 		set inputFrame to current application's NSMakeRect(marginX, yCursor, panelWidth - (2 * marginX), inputHeight)
 		if lineCount ≤ 1 then
 			set inputView to current application's NSTextField's alloc()'s initWithFrame:inputFrame
@@ -371,14 +371,14 @@ on customDialog(header, body, buttonList, hasInput, defaultText, lineCount, inpu
 
 	-- Checkbox (optional)
 	if hasCheckbox then
-		set yCursor to yCursor - spacing - checkboxHeight
+		set yCursor to yCursor - itemSpacing - checkboxHeight
 		set cbFrame to current application's NSMakeRect(marginX, yCursor, panelWidth - (2 * marginX), checkboxHeight)
-		set cb to current application's NSButton's alloc()'s initWithFrame:cbFrame
-		cb's setButtonType:3 -- NSSwitchButton
-		cb's setTitle:checkboxLabel
-		cb's setState:0
-		contentView's addSubview:cb
-		set my panelCheckboxView to cb
+		set cbBtn to current application's NSButton's alloc()'s initWithFrame:cbFrame
+		cbBtn's setButtonType:3 -- NSSwitchButton
+		cbBtn's setTitle:checkboxLabel
+		cbBtn's setState:0
+		contentView's addSubview:cbBtn
+		set my panelCheckboxView to cbBtn
 	else
 		set my panelCheckboxView to missing value
 	end if
@@ -416,11 +416,11 @@ on customDialog(header, body, buttonList, hasInput, defaultText, lineCount, inpu
 	set my panelInputText to ""
 	set my panelChecked to false
 	if hasInput then
-		win's makeFirstResponder:(my panelInputView)
+		panelWin's makeFirstResponder:(my panelInputView)
 	end if
 
-	(current application's NSApplication's sharedApplication())'s runModalForWindow:win
-	win's orderOut:(missing value)
+	(current application's NSApplication's sharedApplication())'s runModalForWindow:panelWin
+	panelWin's orderOut:(missing value)
 
 	if my panelResult is 0 then error number -128
 
