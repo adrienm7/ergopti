@@ -698,11 +698,12 @@ LSR=/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.
 # to the Finder's path-based lookup which tends to find a stale system
 # icon. The `book` field — an NSURL bookmark blob — is what manual
 # drag-to-Dock generates and what makes the entry survive moves.
-python3 - "$DEST" "$UNIQUE_ID" <<'DOCKEOF'
+python3 - "$DEST" "$UNIQUE_ID" "$SOURCE_APP" <<'DOCKEOF'
 import sys, plistlib, os, subprocess, time
 
 app_path     = sys.argv[1]
 bundle_id    = sys.argv[2]
+source_app   = sys.argv[3]
 plist_path   = os.path.expanduser("~/Library/Preferences/com.apple.dock.plist")
 lsr          = ("/System/Library/Frameworks/CoreServices.framework"
                 "/Frameworks/LaunchServices.framework/Support/lsregister")
@@ -763,8 +764,33 @@ apps.append({
 })
 dock['persistent-apps'] = apps
 
+# Copy the source app's Space assignment to the clone.
+# macOS stores per-app Space pinning in com.apple.dock.plist under the key
+# 'workspaces-application-assignments', a dict mapping bundle-id → Space UUID.
+# We read the source app's bundle-id, look up its assignment, and write the
+# same UUID for the clone's bundle-id so it lands on the same Space.
+def copy_space_assignment(src_app_path, clone_bundle_id, dock_plist):
+    try:
+        src_plist = os.path.join(src_app_path, "Contents", "Info.plist")
+        with open(src_plist, 'rb') as f:
+            src_info = plistlib.load(f)
+        src_bundle_id = src_info.get("CFBundleIdentifier", "")
+        if not src_bundle_id:
+            return
+        assignments = dock_plist.get("workspaces-application-assignments", {})
+        space_uuid = assignments.get(src_bundle_id)
+        if not space_uuid:
+            return
+        assignments[clone_bundle_id] = space_uuid
+        dock_plist["workspaces-application-assignments"] = assignments
+        print(f"Space assignment copied: {src_bundle_id} → {clone_bundle_id} (Space {space_uuid})")
+    except Exception as e:
+        print(f"Space assignment copy skipped ({e})")
+
+copy_space_assignment(source_app, bundle_id, dock)
+
 with open(plist_path, 'wb') as f:
-	plistlib.dump(dock, f)
+    plistlib.dump(dock, f)
 
 # Unregister + force-register (recursive) before killing Dock so it reads
 # the right metadata on restart — without this, single-kill races produce

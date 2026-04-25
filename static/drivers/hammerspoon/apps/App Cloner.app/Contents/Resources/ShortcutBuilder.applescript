@@ -570,7 +570,19 @@ on run argv
 		-- Prompt for URL with auto-prefill (Teams → teams.microsoft.com etc.)
 		repeat
 			try
-				set candidate to my askText("URL de la web app à cloner. Pré-remplie pour les apps connues — modifiable.", ¬
+				set candidate to my askText(¬
+					"URL à ouvrir dans la PWA." & return & return & ¬
+					"App entière (page d'accueil) :" & return & ¬
+					"  https://teams.microsoft.com/v2/" & return & return & ¬
+					"Conversation 1-1 ou groupe (Teams) :" & return & ¬
+					"  → Dans Teams, ouvre la conv → ⋯ → « Copier le lien »" & return & ¬
+					"  → Colle ici l'URL https://teams.microsoft.com/l/chat/…" & return & return & ¬
+					"Canal Teams :" & return & ¬
+					"  → Clic-droit sur le canal → « Obtenir le lien vers le canal »" & return & ¬
+					"  → URL de la forme https://teams.microsoft.com/l/channel/…" & return & return & ¬
+					"Outlook :" & return & ¬
+					"  https://outlook.office.com/mail/" & return & ¬
+					"  https://outlook.office.com/calendar/", ¬
 					pwaDefaultURL, "URL PWA", 560, 1)
 			on error
 				return
