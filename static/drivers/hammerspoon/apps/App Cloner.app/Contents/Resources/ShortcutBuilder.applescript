@@ -548,14 +548,19 @@ on run argv
 	if pwaForced then
 		-- Recommended: explain why, ask only «PWA web app» vs «Tenter quand même»
 		set pwaAnswer to my chooseButton("Mode PWA recommandé", ¬
-			"Cette application ne peut pas être clonée au niveau binaire (sandbox + signature liée au fournisseur). Le mode PWA installe une version web isolée via Edge / Chrome avec sa propre fenêtre, son propre profil et son propre compte.", ¬
+			"Cette app ne peut pas être clonée au niveau binaire" & return & ¬
+			"(sandbox + signature liée au fournisseur)." & return & return & ¬
+			"Le mode PWA installe une version web isolée via Edge / Chrome" & return & ¬
+			"avec sa propre fenêtre, son propre profil et son propre compte.", ¬
 			{"Annuler", "Tenter natif", "PWA (recommandé)"}, "App Cloner")
 		if pwaAnswer is "Annuler" then return
 		if pwaAnswer is "PWA (recommandé)" then set pwaMode to true
 	else
 		-- Not strictly required — opt-in dialog
 		set pwaAnswer to my chooseButton("Mode PWA ?", ¬
-			"Cloner via une web app (Edge / Chrome --app=URL) au lieu de relancer l'app native. Utile pour avoir des comptes vraiment séparés sans dépendance au binaire.", ¬
+			"Cloner via une web app (Edge / Chrome --app=URL)" & return & ¬
+			"au lieu de relancer l'app native." & return & return & ¬
+			"Utile pour avoir des comptes séparés sans dépendance au binaire.", ¬
 			{"Annuler", "PWA web app", "Cloner l'app native"}, "App Cloner")
 		if pwaAnswer is "Annuler" then return
 		if pwaAnswer is "PWA web app" then set pwaMode to true
