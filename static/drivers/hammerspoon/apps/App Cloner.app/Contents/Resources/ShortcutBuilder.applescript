@@ -645,7 +645,7 @@ on run argv
 		end repeat
 	end if
 	end if -- end pwaMode skip block
-	logmsg("openArg: " & openArg & "  pwaMode: " & pwaMode)
+	logmsg("openArg: " & openArg & "  pwaMode: " & (pwaMode as text))
 
 	-- ===== 4) Icon style =====
 	-- The whole step is wrapped in a loop so that cancelling a sub-prompt
