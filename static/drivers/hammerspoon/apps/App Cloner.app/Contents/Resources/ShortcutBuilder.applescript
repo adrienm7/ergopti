@@ -16,11 +16,12 @@ use scripting additions
 -- the menu — without those menu items, Cmd+A/C/V/X are dropped. We install
 -- a minimal Edit menu once at startup so every text field in this app gets
 -- standard editing shortcuts.
--- Hand back a 1×1 fully transparent NSImage. Assigning this to NSAlert.icon
--- (or anything else asking for an image) collapses the icon slot in the
--- layout so the dialog renders flush-left without a generic folder/app glyph.
+-- Hand back a zero-sized NSImage. NSAlert sizes its icon slot from the
+-- image's pixel dimensions; {0, 0} fully collapses the slot so the
+-- dialog renders flush-left with no awkward leading gap. A 1×1 image
+-- still leaves the icon column padding intact.
 on blankImage()
-	return current application's NSImage's alloc()'s initWithSize:(current application's NSMakeSize(1, 1))
+	return current application's NSImage's alloc()'s initWithSize:(current application's NSMakeSize(0, 0))
 end blankImage
 
 -- Wrapper around `display dialog` that also strips the implicit Dock-app icon
@@ -180,7 +181,7 @@ on run argv
 	-- often ignores in favour of its last-visited location.
 	set appsFolder to path to applications folder
 	set sourceFile to choose file ¬
-		with prompt "Choisir l'application à cloner :" ¬
+		with prompt "Application à cloner" ¬
 		default location appsFolder ¬
 		of type {"com.apple.application-bundle"}
 	set sourcePath to POSIX path of sourceFile
@@ -193,7 +194,7 @@ on run argv
 	-- ===== 2) Clone name =====
 	tell me to activate
 	-- Narrow single-line dialog: the name rarely exceeds 30 characters
-	set cloneName to my askText("Choisis un nom (apparaîtra sous l'icône du Dock) :", defaultName & " — Clone", "Nom du clone", 280, 1)
+	set cloneName to my askText("Nom à afficher sous l'icône du Dock.", defaultName & " — Clone", "Nom du clone", 280, 1)
 	if cloneName is "" then set cloneName to defaultName & " Clone"
 	logmsg("cloneName: " & cloneName)
 
@@ -202,18 +203,20 @@ on run argv
 	-- msteams:/l/chat/… or ms-outlook://events let Teams/Outlook/Slack/Spotify/
 	-- Notion launch directly on a specific view (chat, calendar, channel…).
 	tell me to activate
-	set openTypeAnswer to my chooseButton("Que veux-tu ouvrir au lancement ?", "", {"Rien", "Dossier", "URL ou chemin"}, "App Cloner")
+	set openTypeAnswer to my chooseButton("Élément à ouvrir au lancement", ¬
+		"Optionnel — laisser à « Rien » pour simplement lancer l'app.", ¬
+		{"Rien", "Dossier", "URL ou chemin"}, "App Cloner")
 	set openArg to ""
 	if openTypeAnswer is "Dossier" then
 		try
-			set openAlias to choose folder with prompt "Dossier à ouvrir avec le clone :"
+			set openAlias to choose folder with prompt "Dossier à ouvrir avec le clone"
 			set openArg to POSIX path of openAlias
 		end try
 	else if openTypeAnswer is "URL ou chemin" then
 		-- Each example separated by a blank line for readability. The how-to
 		-- hint sits on the line right under the URL it explains.
 		set urlPrompt to ¬
-			"Colle l'URL ou le chemin à ouvrir au lancement (Cmd+V supporté)." & return & return & ¬
+			"Coller l'URL ou le chemin à ouvrir au lancement." & return & return & ¬
 			"📅  Outlook calendrier :   ms-outlook://events" & return & return & ¬
 			"📨  Outlook mail :         ms-outlook://" & return & return & ¬
 			"💬  Teams (une conv) :     msteams:/l/chat/0/0?users=foo@bar.com" & return & ¬
@@ -241,10 +244,10 @@ on run argv
 	tell me to activate
 	set iconMode to "tint"
 	set iconPath to ""
-	set iconChoice to my chooseButton("Style d'icône pour le clone ?", ¬
-		"  • Teinte couleur : applique une teinte sur l'icône d'origine" & return & ¬
-		"  • Noir & blanc : convertit en niveaux de gris" & return & ¬
-		"  • Personnalisée : choisir une image (PNG, ICNS, JPG…)", ¬
+	set iconChoice to my chooseButton("Style d'icône", ¬
+		"  • Teinte couleur — applique une teinte sur l'icône d'origine." & return & ¬
+		"  • Noir & blanc — convertit l'icône d'origine en niveaux de gris." & return & ¬
+		"  • Personnalisée — utilise une image (PNG, ICNS, JPG…) en remplacement.", ¬
 		{"Personnalisée", "Noir & blanc", "Teinte couleur"}, "App Cloner")
 	if iconChoice is "Teinte couleur" then
 		set iconMode to "tint"
@@ -259,7 +262,7 @@ on run argv
 		set colorHex to "#000000"
 		try
 			set iconAlias to choose file ¬
-				with prompt "Choisir l'image pour l'icône :" ¬
+				with prompt "Image à utiliser pour l'icône" ¬
 				of type {"public.image", "com.apple.icns"}
 			set iconPath to POSIX path of iconAlias
 		on error
