@@ -273,10 +273,16 @@ on customDialog(header, body, buttonList, hasInput, defaultText, lineCount, inpu
 	end if
 
 	-- Input height
+	-- lineCount = 1  → single-line NSTextField (Enter = validate)
+	-- lineCount = -1 → wrapped multi-line-looking NSTextField, still Enter = validate
+	-- lineCount ≥ 2  → NSTextView (Enter = newline, scrollable)
 	set inputHeight to 0
 	if hasInput then
-		if lineCount ≤ 1 then
+		if lineCount = 1 then
 			set inputHeight to 24
+		else if lineCount = -1 then
+			-- 3-row wrapped NSTextField: enough height to show a pasted URL without scrolling
+			set inputHeight to 58
 		else
 			set inputHeight to (lineCount * 18) + 12
 		end if
@@ -344,10 +350,16 @@ on customDialog(header, body, buttonList, hasInput, defaultText, lineCount, inpu
 	if hasInput then
 		set yCursor to yCursor - itemSpacing - inputHeight
 		set inputFrame to current application's NSMakeRect(marginX, yCursor, panelWidth - (2 * marginX), inputHeight)
-		if lineCount ≤ 1 then
+		if lineCount = 1 or lineCount = -1 then
 			set inputView to current application's NSTextField's alloc()'s initWithFrame:inputFrame
 			inputView's setStringValue:defaultText
 			inputView's setFont:(current application's NSFont's systemFontOfSize:13)
+			-- lineCount=-1: enable word-wrap so long URLs wrap across the 3-row height
+			-- instead of scrolling horizontally out of view
+			if lineCount = -1 then
+				(inputView's cell())'s setWraps:true
+				(inputView's cell())'s setScrollable:false
+			end if
 			contentView's addSubview:inputView
 			set my panelInputView to inputView
 			set my panelIsTextView to false
@@ -571,19 +583,17 @@ on run argv
 		repeat
 			try
 				set candidate to my askText(¬
-					"URL à ouvrir dans la PWA." & return & return & ¬
-					"App entière (page d'accueil) :" & return & ¬
-					"  https://teams.microsoft.com/v2/" & return & return & ¬
-					"Conversation 1-1 ou groupe (Teams) :" & return & ¬
-					"  → Dans Teams, ouvre la conv → ⋯ → « Copier le lien »" & return & ¬
-					"  → Colle ici l'URL https://teams.microsoft.com/l/chat/…" & return & return & ¬
-					"Canal Teams :" & return & ¬
-					"  → Clic-droit sur le canal → « Obtenir le lien vers le canal »" & return & ¬
-					"  → URL de la forme https://teams.microsoft.com/l/channel/…" & return & return & ¬
-					"Outlook :" & return & ¬
-					"  https://outlook.office.com/mail/" & return & ¬
-					"  https://outlook.office.com/calendar/", ¬
-					pwaDefaultURL, "URL PWA", 560, 1)
+					"URL à ouvrir dans la PWA (Enter pour valider) :" & return & return & ¬
+					"── Microsoft Teams ──────────────────────────────" & return & ¬
+					"App entière     : https://teams.microsoft.com/v2/" & return & ¬
+					"Conversation    : Teams → conv → ⋯ → « Copier le lien »" & return & ¬
+					"                  https://teams.microsoft.com/l/chat/…" & return & ¬
+					"Canal           : clic-droit canal → « Lien vers le canal »" & return & ¬
+					"                  https://teams.microsoft.com/l/channel/…" & return & return & ¬
+					"── Outlook ──────────────────────────────────────" & return & ¬
+					"Boîte de réception : https://outlook.office.com/mail/" & return & ¬
+					"Calendrier         : https://outlook.office.com/calendar/", ¬
+					pwaDefaultURL, "URL PWA", 600, -1)
 			on error
 				return
 			end try
