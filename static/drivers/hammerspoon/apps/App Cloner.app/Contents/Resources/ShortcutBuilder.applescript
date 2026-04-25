@@ -539,7 +539,8 @@ on showTintColorPicker(appPath)
 	set cwY to imgY - 12 - cwH
 	set colorWell to current application's NSColorWell's alloc()'s initWithFrame:(current application's NSMakeRect(cwX, cwY, cwW, cwH))
 	-- Seed with a vivid red so the tint effect is visible immediately
-	colorWell's setColor:(current application's NSColor's colorWithSRGBRed:0.8 green:0.0 blue:0.0 alpha:1.0)
+	set initialColor to current application's NSColor's colorWithSRGBRed:0.8 green:0.0 blue:0.0 alpha:1.0
+	colorWell's setColor:initialColor
 	cv's addSubview:colorWell
 	set my tintPreviewColorWell to colorWell
 
@@ -571,7 +572,8 @@ on showTintColorPicker(appPath)
 	set my panelResult to 0
 	set my panelInputView to missing value
 	set my panelCheckboxView to missing value
-	set theTimer to current application's NSTimer's timerWithTimeInterval:0.08 target:me selector:"updateTintPreview:" userInfo:(missing value) repeats:true
+	set timerUserInfo to missing value
+	set theTimer to current application's NSTimer's timerWithTimeInterval:0.08 target:me selector:"updateTintPreview:" userInfo:timerUserInfo repeats:true
 	(current application's NSRunLoop's mainRunLoop())'s addTimer:theTimer forMode:"NSRunLoopCommonModes"
 
 	(current application's NSApplication's sharedApplication())'s runModalForWindow:pickerPanel
@@ -901,7 +903,8 @@ on run argv
 						set chosenNSColor to my showTintColorPicker(sourcePath)
 						if chosenNSColor is not missing value then
 							-- Convert sRGB float components (0.0–1.0) to 16-bit integers for rgbToHex
-							set rgbColor to chosenNSColor's colorUsingColorSpace:(current application's NSColorSpace's sRGBColorSpace())
+							set sRGBSpace to current application's NSColorSpace's sRGBColorSpace()
+						set rgbColor to chosenNSColor's colorUsingColorSpace:sRGBSpace
 							set r16 to (((rgbColor's redComponent()) * 65535.0) as integer)
 							set g16 to (((rgbColor's greenComponent()) * 65535.0) as integer)
 							set b16 to (((rgbColor's blueComponent()) * 65535.0) as integer)

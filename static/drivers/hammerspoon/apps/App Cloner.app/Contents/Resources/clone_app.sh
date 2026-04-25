@@ -607,300 +607,122 @@ if [[ "$PWA_MODE" == "1" ]]; then
 
 
 
-	# ===========================================================
-	# ===== 6.b.2) Python cookie exporter (all browsers) =====
-	# ===========================================================
+	# ================================================
+	# ===== 6.b.2) Python WKWebView launcher =====
+	# ================================================
 
-	# The cookie import logic lives entirely in Python so it has zero effect on
-	# Swift compilation. Python has built-in sqlite3 and can call macOS
-	# CommonCrypto via ctypes — no third-party packages required.
-	# Supported browsers: Edge, Chrome, Brave (Chromium AES-128-CBC cookies),
-	# Firefox (unencrypted sqlite). Safari requires Full Disk Access → skipped.
-	cat > "$RES/export_cookies.py" << 'COOKIESEOF'
-#!/usr/bin/env python3
-"""Export Microsoft auth cookies from all available browsers as JSON."""
-import ctypes, hashlib, json, os, shutil, sqlite3, subprocess, sys, tempfile
-
-HOME = os.path.expanduser("~")
-
-MS_DOMAINS = [
-	"microsoftonline.com", "microsoft.com", "office.com", "office365.com",
-	"live.com", "windows.net", "msftauth.net", "msauth.net", "msauthimages.net",
-	"sharepoint.com", "teams.live.com", "skype.com", "msocdn.com",
-]
-
-def is_ms(host):
-	h = host.lstrip(".")
-	return any(h == d or h.endswith("." + d) for d in MS_DOMAINS)
-
-# AES-128-CBC via CommonCrypto (bundled in /usr/lib/libSystem.B.dylib on macOS).
-_lib = ctypes.CDLL("/usr/lib/libSystem.B.dylib")
-def _aes_cbc_decrypt(key: bytes, iv: bytes, data: bytes):
-	out = ctypes.create_string_buffer(len(data) + 16)
-	n   = ctypes.c_size_t(0)
-	# CCCrypt(kCCDecrypt=1, kCCAlgorithmAES=0, kCCOptionPKCS7Padding=1, ...)
-	ok  = _lib.CCCrypt(1, 0, 1, key, len(key), iv, data, len(data),
-	                   out, ctypes.sizeof(out), ctypes.byref(n))
-	return bytes(out)[:n.value] if ok == 0 else None
-
-def chromium_key(password: str) -> bytes:
-	return hashlib.pbkdf2_hmac("sha1", password.encode(), b"saltysalt", 1003, dklen=16)
-
-def decrypt_chromium(enc: bytes, key: bytes):
-	# macOS Chromium: v10 prefix, AES-128-CBC, IV = 16 spaces.
-	if len(enc) <= 3 or enc[:3] != b"v10":
-		return None
-	raw = _aes_cbc_decrypt(key, b" " * 16, enc[3:])
-	return raw.decode("utf-8", errors="replace") if raw else None
-
-# Chromium-family browsers: Edge, Chrome, Brave
-CHROMIUM = [
-	("Microsoft Edge", "Microsoft Edge Safe Storage", "Microsoft Edge",
-	 f"{HOME}/Library/Application Support/Microsoft Edge/Default"),
-	("Google Chrome",  "Chrome Safe Storage",         "Chrome",
-	 f"{HOME}/Library/Application Support/Google/Chrome/Default"),
-	("Brave",          "Brave Safe Storage",          "Brave",
-	 f"{HOME}/Library/Application Support/BraveSoftware/Brave-Browser/Default"),
-]
-
-all_cookies = {}  # keyed by (name, domain, path) — last browser wins
-
-def add(c):
-	all_cookies[(c["name"], c["domain"], c["path"])] = c
-
-def read_chromium(name, svc, acct, profile):
-	db = next((p for p in [
-		f"{profile}/Network/Cookies", f"{profile}/Cookies",
-	] if os.path.isfile(p)), None)
-	if not db:
-		return
-	r = subprocess.run(
-		["security", "find-generic-password", "-w", "-s", svc, "-a", acct],
-		capture_output=True, text=True,
-	)
-	if r.returncode != 0 or not r.stdout.strip():
-		return
-	key = chromium_key(r.stdout.strip())
-	tmp = tempfile.mktemp(suffix=".sqlite")
-	try:
-		shutil.copy2(db, tmp)
-		con = sqlite3.connect(tmp)
-		for host, cname, enc, path, exp, secure in con.execute(
-			"SELECT host_key,name,encrypted_value,path,expires_utc,is_secure FROM cookies"
-		):
-			if not is_ms(host):
-				continue
-			val = decrypt_chromium(bytes(enc), key)
-			if val is None:
-				continue
-			c = {"name": cname, "value": val, "domain": host,
-			     "path": path, "secure": bool(secure)}
-			if exp:
-				unix = exp / 1_000_000 - 11644473600  # Chromium epoch → Unix
-				if unix > 0:
-					c["expires"] = unix
-			add(c)
-		con.close()
-	except Exception:
-		pass
-	finally:
-		if os.path.isfile(tmp):
-			os.unlink(tmp)
-
-def read_firefox():
-	profiles = f"{HOME}/Library/Application Support/Firefox/Profiles"
-	if not os.path.isdir(profiles):
-		return
-	for profile in os.listdir(profiles):
-		db = os.path.join(profiles, profile, "cookies.sqlite")
-		if not os.path.isfile(db):
-			continue
-		tmp = tempfile.mktemp(suffix=".sqlite")
-		try:
-			shutil.copy2(db, tmp)
-			con = sqlite3.connect(tmp)
-			for host, cname, val, path, exp, secure in con.execute(
-				"SELECT host,name,value,path,expiry,isSecure FROM moz_cookies"
-			):
-				if not is_ms(host):
-					continue
-				c = {"name": cname, "value": val or "", "domain": host,
-				     "path": path, "secure": bool(secure)}
-				if exp:
-					c["expires"] = float(exp)
-				add(c)
-			con.close()
-		except Exception:
-			pass
-		finally:
-			if os.path.isfile(tmp):
-				os.unlink(tmp)
-
-for args in CHROMIUM:
-	read_chromium(*args)
-read_firefox()
-print(json.dumps(list(all_cookies.values())))
-COOKIESEOF
-	chmod +x "$RES/export_cookies.py"
-	log "Cookie exporter written → $RES/export_cookies.py"
-
-
-	# ===========================================================
-	# ===== 6.b.3) Generate the Swift WKWebView launcher =====
-	# ===========================================================
-
-	# Compile a real Cocoa NSApplication in Swift. Only Cocoa + WebKit are
-	# imported — no SQLite3, no CommonCrypto, no Security. All browser-cookie
-	# logic lives in export_cookies.py (called via Process at launch).
-	# Shell expands ${OPEN_ARG} and ${CLONE_NAME} into the source; Swift's own
-	# \(...) interpolation is preserved verbatim by the unquoted heredoc.
-	SWIFT_SRC="$RES/launcher.swift"
-	cat > "$SWIFT_SRC" << SWIFTEOF
-import Cocoa
-import WebKit
-
-let OPEN_ARG   = "${OPEN_ARG}"
-let CLONE_NAME = "${CLONE_NAME}"
-
-// Run export_cookies.py (bundled in Resources) on a background queue, parse
-// the JSON it prints to stdout, and inject the cookies into the WKWebView's
-// data store. Calls completion on the main queue when done — or immediately
-// if the script is absent or fails (the app loads the URL either way).
-func importBrowserCookies(into store: WKHTTPCookieStore, completion: @escaping () -> Void) {
-	DispatchQueue.global(qos: .userInitiated).async {
-		defer { DispatchQueue.main.async { completion() } }
-		guard let script = Bundle.main.path(forResource: "export_cookies", ofType: "py"),
-		      FileManager.default.fileExists(atPath: script) else { return }
-		let task = Process()
-		task.launchPath  = "/usr/bin/python3"
-		task.arguments   = [script]
-		let pipe = Pipe()
-		task.standardOutput = pipe
-		task.standardError  = Pipe()
-		guard (try? task.run()) != nil else { return }
-		task.waitUntilExit()
-		let raw = pipe.fileHandleForReading.readDataToEndOfFile()
-		guard let arr = try? JSONSerialization.jsonObject(with: raw) as? [[String: Any]] else { return }
-		let cookies: [HTTPCookie] = arr.compactMap { d in
-			var p: [HTTPCookiePropertyKey: Any] = [:]
-			guard let name   = d["name"]   as? String,
-			      let value  = d["value"]  as? String,
-			      let domain = d["domain"] as? String,
-			      let path   = d["path"]   as? String else { return nil }
-			p[.name] = name; p[.value] = value; p[.domain] = domain; p[.path] = path
-			if let s = d["secure"] as? Bool, s { p[.secure] = "TRUE" }
-			if let exp = d["expires"] as? Double, exp > Date().timeIntervalSince1970 {
-				p[.expires] = Date(timeIntervalSince1970: exp)
-			}
-			return HTTPCookie(properties: p)
-		}
-		let g = DispatchGroup()
-		DispatchQueue.main.async {
-			for c in cookies { g.enter(); store.setCookie(c) { g.leave() } }
-		}
-		g.wait()
-	}
-}
-
-class WindowDelegate: NSObject, NSWindowDelegate {
-	// Hide on close so the Dock tile stays alive; window is recreated on reopen.
-	func windowShouldClose(_ sender: NSWindow) -> Bool { sender.orderOut(nil); return false }
-}
-
-class AppDelegate: NSObject, NSApplicationDelegate, WKUIDelegate, WKNavigationDelegate {
-	var window: NSWindow?
-	var webView: WKWebView?
-	let winDelegate = WindowDelegate()
-
-	func applicationDidFinishLaunching(_ n: Notification) {
-		buildWindow()
-		NSApp.activate(ignoringOtherApps: true)
-		guard let wv = webView else { return }
-		// Placeholder while cookies are being imported (typically < 1 s).
-		wv.loadHTMLString("<html><body style='display:flex;align-items:center;justify-content:center;height:100vh;margin:0;font-family:-apple-system,sans-serif;color:#888;background:#f5f5f5'><p>Chargement\u{2026}</p></body></html>", baseURL: nil)
-		let store = wv.configuration.websiteDataStore.httpCookieStore
-		importBrowserCookies(into: store) { [weak self] in
-			guard let self = self, let url = URL(string: OPEN_ARG) else { return }
-			self.webView?.load(URLRequest(url: url))
-		}
-	}
-
-	func buildWindow() {
-		let cfg = WKWebViewConfiguration()
-		cfg.mediaTypesRequiringUserActionForPlayback = []
-		cfg.websiteDataStore = WKWebsiteDataStore.default()
-		let win = NSWindow(
-			contentRect: NSRect(x: 0, y: 0, width: 1280, height: 820),
-			styleMask: [.titled, .closable, .miniaturizable, .resizable, .fullSizeContentView],
-			backing: .buffered, defer: false
-		)
-		win.title = CLONE_NAME
-		win.center()
-		win.delegate = winDelegate
-		win.tabbingMode = .disallowed
-		let wv = WKWebView(frame: win.contentView!.bounds, configuration: cfg)
-		wv.autoresizingMask = [.width, .height]
-		wv.uiDelegate      = self
-		wv.navigationDelegate = self
-		// Chromium UA: Microsoft 365 serves the full web client to Edge/Chrome.
-		wv.customUserAgent = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36 Edg/126.0.0.0"
-		win.contentView?.addSubview(wv)
-		win.makeKeyAndOrderFront(nil)
-		self.window = win
-		self.webView = wv
-	}
-
-	func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows: Bool) -> Bool {
-		if window == nil {
-			buildWindow()
-			if let url = URL(string: OPEN_ARG) { webView?.load(URLRequest(url: url)) }
-		} else {
-			window?.makeKeyAndOrderFront(nil)
-		}
-		NSApp.activate(ignoringOtherApps: true)
-		return true
-	}
-
-	func applicationShouldTerminateAfterLastWindowClosed(_ s: NSApplication) -> Bool { false }
-
-	func webView(_ wv: WKWebView, createWebViewWith cfg: WKWebViewConfiguration,
-	             for action: WKNavigationAction, windowFeatures: WKWindowFeatures) -> WKWebView? {
-		if action.targetFrame == nil, let url = action.request.url { wv.load(URLRequest(url: url)) }
-		return nil
-	}
-
-	@available(macOS 12.0, *)
-	func webView(_ wv: WKWebView, requestMediaCapturePermissionFor origin: WKSecurityOrigin,
-	             initiatedByFrame: WKFrameInfo, type: WKMediaCaptureType,
-	             decisionHandler: @escaping (WKPermissionDecision) -> Void) {
-		decisionHandler(.grant)
-	}
-}
-
-let app = NSApplication.shared
-app.setActivationPolicy(.regular)
-let del = AppDelegate()
-app.delegate = del
-app.run()
-SWIFTEOF
-
-	# swiftc is mandatory — the script mode fallback cannot link WebKit at
-	# runtime and silently produces a binary that does nothing on launch.
-	if ! command -v swiftc >/dev/null 2>&1; then
-		log "ERROR: swiftc not found. Install Xcode Command Line Tools:"
-		log "  xcode-select --install"
-		echo "swiftc introuvable — installez les Xcode Command Line Tools (xcode-select --install)" >&2
-		exit 1
-	fi
-	log "Compiling Swift launcher…"
-	if ! swiftc "$SWIFT_SRC" -o "$LAUNCHER" \
-	            -framework Cocoa -framework WebKit 2>>"$DIAG"; then
-		log "ERROR: swiftc compilation failed — details in $DIAG"
-		echo "Échec de compilation Swift — détails dans $DIAG" >&2
-		exit 1
-	fi
+	# No compilation required — works on any Mac out of the box.
+	# The launcher is split into two files:
+	#   * Contents/MacOS/launcher  — tiny zsh wrapper that sets CFProcessPath=$0
+	#     before exec-ing python3. CoreFoundation reads CFProcessPath to resolve
+	#     NSBundle.mainBundle(), giving each clone its unique bundle-id and an
+	#     isolated WKWebsiteDataStore (cookies/localStorage per clone, not shared).
+	#   * Contents/Resources/pwa_launcher.py — full Cocoa NSApplication via
+	#     PyObjC, which ships with macOS's own /usr/bin/python3 (no Xcode, no
+	#     Homebrew). WKWebsiteDataStore.defaultDataStore() persists login state
+	#     across launches so the user only needs to authenticate once.
+	cat > "$LAUNCHER" << 'SHELLEOF'
+#!/bin/zsh
+# CFProcessPath must point to this bundle's MacOS executable so CoreFoundation
+# resolves NSBundle.mainBundle() to THIS clone's bundle (unique bundle-id →
+# isolated WKWebsiteDataStore). Without it, python3 would be the main bundle.
+export CFProcessPath="$0"
+BUNDLE_RES="$(dirname "$(dirname "$0")")/Resources"
+exec /usr/bin/python3 "$BUNDLE_RES/pwa_launcher.py" "$@"
+SHELLEOF
 	chmod +x "$LAUNCHER"
-	log "Swift launcher compiled → $LAUNCHER"
+
+	cat > "$RES/pwa_launcher.py" << PYEOF
+#!/usr/bin/env python3
+"""PWA WKWebView launcher — generated by App Cloner. Do not edit."""
+from Foundation import NSObject, NSURL, NSURLRequest, NSMakeRect
+from AppKit import NSApplication, NSWindow, NSBackingStoreBuffered
+from WebKit import WKWebView, WKWebViewConfiguration, WKWebsiteDataStore
+
+OPEN_ARG   = "${OPEN_ARG}"
+CLONE_NAME = "${CLONE_NAME}"
+
+# NSWindowStyleMask: Titled=1 Closable=2 Miniaturizable=4 Resizable=8 FullSizeContent=32768
+_WIN_MASK  = 1 | 2 | 4 | 8 | 32768
+# NSViewAutoresizingMask: WidthSizable=2 HeightSizable=16
+_VIEW_MASK = 2 | 16
+
+
+class _WinDelegate(NSObject):
+    def windowShouldClose_(self, win):
+        win.orderOut_(None)
+        return False
+
+
+class _AppDelegate(NSObject):
+    _win = None
+    _wv  = None
+    _wd  = None
+
+    def applicationDidFinishLaunching_(self, _notification):
+        self._wd = _WinDelegate.alloc().init()
+        self._open()
+        NSApplication.sharedApplication().activateIgnoringOtherApps_(True)
+        url = NSURL.URLWithString_(OPEN_ARG)
+        if url:
+            self._wv.loadRequest_(NSURLRequest.requestWithURL_(url))
+
+    def _open(self):
+        win = NSWindow.alloc().initWithContentRect_styleMask_backing_defer_(
+            NSMakeRect(0, 0, 1280, 820), _WIN_MASK, NSBackingStoreBuffered, False
+        )
+        win.setTitle_(CLONE_NAME)
+        win.center()
+        win.setDelegate_(self._wd)
+        win.setTabbingMode_(2)  # NSWindowTabbingModeDisallowed
+        cfg = WKWebViewConfiguration.alloc().init()
+        cfg.setWebsiteDataStore_(WKWebsiteDataStore.defaultDataStore())
+        cfg.setMediaTypesRequiringUserActionForPlayback_(0)
+        wv = WKWebView.alloc().initWithFrame_configuration_(
+            win.contentView().bounds(), cfg
+        )
+        wv.setAutoresizingMask_(_VIEW_MASK)
+        wv.setCustomUserAgent_(
+            "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
+            "AppleWebKit/537.36 (KHTML, like Gecko) "
+            "Chrome/126.0.0.0 Safari/537.36 Edg/126.0.0.0"
+        )
+        wv.setUIDelegate_(self)
+        win.contentView().addSubview_(wv)
+        win.makeKeyAndOrderFront_(None)
+        self._win = win
+        self._wv  = wv
+
+    def applicationShouldHandleReopen_hasVisibleWindows_(self, _app, _flag):
+        if self._win is None:
+            self._open()
+            url = NSURL.URLWithString_(OPEN_ARG)
+            if url:
+                self._wv.loadRequest_(NSURLRequest.requestWithURL_(url))
+        else:
+            self._win.makeKeyAndOrderFront_(None)
+        NSApplication.sharedApplication().activateIgnoringOtherApps_(True)
+        return True
+
+    def applicationShouldTerminateAfterLastWindowClosed_(self, _app):
+        return False
+
+    def webView_createWebViewWithConfiguration_forNavigationAction_windowFeatures_(
+            self, wv, _cfg, action, _features):
+        if action.targetFrame() is None:
+            req = action.request()
+            if req and req.URL():
+                wv.loadRequest_(req)
+        return None
+
+
+_app = NSApplication.sharedApplication()
+_app.setActivationPolicy_(0)  # NSApplicationActivationPolicyRegular
+_delegate = _AppDelegate.alloc().init()
+_app.setDelegate_(_delegate)
+_app.run()
+PYEOF
+	log "PWA Python launcher written → $LAUNCHER (no compilation needed)"
 	log "PWA WKWebView launcher ready — URL=${OPEN_ARG}"
 	APPCLONER_PWA_DONE=1
 fi
