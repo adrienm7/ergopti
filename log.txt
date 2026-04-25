@@ -1,25 +1,12 @@
 App Cloner — Erreur de démarrage :
 
-/Users/b519hs/perso/ergopti/static/drivers/hammerspoon/apps/App Cloner.app/Contents/Resources/ShortcutBuilder.applescript:4559:4560: script error: fin de ligne prévu(s) mais « ( » trouvé(s). (-2741)
+/Users/b519hs/perso/ergopti/static/drivers/hammerspoon/apps/App Cloner.app/Contents/Resources/ShortcutBuilder.applescript:4551:4552: script error: fin de ligne prévu(s) mais « ( » trouvé(s). (-2741)
 
 Log : /tmp/appcloner.log
 
 
-résultat: /Users/b519hs/Applications/Kubernetes Sandbox.app
-[AppCloner] exit=0
-[AppCloner] app_root=/Users/b519hs/perso/ergopti/static/drivers/hammerspoon/apps/AppCloner.app
-[AppCloner] applescript=/Users/b519hs/perso/ergopti/static/drivers/hammerspoon/apps/AppCloner.app/Contents/Resources/ShortcutBuilder.applescript
---- App Cloner démarrage Sat Apr 25 03:10:18 CEST 2026
-appDir: /Users/b519hs/perso/ergopti/static/drivers/hammerspoon/apps/AppCloner.app
-source: /Applications/Visual Studio Code.app/
-defaultName: Visual Studio Code
-cloneName: Config
-openArg: /Users/b519hs/perso/config/
-colorHex: #00B4BC
-cmd: '/Users/b519hs/perso/ergopti/static/drivers/hammerspoon/apps/AppCloner.app/Contents/Resources/clone_app.sh' '/Applications/Visual Studio Code.app/' 'Config' '#00B4BC' '/Users/b519hs/perso/config/'
-résultat: /Users/b519hs/Applications/Config.app
-[AppCloner] exit=0
-[AppCloner] app_root=/Users/b519hs/perso/ergopti/static/drivers/hammerspoon/apps/AppCloner.app
+
+/AppCloner.app
 [AppCloner] applescript=/Users/b519hs/perso/ergopti/static/drivers/hammerspoon/apps/AppCloner.app/Contents/Resources/ShortcutBuilder.applescript
 --- App Cloner démarrage Sat Apr 25 03:12:53 CEST 2026
 appDir: /Users/b519hs/perso/ergopti/static/drivers/hammerspoon/apps/AppCloner.app
@@ -611,6 +598,17 @@ result: /Users/b519hs/Applications/Philippe.app
 [AppCloner] exit=1
 [AppCloner] stderr=/Users/b519hs/perso/ergopti/static/drivers/hammerspoon/apps/App Cloner.app/Contents/Resources/ShortcutBuilder.applescript:4559:4560: script error: fin de ligne prévu(s) mais « ( » trouvé(s). (-2741)
 
+[AppCloner] app_root=/Users/b519hs/perso/ergopti/static/drivers/hammerspoon/apps/App Cloner.app
+[AppCloner] applescript=/Users/b519hs/perso/ergopti/static/drivers/hammerspoon/apps/App Cloner.app/Contents/Resources/ShortcutBuilder.applescript
+[AppCloner] exit=1
+[AppCloner] stderr=/Users/b519hs/perso/ergopti/static/drivers/hammerspoon/apps/App Cloner.app/Contents/Resources/ShortcutBuilder.applescript:4551:4552: script error: fin de ligne prévu(s) mais « ( » trouvé(s). (-2741)
 
-╭─     ~ ──────────────────────────────────────────────── ✔  01:08:17 
+[AppCloner] app_root=/Users/b519hs/perso/ergopti/static/drivers/hammerspoon/apps/App Cloner.app
+[AppCloner] applescript=/Users/b519hs/perso/ergopti/static/drivers/hammerspoon/apps/App Cloner.app/Contents/Resources/ShortcutBuilder.applescript
+[AppCloner] regenerating icon from /Users/b519hs/perso/ergopti/static/drivers/hammerspoon/apps/App Cloner.app/Contents/Resources/AppIcon.svg
+[AppCloner] exit=1
+[AppCloner] stderr=/Users/b519hs/perso/ergopti/static/drivers/hammerspoon/apps/App Cloner.app/Contents/Resources/ShortcutBuilder.applescript:4551:4552: script error: fin de ligne prévu(s) mais « ( » trouvé(s). (-2741)
+
+
+╭─     ~ ──────────────────────────────────────────────── ✔  01:14:24 
 ╰─
