@@ -129,10 +129,9 @@ on validateOpenArg(value, sourceAppPath)
 			set expanded to (POSIX path of (path to home folder)) & (text 2 thru -1 of value)
 		end if
 		try
-			tell application "System Events" to set existsItem to exists disk item expanded
-			if not existsItem then return "Le chemin « " & value & " » n'existe pas sur le disque."
+			do shell script "test -e " & quoted form of expanded
 		on error
-			return "Le chemin « " & value & " » n'a pas pu être vérifié."
+			return "Le chemin « " & value & " » n'existe pas sur le disque."
 		end try
 		return ""
 	end if
