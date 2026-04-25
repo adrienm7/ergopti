@@ -107,7 +107,7 @@ on doUpdatePreview()
 	if (my tintPreviewImageView) is missing value then return
 	if (my tintPreviewSourceImage) is missing value then return
 	try
-		set currentColor to (my tintPreviewColorWell)'s color()
+		set currentColor to (my tintPreviewColorWell)'s color
 		set tinted to my tintedIconImage((my tintPreviewSourceImage), currentColor)
 		set imgView to my tintPreviewImageView
 		imgView's setImage:tinted
@@ -338,7 +338,7 @@ on customDialog(header, body, buttonList, hasInput, defaultText, lineCount, inpu
 	panelWin's |center|()
 	panelWin's setReleasedWhenClosed:false
 
-	set contentView to panelWin's contentView()
+	set contentView to panelWin's contentView
 
 	-- Layout top → bottom
 	set yCursor to panelHeight - marginYTop - headerHeight
@@ -367,7 +367,7 @@ on customDialog(header, body, buttonList, hasInput, defaultText, lineCount, inpu
 		bodyLabel's setEditable:false
 		bodyLabel's setSelectable:true
 		bodyLabel's setDrawsBackground:false
-		set bodyCell to bodyLabel's cell()
+		set bodyCell to bodyLabel's cell
 		bodyCell's setWraps:true
 		bodyCell's setLineBreakMode:0
 		contentView's addSubview:bodyLabel
@@ -385,7 +385,7 @@ on customDialog(header, body, buttonList, hasInput, defaultText, lineCount, inpu
 			-- lineCount=-1: enable word-wrap so long URLs wrap across the 3-row height
 			-- instead of scrolling horizontally out of view
 			if lineCount = -1 then
-				set inputCell to inputView's cell()
+				set inputCell to inputView's cell
 				inputCell's setWraps:true
 				inputCell's setScrollable:false
 			end if
@@ -489,7 +489,7 @@ on tintedIconImage(srcImage, tintColor)
 	srcImage's drawInRect:destRect fromRect:(current application's NSZeroRect) operation:2 fraction:1.0
 	-- Overlay the tint colour at 50% alpha using sourceAtop compositing (value 5)
 	-- so the tint respects the icon's own alpha channel
-	set ctx to current application's NSGraphicsContext's currentContext()
+	set ctx to current application's NSGraphicsContext's currentContext
 	ctx's saveGraphicsState()
 	ctx's setCompositingOperation:5
 	set halfColor to tintColor's colorWithAlphaComponent:0.5
@@ -506,7 +506,7 @@ end tintedIconImage
 -- sliders in the system colour panel.
 -- Returns the chosen NSColor, or missing value when the user clicks Retour.
 on showTintColorPicker(appPath)
-	set ws to current application's NSWorkspace's sharedWorkspace()
+	set ws to current application's NSWorkspace's sharedWorkspace
 	set srcImage to ws's iconForFile:appPath
 	set my tintPreviewSourceImage to srcImage
 
@@ -518,7 +518,7 @@ on showTintColorPicker(appPath)
 	pickerPanel's setTitle:"App Cloner"
 	pickerPanel's |center|()
 	pickerPanel's setReleasedWhenClosed:false
-	set cv to pickerPanel's contentView()
+	set cv to pickerPanel's contentView
 
 	-- Header
 	set hLabel to current application's NSTextField's alloc()'s initWithFrame:(current application's NSMakeRect(16, pH - 42, pW - 32, 22))
@@ -607,7 +607,7 @@ on showTintColorPicker(appPath)
 
 	-- btn1 = Retour, btn2 = Valider
 	if my panelResult is not 2 then return missing value
-	return colorWell's color()
+	return colorWell's color
 end showTintColorPicker
 
 on installEditMenu()
@@ -616,13 +616,13 @@ on installEditMenu()
 		-- go through NSApplication's sharedApplication. Wrap everything in
 		-- try/end try so a Cocoa hiccup never crashes the whole UI.
 		set theApp to current application's NSApplication's sharedApplication
-		set mainMenu to theApp's mainMenu()
+		set mainMenu to theApp's mainMenu
 		if mainMenu is missing value then
-			set mainMenu to current application's NSMenu's alloc()'s init()
+			set mainMenu to current application's NSMenu's alloc()'s init
 			theApp's setMainMenu:mainMenu
 		end if
 		-- Skip if an Edit menu is already present (e.g. installed by the host)
-		set itemCount to mainMenu's numberOfItems() as integer
+		set itemCount to mainMenu's numberOfItems as integer
 		repeat with i from 0 to (itemCount - 1)
 			set existing to ((mainMenu's itemAtIndex:i)'s title()) as text
 			if existing is "Edit" or existing is "Édition" then return
@@ -923,7 +923,7 @@ on run argv
 						set chosenNSColor to my showTintColorPicker(sourcePath)
 						if chosenNSColor is not missing value then
 							-- Convert sRGB float components (0.0–1.0) to 16-bit integers for rgbToHex
-							set sRGBSpace to current application's NSColorSpace's sRGBColorSpace()
+							set sRGBSpace to current application's NSColorSpace's sRGBColorSpace
 							set rgbColor to chosenNSColor's colorUsingColorSpace:sRGBSpace
 							set r16 to (((rgbColor's redComponent()) * 65535.0) as integer)
 							set g16 to (((rgbColor's greenComponent()) * 65535.0) as integer)
