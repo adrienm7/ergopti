@@ -94,6 +94,78 @@ on btn4Clicked:sender
 	(current application's NSApplication's sharedApplication())'s stopModal()
 end btn4Clicked:
 
+-- Strip leading and trailing whitespace (spaces, tabs, CR/LF). Pure
+-- AppleScript implementation to avoid spawning a shell.
+on trim(s)
+	set whitespaces to {" ", tab, return, linefeed, character id 160}
+	set i to 1
+	set n to length of s
+	repeat while i ≤ n and (character i of s) is in whitespaces
+		set i to i + 1
+	end repeat
+	repeat while n ≥ i and (character n of s) is in whitespaces
+		set n to n - 1
+	end repeat
+	if i > n then return ""
+	return text i thru n of s
+end trim
+
+-- Validate the optional launch argument the user pasted at clone-creation
+-- time. Returns "" when the value is acceptable, or a French error message
+-- describing what's wrong so we can re-prompt.
+--
+-- Catches the most common mistakes:
+--   * empty string after trimming
+--   * the user typed text instead of pasting a URL / path
+--   * a typo in the scheme such as «mstems:» or «msteams//» (missing colon)
+--   * a Teams clone with a non-Teams URL (and vice-versa) — best-effort hint
+on validateOpenArg(value, sourceAppPath)
+	if value is "" then return "Le champ est vide. Colle une URL ou un chemin de fichier."
+
+	-- File-system path: must point to something that actually exists
+	if (value starts with "/") or (value starts with "~") then
+		set expanded to value
+		if expanded starts with "~" then
+			set expanded to (POSIX path of (path to home folder)) & (text 2 thru -1 of value)
+		end if
+		try
+			tell application "System Events" to set existsItem to exists disk item expanded
+			if not existsItem then return "Le chemin « " & value & " » n'existe pas sur le disque."
+		on error
+			return "Le chemin « " & value & " » n'a pas pu être vérifié."
+		end try
+		return ""
+	end if
+
+	-- URL: must contain «://» — most copy-paste typos break here
+	-- (e.g. «msteams:/l/chat», «https:/example.com», «msteams.com»).
+	if value does not contain "://" then
+		-- Tolerate the single-slash msteams form Microsoft documents
+		if not (value starts with "msteams:/l/" or value starts with "msteams:/calendar") then
+			return "Format invalide. Une URL doit contenir « :// » (ex. https://… , msteams://… , slack://…)."
+		end if
+	end if
+
+	-- Cross-check: if the source app is Teams, warn when the URL clearly
+	-- targets another product (and vice-versa). Pure heuristic, only
+	-- triggered when we're confident the mismatch is a typo.
+	set sourceLower to my toLower(sourceAppPath)
+	set valueLower to my toLower(value)
+	set isTeamsSource to (sourceLower contains "teams")
+	set isTeamsURL to (valueLower starts with "msteams:")
+	set isHTTP to (valueLower starts with "http")
+	if isTeamsSource and not (isTeamsURL or isHTTP or (valueLower starts with "/")) then
+		return "Cette app source est Teams, mais l'URL ne commence pas par « msteams: » ni « https: »."
+	end if
+
+	return ""
+end validateOpenArg
+
+-- Lowercase via NSString since AppleScript has no case-insensitive ops.
+on toLower(s)
+	return ((current application's NSString's stringWithString:s)'s lowercaseString()) as text
+end toLower
+
 -- Rough text-width estimator (no NSAttributedString.size to keep it pure
 -- AppleScript). Buttons are clamped between 90 and 220 pixels.
 on measureButtonWidth(title)
@@ -449,11 +521,27 @@ on run argv
 			"        → Discord : clic-droit sur le salon → « Copy Link »" & return & return & ¬
 			"🌐  Tout site web :        https://example.com" & return & return & ¬
 			"📁  Dossier ou fichier :   /Users/moi/projet"
-		try
-			-- Wide dialog (URLs can be very long), 3-line input view to avoid
-			-- horizontal scrolling on long Teams/Slack permalinks
-			set openArg to my askText(urlPrompt, "", "URL ou chemin", 560, 3)
-		end try
+		-- Loop until we get a valid URL/path, or the user cancels the
+		-- whole flow. Single-line NSTextField (lineCount=1) so Enter
+		-- submits instead of inserting a newline.
+		repeat
+			try
+				set candidate to my askText(urlPrompt, "", "URL ou chemin", 560, 1)
+			on error
+				-- User cancelled the input dialog → abort the whole creation
+				return
+			end try
+			-- Trim leading/trailing whitespace
+			set candidate to my trim(candidate)
+			set validationError to my validateOpenArg(candidate, sourcePath)
+			if validationError is "" then
+				set openArg to candidate
+				exit repeat
+			else
+				-- Re-prompt after showing the specific error
+				display alert "Entrée invalide" message validationError as warning
+			end if
+		end repeat
 	end if
 	logmsg("openArg: " & openArg)
 
