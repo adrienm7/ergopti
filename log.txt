@@ -1,44 +1,11 @@
-App Cloner — Erreur de syntaxe AppleScript :
+App Cloner — Erreur de démarrage :
 
-/Users/b519hs/perso/ergopti/static/drivers/hammerspoon/apps/App Cloner.app/Contents/Resources/ShortcutBuilder.applescript:98: error: Expected end of line but found “(”. (-2741)
+/Users/b519hs/perso/ergopti/static/drivers/hammerspoon/apps/App Cloner.app/Contents/Resources/ShortcutBuilder.applescript:4479:4480: script error: fin de ligne prévu(s) mais « ( » trouvé(s). (-2741)
 
-Log complet : /tmp/appcloner.log
-
-
-commit 763c04313a26fe6179a33a0a6aba3343a34b6728 (HEAD -> feat/apps-menu, origin/feat/apps-menu)
-Author: Adrien MOYAUX <49562406+adrienm7@users.noreply.github.com>
-Date:   Sun Apr 26 00:50:36 2026 +0200
-
-    fix(app-cloner): purge all backticks and quoted-colon patterns from AppleScript comments
-    
-    osacompile lexes quoted strings before checking comment context — a backtick
-    or double-quoted token containing a colon inside a -- comment can corrupt
-    the parser state and produce spurious -2741 errors on the following line.
-
-commit 70eb8b66aa3f99f81ff4e857da14ad614e8b3281
-Author: adrienm7 <moyaux.adrien@gmail.com>
-Date:   Sun Apr 26 00:47:20 2026 +0200
-
-    log
-
-commit 7ef62b5691de871fb16fc39b064734c31a9422ab
-Author: adrienm7 <moyaux.adrien@gmail.com>
-Date:   Sun Apr 26 00:39:00 2026 +0200
-
-    log
-
-commit ab4da395e24aabcf6eca9b0a435ac9b5a17331f0
-:
+Log : /tmp/appcloner.log
 
 
-
-appDir: /Users/b519hs/perso/ergopti/static/drivers/hammerspoon/apps/AppCloner.app
-source: /Applications/Visual Studio Code.app/
-defaultName: Visual Studio Code
-cloneName: Kubernetes Sandbox IA
-openArg: /Users/b519hs/dev/kubernetes-sandbox-ia/
-colorHex: #003C00
-cmd: '/Users/b519hs/perso/ergopti/static/drivers/hammerspoon/apps/AppCloner.app/Contents/Resources/clone_app.sh' '/Applications/Visual Studio Code.app/' 'Kubernetes Sandbox IA' '#003C00' '/Users/b519hs/dev/kubernetes-sandbox-ia/'
+etes Sandbox IA' '#003C00' '/Users/b519hs/dev/kubernetes-sandbox-ia/'
 résultat: /Users/b519hs/Applications/Kubernetes Sandbox IA.app
 [AppCloner] exit=0
 [AppCloner] stdout=
@@ -643,6 +610,11 @@ result: /Users/b519hs/Applications/Philippe.app
 [AppCloner] applescript=/Users/b519hs/perso/ergopti/static/drivers/hammerspoon/apps/App Cloner.app/Contents/Resources/ShortcutBuilder.applescript
 [AppCloner] PARSE ERROR (osacompile rc=1):
 /Users/b519hs/perso/ergopti/static/drivers/hammerspoon/apps/App Cloner.app/Contents/Resources/ShortcutBuilder.applescript:98: error: Expected end of line but found “(”. (-2741)
+[AppCloner] app_root=/Users/b519hs/perso/ergopti/static/drivers/hammerspoon/apps/App Cloner.app
+[AppCloner] applescript=/Users/b519hs/perso/ergopti/static/drivers/hammerspoon/apps/App Cloner.app/Contents/Resources/ShortcutBuilder.applescript
+[AppCloner] exit=1
+[AppCloner] stderr=/Users/b519hs/perso/ergopti/static/drivers/hammerspoon/apps/App Cloner.app/Contents/Resources/ShortcutBuilder.applescript:4479:4480: script error: fin de ligne prévu(s) mais « ( » trouvé(s). (-2741)
 
-╭─     ~ ──────────────────────────────────────────────── ✔  00:55:18 
+
+╭─     ~ ──────────────────────────────────────────────── ✔  00:59:04 
 ╰─
