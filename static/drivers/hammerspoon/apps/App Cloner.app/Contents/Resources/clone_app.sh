@@ -96,13 +96,29 @@ log "UNIQUE_ID=$UNIQUE_ID"
 #                       concept — only the __CFBundleIdentifier override
 #                       gives them a distinct Dock identity.
 APP_FAMILY=native
+# Standard Electron detection: vendored Electron Framework
 if [[ -d "$SOURCE_APP/Contents/Frameworks/Electron Framework.framework" ]]; then
 	APP_FAMILY=electron
-	if [[ -f "$SOURCE_APP/Contents/Resources/app/bin/code" ]] \
-	   || [[ "$SRC_EXE_NAME" == "Code" ]] \
-	   || [[ "$SRC_EXE_NAME" == "Code - Insiders" ]]; then
-		APP_FAMILY=vscode
-	fi
+fi
+# Catch the new Microsoft Teams which ships a custom Chromium fork under a
+# different name and the (rarer) Chromium Embedded Framework wrappers.
+for fw in "$SOURCE_APP/Contents/Frameworks"/*.framework(N); do
+	case "${fw:t}" in
+		"Microsoft Teams Framework.framework"|"MSTeams Framework.framework"|\
+		"Chromium Embedded Framework.framework"|"Chromium Framework.framework")
+			APP_FAMILY=electron ;;
+	esac
+done
+# Catch by executable name when frameworks are renamed/hidden
+case "$SRC_EXE_NAME" in
+	"MSTeams"|"Microsoft Teams"|"Slack"|"Discord"|"Notion"|"Spotify"|"Figma"|"Postman")
+		APP_FAMILY=electron ;;
+esac
+# VSCode is Electron too but with extra CLI flags worth passing
+if [[ -f "$SOURCE_APP/Contents/Resources/app/bin/code" ]] \
+   || [[ "$SRC_EXE_NAME" == "Code" ]] \
+   || [[ "$SRC_EXE_NAME" == "Code - Insiders" ]]; then
+	APP_FAMILY=vscode
 fi
 log "APP_FAMILY=$APP_FAMILY"
 
@@ -184,19 +200,51 @@ if [[ ! -f "$BASE_PNG" ]]; then
 	log "No .icns found — falling back to NSWorkspace.iconForFile"
 	python3 - "$SOURCE_APP" "$BASE_PNG" <<'NSWSEOF' || true
 import sys
-from AppKit import NSWorkspace, NSBitmapImageRep, NSPNGFileType, NSMakeSize
-from Foundation import NSData
+from AppKit import (
+	NSWorkspace, NSBitmapImageRep, NSPNGFileType, NSGraphicsContext,
+	NSDeviceRGBColorSpace, NSCompositingOperationCopy
+)
+from Foundation import NSMakeSize, NSMakeRect
 
 src, dst = sys.argv[1], sys.argv[2]
 img = NSWorkspace.sharedWorkspace().iconForFile_(src)
 if img is None:
 	sys.exit(1)
-img.setSize_(NSMakeSize(1024, 1024))
-tiff = img.TIFFRepresentation()
-rep = NSBitmapImageRep.imageRepWithData_(tiff)
-png = rep.representationUsingType_properties_(NSPNGFileType, None)
+
+# Pick the largest representation NSImage holds. Apps with asset catalogs
+# (Teams, Slack…) typically include 1024×1024; older apps top out at 512.
+# Without picking explicitly, TIFFRepresentation can return a tiny rep that
+# scales up garbage-looking when we later push it through sips/iconutil.
+reps = img.representations()
+best_rep = None
+for r in reps:
+	if best_rep is None or r.pixelsWide() > best_rep.pixelsWide():
+		best_rep = r
+target_w = max(best_rep.pixelsWide() if best_rep else 1024, 1024)
+target_h = max(best_rep.pixelsHigh() if best_rep else 1024, 1024)
+
+# Draw the NSImage into a fresh RGBA bitmap at the target resolution. This
+# forces Cocoa to use its best rep + proper scaling, instead of returning
+# whatever happens to be cached.
+bitmap = NSBitmapImageRep.alloc().initWithBitmapDataPlanes_pixelsWide_pixelsHigh_bitsPerSample_samplesPerPixel_hasAlpha_isPlanar_colorSpaceName_bytesPerRow_bitsPerPixel_(
+	None, target_w, target_h, 8, 4, True, False,
+	NSDeviceRGBColorSpace, 0, 32
+)
+ctx = NSGraphicsContext.graphicsContextWithBitmapImageRep_(bitmap)
+NSGraphicsContext.saveGraphicsState()
+NSGraphicsContext.setCurrentContext_(ctx)
+img.drawInRect_fromRect_operation_fraction_respectFlipped_hints_(
+	NSMakeRect(0, 0, target_w, target_h),
+	NSMakeRect(0, 0, 0, 0),  # zero-size source = use full image
+	NSCompositingOperationCopy,
+	1.0,
+	True,
+	None
+)
+NSGraphicsContext.restoreGraphicsState()
+png = bitmap.representationUsingType_properties_(NSPNGFileType, None)
 png.writeToFile_atomically_(dst, True)
-print(f"NSWorkspace icon extracted → {dst}", flush=True)
+print(f"NSWorkspace icon extracted at {target_w}×{target_h} → {dst}", flush=True)
 NSWSEOF
 fi
 if [[ ! -f "$BASE_PNG" ]]; then
