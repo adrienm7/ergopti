@@ -555,16 +555,40 @@ TEAMSLAUNCHER
 	# Strip quarantine so Gatekeeper doesn't block the clone on first launch
 	xattr -cr "$DEST" 2>/dev/null || true
 
-	# Re-sign ad-hoc, preserving Microsoft's entitlements. Without
-	# --preserve-metadata=entitlements the keychain-access-groups entitlement
-	# is stripped → Teams cannot open its «team2.spotlight.encryption»
-	# keychain item and surfaces an error dialog on every launch. Preserving
-	# entitlements keeps the sandbox declaration too, but with an ad-hoc
-	# (no team-id) signature macOS does not actually engage the sandbox →
-	# our $HOME override still applies. --force overwrites Microsoft's sigs.
-	codesign --force --deep --sign - --preserve-metadata=entitlements "$DEST" >> "$DIAG" 2>&1 \
-		|| log "codesign returned non-zero (often OK on Tahoe)"
-	log "Teams clone re-signed ad-hoc (entitlements preserved)"
+	# Re-sign ad-hoc with a curated entitlements set. Three competing needs:
+	#   * Keep keychain-access-groups → Teams can open its «team2.spotlight.
+	#     encryption» keychain item (otherwise an error dialog blocks login).
+	#   * Strip com.apple.security.app-sandbox → without sandbox, the $HOME
+	#     override actually applies (sandbox would force the container path
+	#     and ignore our HOME).
+	#   * Do NOT enable the hardened runtime — macOS rejects shell-script
+	#     CFBundleExecutables under hardened runtime, so re-using Microsoft's
+	#     hardened flags via --preserve-metadata=flags would silently kill
+	#     the launcher at exec time.
+	ENT_FILE="$TMPDIR_WORK/entitlements.plist"
+	if codesign -d --entitlements - --xml "$SOURCE_APP" > "$ENT_FILE" 2>/dev/null && [[ -s "$ENT_FILE" ]]; then
+		# Some macOS versions prepend a binary blob length header — strip
+		# anything before the XML declaration so PlistBuddy can parse it.
+		python3 -c '
+import sys, re
+p = sys.argv[1]
+data = open(p, "rb").read()
+i = data.find(b"<?xml")
+if i > 0:
+	open(p, "wb").write(data[i:])
+' "$ENT_FILE" || true
+		/usr/libexec/PlistBuddy -c "Delete :com.apple.security.app-sandbox" "$ENT_FILE" 2>/dev/null || true
+		log "Entitlements extracted and sandbox stripped"
+		codesign --force --deep --sign - --entitlements "$ENT_FILE" "$DEST" >> "$DIAG" 2>&1 \
+			|| log "codesign returned non-zero (often OK on Tahoe)"
+	else
+		# Fallback: sign with no entitlements file (loses keychain-access-groups
+		# but at least produces a launchable bundle).
+		log "Could not extract source entitlements — signing without them"
+		codesign --force --deep --sign - "$DEST" >> "$DIAG" 2>&1 \
+			|| log "codesign returned non-zero (often OK on Tahoe)"
+	fi
+	log "Teams clone re-signed ad-hoc"
 
 	# Skip the stub-specific sections (5, 6, 7) — jump straight to
 	# LaunchServices registration + Dock add (section 8).

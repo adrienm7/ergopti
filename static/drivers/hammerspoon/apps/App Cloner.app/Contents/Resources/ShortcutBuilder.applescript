@@ -450,40 +450,47 @@ on run argv
 	logmsg("openArg: " & openArg)
 
 	-- ===== 4) Icon style =====
+	-- The whole step is wrapped in a loop so that cancelling a sub-prompt
+	-- (color picker, file picker) sends the user back to the style chooser
+	-- instead of silently falling through to a hardcoded default.
 	tell me to activate
-	set iconMode to "tint"
+	set iconMode to ""
 	set iconPath to ""
-	-- Leftmost button gets the Esc-key binding from customDialog. We put a
-	-- real "Annuler" there so pressing Esc actually aborts the whole flow
-	-- instead of falling through to a default style choice.
-	set iconChoice to my chooseButton("Style d'icône", ¬
-		"  • Teinte couleur — applique une teinte sur l'icône d'origine." & return & ¬
-		"  • Noir & blanc — convertit l'icône d'origine en niveaux de gris." & return & ¬
-		"  • Personnalisée — utilise une image (PNG, ICNS, JPG…) en remplacement.", ¬
-		{"Annuler", "Personnalisée", "Noir & blanc", "Teinte couleur"}, "App Cloner")
-	if iconChoice is "Annuler" then return
-	if iconChoice is "Teinte couleur" then
-		set iconMode to "tint"
-		set colorList to choose color default color {52428, 0, 0}
-		set colorHex to my rgbToHex(item 1 of colorList, item 2 of colorList, item 3 of colorList)
-	else if iconChoice is "Noir & blanc" then
-		set iconMode to "bw"
-		-- Color ignored downstream but we still need a placeholder for the shell
-		set colorHex to "#808080"
-	else
-		set iconMode to "custom"
-		set colorHex to "#000000"
-		try
-			set iconAlias to choose file ¬
-				with prompt "Image à utiliser pour l'icône" ¬
-				of type {"public.image", "com.apple.icns"}
-			set iconPath to POSIX path of iconAlias
-		on error
-			-- Cancellation in the file picker → fall back to default red tint
-			set iconMode to "tint"
-			set colorHex to "#CC0000"
-		end try
-	end if
+	set colorHex to ""
+	repeat while iconMode is ""
+		-- Leftmost button gets the Esc-key binding from customDialog. We put a
+		-- real "Annuler" there so pressing Esc actually aborts the whole flow.
+		set iconChoice to my chooseButton("Style d'icône", ¬
+			"  • Teinte couleur — applique une teinte sur l'icône d'origine." & return & ¬
+			"  • Noir & blanc — convertit l'icône d'origine en niveaux de gris." & return & ¬
+			"  • Personnalisée — utilise une image (PNG, ICNS, JPG…) en remplacement.", ¬
+			{"Annuler", "Personnalisée", "Noir & blanc", "Teinte couleur"}, "App Cloner")
+		if iconChoice is "Annuler" then return
+		if iconChoice is "Teinte couleur" then
+			try
+				set colorList to choose color default color {52428, 0, 0}
+				set iconMode to "tint"
+				set colorHex to my rgbToHex(item 1 of colorList, item 2 of colorList, item 3 of colorList)
+			on error
+				-- User cancelled the color picker → re-loop to style chooser
+			end try
+		else if iconChoice is "Noir & blanc" then
+			set iconMode to "bw"
+			-- Color ignored downstream but we still need a placeholder for the shell
+			set colorHex to "#808080"
+		else if iconChoice is "Personnalisée" then
+			try
+				set iconAlias to choose file ¬
+					with prompt "Image à utiliser pour l'icône" ¬
+					of type {"public.image", "com.apple.icns"}
+				set iconPath to POSIX path of iconAlias
+				set iconMode to "custom"
+				set colorHex to "#000000"
+			on error
+				-- User cancelled the file picker → re-loop to style chooser
+			end try
+		end if
+	end repeat
 	logmsg("iconMode: " & iconMode & "  iconPath: " & iconPath & "  colorHex: " & colorHex)
 
 	-- ===== 5) Confirmation and creation =====
