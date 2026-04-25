@@ -105,14 +105,20 @@ fi
 # different name and the (rarer) Chromium Embedded Framework wrappers.
 for fw in "$SOURCE_APP/Contents/Frameworks"/*.framework(N); do
 	case "${fw:t}" in
-		"Microsoft Teams Framework.framework"|"MSTeams Framework.framework"|\
+		"Microsoft Teams Framework.framework"|"MSTeams Framework.framework")
+			# Teams rejects --user-data-dir — treat as its own family so
+			# no args are injected, only the __CFBundleIdentifier override
+			APP_FAMILY=teams ;;
 		"Chromium Embedded Framework.framework"|"Chromium Framework.framework")
 			APP_FAMILY=electron ;;
 	esac
 done
 # Catch by executable name when frameworks are renamed/hidden
 case "$SRC_EXE_NAME" in
-	"MSTeams"|"Microsoft Teams"|"Slack"|"Discord"|"Notion"|"Spotify"|"Figma"|"Postman")
+	"MSTeams"|"Microsoft Teams")
+		# Same reason: Teams ignores / crashes on --user-data-dir
+		APP_FAMILY=teams ;;
+	"Slack"|"Discord"|"Notion"|"Spotify"|"Figma"|"Postman")
 		APP_FAMILY=electron ;;
 esac
 # VSCode is Electron too but with extra CLI flags worth passing
@@ -506,7 +512,9 @@ case "$APP_FAMILY" in
 )' ;;
 	electron)
 		LAUNCHER_ARGS_LITERAL='ARGS=(--user-data-dir "'"$USER_DATA_DIR"'")' ;;
-	native|*)
+	teams|native|*)
+		# Teams rejects --user-data-dir; identity isolation is achieved
+		# solely via the __CFBundleIdentifier env override in the launcher
 		LAUNCHER_ARGS_LITERAL='ARGS=()' ;;
 esac
 

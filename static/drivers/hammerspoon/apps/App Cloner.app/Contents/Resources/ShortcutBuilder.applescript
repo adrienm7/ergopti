@@ -131,9 +131,16 @@ on customDialog(header, body, buttonList, hasInput, defaultText, lineCount, inpu
 	set buttonHeight to 28
 	set buttonGap to 8
 
-	-- Width: derive from input area, never smaller than 380
+	-- Width: derive from input area, never smaller than 380, and never
+	-- smaller than the total buttons row (so buttons don't overflow the margin)
 	set panelWidth to inputWidth + (2 * marginX)
 	if panelWidth < 380 then set panelWidth to 380
+	set totalBtnW to 0
+	repeat with bTitle in buttonList
+		set totalBtnW to totalBtnW + (my measureButtonWidth(bTitle))
+	end repeat
+	set totalBtnW to totalBtnW + ((count of buttonList) - 1) * buttonGap + (2 * marginX)
+	if panelWidth < totalBtnW then set panelWidth to totalBtnW
 
 	-- Body height: 0 if no body, else lines × line height
 	set bodyLines to my countLines(body)
