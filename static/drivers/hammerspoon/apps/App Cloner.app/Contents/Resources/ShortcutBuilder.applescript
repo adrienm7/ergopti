@@ -16,39 +16,280 @@ use scripting additions
 -- the menu — without those menu items, Cmd+A/C/V/X are dropped. We install
 -- a minimal Edit menu once at startup so every text field in this app gets
 -- standard editing shortcuts.
--- Hand back a zero-sized NSImage. NSAlert sizes its icon slot from the
--- image's pixel dimensions; {0, 0} fully collapses the slot so the
--- dialog renders flush-left with no awkward leading gap. A 1×1 image
--- still leaves the icon column padding intact.
-on blankImage()
-	return current application's NSImage's alloc()'s initWithSize:(current application's NSMakeSize(0, 0))
-end blankImage
+-- ─────────────────────────────────────────────────────────────────────────
+-- Custom NSPanel-based dialog. Replaces NSAlert entirely so we get full
+-- control over the layout — most importantly, no reserved icon column
+-- forcing an empty gap at the top-left of every prompt.
+--
+-- One big customDialog() handles every prompt shape we need:
+--   * pure choice (header + body + buttons)
+--   * text input (1 line or N lines)
+--   * input + checkbox (used by the summary screen for the badge toggle)
+-- ─────────────────────────────────────────────────────────────────────────
 
--- Wrapper around `display dialog` that also strips the implicit Dock-app icon
--- from the dialog. AppleScript's classic display dialog always shows the host
--- app's icon top-left; this helper rebuilds the same prompt as an NSAlert
--- with no icon and returns the title of the clicked button — same shape as
--- `button returned of (display dialog …)`.
-on chooseButton(messageText, informativeText, buttonList, dialogTitle)
-	set anAlert to current application's NSAlert's alloc()'s init()
-	anAlert's setMessageText:messageText
-	anAlert's setInformativeText:informativeText
-	anAlert's setIcon:(my blankImage())
-	-- NSAlert places buttons right-to-left. Add the rightmost (= default)
-	-- first by iterating the AppleScript-style button list backwards. That
-	-- preserves the natural reading order: leftmost button = "Annuler",
-	-- rightmost = the action verb.
+-- DialogState is the AppleScript-ObjC bridge target for NSButton actions.
+-- AppleScript script objects can serve as Cocoa targets when their handler
+-- names end with `:` — Cocoa dispatches `btnXClicked:` to handler
+-- `btnXClicked:` on this object. We store the picked button index and the
+-- captured input/checkbox values here so customDialog() can read them back
+-- after the modal returns.
+script DialogState
+	property panelResult : 0          -- 1-based button index, 0 if cancelled
+	property panelInputText : ""
+	property panelChecked : false
+	property panelInputView : missing value
+	property panelCheckboxView : missing value
+	property panelIsTextView : false  -- true if input is NSTextView, false for NSTextField
+
+	on captureValues()
+		if panelInputView is not missing value then
+			try
+				if panelIsTextView then
+					set panelInputText to (panelInputView's |string|()) as text
+				else
+					set panelInputText to (panelInputView's stringValue()) as text
+				end if
+			end try
+		end if
+		if panelCheckboxView is not missing value then
+			try
+				set panelChecked to ((panelCheckboxView's state()) as integer) is 1
+			end try
+		end if
+	end captureValues
+
+	on btn1Clicked:sender
+		my captureValues()
+		set panelResult to 1
+		(current application's NSApplication's sharedApplication())'s stopModal()
+	end btn1Clicked:
+
+	on btn2Clicked:sender
+		my captureValues()
+		set panelResult to 2
+		(current application's NSApplication's sharedApplication())'s stopModal()
+	end btn2Clicked:
+
+	on btn3Clicked:sender
+		my captureValues()
+		set panelResult to 3
+		(current application's NSApplication's sharedApplication())'s stopModal()
+	end btn3Clicked:
+end script
+
+-- Rough text-width estimator (no NSAttributedString.size to keep it pure
+-- AppleScript). Buttons are clamped between 90 and 220 pixels.
+on measureButtonWidth(title)
+	set w to ((length of title) * 8) + 32
+	if w < 90 then set w to 90
+	if w > 220 then set w to 220
+	return w
+end measureButtonWidth
+
+-- Count visible lines in a string (LF and CR both count as breaks).
+on countLines(s)
+	if s is "" then return 0
+	set n to 1
+	repeat with i from 1 to (length of s)
+		set c to character i of s
+		if (c is return) or (c is linefeed) then set n to n + 1
+	end repeat
+	return n
+end countLines
+
+-- The swiss-army-knife dialog. Every UI prompt routes through this.
+--   header       : bold heading string (top)
+--   body         : informative string below the header (multi-line OK)
+--   buttonList   : list of button titles, leftmost first; the rightmost
+--                  becomes the default (Enter), the leftmost becomes the
+--                  cancel button (Esc) when there are 2+ buttons.
+--   hasInput     : true to add a text editor below the body
+--   defaultText  : prefilled value for the input
+--   lineCount    : 1 → NSTextField, ≥2 → NSTextView in NSScrollView
+--   inputWidth   : pixel width of the input area; drives the panel width
+--   hasCheckbox  : true to add a checkbox above the buttons
+--   checkboxLabel: title shown next to the checkbox
+-- Returns a record: {chosenButton, inputText, checked}.
+on customDialog(header, body, buttonList, hasInput, defaultText, lineCount, inputWidth, hasCheckbox, checkboxLabel)
+	set marginX to 24
+	set marginYTop to 22
+	set marginYBottom to 18
+	set spacing to 14
+	set headerHeight to 22
+	set bodyLineHeight to 16
+	set buttonHeight to 28
+	set buttonGap to 8
+
+	-- Width: derive from input area, never smaller than 380
+	set panelWidth to inputWidth + (2 * marginX)
+	if panelWidth < 380 then set panelWidth to 380
+
+	-- Body height: 0 if no body, else lines × line height
+	set bodyLines to my countLines(body)
+	if bodyLines = 0 then
+		set bodyHeight to 0
+	else
+		set bodyHeight to (bodyLines * bodyLineHeight) + 4
+	end if
+
+	-- Input height
+	set inputHeight to 0
+	if hasInput then
+		if lineCount ≤ 1 then
+			set inputHeight to 24
+		else
+			set inputHeight to (lineCount * 18) + 12
+		end if
+	end if
+
+	-- Checkbox height
+	set checkboxHeight to 0
+	if hasCheckbox then set checkboxHeight to 22
+
+	-- Total panel height (sum of stack + margins + spacings between items)
+	set verticalElements to {headerHeight}
+	if bodyHeight > 0 then set end of verticalElements to bodyHeight
+	if hasInput then set end of verticalElements to inputHeight
+	if hasCheckbox then set end of verticalElements to checkboxHeight
+	set end of verticalElements to buttonHeight
+
+	set panelHeight to marginYTop + marginYBottom
+	set elemCount to count of verticalElements
+	repeat with i from 1 to elemCount
+		set panelHeight to panelHeight + (item i of verticalElements)
+	end repeat
+	set panelHeight to panelHeight + ((elemCount - 1) * spacing)
+
+	-- Build panel: titled + closable, no resize, no minimise
+	set rect to current application's NSMakeRect(0, 0, panelWidth, panelHeight)
+	set styleMask to 3 -- NSWindowStyleMaskTitled (1) + Closable (2)
+	set win to current application's NSPanel's alloc()'s initWithContentRect:rect styleMask:styleMask backing:2 defer:false
+	win's setTitle:"App Cloner"
+	win's |center|()
+	win's setReleasedWhenClosed:false
+
+	set contentView to win's contentView()
+
+	-- Layout top → bottom
+	set yCursor to panelHeight - marginYTop - headerHeight
+
+	-- Header (bold)
+	set headerFrame to current application's NSMakeRect(marginX, yCursor, panelWidth - (2 * marginX), headerHeight)
+	set headerLabel to current application's NSTextField's alloc()'s initWithFrame:headerFrame
+	headerLabel's setStringValue:header
+	headerLabel's setFont:(current application's NSFont's boldSystemFontOfSize:14)
+	headerLabel's setBordered:false
+	headerLabel's setEditable:false
+	headerLabel's setSelectable:false
+	headerLabel's setDrawsBackground:false
+	contentView's addSubview:headerLabel
+
+	-- Body (multi-line, selectable so users can copy text from prompts)
+	if bodyHeight > 0 then
+		set yCursor to yCursor - spacing - bodyHeight
+		set bodyFrame to current application's NSMakeRect(marginX, yCursor, panelWidth - (2 * marginX), bodyHeight)
+		set bodyLabel to current application's NSTextField's alloc()'s initWithFrame:bodyFrame
+		bodyLabel's setStringValue:body
+		bodyLabel's setFont:(current application's NSFont's systemFontOfSize:12)
+		bodyLabel's setBordered:false
+		bodyLabel's setEditable:false
+		bodyLabel's setSelectable:true
+		bodyLabel's setDrawsBackground:false
+		(bodyLabel's cell())'s setWraps:true
+		(bodyLabel's cell())'s setLineBreakMode:0
+		contentView's addSubview:bodyLabel
+	end if
+
+	-- Input (optional)
+	if hasInput then
+		set yCursor to yCursor - spacing - inputHeight
+		set inputFrame to current application's NSMakeRect(marginX, yCursor, panelWidth - (2 * marginX), inputHeight)
+		if lineCount ≤ 1 then
+			set inputView to current application's NSTextField's alloc()'s initWithFrame:inputFrame
+			inputView's setStringValue:defaultText
+			inputView's setFont:(current application's NSFont's systemFontOfSize:13)
+			contentView's addSubview:inputView
+			set DialogState's panelInputView to inputView
+			set DialogState's panelIsTextView to false
+		else
+			set scrollView to current application's NSScrollView's alloc()'s initWithFrame:inputFrame
+			scrollView's setHasVerticalScroller:true
+			scrollView's setBorderType:2 -- NSBezelBorder
+			set textView to current application's NSTextView's alloc()'s initWithFrame:inputFrame
+			textView's setRichText:false
+			textView's setAllowsUndo:true
+			textView's setFont:(current application's NSFont's systemFontOfSize:13)
+			textView's setString:defaultText
+			scrollView's setDocumentView:textView
+			contentView's addSubview:scrollView
+			set DialogState's panelInputView to textView
+			set DialogState's panelIsTextView to true
+		end if
+	else
+		set DialogState's panelInputView to missing value
+	end if
+
+	-- Checkbox (optional)
+	if hasCheckbox then
+		set yCursor to yCursor - spacing - checkboxHeight
+		set cbFrame to current application's NSMakeRect(marginX, yCursor, panelWidth - (2 * marginX), checkboxHeight)
+		set cb to current application's NSButton's alloc()'s initWithFrame:cbFrame
+		cb's setButtonType:3 -- NSSwitchButton
+		cb's setTitle:checkboxLabel
+		cb's setState:0
+		contentView's addSubview:cb
+		set DialogState's panelCheckboxView to cb
+	else
+		set DialogState's panelCheckboxView to missing value
+	end if
+
+	-- Buttons row, right-to-left so the rightmost = default
+	set xCursor to (panelWidth - marginX)
 	set lastIdx to (count of buttonList)
 	repeat with i from lastIdx to 1 by -1
-		anAlert's addButtonWithTitle:(item i of buttonList)
+		set btnTitle to item i of buttonList
+		set btnW to my measureButtonWidth(btnTitle)
+		set btnX to xCursor - btnW
+		set btnFrame to current application's NSMakeRect(btnX, marginYBottom, btnW, buttonHeight)
+		set btn to current application's NSButton's alloc()'s initWithFrame:btnFrame
+		btn's setTitle:btnTitle
+		btn's setBezelStyle:1 -- rounded
+		btn's setTarget:DialogState
+		if i = 1 then
+			btn's setAction:"btn1Clicked:"
+			-- Leftmost = cancel-style: bind Esc
+			if lastIdx > 1 then btn's setKeyEquivalent:(character id 27)
+		else if i = 2 then
+			btn's setAction:"btn2Clicked:"
+		else if i = 3 then
+			btn's setAction:"btn3Clicked:"
+		end if
+		if i = lastIdx then btn's setKeyEquivalent:return
+		contentView's addSubview:btn
+		set xCursor to btnX - buttonGap
 	end repeat
-	set response to (anAlert's runModal()) as integer
-	-- Hard-coded NSAlertFirstButtonReturn (1000) — bridging the AppKit
-	-- enum constant via `current application's NSAlertFirstButtonReturn`
-	-- is unreliable across macOS versions and silently returns missing
-	-- value, leading to off-by-one button mapping or a crash.
-	set picked to response - 1000 + 1
-	return item (lastIdx - picked + 1) of buttonList
+
+	-- Reset state, focus the input if any, and run modal
+	set DialogState's panelResult to 0
+	set DialogState's panelInputText to ""
+	set DialogState's panelChecked to false
+	if hasInput then
+		win's makeFirstResponder:(DialogState's panelInputView)
+	end if
+
+	(current application's NSApplication's sharedApplication())'s runModalForWindow:win
+	win's orderOut:(missing value)
+
+	if DialogState's panelResult is 0 then error number -128
+
+	return {chosenButton:(item (DialogState's panelResult) of buttonList), inputText:(DialogState's panelInputText), checked:(DialogState's panelChecked)}
+end customDialog
+
+-- Convenience wrappers around customDialog so call sites stay readable.
+
+on chooseButton(headerText, bodyText, buttonList, dialogTitle)
+	set r to my customDialog(headerText, bodyText, buttonList, false, "", 0, 380, false, "")
+	return chosenButton of r
 end chooseButton
 
 on installEditMenu()
@@ -84,60 +325,10 @@ on installEditMenu()
 	end try
 end installEditMenu
 
--- Text input via NSAlert with optional multi-line text view. Width and line
--- count are tunable so different prompts can size their dialog appropriately
--- (short name → narrow + 1 line; URL with examples → wide + 3 lines).
---   widthPx     : pixel width of the input area (drives overall dialog width)
---   lineCount   : 1 for an NSTextField, ≥2 for a multi-line NSTextView
 on askText(prompt, defaultValue, dialogTitle, widthPx, lineCount)
-	set anAlert to current application's NSAlert's alloc()'s init()
-	anAlert's setMessageText:dialogTitle
-	anAlert's setInformativeText:prompt
-
-	-- Suppress the NSAlert default app/folder icon — visually distracting
-	-- and irrelevant for plain text input.
-	anAlert's setIcon:(my blankImage())
-
-	if lineCount is 1 then
-		set inputField to current application's NSTextField's alloc()'s initWithFrame:(current application's NSMakeRect(0, 0, widthPx, 24))
-		inputField's setStringValue:defaultValue
-		anAlert's setAccessoryView:inputField
-		set firstResponderTarget to inputField
-	else
-		-- NSTextView inside an NSScrollView gives a real multi-line editor
-		-- with native Cmd+A/C/V/X/Z, scroll bar when content overflows, and
-		-- correct first-responder behavior inside an NSAlert.
-		set lineHeight to 18
-		set viewHeight to (lineCount * lineHeight) + 8
-		set scrollFrame to current application's NSMakeRect(0, 0, widthPx, viewHeight)
-		set scrollView to current application's NSScrollView's alloc()'s initWithFrame:scrollFrame
-		scrollView's setHasVerticalScroller:true
-		scrollView's setBorderType:(current application's NSBezelBorder)
-		set textView to current application's NSTextView's alloc()'s initWithFrame:scrollFrame
-		textView's setRichText:false
-		textView's setAllowsUndo:true
-		textView's setFont:(current application's NSFont's systemFontOfSize:13)
-		textView's setString:defaultValue
-		scrollView's setDocumentView:textView
-		anAlert's setAccessoryView:scrollView
-		set firstResponderTarget to textView
-	end if
-
-	anAlert's addButtonWithTitle:"OK"
-	anAlert's addButtonWithTitle:"Annuler"
-	-- Hand focus to the input on open so paste works immediately on Cmd+V
-	(anAlert's |window|()'s makeFirstResponder:firstResponderTarget)
-	set response to (anAlert's runModal()) as integer
-	-- 1000 = NSAlertFirstButtonReturn (the OK we added first / rightmost)
-	if response = 1000 then
-		if lineCount is 1 then
-			return (firstResponderTarget's stringValue() as text)
-		else
-			return (firstResponderTarget's |string|() as text)
-		end if
-	else
-		error number -128
-	end if
+	set r to my customDialog(dialogTitle, prompt, {"Annuler", "OK"}, true, defaultValue, lineCount, widthPx, false, "")
+	if (chosenButton of r) is "Annuler" then error number -128
+	return inputText of r
 end askText
 
 on logmsg(m)
@@ -289,18 +480,29 @@ on run argv
 		& "• Icône  : " & iconDisplay & return ¬
 		& "• Ouvre  : " & openArgDisplay
 	tell me to activate
-	set go to my chooseButton("Récapitulatif", summary, {"Annuler", "Créer le clone"}, "App Cloner")
+	-- Summary screen also exposes the experimental unread-badge toggle.
+	-- Default off — implementation needs a Cocoa wrapper helper that we
+	-- spawn alongside the app, and the helper requires Accessibility
+	-- permissions (System Settings → Privacy → Accessibility).
+	set summaryResult to my customDialog("Récapitulatif", summary, ¬
+		{"Annuler", "Créer le clone"}, false, "", 0, 380, true, ¬
+		"Activer le badge unread (expérimental, Teams uniquement)")
+	set go to chosenButton of summaryResult
+	set badgeEnabled to checked of summaryResult
 	if go is "Annuler" then return
 
 	do shell script "chmod +x " & quoted form of cloneScript
 
+	set badgeArg to "0"
+	if badgeEnabled then set badgeArg to "1"
 	set cmd to quoted form of cloneScript ¬
 		& " " & quoted form of sourcePath ¬
 		& " " & quoted form of cloneName ¬
 		& " " & quoted form of colorHex ¬
 		& " " & quoted form of openArg ¬
 		& " " & quoted form of iconMode ¬
-		& " " & quoted form of iconPath
+		& " " & quoted form of iconPath ¬
+		& " " & quoted form of badgeArg
 	logmsg("cmd: " & cmd)
 
 	-- Run the shell script in the background, signal completion via a
