@@ -35,13 +35,13 @@ COLOR_HEX="${3:-}"
 OPEN_ARG="${4:-}"
 ICON_MODE="${5:-tint}"   # tint | bw | custom
 ICON_PATH="${6:-}"        # only used when ICON_MODE=custom
-BADGE_ENABLED="${7:-0}"   # 1 = launch the unread-badge helper alongside the app
+PWA_MODE="${7:-0}"        # 1 = clone is an Edge PWA pointing at OPEN_ARG (URL)
 
 log "============================================================"
 log "=== AppCloner (stub mode) — $(date)"
 log "=== SOURCE=$SOURCE_APP"
 log "=== NAME=$CLONE_NAME  COLOR=$COLOR_HEX  ARG=$OPEN_ARG"
-log "=== ICON_MODE=$ICON_MODE  ICON_PATH=$ICON_PATH  BADGE=$BADGE_ENABLED"
+log "=== ICON_MODE=$ICON_MODE  ICON_PATH=$ICON_PATH  PWA=$PWA_MODE"
 log "============================================================"
 
 [[ -z "$SOURCE_APP" ]] && { echo "Error: SOURCE_APP missing"; exit 1; }
@@ -74,15 +74,6 @@ trap 'rm -rf "$TMPDIR_WORK"' EXIT
 
 UNIQUE_ID="fr.b519hs.clone.$(date +%s)"
 
-# For sandboxed apps with strict parent-identifier checks (Teams' WebView2,
-# any Mac App Store app), deriving the clone id from the source app's own
-# bundle id keeps the namespace prefix that nested helpers expect. The full
-# id is still unique → macOS still creates a fresh sandbox container.
-SRC_BUNDLE_ID="$(/usr/libexec/PlistBuddy -c "Print :CFBundleIdentifier" "$SOURCE_APP/Contents/Info.plist" 2>/dev/null || echo "")"
-if [[ -n "$SRC_BUNDLE_ID" ]]; then
-	NAMESPACED_ID="${SRC_BUNDLE_ID}.clone.$(date +%s)"
-fi
-
 # Resolve source app's main executable name once, up front — needed by both
 # the family-detection and the launcher generation.
 SRC_EXE_NAME="$(/usr/libexec/PlistBuddy -c "Print :CFBundleExecutable" "$SOURCE_APP/Contents/Info.plist" 2>/dev/null || echo "")"
@@ -105,28 +96,23 @@ log "UNIQUE_ID=$UNIQUE_ID"
 #   * Native           (Calculator, Mail, Safari, ...). No user-data-dir
 #                       concept — only the __CFBundleIdentifier override
 #                       gives them a distinct Dock identity.
+# Sandboxed apps such as the new Microsoft Teams or Outlook cannot be cloned
+# this way (signature/entitlement checks defeat any binary-level patching);
+# the menu offers a separate «PWA mode» for those — see Section 6.b.
 APP_FAMILY=native
 # Standard Electron detection: vendored Electron Framework
 if [[ -d "$SOURCE_APP/Contents/Frameworks/Electron Framework.framework" ]]; then
 	APP_FAMILY=electron
 fi
-# Catch the new Microsoft Teams which ships a custom Chromium fork under a
-# different name and the (rarer) Chromium Embedded Framework wrappers.
+# Chromium Embedded Framework wrappers also accept --user-data-dir
 for fw in "$SOURCE_APP/Contents/Frameworks"/*.framework(N); do
 	case "${fw:t}" in
-		"Microsoft Teams Framework.framework"|"MSTeams Framework.framework")
-			# Teams rejects --user-data-dir — treat as its own family so
-			# no args are injected, only the __CFBundleIdentifier override
-			APP_FAMILY=teams ;;
 		"Chromium Embedded Framework.framework"|"Chromium Framework.framework")
 			APP_FAMILY=electron ;;
 	esac
 done
 # Catch by executable name when frameworks are renamed/hidden
 case "$SRC_EXE_NAME" in
-	"MSTeams"|"Microsoft Teams")
-		# Same reason: Teams ignores / crashes on --user-data-dir
-		APP_FAMILY=teams ;;
 	"Slack"|"Discord"|"Notion"|"Spotify"|"Figma"|"Postman")
 		APP_FAMILY=electron ;;
 esac
@@ -445,133 +431,6 @@ log "icns built"
 
 
 
-# ====================================================================
-# ====================================================================
-# ======= 4.5/ Teams full-clone path (skip stub for sandboxed apps) =
-# ====================================================================
-# ====================================================================
-
-# Sandboxed apps like the new Microsoft Teams resolve their data container
-# from the *signed* bundle id, not from __CFBundleIdentifier injected at
-# runtime. The stub-bundle technique therefore cannot give Teams a separate
-# Dock identity AND a separate data container at the same time. We work
-# around this by doing a full clone:
-#   1. ditto-copy the source bundle into $DEST (~600 MB for Teams)
-#   2. rewrite Info.plist with a fresh CFBundleIdentifier + display name
-#   3. swap the icon for our tinted one
-#   4. install a thin launcher script as CFBundleExecutable that overrides
-#      $HOME → per-clone Application Support → forces Teams to read/write
-#      its state under our isolated tree (separate accounts, separate state)
-#   5. ad-hoc re-sign the whole tree (--deep). Microsoft's entitlements are
-#      stripped in the process, so Teams runs unsandboxed under our HOME
-#      override — exactly what we want for isolation.
-if [[ "$APP_FAMILY" == "teams" ]]; then
-	# Use the source-app-derived namespaced id so Teams' WebView2 helper's
-	# parent-identifier validation passes. macOS still treats this as a new
-	# bundle id → fresh sandbox container = isolation preserved.
-	if [[ -n "${NAMESPACED_ID:-}" ]]; then
-		UNIQUE_ID="$NAMESPACED_ID"
-		log "Teams uses namespaced clone id: $UNIQUE_ID"
-	fi
-	log "Teams full-clone path: copying source bundle to $DEST…"
-
-	# Strategy — let macOS sandbox itself do the isolation work:
-	#   * ditto the original Teams bundle.
-	#   * Change ONLY CFBundleIdentifier + display name + icon. Leave
-	#     CFBundleExecutable pointing to the real MSTeams binary; do NOT
-	#     introduce a launcher script (hardened-runtime would reject it).
-	#   * Re-sign --deep ad-hoc with --preserve-metadata=entitlements,flags
-	#     so Microsoft's full entitlements set (incl. app-sandbox, hardened
-	#     runtime, keychain-access-groups) survives untouched on every
-	#     binary, including nested helpers.
-	# Result: macOS sees a brand new bundle id → creates a fresh sandbox
-	# container at ~/Library/Containers/<UNIQUE_ID>/. Teams writes all its
-	# state there → fully isolated account/login/cache from the main install,
-	# without us having to manipulate $HOME or strip the sandbox.
-
-	# Section 4 wrote our tinted .icns inside $RES (= $DEST/Contents/Resources).
-	# Stash it outside $DEST before we wipe — we'll restore it post-ditto.
-	ICON_STASH="$TMPDIR_WORK/AppIcon.icns"
-	cp "$RES/AppIcon.icns" "$ICON_STASH"
-
-	# Section 1 created an empty $DEST scaffold — wipe it before ditto so
-	# we don't merge structures.
-	rm -rf "$DEST"
-	ditto "$SOURCE_APP" "$DEST"
-	log "ditto copy complete"
-
-	# Re-derive paths inside the freshly copied bundle
-	CONTENTS="$DEST/Contents"
-	MACOS="$CONTENTS/MacOS"
-	RES2="$CONTENTS/Resources"
-
-	# Place our tinted icon under a new name and point Info.plist to it. We
-	# don't overwrite the original .icns in case Teams reads other slices
-	# from Assets.car for system surfaces; the new name takes precedence in
-	# Info.plist and that's what Dock/LaunchServices use.
-	cp "$ICON_STASH" "$RES2/AppIcon.icns"
-	log "icon installed in cloned bundle"
-
-	# Patch Info.plist: new bundle id + display name + icon. Leave
-	# CFBundleExecutable alone — keeping the original MSTeams binary as
-	# the entry point lets the hardened runtime stay enabled (which we
-	# need to keep entitlements valid).
-	PLIST_PATH="$CONTENTS/Info.plist"
-	/usr/libexec/PlistBuddy -c "Set :CFBundleIdentifier ${UNIQUE_ID}" "$PLIST_PATH" 2>/dev/null \
-		|| /usr/libexec/PlistBuddy -c "Add :CFBundleIdentifier string ${UNIQUE_ID}" "$PLIST_PATH"
-	/usr/libexec/PlistBuddy -c "Set :CFBundleName ${safe_name}" "$PLIST_PATH" 2>/dev/null \
-		|| /usr/libexec/PlistBuddy -c "Add :CFBundleName string ${safe_name}" "$PLIST_PATH"
-	/usr/libexec/PlistBuddy -c "Set :CFBundleDisplayName ${safe_name}" "$PLIST_PATH" 2>/dev/null \
-		|| /usr/libexec/PlistBuddy -c "Add :CFBundleDisplayName string ${safe_name}" "$PLIST_PATH"
-	/usr/libexec/PlistBuddy -c "Set :CFBundleIconFile AppIcon" "$PLIST_PATH" 2>/dev/null \
-		|| /usr/libexec/PlistBuddy -c "Add :CFBundleIconFile string AppIcon" "$PLIST_PATH"
-	# CFBundleIconName drives the Asset catalog lookup on modern macOS — if
-	# the original used Assets.car for the icon, leaving the name pointing
-	# to the source asset would override our AppIcon.icns. Delete it so the
-	# CFBundleIconFile takes precedence.
-	/usr/libexec/PlistBuddy -c "Delete :CFBundleIconName" "$PLIST_PATH" 2>/dev/null || true
-	log "Info.plist patched: id=$UNIQUE_ID name=$safe_name (executable left as ${SRC_EXE_NAME})"
-
-	# $LAUNCHER is read by section 9's diagnostic — point it at the actual
-	# main binary so the diagnostic dump still works.
-	LAUNCHER="$MACOS/${SRC_EXE_NAME}"
-
-	# Strip quarantine so Gatekeeper doesn't block the clone on first launch
-	xattr -cr "$DEST" 2>/dev/null || true
-
-	# Two-pass re-sign — different needs for helpers vs. outer bundle.
-	#
-	# Helpers (WebView2 in particular) MUST keep:
-	#   * hardened runtime → otherwise V8 / JIT engines refuse to start
-	#   * com.apple.security.cs.allow-jit → JavaScript engine needs to
-	#     allocate executable memory
-	#   * camera/microphone/network entitlements → Teams calls won't work
-	# Without these, Teams loads but the webview never finishes loading
-	# («Nous avons rencontré un problème»).
-	#
-	# Outer bundle MUST drop:
-	#   * keychain-access-groups → bound to Microsoft's team-id UBF8T346G9,
-	#     ad-hoc sig has no team-id → AMFI rejects the launch entirely
-	#   * com.apple.security.app-sandbox → same team-id binding issue
-	#
-	# Pass 1: --deep preserves entitlements + flags on EVERY binary, helpers
-	# included. Each helper keeps its own original entitlements (codesign
-	# reads them from each binary individually).
-	codesign --force --deep --sign - --preserve-metadata=entitlements,flags "$DEST" >> "$DIAG" 2>&1 \
-		|| log "pass-1 codesign returned non-zero"
-
-	# Pass 2: re-sign the OUTER bundle only, with no entitlements and no
-	# preserved flags. This drops the team-id-bound entitlements that AMFI
-	# was rejecting, while leaving every helper's signature from pass 1
-	# intact. No --deep here on purpose.
-	codesign --force --sign - "$DEST" >> "$DIAG" 2>&1 \
-		|| log "pass-2 codesign returned non-zero"
-	log "Teams clone re-signed (helpers: preserved, outer: stripped)"
-
-	# Skip the stub-specific sections (5, 6, 7) — jump straight to
-	# LaunchServices registration + Dock add (section 8).
-	APPCLONER_SKIP_STUB=1
-fi
 
 
 
@@ -657,270 +516,81 @@ case "$APP_FAMILY" in
 )' ;;
 	electron)
 		LAUNCHER_ARGS_LITERAL='ARGS=(--user-data-dir "'"$USER_DATA_DIR"'")' ;;
-	teams|native|*)
-		# Teams rejects --user-data-dir; identity isolation is achieved
-		# solely via the __CFBundleIdentifier env override in the launcher
+	native|*)
 		LAUNCHER_ARGS_LITERAL='ARGS=()' ;;
 esac
 
-# Per-clone Cocoa wrapper for the unread-badge feature.
-#
-# When BADGE_ENABLED=1 the launcher execs this Python wrapper instead of
-# the source app directly. The wrapper:
-#   1. Becomes a real NSApplication under our bundle id (fr.xxx) thanks to
-#      __CFBundleIdentifier set by the launcher → owns its own Dock tile.
-#   2. Spawns the source app via NSWorkspace open URL — Teams keeps its
-#      own bundle id (com.microsoft.Teams), so it runs as a single shared
-#      instance across all clones. User stays logged in once.
-#   3. Polls Teams' Accessibility tree every POLL_SECONDS to count unread
-#      messages for THIS clone's specific chat (matched against the URL).
-#   4. Writes the count to its own NSDockTile.badgeLabel.
-#   5. On Dock tile click (applicationShouldHandleReopen:), re-opens the
-#      chat URL so Teams jumps back to this clone's conversation.
-#
-# Outcome: per-clone Dock tiles with their own custom icon + per-chat
-# badge, plus one shared transient Teams tile when the app is running.
-# Teams requires the Cocoa wrapper regardless of the badge setting — it is
-# the only launch path that goes through LaunchServices (open -a) and lets
-# Teams pass its own integrity checks, while still owning a separate Dock tile.
-if [[ "$BADGE_ENABLED" == "1" || "$APP_FAMILY" == "teams" ]]; then
-	cat > "$RES/badge_wrapper.py" <<'BADGEEOF'
-#!/usr/bin/env python3
-"""Per-clone Cocoa wrapper with Dock-tile unread badge.
 
-Run as the clone bundle's main executable when BADGE_ENABLED=1. Becomes a
-real NSApplication under the clone's bundle id (inherited from the env via
-__CFBundleIdentifier), owns its own Dock tile, spawns the source app
-(Teams) as a shared instance, and writes the per-conversation unread
-count as the badge label of OUR Dock tile — which carries the clone's
-custom tinted icon.
 
-Args (positional):
-  1. clone_id     — bundle identifier (used as log filename)
-  2. clone_name   — display name (Dock tooltip)
-  3. source_app   — path to the source .app bundle
-  4. chat_url     — URL configured at clone creation
-"""
-import os, sys, time, threading, subprocess, urllib.parse, logging
-from pathlib import Path
 
-clone_id    = sys.argv[1] if len(sys.argv) > 1 else "unknown"
-clone_name  = sys.argv[2] if len(sys.argv) > 2 else "Clone"
-source_app  = sys.argv[3] if len(sys.argv) > 3 else ""
-chat_url    = sys.argv[4] if len(sys.argv) > 4 else ""
+# ====================================================================
+# ====================================================================
+# ======= 6.b/ PWA mode — clone is an Edge web app ===================
+# ====================================================================
+# ====================================================================
 
-POLL_SECONDS = 5
-log_dir = Path.home() / "Library" / "Logs" / "AppCloner"
-log_dir.mkdir(parents=True, exist_ok=True)
-logging.basicConfig(
-	filename=log_dir / f"{clone_id}.log",
-	level=logging.INFO,
-	format="%(asctime)s %(message)s",
-)
-logging.info("wrapper start  clone=%s  source=%s  chat=%s",
-             clone_id, source_app, chat_url)
+# When the user ticks «mode PWA» the clone is no longer a stub that re-
+# launches the source desktop app. Instead it spawns Microsoft Edge (or
+# Chrome / Brave as fallback) in --app=URL mode with an isolated user-data
+# dir. The result is a chromeless, single-window web app — fully isolated
+# from the user's main browser session, and from any other clone — that
+# can be logged into independently. This is the only reliable way to get
+# multiple sandboxed apps (Teams new, Outlook for Mac) running side by
+# side on macOS without Microsoft's signing key.
+if [[ "$PWA_MODE" == "1" ]]; then
+	# Locate a Chromium-based browser. Edge is preferred (best Teams /
+	# Microsoft 365 integration), Chrome and Brave are accepted fallbacks.
+	PWA_BROWSER=""
+	for candidate in \
+		"/Applications/Microsoft Edge.app" \
+		"$HOME/Applications/Microsoft Edge.app" \
+		"/Applications/Google Chrome.app" \
+		"$HOME/Applications/Google Chrome.app" \
+		"/Applications/Brave Browser.app" \
+		"$HOME/Applications/Brave Browser.app"; do
+		if [[ -d "$candidate" ]]; then
+			PWA_BROWSER="$candidate"
+			break
+		fi
+	done
+	if [[ -z "$PWA_BROWSER" ]]; then
+		echo "Error: PWA mode requires Microsoft Edge, Google Chrome or Brave installed in /Applications."
+		exit 1
+	fi
+	PWA_BROWSER_EXE_NAME="$(/usr/libexec/PlistBuddy -c "Print :CFBundleExecutable" "$PWA_BROWSER/Contents/Info.plist" 2>/dev/null || echo "")"
+	PWA_BROWSER_EXE="$PWA_BROWSER/Contents/MacOS/$PWA_BROWSER_EXE_NAME"
+	log "PWA browser: $PWA_BROWSER_EXE"
 
-PYOBJC_OK = True
-try:
-	from AppKit import (
-		NSApplication, NSWorkspace, NSObject,
-		NSApplicationActivationPolicyRegular,
-		NSApplicationActivateIgnoringOtherApps,
-	)
-	from ApplicationServices import (
-		AXUIElementCreateApplication, AXUIElementCopyAttributeValue,
-		kAXChildrenAttribute, kAXTitleAttribute, kAXValueAttribute,
-		AXIsProcessTrusted,
-	)
-except ImportError as e:
-	# PyObjC absent (non-system Python, missing framework) — fall back to a
-	# plain shell-level launch so the clone still opens the app, without the
-	# Dock-tile / badge features. We open the source app and sleep forever so
-	# the launcher process stays alive and macOS doesn't loop-relaunch it.
-	logging.error("PyObjC unavailable: %s — falling back to plain open", e)
-	PYOBJC_OK = False
+	# Per-clone Chromium profile — keeps cookies/storage/extensions of each
+	# PWA fully isolated from the user's main browser and from other PWAs.
+	PWA_PROFILE_DIR="$HOME/Library/Application Support/AppCloner/${safe_name}_pwa"
+	mkdir -p "$PWA_PROFILE_DIR"
 
-if not PYOBJC_OK:
-	import subprocess, signal
-	args = ["/usr/bin/open", "-a", source_app]
-	if chat_url:
-		subprocess.Popen(args)
-		import time; time.sleep(3)
-		subprocess.Popen(["/usr/bin/open", "-a", source_app, chat_url])
-	else:
-		subprocess.Popen(args)
-	# Stay alive indefinitely — exit only on SIGTERM (Dock Quit)
-	signal.pause()
-	sys.exit(0)
+	cat > "$LAUNCHER" <<PWAEOF
+#!/bin/zsh
+# Generated by AppCloner (PWA mode). Do not edit — regenerated on each clone.
+set -e
 
-# Extract a "needle" from the chat URL — the substring we expect to find
-# in the AX node title/value of the matching sidebar item. URL schemes
-# embed the chat id differently.
-def url_to_needle(url):
-	if not url:
-		return ""
-	low = url.lower()
-	if low.startswith("msteams:"):
-		u = url.replace("msteams:", "https:")
-		q = urllib.parse.parse_qs(urllib.parse.urlparse(u).query)
-		return (q.get("users", [""])[0] or "").split(",")[0].lower()
-	if low.startswith("slack://"):
-		q = urllib.parse.parse_qs(urllib.parse.urlparse(url).query)
-		return (q.get("id", [""])[0] or "").lower()
-	if low.startswith("discord://"):
-		return url.rstrip("/").split("/")[-1].lower()
-	return ""
+# Override the NSApp bundle identifier so the Dock associates Edge's window
+# with our stub tile — tinted icon, not the generic Edge icon.
+export __CFBundleIdentifier="${UNIQUE_ID}"
 
-needle = url_to_needle(chat_url)
-logging.info("needle=%r", needle)
-
-# Find the running source app (Teams) by matching its bundle id or name
-# against the source app's basename.
-SOURCE_NAME = Path(source_app).stem.lower() if source_app else ""
-
-def find_source_pid():
-	if not SOURCE_NAME:
-		return None
-	for a in NSWorkspace.sharedWorkspace().runningApplications():
-		bid  = (a.bundleIdentifier() or "").lower()
-		name = (a.localizedName() or "").lower()
-		if SOURCE_NAME in name or SOURCE_NAME in bid \
-		   or "teams" in bid or "msteams" in bid:
-			return int(a.processIdentifier())
-	return None
-
-def find_source_running_app():
-	if not SOURCE_NAME:
-		return None
-	for a in NSWorkspace.sharedWorkspace().runningApplications():
-		bid  = (a.bundleIdentifier() or "").lower()
-		name = (a.localizedName() or "").lower()
-		if SOURCE_NAME in name or SOURCE_NAME in bid \
-		   or "teams" in bid or "msteams" in bid:
-			return a
-	return None
-
-# Walk an AX tree, return (title, depth) tuples. Bounded recursion to
-# protect against cyclic or pathologically deep trees.
-def walk_titles(elem, depth=0, out=None):
-	if out is None:
-		out = []
-	if depth > 18:
-		return out
-	for attr in (kAXTitleAttribute, kAXValueAttribute):
-		try:
-			err, val = AXUIElementCopyAttributeValue(elem, attr, None)
-			if err == 0 and val is not None:
-				s = str(val)
-				if s:
-					out.append((s, depth))
-		except Exception:
-			pass
-	try:
-		err, kids = AXUIElementCopyAttributeValue(elem, kAXChildrenAttribute, None)
-		if err == 0 and kids:
-			for k in kids:
-				walk_titles(k, depth + 1, out)
-	except Exception:
-		pass
-	return out
-
-# Heuristic: sidebar items whose title contains our needle are this clone's
-# chat. Adjacent nodes within a small window often hold the unread badge as
-# a digit string. Take the first plausible integer (1..999 rules out
-# year/timestamp noise).
-def count_unread(pid, needle):
-	if not needle:
-		return 0
-	ax = AXUIElementCreateApplication(pid)
-	nodes = walk_titles(ax)
-	matches = [i for i, (s, _) in enumerate(nodes) if needle in s.lower()]
-	if not matches:
-		return 0
-	for i in matches:
-		for j in range(i, min(i + 10, len(nodes))):
-			s, _ = nodes[j]
-			ss = s.strip().replace("+", "")
-			if ss.isdigit():
-				n = int(ss)
-				if 0 < n < 1000:
-					return n
-	return 0
-
-# Become the running NSApp under the clone's bundle id (inherited via
-# __CFBundleIdentifier env var set by the launcher) — and own a real
-# Dock tile under that id, with the clone's custom tinted icon.
-app = NSApplication.sharedApplication()
-app.setActivationPolicy_(NSApplicationActivationPolicyRegular)
-
-if not AXIsProcessTrusted():
-	logging.warning(
-		"Accessibility permission missing for /usr/bin/python3 — open\n"
-		"System Settings → Privacy & Security → Accessibility and enable it.\n"
-		"Until then the unread count cannot be read from Teams."
-	)
-
-def open_chat_in_source():
-	"""Launch / focus Teams and dispatch the chat URL via LaunchServices."""
-	if not source_app:
-		return
-	if chat_url and any(chat_url.lower().startswith(s) for s in (
-		"msteams:", "outlook:", "ms-outlook:", "slack:", "discord:",
-		"notion:", "spotify:", "https:", "http:")):
-		subprocess.Popen(["/usr/bin/open", "-a", source_app, chat_url])
-		logging.info("open -a %s %s", source_app, chat_url)
-	else:
-		# No URL → just bring the source app forward
-		subprocess.Popen(["/usr/bin/open", "-a", source_app])
-		logging.info("open -a %s", source_app)
-
-# AppDelegate: handle Dock-tile clicks. When user clicks the clone's Dock
-# tile (whether wrapper just launched or already running), navigate the
-# shared Teams instance to this clone's chat URL.
-class WrapperDelegate(NSObject):
-	def applicationDidFinishLaunching_(self, notification):
-		# First launch — open the chat right away
-		open_chat_in_source()
-
-	def applicationShouldHandleReopen_hasVisibleWindows_(self, sender, flag):
-		# User clicked the Dock tile while we were already running →
-		# refocus the chat in the shared Teams instance
-		open_chat_in_source()
-		return True
-
-delegate = WrapperDelegate.alloc().init()
-app.setDelegate_(delegate)
-
-# Background poller — every POLL_SECONDS, walk Teams' AX tree, find the
-# unread count for our specific chat, and write it on OUR Dock tile.
-def update_loop():
-	last = -2
-	while True:
-		try:
-			pid = find_source_pid()
-			if pid is None:
-				count = 0
-			else:
-				count = count_unread(pid, needle)
-			if count != last:
-				label = str(count) if count > 0 else ""
-				app.dockTile().setBadgeLabel_(label)
-				logging.info("badge → %r (count=%d)", label, count)
-				last = count
-		except Exception:
-			logging.exception("update_loop failed")
-		time.sleep(POLL_SECONDS)
-
-threading.Thread(target=update_loop, daemon=True).start()
-
-# Cocoa main loop — runs forever until the user quits the wrapper via
-# Cmd+Q (or the clone's Dock context menu → Quit).
-app.run()
-BADGEEOF
-	chmod +x "$RES/badge_wrapper.py"
-	log "Cocoa badge wrapper written to $RES/badge_wrapper.py"
+# --app=URL gives a chromeless single-purpose window (no tabs, no address
+# bar). --user-data-dir isolates the profile so each clone has its own
+# cookies/login. --no-first-run skips the welcome flow on first launch.
+exec "${PWA_BROWSER_EXE}" \\
+	--app="${OPEN_ARG}" \\
+	--user-data-dir="${PWA_PROFILE_DIR}" \\
+	--no-first-run \\
+	--no-default-browser-check
+PWAEOF
+	chmod +x "$LAUNCHER"
+	log "PWA launcher written → ${PWA_BROWSER_EXE} --app=${OPEN_ARG}"
+	# Skip the standard launcher generation block below.
+	APPCLONER_PWA_DONE=1
 fi
 
+if [[ "${APPCLONER_PWA_DONE:-0}" != "1" ]]; then
 cat > "$LAUNCHER" <<LAUNCHEREOF
 #!/bin/zsh
 # Generated by AppCloner. Do not edit — regenerated on each clone.
@@ -930,20 +600,6 @@ set -e
 # associates the running window with our stub tile, displaying the
 # tinted icon instead of the source app's default one.
 export __CFBundleIdentifier="${UNIQUE_ID}"
-
-# When the user enabled the unread-badge feature at clone creation, our
-# main executable becomes a Cocoa Python wrapper instead of the source
-# app directly. The wrapper owns the Dock tile (so it can write a badge
-# label there), polls Teams' Accessibility tree for the per-chat unread
-# count, and dispatches the chat URL to the shared Teams instance via
-# \`open -a\`. See badge_wrapper.py for details.
-RES_DIR="\$(dirname "\$0")/../Resources"
-if [[ -f "\$RES_DIR/badge_wrapper.py" ]]; then
-	# The wrapper uses \`open -a\` to launch the source app, which delegates
-	# arch selection to LaunchServices — no need to pass the native arch.
-	exec /usr/bin/python3 "\$RES_DIR/badge_wrapper.py" \\
-		"${UNIQUE_ID}" "${CLONE_NAME}" "${SOURCE_APP}" "${OPEN_ARG}"
-fi
 
 # Family-specific launch args. VSCode gets the full triplet so it shares
 # extensions and settings with the user's main install. Generic Electron
@@ -1005,6 +661,7 @@ wait "\$APP_PID"
 LAUNCHEREOF
 chmod +x "$LAUNCHER"
 log "launcher written (direct exec of $SRC_EXE)"
+fi  # end APPCLONER_PWA_DONE guard
 
 
 

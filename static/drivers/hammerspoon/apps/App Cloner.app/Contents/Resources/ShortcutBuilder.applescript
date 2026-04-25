@@ -166,6 +166,51 @@ on toLower(s)
 	return ((current application's NSString's stringWithString:s)'s lowercaseString()) as text
 end toLower
 
+-- Read the source app's CFBundleIdentifier so we can map known sandboxed
+-- apps (Teams, Outlook, …) to their web equivalents for PWA mode.
+on getBundleId(appPath)
+	try
+		return (do shell script "/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' " & quoted form of (appPath & "/Contents/Info.plist"))
+	on error
+		return ""
+	end try
+end getBundleId
+
+-- Decide whether the source app should default to PWA mode and what URL
+-- to pre-fill. Returns {forced, defaultURL}:
+--   forced=true  → app is known to be uncloneable natively; PWA recommended
+--   forced=false → PWA optional; defaultURL is "" unless we have a guess
+on pwaSuggestionFor(bundleId, appPath)
+	set bid to my toLower(bundleId)
+	-- Strict allowlist of apps known to require PWA mode. Source: every
+	-- macOS-sandboxed Microsoft 365 / Apple iWork client whose entitlements
+	-- are bound to a vendor team-id we can't reuse.
+	if bid contains "com.microsoft.teams" then return {true, "https://teams.microsoft.com/v2/"}
+	if bid contains "com.microsoft.outlook" then return {true, "https://outlook.office.com/mail/"}
+	if bid contains "com.microsoft.onenotemac" or bid contains "com.microsoft.onenote" then return {true, "https://www.onenote.com/notebooks"}
+	if bid contains "com.microsoft.word" then return {true, "https://www.office.com/launch/word"}
+	if bid contains "com.microsoft.excel" then return {true, "https://www.office.com/launch/excel"}
+	if bid contains "com.microsoft.powerpoint" then return {true, "https://www.office.com/launch/powerpoint"}
+	-- Best-effort suggestions for non-Microsoft apps where a web version
+	-- is just nice to have (still optional).
+	if bid contains "com.tinyspeck.slackmacgap" then return {false, "https://app.slack.com/client"}
+	if bid contains "com.hnc.discord" then return {false, "https://discord.com/app"}
+	if bid contains "notion.id" then return {false, "https://www.notion.so/"}
+	if bid contains "com.spotify.client" then return {false, "https://open.spotify.com/"}
+	return {false, ""}
+end pwaSuggestionFor
+
+-- Validate a URL specifically for PWA mode. Stricter than validateOpenArg:
+-- requires http(s) since Edge --app= only accepts navigable web URLs.
+on validatePWAURL(value)
+	if value is "" then return "L'URL de la PWA est obligatoire en mode PWA."
+	set v to my toLower(value)
+	if not (v starts with "http://" or v starts with "https://") then
+		return "L'URL doit commencer par http:// ou https:// (Edge --app= n'accepte que des URLs web)."
+	end if
+	return ""
+end validatePWAURL
+
 -- Rough text-width estimator (no NSAttributedString.size to keep it pure
 -- AppleScript). Buttons are clamped between 90 and 220 pixels.
 on measureButtonWidth(title)
@@ -487,10 +532,66 @@ on run argv
 	if cloneName is "" then set cloneName to defaultName & " Clone"
 	logmsg("cloneName: " & cloneName)
 
-	-- ===== 3) Optional launch argument =====
+	-- ===== 2.5) PWA mode detection + opt-in =====
+	-- Sandboxed apps (Teams new, Outlook for Mac, OneNote, …) cannot be
+	-- cloned at the binary level: their entitlements are bound to the
+	-- vendor's team-id and ad-hoc re-signing breaks them. The only reliable
+	-- way to run them in parallel with a separate Dock identity is to
+	-- clone the *web version* — Edge in --app= mode wrapped in our stub
+	-- bundle. We auto-detect this scenario and pre-tick the checkbox.
+	set sourceBundleId to my getBundleId(sourcePath)
+	set pwaSuggestion to my pwaSuggestionFor(sourceBundleId, sourcePath)
+	-- pwaSuggestion = {forced, defaultURL}: forced=true → recommended
+	set pwaForced to item 1 of pwaSuggestion
+	set pwaDefaultURL to item 2 of pwaSuggestion
+	set pwaMode to false
+	set pwaURL to ""
+	if pwaForced then
+		-- Recommended: explain why, ask only «PWA web app» vs «Tenter quand même»
+		set pwaAnswer to my chooseButton("Mode PWA recommandé", ¬
+			"Cette application ne peut pas être clonée au niveau binaire (sandbox + signature liée au fournisseur). Le mode PWA installe une version web isolée via Edge / Chrome avec sa propre fenêtre, son propre profil et son propre compte.", ¬
+			{"Annuler", "Tenter natif", "PWA (recommandé)"}, "App Cloner")
+		if pwaAnswer is "Annuler" then return
+		if pwaAnswer is "PWA (recommandé)" then set pwaMode to true
+	else
+		-- Not strictly required — opt-in dialog
+		set pwaAnswer to my chooseButton("Mode PWA ?", ¬
+			"Cloner via une web app (Edge / Chrome --app=URL) au lieu de relancer l'app native. Utile pour avoir des comptes vraiment séparés sans dépendance au binaire.", ¬
+			{"Annuler", "PWA web app", "Cloner l'app native"}, "App Cloner")
+		if pwaAnswer is "Annuler" then return
+		if pwaAnswer is "PWA web app" then set pwaMode to true
+	end if
+
+	if pwaMode then
+		-- Prompt for URL with auto-prefill (Teams → teams.microsoft.com etc.)
+		repeat
+			try
+				set candidate to my askText("URL de la web app à cloner. Pré-remplie pour les apps connues — modifiable.", ¬
+					pwaDefaultURL, "URL PWA", 560, 1)
+			on error
+				return
+			end try
+			set candidate to my trim(candidate)
+			set pwaErr to my validatePWAURL(candidate)
+			if pwaErr is "" then
+				set pwaURL to candidate
+				exit repeat
+			else
+				display alert "URL invalide" message pwaErr as warning
+			end if
+		end repeat
+		-- In PWA mode the URL replaces the open-arg (passed as $4 to the
+		-- shell script). Skip the open-arg step entirely.
+		set openArg to pwaURL
+	end if
+
+	-- ===== 3) Optional launch argument (native clone only) =====
 	-- Three cases: nothing, a folder (VSCode), or a free URL/path. URLs like
 	-- msteams:/l/chat/… or ms-outlook://events let Teams/Outlook/Slack/Spotify/
 	-- Notion launch directly on a specific view (chat, calendar, channel…).
+	if pwaMode then
+		-- skip — openArg already set to the PWA URL
+	else
 	tell me to activate
 	set openTypeAnswer to my chooseButton("Élément à ouvrir au lancement", ¬
 		"Optionnel — laisser à « Rien » pour simplement lancer l'app.", ¬
@@ -543,7 +644,8 @@ on run argv
 			end if
 		end repeat
 	end if
-	logmsg("openArg: " & openArg)
+	end if -- end pwaMode skip block
+	logmsg("openArg: " & openArg & "  pwaMode: " & pwaMode)
 
 	-- ===== 4) Icon style =====
 	-- The whole step is wrapped in a loop so that cancelling a sub-prompt
@@ -600,26 +702,23 @@ on run argv
 	else
 		set iconDisplay to "Personnalisée — " & iconPath
 	end if
+	set modeDisplay to "App native"
+	if pwaMode then set modeDisplay to "PWA web app (Edge / Chrome)"
 	set summary to "• Source : " & sourcePath & return ¬
 		& "• Nom    : " & cloneName & return ¬
+		& "• Mode   : " & modeDisplay & return ¬
 		& "• Icône  : " & iconDisplay & return ¬
 		& "• Ouvre  : " & openArgDisplay
 	tell me to activate
-	-- Summary screen also exposes the experimental unread-badge toggle.
-	-- Default off — implementation needs a Cocoa wrapper helper that we
-	-- spawn alongside the app, and the helper requires Accessibility
-	-- permissions (System Settings → Privacy → Accessibility).
 	set summaryResult to my customDialog("Récapitulatif", summary, ¬
-		{"Annuler", "Créer le clone"}, false, "", 0, 380, true, ¬
-		"Activer le badge unread (expérimental, Teams uniquement)")
+		{"Annuler", "Créer le clone"}, false, "", 0, 380, false, "")
 	set go to chosenButton of summaryResult
-	set badgeEnabled to checked of summaryResult
 	if go is "Annuler" then return
 
 	do shell script "chmod +x " & quoted form of cloneScript
 
-	set badgeArg to "0"
-	if badgeEnabled then set badgeArg to "1"
+	set pwaArg to "0"
+	if pwaMode then set pwaArg to "1"
 	set cmd to quoted form of cloneScript ¬
 		& " " & quoted form of sourcePath ¬
 		& " " & quoted form of cloneName ¬
@@ -627,7 +726,7 @@ on run argv
 		& " " & quoted form of openArg ¬
 		& " " & quoted form of iconMode ¬
 		& " " & quoted form of iconPath ¬
-		& " " & quoted form of badgeArg
+		& " " & quoted form of pwaArg
 	logmsg("cmd: " & cmd)
 
 	-- Run the shell script in the background, signal completion via a
