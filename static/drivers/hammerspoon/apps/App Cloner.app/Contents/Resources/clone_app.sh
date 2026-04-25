@@ -566,6 +566,74 @@ if [[ "$PWA_MODE" == "1" ]]; then
 	PWA_PROFILE_DIR="$HOME/Library/Application Support/AppCloner/${safe_name}_pwa"
 	mkdir -p "$PWA_PROFILE_DIR"
 
+
+
+
+	# ====================================================================
+	# ===== 6.b.1) Full Edge bundle clone via APFS copy-on-write =====
+	# ====================================================================
+
+	# We replace the lightweight stub bundle with an APFS clone of Edge.app.
+	# Why: when Edge runs from /Applications/Microsoft Edge.app/Contents/MacOS/...,
+	# Cocoa's mainBundle() resolves to Edge.app — Mission Control, Space pinning,
+	# and NSRunningApplication.localizedName all see "Microsoft Edge", regardless
+	# of __CFBundleIdentifier env tricks. The only fix is to make Edge's
+	# executable LIVE INSIDE our bundle, so mainBundle() resolves to OUR path.
+	#
+	# `cp -c` uses APFS clonefile() — disk usage is ~0 bytes initially, content
+	# is shared with the original Edge.app via copy-on-write. Cloning a 700 MB
+	# Edge bundle takes < 1 second and uses no extra disk until the user (or an
+	# Edge update) modifies files.
+	log "PWA full-clone: APFS-cloning $PWA_BROWSER → $DEST"
+
+	# Save our tinted icon before we wipe the stub bundle.
+	SAVED_TINTED_ICON="$TMPDIR_WORK/saved_AppIcon.icns"
+	cp "$RES/AppIcon.icns" "$SAVED_TINTED_ICON"
+
+	rm -rf "$DEST"
+	cp -c -R "$PWA_BROWSER" "$DEST"
+
+	# Restore our icon over Edge's icon. We also patch CFBundleIconFile to
+	# point at AppIcon.icns regardless of what Edge was using (saves us from
+	# tracking Edge's per-version icon naming).
+	cp "$SAVED_TINTED_ICON" "$DEST/Contents/Resources/AppIcon.icns"
+
+	# Patch the cloned Info.plist with our identity. mainBundle.bundleIdentifier
+	# now returns our clone id — Mission Control, LaunchServices, the Dock and
+	# Space pinning all see this app as ours, not Edge.
+	INFO_PLIST="$DEST/Contents/Info.plist"
+	/usr/libexec/PlistBuddy -c "Set :CFBundleIdentifier $UNIQUE_ID" "$INFO_PLIST" 2>>"$DIAG"
+	/usr/libexec/PlistBuddy -c "Set :CFBundleName $CLONE_NAME"     "$INFO_PLIST" 2>>"$DIAG"
+	/usr/libexec/PlistBuddy -c "Set :CFBundleDisplayName $CLONE_NAME" "$INFO_PLIST" 2>/dev/null \
+		|| /usr/libexec/PlistBuddy -c "Add :CFBundleDisplayName string $CLONE_NAME" "$INFO_PLIST" 2>>"$DIAG"
+	/usr/libexec/PlistBuddy -c "Set :CFBundleIconFile AppIcon"     "$INFO_PLIST" 2>>"$DIAG"
+	/usr/libexec/PlistBuddy -c "Set :CFBundleExecutable launcher"  "$INFO_PLIST" 2>>"$DIAG"
+	# Strip URL handlers Edge registers — we don't want our clone to claim
+	# http(s)/microsoft-edge:// associations system-wide.
+	/usr/libexec/PlistBuddy -c "Delete :CFBundleURLTypes"          "$INFO_PLIST" 2>/dev/null || true
+	/usr/libexec/PlistBuddy -c "Delete :CFBundleDocumentTypes"     "$INFO_PLIST" 2>/dev/null || true
+	log "Info.plist patched: id=$UNIQUE_ID name=$CLONE_NAME exe=launcher"
+
+	# Re-establish the path variables now that $DEST has been recreated.
+	CONTENTS="$DEST/Contents"
+	MACOS="$CONTENTS/MacOS"
+	RES="$CONTENTS/Resources"
+	LAUNCHER="$MACOS/launcher"
+
+	# The cloned Edge binary keeps its original filename inside our bundle.
+	# Our launcher exec's it directly.
+	EDGE_BIN_IN_BUNDLE="$MACOS/$PWA_BROWSER_EXE_NAME"
+	if [[ ! -x "$EDGE_BIN_IN_BUNDLE" ]]; then
+		echo "Error: cloned Edge binary missing at $EDGE_BIN_IN_BUNDLE"; exit 1
+	fi
+
+
+
+
+	# ===========================================================
+	# ===== 6.b.2) Generate the Swift NSApplication launcher =====
+	# ===========================================================
+
 	# Compile a real Cocoa NSApplication launcher in Swift. This is the only
 	# reliable singleton mechanism for an .app bundle: macOS guarantees a single
 	# NSApplication instance per bundle-id and dispatches kAEReopenApplication
@@ -586,7 +654,7 @@ import Foundation
 import CoreGraphics
 
 let PROFILE_DIR        = "${PWA_PROFILE_DIR}"
-let BROWSER_EXE        = "${PWA_BROWSER_EXE}"
+let BROWSER_EXE        = "${EDGE_BIN_IN_BUNDLE}"
 let OPEN_ARG           = "${OPEN_ARG}"
 let UNIQUE_ID          = "${UNIQUE_ID}"
 let LOG_FILE           = "/tmp/appcloner_pwa_\(UNIQUE_ID).log"
@@ -738,10 +806,11 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 		// time. The hint file is no longer consumed; we read it forever.
 		let targetSpaceID = resolveTargetSpaceID()
 
-		// Launch Edge as a child process. __CFBundleIdentifier overrides Edge's
-		// own bundle-id so LaunchServices registers Edge under our clone's id —
-		// this prevents a duplicate Edge tile from appearing in the Dock alongside
-		// our cloned-app tile.
+		// Launch Edge as a child process. The Edge binary lives INSIDE our
+		// cloned bundle, so Cocoa's mainBundle() resolves to our bundle —
+		// CFBundleName, CFBundleIdentifier, icon, and Space pinning all come
+		// from our patched Info.plist. No __CFBundleIdentifier env override
+		// needed anymore.
 		let p = Process()
 		p.executableURL = URL(fileURLWithPath: BROWSER_EXE)
 		p.arguments = [
@@ -752,9 +821,6 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 			"--disable-features=DesktopPWAsLinkCapturing,WebAppEnableUrlHandling",
 			"--disable-default-apps",
 		]
-		var env = ProcessInfo.processInfo.environment
-		env["__CFBundleIdentifier"] = UNIQUE_ID
-		p.environment = env
 
 		if !FileManager.default.fileExists(atPath: LOG_FILE) {
 			FileManager.default.createFile(atPath: LOG_FILE, contents: nil)
@@ -939,11 +1005,19 @@ fi  # end APPCLONER_PWA_DONE guard
 # ===========================================
 # ===========================================
 
-# Tiny bundle, shell-script executable, no hardened runtime, no entitlements.
-# codesign handles it in < 1 s and macOS Tahoe's CodeSigningMonitor has no
-# notarized baseline to compare against — nothing for it to flag.
-codesign --force --sign - "$DEST" >> "$DIAG" 2>&1 || true
-log "stub signed"
+# For stub bundles: tiny, no hardened runtime — codesign in < 1 s.
+# For PWA full clones: --deep is required so codesign also re-stamps every
+# nested helper, framework and library. Without --deep, the cloned Edge
+# helpers keep Microsoft's signatures (still valid individually) but the
+# top-level bundle's seal does not include them, and Gatekeeper rejects launch.
+if [[ "$PWA_MODE" == "1" ]]; then
+	log "Re-signing full Edge clone with --deep (this may take a few seconds)…"
+	codesign --force --deep --sign - "$DEST" >> "$DIAG" 2>&1 || true
+	log "PWA clone signed"
+else
+	codesign --force --sign - "$DEST" >> "$DIAG" 2>&1 || true
+	log "stub signed"
+fi
 
 fi  # end APPCLONER_SKIP_STUB guard
 
