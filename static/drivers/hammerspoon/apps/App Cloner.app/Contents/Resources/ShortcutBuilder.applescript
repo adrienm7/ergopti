@@ -100,7 +100,7 @@ end btn4Clicked:
 
 -- Repaints the icon preview using the current colour-well value. Pure
 -- AppleScript handler so it can be invoked both directly (initial render)
--- and from the ObjC selector wrapper below — `my methodName:arg` is
+-- and from the ObjC selector wrapper below — "my methodName:arg" is
 -- syntactically fragile in osascript, so we go through a regular handler.
 on doUpdatePreview()
 	if (my tintPreviewColorWell) is missing value then return
