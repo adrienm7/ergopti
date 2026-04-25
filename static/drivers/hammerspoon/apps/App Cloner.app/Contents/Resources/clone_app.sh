@@ -176,8 +176,48 @@ if [[ "$ICON_MODE" == "custom" && -n "$ICON_PATH" && -f "$ICON_PATH" ]]; then
 			[[ -f "$ICONSET_TMP/${sz}.png" ]] && cp "$ICONSET_TMP/${sz}.png" "$BASE_PNG" && break
 		done
 	else
-		# Convert anything else to a 1024-square PNG. sips silently scales+pads.
-		sips -s format png -z 1024 1024 "$ICON_PATH" --out "$BASE_PNG" >/dev/null 2>&1 || true
+		# Convert anything else to a 1024-square PNG with a pure-white background.
+		# sips -z pads transparent areas with a grayish tint; Python + AppKit lets us
+		# fill the canvas with #FFFFFF before compositing the image on top.
+		python3 - "$ICON_PATH" "$BASE_PNG" <<'CUSTOMICONEOF' 2>/dev/null || true
+import sys
+from AppKit import (
+	NSImage, NSBitmapImageRep, NSPNGFileType,
+	NSGraphicsContext, NSColor, NSCompositingOperationSourceOver, NSBezierPath
+)
+from Foundation import NSMakeRect
+
+src, dst = sys.argv[1], sys.argv[2]
+img = NSImage.alloc().initWithContentsOfFile_(src)
+if img is None:
+	sys.exit(1)
+
+target = 1024
+w = img.size().width
+h = img.size().height
+scale = target / max(w, h, 1)
+nw, nh = int(w * scale), int(h * scale)
+x, y = (target - nw) // 2, (target - nh) // 2
+
+bitmap = NSBitmapImageRep.alloc().initWithBitmapDataPlanes_pixelsWide_pixelsHigh_bitsPerSample_samplesPerPixel_hasAlpha_isPlanar_colorSpaceName_bytesPerRow_bitsPerPixel_(
+	None, target, target, 8, 4, True, False, "NSDeviceRGBColorSpace", 0, 32
+)
+ctx = NSGraphicsContext.graphicsContextWithBitmapImageRep_(bitmap)
+NSGraphicsContext.saveGraphicsState()
+NSGraphicsContext.setCurrentContext_(ctx)
+# Pure white canvas — avoids the grayish tint sips leaves on transparent areas
+NSColor.whiteColor().setFill()
+NSBezierPath.fillRect_(NSMakeRect(0, 0, target, target))
+img.drawInRect_fromRect_operation_fraction_respectFlipped_hints_(
+	NSMakeRect(x, y, nw, nh),
+	NSMakeRect(0, 0, 0, 0),
+	NSCompositingOperationSourceOver,
+	1.0, True, None
+)
+NSGraphicsContext.restoreGraphicsState()
+png = bitmap.representationUsingType_properties_(NSPNGFileType, None)
+png.writeToFile_atomically_(dst, True)
+CUSTOMICONEOF
 	fi
 	if [[ -f "$BASE_PNG" ]]; then
 		log "Custom icon source: $ICON_PATH"

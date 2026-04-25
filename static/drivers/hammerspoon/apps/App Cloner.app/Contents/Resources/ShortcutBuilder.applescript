@@ -49,6 +49,10 @@ property panelChecked : false
 property panelInputView : missing value
 property panelCheckboxView : missing value
 property panelIsTextView : false  -- true for NSTextView, false for NSTextField
+-- State for the live tint preview panel (showTintColorPicker)
+property tintPreviewImageView : missing value
+property tintPreviewColorWell : missing value
+property tintPreviewSourceImage : missing value
 
 on captureDialogValues()
 	-- `my` qualifier is mandatory inside handlers; without it, AppleScript
@@ -93,6 +97,18 @@ on btn4Clicked:sender
 	set my panelResult to 4
 	(current application's NSApplication's sharedApplication())'s stopModal()
 end btn4Clicked:
+
+-- Timer callback — polls the NSColorWell every 80 ms and updates the icon preview.
+on updateTintPreview:sender
+	if (my tintPreviewColorWell) is missing value then return
+	if (my tintPreviewImageView) is missing value then return
+	if (my tintPreviewSourceImage) is missing value then return
+	try
+		set currentColor to (my tintPreviewColorWell)'s color()
+		set tinted to my tintedIconImage((my tintPreviewSourceImage), currentColor)
+		(my tintPreviewImageView)'s setImage:tinted
+	end try
+end updateTintPreview:
 
 -- Strip leading and trailing whitespace (spaces, tabs, CR/LF). Pure
 -- AppleScript implementation to avoid spawning a shell.
@@ -446,6 +462,132 @@ on chooseButton(headerText, bodyText, buttonList, dialogTitle)
 	return chosenButton of r
 end chooseButton
 
+-- Render a 128×128 NSImage with the given tint color overlaid using
+-- NSCompositingOperationSourceAtop: the fill only paints where the original
+-- icon has non-zero alpha, so the icon shape and transparency are preserved.
+on tintedIconImage(srcImage, tintColor)
+	set sz to current application's NSMakeSize(128, 128)
+	set tinted to current application's NSImage's alloc()'s initWithSize:sz
+	tinted's lockFocus()
+	set destRect to current application's NSMakeRect(0, 0, 128, 128)
+	-- Draw the original icon at full opacity
+	srcImage's drawInRect:destRect fromRect:(current application's NSZeroRect) operation:2 fraction:1.0
+	-- Overlay the tint colour at 50% alpha using sourceAtop compositing (value 5)
+	-- so the tint respects the icon's own alpha channel
+	set ctx to current application's NSGraphicsContext's currentContext()
+	ctx's saveGraphicsState()
+	ctx's setCompositingOperation:5
+	(tintColor's colorWithAlphaComponent:0.5)'s setFill()
+	(current application's NSBezierPath's fillRect:destRect)
+	ctx's restoreGraphicsState()
+	tinted's unlockFocus()
+	return tinted
+end tintedIconImage
+
+-- Custom colour-picker dialog with a live 128×128 icon preview.
+-- An NSTimer fires every 80 ms, reads the NSColorWell's current colour, and
+-- repaints the preview — giving immediate visual feedback as the user drags
+-- sliders in the system colour panel.
+-- Returns the chosen NSColor, or missing value when the user clicks Retour.
+on showTintColorPicker(appPath)
+	set ws to current application's NSWorkspace's sharedWorkspace()
+	set srcImage to ws's iconForFile:appPath
+	set my tintPreviewSourceImage to srcImage
+
+	-- Panel: titled only (no close button) — forces the user to use the buttons
+	-- so the modal loop can never get stuck if the window is X-closed.
+	set pW to 300
+	set pH to 320
+	set pickerPanel to current application's NSPanel's alloc()'s initWithContentRect:(current application's NSMakeRect(0, 0, pW, pH)) styleMask:1 backing:2 defer:false
+	pickerPanel's setTitle:"App Cloner"
+	pickerPanel's |center|()
+	pickerPanel's setReleasedWhenClosed:false
+	set cv to pickerPanel's contentView()
+
+	-- Header
+	set hLabel to current application's NSTextField's alloc()'s initWithFrame:(current application's NSMakeRect(16, pH - 42, pW - 32, 22))
+	hLabel's setStringValue:"Teinte de couleur"
+	hLabel's setFont:(current application's NSFont's boldSystemFontOfSize:14)
+	hLabel's setBordered:false
+	hLabel's setEditable:false
+	hLabel's setDrawsBackground:false
+	cv's addSubview:hLabel
+
+	-- Subtitle
+	set bLabel to current application's NSTextField's alloc()'s initWithFrame:(current application's NSMakeRect(16, pH - 62, pW - 32, 16))
+	bLabel's setStringValue:"Aperçu en temps réel — cliquez sur la couleur pour la modifier."
+	bLabel's setFont:(current application's NSFont's systemFontOfSize:11)
+	bLabel's setBordered:false
+	bLabel's setEditable:false
+	bLabel's setDrawsBackground:false
+	cv's addSubview:bLabel
+
+	-- Icon preview (128×128, horizontally centred)
+	set imgSize to 128
+	set imgX to (pW - imgSize) / 2
+	set imgY to pH - 62 - 12 - imgSize
+	set imgView to current application's NSImageView's alloc()'s initWithFrame:(current application's NSMakeRect(imgX, imgY, imgSize, imgSize))
+	imgView's setImage:srcImage
+	imgView's setImageScaling:3
+	cv's addSubview:imgView
+	set my tintPreviewImageView to imgView
+
+	-- Colour well (centred, below icon)
+	set cwW to 64
+	set cwH to 32
+	set cwX to (pW - cwW) / 2
+	set cwY to imgY - 12 - cwH
+	set colorWell to current application's NSColorWell's alloc()'s initWithFrame:(current application's NSMakeRect(cwX, cwY, cwW, cwH))
+	-- Seed with a vivid red so the tint effect is visible immediately
+	colorWell's setColor:(current application's NSColor's colorWithSRGBRed:0.8 green:0.0 blue:0.0 alpha:1.0)
+	cv's addSubview:colorWell
+	set my tintPreviewColorWell to colorWell
+
+	-- Buttons
+	set btnY to 16
+	set btnH to 28
+	set btnW to 90
+	set valBtn to current application's NSButton's alloc()'s initWithFrame:(current application's NSMakeRect(pW - 16 - btnW, btnY, btnW, btnH))
+	valBtn's setTitle:"Valider"
+	valBtn's setBezelStyle:1
+	valBtn's setTarget:me
+	valBtn's setAction:"btn2Clicked:"
+	valBtn's setKeyEquivalent:return
+	cv's addSubview:valBtn
+
+	set retBtn to current application's NSButton's alloc()'s initWithFrame:(current application's NSMakeRect(16, btnY, btnW, btnH))
+	retBtn's setTitle:"Retour"
+	retBtn's setBezelStyle:1
+	retBtn's setTarget:me
+	retBtn's setAction:"btn1Clicked:"
+	retBtn's setKeyEquivalent:(character id 27)
+	cv's addSubview:retBtn
+
+	-- Render initial preview before showing the panel
+	my updateTintPreview:(missing value)
+
+	-- Start polling timer. NSRunLoopCommonModes includes NSModalPanelRunLoopMode
+	-- so the timer fires even while runModalForWindow: is blocking the thread.
+	set my panelResult to 0
+	set my panelInputView to missing value
+	set my panelCheckboxView to missing value
+	set theTimer to current application's NSTimer's timerWithTimeInterval:0.08 target:me selector:"updateTintPreview:" userInfo:(missing value) repeats:true
+	(current application's NSRunLoop's mainRunLoop())'s addTimer:theTimer forMode:"NSRunLoopCommonModes"
+
+	(current application's NSApplication's sharedApplication())'s runModalForWindow:pickerPanel
+	pickerPanel's orderOut:(missing value)
+
+	-- Tear down timer and clear shared preview state
+	theTimer's invalidate()
+	set my tintPreviewImageView to missing value
+	set my tintPreviewColorWell to missing value
+	set my tintPreviewSourceImage to missing value
+
+	-- btn1 = Retour, btn2 = Valider
+	if my panelResult is not 2 then return missing value
+	return colorWell's color()
+end showTintColorPicker
+
 on installEditMenu()
 	try
 		-- NSApp is a C global, not a property; in AppleScript-ObjC we have to
@@ -756,15 +898,19 @@ on run argv
 						set step to 4
 						set iconChosen to true -- exit inner loop; outer repeat re-enters step 4
 					else if iconChoice is "Teinte couleur" then
-						try
-							set colorList to choose color default color {52428, 0, 0}
+						set chosenNSColor to my showTintColorPicker(sourcePath)
+						if chosenNSColor is not missing value then
+							-- Convert sRGB float components (0.0–1.0) to 16-bit integers for rgbToHex
+							set rgbColor to chosenNSColor's colorUsingColorSpace:(current application's NSColorSpace's sRGBColorSpace())
+							set r16 to (((rgbColor's redComponent()) * 65535.0) as integer)
+							set g16 to (((rgbColor's greenComponent()) * 65535.0) as integer)
+							set b16 to (((rgbColor's blueComponent()) * 65535.0) as integer)
 							set iconMode to "tint"
-							set colorHex to my rgbToHex(item 1 of colorList, item 2 of colorList, item 3 of colorList)
+							set colorHex to my rgbToHex(r16, g16, b16)
 							set step to 6
 							set iconChosen to true
-						on error
-							-- Color picker cancelled → re-loop to style chooser
-						end try
+						end if
+						-- missing value means Retour → iconChosen stays false, re-loop to style chooser
 					else if iconChoice is "Noir & blanc" then
 						set iconMode to "bw"
 						-- Color ignored downstream but shell expects a non-empty placeholder
@@ -814,7 +960,7 @@ on run argv
 			tell me to activate
 			try
 				set summaryResult to my customDialog("Récapitulatif", summary, ¬
-					{"Retour", "Créer le clone"}, false, "", 0, 380, false, "")
+					{"Retour", "Cloner l'application"}, false, "", 0, 380, false, "")
 				if (chosenButton of summaryResult) is "Retour" then
 					set step to 5
 				else
