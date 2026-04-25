@@ -585,14 +585,12 @@ on run argv
 				set candidate to my askText(¬
 					"URL à ouvrir dans la PWA (Enter pour valider) :" & return & return & ¬
 					"── Microsoft Teams ──────────────────────────────" & return & ¬
-					"App entière     : https://teams.microsoft.com/v2/" & return & ¬
-					"Conversation    : Teams → conv → ⋯ → « Copier le lien »" & return & ¬
-					"                  https://teams.microsoft.com/l/chat/…" & return & ¬
-					"Canal           : clic-droit canal → « Lien vers le canal »" & return & ¬
-					"                  https://teams.microsoft.com/l/channel/…" & return & return & ¬
+					"App entière : https://teams.microsoft.com/v2/" & return & ¬
+					"Conversation : Teams → conv → ⋯ → « Copier le lien » → https://teams.microsoft.com/l/chat/…" & return & ¬
+					"Canal : clic-droit canal → « Lien vers le canal » → https://teams.microsoft.com/l/channel/…" & return & return & ¬
 					"── Outlook ──────────────────────────────────────" & return & ¬
 					"Boîte de réception : https://outlook.office.com/mail/" & return & ¬
-					"Calendrier         : https://outlook.office.com/calendar/", ¬
+					"Calendrier : https://outlook.office.com/calendar/", ¬
 					pwaDefaultURL, "URL PWA", 600, -1)
 			on error
 				return
