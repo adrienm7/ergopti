@@ -404,8 +404,18 @@ if [[ -n "\$OPEN_ARG" ]]; then
 	ARGS+=("\$OPEN_ARG")
 fi
 
+# Force the native architecture. VSCode ships a universal Mach-O (x86_64 +
+# arm64); without an explicit \`arch\` selector, the kernel inherits the
+# parent shell's arch, which on Apple Silicon can stick the process to
+# Rosetta x86_64 if the launcher's parent (Dock/launchd) was forked from
+# any x86 process earlier in the tree. \`uname -m\` returns the host
+# native arch (arm64 on M-series, x86_64 on Intel). On Apple Silicon
+# this guarantees we run native arm64 — same perf as the user's main
+# VSCode rather than emulated x86_64.
+NATIVE_ARCH="\$(uname -m)"
+
 # Direct exec — no \`open\`, no LaunchServices scrubbing of our env
-exec "${SRC_EXE}" "\${ARGS[@]}"
+exec /usr/bin/arch -"\$NATIVE_ARCH" "${SRC_EXE}" "\${ARGS[@]}"
 LAUNCHEREOF
 chmod +x "$LAUNCHER"
 log "launcher written (direct exec of $SRC_EXE)"
