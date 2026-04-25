@@ -34,6 +34,12 @@ use scripting additions
 -- captured input/checkbox values here so customDialog() can read them back
 -- after the modal returns.
 script DialogState
+	-- This `parent` declaration makes DialogState an actual NSObject subclass
+	-- in the Cocoa runtime — without it, `setTarget:DialogState` registers a
+	-- target that Cocoa can't dispatch to, and every button click is dropped
+	-- silently. With it, AppleScript's btnXClicked: handlers map to Cocoa
+	-- selectors of the same name and the responder chain works.
+	property parent : class "NSObject"
 	property panelResult : 0          -- 1-based button index, 0 if cancelled
 	property panelInputText : ""
 	property panelChecked : false

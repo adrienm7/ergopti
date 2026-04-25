@@ -510,97 +510,220 @@ case "$APP_FAMILY" in
 		LAUNCHER_ARGS_LITERAL='ARGS=()' ;;
 esac
 
-# Optional unread-badge helper — written into the bundle when BADGE_ENABLED=1.
-# Polls macOS Accessibility every few seconds to read Teams' sidebar unread
-# count for OUR specific chat (matched by the URL stored in OPEN_ARG), and
-# dumps the result to a per-clone log file. The actual Dock-badge surface
-# requires a Cocoa wrapper that owns the NSDockTile of UNIQUE_ID — out of
-# scope for the shell stub. This helper is the data source the wrapper
-# would consume; today it lets the user verify that the chat detection
-# heuristics work on their Teams build.
+# Per-clone unread-badge helper — generated when BADGE_ENABLED=1.
+#
+# Architecture decision: the macOS Dock badge can only be set by the
+# process that owns the corresponding NSDockTile, and Teams owns its
+# own tile. We can't override it without a full Cocoa wrapper that
+# competes with Teams for the tile, which would either lose the race
+# or duplicate Dock entries. Instead, the helper surfaces the per-clone
+# unread count as a NSStatusItem in the macOS menu bar — always visible,
+# zero conflict with Teams, no extra Dock tile.
+#
+# Display: ⚪ NomDuClone        → 0 unread
+#          🔴 NomDuClone (3)    → 3 unread for this chat
+#          ⚫ NomDuClone        → Teams not running
+#          ⚠ NomDuClone         → Accessibility permission missing
 if [[ "$BADGE_ENABLED" == "1" ]]; then
 	cat > "$RES/badge_helper.py" <<'BADGEEOF'
 #!/usr/bin/env python3
-"""Per-clone unread-count poller for Microsoft Teams.
+"""Per-clone unread-count menu bar daemon.
 
-Reads the chat URL from argv, then every POLL_INTERVAL seconds tries to:
-  1. Find the running Teams process via NSWorkspace
-  2. Walk the Teams window's Accessibility tree to find a sidebar item
-     whose label matches the chat name
-  3. Read its unread-count badge value
-  4. Append the count to ~/Library/Logs/AppCloner/<clone-id>.log
+Spawned in the background by the clone's launcher. Lives as long as the
+parent (Teams) process. Polls macOS Accessibility every POLL_SECONDS to
+count unread messages for the conversation matching the clone's URL,
+and updates an NSStatusItem in the menu bar with the result.
 
-This is the data layer for the future Dock-badge feature. The Dock
-itself can only be badged from the process owning that bundle's
-NSDockTile, which would be a Cocoa wrapper to be built separately.
+Args (positional):
+  1. clone_id    — bundle identifier (used as log file name)
+  2. clone_name  — displayed next to the count in the menu bar
+  3. chat_url    — URL configured at clone creation (msteams:/...)
+  4. parent_pid  — exit when this process dies (the launcher's PID)
 """
-import sys, os, time, urllib.parse, logging
+import os, sys, time, threading, urllib.parse, logging
 from pathlib import Path
 
-POLL_INTERVAL = 5
-chat_url    = sys.argv[1] if len(sys.argv) > 1 else ""
-clone_id    = sys.argv[2] if len(sys.argv) > 2 else "unknown"
-log_dir     = Path.home() / "Library" / "Logs" / "AppCloner"
+clone_id   = sys.argv[1] if len(sys.argv) > 1 else "unknown"
+clone_name = sys.argv[2] if len(sys.argv) > 2 else "Clone"
+chat_url   = sys.argv[3] if len(sys.argv) > 3 else ""
+parent_pid = int(sys.argv[4]) if len(sys.argv) > 4 else os.getppid()
+
+POLL_SECONDS = 5
+log_dir = Path.home() / "Library" / "Logs" / "AppCloner"
 log_dir.mkdir(parents=True, exist_ok=True)
 logging.basicConfig(
 	filename=log_dir / f"{clone_id}.log",
 	level=logging.INFO,
 	format="%(asctime)s %(message)s",
 )
-
-# Extract the conversation hint from the URL. msteams:/l/chat/0/0?users=foo@x
-# → "foo@x"; we'll match this against sidebar item labels.
-needle = ""
-if "msteams:" in chat_url:
-	parsed = urllib.parse.urlparse(chat_url.replace("msteams:", "https:"))
-	q = urllib.parse.parse_qs(parsed.query)
-	needle = (q.get("users", [""])[0] or "").split(",")[0].lower()
-logging.info("badge_helper start, needle=%r", needle)
+logging.info("start  pid=%d  parent=%d  clone=%s  chat=%s",
+             os.getpid(), parent_pid, clone_id, chat_url)
 
 try:
-	from AppKit import NSWorkspace
+	from AppKit import (
+		NSApplication, NSStatusBar, NSWorkspace,
+		NSApplicationActivationPolicyAccessory,
+	)
 	from ApplicationServices import (
 		AXUIElementCreateApplication, AXUIElementCopyAttributeValue,
 		kAXChildrenAttribute, kAXTitleAttribute, kAXValueAttribute,
+		AXIsProcessTrusted,
 	)
 except ImportError as e:
-	logging.error("PyObjC missing: %s — install via `pip3 install pyobjc`", e)
+	logging.error("PyObjC unavailable: %s", e)
 	sys.exit(1)
+
+NSVariableStatusItemLength = -1.0
+
+# Resolve a "needle" from the chat URL — the substring we expect to find
+# in the AX node title or value of the matching sidebar item. Each URL
+# scheme has its own embedding for the chat identifier.
+def url_to_needle(url):
+	if not url:
+		return ""
+	low = url.lower()
+	if low.startswith("msteams:"):
+		u = url.replace("msteams:", "https:")
+		q = urllib.parse.parse_qs(urllib.parse.urlparse(u).query)
+		users = (q.get("users", [""])[0] or "").split(",")[0]
+		return users.lower()
+	if low.startswith("slack://"):
+		q = urllib.parse.parse_qs(urllib.parse.urlparse(url).query)
+		return (q.get("id", [""])[0] or "").lower()
+	if low.startswith("discord://"):
+		return url.rstrip("/").split("/")[-1].lower()
+	return ""
+
+needle = url_to_needle(chat_url)
+logging.info("needle=%r", needle)
 
 def find_teams_pid():
 	for app in NSWorkspace.sharedWorkspace().runningApplications():
-		bid = app.bundleIdentifier() or ""
-		if "teams" in bid.lower() or "MSTeams" in (app.localizedName() or ""):
-			return app.processIdentifier()
+		bid  = (app.bundleIdentifier() or "").lower()
+		name = (app.localizedName() or "").lower()
+		if "teams" in bid or "msteams" in bid or "teams" in name:
+			return int(app.processIdentifier())
 	return None
 
-def walk(elem, depth=0):
-	"""Yield (title, value) for every accessibility node under elem."""
-	if depth > 12:
-		return
+# Walk Teams' Accessibility tree, return (title, depth) for every node.
+# Bounded recursion to prevent loops in pathological trees.
+def walk_titles(elem, depth=0, out=None):
+	if out is None:
+		out = []
+	if depth > 18:
+		return out
 	for attr in (kAXTitleAttribute, kAXValueAttribute):
-		err, val = AXUIElementCopyAttributeValue(elem, attr, None)
-		if err == 0 and val:
-			yield (str(val),)
-	err, kids = AXUIElementCopyAttributeValue(elem, kAXChildrenAttribute, None)
-	if err == 0 and kids:
-		for k in kids:
-			yield from walk(k, depth + 1)
-
-while True:
+		try:
+			err, val = AXUIElementCopyAttributeValue(elem, attr, None)
+			if err == 0 and val is not None:
+				s = str(val)
+				if s:
+					out.append((s, depth))
+		except Exception:
+			pass
 	try:
-		pid = find_teams_pid()
-		if pid is None:
-			logging.info("teams not running — sleeping")
-		else:
-			ax = AXUIElementCreateApplication(pid)
-			matches = [s for (s,) in walk(ax) if needle and needle in s.lower()]
-			logging.info("matched %d nodes for needle=%r", len(matches), needle)
-			# TODO: extract the integer from a sibling badge node and surface
-			# it via XPC to the Cocoa wrapper that owns the Dock tile.
-	except Exception as e:
-		logging.exception("poll failed: %s", e)
-	time.sleep(POLL_INTERVAL)
+		err, kids = AXUIElementCopyAttributeValue(elem, kAXChildrenAttribute, None)
+		if err == 0 and kids:
+			for k in kids:
+				walk_titles(k, depth + 1, out)
+	except Exception:
+		pass
+	return out
+
+# Heuristic: nodes whose title contains our needle are sidebar entries
+# for our chat. Adjacent nodes within a small window often hold the
+# unread badge as a digit string. Take the first plausible integer
+# (1-999, ruling out years/timestamps).
+def count_unread(pid, needle):
+	if not needle:
+		return 0
+	ax = AXUIElementCreateApplication(pid)
+	nodes = walk_titles(ax)
+	matches = [i for i, (s, _) in enumerate(nodes) if needle in s.lower()]
+	if not matches:
+		return 0
+	for i in matches:
+		for j in range(i, min(i + 10, len(nodes))):
+			s, _ = nodes[j]
+			ss = s.strip().replace("+", "")
+			if ss.isdigit():
+				n = int(ss)
+				if 0 < n < 1000:
+					return n
+	return 0
+
+# Cocoa NSApp setup with no Dock tile (Accessory) — only a menu bar
+# item, no extra icon next to the clone's Dock entry.
+app = NSApplication.sharedApplication()
+app.setActivationPolicy_(NSApplicationActivationPolicyAccessory)
+
+status_bar  = NSStatusBar.systemStatusBar()
+status_item = status_bar.statusItemWithLength_(NSVariableStatusItemLength)
+
+def set_label(text):
+	# .button() is the modern API (10.10+). Fall back to setTitle_ on the
+	# item itself for legacy macOS.
+	try:
+		btn = status_item.button()
+		if btn is not None:
+			btn.setTitle_(text)
+			return
+	except Exception:
+		pass
+	try:
+		status_item.setTitle_(text)
+	except Exception:
+		pass
+
+set_label(f"⚪ {clone_name}")
+
+if not AXIsProcessTrusted():
+	logging.warning(
+		"Accessibility permission not granted to /usr/bin/python3.\n"
+		"Open System Settings → Privacy & Security → Accessibility,\n"
+		"and add /usr/bin/python3 (or your python3 binary)."
+	)
+	set_label(f"⚠ {clone_name}")
+
+# Polling loop in a background thread — keeps the NSApp main thread
+# free for menu bar event handling.
+def update_loop():
+	last = -2
+	while True:
+		try:
+			pid = find_teams_pid()
+			if pid is None:
+				new_label = f"⚫ {clone_name}"
+				count = -1
+			else:
+				count = count_unread(pid, needle)
+				if count > 0:
+					new_label = f"🔴 {clone_name} ({count})"
+				else:
+					new_label = f"⚪ {clone_name}"
+			if count != last:
+				set_label(new_label)
+				logging.info("→ %s", new_label)
+				last = count
+		except Exception:
+			logging.exception("poll failed")
+		time.sleep(POLL_SECONDS)
+
+# Watchdog: when the launcher (and thus Teams) exits, exit too —
+# no orphan menu bar items lingering after Teams is quit.
+def watch_parent():
+	while True:
+		try:
+			os.kill(parent_pid, 0)
+		except OSError:
+			logging.info("parent %d exited — quitting helper", parent_pid)
+			os._exit(0)
+		time.sleep(2)
+
+threading.Thread(target=update_loop, daemon=True).start()
+threading.Thread(target=watch_parent, daemon=True).start()
+
+app.run()
 BADGEEOF
 	chmod +x "$RES/badge_helper.py"
 	log "Badge helper written to $RES/badge_helper.py"
@@ -616,11 +739,12 @@ set -e
 # tinted icon instead of VSCode's default blue one beside ours.
 export __CFBundleIdentifier="${UNIQUE_ID}"
 
-# If badging is enabled, kick off the per-clone unread poller in the
-# background. It writes detection results to ~/Library/Logs/AppCloner/
-# but does not yet touch the Dock tile (see badge_helper.py header).
+# If badging is enabled, spawn the menu bar helper in the background.
+# Args: clone_id, clone_name, chat_url, our PID (so it auto-exits when
+# this launcher / Teams process dies).
 if [[ "${BADGE_ENABLED}" == "1" ]] && [[ -f "${RES}/badge_helper.py" ]]; then
-	/usr/bin/python3 "${RES}/badge_helper.py" "${OPEN_ARG}" "${UNIQUE_ID}" &
+	/usr/bin/python3 "${RES}/badge_helper.py" \\
+		"${UNIQUE_ID}" "${CLONE_NAME}" "${OPEN_ARG}" "\$\$" &
 fi
 
 # Family-specific launch args. VSCode gets the full triplet so it shares
