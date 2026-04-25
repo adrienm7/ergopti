@@ -88,6 +88,12 @@ on btn3Clicked:sender
 	(current application's NSApplication's sharedApplication())'s stopModal()
 end btn3Clicked:
 
+on btn4Clicked:sender
+	captureDialogValues()
+	set my panelResult to 4
+	(current application's NSApplication's sharedApplication())'s stopModal()
+end btn4Clicked:
+
 -- Rough text-width estimator (no NSAttributedString.size to keep it pure
 -- AppleScript). Buttons are clamped between 90 and 220 pixels.
 on measureButtonWidth(title)
@@ -281,6 +287,8 @@ on customDialog(header, body, buttonList, hasInput, defaultText, lineCount, inpu
 			btn's setAction:"btn2Clicked:"
 		else if i = 3 then
 			btn's setAction:"btn3Clicked:"
+		else if i = 4 then
+			btn's setAction:"btn4Clicked:"
 		end if
 		if i = lastIdx then btn's setKeyEquivalent:return
 		contentView's addSubview:btn

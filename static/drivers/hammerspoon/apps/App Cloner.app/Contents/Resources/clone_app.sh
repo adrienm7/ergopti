@@ -523,16 +523,19 @@ if [[ "$APP_FAMILY" == "teams" ]]; then
 	# Strip quarantine so Gatekeeper doesn't block the clone on first launch
 	xattr -cr "$DEST" 2>/dev/null || true
 
-	# Single-pass deep ad-hoc re-sign that preserves both entitlements AND
-	# flags (= hardened runtime). This is the same approach Microsoft would
-	# use to update an internal copy: the bundle keeps its full security
-	# posture, only the signing identity changes from Microsoft → ad-hoc.
-	# Because the new bundle id has no team-id prefix in shared keychain
-	# groups, Teams will create its own per-bundle keychain entries inside
-	# its fresh sandbox container — no spotlight-encryption error.
-	codesign --force --deep --sign - --preserve-metadata=entitlements,flags "$DEST" >> "$DIAG" 2>&1 \
+	# Re-sign --deep ad-hoc with NO entitlements / flags preserved.
+	# Rationale: ad-hoc signatures have no team-id, but Microsoft's
+	# entitlements (keychain-access-groups, app-sandbox) are bound to
+	# UBF8T346G9. macOS rejects the launch when entitlements demand a
+	# team-id the signature doesn't actually have → "impossible d'ouvrir
+	# l'application". Stripping them yields a plain ad-hoc binary that
+	# launches cleanly. Trade-offs: no sandbox container (Teams writes
+	# under ~/Library/Application Support keyed off the new bundle id, so
+	# isolation still holds), and Teams may show one keychain warning at
+	# first launch — non-fatal, login completes via the default keychain.
+	codesign --force --deep --sign - "$DEST" >> "$DIAG" 2>&1 \
 		|| log "codesign returned non-zero (often OK on Tahoe)"
-	log "Teams clone re-signed ad-hoc (entitlements + flags preserved)"
+	log "Teams clone re-signed ad-hoc (entitlements stripped)"
 
 	# Skip the stub-specific sections (5, 6, 7) — jump straight to
 	# LaunchServices registration + Dock add (section 8).
