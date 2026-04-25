@@ -729,10 +729,10 @@ on run argv
 	set modeDisplay to "App native"
 	if pwaMode then set modeDisplay to "PWA web app (Edge / Chrome)"
 	set summary to "• Source : " & sourcePath & return ¬
-		& "• Nom    : " & cloneName & return ¬
-		& "• Mode   : " & modeDisplay & return ¬
-		& "• Icône  : " & iconDisplay & return ¬
-		& "• Ouvre  : " & openArgDisplay
+		& "• Nom : " & cloneName & return ¬
+		& "• Mode : " & modeDisplay & return ¬
+		& "• Icône : " & iconDisplay & return ¬
+		& "• Ouvre : " & openArgDisplay
 	tell me to activate
 	set summaryResult to my customDialog("Récapitulatif", summary, ¬
 		{"Annuler", "Créer le clone"}, false, "", 0, 380, false, "")
