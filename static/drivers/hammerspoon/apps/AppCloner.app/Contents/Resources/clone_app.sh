@@ -70,44 +70,57 @@ trap 'rm -rf "$TMPDIR_WORK"' EXIT
 
 UNIQUE_ID="fr.b519hs.clone.$(date +%s)"
 
+# Resolve source app's main executable name once, up front — needed by both
+# the family-detection and the launcher generation.
+SRC_EXE_NAME="$(/usr/libexec/PlistBuddy -c "Print :CFBundleExecutable" "$SOURCE_APP/Contents/Info.plist" 2>/dev/null || echo "")"
+SRC_EXE="$SOURCE_APP/Contents/MacOS/$SRC_EXE_NAME"
+if [[ -z "$SRC_EXE_NAME" || ! -f "$SRC_EXE" ]]; then
+	echo "Error: cannot resolve source executable ($SRC_EXE)"; exit 1
+fi
+log "SRC_EXE=$SRC_EXE"
+
 log "DEST=$DEST"
 log "UNIQUE_ID=$UNIQUE_ID"
 
-# Each clone gets its own user-data-dir (required: VSCode locks this dir,
-# two Electron processes can't share it). But we symlink the heavy/static
-# subdirectories from the main VSCode user-data-dir so the clone has
-# instant access to:
-#   - User/settings.json, keybindings.json, snippets/  (preferences)
-#   - User/globalStorage/                              (theme, color picks,
-#                                                       extension state)
-#   - User/profiles/                                   (custom profiles)
-# Plus we point --extensions-dir at the SHARED ~/.vscode/extensions so the
-# clone reuses already-installed extensions instead of reinstalling them
-# (this was the main source of the 10-second file-click lag).
-#
-# What stays per-clone (NOT symlinked):
-#   - workspaceStorage/    (per-folder window state, undo, git decoration)
-#   - logs/, CachedData/, GPUCache/, Code Cache/, Cache/
-# These are inherently per-instance — symlinking them would corrupt under
-# concurrent writes by two running Electron processes.
+# Detect the source app's flavor so the launcher script can pass the right
+# args. We support three families:
+#   * VSCode-like      (Electron + supports --user-data-dir + --extensions-dir
+#                       + --new-window). Detected by Frameworks/Electron + a
+#                       Code-like CLI bin.
+#   * Generic Electron (Slack, Discord, Notion, ...). Supports --user-data-dir
+#                       but not the VSCode-specific flags.
+#   * Native           (Calculator, Mail, Safari, ...). No user-data-dir
+#                       concept — only the __CFBundleIdentifier override
+#                       gives them a distinct Dock identity.
+APP_FAMILY=native
+if [[ -d "$SOURCE_APP/Contents/Frameworks/Electron Framework.framework" ]]; then
+	APP_FAMILY=electron
+	if [[ -f "$SOURCE_APP/Contents/Resources/app/bin/code" ]] \
+	   || [[ "$SRC_EXE_NAME" == "Code" ]] \
+	   || [[ "$SRC_EXE_NAME" == "Code - Insiders" ]]; then
+		APP_FAMILY=vscode
+	fi
+fi
+log "APP_FAMILY=$APP_FAMILY"
+
+# Per-clone user-data-dir under Application Support — only meaningful for
+# Electron-based apps. We still create the directory unconditionally so
+# downstream code doesn't have to special-case empty paths.
 USER_DATA_DIR="$HOME/Library/Application Support/AppCloner/${safe_name}"
 mkdir -p "$USER_DATA_DIR"
-MAIN_VSCODE_DATA="$HOME/Library/Application Support/Code"
-SHARED_EXT_DIR="$HOME/.vscode/extensions"
 
-if [[ -d "$MAIN_VSCODE_DATA/User" ]]; then
-	# Symlink the whole User dir at once — it contains settings, keybindings,
-	# snippets, globalStorage, profiles. Concurrent writes are rare (only on
-	# explicit user action like editing settings) and VSCode tolerates them.
-	# We only create the symlink if nothing's there yet to avoid clobbering
-	# a clone where the user has intentionally diverged.
-	if [[ ! -e "$USER_DATA_DIR/User" ]]; then
+# VSCode-specific extras: shared extensions dir + symlinked User/ subdir,
+# so the clone inherits settings/keybindings/snippets/themes/globalStorage
+# from the main VSCode instance and doesn't re-install extensions.
+SHARED_EXT_DIR="$HOME/.vscode/extensions"
+if [[ "$APP_FAMILY" == "vscode" ]]; then
+	MAIN_VSCODE_DATA="$HOME/Library/Application Support/Code"
+	if [[ -d "$MAIN_VSCODE_DATA/User" && ! -e "$USER_DATA_DIR/User" ]]; then
 		ln -s "$MAIN_VSCODE_DATA/User" "$USER_DATA_DIR/User"
 		log "Symlinked User/ → main VSCode user data"
 	fi
 fi
 log "USER_DATA_DIR=$USER_DATA_DIR"
-log "SHARED_EXT_DIR=$SHARED_EXT_DIR"
 
 
 
@@ -364,15 +377,20 @@ LAUNCHER="$MACOS/launcher"
 # when present. This is the same technique Chromium itself uses to give
 # its helper processes distinct identities.
 
-# Resolve VSCode's actual executable name (varies per source app: "Code",
-# "Slack", "Discord", etc.) at clone-time so the launcher has a fully
-# concrete exec path.
-SRC_EXE_NAME="$(/usr/libexec/PlistBuddy -c "Print :CFBundleExecutable" "$SOURCE_APP/Contents/Info.plist" 2>/dev/null || echo "")"
-SRC_EXE="$SOURCE_APP/Contents/MacOS/$SRC_EXE_NAME"
-if [[ -z "$SRC_EXE_NAME" || ! -f "$SRC_EXE" ]]; then
-	echo "Error: cannot resolve source executable ($SRC_EXE)"; exit 1
-fi
-log "SRC_EXE=$SRC_EXE"
+# Build the per-family argument array. VSCode-only flags are skipped for
+# generic Electron apps and natives.
+case "$APP_FAMILY" in
+	vscode)
+		LAUNCHER_ARGS_LITERAL='ARGS=(
+	--user-data-dir "'"$USER_DATA_DIR"'"
+	--extensions-dir "'"$SHARED_EXT_DIR"'"
+	--new-window
+)' ;;
+	electron)
+		LAUNCHER_ARGS_LITERAL='ARGS=(--user-data-dir "'"$USER_DATA_DIR"'")' ;;
+	native|*)
+		LAUNCHER_ARGS_LITERAL='ARGS=()' ;;
+esac
 
 cat > "$LAUNCHER" <<LAUNCHEREOF
 #!/bin/zsh
@@ -384,21 +402,10 @@ set -e
 # tinted icon instead of VSCode's default blue one beside ours.
 export __CFBundleIdentifier="${UNIQUE_ID}"
 
-# --user-data-dir : per-clone state (workspace storage, caches), required
-#                    so this Electron process is independent of the main
-#                    VSCode → distinct Dock tile.
-# --extensions-dir : SHARED with main VSCode (~/.vscode/extensions), so we
-#                    don't reinstall extensions on every clone. The 10s
-#                    file-click lag came from VSCode trying to set up
-#                    fresh extension installs on first launch.
-# The User/ subdirectory inside USER_DATA_DIR is itself a symlink to main
-# VSCode's User/ (created at clone time) → settings, keybindings, themes
-# all carry over.
-ARGS=(
-	--user-data-dir "${USER_DATA_DIR}"
-	--extensions-dir "${SHARED_EXT_DIR}"
-	--new-window
-)
+# Family-specific launch args. VSCode gets the full triplet so it shares
+# extensions and settings with the user's main install. Generic Electron
+# apps just get an isolated user-data-dir. Native apps run with no flags.
+${LAUNCHER_ARGS_LITERAL}
 OPEN_ARG="${OPEN_ARG}"
 if [[ -n "\$OPEN_ARG" ]]; then
 	ARGS+=("\$OPEN_ARG")
@@ -454,13 +461,37 @@ touch "$DEST"
 LSR=/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister
 "$LSR" -f "$DEST" >/dev/null 2>&1 || true
 
-python3 - "$DEST" <<'DOCKEOF'
+# Bundle id is needed inside the Dock plist entry so Dock resolves the
+# icon via LaunchServices (= reads our Info.plist) instead of falling back
+# to the Finder's path-based lookup which tends to find a stale system
+# icon. The `book` field — an NSURL bookmark blob — is what manual
+# drag-to-Dock generates and what makes the entry survive moves.
+python3 - "$DEST" "$UNIQUE_ID" <<'DOCKEOF'
 import sys, plistlib, os, subprocess, time
 
-app_path   = sys.argv[1]
-plist_path = os.path.expanduser("~/Library/Preferences/com.apple.dock.plist")
-lsr        = ("/System/Library/Frameworks/CoreServices.framework"
-              "/Frameworks/LaunchServices.framework/Support/lsregister")
+app_path     = sys.argv[1]
+bundle_id    = sys.argv[2]
+plist_path   = os.path.expanduser("~/Library/Preferences/com.apple.dock.plist")
+lsr          = ("/System/Library/Frameworks/CoreServices.framework"
+                "/Frameworks/LaunchServices.framework/Support/lsregister")
+
+# Generate a real NSURL bookmark blob via PyObjC. This is the same data
+# Finder writes when you drag an .app onto the Dock — it lets the Dock
+# track the bundle by inode rather than by path, so renames/moves don't
+# break the tile, and the tile resolves the correct icon via LS.
+def make_bookmark(path):
+	try:
+		from Foundation import NSURL
+		url = NSURL.fileURLWithPath_(path)
+		bookmark, err = url.bookmarkDataWithOptions_includingResourceValuesForKeys_relativeToURL_error_(
+			0, None, None, None
+		)
+		if bookmark is None:
+			return None
+		return bytes(bookmark)
+	except Exception as e:
+		print(f"Bookmark generation failed ({e}); Dock will fall back to path-only entry")
+		return None
 
 with open(plist_path, 'rb') as f:
 	dock = plistlib.load(f)
@@ -468,20 +499,34 @@ with open(plist_path, 'rb') as f:
 apps = dock.get('persistent-apps', [])
 url  = app_path.rstrip('/') + '/'
 
-for e in apps:
-	if e.get('tile-data', {}).get('file-data', {}).get('_CFURLString', '') == url:
-		print("Already in Dock")
-		sys.exit(0)
+# If the same app is already pinned, remove it so we always end up with a
+# fresh, correct entry (manual re-drag behavior). Avoids stale entries
+# pointing at obsolete clone paths after re-clones with the same name.
+apps = [
+	e for e in apps
+	if e.get('tile-data', {}).get('file-data', {}).get('_CFURLString', '') != url
+]
 
 label = os.path.basename(app_path).removesuffix('.app')
+tile_data = {
+	'bundle-identifier': bundle_id,
+	'dock-extra': False,
+	'file-data': {
+		'_CFURLString': 'file://' + app_path.replace(' ', '%20').rstrip('/') + '/',
+		'_CFURLStringType': 15,
+	},
+	'file-label': label,
+	'file-mod-date': 0,
+	'file-type': 41,
+	'parent-mod-date': 0,
+}
+book = make_bookmark(app_path)
+if book is not None:
+	tile_data['book'] = book
+
 apps.append({
 	'GUID': int.from_bytes(os.urandom(4), 'big'),
-	'tile-data': {
-		'file-data': {'_CFURLString': url, '_CFURLStringType': 15},
-		'file-label': label,
-		'file-type': 41,
-		'parent-mod-date': 0,
-	},
+	'tile-data': tile_data,
 	'tile-type': 'file-tile',
 })
 dock['persistent-apps'] = apps
