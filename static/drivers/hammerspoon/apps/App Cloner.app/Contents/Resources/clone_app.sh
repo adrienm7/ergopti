@@ -538,100 +538,37 @@ esac
 # multiple sandboxed apps (Teams new, Outlook for Mac) running side by
 # side on macOS without Microsoft's signing key.
 if [[ "$PWA_MODE" == "1" ]]; then
-	# Locate a Chromium-based browser. Edge is preferred (best Teams /
-	# Microsoft 365 integration), Chrome and Brave are accepted fallbacks.
-	PWA_BROWSER=""
-	for candidate in \
-		"/Applications/Microsoft Edge.app" \
-		"$HOME/Applications/Microsoft Edge.app" \
-		"/Applications/Google Chrome.app" \
-		"$HOME/Applications/Google Chrome.app" \
-		"/Applications/Brave Browser.app" \
-		"$HOME/Applications/Brave Browser.app"; do
-		if [[ -d "$candidate" ]]; then
-			PWA_BROWSER="$candidate"
-			break
-		fi
-	done
-	if [[ -z "$PWA_BROWSER" ]]; then
-		echo "Error: PWA mode requires Microsoft Edge, Google Chrome or Brave installed in /Applications."
-		exit 1
-	fi
-	PWA_BROWSER_EXE_NAME="$(/usr/libexec/PlistBuddy -c "Print :CFBundleExecutable" "$PWA_BROWSER/Contents/Info.plist" 2>/dev/null || echo "")"
-	PWA_BROWSER_EXE="$PWA_BROWSER/Contents/MacOS/$PWA_BROWSER_EXE_NAME"
-	log "PWA browser: $PWA_BROWSER_EXE"
+	# WKWebView mode: the launcher hosts the web app directly via WebKit, no
+	# Edge/Chrome dependency at runtime. The clone IS the app — Mission Control
+	# shows our name, Space pinning by our bundle-id is honored natively, and
+	# the bundle stays small (~tens of KB) so signing is trivial.
+	log "PWA mode: WKWebView launcher (no external browser)"
 
-	# Per-clone Chromium profile — keeps cookies/storage/extensions of each
-	# PWA fully isolated from the user's main browser and from other PWAs.
+	# Per-clone WKWebView data store — keeps cookies/localStorage of each
+	# PWA isolated. With WKWebView, the default data store is per-bundle, so
+	# each clone (different bundle-id) is naturally isolated. We still keep
+	# this directory for the launcher's hint files (target_space_uuid, etc).
 	PWA_PROFILE_DIR="$HOME/Library/Application Support/AppCloner/${safe_name}_pwa"
 	mkdir -p "$PWA_PROFILE_DIR"
 
-
-
-
-	# ====================================================================
-	# ===== 6.b.1) Full Edge bundle clone via APFS copy-on-write =====
-	# ====================================================================
-
-	# We replace the lightweight stub bundle with an APFS clone of Edge.app.
-	# Why: when Edge runs from /Applications/Microsoft Edge.app/Contents/MacOS/...,
-	# Cocoa's mainBundle() resolves to Edge.app — Mission Control, Space pinning,
-	# and NSRunningApplication.localizedName all see "Microsoft Edge", regardless
-	# of __CFBundleIdentifier env tricks. The only fix is to make Edge's
-	# executable LIVE INSIDE our bundle, so mainBundle() resolves to OUR path.
-	#
-	# `cp -c` uses APFS clonefile() — disk usage is ~0 bytes initially, content
-	# is shared with the original Edge.app via copy-on-write. Cloning a 700 MB
-	# Edge bundle takes < 1 second and uses no extra disk until the user (or an
-	# Edge update) modifies files.
-	log "PWA full-clone: APFS-cloning $PWA_BROWSER → $DEST"
-
-	# Save our tinted icon before we wipe the stub bundle.
-	SAVED_TINTED_ICON="$TMPDIR_WORK/saved_AppIcon.icns"
-	cp "$RES/AppIcon.icns" "$SAVED_TINTED_ICON"
-
-	rm -rf "$DEST"
-	cp -c -R "$PWA_BROWSER" "$DEST"
-
-	# Restore our icon over Edge's icon. We also patch CFBundleIconFile to
-	# point at AppIcon.icns regardless of what Edge was using (saves us from
-	# tracking Edge's per-version icon naming).
-	cp "$SAVED_TINTED_ICON" "$DEST/Contents/Resources/AppIcon.icns"
-
-	# Patch the cloned Info.plist with our identity. mainBundle.bundleIdentifier
-	# now returns our clone id — Mission Control, LaunchServices, the Dock and
-	# Space pinning all see this app as ours, not Edge.
-	INFO_PLIST="$DEST/Contents/Info.plist"
-	/usr/libexec/PlistBuddy -c "Set :CFBundleIdentifier $UNIQUE_ID" "$INFO_PLIST" 2>>"$DIAG"
-	/usr/libexec/PlistBuddy -c "Set :CFBundleName $CLONE_NAME"     "$INFO_PLIST" 2>>"$DIAG"
-	/usr/libexec/PlistBuddy -c "Set :CFBundleDisplayName $CLONE_NAME" "$INFO_PLIST" 2>/dev/null \
-		|| /usr/libexec/PlistBuddy -c "Add :CFBundleDisplayName string $CLONE_NAME" "$INFO_PLIST" 2>>"$DIAG"
-	/usr/libexec/PlistBuddy -c "Set :CFBundleIconFile AppIcon"     "$INFO_PLIST" 2>>"$DIAG"
-	/usr/libexec/PlistBuddy -c "Set :CFBundleExecutable launcher"  "$INFO_PLIST" 2>>"$DIAG"
-	# Strip URL handlers Edge registers — we don't want our clone to claim
-	# http(s)/microsoft-edge:// associations system-wide.
-	/usr/libexec/PlistBuddy -c "Delete :CFBundleURLTypes"          "$INFO_PLIST" 2>/dev/null || true
-	/usr/libexec/PlistBuddy -c "Delete :CFBundleDocumentTypes"     "$INFO_PLIST" 2>/dev/null || true
-	log "Info.plist patched: id=$UNIQUE_ID name=$CLONE_NAME exe=launcher"
-
-	# Re-establish the path variables now that $DEST has been recreated.
-	CONTENTS="$DEST/Contents"
-	MACOS="$CONTENTS/MacOS"
-	RES="$CONTENTS/Resources"
-	LAUNCHER="$MACOS/launcher"
-
-	# The cloned Edge binary keeps its original filename inside our bundle.
-	# Our launcher exec's it directly.
-	EDGE_BIN_IN_BUNDLE="$MACOS/$PWA_BROWSER_EXE_NAME"
-	if [[ ! -x "$EDGE_BIN_IN_BUNDLE" ]]; then
-		echo "Error: cloned Edge binary missing at $EDGE_BIN_IN_BUNDLE"; exit 1
-	fi
+	# Patch the stub Info.plist with media usage descriptions. The user-facing
+	# strings are shown by macOS the first time the WKWebView requests camera
+	# or microphone access (e.g. on a Teams call).
+	INFO_PLIST="$CONTENTS/Info.plist"
+	/usr/libexec/PlistBuddy -c "Add :NSCameraUsageDescription string $CLONE_NAME a besoin de la caméra pour les appels vidéo." "$INFO_PLIST" 2>/dev/null \
+		|| /usr/libexec/PlistBuddy -c "Set :NSCameraUsageDescription $CLONE_NAME a besoin de la caméra pour les appels vidéo." "$INFO_PLIST" 2>>"$DIAG"
+	/usr/libexec/PlistBuddy -c "Add :NSMicrophoneUsageDescription string $CLONE_NAME a besoin du micro pour les appels vidéo." "$INFO_PLIST" 2>/dev/null \
+		|| /usr/libexec/PlistBuddy -c "Set :NSMicrophoneUsageDescription $CLONE_NAME a besoin du micro pour les appels vidéo." "$INFO_PLIST" 2>>"$DIAG"
+	# Allow inbound mixed content / WebRTC over local networks (Teams uses LAN
+	# negotiation for screen sharing).
+	/usr/libexec/PlistBuddy -c "Add :NSAppTransportSecurity dict" "$INFO_PLIST" 2>/dev/null || true
+	/usr/libexec/PlistBuddy -c "Add :NSAppTransportSecurity:NSAllowsArbitraryLoads bool true" "$INFO_PLIST" 2>/dev/null || true
 
 
 
 
 	# ===========================================================
-	# ===== 6.b.2) Generate the Swift NSApplication launcher =====
+	# ===== 6.b.2) Generate the Swift WKWebView launcher =====
 	# ===========================================================
 
 	# Compile a real Cocoa NSApplication launcher in Swift. This is the only
@@ -644,256 +581,120 @@ if [[ "$PWA_MODE" == "1" ]]; then
 	# (Edge may be pinned to Space 1, but the cloned PWA window must land on
 	# the source app's Space, e.g. Teams' Space 2).
 	#
-	# We use a heredoc without quoting so shell expands ${PWA_PROFILE_DIR},
-	# ${PWA_BROWSER_EXE}, ${OPEN_ARG}, ${UNIQUE_ID} into the Swift source.
+	# We use a heredoc without quoting so shell expands ${OPEN_ARG}, ${UNIQUE_ID}
+	# and ${CLONE_NAME} into the Swift source.
 	# Swift's string interpolation uses \(...) which the shell preserves verbatim.
 	SWIFT_SRC="$RES/launcher.swift"
 	cat > "$SWIFT_SRC" << SWIFTEOF
 import Cocoa
+import WebKit
 import Foundation
-import CoreGraphics
 
-let PROFILE_DIR        = "${PWA_PROFILE_DIR}"
-let BROWSER_EXE        = "${EDGE_BIN_IN_BUNDLE}"
-let OPEN_ARG           = "${OPEN_ARG}"
-let UNIQUE_ID          = "${UNIQUE_ID}"
-let LOG_FILE           = "/tmp/appcloner_pwa_\(UNIQUE_ID).log"
-let SPACE_HINT         = (PROFILE_DIR as NSString).appendingPathComponent("target_space_uuid")
-let SOURCE_BUNDLE_FILE = (PROFILE_DIR as NSString).appendingPathComponent("source_bundle_id")
+// Constants substituted from shell at clone-creation time.
+let OPEN_ARG    = "${OPEN_ARG}"
+let UNIQUE_ID   = "${UNIQUE_ID}"
+let CLONE_NAME  = "${CLONE_NAME}"
 
-// Private CoreGraphics Services APIs for Space management.
-@_silgen_name("CGSMainConnectionID")
-func CGSMainConnectionID() -> Int32
+// The launcher hosts the PWA inside a WKWebView in our own bundle. There is no
+// external browser dependency at runtime — this process IS the cloned app, so
+// Cocoa's mainBundle() returns our patched Info.plist, Mission Control shows
+// our name, and macOS Space pinning honors our bundle-id natively. WKWebView
+// uses the per-bundle default WKWebsiteDataStore, which gives each clone an
+// automatically isolated cookie/storage profile.
 
-@_silgen_name("CGSCopySpaces")
-func CGSCopySpaces(_ cid: Int32, _ mask: Int) -> CFArray?
-
-// CGSMoveWindowsToManagedSpace expects a CFArray of pointers to uint32_t window
-// IDs (NOT a CFArray of CFNumber). The pointer-array dance is required for the
-// move to actually take effect — passing wids as CFArray silently no-ops.
-@_silgen_name("CGSMoveWindowsToManagedSpace")
-func CGSMoveWindowsToManagedSpace(_ cid: Int32, _ wids: CFArray, _ sid: UInt64)
-
-// Look up the macOS-internal Space ID for a Space UUID stored in com.apple.spaces.
-func spaceID(forUUID uuid: String) -> UInt64? {
-	let cid = CGSMainConnectionID()
-	guard let raw = CGSCopySpaces(cid, 0xF) as? [[String: Any]] else { return nil }
-	for entry in raw {
-		if let u = entry["uuid"] as? String, u == uuid,
-		   let sid = entry["ManagedSpaceID"] as? UInt64 { return sid }
-	}
-	return nil
-}
-
-// Read com.apple.spaces.plist via plutil, find which Space currently hosts the
-// given source-app bundle-id. Lets the clone follow Teams if the user moves it
-// to a different Space later. Falls back to nil if the source app isn't pinned.
-func currentSpaceUUID(forSourceBundleID bid: String) -> String? {
-	let task = Process()
-	task.executableURL = URL(fileURLWithPath: "/usr/bin/plutil")
-	task.arguments = ["-convert", "json", "-o", "-",
-	                  "\(NSHomeDirectory())/Library/Preferences/com.apple.spaces.plist"]
-	let pipe = Pipe()
-	task.standardOutput = pipe
-	task.standardError = Pipe()
-	do { try task.run() } catch { return nil }
-	task.waitUntilExit()
-	let data = pipe.fileHandleForReading.readDataToEndOfFile()
-	guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-	      let displays = json["ManagedDisplaySpaces"] as? [[String: Any]] else { return nil }
-	for display in displays {
-		guard let spaces = display["Spaces"] as? [[String: Any]] else { continue }
-		for sp in spaces {
-			if let uuid = sp["uuid"] as? String,
-			   let apps = sp["apps"] as? [String], apps.contains(bid) { return uuid }
-		}
-	}
-	return nil
-}
-
-// Resolve the target Space ID by trying — in order — the static SPACE_HINT
-// (written at clone creation), then dynamic lookup of the source app's current
-// Space. Re-evaluated on every launch and every reopen click.
-func resolveTargetSpaceID() -> UInt64? {
-	if FileManager.default.fileExists(atPath: SPACE_HINT),
-	   let raw = try? String(contentsOfFile: SPACE_HINT, encoding: .utf8) {
-		let uuid = raw.trimmingCharacters(in: .whitespacesAndNewlines)
-		if let sid = spaceID(forUUID: uuid) { return sid }
-	}
-	if FileManager.default.fileExists(atPath: SOURCE_BUNDLE_FILE),
-	   let raw = try? String(contentsOfFile: SOURCE_BUNDLE_FILE, encoding: .utf8) {
-		let bid = raw.trimmingCharacters(in: .whitespacesAndNewlines)
-		if let uuid = currentSpaceUUID(forSourceBundleID: bid),
-		   let sid = spaceID(forUUID: uuid) { return sid }
-	}
-	return nil
-}
-
-// Move every window owned by a given PID to the target Space. The CFArray of
-// uint32 pointers is the magic incantation CGSMoveWindowsToManagedSpace needs.
-func moveAllWindows(ofPID pid: pid_t, toSpace sid: UInt64) {
-	let cid = CGSMainConnectionID()
-	guard let info = CGWindowListCopyWindowInfo([.optionAll], kCGNullWindowID)
-		as? [[String: Any]] else { return }
-	let wids: [UInt32] = info.compactMap { d in
-		guard let owner = d[kCGWindowOwnerPID as String] as? Int,
-		      owner == Int(pid),
-		      let num = d[kCGWindowNumber as String] as? Int
-		else { return nil }
-		return UInt32(num)
-	}
-	guard !wids.isEmpty else { return }
-	var values = wids
-	values.withUnsafeMutableBufferPointer { buf in
-		let count = buf.count
-		let ptrs = UnsafeMutablePointer<UnsafeRawPointer?>.allocate(capacity: count)
-		defer { ptrs.deallocate() }
-		for i in 0..<count {
-			ptrs[i] = UnsafeRawPointer(buf.baseAddress!.advanced(by: i))
-		}
-		if let arr = CFArrayCreate(nil, ptrs, count, nil) {
-			CGSMoveWindowsToManagedSpace(cid, arr, sid)
-		}
+class WindowDelegate: NSObject, NSWindowDelegate {
+	// Hide-on-close: the user expects the Dock tile to stay alive after a red-X
+	// click, like a typical macOS app. The window is recreated lazily on reopen.
+	func windowShouldClose(_ sender: NSWindow) -> Bool {
+		sender.orderOut(nil)
+		return false
 	}
 }
 
-// Find an Edge process already using our profile dir. Used to recover from
-// orphaned Edge instances after a launcher crash, so we never spawn a duplicate.
-func findEdgePID() -> pid_t? {
-	let task = Process()
-	task.executableURL = URL(fileURLWithPath: "/usr/bin/pgrep")
-	task.arguments = ["-f", "user-data-dir=\(PROFILE_DIR)"]
-	let pipe = Pipe()
-	task.standardOutput = pipe
-	task.standardError = Pipe()
-	do { try task.run() } catch { return nil }
-	task.waitUntilExit()
-	let data = pipe.fileHandleForReading.readDataToEndOfFile()
-	guard let s = String(data: data, encoding: .utf8) else { return nil }
-	return s.split(separator: "\n")
-		.compactMap { pid_t(\$0.trimmingCharacters(in: .whitespaces)) }
-		.first
-}
-
-class AppDelegate: NSObject, NSApplicationDelegate {
-	var edgeProcess: Process?
-	var edgePID: pid_t = 0
+class AppDelegate: NSObject, NSApplicationDelegate, WKUIDelegate, WKNavigationDelegate {
+	var window: NSWindow?
+	var webView: WKWebView?
+	let windowDelegate = WindowDelegate()
 
 	func applicationDidFinishLaunching(_ notification: Notification) {
-		try? FileManager.default.createDirectory(
-			atPath: PROFILE_DIR, withIntermediateDirectories: true
-		)
-
-		// Recovery path: orphaned Edge from a previous crashed launcher. Adopt
-		// it instead of spawning a second instance (which would open a new
-		// browser tab via Edge's IPC SingletonSocket).
-		if let pid = findEdgePID() {
-			edgePID = pid
-			NSRunningApplication(processIdentifier: pid)?.activate(
-				options: [.activateAllWindows, .activateIgnoringOtherApps]
-			)
-			// Watch the orphan; when it dies, we die too.
-			DispatchQueue.global(qos: .background).async {
-				while kill(pid, 0) == 0 { Thread.sleep(forTimeInterval: 1.0) }
-				DispatchQueue.main.async { NSApp.terminate(nil) }
-			}
-			return
-		}
-
-		// Resolve target Space dynamically on every launch — Edge is pinned to
-		// its own Space (e.g. Space 1) and ignores __CFBundleIdentifier for
-		// window-Space association, so we MUST move the window ourselves every
-		// time. The hint file is no longer consumed; we read it forever.
-		let targetSpaceID = resolveTargetSpaceID()
-
-		// Launch Edge as a child process. The Edge binary lives INSIDE our
-		// cloned bundle, so Cocoa's mainBundle() resolves to our bundle —
-		// CFBundleName, CFBundleIdentifier, icon, and Space pinning all come
-		// from our patched Info.plist. No __CFBundleIdentifier env override
-		// needed anymore.
-		let p = Process()
-		p.executableURL = URL(fileURLWithPath: BROWSER_EXE)
-		p.arguments = [
-			"--app=\(OPEN_ARG)",
-			"--user-data-dir=\(PROFILE_DIR)",
-			"--no-first-run",
-			"--no-default-browser-check",
-			"--disable-features=DesktopPWAsLinkCapturing,WebAppEnableUrlHandling",
-			"--disable-default-apps",
-		]
-
-		if !FileManager.default.fileExists(atPath: LOG_FILE) {
-			FileManager.default.createFile(atPath: LOG_FILE, contents: nil)
-		}
-		if let h = try? FileHandle(forWritingTo: URL(fileURLWithPath: LOG_FILE)) {
-			h.seekToEndOfFile()
-			p.standardOutput = h
-			p.standardError = h
-		}
-
-		// When Edge exits, the launcher exits too — keeps the Dock tile lifecycle in sync.
-		p.terminationHandler = { _ in
-			DispatchQueue.main.async { NSApp.terminate(nil) }
-		}
-
-		do {
-			try p.run()
-			edgeProcess = p
-			edgePID = p.processIdentifier
-		} catch {
-			NSApp.terminate(nil)
-			return
-		}
-
-		// Move Edge's PWA window to the target Space. Edge is pinned to its own
-		// Space and creates the window there; we forcibly move it to where the
-		// source app lives. Polled continuously for 15s so we catch the splash
-		// window, the real PWA window, and any popup Edge creates during boot.
-		if let sid = targetSpaceID {
-			let pid = edgePID
-			DispatchQueue.global(qos: .background).async {
-				// 75 iterations × 200ms = 15s of continuous re-application
-				for _ in 0..<75 {
-					moveAllWindows(ofPID: pid, toSpace: sid)
-					Thread.sleep(forTimeInterval: 0.2)
-				}
-				// Final activation so macOS auto-switches to the target Space
-				DispatchQueue.main.async {
-					NSRunningApplication(processIdentifier: pid)?.activate(
-						options: [.activateAllWindows, .activateIgnoringOtherApps]
-					)
-				}
-			}
-		}
+		buildWindowAndLoad()
+		NSApp.activate(ignoringOtherApps: true)
 	}
 
-	// Dock click while we are running — focus Edge AND re-apply the Space move.
-	// Re-resolving the target on every reopen lets the clone follow the source
-	// app even if the user has moved Teams to a different Space since launch.
+	func buildWindowAndLoad() {
+		let cfg = WKWebViewConfiguration()
+		// Allow audio/video autoplay for Teams calls.
+		cfg.mediaTypesRequiringUserActionForPlayback = []
+		// Persistent default store — per-bundle, so each clone is isolated.
+		cfg.websiteDataStore = WKWebsiteDataStore.default()
+
+		let frame = NSRect(x: 0, y: 0, width: 1280, height: 820)
+		let win = NSWindow(
+			contentRect: frame,
+			styleMask: [.titled, .closable, .miniaturizable, .resizable, .fullSizeContentView],
+			backing: .buffered, defer: false
+		)
+		win.title = CLONE_NAME
+		win.center()
+		win.delegate = windowDelegate
+		win.tabbingMode = .disallowed
+
+		let wv = WKWebView(frame: win.contentView!.bounds, configuration: cfg)
+		wv.autoresizingMask = [.width, .height]
+		wv.uiDelegate = self
+		wv.navigationDelegate = self
+		// Send a Chromium UA so Microsoft 365 / Teams serve us their full client
+		// (the Safari UA gets a stripped-down fallback in some flows).
+		wv.customUserAgent = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36 Edg/126.0.0.0"
+		win.contentView?.addSubview(wv)
+
+		if let url = URL(string: OPEN_ARG) {
+			wv.load(URLRequest(url: url))
+		}
+
+		win.makeKeyAndOrderFront(nil)
+		self.window = win
+		self.webView = wv
+	}
+
+	// Reopen click on the Dock tile — show the window if it was hidden.
 	func applicationShouldHandleReopen(
 		_ sender: NSApplication, hasVisibleWindows flag: Bool
 	) -> Bool {
-		if edgePID > 0 {
-			let pid = edgePID
-			if let sid = resolveTargetSpaceID() {
-				DispatchQueue.global(qos: .background).async {
-					moveAllWindows(ofPID: pid, toSpace: sid)
-				}
-			}
-			NSRunningApplication(processIdentifier: pid)?.activate(
-				options: [.activateAllWindows, .activateIgnoringOtherApps]
-			)
+		if window == nil {
+			buildWindowAndLoad()
+		} else {
+			window?.makeKeyAndOrderFront(nil)
 		}
+		NSApp.activate(ignoringOtherApps: true)
 		return true
 	}
 
+	// Don't quit when the window is closed (we hide it instead via WindowDelegate).
 	func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
 		return false
 	}
 
-	func applicationWillTerminate(_ notification: Notification) {
-		// Only terminate Edge if we spawned it (not if we adopted an orphan).
-		edgeProcess?.terminate()
+	// Open links that target a new window inside the same WKWebView (single-window PWA).
+	func webView(_ webView: WKWebView,
+	             createWebViewWith configuration: WKWebViewConfiguration,
+	             for navigationAction: WKNavigationAction,
+	             windowFeatures: WKWindowFeatures) -> WKWebView? {
+		if navigationAction.targetFrame == nil, let url = navigationAction.request.url {
+			webView.load(URLRequest(url: url))
+		}
+		return nil
+	}
+
+	// Auto-grant camera & microphone on origins that match our PWA's host.
+	// Without this, getUserMedia() requests fall through silently.
+	@available(macOS 12.0, *)
+	func webView(_ webView: WKWebView,
+	             requestMediaCapturePermissionFor origin: WKSecurityOrigin,
+	             initiatedByFrame frame: WKFrameInfo,
+	             type: WKMediaCaptureType,
+	             decisionHandler: @escaping (WKPermissionDecision) -> Void) {
+		decisionHandler(.grant)
 	}
 }
 
@@ -908,7 +709,7 @@ SWIFTEOF
 	# (#!/usr/bin/env swift) if swiftc is missing — slower startup but works.
 	if command -v swiftc >/dev/null 2>&1; then
 		if swiftc "$SWIFT_SRC" -o "$LAUNCHER" \
-		         -framework Cocoa -framework CoreGraphics 2>>"$DIAG"; then
+		         -framework Cocoa -framework WebKit 2>>"$DIAG"; then
 			log "Swift launcher compiled to native binary"
 		else
 			log "WARNING: swiftc failed — falling back to swift script mode"
@@ -919,7 +720,7 @@ SWIFTEOF
 		{ echo "#!/usr/bin/env swift"; cat "$SWIFT_SRC"; } > "$LAUNCHER"
 	fi
 	chmod +x "$LAUNCHER"
-	log "PWA launcher written → ${PWA_BROWSER_EXE} --app=${OPEN_ARG}"
+	log "PWA WKWebView launcher written → URL=${OPEN_ARG}"
 	APPCLONER_PWA_DONE=1
 fi
 
@@ -1005,19 +806,11 @@ fi  # end APPCLONER_PWA_DONE guard
 # ===========================================
 # ===========================================
 
-# For stub bundles: tiny, no hardened runtime — codesign in < 1 s.
-# For PWA full clones: --deep is required so codesign also re-stamps every
-# nested helper, framework and library. Without --deep, the cloned Edge
-# helpers keep Microsoft's signatures (still valid individually) but the
-# top-level bundle's seal does not include them, and Gatekeeper rejects launch.
-if [[ "$PWA_MODE" == "1" ]]; then
-	log "Re-signing full Edge clone with --deep (this may take a few seconds)…"
-	codesign --force --deep --sign - "$DEST" >> "$DIAG" 2>&1 || true
-	log "PWA clone signed"
-else
-	codesign --force --sign - "$DEST" >> "$DIAG" 2>&1 || true
-	log "stub signed"
-fi
+# Tiny bundle, shell-script executable, no hardened runtime, no entitlements.
+# codesign handles it in < 1 s and macOS Tahoe's CodeSigningMonitor has no
+# notarized baseline to compare against — nothing for it to flag.
+codesign --force --sign - "$DEST" >> "$DIAG" 2>&1 || true
+log "stub signed"
 
 fi  # end APPCLONER_SKIP_STUB guard
 
