@@ -77,28 +77,28 @@ end captureDialogValues
 on btn1Clicked:sender
 	captureDialogValues()
 	set my panelResult to 1
-	set theApp to current application's NSApplication's sharedApplication()
+	set theApp to current application's NSApplication's sharedApplication
 	theApp's stopModal()
 end btn1Clicked:
 
 on btn2Clicked:sender
 	captureDialogValues()
 	set my panelResult to 2
-	set theApp to current application's NSApplication's sharedApplication()
+	set theApp to current application's NSApplication's sharedApplication
 	theApp's stopModal()
 end btn2Clicked:
 
 on btn3Clicked:sender
 	captureDialogValues()
 	set my panelResult to 3
-	set theApp to current application's NSApplication's sharedApplication()
+	set theApp to current application's NSApplication's sharedApplication
 	theApp's stopModal()
 end btn3Clicked:
 
 on btn4Clicked:sender
 	captureDialogValues()
 	set my panelResult to 4
-	set theApp to current application's NSApplication's sharedApplication()
+	set theApp to current application's NSApplication's sharedApplication
 	theApp's stopModal()
 end btn4Clicked:
 
@@ -461,7 +461,7 @@ on customDialog(header, body, buttonList, hasInput, defaultText, lineCount, inpu
 		panelWin's makeFirstResponder:(my panelInputView)
 	end if
 
-	set theApp to current application's NSApplication's sharedApplication()
+	set theApp to current application's NSApplication's sharedApplication
 	theApp's runModalForWindow:panelWin
 	panelWin's orderOut:(missing value)
 
@@ -592,10 +592,10 @@ on showTintColorPicker(appPath)
 	set my panelCheckboxView to missing value
 	set timerUserInfo to missing value
 	set theTimer to current application's NSTimer's timerWithTimeInterval:0.08 target:me selector:"updateTintPreview:" userInfo:timerUserInfo repeats:true
-	set theLoop to current application's NSRunLoop's mainRunLoop()
+	set theLoop to current application's NSRunLoop's mainRunLoop
 	theLoop's addTimer:theTimer forMode:"NSRunLoopCommonModes"
 
-	set theApp to current application's NSApplication's sharedApplication()
+	set theApp to current application's NSApplication's sharedApplication
 	theApp's runModalForWindow:pickerPanel
 	pickerPanel's orderOut:(missing value)
 
@@ -615,7 +615,7 @@ on installEditMenu()
 		-- NSApp is a C global, not a property; in AppleScript-ObjC we have to
 		-- go through NSApplication's sharedApplication. Wrap everything in
 		-- try/end try so a Cocoa hiccup never crashes the whole UI.
-		set theApp to current application's NSApplication's sharedApplication()
+		set theApp to current application's NSApplication's sharedApplication
 		set mainMenu to theApp's mainMenu()
 		if mainMenu is missing value then
 			set mainMenu to current application's NSMenu's alloc()'s init()
