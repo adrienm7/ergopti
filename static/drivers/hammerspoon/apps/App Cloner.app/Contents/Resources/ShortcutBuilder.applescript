@@ -337,6 +337,9 @@ on customDialog(header, body, buttonList, hasInput, defaultText, lineCount, inpu
 	panelWin's setTitle:"App Cloner"
 	panelWin's |center|()
 	panelWin's setReleasedWhenClosed:false
+	-- Ensure the panel always becomes key, not just when a text field needs it,
+	-- so that Cmd key equivalents are dispatched even before the user clicks.
+	panelWin's setBecomesKeyOnlyIfNeeded:false
 
 	set contentView to panelWin's contentView
 
@@ -485,15 +488,26 @@ on tintedIconImage(srcImage, tintColor)
 	set tinted to current application's NSImage's alloc()'s initWithSize:sz
 	tinted's lockFocus()
 	set destRect to current application's NSMakeRect(0, 0, 128, 128)
-	-- Draw the original icon at full opacity
-	srcImage's drawInRect:destRect fromRect:(current application's NSZeroRect) operation:2 fraction:1.0
-	-- Overlay the tint colour at 50% alpha using sourceAtop compositing (value 5)
-	-- so the tint respects the icon's own alpha channel
 	set ctx to current application's NSGraphicsContext's currentContext
 	ctx's saveGraphicsState()
-	ctx's setCompositingOperation:5
-	set halfColor to tintColor's colorWithAlphaComponent:0.5
-	halfColor's setFill()
+	-- Pass 1: draw the original icon at full opacity
+	srcImage's drawInRect:destRect fromRect:(current application's NSZeroRect) operation:2 fraction:1.0
+	-- Pass 2: desaturate — Saturation compositing with a neutral gray replaces
+	-- each pixel's saturation with 0 while preserving its hue and luminosity
+	-- (which in practice means the icon is converted to grayscale). This gives
+	-- the tint overlay (Pass 3) a neutral base and prevents the icon's original
+	-- hue from contaminating the chosen tint colour.
+	ctx's setCompositingOperation:26  -- NSCompositingOperationSaturation
+	set grayFill to current application's NSColor's colorWithWhite:0.5 alpha:1.0
+	grayFill's setFill()
+	current application's NSBezierPath's fillRect:destRect
+	-- Pass 3: Screen blend of the tint colour. Screen leaves white (and near-white)
+	-- pixels unchanged — the formula is 1-(1-src)(1-dst), which yields 1 when
+	-- dst=1 regardless of src — so opaque white icon backgrounds are untouched.
+	-- Dark and mid-tone areas are shifted toward the tint hue without losing
+	-- their shape or contrast.
+	ctx's setCompositingOperation:15  -- NSCompositingOperationScreen
+	tintColor's setFill()
 	current application's NSBezierPath's fillRect:destRect
 	ctx's restoreGraphicsState()
 	tinted's unlockFocus()
@@ -518,6 +532,7 @@ on showTintColorPicker(appPath)
 	pickerPanel's setTitle:"App Cloner"
 	pickerPanel's |center|()
 	pickerPanel's setReleasedWhenClosed:false
+	pickerPanel's setBecomesKeyOnlyIfNeeded:false
 	set cv to pickerPanel's contentView
 
 	-- Header
@@ -620,21 +635,12 @@ end showTintColorPicker
 
 on installEditMenu()
 	try
-		-- NSApp is a C global, not a property; in AppleScript-ObjC we have to
-		-- go through NSApplication's sharedApplication. Wrap everything in
-		-- try/end try so a Cocoa hiccup never crashes the whole UI.
 		set theApp to current application's NSApplication's sharedApplication
-		set mainMenu to theApp's mainMenu
-		if mainMenu is missing value then
-			set mainMenu to current application's NSMenu's alloc()'s init
-			theApp's setMainMenu:mainMenu
-		end if
-		-- Skip if an Edit menu is already present (e.g. installed by the host)
-		set itemCount to mainMenu's numberOfItems as integer
-		repeat with i from 0 to (itemCount - 1)
-			set existing to ((mainMenu's itemAtIndex:i)'s |title|()) as text
-			if existing is "Edit" or existing is "Édition" then return
-		end repeat
+		-- Always rebuild the main menu from scratch. The existence check is unsafe:
+		-- osascript may return a non-nil stale menu object that prevents our Edit
+		-- items from being installed, silently leaving Cmd+V/A/C/X non-functional.
+		set mainMenu to current application's NSMenu's alloc()'s init
+		theApp's setMainMenu:mainMenu
 		set editItem to current application's NSMenuItem's alloc()'s initWithTitle:"Edit" action:(missing value) keyEquivalent:""
 		set editMenu to current application's NSMenu's alloc()'s initWithTitle:"Edit"
 		editMenu's addItemWithTitle:"Cut"        action:"cut:"        keyEquivalent:"x"
@@ -672,6 +678,13 @@ on rgbToHex(r, g, b)
 end rgbToHex
 
 on run argv
+	-- Promote osascript from background/accessory to a regular foreground app.
+	-- Without this, NSApp.sendEvent: never checks the main menu for key
+	-- equivalents — Cmd+V/A/C/X and every other shortcut are silently dropped
+	-- even though the windows are key and text input works.
+	set nsApp to current application's NSApplication's sharedApplication
+	nsApp's setActivationPolicy:0  -- NSApplicationActivationPolicyRegular
+
 	-- Install a standard Edit menu (Cut/Copy/Paste/Select All/Undo/Redo) so
 	-- the keyboard shortcuts work in every NSAlert text input we open later.
 	my installEditMenu()
@@ -802,12 +815,8 @@ on run argv
 					"Boîte de réception : https://outlook.office.com/mail/" & return & ¬
 					"Calendrier : https://outlook.office.com/calendar/"
 				try
-					-- lineCount = 1 (not -1): a wrapped multi-line NSTextField
-					-- swallows Enter as a newline and breaks Cmd+V routing on
-					-- some Tahoe builds. Single-line NSTextField makes Enter
-					-- trigger the default OK button via setKeyEquivalent.
 					set r to my customDialog("URL PWA", urlBody, ¬
-						{"Retour", "OK"}, true, pwaURL, 1, 600, false, "")
+						{"Retour", "OK"}, true, pwaURL, -1, 600, false, "")
 					if (chosenButton of r) is "Retour" then
 						set step to 3
 					else
