@@ -119,28 +119,28 @@ end trim
 --   * the user typed text instead of pasting a URL / path
 --   * a typo in the scheme such as «mstems:» or «msteams//» (missing colon)
 --   * a Teams clone with a non-Teams URL (and vice-versa) — best-effort hint
-on validateOpenArg(value, sourceAppPath)
-	if value is "" then return "Le champ est vide. Colle une URL ou un chemin de fichier."
+on validateOpenArg(inputVal, sourceAppPath)
+	if inputVal is "" then return "Le champ est vide. Colle une URL ou un chemin de fichier."
 
 	-- File-system path: must point to something that actually exists
-	if (value starts with "/") or (value starts with "~") then
-		set expanded to value
+	if (inputVal starts with "/") or (inputVal starts with "~") then
+		set expanded to inputVal
 		if expanded starts with "~" then
-			set expanded to (POSIX path of (path to home folder)) & (text 2 thru -1 of value)
+			set expanded to (POSIX path of (path to home folder)) & (text 2 thru -1 of inputVal)
 		end if
 		try
 			do shell script "test -e " & quoted form of expanded
 		on error
-			return "Le chemin « " & value & " » n'existe pas sur le disque."
+			return "Le chemin « " & inputVal & " » n'existe pas sur le disque."
 		end try
 		return ""
 	end if
 
 	-- URL: must contain «://» — most copy-paste typos break here
 	-- (e.g. «msteams:/l/chat», «https:/example.com», «msteams.com»).
-	if value does not contain "://" then
+	if inputVal does not contain "://" then
 		-- Tolerate the single-slash msteams form Microsoft documents
-		if not (value starts with "msteams:/l/" or value starts with "msteams:/calendar") then
+		if not (inputVal starts with "msteams:/l/" or inputVal starts with "msteams:/calendar") then
 			return "Format invalide. Une URL doit contenir « :// » (ex. https://… , msteams://… , slack://…)."
 		end if
 	end if
@@ -149,11 +149,11 @@ on validateOpenArg(value, sourceAppPath)
 	-- targets another product (and vice-versa). Pure heuristic, only
 	-- triggered when we're confident the mismatch is a typo.
 	set sourceLower to my toLower(sourceAppPath)
-	set valueLower to my toLower(value)
+	set inputLower to my toLower(inputVal)
 	set isTeamsSource to (sourceLower contains "teams")
-	set isTeamsURL to (valueLower starts with "msteams:")
-	set isHTTP to (valueLower starts with "http")
-	if isTeamsSource and not (isTeamsURL or isHTTP or (valueLower starts with "/")) then
+	set isTeamsURL to (inputLower starts with "msteams:")
+	set isHTTP to (inputLower starts with "http")
+	if isTeamsSource and not (isTeamsURL or isHTTP or (inputLower starts with "/")) then
 		return "Cette app source est Teams, mais l'URL ne commence pas par « msteams: » ni « https: »."
 	end if
 
@@ -201,9 +201,9 @@ end pwaSuggestionFor
 
 -- Validate a URL specifically for PWA mode. Stricter than validateOpenArg:
 -- requires http(s) since Edge --app= only accepts navigable web URLs.
-on validatePWAURL(value)
-	if value is "" then return "L'URL de la PWA est obligatoire en mode PWA."
-	set v to my toLower(value)
+on validatePWAURL(inputVal)
+	if inputVal is "" then return "L'URL de la PWA est obligatoire en mode PWA."
+	set v to my toLower(inputVal)
 	if not (v starts with "http://" or v starts with "https://") then
 		return "L'URL doit commencer par http:// ou https:// (Edge --app= n'accepte que des URLs web)."
 	end if
@@ -467,8 +467,8 @@ on installEditMenu()
 	end try
 end installEditMenu
 
-on askText(prompt, defaultValue, dialogTitle, widthPx, lineCount)
-	set r to my customDialog(dialogTitle, prompt, {"Annuler", "OK"}, true, defaultValue, lineCount, widthPx, false, "")
+on askText(promptText, defaultValue, dialogTitle, widthPx, lineCount)
+	set r to my customDialog(dialogTitle, promptText, {"Annuler", "OK"}, true, defaultValue, lineCount, widthPx, false, "")
 	if (chosenButton of r) is "Annuler" then error number -128
 	return inputText of r
 end askText
