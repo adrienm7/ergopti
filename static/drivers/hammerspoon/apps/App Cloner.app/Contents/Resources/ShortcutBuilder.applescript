@@ -105,7 +105,8 @@ on doUpdatePreview()
 	try
 		set currentColor to (my tintPreviewColorWell)'s color()
 		set tinted to my tintedIconImage((my tintPreviewSourceImage), currentColor)
-		(my tintPreviewImageView)'s setImage:tinted
+		set imgView to my tintPreviewImageView
+		imgView's setImage:tinted
 	end try
 end doUpdatePreview
 
