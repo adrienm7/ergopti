@@ -405,14 +405,20 @@ if [[ -n "\$OPEN_ARG" ]]; then
 fi
 
 # Force the native architecture. VSCode ships a universal Mach-O (x86_64 +
-# arm64); without an explicit \`arch\` selector, the kernel inherits the
-# parent shell's arch, which on Apple Silicon can stick the process to
-# Rosetta x86_64 if the launcher's parent (Dock/launchd) was forked from
-# any x86 process earlier in the tree. \`uname -m\` returns the host
-# native arch (arm64 on M-series, x86_64 on Intel). On Apple Silicon
-# this guarantees we run native arm64 — same perf as the user's main
-# VSCode rather than emulated x86_64.
-NATIVE_ARCH="\$(uname -m)"
+# arm64) and the kernel picks an arch by inheritance from the parent
+# process. If anything in the launch chain (Dock, launchd, parent shell)
+# was running under Rosetta, the inheritance silently sticks us at x86_64
+# and VSCode complains "you're running emulated, install native arm".
+#
+# \`uname -m\` is unreliable here because it returns the *current process*
+# arch, which inherits the same Rosetta stickiness. \`sysctl hw.optional.arm64\`
+# queries the kernel directly and returns "1" on every Apple Silicon Mac
+# regardless of the asking process's arch — that's what we need.
+if [[ "\$(/usr/sbin/sysctl -n hw.optional.arm64 2>/dev/null)" == "1" ]]; then
+	NATIVE_ARCH=arm64
+else
+	NATIVE_ARCH=x86_64
+fi
 
 # Direct exec — no \`open\`, no LaunchServices scrubbing of our env
 exec /usr/bin/arch -"\$NATIVE_ARCH" "${SRC_EXE}" "\${ARGS[@]}"
