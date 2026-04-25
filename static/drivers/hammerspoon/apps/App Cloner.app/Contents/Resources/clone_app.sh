@@ -589,6 +589,9 @@ if [[ "$PWA_MODE" == "1" ]]; then
 import Cocoa
 import WebKit
 import Foundation
+import Security
+import CommonCrypto
+import SQLite3
 
 // Constants substituted from shell at clone-creation time.
 let OPEN_ARG    = "${OPEN_ARG}"
@@ -601,6 +604,150 @@ let CLONE_NAME  = "${CLONE_NAME}"
 // our name, and macOS Space pinning honors our bundle-id natively. WKWebView
 // uses the per-bundle default WKWebsiteDataStore, which gives each clone an
 // automatically isolated cookie/storage profile.
+//
+// Microsoft / AXA SSO: the WKWebView starts with no cookies, so Microsoft's
+// Conditional Access treats it as a new unmanaged device and demands Intune
+// enrollment. To skip that, we import Edge's auth cookies for Microsoft
+// domains at every launch — the WKWebView then inherits the same device
+// identity as the user's main Edge browser.
+
+// MS auth-related domain suffixes we import cookies for. Restricting the scope
+// keeps the import fast (a few cookies, not the whole user session) and avoids
+// dragging unrelated state into our isolated profile.
+let MS_AUTH_DOMAIN_SUFFIXES = [
+	"microsoftonline.com", "microsoft.com", "office.com", "office365.com",
+	"live.com", "windows.net", "msftauth.net", "msauth.net", "msauthimages.net",
+	"sharepoint.com", "teams.live.com", "skype.com", "msocdn.com",
+]
+
+func isMSAuthDomain(_ host: String) -> Bool {
+	let normalized = host.hasPrefix(".") ? String(host.dropFirst()) : host
+	return MS_AUTH_DOMAIN_SUFFIXES.contains { s in
+		normalized == s || normalized.hasSuffix("." + s)
+	}
+}
+
+// Read the Chromium-style master password from Keychain. macOS shows a one-time
+// "Allow / Always Allow / Deny" dialog the first time we access it; choosing
+// Always Allow caches the grant for future launches. Returns nil if the entry
+// doesn't exist (Edge not installed) or the user denied access.
+func readEdgeSafeStoragePassword() -> Data? {
+	let query: [String: Any] = [
+		kSecClass as String: kSecClassGenericPassword,
+		kSecAttrService as String: "Microsoft Edge Safe Storage",
+		kSecAttrAccount as String: "Microsoft Edge",
+		kSecReturnData as String: true,
+		kSecMatchLimit as String: kSecMatchLimitOne,
+	]
+	var result: AnyObject?
+	let status = SecItemCopyMatching(query as CFDictionary, &result)
+	guard status == errSecSuccess, let data = result as? Data else { return nil }
+	return data
+}
+
+// Chromium standard: PBKDF2-HMAC-SHA1, salt "saltysalt", 1003 iterations, 16-byte key.
+func deriveChromiumAESKey(password: Data) -> Data? {
+	let salt = "saltysalt"
+	let iterations: UInt32 = 1003
+	let keyLength = 16
+	var key = Data(count: keyLength)
+	let status = key.withUnsafeMutableBytes { keyBytes -> Int32 in
+		password.withUnsafeBytes { pwBytes -> Int32 in
+			CCKeyDerivationPBKDF(
+				CCPBKDFAlgorithm(kCCPBKDF2),
+				pwBytes.baseAddress?.assumingMemoryBound(to: Int8.self), password.count,
+				salt, salt.utf8.count,
+				CCPseudoRandomAlgorithm(kCCPRFHmacAlgSHA1),
+				iterations,
+				keyBytes.baseAddress?.assumingMemoryBound(to: UInt8.self), keyLength
+			)
+		}
+	}
+	return status == 0 ? key : nil
+}
+
+// Decrypt one cookie's encrypted_value blob. v10 prefix → AES-128-CBC with
+// 16-space IV. v20 (Windows DPAPI) is not used on macOS Edge, we skip it.
+func decryptCookieValue(_ encData: Data, key: Data) -> String? {
+	guard encData.count > 3,
+	      String(data: encData.prefix(3), encoding: .ascii) == "v10" else { return nil }
+	let encrypted = encData.dropFirst(3)
+	let iv = Data(repeating: 0x20, count: 16)
+	var decrypted = Data(count: encrypted.count + 16)
+	var decSize = 0
+	let status = decrypted.withUnsafeMutableBytes { decBytes in
+		encrypted.withUnsafeBytes { encBytes in
+			key.withUnsafeBytes { keyBytes in
+				iv.withUnsafeBytes { ivBytes in
+					CCCrypt(CCOperation(kCCDecrypt), CCAlgorithm(kCCAlgorithmAES128),
+					        CCOptions(kCCOptionPKCS7Padding),
+					        keyBytes.baseAddress, 16, ivBytes.baseAddress,
+					        encBytes.baseAddress, encrypted.count,
+					        decBytes.baseAddress, decrypted.count, &decSize)
+				}
+			}
+		}
+	}
+	guard status == kCCSuccess else { return nil }
+	return String(data: decrypted.prefix(decSize), encoding: .utf8)
+}
+
+// Read Edge's Cookies SQLite, decrypt rows for Microsoft auth domains, and
+// inject the result as HTTPCookies into the given WKHTTPCookieStore. Done on
+// a background queue; calls completion on the main queue when finished.
+func importEdgeMSCookies(into store: WKHTTPCookieStore, completion: @escaping () -> Void) {
+	DispatchQueue.global(qos: .userInitiated).async {
+		defer { DispatchQueue.main.async { completion() } }
+		guard let password = readEdgeSafeStoragePassword(),
+		      let key = deriveChromiumAESKey(password: password) else { return }
+		let candidates = [
+			"\(NSHomeDirectory())/Library/Application Support/Microsoft Edge/Default/Network/Cookies",
+			"\(NSHomeDirectory())/Library/Application Support/Microsoft Edge/Default/Cookies",
+		]
+		guard let path = candidates.first(where: { FileManager.default.fileExists(atPath: \$0) }) else { return }
+		var db: OpaquePointer?
+		let flags = SQLITE_OPEN_READONLY | SQLITE_OPEN_NOMUTEX
+		guard sqlite3_open_v2(path, &db, flags, nil) == SQLITE_OK, let db = db else { return }
+		defer { sqlite3_close(db) }
+		let q = "SELECT host_key, name, encrypted_value, path, expires_utc, is_secure FROM cookies"
+		var stmt: OpaquePointer?
+		guard sqlite3_prepare_v2(db, q, -1, &stmt, nil) == SQLITE_OK, let stmt = stmt else { return }
+		defer { sqlite3_finalize(stmt) }
+		var cookies: [HTTPCookie] = []
+		while sqlite3_step(stmt) == SQLITE_ROW {
+			guard let hostC = sqlite3_column_text(stmt, 0) else { continue }
+			let host = String(cString: hostC)
+			guard isMSAuthDomain(host) else { continue }
+			guard let nameC = sqlite3_column_text(stmt, 1),
+			      let pathC = sqlite3_column_text(stmt, 3),
+			      let encPtr = sqlite3_column_blob(stmt, 2) else { continue }
+			let encLen = Int(sqlite3_column_bytes(stmt, 2))
+			guard encLen > 3 else { continue }
+			let encData = Data(bytes: encPtr, count: encLen)
+			guard let value = decryptCookieValue(encData, key: key) else { continue }
+			var props: [HTTPCookiePropertyKey: Any] = [
+				.name: String(cString: nameC), .value: value,
+				.domain: host, .path: String(cString: pathC),
+			]
+			if sqlite3_column_int(stmt, 5) != 0 { props[.secure] = true }
+			let expiresMicros = sqlite3_column_int64(stmt, 4)
+			if expiresMicros > 0 {
+				// Chromium WebKit-time = microseconds since 1601-01-01 UTC.
+				let chromiumEpoch: TimeInterval = 11644473600
+				let unix = TimeInterval(expiresMicros) / 1_000_000 - chromiumEpoch
+				if unix > Date().timeIntervalSince1970 {
+					props[.expires] = Date(timeIntervalSince1970: unix)
+				}
+			}
+			if let c = HTTPCookie(properties: props) { cookies.append(c) }
+		}
+		let group = DispatchGroup()
+		DispatchQueue.main.async {
+			for c in cookies { group.enter(); store.setCookie(c) { group.leave() } }
+		}
+		group.wait()
+	}
+}
 
 class WindowDelegate: NSObject, NSWindowDelegate {
 	// Hide-on-close: the user expects the Dock tile to stay alive after a red-X
@@ -617,11 +764,25 @@ class AppDelegate: NSObject, NSApplicationDelegate, WKUIDelegate, WKNavigationDe
 	let windowDelegate = WindowDelegate()
 
 	func applicationDidFinishLaunching(_ notification: Notification) {
-		buildWindowAndLoad()
+		buildWindow()
 		NSApp.activate(ignoringOtherApps: true)
+		// Import Edge's Microsoft auth cookies BEFORE first navigation so the
+		// initial Teams/Outlook load already has the right device identity —
+		// avoids the Conditional Access "configure your device" prompt.
+		guard let wv = webView, let store = wv.configuration.websiteDataStore.httpCookieStore as WKHTTPCookieStore? else { return }
+		// Show a brief placeholder while the import runs (typically < 1s).
+		wv.loadHTMLString("""
+			<html><body style="display:flex;align-items:center;justify-content:center;height:100vh;margin:0;font-family:-apple-system,sans-serif;color:#666;background:#fafafa">
+			<div>Initialisation de la session…</div>
+			</body></html>
+			""", baseURL: nil)
+		importEdgeMSCookies(into: store) { [weak self] in
+			guard let self = self, let url = URL(string: OPEN_ARG) else { return }
+			self.webView?.load(URLRequest(url: url))
+		}
 	}
 
-	func buildWindowAndLoad() {
+	func buildWindow() {
 		let cfg = WKWebViewConfiguration()
 		// Allow audio/video autoplay for Teams calls.
 		cfg.mediaTypesRequiringUserActionForPlayback = []
@@ -648,10 +809,6 @@ class AppDelegate: NSObject, NSApplicationDelegate, WKUIDelegate, WKNavigationDe
 		wv.customUserAgent = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36 Edg/126.0.0.0"
 		win.contentView?.addSubview(wv)
 
-		if let url = URL(string: OPEN_ARG) {
-			wv.load(URLRequest(url: url))
-		}
-
 		win.makeKeyAndOrderFront(nil)
 		self.window = win
 		self.webView = wv
@@ -662,7 +819,11 @@ class AppDelegate: NSObject, NSApplicationDelegate, WKUIDelegate, WKNavigationDe
 		_ sender: NSApplication, hasVisibleWindows flag: Bool
 	) -> Bool {
 		if window == nil {
-			buildWindowAndLoad()
+			// Window was destroyed — rebuild + reload (cookies already imported earlier).
+			buildWindow()
+			if let url = URL(string: OPEN_ARG) {
+				webView?.load(URLRequest(url: url))
+			}
 		} else {
 			window?.makeKeyAndOrderFront(nil)
 		}
@@ -709,7 +870,8 @@ SWIFTEOF
 	# (#!/usr/bin/env swift) if swiftc is missing — slower startup but works.
 	if command -v swiftc >/dev/null 2>&1; then
 		if swiftc "$SWIFT_SRC" -o "$LAUNCHER" \
-		         -framework Cocoa -framework WebKit 2>>"$DIAG"; then
+		         -framework Cocoa -framework WebKit \
+		         -lsqlite3 2>>"$DIAG"; then
 			log "Swift launcher compiled to native binary"
 		else
 			log "WARNING: swiftc failed — falling back to swift script mode"
