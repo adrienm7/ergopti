@@ -139,9 +139,14 @@ on run argv
 	logmsg("résultat: " & result_path)
 
 	if result_path does not start with "/" then
-		display dialog "❌  Échec de la création du clone." & return & return ¬
-			& "Détails : " & raw ¬
-			buttons {"OK"} default button 1 with title "App Cloner"
+		set errDlg to display dialog "❌  Échec de la création du clone" & return & return ¬
+			& "Le diagnostic complet est dans /tmp/clone_diag.log" ¬
+			buttons {"Ouvrir le log", "Fermer"} ¬
+			default button 1 ¬
+			with title "App Cloner"
+		if button returned of errDlg is "Ouvrir le log" then
+			do shell script "open -e /tmp/clone_diag.log"
+		end if
 		return
 	end if
 
