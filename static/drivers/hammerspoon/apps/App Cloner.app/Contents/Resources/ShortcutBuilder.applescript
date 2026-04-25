@@ -27,61 +27,66 @@ use scripting additions
 --   * input + checkbox (used by the summary screen for the badge toggle)
 -- ─────────────────────────────────────────────────────────────────────────
 
--- DialogState is the AppleScript-ObjC bridge target for NSButton actions.
+-- The script itself acts as the AppleScript-ObjC bridge target for NSButton
+-- actions. setTarget:me + top-level `on btnXClicked:sender` handlers are the
+-- canonical pattern that works in plain osascript.
 -- AppleScript script objects can serve as Cocoa targets when their handler
 -- names end with `:` — Cocoa dispatches `btnXClicked:` to handler
 -- `btnXClicked:` on this object. We store the picked button index and the
 -- captured input/checkbox values here so customDialog() can read them back
 -- after the modal returns.
-script DialogState
-	-- This `parent` declaration makes DialogState an actual NSObject subclass
-	-- in the Cocoa runtime — without it, `setTarget:DialogState` registers a
-	-- target that Cocoa can't dispatch to, and every button click is dropped
-	-- silently. With it, AppleScript's btnXClicked: handlers map to Cocoa
-	-- selectors of the same name and the responder chain works.
-	property parent : class "NSObject"
-	property panelResult : 0          -- 1-based button index, 0 if cancelled
-	property panelInputText : ""
-	property panelChecked : false
-	property panelInputView : missing value
-	property panelCheckboxView : missing value
-	property panelIsTextView : false  -- true if input is NSTextView, false for NSTextField
+-- Dialog state held as top-level properties of the running script. We use
+-- `setTarget:me` for button actions — `me` (the script itself) is the
+-- canonical NSObject target that osascript exposes to Cocoa, and top-level
+-- handlers `on btnXClicked:sender` are bridged 1:1 to Cocoa selectors of
+-- the same name. Trying to wrap this in a `script Foo ... end script`
+-- with `property parent : class "NSObject"` works in app bundles but
+-- crashes when the file is run by raw osascript on macOS Tahoe — hence
+-- the flat top-level layout.
+property panelResult : 0          -- 1-based button index, 0 if cancelled
+property panelInputText : ""
+property panelChecked : false
+property panelInputView : missing value
+property panelCheckboxView : missing value
+property panelIsTextView : false  -- true for NSTextView, false for NSTextField
 
-	on captureValues()
-		if panelInputView is not missing value then
-			try
-				if panelIsTextView then
-					set panelInputText to (panelInputView's |string|()) as text
-				else
-					set panelInputText to (panelInputView's stringValue()) as text
-				end if
-			end try
-		end if
-		if panelCheckboxView is not missing value then
-			try
-				set panelChecked to ((panelCheckboxView's state()) as integer) is 1
-			end try
-		end if
-	end captureValues
+on captureDialogValues()
+	-- `my` qualifier is mandatory inside handlers; without it, AppleScript
+	-- creates a local variable that shadows the script property, and the
+	-- caller never sees the captured value.
+	if (my panelInputView) is not missing value then
+		try
+			if my panelIsTextView then
+				set my panelInputText to ((my panelInputView)'s |string|()) as text
+			else
+				set my panelInputText to ((my panelInputView)'s stringValue()) as text
+			end if
+		end try
+	end if
+	if (my panelCheckboxView) is not missing value then
+		try
+			set my panelChecked to (((my panelCheckboxView)'s state()) as integer) is 1
+		end try
+	end if
+end captureDialogValues
 
-	on btn1Clicked:sender
-		my captureValues()
-		set panelResult to 1
-		(current application's NSApplication's sharedApplication())'s stopModal()
-	end btn1Clicked:
+on btn1Clicked:sender
+	captureDialogValues()
+	set my panelResult to 1
+	(current application's NSApplication's sharedApplication())'s stopModal()
+end btn1Clicked:
 
-	on btn2Clicked:sender
-		my captureValues()
-		set panelResult to 2
-		(current application's NSApplication's sharedApplication())'s stopModal()
-	end btn2Clicked:
+on btn2Clicked:sender
+	captureDialogValues()
+	set my panelResult to 2
+	(current application's NSApplication's sharedApplication())'s stopModal()
+end btn2Clicked:
 
-	on btn3Clicked:sender
-		my captureValues()
-		set panelResult to 3
-		(current application's NSApplication's sharedApplication())'s stopModal()
-	end btn3Clicked:
-end script
+on btn3Clicked:sender
+	captureDialogValues()
+	set my panelResult to 3
+	(current application's NSApplication's sharedApplication())'s stopModal()
+end btn3Clicked:
 
 -- Rough text-width estimator (no NSAttributedString.size to keep it pure
 -- AppleScript). Buttons are clamped between 90 and 220 pixels.
@@ -215,8 +220,8 @@ on customDialog(header, body, buttonList, hasInput, defaultText, lineCount, inpu
 			inputView's setStringValue:defaultText
 			inputView's setFont:(current application's NSFont's systemFontOfSize:13)
 			contentView's addSubview:inputView
-			set DialogState's panelInputView to inputView
-			set DialogState's panelIsTextView to false
+			set my panelInputView to inputView
+			set my panelIsTextView to false
 		else
 			set scrollView to current application's NSScrollView's alloc()'s initWithFrame:inputFrame
 			scrollView's setHasVerticalScroller:true
@@ -228,11 +233,11 @@ on customDialog(header, body, buttonList, hasInput, defaultText, lineCount, inpu
 			textView's setString:defaultText
 			scrollView's setDocumentView:textView
 			contentView's addSubview:scrollView
-			set DialogState's panelInputView to textView
-			set DialogState's panelIsTextView to true
+			set my panelInputView to textView
+			set my panelIsTextView to true
 		end if
 	else
-		set DialogState's panelInputView to missing value
+		set my panelInputView to missing value
 	end if
 
 	-- Checkbox (optional)
@@ -244,9 +249,9 @@ on customDialog(header, body, buttonList, hasInput, defaultText, lineCount, inpu
 		cb's setTitle:checkboxLabel
 		cb's setState:0
 		contentView's addSubview:cb
-		set DialogState's panelCheckboxView to cb
+		set my panelCheckboxView to cb
 	else
-		set DialogState's panelCheckboxView to missing value
+		set my panelCheckboxView to missing value
 	end if
 
 	-- Buttons row, right-to-left so the rightmost = default
@@ -260,7 +265,7 @@ on customDialog(header, body, buttonList, hasInput, defaultText, lineCount, inpu
 		set btn to current application's NSButton's alloc()'s initWithFrame:btnFrame
 		btn's setTitle:btnTitle
 		btn's setBezelStyle:1 -- rounded
-		btn's setTarget:DialogState
+		btn's setTarget:me
 		if i = 1 then
 			btn's setAction:"btn1Clicked:"
 			-- Leftmost = cancel-style: bind Esc
@@ -276,19 +281,19 @@ on customDialog(header, body, buttonList, hasInput, defaultText, lineCount, inpu
 	end repeat
 
 	-- Reset state, focus the input if any, and run modal
-	set DialogState's panelResult to 0
-	set DialogState's panelInputText to ""
-	set DialogState's panelChecked to false
+	set my panelResult to 0
+	set my panelInputText to ""
+	set my panelChecked to false
 	if hasInput then
-		win's makeFirstResponder:(DialogState's panelInputView)
+		win's makeFirstResponder:(my panelInputView)
 	end if
 
 	(current application's NSApplication's sharedApplication())'s runModalForWindow:win
 	win's orderOut:(missing value)
 
-	if DialogState's panelResult is 0 then error number -128
+	if my panelResult is 0 then error number -128
 
-	return {chosenButton:(item (DialogState's panelResult) of buttonList), inputText:(DialogState's panelInputText), checked:(DialogState's panelChecked)}
+	return {chosenButton:(item (my panelResult) of buttonList), inputText:(my panelInputText), checked:(my panelChecked)}
 end customDialog
 
 -- Convenience wrappers around customDialog so call sites stay readable.

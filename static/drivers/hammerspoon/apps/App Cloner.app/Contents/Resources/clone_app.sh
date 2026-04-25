@@ -510,21 +510,37 @@ case "$APP_FAMILY" in
 		LAUNCHER_ARGS_LITERAL='ARGS=()' ;;
 esac
 
-# Per-clone unread-badge helper — generated when BADGE_ENABLED=1.
+# Per-clone unread-badge helper.
 #
-# Architecture decision: the macOS Dock badge can only be set by the
-# process that owns the corresponding NSDockTile, and Teams owns its
-# own tile. We can't override it without a full Cocoa wrapper that
-# competes with Teams for the tile, which would either lose the race
-# or duplicate Dock entries. Instead, the helper surfaces the per-clone
-# unread count as a NSStatusItem in the macOS menu bar — always visible,
-# zero conflict with Teams, no extra Dock tile.
+# Status: NOT YET IMPLEMENTED in a way that puts the badge on the clone's
+# own Dock tile. macOS only lets the process that owns a Dock tile set
+# its badge — and that process is Teams itself (via __CFBundleIdentifier
+# override). To override Teams' badge from outside requires either:
 #
-# Display: ⚪ NomDuClone        → 0 unread
-#          🔴 NomDuClone (3)    → 3 unread for this chat
-#          ⚫ NomDuClone        → Teams not running
-#          ⚠ NomDuClone         → Accessibility permission missing
+#   (a) A Cocoa wrapper that becomes the running NSApp under the clone's
+#       bundle id and competes with Teams for the tile. Outcome: race
+#       condition between Teams' total-unread badge and our per-chat
+#       badge — flickering. Or two separate Dock tiles per clone.
+#
+#   (b) DYLD library injection into Teams that overrides its badge calls.
+#       Requires shipping a compiled .dylib + Teams to allow third-party
+#       library injection (entitlement-dependent on the Teams build).
+#
+# The BADGE_ENABLED flag is persisted in the bundle so a future Cocoa
+# wrapper or dylib hook can read it and activate. For now the helper
+# is a no-op stub.
 if [[ "$BADGE_ENABLED" == "1" ]]; then
+	# Persist the flag in a config file for future activation by a proper
+	# Cocoa wrapper. Today the launcher does not spawn a helper.
+	cat > "$RES/badge_config.sh" <<EOF
+BADGE_ENABLED=1
+CHAT_URL=$(printf %q "$OPEN_ARG")
+CLONE_NAME=$(printf %q "$CLONE_NAME")
+EOF
+	log "Badge enabled — config saved to $RES/badge_config.sh (no live helper yet)"
+
+	# Stub kept for reference; current implementation deliberately disabled
+	# pending architectural decision on the wrapper approach.
 	cat > "$RES/badge_helper.py" <<'BADGEEOF'
 #!/usr/bin/env python3
 """Per-clone unread-count menu bar daemon.
@@ -739,13 +755,11 @@ set -e
 # tinted icon instead of VSCode's default blue one beside ours.
 export __CFBundleIdentifier="${UNIQUE_ID}"
 
-# If badging is enabled, spawn the menu bar helper in the background.
-# Args: clone_id, clone_name, chat_url, our PID (so it auto-exits when
-# this launcher / Teams process dies).
-if [[ "${BADGE_ENABLED}" == "1" ]] && [[ -f "${RES}/badge_helper.py" ]]; then
-	/usr/bin/python3 "${RES}/badge_helper.py" \\
-		"${UNIQUE_ID}" "${CLONE_NAME}" "${OPEN_ARG}" "\$\$" &
-fi
+# BADGE_ENABLED is persisted in Resources/badge_config.sh for a future
+# Cocoa wrapper or DYLD-injected dylib to consume. The current launcher
+# does not spawn any helper — the menu bar approach was pulled per user
+# feedback, and the real-Dock-badge approach is gated on architectural
+# decisions documented in clone_app.sh's section 6 comments.
 
 # Family-specific launch args. VSCode gets the full triplet so it shares
 # extensions and settings with the user's main install. Generic Electron
