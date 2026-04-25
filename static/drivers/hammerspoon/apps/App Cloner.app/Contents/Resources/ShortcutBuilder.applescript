@@ -107,7 +107,7 @@ on doUpdatePreview()
 	if (my tintPreviewImageView) is missing value then return
 	if (my tintPreviewSourceImage) is missing value then return
 	try
-		set currentColor to (my tintPreviewColorWell)'s color
+		set currentColor to (my tintPreviewColorWell)'s |color|
 		set tinted to my tintedIconImage((my tintPreviewSourceImage), currentColor)
 		set imgView to my tintPreviewImageView
 		imgView's setImage:tinted
@@ -605,9 +605,17 @@ on showTintColorPicker(appPath)
 	set my tintPreviewColorWell to missing value
 	set my tintPreviewSourceImage to missing value
 
+	-- Close the system NSColorPanel that the NSColorWell brings up — it is
+	-- a separate window that does not belong to our modal session and would
+	-- otherwise stay floating on screen after the user clicks Valider/Retour.
+	try
+		set sharedColorPanel to current application's NSColorPanel's sharedColorPanel
+		sharedColorPanel's orderOut:(missing value)
+	end try
+
 	-- btn1 = Retour, btn2 = Valider
 	if my panelResult is not 2 then return missing value
-	return colorWell's color
+	return colorWell's |color|
 end showTintColorPicker
 
 on installEditMenu()
@@ -624,7 +632,7 @@ on installEditMenu()
 		-- Skip if an Edit menu is already present (e.g. installed by the host)
 		set itemCount to mainMenu's numberOfItems as integer
 		repeat with i from 0 to (itemCount - 1)
-			set existing to ((mainMenu's itemAtIndex:i)'s title()) as text
+			set existing to ((mainMenu's itemAtIndex:i)'s |title|()) as text
 			if existing is "Edit" or existing is "Édition" then return
 		end repeat
 		set editItem to current application's NSMenuItem's alloc()'s initWithTitle:"Edit" action:(missing value) keyEquivalent:""
@@ -794,8 +802,12 @@ on run argv
 					"Boîte de réception : https://outlook.office.com/mail/" & return & ¬
 					"Calendrier : https://outlook.office.com/calendar/"
 				try
+					-- lineCount = 1 (not -1): a wrapped multi-line NSTextField
+					-- swallows Enter as a newline and breaks Cmd+V routing on
+					-- some Tahoe builds. Single-line NSTextField makes Enter
+					-- trigger the default OK button via setKeyEquivalent.
 					set r to my customDialog("URL PWA", urlBody, ¬
-						{"Retour", "OK"}, true, pwaURL, -1, 600, false, "")
+						{"Retour", "OK"}, true, pwaURL, 1, 600, false, "")
 					if (chosenButton of r) is "Retour" then
 						set step to 3
 					else
