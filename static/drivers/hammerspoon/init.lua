@@ -405,24 +405,17 @@ shortcuts.start_script_control(keymap, shortcuts, gestures, karabiner)
 
 Logger.info(LOG, "User interface initialized successfully.")
 
--- Generate AppIcon.icns for bundled apps that ship only an SVG source.
--- Runs asynchronously so it never blocks startup; skipped if already done.
+-- App Cloner builds its own icon at first launch (see Contents/MacOS/AppCloner).
+-- Encryptor still uses make_icon.sh on Hammerspoon startup since it doesn't
+-- have a Python launcher to do lazy generation; keep its hook only.
 hs.timer.doAfter(2, function()
-	local apps_base = hs.configdir .. "/apps"
-	local ok, app_list = pcall(hs.execute, string.format(
-		"find %q -maxdepth 1 -name '*.app' 2>/dev/null", apps_base
-	))
-	if not ok then return end
-	for app_path in (app_list or ""):gmatch("[^\n]+") do
-		local make_icon = app_path .. "/Contents/Resources/make_icon.sh"
-		local icns_out  = app_path .. "/Contents/Resources/AppIcon.icns"
-		-- Only run if the script exists and the .icns hasn't been generated yet
-		local needs_gen = hs.execute(string.format("test -f %q && echo yes || echo no", icns_out)):find("no")
-		local has_script = hs.execute(string.format("test -f %q && echo yes || echo no", make_icon)):find("yes")
-		if needs_gen and has_script then
-			Logger.info(LOG, "Generating AppIcon.icns for %s…", app_path:match("([^/]+)%.app$") or app_path)
-			pcall(hs.execute, string.format("zsh %q &", make_icon))
-		end
+	local encryptor_make = hs.configdir .. "/apps/Encryptor.app/Contents/Resources/make_icon.sh"
+	local encryptor_icns = hs.configdir .. "/apps/Encryptor.app/Contents/Resources/AppIcon.icns"
+	local needs_gen  = hs.execute(string.format("test -f %q && echo yes || echo no", encryptor_icns)):find("no")
+	local has_script = hs.execute(string.format("test -f %q && echo yes || echo no", encryptor_make)):find("yes")
+	if needs_gen and has_script then
+		Logger.info(LOG, "Generating AppIcon.icns for Encryptor…")
+		pcall(hs.execute, string.format("zsh %q &", encryptor_make))
 	end
 end)
 

@@ -1,5 +1,5 @@
 #!/bin/zsh
-# apps/AppCloner.app/Contents/Resources/clone_app.sh
+# apps/App Cloner.app/Contents/Resources/clone_app.sh
 # Usage: clone_app.sh <source_app_path> <clone_name> <color_hex> <open_arg>
 #
 # Stub-bundle approach (NOT full clone): we create a tiny ~50 KB bundle that

@@ -6,16 +6,38 @@ import os
 import subprocess
 import sys
 
+def ensure_icon(resources_dir, log):
+    """Build AppIcon.icns from AppIcon.svg if missing or stale.
+
+    Self-contained icon generation — App Cloner no longer depends on
+    Hammerspoon's startup hook to build its own icon. Runs make_icon.sh
+    when AppIcon.icns is absent OR when AppIcon.svg is newer than it.
+    """
+    svg  = os.path.join(resources_dir, "AppIcon.svg")
+    icns = os.path.join(resources_dir, "AppIcon.icns")
+    script = os.path.join(resources_dir, "make_icon.sh")
+    if not os.path.exists(svg) or not os.path.exists(script):
+        return
+    needs_build = (
+        not os.path.exists(icns)
+        or os.path.getmtime(svg) > os.path.getmtime(icns)
+    )
+    if needs_build:
+        log.write(f"[AppCloner] regenerating icon from {svg}\n")
+        subprocess.run(["zsh", script], capture_output=True)
+
 def main():
     script_path = os.path.realpath(__file__)
     macos_dir   = os.path.dirname(script_path)
     app_root    = os.path.dirname(os.path.dirname(macos_dir))
-    applescript = os.path.join(app_root, "Contents", "Resources", "ShortcutBuilder.applescript")
+    resources   = os.path.join(app_root, "Contents", "Resources")
+    applescript = os.path.join(resources, "ShortcutBuilder.applescript")
     log_path    = "/tmp/appcloner.log"
 
     with open(log_path, "a") as log:
         log.write(f"[AppCloner] app_root={app_root}\n")
         log.write(f"[AppCloner] applescript={applescript}\n")
+        ensure_icon(resources, log)
 
     result = subprocess.run(
         ["osascript", applescript, app_root],

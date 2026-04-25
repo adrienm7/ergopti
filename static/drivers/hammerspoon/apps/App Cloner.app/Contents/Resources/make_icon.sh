@@ -1,6 +1,9 @@
 #!/bin/zsh
-# apps/AppCloner.app/Contents/Resources/make_icon.sh
-# Génère AppIcon.icns depuis AppIcon.svg — exécuté au démarrage Hammerspoon.
+# apps/App Cloner.app/Contents/Resources/make_icon.sh
+# Builds AppIcon.icns from AppIcon.svg.
+# Invoked automatically by Contents/MacOS/AppCloner when the .icns is missing
+# or older than the SVG — the bundle is fully self-contained, no Hammerspoon
+# startup hook required.
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
@@ -32,8 +35,21 @@ cp "$PNG"          "$ICONSET/icon_512x512@2x.png"
 iconutil -c icns "$ICONSET" -o "$ICNS"
 
 BUNDLE_DIR="$(cd "$SCRIPT_DIR/../.." && pwd)"
+
+# Force Finder/Dock to drop their cached icon for this bundle. Without these
+# steps, even after regenerating AppIcon.icns, Finder keeps showing the old
+# icon (cached by inode + bundle id). Sequence:
+#   1. Re-touch the bundle so its mtime changes → invalidates per-bundle
+#      icon cache entries
+#   2. Force-delete any per-app icon stored in the user's icon services
+#      cache for this specific bundle path
+#   3. Re-register with LaunchServices so it re-reads CFBundleIconFile
+#   4. killall Dock + Finder so they reload icons from disk
 touch "$BUNDLE_DIR"
-/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister \
-  -f "$BUNDLE_DIR" >/dev/null 2>&1 || true
+LSR=/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister
+"$LSR" -u "$BUNDLE_DIR" >/dev/null 2>&1 || true
+"$LSR" -f -r "$BUNDLE_DIR" >/dev/null 2>&1 || true
+killall Dock 2>/dev/null || true
+killall Finder 2>/dev/null || true
 
 echo "Icône générée : $ICNS"
