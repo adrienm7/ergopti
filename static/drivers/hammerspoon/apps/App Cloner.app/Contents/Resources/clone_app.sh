@@ -574,27 +574,27 @@ if [[ "$PWA_MODE" == "1" ]]; then
 # with our stub tile — tinted icon, not the generic Edge icon.
 export __CFBundleIdentifier="${UNIQUE_ID}"
 
-# If the PWA is already running (detected by a lock file Chromium writes in
-# the profile dir), bring it to the foreground via AppleScript instead of
-# launching a second instance, which would open a plain browser tab.
-LOCK_FILE="${PWA_PROFILE_DIR}/SingletonLock"
-if [[ -e "\$LOCK_FILE" ]]; then
-	# Resolve the PID from the lock symlink target ("HOST-PID")
-	LOCK_TARGET="\$(readlink "\$LOCK_FILE" 2>/dev/null || echo "")"
-	LOCK_PID="\${LOCK_TARGET##*-}"
-	if [[ -n "\$LOCK_PID" ]] && kill -0 "\$LOCK_PID" 2>/dev/null; then
-		# Process is alive — activate it via osascript and exit
-		osascript -e "tell application \"System Events\" to set frontmost of (first process whose unix id is \$LOCK_PID) to true" 2>/dev/null || true
-		exit 0
-	fi
+# Detect whether this PWA's Chromium instance is already running by scanning
+# live processes for the exact --user-data-dir flag. SingletonLock is
+# unreliable: it may hold the PID of a short-lived helper that has already
+# exited, causing a false-negative and opening a duplicate browser tab.
+RUNNING_PID="\$(pgrep -f -- "--user-data-dir=${PWA_PROFILE_DIR}" 2>/dev/null | head -1)"
+if [[ -n "\$RUNNING_PID" ]]; then
+	# PWA already open — bring it to the foreground and exit immediately
+	osascript -e "tell application \"System Events\" to set frontmost of (first process whose unix id is \$RUNNING_PID) to true" 2>/dev/null || true
+	exit 0
 fi
 
-# First launch or stale lock — start the PWA normally.
+# First launch — start the PWA normally.
+# --disable-features flags suppress the "Open in desktop app" infobar that
+# Chromium shows when it detects a registered protocol handler (e.g. Teams).
 exec "${PWA_BROWSER_EXE}" \\
 	--app="${OPEN_ARG}" \\
 	--user-data-dir="${PWA_PROFILE_DIR}" \\
 	--no-first-run \\
-	--no-default-browser-check
+	--no-default-browser-check \\
+	--disable-features=DesktopPWAsLinkCapturing,WebAppEnableUrlHandling \\
+	--disable-default-apps
 PWAEOF
 	chmod +x "$LAUNCHER"
 	log "PWA launcher written → ${PWA_BROWSER_EXE} --app=${OPEN_ARG}"
@@ -777,10 +777,41 @@ apps.append({
 dock['persistent-apps'] = apps
 
 # Copy the source app's Space assignment to the clone.
-# macOS stores per-app Space pinning in com.apple.dock.plist under the key
-# 'workspaces-application-assignments', a dict mapping bundle-id → Space UUID.
-# We read the source app's bundle-id, look up its assignment, and write the
-# same UUID for the clone's bundle-id so it lands on the same Space.
+#
+# macOS stores per-app Space pinning in two places:
+#   1. com.apple.dock.plist  →  "workspaces-application-assignments"
+#      dict  bundle-id → Space UUID. Only present when the user right-clicked
+#      the Dock tile → "Options" → "Assign to this desktop". Mission-Control
+#      drag-and-drop does NOT write this key, so the dict is often empty.
+#
+#   2. com.apple.spaces.plist (binary, read via plutil) → ManagedDisplaySpaces
+#      → each Space has a list of app bundle-ids under "apps". This IS written
+#      when a window is moved to a Space in Mission Control. We scan it as a
+#      fallback to find the Space UUID for the source app.
+def _find_space_uuid_in_spaces_plist(src_bundle_id):
+    """Scan com.apple.spaces to find which Space UUID hosts src_bundle_id."""
+    import json
+    spaces_path = os.path.expanduser(
+        "~/Library/Preferences/com.apple.spaces.plist"
+    )
+    try:
+        result = subprocess.run(
+            ["plutil", "-convert", "json", "-o", "-", spaces_path],
+            capture_output=True, text=True
+        )
+        if result.returncode != 0:
+            return None
+        data = json.loads(result.stdout)
+        for display in data.get("ManagedDisplaySpaces", []):
+            for space in display.get("Spaces", []):
+                uuid = space.get("uuid", "")
+                apps = space.get("apps", [])
+                if src_bundle_id in apps:
+                    return uuid
+    except Exception:
+        pass
+    return None
+
 def copy_space_assignment(src_app_path, clone_bundle_id, dock_plist):
     try:
         src_plist = os.path.join(src_app_path, "Contents", "Info.plist")
@@ -788,11 +819,24 @@ def copy_space_assignment(src_app_path, clone_bundle_id, dock_plist):
             src_info = plistlib.load(f)
         src_bundle_id = src_info.get("CFBundleIdentifier", "")
         if not src_bundle_id:
+            print("Space assignment skipped: source bundle-id not found")
             return
+
+        # Try dock.plist first (explicit "Assign to desktop" action)
         assignments = dock_plist.get("workspaces-application-assignments", {})
         space_uuid = assignments.get(src_bundle_id)
+
+        # Fallback: scan com.apple.spaces (Mission Control window placement)
         if not space_uuid:
+            space_uuid = _find_space_uuid_in_spaces_plist(src_bundle_id)
+            if space_uuid:
+                print(f"Space UUID found via com.apple.spaces: {space_uuid}")
+
+        if not space_uuid:
+            print(f"Space assignment skipped: no Space pinning found for {src_bundle_id}")
+            print("Tip: right-click the source app in Dock → Options → Assign to Desktop, then recreate the clone.")
             return
+
         assignments[clone_bundle_id] = space_uuid
         dock_plist["workspaces-application-assignments"] = assignments
         print(f"Space assignment copied: {src_bundle_id} → {clone_bundle_id} (Space {space_uuid})")
