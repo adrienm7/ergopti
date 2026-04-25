@@ -94,17 +94,69 @@ on run argv
 		& " " & quoted form of openArg
 	logmsg("cmd: " & cmd)
 
-	try
-		set result_path to do shell script cmd
-		logmsg("résultat: " & result_path)
-		set dlg to display dialog "Clone créé avec succès :" & return & result_path ¬
-			buttons {"Ouvrir Applications", "OK"} default button 2
-		if button returned of dlg is "Ouvrir Applications" then
-			do shell script "open ~/Applications"
+	-- Lancement du script en arrière-plan + polling. Un fichier sentinelle
+	-- /tmp/appcloner_done est créé à la fin pour signaler la complétion.
+	-- La barre de progression avance pendant que le shell tourne — elle est
+	-- volontairement asymptotique (n'atteint 95 % qu'au bout de ~5 s) puis
+	-- saute à 100 % dès que le sentinel apparaît.
+	do shell script "rm -f /tmp/appcloner_done /tmp/appcloner_result"
+	set bgCmd to "(" & cmd & " > /tmp/appcloner_result 2>&1 ; touch /tmp/appcloner_done) >/dev/null 2>&1 &"
+	do shell script bgCmd
+
+	set progress total steps to 100
+	set progress completed steps to 0
+	set progress description to "Création du clone en cours…"
+	set progress additional description to "Préparation de l'icône et du bundle"
+
+	set tickCount to 0
+	set isDone to false
+	repeat until isDone
+		delay 0.08
+		set tickCount to tickCount + 1
+		-- Courbe asymptotique : ~95 % au bout de ~7 s
+		set pct to round (95 * (1 - (0.96 ^ tickCount)))
+		set progress completed steps to pct
+		if tickCount = 12 then
+			set progress additional description to "Génération de l'icône teintée…"
+		else if tickCount = 30 then
+			set progress additional description to "Signature ad-hoc du bundle…"
+		else if tickCount = 50 then
+			set progress additional description to "Enregistrement dans le Dock…"
 		end if
-	on error errMsg
-		logmsg("erreur: " & errMsg)
-		display dialog "Erreur lors de la création du clone :" & return & errMsg ¬
-			buttons {"OK"} default button 1
-	end try
+		try
+			do shell script "test -e /tmp/appcloner_done"
+			set isDone to true
+		end try
+	end repeat
+
+	set progress completed steps to 100
+	set progress additional description to "Terminé"
+	delay 0.2
+
+	-- Récupérer le résultat (dernière ligne de stdout) et l'éventuelle erreur
+	set raw to do shell script "cat /tmp/appcloner_result 2>/dev/null || echo ''"
+	set result_path to do shell script "tail -n 1 /tmp/appcloner_result 2>/dev/null || echo ''"
+	logmsg("résultat: " & result_path)
+
+	if result_path does not start with "/" then
+		display dialog "❌  Échec de la création du clone." & return & return ¬
+			& "Détails : " & raw ¬
+			buttons {"OK"} default button 1 with title "App Cloner"
+		return
+	end if
+
+	-- Dialog de succès. On garde le texte court avec un saut de ligne avant
+	-- ET après le contenu pour équilibrer les marges visuelles haut/bas.
+	-- Le chemin du clone n'est pas répété puisque le nom est déjà dans la
+	-- ligne d'introduction — l'utilisateur sait où chercher (~/Applications).
+	set successMsg to "✅  Clone créé avec succès" & return & return & ¬
+		"« " & cloneName & " »" & return & ¬
+		"a été ajouté au Dock et au dossier Applications."
+	set dlg to display dialog successMsg ¬
+		buttons {"Ouvrir Applications", "Terminé"} ¬
+		default button 2 ¬
+		with title "App Cloner"
+	if button returned of dlg is "Ouvrir Applications" then
+		do shell script "open ~/Applications"
+	end if
 end run

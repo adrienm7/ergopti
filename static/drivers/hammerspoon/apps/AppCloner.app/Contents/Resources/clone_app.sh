@@ -582,6 +582,7 @@ DOCKEOF
 	echo "=== End of diagnostic ==="
 } >> "$DIAG" 2>&1
 
-echo ""
-echo "Diagnostic written to $DIAG"
+# The very last line of stdout becomes the AppleScript `do shell script`
+# return value, so we end with just the bundle path. The diagnostic file
+# location is in the log itself if needed.
 echo "$DEST"
