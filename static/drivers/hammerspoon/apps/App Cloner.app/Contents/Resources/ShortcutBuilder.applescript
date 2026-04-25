@@ -453,11 +453,15 @@ on run argv
 	tell me to activate
 	set iconMode to "tint"
 	set iconPath to ""
+	-- Leftmost button gets the Esc-key binding from customDialog. We put a
+	-- real "Annuler" there so pressing Esc actually aborts the whole flow
+	-- instead of falling through to a default style choice.
 	set iconChoice to my chooseButton("Style d'icône", ¬
 		"  • Teinte couleur — applique une teinte sur l'icône d'origine." & return & ¬
 		"  • Noir & blanc — convertit l'icône d'origine en niveaux de gris." & return & ¬
 		"  • Personnalisée — utilise une image (PNG, ICNS, JPG…) en remplacement.", ¬
-		{"Personnalisée", "Noir & blanc", "Teinte couleur"}, "App Cloner")
+		{"Annuler", "Personnalisée", "Noir & blanc", "Teinte couleur"}, "App Cloner")
+	if iconChoice is "Annuler" then return
 	if iconChoice is "Teinte couleur" then
 		set iconMode to "tint"
 		set colorList to choose color default color {52428, 0, 0}

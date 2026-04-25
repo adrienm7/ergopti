@@ -555,11 +555,16 @@ TEAMSLAUNCHER
 	# Strip quarantine so Gatekeeper doesn't block the clone on first launch
 	xattr -cr "$DEST" 2>/dev/null || true
 
-	# Re-sign deeply, ad-hoc. This drops Microsoft's signed entitlements
-	# (sandbox, hardened runtime) — Teams then runs as a regular unsigned
-	# app, honoring our HOME override. --force overwrites Microsoft's sigs.
-	codesign --force --deep --sign - "$DEST" >> "$DIAG" 2>&1 || log "codesign returned non-zero (often OK on Tahoe)"
-	log "Teams clone re-signed ad-hoc"
+	# Re-sign ad-hoc, preserving Microsoft's entitlements. Without
+	# --preserve-metadata=entitlements the keychain-access-groups entitlement
+	# is stripped → Teams cannot open its «team2.spotlight.encryption»
+	# keychain item and surfaces an error dialog on every launch. Preserving
+	# entitlements keeps the sandbox declaration too, but with an ad-hoc
+	# (no team-id) signature macOS does not actually engage the sandbox →
+	# our $HOME override still applies. --force overwrites Microsoft's sigs.
+	codesign --force --deep --sign - --preserve-metadata=entitlements "$DEST" >> "$DIAG" 2>&1 \
+		|| log "codesign returned non-zero (often OK on Tahoe)"
+	log "Teams clone re-signed ad-hoc (entitlements preserved)"
 
 	# Skip the stub-specific sections (5, 6, 7) — jump straight to
 	# LaunchServices registration + Dock add (section 8).
