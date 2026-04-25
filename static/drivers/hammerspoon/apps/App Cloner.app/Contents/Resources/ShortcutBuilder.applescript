@@ -33,42 +33,54 @@ on chooseButton(messageText, informativeText, buttonList, dialogTitle)
 	anAlert's setMessageText:messageText
 	anAlert's setInformativeText:informativeText
 	anAlert's setIcon:(my blankImage())
-	-- NSAlert displays buttons right-to-left. Add them in the same order
-	-- AppleScript would (rightmost = default), so the leftmost stays as
-	-- the cancel-style button.
+	-- NSAlert places buttons right-to-left. Add the rightmost (= default)
+	-- first by iterating the AppleScript-style button list backwards. That
+	-- preserves the natural reading order: leftmost button = "Annuler",
+	-- rightmost = the action verb.
 	set lastIdx to (count of buttonList)
 	repeat with i from lastIdx to 1 by -1
 		anAlert's addButtonWithTitle:(item i of buttonList)
 	end repeat
-	set response to anAlert's runModal()
-	-- response 1000 = first added (rightmost), 1001 = second, etc.
-	set picked to (response - (current application's NSAlertFirstButtonReturn) + 1)
+	set response to (anAlert's runModal()) as integer
+	-- Hard-coded NSAlertFirstButtonReturn (1000) — bridging the AppKit
+	-- enum constant via `current application's NSAlertFirstButtonReturn`
+	-- is unreliable across macOS versions and silently returns missing
+	-- value, leading to off-by-one button mapping or a crash.
+	set picked to response - 1000 + 1
 	return item (lastIdx - picked + 1) of buttonList
 end chooseButton
 
 on installEditMenu()
-	set theApp to current application's NSApp
-	set mainMenu to theApp's mainMenu()
-	if mainMenu is missing value then
-		set mainMenu to current application's NSMenu's alloc()'s init()
-		theApp's setMainMenu:mainMenu
-	end if
-	-- Skip if an Edit menu is already present (e.g. installed by the host app)
-	repeat with i from 0 to ((mainMenu's numberOfItems()) - 1)
-		set existing to (mainMenu's itemAtIndex:i)'s title() as text
-		if existing is "Edit" or existing is "Édition" then return
-	end repeat
-	set editItem to current application's NSMenuItem's alloc()'s initWithTitle:"Edit" action:(missing value) keyEquivalent:""
-	set editMenu to current application's NSMenu's alloc()'s initWithTitle:"Edit"
-	editMenu's addItemWithTitle:"Cut"        action:"cut:"        keyEquivalent:"x"
-	editMenu's addItemWithTitle:"Copy"       action:"copy:"       keyEquivalent:"c"
-	editMenu's addItemWithTitle:"Paste"      action:"paste:"      keyEquivalent:"v"
-	editMenu's addItemWithTitle:"Select All" action:"selectAll:"  keyEquivalent:"a"
-	editMenu's addItemWithTitle:"Undo"       action:"undo:"       keyEquivalent:"z"
-	editMenu's addItem:(current application's NSMenuItem's separatorItem())
-	editMenu's addItemWithTitle:"Redo"       action:"redo:"       keyEquivalent:"Z"
-	editItem's setSubmenu:editMenu
-	mainMenu's addItem:editItem
+	try
+		-- NSApp is a C global, not a property; in AppleScript-ObjC we have to
+		-- go through NSApplication's sharedApplication. Wrap everything in
+		-- try/end try so a Cocoa hiccup never crashes the whole UI.
+		set theApp to current application's NSApplication's sharedApplication()
+		set mainMenu to theApp's mainMenu()
+		if mainMenu is missing value then
+			set mainMenu to current application's NSMenu's alloc()'s init()
+			theApp's setMainMenu:mainMenu
+		end if
+		-- Skip if an Edit menu is already present (e.g. installed by the host)
+		set itemCount to mainMenu's numberOfItems() as integer
+		repeat with i from 0 to (itemCount - 1)
+			set existing to ((mainMenu's itemAtIndex:i)'s title()) as text
+			if existing is "Edit" or existing is "Édition" then return
+		end repeat
+		set editItem to current application's NSMenuItem's alloc()'s initWithTitle:"Edit" action:(missing value) keyEquivalent:""
+		set editMenu to current application's NSMenu's alloc()'s initWithTitle:"Edit"
+		editMenu's addItemWithTitle:"Cut"        action:"cut:"        keyEquivalent:"x"
+		editMenu's addItemWithTitle:"Copy"       action:"copy:"       keyEquivalent:"c"
+		editMenu's addItemWithTitle:"Paste"      action:"paste:"      keyEquivalent:"v"
+		editMenu's addItemWithTitle:"Select All" action:"selectAll:"  keyEquivalent:"a"
+		editMenu's addItemWithTitle:"Undo"       action:"undo:"       keyEquivalent:"z"
+		editMenu's addItem:(current application's NSMenuItem's separatorItem())
+		editMenu's addItemWithTitle:"Redo"       action:"redo:"       keyEquivalent:"Z"
+		editItem's setSubmenu:editMenu
+		mainMenu's addItem:editItem
+	on error errMsg
+		my logmsg("installEditMenu failed: " & errMsg)
+	end try
 end installEditMenu
 
 -- Text input via NSAlert with optional multi-line text view. Width and line
@@ -114,8 +126,9 @@ on askText(prompt, defaultValue, dialogTitle, widthPx, lineCount)
 	anAlert's addButtonWithTitle:"Annuler"
 	-- Hand focus to the input on open so paste works immediately on Cmd+V
 	(anAlert's |window|()'s makeFirstResponder:firstResponderTarget)
-	set response to anAlert's runModal()
-	if response = (current application's NSAlertFirstButtonReturn) then
+	set response to (anAlert's runModal()) as integer
+	-- 1000 = NSAlertFirstButtonReturn (the OK we added first / rightmost)
+	if response = 1000 then
 		if lineCount is 1 then
 			return (firstResponderTarget's stringValue() as text)
 		else
