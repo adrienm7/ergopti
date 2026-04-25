@@ -77,25 +77,29 @@ end captureDialogValues
 on btn1Clicked:sender
 	captureDialogValues()
 	set my panelResult to 1
-	(current application's NSApplication's sharedApplication())'s stopModal()
+	set theApp to current application's NSApplication's sharedApplication()
+	theApp's stopModal()
 end btn1Clicked:
 
 on btn2Clicked:sender
 	captureDialogValues()
 	set my panelResult to 2
-	(current application's NSApplication's sharedApplication())'s stopModal()
+	set theApp to current application's NSApplication's sharedApplication()
+	theApp's stopModal()
 end btn2Clicked:
 
 on btn3Clicked:sender
 	captureDialogValues()
 	set my panelResult to 3
-	(current application's NSApplication's sharedApplication())'s stopModal()
+	set theApp to current application's NSApplication's sharedApplication()
+	theApp's stopModal()
 end btn3Clicked:
 
 on btn4Clicked:sender
 	captureDialogValues()
 	set my panelResult to 4
-	(current application's NSApplication's sharedApplication())'s stopModal()
+	set theApp to current application's NSApplication's sharedApplication()
+	theApp's stopModal()
 end btn4Clicked:
 
 on doUpdatePreview()
@@ -363,8 +367,9 @@ on customDialog(header, body, buttonList, hasInput, defaultText, lineCount, inpu
 		bodyLabel's setEditable:false
 		bodyLabel's setSelectable:true
 		bodyLabel's setDrawsBackground:false
-		(bodyLabel's cell())'s setWraps:true
-		(bodyLabel's cell())'s setLineBreakMode:0
+		set bodyCell to bodyLabel's cell()
+		bodyCell's setWraps:true
+		bodyCell's setLineBreakMode:0
 		contentView's addSubview:bodyLabel
 	end if
 
@@ -380,8 +385,9 @@ on customDialog(header, body, buttonList, hasInput, defaultText, lineCount, inpu
 			-- lineCount=-1: enable word-wrap so long URLs wrap across the 3-row height
 			-- instead of scrolling horizontally out of view
 			if lineCount = -1 then
-				(inputView's cell())'s setWraps:true
-				(inputView's cell())'s setScrollable:false
+				set inputCell to inputView's cell()
+				inputCell's setWraps:true
+				inputCell's setScrollable:false
 			end if
 			contentView's addSubview:inputView
 			set my panelInputView to inputView
@@ -455,7 +461,8 @@ on customDialog(header, body, buttonList, hasInput, defaultText, lineCount, inpu
 		panelWin's makeFirstResponder:(my panelInputView)
 	end if
 
-	(current application's NSApplication's sharedApplication())'s runModalForWindow:panelWin
+	set theApp to current application's NSApplication's sharedApplication()
+	theApp's runModalForWindow:panelWin
 	panelWin's orderOut:(missing value)
 
 	if my panelResult is 0 then error number -128
@@ -485,8 +492,9 @@ on tintedIconImage(srcImage, tintColor)
 	set ctx to current application's NSGraphicsContext's currentContext()
 	ctx's saveGraphicsState()
 	ctx's setCompositingOperation:5
-	(tintColor's colorWithAlphaComponent:0.5)'s setFill()
-	(current application's NSBezierPath's fillRect:destRect)
+	set halfColor to tintColor's colorWithAlphaComponent:0.5
+	halfColor's setFill()
+	current application's NSBezierPath's fillRect:destRect
 	ctx's restoreGraphicsState()
 	tinted's unlockFocus()
 	return tinted
@@ -584,9 +592,11 @@ on showTintColorPicker(appPath)
 	set my panelCheckboxView to missing value
 	set timerUserInfo to missing value
 	set theTimer to current application's NSTimer's timerWithTimeInterval:0.08 target:me selector:"updateTintPreview:" userInfo:timerUserInfo repeats:true
-	(current application's NSRunLoop's mainRunLoop())'s addTimer:theTimer forMode:"NSRunLoopCommonModes"
+	set theLoop to current application's NSRunLoop's mainRunLoop()
+	theLoop's addTimer:theTimer forMode:"NSRunLoopCommonModes"
 
-	(current application's NSApplication's sharedApplication())'s runModalForWindow:pickerPanel
+	set theApp to current application's NSApplication's sharedApplication()
+	theApp's runModalForWindow:pickerPanel
 	pickerPanel's orderOut:(missing value)
 
 	-- Tear down timer and clear shared preview state
