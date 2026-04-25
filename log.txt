@@ -1,18 +1,10 @@
 App Cloner — Erreur de démarrage :
 
-/Users/b519hs/perso/ergopti/static/drivers/hammerspoon/apps/App Cloner.app/Contents/Resources/ShortcutBuilder.applescript:4479:4480: script error: fin de ligne prévu(s) mais « ( » trouvé(s). (-2741)
+/Users/b519hs/perso/ergopti/static/drivers/hammerspoon/apps/App Cloner.app/Contents/Resources/ShortcutBuilder.applescript:4559:4560: script error: fin de ligne prévu(s) mais « ( » trouvé(s). (-2741)
 
 Log : /tmp/appcloner.log
 
 
-
-p
-source: /Applications/Visual Studio Code.app/
-defaultName: Visual Studio Code
-cloneName: Kubernetes Sandbox
-openArg: /Users/b519hs/dev/kubernetes-sandbox-ia/
-colorHex: #00A8BD
-cmd: '/Users/b519hs/perso/ergopti/static/drivers/hammerspoon/apps/AppCloner.app/Contents/Resources/clone_app.sh' '/Applications/Visual Studio Code.app/' 'Kubernetes Sandbox' '#00A8BD' '/Users/b519hs/dev/kubernetes-sandbox-ia/'
 résultat: /Users/b519hs/Applications/Kubernetes Sandbox.app
 [AppCloner] exit=0
 [AppCloner] app_root=/Users/b519hs/perso/ergopti/static/drivers/hammerspoon/apps/AppCloner.app
@@ -614,6 +606,11 @@ result: /Users/b519hs/Applications/Philippe.app
 [AppCloner] exit=1
 [AppCloner] stderr=/Users/b519hs/perso/ergopti/static/drivers/hammerspoon/apps/App Cloner.app/Contents/Resources/ShortcutBuilder.applescript:4479:4480: script error: fin de ligne prévu(s) mais « ( » trouvé(s). (-2741)
 
+[AppCloner] app_root=/Users/b519hs/perso/ergopti/static/drivers/hammerspoon/apps/App Cloner.app
+[AppCloner] applescript=/Users/b519hs/perso/ergopti/static/drivers/hammerspoon/apps/App Cloner.app/Contents/Resources/ShortcutBuilder.applescript
+[AppCloner] exit=1
+[AppCloner] stderr=/Users/b519hs/perso/ergopti/static/drivers/hammerspoon/apps/App Cloner.app/Contents/Resources/ShortcutBuilder.applescript:4559:4560: script error: fin de ligne prévu(s) mais « ( » trouvé(s). (-2741)
 
-╭─     ~ ──────────────────────────────────────────────── ✔  01:02:17 
+
+╭─     ~ ──────────────────────────────────────────────── ✔  01:08:17 
 ╰─
