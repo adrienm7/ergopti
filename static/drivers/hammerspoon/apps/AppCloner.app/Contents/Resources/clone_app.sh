@@ -33,11 +33,14 @@ SOURCE_APP="${1:-}"
 CLONE_NAME="${2:-}"
 COLOR_HEX="${3:-}"
 OPEN_ARG="${4:-}"
+ICON_MODE="${5:-tint}"   # tint | bw | custom
+ICON_PATH="${6:-}"        # only used when ICON_MODE=custom
 
 log "============================================================"
 log "=== AppCloner (stub mode) — $(date)"
 log "=== SOURCE=$SOURCE_APP"
 log "=== NAME=$CLONE_NAME  COLOR=$COLOR_HEX  ARG=$OPEN_ARG"
+log "=== ICON_MODE=$ICON_MODE  ICON_PATH=$ICON_PATH"
 log "============================================================"
 
 [[ -z "$SOURCE_APP" ]] && { echo "Error: SOURCE_APP missing"; exit 1; }
@@ -143,7 +146,29 @@ SRC_ICNS=""
 log "SRC_ICNS=$SRC_ICNS"
 
 BASE_PNG="$TMPDIR_WORK/base.png"
-if [[ -n "$SRC_ICNS" && -f "$SRC_ICNS" ]]; then
+
+# Custom icon path: skip the source-app extraction entirely and convert the
+# user-provided image (PNG/JPG/HEIC/SVG/ICNS) into our working PNG. sips
+# handles every macOS image format; for icns we extract the largest slice.
+if [[ "$ICON_MODE" == "custom" && -n "$ICON_PATH" && -f "$ICON_PATH" ]]; then
+	if [[ "${ICON_PATH:l}" == *.icns ]]; then
+		ICONSET_TMP="$TMPDIR_WORK/custom.iconset"
+		iconutil -c iconset "$ICON_PATH" -o "$ICONSET_TMP" 2>/dev/null || true
+		for sz in "icon_512x512@2x" "icon_512x512" "icon_256x256@2x" "icon_256x256"; do
+			[[ -f "$ICONSET_TMP/${sz}.png" ]] && cp "$ICONSET_TMP/${sz}.png" "$BASE_PNG" && break
+		done
+	else
+		# Convert anything else to a 1024-square PNG. sips silently scales+pads.
+		sips -s format png -z 1024 1024 "$ICON_PATH" --out "$BASE_PNG" >/dev/null 2>&1 || true
+	fi
+	if [[ -f "$BASE_PNG" ]]; then
+		log "Custom icon source: $ICON_PATH"
+	else
+		log "Custom icon conversion failed — falling back to source app icon"
+	fi
+fi
+
+if [[ ! -f "$BASE_PNG" && -n "$SRC_ICNS" && -f "$SRC_ICNS" ]]; then
 	ICONSET_TMP="$TMPDIR_WORK/src.iconset"
 	iconutil -c iconset "$SRC_ICNS" -o "$ICONSET_TMP" 2>/dev/null || true
 	for sz in "icon_512x512@2x" "icon_512x512" "icon_256x256@2x" "icon_256x256"; do
@@ -174,19 +199,33 @@ fi
 # ==========================================================
 # ==========================================================
 
-# No AppleScript, no external dependency. Read/write PNG via struct+zlib,
-# rotate hue of every saturated pixel toward the target, preserve B/W regions.
+# Three icon modes:
+#   * tint:   pixel-by-pixel hue rotation toward COLOR_HEX (existing behavior)
+#   * bw:     drop saturation to 0 → true grayscale, keeping luminance
+#   * custom: user provided a finished image — pass through, no processing
+TINTED_PNG="$TMPDIR_WORK/tinted.png"
+
+if [[ "$ICON_MODE" == "custom" ]]; then
+	# Already correct in BASE_PNG, just hand off
+	cp "$BASE_PNG" "$TINTED_PNG"
+	log "Icon mode: custom (no processing)"
+	# Skip the Python tint block by short-circuiting via parsed args that
+	# the script itself reads as harmless. Easier: gate the python call
+	# with an outer if/else.
+fi
+
+if [[ "$ICON_MODE" != "custom" ]]; then
+
 R_INT=$(( 16#${COLOR_HEX:1:2} ))
 G_INT=$(( 16#${COLOR_HEX:3:2} ))
 B_INT=$(( 16#${COLOR_HEX:5:2} ))
 
-TINTED_PNG="$TMPDIR_WORK/tinted.png"
-
-python3 - "$BASE_PNG" "$TINTED_PNG" "$R_INT" "$G_INT" "$B_INT" <<'TINTEOF'
+python3 - "$BASE_PNG" "$TINTED_PNG" "$R_INT" "$G_INT" "$B_INT" "$ICON_MODE" <<'TINTEOF'
 import sys, colorsys, struct, zlib
 
 src, dst = sys.argv[1], sys.argv[2]
 r_int, g_int, b_int = int(sys.argv[3]), int(sys.argv[4]), int(sys.argv[5])
+mode = sys.argv[6] if len(sys.argv) > 6 else "tint"
 target_h, target_s, _ = colorsys.rgb_to_hsv(r_int/255, g_int/255, b_int/255)
 
 def png_read(path):
@@ -251,7 +290,11 @@ for row in rows:
 		pr, pg, pb = row[i], row[i+1], row[i+2]
 		pa = row[i+3] if channels == 4 else 255
 		h, s, v = colorsys.rgb_to_hsv(pr/255, pg/255, pb/255)
-		if s > 0.12 and v > 0.05:
+		if mode == "bw":
+			# True grayscale: drop saturation entirely, keep luminance
+			s = 0
+		elif s > 0.12 and v > 0.05:
+			# Hue-rotate toward target color, blend saturation to feel natural
 			h = target_h
 			s = s * 0.3 + target_s * 0.7
 		nr, ng, nb = colorsys.hsv_to_rgb(h, s, v)
@@ -279,8 +322,10 @@ def png_write(path, rows, width, height, channels):
 		f.write(chunk(b"IEND", b""))
 
 png_write(dst, out_rows, width, height, channels)
-print(f"tint OK target_h={target_h:.3f}", flush=True)
+print(f"icon OK mode={mode} target_h={target_h:.3f}", flush=True)
 TINTEOF
+
+fi  # end of "ICON_MODE != custom" block
 
 [[ ! -f "$TINTED_PNG" ]] && { log "Tint failed — using base PNG"; cp "$BASE_PNG" "$TINTED_PNG"; }
 
@@ -407,7 +452,19 @@ export __CFBundleIdentifier="${UNIQUE_ID}"
 # apps just get an isolated user-data-dir. Native apps run with no flags.
 ${LAUNCHER_ARGS_LITERAL}
 OPEN_ARG="${OPEN_ARG}"
-if [[ -n "\$OPEN_ARG" ]]; then
+
+# OPEN_ARG can be:
+#   * a folder path        → passed as positional arg (VSCode opens it)
+#   * a file path          → same
+#   * a URL scheme like
+#     msteams:/l/chat/...  → Outlook/Teams handle their own URL handlers,
+#     outlook://calendar     so we let macOS dispatch via \`open\` AFTER
+#                            the app process is up. Without this, passing
+#                            a URL as positional argv to Electron silently
+#                            no-ops because the app isn't yet a registered
+#                            URL handler in this process tree.
+URL_SCHEME_RE='^[a-zA-Z][a-zA-Z0-9+.-]*://'
+if [[ -n "\$OPEN_ARG" && ! "\$OPEN_ARG" =~ \$URL_SCHEME_RE ]]; then
 	ARGS+=("\$OPEN_ARG")
 fi
 
@@ -427,8 +484,23 @@ else
 	NATIVE_ARCH=x86_64
 fi
 
-# Direct exec — no \`open\`, no LaunchServices scrubbing of our env
-exec /usr/bin/arch -"\$NATIVE_ARCH" "${SRC_EXE}" "\${ARGS[@]}"
+# Spawn the app in the background so we can dispatch a URL to it after a
+# short delay if the user gave us one. If no URL, we still wait on the
+# child PID so the launcher's process lifetime tracks the app's — Dock
+# tile stays as "running" until the user quits VSCode/Outlook/Teams.
+__CFBundleIdentifier="${UNIQUE_ID}" \\
+	/usr/bin/arch -"\$NATIVE_ARCH" "${SRC_EXE}" "\${ARGS[@]}" &
+APP_PID=\$!
+
+if [[ -n "\$OPEN_ARG" && "\$OPEN_ARG" =~ \$URL_SCHEME_RE ]]; then
+	# Give the app ~1 s to register its URL handler with macOS, then
+	# dispatch the URL via \`open\` so the running instance navigates
+	# (e.g. Teams jumps to the chat, Outlook opens the calendar).
+	sleep 1
+	/usr/bin/open "\$OPEN_ARG"
+fi
+
+wait "\$APP_PID"
 LAUNCHEREOF
 chmod +x "$LAUNCHER"
 log "launcher written (direct exec of $SRC_EXE)"

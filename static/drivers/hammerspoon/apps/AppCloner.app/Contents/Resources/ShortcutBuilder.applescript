@@ -53,36 +53,89 @@ on run argv
 	logmsg("cloneName: " & cloneName)
 
 	-- ── 3) Argument d'ouverture (optionnel) ─────────────────────────────────
-	set openArgAnswer to button returned of (display dialog ¬
-		"Ouvrir un fichier ou dossier spécifique au lancement ?" ¬
-		buttons {"Non", "Choisir…"} default button 1)
+	-- Trois cas : rien, un dossier (VSCode), ou une URL/chemin libre. Les URLs
+	-- type msteams:/l/chat/… ou outlook://calendar permettent d'ouvrir Teams/
+	-- Outlook directement sur une conversation ou un onglet spécifique.
+	set openTypeAnswer to button returned of (display dialog ¬
+		"Ouvrir quelque chose de spécifique au lancement ?" ¬
+		buttons {"Rien", "Dossier", "URL ou chemin"} ¬
+		default button 1 ¬
+		with title "App Cloner")
 	set openArg to ""
-	if openArgAnswer is "Choisir…" then
+	if openTypeAnswer is "Dossier" then
 		try
-			set openAlias to choose folder ¬
-				with prompt "Dossier à ouvrir avec le clone :"
+			set openAlias to choose folder with prompt "Dossier à ouvrir avec le clone :"
 			set openArg to POSIX path of openAlias
-			logmsg("openArg: " & openArg)
-		on error
-			set openArg to ""
+		end try
+	else if openTypeAnswer is "URL ou chemin" then
+		try
+			set openArg to text returned of (display dialog ¬
+				"URL ou chemin à ouvrir au lancement :" & return & return & ¬
+				"Exemples :" & return & ¬
+				"  • outlook://calendar" & return & ¬
+				"  • msteams:/l/chat/0/0?users=foo@bar.com" & return & ¬
+				"  • /Users/moi/projet" ¬
+				default answer "" ¬
+				buttons {"Annuler", "OK"} default button 2 ¬
+				with title "App Cloner")
 		end try
 	end if
+	logmsg("openArg: " & openArg)
 
-	-- ── 4) Couleur de teinte ────────────────────────────────────────────────
-	set colorList to choose color default color {52428, 0, 0}
-	set colorHex to my rgbToHex(item 1 of colorList, item 2 of colorList, item 3 of colorList)
-	logmsg("colorHex: " & colorHex)
+	-- ── 4) Type d'icône ─────────────────────────────────────────────────────
+	set iconMode to "tint"
+	set iconPath to ""
+	set iconChoice to button returned of (display dialog ¬
+		"Style d'icône pour le clone ?" & return & return & ¬
+		"  • Teinte couleur : applique une teinte sur l'icône d'origine" & return & ¬
+		"  • Noir & blanc : convertit en niveaux de gris" & return & ¬
+		"  • Personnalisée : choisir une image (PNG, ICNS, JPG…)" ¬
+		buttons {"Personnalisée", "Noir & blanc", "Teinte couleur"} ¬
+		default button 3 ¬
+		with title "App Cloner")
+	if iconChoice is "Teinte couleur" then
+		set iconMode to "tint"
+		set colorList to choose color default color {52428, 0, 0}
+		set colorHex to my rgbToHex(item 1 of colorList, item 2 of colorList, item 3 of colorList)
+	else if iconChoice is "Noir & blanc" then
+		set iconMode to "bw"
+		-- Couleur ignorée mais on doit fournir quelque chose au shell
+		set colorHex to "#808080"
+	else
+		set iconMode to "custom"
+		set colorHex to "#000000"
+		try
+			set iconAlias to choose file ¬
+				with prompt "Choisir l'image pour l'icône :" ¬
+				of type {"public.image", "com.apple.icns"}
+			set iconPath to POSIX path of iconAlias
+		on error
+			-- Annulation → on retombe sur teinte rouge par défaut
+			set iconMode to "tint"
+			set colorHex to "#CC0000"
+		end try
+	end if
+	logmsg("iconMode: " & iconMode & "  iconPath: " & iconPath & "  colorHex: " & colorHex)
 
 	-- ── 5) Confirmation et création ─────────────────────────────────────────
 	set openArgDisplay to "(aucun)"
 	if openArg is not "" then set openArgDisplay to openArg
+	set iconDisplay to ""
+	if iconMode is "tint" then
+		set iconDisplay to "Teinte " & colorHex
+	else if iconMode is "bw" then
+		set iconDisplay to "Noir & blanc"
+	else
+		set iconDisplay to "Personnalisée — " & iconPath
+	end if
 	set summary to "Récapitulatif :" & return & return ¬
 		& "• Source : " & sourcePath & return ¬
 		& "• Nom    : " & cloneName & return ¬
-		& "• Teinte : " & colorHex & return ¬
-		& "• Arg    : " & openArgDisplay
+		& "• Icône  : " & iconDisplay & return ¬
+		& "• Ouvre  : " & openArgDisplay
 	set go to button returned of (display dialog summary ¬
-		buttons {"Annuler", "Créer le clone"} default button 2)
+		buttons {"Annuler", "Créer le clone"} default button 2 ¬
+		with title "App Cloner")
 	if go is "Annuler" then return
 
 	do shell script "chmod +x " & quoted form of cloneScript
@@ -91,7 +144,9 @@ on run argv
 		& " " & quoted form of sourcePath ¬
 		& " " & quoted form of cloneName ¬
 		& " " & quoted form of colorHex ¬
-		& " " & quoted form of openArg
+		& " " & quoted form of openArg ¬
+		& " " & quoted form of iconMode ¬
+		& " " & quoted form of iconPath
 	logmsg("cmd: " & cmd)
 
 	-- Lancement du script en arrière-plan + polling. Un fichier sentinelle
