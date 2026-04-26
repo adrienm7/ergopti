@@ -1,13 +1,4 @@
-[AppCloner] app_root=/Users/b519hs/perso/ergopti/static/drivers/hammerspoon/apps/App Cloner.app
-[AppCloner] applescript=/Users/b519hs/perso/ergopti/static/drivers/hammerspoon/apps/App Cloner.app/Contents/Resources/ShortcutBuilder.applescript
---- App Cloner start Sat Apr 25 18:20:44 CEST 2026
-appDir: /Users/b519hs/perso/ergopti/static/drivers/hammerspoon/apps/App Cloner.app
-source: /Applications/Microsoft Teams.app/
-defaultName: Microsoft Teams
-cloneName: Philippe
-openArg: msteams:/l/chat/0/0?users=philippe.fraisse@axa.fr
-iconMode: custom  iconPath: /Users/b519hs/Downloads/8_orgid_be264a6c-8397-4900-8325-fbf85fab60e6.jpg  colorHex: #000000
-cmd: '/Users/b519hs/perso/ergopti/static/drivers/hammerspoon/apps/App Cloner.app/Contents/Resources/clone_app.sh' '/Applications/Microsoft Teams.app/' 'Philippe' '#000000' 'msteams:/l/chat/0/0?users=philippe.fraisse@axa.fr' 'custom' '/Users/b519hs/Downloads/8_orgid_be264a6c-8397-4900-8325-fbf85fab60e6.jpg' '1'
+/b519hs/Downloads/8_orgid_be264a6c-8397-4900-8325-fbf85fab60e6.jpg' '1'
 result: /Users/b519hs/Applications/Philippe.app
 [AppCloner] exit=0
 [AppCloner] app_root=/Users/b519hs/perso/ergopti/static/drivers/hammerspoon/apps/App Cloner.app
@@ -566,6 +557,17 @@ iconMode: custom  iconPath: /Users/b519hs/Downloads/8_orgid_be264a6c-8397-4900-8
 cmd: '/Users/b519hs/perso/ergopti/static/drivers/hammerspoon/apps/App Cloner.app/Contents/Resources/clone_app.sh' '/Applications/Microsoft Teams.app' 'Philippe' '#000000' 'https://teams.microsoft.com/l/chat/19:bcbdf563-3c5d-483c-bdf1-002b202f6dd9_be264a6c-8397-4900-8325-fbf85fab60e6@unq.gbl.spaces/conversations?context=%7B%22contextType%22%3A%22chat%22%7D' 'custom' '/Users/b519hs/Downloads/8_orgid_be264a6c-8397-4900-8325-fbf85fab60e6.jpg' '1' '1'
 result: /Users/b519hs/Applications/Philippe.app
 [AppCloner] exit=0
+[AppCloner] app_root=/Users/b519hs/perso/ergopti/static/drivers/hammerspoon/apps/App Cloner.app
+[AppCloner] applescript=/Users/b519hs/perso/ergopti/static/drivers/hammerspoon/apps/App Cloner.app/Contents/Resources/ShortcutBuilder.applescript
+--- App Cloner start Sun Apr 26 16:40:15 CEST 2026
+appDir: /Users/b519hs/perso/ergopti/static/drivers/hammerspoon/apps/App Cloner.app
+source: /System/Applications/Chess.app
+cloneName: Chess — Clone
+openArg:   pwaMode: false
+iconMode: tint  iconPath:   colorHex: #477EC0
+cmd: '/Users/b519hs/perso/ergopti/static/drivers/hammerspoon/apps/App Cloner.app/Contents/Resources/clone_app.sh' '/System/Applications/Chess.app' 'Chess — Clone' '#477EC0' '' 'tint' '' '0' '0'
+result: /Users/b519hs/Applications/Chess — Clone.app
+[AppCloner] exit=0
 
-╭─     ~ ──────────────────────────────────────────────── ✔  16:35:27 
+╭─     ~ ──────────────────────────────────────────────── ✔  16:41:33 
 ╰─
