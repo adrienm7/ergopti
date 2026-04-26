@@ -77,6 +77,12 @@ on captureDialogValues()
 	end if
 end captureDialogValues
 
+-- Window delegate: the red close button on any App Cloner dialog fully quits
+-- the app rather than leaving an invisible osascript process running.
+on windowWillClose:notification
+	(current application's NSApplication's sharedApplication)'s terminate:missing value
+end windowWillClose:
+
 on btn1Clicked:sender
 	captureDialogValues()
 	set my panelResult to 1
@@ -353,6 +359,9 @@ on customDialog(header, body, buttonList, hasInput, defaultText, lineCount, inpu
 	-- Ensure the panel always becomes key, not just when a text field needs it,
 	-- so that Cmd key equivalents are dispatched even before the user clicks.
 	panelWin's setBecomesKeyOnlyIfNeeded:false
+	-- Route close-button clicks through windowWillClose: so the red X quits
+	-- the app entirely instead of leaving a ghost osascript process.
+	panelWin's setDelegate:me
 
 	set contentView to panelWin's contentView
 
