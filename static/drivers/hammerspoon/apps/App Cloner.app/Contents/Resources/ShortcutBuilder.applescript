@@ -556,8 +556,10 @@ on tintedIconImage(srcImage, tintColor, appPath)
 	my logmsg("[tint] dstPngBytes=" & (do shell script "wc -c < " & quoted form of tmpDst & " 2>/dev/null || echo MISSING") & " tmpDst=" & tmpDst)
 
 	-- Load result PNG back as NSImage.
-	set result to current application's NSImage's alloc()'s initWithContentsOfFile:tmpDst
-	my logmsg("[tint] initWithContentsOfFile result is missing value: " & (result is missing value))
+	-- imageWithContentsOfFile: returns a proper NSImage; alloc/initWithContentsOfFile:
+	-- can hand back a raw ObjC pointer that AppleScript coerces to NSString.
+	set result to current application's NSImage's imageWithContentsOfFile:tmpDst
+	my logmsg("[tint] imageWithContentsOfFile result is missing value: " & (result is missing value))
 	do shell script "rm -f " & quoted form of tmpSrc & " " & quoted form of tmpDst
 	if result is missing value then
 		my logmsg("[tint] falling back to srcImage")
