@@ -525,8 +525,15 @@ on tintedIconImage(srcImage, tintColor)
 	-- rasterised pixels; NSWorkspace's lazy NSImage does not — so lockFocus
 	-- on it always produces a blank white result. Here we create the pixel
 	-- buffer first, then draw the source INTO it, which forces rasterisation.
-	set bitmap to current application's NSBitmapImageRep's alloc()'s initWithBitmapDataPlanes:missing value pixelsWide:targetSize pixelsHigh:targetSize bitsPerSample:8 samplesPerPixel:4 hasAlpha:true isPlanar:false colorSpaceName:"NSDeviceRGBColorSpace" bytesPerRow:0 bitsPerPixel:32
-	set ctx to current application's NSGraphicsContext's graphicsContextWithBitmapImageRep:bitmap
+	set bitmap to current application's NSBitmapImageRep's alloc()'s ¬
+		initWithBitmapDataPlanes:missing value ¬
+		pixelsWide:targetSize pixelsHigh:targetSize ¬
+		bitsPerSample:8 samplesPerPixel:4 ¬
+		hasAlpha:true isPlanar:false ¬
+		colorSpaceName:"NSDeviceRGBColorSpace" ¬
+		bytesPerRow:0 bitsPerPixel:32
+	set ctx to current application's NSGraphicsContext's ¬
+		graphicsContextWithBitmapImageRep:bitmap
 	if ctx is missing value then return srcImage
 
 	-- Store class ref to avoid AppleScript-ObjC selector-colon parse issues.
