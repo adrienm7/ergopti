@@ -53,6 +53,9 @@ property panelIsTextView : false  -- true for NSTextView, false for NSTextField
 property tintPreviewImageView : missing value
 property tintPreviewColorWell : missing value
 property tintPreviewSourceImage : missing value
+-- Absolute path to the App Cloner bundle, captured from argv at startup so
+-- helpers that need bundled resources (extract_icon.py, etc.) can locate them.
+property appBundlePath : ""
 
 on captureDialogValues()
 	-- The my qualifier is mandatory inside handlers; without it, AppleScript
@@ -544,13 +547,35 @@ on tintedIconImage(srcImage, tintColor)
 	return tinted
 end tintedIconImage
 
--- Resolve the source app's icon as a high-resolution NSImage. Tries the
--- bundle's .icns directly first (gives the highest-quality reps for
--- Outlook, Safari, and other apps where NSWorkspace's iconForFile may
--- return a generic placeholder under osascript). Falls back to
--- NSWorkspace.iconForFile for App Store / asset-catalog apps that ship
--- icons inside Assets.car instead of a plain .icns.
+-- Find the largest pixel dimension among an NSImage's representations.
+-- Returns 0 when the image has no reps, so callers can decide whether
+-- to trust the icon or fall back to a richer source.
+on largestRepSize(img)
+	if img is missing value then return 0
+	set bestSz to 0
+	try
+		repeat with r in (img's representations())
+			set sz to (r's pixelsWide()) as integer
+			if sz > bestSz then set bestSz to sz
+		end repeat
+	end try
+	return bestSz
+end largestRepSize
+
+-- Resolve the source app's icon as a high-resolution NSImage. Three layers,
+-- in increasing cost order:
+--   1) The bundle's CFBundleIconFile resource. Most third-party apps ship a
+--      proper .icns here and we are done. Sandboxed Microsoft 365 apps
+--      (Teams, Outlook) ship a near-empty .icns whose real artwork lives in
+--      Assets.car — we detect that via largestRepSize() < 128 and fall through.
+--   2) extract_icon.py shell-out. A fresh /usr/bin/python3 process runs
+--      NSWorkspace.iconForFile_ in a fully resolved LaunchServices context,
+--      which sandboxed and asset-catalog icons need. Renders to a temp PNG
+--      we load back as NSImage. Same code path clone_app.sh uses for the
+--      actual clone creation, guaranteeing identical preview vs. final icon.
+--   3) AppleScript-ObjC NSWorkspace.iconForFile: as last resort.
 on resolveAppIcon(appPath)
+	-- Layer 1: bundle .icns (cheap path, no shell-out)
 	try
 		set iconName to do shell script "/usr/libexec/PlistBuddy -c 'Print :CFBundleIconFile' " & quoted form of (appPath & "/Contents/Info.plist")
 		if iconName does not end with ".icns" then set iconName to iconName & ".icns"
@@ -558,9 +583,25 @@ on resolveAppIcon(appPath)
 		set fm to current application's NSFileManager's defaultManager
 		if (fm's fileExistsAtPath:icnsPath) as boolean then
 			set img to current application's NSImage's alloc()'s initWithContentsOfFile:icnsPath
-			if img is not missing value then return img
+			if img is not missing value and (my largestRepSize(img)) ≥ 128 then return img
 		end if
 	end try
+
+	-- Layer 2: Python helper for sandboxed / asset-catalog apps
+	try
+		set helperPath to (my appBundlePath) & "/Contents/Resources/extract_icon.py"
+		set tmpDir to do shell script "mktemp -d -t appcloner_iconprev"
+		set tmpPng to tmpDir & "/icon.png"
+		do shell script "/usr/bin/python3 " & quoted form of helperPath & " " & quoted form of appPath & " " & quoted form of tmpPng
+		set img2 to current application's NSImage's alloc()'s initWithContentsOfFile:tmpPng
+		try
+			do shell script "rm -rf " & quoted form of tmpDir & " >/dev/null 2>&1 &"
+		end try
+		if img2 is not missing value and (my largestRepSize(img2)) > 0 then return img2
+	end try
+
+	-- Layer 3: native NSWorkspace fallback (likely the same blank icon
+	-- layer 2 was meant to fix, but better than missing value)
 	set ws to current application's NSWorkspace's sharedWorkspace
 	return ws's iconForFile:appPath
 end resolveAppIcon
@@ -752,6 +793,7 @@ on run argv
 		return
 	end if
 	set appDir to item 1 of argv
+	set my appBundlePath to appDir
 	set cloneScript to appDir & "/Contents/Resources/clone_app.sh"
 
 	logmsg("--- App Cloner start " & (do shell script "date"))
