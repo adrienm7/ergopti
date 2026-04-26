@@ -1,34 +1,3 @@
-/App Cloner.app
-[AppCloner] applescript=/Users/b519hs/perso/ergopti/static/drivers/hammerspoon/apps/App Cloner.app/Contents/Resources/ShortcutBuilder.applescript
---- App Cloner start Sat Apr 25 21:20:21 CEST 2026
-appDir: /Users/b519hs/perso/ergopti/static/drivers/hammerspoon/apps/App Cloner.app
-source: /Applications/Microsoft Teams.app/
-defaultName: Microsoft Teams
-cloneName: Philippe
-openArg: https://teams.microsoft.com/l/chat/19:bcbdf563-3c5d-483c-bdf1-002b202f6dd9_be264a6c-8397-4900-8325-fbf85fab60e6@unq.gbl.spaces/conversations?context=%7B%22contextType%22%3A%22chat%22%7D  pwaMode: true
-iconMode: custom  iconPath: /Users/b519hs/Downloads/8_orgid_be264a6c-8397-4900-8325-fbf85fab60e6.jpg  colorHex: #000000
-cmd: '/Users/b519hs/perso/ergopti/static/drivers/hammerspoon/apps/App Cloner.app/Contents/Resources/clone_app.sh' '/Applications/Microsoft Teams.app/' 'Philippe' '#000000' 'https://teams.microsoft.com/l/chat/19:bcbdf563-3c5d-483c-bdf1-002b202f6dd9_be264a6c-8397-4900-8325-fbf85fab60e6@unq.gbl.spaces/conversations?context=%7B%22contextType%22%3A%22chat%22%7D' 'custom' '/Users/b519hs/Downloads/8_orgid_be264a6c-8397-4900-8325-fbf85fab60e6.jpg' '1'
-result: /Users/b519hs/Applications/Philippe.app
-[AppCloner] exit=0
-[AppCloner] app_root=/Users/b519hs/perso/ergopti/static/drivers/hammerspoon/apps/App Cloner.app
-[AppCloner] applescript=/Users/b519hs/perso/ergopti/static/drivers/hammerspoon/apps/App Cloner.app/Contents/Resources/ShortcutBuilder.applescript
---- App Cloner start Sat Apr 25 21:34:35 CEST 2026
-appDir: /Users/b519hs/perso/ergopti/static/drivers/hammerspoon/apps/App Cloner.app
-source: /Applications/Microsoft Teams.app/
-defaultName: Microsoft Teams
-cloneName: Philippe
-openArg: https://teams.microsoft.com/l/chat/19:bcbdf563-3c5d-483c-bdf1-002b202f6dd9_be264a6c-8397-4900-8325-fbf85fab60e6@unq.gbl.spaces/conversations?context=%7B%22contextType%22%3A%22chat%22%7D  pwaMode: true
-iconMode: custom  iconPath: /Users/b519hs/Downloads/8_orgid_be264a6c-8397-4900-8325-fbf85fab60e6.jpg  colorHex: #000000
-cmd: '/Users/b519hs/perso/ergopti/static/drivers/hammerspoon/apps/App Cloner.app/Contents/Resources/clone_app.sh' '/Applications/Microsoft Teams.app/' 'Philippe' '#000000' 'https://teams.microsoft.com/l/chat/19:bcbdf563-3c5d-483c-bdf1-002b202f6dd9_be264a6c-8397-4900-8325-fbf85fab60e6@unq.gbl.spaces/conversations?context=%7B%22contextType%22%3A%22chat%22%7D' 'custom' '/Users/b519hs/Downloads/8_orgid_be264a6c-8397-4900-8325-fbf85fab60e6.jpg' '1'
-result: /Users/b519hs/Applications/Philippe.app
-[AppCloner] exit=0
-[AppCloner] app_root=/Users/b519hs/perso/ergopti/static/drivers/hammerspoon/apps/App Cloner.app
-[AppCloner] applescript=/Users/b519hs/perso/ergopti/static/drivers/hammerspoon/apps/App Cloner.app/Contents/Resources/ShortcutBuilder.applescript
---- App Cloner start Sat Apr 25 21:58:43 CEST 2026
-appDir: /Users/b519hs/perso/ergopti/static/drivers/hammerspoon/apps/App Cloner.app
-source: /Applications/Microsoft Teams.app/
-defaultName: Microsoft Teams
-cloneName: Philippe
 openArg: https://teams.microsoft.com/l/chat/19:bcbdf563-3c5d-483c-bdf1-002b202f6dd9_be264a6c-8397-4900-8325-fbf85fab60e6@unq.gbl.spaces/conversations?context=%7B%22contextType%22%3A%22chat%22%7D  pwaMode: true
 iconMode: custom  iconPath: /Users/b519hs/Downloads/8_orgid_be264a6c-8397-4900-8325-fbf85fab60e6.jpg  colorHex: #000000
 cmd: '/Users/b519hs/perso/ergopti/static/drivers/hammerspoon/apps/App Cloner.app/Contents/Resources/clone_app.sh' '/Applications/Microsoft Teams.app/' 'Philippe' '#000000' 'https://teams.microsoft.com/l/chat/19:bcbdf563-3c5d-483c-bdf1-002b202f6dd9_be264a6c-8397-4900-8325-fbf85fab60e6@unq.gbl.spaces/conversations?context=%7B%22contextType%22%3A%22chat%22%7D' 'custom' '/Users/b519hs/Downloads/8_orgid_be264a6c-8397-4900-8325-fbf85fab60e6.jpg' '1'
@@ -600,6 +569,47 @@ iconMode: tint  iconPath:   colorHex: #C63BC0
 cmd: '/Users/b519hs/perso/ergopti/static/drivers/hammerspoon/apps/App Cloner.app/Contents/Resources/clone_app.sh' '/System/Applications/Books.app' 'Books — Clone' '#C63BC0' '' 'tint' '' '0' '0'
 result: /Users/b519hs/Applications/Books — Clone.app
 [AppCloner] exit=0
+[AppCloner] app_root=/Users/b519hs/perso/ergopti/static/drivers/hammerspoon/apps/App Cloner.app
+[AppCloner] applescript=/Users/b519hs/perso/ergopti/static/drivers/hammerspoon/apps/App Cloner.app/Contents/Resources/ShortcutBuilder.applescript
+--- App Cloner start Sun Apr 26 21:08:41 CEST 2026
+appDir: /Users/b519hs/perso/ergopti/static/drivers/hammerspoon/apps/App Cloner.app
+source: /System/Applications/App Store.app
+cloneName: App Store — Clone
+[preview] doUpdatePreview: calling tintedIconImage
+[tint] tiffOk=true tmpTiff=/tmp/appcloner_tint_49593.tiff
+[tint] srcPngBytes= 1218920 tmpSrc=/tmp/appcloner_tint_49593_src.png
+[tint] color=#BE0004 alpha=1,0
+[tint] running: /usr/bin/python3 '/Users/b519hs/perso/ergopti/static/drivers/hammerspoon/apps/App Cloner.app/Contents/Resources/tint_icon.py' '/tmp/appcloner_tint_49593_src.png' '/tmp/appcloner_tint_49593_dst.png' '#BE0004' tint
+[tint] dstPngBytes=    8418 tmpDst=/tmp/appcloner_tint_49593_dst.png
+[tint] initWithData result is missing value: false
+[tint] returning tinted image OK
+[preview] tintedIconImage returned — is missing value: false
+[preview] doUpdatePreview failed: NSImageCell's object value must be an NSImage, not a "__NSCFConstantString".
+[preview] doUpdatePreview: calling tintedIconImage
+[tint] tiffOk=true tmpTiff=/tmp/appcloner_tint_49681.tiff
+[tint] srcPngBytes= 1218920 tmpSrc=/tmp/appcloner_tint_49681_src.png
+[tint] color=#00B600 alpha=1,0
+[tint] running: /usr/bin/python3 '/Users/b519hs/perso/ergopti/static/drivers/hammerspoon/apps/App Cloner.app/Contents/Resources/tint_icon.py' '/tmp/appcloner_tint_49681_src.png' '/tmp/appcloner_tint_49681_dst.png' '#00B600' tint
+[tint] dstPngBytes=    8337 tmpDst=/tmp/appcloner_tint_49681_dst.png
+[tint] initWithData result is missing value: false
+[tint] returning tinted image OK
+[preview] tintedIconImage returned — is missing value: false
+[preview] doUpdatePreview failed: NSImageCell's object value must be an NSImage, not a "__NSCFConstantString".
+[preview] doUpdatePreview: calling tintedIconImage
+[tint] tiffOk=true tmpTiff=/tmp/appcloner_tint_49795.tiff
+[tint] srcPngBytes= 1218920 tmpSrc=/tmp/appcloner_tint_49795_src.png
+[tint] color=#BE000E alpha=1,0
+[tint] running: /usr/bin/python3 '/Users/b519hs/perso/ergopti/static/drivers/hammerspoon/apps/App Cloner.app/Contents/Resources/tint_icon.py' '/tmp/appcloner_tint_49795_src.png' '/tmp/appcloner_tint_49795_dst.png' '#BE000E' tint
+[tint] dstPngBytes=    8733 tmpDst=/tmp/appcloner_tint_49795_dst.png
+[tint] initWithData result is missing value: false
+[tint] returning tinted image OK
+[preview] tintedIconImage returned — is missing value: false
+[preview] doUpdatePreview failed: NSImageCell's object value must be an NSImage, not a "__NSCFConstantString".
+openArg:   pwaMode: false
+iconMode: tint  iconPath:   colorHex: #CC000D
+cmd: '/Users/b519hs/perso/ergopti/static/drivers/hammerspoon/apps/App Cloner.app/Contents/Resources/clone_app.sh' '/System/Applications/App Store.app' 'App Store — Clone' '#CC000D' '' 'tint' '' '0' '0'
+result: /Users/b519hs/Applications/App Store — Clone.app
+[AppCloner] exit=0
 
-╭─     ~ ──────────────────────────────────────────────── ✔  21:06:04 
+╭─     ~ ──────────────────────────────────────────────── ✔  21:09:53 
 ╰─
