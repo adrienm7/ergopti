@@ -505,19 +505,22 @@ end chooseButton
 -- Render a 128×128 NSImage with the tint color overlaid using a 4-pass
 -- compositing pipeline that preserves both hue and the icon's alpha mask.
 on tintedIconImage(srcImage, tintColor)
+	-- Force NSWorkspace's lazy NSImage to materialise its bitmap representations
+	-- before we lock focus. Without this, lockFocus on a freshly-obtained
+	-- NSWorkspace icon (which is loaded on demand) produces a blank white
+	-- context because no pixels have been rasterised yet.
+	set tiffData to srcImage's TIFFRepresentation()
+	set concreteImage to current application's NSImage's alloc()'s initWithData:tiffData
+	if concreteImage is missing value then set concreteImage to srcImage
+
 	set sz to current application's NSMakeSize(128, 128)
 	set tinted to current application's NSImage's alloc()'s initWithSize:sz
-	-- lockFocus is deprecated on Tahoe but still functional. The recommended
-	-- replacement (NSBitmapImageRep + initWithBitmapDataPlanes:) cannot be
-	-- called from AppleScript-ObjC because its first parameter is unsigned
-	-- char ** which has no AppleScript bridge for nil — passing
-	-- (missing value) makes the script fail to compile (-1750).
 	tinted's lockFocus()
 	set destRect to current application's NSMakeRect(0, 0, 128, 128)
 	set ctx to current application's NSGraphicsContext's currentContext
 	ctx's saveGraphicsState()
 	-- Pass 1: draw the original icon. Establishes colour and alpha mask.
-	srcImage's drawInRect:destRect fromRect:(current application's NSZeroRect) operation:2 fraction:1.0
+	concreteImage's drawInRect:destRect fromRect:(current application's NSZeroRect) operation:2 fraction:1.0
 	-- Pass 2 (optional — grayscale mode): desaturate via Saturation blend.
 	-- Only applied when tintAlpha ≈ 0; otherwise Pass 3 (Multiply) works
 	-- directly on the coloured icon with no prior desaturation needed.
@@ -543,7 +546,7 @@ on tintedIconImage(srcImage, tintColor)
 	end if
 	-- Pass 3: restore the icon's alpha mask (DestinationIn). Transparent pixels
 	-- the icon left empty are zeroed out — no coloured square halo remains.
-	srcImage's drawInRect:destRect fromRect:(current application's NSZeroRect) operation:7 fraction:1.0
+	concreteImage's drawInRect:destRect fromRect:(current application's NSZeroRect) operation:7 fraction:1.0
 	-- Post-pass: place opaque white behind the result (DestinationOver).
 	-- Flattens semi-transparent edges onto a clean white matte so no fringe
 	-- appears when the preview panel renders on its own white background.
