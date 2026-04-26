@@ -680,8 +680,11 @@ CLONE_NAME     = "${CLONE_NAME}"
 PROFILE_DIR    = "${PWA_PROFILE_DIR}"
 MY_BUNDLE_ID   = "${UNIQUE_ID}"
 
-# NSWindowStyleMask: Titled=1 Closable=2 Miniaturizable=4 Resizable=8 FullSizeContent=32768
-_WIN_MASK  = 1 | 2 | 4 | 8 | 32768
+# NSWindowStyleMask: Titled=1 Closable=2 Miniaturizable=4 Resizable=8
+# FullSizeContentView (32768) is intentionally omitted: it would extend the
+# WKWebView under the titlebar, making dark-mode chrome invisible (white web
+# content covers the title area, and DarkAqua text becomes black-on-white).
+_WIN_MASK  = 1 | 2 | 4 | 8
 # NSViewAutoresizingMask: WidthSizable=2 HeightSizable=16
 _VIEW_MASK = 2 | 16
 
@@ -695,55 +698,13 @@ def _is_dark_mode():
 
 _DARK_MODE = _is_dark_mode()
 
-# Injected at document start into every frame.
-# 1) Forces prefers-color-scheme to always report "light" so the web app
-#    never renders dark content regardless of the macOS theme.
-# 2) Exposes window.__setAppColorScheme(isDark) so the native layer can
-#    call it via evaluateJavaScript when macOS appearance changes — Teams
-#    re-evaluates its theme logic without a full page reload.
-# 3) Intercepts fetch() for graph.microsoft.com only to add credentials,
-#    fixing profile photo/avatar loads blocked by WebKit ITP.
-_FORCE_LIGHT_JS = r"""
+# Injected at document start into every frame regardless of theme.
+# Only handles graph.microsoft.com credentials — always needed for profile photos.
+_BASE_JS = r"""
 (function() {
-    // Frozen MediaQueryList that always reports "light" — handed back for
-    // every prefers-color-scheme query so Teams never switches to dark.
-    function _fakeMQL(matches, q) {
-        return {
-            matches: matches, media: q, onchange: null,
-            addListener: function(){}, removeListener: function(){},
-            addEventListener: function(){}, removeEventListener: function(){},
-            dispatchEvent: function(){ return false; }
-        };
-    }
-
-    const origMM = window.matchMedia.bind(window);
-    window.matchMedia = function(q) {
-        if (typeof q === 'string' && q.indexOf('prefers-color-scheme') !== -1) {
-            return _fakeMQL(q.indexOf('light') !== -1, q);
-        }
-        return origMM(q);
-    };
-
-    // Force color-scheme on :root via a <meta> tag so CSS 'color-scheme'
-    // property also resolves to light (scrollbar colour, system colours, etc.).
-    function _ensureLightMeta() {
-        var meta = document.querySelector('meta[name="color-scheme"]');
-        if (!meta) {
-            meta = document.createElement('meta');
-            meta.name = 'color-scheme';
-            document.head.appendChild(meta);
-        }
-        meta.content = 'light';
-        document.documentElement.style.colorScheme = 'light';
-    }
-    if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', _ensureLightMeta, { once: true });
-    } else {
-        _ensureLightMeta();
-    }
-
-    // graph.microsoft.com fetch intercept — credentials only for Graph,
-    // never for auth endpoints (Access-Control-Allow-Origin:* there).
+    // Targeted fetch intercept: add credentials:'include' only for Graph API
+    // requests (profile photos, avatars). Auth endpoints use
+    // Access-Control-Allow-Origin:* and must NOT receive credentials.
     const origFetch = window.fetch.bind(window);
     window.fetch = function(input, init) {
         try {
@@ -758,22 +719,81 @@ _FORCE_LIGHT_JS = r"""
 })();
 """
 
+# Injected only in light mode. Forces prefers-color-scheme to always report
+# "light" so the web app renders its light theme regardless of macOS appearance.
+_FORCE_LIGHT_JS = _BASE_JS + r"""
+(function() {
+    function _fakeMQL(matches, q) {
+        return {
+            matches: matches, media: q, onchange: null,
+            addListener: function(){}, removeListener: function(){},
+            addEventListener: function(){}, removeEventListener: function(){},
+            dispatchEvent: function(){ return false; }
+        };
+    }
+    const origMM = window.matchMedia.bind(window);
+    window.matchMedia = function(q) {
+        if (typeof q === 'string' && q.indexOf('prefers-color-scheme') !== -1) {
+            return _fakeMQL(q.indexOf('light') !== -1, q);
+        }
+        return origMM(q);
+    };
+    function _applyScheme() {
+        var meta = document.querySelector('meta[name="color-scheme"]');
+        if (!meta) {
+            meta = document.createElement('meta');
+            meta.name = 'color-scheme';
+            document.head.appendChild(meta);
+        }
+        meta.content = 'light';
+        document.documentElement.style.colorScheme = 'light';
+    }
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', _applyScheme, { once: true });
+    } else {
+        _applyScheme();
+    }
+})();
+"""
+
+# Injected only in dark mode. Lets the web app use its own dark theme by
+# passing real matchMedia results through unmodified.
+_FORCE_DARK_JS = _BASE_JS + r"""
+(function() {
+    function _applyScheme() {
+        var meta = document.querySelector('meta[name="color-scheme"]');
+        if (!meta) {
+            meta = document.createElement('meta');
+            meta.name = 'color-scheme';
+            document.head.appendChild(meta);
+        }
+        meta.content = 'dark';
+        document.documentElement.style.colorScheme = 'dark';
+    }
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', _applyScheme, { once: true });
+    } else {
+        _applyScheme();
+    }
+})();
+"""
+
 # Evaluated via evaluateJavaScript when macOS appearance changes at runtime.
-# Re-applies the light theme without a page reload.
 _REFRESH_LIGHT_JS = r"""
 (function() {
     var meta = document.querySelector('meta[name="color-scheme"]');
-    if (!meta) {
-        meta = document.createElement('meta');
-        meta.name = 'color-scheme';
-        document.head.appendChild(meta);
-    }
+    if (!meta) { meta = document.createElement('meta'); meta.name = 'color-scheme'; document.head.appendChild(meta); }
     meta.content = 'light';
     document.documentElement.style.colorScheme = 'light';
-    // Remove any class/attribute Teams sets to track dark mode
-    document.documentElement.classList.remove('theme--dark', 'dark-theme', 'ts-dark');
-    document.documentElement.removeAttribute('data-theme');
-    document.documentElement.setAttribute('data-theme', 'default');
+})();
+"""
+
+_REFRESH_DARK_JS = r"""
+(function() {
+    var meta = document.querySelector('meta[name="color-scheme"]');
+    if (!meta) { meta = document.createElement('meta'); meta.name = 'color-scheme'; document.head.appendChild(meta); }
+    meta.content = 'dark';
+    document.documentElement.style.colorScheme = 'dark';
 })();
 """
 
@@ -865,31 +885,32 @@ class _AppDelegate(NSObject):
 
     def applicationDidFinishLaunching_(self, _notification):
         self._wd = _WinDelegate.alloc().init()
+        # Listen for macOS appearance changes before opening so we never miss
+        # a theme switch that happens between launch and first paint.
+        NSDistributedNotificationCenter.defaultCenter().addObserver_selector_name_object_(
+            self, "systemThemeChanged:", "AppleInterfaceThemeChangedNotification", None
+        )
+        # Space sync: kill Dock BEFORE showing the window so macOS has already
+        # teleported the user (and our CanJoinAllSpaces window) to the target
+        # Space by the time the window becomes visible. Without this ordering
+        # the window appears on the wrong Space for ~1-2 s before following.
+        needs_settle = _sync_space_assignment()
         self._open()
         NSApplication.sharedApplication().activateIgnoringOtherApps_(True)
         url = NSURL.URLWithString_(OPEN_ARG)
         if url:
             self._wv.loadRequest_(NSURLRequest.requestWithURL_(url))
-        # Listen for macOS appearance changes so we can update window chrome
-        # and re-apply the light-theme JS without a page reload.
-        NSDistributedNotificationCenter.defaultCenter().addObserver_selector_name_object_(
-            self, "systemThemeChanged:", "AppleInterfaceThemeChangedNotification", None
-        )
-        if _sync_space_assignment():
-            self.performSelector_withObject_afterDelay_("_settleOnTargetSpace", None, 1.8)
+        if needs_settle:
+            self.performSelector_withObject_afterDelay_("_settleOnTargetSpace", None, 2.5)
 
     def systemThemeChanged_(self, _notification):
         """Called by NSDistributedNotificationCenter when the user toggles dark/light mode."""
         global _DARK_MODE
         _DARK_MODE = _is_dark_mode()
         self._apply_appearance()
-        # Re-apply the light-theme override in the already-loaded page — Teams
-        # listens for matchMedia changes via its own observers, but since we
-        # replaced matchMedia with a frozen stub those observers never fire.
-        # Instead we directly patch the DOM state Teams inspects for theming.
         if self._wv is not None:
-            self._wv.evaluateJavaScript_completionHandler_(_REFRESH_LIGHT_JS, None)
-        # Also update the whole app appearance so menus/alerts follow the new theme.
+            js = _REFRESH_DARK_JS if _DARK_MODE else _REFRESH_LIGHT_JS
+            self._wv.evaluateJavaScript_completionHandler_(js, None)
         app = NSApplication.sharedApplication()
         if _DARK_MODE:
             app.setAppearance_(None)  # follow system
@@ -949,11 +970,12 @@ class _AppDelegate(NSObject):
         except Exception:
             pass
 
-        # Inject the prefers-color-scheme override at document start so the
-        # web app picks up the light theme on its very first paint.
+        # Inject color-scheme script matching current macOS appearance so the
+        # web app uses dark theme in dark mode and light theme in light mode.
         ucc = WKUserContentController.alloc().init()
+        scheme_js = _FORCE_DARK_JS if _DARK_MODE else _FORCE_LIGHT_JS
         script = WKUserScript.alloc().initWithSource_injectionTime_forMainFrameOnly_(
-            _FORCE_LIGHT_JS, 0, False  # 0 = AtDocumentStart, False = all frames
+            scheme_js, 0, False  # 0 = AtDocumentStart, False = all frames
         )
         ucc.addUserScript_(script)
         cfg.setUserContentController_(ucc)
