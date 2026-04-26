@@ -703,6 +703,10 @@ _DARK_MODE = _is_dark_mode()
 _FORCE_LIGHT_JS = """
 (function() {
     // Override matchMedia so the web app always thinks light theme is active.
+    // We deliberately do NOT touch fetch / XHR here: forcing credentials:'include'
+    // globally breaks CORS preflight for any endpoint that returns
+    // Access-Control-Allow-Origin:* (Microsoft auth endpoints in particular),
+    // killing the login flow entirely.
     const orig = window.matchMedia.bind(window);
     window.matchMedia = function(q) {
         if (typeof q === 'string' && q.indexOf('prefers-color-scheme') !== -1) {
@@ -717,21 +721,6 @@ _FORCE_LIGHT_JS = """
             };
         }
         return orig(q);
-    };
-    // Ensure all fetch() calls include cookies (credentials:'include').
-    // Profile images from Microsoft CDN require authenticated requests;
-    // WKWebView's ITP can strip cookies on cross-site requests without this.
-    const origFetch = window.fetch.bind(window);
-    window.fetch = function(url, opts) {
-        opts = Object.assign({}, opts);
-        if (!opts.credentials) { opts.credentials = 'include'; }
-        return origFetch(url, opts);
-    };
-    // Same for XMLHttpRequest — some older Teams code paths use XHR.
-    const origOpen = XMLHttpRequest.prototype.open;
-    XMLHttpRequest.prototype.open = function() {
-        this.withCredentials = true;
-        return origOpen.apply(this, arguments);
     };
 })();
 """
