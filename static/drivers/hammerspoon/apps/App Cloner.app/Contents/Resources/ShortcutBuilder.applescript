@@ -504,30 +504,16 @@ on tintedIconImage(srcImage, tintColor)
 	set destRect to current application's NSMakeRect(0, 0, 128, 128)
 	set ctx to current application's NSGraphicsContext's currentContext
 	ctx's saveGraphicsState()
-	-- Pre-pass: flood the canvas with opaque white so that transparent icon
-	-- pixels (the rounded-rect corners) never accumulate gray from the
-	-- Saturation pass below. Without this, alpha-zero pixels pick up a faint
-	-- gray tint that shows as dots on white backgrounds.
-	ctx's setCompositingOperation:2  -- NSCompositingOperationSourceOver
-	set whiteFill to current application's NSColor's whiteColor
-	whiteFill's setFill()
-	current application's NSBezierPath's fillRect:destRect
-	-- Pass 1: draw the original icon at full opacity. This establishes both
-	-- the colour buffer AND the alpha mask (rounded-rect shape, transparent
-	-- pixels in the corners) that Pass 4 will use to clip the tint.
+	-- Pass 1: draw the original icon. Establishes both colour and alpha mask.
 	srcImage's drawInRect:destRect fromRect:(current application's NSZeroRect) operation:2 fraction:1.0
-	-- Pass 2: desaturate via Saturation compositing with a neutral gray. The
-	-- result has the original luminosity of each pixel but zero saturation,
-	-- giving Pass 3 a hue-neutral base so the chosen tint reads cleanly.
+	-- Pass 2: desaturate with a neutral grey (Saturation blend). Strips hue
+	-- while keeping luminance, giving Pass 3 a neutral base for the tint.
 	ctx's setCompositingOperation:26  -- NSCompositingOperationSaturation
 	set grayFill to current application's NSColor's colorWithWhite:0.5 alpha:1.0
 	grayFill's setFill()
 	current application's NSBezierPath's fillRect:destRect
-	-- Pass 3: Screen-blend the tint. Screen's formula 1-(1-src)(1-dst) yields
-	-- 1 wherever dst=1, leaving white/near-white pixels untouched while shifting
-	-- dark and mid-tone areas toward the tint hue. Skipped when alpha is zero
-	-- (grayscale mode) to prevent the gray desaturation pass from being screened
-	-- back toward white, which would wash out dark areas of the icon.
+	-- Pass 3: Screen-blend the tint colour. Skipped when alpha ≈ 0 (grayscale
+	-- mode) — the Screen formula would wash dark areas back toward white.
 	set sRGBSpace to current application's NSColorSpace's sRGBColorSpace
 	set tintRGB to tintColor's colorUsingColorSpace:sRGBSpace
 	set tintAlpha to (tintRGB's alphaComponent()) as real
@@ -536,13 +522,20 @@ on tintedIconImage(srcImage, tintColor)
 		tintColor's setFill()
 		current application's NSBezierPath's fillRect:destRect
 	end if
-	-- Pass 4: restore the icon's alpha mask. Passes 2 and 3 fillRect the entire
-	-- 128×128 square, so the rounded-rect corners (originally transparent) end
-	-- up filled with opaque tint — visible as a coloured square halo around the
-	-- icon. NSCompositingOperationDestinationIn (7) keeps the destination colour
-	-- but multiplies its alpha by the source's, which zeroes out every pixel
-	-- the original icon left transparent, restoring the rounded-rect silhouette.
+	-- Pass 4: restore the icon's alpha mask by multiplying destination alpha
+	-- by source alpha (DestinationIn). Pixels the icon left transparent go
+	-- back to fully transparent — no coloured halo around the silhouette.
 	srcImage's drawInRect:destRect fromRect:(current application's NSZeroRect) operation:7 fraction:1.0
+	-- Post-pass: place opaque white BEHIND the composited result using
+	-- DestinationOver (3). Semantics: dest stays where dest is opaque;
+	-- white fills only where dest is transparent or semi-transparent.
+	-- This flattens the icon's anti-aliased edges onto a clean white matte
+	-- so no tinted semi-transparent fringe is visible when the preview panel
+	-- renders it on its own white background.
+	ctx's setCompositingOperation:3  -- NSCompositingOperationDestinationOver
+	set whiteFill to current application's NSColor's whiteColor
+	whiteFill's setFill()
+	current application's NSBezierPath's fillRect:destRect
 	ctx's restoreGraphicsState()
 	tinted's unlockFocus()
 	return tinted
