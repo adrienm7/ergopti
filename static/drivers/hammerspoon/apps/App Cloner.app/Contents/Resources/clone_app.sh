@@ -697,30 +697,47 @@ def _is_dark_mode():
 
 _DARK_MODE = _is_dark_mode()
 
-# Inject a script that forces every prefers-color-scheme: dark media query to
-# return false. Web content always renders in light theme so it reads cleanly
-# regardless of the macOS appearance — window chrome adapts separately.
+# Inject a script that:
+#   1. Forces every prefers-color-scheme: dark media query to return false so the
+#      web app always renders in light theme regardless of the macOS appearance.
+#   2. Intercepts fetch() calls to graph.microsoft.com to always include
+#      credentials. Teams fetches profile photos and avatars from Graph with a
+#      Bearer token, but WebKit's ITP can strip the cookie/auth state on
+#      cross-site requests. Forcing credentials:'include' only for Graph URLs
+#      fixes profile images without touching auth endpoints (which must stay
+#      credentials:'omit' or use CORS wildcard — those we do NOT touch).
 _FORCE_LIGHT_JS = """
 (function() {
-    // Override matchMedia so the web app always thinks light theme is active.
-    // We deliberately do NOT touch fetch / XHR here: forcing credentials:'include'
-    // globally breaks CORS preflight for any endpoint that returns
-    // Access-Control-Allow-Origin:* (Microsoft auth endpoints in particular),
-    // killing the login flow entirely.
-    const orig = window.matchMedia.bind(window);
+    // 1) matchMedia override — light theme always
+    const origMM = window.matchMedia.bind(window);
     window.matchMedia = function(q) {
         if (typeof q === 'string' && q.indexOf('prefers-color-scheme') !== -1) {
             const isLight = q.indexOf('light') !== -1;
             return {
-                matches: isLight,
-                media: q,
-                onchange: null,
+                matches: isLight, media: q, onchange: null,
                 addListener: function(){}, removeListener: function(){},
                 addEventListener: function(){}, removeEventListener: function(){},
                 dispatchEvent: function(){ return false; }
             };
         }
-        return orig(q);
+        return origMM(q);
+    };
+
+    // 2) Targeted fetch intercept: add credentials:'include' only for
+    //    graph.microsoft.com requests (profile photos, avatars).
+    //    All other fetch calls (including Microsoft login/auth endpoints that
+    //    use Access-Control-Allow-Origin:* and must NOT send credentials)
+    //    pass through completely unmodified.
+    const origFetch = window.fetch.bind(window);
+    window.fetch = function(input, init) {
+        try {
+            const url = (typeof input === 'string') ? input
+                : (input && input.url) ? input.url : String(input);
+            if (url.indexOf('graph.microsoft.com') !== -1) {
+                init = Object.assign({}, init || {}, { credentials: 'include' });
+            }
+        } catch(_) {}
+        return origFetch(input, init);
     };
 })();
 """
@@ -821,19 +838,16 @@ class _AppDelegate(NSObject):
         # Sync Space assignment here (not before NSApp.run()) so we can schedule
         # a re-activation if killall Dock runs — Dock restart steals focus AND
         # teleports the user to the target Space without bringing our window.
-        # Setting CanJoinAllSpaces (1) before the Dock restart makes the window
-        # visible on every Space, including the target one the user lands on;
-        # _settleOnTargetSpace then removes the flag, pinning it to that Space.
+        # The window is already set to CanJoinAllSpaces in _open() so it follows
+        # the teleportation to the target Space; _settleOnTargetSpace pins it there.
         if _sync_space_assignment():
-            if self._win:
-                self._win.setCollectionBehavior_(1)  # NSWindowCollectionBehaviorCanJoinAllSpaces
             self.performSelector_withObject_afterDelay_("_settleOnTargetSpace", None, 1.8)
 
     def _settleOnTargetSpace(self):
-        """Pin the window to whichever Space is now active (the target one)
-        and re-grab focus after Dock has finished restarting.
-        """
+        """Pin the window to the target Space and re-grab focus after Dock restarts."""
         if self._win:
+            # Remove CanJoinAllSpaces — window is now on the target Space,
+            # switching back to Default pins it there so it stops following the user.
             self._win.setCollectionBehavior_(0)  # NSWindowCollectionBehaviorDefault
             self._win.makeKeyAndOrderFront_(None)
         NSApplication.sharedApplication().activateIgnoringOtherApps_(True)
@@ -846,6 +860,10 @@ class _AppDelegate(NSObject):
         win.center()
         win.setDelegate_(self._wd)
         win.setTabbingMode_(2)  # NSWindowTabbingModeDisallowed
+        # Start as CanJoinAllSpaces so the window is visible on every Space,
+        # including whichever one Dock teleports the user to during _sync_space_assignment.
+        # _settleOnTargetSpace removes this flag to pin the window to the target Space.
+        win.setCollectionBehavior_(1)  # NSWindowCollectionBehaviorCanJoinAllSpaces
         # In light mode: force Aqua appearance so the entire chrome stays white.
         # In dark mode: let the window inherit the system dark chrome (title bar,
         # traffic lights) while using a pleasant dark blue-grey content background
@@ -860,10 +878,16 @@ class _AppDelegate(NSObject):
         cfg.setWebsiteDataStore_(WKWebsiteDataStore.defaultDataStore())
         cfg.setMediaTypesRequiringUserActionForPlayback_(0)
         # Disable WebKit's Intelligent Tracking Prevention. ITP strips cookies
-        # on cross-site requests, which breaks profile-image loads from
-        # Microsoft's CDN (graph.microsoft.com, *.msecnd.net, etc.).
+        # and blocks authenticated cross-site requests, which breaks profile-image
+        # loads from Microsoft's CDN (graph.microsoft.com, *.msecnd.net, etc.).
         try:
             cfg.websiteDataStore().setPreventsCrossSiteTracking_(False)
+        except Exception:
+            pass
+        # Allow navigation to any domain (Teams loads content from many Microsoft
+        # subdomains; restricting to app-bound domains would block auth flows).
+        try:
+            cfg.setLimitsNavigationsToAppBoundDomains_(False)
         except Exception:
             pass
 
