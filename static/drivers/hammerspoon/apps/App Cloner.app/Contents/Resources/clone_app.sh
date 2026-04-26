@@ -36,12 +36,13 @@ OPEN_ARG="${4:-}"
 ICON_MODE="${5:-tint}"   # tint | bw | custom
 ICON_PATH="${6:-}"        # only used when ICON_MODE=custom
 PWA_MODE="${7:-0}"        # 1 = clone is an Edge PWA pointing at OPEN_ARG (URL)
+URL_LOCK="${8:-0}"        # 1 = PWA refuses to navigate away from OPEN_ARG (out-of-scope URLs are dispatched to SOURCE_APP)
 
 log "============================================================"
 log "=== AppCloner (stub mode) — $(date)"
 log "=== SOURCE=$SOURCE_APP"
 log "=== NAME=$CLONE_NAME  COLOR=$COLOR_HEX  ARG=$OPEN_ARG"
-log "=== ICON_MODE=$ICON_MODE  ICON_PATH=$ICON_PATH  PWA=$PWA_MODE"
+log "=== ICON_MODE=$ICON_MODE  ICON_PATH=$ICON_PATH  PWA=$PWA_MODE  URL_LOCK=$URL_LOCK"
 log "============================================================"
 
 [[ -z "$SOURCE_APP" ]] && { echo "Error: SOURCE_APP missing"; exit 1; }
@@ -674,6 +675,8 @@ except Exception as _wk_err:
 
 OPEN_ARG       = "${OPEN_ARG}"
 CLONE_NAME     = "${CLONE_NAME}"
+SOURCE_APP     = "${SOURCE_APP}"
+URL_LOCK       = "${URL_LOCK}" == "1"
 
 # NSWindowStyleMask: Titled=1 Closable=2 Miniaturizable=4 Resizable=8
 # FullSizeContentView (32768) is intentionally omitted: it would extend the
@@ -693,14 +696,23 @@ def _is_dark_mode():
 
 _DARK_MODE = _is_dark_mode()
 
-# Injected at document start into every frame. ONLY handles the
-# graph.microsoft.com credentials intercept needed for profile photos —
-# we never touch the page's CSS, color-scheme meta, matchMedia, or DOM
-# attributes. WKWebView already reports prefers-color-scheme correctly
-# based on the window's NSAppearance, so the web app picks the right
-# theme on its own via its own CSS rules.
-_INJECT_JS = r"""
+# Injected at document start into every frame. Generic fixes that work on
+# any PWA — never touches the page's CSS, color-scheme meta, matchMedia,
+# or DOM attributes. WKWebView reports prefers-color-scheme correctly
+# based on the window's NSAppearance, so the web app picks the right theme
+# on its own via its own CSS rules.
+#
+# Two helpers are injected:
+#  1. fetch() credentials helper for graph.microsoft.com, used by web apps
+#     that load profile photos via authenticated XHR.
+#  2. <img> error recovery: when a cross-origin image fails to load (often
+#     because WebKit's ITP stripped cookies on the cross-site request),
+#     re-fetch it via fetch(credentials:'include') and swap in a blob URL.
+#     This rescues contact avatars in Teams, Outlook, etc. without
+#     hard-coding any specific domain.
+_INJECT_JS_TPL = r"""
 (function() {
+    // ===== fetch credentials =====
     const origFetch = window.fetch.bind(window);
     window.fetch = function(input, init) {
         try {
@@ -712,8 +724,133 @@ _INJECT_JS = r"""
         } catch(_) {}
         return origFetch(input, init);
     };
+
+    // ===== <img> cross-origin error recovery =====
+    function _attachImgRecovery(img) {
+        if (img.__appcloner_hooked) return;
+        img.__appcloner_hooked = true;
+        img.addEventListener('error', function _onErr() {
+            if (img.__appcloner_recovered) return;
+            const src = img.getAttribute('src') || '';
+            if (!src) return;
+            if (src.startsWith('data:') || src.startsWith('blob:') || src.startsWith('file:')) return;
+            try {
+                const u = new URL(src, location.href);
+                if (u.origin === location.origin) return;  // same-origin, nothing we can do
+            } catch (_) { return; }
+            img.__appcloner_recovered = true;
+            fetch(src, { credentials: 'include' })
+                .then(function(r) { return r.ok ? r.blob() : null; })
+                .then(function(blob) { if (blob) img.src = URL.createObjectURL(blob); })
+                .catch(function() {});
+        });
+    }
+    function _scanExisting() {
+        document.querySelectorAll('img').forEach(_attachImgRecovery);
+    }
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', _scanExisting, { once: true });
+    } else {
+        _scanExisting();
+    }
+    new MutationObserver(function(records) {
+        for (var i = 0; i < records.length; i++) {
+            var added = records[i].addedNodes;
+            for (var j = 0; j < added.length; j++) {
+                var n = added[j];
+                if (n.nodeName === 'IMG') _attachImgRecovery(n);
+                else if (n.querySelectorAll) {
+                    n.querySelectorAll('img').forEach(_attachImgRecovery);
+                }
+            }
+        }
+    }).observe(document.documentElement, { childList: true, subtree: true });
+
+    // ===== URL lock (only active when __APPCLONER_LOCK__ is true) =====
+    var _LOCKED = __APPCLONER_LOCK__;
+    var _LOCKED_URL = "__APPCLONER_LOCKED_URL__";
+    if (_LOCKED && _LOCKED_URL) {
+        function _splitFrag(s) {
+            var i = (s || '').indexOf('?');
+            return i < 0 ? (s || '') : s.substring(0, i);
+        }
+        function _isLocked(target) {
+            try {
+                var l = new URL(_LOCKED_URL);
+                var t = new URL(target, location.href);
+                if (l.protocol !== t.protocol || l.host !== t.host) return false;
+                if (l.pathname !== t.pathname) return false;
+                return _splitFrag(l.hash) === _splitFrag(t.hash);
+            } catch (_) { return false; }
+        }
+        function _dispatchExternal(url) {
+            try {
+                if (window.webkit && window.webkit.messageHandlers
+                    && window.webkit.messageHandlers.appclonerExternal) {
+                    window.webkit.messageHandlers.appclonerExternal.postMessage(url);
+                }
+            } catch (_) {}
+        }
+        var origPush = history.pushState.bind(history);
+        history.pushState = function(state, title, url) {
+            if (url != null && !_isLocked(url)) {
+                _dispatchExternal(new URL(url, location.href).href);
+                return;
+            }
+            return origPush(state, title, url);
+        };
+        var origReplace = history.replaceState.bind(history);
+        history.replaceState = function(state, title, url) {
+            if (url != null && !_isLocked(url)) {
+                _dispatchExternal(new URL(url, location.href).href);
+                return;
+            }
+            return origReplace(state, title, url);
+        };
+        window.addEventListener('hashchange', function(e) {
+            if (!_isLocked(location.href)) {
+                _dispatchExternal(location.href);
+                try { history.replaceState(null, '', e.oldURL); } catch (_) {}
+            }
+        });
+    }
 })();
 """
+
+
+def _url_in_lock_scope(target):
+    """Return True when target URL stays within OPEN_ARG's locked scope.
+
+    Compares scheme, host, path, and the path-portion of the fragment
+    (everything before '?'). Query params are ignored on purpose so query
+    string changes such as '?ctx=…' or '&var=…' are considered legitimate.
+    """
+    if not URL_LOCK or not OPEN_ARG or not target:
+        return True
+    try:
+        from urllib.parse import urlparse
+        a = urlparse(OPEN_ARG)
+        b = urlparse(target)
+        if a.scheme != b.scheme or a.netloc != b.netloc:
+            return False
+        if a.path != b.path:
+            return False
+        return (a.fragment or "").split("?", 1)[0] == (b.fragment or "").split("?", 1)[0]
+    except Exception:
+        return False
+
+
+def _open_in_source_app(url):
+    """Dispatch a URL to the source desktop app via `open -a`."""
+    if not url:
+        return
+    try:
+        if SOURCE_APP:
+            subprocess.run(["open", "-a", SOURCE_APP, url], capture_output=True)
+        else:
+            subprocess.run(["open", url], capture_output=True)
+    except Exception:
+        pass
 
 
 class _WinDelegate(NSObject):
@@ -793,11 +930,25 @@ class _AppDelegate(NSObject):
         except Exception:
             pass
 
-        # Inject only the Graph credentials helper. Theme detection is left
-        # entirely to WebKit + the page's own CSS — we never touch its styles.
+        # Inject generic helpers (fetch credentials, <img> error recovery, and
+        # — when URL_LOCK is on — pushState/hashchange interception). Theme
+        # detection is left entirely to WebKit + the page's own CSS.
         ucc = WKUserContentController.alloc().init()
+        # Register a script-message handler for the lock's "external link"
+        # channel. The page calls window.webkit.messageHandlers.appclonerExternal
+        # .postMessage(url) when navigation outside the locked URL is attempted;
+        # we dispatch that URL to the source desktop app so the user gets the
+        # real client for whatever they were trying to open.
+        ucc.addScriptMessageHandler_name_(self, "appclonerExternal")
+        # Resolve the template's URL_LOCK and locked URL before injection so the
+        # JS sees plain values (no extra IPC roundtrip needed).
+        lock_flag = "true" if URL_LOCK else "false"
+        locked_url_js = (OPEN_ARG or "").replace("\\", "\\\\").replace('"', '\\"')
+        injected = (_INJECT_JS_TPL
+            .replace("__APPCLONER_LOCK__", lock_flag)
+            .replace("__APPCLONER_LOCKED_URL__", locked_url_js))
         script = WKUserScript.alloc().initWithSource_injectionTime_forMainFrameOnly_(
-            _INJECT_JS, 0, False  # 0 = AtDocumentStart, False = all frames
+            injected, 0, False  # 0 = AtDocumentStart, False = all frames
         )
         ucc.addUserScript_(script)
         cfg.setUserContentController_(ucc)
@@ -812,9 +963,39 @@ class _AppDelegate(NSObject):
             "Chrome/130.0.0.0 Safari/537.36 Edg/130.0.0.0"
         )
         wv.setUIDelegate_(self)
+        wv.setNavigationDelegate_(self)
         win.contentView().addSubview_(wv)
         win.makeKeyAndOrderFront_(None)
         self._wv = wv
+
+    # ===== WKNavigationDelegate =====
+    def webView_decidePolicyForNavigationAction_decisionHandler_(self, wv, action, handler):
+        """Block navigation outside the locked URL when URL_LOCK is on.
+
+        Out-of-scope navigation is dispatched to SOURCE_APP via `open -a`
+        so the user lands in the real desktop app. The very first navigation
+        (loading OPEN_ARG itself) is always in scope so it passes through.
+        """
+        try:
+            if URL_LOCK:
+                req = action.request()
+                target = req.URL().absoluteString() if req and req.URL() else ""
+                if not _url_in_lock_scope(target):
+                    handler(0)  # WKNavigationActionPolicyCancel
+                    _open_in_source_app(target)
+                    return
+        except Exception:
+            pass
+        handler(1)  # WKNavigationActionPolicyAllow
+
+    # ===== WKScriptMessageHandler =====
+    def userContentController_didReceiveScriptMessage_(self, _ucc, message):
+        """Receive 'appclonerExternal' messages from the JS lock and dispatch."""
+        try:
+            if message.name() == "appclonerExternal":
+                _open_in_source_app(str(message.body()))
+        except Exception:
+            pass
 
     def applicationShouldHandleReopen_hasVisibleWindows_(self, _app, _flag):
         if self._win is None:

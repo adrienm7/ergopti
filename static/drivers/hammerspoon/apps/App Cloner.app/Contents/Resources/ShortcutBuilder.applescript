@@ -154,7 +154,7 @@ end trim
 --   * a typo in the scheme such as «mstems:» or «msteams//» (missing colon)
 --   * a Teams clone with a non-Teams URL (and vice-versa) — best-effort hint
 on validateOpenArg(inputVal, sourceAppPath)
-	if inputVal is "" then return "Le champ est vide. Colle une URL ou un chemin de fichier."
+	if inputVal is "" then return "Le champ est vide. Coller une URL ou un chemin de fichier."
 
 	-- File-system path: must point to something that actually exists
 	if (inputVal starts with "/") or (inputVal starts with "~") then
@@ -165,7 +165,7 @@ on validateOpenArg(inputVal, sourceAppPath)
 		try
 			do shell script "test -e " & quoted form of resolvedPath
 		on error
-			return "Le chemin « " & inputVal & " » n'existe pas sur le disque."
+			return "Le chemin « " & inputVal & " » n’existe pas sur le disque."
 		end try
 		return ""
 	end if
@@ -188,7 +188,7 @@ on validateOpenArg(inputVal, sourceAppPath)
 	set isTeamsURL to (inputLower starts with "msteams:")
 	set isHTTP to (inputLower starts with "http")
 	if isTeamsSource and not (isTeamsURL or isHTTP or (inputLower starts with "/")) then
-		return "Cette app source est Teams, mais l'URL ne commence pas par « msteams: » ni « https: »."
+		return "Cette app source est Teams, mais l’URL ne commence pas par « msteams: » ni « https: »."
 	end if
 
 	return ""
@@ -236,10 +236,10 @@ end pwaSuggestionFor
 -- Validate a URL specifically for PWA mode. Stricter than validateOpenArg:
 -- requires http(s) since Edge --app= only accepts navigable web URLs.
 on validatePWAURL(inputVal)
-	if inputVal is "" then return "L'URL de la PWA est obligatoire en mode PWA."
+	if inputVal is "" then return "L’URL de la PWA est obligatoire en mode PWA."
 	set v to my toLower(inputVal)
 	if not (v starts with "http://" or v starts with "https://") then
-		return "L'URL doit commencer par http:// ou https:// (Edge --app= n'accepte que des URLs web)."
+		return "L’URL doit commencer par http:// ou https:// (Edge --app= n’accepte que des URLs web)."
 	end if
 	return ""
 end validatePWAURL
@@ -544,14 +544,33 @@ on tintedIconImage(srcImage, tintColor)
 	return tinted
 end tintedIconImage
 
--- Custom colour-picker dialog with a live 128×128 icon preview.
--- An NSTimer fires every 80 ms, reads the NSColorWell's current colour, and
--- repaints the preview — giving immediate visual feedback as the user drags
--- sliders in the system colour panel.
+-- Resolve the source app's icon as a high-resolution NSImage. Tries the
+-- bundle's .icns directly first (gives the highest-quality reps for
+-- Outlook, Safari, and other apps where NSWorkspace's iconForFile may
+-- return a generic placeholder under osascript). Falls back to
+-- NSWorkspace.iconForFile for App Store / asset-catalog apps that ship
+-- icons inside Assets.car instead of a plain .icns.
+on resolveAppIcon(appPath)
+	try
+		set iconName to do shell script "/usr/libexec/PlistBuddy -c 'Print :CFBundleIconFile' " & quoted form of (appPath & "/Contents/Info.plist")
+		if iconName does not end with ".icns" then set iconName to iconName & ".icns"
+		set icnsPath to appPath & "/Contents/Resources/" & iconName
+		set fm to current application's NSFileManager's defaultManager
+		if (fm's fileExistsAtPath:icnsPath) as boolean then
+			set img to current application's NSImage's alloc()'s initWithContentsOfFile:icnsPath
+			if img is not missing value then return img
+		end if
+	end try
+	set ws to current application's NSWorkspace's sharedWorkspace
+	return ws's iconForFile:appPath
+end resolveAppIcon
+
+-- Custom colour-picker dialog with a live 128×128 icon preview. The colour
+-- well fires its target/action on every change in the system NSColorPanel,
+-- giving immediate visual feedback as the user drags sliders.
 -- Returns the chosen NSColor, or missing value when the user clicks Retour.
 on showTintColorPicker(appPath)
-	set ws to current application's NSWorkspace's sharedWorkspace
-	set srcImage to ws's iconForFile:appPath
+	set srcImage to my resolveAppIcon(appPath)
 	set my tintPreviewSourceImage to srcImage
 
 	-- Panel: titled only (no close button) — forces the user to use the buttons
@@ -577,7 +596,7 @@ on showTintColorPicker(appPath)
 
 	-- Subtitle
 	set bLabel to current application's NSTextField's alloc()'s initWithFrame:(current application's NSMakeRect(16, pH - 62, pW - 32, 16))
-	bLabel's setStringValue:"Aperçu en temps réel — cliquez sur la couleur pour la modifier."
+	bLabel's setStringValue:"Aperçu en temps réel — cliquer sur la couleur pour la modifier."
 	set pickerBodyFont to current application's NSFont's systemFontOfSize:11
 	bLabel's setFont:pickerBodyFont
 	bLabel's setBordered:false
@@ -746,6 +765,7 @@ on run argv
 	set pwaURL to ""
 	set pwaDefaultURL to ""
 	set pwaForced to false
+	set urlLocked to false
 	set openArg to ""
 	set iconMode to ""
 	set iconPath to ""
@@ -758,27 +778,44 @@ on run argv
 	repeat
 		-- ===== 1) Pick the source application =====
 		if step = 1 then
+			-- Use NSOpenPanel directly so the action button reads "Choisir"
+			-- and the cancel button reads "Annuler". AppleScript's built-in
+			-- `choose file` exposes Cancel via the osascript bundle which
+			-- often falls back to English even on a French system.
+			set panel to current application's NSOpenPanel's openPanel
+			panel's setMessage:"Application à cloner"
+			panel's setPrompt:"Choisir"
+			panel's setCanChooseFiles:true
+			panel's setCanChooseDirectories:false
+			panel's setAllowsMultipleSelection:false
+			panel's setAllowedFileTypes:{"app"}
+			-- Override the cancel button label via KVC. The property is private
+			-- on NSSavePanel (NSOpenPanel's superclass) but the KVC accessor
+			-- works on Tahoe; if it does not, the system label is shown.
+			try
+				panel's setValue:"Annuler" forKey:"cancelButtonTitle"
+			end try
 			set appsFolder to path to applications folder
 			try
-				set sourceFile to choose file ¬
-					with prompt "Application à cloner" ¬
-					default location appsFolder ¬
-					of type {"com.apple.application-bundle"}
-				set sourcePath to POSIX path of sourceFile
-				logmsg("source: " & sourcePath)
-				set defaultName to do shell script "basename " & quoted form of sourcePath & " .app"
-				set cloneName to defaultName & " — Clone"
-				set step to 2
-			on error
-				-- File picker cancelled at step 1 → nothing to go back to
-				return
+				panel's setDirectoryURL:(current application's NSURL's fileURLWithPath:(POSIX path of appsFolder))
 			end try
+			set rc to panel's runModal()
+			if rc is not 1 then
+				-- Cancel at step 1 → nothing to go back to
+				return
+			end if
+			set chosenURL to (panel's |URLs|()'s firstObject())
+			set sourcePath to (chosenURL's |path|()) as text
+			logmsg("source: " & sourcePath)
+			set defaultName to do shell script "basename " & quoted form of sourcePath & " .app"
+			set cloneName to defaultName & " — Clone"
+			set step to 2
 
 		-- ===== 2) Clone name =====
 		else if step = 2 then
 			tell me to activate
 			try
-				set r to my customDialog("Nom du clone", "Nom à afficher sous l'icône du Dock.", ¬
+				set r to my customDialog("Nom du clone", "Nom à afficher sous l’icône du Dock.", ¬
 					{"Retour", "OK"}, true, cloneName, 1, 280, false, "")
 				if (chosenButton of r) is "Retour" then
 					set step to 1
@@ -814,9 +851,9 @@ on run argv
 				else
 					set pwaAnswer to my chooseButton("Mode PWA ?", ¬
 						"Cloner via une web app (navigateur --app=URL)" & return & ¬
-						"au lieu de relancer l'app native." & return & return & ¬
+						"au lieu de relancer l’app native." & return & return & ¬
 						"Utile pour avoir des comptes séparés sans dépendance au binaire.", ¬
-						{"Retour", "PWA web app", "Cloner l'app native"}, "App Cloner")
+						{"Retour", "PWA web app", "Cloner l’app native"}, "App Cloner")
 				end if
 				if pwaAnswer is "Retour" then
 					set step to 2
@@ -837,7 +874,12 @@ on run argv
 		else if step = 4 then
 			tell me to activate
 			if pwaMode then
-				-- PWA: single URL input, no folder picker needed
+				-- PWA: single URL input + an opt-in checkbox to lock the PWA
+				-- to its initial URL. With the lock on, navigations to a
+				-- different page (different scheme/host/path or fragment-path)
+				-- are dispatched to the source desktop app via `open -a`,
+				-- forcing the user to switch to the real app for anything
+				-- outside the original conversation/page.
 				set urlBody to ¬
 					"URL à ouvrir dans la PWA (Entrée pour valider) :" & return & return & ¬
 					"── Microsoft Teams ──────────────────────────────" & return & ¬
@@ -849,7 +891,8 @@ on run argv
 					"Calendrier : https://outlook.office.com/calendar/"
 				try
 					set r to my customDialog("URL PWA", urlBody, ¬
-						{"Retour", "OK"}, true, pwaURL, -1, 600, false, "")
+						{"Retour", "OK"}, true, pwaURL, -1, 600, true, ¬
+						"Verrouiller la PWA sur cette URL (rediriger vers l’app source pour toute autre page)")
 					if (chosenButton of r) is "Retour" then
 						set step to 3
 					else
@@ -858,6 +901,7 @@ on run argv
 						if pwaErr is "" then
 							set pwaURL to candidate
 							set openArg to candidate
+							set urlLocked to (checked of r)
 							set step to 5
 						else
 							display alert "URL invalide" message pwaErr as warning
@@ -878,7 +922,7 @@ on run argv
 					if nativeSubStep = 0 then
 						try
 							set openTypeAnswer to my chooseButton("Élément à ouvrir au lancement", ¬
-								"Optionnel — laisser à « Rien » pour simplement lancer l'app.", ¬
+								"Optionnel — laisser à « Rien » pour simplement lancer l’app.", ¬
 								{"Retour", "Rien", "URL ou chemin"}, "App Cloner")
 							if openTypeAnswer is "Retour" then
 								set step to 3
@@ -899,7 +943,7 @@ on run argv
 						-- URL / path input with an inline Parcourir… button that fills
 						-- the field with a folder path chosen via the system picker.
 						set urlPrompt to ¬
-							"Coller l'URL ou le chemin à ouvrir au lancement." & return & return & ¬
+							"Coller l’URL ou le chemin à ouvrir au lancement." & return & return & ¬
 							"📅  Outlook calendrier :   ms-outlook://events" & return & return & ¬
 							"📨  Outlook mail :         ms-outlook://" & return & return & ¬
 							"💬  Teams (une conv) :     msteams:/l/chat/0/0?users=foo@bar.com" & return & ¬
@@ -935,7 +979,7 @@ on run argv
 									-- Valider
 									set candidate to my trim(inputText of r)
 									if candidate is "" then
-										display alert "Champ vide" message "Saisis une URL ou un chemin, ou clique sur Parcourir…" as warning
+										display alert "Champ vide" message "Saisir une URL ou un chemin, ou cliquer sur Parcourir…" as warning
 									else
 										set validationError to my validateOpenArg(candidate, sourcePath)
 										if validationError is "" then
@@ -965,10 +1009,12 @@ on run argv
 			set iconChosen to false
 			repeat while not iconChosen
 				try
-					set iconChoice to my chooseButton("Style d'icône", ¬
-						"  • Teinte couleur — applique une teinte sur l'icône d'origine." & return & ¬
-						"    (opacité 0 = noir & blanc)" & return & ¬
-						"  • Personnalisée — utilise une image (PNG, ICNS, JPG…) en remplacement.", ¬
+					set iconChoice to my chooseButton("Style d’icône", ¬
+						"  • Personnalisée — utilise une image (PNG, ICNS, JPG…)" & return & ¬
+						"    en remplacement de l’icône d’origine." & return & ¬
+						return & ¬
+						"  • Teinte couleur — applique une teinte sur l’icône d’origine." & return & ¬
+						"    (opacité 0 = noir & blanc)", ¬
 						{"Retour", "Personnalisée", "Teinte couleur"}, "App Cloner")
 					if iconChoice is "Retour" then
 						set step to 4
@@ -991,7 +1037,7 @@ on run argv
 					else if iconChoice is "Personnalisée" then
 						try
 							set iconAlias to choose file ¬
-								with prompt "Image à utiliser pour l'icône" ¬
+								with prompt "Image à utiliser pour l’icône" ¬
 								of type {"public.image", "com.apple.icns"}
 							set iconPath to POSIX path of iconAlias
 							set iconMode to "custom"
@@ -1026,10 +1072,13 @@ on run argv
 				& "• Mode :    " & modeDisplay & return ¬
 				& "• Icône :   " & iconDisplay & return ¬
 				& "• Ouvre :   " & openArgDisplay
+			if pwaMode and urlLocked then
+				set summary to summary & return & "• Verrou :  URL fixe (sortie → app source)"
+			end if
 			tell me to activate
 			try
 				set summaryResult to my customDialog("Récapitulatif", summary, ¬
-					{"Retour", "Cloner l'application"}, false, "", 0, 380, false, "")
+					{"Retour", "Cloner l’application"}, false, "", 0, 380, false, "")
 				if (chosenButton of summaryResult) is "Retour" then
 					set step to 5
 				else
@@ -1049,6 +1098,8 @@ on run argv
 
 	set pwaArg to "0"
 	if pwaMode then set pwaArg to "1"
+	set lockArg to "0"
+	if urlLocked then set lockArg to "1"
 	set cmd to quoted form of cloneScript ¬
 		& " " & quoted form of sourcePath ¬
 		& " " & quoted form of cloneName ¬
@@ -1056,7 +1107,8 @@ on run argv
 		& " " & quoted form of openArg ¬
 		& " " & quoted form of iconMode ¬
 		& " " & quoted form of iconPath ¬
-		& " " & quoted form of pwaArg
+		& " " & quoted form of pwaArg ¬
+		& " " & quoted form of lockArg
 	logmsg("cmd: " & cmd)
 
 	-- Run the shell script in the background, signal completion via a
@@ -1070,7 +1122,7 @@ on run argv
 	set progress total steps to 100
 	set progress completed steps to 0
 	set progress description to "Création du clone en cours…"
-	set progress additional description to "Préparation de l'icône et du bundle"
+	set progress additional description to "Préparation de l’icône et du bundle"
 
 	set tickCount to 0
 	set isDone to false
@@ -1081,7 +1133,7 @@ on run argv
 		set pct to round (95 * (1 - (0.96 ^ tickCount)))
 		set progress completed steps to pct
 		if tickCount = 12 then
-			set progress additional description to "Génération de l'icône teintée…"
+			set progress additional description to "Génération de l’icône teintée…"
 		else if tickCount = 30 then
 			set progress additional description to "Signature ad-hoc du bundle…"
 		else if tickCount = 50 then
