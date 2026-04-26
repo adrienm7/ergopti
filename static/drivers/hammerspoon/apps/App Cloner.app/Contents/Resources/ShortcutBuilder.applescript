@@ -53,6 +53,7 @@ property panelIsTextView : false  -- true for NSTextView, false for NSTextField
 property tintPreviewImageView : missing value
 property tintPreviewColorWell : missing value
 property tintPreviewSourceImage : missing value
+property tintPreviewAppPath : ""
 -- Absolute path to the App Cloner bundle, captured from argv at startup so
 -- helpers that need bundled resources (extract_icon.py, etc.) can locate them.
 property appBundlePath : ""
@@ -117,7 +118,7 @@ on doUpdatePreview()
 	if (my tintPreviewSourceImage) is missing value then return
 	try
 		set currentColor to (my tintPreviewColorWell)'s |color|
-		set tinted to my tintedIconImage((my tintPreviewSourceImage), currentColor)
+		set tinted to my tintedIconImage((my tintPreviewSourceImage), currentColor, (my tintPreviewAppPath))
 		set imgView to my tintPreviewImageView
 		imgView's setImage:tinted
 		-- Force a repaint: setImage: alone does not always invalidate the view's
@@ -503,20 +504,12 @@ on chooseButton(headerText, bodyText, buttonList, dialogTitle)
 end chooseButton
 
 -- Render a 128×128 tinted preview by delegating to tint_icon.py.
--- All NSGraphicsContext compositing is done in Python where the ObjC bridge
--- has no AppleScript-ObjC selector-colon parse constraints.
-on tintedIconImage(srcImage, tintColor)
+-- tint_icon.py receives the app path and extracts the icon itself via
+-- extract_icon.py, so AppleScript never needs to serialise an NSImage to disk
+-- (which would require the reserved word "properties" as a keyword argument).
+on tintedIconImage(srcImage, tintColor, appPath)
 	set helperPath to (my appBundlePath) & "/Contents/Resources/tint_icon.py"
-
-	-- Write the source PNG to a temp file so Python can read it.
-	set tmpSrc to do shell script "mktemp /tmp/appcloner_tint_src.XXXXXXXXXX.png"
 	set tmpDst to do shell script "mktemp /tmp/appcloner_tint_dst.XXXXXXXXXX.png"
-
-	-- Save srcImage as PNG via NSData.
-	set pngRep to srcImage's TIFFRepresentation()
-	set bmpRep to current application's NSBitmapImageRep's imageRepWithData:pngRep
-	set pngData to bmpRep's representationUsingType:4 properties:(missing value)
-	pngData's writeToFile:tmpSrc atomically:true
 
 	-- Build hex colour string from tintColor.
 	set sRGB to tintColor's colorUsingColorSpaceName:"NSCalibratedRGBColorSpace"
@@ -536,15 +529,15 @@ on tintedIconImage(srcImage, tintColor)
 		set tintMode to "tint"
 	end if
 
-	-- Run the Python helper.
-	set pyCmd to "/usr/bin/python3 " & quoted form of helperPath & " " & quoted form of tmpSrc & " " & quoted form of tmpDst & " " & quoted form of hexColor & " " & tintMode
+	-- Run the Python helper (receives app path, extracts icon itself).
+	set pyCmd to "/usr/bin/python3 " & quoted form of helperPath & " " & quoted form of appPath & " " & quoted form of tmpDst & " " & quoted form of hexColor & " " & tintMode
 	try
 		do shell script pyCmd
 	end try
 
 	-- Load result PNG back as NSImage.
 	set result to current application's NSImage's alloc()'s initWithContentsOfFile:tmpDst
-	do shell script "rm -f " & quoted form of tmpSrc & " " & quoted form of tmpDst
+	do shell script "rm -f " & quoted form of tmpDst
 	if result is missing value then return srcImage
 	return result
 end tintedIconImage
@@ -584,6 +577,7 @@ end resolveAppIcon
 on showTintColorPicker(appPath)
 	set srcImage to my resolveAppIcon(appPath)
 	set my tintPreviewSourceImage to srcImage
+	set my tintPreviewAppPath to appPath
 
 	-- Panel: titled only (no close button) — forces the user to use the buttons
 	-- so the modal loop can never get stuck if the window is X-closed.
@@ -683,6 +677,7 @@ on showTintColorPicker(appPath)
 	set my tintPreviewImageView to missing value
 	set my tintPreviewColorWell to missing value
 	set my tintPreviewSourceImage to missing value
+	set my tintPreviewAppPath to ""
 
 	-- Close the system NSColorPanel that the NSColorWell brings up — it is
 	-- a separate window that does not belong to our modal session and would

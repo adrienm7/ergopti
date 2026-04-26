@@ -4,26 +4,49 @@
 ==============================================================================
 MODULE: Icon Tinter
 DESCRIPTION:
-Applies a colour tint or greyscale conversion to a source PNG and writes the
-result to a destination PNG.
+Extracts a macOS app icon and applies a colour tint or greyscale conversion,
+writing the result to a destination PNG.
 
 FEATURES & RATIONALE:
-1. Python subprocess: avoids all AppleScript-ObjC selector-colon parse issues
-   that arise when using NSGraphicsContext methods in osascript contexts.
-2. 4-pass pipeline: identical compositing logic to the original AppleScript
-   version — Normal draw, Multiply/Saturation tint, DestinationIn mask,
-   DestinationOver white matte.
-3. Pure PyObjC stdlib — no Homebrew, no Xcode, no extra deps.
+1. Python subprocess: avoids all AppleScript-ObjC selector-colon and reserved-
+   keyword parse issues that arise in osascript contexts.
+2. Reuses extract_icon.py: the same icon extraction pipeline used by
+   clone_app.sh, so the preview is pixel-identical to the final result.
+3. 4-pass compositing: Normal draw, Multiply/Saturation tint, DestinationIn
+   alpha mask, DestinationOver white matte.
+4. Pure PyObjC stdlib — no Homebrew, no Xcode, no extra deps.
 
 USAGE:
-    tint_icon.py <src-png> <dst-png> <#RRGGBB> <tint|bw>
+    tint_icon.py <app-bundle-path> <dst-png> <#RRGGBB> <tint|bw>
 
 EXIT:
     0 on success, 1 on failure.
 ==============================================================================
 """
 
+import os
+import subprocess
 import sys
+import tempfile
+
+
+def _extract_icon(app_path: str, dst_png: str) -> bool:
+	"""Extract the app icon to dst_png using extract_icon.py.
+
+	Args:
+		app_path: Absolute path to the .app bundle.
+		dst_png:  Destination PNG path.
+
+	Returns:
+		True on success.
+	"""
+	script_dir = os.path.dirname(os.path.abspath(__file__))
+	extractor = os.path.join(script_dir, "extract_icon.py")
+	result = subprocess.run(
+		["/usr/bin/python3", extractor, app_path, dst_png],
+		capture_output=True,
+	)
+	return result.returncode == 0 and os.path.isfile(dst_png)
 
 
 def main() -> int:
@@ -33,10 +56,10 @@ def main() -> int:
 		Exit code — 0 on success, 1 on failure.
 	"""
 	if len(sys.argv) != 5:
-		sys.stderr.write("Usage: tint_icon.py <src.png> <dst.png> <#RRGGBB> <tint|bw>\n")
+		sys.stderr.write("Usage: tint_icon.py <app-path> <dst.png> <#RRGGBB> <tint|bw>\n")
 		return 1
 
-	src_path, dst_path, hex_color, mode = sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4]
+	app_path, dst_path, hex_color, mode = sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4]
 
 	from AppKit import (
 		NSImage, NSBitmapImageRep, NSGraphicsContext, NSColor,
@@ -45,23 +68,34 @@ def main() -> int:
 		NSCompositingOperationDestinationOver, NSCompositingOperationSaturation,
 		NSPNGFileType,
 	)
-	from Foundation import NSMakeRect, NSMakeSize, NSZeroRect
+	from Foundation import NSMakeRect, NSZeroRect
 
-	# ===========================
-	# ===== 1) Load source =====
-	# ===========================
 
-	src = NSImage.alloc().initWithContentsOfFile_(src_path)
-	if src is None:
-		sys.stderr.write(f"Failed to load source: {src_path}\n")
-		return 1
+	# ================================
+	# ===== 1) Extract app icon =====
+	# ================================
 
-	size = 128
+	tmpdir = tempfile.mkdtemp(prefix="appcloner_tint_")
+	src_png = os.path.join(tmpdir, "src.png")
+	try:
+		if not _extract_icon(app_path, src_png):
+			sys.stderr.write(f"Icon extraction failed for: {app_path}\n")
+			return 1
+
+		src = NSImage.alloc().initWithContentsOfFile_(src_png)
+		if src is None:
+			sys.stderr.write(f"Failed to load extracted icon: {src_png}\n")
+			return 1
+	finally:
+		import shutil
+		shutil.rmtree(tmpdir, ignore_errors=True)
+
 
 	# ===========================
 	# ===== 2) Build canvas =====
 	# ===========================
 
+	size = 128
 	bitmap = NSBitmapImageRep.alloc().initWithBitmapDataPlanes_pixelsWide_pixelsHigh_bitsPerSample_samplesPerPixel_hasAlpha_isPlanar_colorSpaceName_bytesPerRow_bitsPerPixel_(
 		None, size, size, 8, 4, True, False, "NSDeviceRGBColorSpace", 0, 32,
 	)
@@ -75,7 +109,7 @@ def main() -> int:
 
 	dest_rect = NSMakeRect(0, 0, size, size)
 
-	# Pass 1: draw source (forces rasterisation of lazy NSImage).
+	# Pass 1: draw source (forces rasterisation).
 	src.drawInRect_fromRect_operation_fraction_respectFlipped_hints_(
 		dest_rect, NSZeroRect, NSCompositingOperationSourceOver, 1.0, True, None,
 	)
@@ -88,7 +122,6 @@ def main() -> int:
 
 	# Pass 2: tint or greyscale.
 	if mode == "bw":
-		# Saturation = 0 desaturates while preserving luminosity.
 		ctx.setCompositingOperation_(NSCompositingOperationSaturation)
 		NSColor.colorWithWhite_alpha_(0.5, 1.0).setFill()
 		NSBezierPath.fillRect_(dest_rect)
@@ -108,6 +141,7 @@ def main() -> int:
 	NSBezierPath.fillRect_(dest_rect)
 
 	NSGraphicsContext.restoreGraphicsState()
+
 
 	# ============================
 	# ===== 3) Write output =====
