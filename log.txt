@@ -1,2 +1,41 @@
-wc -l "/Users/b519hs/perso/ergopti/static/drivers/hammerspoon/apps/App Cloner.app/Contents/Resources/ShortcutBuilder.applescript"
-git -C /Users/b519hs/perso/ergopti log --oneline -3
+[AppCloner] stderr=/Users/b519hs/perso/ergopti/static/drivers/hammerspoon/apps/App Cloner.app/Contents/Resources/ShortcutBuilder.applescript:22194:22195: script error: fin de ligne, etc. prévu(s) mais « : » trouvé(s). (-2741)
+
+[AppCloner] app_root=/Users/b519hs/perso/ergopti/static/drivers/hammerspoon/apps/App Cloner.app
+[AppCloner] applescript=/Users/b519hs/perso/ergopti/static/drivers/hammerspoon/apps/App Cloner.app/Contents/Resources/ShortcutBuilder.applescript
+[AppCloner] exit=1
+[AppCloner] stderr=/Users/b519hs/perso/ergopti/static/drivers/hammerspoon/apps/App Cloner.app/Contents/Resources/ShortcutBuilder.applescript:22631:22632: script error: fin de ligne, etc. prévu(s) mais « : » trouvé(s). (-2741)
+
+[AppCloner] app_root=/Users/b519hs/perso/ergopti/static/drivers/hammerspoon/apps/App Cloner.app
+[AppCloner] applescript=/Users/b519hs/perso/ergopti/static/drivers/hammerspoon/apps/App Cloner.app/Contents/Resources/ShortcutBuilder.applescript
+[AppCloner] exit=1
+[AppCloner] stderr=/Users/b519hs/perso/ergopti/static/drivers/hammerspoon/apps/App Cloner.app/Contents/Resources/ShortcutBuilder.applescript:22631:22632: script error: fin de ligne, etc. prévu(s) mais « : » trouvé(s). (-2741)
+
+❯ clear
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+1fa1ff43 (HEAD -> feat/apps-menu, origin/feat/apps-menu) log
+46e35278 log
+92128c20 fix(app-cloner): store NSGraphicsContext class ref to fix selector-colon parse
+(END)
