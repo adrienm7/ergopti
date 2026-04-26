@@ -4,8 +4,6 @@ App Cloner — Erreur de démarrage :
 
 Log : /tmp/appcloner.log
 
-
-
 /Users/b519hs/perso/ergopti/static/drivers/hammerspoon/apps/App Cloner.app/Contents/Resources/ShortcutBuilder.applescript:2399:2404: execution error: Il est impossible d’obtenir NSApp. (-1728)
 
 [AppCloner] app_root=/Users/b519hs/perso/ergopti/static/drivers/hammerspoon/apps/App Cloner.app
@@ -594,5 +592,5 @@ result: /Users/b519hs/Applications/Philippe.app
 [AppCloner] stderr=/Users/b519hs/perso/ergopti/static/drivers/hammerspoon/apps/App Cloner.app/Contents/Resources/ShortcutBuilder.applescript:31613:31723: script error: Erreur de composant de script. (-1750)
 
 
-╭─     ~ ──────────────────────────────────────────────── ✔  11:21:38 
+╭─     ~ ──────────────────────────────────────────────── ✔  11:27:23 
 ╰─
