@@ -118,16 +118,10 @@ on doUpdatePreview()
 	if (my tintPreviewSourceImage) is missing value then return
 	try
 		set currentColor to (my tintPreviewColorWell)'s |color|
-		my logmsg("[preview] doUpdatePreview: calling tintedIconImage")
-		set tinted to my tintedIconImage((my tintPreviewSourceImage), currentColor, (my tintPreviewAppPath))
-		my logmsg("[preview] tintedIconImage returned — is missing value: " & (tinted is missing value))
-		set imgView to my tintPreviewImageView
-		imgView's setImage:tinted
-		-- Force a repaint: setImage: alone does not always invalidate the view's
-		-- cached display on Tahoe, especially when the new NSImage has the same
-		-- size as the previous one.
-		imgView's setNeedsDisplay:true
-		my logmsg("[preview] setImage + setNeedsDisplay done")
+		my logmsg("[preview] doUpdatePreview: calling applyTintToImageView")
+		-- Pass imgView directly so the handler calls setImage: without crossing
+		-- the AppleScript return boundary, which coerces NSImage to NSString.
+		my applyTintToImageView((my tintPreviewSourceImage), currentColor, (my tintPreviewAppPath), (my tintPreviewImageView))
 	on error errMsg
 		my logmsg("[preview] doUpdatePreview failed: " & errMsg)
 	end try
@@ -511,7 +505,12 @@ end chooseButton
 -- AppleScript process which has a display server). We serialise it to TIFF
 -- using writeToFile:atomically: (no reserved-word keyword arguments), then
 -- convert to PNG with sips, then hand the PNG to tint_icon.py.
-on tintedIconImage(srcImage, tintColor, appPath)
+-- Applies a colour tint to srcImage and sets the result directly on imgView.
+-- The NSImage object is never returned across the AppleScript handler boundary
+-- because AppleScript coerces ObjC objects to NSString on return, which causes
+-- "NSImageCell's object value must be an NSImage" errors when passed to setImage:.
+-- Calling setImage: inside this handler avoids that coercion entirely.
+on applyTintToImageView(srcImage, tintColor, appPath, imgView)
 	set helperPath to (my appBundlePath) & "/Contents/Resources/tint_icon.py"
 	-- Use PID-based names to avoid mktemp conflicts between rapid preview updates.
 	set pid to do shell script "echo $$"
@@ -558,24 +557,25 @@ on tintedIconImage(srcImage, tintColor, appPath)
 	end try
 	my logmsg("[tint] dstPngBytes=" & (do shell script "wc -c < " & quoted form of tmpDst & " 2>/dev/null || echo MISSING") & " tmpDst=" & tmpDst)
 
-	-- Load result PNG via NSData then initWithData: — initWithContentsOfFile:
-	-- returns a raw ObjC pointer that AppleScript coerces to NSString, and
-	-- imageWithContentsOfFile: is not available on this macOS bridge version.
+	-- Load PNG via NSData/initWithData: and call setImage: immediately, without
+	-- returning the NSImage across the handler boundary (which would coerce it).
 	set pngData to current application's NSData's dataWithContentsOfFile:tmpDst
 	do shell script "rm -f " & quoted form of tmpSrc & " " & quoted form of tmpDst
 	if pngData is missing value then
-		my logmsg("[tint] NSData load failed — falling back to srcImage")
-		return srcImage
+		my logmsg("[tint] NSData load failed — keeping current image")
+		return
 	end if
-	set result to current application's NSImage's alloc()'s initWithData:pngData
-	my logmsg("[tint] initWithData result is missing value: " & (result is missing value))
-	if result is missing value then
-		my logmsg("[tint] falling back to srcImage")
-		return srcImage
+	set tinted to current application's NSImage's alloc()'s initWithData:pngData
+	my logmsg("[tint] initWithData result is missing value: " & (tinted is missing value))
+	if tinted is missing value then
+		my logmsg("[tint] initWithData failed — keeping current image")
+		return
 	end if
-	my logmsg("[tint] returning tinted image OK")
-	return result
-end tintedIconImage
+	-- setImage: called here, inside the handler, so tinted is still a live ObjC ref.
+	imgView's setImage:tinted
+	imgView's setNeedsDisplay:true
+	my logmsg("[tint] setImage + setNeedsDisplay done OK")
+end applyTintToImageView
 
 -- Resolve the source app's icon as a high-resolution NSImage.
 -- NSWorkspace.iconForFile: is called directly from AppleScript-ObjC, which
