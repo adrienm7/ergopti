@@ -1053,7 +1053,8 @@ on run argv
 						try
 							set iconAlias to choose file ¬
 								with prompt "Image à utiliser pour l’icône" ¬
-								of type {"public.image", "com.apple.icns"}
+								of type {"public.image", "com.apple.icns"} ¬
+								default location (path to downloads folder)
 							set iconPath to POSIX path of iconAlias
 							set iconMode to "custom"
 							set colorHex to "#000000"
