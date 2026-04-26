@@ -1,17 +1,12 @@
 App Cloner — Erreur de démarrage :
 
-/Users/b519hs/perso/ergopti/static/drivers/hammerspoon/apps/App Cloner.app/Contents/Resources/ShortcutBuilder.applescript:22639:22640: script error: fin de ligne, etc. prévu(s) mais « : » trouvé(s). (-2741)
+/Users/b519hs/perso/ergopti/static/drivers/hammerspoon/apps/App Cloner.app/Contents/Resources/ShortcutBuilder.applescript:21829:21839: script error: fin de ligne, etc. prévu(s) mais propriété trouvé(s). (-2741)
 
 Log : /tmp/appcloner.log
 
 
-cloneName: Philippe
-openArg: https://teams.microsoft.com/v2/  pwaMode: true
-iconMode: bw  iconPath:   colorHex: #808080
-cmd: '/Users/b519hs/perso/ergopti/static/drivers/hammerspoon/apps/App Cloner.app/Contents/Resources/clone_app.sh' '/Applications/Microsoft Teams.app/' 'Philippe' '#808080' 'https://teams.microsoft.com/v2/' 'bw' '' '1'
-result: /Users/b519hs/Applications/Philippe.app
-[AppCloner] exit=0
-[AppCloner] app_root=/Users/b519hs/perso/ergopti/static/drivers/hammerspoon/apps/App Cloner.app
+
+/App Cloner.app
 [AppCloner] applescript=/Users/b519hs/perso/ergopti/static/drivers/hammerspoon/apps/App Cloner.app/Contents/Resources/ShortcutBuilder.applescript
 --- App Cloner start Sat Apr 25 19:45:26 CEST 2026
 appDir: /Users/b519hs/perso/ergopti/static/drivers/hammerspoon/apps/App Cloner.app
@@ -567,6 +562,11 @@ cloneName: Books — Clone
 [AppCloner] exit=1
 [AppCloner] stderr=/Users/b519hs/perso/ergopti/static/drivers/hammerspoon/apps/App Cloner.app/Contents/Resources/ShortcutBuilder.applescript:22639:22640: script error: fin de ligne, etc. prévu(s) mais « : » trouvé(s). (-2741)
 
+[AppCloner] app_root=/Users/b519hs/perso/ergopti/static/drivers/hammerspoon/apps/App Cloner.app
+[AppCloner] applescript=/Users/b519hs/perso/ergopti/static/drivers/hammerspoon/apps/App Cloner.app/Contents/Resources/ShortcutBuilder.applescript
+[AppCloner] exit=1
+[AppCloner] stderr=/Users/b519hs/perso/ergopti/static/drivers/hammerspoon/apps/App Cloner.app/Contents/Resources/ShortcutBuilder.applescript:21829:21839: script error: fin de ligne, etc. prévu(s) mais propriété trouvé(s). (-2741)
 
-╭─     ~ ──────────────────────────────────────────────── ✔  17:55:15 
+
+╭─     ~ ──────────────────────────────────────────────── ✔  17:59:31 
 ╰─
