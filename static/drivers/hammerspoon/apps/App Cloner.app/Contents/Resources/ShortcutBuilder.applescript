@@ -620,8 +620,10 @@ on showTintColorPicker(appPath)
 	-- Render initial preview before showing the panel
 	my doUpdatePreview()
 
-	-- Start polling timer. NSRunLoopCommonModes includes NSModalPanelRunLoopMode
-	-- so the timer fires even while runModalForWindow: is blocking the thread.
+	-- Start polling timer. NSRunLoopCommonModes does NOT include
+	-- NSModalPanelRunLoopMode by default on macOS — without explicit modal-mode
+	-- registration the timer never fires while runModalForWindow: is blocking
+	-- the thread, leaving the preview frozen on the seed colour.
 	set my panelResult to 0
 	set my panelInputView to missing value
 	set my panelCheckboxView to missing value
@@ -629,6 +631,7 @@ on showTintColorPicker(appPath)
 	set theTimer to current application's NSTimer's timerWithTimeInterval:0.08 target:me selector:"updateTintPreview:" userInfo:timerUserInfo repeats:true
 	set theLoop to current application's NSRunLoop's mainRunLoop
 	theLoop's addTimer:theTimer forMode:"NSRunLoopCommonModes"
+	theLoop's addTimer:theTimer forMode:"NSModalPanelRunLoopMode"
 
 	set theApp to current application's NSApplication's sharedApplication
 	theApp's runModalForWindow:pickerPanel
