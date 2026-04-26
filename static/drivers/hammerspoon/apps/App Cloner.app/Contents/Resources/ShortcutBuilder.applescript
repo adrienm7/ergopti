@@ -556,36 +556,24 @@ on tintedIconImage(srcImage, tintColor)
 	return tinted
 end tintedIconImage
 
--- Resolve the source app's icon as a high-resolution NSImage. Always shells
--- out to extract_icon.py rather than reading the .icns directly via
--- NSImage's initWithContentsOfFile: — the helper uses iconutil to unpack
--- pre-rendered PNGs (same pipeline clone_app.sh uses for the final clone
--- icon) which gives a sharp preview that matches the generated result, even
--- for apps whose .icns picker would otherwise land on a blank alpha mask.
--- Falls back to AppleScript-ObjC NSWorkspace.iconForFile: if the helper
--- itself fails (no Python, malformed bundle, etc.).
+-- Resolve the source app's icon as a high-resolution NSImage.
+-- NSWorkspace.iconForFile: is called directly from AppleScript-ObjC, which
+-- runs in a real Cocoa process with a display server — unlike a Python
+-- subprocess it always returns a correctly populated NSImage, including for
+-- sandboxed apps whose icon lives in Assets.car (Teams, Outlook, …).
+-- The Python/iconutil path (extract_icon.py) is only used by clone_app.sh
+-- to generate the final clone icon on disk; it is not needed here.
 on resolveAppIcon(appPath)
-	try
-		set helperPath to (my appBundlePath) & "/Contents/Resources/extract_icon.py"
-		set tmpPng to do shell script "f=$(mktemp -t appcloner_iconprev); mv \"$f\" \"${f}.png\"; echo \"${f}.png\""
-		-- Log helper invocation for debugging icon issues
-		my logmsg("resolveAppIcon: helperPath=" & helperPath)
-		my logmsg("resolveAppIcon: tmpPng=" & tmpPng)
-		set pyResult to do shell script "/usr/bin/python3 " & quoted form of helperPath & " " & quoted form of appPath & " " & quoted form of tmpPng & " 2>&1; echo EXIT:$?"
-		my logmsg("resolveAppIcon: pyResult=" & pyResult)
-		set img to current application's NSImage's alloc()'s initWithContentsOfFile:tmpPng
-		try
-			do shell script "rm -f " & quoted form of tmpPng & " >/dev/null 2>&1 &"
-		end try
-		if img is not missing value then
-			if ((img's |size|()'s width as integer) > 0) then return img
-		end if
-	end try
-
-	-- Last-resort fallback: native NSWorkspace.iconForFile (may yield a
-	-- placeholder for sandboxed apps, but is always defined).
 	set ws to current application's NSWorkspace's sharedWorkspace
-	return ws's iconForFile:appPath
+	set img to ws's iconForFile:appPath
+	-- NSWorkspace can return an NSImage marked as a template (monochrome mask).
+	-- Template images are rendered black-on-transparent by Cocoa, making the
+	-- tint preview appear white after compositing. Clearing the flag forces the
+	-- full-colour representation to be used for drawing.
+	try
+		img's setTemplate:false
+	end try
+	return img
 end resolveAppIcon
 
 -- Custom colour-picker dialog with a live 128×128 icon preview. The colour
