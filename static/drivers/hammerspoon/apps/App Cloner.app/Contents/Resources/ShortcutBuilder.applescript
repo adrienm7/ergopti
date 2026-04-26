@@ -517,33 +517,22 @@ end chooseButton
 -- need to exist in advance.
 on tintedIconImage(srcImage, tintColor)
 	set targetSize to 128
-
-	-- Allocate a fresh RGBA bitmap — this is our off-screen canvas.
-	set bitmap to current application's NSBitmapImageRep's alloc()'s ¬
-		initWithBitmapDataPlanes:missing value ¬
-		pixelsWide:targetSize ¬
-		pixelsHigh:targetSize ¬
-		bitsPerSample:8 ¬
-		samplesPerPixel:4 ¬
-		hasAlpha:true ¬
-		isPlanar:false ¬
-		colorSpaceName:(current application's NSDeviceRGBColorSpace) ¬
-		bytesPerRow:0 ¬
-		bitsPerPixel:32
-
-	set ctx to current application's NSGraphicsContext's graphicsContextWithBitmapImageRep:bitmap
-	if ctx is missing value then
-		-- Last-resort fallback: return the raw source image unchanged so at
-		-- least something visible appears in the preview rather than nothing.
-		return srcImage
-	end if
-
-	current application's NSGraphicsContext's saveGraphicsState()
-	current application's NSGraphicsContext's setCurrentContext:ctx
 	set destRect to current application's NSMakeRect(0, 0, targetSize, targetSize)
 
-	-- Pass 1: draw the source icon into the bitmap. This is the step that
-	-- triggers Cocoa's lazy rasterisation — the icon pixels are now in memory.
+	-- Allocate a fresh RGBA bitmap — this is our off-screen canvas.
+	-- Using NSBitmapImageRep + graphicsContextWithBitmapImageRep: avoids
+	-- lockFocus entirely. lockFocus requires the NSImage to already hold
+	-- rasterised pixels; NSWorkspace's lazy NSImage does not — so lockFocus
+	-- on it always produces a blank white result. Here we create the pixel
+	-- buffer first, then draw the source INTO it, which forces rasterisation.
+	set bitmap to current application's NSBitmapImageRep's alloc()'s initWithBitmapDataPlanes:missing value pixelsWide:targetSize pixelsHigh:targetSize bitsPerSample:8 samplesPerPixel:4 hasAlpha:true isPlanar:false colorSpaceName:"NSDeviceRGBColorSpace" bytesPerRow:0 bitsPerPixel:32
+	set ctx to current application's NSGraphicsContext's graphicsContextWithBitmapImageRep:bitmap
+	if ctx is missing value then return srcImage
+
+	ctx's saveGraphicsState()
+	current application's NSGraphicsContext's setCurrentContext:ctx
+
+	-- Pass 1: draw source icon. Forces Cocoa to rasterise the lazy NSImage.
 	srcImage's drawInRect:destRect fromRect:(current application's NSZeroRect) operation:2 fraction:1.0
 
 	-- Pass 2: colour tint (Multiply) or greyscale (Saturation).
@@ -551,29 +540,26 @@ on tintedIconImage(srcImage, tintColor)
 	set tintRGB to tintColor's colorUsingColorSpace:sRGBSpace
 	set tintAlpha to (tintRGB's alphaComponent()) as real
 	if tintAlpha <= 0.01 then
-		ctx's setCompositingOperation:26  -- NSCompositingOperationSaturation
-		set grayFill to current application's NSColor's colorWithWhite:0.5 alpha:1.0
-		grayFill's setFill()
+		ctx's setCompositingOperation:26
+		(current application's NSColor's colorWithWhite:0.5 alpha:1.0)'s setFill()
 		current application's NSBezierPath's fillRect:destRect
 	else
-		ctx's setCompositingOperation:16  -- NSCompositingOperationMultiply
+		ctx's setCompositingOperation:16
 		tintColor's setFill()
 		current application's NSBezierPath's fillRect:destRect
 	end if
 
-	-- Pass 3: restore alpha mask (DestinationIn) — clears pixels the icon
-	-- left transparent so no coloured square halo remains around the icon.
+	-- Pass 3: restore alpha mask (DestinationIn).
 	srcImage's drawInRect:destRect fromRect:(current application's NSZeroRect) operation:7 fraction:1.0
 
-	-- Post-pass: white matte behind semi-transparent edges (DestinationOver).
+	-- Post-pass: white matte (DestinationOver).
 	ctx's setCompositingOperation:3
-	set whiteFill to current application's NSColor's whiteColor
-	whiteFill's setFill()
+	(current application's NSColor's whiteColor())'s setFill()
 	current application's NSBezierPath's fillRect:destRect
 
-	current application's NSGraphicsContext's restoreGraphicsState()
+	ctx's restoreGraphicsState()
 
-	-- Wrap the finished bitmap in an NSImage so NSImageView can display it.
+	-- Wrap the finished bitmap in an NSImage for NSImageView.
 	set tinted to current application's NSImage's alloc()'s initWithSize:(current application's NSMakeSize(targetSize, targetSize))
 	tinted's addRepresentation:bitmap
 	return tinted
