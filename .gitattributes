@@ -1,0 +1,8 @@
+* text=auto
+
+# Force LF for shell scripts — macOS execution modifies timestamps/mode bits
+# causing false-positive git diffs on Windows hosts
+*.sh text eol=lf
+*.applescript text eol=lf
+*.lua text eol=lf
+*.py text eol=lf

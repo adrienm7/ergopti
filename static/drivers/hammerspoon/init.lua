@@ -405,6 +405,20 @@ shortcuts.start_script_control(keymap, shortcuts, gestures, karabiner)
 
 Logger.info(LOG, "User interface initialized successfully.")
 
+-- App Cloner builds its own icon at first launch (see Contents/MacOS/AppCloner).
+-- Encryptor still uses make_icon.sh on Hammerspoon startup since it doesn't
+-- have a Python launcher to do lazy generation; keep its hook only.
+hs.timer.doAfter(2, function()
+	local encryptor_make = hs.configdir .. "/apps/Encryptor.app/Contents/Resources/make_icon.sh"
+	local encryptor_icns = hs.configdir .. "/apps/Encryptor.app/Contents/Resources/AppIcon.icns"
+	local needs_gen  = hs.execute(string.format("test -f %q && echo yes || echo no", encryptor_icns)):find("no")
+	local has_script = hs.execute(string.format("test -f %q && echo yes || echo no", encryptor_make)):find("yes")
+	if needs_gen and has_script then
+		Logger.info(LOG, "Generating AppIcon.icns for Encryptor…")
+		pcall(hs.execute, string.format("zsh %q &", encryptor_make))
+	end
+end)
+
 
 
 -- =======================================

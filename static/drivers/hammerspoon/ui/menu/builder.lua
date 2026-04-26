@@ -143,6 +143,9 @@ function M.generate(ctx, menu_mods, actions)
 	if type(menu_mods.gestures) == "table" then
 		push("gestures.build", menu_mods.gestures.build, ctx)
 	end
+	if type(menu_mods.apps) == "table" then
+		push("apps.build", menu_mods.apps.build, ctx)
+	end
 
 
 	table.insert(items, { title = "-" })

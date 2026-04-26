@@ -24,9 +24,9 @@
 	<key>CFBundleExecutable</key>
 	<string>droplet</string>
 	<key>CFBundleIconFile</key>
-	<string>droplet</string>
+	<string>AppIcon</string>
 	<key>CFBundleIconName</key>
-	<string>droplet</string>
+	<string>AppIcon</string>
 	<key>CFBundleInfoDictionaryVersion</key>
 	<string>6.0</string>
 	<key>CFBundleName</key>

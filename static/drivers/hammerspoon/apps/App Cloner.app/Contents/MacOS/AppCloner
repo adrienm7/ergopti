@@ -1,0 +1,67 @@
+#!/usr/bin/env python3
+# Launcher for the App Cloner bundle.
+# Python is used instead of zsh because macOS refuses to execute a plain shell
+# script as the main binary of an .app bundle (no Mach-O header).
+import os
+import subprocess
+import sys
+
+def ensure_icon(resources_dir, log):
+    """Build AppIcon.icns from AppIcon.svg if missing or stale.
+
+    Self-contained icon generation — App Cloner no longer depends on
+    Hammerspoon's startup hook to build its own icon. Runs make_icon.sh
+    when AppIcon.icns is absent OR when AppIcon.svg is newer than it.
+    """
+    svg  = os.path.join(resources_dir, "AppIcon.svg")
+    icns = os.path.join(resources_dir, "AppIcon.icns")
+    script = os.path.join(resources_dir, "make_icon.sh")
+    if not os.path.exists(svg) or not os.path.exists(script):
+        return
+    needs_build = (
+        not os.path.exists(icns)
+        or os.path.getmtime(svg) > os.path.getmtime(icns)
+    )
+    if needs_build:
+        log.write(f"[AppCloner] regenerating icon from {svg}\n")
+        subprocess.run(["zsh", script], capture_output=True)
+
+def main():
+    script_path = os.path.realpath(__file__)
+    macos_dir   = os.path.dirname(script_path)
+    app_root    = os.path.dirname(os.path.dirname(macos_dir))
+    resources   = os.path.join(app_root, "Contents", "Resources")
+    applescript = os.path.join(resources, "ShortcutBuilder.applescript")
+    log_path    = "/tmp/appcloner.log"
+
+    with open(log_path, "a") as log:
+        log.write(f"[AppCloner] app_root={app_root}\n")
+        log.write(f"[AppCloner] applescript={applescript}\n")
+        ensure_icon(resources, log)
+
+    result = subprocess.run(
+        ["osascript", applescript, app_root],
+        capture_output=True,
+        text=True,
+    )
+
+    with open(log_path, "a") as log:
+        log.write(f"[AppCloner] exit={result.returncode}\n")
+        if result.stdout:
+            log.write(f"[AppCloner] stdout={result.stdout}\n")
+        if result.stderr:
+            log.write(f"[AppCloner] stderr={result.stderr}\n")
+
+    if result.returncode not in (0, -128):
+        err_text = (result.stderr or result.stdout or "Erreur inconnue.").strip()
+        clean = err_text.replace("\\", "\\\\").replace('"', '\\"')
+        subprocess.run([
+            "osascript", "-e",
+            'display dialog "App Cloner — Erreur de démarrage :\\n\\n'
+            + clean
+            + '\\n\\nLog : /tmp/appcloner.log" '
+            'buttons {"OK"} default button 1',
+        ], capture_output=True)
+
+if __name__ == "__main__":
+    main()

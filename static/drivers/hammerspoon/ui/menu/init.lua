@@ -50,6 +50,7 @@ local menu_mods = {
 	llm        = safe_require("ui.menu.menu_llm",        "AI menu"),
 	keylogger  = safe_require("ui.menu.menu_metrics",    "metrics menu"),
 	karabiner  = safe_require("ui.menu.menu_karabiner",  "Karabiner menu"),
+	apps       = safe_require("ui.menu.menu_apps",       "apps menu"),
 }
 
 -- Load core modules
