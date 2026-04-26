@@ -894,14 +894,18 @@ class _AppDelegate(NSObject):
         # teleported the user (and our CanJoinAllSpaces window) to the target
         # Space by the time the window becomes visible. Without this ordering
         # the window appears on the wrong Space for ~1-2 s before following.
-        needs_settle = _sync_space_assignment()
+        dock_was_killed = _sync_space_assignment()
         self._open()
         NSApplication.sharedApplication().activateIgnoringOtherApps_(True)
         url = NSURL.URLWithString_(OPEN_ARG)
         if url:
             self._wv.loadRequest_(NSURLRequest.requestWithURL_(url))
-        if needs_settle:
-            self.performSelector_withObject_afterDelay_("_settleOnTargetSpace", None, 2.5)
+        # Always schedule _settleOnTargetSpace to remove CanJoinAllSpaces —
+        # the window must be pinned to its Space regardless of whether the Dock
+        # was killed. When Dock was killed, wait 2.5 s for it to fully restart
+        # before pinning; otherwise 0.5 s is enough to let the run loop settle.
+        delay = 2.5 if dock_was_killed else 0.5
+        self.performSelector_withObject_afterDelay_("_settleOnTargetSpace", None, delay)
 
     def systemThemeChanged_(self, _notification):
         """Called by NSDistributedNotificationCenter when the user toggles dark/light mode."""
