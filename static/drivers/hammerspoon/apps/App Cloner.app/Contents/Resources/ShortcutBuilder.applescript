@@ -568,7 +568,15 @@ end tintedIconImage
 -- to generate the final clone icon on disk; it is not needed here.
 on resolveAppIcon(appPath)
 	set ws to current application's NSWorkspace's sharedWorkspace
-	set img to ws's iconForFile:appPath
+	set lazyImg to ws's iconForFile:appPath
+	-- NSWorkspace returns a lazy NSImage whose pixel data is not loaded until
+	-- it is actually drawn into a context. Calling TIFFRepresentation() forces
+	-- Cocoa to rasterise every representation into memory before we ever call
+	-- lockFocus or drawInRect — without this, the first draw produces a blank
+	-- white bitmap because no pixels exist yet.
+	set tiffData to lazyImg's TIFFRepresentation()
+	set img to current application's NSImage's alloc()'s initWithData:tiffData
+	if img is missing value then set img to lazyImg
 	-- NSWorkspace can return an NSImage marked as a template (monochrome mask).
 	-- Template images are rendered black-on-transparent by Cocoa, making the
 	-- tint preview appear white after compositing. Clearing the flag forces the
@@ -1082,19 +1090,23 @@ on run argv
 				set iconDisplay to "Personnalisée — " & iconPath
 			end if
 			set modeDisplay to "App native"
-			if pwaMode then set modeDisplay to "PWA web app (navigateur)"
+			if pwaMode then set modeDisplay to "PWA web app (WKWebView)"
 			set summary to "• Source :  " & sourcePath & return ¬
 				& "• Nom :     " & cloneName & return ¬
 				& "• Mode :    " & modeDisplay & return ¬
 				& "• Icône :   " & iconDisplay & return ¬
-				& "• Ouvre :   " & openArgDisplay
-			if pwaMode and urlLocked then
-				set summary to summary & return & "• Verrou :  URL fixe (sortie → app source)"
+				& "• URL :     " & openArgDisplay
+			if pwaMode then
+				if urlLocked then
+					set summary to summary & return & "• Verrou :  URL fixe (les autres pages s'ouvrent dans l'app source)"
+				else
+					set summary to summary & return & "• Verrou :  URL libre (navigation non restreinte)"
+				end if
 			end if
 			tell me to activate
 			try
 				set summaryResult to my customDialog("Récapitulatif", summary, ¬
-					{"Retour", "Cloner l’application"}, false, "", 0, 380, false, "")
+					{"Retour", "Cloner l’application"}, false, "", 0, 620, false, "")
 				if (chosenButton of summaryResult) is "Retour" then
 					set step to 5
 				else
