@@ -504,6 +504,14 @@ on tintedIconImage(srcImage, tintColor)
 	set destRect to current application's NSMakeRect(0, 0, 128, 128)
 	set ctx to current application's NSGraphicsContext's currentContext
 	ctx's saveGraphicsState()
+	-- Pre-pass: flood the canvas with opaque white so that transparent icon
+	-- pixels (the rounded-rect corners) never accumulate gray from the
+	-- Saturation pass below. Without this, alpha-zero pixels pick up a faint
+	-- gray tint that shows as dots on white backgrounds.
+	ctx's setCompositingOperation:2  -- NSCompositingOperationSourceOver
+	set whiteFill to current application's NSColor's whiteColor
+	whiteFill's setFill()
+	current application's NSBezierPath's fillRect:destRect
 	-- Pass 1: draw the original icon at full opacity. This establishes both
 	-- the colour buffer AND the alpha mask (rounded-rect shape, transparent
 	-- pixels in the corners) that Pass 4 will use to clip the tint.
@@ -517,10 +525,17 @@ on tintedIconImage(srcImage, tintColor)
 	current application's NSBezierPath's fillRect:destRect
 	-- Pass 3: Screen-blend the tint. Screen's formula 1-(1-src)(1-dst) yields
 	-- 1 wherever dst=1, leaving white/near-white pixels untouched while shifting
-	-- dark and mid-tone areas toward the tint hue.
-	ctx's setCompositingOperation:15  -- NSCompositingOperationScreen
-	tintColor's setFill()
-	current application's NSBezierPath's fillRect:destRect
+	-- dark and mid-tone areas toward the tint hue. Skipped when alpha is zero
+	-- (grayscale mode) to prevent the gray desaturation pass from being screened
+	-- back toward white, which would wash out dark areas of the icon.
+	set sRGBSpace to current application's NSColorSpace's sRGBColorSpace
+	set tintRGB to tintColor's colorUsingColorSpace:sRGBSpace
+	set tintAlpha to (tintRGB's alphaComponent()) as real
+	if tintAlpha > 0.01 then
+		ctx's setCompositingOperation:15  -- NSCompositingOperationScreen
+		tintColor's setFill()
+		current application's NSBezierPath's fillRect:destRect
+	end if
 	-- Pass 4: restore the icon's alpha mask. Passes 2 and 3 fillRect the entire
 	-- 128×128 square, so the rounded-rect corners (originally transparent) end
 	-- up filled with opaque tint — visible as a coloured square halo around the
@@ -956,9 +971,9 @@ on run argv
 				try
 					set iconChoice to my chooseButton("Style d'icône", ¬
 						"  • Teinte couleur — applique une teinte sur l'icône d'origine." & return & ¬
-						"  • Noir & blanc — convertit l'icône d'origine en niveaux de gris." & return & ¬
+						"    (opacité 0 = noir & blanc)" & return & ¬
 						"  • Personnalisée — utilise une image (PNG, ICNS, JPG…) en remplacement.", ¬
-						{"Retour", "Personnalisée", "Noir & blanc", "Teinte couleur"}, "App Cloner")
+						{"Retour", "Personnalisée", "Teinte couleur"}, "App Cloner")
 					if iconChoice is "Retour" then
 						set step to 4
 						set iconChosen to true -- exit inner loop; outer repeat re-enters step 4
@@ -977,12 +992,6 @@ on run argv
 							set iconChosen to true
 						end if
 						-- missing value means Retour → iconChosen stays false, re-loop to style chooser
-					else if iconChoice is "Noir & blanc" then
-						set iconMode to "bw"
-						-- Color ignored downstream but shell expects a non-empty placeholder
-						set colorHex to "#808080"
-						set step to 6
-						set iconChosen to true
 					else if iconChoice is "Personnalisée" then
 						try
 							set iconAlias to choose file ¬
@@ -1011,8 +1020,6 @@ on run argv
 			set iconDisplay to ""
 			if iconMode is "tint" then
 				set iconDisplay to "Teinte " & colorHex
-			else if iconMode is "bw" then
-				set iconDisplay to "Noir & blanc"
 			else
 				set iconDisplay to "Personnalisée — " & iconPath
 			end if
@@ -1109,13 +1116,6 @@ on run argv
 		return
 	end if
 
-	-- Success dialog. Headline + one-sentence body. The clone path is not
-	-- repeated — the user already sees the name and knows to look in
-	-- ~/Applications.
-	set successInfo to "« " & cloneName & " » a été ajouté au Dock et au dossier Applications."
-	set successBtn to my chooseButton("✅  Clone créé avec succès", successInfo, ¬
-		{"Ouvrir Applications", "Terminé"}, "App Cloner")
-	if successBtn is "Ouvrir Applications" then
-		do shell script "open ~/Applications"
-	end if
+	-- Success: close silently — the clone appears in the Dock immediately,
+	-- which is confirmation enough without an extra click to dismiss.
 end run
