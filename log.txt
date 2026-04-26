@@ -1,16 +1,12 @@
 App Cloner — Erreur de démarrage :
 
-/Users/b519hs/perso/ergopti/static/drivers/hammerspoon/apps/App Cloner.app/Contents/Resources/ShortcutBuilder.applescript:22194:22195: script error: fin de ligne, etc. prévu(s) mais « : » trouvé(s). (-2741)
+/Users/b519hs/perso/ergopti/static/drivers/hammerspoon/apps/App Cloner.app/Contents/Resources/ShortcutBuilder.applescript:22631:22632: script error: fin de ligne, etc. prévu(s) mais « : » trouvé(s). (-2741)
 
 Log : /tmp/appcloner.log
 
 
-/App Cloner.app
-[AppCloner] applescript=/Users/b519hs/perso/ergopti/static/drivers/hammerspoon/apps/App Cloner.app/Contents/Resources/ShortcutBuilder.applescript
-[AppCloner] exit=1
-[AppCloner] stderr=/Users/b519hs/perso/ergopti/static/drivers/hammerspoon/apps/App Cloner.app/Contents/Resources/ShortcutBuilder.applescript:5300:5305: script error: Il est impossible de régler expanded à value. Accès non autorisé. (-10003)
 
-[AppCloner] app_root=/Users/b519hs/perso/ergopti/static/drivers/hammerspoon/apps/App Cloner.app
+/App Cloner.app
 [AppCloner] applescript=/Users/b519hs/perso/ergopti/static/drivers/hammerspoon/apps/App Cloner.app/Contents/Resources/ShortcutBuilder.applescript
 [AppCloner] exit=1
 [AppCloner] stderr=/Users/b519hs/perso/ergopti/static/drivers/hammerspoon/apps/App Cloner.app/Contents/Resources/ShortcutBuilder.applescript:5300:5305: script error: Il est impossible de régler expanded à value. Accès non autorisé. (-10003)
@@ -568,6 +564,11 @@ cloneName: Books — Clone
 [AppCloner] exit=1
 [AppCloner] stderr=/Users/b519hs/perso/ergopti/static/drivers/hammerspoon/apps/App Cloner.app/Contents/Resources/ShortcutBuilder.applescript:22194:22195: script error: fin de ligne, etc. prévu(s) mais « : » trouvé(s). (-2741)
 
+[AppCloner] app_root=/Users/b519hs/perso/ergopti/static/drivers/hammerspoon/apps/App Cloner.app
+[AppCloner] applescript=/Users/b519hs/perso/ergopti/static/drivers/hammerspoon/apps/App Cloner.app/Contents/Resources/ShortcutBuilder.applescript
+[AppCloner] exit=1
+[AppCloner] stderr=/Users/b519hs/perso/ergopti/static/drivers/hammerspoon/apps/App Cloner.app/Contents/Resources/ShortcutBuilder.applescript:22631:22632: script error: fin de ligne, etc. prévu(s) mais « : » trouvé(s). (-2741)
 
-╭─     ~ ──────────────────────────────────────────────── ✔  17:23:08 
+
+╭─     ~ ──────────────────────────────────────────────── ✔  17:28:00 
 ╰─
