@@ -1,0 +1,128 @@
+# static/drivers/hammerspoon/apps/App Cloner.app/Contents/Resources/tint_icon.py
+
+"""
+==============================================================================
+MODULE: Icon Tinter
+DESCRIPTION:
+Applies a colour tint or greyscale conversion to a source PNG and writes the
+result to a destination PNG.
+
+FEATURES & RATIONALE:
+1. Python subprocess: avoids all AppleScript-ObjC selector-colon parse issues
+   that arise when using NSGraphicsContext methods in osascript contexts.
+2. 4-pass pipeline: identical compositing logic to the original AppleScript
+   version — Normal draw, Multiply/Saturation tint, DestinationIn mask,
+   DestinationOver white matte.
+3. Pure PyObjC stdlib — no Homebrew, no Xcode, no extra deps.
+
+USAGE:
+    tint_icon.py <src-png> <dst-png> <#RRGGBB> <tint|bw>
+
+EXIT:
+    0 on success, 1 on failure.
+==============================================================================
+"""
+
+import sys
+
+
+def main() -> int:
+	"""Entry point.
+
+	Returns:
+		Exit code — 0 on success, 1 on failure.
+	"""
+	if len(sys.argv) != 5:
+		sys.stderr.write("Usage: tint_icon.py <src.png> <dst.png> <#RRGGBB> <tint|bw>\n")
+		return 1
+
+	src_path, dst_path, hex_color, mode = sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4]
+
+	from AppKit import (
+		NSImage, NSBitmapImageRep, NSGraphicsContext, NSColor,
+		NSBezierPath, NSCompositingOperationSourceOver,
+		NSCompositingOperationMultiply, NSCompositingOperationDestinationIn,
+		NSCompositingOperationDestinationOver, NSCompositingOperationSaturation,
+		NSPNGFileType,
+	)
+	from Foundation import NSMakeRect, NSMakeSize, NSZeroRect
+
+	# ===========================
+	# ===== 1) Load source =====
+	# ===========================
+
+	src = NSImage.alloc().initWithContentsOfFile_(src_path)
+	if src is None:
+		sys.stderr.write(f"Failed to load source: {src_path}\n")
+		return 1
+
+	size = 128
+
+	# ===========================
+	# ===== 2) Build canvas =====
+	# ===========================
+
+	bitmap = NSBitmapImageRep.alloc().initWithBitmapDataPlanes_pixelsWide_pixelsHigh_bitsPerSample_samplesPerPixel_hasAlpha_isPlanar_colorSpaceName_bytesPerRow_bitsPerPixel_(
+		None, size, size, 8, 4, True, False, "NSDeviceRGBColorSpace", 0, 32,
+	)
+	ctx = NSGraphicsContext.graphicsContextWithBitmapImageRep_(bitmap)
+	if ctx is None:
+		sys.stderr.write("Failed to create graphics context\n")
+		return 1
+
+	NSGraphicsContext.saveGraphicsState()
+	NSGraphicsContext.setCurrentContext_(ctx)
+
+	dest_rect = NSMakeRect(0, 0, size, size)
+
+	# Pass 1: draw source (forces rasterisation of lazy NSImage).
+	src.drawInRect_fromRect_operation_fraction_respectFlipped_hints_(
+		dest_rect, NSZeroRect, NSCompositingOperationSourceOver, 1.0, True, None,
+	)
+
+	# Parse hex colour.
+	hex_color = hex_color.lstrip("#")
+	r = int(hex_color[0:2], 16) / 255.0
+	g = int(hex_color[2:4], 16) / 255.0
+	b = int(hex_color[4:6], 16) / 255.0
+
+	# Pass 2: tint or greyscale.
+	if mode == "bw":
+		# Saturation = 0 desaturates while preserving luminosity.
+		ctx.setCompositingOperation_(NSCompositingOperationSaturation)
+		NSColor.colorWithWhite_alpha_(0.5, 1.0).setFill()
+		NSBezierPath.fillRect_(dest_rect)
+	else:
+		ctx.setCompositingOperation_(NSCompositingOperationMultiply)
+		NSColor.colorWithRed_green_blue_alpha_(r, g, b, 1.0).setFill()
+		NSBezierPath.fillRect_(dest_rect)
+
+	# Pass 3: restore alpha mask (DestinationIn).
+	src.drawInRect_fromRect_operation_fraction_respectFlipped_hints_(
+		dest_rect, NSZeroRect, NSCompositingOperationDestinationIn, 1.0, True, None,
+	)
+
+	# Pass 4: white matte behind (DestinationOver).
+	ctx.setCompositingOperation_(NSCompositingOperationDestinationOver)
+	NSColor.whiteColor().setFill()
+	NSBezierPath.fillRect_(dest_rect)
+
+	NSGraphicsContext.restoreGraphicsState()
+
+	# ============================
+	# ===== 3) Write output =====
+	# ============================
+
+	png_data = bitmap.representationUsingType_properties_(NSPNGFileType, None)
+	if png_data is None:
+		sys.stderr.write("Failed to encode PNG\n")
+		return 1
+	if not png_data.writeToFile_atomically_(dst_path, True):
+		sys.stderr.write(f"Failed to write: {dst_path}\n")
+		return 1
+
+	return 0
+
+
+if __name__ == "__main__":
+	sys.exit(main())

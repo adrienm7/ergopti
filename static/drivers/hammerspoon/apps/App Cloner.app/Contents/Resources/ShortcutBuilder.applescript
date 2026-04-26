@@ -502,76 +502,51 @@ on chooseButton(headerText, bodyText, buttonList, dialogTitle)
 	return chosenButton of r
 end chooseButton
 
--- Render a 128×128 NSImage with the tint color overlaid using a 4-pass
--- compositing pipeline that preserves both hue and the icon's alpha mask.
---
--- Drawing path: NSBitmapImageRep + graphicsContextWithBitmapImageRep: instead
--- of NSImage.lockFocus(). lockFocus requires the receiving NSImage to already
--- hold rasterised pixel data — NSWorkspace returns a lazy NSImage that defers
--- loading until it is drawn into a concrete context, so lockFocus on it (or
--- on a second NSImage initialised from its TIFFRepresentation when that also
--- returns empty/lazy data) always produces a blank white result.
--- graphicsContextWithBitmapImageRep: creates its own pixel buffer from scratch
--- and uses it as the destination — the source image is drawn INTO it via
--- drawInRect:, which forces Cocoa to rasterise the icon on demand. No pixels
--- need to exist in advance.
+-- Render a 128×128 tinted preview by delegating to tint_icon.py.
+-- All NSGraphicsContext compositing is done in Python where the ObjC bridge
+-- has no AppleScript-ObjC selector-colon parse constraints.
 on tintedIconImage(srcImage, tintColor)
-	set targetSize to 128
-	set destRect to current application's NSMakeRect(0, 0, targetSize, targetSize)
+	set helperPath to (my appBundlePath) & "/Contents/Resources/tint_icon.py"
 
-	-- Allocate a fresh RGBA bitmap — this is our off-screen canvas.
-	-- Using NSBitmapImageRep + graphicsContextWithBitmapImageRep: avoids
-	-- lockFocus entirely. lockFocus requires the NSImage to already hold
-	-- rasterised pixels; NSWorkspace's lazy NSImage does not — so lockFocus
-	-- on it always produces a blank white result. Here we create the pixel
-	-- buffer first, then draw the source INTO it, which forces rasterisation.
-	set bitmap to current application's NSBitmapImageRep's alloc()'s ¬
-		initWithBitmapDataPlanes:missing value ¬
-		pixelsWide:targetSize pixelsHigh:targetSize ¬
-		bitsPerSample:8 samplesPerPixel:4 ¬
-		hasAlpha:true isPlanar:false ¬
-		colorSpaceName:"NSDeviceRGBColorSpace" ¬
-		bytesPerRow:0 bitsPerPixel:32
-	set ctx to current application's NSGraphicsContext's ¬
-		graphicsContextWithBitmapImageRep:bitmap
-	if ctx is missing value then return srcImage
+	-- Write the source PNG to a temp file so Python can read it.
+	set tmpSrc to do shell script "mktemp /tmp/appcloner_tint_src.XXXXXXXXXX.png"
+	set tmpDst to do shell script "mktemp /tmp/appcloner_tint_dst.XXXXXXXXXX.png"
 
-	-- Store class ref to avoid AppleScript-ObjC selector-colon parse issues.
-	set NSGfxCtx to current application's NSGraphicsContext
-	NSGfxCtx's saveGraphicsState()
-	NSGfxCtx's setCurrentContext:ctx
+	-- Save srcImage as PNG via NSData.
+	set pngRep to srcImage's TIFFRepresentation()
+	set bmpRep to current application's NSBitmapImageRep's imageRepWithData:pngRep
+	set pngData to bmpRep's representationUsingType:4 properties:(missing value)
+	pngData's writeToFile:tmpSrc atomically:true
 
-	-- Pass 1: draw source icon. Forces Cocoa to rasterise the lazy NSImage.
-	srcImage's drawInRect:destRect fromRect:(current application's NSZeroRect) operation:2 fraction:1.0
+	-- Build hex colour string from tintColor.
+	set sRGB to tintColor's colorUsingColorSpaceName:"NSCalibratedRGBColorSpace"
+	set r to (sRGB's redComponent()) as real
+	set g to (sRGB's greenComponent()) as real
+	set b to (sRGB's blueComponent()) as real
+	set a to (sRGB's alphaComponent()) as real
+	set rHex to do shell script "printf '%02X' " & (round (r * 255) rounding to nearest)
+	set gHex to do shell script "printf '%02X' " & (round (g * 255) rounding to nearest)
+	set bHex to do shell script "printf '%02X' " & (round (b * 255) rounding to nearest)
+	set hexColor to "#" & rHex & gHex & bHex
 
-	-- Pass 2: colour tint (Multiply) or greyscale (Saturation).
-	set sRGBSpace to current application's NSColorSpace's sRGBColorSpace
-	set tintRGB to tintColor's colorUsingColorSpace:sRGBSpace
-	set tintAlpha to (tintRGB's alphaComponent()) as real
-	if tintAlpha <= 0.01 then
-		ctx's setCompositingOperation:26
-		(current application's NSColor's colorWithWhite:0.5 alpha:1.0)'s setFill()
-		current application's NSBezierPath's fillRect:destRect
+	-- Determine mode: alpha < 0.02 means greyscale (bw), else tint.
+	if a < 0.02 then
+		set tintMode to "bw"
 	else
-		ctx's setCompositingOperation:16
-		tintColor's setFill()
-		current application's NSBezierPath's fillRect:destRect
+		set tintMode to "tint"
 	end if
 
-	-- Pass 3: restore alpha mask (DestinationIn).
-	srcImage's drawInRect:destRect fromRect:(current application's NSZeroRect) operation:7 fraction:1.0
+	-- Run the Python helper.
+	set pyCmd to "/usr/bin/python3 " & quoted form of helperPath & " " & quoted form of tmpSrc & " " & quoted form of tmpDst & " " & quoted form of hexColor & " " & tintMode
+	try
+		do shell script pyCmd
+	end try
 
-	-- Post-pass: white matte (DestinationOver).
-	ctx's setCompositingOperation:3
-	(current application's NSColor's whiteColor())'s setFill()
-	current application's NSBezierPath's fillRect:destRect
-
-	NSGfxCtx's restoreGraphicsState()
-
-	-- Wrap the finished bitmap in an NSImage for NSImageView.
-	set tinted to current application's NSImage's alloc()'s initWithSize:(current application's NSMakeSize(targetSize, targetSize))
-	tinted's addRepresentation:bitmap
-	return tinted
+	-- Load result PNG back as NSImage.
+	set result to current application's NSImage's alloc()'s initWithContentsOfFile:tmpDst
+	do shell script "rm -f " & quoted form of tmpSrc & " " & quoted form of tmpDst
+	if result is missing value then return srcImage
+	return result
 end tintedIconImage
 
 -- Resolve the source app's icon as a high-resolution NSImage.
