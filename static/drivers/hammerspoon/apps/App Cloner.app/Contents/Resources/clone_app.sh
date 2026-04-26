@@ -641,7 +641,7 @@ import json
 import plistlib
 import subprocess
 import objc
-from Foundation import NSObject, NSURL, NSURLRequest, NSMakeRect
+from Foundation import NSObject, NSURL, NSURLRequest, NSMakeRect, NSDistributedNotificationCenter
 from AppKit import (
     NSApplication, NSWindow, NSBackingStoreBuffered,
     NSAlert, NSAlertFirstButtonReturn, NSAppearance, NSColor,
@@ -685,8 +685,6 @@ _WIN_MASK  = 1 | 2 | 4 | 8 | 32768
 # NSViewAutoresizingMask: WidthSizable=2 HeightSizable=16
 _VIEW_MASK = 2 | 16
 
-# Detect the macOS appearance once at startup so _open() can branch on it.
-# subprocess is already imported; no extra AppKit import needed.
 def _is_dark_mode():
     """Return True when macOS is currently in Dark Mode."""
     r = subprocess.run(
@@ -697,37 +695,55 @@ def _is_dark_mode():
 
 _DARK_MODE = _is_dark_mode()
 
-# Inject a script that:
-#   1. Forces every prefers-color-scheme: dark media query to return false so the
-#      web app always renders in light theme regardless of the macOS appearance.
-#   2. Intercepts fetch() calls to graph.microsoft.com to always include
-#      credentials. Teams fetches profile photos and avatars from Graph with a
-#      Bearer token, but WebKit's ITP can strip the cookie/auth state on
-#      cross-site requests. Forcing credentials:'include' only for Graph URLs
-#      fixes profile images without touching auth endpoints (which must stay
-#      credentials:'omit' or use CORS wildcard — those we do NOT touch).
-_FORCE_LIGHT_JS = """
+# Injected at document start into every frame.
+# 1) Forces prefers-color-scheme to always report "light" so the web app
+#    never renders dark content regardless of the macOS theme.
+# 2) Exposes window.__setAppColorScheme(isDark) so the native layer can
+#    call it via evaluateJavaScript when macOS appearance changes — Teams
+#    re-evaluates its theme logic without a full page reload.
+# 3) Intercepts fetch() for graph.microsoft.com only to add credentials,
+#    fixing profile photo/avatar loads blocked by WebKit ITP.
+_FORCE_LIGHT_JS = r"""
 (function() {
-    // 1) matchMedia override — light theme always
+    // Frozen MediaQueryList that always reports "light" — handed back for
+    // every prefers-color-scheme query so Teams never switches to dark.
+    function _fakeMQL(matches, q) {
+        return {
+            matches: matches, media: q, onchange: null,
+            addListener: function(){}, removeListener: function(){},
+            addEventListener: function(){}, removeEventListener: function(){},
+            dispatchEvent: function(){ return false; }
+        };
+    }
+
     const origMM = window.matchMedia.bind(window);
     window.matchMedia = function(q) {
         if (typeof q === 'string' && q.indexOf('prefers-color-scheme') !== -1) {
-            const isLight = q.indexOf('light') !== -1;
-            return {
-                matches: isLight, media: q, onchange: null,
-                addListener: function(){}, removeListener: function(){},
-                addEventListener: function(){}, removeEventListener: function(){},
-                dispatchEvent: function(){ return false; }
-            };
+            return _fakeMQL(q.indexOf('light') !== -1, q);
         }
         return origMM(q);
     };
 
-    // 2) Targeted fetch intercept: add credentials:'include' only for
-    //    graph.microsoft.com requests (profile photos, avatars).
-    //    All other fetch calls (including Microsoft login/auth endpoints that
-    //    use Access-Control-Allow-Origin:* and must NOT send credentials)
-    //    pass through completely unmodified.
+    // Force color-scheme on :root via a <meta> tag so CSS 'color-scheme'
+    // property also resolves to light (scrollbar colour, system colours, etc.).
+    function _ensureLightMeta() {
+        var meta = document.querySelector('meta[name="color-scheme"]');
+        if (!meta) {
+            meta = document.createElement('meta');
+            meta.name = 'color-scheme';
+            document.head.appendChild(meta);
+        }
+        meta.content = 'light';
+        document.documentElement.style.colorScheme = 'light';
+    }
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', _ensureLightMeta, { once: true });
+    } else {
+        _ensureLightMeta();
+    }
+
+    // graph.microsoft.com fetch intercept — credentials only for Graph,
+    // never for auth endpoints (Access-Control-Allow-Origin:* there).
     const origFetch = window.fetch.bind(window);
     window.fetch = function(input, init) {
         try {
@@ -739,6 +755,25 @@ _FORCE_LIGHT_JS = """
         } catch(_) {}
         return origFetch(input, init);
     };
+})();
+"""
+
+# Evaluated via evaluateJavaScript when macOS appearance changes at runtime.
+# Re-applies the light theme without a page reload.
+_REFRESH_LIGHT_JS = r"""
+(function() {
+    var meta = document.querySelector('meta[name="color-scheme"]');
+    if (!meta) {
+        meta = document.createElement('meta');
+        meta.name = 'color-scheme';
+        document.head.appendChild(meta);
+    }
+    meta.content = 'light';
+    document.documentElement.style.colorScheme = 'light';
+    // Remove any class/attribute Teams sets to track dark mode
+    document.documentElement.classList.remove('theme--dark', 'dark-theme', 'ts-dark');
+    document.documentElement.removeAttribute('data-theme');
+    document.documentElement.setAttribute('data-theme', 'default');
 })();
 """
 
@@ -835,19 +870,49 @@ class _AppDelegate(NSObject):
         url = NSURL.URLWithString_(OPEN_ARG)
         if url:
             self._wv.loadRequest_(NSURLRequest.requestWithURL_(url))
-        # Sync Space assignment here (not before NSApp.run()) so we can schedule
-        # a re-activation if killall Dock runs — Dock restart steals focus AND
-        # teleports the user to the target Space without bringing our window.
-        # The window is already set to CanJoinAllSpaces in _open() so it follows
-        # the teleportation to the target Space; _settleOnTargetSpace pins it there.
+        # Listen for macOS appearance changes so we can update window chrome
+        # and re-apply the light-theme JS without a page reload.
+        NSDistributedNotificationCenter.defaultCenter().addObserver_selector_name_object_(
+            self, "systemThemeChanged:", "AppleInterfaceThemeChangedNotification", None
+        )
         if _sync_space_assignment():
             self.performSelector_withObject_afterDelay_("_settleOnTargetSpace", None, 1.8)
+
+    def systemThemeChanged_(self, _notification):
+        """Called by NSDistributedNotificationCenter when the user toggles dark/light mode."""
+        global _DARK_MODE
+        _DARK_MODE = _is_dark_mode()
+        self._apply_appearance()
+        # Re-apply the light-theme override in the already-loaded page — Teams
+        # listens for matchMedia changes via its own observers, but since we
+        # replaced matchMedia with a frozen stub those observers never fire.
+        # Instead we directly patch the DOM state Teams inspects for theming.
+        if self._wv is not None:
+            self._wv.evaluateJavaScript_completionHandler_(_REFRESH_LIGHT_JS, None)
+        # Also update the whole app appearance so menus/alerts follow the new theme.
+        app = NSApplication.sharedApplication()
+        if _DARK_MODE:
+            app.setAppearance_(None)  # follow system
+        else:
+            app.setAppearance_(NSAppearance.appearanceNamed_("NSAppearanceNameAqua"))
+
+    def _apply_appearance(self):
+        """Apply window chrome for the current _DARK_MODE value."""
+        if self._win is None:
+            return
+        if _DARK_MODE:
+            # DarkAqua gives the titlebar proper dark chrome (white text on dark grey)
+            # which is readable. We override the content background to a warmer
+            # dark blue-grey instead of the default almost-black.
+            self._win.setAppearance_(NSAppearance.appearanceNamed_("NSAppearanceNameDarkAqua"))
+            self._win.setBackgroundColor_(NSColor.colorWithRed_green_blue_alpha_(0.13, 0.13, 0.17, 1.0))
+        else:
+            self._win.setAppearance_(NSAppearance.appearanceNamed_("NSAppearanceNameAqua"))
+            self._win.setBackgroundColor_(NSColor.whiteColor())
 
     def _settleOnTargetSpace(self):
         """Pin the window to the target Space and re-grab focus after Dock restarts."""
         if self._win:
-            # Remove CanJoinAllSpaces — window is now on the target Space,
-            # switching back to Default pins it there so it stops following the user.
             self._win.setCollectionBehavior_(0)  # NSWindowCollectionBehaviorDefault
             self._win.makeKeyAndOrderFront_(None)
         NSApplication.sharedApplication().activateIgnoringOtherApps_(True)
@@ -864,15 +929,8 @@ class _AppDelegate(NSObject):
         # including whichever one Dock teleports the user to during _sync_space_assignment.
         # _settleOnTargetSpace removes this flag to pin the window to the target Space.
         win.setCollectionBehavior_(1)  # NSWindowCollectionBehaviorCanJoinAllSpaces
-        # In light mode: force Aqua appearance so the entire chrome stays white.
-        # In dark mode: let the window inherit the system dark chrome (title bar,
-        # traffic lights) while using a pleasant dark blue-grey content background
-        # instead of pure black. Web content is always forced light via JS.
-        if _DARK_MODE:
-            win.setBackgroundColor_(NSColor.colorWithRed_green_blue_alpha_(0.13, 0.13, 0.17, 1.0))
-        else:
-            win.setAppearance_(NSAppearance.appearanceNamed_("NSAppearanceNameAqua"))
-            win.setBackgroundColor_(NSColor.whiteColor())
+        self._win = win
+        self._apply_appearance()
 
         cfg = WKWebViewConfiguration.alloc().init()
         cfg.setWebsiteDataStore_(WKWebsiteDataStore.defaultDataStore())
@@ -912,8 +970,7 @@ class _AppDelegate(NSObject):
         wv.setUIDelegate_(self)
         win.contentView().addSubview_(wv)
         win.makeKeyAndOrderFront_(None)
-        self._win = win
-        self._wv  = wv
+        self._wv = wv
 
     def applicationShouldHandleReopen_hasVisibleWindows_(self, _app, _flag):
         if self._win is None:
@@ -940,10 +997,12 @@ class _AppDelegate(NSObject):
 
 _app = NSApplication.sharedApplication()
 _app.setActivationPolicy_(0)  # NSApplicationActivationPolicyRegular
-# In light mode force the entire app (menu bar, alerts, panels) to Aqua.
-# In dark mode let the app follow the system theme; per-window appearance
-# is set in _open() and web content is kept light via _FORCE_LIGHT_JS.
-if not _DARK_MODE:
+# Set initial app-level appearance. In light mode lock to Aqua so menus/alerts
+# stay white. In dark mode follow the system — per-window DarkAqua is set in
+# _apply_appearance(), and systemThemeChanged_() handles runtime switches.
+if _DARK_MODE:
+    _app.setAppearance_(None)  # follow system (DarkAqua)
+else:
     _app.setAppearance_(NSAppearance.appearanceNamed_("NSAppearanceNameAqua"))
 _delegate = _AppDelegate.alloc().init()
 _app.setDelegate_(_delegate)
