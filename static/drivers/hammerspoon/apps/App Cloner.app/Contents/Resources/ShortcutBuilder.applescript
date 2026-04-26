@@ -591,7 +591,7 @@ on showTintColorPicker(appPath)
 	-- well's color property, and the live preview stays frozen on the seed.
 	-- The "false" arg means non-exclusive (other wells in the app could also
 	-- be active — irrelevant here as we only have one).
-	colorWell's activate:false
+	colorWell's |activate|:false
 	set my tintPreviewColorWell to colorWell
 
 	-- Buttons
@@ -656,8 +656,8 @@ on installEditMenu()
 		-- Always rebuild the main menu from scratch. The existence check is unsafe:
 		-- osascript may return a non-nil stale menu object that prevents our Edit
 		-- items from being installed, silently leaving Cmd+V/A/C/X non-functional.
-		set mainMenu to current application's NSMenu's alloc()'s init
-		theApp's setMainMenu:mainMenu
+		set appMainMenu to current application's NSMenu's alloc()'s init
+		theApp's setMainMenu:appMainMenu
 		set editItem to current application's NSMenuItem's alloc()'s initWithTitle:"Edit" action:(missing value) keyEquivalent:""
 		set editMenu to current application's NSMenu's alloc()'s initWithTitle:"Edit"
 		editMenu's addItemWithTitle:"Cut"        action:"cut:"        keyEquivalent:"x"
@@ -668,7 +668,7 @@ on installEditMenu()
 		editMenu's addItem:(current application's NSMenuItem's separatorItem())
 		editMenu's addItemWithTitle:"Redo"       action:"redo:"       keyEquivalent:"Z"
 		editItem's setSubmenu:editMenu
-		mainMenu's addItem:editItem
+		appMainMenu's addItem:editItem
 	on error errMsg
 		my logmsg("installEditMenu failed: " & errMsg)
 	end try
