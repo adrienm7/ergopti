@@ -558,14 +558,19 @@ end tintedIconImage
 on resolveAppIcon(appPath)
 	try
 		set helperPath to (my appBundlePath) & "/Contents/Resources/extract_icon.py"
-		set tmpDir to do shell script "mktemp -d -t appcloner_iconprev"
-		set tmpPng to tmpDir & "/icon.png"
-		do shell script "/usr/bin/python3 " & quoted form of helperPath & " " & quoted form of appPath & " " & quoted form of tmpPng
+		set tmpPng to do shell script "f=$(mktemp -t appcloner_iconprev); mv \"$f\" \"${f}.png\"; echo \"${f}.png\""
+		-- Log helper invocation for debugging icon issues
+		my logmsg("resolveAppIcon: helperPath=" & helperPath)
+		my logmsg("resolveAppIcon: tmpPng=" & tmpPng)
+		set pyResult to do shell script "/usr/bin/python3 " & quoted form of helperPath & " " & quoted form of appPath & " " & quoted form of tmpPng & " 2>&1; echo EXIT:$?"
+		my logmsg("resolveAppIcon: pyResult=" & pyResult)
 		set img to current application's NSImage's alloc()'s initWithContentsOfFile:tmpPng
 		try
-			do shell script "rm -rf " & quoted form of tmpDir & " >/dev/null 2>&1 &"
+			do shell script "rm -f " & quoted form of tmpPng & " >/dev/null 2>&1 &"
 		end try
-		if img is not missing value then return img
+		if img is not missing value then
+			if ((img's |size|()'s width as integer) > 0) then return img
+		end if
 	end try
 
 	-- Last-resort fallback: native NSWorkspace.iconForFile (may yield a

@@ -871,9 +871,9 @@ def _open_in_source_app(url):
 
 
 class _WinDelegate(NSObject):
-    def windowShouldClose_(self, win):
-        win.orderOut_(None)
-        return False
+    def windowShouldClose_(self, _win):
+        NSApplication.sharedApplication().terminate_(None)
+        return True
 
 
 class _AppDelegate(NSObject):
@@ -992,7 +992,7 @@ class _AppDelegate(NSObject):
         return True
 
     def applicationShouldTerminateAfterLastWindowClosed_(self, _app):
-        return False
+        return True
 
     def webView_createWebViewWithConfiguration_forNavigationAction_windowFeatures_(
             self, wv, _cfg, action, _features):
