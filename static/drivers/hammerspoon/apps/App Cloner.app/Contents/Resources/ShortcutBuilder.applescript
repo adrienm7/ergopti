@@ -529,8 +529,10 @@ on tintedIconImage(srcImage, tintColor)
 	set ctx to current application's NSGraphicsContext's graphicsContextWithBitmapImageRep:bitmap
 	if ctx is missing value then return srcImage
 
-	ctx's saveGraphicsState()
-	current application's NSGraphicsContext's setCurrentContext:ctx
+	-- Store class ref to avoid AppleScript-ObjC selector-colon parse issues.
+	set NSGfxCtx to current application's NSGraphicsContext
+	NSGfxCtx's saveGraphicsState()
+	NSGfxCtx's setCurrentContext:ctx
 
 	-- Pass 1: draw source icon. Forces Cocoa to rasterise the lazy NSImage.
 	srcImage's drawInRect:destRect fromRect:(current application's NSZeroRect) operation:2 fraction:1.0
@@ -557,7 +559,7 @@ on tintedIconImage(srcImage, tintColor)
 	(current application's NSColor's whiteColor())'s setFill()
 	current application's NSBezierPath's fillRect:destRect
 
-	ctx's restoreGraphicsState()
+	NSGfxCtx's restoreGraphicsState()
 
 	-- Wrap the finished bitmap in an NSImage for NSImageView.
 	set tinted to current application's NSImage's alloc()'s initWithSize:(current application's NSMakeSize(targetSize, targetSize))
