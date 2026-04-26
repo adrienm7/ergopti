@@ -120,9 +120,13 @@ on doUpdatePreview()
 	end try
 end doUpdatePreview
 
-on updateTintPreview:sender
+-- Action target wired on the NSColorWell — fires every time the user picks
+-- a new colour in the system NSColorPanel. Replaces the old NSTimer polling
+-- approach which never fired during runModalForWindow: because the timer
+-- was registered in NSRunLoopCommonModes (which excludes modal mode).
+on colorWellChanged:sender
 	my doUpdatePreview()
-end updateTintPreview:
+end colorWellChanged:
 
 -- Strip leading and trailing whitespace (spaces, tabs, CR/LF). Pure
 -- AppleScript implementation to avoid spawning a shell.
@@ -592,10 +596,14 @@ on showTintColorPicker(appPath)
 	cv's addSubview:colorWell
 	-- Activate the well so it tracks the system NSColorPanel: without this,
 	-- changes the user makes in the colour panel never propagate back to the
-	-- well's color property, and the live preview stays frozen on the seed.
-	-- The "false" arg means non-exclusive (other wells in the app could also
-	-- be active — irrelevant here as we only have one).
+	-- well's color property. "false" means non-exclusive activation.
 	colorWell's |activate|:false
+	-- Wire a target/action callback that fires every time the user picks a new
+	-- colour. This is far more reliable than NSTimer polling: NSTimer needs
+	-- explicit registration in NSModalPanelRunLoopMode and AppleScript-ObjC has
+	-- subtle issues calling addTimer:forMode: twice for the same timer.
+	colorWell's setTarget:me
+	colorWell's setAction:"colorWellChanged:"
 	set my tintPreviewColorWell to colorWell
 
 	-- Buttons
@@ -621,25 +629,15 @@ on showTintColorPicker(appPath)
 	-- Render initial preview before showing the panel
 	my doUpdatePreview()
 
-	-- Start polling timer. NSRunLoopCommonModes does NOT include
-	-- NSModalPanelRunLoopMode by default on macOS — without explicit modal-mode
-	-- registration the timer never fires while runModalForWindow: is blocking
-	-- the thread, leaving the preview frozen on the seed colour.
 	set my panelResult to 0
 	set my panelInputView to missing value
 	set my panelCheckboxView to missing value
-	set timerUserInfo to missing value
-	set theTimer to current application's NSTimer's timerWithTimeInterval:0.08 target:me selector:"updateTintPreview:" userInfo:timerUserInfo repeats:true
-	set theLoop to current application's NSRunLoop's mainRunLoop
-	theLoop's addTimer:theTimer forMode:"NSRunLoopCommonModes"
-	theLoop's addTimer:theTimer forMode:"NSModalPanelRunLoopMode"
 
 	set theApp to current application's NSApplication's sharedApplication
 	theApp's runModalForWindow:pickerPanel
 	pickerPanel's orderOut:(missing value)
 
-	-- Tear down timer and clear shared preview state
-	theTimer's invalidate()
+	-- Clear shared preview state
 	set my tintPreviewImageView to missing value
 	set my tintPreviewColorWell to missing value
 	set my tintPreviewSourceImage to missing value
