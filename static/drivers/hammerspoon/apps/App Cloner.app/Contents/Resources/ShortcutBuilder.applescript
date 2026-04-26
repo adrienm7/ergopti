@@ -504,12 +504,22 @@ on chooseButton(headerText, bodyText, buttonList, dialogTitle)
 end chooseButton
 
 -- Render a 128×128 tinted preview by delegating to tint_icon.py.
--- tint_icon.py receives the app path and extracts the icon itself via
--- extract_icon.py, so AppleScript never needs to serialise an NSImage to disk
--- (which would require the reserved word "properties" as a keyword argument).
+-- The srcImage is already rasterised (resolved via NSWorkspace in the main
+-- AppleScript process which has a display server). We serialise it to TIFF
+-- using writeToFile:atomically: (no reserved-word keyword arguments), then
+-- convert to PNG with sips, then hand the PNG to tint_icon.py.
 on tintedIconImage(srcImage, tintColor, appPath)
 	set helperPath to (my appBundlePath) & "/Contents/Resources/tint_icon.py"
+	set tmpTiff to do shell script "mktemp /tmp/appcloner_tint_src.XXXXXXXXXX.tiff"
+	set tmpSrc to do shell script "mktemp /tmp/appcloner_tint_src.XXXXXXXXXX.png"
 	set tmpDst to do shell script "mktemp /tmp/appcloner_tint_dst.XXXXXXXXXX.png"
+
+	-- Serialise the rasterised NSImage to TIFF (no keyword-arg issues).
+	set tiffData to srcImage's TIFFRepresentation()
+	tiffData's writeToFile:tmpTiff atomically:true
+	-- Convert TIFF to PNG using the system sips tool (no PyObjC needed).
+	do shell script "/usr/bin/sips -s format png " & quoted form of tmpTiff & " --out " & quoted form of tmpSrc & " > /dev/null 2>&1"
+	do shell script "rm -f " & quoted form of tmpTiff
 
 	-- Build hex colour string from tintColor.
 	set sRGB to tintColor's colorUsingColorSpaceName:"NSCalibratedRGBColorSpace"
@@ -529,15 +539,15 @@ on tintedIconImage(srcImage, tintColor, appPath)
 		set tintMode to "tint"
 	end if
 
-	-- Run the Python helper (receives app path, extracts icon itself).
-	set pyCmd to "/usr/bin/python3 " & quoted form of helperPath & " " & quoted form of appPath & " " & quoted form of tmpDst & " " & quoted form of hexColor & " " & tintMode
+	-- Run the Python helper with the already-extracted PNG source.
+	set pyCmd to "/usr/bin/python3 " & quoted form of helperPath & " " & quoted form of tmpSrc & " " & quoted form of tmpDst & " " & quoted form of hexColor & " " & tintMode
 	try
 		do shell script pyCmd
 	end try
 
 	-- Load result PNG back as NSImage.
 	set result to current application's NSImage's alloc()'s initWithContentsOfFile:tmpDst
-	do shell script "rm -f " & quoted form of tmpDst
+	do shell script "rm -f " & quoted form of tmpSrc & " " & quoted form of tmpDst
 	if result is missing value then return srcImage
 	return result
 end tintedIconImage
