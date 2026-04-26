@@ -118,15 +118,18 @@ on doUpdatePreview()
 	if (my tintPreviewSourceImage) is missing value then return
 	try
 		set currentColor to (my tintPreviewColorWell)'s |color|
+		my logmsg("[preview] doUpdatePreview: calling tintedIconImage")
 		set tinted to my tintedIconImage((my tintPreviewSourceImage), currentColor, (my tintPreviewAppPath))
+		my logmsg("[preview] tintedIconImage returned — is missing value: " & (tinted is missing value))
 		set imgView to my tintPreviewImageView
 		imgView's setImage:tinted
 		-- Force a repaint: setImage: alone does not always invalidate the view's
 		-- cached display on Tahoe, especially when the new NSImage has the same
 		-- size as the previous one.
 		imgView's setNeedsDisplay:true
+		my logmsg("[preview] setImage + setNeedsDisplay done")
 	on error errMsg
-		my logmsg("doUpdatePreview failed: " & errMsg)
+		my logmsg("[preview] doUpdatePreview failed: " & errMsg)
 	end try
 end doUpdatePreview
 
@@ -517,11 +520,11 @@ on tintedIconImage(srcImage, tintColor, appPath)
 	-- Serialise the rasterised NSImage to TIFF (no keyword-arg issues).
 	set tiffData to srcImage's TIFFRepresentation()
 	set tiffOk to tiffData's writeToFile:tmpTiff atomically:true
+	my logmsg("[tint] tiffOk=" & tiffOk & " tmpTiff=" & tmpTiff)
 	-- Convert TIFF to PNG using the system sips tool (no PyObjC needed).
 	do shell script "/usr/bin/sips -s format png " & quoted form of tmpTiff & " --out " & quoted form of tmpSrc & " > /dev/null 2>&1"
 	do shell script "rm -f " & quoted form of tmpTiff
-	-- Log sizes of intermediate files to diagnose pipeline.
-	do shell script "printf '[tint] tiffOk=" & tiffOk & " srcPngBytes=%s\\n' \"$(wc -c < " & quoted form of tmpSrc & ")\" >> /tmp/appcloner_tint.log"
+	my logmsg("[tint] srcPngBytes=" & (do shell script "wc -c < " & quoted form of tmpSrc) & " tmpSrc=" & tmpSrc)
 
 	-- Build hex colour string from tintColor.
 	set sRGB to tintColor's colorUsingColorSpaceName:"NSCalibratedRGBColorSpace"
@@ -533,6 +536,7 @@ on tintedIconImage(srcImage, tintColor, appPath)
 	set gHex to do shell script "printf '%02X' " & (round (g * 255) rounding to nearest)
 	set bHex to do shell script "printf '%02X' " & (round (b * 255) rounding to nearest)
 	set hexColor to "#" & rHex & gHex & bHex
+	my logmsg("[tint] color=" & hexColor & " alpha=" & a)
 
 	-- Determine mode: alpha < 0.02 means greyscale (bw), else tint.
 	if a < 0.02 then
@@ -541,20 +545,25 @@ on tintedIconImage(srcImage, tintColor, appPath)
 		set tintMode to "tint"
 	end if
 
-	-- Run Python helper; capture stdout+stderr into log.
+	-- Run Python helper; capture stdout+stderr into the central log.
 	set pyCmd to "/usr/bin/python3 " & quoted form of helperPath & " " & quoted form of tmpSrc & " " & quoted form of tmpDst & " " & quoted form of hexColor & " " & tintMode
-	do shell script "echo '[tint] running: " & pyCmd & "' >> /tmp/appcloner_tint.log"
+	my logmsg("[tint] running: " & pyCmd)
 	try
-		do shell script pyCmd & " >> /tmp/appcloner_tint.log 2>&1"
-	on error errMsg number errNum
-		do shell script "echo '[tint] python error " & errNum & ": " & errMsg & "' >> /tmp/appcloner_tint.log"
+		do shell script pyCmd & " >> /tmp/appcloner.log 2>&1"
+	on error pyErr number pyNum
+		my logmsg("[tint] python error " & pyNum & ": " & pyErr)
 	end try
-	do shell script "printf '[tint] dstPngBytes=%s\\n' \"$(wc -c < " & quoted form of tmpDst & " 2>/dev/null || echo MISSING)\" >> /tmp/appcloner_tint.log"
+	my logmsg("[tint] dstPngBytes=" & (do shell script "wc -c < " & quoted form of tmpDst & " 2>/dev/null || echo MISSING") & " tmpDst=" & tmpDst)
 
 	-- Load result PNG back as NSImage.
 	set result to current application's NSImage's alloc()'s initWithContentsOfFile:tmpDst
+	my logmsg("[tint] initWithContentsOfFile result is missing value: " & (result is missing value))
 	do shell script "rm -f " & quoted form of tmpSrc & " " & quoted form of tmpDst
-	if result is missing value then return srcImage
+	if result is missing value then
+		my logmsg("[tint] falling back to srcImage")
+		return srcImage
+	end if
+	my logmsg("[tint] returning tinted image OK")
 	return result
 end tintedIconImage
 
