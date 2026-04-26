@@ -747,14 +747,24 @@ class _AppDelegate(NSObject):
         self._apply_appearance()
 
     def _apply_appearance(self):
-        """Apply window chrome for the current _DARK_MODE value."""
-        if self._win is None:
-            return
+        """Apply appearance for the current _DARK_MODE value.
+
+        Setting appearance to None on the window lets it inherit the system
+        appearance — WKWebView then reports prefers-color-scheme: dark correctly.
+        Forcing Aqua in light mode prevents the system DarkAqua from leaking in.
+        We also sync the app-level appearance so menus and alerts follow.
+        """
+        app = NSApplication.sharedApplication()
         if _DARK_MODE:
-            # DarkAqua gives the titlebar proper dark chrome with white text.
-            self._win.setAppearance_(NSAppearance.appearanceNamed_("NSAppearanceNameDarkAqua"))
+            # None = inherit system (DarkAqua) — window and all subviews including
+            # WKWebView report dark to CSS prefers-color-scheme queries.
+            if self._win is not None:
+                self._win.setAppearance_(None)
+            app.setAppearance_(None)
         else:
-            self._win.setAppearance_(NSAppearance.appearanceNamed_("NSAppearanceNameAqua"))
+            if self._win is not None:
+                self._win.setAppearance_(NSAppearance.appearanceNamed_("NSAppearanceNameAqua"))
+            app.setAppearance_(NSAppearance.appearanceNamed_("NSAppearanceNameAqua"))
 
     def _open(self):
         win = NSWindow.alloc().initWithContentRect_styleMask_backing_defer_(
@@ -831,11 +841,11 @@ class _AppDelegate(NSObject):
 
 _app = NSApplication.sharedApplication()
 _app.setActivationPolicy_(0)  # NSApplicationActivationPolicyRegular
-# Set initial app-level appearance. In light mode lock to Aqua so menus/alerts
-# stay white. In dark mode follow the system — per-window DarkAqua is set in
-# _apply_appearance(), and systemThemeChanged_() handles runtime switches.
+# Initial app-level appearance — _apply_appearance() will refine per-window
+# once applicationDidFinishLaunching_ fires, but we set it here early so
+# any system dialogs shown before the window is ready already look correct.
 if _DARK_MODE:
-    _app.setAppearance_(None)  # follow system (DarkAqua)
+    _app.setAppearance_(None)
 else:
     _app.setAppearance_(NSAppearance.appearanceNamed_("NSAppearanceNameAqua"))
 _delegate = _AppDelegate.alloc().init()

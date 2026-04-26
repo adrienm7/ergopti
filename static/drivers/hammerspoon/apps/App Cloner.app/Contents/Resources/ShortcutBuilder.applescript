@@ -504,34 +504,37 @@ on tintedIconImage(srcImage, tintColor)
 	set destRect to current application's NSMakeRect(0, 0, 128, 128)
 	set ctx to current application's NSGraphicsContext's currentContext
 	ctx's saveGraphicsState()
-	-- Pass 1: draw the original icon. Establishes both colour and alpha mask.
+	-- Pass 1: draw the original icon. Establishes colour and alpha mask.
 	srcImage's drawInRect:destRect fromRect:(current application's NSZeroRect) operation:2 fraction:1.0
-	-- Pass 2: desaturate with a neutral grey (Saturation blend). Strips hue
-	-- while keeping luminance, giving Pass 3 a neutral base for the tint.
-	ctx's setCompositingOperation:26  -- NSCompositingOperationSaturation
-	set grayFill to current application's NSColor's colorWithWhite:0.5 alpha:1.0
-	grayFill's setFill()
-	current application's NSBezierPath's fillRect:destRect
-	-- Pass 3: Screen-blend the tint colour. Skipped when alpha ≈ 0 (grayscale
-	-- mode) — the Screen formula would wash dark areas back toward white.
+	-- Pass 2 (optional — grayscale mode): desaturate via Saturation blend.
+	-- Only applied when tintAlpha ≈ 0; otherwise Pass 3 (Multiply) works
+	-- directly on the coloured icon with no prior desaturation needed.
 	set sRGBSpace to current application's NSColorSpace's sRGBColorSpace
 	set tintRGB to tintColor's colorUsingColorSpace:sRGBSpace
 	set tintAlpha to (tintRGB's alphaComponent()) as real
-	if tintAlpha > 0.01 then
-		ctx's setCompositingOperation:15  -- NSCompositingOperationScreen
+	if tintAlpha <= 0.01 then
+		-- Grayscale path: strip hue with a neutral grey Saturation fill.
+		ctx's setCompositingOperation:26  -- NSCompositingOperationSaturation
+		set grayFill to current application's NSColor's colorWithWhite:0.5 alpha:1.0
+		grayFill's setFill()
+		current application's NSBezierPath's fillRect:destRect
+	else
+		-- Tint path: Multiply blends the tint colour into every pixel.
+		-- Multiply formula: dst × src. On white pixels (dst=1) it applies the
+		-- tint at full strength; on dark pixels (dst≈0) it stays dark — which
+		-- is exactly right for icons like Outlook whose background is white.
+		-- Screen (the former operation) collapses to white on white backgrounds,
+		-- making the whole preview appear blank for such icons.
+		ctx's setCompositingOperation:16  -- NSCompositingOperationMultiply
 		tintColor's setFill()
 		current application's NSBezierPath's fillRect:destRect
 	end if
-	-- Pass 4: restore the icon's alpha mask by multiplying destination alpha
-	-- by source alpha (DestinationIn). Pixels the icon left transparent go
-	-- back to fully transparent — no coloured halo around the silhouette.
+	-- Pass 3: restore the icon's alpha mask (DestinationIn). Transparent pixels
+	-- the icon left empty are zeroed out — no coloured square halo remains.
 	srcImage's drawInRect:destRect fromRect:(current application's NSZeroRect) operation:7 fraction:1.0
-	-- Post-pass: place opaque white BEHIND the composited result using
-	-- DestinationOver (3). Semantics: dest stays where dest is opaque;
-	-- white fills only where dest is transparent or semi-transparent.
-	-- This flattens the icon's anti-aliased edges onto a clean white matte
-	-- so no tinted semi-transparent fringe is visible when the preview panel
-	-- renders it on its own white background.
+	-- Post-pass: place opaque white behind the result (DestinationOver).
+	-- Flattens semi-transparent edges onto a clean white matte so no fringe
+	-- appears when the preview panel renders on its own white background.
 	ctx's setCompositingOperation:3  -- NSCompositingOperationDestinationOver
 	set whiteFill to current application's NSColor's whiteColor
 	whiteFill's setFill()
