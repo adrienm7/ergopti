@@ -516,9 +516,11 @@ on tintedIconImage(srcImage, tintColor, appPath)
 
 	-- Serialise the rasterised NSImage to TIFF (no keyword-arg issues).
 	set tiffData to srcImage's TIFFRepresentation()
-	tiffData's writeToFile:tmpTiff atomically:true
+	set tiffOk to tiffData's writeToFile:tmpTiff atomically:true
+	do shell script "echo '[tint] tiffOk=" & tiffOk & " tiffSize=$(wc -c < " & quoted form of tmpTiff & ") srcPng=" & quoted form of tmpSrc & " dstPng=" & quoted form of tmpDst & "' >> /tmp/appcloner_tint.log 2>&1"
 	-- Convert TIFF to PNG using the system sips tool (no PyObjC needed).
-	do shell script "/usr/bin/sips -s format png " & quoted form of tmpTiff & " --out " & quoted form of tmpSrc & " > /dev/null 2>&1"
+	do shell script "/usr/bin/sips -s format png " & quoted form of tmpTiff & " --out " & quoted form of tmpSrc & " >> /tmp/appcloner_tint.log 2>&1"
+	do shell script "echo '[tint] srcPngSize=$(wc -c < " & quoted form of tmpSrc & ")' >> /tmp/appcloner_tint.log 2>&1"
 	do shell script "rm -f " & quoted form of tmpTiff
 
 	-- Build hex colour string from tintColor.
@@ -541,9 +543,12 @@ on tintedIconImage(srcImage, tintColor, appPath)
 
 	-- Run the Python helper with the already-extracted PNG source.
 	set pyCmd to "/usr/bin/python3 " & quoted form of helperPath & " " & quoted form of tmpSrc & " " & quoted form of tmpDst & " " & quoted form of hexColor & " " & tintMode
+	do shell script "echo '[tint] cmd=" & pyCmd & "' >> /tmp/appcloner_tint.log 2>&1"
+	set pyOut to ""
 	try
-		do shell script pyCmd
+		set pyOut to do shell script pyCmd & " 2>&1"
 	end try
+	do shell script "echo '[tint] pyOut=" & pyOut & " dstSize=$(wc -c < " & quoted form of tmpDst & " 2>/dev/null || echo MISSING)' >> /tmp/appcloner_tint.log 2>&1"
 
 	-- Load result PNG back as NSImage.
 	set result to current application's NSImage's alloc()'s initWithContentsOfFile:tmpDst
