@@ -486,15 +486,17 @@ on chooseButton(headerText, bodyText, buttonList, dialogTitle)
 	return chosenButton of r
 end chooseButton
 
--- Render a 128×128 NSImage with the given tint color overlaid using
--- NSCompositingOperationSourceAtop: the fill only paints where the original
--- icon has non-zero alpha, so the icon shape and transparency are preserved.
+-- Render a 128×128 NSImage with the tint color overlaid using a 4-pass
+-- compositing pipeline that preserves both hue and the icon's alpha mask.
 on tintedIconImage(srcImage, tintColor)
 	set sz to current application's NSMakeSize(128, 128)
-	set tinted to current application's NSImage's alloc()'s initWithSize:sz
-	tinted's lockFocus()
 	set destRect to current application's NSMakeRect(0, 0, 128, 128)
-	set ctx to current application's NSGraphicsContext's currentContext
+	-- NSBitmapImageRep-based offscreen context: more reliable than
+	-- NSImage.lockFocus/unlockFocus, which is deprecated on macOS Tahoe and
+	-- can fail silently when the NSImage has no screen-resident cached rep yet.
+	set bitmapRep to current application's NSBitmapImageRep's alloc()'s initWithBitmapDataPlanes:(missing value) pixelsWide:128 pixelsHigh:128 bitsPerSample:8 samplesPerPixel:4 hasAlpha:true isPlanar:false colorSpaceName:"NSCalibratedRGBColorSpace" bytesPerRow:0 bitsPerPixel:0
+	set ctx to current application's NSGraphicsContext's graphicsContextWithBitmapImageRep:bitmapRep
+	current application's NSGraphicsContext's setCurrentContext:ctx
 	ctx's saveGraphicsState()
 	-- Pass 1: draw the original icon at full opacity. This establishes both
 	-- the colour buffer AND the alpha mask (rounded-rect shape, transparent
@@ -521,7 +523,8 @@ on tintedIconImage(srcImage, tintColor)
 	-- the original icon left transparent, restoring the rounded-rect silhouette.
 	srcImage's drawInRect:destRect fromRect:(current application's NSZeroRect) operation:7 fraction:1.0
 	ctx's restoreGraphicsState()
-	tinted's unlockFocus()
+	set tinted to current application's NSImage's alloc()'s initWithSize:sz
+	tinted's addRepresentation:bitmapRep
 	return tinted
 end tintedIconImage
 

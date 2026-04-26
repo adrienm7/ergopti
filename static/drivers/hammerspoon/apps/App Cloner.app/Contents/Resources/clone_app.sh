@@ -685,12 +685,24 @@ _WIN_MASK  = 1 | 2 | 4 | 8 | 32768
 # NSViewAutoresizingMask: WidthSizable=2 HeightSizable=16
 _VIEW_MASK = 2 | 16
 
+# Detect the macOS appearance once at startup so _open() can branch on it.
+# subprocess is already imported; no extra AppKit import needed.
+def _is_dark_mode():
+    """Return True when macOS is currently in Dark Mode."""
+    r = subprocess.run(
+        ["defaults", "read", "-g", "AppleInterfaceStyle"],
+        capture_output=True, text=True
+    )
+    return r.returncode == 0 and "Dark" in r.stdout
+
+_DARK_MODE = _is_dark_mode()
+
 # Inject a script that forces every prefers-color-scheme: dark media query to
-# return false. The page's auto-detection then renders in light theme even
-# when the user is running macOS in dark mode — matching the always-white
-# window chrome we set below via NSAppearanceNameAqua.
+# return false. Web content always renders in light theme so it reads cleanly
+# regardless of the macOS appearance — window chrome adapts separately.
 _FORCE_LIGHT_JS = """
 (function() {
+    // Override matchMedia so the web app always thinks light theme is active.
     const orig = window.matchMedia.bind(window);
     window.matchMedia = function(q) {
         if (typeof q === 'string' && q.indexOf('prefers-color-scheme') !== -1) {
@@ -706,14 +718,33 @@ _FORCE_LIGHT_JS = """
         }
         return orig(q);
     };
+    // Ensure all fetch() calls include cookies (credentials:'include').
+    // Profile images from Microsoft CDN require authenticated requests;
+    // WKWebView's ITP can strip cookies on cross-site requests without this.
+    const origFetch = window.fetch.bind(window);
+    window.fetch = function(url, opts) {
+        opts = Object.assign({}, opts);
+        if (!opts.credentials) { opts.credentials = 'include'; }
+        return origFetch(url, opts);
+    };
+    // Same for XMLHttpRequest — some older Teams code paths use XHR.
+    const origOpen = XMLHttpRequest.prototype.open;
+    XMLHttpRequest.prototype.open = function() {
+        this.withCredentials = true;
+        return origOpen.apply(this, arguments);
+    };
 })();
 """
 
 
 def _sync_space_assignment():
     """Keep this PWA pinned to whichever Space its source app currently lives in.
+
     Runs at every launch — if the user has moved Teams (or whatever the source
     app is) to a different desktop since the last launch, we follow.
+
+    Returns True if the Dock process was killed (so the caller can schedule a
+    delayed re-activation to recover focus after Dock restarts).
     """
     try:
         src_id_path = os.path.join(PROFILE_DIR, "source_bundle_id")
@@ -773,9 +804,11 @@ def _sync_space_assignment():
             # new assignment. The brief flash is acceptable for a launch path
             # that only happens when the source app has actually moved.
             subprocess.run(["killall", "Dock"], capture_output=True)
+            return True
     except Exception:
         # Never let a Space-sync failure block the PWA from launching.
         pass
+    return False
 
 
 class _WinDelegate(NSObject):
@@ -796,6 +829,16 @@ class _AppDelegate(NSObject):
         url = NSURL.URLWithString_(OPEN_ARG)
         if url:
             self._wv.loadRequest_(NSURLRequest.requestWithURL_(url))
+        # Sync Space assignment here (not before NSApp.run()) so we can schedule
+        # a re-activation if killall Dock runs — Dock restart steals focus.
+        if _sync_space_assignment():
+            self.performSelector_withObject_afterDelay_("_reactivateAfterDock", None, 1.8)
+
+    def _reactivateAfterDock(self):
+        """Re-grab focus after the Dock process has had time to restart."""
+        NSApplication.sharedApplication().activateIgnoringOtherApps_(True)
+        if self._win:
+            self._win.makeKeyAndOrderFront_(None)
 
     def _open(self):
         win = NSWindow.alloc().initWithContentRect_styleMask_backing_defer_(
@@ -805,15 +848,26 @@ class _AppDelegate(NSObject):
         win.center()
         win.setDelegate_(self._wd)
         win.setTabbingMode_(2)  # NSWindowTabbingModeDisallowed
-        # Force light mode chrome regardless of the system theme: the title
-        # bar, traffic-light buttons and content background all stay white
-        # so the embedded web app reads cleanly even when macOS is in dark.
-        win.setAppearance_(NSAppearance.appearanceNamed_("NSAppearanceNameAqua"))
-        win.setBackgroundColor_(NSColor.whiteColor())
+        # In light mode: force Aqua appearance so the entire chrome stays white.
+        # In dark mode: let the window inherit the system dark chrome (title bar,
+        # traffic lights) while using a pleasant dark blue-grey content background
+        # instead of pure black. Web content is always forced light via JS.
+        if _DARK_MODE:
+            win.setBackgroundColor_(NSColor.colorWithRed_green_blue_alpha_(0.13, 0.13, 0.17, 1.0))
+        else:
+            win.setAppearance_(NSAppearance.appearanceNamed_("NSAppearanceNameAqua"))
+            win.setBackgroundColor_(NSColor.whiteColor())
 
         cfg = WKWebViewConfiguration.alloc().init()
         cfg.setWebsiteDataStore_(WKWebsiteDataStore.defaultDataStore())
         cfg.setMediaTypesRequiringUserActionForPlayback_(0)
+        # Disable WebKit's Intelligent Tracking Prevention. ITP strips cookies
+        # on cross-site requests, which breaks profile-image loads from
+        # Microsoft's CDN (graph.microsoft.com, *.msecnd.net, etc.).
+        try:
+            cfg.websiteDataStore().setPreventsCrossSiteTracking_(False)
+        except Exception:
+            pass
 
         # Inject the prefers-color-scheme override at document start so the
         # web app picks up the light theme on its very first paint.
@@ -862,15 +916,13 @@ class _AppDelegate(NSObject):
         return None
 
 
-# Sync Space assignment with the source app BEFORE NSApp.run() so the window
-# is placed on the correct desktop on this very launch, not the next one.
-_sync_space_assignment()
-
 _app = NSApplication.sharedApplication()
 _app.setActivationPolicy_(0)  # NSApplicationActivationPolicyRegular
-# Force the entire app's appearance to Aqua so menu bar, alerts, panels and
-# every NSWindow we open inherit a light look regardless of the OS theme.
-_app.setAppearance_(NSAppearance.appearanceNamed_("NSAppearanceNameAqua"))
+# In light mode force the entire app (menu bar, alerts, panels) to Aqua.
+# In dark mode let the app follow the system theme; per-window appearance
+# is set in _open() and web content is kept light via _FORCE_LIGHT_JS.
+if not _DARK_MODE:
+    _app.setAppearance_(NSAppearance.appearanceNamed_("NSAppearanceNameAqua"))
 _delegate = _AppDelegate.alloc().init()
 _app.setDelegate_(_delegate)
 _app.run()
