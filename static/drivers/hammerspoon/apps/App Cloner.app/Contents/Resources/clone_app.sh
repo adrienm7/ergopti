@@ -736,7 +736,7 @@ _INJECT_JS_TPL = r"""
             if (src.startsWith('data:') || src.startsWith('blob:') || src.startsWith('file:')) return;
             try {
                 const u = new URL(src, location.href);
-                if (u.origin === location.origin) return;  // same-origin, nothing we can do
+                if (u.origin === location.origin) return;
             } catch (_) { return; }
             img.__appcloner_recovered = true;
             fetch(src, { credentials: 'include' })
@@ -767,6 +767,13 @@ _INJECT_JS_TPL = r"""
     }).observe(document.documentElement, { childList: true, subtree: true });
 
     // ===== URL lock (only active when __APPCLONER_LOCK__ is true) =====
+    // External dispatch goes through window.open(url, '_blank'), which
+    // triggers the UI delegate's createWebViewWithConfiguration:... method.
+    // The native side intercepts that call when URL_LOCK is on and dispatches
+    // the URL to the source desktop app via `open -a`. This avoids needing a
+    // WKNavigationDelegate or a WKScriptMessageHandler — both of which require
+    // formal protocol conformance that PyObjC under /usr/bin/python3 does
+    // not provide cleanly.
     var _LOCKED = __APPCLONER_LOCK__;
     var _LOCKED_URL = "__APPCLONER_LOCKED_URL__";
     if (_LOCKED && _LOCKED_URL) {
@@ -784,13 +791,23 @@ _INJECT_JS_TPL = r"""
             } catch (_) { return false; }
         }
         function _dispatchExternal(url) {
-            try {
-                if (window.webkit && window.webkit.messageHandlers
-                    && window.webkit.messageHandlers.appclonerExternal) {
-                    window.webkit.messageHandlers.appclonerExternal.postMessage(url);
-                }
-            } catch (_) {}
+            try { window.open(url, '_blank'); } catch (_) {}
         }
+        // Capture-phase click listener: intercept <a> clicks pointing
+        // out-of-scope before the SPA framework can route them.
+        document.addEventListener('click', function(e) {
+            try {
+                var a = e.target && e.target.closest && e.target.closest('a[href]');
+                if (!a) return;
+                var href = a.href || '';
+                if (!href || href.indexOf('javascript:') === 0) return;
+                if (_isLocked(href)) return;
+                e.preventDefault();
+                e.stopPropagation();
+                _dispatchExternal(href);
+            } catch (_) {}
+        }, true);
+        // SPA navigation hooks: pushState / replaceState / hashchange.
         var origPush = history.pushState.bind(history);
         history.pushState = function(state, title, url) {
             if (url != null && !_isLocked(url)) {
@@ -931,17 +948,13 @@ class _AppDelegate(NSObject):
             pass
 
         # Inject generic helpers (fetch credentials, <img> error recovery, and
-        # — when URL_LOCK is on — pushState/hashchange interception). Theme
-        # detection is left entirely to WebKit + the page's own CSS.
+        # — when URL_LOCK is on — click + pushState/hashchange interception).
+        # Theme detection is left entirely to WebKit + the page's own CSS.
+        # No script-message handler is registered: the JS routes out-of-scope
+        # navigation through window.open(_blank), which goes through the
+        # already-installed UI delegate. That avoids needing PyObjC to bridge
+        # a WKScriptMessageHandler-conforming class.
         ucc = WKUserContentController.alloc().init()
-        # Register a script-message handler for the lock's "external link"
-        # channel. The page calls window.webkit.messageHandlers.appclonerExternal
-        # .postMessage(url) when navigation outside the locked URL is attempted;
-        # we dispatch that URL to the source desktop app so the user gets the
-        # real client for whatever they were trying to open.
-        ucc.addScriptMessageHandler_name_(self, "appclonerExternal")
-        # Resolve the template's URL_LOCK and locked URL before injection so the
-        # JS sees plain values (no extra IPC roundtrip needed).
         lock_flag = "true" if URL_LOCK else "false"
         locked_url_js = (OPEN_ARG or "").replace("\\", "\\\\").replace('"', '\\"')
         injected = (_INJECT_JS_TPL
@@ -963,39 +976,9 @@ class _AppDelegate(NSObject):
             "Chrome/130.0.0.0 Safari/537.36 Edg/130.0.0.0"
         )
         wv.setUIDelegate_(self)
-        wv.setNavigationDelegate_(self)
         win.contentView().addSubview_(wv)
         win.makeKeyAndOrderFront_(None)
         self._wv = wv
-
-    # ===== WKNavigationDelegate =====
-    def webView_decidePolicyForNavigationAction_decisionHandler_(self, wv, action, handler):
-        """Block navigation outside the locked URL when URL_LOCK is on.
-
-        Out-of-scope navigation is dispatched to SOURCE_APP via `open -a`
-        so the user lands in the real desktop app. The very first navigation
-        (loading OPEN_ARG itself) is always in scope so it passes through.
-        """
-        try:
-            if URL_LOCK:
-                req = action.request()
-                target = req.URL().absoluteString() if req and req.URL() else ""
-                if not _url_in_lock_scope(target):
-                    handler(0)  # WKNavigationActionPolicyCancel
-                    _open_in_source_app(target)
-                    return
-        except Exception:
-            pass
-        handler(1)  # WKNavigationActionPolicyAllow
-
-    # ===== WKScriptMessageHandler =====
-    def userContentController_didReceiveScriptMessage_(self, _ucc, message):
-        """Receive 'appclonerExternal' messages from the JS lock and dispatch."""
-        try:
-            if message.name() == "appclonerExternal":
-                _open_in_source_app(str(message.body()))
-        except Exception:
-            pass
 
     def applicationShouldHandleReopen_hasVisibleWindows_(self, _app, _flag):
         if self._win is None:
@@ -1013,10 +996,24 @@ class _AppDelegate(NSObject):
 
     def webView_createWebViewWithConfiguration_forNavigationAction_windowFeatures_(
             self, wv, _cfg, action, _features):
+        # Called when the page calls window.open(url, '_blank') or clicks an
+        # <a target="_blank"> link. With targetFrame=None there is no existing
+        # frame to receive the request so WKWebView would normally create a
+        # second webview — we never want that (the clone is a single-window
+        # app). Two cases:
+        #   * URL_LOCK on AND target outside lock scope → dispatch to the
+        #     source desktop app via `open -a`. Used by the injected JS to
+        #     bounce out-of-scope clicks and SPA navigation to the real client.
+        #   * Otherwise → load the URL in the existing webview, replacing
+        #     whatever is on screen.
         if action.targetFrame() is None:
             req = action.request()
             if req and req.URL():
-                wv.loadRequest_(req)
+                target = req.URL().absoluteString()
+                if URL_LOCK and not _url_in_lock_scope(target):
+                    _open_in_source_app(target)
+                else:
+                    wv.loadRequest_(req)
         return None
 
 
