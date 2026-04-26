@@ -830,15 +830,24 @@ class _AppDelegate(NSObject):
         if url:
             self._wv.loadRequest_(NSURLRequest.requestWithURL_(url))
         # Sync Space assignment here (not before NSApp.run()) so we can schedule
-        # a re-activation if killall Dock runs — Dock restart steals focus.
+        # a re-activation if killall Dock runs — Dock restart steals focus AND
+        # teleports the user to the target Space without bringing our window.
+        # Setting CanJoinAllSpaces (1) before the Dock restart makes the window
+        # visible on every Space, including the target one the user lands on;
+        # _settleOnTargetSpace then removes the flag, pinning it to that Space.
         if _sync_space_assignment():
-            self.performSelector_withObject_afterDelay_("_reactivateAfterDock", None, 1.8)
+            if self._win:
+                self._win.setCollectionBehavior_(1)  # NSWindowCollectionBehaviorCanJoinAllSpaces
+            self.performSelector_withObject_afterDelay_("_settleOnTargetSpace", None, 1.8)
 
-    def _reactivateAfterDock(self):
-        """Re-grab focus after the Dock process has had time to restart."""
-        NSApplication.sharedApplication().activateIgnoringOtherApps_(True)
+    def _settleOnTargetSpace(self):
+        """Pin the window to whichever Space is now active (the target one)
+        and re-grab focus after Dock has finished restarting.
+        """
         if self._win:
+            self._win.setCollectionBehavior_(0)  # NSWindowCollectionBehaviorDefault
             self._win.makeKeyAndOrderFront_(None)
+        NSApplication.sharedApplication().activateIgnoringOtherApps_(True)
 
     def _open(self):
         win = NSWindow.alloc().initWithContentRect_styleMask_backing_defer_(
