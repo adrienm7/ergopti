@@ -111,6 +111,12 @@ on doUpdatePreview()
 		set tinted to my tintedIconImage((my tintPreviewSourceImage), currentColor)
 		set imgView to my tintPreviewImageView
 		imgView's setImage:tinted
+		-- Force a repaint: setImage: alone does not always invalidate the view's
+		-- cached display on Tahoe, especially when the new NSImage has the same
+		-- size as the previous one.
+		imgView's setNeedsDisplay:true
+	on error errMsg
+		my logmsg("doUpdatePreview failed: " & errMsg)
 	end try
 end doUpdatePreview
 
@@ -490,25 +496,30 @@ on tintedIconImage(srcImage, tintColor)
 	set destRect to current application's NSMakeRect(0, 0, 128, 128)
 	set ctx to current application's NSGraphicsContext's currentContext
 	ctx's saveGraphicsState()
-	-- Pass 1: draw the original icon at full opacity
+	-- Pass 1: draw the original icon at full opacity. This establishes both
+	-- the colour buffer AND the alpha mask (rounded-rect shape, transparent
+	-- pixels in the corners) that Pass 4 will use to clip the tint.
 	srcImage's drawInRect:destRect fromRect:(current application's NSZeroRect) operation:2 fraction:1.0
-	-- Pass 2: desaturate — Saturation compositing with a neutral gray replaces
-	-- each pixel's saturation with 0 while preserving its hue and luminosity
-	-- (which in practice means the icon is converted to grayscale). This gives
-	-- the tint overlay (Pass 3) a neutral base and prevents the icon's original
-	-- hue from contaminating the chosen tint colour.
+	-- Pass 2: desaturate via Saturation compositing with a neutral gray. The
+	-- result has the original luminosity of each pixel but zero saturation,
+	-- giving Pass 3 a hue-neutral base so the chosen tint reads cleanly.
 	ctx's setCompositingOperation:26  -- NSCompositingOperationSaturation
 	set grayFill to current application's NSColor's colorWithWhite:0.5 alpha:1.0
 	grayFill's setFill()
 	current application's NSBezierPath's fillRect:destRect
-	-- Pass 3: Screen blend of the tint colour. Screen leaves white (and near-white)
-	-- pixels unchanged — the formula is 1-(1-src)(1-dst), which yields 1 when
-	-- dst=1 regardless of src — so opaque white icon backgrounds are untouched.
-	-- Dark and mid-tone areas are shifted toward the tint hue without losing
-	-- their shape or contrast.
+	-- Pass 3: Screen-blend the tint. Screen's formula 1-(1-src)(1-dst) yields
+	-- 1 wherever dst=1, leaving white/near-white pixels untouched while shifting
+	-- dark and mid-tone areas toward the tint hue.
 	ctx's setCompositingOperation:15  -- NSCompositingOperationScreen
 	tintColor's setFill()
 	current application's NSBezierPath's fillRect:destRect
+	-- Pass 4: restore the icon's alpha mask. Passes 2 and 3 fillRect the entire
+	-- 128×128 square, so the rounded-rect corners (originally transparent) end
+	-- up filled with opaque tint — visible as a coloured square halo around the
+	-- icon. NSCompositingOperationDestinationIn (7) keeps the destination colour
+	-- but multiplies its alpha by the source's, which zeroes out every pixel
+	-- the original icon left transparent, restoring the rounded-rect silhouette.
+	srcImage's drawInRect:destRect fromRect:(current application's NSZeroRect) operation:7 fraction:1.0
 	ctx's restoreGraphicsState()
 	tinted's unlockFocus()
 	return tinted
@@ -575,6 +586,12 @@ on showTintColorPicker(appPath)
 	set initialColor to current application's NSColor's colorWithSRGBRed:0.8 green:0.0 blue:0.0 alpha:1.0
 	colorWell's setColor:initialColor
 	cv's addSubview:colorWell
+	-- Activate the well so it tracks the system NSColorPanel: without this,
+	-- changes the user makes in the colour panel never propagate back to the
+	-- well's color property, and the live preview stays frozen on the seed.
+	-- The "false" arg means non-exclusive (other wells in the app could also
+	-- be active — irrelevant here as we only have one).
+	colorWell's activate:false
 	set my tintPreviewColorWell to colorWell
 
 	-- Buttons
