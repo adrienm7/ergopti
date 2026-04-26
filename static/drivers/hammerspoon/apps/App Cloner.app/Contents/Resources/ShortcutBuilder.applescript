@@ -513,9 +513,12 @@ end chooseButton
 -- convert to PNG with sips, then hand the PNG to tint_icon.py.
 on tintedIconImage(srcImage, tintColor, appPath)
 	set helperPath to (my appBundlePath) & "/Contents/Resources/tint_icon.py"
-	set tmpTiff to do shell script "mktemp /tmp/appcloner_tint_src.XXXXXXXXXX.tiff"
-	set tmpSrc to do shell script "mktemp /tmp/appcloner_tint_src.XXXXXXXXXX.png"
-	set tmpDst to do shell script "mktemp /tmp/appcloner_tint_dst.XXXXXXXXXX.png"
+	-- Use PID-based names to avoid mktemp conflicts between rapid preview updates.
+	set pid to do shell script "echo $$"
+	set tmpTiff to "/tmp/appcloner_tint_" & pid & ".tiff"
+	set tmpSrc to "/tmp/appcloner_tint_" & pid & "_src.png"
+	set tmpDst to "/tmp/appcloner_tint_" & pid & "_dst.png"
+	do shell script "rm -f " & quoted form of tmpTiff & " " & quoted form of tmpSrc & " " & quoted form of tmpDst
 
 	-- Serialise the rasterised NSImage to TIFF (no keyword-arg issues).
 	set tiffData to srcImage's TIFFRepresentation()
@@ -555,12 +558,17 @@ on tintedIconImage(srcImage, tintColor, appPath)
 	end try
 	my logmsg("[tint] dstPngBytes=" & (do shell script "wc -c < " & quoted form of tmpDst & " 2>/dev/null || echo MISSING") & " tmpDst=" & tmpDst)
 
-	-- Load result PNG back as NSImage.
-	-- imageWithContentsOfFile: returns a proper NSImage; alloc/initWithContentsOfFile:
-	-- can hand back a raw ObjC pointer that AppleScript coerces to NSString.
-	set result to current application's NSImage's imageWithContentsOfFile:tmpDst
-	my logmsg("[tint] imageWithContentsOfFile result is missing value: " & (result is missing value))
+	-- Load result PNG via NSData then initWithData: — initWithContentsOfFile:
+	-- returns a raw ObjC pointer that AppleScript coerces to NSString, and
+	-- imageWithContentsOfFile: is not available on this macOS bridge version.
+	set pngData to current application's NSData's dataWithContentsOfFile:tmpDst
 	do shell script "rm -f " & quoted form of tmpSrc & " " & quoted form of tmpDst
+	if pngData is missing value then
+		my logmsg("[tint] NSData load failed — falling back to srcImage")
+		return srcImage
+	end if
+	set result to current application's NSImage's alloc()'s initWithData:pngData
+	my logmsg("[tint] initWithData result is missing value: " & (result is missing value))
 	if result is missing value then
 		my logmsg("[tint] falling back to srcImage")
 		return srcImage
