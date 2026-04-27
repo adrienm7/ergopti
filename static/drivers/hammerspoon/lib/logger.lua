@@ -20,10 +20,18 @@
 ---    Seeing a START without a following SUCCESS points to a silent failure.
 --- 5. Deduplication: consecutive identical lines are suppressed automatically;
 ---    a count summary is printed when the run breaks, using the same color/level.
+--- 6. Unified file sink: every log line is also appended to /tmp/ergopti.log so
+---    HS, MLX server output, Ollama server output and any other subsystem land
+---    in a single rotating file the user can tail. The file is truncated
+---    automatically on the first log of a new day so it never grows unbounded.
 --- ==============================================================================
 
 local M = {}
 local hs = hs
+
+-- Single rotating file for the whole stack. MLX / Ollama subprocesses append
+-- here too via shell redirection (see models_manager_mlx.lua / api_ollama.lua).
+M.UNIFIED_LOG_FILE = "/tmp/ergopti.log"
 
 
 
@@ -117,6 +125,87 @@ end
 -- Stores the variant so the summary line uses the same color/label as the suppressed messages.
 local _dedup = { line = nil, count = 0, variant_key = nil }
 
+
+
+
+-- ===========================================
+-- ===========================================
+-- ======= 3.1) Unified File Sink Helpers ====
+-- ===========================================
+
+-- File sink state — opened lazily on first write, kept open for the life of
+-- the Hammerspoon process to avoid open/close overhead on every log line.
+-- _last_log_date carries the YYYY-MM-DD of the last write so we can detect a
+-- day rollover and truncate the file to keep it bounded to one day at a time.
+local _file_handle    = nil
+local _last_log_date  = nil
+
+--- Returns an open file handle to the unified log file, ready for append. On
+--- the very first call of a new calendar day, the file is truncated so daily
+--- rotation happens transparently without any external rotation daemon. Also
+--- handles the cold-start case: if Hammerspoon starts up and finds an
+--- existing log file from a previous day, it gets truncated before the first
+--- new line is written.
+--- @return file*|nil The open handle, or nil if the file could not be opened.
+local function _ensure_log_file()
+	local today = os.date("%Y-%m-%d")
+
+	-- Hot path: handle still valid for the same calendar day
+	if _file_handle and _last_log_date == today then
+		return _file_handle
+	end
+
+	-- Either first call of the session or the day just rolled over
+	if _file_handle then
+		pcall(function() _file_handle:close() end)
+		_file_handle = nil
+	end
+
+	local should_truncate = true
+	if _last_log_date == nil then
+		-- First write this session: keep yesterday's log only if its mtime
+		-- is from today (e.g. Hammerspoon was reloaded mid-day)
+		local attrs = (hs and hs.fs and hs.fs.attributes) and hs.fs.attributes(M.UNIFIED_LOG_FILE) or nil
+		if attrs and attrs.modification then
+			local file_date = os.date("%Y-%m-%d", attrs.modification)
+			if file_date == today then should_truncate = false end
+		else
+			-- File does not exist — open in append mode (which creates it)
+			should_truncate = false
+		end
+	end
+
+	local mode = should_truncate and "w" or "a"
+	local ok, fh = pcall(io.open, M.UNIFIED_LOG_FILE, mode)
+	if not ok or not fh then return nil end
+	_file_handle   = fh
+	_last_log_date = today
+
+	-- Stamp every truncation / fresh open with a session header so the user
+	-- can tell where one Hammerspoon session ends and the next one begins
+	pcall(function()
+		fh:write("\n", "===== ", os.date("%Y-%m-%d %H:%M:%S"),
+			" — Ergopti unified log opened (mode=", mode, ") =====", "\n")
+		fh:flush()
+	end)
+	return _file_handle
+end
+
+--- Appends a single already-formatted log line to the unified file with a
+--- compact HH:MM:SS prefix. Each call is line-flushed so a tail -f sees output
+--- in real time and an unexpected Hammerspoon crash does not lose buffered
+--- entries. Failures are silent on purpose: we never want logging to abort the
+--- caller's work, e.g. when /tmp is full.
+--- @param line string The fully-formatted line to append.
+local function _write_to_file(line)
+	local fh = _ensure_log_file()
+	if not fh then return end
+	pcall(function()
+		fh:write(os.date("%H:%M:%S "), line, "\n")
+		fh:flush()
+	end)
+end
+
 --- Emits a count summary using the same variant as the suppressed messages, then resets state.
 local function _flush_dedup_summary()
 	if _dedup.count == 0 then return end
@@ -130,6 +219,7 @@ local function _flush_dedup_summary()
 	else
 		print(summary)
 	end
+	_write_to_file(summary)
 	_dedup.count       = 0
 	_dedup.line        = nil
 	_dedup.variant_key = nil
@@ -177,6 +267,9 @@ local function _log(variant_key, module_name, msg, ...)
 	else
 		print(line)
 	end
+
+	-- Mirror to the unified rotating file so the user has a single tail target
+	_write_to_file(line)
 end
 
 --- Logs a DEBUG message — verbose detail for development and troubleshooting.

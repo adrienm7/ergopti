@@ -49,7 +49,7 @@ M.DEFAULT_STATE = {
 	llm_active_profile    = "basic",
 	-- Bridge behavioral flags (read by llm_bridge, overridden by menu_llm at startup)
 	llm_reset_on_nav      = true,
-	llm_after_hotstring   = false,
+	llm_after_hotstring   = true,
 	llm_auto_raise_temp   = false, -- Incrementally raise temperature for each extra prediction
 	llm_streaming             = true,  -- Token-by-token streaming
 	llm_streaming_multi       = true,  -- Show predictions as they arrive when num_predictions > 1 (otherwise wait for all to complete before showing any)
@@ -135,15 +135,48 @@ function M.warm_up_connections()
 	end)
 end
 
+--- Returns the active API engine based on the current backend state.
+--- Defined here (early in the file) because warmup_model and cancel_streaming
+--- need to reference it; Lua locals are only visible after their declaration,
+--- so placing this later silently turns get_api into a nil global lookup that
+--- fails the first time it is called.
+--- @return table The specific backend module object.
+local function get_api()
+	if CoreState.backend == "mlx" then
+		return ApiMlx
+	end
+	return ApiOllama
+end
+
 --- Primes the backend model and its KV cache with the active profile's system prompt.
 --- Must be called after both model and profile are configured; runs async so it does
 --- not block the caller.
 --- @param model_name string The backend-specific model identifier.
 --- @param profile table|nil The active profile object; omit to use a minimal ping.
 function M.warmup_model(model_name, profile)
-	if type(model_name) ~= "string" or model_name == "" then return end
+	if type(model_name) ~= "string" or model_name == "" then
+		Logger.debug(LOG, "warmup_model: skipped — model_name is empty.")
+		return
+	end
 	local resolved_profile = profile or M.get_active_profile()
-	pcall(function() get_api().warmup(model_name, resolved_profile) end)
+	Logger.debug(LOG, "warmup_model: dispatching to backend '%s' for model '%s'.",
+		tostring(CoreState.backend), tostring(model_name))
+	local ok, err = pcall(function() get_api().warmup(model_name, resolved_profile) end)
+	if not ok then
+		Logger.warn(LOG, "warmup_model: backend warmup raised: %s", tostring(err))
+	end
+end
+
+--- Returns true when the active backend has confirmed it can answer inference
+--- requests (model loaded, server responsive). The prediction engine uses this
+--- to gate the loading tooltip and request dispatch — without it, the spinner
+--- shows even while the MLX server is still loading model weights and would
+--- never produce a prediction in time.
+--- @return boolean
+function M.is_backend_ready()
+	local api = get_api()
+	if type(api.is_ready) ~= "function" then return true end
+	return api.is_ready() == true
 end
 
 -- Defer backend detection entirely off the synchronous init path
@@ -288,15 +321,6 @@ function M.set_user_profiles(profiles_table)
 	if type(profiles_table) == "table" then
 		CoreState.user_profiles = profiles_table
 	end
-end
-
---- Returns the active API engine based on the current backend state.
---- @return table The specific backend module object.
-local function get_api()
-	if CoreState.backend == "mlx" then
-		return ApiMlx
-	end
-	return ApiOllama
 end
 
 --- Initiates a new LLM prediction request, selecting the optimal fetch strategy based on profile state.

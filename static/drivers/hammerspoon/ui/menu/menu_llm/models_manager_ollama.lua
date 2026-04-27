@@ -138,8 +138,18 @@ function M.new(deps, presets, ram_getter)
 		local ollama_bin = get_ollama_path()
 		if not ollama_bin or ollama_bin == "" then return false end
 		
-		-- Launch daemon via bash nohup to ensure it survives subprocess termination
-		local ok = pcall(hs.execute, "nohup " .. ollama_bin .. " serve > /tmp/ollama.serve.log 2>&1 &")
+		-- Launch daemon via bash nohup to ensure it survives subprocess termination,
+		-- and funnel its output into the unified Ergopti log with an
+		-- [OLLAMA-SERVER] prefix (single tail target for the whole stack).
+		-- Uses a `while read` loop instead of awk: macOS' default BWK awk
+		-- lacks gawk's strftime() / fflush(file) builtins, so the previous
+		-- awk pipeline crashed on the first line and killed ollama on SIGPIPE.
+		local ok = pcall(hs.execute,
+			"nohup bash -c \"" .. ollama_bin .. " serve 2>&1 | " ..
+			"while IFS= read -r LINE; do " ..
+			"printf '%s [OLLAMA-SERVER] %s\\n' \\\"\\$(date +%H:%M:%S)\\\" \\\"\\$LINE\\\" " ..
+			">> /tmp/ergopti.log; " ..
+			"done\" &")
 		return ok == true
 	end
 
