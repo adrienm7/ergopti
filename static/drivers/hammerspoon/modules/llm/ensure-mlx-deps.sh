@@ -15,10 +15,9 @@
 # FEATURES:
 # 1. Project venv first: prefers $PROJECT_ROOT/.venv over system Python so the
 #    same interpreter that runs `mlx_lm.server` is the one we maintain.
-# 2. Install-only: only installs missing packages; never upgrades installed ones
-#    on its own initiative. Auto-upgrade is handled by the MLX models manager
-#    (models_manager_mlx.lua) which runs `pip install --upgrade --no-cache-dir
-#    mlx-lm` only when a model crash signals an architecture mismatch.
+# 2. Version-pinned install: only installs missing packages at the pinned version
+#    (mlx-lm==0.31.3). Never upgrades automatically — version bumps require an
+#    explicit user action (menu entry or manual pip invocation).
 # 3. Safe for repeated runs: silent when nothing changes, loud when it heals.
 # ==============================================================================
 
@@ -105,7 +104,7 @@ PY
 # install only what is missing, surface the installed versions clearly, and
 # leave version bumps to an explicit user action (e.g. a menu entry).
 INSTALL_IF_MISSING=(
-	"mlx-lm"
+	"mlx-lm==0.31.3"
 	"huggingface_hub"
 	"hf_transfer"
 	"safetensors"

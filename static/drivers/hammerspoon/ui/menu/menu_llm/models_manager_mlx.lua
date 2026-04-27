@@ -37,17 +37,8 @@ local HF_TOKEN_FILE = (os.getenv("HOME") or "") .. "/.huggingface/token"
 function M.new(deps, presets)
 	local obj = {}
 	deps.active_tasks = deps.active_tasks or {}
-	obj._mlx_upgrade_attempted = {}
-	obj._mlx_upgrade_done = false
-	obj._mlx_upgrade_failed = false
-	obj._mlx_upgrade_in_progress = false
-	obj._mlx_upgrade_waiters = {}
 	obj._installed_cache = nil
 	obj._installed_cache_ts = 0
-	-- Per-model guard against infinite "crash → upgrade → crash" loops:
-	-- once we've tried to recover from a crash for a given model, don't try
-	-- again until Hammerspoon is reloaded
-	obj._auto_recovery_attempted = {}
 
 	local module_source = debug.getinfo(1, "S").source:sub(2)
 	local project_root = module_source:match("^(.*)/static/drivers/hammerspoon/ui/menu/menu_llm/models_manager_mlx%.lua$")
@@ -91,161 +82,6 @@ function M.new(deps, presets)
 		fh:close()
 		local token = raw and raw:match("^%s*(.-)%s*$") or ""
 		return token ~= "" and token or nil
-	end
-
-	--- @param on_done function|nil Callback invoked with (ok:boolean) once the upgrade resolves.
-	--- @param force boolean|nil When true, bypass the cached "already done" state and re-run.
-	---        Used by the crash-recovery path: a previous successful upgrade may still
-	---        leave the server unable to load a freshly published model, so we force a
-	---        second attempt with the very latest wheels.
-	local function upgrade_mlx_stack(on_done, force)
-		if force then
-			obj._mlx_upgrade_done = false
-			obj._mlx_upgrade_failed = false
-		end
-
-		if type(on_done) == "function" then
-			table.insert(obj._mlx_upgrade_waiters, on_done)
-		end
-
-		if obj._mlx_upgrade_done then
-			local waiters = obj._mlx_upgrade_waiters
-			obj._mlx_upgrade_waiters = {}
-			for _, cb in ipairs(waiters) do pcall(cb, true) end
-			return
-		end
-
-		if obj._mlx_upgrade_in_progress then return end
-		obj._mlx_upgrade_in_progress = true
-
-		local py_detect =
-			-- SSL certs: macOS Python wheels often fail PyPI TLS handshake without these.
-			-- Set unconditionally so pip's --no-cache-dir fetch from pypi.org actually
-			-- succeeds instead of bailing out with a silent SSL error
-			"export SSL_CERT_FILE=/etc/ssl/cert.pem; " ..
-			"export REQUESTS_CA_BUNDLE=/etc/ssl/cert.pem; " ..
-			"export PIP_CERT=/etc/ssl/cert.pem; " ..
-			"export PATH=\"/opt/homebrew/bin:/usr/local/bin:$PATH\"; " ..
-			"PYTHON_BIN=\"python3\"; " ..
-			"if [ -n \"$VIRTUAL_ENV\" ] && [ -x \"$VIRTUAL_ENV/bin/python3\" ]; then PYTHON_BIN=\"$VIRTUAL_ENV/bin/python3\"; " ..
-			"elif [ -x \"" .. project_venv_python_escaped .. "\" ]; then PYTHON_BIN=\"" .. project_venv_python_escaped .. "\"; fi; " ..
-			"if [ \"$PYTHON_BIN\" = \"python3\" ]; then MLX_VENV=\"$HOME/.mlx_py_env\"; python3 -m venv \"$MLX_VENV\" >/dev/null 2>&1 || true; [ -x \"$MLX_VENV/bin/python3\" ] && PYTHON_BIN=\"$MLX_VENV/bin/python3\"; fi; " ..
-			"echo \"[pip] Using Python: $PYTHON_BIN\"; " ..
-			"\"$PYTHON_BIN\" -c 'import sys; print(\"[pip] Python version:\", sys.version)'; " ..
-			"\"$PYTHON_BIN\" -m pip --version 2>&1 | sed 's/^/[pip] /'; " ..
-			"\"$PYTHON_BIN\" -c 'from importlib.metadata import version; print(\"[pip] mlx-lm before upgrade:\", version(\"mlx-lm\"))' 2>&1 || true; "
-
-		local dry_run_cmd = py_detect .. "\"$PYTHON_BIN\" -u -m pip install --disable-pip-version-check --dry-run --upgrade mlx-lm huggingface_hub hf_transfer truststore"
-		-- Force path uses --no-cache-dir so pip fetches fresh metadata from PyPI instead
-		-- of trusting a stale local index that may claim the installed version is already
-		-- latest (which caused the dry-run to exit 0 with no "Would install" output,
-		-- making the upgrade "succeed" in under a second without actually installing anything)
-		local upgrade_cmd = py_detect ..
-			"\"$PYTHON_BIN\" -u -m pip install --disable-pip-version-check" ..
-			(force and " --no-cache-dir" or "") ..
-			" --upgrade mlx-lm huggingface_hub hf_transfer truststore; " ..
-			-- Always print the post-upgrade version so we can correlate the model
-			-- crash with the exact mlx-lm wheel that was loaded
-			"\"$PYTHON_BIN\" -c 'from importlib.metadata import version; print(\"[pip] mlx-lm AFTER upgrade:\", version(\"mlx-lm\"))' 2>&1 || true"
-
-		local function finish_upgrade(ok)
-			if ok then
-				obj._mlx_upgrade_done = true
-				obj._mlx_upgrade_failed = false
-			else
-				obj._mlx_upgrade_failed = true
-			end
-			obj._mlx_upgrade_in_progress = false
-			if deps.active_tasks then deps.active_tasks["mlx_upgrade"] = nil end
-			local waiters = obj._mlx_upgrade_waiters
-			obj._mlx_upgrade_waiters = {}
-			for _, cb in ipairs(waiters) do pcall(cb, ok) end
-		end
-
-		local function cancel_upgrade()
-			local t = deps.active_tasks and deps.active_tasks["mlx_upgrade"]
-			if t and type(t.terminate) == "function" then pcall(function() t:terminate() end) end
-		end
-
-		local function start_real_upgrade()
-			Logger.info(LOG, "Running pip upgrade%s: mlx-lm + huggingface_hub + hf_transfer + truststore…",
-				force and " (force, --no-cache-dir)" or "")
-			local upgrade_task = hs.task.new("/bin/bash", function(ucode)
-				Logger.info(LOG, "pip upgrade exited with code %s.", tostring(ucode))
-				if ucode == 0 then
-					finish_upgrade(true)
-				elseif ucode == 15 then
-					finish_upgrade(false)
-				else
-					finish_upgrade(false)
-				end
-			end, function(_, stdout, stderr)
-				-- Route pip output through Logger so the unified log captures the
-				-- actual install/skip/error messages — invaluable when the upgrade
-				-- "succeeds" too fast to have done any real work
-				local out = (stdout or "")
-				local err = (stderr or "")
-				if out ~= "" then
-					for line in out:gmatch("[^\n]+") do
-						if line:match("%S") then Logger.info(LOG, "[pip] %s", line) end
-					end
-				end
-				if err ~= "" then
-					for line in err:gmatch("[^\n]+") do
-						if line:match("%S") then Logger.warn(LOG, "[pip-err] %s", line) end
-					end
-				end
-				return true
-			end, { "-c", upgrade_cmd })
-
-			if upgrade_task then
-				deps.active_tasks["mlx_upgrade"] = upgrade_task
-				pcall(function() upgrade_task:start() end)
-			else
-				finish_upgrade(false)
-			end
-		end
-
-		-- For forced recovery, skip the dry-run entirely: the dry-run relies on
-		-- pip's local index cache, which may report "already latest" even when PyPI
-		-- has a newer wheel. Go straight to the real install with --no-cache-dir.
-		if force then
-			start_real_upgrade()
-			return
-		end
-
-		local dry_run_out = ""
-		local dry_run_task = hs.task.new("/bin/bash", function(code)
-			local has_updates = dry_run_out:find("Would install", 1, true) ~= nil
-			local dry_run_unsupported = dry_run_out:lower():find("no such option: --dry%-run") ~= nil
-
-			if has_updates then
-				start_real_upgrade()
-				return
-			end
-
-			if code == 0 then
-				finish_upgrade(true)
-				return
-			end
-
-			if dry_run_unsupported then
-				start_real_upgrade()
-				return
-			end
-
-			finish_upgrade(false)
-		end, function(_, stdout, stderr)
-			dry_run_out = dry_run_out .. (stdout or "") .. (stderr or "")
-			return true
-		end, { "-c", dry_run_cmd })
-
-		if dry_run_task then
-			deps.active_tasks["mlx_upgrade"] = dry_run_task
-			pcall(function() dry_run_task:start() end)
-		else
-			finish_upgrade(false)
-		end
 	end
 
 	function obj.get_mlx_repo(model_name)
@@ -530,7 +366,7 @@ PY
 		return installed
 	end
 
-	function obj.start_server(target_model, on_success, opts)
+	function obj.start_server(target_model, on_success, on_cancel, opts)
 		local repo = obj.get_mlx_repo(target_model)
 		if not repo then
 			Logger.warn(LOG, "Cannot start MLX server: no repository found for model %s.", tostring(target_model))
@@ -704,66 +540,17 @@ PY
 				if crash_recovery_triggered then return end
 				crash_recovery_triggered = true
 
-				if obj._auto_recovery_attempted[target_model] then
-					Logger.error(LOG, "MLX server for ‘%s’ crashed again after upgrade — giving up. Reason: %s",
-						tostring(target_model), tostring(reason_line))
-					dump_mlx_server_log("MLX 2ᵉ crash (giving up) for ‘" .. tostring(target_model) .. "’")
-					if not silent_notifications then
-						pcall(notifications.notify, "❌ MLX incompatible",
-							"Le modèle " .. tostring(target_model) ..
-							" n'est pas compatible avec la version actuelle de mlx-lm. Voir les logs.")
-					end
-					return
-				end
-				obj._auto_recovery_attempted[target_model] = true
-
-				Logger.warn(LOG,
-					"MLX server crash detected for ‘%s’ (%s) — forcing mlx-lm upgrade and restart…",
+				Logger.error(LOG, "MLX server for ‘%s’ crashed — giving up. Reason: %s",
 					tostring(target_model), tostring(reason_line))
-				dump_mlx_server_log("MLX 1er crash (will retry) for ‘" .. tostring(target_model) .. "’")
+				dump_mlx_server_log("MLX crash for ‘" .. tostring(target_model) .. "’")
 				if not silent_notifications then
-					pcall(notifications.notify, "⚙️ MLX auto-réparation",
-						"Mise à jour de mlx-lm puis redémarrage du serveur pour " ..
-						tostring(target_model) .. "…")
+					pcall(notifications.notify, "❌ MLX incompatible",
+						"Le modèle " .. tostring(target_model) ..
+						" n’est pas compatible avec mlx-lm. Choisissez un autre modèle.")
 				end
-
-				-- Tear down the current server task so port 8080 is free for the restart.
-				-- We deliberately do not capture the outer `task` local here — it is
-				-- declared a few lines below this closure, so Lua would resolve
-				-- it as a global (nil) at parse time. Going through deps.active_tasks
-				-- avoids the forward-reference and is exactly what we want anyway.
-				local existing = deps.active_tasks and deps.active_tasks["mlx_server"] or nil
-				if existing then
-					pcall(function() existing:terminate() end)
-					deps.active_tasks["mlx_server"] = nil
-				end
-				if obj._server_target == target_model then obj._server_target = nil end
-
-				-- Force-upgrade the MLX stack (bypasses the cached upgrade-done flag),
-				-- then restart the server for the same model. The startup callback
-				-- given on the original call is preserved so the caller still gets
-				-- notified once recovery succeeds.
-				local original_on_success = on_success
-				on_success = nil
-				upgrade_mlx_stack(function(ok)
-					if not ok then
-						Logger.error(LOG, "MLX auto-recovery: upgrade failed for ‘%s’.", tostring(target_model))
-						if not silent_notifications then
-							pcall(notifications.notify, "❌ MLX upgrade KO",
-								"Impossible de mettre à jour mlx-lm. Vérifiez votre connexion.")
-						end
-						return
-					end
-					Logger.info(LOG, "MLX auto-recovery: upgrade succeeded — restarting server for ‘%s’.",
-						tostring(target_model))
-					-- A newly installed mlx-lm wheel may expose different HTTP routes than
-					-- the pre-upgrade server; reset cached discovery so the next warmup
-					-- re-probes the live routes instead of reusing stale paths
-					if type(ApiMlx.reset_endpoints) == "function" then
-						ApiMlx.reset_endpoints()
-					end
-					obj.start_server(target_model, original_on_success, opts)
-				end, true)
+				-- Release the caller’s prediction lock so the user can switch to a working
+				-- model without having to reload Hammerspoon
+				if on_cancel then pcall(on_cancel) end
 			end
 
 			local task = hs.task.new("/bin/bash", function(code)
@@ -1330,11 +1117,7 @@ PY
 			end
 		end
 
-		-- Step 0: Ensure MLX stack is upgraded before starting the download
-		pcall(notifications.notify, "⚙️ Préparation MLX", "Vérification des mises à jour des dépendances…")
-		upgrade_mlx_stack(function()
-			_internal_pull()
-		end)
+		_internal_pull()
 	end
 
 	--- Reattaches the download UI and log tail to an already-running detached Python download.
@@ -1494,7 +1277,7 @@ PY
 			local installed = obj.get_installed_models()
 			if installed[target_model] then
 				Logger.info(LOG, "MLX model %s is installed. Starting server…", tostring(target_model))
-				obj.start_server(target_model, on_success, opts)
+				obj.start_server(target_model, on_success, on_cancel, opts)
 			else
 				Logger.warn(LOG, "MLX model %s not detected as installed. Starting download flow…", tostring(target_model))
 				local repo = obj.get_mlx_repo(target_model)

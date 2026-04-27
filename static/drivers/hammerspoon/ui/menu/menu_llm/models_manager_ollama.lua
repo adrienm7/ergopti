@@ -473,28 +473,10 @@ function M.new(deps, presets, ram_getter)
 				local requires_upgrade = needs_ollama_upgrade(pull_output)
 				local connection_error = pull_output:lower():find("could not connect") or pull_output:lower():find("connection refused")
 				
-				if requires_upgrade and not obj._ollama_upgrade_attempted[repo] then
-					obj._ollama_upgrade_attempted[repo] = true
-					pcall(notifications.notify, "⚙️ Mise à jour Ollama", "Version trop ancienne détectée. Mise à jour automatique en cours…")
-					update_progress_ui(0, "Mise à jour d’Ollama en cours…")
-
-					upgrade_ollama_stack(function(ok_upgrade, manual_required)
-						if ok_upgrade then
-							pcall(notifications.notify, "✅ Ollama mis à jour", "Relance du téléchargement du modèle…")
-							hs.timer.doAfter(0.4, function()
-								obj.pull_model(target_model, repo, on_success)
-							end)
-							return
-						end
-
-						if manual_required then
-							pcall(hs.urlevent.openURL, "https://ollama.com/download")
-							pcall(notifications.notify, "⚠️ Mise à jour Ollama requise", "Installation manuelle requise. Téléchargez la dernière version puis relancez")
-						else
-							pcall(notifications.notify, "❌ Échec mise à jour Ollama", "Impossible de mettre à jour automatiquement Ollama")
-						end
-					end)
-					return
+				if requires_upgrade then
+					pcall(notifications.notify, "⚠️ Mise à jour Ollama requise",
+						"La version d’Ollama installée est trop ancienne pour ce modèle. Mettez à jour Ollama manuellement.")
+					complete_progress_ui(false, target_model)
 				elseif connection_error then
 					pcall(notifications.notify, "❌ Échec Ollama", "Le service Ollama a cessé de répondre.")
 					complete_progress_ui(false, target_model)
