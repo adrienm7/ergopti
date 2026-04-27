@@ -15,6 +15,7 @@ local hs            = hs
 local notifications = require("lib.notifications")
 local ui_builder = require("ui.ui_builder")
 local Logger = require("lib.logger")
+local ApiMlx = require("modules.llm.api_mlx")
 
 local LOG = "menu_llm.mlx"
 
@@ -43,6 +44,10 @@ function M.new(deps, presets)
 	obj._mlx_upgrade_waiters = {}
 	obj._installed_cache = nil
 	obj._installed_cache_ts = 0
+	-- Per-model guard against infinite "crash → upgrade → crash" loops:
+	-- once we've tried to recover from a crash for a given model, don't try
+	-- again until Hammerspoon is reloaded
+	obj._auto_recovery_attempted = {}
 
 	local module_source = debug.getinfo(1, "S").source:sub(2)
 	local project_root = module_source:match("^(.*)/static/drivers/hammerspoon/ui/menu/menu_llm/models_manager_mlx%.lua$")
@@ -88,7 +93,17 @@ function M.new(deps, presets)
 		return token ~= "" and token or nil
 	end
 
-	local function upgrade_mlx_stack(on_done)
+	--- @param on_done function|nil Callback invoked with (ok:boolean) once the upgrade resolves.
+	--- @param force boolean|nil When true, bypass the cached "already done" state and re-run.
+	---        Used by the crash-recovery path: a previous successful upgrade may still
+	---        leave the server unable to load a freshly published model, so we force a
+	---        second attempt with the very latest wheels.
+	local function upgrade_mlx_stack(on_done, force)
+		if force then
+			obj._mlx_upgrade_done = false
+			obj._mlx_upgrade_failed = false
+		end
+
 		if type(on_done) == "function" then
 			table.insert(obj._mlx_upgrade_waiters, on_done)
 		end
@@ -104,13 +119,34 @@ function M.new(deps, presets)
 		obj._mlx_upgrade_in_progress = true
 
 		local py_detect =
+			-- SSL certs: macOS Python wheels often fail PyPI TLS handshake without these.
+			-- Set unconditionally so pip's --no-cache-dir fetch from pypi.org actually
+			-- succeeds instead of bailing out with a silent SSL error
+			"export SSL_CERT_FILE=/etc/ssl/cert.pem; " ..
+			"export REQUESTS_CA_BUNDLE=/etc/ssl/cert.pem; " ..
+			"export PIP_CERT=/etc/ssl/cert.pem; " ..
+			"export PATH=\"/opt/homebrew/bin:/usr/local/bin:$PATH\"; " ..
 			"PYTHON_BIN=\"python3\"; " ..
 			"if [ -n \"$VIRTUAL_ENV\" ] && [ -x \"$VIRTUAL_ENV/bin/python3\" ]; then PYTHON_BIN=\"$VIRTUAL_ENV/bin/python3\"; " ..
 			"elif [ -x \"" .. project_venv_python_escaped .. "\" ]; then PYTHON_BIN=\"" .. project_venv_python_escaped .. "\"; fi; " ..
-			"if [ \"$PYTHON_BIN\" = \"python3\" ]; then MLX_VENV=\"$HOME/.mlx_py_env\"; python3 -m venv \"$MLX_VENV\" >/dev/null 2>&1 || true; [ -x \"$MLX_VENV/bin/python3\" ] && PYTHON_BIN=\"$MLX_VENV/bin/python3\"; fi; "
+			"if [ \"$PYTHON_BIN\" = \"python3\" ]; then MLX_VENV=\"$HOME/.mlx_py_env\"; python3 -m venv \"$MLX_VENV\" >/dev/null 2>&1 || true; [ -x \"$MLX_VENV/bin/python3\" ] && PYTHON_BIN=\"$MLX_VENV/bin/python3\"; fi; " ..
+			"echo \"[pip] Using Python: $PYTHON_BIN\"; " ..
+			"\"$PYTHON_BIN\" -c 'import sys; print(\"[pip] Python version:\", sys.version)'; " ..
+			"\"$PYTHON_BIN\" -m pip --version 2>&1 | sed 's/^/[pip] /'; " ..
+			"\"$PYTHON_BIN\" -c 'from importlib.metadata import version; print(\"[pip] mlx-lm before upgrade:\", version(\"mlx-lm\"))' 2>&1 || true; "
 
-		local dry_run_cmd = py_detect .. "$PYTHON_BIN -u -m pip install --disable-pip-version-check --dry-run --upgrade mlx-lm huggingface_hub hf_transfer truststore"
-		local upgrade_cmd = py_detect .. "$PYTHON_BIN -u -m pip install --disable-pip-version-check --upgrade mlx-lm huggingface_hub hf_transfer truststore"
+		local dry_run_cmd = py_detect .. "\"$PYTHON_BIN\" -u -m pip install --disable-pip-version-check --dry-run --upgrade mlx-lm huggingface_hub hf_transfer truststore"
+		-- Force path uses --no-cache-dir so pip fetches fresh metadata from PyPI instead
+		-- of trusting a stale local index that may claim the installed version is already
+		-- latest (which caused the dry-run to exit 0 with no "Would install" output,
+		-- making the upgrade "succeed" in under a second without actually installing anything)
+		local upgrade_cmd = py_detect ..
+			"\"$PYTHON_BIN\" -u -m pip install --disable-pip-version-check" ..
+			(force and " --no-cache-dir" or "") ..
+			" --upgrade mlx-lm huggingface_hub hf_transfer truststore; " ..
+			-- Always print the post-upgrade version so we can correlate the model
+			-- crash with the exact mlx-lm wheel that was loaded
+			"\"$PYTHON_BIN\" -c 'from importlib.metadata import version; print(\"[pip] mlx-lm AFTER upgrade:\", version(\"mlx-lm\"))' 2>&1 || true"
 
 		local function finish_upgrade(ok)
 			if ok then
@@ -132,7 +168,10 @@ function M.new(deps, presets)
 		end
 
 		local function start_real_upgrade()
+			Logger.info(LOG, "Running pip upgrade%s: mlx-lm + huggingface_hub + hf_transfer + truststore…",
+				force and " (force, --no-cache-dir)" or "")
 			local upgrade_task = hs.task.new("/bin/bash", function(ucode)
+				Logger.info(LOG, "pip upgrade exited with code %s.", tostring(ucode))
 				if ucode == 0 then
 					finish_upgrade(true)
 				elseif ucode == 15 then
@@ -141,8 +180,21 @@ function M.new(deps, presets)
 					finish_upgrade(false)
 				end
 			end, function(_, stdout, stderr)
-				local out = (stdout or "") .. (stderr or "")
-				if out ~= "" then print("[MLX Upgrade] " .. out) end
+				-- Route pip output through Logger so the unified log captures the
+				-- actual install/skip/error messages — invaluable when the upgrade
+				-- "succeeds" too fast to have done any real work
+				local out = (stdout or "")
+				local err = (stderr or "")
+				if out ~= "" then
+					for line in out:gmatch("[^\n]+") do
+						if line:match("%S") then Logger.info(LOG, "[pip] %s", line) end
+					end
+				end
+				if err ~= "" then
+					for line in err:gmatch("[^\n]+") do
+						if line:match("%S") then Logger.warn(LOG, "[pip-err] %s", line) end
+					end
+				end
 				return true
 			end, { "-c", upgrade_cmd })
 
@@ -152,6 +204,14 @@ function M.new(deps, presets)
 			else
 				finish_upgrade(false)
 			end
+		end
+
+		-- For forced recovery, skip the dry-run entirely: the dry-run relies on
+		-- pip's local index cache, which may report "already latest" even when PyPI
+		-- has a newer wheel. Go straight to the real install with --no-cache-dir.
+		if force then
+			start_real_upgrade()
+			return
 		end
 
 		local dry_run_out = ""
@@ -520,9 +580,20 @@ PY
 			end
 
 			obj._server_target = target_model
-			Logger.info(LOG, "Starting MLX server process for model %s…", tostring(target_model))
-
-			local server_log_file = "/tmp/hs_mlx_server_" .. tostring(math.random(1000,9999)) .. ".log"
+			-- The new server process may run a different mlx-lm version or be
+			-- configured for different routes than the previous one; clear the
+			-- cached discovery result so the first warmup re-probes rather than
+			-- reusing stale endpoint paths that return 404 for this new server
+			if type(ApiMlx.reset_endpoints) == "function" then
+				ApiMlx.reset_endpoints()
+			end
+			-- All MLX server output is funneled into the unified Ergopti log so
+			-- the user has a single tail target. Each line is prefixed
+			-- [MLX-SERVER] downstream so it stands out from Hammerspoon's own
+			-- log entries.
+			local unified_log_file = "/tmp/ergopti.log"
+			Logger.info(LOG, "Starting MLX server process for model %s — output prefixed [MLX-SERVER] in %s",
+				tostring(target_model), unified_log_file)
 			local startup_confirmed = false
 			local startup_closed = false
 
@@ -547,6 +618,22 @@ PY
 				end)
 			end
 
+			-- Every line of MLX stdout/stderr gets:
+			--   1. timestamped + prefixed [MLX-SERVER] by a small bash
+			--      `while read` loop. The previous awk-based version used
+			--      `strftime()` and `fflush(file)` which are gawk extensions
+			--      not supported by macOS' default BWK awk — the awk crashed
+			--      on the first line, the pipe closed, and the whole MLX
+			--      server died on SIGPIPE before producing any output.
+			--   2. appended to the unified Ergopti log via `tee -a`
+			--   3. ALSO emitted on the bash task's stdout (tee writes both)
+			--      so the existing stream callback (server_log_buffer /
+			--      crash detector / ready probe) keeps working unchanged.
+			local prefix_pipe =
+				"while IFS= read -r LINE; do " ..
+				"printf '%s [MLX-SERVER] %s\\n' \"$(date +%H:%M:%S)\" \"$LINE\" " ..
+				"| tee -a " .. unified_log_file .. "; " ..
+				"done"
 			local bash_cmd =
 				"set -o pipefail; " ..
 				"export PATH=\"/opt/homebrew/bin:/usr/local/bin:$PATH\"; " ..
@@ -560,10 +647,125 @@ PY
 				"if [ \"$PYTHON_BIN\" = \"python3\" ]; then MLX_VENV=\"$HOME/.mlx_py_env\"; [ -x \"$MLX_VENV/bin/python3\" ] && PYTHON_BIN=\"$MLX_VENV/bin/python3\"; fi; " ..
 				"echo \"[MLX] Python utilisé: $PYTHON_BIN\"; " ..
 				"pids=$(lsof -tiTCP:8080 -sTCP:LISTEN 2>/dev/null); [ -n \"$pids\" ] && kill -9 $pids 2>/dev/null; sleep 0.3; " ..
-				"$PYTHON_BIN -m mlx_lm server --model " .. repo .. " 2>&1 | tee \"" .. server_log_file .. "\""
+				"$PYTHON_BIN -m mlx_lm server --model " .. repo .. " 2>&1 | " .. prefix_pipe
 
 			local server_last_line = ""
 			local server_log_buffer = {}
+			local crash_recovery_triggered = false
+
+			-- Auto-recovery: when mlx_lm.server crashes loading the model (most often
+			-- because HuggingFace shipped a new architecture / quantization format
+			-- the local mlx-lm wheel does not yet understand), we get a Python
+			-- traceback in the server stdout but the HTTP listener stays up and
+			-- every request hangs forever. Detect those signature errors, kill the
+			-- server, force-upgrade the MLX stack, and restart — once per model
+			-- per Hammerspoon session to avoid loops.
+			local function looks_like_arch_mismatch(text)
+				if type(text) ~= "string" or text == "" then return false end
+				-- Only match patterns that PROVE a model-loading failure. Earlier we
+				-- also matched the bare 'Exception in thread Thread-1 (_generate)'
+				-- header, which turned out to be a false positive: mlx-lm prints
+				-- that line whenever its background generation thread sees an
+				-- unexpected request (e.g. a 404 due to an endpoint route mismatch),
+				-- and our recovery would then needlessly tear down a perfectly
+				-- healthy server that just had a routing problem we should fix
+				-- elsewhere.
+				return text:find("Received %d+ parameters not in model")  ~= nil
+				    or text:find("Missing %d+ parameters")                 ~= nil
+				    or text:find("Unsupported model type",      1, true)   ~= nil
+				    or text:find("ModuleNotFoundError",         1, true)   ~= nil
+				    or text:find("ImportError",                 1, true)   ~= nil
+			end
+
+			--- Dumps the in-memory ring buffer (last ~15 lines captured live from
+			--- the MLX server stdout) into the Hammerspoon log so the Python
+			--- traceback header that triggered the crash detection lands in the
+			--- same log file as everything else. The full server output is
+			--- separately mirrored line-by-line into /tmp/ergopti.log via the
+			--- awk prefixer, so the user can grep for [MLX-SERVER] there to see
+			--- the complete trace if they need more than the last 15 lines.
+			local function dump_mlx_server_log(prefix)
+				if #server_log_buffer == 0 then
+					Logger.warn(LOG, "%s — no buffered server lines to dump (tail %s).",
+						prefix, unified_log_file)
+					return
+				end
+				-- Only the summary line fires a notification (via Logger.error);
+			-- individual trace lines use Logger.warn to avoid spamming the user
+			-- with 15 separate macOS notifications for one crash event
+			Logger.error(LOG, "%s — last %d line(s) from MLX server stdout (full trace in %s):",
+					prefix, #server_log_buffer, unified_log_file)
+				for _, line in ipairs(server_log_buffer) do
+					if line:match("%S") then Logger.warn(LOG, "  | %s", line) end
+				end
+			end
+
+			local function trigger_auto_recovery(reason_line)
+				if crash_recovery_triggered then return end
+				crash_recovery_triggered = true
+
+				if obj._auto_recovery_attempted[target_model] then
+					Logger.error(LOG, "MLX server for ‘%s’ crashed again after upgrade — giving up. Reason: %s",
+						tostring(target_model), tostring(reason_line))
+					dump_mlx_server_log("MLX 2ᵉ crash (giving up) for ‘" .. tostring(target_model) .. "’")
+					if not silent_notifications then
+						pcall(notifications.notify, "❌ MLX incompatible",
+							"Le modèle " .. tostring(target_model) ..
+							" n'est pas compatible avec la version actuelle de mlx-lm. Voir les logs.")
+					end
+					return
+				end
+				obj._auto_recovery_attempted[target_model] = true
+
+				Logger.warn(LOG,
+					"MLX server crash detected for ‘%s’ (%s) — forcing mlx-lm upgrade and restart…",
+					tostring(target_model), tostring(reason_line))
+				dump_mlx_server_log("MLX 1er crash (will retry) for ‘" .. tostring(target_model) .. "’")
+				if not silent_notifications then
+					pcall(notifications.notify, "⚙️ MLX auto-réparation",
+						"Mise à jour de mlx-lm puis redémarrage du serveur pour " ..
+						tostring(target_model) .. "…")
+				end
+
+				-- Tear down the current server task so port 8080 is free for the restart.
+				-- We deliberately do not capture the outer `task` local here — it is
+				-- declared a few lines below this closure, so Lua would resolve
+				-- it as a global (nil) at parse time. Going through deps.active_tasks
+				-- avoids the forward-reference and is exactly what we want anyway.
+				local existing = deps.active_tasks and deps.active_tasks["mlx_server"] or nil
+				if existing then
+					pcall(function() existing:terminate() end)
+					deps.active_tasks["mlx_server"] = nil
+				end
+				if obj._server_target == target_model then obj._server_target = nil end
+
+				-- Force-upgrade the MLX stack (bypasses the cached upgrade-done flag),
+				-- then restart the server for the same model. The startup callback
+				-- given on the original call is preserved so the caller still gets
+				-- notified once recovery succeeds.
+				local original_on_success = on_success
+				on_success = nil
+				upgrade_mlx_stack(function(ok)
+					if not ok then
+						Logger.error(LOG, "MLX auto-recovery: upgrade failed for ‘%s’.", tostring(target_model))
+						if not silent_notifications then
+							pcall(notifications.notify, "❌ MLX upgrade KO",
+								"Impossible de mettre à jour mlx-lm. Vérifiez votre connexion.")
+						end
+						return
+					end
+					Logger.info(LOG, "MLX auto-recovery: upgrade succeeded — restarting server for ‘%s’.",
+						tostring(target_model))
+					-- A newly installed mlx-lm wheel may expose different HTTP routes than
+					-- the pre-upgrade server; reset cached discovery so the next warmup
+					-- re-probes the live routes instead of reusing stale paths
+					if type(ApiMlx.reset_endpoints) == "function" then
+						ApiMlx.reset_endpoints()
+					end
+					obj.start_server(target_model, original_on_success, opts)
+				end, true)
+			end
+
 			local task = hs.task.new("/bin/bash", function(code)
 				startup_closed = true
 				if deps.active_tasks and deps.active_tasks["mlx_server"] == task then
@@ -583,6 +785,9 @@ PY
 				end
 
 				if code ~= 0 then
+					-- Look for the most informative line in the in-memory ring buffer
+					-- (last ~15 lines captured live). The full server output is in
+					-- /tmp/ergopti.log behind the [MLX-SERVER] prefix if needed.
 					local error_msg = ""
 					for _, line in ipairs(server_log_buffer) do
 						if line:lower():match("error") or line:match("Traceback") or line:match("Exception") or
@@ -593,24 +798,6 @@ PY
 					end
 					if error_msg == "" and #server_log_buffer > 0 then
 						error_msg = server_log_buffer[#server_log_buffer]
-					end
-
-					if error_msg == "" then
-						local ok_fh, fh = pcall(io.open, server_log_file, "r")
-						if ok_fh and fh then
-							local raw = fh:read("*a") or ""
-							pcall(function() fh:close() end)
-							for line in raw:gmatch("([^\n\r]+)") do
-								if line:match("%S") then
-									if line:lower():match("error") or line:match("Traceback") or line:match("Exception") or
-									   line:match("CUDA") or line:match("RuntimeError") or line:match("ModuleNotFoundError") then
-										error_msg = line
-										break
-									end
-									error_msg = line
-								end
-							end
-						end
 					end
 
 					if error_msg ~= "" then
@@ -631,13 +818,20 @@ PY
 				if out:find("Starting httpd at") or out:find("Uvicorn running on") or out:find("Application startup complete") then
 					mark_server_ready()
 				end
+				-- Lazy-loaded model crashes happen *after* the HTTP listener is up,
+				-- so this detection must run on every stream chunk — not only on
+				-- process exit (the process never exits when this happens)
+				if not crash_recovery_triggered and looks_like_arch_mismatch(out) then
+					trigger_auto_recovery(server_last_line)
+				end
 				return true
 			end, { "-c", bash_cmd })
 
 			if task then
 				deps.active_tasks["mlx_server"] = task
 				pcall(function() task:start() end)
-				probe_server_ready(40)
+				-- 120 retries × 0.5 s = 60 s total; large models can take >30 s to load weights
+				probe_server_ready(120)
 			else
 				Logger.error(LOG, "Failed to create hs.task for MLX server — model ‘%s’ cannot start.", tostring(target_model))
 			end

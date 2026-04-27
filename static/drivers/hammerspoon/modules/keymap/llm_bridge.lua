@@ -392,6 +392,20 @@ function M.update_preview(buf)
 				or _state.groups[mapping.group].enabled
 		end
 
+		-- Repetition star mappings (e.g. "t★ → tt", used by the magic-key
+		-- repeat feature) match nearly every keystroke whose tail char is also
+		-- the previous-to-last char of the replacement. If we let them break
+		-- out of the star loop, they shadow longer non-repetition matches
+		-- further down (e.g. "chatgpt → ChatGPT" lives in the tail bucket and
+		-- never gets a chance). Detect them inline and skip.
+		local repeat_enabled = _state.is_repeat_feature_enabled()
+		local function is_repetition_star(mapping, star_base)
+			if not repeat_enabled then return false end
+			local offset = utf8.offset(star_base, -1)
+			if not offset then return false end
+			return mapping.plain_repl == star_base .. star_base:sub(offset)
+		end
+
 		-- Star-base path first: when a has_magic mapping's star_base matches,
 		-- its preview wins over a shorter non-magic trigger that happens to
 		-- end at the same character, matching the sort-order priority of the
@@ -404,6 +418,7 @@ function M.update_preview(buf)
 					if star_base and star_base ~= ""
 						and ends_with_trigger(buf, star_base, mapping.is_word)
 						and mapping.plain_repl ~= star_base
+						and not is_repetition_star(mapping, star_base)
 					then
 						matched_repl       = mapping.repl
 						matched_plain_repl = mapping.plain_repl
@@ -420,11 +435,11 @@ function M.update_preview(buf)
 			local tail_bucket = Registry.mappings_for_tail(buf_tail_char)
 			if tail_bucket then
 				for _, mapping in ipairs(tail_bucket) do
-					if group_active(mapping)
-						and not (mapping.is_word == false and mapping.auto == true)
-						and ends_with_trigger(buf, mapping.trigger, mapping.is_word)
-						and mapping.plain_repl ~= mapping.trigger
-					then
+					local ga = group_active(mapping)
+					local c2 = not (mapping.is_word == false and mapping.auto == true)
+					local c3 = ends_with_trigger(buf, mapping.trigger, mapping.is_word)
+					local c4 = mapping.plain_repl ~= mapping.trigger
+					if ga and c2 and c3 and c4 then
 						matched_repl       = mapping.repl
 						matched_plain_repl = mapping.plain_repl
 						match_type         = "autocorrect"
@@ -437,16 +452,7 @@ function M.update_preview(buf)
 		end
 	end
 
-	-- Anti-loop guard: discard repetition mappings (trigger → trigger + last_char)
-	-- to prevent the preview from showing a tooltip for the repeat feature itself.
-	local is_repetition = false
-	if matched_repl and _state.is_repeat_feature_enabled() then
-		local ref    = matched_input or last_word
-		local offset = utf8.offset(ref, -1)
-		if offset then is_repetition = (matched_plain_repl == ref .. ref:sub(offset)) end
-	end
-
-	if matched_repl and not is_repetition then
+	if matched_repl then
 		-- Hotstring match found — show the tooltip.
 		M.reset_predictions(true)
 

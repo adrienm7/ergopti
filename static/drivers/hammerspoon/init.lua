@@ -157,12 +157,19 @@ do
 			end
 
 			-- Restore section states
+			-- WHY explicit if/else: in Lua, both `false` and `nil` are falsy, so
+			-- the idiom `cond and X or Y` cannot return `false` reliably and was
+			-- silently writing `false` (disabling every section) at each restart
 			if type(cfg.section_states) == "table" then
 				for grp, secs in pairs(cfg.section_states) do
 					if type(secs) == "table" then
 						for sec_name, enabled in pairs(secs) do
 							local key = "hotstrings_section_" .. grp .. "_" .. sec_name
-							hs.settings.set(key, enabled ~= false and nil or false)
+							if enabled == false then
+								hs.settings.set(key, false)
+							else
+								hs.settings.set(key, nil)
+							end
 						end
 					end
 				end

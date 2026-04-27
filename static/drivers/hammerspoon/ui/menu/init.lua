@@ -205,12 +205,19 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 
 	local function sync_state_to_modules(saved, config_absent)
 		-- Sync section states
+		-- WHY explicit if/else: in Lua, both `false` and `nil` are falsy, so the
+		-- `cond and false or nil` idiom evaluates to `nil` even when sec_enabled
+		-- is `false` (silently re-enabling sections the user had disabled)
 		if type(saved.section_states) == "table" then
 			for group_name, secs in pairs(saved.section_states) do
 				if type(secs) == "table" then
 					for sec_name, sec_enabled in pairs(secs) do
 						local key = "hotstrings_section_" .. tostring(group_name) .. "_" .. tostring(sec_name)
-						pcall(hs.settings.set, key, sec_enabled == false and false or nil)
+						if sec_enabled == false then
+							pcall(hs.settings.set, key, false)
+						else
+							pcall(hs.settings.set, key, nil)
+						end
 					end
 				end
 			end
