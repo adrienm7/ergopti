@@ -12,10 +12,14 @@
 --- FEATURES & RATIONALE:
 --- 1. Eliminates magic numbers scattered across script_control, prediction_engine,
 ---    llm_bridge, watchers, system, generator, keymap, and the tooltip modules.
----  2. Documents the role of each F-key so a new contributor immediately knows
----     why the codebase reserves F13/F17/F18/F19/F20 for synthetic events.
----  3. Stateless and side-effect-free: pure constants, safe to require anywhere
----     without any init pattern.
+--- 2. Documents the role of each F-key so a new contributor immediately knows
+---    why the codebase reserves F13–F17 for sentinels and signals. F-keys are
+---    allocated contiguously starting at F13; future features should consume
+---    F18, F19, F20… in order. The legacy "layer syn" no-op channel — formerly
+---    overlapping F14/F15/F16 — has been relocated to F21/F22/F23 to free the
+---    F13–F17 block for real signal use.
+--- 3. Stateless and side-effect-free: pure constants, safe to require anywhere
+---    without any init pattern.
 --- ==============================================================================
 
 local M = {}
@@ -29,32 +33,40 @@ local M = {}
 -- =====================================
 -- =====================================
 
---- F13 (keycode 105) — Karabiner-emitted "cycle windows in app" hotkey.
---- Bound by modules/karabiner/watchers.lua so the shortcut is layout-independent.
-M.F13_CYCLE_WINDOWS = 105
+--- F13 (keycode 105) — Karabiner sentinel for the "right-command + Return"
+--- script-control slot. Emitted by Karabiner when the user fires the chord
+--- while KE is active; consumed by modules/shortcuts/script_control.lua.
+M.F13_KARABINER_RETURN = 105
 
---- F17 (keycode 64) — synthetic "typing complete" / chain-trigger signal sent
---- by the LLM bridge after applying a prediction. The prediction engine listens
---- for this keycode in handle_chain_signal() to fire the next chained request
---- as soon as the HID queue drains. Distinct from F20 so it cannot be confused
---- with the script-control kill-switch.
-M.F17_LLM_CHAIN_SIGNAL = 64
-
---- F18 (keycode 79) — Karabiner sentinel for the right-command + Backspace
+--- F14 (keycode 107) — Karabiner sentinel for the "right-command + Backspace"
 --- script-control slot. Also reused by modules/shortcuts/actions/system.lua as
 --- a benign keystroke to wake the OS without touching the user's text.
-M.F18_KARABINER_BACKSPACE = 79
+M.F14_KARABINER_BACKSPACE = 107
 
---- F19 (keycode 80) — Karabiner sentinel for the right-command + Return slot,
---- and the physical "layer" key whose hold-and-scroll combination is mapped to
---- system volume up/down by modules/shortcuts/actions/system.lua.
-M.F19_KARABINER_RETURN = 80
+--- F15 (keycode 113) — Karabiner sentinel for the "right-command + Escape"
+--- script-control slot. Reserved as the Hammerspoon kill-switch path — DO NOT
+--- reuse it for any internal signalling, otherwise pressing it manually would
+--- tear down HS.
+M.F15_KARABINER_ESCAPE = 113
 
---- F20 (keycode 90) — Karabiner sentinel for the right-command + Escape slot.
---- Reserved as the Hammerspoon kill-switch path — DO NOT reuse it for any
---- internal "typing complete" signalling, or pressing F20 manually would
---- accidentally fire LLM chains. Use F17 for chain signalling instead.
-M.F20_KARABINER_ESCAPE = 90
+--- F16 (keycode 106) — synthetic "typing complete" / chain-trigger signal sent
+--- by the LLM bridge after applying a prediction. The prediction engine listens
+--- for this keycode in handle_chain_signal() to fire the next chained request
+--- as soon as the HID queue drains. Distinct from the kill-switch sentinel
+--- (F15) so it cannot be confused with a user-driven script-control event.
+M.F16_LLM_CHAIN_SIGNAL = 106
+
+--- F17 (keycode 64) — Karabiner-emitted "cycle windows in app" hotkey.
+--- Bound by modules/karabiner/watchers.lua so the shortcut is layout-independent.
+M.F17_CYCLE_WINDOWS = 64
+
+--- F18 (keycode 79) — currently used by modules/shortcuts/actions/system.lua as
+--- the OS-wake keystroke for the keep-awake jiggler. Free for reassignment.
+M.F18_WAKE_OS = 79
+
+--- F19 (keycode 80) — physical "layer" key whose hold-and-scroll combination is
+--- mapped to system volume up/down by modules/shortcuts/actions/system.lua.
+M.F19_VOLUME_SCROLL_MODIFIER = 80
 
 
 
@@ -76,10 +88,14 @@ M.RETURN = 36
 --- consumed by modules/keymap/init.lua to dismiss predictions.
 M.ESCAPE = 53
 
---- Karabiner synthetic layer keys (107/113/106) — emitted by the active layer
---- when no real action is bound; ignored by keymap/tooltip dispatchers.
-M.LAYER_SYN_1 = 107
-M.LAYER_SYN_2 = 113
-M.LAYER_SYN_3 = 106
+--- Karabiner synthetic layer keys (relocated to F21/F22/F23 — keycodes 131,
+--- 134, 135) — emitted by the active layer when no real action is bound;
+--- ignored by keymap/tooltip dispatchers. Previously sat on 107/113/106
+--- (physical F14/F15/F16) and clashed with the new sentinel block, so they
+--- were moved into the high F-key range that no Apple keyboard exposes
+--- physically.
+M.LAYER_SYN_1 = 131
+M.LAYER_SYN_2 = 134
+M.LAYER_SYN_3 = 135
 
 return M

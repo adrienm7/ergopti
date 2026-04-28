@@ -30,9 +30,9 @@ local Keycodes = require("lib.keycodes")
 local LOG = "karabiner"
 
 -- Sanity reference so the registry stays the canonical source even though
--- hs.hotkey accepts the "f13" string directly. Touching this constant from a
+-- hs.hotkey accepts the "f17" string directly. Touching this constant from a
 -- future remap will surface a stale literal here at module load.
-local _F13_CYCLE_WINDOWS = Keycodes.F13_CYCLE_WINDOWS
+local _F17_CYCLE_WINDOWS = Keycodes.F17_CYCLE_WINDOWS
 
 local KARABINER_CLI = "/Library/Application Support/org.pqrs/Karabiner-Elements/bin/karabiner_cli"
 
@@ -205,16 +205,16 @@ local function cycle_windows_in_app()
 	visible[next_idx]:focus()
 end
 
---- Registers a global hotkey on F13 that cycles windows within the frontmost app.
---- F13 is sent by the 'cycle_windows_in_app' Karabiner action, making the shortcut
+--- Registers a global hotkey on F17 that cycles windows within the frontmost app.
+--- F17 is sent by the 'cycle_windows_in_app' Karabiner action, making the shortcut
 --- layout-independent — no dependency on the macOS Cmd+` binding, which is
 --- unreliable on AZERTY and other non-US keyboard layouts.
---- F13 is used here because F18/F19/F20 are already reserved as script-control
---- sentinels and LLM-chain signals in this codebase.
+--- F17 is used here because F13/F14/F15 are reserved as script-control
+--- sentinels and F16 carries the LLM-chain signal in this codebase.
 --- @return hs.hotkey The enabled hotkey instance.
 function M.start_cycle_windows_hotkey()
-	Logger.trace(LOG, "Registering cycle-windows hotkey (F13)…")
-	local hotkey = hs.hotkey.new({}, "f13", cycle_windows_in_app)
+	Logger.trace(LOG, "Registering cycle-windows hotkey (F17)…")
+	local hotkey = hs.hotkey.new({}, "f17", cycle_windows_in_app)
 	hotkey:enable()
 	Logger.done(LOG, "Cycle-windows hotkey registered.")
 	return hotkey

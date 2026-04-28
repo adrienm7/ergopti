@@ -33,13 +33,13 @@ local Keycodes = require("lib.keycodes")
 
 local LOG = "karabiner"
 
--- Sanity references — Karabiner JSON is built with string sentinels ("f18",
--- "f19", "f20") consumed by Karabiner Elements directly, but the numeric
+-- Sanity references — Karabiner JSON is built with string sentinels ("f13",
+-- "f14", "f15") consumed by Karabiner Elements directly, but the numeric
 -- keycodes that the receiving Hammerspoon modules dispatch on must stay aligned
 -- with lib.keycodes. Touching those constants surfaces a stale literal here.
-local _F18_NUMERIC = Keycodes.F18_KARABINER_BACKSPACE
-local _F19_NUMERIC = Keycodes.F19_KARABINER_RETURN
-local _F20_NUMERIC = Keycodes.F20_KARABINER_ESCAPE
+local _F13_NUMERIC = Keycodes.F13_KARABINER_RETURN
+local _F14_NUMERIC = Keycodes.F14_KARABINER_BACKSPACE
+local _F15_NUMERIC = Keycodes.F15_KARABINER_ESCAPE
 
 -- Always-on rule files loaded in order after CapsWord (which is loaded first
 -- separately to guarantee the highest priority in the KE rule engine).
@@ -92,13 +92,13 @@ local ACTUAL_MODIFIER_KEY_CODES = {
 }
 
 -- Physical key and sentinel outputs for the script-control rules.
--- These values must match the KEYCODE_F18/F19/F20 constants consumed by
+-- These values must match the F13/F14/F15 sentinel constants consumed by
 -- modules/shortcuts/script_control.lua.
 local SCRIPT_CONTROL_HOLDER_KEY     = "right_command"
 local SCRIPT_CONTROL_SENTINEL_SLOTS = {
-	{ from_key = "delete_or_backspace", sentinel = "f18", slot_label = "backspace" },
-	{ from_key = "return_or_enter",     sentinel = "f19", slot_label = "return"    },
-	{ from_key = "escape",              sentinel = "f20", slot_label = "escape"    },
+	{ from_key = "delete_or_backspace", sentinel = "f14", slot_label = "backspace" },
+	{ from_key = "return_or_enter",     sentinel = "f13", slot_label = "return"    },
+	{ from_key = "escape",              sentinel = "f15", slot_label = "escape"    },
 }
 
 

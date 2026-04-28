@@ -403,15 +403,16 @@ local function onKeyDownRaw(e)
 		end
 	end
 
-	-- Ignore Karabiner synthetic layer keys and F13/F17-F20 (used for signaling).
-	if keyCode == Keycodes.F13_CYCLE_WINDOWS
+	-- Ignore Karabiner sentinels (F13/F14/F15), the LLM chain signal (F16),
+	-- the cycle-windows hotkey (F17), and the relocated layer-syn no-op channel.
+	if keyCode == Keycodes.F13_KARABINER_RETURN
+		or keyCode == Keycodes.F14_KARABINER_BACKSPACE
+		or keyCode == Keycodes.F15_KARABINER_ESCAPE
+		or keyCode == Keycodes.F16_LLM_CHAIN_SIGNAL
+		or keyCode == Keycodes.F17_CYCLE_WINDOWS
 		or keyCode == Keycodes.LAYER_SYN_1
 		or keyCode == Keycodes.LAYER_SYN_2
-		or keyCode == Keycodes.LAYER_SYN_3
-		or keyCode == Keycodes.F17_LLM_CHAIN_SIGNAL
-		or keyCode == Keycodes.F18_KARABINER_BACKSPACE
-		or keyCode == Keycodes.F19_KARABINER_RETURN
-		or keyCode == Keycodes.F20_KARABINER_ESCAPE then
+		or keyCode == Keycodes.LAYER_SYN_3 then
 		return false
 	end
 
