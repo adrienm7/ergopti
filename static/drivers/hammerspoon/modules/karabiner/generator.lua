@@ -93,6 +93,14 @@ local SCRIPT_CONTROL_SENTINEL_SLOTS = {
 	{ from_key = "escape",              sentinel = Keycodes.to_name(Keycodes.F15_KARABINER_ESCAPE),    slot_label = "escape"    },
 }
 
+-- Karabiner variable name and value that signal the navigation layer is being
+-- activated. Any action whose karabiner_to sets this variable must first emit
+-- the F20 sentinel so Hammerspoon can distinguish "user is entering the nav
+-- layer" from "user pressed a real key that should dismiss the tooltip".
+local LAYER_ACTIVE_VAR_NAME    = "layer_active"
+local LAYER_ACTIVE_ON_VALUE    = 1
+local LAYER_NAV_SENTINEL_NAME  = Keycodes.to_name(Keycodes.F20_LAYER_NAV_ENTERED)
+
 
 
 
@@ -119,6 +127,57 @@ local function load_json_file(path)
 		return nil
 	end
 	return data
+end
+
+--- Returns true when an event sets layer_active to its "on" value.
+--- @param ev table A karabiner_to event entry.
+--- @return boolean
+local function is_layer_activation_event(ev)
+	if type(ev) ~= "table" or type(ev.set_variable) ~= "table" then return false end
+	return ev.set_variable.name  == LAYER_ACTIVE_VAR_NAME
+	   and ev.set_variable.value == LAYER_ACTIVE_ON_VALUE
+end
+
+--- Returns true when a karabiner_to array activates the navigation layer.
+--- @param to_events table List of karabiner_to events.
+--- @return boolean
+local function activates_nav_layer(to_events)
+	if type(to_events) ~= "table" then return false end
+	for _, ev in ipairs(to_events) do
+		if is_layer_activation_event(ev) then return true end
+	end
+	return false
+end
+
+--- Mutates the available_actions list so every action that activates the
+--- navigation layer (set_variable layer_active=1) emits the F20 sentinel as its
+--- very first karabiner_to event. This guarantees that no matter which physical
+--- key the user binds to such an action (cmd, space-hold, tab-hold, caps_lock,
+--- etc.), Hammerspoon receives F20 before any layer key is consumed.
+---
+--- Idempotent: re-runs are safe because we skip actions whose first event is
+--- already the F20 sentinel.
+--- @param available_actions table List of action definitions (mutated in place).
+local function prepend_nav_layer_sentinel(available_actions)
+	local patched = 0
+	for _, action in ipairs(available_actions) do
+		local to_events = action.karabiner_to
+		if type(to_events) == "table" and activates_nav_layer(to_events) then
+			local first = to_events[1]
+			local already_has_sentinel =
+				type(first) == "table"
+				and first.key_code == LAYER_NAV_SENTINEL_NAME
+			if not already_has_sentinel then
+				table.insert(to_events, 1, { key_code = LAYER_NAV_SENTINEL_NAME })
+				patched = patched + 1
+				Logger.debug(LOG, "Action '%s': prepended F20 sentinel to nav-layer activation.",
+					tostring(action.id))
+			end
+		end
+	end
+	if patched > 0 then
+		Logger.info(LOG, "Prepended F20 sentinel to %d nav-layer-activating action(s).", patched)
+	end
 end
 
 --- Builds an index of action id → action definition.
@@ -561,6 +620,10 @@ end
 --- @param self_dir string Directory containing data/ (init.lua's directory).
 --- @return table Karabiner config table ready for hs.json.encode.
 function M.build_karabiner_json(state, available_actions, tap_hold_keys, mod_combos, non_canonical, self_dir)
+	-- Inject F20 sentinel into every nav-layer-activating action BEFORE indexing,
+	-- so all downstream rule builders (tap/hold, combo, etc.) inherit the sentinel.
+	prepend_nav_layer_sentinel(available_actions)
+
 	local action_index = build_action_index(available_actions)
 	local all_rules    = {}
 	local none_action  = action_index["none"] or { label = "none", karabiner_to = {} }
