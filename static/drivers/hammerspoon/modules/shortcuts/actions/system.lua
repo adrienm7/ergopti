@@ -50,7 +50,7 @@ local KEYCODE_AT_HASH        = 10
 -- The hs.eventtap.keyStroke API accepts the string form, but the actual numeric
 -- keycode is owned by lib.keycodes (sanity-check below).
 local Keycodes               = require("lib.keycodes")
-local _F18_NUMERIC           = Keycodes.F18_KARABINER_BACKSPACE
+local _F18_NUMERIC           = Keycodes.F18_WAKE_OS
 local KEYCODE_F18            = "f18"
 
 -- Keep-awake jitter parameters

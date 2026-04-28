@@ -66,9 +66,9 @@ end
 -- three target keys. Tap actions that happen to emit backspace/return/escape
 -- (e.g. left_command tap → backspace) can NEVER activate these sentinels,
 -- because rule outputs bypass Karabiner's rule engine.
-local KEYCODE_F18 = Keycodes.F18_KARABINER_BACKSPACE
-local KEYCODE_F19 = Keycodes.F19_KARABINER_RETURN
-local KEYCODE_F20 = Keycodes.F20_KARABINER_ESCAPE
+local KEYCODE_RETURN_SENTINEL    = Keycodes.F13_KARABINER_RETURN
+local KEYCODE_BACKSPACE_SENTINEL = Keycodes.F14_KARABINER_BACKSPACE
+local KEYCODE_ESCAPE_SENTINEL    = Keycodes.F15_KARABINER_ESCAPE
 
 -- Physical keycodes used in the Karabiner-paused fallback path below. When KE is
 -- running the sentinels above are the sole dispatch mechanism; this fallback
@@ -241,8 +241,8 @@ end
 --- Handles incoming keyDown events; consumes the event when it matches a configured slot.
 ---
 --- Two independent dispatch paths:
----   1. Sentinel keycodes (F18/F19/F20) — emitted by Karabiner's script-control
----      rules on physical right_command + backspace/return/escape. This is the
+---   1. Sentinel keycodes (F13/F14/F15) — emitted by Karabiner's script-control
+---      rules on physical right_command + return/backspace/escape. This is the
 ---      primary path when KE is running and cannot be spoofed by tap actions,
 ---      because KE rule outputs bypass further rule matching.
 ---   2. Right-command fallback — when KE is paused/killed, physical right_command
@@ -256,17 +256,17 @@ local function handle_key(e)
 	if not ok or type(code) ~= "number" then return false end
 
 	-- Primary path: sentinel keycodes from KE's script-control rules.
-	if code == KEYCODE_F18 then
+	if code == KEYCODE_BACKSPACE_SENTINEL then
 		log_shortcut_if_available("Alt+Backspace")
 		dispatch_action(_key_actions.backspace)
 		return true
 	end
-	if code == KEYCODE_F19 then
+	if code == KEYCODE_RETURN_SENTINEL then
 		log_shortcut_if_available("Alt+Enter")
 		dispatch_action(_key_actions.return_key)
 		return true
 	end
-	if code == KEYCODE_F20 then
+	if code == KEYCODE_ESCAPE_SENTINEL then
 		log_shortcut_if_available("Alt+Escape")
 		dispatch_action(_key_actions.escape)
 		return true
