@@ -29,10 +29,9 @@ local Keycodes = require("lib.keycodes")
 
 local LOG = "karabiner"
 
--- Sanity reference so the registry stays the canonical source even though
--- hs.hotkey accepts the "f17" string directly. Touching this constant from a
--- future remap will surface a stale literal here at module load.
-local _F17_CYCLE_WINDOWS = Keycodes.F17_CYCLE_WINDOWS
+-- hs.hotkey accepts the macOS key name directly, derived here from the
+-- registry numeric keycode so the registry stays the canonical source.
+local KEYCODE_F17_NAME = Keycodes.to_name(Keycodes.F17_CYCLE_WINDOWS)
 
 local KARABINER_CLI = "/Library/Application Support/org.pqrs/Karabiner-Elements/bin/karabiner_cli"
 
@@ -214,7 +213,7 @@ end
 --- @return hs.hotkey The enabled hotkey instance.
 function M.start_cycle_windows_hotkey()
 	Logger.trace(LOG, "Registering cycle-windows hotkey (F17)…")
-	local hotkey = hs.hotkey.new({}, "f17", cycle_windows_in_app)
+	local hotkey = hs.hotkey.new({}, KEYCODE_F17_NAME, cycle_windows_in_app)
 	hotkey:enable()
 	Logger.done(LOG, "Cycle-windows hotkey registered.")
 	return hotkey

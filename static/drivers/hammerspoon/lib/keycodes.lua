@@ -68,6 +68,36 @@ M.F18_WAKE_OS = 79
 --- mapped to system volume up/down by modules/shortcuts/actions/system.lua.
 M.F19_VOLUME_SCROLL_MODIFIER = 80
 
+--- F20 (keycode 90) — Karabiner-emitted "nav layer entered" sentinel. Fired
+--- as the first action of any tap-hold that activates the navigation layer
+--- (regardless of which physical key the user binds — space, left_command,
+--- caps_lock, etc.) so Hammerspoon can distinguish "user is entering the nav
+--- layer" from "user pressed a real key that should dismiss the tooltip".
+--- The keymap dispatcher and the tooltip eventtaps ignore this keycode AND
+--- reset the tooltip auto-dismiss timer when they see it.
+M.F20_LAYER_NAV_ENTERED = 90
+
+
+
+
+-- ========================
+-- ===== 1.1) Helpers =====
+-- ========================
+
+--- Returns the lowercase macOS key name (e.g. "f13", "f20", "spacebar") for a
+--- numeric keycode, by reverse-mapping hs.keycodes.map. Used by callers that
+--- emit JSON destined for Karabiner Elements (which expects textual key names),
+--- so the source of truth stays the numeric registry above and no magic
+--- "f13"/"f20" string ever appears in Lua code.
+--- @param numeric_code integer The macOS HID keycode to translate.
+--- @return string The lowercase key name. Errors if the code is unknown.
+function M.to_name(numeric_code)
+	for name, code in pairs(hs.keycodes.map) do
+		if code == numeric_code then return name end
+	end
+	error(string.format("Keycodes.to_name: unknown keycode %d", numeric_code))
+end
+
 
 
 

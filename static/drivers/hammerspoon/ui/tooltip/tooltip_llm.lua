@@ -25,7 +25,7 @@ local MAC_KEYCODES_NUMBERS = {
 }
 
 local KEY_TAB = 48
-local KEY_RETURN = 36
+local KEY_RETURN = Keycodes.RETURN
 local KEY_ENTER = 76
 local KEY_LEFT_ARROW = 123
 local KEY_UP_ARROW = 126
@@ -256,6 +256,7 @@ local function start_watchers()
 			Keycodes.F15_KARABINER_ESCAPE,
 			Keycodes.F16_LLM_CHAIN_SIGNAL,
 			Keycodes.F17_CYCLE_WINDOWS,
+			Keycodes.F20_LAYER_NAV_ENTERED,
 			Keycodes.LAYER_SYN_1,
 			Keycodes.LAYER_SYN_2,
 			Keycodes.LAYER_SYN_3,

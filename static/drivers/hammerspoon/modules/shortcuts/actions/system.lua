@@ -47,11 +47,11 @@ if not ok_gestures then gestures = nil end
 local KEYCODE_AT_HASH        = 10
 
 -- F18 is unmapped on most keyboards; used as a secondary wake signal for the OS.
--- The hs.eventtap.keyStroke API accepts the string form, but the actual numeric
--- keycode is owned by lib.keycodes (sanity-check below).
+-- The hs.eventtap.keyStroke API accepts the string form, derived here from the
+-- numeric keycode owned by lib.keycodes so the registry remains the single
+-- source of truth.
 local Keycodes               = require("lib.keycodes")
-local _F18_NUMERIC           = Keycodes.F18_WAKE_OS
-local KEYCODE_F18            = "f18"
+local KEYCODE_F18            = Keycodes.to_name(Keycodes.F18_WAKE_OS)
 
 -- Keep-awake jitter parameters
 local AWAKE_TICK_MIN_SEC     = 1     -- Minimum interval between mouse-jitter ticks
@@ -377,7 +377,7 @@ end
 --- @return table Fake-hotkey object with :delete().
 function M.bind_layer_scroll()
 	local layer_held  = false
-	local f19_keycode = hs.keycodes.map["f19"]
+	local f19_keycode = Keycodes.F19_VOLUME_SCROLL_MODIFIER
 
 	local key_tap = hs.eventtap.new(
 		{hs.eventtap.event.types.keyDown, hs.eventtap.event.types.keyUp},
