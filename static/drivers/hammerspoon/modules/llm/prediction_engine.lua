@@ -190,6 +190,27 @@ local _stream_watchdog_timer = nil
 -- True between an accepted prediction and the F16 chain trigger that follows it
 local chain_pending = false
 
+-- ── Streaming timing instrumentation ─────────────────────────────────────────
+-- Captures the round-trip latency at two granularities so the tooltip can
+-- expose both per-prediction and chain-wide timing without ever blocking the
+-- main loop:
+--   * _request_sent_at_s     — set in perform_check() right before the backend
+--                              call dispatches; used as the TTFT origin.
+--   * _first_token_at_s      — set the first time on_partial_cb fires for the
+--                              current request; nil while waiting on the model.
+--   * _chain_first_request_at_s — first backend dispatch of the active chain
+--                              of n predictions. Persists across chained
+--                              perform_check() calls until M.reset_predictions
+--                              clears the chain (i.e. the user typed something
+--                              the chain could not absorb, or all variants
+--                              were exhausted).
+--   * _chain_last_token_at_s — refreshed on every accepted token so it always
+--                              points at the most recent activity in the chain.
+local _request_sent_at_s        = nil
+local _first_token_at_s         = nil
+local _chain_first_request_at_s = nil
+local _chain_last_token_at_s    = nil
+
 -- ── LLM engine configuration ─────────────────────────────────────────────────
 -- Stub values that prevent crashes during the brief startup window before the
 -- menu loads and calls the set_* setters. NOT the user-configured values.
