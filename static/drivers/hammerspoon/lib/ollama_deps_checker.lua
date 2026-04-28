@@ -16,7 +16,7 @@
 ---    silently and we never paint anything on screen.
 --- 3. Granular progress UX: the script emits OLLAMA_INSTALLING /
 ---    OLLAMA_STARTING / OLLAMA_READY markers; we map each to a French
----    step label in the unified llm_progress UI.
+---    step label in the unified download_window UI.
 --- 4. Tri-state lifecycle: callers branch on get_state() ("pending" /
 ---    "ready" / "failed") just like mlx_deps_checker, so menu code can
 ---    treat the two backends with one shared pattern.
@@ -25,7 +25,7 @@
 local M = {}
 local hs           = hs
 local Logger       = require("lib.logger")
-local llm_progress = require("ui.llm_progress")
+local llm_progress = require("ui.download_window")
 
 local LOG = "ollama_deps"
 

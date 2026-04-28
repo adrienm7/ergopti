@@ -7,7 +7,7 @@
 --- static/drivers/hammerspoon/.venv from pyproject.toml on every Hammerspoon
 --- startup. The heavy lifting lives in modules/llm/ensure-mlx-deps.sh; this
 --- module orchestrates the async invocation, streams stdout AND stderr to
---- surface granular progress through the unified llm_progress UI, and
+--- surface granular progress through the unified download_window UI, and
 --- reports the FINAL state to the user.
 ---
 --- FEATURES & RATIONALE:
@@ -18,15 +18,15 @@
 --- 2. Granular progress UX: the script prints identifiable markers
 ---    (UV_INSTALLING, PYTHON_INSTALLING, VENV_CREATING, DEPS_SYNCING) on
 ---    its stdout when about to start each long-running step. We forward
----    each marker to ui.llm_progress.set_step with a French label, and
----    every raw stderr line to ui.llm_progress.set_detail so the user sees
+---    each marker to ui.download_window.set_step with a French label, and
+---    every raw stderr line to ui.download_window.set_detail so the user sees
 ---    live verbose output (uv "Downloading torch (220 MB)…").
 --- 3. Verbose live log: every line of the script's stderr is also
 ---    forwarded to Logger.info so 'tail -f /tmp/ergopti.log' shows the
 ---    same live download progress instead of a 4-minute frozen silence.
 --- 4. Final state reporting: a successful slow-path run posts a final
 ---    "Moteur IA prêt." step then auto-hides 1.5s later. Any failure
----    routes through ui.llm_progress.set_error with the actual stderr
+---    routes through ui.download_window.set_error with the actual stderr
 ---    tail from the script (network down, uv install blocked, etc.) so
 ---    the user sees the real cause.
 --- 5. Non-blocking: full check + install runs in a background hs.task so
@@ -41,7 +41,7 @@
 local M = {}
 local hs           = hs
 local Logger       = require("lib.logger")
-local llm_progress = require("ui.llm_progress")
+local llm_progress = require("ui.download_window")
 
 local LOG = "mlx_deps"
 
@@ -267,7 +267,7 @@ end
 --- asynchronously. The script is hash-gated: a no-op run finishes silently
 --- and the progress UI never appears. A real sync prints SYNC_MARKER_LINE
 --- first and then granular markers per long-running step which we surface
---- through ui.llm_progress.
+--- through ui.download_window.
 function M.check_and_install_deps()
 	Logger.start(LOG, "Bootstrapping MLX virtualenv…")
 	local project_root = resolve_project_root()
