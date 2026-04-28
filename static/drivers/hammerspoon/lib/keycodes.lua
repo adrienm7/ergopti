@@ -118,6 +118,23 @@ M.RETURN = 36
 --- consumed by modules/keymap/init.lua to dismiss predictions.
 M.ESCAPE = 53
 
+--- Tab (keycode 48) — used by the LLM tooltip eventtap to accept the currently
+--- highlighted prediction (mirrors the on_accept path).
+M.TAB = 48
+
+--- Numpad Enter (keycode 76) — paired with RETURN in submit-key checks; some
+--- keyboards send 76 instead of 36 for the numeric-keypad Enter key.
+M.ENTER = 76
+
+--- Arrow keys (keycodes 123/124/125/126 — left/right/down/up) — consumed by
+--- the LLM tooltip eventtap for prediction navigation. Each press also resets
+--- the auto-dismiss timer so a user actively navigating never loses the
+--- tooltip mid-decision.
+M.LEFT_ARROW  = 123
+M.RIGHT_ARROW = 124
+M.DOWN_ARROW  = 125
+M.UP_ARROW    = 126
+
 --- Karabiner synthetic layer keys (relocated to F21/F22/F23 — keycodes 131,
 --- 134, 135) — emitted by the active layer when no real action is bound;
 --- ignored by keymap/tooltip dispatchers. Previously sat on 107/113/106

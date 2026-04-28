@@ -24,11 +24,6 @@ local MAC_KEYCODES_NUMBERS = {
 	[22] = 6, [26] = 7, [28] = 8, [25] = 9, [29] = 10
 }
 
-local KEY_TAB = 48
-local KEY_RETURN = Keycodes.RETURN
-local KEY_ENTER = 76
-local KEY_LEFT_ARROW = 123
-local KEY_UP_ARROW = 126
 
 
 
@@ -167,10 +162,10 @@ local function start_watchers()
 		local keycode = event:getKeyCode()
 		local flags = event:getFlags()
 		local chars = event:getCharacters(true) or event:getCharacters(false) or ""
-		local is_submit_key = (keycode == KEY_RETURN or keycode == KEY_ENTER or chars == "\r" or chars == "\n")
+		local is_submit_key = (keycode == Keycodes.RETURN or keycode == Keycodes.ENTER or chars == "\r" or chars == "\n")
 
 		-- Handling Tab presses during LLM execution
-		if keycode == KEY_TAB then
+		if keycode == Keycodes.TAB then
 			if flags.shift then
 				local preds_count = type(_state.raw_predictions) == "table" and #_state.raw_predictions or 0
 				if preds_count > 1 then
@@ -208,10 +203,10 @@ local function start_watchers()
 		end
 		
 		-- Handling Arrow Navigation
-		if keycode >= KEY_LEFT_ARROW and keycode <= KEY_UP_ARROW then
+		if keycode >= Keycodes.LEFT_ARROW and keycode <= Keycodes.UP_ARROW then
 			local preds_count = type(_state.raw_predictions) == "table" and #_state.raw_predictions or 0
 			if preds_count > 1 and evaluate_modifiers(flags, _state.nav_mods) then
-				local nav_direction = (keycode == KEY_LEFT_ARROW or keycode == KEY_UP_ARROW) and -1 or 1
+				local nav_direction = (keycode == Keycodes.LEFT_ARROW or keycode == Keycodes.UP_ARROW) and -1 or 1
 				M.navigate(nav_direction)
 				return true
 			end
