@@ -36,21 +36,27 @@ local MAC_KEYCODES_NUMBERS = {
 -- ==================================
 
 local _state = {
-	raw_predictions = {},
-	current_index   = 1,
-	on_navigate     = nil,
-	on_accept       = nil,
-	on_cancel       = nil,
-	info_bar        = nil,
-	shortcut_mod    = "alt",
-	nav_mods        = {},
-	nav_mod_str     = "none",
-	indent          = 0,
-	fixed_width     = nil,
-	bg_color        = nil,
-	loading_text    = nil,
-	enter_validates = false,
-	reserved_count  = 0
+	raw_predictions    = {},
+	current_index      = 1,
+	on_navigate        = nil,
+	on_accept          = nil,
+	on_cancel          = nil,
+	info_bar           = nil,
+	shortcut_mod       = "alt",
+	nav_mods           = {},
+	nav_mod_str        = "none",
+	indent             = 0,
+	fixed_width        = nil,
+	bg_color           = nil,
+	loading_text       = nil,
+	enter_validates    = false,
+	reserved_count     = 0,
+	-- Set to true the first time the user navigates within an open tooltip
+	-- (arrow keys, shift+Tab). Used by the Enter handler to choose between
+	-- "accept current prediction" (post-navigation) and "let Enter through"
+	-- (no navigation happened — Enter is just a normal newline). Reset to
+	-- false on every show_predictions() and hide().
+	navigation_started = false,
 }
 
 local _watchers = {}
@@ -171,12 +177,14 @@ local function start_watchers()
 				if preds_count > 1 then
 					-- Left shift → back (-1), right shift → forward (+1)
 					local direction = (_shift_side == "right") and 1 or -1
+					_state.navigation_started = true
 					M.navigate(direction)
 					return true
 				end
 			else
 				local has_other_modifiers = flags.cmd or flags.alt or flags.ctrl or (flags.shift == true)
 				if not has_other_modifiers then
+					-- Tab always accepts directly, regardless of prior navigation
 					if type(_state.on_accept) == "function" then _state.on_accept(_state.current_index) end
 					return true
 				end
@@ -189,24 +197,37 @@ local function start_watchers()
 		if is_submit_key then
 			local has_other_modifiers = flags.cmd or flags.alt or flags.ctrl or flags.shift
 			if not has_other_modifiers then
+				-- Contextual Enter:
+				--   • If the user has navigated at least once, treat Enter like Tab and
+				--     accept the currently highlighted prediction (consume the keystroke).
+				--   • Otherwise, Enter is just a normal newline — close the tooltip but
+				--     let the keystroke flow through to the application.
+				if _state.navigation_started then
+					if type(_state.on_accept) == "function" then _state.on_accept(_state.current_index) end
+					return true
+				end
 				if _state.enter_validates then
 					if type(_state.on_accept) == "function" then _state.on_accept(_state.current_index) end
 					return true
-				else
-					if type(_state.on_cancel) == "function" then pcall(_state.on_cancel) end
-					return false
 				end
+				if type(_state.on_cancel) == "function" then pcall(_state.on_cancel) end
+				return false
 			else
 				if type(_state.on_cancel) == "function" then pcall(_state.on_cancel) end
 				return false
 			end
 		end
-		
+
 		-- Handling Arrow Navigation
 		if keycode >= Keycodes.LEFT_ARROW and keycode <= Keycodes.UP_ARROW then
 			local preds_count = type(_state.raw_predictions) == "table" and #_state.raw_predictions or 0
 			if preds_count > 1 and evaluate_modifiers(flags, _state.nav_mods) then
 				local nav_direction = (keycode == Keycodes.LEFT_ARROW or keycode == Keycodes.UP_ARROW) and -1 or 1
+				-- Any arrow consumed for navigation marks the session as "user is engaged"
+				-- and resets the auto-dismiss timer so the user never loses the tooltip
+				-- mid-decision (timer reset is also done inside M.navigate()).
+				_state.navigation_started = true
+				reset_idle_timer()
 				M.navigate(nav_direction)
 				return true
 			end
@@ -242,6 +263,16 @@ local function start_watchers()
 			end
 		end
 		
+		-- F20 ("nav layer entered") signals that the user just engaged the
+		-- navigation layer — this is a strong "user is actively using the
+		-- tooltip" signal, so reset the auto-dismiss timer before letting the
+		-- event flow through. F20 must NOT be treated as a real keystroke that
+		-- dismisses the tooltip.
+		if keycode == Keycodes.F20_LAYER_NAV_ENTERED then
+			reset_idle_timer()
+			return false
+		end
+
 		-- Ignored system modifier keys (preventing unintended dismissals).
 		-- 54-60 are physical modifiers; the rest are owned by lib.keycodes.
 		local ignored_keycodes = {
@@ -251,7 +282,6 @@ local function start_watchers()
 			Keycodes.F15_KARABINER_ESCAPE,
 			Keycodes.F16_LLM_CHAIN_SIGNAL,
 			Keycodes.F17_CYCLE_WINDOWS,
-			Keycodes.F20_LAYER_NAV_ENTERED,
 			Keycodes.LAYER_SYN_1,
 			Keycodes.LAYER_SYN_2,
 			Keycodes.LAYER_SYN_3,
@@ -554,13 +584,14 @@ end
 function M.hide()
 	pcall(function()
 		stop_watchers()
-		_state.raw_predictions = {}
-		_state.current_index   = 1
-		_state.info_bar        = nil
-		_state.fixed_width     = nil
-		_state.bg_color        = nil
-		_state.loading_text    = nil
-		_state.enter_validates = false
+		_state.raw_predictions    = {}
+		_state.current_index      = 1
+		_state.info_bar           = nil
+		_state.fixed_width        = nil
+		_state.bg_color           = nil
+		_state.loading_text       = nil
+		_state.enter_validates    = false
+		_state.navigation_started = false
 		Renderer.hide()
 	end)
 end
@@ -646,9 +677,12 @@ function M.show_predictions(predictions, current_index, is_enabled, info_bar, sh
 			if final_width > calculated_max_width then calculated_max_width = final_width end
 		end
 
-		_state.fixed_width = calculated_max_width
-		_state.reserved_count = render_count
-		_state.enter_validates = false
+		_state.fixed_width        = calculated_max_width
+		_state.reserved_count     = render_count
+		_state.enter_validates    = false
+		-- Fresh tooltip session: user has not navigated yet, so an Enter press
+		-- right now is a "real" newline and should pass through.
+		_state.navigation_started = false
 
 		Renderer.render(assemble_blocks(_state, render_count), _state, start_watchers)
 	end)
