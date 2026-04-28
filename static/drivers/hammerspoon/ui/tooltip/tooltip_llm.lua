@@ -13,6 +13,7 @@
 local M = {}
 local hs = hs
 local Logger = require("lib.logger")
+local Keycodes = require("lib.keycodes")
 local LOG = "tooltip_llm"
 
 local Config = require("ui.tooltip.config")
@@ -246,8 +247,19 @@ local function start_watchers()
 			end
 		end
 		
-		-- Ignored system modifier keys (preventing unintended dismissals)
-		local ignored_keycodes = { 54, 55, 56, 58, 59, 60, 105, 107, 113, 106, 64, 79, 80, 90 }
+		-- Ignored system modifier keys (preventing unintended dismissals).
+		-- 54-60 are physical modifiers; the rest are owned by lib.keycodes.
+		local ignored_keycodes = {
+			54, 55, 56, 58, 59, 60,
+			Keycodes.F13_CYCLE_WINDOWS,
+			Keycodes.LAYER_SYN_1,
+			Keycodes.LAYER_SYN_2,
+			Keycodes.LAYER_SYN_3,
+			Keycodes.F17_LLM_CHAIN_SIGNAL,
+			Keycodes.F18_KARABINER_BACKSPACE,
+			Keycodes.F19_KARABINER_RETURN,
+			Keycodes.F20_KARABINER_ESCAPE,
+		}
 		for _, ignored_code in ipairs(ignored_keycodes) do
 			if keycode == ignored_code then return false end
 		end
