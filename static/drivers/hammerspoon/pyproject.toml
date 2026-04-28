@@ -1,0 +1,34 @@
+# static/drivers/hammerspoon/pyproject.toml
+#
+# Pinned Python dependencies for the Hammerspoon driver. The local virtualenv
+# at static/drivers/hammerspoon/.venv is the ONLY interpreter used by the
+# Hammerspoon scripts at runtime — there is no system-Python fallback. The
+# venv is provisioned by modules/llm/ensure-mlx-deps.sh which calls
+# `uv pip sync pyproject.toml` so this file is the single source of truth
+# for which package versions ship to the user's machine.
+#
+# IMPORTANT: every dependency MUST be pinned with `==` so a fresh `uv sync`
+# is reproducible. Use `>=` only as a temporary measure during a known-good
+# version search.
+
+[project]
+name = "ergopti-hammerspoon"
+version = "0.1.0"
+description = "Pinned Python deps for the Ergopti+ Hammerspoon driver."
+requires-python = ">=3.11"
+
+dependencies = [
+	# MLX inference server. 0.31.2 is the last release that supports Gemma 4
+	# correctly: 0.31.3 reintroduced regressions on the gemma4 KV-shared
+	# layers and quantized per-layer projection loading paths. Do NOT bump
+	# without first re-testing every supported model in production.
+	"mlx-lm==0.31.2",
+
+	# Used by data/generate_models.py to scrape the HuggingFace MLX
+	# community organization page when refreshing data/llm_models.json.
+	"requests==2.32.3",
+	"beautifulsoup4==4.12.3",
+]
+
+[tool.uv]
+package = false

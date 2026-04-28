@@ -36,11 +36,6 @@ local HF_TOKEN_FILE = (os.getenv("HOME") or "") .. "/.huggingface/token"
 function M.new(deps, presets)
 	local obj = {}
 	deps.active_tasks = deps.active_tasks or {}
-	obj._mlx_upgrade_attempted = {}
-	obj._mlx_upgrade_done = false
-	obj._mlx_upgrade_failed = false
-	obj._mlx_upgrade_in_progress = false
-	obj._mlx_upgrade_waiters = {}
 	obj._installed_cache = nil
 	obj._installed_cache_ts = 0
 
@@ -54,10 +49,19 @@ function M.new(deps, presets)
 		end
 		return ""
 	end
-	local project_venv_python = first_existing_path({
-		(project_root and (project_root .. "/.venv/bin/python3")) or "",
-		(os.getenv("HOME") or "") .. "/Documents/perso/ergopti/.venv/bin/python3",
-	})
+	-- Single, canonical Python interpreter for every Hammerspoon-driven MLX
+	-- invocation. This venv is provisioned by modules/llm/ensure-mlx-deps.sh
+	-- on first launch from the pinned pyproject.toml, so its absolute path is
+	-- the only one we ever shell out to. Any consumer that hits a missing
+	-- interpreter must fail fast — silent fallback to a system python would
+	-- bypass the pinned mlx-lm version and reintroduce the very drift we are
+	-- trying to eliminate.
+	local hs_root = project_root and (project_root .. "/static/drivers/hammerspoon") or ""
+	local project_venv_python = hs_root ~= "" and (hs_root .. "/.venv/bin/python") or ""
+	if project_venv_python == "" or not hs.fs.attributes(project_venv_python, "mode") then
+		Logger.warn(LOG, "Project venv python introuvable à %s — exécutez modules/llm/ensure-mlx-deps.sh.",
+			tostring(project_venv_python))
+	end
 	local project_venv_python_escaped = project_venv_python:gsub("\\", "\\\\"):gsub("\"", "\\\"")
 
 	local function shell_escape_single(value)
@@ -88,105 +92,6 @@ function M.new(deps, presets)
 		return token ~= "" and token or nil
 	end
 
-	local function upgrade_mlx_stack(on_done)
-		if type(on_done) == "function" then
-			table.insert(obj._mlx_upgrade_waiters, on_done)
-		end
-
-		if obj._mlx_upgrade_done then
-			local waiters = obj._mlx_upgrade_waiters
-			obj._mlx_upgrade_waiters = {}
-			for _, cb in ipairs(waiters) do pcall(cb, true) end
-			return
-		end
-
-		if obj._mlx_upgrade_in_progress then return end
-		obj._mlx_upgrade_in_progress = true
-
-		local py_detect =
-			"PYTHON_BIN=\"python3\"; " ..
-			"if [ -n \"$VIRTUAL_ENV\" ] && [ -x \"$VIRTUAL_ENV/bin/python3\" ]; then PYTHON_BIN=\"$VIRTUAL_ENV/bin/python3\"; " ..
-			"elif [ -x \"" .. project_venv_python_escaped .. "\" ]; then PYTHON_BIN=\"" .. project_venv_python_escaped .. "\"; fi; " ..
-			"if [ \"$PYTHON_BIN\" = \"python3\" ]; then MLX_VENV=\"$HOME/.mlx_py_env\"; python3 -m venv \"$MLX_VENV\" >/dev/null 2>&1 || true; [ -x \"$MLX_VENV/bin/python3\" ] && PYTHON_BIN=\"$MLX_VENV/bin/python3\"; fi; "
-
-		local dry_run_cmd = py_detect .. "$PYTHON_BIN -u -m pip install --disable-pip-version-check --dry-run --upgrade mlx-lm huggingface_hub hf_transfer truststore"
-		local upgrade_cmd = py_detect .. "$PYTHON_BIN -u -m pip install --disable-pip-version-check --upgrade mlx-lm huggingface_hub hf_transfer truststore"
-
-		local function finish_upgrade(ok)
-			if ok then
-				obj._mlx_upgrade_done = true
-				obj._mlx_upgrade_failed = false
-			else
-				obj._mlx_upgrade_failed = true
-			end
-			obj._mlx_upgrade_in_progress = false
-			if deps.active_tasks then deps.active_tasks["mlx_upgrade"] = nil end
-			local waiters = obj._mlx_upgrade_waiters
-			obj._mlx_upgrade_waiters = {}
-			for _, cb in ipairs(waiters) do pcall(cb, ok) end
-		end
-
-		local function cancel_upgrade()
-			local t = deps.active_tasks and deps.active_tasks["mlx_upgrade"]
-			if t and type(t.terminate) == "function" then pcall(function() t:terminate() end) end
-		end
-
-		local function start_real_upgrade()
-			local upgrade_task = hs.task.new("/bin/bash", function(ucode)
-				if ucode == 0 then
-					finish_upgrade(true)
-				elseif ucode == 15 then
-					finish_upgrade(false)
-				else
-					finish_upgrade(false)
-				end
-			end, function(_, stdout, stderr)
-				local out = (stdout or "") .. (stderr or "")
-				if out ~= "" then print("[MLX Upgrade] " .. out) end
-				return true
-			end, { "-c", upgrade_cmd })
-
-			if upgrade_task then
-				deps.active_tasks["mlx_upgrade"] = upgrade_task
-				pcall(function() upgrade_task:start() end)
-			else
-				finish_upgrade(false)
-			end
-		end
-
-		local dry_run_out = ""
-		local dry_run_task = hs.task.new("/bin/bash", function(code)
-			local has_updates = dry_run_out:find("Would install", 1, true) ~= nil
-			local dry_run_unsupported = dry_run_out:lower():find("no such option: --dry%-run") ~= nil
-
-			if has_updates then
-				start_real_upgrade()
-				return
-			end
-
-			if code == 0 then
-				finish_upgrade(true)
-				return
-			end
-
-			if dry_run_unsupported then
-				start_real_upgrade()
-				return
-			end
-
-			finish_upgrade(false)
-		end, function(_, stdout, stderr)
-			dry_run_out = dry_run_out .. (stdout or "") .. (stderr or "")
-			return true
-		end, { "-c", dry_run_cmd })
-
-		if dry_run_task then
-			deps.active_tasks["mlx_upgrade"] = dry_run_task
-			pcall(function() dry_run_task:start() end)
-		else
-			finish_upgrade(false)
-		end
-	end
 
 	function obj.get_mlx_repo(model_name)
 		for _, provider in ipairs(presets) do
@@ -557,13 +462,13 @@ PY
 				"export REQUESTS_CA_BUNDLE=/etc/ssl/cert.pem; " ..
 				"export HF_HUB_DISABLE_XET=1; " ..
 				"export PYTHONUNBUFFERED=1; " ..
-				"PYTHON_BIN=\"python3\"; " ..
-				"if [ -n \"$VIRTUAL_ENV\" ] && [ -x \"$VIRTUAL_ENV/bin/python3\" ]; then PYTHON_BIN=\"$VIRTUAL_ENV/bin/python3\"; " ..
-				"elif [ -x \"" .. project_venv_python_escaped .. "\" ]; then PYTHON_BIN=\"" .. project_venv_python_escaped .. "\"; fi; " ..
-				"if [ \"$PYTHON_BIN\" = \"python3\" ]; then MLX_VENV=\"$HOME/.mlx_py_env\"; [ -x \"$MLX_VENV/bin/python3\" ] && PYTHON_BIN=\"$MLX_VENV/bin/python3\"; fi; " ..
+				-- Fail fast if the pinned project venv is missing — any other Python
+				-- would bypass the pinned mlx-lm version
+				"PYTHON_BIN=\"" .. project_venv_python_escaped .. "\"; " ..
+				"if [ ! -x \"$PYTHON_BIN\" ]; then echo \"[MLX] ❌ venv introuvable : $PYTHON_BIN\"; exit 1; fi; " ..
 				"echo \"[MLX] Python utilisé: $PYTHON_BIN\"; " ..
 				"pids=$(lsof -tiTCP:8080 -sTCP:LISTEN 2>/dev/null); [ -n \"$pids\" ] && kill -9 $pids 2>/dev/null; sleep 0.3; " ..
-				"$PYTHON_BIN -m mlx_lm server --model " .. repo .. " 2>&1 | tee \"" .. server_log_file .. "\""
+				"\"$PYTHON_BIN\" -m mlx_lm server --model " .. repo .. " 2>&1 | tee \"" .. server_log_file .. "\""
 
 			local server_last_line = ""
 			local server_log_buffer = {}
@@ -853,18 +758,12 @@ PY
 			end
 			f:write("#!/bin/bash\n")
 			f:write("export PATH=\"/opt/homebrew/bin:/usr/local/bin:$PATH\"\n")
-			f:write("PYTHON_BIN=\"python3\"\n")
-			f:write("if [ -n \"$VIRTUAL_ENV\" ] && [ -x \"$VIRTUAL_ENV/bin/python3\" ]; then\n")
-			f:write("  PYTHON_BIN=\"$VIRTUAL_ENV/bin/python3\"\n")
-			f:write("elif [ -x \"" .. script_project_venv_python_escaped .. "\" ]; then\n")
-			f:write("  PYTHON_BIN=\"" .. script_project_venv_python_escaped .. "\"\n")
-			f:write("fi\n")
-			f:write("if [ \"$PYTHON_BIN\" = \"python3\" ]; then\n")
-			f:write("  MLX_VENV=\"$HOME/.mlx_py_env\"\n")
-			f:write("  python3 -m venv \"$MLX_VENV\" >/dev/null 2>&1 || true\n")
-			f:write("  if [ -x \"$MLX_VENV/bin/python3\" ]; then\n")
-			f:write("    PYTHON_BIN=\"$MLX_VENV/bin/python3\"\n")
-			f:write("  fi\n")
+			-- Pin to the project venv: any other interpreter would bypass the
+			-- versions pinned in pyproject.toml. Fail fast if it is missing.
+			f:write("PYTHON_BIN=\"" .. script_project_venv_python_escaped .. "\"\n")
+			f:write("if [ ! -x \"$PYTHON_BIN\" ]; then\n")
+			f:write("  echo \"[MLX] ❌ venv introuvable : $PYTHON_BIN — exécutez modules/llm/ensure-mlx-deps.sh\"\n")
+			f:write("  exit 1\n")
 			f:write("fi\n")
 			f:write("echo \"Python utilisé: $PYTHON_BIN\"\n")
 			f:write("export HF_HUB_DISABLE_SYMLINKS_WARNING=1\n")
@@ -872,15 +771,10 @@ PY
 			f:write("export SSL_CERT_FILE=/etc/ssl/cert.pem\n")
 			f:write("export REQUESTS_CA_BUNDLE=/etc/ssl/cert.pem\n")
 			f:write("export HF_HUB_DISABLE_XET=1\n")
-			f:write("if ! $PYTHON_BIN -c 'import huggingface_hub, truststore, hf_transfer' >/dev/null 2>&1; then\n")
-			f:write("  echo '[MLX] Dépendances Hugging Face manquantes, installation... '\n")
-			f:write("  if ! $PYTHON_BIN -m pip install --disable-pip-version-check --upgrade huggingface_hub hf_transfer truststore; then\n")
-			f:write("    echo '[MLX] Installation globale impossible, tentative en --user'\n")
-			f:write("    $PYTHON_BIN -m pip install --user --disable-pip-version-check --upgrade huggingface_hub hf_transfer truststore || { echo '[MLX] Installation huggingface_hub impossible'; exit 1; }\n")
-			f:write("  fi\n")
-			f:write("fi\n")
-			f:write("$PYTHON_BIN -c 'import huggingface_hub, truststore' >/dev/null 2>&1 || { echo '[MLX] Python utilisé sans huggingface_hub/truststore'; exit 1; }\n")
-			f:write("$PYTHON_BIN -c 'import hf_transfer' 2>/dev/null && export HF_HUB_ENABLE_HF_TRANSFER=1 || export HF_HUB_ENABLE_HF_TRANSFER=0\n")
+			-- Dependencies are pinned in pyproject.toml and installed by uv pip
+			-- sync — no runtime install/upgrade. Just verify the imports succeed.
+			f:write("\"$PYTHON_BIN\" -c 'import huggingface_hub, truststore' >/dev/null 2>&1 || { echo '[MLX] ❌ huggingface_hub/truststore manquants — relancez ensure-mlx-deps.sh'; exit 1; }\n")
+			f:write("\"$PYTHON_BIN\" -c 'import hf_transfer' 2>/dev/null && export HF_HUB_ENABLE_HF_TRANSFER=1 || export HF_HUB_ENABLE_HF_TRANSFER=0\n")
 			f:write("HUB_DIR=\"$HOME/.cache/huggingface/hub\"\n")
 			f:write("SNAP_DIR=\"$HUB_DIR/" .. safe_repo_bash .. "/snapshots\"\n")
 			f:write("HAS_WEIGHTS=0\n")
@@ -1145,11 +1039,9 @@ PY
 			end
 		end
 
-		-- Step 0: Ensure MLX stack is upgraded before starting the download
-		pcall(notifications.notify, "⚙️ Préparation MLX", "Vérification des mises à jour des dépendances…")
-		upgrade_mlx_stack(function()
-			_internal_pull()
-		end)
+		-- Dependencies are pinned in pyproject.toml and provisioned by
+		-- ensure-mlx-deps.sh on Hammerspoon startup; no runtime upgrade path.
+		_internal_pull()
 	end
 
 	--- Reattaches the download UI and log tail to an already-running detached Python download.
@@ -1329,93 +1221,21 @@ PY
 			end
 		end
 
+		-- Verify the pinned project venv has every required MLX dependency
+		-- importable. If it does not, the venv is broken / out of sync and the
+		-- user must run modules/llm/ensure-mlx-deps.sh manually — silently
+		-- pip-installing a fallback would bypass pyproject.toml.
+		local check_cmd = "\"" .. project_venv_python_escaped .. "\" -c 'import mlx_lm; import huggingface_hub; import jinja2; import safetensors'"
 		local check_task = hs.task.new("/bin/bash", function(code)
 			if code == 0 then
 				do_check()
 			else
-				local function cancel_install()
-					local t = deps.active_tasks and deps.active_tasks["install"]
-					if t and type(t) == "userdata" and type(t.terminate) == "function" then pcall(function() t:terminate() end) end
-				end
-
-				local script_path = "/tmp/hs_mlx_deps.sh"
-				local f = io.open(script_path, "w")
-				if not f then return end
-				f:write("#!/bin/bash\n")
-				f:write("export PATH=\"/opt/homebrew/bin:/usr/local/bin:$PATH\"\n")
-				f:write("PYTHON_BIN=\"python3\"\n")
-				f:write("if [ -n \"$VIRTUAL_ENV\" ] && [ -x \"$VIRTUAL_ENV/bin/python3\" ]; then\n")
-				f:write("  PYTHON_BIN=\"$VIRTUAL_ENV/bin/python3\"\n")
-				f:write("elif [ -x \"" .. project_venv_python_escaped .. "\" ]; then\n")
-				f:write("  PYTHON_BIN=\"" .. project_venv_python_escaped .. "\"\n")
-				f:write("fi\n")
-				f:write("if [ \"$PYTHON_BIN\" = \"python3\" ]; then\n")
-				f:write("  MLX_VENV=\"$HOME/.mlx_py_env\"\n")
-				f:write("  python3 -m venv \"$MLX_VENV\" >/dev/null 2>&1 || true\n")
-				f:write("  if [ -x \"$MLX_VENV/bin/python3\" ]; then\n")
-				f:write("    PYTHON_BIN=\"$MLX_VENV/bin/python3\"\n")
-				f:write("  fi\n")
-				f:write("fi\n")
-				f:write("if ! \"$PYTHON_BIN\" -m pip --version >/dev/null 2>&1; then\n")
-				f:write("  \"$PYTHON_BIN\" -m ensurepip --upgrade >/dev/null 2>&1 || true\n")
-				f:write("fi\n")
-				f:write("if ! \"$PYTHON_BIN\" -m pip --version >/dev/null 2>&1; then\n")
-				f:write("  MLX_VENV=\"$HOME/.mlx_py_env\"\n")
-				f:write("  python3 -m venv \"$MLX_VENV\" >/dev/null 2>&1 || true\n")
-				f:write("  if [ -x \"$MLX_VENV/bin/python3\" ]; then\n")
-				f:write("    PYTHON_BIN=\"$MLX_VENV/bin/python3\"\n")
-				f:write("  fi\n")
-				f:write("fi\n")
-				f:write("if ! \"$PYTHON_BIN\" -m pip --version >/dev/null 2>&1; then\n")
-				f:write("  \"$PYTHON_BIN\" -m ensurepip --upgrade >/dev/null 2>&1 || true\n")
-				f:write("fi\n")
-				f:write("export SSL_CERT_FILE=/etc/ssl/cert.pem\n")
-				f:write("export REQUESTS_CA_BUNDLE=/etc/ssl/cert.pem\n")
-				f:write("export PIP_CERT=/etc/ssl/cert.pem\n")
-				f:write("export HF_HUB_DISABLE_XET=1\n")
-				f:write("echo \"Python utilisé: $PYTHON_BIN\"\n")
-				f:write("echo 'Installation des dépendances MLX...'\n")
-				f:write("$PYTHON_BIN -u -m pip install --upgrade mlx-lm huggingface_hub hf_transfer truststore\n")
-				f:close()
-				os.execute("chmod +x " .. script_path)
-
-				if download_window then 
-					pcall(download_window.show, "Dépendances MLX", cancel_install, script_path) 
-				end
-
-				local install_task = hs.task.new(script_path, function(icode)
-					if deps.active_tasks then deps.active_tasks["install"] = nil end
-					os.remove(script_path)
-					
-					if icode == 15 then
-						pcall(notifications.notify, "🛑 Annulé", "Installation interrompue.")
-						if download_window then pcall(download_window.complete, false, "Dépendances") end
-						if on_cancel then on_cancel() end
-						return
-					end
-
-					if icode == 0 then
-						if download_window then pcall(download_window.complete, true, "Dépendances") end
-						hs.timer.doAfter(1.5, do_check)
-					else
-						pcall(notifications.notify, "Erreur", "Échec de l’installation des dépendances.")
-						if download_window then pcall(download_window.complete, false, "Dépendances") end
-						if on_cancel then on_cancel() end
-					end
-				end, function(_, stdout, stderr)
-					local out = (stdout or "") .. (stderr or "")
-					if download_window and out ~= "" then
-						pcall(download_window.update, 0, nil, nil, out:gsub("[\r\n]", ""))
-					end
-					return true
-				end)
-				
-				if install_task then
-					deps.active_tasks["install"] = install_task
-					pcall(function() install_task:start() end)
-				end
+				Logger.error(LOG, "MLX dependencies missing in %s — run modules/llm/ensure-mlx-deps.sh.", project_venv_python_escaped)
+				pcall(notifications.notify, "❌ Dépendances MLX manquantes",
+					"Le venv local est incomplet. Exécutez modules/llm/ensure-mlx-deps.sh puis relancez.")
+				if on_cancel then pcall(on_cancel) end
 			end
-		end, {"-c", "export PATH=\"/opt/homebrew/bin:/usr/local/bin:$PATH\"; PYTHON_BIN=\"python3\"; if [ -n \"$VIRTUAL_ENV\" ] && [ -x \"$VIRTUAL_ENV/bin/python3\" ]; then PYTHON_BIN=\"$VIRTUAL_ENV/bin/python3\"; elif [ -x \"" .. project_venv_python_escaped .. "\" ]; then PYTHON_BIN=\"" .. project_venv_python_escaped .. "\"; fi; if [ \"$PYTHON_BIN\" = \"python3\" ]; then MLX_VENV=\"$HOME/.mlx_py_env\"; python3 -m venv \"$MLX_VENV\" >/dev/null 2>&1 || true; [ -x \"$MLX_VENV/bin/python3\" ] && PYTHON_BIN=\"$MLX_VENV/bin/python3\"; fi; $PYTHON_BIN -c 'import mlx_lm; import huggingface_hub; import jinja2; import safetensors'"})
+		end, {"-c", check_cmd})
 		
 		if check_task then
 			pcall(function() check_task:start() end)
