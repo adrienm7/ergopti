@@ -63,6 +63,25 @@ local _watchers = {}
 local _idle_timer = nil
 local _shift_side = nil  -- "left", "right", or nil when no shift is held
 
+-- ── Chain timing instrumentation ─────────────────────────────────────────────
+-- Backend-agnostic TTFT / TTLT measurement done at the tooltip level.
+--   * _chain_start_time          — epoch seconds at the very first request of
+--                                  the active chain. Set by prediction_engine
+--                                  via M.set_chain_start(); reset on M.hide()
+--                                  and on M.mark_chain_complete().
+--   * _tooltip_first_show_at     — epoch seconds at the first paint of the
+--                                  tooltip after a chain start. Used to
+--                                  derive TTFT exactly once per chain.
+--   * _last_update_at            — epoch seconds at the most recent render of
+--                                  the tooltip during the current chain.
+--                                  Refreshed on every show_predictions().
+--   * _chain_ttft_ms             — cached TTFT once computed, so we can keep
+--                                  showing it while streaming further tokens.
+local _chain_start_time      = nil
+local _tooltip_first_show_at = nil
+local _last_update_at        = nil
+local _chain_ttft_ms         = nil
+
 
 
 
@@ -561,6 +580,77 @@ function M.set_model_info(model_name, prompt_label)
 	end)
 end
 
+--- Records the epoch timestamp at which the active chain started.
+--- Called by prediction_engine right before the first backend dispatch of a
+--- chain. Successive calls within the same chain are ignored — only the very
+--- first sets the origin so TTLT spans the entire chain, not the last link.
+--- @param timestamp number Epoch seconds (typically hs.timer.secondsSinceEpoch()).
+function M.set_chain_start(timestamp)
+	if type(timestamp) ~= "number" then
+		Logger.error(LOG, "set_chain_start(): timestamp must be a number, got %s.", type(timestamp))
+		return
+	end
+	if _chain_start_time then
+		-- Chain already running — keep the original start so TTLT measures
+		-- the entire chain, not just the last prediction in it
+		Logger.debug(LOG, "set_chain_start: chain already armed (%.3fs ago) — keeping original origin.",
+			hs.timer.secondsSinceEpoch() - _chain_start_time)
+		return
+	end
+	_chain_start_time      = timestamp
+	_tooltip_first_show_at = nil
+	_last_update_at        = nil
+	_chain_ttft_ms         = nil
+	Logger.debug(LOG, "Chain timing armed at epoch %.3f.", timestamp)
+end
+
+--- Internal helper: called from every paint path (show_predictions, navigate).
+--- Captures the first-show timestamp and refreshes the last-update timestamp.
+--- Also pushes the in-progress TTFT line to the info zone as soon as it is known.
+local function refresh_chain_timing()
+	if not _chain_start_time then return end
+
+	local now = hs.timer.secondsSinceEpoch()
+	_last_update_at = now
+
+	if not _tooltip_first_show_at then
+		_tooltip_first_show_at = now
+		_chain_ttft_ms         = (now - _chain_start_time) * 1000
+		Logger.debug(LOG, "TTFT captured: %.0f ms.", _chain_ttft_ms)
+	end
+
+	-- Re-apply the streaming TTFT line on every paint: the full render path
+	-- inside show_predictions resets ELEM_INFO to the static model/profile
+	-- info bar, which would otherwise wipe the timing line on every streamed
+	-- partial. Pushing it here keeps the timing visible throughout the chain.
+	if _chain_ttft_ms then
+		M.set_timing(_chain_ttft_ms, nil)
+	end
+end
+
+--- Finalises the active chain: computes TTLT from the last update timestamp
+--- and updates the timing zone with both values. Called by prediction_engine
+--- when the chain ends (success or failure — both paths benefit from timing).
+--- The internal chain state is NOT reset here — only M.hide() does that. This
+--- allows the function to be invoked at the end of every chain link to refresh
+--- the displayed TTLT while the chain origin keeps growing across links.
+function M.mark_chain_complete()
+	if not _chain_start_time then
+		Logger.debug(LOG, "mark_chain_complete: no chain in progress — ignoring.")
+		return
+	end
+
+	local final_update = _last_update_at or hs.timer.secondsSinceEpoch()
+	local ttlt_ms = (final_update - _chain_start_time) * 1000
+	-- TTFT may still be nil if the chain ended before the tooltip ever showed
+	-- (e.g. all predictions filtered out). Fall back to ttlt so the user still
+	-- gets a meaningful number rather than a blank line.
+	local ttft_ms = _chain_ttft_ms or ttlt_ms
+
+	Logger.debug(LOG, "Chain link complete — TTFT: %.0f ms | TTLT: %.0f ms.", ttft_ms, ttlt_ms)
+	M.set_timing(ttft_ms, ttlt_ms)
+end
+
 function M.set_navigate_callback(callback) _state.on_navigate = callback end
 function M.set_accept_callback(callback) _state.on_accept = callback end
 function M.set_cancel_callback(callback) _state.on_cancel = callback end
@@ -592,6 +682,11 @@ function M.hide()
 		_state.loading_text       = nil
 		_state.enter_validates    = false
 		_state.navigation_started = false
+		-- Reset chain timing — next chain starts from a clean slate
+		_chain_start_time      = nil
+		_tooltip_first_show_at = nil
+		_last_update_at        = nil
+		_chain_ttft_ms         = nil
 		Renderer.hide()
 	end)
 end
@@ -685,8 +780,12 @@ function M.show_predictions(predictions, current_index, is_enabled, info_bar, sh
 		_state.navigation_started = false
 
 		Renderer.render(assemble_blocks(_state, render_count), _state, start_watchers)
+
+		-- Capture TTFT on first paint after a chain start; refresh _last_update_at
+		-- on every subsequent paint so TTLT measures up to the last streamed update
+		refresh_chain_timing()
 	end)
-	
+
 	if not ok then Logger.error(LOG, "Crash during show_predictions initialization: " .. tostring(err) .. ".") end
 end
 
