@@ -29,6 +29,17 @@ if not ok_bridge then vscode_bridge = nil end
 -- ===============================
 -- ===============================
 
+-- Canvas element index map (single source of truth — used by both render() and
+-- the partial-update setters that mutate elements without re-rendering the whole
+-- canvas, which is what avoids flicker during streaming).
+M.ELEM_BG          = 1  -- Filled rounded background (tinted)
+M.ELEM_BORDER      = 2  -- Stroked rounded border
+M.ELEM_PREDS       = 3  -- Predictions block (variable zone — streamed text)
+M.ELEM_SEPARATOR   = 4  -- Thin horizontal separator above hint/info
+M.ELEM_HINT        = 5  -- Hint line (or hint+info combined when they fit on one row)
+M.ELEM_INFO        = 6  -- Info bar (variable zone — TTFT/TTLT timing line)
+M.ELEM_MODEL_INFO  = 7  -- Stable "model + prompt" header (FIXED zone — render once per chain)
+
 M.canvas = hs.canvas.new({ x = 0, y = 0, w = 0, h = 0 })
 if M.canvas then
 	M.canvas:level(hs.canvas.windowLevels.cursor)
@@ -39,8 +50,27 @@ if M.canvas then
 		{ type = "text" },
 		{ type = "rectangle" },
 		{ type = "text" },
-		{ type = "text" }
+		{ type = "text" },
+		{ type = "text", action = "skip" }
 	)
+end
+
+--- Updates a single text element without redrawing the rest of the canvas.
+--- Used by tooltip_llm during streaming to refresh the info bar / model header
+--- without recreating the canvas — `hs.canvas` element assignment is the
+--- documented anti-flicker path.
+--- @param element_index integer Canvas element index (use M.ELEM_* constants).
+--- @param styled_text userdata|nil Styled text to install, or nil to skip the element.
+function M.set_element_text(element_index, styled_text)
+	pcall(function()
+		if not M.canvas then return end
+		if styled_text == nil then
+			M.canvas[element_index].action = "skip"
+			return
+		end
+		M.canvas[element_index].action = "fill"
+		M.canvas[element_index].text   = styled_text
+	end)
 end
 
 
@@ -293,10 +323,12 @@ function M.render(blocks, state, start_watchers_callback)
 	if not ok then Logger.error(LOG, "Crash during UI rendering: " .. tostring(err) .. ".") end
 end
 
---- Safely hides the canvas.
+--- Safely hides the canvas. Also clears the stable model-info zone so the
+--- next session starts with no stale header from a previous chain.
 function M.hide()
 	pcall(function()
 		if M.canvas and type(M.canvas.hide) == "function" then M.canvas:hide() end
+		if M.canvas then M.canvas[M.ELEM_MODEL_INFO].action = "skip" end
 	end)
 end
 

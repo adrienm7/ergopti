@@ -479,6 +479,58 @@ end
 -- =============================
 -- =============================
 
+--- Updates the variable info-bar zone with a TTFT / TTLT timing line.
+--- Uses the renderer's partial-update path — does NOT recreate the canvas, so
+--- there is no flicker during a streaming chain.
+--- @param ttft_ms number|nil First-token latency in milliseconds (nil to omit).
+--- @param ttlt_ms number|nil Last-token latency in milliseconds (nil while streaming).
+function M.set_timing(ttft_ms, ttlt_ms)
+	pcall(function()
+		local parts = {}
+		if type(ttft_ms) == "number" and ttft_ms >= 0 then
+			parts[#parts + 1] = string.format("Premier token : %d ms", math.floor(ttft_ms + 0.5))
+		end
+		if type(ttlt_ms) == "number" and ttlt_ms >= 0 then
+			parts[#parts + 1] = string.format("Dernier token : %d ms", math.floor(ttlt_ms + 0.5))
+		end
+		if #parts == 0 then
+			Renderer.set_element_text(Renderer.ELEM_INFO, nil)
+			return
+		end
+		local text = table.concat(parts, " — ")
+		local styled = hs.styledtext.new(text, {
+			font           = { name = Config.fonts.main, size = Config.sizes.info },
+			color          = Config.colors.info_bar,
+			paragraphStyle = { alignment = "center" },
+		})
+		Renderer.set_element_text(Renderer.ELEM_INFO, styled)
+	end)
+end
+
+--- Installs the stable "model + prompt" header at the top of the tooltip.
+--- This zone is rendered ONCE at the start of a chain and never redrawn while
+--- streaming — pass nil to clear it (e.g. when the chain ends).
+--- @param model_name string|nil Display name of the active LLM model.
+--- @param prompt_label string|nil Short label of the current prompt.
+function M.set_model_info(model_name, prompt_label)
+	pcall(function()
+		if not model_name and not prompt_label then
+			Renderer.set_element_text(Renderer.ELEM_MODEL_INFO, nil)
+			return
+		end
+		local pieces = {}
+		if model_name   and model_name   ~= "" then pieces[#pieces + 1] = tostring(model_name)   end
+		if prompt_label and prompt_label ~= "" then pieces[#pieces + 1] = tostring(prompt_label) end
+		local text = table.concat(pieces, " · ")
+		local styled = hs.styledtext.new(text, {
+			font           = { name = Config.fonts.main, size = Config.sizes.info },
+			color          = Config.colors.info_bar,
+			paragraphStyle = { alignment = "center" },
+		})
+		Renderer.set_element_text(Renderer.ELEM_MODEL_INFO, styled)
+	end)
+end
+
 function M.set_navigate_callback(callback) _state.on_navigate = callback end
 function M.set_accept_callback(callback) _state.on_accept = callback end
 function M.set_cancel_callback(callback) _state.on_cancel = callback end
