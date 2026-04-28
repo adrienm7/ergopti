@@ -21,6 +21,7 @@ local eventtap   = hs.eventtap
 local text_utils = require("lib.text_utils")
 local km_utils   = require("modules.keymap.utils")
 local Logger     = require("lib.logger")
+local Keycodes   = require("lib.keycodes")
 
 local Registry   = require("modules.keymap.registry")
 local Expander   = require("modules.keymap.expander")
@@ -402,14 +403,20 @@ local function onKeyDownRaw(e)
 		end
 	end
 
-	-- Ignore Karabiner synthetic layer keys and F13-F20 (used for signaling).
-	if keyCode == 105 or keyCode == 107 or keyCode == 113 or keyCode == 106
-		or keyCode == 64 or keyCode == 79 or keyCode == 80 or keyCode == 90 then
+	-- Ignore Karabiner synthetic layer keys and F13/F17-F20 (used for signaling).
+	if keyCode == Keycodes.F13_CYCLE_WINDOWS
+		or keyCode == Keycodes.LAYER_SYN_1
+		or keyCode == Keycodes.LAYER_SYN_2
+		or keyCode == Keycodes.LAYER_SYN_3
+		or keyCode == Keycodes.F17_LLM_CHAIN_SIGNAL
+		or keyCode == Keycodes.F18_KARABINER_BACKSPACE
+		or keyCode == Keycodes.F19_KARABINER_RETURN
+		or keyCode == Keycodes.F20_KARABINER_ESCAPE then
 		return false
 	end
 
 	-- 4. Handle Escape — dismiss predictions or optionally clear the buffer.
-	if keyCode == 53 then return LLMBridge.check_escape_reset() end
+	if keyCode == Keycodes.ESCAPE then return LLMBridge.check_escape_reset() end
 
 	-- 5. Modifier shortcuts (Cmd/Ctrl) break the current word context.
 	if flags.cmd or flags.ctrl then

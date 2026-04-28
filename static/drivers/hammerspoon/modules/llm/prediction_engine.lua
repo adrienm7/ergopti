@@ -28,6 +28,7 @@ local hs = hs
 local core_llm  = require("modules.llm")
 local Parser    = require("modules.llm.parser")
 local Logger    = require("lib.logger")
+local Keycodes  = require("lib.keycodes")
 local tooltip   = require("ui.tooltip")
 local keylogger = require("modules.keylogger")
 local km_utils  = require("modules.keymap.utils")
@@ -48,7 +49,7 @@ local _state = nil  -- Shared keymap core state; injected via M.init()
 
 -- Synthetic "typing complete" signal sent by apply_prediction after all HID events.
 -- Exported so the keymap bridge can detect it without duplicating the constant.
-local KEYCODE_F20 = 90
+local KEYCODE_F20 = Keycodes.F20_KARABINER_ESCAPE
 
 -- ── LLM request parameters ────────────────────────────────────────────────────
 -- Token budget formula: max_tokens = max(MIN_MAX_TOKENS, effective_max_words * RATIO + OVERHEAD)

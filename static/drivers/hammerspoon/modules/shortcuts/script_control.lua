@@ -22,6 +22,7 @@ local M = {}
 local hs            = hs
 local notifications = require("lib.notifications")
 local Logger        = require("lib.logger")
+local Keycodes      = require("lib.keycodes")
 
 local LOG = "shortcuts.script_control"
 
@@ -65,17 +66,17 @@ end
 -- three target keys. Tap actions that happen to emit backspace/return/escape
 -- (e.g. left_command tap → backspace) can NEVER activate these sentinels,
 -- because rule outputs bypass Karabiner's rule engine.
-local KEYCODE_F18 = 79   -- Backspace slot
-local KEYCODE_F19 = 80   -- Return / enter slot
-local KEYCODE_F20 = 90   -- Escape slot
+local KEYCODE_F18 = Keycodes.F18_KARABINER_BACKSPACE
+local KEYCODE_F19 = Keycodes.F19_KARABINER_RETURN
+local KEYCODE_F20 = Keycodes.F20_KARABINER_ESCAPE
 
 -- Physical keycodes used in the Karabiner-paused fallback path below. When KE is
 -- running the sentinels above are the sole dispatch mechanism; this fallback
 -- only exists so the user can still un-pause by pressing right_command + key
 -- when KE's altgr remap is gone.
-local KEYCODE_BACKSPACE = 51
-local KEYCODE_RETURN    = 36
-local KEYCODE_ESCAPE    = 53
+local KEYCODE_BACKSPACE = Keycodes.BACKSPACE
+local KEYCODE_RETURN    = Keycodes.RETURN
+local KEYCODE_ESCAPE    = Keycodes.ESCAPE
 
 -- Module-level state
 local _is_paused       = false

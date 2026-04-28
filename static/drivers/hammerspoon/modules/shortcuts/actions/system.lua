@@ -46,7 +46,11 @@ if not ok_gestures then gestures = nil end
 -- Physical key-code for the @ / # key (position-based, not character-based)
 local KEYCODE_AT_HASH        = 10
 
--- F18 is unmapped on most keyboards; used as a secondary wake signal for the OS
+-- F18 is unmapped on most keyboards; used as a secondary wake signal for the OS.
+-- The hs.eventtap.keyStroke API accepts the string form, but the actual numeric
+-- keycode is owned by lib.keycodes (sanity-check below).
+local Keycodes               = require("lib.keycodes")
+local _F18_NUMERIC           = Keycodes.F18_KARABINER_BACKSPACE
 local KEYCODE_F18            = "f18"
 
 -- Keep-awake jitter parameters

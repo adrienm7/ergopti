@@ -23,10 +23,16 @@
 
 local M = {}
 
-local hs     = hs
-local Logger = require("lib.logger")
+local hs       = hs
+local Logger   = require("lib.logger")
+local Keycodes = require("lib.keycodes")
 
 local LOG = "karabiner"
+
+-- Sanity reference so the registry stays the canonical source even though
+-- hs.hotkey accepts the "f13" string directly. Touching this constant from a
+-- future remap will surface a stale literal here at module load.
+local _F13_CYCLE_WINDOWS = Keycodes.F13_CYCLE_WINDOWS
 
 local KARABINER_CLI = "/Library/Application Support/org.pqrs/Karabiner-Elements/bin/karabiner_cli"
 

@@ -27,10 +27,19 @@
 
 local M = {}
 
-local hs     = hs
-local Logger = require("lib.logger")
+local hs       = hs
+local Logger   = require("lib.logger")
+local Keycodes = require("lib.keycodes")
 
 local LOG = "karabiner"
+
+-- Sanity references — Karabiner JSON is built with string sentinels ("f18",
+-- "f19", "f20") consumed by Karabiner Elements directly, but the numeric
+-- keycodes that the receiving Hammerspoon modules dispatch on must stay aligned
+-- with lib.keycodes. Touching those constants surfaces a stale literal here.
+local _F18_NUMERIC = Keycodes.F18_KARABINER_BACKSPACE
+local _F19_NUMERIC = Keycodes.F19_KARABINER_RETURN
+local _F20_NUMERIC = Keycodes.F20_KARABINER_ESCAPE
 
 -- Always-on rule files loaded in order after CapsWord (which is loaded first
 -- separately to guarantee the highest priority in the KE rule engine).
