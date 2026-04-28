@@ -982,6 +982,12 @@ function M.perform_check(force_trigger, profile_name)
 	Logger.start(LOG, "LLM request — model: '%s' | temp: %.2f | %d pred(s) | max tokens: %d.",
 		tostring(model_to_use), req_temperature, num_preds, max_tokens)
 
+	-- Arm the backend-agnostic chain timing instrumentation. The tooltip
+	-- ignores subsequent calls within the same chain, so this is safe to call
+	-- on every perform_check — the first one in a chain wins and TTLT spans
+	-- all subsequent links until M.reset() fires mark_chain_complete().
+	pcall(tooltip.set_chain_start, hs.timer.secondsSinceEpoch())
+
 	-- Loading indicator: only shown when nothing is already on screen (n-gram placeholder
 	-- or previous LLM predictions). Avoids the blank gap that the spinner creates —
 	-- existing content stays visible and is replaced in-place when new predictions arrive.
@@ -1248,8 +1254,14 @@ function M.perform_check(force_trigger, profile_name)
 				loading_text, slot_count)
 
 			-- Start the auto-dismiss countdown only once the full batch has arrived;
-			-- reset_llm_dismiss_timer() re-syncs the delay in case it changed mid-session
-			if is_final then reset_llm_dismiss_timer() end
+			-- reset_llm_dismiss_timer() re-syncs the delay in case it changed mid-session.
+			-- Also publish the up-to-date TTLT so the user sees the full timing line as
+			-- soon as streaming concludes for the current chain link — the chain origin
+			-- itself stays anchored to the very first link until M.reset() fires.
+			if is_final then
+				reset_llm_dismiss_timer()
+				pcall(tooltip.mark_chain_complete)
+			end
 		end,
 		function()
 			if fetch_request_counter ~= my_fetch_id then return end
@@ -1293,6 +1305,9 @@ function M.perform_check(force_trigger, profile_name)
 					tooltip.tint("ai_prediction"), nil, #pending_predictions
 				)
 				reset_llm_dismiss_timer()
+				-- Publish TTLT even on failure: the user still cares how long the
+				-- attempt took, especially during repeated backend stalls.
+				pcall(tooltip.mark_chain_complete)
 			end
 		end,
 		sequential_mode, force_trigger, function() return fetch_request_counter end,
@@ -1309,6 +1324,12 @@ function M.reset()
 	if was_visible then
 		keylogger.log_llm_dismissed(nil, pending_predictions)
 	end
+
+	-- Finalise chain timing before tearing down state so the tooltip can
+	-- compute TTLT against the last update and render the full line one last
+	-- time. Safe to call unconditionally — tooltip ignores it if no chain
+	-- was armed (e.g. reset fired before any backend dispatch).
+	pcall(tooltip.mark_chain_complete)
 
 	pending_predictions        = {}
 	predictions_visible        = false
