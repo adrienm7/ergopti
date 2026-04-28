@@ -57,8 +57,8 @@ local KEYCODE_DIGITS = {
 	[22] = 6, [26] = 7, [28] = 8, [25] = 9, [29] = 10,
 }
 
-local KEYCODE_ESCAPE    = 53   -- Escape key consumed by the dynamic escape trap
-local KEYCODE_RETURN    = 36   -- Main Return key (accepts the active prediction)
+local KEYCODE_ESCAPE    = Keycodes.ESCAPE   -- Escape key consumed by the dynamic escape trap
+local KEYCODE_RETURN    = Keycodes.RETURN   -- Main Return key (accepts the active prediction)
 local KEYCODE_ENTER     = 76   -- Numpad Enter (same behaviour as Return)
 local KEYCODE_TAB       = 48   -- Tab: fast-accepts prediction #1 and stops all streaming
 local KEYCODE_ARROW_MIN = 123  -- Lowest arrow keycode (left arrow)
@@ -639,7 +639,7 @@ function M.apply_prediction(idx)
 	-- F16 (not F15) so the script-control kill-switch keycode stays exclusive.
 	engine.arm_chain()
 	Logger.debug(LOG, "F16 signal sent — LLM chain pending.")
-	hs.eventtap.keyStroke({}, "f16", 0)
+	hs.eventtap.keyStroke({}, Keycodes.to_name(Keycodes.F16_LLM_CHAIN_SIGNAL), 0)
 	return true
 end
 

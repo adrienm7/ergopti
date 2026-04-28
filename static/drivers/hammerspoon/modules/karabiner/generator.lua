@@ -33,14 +33,6 @@ local Keycodes = require("lib.keycodes")
 
 local LOG = "karabiner"
 
--- Sanity references — Karabiner JSON is built with string sentinels ("f13",
--- "f14", "f15") consumed by Karabiner Elements directly, but the numeric
--- keycodes that the receiving Hammerspoon modules dispatch on must stay aligned
--- with lib.keycodes. Touching those constants surfaces a stale literal here.
-local _F13_NUMERIC = Keycodes.F13_KARABINER_RETURN
-local _F14_NUMERIC = Keycodes.F14_KARABINER_BACKSPACE
-local _F15_NUMERIC = Keycodes.F15_KARABINER_ESCAPE
-
 -- Always-on rule files loaded in order after CapsWord (which is loaded first
 -- separately to guarantee the highest priority in the KE rule engine).
 local ALWAYS_ON_RULES = {
@@ -96,9 +88,9 @@ local ACTUAL_MODIFIER_KEY_CODES = {
 -- modules/shortcuts/script_control.lua.
 local SCRIPT_CONTROL_HOLDER_KEY     = "right_command"
 local SCRIPT_CONTROL_SENTINEL_SLOTS = {
-	{ from_key = "delete_or_backspace", sentinel = "f14", slot_label = "backspace" },
-	{ from_key = "return_or_enter",     sentinel = "f13", slot_label = "return"    },
-	{ from_key = "escape",              sentinel = "f15", slot_label = "escape"    },
+	{ from_key = "delete_or_backspace", sentinel = Keycodes.to_name(Keycodes.F14_KARABINER_BACKSPACE), slot_label = "backspace" },
+	{ from_key = "return_or_enter",     sentinel = Keycodes.to_name(Keycodes.F13_KARABINER_RETURN),    slot_label = "return"    },
+	{ from_key = "escape",              sentinel = Keycodes.to_name(Keycodes.F15_KARABINER_ESCAPE),    slot_label = "escape"    },
 }
 
 
@@ -506,7 +498,8 @@ end
 -- ===========================================
 
 --- Builds the three sentinel rules that translate physical right_command +
---- (backspace | return | escape) into F18 / F19 / F20 respectively.
+--- (backspace | return | escape) into the F13/F14/F15 sentinels declared in
+--- SCRIPT_CONTROL_SENTINEL_SLOTS.
 ---
 --- The variable_if guard on ke_held_right_command ensures these rules only fire
 --- for PHYSICAL presses — tap outputs from the rule engine bypass further rule
