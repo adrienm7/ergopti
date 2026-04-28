@@ -16,6 +16,13 @@ local notifications = require("lib.notifications")
 local ui_builder = require("ui.ui_builder")
 local Logger = require("lib.logger")
 
+-- Optional dependency: the auto-bootstrap status lives in this module so we
+-- can differentiate "still installing" from "definitively failed" when the
+-- MLX import probe below fails. If the module is absent (unusual layout),
+-- we fall back to the previous generic behaviour.
+local ok_mlx_deps, mlx_deps_checker = pcall(require, "lib.mlx_deps_checker")
+if not ok_mlx_deps then mlx_deps_checker = nil end
+
 local LOG = "menu_llm.mlx"
 
 local ok_dw, download_window = pcall(require, "ui.download_window")
@@ -1233,9 +1240,25 @@ PY
 			if code == 0 then
 				do_check()
 			else
-				Logger.error(LOG, "MLX dependencies missing in %s — auto-bootstrap may have failed.", project_venv_python_escaped)
-				pcall(notifications.notify, "❌ Dépendances MLX manquantes",
-					"Le bootstrap automatique du venv a échoué. Rechargez Hammerspoon et consultez la console.")
+				-- Differentiate three cases so the user sees the truth:
+				--   1. bootstrap still running → "patientez", do not flip to error
+				--   2. bootstrap failed        → show the actual stderr cause
+				--   3. unknown                 → previous generic message
+				if mlx_deps_checker and mlx_deps_checker.is_pending and mlx_deps_checker.is_pending() then
+					Logger.info(LOG, "MLX import probe failed but bootstrap still pending — asking user to wait.")
+					pcall(notifications.notify, "Moteur IA",
+						"Initialisation IA en cours, veuillez patienter…")
+				elseif mlx_deps_checker and mlx_deps_checker.has_failed and mlx_deps_checker.has_failed() then
+					local cause = (mlx_deps_checker.get_failure_message and mlx_deps_checker.get_failure_message())
+						or "Cause inconnue. Consultez la console Hammerspoon."
+					Logger.error(LOG, "MLX dependencies missing — bootstrap definitively failed: %s",
+						tostring(cause):gsub("\n", " | "))
+					pcall(notifications.notify, "❌ Dépendances MLX manquantes", cause)
+				else
+					Logger.error(LOG, "MLX dependencies missing in %s — auto-bootstrap may have failed.", project_venv_python_escaped)
+					pcall(notifications.notify, "❌ Dépendances MLX manquantes",
+						"Le bootstrap automatique du venv a échoué. Rechargez Hammerspoon et consultez la console.")
+				end
 				if on_cancel then pcall(on_cancel) end
 			end
 		end, {"-c", check_cmd})
