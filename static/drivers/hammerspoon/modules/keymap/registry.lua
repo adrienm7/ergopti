@@ -548,6 +548,8 @@ function M.load_toml(name, path)
 					final_result      = entry.final_result,
 				})
 			end
+		else
+			Logger.debug(LOG, "Section '%s/%s' skipped (disabled in hs.settings).", name, sec_name)
 		end
 
 		table.insert(sections_info, {

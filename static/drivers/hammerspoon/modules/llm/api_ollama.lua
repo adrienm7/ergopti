@@ -27,6 +27,17 @@ local RETRY_FAILED_PREDICTION_MAX_MULTIPLIER = 2
 -- Holds the current in-flight hs.task; cancelled when a new streaming request starts.
 -- The streaming flag itself is owned by modules/llm/init.lua and passed per-call.
 local _active_stream_task = nil
+-- Monotonic counter; each new stream gets its own ID so a stale on_done from a
+-- terminated stream does not clobber the active task reference of a newer one.
+local _stream_generation  = 0
+-- Readiness flag: true once warmup has confirmed the model is loaded
+local _is_ready           = false
+
+--- Returns true when the backend has confirmed it can answer inference requests.
+--- @return boolean
+function M.is_ready()
+	return _is_ready
+end
 
 -- Ensure Ollama daemon is running with optimized background start
 local function ensure_ollama_running()
@@ -35,7 +46,20 @@ local function ensure_ollama_running()
 	pcall(function()
 		hs.execute("pkill -f '[o]llama serve' 2>/dev/null || true")
 		hs.timer.usleep(50 * 1000)
-		hs.execute("nohup /opt/homebrew/bin/ollama serve > /tmp/ollama.serve.log 2>&1 &")
+		-- Funnel Ollama stdout/stderr into the unified Ergopti log behind an
+		-- [OLLAMA-SERVER] prefix so the user has a single tail target for the
+		-- whole stack (HS + MLX + Ollama land in the same /tmp/ergopti.log).
+		-- Uses a `while read` loop instead of awk: macOS' default BWK awk
+		-- does not implement the gawk-only strftime() / fflush(file) builtins,
+		-- so the previous awk pipeline crashed on the first line and killed
+		-- the ollama subprocess on SIGPIPE.
+		hs.execute(
+			"nohup bash -c \"/opt/homebrew/bin/ollama serve 2>&1 | " ..
+			"while IFS= read -r LINE; do " ..
+			"printf '%s [OLLAMA-SERVER] %s\\n' \\\"\\$(date +%H:%M:%S)\\\" \\\"\\$LINE\\\" " ..
+			">> /tmp/ergopti.log; " ..
+			"done\" &"
+		)
 	end)
 end
 
@@ -63,8 +87,10 @@ function M.warmup(model_name)
 		{ ["Content-Type"] = "application/json" },
 		function(status, _)
 			if status == 200 then
+				_is_ready = true
 				Logger.info(LOG, "Model '%s' warmed up — GPU cache ready.", model_name)
 			else
+				_is_ready = false
 				Logger.debug(LOG, "Warmup request returned %s — model may not be loaded yet.", tostring(status))
 			end
 		end
@@ -74,6 +100,8 @@ end
 --- Terminates the in-flight streaming task if one is active.
 --- Called when a newer request supersedes the current one.
 function M.cancel_streaming()
+	-- Bump generation so any stale on_done from a terminated stream becomes a no-op
+	_stream_generation = _stream_generation + 1
 	if _active_stream_task then
 		pcall(function() _active_stream_task:terminate() end)
 		_active_stream_task = nil
@@ -349,6 +377,9 @@ local function post_and_parse_streaming(model_name, system_prompt, full_text, ta
 		_active_stream_task = nil
 	end
 
+	_stream_generation = _stream_generation + 1
+	local my_generation = _stream_generation
+
 	_req_counter = _req_counter + 1
 	local req_id = _req_counter
 
@@ -405,6 +436,8 @@ local function post_and_parse_streaming(model_name, system_prompt, full_text, ta
 	-- Streaming callback: fired each time curl writes a chunk to stdout
 	local function on_chunk(_, chunk, _)
 		if not chunk or chunk == "" then return true end
+		-- Generation check: discard chunks from a stream that has been superseded
+		if my_generation ~= _stream_generation then return false end
 		line_buf = line_buf .. chunk
 		flush_lines()
 		return true
@@ -412,6 +445,12 @@ local function post_and_parse_streaming(model_name, system_prompt, full_text, ta
 
 	-- Completion callback: fired when curl exits
 	local function on_done(_, remaining, _)
+		-- Generation check: a newer request superseded this stream — don't touch
+		-- shared state (otherwise we untrack the active stream and leak its task)
+		if my_generation ~= _stream_generation then
+			Logger.debug(LOG, "[%s] #%d STREAM: superseded — discarding on_done.", model_name, req_id)
+			return
+		end
 		_active_stream_task = nil
 		if remaining and remaining ~= "" then
 			line_buf = line_buf .. remaining

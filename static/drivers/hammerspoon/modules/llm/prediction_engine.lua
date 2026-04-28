@@ -253,17 +253,43 @@ end
 -- ===== 3.2) LLM Config =====
 -- ===========================
 
+--- Schedules a warmup attempt now and keeps retrying every WARMUP_RETRY_SEC seconds
+--- until the backend reports ready. The first request often hits a server that is
+--- still loading model weights (10-30 s for a 2B model) and returns -1; this
+--- retry loop keeps re-priming until the model is actually loaded.
+local WARMUP_INITIAL_DELAY_SEC = 2
+local WARMUP_RETRY_SEC         = 5
+local function schedule_warmup_with_retry(reason)
+	-- Always re-resolve through core_llm.get_current_model so the warmup hits
+	-- the backend-specific id (e.g. 'gemma-4-e2b-it-mxfp4') and not the display
+	-- label ('gemma-4-E2B-it'); MLX server expects the exact id it was launched
+	-- with and stalls indefinitely on an unknown name
+	local resolved = core_llm.get_current_model()
+	if type(resolved) ~= "string" or resolved == "" then
+		Logger.debug(LOG, "%s: warmup skipped — backend model not resolved yet.", reason)
+		return
+	end
+	Logger.debug(LOG, "Scheduling warmup for '%s' in %.0fs (from %s).",
+		resolved, WARMUP_INITIAL_DELAY_SEC, reason)
+
+	local function try_warmup()
+		if not is_llm_enabled then return end
+		if core_llm.is_backend_ready and core_llm.is_backend_ready() then return end
+		local current = core_llm.get_current_model()
+		if type(current) ~= "string" or current == "" then return end
+		Logger.debug(LOG, "Warmup attempt for '%s' (backend: %s).",
+			current, tostring(core_llm.get_backend()))
+		pcall(core_llm.warmup_model, current, core_llm.get_active_profile())
+		hs.timer.doAfter(WARMUP_RETRY_SEC, try_warmup)
+	end
+	hs.timer.doAfter(WARMUP_INITIAL_DELAY_SEC, try_warmup)
+end
+
 function M.set_llm_enabled(enabled)
 	is_llm_enabled = (enabled == true)
 	Logger.info(LOG, "LLM %s.", is_llm_enabled and "enabled" or "disabled")
 	if not is_llm_enabled then M.reset(); return end
-	-- Pre-load model weights and prime the KV cache for the active profile's system
-	-- prompt; deferred so the rest of the startup sequence settles first
-	if type(active_model) == "string" and active_model ~= "" then
-		hs.timer.doAfter(2, function()
-			pcall(core_llm.warmup_model, active_model, core_llm.get_active_profile())
-		end)
-	end
+	schedule_warmup_with_retry("set_llm_enabled")
 end
 
 --- @return boolean
@@ -278,9 +304,7 @@ function M.set_llm_model(model_name)
 	-- Trigger a warmup only when LLM is already enabled (avoids spurious requests
 	-- during startup when set_llm_model fires before set_llm_enabled(true))
 	if is_llm_enabled then
-		hs.timer.doAfter(2, function()
-			pcall(core_llm.warmup_model, model_name, core_llm.get_active_profile())
-		end)
+		schedule_warmup_with_retry("set_llm_model")
 	end
 end
 
@@ -825,6 +849,14 @@ function M.perform_check(force_trigger, profile_name)
 
 	if not is_llm_enabled then
 		Logger.debug(LOG, "LLM disabled — request skipped.")
+		return
+	end
+	-- Backend readiness gate: until the warmup has confirmed the model is loaded
+	-- and serving inference, dispatching a request would show the loading tooltip
+	-- against a server that simply cannot answer in time. Skip silently so the
+	-- user sees no spinner while the backend warms up
+	if type(core_llm.is_backend_ready) == "function" and not core_llm.is_backend_ready() then
+		Logger.debug(LOG, "Backend not ready yet — request skipped (model warming up).")
 		return
 	end
 	if is_blocked_for_current_app() then
