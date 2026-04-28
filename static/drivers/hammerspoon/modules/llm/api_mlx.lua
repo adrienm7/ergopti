@@ -23,26 +23,232 @@ local DEDUPLICATION_ENABLED = false
 local RETRY_FAILED_PREDICTION_ENABLED = true
 local RETRY_FAILED_PREDICTION_MAX_MULTIPLIER = 2
 local STREAM_CONNECT_TIMEOUT_SEC = 5    -- Fail fast if the MLX server does not accept the TCP connection
-local STREAM_HARD_TIMEOUT_SEC    = 30   -- Kill the task if the server accepts but never sends a token
+local STREAM_HARD_TIMEOUT_SEC    = 90   -- Kill the task if the server accepts but never sends a token; large models need up to 60 s to load weights
 
 -- Holds the current in-flight hs.task; cancelled when a new streaming request starts.
 -- The streaming flag itself is owned by modules/llm/init.lua and passed per-call.
 local _active_stream_task       = nil
 local _active_stream_timeout    = nil  -- Hard-timeout timer for the current stream task
+local _stream_generation        = 0    -- Monotonic counter; each new stream gets its own ID
+local _active_stream_has_chunks = false  -- True once the current stream has received at least one SSE chunk
+
+-- Readiness flag: true once warmup has confirmed the model is loaded and the server
+-- can answer inference requests. perform_check gates on this so the loading tooltip
+-- and stream dispatch do not happen before the backend is actually responsive
+local _is_ready          = false
+-- Guard against concurrent warmup requests: set_llm_enabled and set_llm_model both
+-- schedule a warmup, the menu fires another after the requirements check, etc. Without
+-- this flag the user's log showed 4 simultaneous warmup POSTs piling up against an
+-- MLX server that can only process one request at a time, which is the very reason
+-- the warmup never received a 200
+local _warmup_in_flight  = false
+
+-- Discovered endpoint paths. Different mlx-lm releases have shipped completions
+-- and chat-completions under different routes (with/without the `/v1/` prefix);
+-- a silent route rename in a freshly-pulled wheel turns every request into a
+-- 404 with no obvious cause. Rather than hard-coding one set of paths, we probe
+-- the live server once per process to discover what it actually exposes, cache
+-- the working URLs here, and let everything else resolve through these vars.
+-- Initial values are the OpenAI-standard paths used by the long-stable
+-- mlx-lm 0.18→0.21 series; discover_endpoints overrides them at runtime
+-- whenever a probe finds a different working route.
+local MLX_BASE_URL          = "http://127.0.0.1:8080"
+local _completions_endpoint = MLX_BASE_URL .. "/v1/completions"
+local _chat_endpoint        = MLX_BASE_URL .. "/v1/chat/completions"
+local _endpoints_discovered = false
+local _endpoint_probe_in_flight = false
+-- Canonical model ID reported by the server via GET /v1/models.
+-- mlx-lm 0.26+ validates the model field in request payloads against the ID
+-- of the loaded model (typically the full HF path, e.g.
+-- "mlx-community/Qwen3.5-2B-4bit") and returns 404 when the short local name
+-- is sent instead. We read this once during discovery Phase 1 and substitute
+-- it everywhere we build a request payload.
+local _server_model_id = nil
+
+-- Candidate paths tried in order. The first probe whose POST returns ANYTHING
+-- other than 404 is treated as the live endpoint — 200 is a success, 400 and
+-- 422 are validation errors that still prove the route is registered (so a
+-- tiny "ping" payload is enough). We do NOT accept -1 as a hit: -1 from
+-- hs.http means connection refused / timeout, i.e. the server is not yet
+-- listening — that proves nothing about the route and forces us to retry.
+local COMPLETIONS_CANDIDATES = {
+	"/v1/completions",
+	"/completions",
+}
+local CHAT_CANDIDATES = {
+	"/v1/chat/completions",
+	"/chat/completions",
+}
+
+local DISCOVERY_MAX_WAIT_SEC   = 60   -- Stop polling /v1/models after this much real time
+local DISCOVERY_POLL_PERIOD_SEC = 1.0 -- Wait between /v1/models probes during the wait phase
+
+--- Probes the MLX server to discover which endpoint paths are valid in this
+--- mlx-lm install. Two phases:
+---   1. Wait for /v1/models to return 200 (proof the server is actually
+---      listening). Earlier we ran probe POSTs immediately, but if the server
+---      had not bound port 8080 yet, every probe came back as -1 (connection
+---      refused) and we mistook that for "route absent". Now we gate the POST
+---      probes on a successful /v1/models call so -1 results only happen when
+---      the route really is unreachable.
+---   2. POST a minimal payload to each candidate, accepting any HTTP status
+---      other than 404 / -1 as a live route.
+--- Idempotent: runs at most one probe per process.
+--- @param on_done function|nil Optional callback invoked once the probe finishes.
+local function discover_endpoints(on_done)
+	if _endpoints_discovered then
+		if type(on_done) == "function" then pcall(on_done) end
+		return
+	end
+	if _endpoint_probe_in_flight then return end
+	_endpoint_probe_in_flight = true
+
+	local probe_completions = hs.json.encode({ prompt = " ", max_tokens = 1 })
+	local probe_chat        = hs.json.encode({
+		messages   = { { role = "user", content = " " } },
+		max_tokens = 1,
+	})
+	local headers    = { ["Content-Type"] = "application/json" }
+	local started_at = hs.timer.secondsSinceEpoch()
+
+	local function run_post_probes()
+		-- payloads indexed by kind so each probe uses the correct API format;
+		-- using the wrong format on some mlx-lm versions returns 404 (not 422)
+		local probe_by_kind = { completions = probe_completions, chat = probe_chat }
+
+		local function probe_one(candidates, idx, found_so_far, kind, on_resolved)
+			if idx > #candidates then
+				pcall(on_resolved, found_so_far)
+				return
+			end
+			local path = candidates[idx]
+			local payload = probe_by_kind[kind] or probe_completions
+			hs.http.asyncPost(MLX_BASE_URL .. path, payload, headers, function(status, _)
+				if status and status ~= 404 and status ~= -1 then
+					Logger.info(LOG, "Endpoint discovery (%s): %s -> HTTP %s — accepted as live route.",
+						kind, path, tostring(status))
+					pcall(on_resolved, MLX_BASE_URL .. path)
+				else
+					Logger.debug(LOG, "Endpoint discovery (%s): %s -> %s, trying next candidate.",
+						kind, path, tostring(status))
+					probe_one(candidates, idx + 1, found_so_far, kind, on_resolved)
+				end
+			end)
+		end
+
+		probe_one(COMPLETIONS_CANDIDATES, 1, nil, "completions", function(found)
+			if found then _completions_endpoint = found end
+			probe_one(CHAT_CANDIDATES, 1, nil, "chat", function(found_chat)
+				if found_chat then _chat_endpoint = found_chat end
+				_endpoint_probe_in_flight = false
+
+				if not found and not found_chat then
+					-- All routes returned 404. This usually means the model is still
+					-- loading in Thread-1 (mlx-lm lazy-loads on first inference request
+					-- and returns 404 on inference routes until the load completes).
+					-- Do NOT mark discovery done — leave _endpoints_discovered = false
+					-- so the next warmup attempt re-probes the live server rather than
+					-- using stale defaults that will keep 404ing forever.
+					Logger.debug(LOG,
+						"MLX endpoint discovery: all candidates returned 404 — " ..
+						"model may still be loading. Will retry on next warmup.")
+					-- Last-ditch: log what the server says about itself, in case
+					-- the 404s really do mean the routes are absent
+					hs.http.asyncGet(MLX_BASE_URL .. "/", {}, function(s, body)
+						local snippet = (type(body) == "string") and body:sub(1, 600) or ""
+						Logger.debug(LOG, "MLX server GET / -> HTTP %s, body: %s",
+							tostring(s), snippet)
+					end)
+				else
+					-- At least one route confirmed — lock in the results
+					_endpoints_discovered = true
+					Logger.info(LOG, "MLX endpoints resolved: completions=%s, chat=%s.",
+						_completions_endpoint, _chat_endpoint)
+				end
+				if type(on_done) == "function" then pcall(on_done) end
+			end)
+		end)
+	end
+
+	-- Phase 1: poll /v1/models until the server is actually accepting requests
+	local function wait_for_server_ready()
+		hs.http.asyncGet(MLX_BASE_URL .. "/v1/models", {}, function(status, body)
+			if status == 200 then
+				-- Extract the canonical model ID so subsequent payloads use the
+				-- exact string the server expects in the "model" field.
+				if type(body) == "string" then
+					local ok_dec, resp = pcall(hs.json.decode, body)
+					if ok_dec and type(resp) == "table"
+						and type(resp.data) == "table"
+						and type(resp.data[1]) == "table"
+						and type(resp.data[1].id) == "string"
+						and resp.data[1].id ~= "" then
+						_server_model_id = resp.data[1].id
+						Logger.debug(LOG, "Endpoint discovery: server model ID = '%s'.", _server_model_id)
+					end
+				end
+				Logger.debug(LOG, "Endpoint discovery: server reachable on /v1/models — starting POST probes.")
+				run_post_probes()
+				return
+			end
+			local elapsed = hs.timer.secondsSinceEpoch() - started_at
+			if elapsed >= DISCOVERY_MAX_WAIT_SEC then
+				_endpoint_probe_in_flight = false
+				Logger.warn(LOG,
+					"Endpoint discovery: gave up waiting for MLX server after %.1fs (last status=%s). " ..
+					"Falling back to default routes; warmup will keep retrying.",
+					elapsed, tostring(status))
+				if type(on_done) == "function" then pcall(on_done) end
+				return
+			end
+			hs.timer.doAfter(DISCOVERY_POLL_PERIOD_SEC, wait_for_server_ready)
+		end)
+	end
+	wait_for_server_ready()
+end
 
 -- M.is_thinking_model is injected by init.lua
 
---- Terminates the in-flight streaming task if one is active.
+--- Returns true when the backend has confirmed it can answer inference requests.
+--- Flipped to true on the first successful warmup (HTTP 200), back to false on
+--- subsequent failures so the tooltip layer can hide the loading spinner cleanly.
+--- @return boolean
+function M.is_ready()
+	return _is_ready
+end
+
+--- Resets the endpoint discovery state so the next warmup re-probes the live
+--- server. Called after an mlx-lm upgrade, because a new wheel may expose
+--- different route paths than the previously cached ones.
+function M.reset_endpoints()
+	_endpoints_discovered     = false
+	_endpoint_probe_in_flight = false
+	_is_ready                 = false
+	_server_model_id          = nil
+	Logger.debug(LOG, "Endpoint discovery state reset (post-upgrade).")
+end
+
+--- Supersedes the in-flight streaming task.
+--- Always terminates the curl process to free the TCP connection to the MLX server,
+--- which can only handle one request at a time. Keeping stale connections open blocks
+--- subsequent requests and causes a deadlock where no prediction ever completes.
 --- Called when a newer request supersedes the current one.
 function M.cancel_streaming()
 	if _active_stream_timeout then
 		pcall(function() _active_stream_timeout:stop() end)
 		_active_stream_timeout = nil
 	end
+	-- Bump generation so all callbacks from the old stream become no-ops
+	_stream_generation = _stream_generation + 1
+
 	if _active_stream_task then
+		-- Always terminate to free the MLX server connection; leaving prefill-phase
+		-- curls running blocks the server from answering the next request
 		pcall(function() _active_stream_task:terminate() end)
-		_active_stream_task = nil
-		Logger.debug(LOG, "Active MLX stream cancelled.")
+		local phase = _active_stream_has_chunks and "mid-flight" or "prefill"
+		Logger.debug(LOG, "Active MLX stream terminated (%s).", phase)
+		_active_stream_task    = nil
+		_active_stream_has_chunks = false
 	end
 end
 
@@ -55,11 +261,35 @@ end
 --- @param model_name string The MLX model identifier (logged only).
 --- @param profile table|nil The active profile object; falls back to a minimal ping.
 function M.warmup(model_name, profile)
+	-- Skip if the backend already answered a previous warmup successfully — the
+	-- model is loaded, no need to re-prime
+	if _is_ready then
+		Logger.debug(LOG, "MLX warmup skipped — backend already ready.")
+		return
+	end
+	-- Skip if a warmup is already in flight; otherwise the user's log shows 4
+	-- simultaneous POST requests piling up against the single-threaded server
+	if _warmup_in_flight then
+		Logger.debug(LOG, "MLX warmup skipped — request already in flight.")
+		return
+	end
+
+	-- Make sure we know which routes the live mlx-lm install exposes BEFORE we
+	-- send the warmup itself. Without this, a route rename in a freshly
+	-- installed mlx-lm wheel turns every warmup into a 404 with no recovery.
+	if not _endpoints_discovered then
+		discover_endpoints(function() M.warmup(model_name, profile) end)
+		return
+	end
+
 	Logger.debug(LOG, "Warming up MLX KV cache for model '%s'…", tostring(model_name))
 
 	local Profiles  = require("modules.llm.profiles")
-	local endpoint  = "http://127.0.0.1:8080/v1/completions"
+	local endpoint  = _completions_endpoint
 	local payload
+	-- Use the server's canonical model ID (fetched from /v1/models during discovery)
+	-- so the "model" field matches what mlx-lm 0.26+ validates against.
+	local effective_model = _server_model_id or model_name
 
 	-- Build the full prompt the server will actually see on real requests so that its
 	-- KV cache entry for the static prefix is immediately useful.
@@ -82,8 +312,9 @@ function M.warmup(model_name, profile)
 			-- user message — prime the full static system block (~350 tokens).
 			local user_msg = uses_pf_tail and 'PREFIX: "Bonjour"\nTAIL: "Bonjour"' or "Bonjour"
 			local merged   = sys .. "\n\n" .. user_msg
-			endpoint = "http://127.0.0.1:8080/v1/chat/completions"
+			endpoint = _chat_endpoint
 			local ok_enc, enc = pcall(hs.json.encode, {
+				model       = effective_model,
 				messages    = { { role = "user", content = merged } },
 				max_tokens  = 1,
 				temperature = 0,
@@ -94,6 +325,7 @@ function M.warmup(model_name, profile)
 			-- Basic / raw profiles fold the context into the system prompt; only the
 			-- static prefix before {context} is shared, so a completions ping suffices.
 			local ok_enc, enc = pcall(hs.json.encode, {
+				model       = effective_model,
 				prompt      = sys,
 				max_tokens  = 1,
 				temperature = 0,
@@ -107,6 +339,7 @@ function M.warmup(model_name, profile)
 	-- is loaded without risking a crash.
 	if not payload then
 		local ok_enc, enc = pcall(hs.json.encode, {
+			model       = effective_model,
 			prompt      = " ",
 			max_tokens  = 1,
 			temperature = 0,
@@ -115,13 +348,28 @@ function M.warmup(model_name, profile)
 		payload = enc
 	end
 
+	_warmup_in_flight = true
 	hs.http.asyncPost(endpoint, payload, { ["Content-Type"] = "application/json" },
 		function(status, _)
+			_warmup_in_flight = false
 			if status == 200 then
-				Logger.info(LOG, "MLX KV cache primed (profile: %s).",
+				_is_ready = true
+				Logger.info(LOG, "MLX KV cache primed (profile: %s) — backend ready.",
 					(type(profile) == "table" and profile.id) or "default")
 			else
-				Logger.debug(LOG, "MLX warmup returned %s — model may not be loaded yet.", tostring(status))
+				_is_ready = false
+				-- Reset discovery when the warmup itself returns 404 so the next
+				-- retry re-probes the live routes instead of hitting the same dead
+				-- endpoint indefinitely. Covers two cases: (a) model still loading
+				-- in Thread-1 when discovery ran but the subsequent warmup POST
+				-- came too late for the lazy-load cache, and (b) chat route absent
+				-- in older mlx-lm while completions works — re-discovery picks up
+				-- whichever endpoint actually answers.
+				if status == 404 then
+					_endpoints_discovered = false
+				end
+				Logger.debug(LOG, "MLX warmup returned %s — model may not be loaded yet; will retry on next set_llm_enabled / set_llm_model.",
+					tostring(status))
 			end
 		end
 	)
@@ -233,16 +481,18 @@ local function post_and_parse(model_name, system_prompt, full_text, tail_text,
 
     local opts = build_options(temperature, num_predict_tokens, is_batch, line_mode)
     local payload
-    local endpoint = "http://127.0.0.1:8080/v1/chat/completions"
+    local endpoint = _chat_endpoint
     local prompt_preview = merged_prompt
 
+    local effective_model = _server_model_id or model_name
     if line_mode then
         -- For plain autocomplete, completion endpoint is more reliable than chat formatting
         local ctx = type(full_text) == "string" and full_text or ""
         local prompt = (#ctx > 240) and ctx:sub(#ctx - 239) or ctx
         prompt_preview = prompt
-        endpoint = "http://127.0.0.1:8080/v1/completions"
+        endpoint = _completions_endpoint
         payload = {
+            model       = effective_model,
             prompt      = prompt,
             stream      = false,
             temperature = opts.temperature,
@@ -251,12 +501,12 @@ local function post_and_parse(model_name, system_prompt, full_text, tail_text,
         }
     else
         payload = {
+            model       = effective_model,
             messages    = messages,
             stream      = false,
             temperature = opts.temperature,
             max_tokens  = opts.max_tokens,
             stop        = opts.stop,
-            chat_template_kwargs = { enable_thinking = false }
         }
     end
 
@@ -382,11 +632,15 @@ end
 local function post_and_parse_streaming(model_name, system_prompt, full_text, tail_text,
                                          temperature, num_predict_tokens, num_predictions, is_batch,
                                          on_success, on_fail, dedup_stats, on_partial)
-	-- Terminate any previous stream so resources are not leaked
+	-- Supersede any previous stream: always terminate to free the MLX server connection
 	if _active_stream_task then
 		pcall(function() _active_stream_task:terminate() end)
-		_active_stream_task = nil
+		_active_stream_task    = nil
+		_active_stream_has_chunks = false
 	end
+
+	_stream_generation = _stream_generation + 1
+	local my_generation = _stream_generation
 
 	_req_counter = _req_counter + 1
 	local req_id = _req_counter
@@ -420,13 +674,15 @@ local function post_and_parse_streaming(model_name, system_prompt, full_text, ta
 	local line_mode = (not is_batch) and (not is_advanced_prompt)
 	local opts = build_options(temperature, num_predict_tokens, is_batch, line_mode)
 
+	local effective_model = _server_model_id or model_name
 	local payload, endpoint, prompt_preview
 	if line_mode then
 		local ctx    = type(full_text) == "string" and full_text or ""
 		local prompt = (#ctx > 240) and ctx:sub(#ctx - 239) or ctx
 		prompt_preview = prompt
-		endpoint = "http://127.0.0.1:8080/v1/completions"
+		endpoint = _completions_endpoint
 		payload = {
+			model       = effective_model,
 			prompt      = prompt,
 			stream      = true,
 			temperature = opts.temperature,
@@ -435,14 +691,14 @@ local function post_and_parse_streaming(model_name, system_prompt, full_text, ta
 		}
 	else
 		prompt_preview = merged_prompt
-		endpoint = "http://127.0.0.1:8080/v1/chat/completions"
+		endpoint = _chat_endpoint
 		payload = {
+			model       = effective_model,
 			messages    = { { role = "user", content = merged_prompt } },
 			stream      = true,
 			temperature = opts.temperature,
 			max_tokens  = opts.max_tokens,
 			stop        = opts.stop,
-			chat_template_kwargs = { enable_thinking = false },
 		}
 	end
 
@@ -501,10 +757,15 @@ local function post_and_parse_streaming(model_name, system_prompt, full_text, ta
 	-- Streaming callback: fired each time curl writes a chunk to stdout
 	local function on_chunk(_, chunk, stderr_chunk)
 		if not chunk or chunk == "" then return true end
-		-- First chunk received — server is alive, cancel the hard-timeout watchdog
-		if _active_stream_timeout then
-			pcall(function() _active_stream_timeout:stop() end)
-			_active_stream_timeout = nil
+		-- Generation check: if a newer request superseded us, discard chunks silently
+		if my_generation ~= _stream_generation then return false end
+		-- First chunk received — server is alive; cancel the hard-timeout watchdog and mark stream active
+		if not _active_stream_has_chunks then
+			_active_stream_has_chunks = true
+			if _active_stream_timeout then
+				pcall(function() _active_stream_timeout:stop() end)
+				_active_stream_timeout = nil
+			end
 		end
 		Logger.debug(LOG, "[%s] #%d STREAM chunk (%d bytes): '%s'",
 			model_name, req_id, #chunk, chunk:sub(1, 120))
@@ -515,20 +776,32 @@ local function post_and_parse_streaming(model_name, system_prompt, full_text, ta
 
 	-- Completion callback: fired when curl exits
 	local function on_done(exit_code, remaining, stderr_out)
-		_active_stream_task = nil
-		if _active_stream_timeout then
-			pcall(function() _active_stream_timeout:stop() end)
-			_active_stream_timeout = nil
-		end
 		Logger.debug(LOG, "[%s] #%d STREAM on_done: exit=%s remaining_len=%d stderr='%s'",
 			model_name, req_id, tostring(exit_code),
 			(remaining and #remaining or -1),
 			tostring((stderr_out or ""):sub(1, 200)))
 
-		-- SIGTERM (15) means a newer request killed this stream intentionally —
-		-- skip callbacks entirely to prevent the retry chain from cascading
+		-- Generation check: a newer request superseded this stream — discard result silently
+		-- and DO NOT touch _active_stream_task: it now belongs to the newer request,
+		-- and clearing it would untrack the active stream so subsequent cancel_streaming
+		-- calls would no-op, leaking curl processes that hold the MLX connection
+		if my_generation ~= _stream_generation then
+			Logger.debug(LOG, "[%s] #%d STREAM: superseded by newer request (gen %d vs %d) — no callbacks.",
+				model_name, req_id, my_generation, _stream_generation)
+			return
+		end
+
+		-- This stream is still the current one — clear active state
+		_active_stream_task    = nil
+		_active_stream_has_chunks = false
+		if _active_stream_timeout then
+			pcall(function() _active_stream_timeout:stop() end)
+			_active_stream_timeout = nil
+		end
+
+		-- SIGTERM (15) means this stream was explicitly terminated (mid-flight cancel)
 		if exit_code == 15 then
-			Logger.debug(LOG, "[%s] #%d STREAM: terminated by newer request — no callbacks.", model_name, req_id)
+			Logger.debug(LOG, "[%s] #%d STREAM: terminated mid-flight — no callbacks.", model_name, req_id)
 			return
 		end
 
@@ -594,7 +867,8 @@ local function post_and_parse_streaming(model_name, system_prompt, full_text, ta
 		endpoint,
 	})
 	task:start()
-	_active_stream_task = task
+	_active_stream_task    = task
+	_active_stream_has_chunks = false
 	Logger.debug(LOG, "[%s] #%d STREAM task started (payload: %s).", model_name, req_id, tmp_path)
 
 	-- Hard-timeout: if no token has arrived within STREAM_HARD_TIMEOUT_SEC, the server
@@ -602,11 +876,14 @@ local function post_and_parse_streaming(model_name, system_prompt, full_text, ta
 	-- UI does not freeze indefinitely showing the loading spinner.
 	_active_stream_timeout = hs.timer.doAfter(STREAM_HARD_TIMEOUT_SEC, function()
 		_active_stream_timeout = nil
+		-- Only fire if this stream is still the current one
+		if my_generation ~= _stream_generation then return end
 		if _active_stream_task then
 			Logger.warn(LOG, "[%s] #%d STREAM hard timeout (%gs) — terminating hung task.",
 				model_name, req_id, STREAM_HARD_TIMEOUT_SEC)
 			pcall(function() _active_stream_task:terminate() end)
-			_active_stream_task = nil
+			_active_stream_task    = nil
+			_active_stream_has_chunks = false
 			if type(on_fail) == "function" then pcall(on_fail) end
 		end
 	end)
