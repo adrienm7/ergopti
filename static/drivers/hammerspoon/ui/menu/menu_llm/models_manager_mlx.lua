@@ -470,10 +470,13 @@ PY
 		return installed
 	end
 
-	function obj.start_server(target_model, on_success, opts)
+	function obj.start_server(target_model, on_success, on_cancel, opts)
 		local repo = obj.get_mlx_repo(target_model)
 		if not repo then
 			Logger.warn(LOG, "Cannot start MLX server: no repository found for model %s.", tostring(target_model))
+			-- Fire on_cancel so the caller's prediction lock is released; otherwise
+			-- predictions stay silently disabled for the rest of the session
+			if type(on_cancel) == "function" then pcall(on_cancel) end
 			return
 		end
 		Logger.info(LOG, "Ensuring MLX server for model %s…", tostring(target_model))
@@ -579,6 +582,8 @@ PY
 				if code == 0 and not startup_confirmed then
 					-- Process exited cleanly before signalling readiness — this is unexpected
 					Logger.error(LOG, "MLX server for model ‘%s’ exited before readiness (code 0).", tostring(target_model))
+					-- Release prediction lock so future predictions are not silently disabled
+					if type(on_cancel) == "function" then pcall(on_cancel); on_cancel = nil end
 					return
 				end
 
@@ -618,6 +623,9 @@ PY
 					else
 						Logger.error(LOG, "MLX server for model ‘%s’ crashed (code %d).", tostring(target_model), code)
 					end
+					-- Release prediction lock so the session is not silently broken
+					-- after an architecture-mismatch crash or any other startup failure
+					if type(on_cancel) == "function" then pcall(on_cancel); on_cancel = nil end
 				end
 
 				Logger.info(LOG, "MLX server process exited with code %d.", code)
@@ -640,6 +648,7 @@ PY
 				probe_server_ready(40)
 			else
 				Logger.error(LOG, "Failed to create hs.task for MLX server — model ‘%s’ cannot start.", tostring(target_model))
+				if type(on_cancel) == "function" then pcall(on_cancel); on_cancel = nil end
 			end
 		end)
 	end
@@ -1300,7 +1309,7 @@ PY
 			local installed = obj.get_installed_models()
 			if installed[target_model] then
 				Logger.info(LOG, "MLX model %s is installed. Starting server…", tostring(target_model))
-				obj.start_server(target_model, on_success, opts)
+				obj.start_server(target_model, on_success, on_cancel, opts)
 			else
 				Logger.warn(LOG, "MLX model %s not detected as installed. Starting download flow…", tostring(target_model))
 				local repo = obj.get_mlx_repo(target_model)
