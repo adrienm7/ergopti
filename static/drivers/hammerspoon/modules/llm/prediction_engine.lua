@@ -15,7 +15,7 @@
 ---    inactivity / chain / watchdog timers, and all LLM configuration.
 --- 2. LLM pipeline: sends async requests, streams results progressively,
 ---    deduplicates candidates, and manages the auto-dismiss countdown.
---- 3. Chain trigger: after a prediction is accepted, arms F20 detection so the
+--- 3. Chain trigger: after a prediction is accepted, arms F17 detection so the
 ---    next LLM request fires as soon as the HID queue drains.
 --- 4. Public API surface: exposed to the keymap bridge and menu modules via
 ---    typed setters and query helpers; no shared mutable globals.
@@ -48,8 +48,10 @@ local _state = nil  -- Shared keymap core state; injected via M.init()
 -- ── macOS key code ────────────────────────────────────────────────────────────
 
 -- Synthetic "typing complete" signal sent by apply_prediction after all HID events.
--- Exported so the keymap bridge can detect it without duplicating the constant.
-local KEYCODE_F20 = Keycodes.F20_KARABINER_ESCAPE
+-- Uses F17 — distinct from the F20 script-control kill-switch, so manually pressing
+-- F20 cannot accidentally fire an LLM chain. Exported so the keymap bridge can
+-- detect it without duplicating the constant.
+local KEYCODE_F17 = Keycodes.F17_LLM_CHAIN_SIGNAL
 
 -- ── LLM request parameters ────────────────────────────────────────────────────
 -- Token budget formula: max_tokens = max(MIN_MAX_TOKENS, effective_max_words * RATIO + OVERHEAD)
@@ -102,7 +104,7 @@ local NGRAM_MAX_PREDS = 3  -- Maximum instant candidates to show before LLM resp
 -- ── Timing constants ──────────────────────────────────────────────────────────
 
 local STREAM_WATCHDOG_SEC = 12.0  -- Surface partial results after this many seconds of stream stall
-local CHAIN_FALLBACK_SEC  = 0.5   -- Fire chain LLM if the F20 signal is somehow missed
+local CHAIN_FALLBACK_SEC  = 0.5   -- Fire chain LLM if the F17 signal is somehow missed
 
 -- ── Failure detection ─────────────────────────────────────────────────────────
 -- Track consecutive on_fail callbacks to surface a notification when failures are
@@ -179,13 +181,13 @@ local _consecutive_llm_failures = 0
 -- Fires perform_check() after inactivity_debounce_sec of silence
 local _inactivity_timer = nil
 
--- Fallback: fires perform_check() if the F20 chain signal is somehow missed
+-- Fallback: fires perform_check() if the F17 chain signal is somehow missed
 local _chain_trigger_timer = nil
 
 -- Surfaces partial streaming results if the LLM stream stalls
 local _stream_watchdog_timer = nil
 
--- True between an accepted prediction and the F20 chain trigger that follows it
+-- True between an accepted prediction and the F17 chain trigger that follows it
 local chain_pending = false
 
 -- ── LLM engine configuration ─────────────────────────────────────────────────
@@ -1292,8 +1294,8 @@ function M.consume(idx)
 end
 
 --- Arms the chain trigger after a prediction is accepted.
---- Sets chain_pending and starts a fallback timer in case the F20 signal is missed.
---- Must be called BEFORE hs.eventtap.keyStroke({}, "f20", 0) is sent by the bridge.
+--- Sets chain_pending and starts a fallback timer in case the F17 signal is missed.
+--- Must be called BEFORE hs.eventtap.keyStroke({}, "f17", 0) is sent by the bridge.
 function M.arm_chain()
 	if not require_state("arm_chain") then return end
 	if _inactivity_timer    then _inactivity_timer:stop() end
@@ -1305,7 +1307,7 @@ function M.arm_chain()
 	_chain_trigger_timer = hs.timer.doAfter(CHAIN_FALLBACK_SEC, function()
 		if chain_pending then
 			chain_pending = false
-			Logger.warn(LOG, "Fallback chain triggered — F20 signal was missed.")
+			Logger.warn(LOG, "Fallback chain triggered — F17 signal was missed.")
 			M.perform_check(true)
 		end
 	end)
@@ -1361,15 +1363,15 @@ function M.stop_timer()
 	core_llm.cancel_streaming()
 end
 
---- Consumes the F20 chain signal if a chain is pending.
+--- Consumes the F17 chain signal if a chain is pending.
 --- Called from the keymap bridge's keystroke handler before any other routing.
 --- @param keyCode number The macOS key code of the pressed key.
---- @return boolean True if the F20 event was consumed and the chain was triggered.
-function M.handle_f20(keyCode)
-	if keyCode ~= KEYCODE_F20 or not chain_pending then return false end
+--- @return boolean True if the F17 event was consumed and the chain was triggered.
+function M.handle_chain_signal(keyCode)
+	if keyCode ~= KEYCODE_F17 or not chain_pending then return false end
 	chain_pending = false
 	if _chain_trigger_timer then _chain_trigger_timer:stop() end
-	Logger.debug(LOG, "F20 received — triggering chained LLM.")
+	Logger.debug(LOG, "F17 received — triggering chained LLM.")
 	M.perform_check(true)
 	return true
 end
@@ -1377,7 +1379,7 @@ end
 --- @return boolean True while predictions are displayed and awaiting user interaction.
 function M.is_visible() return predictions_visible end
 
---- @return boolean True between an accepted prediction and the incoming F20 chain signal.
+--- @return boolean True between an accepted prediction and the incoming F17 chain signal.
 function M.is_chain_pending() return chain_pending end
 
 --- @return table The current pending predictions array.
@@ -1403,7 +1405,7 @@ function M.get_navigation_mods() return normalize_mods(navigation_mods) end
 function M.get_validation_mods() return normalize_mods(validation_mods) end
 
 -- Export constants needed by external callers
-M.KEYCODE_F20        = KEYCODE_F20         -- Bridge uses this to detect the chain signal
+M.KEYCODE_F17        = KEYCODE_F17         -- Bridge uses this to detect the chain signal
 M.CHAIN_FALLBACK_SEC = CHAIN_FALLBACK_SEC  -- Bridge passes this to suppress_rescan_keep_buffer
 
 

@@ -626,13 +626,14 @@ function M.apply_prediction(idx)
 
 	Logger.success(LOG, "Prediction #%d applied — buffer updated.", idx)
 
-	-- Chain trigger: F20 is injected after all deletions and text keystrokes.
-	-- The HID event queue is ordered, so by the time handle_llm_keys() sees F20,
+	-- Chain trigger: F17 is injected after all deletions and text keystrokes.
+	-- The HID event queue is ordered, so by the time handle_llm_keys() sees F17,
 	-- all previous keystrokes have been delivered to the target application.
-	-- engine.arm_chain() sets a fallback timer in case F20 is somehow missed.
+	-- engine.arm_chain() sets a fallback timer in case F17 is somehow missed.
+	-- F17 (not F20) so the script-control kill-switch keycode stays exclusive.
 	engine.arm_chain()
-	Logger.debug(LOG, "F20 signal sent — LLM chain pending.")
-	hs.eventtap.keyStroke({}, "f20", 0)
+	Logger.debug(LOG, "F17 signal sent — LLM chain pending.")
+	hs.eventtap.keyStroke({}, "f17", 0)
 	return true
 end
 
@@ -644,8 +645,8 @@ end
 --- @param is_ignored boolean True when the current app is on the keymap ignore list.
 --- @return boolean True when the event was consumed by the prediction pipeline.
 function M.handle_llm_keys(keyCode, flags, is_ignored)
-	-- F20: precise "typing complete" signal sent by apply_prediction().
-	if engine.handle_f20(keyCode) then return true end
+	-- F17: precise "typing complete" signal sent by apply_prediction().
+	if engine.handle_chain_signal(keyCode) then return true end
 
 	-- Always handle navigation when predictions are on screen, even in keymap-ignored apps
 	-- (e.g. Raycast): the user must be able to navigate/dismiss the tooltip regardless of context.
