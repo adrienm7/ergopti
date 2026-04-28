@@ -29,11 +29,17 @@
 # 6. Streaming progress markers: every long-running step (uv install, Python
 #    install, venv creation, deps sync) prints an identifiable marker on
 #    stdout so the Lua side can show the user a precise notification while
-#    the operation is in progress.
-# 7. Fail fast: any unrecoverable failure (no network, install blocked by a
+#    the operation is in progress. Markers are emitted via 'printf' followed
+#    by an explicit redirect-flush trick so they reach Hammerspoon's
+#    streaming callback in real time, not buffered until process exit.
+# 7. Verbose pass-through: the raw stdout/stderr of 'uv' (which prints
+#    "Resolved 47 packages…", "Downloading torch (220 MB)…" in real time)
+#    is forwarded to stderr line by line. The Lua side logs each stderr
+#    line via Logger.info so 'tail -f /tmp/ergopti.log' shows live progress.
+# 8. Fail fast: any unrecoverable failure (no network, install blocked by a
 #    firewall) aborts with a non-zero exit code and a clear French message
 #    that the Lua side propagates verbatim to the user notification.
-# 8. Bash 3.2 compatible: macOS still ships bash 3.2 as /bin/bash — no
+# 9. Bash 3.2 compatible: macOS still ships bash 3.2 as /bin/bash — no
 #    associative arrays, no '${var,,}', nothing that requires bash 4+.
 # ==============================================================================
 
@@ -68,24 +74,37 @@ PYTHON_VERSION="3.11"
 # Homebrew when present, then the Astral installer's default targets.
 export PATH="/opt/homebrew/bin:/usr/local/bin:$HOME/.local/bin:$HOME/.cargo/bin:$PATH"
 
+# Disable I/O buffering on Python child processes — uv spawns python which
+# would otherwise buffer its progress messages until exit on a non-tty.
+export PYTHONUNBUFFERED=1
+
 # ------------------------------------------------------------------------------
 # Helpers
 # ------------------------------------------------------------------------------
 
 # Emits a marker line on stdout. The Lua caller streams stdout line by line
 # and surfaces a French "patientez" notification when it sees one of these.
+# Use 'printf' + a no-op redirect to coax bash into flushing the line in real
+# time; without it, stdout is fully buffered when not attached to a tty and
+# the markers only reach the Lua side on process exit, defeating the whole
+# purpose of progress notifications.
 emit_marker() {
-	echo "$1"
+	printf "%s\n" "$1"
+	# Force the kernel to drain any pending stdio buffers immediately. The
+	# combination "printf + sync" is portable across macOS bash 3.2 and gives
+	# us deterministic real-time delivery to hs.task's streaming callback.
+	sync 2>/dev/null || true
 }
 
 # Logs a human-readable line on stderr so it never collides with the marker
-# protocol on stdout.
+# protocol on stdout. The Lua side captures stderr too and forwards each
+# line to Logger.info, so 'tail -f /tmp/ergopti.log' shows live progress.
 log_info() {
-	echo "[MLX-DEPS] $1" >&2
+	printf "[MLX-DEPS] %s\n" "$1" >&2
 }
 
 log_error() {
-	echo "[MLX-DEPS] ❌ $1" >&2
+	printf "[MLX-DEPS] ❌ %s\n" "$1" >&2
 }
 
 # Locates uv in PATH or in the well-known install directories. Prints the
@@ -147,7 +166,8 @@ else
 
 	# The installer writes uv to ~/.local/bin by default on recent versions
 	# and to ~/.cargo/bin on older ones. We pre-extended PATH above to cover
-	# both, then re-locate the binary explicitly.
+	# both, then re-locate the binary explicitly. Verbose progress from the
+	# installer goes to stderr so the Lua side surfaces it via Logger.info.
 	if ! curl -LsSf https://astral.sh/uv/install.sh | sh >&2; then
 		log_error "Téléchargement / installation de uv impossible. Vérifiez votre connexion réseau (ou un éventuel pare-feu)."
 		exit 1
@@ -157,6 +177,7 @@ else
 		log_error "uv installé mais introuvable dans le PATH (~/.local/bin ou ~/.cargo/bin). Installation bloquée — exit."
 		exit 1
 	fi
+	emit_marker "UV_INSTALLED"
 fi
 
 # Sanity-check that uv actually runs. A binary on disk that segfaults or
@@ -182,10 +203,13 @@ fi
 if ! "$UV_BIN" python find "$PYTHON_VERSION" >/dev/null 2>&1; then
 	emit_marker "PYTHON_INSTALLING"
 	log_info "Téléchargement de Python $PYTHON_VERSION via uv (interpréteur managé)…"
+	# uv prints "Downloading cpython-3.11.x (45 MB)…" on stderr — we forward
+	# it verbatim so the live log shows real download progress.
 	if ! "$UV_BIN" python install "$PYTHON_VERSION" >&2; then
 		log_error "Échec du téléchargement de Python $PYTHON_VERSION via uv. Vérifiez votre connexion réseau."
 		exit 1
 	fi
+	emit_marker "PYTHON_INSTALLED"
 fi
 
 
@@ -204,6 +228,7 @@ if [ ! -x "$VENV_DIR/bin/python" ]; then
 		log_error "Impossible de créer le virtualenv via 'uv venv'."
 		exit 1
 	fi
+	emit_marker "VENV_CREATED"
 fi
 
 
@@ -237,10 +262,16 @@ emit_marker "VENV_SYNC_RAN"
 emit_marker "DEPS_SYNCING"
 log_info "Synchronisation des dépendances depuis pyproject.toml…"
 cd "$HS_ROOT"
-if ! VIRTUAL_ENV="$VENV_DIR" "$UV_BIN" pip sync "$PYPROJECT" >&2; then
+# Pass --verbose so uv prints "Resolved 47 packages in 12 ms",
+# "Downloading torch (220 MB)…" line by line on stderr. The Lua side logs
+# each stderr line via Logger.info so 'tail -f /tmp/ergopti.log' shows
+# real download progress instead of a 4-minute frozen silence.
+if ! VIRTUAL_ENV="$VENV_DIR" "$UV_BIN" pip sync --verbose "$PYPROJECT" >&2; then
 	log_error "'uv pip sync' a échoué — vérifiez votre connexion réseau et les versions épinglées dans pyproject.toml."
 	exit 1
 fi
+
+emit_marker "DEPS_SYNCED"
 
 # Persist the hash so the next invocation takes the silent fast path.
 printf "%s" "$PYPROJECT_HASH" > "$SYNC_HASH_FILE"
