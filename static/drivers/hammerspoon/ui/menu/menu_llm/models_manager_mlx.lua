@@ -59,7 +59,10 @@ function M.new(deps, presets)
 	local hs_root = project_root and (project_root .. "/static/drivers/hammerspoon") or ""
 	local project_venv_python = hs_root ~= "" and (hs_root .. "/.venv/bin/python") or ""
 	if project_venv_python == "" or not hs.fs.attributes(project_venv_python, "mode") then
-		Logger.warn(LOG, "Project venv python introuvable à %s — exécutez modules/llm/ensure-mlx-deps.sh.",
+		-- The auto-bootstrap (lib/mlx_deps_checker) provisions this interpreter
+		-- on every reload; if it is still missing here the bootstrap failed and
+		-- the user has already been notified.
+		Logger.warn(LOG, "Project venv python introuvable à %s — bootstrap auto en échec.",
 			tostring(project_venv_python))
 	end
 	local project_venv_python_escaped = project_venv_python:gsub("\\", "\\\\"):gsub("\"", "\\\"")
@@ -762,7 +765,7 @@ PY
 			-- versions pinned in pyproject.toml. Fail fast if it is missing.
 			f:write("PYTHON_BIN=\"" .. script_project_venv_python_escaped .. "\"\n")
 			f:write("if [ ! -x \"$PYTHON_BIN\" ]; then\n")
-			f:write("  echo \"[MLX] ❌ venv introuvable : $PYTHON_BIN — exécutez modules/llm/ensure-mlx-deps.sh\"\n")
+			f:write("  echo \"[MLX] ❌ venv introuvable : $PYTHON_BIN — rechargez Hammerspoon (bootstrap auto)\"\n")
 			f:write("  exit 1\n")
 			f:write("fi\n")
 			f:write("echo \"Python utilisé: $PYTHON_BIN\"\n")
@@ -1230,9 +1233,9 @@ PY
 			if code == 0 then
 				do_check()
 			else
-				Logger.error(LOG, "MLX dependencies missing in %s — run modules/llm/ensure-mlx-deps.sh.", project_venv_python_escaped)
+				Logger.error(LOG, "MLX dependencies missing in %s — auto-bootstrap may have failed.", project_venv_python_escaped)
 				pcall(notifications.notify, "❌ Dépendances MLX manquantes",
-					"Le venv local est incomplet. Exécutez modules/llm/ensure-mlx-deps.sh puis relancez.")
+					"Le bootstrap automatique du venv a échoué. Rechargez Hammerspoon et consultez la console.")
 				if on_cancel then pcall(on_cancel) end
 			end
 		end, {"-c", check_cmd})
