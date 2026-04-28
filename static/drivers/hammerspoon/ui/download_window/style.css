@@ -1,10 +1,12 @@
 /* ui/download_window/style.css */
 
 /* =========================================================================== */
-/* Download Window UI Styles.                                                  */
+/* Unified Download / Install Window UI Styles.                                */
 /* */
-/* Defines the visual layout and animations for the model download progress    */
-/* interface, including the progress bar, action buttons, and terminal logs.   */
+/* Defines the visual layout for the model download progress interface and the */
+/* engine bootstrap (MLX / Ollama install) progress UI. A `.mode-download` or  */
+/* `.mode-bootstrap` body class toggles which sections are visible, and a      */
+/* `.kind-<kind>` class drives the accent color shown in the left stripe.      */
 /* =========================================================================== */
 
 /* =============================== */
@@ -36,11 +38,12 @@ body {
 	font-family: -apple-system, 'SF Pro Text', 'Helvetica Neue', sans-serif;
 	height: 100vh;
 	overflow: hidden;
-	padding: 18px 20px;
+	padding: 18px 20px 18px 24px;
 	user-select: none;
 	-webkit-app-region: drag;
 	display: flex;
 	flex-direction: column;
+	position: relative;
 }
 
 h2 {
@@ -57,6 +60,12 @@ h2 {
 	word-break: break-all;
 }
 
+#subtitle {
+	color: #aaa;
+	font-size: 12px;
+	margin-top: 2px;
+}
+
 #ui-controls {
 	display: flex;
 	flex-direction: column;
@@ -65,10 +74,48 @@ h2 {
 }
 
 .header-group,
-.progress-group {
+.progress-group,
+#bootstrap-group {
 	display: flex;
 	flex-direction: column;
 }
+
+/* =============================================== */
+/* ===== 2.1) Accent stripe (per-kind color) ===== */
+/* =============================================== */
+
+#accent-stripe {
+	position: absolute;
+	left: 0;
+	top: 0;
+	bottom: 0;
+	width: 4px;
+	background: #4da6ff;
+	transition: background 0.25s ease;
+}
+
+body.kind-mlx_install #accent-stripe { background: #4da6ff; }
+body.kind-ollama_install #accent-stripe { background: #73d98c; }
+body.kind-mlx_model #accent-stripe { background: #9973f2; }
+body.kind-ollama_model #accent-stripe { background: #f2bf4d; }
+body.is-error #accent-stripe { background: #ff453a; }
+
+/* ================================================== */
+/* ===== 2.2) Mode toggling (download vs bootstrap) === */
+/* ================================================== */
+
+/* In download mode: hide the bootstrap-only block, hide subtitle. */
+body.mode-download #bootstrap-group { display: none; }
+body.mode-download #subtitle { display: none; }
+
+/* In bootstrap mode: hide download-only blocks. */
+body.mode-bootstrap .progress-group { display: none; }
+body.mode-bootstrap #model { display: none; }
+body.mode-bootstrap #log-area { display: none !important; }
+body.mode-bootstrap #btn-cancel,
+body.mode-bootstrap #btn-term,
+body.mode-bootstrap #btn-retry { display: none !important; }
+body.mode-bootstrap .btn-row { display: none; }
 
 /* ======================================= */
 /* ======================================= */
@@ -146,6 +193,55 @@ h2 {
 	display: inline-block;
 	width: 1em;
 }
+
+/* ============================================== */
+/* ===== 3.1) Bootstrap step / detail / bar ===== */
+/* ============================================== */
+
+#step-line {
+	color: #ebebee;
+	font-size: 13px;
+	font-weight: 500;
+	margin-bottom: 6px;
+}
+
+body.is-error #step-line {
+	color: #ff8e85;
+}
+
+#detail-line {
+	color: #888;
+	font-family: 'SF Mono', monospace;
+	font-size: 11px;
+	min-height: 14px;
+	margin-bottom: 10px;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+	direction: rtl; /* Truncate from the LEFT so the trailing actionable info stays visible */
+	text-align: left;
+}
+
+#bootstrap-bar-bg {
+	background: #3a3a3c;
+	border-radius: 2px;
+	height: 4px;
+	overflow: hidden;
+}
+
+#bootstrap-bar-fill {
+	background: #4da6ff;
+	border-radius: 2px;
+	height: 100%;
+	width: 30%; /* Indeterminate default */
+	transition: width 0.35s ease, background 0.25s ease;
+}
+
+body.kind-mlx_install #bootstrap-bar-fill { background: #4da6ff; }
+body.kind-ollama_install #bootstrap-bar-fill { background: #73d98c; }
+body.kind-mlx_model #bootstrap-bar-fill { background: #9973f2; }
+body.kind-ollama_model #bootstrap-bar-fill { background: #f2bf4d; }
+body.is-error #bootstrap-bar-fill { background: #ff453a; }
 
 /* ===================================== */
 /* ===================================== */
