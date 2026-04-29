@@ -13,6 +13,7 @@
 local M = {}
 local hs = hs
 local Logger = require("lib.logger")
+local Keycodes = require("lib.keycodes")
 local LOG = "tooltip_hotstring"
 
 local Config = require("ui.tooltip.config")
@@ -78,7 +79,18 @@ local function start_watchers()
 
 	local ok_key, watcher_key = pcall(hs.eventtap.new, { event_types.keyDown }, function(event)
 		local keycode = event:getKeyCode()
-		local ignored_keycodes = { 54, 55, 56, 58, 59, 60, 105, 107, 113, 106, 64, 79, 80, 90 }
+		local ignored_keycodes = {
+			54, 55, 56, 58, 59, 60,
+			Keycodes.F13_KARABINER_RETURN,
+			Keycodes.F14_KARABINER_BACKSPACE,
+			Keycodes.F15_KARABINER_ESCAPE,
+			Keycodes.F16_LLM_CHAIN_SIGNAL,
+			Keycodes.F17_CYCLE_WINDOWS,
+			Keycodes.F20_LAYER_NAV_ENTERED,
+			Keycodes.LAYER_SYN_1,
+			Keycodes.LAYER_SYN_2,
+			Keycodes.LAYER_SYN_3,
+		}
 		
 		for _, ignored_code in ipairs(ignored_keycodes) do
 			if keycode == ignored_code then return false end

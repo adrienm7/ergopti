@@ -21,6 +21,7 @@ local eventtap   = hs.eventtap
 local text_utils = require("lib.text_utils")
 local km_utils   = require("modules.keymap.utils")
 local Logger     = require("lib.logger")
+local Keycodes   = require("lib.keycodes")
 
 local Registry   = require("modules.keymap.registry")
 local Expander   = require("modules.keymap.expander")
@@ -384,7 +385,7 @@ local function onKeyDownRaw(e)
 	local is_ignored = km_utils.is_ignored_window(CoreState.ignored_window_titles, CoreState.ignored_window_patterns, now)
 
 	-- 1. Ignore our own synthetic "Delete" keystrokes to prevent double-deletion.
-	if keyCode == 51 and CoreState.expected_synthetic_deletes > 0 then
+	if keyCode == Keycodes.BACKSPACE and CoreState.expected_synthetic_deletes > 0 then
 		CoreState.expected_synthetic_deletes = CoreState.expected_synthetic_deletes - 1
 		return false
 	end
@@ -402,14 +403,23 @@ local function onKeyDownRaw(e)
 		end
 	end
 
-	-- Ignore Karabiner synthetic layer keys and F13-F20 (used for signaling).
-	if keyCode == 105 or keyCode == 107 or keyCode == 113 or keyCode == 106
-		or keyCode == 64 or keyCode == 79 or keyCode == 80 or keyCode == 90 then
+	-- Ignore Karabiner sentinels (F13/F14/F15), the LLM chain signal (F16),
+	-- the cycle-windows hotkey (F17), the nav-layer-entered sentinel (F20),
+	-- and the relocated layer-syn no-op channel.
+	if keyCode == Keycodes.F13_KARABINER_RETURN
+		or keyCode == Keycodes.F14_KARABINER_BACKSPACE
+		or keyCode == Keycodes.F15_KARABINER_ESCAPE
+		or keyCode == Keycodes.F16_LLM_CHAIN_SIGNAL
+		or keyCode == Keycodes.F17_CYCLE_WINDOWS
+		or keyCode == Keycodes.F20_LAYER_NAV_ENTERED
+		or keyCode == Keycodes.LAYER_SYN_1
+		or keyCode == Keycodes.LAYER_SYN_2
+		or keyCode == Keycodes.LAYER_SYN_3 then
 		return false
 	end
 
 	-- 4. Handle Escape — dismiss predictions or optionally clear the buffer.
-	if keyCode == 53 then return LLMBridge.check_escape_reset() end
+	if keyCode == Keycodes.ESCAPE then return LLMBridge.check_escape_reset() end
 
 	-- 5. Modifier shortcuts (Cmd/Ctrl) break the current word context.
 	if flags.cmd or flags.ctrl then
@@ -419,7 +429,7 @@ local function onKeyDownRaw(e)
 	end
 
 	-- 6. Handle Backspace.
-	if keyCode == 51 then
+	if keyCode == Keycodes.BACKSPACE then
 		-- Cmd+Backspace / Alt+Backspace delete whole words — wipe the buffer.
 		if flags.cmd or flags.alt then
 			CoreState.buffer = ""
@@ -601,7 +611,7 @@ local function onKeyDownRaw(e)
 	-- Enter / Tab with no predictions visible clears prediction state.
 	-- When predictions ARE visible, Tab is consumed upstream by handle_llm_keys
 	-- (fast-accepts pred #1) and never reaches this point.
-	if keyCode == 36 or keyCode == 48 then
+	if keyCode == Keycodes.RETURN or keyCode == 48 then
 		LLMBridge.check_nav_reset()
 	end
 

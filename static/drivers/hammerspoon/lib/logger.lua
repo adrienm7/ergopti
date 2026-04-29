@@ -128,10 +128,10 @@ local _dedup = { line = nil, count = 0, variant_key = nil }
 
 
 
--- ===========================================
--- ===========================================
--- ======= 3.1) Unified File Sink Helpers ====
--- ===========================================
+-- ===============================================
+-- ===============================================
+-- ===== 3.1) Unified File Sink Helpers ==========
+-- ===============================================
 
 -- File sink state — opened lazily on first write, kept open for the life of
 -- the Hammerspoon process to avoid open/close overhead on every log line.

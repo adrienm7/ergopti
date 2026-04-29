@@ -133,6 +133,14 @@ function M.make_diff_styled(...) return TooltipLLM.make_diff_styled(...) end
 --- A configured delay of 0 means infinite display (no timer is started).
 function M.reset_llm_timer() TooltipLLM.reset_timer() end
 
+--- Arms the backend-agnostic chain timing origin. See TooltipLLM.set_chain_start.
+--- @param timestamp number Epoch seconds (typically hs.timer.secondsSinceEpoch()).
+function M.set_chain_start(timestamp) TooltipLLM.set_chain_start(timestamp) end
+
+--- Finalises the active chain: computes TTLT and renders the full timing line.
+--- Called by prediction_engine when the chain ends — success or failure.
+function M.mark_chain_complete() TooltipLLM.mark_chain_complete() end
+
 --- Returns the tinted background color for a display context, or nil if colorization is off.
 --- Delegates to Config.tint() so callers never need to import the config directly.
 --- @param key string Context key — "hotstring_star", "hotstring_autocorrect", "hotstring_personal", "ai_loading", "ai_prediction".

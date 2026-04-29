@@ -74,8 +74,10 @@ local dynamic_hotstrings = require("modules.dynamic_hotstrings")
 local karabiner          = require("modules.karabiner")
 local menu               = require("ui.menu")
 local hotstring_editor   = require("ui.hotstring_editor")
-local mlx_deps_checker   = require("lib.mlx_deps_checker")
-local notifications      = require("lib.notifications")
+local mlx_deps_checker    = require("lib.mlx_deps_checker")
+local ollama_deps_checker = require("lib.ollama_deps_checker")
+local backend_detector    = require("modules.llm.backend_detector")
+local notifications       = require("lib.notifications")
 local ui_restore         = require("lib.ui_restore")
 
 -- Wire Logger.error → system notification so every ERROR surfaces to the user
@@ -103,9 +105,19 @@ Logger.debug(LOG, "Starting shortcuts module…")
 shortcuts.start()
 Logger.info(LOG, "Main modules initialized successfully.")
 
--- Background check: verify Python MLX dependencies are installed
--- This runs asynchronously once per session, non-blocking
-mlx_deps_checker.check_and_install_deps()
+-- Background deps check for the active LLM backend. The detector picks
+-- MLX on Apple Silicon (≥ macOS 13) and Ollama everywhere else; a
+-- previously user-saved preference always wins. Both checkers are async
+-- and silent on the fast path, so a normal reload stays invisible.
+do
+	local active_backend = backend_detector.effective_backend()
+	Logger.info(LOG, "Bootstrapping default LLM backend: %s", active_backend)
+	if active_backend == backend_detector.BACKEND_MLX then
+		mlx_deps_checker.check_and_install_deps()
+	else
+		ollama_deps_checker.check_and_install_deps()
+	end
+end
 
 
 
