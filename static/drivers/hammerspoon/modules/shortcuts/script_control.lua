@@ -22,6 +22,7 @@ local M = {}
 local hs            = hs
 local notifications = require("lib.notifications")
 local Logger        = require("lib.logger")
+local Keycodes      = require("lib.keycodes")
 
 local LOG = "shortcuts.script_control"
 
@@ -65,17 +66,17 @@ end
 -- three target keys. Tap actions that happen to emit backspace/return/escape
 -- (e.g. left_command tap → backspace) can NEVER activate these sentinels,
 -- because rule outputs bypass Karabiner's rule engine.
-local KEYCODE_F18 = 79   -- Backspace slot
-local KEYCODE_F19 = 80   -- Return / enter slot
-local KEYCODE_F20 = 90   -- Escape slot
+local KEYCODE_RETURN_SENTINEL    = Keycodes.F13_KARABINER_RETURN
+local KEYCODE_BACKSPACE_SENTINEL = Keycodes.F14_KARABINER_BACKSPACE
+local KEYCODE_ESCAPE_SENTINEL    = Keycodes.F15_KARABINER_ESCAPE
 
 -- Physical keycodes used in the Karabiner-paused fallback path below. When KE is
 -- running the sentinels above are the sole dispatch mechanism; this fallback
 -- only exists so the user can still un-pause by pressing right_command + key
 -- when KE's altgr remap is gone.
-local KEYCODE_BACKSPACE = 51
-local KEYCODE_RETURN    = 36
-local KEYCODE_ESCAPE    = 53
+local KEYCODE_BACKSPACE = Keycodes.BACKSPACE
+local KEYCODE_RETURN    = Keycodes.RETURN
+local KEYCODE_ESCAPE    = Keycodes.ESCAPE
 
 -- Module-level state
 local _is_paused       = false
@@ -240,8 +241,8 @@ end
 --- Handles incoming keyDown events; consumes the event when it matches a configured slot.
 ---
 --- Two independent dispatch paths:
----   1. Sentinel keycodes (F18/F19/F20) — emitted by Karabiner's script-control
----      rules on physical right_command + backspace/return/escape. This is the
+---   1. Sentinel keycodes (F13/F14/F15) — emitted by Karabiner's script-control
+---      rules on physical right_command + return/backspace/escape. This is the
 ---      primary path when KE is running and cannot be spoofed by tap actions,
 ---      because KE rule outputs bypass further rule matching.
 ---   2. Right-command fallback — when KE is paused/killed, physical right_command
@@ -255,17 +256,17 @@ local function handle_key(e)
 	if not ok or type(code) ~= "number" then return false end
 
 	-- Primary path: sentinel keycodes from KE's script-control rules.
-	if code == KEYCODE_F18 then
+	if code == KEYCODE_BACKSPACE_SENTINEL then
 		log_shortcut_if_available("Alt+Backspace")
 		dispatch_action(_key_actions.backspace)
 		return true
 	end
-	if code == KEYCODE_F19 then
+	if code == KEYCODE_RETURN_SENTINEL then
 		log_shortcut_if_available("Alt+Enter")
 		dispatch_action(_key_actions.return_key)
 		return true
 	end
-	if code == KEYCODE_F20 then
+	if code == KEYCODE_ESCAPE_SENTINEL then
 		log_shortcut_if_available("Alt+Escape")
 		dispatch_action(_key_actions.escape)
 		return true

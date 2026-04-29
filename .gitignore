@@ -37,3 +37,6 @@ static/drivers/hammerspoon/karabiner.json
 static/drivers/hammerspoon/ergopti_bootstrap.json
 static/drivers/hotstrings/personal.toml
 static/drivers/hotstrings/personal_info.toml
+
+# Hammerspoon Python virtualenv (provisioned by modules/llm/ensure-mlx-deps.sh)
+static/drivers/hammerspoon/.venv/

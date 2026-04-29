@@ -31,6 +31,7 @@ local km_utils   = require("modules.keymap.utils")
 local text_utils = require("lib.text_utils")
 local core_llm   = require("modules.llm")
 local Logger     = require("lib.logger")
+local Keycodes   = require("lib.keycodes")
 local keylogger  = require("modules.keylogger")
 local tooltip    = require("ui.tooltip")
 local engine     = require("modules.llm.prediction_engine")
@@ -56,8 +57,8 @@ local KEYCODE_DIGITS = {
 	[22] = 6, [26] = 7, [28] = 8, [25] = 9, [29] = 10,
 }
 
-local KEYCODE_ESCAPE    = 53   -- Escape key consumed by the dynamic escape trap
-local KEYCODE_RETURN    = 36   -- Main Return key (accepts the active prediction)
+local KEYCODE_ESCAPE    = Keycodes.ESCAPE   -- Escape key consumed by the dynamic escape trap
+local KEYCODE_RETURN    = Keycodes.RETURN   -- Main Return key (accepts the active prediction)
 local KEYCODE_ENTER     = 76   -- Numpad Enter (same behaviour as Return)
 local KEYCODE_TAB       = 48   -- Tab: fast-accepts prediction #1 and stops all streaming
 local KEYCODE_ARROW_MIN = 123  -- Lowest arrow keycode (left arrow)
@@ -631,13 +632,14 @@ function M.apply_prediction(idx)
 
 	Logger.success(LOG, "Prediction #%d applied — buffer updated.", idx)
 
-	-- Chain trigger: F20 is injected after all deletions and text keystrokes.
-	-- The HID event queue is ordered, so by the time handle_llm_keys() sees F20,
+	-- Chain trigger: F16 is injected after all deletions and text keystrokes.
+	-- The HID event queue is ordered, so by the time handle_llm_keys() sees F16,
 	-- all previous keystrokes have been delivered to the target application.
-	-- engine.arm_chain() sets a fallback timer in case F20 is somehow missed.
+	-- engine.arm_chain() sets a fallback timer in case F16 is somehow missed.
+	-- F16 (not F15) so the script-control kill-switch keycode stays exclusive.
 	engine.arm_chain()
-	Logger.debug(LOG, "F20 signal sent — LLM chain pending.")
-	hs.eventtap.keyStroke({}, "f20", 0)
+	Logger.debug(LOG, "F16 signal sent — LLM chain pending.")
+	hs.eventtap.keyStroke({}, Keycodes.to_name(Keycodes.F16_LLM_CHAIN_SIGNAL), 0)
 	return true
 end
 
@@ -649,8 +651,8 @@ end
 --- @param is_ignored boolean True when the current app is on the keymap ignore list.
 --- @return boolean True when the event was consumed by the prediction pipeline.
 function M.handle_llm_keys(keyCode, flags, is_ignored)
-	-- F20: precise "typing complete" signal sent by apply_prediction().
-	if engine.handle_f20(keyCode) then return true end
+	-- F16: precise "typing complete" signal sent by apply_prediction().
+	if engine.handle_chain_signal(keyCode) then return true end
 
 	-- Always handle navigation when predictions are on screen, even in keymap-ignored apps
 	-- (e.g. Raycast): the user must be able to navigate/dismiss the tooltip regardless of context.

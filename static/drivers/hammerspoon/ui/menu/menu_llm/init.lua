@@ -23,6 +23,26 @@ local Profiles      = require("ui.menu.menu_llm.profiles_manager")
 local Settings      = require("ui.menu.menu_llm.settings_manager")
 local AppPickerLib  = require("lib.app_picker")
 
+-- Deps checkers — kicked off on backend switch and on first menu activation
+-- so a fresh-out-of-the-box Mac auto-bootstraps the engine without any
+-- manual user action. Both checkers are idempotent and exit silently when
+-- nothing needs doing, so the menu opens instantly in the nominal case.
+local mlx_deps_checker    = require("lib.mlx_deps_checker")
+local ollama_deps_checker = require("lib.ollama_deps_checker")
+
+--- Triggers the deps checker matching the given backend name. Designed to
+--- be safe to call repeatedly: each underlying script is hash-gated /
+--- liveness-gated and exits in milliseconds when the backend is already
+--- ready, so this is effectively a no-op on a working system.
+--- @param backend string Either "mlx" or "ollama".
+local function check_backend_deps(backend)
+	if backend == "mlx" then
+		pcall(mlx_deps_checker.check_and_install_deps)
+	elseif backend == "ollama" then
+		pcall(ollama_deps_checker.check_and_install_deps)
+	end
+end
+
 local LOG = "menu_llm"
 
 -- Holds the active models manager so M.stop_mlx_server() can reach it from any context
@@ -991,6 +1011,10 @@ function M.create(deps)
                     Logger.info(LOG, "Activating MLX backend…")
                     state.llm_backend = "mlx"
                     llm_mod.set_backend("mlx")
+                    -- On-demand deps check: bootstrap the MLX venv if the
+                    -- user just switched and the engine is not ready.
+                    -- The call is non-blocking and silent on the fast path.
+                    check_backend_deps("mlx")
 
                     if keymap and type(keymap.set_llm_backend_name) == "function" then
                         pcall(keymap.set_llm_backend_name, "MLX 🚀")
@@ -1032,6 +1056,10 @@ function M.create(deps)
                     Logger.info(LOG, "Deactivating MLX backend (switching to Ollama)…")
                     state.llm_backend = "ollama"
                     llm_mod.set_backend("ollama")
+                    -- On-demand deps check: install + start the Ollama
+                    -- server if the user just switched and the engine is
+                    -- not ready. Silent on the fast path.
+                    check_backend_deps("ollama")
                     if models_mgr.stop_mlx_server_if_needed then models_mgr.stop_mlx_server_if_needed() end
                     -- Hard kill just in case
                     os.execute("pids=$(lsof -tiTCP:8080 -sTCP:LISTEN 2>/dev/null); [ -n \"$pids\" ] && kill -9 $pids 2>/dev/null")

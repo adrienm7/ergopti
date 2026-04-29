@@ -15,7 +15,7 @@
 ---    inactivity / chain / watchdog timers, and all LLM configuration.
 --- 2. LLM pipeline: sends async requests, streams results progressively,
 ---    deduplicates candidates, and manages the auto-dismiss countdown.
---- 3. Chain trigger: after a prediction is accepted, arms F20 detection so the
+--- 3. Chain trigger: after a prediction is accepted, arms F16 detection so the
 ---    next LLM request fires as soon as the HID queue drains.
 --- 4. Public API surface: exposed to the keymap bridge and menu modules via
 ---    typed setters and query helpers; no shared mutable globals.
@@ -28,6 +28,7 @@ local hs = hs
 local core_llm  = require("modules.llm")
 local Parser    = require("modules.llm.parser")
 local Logger    = require("lib.logger")
+local Keycodes  = require("lib.keycodes")
 local tooltip   = require("ui.tooltip")
 local keylogger = require("modules.keylogger")
 local km_utils  = require("modules.keymap.utils")
@@ -47,8 +48,10 @@ local _state = nil  -- Shared keymap core state; injected via M.init()
 -- ── macOS key code ────────────────────────────────────────────────────────────
 
 -- Synthetic "typing complete" signal sent by apply_prediction after all HID events.
--- Exported so the keymap bridge can detect it without duplicating the constant.
-local KEYCODE_F20 = 90
+-- Uses F16 — distinct from the F15 script-control kill-switch, so manually pressing
+-- F15 cannot accidentally fire an LLM chain. Exported so the keymap bridge can
+-- detect it without duplicating the constant.
+local KEYCODE_LLM_CHAIN = Keycodes.F16_LLM_CHAIN_SIGNAL
 
 -- ── LLM request parameters ────────────────────────────────────────────────────
 -- Token budget formula: max_tokens = max(MIN_MAX_TOKENS, effective_max_words * RATIO + OVERHEAD)
@@ -101,7 +104,7 @@ local NGRAM_MAX_PREDS = 3  -- Maximum instant candidates to show before LLM resp
 -- ── Timing constants ──────────────────────────────────────────────────────────
 
 local STREAM_WATCHDOG_SEC = 12.0  -- Surface partial results after this many seconds of stream stall
-local CHAIN_FALLBACK_SEC  = 0.5   -- Fire chain LLM if the F20 signal is somehow missed
+local CHAIN_FALLBACK_SEC  = 0.5   -- Fire chain LLM if the F16 signal is somehow missed
 
 -- ── Failure detection ─────────────────────────────────────────────────────────
 -- Track consecutive on_fail callbacks to surface a notification when failures are
@@ -178,14 +181,35 @@ local _consecutive_llm_failures = 0
 -- Fires perform_check() after inactivity_debounce_sec of silence
 local _inactivity_timer = nil
 
--- Fallback: fires perform_check() if the F20 chain signal is somehow missed
+-- Fallback: fires perform_check() if the F16 chain signal is somehow missed
 local _chain_trigger_timer = nil
 
 -- Surfaces partial streaming results if the LLM stream stalls
 local _stream_watchdog_timer = nil
 
--- True between an accepted prediction and the F20 chain trigger that follows it
+-- True between an accepted prediction and the F16 chain trigger that follows it
 local chain_pending = false
+
+-- ── Streaming timing instrumentation ─────────────────────────────────────────
+-- Captures the round-trip latency at two granularities so the tooltip can
+-- expose both per-prediction and chain-wide timing without ever blocking the
+-- main loop:
+--   * _request_sent_at_s     — set in perform_check() right before the backend
+--                              call dispatches; used as the TTFT origin.
+--   * _first_token_at_s      — set the first time on_partial_cb fires for the
+--                              current request; nil while waiting on the model.
+--   * _chain_first_request_at_s — first backend dispatch of the active chain
+--                              of n predictions. Persists across chained
+--                              perform_check() calls until M.reset_predictions
+--                              clears the chain (i.e. the user typed something
+--                              the chain could not absorb, or all variants
+--                              were exhausted).
+--   * _chain_last_token_at_s — refreshed on every accepted token so it always
+--                              points at the most recent activity in the chain.
+local _request_sent_at_s        = nil
+local _first_token_at_s         = nil
+local _chain_first_request_at_s = nil
+local _chain_last_token_at_s    = nil
 
 -- ── LLM engine configuration ─────────────────────────────────────────────────
 -- Stub values that prevent crashes during the brief startup window before the
@@ -958,6 +982,12 @@ function M.perform_check(force_trigger, profile_name)
 	Logger.start(LOG, "LLM request — model: '%s' | temp: %.2f | %d pred(s) | max tokens: %d.",
 		tostring(model_to_use), req_temperature, num_preds, max_tokens)
 
+	-- Arm the backend-agnostic chain timing instrumentation. The tooltip
+	-- ignores subsequent calls within the same chain, so this is safe to call
+	-- on every perform_check — the first one in a chain wins and TTLT spans
+	-- all subsequent links until M.reset() fires mark_chain_complete().
+	pcall(tooltip.set_chain_start, hs.timer.secondsSinceEpoch())
+
 	-- Loading indicator: only shown when nothing is already on screen (n-gram placeholder
 	-- or previous LLM predictions). Avoids the blank gap that the spinner creates —
 	-- existing content stays visible and is replaced in-place when new predictions arrive.
@@ -1224,8 +1254,14 @@ function M.perform_check(force_trigger, profile_name)
 				loading_text, slot_count)
 
 			-- Start the auto-dismiss countdown only once the full batch has arrived;
-			-- reset_llm_dismiss_timer() re-syncs the delay in case it changed mid-session
-			if is_final then reset_llm_dismiss_timer() end
+			-- reset_llm_dismiss_timer() re-syncs the delay in case it changed mid-session.
+			-- Also publish the up-to-date TTLT so the user sees the full timing line as
+			-- soon as streaming concludes for the current chain link — the chain origin
+			-- itself stays anchored to the very first link until M.reset() fires.
+			if is_final then
+				reset_llm_dismiss_timer()
+				pcall(tooltip.mark_chain_complete)
+			end
 		end,
 		function()
 			if fetch_request_counter ~= my_fetch_id then return end
@@ -1269,6 +1305,9 @@ function M.perform_check(force_trigger, profile_name)
 					tooltip.tint("ai_prediction"), nil, #pending_predictions
 				)
 				reset_llm_dismiss_timer()
+				-- Publish TTLT even on failure: the user still cares how long the
+				-- attempt took, especially during repeated backend stalls.
+				pcall(tooltip.mark_chain_complete)
 			end
 		end,
 		sequential_mode, force_trigger, function() return fetch_request_counter end,
@@ -1285,6 +1324,12 @@ function M.reset()
 	if was_visible then
 		keylogger.log_llm_dismissed(nil, pending_predictions)
 	end
+
+	-- Finalise chain timing before tearing down state so the tooltip can
+	-- compute TTLT against the last update and render the full line one last
+	-- time. Safe to call unconditionally — tooltip ignores it if no chain
+	-- was armed (e.g. reset fired before any backend dispatch).
+	pcall(tooltip.mark_chain_complete)
 
 	pending_predictions        = {}
 	predictions_visible        = false
@@ -1323,8 +1368,8 @@ function M.consume(idx)
 end
 
 --- Arms the chain trigger after a prediction is accepted.
---- Sets chain_pending and starts a fallback timer in case the F20 signal is missed.
---- Must be called BEFORE hs.eventtap.keyStroke({}, "f20", 0) is sent by the bridge.
+--- Sets chain_pending and starts a fallback timer in case the F16 signal is missed.
+--- Must be called BEFORE hs.eventtap.keyStroke({}, "f16", 0) is sent by the bridge.
 function M.arm_chain()
 	if not require_state("arm_chain") then return end
 	if _inactivity_timer    then _inactivity_timer:stop() end
@@ -1336,7 +1381,7 @@ function M.arm_chain()
 	_chain_trigger_timer = hs.timer.doAfter(CHAIN_FALLBACK_SEC, function()
 		if chain_pending then
 			chain_pending = false
-			Logger.warn(LOG, "Fallback chain triggered — F20 signal was missed.")
+			Logger.warn(LOG, "Fallback chain triggered — F16 signal was missed.")
 			M.perform_check(true)
 		end
 	end)
@@ -1392,15 +1437,15 @@ function M.stop_timer()
 	core_llm.cancel_streaming()
 end
 
---- Consumes the F20 chain signal if a chain is pending.
+--- Consumes the F16 chain signal if a chain is pending.
 --- Called from the keymap bridge's keystroke handler before any other routing.
 --- @param keyCode number The macOS key code of the pressed key.
---- @return boolean True if the F20 event was consumed and the chain was triggered.
-function M.handle_f20(keyCode)
-	if keyCode ~= KEYCODE_F20 or not chain_pending then return false end
+--- @return boolean True if the F16 event was consumed and the chain was triggered.
+function M.handle_chain_signal(keyCode)
+	if keyCode ~= KEYCODE_LLM_CHAIN or not chain_pending then return false end
 	chain_pending = false
 	if _chain_trigger_timer then _chain_trigger_timer:stop() end
-	Logger.debug(LOG, "F20 received — triggering chained LLM.")
+	Logger.debug(LOG, "F16 received — triggering chained LLM.")
 	M.perform_check(true)
 	return true
 end
@@ -1408,7 +1453,7 @@ end
 --- @return boolean True while predictions are displayed and awaiting user interaction.
 function M.is_visible() return predictions_visible end
 
---- @return boolean True between an accepted prediction and the incoming F20 chain signal.
+--- @return boolean True between an accepted prediction and the incoming F16 chain signal.
 function M.is_chain_pending() return chain_pending end
 
 --- @return table The current pending predictions array.
@@ -1434,7 +1479,7 @@ function M.get_navigation_mods() return normalize_mods(navigation_mods) end
 function M.get_validation_mods() return normalize_mods(validation_mods) end
 
 -- Export constants needed by external callers
-M.KEYCODE_F20        = KEYCODE_F20         -- Bridge uses this to detect the chain signal
+M.KEYCODE_LLM_CHAIN  = KEYCODE_LLM_CHAIN   -- Bridge uses this to detect the chain signal
 M.CHAIN_FALLBACK_SEC = CHAIN_FALLBACK_SEC  -- Bridge passes this to suppress_rescan_keep_buffer
 
 

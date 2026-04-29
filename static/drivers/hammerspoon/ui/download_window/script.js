@@ -16,6 +16,98 @@
 let globalLogLines = [];
 let globalDoneState = false;
 
+const KIND_TITLES = {
+	mlx_install: '⚙️ Installation du moteur IA (MLX)',
+	ollama_install: '⚙️ Installation du moteur IA (Ollama)',
+	mlx_model: '📥 Téléchargement du modèle MLX',
+	ollama_model: '📥 Téléchargement du modèle Ollama',
+};
+
+const KIND_MODES = {
+	mlx_install: 'bootstrap',
+	ollama_install: 'bootstrap',
+	mlx_model: 'download',
+	ollama_model: 'download',
+};
+
+/**
+ * Switches the body class set so the right "kind" accent and "mode" layout
+ * are applied. Called by the Lua side at show() time and again whenever the
+ * caller re-issues show() with a different kind.
+ * @param {string} kind - One of mlx_install, ollama_install, mlx_model, ollama_model.
+ * @param {string|null} title - Override for the H2 title (null = use default for kind).
+ * @param {string|null} subtitle - Override for the subtitle line (bootstrap mode only).
+ */
+function setKind(kind, title, subtitle) {
+	if (!kind || !KIND_MODES[kind]) return;
+	const mode = KIND_MODES[kind];
+	// Clear previous kind/mode classes before applying the fresh ones
+	document.body.classList.remove(
+		'mode-download',
+		'mode-bootstrap',
+		'kind-mlx_install',
+		'kind-ollama_install',
+		'kind-mlx_model',
+		'kind-ollama_model',
+		'is-error'
+	);
+	document.body.classList.add('mode-' + mode, 'kind-' + kind);
+
+	const titleEl = document.getElementById('title');
+	if (titleEl) titleEl.textContent = title || KIND_TITLES[kind] || 'Progression';
+
+	const subtitleEl = document.getElementById('subtitle');
+	if (subtitleEl) subtitleEl.textContent = subtitle || '';
+}
+
+/**
+ * Updates the bootstrap step label (second line, brighter).
+ * @param {string} text - French step label.
+ */
+function setStep(text) {
+	document.body.classList.remove('is-error');
+	const el = document.getElementById('step-line');
+	if (el) el.textContent = text || '';
+}
+
+/**
+ * Updates the bootstrap detail line (third line, monospaced, dimmed).
+ * Truncation from the left is handled in CSS via direction: rtl.
+ * @param {string} text - Raw subprocess output line.
+ */
+function setDetail(text) {
+	const el = document.getElementById('detail-line');
+	if (!el) return;
+	// Strip ANSI escape sequences so the user sees clean text
+	const clean = String(text || '').replace(/\x1b\[[0-9;]*[A-Za-z]/g, '');
+	el.textContent = clean;
+}
+
+/**
+ * Updates the bootstrap progress bar fill. Pass null for indeterminate.
+ * @param {number|null} pct - Percentage in [0, 100], or null for indeterminate.
+ */
+function setProgress(pct) {
+	const fill = document.getElementById('bootstrap-bar-fill');
+	if (!fill) return;
+	if (pct === null || pct === undefined) {
+		fill.style.width = '30%';
+		return;
+	}
+	const clamped = Math.max(0, Math.min(100, Number(pct) || 0));
+	fill.style.width = clamped + '%';
+}
+
+/**
+ * Switches the bootstrap UI to error presentation: red accent + red step.
+ * @param {string} text - Short French error message.
+ */
+function setError(text) {
+	document.body.classList.add('is-error');
+	const el = document.getElementById('step-line');
+	if (el) el.textContent = text || 'Erreur inconnue.';
+}
+
 // ========================================
 // ========================================
 // ======= 1/ Backend Communication =======

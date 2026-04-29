@@ -13,6 +13,7 @@
 local M = {}
 local hs = hs
 local Logger = require("lib.logger")
+local Keycodes = require("lib.keycodes")
 local LOG = "tooltip_llm"
 
 local Config = require("ui.tooltip.config")
@@ -23,11 +24,6 @@ local MAC_KEYCODES_NUMBERS = {
 	[22] = 6, [26] = 7, [28] = 8, [25] = 9, [29] = 10
 }
 
-local KEY_TAB = 48
-local KEY_RETURN = 36
-local KEY_ENTER = 76
-local KEY_LEFT_ARROW = 123
-local KEY_UP_ARROW = 126
 
 
 
@@ -40,26 +36,51 @@ local KEY_UP_ARROW = 126
 -- ==================================
 
 local _state = {
-	raw_predictions = {},
-	current_index   = 1,
-	on_navigate     = nil,
-	on_accept       = nil,
-	on_cancel       = nil,
-	info_bar        = nil,
-	shortcut_mod    = "alt",
-	nav_mods        = {},
-	nav_mod_str     = "none",
-	indent          = 0,
-	fixed_width     = nil,
-	bg_color        = nil,
-	loading_text    = nil,
-	enter_validates = false,
-	reserved_count  = 0
+	raw_predictions    = {},
+	current_index      = 1,
+	on_navigate        = nil,
+	on_accept          = nil,
+	on_cancel          = nil,
+	info_bar           = nil,
+	shortcut_mod       = "alt",
+	nav_mods           = {},
+	nav_mod_str        = "none",
+	indent             = 0,
+	fixed_width        = nil,
+	bg_color           = nil,
+	loading_text       = nil,
+	enter_validates    = false,
+	reserved_count     = 0,
+	-- Set to true the first time the user navigates within an open tooltip
+	-- (arrow keys, shift+Tab). Used by the Enter handler to choose between
+	-- "accept current prediction" (post-navigation) and "let Enter through"
+	-- (no navigation happened — Enter is just a normal newline). Reset to
+	-- false on every show_predictions() and hide().
+	navigation_started = false,
 }
 
 local _watchers = {}
 local _idle_timer = nil
 local _shift_side = nil  -- "left", "right", or nil when no shift is held
+
+-- ── Chain timing instrumentation ─────────────────────────────────────────────
+-- Backend-agnostic TTFT / TTLT measurement done at the tooltip level.
+--   * _chain_start_time          — epoch seconds at the very first request of
+--                                  the active chain. Set by prediction_engine
+--                                  via M.set_chain_start(); reset on M.hide()
+--                                  and on M.mark_chain_complete().
+--   * _tooltip_first_show_at     — epoch seconds at the first paint of the
+--                                  tooltip after a chain start. Used to
+--                                  derive TTFT exactly once per chain.
+--   * _last_update_at            — epoch seconds at the most recent render of
+--                                  the tooltip during the current chain.
+--                                  Refreshed on every show_predictions().
+--   * _chain_ttft_ms             — cached TTFT once computed, so we can keep
+--                                  showing it while streaming further tokens.
+local _chain_start_time      = nil
+local _tooltip_first_show_at = nil
+local _last_update_at        = nil
+local _chain_ttft_ms         = nil
 
 
 
@@ -166,21 +187,23 @@ local function start_watchers()
 		local keycode = event:getKeyCode()
 		local flags = event:getFlags()
 		local chars = event:getCharacters(true) or event:getCharacters(false) or ""
-		local is_submit_key = (keycode == KEY_RETURN or keycode == KEY_ENTER or chars == "\r" or chars == "\n")
+		local is_submit_key = (keycode == Keycodes.RETURN or keycode == Keycodes.ENTER or chars == "\r" or chars == "\n")
 
 		-- Handling Tab presses during LLM execution
-		if keycode == KEY_TAB then
+		if keycode == Keycodes.TAB then
 			if flags.shift then
 				local preds_count = type(_state.raw_predictions) == "table" and #_state.raw_predictions or 0
 				if preds_count > 1 then
 					-- Left shift → back (-1), right shift → forward (+1)
 					local direction = (_shift_side == "right") and 1 or -1
+					_state.navigation_started = true
 					M.navigate(direction)
 					return true
 				end
 			else
 				local has_other_modifiers = flags.cmd or flags.alt or flags.ctrl or (flags.shift == true)
 				if not has_other_modifiers then
+					-- Tab always accepts directly, regardless of prior navigation
 					if type(_state.on_accept) == "function" then _state.on_accept(_state.current_index) end
 					return true
 				end
@@ -193,24 +216,37 @@ local function start_watchers()
 		if is_submit_key then
 			local has_other_modifiers = flags.cmd or flags.alt or flags.ctrl or flags.shift
 			if not has_other_modifiers then
+				-- Contextual Enter:
+				--   • If the user has navigated at least once, treat Enter like Tab and
+				--     accept the currently highlighted prediction (consume the keystroke).
+				--   • Otherwise, Enter is just a normal newline — close the tooltip but
+				--     let the keystroke flow through to the application.
+				if _state.navigation_started then
+					if type(_state.on_accept) == "function" then _state.on_accept(_state.current_index) end
+					return true
+				end
 				if _state.enter_validates then
 					if type(_state.on_accept) == "function" then _state.on_accept(_state.current_index) end
 					return true
-				else
-					if type(_state.on_cancel) == "function" then pcall(_state.on_cancel) end
-					return false
 				end
+				if type(_state.on_cancel) == "function" then pcall(_state.on_cancel) end
+				return false
 			else
 				if type(_state.on_cancel) == "function" then pcall(_state.on_cancel) end
 				return false
 			end
 		end
-		
+
 		-- Handling Arrow Navigation
-		if keycode >= KEY_LEFT_ARROW and keycode <= KEY_UP_ARROW then
+		if keycode >= Keycodes.LEFT_ARROW and keycode <= Keycodes.UP_ARROW then
 			local preds_count = type(_state.raw_predictions) == "table" and #_state.raw_predictions or 0
 			if preds_count > 1 and evaluate_modifiers(flags, _state.nav_mods) then
-				local nav_direction = (keycode == KEY_LEFT_ARROW or keycode == KEY_UP_ARROW) and -1 or 1
+				local nav_direction = (keycode == Keycodes.LEFT_ARROW or keycode == Keycodes.UP_ARROW) and -1 or 1
+				-- Any arrow consumed for navigation marks the session as "user is engaged"
+				-- and resets the auto-dismiss timer so the user never loses the tooltip
+				-- mid-decision (timer reset is also done inside M.navigate()).
+				_state.navigation_started = true
+				reset_idle_timer()
 				M.navigate(nav_direction)
 				return true
 			end
@@ -246,8 +282,29 @@ local function start_watchers()
 			end
 		end
 		
-		-- Ignored system modifier keys (preventing unintended dismissals)
-		local ignored_keycodes = { 54, 55, 56, 58, 59, 60, 105, 107, 113, 106, 64, 79, 80, 90 }
+		-- F20 ("nav layer entered") signals that the user just engaged the
+		-- navigation layer — this is a strong "user is actively using the
+		-- tooltip" signal, so reset the auto-dismiss timer before letting the
+		-- event flow through. F20 must NOT be treated as a real keystroke that
+		-- dismisses the tooltip.
+		if keycode == Keycodes.F20_LAYER_NAV_ENTERED then
+			reset_idle_timer()
+			return false
+		end
+
+		-- Ignored system modifier keys (preventing unintended dismissals).
+		-- 54-60 are physical modifiers; the rest are owned by lib.keycodes.
+		local ignored_keycodes = {
+			54, 55, 56, 58, 59, 60,
+			Keycodes.F13_KARABINER_RETURN,
+			Keycodes.F14_KARABINER_BACKSPACE,
+			Keycodes.F15_KARABINER_ESCAPE,
+			Keycodes.F16_LLM_CHAIN_SIGNAL,
+			Keycodes.F17_CYCLE_WINDOWS,
+			Keycodes.LAYER_SYN_1,
+			Keycodes.LAYER_SYN_2,
+			Keycodes.LAYER_SYN_3,
+		}
 		for _, ignored_code in ipairs(ignored_keycodes) do
 			if keycode == ignored_code then return false end
 		end
@@ -471,6 +528,129 @@ end
 -- =============================
 -- =============================
 
+--- Updates the variable info-bar zone with a TTFT / TTLT timing line.
+--- Uses the renderer's partial-update path — does NOT recreate the canvas, so
+--- there is no flicker during a streaming chain.
+--- @param ttft_ms number|nil First-token latency in milliseconds (nil to omit).
+--- @param ttlt_ms number|nil Last-token latency in milliseconds (nil while streaming).
+function M.set_timing(ttft_ms, ttlt_ms)
+	pcall(function()
+		local parts = {}
+		if type(ttft_ms) == "number" and ttft_ms >= 0 then
+			parts[#parts + 1] = string.format("Premier token : %d ms", math.floor(ttft_ms + 0.5))
+		end
+		if type(ttlt_ms) == "number" and ttlt_ms >= 0 then
+			parts[#parts + 1] = string.format("Dernier token : %d ms", math.floor(ttlt_ms + 0.5))
+		end
+		if #parts == 0 then
+			Renderer.set_element_text(Renderer.ELEM_INFO, nil)
+			return
+		end
+		local text = table.concat(parts, " — ")
+		local styled = hs.styledtext.new(text, {
+			font           = { name = Config.fonts.main, size = Config.sizes.info },
+			color          = Config.colors.info_bar,
+			paragraphStyle = { alignment = "center" },
+		})
+		Renderer.set_element_text(Renderer.ELEM_INFO, styled)
+	end)
+end
+
+--- Installs the stable "model + prompt" header at the top of the tooltip.
+--- This zone is rendered ONCE at the start of a chain and never redrawn while
+--- streaming — pass nil to clear it (e.g. when the chain ends).
+--- @param model_name string|nil Display name of the active LLM model.
+--- @param prompt_label string|nil Short label of the current prompt.
+function M.set_model_info(model_name, prompt_label)
+	pcall(function()
+		if not model_name and not prompt_label then
+			Renderer.set_element_text(Renderer.ELEM_MODEL_INFO, nil)
+			return
+		end
+		local pieces = {}
+		if model_name   and model_name   ~= "" then pieces[#pieces + 1] = tostring(model_name)   end
+		if prompt_label and prompt_label ~= "" then pieces[#pieces + 1] = tostring(prompt_label) end
+		local text = table.concat(pieces, " · ")
+		local styled = hs.styledtext.new(text, {
+			font           = { name = Config.fonts.main, size = Config.sizes.info },
+			color          = Config.colors.info_bar,
+			paragraphStyle = { alignment = "center" },
+		})
+		Renderer.set_element_text(Renderer.ELEM_MODEL_INFO, styled)
+	end)
+end
+
+--- Records the epoch timestamp at which the active chain started.
+--- Called by prediction_engine right before the first backend dispatch of a
+--- chain. Successive calls within the same chain are ignored — only the very
+--- first sets the origin so TTLT spans the entire chain, not the last link.
+--- @param timestamp number Epoch seconds (typically hs.timer.secondsSinceEpoch()).
+function M.set_chain_start(timestamp)
+	if type(timestamp) ~= "number" then
+		Logger.error(LOG, "set_chain_start(): timestamp must be a number, got %s.", type(timestamp))
+		return
+	end
+	if _chain_start_time then
+		-- Chain already running — keep the original start so TTLT measures
+		-- the entire chain, not just the last prediction in it
+		Logger.debug(LOG, "set_chain_start: chain already armed (%.3fs ago) — keeping original origin.",
+			hs.timer.secondsSinceEpoch() - _chain_start_time)
+		return
+	end
+	_chain_start_time      = timestamp
+	_tooltip_first_show_at = nil
+	_last_update_at        = nil
+	_chain_ttft_ms         = nil
+	Logger.debug(LOG, "Chain timing armed at epoch %.3f.", timestamp)
+end
+
+--- Internal helper: called from every paint path (show_predictions, navigate).
+--- Captures the first-show timestamp and refreshes the last-update timestamp.
+--- Also pushes the in-progress TTFT line to the info zone as soon as it is known.
+local function refresh_chain_timing()
+	if not _chain_start_time then return end
+
+	local now = hs.timer.secondsSinceEpoch()
+	_last_update_at = now
+
+	if not _tooltip_first_show_at then
+		_tooltip_first_show_at = now
+		_chain_ttft_ms         = (now - _chain_start_time) * 1000
+		Logger.debug(LOG, "TTFT captured: %.0f ms.", _chain_ttft_ms)
+	end
+
+	-- Re-apply the streaming TTFT line on every paint: the full render path
+	-- inside show_predictions resets ELEM_INFO to the static model/profile
+	-- info bar, which would otherwise wipe the timing line on every streamed
+	-- partial. Pushing it here keeps the timing visible throughout the chain.
+	if _chain_ttft_ms then
+		M.set_timing(_chain_ttft_ms, nil)
+	end
+end
+
+--- Finalises the active chain: computes TTLT from the last update timestamp
+--- and updates the timing zone with both values. Called by prediction_engine
+--- when the chain ends (success or failure — both paths benefit from timing).
+--- The internal chain state is NOT reset here — only M.hide() does that. This
+--- allows the function to be invoked at the end of every chain link to refresh
+--- the displayed TTLT while the chain origin keeps growing across links.
+function M.mark_chain_complete()
+	if not _chain_start_time then
+		Logger.debug(LOG, "mark_chain_complete: no chain in progress — ignoring.")
+		return
+	end
+
+	local final_update = _last_update_at or hs.timer.secondsSinceEpoch()
+	local ttlt_ms = (final_update - _chain_start_time) * 1000
+	-- TTFT may still be nil if the chain ended before the tooltip ever showed
+	-- (e.g. all predictions filtered out). Fall back to ttlt so the user still
+	-- gets a meaningful number rather than a blank line.
+	local ttft_ms = _chain_ttft_ms or ttlt_ms
+
+	Logger.debug(LOG, "Chain link complete — TTFT: %.0f ms | TTLT: %.0f ms.", ttft_ms, ttlt_ms)
+	M.set_timing(ttft_ms, ttlt_ms)
+end
+
 function M.set_navigate_callback(callback) _state.on_navigate = callback end
 function M.set_accept_callback(callback) _state.on_accept = callback end
 function M.set_cancel_callback(callback) _state.on_cancel = callback end
@@ -494,13 +674,19 @@ end
 function M.hide()
 	pcall(function()
 		stop_watchers()
-		_state.raw_predictions = {}
-		_state.current_index   = 1
-		_state.info_bar        = nil
-		_state.fixed_width     = nil
-		_state.bg_color        = nil
-		_state.loading_text    = nil
-		_state.enter_validates = false
+		_state.raw_predictions    = {}
+		_state.current_index      = 1
+		_state.info_bar           = nil
+		_state.fixed_width        = nil
+		_state.bg_color           = nil
+		_state.loading_text       = nil
+		_state.enter_validates    = false
+		_state.navigation_started = false
+		-- Reset chain timing — next chain starts from a clean slate
+		_chain_start_time      = nil
+		_tooltip_first_show_at = nil
+		_last_update_at        = nil
+		_chain_ttft_ms         = nil
 		Renderer.hide()
 	end)
 end
@@ -586,13 +772,20 @@ function M.show_predictions(predictions, current_index, is_enabled, info_bar, sh
 			if final_width > calculated_max_width then calculated_max_width = final_width end
 		end
 
-		_state.fixed_width = calculated_max_width
-		_state.reserved_count = render_count
-		_state.enter_validates = false
+		_state.fixed_width        = calculated_max_width
+		_state.reserved_count     = render_count
+		_state.enter_validates    = false
+		-- Fresh tooltip session: user has not navigated yet, so an Enter press
+		-- right now is a "real" newline and should pass through.
+		_state.navigation_started = false
 
 		Renderer.render(assemble_blocks(_state, render_count), _state, start_watchers)
+
+		-- Capture TTFT on first paint after a chain start; refresh _last_update_at
+		-- on every subsequent paint so TTLT measures up to the last streamed update
+		refresh_chain_timing()
 	end)
-	
+
 	if not ok then Logger.error(LOG, "Crash during show_predictions initialization: " .. tostring(err) .. ".") end
 end
 

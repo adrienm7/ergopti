@@ -63,10 +63,6 @@ end
 --- @return table The Ollama manager instance.
 function M.new(deps, presets, ram_getter)
 	local obj = {}
-	obj._ollama_upgrade_attempted = {}
-	obj._ollama_upgrade_done = false
-	obj._ollama_upgrade_in_progress = false
-	obj._ollama_upgrade_waiters = {}
 
 	local function cancel_task(task_key)
 		local t = deps.active_tasks and deps.active_tasks[task_key]
@@ -238,102 +234,6 @@ function M.new(deps, presets, ram_getter)
 		return false
 	end
 
-	local function upgrade_ollama_stack(on_done)
-		if type(on_done) == "function" then
-			table.insert(obj._ollama_upgrade_waiters, on_done)
-		end
-
-		if obj._ollama_upgrade_done then
-			local waiters = obj._ollama_upgrade_waiters
-			obj._ollama_upgrade_waiters = {}
-			for _, cb in ipairs(waiters) do pcall(cb, true, false) end
-			return
-		end
-
-		if obj._ollama_upgrade_in_progress then return end
-		obj._ollama_upgrade_in_progress = true
-
-		local function finish_upgrade(ok, manual_required)
-			if ok then obj._ollama_upgrade_done = true end
-			obj._ollama_upgrade_in_progress = false
-			if deps.active_tasks then deps.active_tasks["ollama_upgrade"] = nil end
-			complete_progress_ui(ok == true, "Mise à jour Ollama")
-			local waiters = obj._ollama_upgrade_waiters
-			obj._ollama_upgrade_waiters = {}
-			for _, cb in ipairs(waiters) do pcall(cb, ok, manual_required == true) end
-		end
-
-		local upgrade_cmd =
-			"export PATH=\"/opt/homebrew/bin:/usr/local/bin:$PATH\"; " ..
-			"if command -v brew >/dev/null 2>&1; then " ..
-			"if brew list --versions ollama >/dev/null 2>&1; then " ..
-			"HOMEBREW_NO_AUTO_UPDATE=1 brew upgrade ollama; " ..
-			"else " ..
-			"HOMEBREW_NO_AUTO_UPDATE=1 brew install ollama; " ..
-			"fi; " ..
-			"rc=$?; [ $rc -ne 0 ] && exit $rc; " ..
-			"pkill -f '[o]llama serve' >/dev/null 2>&1 || true; " ..
-			"else " ..
-			"exit 42; " ..
-			"fi"
-
-		show_progress_ui("Mise à jour Ollama", upgrade_cmd, "Préparation de la mise à jour…", function()
-			cancel_task("ollama_upgrade")
-		end)
-
-		local task = hs.task.new("/bin/bash", function(code)
-			if code == 0 then
-				-- Upgrade succeeded, now restart the daemon
-				pcall(notifications.notify, "⚙️ Mise à jour Ollama", "Redémarrage du service…")
-				update_progress_ui(0, "Redémarrage du service Ollama…")
-				
-				-- Kill any stray processes
-				pcall(hs.execute, "pkill -f '[o]llama serve' >/dev/null 2>&1 || true")
-				hs.timer.usleep(500 * 1000) -- 500ms
-				
-				-- Start the daemon in background
-				if restart_ollama_daemon() then
-					-- Wait for the API to respond
-					hs.timer.doAfter(0.2, function()
-						if wait_for_ollama_api(20) then
-							pcall(notifications.notify, "✅ Service prêt", "Relance du téléchargement…")
-							finish_upgrade(true, false)
-						else
-							pcall(notifications.notify, "⚠️ Service Ollama ne répond pas", "Le redémarrage a échoué, veuillez redémarrer manuellement")
-							finish_upgrade(false, false)
-						end
-					end)
-					return
-				else
-					pcall(notifications.notify, "❌ Impossible de relancer le service", "Ollama n'a pas pu être redémarré")
-					finish_upgrade(false, false)
-				end
-			elseif code == 42 then
-				finish_upgrade(false, true)
-			else
-				finish_upgrade(false, false)
-			end
-		end, function(_, stdout, stderr)
-			local out = sanitize_terminal_stream((stdout or "") .. (stderr or ""))
-			if out ~= "" then
-				local last_line = ""
-				for line in out:gmatch("([^\n\r]+)") do
-					last_line = line
-				end
-				if last_line ~= "" then update_progress_ui(0, last_line) end
-				print("[Ollama Upgrade] " .. out)
-			end
-			return true
-		end, {"-c", upgrade_cmd})
-
-		if task then
-			deps.active_tasks = deps.active_tasks or {}
-			deps.active_tasks["ollama_upgrade"] = task
-			pcall(function() task:start() end)
-		else
-			finish_upgrade(false, false)
-		end
-	end
 
 	local _installed_cache = nil
 	local _installed_cache_time = 0
