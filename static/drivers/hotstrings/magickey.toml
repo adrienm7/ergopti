@@ -153,7 +153,8 @@ repeat = "La touche ★ permet la répétition"
 "avv★" = { output = "avez-vous", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
 "avvd★" = { output = "avez-vous déjà", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
 "b★" = { output = "bonjour", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
-"bb★" = { output = "barbecue", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
+"bbc★" = { output = "barbecue", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
+"bbq★" = { output = "barbecue", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
 "bc★" = { output = "because", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
 "bcp★" = { output = "beaucoup", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
 "bdd★" = { output = "base de données", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
@@ -422,6 +423,8 @@ repeat = "La touche ★ permet la répétition"
 "niv★" = { output = "niveau", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
 "norm★" = { output = "normalement", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
 "nota★" = { output = "notamment", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
+"notif★" = { output = "notification", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
+"notifs★" = { output = "notifications", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
 "notm★" = { output = "notamment", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
 "nouv★" = { output = "nouvelle", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
 "nov★" = { output = "novembre", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
