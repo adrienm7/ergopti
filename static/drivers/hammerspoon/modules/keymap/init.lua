@@ -46,10 +46,10 @@ local LOG = "keymap"
 M.DELAYS_DEFAULT = {
 	STAR_TRIGGER       = 2.0,  -- Manual expansions with ★ (magic key)
 	dynamichotstrings  = 2.0,  -- Phone numbers, SSN, dates…
-	autocorrection     = 0.5,  -- Spell checking
-	rolls              = 0.25, -- Rolls (e.g. sx → sk)
-	sfbsreduction      = 0.25, -- Comma combos (e.g. ,t → pt)
-	distancesreduction = 0.25, -- Dead keys and suffixes
+	autocorrection     = 1.0,  -- Spell checking
+	rolls              = 0.5,  -- Rolls (e.g. sx → sk)
+	sfbsreduction      = 0.5,  -- Comma combos (e.g. ,t → pt)
+	distancesreduction = 0.5,  -- Dead keys and suffixes
 	llm_prediction     = 20.0, -- AI prediction tooltip timeout
 }
 
