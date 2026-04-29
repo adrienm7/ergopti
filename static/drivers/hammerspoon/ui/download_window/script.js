@@ -20,7 +20,7 @@ const KIND_TITLES = {
 	mlx_install: '⚙️ Installation du moteur IA (MLX)',
 	ollama_install: '⚙️ Installation du moteur IA (Ollama)',
 	mlx_model: '📥 Téléchargement du modèle MLX',
-	ollama_model: '📥 Téléchargement en cours',
+	ollama_model: '📥 Téléchargement du modèle Ollama',
 };
 
 const KIND_MODES = {
