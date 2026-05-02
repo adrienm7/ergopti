@@ -33,7 +33,7 @@ local _logo_image = nil
 pcall(function()
 	local _src  = debug.getinfo(1, "S").source
 	local _base = (_src:sub(1,1) == "@" and _src:sub(2) or _src):match("^(.*[/\\])") or "./"
-	_logo_path  = _base .. "../../../favicon.png"
+	_logo_path  = _base .. "../../../img/logo/logo_simple.png"
 end)
 
 
