@@ -1,0 +1,616 @@
+00:22:21            [DEBUG] [karabiner]   → rule: Cmd droit + Fn (right_command→fn): ⇪ CapsLock — Verr. majuscules (tap) / — Rien (touche normale) (hold) [var-based]
+00:22:21            [DEBUG] [karabiner] Combo 'rcmd_lopt': tap=opt_delete_fwd, hold=none, combo=opt_delete_fwd (non_canonical=true).
+00:22:21            [DEBUG] [karabiner]   → rule: Cmd droit + Option gauche: ⌥⌦ — Supprimer le mot suivant [chord]
+00:22:21            [DEBUG] [karabiner]   → rule: Cmd droit + Option gauche (right_command→left_option): ⌥⌦ — Supprimer le mot suivant (tap) / — Rien (touche normale) (hold) [var-based]
+00:22:21            [DEBUG] [karabiner] Combo 'rcmd_lcmd': tap=opt_backspace, hold=option_shift, combo=opt_backspace (non_canonical=true).
+00:22:21            [DEBUG] [karabiner]   → rule: Cmd droit + Cmd gauche: ⌥⌫ — Supprimer le mot précédent [chord]
+00:22:21            [DEBUG] [karabiner]   → rule: Cmd droit + Cmd gauche (right_command→left_command): ⌥⌫ — Supprimer le mot précédent (tap) / ⌥⇧ — Option+Shift (hold) [var-based]
+00:22:21            [DEBUG] [karabiner] Tap/hold 'right_option' sticky-equivalent to 'shift' — 8 companion(s) added.
+00:22:21            [DEBUG] [karabiner] Building config: tap/hold=1000 ms, simultaneous=100 ms, symmetric=false, 31 rule(s).
+00:22:21            [DEBUG] [karabiner] Merged HS rules into profile 1 of existing karabiner.json.
+00:22:21            [TRACE] [karabiner] Stopping Karabiner-Elements before deploy…
+00:22:21            [DONE] [karabiner] Karabiner-Elements stopped.
+00:22:21            [TRACE] [karabiner] Deploy: '/Users/b519hs/perso/ergopti/static/drivers/hammerspoon/modules/karabiner/../../karabiner.json' → '/Users/b519hs/.config/karabiner/karabiner.json'…
+00:22:21            [DEBUG] [karabiner] Deploy: read 125350 byte(s) from source.
+00:22:21            [DONE] [karabiner] Deploy S1 (direct write) succeeded: '/Users/b519hs/.config/karabiner/karabiner.json'.
+00:22:21            [DEBUG] [karabiner] Karabiner-Elements GUI suppressor active for 5s.
+00:22:21            [TRACE] [karabiner] Relaunching Karabiner-Elements after deploy…
+00:22:22            [DONE] [karabiner] Karabiner-Elements relaunch command issued.
+00:22:22  [SUCCESS] [karabiner] Karabiner config regenerated: 6 combo(s) + 14 tap/hold key(s) deployed.
+00:22:22  [SUCCESS] [karabiner] Trackpad CapsWord watcher started.
+00:22:22            [TRACE] [karabiner] Registering cycle-windows hotkey (F17)…
+00:22:22            [DONE] [karabiner] Cycle-windows hotkey registered.
+00:22:22            [TRACE] [karabiner] Registering input source watcher…
+00:22:22            [DONE] [karabiner] Input source watcher registered.
+00:22:22  [SUCCESS] [karabiner] Karabiner bridge initialized (70 action(s), 6 combo(s) active).
+00:22:22            [DEBUG] [init] Starting user interface components…
+00:22:22  [INFO] [menu] Menubar created successfully.
+00:22:22            [DEBUG] [keymap] Base delay: 0.750s.
+00:22:22            [DEBUG] [keymap] Delay 'dynamichotstrings': 2.000s.
+00:22:22            [DEBUG] [keymap] Delay 'STAR_TRIGGER': 2.000s.
+00:22:22            [DEBUG] [keymap] Delay 'autocorrection': 1.000s.
+00:22:22            [DEBUG] [keymap] Delay 'rolls': 0.500s.
+00:22:22            [DEBUG] [keymap] Delay 'distancesreduction': 0.500s.
+00:22:22            [DEBUG] [keymap] Delay 'llm_prediction': 20.000s.
+00:22:22            [DEBUG] [keymap] Delay 'sfbsreduction': 0.500s.
+00:22:22            [DEBUG] [gestures.conflicts] Evaluating all overrides for conflicts…
+00:22:22  [INFO] [gestures.conflicts] Overrides conflict evaluation completed.
+00:22:22            [DEBUG] [keymap.llm_bridge] Star preview: on.
+00:22:22            [DEBUG] [keymap.llm_bridge] Autocorrect preview: on.
+00:22:22            [DEBUG] [llm.prediction_engine] AI preview: on.
+00:22:22  [INFO] [tooltip_config] Colorization explicitly set to: true.
+00:22:22            [DEBUG] [keymap.llm_bridge] Colored tooltips: on.
+00:22:22            [DEBUG] [keymap.llm_bridge] LLM chain after hotstring: on.
+00:22:22            [DEBUG] [llm.prediction_engine] Auto temperature raise: on.
+00:22:22  [INFO] [llm.prediction_engine] LLM enabled.
+00:22:22            [DEBUG] [llm.prediction_engine] set_llm_enabled: warmup skipped — backend model not resolved yet.
+00:22:22            [DEBUG] [llm.prediction_engine] Inactivity timer rebuilt: 0.200s.
+00:22:22  [INFO] [llm.prediction_engine] Model set: 'Llama-3.1-8B-Instruct' (backend: ollama).
+00:22:22            [DEBUG] [llm.prediction_engine] Scheduling warmup for 'llama3.1:8b' in 2s (from set_llm_model).
+00:22:22            [DEBUG] [keymap.registry] update_trigger_char: key unchanged ('★') — skipping rename.
+00:22:22            [DEBUG] [keymap] Trigger char: '★'.
+00:22:22            [DEBUG] [llm.prediction_engine] Context window: 500 chars.
+00:22:22            [DEBUG] [keymap.llm_bridge] Buffer reset on nav: yes.
+00:22:22            [DEBUG] [llm.prediction_engine] Temperature: 0.1.
+00:22:22            [DEBUG] [llm.prediction_engine] Prediction count: 3.
+00:22:22            [DEBUG] [llm.prediction_engine] Navigation modifiers: [].
+00:22:22            [DEBUG] [llm.prediction_engine] Info bar: visible.
+00:22:22            [DEBUG] [llm.prediction_engine] Validation modifiers: [alt].
+00:22:22            [DEBUG] [llm.prediction_engine] Prediction indent: -3.
+00:22:22            [DEBUG] [llm.prediction_engine] Excluded apps: 1 configured.
+00:22:22            [DEBUG] [llm.prediction_engine] URL bar filter: on.
+00:22:22            [DEBUG] [llm.prediction_engine] Secure field filter: on.
+00:22:22            [DEBUG] [llm.prediction_engine] Instant on word end: on.
+00:22:22            [DEBUG] [keylogger] Options updated.
+00:22:22            [DEBUG] [keylogger] Disabled apps updated (0 entry(ies)).
+00:22:22  [START] [keylogger] Starting keylogger engine…
+00:22:22            [DEBUG] [keylogger] Keymap module cached for shift-side detection.
+00:22:22            [TRACE] [keylogger] Starting hardware watchers…
+00:22:22            [DONE] [keylogger] Hardware watchers started.
+00:22:22  [START] [keymap] Starting keymap engine…
+00:22:22  [INFO] [keymap] Perf sampling auto-enabled (DEBUG log level active).
+00:22:22  [SUCCESS] [keymap] Keymap engine started.
+00:22:22  [WARNING] [shortcuts.bindings] M.start() called more than once — ignoring duplicate call.
+00:22:22            [DEBUG] [personal_info] Enabling personal info tracking…
+00:22:22  [INFO] [personal_info] Personal info tracking enabled.
+00:22:22            [DEBUG] [keymap.registry] Group 'personal' disabled (5503 mapping(s) remaining).
+00:22:22            [DEBUG] [keymap.registry] Enabling group 'personal' (kind: toml)…
+00:22:22  [START] [keymap.registry] Loading TOML mapping file 'personal'…
+00:22:22            [DEBUG] [toml_reader] Parsing TOML file…
+00:22:22  [INFO] [toml_reader] TOML file parsed successfully.
+00:22:22            [TRACE] [keymap.registry] Sorting 6021 mapping(s)…
+00:22:22            [DONE] [keymap.registry] Mappings sorted.
+00:22:22  [SUCCESS] [keymap.registry] TOML mapping file 'personal' loaded (6021 total mapping(s)).
+00:22:22            [TRACE] [keymap.registry] Sorting 6021 mapping(s)…
+00:22:22            [DONE] [keymap.registry] Mappings sorted.
+00:22:22            [DEBUG] [keymap.registry] Group 'dynamichotstrings' disabled (6021 mapping(s) remaining).
+00:22:22            [DEBUG] [keymap.registry] Enabling group 'dynamichotstrings' (kind: lua)…
+00:22:22            [DEBUG] [dynamic_hotstrings.rules] Registering prefix-based dynamic hotstrings…
+00:22:22            [TRACE] [keymap.registry] Sorting 6045 mapping(s)…
+00:22:22            [DONE] [keymap.registry] Mappings sorted.
+00:22:22  [INFO] [dynamic_hotstrings.rules] Prefix-based dynamic hotstrings registered.
+00:22:22            [TRACE] [keymap.registry] Sorting 6045 mapping(s)…
+00:22:22            [DONE] [keymap.registry] Mappings sorted.
+00:22:22            [DEBUG] [keymap.registry] Group 'autocorrection' disabled (4351 mapping(s) remaining).
+00:22:22            [DEBUG] [keymap.registry] Enabling group 'autocorrection' (kind: toml)…
+00:22:22  [START] [keymap.registry] Loading TOML mapping file 'autocorrection'…
+00:22:22            [DEBUG] [toml_reader] Parsing TOML file…
+00:22:22  [INFO] [toml_reader] TOML file parsed successfully.
+00:22:22            [TRACE] [keymap.registry] Sorting 6045 mapping(s)…
+00:22:22            [DONE] [keymap.registry] Mappings sorted.
+00:22:22  [SUCCESS] [keymap.registry] TOML mapping file 'autocorrection' loaded (6045 total mapping(s)).
+00:22:22            [TRACE] [keymap.registry] Sorting 6045 mapping(s)…
+00:22:22            [DONE] [keymap.registry] Mappings sorted.
+00:22:22            [DEBUG] [keymap.registry] Group 'rolls' disabled (5995 mapping(s) remaining).
+00:22:22            [DEBUG] [keymap.registry] Enabling group 'rolls' (kind: toml)…
+00:22:22  [START] [keymap.registry] Loading TOML mapping file 'rolls'…
+00:22:22            [DEBUG] [toml_reader] Parsing TOML file…
+00:22:22  [INFO] [toml_reader] TOML file parsed successfully.
+00:22:22            [TRACE] [keymap.registry] Sorting 6045 mapping(s)…
+00:22:22            [DONE] [keymap.registry] Mappings sorted.
+00:22:22  [SUCCESS] [keymap.registry] TOML mapping file 'rolls' loaded (6045 total mapping(s)).
+00:22:22            [TRACE] [keymap.registry] Sorting 6045 mapping(s)…
+00:22:22            [DONE] [keymap.registry] Mappings sorted.
+00:22:22            [DEBUG] [keymap.registry] Group 'distancesreduction' disabled (5767 mapping(s) remaining).
+00:22:22            [DEBUG] [keymap.registry] Enabling group 'distancesreduction' (kind: toml)…
+00:22:22  [START] [keymap.registry] Loading TOML mapping file 'distancesreduction'…
+00:22:22            [DEBUG] [toml_reader] Parsing TOML file…
+00:22:22  [INFO] [toml_reader] TOML file parsed successfully.
+00:22:22            [TRACE] [keymap.registry] Sorting 6045 mapping(s)…
+00:22:22            [DONE] [keymap.registry] Mappings sorted.
+00:22:22  [SUCCESS] [keymap.registry] TOML mapping file 'distancesreduction' loaded (6045 total mapping(s)).
+00:22:22            [TRACE] [keymap.registry] Sorting 6045 mapping(s)…
+00:22:22            [DONE] [keymap.registry] Mappings sorted.
+00:22:22            [DEBUG] [keymap.registry] Group 'magickey' disabled (2753 mapping(s) remaining).
+00:22:22            [DEBUG] [keymap.registry] Enabling group 'magickey' (kind: toml)…
+00:22:22  [START] [keymap.registry] Loading TOML mapping file 'magickey'…
+00:22:22            [DEBUG] [toml_reader] Parsing TOML file…
+00:22:22  [INFO] [toml_reader] TOML file parsed successfully.
+00:22:22            [TRACE] [keymap.registry] Sorting 6045 mapping(s)…
+00:22:22            [DONE] [keymap.registry] Mappings sorted.
+00:22:22  [SUCCESS] [keymap.registry] TOML mapping file 'magickey' loaded (6045 total mapping(s)).
+00:22:22            [TRACE] [keymap.registry] Sorting 6045 mapping(s)…
+00:22:22            [DONE] [keymap.registry] Mappings sorted.
+00:22:22            [DEBUG] [keymap.registry] Group 'sfbsreduction' disabled (5857 mapping(s) remaining).
+00:22:22            [DEBUG] [keymap.registry] Enabling group 'sfbsreduction' (kind: toml)…
+00:22:22  [START] [keymap.registry] Loading TOML mapping file 'sfbsreduction'…
+00:22:22            [DEBUG] [toml_reader] Parsing TOML file…
+00:22:22  [INFO] [toml_reader] TOML file parsed successfully.
+00:22:22            [TRACE] [keymap.registry] Sorting 6045 mapping(s)…
+00:22:22            [DONE] [keymap.registry] Mappings sorted.
+00:22:22  [SUCCESS] [keymap.registry] TOML mapping file 'sfbsreduction' loaded (6045 total mapping(s)).
+00:22:22            [TRACE] [keymap.registry] Sorting 6045 mapping(s)…
+00:22:22            [DONE] [keymap.registry] Mappings sorted.
+00:22:22            [DEBUG] [shortcuts.bindings] Hotkey 'ctrl_p' already enabled — skipping.
+00:22:22            [DEBUG] [shortcuts.bindings] Hotkey 'ctrl_h' already enabled — skipping.
+00:22:22            [DEBUG] [shortcuts.bindings] Hotkey 'ctrl_a' already enabled — skipping.
+00:22:22            [DEBUG] [shortcuts.bindings] Hotkey 'at_hash' already enabled — skipping.
+00:22:22            [DEBUG] [shortcuts.bindings] Hotkey 'layer_scroll' already enabled — skipping.
+00:22:22            [DEBUG] [shortcuts.bindings] Hotkey 'ctrl_i' already enabled — skipping.
+00:22:22            [DEBUG] [shortcuts.bindings] Hotkey 'ctrl_x' already enabled — skipping.
+00:22:22            [DEBUG] [shortcuts.bindings] Hotkey 'ctrl_d' already enabled — skipping.
+00:22:22            [DEBUG] [shortcuts.bindings] Hotkey 'ctrl_o' already enabled — skipping.
+00:22:22            [DEBUG] [shortcuts.bindings] Hotkey 'cmd_star' already enabled — skipping.
+00:22:22            [DEBUG] [shortcuts.bindings] Hotkey 'cmd_shift_v' already enabled — skipping.
+00:22:22            [DEBUG] [shortcuts.bindings] Hotkey 'ctrl_m' already enabled — skipping.
+00:22:22            [DEBUG] [shortcuts.bindings] Hotkey 'ctrl_t' already enabled — skipping.
+00:22:22            [DEBUG] [shortcuts.bindings] Hotkey 'ctrl_e' already enabled — skipping.
+00:22:22            [DEBUG] [shortcuts.bindings] Hotkey 'ctrl_w' already enabled — skipping.
+00:22:22            [DEBUG] [shortcuts.bindings] Hotkey 'ctrl_u' already enabled — skipping.
+00:22:22            [DEBUG] [shortcuts.bindings] Hotkey 'ctrl_period' already enabled — skipping.
+00:22:22            [DEBUG] [shortcuts.bindings] Hotkey 'ctrl_g' already enabled — skipping.
+00:22:22            [DEBUG] [shortcuts.bindings] Hotkey 'ctrl_quote' already enabled — skipping.
+00:22:22            [DEBUG] [shortcuts.bindings] Hotkey 'ctrl_s' already enabled — skipping.
+00:22:22            [DEBUG] [llm.api_mlx] Restart hook registered.
+00:22:22            [DEBUG] [menu_llm] Resolving model name on startup: 'Llama-3.1-8B-Instruct' -> 'Meta-Llama-3.1-8B-Instruct-4bit'
+00:22:22            [DEBUG] [llm.prediction_engine] Model display name: 'Llama-3.1-8B-Instruct'.
+00:22:22            [DEBUG] [menu_llm] Model power on startup: 3
+00:22:22            [DEBUG] [llm.prediction_engine] Prediction count: 3.
+00:22:22            [DEBUG] [llm.prediction_engine] Max words: 20 (0 = unlimited).
+00:22:22            [DEBUG] [llm.core] Streaming: on.
+00:22:22            [DEBUG] [llm.prediction_engine] Streaming: on.
+00:22:22            [DEBUG] [llm.prediction_engine] Streaming multi: on.
+00:22:22  [INFO] [menu] LLM handler created successfully.
+00:22:22  [INFO] [menu_llm] ═══════════════ Starting menu_llm ═══════════════
+00:22:22            [DEBUG] [menu_llm] No global trigger shortcut configured.
+00:22:22            [DEBUG] [menu_llm] Built-in profiles loaded: 4
+00:22:22            [DEBUG] [menu_llm] User profiles loaded: 0
+00:22:22  [INFO] [menu_llm] Profile shortcuts loaded: 0 entries
+00:22:22            [DEBUG] [menu_llm] Activating bound hotkeys…
+00:22:22  [INFO] [menu_llm] LLM enabled at startup, model: Llama-3.1-8B-Instruct
+00:22:22            [DEBUG] [menu_llm] MLX mode: locking predictions during initialization.
+00:22:22  [INFO] [llm.prediction_engine] LLM disabled.
+00:22:22            [DEBUG] [tooltip_llm] mark_chain_complete: no chain in progress — ignoring.
+00:22:22            [DONE] [llm.prediction_engine] Inactivity timer stopped.
+00:22:22            [DEBUG] [menu_llm] Checking model requirements: Llama-3.1-8B-Instruct
+00:22:22  [INFO] [menu_llm] ═══════════════ Startup completed for menu_llm ═══════════════
+00:22:22            [DEBUG] [shortcuts.script_control] Pause-change callback registered.
+00:22:22            [DEBUG] [shortcuts.script_control] Key slot 'return_key' → 'show_metrics'.
+00:22:22            [DEBUG] [shortcuts.script_control] Key slot 'backspace' → 'reload'.
+00:22:22            [DEBUG] [shortcuts.script_control] Key slot 'escape' → 'quit_hammerspoon'.
+00:22:22            [DEBUG] [shortcuts.script_control] Extras table registered (8 handler(s)).
+00:22:22  [INFO] [notify] Notification utilisateur: Ergopti+ | Script prêt ! 🚀
+00:22:22  [INFO] [notifications] Notification dispatched successfully:
+00:22:22            [DEBUG] [init] Starting script control engine…
+00:22:22  [START] [shortcuts.script_control] Starting script control…
+00:22:22  [SUCCESS] [shortcuts.script_control] Script control started.
+00:22:22  [INFO] [init] User interface initialized successfully.
+00:22:22            [DEBUG] [init] Configuring file watchers for auto-reloading…
+00:22:22  [INFO] [init] ════════════════════════════════════════════════════════════
+00:22:22  [INFO] [init] ✅ Hammerspoon boot SUCCESSFUL.
+00:22:22  [INFO] [init] ════════════════════════════════════════════════════════════
+00:22:22            [DEBUG] [llm.core] warmup_model: dispatching to backend 'mlx' for model 'Meta-Llama-3.1-8B-Instruct-4bit'.
+00:22:22  [WARNING] [llm.api_mlx] warmup() called — model='Meta-Llama-3.1-8B-Instruct-4bit' _is_ready=false _warmup_in_flight=false _endpoints_discovered=false.
+00:22:22  [WARNING] [llm.api_mlx] warmup() — endpoints not yet discovered, triggering discovery…
+00:22:22            [DEBUG] [llm.core] warmup_model: dispatching to backend 'mlx' for model 'Meta-Llama-3.1-8B-Instruct-4bit'.
+00:22:22  [WARNING] [llm.api_mlx] warmup() called — model='Meta-Llama-3.1-8B-Instruct-4bit' _is_ready=false _warmup_in_flight=false _endpoints_discovered=false.
+00:22:22  [WARNING] [llm.api_mlx] warmup() — endpoints not yet discovered, triggering discovery…
+00:22:22  [WARNING] [llm.api_mlx] Endpoint discovery: polling /v1/models (elapsed=0.0s)…
+00:22:22  [WARNING] [llm.api_mlx] Endpoint discovery: /v1/models -> HTTP -1.
+00:22:22            [DEBUG] [karabiner] Karabiner-Elements GUI appeared during suppression window — quitting…
+00:22:23            [TRACE] [keylogger.context_tracker] Attaching accessibility observer to PID 8159…
+00:22:23            [DONE] [keylogger.context_tracker] Accessibility observer attached to PID 8159.
+00:22:23            [DEBUG] [karabiner] Restoring Space after Karabiner-Elements GUI switch.
+00:22:23            [DEBUG] [menu_llm.mlx] Scanning MLX installed models cache…
+00:22:23            [DEBUG] [menu_llm.mlx] MLX model detected in cache: Qwen3.5-2B
+00:22:23            [DEBUG] [menu_llm.mlx] MLX model detected in cache: Qwen3.5-4B
+00:22:23            [DEBUG] [menu_llm.mlx] MLX model detected in cache: starcoder2-3b
+00:22:23            [DEBUG] [menu_llm.mlx] MLX model detected in cache: gemma-4-E2B
+00:22:23            [DEBUG] [menu_llm.mlx] MLX model detected in cache: gemma-4-E2B-it
+00:22:23            [DEBUG] [menu_llm.mlx] MLX model detected in cache: gemma-4-E4B
+00:22:23            [DEBUG] [menu_llm.mlx] MLX model detected in cache: gemma-4-E4B-it
+00:22:23            [DEBUG] [menu_llm.mlx] MLX model detected in cache: SmolLM3-3B
+00:22:23            [DEBUG] [menu_llm.mlx] MLX model detected in cache: granite-4.0-h-1b-base
+00:22:23            [DEBUG] [menu_llm.mlx] MLX model detected in cache: granite-4.0-h-1b
+00:22:23            [DEBUG] [menu_llm.mlx] MLX model detected in cache: LFM2.5-350M
+00:22:23            [DEBUG] [menu_llm.mlx] MLX model detected in cache: LFM2.5-1.2B-Instruct
+00:22:23            [DEBUG] [menu_llm.mlx] MLX model detected in cache: Llama-3.1-8B-Instruct
+00:22:23            [DEBUG] [menu_llm.mlx] MLX model detected in cache: Llama-3.2-3B-Instruct
+00:22:23            [DEBUG] [menu_llm.mlx] MLX model detected in cache: Mistral-7B-Instruct-v0.3
+00:22:23            [DEBUG] [menu_llm.mlx] MLX model detected in cache: Hermes-3-Llama-3.2-3B
+00:22:23            [DEBUG] [menu_llm.mlx] MLX model detected in cache: NVIDIA-Nemotron-3-Nano-4B-BF16
+00:22:23            [DEBUG] [menu_llm.mlx] MLX installed models scan complete: 17 model(s).
+00:22:23            [DEBUG] [menu_llm] Startup installed-models cache count: 17
+00:22:23            [DEBUG] [menu_llm] Startup MLX mode: forcing MLX requirements check for model Llama-3.1-8B-Instruct
+00:22:23            [DEBUG] [menu_llm.mlx] Checking MLX requirements for model Llama-3.1-8B-Instruct…
+00:22:23  [WARNING] [llm.api_mlx] Endpoint discovery: polling /v1/models (elapsed=1.3s)…
+00:22:23  [WARNING] [llm.api_mlx] Endpoint discovery: /v1/models -> HTTP -1.
+00:22:23            [DEBUG] [keylogger.context_tracker] App switch: 'QSpace Pro' → 'Code' (894 ms).
+00:22:24            [TRACE] [keylogger.context_tracker] Stopping previous accessibility observer…
+00:22:24            [DONE] [keylogger.context_tracker] Previous accessibility observer stopped.
+00:22:24            [TRACE] [keylogger.context_tracker] Attaching accessibility observer to PID 68120…
+00:22:24            [DONE] [keylogger.context_tracker] Accessibility observer attached to PID 68120.
+00:22:24  [INFO] [menu_llm.mlx] MLX model Llama-3.1-8B-Instruct is installed. Starting server…
+00:22:24  [INFO] [menu_llm.mlx] Ensuring MLX server for model Llama-3.1-8B-Instruct…
+00:22:24  [WARNING] [llm.api_mlx] Endpoint discovery state reset.
+00:22:24            [DEBUG] [llm.api_mlx] Model HF path set to 'mlx-community/Meta-Llama-3.1-8B-Instruct-4bit'.
+00:22:24  [INFO] [menu_llm.mlx] Starting MLX server process for model Llama-3.1-8B-Instruct — output prefixed [MLX-SERVER] in /tmp/ergopti.log
+00:22:24            [DEBUG] [menu_llm.mlx] MLX server bash_cmd: export PATH="/opt/homebrew/bin:/usr/local/bin:$PATH"; export SSL_CERT_FILE=/etc/ssl/cert.pem; export REQUESTS_CA_BUNDLE=/etc/ssl/cert.pem; export HF_HUB_DISABLE_XET=1; export HF_HUB_OFFLINE=1; export TRANSFORMERS_OFFLINE=1; export PYTHONUNBUFFERED=1; PYTHON_BIN="/Users/b519hs/perso/ergopti/static/drivers/hammerspoon/.venv/bin/python"; if [ ! -x "$PYTHON_BIN" ]; then echo "[MLX] ❌ venv introuvable : $PYTHON_BIN"; exit 1; fi; echo "[MLX] Python utilisé: $PYTHON_BIN"; MLX_PID_FILE=/tmp/mlx_server.pid; MLX_PGID_FILE=/tmp/mlx_server.pgid; if [ -f "$MLX_PGID_FILE" ]; then OLD_PGID=$(cat "$MLX_PGID_FILE" 2>/dev/null | tr -d '[:space:]'); echo "[MLX] Skipping PGID-kill of $OLD_PGID — PID-based kill is safer on macOS."; rm -f "$MLX_PGID_FILE"; fi; if [ -f "$MLX_PID_FILE" ]; then OLD_PID=$(cat "$MLX_PID_FILE" 2>/dev/null | tr -d '[:space:]'); if [ -n "$OLD_PID" ] && kill -0 "$OLD_PID" 2>/dev/null; then OLD_COMM=$(ps -o comm= -p "$OLD_PID" 2>/dev/null | tr -d '[:space:]'); OLD_ARGS=$(ps -o args= -p "$OLD_PID" 2>/dev/null); if echo "$OLD_COMM" | grep -qi python && echo "$OLD_ARGS" | grep -q mlx_lm; then echo "[MLX] Killing previous server PID $OLD_PID (verified python+mlx_lm)…"; kill -9 "$OLD_PID" 2>/dev/null || true; else echo "[MLX] ⚠️  PID $OLD_PID is alive but not a python+mlx_lm process (comm='$OLD_COMM') — refusing to kill (PID was recycled, likely Hammerspoon)."; fi; else echo "[MLX] PID file stale (PID $OLD_PID not running)."; fi; rm -f "$MLX_PID_FILE"; fi; PGREP_PIDS=$(ps -axo pid=,comm=,args= | awk '$2 ~ /^[Pp]ython/ && /mlx_lm/ {print $1}' || true); if [ -n "$PGREP_PIDS" ]; then echo "[MLX] mlx_lm process(es) still alive (PIDs: $PGREP_PIDS) — killing…"; echo "$PGREP_PIDS" | xargs kill -9 2>/dev/null || true; sleep 1; fi; sleep 3; LSOF_ATTEMPTS=0; while true; do STALE_PIDS=$(lsof -ti TCP:8080 2>/dev/null || true); if [ -z "$STALE_PIDS" ]; then echo "[MLX] Port 8080 free — starting server."; break; fi; LSOF_ATTEMPTS=$((LSOF_ATTEMPTS + 1)); echo "[MLX] Port 8080 still occupied attempt $LSOF_ATTEMPTS (PIDs: $STALE_PIDS) — killing…"; echo "$STALE_PIDS" | xargs kill -9 2>/dev/null || true; if [ "$LSOF_ATTEMPTS" -ge 10 ]; then echo "[MLX] ❌ Port 8080 still occupied after 10 attempts — giving up."; exit 1; fi; sleep 0.5; done; MLX_FIFO=$(mktemp -u /tmp/mlx_out.XXXXXX); mkfifo "$MLX_FIFO"; set -m; REPO_ID="mlx-community/Meta-Llama-3.1-8B-Instruct-4bit"; CACHE_NAME="models--$(echo "$REPO_ID" | sed 's|/|--|g')"; CACHE_ROOT="$HOME/.cache/huggingface/hub/$CACHE_NAME"; SNAPSHOT_DIR=$(ls -dt "$CACHE_ROOT/snapshots/"*/ 2>/dev/null | head -1); if [ -n "$SNAPSHOT_DIR" ] && [ -d "$SNAPSHOT_DIR" ]; then MODEL_ARG="${SNAPSHOT_DIR%/}"; echo "[MLX] Using local snapshot path: $MODEL_ARG"; echo "$MODEL_ARG" > /tmp/mlx_active_model.txt; REVISION=$(basename "$MODEL_ARG"); mkdir -p "$CACHE_ROOT/refs"; if [ ! -f "$CACHE_ROOT/refs/main" ]; then echo "$REVISION" > "$CACHE_ROOT/refs/main"; echo "[MLX] Wrote refs/main = $REVISION (was missing — required by HF offline mode)."; fi; else MODEL_ARG="$REPO_ID"; echo "[MLX] No local snapshot found for $REPO_ID — falling back to repo id."; echo "$REPO_ID" > /tmp/mlx_active_model.txt; fi; "$PYTHON_BIN" -m mlx_lm server --model "$MODEL_ARG" --decode-concurrency 1 --prompt-concurrency 1 > "$MLX_FIFO" 2>&1 & MLX_PID=$!; set +m; MLX_PGID=$(ps -o pgid= -p $MLX_PID 2>/dev/null | tr -d ' ' || echo ''); echo "[MLX] Server started with PID $MLX_PID PGID $MLX_PGID."; echo "$MLX_PID" > "$MLX_PID_FILE"; OWN_PGID=$(ps -o pgid= -p $$ 2>/dev/null | tr -d '[:space:]'); PARENT_PGID=$(ps -o pgid= -p $PPID 2>/dev/null | tr -d '[:space:]'); if [ -n "$MLX_PGID" ] && [ "$MLX_PGID" != "$OWN_PGID" ] && [ "$MLX_PGID" != "$PARENT_PGID" ]; then echo "$MLX_PGID" > "$MLX_PGID_FILE"; echo "[MLX] Persisted PGID $MLX_PGID (isolated from Hammerspoon group $PARENT_PGID)."; else echo "[MLX] ⚠️  set -m did not isolate python (MLX_PGID=$MLX_PGID, own=$OWN_PGID, parent=$PARENT_PGID) — NOT persisting PGID. Will rely on PID-only kill on next switch."; rm -f "$MLX_PGID_FILE"; fi; while IFS= read -r LINE; do OUT="$(date +%H:%M:%S) [MLX-SERVER] $LINE"; printf '%s\n' "$OUT"; printf '%s\n' "$OUT" >> /tmp/ergopti.log; done < "$MLX_FIFO"; rm -f "$MLX_FIFO"
+00:22:24  [INFO] [menu_llm.mlx] MLX server task started for model ‘Llama-3.1-8B-Instruct’.
+00:22:24            [DEBUG] [menu_llm.mlx] MLX server stream chunk (96 bytes).
+00:22:24            [DEBUG] [menu_llm.mlx] MLX server: [MLX] Python utilisé: /Users/b519hs/perso/ergopti/static/drivers/hammerspoon/.venv/bin/python
+00:22:24            [DEBUG] [menu_llm.mlx] MLX server stream chunk (72 bytes).
+00:22:24            [DEBUG] [menu_llm.mlx] MLX server: [MLX] Skipping PGID-kill of 71069 — PID-based kill is safer on macOS.
+00:22:24            [DEBUG] [menu_llm.mlx] MLX server stream chunk (46 bytes).
+00:22:24            [DEBUG] [menu_llm.mlx] MLX server: [MLX] PID file stale (PID 71069 not running).
+00:22:24            [DEBUG] [menu_llm.mlx] Pre-launch port-8080 sweep done: done
+00:22:25            [DEBUG] [menu_llm] Startup MLX backup check fired for model Llama-3.1-8B-Instruct
+00:22:25            [DEBUG] [menu_llm.mlx] Checking MLX requirements for model Llama-3.1-8B-Instruct…
+00:22:25            [TRACE] [keylogger.log_manager] Executing debounced save…
+00:22:25            [DONE] [keylogger.log_manager] Debounced save completed.
+00:22:26            [DEBUG] [menu_llm.mlx] Scanning MLX installed models cache…
+00:22:26            [DEBUG] [menu_llm.mlx] MLX model detected in cache: Qwen3.5-2B
+00:22:26            [DEBUG] [menu_llm.mlx] MLX model detected in cache: Qwen3.5-4B
+00:22:26            [DEBUG] [menu_llm.mlx] MLX model detected in cache: starcoder2-3b
+00:22:26            [DEBUG] [menu_llm.mlx] MLX model detected in cache: gemma-4-E2B
+00:22:26            [DEBUG] [menu_llm.mlx] MLX model detected in cache: gemma-4-E2B-it
+00:22:26            [DEBUG] [menu_llm.mlx] MLX model detected in cache: gemma-4-E4B
+00:22:26            [DEBUG] [menu_llm.mlx] MLX model detected in cache: gemma-4-E4B-it
+00:22:26            [DEBUG] [menu_llm.mlx] MLX model detected in cache: SmolLM3-3B
+00:22:26            [DEBUG] [menu_llm.mlx] MLX model detected in cache: granite-4.0-h-1b-base
+00:22:26            [DEBUG] [menu_llm.mlx] MLX model detected in cache: granite-4.0-h-1b
+00:22:26            [DEBUG] [menu_llm.mlx] MLX model detected in cache: LFM2.5-350M
+00:22:26            [DEBUG] [menu_llm.mlx] MLX model detected in cache: LFM2.5-1.2B-Instruct
+00:22:26            [DEBUG] [menu_llm.mlx] MLX model detected in cache: Llama-3.1-8B-Instruct
+00:22:26            [DEBUG] [menu_llm.mlx] MLX model detected in cache: Llama-3.2-3B-Instruct
+00:22:26            [DEBUG] [menu_llm.mlx] MLX model detected in cache: Mistral-7B-Instruct-v0.3
+00:22:26            [DEBUG] [menu_llm.mlx] MLX model detected in cache: Hermes-3-Llama-3.2-3B
+00:22:26            [DEBUG] [menu_llm.mlx] MLX model detected in cache: NVIDIA-Nemotron-3-Nano-4B-BF16
+00:22:26            [DEBUG] [menu_llm.mlx] MLX installed models scan complete: 17 model(s).
+00:22:26  [INFO] [menu_llm.mlx] MLX model Llama-3.1-8B-Instruct is installed. Starting server…
+00:22:26  [INFO] [menu_llm.mlx] Ensuring MLX server for model Llama-3.1-8B-Instruct…
+00:22:26            [DEBUG] [menu_llm.mlx] Existing MLX task found — running=true, server_target='Llama-3.1-8B-Instruct', target_model='Llama-3.1-8B-Instruct'.
+00:22:26  [INFO] [menu_llm.mlx] MLX server already running for model 'Llama-3.1-8B-Instruct' — reusing, calling on_success.
+00:22:26  [INFO] [menu_llm] Startup MLX backup check succeeded for model Llama-3.1-8B-Instruct
+00:22:26  [INFO] [llm.prediction_engine] LLM enabled.
+00:22:26            [DEBUG] [llm.prediction_engine] Scheduling warmup for 'Meta-Llama-3.1-8B-Instruct-4bit' in 2s (from set_llm_enabled).
+00:22:27            [DEBUG] [tooltip_llm] mark_chain_complete: no chain in progress — ignoring.
+00:22:27            [DONE] [llm.prediction_engine] Inactivity timer stopped.
+00:22:27            [DEBUG] [tooltip_llm] mark_chain_complete: no chain in progress — ignoring.
+00:22:27            [DONE] [llm.prediction_engine] Inactivity timer stopped.
+00:22:27            [DEBUG] [builder] Building hotstrings submenu…
+00:22:27            [DEBUG] [builder] Component 'hotstrings.build_groups' added successfully.
+00:22:27            [DEBUG] [builder] Component 'hotstrings.build_custom' added successfully.
+00:22:27            [DEBUG] [builder] Component 'hotstrings.build_management' added successfully.
+00:22:27            [DEBUG] [builder] Building AI component…
+00:22:27            [DEBUG] [menu_llm] Building LLM menu item (build_item)…
+00:22:27            [DEBUG] [menu_llm] Menu state: paused=false, llm_enabled=true, is_disabled=false
+00:22:27            [DEBUG] [menu_llm] Building models selection menu…
+00:22:27            [DEBUG] [menu_llm] Installed models detected: 17
+00:22:27            [DEBUG] [menu_llm] Building prediction count menu…
+00:22:27            [DEBUG] [app_picker] Building application exclusion menu…
+00:22:27  [INFO] [app_picker] Application exclusion menu built successfully.
+00:22:27            [DEBUG] [llm.prediction_engine] Navigation modifiers: [].
+00:22:27            [DEBUG] [llm.prediction_engine] Validation modifiers: [alt].
+00:22:27            [DEBUG] [builder] AI component added successfully.
+00:22:27            [DEBUG] [keylogger] Options updated.
+00:22:27            [DEBUG] [keylogger] Disabled apps updated (0 entry(ies)).
+00:22:27            [DEBUG] [keylogger] Private window filter: on.
+00:22:27            [DEBUG] [keylogger] Secure field filter: on.
+00:22:27            [DEBUG] [keylogger] System auth filter: on.
+00:22:27  [WARNING] [keylogger] M.start() called while already running — ignoring.
+00:22:27            [DEBUG] [app_picker] Building application exclusion menu…
+00:22:27  [INFO] [app_picker] Application exclusion menu built successfully.
+00:22:27            [DEBUG] [builder] Component 'keylogger.build' added successfully.
+00:22:27            [DEBUG] [builder] Component 'shortcuts.build' added successfully.
+00:22:27            [DEBUG] [builder] Component 'karabiner.build' added successfully.
+00:22:27            [DEBUG] [builder] Component 'gestures.build' added successfully.
+00:22:27            [TRACE] [menu_apps] Building applications submenu…
+00:22:27            [TRACE] [menu_apps] Scanning apps/ directory: /Users/b519hs/perso/ergopti/static/drivers/hammerspoon/apps…
+00:22:27            [DONE] [menu_apps] Found 2 bundled app(s).
+00:22:27            [DONE] [menu_apps] Applications submenu built (2 item(s)).
+00:22:27            [DEBUG] [builder] Component 'apps.build' added successfully.
+00:22:28 [MLX-SERVER] /Users/b519hs/perso/ergopti/static/drivers/hammerspoon/.venv/lib/python3.11/site-packages/mlx_lm/server.py:1723: UserWarning: mlx_lm.server is not recommended for production as it only implements basic security checks.
+00:22:28 [MLX-SERVER]   warnings.warn(
+00:22:28 [MLX-SERVER] 2026-05-03 00:22:28,690 - INFO - Starting httpd at 127.0.0.1 on port 8080...
+00:22:30            [DEBUG] [tooltip_llm] mark_chain_complete: no chain in progress — ignoring.
+00:22:30            [DONE] [llm.prediction_engine] Inactivity timer stopped.
+00:22:30            [DEBUG] [tooltip_llm] mark_chain_complete: no chain in progress — ignoring.
+00:22:30            [DONE] [llm.prediction_engine] Inactivity timer stopped.
+00:22:30            [DEBUG] [keylogger] Loading metrics UI…
+00:22:30  [START] [metrics_typing] Opening typing metrics dashboard…
+00:22:30  [START] [keylogger.log_manager] Evaluating index state for rebuild…
+00:22:30  [INFO] [keylogger.log_manager] Today's index is sparse — rebuilding from raw log…
+00:22:30  [INFO] [keylogger.log_manager] Rebuild from raw log complete (31 typing event(s) replayed).
+00:22:30  [SUCCESS] [keylogger.log_manager] Index evaluation and migration complete.
+00:22:30  [INFO] [metrics_typing] New day detected — flushing historical caches.
+00:22:31            [TRACE] [metrics_typing] Historical manifest cache miss — decrypting DB…
+00:22:31            [DONE] [metrics_typing] Historical manifest decrypted and cached.
+00:22:33            [DEBUG] [ui_builder] Creating new webview window…
+00:22:33            [DEBUG] [ui_builder] Building injected HTML assets…
+00:22:33  [INFO] [ui_builder] Injected HTML assets built successfully.
+00:22:33            [DEBUG] [ui_builder] Forcing window focus and teleporting to active space…
+00:22:33  [INFO] [ui_builder] Webview window created successfully.
+00:22:33            [DEBUG] [metrics_typing] Keycode layout loaded: 116 entries.
+00:22:33  [SUCCESS] [metrics_typing] Typing metrics dashboard opened.
+00:22:33  [INFO] [keylogger] Metrics UI opened.
+00:22:33            [TRACE] [metrics_typing] Initial n-gram data: cache miss — decrypting DB…
+00:22:33            [TRACE] [metrics_typing] Historical n-gram cache miss — querying encrypted DB…
+00:22:33 [MLX-SERVER] 127.0.0.1 - - [03/May/2026 00:22:33] "GET /v1/models HTTP/1.1" 200 -
+00:22:40            [DONE] [metrics_typing] Historical n-gram data cached.
+00:22:41            [DONE] [metrics_typing] Initial n-gram data ready.
+00:22:41            [DEBUG] [builder] Building hotstrings submenu…
+00:22:41            [DEBUG] [builder] Component 'hotstrings.build_groups' added successfully.
+00:22:41            [DEBUG] [builder] Component 'hotstrings.build_custom' added successfully.
+00:22:41            [DEBUG] [builder] Component 'hotstrings.build_management' added successfully.
+00:22:41            [DEBUG] [builder] Building AI component…
+00:22:41            [DEBUG] [menu_llm] Building LLM menu item (build_item)…
+00:22:41            [DEBUG] [menu_llm] Menu state: paused=false, llm_enabled=true, is_disabled=false
+00:22:41            [DEBUG] [menu_llm] Building models selection menu…
+00:22:41            [DEBUG] [menu_llm.mlx] Scanning MLX installed models cache…
+00:22:41            [DEBUG] [menu_llm.mlx] MLX model detected in cache: Qwen3.5-2B
+00:22:41            [DEBUG] [menu_llm.mlx] MLX model detected in cache: Qwen3.5-4B
+00:22:41            [DEBUG] [menu_llm.mlx] MLX model detected in cache: starcoder2-3b
+00:22:41            [DEBUG] [menu_llm.mlx] MLX model detected in cache: gemma-4-E2B
+00:22:41            [DEBUG] [menu_llm.mlx] MLX model detected in cache: gemma-4-E2B-it
+00:22:41            [DEBUG] [menu_llm.mlx] MLX model detected in cache: gemma-4-E4B
+00:22:41            [DEBUG] [menu_llm.mlx] MLX model detected in cache: gemma-4-E4B-it
+00:22:41            [DEBUG] [menu_llm.mlx] MLX model detected in cache: SmolLM3-3B
+00:22:41            [DEBUG] [menu_llm.mlx] MLX model detected in cache: granite-4.0-h-1b-base
+00:22:41            [DEBUG] [menu_llm.mlx] MLX model detected in cache: granite-4.0-h-1b
+00:22:41            [DEBUG] [menu_llm.mlx] MLX model detected in cache: LFM2.5-350M
+00:22:41            [DEBUG] [menu_llm.mlx] MLX model detected in cache: LFM2.5-1.2B-Instruct
+00:22:41            [DEBUG] [menu_llm.mlx] MLX model detected in cache: Llama-3.1-8B-Instruct
+00:22:41            [DEBUG] [menu_llm.mlx] MLX model detected in cache: Llama-3.2-3B-Instruct
+00:22:41            [DEBUG] [menu_llm.mlx] MLX model detected in cache: Mistral-7B-Instruct-v0.3
+00:22:41            [DEBUG] [menu_llm.mlx] MLX model detected in cache: Hermes-3-Llama-3.2-3B
+00:22:41            [DEBUG] [menu_llm.mlx] MLX model detected in cache: NVIDIA-Nemotron-3-Nano-4B-BF16
+00:22:41            [DEBUG] [menu_llm.mlx] MLX installed models scan complete: 17 model(s).
+00:22:41            [DEBUG] [menu_llm] Installed models detected: 17
+00:22:41            [DEBUG] [menu_llm] Building prediction count menu…
+00:22:41            [DEBUG] [app_picker] Building application exclusion menu…
+00:22:41  [INFO] [app_picker] Application exclusion menu built successfully.
+00:22:41            [DEBUG] [llm.prediction_engine] Navigation modifiers: [].
+00:22:41            [DEBUG] [llm.prediction_engine] Validation modifiers: [alt].
+00:22:41            [DEBUG] [builder] AI component added successfully.
+00:22:41            [DEBUG] [app_picker] Building application exclusion menu…
+00:22:41  [INFO] [app_picker] Application exclusion menu built successfully.
+00:22:41            [DEBUG] [builder] Component 'keylogger.build' added successfully.
+00:22:41            [DEBUG] [builder] Component 'shortcuts.build' added successfully.
+00:22:41            [DEBUG] [builder] Component 'karabiner.build' added successfully.
+00:22:41            [DEBUG] [builder] Component 'gestures.build' added successfully.
+00:22:41            [TRACE] [menu_apps] Building applications submenu…
+00:22:41            [TRACE] [menu_apps] Scanning apps/ directory: /Users/b519hs/perso/ergopti/static/drivers/hammerspoon/apps…
+00:22:41            [DONE] [menu_apps] Found 2 bundled app(s).
+00:22:41            [DONE] [menu_apps] Applications submenu built (2 item(s)).
+00:22:41            [DEBUG] [builder] Component 'apps.build' added successfully.
+00:22:42            [DEBUG] [tooltip_llm] mark_chain_complete: no chain in progress — ignoring.
+00:22:42            [DONE] [llm.prediction_engine] Inactivity timer stopped.
+00:22:42            [DEBUG] [tooltip_llm] mark_chain_complete: no chain in progress — ignoring.
+00:22:42            [DONE] [llm.prediction_engine] Inactivity timer stopped.
+00:22:42            [DEBUG] [menu_llm.mlx] MLX server stream chunk (42 bytes).
+00:22:42            [DEBUG] [menu_llm.mlx] MLX server: [MLX] Port 8080 free — starting server.
+00:22:42 [MLX-SERVER] 127.0.0.1 - - [03/May/2026 00:22:42] "GET /v1/models HTTP/1.1" 200 -
+00:22:42            [DEBUG] [menu_llm.mlx] MLX server stream chunk (762 bytes).
+00:22:42            [DEBUG] [menu_llm.mlx] MLX server: [MLX] Using local snapshot path: /Users/b519hs/.cache/huggingface/hub/models--mlx-community--Meta-Llama-3.1-8B-Instruct-4bit/snapshots/241a666dad6cb93c8ff213d39a7f34a36bf26db4
+00:22:42            [DEBUG] [menu_llm.mlx] MLX server: [MLX] Server started with PID 72101 PGID 72101.
+00:22:42            [DEBUG] [llm.api_mlx] Active server PGID guard set to 72101.
+00:22:42  [WARNING] [llm.api_mlx] Killing zombie mlx_lm Python process(es) via ps+awk (excluding PGID 72101)…
+00:22:42            [DEBUG] [menu_llm.mlx] MLX server: [MLX] Persisted PGID 72101 (isolated from Hammerspoon group 71881).
+00:22:42            [DEBUG] [menu_llm.mlx] MLX server: 00:22:28 [MLX-SERVER] /Users/b519hs/perso/ergopti/static/drivers/hammerspoon/.venv/lib/python3.11/site-packages/mlx_lm/server.py:1723: UserWarning: mlx_lm.server is not recommended for production as it only implements basic security checks.
+00:22:42            [DEBUG] [menu_llm.mlx] MLX server: 00:22:28 [MLX-SERVER]   warnings.warn(
+00:22:42            [DEBUG] [menu_llm.mlx] MLX server: 00:22:28 [MLX-SERVER] 2026-05-03 00:22:28,690 - INFO - Starting httpd at 127.0.0.1 on port 8080...
+00:22:42            [DEBUG] [menu_llm.mlx] MLX server: 00:22:33 [MLX-SERVER] 127.0.0.1 - - [03/May/2026 00:22:33] "GET /v1/models HTTP/1.1" 200 -
+00:22:42  [INFO] [menu_llm] Requirements verified for model Llama-3.1-8B-Instruct.
+00:22:42            [DEBUG] [menu_llm] Reactivating MLX predictions.
+00:22:42  [INFO] [llm.prediction_engine] LLM enabled.
+00:22:42            [DEBUG] [llm.prediction_engine] Scheduling warmup for 'Meta-Llama-3.1-8B-Instruct-4bit' in 2s (from set_llm_enabled).
+00:22:42            [DEBUG] [menu_llm.mlx] MLX server stream chunk (91 bytes).
+00:22:42            [DEBUG] [menu_llm.mlx] MLX server: 00:22:42 [MLX-SERVER] 127.0.0.1 - - [03/May/2026 00:22:42] "GET /v1/models HTTP/1.1" 200 -
+00:22:42            [DEBUG] [metrics_typing] Dashboard manifest and data injected.
+00:22:42  [WARNING] [llm.api_mlx] Zombie kill completed; stdout: none
+00:22:42            [DEBUG] [tooltip_llm] mark_chain_complete: no chain in progress — ignoring.
+00:22:42            [DONE] [llm.prediction_engine] Inactivity timer stopped.
+00:22:42            [DEBUG] [tooltip_llm] mark_chain_complete: no chain in progress — ignoring.
+00:22:42            [DONE] [llm.prediction_engine] Inactivity timer stopped.
+00:22:42            [DEBUG] [metrics_typing] Handling n-gram range request from frontend…
+00:22:42            [DONE] [metrics_typing] Historical n-gram cache hit.
+00:22:43            [DEBUG] [tooltip_llm] mark_chain_complete: no chain in progress — ignoring.
+00:22:43            [DONE] [llm.prediction_engine] Inactivity timer stopped.
+00:22:43            [DEBUG] [tooltip_llm] mark_chain_complete: no chain in progress — ignoring.
+00:22:43            [DONE] [llm.prediction_engine] Inactivity timer stopped.
+00:22:44  [WARNING] [llm.prediction_engine] [WARMUP-LOOP] Warmup attempt for 'Meta-Llama-3.1-8B-Instruct-4bit' (backend: mlx).
+00:22:44            [DEBUG] [llm.core] warmup_model: dispatching to backend 'mlx' for model 'Meta-Llama-3.1-8B-Instruct-4bit'.
+00:22:44  [WARNING] [llm.api_mlx] warmup() called — model='Meta-Llama-3.1-8B-Instruct-4bit' _is_ready=false _warmup_in_flight=false _endpoints_discovered=false.
+00:22:44  [WARNING] [llm.api_mlx] warmup() — endpoints not yet discovered, triggering discovery…
+00:22:44  [WARNING] [llm.api_mlx] Endpoint discovery: polling /v1/models (elapsed=0.0s)…
+00:22:44 [MLX-SERVER] 127.0.0.1 - - [03/May/2026 00:22:44] "GET /v1/models HTTP/1.1" 200 -
+00:22:44            [DEBUG] [menu_llm.mlx] MLX server stream chunk (91 bytes).
+00:22:44            [DEBUG] [menu_llm.mlx] MLX server: 00:22:44 [MLX-SERVER] 127.0.0.1 - - [03/May/2026 00:22:44] "GET /v1/models HTTP/1.1" 200 -
+00:22:44  [WARNING] [llm.api_mlx] Endpoint discovery: /v1/models -> HTTP 200.
+00:22:44  [WARNING] [llm.api_mlx] Endpoint discovery: server reachable on /v1/models — starting POST probes.
+00:22:44 [MLX-SERVER] 2026-05-03 00:22:44,372 - INFO - Prompt Cache: 0 sequences, 0.00 GB
+00:22:44            [DEBUG] [menu_llm.mlx] MLX server stream chunk (90 bytes).
+00:22:44            [DEBUG] [menu_llm.mlx] MLX server: 00:22:44 [MLX-SERVER] 2026-05-03 00:22:44,372 - INFO - Prompt Cache: 0 sequences, 0.00 GB
+00:22:44 [MLX-SERVER] 2026-05-03 00:22:44,372 - INFO - - assistant: 0 sequences, 0.00 GB
+00:22:44            [DEBUG] [menu_llm.mlx] MLX server stream chunk (89 bytes).
+00:22:44            [DEBUG] [menu_llm.mlx] MLX server: 00:22:44 [MLX-SERVER] 2026-05-03 00:22:44,372 - INFO - - assistant: 0 sequences, 0.00 GB
+00:22:44 [MLX-SERVER] 2026-05-03 00:22:44,372 - INFO - - user: 0 sequences, 0.00 GB
+00:22:44            [DEBUG] [menu_llm.mlx] MLX server stream chunk (84 bytes).
+00:22:44            [DEBUG] [menu_llm.mlx] MLX server: 00:22:44 [MLX-SERVER] 2026-05-03 00:22:44,372 - INFO - - user: 0 sequences, 0.00 GB
+00:22:44 [MLX-SERVER] 2026-05-03 00:22:44,372 - INFO - - system: 0 sequences, 0.00 GB
+00:22:44            [DEBUG] [menu_llm.mlx] MLX server stream chunk (86 bytes).
+00:22:44            [DEBUG] [menu_llm.mlx] MLX server: 00:22:44 [MLX-SERVER] 2026-05-03 00:22:44,372 - INFO - - system: 0 sequences, 0.00 GB
+00:22:44 [MLX-SERVER] 127.0.0.1 - - [03/May/2026 00:22:44] "POST /v1/completions HTTP/1.1" 200 -
+00:22:44            [DEBUG] [menu_llm.mlx] MLX server stream chunk (97 bytes).
+00:22:44            [DEBUG] [menu_llm.mlx] MLX server: 00:22:44 [MLX-SERVER] 127.0.0.1 - - [03/May/2026 00:22:44] "POST /v1/completions HTTP/1.1" 200 -
+00:22:44 [MLX-SERVER] 2026-05-03 00:22:44,478 - INFO - Prompt processing progress: 1/1
+00:22:44            [DEBUG] [menu_llm.mlx] MLX server stream chunk (87 bytes).
+00:22:44            [DEBUG] [menu_llm.mlx] MLX server: 00:22:44 [MLX-SERVER] 2026-05-03 00:22:44,478 - INFO - Prompt processing progress: 1/1
+00:22:44  [INFO] [llm.api_mlx] Endpoint discovery (completions): /v1/completions -> HTTP 200 — accepted as live route.
+00:22:44  [WARNING] [llm.api_mlx] MLX endpoints resolved: completions=http://127.0.0.1:8080/v1/completions, chat=http://127.0.0.1:8080/v1/chat/completions.
+00:22:44  [WARNING] [llm.api_mlx] warmup() called — model='Meta-Llama-3.1-8B-Instruct-4bit' _is_ready=false _warmup_in_flight=false _endpoints_discovered=true.
+00:22:44  [WARNING] [llm.api_mlx] warmup() — sending warmup POST to 'http://127.0.0.1:8080/v1/completions' for model 'Meta-Llama-3.1-8B-Instruct-4bit'…
+00:22:44 [MLX-SERVER] 127.0.0.1 - - [03/May/2026 00:22:44] "GET /v1/models HTTP/1.1" 200 -
+00:22:44            [DEBUG] [menu_llm.mlx] MLX server stream chunk (91 bytes).
+00:22:44            [DEBUG] [menu_llm.mlx] MLX server: 00:22:44 [MLX-SERVER] 127.0.0.1 - - [03/May/2026 00:22:44] "GET /v1/models HTTP/1.1" 200 -
+00:22:44 [MLX-SERVER] 127.0.0.1 - - [03/May/2026 00:22:44] "GET /v1/models HTTP/1.1" 200 -
+00:22:44            [DEBUG] [menu_llm.mlx] MLX server stream chunk (91 bytes).
+00:22:44            [DEBUG] [menu_llm.mlx] MLX server: 00:22:44 [MLX-SERVER] 127.0.0.1 - - [03/May/2026 00:22:44] "GET /v1/models HTTP/1.1" 200 -
+00:22:44 [MLX-SERVER] 2026-05-03 00:22:44,521 - INFO - Prompt Cache: 1 sequences, 0.00 GB
+00:22:44            [DEBUG] [menu_llm.mlx] MLX server stream chunk (90 bytes).
+00:22:44            [DEBUG] [menu_llm.mlx] MLX server: 00:22:44 [MLX-SERVER] 2026-05-03 00:22:44,521 - INFO - Prompt Cache: 1 sequences, 0.00 GB
+00:22:44 [MLX-SERVER] 2026-05-03 00:22:44,521 - INFO - - assistant: 1 sequences, 0.00 GB
+00:22:44            [DEBUG] [menu_llm.mlx] MLX server stream chunk (89 bytes).
+00:22:44            [DEBUG] [menu_llm.mlx] MLX server: 00:22:44 [MLX-SERVER] 2026-05-03 00:22:44,521 - INFO - - assistant: 1 sequences, 0.00 GB
+00:22:44 [MLX-SERVER] 2026-05-03 00:22:44,521 - INFO - - user: 0 sequences, 0.00 GB
+00:22:44            [DEBUG] [menu_llm.mlx] MLX server stream chunk (84 bytes).
+00:22:44            [DEBUG] [menu_llm.mlx] MLX server: 00:22:44 [MLX-SERVER] 2026-05-03 00:22:44,521 - INFO - - user: 0 sequences, 0.00 GB
+00:22:44 [MLX-SERVER] 2026-05-03 00:22:44,521 - INFO - - system: 0 sequences, 0.00 GB
+00:22:44            [DEBUG] [menu_llm.mlx] MLX server stream chunk (86 bytes).
+00:22:44            [DEBUG] [menu_llm.mlx] MLX server: 00:22:44 [MLX-SERVER] 2026-05-03 00:22:44,521 - INFO - - system: 0 sequences, 0.00 GB
+00:22:44 [MLX-SERVER] 127.0.0.1 - - [03/May/2026 00:22:44] "POST /v1/chat/completions HTTP/1.1" 200 -
+00:22:44            [DEBUG] [menu_llm.mlx] MLX server stream chunk (102 bytes).
+00:22:44            [DEBUG] [menu_llm.mlx] MLX server: 00:22:44 [MLX-SERVER] 127.0.0.1 - - [03/May/2026 00:22:44] "POST /v1/chat/completions HTTP/1.1" 200 -
+00:22:44            [DEBUG] [tooltip_llm] mark_chain_complete: no chain in progress — ignoring.
+00:22:44            [DONE] [llm.prediction_engine] Inactivity timer stopped.
+00:22:44            [DEBUG] [tooltip_llm] mark_chain_complete: no chain in progress — ignoring.
+00:22:44            [DONE] [llm.prediction_engine] Inactivity timer stopped.
+00:22:44            [DEBUG] [builder] Building hotstrings submenu…
+00:22:44            [DEBUG] [builder] Component 'hotstrings.build_groups' added successfully.
+00:22:44            [DEBUG] [builder] Component 'hotstrings.build_custom' added successfully.
+00:22:44            [DEBUG] [builder] Component 'hotstrings.build_management' added successfully.
+00:22:44            [DEBUG] [builder] Building AI component…
+00:22:44            [DEBUG] [menu_llm] Building LLM menu item (build_item)…
+00:22:44            [DEBUG] [menu_llm] Menu state: paused=false, llm_enabled=true, is_disabled=false
+00:22:44            [DEBUG] [menu_llm] Building models selection menu…
+00:22:44            [DEBUG] [menu_llm.mlx] Scanning MLX installed models cache…
+00:22:44            [DEBUG] [menu_llm.mlx] MLX model detected in cache: Qwen3.5-2B
+00:22:44            [DEBUG] [menu_llm.mlx] MLX model detected in cache: Qwen3.5-4B
+00:22:44            [DEBUG] [menu_llm.mlx] MLX model detected in cache: starcoder2-3b
+00:22:44            [DEBUG] [menu_llm.mlx] MLX model detected in cache: gemma-4-E2B
+00:22:44            [DEBUG] [menu_llm.mlx] MLX model detected in cache: gemma-4-E2B-it
+00:22:44            [DEBUG] [menu_llm.mlx] MLX model detected in cache: gemma-4-E4B
+00:22:44            [DEBUG] [menu_llm.mlx] MLX model detected in cache: gemma-4-E4B-it
+00:22:44            [DEBUG] [menu_llm.mlx] MLX model detected in cache: SmolLM3-3B
+00:22:44            [DEBUG] [menu_llm.mlx] MLX model detected in cache: granite-4.0-h-1b-base
+00:22:44            [DEBUG] [menu_llm.mlx] MLX model detected in cache: granite-4.0-h-1b
+00:22:44            [DEBUG] [menu_llm.mlx] MLX model detected in cache: LFM2.5-350M
+00:22:44            [DEBUG] [menu_llm.mlx] MLX model detected in cache: LFM2.5-1.2B-Instruct
+00:22:44            [DEBUG] [menu_llm.mlx] MLX model detected in cache: Llama-3.1-8B-Instruct
+00:22:44            [DEBUG] [menu_llm.mlx] MLX model detected in cache: Llama-3.2-3B-Instruct
+00:22:44            [DEBUG] [menu_llm.mlx] MLX model detected in cache: Mistral-7B-Instruct-v0.3
+00:22:44            [DEBUG] [menu_llm.mlx] MLX model detected in cache: Hermes-3-Llama-3.2-3B
+00:22:44            [DEBUG] [menu_llm.mlx] MLX model detected in cache: NVIDIA-Nemotron-3-Nano-4B-BF16
+00:22:44            [DEBUG] [menu_llm.mlx] MLX installed models scan complete: 17 model(s).
+00:22:44            [DEBUG] [menu_llm] Installed models detected: 17
+00:22:44            [DEBUG] [menu_llm] Building prediction count menu…
+00:22:44            [DEBUG] [app_picker] Building application exclusion menu…
+00:22:44  [INFO] [app_picker] Application exclusion menu built successfully.
+00:22:44            [DEBUG] [llm.prediction_engine] Navigation modifiers: [].
+00:22:44            [DEBUG] [llm.prediction_engine] Validation modifiers: [alt].
+00:22:44            [DEBUG] [builder] AI component added successfully.
+00:22:44            [DEBUG] [app_picker] Building application exclusion menu…
+00:22:44  [INFO] [app_picker] Application exclusion menu built successfully.
+00:22:44            [DEBUG] [builder] Component 'keylogger.build' added successfully.
+00:22:44            [DEBUG] [builder] Component 'shortcuts.build' added successfully.
+00:22:44            [DEBUG] [builder] Component 'karabiner.build' added successfully.
+00:22:44            [DEBUG] [builder] Component 'gestures.build' added successfully.
+00:22:44            [TRACE] [menu_apps] Building applications submenu…
+00:22:44            [TRACE] [menu_apps] Scanning apps/ directory: /Users/b519hs/perso/ergopti/static/drivers/hammerspoon/apps…
+00:22:44            [DONE] [menu_apps] Found 2 bundled app(s).
+00:22:44            [DONE] [menu_apps] Applications submenu built (2 item(s)).
+00:22:44            [DEBUG] [builder] Component 'apps.build' added successfully.
+00:22:45 [MLX-SERVER] 2026-05-03 00:22:45,133 - INFO - Prompt processing progress: 270/271
+00:22:45 [MLX-SERVER] 2026-05-03 00:22:45,155 - INFO - Prompt processing progress: 271/271
+00:22:45 [MLX-SERVER] 2026-05-03 00:22:45,186 - INFO - Prompt Cache: 2 sequences, 0.04 GB
+00:22:45 [MLX-SERVER] 2026-05-03 00:22:45,187 - INFO - - assistant: 2 sequences, 0.04 GB
+00:22:45 [MLX-SERVER] 2026-05-03 00:22:45,187 - INFO - - user: 0 sequences, 0.00 GB
+00:22:45 [MLX-SERVER] 2026-05-03 00:22:45,187 - INFO - - system: 0 sequences, 0.00 GB
+00:22:45 [MLX-SERVER] 127.0.0.1 - - [03/May/2026 00:22:45] "POST /v1/chat/completions HTTP/1.1" 200 -
+00:22:45 [MLX-SERVER] 2026-05-03 00:22:45,267 - INFO - Prompt processing progress: 4/5
+00:22:45 [MLX-SERVER] 2026-05-03 00:22:45,288 - INFO - Prompt processing progress: 5/5
+00:22:47            [DEBUG] [tooltip_llm] mark_chain_complete: no chain in progress — ignoring.
+00:22:47            [DONE] [llm.prediction_engine] Inactivity timer stopped.
+00:22:47            [DEBUG] [tooltip_llm] mark_chain_complete: no chain in progress — ignoring.
+00:22:47            [DONE] [llm.prediction_engine] Inactivity timer stopped.
+00:22:47            [DEBUG] [keylogger] Loading metrics UI…
+00:22:47            [DEBUG] [metrics_typing] Dashboard already open, bringing to front…
+00:22:47            [DEBUG] [ui_builder] Forcing window focus and teleporting to active space…
+00:22:47  [INFO] [keylogger] Metrics UI opened.
+00:22:47  [WARNING] [llm.api_mlx] warmup POST response: status=200 has_tokens=true body_len=576.
+00:22:47  [WARNING] [llm.api_mlx] MLX KV cache primed (profile: batch_advanced) — backend ready.
+00:22:47  [INFO] [llm.api_mlx] Endpoint discovery (chat): /v1/chat/completions -> HTTP 200 — accepted as live route.
+00:22:47            [DEBUG] [menu_llm.mlx] MLX server stream chunk (91 bytes).
+00:22:47            [DEBUG] [menu_llm.mlx] MLX server: 00:22:45 [MLX-SERVER] 2026-05-03 00:22:45,133 - INFO - Prompt processing progress: 270/271
+00:22:47            [DEBUG] [menu_llm.mlx] MLX server stream chunk (716 bytes).
+00:22:47            [DEBUG] [menu_llm.mlx] MLX server: 00:22:45 [MLX-SERVER] 2026-05-03 00:22:45,155 - INFO - Prompt processing progress: 271/271
+00:22:47            [DEBUG] [menu_llm.mlx] MLX server: 00:22:45 [MLX-SERVER] 2026-05-03 00:22:45,186 - INFO - Prompt Cache: 2 sequences, 0.04 GB
+00:22:47            [DEBUG] [menu_llm.mlx] MLX server: 00:22:45 [MLX-SERVER] 2026-05-03 00:22:45,187 - INFO - - assistant: 2 sequences, 0.04 GB
+00:22:47            [DEBUG] [menu_llm.mlx] MLX server: 00:22:45 [MLX-SERVER] 2026-05-03 00:22:45,187 - INFO - - user: 0 sequences, 0.00 GB
+00:22:47            [DEBUG] [menu_llm.mlx] MLX server: 00:22:45 [MLX-SERVER] 2026-05-03 00:22:45,187 - INFO - - system: 0 sequences, 0.00 GB
+00:22:47            [DEBUG] [menu_llm.mlx] MLX server: 00:22:45 [MLX-SERVER] 127.0.0.1 - - [03/May/2026 00:22:45] "POST /v1/chat/completions HTTP/1.1" 200 -
+00:22:47            [DEBUG] [menu_llm.mlx] MLX server: 00:22:45 [MLX-SERVER] 2026-05-03 00:22:45,267 - INFO - Prompt processing progress: 4/5
+00:22:47            [DEBUG] [menu_llm.mlx] MLX server: 00:22:45 [MLX-SERVER] 2026-05-03 00:22:45,288 - INFO - Prompt processing progress: 5/5
+00:22:48 [MLX-SERVER] 127.0.0.1 - - [03/May/2026 00:22:47] "GET /v1/models HTTP/1.1" 200 -
+00:22:48            [DEBUG] [menu_llm.mlx] MLX server stream chunk (91 bytes).
+00:22:48            [DEBUG] [menu_llm.mlx] MLX server: 00:22:48 [MLX-SERVER] 127.0.0.1 - - [03/May/2026 00:22:47] "GET /v1/models HTTP/1.1" 200 -
+00:22:48  [INFO] [ui_builder] Window focus applied.
+00:22:48            [DEBUG] [keylogger.context_tracker] App switch: 'Code' → 'Hammerspoon' (24083 ms).
+00:22:48            [TRACE] [keylogger.context_tracker] Stopping previous accessibility observer…
+00:22:48            [DONE] [keylogger.context_tracker] Previous accessibility observer stopped.
+00:22:48            [TRACE] [keylogger.context_tracker] Attaching accessibility observer to PID 71881…
+00:22:49            [DONE] [keylogger.context_tracker] Accessibility observer attached to PID 71881.
+00:22:49            [TRACE] [keylogger.log_manager] Executing debounced save…
+00:22:49            [DONE] [keylogger.log_manager] Debounced save completed.
+00:22:49            [DEBUG] [metrics_typing] Handling n-gram range request from frontend…
+00:22:49            [DONE] [metrics_typing] Historical n-gram cache hit.
+00:22:50            [DEBUG] [metrics_typing] Handling n-gram range request from frontend…
+00:22:50            [DONE] [metrics_typing] Historical n-gram cache hit.
+00:22:51            [DEBUG] [metrics_typing] Handling n-gram range request from frontend…
+00:22:51            [DONE] [metrics_typing] Historical n-gram cache hit.
+00:22:53            [DEBUG] [tooltip_llm] mark_chain_complete: no chain in progress — ignoring.
+00:22:53            [DONE] [llm.prediction_engine] Inactivity timer stopped.
+00:22:53            [DEBUG] [tooltip_llm] mark_chain_complete: no chain in progress — ignoring.
+00:22:53            [DONE] [llm.prediction_engine] Inactivity timer stopped.
+00:22:53            [DEBUG] [keylogger.context_tracker] App switch: 'Hammerspoon' → 'iTerm2' (5114 ms).
+00:22:53            [TRACE] [keylogger.context_tracker] Stopping previous accessibility observer…
+00:22:53            [DONE] [keylogger.context_tracker] Previous accessibility observer stopped.
+00:22:53            [TRACE] [keylogger.context_tracker] Attaching accessibility observer to PID 13539…
+00:22:53            [DONE] [keylogger.context_tracker] Accessibility observer attached to PID 13539.
+00:22:53            [DEBUG] [tooltip_llm] mark_chain_complete: no chain in progress — ignoring.
+00:22:53            [DONE] [llm.prediction_engine] Inactivity timer stopped.
+00:22:53            [DEBUG] [tooltip_llm] mark_chain_complete: no chain in progress — ignoring.
+00:22:53            [DONE] [llm.prediction_engine] Inactivity timer stopped.
+00:22:54            [TRACE] [keylogger.log_manager] Executing debounced save…
+00:22:54            [DONE] [keylogger.log_manager] Debounced save completed.
+00:22:55            [TRACE] [keylogger.log_manager] Flushing event buffer (0 event(s))…
+00:22:55            [DONE] [keylogger.log_manager] Buffer flushed.
+00:22:55            [DEBUG] [tooltip_llm] mark_chain_complete: no chain in progress — ignoring.
+00:22:55            [DONE] [llm.prediction_engine] Inactivity timer stopped.
+00:22:55            [DEBUG] [keymap.utils] Ignored-window cache: application watcher started.
+00:22:55            [DEBUG] [keymap.utils] Ignored-window cache: window filter subscribed.
+00:22:55            [DEBUG] [tooltip_llm] mark_chain_complete: no chain in progress — ignoring.
+00:22:55            [DONE] [llm.prediction_engine] Inactivity timer stopped.
+00:22:56            [TRACE] [keylogger.log_manager] Flushing event buffer (1 event(s))…
+00:22:56            [DONE] [keylogger.log_manager] Buffer flushed.
+00:22:56            [DONE] [llm.prediction_engine] Inactivity timer stopped.
+00:22:56            [DEBUG] [tooltip_llm] mark_chain_complete: no chain in progress — ignoring.
+00:22:56            [DONE] [llm.prediction_engine] Inactivity timer stopped.
+00:22:56            [TRACE] [llm.prediction_engine] Inactivity timer started (override: 0.000s).
+00:22:56            [DEBUG] [keymap.llm_bridge] Buffer cleared on navigation.
+00:22:56            [DEBUG] [tooltip_llm] mark_chain_complete: no chain in progress — ignoring.
+00:22:56            [DONE] [llm.prediction_engine] Inactivity timer stopped.
+
+╭─     ~ ──────────────────────────────────────────────── ✔  00:22:56 
+╰─
