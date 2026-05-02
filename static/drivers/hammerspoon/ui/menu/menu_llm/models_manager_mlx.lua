@@ -28,6 +28,12 @@ local LOG = "menu_llm.mlx"
 local ok_dw, download_window = pcall(require, "ui.download_window")
 if not ok_dw then download_window = nil end
 
+-- Required to inform the discovery poller of the active server PID so it can
+-- exclude it from zombie kills; safe to require here because api_mlx holds no
+-- circular dependency on this file.
+local ok_api_mlx, ApiMlx = pcall(require, "modules.llm.api_mlx")
+if not ok_api_mlx then ApiMlx = nil end
+
 local HF_TOKEN_FILE = (os.getenv("HOME") or "") .. "/.huggingface/token"
 
 
@@ -45,6 +51,47 @@ function M.new(deps, presets)
 	deps.active_tasks = deps.active_tasks or {}
 	obj._installed_cache = nil
 	obj._installed_cache_ts = 0
+
+	-- Register a restart hook so api_mlx can request a fresh launch when its
+	-- discovery loop detects a model-ID mismatch it cannot resolve on its own
+	-- (typically a cross-session leftover whose PGID was wrongly adopted as the
+	-- active guard). The hook is invoked with the expected short model name.
+	if type(ApiMlx) == "table" and type(ApiMlx.set_restart_hook) == "function" then
+		ApiMlx.set_restart_hook(function(target)
+			-- api_mlx passes _expected_model_id, which is the resolved backend ID
+			-- (e.g. "Meta-Llama-3.1-8B-Instruct-4bit"). get_mlx_repo expects the
+			-- menu label (e.g. "Llama-3.1-8B-Instruct"). When the resolved ID does
+			-- not match any preset, fall back to obj._server_target — the label
+			-- of the most recent successful start_server, which is exactly the
+			-- server we are trying to restart.
+			local resolved_repo = (type(target) == "string" and target ~= "") and obj.get_mlx_repo(target) or nil
+			local effective_target = target
+			if not resolved_repo and obj._server_target and obj._server_target ~= "" then
+				Logger.warn(LOG, "Restart hook target '%s' has no repo — falling back to last server target '%s'.",
+					tostring(target), tostring(obj._server_target))
+				effective_target = obj._server_target
+			end
+			if type(effective_target) ~= "string" or effective_target == "" then
+				Logger.warn(LOG, "Restart hook invoked without a usable target — ignoring.")
+				return
+			end
+			Logger.warn(LOG, "Restart hook invoked for target='%s' — calling start_server.", effective_target)
+			-- Force a fresh launch: clear server_target and the active task entry so
+			-- start_server's reuse branch cannot short-circuit. The currently-tracked
+			-- task is the one we just hard-killed (or about to); reusing it would
+			-- mean returning success against a dead/wrong-model process.
+			if deps.active_tasks and deps.active_tasks["mlx_server"] then
+				local existing = deps.active_tasks["mlx_server"]
+				pcall(function() if type(existing.terminate) == "function" then existing:terminate() end end)
+				deps.active_tasks["mlx_server"] = nil
+			end
+			obj._server_target = nil
+			-- on_success / on_cancel are nil here: the prediction layer is already
+			-- waiting on its own warmup retry loop and will pick up the new server
+			-- automatically once the bash launcher emits the PGID line.
+			pcall(obj.start_server, effective_target, nil, nil, { silent_notifications = true })
+		end)
+	end
 
 	local module_source = debug.getinfo(1, "S").source:sub(2)
 	local project_root = module_source:match("^(.*)/static/drivers/hammerspoon/ui/menu/menu_llm/models_manager_mlx%.lua$")
@@ -112,6 +159,14 @@ function M.new(deps, presets)
 					end
 				end
 			end
+		end
+		-- Custom user-added models are passed straight through: a HuggingFace
+		-- repo path ("org/model-name") is the canonical MLX identifier and
+		-- mlx_lm.server / huggingface_hub resolve it natively. Without this
+		-- fallback, check_requirements would refuse any model the user adds
+		-- via the "Ajouter un modèle personnalisé" menu entry.
+		if type(model_name) == "string" and model_name:match("^[%w%._%-]+/[%w%._%-]+$") then
+			return model_name
 		end
 		return nil
 	end
@@ -421,29 +476,63 @@ PY
 		if deps.active_tasks and deps.active_tasks["mlx_server"] then
 			local existing = deps.active_tasks["mlx_server"]
 			local running = type(existing.isRunning) == "function" and existing:isRunning()
+			Logger.debug(LOG, "Existing MLX task found — running=%s, server_target='%s', target_model='%s'.",
+				tostring(running), tostring(obj._server_target), tostring(target_model))
 			if running and obj._server_target == target_model then
+				Logger.info(LOG, "MLX server already running for model '%s' — reusing, calling on_success.", tostring(target_model))
 				if on_success then pcall(on_success) end
 				return
 			end
-			if running then pcall(function() existing:terminate() end) end
+			if running then
+				Logger.info(LOG, "MLX server running for different model — terminating.")
+				pcall(function() existing:terminate() end)
+			end
 			deps.active_tasks["mlx_server"] = nil
 		end
 
-		hs.http.asyncGet("http://127.0.0.1:8080/v1/models", {}, function(probe_status, body)
-			if probe_status == 200 and probe_matches_target(body) then
-				obj._server_target = target_model
-				Logger.info(LOG, "MLX server already ready for model %s.", tostring(target_model))
-				if on_success then pcall(on_success) end
-				return
-			end
+		-- Defensive cross-session port sweep: at this point we are committed to launching
+		-- a fresh server. Any python+mlx_lm process still alive — typically a leftover from
+		-- a previous Hammerspoon session whose hs.task handle is gone, or an orphan whose
+		-- bash wrapper exited but Python child survived — must die before the new server
+		-- binds 8080. The bash launcher does its own kill+lsof loop, but it trusts
+		-- /tmp/mlx_server.pgid which can be stale; firing this sweep here closes that gap.
+		-- Fire-and-forget — the bash launcher's own sleep+lsof retry loop will catch any
+		-- survivor that this async kill doesn't reach in time.
+		do
+			local sweep_cmd =
+				"PIDS=$(ps -axo pid=,comm=,args= | awk '$2 ~ /^[Pp]ython/ && /mlx_lm/ {print $1}'); " ..
+				"PORT_PIDS=$(lsof -ti TCP:8080 2>/dev/null); " ..
+				"ALL=\"$PIDS $PORT_PIDS\"; " ..
+				"[ -n \"$(echo $ALL | tr -d ' ')\" ] && echo \"$ALL\" | tr ' ' '\\n' | sort -u | xargs kill -9 2>/dev/null; " ..
+				"rm -f /tmp/mlx_server.pid /tmp/mlx_server.pgid; " ..
+				"echo done"
+			local sweep = hs.task.new("/bin/bash", function(_c, stdout, _e)
+				Logger.debug(LOG, "Pre-launch port-8080 sweep done: %s", tostring(stdout):gsub("\n", " "))
+			end, {"-c", sweep_cmd})
+			pcall(function() sweep:start() end)
+		end
 
+		-- Skip the async pre-probe: if a server is already listening, probe_server_ready
+		-- will detect it on the first 0.5 s tick. The asyncGet pre-probe was introduced
+		-- to short-circuit task creation for an already-running server, but it blocked
+		-- all subsequent server-start logic when the HTTP callback was delayed (e.g.
+		-- connection refused on macOS can take several seconds to resolve asynchronously),
+		-- causing the task to never be created and predictions to stay locked indefinitely.
+		do
 			obj._server_target = target_model
 			-- The new server process may run a different mlx-lm version or be
 			-- configured for different routes than the previous one; clear the
 			-- cached discovery result so the first warmup re-probes rather than
 			-- reusing stale endpoint paths that return 404 for this new server
-			if type(ApiMlx.reset_endpoints) == "function" then
+			if type(ApiMlx) == "table" and type(ApiMlx.reset_endpoints) == "function" then
 				ApiMlx.reset_endpoints()
+			end
+			-- Store the authoritative HF path used to launch the server so the
+			-- discovery bypass can fall back to it when /v1/models returns a stale
+			-- model ID. Without this, warmup sends the wrong model name and every
+			-- request returns 404, creating an infinite discovery-reset loop.
+			if type(ApiMlx) == "table" and type(ApiMlx.set_model_hf_path) == "function" then
+				ApiMlx.set_model_hf_path(repo)
 			end
 			-- All MLX server output is funneled into the unified Ergopti log so
 			-- the user has a single tail target. Each line is prefixed
@@ -463,17 +552,32 @@ PY
 
 			local function probe_server_ready(retries)
 				if startup_closed or startup_confirmed then return end
-				if retries <= 0 then return end
-				hs.http.asyncGet("http://127.0.0.1:8080/v1/models", {}, function(status, body_retry)
+				if retries <= 0 then
+					-- 60 s elapsed without the server answering — release the prediction
+					-- lock so the user is not silently stuck; log for diagnosis
+					Logger.error(LOG, "MLX server for model '%s' did not become ready within 60s — releasing prediction lock.",
+						tostring(target_model))
+					if type(on_cancel) == "function" then pcall(on_cancel); on_cancel = nil end
+					return
+				end
+				-- Use curl --no-keepalive so each probe opens a fresh TCP connection.
+				-- hs.http pools connections and reuses a keep-alive socket to a zombie
+				-- server, making this probe see the zombie's stale model ID indefinitely.
+				local probe_task = hs.task.new("/usr/bin/curl", function(exit_code, stdout, _)
 					if startup_closed or startup_confirmed then return end
-					if status == 200 and probe_matches_target(body_retry) then
+					if exit_code == 0 and probe_matches_target(stdout or "") then
 						mark_server_ready()
 					else
 						hs.timer.doAfter(0.5, function()
 							probe_server_ready(retries - 1)
 						end)
 					end
-				end)
+				end, {
+					"--silent", "--max-time", "5", "--no-keepalive",
+					"-H", "Connection: close",
+					"http://127.0.0.1:8080/v1/models",
+				})
+				pcall(function() probe_task:start() end)
 			end
 
 			-- Every line of MLX stdout/stderr gets:
@@ -487,25 +591,202 @@ PY
 			--   3. ALSO emitted on the bash task's stdout (tee writes both)
 			--      so the existing stream callback (server_log_buffer /
 			--      crash detector / ready probe) keeps working unchanged.
-			local prefix_pipe =
-				"while IFS= read -r LINE; do " ..
-				"printf '%s [MLX-SERVER] %s\\n' \"$(date +%H:%M:%S)\" \"$LINE\" " ..
-				"| tee -a " .. unified_log_file .. "; " ..
-				"done"
 			local bash_cmd =
-				"set -o pipefail; " ..
 				"export PATH=\"/opt/homebrew/bin:/usr/local/bin:$PATH\"; " ..
 				"export SSL_CERT_FILE=/etc/ssl/cert.pem; " ..
 				"export REQUESTS_CA_BUNDLE=/etc/ssl/cert.pem; " ..
 				"export HF_HUB_DISABLE_XET=1; " ..
+				-- HF_HUB_OFFLINE=1 forces huggingface_hub to use ONLY the local cache
+				-- and skip every HTTPS call to huggingface.co. Required behind a
+				-- corporate proxy with a self-signed root CA, because the httpx
+				-- client used by huggingface_hub>=1.x ignores SSL_CERT_FILE /
+				-- REQUESTS_CA_BUNDLE and uses its own SSL context — a single
+				-- snapshot-validation call on first inference would fail with
+				-- CERTIFICATE_VERIFY_FAILED and crash mlx_lm's _generate thread.
+				-- TRANSFORMERS_OFFLINE=1 mirrors the policy for transformers.
+				"export HF_HUB_OFFLINE=1; " ..
+				"export TRANSFORMERS_OFFLINE=1; " ..
 				"export PYTHONUNBUFFERED=1; " ..
 				-- Fail fast if the pinned project venv is missing — any other Python
 				-- would bypass the pinned mlx-lm version
 				"PYTHON_BIN=\"" .. project_venv_python_escaped .. "\"; " ..
 				"if [ ! -x \"$PYTHON_BIN\" ]; then echo \"[MLX] ❌ venv introuvable : $PYTHON_BIN\"; exit 1; fi; " ..
 				"echo \"[MLX] Python utilisé: $PYTHON_BIN\"; " ..
-				"pids=$(lsof -tiTCP:8080 -sTCP:LISTEN 2>/dev/null); [ -n \"$pids\" ] && kill -9 $pids 2>/dev/null; sleep 0.3; " ..
-				"\"$PYTHON_BIN\" -m mlx_lm server --model " .. repo .. " 2>&1 | tee \"" .. server_log_file .. "\""
+				-- Kill strategy: setsid launches Python in its own process group so we
+				-- can kill the entire tree (Python + any fork()+exec() children whose
+				-- argv no longer contains 'mlx_lm') with a single `kill -PGID`. This
+				-- is the only reliable approach: pgrep misses exec-replaced argv,
+				-- lsof misses processes between accept() calls, and PID-only kill
+				-- leaves orphaned children alive. Three steps, each increasingly broad:
+				--   1. PGID file: kill the whole process group of the previous server.
+				--   2. pgrep fallback: catch any surviving mlx_lm process by argv.
+				--   3. lsof fallback: last resort for anything still holding port 8080.
+				"MLX_PID_FILE=/tmp/mlx_server.pid; " ..
+				"MLX_PGID_FILE=/tmp/mlx_server.pgid; " ..
+				-- IMPORTANT: we used to also kill by saved PGID (kill -9 -<PGID>) here.
+				-- That turned out to be unsafe on macOS: PIDs/PGIDs are aggressively
+				-- recycled, and after a Hammerspoon reload the recorded PGID could
+				-- legitimately belong to the new Hammerspoon process (or any other
+				-- innocent app), making `kill -9 -<PGID>` a roulette that tore down
+				-- the menubar mid-switch. We now rely exclusively on the PID-based
+				-- kill below — targeted, safe, and sufficient for cleaning up the
+				-- previous mlx_lm.server. The PGID file is still written by the
+				-- launcher (kept for future debugging) but ignored on shutdown.
+				"if [ -f \"$MLX_PGID_FILE\" ]; then " ..
+				"OLD_PGID=$(cat \"$MLX_PGID_FILE\" 2>/dev/null | tr -d '[:space:]'); " ..
+				"echo \"[MLX] Skipping PGID-kill of $OLD_PGID — PID-based kill is safer on macOS.\"; " ..
+				"rm -f \"$MLX_PGID_FILE\"; " ..
+				"fi; " ..
+				-- Step 1: kill by PID (the recorded mlx_lm.server pid). Targeted
+				-- and safe — no risk of hitting an unrelated process via PGID
+				-- recycling.
+				"if [ -f \"$MLX_PID_FILE\" ]; then " ..
+				"OLD_PID=$(cat \"$MLX_PID_FILE\" 2>/dev/null | tr -d '[:space:]'); " ..
+				"if [ -n \"$OLD_PID\" ] && kill -0 \"$OLD_PID\" 2>/dev/null; then " ..
+				-- macOS aggressively recycles PIDs after a Hammerspoon reload, so the
+				-- PID we wrote at launch may now belong to ANY process — including
+				-- Hammerspoon itself. Verify the process is still a python interpreter
+				-- running mlx_lm before issuing kill -9; otherwise we risk taking
+				-- down the menubar app on every model switch.
+				"OLD_COMM=$(ps -o comm= -p \"$OLD_PID\" 2>/dev/null | tr -d '[:space:]'); " ..
+				"OLD_ARGS=$(ps -o args= -p \"$OLD_PID\" 2>/dev/null); " ..
+				"if echo \"$OLD_COMM\" | grep -qi python && echo \"$OLD_ARGS\" | grep -q mlx_lm; then " ..
+				"echo \"[MLX] Killing previous server PID $OLD_PID (verified python+mlx_lm)…\"; " ..
+				"kill -9 \"$OLD_PID\" 2>/dev/null || true; " ..
+				"else " ..
+				"echo \"[MLX] ⚠️  PID $OLD_PID is alive but not a python+mlx_lm process (comm='$OLD_COMM') — refusing to kill (PID was recycled, likely Hammerspoon).\"; " ..
+				"fi; " ..
+				"else " ..
+				"echo \"[MLX] PID file stale (PID $OLD_PID not running).\"; " ..
+				"fi; " ..
+				"rm -f \"$MLX_PID_FILE\"; " ..
+				"fi; " ..
+				-- Step 2: argv fallback — filter on COMM (executable basename), not on the
+				-- full argv. A bare pgrep -f 'python.*mlx_lm' also matches THIS bash wrapper:
+				-- its argv is "/bin/bash -c <SCRIPT>", and the script text literally contains
+				-- the substring 'python… -m mlx_lm', so the regex hits it. Killing that PID
+				-- is suicide on the Hammerspoon-watched task. Using $2 (comm) instead skips
+				-- bash cleanly: only processes whose executable starts with python qualify.
+				"PGREP_PIDS=$(ps -axo pid=,comm=,args= | awk '$2 ~ /^[Pp]ython/ && /mlx_lm/ {print $1}' || true); " ..
+				"if [ -n \"$PGREP_PIDS\" ]; then " ..
+				"echo \"[MLX] mlx_lm process(es) still alive (PIDs: $PGREP_PIDS) — killing…\"; " ..
+				"echo \"$PGREP_PIDS\" | xargs kill -9 2>/dev/null || true; " ..
+				"sleep 1; " ..
+				"fi; " ..
+				-- Step 3: lsof retry loop — port 8080 must be free before we start.
+				-- The initial sleep gives the kernel time to finish releasing the socket
+				-- after kill -9 AND lets any SO_REUSEPORT zombie re-bind so that lsof
+				-- can see it. Without this pause, lsof catches the port "free" during
+				-- the brief window between kill -9 and the zombie re-binding, allowing
+				-- both processes to co-exist. 3 s is long enough for the zombie to
+				-- re-bind while short enough to not frustrate the user.
+				"sleep 3; " ..
+				"LSOF_ATTEMPTS=0; " ..
+				"while true; do " ..
+				"STALE_PIDS=$(lsof -ti TCP:8080 2>/dev/null || true); " ..
+				"if [ -z \"$STALE_PIDS\" ]; then " ..
+				"echo \"[MLX] Port 8080 free — starting server.\"; " ..
+				"break; " ..
+				"fi; " ..
+				"LSOF_ATTEMPTS=$((LSOF_ATTEMPTS + 1)); " ..
+				"echo \"[MLX] Port 8080 still occupied attempt $LSOF_ATTEMPTS (PIDs: $STALE_PIDS) — killing…\"; " ..
+				"echo \"$STALE_PIDS\" | xargs kill -9 2>/dev/null || true; " ..
+				"if [ \"$LSOF_ATTEMPTS\" -ge 10 ]; then " ..
+				"echo \"[MLX] ❌ Port 8080 still occupied after 10 attempts — giving up.\"; " ..
+				"exit 1; " ..
+				"fi; " ..
+				"sleep 0.5; " ..
+				"done; " ..
+				-- Launch Python in background, capture PID, write PID file, then attach
+				-- the output loop to the background process via wait + fd redirect.
+				-- Using a named FIFO lets us attach the streaming pipeline to a backgrounded
+				-- process without /proc (Linux-only). The FIFO is created once per start,
+				-- the Python server writes into it (via exec redirect), and the while-read
+				-- loop drains it for as long as the server lives.
+				"MLX_FIFO=$(mktemp -u /tmp/mlx_out.XXXXXX); " ..
+				"mkfifo \"$MLX_FIFO\"; " ..
+				-- set -m (job control) makes bash assign a fresh PGID to every
+				-- backgrounded job — the macOS-compatible replacement for Linux setsid.
+				-- set +m immediately after so the rest of the script is unaffected.
+				"set -m; " ..
+				-- Resolve the local snapshot path BEFORE invoking mlx_lm. Passing
+				-- the HF repo id (e.g. mlx-community/Qwen3.5-2B-4bit) makes mlx_lm
+				-- call huggingface_hub.snapshot_download which, even in offline
+				-- mode (HF_HUB_OFFLINE=1), insists on resolving a refs/main entry
+				-- and a specific revision and crashes with "Cannot find an
+				-- appropriate cached snapshot folder for the specified revision"
+				-- when those metadata files are missing — common in caches built
+				-- by alternative downloaders. By passing the snapshot directory
+				-- directly as --model, mlx_lm treats it as a local path and
+				-- bypasses huggingface_hub entirely.
+				"REPO_ID=\"" .. repo .. "\"; " ..
+				"CACHE_NAME=\"models--$(echo \"$REPO_ID\" | sed 's|/|--|g')\"; " ..
+				"CACHE_ROOT=\"$HOME/.cache/huggingface/hub/$CACHE_NAME\"; " ..
+				"SNAPSHOT_DIR=$(ls -dt \"$CACHE_ROOT/snapshots/\"*/ 2>/dev/null | head -1); " ..
+				"if [ -n \"$SNAPSHOT_DIR\" ] && [ -d \"$SNAPSHOT_DIR\" ]; then " ..
+				"MODEL_ARG=\"${SNAPSHOT_DIR%/}\"; " ..
+				"echo \"[MLX] Using local snapshot path: $MODEL_ARG\"; " ..
+				-- Persist the resolved snapshot path so api_mlx can use the SAME
+				-- value in the "model" field of every POST payload. mlx_lm.server
+				-- routes each request through model_provider.load() keyed by the
+				-- payload's "model" string; if we send the repo id instead of the
+				-- local path, the server tries snapshot_download on the repo and
+				-- fails with the offline error. Identical strings → cache hit on
+				-- the model loaded at boot, no HF call.
+				"echo \"$MODEL_ARG\" > /tmp/mlx_active_model.txt; " ..
+				-- mlx-lm 0.31.x's _download() always calls huggingface_hub
+				-- snapshot_download even when the --model argument is an
+				-- absolute local path. With HF_HUB_OFFLINE=1, snapshot_download
+				-- still needs refs/<revision> on disk to resolve the snapshot
+				-- hash; if that file is missing (caches built by uv, partial
+				-- downloads, or pre-1.x hf-xet leave it out), the call fails
+				-- with "Cannot find an appropriate cached snapshot folder for
+				-- the specified revision" and every inference returns 404 with
+				-- that error body. Synthesize refs/main from the snapshot dir
+				-- name (which IS the commit hash) so the resolver succeeds.
+				"REVISION=$(basename \"$MODEL_ARG\"); " ..
+				"mkdir -p \"$CACHE_ROOT/refs\"; " ..
+				"if [ ! -f \"$CACHE_ROOT/refs/main\" ]; then " ..
+				"echo \"$REVISION\" > \"$CACHE_ROOT/refs/main\"; " ..
+				"echo \"[MLX] Wrote refs/main = $REVISION (was missing — required by HF offline mode).\"; " ..
+				"fi; " ..
+				"else " ..
+				"MODEL_ARG=\"$REPO_ID\"; " ..
+				"echo \"[MLX] No local snapshot found for $REPO_ID — falling back to repo id.\"; " ..
+				"echo \"$REPO_ID\" > /tmp/mlx_active_model.txt; " ..
+				"fi; " ..
+				-- --decode-concurrency 1 --prompt-concurrency 1 disables mlx-lm's
+				-- BatchGenerator which is broken in 0.31.x: filtering across worker
+				-- threads triggers `RuntimeError: There is no Stream(gpu, 0) in
+				-- current thread` and the generate thread dies before sending the
+				-- response body, leaving the client hanging on a 200 with empty body.
+				-- Forcing serial execution sidesteps the bug entirely; for our
+				-- single-user prediction use case batching brought no benefit anyway.
+				"\"$PYTHON_BIN\" -m mlx_lm server --model \"$MODEL_ARG\" --decode-concurrency 1 --prompt-concurrency 1 > \"$MLX_FIFO\" 2>&1 & " ..
+				"MLX_PID=$!; " ..
+				"set +m; " ..
+				"MLX_PGID=$(ps -o pgid= -p $MLX_PID 2>/dev/null | tr -d ' ' || echo ''); " ..
+				"echo \"[MLX] Server started with PID $MLX_PID PGID $MLX_PGID.\"; " ..
+				"echo \"$MLX_PID\" > \"$MLX_PID_FILE\"; " ..
+				-- Persist the PGID only if `set -m` actually isolated python into its
+				-- own process group. If MLX_PGID equals our own bash PGID or our
+				-- parent's (Hammerspoon's), saving it would arm a fratricidal
+				-- `kill -9 -<PGID>` on the next switch that wipes the menubar app.
+				"OWN_PGID=$(ps -o pgid= -p $$ 2>/dev/null | tr -d '[:space:]'); " ..
+				"PARENT_PGID=$(ps -o pgid= -p $PPID 2>/dev/null | tr -d '[:space:]'); " ..
+				"if [ -n \"$MLX_PGID\" ] && [ \"$MLX_PGID\" != \"$OWN_PGID\" ] && [ \"$MLX_PGID\" != \"$PARENT_PGID\" ]; then " ..
+				"echo \"$MLX_PGID\" > \"$MLX_PGID_FILE\"; " ..
+				"echo \"[MLX] Persisted PGID $MLX_PGID (isolated from Hammerspoon group $PARENT_PGID).\"; " ..
+				"else " ..
+				"echo \"[MLX] ⚠️  set -m did not isolate python (MLX_PGID=$MLX_PGID, own=$OWN_PGID, parent=$PARENT_PGID) — NOT persisting PGID. Will rely on PID-only kill on next switch.\"; " ..
+				"rm -f \"$MLX_PGID_FILE\"; " ..
+				"fi; " ..
+				"while IFS= read -r LINE; do " ..
+				"OUT=\"$(date +%H:%M:%S) [MLX-SERVER] $LINE\"; " ..
+				"printf '%s\\n' \"$OUT\"; " ..
+				"printf '%s\\n' \"$OUT\" >> " .. unified_log_file .. "; " ..
+				"done < \"$MLX_FIFO\"; " ..
+				"rm -f \"$MLX_FIFO\""
 
 			local server_last_line = ""
 			local server_log_buffer = {}
@@ -624,10 +905,23 @@ PY
 				Logger.info(LOG, "MLX server process exited with code %d.", code)
 			end, function(_, stdout, stderr)
 				local out = (stdout or "") .. (stderr or "")
+				if out ~= "" then
+					Logger.debug(LOG, "MLX server stream chunk (%d bytes).", #out)
+				end
 				for line in out:gmatch("([^\n\r]+)") do
 					server_last_line = line
 					table.insert(server_log_buffer, line)
 					while #server_log_buffer > 15 do table.remove(server_log_buffer, 1) end
+					Logger.debug(LOG, "MLX server: %s", line)
+					-- Inform api_mlx of the active server PGID as soon as bash reports it.
+					-- The zombie-kill logic excludes the entire process group (bash wrapper
+					-- + Python mlx_lm child) so it never terminates the server we just
+					-- launched. PGID is used instead of PID because SO_REUSEPORT makes
+					-- lsof only see the bash wrapper, not the Python child on the socket.
+					local pgid_str = line:match("%[MLX%] Server started with PID %d+ PGID (%d+)")
+					if pgid_str and type(ApiMlx) == "table" and type(ApiMlx.set_active_server_pgid) == "function" then
+						ApiMlx.set_active_server_pgid(tonumber(pgid_str))
+					end
 				end
 				if out:find("Starting httpd at") or out:find("Uvicorn running on") or out:find("Application startup complete") then
 					mark_server_ready()
@@ -641,16 +935,24 @@ PY
 				return true
 			end, { "-c", bash_cmd })
 
+			Logger.debug(LOG, "MLX server bash_cmd: %s", bash_cmd)
 			if task then
 				deps.active_tasks["mlx_server"] = task
-				pcall(function() task:start() end)
+				local ok, start_err = pcall(function() task:start() end)
+				if ok then
+					Logger.info(LOG, "MLX server task started for model ‘%s’.", tostring(target_model))
+				else
+					Logger.error(LOG, "MLX server task:start() failed for model ‘%s’: %s", tostring(target_model), tostring(start_err))
+					if type(on_cancel) == "function" then pcall(on_cancel); on_cancel = nil end
+					return
+				end
 				-- 120 retries × 0.5 s = 60 s total; large models can take >30 s to load weights
 				probe_server_ready(120)
 			else
 				Logger.error(LOG, "Failed to create hs.task for MLX server — model ‘%s’ cannot start.", tostring(target_model))
 				if type(on_cancel) == "function" then pcall(on_cancel); on_cancel = nil end
 			end
-		end)
+		end
 	end
 
 
@@ -1330,9 +1632,20 @@ PY
 				--   2. bootstrap failed        → show the actual stderr cause
 				--   3. unknown                 → previous generic message
 				if mlx_deps_checker and mlx_deps_checker.is_pending and mlx_deps_checker.is_pending() then
-					Logger.info(LOG, "MLX import probe failed but bootstrap still pending — asking user to wait.")
-					pcall(notifications.notify, "Moteur IA",
-						"Initialisation IA en cours, veuillez patienter…")
+					Logger.info(LOG, "MLX import probe failed but bootstrap still pending — launching install.")
+					-- Show the progress window and kick off the actual install.
+					-- The checker is idempotent: if it is already running, the second
+					-- call exits silently; if it was never started (e.g., LLM was
+					-- disabled at startup), this is the first real launch.
+					local llm_progress = require("ui.download_window")
+					if not llm_progress.is_active() then
+						pcall(llm_progress.show, {
+							kind     = "mlx_install",
+							title    = "Initialisation du moteur IA (MLX)",
+							subtitle = "Initialisation IA en cours, veuillez patienter…",
+						})
+					end
+					pcall(mlx_deps_checker.check_and_install_deps)
 				elseif mlx_deps_checker and mlx_deps_checker.has_failed and mlx_deps_checker.has_failed() then
 					local cause = (mlx_deps_checker.get_failure_message and mlx_deps_checker.get_failure_message())
 						or "Cause inconnue. Consultez la console Hammerspoon."

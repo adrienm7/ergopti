@@ -18,11 +18,13 @@ description = "Pinned Python deps for the Ergopti+ Hammerspoon driver."
 requires-python = ">=3.11"
 
 dependencies = [
-	# MLX inference server. 0.31.2 is the last release that supports Gemma 4
-	# correctly: 0.31.3 reintroduced regressions on the gemma4 KV-shared
-	# layers and quantized per-layer projection loading paths. Do NOT bump
-	# without first re-testing every supported model in production.
-	"mlx-lm==0.31.2",
+	# MLX inference server. PINNED to 0.31.3 — known-good in this environment.
+	# Note: 0.31.2 looks safer on paper (better gemma-4 weight loader) but
+	# triggers the BatchGenerator threading bug on Apple Silicon
+	# ("RuntimeError: There is no Stream(gpu, 0) in current thread") on the
+	# very first POST. 0.31.3 sidesteps that path. gemma-4 is broken either
+	# way — Qwen / Llama / Mistral / NVIDIA-Nemotron all work on 0.31.3.
+	"mlx-lm==0.31.3",
 
 	# Used by data/generate_models.py to scrape the HuggingFace MLX
 	# community organization page when refreshing data/llm_models.json.

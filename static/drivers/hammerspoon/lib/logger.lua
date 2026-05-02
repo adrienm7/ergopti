@@ -197,13 +197,54 @@ end
 --- entries. Failures are silent on purpose: we never want logging to abort the
 --- caller's work, e.g. when /tmp is full.
 --- @param line string The fully-formatted line to append.
+--- Routes a formatted log line into one or more topical sub-files in addition
+--- to the main /tmp/ergopti.log sink. The classification is purely based on
+--- substring matches in the rendered line (which always contains the module
+--- tag, e.g. "[menu_llm.mlx]") so a module never has to know which file it
+--- writes to. A line can land in multiple sub-files (e.g. "[mlx_deps]" lines
+--- in both ergopti_mlx.log and ergopti_llm.log).
+local SUB_LOG_FILES = {
+	{ path = "/tmp/ergopti_mlx.log",        patterns = { "[mlx", "MLX-", "[menu_llm.mlx]", "[llm.api_mlx]" } },
+	{ path = "/tmp/ergopti_ollama.log",     patterns = { "[ollama", "[menu_llm.ollama]", "[llm.api_ollama]" } },
+	{ path = "/tmp/ergopti_llm.log",        patterns = { "[llm.", "[menu_llm", "[mlx_deps]", "[ollama_deps]", "WARMUP", "[TOGGLE]" } },
+	{ path = "/tmp/ergopti_hotstrings.log", patterns = { "[keymap.registry]", "[dynamic_hotstrings", "[personal_info]", "hotstring", "[toml_reader]" } },
+	{ path = "/tmp/ergopti_keylogger.log",  patterns = { "[keylogger" } },
+	{ path = "/tmp/ergopti_karabiner.log",  patterns = { "[karabiner" } },
+	{ path = "/tmp/ergopti_gestures.log",   patterns = { "[gestures" } },
+	{ path = "/tmp/ergopti_menu.log",       patterns = { "[menu]", "[menu_", "[builder]", "[ui_builder]", "[app_picker]" } },
+}
+
+local function _matches_any(line, patterns)
+	for _, p in ipairs(patterns) do
+		if line:find(p, 1, true) then return true end
+	end
+	return false
+end
+
 local function _write_to_file(line)
 	local fh = _ensure_log_file()
-	if not fh then return end
-	pcall(function()
-		fh:write(os.date("%H:%M:%S "), line, "\n")
-		fh:flush()
-	end)
+	local stamped = os.date("%H:%M:%S ") .. line .. "\n"
+	if fh then
+		pcall(function()
+			fh:write(stamped)
+			fh:flush()
+		end)
+	end
+	-- Fan out to topical sub-files. Each sub-file is opened/closed per write
+	-- so a crash never leaves a stale handle, and the file count is bounded
+	-- (one open at a time). Cost is negligible vs. the network/MLX work
+	-- already happening on every interesting log line.
+	for _, sub in ipairs(SUB_LOG_FILES) do
+		if _matches_any(line, sub.patterns) then
+			pcall(function()
+				local f = io.open(sub.path, "a")
+				if f then
+					f:write(stamped)
+					f:close()
+				end
+			end)
+		end
+	end
 end
 
 --- Emits a count summary using the same variant as the suppressed messages, then resets state.

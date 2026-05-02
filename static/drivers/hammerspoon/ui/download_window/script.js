@@ -91,7 +91,7 @@ function setProgress(pct) {
 	const fill = document.getElementById('bootstrap-bar-fill');
 	if (!fill) return;
 	if (pct === null || pct === undefined) {
-		fill.style.width = '30%';
+		fill.style.width = '0%';
 		return;
 	}
 	const clamped = Math.max(0, Math.min(100, Number(pct) || 0));

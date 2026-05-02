@@ -294,11 +294,25 @@ local function schedule_warmup_with_retry(reason)
 		resolved, WARMUP_INITIAL_DELAY_SEC, reason)
 
 	local function try_warmup()
-		if not is_llm_enabled then return end
-		if core_llm.is_backend_ready and core_llm.is_backend_ready() then return end
+		if not is_llm_enabled then
+			Logger.warn(LOG, "[WARMUP-LOOP] try_warmup early-return: is_llm_enabled=false — chain ends here.")
+			return
+		end
+		if core_llm.is_backend_ready and core_llm.is_backend_ready() then
+			Logger.warn(LOG, "[WARMUP-LOOP] try_warmup early-return: backend already ready — chain ends here.")
+			return
+		end
 		local current = core_llm.get_current_model()
-		if type(current) ~= "string" or current == "" then return end
-		Logger.debug(LOG, "Warmup attempt for '%s' (backend: %s).",
+		if type(current) ~= "string" or current == "" then
+			Logger.warn(LOG, "[WARMUP-LOOP] try_warmup early-return: get_current_model returned %s — re-scheduling in %ds.",
+				tostring(current), WARMUP_RETRY_SEC)
+			-- IMPORTANT: do NOT silently terminate the retry chain when the model
+			-- is momentarily missing (typical during a backend swap). Re-schedule
+			-- so warmup eventually picks up once set_llm_model has run.
+			hs.timer.doAfter(WARMUP_RETRY_SEC, try_warmup)
+			return
+		end
+		Logger.warn(LOG, "[WARMUP-LOOP] Warmup attempt for '%s' (backend: %s).",
 			current, tostring(core_llm.get_backend()))
 		pcall(core_llm.warmup_model, current, core_llm.get_active_profile())
 		hs.timer.doAfter(WARMUP_RETRY_SEC, try_warmup)
@@ -541,11 +555,20 @@ end
 --- @param label string|nil The raw profile label.
 --- @return string|nil The trimmed label, or nil if it was blank.
 local function trim_profile_label(label)
-	if not label then return nil end
+	if type(label) ~= "string" then return nil end
 	local clean = label:match("^%s*(.-)%s*$")
 	if clean == "" then return nil end
 	local head = clean:match("^(.-)%s*—")
-	return (head and head ~= "") and head:gsub("%s+$", "") or clean
+	-- Pick the head only if it has actual content (head:match("%S")). A bare
+	-- em-dash like "— foo" yields head = "" which previously fell through to
+	-- `clean` and re-introduced the dash; checking %S guards against that.
+	local picked = (head and head:match("%S")) and head or clean
+	picked = picked:gsub("^%s+", ""):gsub("%s+$", "")
+	-- Also strip a stray trailing em-dash so concatenation downstream never
+	-- produces the user-reported "— (vide)" tail.
+	picked = picked:gsub("%s*—%s*$", "")
+	if picked == "" then return nil end
+	return picked
 end
 
 --- Assembles the info-bar text displayed beneath the prediction list.
@@ -558,17 +581,20 @@ end
 local function build_info_bar_text(model_name, elapsed_ms, backend, profile_name)
 	if not model_name or model_name == "" then return nil end
 
-	local text          = model_name
+	local pieces = { model_name }
+	if type(backend) == "string" and backend ~= "" then pieces[#pieces + 1] = backend end
 	local short_profile = trim_profile_label(profile_name)
+	if short_profile and short_profile ~= "" then pieces[#pieces + 1] = short_profile end
+	-- Concat with em-dash separators in a single pass — guarantees no
+	-- trailing or doubled " — " regardless of which fields are present.
+	local text = table.concat(pieces, " — ")
 
-	if backend and backend ~= "" then text = text .. " — " .. backend end
-	if short_profile               then text = text .. " — " .. short_profile end
-
-	if elapsed_ms and elapsed_ms > 0 then
-		local s          = elapsed_ms / 1000
-		local time_label = s < 10 and string.format("%.1fs", s) or string.format("%ds", math.floor(s + 0.5))
-		text = text .. " — ⏱️ " .. time_label
-	end
+	-- Note: elapsed_ms is intentionally NOT rendered here. tooltip_llm owns the
+	-- ⏱ timing zone and composes "Model · Profile — ⏱ TTFT [— TTLT]" so we
+	-- don't duplicate (and contradict) timing across two zones. The
+	-- elapsed_ms parameter is retained for backwards compatibility but its
+	-- value is discarded on purpose.
+	local _ = elapsed_ms
 
 	return text
 end

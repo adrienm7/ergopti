@@ -24,6 +24,150 @@ local RETRY_FAILED_PREDICTION_ENABLED = true
 local RETRY_FAILED_PREDICTION_MAX_MULTIPLIER = 2
 local STREAM_CONNECT_TIMEOUT_SEC = 5    -- Fail fast if the MLX server does not accept the TCP connection
 local STREAM_HARD_TIMEOUT_SEC    = 90   -- Kill the task if the server accepts but never sends a token; large models need up to 60 s to load weights
+local WARMUP_POST_TIMEOUT_SEC    = 30   -- Unblock _warmup_in_flight if the single-token POST never returns
+
+-- Minimum interval between zombie-kill attempts during discovery. Without this
+-- guard, every 1-second poll tick would fire a separate lsof+kill task, creating
+-- a cascade of overlapping processes while the kernel is still processing the
+-- first kill signal.
+local ZOMBIE_KILL_MIN_INTERVAL_SEC = 3.0
+
+local _last_zombie_kill_at  = 0    -- epoch time of the most-recent kill attempt
+-- PGID of the newly-launched server process group. Set by models_manager_mlx as soon
+-- as the bash script prints "[MLX] Server started with PID XXXX PGID YYYY". Every
+-- process in this group (bash wrapper + Python mlx_lm child) shares this PGID and
+-- must be excluded from zombie kills. Using PGID instead of PID is required because
+-- SO_REUSEPORT means lsof -ti TCP:8080 only returns the bash wrapper PID (it holds
+-- the FIFO), not the Python child that actually answers HTTP — yet both must survive.
+local _active_server_pgid   = nil
+-- Forward declaration: kill_zombie_on_port_8080 is defined below but called from
+-- set_active_server_pgid, which is declared before it. Lua locals are only visible after
+-- their declaration point; the forward reference here lets the upvalue resolve correctly.
+local kill_zombie_on_port_8080
+
+-- True from the moment a new server launch begins (reset_endpoints called) until the
+-- bash script reports "[MLX] Server started with PID X PGID Y" and set_active_server_pgid
+-- is called. During this window the new Python process is already alive but its PGID is
+-- unknown, so any unguarded kill -9 would massacre it. Block all zombie kills while pending.
+local _server_pgid_pending  = false
+
+-- Optional callback registered by models_manager_mlx so api_mlx can request a fresh
+-- server launch when discovery detects a model-ID mismatch that the zombie killer
+-- cannot resolve (e.g. cross-session leftover whose PGID was wrongly adopted as the
+-- active guard). The hook receives the expected short model name and is responsible
+-- for invoking start_server with the correct target.
+local _restart_hook = nil
+
+--- Registers a callback that api_mlx invokes when it cannot recover from a model-ID
+--- mismatch on its own and needs the menu layer to relaunch the server.
+--- @param fn function|nil Callback receiving the expected model name, or nil to clear.
+function M.set_restart_hook(fn)
+	_restart_hook = (type(fn) == "function") and fn or nil
+	Logger.debug(LOG, "Restart hook %s.", _restart_hook and "registered" or "cleared")
+end
+
+--- Cooldown so we don't spam restart requests when the discovery loop fires repeatedly
+--- before the new server has had time to come up. 10 s is enough for bash to do its
+--- kill+lsof loop and for the new mlx_lm to start binding port 8080.
+local RESTART_HOOK_MIN_INTERVAL_SEC = 10.0
+local _last_restart_hook_at = 0
+
+-- Timestamp of the most recent set_active_server_pgid() call. Used by discover_endpoints
+-- to grant a "fresh launch" grace window during which a mismatched /v1/models model ID
+-- is tolerated: mlx_lm.server starts answering HTTP before the requested weights finish
+-- loading, and during that window /v1/models can report a stale or placeholder ID even
+-- though we passed the correct --model argv. Forcing a restart in this window creates
+-- an infinite restart loop. Only trust the model-ID check once the launch is "old".
+local _active_server_pgid_set_at = 0
+local FRESH_LAUNCH_GRACE_SEC     = 90  -- 8B-class models can take up to ~60s to load weights
+
+--- Records the PGID of the currently-launched server process group so zombie kills
+--- can exclude the entire group. Called by models_manager_mlx immediately after the
+--- bash script writes the "[MLX] Server started with PID XXXX PGID YYYY" line.
+--- @param pgid number|nil The PGID to protect, or nil to clear the guard.
+function M.set_active_server_pgid(pgid)
+	_active_server_pgid  = tonumber(pgid) or nil
+	_server_pgid_pending = false  -- PGID now known; zombie kills can safely use the guard
+	_active_server_pgid_set_at = hs.timer.secondsSinceEpoch()
+	Logger.debug(LOG, "Active server PGID guard set to %s.", tostring(_active_server_pgid))
+	-- Immediately fire a guarded kill now that we know which PGID to protect. Any
+	-- zombie that was deferred during the pending window is still alive at this point;
+	-- without this call it would survive until the next discovery mismatch (which may
+	-- never arrive if the zombie answered first and discovery already resolved).
+	-- Reset the cooldown so this first post-PGID kill is never skipped by the interval guard.
+	_last_zombie_kill_at = 0
+	kill_zombie_on_port_8080()
+end
+
+--- Asynchronously kills all mlx_lm Python processes whose PGID differs from the
+--- active server's PGID. Uses ps+awk filtered on COMM (executable basename) instead
+--- of lsof because SO_REUSEPORT lets multiple processes share port 8080 and lsof only
+--- sees one of them at any instant. Filtering on COMM (rather than a bare pgrep -f)
+--- is critical: the bash wrapper's argv contains the literal script text including
+--- "python -m mlx_lm", so a pgrep -f 'python.*mlx_lm' would also match the wrapper.
+--- Restricting $2 ~ /^[Pp]ython/ guarantees only real python processes qualify.
+kill_zombie_on_port_8080 = function()
+	-- A new server was launched but its PGID is not yet known. Any unguarded kill
+	-- would hit the new Python process (already alive, PGID unknown) and crash it
+	-- before it can serve a single request. Block all zombie kills in this window;
+	-- once set_active_server_pgid() fires, _server_pgid_pending becomes false and
+	-- subsequent discovery mismatches will trigger guarded kills normally.
+	if _server_pgid_pending then
+		Logger.debug(LOG, "Zombie kill deferred — new server PGID not yet known.")
+		return
+	end
+	local now = hs.timer.secondsSinceEpoch()
+	if now - _last_zombie_kill_at < ZOMBIE_KILL_MIN_INTERVAL_SEC then
+		Logger.debug(LOG, "Zombie kill skipped — last attempt was %.1fs ago (min interval %.1fs).",
+			now - _last_zombie_kill_at, ZOMBIE_KILL_MIN_INTERVAL_SEC)
+		return
+	end
+	_last_zombie_kill_at = now
+	Logger.warn(LOG, "Killing zombie mlx_lm Python process(es) via ps+awk (excluding PGID %s)…",
+		tostring(_active_server_pgid or "none"))
+	-- Target only real Python processes via COMM filter, never the bash wrapper.
+	-- Earlier versions used `pgrep -f 'python.*mlx_lm'`, but the wrapper argv is
+	-- '/bin/bash -c <SCRIPT>' and the script text literally contains 'python -m mlx_lm',
+	-- so pgrep -f matched the wrapper too. The wrapper has a different PGID than the
+	-- new Python child (set -m gives Python a fresh PGID), so the PGID guard let it
+	-- through and kill -9 brought down the wrapper, closing the FIFO and forcing the
+	-- Python child into SIGPIPE — the very crash this routine was supposed to prevent.
+	if not _active_server_pgid then
+		-- PGID was never set (server launched but exited before reporting its PGID,
+		-- or reset_endpoints was called without a subsequent server start). Skip
+		-- rather than killing blindly — a kill without a guard would hit whatever
+		-- mlx_lm process happens to be running, including a legitimate server.
+		Logger.warn(LOG, "Zombie kill skipped — no active PGID guard available.")
+		return
+	end
+	local pgid_str = tostring(_active_server_pgid)
+	-- Two complementary detection paths, unioned to catch zombies the awk filter
+	-- alone would miss:
+	--   1. ps+awk on COMM=python AND argv contains mlx_lm — catches well-formed
+	--      mlx_lm.server processes regardless of port.
+	--   2. lsof -ti TCP:8080 — catches anything listening on the port even if its
+	--      argv was rewritten, truncated, or the COMM is not "python" (e.g., a
+	--      relinked binary, or a child fork whose argv was replaced).
+	-- For each candidate PID, compare its PGID against the active server's PGID;
+	-- kill -9 only if PGID differs. This preserves the legitimate server.
+	local cmd = "PIDS_AWK=$(ps -axo pid=,comm=,args= | awk '$2 ~ /^[Pp]ython/ && /mlx_lm/ {print $1}'); " ..
+		"PIDS_PORT=$(lsof -ti TCP:8080 2>/dev/null); " ..
+		"PIDS=$(printf '%s\\n%s\\n' \"$PIDS_AWK\" \"$PIDS_PORT\" | sort -u | grep -v '^$'); " ..
+		"[ -z \"$PIDS\" ] && echo 'none' && exit 0; " ..
+		"ZOMBIES=$(echo \"$PIDS\" | while read P; do " ..
+		"  PG=$(ps -o pgid= -p \"$P\" 2>/dev/null | tr -d ' '); " ..
+		"  [ -n \"$PG\" ] && [ \"$PG\" != \"" .. pgid_str .. "\" ] && echo \"$P\"; " ..
+		"done); " ..
+		"[ -n \"$ZOMBIES\" ] && echo \"$ZOMBIES\" | xargs kill -9 2>/dev/null && echo \"killed: $ZOMBIES\" || echo 'none'"
+	local kill_task = hs.task.new("/bin/bash", function(exit_code, stdout, _stderr)
+		if exit_code == 0 then
+			Logger.warn(LOG, "Zombie kill completed; stdout: %s", tostring(stdout):gsub("\n", " "))
+		else
+			Logger.debug(LOG, "Zombie kill exit %d.", exit_code)
+		end
+	end, {"-c", cmd})
+	pcall(function() kill_task:start() end)
+end
 
 -- Holds the current in-flight hs.task; cancelled when a new streaming request starts.
 -- The streaming flag itself is owned by modules/llm/init.lua and passed per-call.
@@ -42,6 +186,7 @@ local _is_ready          = false
 -- MLX server that can only process one request at a time, which is the very reason
 -- the warmup never received a 200
 local _warmup_in_flight  = false
+local _warmup_timeout    = nil   -- hard-timeout timer; cleared on callback or cancellation
 
 -- Discovered endpoint paths. Different mlx-lm releases have shipped completions
 -- and chat-completions under different routes (with/without the `/v1/` prefix);
@@ -57,6 +202,10 @@ local _completions_endpoint = MLX_BASE_URL .. "/v1/completions"
 local _chat_endpoint        = MLX_BASE_URL .. "/v1/chat/completions"
 local _endpoints_discovered = false
 local _endpoint_probe_in_flight = false
+-- Callbacks waiting for the current discovery probe to complete; each
+-- discover_endpoints() call during a probe enqueues its on_done here so no
+-- caller is silently dropped when a second warmup fires mid-poll.
+local _discovery_pending_callbacks = {}
 -- Canonical model ID reported by the server via GET /v1/models.
 -- mlx-lm 0.26+ validates the model field in request payloads against the ID
 -- of the loaded model (typically the full HF path, e.g.
@@ -64,6 +213,36 @@ local _endpoint_probe_in_flight = false
 -- is sent instead. We read this once during discovery Phase 1 and substitute
 -- it everywhere we build a request payload.
 local _server_model_id = nil
+-- Short model name we are waiting for (set by warmup() before triggering
+-- discovery). The discovery poll rejects a /v1/models 200 whose reported
+-- model ID does not contain this string, preventing a stale old server
+-- (alive for 2 s after kill -9, during the bash sleep) from satisfying the
+-- probe intended for the newly launched server.
+local _expected_model_id = nil
+-- Full HuggingFace repository path used to launch the current server (e.g.
+-- "mlx-community/Meta-Llama-3.1-8B-Instruct-4bit"). Set by models_manager_mlx
+-- immediately after reset_endpoints() so warmup and inference payloads always
+-- have a reliable model identifier even when /v1/models reports a stale ID
+-- during weight loading (bypass scenario).
+local _model_hf_path = nil
+
+-- Reads the runtime model identifier the bash launcher passed to mlx_lm via
+-- --model. mlx_lm.server routes every POST request through model_provider.load(),
+-- keyed by the payload's "model" field; if the payload sends the HF repo id
+-- but the server was launched with a local snapshot path (or vice-versa),
+-- the server tries to snapshot_download that mismatched id and fails offline.
+-- The bash launcher writes the exact --model argument it used to this file so
+-- payloads can mirror it byte-for-byte and hit the cached model.
+local ACTIVE_MODEL_FILE = "/tmp/mlx_active_model.txt"
+local function read_active_model_arg()
+	local fh = io.open(ACTIVE_MODEL_FILE, "r")
+	if not fh then return nil end
+	local raw = fh:read("*a")
+	fh:close()
+	if type(raw) ~= "string" then return nil end
+	local trimmed = raw:gsub("^%s+", ""):gsub("%s+$", "")
+	return trimmed ~= "" and trimmed or nil
+end
 
 -- Candidate paths tried in order. The first probe whose POST returns ANYTHING
 -- other than 404 is treated as the live endpoint — 200 is a success, 400 and
@@ -80,25 +259,37 @@ local CHAT_CANDIDATES = {
 	"/chat/completions",
 }
 
-local DISCOVERY_MAX_WAIT_SEC   = 60   -- Stop polling /v1/models after this much real time
-local DISCOVERY_POLL_PERIOD_SEC = 1.0 -- Wait between /v1/models probes during the wait phase
+local DISCOVERY_MAX_WAIT_SEC        = 60   -- Stop polling /v1/models after this much real time
+local DISCOVERY_POLL_PERIOD_SEC     = 1.0  -- Wait between /v1/models probes during the wait phase
+-- After this many seconds of persistent model-ID mismatch, bypass the check and
+-- proceed to POST probes. A mismatch beyond this window means either (a) the old
+-- server's socket lingered in CLOSE_WAIT and the zombie killer couldn't find the
+-- process, or (b) the new server itself reports a stale model ID while loading
+-- its weights from GPU cache. In both cases waiting longer achieves nothing.
+local DISCOVERY_MODEL_ID_BYPASS_SEC = 20
 
 --- Probes the MLX server to discover which endpoint paths are valid in this
 --- mlx-lm install. Two phases:
 ---   1. Wait for /v1/models to return 200 (proof the server is actually
----      listening). Earlier we ran probe POSTs immediately, but if the server
----      had not bound port 8080 yet, every probe came back as -1 (connection
----      refused) and we mistook that for "route absent". Now we gate the POST
----      probes on a successful /v1/models call so -1 results only happen when
----      the route really is unreachable.
+---      listening). A repeating hs.timer drives the poll so it is immune to
+---      lost asyncGet callbacks — when the old server is killed mid-request the
+---      callback may never fire, which used to leave _endpoint_probe_in_flight
+---      stuck at true forever. The timer fires regardless of pending callbacks.
 ---   2. POST a minimal payload to each candidate, accepting any HTTP status
 ---      other than 404 / -1 as a live route.
---- Idempotent: runs at most one probe per process.
+--- Idempotent: the timer runs only once; subsequent calls enqueue their
+--- on_done callback and return.
 --- @param on_done function|nil Optional callback invoked once the probe finishes.
 local function discover_endpoints(on_done)
 	if _endpoints_discovered then
 		if type(on_done) == "function" then pcall(on_done) end
 		return
+	end
+	-- Enqueue the callback so it fires when the in-flight probe completes —
+	-- previously we returned silently here, dropping the caller's on_done and
+	-- causing every warmup issued during the server boot window to be lost.
+	if type(on_done) == "function" then
+		_discovery_pending_callbacks[#_discovery_pending_callbacks + 1] = on_done
 	end
 	if _endpoint_probe_in_flight then return end
 	_endpoint_probe_in_flight = true
@@ -110,6 +301,25 @@ local function discover_endpoints(on_done)
 	})
 	local headers    = { ["Content-Type"] = "application/json" }
 	local started_at = hs.timer.secondsSinceEpoch()
+
+	local function finish_discovery(success)
+		-- Stop the poll timer before firing callbacks so a callback that calls
+		-- reset_endpoints() + discover_endpoints() again does not find the timer
+		-- still running and incorrectly skip starting a fresh one.
+		_endpoint_probe_in_flight = false
+		if success then
+			_endpoints_discovered = true
+			Logger.warn(LOG, "MLX endpoints resolved: completions=%s, chat=%s.",
+				_completions_endpoint, _chat_endpoint)
+		end
+		-- Fire only the most-recent callback — it reflects the currently
+		-- active model. Earlier callbacks are stale (issued before a model
+		-- switch) and would trigger warmup POSTs for the wrong model, which
+		-- causes an avalanche of discovery + warmup cycles on the new server.
+		local cbs = _discovery_pending_callbacks
+		_discovery_pending_callbacks = {}
+		if #cbs > 0 then pcall(cbs[#cbs]) end
+	end
 
 	local function run_post_probes()
 		-- payloads indexed by kind so each probe uses the correct API format;
@@ -138,73 +348,122 @@ local function discover_endpoints(on_done)
 
 		probe_one(COMPLETIONS_CANDIDATES, 1, nil, "completions", function(found)
 			if found then _completions_endpoint = found end
+			if found then
+				-- Completions route confirmed — resolve immediately. Do NOT wait for
+				-- the chat probe: after a server-side RuntimeError (e.g. mlx-lm batch
+				-- crash), subsequent POST requests may block indefinitely, leaving
+				-- _endpoint_probe_in_flight=true forever and silently starving all
+				-- future warmup attempts. Probing chat opportunistically in the
+				-- background means its URL gets cached when it eventually responds,
+				-- without blocking the critical path.
+				finish_discovery(true)
+				probe_one(CHAT_CANDIDATES, 1, nil, "chat", function(found_chat)
+					-- Only update the cached URL — never call finish_discovery here.
+					-- By the time this fires, reset_endpoints() may have run for a new
+					-- model; calling finish_discovery would corrupt the new server's state.
+					if found_chat then _chat_endpoint = found_chat end
+				end)
+				return
+			end
+			-- Completions route not found — fall through to chat so the user still
+			-- gets predictions on mlx-lm builds that only expose the chat route.
 			probe_one(CHAT_CANDIDATES, 1, nil, "chat", function(found_chat)
 				if found_chat then _chat_endpoint = found_chat end
-				_endpoint_probe_in_flight = false
-
-				if not found and not found_chat then
-					-- All routes returned 404. This usually means the model is still
-					-- loading in Thread-1 (mlx-lm lazy-loads on first inference request
-					-- and returns 404 on inference routes until the load completes).
-					-- Do NOT mark discovery done — leave _endpoints_discovered = false
-					-- so the next warmup attempt re-probes the live server rather than
-					-- using stale defaults that will keep 404ing forever.
-					Logger.debug(LOG,
+				if not found_chat then
+					-- All routes returned 404. The model is likely still loading in
+					-- Thread-1 (mlx-lm lazy-loads on first inference request and returns
+					-- 404 on inference routes until the load completes). Do NOT mark
+					-- discovery done — clear the in-flight flag so the repeating timer
+					-- triggers a fresh attempt on the next warmup.
+					Logger.warn(LOG,
 						"MLX endpoint discovery: all candidates returned 404 — " ..
 						"model may still be loading. Will retry on next warmup.")
-					-- Last-ditch: log what the server says about itself, in case
-					-- the 404s really do mean the routes are absent
-					hs.http.asyncGet(MLX_BASE_URL .. "/", {}, function(s, body)
-						local snippet = (type(body) == "string") and body:sub(1, 600) or ""
-						Logger.debug(LOG, "MLX server GET / -> HTTP %s, body: %s",
-							tostring(s), snippet)
-					end)
+					finish_discovery(false)
 				else
-					-- At least one route confirmed — lock in the results
-					_endpoints_discovered = true
-					Logger.info(LOG, "MLX endpoints resolved: completions=%s, chat=%s.",
-						_completions_endpoint, _chat_endpoint)
+					finish_discovery(true)
 				end
-				if type(on_done) == "function" then pcall(on_done) end
 			end)
 		end)
 	end
 
-	-- Phase 1: poll /v1/models until the server is actually accepting requests
-	local function wait_for_server_ready()
-		hs.http.asyncGet(MLX_BASE_URL .. "/v1/models", {}, function(status, body)
+	-- Phase 1: use a repeating hs.timer to poll /v1/models so the loop
+	-- survives dropped asyncGet callbacks (which happen when the old server
+	-- process is killed mid-request — the connection resets and Hammerspoon
+	-- never fires the callback, leaving a recursive doAfter chain dead).
+	local poll_timer = nil
+	local function do_poll()
+		-- Guard: if discovery was reset externally (model switch) while the
+		-- timer was in flight, stop quietly without firing callbacks.
+		if not _endpoint_probe_in_flight then
+			if poll_timer then pcall(function() poll_timer:stop() end) end
+			poll_timer = nil
+			return
+		end
+		local elapsed = hs.timer.secondsSinceEpoch() - started_at
+		if elapsed >= DISCOVERY_MAX_WAIT_SEC then
+			if poll_timer then pcall(function() poll_timer:stop() end) end
+			poll_timer = nil
+			Logger.warn(LOG,
+				"Endpoint discovery: gave up waiting for MLX server after %.1fs. " ..
+				"Falling back to default routes; warmup will keep retrying.", elapsed)
+			finish_discovery(false)
+			return
+		end
+		Logger.warn(LOG, "Endpoint discovery: polling /v1/models (elapsed=%.1fs)…", elapsed)
+		-- Use curl instead of hs.http.asyncGet so we can pass --no-keepalive.
+		-- Hammerspoon's HTTP client pools TCP connections and will reuse a keep-alive
+		-- socket to a zombie server (whose process was kill -9'd but whose socket
+		-- lingers in CLOSE_WAIT), making the poll see the zombie's stale model ID
+		-- indefinitely. curl --no-keepalive forces a fresh TCP handshake every call,
+		-- so the moment the zombie's socket closes the next poll reaches the new server.
+		local curl_task = hs.task.new("/usr/bin/curl", function(exit_code, stdout, _stderr)
+			if poll_timer then pcall(function() poll_timer:stop() end) end
+			poll_timer = nil
+			local status = (exit_code == 0) and 200 or -1
+			local body   = stdout or ""
+			Logger.warn(LOG, "Endpoint discovery: /v1/models -> HTTP %s.", tostring(status))
+			if not _endpoint_probe_in_flight then return end  -- reset externally
 			if status == 200 then
-				-- Extract the canonical model ID so subsequent payloads use the
-				-- exact string the server expects in the "model" field.
-				if type(body) == "string" then
-					local ok_dec, resp = pcall(hs.json.decode, body)
-					if ok_dec and type(resp) == "table"
-						and type(resp.data) == "table"
-						and type(resp.data[1]) == "table"
-						and type(resp.data[1].id) == "string"
-						and resp.data[1].id ~= "" then
-						_server_model_id = resp.data[1].id
-						Logger.debug(LOG, "Endpoint discovery: server model ID = '%s'.", _server_model_id)
+				-- mlx_lm.server's /v1/models endpoint returns the LIST of models
+				-- discoverable in the local HF cache, NOT the currently loaded
+				-- model. data[] can have 30+ entries and their order is dictated
+				-- by cache ordering, not load state. Earlier code read data[1].id
+				-- as if it were the loaded model and then tried to "fix" mismatches
+				-- via zombie kills and forced restarts — all chasing a phantom.
+				-- The right semantic: a 200 here means the server is reachable.
+				-- The model we passed to --model in bash is the one that actually
+				-- gets loaded; trust that and proceed straight to POST probes.
+				-- For the warmup payload's "model" field, prefer _model_hf_path
+				-- (the canonical --model arg) over anything from /v1/models.
+				_server_model_id = nil
+				if type(body) == "string" and type(_expected_model_id) == "string"
+					and _expected_model_id ~= "" then
+					-- Informational: confirm the expected model is at least
+					-- visible in the cache list. If it is not, the user likely
+					-- has a misconfigured preset; log a warning but do not block.
+					local needle = _expected_model_id:lower()
+					if not body:lower():find(needle, 1, true) then
+						Logger.warn(LOG,
+							"Endpoint discovery: expected model '%s' not visible in /v1/models cache list — POST may 404 if mlx_lm cannot resolve it.",
+							_expected_model_id)
 					end
 				end
-				Logger.debug(LOG, "Endpoint discovery: server reachable on /v1/models — starting POST probes.")
+				if not _endpoint_probe_in_flight then return end
+				Logger.warn(LOG, "Endpoint discovery: server reachable on /v1/models — starting POST probes.")
 				run_post_probes()
-				return
+			else
+				-- Server not ready yet — restart the timer for the next poll tick
+				poll_timer = hs.timer.doAfter(DISCOVERY_POLL_PERIOD_SEC, do_poll)
 			end
-			local elapsed = hs.timer.secondsSinceEpoch() - started_at
-			if elapsed >= DISCOVERY_MAX_WAIT_SEC then
-				_endpoint_probe_in_flight = false
-				Logger.warn(LOG,
-					"Endpoint discovery: gave up waiting for MLX server after %.1fs (last status=%s). " ..
-					"Falling back to default routes; warmup will keep retrying.",
-					elapsed, tostring(status))
-				if type(on_done) == "function" then pcall(on_done) end
-				return
-			end
-			hs.timer.doAfter(DISCOVERY_POLL_PERIOD_SEC, wait_for_server_ready)
-		end)
+		end, {
+			"--silent", "--max-time", "5", "--no-keepalive",
+			"-H", "Connection: close",
+			MLX_BASE_URL .. "/v1/models",
+		})
+		pcall(function() curl_task:start() end)
 	end
-	wait_for_server_ready()
+
+	poll_timer = hs.timer.doAfter(0, do_poll)
 end
 
 -- M.is_thinking_model is injected by init.lua
@@ -217,15 +476,32 @@ function M.is_ready()
 	return _is_ready
 end
 
+--- Records the full HuggingFace repository path (e.g.
+--- "mlx-community/Meta-Llama-3.1-8B-Instruct-4bit") used to launch the server.
+--- Called by models_manager_mlx immediately after reset_endpoints() so the
+--- discovery bypass and warmup can fall back to this authoritative path when
+--- /v1/models returns a stale model ID during weight loading.
+--- @param hf_path string The full HF repo path passed to `mlx_lm server --model`.
+function M.set_model_hf_path(hf_path)
+	_model_hf_path = type(hf_path) == "string" and hf_path or nil
+	Logger.debug(LOG, "Model HF path set to '%s'.", tostring(_model_hf_path))
+end
+
 --- Resets the endpoint discovery state so the next warmup re-probes the live
 --- server. Called after an mlx-lm upgrade, because a new wheel may expose
 --- different route paths than the previously cached ones.
 function M.reset_endpoints()
-	_endpoints_discovered     = false
-	_endpoint_probe_in_flight = false
-	_is_ready                 = false
-	_server_model_id          = nil
-	Logger.debug(LOG, "Endpoint discovery state reset (post-upgrade).")
+	_endpoints_discovered        = false
+	_endpoint_probe_in_flight    = false
+	_discovery_pending_callbacks = {}
+	_is_ready                    = false
+	_server_model_id             = nil
+	_expected_model_id           = nil
+	_model_hf_path               = nil
+	_active_server_pgid          = nil   -- cleared until the new server reports its PGID
+	_server_pgid_pending         = true  -- block zombie kills until set_active_server_pgid() fires
+	_last_zombie_kill_at         = 0     -- allow an immediate kill on the first mismatch after PGID is known
+	Logger.warn(LOG, "Endpoint discovery state reset.")
 end
 
 --- Supersedes the in-flight streaming task.
@@ -261,16 +537,19 @@ end
 --- @param model_name string The MLX model identifier (logged only).
 --- @param profile table|nil The active profile object; falls back to a minimal ping.
 function M.warmup(model_name, profile)
+	-- Log at warn so the line appears in logs regardless of configured log level
+	Logger.warn(LOG, "warmup() called — model='%s' _is_ready=%s _warmup_in_flight=%s _endpoints_discovered=%s.",
+		tostring(model_name), tostring(_is_ready), tostring(_warmup_in_flight), tostring(_endpoints_discovered))
 	-- Skip if the backend already answered a previous warmup successfully — the
 	-- model is loaded, no need to re-prime
 	if _is_ready then
-		Logger.debug(LOG, "MLX warmup skipped — backend already ready.")
+		Logger.warn(LOG, "MLX warmup skipped — backend already ready.")
 		return
 	end
 	-- Skip if a warmup is already in flight; otherwise the user's log shows 4
 	-- simultaneous POST requests piling up against the single-threaded server
 	if _warmup_in_flight then
-		Logger.debug(LOG, "MLX warmup skipped — request already in flight.")
+		Logger.warn(LOG, "MLX warmup skipped — request already in flight.")
 		return
 	end
 
@@ -278,18 +557,30 @@ function M.warmup(model_name, profile)
 	-- send the warmup itself. Without this, a route rename in a freshly
 	-- installed mlx-lm wheel turns every warmup into a 404 with no recovery.
 	if not _endpoints_discovered then
+		Logger.warn(LOG, "warmup() — endpoints not yet discovered, triggering discovery…")
+		-- Record the model we are waiting for so the discovery poll can reject a
+		-- /v1/models 200 from the old server (still alive for ~2 s during model switch).
+		_expected_model_id = model_name
 		discover_endpoints(function() M.warmup(model_name, profile) end)
 		return
 	end
 
-	Logger.debug(LOG, "Warming up MLX KV cache for model '%s'…", tostring(model_name))
+	Logger.warn(LOG, "warmup() — sending warmup POST to '%s' for model '%s'…",
+		_completions_endpoint, tostring(model_name))
 
 	local Profiles  = require("modules.llm.profiles")
 	local endpoint  = _completions_endpoint
 	local payload
-	-- Use the server's canonical model ID (fetched from /v1/models during discovery)
-	-- so the "model" field matches what mlx-lm 0.26+ validates against.
-	local effective_model = _server_model_id or model_name
+	-- Use the server's canonical model ID (fetched from /v1/models during discovery).
+	-- Fall back to the HF path stored at server launch time (_model_hf_path) when
+	-- _server_model_id was cleared because /v1/models returned a stale model ID
+	-- (bypass scenario). This avoids the 404 validation error that would result from
+	-- sending the wrong model name to mlx-lm 0.26+.
+	-- Prefer the exact --model arg the bash launcher wrote to disk: when the
+	-- server was started with a local snapshot path (the common offline case),
+	-- the payload MUST echo that same path or model_provider.load() will
+	-- attempt a fresh snapshot_download on the repo id and fail.
+	local effective_model = read_active_model_arg() or _server_model_id or _model_hf_path or model_name
 
 	-- Build the full prompt the server will actually see on real requests so that its
 	-- KV cache entry for the static prefix is immediately useful.
@@ -349,12 +640,38 @@ function M.warmup(model_name, profile)
 	end
 
 	_warmup_in_flight = true
+	-- Hard timeout: hs.http.asyncPost has no built-in timeout, so if the server
+	-- accepts the TCP connection but never sends a response (e.g. during model
+	-- weight loading or a stale GPU stream), _warmup_in_flight would stay true
+	-- forever, silently blocking every subsequent warmup call.
+	if _warmup_timeout then pcall(function() _warmup_timeout:stop() end) end
+	_warmup_timeout = hs.timer.doAfter(WARMUP_POST_TIMEOUT_SEC, function()
+		_warmup_timeout = nil
+		if not _warmup_in_flight then return end
+		_warmup_in_flight = false
+		Logger.warn(LOG, "Warmup POST timed out after %.0fs — unblocking and retrying in 2s.",
+			WARMUP_POST_TIMEOUT_SEC)
+		hs.timer.doAfter(2, function() M.warmup(model_name, profile) end)
+	end)
 	hs.http.asyncPost(endpoint, payload, { ["Content-Type"] = "application/json" },
-		function(status, _)
+		function(status, body)
+			if _warmup_timeout then
+				pcall(function() _warmup_timeout:stop() end)
+				_warmup_timeout = nil
+			end
 			_warmup_in_flight = false
-			if status == 200 then
+			-- A 200 with an empty or choices-less body means the server accepted the
+			-- request but the generation thread crashed (e.g. mlx RuntimeError in the
+			-- GPU stream during model hot-swap). Treat it as not-ready so the next
+			-- warmup attempt actually re-probes rather than locking _is_ready = true
+			-- against a broken server.
+			local has_tokens = type(body) == "string" and body:find("choices", 1, true) ~= nil
+			Logger.warn(LOG, "warmup POST response: status=%s has_tokens=%s body_len=%s.",
+				tostring(status), tostring(has_tokens),
+				tostring(type(body) == "string" and #body or "nil"))
+			if status == 200 and has_tokens then
 				_is_ready = true
-				Logger.info(LOG, "MLX KV cache primed (profile: %s) — backend ready.",
+				Logger.warn(LOG, "MLX KV cache primed (profile: %s) — backend ready.",
 					(type(profile) == "table" and profile.id) or "default")
 			else
 				_is_ready = false
@@ -368,8 +685,14 @@ function M.warmup(model_name, profile)
 				if status == 404 then
 					_endpoints_discovered = false
 				end
-				Logger.debug(LOG, "MLX warmup returned %s — model may not be loaded yet; will retry on next set_llm_enabled / set_llm_model.",
-					tostring(status))
+				Logger.warn(LOG, "MLX warmup returned %s (has_tokens=%s) — model not ready; retrying in 2s.",
+					tostring(status), tostring(has_tokens))
+				-- Retry automatically so the user does not have to manually trigger
+				-- set_llm_enabled / set_llm_model after a slow model load or a
+				-- generation-thread crash during the server hot-swap window.
+				hs.timer.doAfter(2, function()
+					M.warmup(model_name, profile)
+				end)
 			end
 		end
 	)
@@ -471,7 +794,13 @@ local function post_and_parse(model_name, system_prompt, full_text, tail_text,
         merged_prompt = final_sys .. "\n\n" .. (user_prompt or "")
     end
 
-    table.insert(messages, { role = "user", content = merged_prompt })
+    -- Disable reasoning mode globally (Qwen3, DeepSeek-R1, Hermes-3-think,
+    -- etc.). See the streaming path below for the rationale; in short, these
+    -- models otherwise burn the entire token budget on <think>…</think>
+    -- monologue and emit zero final-answer content. /no_think is honoured
+    -- as an in-prompt directive even when the chat template ignores
+    -- chat_template_kwargs.
+    table.insert(messages, { role = "user", content = merged_prompt .. "\n\n/no_think" })
 
     local t0_req = hs.timer.secondsSinceEpoch()
 
@@ -484,7 +813,10 @@ local function post_and_parse(model_name, system_prompt, full_text, tail_text,
     local endpoint = _chat_endpoint
     local prompt_preview = merged_prompt
 
-    local effective_model = _server_model_id or model_name
+    -- See read_active_model_arg() rationale at top of file: must mirror the
+    -- exact --model arg the bash launcher passed to mlx_lm or the server
+    -- treats it as a different model and tries snapshot_download (offline 404).
+    local effective_model = read_active_model_arg() or _server_model_id or _model_hf_path or model_name
     if line_mode then
         -- For plain autocomplete, completion endpoint is more reliable than chat formatting
         local ctx = type(full_text) == "string" and full_text or ""
@@ -501,12 +833,14 @@ local function post_and_parse(model_name, system_prompt, full_text, tail_text,
         }
     else
         payload = {
-            model       = effective_model,
-            messages    = messages,
-            stream      = false,
-            temperature = opts.temperature,
-            max_tokens  = opts.max_tokens,
-            stop        = opts.stop,
+            model               = effective_model,
+            messages            = messages,
+            stream              = false,
+            temperature         = opts.temperature,
+            max_tokens          = opts.max_tokens,
+            stop                = opts.stop,
+            chat_template_kwargs = { enable_thinking = false },
+            chat_template_args   = { enable_thinking = false },
         }
     end
 
@@ -674,7 +1008,10 @@ local function post_and_parse_streaming(model_name, system_prompt, full_text, ta
 	local line_mode = (not is_batch) and (not is_advanced_prompt)
 	local opts = build_options(temperature, num_predict_tokens, is_batch, line_mode)
 
-	local effective_model = _server_model_id or model_name
+	-- See read_active_model_arg() rationale at top of file: must mirror the
+	-- exact --model arg the bash launcher passed to mlx_lm or the server
+	-- treats it as a different model and tries snapshot_download (offline 404).
+	local effective_model = read_active_model_arg() or _server_model_id or model_name
 	local payload, endpoint, prompt_preview
 	if line_mode then
 		local ctx    = type(full_text) == "string" and full_text or ""
@@ -690,15 +1027,31 @@ local function post_and_parse_streaming(model_name, system_prompt, full_text, ta
 			stop        = { "\n\n", "</", "\"", "- " },
 		}
 	else
-		prompt_preview = merged_prompt
+		-- Disable reasoning / "thinking" mode globally. Qwen3, DeepSeek-R1,
+		-- Hermes-3-think and other reasoning models otherwise spend their
+		-- entire token budget producing <think>…</think> internal monologue
+		-- and emit zero final-answer content, which surfaces as
+		-- STREAM_DONE → empty raw → "parse yielded 0 result(s)".
+		--
+		-- Belt-and-braces:
+		--   1. chat_template_kwargs / chat_template_args: the standard
+		--      mlx-lm 0.31+ knob to flip Jinja templates that gate
+		--      <think> blocks behind `enable_thinking`.
+		--   2. /no_think suffix on the user message: Qwen3 honours this as
+		--      a literal in-prompt directive even if the chat template
+		--      does not pick up the kwarg (e.g. older snapshots).
+		local user_content    = merged_prompt .. "\n\n/no_think"
+		prompt_preview = user_content
 		endpoint = _chat_endpoint
 		payload = {
-			model       = effective_model,
-			messages    = { { role = "user", content = merged_prompt } },
-			stream      = true,
-			temperature = opts.temperature,
-			max_tokens  = opts.max_tokens,
-			stop        = opts.stop,
+			model               = effective_model,
+			messages            = { { role = "user", content = user_content } },
+			stream              = true,
+			temperature         = opts.temperature,
+			max_tokens          = opts.max_tokens,
+			stop                = opts.stop,
+			chat_template_kwargs = { enable_thinking = false },
+			chat_template_args   = { enable_thinking = false },
 		}
 	end
 
@@ -712,9 +1065,10 @@ local function post_and_parse_streaming(model_name, system_prompt, full_text, ta
 		return
 	end
 
-	local accumulated = ""
-	local line_buf    = ""
-	local t0_req      = hs.timer.secondsSinceEpoch()
+	local accumulated   = ""
+	local line_buf      = ""
+	local in_reasoning  = false  -- Currently accumulating delta.reasoning(_content) tokens — close </think> on transition or end
+	local t0_req        = hs.timer.secondsSinceEpoch()
 
 	-- Parse one SSE line (data: {...} or data: [DONE]) and append its token to accumulated
 	local function process_sse_line(line)
@@ -729,17 +1083,50 @@ local function post_and_parse_streaming(model_name, system_prompt, full_text, ta
 			return
 		end
 		local choice = obj.choices[1]
-		local token  = nil
-		-- Chat completions streaming: delta.content
-		if type(choice.delta) == "table" and type(choice.delta.content) == "string" then
-			token = choice.delta.content
-		-- Completions endpoint streaming: text directly
-		elseif type(choice.text) == "string" then
-			token = choice.text
+		-- Chat completions streaming. Reasoning models (Qwen3, DeepSeek-R1,
+		-- Hermes-3 in think mode) route their thought tokens through
+		-- delta.reasoning(_content) and the final answer through
+		-- delta.content. We accumulate both into a single string,
+		-- inserting a single <think>…</think> wrapper around the reasoning
+		-- segment so Parser.strip_thinking() can remove it cleanly at the
+		-- end. Without this branch, the reasoning chunks were silently
+		-- dropped and the chat-completions stream finished with "empty
+		-- accumulation" even when the server emitted hundreds of tokens.
+		local reasoning_chunk = nil
+		local content_chunk   = nil
+		if type(choice.delta) == "table" then
+			if type(choice.delta.content) == "string" and choice.delta.content ~= "" then
+				content_chunk = choice.delta.content
+			end
+			if type(choice.delta.reasoning_content) == "string" and choice.delta.reasoning_content ~= "" then
+				reasoning_chunk = choice.delta.reasoning_content
+			elseif type(choice.delta.reasoning) == "string" and choice.delta.reasoning ~= "" then
+				reasoning_chunk = choice.delta.reasoning
+			end
+		elseif type(choice.text) == "string" and choice.text ~= "" then
+			-- Completions endpoint streaming: text directly
+			content_chunk = choice.text
 		end
-		if token and token ~= "" then
-			accumulated = accumulated .. token
-			if type(on_partial) == "function" then pcall(on_partial, accumulated) end
+
+		local appended = false
+		if reasoning_chunk then
+			if not in_reasoning then
+				accumulated = accumulated .. "<think>"
+				in_reasoning = true
+			end
+			accumulated = accumulated .. reasoning_chunk
+			appended = true
+		end
+		if content_chunk then
+			if in_reasoning then
+				accumulated = accumulated .. "</think>"
+				in_reasoning = false
+			end
+			accumulated = accumulated .. content_chunk
+			appended = true
+		end
+		if appended and type(on_partial) == "function" then
+			pcall(on_partial, accumulated)
 		end
 	end
 
@@ -808,6 +1195,15 @@ local function post_and_parse_streaming(model_name, system_prompt, full_text, ta
 		if remaining and remaining ~= "" then
 			line_buf = line_buf .. remaining
 			flush_lines()
+		end
+
+		-- Close any unterminated reasoning segment so Parser.strip_thinking
+		-- can remove the entire <think>…</think> block; without this,
+		-- a reasoning-only stream that never transitions to content would
+		-- leave "<think>…" unbalanced and strip_thinking would no-op.
+		if in_reasoning then
+			accumulated  = accumulated .. "</think>"
+			in_reasoning = false
 		end
 
 		if accumulated == "" then
