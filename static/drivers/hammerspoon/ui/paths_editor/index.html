@@ -1,0 +1,25 @@
+<!-- ui/paths_editor/index.html -->
+<!doctype html>
+<html lang="fr">
+	<head>
+		<meta charset="utf-8" />
+		<title>Chemins des fichiers</title>
+		<link rel="stylesheet" href="style.css" />
+	</head>
+	<body>
+		<h1>Chemins des fichiers</h1>
+		<p class="subtitle">Personnalisez les emplacements des fichiers utilisés par Ergopti.</p>
+
+		<form id="paths-form">
+			<!-- Rows injected dynamically by script.js via window.initData() -->
+		</form>
+
+		<div class="btns">
+			<button type="button" id="btn-reset" class="reset">Réinitialiser</button>
+			<button type="button" id="btn-cancel" class="cancel">Annuler</button>
+			<button type="button" id="btn-save" class="save">Appliquer et recharger</button>
+		</div>
+
+		<script src="script.js"></script>
+	</body>
+</html>
