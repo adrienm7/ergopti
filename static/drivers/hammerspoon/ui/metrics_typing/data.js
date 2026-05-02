@@ -418,6 +418,126 @@ function compute_manifest_metrics() {
 // ============================================
 
 /**
+ * Recomputes the global speed KPI (MPM/CPM) from the per-character timing data
+ * in app_state.data.c, applying the user-selected pause threshold. Called from
+ * apply_local_filters() so every threshold or source-mode change updates the KPI.
+ *
+ * Method: sum all (time, count) pairs from character entries whose mean inter-key
+ * interval is ≤ pause_threshold. Intervals above the threshold indicate a pause
+ * between bursts and are excluded from the active-typing time, giving a more
+ * accurate speed that scales correctly with the selected threshold value.
+ *
+ * For hotstrings mode: the manifest-level app.time already bakes in output chars,
+ * so we independently estimate raw-input speed and use an n-gram-based multiplier
+ * to derive the equivalent output speed (marked "estimé").
+ */
+function recompute_speed_kpi() {
+	const pause_thresh = parseInt(document.getElementById("pause_threshold")?.value ?? "2000", 10) || 2000;
+	const { hs_raw_mode, llm_raw_mode, show_hs, show_llm } = get_source_mode_flags();
+	const c_dict = app_state.data.c || {};
+
+	// Sum time and char count for entries whose mean inter-key interval is ≤ threshold.
+	// Each entry in c_dict has .time (total inter-key ms, manual chars) and .manual_count.
+	let active_ms     = 0;
+	let active_chars  = 0;
+	let total_chars   = 0; // all chars regardless of threshold (for HS boost ratio)
+	let hs_chars      = 0;
+	let llm_chars     = 0;
+
+	// Accumulate from c_dict (manual chars only — timing is only tracked for manual)
+	Object.values(c_dict).forEach(item => {
+		const mc  = item.count - (item.synth_hs || 0) - (item.synth_llm || 0) - (item.synth_other || 0);
+		if (mc <= 0) return;
+		const avg = mc > 0 ? (item.time || 0) / mc : 0;
+		total_chars += mc;
+		if (avg <= pause_thresh) {
+			active_ms    += item.time || 0;
+			active_chars += mc;
+		}
+		hs_chars  += item.synth_hs  || 0;
+		llm_chars += item.synth_llm || 0;
+	});
+
+	// Estimate output chars = manual + HS output + LLM output.
+	// In raw-input view, hs_chars/llm_chars from c_dict are trigger chars, not outputs.
+	// We don't have output counts here, so we use the manifest totals for the ratio.
+	// Manifest wpm_chars / manifest manual_chars gives an output-to-input multiplier.
+	let manifest_wpm_chars = 0;
+	let manifest_manual_chars = 0;
+	const start_val = document.getElementById("date_start").value;
+	const end_val   = document.getElementById("date_end").value;
+	const manifest_dates = app_state.manifest_dates_sorted.length > 0
+		? app_state.manifest_dates_sorted
+		: Object.keys(window.metrics_manifest).sort();
+	manifest_dates.forEach(date_str => {
+		if (start_val && date_str < start_val) return;
+		if (end_val   && date_str > end_val)   return;
+		Object.keys(window.metrics_manifest[date_str] || {}).forEach(app_name => {
+			if (app_name !== "Unknown" && !app_state.selected_apps.has(app_name)) return;
+			const app = window.metrics_manifest[date_str][app_name];
+			const t   = app.chars || 0;
+			const h   = app.hs_chars  || 0;
+			const l   = app.llm_chars || 0;
+			manifest_wpm_chars    += t; // total output chars
+			manifest_manual_chars += Math.max(0, t - h - l);
+		});
+	});
+
+	// Output-boost multiplier: if HS/LLM are expanding chars, output > manual.
+	// E.g. manual=80 chars typed, output=100 chars → multiplier = 1.25.
+	// Applied to the c_dict-derived speed so the KPI reflects actual output.
+	const output_multiplier = manifest_manual_chars > 0
+		? manifest_wpm_chars / manifest_manual_chars
+		: 1.0;
+	const is_estimated = output_multiplier > 1.01; // only label as estimated when noticeably boosted
+
+	const output_cpm = active_ms > 0
+		? (active_chars * output_multiplier) / (active_ms / 60000)
+		: 0;
+	const output_wpm = output_cpm / 5;
+
+	const wpm_val_elem = document.getElementById("wpm_val");
+	if (!wpm_val_elem) return;
+
+	const thresh_label = pause_thresh >= 99999000 ? "sans filtre"
+		: pause_thresh >= 60000 ? `> ${pause_thresh/60000} min`
+		: `> ${pause_thresh/1000} s`;
+	const est_badge = is_estimated
+		? `<span style="font-size:0.65em;color:var(--text-muted);margin-left:4px;">(estimé)</span>`
+		: "";
+
+	wpm_val_elem.innerHTML =
+		`<div style="display:flex;flex-direction:column;justify-content:center;">` +
+		`<div style="display:flex;align-items:center;gap:6px;">` +
+		`<span>${format_number(output_wpm.toFixed(1))} <span class="stat-unit">MPM</span>${est_badge}</span>` +
+		`<span class="tooltip stat-inline-tooltip">${INFO_SVG}<span class="tooltiptext">` +
+		`MPM : Mots par minute (1 mot = 5 touches).<br>` +
+		`Seuil de pause : pauses ${thresh_label} exclues du temps actif.<br>` +
+		(is_estimated ? `Vitesse estimée : les chars générés par hotstrings/IA sont inférés via un ratio output/input (×${format_number(output_multiplier.toFixed(2))}).` : `Vitesse basée sur le texte final.`) +
+		`</span></span>` +
+		`</div>` +
+		`<div style="display:flex;align-items:center;gap:6px;font-size:0.65em;margin-top:5px;">` +
+		`<span>${format_number(output_cpm.toFixed(0))} <span class="stat-unit">CPM</span></span>` +
+		`<span class="tooltip stat-inline-tooltip">${INFO_SVG}<span class="tooltiptext">CPM : Caractères par minute</span></span>` +
+		`</div>` +
+		`</div>`;
+
+	const global_details = document.getElementById("global_details");
+	if (global_details) {
+		const raw_note = (hs_raw_mode || llm_raw_mode)
+			? `<div style="font-size:0.7em;color:var(--text-muted);margin-top:3px;">` +
+			  `Frappes brutes (triggers) — MPM basé sur l’output</div>`
+			: "";
+		const total_display = Object.values(c_dict).reduce((s, i) => s + (i.count || 0), 0);
+		global_details.innerHTML =
+			`<div style="margin-top:5px;">` +
+			`<strong style="color:var(--kpi-wpm-color);font-size:1.1em;">${format_number(total_display)}</strong>` +
+			` <span class="stat-unit" style="font-size:0.9em;">touches tapées</span>` +
+			`</div>${raw_note}`;
+	}
+}
+
+/**
  * Applies all active toggle filters to the cached n-gram data and
  * re-renders the current table. Called after data fetch completes or when
  * a toggle filter changes.
@@ -428,7 +548,7 @@ function apply_local_filters() {
 	app_state.data = { c: {}, bg: {}, tg: {}, qg: {}, pg: {}, hx: {}, hp: {}, w: {}, sc: {}, sc_bg: {}, w_bg: {}, kc: {} };
 
 	const { show_manual, show_hs, show_llm } = get_source_mode_flags();
-	const show_spaces    = document.getElementById("btn_show_spaces").classList.contains("active");
+	const show_spaces    = true; // Espaces toujours visibles (bouton supprimé)
 	const case_sensitive = document.getElementById("btn_case_sensitive").classList.contains("active");
 
 	const merge_source = (source_cache) => {
@@ -477,6 +597,7 @@ function apply_local_filters() {
 	render_repetitions_kpi();
 	render_distance_kpi();
 	render_avg_words_kpi();
+	recompute_speed_kpi();
 	render_current_tab();
 }
 

@@ -201,6 +201,9 @@ function M.show_webview(opts)
 		pcall(function() wv:html(final_html) end)
 	end
 
+	-- wv:html() loads content but does not show the window — explicit show() required.
+	-- This must happen before force_focus so the window actually appears on first open.
+	pcall(function() wv:show() end)
 	M.force_focus(wv, true)
 	Logger.info(LOG, "Webview window created successfully.")
 	return wv

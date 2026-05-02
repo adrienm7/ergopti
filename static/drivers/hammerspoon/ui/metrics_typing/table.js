@@ -138,24 +138,55 @@ function count_uppercase_shift() {
 	return total;
 }
 
+// Mapping from macOS virtual keycode string to canonical modifier name.
+// These keycodes are emitted via flagsChanged events (tracked by log_manager).
+const MODIFIER_KEYCODES = {
+	"54": "cmd",   "55": "cmd",
+	"56": "shift", "60": "shift",
+	"58": "alt",   "61": "alt",
+	"59": "ctrl",  "62": "ctrl",
+	"57": "capslock",
+	"63": "fn",
+};
+
 /**
- * Derives modifier-combo usage by aggregating shortcut entries by their modifier pattern.
- * Also infers Shift usage from uppercase letter presses in the character data so that
- * Shift appears in the Modifiers tab even when case-insensitive mode is active.
+ * Derives modifier usage from two sources:
+ * 1. Raw kc dict: flagsChanged keycode presses (standalone modifier key taps).
+ * 2. Shortcut sc dict: modifier+key combos aggregated by modifier pattern.
+ * 3. Uppercase letter inference: Shift usage from capital letters typed.
+ *
+ * This ensures that pressing Option (kc 58/61) for a symbol layer is counted,
+ * and that thumb keys (cmd-L=55, cmd-R=54, alt-L=58, etc.) appear correctly.
  * @param {Object} sc_dict - The processed shortcut dictionary from app_state.data.sc.
- * @returns {Object} A new dict keyed by canonical modifier combo ("cmd", "cmd+shift", …)
- *                   with count/time/errors summed across all matching shortcuts.
+ * @returns {Object} A new dict keyed by canonical modifier name or combo.
  */
 function derive_modifier_usage(sc_dict) {
 	const result = {};
 
-	// Seed Shift from uppercase letter usage (read directly from raw cache, layout-safe)
+	// ── Source 1: raw flagsChanged kc presses ────────────────────────────────
+	// Each entry in kc_dict where the keycode is a modifier contributes directly.
+	const kc_dict = app_state.data.kc || {};
+	Object.entries(kc_dict).forEach(([kc_str, kc_item]) => {
+		const mod_name = MODIFIER_KEYCODES[kc_str];
+		if (!mod_name) return;
+		if (!result[mod_name]) {
+			result[mod_name] = { count: 0, time: 0, errors: 0, synth_hs: 0, synth_llm: 0, synth_other: 0 };
+		}
+		result[mod_name].count += kc_item.count || 0;
+	});
+
+	// ── Source 2: Shift inferred from uppercase letter presses ───────────────
 	const shift_count = count_uppercase_shift();
 	if (shift_count > 0) {
-		result["shift"] = { count: shift_count, time: 0, errors: 0, synth_hs: 0, synth_llm: 0, synth_other: 0 };
+		if (!result["shift"]) {
+			result["shift"] = { count: 0, time: 0, errors: 0, synth_hs: 0, synth_llm: 0, synth_other: 0 };
+		}
+		// Add inferred shift presses on top of direct flagsChanged counts to get
+		// the total number of shift activations (direct key tap + held for uppercase).
+		result["shift"].count += shift_count;
 	}
 
-	// Aggregate modifier combos from shortcuts, merging into any existing entry
+	// ── Source 3: modifier combos from shortcuts ──────────────────────────────
 	Object.entries(sc_dict).forEach(([k, item]) => {
 		const parts = String(k).toLowerCase().split("+").map(p => p.trim()).filter(p => p.length > 0);
 		const mods  = parts.filter(p => MODIFIER_ORDER.includes(p));
@@ -629,16 +660,11 @@ function render_current_tab() {
 		}
 	}
 
-	// Show or hide the keyboard heatmap based on the active tab
-	const heatmap_el = document.getElementById("kc_heatmap_container");
-	if (heatmap_el) {
-		if (app_state.current_tab === "kc") {
-			heatmap_el.style.display = "";
-			render_kc_heatmap(data_arr);
-		} else {
-			heatmap_el.style.display = "none";
-		}
-	}
+	// Always refresh the heatmap with current kc data regardless of active tab
+	const kc_data_for_heatmap = app_state.data.kc
+		? Object.entries(app_state.data.kc).map(([key, item]) => ({ key, count: item.count || 0 }))
+		: [];
+	render_kc_heatmap(kc_data_for_heatmap);
 
 	render_table();
 }
@@ -651,129 +677,290 @@ function render_current_tab() {
 
 /**
  * Renders an SVG keyboard heatmap into #kc_heatmap_container.
- * Each key is coloured from cold (low frequency) to hot (high frequency)
- * using the keycode_layout injected by Lua so the user's actual layout
- * labels appear on the keys instead of the QWERTY defaults.
- * @param {Array} kc_data_arr - The current rendered_list from the kc tab.
+ * The heatmap is always visible above the tab buttons and updates on every
+ * filter change. Each key shows the user's actual layout label (from Lua
+ * injection) and a full hover tooltip with frequency, counts, and bigram info.
+ * @param {Array} kc_data_arr - Array of { key: kc_str, count } objects.
  */
 function render_kc_heatmap(kc_data_arr) {
 	const container = document.getElementById("kc_heatmap_container");
 	if (!container) return;
 
-	// Build a lookup kc_str → count from the current data
+	// Build lookup maps: kc_str → count and kc_str → full item for tooltip
 	const count_map = {};
-	let max_count = 1;
+	const item_map  = {};
+	let max_count   = 1;
 	kc_data_arr.forEach(item => {
 		const c = item.count || 0;
 		count_map[item.key] = c;
+		item_map[item.key]  = item;
 		if (c > max_count) max_count = c;
 	});
+
+	// Also collect the full kc item from app_state for extra stats in tooltips
+	const kc_full = app_state.data.kc || {};
 
 	const kc_name_map = (window.keycode_layout && Object.keys(window.keycode_layout).length > 0)
 		? window.keycode_layout
 		: KEYCODE_NAMES;
 
-	// SVG layout constants (1 unit = U px)
-	const U     = 42;   // key unit size in px
-	const GAP   = 3;    // gap between keys in px
-	const R     = 4;    // border radius
+	// ── SVG layout constants ──────────────────────────────────────────────────
+	// 1 unit = U px; PAD adds breathing room so wide/edge keys aren't clipped
+	const U     = 44;
+	const GAP   = 4;
+	const R     = 5;
 	const KW    = U - GAP;
-	const KH    = U * 0.9 - GAP;
-	// Total canvas: 18 units wide × 6 rows tall (fn + number + qwerty + home + bottom + thumb)
-	const SVG_W = Math.round(18.5 * U);
-	const SVG_H = Math.round(5.0  * U);
+	const KH    = Math.round(U * 0.88 - GAP);
+	const PAD   = 8; // padding around the full keyboard in px
 
-	// Row order: y values go top (fn=2.70) → bottom (thumb=-1.80).
-	// Map y coordinate (in key units from state.js) to SVG pixel y using:
-	//   svg_y = (2.70 - key_y) * U * vertical_scale
-	// where vertical_scale = SVG_H / (2.70 - (-1.80)) = SVG_H / 4.50
+	// Key y-coordinates span Y_BOT (thumb row) to Y_TOP (fn row)
 	const Y_TOP  = 2.70;
 	const Y_BOT  = -1.80;
 	const Y_SPAN = Y_TOP - Y_BOT;
 
-	const to_svg_x = (x) => Math.round(x * U);
-	const to_svg_y = (y) => Math.round((Y_TOP - y) / Y_SPAN * SVG_H);
+	// Widths of non-standard keys in key-units
+	const WIDE_KEYS = {
+		"36":  1.75, // return — ISO enter is tall; we draw it as wide here
+		"48":  1.50, // tab
+		"51":  1.75, // backspace
+		"56":  1.25, // l-shift (ISO)
+		"57":  1.50, // capslock
+		"60":  2.25, // r-shift (ISO/ANSI)
+		"49":  6.25, // space bar
+		"59":  1.25, // ctrl-L
+		"55":  1.50, // cmd-L
+		"54":  1.50, // cmd-R
+		"61":  1.25, // alt-R
+		"62":  1.25, // ctrl-R
+	};
 
-	// Heat colour: interpolate from a cool blue-grey for 0 → yellow → red for max
+	// Compute pixel canvas size including padding
+	// X range: leftmost key centre − half its width to rightmost + half its width
+	let min_x_px = Infinity, max_x_px = -Infinity;
+	let min_y_px = Infinity, max_y_px = -Infinity;
+	const key_entries = Object.entries(KEY_POSITIONS);
+
+	// First pass: determine canvas bounds
+	key_entries.forEach(([kc_str, pos]) => {
+		const w_units = WIDE_KEYS[kc_str] ?? 1;
+		const key_w   = Math.round(w_units * U - GAP);
+		const extra_w = (w_units - 1) * U / 2;
+		const sx      = Math.round(pos.x * U) - Math.round(KW / 2) - Math.round(extra_w);
+		const sy      = Math.round((Y_TOP - pos.y) / Y_SPAN * (5.5 * U)) - Math.round(KH / 2);
+		min_x_px = Math.min(min_x_px, sx);
+		max_x_px = Math.max(max_x_px, sx + key_w);
+		min_y_px = Math.min(min_y_px, sy);
+		max_y_px = Math.max(max_y_px, sy + KH);
+	});
+
+	const SVG_W = max_x_px - min_x_px + PAD * 2;
+	const SVG_H = max_y_px - min_y_px + PAD * 2;
+	const off_x = -min_x_px + PAD;
+	const off_y = -min_y_px + PAD;
+
+	// Heat colour: dark blue (cold) → orange (mid) → bright red (hot)
 	const heat_color = (count) => {
-		if (count === 0) return "#2a2a3a";
-		const t = Math.pow(count / max_count, 0.45); // sqrt-like curve to avoid washing out low values
+		if (count === 0) return "#1e1e2e";
+		const t = Math.pow(count / max_count, 0.40);
 		if (t < 0.5) {
-			// Cool (0) → warm mid (0.5): dark-blue → orange
 			const tt = t * 2;
-			const r = Math.round(30  + tt * (240 - 30));
-			const g = Math.round(60  + tt * (140 - 60));
-			const b = Math.round(120 + tt * (20  - 120));
-			return `rgb(${r},${g},${b})`;
-		} else {
-			// Warm mid (0.5) → hot (1.0): orange → bright red
-			const tt = (t - 0.5) * 2;
-			const r = Math.round(240 + tt * (255 - 240));
-			const g = Math.round(140 + tt * (30  - 140));
-			const b = Math.round(20  + tt * (0   - 20));
+			const r  = Math.round(30  + tt * (220 - 30));
+			const g  = Math.round(50  + tt * (130 - 50));
+			const b  = Math.round(130 + tt * (20  - 130));
 			return `rgb(${r},${g},${b})`;
 		}
+		const tt = (t - 0.5) * 2;
+		const r  = Math.round(220 + tt * (255 - 220));
+		const g  = Math.round(130 + tt * (20  - 130));
+		const b  = Math.round(20  + tt * (0   - 20));
+		return `rgb(${r},${g},${b})`;
 	};
 
-	// Widen keys that span more than 1U (Backspace, Tab, CapsLock, Shift, Space…)
-	// Values in key-units, matching KEY_POSITIONS x-centres.
-	const WIDE_KEYS = {
-		"36":  { w: 1.5  }, // return
-		"48":  { w: 1.25 }, // tab
-		"51":  { w: 1.5  }, // backspace
-		"56":  { w: 1.25 }, // l-shift (ISO)
-		"57":  { w: 1.25 }, // capslock
-		"60":  { w: 1.75 }, // r-shift (ISO)
-		"49":  { w: 5.0  }, // space bar
-		"59":  { w: 1.0  }, // ctrl-L
-		"55":  { w: 1.25 }, // cmd-L
-		"54":  { w: 1.25 }, // cmd-R
-		"62":  { w: 1.0  }, // ctrl-R
-	};
+	// Compute total presses for frequency percentage
+	const grand_total = kc_data_arr.reduce((s, i) => s + (i.count || 0), 0);
 
-	let rects = "";
+	// Collect per-modifier combo counts for tooltip breakdown
+	const sc_dict   = app_state.data.sc || {};
+	// Build a map: kc_str → list of modifier combos that used this key
+	const mod_by_kc = {};
+	Object.entries(sc_dict).forEach(([sc_key, sc_item]) => {
+		if (!sc_key.includes("+")) return;
+		const parts = sc_key.toLowerCase().split("+").map(p => p.trim());
+		const mods  = parts.filter(p => MODIFIER_ORDER.includes(p));
+		const keys  = parts.filter(p => !MODIFIER_ORDER.includes(p));
+		if (mods.length === 0 || keys.length === 0) return;
+		keys.forEach(key_name => {
+			// Try to resolve key_name back to a kc_str
+			Object.entries(kc_name_map).forEach(([kc_str, kc_label]) => {
+				if (kc_label.toLowerCase() === key_name) {
+					if (!mod_by_kc[kc_str]) mod_by_kc[kc_str] = {};
+					const mod_key = mods.join("+");
+					mod_by_kc[kc_str][mod_key] = (mod_by_kc[kc_str][mod_key] || 0) + (sc_item.count || 0);
+				}
+			});
+		});
+	});
+
+	// Build bigram following-key data from app_state.data.bg for tooltip
+	// We'll build a map: char → top-3 following chars by frequency
+	const bg_dict    = app_state.data.bg || {};
+	const follow_map = {}; // char_lower → [{char, count}]
+	const kc_chars   = {}; // kc_str → the char label it produces
+	Object.entries(kc_name_map).forEach(([kc_str, label]) => {
+		kc_chars[kc_str] = label;
+	});
+	Object.entries(bg_dict).forEach(([bg_key, bg_item]) => {
+		const chars = Array.from(bg_key);
+		if (chars.length !== 2) return;
+		const first = chars[0];
+		if (!follow_map[first]) follow_map[first] = {};
+		follow_map[first][chars[1]] = (follow_map[first][chars[1]] || 0) + (bg_item.count || 0);
+	});
+
+	let rects  = "";
 	let labels = "";
+	let tooltips = ""; // foreignObject-based tooltip divs (CSS-positioned via JS)
 
-	Object.entries(KEY_POSITIONS).forEach(([kc_str, pos]) => {
+	// Generate a unique id prefix for tooltip elements
+	const uid = "hm_" + Date.now().toString(36);
+
+	key_entries.forEach(([kc_str, pos]) => {
 		const count    = count_map[kc_str] || 0;
 		const fill     = heat_color(count);
-		const wide     = WIDE_KEYS[kc_str];
-		const key_w    = wide ? Math.round(wide.w * U - GAP) : KW;
-		// x position: subtract half the extra width so the centre stays at pos.x
-		const extra_w  = wide ? (wide.w - 1) * U / 2 : 0;
-		const sx       = to_svg_x(pos.x) - Math.round(KW / 2) - Math.round(extra_w);
-		const sy       = to_svg_y(pos.y) - Math.round(KH / 2);
+		const w_units  = WIDE_KEYS[kc_str] ?? 1;
+		const key_w    = Math.round(w_units * U - GAP);
+		const extra_w  = (w_units - 1) * U / 2;
+		const sx       = Math.round(pos.x * U) - Math.round(KW / 2) - Math.round(extra_w) + off_x;
+		const sy       = Math.round((Y_TOP - pos.y) / Y_SPAN * (5.5 * U)) - Math.round(KH / 2) + off_y;
+		const cx       = sx + key_w / 2;
+		const cy       = sy + KH / 2;
 
-		// Choose a readable text colour: white on dark/warm, dark on very light
-		const text_color = count === 0 ? "#666" : "#fff";
+		const text_color = count === 0 ? "#555" : "#fff";
 
-		const label_raw = kc_name_map[kc_str] ?? KEYCODE_NAMES[kc_str] ?? kc_str;
-		// Shorten long labels so they fit the key cap
-		let label = label_raw.length > 6 ? label_raw.slice(0, 5) + "…" : label_raw;
+		// Label: user's layout label, uppercase, shortened to fit
+		const label_raw  = kc_name_map[kc_str] ?? KEYCODE_NAMES[kc_str] ?? "";
+		const label_disp = label_raw.length > 5
+			? label_raw.slice(0, 4).toUpperCase() + "…"
+			: label_raw.toUpperCase();
 
-		// Count badge: show abbreviated count on active keys
+		const font_size  = label_disp.length > 3 ? 9 : 11;
+
+		// Count badge bottom-right of key
 		let badge = "";
 		if (count > 0) {
-			const badge_str = count >= 10000 ? `${(count / 1000).toFixed(0)}k`
-				: count >= 1000 ? `${(count / 1000).toFixed(1)}k`
+			const badge_str = count >= 100000 ? `${(count / 1000).toFixed(0)}k`
+				: count >= 10000  ? `${(count / 1000).toFixed(1)}k`
+				: count >= 1000   ? `${(count / 1000).toFixed(1)}k`
 				: String(count);
-			badge = `<text x="${sx + key_w / 2}" y="${sy + KH - 4}" text-anchor="middle"
-				font-size="7" fill="${text_color}" opacity="0.75">${escape_html(badge_str)}</text>`;
+			badge = `<text x="${Math.round(cx + key_w * 0.30)}" y="${sy + KH - 3}"
+				text-anchor="middle" font-size="7" fill="${text_color}" opacity="0.70"
+				font-family="monospace">${escape_html(badge_str)}</text>`;
 		}
 
-		rects  += `<rect x="${sx}" y="${sy}" width="${key_w}" height="${KH}" rx="${R}" fill="${fill}" stroke="#1a1a2e" stroke-width="1"/>`;
-		labels += `<text x="${sx + key_w / 2}" y="${sy + KH / 2 + 4}" text-anchor="middle"
-			font-size="9" font-family="monospace" fill="${text_color}">${escape_html(label)}</text>${badge}`;
+		// Tooltip content assembled as a data attribute string; rendered by JS onmouseover
+		const freq_pct  = grand_total > 0 ? ((count / grand_total) * 100).toFixed(2) : "0.00";
+		let tip_lines   = [
+			`<b>${escape_html(label_raw || kc_str)}</b> (kc ${kc_str})`,
+			`Presses : <b>${format_number(count)}</b>`,
+			`Fréquence : <b>${freq_pct}%</b>`,
+		];
+
+		// Modifier combos
+		const mods = mod_by_kc[kc_str];
+		if (mods) {
+			const mod_sorted = Object.entries(mods).sort((a, b) => b[1] - a[1]).slice(0, 4);
+			if (mod_sorted.length > 0) {
+				tip_lines.push(`<hr style="border-color:#444;margin:3px 0">`);
+				tip_lines.push(`Combos modificateurs :`);
+				mod_sorted.forEach(([mod, mc]) => {
+					tip_lines.push(`&nbsp;&nbsp;${escape_html(mod)} : <b>${format_number(mc)}</b>`);
+				});
+			}
+		}
+
+		// Top following characters (bigrams)
+		if (label_raw && label_raw.length === 1) {
+			const follows = follow_map[label_raw.toLowerCase()];
+			if (follows) {
+				const top3 = Object.entries(follows).sort((a, b) => b[1] - a[1]).slice(0, 3);
+				if (top3.length > 0) {
+					tip_lines.push(`<hr style="border-color:#444;margin:3px 0">`);
+					tip_lines.push(`Top lettres suivantes :`);
+					top3.forEach(([ch, n]) => {
+						const disp = ch === " " ? "Espace" : ch === " " ? "NBSP" : escape_html(ch.toUpperCase());
+						tip_lines.push(`&nbsp;&nbsp;${disp} : <b>${format_number(n)}</b>`);
+					});
+				}
+			}
+		}
+
+		const tip_html  = tip_lines.join("<br>");
+		const tip_id    = `${uid}_${kc_str}`;
+
+		// Invisible overlay rect to capture mouse events
+		rects += `<rect x="${sx}" y="${sy}" width="${key_w}" height="${KH}" rx="${R}"
+			fill="${fill}" stroke="#0d0d1a" stroke-width="1.5"
+			data-tip="${tip_id}" class="hm-key"
+			onmouseenter="hm_show_tip('${tip_id}')" onmouseleave="hm_hide_tip('${tip_id}')"/>`;
+
+		labels += `<text x="${Math.round(cx)}" y="${Math.round(cy + font_size * 0.38)}"
+			text-anchor="middle" font-size="${font_size}" font-weight="bold"
+			font-family="monospace,sans-serif" fill="${text_color}"
+			pointer-events="none">${escape_html(label_disp)}</text>${badge}`;
+
+		// Tooltip div — absolutely positioned, hidden by default
+		tooltips += `<div id="${tip_id}" class="hm-tooltip" style="display:none;position:fixed;z-index:9999;` +
+			`background:#1a1a2e;border:1px solid #444;border-radius:6px;padding:7px 10px;` +
+			`font-size:12px;line-height:1.5;color:#ddd;pointer-events:none;max-width:220px;white-space:nowrap;">` +
+			tip_html + `</div>`;
 	});
 
 	container.innerHTML =
-		`<div style="overflow-x:auto;padding:8px 0;">` +
-		`<div style="font-size:11px;color:var(--text-muted);margin-bottom:6px;">` +
-		`Heatmap des keycodes — labels selon votre layout actuel</div>` +
+		`<div style="display:inline-block;position:relative;">` +
+		`<div style="font-size:11px;color:var(--text-muted);margin-bottom:6px;text-align:left;">` +
+		`Heatmap des touches — layout actuel · survol pour détails</div>` +
 		`<svg width="${SVG_W}" height="${SVG_H}" xmlns="http://www.w3.org/2000/svg" ` +
-		`style="background:#12121e;border-radius:8px;display:block;">` +
+		`style="background:#12121e;border-radius:10px;display:block;"` +
+		`onmousemove="hm_track_mouse(event)">` +
 		rects + labels +
-		`</svg></div>`;
+		`</svg>` +
+		tooltips +
+		`</div>`;
+}
+
+/**
+ * Shows a heatmap tooltip positioned near the cursor.
+ * @param {string} tip_id - The DOM id of the tooltip element.
+ */
+function hm_show_tip(tip_id) {
+	const el = document.getElementById(tip_id);
+	if (el) el.style.display = "block";
+}
+
+/**
+ * Hides a heatmap tooltip.
+ * @param {string} tip_id - The DOM id of the tooltip element.
+ */
+function hm_hide_tip(tip_id) {
+	const el = document.getElementById(tip_id);
+	if (el) el.style.display = "none";
+}
+
+/** Tracks mouse position and repositions any visible heatmap tooltip near the cursor. */
+function hm_track_mouse(evt) {
+	document.querySelectorAll(".hm-tooltip").forEach(el => {
+		if (el.style.display === "none") return;
+		const vw  = window.innerWidth;
+		const vh  = window.innerHeight;
+		const tw  = el.offsetWidth  || 200;
+		const th  = el.offsetHeight || 80;
+		let   lft = evt.clientX + 14;
+		let   top = evt.clientY + 14;
+		if (lft + tw > vw - 8) lft = evt.clientX - tw - 8;
+		if (top + th > vh - 8) top = evt.clientY - th - 8;
+		el.style.left = lft + "px";
+		el.style.top  = top + "px";
+	});
 }
 
 

@@ -214,7 +214,6 @@ function reset_filters() {
 	document.getElementById("btn_toggle_llm")?.classList.remove("active");
 
 	// Restore remaining toggle buttons to their defaults
-	document.getElementById("btn_show_spaces").classList.add("active");
 	document.getElementById("btn_case_sensitive").classList.remove("active");
 
 	// Restore pause threshold and quick range selects to their defaults

@@ -78,13 +78,6 @@
 					</button>
 
 					<button
-						class="filter-btn active"
-						id="btn_show_spaces"
-						onclick="toggle_filter('btn_show_spaces')"
-					>
-						Espaces
-					</button>
-					<button
 						class="filter-btn"
 						id="btn_case_sensitive"
 						onclick="toggle_filter('btn_case_sensitive')"
@@ -95,8 +88,8 @@
 					<select
 						id="pause_threshold"
 						class="filter-btn"
-						onchange="compute_manifest_metrics(); apply_local_filters()"
-						title="Seuil de pause : filtre les délais entre touches dans le calcul de vitesse par ligne du tableau. Le KPI global MPM est calculé à partir du temps actif enregistré (seuil fixe 2 s côté enregistrement)."
+						onchange="apply_local_filters()"
+						title="Seuil de pause : pauses supérieures à ce seuil sont exclues du temps actif pour le calcul MPM global et par ligne."
 					>
 						<option value="1000">Pauses &gt; 1 s</option>
 						<option value="2000" selected>Pauses &gt; 2 s</option>
@@ -342,6 +335,9 @@
 				</div>
 			</div>
 
+			<!-- Keyboard heatmap — always visible above the tab buttons -->
+			<div id="kc_heatmap_container" style="margin-bottom:16px;text-align:center;"></div>
+
 			<div class="tabs">
 				<button class="tab-btn active" data-tab="c" onclick="switch_tab('c')">Caractères</button>
 				<button class="tab-btn" data-tab="bg" onclick="switch_tab('bg')">Bigrammes</button>
@@ -359,9 +355,6 @@
 				</button>
 				<button class="tab-btn" data-tab="w_bg" onclick="switch_tab('w_bg')">Bigrammes mots</button>
 			</div>
-
-			<!-- Keyboard heatmap — shown only when the Keycodes tab is active -->
-			<div id="kc_heatmap_container" style="display:none;margin-bottom:16px;"></div>
 
 			<div class="table-container">
 				<table id="metrics_table">
