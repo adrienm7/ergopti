@@ -1,0 +1,232 @@
+/* ui/paths_editor/style.css */
+
+/* =========================================================================== */
+/* Paths Editor UI Styles.                                                     */
+/*                                                                             */
+/* Styles for the file paths configuration form, matching the macOS system     */
+/* design language used across all Ergopti webview windows.                   */
+/* =========================================================================== */
+
+/* =============================== */
+/* =============================== */
+/* ======= 1/ Reset & Base ======= */
+/* =============================== */
+/* =============================== */
+
+* {
+	box-sizing: border-box;
+}
+
+/* ====================================== */
+/* ====================================== */
+/* ======= 2/ Layout & Typography ======= */
+/* ====================================== */
+/* ====================================== */
+
+html,
+body {
+	height: 100%;
+}
+
+body {
+	background: #f5f5f7;
+	color: #333;
+	display: flex;
+	flex-direction: column;
+	font-family: -apple-system, BlinkMacSystemFont, 'Helvetica Neue', sans-serif;
+	font-size: 14px;
+	margin: 0;
+	padding: 16px 20px 14px;
+}
+
+h1 {
+	color: #1d1d1f;
+	flex-shrink: 0;
+	font-size: 16px;
+	font-weight: 600;
+	margin: 0 0 2px;
+}
+
+.subtitle {
+	color: #888;
+	flex-shrink: 0;
+	font-size: 11px;
+	margin: 0 0 12px;
+}
+
+/* ================================ */
+/* ================================ */
+/* ======= 3/ Form Elements ======= */
+/* ================================ */
+/* ================================ */
+
+#paths-form {
+	display: flex;
+	flex-direction: column;
+	flex-grow: 1;
+	gap: 8px;
+	min-height: 0;
+	overflow-y: auto;
+}
+
+.row {
+	background: #fff;
+	border: 1px solid #e0e0e0;
+	border-radius: 8px;
+	flex-shrink: 0;
+	padding: 8px 11px;
+}
+
+.row-header {
+	align-items: center;
+	display: flex;
+	gap: 6px;
+	margin-bottom: 5px;
+}
+
+.row-icon {
+	color: #007aff;
+	flex-shrink: 0;
+	font-size: 13px;
+	line-height: 1;
+}
+
+label {
+	color: #444;
+	flex-grow: 1;
+	font-size: 11px;
+	font-weight: 600;
+}
+
+.path-input-wrap {
+	align-items: center;
+	display: flex;
+	gap: 5px;
+}
+
+input[type="text"] {
+	background: #f9f9f9;
+	border: 1px solid #d0d0d0;
+	border-radius: 5px;
+	color: #1d1d1f;
+	flex-grow: 1;
+	font-family: 'SF Mono', 'Monaco', monospace;
+	font-size: 10.5px;
+	outline: none;
+	padding: 5px 8px;
+	transition:
+		border-color 0.15s,
+		box-shadow 0.15s;
+}
+
+input[type="text"]:focus {
+	background: #fff;
+	border-color: #007aff;
+	box-shadow: 0 0 0 3px rgba(0, 122, 255, 0.15);
+}
+
+input[type="text"].is-default {
+	color: #999;
+}
+
+/* ======================================= */
+/* ======================================= */
+/* ======= 4/ Browse Button & Tags ======= */
+/* ======================================= */
+/* ======================================= */
+
+.btn-browse {
+	background: #e8e8ed;
+	border: none;
+	border-radius: 5px;
+	color: #333;
+	cursor: pointer;
+	flex-shrink: 0;
+	font-size: 11px;
+	font-weight: 500;
+	padding: 5px 10px;
+	transition: background 0.1s;
+	white-space: nowrap;
+}
+
+.btn-browse:hover {
+	background: #d8d8de;
+}
+
+.tag-default {
+	background: #e8f4ff;
+	border-radius: 4px;
+	color: #007aff;
+	font-size: 10px;
+	font-weight: 500;
+	margin-left: 4px;
+	padding: 2px 6px;
+	white-space: nowrap;
+}
+
+.tag-modified {
+	background: #fff3e0;
+	border-radius: 4px;
+	color: #e65100;
+	font-size: 10px;
+	font-weight: 500;
+	margin-left: 4px;
+	padding: 2px 6px;
+	white-space: nowrap;
+}
+
+/* ===================================== */
+/* ===================================== */
+/* ======= 5/ Buttons & Controls ======= */
+/* ===================================== */
+/* ===================================== */
+
+.btns {
+	align-items: center;
+	display: flex;
+	flex-shrink: 0;
+	gap: 7px;
+	justify-content: flex-end;
+	margin-top: 12px;
+}
+
+.btns .reset {
+	margin-right: auto;
+}
+
+button {
+	border: none;
+	border-radius: 7px;
+	cursor: pointer;
+	font-size: 12.5px;
+	font-weight: 500;
+	padding: 7px 16px;
+	transition: filter 0.1s;
+}
+
+button:hover {
+	filter: brightness(0.92);
+}
+
+.cancel {
+	background: #e0e0e0;
+	color: #333;
+}
+
+.save {
+	background: #007aff;
+	color: #fff;
+}
+
+.reset {
+	background: transparent;
+	border: 1px solid #ccc;
+	color: #666;
+	font-size: 11.5px;
+	padding: 6px 12px;
+}
+
+.reset:hover {
+	background: #f0f0f0;
+	filter: none;
+}

@@ -3,9 +3,10 @@
 --- ==============================================================================
 --- MODULE: Menu Paths
 --- DESCRIPTION:
---- Provides a menu item and GUI panel to let the user configure all
---- machine-specific file paths used by Hammerspoon : personal.toml, the
---- driver config.json, the Karabiner user config, and the hotstrings directory.
+--- Provides a menu item and a webview-based form panel that lets the user
+--- configure all machine-specific file paths used by Hammerspoon: personal.toml,
+--- the driver config.json, the Karabiner user config, and the hotstrings
+--- directory.
 ---
 --- FEATURES & RATIONALE:
 --- 1. Bootstrap File: Paths are persisted in a gitignored bootstrap JSON file
@@ -15,6 +16,9 @@
 ---    identical to the defaults used by the AutoHotkey driver.
 --- 3. Live Reload: A path change that affects loaded data (personal.toml,
 ---    hotstrings dir) triggers a Hammerspoon reload automatically.
+--- 4. WebView Form: All five paths are presented simultaneously in a single
+---    native-looking form, with per-field "Parcourir…" buttons that open a
+---    proper file/folder picker.  Replaces the old sequential blockAlert loop.
 --- ==============================================================================
 
 local M = {}
@@ -35,13 +39,13 @@ local PATH_KEYS = {
 	"KarabinerConfigPath",
 }
 
--- Human labels shown in the dialog for each key (French, user-facing).
+-- Human labels shown in the form for each key (French, user-facing).
 local PATH_LABELS = {
-	PersonalTomlPath    = "Fichier personal.toml :",
-	PersonalInfoTomlPath = "Fichier personal_info.toml (coordonnées personnelles) :",
-	HotstringsDirPath   = "Dossier des hotstrings :",
-	ConfigJsonPath      = "Fichier de configuration (config.json) :",
-	KarabinerConfigPath = "Configuration Karabiner (karabiner_user_config.json) :",
+	PersonalTomlPath     = "Fichier personal.toml",
+	PersonalInfoTomlPath = "Fichier personal_info.toml (coordonnées personnelles)",
+	HotstringsDirPath    = "Dossier des hotstrings",
+	ConfigJsonPath       = "Fichier de configuration (config.json)",
+	KarabinerConfigPath  = "Configuration Karabiner (karabiner_user_config.json)",
 }
 
 -- File-type filter hints for each key (used in the open-panel title).
@@ -53,9 +57,17 @@ local PATH_FILTERS = {
 	KarabinerConfigPath  = { kind = "file",   ext = "json" },
 }
 
-local _base_dir     = nil
-local _reload_fn    = nil
-local _bootstrap    = {}   -- in-memory cache of the loaded bootstrap table
+-- Absolute path to the assets directory (same folder as this file).
+local _src       = debug.getinfo(1, "S").source:sub(2)
+local ASSETS_DIR = (_src:match("^(.*[/\\])") or "./"):gsub("menu[/\\]$", "") .. "paths_editor/"
+
+local _base_dir  = nil
+local _reload_fn = nil
+local _bootstrap = {}   -- in-memory cache of the loaded bootstrap table
+
+-- WebView state (singleton)
+local _webview     = nil
+local _usercontent = nil
 
 
 
@@ -161,136 +173,97 @@ end
 -- ===================================
 -- ===================================
 
+
+-- =========================================
+-- ===== 3.1) Native File/Folder Picker =====
+-- =========================================
+
 --- Opens a native AppleScript-based dialog to pick a file or folder.
 --- Returns the selected path, or nil if cancelled.
 --- @param current string Currently configured path shown as default location.
 --- @param filter table {kind="file"|"folder", ext="toml"|"json"|nil}
 --- @return string|nil
 local function pick_path(current, filter)
-	local script
-	if filter and filter.kind == "folder" then
-		script = string.format(
-			'tell application "Finder"\n'
-			.. '  set d to POSIX file "%s" as alias\n'
-			.. '  set r to choose folder with prompt "Sélectionner un dossier" default location d\n'
-			.. '  return POSIX path of r\n'
-			.. 'end tell',
-			current:gsub('"', '\\"')
-		)
-	else
-		local ext_filter = ""
-		if filter and filter.ext then
-			ext_filter = string.format(' of type {"%s"}', filter.ext)
-		end
-		script = string.format(
-			'tell application "Finder"\n'
-			.. '  set d to POSIX file "%s" as alias\n'
-			.. '  set r to choose file with prompt "Sélectionner un fichier"%s default location d\n'
-			.. '  return POSIX path of r\n'
-			.. 'end tell',
-			current:gsub('"', '\\"'),
-			ext_filter
-		)
+	-- Resolve a default location that exists as a directory on disk.
+	-- choose file/folder default location requires a directory alias, not a file path.
+	local default_dir = current or ""
+	-- Strip to parent directory if current is a file path
+	if not default_dir:match("[/\\]$") then
+		default_dir = default_dir:match("^(.+[/\\])") or default_dir
 	end
-	local ok, result = pcall(hs.osascript.applescript, script)
-	if ok and type(result) == "string" and result ~= "" then
-		-- Strip trailing newline
-		return result:match("^(.-)%s*$")
+	local ok_attr, attr = pcall(hs.fs.attributes, default_dir)
+	if not ok_attr or not attr or attr.mode ~= "directory" then
+		default_dir = os.getenv("HOME") or "/"
+	end
+
+	local is_folder = filter and filter.kind == "folder"
+	local verb      = is_folder and "choose folder" or "choose file"
+	local prompt    = is_folder and "Sélectionner un dossier" or "Sélectionner un fichier"
+
+	-- Use 'POSIX file ... as alias' which works for both file and folder defaults.
+	-- AppleScript raises error -128 on user cancel — we capture and treat as nil.
+	local escaped = default_dir:gsub('"', '\\"')
+	local script  = string.format([[
+		try
+			set r to %s with prompt "%s" default location ((POSIX file "%s") as alias)
+			return POSIX path of r
+		on error errMsg number errNum
+			return ""
+		end try
+	]], verb, prompt, escaped)
+
+	Logger.debug(LOG, "pick_path: AppleScript with default_dir='%s'.", default_dir)
+	local ok, r2, raw = hs.osascript.applescript(script)
+	Logger.debug(LOG, "pick_path: ok=%s r2=%s raw=%s.", tostring(ok), tostring(r2), tostring(raw))
+
+	if type(r2) == "string" and r2 ~= "" then
+		return (r2:match("^(.-)%s*$"))
+	end
+	-- Fallback: parse raw string if r2 isn't a clean string
+	if type(raw) == "string" and raw ~= "" then
+		local stripped = raw:match('^"(.*)"$') or raw
+		stripped = stripped:match("^(.-)%s*$")
+		if stripped ~= "" then return stripped end
 	end
 	return nil
 end
 
---- Opens the paths editor as a webview-based dialog (using hs.dialog.blockAlert
---- for confirmation, AppleScript open panels for picking).
-function M.open_editor()
-	if not _base_dir then
-		Logger.error(LOG, "open_editor() called before M.init().")
-		return
-	end
 
-	-- Collect current values
-	local current = {}
+-- ===================================
+-- ===== 3.2) WebView Lifecycle =====
+-- ===================================
+
+--- Closes and cleans up the paths editor webview.
+local function close_webview()
+	if _webview then
+		pcall(function() _webview:delete() end)
+		_webview     = nil
+		_usercontent = nil
+	end
+end
+
+--- Applies changed paths to the bootstrap file and triggers a reload.
+--- @param new_values table key → path string for all keys.
+local function apply_and_reload(new_values)
+	local changed = false
 	for _, key in ipairs(PATH_KEYS) do
-		current[key] = M.get(key)
-	end
-
-	-- Build a summary text for the alert
-	local lines = { "Chemins actuels :\n" }
-	for _, key in ipairs(PATH_KEYS) do
-		lines[#lines + 1] = PATH_LABELS[key] .. "\n" .. current[key]
-	end
-	local summary = table.concat(lines, "\n\n")
-
-	-- Present the editor loop: pick paths one by one, then confirm
-	local changed_keys = {}
-
-	for _, key in ipairs(PATH_KEYS) do
-		local label  = PATH_LABELS[key]
-		local filter = PATH_FILTERS[key]
-		local cur    = current[key]
-
-		local btn = hs.dialog.blockAlert(
-			label,
-			"Valeur actuelle :\n" .. cur .. "\n\nCliquez « Modifier » pour choisir un autre emplacement, ou « Ignorer » pour conserver cette valeur.",
-			"Modifier…",
-			"Ignorer"
-		)
-
-		if btn == "Modifier…" then
-			-- Use the directory of the current file/folder as the default location
-			local default_loc
-			if filter and filter.kind == "folder" then
-				default_loc = cur:match("^(.+[/\\])") or cur
-			else
-				default_loc = cur:match("^(.+[/\\])") or (_base_dir or "")
-			end
-
-			local picked = pick_path(default_loc, filter)
-			if picked then
-				-- Normalize folder paths to always end with /
-				if filter and filter.kind == "folder" and not picked:match("[/\\]$") then
-					picked = picked .. "/"
-				end
-				current[key]   = picked
-				changed_keys[#changed_keys + 1] = key
-			end
-		end
-	end
-
-	if #changed_keys == 0 then
-		Logger.debug(LOG, "Paths editor closed without changes.")
-		return
-	end
-
-	-- Show summary of new values before saving
-	local new_lines = { "Nouvelles valeurs :\n" }
-	for _, key in ipairs(changed_keys) do
-		new_lines[#new_lines + 1] = PATH_LABELS[key] .. "\n" .. current[key]
-	end
-
-	local confirm = hs.dialog.blockAlert(
-		"Confirmer les modifications",
-		table.concat(new_lines, "\n\n") .. "\n\nUn rechargement sera nécessaire pour appliquer les changements.",
-		"Appliquer et recharger",
-		"Annuler"
-	)
-
-	if confirm ~= "Appliquer et recharger" then
-		Logger.debug(LOG, "Paths editor: user cancelled save.")
-		return
-	end
-
-	-- Persist changed keys to bootstrap
-	for _, key in ipairs(changed_keys) do
-		-- Store nil (omit from bootstrap) when the value matches the default,
-		-- so the file stays clean and portable
-		if current[key] == default_path(key) then
-			_bootstrap[key] = nil
+		local v = type(new_values[key]) == "string" and new_values[key] or ""
+		-- Omit from bootstrap when equal to default, keeping the file portable
+		if v == default_path(key) then
+			if _bootstrap[key] ~= nil then _bootstrap[key] = nil; changed = true end
 		else
-			_bootstrap[key] = current[key]
+			if _bootstrap[key] ~= v then _bootstrap[key] = v; changed = true end
 		end
 	end
+
+	if not changed then
+		Logger.debug(LOG, "Paths editor: no effective changes, skipping reload.")
+		close_webview()
+		return
+	end
+
 	save_bootstrap()
+	close_webview()
 
 	Logger.start(LOG, "Applying new paths and reloading…")
 	if type(_reload_fn) == "function" then
@@ -298,6 +271,166 @@ function M.open_editor()
 	else
 		pcall(hs.reload)
 	end
+end
+
+--- Builds the form data payload and injects it into the webview via initData().
+local function inject_init_data()
+	if not _webview then return end
+
+	local defaults = {}
+	local current  = {}
+	for _, key in ipairs(PATH_KEYS) do
+		defaults[key] = default_path(key)
+		current[key]  = M.get(key)
+	end
+
+	local payload = {
+		keys     = PATH_KEYS,
+		labels   = PATH_LABELS,
+		defaults = defaults,
+		current  = current,
+	}
+
+	local ok_enc, json = pcall(hs.json.encode, payload)
+	if not ok_enc or not json then
+		Logger.error(LOG, "Failed to encode initData payload.")
+		return
+	end
+
+	Logger.debug(LOG, "Injecting initData into webview…")
+	pcall(function()
+		_webview:evaluateJavaScript("if(window.initData) window.initData(" .. json .. ")")
+	end)
+end
+
+--- Handles an incoming message from the JavaScript frontend via usercontent bridge.
+--- @param body table The decoded message body.
+local function handle_message(body)
+	if type(body) ~= "table" then return end
+	local action = body.action
+	Logger.debug(LOG, "usercontent message received: action='%s'.", tostring(action))
+
+	if action == "ready" then
+		inject_init_data()
+	elseif action == "browse" then
+		local key    = body.key
+		local filter = PATH_FILTERS[key]
+		Logger.debug(LOG, "browse: key='%s', filter.kind='%s', filter.ext='%s'.",
+			tostring(key), tostring(filter and filter.kind), tostring(filter and filter.ext))
+		if not filter then
+			Logger.error(LOG, "browse: no filter for key '%s'.", tostring(key))
+			return
+		end
+		hs.timer.doAfter(0, function()
+			local cur_val  = M.get(key)
+			local base_loc = filter.kind == "folder"
+				and (cur_val:match("^(.+[/\\])") or cur_val)
+				or  (cur_val:match("^(.+[/\\])") or (_base_dir or ""))
+			Logger.debug(LOG, "browse: cur_val='%s', base_loc='%s'.", tostring(cur_val), tostring(base_loc))
+			Logger.start(LOG, "Opening native file picker…")
+			local picked = pick_path(base_loc, filter)
+			Logger.success(LOG, "Picker returned: '%s' (type=%s).", tostring(picked), type(picked))
+			if picked and picked ~= "" then
+				if filter.kind == "folder" and not picked:match("[/\\]$") then picked = picked .. "/" end
+				-- Manual JS string escaping — avoids hs.json.encode pitfalls on bare strings
+				local function js_str(s)
+					return '"' .. s:gsub("\\", "\\\\"):gsub('"', '\\"'):gsub("\n", "\\n") .. '"'
+				end
+				local js = "window.applyBrowseResult(" .. js_str(key) .. "," .. js_str(picked) .. ")"
+				Logger.debug(LOG, "browse: injecting JS: %s.", js)
+				hs.timer.doAfter(0.1, function()
+					if _webview then
+						local ok_js, err_js = pcall(function() _webview:evaluateJavaScript(js) end)
+						if ok_js then
+							Logger.success(LOG, "browse: applyBrowseResult JS dispatched.")
+						else
+							Logger.error(LOG, "browse: evaluateJavaScript failed: %s.", tostring(err_js))
+						end
+					else
+						Logger.error(LOG, "browse: _webview is nil when applying result.")
+					end
+				end)
+			else
+				Logger.warn(LOG, "browse: picker returned nothing — user cancelled or AppleScript failed.")
+			end
+		end)
+	elseif action == "save" then
+		local vals = type(body.current) == "table" and body.current or {}
+		apply_and_reload(vals)
+	elseif action == "cancel" then
+		close_webview()
+	end
+end
+
+--- Opens the paths editor as a webview form.
+function M.open_editor()
+	if not _base_dir then
+		Logger.error(LOG, "open_editor() called before M.init().")
+		return
+	end
+
+	-- Reuse the existing window if already open
+	if _webview then
+		local ok_ui = pcall(require, "ui.ui_builder")
+		if ok_ui then
+			local ui_builder = require("ui.ui_builder")
+			ui_builder.force_focus(_webview)
+		else
+			pcall(function() _webview:bringToFront() end)
+		end
+		return
+	end
+
+	-- Initialize the User Content bridge
+	local ok_uc, uc = pcall(hs.webview.usercontent.new, "hsPaths")
+	if not ok_uc or not uc then
+		Logger.error(LOG, "Failed to create webview usercontent bridge.")
+		return
+	end
+
+	_usercontent = uc
+	_usercontent:setCallback(function(message)
+		if message and type(message.body) == "table" then
+			handle_message(message.body)
+		end
+	end)
+
+	local ok_ui, ui_builder = pcall(require, "ui.ui_builder")
+	if not ok_ui or not ui_builder then
+		Logger.error(LOG, "Failed to load ui_builder module.")
+		return
+	end
+
+	local masks       = hs.webview.windowMasks
+	local style_masks = (masks["titled"] or 1) + (masks["closable"] or 2)
+
+	-- Compute a height that fits comfortably on the current screen without
+	-- overflowing: 88 % of usable height, capped at 540 px so it is never
+	-- taller than a 13" MacBook allows without feeling cramped.
+	local screen    = hs.screen.mainScreen()
+	local sf        = screen and type(screen.frame) == "function" and screen:frame() or { h = 800 }
+	local win_h     = math.min(500, math.floor(sf.h * 0.80))
+	local win_w     = math.min(900, math.floor((sf.w or 1440) * 0.7))
+
+	_webview = ui_builder.show_webview({
+		frame       = ui_builder.get_centered_frame(win_w, win_h),
+		title       = "Chemins des fichiers — Ergopti",
+		style_masks = style_masks,
+		usercontent = _usercontent,
+		assets_dir  = ASSETS_DIR,
+		on_close    = function()
+			_webview     = nil
+			_usercontent = nil
+		end,
+		-- Inject initData once the page has finished loading
+		on_navigation = function(action)
+			if action == "didFinishNavigation" then
+				Logger.debug(LOG, "Navigation finished — injecting initData.")
+				hs.timer.doAfter(0.05, inject_init_data)
+			end
+			return true
+		end,
+	})
 end
 
 
