@@ -11,10 +11,11 @@
  * FEATURES & RATIONALE:
  * 1. Quick Date Ranges: Presets (today, week, month, 3m, 6m, year, all) save
  *    time when jumping to common analysis windows.
- * 2. Source Mode: Two independent toggles (+ Hotstrings, + IA) control which
- *    synthetic sources are included. An alternate "Sans Ergopti+" button shows
- *    the full output text (all sources) with WPM inferred at manual typing speed,
- *    giving a sense of what would have been typed without Ergopti+.
+ * 2. Source Mode: Two independent toggles (+ Hotstrings, + IA) switch between
+ *    output view (default, no toggle) and raw-input view (toggle active).
+ *    Output view: tables show the final text that appeared on screen.
+ *    Raw-input view: tables show only the trigger chars the user actually typed;
+ *    MPM still counts output chars so the productivity boost remains visible.
  *    All KPIs, charts, and table sections respond to the selected mode.
  * 3. Pause Threshold: Filters only the per-row WPM in the table; the global
  *    KPI always uses the full manifest time (which already excludes pauses).
@@ -123,58 +124,61 @@ function apply_quick_date_range() {
 
 /**
  * Returns the current source-mode flags.
- * Manual keystrokes are always included. Hotstrings and LLM are independent
- * toggles: either or both may be active at the same time.
- * When "Texte final" mode is active, all sources are shown but the WPM
- * computation uses only manual keystrokes (inferred timing for synthetic chars).
- * @returns {{show_manual: boolean, show_hs: boolean, show_llm: boolean, texte_final: boolean}}
+ *
+ * The two toggles work as "raw input" lenses — each one switches the
+ * corresponding source from "show the expanded output chars" to "show only
+ * the trigger chars actually typed".
+ *
+ * Default (no toggle active):
+ *   Tables show the final text that appeared on screen (output).
+ *   MPM is based on output chars / active typing time.
+ *
+ * + Hotstrings active:
+ *   Tables show only the manual trigger chars (e.g. "at", not "attend").
+ *   MPM is still based on output chars / active typing time so the speed
+ *   boost from hotstrings is visible in the KPI even though the table shows
+ *   fewer characters.
+ *
+ * + IA active: same principle for LLM-generated chars.
+ *
+ * @returns {{show_hs_in_table: boolean, show_llm_in_table: boolean,
+ *            hs_raw_mode: boolean, llm_raw_mode: boolean}}
  */
 function get_source_mode_flags() {
-	const is_texte_final = document.getElementById("btn_texte_final")?.classList.contains("active") ?? false;
-	// In Texte final mode, all sources are included for table/volume display
-	if (is_texte_final) {
-		return { show_manual: true, show_hs: true, show_llm: true, texte_final: true };
-	}
+	const hs_raw  = document.getElementById("btn_toggle_hs")?.classList.contains("active")  ?? false;
+	const llm_raw = document.getElementById("btn_toggle_llm")?.classList.contains("active") ?? false;
 	return {
-		show_manual: true,
-		show_hs:     document.getElementById("btn_toggle_hs")?.classList.contains("active")  ?? true,
-		show_llm:    document.getElementById("btn_toggle_llm")?.classList.contains("active") ?? true,
-		texte_final: false,
+		show_manual:       true,
+		// When raw mode is ON for a source, hide its synthetic chars from tables
+		// (user sees triggers only). When raw mode is OFF, include them (output view).
+		show_hs:           !hs_raw,
+		show_llm:          !llm_raw,
+		hs_raw_mode:       hs_raw,
+		llm_raw_mode:      llm_raw,
+		// MPM always counts output chars so the productivity boost is visible
+		mpm_include_hs:    true,
+		mpm_include_llm:   true,
+		// Kept for backward compatibility with any remaining callers
+		texte_final:       false,
 	};
 }
 
 /**
- * Toggles Hotstrings inclusion independently of the LLM toggle.
- * Deactivates "Texte final" mode if it was active (the individual toggles
- * are only meaningful in the regular trigger-based view).
+ * Toggles Hotstrings raw-input mode.
+ * When active: tables show trigger chars only; MPM still uses output chars.
  */
 function toggle_hs_source() {
-	document.getElementById("btn_texte_final")?.classList.remove("active");
 	document.getElementById("btn_toggle_hs")?.classList.toggle("active");
 	compute_manifest_metrics();
 	apply_local_filters();
 }
 
 /**
- * Toggles LLM/IA inclusion independently of the Hotstrings toggle.
- * Deactivates "Texte final" mode if it was active.
+ * Toggles IA raw-input mode.
+ * When active: tables show trigger chars only; MPM still uses output chars.
  */
 function toggle_llm_source() {
-	document.getElementById("btn_texte_final")?.classList.remove("active");
 	document.getElementById("btn_toggle_llm")?.classList.toggle("active");
-	compute_manifest_metrics();
-	apply_local_filters();
-}
-
-/**
- * Toggles the "Texte final" view mode.
- * When active: shows the full output text that would have been typed without
- * Ergopti+, with WPM inferred at the user's manual typing speed.
- * When inactive: reverts to the regular trigger-based view driven by the
- * individual Hotstrings / IA toggles.
- */
-function toggle_texte_final() {
-	document.getElementById("btn_texte_final")?.classList.toggle("active");
 	compute_manifest_metrics();
 	apply_local_filters();
 }
@@ -205,11 +209,9 @@ function apply_date_app_filters() {
 function reset_filters() {
 	apply_default_date_range();
 
-	// Default: both Hotstrings and IA active, Texte final off
-	// (= equivalent of the old "+IA" default that showed everything)
-	document.getElementById("btn_toggle_hs")?.classList.add("active");
-	document.getElementById("btn_toggle_llm")?.classList.add("active");
-	document.getElementById("btn_texte_final")?.classList.remove("active");
+	// Default: both toggles OFF (= output / texte final view)
+	document.getElementById("btn_toggle_hs")?.classList.remove("active");
+	document.getElementById("btn_toggle_llm")?.classList.remove("active");
 
 	// Restore remaining toggle buttons to their defaults
 	document.getElementById("btn_show_spaces").classList.add("active");

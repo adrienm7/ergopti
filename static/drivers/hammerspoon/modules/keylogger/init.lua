@@ -177,6 +177,9 @@ local CoreState = {
 	recent_typing_eff     = {},  -- includes synthetic characters
 	recent_typing_phys    = {},  -- physical keystrokes only
 
+	-- Previous modifier flags — used to detect key-down vs key-up for flagsChanged events
+	prev_flags            = {},
+
 	-- Last autocomplete source (for the WPM overlay)
 	last_source_type      = "none",
 	last_source_variant   = "none",
@@ -396,6 +399,40 @@ local function handle_key(event_obj)
 				pending.event[3].h = math.floor(now - pending.down_time)
 				CoreState.pending_keyup[keycode] = nil
 			end
+			return
+		end
+
+		-- flagsChanged: track modifier key presses (Option/Alt, Cmd, Shift, Ctrl, Fn).
+		-- Compare current flags against the previous state to detect key-down only
+		-- (we do not want to double-count when the modifier is released).
+		if evt_type == hs.eventtap.event.types.flagsChanged then
+			local keycode = event_obj:getKeyCode()
+			local flags   = event_obj:getFlags() or {}
+			-- The flag that corresponds to this keycode was just pressed when the
+			-- relevant bit flips from false → true.  We detect this by checking
+			-- whether the keycode is a known modifier and the associated flag is now on
+			-- while it was off in the previous snapshot.
+			local FLAG_BY_KC = {
+				[54] = "cmd", [55] = "cmd",
+				[56] = "shift", [60] = "shift",
+				[57] = "capslock",
+				[58] = "alt", [61] = "alt",
+				[59] = "ctrl", [62] = "ctrl",
+				[63] = "fn",
+			}
+			local flag_name = FLAG_BY_KC[keycode]
+			if flag_name then
+				local was_on = CoreState.prev_flags[flag_name] or false
+				local now_on = flags[flag_name] or false
+				if not was_on and now_on then
+					-- Modifier key was just pressed — log its keycode into kc metrics
+					local front_app = hs.application.frontmostApplication()
+					local app_name  = front_app and front_app:title() or "Unknown"
+					LogManager.log_modifier_press(keycode, app_name)
+				end
+			end
+			-- Always update the stored flag snapshot
+			CoreState.prev_flags = flags
 			return
 		end
 
@@ -1231,6 +1268,7 @@ function M.start(script_control)
 		_event_tap = hs.eventtap.new({
 			hs.eventtap.event.types.keyDown,
 			hs.eventtap.event.types.keyUp,
+			hs.eventtap.event.types.flagsChanged,
 			hs.eventtap.event.types.leftMouseDown,
 			hs.eventtap.event.types.rightMouseDown,
 			hs.eventtap.event.types.scrollWheel,

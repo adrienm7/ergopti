@@ -58,32 +58,23 @@
 					</button>
 
 					<!-- Source toggles : indépendants — HS et IA peuvent être actifs séparément -->
-					<!-- Sans aucun toggle actif = uniquement les triggers manuels tapés -->
+					<!-- Sans aucun toggle actif = texte final affiché à l'écran (output) -->
+					<!-- Avec un toggle actif = frappe brute pour produire cet output (input) -->
 					<button
-						class="filter-btn source-toggle active"
+						class="filter-btn source-toggle"
 						id="btn_toggle_hs"
 						onclick="toggle_hs_source()"
-						title="+ Hotstrings : inclure les caractères générés par les hotstrings (touche ★, abréviations…). Désactiver masquera aussi les caractères synthétiques comme NBSP/NNBSP générés par hotstrings."
+						title="+ Hotstrings : affiche la frappe brute qui a produit le texte (ex. 'at' au lieu de 'attend'). La vitesse reflète le gain réel — plus de caractères produits pour le même effort de frappe. Désactivé : le texte final affiché à l'écran est affiché."
 					>
 						+ Hotstrings
 					</button>
 					<button
-						class="filter-btn source-toggle active"
+						class="filter-btn source-toggle"
 						id="btn_toggle_llm"
 						onclick="toggle_llm_source()"
-						title="+ IA : inclure les caractères générés par l'IA (complétion, correction…). Indépendant de Hotstrings."
+						title="+ IA : affiche la frappe brute qui a déclenché la complétion IA (caractères déclencheurs seulement). Désactivé : le texte final généré par l'IA apparaît dans les stats."
 					>
 						+ IA
-					</button>
-					<!-- Sans Ergopti+ : mode alternatif — montre le texte brut total inféré sans Ergopti+ -->
-					<!-- La vitesse est inférée à votre vitesse manuelle ; le volume inclut toutes les expansions -->
-					<button
-						class="filter-btn source-toggle"
-						id="btn_texte_final"
-						onclick="toggle_texte_final()"
-						title="Sans Ergopti+ : affiche le texte complet qui aurait été saisi sans Ergopti+. Le volume inclut hotstrings + IA ; la vitesse (MPM) est votre vitesse manuelle naturelle — les frappes synthétiques sont inférées à ce rythme."
-					>
-						Sans Ergopti+
 					</button>
 
 					<button
@@ -104,8 +95,8 @@
 					<select
 						id="pause_threshold"
 						class="filter-btn"
-						onchange="apply_date_app_filters()"
-						title="Seuil de pause : délai au-delà duquel une interruption est ignorée dans le calcul de vitesse"
+						onchange="compute_manifest_metrics(); apply_local_filters()"
+						title="Seuil de pause : filtre les délais entre touches dans le calcul de vitesse par ligne du tableau. Le KPI global MPM est calculé à partir du temps actif enregistré (seuil fixe 2 s côté enregistrement)."
 					>
 						<option value="1000">Pauses &gt; 1 s</option>
 						<option value="2000" selected>Pauses &gt; 2 s</option>
@@ -368,6 +359,9 @@
 				</button>
 				<button class="tab-btn" data-tab="w_bg" onclick="switch_tab('w_bg')">Bigrammes mots</button>
 			</div>
+
+			<!-- Keyboard heatmap — shown only when the Keycodes tab is active -->
+			<div id="kc_heatmap_container" style="display:none;margin-bottom:16px;"></div>
 
 			<div class="table-container">
 				<table id="metrics_table">

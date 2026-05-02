@@ -25,6 +25,12 @@ local dialog     = require("lib.dialog_util")
 local LOG = "metrics_apps"
 
 M._wv = nil
+
+-- Persistent caches — survive UI close/reopen within the same Hammerspoon session
+-- so that the expensive openssl decrypt runs at most once per calendar day.
+M._hist_manifest_cache = nil   -- date → app_name → stats (from SQLite daily_manifest)
+M._cache_date          = nil   -- date string when the cache was last populated
+
 local CONFIG_DIR = hs.configdir .. "/data"
 local CATEGORIES_FILE = CONFIG_DIR .. "/app_categories.json"
 
@@ -168,33 +174,60 @@ function M.show(log_dir)
 		return
 	end
 
-	Logger.debug(LOG, "Building apps time dashboard UI…")
+	Logger.start(LOG, "Opening apps time dashboard…")
 	local sf = hs.screen.mainScreen():frame()
 	local frame = { x = sf.x + 50, y = sf.y + 50, w = sf.w - 100, h = sf.h - 100 }
 
-	local manifest = {}
 	local log_manager = require("modules.keylogger.log_manager")
 	pcall(log_manager.rebuild_today_from_raw_log)
-	local enc_path = log_dir .. "/metrics.sqlite.enc"
-	local pwd = log_manager.get_mac_serial():gsub("\"", "\\\"")
 
-	if fs.attributes(enc_path) then
-		Logger.debug(LOG, "Extracting historical manifest data from encrypted DB…")
+	local today_str = os.date("%Y-%m-%d")
+
+	-- Invalidate historical cache on day boundary
+	if M._cache_date ~= today_str then
+		M._cache_date          = today_str
+		M._hist_manifest_cache = nil
+		Logger.info(LOG, "New day or first open — flushing apps manifest cache.")
+	end
+
+	local manifest   = {}
+	local enc_path   = log_dir .. "/metrics.sqlite.enc"
+	local pwd        = log_manager.get_mac_serial():gsub("\"", "\\\"")
+
+	if M._hist_manifest_cache then
+		Logger.done(LOG, "Historical manifest cache hit — skipping DB decrypt.")
+		for date_str, day_data in pairs(M._hist_manifest_cache) do
+			manifest[date_str] = manifest[date_str] or {}
+			for app_name, stats in pairs(day_data) do
+				manifest[date_str][app_name] = stats
+			end
+		end
+	elseif fs.attributes(enc_path) then
+		Logger.trace(LOG, "Historical manifest cache miss — decrypting DB…")
+		M._hist_manifest_cache = {}
 		local tmp_path = os.tmpname()
-		hs.execute(string.format("openssl enc -d -aes-256-cbc -a -A -salt -pbkdf2 -pass pass:\"%s\" -in %q > %q 2>/dev/null", pwd, enc_path, tmp_path))
-		
+		hs.execute(string.format(
+			"openssl enc -d -aes-256-cbc -a -A -salt -pbkdf2 -pass pass:\"%s\" -in %q > %q 2>/dev/null",
+			pwd, enc_path, tmp_path
+		))
 		local db = sqlite3.open(tmp_path)
 		if db then
 			for row in db:nrows("SELECT date, app_name, stats_json FROM daily_manifest") do
-				manifest[row.date] = manifest[row.date] or {}
 				local ok, parsed = pcall(json.decode, row.stats_json)
-				if ok then manifest[row.date][row.app_name] = parsed end
+				if ok then
+					M._hist_manifest_cache[row.date]             = M._hist_manifest_cache[row.date] or {}
+					M._hist_manifest_cache[row.date][row.app_name] = parsed
+					manifest[row.date]                           = manifest[row.date] or {}
+					manifest[row.date][row.app_name]             = parsed
+				end
 			end
 			db:close()
 		end
 		os.remove(tmp_path)
+		Logger.done(LOG, "Historical manifest decrypted and cached.")
 	end
-	
+
+	-- Always merge today's live manifest (cheap plaintext read)
 	local manifest_file = log_dir .. "/manifest.json"
 	local mf = io.open(manifest_file, "r")
 	if mf then
@@ -207,7 +240,9 @@ function M.show(log_dir)
 		end
 	end
 
-	local user_cats = load_categories()
+	local user_cats      = load_categories()
+	local manifest_json  = json.encode(manifest)
+	local user_cats_json = json.encode(user_cats)
 
 	M._wv = ui_builder.show_webview({
 		frame       = frame,
@@ -216,18 +251,43 @@ function M.show(log_dir)
 		assets_dir  = hs.configdir .. "/ui/metrics_apps/",
 		on_close    = function()
 			M._wv = nil
+			-- Intentionally keep hist_manifest_cache: it is valid for the rest of the day
 			Logger.info(LOG, "Apps time dashboard closed.")
 		end
 	})
 
-	hs.timer.doAfter(0.5, function()
-		if M._wv then
-			local js = string.format("if(window.bootstrapMetricsAppsData){window.bootstrapMetricsAppsData(%s,%s);}else{window.ManifestData=%s;window.UserCategories=%s;if(window.initDashboard)window.initDashboard();}", json.encode(manifest), json.encode(user_cats), json.encode(manifest), json.encode(user_cats))
-			pcall(function() M._wv:evaluateJavaScript(js) end)
-		end
-	end)
+	-- Retry injection loop (same pattern as metrics_typing) — robust against slow CDN loads
+	local function try_inject(remaining)
+		if not M._wv then return end
+		M._wv:evaluateJavaScript("typeof window.bootstrapMetricsAppsData", function(t)
+			if t == "function" then
+				local js = string.format("window.bootstrapMetricsAppsData(%s,%s);", manifest_json, user_cats_json)
+				pcall(function() M._wv:evaluateJavaScript(js) end)
+				Logger.debug(LOG, "Apps dashboard manifest injected.")
+			elseif t == "undefined" then
+				-- Fallback path for older JS entry-point
+				M._wv:evaluateJavaScript("typeof window.initDashboard", function(t2)
+					if t2 == "function" then
+						local js = string.format("window.ManifestData=%s;window.UserCategories=%s;window.initDashboard();", manifest_json, user_cats_json)
+						pcall(function() M._wv:evaluateJavaScript(js) end)
+						Logger.debug(LOG, "Apps dashboard manifest injected (legacy path).")
+					elseif remaining > 0 then
+						hs.timer.doAfter(0.15, function() try_inject(remaining - 1) end)
+					else
+						Logger.error(LOG, "M.show(): bootstrapMetricsAppsData not available after 3 s.")
+					end
+				end)
+			elseif remaining > 0 then
+				hs.timer.doAfter(0.15, function() try_inject(remaining - 1) end)
+			else
+				Logger.error(LOG, "M.show(): apps dashboard JS not available after 3 s.")
+			end
+		end)
+	end
 
-	Logger.info(LOG, "Apps time dashboard displayed successfully.")
+	hs.timer.doAfter(0.1, function() try_inject(20) end)
+
+	Logger.success(LOG, "Apps time dashboard opened.")
 end
 
 --- Broadcasts real-time manifest events to the webview UI.

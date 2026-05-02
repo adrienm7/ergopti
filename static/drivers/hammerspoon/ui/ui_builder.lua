@@ -109,15 +109,20 @@ end
 
 --- Forces a webview window to the front, teleports it to the current space natively, and gives it focus cleanly.
 --- @param wv userdata The hs.webview object.
-function M.force_focus(wv)
+--- @param is_new boolean When true the window is being shown for the first time — skip hide/show to avoid a
+---   flicker where the window appears briefly hidden before the HTML finishes loading.
+function M.force_focus(wv, is_new)
 	if not wv then return end
-	
+
 	Logger.debug(LOG, "Forcing window focus and teleporting to active space…")
-	-- Hiding and showing the window natively teleports it to the active macOS space
-	-- without changing its behavior property, which would destroy the webview state
-	pcall(function() wv:hide() end)
-	pcall(function() wv:show() end)
-	
+	-- Only hide+show when re-focusing an already-visible window: this teleports it to the
+	-- active macOS Space.  On a brand-new window the webview is not yet visible, so
+	-- hiding it races with the async HTML load and causes the first open to appear blank.
+	if not is_new then
+		pcall(function() wv:hide() end)
+		pcall(function() wv:show() end)
+	end
+
 	-- Bring to front and request system focus
 	hs.timer.doAfter(0.05, function()
 		if type(wv.hswindow) == "function" then
@@ -134,7 +139,7 @@ function M.force_focus(wv)
 		else
 			pcall(function() wv:bringToFront() end)
 		end
-		
+
 		-- Ensure Hammerspoon application regains primary OS focus
 		pcall(hs.focus)
 		Logger.info(LOG, "Window focus applied.")
@@ -196,7 +201,7 @@ function M.show_webview(opts)
 		pcall(function() wv:html(final_html) end)
 	end
 
-	M.force_focus(wv)
+	M.force_focus(wv, true)
 	Logger.info(LOG, "Webview window created successfully.")
 	return wv
 end

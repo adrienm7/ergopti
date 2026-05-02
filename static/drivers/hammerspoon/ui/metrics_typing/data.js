@@ -227,7 +227,7 @@ function compute_manifest_metrics() {
 
 	const start_val   = document.getElementById("date_start").value;
 	const end_val     = document.getElementById("date_end").value;
-	const { show_manual, show_hs, show_llm, texte_final } = get_source_mode_flags();
+	const { show_manual, show_hs, show_llm, mpm_include_hs, mpm_include_llm } = get_source_mode_flags();
 
 	const manifest_dates =
 		app_state.manifest_dates_sorted.length > 0
@@ -255,41 +255,32 @@ function compute_manifest_metrics() {
 			const hs_chars_raw   = app.hs_chars   || 0;
 			const llm_chars_raw  = app.llm_chars  || 0;
 
-			const filtered_hs     = show_hs     ? hs_chars_raw  : 0;
-			const filtered_llm    = show_llm    ? llm_chars_raw : 0;
-			const filtered_manual = show_manual ? total_chars   : 0;
+			const manual_chars    = Math.max(0, total_chars - hs_chars_raw - llm_chars_raw);
+			// MPM always counts output chars: HS/LLM expansions count even in raw-input
+			// mode so the productivity boost is visible in the KPI while tables show triggers.
+			const mpm_hs          = mpm_include_hs  ? hs_chars_raw  : 0;
+			const mpm_llm         = mpm_include_llm ? llm_chars_raw : 0;
+			const effective_wpm_chars    = manual_chars + mpm_hs + mpm_llm;
+			// Volume displayed in the KPI text ("X touches tapées"):
+			// In output view (no toggle) = total output; in raw-input view = manual triggers only.
+			const table_hs        = show_hs  ? hs_chars_raw  : 0;
+			const table_llm       = show_llm ? llm_chars_raw : 0;
+			const effective_volume_chars = manual_chars + table_hs + table_llm;
 
-			// "Texte final" mode: volume = full output text (manual + HS + LLM),
-			// but WPM is computed from manual chars only (inferred timing —
-			// synthetic chars are assumed to be typed at the manual average speed,
-			// giving the baseline speed "without Ergopti+").
-			// Regular modes: both WPM and volume include the selected sources.
-			// Adding HS/LLM chars to the same typing time → higher apparent WPM,
-			// which correctly reflects the throughput gain from Ergopti+.
-			const effective_wpm_chars    = texte_final
-				? filtered_manual
-				: filtered_manual + filtered_hs + filtered_llm;
-			const effective_volume_chars = texte_final
-				? total_chars + hs_chars_raw + llm_chars_raw
-				: effective_wpm_chars;
-
-			if (show_hs) {
-				global_hs_triggers  += app.hs_triggers  || 0;
-				global_hs_suggested += app.hs_suggested || 0;
-			}
-			if (show_llm) {
-				global_llm_triggers  += app.llm_triggers  || 0;
-				global_llm_suggested += app.llm_suggested || 0;
-			}
+			// Always surface HS/LLM KPI cards regardless of toggle state
+			global_hs_triggers  += app.hs_triggers  || 0;
+			global_hs_suggested += app.hs_suggested || 0;
+			global_llm_triggers  += app.llm_triggers  || 0;
+			global_llm_suggested += app.llm_suggested || 0;
 
 			const ts = app_state.time_series[date_str];
-			// ts.chars = volume for display (may include inferred synthetic chars in texte_final mode)
-			// ts.wpm_chars = chars used for speed computation (manual-only in texte_final mode)
+			// ts.chars    = volume for display (output view: all sources; raw-input view: triggers only)
+			// ts.wpm_chars = output chars for MPM — always includes HS/LLM expansions
 			ts.chars     += effective_volume_chars;
 			ts.wpm_chars += effective_wpm_chars;
 			ts.time_ms   += app.time || 0;
-			ts.hs_chars  += filtered_hs;
-			ts.llm_chars += filtered_llm;
+			ts.hs_chars  += hs_chars_raw;
+			ts.llm_chars += llm_chars_raw;
 
 			if (app.hourly) {
 				Object.keys(app.hourly).forEach((hour) => {
@@ -404,17 +395,16 @@ function compute_manifest_metrics() {
 
 	const global_details = document.getElementById("global_details");
 	if (global_details) {
-		// In Texte final mode, global_chars is the full output (manual + synthetic).
-		// Add a note so it's clear the speed is inferred at manual rate.
-		const texte_final_note = texte_final
+		const { hs_raw_mode, llm_raw_mode } = get_source_mode_flags();
+		const raw_note = (hs_raw_mode || llm_raw_mode)
 			? `<div style="font-size:0.7em;color:var(--text-muted);margin-top:3px;">` +
-			  `Texte\u00A0total reconstruit \u2014 vitesse\u00A0manuelle inf\u00E9r\u00E9e</div>`
+			  `Frappes brutes (triggers) — MPM basé sur l’output</div>`
 			: "";
 		global_details.innerHTML =
 			`<div style="margin-top:5px;">` +
 			`<strong style="color:var(--kpi-wpm-color);font-size:1.1em;">${format_number(global_chars)}</strong>` +
-			` <span class="stat-unit" style="font-size:0.9em;">touches tap\u00E9es</span>` +
-			`</div>${texte_final_note}`;
+			` <span class="stat-unit" style="font-size:0.9em;">touches tapées</span>` +
+			`</div>${raw_note}`;
 	}
 
 	render_charts();

@@ -1512,6 +1512,26 @@ function M.log_shortcut(shortcut_key, app_name)
 	debounced_save()
 end
 
+--- Records a single modifier-key press (flagsChanged) into the kc dict.
+--- Modifier keys are not keyDown events and therefore never reach aggregate_events,
+--- so this dedicated function gives them a direct path into the Keycodes tab data.
+--- @param keycode number The macOS virtual keycode of the modifier key.
+--- @param app_name string The frontmost application at the time of the press.
+function M.log_modifier_press(keycode, app_name)
+	if not require_state("log_modifier_press") then return end
+	local safe_app = (type(app_name) == "string" and app_name ~= "") and app_name or "Unknown"
+
+	local app_idx = _state.today_idx[safe_app]
+	if type(app_idx) ~= "table" then
+		app_idx = { c = {}, bg = {}, tg = {}, qg = {}, pg = {}, hx = {}, hp = {}, w = {}, sc = {}, sc_bg = {}, w_bg = {}, kc = {} }
+		_state.today_idx[safe_app] = app_idx
+	end
+	app_idx.kc = type(app_idx.kc) == "table" and app_idx.kc or {}
+	add_metric(app_idx.kc, tostring(keycode), 0, false, "none")
+	debounced_save()
+end
+
+
 --- Increments a scalar metric field in the manifest for an app, then saves.
 --- Used for quick stats like hs_suggested or llm_suggested.
 --- @param app_name string The application to update.

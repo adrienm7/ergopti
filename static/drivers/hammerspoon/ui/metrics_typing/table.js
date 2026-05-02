@@ -629,7 +629,151 @@ function render_current_tab() {
 		}
 	}
 
+	// Show or hide the keyboard heatmap based on the active tab
+	const heatmap_el = document.getElementById("kc_heatmap_container");
+	if (heatmap_el) {
+		if (app_state.current_tab === "kc") {
+			heatmap_el.style.display = "";
+			render_kc_heatmap(data_arr);
+		} else {
+			heatmap_el.style.display = "none";
+		}
+	}
+
 	render_table();
+}
+
+
+// =============================================
+// =============================================
+// ======= 2.2) Keyboard Heatmap Render =======
+// =============================================
+
+/**
+ * Renders an SVG keyboard heatmap into #kc_heatmap_container.
+ * Each key is coloured from cold (low frequency) to hot (high frequency)
+ * using the keycode_layout injected by Lua so the user's actual layout
+ * labels appear on the keys instead of the QWERTY defaults.
+ * @param {Array} kc_data_arr - The current rendered_list from the kc tab.
+ */
+function render_kc_heatmap(kc_data_arr) {
+	const container = document.getElementById("kc_heatmap_container");
+	if (!container) return;
+
+	// Build a lookup kc_str → count from the current data
+	const count_map = {};
+	let max_count = 1;
+	kc_data_arr.forEach(item => {
+		const c = item.count || 0;
+		count_map[item.key] = c;
+		if (c > max_count) max_count = c;
+	});
+
+	const kc_name_map = (window.keycode_layout && Object.keys(window.keycode_layout).length > 0)
+		? window.keycode_layout
+		: KEYCODE_NAMES;
+
+	// SVG layout constants (1 unit = U px)
+	const U     = 42;   // key unit size in px
+	const GAP   = 3;    // gap between keys in px
+	const R     = 4;    // border radius
+	const KW    = U - GAP;
+	const KH    = U * 0.9 - GAP;
+	// Total canvas: 18 units wide × 6 rows tall (fn + number + qwerty + home + bottom + thumb)
+	const SVG_W = Math.round(18.5 * U);
+	const SVG_H = Math.round(5.0  * U);
+
+	// Row order: y values go top (fn=2.70) → bottom (thumb=-1.80).
+	// Map y coordinate (in key units from state.js) to SVG pixel y using:
+	//   svg_y = (2.70 - key_y) * U * vertical_scale
+	// where vertical_scale = SVG_H / (2.70 - (-1.80)) = SVG_H / 4.50
+	const Y_TOP  = 2.70;
+	const Y_BOT  = -1.80;
+	const Y_SPAN = Y_TOP - Y_BOT;
+
+	const to_svg_x = (x) => Math.round(x * U);
+	const to_svg_y = (y) => Math.round((Y_TOP - y) / Y_SPAN * SVG_H);
+
+	// Heat colour: interpolate from a cool blue-grey for 0 → yellow → red for max
+	const heat_color = (count) => {
+		if (count === 0) return "#2a2a3a";
+		const t = Math.pow(count / max_count, 0.45); // sqrt-like curve to avoid washing out low values
+		if (t < 0.5) {
+			// Cool (0) → warm mid (0.5): dark-blue → orange
+			const tt = t * 2;
+			const r = Math.round(30  + tt * (240 - 30));
+			const g = Math.round(60  + tt * (140 - 60));
+			const b = Math.round(120 + tt * (20  - 120));
+			return `rgb(${r},${g},${b})`;
+		} else {
+			// Warm mid (0.5) → hot (1.0): orange → bright red
+			const tt = (t - 0.5) * 2;
+			const r = Math.round(240 + tt * (255 - 240));
+			const g = Math.round(140 + tt * (30  - 140));
+			const b = Math.round(20  + tt * (0   - 20));
+			return `rgb(${r},${g},${b})`;
+		}
+	};
+
+	// Widen keys that span more than 1U (Backspace, Tab, CapsLock, Shift, Space…)
+	// Values in key-units, matching KEY_POSITIONS x-centres.
+	const WIDE_KEYS = {
+		"36":  { w: 1.5  }, // return
+		"48":  { w: 1.25 }, // tab
+		"51":  { w: 1.5  }, // backspace
+		"56":  { w: 1.25 }, // l-shift (ISO)
+		"57":  { w: 1.25 }, // capslock
+		"60":  { w: 1.75 }, // r-shift (ISO)
+		"49":  { w: 5.0  }, // space bar
+		"59":  { w: 1.0  }, // ctrl-L
+		"55":  { w: 1.25 }, // cmd-L
+		"54":  { w: 1.25 }, // cmd-R
+		"62":  { w: 1.0  }, // ctrl-R
+	};
+
+	let rects = "";
+	let labels = "";
+
+	Object.entries(KEY_POSITIONS).forEach(([kc_str, pos]) => {
+		const count    = count_map[kc_str] || 0;
+		const fill     = heat_color(count);
+		const wide     = WIDE_KEYS[kc_str];
+		const key_w    = wide ? Math.round(wide.w * U - GAP) : KW;
+		// x position: subtract half the extra width so the centre stays at pos.x
+		const extra_w  = wide ? (wide.w - 1) * U / 2 : 0;
+		const sx       = to_svg_x(pos.x) - Math.round(KW / 2) - Math.round(extra_w);
+		const sy       = to_svg_y(pos.y) - Math.round(KH / 2);
+
+		// Choose a readable text colour: white on dark/warm, dark on very light
+		const text_color = count === 0 ? "#666" : "#fff";
+
+		const label_raw = kc_name_map[kc_str] ?? KEYCODE_NAMES[kc_str] ?? kc_str;
+		// Shorten long labels so they fit the key cap
+		let label = label_raw.length > 6 ? label_raw.slice(0, 5) + "…" : label_raw;
+
+		// Count badge: show abbreviated count on active keys
+		let badge = "";
+		if (count > 0) {
+			const badge_str = count >= 10000 ? `${(count / 1000).toFixed(0)}k`
+				: count >= 1000 ? `${(count / 1000).toFixed(1)}k`
+				: String(count);
+			badge = `<text x="${sx + key_w / 2}" y="${sy + KH - 4}" text-anchor="middle"
+				font-size="7" fill="${text_color}" opacity="0.75">${escape_html(badge_str)}</text>`;
+		}
+
+		rects  += `<rect x="${sx}" y="${sy}" width="${key_w}" height="${KH}" rx="${R}" fill="${fill}" stroke="#1a1a2e" stroke-width="1"/>`;
+		labels += `<text x="${sx + key_w / 2}" y="${sy + KH / 2 + 4}" text-anchor="middle"
+			font-size="9" font-family="monospace" fill="${text_color}">${escape_html(label)}</text>${badge}`;
+	});
+
+	container.innerHTML =
+		`<div style="overflow-x:auto;padding:8px 0;">` +
+		`<div style="font-size:11px;color:var(--text-muted);margin-bottom:6px;">` +
+		`Heatmap des keycodes — labels selon votre layout actuel</div>` +
+		`<svg width="${SVG_W}" height="${SVG_H}" xmlns="http://www.w3.org/2000/svg" ` +
+		`style="background:#12121e;border-radius:8px;display:block;">` +
+		rects + labels +
+		`</svg></div>`;
 }
 
 
