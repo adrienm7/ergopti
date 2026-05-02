@@ -63,11 +63,11 @@
 
 <g transform="rotate(36)">
     <path
-		transform="scale(11.88) rotate(180) translate(-0.025 -0.3)"
+		transform="scale(15.78) rotate(180) translate(-0.025 -0.3)"
 		style="
 			fill: #343048;
 			stroke: #edebf0;
-			stroke-width: 3px;
+			stroke-width: 2px;
 		"
 		class="star"
 		d="M0-16 3.652-4.76h11.817l-9.56 6.944 3.65 11.24L0 6.474l-9.561 6.947
