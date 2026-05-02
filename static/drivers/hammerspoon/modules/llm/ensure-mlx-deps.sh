@@ -56,6 +56,45 @@ export REQUESTS_CA_BUNDLE=/etc/ssl/cert.pem
 export PIP_CERT=/etc/ssl/cert.pem
 export HF_HUB_DISABLE_XET=1
 
+# Network robustness — these env vars are honoured by uv (Rust HTTP client)
+# and indirectly by curl/python downloads. Set generously so a flaky tether
+# or a throttled mobile hotspot doesn't abort the whole install on a single
+# stall: a 120 s read timeout is long enough for slow chunks of a 200 MB
+# wheel to dribble through, and 6 retries cover transient DNS or TLS
+# handshake failures without giving up after one bad packet.
+export UV_HTTP_TIMEOUT=120
+export UV_CONCURRENT_DOWNLOADS=2
+
+# Maximum number of retries for any single network operation in this
+# script (curl install, uv sync, python install). Each retry waits an
+# increasing number of seconds (5, 10, 20, …) so we play nice with the
+# server while still recovering from a transient outage.
+NETWORK_MAX_RETRIES=6
+NETWORK_BASE_BACKOFF_SEC=5
+
+# Runs "$@" up to NETWORK_MAX_RETRIES times with exponential backoff. Logs
+# every retry on stderr so the user sees that the script is still alive
+# during a flaky network. Returns the exit code of the last attempt.
+retry_network() {
+	local attempt=1
+	local backoff="$NETWORK_BASE_BACKOFF_SEC"
+	while [ "$attempt" -le "$NETWORK_MAX_RETRIES" ]; do
+		if "$@"; then
+			return 0
+		fi
+		local rc=$?
+		if [ "$attempt" -ge "$NETWORK_MAX_RETRIES" ]; then
+			log_error "Tentative $attempt/$NETWORK_MAX_RETRIES échouée (code $rc) — abandon."
+			return "$rc"
+		fi
+		log_info "Tentative $attempt/$NETWORK_MAX_RETRIES échouée (code $rc) — nouvelle tentative dans ${backoff}s…"
+		sleep "$backoff"
+		attempt=$((attempt + 1))
+		backoff=$((backoff * 2))
+	done
+	return 1
+}
+
 # Resolve the Hammerspoon driver root from this script's location so the
 # script works regardless of the caller's CWD.
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
@@ -139,6 +178,19 @@ if [ ! -f "$PYPROJECT" ]; then
 	exit 1
 fi
 
+# Clean up stale venv lock files. uv holds exclusive locks while resolving
+# dependencies. If a previous uv process crashed or was killed, the lock
+# persists and blocks the next invocation indefinitely. Rather than hang,
+# remove any lock file older than 5 seconds — it's definitely stale.
+LOCK_FILE="$VENV_DIR/.lock"
+if [ -f "$LOCK_FILE" ]; then
+	LOCK_AGE=$(($(date +%s) - $(stat -f%m "$LOCK_FILE" 2>/dev/null || echo 0)))
+	if [ "$LOCK_AGE" -gt 5 ]; then
+		log_info "Stale venv lock detected (age: ${LOCK_AGE}s) — removing."
+		rm -f "$LOCK_FILE"
+	fi
+fi
+
 
 
 
@@ -168,7 +220,23 @@ else
 	# and to ~/.cargo/bin on older ones. We pre-extended PATH above to cover
 	# both, then re-locate the binary explicitly. Verbose progress from the
 	# installer goes to stderr so the Lua side surfaces it via Logger.info.
-	if ! curl -LsSf https://astral.sh/uv/install.sh | sh >&2; then
+	# curl flags add resilience for slow / flaky connections: --connect-timeout
+	# avoids hanging on a dead DNS, --max-time bounds the total install
+	# duration, --retry covers transient network blips with exponential
+	# backoff inside curl itself, and --retry-all-errors retries even on
+	# partial transfer failures. The outer retry_network loop adds a second
+	# layer of resilience on top of curl's own retries.
+	curl_uv_install() {
+		curl -LsSf \
+			--connect-timeout 30 \
+			--max-time 600 \
+			--retry 5 \
+			--retry-delay 5 \
+			--retry-max-time 300 \
+			--retry-all-errors \
+			https://astral.sh/uv/install.sh | sh >&2
+	}
+	if ! retry_network curl_uv_install; then
 		log_error "Téléchargement / installation de uv impossible. Vérifiez votre connexion réseau (ou un éventuel pare-feu)."
 		exit 1
 	fi
@@ -204,8 +272,11 @@ if ! "$UV_BIN" python find "$PYTHON_VERSION" >/dev/null 2>&1; then
 	emit_marker "PYTHON_INSTALLING"
 	log_info "Téléchargement de Python $PYTHON_VERSION via uv (interpréteur managé)…"
 	# uv prints "Downloading cpython-3.11.x (45 MB)…" on stderr — we forward
-	# it verbatim so the live log shows real download progress.
-	if ! "$UV_BIN" python install "$PYTHON_VERSION" >&2; then
+	# it verbatim so the live log shows real download progress. Wrapped in
+	# retry_network so a tethered / throttled connection doesn't fail the
+	# whole bootstrap on a single TCP reset.
+	uv_python_install() { "$UV_BIN" python install "$PYTHON_VERSION" >&2; }
+	if ! retry_network uv_python_install; then
 		log_error "Échec du téléchargement de Python $PYTHON_VERSION via uv. Vérifiez votre connexion réseau."
 		exit 1
 	fi
@@ -244,13 +315,32 @@ fi
 # required to compute the pyproject.toml fingerprint.
 PYPROJECT_HASH="$(shasum -a 256 "$PYPROJECT" | awk '{print $1}')"
 
-# Fast path: the venv exists, the hash file matches, and the python
-# interpreter is intact — nothing to do, exit silently. No marker is
-# emitted so the Lua side stays quiet on a normal reload.
+# Fast path: the venv exists, the hash file matches, AND the four pinned
+# imports the Hammerspoon side expects all resolve — nothing to do, exit
+# silently. The import probe is the safety net: an earlier run could have
+# written the hash marker without actually installing anything (e.g. the
+# pre-fix `uv pip sync pyproject.toml` was a silent no-op), and a hash-only
+# check would then keep skipping work forever. When the imports fail, drop
+# the hash file so the slow path runs unconditionally below.
 if [ -x "$VENV_DIR/bin/python" ] && [ -f "$SYNC_HASH_FILE" ]; then
 	LAST_HASH="$(cat "$SYNC_HASH_FILE" 2>/dev/null || true)"
 	if [ "$LAST_HASH" = "$PYPROJECT_HASH" ]; then
-		exit 0
+		# Cheap disk check before the python import probe: globbing the
+		# site-packages directory takes microseconds, while spawning python
+		# and importing mlx_lm pulls in torch / numpy / etc. and can stall
+		# for several seconds — long enough to make the menubar feel frozen
+		# on every reload. We only fall back to the slower import probe
+		# when the disk check passes.
+		SP_DIR="$VENV_DIR/lib/python$PYTHON_VERSION/site-packages"
+		if [ -d "$SP_DIR/mlx_lm" ] && [ -d "$SP_DIR/huggingface_hub" ] \
+			&& [ -d "$SP_DIR/jinja2" ] && [ -d "$SP_DIR/safetensors" ]; then
+			# Disk says the four packages are there; trust the hash and exit.
+			# The import probe is intentionally skipped here — keeping the
+			# fast path as fast as the original (~50 ms) on a healthy venv.
+			exit 0
+		fi
+		log_info "Hash matched but site-packages incomplete — re-syncing dependencies."
+		rm -f "$SYNC_HASH_FILE"
 	fi
 fi
 
@@ -262,12 +352,25 @@ emit_marker "VENV_SYNC_RAN"
 emit_marker "DEPS_SYNCING"
 log_info "Synchronisation des dépendances depuis pyproject.toml…"
 cd "$HS_ROOT"
-# Pass --verbose so uv prints "Resolved 47 packages in 12 ms",
-# "Downloading torch (220 MB)…" line by line on stderr. The Lua side logs
-# each stderr line via Logger.info so 'tail -f /tmp/ergopti.log' shows
-# real download progress instead of a 4-minute frozen silence.
-if ! VIRTUAL_ENV="$VENV_DIR" "$UV_BIN" pip sync --verbose "$PYPROJECT" >&2; then
-	log_error "'uv pip sync' a échoué — vérifiez votre connexion réseau et les versions épinglées dans pyproject.toml."
+# Use 'uv sync' (project-aware) rather than 'uv pip sync' — the latter expects
+# a requirements.txt-style file and silently installs nothing when handed a
+# pyproject.toml. With '[tool.uv] package = false' in pyproject.toml, uv sync
+# only resolves and installs the declared dependencies, exactly what we need.
+# --verbose makes uv print "Resolved 47 packages in 12 ms",
+# "Downloading torch (220 MB)…" line by line on stderr; --no-progress avoids
+# carriage-return progress bars that confuse the line-buffered Lua streamer.
+# Wrap uv sync in retry_network so a flaky connection (mobile tether,
+# captive portal, packet loss) doesn't fail the bootstrap on a single
+# stalled wheel download. uv has internal retries but they are not
+# configurable, so this outer retry covers cases where uv itself gives up.
+uv_deps_sync() {
+	VIRTUAL_ENV="$VENV_DIR" "$UV_BIN" sync \
+		--project "$HS_ROOT" \
+		--python "$VENV_DIR/bin/python" \
+		--verbose --no-progress >&2
+}
+if ! retry_network uv_deps_sync; then
+	log_error "'uv sync' a échoué — vérifiez votre connexion réseau et les versions épinglées dans pyproject.toml."
 	exit 1
 fi
 

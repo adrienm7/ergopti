@@ -634,6 +634,91 @@ function M.create(deps)
     -- ===== 2.2) Dynamic Menu Builders =====
     -- ======================================
 
+    --- Returns the user-added models persisted in the config that match the
+    --- given backend. Defensive against malformed entries (older config
+    --- versions or hand edits).
+    --- @param backend string Either "ollama" or "mlx".
+    --- @return table List of { name = string } entries.
+    local function list_user_models_for_backend(backend)
+        local out = {}
+        local raw = state.llm_user_models
+        if type(raw) ~= "table" then return out end
+        for _, entry in ipairs(raw) do
+            if type(entry) == "table" and type(entry.name) == "string" and entry.name ~= "" and entry.backend == backend then
+                table.insert(out, { name = entry.name })
+            end
+        end
+        return out
+    end
+
+    --- Adds a user model to the persisted list, deduplicating on the
+    --- (backend, name) tuple so repeated additions are idempotent.
+    --- @param backend string Either "ollama" or "mlx".
+    --- @param name string Backend-native identifier ("qwen2.5:1.5b" or "mlx-community/Qwen…").
+    local function add_user_model(backend, name)
+        if type(state.llm_user_models) ~= "table" then state.llm_user_models = {} end
+        for _, entry in ipairs(state.llm_user_models) do
+            if type(entry) == "table" and entry.backend == backend and entry.name == name then
+                Logger.debug(LOG, string.format("User model already present (%s/%s) — no-op.", backend, name))
+                return
+            end
+        end
+        table.insert(state.llm_user_models, { backend = backend, name = name })
+        Logger.info(LOG, string.format("User model added: %s/%s.", backend, name))
+    end
+
+    --- Removes a user model from the persisted list.
+    --- @param backend string Either "ollama" or "mlx".
+    --- @param name string Backend-native identifier.
+    local function remove_user_model(backend, name)
+        if type(state.llm_user_models) ~= "table" then return end
+        for i, entry in ipairs(state.llm_user_models) do
+            if type(entry) == "table" and entry.backend == backend and entry.name == name then
+                table.remove(state.llm_user_models, i)
+                Logger.info(LOG, string.format("User model removed: %s/%s.", backend, name))
+                return
+            end
+        end
+    end
+
+    --- Prompts the user for a custom model identifier and persists it. The hint
+    --- text adapts to the active backend so the user knows what format is expected
+    --- (Ollama tag vs HuggingFace MLX path).
+    local function prompt_add_user_model()
+        local active_backend = state.llm_backend
+        local hint
+        if active_backend == "mlx" then
+            hint = "Identifiant HuggingFace du modèle MLX, par exemple : mlx-community/Qwen2.5-3B-Instruct-4bit"
+        else
+            hint = "Identifiant Ollama du modèle, par exemple : qwen2.5:1.5b ou llama3.2:3b"
+        end
+        local ok, ret_a, ret_b = pcall(dialog.text_prompt,
+            "Ajouter un modèle personnalisé",
+            hint,
+            "", "Ajouter", "Annuler")
+        if not ok then
+            Logger.warn(LOG, "Custom model dialog raised — aborting add.")
+            return
+        end
+        -- hs.dialog.textPrompt return order has varied across macOS builds —
+        -- accept both (button, text) and (text, button) without surprises.
+        local picked_btn, picked_text
+        if ret_a == "Ajouter" or ret_a == "Annuler" then
+            picked_btn, picked_text = ret_a, ret_b
+        else
+            picked_text, picked_btn = ret_a, ret_b
+        end
+        if picked_btn ~= "Ajouter" then return end
+        local name = (type(picked_text) == "string" and picked_text or ""):gsub("^%s+", ""):gsub("%s+$", "")
+        if name == "" then
+            pcall(dialog.alert, "Modèle personnalisé", "Identifiant vide — aucune action.", "OK")
+            return
+        end
+        add_user_model(active_backend, name)
+        save_prefs()
+        switch_model(name)
+    end
+
     local function build_models_selection()
         Logger.debug(LOG, "Building models selection menu…")
         local menu = {}
@@ -695,6 +780,44 @@ function M.create(deps)
         end
 
         table.insert(menu, { title = "-" })
+
+        -- User-added models for the active backend appear as their own provider
+        -- so they sit alongside the curated presets without polluting the JSON.
+        -- Each entry is a flat selectable line with a delete sub-option.
+        local user_models_for_backend = list_user_models_for_backend(active_backend)
+        if #user_models_for_backend > 0 then
+            local user_sub = {}
+            for _, entry in ipairs(user_models_for_backend) do
+                local m_name = entry.name
+                local prefix = (state.llm_model == m_name) and "✓ " or "  "
+                local model_submenu = {}
+                table.insert(model_submenu, {
+                    title   = "👉 Sélectionner ce modèle",
+                    checked = (state.llm_model == m_name),
+                    fn      = function() switch_model(m_name) end
+                })
+                table.insert(model_submenu, {
+                    title = "🗑️ Retirer de mes modèles",
+                    fn = function()
+                        local ok, choice = pcall(dialog.block_alert,
+                            "Retirer ce modèle ?",
+                            "Voulez-vous retirer le modèle personnalisé \"" .. m_name .. "\" de votre liste ? Le modèle ne sera pas désinstallé du système.",
+                            "Retirer", "Annuler", "warning")
+                        if ok and choice == "Retirer" then
+                            remove_user_model(active_backend, m_name)
+                            if state.llm_model == m_name then state.llm_model = "" end
+                            save_prefs(); update_menu()
+                        end
+                    end
+                })
+                table.insert(user_sub, {
+                    title   = prefix .. m_name,
+                    menu    = model_submenu,
+                    fn      = function() pcall(function() switch_model(m_name) end) end
+                })
+            end
+            table.insert(menu, { title = "🛠️ Mes modèles", menu = user_sub })
+        end
 
         for _, provider in ipairs(presets) do
             local sub = {}
@@ -814,6 +937,15 @@ function M.create(deps)
                 table.insert(menu, { title = provider.label, menu = sub })
             end
         end
+
+        -- "+" entry that lets the user register an arbitrary backend-native
+        -- model identifier. Sits at the bottom so curated presets remain the
+        -- discoverable default — the custom entry is for power users.
+        table.insert(menu, { title = "-" })
+        table.insert(menu, {
+            title = "➕ Ajouter un modèle personnalisé…",
+            fn    = function() prompt_add_user_model() end,
+        })
 
         return menu
     end
@@ -1108,14 +1240,28 @@ function M.create(deps)
         end
 
         -- Health indicator: shown only when the feature is enabled.
-        -- 🟢 = server responded to last probe, 🔴 = unreachable or not yet checked.
+        -- 🟢 = backend confirmed ready (warmup POST returned 200 + tokens) OR
+        --      last async probe succeeded (covers backends without is_ready()).
+        -- 🔴 = explicit failure on last probe.
+        -- The is_ready() check is synchronous and reflects the warmup state
+        -- accurately even on the first menu open after a model swap; the
+        -- old logic relied solely on the async probe whose result lagged
+        -- the menu paint by one open, so a freshly-warmed backend showed
+        -- red until the next menu open.
         local health_dot
         if not state.llm_enabled or paused then
             health_dot = ""
-        elseif _llm_health_status == true then
-            health_dot = "🟢 "
         else
-            health_dot = "🔴 "
+            local backend_ready = false
+            if type(llm_mod.is_backend_ready) == "function" then
+                local ok, ready = pcall(llm_mod.is_backend_ready)
+                backend_ready = ok and ready == true
+            end
+            if backend_ready or _llm_health_status == true then
+                health_dot = "🟢 "
+            else
+                health_dot = "🔴 "
+            end
         end
 
         local rich_model_title = health_dot .. "Modèle actif : "
@@ -1400,21 +1546,47 @@ function M.create(deps)
                 local function toggle_state()
                     Logger.info(LOG, string.format("Toggling LLM: %s -> %s", tostring(state.llm_enabled), tostring(not state.llm_enabled)))
                     state.llm_enabled = not state.llm_enabled
-                    if keymap and type(keymap.set_llm_enabled) == "function" then 
+                    if keymap and type(keymap.set_llm_enabled) == "function" then
                         local ok = pcall(keymap.set_llm_enabled, state.llm_enabled)
                         Logger.debug(LOG, string.format("keymap.set_llm_enabled(%s) execution -> %s", tostring(state.llm_enabled), tostring(ok)))
                     else
                         Logger.warn(LOG, "keymap.set_llm_enabled is unavailable.")
+                    end
+                    -- The first activation is when the user expects to see the
+                    -- backend's deps install — fire the deps bootstrap here.
+                    -- It's idempotent and silent when the venv is already in
+                    -- sync, so toggling LLM on/off in succession costs nothing.
+                    if state.llm_enabled then
+                        check_backend_deps(state.llm_backend)
                     end
                     save_prefs(); update_menu()
                     pcall(function() hs.notify.new({title = state.llm_enabled and "🟢 ACTIVÉ" or "🔴 DÉSACTIVÉ", informativeText = "Suggestions IA"}):send() end)
                 end
 
                 if not state.llm_enabled then
-                    if not state.llm_model or state.llm_model == "" then
+                    local function activate_llm()
                         toggle_state()
+                        if state.llm_model and state.llm_model ~= "" then
+                            -- Start the server in the background — the checkmark is
+                            -- already showing, so no need to gate on server readiness.
+                            models_mgr.check_requirements(state.llm_model, nil, nil)
+                        end
+                    end
+
+                    if state.llm_backend == "mlx" then
+                        -- Run the bootstrap (idempotent: fires callback immediately if
+                        -- already ready). Activation happens in the on_complete callback
+                        -- so the checkmark only appears once deps are confirmed good.
+                        Logger.info(LOG, "Activating LLM — running MLX bootstrap check first.")
+                        mlx_deps_checker.check_and_install_deps(function(ok)
+                            if ok then
+                                activate_llm()
+                            else
+                                Logger.error(LOG, "MLX bootstrap failed — cannot activate LLM.")
+                            end
+                        end)
                     else
-                        models_mgr.check_requirements(state.llm_model, toggle_state, nil)
+                        activate_llm()
                     end
                 else
                     toggle_state()

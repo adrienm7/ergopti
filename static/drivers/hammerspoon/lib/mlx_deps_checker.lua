@@ -72,6 +72,17 @@ local FAILURE_TAIL_CHARS = 280
 -- not feel laggy.
 local SUCCESS_AUTO_HIDE_SEC = 1.5
 
+-- Delay before proactively showing the progress UI when the script keeps
+-- running without emitting any marker. Covers two cases that would
+-- otherwise leave the user staring at a silent menubar:
+--   1. uv sync downloads packages internally without producing one of our
+--      protocol markers fast enough.
+--   2. The python import probe at the fast-path gate stalls for a few
+--      seconds while pulling in mlx_lm transitively.
+-- Picked above the typical fast-path duration (~50 ms) so a silent reload
+-- never flashes the UI, but well below the visible-stall threshold.
+local PROACTIVE_UI_DELAY_SEC = 1.5
+
 -- Module-level state so callers can branch on the bootstrap outcome without
 -- re-running the script. The values are:
 --   "pending" — bootstrap not finished yet (initial state).
@@ -82,6 +93,11 @@ local _bootstrap_state = "pending"
 -- Last error message captured from the script (stderr tail). Surfaced by
 -- callers that need to explain WHY an IA action was refused.
 local _last_failure_message = nil
+
+-- Callbacks registered while the script is running. Fired all at once when
+-- the script exits so concurrent callers (startup probe + user click) each
+-- get their on_complete called without launching a second bash process.
+local _pending_callbacks = {}
 
 
 
@@ -152,17 +168,39 @@ local function chunk_contains(chunk, marker)
 end
 
 --- Logs every non-empty line from a chunk at INFO level AND forwards it to
---- the progress UI's verbose detail line, skipping protocol markers.
+--- the progress UI's verbose detail line + scrollable terminal log,
+--- skipping protocol markers.
 --- @param chunk string A stdout or stderr chunk.
 local function forward_chunk(chunk)
 	if type(chunk) ~= "string" or chunk == "" then return end
 	for line in chunk:gmatch("([^\n\r]+)") do
 		if line:match("%S") and not KNOWN_MARKERS[line] then
 			Logger.info(LOG, "[script] %s", line)
+			-- The detail line shows the latest, the log area shows history.
+			-- Both are wired so the user sees progress at a glance and the
+			-- full audit trail — matching how model downloads already render.
 			pcall(llm_progress.set_detail, line)
+			pcall(llm_progress.append_log, line)
 		end
 	end
 end
+
+-- Map each progress marker to a percentage so the bootstrap bar visibly
+-- advances rather than sitting at 0%. Values are coarse on purpose: they
+-- only need to show monotonic progress, not exact accuracy. uv resolution
+-- and wheel downloads dominate the slow path, hence the wide gap from
+-- DEPS_SYNCING (70%) to DEPS_SYNCED (100%) — the script can spend several
+-- minutes there.
+local MARKER_PROGRESS = {
+	[MARKER_UV_INSTALL]     = 5,
+	[MARKER_UV_INSTALLED]   = 15,
+	[MARKER_PYTHON_INSTALL] = 25,
+	[MARKER_PYTHON_DONE]    = 40,
+	[MARKER_VENV_CREATE]    = 50,
+	[MARKER_VENV_CREATED]   = 60,
+	[MARKER_DEPS_SYNC]      = 70,
+	[MARKER_DEPS_SYNCED]    = 100,
+}
 
 --- Returns the trailing N characters of `s`, trimmed of empty lines, so
 --- the failure message carries the actual cause rather than a generic
@@ -207,7 +245,15 @@ local function make_streaming_handler()
 	-- Per-marker dedupe: stdout is line-buffered but each marker may arrive
 	-- multiple times across chunks; we want exactly one transition each.
 	local shown = {}
-	local ui_shown = false
+	-- The proactive-show fallback in M.check_and_install_deps can flip the
+	-- progress UI on without going through this handler. Querying the UI
+	-- directly each time is more reliable than a cached local: it lets the
+	-- markers transition cleanly from "show" to "set_step" even when the UI
+	-- is already visible from the fallback path.
+	local function ui_already_visible()
+		local ok, visible = pcall(llm_progress.is_active)
+		return ok and visible == true
+	end
 
 	return function(_, stdout_chunk, stderr_chunk)
 		-- Forward stderr (uv's verbose output) so the live log AND the
@@ -224,13 +270,12 @@ local function make_streaming_handler()
 		if not shown[SYNC_MARKER_LINE] and chunk_contains(stdout_chunk, SYNC_MARKER_LINE) then
 			shown[SYNC_MARKER_LINE] = true
 			Logger.debug(LOG, "Slow-path marker observed (real sync in progress).")
-			if not ui_shown then
+			if not ui_already_visible() then
 				pcall(llm_progress.show, {
 					kind     = "mlx_install",
 					title    = "Initialisation du moteur IA (MLX)",
 					subtitle = "Préparation en cours…",
 				})
-				ui_shown = true
 			end
 		end
 
@@ -238,16 +283,27 @@ local function make_streaming_handler()
 			if not shown[marker] and chunk_contains(stdout_chunk, marker) then
 				shown[marker] = true
 				Logger.info(LOG, "Progress marker '%s' observed — updating UI.", marker)
-				if not ui_shown then
+				if not ui_already_visible() then
 					pcall(llm_progress.show, {
 						kind     = "mlx_install",
 						title    = "Initialisation du moteur IA (MLX)",
 						subtitle = label,
 					})
-					ui_shown = true
 				else
 					pcall(llm_progress.set_step, label)
 				end
+			end
+		end
+
+		-- Advance the progress bar on EVERY known marker, including the
+		-- *_INSTALLED / *_DONE pair markers that PROGRESS_LABELS skips for
+		-- step-label updates. Without this loop the bar would stay frozen at
+		-- the first step's percentage even as later phases complete.
+		for marker, pct in pairs(MARKER_PROGRESS) do
+			local progress_key = "progress:" .. marker
+			if not shown[progress_key] and chunk_contains(stdout_chunk, marker) then
+				shown[progress_key] = true
+				pcall(llm_progress.set_progress, pct)
 			end
 		end
 		return true
@@ -268,13 +324,50 @@ end
 --- and the progress UI never appears. A real sync prints SYNC_MARKER_LINE
 --- first and then granular markers per long-running step which we surface
 --- through ui.download_window.
-function M.check_and_install_deps()
+--- @param on_complete function|nil Called when the script exits — receives
+---   true on success, false on failure. Safe to call repeatedly; only the
+---   first invocation runs the script, subsequent ones queue the callback.
+-- Fires all pending callbacks with the given result and clears the queue.
+local function fire_pending_callbacks(ok)
+	local cbs = _pending_callbacks
+	_pending_callbacks = {}
+	for _, cb in ipairs(cbs) do
+		pcall(cb, ok)
+	end
+end
+
+function M.check_and_install_deps(on_complete)
+	-- If already done, fire the callback immediately — no need to re-run.
+	if _bootstrap_state == "ready" then
+		if type(on_complete) == "function" then on_complete(true) end
+		return
+	end
+	if _bootstrap_state == "failed" then
+		if type(on_complete) == "function" then on_complete(false) end
+		return
+	end
+
+	-- Script is already running — queue the callback instead of launching a
+	-- second bash process in parallel.
+	if #_pending_callbacks > 0 then
+		if type(on_complete) == "function" then
+			table.insert(_pending_callbacks, on_complete)
+		end
+		Logger.debug(LOG, "Bootstrap already running — queued on_complete callback (%d total).", #_pending_callbacks)
+		return
+	end
+
+	if type(on_complete) == "function" then
+		table.insert(_pending_callbacks, on_complete)
+	end
+
 	Logger.start(LOG, "Bootstrapping MLX virtualenv…")
 	local project_root = resolve_project_root()
 	if not project_root then
 		Logger.error(LOG, "Project root introuvable depuis mlx_deps_checker.lua — bootstrap aborted.")
 		_bootstrap_state = "failed"
 		_last_failure_message = "Project root introuvable."
+		fire_pending_callbacks(false)
 		return
 	end
 
@@ -285,6 +378,7 @@ function M.check_and_install_deps()
 		Logger.error(LOG, "Script ensure-mlx-deps.sh introuvable à %s — bootstrap aborted.", script_path)
 		_bootstrap_state = "failed"
 		_last_failure_message = "Script ensure-mlx-deps.sh introuvable."
+		fire_pending_callbacks(false)
 		return
 	end
 
@@ -295,9 +389,101 @@ function M.check_and_install_deps()
 
 	Logger.debug(LOG, "Executing dependency validation script in background (root=%s)…", project_root)
 
+	-- Surface the launched command in the terminal area so the user has
+	-- visible proof that work has started — even before uv emits its first
+	-- line. The step-line communicates the macro phase; the detail-line is
+	-- left blank so the very first real subprocess line populates it.
+	pcall(llm_progress.append_log, "$ " .. bash_cmd)
+	pcall(llm_progress.set_step, "Démarrage du script d'installation…")
+	Logger.debug(LOG, "Full bash command: %s", bash_cmd)
+
+	-- Write the PTY wrapper to a temp file so we can pass it to Python properly
+	local random_suffix = math.random(100000, 999999)
+	local pty_wrapper_path = "/tmp/hs_pty_wrapper_" .. random_suffix .. ".py"
+	Logger.debug(LOG, "Creating PTY wrapper at %s…", pty_wrapper_path)
+	local pty_file = io.open(pty_wrapper_path, "w")
+	if not pty_file then
+		Logger.error(LOG, "Failed to write PTY wrapper to %s — aborting bootstrap.", pty_wrapper_path)
+		_bootstrap_state = "failed"
+		_last_failure_message = "Impossible d'écrire le fichier PTY wrapper."
+		return
+	end
+	-- pty.spawn() alone doesn't forward PTY output to stdout (the Python
+	-- process's stdout pipe). We must use os.openpty() and manually forward
+	-- the PTY master fd to sys.stdout so hs.task's streaming callback sees
+	-- the output. The child process runs with its stdin/stdout/stderr all
+	-- wired to the PTY slave, so it behaves as if attached to a real terminal
+	-- and never switches to block-buffered I/O.
+	pty_file:write("import os, sys, select, subprocess\n")
+	pty_file:write("master_fd, slave_fd = os.openpty()\n")
+	pty_file:write("proc = subprocess.Popen(sys.argv[1:], stdin=slave_fd, stdout=slave_fd, stderr=slave_fd, close_fds=True)\n")
+	pty_file:write("os.close(slave_fd)\n")
+	pty_file:write("buf = b''\n")
+	pty_file:write("while True:\n")
+	pty_file:write("    try:\n")
+	pty_file:write("        r, _, _ = select.select([master_fd], [], [], 0.05)\n")
+	pty_file:write("    except (OSError, ValueError): break\n")
+	pty_file:write("    if r:\n")
+	pty_file:write("        try:\n")
+	pty_file:write("            data = os.read(master_fd, 4096)\n")
+	pty_file:write("        except OSError: break\n")
+	pty_file:write("        if not data: break\n")
+	pty_file:write("        sys.stdout.buffer.write(data)\n")
+	pty_file:write("        sys.stdout.buffer.flush()\n")
+	pty_file:write("    elif proc.poll() is not None: break\n")
+	pty_file:write("proc.wait()\n")
+	pty_file:write("os.close(master_fd)\n")
+	pty_file:write("sys.exit(proc.returncode)\n")
+	pty_file:close()
+	os.execute("chmod +x " .. pty_wrapper_path)
+	Logger.debug(LOG, "PTY wrapper created successfully at %s", pty_wrapper_path)
+
+	-- Proactive UI fallback: if no marker has surfaced within
+	-- PROACTIVE_UI_DELAY_SEC the user is staring at silence — show the
+	-- download_window so they have visible feedback that work is happening.
+	-- The streaming handler will keep refining the message as markers arrive.
+	local proactive_timer
+	proactive_timer = hs.timer.doAfter(PROACTIVE_UI_DELAY_SEC, function()
+		if not llm_progress.is_active() then
+			Logger.info(LOG, "Bootstrap silent for %.1fs — surfacing progress UI proactively.", PROACTIVE_UI_DELAY_SEC)
+			pcall(llm_progress.show, {
+				kind     = "mlx_install",
+				title    = "Initialisation du moteur IA (MLX)",
+				subtitle = "Préparation en cours…",
+			})
+			-- Seed the bar at a small visible value so the user sees movement
+			-- immediately. The streaming handler will override per-marker.
+			pcall(llm_progress.set_progress, 3)
+		end
+	end)
+
+	-- Wrap the bash invocation in a tiny Python pty.spawn shim so the child
+	-- processes (bash, uv, python install) see a real pseudo-TTY on their
+	-- stdio. Without a pty, uv (Rust) and any libc-using subprocess switch
+	-- to fully buffered stdio when piped, meaning their output only reaches
+	-- our streaming callback when a 4 KB buffer fills — i.e., not for
+	-- minutes. We use Python (built-in to macOS at /usr/bin/python3 since
+	-- Catalina) rather than BSD `script` because macOS `script -F` does not
+	-- mean "flush" (it means "write to named pipe") — `script` ends up
+	-- buffering its own stdout output and we get nothing in real time.
+	-- python -u + pty.spawn gives us unbuffered, line-by-line forwarding.
+
+	Logger.debug(LOG, "Creating hs.task for PTY wrapper execution…")
 	local task
-	task = hs.task.new("/bin/bash", function(exit_code, stdout, stderr)
+	-- Construct the full Python invocation: python3 executes the PTY wrapper,
+	-- passing bash_cmd as the first argument so pty.spawn(sys.argv[1:]) receives ["/bin/bash", "-c", bash_cmd].
+	-- The signature is: hs.task.new(launchPath, completionCallback, streamingCallback, arguments)
+	task = hs.task.new("/usr/bin/python3", function(exit_code, stdout, stderr)
+		-- Completion callback: fires when the process exits
+		-- Cancel the proactive-show fallback as soon as the script finishes
+		-- so a fast-path completion (~50 ms) never flashes the UI.
+		if proactive_timer and type(proactive_timer.stop) == "function" then
+			pcall(function() proactive_timer:stop() end)
+		end
 		local combined = (stdout or "") .. (stderr or "")
+		-- Clean up the temporary PTY wrapper script
+		os.execute("rm -f " .. pty_wrapper_path)
+
 		-- Final pass: forward any residual lines the streaming callback may
 		-- have missed if the task ended before its final flush.
 		forward_chunk(stdout or "")
@@ -317,8 +503,13 @@ function M.check_and_install_deps()
 				end)
 			else
 				Logger.success(LOG, "MLX virtualenv already in sync — fast path.")
-				-- Fast path: never showed the UI, nothing to hide.
+				-- Fast path can race with the proactive UI fallback (e.g. the
+				-- import probe took just over the threshold). Hide the UI so a
+				-- transient "Préparation en cours" stays out of the way once the
+				-- bootstrap is actually done.
+				pcall(llm_progress.hide)
 			end
+			fire_pending_callbacks(true)
 		else
 			_bootstrap_state = "failed"
 			local tail = tail_for_error(combined)
@@ -332,28 +523,32 @@ function M.check_and_install_deps()
 				pcall(llm_progress.show, {
 					kind     = "mlx_install",
 					title    = "Initialisation du moteur IA (MLX)",
-					subtitle = "Échec…",
+					subtitle    = "Échec…",
 				})
 			end
 			pcall(llm_progress.set_error, tail)
+			fire_pending_callbacks(false)
 		end
-	end, { "-c", bash_cmd })
+	end, make_streaming_handler(), { "-u", pty_wrapper_path, "/bin/bash", "-c", bash_cmd })
 
 	if not task then
 		Logger.error(LOG, "Failed to create hs.task for MLX bootstrap script.")
 		_bootstrap_state = "failed"
 		_last_failure_message = "Impossible de créer la tâche hs.task."
+		os.execute("rm -f " .. pty_wrapper_path)
 		return
 	end
+	Logger.debug(LOG, "hs.task created successfully")
 
-	-- Streaming callback: fires every time the script flushes stdout. The
-	-- handler closure is per-task so reloading HS resets all marker state.
-	pcall(function() task:setStreamingCallback(make_streaming_handler()) end)
-
+	Logger.debug(LOG, "Starting hs.task…")
 	if not pcall(function() task:start() end) then
 		Logger.error(LOG, "Failed to start hs.task for MLX bootstrap script.")
 		_bootstrap_state = "failed"
 		_last_failure_message = "Impossible de démarrer la tâche hs.task."
+		os.execute("rm -f " .. pty_wrapper_path)
+		fire_pending_callbacks(false)
+	else
+		Logger.debug(LOG, "hs.task started successfully")
 	end
 end
 

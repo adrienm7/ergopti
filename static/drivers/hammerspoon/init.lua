@@ -105,6 +105,35 @@ Logger.debug(LOG, "Starting shortcuts module…")
 shortcuts.start()
 Logger.info(LOG, "Main modules initialized successfully.")
 
+-- Hammerspoon does not always reap children on quit/reload (a SIGKILL on
+-- the parent leaves orphans bound to port 49317), so a fresh boot can find
+-- multiple zombie mlx_lm.server processes from previous sessions still
+-- listening on the same port. The kernel then load-balances /v1/models
+-- requests between them with SO_REUSEPORT, returning a different model ID
+-- each time and breaking endpoint discovery permanently. Nuke them ALL
+-- before any LLM code touches port 49317. Synchronous on purpose: we want
+-- the port free before the warmup retry loop fires its first probe.
+do
+	local kill_cmd =
+		-- Kill ALL mlx_lm processes regardless of port (catches old spawns
+		-- on legacy ports 8080 and 8765 that previous sessions left behind).
+		"PIDS=$(pgrep -f 'mlx_lm' 2>/dev/null); " ..
+		"if [ -n \"$PIDS\" ]; then echo \"[BOOT] killing leftover mlx_lm processes: $PIDS\"; echo \"$PIDS\" | xargs kill -9 2>/dev/null; fi; " ..
+		-- Kill anything still bound to the legacy ports + new port (paranoia).
+		"for P in 8080 8765 49317; do " ..
+		"  PIDS=$(lsof -tiTCP:$P -sTCP:LISTEN 2>/dev/null); " ..
+		"  if [ -n \"$PIDS\" ]; then echo \"[BOOT] port $P listeners: $PIDS — leaving alone (might be LM Studio etc.)\"; fi; " ..
+		"done; " ..
+		"sleep 0.3; " ..
+		-- Diagnostic: dump current state of port 49317 so we know if anything
+		-- foreign is squatting it BEFORE we try to spawn.
+		"echo \"[BOOT-DIAG] port 49317 current state:\"; lsof -i :49317 -P -n 2>/dev/null || echo \"  (port 49317 is FREE)\"; " ..
+		"echo \"[BOOT-DIAG] any python on box:\"; pgrep -af python 2>/dev/null | head -10 || echo \"  (none)\""
+	local out, ok = hs.execute(kill_cmd, true)
+	Logger.info(LOG, "[BOOT-NUKE] mlx_lm cleanup ok=%s output=%s",
+		tostring(ok), (out or ""):gsub("\n", " | "))
+end
+
 -- Background deps check for the active LLM backend. The detector picks
 -- MLX on Apple Silicon (≥ macOS 13) and Ollama everywhere else; a
 -- previously user-saved preference always wins. Both checkers are async
@@ -551,6 +580,12 @@ hs.shutdownCallback = function()
 	-- Terminate any running MLX server process so no orphaned Python process lingers
 	-- after Hammerspoon exits. The require is cached, so this has no startup overhead.
 	pcall(function() require("ui.menu.menu_llm").stop_mlx_server() end)
+	-- Belt-and-braces: hs.task does not always reap its children when the
+	-- parent dies abruptly. Kill any mlx_lm.server still bound to port 49317
+	-- so the next reload starts from a clean slate.
+	pcall(hs.execute,
+		"pgrep -f 'mlx_lm.*server' | xargs kill -9 2>/dev/null; " ..
+		"lsof -tiTCP:49317 -sTCP:LISTEN | xargs kill -9 2>/dev/null", true)
 	Logger.info(LOG, "Hammerspoon arrêté")
 end
 

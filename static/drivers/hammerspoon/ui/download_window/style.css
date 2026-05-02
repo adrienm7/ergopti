@@ -38,7 +38,7 @@ body {
 	font-family: -apple-system, 'SF Pro Text', 'Helvetica Neue', sans-serif;
 	height: 100vh;
 	overflow: hidden;
-	padding: 18px 20px 18px 24px;
+	padding: 18px 20px;
 	user-select: none;
 	-webkit-app-region: drag;
 	display: flex;
@@ -80,38 +80,24 @@ h2 {
 	flex-direction: column;
 }
 
-/* =============================================== */
-/* ===== 2.1) Accent stripe (per-kind color) ===== */
-/* =============================================== */
-
-#accent-stripe {
-	position: absolute;
-	left: 0;
-	top: 0;
-	bottom: 0;
-	width: 4px;
-	background: #4da6ff;
-	transition: background 0.25s ease;
-}
-
-body.kind-mlx_install #accent-stripe { background: #4da6ff; }
-body.kind-ollama_install #accent-stripe { background: #73d98c; }
-body.kind-mlx_model #accent-stripe { background: #9973f2; }
-body.kind-ollama_model #accent-stripe { background: #f2bf4d; }
-body.is-error #accent-stripe { background: #ff453a; }
-
 /* ================================================== */
-/* ===== 2.2) Mode toggling (download vs bootstrap) === */
+/* ===== 2.1) Mode toggling (download vs bootstrap) === */
 /* ================================================== */
 
-/* In download mode: hide the bootstrap-only block, hide subtitle. */
+/* The subtitle is redundant with the step-line in bootstrap mode and unused
+   in download mode (which has its own progress text), so hide it globally. */
+#subtitle { display: none; }
+
+/* In download mode: hide the bootstrap-only block. */
 body.mode-download #bootstrap-group { display: none; }
-body.mode-download #subtitle { display: none; }
 
 /* In bootstrap mode: hide download-only blocks. */
 body.mode-bootstrap .progress-group { display: none; }
 body.mode-bootstrap #model { display: none; }
-body.mode-bootstrap #log-area { display: none !important; }
+/* The terminal log is just as important during MLX install (uv sync,
+   downloads, wheel builds) as it is during a model download — keep it
+   visible so the user sees real progress, not a static 0 % bar. */
+body.mode-bootstrap #log-area { display: block; }
 body.mode-bootstrap #btn-cancel,
 body.mode-bootstrap #btn-term,
 body.mode-bootstrap #btn-retry { display: none !important; }
@@ -233,7 +219,7 @@ body.is-error #step-line {
 	background: #4da6ff;
 	border-radius: 2px;
 	height: 100%;
-	width: 30%; /* Indeterminate default */
+	width: 0%;
 	transition: width 0.35s ease, background 0.25s ease;
 }
 
@@ -326,7 +312,7 @@ button {
 	background: #1a1a1c;
 	border-radius: 6px;
 	color: #888;
-	display: block;
+	display: none; /* Hidden by default; bootstrap mode overrides via CSS */
 	flex: 1 1 auto;
 	font-family: 'SF Mono', monospace;
 	font-size: 10px;
@@ -338,4 +324,19 @@ button {
 	padding: 8px;
 	white-space: pre-wrap;
 	word-break: break-word;
+	scrollbar-width: thin;
+	scrollbar-color: #444 transparent;
+}
+
+#log-area::-webkit-scrollbar {
+	width: 4px;
+}
+
+#log-area::-webkit-scrollbar-track {
+	background: transparent;
+}
+
+#log-area::-webkit-scrollbar-thumb {
+	background: #444;
+	border-radius: 2px;
 }

@@ -81,6 +81,66 @@ local _chain_start_time      = nil
 local _tooltip_first_show_at = nil
 local _last_update_at        = nil
 local _chain_ttft_ms         = nil
+-- Cached TTLT once the chain completes. Persisted alongside _chain_ttft_ms so
+-- every full render in assemble_blocks rebuilds an info row that already
+-- matches what set_timing draws via the partial-update path. Without this
+-- cache, full renders would temporarily wipe the dernier-token segment and
+-- create a one-frame flicker between a complete chain's "premier — dernier"
+-- and the partial "premier" rebuilt from chain timing alone.
+local _chain_ttlt_ms         = nil
+
+--- Composes the info-bar text shown beneath the prediction list.
+---   * `model_info` is the static "Model · Profile" header passed by
+---     prediction_engine via show_predictions(..., info_bar, ...).
+---   * `ttft_ms` / `ttlt_ms` are the per-chain timings captured locally.
+--- The result is a single line: "Model · Profile — ⏱ X.XX s [— Y.YY s]".
+--- Empty model_info, missing TTFT, missing TTLT are all handled — no
+--- placeholder is rendered when nothing is known yet so the tooltip never
+--- shows "—.—— s" filler.
+--- @param model_info string|nil "Model · Profile" header text.
+--- @param ttft_ms number|nil First-token latency (milliseconds).
+--- @param ttlt_ms number|nil Last-token latency (milliseconds).
+--- @param for_sizing boolean|nil When true, reserve width for the longest
+---   plausible final string (model + ⏱ TTFT — TTLT). Used by the canvas
+---   width-calc loop so the frame is wide enough for the post-chain
+---   "TTLT appended" partial-update; without this, TTFT-only sizing led
+---   to truncation when mark_chain_complete added " — Y.YY s" later.
+--- @return string|nil Composed line, or nil when there is nothing to show.
+local function format_info_line(model_info, ttft_ms, ttlt_ms, for_sizing)
+	local has_model = type(model_info) == "string" and model_info ~= ""
+	-- Require strictly positive timings: 0 / nil / negative all hide the
+	-- value. Without the strict-positive guard, a partial-update fired
+	-- with ttlt_ms = 0 (race during chain reset) would render a useless
+	-- " — 0.00 s" suffix or, worse, the trailing em-dash with nothing
+	-- behind it.
+	local has_ttft = type(ttft_ms) == "number" and ttft_ms > 0
+	local has_ttlt = type(ttlt_ms) == "number" and ttlt_ms > 0
+
+	-- Sizing pass: pretend both timings are present (with realistic worst-case
+	-- values) so the canvas frame is wide enough for the eventual full line.
+	-- Real renders always use the actual values (no placeholder text shown).
+	if for_sizing then
+		if not has_ttft then ttft_ms = 9999 ; has_ttft = true end
+		if not has_ttlt then ttlt_ms = 9999 ; has_ttlt = true end
+	end
+
+	if not has_model and not has_ttft and not has_ttlt then
+		return nil
+	end
+	local pieces = {}
+	if has_model then pieces[#pieces + 1] = model_info end
+	if has_ttft then
+		local timing = string.format("⏱ %.2f s", ttft_ms / 1000)
+		if has_ttlt then
+			timing = timing .. string.format(" — %.2f s", ttlt_ms / 1000)
+		end
+		pieces[#pieces + 1] = timing
+	elseif has_ttlt then
+		-- Edge case: TTLT known without TTFT (chain ended before first paint)
+		pieces[#pieces + 1] = string.format("⏱ %.2f s", ttlt_ms / 1000)
+	end
+	return table.concat(pieces, " — ")
+end
 
 
 
@@ -510,9 +570,19 @@ local function assemble_blocks(state, reserved_count)
 		styled_hint = hs.styledtext.new("Tab pour accepter", { font = { name = Config.fonts.main, size = Config.sizes.hint }, color = Config.colors.hint, paragraphStyle = { alignment = "center" } })
 	end
 
+	-- Info row composes the static model/profile header (state.info_bar) with
+	-- the live chain timing (TTFT / TTLT). set_timing() partial-updates
+	-- ELEM_INFO with the same composition so full renders never wipe the
+	-- timing line and there is no flicker.
+	-- state._sizing_pass = true is set by the width-calc loop in
+	-- show_predictions; in that mode, format_info_line is asked to reserve
+	-- width for the longest plausible final string (model + ⏱ TTFT — TTLT)
+	-- so the post-chain partial-update appending TTLT does not exceed the
+	-- canvas frame and clip the info zone.
 	local styled_info = nil
-	if state.info_bar and tostring(state.info_bar) ~= "" then
-		styled_info = hs.styledtext.new(tostring(state.info_bar), { font = { name = Config.fonts.main, size = Config.sizes.info }, color = Config.colors.info_bar, paragraphStyle = { alignment = "center" } })
+	local info_text = format_info_line(state.info_bar, _chain_ttft_ms, _chain_ttlt_ms, state._sizing_pass == true)
+	if info_text then
+		styled_info = hs.styledtext.new(info_text, { font = { name = Config.fonts.main, size = Config.sizes.info }, color = Config.colors.info_bar, paragraphStyle = { alignment = "center" } })
 	end
 
 	return { preds = assembled_result, hint_st = styled_hint, info_st = styled_info, SP = space_divider }
@@ -535,18 +605,11 @@ end
 --- @param ttlt_ms number|nil Last-token latency in milliseconds (nil while streaming).
 function M.set_timing(ttft_ms, ttlt_ms)
 	pcall(function()
-		local parts = {}
-		if type(ttft_ms) == "number" and ttft_ms >= 0 then
-			parts[#parts + 1] = string.format("Premier token : %d ms", math.floor(ttft_ms + 0.5))
-		end
-		if type(ttlt_ms) == "number" and ttlt_ms >= 0 then
-			parts[#parts + 1] = string.format("Dernier token : %d ms", math.floor(ttlt_ms + 0.5))
-		end
-		if #parts == 0 then
+		local text = format_info_line(_state.info_bar, ttft_ms, ttlt_ms)
+		if not text then
 			Renderer.set_element_text(Renderer.ELEM_INFO, nil)
 			return
 		end
-		local text = table.concat(parts, " — ")
 		local styled = hs.styledtext.new(text, {
 			font           = { name = Config.fonts.main, size = Config.sizes.info },
 			color          = Config.colors.info_bar,
@@ -590,23 +653,29 @@ function M.set_chain_start(timestamp)
 		Logger.error(LOG, "set_chain_start(): timestamp must be a number, got %s.", type(timestamp))
 		return
 	end
-	if _chain_start_time then
-		-- Chain already running — keep the original start so TTLT measures
-		-- the entire chain, not just the last prediction in it
-		Logger.debug(LOG, "set_chain_start: chain already armed (%.3fs ago) — keeping original origin.",
-			hs.timer.secondsSinceEpoch() - _chain_start_time)
-		return
-	end
+	-- Always overwrite. The previous "keep if already armed" guard meant a
+	-- transient M.hide() between perform_check and the actual streaming
+	-- show_predictions wiped the chain (M.hide used to reset timing) and
+	-- the next set_chain_start was a no-op, so TTFT was never captured.
+	-- A fresh overwrite per perform_check is what we want anyway: TTFT
+	-- measures the latest dispatch's first-token latency, which is the
+	-- number the user actually cares about.
 	_chain_start_time      = timestamp
 	_tooltip_first_show_at = nil
 	_last_update_at        = nil
 	_chain_ttft_ms         = nil
+	_chain_ttlt_ms         = nil
 	Logger.debug(LOG, "Chain timing armed at epoch %.3f.", timestamp)
 end
 
---- Internal helper: called from every paint path (show_predictions, navigate).
---- Captures the first-show timestamp and refreshes the last-update timestamp.
---- Also pushes the in-progress TTFT line to the info zone as soon as it is known.
+--- Internal helper: must be called BEFORE assemble_blocks so the freshly
+--- captured TTFT is included in the full render path. Captures the
+--- first-show timestamp and refreshes the last-update timestamp.
+--- Without pre-render capture, the first paint shows just the model header
+--- (TTFT still nil), the partial-update from a post-render call would then
+--- have to retro-fit the wider "Model · … — ⏱ X.XX s" string into a
+--- canvas element whose frame was sized for the shorter model-only text —
+--- which clips the timing off the visible area.
 local function refresh_chain_timing()
 	if not _chain_start_time then return end
 
@@ -617,14 +686,6 @@ local function refresh_chain_timing()
 		_tooltip_first_show_at = now
 		_chain_ttft_ms         = (now - _chain_start_time) * 1000
 		Logger.debug(LOG, "TTFT captured: %.0f ms.", _chain_ttft_ms)
-	end
-
-	-- Re-apply the streaming TTFT line on every paint: the full render path
-	-- inside show_predictions resets ELEM_INFO to the static model/profile
-	-- info bar, which would otherwise wipe the timing line on every streamed
-	-- partial. Pushing it here keeps the timing visible throughout the chain.
-	if _chain_ttft_ms then
-		M.set_timing(_chain_ttft_ms, nil)
 	end
 end
 
@@ -647,6 +708,9 @@ function M.mark_chain_complete()
 	-- gets a meaningful number rather than a blank line.
 	local ttft_ms = _chain_ttft_ms or ttlt_ms
 
+	-- Cache TTLT so subsequent full renders rebuild the same "premier — dernier"
+	-- string the partial-update path draws — no flicker on streaming follow-ups.
+	_chain_ttlt_ms = ttlt_ms
 	Logger.debug(LOG, "Chain link complete — TTFT: %.0f ms | TTLT: %.0f ms.", ttft_ms, ttlt_ms)
 	M.set_timing(ttft_ms, ttlt_ms)
 end
@@ -682,11 +746,15 @@ function M.hide()
 		_state.loading_text       = nil
 		_state.enter_validates    = false
 		_state.navigation_started = false
-		-- Reset chain timing — next chain starts from a clean slate
-		_chain_start_time      = nil
-		_tooltip_first_show_at = nil
-		_last_update_at        = nil
-		_chain_ttft_ms         = nil
+		-- IMPORTANT: do NOT reset chain timing here. The keymap layer can
+		-- call hide() at any moment between set_chain_start (in
+		-- perform_check) and the actual streaming show_predictions — for
+		-- example after a backspace or a fresh keystroke. Wiping
+		-- _chain_start_time here meant refresh_chain_timing skipped TTFT
+		-- capture for the entire chain that came right after, so the
+		-- timing zone never rendered. The lifecycle of chain timing is
+		-- now owned exclusively by set_chain_start (overwrites on every
+		-- new perform_check).
 		Renderer.hide()
 	end)
 end
@@ -744,6 +812,14 @@ function M.show_predictions(predictions, current_index, is_enabled, info_bar, sh
 		end
 		_state.nav_mod_str = nav_modifier_string
 
+		-- Capture TTFT BEFORE the width-calculation loop so format_info_line
+		-- sees a non-nil _chain_ttft_ms when it composes the info line during
+		-- the simulated assemble_blocks calls below. Otherwise the width is
+		-- locked to the shorter "Model · Profile" string (no timing yet) and
+		-- the real render that DOES include "— ⏱ X.XX s" gets clipped to
+		-- that narrower frame, hiding the timing zone off-screen.
+		refresh_chain_timing()
+
 		local render_count = math.max(1, math.floor(reserved_slots > 0 and reserved_slots or active_count))
 		local calculated_max_width = 0
 
@@ -751,7 +827,12 @@ function M.show_predictions(predictions, current_index, is_enabled, info_bar, sh
 			local simulation_state = {}
 			for k, v in pairs(_state) do simulation_state[k] = v end
 			simulation_state.current_index = i
-			
+			-- Tell assemble_blocks to size the info row for the worst-case
+			-- "Model · Profile — ⏱ X.XX s — Y.YY s" string even if TTLT is
+			-- not known yet. Otherwise the post-chain partial-update that
+			-- appends ' — Y.YY s' would exceed the frame and clip both ends.
+			simulation_state._sizing_pass = true
+
 			local blocks = assemble_blocks(simulation_state, render_count)
 			local width_predictions = Renderer.canvas:minimumTextSize(3, blocks.preds).w
 			local width_hint = blocks.hint_st and Renderer.canvas:minimumTextSize(3, blocks.hint_st).w or 0
@@ -780,10 +861,6 @@ function M.show_predictions(predictions, current_index, is_enabled, info_bar, sh
 		_state.navigation_started = false
 
 		Renderer.render(assemble_blocks(_state, render_count), _state, start_watchers)
-
-		-- Capture TTFT on first paint after a chain start; refresh _last_update_at
-		-- on every subsequent paint so TTLT measures up to the last streamed update
-		refresh_chain_timing()
 	end)
 
 	if not ok then Logger.error(LOG, "Crash during show_predictions initialization: " .. tostring(err) .. ".") end

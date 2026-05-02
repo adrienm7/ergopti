@@ -113,7 +113,8 @@ _ucc:setCallback(function(msg)
         if type(_on_retry) == "function" then pcall(_on_retry) end
 
     elseif msg.body == "terminal" then
-        local cmd   = M._terminal_cmd or ("ollama pull " .. (M._current_model or ""))
+        -- In bootstrap mode, show the live Hammerspoon log; in download mode, use the model-specific cmd
+        local cmd = _mode == "bootstrap" and "tail -f /tmp/ergopti.log" or (M._terminal_cmd or ("ollama pull " .. (M._current_model or "")))
         local apple_script = string.format(
             "osascript -e 'tell application \"Terminal\" to do script \"%s\"' -e 'tell application \"Terminal\" to activate'",
             cmd:gsub("\"", "\\\"")
@@ -222,10 +223,10 @@ local function compute_frame(mode)
     local screen = hs.screen.mainScreen()
     local f = screen and type(screen.frame) == "function" and screen:frame() or {x=0, y=0, w=1920, h=1080}
 
-    -- Download keeps the historical 460x380 footprint (room for log tail);
-    -- bootstrap is a slimmer 460x190 banner since there is no log/ETA block.
+    -- Both modes use the same 460x380 footprint: bootstrap now shows the live
+    -- terminal log so the user can see uv output without needing to expand.
     local W = 460
-    local H = (mode == "bootstrap") and 190 or 380
+    local H = 380
     return {
         x = f.x + f.w - W - 10,
         y = f.y + f.h - H - 10,
@@ -389,7 +390,12 @@ function M.show(model_or_opts, on_cancel, terminal_cmd, sizes, actions)
     _on_cancel  = type(on_cancel) == "function" and on_cancel or nil
     _on_resolve = type(actions) == "table" and type(actions.on_resolve) == "function" and actions.on_resolve or nil
     _on_retry   = type(actions) == "table" and type(actions.on_retry)   == "function" and actions.on_retry   or nil
-    _kind = _kind or "ollama_model"
+    -- Detect backend from terminal_cmd to set correct kind; reset from any prior bootstrap mode
+    if type(M._terminal_cmd) == "string" and (M._terminal_cmd:find("mlx", 1, true) or M._terminal_cmd:find("huggingface", 1, true)) then
+        _kind = "mlx_model"
+    else
+        _kind = "ollama_model"
+    end
     _mode = "download"
 
     if _wv then
@@ -594,6 +600,17 @@ function M.set_detail(text)
     if not _wv then return end
     if type(text) ~= "string" then return end
     eval(string.format("setDetail(%s)", js_str(text)))
+end
+
+--- Appends a single line to the scrollable terminal log area. Use during
+--- bootstrap to mirror every stdout/stderr line from the subprocess so
+--- the user sees the real install progress (uv resolution, wheel
+--- downloads, etc.), not just the highest-level step.
+--- @param text string One line of subprocess output.
+function M.append_log(text)
+    if not _wv then return end
+    if type(text) ~= "string" or text == "" then return end
+    eval(string.format("addLog(%s)", js_str(text)))
 end
 
 --- Updates the bootstrap progress bar fill. Pass nil for indeterminate.
