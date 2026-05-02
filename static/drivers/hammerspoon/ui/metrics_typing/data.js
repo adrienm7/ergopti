@@ -433,37 +433,35 @@ function compute_manifest_metrics() {
  */
 function recompute_speed_kpi() {
 	const pause_thresh = parseInt(document.getElementById("pause_threshold")?.value ?? "2000", 10) || 2000;
-	const { hs_raw_mode, llm_raw_mode, show_hs, show_llm } = get_source_mode_flags();
+	const { hs_raw_mode, llm_raw_mode } = get_source_mode_flags();
 	const c_dict = app_state.data.c || {};
 
 	// Sum time and char count for entries whose mean inter-key interval is ≤ threshold.
 	// Each entry in c_dict has .time (total inter-key ms, manual chars) and .manual_count.
 	let active_ms     = 0;
-	let active_chars  = 0;
-	let total_chars   = 0; // all chars regardless of threshold (for HS boost ratio)
-	let hs_chars      = 0;
-	let llm_chars     = 0;
+	let manual_active = 0;
 
-	// Accumulate from c_dict (manual chars only — timing is only tracked for manual)
+	// c_dict.time only accumulates inter-key intervals for manually typed chars,
+	// so it naturally excludes HS/LLM expansion bursts. Pause threshold applied
+	// per-character: chars whose mean inter-key interval exceeds the threshold
+	// indicate sustained pauses and are excluded from active typing time.
 	Object.values(c_dict).forEach(item => {
-		const mc  = item.count - (item.synth_hs || 0) - (item.synth_llm || 0) - (item.synth_other || 0);
+		const mc = item.count - (item.synth_hs || 0) - (item.synth_llm || 0) - (item.synth_other || 0);
 		if (mc <= 0) return;
-		const avg = mc > 0 ? (item.time || 0) / mc : 0;
-		total_chars += mc;
+		const avg = (item.time || 0) / mc;
 		if (avg <= pause_thresh) {
-			active_ms    += item.time || 0;
-			active_chars += mc;
+			active_ms     += item.time || 0;
+			manual_active += mc;
 		}
-		hs_chars  += item.synth_hs  || 0;
-		llm_chars += item.synth_llm || 0;
 	});
 
 	// Estimate output chars = manual + HS output + LLM output.
 	// In raw-input view, hs_chars/llm_chars from c_dict are trigger chars, not outputs.
 	// We don't have output counts here, so we use the manifest totals for the ratio.
 	// Manifest wpm_chars / manifest manual_chars gives an output-to-input multiplier.
-	let manifest_wpm_chars = 0;
-	let manifest_manual_chars = 0;
+	let manifest_total = 0;
+	let manifest_hs    = 0;
+	let manifest_llm   = 0;
 	const start_val = document.getElementById("date_start").value;
 	const end_val   = document.getElementById("date_end").value;
 	const manifest_dates = app_state.manifest_dates_sorted.length > 0
@@ -475,24 +473,35 @@ function recompute_speed_kpi() {
 		Object.keys(window.metrics_manifest[date_str] || {}).forEach(app_name => {
 			if (app_name !== "Unknown" && !app_state.selected_apps.has(app_name)) return;
 			const app = window.metrics_manifest[date_str][app_name];
-			const t   = app.chars || 0;
-			const h   = app.hs_chars  || 0;
-			const l   = app.llm_chars || 0;
-			manifest_wpm_chars    += t; // total output chars
-			manifest_manual_chars += Math.max(0, t - h - l);
+			manifest_total += app.chars     || 0;
+			manifest_hs    += app.hs_chars  || 0;
+			manifest_llm   += app.llm_chars || 0;
 		});
 	});
+	const manifest_manual = Math.max(0, manifest_total - manifest_hs - manifest_llm);
 
-	// Output-boost multiplier: if HS/LLM are expanding chars, output > manual.
-	// E.g. manual=80 chars typed, output=100 chars → multiplier = 1.25.
-	// Applied to the c_dict-derived speed so the KPI reflects actual output.
-	const output_multiplier = manifest_manual_chars > 0
-		? manifest_wpm_chars / manifest_manual_chars
+	// Per-source effective output: when a raw toggle is ON, that source's
+	// expansion chars are excluded from the displayed speed. So:
+	// - Both toggles OFF (default)   → eff = manual + hs + llm  → highest multiplier
+	// - HS toggle ON, LLM OFF        → eff = manual + llm       → middle (LLM boost only)
+	// - HS OFF, LLM ON               → eff = manual + hs        → middle (HS boost only)
+	// - Both ON                      → eff = manual             → 1.0 (raw measured speed)
+	const eff_output_chars =
+		manifest_manual +
+		(hs_raw_mode  ? 0 : manifest_hs)  +
+		(llm_raw_mode ? 0 : manifest_llm);
+
+	const output_multiplier = manifest_manual > 0
+		? eff_output_chars / manifest_manual
 		: 1.0;
-	const is_estimated = output_multiplier > 1.01; // only label as estimated when noticeably boosted
+
+	// "(estimé)" is shown only when a multiplier > 1 is applied — i.e. when at
+	// least one source's expansion is being inferred from the manifest ratio.
+	// When both raw toggles are ON, multiplier = 1.0 (measured directly) → no badge.
+	const is_estimated = output_multiplier > 1.01;
 
 	const output_cpm = active_ms > 0
-		? (active_chars * output_multiplier) / (active_ms / 60000)
+		? (manual_active * output_multiplier) / (active_ms / 60000)
 		: 0;
 	const output_wpm = output_cpm / 5;
 
@@ -503,17 +512,17 @@ function recompute_speed_kpi() {
 		: pause_thresh >= 60000 ? `> ${pause_thresh/60000} min`
 		: `> ${pause_thresh/1000} s`;
 	const est_badge = is_estimated
-		? `<span style="font-size:0.65em;color:var(--text-muted);margin-left:4px;">(estimé)</span>`
+		? `<span style="color:var(--text-muted);margin-left:4px;">(estimé)</span>`
 		: "";
 
 	wpm_val_elem.innerHTML =
 		`<div style="display:flex;flex-direction:column;justify-content:center;">` +
 		`<div style="display:flex;align-items:center;gap:6px;">` +
-		`<span>${format_number(output_wpm.toFixed(1))} <span class="stat-unit">MPM</span>${est_badge}</span>` +
+		`<span>${format_number(output_wpm.toFixed(1))} <span class="stat-unit">MPM${est_badge}</span></span>` +
 		`<span class="tooltip stat-inline-tooltip">${INFO_SVG}<span class="tooltiptext">` +
 		`MPM : Mots par minute (1 mot = 5 touches).<br>` +
 		`Seuil de pause : pauses ${thresh_label} exclues du temps actif.<br>` +
-		(is_estimated ? `Vitesse estimée : les chars générés par hotstrings/IA sont inférés via un ratio output/input (×${format_number(output_multiplier.toFixed(2))}).` : `Vitesse basée sur le texte final.`) +
+		(is_estimated ? `Vitesse estimée : les chars générés par hotstrings/IA sont inférés via un ratio output/input (×${format_number(output_multiplier.toFixed(2))}).` : `Vitesse mesurée à partir du temps de frappe manuel.`) +
 		`</span></span>` +
 		`</div>` +
 		`<div style="display:flex;align-items:center;gap:6px;font-size:0.65em;margin-top:5px;">` +

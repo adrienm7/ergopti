@@ -720,18 +720,18 @@ function render_kc_heatmap(kc_data_arr) {
 
 	// Widths of non-standard keys in key-units
 	const WIDE_KEYS = {
-		"36":  1.75, // return — ISO enter is tall; we draw it as wide here
-		"48":  1.50, // tab
-		"51":  1.75, // backspace
-		"56":  1.25, // l-shift (ISO)
-		"57":  1.50, // capslock
-		"60":  2.25, // r-shift (ISO/ANSI)
-		"49":  6.25, // space bar
-		"59":  1.25, // ctrl-L
-		"55":  1.50, // cmd-L
-		"54":  1.50, // cmd-R
-		"61":  1.25, // alt-R
-		"62":  1.25, // ctrl-R
+		"36":  1.10, // return
+		"48":  1.10, // tab
+		"51":  1.10, // backspace
+		"56":  1.10, // l-shift
+		"57":  1.10, // capslock
+		"60":  1.10, // r-shift
+		"49":  2.50, // space bar
+		"59":  1.00, // ctrl-L
+		"55":  1.00, // cmd-L
+		"54":  1.00, // cmd-R
+		"61":  1.00, // alt-R
+		"62":  1.00, // ctrl-R
 	};
 
 	// Compute pixel canvas size including padding
@@ -837,13 +837,38 @@ function render_kc_heatmap(kc_data_arr) {
 
 		const text_color = count === 0 ? "#555" : "#fff";
 
-		// Label: user's layout label, uppercase, shortened to fit
+		// Label: user's layout label, uppercase. Force a few well-known wide-key
+		// short forms so they render clearly (Esc, Ret, Tab, Bksp, Caps, Shft).
 		const label_raw  = kc_name_map[kc_str] ?? KEYCODE_NAMES[kc_str] ?? "";
-		const label_disp = label_raw.length > 5
-			? label_raw.slice(0, 4).toUpperCase() + "…"
-			: label_raw.toUpperCase();
+		const SHORT_LABELS = {
+			"53":  "ESC",
+			"36":  "RET",
+			"48":  "TAB",
+			"51":  "BKSP",
+			"56":  "SHFT",
+			"60":  "SHFT",
+			"57":  "CAPS",
+			"49":  "SPC",
+			"59":  "CTRL",
+			"62":  "CTRL",
+			"55":  "CMD",
+			"54":  "CMD",
+			"58":  "ALT",
+			"61":  "ALT",
+			"63":  "FN",
+		};
+		// Truncate only when truly too long for the cell. Most names ≤ 6 chars fit
+		// at font_size 9; longer ones get the ellipsis fallback.
+		let label_disp;
+		if (SHORT_LABELS[kc_str]) {
+			label_disp = SHORT_LABELS[kc_str];
+		} else if (label_raw.length > 6) {
+			label_disp = label_raw.slice(0, 5).toUpperCase() + "…";
+		} else {
+			label_disp = label_raw.toUpperCase();
+		}
 
-		const font_size  = label_disp.length > 3 ? 9 : 11;
+		const font_size  = label_disp.length > 4 ? 8 : label_disp.length > 2 ? 10 : 12;
 
 		// Count badge bottom-right of key
 		let badge = "";

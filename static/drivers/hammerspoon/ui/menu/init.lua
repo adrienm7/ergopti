@@ -175,6 +175,14 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 		if mods and key then
 			state.metrics_shortcut = { mods = mods, key = key }
 			local ok, hk = pcall(hs.hotkey.new, mods, key, function()
+				-- Toggle: close the dashboard if already open, otherwise open it.
+				-- Using package.loaded so we don't accidentally trigger require() on close.
+				local mui = package.loaded["ui.metrics_typing.init"] or package.loaded["ui.metrics_typing"]
+				if mui and mui._wv then
+					pcall(function() mui._wv:delete() end)
+					mui._wv = nil
+					return
+				end
 				local kl = core_mods.keylogger
 				if kl and type(kl.show_metrics) == "function" then pcall(kl.show_metrics) end
 			end)
@@ -192,6 +200,13 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 		if mods and key then
 			state.apps_time_shortcut = { mods = mods, key = key }
 			local ok, hk = pcall(hs.hotkey.new, mods, key, function()
+				-- Toggle behaviour: close if open, else open
+				local at_loaded = package.loaded["ui.metrics_apps"] or package.loaded["ui.metrics_apps.init"]
+				if at_loaded and at_loaded._wv then
+					pcall(function() at_loaded._wv:delete() end)
+					at_loaded._wv = nil
+					return
+				end
 				local ok_mod, at = pcall(require, "ui.metrics_apps")
 				if ok_mod and type(at.show) == "function" then pcall(at.show, base_dir .. "logs") end
 			end)

@@ -421,7 +421,7 @@ function _render_sparkline(ctx_id, chart_ref, data_pts, color) {
 				y: {
 					display:     true,
 					beginAtZero: true,
-					ticks:       { font: { size: 10 }, maxTicksLimit: 3, callback: (v) => format_number(v) + "%" },
+					ticks:       { font: { size: 10 }, maxTicksLimit: 3, callback: (v) => format_number_plain(v) + "%" },
 					grid:        { color: "rgba(128, 128, 128, 0.1)" },
 				},
 			},
