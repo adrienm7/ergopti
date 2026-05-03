@@ -170,23 +170,8 @@
 			<!-- align-items:flex-start prevents cross-axis stretching of side-by-side
 			     chart containers so each sizes to its own content height only -->
 			<div style="display: flex; gap: 20px; margin-bottom: 20px; align-items: flex-start;">
-				<div
-					class="chart-row-block"
-					style="
-						flex: 1;
-						padding: 20px 15px 8px 15px;
-						background: var(--precision-bg);
-						border: 1px solid var(--precision-border);
-						border-radius: 8px;
-					"
-				>
-					<div
-						style="
-							display: flex;
-							justify-content: space-between;
-							align-items: center;
-						"
-					>
+				<div class="chart-row-block is-precision">
+					<div class="chart-row-block-header">
 						<div style="display: flex; align-items: baseline; gap: 10px">
 							<h3
 								id="precision_chart_title"
@@ -204,28 +189,13 @@
 							Restaurer le zoom
 						</button>
 					</div>
-					<div style="position: relative; height: 150px; margin-top: 5px;">
+					<div class="chart-row-block-canvas">
 						<canvas id="precision_chart" style="position: absolute; inset: 0; width: 100%; height: 100%;"></canvas>
 					</div>
 				</div>
 
-				<div
-					class="chart-row-block"
-					style="
-						flex: 1;
-						padding: 20px 15px 8px 15px;
-						background: var(--global-bg);
-						border: 1px solid var(--global-border);
-						border-radius: 8px;
-					"
-				>
-					<div
-						style="
-							display: flex;
-							justify-content: space-between;
-							align-items: center;
-						"
-					>
+				<div class="chart-row-block is-speed">
+					<div class="chart-row-block-header">
 						<div style="display: flex; align-items: baseline; gap: 10px">
 							<h3
 								id="wpm_chart_title"
@@ -243,7 +213,7 @@
 							Restaurer le zoom
 						</button>
 					</div>
-					<div style="position: relative; height: 150px; margin-top: 5px;">
+					<div class="chart-row-block-canvas">
 						<canvas id="wpm_chart" style="position: absolute; inset: 0; width: 100%; height: 100%;"></canvas>
 					</div>
 				</div>

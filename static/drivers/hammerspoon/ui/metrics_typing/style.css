@@ -563,6 +563,41 @@ input[type='date']::-webkit-datetime-edit-year-field {
 	font-size: 11px;
 }
 
+/* Side-by-side blocks holding the precision and speed charts.
+   Flex column + gap puts a real visual breathing room between the title and
+   the chart, while a tight bottom padding stops the plot from feeling
+   stranded above an empty zone. Top padding is kept smaller than the
+   title-to-chart gap so the title is not glued to the upper border. */
+.chart-row-block {
+	border-radius: 8px;
+	display: flex;
+	flex: 1;
+	flex-direction: column;
+	gap: 18px;
+	padding: 10px 15px 4px 15px;
+}
+
+.chart-row-block.is-precision {
+	background: var(--precision-bg);
+	border: 1px solid var(--precision-border);
+}
+
+.chart-row-block.is-speed {
+	background: var(--global-bg);
+	border: 1px solid var(--global-border);
+}
+
+.chart-row-block-header {
+	align-items: center;
+	display: flex;
+	justify-content: space-between;
+}
+
+.chart-row-block-canvas {
+	height: 150px;
+	position: relative;
+}
+
 /* ======================= */
 /* ======================= */
 /* ======= 6/ Tabs ======= */
