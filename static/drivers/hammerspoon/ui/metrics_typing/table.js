@@ -800,14 +800,19 @@ function render_kc_heatmap(kc_data_arr) {
 	let min_y_px = Infinity, max_y_px = -Infinity;
 	const key_entries = Object.entries(KEY_POSITIONS);
 
-	// First pass: determine canvas bounds
+	// First pass: determine canvas bounds.
+	// The ISO Return key (kc 36) draws a wing that extends one full row above its
+	// sy, so we must account for that extra vertical extent when computing the
+	// SVG canvas height, otherwise the wing is clipped at the top.
+	const ROW_PX = Math.round(U * 0.90); // vertical distance between rows (px)
 	key_entries.forEach(([kc_str, pos]) => {
-		const key_w = compute_kw(kc_str, pos);
-		const sx    = compute_sx(kc_str, pos);
-		const sy    = Math.round((Y_TOP - pos.y) / Y_SPAN * (5.5 * U)) - Math.round(KH / 2);
+		const key_w   = compute_kw(kc_str, pos);
+		const sx      = compute_sx(kc_str, pos);
+		const sy      = Math.round((Y_TOP - pos.y) / Y_SPAN * (5.5 * U)) - Math.round(KH / 2);
+		const top_ext = kc_str === "36" ? ROW_PX : 0; // Return: wing extends one row up
 		min_x_px = Math.min(min_x_px, sx);
 		max_x_px = Math.max(max_x_px, sx + key_w);
-		min_y_px = Math.min(min_y_px, sy);
+		min_y_px = Math.min(min_y_px, sy - top_ext);
 		max_y_px = Math.max(max_y_px, sy + KH);
 	});
 
@@ -925,6 +930,7 @@ function render_kc_heatmap(kc_data_arr) {
 			"124": "→",     // →
 			"125": "↓",     // ↓
 			"126": "↑",     // ↑
+			"76":  "PENT",  // numpad enter
 		};
 		// Truncate only when truly too long for the cell. Most names ≤ 6 chars fit
 		// at font_size 9; longer ones get the ellipsis fallback.
@@ -983,57 +989,70 @@ function render_kc_heatmap(kc_data_arr) {
 		// ISO Return (kc 36) gets an L-shaped path spanning home + QWERTY rows.
 		// For all other keys a standard rounded-rect is drawn.
 		if (kc_str === "36") {
-			// ISO Return (Apple): wide top portion on the QWERTY row, narrower stem
-			// on the home row right-aligned. The wing has the same vertical extent
-			// as a normal QWERTY-row key (KH) and the stem the same as a home-row
-			// key — the two are separated by the standard row gap so Return does
-			// not appear glued to the home row keys to its left.
-			const row_px   = Math.round(U * 0.90);       // pixel distance between rows
-			const row_gap  = Math.max(GAP, row_px - KH); // vertical gap between rows
-			const stem_w   = Math.round(U - GAP);        // stem = 1u wide
-			const lx       = sx + key_w - stem_w;        // stem left edge (right-aligned)
-			const rx       = sx + key_w;                 // shared right edge
-			const top_y    = sy - row_px;                // top of QWERTY-row wing
-			const wing_bot = top_y + KH;                 // bottom of wing rect
-			const mid_y    = sy;                         // top of home-row stem
-			const bot_y    = sy + KH;                    // bottom of stem
-			// The neck (lx → rx, between wing_bot and mid_y) bridges the row gap
-			// at the right edge so the L stays a single connected outline.
-			//
-			// Clockwise outline starting at the top-left convex corner.
-			// Convex corners use sweep flag 1; the single inner concave corner
-			// where the wing meets the neck uses sweep flag 0.
+			// ISO Return: wing on QWERTY row, stem on home row. Both left edges are
+			// anchored to the right edge of their respective row neighbour so the
+			// gap is exactly GAP px everywhere and no overlap can occur.
+			//   Wing left = right edge of ] (kc 30, QWERTY row)
+			//   Stem left = right edge of \ (kc 42, home row ISO backslash)
+			//   Right edge shared = stem left + 1u wide stem
+			const pos_bracket   = KEY_POSITIONS["30"];  // ] — QWERTY row
+			const pos_backslash = KEY_POSITIONS["42"];  // \ — home row
+			const wing_lx = compute_sx("30",  pos_bracket)   + off_x + compute_kw("30",  pos_bracket)   + GAP;
+			const stem_lx = compute_sx("42",  pos_backslash) + off_x + compute_kw("42",  pos_backslash) + GAP;
+			const stem_w  = Math.round(U - GAP);               // stem = 1u wide
+			const rx_ret  = stem_lx + stem_w;                  // shared right edge
+
+			const sy_qwerty = Math.round((Y_TOP - 0.90) / Y_SPAN * (5.5 * U)) - Math.round(KH / 2) + off_y;
+			const sy_home   = sy; // Return pos.y = 0 (home row), so sy is already the home-row sy
+			const top_y     = sy_qwerty;         // top of wing (QWERTY row)
+			const wing_bot  = sy_qwerty + KH;    // bottom of wing rect
+			const bot_y     = sy_home   + KH;    // bottom of stem
+
+			// Clockwise path. The inner concave corner (stem_lx, wing_bot) uses
+			// sweep=0 (counter-clockwise arc) to produce the correct inward curve.
 			const d = [
-				`M ${sx} ${top_y+R}`,
-				`A ${R} ${R} 0 0 1 ${sx+R} ${top_y}`,
-				`L ${rx-R} ${top_y}`,
-				`A ${R} ${R} 0 0 1 ${rx} ${top_y+R}`,
-				`L ${rx} ${bot_y-R}`,
-				`A ${R} ${R} 0 0 1 ${rx-R} ${bot_y}`,
-				`L ${lx+R} ${bot_y}`,
-				`A ${R} ${R} 0 0 1 ${lx} ${bot_y-R}`,
-				`L ${lx} ${wing_bot+R}`,
-				`A ${R} ${R} 0 0 0 ${lx-R} ${wing_bot}`,
-				`L ${sx+R} ${wing_bot}`,
-				`A ${R} ${R} 0 0 1 ${sx} ${wing_bot-R}`,
-				`L ${sx} ${top_y+R}`,
+				`M ${wing_lx} ${top_y+R}`,
+				`A ${R} ${R} 0 0 1 ${wing_lx+R} ${top_y}`,
+				`L ${rx_ret-R} ${top_y}`,
+				`A ${R} ${R} 0 0 1 ${rx_ret} ${top_y+R}`,
+				`L ${rx_ret} ${bot_y-R}`,
+				`A ${R} ${R} 0 0 1 ${rx_ret-R} ${bot_y}`,
+				`L ${stem_lx+R} ${bot_y}`,
+				`A ${R} ${R} 0 0 1 ${stem_lx} ${bot_y-R}`,
+				`L ${stem_lx} ${wing_bot+R}`,
+				`A ${R} ${R} 0 0 0 ${stem_lx-R} ${wing_bot}`,
+				`L ${wing_lx+R} ${wing_bot}`,
+				`A ${R} ${R} 0 0 1 ${wing_lx} ${wing_bot-R}`,
+				`L ${wing_lx} ${top_y+R}`,
 				"Z",
 			].join(" ");
-			rects += `<path d="${d}" fill="${fill}" stroke="#0d0d1a" stroke-width="1.5"
+			rects += `<path d="${d}" fill="${fill}" stroke="#0d0d1a" stroke-width="1.5" paint-order="stroke fill"
 				data-tip="${tip_id}" class="hm-key"
 				onmouseenter="hm_show_tip('${tip_id}')" onmouseleave="hm_hide_tip('${tip_id}')"/>`;
+			// Label centred in the wing portion (wider area, more legible than the narrow stem)
+			const ret_font = 10;
+			const ret_cx   = (wing_lx + rx_ret) / 2;
+			const ret_cy   = sy_qwerty + KH / 2;
+			labels += `<text x="${Math.round(ret_cx)}" y="${Math.round(ret_cy + ret_font * 0.38)}"
+				text-anchor="middle" font-size="${ret_font}" font-weight="bold"
+				font-family="monospace,sans-serif" fill="${text_color}"
+				pointer-events="none">${escape_html(label_disp)}</text>`;
+
 		} else {
 			// Standard rounded rect for every other key
 			rects += `<rect x="${sx}" y="${sy}" width="${key_w}" height="${KH}" rx="${R}"
-				fill="${fill}" stroke="#0d0d1a" stroke-width="1.5"
+				fill="${fill}" stroke="#0d0d1a" stroke-width="1.5" paint-order="stroke fill"
 				data-tip="${tip_id}" class="hm-key"
 				onmouseenter="hm_show_tip('${tip_id}')" onmouseleave="hm_hide_tip('${tip_id}')"/>`;
 		}
 
-		labels += `<text x="${Math.round(cx)}" y="${Math.round(cy + font_size * 0.38)}"
-			text-anchor="middle" font-size="${font_size}" font-weight="bold"
-			font-family="monospace,sans-serif" fill="${text_color}"
-			pointer-events="none">${escape_html(label_disp)}</text>`;
+		// ISO Return renders its own label (centred in the wing); skip the generic one
+		if (kc_str !== "36") {
+			labels += `<text x="${Math.round(cx)}" y="${Math.round(cy + font_size * 0.38)}"
+				text-anchor="middle" font-size="${font_size}" font-weight="bold"
+				font-family="monospace,sans-serif" fill="${text_color}"
+				pointer-events="none">${escape_html(label_disp)}</text>`;
+		}
 
 		// Tooltip div — absolutely positioned, hidden by default
 		tooltips += `<div id="${tip_id}" class="hm-tooltip" style="display:none;position:fixed;z-index:9999;` +

@@ -263,13 +263,13 @@ const KEY_POSITIONS = {
 	"119": { x: 16.0,  y: 0     }, // end
 	"121": { x: 17.0,  y: 0     }, // page down (rightmost column to avoid overcrowding)
 
-	// Arrow cluster — flat row layout requested by the user:
-	//   row 1 (y = -0.90): LEFT, UP, RIGHT
-	//   row 2 (y = -1.80): DOWN (centred under UP)
-	"123": { x: 14.5,  y: -0.90 }, // left
-	"126": { x: 15.5,  y: -0.90 }, // up
-	"124": { x: 16.5,  y: -0.90 }, // right
+	// Arrow cluster — inverted-T layout (matches physical keyboard):
+	//   row 1 (y = -0.90): UP alone, centred above DOWN
+	//   row 2 (y = -1.80): LEFT, DOWN, RIGHT aligned side by side
+	"126": { x: 15.5,  y: -0.90 }, // up — isolated above down
+	"123": { x: 14.5,  y: -1.80 }, // left
 	"125": { x: 15.5,  y: -1.80 }, // down
+	"124": { x: 16.5,  y: -1.80 }, // right
 
 	// Numpad enter
 	"76":  { x: 18.0,  y: -1.80 }, // enter (numpad)
