@@ -34,6 +34,12 @@ M._cache_date          = nil   -- date string when the cache was last populated
 local CONFIG_DIR = hs.configdir .. "/data"
 local CATEGORIES_FILE = CONFIG_DIR .. "/app_categories.json"
 
+-- On-disk snapshot of the last successful render — used to pre-fill the
+-- dashboard with last-known values within milliseconds of opening, even
+-- after a Hammerspoon reload.  Stale values are acceptable per UX spec:
+-- the background refresh overwrites them once the openssl decrypt finishes.
+local UI_CACHE_FILE = CONFIG_DIR .. "/metrics_apps_cache.json"
+
 
 
 
@@ -165,8 +171,38 @@ end)
 -- ===============================
 -- ===============================
 
---- Shows the webview for the apps time dashboard.
---- @param log_dir string Path to the logging directory.
+--- Persists a snapshot of the data injected into the webview to disk so the
+--- next open (even after HS reload) can render instantly from this cache.
+--- @param payload table { manifest, user_cats } as JSON strings.
+local function save_disk_cache(payload)
+	pcall(function() os.execute(string.format("mkdir -p %q", CONFIG_DIR)) end)
+	local ok_enc, body = pcall(json.encode, payload)
+	if not ok_enc then
+		Logger.warn(LOG, "Failed to encode disk cache payload — skipping persist.")
+		return
+	end
+	local f = io.open(UI_CACHE_FILE, "w")
+	if f then
+		f:write(body)
+		f:close()
+		Logger.debug(LOG, "Apps dashboard snapshot persisted to disk cache.")
+	else
+		Logger.warn(LOG, "Cannot open '%s' for writing — disk cache not persisted.", UI_CACHE_FILE)
+	end
+end
+
+--- Reads the previously-saved disk cache snapshot.
+--- @return table|nil Snapshot with manifest/user_cats JSON strings.
+local function load_disk_cache()
+	local f = io.open(UI_CACHE_FILE, "r")
+	if not f then return nil end
+	local content = f:read("*a")
+	f:close()
+	local ok, data = pcall(json.decode, content)
+	if not ok or type(data) ~= "table" then return nil end
+	return data
+end
+
 --- Aggressively raises the dashboard window above any compositing menu.
 --- Same rationale as metrics_typing.raise_now — see that module for details.
 local function raise_now(wv, above_everything)
@@ -257,6 +293,10 @@ local function load_and_inject(log_dir)
 	local manifest_json  = json.encode(manifest)
 	local user_cats_json = json.encode(user_cats)
 
+	-- Persist the freshly-built snapshot so the next open (even after HS
+	-- reload) renders instantly from disk.
+	save_disk_cache({ manifest = manifest_json, user_cats = user_cats_json })
+
 	-- Retry injection loop — robust against slow CDN loads.
 	local function try_inject(remaining)
 		if not M._wv then return end
@@ -285,6 +325,50 @@ local function load_and_inject(log_dir)
 		end)
 	end
 	try_inject(60)
+end
+
+--- Pre-fills the dashboard with the on-disk snapshot from the previous run
+--- so the user sees populated values within milliseconds of opening.  The
+--- caller delays the background refresh slightly so JS finishes parsing
+--- the cached payload before the fresh values overwrite it.
+--- @return boolean True if a cache existed and pre-fill was scheduled.
+local function prefill_from_disk_cache()
+	if not M._wv then return false end
+	local cached = load_disk_cache()
+	if not cached or type(cached.manifest) ~= "string" then
+		Logger.debug(LOG, "No disk cache available — UI will fill from fresh decrypt.")
+		return false
+	end
+	local function try_inject_cache(remaining)
+		if not M._wv then return end
+		M._wv:evaluateJavaScript("typeof window.bootstrapMetricsAppsData", function(t)
+			if t == "function" then
+				local js = string.format(
+					"window.bootstrapMetricsAppsData(%s,%s);",
+					cached.manifest, cached.user_cats or "{}"
+				)
+				pcall(function() M._wv:evaluateJavaScript(js) end)
+				Logger.success(LOG, "Apps dashboard pre-filled from disk cache.")
+			elseif t == "undefined" then
+				M._wv:evaluateJavaScript("typeof window.initDashboard", function(t2)
+					if t2 == "function" then
+						local js = string.format(
+							"window.ManifestData=%s;window.UserCategories=%s;window.initDashboard();",
+							cached.manifest, cached.user_cats or "{}"
+						)
+						pcall(function() M._wv:evaluateJavaScript(js) end)
+						Logger.success(LOG, "Apps dashboard pre-filled from disk cache (legacy).")
+					elseif remaining > 0 then
+						hs.timer.doAfter(0.10, function() try_inject_cache(remaining - 1) end)
+					end
+				end)
+			elseif remaining > 0 then
+				hs.timer.doAfter(0.10, function() try_inject_cache(remaining - 1) end)
+			end
+		end)
+	end
+	try_inject_cache(50)
+	return true
 end
 
 function M.show(log_dir)
@@ -320,10 +404,16 @@ function M.show(log_dir)
 	hs.timer.doAfter(0.35, function() raise_now(M._wv, true) end)
 	hs.timer.doAfter(0.70, function() raise_now(M._wv, false) end)
 
-	-- Defer all data work so the empty shell appears before openssl blocks.
-	hs.timer.doAfter(0.10, function() load_and_inject(log_dir) end)
+	-- Two-stage data fill (see metrics_typing for full rationale):
+	--   1. Pre-fill from on-disk snapshot — populated values appear within a frame.
+	--   2. Refresh from fresh decrypt+SQL in the background and overwrite.
+	hs.timer.doAfter(0.05, function()
+		local had_cache = prefill_from_disk_cache()
+		local refresh_delay = had_cache and 0.40 or 0.05
+		hs.timer.doAfter(refresh_delay, function() load_and_inject(log_dir) end)
+	end)
 
-	Logger.success(LOG, "Apps time dashboard window opened (data loading…).")
+	Logger.success(LOG, "Apps time dashboard window opened (cache pre-fill + background refresh).")
 end
 
 --- Broadcasts real-time manifest events to the webview UI.

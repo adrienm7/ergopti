@@ -28,6 +28,14 @@ local Logger     = require("lib.logger")
 
 local LOG = "metrics_typing"
 
+-- On-disk cache file: lets the dashboard pre-fill INSTANTLY from the last
+-- successful render even after a Hammerspoon reload (the in-memory caches
+-- below survive close/reopen but not a full HS reload).  The user is happy
+-- to see slightly stale numbers (1 h, 1 day) provided the UI is instant —
+-- a fresh refresh runs in the background and overwrites the cache.
+local UI_CACHE_DIR  = hs.configdir .. "/data"
+local UI_CACHE_FILE = UI_CACHE_DIR .. "/metrics_typing_cache.json"
+
 M._wv             = nil
 M._timer          = nil
 M._last_req       = nil
@@ -224,7 +232,42 @@ end
 --- scripts, then injects the manifest and data the instant JS is ready.
 --- Using a retry loop instead of a fixed delay guarantees the injection fires
 --- even when CDN scripts slow down the initial HTML parse.
---- @param log_dir string Path to the logging directory.
+--- Persists a snapshot of the data injected into the webview to disk so the
+--- next open (even after HS reload) can render instantly from this cache.
+--- Stored as a JSON wrapper whose four string fields are themselves the JSON
+--- payloads used by process_manifest() — no re-encoding needed at load time.
+--- @param payload table { manifest, app_icons, initial_data, kc_layout } as JSON strings.
+local function save_disk_cache(payload)
+	pcall(function() os.execute(string.format("mkdir -p %q", UI_CACHE_DIR)) end)
+	local ok_enc, body = pcall(json.encode, payload)
+	if not ok_enc then
+		Logger.warn(LOG, "Failed to encode disk cache payload — skipping persist.")
+		return
+	end
+	local f = io.open(UI_CACHE_FILE, "w")
+	if f then
+		f:write(body)
+		f:close()
+		Logger.debug(LOG, "Dashboard snapshot persisted to disk cache.")
+	else
+		Logger.warn(LOG, "Cannot open '%s' for writing — disk cache not persisted.", UI_CACHE_FILE)
+	end
+end
+
+--- Reads the previously-saved disk cache snapshot.  Used to pre-fill the
+--- dashboard with last-known values within milliseconds of opening, while
+--- the slow decrypt+SQL refresh runs in the background.
+--- @return table|nil Snapshot with manifest/app_icons/initial_data/kc_layout JSON strings.
+local function load_disk_cache()
+	local f = io.open(UI_CACHE_FILE, "r")
+	if not f then return nil end
+	local content = f:read("*a")
+	f:close()
+	local ok, data = pcall(json.decode, content)
+	if not ok or type(data) ~= "table" then return nil end
+	return data
+end
+
 --- Aggressively raises the dashboard window above any compositing menu and
 --- gives Hammerspoon foreground focus.  Called multiple times on a schedule
 --- after window creation because, on a fresh HS reload, the menu-bar item
@@ -390,6 +433,16 @@ local function load_and_inject(log_dir)
 	local ok_json, kc_layout_json = pcall(json.encode, kc_layout)
 	if not ok_json then kc_layout_json = "{}" end
 
+	-- Persist the freshly-built snapshot so the next open (even after HS
+	-- reload) can render instantly from disk.  Done BEFORE the JS injection
+	-- so a JS retry-loop failure does not block cache persistence.
+	save_disk_cache({
+		manifest     = manifest_json,
+		app_icons    = app_icons_json,
+		initial_data = initial_data_json,
+		kc_layout    = kc_layout_json,
+	})
+
 	-- Retry injection every 150 ms until process_manifest is defined (up to ~9 s).
 	-- Robust against slow CDN script loading on first open after fresh launch.
 	local function try_inject(remaining)
@@ -410,6 +463,42 @@ local function load_and_inject(log_dir)
 		end)
 	end
 	try_inject(60)
+end
+
+--- Pre-fills the dashboard with the on-disk snapshot from the previous run
+--- so the user sees populated KPIs/charts within milliseconds of opening,
+--- well before the slow openssl decrypt + SQL refresh in load_and_inject()
+--- completes.  Returns true when a cached payload was found and injection
+--- was scheduled — the caller delays the background refresh slightly so JS
+--- finishes parsing the cached data before the fresh values overwrite it.
+--- @return boolean True if a cache existed and pre-fill was scheduled.
+local function prefill_from_disk_cache()
+	if not M._wv then return false end
+	local cached = load_disk_cache()
+	if not cached or type(cached.manifest) ~= "string" then
+		Logger.debug(LOG, "No disk cache available — UI will fill from fresh decrypt.")
+		return false
+	end
+	local function try_inject_cache(remaining)
+		if not M._wv then return end
+		M._wv:evaluateJavaScript("typeof window.process_manifest", function(t)
+			if t == "function" then
+				local js = string.format(
+					"window.metrics_manifest=%s;window.app_icons=%s;window._prefetch_data=%s;window.keycode_layout=%s;window.process_manifest();",
+					cached.manifest or "{}",
+					cached.app_icons or "{}",
+					cached.initial_data or "null",
+					cached.kc_layout or "{}"
+				)
+				pcall(function() M._wv:evaluateJavaScript(js) end)
+				Logger.success(LOG, "Dashboard pre-filled from disk cache.")
+			elseif remaining > 0 then
+				hs.timer.doAfter(0.10, function() try_inject_cache(remaining - 1) end)
+			end
+		end)
+	end
+	try_inject_cache(50)
+	return true
 end
 
 function M.show(log_dir)
@@ -454,10 +543,18 @@ function M.show(log_dir)
 	hs.timer.doAfter(0.35, function() raise_now(M._wv, true) end)
 	hs.timer.doAfter(0.70, function() raise_now(M._wv, false) end)
 
-	-- Defer ALL data work so the webview is rendered and visible before the
-	-- expensive openssl decrypt blocks the run loop.  100 ms gives enough
-	-- time for HS to commit the window to screen on first open.
-	hs.timer.doAfter(0.10, function() load_and_inject(log_dir) end)
+	-- Two-stage data fill:
+	--   1. Pre-fill from on-disk snapshot (≈ 50 ms): the user sees real
+	--      KPIs/charts within a frame, even if slightly stale.
+	--   2. Refresh from fresh decrypt+SQL in the background and overwrite
+	--      the cached values once ready.  The delay before refresh is
+	--      longer when a cache hit was scheduled so JS has time to parse
+	--      the cached payload before the fresh one overwrites it.
+	hs.timer.doAfter(0.05, function()
+		local had_cache = prefill_from_disk_cache()
+		local refresh_delay = had_cache and 0.40 or 0.05
+		hs.timer.doAfter(refresh_delay, function() load_and_inject(log_dir) end)
+	end)
 
 	-- Poll timer: serves subsequent filter-change requests from JS (cached).
 	if M._timer then M._timer:stop() end
