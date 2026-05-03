@@ -1532,6 +1532,27 @@ function M.log_modifier_press(keycode, app_name)
 end
 
 
+--- Records a single Karabiner-intercepted physical key press into the kc dict.
+--- Called by modules/keylogger/kc_bridge when it drains the KE physical-kc log;
+--- the kc_num here is the TRUE physical key the user pressed, not the remapped
+--- output that the HS event tap would observe.
+--- @param kc_num number The macOS virtual keycode of the physical key.
+--- @param app_name string The frontmost application at the time of the press.
+function M.log_karabiner_press(kc_num, app_name)
+	if not require_state("log_karabiner_press") then return end
+	local safe_app = (type(app_name) == "string" and app_name ~= "") and app_name or "Unknown"
+
+	local app_idx = _state.today_idx[safe_app]
+	if type(app_idx) ~= "table" then
+		app_idx = { c = {}, bg = {}, tg = {}, qg = {}, pg = {}, hx = {}, hp = {}, w = {}, sc = {}, sc_bg = {}, w_bg = {}, kc = {} }
+		_state.today_idx[safe_app] = app_idx
+	end
+	app_idx.kc = type(app_idx.kc) == "table" and app_idx.kc or {}
+	add_metric(app_idx.kc, tostring(kc_num), 0, false, "none")
+	debounced_save()
+end
+
+
 --- Increments a scalar metric field in the manifest for an app, then saves.
 --- Used for quick stats like hs_suggested or llm_suggested.
 --- @param app_name string The application to update.

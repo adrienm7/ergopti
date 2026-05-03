@@ -28,6 +28,7 @@ local dialog = require("lib.dialog_util")
 
 local LogManager     = require("modules.keylogger.log_manager")
 local ContextTracker = require("modules.keylogger.context_tracker")
+local KcBridge       = require("modules.keylogger.kc_bridge")
 local LOG            = "keylogger"
 
 
@@ -555,7 +556,10 @@ local function handle_key(event_obj)
 			d  = delay,
 			dk = false,
 			cp = false,
-			kc = keycode,  -- raw virtual keycode for physical-key frequency analysis
+			-- Suppress the output kc when Karabiner is logging the physical key for
+			-- this keycode — the bridge will credit the physical key instead, so we
+			-- must not also count the remapped output or the heatmap is double-counted.
+			kc = KcBridge.is_ke_managed_output_kc(keycode) and nil or keycode,
 		}
 
 		local ev_entry = nil
@@ -1233,6 +1237,12 @@ function M.start(script_control)
 	CoreState.is_enabled    = true
 	CoreState.last_flush_time = hs.timer.absoluteTime() / 1000000
 
+	-- KE physical-kc bridge — starts the log file watcher so Karabiner-emitted
+	-- physical kc names are drained into the kc dict. The suppression set is
+	-- empty at this point; karabiner/init.lua calls KcBridge.refresh_managed_set()
+	-- after it loads its own config.
+	KcBridge.init(CoreState, LogManager, nil, nil)
+
 	-- Application watcher
 	if not _app_watcher then
 		_app_watcher = hs.application.watcher.new(ContextTracker.app_watcher_cb)
@@ -1335,6 +1345,7 @@ function M.stop()
 	end
 
 	stop_hardware_watchers()
+	KcBridge.stop()
 	Logger.success(LOG, "Keylogger engine stopped.")
 end
 
