@@ -1,4 +1,4 @@
-﻿﻿﻿// ui/metrics_typing/data.js
+// ui/metrics_typing/data.js
 
 /**
  * ==============================================================================
@@ -475,14 +475,17 @@ function recompute_speed_kpi() {
 	const think_scale  = Math.max(0, 1 - THINK_PAUSE_THRESHOLD_MS / Math.max(pause_thresh, 1));
 	const effective_ms = time_ms + think_ms * think_scale;
 
-	// Output chars: physical keystrokes + net expansion chars for enabled sources
-	const eff_output_chars =
-		raw_chars +
-		(hs_raw_mode  ? hs_chars  : 0) +
-		(llm_raw_mode ? llm_chars : 0);
+	// CPM uses raw manual keystrokes (physical keys pressed, not expansions)
+	const output_cpm = effective_ms > 0 ? raw_chars / (effective_ms / 60000) : 0;
 
-	const output_cpm = effective_ms > 0 ? eff_output_chars / (effective_ms / 60000) : 0;
-	const output_wpm = output_cpm / 5;
+	// MPM uses actual word count from the w-dict (words are sequences of letters
+	// separated by spaces, punctuation, enter, tab — logged by the Lua keylogger).
+	const w_dict      = app_state.data.w || {};
+	let   total_words = 0;
+	Object.values(w_dict).forEach(item => { total_words += item.count || 0; });
+	const output_wpm  = effective_ms > 0 && total_words > 0
+		? total_words / (effective_ms / 60000)
+		: output_cpm / 5;   // fallback to CPM/5 if word dict not yet loaded
 
 	const wpm_val_elem = document.getElementById("wpm_val");
 	if (!wpm_val_elem) return;
@@ -496,12 +499,12 @@ function recompute_speed_kpi() {
 		`<div style="display:flex;align-items:center;gap:6px;">` +
 		`<span>${format_number(output_wpm.toFixed(1))} <span class="stat-unit">MPM</span></span>` +
 		`<span class="tooltip stat-inline-tooltip">${INFO_SVG}<span class="tooltiptext">` +
-		`MPM : Mots par minute (1 mot = 5 touches).<br>` +
-		`Seuil de pause : pauses ${thresh_label} incluses dans le temps actif.</span></span>` +
+		`MPM : Mots par minute (mots réels d'après le dictionnaire de mots tapés).<br>` +
+		`Seuil de pause : pauses ${thresh_label} incluses dans le temps actif.</span></span>` +
 		`</div>` +
 		`<div style="display:flex;align-items:center;gap:6px;font-size:0.65em;margin-top:5px;">` +
 		`<span>${format_number(output_cpm.toFixed(0))} <span class="stat-unit">CPM</span></span>` +
-		`<span class="tooltip stat-inline-tooltip">${INFO_SVG}<span class="tooltiptext">CPM : Caractères par minute</span></span>` +
+		`<span class="tooltip stat-inline-tooltip">${INFO_SVG}<span class="tooltiptext">CPM : Frappes physiques par minute (touches brutes, sans expansions HS/IA)</span></span>` +
 		`</div>` +
 		`</div>`;
 

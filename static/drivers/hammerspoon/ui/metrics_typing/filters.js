@@ -216,7 +216,7 @@ function reset_filters() {
 
 	// Restore pause threshold and quick range selects to their defaults
 	const pause_sel = document.getElementById("pause_threshold");
-	if (pause_sel) pause_sel.value = "2000";
+	if (pause_sel) pause_sel.value = "5000";
 	const quick_sel = document.getElementById("quick_range");
 	if (quick_sel) quick_sel.value = "";
 

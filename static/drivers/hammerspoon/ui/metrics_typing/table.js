@@ -628,7 +628,17 @@ function render_current_tab() {
 
 	// Update the occurrences subtitle in the table header (not the global KPI)
 	const occ_elem = document.getElementById("total_occurrences");
-	if (occ_elem) occ_elem.innerHTML = format_number(total_occ);
+	if (occ_elem) {
+		// For the chars tab, append a small mode badge so users know whether the
+		// total reflects raw keystrokes or output chars (controlled by the HS/LLM toggles).
+		let mode_badge = "";
+		if (app_state.current_tab === "c") {
+			const { show_hs, show_llm } = get_source_mode_flags();
+			const mode_label = (show_hs || show_llm) ? "frappes brutes" : "sortie écran";
+			mode_badge = ` <span style="font-size:0.8em;opacity:0.7;">(${mode_label})</span>`;
+		}
+		occ_elem.innerHTML = format_number(total_occ) + mode_badge;
+	}
 
 	// Compute weighted global metrics for the column sub-headers
 	let g_time = 0, g_man = 0, g_wpm = 0, g_wpm_n = 0, g_acc = 0, g_acc_n = 0;

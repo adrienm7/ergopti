@@ -61,6 +61,10 @@ function render_charts() {
 		if (!isNaN(wpm) && wpm > 0) wpm_pts.push({ x: date_obj, y: wpm });
 	});
 
+	// Shared x-axis range so precision and speed charts always have identical bounds
+	const x_min = sorted_keys.length > 0 ? new Date(sorted_keys[0]          + "T12:00:00") : null;
+	const x_max = sorted_keys.length > 0 ? new Date(sorted_keys.at(-1) + "T12:00:00") : null;
+
 	// Delegation chart always uses daily points — no per-hour HS/LLM breakdown available
 	_render_delegation_chart(manual_pts, hs_pts, llm_pts, rgb_ia, rgb_hs, rgb_man);
 	_render_sparklines(hs_sp_pts, llm_sp_pts, rgb_hs, rgb_ia);
@@ -76,8 +80,8 @@ function render_charts() {
 		const prc_title_el = document.getElementById("precision_chart_title");
 		if (prc_title_el) prc_title_el.textContent = "Précision (%)";
 
-		_render_wpm_chart(wpm_pts, rgb_wpm);
-		_render_precision_chart(sorted_keys, rgb_prc);
+		_render_wpm_chart(wpm_pts, rgb_wpm, x_min, x_max);
+		_render_precision_chart(sorted_keys, rgb_prc, x_min, x_max);
 	}
 }
 
@@ -257,11 +261,18 @@ function _render_delegation_chart(manual_pts, hs_pts, llm_pts, rgb_ia, rgb_hs, r
 /**
  * @param {Object[]} wpm_pts - Data points for daily WPM values.
  * @param {string}   rgb_wpm - CSS RGB string for WPM color.
+ * @param {Date|null} x_min  - Shared x-axis lower bound (aligns with precision chart).
+ * @param {Date|null} x_max  - Shared x-axis upper bound.
  */
-function _render_wpm_chart(wpm_pts, rgb_wpm) {
+function _render_wpm_chart(wpm_pts, rgb_wpm, x_min = null, x_max = null) {
 	if (wpm_chart_instance) wpm_chart_instance.destroy();
 	const elem = document.getElementById("wpm_chart");
 	if (!elem) return;
+
+	const x_opts = { type: "time", time: { unit: "day" }, grid: { color: GRID_COLOR },
+		ticks: { color: "transparent", callback: (v) => _format_day_tick(v) } };
+	if (x_min) x_opts.min = x_min;
+	if (x_max) x_opts.max = x_max;
 
 	wpm_chart_instance = new Chart(elem.getContext("2d"), {
 		type: "line",
@@ -288,12 +299,7 @@ function _render_wpm_chart(wpm_pts, rgb_wpm) {
 				},
 			},
 			scales: {
-				x: {
-					type:  "time",
-					time:  { unit: "day" },
-					grid:  { color: GRID_COLOR },
-					ticks: { color: "transparent", callback: (v) => _format_day_tick(v) },
-				},
+				x: x_opts,
 				y: { beginAtZero: true, grid: { color: GRID_COLOR } },
 			},
 		},
@@ -303,20 +309,24 @@ function _render_wpm_chart(wpm_pts, rgb_wpm) {
 /**
  * @param {string[]} sorted_keys - Sorted date keys from time_series.
  * @param {string}   rgb_prc     - CSS RGB string for precision color.
+ * @param {Date|null} x_min      - Shared x-axis lower bound (aligns with speed chart).
+ * @param {Date|null} x_max      - Shared x-axis upper bound.
  */
-function _render_precision_chart(sorted_keys, rgb_prc) {
+function _render_precision_chart(sorted_keys, rgb_prc, x_min = null, x_max = null) {
 	if (precision_chart_instance) precision_chart_instance.destroy();
 	const elem = document.getElementById("precision_chart");
 	if (!elem) return;
 
-	// Skip days with no data so the precision chart has no spurious y=0 points
+	// Skip days with no data and days with suspiciously low accuracy (<20%) which
+	// indicate data artifacts (e.g., a session logged almost entirely as errors).
 	const precision_pts = sorted_keys
 		.filter(k => app_state.time_series[k].daily_chars > 0)
 		.map((k) => {
 			const d = app_state.time_series[k];
 			const accuracy = ((d.daily_chars - d.daily_manual_errors) / d.daily_chars) * 100;
 			return { x: new Date(k + "T12:00:00"), y: Math.max(0, Math.min(100, accuracy)) };
-		});
+		})
+		.filter(pt => pt.y >= 20);
 
 	precision_chart_instance = new Chart(elem.getContext("2d"), {
 		type: "line",
@@ -343,14 +353,14 @@ function _render_precision_chart(sorted_keys, rgb_prc) {
 				},
 			},
 			scales: {
-				x: {
-					type:  "time",
-					time:  { unit: "day" },
-					grid:  { color: GRID_COLOR },
-					ticks: { color: "transparent", callback: (v) => _format_day_tick(v) },
-				},
+				x: Object.assign(
+					{ type: "time", time: { unit: "day" }, grid: { color: GRID_COLOR },
+					  ticks: { color: "transparent", callback: (v) => _format_day_tick(v) } },
+					x_min ? { min: x_min } : {},
+					x_max ? { max: x_max } : {}
+				),
 				y: {
-					beginAtZero: false, min: 50, max: 100,
+					beginAtZero: true, min: 0, max: 100,
 					ticks: { callback: (v) => v + "%" },
 					grid:  { color: "rgba(128, 128, 128, 0.1)" },
 				},
