@@ -167,32 +167,43 @@ end)
 
 --- Shows the webview for the apps time dashboard.
 --- @param log_dir string Path to the logging directory.
-function M.show(log_dir)
-	if M._wv then
-		Logger.debug(LOG, "Dashboard already open, bringing to front…")
-		ui_builder.force_focus(M._wv)
-		return
+--- Aggressively raises the dashboard window above any compositing menu.
+--- Same rationale as metrics_typing.raise_now — see that module for details.
+local function raise_now(wv, above_everything)
+	if not wv then return end
+	pcall(function() wv:show() end)
+	pcall(function() wv:bringToFront(above_everything) end)
+	pcall(hs.focus)
+	local ok, win = pcall(function() return wv:hswindow() end)
+	if ok and win then
+		pcall(function() win:raise() end)
+		pcall(function() win:focus() end)
 	end
+end
 
-	Logger.start(LOG, "Opening apps time dashboard…")
-	local sf = hs.screen.mainScreen():frame()
-	local frame = { x = sf.x + 50, y = sf.y + 50, w = sf.w - 100, h = sf.h - 100 }
+--- Performs the slow disk I/O (today rebuild, manifest read, DB decrypt) and
+--- injects the resulting manifest into the already-visible webview.  Decoupling
+--- this from M.show() lets the window appear instantly: the user sees the empty
+--- shell first and the data fills in once decrypt completes.
+--- @param log_dir string Path to the logging directory.
+local function load_and_inject(log_dir)
+	if not M._wv then return end
 
 	local log_manager = require("modules.keylogger.log_manager")
 	pcall(log_manager.rebuild_today_from_raw_log)
 
 	local today_str = os.date("%Y-%m-%d")
 
-	-- Invalidate historical cache on day boundary
+	-- Invalidate historical cache on day boundary.
 	if M._cache_date ~= today_str then
 		M._cache_date          = today_str
 		M._hist_manifest_cache = nil
 		Logger.info(LOG, "New day or first open — flushing apps manifest cache.")
 	end
 
-	local manifest   = {}
-	local enc_path   = log_dir .. "/metrics.sqlite.enc"
-	local pwd        = log_manager.get_mac_serial():gsub("\"", "\\\"")
+	local manifest = {}
+	local enc_path = log_dir .. "/metrics.sqlite.enc"
+	local pwd      = log_manager.get_mac_serial():gsub("\"", "\\\"")
 
 	if M._hist_manifest_cache then
 		Logger.done(LOG, "Historical manifest cache hit — skipping DB decrypt.")
@@ -227,7 +238,9 @@ function M.show(log_dir)
 		Logger.done(LOG, "Historical manifest decrypted and cached.")
 	end
 
-	-- Always merge today's live manifest (cheap plaintext read)
+	if not M._wv then return end
+
+	-- Today's live manifest (cheap plaintext read).
 	local manifest_file = log_dir .. "/manifest.json"
 	local mf = io.open(manifest_file, "r")
 	if mf then
@@ -244,6 +257,51 @@ function M.show(log_dir)
 	local manifest_json  = json.encode(manifest)
 	local user_cats_json = json.encode(user_cats)
 
+	-- Retry injection loop — robust against slow CDN loads.
+	local function try_inject(remaining)
+		if not M._wv then return end
+		M._wv:evaluateJavaScript("typeof window.bootstrapMetricsAppsData", function(t)
+			if t == "function" then
+				local js = string.format("window.bootstrapMetricsAppsData(%s,%s);", manifest_json, user_cats_json)
+				pcall(function() M._wv:evaluateJavaScript(js) end)
+				Logger.success(LOG, "Apps dashboard manifest injected.")
+			elseif t == "undefined" then
+				M._wv:evaluateJavaScript("typeof window.initDashboard", function(t2)
+					if t2 == "function" then
+						local js = string.format("window.ManifestData=%s;window.UserCategories=%s;window.initDashboard();", manifest_json, user_cats_json)
+						pcall(function() M._wv:evaluateJavaScript(js) end)
+						Logger.success(LOG, "Apps dashboard manifest injected (legacy path).")
+					elseif remaining > 0 then
+						hs.timer.doAfter(0.15, function() try_inject(remaining - 1) end)
+					else
+						Logger.error(LOG, "load_and_inject(): bootstrapMetricsAppsData not available.")
+					end
+				end)
+			elseif remaining > 0 then
+				hs.timer.doAfter(0.15, function() try_inject(remaining - 1) end)
+			else
+				Logger.error(LOG, "load_and_inject(): apps dashboard JS not available.")
+			end
+		end)
+	end
+	try_inject(60)
+end
+
+function M.show(log_dir)
+	if M._wv then
+		Logger.debug(LOG, "Dashboard already open, bringing to front…")
+		ui_builder.force_focus(M._wv)
+		return
+	end
+
+	Logger.start(LOG, "Opening apps time dashboard…")
+
+	-- Create webview FIRST with zero disk I/O so the window appears instantly.
+	-- All migration / decrypt / SQL work is deferred to load_and_inject() once
+	-- the window is on screen and the raise sequence has settled.
+	local sf    = hs.screen.mainScreen():frame()
+	local frame = { x = sf.x + 50, y = sf.y + 50, w = sf.w - 100, h = sf.h - 100 }
+
 	M._wv = ui_builder.show_webview({
 		frame       = frame,
 		title       = "Temps sur les applications",
@@ -251,43 +309,21 @@ function M.show(log_dir)
 		assets_dir  = hs.configdir .. "/ui/metrics_apps/",
 		on_close    = function()
 			M._wv = nil
-			-- Intentionally keep hist_manifest_cache: it is valid for the rest of the day
+			-- Keep hist_manifest_cache: it is valid for the rest of the day.
 			Logger.info(LOG, "Apps time dashboard closed.")
 		end
 	})
 
-	-- Retry injection loop (same pattern as metrics_typing) — robust against slow CDN loads
-	local function try_inject(remaining)
-		if not M._wv then return end
-		M._wv:evaluateJavaScript("typeof window.bootstrapMetricsAppsData", function(t)
-			if t == "function" then
-				local js = string.format("window.bootstrapMetricsAppsData(%s,%s);", manifest_json, user_cats_json)
-				pcall(function() M._wv:evaluateJavaScript(js) end)
-				Logger.debug(LOG, "Apps dashboard manifest injected.")
-			elseif t == "undefined" then
-				-- Fallback path for older JS entry-point
-				M._wv:evaluateJavaScript("typeof window.initDashboard", function(t2)
-					if t2 == "function" then
-						local js = string.format("window.ManifestData=%s;window.UserCategories=%s;window.initDashboard();", manifest_json, user_cats_json)
-						pcall(function() M._wv:evaluateJavaScript(js) end)
-						Logger.debug(LOG, "Apps dashboard manifest injected (legacy path).")
-					elseif remaining > 0 then
-						hs.timer.doAfter(0.15, function() try_inject(remaining - 1) end)
-					else
-						Logger.error(LOG, "M.show(): bootstrapMetricsAppsData not available after 3 s.")
-					end
-				end)
-			elseif remaining > 0 then
-				hs.timer.doAfter(0.15, function() try_inject(remaining - 1) end)
-			else
-				Logger.error(LOG, "M.show(): apps dashboard JS not available after 3 s.")
-			end
-		end)
-	end
+	raise_now(M._wv, true)
+	hs.timer.doAfter(0.05, function() raise_now(M._wv, true) end)
+	hs.timer.doAfter(0.15, function() raise_now(M._wv, true) end)
+	hs.timer.doAfter(0.35, function() raise_now(M._wv, true) end)
+	hs.timer.doAfter(0.70, function() raise_now(M._wv, false) end)
 
-	hs.timer.doAfter(0.1, function() try_inject(20) end)
+	-- Defer all data work so the empty shell appears before openssl blocks.
+	hs.timer.doAfter(0.10, function() load_and_inject(log_dir) end)
 
-	Logger.success(LOG, "Apps time dashboard opened.")
+	Logger.success(LOG, "Apps time dashboard window opened (data loading…).")
 end
 
 --- Broadcasts real-time manifest events to the webview UI.
