@@ -387,21 +387,23 @@ function M.show(log_dir)
 		end
 	})
 
-	-- After HS reload the webview window handle (hswindow) is not available
-	-- immediately — the OS needs a few frames to composite it.  Poll until the
-	-- handle exists, then raise the window.  Cap at 20 attempts (≈ 2 s total)
-	-- to avoid leaking timers if something goes wrong.
+	-- After HS reload the OS takes a variable number of frames to assign a window
+	-- handle to the new webview.  Poll every 100 ms until hswindow() returns a
+	-- valid handle, then bring the window to the front.  show() is also called on
+	-- each attempt in case the window was created but not yet made visible by the
+	-- compositor.  Cap at 30 attempts (≈ 3 s) to avoid leaking timers.
 	local focus_attempts = 0
 	local function try_focus_when_ready()
 		if not M._wv then return end
 		focus_attempts = focus_attempts + 1
+		pcall(function() M._wv:show() end)
 		local ok, win = pcall(function() return M._wv:hswindow() end)
 		if ok and win then
 			pcall(function() win:raise() end)
 			pcall(function() win:focus() end)
 			pcall(hs.focus)
 			Logger.debug(LOG, "Dashboard window raised after %d attempt(s).", focus_attempts)
-		elseif focus_attempts < 20 then
+		elseif focus_attempts < 30 then
 			hs.timer.doAfter(0.1, try_focus_when_ready)
 		else
 			Logger.warn(LOG, "Dashboard window handle never became available — focus skipped.")

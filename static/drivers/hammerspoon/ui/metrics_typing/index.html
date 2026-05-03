@@ -172,7 +172,7 @@
 					class="chart-container"
 					style="
 						flex: 1;
-						padding-bottom: 0;
+						padding: 15px 15px 0 15px;
 						background: var(--precision-bg);
 						border-color: var(--precision-border);
 					"
@@ -202,8 +202,9 @@
 							Restaurer le zoom
 						</button>
 					</div>
+					<!-- margin-top gives breathing room below title; height drives chart canvas size -->
 					<div style="position: relative; height: 160px; margin-top: 10px;">
-						<canvas id="precision_chart" style="position: absolute; inset: 0;"></canvas>
+						<canvas id="precision_chart" style="position: absolute; inset: 0; width: 100%; height: 100%;"></canvas>
 					</div>
 				</div>
 
@@ -211,7 +212,7 @@
 					class="chart-container"
 					style="
 						flex: 1;
-						padding-bottom: 0;
+						padding: 15px 15px 0 15px;
 						background: var(--global-bg);
 						border-color: var(--global-border);
 					"
@@ -241,8 +242,9 @@
 							Restaurer le zoom
 						</button>
 					</div>
+					<!-- margin-top gives breathing room below title; height drives chart canvas size -->
 					<div style="position: relative; height: 160px; margin-top: 10px;">
-						<canvas id="wpm_chart" style="position: absolute; inset: 0;"></canvas>
+						<canvas id="wpm_chart" style="position: absolute; inset: 0; width: 100%; height: 100%;"></canvas>
 					</div>
 				</div>
 			</div>
