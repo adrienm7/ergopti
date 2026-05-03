@@ -169,10 +169,10 @@ const KEY_POSITIONS = {
 	"41":  { x: 10.75, y: 0     }, // ;  — right pinky home
 	"39":  { x: 11.75, y: 0     }, // '  — right pinky reach
 	"36":  { x: 14.0,  y: 0     }, // return
-	"57":  { x: 0.75,  y: 0     }, // capslock
+	"57":  { x: 0.875, y: 0     }, // capslock — 1.75u wide, left-aligned at x=0
 
 	// QWERTY row (y = 0.90)
-	"48":  { x: 0.50,  y: 0.90  }, // tab
+	"48":  { x: 0.75,  y: 0.90  }, // tab — 1.5u wide, left-aligned at x=0
 	"12":  { x: 1.5,   y: 0.90  }, // q
 	"13":  { x: 2.5,   y: 0.90  }, // w
 	"14":  { x: 3.5,   y: 0.90  }, // e
@@ -188,7 +188,11 @@ const KEY_POSITIONS = {
 	"42":  { x: 12.75, y: 0     }, // \ — ISO backslash is on the home row, between ' and Return
 
 	// Number row (y = 1.80)
-	"50":  { x: 0,     y: 1.80  }, // `
+	// Apple ISO keyboard quirk: the kc to the left of "1" is reported as 10
+	// (normally the ISO < > key) and the kc right of left-shift is reported
+	// as 50 (normally `). The visual layout swaps them so the labels match
+	// what the user actually sees on their physical keyboard.
+	"10":  { x: 0,     y: 1.80  }, // ` (left of 1) — Apple ISO swap
 	"18":  { x: 1,     y: 1.80  }, // 1
 	"19":  { x: 2,     y: 1.80  }, // 2
 	"20":  { x: 3,     y: 1.80  }, // 3
@@ -207,7 +211,7 @@ const KEY_POSITIONS = {
 	// Left Shift is 1.25u on ISO (vs 2.25u ANSI); ISO extra key (kc 10) fills the gap.
 	// Z and every key after it sit at the same x as ANSI because 1.25u + 1u = 2.25u total offset.
 	"56":  { x: 0.625, y: -0.90 }, // shift (L) — 1.25u ISO key, centre at 0.625
-	"10":  { x: 1.75,  y: -0.90 }, // ISO extra key (< > on AZERTY, § on UK) — not in ANSI
+	"50":  { x: 1.75,  y: -0.90 }, // ISO extra key (< > on AZERTY, § on UK) — Apple ISO swap
 	"6":   { x: 2.75,  y: -0.90 }, // z
 	"7":   { x: 3.75,  y: -0.90 }, // x
 	"8":   { x: 4.75,  y: -0.90 }, // c

@@ -70,7 +70,8 @@ function switch_tab(tab_name) {
  * Updates the search query from the table header input and re-renders.
  */
 function handle_search() {
-	app_state.search_query = (document.getElementById("search_input")?.value ?? "").toLowerCase();
+	// Preserve original case — render_table() applies the case-sensitive toggle
+	app_state.search_query = document.getElementById("search_input")?.value ?? "";
 	render_table();
 }
 
@@ -720,13 +721,13 @@ function render_kc_heatmap(kc_data_arr) {
 
 	// Widths of non-standard keys in key-units
 	const WIDE_KEYS = {
-		"36":  1.10, // return
-		"48":  1.10, // tab
-		"51":  1.10, // backspace
-		"56":  1.10, // l-shift
-		"57":  1.10, // capslock
-		"60":  1.10, // r-shift
-		"49":  2.50, // space bar
+		"36":  1.50, // return — top-row width on the QWERTY row (L-shape)
+		"48":  1.50, // tab — left edge at x=0, flush against Q
+		"51":  2.00, // backspace
+		"56":  1.25, // l-shift (ISO)
+		"57":  1.75, // capslock
+		"60":  1.75, // r-shift (ISO)
+		"49":  5.00, // space bar — fills cmd-L → cmd-R gap
 		"59":  1.00, // ctrl-L
 		"55":  1.00, // cmd-L
 		"54":  1.00, // cmd-R
@@ -734,19 +735,76 @@ function render_kc_heatmap(kc_data_arr) {
 		"62":  1.00, // ctrl-R
 	};
 
+	// Anchor side for each wide key — determines whether the key extends from its
+	// pos.x toward the left, the right, or both sides of its declared centre.
+	// "right": right edge butts against the next 1u key on the same row (GAP between).
+	// "left":  left edge butts against the previous 1u key on the same row.
+	// "centre": symmetric around pos.x (default for unspecified keys).
+	// "stretch": fills the gap between two neighbours given as { left_kc, right_kc }.
+	const WIDE_KEY_ANCHOR = {
+		"48": "right",   // tab
+		"57": "right",   // capslock
+		"36": "right",   // return (L-shape uses anchor for the QWERTY-row top portion)
+		"51": "left",    // backspace
+		"56": "right",   // l-shift
+		"60": "left",    // r-shift
+		"49": "stretch", // space — fills cmd-L → cmd-R
+	};
+	const SPACE_LEFT_NEIGHBOUR  = "55"; // cmd-L
+	const SPACE_RIGHT_NEIGHBOUR = "54"; // cmd-R
+
+	/** Returns the visual sx (left edge, in raw px) for a key. Wide keys are anchored
+	 * to their neighbour rather than centred on pos.x so that horizontal gaps stay
+	 * uniform (= GAP px) regardless of key width. */
+	const compute_sx = (kc_str, pos) => {
+		const w_units = WIDE_KEYS[kc_str] ?? 1;
+		const key_w   = Math.round(w_units * U - GAP);
+		const anchor  = WIDE_KEY_ANCHOR[kc_str];
+		if (anchor === "right") {
+			// Right edge sits GAP px to the left of pos.x*U + KW/2 + GAP/2
+			// (i.e. flush against the next 1u key whose centre is pos.x + 1).
+			return Math.round((pos.x + 0.5) * U) - Math.round(GAP / 2) - key_w;
+		}
+		if (anchor === "left") {
+			return Math.round((pos.x - 0.5) * U) + Math.round(GAP / 2);
+		}
+		if (anchor === "stretch") {
+			const lp = KEY_POSITIONS[SPACE_LEFT_NEIGHBOUR];
+			const rp = KEY_POSITIONS[SPACE_RIGHT_NEIGHBOUR];
+			if (lp && rp) {
+				return Math.round((lp.x + 0.5) * U) + Math.round(GAP / 2);
+			}
+		}
+		// Default: centred on pos.x
+		const extra_w = (w_units - 1) * U / 2;
+		return Math.round(pos.x * U) - Math.round(KW / 2) - Math.round(extra_w);
+	};
+
+	/** Returns the visible width in px for a key, taking stretch into account. */
+	const compute_kw = (kc_str, pos) => {
+		const w_units = WIDE_KEYS[kc_str] ?? 1;
+		if (WIDE_KEY_ANCHOR[kc_str] === "stretch") {
+			const lp = KEY_POSITIONS[SPACE_LEFT_NEIGHBOUR];
+			const rp = KEY_POSITIONS[SPACE_RIGHT_NEIGHBOUR];
+			if (lp && rp) {
+				const left  = Math.round((lp.x + 0.5) * U) + Math.round(GAP / 2);
+				const right = Math.round((rp.x - 0.5) * U) - Math.round(GAP / 2);
+				return Math.max(0, right - left);
+			}
+		}
+		return Math.round(w_units * U - GAP);
+	};
+
 	// Compute pixel canvas size including padding
-	// X range: leftmost key centre − half its width to rightmost + half its width
 	let min_x_px = Infinity, max_x_px = -Infinity;
 	let min_y_px = Infinity, max_y_px = -Infinity;
 	const key_entries = Object.entries(KEY_POSITIONS);
 
 	// First pass: determine canvas bounds
 	key_entries.forEach(([kc_str, pos]) => {
-		const w_units = WIDE_KEYS[kc_str] ?? 1;
-		const key_w   = Math.round(w_units * U - GAP);
-		const extra_w = (w_units - 1) * U / 2;
-		const sx      = Math.round(pos.x * U) - Math.round(KW / 2) - Math.round(extra_w);
-		const sy      = Math.round((Y_TOP - pos.y) / Y_SPAN * (5.5 * U)) - Math.round(KH / 2);
+		const key_w = compute_kw(kc_str, pos);
+		const sx    = compute_sx(kc_str, pos);
+		const sy    = Math.round((Y_TOP - pos.y) / Y_SPAN * (5.5 * U)) - Math.round(KH / 2);
 		min_x_px = Math.min(min_x_px, sx);
 		max_x_px = Math.max(max_x_px, sx + key_w);
 		min_y_px = Math.min(min_y_px, sy);
@@ -827,10 +885,8 @@ function render_kc_heatmap(kc_data_arr) {
 	key_entries.forEach(([kc_str, pos]) => {
 		const count    = count_map[kc_str] || 0;
 		const fill     = heat_color(count);
-		const w_units  = WIDE_KEYS[kc_str] ?? 1;
-		const key_w    = Math.round(w_units * U - GAP);
-		const extra_w  = (w_units - 1) * U / 2;
-		const sx       = Math.round(pos.x * U) - Math.round(KW / 2) - Math.round(extra_w) + off_x;
+		const key_w    = compute_kw(kc_str, pos);
+		const sx       = compute_sx(kc_str, pos) + off_x;
 		const sy       = Math.round((Y_TOP - pos.y) / Y_SPAN * (5.5 * U)) - Math.round(KH / 2) + off_y;
 		const cx       = sx + key_w / 2;
 		const cy       = sy + KH / 2;
@@ -914,26 +970,32 @@ function render_kc_heatmap(kc_data_arr) {
 		// ISO Return (kc 36) gets an L-shaped path spanning home + QWERTY rows.
 		// For all other keys a standard rounded-rect is drawn.
 		if (kc_str === "36") {
+			// ISO Return (Apple): wide top portion on the QWERTY row, narrower stem
+			// on the home row right-aligned to the same right edge.
 			const row_px  = Math.round(U * 0.90);    // pixel distance between rows
-			const stem_w  = Math.round(U - GAP);     // stem = 1u wide
-			const stem_sx = sx + key_w - stem_w;     // stem right-aligned
-			const top_y   = sy - row_px;             // top of QWERTY row
-			const bot_bot = sy + KH;                 // bottom of home row
-			const lx = stem_sx, rx = sx + key_w;
-			// Clockwise L-path with rounded corners
+			const stem_w  = Math.round(U - GAP);     // stem = 1u wide on the home row
+			const lx      = sx + key_w - stem_w;     // stem left edge (right-aligned)
+			const rx      = sx + key_w;              // shared right edge
+			const top_y   = sy - row_px;             // top edge (QWERTY row top)
+			const mid_y   = sy;                      // junction between wing and stem
+			const bot_y   = sy + KH;                 // bottom of home row stem
+			// Clockwise outline starting at top-left convex corner.
+			// Convex corners use sweep flag 1; the single inner concave corner
+			// where the wing meets the stem uses sweep flag 0.
 			const d = [
-				`M ${rx-R} ${top_y}`,
+				`M ${sx} ${top_y+R}`,
+				`A ${R} ${R} 0 0 1 ${sx+R} ${top_y}`,
+				`L ${rx-R} ${top_y}`,
 				`A ${R} ${R} 0 0 1 ${rx} ${top_y+R}`,
-				`L ${rx} ${bot_bot-R}`,
-				`A ${R} ${R} 0 0 1 ${rx-R} ${bot_bot}`,
-				`L ${sx+R} ${bot_bot}`,
-				`A ${R} ${R} 0 0 1 ${sx} ${bot_bot-R}`,
-				`L ${sx} ${sy+R}`,
-				`A ${R} ${R} 0 0 1 ${sx+R} ${sy}`,
-				`L ${lx-R} ${sy}`,
-				`A ${R} ${R} 0 0 1 ${lx} ${sy-R}`,
-				`L ${lx} ${top_y+R}`,
-				`A ${R} ${R} 0 0 1 ${lx+R} ${top_y}`,
+				`L ${rx} ${bot_y-R}`,
+				`A ${R} ${R} 0 0 1 ${rx-R} ${bot_y}`,
+				`L ${lx+R} ${bot_y}`,
+				`A ${R} ${R} 0 0 1 ${lx} ${bot_y-R}`,
+				`L ${lx} ${mid_y+R}`,
+				`A ${R} ${R} 0 0 0 ${lx-R} ${mid_y}`,
+				`L ${sx+R} ${mid_y}`,
+				`A ${R} ${R} 0 0 1 ${sx} ${mid_y-R}`,
+				`L ${sx} ${top_y+R}`,
 				"Z",
 			].join(" ");
 			rects += `<path d="${d}" fill="${fill}" stroke="#0d0d1a" stroke-width="1.5"
@@ -1022,8 +1084,8 @@ function hm_track_mouse(evt) {
  * @param {string} raw_key - The raw key string from the data dictionary.
  * @returns {string} Lowercase composite string including all aliases.
  */
-function build_searchable_key(raw_key) {
-	let s = raw_key.toLowerCase();
+function build_searchable_key(raw_key, case_sensitive) {
+	let s = case_sensitive ? raw_key : raw_key.toLowerCase();
 	// Space character variants
 	if (raw_key.includes("\u00A0")) s += " nbsp";
 	if (raw_key.includes("\u202F")) s += " nnbsp";
@@ -1032,28 +1094,31 @@ function build_searchable_key(raw_key) {
 	// Single ASCII control characters → add their CONTROL_CHAR_NAMES abbreviation
 	if (raw_key.length === 1) {
 		const code = raw_key.charCodeAt(0);
-		if (CONTROL_CHAR_NAMES[code]) s += " " + CONTROL_CHAR_NAMES[code].toLowerCase();
+		if (CONTROL_CHAR_NAMES[code]) {
+			const name = CONTROL_CHAR_NAMES[code];
+			s += " " + (case_sensitive ? name : name.toLowerCase());
+		}
 	}
 	// Keycode tab → add the resolved human-readable name (custom layout > static map)
 	if (app_state.current_tab === "kc") {
 		const kc_resolved = (window.keycode_layout && window.keycode_layout[raw_key])
 			|| KEYCODE_NAMES[raw_key];
-		if (kc_resolved) s += " " + kc_resolved.toLowerCase();
+		if (kc_resolved) s += " " + (case_sensitive ? kc_resolved : kc_resolved.toLowerCase());
 	}
 	// Add the text label for the exact key (lowercased for case-insensitive search)
 	// so that typing "backspace", "left", "space", etc. finds the matching entries.
 	const exact_sym = CONTROL_KEY_SYMBOLS[raw_key.toLowerCase()];
 	if (exact_sym) {
-		const exact_lower = exact_sym.toLowerCase();
-		if (!s.includes(exact_lower)) s += " " + exact_lower;
+		const candidate = case_sensitive ? exact_sym : exact_sym.toLowerCase();
+		if (!s.includes(candidate)) s += " " + candidate;
 	}
 	// For sequences: also add labels for each embedded bracket marker (e.g. in bigrams)
 	const bracket_matches = raw_key.match(/\[[^\]]+\]/gi) || [];
 	bracket_matches.forEach(m => {
 		const m_sym = CONTROL_KEY_SYMBOLS[m.toLowerCase()];
 		if (m_sym) {
-			const m_lower = m_sym.toLowerCase();
-			if (!s.includes(m_lower)) s += " " + m_lower;
+			const candidate = case_sensitive ? m_sym : m_sym.toLowerCase();
+			if (!s.includes(candidate)) s += " " + candidate;
 		}
 	});
 	return s;
@@ -1070,13 +1135,31 @@ function render_table() {
 		let arr = [...app_state.rendered_list];
 
 		// Apply search filter using enriched searchable key so special characters
-		// like NBSP, NNBSP, and [BS] can be found by typing their alias names
+		// like NBSP, NNBSP, and [BS] can be found by typing their alias names.
+		// Case sensitivity follows the dedicated toggle button — when active, "e"
+		// must not match "Enter" and capitalised aliases are preserved verbatim.
+		const case_sensitive_search = !!document.getElementById("btn_case_sensitive")?.classList.contains("active");
+		const match_positions = new Map();
 		if (app_state.search_query) {
-			arr = arr.filter((i) => build_searchable_key(i.key).includes(app_state.search_query));
+			const q = app_state.search_query;
+			arr = arr.filter((i) => {
+				const haystack = build_searchable_key(i.key, case_sensitive_search);
+				const idx = haystack.indexOf(q);
+				if (idx === -1) return false;
+				match_positions.set(i, idx);
+				return true;
+			});
 		}
 
-		// Sort
+		// Sort. When a search is active, rows whose match position is further left
+		// rank first — typing "e" should surface "e" itself before words containing
+		// "e" further inside. Ties fall back to the regular column-based sort.
 		arr.sort((a, b) => {
+			if (app_state.search_query) {
+				const pa = match_positions.get(a) ?? Infinity;
+				const pb = match_positions.get(b) ?? Infinity;
+				if (pa !== pb) return pa - pb;
+			}
 			const v_a = a[app_state.sort_col] ?? 0;
 			const v_b = b[app_state.sort_col] ?? 0;
 			if (typeof v_a === "string") {
