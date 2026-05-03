@@ -707,7 +707,7 @@ function render_kc_heatmap(kc_data_arr) {
 
 	// ── SVG layout constants ──────────────────────────────────────────────────
 	// 1 unit = U px; PAD adds breathing room so wide/edge keys aren't clipped
-	const U     = 44;
+	const U     = 50;
 	const GAP   = 4;
 	const R     = 5;
 	const KW    = U - GAP;
@@ -723,7 +723,7 @@ function render_kc_heatmap(kc_data_arr) {
 	const WIDE_KEYS = {
 		"36":  1.50, // return — top-row width on the QWERTY row (L-shape)
 		"48":  1.50, // tab — left edge at x=0, flush against Q
-		"51":  2.00, // backspace
+		"51":  1.75, // backspace — 1.75u so right edge aligns with Return stem and right shift
 		"56":  1.25, // l-shift (ISO)
 		"57":  1.75, // capslock
 		"60":  1.75, // r-shift (ISO)

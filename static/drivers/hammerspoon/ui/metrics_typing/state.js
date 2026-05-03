@@ -169,10 +169,10 @@ const KEY_POSITIONS = {
 	"41":  { x: 10.75, y: 0     }, // ;  — right pinky home
 	"39":  { x: 11.75, y: 0     }, // '  — right pinky reach
 	"36":  { x: 14.0,  y: 0     }, // return
-	"57":  { x: 0.875, y: 0     }, // capslock — 1.75u wide, left-aligned at x=0
+	"57":  { x: 0.75,  y: 0     }, // capslock — 1.75u wide, anchored so right edge has normal gap with A
 
 	// QWERTY row (y = 0.90)
-	"48":  { x: 0.75,  y: 0.90  }, // tab — 1.5u wide, left-aligned at x=0
+	"48":  { x: 0.5,   y: 0.90  }, // tab — 1.5u wide, anchored so right edge has normal gap with Q
 	"12":  { x: 1.5,   y: 0.90  }, // q
 	"13":  { x: 2.5,   y: 0.90  }, // w
 	"14":  { x: 3.5,   y: 0.90  }, // e
@@ -188,11 +188,10 @@ const KEY_POSITIONS = {
 	"42":  { x: 12.75, y: 0     }, // \ — ISO backslash is on the home row, between ' and Return
 
 	// Number row (y = 1.80)
-	// Apple ISO keyboard quirk: the kc to the left of "1" is reported as 10
-	// (normally the ISO < > key) and the kc right of left-shift is reported
-	// as 50 (normally `). The visual layout swaps them so the labels match
-	// what the user actually sees on their physical keyboard.
-	"10":  { x: 0,     y: 1.80  }, // ` (left of 1) — Apple ISO swap
+	// Apple ISO keyboard quirk: physical backtick key (left of 1) is kc 50,
+	// and the ISO extra key (< >, right of left-shift) is kc 10.
+	// kc 50 is placed here (number row) so its ` label sits at the correct position.
+	"50":  { x: 0,     y: 1.80  }, // ` (number row, left of 1) — Apple ISO swap: kc50 is physically the ` key
 	"18":  { x: 1,     y: 1.80  }, // 1
 	"19":  { x: 2,     y: 1.80  }, // 2
 	"20":  { x: 3,     y: 1.80  }, // 3
@@ -205,13 +204,15 @@ const KEY_POSITIONS = {
 	"29":  { x: 10,    y: 1.80  }, // 0
 	"27":  { x: 11,    y: 1.80  }, // -
 	"24":  { x: 12,    y: 1.80  }, // =
-	"51":  { x: 13.5,  y: 1.80  }, // backspace
+	"51":  { x: 13.0,  y: 1.80  }, // backspace — left anchor; right edge aligns with Return stem
 
 	// Bottom row (y = -0.90) — ISO layout
 	// Left Shift is 1.25u on ISO (vs 2.25u ANSI); ISO extra key (kc 10) fills the gap.
 	// Z and every key after it sit at the same x as ANSI because 1.25u + 1u = 2.25u total offset.
-	"56":  { x: 0.625, y: -0.90 }, // shift (L) — 1.25u ISO key, centre at 0.625
-	"50":  { x: 1.75,  y: -0.90 }, // ISO extra key (< > on AZERTY, § on UK) — Apple ISO swap
+	// Apple ISO quirk: kc 50 is physically the ` key (number row) but Apple reports the bottom-row
+	// ISO extra key (< >) as kc 10. Both are swapped here so the visual position matches the label.
+	"56":  { x: 0.75,  y: -0.90 }, // shift (L) — 1.25u, right edge has normal gap with kc10
+	"10":  { x: 1.75,  y: -0.90 }, // ISO extra key (< > on AZERTY) — Apple ISO swap: kc10 sits here
 	"6":   { x: 2.75,  y: -0.90 }, // z
 	"7":   { x: 3.75,  y: -0.90 }, // x
 	"8":   { x: 4.75,  y: -0.90 }, // c
@@ -222,7 +223,7 @@ const KEY_POSITIONS = {
 	"43":  { x: 9.75,  y: -0.90 }, // ,
 	"47":  { x: 10.75, y: -0.90 }, // .
 	"44":  { x: 11.75, y: -0.90 }, // /
-	"60":  { x: 12.875,y: -0.90 }, // shift (R) — 1.75u ISO right shift
+	"60":  { x: 12.75, y: -0.90 }, // shift (R) — 1.75u, left edge has normal gap with /
 
 	// Thumb row (y = -1.80)
 	"59":  { x: 0.5,   y: -1.80 }, // ctrl (L) — left pinky (standard touch-typing)
@@ -257,11 +258,11 @@ const KEY_POSITIONS = {
 	"107": { x: 16.0,  y: 2.70  }, // f14 (above page up)
 	"113": { x: 17.0,  y: 2.70  }, // f15
 	"114": { x: 18.0,  y: 2.70  }, // help / insert — isolated, rarely used on ISO
-	"117": { x: 15.0,  y: 1.80  }, // forward delete (number-row line)
-	"115": { x: 16.0,  y: 1.80  }, // home
-	"116": { x: 16.0,  y: 0.90  }, // page up
+	"117": { x: 16.0,  y: 1.80  }, // forward delete — moved right to fill where home was
+	"115": { x: 16.0,  y: 0.90  }, // home — dropped one row (from number-row to QWERTY row)
+	"116": { x: 17.0,  y: 0.90  }, // page up — shifted one column right to make room for home
 	"119": { x: 16.0,  y: 0     }, // end
-	"121": { x: 17.0,  y: 0     }, // page down (rightmost column to avoid overcrowding)
+	"121": { x: 17.0,  y: 0     }, // page down
 
 	// Arrow cluster — inverted-T layout (matches physical keyboard):
 	//   row 1 (y = -0.90): UP alone, centred above DOWN
