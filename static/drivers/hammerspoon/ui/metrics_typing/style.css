@@ -40,6 +40,7 @@
 	--kpi-hs-color: rgb(217, 48, 37);
 	--kpi-llm-color: rgb(138, 62, 184);
 	--kpi-wpm-color: rgb(230, 140, 0);
+	--kpi-wpm-rgb: 230, 140, 0;
 	--kpi-precision-color: #008000;
 	--kpi-delegation-color: rgb(0, 86, 179);
 	--kpi-rep-color: rgb(0, 155, 150); /* Teal */

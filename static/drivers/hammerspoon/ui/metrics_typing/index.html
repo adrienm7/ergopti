@@ -83,25 +83,7 @@
 						onclick="toggle_filter('btn_case_sensitive')"
 					>
 						Sensible à la casse
-					</button>
-
-					<select
-						id="pause_threshold"
-						class="filter-btn"
-						onchange="apply_local_filters()"
-						title="Seuil de pause : pauses supérieures à ce seuil sont exclues du temps actif pour le calcul MPM global et par ligne."
-					>
-						<option value="1000">Pauses &gt; 1 s</option>
-						<option value="2000" selected>Pauses &gt; 2 s</option>
-						<option value="3000">Pauses &gt; 3 s</option>
-						<option value="5000">Pauses &gt; 5 s</option>
-						<option value="10000">Pauses &gt; 10 s</option>
-						<option value="20000">Pauses &gt; 20 s</option>
-						<option value="30000">Pauses &gt; 30 s</option>
-						<option value="60000">Pauses &gt; 1 min</option>
-						<option value="99999999">Sans filtrage</option>
-					</select>
-				</div>
+					</button>				</div>
 
 				<button class="filter-btn filter-reset" onclick="reset_filters()">Réinitialiser</button>
 			</div>
@@ -163,6 +145,25 @@
 						</div>
 					</div>
 					<div id="wpm_words_sub"></div>
+					<div style="margin-top:8px;">
+						<select
+							id="pause_threshold"
+							class="filter-btn"
+							onchange="apply_local_filters()"
+							title="Seuil de pause : pauses supérieures à ce seuil sont exclues du temps actif pour le calcul MPM."
+							style="font-size:11px;padding:3px 6px;height:auto;"
+						>
+							<option value="1000">Pauses &gt; 1 s</option>
+							<option value="2000" selected>Pauses &gt; 2 s</option>
+							<option value="3000">Pauses &gt; 3 s</option>
+							<option value="5000">Pauses &gt; 5 s</option>
+							<option value="10000">Pauses &gt; 10 s</option>
+							<option value="20000">Pauses &gt; 20 s</option>
+							<option value="30000">Pauses &gt; 30 s</option>
+							<option value="60000">Pauses &gt; 1 min</option>
+							<option value="99999999">Sans filtrage</option>
+						</select>
+					</div>
 				</div>
 			</div>
 

@@ -462,8 +462,8 @@ function M.show(log_dir)
 			end)
 		end
 
-		-- Short initial pause so the webview can start parsing HTML before the first check
-		hs.timer.doAfter(0.1, function() try_inject(20) end)
+		-- Longer initial pause so CDN scripts (Chart.js etc.) finish loading on first open
+		hs.timer.doAfter(0.5, function() try_inject(60) end)
 	end)
 
 	-- Poll timer: serves subsequent filter-change requests from JS (cached)

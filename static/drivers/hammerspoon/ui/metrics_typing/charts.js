@@ -37,7 +37,7 @@ function render_charts() {
 	const rgb_ia  = root.getPropertyValue("--kpi-llm-rgb").trim()        || "122, 54, 163";
 	const rgb_hs  = root.getPropertyValue("--kpi-hs-rgb").trim()         || "204, 41, 34";
 	const rgb_man = root.getPropertyValue("--kpi-delegation-rgb").trim() || "0, 86, 179";
-	const rgb_wpm = root.getPropertyValue("--kpi-wpm-rgb").trim()        || "170, 122, 10";
+	const rgb_wpm = root.getPropertyValue("--kpi-wpm-rgb").trim()        || "230, 140, 0";
 	const rgb_prc = root.getPropertyValue("--kpi-precision-rgb").trim()  || "33, 136, 56";
 
 	const sorted_keys = Object.keys(app_state.time_series).sort();
@@ -309,13 +309,14 @@ function _render_precision_chart(sorted_keys, rgb_prc) {
 	const elem = document.getElementById("precision_chart");
 	if (!elem) return;
 
-	const precision_pts = sorted_keys.map((k) => {
-		const d        = app_state.time_series[k];
-		const accuracy = d.daily_chars > 0
-			? ((d.daily_chars - d.daily_manual_errors) / d.daily_chars) * 100
-			: 0;
-		return { x: new Date(k + "T12:00:00"), y: accuracy };
-	});
+	// Skip days with no data so the precision chart has no spurious y=0 points
+	const precision_pts = sorted_keys
+		.filter(k => app_state.time_series[k].daily_chars > 0)
+		.map((k) => {
+			const d = app_state.time_series[k];
+			const accuracy = ((d.daily_chars - d.daily_manual_errors) / d.daily_chars) * 100;
+			return { x: new Date(k + "T12:00:00"), y: Math.max(0, Math.min(100, accuracy)) };
+		});
 
 	precision_chart_instance = new Chart(elem.getContext("2d"), {
 		type: "line",

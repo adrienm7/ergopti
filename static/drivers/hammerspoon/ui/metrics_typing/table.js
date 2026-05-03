@@ -1333,11 +1333,9 @@ function render_table() {
 			// "—" for home-row keys and sequences whose geometry can't be resolved.
 			let km_html;
 			if (item.km <= 0) {
-				km_html = `<span style="color:var(--text-muted);">\u2014</span>`;
-			} else if (item.km >= 1) {
-				km_html = `${format_number(item.km.toFixed(2))}\u00A0<span class="stat-unit">km</span>`;
+				km_html = `<span style="color:var(--text-muted);">—</span>`;
 			} else {
-				km_html = `${format_number((item.km * 1000).toFixed(1))}\u00A0<span class="stat-unit">m</span>`;
+				km_html = `${format_number(item.km.toFixed(4))} <span class="stat-unit">km</span>`;
 			}
 
 			return `<tr>

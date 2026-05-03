@@ -209,12 +209,12 @@ function apply_date_app_filters() {
 function reset_filters() {
 	apply_default_date_range();
 
-	// Default: both toggles OFF (= output / texte final view)
-	document.getElementById("btn_toggle_hs")?.classList.remove("active");
-	document.getElementById("btn_toggle_llm")?.classList.remove("active");
+	// Default: HS, IA and case-sensitive all ON out of the box
+	document.getElementById("btn_toggle_hs")?.classList.add("active");
+	document.getElementById("btn_toggle_llm")?.classList.add("active");
 
 	// Restore remaining toggle buttons to their defaults
-	document.getElementById("btn_case_sensitive").classList.remove("active");
+	document.getElementById("btn_case_sensitive").classList.add("active");
 
 	// Restore pause threshold and quick range selects to their defaults
 	const pause_sel = document.getElementById("pause_threshold");

@@ -898,9 +898,7 @@ function render_dist_table() {
 		rows_html = `<tr><td colspan="3" style="text-align:center;padding:12px;color:var(--text-muted);">Aucune donn\u00E9e</td></tr>`;
 	} else {
 		rows_html = sorted.slice(0, 10).map(d => {
-			const km_str = d.km >= 0.01
-				? `${format_number(d.km.toFixed(3))}\u00A0km`
-				: `${format_number((d.km * 1000).toFixed(1))}\u00A0m`;
+			const km_str = `${format_number(d.km.toFixed(4))}\u00A0km`;
 			// Left-hand fingers in a warm tint, right-hand in the dist accent color
 			const hand_color = d.hand === "G"
 				? "var(--kpi-hs-color)"
