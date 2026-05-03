@@ -98,7 +98,8 @@
 		/* KPI Colors (Vibrant, readable colors for Dark Mode) */
 		--kpi-hs-color: rgb(255, 69, 58); /* #ff453a (Vibrant Red) */
 		--kpi-llm-color: rgb(191, 90, 242); /* #bf5af2 (Vibrant Purple) */
-		--kpi-wpm-color: rgb(255, 214, 10); /* #ffd60a (Vibrant Yellow) */
+		--kpi-wpm-color: rgb(255, 149, 0); /* #ff9500 (Vibrant Orange) */
+		--kpi-wpm-rgb: 255, 149, 0;
 		--kpi-precision-color: rgb(48, 209, 88); /* #30d158 (Vibrant Green) */
 		--kpi-delegation-color: rgb(30, 150, 255); /* #0a84ff (Vibrant Blue) */
 		--kpi-rep-color: rgb(0, 212, 204); /* #00d4cc (Vibrant Teal) */
