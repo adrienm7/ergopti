@@ -387,29 +387,35 @@ function M.show(log_dir)
 		end
 	})
 
-	-- After HS reload the OS takes a variable number of frames to assign a window
-	-- handle to the new webview.  Poll every 100 ms until hswindow() returns a
-	-- valid handle, then bring the window to the front.  show() is also called on
-	-- each attempt in case the window was created but not yet made visible by the
-	-- compositor.  Cap at 30 attempts (≈ 3 s) to avoid leaking timers.
-	local focus_attempts = 0
-	local function try_focus_when_ready()
+	-- After a Hammerspoon reload, the menu-bar item that triggered M.show() is
+	-- still being dismissed by macOS when this code runs, and the previous app
+	-- often steals focus before the new webview is composited — leaving the
+	-- window invisible behind everything.  Three coordinated mitigations:
+	--   1. Call wv:bringToFront(true) [aboveEverything] + hs.focus() right
+	--      away to force the window above any compositing menu.
+	--   2. Repeat the show/bringToFront/focus sequence at increasing delays
+	--      (50, 150, 350, 700 ms): each tick covers a different race window
+	--      (menu animation, app switch, compositor commit) without relying
+	--      on hswindow() which may never become non-nil on a fresh webview.
+	--   3. On the last tick, drop bringToFront back to normal level so the
+	--      window does not stay floating above other apps.
+	local function raise_now(above_everything)
 		if not M._wv then return end
-		focus_attempts = focus_attempts + 1
 		pcall(function() M._wv:show() end)
+		pcall(function() M._wv:bringToFront(above_everything) end)
+		pcall(hs.focus)
 		local ok, win = pcall(function() return M._wv:hswindow() end)
 		if ok and win then
 			pcall(function() win:raise() end)
 			pcall(function() win:focus() end)
-			pcall(hs.focus)
-			Logger.debug(LOG, "Dashboard window raised after %d attempt(s).", focus_attempts)
-		elseif focus_attempts < 30 then
-			hs.timer.doAfter(0.1, try_focus_when_ready)
-		else
-			Logger.warn(LOG, "Dashboard window handle never became available — focus skipped.")
 		end
 	end
-	hs.timer.doAfter(0.1, try_focus_when_ready)
+
+	raise_now(true)
+	hs.timer.doAfter(0.05, function() raise_now(true) end)
+	hs.timer.doAfter(0.15, function() raise_now(true) end)
+	hs.timer.doAfter(0.35, function() raise_now(true) end)
+	hs.timer.doAfter(0.70, function() raise_now(false) end)
 
 	-- Build the current keyboard layout map (keycode number → character/name).
 	-- hs.keycodes.map() returns a bidirectional table; we extract the numeric keys
