@@ -634,7 +634,10 @@ function render_current_tab() {
 		let mode_badge = "";
 		if (app_state.current_tab === "c") {
 			const { show_hs, show_llm } = get_source_mode_flags();
-			const mode_label = (show_hs || show_llm) ? "frappes brutes" : "sortie écran";
+			// show_hs/show_llm=true means HS/LLM expansions are included (output view)
+			const mode_label = (show_hs && show_llm) ? "sortie écran"
+				: (show_hs || show_llm) ? "mixte"
+				: "frappes brutes";
 			mode_badge = ` <span style="font-size:0.8em;opacity:0.7;">(${mode_label})</span>`;
 		}
 		occ_elem.innerHTML = format_number(total_occ) + mode_badge;
@@ -734,10 +737,11 @@ function render_kc_heatmap(kc_data_arr) {
 		"36":  1.50, // return — top-row width on the QWERTY row (L-shape)
 		"48":  1.50, // tab — left edge at x=0, flush against Q
 		"51":  1.75, // backspace — 1.75u so right edge aligns with Return stem and right shift
-		"56":  1.25, // l-shift (ISO)
+		"56":  1.50, // l-shift (ISO) — stretched to align left edge with Tab and CapsLock
 		"57":  1.75, // capslock
 		"60":  2.25, // r-shift (ISO) — right edge aligns with Return's right edge
 		"49":  5.00, // space bar — fills cmd-L → cmd-R gap
+		"63":  1.50, // fn — stretched to align left edge with Tab, CapsLock, and l-Shift
 		"59":  1.00, // ctrl-L
 		"55":  1.00, // cmd-L
 		"54":  1.00, // cmd-R
@@ -757,6 +761,7 @@ function render_kc_heatmap(kc_data_arr) {
 		"36": "right",   // return (L-shape uses anchor for the QWERTY-row top portion)
 		"51": "left",    // backspace
 		"56": "right",   // l-shift
+		"63": "right",   // fn — left edge aligns with Tab, CapsLock, l-Shift
 		"60": "left",    // r-shift
 		"49": "stretch", // space — fills cmd-L → cmd-R
 	};

@@ -1,4 +1,4 @@
-// ui/metrics_typing/data.js
+﻿// ui/metrics_typing/data.js
 
 /**
  * ==============================================================================
@@ -438,7 +438,7 @@ function compute_manifest_metrics() {
  */
 function recompute_speed_kpi() {
 	const pause_thresh = parseInt(document.getElementById("pause_threshold")?.value ?? "2000", 10) || 2000;
-	const { hs_raw_mode, llm_raw_mode } = get_source_mode_flags();
+	const { show_hs, show_llm, hs_raw_mode, llm_raw_mode } = get_source_mode_flags();
 
 	// Collect totals from manifest for the selected date range
 	let time_ms   = 0;
@@ -475,17 +475,23 @@ function recompute_speed_kpi() {
 	const think_scale  = Math.max(0, 1 - THINK_PAUSE_THRESHOLD_MS / Math.max(pause_thresh, 1));
 	const effective_ms = time_ms + think_ms * think_scale;
 
-	// CPM uses raw manual keystrokes (physical keys pressed, not expansions)
-	const output_cpm = effective_ms > 0 ? raw_chars / (effective_ms / 60000) : 0;
+	// CPM counts all chars that appeared on screen, respecting the HS/LLM toggles.
+	// With both toggles active (default): raw_chars + hs_chars + llm_chars = full output speed.
+	// With toggles off: raw_chars only = pure manual typing speed.
+	// This way the toggles demonstrate the productivity boost from each feature.
+	const cpm_hs_chars  = show_hs  ? hs_chars  : 0;
+	const cpm_llm_chars = show_llm ? llm_chars : 0;
+	const cpm_total     = raw_chars + cpm_hs_chars + cpm_llm_chars;
+	const output_cpm    = effective_ms > 0 ? cpm_total / (effective_ms / 60000) : 0;
 
-	// MPM uses actual word count from the w-dict (words are sequences of letters
-	// separated by spaces, punctuation, enter, tab — logged by the Lua keylogger).
+	// MPM uses actual word count from the w-dict; the toggle state controls whether
+	// HS/LLM-generated words are included, matching the CPM philosophy above.
 	const w_dict      = app_state.data.w || {};
 	let   total_words = 0;
 	Object.values(w_dict).forEach(item => { total_words += item.count || 0; });
 	const output_wpm  = effective_ms > 0 && total_words > 0
 		? total_words / (effective_ms / 60000)
-		: output_cpm / 5;   // fallback to CPM/5 if word dict not yet loaded
+		: output_cpm / 5;   // Fallback to CPM/5 if word dict not yet loaded
 
 	const wpm_val_elem = document.getElementById("wpm_val");
 	if (!wpm_val_elem) return;
@@ -494,17 +500,22 @@ function recompute_speed_kpi() {
 		: pause_thresh >= 60000 ? `> ${pause_thresh/60000} min`
 		: `> ${pause_thresh/1000} s`;
 
+	const cpm_mode_label = (show_hs && show_llm) ? "avec HS + IA"
+		: show_hs ? "avec HS"
+		: show_llm ? "avec IA"
+		: "frappes brutes";
+
 	wpm_val_elem.innerHTML =
 		`<div style="display:flex;flex-direction:column;justify-content:center;">` +
 		`<div style="display:flex;align-items:center;gap:6px;">` +
 		`<span>${format_number(output_wpm.toFixed(1))} <span class="stat-unit">MPM</span></span>` +
 		`<span class="tooltip stat-inline-tooltip">${INFO_SVG}<span class="tooltiptext">` +
-		`MPM : Mots par minute (mots réels d'après le dictionnaire de mots tapés).<br>` +
-		`Seuil de pause : pauses ${thresh_label} incluses dans le temps actif.</span></span>` +
+		`MPM${String.fromCharCode(160)}: Mots par minute (mots r${String.fromCharCode(233)}els du dictionnaire).<br>` +
+		`Seuil de pause${String.fromCharCode(160)}: pauses ${thresh_label} incluses. Mode${String.fromCharCode(160)}: ${cpm_mode_label}.</span></span>` +
 		`</div>` +
 		`<div style="display:flex;align-items:center;gap:6px;font-size:0.65em;margin-top:5px;">` +
 		`<span>${format_number(output_cpm.toFixed(0))} <span class="stat-unit">CPM</span></span>` +
-		`<span class="tooltip stat-inline-tooltip">${INFO_SVG}<span class="tooltiptext">CPM : Frappes physiques par minute (touches brutes, sans expansions HS/IA)</span></span>` +
+		`<span class="tooltip stat-inline-tooltip">${INFO_SVG}<span class="tooltiptext">CPM${String.fromCharCode(160)}: Caract${String.fromCharCode(232)}res par minute (${cpm_mode_label}). D${String.fromCharCode(233)}sactiver HS/IA pour voir la vitesse brute.</span></span>` +
 		`</div>` +
 		`</div>`;
 

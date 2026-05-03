@@ -223,15 +223,16 @@ const KEY_POSITIONS = {
 	"44":  { x: 11.50, y: -0.66 }, // /
 	"60":  { x: 12.50, y: -0.66 }, // shift (R) — 2.5u (stretched so right edge aligns with Return)
 
-	// Thumb row (y = -1.80)
-	"59":  { x: 0.5,   y: -1.56 }, // ctrl (L) — left pinky (standard touch-typing)
-	"63":  { x: 1.5,   y: -1.56 }, // fn
-	"58":  { x: 2.5,   y: -1.56 }, // alt / option (L)
-	"55":  { x: 3.5,   y: -1.56 }, // cmd (L)
-	"49":  { x: 6.5,   y: -1.56 }, // space — left thumb rest position
-	"54":  { x: 9.5,   y: -1.56 }, // cmd (R) — right thumb rest position
-	"61":  { x: 10.5,  y: -1.56 }, // alt / option (R)
-	"62":  { x: 11.5,  y: -1.56 }, // ctrl (R)
+	// Thumb row (y = -1.44) — same 0.78u pitch as the letter rows (-0.66 - 0.78 = -1.44)
+	// Physical order on Apple ISO: fn, ctrl, alt, cmd | space | cmd, alt, ctrl
+	"63":  { x: 0.5,   y: -1.44 }, // fn
+	"59":  { x: 1.5,   y: -1.44 }, // ctrl (L)
+	"58":  { x: 2.5,   y: -1.44 }, // alt / option (L)
+	"55":  { x: 3.5,   y: -1.44 }, // cmd (L)
+	"49":  { x: 6.5,   y: -1.44 }, // space — left thumb rest position
+	"54":  { x: 9.5,   y: -1.44 }, // cmd (R) — right thumb rest position
+	"61":  { x: 10.5,  y: -1.44 }, // alt / option (R)
+	"62":  { x: 11.5,  y: -1.44 }, // ctrl (R)
 
 	// Function row (y = 2.70)
 	"53":  { x: 0,     y: 2.70  }, // escape
@@ -256,19 +257,19 @@ const KEY_POSITIONS = {
 	"107": { x: 16.0,  y: 2.70  }, // f14 (above page up)
 	"113": { x: 17.0,  y: 2.70  }, // f15
 	"114": { x: 18.0,  y: 2.70  }, // help / insert — isolated, rarely used on ISO
-	"117": { x: 16.0,  y: 1.80  }, // forward delete — moved right to fill where home was
-	"115": { x: 16.0,  y: 0.90  }, // home — dropped one row (from number-row to QWERTY row)
-	"116": { x: 17.0,  y: 0.90  }, // page up — shifted one column right to make room for home
-	"119": { x: 16.0,  y: 0     }, // end
-	"121": { x: 17.0,  y: 0     }, // page down
+	"117": { x: 16.0,  y: 1.80  }, // forward delete — aligned with number row
+	"115": { x: 16.0,  y: 0.90  }, // home — aligned with QWERTY row
+	"116": { x: 17.0,  y: 0.90  }, // page up — aligned with QWERTY row
+	"119": { x: 16.0,  y: 0.12  }, // end — aligned with home row (was y=0, off by one)
+	"121": { x: 17.0,  y: 0.12  }, // page down — aligned with home row
 
 	// Arrow cluster — inverted-T layout (matches physical keyboard):
-	//   row 1 (y = -0.90): UP alone, centred above DOWN
-	//   row 2 (y = -1.80): LEFT, DOWN, RIGHT aligned side by side
-	"126": { x: 15.5,  y: -0.90 }, // up — isolated above down
-	"123": { x: 14.5,  y: -1.80 }, // left
-	"125": { x: 15.5,  y: -1.80 }, // down
-	"124": { x: 16.5,  y: -1.80 }, // right
+	//   row 1 (y = -0.66): UP alone, at bottom-row height
+	//   row 2 (y = -1.44): LEFT, DOWN, RIGHT at spacebar-row height
+	"126": { x: 15.5,  y: -0.66 }, // up — at bottom-row level
+	"123": { x: 14.5,  y: -1.44 }, // left — at spacebar-row level
+	"125": { x: 15.5,  y: -1.44 }, // down — at spacebar-row level
+	"124": { x: 16.5,  y: -1.44 }, // right — at spacebar-row level
 
 	// Numpad enter
 	"76":  { x: 18.0,  y: -1.80 }, // enter (numpad)
@@ -318,12 +319,12 @@ const FINGER_HOME = {
 	l_ring:  { x: 2.75,  y: 0.12  }, // rests on s
 	l_mid:   { x: 3.75,  y: 0.12  }, // rests on d
 	l_idx:   { x: 4.75,  y: 0.12  }, // rests on f (bump)
-	l_thumb: { x: 6.5,   y: -1.56 }, // rests on the space bar
+	l_thumb: { x: 6.5,   y: -1.44 }, // rests on the space bar
 	r_idx:   { x: 7.75,  y: 0.12  }, // rests on j (bump)
 	r_mid:   { x: 8.75,  y: 0.12  }, // rests on k
 	r_ring:  { x: 9.75,  y: 0.12  }, // rests on l
 	r_pinky: { x: 10.75, y: 0.12  }, // rests on ;
-	r_thumb: { x: 9.5,   y: -1.56 }, // rests on cmd (R), adjacent to space
+	r_thumb: { x: 9.5,   y: -1.44 }, // rests on cmd (R), adjacent to space
 };
 
 // French display labels for each finger identifier.
