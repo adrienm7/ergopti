@@ -387,6 +387,15 @@ function M.show(log_dir)
 		end
 	})
 
+	-- On the first open after a Hammerspoon reload the window is created but
+	-- sometimes stays behind other windows because the HS menu that triggered
+	-- this call is still compositing.  A second force_focus ~300 ms later (with
+	-- is_new=false so hide+show teleports it to the active Space) guarantees the
+	-- window actually appears on the user's current desktop.
+	hs.timer.doAfter(0.3, function()
+		if M._wv then ui_builder.force_focus(M._wv) end
+	end)
+
 	-- Build the current keyboard layout map (keycode number → character/name).
 	-- hs.keycodes.map() returns a bidirectional table; we extract the numeric keys
 	-- so the JS side can display the actual character produced on the user's custom
