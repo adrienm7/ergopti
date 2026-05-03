@@ -912,6 +912,19 @@ function render_kc_heatmap(kc_data_arr) {
 			"58":  "ALT",
 			"61":  "ALT",
 			"63":  "FN",
+			// Navigation cluster — full names overflow the 1u cell at any reasonable
+			// font size, so we use compact glyph-bearing forms that match Apple's own
+			// keycap markings (PgUp / PgDn / Home / End / forward-delete arrow).
+			"114": "HELP",
+			"117": "DEL⌦",  // ⌦ — forward delete glyph
+			"115": "HOME",
+			"119": "END",
+			"116": "PG↑",   // ↑
+			"121": "PG↓",   // ↓
+			"123": "←",     // ←
+			"124": "→",     // →
+			"125": "↓",     // ↓
+			"126": "↑",     // ↑
 		};
 		// Truncate only when truly too long for the cell. Most names ≤ 6 chars fit
 		// at font_size 9; longer ones get the ellipsis fallback.
@@ -971,17 +984,25 @@ function render_kc_heatmap(kc_data_arr) {
 		// For all other keys a standard rounded-rect is drawn.
 		if (kc_str === "36") {
 			// ISO Return (Apple): wide top portion on the QWERTY row, narrower stem
-			// on the home row right-aligned to the same right edge.
-			const row_px  = Math.round(U * 0.90);    // pixel distance between rows
-			const stem_w  = Math.round(U - GAP);     // stem = 1u wide on the home row
-			const lx      = sx + key_w - stem_w;     // stem left edge (right-aligned)
-			const rx      = sx + key_w;              // shared right edge
-			const top_y   = sy - row_px;             // top edge (QWERTY row top)
-			const mid_y   = sy;                      // junction between wing and stem
-			const bot_y   = sy + KH;                 // bottom of home row stem
-			// Clockwise outline starting at top-left convex corner.
+			// on the home row right-aligned. The wing has the same vertical extent
+			// as a normal QWERTY-row key (KH) and the stem the same as a home-row
+			// key — the two are separated by the standard row gap so Return does
+			// not appear glued to the home row keys to its left.
+			const row_px   = Math.round(U * 0.90);       // pixel distance between rows
+			const row_gap  = Math.max(GAP, row_px - KH); // vertical gap between rows
+			const stem_w   = Math.round(U - GAP);        // stem = 1u wide
+			const lx       = sx + key_w - stem_w;        // stem left edge (right-aligned)
+			const rx       = sx + key_w;                 // shared right edge
+			const top_y    = sy - row_px;                // top of QWERTY-row wing
+			const wing_bot = top_y + KH;                 // bottom of wing rect
+			const mid_y    = sy;                         // top of home-row stem
+			const bot_y    = sy + KH;                    // bottom of stem
+			// The neck (lx → rx, between wing_bot and mid_y) bridges the row gap
+			// at the right edge so the L stays a single connected outline.
+			//
+			// Clockwise outline starting at the top-left convex corner.
 			// Convex corners use sweep flag 1; the single inner concave corner
-			// where the wing meets the stem uses sweep flag 0.
+			// where the wing meets the neck uses sweep flag 0.
 			const d = [
 				`M ${sx} ${top_y+R}`,
 				`A ${R} ${R} 0 0 1 ${sx+R} ${top_y}`,
@@ -991,10 +1012,10 @@ function render_kc_heatmap(kc_data_arr) {
 				`A ${R} ${R} 0 0 1 ${rx-R} ${bot_y}`,
 				`L ${lx+R} ${bot_y}`,
 				`A ${R} ${R} 0 0 1 ${lx} ${bot_y-R}`,
-				`L ${lx} ${mid_y+R}`,
-				`A ${R} ${R} 0 0 0 ${lx-R} ${mid_y}`,
-				`L ${sx+R} ${mid_y}`,
-				`A ${R} ${R} 0 0 1 ${sx} ${mid_y-R}`,
+				`L ${lx} ${wing_bot+R}`,
+				`A ${R} ${R} 0 0 0 ${lx-R} ${wing_bot}`,
+				`L ${sx+R} ${wing_bot}`,
+				`A ${R} ${R} 0 0 1 ${sx} ${wing_bot-R}`,
 				`L ${sx} ${top_y+R}`,
 				"Z",
 			].join(" ");

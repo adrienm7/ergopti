@@ -323,13 +323,19 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 			if type(hotstring_editor.set_shortcut) == "function" then pcall(hotstring_editor.set_shortcut, sc.mods, sc.key) end
 		end
 
-		if type(state.metrics_shortcut) == "table" then
-			apply_metrics_shortcut(state.metrics_shortcut.mods, state.metrics_shortcut.key)
-		end
-
-		if type(state.apps_time_shortcut) == "table" then
-			apply_apps_time_shortcut(state.apps_time_shortcut.mods, state.apps_time_shortcut.key)
-		end
+		-- Hotkeys bound during the very first Lua load are sometimes ignored by
+		-- Hammerspoon for the first one or two presses (the global event tap is
+		-- still warming up). Defer the registration by a short delay so the tap
+		-- is fully live before hs.hotkey.enable() takes effect — the UI is not
+		-- needed in the very first second after restart anyway.
+		hs.timer.doAfter(0.5, function()
+			if type(state.metrics_shortcut) == "table" then
+				pcall(apply_metrics_shortcut, state.metrics_shortcut.mods, state.metrics_shortcut.key)
+			end
+			if type(state.apps_time_shortcut) == "table" then
+				pcall(apply_apps_time_shortcut, state.apps_time_shortcut.mods, state.apps_time_shortcut.key)
+			end
+		end)
 
 		-- Sync keylogger engine
 		local kl = core_mods.keylogger

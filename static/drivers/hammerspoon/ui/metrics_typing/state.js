@@ -249,22 +249,27 @@ const KEY_POSITIONS = {
 	"103": { x: 12.0,  y: 2.70  }, // f11
 	"111": { x: 13.0,  y: 2.70  }, // f12
 
-	// Navigation cluster (right of main keyboard)
-	"114": { x: 15.0,  y: 2.70  }, // help / insert
-	"105": { x: 15.5,  y: 2.70  }, // f13
-	"107": { x: 16.5,  y: 2.70  }, // f14
-	"113": { x: 17.5,  y: 2.70  }, // f15
-	"117": { x: 16.0,  y: 1.80  }, // delete (forward)
-	"115": { x: 15.0,  y: 0.90  }, // home
+	// Navigation cluster (right of main keyboard) — strict 2-column grid at x=15/16,
+	// vertically aligned with each main row. F13/F14/F15 live on the function row;
+	// kc 114 ("help" — vestigial, not present on most Apple ISO keyboards) is
+	// pushed to the far edge so it never overlaps F13/F14.
+	"105": { x: 15.0,  y: 2.70  }, // f13 (above home)
+	"107": { x: 16.0,  y: 2.70  }, // f14 (above page up)
+	"113": { x: 17.0,  y: 2.70  }, // f15
+	"114": { x: 18.0,  y: 2.70  }, // help / insert — isolated, rarely used on ISO
+	"117": { x: 15.0,  y: 1.80  }, // forward delete (number-row line)
+	"115": { x: 16.0,  y: 1.80  }, // home
 	"116": { x: 16.0,  y: 0.90  }, // page up
-	"119": { x: 15.0,  y: 0     }, // end
-	"121": { x: 16.0,  y: 0     }, // page down
+	"119": { x: 16.0,  y: 0     }, // end
+	"121": { x: 17.0,  y: 0     }, // page down (rightmost column to avoid overcrowding)
 
-	// Arrow cluster
-	"123": { x: 14.5,  y: -1.80 }, // left
-	"124": { x: 16.5,  y: -1.80 }, // right
-	"125": { x: 15.5,  y: -1.80 }, // down
+	// Arrow cluster — flat row layout requested by the user:
+	//   row 1 (y = -0.90): LEFT, UP, RIGHT
+	//   row 2 (y = -1.80): DOWN (centred under UP)
+	"123": { x: 14.5,  y: -0.90 }, // left
 	"126": { x: 15.5,  y: -0.90 }, // up
+	"124": { x: 16.5,  y: -0.90 }, // right
+	"125": { x: 15.5,  y: -1.80 }, // down
 
 	// Numpad enter
 	"76":  { x: 18.0,  y: -1.80 }, // enter (numpad)
