@@ -38,7 +38,10 @@ local CATEGORIES_FILE = CONFIG_DIR .. "/app_categories.json"
 -- dashboard with last-known values within milliseconds of opening, even
 -- after a Hammerspoon reload.  Stale values are acceptable per UX spec:
 -- the background refresh overwrites them once the openssl decrypt finishes.
-local UI_CACHE_FILE = CONFIG_DIR .. "/metrics_apps_cache.json"
+-- Lives in $TMPDIR (per-user macOS temp dir, falling back to /tmp) so the
+-- cache stays outside the versioned ~/.hammerspoon tree.
+local UI_TMP_DIR    = (os.getenv("TMPDIR") or "/tmp/"):gsub("/?$", "/")
+local UI_CACHE_FILE = UI_TMP_DIR .. "ergopti_metrics_apps_cache.json"
 
 
 
@@ -175,7 +178,7 @@ end)
 --- next open (even after HS reload) can render instantly from this cache.
 --- @param payload table { manifest, user_cats } as JSON strings.
 local function save_disk_cache(payload)
-	pcall(function() os.execute(string.format("mkdir -p %q", CONFIG_DIR)) end)
+	-- TMPDIR always exists on macOS — no mkdir needed.
 	local ok_enc, body = pcall(json.encode, payload)
 	if not ok_enc then
 		Logger.warn(LOG, "Failed to encode disk cache payload — skipping persist.")

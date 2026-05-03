@@ -19,6 +19,12 @@ local hs = hs
 local Logger = require("lib.logger")
 local LOG = "ui_builder"
 
+-- Per-process cache of assembled HTML strings.  Avoids re-reading the local
+-- CSS/JS files (and re-running the gsub inlining pass) on every UI open —
+-- assets only change when the user edits source so a single assembly per
+-- HS session is enough.
+local _html_cache = {}
+
 
 
 
@@ -48,8 +54,14 @@ end
 --- @param html_name string Optional name of the HTML file (default: "index.html").
 --- @return string The complete self-contained HTML string.
 function M.build_injected_html(assets_dir, html_name)
-	Logger.debug(LOG, "Building injected HTML assets…")
 	html_name = html_name or "index.html"
+	local cache_key = assets_dir .. "|" .. html_name
+	if _html_cache[cache_key] then
+		Logger.debug(LOG, "Injected HTML cache hit for '%s'.", html_name)
+		return _html_cache[cache_key]
+	end
+
+	Logger.debug(LOG, "Building injected HTML assets…")
 
 	local html_path = assets_dir .. html_name
 	local ok, fh = pcall(io.open, html_path, "r")
@@ -78,8 +90,39 @@ function M.build_injected_html(assets_dir, html_name)
 		return js ~= "" and ("<script>" .. js .. "</script>") or ""
 	end)
 
-	Logger.info(LOG, "Injected HTML assets built successfully.")
+	_html_cache[cache_key] = html
+	Logger.info(LOG, "Injected HTML assets built and memoised (%d bytes).", #html)
 	return html
+end
+
+--- Drops every memoised HTML so the next open re-reads sources from disk.
+--- Call this from a /reload-style command if you edit assets and want the
+--- change to take effect without a full Hammerspoon reload.
+function M.clear_html_cache()
+	_html_cache = {}
+	Logger.info(LOG, "Injected HTML cache cleared.")
+end
+
+--- Pre-warms macOS WebKit by creating a tiny invisible webview.  The very
+--- first webview created in a Hammerspoon session pays a 1-2 s framework-
+--- load cost; subsequent webviews open in a single frame.  Calling this
+--- once at HS startup moves that cost off the user's critical path so
+--- dashboards open instantly when the menu shortcut is pressed.
+function M.warmup_webkit()
+	Logger.start(LOG, "Warming up WebKit framework…")
+	local ok, err = pcall(function()
+		local wv = hs.webview.new({ x = -10, y = -10, w = 1, h = 1 }, { developerExtrasEnabled = false })
+		if not wv then return end
+		pcall(function() wv:html("<html><body></body></html>") end)
+		pcall(function() wv:hide() end)
+		-- Hold the warmup webview for 5 s so WebKit fully initialises, then release.
+		hs.timer.doAfter(5, function() pcall(function() wv:delete() end) end)
+	end)
+	if ok then
+		Logger.success(LOG, "WebKit warmup scheduled.")
+	else
+		Logger.warn(LOG, "WebKit warmup failed: %s.", tostring(err))
+	end
 end
 
 

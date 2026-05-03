@@ -33,8 +33,11 @@ local LOG = "metrics_typing"
 -- below survive close/reopen but not a full HS reload).  The user is happy
 -- to see slightly stale numbers (1 h, 1 day) provided the UI is instant —
 -- a fresh refresh runs in the background and overwrites the cache.
-local UI_CACHE_DIR  = hs.configdir .. "/data"
-local UI_CACHE_FILE = UI_CACHE_DIR .. "/metrics_typing_cache.json"
+-- Stored in $TMPDIR (per-user macOS temp dir, falling back to /tmp) so
+-- the cache lives outside the versioned ~/.hammerspoon tree and is wiped
+-- naturally by the OS on disk-pressure / reboots.
+local UI_CACHE_DIR  = (os.getenv("TMPDIR") or "/tmp/"):gsub("/?$", "/")
+local UI_CACHE_FILE = UI_CACHE_DIR .. "ergopti_metrics_typing_cache.json"
 
 M._wv             = nil
 M._timer          = nil
@@ -238,7 +241,8 @@ end
 --- payloads used by process_manifest() — no re-encoding needed at load time.
 --- @param payload table { manifest, app_icons, initial_data, kc_layout } as JSON strings.
 local function save_disk_cache(payload)
-	pcall(function() os.execute(string.format("mkdir -p %q", UI_CACHE_DIR)) end)
+	-- TMPDIR always exists on macOS so no mkdir needed.  Skip the os.execute
+	-- call which costs a fork+shell roundtrip and was a startup cost on its own.
 	local ok_enc, body = pcall(json.encode, payload)
 	if not ok_enc then
 		Logger.warn(LOG, "Failed to encode disk cache payload — skipping persist.")
