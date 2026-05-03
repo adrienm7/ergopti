@@ -574,7 +574,7 @@ input[type='date']::-webkit-datetime-edit-year-field {
 	flex: 1;
 	flex-direction: column;
 	gap: 18px;
-	padding: 10px 15px 4px 15px;
+	padding: 10px 15px 0px 15px;
 }
 
 .chart-row-block.is-precision {
@@ -594,7 +594,7 @@ input[type='date']::-webkit-datetime-edit-year-field {
 }
 
 .chart-row-block-canvas {
-	height: 120px;
+	height: 240px;
 	position: relative;
 }
 

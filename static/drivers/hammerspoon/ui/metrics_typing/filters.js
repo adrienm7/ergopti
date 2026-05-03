@@ -109,8 +109,6 @@ function apply_quick_date_range() {
 
 	document.getElementById("date_start").value = start;
 	document.getElementById("date_end").value   = today;
-	// Reset dropdown to placeholder so re-selecting the same option still fires
-	if (sel) sel.value = "";
 
 	apply_date_app_filters();
 }

@@ -185,7 +185,7 @@ const KEY_POSITIONS = {
 	"35":  { x: 10.5,  y: 0.90  }, // p
 	"33":  { x: 11.5,  y: 0.90  }, // [
 	"30":  { x: 12.5,  y: 0.90  }, // ]
-	"42":  { x: 12.75, y: 0     }, // \ — ISO backslash is on the home row, between ' and Return
+	"42":  { x: 12.75, y: 0.12  }, // \ — ISO backslash is on the home row, between ' and Return
 
 	// Number row (y = 1.80)
 	// Apple ISO keyboard quirk: the OS-reported keycode for the backtick key (left of 1)
@@ -224,14 +224,14 @@ const KEY_POSITIONS = {
 	"60":  { x: 12.50, y: -0.66 }, // shift (R) — 2.5u (stretched so right edge aligns with Return)
 
 	// Thumb row (y = -1.80)
-	"59":  { x: 0.5,   y: -1.80 }, // ctrl (L) — left pinky (standard touch-typing)
-	"63":  { x: 1.5,   y: -1.80 }, // fn
-	"58":  { x: 2.5,   y: -1.80 }, // alt / option (L)
-	"55":  { x: 3.5,   y: -1.80 }, // cmd (L)
-	"49":  { x: 6.5,   y: -1.80 }, // space — left thumb rest position
-	"54":  { x: 9.5,   y: -1.80 }, // cmd (R) — right thumb rest position
-	"61":  { x: 10.5,  y: -1.80 }, // alt / option (R)
-	"62":  { x: 11.5,  y: -1.80 }, // ctrl (R)
+	"59":  { x: 0.5,   y: -1.56 }, // ctrl (L) — left pinky (standard touch-typing)
+	"63":  { x: 1.5,   y: -1.56 }, // fn
+	"58":  { x: 2.5,   y: -1.56 }, // alt / option (L)
+	"55":  { x: 3.5,   y: -1.56 }, // cmd (L)
+	"49":  { x: 6.5,   y: -1.56 }, // space — left thumb rest position
+	"54":  { x: 9.5,   y: -1.56 }, // cmd (R) — right thumb rest position
+	"61":  { x: 10.5,  y: -1.56 }, // alt / option (R)
+	"62":  { x: 11.5,  y: -1.56 }, // ctrl (R)
 
 	// Function row (y = 2.70)
 	"53":  { x: 0,     y: 2.70  }, // escape
@@ -318,12 +318,12 @@ const FINGER_HOME = {
 	l_ring:  { x: 2.75,  y: 0.12  }, // rests on s
 	l_mid:   { x: 3.75,  y: 0.12  }, // rests on d
 	l_idx:   { x: 4.75,  y: 0.12  }, // rests on f (bump)
-	l_thumb: { x: 6.5,   y: -1.80 }, // rests on the space bar
+	l_thumb: { x: 6.5,   y: -1.56 }, // rests on the space bar
 	r_idx:   { x: 7.75,  y: 0.12  }, // rests on j (bump)
 	r_mid:   { x: 8.75,  y: 0.12  }, // rests on k
 	r_ring:  { x: 9.75,  y: 0.12  }, // rests on l
 	r_pinky: { x: 10.75, y: 0.12  }, // rests on ;
-	r_thumb: { x: 9.5,   y: -1.80 }, // rests on cmd (R), adjacent to space
+	r_thumb: { x: 9.5,   y: -1.56 }, // rests on cmd (R), adjacent to space
 };
 
 // French display labels for each finger identifier.

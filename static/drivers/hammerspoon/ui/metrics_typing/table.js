@@ -726,7 +726,7 @@ function render_kc_heatmap(kc_data_arr) {
 		"51":  1.75, // backspace — 1.75u so right edge aligns with Return stem and right shift
 		"56":  1.25, // l-shift (ISO)
 		"57":  1.75, // capslock
-		"60":  2.50, // r-shift (ISO) — stretched so its right edge aligns with Return's right edge
+		"60":  2.25, // r-shift (ISO) — right edge aligns with Return's right edge
 		"49":  5.00, // space bar — fills cmd-L → cmd-R gap
 		"59":  1.00, // ctrl-L
 		"55":  1.00, // cmd-L
