@@ -387,14 +387,27 @@ function M.show(log_dir)
 		end
 	})
 
-	-- On the first open after a Hammerspoon reload the window is created but
-	-- sometimes stays behind other windows because the HS menu that triggered
-	-- this call is still compositing.  We raise the window 300 ms later using
-	-- is_new=true so force_focus skips the hide/show cycle: the webview may not
-	-- have finished loading yet and hiding it at that point causes a crash.
-	hs.timer.doAfter(0.3, function()
-		if M._wv then ui_builder.force_focus(M._wv, true) end
-	end)
+	-- After HS reload the webview window handle (hswindow) is not available
+	-- immediately — the OS needs a few frames to composite it.  Poll until the
+	-- handle exists, then raise the window.  Cap at 20 attempts (≈ 2 s total)
+	-- to avoid leaking timers if something goes wrong.
+	local focus_attempts = 0
+	local function try_focus_when_ready()
+		if not M._wv then return end
+		focus_attempts = focus_attempts + 1
+		local ok, win = pcall(function() return M._wv:hswindow() end)
+		if ok and win then
+			pcall(function() win:raise() end)
+			pcall(function() win:focus() end)
+			pcall(hs.focus)
+			Logger.debug(LOG, "Dashboard window raised after %d attempt(s).", focus_attempts)
+		elseif focus_attempts < 20 then
+			hs.timer.doAfter(0.1, try_focus_when_ready)
+		else
+			Logger.warn(LOG, "Dashboard window handle never became available — focus skipped.")
+		end
+	end
+	hs.timer.doAfter(0.1, try_focus_when_ready)
 
 	-- Build the current keyboard layout map (keycode number → character/name).
 	-- hs.keycodes.map() returns a bidirectional table; we extract the numeric keys
