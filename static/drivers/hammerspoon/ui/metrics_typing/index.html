@@ -167,13 +167,11 @@
 				</div>
 			</div>
 
-			<div style="display: flex; gap: 20px; margin-bottom: 20px; align-items: stretch;">
+			<div style="display: flex; gap: 20px; margin-bottom: 20px;">
 				<div
 					class="chart-container"
 					style="
 						flex: 1;
-						height: 220px;
-						min-height: 220px;
 						background: var(--precision-bg);
 						border-color: var(--precision-border);
 					"
@@ -184,6 +182,7 @@
 							justify-content: space-between;
 							align-items: center;
 							margin-bottom: 5px;
+							flex-shrink: 0;
 						"
 					>
 						<div style="display: flex; align-items: baseline; gap: 10px">
@@ -203,8 +202,8 @@
 							Restaurer le zoom
 						</button>
 					</div>
-					<div style="flex: 1; min-height: 0; position: relative;">
-						<canvas id="precision_chart"></canvas>
+					<div style="position: relative; height: 160px;">
+						<canvas id="precision_chart" style="position: absolute; inset: 0;"></canvas>
 					</div>
 				</div>
 
@@ -212,8 +211,6 @@
 					class="chart-container"
 					style="
 						flex: 1;
-						height: 220px;
-						min-height: 220px;
 						background: var(--global-bg);
 						border-color: var(--global-border);
 					"
@@ -224,6 +221,7 @@
 							justify-content: space-between;
 							align-items: center;
 							margin-bottom: 5px;
+							flex-shrink: 0;
 						"
 					>
 						<div style="display: flex; align-items: baseline; gap: 10px">
@@ -243,8 +241,8 @@
 							Restaurer le zoom
 						</button>
 					</div>
-					<div style="flex: 1; min-height: 0; position: relative;">
-						<canvas id="wpm_chart"></canvas>
+					<div style="position: relative; height: 160px;">
+						<canvas id="wpm_chart" style="position: absolute; inset: 0;"></canvas>
 					</div>
 				</div>
 			</div>

@@ -224,9 +224,14 @@ local CoreState = {
 	ngram_context         = nil,
 }
 
--- Wire sub-modules to the shared state immediately at load time
+-- Wire sub-modules to the shared state immediately at load time.
+-- KcBridge is also wired here (not in M.start) so the file watcher and poll
+-- timer run regardless of whether the keylogger is currently enabled — KE
+-- emits physical kc events unconditionally and the bridge must always be
+-- ready to drain them.
 LogManager.init(CoreState)
 ContextTracker.init(CoreState, LogManager)
+KcBridge.init(CoreState, LogManager, nil, nil)
 
 -- Watcher and timer handles
 local _event_tap            = nil
@@ -1236,12 +1241,6 @@ function M.start(script_control)
 
 	CoreState.is_enabled    = true
 	CoreState.last_flush_time = hs.timer.absoluteTime() / 1000000
-
-	-- KE physical-kc bridge — starts the log file watcher so Karabiner-emitted
-	-- physical kc names are drained into the kc dict. The suppression set is
-	-- empty at this point; karabiner/init.lua calls KcBridge.refresh_managed_set()
-	-- after it loads its own config.
-	KcBridge.init(CoreState, LogManager, nil, nil)
 
 	-- Application watcher
 	if not _app_watcher then

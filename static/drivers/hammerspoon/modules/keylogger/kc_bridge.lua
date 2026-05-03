@@ -181,6 +181,21 @@ local function drain_log()
 		Logger.debug(LOG, "Drained %d physical kc event(s) (total since start: %d).",
 			drained, _drained_total)
 	end
+
+	-- Truncate the file once we have read everything up to EOF so the file never
+	-- grows unboundedly.  Only truncate when we are at the end (no partial read).
+	local fh_size = io.open(KC_LOG_PATH, "r")
+	if fh_size then
+		local current_size = fh_size:seek("end") or 0
+		fh_size:close()
+		if _file_offset >= current_size and current_size > 0 then
+			local fh_trunc = io.open(KC_LOG_PATH, "w")
+			if fh_trunc then
+				fh_trunc:close()
+				_file_offset = 0
+			end
+		end
+	end
 end
 
 
