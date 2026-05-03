@@ -105,7 +105,9 @@ local LAYER_NAV_SENTINEL_NAME  = Keycodes.to_name(Keycodes.F20_LAYER_NAV_ENTERED
 -- Each line written by the shell_command is: "<physical_key_code_name>\n"
 -- so Hammerspoon can map the name back to a numeric kc and record true
 -- physical key frequency — bypassing the Karabiner remap layer.
-local KE_PHYSICAL_KC_LOG = os.getenv("HOME") .. "/.hammerspoon/karabiner_kc.log"
+-- Path uses hs.configdir to stay aligned with the bridge's reader regardless
+-- of the user's HAMMERSPOON_CONFIG_HOME override.
+local KE_PHYSICAL_KC_LOG = hs.configdir .. "/karabiner_kc.log"
 
 
 

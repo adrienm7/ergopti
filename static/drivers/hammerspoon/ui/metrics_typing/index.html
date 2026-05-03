@@ -91,28 +91,6 @@
 
 		<div class="main-content">
 			<div class="stats-grid" id="main_stats_grid">
-				<div class="stat-card card-hs" id="hs_card">
-					<h2>Hotstrings <span id="hs_trend"></span></h2>
-					<div class="stat-value" id="hs_val">0 <span class="stat-unit">activations</span></div>
-
-					<div class="stat-details" id="hs_loading">Calcul en cours...</div>
-					<div class="stat-details-split" id="hs_details" style="display: none">
-						<div class="split-col" title="Différence nette entre caractères tapés et générés">
-							<div class="split-label">Économisées</div>
-							<div class="split-val"><strong id="hs_net_val">0</strong> frappes</div>
-						</div>
-						<div class="split-col">
-							<div class="split-label">Acceptées</div>
-							<div class="split-val">
-								<strong id="hs_acc_pct">0%</strong>
-								<span class="split-sub" id="hs_acc_raw">(0/0)</span>
-							</div>
-						</div>
-					</div>
-
-					<div class="sparkline-container"><canvas id="hs_sparkline"></canvas></div>
-				</div>
-
 				<div class="stat-card card-llm" id="llm_card">
 					<h2>Intelligence artificielle <span id="llm_trend"></span></h2>
 					<div class="stat-value" id="llm_val">0 <span class="stat-unit">activations</span></div>
@@ -133,6 +111,28 @@
 					</div>
 
 					<div class="sparkline-container"><canvas id="llm_sparkline"></canvas></div>
+				</div>
+
+				<div class="stat-card card-hs" id="hs_card">
+					<h2>Hotstrings <span id="hs_trend"></span></h2>
+					<div class="stat-value" id="hs_val">0 <span class="stat-unit">activations</span></div>
+
+					<div class="stat-details" id="hs_loading">Calcul en cours...</div>
+					<div class="stat-details-split" id="hs_details" style="display: none">
+						<div class="split-col" title="Différence nette entre caractères tapés et générés">
+							<div class="split-label">Économisées</div>
+							<div class="split-val"><strong id="hs_net_val">0</strong> frappes</div>
+						</div>
+						<div class="split-col">
+							<div class="split-label">Acceptées</div>
+							<div class="split-val">
+								<strong id="hs_acc_pct">0%</strong>
+								<span class="split-sub" id="hs_acc_raw">(0/0)</span>
+							</div>
+						</div>
+					</div>
+
+					<div class="sparkline-container"><canvas id="hs_sparkline"></canvas></div>
 				</div>
 
 				<div class="stat-card card-global" id="global_card">
@@ -167,12 +167,13 @@
 				</div>
 			</div>
 
-			<div style="display: flex; gap: 20px; margin-bottom: 20px">
+			<div style="display: flex; gap: 20px; margin-bottom: 20px; align-items: stretch;">
 				<div
 					class="chart-container"
 					style="
 						flex: 1;
 						height: 220px;
+						min-height: 220px;
 						background: var(--precision-bg);
 						border-color: var(--precision-border);
 					"
@@ -212,6 +213,7 @@
 					style="
 						flex: 1;
 						height: 220px;
+						min-height: 220px;
 						background: var(--global-bg);
 						border-color: var(--global-border);
 					"
@@ -227,7 +229,7 @@
 						<div style="display: flex; align-items: baseline; gap: 10px">
 							<h3
 								id="wpm_chart_title"
-								style="margin: 0; font-size: 14px; color: var(--kpi-wpm-color)"
+								style="margin: 0; font-size: 14px; color: var(--chart-wpm-color)"
 							>
 								Vitesse (MPM)
 							</h3>

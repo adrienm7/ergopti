@@ -37,7 +37,7 @@ function render_charts() {
 	const rgb_ia  = root.getPropertyValue("--kpi-llm-rgb").trim()        || "122, 54, 163";
 	const rgb_hs  = root.getPropertyValue("--kpi-hs-rgb").trim()         || "204, 41, 34";
 	const rgb_man = root.getPropertyValue("--kpi-delegation-rgb").trim() || "0, 86, 179";
-	const rgb_wpm = root.getPropertyValue("--kpi-wpm-rgb").trim()        || "230, 140, 0";
+	const rgb_wpm = root.getPropertyValue("--chart-wpm-rgb").trim()      || "230, 140, 0";
 	const rgb_prc = root.getPropertyValue("--kpi-precision-rgb").trim()  || "33, 136, 56";
 
 	const sorted_keys = Object.keys(app_state.time_series).sort();

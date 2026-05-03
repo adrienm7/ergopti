@@ -39,8 +39,11 @@
 	/* KPI Colors (Strong contrast for Light Mode) */
 	--kpi-hs-color: rgb(217, 48, 37);
 	--kpi-llm-color: rgb(138, 62, 184);
-	--kpi-wpm-color: rgb(230, 140, 0);
-	--kpi-wpm-rgb: 230, 140, 0;
+	/* WPM KPI card stays yellow; the chart uses --chart-wpm-color (orange) */
+	--kpi-wpm-color: rgb(204, 163, 0);
+	--kpi-wpm-rgb: 204, 163, 0;
+	--chart-wpm-color: rgb(230, 140, 0);
+	--chart-wpm-rgb: 230, 140, 0;
 	--kpi-precision-color: #008000;
 	--kpi-delegation-color: rgb(0, 86, 179);
 	--kpi-rep-color: rgb(0, 155, 150); /* Teal */
@@ -49,8 +52,9 @@
 	/* KPI Backgrounds Light Mode */
 	--hs-bg: color-mix(in srgb, var(--kpi-hs-color), transparent 95%);
 	--llm-bg: color-mix(in srgb, var(--kpi-llm-color), transparent 95%);
-	--global-bg: color-mix(in srgb, var(--kpi-wpm-color), transparent 95%);
+	--global-bg: color-mix(in srgb, var(--chart-wpm-color), transparent 95%);
 	--precision-bg: color-mix(in srgb, var(--kpi-precision-color), transparent 95%);
+	--kpi-wpm-bg: color-mix(in srgb, var(--kpi-wpm-color), transparent 95%);
 	--delegation-bg: rgba(var(--text-color-rgb), 0.05);
 	--rep-bg: color-mix(in srgb, var(--kpi-rep-color), transparent 95%);
 	--dist-bg: color-mix(in srgb, var(--kpi-dist-color), transparent 95%);
@@ -58,8 +62,9 @@
 	/* KPI Borders Light Mode (Soft opacity) */
 	--hs-border: color-mix(in srgb, var(--kpi-hs-color), transparent 50%);
 	--llm-border: color-mix(in srgb, var(--kpi-llm-color), transparent 50%);
-	--global-border: color-mix(in srgb, var(--kpi-wpm-color), transparent 50%);
+	--global-border: color-mix(in srgb, var(--chart-wpm-color), transparent 50%);
 	--precision-border: color-mix(in srgb, var(--kpi-precision-color), transparent 50%);
+	--kpi-wpm-border: color-mix(in srgb, var(--kpi-wpm-color), transparent 50%);
 	--delegation-border: rgba(var(--text-color-rgb), 0.5);
 	--rep-border: color-mix(in srgb, var(--kpi-rep-color), transparent 50%);
 	--dist-border: color-mix(in srgb, var(--kpi-dist-color), transparent 50%);
@@ -98,8 +103,11 @@
 		/* KPI Colors (Vibrant, readable colors for Dark Mode) */
 		--kpi-hs-color: rgb(255, 69, 58); /* #ff453a (Vibrant Red) */
 		--kpi-llm-color: rgb(191, 90, 242); /* #bf5af2 (Vibrant Purple) */
-		--kpi-wpm-color: rgb(255, 149, 0); /* #ff9500 (Vibrant Orange) */
-		--kpi-wpm-rgb: 255, 149, 0;
+		/* WPM KPI card stays yellow; the chart uses --chart-wpm-color (orange) */
+		--kpi-wpm-color: rgb(255, 214, 10); /* #ffd60a (Vibrant Yellow) */
+		--kpi-wpm-rgb: 255, 214, 10;
+		--chart-wpm-color: rgb(255, 149, 0); /* #ff9500 (Vibrant Orange) */
+		--chart-wpm-rgb: 255, 149, 0;
 		--kpi-precision-color: rgb(48, 209, 88); /* #30d158 (Vibrant Green) */
 		--kpi-delegation-color: rgb(30, 150, 255); /* #0a84ff (Vibrant Blue) */
 		--kpi-rep-color: rgb(0, 212, 204); /* #00d4cc (Vibrant Teal) */
@@ -108,8 +116,9 @@
 		/* KPI Backgrounds Dark Mode */
 		--hs-bg: color-mix(in srgb, var(--kpi-hs-color), transparent 90%);
 		--llm-bg: color-mix(in srgb, var(--kpi-llm-color), transparent 90%);
-		--global-bg: color-mix(in srgb, var(--kpi-wpm-color), transparent 90%);
+		--global-bg: color-mix(in srgb, var(--chart-wpm-color), transparent 90%);
 		--precision-bg: color-mix(in srgb, var(--kpi-precision-color), transparent 90%);
+		--kpi-wpm-bg: color-mix(in srgb, var(--kpi-wpm-color), transparent 90%);
 		--delegation-bg: rgba(var(--text-color-rgb), 0.1);
 		--rep-bg: color-mix(in srgb, var(--kpi-rep-color), transparent 90%);
 		--dist-bg: color-mix(in srgb, var(--kpi-dist-color), transparent 90%);
@@ -117,8 +126,9 @@
 		/* KPI Borders Dark Mode */
 		--hs-border: color-mix(in srgb, var(--kpi-hs-color), transparent 50%);
 		--llm-border: color-mix(in srgb, var(--kpi-llm-color), transparent 50%);
-		--global-border: color-mix(in srgb, var(--kpi-wpm-color), transparent 50%);
+		--global-border: color-mix(in srgb, var(--chart-wpm-color), transparent 50%);
 		--precision-border: color-mix(in srgb, var(--kpi-precision-color), transparent 50%);
+		--kpi-wpm-border: color-mix(in srgb, var(--kpi-wpm-color), transparent 50%);
 		--delegation-border: rgba(var(--text-color-rgb), 0.5);
 		--rep-border: color-mix(in srgb, var(--kpi-rep-color), transparent 50%);
 		--dist-border: color-mix(in srgb, var(--kpi-dist-color), transparent 50%);
@@ -310,8 +320,8 @@ input[type='date']::-webkit-datetime-edit-year-field {
 	border-color: var(--llm-border);
 }
 .stat-card.card-global {
-	background: var(--global-bg);
-	border-color: var(--global-border);
+	background: var(--kpi-wpm-bg);
+	border-color: var(--kpi-wpm-border);
 }
 .stat-card.card-rep {
 	background: var(--rep-bg);

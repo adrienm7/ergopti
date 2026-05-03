@@ -36,6 +36,11 @@ local KC_LOG_PATH = hs.configdir .. "/karabiner_kc.log"
 -- when a burst of key presses writes many lines before the watcher fires.
 local MAX_DRAIN_LINES = 200
 
+-- Backup poller interval (seconds). hs.pathwatcher relies on FSEvents which can
+-- coalesce or miss rapid append-only writes on some macOS versions; a low-cost
+-- timer drains the log on a fixed cadence so no physical kc event is ever lost.
+local POLL_FALLBACK_SEC = 0.5
+
 local _state      = nil   -- injected by M.init()
 local _log_manager = nil  -- injected by M.init()
 
@@ -47,8 +52,16 @@ local _managed_output_kcs = {}
 -- Watcher that fires whenever KC_LOG_PATH is written to.
 local _watcher = nil
 
+-- Backup poll timer that drains the log on a fixed cadence.
+local _poll_timer = nil
+
 -- Byte offset into KC_LOG_PATH: we only read lines written since the last drain.
 local _file_offset = 0
+
+-- Cumulative count of physical kc events drained — surfaced via M.get_stats()
+-- so the user can verify in the console that the bridge is actually receiving
+-- events from Karabiner without manually inspecting the log file.
+local _drained_total = 0
 
 
 
@@ -164,7 +177,9 @@ local function drain_log()
 	fh:close()
 
 	if drained > 0 then
-		Logger.trace(LOG, "Drained %d physical kc event(s) from KE log.", drained)
+		_drained_total = _drained_total + drained
+		Logger.debug(LOG, "Drained %d physical kc event(s) (total since start: %d).",
+			drained, _drained_total)
 	end
 end
 
@@ -229,26 +244,63 @@ function M.init(core_state, log_manager, tap_hold_config, available_actions)
 		Logger.warn(LOG, "No tap_hold_config or available_actions — suppression set empty.")
 	end
 
-	-- Drain any lines already written since the last HS run (e.g. keystrokes
-	-- typed before the keylogger started). Then set _file_offset to the current
-	-- end so only future writes trigger the normal drain path.
+	-- Ensure the log file exists BEFORE the watcher starts: hs.pathwatcher binds
+	-- to an inode and may miss creation events if the file does not yet exist.
+	-- Touching it here also lets the KE shell_command "echo … >> file" succeed
+	-- on first write without a parent-directory race.
+	local fh_touch = io.open(KC_LOG_PATH, "a")
+	if fh_touch then
+		fh_touch:close()
+	else
+		Logger.warn(LOG, "Cannot create '%s' — bridge may not receive KE events.", KC_LOG_PATH)
+	end
+
+	-- Set _file_offset to current end so we ignore stale lines from a prior session
+	-- (those have already been counted in the persisted kc dict on disk).
 	local fh_init = io.open(KC_LOG_PATH, "r")
 	if fh_init then
 		_file_offset = fh_init:seek("end") or 0
 		fh_init:close()
-		Logger.debug(LOG, "KC log exists (%d bytes) — starting from end.", _file_offset)
+		Logger.debug(LOG, "KC log opened (%d bytes) — draining only future writes.", _file_offset)
 	end
 
 	-- Path watcher fires whenever the log file is written to by KE shell_command
 	_watcher = hs.pathwatcher.new(KC_LOG_PATH, function(_paths)
 		local ok, err = pcall(drain_log)
 		if not ok then
-			Logger.error(LOG, "drain_log() raised: %s.", tostring(err))
+			Logger.error(LOG, "drain_log() raised (watcher): %s.", tostring(err))
 		end
 	end)
 	_watcher:start()
 
+	-- Backup poll timer — covers FSEvents misses. Cheap: only opens the file and
+	-- seeks to _file_offset; bails out immediately when there is no new data.
+	if _poll_timer then _poll_timer:stop() end
+	_poll_timer = hs.timer.new(POLL_FALLBACK_SEC, function()
+		local ok, err = pcall(drain_log)
+		if not ok then
+			Logger.error(LOG, "drain_log() raised (poll): %s.", tostring(err))
+		end
+	end)
+	_poll_timer:start()
+
 	Logger.success(LOG, "KE physical-kc bridge initialized (watching '%s').", KC_LOG_PATH)
+end
+
+--- Diagnostic: returns the cumulative number of physical kc events drained,
+--- the number of suppressed output kcs, and the current log byte offset.
+--- Useful from the HS console to verify the bridge is wired correctly:
+---   require("modules.keylogger.kc_bridge").get_stats()
+--- @return table { drained_total = number, suppressed = number, offset = number }
+function M.get_stats()
+	local n = 0
+	for _ in pairs(_managed_output_kcs) do n = n + 1 end
+	return {
+		drained_total = _drained_total,
+		suppressed    = n,
+		offset        = _file_offset,
+		log_path      = KC_LOG_PATH,
+	}
 end
 
 --- Stops the path watcher. Called from keylogger M.stop().
@@ -256,8 +308,12 @@ function M.stop()
 	if _watcher then
 		_watcher:stop()
 		_watcher = nil
-		Logger.done(LOG, "KE physical-kc bridge stopped.")
 	end
+	if _poll_timer then
+		_poll_timer:stop()
+		_poll_timer = nil
+	end
+	Logger.done(LOG, "KE physical-kc bridge stopped.")
 end
 
 return M
