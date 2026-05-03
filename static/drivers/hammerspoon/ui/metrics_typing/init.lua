@@ -96,7 +96,10 @@ local function fetch_range(log_dir, start_date, end_date, selected_apps)
 		
 		local db = sqlite3.open(tmp_path)
 		if db then
-			local query = "SELECT app_name, index_json FROM daily_index WHERE 1=1"
+			-- Always exclude today from the SQLite query: today's data comes exclusively
+			-- from the flat .idx live file to avoid double-counting when both sources overlap.
+			local today_str = os.date("%Y-%m-%d")
+			local query = "SELECT app_name, index_json FROM daily_index WHERE date < '" .. today_str .. "'"
 			if start_date and start_date ~= "" then query = query .. string.format(" AND date >= '%s'", start_date) end
 			if end_date and end_date ~= "" then query = query .. string.format(" AND date <= '%s'", end_date) end
 
