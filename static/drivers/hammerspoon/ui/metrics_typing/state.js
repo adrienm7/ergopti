@@ -188,10 +188,10 @@ const KEY_POSITIONS = {
 	"42":  { x: 12.75, y: 0     }, // \ — ISO backslash is on the home row, between ' and Return
 
 	// Number row (y = 1.80)
-	// Apple ISO keyboard quirk: physical backtick key (left of 1) is kc 50,
-	// and the ISO extra key (< >, right of left-shift) is kc 10.
-	// kc 50 is placed here (number row) so its ` label sits at the correct position.
-	"50":  { x: 0,     y: 1.80  }, // ` (number row, left of 1) — Apple ISO swap: kc50 is physically the ` key
+	// Apple ISO keyboard quirk: the OS-reported keycode for the backtick key (left of 1)
+	// is kc 10, and the ISO extra key (< >, right of left-shift) is kc 50.
+	// kc 10 is placed here (number row) so the ` label sits at the correct position.
+	"10":  { x: 0,     y: 1.80  }, // ` (number row, left of 1) — Apple ISO: kc10 is physically the ` key
 	"18":  { x: 1,     y: 1.80  }, // 1
 	"19":  { x: 2,     y: 1.80  }, // 2
 	"20":  { x: 3,     y: 1.80  }, // 3
@@ -207,12 +207,12 @@ const KEY_POSITIONS = {
 	"51":  { x: 13.0,  y: 1.80  }, // backspace — left anchor; right edge aligns with Return stem
 
 	// Bottom row (y = -0.90) — ISO layout
-	// Left Shift is 1.25u on ISO (vs 2.25u ANSI); ISO extra key (kc 10) fills the gap.
+	// Left Shift is 1.25u on ISO (vs 2.25u ANSI); ISO extra key (kc 50) fills the gap.
 	// Z and every key after it sit at the same x as ANSI because 1.25u + 1u = 2.25u total offset.
-	// Apple ISO quirk: kc 50 is physically the ` key (number row) but Apple reports the bottom-row
-	// ISO extra key (< >) as kc 10. Both are swapped here so the visual position matches the label.
-	"56":  { x: 0.75,  y: -0.90 }, // shift (L) — 1.25u, right edge has normal gap with kc10
-	"10":  { x: 1.75,  y: -0.90 }, // ISO extra key (< > on AZERTY) — Apple ISO swap: kc10 sits here
+	// Apple ISO quirk: kc 10 is physically the ` key (number row); kc 50 is the bottom-row
+	// ISO extra key (< >). Both are placed at their correct visual positions.
+	"56":  { x: 0.75,  y: -0.90 }, // shift (L) — 1.25u, right edge has normal gap with kc50
+	"50":  { x: 1.75,  y: -0.90 }, // ISO extra key (< > on AZERTY) — Apple ISO: kc50 sits here
 	"6":   { x: 2.75,  y: -0.90 }, // z
 	"7":   { x: 3.75,  y: -0.90 }, // x
 	"8":   { x: 4.75,  y: -0.90 }, // c
@@ -289,12 +289,12 @@ const KEY_FINGER = {
 	"34": "r_mid",  "31": "r_ring", "35": "r_pinky","33": "r_pinky",
 	"30": "r_pinky","42": "r_pinky",
 	// Number row
-	"50": "l_pinky","18": "l_pinky","19": "l_ring", "20": "l_mid",
+	"10": "l_pinky","18": "l_pinky","19": "l_ring", "20": "l_mid",
 	"21": "l_idx",  "23": "l_idx",  "22": "r_idx",  "26": "r_idx",
 	"28": "r_mid",  "25": "r_ring", "29": "r_pinky","27": "r_pinky",
 	"24": "r_pinky","51": "r_pinky",
 	// Bottom row
-	"56": "l_pinky","10": "l_pinky","6":  "l_pinky","7":  "l_ring", "8":  "l_mid",
+	"56": "l_pinky","50": "l_pinky","6":  "l_pinky","7":  "l_ring", "8":  "l_mid",
 	"9":  "l_idx",  "11": "l_idx",  "45": "r_idx",  "46": "r_idx",
 	"43": "r_mid",  "47": "r_ring", "44": "r_pinky","60": "r_pinky",
 	// Thumb row (ctrl-L is typed with the left pinky in standard touch typing)

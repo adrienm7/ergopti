@@ -497,10 +497,10 @@ function recompute_speed_kpi() {
 		? eff_output_chars / manifest_manual
 		: 1.0;
 
-	// "(estimé)" appears when at least one boost source is included — the resulting
-	// speed is inferred from a manifest-level ratio, not directly measured.
-	// When both toggles are OFF (multiplier = 1.0) the speed is purely measured.
-	const is_estimated = output_multiplier > 1.01;
+	// "(estimé)" appears whenever at least one source is excluded — without full
+	// n-gram timing data for every source we can only infer via a manifest ratio.
+	// Only when both HS and IA are active (output view) do we have the real numbers.
+	const is_estimated = !(hs_raw_mode && llm_raw_mode);
 
 	const output_cpm = active_ms > 0
 		? (manual_active * output_multiplier) / (active_ms / 60000)
