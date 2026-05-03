@@ -247,6 +247,7 @@ function compute_manifest_metrics() {
 				app_state.time_series[date_str] = {
 					chars: 0, wpm_chars: 0, time_ms: 0,
 					hs_chars: 0, llm_chars: 0,
+					raw_chars: 0, output_chars: 0,
 					daily_chars: 0, daily_manual_errors: 0,
 				};
 			}
@@ -276,11 +277,13 @@ function compute_manifest_metrics() {
 			const ts = app_state.time_series[date_str];
 			// ts.chars    = volume for display (output view: all sources; raw-input view: triggers only)
 			// ts.wpm_chars = output chars for MPM — always includes HS/LLM expansions
-			ts.chars     += effective_volume_chars;
-			ts.wpm_chars += effective_wpm_chars;
-			ts.time_ms   += app.time || 0;
-			ts.hs_chars  += hs_chars_raw;
-			ts.llm_chars += llm_chars_raw;
+			ts.chars        += effective_volume_chars;
+			ts.wpm_chars    += effective_wpm_chars;
+			ts.time_ms      += app.time || 0;
+			ts.hs_chars     += hs_chars_raw;
+			ts.llm_chars    += llm_chars_raw;
+			ts.raw_chars    += total_chars;
+			ts.output_chars += total_chars + hs_chars_raw + llm_chars_raw;
 
 			if (app.hourly) {
 				Object.keys(app.hourly).forEach((hour) => {
@@ -319,14 +322,17 @@ function compute_manifest_metrics() {
 	const hs_points      = [], llm_points = [], wpm_points = [];
 	let hs_chars_total   = 0, llm_chars_total   = 0;
 	let global_chars     = 0, global_time_ms    = 0, wpm_chars_total = 0;
+	let global_raw_chars = 0, global_output_chars = 0;
 
 	sorted_keys.forEach((k) => {
 		const d  = app_state.time_series[k];
-		hs_chars_total   += d.hs_chars;
-		llm_chars_total  += d.llm_chars;
-		global_chars     += d.chars    || 0;
-		global_time_ms   += d.time_ms  || 0;
-		wpm_chars_total  += d.wpm_chars || 0;
+		hs_chars_total     += d.hs_chars;
+		llm_chars_total    += d.llm_chars;
+		global_chars       += d.chars    || 0;
+		global_time_ms     += d.time_ms  || 0;
+		wpm_chars_total    += d.wpm_chars || 0;
+		global_raw_chars   += d.raw_chars   || 0;
+		global_output_chars += d.output_chars || 0;
 
 		if (d.chars > 0) {
 			hs_points.push(  { x: new Date(k + "T12:00:00"), y: (d.hs_chars  / d.chars) * 100 });
@@ -403,7 +409,7 @@ function compute_manifest_metrics() {
 			`<div style="margin-top:3px;">` +
 			`<strong style="color:var(--kpi-wpm-color);font-size:1.1em;">${format_number(global_output_chars)}</strong>` +
 			` <span class="stat-unit" style="font-size:0.9em;">touches apparues à l’écran</span>` +
-			`</div>";
+			`</div>`;
 	}
 
 	render_charts();
