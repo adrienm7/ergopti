@@ -389,11 +389,11 @@ function M.show(log_dir)
 
 	-- On the first open after a Hammerspoon reload the window is created but
 	-- sometimes stays behind other windows because the HS menu that triggered
-	-- this call is still compositing.  A second force_focus ~300 ms later (with
-	-- is_new=false so hide+show teleports it to the active Space) guarantees the
-	-- window actually appears on the user's current desktop.
+	-- this call is still compositing.  We raise the window 300 ms later using
+	-- is_new=true so force_focus skips the hide/show cycle: the webview may not
+	-- have finished loading yet and hiding it at that point causes a crash.
 	hs.timer.doAfter(0.3, function()
-		if M._wv then ui_builder.force_focus(M._wv) end
+		if M._wv then ui_builder.force_focus(M._wv, true) end
 	end)
 
 	-- Build the current keyboard layout map (keycode number → character/name).

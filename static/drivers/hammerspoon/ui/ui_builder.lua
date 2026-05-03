@@ -123,24 +123,25 @@ function M.force_focus(wv, is_new)
 		pcall(function() wv:show() end)
 	end
 
-	-- Bring to front and request system focus
+	-- Bring to front and request system focus.
+	-- bringToFront() alone is used when hswindow() returns nil (window not yet
+	-- composited by the OS) to avoid calling raise/focus on a nil handle.
 	hs.timer.doAfter(0.05, function()
-		if type(wv.hswindow) == "function" then
-			local ok, win = pcall(function() return wv:hswindow() end)
-			if ok and win then
-				pcall(function() win:moveToScreen(hs.screen.mainScreen()) end)
-				if type(win.raise) == "function" then
-					pcall(function() win:raise() end)
-					pcall(function() win:focus() end)
-				end
-			else
-				pcall(function() wv:bringToFront() end)
-			end
+		if type(wv.hswindow) ~= "function" then
+			pcall(function() wv:bringToFront() end)
+			pcall(hs.focus)
+			Logger.info(LOG, "Window focus applied (bringToFront fallback).")
+			return
+		end
+		local ok, win = pcall(function() return wv:hswindow() end)
+		if ok and win and type(win.raise) == "function" then
+			pcall(function() win:moveToScreen(hs.screen.mainScreen()) end)
+			pcall(function() win:raise() end)
+			pcall(function() win:focus() end)
 		else
+			-- hswindow() returned nil — window not yet composited; bringToFront is safe
 			pcall(function() wv:bringToFront() end)
 		end
-
-		-- Ensure Hammerspoon application regains primary OS focus
 		pcall(hs.focus)
 		Logger.info(LOG, "Window focus applied.")
 	end)
