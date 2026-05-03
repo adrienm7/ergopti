@@ -594,7 +594,7 @@ input[type='date']::-webkit-datetime-edit-year-field {
 }
 
 .chart-row-block-canvas {
-	height: 150px;
+	height: 120px;
 	position: relative;
 }
 

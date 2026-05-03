@@ -1,4 +1,4 @@
-// ui/metrics_typing/data.js
+﻿﻿﻿// ui/metrics_typing/data.js
 
 /**
  * ==============================================================================
@@ -395,16 +395,15 @@ function compute_manifest_metrics() {
 
 	const global_details = document.getElementById("global_details");
 	if (global_details) {
-		const { hs_raw_mode, llm_raw_mode } = get_source_mode_flags();
-		const raw_note = (hs_raw_mode || llm_raw_mode)
-			? `<div style="font-size:0.7em;color:var(--text-muted);margin-top:3px;">` +
-			  `Frappes brutes (triggers) — MPM basé sur l’output</div>`
-			: "";
 		global_details.innerHTML =
 			`<div style="margin-top:5px;">` +
-			`<strong style="color:var(--kpi-wpm-color);font-size:1.1em;">${format_number(global_chars)}</strong>` +
-			` <span class="stat-unit" style="font-size:0.9em;">touches tapées</span>` +
-			`</div>${raw_note}`;
+			`<strong style="color:var(--kpi-wpm-color);font-size:1.1em;">${format_number(global_raw_chars)}</strong>` +
+			` <span class="stat-unit" style="font-size:0.9em;">touches brutes tapées</span>` +
+			`</div>` +
+			`<div style="margin-top:3px;">` +
+			`<strong style="color:var(--kpi-wpm-color);font-size:1.1em;">${format_number(global_output_chars)}</strong>` +
+			` <span class="stat-unit" style="font-size:0.9em;">touches apparues à l’écran</span>` +
+			`</div>";
 	}
 
 	render_charts();
@@ -434,34 +433,13 @@ function compute_manifest_metrics() {
 function recompute_speed_kpi() {
 	const pause_thresh = parseInt(document.getElementById("pause_threshold")?.value ?? "2000", 10) || 2000;
 	const { hs_raw_mode, llm_raw_mode } = get_source_mode_flags();
-	const c_dict = app_state.data.c || {};
 
-	// Sum time and char count for entries whose mean inter-key interval is ≤ threshold.
-	// Each entry in c_dict has .time (total inter-key ms, manual chars) and .manual_count.
-	let active_ms     = 0;
-	let manual_active = 0;
-
-	// c_dict.time only accumulates inter-key intervals for manually typed chars,
-	// so it naturally excludes HS/LLM expansion bursts. Pause threshold applied
-	// per-character: chars whose mean inter-key interval exceeds the threshold
-	// indicate sustained pauses and are excluded from active typing time.
-	Object.values(c_dict).forEach(item => {
-		const mc = item.count - (item.synth_hs || 0) - (item.synth_llm || 0) - (item.synth_other || 0);
-		if (mc <= 0) return;
-		const avg = (item.time || 0) / mc;
-		if (avg <= pause_thresh) {
-			active_ms     += item.time || 0;
-			manual_active += mc;
-		}
-	});
-
-	// Estimate output chars = manual + HS output + LLM output.
-	// In raw-input view, hs_chars/llm_chars from c_dict are trigger chars, not outputs.
-	// We don't have output counts here, so we use the manifest totals for the ratio.
-	// Manifest wpm_chars / manifest manual_chars gives an output-to-input multiplier.
-	let manifest_total = 0;
-	let manifest_hs    = 0;
-	let manifest_llm   = 0;
+	// Collect totals from manifest for the selected date range
+	let time_ms   = 0;
+	let think_ms  = 0;
+	let raw_chars = 0;
+	let hs_chars  = 0;
+	let llm_chars = 0;
 	const start_val = document.getElementById("date_start").value;
 	const end_val   = document.getElementById("date_end").value;
 	const manifest_dates = app_state.manifest_dates_sorted.length > 0
@@ -473,38 +451,31 @@ function recompute_speed_kpi() {
 		Object.keys(window.metrics_manifest[date_str] || {}).forEach(app_name => {
 			if (app_name !== "Unknown" && !app_state.selected_apps.has(app_name)) return;
 			const app = window.metrics_manifest[date_str][app_name];
-			manifest_total += app.chars     || 0;
-			manifest_hs    += app.hs_chars  || 0;
-			manifest_llm   += app.llm_chars || 0;
+			// app.chars is manual physical keystrokes (already excludes hs/llm expansions)
+			raw_chars += app.chars      || 0;
+			hs_chars  += app.hs_chars   || 0;
+			llm_chars += app.llm_chars  || 0;
+			time_ms   += app.time       || 0;
+			// think_time is the total pause duration > 2 s recorded by Lua
+			think_ms  += app.think_time || 0;
 		});
 	});
-	const manifest_manual = Math.max(0, manifest_total - manifest_hs - manifest_llm);
 
-	// Speed boost semantics: the "+ Hotstrings" and "+ IA" toggle buttons mean
-	// "include this source's output boost in the speed display". When a toggle is
-	// ACTIVE (raw_mode = true), that source's expansion IS included → higher MPM.
-	// When a toggle is INACTIVE, that source is excluded → slower, manual-only speed.
-	// - Both toggles OFF (default)  → eff = manual only            → lowest (raw speed)
-	// - HS ON, LLM OFF              → eff = manual + hs            → middle
-	// - HS OFF, LLM ON              → eff = manual + llm           → middle
-	// - Both ON                     → eff = manual + hs + llm      → highest (full boost)
+	// The Lua keylogger already excluded pauses > 2 s from app.time and accumulated
+	// them in app.think_time. The slider lets the user re-include a fraction of that
+	// think time to get a relaxed speed that counts longer pauses as active.
+	// scale = 0 at pause_thresh = 2000 ms (Lua threshold); scale -> 1 as pause_thresh -> inf.
+	const THINK_PAUSE_THRESHOLD_MS = 2000;
+	const think_scale  = Math.max(0, 1 - THINK_PAUSE_THRESHOLD_MS / Math.max(pause_thresh, 1));
+	const effective_ms = time_ms + think_ms * think_scale;
+
+	// Output chars: physical keystrokes + net expansion chars for enabled sources
 	const eff_output_chars =
-		manifest_manual +
-		(hs_raw_mode  ? manifest_hs  : 0) +
-		(llm_raw_mode ? manifest_llm : 0);
+		raw_chars +
+		(hs_raw_mode  ? hs_chars  : 0) +
+		(llm_raw_mode ? llm_chars : 0);
 
-	const output_multiplier = manifest_manual > 0
-		? eff_output_chars / manifest_manual
-		: 1.0;
-
-	// "(estimé)" appears whenever at least one source is excluded — without full
-	// n-gram timing data for every source we can only infer via a manifest ratio.
-	// Only when both HS and IA are active (output view) do we have the real numbers.
-	const is_estimated = !(hs_raw_mode && llm_raw_mode);
-
-	const output_cpm = active_ms > 0
-		? (manual_active * output_multiplier) / (active_ms / 60000)
-		: 0;
+	const output_cpm = effective_ms > 0 ? eff_output_chars / (effective_ms / 60000) : 0;
 	const output_wpm = output_cpm / 5;
 
 	const wpm_val_elem = document.getElementById("wpm_val");
@@ -513,19 +484,14 @@ function recompute_speed_kpi() {
 	const thresh_label = pause_thresh >= 99999000 ? "sans filtre"
 		: pause_thresh >= 60000 ? `> ${pause_thresh/60000} min`
 		: `> ${pause_thresh/1000} s`;
-	const est_badge = is_estimated
-		? `<span style="color:var(--text-muted);margin-left:4px;">(estimé)</span>`
-		: "";
 
 	wpm_val_elem.innerHTML =
 		`<div style="display:flex;flex-direction:column;justify-content:center;">` +
 		`<div style="display:flex;align-items:center;gap:6px;">` +
-		`<span>${format_number(output_wpm.toFixed(1))} <span class="stat-unit">MPM${est_badge}</span></span>` +
+		`<span>${format_number(output_wpm.toFixed(1))} <span class="stat-unit">MPM</span></span>` +
 		`<span class="tooltip stat-inline-tooltip">${INFO_SVG}<span class="tooltiptext">` +
 		`MPM : Mots par minute (1 mot = 5 touches).<br>` +
-		`Seuil de pause : pauses ${thresh_label} exclues du temps actif.<br>` +
-		(is_estimated ? `Vitesse estimée : les chars générés par hotstrings/IA sont inférés via un ratio output/input (×${format_number(output_multiplier.toFixed(2))}).` : `Vitesse mesurée à partir du temps de frappe manuel.`) +
-		`</span></span>` +
+		`Seuil de pause : pauses ${thresh_label} incluses dans le temps actif.</span></span>` +
 		`</div>` +
 		`<div style="display:flex;align-items:center;gap:6px;font-size:0.65em;margin-top:5px;">` +
 		`<span>${format_number(output_cpm.toFixed(0))} <span class="stat-unit">CPM</span></span>` +
@@ -535,16 +501,16 @@ function recompute_speed_kpi() {
 
 	const global_details = document.getElementById("global_details");
 	if (global_details) {
-		const raw_note = (hs_raw_mode || llm_raw_mode)
-			? `<div style="font-size:0.7em;color:var(--text-muted);margin-top:3px;">` +
-			  `Frappes brutes (triggers) — MPM basé sur l’output</div>`
-			: "";
-		const total_display = Object.values(c_dict).reduce((s, i) => s + (i.count || 0), 0);
+		const output_chars = raw_chars + hs_chars + llm_chars;
 		global_details.innerHTML =
 			`<div style="margin-top:5px;">` +
-			`<strong style="color:var(--kpi-wpm-color);font-size:1.1em;">${format_number(total_display)}</strong>` +
-			` <span class="stat-unit" style="font-size:0.9em;">touches tapées</span>` +
-			`</div>${raw_note}`;
+			`<strong style="color:var(--kpi-wpm-color);font-size:1.1em;">${format_number(raw_chars)}</strong>` +
+			` <span class="stat-unit" style="font-size:0.9em;">touches brutes tapées</span>` +
+			`</div>` +
+			`<div style="margin-top:3px;">` +
+			`<strong style="color:var(--kpi-wpm-color);font-size:1.1em;">${format_number(output_chars)}</strong>` +
+			` <span class="stat-unit" style="font-size:0.9em;">touches apparues à l’écran</span>` +
+			`</div>`;
 	}
 }
 
@@ -958,30 +924,20 @@ function render_avg_words_kpi() {
 	if (!sub_el) return;
 
 	const w_dict = app_state.data.w || {};
-	const c_dict = app_state.data.c || {};
 
 	// Count total word occurrences across all entries in the words dict
 	let total_words = 0;
 	Object.values(w_dict).forEach(item => { total_words += item.count || 0; });
 
-	// Sentence endings: sum of ., !, ? counts (case-insensitive keys just in case)
-	const sentence_chars = [".", "!", "?"];
-	let total_sentences = 0;
-	sentence_chars.forEach(ch => {
-		const entry = c_dict[ch];
-		if (entry) total_sentences += entry.count || 0;
-	});
-
-	if (total_words === 0 || total_sentences === 0) {
+	if (total_words === 0) {
 		sub_el.innerHTML = "";
 		return;
 	}
 
-	const avg = total_words / total_sentences;
 	sub_el.innerHTML =
 		`<div style="margin-top:5px;">` +
-		`<strong style="color:var(--kpi-wpm-color);font-size:1.1em;">${format_number(avg.toFixed(1))}</strong>` +
-		` <span class="stat-unit" style="font-size:0.9em;">mots par phrase en moyenne</span>` +
+		`<strong style="color:var(--kpi-wpm-color);font-size:1.1em;">${format_number(total_words)}</strong>` +
+		` <span class="stat-unit" style="font-size:0.9em;">mots tapés au total</span>` +
 		`</div>`;
 }
 

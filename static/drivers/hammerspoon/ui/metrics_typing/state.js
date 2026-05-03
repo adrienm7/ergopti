@@ -156,20 +156,20 @@ const CONTROL_KEY_SYMBOLS = {
 const KEY_UNIT_MM = 19.05;
 
 const KEY_POSITIONS = {
-	// Home row (y = 0)
-	"0":   { x: 1.75,  y: 0     }, // a — left pinky home
-	"1":   { x: 2.75,  y: 0     }, // s — left ring home
-	"2":   { x: 3.75,  y: 0     }, // d — left middle home
-	"3":   { x: 4.75,  y: 0     }, // f — left index home (bump)
-	"5":   { x: 5.75,  y: 0     }, // g — left index stretch
-	"4":   { x: 6.75,  y: 0     }, // h — right index stretch
-	"38":  { x: 7.75,  y: 0     }, // j — right index home (bump)
-	"40":  { x: 8.75,  y: 0     }, // k — right middle home
-	"37":  { x: 9.75,  y: 0     }, // l — right ring home
-	"41":  { x: 10.75, y: 0     }, // ;  — right pinky home
-	"39":  { x: 11.75, y: 0     }, // '  — right pinky reach
-	"36":  { x: 14.0,  y: 0     }, // return
-	"57":  { x: 0.75,  y: 0     }, // capslock — 1.75u wide, anchored so right edge has normal gap with A
+	// Home row (y = 0.12) — shifted up by half the inter-row reduction to tighten letter-row spacing
+	"0":   { x: 1.75,  y: 0.12  }, // a — left pinky home
+	"1":   { x: 2.75,  y: 0.12  }, // s — left ring home
+	"2":   { x: 3.75,  y: 0.12  }, // d — left middle home
+	"3":   { x: 4.75,  y: 0.12  }, // f — left index home (bump)
+	"5":   { x: 5.75,  y: 0.12  }, // g — left index stretch
+	"4":   { x: 6.75,  y: 0.12  }, // h — right index stretch
+	"38":  { x: 7.75,  y: 0.12  }, // j — right index home (bump)
+	"40":  { x: 8.75,  y: 0.12  }, // k — right middle home
+	"37":  { x: 9.75,  y: 0.12  }, // l — right ring home
+	"41":  { x: 10.75, y: 0.12  }, // ;  — right pinky home
+	"39":  { x: 11.75, y: 0.12  }, // '  — right pinky reach
+	"36":  { x: 14.0,  y: 0.12  }, // return
+	"57":  { x: 0.75,  y: 0.12  }, // capslock — 1.75u wide, anchored so right edge has normal gap with A
 
 	// QWERTY row (y = 0.90)
 	"48":  { x: 0.5,   y: 0.90  }, // tab — 1.5u wide, anchored so right edge has normal gap with Q
@@ -206,24 +206,22 @@ const KEY_POSITIONS = {
 	"24":  { x: 12,    y: 1.80  }, // =
 	"51":  { x: 13.0,  y: 1.80  }, // backspace — left anchor; right edge aligns with Return stem
 
-	// Bottom row (y = -0.90) — ISO layout
+	// Bottom row (y = -0.66) — ISO layout; shifted up by 0.24 to halve inter-row gap vs home
 	// Left Shift is 1.25u on ISO (vs 2.25u ANSI); ISO extra key (kc 50) fills the gap.
-	// Z and every key after it sit at the same x as ANSI because 1.25u + 1u = 2.25u total offset.
-	// Apple ISO quirk: kc 10 is physically the ` key (number row); kc 50 is the bottom-row
-	// ISO extra key (< >). Both are placed at their correct visual positions.
-	"56":  { x: 0.75,  y: -0.90 }, // shift (L) — 1.25u, right edge has normal gap with kc50
-	"50":  { x: 1.75,  y: -0.90 }, // ISO extra key (< > on AZERTY) — Apple ISO: kc50 sits here
-	"6":   { x: 2.75,  y: -0.90 }, // z
-	"7":   { x: 3.75,  y: -0.90 }, // x
-	"8":   { x: 4.75,  y: -0.90 }, // c
-	"9":   { x: 5.75,  y: -0.90 }, // v
-	"11":  { x: 6.75,  y: -0.90 }, // b
-	"45":  { x: 7.75,  y: -0.90 }, // n
-	"46":  { x: 8.75,  y: -0.90 }, // m
-	"43":  { x: 9.75,  y: -0.90 }, // ,
-	"47":  { x: 10.75, y: -0.90 }, // .
-	"44":  { x: 11.75, y: -0.90 }, // /
-	"60":  { x: 12.75, y: -0.90 }, // shift (R) — 1.75u, left edge has normal gap with /
+	// Entire row shifted -0.25u on x so B aligns with the spacebar centre.
+	"56":  { x: 0.50,  y: -0.66 }, // shift (L) — 1.25u
+	"50":  { x: 1.50,  y: -0.66 }, // ISO extra key (< > on AZERTY)
+	"6":   { x: 2.50,  y: -0.66 }, // z
+	"7":   { x: 3.50,  y: -0.66 }, // x
+	"8":   { x: 4.50,  y: -0.66 }, // c
+	"9":   { x: 5.50,  y: -0.66 }, // v
+	"11":  { x: 6.50,  y: -0.66 }, // b
+	"45":  { x: 7.50,  y: -0.66 }, // n
+	"46":  { x: 8.50,  y: -0.66 }, // m
+	"43":  { x: 9.50,  y: -0.66 }, // ,
+	"47":  { x: 10.50, y: -0.66 }, // .
+	"44":  { x: 11.50, y: -0.66 }, // /
+	"60":  { x: 12.50, y: -0.66 }, // shift (R) — 2.5u (stretched so right edge aligns with Return)
 
 	// Thumb row (y = -1.80)
 	"59":  { x: 0.5,   y: -1.80 }, // ctrl (L) — left pinky (standard touch-typing)
@@ -316,15 +314,15 @@ const KEY_FINGER = {
 
 // Rest position for each finger (in KEY_POSITIONS coordinate units).
 const FINGER_HOME = {
-	l_pinky: { x: 1.75,  y: 0     }, // rests on a
-	l_ring:  { x: 2.75,  y: 0     }, // rests on s
-	l_mid:   { x: 3.75,  y: 0     }, // rests on d
-	l_idx:   { x: 4.75,  y: 0     }, // rests on f (bump)
+	l_pinky: { x: 1.75,  y: 0.12  }, // rests on a
+	l_ring:  { x: 2.75,  y: 0.12  }, // rests on s
+	l_mid:   { x: 3.75,  y: 0.12  }, // rests on d
+	l_idx:   { x: 4.75,  y: 0.12  }, // rests on f (bump)
 	l_thumb: { x: 6.5,   y: -1.80 }, // rests on the space bar
-	r_idx:   { x: 7.75,  y: 0     }, // rests on j (bump)
-	r_mid:   { x: 8.75,  y: 0     }, // rests on k
-	r_ring:  { x: 9.75,  y: 0     }, // rests on l
-	r_pinky: { x: 10.75, y: 0     }, // rests on ;
+	r_idx:   { x: 7.75,  y: 0.12  }, // rests on j (bump)
+	r_mid:   { x: 8.75,  y: 0.12  }, // rests on k
+	r_ring:  { x: 9.75,  y: 0.12  }, // rests on l
+	r_pinky: { x: 10.75, y: 0.12  }, // rests on ;
 	r_thumb: { x: 9.5,   y: -1.80 }, // rests on cmd (R), adjacent to space
 };
 

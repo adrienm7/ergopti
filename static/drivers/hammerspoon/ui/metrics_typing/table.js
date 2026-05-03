@@ -726,7 +726,7 @@ function render_kc_heatmap(kc_data_arr) {
 		"51":  1.75, // backspace — 1.75u so right edge aligns with Return stem and right shift
 		"56":  1.25, // l-shift (ISO)
 		"57":  1.75, // capslock
-		"60":  1.75, // r-shift (ISO)
+		"60":  2.50, // r-shift (ISO) — stretched so its right edge aligns with Return's right edge
 		"49":  5.00, // space bar — fills cmd-L → cmd-R gap
 		"59":  1.00, // ctrl-L
 		"55":  1.00, // cmd-L
@@ -943,7 +943,7 @@ function render_kc_heatmap(kc_data_arr) {
 			label_disp = label_raw.toUpperCase();
 		}
 
-		const font_size  = label_disp.length > 4 ? 8 : label_disp.length > 2 ? 10 : 12;
+		const font_size  = label_disp.length > 4 ? 10 : label_disp.length > 2 ? 12 : 14;
 
 
 		// Tooltip content assembled as a data attribute string; rendered by JS onmouseover
