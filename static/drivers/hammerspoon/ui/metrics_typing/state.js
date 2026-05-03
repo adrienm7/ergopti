@@ -168,11 +168,11 @@ const KEY_POSITIONS = {
 	"37":  { x: 9.75,  y: 0     }, // l — right ring home
 	"41":  { x: 10.75, y: 0     }, // ;  — right pinky home
 	"39":  { x: 11.75, y: 0     }, // '  — right pinky reach
-	"36":  { x: 13.0,  y: 0     }, // return
+	"36":  { x: 14.0,  y: 0     }, // return
 	"57":  { x: 0.75,  y: 0     }, // capslock
 
 	// QWERTY row (y = 0.90)
-	"48":  { x: 0.75,  y: 0.90  }, // tab
+	"48":  { x: 0.50,  y: 0.90  }, // tab
 	"12":  { x: 1.5,   y: 0.90  }, // q
 	"13":  { x: 2.5,   y: 0.90  }, // w
 	"14":  { x: 3.5,   y: 0.90  }, // e
@@ -257,10 +257,10 @@ const KEY_POSITIONS = {
 	"121": { x: 16.0,  y: 0     }, // page down
 
 	// Arrow cluster
-	"123": { x: 14.5,  y: -0.90 }, // left
-	"124": { x: 15.5,  y: -0.90 }, // right
+	"123": { x: 14.5,  y: -1.80 }, // left
+	"124": { x: 16.5,  y: -1.80 }, // right
 	"125": { x: 15.5,  y: -1.80 }, // down
-	"126": { x: 15.5,  y: 0     }, // up
+	"126": { x: 15.5,  y: -0.90 }, // up
 
 	// Numpad enter
 	"76":  { x: 18.0,  y: -1.80 }, // enter (numpad)

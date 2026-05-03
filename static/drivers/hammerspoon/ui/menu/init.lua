@@ -553,9 +553,32 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 				end)
 			end,
 			trigger_prediction = function() if keymap and type(keymap.trigger_prediction) == "function" then pcall(keymap.trigger_prediction) end end,
-			add_hotstring = function() if hotstring_editor and type(hotstring_editor.open) == "function" then pcall(hotstring_editor.open, "shortcut") end end,
-			show_metrics = function() if core_mods.keylogger and type(core_mods.keylogger.show_metrics) == "function" then pcall(core_mods.keylogger.show_metrics) end end,
-			show_apps_time = function() local ok_at, at = pcall(require, "ui.metrics_apps"); if ok_at and type(at.show) == "function" then pcall(at.show, base_dir .. "logs") end end,
+			add_hotstring = function()
+				-- Toggle: close if already open, otherwise open
+				if hotstring_editor then
+					if type(hotstring_editor.is_open) == "function" and hotstring_editor.is_open() then
+						if type(hotstring_editor.close) == "function" then pcall(hotstring_editor.close) end
+						return
+					end
+					if type(hotstring_editor.open) == "function" then pcall(hotstring_editor.open, "shortcut") end
+				end
+			end,
+			show_metrics = function()
+				-- Toggle: close if already open, otherwise open
+				local mui = package.loaded["ui.metrics_typing.init"] or package.loaded["ui.metrics_typing"]
+				if mui and mui._wv then
+					pcall(function() mui._wv:delete() end); mui._wv = nil; return
+				end
+				if core_mods.keylogger and type(core_mods.keylogger.show_metrics) == "function" then pcall(core_mods.keylogger.show_metrics) end
+			end,
+			show_apps_time = function()
+				-- Toggle: close if already open, otherwise open
+				local at_loaded = package.loaded["ui.metrics_apps"] or package.loaded["ui.metrics_apps.init"]
+				if at_loaded and at_loaded._wv then
+					pcall(function() at_loaded._wv:delete() end); at_loaded._wv = nil; return
+				end
+				local ok_at, at = pcall(require, "ui.metrics_apps"); if ok_at and type(at.show) == "function" then pcall(at.show, base_dir .. "logs") end
+			end,
 			open_config = function() hs.timer.doAfter(0, function() _suppress_watcher_until = hs.timer.secondsSinceEpoch() + 8; pcall(hs.execute, "open \"" .. base_dir .. "config.json\"") end) end,
 			open_logs = function() hs.timer.doAfter(0, function() pcall(hs.execute, "open \"" .. base_dir .. "logs\"") end) end,
 		})

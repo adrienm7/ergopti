@@ -360,6 +360,12 @@ function M.open(open_mode)
 	})
 end
 
+--- Returns true when the editor window is currently open.
+--- @return boolean
+function M.is_open()
+	return _webview ~= nil
+end
+
 --- Closes the Hotstring Editor window and cleans up resources.
 function M.close()
 	if _webview then

@@ -870,17 +870,6 @@ function render_kc_heatmap(kc_data_arr) {
 
 		const font_size  = label_disp.length > 4 ? 8 : label_disp.length > 2 ? 10 : 12;
 
-		// Count badge bottom-right of key
-		let badge = "";
-		if (count > 0) {
-			const badge_str = count >= 100000 ? `${(count / 1000).toFixed(0)}k`
-				: count >= 10000  ? `${(count / 1000).toFixed(1)}k`
-				: count >= 1000   ? `${(count / 1000).toFixed(1)}k`
-				: String(count);
-			badge = `<text x="${Math.round(cx + key_w * 0.30)}" y="${sy + KH - 3}"
-				text-anchor="middle" font-size="7" fill="${text_color}" opacity="0.70"
-				font-family="monospace">${escape_html(badge_str)}</text>`;
-		}
 
 		// Tooltip content assembled as a data attribute string; rendered by JS onmouseover
 		const freq_pct  = grand_total > 0 ? ((count / grand_total) * 100).toFixed(2) : "0.00";
@@ -922,16 +911,46 @@ function render_kc_heatmap(kc_data_arr) {
 		const tip_html  = tip_lines.join("<br>");
 		const tip_id    = `${uid}_${kc_str}`;
 
-		// Invisible overlay rect to capture mouse events
-		rects += `<rect x="${sx}" y="${sy}" width="${key_w}" height="${KH}" rx="${R}"
-			fill="${fill}" stroke="#0d0d1a" stroke-width="1.5"
-			data-tip="${tip_id}" class="hm-key"
-			onmouseenter="hm_show_tip('${tip_id}')" onmouseleave="hm_hide_tip('${tip_id}')"/>`;
+		// ISO Return (kc 36) gets an L-shaped path spanning home + QWERTY rows.
+		// For all other keys a standard rounded-rect is drawn.
+		if (kc_str === "36") {
+			const row_px  = Math.round(U * 0.90);    // pixel distance between rows
+			const stem_w  = Math.round(U - GAP);     // stem = 1u wide
+			const stem_sx = sx + key_w - stem_w;     // stem right-aligned
+			const top_y   = sy - row_px;             // top of QWERTY row
+			const bot_bot = sy + KH;                 // bottom of home row
+			const lx = stem_sx, rx = sx + key_w;
+			// Clockwise L-path with rounded corners
+			const d = [
+				`M ${rx-R} ${top_y}`,
+				`A ${R} ${R} 0 0 1 ${rx} ${top_y+R}`,
+				`L ${rx} ${bot_bot-R}`,
+				`A ${R} ${R} 0 0 1 ${rx-R} ${bot_bot}`,
+				`L ${sx+R} ${bot_bot}`,
+				`A ${R} ${R} 0 0 1 ${sx} ${bot_bot-R}`,
+				`L ${sx} ${sy+R}`,
+				`A ${R} ${R} 0 0 1 ${sx+R} ${sy}`,
+				`L ${lx-R} ${sy}`,
+				`A ${R} ${R} 0 0 1 ${lx} ${sy-R}`,
+				`L ${lx} ${top_y+R}`,
+				`A ${R} ${R} 0 0 1 ${lx+R} ${top_y}`,
+				"Z",
+			].join(" ");
+			rects += `<path d="${d}" fill="${fill}" stroke="#0d0d1a" stroke-width="1.5"
+				data-tip="${tip_id}" class="hm-key"
+				onmouseenter="hm_show_tip('${tip_id}')" onmouseleave="hm_hide_tip('${tip_id}')"/>`;
+		} else {
+			// Standard rounded rect for every other key
+			rects += `<rect x="${sx}" y="${sy}" width="${key_w}" height="${KH}" rx="${R}"
+				fill="${fill}" stroke="#0d0d1a" stroke-width="1.5"
+				data-tip="${tip_id}" class="hm-key"
+				onmouseenter="hm_show_tip('${tip_id}')" onmouseleave="hm_hide_tip('${tip_id}')"/>`;
+		}
 
 		labels += `<text x="${Math.round(cx)}" y="${Math.round(cy + font_size * 0.38)}"
 			text-anchor="middle" font-size="${font_size}" font-weight="bold"
 			font-family="monospace,sans-serif" fill="${text_color}"
-			pointer-events="none">${escape_html(label_disp)}</text>${badge}`;
+			pointer-events="none">${escape_html(label_disp)}</text>`;
 
 		// Tooltip div — absolutely positioned, hidden by default
 		tooltips += `<div id="${tip_id}" class="hm-tooltip" style="display:none;position:fixed;z-index:9999;` +

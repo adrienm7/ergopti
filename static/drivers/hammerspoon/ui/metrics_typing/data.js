@@ -480,24 +480,26 @@ function recompute_speed_kpi() {
 	});
 	const manifest_manual = Math.max(0, manifest_total - manifest_hs - manifest_llm);
 
-	// Per-source effective output: when a raw toggle is ON, that source's
-	// expansion chars are excluded from the displayed speed. So:
-	// - Both toggles OFF (default)   → eff = manual + hs + llm  → highest multiplier
-	// - HS toggle ON, LLM OFF        → eff = manual + llm       → middle (LLM boost only)
-	// - HS OFF, LLM ON               → eff = manual + hs        → middle (HS boost only)
-	// - Both ON                      → eff = manual             → 1.0 (raw measured speed)
+	// Speed boost semantics: the "+ Hotstrings" and "+ IA" toggle buttons mean
+	// "include this source's output boost in the speed display". When a toggle is
+	// ACTIVE (raw_mode = true), that source's expansion IS included → higher MPM.
+	// When a toggle is INACTIVE, that source is excluded → slower, manual-only speed.
+	// - Both toggles OFF (default)  → eff = manual only            → lowest (raw speed)
+	// - HS ON, LLM OFF              → eff = manual + hs            → middle
+	// - HS OFF, LLM ON              → eff = manual + llm           → middle
+	// - Both ON                     → eff = manual + hs + llm      → highest (full boost)
 	const eff_output_chars =
 		manifest_manual +
-		(hs_raw_mode  ? 0 : manifest_hs)  +
-		(llm_raw_mode ? 0 : manifest_llm);
+		(hs_raw_mode  ? manifest_hs  : 0) +
+		(llm_raw_mode ? manifest_llm : 0);
 
 	const output_multiplier = manifest_manual > 0
 		? eff_output_chars / manifest_manual
 		: 1.0;
 
-	// "(estimé)" is shown only when a multiplier > 1 is applied — i.e. when at
-	// least one source's expansion is being inferred from the manifest ratio.
-	// When both raw toggles are ON, multiplier = 1.0 (measured directly) → no badge.
+	// "(estimé)" appears when at least one boost source is included — the resulting
+	// speed is inferred from a manifest-level ratio, not directly measured.
+	// When both toggles are OFF (multiplier = 1.0) the speed is purely measured.
 	const is_estimated = output_multiplier > 1.01;
 
 	const output_cpm = active_ms > 0

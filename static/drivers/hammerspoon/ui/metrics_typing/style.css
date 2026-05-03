@@ -912,20 +912,20 @@ td.col-rep {
 	color: #fff;
 	font-size: 12px;
 	font-weight: normal;
-	left: 50%;
-	max-width: 250px;
+	left: 0;
+	max-width: 300px;
 	opacity: 0;
-	padding: 8px;
+	padding: 8px 10px;
 	pointer-events: none;
 	position: absolute;
-	text-align: center;
-	transform: translateX(-50%);
+	text-align: left;
+	transform: none;
 	transition: opacity 0.2s;
 	visibility: hidden;
 	white-space: normal;
 	width: max-content;
-	/* Max 32-bit integer: ensures tooltips always render above every other layer */
-	z-index: 99;
+	/* Above the sticky top bar (z-index 100) and any other overlay */
+	z-index: 10000;
 }
 
 th .tooltip .tooltiptext {
