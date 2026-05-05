@@ -1,0 +1,38 @@
+name: Lua Tests
+
+on:
+  push:
+    branches: [main, dev]
+    paths:
+      - "static/drivers/hammerspoon/**"
+      - ".github/workflows/lua-tests.yml"
+  pull_request:
+    branches: [main, dev]
+    paths:
+      - "static/drivers/hammerspoon/**"
+      - ".github/workflows/lua-tests.yml"
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Lua 5.4 + luarocks
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y lua5.4 liblua5.4-dev luarocks
+
+      - name: Install luacheck
+        run: sudo luarocks install luacheck
+
+      - name: Run luacheck
+        run: |
+          luacheck static/drivers/hammerspoon/tests static/drivers/hammerspoon/lib \
+            static/drivers/hammerspoon/modules || true
+        # luacheck failures should not break CI yet — surface them as warnings
+        # so pre-existing style issues do not block the test run.
+
+      - name: Run unit + meta tests
+        working-directory: static/drivers/hammerspoon
+        run: lua5.4 tests/run.lua

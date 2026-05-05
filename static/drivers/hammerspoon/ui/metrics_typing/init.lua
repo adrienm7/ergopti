@@ -1,4 +1,4 @@
-﻿--- ui/metrics_typing/init.lua
+--- ui/metrics_typing/init.lua
 
 --- ==============================================================================
 --- MODULE: Metrics Dashboard UI
