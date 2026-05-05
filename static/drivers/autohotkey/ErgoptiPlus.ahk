@@ -119,15 +119,28 @@ global _BootstrapFile := A_ScriptDir . "\ErgoptiPlus_Bootstrap.ini"
 global ConfigurationFile := IniRead(_BootstrapFile, "Bootstrap", "ConfigurationFilePath",
     A_ScriptDir . "\ErgoptiPlus_Configuration.ini")
 
+; Resolve the shared static/img/logo directory by walking up two levels from
+; the script location (static/drivers/autohotkey → static/drivers → static).
+; Building a fully-normalized absolute path avoids any '..' traversal that
+; TraySetIcon may refuse to resolve on some Windows configurations.
+SplitPath(A_ScriptDir, , &_DriversDir)         ; <repo>/static/drivers
+SplitPath(_DriversDir, , &_StaticDir)          ; <repo>/static
+global _LogoDir := _StaticDir . "\img\logo"
+
+; Tray icon paths are deliberately NOT part of ScriptInformation so that
+; ReadScriptConfig() cannot override them from a user's [Script] section in
+; ErgoptiPlus_Configuration.ini — historical configs still hold stale paths
+; pointing at the old static/drivers/autohotkey/icons/ location and would
+; otherwise silently break the tray icon after each project-level move
+global IconPath         := _LogoDir . "\logo_simple.ico"
+global IconPathDisabled := _LogoDir . "\logo_simple_disabled.ico"
+
 global ScriptInformation := Map(
     "MagicKey", "★",
     ; Shortcuts
     "ShortcutSuspend", True,
     "ShortcutSaveReload", True,
     "ShortcutEdit", True,
-    ; The icon of the script when active or disabled
-    "IconPath", "icons\ErgoptiPlus_Icon.ico",
-    "IconPathDisabled", "icons\ErgoptiPlus_Icon_Disabled.ico",
     ; Configurable file paths (overridable from the ini so users can keep their
     ; personal files outside the Ergopti repository)
     "PersonalAhkPath", A_ScriptDir . "\personal.ahk",
@@ -496,9 +509,9 @@ GetCategoryTitle(Category) {
         case "Personal":
             return "Hotstrings personnels"
         case "Shortcuts":
-            return "Raccourcis"
+            return "🎯 Raccourcis"
         case "TapHolds":
-            return "Tap-Holds ⌨️"
+            return "⌨️ Tap-Holds"
         default:
             return ""
     }
@@ -508,7 +521,7 @@ GetCategoryTitle(Category) {
 ; Main menu initialization
 ; =========================
 
-global MenuHotstrings := "Hotstrings ⚡"
+global MenuHotstrings := "⚡ Hotstrings"
 global MenuScriptManagement := "Gestion du script"
 global MenuConfigurationShortcuts := "Raccourcis de gestion du script"
 global MenuSuspend := "⏸︎ Suspendre" . (ScriptInformation["ShortcutSuspend"] ? " (AltGr + ↩)" : "")
@@ -542,12 +555,12 @@ initMenu() {
 
     A_TrayMenu.Delete()
 
-    ; ── Disposition clavier 🎹 — mirrors the future HS layout section ──
+    ; ── 🌐 Disposition clavier — mirrors the HS layout submenu naming ──
     LayoutMenu := Menu()
     for FeatureName in Features["Layout"]["__Order"] {
         MenuAddItem(LayoutMenu, "Layout", FeatureName)
     }
-    A_TrayMenu.Add("Disposition clavier 🎹", LayoutMenu)
+    A_TrayMenu.Add("🌐 Disposition clavier", LayoutMenu)
 
     ; ── Hotstrings ⚡ — single submenu grouping all hotstring categories ──
     HotstringsMenu := Menu()
@@ -1192,13 +1205,13 @@ ToggleSuspend(*) {
 UpdateTrayIcon() {
     if A_IsSuspended {
         A_TrayMenu.Check(MenuSuspend)
-        if FileExist(ScriptInformation["IconPathDisabled"]) {
-            TraySetIcon(ScriptInformation["IconPathDisabled"], , True)
+        if FileExist(IconPathDisabled) {
+            TraySetIcon(IconPathDisabled, , True)
         }
     } else {
         A_TrayMenu.Uncheck(MenuSuspend)
-        if FileExist(ScriptInformation["IconPath"]) {
-            TraySetIcon(ScriptInformation["IconPath"])
+        if FileExist(IconPath) {
+            TraySetIcon(IconPath)
         }
     }
 }

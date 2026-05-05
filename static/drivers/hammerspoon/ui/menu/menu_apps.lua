@@ -208,7 +208,7 @@ function M.build(ctx)
 
 	Logger.done(LOG, "Applications submenu built (%d item(s)).", #rows)
 	return {
-		title    = "Applications 🛠️",
+		title    = "🛠️ Applications",
 		disabled = paused,
 		menu     = rows,
 	}
