@@ -294,14 +294,47 @@ end
 -- ============================================
 -- ============================================
 
---- Lists the keyboard layouts currently enabled in macOS, using the proper
---- Hammerspoon API. `hs.keycodes.layouts(true)` returns only the user-selected
---- (sourceable) layouts, mirroring exactly what the macOS menubar input-source
---- icon shows. Falls back to an empty list when the API is unavailable.
---- @return table Sorted list of layout names.
+--- Reads the raw list of enabled input source identifiers straight from
+--- com.apple.HIToolbox.plist. Unlike `hs.keycodes.layouts(true)` — which
+--- silently drops entries it cannot resolve to an installed bundle — this
+--- helper returns every entry in the user's enabled-list, including
+--- orphaned legacy IDs that lost their backing bundle after an upgrade.
+--- @return table Deduplicated list of identifiers (Bundle ID or KeyboardLayout Name).
+local function read_enabled_raw_ids()
+	if type(hs.execute) ~= "function" then return {} end
+	local out, ok = hs.execute("/usr/bin/defaults read com.apple.HIToolbox AppleEnabledInputSources 2>/dev/null")
+	if not ok or type(out) ~= "string" or out == "" then return {} end
+	local seen, sources = {}, {}
+	local function push(s)
+		if s and s ~= "" and not seen[s] then
+			seen[s] = true
+			sources[#sources + 1] = s
+		end
+	end
+	-- "Bundle ID" entries (custom keylayout bundles)
+	for id in out:gmatch('"Bundle ID"%s*=%s*"([^"]+)"') do push(id) end
+	for id in out:gmatch('Bundle ID%s*=%s*([%w%.%-_]+);') do push(id) end
+	-- "KeyboardLayout Name" entries (system layouts like French, U.S.)
+	for nm in out:gmatch('"KeyboardLayout Name"%s*=%s*"([^"]+)"') do push(nm) end
+	for nm in out:gmatch('KeyboardLayout Name%s*=%s*([%w%-_]+);') do push(nm) end
+	return sources
+end
+
+--- Lists every keyboard layout currently enabled in macOS by combining the
+--- raw enabled-list from preferences with whatever `hs.keycodes.layouts(true)`
+--- returns. The raw list is authoritative — hs.keycodes filters orphaned
+--- entries, but the user still wants to see them so they can clean up.
+--- @return table Sorted list of layout identifiers / names.
 local function list_enabled_input_sources()
+	local raw = read_enabled_raw_ids()
+	if #raw > 0 then
+		table.sort(raw)
+		return raw
+	end
+	-- Fallback when defaults isn't available (e.g. test environment): use
+	-- the hs.keycodes API. Returns localised names rather than raw IDs.
 	if not (hs.keycodes and type(hs.keycodes.layouts) == "function") then
-		Logger.warn(LOG, "hs.keycodes.layouts unavailable — returning empty list.")
+		Logger.warn(LOG, "Both `defaults read` and hs.keycodes.layouts unavailable — empty list.")
 		return {}
 	end
 	local ok, layouts = pcall(hs.keycodes.layouts, true)
@@ -322,11 +355,32 @@ local function current_input_source_name()
 	return nil
 end
 
---- Activates the given keyboard layout. First tries hs.keycodes.setLayout;
---- if that fails (it expects the localised display name, which fails when
---- the bundle's localisation is broken), falls back to TISSelectInputSource
---- via the AppleScript ObjC bridge using the raw identifier.
---- @param raw_id string The exact name returned by hs.keycodes.layouts(true).
+--- Runs an AppleScript in a child osascript process so that any failure or
+--- crash inside Carbon/TIS stays contained — `hs.osascript.applescript` runs
+--- in-process and was crashing Hammerspoon on every TIS-mutating call. The
+--- script is written to a temp file, executed by `/usr/bin/osascript`, then
+--- the file is removed.
+--- @param script string The AppleScript source code to execute.
+--- @return boolean ok, string|nil output Stdout produced by the script.
+local function run_osascript_isolated(script)
+	if type(hs.execute) ~= "function" then return false, nil end
+	local path = os.tmpname()
+	-- Lua's os.tmpname returns paths under /tmp on macOS; the file does not
+	-- exist yet, so io.open with "w" is safe.
+	local fh = io.open(path, "w")
+	if not fh then return false, nil end
+	fh:write(script)
+	fh:close()
+	local out, ok = hs.execute(string.format("/usr/bin/osascript %q", path))
+	os.remove(path)
+	return ok and true or false, out
+end
+
+--- Activates the given keyboard layout. First tries hs.keycodes.setLayout
+--- (works when the bundle's localisation is intact); on failure, runs
+--- TISSelectInputSource via osascript in an isolated subprocess so that any
+--- TIS-side error cannot crash Hammerspoon.
+--- @param raw_id string Either the localised name or the TISInputSourceID.
 --- @return boolean true on success.
 local function set_input_source(raw_id)
 	if hs.keycodes and type(hs.keycodes.setLayout) == "function" then
@@ -336,7 +390,6 @@ local function set_input_source(raw_id)
 			return true
 		end
 	end
-	-- Fallback: TISSelectInputSource via Carbon framework
 	local script = string.format([[
 use framework "Carbon"
 use framework "Foundation"
@@ -351,21 +404,20 @@ on run
 	return "MISS"
 end run
 ]], raw_id:gsub('"', '\\"'))
-	if hs.osascript and type(hs.osascript.applescript) == "function" then
-		local ok, _, raw = hs.osascript.applescript(script)
-		if ok and raw and tostring(raw):find("OK") then
-			Logger.info(LOG, "Active layout switched to '%s' (TIS fallback).", raw_id)
-			return true
-		end
+	local ok, out = run_osascript_isolated(script)
+	if ok and out and tostring(out):find("OK") then
+		Logger.info(LOG, "Active layout switched to '%s' (TIS subprocess).", raw_id)
+		return true
 	end
-	Logger.warn(LOG, "Failed to switch active layout to '%s'.", raw_id)
+	Logger.warn(LOG, "Failed to switch active layout to '%s' (out=%s).", raw_id, tostring(out))
 	return false
 end
 
 --- Enables the given input source in the user's enabled-list and selects it,
---- using the AppleScript ObjC bridge to call TISEnableInputSource +
---- TISSelectInputSource. The bundle providing the source MUST already be on
---- disk, otherwise TISCreateInputSourceList returns no match.
+--- via TISEnableInputSource + TISSelectInputSource. The bundle providing the
+--- source MUST already be on disk, otherwise TISCreateInputSourceList returns
+--- no match. The script runs in an isolated osascript subprocess (see
+--- run_osascript_isolated) so any TIS-side error stays contained.
 --- @param raw_id string TISInputSourceID, e.g. "com.apple.keylayout.ergopti.plus".
 --- @return boolean true on success.
 local function enable_and_select_source(raw_id)
@@ -385,16 +437,12 @@ on run
 	return "OK"
 end run
 ]], raw_id:gsub('"', '\\"'))
-	if not (hs.osascript and type(hs.osascript.applescript) == "function") then
-		Logger.error(LOG, "hs.osascript.applescript unavailable — cannot enable '%s'.", raw_id)
-		return false
-	end
-	local ok, _, raw = hs.osascript.applescript(script)
-	if ok and raw and tostring(raw):find("OK") then
+	local ok, out = run_osascript_isolated(script)
+	if ok and out and tostring(out):find("OK") then
 		Logger.success(LOG, "Enabled and selected '%s'.", raw_id)
 		return true
 	end
-	Logger.warn(LOG, "Failed to enable '%s' (result=%s).", raw_id, tostring(raw))
+	Logger.warn(LOG, "Failed to enable '%s' (out=%s).", raw_id, tostring(out))
 	return false
 end
 
@@ -476,16 +524,12 @@ local function upgrade_active_list(legacy_active)
 	table.insert(lines, "end run")
 	local script = table.concat(lines, "\n")
 	Logger.start(LOG, "Upgrading %d legacy Ergopti entry(ies) in the active input-source list…", #legacy_active)
-	if not (hs.osascript and type(hs.osascript.applescript) == "function") then
-		Logger.error(LOG, "hs.osascript.applescript unavailable — cannot upgrade list.")
-		return false
-	end
-	local ok, result, raw = hs.osascript.applescript(script)
+	local ok, out = run_osascript_isolated(script)
 	if ok then
-		Logger.success(LOG, "List upgrade applied (%s).", tostring(result or raw))
+		Logger.success(LOG, "List upgrade applied (%s).", tostring(out))
 		return true
 	end
-	Logger.error(LOG, "List upgrade failed: %s.", tostring(raw))
+	Logger.error(LOG, "List upgrade failed (out=%s).", tostring(out))
 	return false
 end
 
@@ -774,29 +818,43 @@ function M.build(ctx)
 		}
 	elseif latest_installed_anywhere then
 		-- 4. Absent and bundle present — submenu listing each variant. Clicking
-		-- a variant calls TISEnableInputSource + TISSelectInputSource directly,
-		-- so the user no longer has to detour through System Settings.
+		-- a variant calls TISEnableInputSource + TISSelectInputSource in an
+		-- isolated osascript subprocess, so the user no longer has to detour
+		-- through System Settings AND a TIS-side failure can no longer crash
+		-- Hammerspoon. Variants already enabled in the user's input-source
+		-- list are greyed out and prefixed with ✅.
+		local active_id_set = {}
+		for _, raw in ipairs(sources) do active_id_set[raw] = true end
+
 		local add_sub = {}
 		for _, var in ipairs(ERGOPTI_VARIANTS) do
 			local id = var.id
-			add_sub[#add_sub + 1] = {
-				title = string.format("%s v%s", var.label, latest_str),
-				fn    = function()
-					-- Bounce the TIS call out of the menu-click frame so macOS
-					-- can dispatch the resulting input-source notifications
-					-- without re-entering us mid-handler (was crashing HS).
-					defer_tis_call(function()
-						local ok = enable_and_select_source(id)
-						if ok and hs.alert then
-							pcall(hs.alert.show, string.format("%s ajouté à la liste.", var.label))
-						end
-						if not ok and hs.alert then
-							pcall(hs.alert.show, "Échec de l’ajout — voir la console.", 3)
-						end
-						schedule_menu_refresh(update_menu)
-					end)
-				end,
-			}
+			local already_added = active_id_set[id] == true
+			if already_added then
+				add_sub[#add_sub + 1] = {
+					title    = string.format("✅ %s v%s — déjà ajouté", var.label, latest_str),
+					disabled = true,
+				}
+			else
+				add_sub[#add_sub + 1] = {
+					title = string.format("%s v%s", var.label, latest_str),
+					fn    = function()
+						-- Bounce the TIS call out of the menu-click frame so macOS
+						-- can dispatch the resulting input-source notifications
+						-- without re-entering us mid-handler.
+						defer_tis_call(function()
+							local ok = enable_and_select_source(id)
+							if ok and hs.alert then
+								pcall(hs.alert.show, string.format("%s ajouté à la liste.", var.label))
+							end
+							if not ok and hs.alert then
+								pcall(hs.alert.show, "Échec de l’ajout — voir la console.", 3)
+							end
+							schedule_menu_refresh(update_menu)
+						end)
+					end,
+				}
+			end
 		end
 		submenu[#submenu + 1] = {
 			title = string.format("➕ Ajouter Ergopti v%s à la liste des dispositions", latest_str),
