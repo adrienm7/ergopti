@@ -40,7 +40,6 @@ window.apply_date_app_filters  = apply_date_app_filters;
 window.apply_quick_date_range  = apply_quick_date_range;
 window.toggle_hs_source        = toggle_hs_source;
 window.toggle_llm_source       = toggle_llm_source;
-window.toggle_texte_final      = toggle_texte_final;
 window.reset_filters           = reset_filters;
 
 // Table interactions
@@ -60,8 +59,14 @@ window.render_app_list      = render_app_list;
 window.reset_chart_zoom = reset_chart_zoom;
 
 // Expanded KPI block sort handlers
-window.sort_dist_table = sort_dist_table;
-window.sort_rep_table  = sort_rep_table;
+window.sort_dist_table         = sort_dist_table;
+window.sort_ergo_bigram_table  = sort_ergo_bigram_table;
+window.sort_ergo_trigram_table = sort_ergo_trigram_table;
+window.sort_errors_table       = sort_errors_table;
+window.sort_apps_table         = sort_apps_table;
+window.sort_rep_table   = sort_rep_table;
+window.sort_sfb_table   = sort_sfb_table;
+window.render_sfb_heatmap = render_sfb_heatmap;
 
 // Find-in-page bar
 window.show_find_bar  = show_find_bar;
@@ -286,6 +291,13 @@ function find_in_page(forward) {
 // ==========================
 
 document.addEventListener("DOMContentLoaded", () => {
+	// Set Chart.js default tick/label color based on system color scheme.
+	// The default rgba(0,0,0,0.6) is nearly invisible in dark mode.
+	if (typeof Chart !== "undefined") {
+		const is_dark = window.matchMedia("(prefers-color-scheme: dark)").matches;
+		Chart.defaults.color = is_dark ? "rgba(220,220,220,0.85)" : "rgba(0,0,0,0.7)";
+	}
+
 	// Global keyboard shortcuts
 	document.addEventListener("keydown", (e) => {
 		// Cmd+F / Ctrl+F → open find bar (prevent default browser behavior)
@@ -326,4 +338,24 @@ document.addEventListener("DOMContentLoaded", () => {
 			if (e.target === modal) close_app_modal();
 		});
 	}
+
+	// Smart tooltip positioning: flip to the left when the tooltip would overflow the
+	// right edge of the viewport. Uses event delegation so dynamically injected tooltips
+	// (KPI cards rebuilt by data.js) are handled without re-binding.
+	document.addEventListener("mouseenter", (e) => {
+		const tooltip = e.target.closest(".tooltip");
+		if (!tooltip) return;
+		const text_box = tooltip.querySelector(".tooltiptext");
+		if (!text_box) return;
+		// Temporarily make it visible at zero opacity to measure its bounding rect
+		text_box.style.visibility = "hidden";
+		text_box.style.opacity    = "0";
+		text_box.style.display    = "block";
+		const rect      = text_box.getBoundingClientRect();
+		const overflow  = rect.right > window.innerWidth - 8;
+		text_box.style.display    = "";
+		text_box.style.visibility = "";
+		text_box.style.opacity    = "";
+		tooltip.classList.toggle("tooltip-left", overflow);
+	}, true);
 });

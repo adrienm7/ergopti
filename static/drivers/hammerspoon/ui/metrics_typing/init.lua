@@ -1,4 +1,4 @@
---- ui/metrics_typing/init.lua
+﻿--- ui/metrics_typing/init.lua
 
 --- ==============================================================================
 --- MODULE: Metrics Dashboard UI
@@ -27,6 +27,17 @@ local ui_builder = require("ui.ui_builder")
 local Logger     = require("lib.logger")
 
 local LOG = "metrics_typing"
+
+-- On-disk cache file: lets the dashboard pre-fill INSTANTLY from the last
+-- successful render even after a Hammerspoon reload (the in-memory caches
+-- below survive close/reopen but not a full HS reload).  The user is happy
+-- to see slightly stale numbers (1 h, 1 day) provided the UI is instant —
+-- a fresh refresh runs in the background and overwrites the cache.
+-- Stored in $TMPDIR (per-user macOS temp dir, falling back to /tmp) so
+-- the cache lives outside the versioned ~/.hammerspoon tree and is wiped
+-- naturally by the OS on disk-pressure / reboots.
+local UI_CACHE_DIR  = (os.getenv("TMPDIR") or "/tmp/"):gsub("/?$", "/")
+local UI_CACHE_FILE = UI_CACHE_DIR .. "ergopti_metrics_typing_cache.json"
 
 M._wv             = nil
 M._timer          = nil
@@ -96,7 +107,10 @@ local function fetch_range(log_dir, start_date, end_date, selected_apps)
 		
 		local db = sqlite3.open(tmp_path)
 		if db then
-			local query = "SELECT app_name, index_json FROM daily_index WHERE 1=1"
+			-- Always exclude today from the SQLite query: today's data comes exclusively
+			-- from the flat .idx live file to avoid double-counting when both sources overlap.
+			local today_str = os.date("%Y-%m-%d")
+			local query = "SELECT app_name, index_json FROM daily_index WHERE date < '" .. today_str .. "'"
 			if start_date and start_date ~= "" then query = query .. string.format(" AND date >= '%s'", start_date) end
 			if end_date and end_date ~= "" then query = query .. string.format(" AND date <= '%s'", end_date) end
 
@@ -221,33 +235,103 @@ end
 --- scripts, then injects the manifest and data the instant JS is ready.
 --- Using a retry loop instead of a fixed delay guarantees the injection fires
 --- even when CDN scripts slow down the initial HTML parse.
---- @param log_dir string Path to the logging directory.
-function M.show(log_dir)
-	if fs.attributes(log_dir, "mode") ~= "directory" then return end
-
-	if M._wv then
-		Logger.debug(LOG, "Dashboard already open, bringing to front…")
-		ui_builder.force_focus(M._wv)
-		pcall(function()
-			M._wv:evaluateJavaScript("if(window.apply_date_app_filters) window.apply_date_app_filters();")
-		end)
+--- Persists a snapshot of the data injected into the webview to disk so the
+--- next open (even after HS reload) can render instantly from this cache.
+--- Stored as a JSON wrapper whose four string fields are themselves the JSON
+--- payloads used by process_manifest() — no re-encoding needed at load time.
+--- @param payload table { manifest, app_icons, initial_data, kc_layout } as JSON strings.
+local function save_disk_cache(payload)
+	-- TMPDIR always exists on macOS so no mkdir needed.  Skip the os.execute
+	-- call which costs a fork+shell roundtrip and was a startup cost on its own.
+	local ok_enc, body = pcall(json.encode, payload)
+	if not ok_enc then
+		Logger.warn(LOG, "Failed to encode disk cache payload — skipping persist.")
 		return
 	end
+	local f = io.open(UI_CACHE_FILE, "w")
+	if f then
+		f:write(body)
+		f:close()
+		Logger.debug(LOG, "Dashboard snapshot persisted to disk cache.")
+	else
+		Logger.warn(LOG, "Cannot open '%s' for writing — disk cache not persisted.", UI_CACHE_FILE)
+	end
+end
 
-	Logger.start(LOG, "Opening typing metrics dashboard…")
+--- Reads the previously-saved disk cache snapshot.  Used to pre-fill the
+--- dashboard with last-known values within milliseconds of opening, while
+--- the slow decrypt+SQL refresh runs in the background.
+--- @return table|nil Snapshot with manifest/app_icons/initial_data/kc_layout JSON strings.
+local function load_disk_cache()
+	local f = io.open(UI_CACHE_FILE, "r")
+	if not f then return nil end
+	local content = f:read("*a")
+	f:close()
+	local ok, data = pcall(json.decode, content)
+	if not ok or type(data) ~= "table" then return nil end
+	return data
+end
+
+--- Shows the dashboard window and gives focus to Hammerspoon so the window
+--- becomes visible over the menu bar that triggered M.show().  Called once
+--- at creation and once after a short delay to cover compositor races.
+--- Does NOT call win:raise() to avoid locking the window above other apps —
+--- the user must be able to click away and have this window go to background.
+local function raise_now(wv)
+	if not wv then return end
+	pcall(function() wv:show() end)
+	pcall(hs.focus)
+	local ok, win = pcall(function() return wv:hswindow() end)
+	if ok and win then
+		pcall(function() win:focus() end)
+	end
+end
+
+--- Polls until hswindow() is available, then applies NSWindowCollectionBehavior
+--- flags via hs.webview:behavior() so Mission Control treats the window as a
+--- normal managed window (click-to-focus, Spaces participation).
+--- hs.webview:behavior() is the correct API — hs.window has no such method.
+--- The bitmask 36 = NSWindowCollectionBehaviorManaged (4) +
+--- NSWindowCollectionBehaviorParticipatesInCycle (32).
+--- @param wv userdata The hs.webview object.
+--- @param attempts number Remaining poll attempts (max 20, one per 50 ms = 1 s).
+local function poll_and_set_behavior(wv, attempts)
+	if not wv then return end
+	-- hswindow() returns nil until the OS has composited the window.
+	-- We need it to return non-nil before behavior() takes effect.
+	local ok, win = pcall(function() return wv:hswindow() end)
+	if ok and win then
+		-- Use hs.drawing.windowBehaviors for constants; fall back to raw ints.
+		local beh = (hs.drawing and hs.drawing.windowBehaviors) or {}
+		local target = (beh.managed or 4) + (beh.participatesInCycle or 32)
+		pcall(function() wv:behavior(target) end)
+		pcall(function() win:focus() end)
+		pcall(hs.focus)
+		Logger.debug(LOG, "Mission Control behavior applied (managed=4 + participatesInCycle=32).")
+	elseif attempts > 0 then
+		hs.timer.doAfter(0.05, function() poll_and_set_behavior(wv, attempts - 1) end)
+	else
+		Logger.warn(LOG, "poll_and_set_behavior(): hswindow() never returned after 1 s.")
+	end
+end
+
+--- Performs all expensive disk I/O and DB decryption in a single deferred
+--- pass: past-day migration, manifest.json read, encrypted SQLite decrypt,
+--- app icon resolution, n-gram pre-fetch, then injects the result into the
+--- already-visible webview.  Decoupling this from M.show() is what makes
+--- the window appear instantly on first open: the user sees "Chargement
+--- de l'interface…" immediately and data fills in once decrypt completes.
+--- @param log_dir string Path to the logging directory.
+local function load_and_inject(log_dir)
+	if not M._wv then return end
+
 	local log_manager = require("modules.keylogger.log_manager")
-
-	local today_str = os.date("%Y-%m-%d")
+	local today_str   = os.date("%Y-%m-%d")
 
 	-- Scan for uncommitted past-day .idx files BEFORE running any migration.
 	-- A past-day .idx means the Mac was off at midnight and merge_day_to_db
 	-- never ran for that day (e.g. typed on Monday, Mac off until Thursday).
-	-- We need to know this now so we can decide whether to invalidate caches
-	-- after the migration completes.
 	local has_pending_past_idx = false
-	-- hs.fs.dir returns (iter_fn, dir_state) on success, nil on failure.
-	-- Capturing both values is mandatory: the for loop passes dir_state back
-	-- to iter_fn on every iteration, and dropping it causes "got nil" errors.
 	local dir_iter, dir_state = fs.dir(log_dir)
 	if dir_iter then
 		for file_name in dir_iter, dir_state do
@@ -262,16 +346,10 @@ function M.show(log_dir)
 		end
 	end
 
-	-- Full index evaluation: rebuilds today's index if sparse AND commits any
-	-- pending past-day .idx files into the encrypted database.  Calling this
-	-- here guarantees past-day data is in SQLite before the caches are read,
-	-- which is the critical invariant after a multi-day Mac sleep.
+	-- Past-day migration: commits any pending .idx into encrypted DB.
 	pcall(log_manager.rebuild_index_if_needed)
 
-	-- Invalidate historical caches when either:
-	--   • the calendar date changed (new rows may exist in SQLite), or
-	--   • a past-day migration just happened (DB was just updated mid-session).
-	-- Both conditions make any in-memory cache stale.
+	-- Invalidate caches on day boundary or after past-day migration.
 	if M._cache_date ~= today_str or has_pending_past_idx then
 		if has_pending_past_idx then
 			Logger.info(LOG, "Past-day migration completed — flushing historical caches.")
@@ -283,7 +361,7 @@ function M.show(log_dir)
 		M._hist_manifest = nil
 	end
 
-	-- Always read today's live manifest from disk (cheap plaintext read, changes live)
+	-- Today's live manifest (cheap plaintext read, changes live).
 	local manifest = {}
 	local f = io.open(log_dir .. "/manifest.json", "r")
 	if f then
@@ -292,8 +370,7 @@ function M.show(log_dir)
 		pcall(function() manifest = json.decode(content) or {} end)
 	end
 
-	-- Merge historical manifest from SQLite — use in-memory cache if already populated.
-	-- The cache is safe because past-day rows are write-once and never mutated.
+	-- Historical manifest from SQLite — cached after first decrypt.
 	local enc_path = log_dir .. "/metrics.sqlite.enc"
 	local pwd      = log_manager.get_mac_serial():gsub("\"", "\\\"")
 	if M._hist_manifest then
@@ -329,7 +406,10 @@ function M.show(log_dir)
 		Logger.done(LOG, "Historical manifest decrypted and cached.")
 	end
 
-	-- Build app icon map and compute the initial query parameters while we have the manifest
+	-- Bail if the user closed the window during the slow decrypt above.
+	if not M._wv then return end
+
+	-- Build app icon map and compute the initial query parameters.
 	local app_icons      = {}
 	local icon_lookups   = 0
 	local first_date     = nil
@@ -337,17 +417,12 @@ function M.show(log_dir)
 	local all_apps_list  = {}
 
 	for date_str, day_data in pairs(manifest) do
-		-- Track earliest date to match JS default date range
 		if first_date == nil or date_str < first_date then first_date = date_str end
-
 		for app_name, _ in pairs(day_data) do
-			-- Collect non-Unknown apps for the pre-fetch query
 			if app_name ~= "Unknown" and not all_apps_set[app_name] then
 				all_apps_set[app_name]  = true
 				table.insert(all_apps_list, app_name)
 			end
-
-			-- Resolve app icons (cached)
 			if app_name ~= "Unknown" and app_icons[app_name] == nil then
 				local cached_icon = M._app_icon_cache[app_name]
 				if cached_icon ~= nil then
@@ -363,7 +438,142 @@ function M.show(log_dir)
 	end
 	table.sort(all_apps_list)
 
-	-- Create webview immediately (returns fast — rendering is async)
+	-- Build keycode layout (numeric kc → character) for the keyboard heatmap.
+	local kc_layout = {}
+	local ok_kc, raw_kc_map = pcall(function() return hs.keycodes.map end)
+	if ok_kc and type(raw_kc_map) == "table" then
+		for k, v in pairs(raw_kc_map) do
+			if type(k) == "number" then kc_layout[tostring(k)] = tostring(v) end
+		end
+	end
+
+	-- Pre-fetch the initial n-gram range (first_date → today, all apps).
+	local initial_data_json = "null"
+	if first_date then
+		local initial_data = fetch_range_cached(log_dir, first_date, today_str, all_apps_list)
+		initial_data_json = json.encode(initial_data)
+	end
+
+	if not M._wv then return end
+
+	local manifest_json    = json.encode(manifest)
+	local app_icons_json   = json.encode(app_icons)
+	local ok_json, kc_layout_json = pcall(json.encode, kc_layout)
+	if not ok_json then kc_layout_json = "{}" end
+
+	-- Persist the freshly-built snapshot so the next open (even after HS
+	-- reload) can render instantly from disk.  Done BEFORE the JS injection
+	-- so a JS retry-loop failure does not block cache persistence.
+	save_disk_cache({
+		manifest     = manifest_json,
+		app_icons    = app_icons_json,
+		initial_data = initial_data_json,
+		kc_layout    = kc_layout_json,
+	})
+
+	-- Retry injection every 150 ms until process_manifest is defined (up to ~9 s).
+	-- Robust against slow CDN script loading on first open after fresh launch.
+	local function try_inject(remaining)
+		if not M._wv then return end
+		M._wv:evaluateJavaScript("typeof window.process_manifest", function(t)
+			if t == "function" then
+				local js = string.format(
+					"window.metrics_manifest=%s;window.app_icons=%s;window._prefetch_data=%s;window.keycode_layout=%s;window.process_manifest();",
+					manifest_json, app_icons_json, initial_data_json, kc_layout_json
+				)
+				pcall(function() M._wv:evaluateJavaScript(js) end)
+				Logger.success(LOG, "Dashboard manifest and data injected.")
+			elseif remaining > 0 then
+				hs.timer.doAfter(0.15, function() try_inject(remaining - 1) end)
+			else
+				Logger.error(LOG, "load_and_inject(): process_manifest() not available — JS may have failed to load.")
+			end
+		end)
+	end
+	try_inject(60)
+end
+
+--- Pre-fills the dashboard with the on-disk snapshot from the previous run
+--- so the user sees populated KPIs/charts within milliseconds of opening,
+--- well before the slow openssl decrypt + SQL refresh in load_and_inject()
+--- completes.  Returns true when a cached payload was found and injection
+--- was scheduled — the caller delays the background refresh slightly so JS
+--- finishes parsing the cached data before the fresh values overwrite it.
+--- @return boolean True if a cache existed and pre-fill was scheduled.
+local function prefill_from_disk_cache()
+	if not M._wv then return false end
+	local cached = load_disk_cache()
+	if not cached or type(cached.manifest) ~= "string" then
+		Logger.debug(LOG, "No disk cache available — UI will fill from fresh decrypt.")
+		return false
+	end
+	local function try_inject_cache(remaining)
+		if not M._wv then return end
+		M._wv:evaluateJavaScript("typeof window.process_manifest", function(t)
+			if t == "function" then
+				local js = string.format(
+					"window.metrics_manifest=%s;window.app_icons=%s;window._prefetch_data=%s;window.keycode_layout=%s;window.process_manifest();",
+					cached.manifest or "{}",
+					cached.app_icons or "{}",
+					cached.initial_data or "null",
+					cached.kc_layout or "{}"
+				)
+				pcall(function() M._wv:evaluateJavaScript(js) end)
+				Logger.success(LOG, "Dashboard pre-filled from disk cache.")
+			elseif remaining > 0 then
+				hs.timer.doAfter(0.10, function() try_inject_cache(remaining - 1) end)
+			end
+		end)
+	end
+	try_inject_cache(50)
+	return true
+end
+
+function M.show(log_dir)
+	if fs.attributes(log_dir, "mode") ~= "directory" then return end
+
+	if M._wv then
+		-- Close if already focused; focus if open but in background
+		local already_focused = false
+		pcall(function()
+			local win = M._wv:hswindow()
+			if win then
+				local focused = hs.window.focusedWindow()
+				already_focused = focused and focused:id() == win:id()
+			end
+		end)
+		if already_focused then
+			Logger.debug(LOG, "Dashboard already focused — closing.")
+			M._wv:delete()
+			M._wv = nil
+			if M._timer then M._timer:stop(); M._timer = nil end
+			return
+		end
+		Logger.debug(LOG, "Dashboard already open, bringing to front…")
+		-- Use a minimal focus path: no hide/show to avoid disrupting macOS compositor
+		-- (hide/show resets the z-order and breaks Mission Control click-to-focus)
+		pcall(function()
+			local win = M._wv:hswindow()
+			if win then
+				win:focus()
+			else
+				M._wv:bringToFront(false)
+				pcall(hs.focus)
+			end
+		end)
+		pcall(function()
+			M._wv:evaluateJavaScript("if(window.apply_date_app_filters) window.apply_date_app_filters();")
+		end)
+		return
+	end
+
+	Logger.start(LOG, "Opening typing metrics dashboard…")
+
+	-- Create the webview FIRST with zero disk I/O so the window appears
+	-- instantly.  All migration, decrypt, and SQL queries are deferred to
+	-- load_and_inject() which fires once the window is on screen and the
+	-- raise sequence has settled.  The HTML shows "Chargement de
+	-- l'interface…" until the data injection completes.
 	local sf    = hs.screen.mainScreen():frame()
 	local frame = { x = sf.x + 50, y = sf.y + 50, w = sf.w - 100, h = sf.h - 100 }
 
@@ -374,99 +584,32 @@ function M.show(log_dir)
 		assets_dir  = hs.configdir .. "/ui/metrics_typing/",
 		on_close    = function()
 			M._wv = nil
-			-- Caches are intentionally NOT cleared on close: they are reused on re-open
-			-- to avoid decrypting the DB again within the same day.
-			if M._timer then
-				M._timer:stop()
-				M._timer = nil
-			end
+			-- Caches are intentionally NOT cleared on close: they are reused on re-open.
+			if M._timer then M._timer:stop(); M._timer = nil end
 			Logger.info(LOG, "Typing metrics dashboard closed.")
 		end
 	})
 
-	-- Build the current keyboard layout map (keycode number → character/name).
-	-- hs.keycodes.map() returns a bidirectional table; we extract the numeric keys
-	-- so the JS side can display the actual character produced on the user's custom
-	-- layout instead of the QWERTY fallback baked into KEYCODE_NAMES in state.js.
-	-- Wrapped in pcall: if the API returns nil or throws, pairs(nil) would crash
-	-- the synchronous part of M.show() before the deferred block is ever scheduled.
-	-- hs.keycodes.map is a Variable (table), not a function — wrap in a closure
-	-- so pcall can protect against any future API change without crashing M.show().
-	local kc_layout = {}
-	local ok_kc, raw_kc_map = pcall(function() return hs.keycodes.map end)
-	if ok_kc and type(raw_kc_map) == "table" then
-		for k, v in pairs(raw_kc_map) do
-			if type(k) == "number" then
-				kc_layout[tostring(k)] = tostring(v)
-			end
-		end
-		Logger.debug(LOG, "Keycode layout loaded: %d entries.", (function()
-			local n = 0; for _ in pairs(kc_layout) do n = n + 1 end; return n
-		end)())
-	else
-		Logger.warn(LOG, "hs.keycodes.map unavailable — keycode tab will use static layout.")
-	end
+	-- Immediate raise for menu-dismiss timing, then a poll loop that waits for
+	-- the OS to assign a window handle before applying the collection behavior
+	-- flags (managed + participatesInCycle) that make Mission Control clickable.
+	raise_now(M._wv)
+	poll_and_set_behavior(M._wv, 20)
 
-	-- Capture JSON for the closed-over async callback below
-	local manifest_json    = json.encode(manifest)
-	local app_icons_json   = json.encode(app_icons)
-	local ok_json, kc_layout_json = pcall(json.encode, kc_layout)
-	if not ok_json then
-		kc_layout_json = "{}"
-		Logger.warn(LOG, "json.encode(kc_layout) failed — falling back to empty layout.")
-	end
-
-	-- Check whether the initial n-gram query is already cached.
-	-- If so the pre-fetch completes in microseconds and we can attempt injection
-	-- immediately rather than waiting for a slow openssl subprocess.
-	local init_cache_key  = first_date and make_cache_key(first_date, today_str, all_apps_list)
-	local cache_warm      = init_cache_key and M._data_cache[init_cache_key] ~= nil
-
-	-- Defer the n-gram fetch so the webview window appears instantly.
-	-- On a warm cache (subsequent opens today) the callback is essentially free.
-	hs.timer.doAfter(0, function()
-		if not M._wv then return end
-
-		-- Pre-fetch the same query JS will send after reset_filters():
-		--   date range = first_date → today, apps = all non-Unknown apps.
-		-- fetch_range_cached returns from memory on warm cache (no I/O).
-		local initial_data_json = "null"
-		if first_date then
-			if cache_warm then
-				Logger.done(LOG, "Initial n-gram data: warm cache hit.")
-			else
-				Logger.trace(LOG, "Initial n-gram data: cache miss — decrypting DB…")
-			end
-			local initial_data = fetch_range_cached(log_dir, first_date, today_str, all_apps_list)
-			initial_data_json = json.encode(initial_data)
-			Logger.done(LOG, "Initial n-gram data ready.")
-		end
-
-		-- Retry injection every 150 ms until process_manifest is defined (up to ~3 s).
-		-- This is robust against slow CDN script loading that a fixed 0.5 s delay is not.
-		local function try_inject(remaining)
-			if not M._wv then return end
-			M._wv:evaluateJavaScript("typeof window.process_manifest", function(t)
-				if t == "function" then
-					local js = string.format(
-						"window.metrics_manifest=%s;window.app_icons=%s;window._prefetch_data=%s;window.keycode_layout=%s;window.process_manifest();",
-						manifest_json, app_icons_json, initial_data_json, kc_layout_json
-					)
-					pcall(function() M._wv:evaluateJavaScript(js) end)
-					Logger.debug(LOG, "Dashboard manifest and data injected.")
-				elseif remaining > 0 then
-					hs.timer.doAfter(0.15, function() try_inject(remaining - 1) end)
-				else
-					Logger.error(LOG, "M.show(): process_manifest() not available after 3 s — JS may have failed to load.")
-				end
-			end)
-		end
-
-		-- Short initial pause so the webview can start parsing HTML before the first check
-		hs.timer.doAfter(0.1, function() try_inject(20) end)
+	-- Two-stage data fill:
+	--   1. Pre-fill from on-disk snapshot (≈ 50 ms): the user sees real
+	--      KPIs/charts within a frame, even if slightly stale.
+	--   2. Refresh from fresh decrypt+SQL in the background and overwrite
+	--      the cached values once ready.  The delay before refresh is
+	--      longer when a cache hit was scheduled so JS has time to parse
+	--      the cached payload before the fresh one overwrites it.
+	hs.timer.doAfter(0.05, function()
+		local had_cache = prefill_from_disk_cache()
+		local refresh_delay = had_cache and 0.40 or 0.05
+		hs.timer.doAfter(refresh_delay, function() load_and_inject(log_dir) end)
 	end)
 
-	-- Poll timer: serves subsequent filter-change requests from JS (cached)
+	-- Poll timer: serves subsequent filter-change requests from JS (cached).
 	if M._timer then M._timer:stop() end
 	M._timer = hs.timer.new(0.3, function()
 		if not M._wv then
@@ -481,10 +624,19 @@ function M.show(log_dir)
 					pcall(function() M._wv:evaluateJavaScript("window._lua_request = null;") end)
 					local ok, query = pcall(json.decode, req)
 					if ok and query then
-						Logger.debug(LOG, "Handling n-gram range request from frontend…")
-						local raw_data = fetch_range_cached(log_dir, query.start_date, query.end_date, query.apps)
-						local js_cmd = string.format("window.receive_range_data(%s)", json.encode(raw_data))
-						pcall(function() M._wv:evaluateJavaScript(js_cmd) end)
+						if query.action == "clear_cache" then
+							local removed = os.remove(UI_CACHE_FILE)
+							if removed then
+								Logger.info(LOG, "Disk cache cleared by user reset.")
+							else
+								Logger.debug(LOG, "clear_cache: no cache file found.")
+							end
+						else
+							Logger.debug(LOG, "Handling n-gram range request from frontend…")
+							local raw_data = fetch_range_cached(log_dir, query.start_date, query.end_date, query.apps)
+							local js_cmd = string.format("window.receive_range_data(%s)", json.encode(raw_data))
+							pcall(function() M._wv:evaluateJavaScript(js_cmd) end)
+						end
 					end
 				end
 			end)
@@ -492,7 +644,7 @@ function M.show(log_dir)
 	end)
 
 	M._timer:start()
-	Logger.success(LOG, "Typing metrics dashboard opened.")
+	Logger.success(LOG, "Typing metrics dashboard window opened (data loading…).")
 end
 
 --- Broadcasts real-time events to the webview UI without requiring a reload.

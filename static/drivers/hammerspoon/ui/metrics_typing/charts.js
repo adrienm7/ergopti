@@ -37,7 +37,7 @@ function render_charts() {
 	const rgb_ia  = root.getPropertyValue("--kpi-llm-rgb").trim()        || "122, 54, 163";
 	const rgb_hs  = root.getPropertyValue("--kpi-hs-rgb").trim()         || "204, 41, 34";
 	const rgb_man = root.getPropertyValue("--kpi-delegation-rgb").trim() || "0, 86, 179";
-	const rgb_wpm = root.getPropertyValue("--kpi-wpm-rgb").trim()        || "170, 122, 10";
+	const rgb_wpm = root.getPropertyValue("--chart-wpm-rgb").trim()      || "230, 140, 0";
 	const rgb_prc = root.getPropertyValue("--kpi-precision-rgb").trim()  || "33, 136, 56";
 
 	const sorted_keys = Object.keys(app_state.time_series).sort();
@@ -61,9 +61,15 @@ function render_charts() {
 		if (!isNaN(wpm) && wpm > 0) wpm_pts.push({ x: date_obj, y: wpm });
 	});
 
+	// Shared x-axis range so precision and speed charts always have identical bounds
+	const x_min = sorted_keys.length > 0 ? new Date(sorted_keys[0]          + "T12:00:00") : null;
+	const x_max = sorted_keys.length > 0 ? new Date(sorted_keys.at(-1) + "T12:00:00") : null;
+
 	// Delegation chart always uses daily points — no per-hour HS/LLM breakdown available
 	_render_delegation_chart(manual_pts, hs_pts, llm_pts, rgb_ia, rgb_hs, rgb_man);
 	_render_sparklines(hs_sp_pts, llm_sp_pts, rgb_hs, rgb_ia);
+	_render_activity_calendar();
+	_render_hour_weekday_heatmap();
 
 	// Single-day view: use hourly_series for precision and activity charts so the
 	// user sees an intra-day curve instead of a single meaningless dot.
@@ -76,8 +82,8 @@ function render_charts() {
 		const prc_title_el = document.getElementById("precision_chart_title");
 		if (prc_title_el) prc_title_el.textContent = "Précision (%)";
 
-		_render_wpm_chart(wpm_pts, rgb_wpm);
-		_render_precision_chart(sorted_keys, rgb_prc);
+		_render_wpm_chart(wpm_pts, rgb_wpm, x_min, x_max);
+		_render_precision_chart(sorted_keys, rgb_prc, x_min, x_max);
 	}
 }
 
@@ -112,19 +118,22 @@ const GRID_COLOR = "rgba(128,128,128,0.2)";
 // French day names used by the x-axis tick formatter below
 const DAYS_FR = ["dimanche", "lundi", "mardi", "mercredi", "jeudi", "vendredi", "samedi"];
 
+// French month names (abbreviated to 4 chars max to keep tick labels compact)
+const MONTHS_FR = [
+	"janv.", "févr.", "mars",  "avr.",  "mai",   "juin",
+	"juil.", "août",  "sept.", "oct.",  "nov.",  "déc.",
+];
+
 /**
  * Returns a two-line French day tick label for a daily x-axis value.
  * Used with ticks.color: "transparent" so Chart.js reserves the correct two-line
  * height while the DAY_TICK_RENDERER plugin redraws the text with bold dates.
  * @param {number} value - Timestamp in milliseconds.
- * @returns {string[]} [dayName, "dd/mm/yyyy"]
+ * @returns {string[]} [dayName, "d month"] — e.g. ["lundi", "12 avr."]
  */
 function _format_day_tick(value) {
-	const d    = new Date(value);
-	const dd   = String(d.getDate()).padStart(2, "0");
-	const mm   = String(d.getMonth() + 1).padStart(2, "0");
-	const yyyy = d.getFullYear();
-	return [DAYS_FR[d.getDay()], `${dd}/${mm}/${yyyy}`];
+	const d = new Date(value);
+	return [DAYS_FR[d.getDay()], `${d.getDate()} ${MONTHS_FR[d.getMonth()]}`];
 }
 
 // Canvas IDs of daily charts that use the two-line day+date tick renderer.
@@ -169,17 +178,14 @@ if (typeof Chart !== "undefined") {
 			ticks.forEach((tick, i) => {
 				const x = xScale.getPixelForTick(i);
 				const d = new Date(tick.value);
-				const dd   = String(d.getDate()).padStart(2, "0");
-				const mm   = String(d.getMonth() + 1).padStart(2, "0");
-				const yyyy = d.getFullYear();
 
 				// Line 1 — day name, normal weight
 				ctx.font = `${size}px sans-serif`;
 				ctx.fillText(DAYS_FR[d.getDay()], x, y1);
 
-				// Line 2 — date, bold
+				// Line 2 — "d month" in bold (e.g. "12 avr.")
 				ctx.font = `bold ${size}px sans-serif`;
-				ctx.fillText(`${dd}/${mm}/${yyyy}`, x, y2);
+				ctx.fillText(`${d.getDate()} ${MONTHS_FR[d.getMonth()]}`, x, y2);
 			});
 
 			ctx.restore();
@@ -257,11 +263,18 @@ function _render_delegation_chart(manual_pts, hs_pts, llm_pts, rgb_ia, rgb_hs, r
 /**
  * @param {Object[]} wpm_pts - Data points for daily WPM values.
  * @param {string}   rgb_wpm - CSS RGB string for WPM color.
+ * @param {Date|null} x_min  - Shared x-axis lower bound (aligns with precision chart).
+ * @param {Date|null} x_max  - Shared x-axis upper bound.
  */
-function _render_wpm_chart(wpm_pts, rgb_wpm) {
+function _render_wpm_chart(wpm_pts, rgb_wpm, x_min = null, x_max = null) {
 	if (wpm_chart_instance) wpm_chart_instance.destroy();
 	const elem = document.getElementById("wpm_chart");
 	if (!elem) return;
+
+	const x_opts = { type: "time", time: { unit: "day" }, grid: { color: GRID_COLOR },
+		ticks: { color: "transparent", callback: (v) => _format_day_tick(v) } };
+	if (x_min) x_opts.min = x_min;
+	if (x_max) x_opts.max = x_max;
 
 	wpm_chart_instance = new Chart(elem.getContext("2d"), {
 		type: "line",
@@ -277,6 +290,7 @@ function _render_wpm_chart(wpm_pts, rgb_wpm) {
 		options: {
 			responsive: true,
 			maintainAspectRatio: false,
+			layout: { padding: { bottom: 0 } },
 			plugins: {
 				legend: { display: false },
 				zoom:   ZOOM_OPTIONS,
@@ -288,12 +302,7 @@ function _render_wpm_chart(wpm_pts, rgb_wpm) {
 				},
 			},
 			scales: {
-				x: {
-					type:  "time",
-					time:  { unit: "day" },
-					grid:  { color: GRID_COLOR },
-					ticks: { color: "transparent", callback: (v) => _format_day_tick(v) },
-				},
+				x: x_opts,
 				y: { beginAtZero: true, grid: { color: GRID_COLOR } },
 			},
 		},
@@ -303,19 +312,61 @@ function _render_wpm_chart(wpm_pts, rgb_wpm) {
 /**
  * @param {string[]} sorted_keys - Sorted date keys from time_series.
  * @param {string}   rgb_prc     - CSS RGB string for precision color.
+ * @param {Date|null} x_min      - Shared x-axis lower bound (aligns with speed chart).
+ * @param {Date|null} x_max      - Shared x-axis upper bound.
  */
-function _render_precision_chart(sorted_keys, rgb_prc) {
+function _render_precision_chart(sorted_keys, rgb_prc, x_min = null, x_max = null) {
 	if (precision_chart_instance) precision_chart_instance.destroy();
 	const elem = document.getElementById("precision_chart");
 	if (!elem) return;
 
-	const precision_pts = sorted_keys.map((k) => {
-		const d        = app_state.time_series[k];
-		const accuracy = d.daily_chars > 0
-			? ((d.daily_chars - d.daily_manual_errors) / d.daily_chars) * 100
-			: 0;
-		return { x: new Date(k + "T12:00:00"), y: accuracy };
-	});
+	// Populate the (i) tooltip next to the chart title with the formula details.
+	const info_el = document.getElementById("precision_info");
+	if (info_el && typeof INFO_SVG === "string") {
+		const NBSP = String.fromCharCode(160);
+		const ui_thresh_ms = parseInt(document.getElementById("pause_threshold")?.value ?? "5000", 10) || 5000;
+		const thresh_label = ui_thresh_ms >= 99999000 ? "sans filtre"
+			: ui_thresh_ms >= 60000 ? `${ui_thresh_ms/60000}${NBSP}min`
+			: `${ui_thresh_ms/1000}${NBSP}s`;
+		const tip =
+			`<strong>Calcul${NBSP}:</strong> précision = (caractères corrects) / (caractères au total).<br><br>` +
+			`<strong>Erreurs comptées</strong> (au numérateur, en moins)${NBSP}:<br>` +
+			`&nbsp;&nbsp;Seuls les retours-arrière déclenchés peu après une touche tapée comptent (délai ≤${NBSP}${thresh_label}, suit le sélecteur de pause). ` +
+			`Un backspace après une longue pause efface généralement une sélection ou une ligne et n'est donc pas une vraie erreur.<br>` +
+			`&nbsp;&nbsp;Par construction du filtre côté keylogger : deux backspaces consécutifs ne sont comptés tous les deux que si chacun a un délai court par rapport à sa touche précédente.<br><br>` +
+			`<strong>Caractères synthétiques${NBSP}:</strong> activer + HS ou + IA ajoute leurs caractères (sortie de l'expansion${NBSP}− leur déclencheur) au numérateur ET au dénominateur. Comme ils sont 100${NBSP}% corrects, activer une source ne peut que faire monter la précision.`;
+		info_el.innerHTML = `${INFO_SVG}<span class="tooltiptext" style="text-align:left;">${tip}</span>`;
+	}
+
+	// Precision formula
+	// ─────────────────
+	//   - Manual errors are read from the per-day cumulative bucket cache
+	//     (daily_e_buckets) at the bucket matching the user's pause-threshold
+	//     slider. A backspace only counts if its delay since the previous
+	//     keystroke is ≤ pause_thresh — backspaces after long pauses are
+	//     typically deletions of selected text / whole lines, not typo
+	//     corrections, so they mustn't deflate precision.
+	//   - Synthetic chars from HS / IA are added when their toggle is active
+	//     (− their trigger chars, which are already in daily_chars). They
+	//     count as 100 % correct, so toggling a source on can only raise
+	//     precision.
+	// precision = (manual − errors + synth) / (manual + synth)
+	const { show_hs, show_llm } = get_source_mode_flags();
+	const pause_thresh = parseInt(document.getElementById("pause_threshold")?.value ?? "5000", 10) || 5000;
+	const bucket_key = pause_thresh_to_bucket_key(pause_thresh);
+	const precision_pts = sorted_keys
+		.filter(k => app_state.time_series[k].daily_chars > 0)
+		.map((k) => {
+			const d            = app_state.time_series[k];
+			const filtered_errs = d.daily_e_buckets?.[bucket_key] || 0;
+			const synth_hs     = show_hs  ? Math.max(0, (d.hs_chars  || 0) - (d.hs_input_chars  || 0)) : 0;
+			const synth_llm    = show_llm ? Math.max(0, (d.llm_chars || 0) - (d.llm_input_chars || 0)) : 0;
+			const total_chars  = d.daily_chars + synth_hs + synth_llm;
+			const correct      = (d.daily_chars - filtered_errs) + synth_hs + synth_llm;
+			const accuracy     = total_chars > 0 ? (correct / total_chars) * 100 : 0;
+			return { x: new Date(k + "T12:00:00"), y: Math.max(0, Math.min(100, accuracy)) };
+		})
+		.filter(pt => pt.y >= 20);
 
 	precision_chart_instance = new Chart(elem.getContext("2d"), {
 		type: "line",
@@ -331,6 +382,7 @@ function _render_precision_chart(sorted_keys, rgb_prc) {
 		options: {
 			responsive: true,
 			maintainAspectRatio: false,
+			layout: { padding: { bottom: 0 } },
 			plugins: {
 				legend: { display: false },
 				zoom:   ZOOM_OPTIONS,
@@ -342,14 +394,14 @@ function _render_precision_chart(sorted_keys, rgb_prc) {
 				},
 			},
 			scales: {
-				x: {
-					type:  "time",
-					time:  { unit: "day" },
-					grid:  { color: GRID_COLOR },
-					ticks: { color: "transparent", callback: (v) => _format_day_tick(v) },
-				},
+				x: Object.assign(
+					{ type: "time", time: { unit: "day" }, grid: { color: GRID_COLOR },
+					  ticks: { color: "transparent", callback: (v) => _format_day_tick(v) } },
+					x_min ? { min: x_min } : {},
+					x_max ? { max: x_max } : {}
+				),
 				y: {
-					beginAtZero: false, min: 50, max: 100,
+					beginAtZero: true, min: 0, max: 100,
 					ticks: { callback: (v) => v + "%" },
 					grid:  { color: "rgba(128, 128, 128, 0.1)" },
 				},
@@ -421,7 +473,7 @@ function _render_sparkline(ctx_id, chart_ref, data_pts, color) {
 				y: {
 					display:     true,
 					beginAtZero: true,
-					ticks:       { font: { size: 10 }, maxTicksLimit: 3, callback: (v) => format_number(v) + "%" },
+					ticks:       { font: { size: 10 }, maxTicksLimit: 3, callback: (v) => format_number_plain(v) + "%" },
 					grid:        { color: "rgba(128, 128, 128, 0.1)" },
 				},
 			},
@@ -483,7 +535,10 @@ function _render_hourly_charts(date_str, rgb_wpm, rgb_prc) {
 		const date_obj = new Date(`${date_str}T${h_str}:30:00`);
 		act_pts.push({ x: date_obj, y: hd.c });
 
-		const acc = ((hd.c - hd.e) / hd.c) * 100;
+		// Precision: bucketed error count at the user's pause threshold.
+		const _key = pause_thresh_to_bucket_key(parseInt(document.getElementById("pause_threshold")?.value ?? "5000", 10) || 5000);
+		const filtered_e = hd.e_buckets?.[_key] || 0;
+		const acc = ((hd.c - filtered_e) / hd.c) * 100;
 		prec_pts.push({ x: date_obj, y: Math.max(0, Math.min(100, acc)) });
 	}
 
@@ -655,6 +710,7 @@ const tooltipTitleCallbackMinute5 = (context) => {
 function _render_minute5_charts(date_str, rgb_wpm, rgb_prc, cutoff) {
 	const act_pts  = [];   // { x: Date, y: chars_count } per 5-min bucket
 	const prec_pts = [];   // { x: Date, y: accuracy_pct }
+	const bucket_key = pause_thresh_to_bucket_key(parseInt(document.getElementById("pause_threshold")?.value ?? "5000", 10) || 5000);
 
 	// Iterate the 5-minute buckets sorted so the chart line is always left-to-right
 	const sorted_buckets = Object.keys(app_state.minute5_series).sort();
@@ -670,7 +726,8 @@ function _render_minute5_charts(date_str, rgb_wpm, rgb_prc, cutoff) {
 		const date_obj = new Date(`${date_str}T${bucket}:00`);
 		act_pts.push({ x: date_obj, y: md.c });
 
-		const acc = ((md.c - md.e) / md.c) * 100;
+		const filtered_e = md.e_buckets?.[bucket_key] || 0;
+		const acc = ((md.c - filtered_e) / md.c) * 100;
 		prec_pts.push({ x: date_obj, y: Math.max(0, Math.min(100, acc)) });
 	});
 
@@ -797,4 +854,228 @@ function _render_minute5_precision_chart(pts, color, date_str, cutoff) {
 			},
 		},
 	});
+}
+
+
+// =================================================
+// =================================================
+// ======= 7/ Activity Calendar (year view) =======
+// =================================================
+// =================================================
+
+/**
+ * Renders a GitHub-style daily activity calendar : 7 rows (weekdays) × ~53
+ * columns (weeks), one cell per day in the rolling last 12 months. Cell
+ * intensity is a function of the day's manual character count, so the user
+ * gets a glance-level view of which days were active and which were not.
+ *
+ * The calendar window is fixed to "today minus 364 days → today" regardless
+ * of the date filter — a calendar IS a navigational view of all data, not a
+ * slice of the currently-filtered data.
+ */
+function _render_activity_calendar() {
+	const container = document.getElementById("activity_calendar_container");
+	if (!container) return;
+
+	const CELL = 12;       // cell side in px
+	const GAP  = 3;        // gap between cells
+	const PAD_TOP = 18;    // space for month labels
+	const PAD_LEFT = 28;   // space for weekday labels
+	const ROWS = 7;        // Mon..Sun
+	const DAYS = 365;      // 52*7 + 1 — covers a full year
+
+	// Build the full date map from the manifest so the calendar shows historical
+	// days even when they're not currently in the filter selection.
+	const date_chars = {};
+	if (window.metrics_manifest) {
+		Object.keys(window.metrics_manifest).forEach(date_str => {
+			let total = 0;
+			Object.values(window.metrics_manifest[date_str] || {}).forEach(app => {
+				total += app.chars || 0;
+			});
+			date_chars[date_str] = total;
+		});
+	}
+	if (app_state.today_live_data) {
+		const today = get_local_date_string();
+		let total = 0;
+		Object.values(app_state.today_live_data).forEach(app => { total += app.chars || 0; });
+		date_chars[today] = (date_chars[today] || 0) + total;
+	}
+
+	const today = new Date();
+	today.setHours(12, 0, 0, 0);
+	const start = new Date(today.getTime() - (DAYS - 1) * 86400_000);
+	// Start the grid on the Monday of `start`'s week so columns align to weeks.
+	const start_dow = (start.getDay() + 6) % 7; // 0 = Mon, 6 = Sun
+	start.setDate(start.getDate() - start_dow);
+
+	// Find the day max for color scale (gamma-compressed so big outliers don't
+	// flatten everything else).
+	let max_chars = 0;
+	Object.values(date_chars).forEach(n => { if (n > max_chars) max_chars = n; });
+	const heat_color = (n) => {
+		if (n <= 0) return "rgba(255, 255, 255, 0.04)";
+		const t = Math.pow(n / Math.max(1, max_chars), 0.5);
+		const r = Math.round(34  + t * (74  - 34));
+		const g = Math.round(70  + t * (222 - 70));
+		const b = Math.round(54  + t * (128 - 54));
+		return `rgb(${r}, ${g}, ${b})`;
+	};
+
+	const fr_date = (d) => d.toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long", year: "numeric" });
+	const iso_date = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+
+	let cells = "";
+	let month_labels = "";
+	let last_month = -1;
+	const cursor = new Date(start);
+	let col = 0;
+	while (cursor <= today) {
+		const dow = (cursor.getDay() + 6) % 7; // 0 = Mon
+		if (dow === 0 && col > 0) col++; // new column at start of each week
+		// Actually the simplest: increment column when we hit Monday OR the very first iteration
+		const x = PAD_LEFT + col * (CELL + GAP);
+		const y = PAD_TOP  + dow * (CELL + GAP);
+		const date_str = iso_date(cursor);
+		const n = date_chars[date_str] || 0;
+		const fill = heat_color(n);
+		const tip = `${fr_date(cursor)} — ${n === 0 ? "aucune frappe" : format_number(n) + " caractères"}`;
+		cells += `<rect x="${x}" y="${y}" width="${CELL}" height="${CELL}" rx="2" fill="${fill}"><title>${tip}</title></rect>`;
+
+		// Month label appears once at the start of each new month
+		if (cursor.getMonth() !== last_month && dow === 0) {
+			const month_short = ["jan", "fév", "mar", "avr", "mai", "juin", "juil", "août", "sep", "oct", "nov", "déc"][cursor.getMonth()];
+			month_labels += `<text x="${x}" y="${PAD_TOP - 6}" font-size="10" fill="var(--text-muted, #888)">${month_short}</text>`;
+			last_month = cursor.getMonth();
+		}
+
+		cursor.setDate(cursor.getDate() + 1);
+		if ((cursor.getDay() + 6) % 7 === 0) col++;
+	}
+
+	const weekday_labels = ["Lun", "Mer", "Ven"]
+		.map((lbl, i) => `<text x="0" y="${PAD_TOP + (i * 2) * (CELL + GAP) + CELL - 2}" font-size="9" fill="var(--text-muted, #888)">${lbl}</text>`)
+		.join("");
+
+	const total_cols = col + 1;
+	const svg_w = PAD_LEFT + total_cols * (CELL + GAP);
+	const svg_h = PAD_TOP + ROWS * (CELL + GAP);
+
+	let total_chars = 0, active_days = 0;
+	Object.values(date_chars).forEach(n => { if (n > 0) { total_chars += n; active_days++; } });
+
+	container.innerHTML =
+		`<div style="background:var(--panel-bg);border:1px solid var(--border);border-radius:10px;padding:12px 14px;">` +
+		`<div style="display:flex;align-items:baseline;justify-content:space-between;margin-bottom:8px;">` +
+		`<h3 style="margin:0;font-size:14px;color:var(--text-color);">Calendrier d'activité <span style="color:var(--text-muted);font-weight:normal;font-size:12px;">— 12 derniers mois</span></h3>` +
+		`<span style="font-size:11px;color:var(--text-muted);">${active_days} jours actifs · ${format_number(total_chars)} caractères</span>` +
+		`</div>` +
+		`<svg width="${svg_w}" height="${svg_h}" xmlns="http://www.w3.org/2000/svg" style="display:block;max-width:100%;">` +
+		weekday_labels + month_labels + cells +
+		`</svg></div>`;
+}
+
+
+// ===================================================
+// ===================================================
+// ======= 8/ Hour × Weekday Heatmap =======
+// ===================================================
+// ===================================================
+
+/**
+ * Renders a 7×24 heatmap of typing volume by weekday and hour, aggregated
+ * over the user-selected date range. The cell intensity is the total number
+ * of manual characters typed in that (weekday, hour) slot — so a cell at
+ * "Wednesday 21:00" reflects every Wednesday in the range, not a single one.
+ *
+ * Useful to spot productivity rhythms (e.g. "I type the most on Tuesday
+ * afternoons but rarely after 22:00") that the time series doesn't show.
+ */
+function _render_hour_weekday_heatmap() {
+	const container = document.getElementById("hour_weekday_heatmap_container");
+	if (!container) return;
+
+	const start_val = document.getElementById("date_start")?.value;
+	const end_val   = document.getElementById("date_end")?.value;
+
+	// matrix[weekday][hour] = total chars
+	const matrix = Array.from({ length: 7 }, () => Array.from({ length: 24 }, () => 0));
+	let max_cell = 0;
+
+	const accumulate_day = (date_str, app_data_map) => {
+		const d = new Date(date_str + "T12:00:00");
+		const dow = (d.getDay() + 6) % 7; // 0 = Mon, 6 = Sun
+		Object.values(app_data_map || {}).forEach(app => {
+			if (!app || !app.hourly) return;
+			Object.entries(app.hourly).forEach(([h_str, hd]) => {
+				const h = parseInt(h_str, 10);
+				if (isNaN(h)) return;
+				const c = hd.c || 0;
+				matrix[dow][h] += c;
+				if (matrix[dow][h] > max_cell) max_cell = matrix[dow][h];
+			});
+		});
+	};
+
+	if (window.metrics_manifest) {
+		Object.keys(window.metrics_manifest).forEach(date_str => {
+			if (start_val && date_str < start_val) return;
+			if (end_val   && date_str > end_val)   return;
+			accumulate_day(date_str, window.metrics_manifest[date_str]);
+		});
+	}
+	if (app_state.today_live_data) {
+		const today = get_local_date_string();
+		const today_in_range = (!start_val || today >= start_val) && (!end_val || today <= end_val);
+		if (today_in_range) accumulate_day(today, app_state.today_live_data);
+	}
+
+	const CELL_W = 22, CELL_H = 18, GAP = 2;
+	const PAD_LEFT = 36, PAD_TOP = 18;
+	const SVG_W = PAD_LEFT + 24 * (CELL_W + GAP) + 4;
+	const SVG_H = PAD_TOP  + 7  * (CELL_H + GAP) + 4;
+
+	const heat_color = (n) => {
+		if (n <= 0) return "rgba(255, 255, 255, 0.04)";
+		const t = Math.pow(n / max_cell, 0.45);
+		const r = Math.round(30  + t * (245 - 30));
+		const g = Math.round(64  + t * (158 - 64));
+		const b = Math.round(175 + t * (11  - 175));
+		return `rgb(${r}, ${g}, ${b})`;
+	};
+
+	const days_fr = ["Lun", "Mar", "Mer", "Jeu", "Ven", "Sam", "Dim"];
+
+	let cells = "";
+	for (let dow = 0; dow < 7; dow++) {
+		for (let h = 0; h < 24; h++) {
+			const x = PAD_LEFT + h * (CELL_W + GAP);
+			const y = PAD_TOP  + dow * (CELL_H + GAP);
+			const n = matrix[dow][h];
+			const tip = `${days_fr[dow]} ${String(h).padStart(2, "0")}h — ${n === 0 ? "aucune frappe" : format_number(n) + " car."}`;
+			cells += `<rect x="${x}" y="${y}" width="${CELL_W}" height="${CELL_H}" rx="2" fill="${heat_color(n)}"><title>${tip}</title></rect>`;
+		}
+	}
+	const day_labels = days_fr
+		.map((lbl, i) => `<text x="0" y="${PAD_TOP + i * (CELL_H + GAP) + CELL_H - 4}" font-size="10" fill="var(--text-muted, #888)">${lbl}</text>`)
+		.join("");
+	const hour_labels = [];
+	for (let h = 0; h < 24; h += 3) {
+		const x = PAD_LEFT + h * (CELL_W + GAP) + CELL_W / 2;
+		hour_labels.push(`<text x="${x}" y="${PAD_TOP - 6}" font-size="9" fill="var(--text-muted, #888)" text-anchor="middle">${String(h).padStart(2, "0")}h</text>`);
+	}
+
+	let total_chars = 0;
+	for (let i = 0; i < 7; i++) for (let j = 0; j < 24; j++) total_chars += matrix[i][j];
+
+	container.innerHTML =
+		`<div style="background:var(--panel-bg);border:1px solid var(--border);border-radius:10px;padding:12px 14px;">` +
+		`<div style="display:flex;align-items:baseline;justify-content:space-between;margin-bottom:8px;">` +
+		`<h3 style="margin:0;font-size:14px;color:var(--text-color);">Activité par heure et jour de la semaine <span style="color:var(--text-muted);font-weight:normal;font-size:12px;">— sur la période sélectionnée</span></h3>` +
+		`<span style="font-size:11px;color:var(--text-muted);">${format_number(total_chars)} caractères au total</span>` +
+		`</div>` +
+		`<svg width="${SVG_W}" height="${SVG_H}" xmlns="http://www.w3.org/2000/svg" style="display:block;max-width:100%;">` +
+		day_labels + hour_labels.join("") + cells +
+		`</svg></div>`;
 }

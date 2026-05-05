@@ -28,6 +28,7 @@ local dialog = require("lib.dialog_util")
 
 local LogManager     = require("modules.keylogger.log_manager")
 local ContextTracker = require("modules.keylogger.context_tracker")
+local KcBridge       = require("modules.keylogger.kc_bridge")
 local LOG            = "keylogger"
 
 
@@ -88,6 +89,15 @@ local F_KEY_CODES = {
 	[122] = "F1",  [120] = "F2",  [99]  = "F3",  [118] = "F4",
 	[96]  = "F5",  [97]  = "F6",  [98]  = "F7",  [100] = "F8",
 	[101] = "F9",  [109] = "F10", [103] = "F11", [111] = "F12",
+}
+
+-- Synthetic OS-signal keys that must never appear in keystroke logs or metrics.
+-- F18 (79) is tapped by the keep-awake jiggler as a secondary wakeup signal;
+-- logging it would pollute character counts and WPM windows.
+local SILENT_KEYCODES = {
+	[79] = true,   -- F18: keep-awake OS signal
+	[80] = true,   -- F19: reserved synthetic channel
+	[90] = true,   -- F20: synthetic "typing complete" signal (KE bridge)
 }
 
 -- Keycodes for navigation keys (arrows + Delete, Home, End, PageUp, PageDown).
@@ -177,6 +187,24 @@ local CoreState = {
 	recent_typing_eff     = {},  -- includes synthetic characters
 	recent_typing_phys    = {},  -- physical keystrokes only
 
+	-- Previous modifier flags — used to detect key-down vs key-up for flagsChanged events
+	prev_flags            = {},
+
+	-- Focus-latency tracking: armed by context_tracker on every app activation,
+	-- consumed by the first non-synthetic keystroke that follows
+	focus_pending_at      = nil,
+	focus_pending_app     = nil,
+
+	-- Per-keycode modifier-down timestamps. Populated on flagsChanged-press,
+	-- consumed (and cleared) on flagsChanged-release to compute hold duration
+	modifier_down_at      = {},
+
+	-- Passive-time accounting: timestamp at which the screen was locked or
+	-- the system went to sleep. Closed on the matching unlock/wake to credit
+	-- the day's passive_*_ms manifest fields with the precise duration
+	passive_started_at    = nil,
+	passive_kind          = nil,
+
 	-- Last autocomplete source (for the WPM overlay)
 	last_source_type      = "none",
 	last_source_variant   = "none",
@@ -220,9 +248,14 @@ local CoreState = {
 	ngram_context         = nil,
 }
 
--- Wire sub-modules to the shared state immediately at load time
+-- Wire sub-modules to the shared state immediately at load time.
+-- KcBridge is also wired here (not in M.start) so the file watcher and poll
+-- timer run regardless of whether the keylogger is currently enabled — KE
+-- emits physical kc events unconditionally and the bridge must always be
+-- ready to drain them.
 LogManager.init(CoreState)
 ContextTracker.init(CoreState, LogManager)
+KcBridge.init(CoreState, LogManager, nil, nil)
 
 -- Watcher and timer handles
 local _event_tap            = nil
@@ -399,6 +432,36 @@ local function handle_key(event_obj)
 			return
 		end
 
+		-- flagsChanged: track modifier press AND release per physical keycode.
+		-- We can't rely on the flag bits alone because shared flags (cmd is set
+		-- by both left_cmd 55 and right_cmd 54) prevent us from disambiguating
+		-- consecutive presses. Instead, we toggle a per-keycode down-timestamp:
+		-- absent → press (record now); present → release (compute hold, clear).
+		if evt_type == hs.eventtap.event.types.flagsChanged then
+			local keycode = event_obj:getKeyCode()
+			local flags   = event_obj:getFlags() or {}
+			if MODIFIER_KEYCODES[keycode] then
+				local down_at = CoreState.modifier_down_at[keycode]
+				if not down_at then
+					-- Press — record timestamp and credit the kc dict
+					CoreState.modifier_down_at[keycode] = now
+					local front_app = hs.application.frontmostApplication()
+					local app_name  = front_app and front_app:title() or "Unknown"
+					LogManager.log_modifier_press(keycode, app_name)
+				else
+					-- Release — compute hold duration and feed the manifest
+					local hold_ms = math.floor(now - down_at)
+					CoreState.modifier_down_at[keycode] = nil
+					local front_app = hs.application.frontmostApplication()
+					local app_name  = front_app and front_app:title() or "Unknown"
+					LogManager.log_modifier_hold(keycode, app_name, hold_ms)
+				end
+			end
+			-- Keep the flag snapshot up to date for any code path that reads it
+			CoreState.prev_flags = flags
+			return
+		end
+
 		if evt_type ~= hs.eventtap.event.types.keyDown then return end
 
 		-- If the script control module signals a pause (e.g. during hotstring expansion),
@@ -424,6 +487,9 @@ local function handle_key(event_obj)
 			)
 			return
 		end
+
+		-- Drop synthetic OS-signal keys before any logging or metric update
+		if SILENT_KEYCODES[keycode] then return end
 
 		-- getCharacters(false) returns the actual composed character for the current
 		-- keyboard layout; nil/empty means a dead-key that needs another stroke to resolve.
@@ -484,6 +550,22 @@ local function handle_key(event_obj)
 			end
 		end
 
+		-- Time-to-first-key after focus: triggered once per app activation,
+		-- only for genuine human keystrokes (synthetic expansion is excluded —
+		-- a hotstring firing 1 ms after focus is not a "user reaction time")
+		if not is_synthetic
+		   and CoreState.focus_pending_at
+		   and not MODIFIER_KEYCODES[keycode]
+		then
+			local latency_ms = math.floor(now - CoreState.focus_pending_at)
+			LogManager.log_focus_first_key(
+				CoreState.focus_pending_app or CoreState.session_app_name or "Unknown",
+				latency_ms
+			)
+			CoreState.focus_pending_at  = nil
+			CoreState.focus_pending_app = nil
+		end
+
 		-- Update rolling WPM buffers (physical typing keystrokes only).
 		-- F-keys and navigation keys are excluded: they are not typing characters
 		-- and would inflate WPM artificially if counted.
@@ -518,7 +600,10 @@ local function handle_key(event_obj)
 			d  = delay,
 			dk = false,
 			cp = false,
-			kc = keycode,  -- raw virtual keycode for physical-key frequency analysis
+			-- Suppress the output kc when Karabiner is logging the physical key for
+			-- this keycode — the bridge will credit the physical key instead, so we
+			-- must not also count the remapped output or the heatmap is double-counted.
+			kc = KcBridge.is_ke_managed_output_kc(keycode) and nil or keycode,
 		}
 
 		local ev_entry = nil
@@ -756,6 +841,9 @@ local function caffeinate_cb(event)
 	or event == hs.caffeinate.watcher.screensDidSleep
 	then
 		LogManager.log_system_event("sleep", { battery_level = CoreState.current_battery_level })
+		-- Arm passive-time accounting: any wake/unlock will close this window
+		CoreState.passive_started_at  = now
+		CoreState.passive_kind        = "sleep"
 		if CoreState.active_app_name then
 			LogManager.log_app_switch(
 				CoreState.active_app_name, "SYSTEM_SLEEP",
@@ -768,10 +856,20 @@ local function caffeinate_cb(event)
 	or     event == hs.caffeinate.watcher.screensDidWake
 	then
 		LogManager.log_system_event("wake")
+		if CoreState.passive_started_at then
+			LogManager.log_passive_period(
+				CoreState.passive_kind or "sleep",
+				math.floor(now - CoreState.passive_started_at)
+			)
+			CoreState.passive_started_at = nil
+			CoreState.passive_kind       = nil
+		end
 		CoreState.active_app_start = now
 
 	elseif event == hs.caffeinate.watcher.screensDidLock then
 		LogManager.log_system_event("lock")
+		CoreState.passive_started_at = now
+		CoreState.passive_kind       = "lock"
 		if CoreState.active_app_name then
 			LogManager.log_app_switch(
 				CoreState.active_app_name, "SYSTEM_LOCK",
@@ -782,6 +880,14 @@ local function caffeinate_cb(event)
 
 	elseif event == hs.caffeinate.watcher.screensDidUnlock then
 		LogManager.log_system_event("unlock")
+		if CoreState.passive_started_at then
+			LogManager.log_passive_period(
+				CoreState.passive_kind or "lock",
+				math.floor(now - CoreState.passive_started_at)
+			)
+			CoreState.passive_started_at = nil
+			CoreState.passive_kind       = nil
+		end
 		CoreState.active_app_start = now
 	end
 end
@@ -1231,6 +1337,7 @@ function M.start(script_control)
 		_event_tap = hs.eventtap.new({
 			hs.eventtap.event.types.keyDown,
 			hs.eventtap.event.types.keyUp,
+			hs.eventtap.event.types.flagsChanged,
 			hs.eventtap.event.types.leftMouseDown,
 			hs.eventtap.event.types.rightMouseDown,
 			hs.eventtap.event.types.scrollWheel,
@@ -1297,6 +1404,7 @@ function M.stop()
 	end
 
 	stop_hardware_watchers()
+	KcBridge.stop()
 	Logger.success(LOG, "Keylogger engine stopped.")
 end
 

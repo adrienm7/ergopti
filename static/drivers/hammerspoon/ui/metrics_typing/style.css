@@ -39,29 +39,38 @@
 	/* KPI Colors (Strong contrast for Light Mode) */
 	--kpi-hs-color: rgb(217, 48, 37);
 	--kpi-llm-color: rgb(138, 62, 184);
+	/* WPM KPI card is orange; the chart uses --chart-wpm-color (yellow) */
 	--kpi-wpm-color: rgb(230, 140, 0);
+	--kpi-wpm-rgb: 230, 140, 0;
+	--chart-wpm-color: rgb(204, 163, 0);
+	--chart-wpm-rgb: 204, 163, 0;
 	--kpi-precision-color: #008000;
 	--kpi-delegation-color: rgb(0, 86, 179);
-	--kpi-rep-color: rgb(0, 155, 150); /* Teal */
+	--kpi-sfb-color: rgb(0, 155, 150); /* Teal — same-finger bigram indicator (was rep color) */
 	--kpi-dist-color: rgb(0, 113, 197);
+	--kpi-rep-color: rgb(0, 134, 174); /* Mid-blue-cyan — between dist blue and sfb teal */
 
 	/* KPI Backgrounds Light Mode */
 	--hs-bg: color-mix(in srgb, var(--kpi-hs-color), transparent 95%);
 	--llm-bg: color-mix(in srgb, var(--kpi-llm-color), transparent 95%);
-	--global-bg: color-mix(in srgb, var(--kpi-wpm-color), transparent 95%);
+	--global-bg: color-mix(in srgb, var(--chart-wpm-color), transparent 95%);
 	--precision-bg: color-mix(in srgb, var(--kpi-precision-color), transparent 95%);
+	--kpi-wpm-bg: color-mix(in srgb, var(--kpi-wpm-color), transparent 95%);
 	--delegation-bg: rgba(var(--text-color-rgb), 0.05);
 	--rep-bg: color-mix(in srgb, var(--kpi-rep-color), transparent 95%);
 	--dist-bg: color-mix(in srgb, var(--kpi-dist-color), transparent 95%);
+	--sfb-bg: color-mix(in srgb, var(--kpi-sfb-color), transparent 95%);
 
 	/* KPI Borders Light Mode (Soft opacity) */
 	--hs-border: color-mix(in srgb, var(--kpi-hs-color), transparent 50%);
 	--llm-border: color-mix(in srgb, var(--kpi-llm-color), transparent 50%);
-	--global-border: color-mix(in srgb, var(--kpi-wpm-color), transparent 50%);
+	--global-border: color-mix(in srgb, var(--chart-wpm-color), transparent 50%);
 	--precision-border: color-mix(in srgb, var(--kpi-precision-color), transparent 50%);
+	--kpi-wpm-border: color-mix(in srgb, var(--kpi-wpm-color), transparent 50%);
 	--delegation-border: rgba(var(--text-color-rgb), 0.5);
 	--rep-border: color-mix(in srgb, var(--kpi-rep-color), transparent 50%);
 	--dist-border: color-mix(in srgb, var(--kpi-dist-color), transparent 50%);
+	--sfb-border: color-mix(in srgb, var(--kpi-sfb-color), transparent 50%);
 
 	/* Chart container tint Light Mode */
 	--chart-bg: rgba(0, 0, 0, 0.02);
@@ -97,17 +106,25 @@
 		/* KPI Colors (Vibrant, readable colors for Dark Mode) */
 		--kpi-hs-color: rgb(255, 69, 58); /* #ff453a (Vibrant Red) */
 		--kpi-llm-color: rgb(191, 90, 242); /* #bf5af2 (Vibrant Purple) */
-		--kpi-wpm-color: rgb(255, 214, 10); /* #ffd60a (Vibrant Yellow) */
+		/* WPM KPI card is orange; the chart uses --chart-wpm-color (yellow) */
+		--kpi-wpm-color: rgb(255, 149, 0); /* #ff9500 (Vibrant Orange) */
+		--kpi-wpm-rgb: 255, 149, 0;
+		--chart-wpm-color: rgb(255, 214, 10); /* #ffd60a (Vibrant Yellow) */
+		--chart-wpm-rgb: 255, 214, 10;
 		--kpi-precision-color: rgb(48, 209, 88); /* #30d158 (Vibrant Green) */
 		--kpi-delegation-color: rgb(30, 150, 255); /* #0a84ff (Vibrant Blue) */
-		--kpi-rep-color: rgb(0, 212, 204); /* #00d4cc (Vibrant Teal) */
+		--kpi-sfb-color: rgb(0, 212, 204); /* #00d4cc (Vibrant Teal) — same-finger bigram indicator */
 		--kpi-dist-color: rgb(10, 132, 255); /* #0a84ff (Vibrant Blue) */
+		--kpi-rep-color: rgb(5, 172, 230); /* Mid-blue-cyan — between dist blue and sfb teal */
 
 		/* KPI Backgrounds Dark Mode */
+		--sfb-bg: color-mix(in srgb, var(--kpi-sfb-color), transparent 90%);
+		--sfb-border: color-mix(in srgb, var(--kpi-sfb-color), transparent 50%);
 		--hs-bg: color-mix(in srgb, var(--kpi-hs-color), transparent 90%);
 		--llm-bg: color-mix(in srgb, var(--kpi-llm-color), transparent 90%);
-		--global-bg: color-mix(in srgb, var(--kpi-wpm-color), transparent 90%);
+		--global-bg: color-mix(in srgb, var(--chart-wpm-color), transparent 90%);
 		--precision-bg: color-mix(in srgb, var(--kpi-precision-color), transparent 90%);
+		--kpi-wpm-bg: color-mix(in srgb, var(--kpi-wpm-color), transparent 90%);
 		--delegation-bg: rgba(var(--text-color-rgb), 0.1);
 		--rep-bg: color-mix(in srgb, var(--kpi-rep-color), transparent 90%);
 		--dist-bg: color-mix(in srgb, var(--kpi-dist-color), transparent 90%);
@@ -115,8 +132,9 @@
 		/* KPI Borders Dark Mode */
 		--hs-border: color-mix(in srgb, var(--kpi-hs-color), transparent 50%);
 		--llm-border: color-mix(in srgb, var(--kpi-llm-color), transparent 50%);
-		--global-border: color-mix(in srgb, var(--kpi-wpm-color), transparent 50%);
+		--global-border: color-mix(in srgb, var(--chart-wpm-color), transparent 50%);
 		--precision-border: color-mix(in srgb, var(--kpi-precision-color), transparent 50%);
+		--kpi-wpm-border: color-mix(in srgb, var(--kpi-wpm-color), transparent 50%);
 		--delegation-border: rgba(var(--text-color-rgb), 0.5);
 		--rep-border: color-mix(in srgb, var(--kpi-rep-color), transparent 50%);
 		--dist-border: color-mix(in srgb, var(--kpi-dist-color), transparent 50%);
@@ -140,6 +158,7 @@ body {
 	height: 100vh;
 	margin: 0;
 	overflow: hidden;
+	overflow-x: hidden;
 }
 
 /* ================================== */
@@ -158,6 +177,7 @@ body {
 
 .main-content {
 	flex-grow: 1;
+	overflow-x: hidden;
 	overflow-y: auto;
 	padding: 0 20px 20px 20px;
 }
@@ -279,13 +299,18 @@ input[type='date']::-webkit-datetime-edit-year-field {
 /* ============================= */
 
 .stats-grid {
-	display: grid;
-	gap: 15px;
-	/* Three cards remain: Hotstrings, IA, Vitesse — HS and IA stay wider for sparklines */
-	grid-template-columns: 2fr 2fr 1.5fr;
-	margin-bottom: 20px;
-	margin-top: 20px;
+	display: flex;
+	flex-wrap: wrap;
+	gap: 16px;
+	margin-bottom: 16px;
+	margin-top: 16px;
 	transition: all 0.3s ease;
+}
+
+/* Each KPI card grows to fill the row; at narrow widths cards stack one per line */
+.stats-grid .stat-card {
+	flex: 1 1 280px;
+	min-width: 0;
 }
 
 .stat-card {
@@ -308,8 +333,8 @@ input[type='date']::-webkit-datetime-edit-year-field {
 	border-color: var(--llm-border);
 }
 .stat-card.card-global {
-	background: var(--global-bg);
-	border-color: var(--global-border);
+	background: var(--kpi-wpm-bg);
+	border-color: var(--kpi-wpm-border);
 }
 .stat-card.card-rep {
 	background: var(--rep-bg);
@@ -390,15 +415,11 @@ input[type='date']::-webkit-datetime-edit-year-field {
 	width: 24px;
 }
 
-.trend-svg.up {
-	color: var(--kpi-precision-color); /* Vert Précision */
-}
-.trend-svg.down {
-	color: var(--kpi-hs-color); /* Rouge Hotstrings */
-}
+.trend-svg.up,
+.trend-svg.down,
 .trend-svg.stable {
-	color: var(--strong-color);
-	opacity: 1;
+	color: #ffffff;
+	opacity: 0.9;
 }
 
 .sparkline-container {
@@ -417,8 +438,9 @@ input[type='date']::-webkit-datetime-edit-year-field {
 /* Two side-by-side blocks immediately below the stats-grid, before the charts */
 .expanded-kpi-row {
 	display: flex;
-	gap: 15px;
-	margin-bottom: 20px;
+	flex-wrap: wrap;
+	gap: 16px;
+	margin-bottom: 16px;
 }
 
 /* Each block mirrors the visual language of .stat-card but is flex-column so
@@ -432,8 +454,9 @@ input[type='date']::-webkit-datetime-edit-year-field {
 	border-radius: 12px;
 	box-shadow: 0 4px 12px rgba(0, 0, 0, 0.04);
 	display: flex;
-	flex: 1;
+	flex: 1 1 340px;
 	flex-direction: column;
+	min-width: 0;
 	overflow: visible;
 	padding: 20px;
 }
@@ -448,6 +471,121 @@ input[type='date']::-webkit-datetime-edit-year-field {
 	border-color: var(--rep-border);
 }
 
+.expanded-kpi-block.card-sfb {
+	background: var(--sfb-bg);
+	border-color: var(--sfb-border);
+}
+
+.expanded-kpi-block.card-ergo-bigram {
+	background: rgba(99, 102, 241, 0.08);
+	border-color: rgba(99, 102, 241, 0.3);
+}
+
+.expanded-kpi-block.card-ergo-bigram h2,
+.expanded-kpi-block.card-ergo-bigram .stat-value {
+	color: rgb(129, 140, 248);
+}
+
+.expanded-kpi-block.card-ergo-trigram {
+	background: rgba(168, 85, 247, 0.08);
+	border-color: rgba(168, 85, 247, 0.3);
+}
+
+.expanded-kpi-block.card-ergo-trigram h2,
+.expanded-kpi-block.card-ergo-trigram .stat-value {
+	color: rgb(192, 132, 252);
+}
+
+.expanded-kpi-block.card-errors {
+	background: rgba(239, 68, 68, 0.08);
+	border-color: rgba(239, 68, 68, 0.3);
+}
+
+.expanded-kpi-block.card-errors h2,
+.expanded-kpi-block.card-errors .stat-value {
+	color: rgb(248, 113, 113);
+}
+
+.expanded-kpi-block.card-roi {
+	background: rgba(34, 197, 94, 0.08);
+	border-color: rgba(34, 197, 94, 0.3);
+}
+
+.expanded-kpi-block.card-roi h2,
+.expanded-kpi-block.card-roi .stat-value {
+	color: rgb(74, 222, 128);
+}
+
+.expanded-kpi-block.card-lexical {
+	background: rgba(245, 158, 11, 0.08);
+	border-color: rgba(245, 158, 11, 0.3);
+}
+
+.expanded-kpi-block.card-lexical h2,
+.expanded-kpi-block.card-lexical .stat-value {
+	color: rgb(251, 191, 36);
+}
+
+.expanded-kpi-block.card-rhythm {
+	background: rgba(14, 165, 233, 0.08);
+	border-color: rgba(14, 165, 233, 0.3);
+}
+
+.expanded-kpi-block.card-rhythm h2,
+.expanded-kpi-block.card-rhythm .stat-value {
+	color: rgb(56, 189, 248);
+}
+
+.expanded-kpi-block.card-sessions {
+	background: rgba(20, 184, 166, 0.08);
+	border-color: rgba(20, 184, 166, 0.3);
+}
+
+.expanded-kpi-block.card-sessions h2,
+.expanded-kpi-block.card-sessions .stat-value {
+	color: rgb(45, 212, 191);
+}
+
+.expanded-kpi-block.card-records {
+	background: rgba(236, 72, 153, 0.08);
+	border-color: rgba(236, 72, 153, 0.3);
+}
+
+.expanded-kpi-block.card-records h2,
+.expanded-kpi-block.card-records .stat-value {
+	color: rgb(244, 114, 182);
+}
+
+.expanded-kpi-block.card-charmix {
+	background: rgba(120, 113, 108, 0.08);
+	border-color: rgba(120, 113, 108, 0.3);
+}
+
+.expanded-kpi-block.card-charmix h2,
+.expanded-kpi-block.card-charmix .stat-value {
+	color: rgb(168, 162, 158);
+}
+
+.expanded-kpi-block.card-apps {
+	background: rgba(217, 70, 239, 0.08);
+	border-color: rgba(217, 70, 239, 0.3);
+}
+
+.expanded-kpi-block.card-apps h2,
+.expanded-kpi-block.card-apps .stat-value {
+	color: rgb(232, 121, 249);
+}
+
+.expanded-kpi-block.card-wellness {
+	background: rgba(132, 204, 22, 0.08);
+	border-color: rgba(132, 204, 22, 0.3);
+}
+
+.expanded-kpi-block.card-wellness h2,
+.expanded-kpi-block.card-wellness .stat-value {
+	color: rgb(163, 230, 53);
+}
+
 /* Header section: title + KPI value + split details */
 .ekpi-header {
 	flex-shrink: 0;
@@ -460,6 +598,7 @@ input[type='date']::-webkit-datetime-edit-year-field {
 	border-bottom: none;
 	display: flex;
 	font-size: 20px;
+	justify-content: space-between;
 	margin: 0 0 10px 0;
 }
 
@@ -471,6 +610,28 @@ input[type='date']::-webkit-datetime-edit-year-field {
 .expanded-kpi-block.card-rep h2,
 .expanded-kpi-block.card-rep .stat-value {
 	color: var(--kpi-rep-color);
+}
+
+.expanded-kpi-block.card-sfb h2,
+.expanded-kpi-block.card-sfb .stat-value {
+	color: var(--kpi-sfb-color);
+}
+
+/* SFB doubling toggle — pushed right via space-between flex on h2, brown when active */
+.sfb-toggle-btn {
+	font-size: 10px;
+	padding: 1px 6px;
+	border-radius: 4px;
+	margin-top: 1px;
+	background: transparent;
+	border-color: var(--kpi-sfb-color);
+	color: var(--kpi-sfb-color);
+}
+
+.sfb-toggle-btn.active {
+	background: var(--sfb-bg);
+	border-color: var(--kpi-sfb-color);
+	color: var(--kpi-sfb-color);
 }
 
 /* Scrollable table wrapper — fixed height so the row doesn't grow unbounded */
@@ -530,6 +691,30 @@ input[type='date']::-webkit-datetime-edit-year-field {
 	background: color-mix(in srgb, var(--tooltip-bg) 65%, var(--kpi-rep-color) 35%);
 }
 
+.expanded-kpi-block.card-sfb .num-tooltip::after {
+	background: color-mix(in srgb, var(--tooltip-bg) 65%, var(--kpi-sfb-color) 35%);
+}
+
+/* ============================================ */
+/* ============================================ */
+/* ======= 5b/ Keyboard Heatmaps Row ========== */
+/* ============================================ */
+/* ============================================ */
+
+/* Flex row holding both the keycode heatmap and the SFB heatmap side by side.
+   flex-wrap ensures they stack vertically on narrow viewports. */
+.heatmaps-row {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 16px;
+	margin-bottom: 16px;
+}
+
+.heatmaps-row > div {
+	flex: 1 1 500px;
+	min-width: 0;
+}
+
 /* ================================== */
 /* ================================== */
 /* ======= 6/ Chart Container ======= */
@@ -551,6 +736,42 @@ input[type='date']::-webkit-datetime-edit-year-field {
 	font-size: 11px;
 }
 
+/* Side-by-side blocks holding the precision and speed charts.
+   Flex column + gap puts a real visual breathing room between the title and
+   the chart, while a tight bottom padding stops the plot from feeling
+   stranded above an empty zone. Top padding is kept smaller than the
+   title-to-chart gap so the title is not glued to the upper border. */
+.chart-row-block {
+	border-radius: 8px;
+	display: flex;
+	flex: 1 1 300px;
+	flex-direction: column;
+	gap: 8px;
+	min-width: 0;
+	padding: 10px 15px 0 15px;
+}
+
+.chart-row-block.is-precision {
+	background: var(--precision-bg);
+	border: 1px solid var(--precision-border);
+}
+
+.chart-row-block.is-speed {
+	background: var(--global-bg);
+	border: 1px solid var(--global-border);
+}
+
+.chart-row-block-header {
+	align-items: center;
+	display: flex;
+	justify-content: space-between;
+}
+
+.chart-row-block-canvas {
+	height: 240px;
+	position: relative;
+}
+
 /* ======================= */
 /* ======================= */
 /* ======= 6/ Tabs ======= */
@@ -561,6 +782,14 @@ input[type='date']::-webkit-datetime-edit-year-field {
 	display: flex;
 	flex-wrap: wrap;
 	gap: 10px;
+	margin-bottom: 15px;
+}
+
+.tabs-row {
+	margin-bottom: 6px;
+}
+
+.tabs-row:last-of-type {
 	margin-bottom: 15px;
 }
 
@@ -912,25 +1141,31 @@ td.col-rep {
 	color: #fff;
 	font-size: 12px;
 	font-weight: normal;
-	left: 50%;
-	max-width: 250px;
+	left: 0;
+	max-width: 300px;
 	opacity: 0;
-	padding: 8px;
+	padding: 8px 10px;
 	pointer-events: none;
 	position: absolute;
-	text-align: center;
-	transform: translateX(-50%);
+	text-align: left;
+	transform: none;
 	transition: opacity 0.2s;
 	visibility: hidden;
 	white-space: normal;
 	width: max-content;
-	/* Max 32-bit integer: ensures tooltips always render above every other layer */
-	z-index: 99;
+	/* Above the sticky top bar (z-index 100) and any other overlay */
+	z-index: 10000;
 }
 
 th .tooltip .tooltiptext {
 	bottom: auto;
 	top: 150%;
+}
+
+/* When the tooltip would overflow the right edge, anchor it to the right side instead */
+.tooltip.tooltip-left .tooltiptext {
+	left: auto;
+	right: 0;
 }
 
 .tooltip:hover .tooltiptext {

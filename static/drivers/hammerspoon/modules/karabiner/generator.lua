@@ -101,6 +101,15 @@ local LAYER_ACTIVE_VAR_NAME    = "layer_active"
 local LAYER_ACTIVE_ON_VALUE    = 1
 local LAYER_NAV_SENTINEL_NAME  = Keycodes.to_name(Keycodes.F20_LAYER_NAV_ENTERED)
 
+-- Append-only log file consumed by modules/keylogger/kc_bridge.lua.
+-- Each line written by the shell_command is: "<physical_key_code_name>\n"
+-- so Hammerspoon can map the name back to a numeric kc and record true
+-- physical key frequency — bypassing the Karabiner remap layer.
+-- Path uses hs.configdir to stay aligned with the bridge's reader regardless
+-- of the user's HAMMERSPOON_CONFIG_HOME override.
+local KE_PHYSICAL_KC_LOG = hs.configdir .. "/karabiner_kc.log"
+
+
 
 
 
@@ -315,7 +324,8 @@ local function build_tap_hold_rule(key_def, tap_action, hold_action, action_inde
 
 	if #tap_to == 0 and #hold_to == 0 then
 		-- Both slots "none" — still track the variable, re-emit the original key
-		-- so the physical press is not consumed
+		-- so the physical press is not consumed. No shell_command needed: HS will
+		-- see the original keycode directly and log it through the normal path.
 		to_events[#to_events + 1] = { key_code = key_code }
 		manipulator.to              = to_events
 		manipulator.to_after_key_up = after_key_up_tail
@@ -325,6 +335,29 @@ local function build_tap_hold_rule(key_def, tap_action, hold_action, action_inde
 			manipulators = { manipulator },
 		}
 	end
+
+	-- Append the physical key_code name to the bridge log on every key_down so
+	-- Hammerspoon can credit the correct physical key in the heatmap instead of
+	-- the remapped output key that the event tap would otherwise observe.
+	to_events[#to_events + 1] = {
+		shell_command = string.format(
+			"echo '%s' >> '%s'",
+			key_code,
+			KE_PHYSICAL_KC_LOG
+		),
+	}
+
+	-- Append a release marker on key_up so the bridge can compute the hold
+	-- duration and split kc_hold counts into tap (≤ HOLD_THRESHOLD_MS) and
+	-- hold (> threshold). Format: "U:<key_code>" — the "U:" prefix is the
+	-- bridge's discriminator; bare "<key_code>" lines remain press events.
+	after_key_up_tail[#after_key_up_tail + 1] = {
+		shell_command = string.format(
+			"echo 'U:%s' >> '%s'",
+			key_code,
+			KE_PHYSICAL_KC_LOG
+		),
+	}
 
 	-- When one slot is "none", fall through to the original key for that slot
 	local passthrough       = { { key_code = key_code } }

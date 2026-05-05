@@ -54,6 +54,156 @@ local RAW_LOG_REPLAY_CHUNK_LINES = 500
 -- and does not resolve $PATH. macOS ships openssl at /usr/bin/openssl.
 local OPENSSL_PATH               = "/usr/bin/openssl"
 
+-- Bucket thresholds (ms) used by the UI's "ignore pauses longer than…" dropdown.
+-- These are CACHE buckets — we accumulate sums/counts at each threshold so the UI
+-- can read an exact value for the user's selected pause threshold without ever
+-- having to interpolate think_time. Adding a new threshold (e.g. 7000) requires
+-- redeploying this list; old data without that bucket falls back to the existing
+-- `m_app.time` / `m_app.think_time` aggregates which remain untouched.
+-- Using string keys so JSON encoding stays stable (numeric keys would round-trip
+-- as object-with-string-keys anyway, but being explicit avoids surprises).
+local UI_PAUSE_BUCKETS_MS = { 1000, 2000, 3000, 5000, 10000, 20000, 30000, 60000 }
+-- Maximum entries kept in the per-batch ring buffer used to retroactively
+-- reclassify the inter-key delay of trigger keystrokes as HS / IA "input time"
+-- when an expansion fires. 50 covers any sane trigger length and stays cheap.
+local TRIGGER_LOOKBACK_LEN = 50
+
+-- A "burst" is a stretch of typing with no inter-keydown gap > BURST_GAP_MS.
+-- Anything longer breaks the burst and that previous one is finalised into the
+-- per-app statistics. Used by the rhythm / records UI: top burst-CPM, longest
+-- burst, length distribution, and inter-key-delay variance.
+local BURST_GAP_MS         = 1000
+-- Minimum number of characters in a burst before it counts toward the max-CPM
+-- record. Below this, sample variance dominates and tiny "abc" bursts at high
+-- transient rates would crown unrealistic personal bests.
+local MIN_BURST_FOR_CPM    = 10
+
+-- A "session" is a stretch of typing with no inter-keydown gap > SESSION_GAP_MS.
+-- 5 min is the same gap a screen-time tracker would use to split work blocks.
+local SESSION_GAP_MS       = 300000
+
+-- Burst length bucket boundaries used to build the on-disk histogram. Each
+-- bucket label maps to "characters in burst ≤ this many", except the last
+-- which is open-ended.
+local BURST_LENGTH_BUCKETS = { 1, 5, 10, 20, 50, 100, 200, 500 }
+local function burst_length_bucket(n)
+	for _, b in ipairs(BURST_LENGTH_BUCKETS) do
+		if n <= b then return tostring(b) end
+	end
+	return "500+"
+end
+
+-- A key repeated within this delay since the previous identical char is treated
+-- as auto-repeat (held key) rather than a separate motor decision. macOS
+-- auto-repeat fires every ~30 ms, so 50 ms is a safe upper bound that still
+-- excludes any human-typed double-letter pair.
+local AUTO_REPEAT_MAX_DELAY_MS = 50
+-- Cascade = run of ≥ N consecutive manual backspaces.
+local CASCADE_MIN_BS = 3
+-- Threshold separating a "tap" from a "hold" on a key whose hold duration we
+-- observe (modifiers via flagsChanged, KE-managed tap-holds via the bridge).
+-- ≤ threshold = tap (brief activation, e.g. typing a chord); > threshold =
+-- hold (intentional sustained press, e.g. layer activation).
+local HOLD_THRESHOLD_MS = 250
+
+-- macOS virtual-keycode → finger column. MUST stay in sync with KEYCODE_DATA in
+-- ui/metrics_typing/state.js (variante-en-A convention: kc 0 = QWERTY 'a' on the
+-- physical left is typed by r_pinky). We only include "content" keys that take
+-- part in same-finger / same-hand streaks; modifiers and thumbs are absent on
+-- purpose so they don't break a streak by appearing in the middle.
+local KC_TO_FINGER = {
+	[0]="r_pinky",[1]="r_ring",[2]="r_mid",[3]="r_idx",[4]="l_idx",[5]="r_idx",
+	[6]="r_ring",[7]="r_mid",[8]="r_idx",[9]="r_idx",[11]="r_idx",
+	[12]="r_pinky",[13]="r_ring",[14]="r_mid",[15]="r_idx",[16]="l_idx",[17]="r_idx",
+	[18]="r_pinky",[19]="r_ring",[20]="r_mid",[21]="r_idx",[22]="l_idx",[23]="r_idx",
+	[25]="l_ring",[26]="l_idx",[28]="l_mid",[29]="l_pinky",
+	[31]="l_ring",[32]="l_idx",[34]="l_mid",[35]="l_pinky",
+	[37]="l_ring",[38]="l_idx",[40]="l_mid",[41]="l_pinky",
+	[43]="l_mid",[44]="l_pinky",[45]="l_idx",[46]="l_idx",[47]="l_ring",
+}
+
+--- Adds `value` to every bucket field whose threshold is ≥ delay.
+--- The buckets are cumulative ("≤ T" semantics) so the UI just reads the field
+--- corresponding to the user-selected pause threshold — no summation in JS.
+--- @param target_map table The bucket map (string-keyed) to mutate in place.
+--- @param delay number Delay in milliseconds.
+--- @param value number Value to accumulate (delay itself for time, 1 for counts).
+local function bucket_add(target_map, delay, value)
+	for _, t in ipairs(UI_PAUSE_BUCKETS_MS) do
+		if delay <= t then
+			local k = tostring(t)
+			target_map[k] = (target_map[k] or 0) + value
+		end
+	end
+end
+
+--- Closes an in-flight burst and folds its statistics into the manifest entry.
+--- The burst itself is a transient table living on `ctx`; we never store
+--- individual bursts — only their aggregates per day per app.
+local function finalize_burst(m_app, b)
+	if not b or b.char_count <= 0 then return end
+	m_app.burst_count_total = (m_app.burst_count_total or 0) + 1
+	if b.char_count > (m_app.burst_max_chars or 0) then
+		m_app.burst_max_chars = b.char_count
+	end
+	-- Only consider sustained bursts for the CPM record. A 3-char "abc" rip
+	-- followed by a coffee break shouldn't crown a 1500 CPM personal best.
+	if b.char_count >= MIN_BURST_FOR_CPM and b.sum_delays > 0 then
+		local cpm = b.char_count * 60000 / b.sum_delays
+		if cpm > (m_app.burst_max_cpm or 0) then m_app.burst_max_cpm = cpm end
+	end
+	local k = burst_length_bucket(b.char_count)
+	m_app.burst_length_buckets[k] = (m_app.burst_length_buckets[k] or 0) + 1
+	-- Pool inter-key delays so the UI can compute mean and std-dev across the
+	-- entire day without us tracking per-burst series.
+	m_app.burst_inter_delay_count = (m_app.burst_inter_delay_count or 0) + math.max(0, b.char_count - 1)
+	m_app.burst_inter_delay_sum   = (m_app.burst_inter_delay_sum   or 0) + b.sum_delays
+	m_app.burst_inter_delay_sumsq = (m_app.burst_inter_delay_sumsq or 0) + b.sum_delays_sq
+end
+
+-- Maximum number of finalised session durations kept on each per-app/day
+-- entry. Sessions beyond this are summarised in aggregates only — the cap
+-- bounds JSON growth on heavy-typing days while still giving the boxplot
+-- enough samples for stable quantiles.
+local SESSION_DURATIONS_CAP = 100
+
+--- Closes an in-flight session and folds it into the per-day aggregates.
+local function finalize_session(m_app, s)
+	if not s or s.char_count <= 0 then return end
+	m_app.session_count_total = (m_app.session_count_total or 0) + 1
+	if s.total_ms   > (m_app.session_longest_ms    or 0) then m_app.session_longest_ms    = s.total_ms   end
+	if s.char_count > (m_app.session_longest_chars or 0) then m_app.session_longest_chars = s.char_count end
+	m_app.session_total_active_ms = (m_app.session_total_active_ms or 0) + s.total_ms
+	-- Per-session durations array (#28 boxplot). Capped to avoid manifest bloat.
+	m_app.session_durations = m_app.session_durations or {}
+	if #m_app.session_durations < SESSION_DURATIONS_CAP then
+		table.insert(m_app.session_durations, s.total_ms)
+	end
+end
+
+-- Cheap UTF-8-aware character classifier used to bucket every typed
+-- character into letter / digit / punct / space / other.
+local function char_class(c)
+	if not c or #c == 0 then return "other" end
+	if c == " " or c == "\t" or c == "\n" or c == "\194\160" or c == "\226\128\175" then
+		return "space"
+	end
+	local b = c:byte(1)
+	if b >= 48 and b <= 57 then return "digit" end
+	-- Latin letters (low ASCII) — fast path.
+	if (b >= 65 and b <= 90) or (b >= 97 and b <= 122) then return "letter" end
+	-- High UTF-8 codepoint: assume letter if it starts in the Latin Extended
+	-- ranges (0xC2..0xC3, 0xC4..0xC5 etc.). We don't need surgical accuracy —
+	-- this only feeds the breakdown chart.
+	if b >= 0xC2 and b <= 0xCF then return "letter" end
+	if b >= 0xD0 and b <= 0xD7 then return "letter" end
+	-- Bracket markers like [BS], [TAB] etc. produced by the keylogger pipeline
+	-- shouldn't pollute the breakdown.
+	if c:sub(1, 1) == "[" and c:sub(-1) == "]" then return "other" end
+	if c:match("^[%p<>=+%*/\\|%-]$") then return "punct" end
+	return "other"
+end
+
 -- French translations for macOS app category identifiers
 local MAC_CATEGORIES_FR = {
 	["Productivity"]     = "Productivité",
@@ -201,6 +351,125 @@ local function new_manifest_app_entry(app_name)
 		llm_triggers  = 0,
 		hs_suggested  = 0,
 		llm_suggested = 0,
+		-- ── Speed / precision cache buckets ─────────────────────────────────────
+		-- All these maps are CACHE fields keyed by bucket threshold (ms, string).
+		-- They never replace the raw aggregates above (chars / time / think_time):
+		-- they only let the UI read a precise value for the user-selected pause
+		-- threshold without re-interpolating think_time at display time.
+		--   time_buckets[T]      : sum of inter-key delays ≤ T ms for non-synth typing.
+		--   credited_buckets[T]  : count of those events. Used as the numerator of
+		--                          CPM at threshold T — we credit "transitions"
+		--                          rather than "chars" so that single-char bursts
+		--                          (whose delay is excluded as a pause) don't
+		--                          create a divide-by-zero / infinite-speed bias.
+		--   hs_input_*_buckets   : same accounting restricted to manual chars that
+		--   llm_input_*_buckets    were consumed by an HS / IA expansion. Their
+		--                          delays must be SUBTRACTED from time_buckets in
+		--                          the default ("manual only") view because those
+		--                          trigger keystrokes are credited to the HS / IA
+		--                          gain, not to the raw typing speed.
+		hs_input_chars              = 0,
+		llm_input_chars             = 0,
+		time_buckets                = {},
+		credited_buckets            = {},
+		hs_input_time_buckets       = {},
+		hs_input_credited_buckets   = {},
+		llm_input_time_buckets      = {},
+		llm_input_credited_buckets  = {},
+		-- ── Burst statistics (rhythm / records UI) ──────────────────────────
+		--   burst_count_total        : total bursts finalised on this day.
+		--   burst_max_cpm            : best CPM over a burst of ≥ MIN_BURST_FOR_CPM
+		--                              characters — the user's "personal best"
+		--                              under realistic conditions.
+		--   burst_max_chars          : longest burst observed (in characters).
+		--   burst_length_buckets     : histogram keyed by BURST_LENGTH_BUCKETS.
+		--   burst_inter_delay_*      : Σ delay, Σ delay², count — together yield
+		--                              the std-dev of inter-key delays for the
+		--                              "rhythm regularity" metric.
+		burst_count_total           = 0,
+		burst_max_cpm               = 0,
+		burst_max_chars             = 0,
+		burst_length_buckets        = {},
+		burst_inter_delay_count     = 0,
+		burst_inter_delay_sum       = 0,
+		burst_inter_delay_sumsq     = 0,
+		-- ── Session statistics ──────────────────────────────────────────────
+		--   session_count_total      : sessions finalised on this day.
+		--   session_longest_ms/chars : longest single session by duration / chars.
+		--   session_total_active_ms  : sum of session durations — useful for a
+		--                              "minutes spent typing" headline metric.
+		session_count_total         = 0,
+		session_longest_ms          = 0,
+		session_longest_chars       = 0,
+		session_total_active_ms     = 0,
+		-- ── Character-type breakdown (Sankey / lexical UI) ──────────────────
+		--   Each non-synthetic typed character is bucketed into one of these by
+		--   simple regex on the produced string. Useful to characterise typing
+		--   style: code-heavy → high digits/symbols, prose → high letters.
+		char_letter                 = 0,
+		char_digit                  = 0,
+		char_punct                  = 0,
+		char_space                  = 0,
+		char_other                  = 0,
+		-- ── First / last typing minute of the day ───────────────────────────
+		--   Hour:minute of the first / last manual keystroke. Lets the records
+		--   UI surface "earliest / latest typed today".
+		first_typed_min             = nil,
+		last_typed_min              = nil,
+		-- ── Error-pattern analytics (errors dashboard) ──────────────────────
+		--   recovery_time_*   : delay between a manual backspace and the next
+		--                       non-backspace keystroke. Sum + count let the UI
+		--                       compute mean recovery time = "how fast you
+		--                       resume typing after a correction".
+		--   cascade_count     : number of "cascade" backspace runs (≥ 3 BS in
+		--                       a row) — the user erased multiple characters,
+		--                       suggesting a major mistake or rewrite.
+		--   cascade_max_len   : length of the longest such cascade.
+		--   bs_total          : every manual backspace, including isolated ones.
+		recovery_time_sum_ms        = 0,
+		recovery_time_count         = 0,
+		cascade_count_total         = 0,
+		cascade_max_len             = 0,
+		bs_total                    = 0,
+		-- ── Ergonomic streaks (rhythm dashboard) ────────────────────────────
+		--   Longest consecutive run of keystrokes typed by the same finger or
+		--   the same hand. High values signal anti-alternation patterns that
+		--   are costly at high speed. Computed Lua-side via the kc → finger
+		--   table embedded below; KC_TO_FINGER must mirror KEYCODE_DATA in
+		--   ui/metrics_typing/state.js (variante-en-A convention).
+		same_finger_streak_max      = 0,
+		same_hand_streak_max        = 0,
+		-- ── Auto-repeat detection ───────────────────────────────────────────
+		--   Macros / held keys (e.g. holding "a" to type "aaaa…") fire repeated
+		--   keyDown events at ~30 ms intervals. We flag any same-character
+		--   bigram with delay ≤ AUTO_REPEAT_MAX_DELAY_MS as auto-repeat — the
+		--   conscious decision was made once, even though many chars hit the
+		--   counter.
+		auto_repeat_count           = 0,
+		-- ── Time-to-first-key after focus change ───────────────────────────
+		--   Latency between the most recent app-focus event and the first
+		--   manual keystroke after it. We accumulate sum + count per app/day
+		--   for a clean mean.
+		focus_to_first_key_sum_ms   = 0,
+		focus_to_first_key_count    = 0,
+		-- ── Keyboard layouts seen on this app/day ──────────────────────────
+		--   Map of layout_id → count of typing flushes captured under it.
+		--   Lets the UI surface "you used QWERTY 18× and Ergopti 142× today"
+		--   and detect per-app layout patterns (code editor in QWERTY, prose
+		--   in Ergopti, etc.).
+		layouts_seen                = {},
+		-- ── Modifier / tap-hold key duration stats (per physical keycode) ──
+		--   Map of kc_str → { s=sum_ms, n=count, m=max_ms, tap=N, hold=N }.
+		--   Each release is classified as a tap (≤ HOLD_THRESHOLD_MS) or a
+		--   hold (>); tap + hold == n. The heatmap tooltip uses tap/hold
+		--   counts to show a unified breakdown for keys we observe both
+		--   sides of (HS-handled modifiers + KE-managed tap-holds).
+		kc_hold                     = {},
+		-- ── Active vs passive time ─────────────────────────────────────────
+		--   active_time_ms = sum of inter-key gaps the user spent actively
+		--                    typing (already proxied by `time` ; redundant alias
+		--                    for clarity in the wellness dashboard).
+		--   passive_time_ms = computed in JS as max(0, app_time_ms - active_time_ms).
 		app_time_ms   = 0,
 		hourly        = {},
 		switches_to   = {},
@@ -346,6 +615,14 @@ function M.aggregate_events(events, app_name, date_str)
 
 	local m_app = get_or_create_manifest_app(date_str, app_name)
 
+	-- Tag the manifest with the keyboard layout that produced this buffer so
+	-- the UI can correlate stats with the active layout (Ergopti vs QWERTY…)
+	if type(_state.session_layout) == "string" and _state.session_layout ~= "" then
+		m_app.layouts_seen = type(m_app.layouts_seen) == "table" and m_app.layouts_seen or {}
+		m_app.layouts_seen[_state.session_layout] =
+			(m_app.layouts_seen[_state.session_layout] or 0) + 1
+	end
+
 	local t            = os.date("*t")
 	local current_hour = string.format("%02d", t.hour)
 	local current_min5 = string.format("%02d:%02d", t.hour, math.floor(t.min / 5) * 5)
@@ -367,6 +644,24 @@ function M.aggregate_events(events, app_name, date_str)
 		prev_word = nil, prev_sc = nil
 	}
 	local ctx = _state.ngram_context
+	-- Ring buffer of the last few non-synthetic typed events with their inter-key
+	-- delay. When a synth backspace fires inside an HS / IA burst it deletes the
+	-- last manually-typed char, so popping from this buffer tells us exactly what
+	-- the trigger was and how long it took to type — which we then route into the
+	-- hs_input_*_buckets / llm_input_*_buckets caches.
+	ctx.recent_typing = ctx.recent_typing or {}
+	-- In-flight burst / session aggregates. They're persisted on ctx so a single
+	-- burst or session can span multiple flush_buffer batches; they get finalised
+	-- only when the next inter-key gap exceeds the corresponding threshold.
+	ctx.current_burst   = ctx.current_burst   or nil
+	ctx.current_session = ctx.current_session or nil
+	-- Cascade / recovery / streak state, persisted across flushes.
+	ctx.bs_run_len      = ctx.bs_run_len      or 0       -- current consecutive-BS count
+	ctx.last_was_bs     = ctx.last_was_bs     or false   -- prev manual event was a backspace
+	ctx.last_finger     = ctx.last_finger     or nil     -- finger of the last typed char
+	ctx.same_finger_run = ctx.same_finger_run or 0       -- current same-finger streak
+	ctx.same_hand_run   = ctx.same_hand_run   or 0       -- current same-hand streak
+	ctx.last_char       = ctx.last_char       or nil     -- last typed char (for auto-repeat detection)
 
 	local p1, p2, p3, p4, p5, p6 = ctx.p1, ctx.p2, ctx.p3, ctx.p4, ctx.p5, ctx.p6
 	local cur_word   = ctx.cur_word or ""   -- guard: nil if context was persisted in an older format
@@ -443,10 +738,25 @@ function M.aggregate_events(events, app_name, date_str)
 				if is_synthetic then
 					m_app.hourly[current_hour].es     = (m_app.hourly[current_hour].es     or 0) + 1
 					m_app.hourly_min5[current_min5].es = (m_app.hourly_min5[current_min5].es or 0) + 1
+					-- Each synthetic backspace inside an HS/LLM burst deletes exactly one
+					-- trigger char that the user had typed manually. Popping from the
+					-- recent-typing buffer gives us the original delay of that trigger
+					-- char so we can route it to the trigger-time cache buckets.
+					local trigger_evt = table.remove(ctx.recent_typing)
 					if synth_type == "hotstring" then
 						m_app.hs_chars = math.max(0, (m_app.hs_chars or 0) - 1)
+						m_app.hs_input_chars = (m_app.hs_input_chars or 0) + 1
+						if trigger_evt then
+							bucket_add(m_app.hs_input_time_buckets,     trigger_evt.delay, trigger_evt.delay)
+							bucket_add(m_app.hs_input_credited_buckets, trigger_evt.delay, 1)
+						end
 					elseif synth_type == "llm" then
 						m_app.llm_chars = math.max(0, (m_app.llm_chars or 0) - 1)
+						m_app.llm_input_chars = (m_app.llm_input_chars or 0) + 1
+						if trigger_evt then
+							bucket_add(m_app.llm_input_time_buckets,     trigger_evt.delay, trigger_evt.delay)
+							bucket_add(m_app.llm_input_credited_buckets, trigger_evt.delay, 1)
+						end
 					end
 				else
 					m_app.hourly[current_hour].e      = (m_app.hourly[current_hour].e      or 0) + 1
@@ -459,6 +769,30 @@ function M.aggregate_events(events, app_name, date_str)
 					else
 						m_app.time = (m_app.time or 0) + delay
 					end
+					-- Cache: bucketed manual-error counts (per-hour and per-5min), indexed
+					-- by delay since previous keystroke. The UI uses this to honour the
+					-- user-selected pause threshold without having to hardcode 2 s. A
+					-- backspace fired after a long pause (typically deleting a selection
+					-- / line) is naturally excluded from low-threshold buckets.
+					m_app.hourly[current_hour].e_buckets       = m_app.hourly[current_hour].e_buckets       or {}
+					m_app.hourly_min5[current_min5].e_buckets  = m_app.hourly_min5[current_min5].e_buckets  or {}
+					bucket_add(m_app.hourly[current_hour].e_buckets,      delay, 1)
+					bucket_add(m_app.hourly_min5[current_min5].e_buckets, delay, 1)
+					-- A manual backspace just deleted the most recently typed char from
+					-- screen. Pop it from the lookback buffer so a later HS / IA expansion
+					-- does not mis-attribute it as a trigger.
+					table.remove(ctx.recent_typing)
+					-- Cascade tracking: count consecutive manual backspaces. The cascade
+					-- closes when the next non-BS event fires (in the typing branch).
+					ctx.bs_run_len = (ctx.bs_run_len or 0) + 1
+					ctx.last_was_bs = true
+					m_app.bs_total = (m_app.bs_total or 0) + 1
+					-- A backspace breaks the typing flow; reset same-finger / same-hand
+					-- streaks so we don't double-count post-correction continuity.
+					ctx.last_finger     = nil
+					ctx.same_finger_run = 0
+					ctx.same_hand_run   = 0
+					ctx.last_char       = nil
 				end
 
 				-- Record the backspace keystroke and its bigram/trigram for pattern analysis
@@ -516,6 +850,114 @@ function M.aggregate_events(events, app_name, date_str)
 						else
 							m_app.time = (m_app.time or 0) + record_delay
 						end
+						-- Cache: bucketed time + credited-event counts, keyed by delay.
+						-- We credit "transitions" (one per inter-key delay actually counted,
+						-- never the first char of a burst whose delay is excluded as a
+						-- pause) so single-char bursts cannot inflate CPM via a 0 / 0
+						-- divide. record_delay is what we charge to time; bucketing on the
+						-- same value keeps numerator and denominator perfectly aligned.
+						bucket_add(m_app.time_buckets,     record_delay, record_delay)
+						bucket_add(m_app.credited_buckets, record_delay, 1)
+						-- Push this event onto the lookback ring buffer so a future HS / IA
+						-- synthetic backspace can retroactively reclassify its delay as
+						-- "trigger time" instead of "pure typing time".
+						table.insert(ctx.recent_typing, { delay = record_delay })
+						if #ctx.recent_typing > TRIGGER_LOOKBACK_LEN then
+							table.remove(ctx.recent_typing, 1)
+						end
+
+						-- Burst tracking: a "fresh start" means the current keystroke
+						-- is the first in a new burst, either because we have no
+						-- in-flight one or because the inter-key gap exceeded
+						-- BURST_GAP_MS.
+						if (not ctx.current_burst) or record_delay > BURST_GAP_MS then
+							finalize_burst(m_app, ctx.current_burst)
+							ctx.current_burst = { char_count = 1, sum_delays = 0, sum_delays_sq = 0, max_delay = 0 }
+						else
+							local b = ctx.current_burst
+							b.char_count    = b.char_count + 1
+							b.sum_delays    = b.sum_delays + record_delay
+							b.sum_delays_sq = b.sum_delays_sq + (record_delay * record_delay)
+							if record_delay > b.max_delay then b.max_delay = record_delay end
+						end
+
+						-- Session tracking: same idea with a much larger gap (5 min).
+						-- A single session can span hundreds of bursts.
+						if (not ctx.current_session) or record_delay > SESSION_GAP_MS then
+							finalize_session(m_app, ctx.current_session)
+							ctx.current_session = { char_count = 1, total_ms = 0 }
+						else
+							local s = ctx.current_session
+							s.char_count = s.char_count + 1
+							s.total_ms   = s.total_ms + record_delay
+						end
+
+						-- Cascade closure + recovery time: if the previous manual event
+						-- was a backspace, this is the first char "after correction".
+						if ctx.last_was_bs then
+							if ctx.bs_run_len >= CASCADE_MIN_BS then
+								m_app.cascade_count_total = (m_app.cascade_count_total or 0) + 1
+								if ctx.bs_run_len > (m_app.cascade_max_len or 0) then
+									m_app.cascade_max_len = ctx.bs_run_len
+								end
+							end
+							-- Only count "real" recoveries: delays short enough to be a
+							-- continuation of typing rather than a long pause.
+							if record_delay <= MAX_KEYSTROKE_DELAY_MS then
+								m_app.recovery_time_sum_ms = (m_app.recovery_time_sum_ms or 0) + record_delay
+								m_app.recovery_time_count  = (m_app.recovery_time_count  or 0) + 1
+							end
+							ctx.bs_run_len = 0
+							ctx.last_was_bs = false
+						end
+
+						-- Same-finger / same-hand streak update.
+						local kc_num     = type(meta.kc) == "number" and meta.kc or nil
+						local cur_finger = kc_num and KC_TO_FINGER[kc_num] or nil
+						if cur_finger then
+							if ctx.last_finger == cur_finger then
+								ctx.same_finger_run = (ctx.same_finger_run or 1) + 1
+							else
+								ctx.same_finger_run = 1
+							end
+							if ctx.same_finger_run > (m_app.same_finger_streak_max or 0) then
+								m_app.same_finger_streak_max = ctx.same_finger_run
+							end
+							local cur_hand  = cur_finger:sub(1, 1)
+							local last_hand = ctx.last_finger and ctx.last_finger:sub(1, 1) or nil
+							if last_hand == cur_hand then
+								ctx.same_hand_run = (ctx.same_hand_run or 1) + 1
+							else
+								ctx.same_hand_run = 1
+							end
+							if ctx.same_hand_run > (m_app.same_hand_streak_max or 0) then
+								m_app.same_hand_streak_max = ctx.same_hand_run
+							end
+							ctx.last_finger = cur_finger
+						else
+							ctx.last_finger     = nil
+							ctx.same_finger_run = 0
+							ctx.same_hand_run   = 0
+						end
+
+						-- Auto-repeat: same character within AUTO_REPEAT_MAX_DELAY_MS.
+						if ctx.last_char == k_c and record_delay > 0 and record_delay <= AUTO_REPEAT_MAX_DELAY_MS then
+							m_app.auto_repeat_count = (m_app.auto_repeat_count or 0) + 1
+						end
+						ctx.last_char = k_c
+
+						-- Character-type breakdown — feeds the Sankey / lexical mix view.
+						local cls = char_class(k_c)
+						if     cls == "letter" then m_app.char_letter = (m_app.char_letter or 0) + 1
+						elseif cls == "digit"  then m_app.char_digit  = (m_app.char_digit  or 0) + 1
+						elseif cls == "punct"  then m_app.char_punct  = (m_app.char_punct  or 0) + 1
+						elseif cls == "space"  then m_app.char_space  = (m_app.char_space  or 0) + 1
+						else                        m_app.char_other  = (m_app.char_other  or 0) + 1
+						end
+
+						-- First / last typed minute markers for the records UI.
+						if not m_app.first_typed_min then m_app.first_typed_min = current_min5 end
+						m_app.last_typed_min = current_min5
 					else
 						if synth_type == "hotstring" then
 							m_app.hs_chars = (m_app.hs_chars or 0) + 1
@@ -1397,7 +1839,38 @@ function M.flush_buffer()
 
 	-- Aggregate into N-gram index; log failure but do not crash
 	local ok, err = pcall(function()
-		M.aggregate_events(_state.buffer_events, _state.session_app_name, os.date("%Y-%m-%d"))
+		local _date_str = os.date("%Y-%m-%d")
+		M.aggregate_events(_state.buffer_events, _state.session_app_name, _date_str)
+
+		-- #39 — Aggregate window title into manifest for the top-windows table.
+		-- Capped at 100 distinct titles per app/day to bound JSON growth.
+		local _title = _state.session_win_title
+		if type(_title) == "string" and _title ~= "" then
+			local _m_app = get_or_create_manifest_app(_date_str, _state.session_app_name or "Unknown")
+			_m_app.win_titles = _m_app.win_titles or {}
+			-- Truncate excessive title strings to 200 chars
+			if #_title > 200 then _title = _title:sub(1, 200) end
+			local _entry = _m_app.win_titles[_title]
+			if not _entry then
+				if next(_m_app.win_titles) and (function()
+					local _n = 0
+					for _ in pairs(_m_app.win_titles) do _n = _n + 1 end
+					return _n
+				end)() >= 100 then
+					-- skip new keys once cap reached
+					_entry = nil
+				else
+					_entry = { c = 0, ms = 0 }
+					_m_app.win_titles[_title] = _entry
+				end
+			end
+			if _entry then
+				local _len = (type(_state.buffer_text) == "string") and #_state.buffer_text or 0
+				_entry.c   = _entry.c  + _len
+				_entry.ms  = _entry.ms + math.max(0, tonumber(_state.current_session_pause) or 0)
+			end
+		end
+
 		debounced_save()
 	end)
 	if not ok then
@@ -1460,6 +1933,45 @@ function M.log_app_switch(prev_app, next_app, duration_ms)
 	end
 end
 
+-- Module-local state for audio mute duration tracking. We accumulate the total
+-- muted time per day in the manifest, but the "currently muted since" timestamp
+-- is transient and lives only in memory.
+local _audio_muted_started_at = nil  -- monotonic ms when mute started, nil if not muted
+
+--- Aggregates a system event into the per-day "_system" pseudo-app counters.
+--- Counters surfaced: wifi_changes, space_switches, battery (sum/count/min/max),
+--- audio_muted_ms. Lets the dashboard display "12 Wi-Fi changes today" without
+--- having to replay the raw log.
+--- @param event_type string The event type ("wifi_change", "space_change", …).
+--- @param metadata table|nil Optional metadata bag for value-bearing events.
+local function aggregate_system_event(event_type, metadata)
+	local date_str = os.date("%Y-%m-%d")
+	local m_app    = get_or_create_manifest_app(date_str, "_system")
+
+	if event_type == "wifi_change" then
+		m_app.wifi_changes = (m_app.wifi_changes or 0) + 1
+	elseif event_type == "space_change" then
+		m_app.space_switches = (m_app.space_switches or 0) + 1
+	elseif event_type == "power_change" then
+		local lvl = type(metadata) == "table" and tonumber(metadata.level) or nil
+		if lvl and lvl >= 0 and lvl <= 100 then
+			m_app.battery_sum   = (m_app.battery_sum   or 0) + lvl
+			m_app.battery_count = (m_app.battery_count or 0) + 1
+			if not m_app.battery_min or lvl < m_app.battery_min then m_app.battery_min = lvl end
+			if not m_app.battery_max or lvl > m_app.battery_max then m_app.battery_max = lvl end
+		end
+	elseif event_type == "audio_change" then
+		local muted = type(metadata) == "table" and metadata.muted or nil
+		local now_ms = hs.timer.absoluteTime() / 1e6
+		if muted and not _audio_muted_started_at then
+			_audio_muted_started_at = now_ms
+		elseif (not muted) and _audio_muted_started_at then
+			m_app.audio_muted_ms = (m_app.audio_muted_ms or 0) + (now_ms - _audio_muted_started_at)
+			_audio_muted_started_at = nil
+		end
+	end
+end
+
 --- Records a system-level event (sleep, wake, wifi change, volume, etc.).
 --- @param event_type string A short identifier for the event.
 --- @param metadata table|nil Optional key-value metadata to include.
@@ -1470,6 +1982,7 @@ function M.log_system_event(event_type, metadata)
 		for k, v in pairs(metadata) do entry[k] = v end
 	end
 	M.append_log(entry)
+	pcall(aggregate_system_event, event_type, metadata)
 end
 
 --- Records a single keyboard shortcut directly into the N-gram index and log file.
@@ -1511,6 +2024,187 @@ function M.log_shortcut(shortcut_key, app_name)
 	M.append_log({ type = "shortcut", key = shortcut_key, app = safe_app })
 	debounced_save()
 end
+
+--- Records a single modifier-key press (flagsChanged) into the kc dict.
+--- Modifier keys are not keyDown events and therefore never reach aggregate_events,
+--- so this dedicated function gives them a direct path into the Keycodes tab data.
+--- @param keycode number The macOS virtual keycode of the modifier key.
+--- @param app_name string The frontmost application at the time of the press.
+function M.log_modifier_press(keycode, app_name)
+	if not require_state("log_modifier_press") then return end
+	local safe_app = (type(app_name) == "string" and app_name ~= "") and app_name or "Unknown"
+
+	local app_idx = _state.today_idx[safe_app]
+	if type(app_idx) ~= "table" then
+		app_idx = { c = {}, bg = {}, tg = {}, qg = {}, pg = {}, hx = {}, hp = {}, w = {}, sc = {}, sc_bg = {}, w_bg = {}, kc = {} }
+		_state.today_idx[safe_app] = app_idx
+	end
+	app_idx.kc = type(app_idx.kc) == "table" and app_idx.kc or {}
+	add_metric(app_idx.kc, tostring(keycode), 0, false, "none")
+	debounced_save()
+
+	-- Push a live refresh so the heatmap and Keycodes tab reflect modifier presses
+	-- immediately, just like character events do via flush_buffer
+	local metrics_typing = package.loaded["ui.metrics_typing.init"]
+	if metrics_typing and type(metrics_typing.push_live_update) == "function" then
+		pcall(metrics_typing.push_live_update, _state.today_idx)
+	end
+end
+
+
+--- Records a single Karabiner-intercepted physical key press into the kc dict.
+--- Called by modules/keylogger/kc_bridge when it drains the KE physical-kc log;
+--- the kc_num here is the TRUE physical key the user pressed, not the remapped
+--- output that the HS event tap would observe.
+--- @param kc_num number The macOS virtual keycode of the physical key.
+--- @param app_name string The frontmost application at the time of the press.
+function M.log_karabiner_press(kc_num, app_name)
+	if not require_state("log_karabiner_press") then return end
+	local safe_app = (type(app_name) == "string" and app_name ~= "") and app_name or "Unknown"
+
+	local app_idx = _state.today_idx[safe_app]
+	if type(app_idx) ~= "table" then
+		app_idx = { c = {}, bg = {}, tg = {}, qg = {}, pg = {}, hx = {}, hp = {}, w = {}, sc = {}, sc_bg = {}, w_bg = {}, kc = {} }
+		_state.today_idx[safe_app] = app_idx
+	end
+	app_idx.kc = type(app_idx.kc) == "table" and app_idx.kc or {}
+	add_metric(app_idx.kc, tostring(kc_num), 0, false, "none")
+	debounced_save()
+
+	-- Push a live refresh so the heatmap reflects KE-intercepted physical
+	-- presses (tap-holds on cmd, shift, etc.) the moment they arrive
+	local metrics_typing = package.loaded["ui.metrics_typing.init"]
+	if metrics_typing and type(metrics_typing.push_live_update) == "function" then
+		pcall(metrics_typing.push_live_update, _state.today_idx)
+	end
+end
+
+
+--- Records a closed system-passive period (screen locked, system asleep, or
+--- keep-awake interval). Stored under the "_system" pseudo-app so the UI can
+--- compute precise active = Σ app_time_ms - (locked_ms + sleep_ms + awake_ms).
+--- @param kind string One of "lock", "sleep", or "awake".
+--- @param duration_ms number Length of the closed period in milliseconds.
+function M.log_passive_period(kind, duration_ms)
+	if not require_state("log_passive_period") then return end
+	local dur = tonumber(duration_ms)
+	if not dur or dur <= 0 then return end
+	local date_str = os.date("%Y-%m-%d")
+	local m_app    = get_or_create_manifest_app(date_str, "_system")
+	if kind == "lock" then
+		m_app.locked_ms = (m_app.locked_ms or 0) + dur
+	elseif kind == "awake" then
+		-- Keep-awake jitter time: not real user activity but the OS-foreground
+		-- timer keeps running. Tracked separately so the dashboard can opt
+		-- out of counting it via a UI toggle.
+		m_app.awake_ms = (m_app.awake_ms or 0) + dur
+	else
+		m_app.sleep_ms = (m_app.sleep_ms or 0) + dur
+	end
+	-- Don't bump passive_count for awake — it's not a lock / sleep event
+	if kind ~= "awake" then
+		m_app.passive_count = (m_app.passive_count or 0) + 1
+	end
+	-- Night wakes: a passive lock/sleep period that closed between 00:00 and
+	-- 06:00 local time means the user resumed activity in the middle of the
+	-- night. Excluded for "awake" kind — that's only a metric-correction
+	-- marker, not a real wake-up event.
+	if kind ~= "awake" then
+		local hour = tonumber(os.date("%H")) or 0
+		if hour >= 0 and hour < 6 then
+			m_app.night_wake_count = (m_app.night_wake_count or 0) + 1
+		end
+	end
+end
+
+--- Tags the duration of a keep-awake interval onto the focused app's manifest
+--- entry as `awake_ms`. The dashboard subtracts this from `app_time_ms` when
+--- the user opts out of counting keep-awake time, so the underlying focus
+--- aggregate is preserved (toggle is reversible).
+--- @param app_name string Name of the app that held the focus during the interval.
+--- @param dur_ms number Length of the keep-awake period in milliseconds.
+function M.tag_awake_focus(app_name, dur_ms)
+	if not require_state("tag_awake_focus") then return end
+	local d = tonumber(dur_ms)
+	if not d or d <= 0 then return end
+	if type(app_name) ~= "string" or app_name == "" then return end
+	local date_str = os.date("%Y-%m-%d")
+	local m_app    = get_or_create_manifest_app(date_str, app_name)
+	m_app.awake_ms = (m_app.awake_ms or 0) + d
+end
+
+
+--- Records a modifier key release with the time it was held down.
+--- Updates per-keycode aggregates (sum, count, max) on the manifest so the
+--- UI can surface "your average shift hold is 280 ms" or flag chord-typing
+--- patterns where a modifier is held for unusually long.
+--- @param keycode number Physical macOS virtual keycode of the modifier.
+--- @param app_name string Frontmost app at release time.
+--- @param hold_ms number Duration the key was held down.
+--- Records a key release event with the time it was held down. Classifies
+--- the release as a tap (≤ HOLD_THRESHOLD_MS) or a hold (>) and accumulates
+--- per-keycode statistics in the manifest's kc_hold map. Shared by both
+--- the modifier-keys path (flagsChanged) and the KE-managed bridge path so
+--- the heatmap tooltip can show a unified tap/hold breakdown.
+--- @param keycode number Physical macOS virtual keycode.
+--- @param app_name string Frontmost app at release time.
+--- @param hold_ms number Duration the key was held down.
+local function _credit_kc_hold(keycode, app_name, hold_ms)
+	local hold = tonumber(hold_ms)
+	if not hold or hold < 0 then return end
+	local date_str = os.date("%Y-%m-%d")
+	local m_app    = get_or_create_manifest_app(date_str, app_name or "Unknown")
+	m_app.kc_hold = type(m_app.kc_hold) == "table" and m_app.kc_hold or {}
+	local kc_str  = tostring(keycode)
+	local entry   = m_app.kc_hold[kc_str]
+	if type(entry) ~= "table" then
+		entry = { s = 0, n = 0, m = 0, tap = 0, hold = 0 }
+		m_app.kc_hold[kc_str] = entry
+	end
+	entry.s = (entry.s or 0) + hold
+	entry.n = (entry.n or 0) + 1
+	if hold > (entry.m or 0) then entry.m = hold end
+	if hold > HOLD_THRESHOLD_MS then
+		entry.hold = (entry.hold or 0) + 1
+	else
+		entry.tap = (entry.tap or 0) + 1
+	end
+end
+
+function M.log_modifier_hold(keycode, app_name, hold_ms)
+	if not require_state("log_modifier_hold") then return end
+	_credit_kc_hold(keycode, app_name, hold_ms)
+end
+
+--- Records a Karabiner-managed key release with hold duration.
+--- Same accounting as log_modifier_hold so the heatmap UI sees a unified
+--- kc_hold table regardless of whether the press came through flagsChanged
+--- (HS-handled modifier) or the KE physical-kc bridge (tap-hold key).
+--- @param kc_num number Physical macOS virtual keycode.
+--- @param app_name string Frontmost app at release time.
+--- @param hold_ms number Duration the key was held down.
+function M.log_karabiner_release(kc_num, app_name, hold_ms)
+	if not require_state("log_karabiner_release") then return end
+	_credit_kc_hold(kc_num, app_name, hold_ms)
+end
+
+
+--- Records the latency between an app-focus event and the first manual
+--- keystroke that followed it. Accumulates Σ delay + count per app/day so
+--- the wellness/UX dashboard can surface a mean "time-to-first-key".
+--- Called once per focus, on the very first non-synthetic keyDown in that app.
+--- @param app_name string The application that just received focus.
+--- @param latency_ms number Time elapsed between focus and first keystroke.
+function M.log_focus_first_key(app_name, latency_ms)
+	if not require_state("log_focus_first_key") then return end
+	local lat = tonumber(latency_ms)
+	if not lat or lat < 0 then return end
+	local date_str = os.date("%Y-%m-%d")
+	local m_app    = get_or_create_manifest_app(date_str, app_name or "Unknown")
+	m_app.focus_to_first_key_sum_ms = (m_app.focus_to_first_key_sum_ms or 0) + lat
+	m_app.focus_to_first_key_count  = (m_app.focus_to_first_key_count  or 0) + 1
+end
+
 
 --- Increments a scalar metric field in the manifest for an app, then saves.
 --- Used for quick stats like hs_suggested or llm_suggested.

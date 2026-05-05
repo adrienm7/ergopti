@@ -29,11 +29,45 @@
 				<div style="flex-grow: 1"></div>
 				<button class="filter-btn active" id="btn-refresh">Rafraîchir</button>
 				<button class="filter-btn" id="btn-add-app">Classer une application…</button>
+				<button class="filter-btn" id="btn-compare-prev" title="Comparer la période avec la précédente équivalente.">Comparer ↔</button>
+				<button class="filter-btn" id="btn-count-awake" title="Activer pour inclure le temps en keep-awake (Ctrl+M) dans les stats. Désactivé par défaut.">Compter keep-awake</button>
+			</div>
+			<!-- Filtres catégorie (#53) et jour de semaine (#54) — toggle pour exclure des apps ou des jours du calcul. -->
+			<div class="filters-bar" style="display:flex;gap:18px;align-items:center;flex-wrap:wrap;margin-top:8px;">
+				<div style="display:flex;align-items:center;gap:6px;">
+					<span style="font-size:12px;color:var(--text-muted);">Catégories :</span>
+					<div id="category-filter-buttons" style="display:flex;gap:4px;flex-wrap:wrap;"></div>
+				</div>
+				<div style="display:flex;align-items:center;gap:6px;">
+					<span style="font-size:12px;color:var(--text-muted);">Jours :</span>
+					<div id="weekday-filter-buttons" style="display:flex;gap:4px;"></div>
+				</div>
+			</div>
+		</div>
+
+		<div class="main-content">
+			<!-- Comparateur 2 périodes (#55) — affiché lorsque le bouton "Comparer" est actif. -->
+			<div id="compare-panel" style="display:none;background:rgba(10,132,255,0.08);border:1px solid rgba(10,132,255,0.3);border-radius:10px;padding:12px;margin-bottom:14px;">
+				<div style="display:flex;align-items:center;gap:10px;font-size:12px;color:var(--text-muted);margin-bottom:8px;">
+					<strong style="color:#fff;font-size:13px;">Comparaison vs période précédente</strong>
+					<span id="compare-window">--</span>
+				</div>
+				<div id="compare-rows" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;"></div>
 			</div>
 
-			<div class="stats-grid">
+			<!-- Onglets (#57) — 5 thèmes pour regrouper les ~30 cartes par finalité. -->
+			<div class="filters-bar" style="display:flex;gap:6px;margin-bottom:14px;flex-wrap:wrap;">
+				<button class="filter-btn tab-btn active" data-tab-target="overview">Aperçu</button>
+				<button class="filter-btn tab-btn" data-tab-target="time">Temps &amp; rythmes</button>
+				<button class="filter-btn tab-btn" data-tab-target="apps">Apps &amp; multitâche</button>
+				<button class="filter-btn tab-btn" data-tab-target="typing">Frappe &amp; productivité</button>
+				<button class="filter-btn tab-btn" data-tab-target="system">Système &amp; records</button>
+			</div>
+
+			<!-- Primary KPI row: global time + productivity + context signals -->
+			<div class="stats-grid" data-tab="overview">
 				<div class="stat-card card-global">
-					<h2>Temps d’écran</h2>
+					<h2>Temps d'écran</h2>
 					<div class="stat-value" id="kpi-total-time">--</div>
 					<div class="stat-details">Activité globale enregistrée</div>
 				</div>
@@ -62,10 +96,76 @@
 					</div>
 				</div>
 			</div>
-		</div>
 
-		<div class="main-content">
-			<div style="display: flex; gap: 20px; margin-bottom: 20px">
+			<!-- Third KPI row: multitâche / context switching signals -->
+			<div class="stats-grid stats-grid-secondary" data-tab="apps">
+				<div class="stat-card" title="Bascules d'app par minute de temps focus. Au-delà d'un seuil le workflow est fragmenté.">
+					<h2>App-hopping</h2>
+					<div class="stat-value" id="kpi-hopping-rate">--</div>
+					<div class="stat-details" id="kpi-hopping-detail">--</div>
+				</div>
+				<div class="stat-card" title="Temps moyen passé dans une app avant de basculer ailleurs.">
+					<h2>Profondeur moy.</h2>
+					<div class="stat-value" id="kpi-depth-mean">--</div>
+					<div class="stat-details" id="kpi-depth-detail">--</div>
+				</div>
+				<div class="stat-card" title="Trois apps qui concentrent la majorité du temps focus, avec leur part cumulée.">
+					<h2>Top trio</h2>
+					<div class="stat-value" id="kpi-top-trio-share">--</div>
+					<div class="stat-details" id="kpi-top-trio-list">--</div>
+				</div>
+				<div class="stat-card" title="App qui sert de point central — celle qui a le plus de destinations différentes vers lesquelles vous basculez.">
+					<h2>App pivot</h2>
+					<div class="stat-value" id="kpi-pivot-app">--</div>
+					<div class="stat-details" id="kpi-pivot-detail">--</div>
+				</div>
+				<div class="stat-card" title="Part du temps focus passée dans l'app la plus utilisée. Plus c'est élevé, plus vous êtes concentré sur un outil.">
+					<h2>Index focus</h2>
+					<div class="stat-value" id="kpi-focus-index">--</div>
+					<div class="stat-details" id="kpi-focus-index-detail">--</div>
+				</div>
+				<div class="stat-card" title="Total des bascules / déverrouillages / changements de Wi-Fi sur la période. Reflet rapide de la mobilité du contexte.">
+					<h2>Volume contexte</h2>
+					<div class="stat-value" id="kpi-context-volume">--</div>
+					<div class="stat-details" id="kpi-context-detail">--</div>
+				</div>
+			</div>
+
+			<!-- Second KPI row: time / rhythm signals derived from the rich manifest fields -->
+			<div class="stats-grid stats-grid-secondary" data-tab="overview">
+				<div class="stat-card" title="Temps réellement passé à frapper (somme des intervalles inter-touches), hors temps de réflexion. Numérateur du ratio actif.">
+					<h2>Temps actif</h2>
+					<div class="stat-value" id="kpi-active-time">--</div>
+					<div class="stat-details" id="kpi-active-ratio">--</div>
+				</div>
+				<div class="stat-card" title="Temps cumulé pendant lequel l'écran était verrouillé ou la machine en veille. Soustrait du temps focus pour le ratio actif.">
+					<h2>Passif système</h2>
+					<div class="stat-value" id="kpi-passive-time">--</div>
+					<div class="stat-details" id="kpi-passive-detail">--</div>
+				</div>
+				<div class="stat-card" title="Heure de la première et de la dernière frappe sur la période. Reflète vos horaires effectifs derrière le clavier.">
+					<h2>Premier / dernier</h2>
+					<div class="stat-value" id="kpi-day-bounds">--</div>
+					<div class="stat-details" id="kpi-day-amplitude">--</div>
+				</div>
+				<div class="stat-card" title="Plus longue séance ininterrompue de la période et l'app où elle s'est passée. Une séance se termine après 5 min sans frappe.">
+					<h2>Plus longue séance</h2>
+					<div class="stat-value" id="kpi-longest-session">--</div>
+					<div class="stat-details" id="kpi-longest-session-app">--</div>
+				</div>
+				<div class="stat-card" title="Total de séances détectées (≥ 1 frappe, gap &lt; 5 min) et durée moyenne de chacune.">
+					<h2>Séances</h2>
+					<div class="stat-value" id="kpi-sessions-count">--</div>
+					<div class="stat-details" id="kpi-sessions-mean">--</div>
+				</div>
+				<div class="stat-card" title="Densité de frappe sur le temps focus : combien de caractères vous tapez par minute passée dans une app au foreground.">
+					<h2>Densité</h2>
+					<div class="stat-value" id="kpi-density">--</div>
+					<div class="stat-details" id="kpi-density-detail">--</div>
+				</div>
+			</div>
+
+			<div data-tab="overview" style="display: flex; gap: 20px; margin-bottom: 20px">
 				<div
 					class="chart-container"
 					style="
@@ -104,6 +204,7 @@
 
 			<div
 				class="chart-container"
+				data-tab="overview"
 				style="
 					height: 260px;
 					background: rgba(30, 30, 30, 0.4);
@@ -121,25 +222,557 @@
 				</div>
 			</div>
 
-			<div class="table-container">
+			<!-- Typing × Temps (#40-43, 49) : signaux croisés frappe/temps. -->
+			<div class="stats-grid stats-grid-secondary" data-tab="typing">
+				<div class="stat-card" title="Latence moyenne entre l'activation d'une app et la 1ʳᵉ frappe — temps d'orientation.">
+					<h2>Latence focus</h2>
+					<div class="stat-value" id="kpi-tx-focus-lat">--</div>
+					<div class="stat-details" id="kpi-tx-focus-lat-detail">--</div>
+				</div>
+				<div class="stat-card" title="Nombre de dispositions de clavier différentes vues sur la période.">
+					<h2>Layouts vus</h2>
+					<div class="stat-value" id="kpi-tx-layouts">--</div>
+					<div class="stat-details" id="kpi-tx-layouts-detail">--</div>
+				</div>
+				<div class="stat-card" title="Nombre d'app-jours dont la séance la plus longue dépasse 90 minutes.">
+					<h2>Longues séances</h2>
+					<div class="stat-value" id="kpi-tx-long-sessions">--</div>
+					<div class="stat-details" id="kpi-tx-long-sessions-detail">--</div>
+				</div>
+				<div class="stat-card" title="Part des frappes détectées comme auto-repeat (touche maintenue, pas une décision motrice).">
+					<h2>Auto-repeat</h2>
+					<div class="stat-value" id="kpi-tx-autorepeat">--</div>
+					<div class="stat-details" id="kpi-tx-autorepeat-detail">--</div>
+				</div>
+				<div class="stat-card" title="App avec le plus haut taux de backspaces sur la période — où vous vous trompez le plus.">
+					<h2>App la + erronée</h2>
+					<div class="stat-value" id="kpi-tx-error-app" style="font-size:1.3em;">--</div>
+					<div class="stat-details" id="kpi-tx-error-app-detail">--</div>
+				</div>
+				<div class="stat-card" title="App avec le temps de récupération moyen le plus long après une erreur.">
+					<h2>Récup la + lente</h2>
+					<div class="stat-value" id="kpi-tx-recovery-app" style="font-size:1.3em;">--</div>
+					<div class="stat-details" id="kpi-tx-recovery-app-detail">--</div>
+				</div>
+			</div>
+
+			<!-- CPM par catégorie (#47). -->
+			<div
+				class="chart-container"
+				data-tab="typing"
+				style="
+					height: 240px;
+					background: rgba(30, 30, 30, 0.4);
+					border: 1px solid rgba(255, 255, 255, 0.1);
+					border-radius: 10px;
+					padding: 15px;
+					margin-bottom: 20px;
+				"
+			>
+				<h3 style="margin: 0 0 10px 0; font-size: 14px; color: #fff">
+					Vitesse de frappe par catégorie (CPM)
+					<span style="font-size:11px;font-weight:400;color:var(--text-muted);margin-left:8px;">caractères par minute focus, regroupés par catégorie d'app</span>
+				</h3>
+				<div style="position: relative; height: 190px"><canvas id="cpm_by_category_chart"></canvas></div>
+			</div>
+
+			<!-- Productivité (#20–22) : split tri-color, meilleure heure, catégorie dominante du jour. -->
+			<div class="stats-grid stats-grid-secondary" data-tab="typing">
+				<div class="stat-card" style="grid-column: span 2;" title="Décomposition du temps focus selon le score de productivité de chaque app.">
+					<h2>Productif vs distraction</h2>
+					<div id="kpi-prod-bar" style="display: flex; height: 22px; border-radius: 6px; overflow: hidden; background: rgba(255,255,255,0.05); margin: 6px 0;"></div>
+					<div class="stat-details" id="kpi-prod-bar-detail">--</div>
+				</div>
+				<div class="stat-card" title="Heure de la journée où votre productivité moyenne est la plus haute (score pondéré par le temps).">
+					<h2>Meilleure heure</h2>
+					<div class="stat-value" id="kpi-best-hour">--</div>
+					<div class="stat-details" id="kpi-best-hour-detail">--</div>
+				</div>
+				<div class="stat-card" title="Catégorie d'app dominante par jour de semaine sur la période.">
+					<h2>Catégorie dominante</h2>
+					<div class="stat-value" id="kpi-dom-cat" style="font-size: 1.3em;">--</div>
+					<div class="stat-details" id="kpi-dom-cat-detail">--</div>
+				</div>
+			</div>
+
+			<!-- Système & matériel : signaux machine (#13–19). -->
+			<div class="stats-grid stats-grid-secondary" data-tab="system">
+				<div class="stat-card" title="Nombre de verrouillages d'écran et mises en veille sur la période.">
+					<h2>Verrouillages</h2>
+					<div class="stat-value" id="kpi-sys-passive">--</div>
+					<div class="stat-details" id="kpi-sys-passive-detail">--</div>
+				</div>
+				<div class="stat-card" title="Temps écran verrouillé vs en veille système, séparés.">
+					<h2>Verrou vs veille</h2>
+					<div class="stat-value" id="kpi-sys-lock-vs-sleep">--</div>
+					<div class="stat-details" id="kpi-sys-lock-vs-sleep-detail">--</div>
+				</div>
+				<div class="stat-card" title="Nombre de changements de réseau Wi-Fi détectés (mobilité : café, train, bureau).">
+					<h2>Changements Wi-Fi</h2>
+					<div class="stat-value" id="kpi-sys-wifi">--</div>
+					<div class="stat-details" id="kpi-sys-wifi-detail">--</div>
+				</div>
+				<div class="stat-card" title="Niveau batterie : moyenne des observations sur la période, plus le minimum atteint.">
+					<h2>Batterie</h2>
+					<div class="stat-value" id="kpi-sys-battery">--</div>
+					<div class="stat-details" id="kpi-sys-battery-detail">--</div>
+				</div>
+				<div class="stat-card" title="Temps cumulé en mode muet (proxy de réunion ou focus profond).">
+					<h2>Audio muet</h2>
+					<div class="stat-value" id="kpi-sys-mute">--</div>
+					<div class="stat-details" id="kpi-sys-mute-detail">--</div>
+				</div>
+				<div class="stat-card" title="Changements de Space (Mission Control) : proxy d'organisation visuelle / multitâche.">
+					<h2>Spaces</h2>
+					<div class="stat-value" id="kpi-sys-spaces">--</div>
+					<div class="stat-details" id="kpi-sys-spaces-detail">--</div>
+				</div>
+				<div class="stat-card" title="Réveils nocturnes : sessions reprises entre 0 h et 6 h.">
+					<h2>Réveils nuit</h2>
+					<div class="stat-value" id="kpi-sys-night">--</div>
+					<div class="stat-details" id="kpi-sys-night-detail">--</div>
+				</div>
+				<div class="stat-card" title="Temps cumulé en keep-awake (Ctrl+M). Soustrait des stats par défaut ; activez le bouton « Compter keep-awake » pour l'inclure.">
+					<h2>Keep-awake</h2>
+					<div class="stat-value" id="kpi-sys-awake">--</div>
+					<div class="stat-details" id="kpi-sys-awake-detail">--</div>
+				</div>
+			</div>
+
+			<!-- Streaks (#58) et objectifs (#60). -->
+			<div class="stats-grid stats-grid-secondary" data-tab="system">
+				<div class="stat-card" title="Plus longue série de jours consécutifs avec au moins 1000 caractères tapés.">
+					<h2>Streak chars ≥ 1k</h2>
+					<div class="stat-value" id="kpi-streak-chars">--</div>
+					<div class="stat-details" id="kpi-streak-chars-detail">--</div>
+				</div>
+				<div class="stat-card" title="Plus longue série de jours consécutifs avec au moins 30 minutes de focus actif.">
+					<h2>Streak focus ≥ 30 min</h2>
+					<div class="stat-value" id="kpi-streak-focus">--</div>
+					<div class="stat-details" id="kpi-streak-focus-detail">--</div>
+				</div>
+				<div class="stat-card" style="grid-column: span 2;" title="Progression vers votre objectif quotidien (modifiable par clic sur la valeur).">
+					<h2>Objectif du jour</h2>
+					<div style="display:flex;align-items:center;gap:8px;margin:6px 0;">
+						<span class="stat-value" id="kpi-goal-value" style="font-size:1.4em;cursor:pointer;" title="Cliquer pour modifier">--</span>
+						<span class="stat-details" style="margin-left:auto;" id="kpi-goal-progress">--</span>
+					</div>
+					<div style="height:14px;border-radius:6px;background:rgba(255,255,255,0.05);overflow:hidden;">
+						<div id="kpi-goal-bar" style="height:100%;width:0%;background:linear-gradient(90deg,#0A84FF,#30D158);transition:width .3s;"></div>
+					</div>
+					<div class="stat-details" id="kpi-goal-detail" style="margin-top:6px;">--</div>
+				</div>
+			</div>
+
+			<!-- Records personnels : meilleurs scores observés sur la période. -->
+			<div class="stats-grid stats-grid-secondary" data-tab="system">
+				<div class="stat-card" title="Meilleure cadence sur un burst (≥ 10 caractères, gap entre touches &lt; 1s).">
+					<h2>Burst record</h2>
+					<div class="stat-value" id="kpi-rec-burst">--</div>
+					<div class="stat-details" id="kpi-rec-burst-detail">--</div>
+				</div>
+				<div class="stat-card" title="Plus long burst en caractères : la salve la plus longue sans pause de plus d'une seconde.">
+					<h2>Burst le + long</h2>
+					<div class="stat-value" id="kpi-rec-burst-chars">--</div>
+					<div class="stat-details" id="kpi-rec-burst-chars-detail">--</div>
+				</div>
+				<div class="stat-card" title="Plus longue séance détectée et l'app où elle s'est passée.">
+					<h2>Séance record</h2>
+					<div class="stat-value" id="kpi-rec-session">--</div>
+					<div class="stat-details" id="kpi-rec-session-detail">--</div>
+				</div>
+				<div class="stat-card" title="Streak max sur le même doigt observé sur la période. Au-delà de 6, vraiment beaucoup d'anti-alternance.">
+					<h2>Streak doigt</h2>
+					<div class="stat-value" id="kpi-rec-finger-streak">--</div>
+					<div class="stat-details" id="kpi-rec-finger-streak-detail">--</div>
+				</div>
+				<div class="stat-card" title="Plus longue cascade de backspaces : combien de caractères vous avez effacés d'un coup pour réécrire.">
+					<h2>Cascade max</h2>
+					<div class="stat-value" id="kpi-rec-cascade">--</div>
+					<div class="stat-details" id="kpi-rec-cascade-detail">--</div>
+				</div>
+				<div class="stat-card" title="Jour avec le plus de caractères tapés sur la période.">
+					<h2>Jour record</h2>
+					<div class="stat-value" id="kpi-rec-day-chars">--</div>
+					<div class="stat-details" id="kpi-rec-day-chars-detail">--</div>
+				</div>
+			</div>
+
+			<!-- Vitesse par heure : à quels créneaux du jour vous frappez le plus vite (CPM moyen). -->
+			<div
+				class="chart-container"
+				data-tab="typing"
+				style="
+					height: 240px;
+					background: rgba(30, 30, 30, 0.4);
+					border: 1px solid rgba(255, 255, 255, 0.1);
+					border-radius: 10px;
+					padding: 15px;
+					margin-bottom: 20px;
+				"
+			>
+				<h3 style="margin: 0 0 10px 0; font-size: 14px; color: #fff">
+					Vitesse de frappe par heure (CPM)
+					<span style="font-size:11px;font-weight:400;color:var(--text-muted);margin-left:8px;">car. par minute focus, sur la période active</span>
+				</h3>
+				<div style="position: relative; height: 190px">
+					<canvas id="cpm_by_hour_chart"></canvas>
+				</div>
+			</div>
+
+			<!-- Calendrier 12 mois glissants — vue style GitHub, intensité = activité du jour. -->
+			<div data-tab="time"
+				class="chart-container"
+				style="
+					background: rgba(30, 30, 30, 0.4);
+					border: 1px solid rgba(255, 255, 255, 0.1);
+					border-radius: 10px;
+					padding: 15px;
+					margin-bottom: 20px;
+				"
+			>
+				<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
+					<h3 style="margin: 0; font-size: 14px; color: #fff">
+						Calendrier d'activité (12 mois glissants)
+					</h3>
+					<div style="display:flex;gap:6px;">
+						<button class="filter-btn" id="cal-mode-time"     onclick="setCalendarMode('time')">Temps</button>
+						<button class="filter-btn active" id="cal-mode-chars" onclick="setCalendarMode('chars')">Caractères</button>
+					</div>
+				</div>
+				<div id="activity_calendar_container" style="overflow-x:auto;"></div>
+			</div>
+
+			<!-- Heure × jour de semaine : où votre activité se concentre dans la grille hebdo. -->
+			<div data-tab="time"
+				class="chart-container"
+				style="
+					background: rgba(30, 30, 30, 0.4);
+					border: 1px solid rgba(255, 255, 255, 0.1);
+					border-radius: 10px;
+					padding: 15px;
+					margin-bottom: 20px;
+				"
+			>
+				<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
+					<h3 style="margin: 0; font-size: 14px; color: #fff">
+						Heure × jour de semaine
+					</h3>
+					<div style="display:flex;gap:6px;">
+						<button class="filter-btn" id="hwk-mode-time"     onclick="setHourWeekdayMode('time')">Temps</button>
+						<button class="filter-btn active" id="hwk-mode-chars" onclick="setHourWeekdayMode('chars')">Caractères</button>
+					</div>
+				</div>
+				<div id="hour_weekday_heatmap_container" style="overflow-x:auto;"></div>
+			</div>
+
+			<!-- Frise annotée d'une journée (#33) — bandes par app et marqueurs verrou/wifi/audio. -->
+			<div
+				class="chart-container"
+				data-tab="time"
+				style="
+					background: rgba(30, 30, 30, 0.4);
+					border: 1px solid rgba(255, 255, 255, 0.1);
+					border-radius: 10px;
+					padding: 15px;
+					margin-bottom: 20px;
+				"
+			>
+				<h3 style="margin: 0 0 12px 0; font-size: 14px; color: #fff">
+					Frise annotée
+					<span style="font-size:11px;font-weight:400;color:var(--text-muted);margin-left:8px;">temps par app + marqueurs système (verrou, Wi-Fi, audio, Space)</span>
+				</h3>
+				<div id="day_timeline_container" style="overflow-x:auto;"></div>
+			</div>
+
+			<!-- Boxplot durées de séance (#28) — distribution par app. -->
+			<div
+				class="chart-container"
+				data-tab="typing"
+				style="
+					background: rgba(30, 30, 30, 0.4);
+					border: 1px solid rgba(255, 255, 255, 0.1);
+					border-radius: 10px;
+					padding: 15px;
+					margin-bottom: 20px;
+				"
+			>
+				<h3 style="margin: 0 0 12px 0; font-size: 14px; color: #fff">
+					Durées de séance par app
+					<span style="font-size:11px;font-weight:400;color:var(--text-muted);margin-left:8px;">moustache : min / Q1 / médiane / Q3 / max</span>
+				</h3>
+				<div id="session_boxplot_container" style="overflow-x:auto;"></div>
+			</div>
+
+			<!-- Top fenêtres (#39) — titres de fenêtre les plus tapés. -->
+			<div class="table-container" data-tab="system" style="margin-bottom: 20px;">
+				<h3 style="margin: 0 0 12px 0; font-size: 14px; color: #fff; padding: 0 10px;">
+					Top fenêtres
+					<span style="font-size:11px;font-weight:400;color:var(--text-muted);margin-left:8px;">titres de fenêtre par caractères tapés</span>
+				</h3>
+				<table id="top_windows_table">
+					<thead>
+						<tr><th>Fenêtre</th><th>App</th><th style="text-align:right;">Caractères</th><th style="text-align:right;">Durée</th></tr>
+					</thead>
+					<tbody id="top_windows_tbody"></tbody>
+				</table>
+			</div>
+
+			<!-- Top sessions (#37) — les plus longues sessions observées par app-jour. -->
+			<div class="table-container" data-tab="system" style="margin-bottom: 20px;">
+				<h3 style="margin: 0 0 12px 0; font-size: 14px; color: #fff; padding: 0 10px;">
+					Top sessions
+					<span style="font-size:11px;font-weight:400;color:var(--text-muted);margin-left:8px;">les plus longues séances observées (par app-jour)</span>
+				</h3>
+				<table id="top_sessions_table">
+					<thead>
+						<tr><th>Jour</th><th>App</th><th style="text-align:right;">Durée</th><th style="text-align:right;">Caractères</th></tr>
+					</thead>
+					<tbody id="top_sessions_tbody"></tbody>
+				</table>
+			</div>
+
+			<!-- Top journées (#38) — meilleures journées par caractères, temps focus, bascules. -->
+			<div class="table-container" data-tab="system" style="margin-bottom: 20px;">
+				<h3 style="margin: 0 0 12px 0; font-size: 14px; color: #fff; padding: 0 10px;">
+					Top journées
+					<span style="font-size:11px;font-weight:400;color:var(--text-muted);margin-left:8px;">classement par caractères tapés, temps focus, et bascules</span>
+				</h3>
+				<table id="top_days_table">
+					<thead>
+						<tr><th>Jour</th><th style="text-align:right;">Caractères</th><th style="text-align:right;">Temps focus</th><th style="text-align:right;">Bascules</th><th style="text-align:right;">Séances</th></tr>
+					</thead>
+					<tbody id="top_days_tbody"></tbody>
+				</table>
+			</div>
+
+			<!-- Table des paires d'app (#36) — bascules A→B les plus fréquentes. -->
+			<div class="table-container" data-tab="apps" style="margin-bottom: 20px;">
+				<h3 style="margin: 0 0 12px 0; font-size: 14px; color: #fff; padding: 0 10px;">
+					Top paires de bascules
+					<span style="font-size:11px;font-weight:400;color:var(--text-muted);margin-left:8px;">de quelle app vers quelle app et combien de fois</span>
+				</h3>
+				<table id="app_pairs_table">
+					<thead>
+						<tr><th>De</th><th>Vers</th><th style="text-align:right;">Bascules</th><th style="text-align:right;">Part du total</th></tr>
+					</thead>
+					<tbody id="app_pairs_tbody"></tbody>
+				</table>
+			</div>
+
+			<!-- Trajectoires journalières (#29-32). -->
+			<div
+				class="chart-container"
+				data-tab="time"
+				style="
+					background: rgba(30, 30, 30, 0.4);
+					border: 1px solid rgba(255, 255, 255, 0.1);
+					border-radius: 10px;
+					padding: 15px;
+					margin-bottom: 20px;
+				"
+			>
+				<h3 style="margin: 0 0 12px 0; font-size: 14px; color: #fff">
+					Évolution journalière
+					<span style="font-size:11px;font-weight:400;color:var(--text-muted);margin-left:8px;">temps focus, caractères, bascules par jour</span>
+				</h3>
+				<div style="position: relative; height: 230px"><canvas id="daily_trio_chart"></canvas></div>
+			</div>
+
+			<div
+				class="chart-container"
+				data-tab="time"
+				style="
+					background: rgba(30, 30, 30, 0.4);
+					border: 1px solid rgba(255, 255, 255, 0.1);
+					border-radius: 10px;
+					padding: 15px;
+					margin-bottom: 20px;
+				"
+			>
+				<h3 style="margin: 0 0 12px 0; font-size: 14px; color: #fff">
+					Ratio actif au fil des jours
+					<span style="font-size:11px;font-weight:400;color:var(--text-muted);margin-left:8px;">temps actif / focus net par jour</span>
+				</h3>
+				<div style="position: relative; height: 200px"><canvas id="daily_active_ratio_chart"></canvas></div>
+			</div>
+
+			<div
+				class="chart-container"
+				data-tab="time"
+				style="
+					background: rgba(30, 30, 30, 0.4);
+					border: 1px solid rgba(255, 255, 255, 0.1);
+					border-radius: 10px;
+					padding: 15px;
+					margin-bottom: 20px;
+				"
+			>
+				<h3 style="margin: 0 0 12px 0; font-size: 14px; color: #fff">
+					Évolution des catégories
+					<span style="font-size:11px;font-weight:400;color:var(--text-muted);margin-left:8px;">aire empilée du temps focus par catégorie</span>
+				</h3>
+				<div style="position: relative; height: 240px"><canvas id="daily_categories_chart"></canvas></div>
+			</div>
+
+			<div
+				class="chart-container"
+				data-tab="time"
+				style="
+					background: rgba(30, 30, 30, 0.4);
+					border: 1px solid rgba(255, 255, 255, 0.1);
+					border-radius: 10px;
+					padding: 15px;
+					margin-bottom: 20px;
+				"
+			>
+				<h3 style="margin: 0 0 12px 0; font-size: 14px; color: #fff">
+					Heures de réveil et de coucher (clavier)
+					<span style="font-size:11px;font-weight:400;color:var(--text-muted);margin-left:8px;">première et dernière frappe par jour</span>
+				</h3>
+				<div style="position: relative; height: 220px"><canvas id="daily_bounds_chart"></canvas></div>
+			</div>
+
+			<!-- Top 8 apps en radar (#27) — temps + caractères en double série. -->
+			<div
+				class="chart-container"
+				data-tab="apps"
+				style="
+					height: 360px;
+					background: rgba(30, 30, 30, 0.4);
+					border: 1px solid rgba(255, 255, 255, 0.1);
+					border-radius: 10px;
+					padding: 15px;
+					margin-bottom: 20px;
+				"
+			>
+				<h3 style="margin: 0 0 10px 0; font-size: 14px; color: #fff">
+					Top 8 apps : temps vs caractères
+					<span style="font-size:11px;font-weight:400;color:var(--text-muted);margin-left:8px;">deux séries normalisées sur le top focus</span>
+				</h3>
+				<div style="position: relative; height: 310px"><canvas id="radial_top8_chart"></canvas></div>
+			</div>
+
+			<!-- Histogramme longueur des bursts (#34, dérivé) — distribution des salves de frappe. -->
+			<div
+				class="chart-container"
+				data-tab="typing"
+				style="
+					background: rgba(30, 30, 30, 0.4);
+					border: 1px solid rgba(255, 255, 255, 0.1);
+					border-radius: 10px;
+					padding: 15px;
+					margin-bottom: 20px;
+				"
+			>
+				<h3 style="margin: 0 0 12px 0; font-size: 14px; color: #fff">
+					Histogramme des bursts
+					<span style="font-size:11px;font-weight:400;color:var(--text-muted);margin-left:8px;">combien de salves selon leur longueur en caractères</span>
+				</h3>
+				<div style="position: relative; height: 220px"><canvas id="burst_histogram_chart"></canvas></div>
+			</div>
+
+			<!-- Sankey-like flow (#26) — flux entre apps, largeur = nombre de bascules. -->
+			<div
+				class="chart-container"
+				data-tab="apps"
+				style="
+					background: rgba(30, 30, 30, 0.4);
+					border: 1px solid rgba(255, 255, 255, 0.1);
+					border-radius: 10px;
+					padding: 15px;
+					margin-bottom: 20px;
+				"
+			>
+				<h3 style="margin: 0 0 12px 0; font-size: 14px; color: #fff">
+					Bascules entre apps
+					<span style="font-size:11px;font-weight:400;color:var(--text-muted);margin-left:8px;">épaisseur du flux = nombre de bascules</span>
+				</h3>
+				<div id="sankey_container" style="overflow-x:auto;"></div>
+			</div>
+
+			<!-- Ribbon journée (#25) — bande horizontale par jour, couleur = catégorie dominante à chaque heure. -->
+			<div
+				class="chart-container"
+				data-tab="time"
+				style="
+					background: rgba(30, 30, 30, 0.4);
+					border: 1px solid rgba(255, 255, 255, 0.1);
+					border-radius: 10px;
+					padding: 15px;
+					margin-bottom: 20px;
+				"
+			>
+				<h3 style="margin: 0 0 12px 0; font-size: 14px; color: #fff">
+					Frise par jour
+					<span style="font-size:11px;font-weight:400;color:var(--text-muted);margin-left:8px;">une bande par jour, couleur = catégorie dominante à chaque heure</span>
+				</h3>
+				<div id="ribbon_container" style="overflow-x:auto;"></div>
+				<div id="ribbon_legend" style="display:flex;flex-wrap:wrap;gap:10px;font-size:11px;color:var(--text-muted);margin-top:10px;"></div>
+			</div>
+
+			<div class="table-container" data-tab="apps">
 				<table id="apps-table">
 					<thead>
 						<tr>
 							<th>Application</th>
 							<th>Catégorie</th>
-							<th>Temps actif</th>
-							<th>Frappe %</th>
+							<th title="Temps avec l'app au foreground (somme des durées de focus).">Focus</th>
+							<th title="Part du temps focus passée à frapper activement (inter-touches sommés).">Frappe %</th>
+							<th title="Caractères tapés ÷ minutes de focus. Densité de production texte par app.">Densité</th>
+							<th title="Nombre de séances détectées dans cette app sur la période (gap inactif &lt; 5 min).">Séances</th>
+							<th title="Latence moyenne entre l'activation de l'app et votre première frappe — temps d'orientation.">Latence</th>
+							<th title="Caractères produits via hotstrings ÷ caractères totaux. Indique l'apport des raccourcis dans cette app.">% HS</th>
+							<th title="Plus long enchaînement same-finger observé dans cette app — signal d'anti-alternance ergonomique.">SFB</th>
+							<th title="Durée moyenne d'appui sur les modifiers (Cmd / Shift / Option) dans cette app.">Hold</th>
 							<th>Principales destinations</th>
 						</tr>
 					</thead>
 					<tbody id="apps-tbody">
 						<tr>
-							<td class="app-name-cell" colspan="5" style="text-align: center">
+							<td class="app-name-cell" colspan="9" style="text-align: center">
 								Chargement des données...
 							</td>
 						</tr>
 					</tbody>
 				</table>
+			</div>
+		</div>
+
+		<!-- Drill-down modal: opens on click on an app row in the apps table. -->
+		<div id="app_drilldown_modal" class="app-modal" style="display:none;" onclick="if(event.target===this) closeAppDrilldown()">
+			<div class="app-modal-card">
+				<div class="app-modal-header">
+					<h2 id="app_modal_title">Application</h2>
+					<button class="app-modal-close" onclick="closeAppDrilldown()" title="Fermer">×</button>
+				</div>
+				<div class="app-modal-tiles" id="app_modal_tiles"></div>
+				<div class="app-modal-section">
+					<h3>Activité par heure</h3>
+					<div style="position:relative;height:160px;">
+						<canvas id="app_modal_hourly"></canvas>
+					</div>
+				</div>
+				<div class="app-modal-section app-modal-grid-2">
+					<div>
+						<h3>Destinations</h3>
+						<div id="app_modal_dests"></div>
+					</div>
+					<div>
+						<h3>Layouts utilisés</h3>
+						<div id="app_modal_layouts"></div>
+					</div>
+				</div>
+				<div class="app-modal-section app-modal-grid-2">
+					<div>
+						<h3>Records</h3>
+						<div id="app_modal_records"></div>
+					</div>
+					<div>
+						<h3>Hotstrings & IA</h3>
+						<div id="app_modal_assist"></div>
+					</div>
+				</div>
 			</div>
 		</div>
 

@@ -19,6 +19,12 @@ local hs = hs
 local Logger = require("lib.logger")
 local LOG = "ui_builder"
 
+-- Per-process cache of assembled HTML strings.  Avoids re-reading the local
+-- CSS/JS files (and re-running the gsub inlining pass) on every UI open —
+-- assets only change when the user edits source so a single assembly per
+-- HS session is enough.
+local _html_cache = {}
+
 
 
 
@@ -48,8 +54,14 @@ end
 --- @param html_name string Optional name of the HTML file (default: "index.html").
 --- @return string The complete self-contained HTML string.
 function M.build_injected_html(assets_dir, html_name)
-	Logger.debug(LOG, "Building injected HTML assets…")
 	html_name = html_name or "index.html"
+	local cache_key = assets_dir .. "|" .. html_name
+	if _html_cache[cache_key] then
+		Logger.debug(LOG, "Injected HTML cache hit for '%s'.", html_name)
+		return _html_cache[cache_key]
+	end
+
+	Logger.debug(LOG, "Building injected HTML assets…")
 
 	local html_path = assets_dir .. html_name
 	local ok, fh = pcall(io.open, html_path, "r")
@@ -78,8 +90,39 @@ function M.build_injected_html(assets_dir, html_name)
 		return js ~= "" and ("<script>" .. js .. "</script>") or ""
 	end)
 
-	Logger.info(LOG, "Injected HTML assets built successfully.")
+	_html_cache[cache_key] = html
+	Logger.info(LOG, "Injected HTML assets built and memoised (%d bytes).", #html)
 	return html
+end
+
+--- Drops every memoised HTML so the next open re-reads sources from disk.
+--- Call this from a /reload-style command if you edit assets and want the
+--- change to take effect without a full Hammerspoon reload.
+function M.clear_html_cache()
+	_html_cache = {}
+	Logger.info(LOG, "Injected HTML cache cleared.")
+end
+
+--- Pre-warms macOS WebKit by creating a tiny invisible webview.  The very
+--- first webview created in a Hammerspoon session pays a 1-2 s framework-
+--- load cost; subsequent webviews open in a single frame.  Calling this
+--- once at HS startup moves that cost off the user's critical path so
+--- dashboards open instantly when the menu shortcut is pressed.
+function M.warmup_webkit()
+	Logger.start(LOG, "Warming up WebKit framework…")
+	local ok, err = pcall(function()
+		local wv = hs.webview.new({ x = -10, y = -10, w = 1, h = 1 }, { developerExtrasEnabled = false })
+		if not wv then return end
+		pcall(function() wv:html("<html><body></body></html>") end)
+		pcall(function() wv:hide() end)
+		-- Hold the warmup webview for 5 s so WebKit fully initialises, then release.
+		hs.timer.doAfter(5, function() pcall(function() wv:delete() end) end)
+	end)
+	if ok then
+		Logger.success(LOG, "WebKit warmup scheduled.")
+	else
+		Logger.warn(LOG, "WebKit warmup failed: %s.", tostring(err))
+	end
 end
 
 
@@ -109,33 +152,56 @@ end
 
 --- Forces a webview window to the front, teleports it to the current space natively, and gives it focus cleanly.
 --- @param wv userdata The hs.webview object.
-function M.force_focus(wv)
+--- @param is_new boolean When true the window is being shown for the first time — skip hide/show to avoid a
+---   flicker where the window appears briefly hidden before the HTML finishes loading.
+function M.force_focus(wv, is_new)
 	if not wv then return end
-	
+
 	Logger.debug(LOG, "Forcing window focus and teleporting to active space…")
-	-- Hiding and showing the window natively teleports it to the active macOS space
-	-- without changing its behavior property, which would destroy the webview state
-	pcall(function() wv:hide() end)
-	pcall(function() wv:show() end)
-	
-	-- Bring to front and request system focus
-	hs.timer.doAfter(0.05, function()
-		if type(wv.hswindow) == "function" then
-			local ok, win = pcall(function() return wv:hswindow() end)
-			if ok and win then
-				pcall(function() win:moveToScreen(hs.screen.mainScreen()) end)
-				if type(win.raise) == "function" then
-					pcall(function() win:raise() end)
-					pcall(function() win:focus() end)
+
+	-- Teleport strategy for an already-visible window:
+	-- 1. Try hs.spaces: move the window to the active space programmatically.
+	-- 2. Fall back to hide+show: macOS moves a shown window to the active space.
+	-- On a brand-new window skip both — the webview is not yet visible so hide()
+	-- races with the async HTML load and causes a blank first open.
+	if not is_new then
+		local ok_sp, hs_spaces = pcall(require, "hs.spaces")
+		if ok_sp and hs_spaces then
+			local ok_win, win = pcall(function() return wv:hswindow() end)
+			if ok_win and win then
+				local ok_active, active_space = pcall(function()
+					return hs_spaces.activeSpaceOnScreen(hs.screen.mainScreen())
+				end)
+				if ok_active and active_space then
+					local ok_move = pcall(function() hs_spaces.moveWindowToSpace(win, active_space) end)
+					if ok_move then
+						Logger.debug(LOG, "Window teleported via hs.spaces.")
+					end
 				end
-			else
-				pcall(function() wv:bringToFront() end)
 			end
+		end
+		-- Intentionally no hide+show here: hide() resets the macOS compositor z-order
+		-- and breaks Mission Control click-to-focus.  hs.spaces teleport is sufficient.
+	end
+
+	-- Bring to front and request system focus.
+	-- bringToFront() alone is used when hswindow() returns nil (window not yet
+	-- composited by the OS) to avoid calling raise/focus on a nil handle.
+	hs.timer.doAfter(0.05, function()
+		if type(wv.hswindow) ~= "function" then
+			pcall(function() wv:bringToFront() end)
+			pcall(hs.focus)
+			Logger.info(LOG, "Window focus applied (bringToFront fallback).")
+			return
+		end
+		local ok, win = pcall(function() return wv:hswindow() end)
+		if ok and win and type(win.focus) == "function" then
+			pcall(function() win:moveToScreen(hs.screen.mainScreen()) end)
+			pcall(function() win:focus() end)
 		else
+			-- hswindow() returned nil — window not yet composited; bringToFront is safe
 			pcall(function() wv:bringToFront() end)
 		end
-		
-		-- Ensure Hammerspoon application regains primary OS focus
 		pcall(hs.focus)
 		Logger.info(LOG, "Window focus applied.")
 	end)
@@ -196,7 +262,11 @@ function M.show_webview(opts)
 		pcall(function() wv:html(final_html) end)
 	end
 
-	M.force_focus(wv)
+	-- wv:html() loads content but does not show the window — explicit show() required.
+	-- Do NOT call force_focus here: the OS has not yet assigned a window handle
+	-- (hswindow()) at this point, so any raise/focus attempt is a no-op or crashes.
+	-- The caller is responsible for polling hswindow() and raising when ready.
+	pcall(function() wv:show() end)
 	Logger.info(LOG, "Webview window created successfully.")
 	return wv
 end

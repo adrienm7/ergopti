@@ -34,6 +34,10 @@ local Generator   = require("modules.karabiner.generator")
 local KeLifecycle = require("modules.karabiner.ke_lifecycle")
 local Watchers    = require("modules.karabiner.watchers")
 
+-- Optional: keylogger may not be loaded in all deployments
+local ok_kcb, KcBridge = pcall(require, "modules.keylogger.kc_bridge")
+if not ok_kcb then KcBridge = nil end
+
 local LOG = "karabiner"
 
 -- Resolve the directory that contains this init.lua at load time.
@@ -442,6 +446,12 @@ function M.regenerate()
 		end
 	end
 
+	-- Keep the bridge suppression set in sync with the newly generated config
+	-- so the heatmap immediately reflects any tap/hold action changes.
+	if KcBridge then
+		KcBridge.refresh_managed_set(_state.tap_hold_config, M.AVAILABLE_ACTIONS)
+	end
+
 	Logger.success(LOG,
 		"Karabiner config regenerated: %d combo(s) + %d tap/hold key(s) deployed.",
 		active_combos, #M.TAP_HOLD_KEYS)
@@ -527,6 +537,13 @@ function M.init()
 		watcher                   = nil,
 		hotkey_cycle_windows      = nil,
 	}
+
+	-- Propagate the tap/hold config to the KE physical-kc bridge so it knows
+	-- which output keycodes to suppress in the HS event tap (preventing double
+	-- counting of remapped keys in the heatmap).
+	if KcBridge then
+		KcBridge.refresh_managed_set(_state.tap_hold_config, M.AVAILABLE_ACTIONS)
+	end
 
 	-- Arm the suppressor watcher first so it catches any GUI activation triggered
 	-- by the config reload below (KE may activate its window on FSEvents reload).
