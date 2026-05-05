@@ -49,6 +49,23 @@ local LOGO_VARIANT_DEFAULT = "simple"
 -- macOS URL that opens System Settings → Keyboard → Input Sources directly
 local KEYBOARD_PREFS_URL = "x-apple.systempreferences:com.apple.preference.keyboard?InputSources"
 
+-- All Ergopti variants packaged in the bundle. Used to expose a submenu with
+-- a one-click TISEnableInputSource entry for each. The order matters — it is
+-- the order shown in the menu, with the most useful variant first.
+local ERGOPTI_VARIANTS = {
+	{ id = "com.apple.keylayout.ergopti.plus",          label = "Ergopti+" },
+	{ id = "com.apple.keylayout.ergopti",               label = "Ergopti" },
+	{ id = "com.apple.keylayout.ergopti.plus_plus",     label = "Ergopti++" },
+	{ id = "com.apple.keylayout.ergopti.ansi",          label = "Ergopti ANSI" },
+	{ id = "com.apple.keylayout.ergopti.plus.ansi",     label = "Ergopti+ ANSI" },
+	{ id = "com.apple.keylayout.ergopti.plus_plus.ansi", label = "Ergopti++ ANSI" },
+}
+
+-- Delay before rebuilding the menu after a bundle install. macOS reloads the
+-- input-source list asynchronously; calling hs.keycodes too quickly during
+-- that window has been observed to crash Hammerspoon. 1.5 s is a safe margin.
+local POST_INSTALL_REFRESH_DELAY = 1.5
+
 
 
 
@@ -336,6 +353,42 @@ end run
 	return false
 end
 
+--- Enables the given input source in the user's enabled-list and selects it,
+--- using the AppleScript ObjC bridge to call TISEnableInputSource +
+--- TISSelectInputSource. The bundle providing the source MUST already be on
+--- disk, otherwise TISCreateInputSourceList returns no match.
+--- @param raw_id string TISInputSourceID, e.g. "com.apple.keylayout.ergopti.plus".
+--- @return boolean true on success.
+local function enable_and_select_source(raw_id)
+	if type(raw_id) ~= "string" or raw_id == "" then return false end
+	local script = string.format([[
+use framework "Carbon"
+use framework "Foundation"
+on run
+	set theProps to current application's NSDictionary's dictionaryWithObjects:{"%s"} forKeys:{"TISPropertyInputSourceID"}
+	set theSources to current application's TISCreateInputSourceList(theProps, true)
+	if theSources is missing value then return "MISS"
+	set theList to theSources as list
+	if (count of theList) = 0 then return "MISS"
+	set theSource to item 1 of theList
+	current application's TISEnableInputSource(theSource)
+	current application's TISSelectInputSource(theSource)
+	return "OK"
+end run
+]], raw_id:gsub('"', '\\"'))
+	if not (hs.osascript and type(hs.osascript.applescript) == "function") then
+		Logger.error(LOG, "hs.osascript.applescript unavailable — cannot enable '%s'.", raw_id)
+		return false
+	end
+	local ok, _, raw = hs.osascript.applescript(script)
+	if ok and raw and tostring(raw):find("OK") then
+		Logger.success(LOG, "Enabled and selected '%s'.", raw_id)
+		return true
+	end
+	Logger.warn(LOG, "Failed to enable '%s' (result=%s).", raw_id, tostring(raw))
+	return false
+end
+
 --- Returns true if the given layout name looks like a legacy Ergopti bundle
 --- identifier (the pre-v2.2.2 'com.apple.keyboardlayout.ergopti.vX_Y_Z…' form).
 --- Used to decide whether the active list contains entries that need to be
@@ -524,6 +577,36 @@ end
 --- Builds the complete "Disposition clavier" submenu item.
 --- @param ctx table Global UI context. Must contain ctx.base_dir and ctx.updateMenu.
 --- @return table A single hs.menubar item with a populated submenu.
+--- Schedules a deferred menu rebuild. macOS reloads its input-source list
+--- asynchronously after a bundle is added or removed, and calling hs.keycodes
+--- in the middle of that window has been observed to crash Hammerspoon — so
+--- we wait POST_INSTALL_REFRESH_DELAY seconds before refreshing.
+--- @param update_menu function|nil Callback that rebuilds the menu structure.
+local function schedule_menu_refresh(update_menu)
+	if type(update_menu) ~= "function" then return end
+	if hs.timer and type(hs.timer.doAfter) == "function" then
+		hs.timer.doAfter(POST_INSTALL_REFRESH_DELAY, function() pcall(update_menu) end)
+	else
+		pcall(update_menu)
+	end
+end
+
+--- Wraps an install action so that, on success, every legacy Ergopti entry
+--- still sitting in the user's enabled-list is replaced by its stable-id
+--- counterpart, and the menu is rebuilt after a small delay.
+--- @param install_fn function The actual install callback (returns true on success).
+--- @param legacy_active table Legacy entries in the active input-source list.
+--- @param update_menu function|nil Menu rebuild callback.
+local function run_install_and_chain(install_fn, legacy_active, update_menu)
+	local ok = false
+	pcall(function() ok = install_fn() end)
+	if ok and type(legacy_active) == "table" and #legacy_active > 0 then
+		Logger.info(LOG, "Install succeeded — auto-upgrading %d legacy entry(ies) in the active list.", #legacy_active)
+		pcall(upgrade_active_list, legacy_active)
+	end
+	schedule_menu_refresh(update_menu)
+end
+
 --- Builds an install/update menu item for one scope (user or system).
 --- The label and click handler are derived from the relationship between the
 --- highest installed version and the latest available bundle:
@@ -598,15 +681,19 @@ function M.build(ctx)
 		submenu[#submenu + 1] = build_install_item(
 			"utilisateur", "📥", user_best, latest, latest_ver,
 			function()
-				install_user(bundles_dir, latest)
-				if update_menu then update_menu() end
+				run_install_and_chain(
+					function() return install_user(bundles_dir, latest) end,
+					legacy_active, update_menu
+				)
 			end
 		)
 		submenu[#submenu + 1] = build_install_item(
 			"système", "🔐", system_best, latest, latest_ver,
 			function()
-				install_system(bundles_dir, latest)
-				if update_menu then update_menu() end
+				run_install_and_chain(
+					function() return install_system(bundles_dir, latest) end,
+					legacy_active, update_menu
+				)
 			end
 		)
 	else
@@ -623,52 +710,71 @@ function M.build(ctx)
 	--   1. latest active in list           → greyed-out success label
 	--   2. older active, latest installed  → in-place TIS swap (programmatic)
 	--   3. older active, latest NOT installed → greyed: install latest first
-	--   4. absent, latest installed        → opens System Settings
+	--   4. absent, latest installed        → submenu of variants for one-click TIS add
 	--   5. absent, latest NOT installed    → greyed: install latest first
 	local latest_ver = latest and parse_version(latest) or nil
-	local list_label, list_disabled, list_fn
+	local latest_str = latest_ver and version_str(latest_ver) or "?"
 	if list_state.present and latest_ver and list_state.version
 		and not version_gt(latest_ver, list_state.version) then
 		-- 1. Already up to date
-		list_label    = string.format("Ergopti v%s dans la liste des dispositions ✅", version_str(list_state.version))
-		list_disabled = true
+		submenu[#submenu + 1] = {
+			title    = string.format("Ergopti v%s dans la liste des dispositions ✅", version_str(list_state.version)),
+			disabled = true,
+		}
 	elseif list_state.present and latest_ver and not latest_installed_anywhere then
 		-- 3. Older active but latest bundle missing — block the upgrade
 		local old_str = version_str(list_state.version or { 0 })
-		local new_str = version_str(latest_ver)
-		list_label    = string.format("Mettre à jour la liste — installer Ergopti v%s d’abord (v%s actif)",
-			new_str, old_str)
-		list_disabled = true
+		submenu[#submenu + 1] = {
+			title    = string.format("Mettre à jour la liste — installer Ergopti v%s d’abord (v%s actif)",
+				latest_str, old_str),
+			disabled = true,
+		}
 	elseif list_state.present and latest_ver then
 		-- 2. Older active and latest installed — programmatic swap via TIS
 		local old_str = version_str(list_state.version or { 0 })
-		local new_str = version_str(latest_ver)
-		list_label = string.format("📥 Mettre à jour Ergopti dans la liste — v%s → v%s", old_str, new_str)
-		list_fn    = function()
-			local ok = upgrade_active_list(legacy_active)
-			if ok and hs.alert then pcall(hs.alert.show, "Liste des dispositions mise à jour.") end
-			if not ok and hs.alert then
-				pcall(hs.alert.show, "Échec de la mise à jour — voir la console.", 3)
-			end
-			if update_menu then update_menu() end
-		end
+		submenu[#submenu + 1] = {
+			title = string.format("📥 Mettre à jour Ergopti dans la liste — v%s → v%s", old_str, latest_str),
+			fn    = function()
+				local ok = upgrade_active_list(legacy_active)
+				if ok and hs.alert then pcall(hs.alert.show, "Liste des dispositions mise à jour.") end
+				if not ok and hs.alert then
+					pcall(hs.alert.show, "Échec de la mise à jour — voir la console.", 3)
+				end
+				schedule_menu_refresh(update_menu)
+			end,
+		}
 	elseif latest_installed_anywhere then
-		-- 4. Absent and bundle present — defer to System Settings (clean add)
-		list_label = "➕ Ajouter Ergopti à la liste des dispositions"
-		list_fn    = function()
-			Logger.info(LOG, "Opening Keyboard input-source preferences pane.")
-			pcall(hs.execute, "open '" .. KEYBOARD_PREFS_URL .. "'")
+		-- 4. Absent and bundle present — submenu listing each variant. Clicking
+		-- a variant calls TISEnableInputSource + TISSelectInputSource directly,
+		-- so the user no longer has to detour through System Settings.
+		local add_sub = {}
+		for _, var in ipairs(ERGOPTI_VARIANTS) do
+			local id = var.id
+			add_sub[#add_sub + 1] = {
+				title = string.format("%s v%s", var.label, latest_str),
+				fn    = function()
+					local ok = enable_and_select_source(id)
+					if ok and hs.alert then
+						pcall(hs.alert.show, string.format("%s ajouté à la liste.", var.label))
+					end
+					if not ok and hs.alert then
+						pcall(hs.alert.show, "Échec de l’ajout — voir la console.", 3)
+					end
+					schedule_menu_refresh(update_menu)
+				end,
+			}
 		end
+		submenu[#submenu + 1] = {
+			title = string.format("➕ Ajouter Ergopti v%s à la liste des dispositions", latest_str),
+			menu  = add_sub,
+		}
 	else
 		-- 5. Absent and bundle missing — greyed
-		list_label    = "Installer Ergopti d’abord pour pouvoir l’ajouter à la liste"
-		list_disabled = true
+		submenu[#submenu + 1] = {
+			title    = "Installer Ergopti d’abord pour pouvoir l’ajouter à la liste",
+			disabled = true,
+		}
 	end
-	submenu[#submenu + 1] = {
-		title    = list_label,
-		disabled = list_disabled or nil,
-		fn       = list_fn,
-	}
 
 	submenu[#submenu + 1] = { title = "-" }
 
