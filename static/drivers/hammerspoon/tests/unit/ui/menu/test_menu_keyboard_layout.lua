@@ -72,9 +72,11 @@ helpers.describe("menu_keyboard_layout._clean_layout_name", function()
 		helpers.assert_eq(kbd._clean_layout_name("com.apple.keylayout.US"), "US")
 	end)
 
-	helpers.it("strips the legacy com.apple.keyboardlayout. prefix", function()
+	helpers.it("renders the legacy com.apple.keyboardlayout.ergopti.* form via the pretty formatter", function()
+		-- Ergopti entries flow through format_ergopti_display rather than
+		-- plain prefix-stripping, so the user sees a friendly name in the menu
 		helpers.assert_eq(kbd._clean_layout_name("com.apple.keyboardlayout.ergopti.v2_2_0"),
-			"ergopti.v2_2_0")
+			"Ergopti v2.2.0")
 	end)
 
 	helpers.it("strips com.apple.inputmethod. and inputsource. prefixes", function()
@@ -126,5 +128,98 @@ helpers.describe("menu_keyboard_layout._version_str", function()
 	end)
 	helpers.it("preserves single-component input", function()
 		helpers.assert_eq(kbd._version_str({3}), "3")
+	end)
+end)
+
+
+
+
+-- ====================================================
+-- ====================================================
+-- ======= 5/ format_ergopti_display + legacy id ======
+-- ====================================================
+-- ====================================================
+
+helpers.describe("menu_keyboard_layout._format_ergopti_display", function()
+	helpers.it("renders the legacy bundle id with version", function()
+		helpers.assert_eq(
+			kbd._format_ergopti_display("com.apple.keyboardlayout.ergopti.v2_2_0"),
+			"Ergopti v2.2.0")
+	end)
+
+	helpers.it("renders the plus variant", function()
+		helpers.assert_eq(
+			kbd._format_ergopti_display("com.apple.keyboardlayout.ergopti.v2_2_0.plus"),
+			"Ergopti+ v2.2.0")
+	end)
+
+	helpers.it("renders the plus_plus ANSI variant", function()
+		helpers.assert_eq(
+			kbd._format_ergopti_display("com.apple.keyboardlayout.ergopti.v2_2_1.plus_plus.ansi"),
+			"Ergopti++ ANSI v2.2.1")
+	end)
+
+	helpers.it("renders the new stable id without version suffix", function()
+		helpers.assert_eq(
+			kbd._format_ergopti_display("com.apple.keylayout.ergopti.plus"),
+			"Ergopti+")
+	end)
+
+	helpers.it("returns nil for non-Ergopti identifiers", function()
+		helpers.assert_nil(kbd._format_ergopti_display("com.apple.keylayout.French"))
+	end)
+end)
+
+helpers.describe("menu_keyboard_layout._clean_layout_name (Ergopti pretty form)", function()
+	helpers.it("uses the pretty formatter for Ergopti entries", function()
+		helpers.assert_eq(
+			kbd._clean_layout_name("com.apple.keyboardlayout.ergopti.v2_2_0.plus"),
+			"Ergopti+ v2.2.0")
+	end)
+
+	helpers.it("falls back to plain prefix-stripping for non-Ergopti entries", function()
+		helpers.assert_eq(kbd._clean_layout_name("com.apple.keylayout.French"), "French")
+	end)
+end)
+
+helpers.describe("menu_keyboard_layout._is_legacy_ergopti_id", function()
+	helpers.it("matches the keyboardlayout.ergopti prefix", function()
+		helpers.assert_true(kbd._is_legacy_ergopti_id("com.apple.keyboardlayout.ergopti.v2_2_0"))
+	end)
+
+	helpers.it("matches an embedded version even without the legacy prefix", function()
+		helpers.assert_true(kbd._is_legacy_ergopti_id("ergopti.v2_2_0"))
+	end)
+
+	helpers.it("rejects the new stable id", function()
+		helpers.assert_true(not kbd._is_legacy_ergopti_id("com.apple.keylayout.ergopti"))
+		helpers.assert_true(not kbd._is_legacy_ergopti_id("com.apple.keylayout.ergopti.plus"))
+	end)
+
+	helpers.it("rejects unrelated layout ids", function()
+		helpers.assert_true(not kbd._is_legacy_ergopti_id("com.apple.keylayout.French"))
+	end)
+end)
+
+helpers.describe("menu_keyboard_layout._migrate_legacy_id", function()
+	helpers.it("strips the version segment and renames the prefix", function()
+		helpers.assert_eq(
+			kbd._migrate_legacy_id("com.apple.keyboardlayout.ergopti.v2_2_0"),
+			"com.apple.keylayout.ergopti")
+	end)
+
+	helpers.it("preserves the variant suffix after the version is stripped", function()
+		helpers.assert_eq(
+			kbd._migrate_legacy_id("com.apple.keyboardlayout.ergopti.v2_2_0.plus"),
+			"com.apple.keylayout.ergopti.plus")
+		helpers.assert_eq(
+			kbd._migrate_legacy_id("com.apple.keyboardlayout.ergopti.v2_2_1.plus_plus.ansi"),
+			"com.apple.keylayout.ergopti.plus_plus.ansi")
+	end)
+
+	helpers.it("is a no-op on already-stable ids", function()
+		helpers.assert_eq(
+			kbd._migrate_legacy_id("com.apple.keylayout.ergopti.plus"),
+			"com.apple.keylayout.ergopti.plus")
 	end)
 end)

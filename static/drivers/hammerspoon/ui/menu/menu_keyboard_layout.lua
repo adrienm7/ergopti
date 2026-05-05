@@ -296,32 +296,135 @@ local function current_input_source_name()
 	return nil
 end
 
---- Activates the given keyboard layout via the proper Hammerspoon API.
---- @param name string Layout name as returned by hs.keycodes.layouts.
+--- Activates the given keyboard layout. First tries hs.keycodes.setLayout;
+--- if that fails (it expects the localised display name, which fails when
+--- the bundle's localisation is broken), falls back to TISSelectInputSource
+--- via the AppleScript ObjC bridge using the raw identifier.
+--- @param raw_id string The exact name returned by hs.keycodes.layouts(true).
 --- @return boolean true on success.
-local function set_input_source(name)
-	if not (hs.keycodes and type(hs.keycodes.setLayout) == "function") then return false end
-	local ok = pcall(hs.keycodes.setLayout, name)
-	if ok then
-		Logger.info(LOG, "Active layout switched to '%s'.", name)
-	else
-		Logger.warn(LOG, "Failed to switch active layout to '%s'.", name)
+local function set_input_source(raw_id)
+	if hs.keycodes and type(hs.keycodes.setLayout) == "function" then
+		local ok = pcall(hs.keycodes.setLayout, raw_id)
+		if ok then
+			Logger.info(LOG, "Active layout switched to '%s' (hs.keycodes).", raw_id)
+			return true
+		end
 	end
-	return ok
+	-- Fallback: TISSelectInputSource via Carbon framework
+	local script = string.format([[
+use framework "Carbon"
+use framework "Foundation"
+on run
+	set theProps to current application's NSDictionary's dictionaryWithObjects:{"%s"} forKeys:{"TISPropertyInputSourceID"}
+	set theSources to current application's TISCreateInputSourceList(theProps, true)
+	if theSources is not missing value and (count of (theSources as list)) > 0 then
+		set theSource to item 1 of (theSources as list)
+		current application's TISSelectInputSource(theSource)
+		return "OK"
+	end if
+	return "MISS"
+end run
+]], raw_id:gsub('"', '\\"'))
+	if hs.osascript and type(hs.osascript.applescript) == "function" then
+		local ok, _, raw = hs.osascript.applescript(script)
+		if ok and raw and tostring(raw):find("OK") then
+			Logger.info(LOG, "Active layout switched to '%s' (TIS fallback).", raw_id)
+			return true
+		end
+	end
+	Logger.warn(LOG, "Failed to switch active layout to '%s'.", raw_id)
+	return false
 end
 
---- Strips the Apple keylayout / keyboardlayout / inputmethod prefixes from a
---- raw input-source identifier so the menu shows readable names like "French"
---- or "ergopti.v2_2_0" instead of the verbose com.apple.* form.
---- @param name string Raw layout name as returned by hs.keycodes.layouts.
---- @return string Cleaned name suitable for display.
-local function clean_layout_name(name)
-	if type(name) ~= "string" then return tostring(name) end
-	return (name
-		:gsub("^com%.apple%.keylayout%.", "")
-		:gsub("^com%.apple%.keyboardlayout%.", "")
-		:gsub("^com%.apple%.inputmethod%.", "")
-		:gsub("^com%.apple%.inputsource%.", ""))
+--- Returns true if the given layout name looks like a legacy Ergopti bundle
+--- identifier (the pre-v2.2.2 'com.apple.keyboardlayout.ergopti.vX_Y_Z…' form).
+--- Used to decide whether the active list contains entries that need to be
+--- replaced by their stable-id counterparts.
+--- @param name string
+--- @return boolean
+local function is_legacy_ergopti_id(name)
+	if type(name) ~= "string" then return false end
+	local lower = name:lower()
+	return lower:find("keyboardlayout%.ergopti", 1) ~= nil
+		or lower:find("ergopti[._]v%d", 1) ~= nil
+end
+
+--- Maps a legacy Ergopti identifier to its v2.2.2+ stable equivalent.
+--- com.apple.keyboardlayout.ergopti.v2_2_0[.suffix] → com.apple.keylayout.ergopti[.suffix]
+--- @param old string
+--- @return string
+local function migrate_legacy_id(old)
+	if type(old) ~= "string" then return old end
+	local m = old:gsub("^com%.apple%.keyboardlayout%.", "com.apple.keylayout.")
+	-- Strip the version segment .vX_Y_Z (or .vX.Y.Z) wherever it appears
+	m = m:gsub("%.v%d+[._]%d+[._]%d+", "")
+	m = m:gsub("%.v%d+[._]%d+", "")
+	m = m:gsub("%.v%d+", "")
+	return m
+end
+
+--- Replaces legacy Ergopti entries in the user's active input-source list with
+--- their v2.2.2+ stable-id equivalents, then re-activates the appropriate
+--- variant. Uses TISDisableInputSource / TISEnableInputSource via the
+--- AppleScript ObjC bridge so no external tooling is required.
+--- The latest bundle MUST already be installed locally — TIS only enables
+--- input sources for layouts present on disk.
+--- @param legacy_active table Names from list_enabled_input_sources() that look legacy.
+--- @return boolean true on success.
+local function upgrade_active_list(legacy_active)
+	if type(legacy_active) ~= "table" or #legacy_active == 0 then return false end
+	-- Build the AppleScript: a sequence of disable+enable operations
+	local lines = {
+		"use framework \"Carbon\"",
+		"use framework \"Foundation\"",
+		"on findSource(theID)",
+		"\tset theProps to current application's NSDictionary's dictionaryWithObjects:{theID} forKeys:{\"TISPropertyInputSourceID\"}",
+		"\tset theSources to current application's TISCreateInputSourceList(theProps, true)",
+		"\tif theSources is missing value then return missing value",
+		"\tset theList to theSources as list",
+		"\tif (count of theList) = 0 then return missing value",
+		"\treturn item 1 of theList",
+		"end findSource",
+		"on run",
+		"\tset disabled to {}",
+		"\tset enabled to {}",
+	}
+	-- Disable each legacy id, then enable its migrated equivalent. The last
+	-- migrated id is also selected so the active layout follows the upgrade.
+	local last_new
+	for _, old in ipairs(legacy_active) do
+		local new_id = migrate_legacy_id(old)
+		last_new = new_id
+		table.insert(lines, string.format("\tset oldSrc to my findSource(\"%s\")", old:gsub('"', '\\"')))
+		table.insert(lines, "\tif oldSrc is not missing value then")
+		table.insert(lines, "\t\tcurrent application's TISDisableInputSource(oldSrc)")
+		table.insert(lines, "\t\tset end of disabled to oldSrc")
+		table.insert(lines, "\tend if")
+		table.insert(lines, string.format("\tset newSrc to my findSource(\"%s\")", new_id:gsub('"', '\\"')))
+		table.insert(lines, "\tif newSrc is not missing value then")
+		table.insert(lines, "\t\tcurrent application's TISEnableInputSource(newSrc)")
+		table.insert(lines, "\t\tset end of enabled to newSrc")
+		table.insert(lines, "\tend if")
+	end
+	if last_new then
+		table.insert(lines, string.format("\tset selSrc to my findSource(\"%s\")", last_new:gsub('"', '\\"')))
+		table.insert(lines, "\tif selSrc is not missing value then current application's TISSelectInputSource(selSrc)")
+	end
+	table.insert(lines, "\treturn (count of disabled) & \"/\" & (count of enabled)")
+	table.insert(lines, "end run")
+	local script = table.concat(lines, "\n")
+	Logger.start(LOG, "Upgrading %d legacy Ergopti entry(ies) in the active input-source list…", #legacy_active)
+	if not (hs.osascript and type(hs.osascript.applescript) == "function") then
+		Logger.error(LOG, "hs.osascript.applescript unavailable — cannot upgrade list.")
+		return false
+	end
+	local ok, result, raw = hs.osascript.applescript(script)
+	if ok then
+		Logger.success(LOG, "List upgrade applied (%s).", tostring(result or raw))
+		return true
+	end
+	Logger.error(LOG, "List upgrade failed: %s.", tostring(raw))
+	return false
 end
 
 --- Extracts the Ergopti version embedded in an input-source identifier.
@@ -343,6 +446,57 @@ local function extract_ergopti_version(name)
 	if m then return { tonumber(m), 0, 0 } end
 	-- An Ergopti layout with no version suffix is treated as version 0
 	return { 0, 0, 0 }
+end
+
+--- Renders an Ergopti input-source identifier as a human-friendly display
+--- name (e.g. "Ergopti+ v2.2.0 ANSI"). macOS normally provides this string
+--- via the bundle's InfoPlist.strings file, but bundles generated before the
+--- v2.2.2 fix used the keylayout filename as the localisation key instead of
+--- the TISInputSourceID, so hs.keycodes fell back to the raw ID. This helper
+--- recovers the pretty form purely from the ID structure.
+--- @param id string Raw or already-prefix-stripped Ergopti identifier.
+--- @return string|nil Friendly display name, or nil if the id is not Ergopti.
+local function format_ergopti_display(id)
+	if type(id) ~= "string" then return nil end
+	local lower = id:lower()
+	if not lower:find("ergopti", 1, true) then return nil end
+	-- Variant detection — order matters because "plus_plus" must match before "plus"
+	local variant
+	if lower:find("plus_plus") or lower:find("plus%.plus") then
+		variant = "++"
+	elseif lower:find("plus") then
+		variant = "+"
+	else
+		variant = ""
+	end
+	local is_ansi = lower:find("ansi") ~= nil
+	local v = extract_ergopti_version(id)
+	local version_part = ""
+	if v and (v[1] ~= 0 or v[2] ~= 0 or v[3] ~= 0) then
+		version_part = string.format(" v%d.%d.%d", v[1] or 0, v[2] or 0, v[3] or 0)
+	end
+	local ansi_part = is_ansi and " ANSI" or ""
+	return "Ergopti" .. variant .. ansi_part .. version_part
+end
+
+--- Strips the Apple keylayout / keyboardlayout / inputmethod prefixes from a
+--- raw input-source identifier and reformats Ergopti entries into their
+--- friendly form (e.g. "Ergopti+ v2.2.0 ANSI"). Non-Ergopti layouts keep
+--- their verbose-prefix-stripped form so "com.apple.keylayout.French"
+--- becomes "French".
+--- @param name string Raw layout name as returned by hs.keycodes.layouts.
+--- @return string Cleaned name suitable for display.
+local function clean_layout_name(name)
+	if type(name) ~= "string" then return tostring(name) end
+	-- For Ergopti, prefer the pretty formatter so a broken-localisation bundle
+	-- still renders nicely in the menu
+	local pretty = format_ergopti_display(name)
+	if pretty then return pretty end
+	return (name
+		:gsub("^com%.apple%.keylayout%.", "")
+		:gsub("^com%.apple%.keyboardlayout%.", "")
+		:gsub("^com%.apple%.inputmethod%.", "")
+		:gsub("^com%.apple%.inputsource%.", ""))
 end
 
 --- Inspects the active input-source list and reports whether an Ergopti
@@ -417,14 +571,29 @@ function M.build(ctx)
 	-- Pull the live state once so the closures below capture stable values
 	local sources    = list_enabled_input_sources()
 	local list_state = ergopti_in_active_layouts(sources)
+	-- Legacy entries that need to be replaced by their stable-id counterparts
+	-- when the user clicks "upgrade in list".
+	local legacy_active = {}
+	for _, n in ipairs(sources) do
+		if is_legacy_ergopti_id(n) then legacy_active[#legacy_active + 1] = n end
+	end
 
 	local latest = M.pick_latest_bundle(bundles_dir)
+	-- The list-upgrade only makes sense once the latest bundle is on disk —
+	-- TIS can't enable an input source whose .bundle isn't installed.
+	local latest_installed_anywhere = false
 	if latest then
 		local latest_ver  = parse_version(latest)
 		local user_best   = highest_installed(USER_LAYOUTS_DIR)
 		local system_best = highest_installed(SYSTEM_LAYOUTS_DIR)
-		Logger.debug(LOG, "Install probe — latest=%s, user_best=%s, system_best=%s.",
-			latest, user_best and user_best.name or "none", system_best and system_best.name or "none")
+		latest_installed_anywhere =
+			(user_best   and not version_gt(latest_ver, user_best.version))
+			or (system_best and not version_gt(latest_ver, system_best.version))
+			or false
+		Logger.debug(LOG, "Install probe — latest=%s, user_best=%s, system_best=%s, latest_installed=%s.",
+			latest, user_best and user_best.name or "none",
+			system_best and system_best.name or "none",
+			tostring(latest_installed_anywhere))
 
 		submenu[#submenu + 1] = build_install_item(
 			"utilisateur", "📥", user_best, latest, latest_ver,
@@ -448,36 +617,52 @@ function M.build(ctx)
 		}
 	end
 
-	-- Add / upgrade Ergopti in the macOS input-source list. macOS does not
-	-- expose a clean programmatic API for this, so we open the Keyboard panel
-	-- and let the user finish the action manually. The label adapts to:
-	--   - absent      → "➕ Ajouter Ergopti à la liste"
-	--   - older active → "📥 Mettre à jour Ergopti dans la liste (vOLD → vLATEST)"
-	--   - latest active → greyed-out success label
+	-- Add / upgrade Ergopti in the macOS input-source list.
+	--
+	-- Five possible states:
+	--   1. latest active in list           → greyed-out success label
+	--   2. older active, latest installed  → in-place TIS swap (programmatic)
+	--   3. older active, latest NOT installed → greyed: install latest first
+	--   4. absent, latest installed        → opens System Settings
+	--   5. absent, latest NOT installed    → greyed: install latest first
 	local latest_ver = latest and parse_version(latest) or nil
 	local list_label, list_disabled, list_fn
 	if list_state.present and latest_ver and list_state.version
 		and not version_gt(latest_ver, list_state.version) then
+		-- 1. Already up to date
 		list_label    = string.format("Ergopti v%s dans la liste des dispositions ✅", version_str(list_state.version))
 		list_disabled = true
+	elseif list_state.present and latest_ver and not latest_installed_anywhere then
+		-- 3. Older active but latest bundle missing — block the upgrade
+		local old_str = version_str(list_state.version or { 0 })
+		local new_str = version_str(latest_ver)
+		list_label    = string.format("Mettre à jour la liste — installer Ergopti v%s d’abord (v%s actif)",
+			new_str, old_str)
+		list_disabled = true
 	elseif list_state.present and latest_ver then
+		-- 2. Older active and latest installed — programmatic swap via TIS
 		local old_str = version_str(list_state.version or { 0 })
 		local new_str = version_str(latest_ver)
 		list_label = string.format("📥 Mettre à jour Ergopti dans la liste — v%s → v%s", old_str, new_str)
 		list_fn    = function()
-			Logger.info(LOG, "Opening Keyboard panel for in-list upgrade (manual swap).")
-			if hs.alert then
-				pcall(hs.alert.show,
-					"Retirez l’ancienne version puis ajoutez la nouvelle dans la liste.", 4)
+			local ok = upgrade_active_list(legacy_active)
+			if ok and hs.alert then pcall(hs.alert.show, "Liste des dispositions mise à jour.") end
+			if not ok and hs.alert then
+				pcall(hs.alert.show, "Échec de la mise à jour — voir la console.", 3)
 			end
-			pcall(hs.execute, "open '" .. KEYBOARD_PREFS_URL .. "'")
+			if update_menu then update_menu() end
 		end
-	else
+	elseif latest_installed_anywhere then
+		-- 4. Absent and bundle present — defer to System Settings (clean add)
 		list_label = "➕ Ajouter Ergopti à la liste des dispositions"
 		list_fn    = function()
 			Logger.info(LOG, "Opening Keyboard input-source preferences pane.")
 			pcall(hs.execute, "open '" .. KEYBOARD_PREFS_URL .. "'")
 		end
+	else
+		-- 5. Absent and bundle missing — greyed
+		list_label    = "Installer Ergopti d’abord pour pouvoir l’ajouter à la liste"
+		list_disabled = true
 	end
 	submenu[#submenu + 1] = {
 		title    = list_label,
@@ -553,5 +738,8 @@ end
 M._version_str             = version_str
 M._clean_layout_name       = clean_layout_name
 M._extract_ergopti_version = extract_ergopti_version
+M._format_ergopti_display  = format_ergopti_display
+M._is_legacy_ergopti_id    = is_legacy_ergopti_id
+M._migrate_legacy_id       = migrate_legacy_id
 
 return M
