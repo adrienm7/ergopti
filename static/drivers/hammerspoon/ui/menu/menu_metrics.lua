@@ -540,7 +540,7 @@ function M.build(ctx)
 	})
 
 	return {
-		title   = "Métriques 📊",
+		title   = "📊 Métriques",
 		checked = state.keylogger_enabled,
 		fn      = function()
 			if not state.keylogger_enabled then
