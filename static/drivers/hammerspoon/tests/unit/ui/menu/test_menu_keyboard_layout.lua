@@ -56,3 +56,75 @@ helpers.describe("menu_keyboard_layout.pick_latest_bundle", function()
 		helpers.assert_nil(kbd.pick_latest_bundle("/no/such/dir/here/"))
 	end)
 end)
+
+
+
+
+-- ====================================================
+-- ====================================================
+-- ======= 4/ Display & version-extraction helpers ====
+-- ====================================================
+-- ====================================================
+
+helpers.describe("menu_keyboard_layout._clean_layout_name", function()
+	helpers.it("strips the standard com.apple.keylayout. prefix", function()
+		helpers.assert_eq(kbd._clean_layout_name("com.apple.keylayout.French"), "French")
+		helpers.assert_eq(kbd._clean_layout_name("com.apple.keylayout.US"), "US")
+	end)
+
+	helpers.it("strips the legacy com.apple.keyboardlayout. prefix", function()
+		helpers.assert_eq(kbd._clean_layout_name("com.apple.keyboardlayout.ergopti.v2_2_0"),
+			"ergopti.v2_2_0")
+	end)
+
+	helpers.it("strips com.apple.inputmethod. and inputsource. prefixes", function()
+		helpers.assert_eq(kbd._clean_layout_name("com.apple.inputmethod.SCIM.ITABC"), "SCIM.ITABC")
+		helpers.assert_eq(kbd._clean_layout_name("com.apple.inputsource.foo"), "foo")
+	end)
+
+	helpers.it("returns the input verbatim when no Apple prefix is present", function()
+		helpers.assert_eq(kbd._clean_layout_name("Ergopti"), "Ergopti")
+	end)
+
+	helpers.it("coerces non-string input safely", function()
+		helpers.assert_eq(kbd._clean_layout_name(nil), "nil")
+		helpers.assert_eq(kbd._clean_layout_name(42), "42")
+	end)
+end)
+
+helpers.describe("menu_keyboard_layout._extract_ergopti_version", function()
+	helpers.it("extracts v2_2_0 from the legacy underscore form", function()
+		local v = kbd._extract_ergopti_version("com.apple.keyboardlayout.ergopti.v2_2_0")
+		helpers.assert_eq(v[1], 2) ; helpers.assert_eq(v[2], 2) ; helpers.assert_eq(v[3], 0)
+	end)
+
+	helpers.it("extracts v2.2.1 from the dotted form", function()
+		local v = kbd._extract_ergopti_version("com.apple.keylayout.ergopti.v2.2.1")
+		helpers.assert_eq(v[1], 2) ; helpers.assert_eq(v[2], 2) ; helpers.assert_eq(v[3], 1)
+	end)
+
+	helpers.it("zero-fills missing minor / patch components", function()
+		local v1 = kbd._extract_ergopti_version("ergopti_v2.2")
+		helpers.assert_eq(v1[3], 0)
+		local v2 = kbd._extract_ergopti_version("ergopti.v3")
+		helpers.assert_eq(v2[1], 3) ; helpers.assert_eq(v2[2], 0) ; helpers.assert_eq(v2[3], 0)
+	end)
+
+	helpers.it("returns a zeroed tuple for unversioned ergopti ids", function()
+		local v = kbd._extract_ergopti_version("com.apple.keylayout.ergopti")
+		helpers.assert_eq(v[1], 0) ; helpers.assert_eq(v[2], 0) ; helpers.assert_eq(v[3], 0)
+	end)
+
+	helpers.it("returns nil when the name is unrelated to Ergopti", function()
+		helpers.assert_nil(kbd._extract_ergopti_version("com.apple.keylayout.French"))
+	end)
+end)
+
+helpers.describe("menu_keyboard_layout._version_str", function()
+	helpers.it("renders {2,2,1} as '2.2.1'", function()
+		helpers.assert_eq(kbd._version_str({2,2,1}), "2.2.1")
+	end)
+	helpers.it("preserves single-component input", function()
+		helpers.assert_eq(kbd._version_str({3}), "3")
+	end)
+end)

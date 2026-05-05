@@ -122,7 +122,8 @@ function M.pick_latest_bundle(dir)
 	return best
 end
 
--- Internal helpers exposed for unit tests
+-- Internal helpers exposed for unit tests (additional helpers defined later in
+-- this file are wired up at the bottom, just before `return M`).
 M._parse_version = parse_version
 M._version_gt    = version_gt
 
@@ -159,15 +160,65 @@ local function path_exists(path)
 	return ok == true
 end
 
---- Copies the bundle to the user's Keyboard Layouts directory.
+--- Lists every Ergopti_v*.bundle currently installed in `dir`.
+--- Returns the parsed version components for each so callers can compare to
+--- the latest available version without having to re-parse strings.
+--- @param dir string Absolute path of the Keyboard Layouts directory.
+--- @return table Array of { name = string, version = table } entries.
+local function find_installed_bundles(dir)
+	local out = {}
+	if type(dir) ~= "string" or dir == "" then return out end
+	local cmd = string.format("ls -1 %q 2>/dev/null", dir)
+	local p = io.popen(cmd)
+	if not p then return out end
+	for line in p:lines() do
+		line = line:gsub("[\r\n]+$", "")
+		if line:match("^Ergopti_v[%d%.]+%.bundle$") then
+			local v = parse_version(line)
+			if v then out[#out + 1] = { name = line, version = v } end
+		end
+	end
+	p:close()
+	return out
+end
+
+--- Returns the highest installed Ergopti version in the given directory.
+--- @param dir string Absolute path of the Keyboard Layouts directory.
+--- @return table|nil { name = string, version = table } or nil if none.
+local function highest_installed(dir)
+	local best
+	for _, entry in ipairs(find_installed_bundles(dir)) do
+		if not best or version_gt(entry.version, best.version) then
+			best = entry
+		end
+	end
+	return best
+end
+
+--- Renders a version components table back to a human-readable string.
+--- @param v table Numeric version components, e.g. {2,2,1}.
+--- @return string e.g. "2.2.1".
+local function version_str(v)
+	if type(v) ~= "table" then return "?" end
+	local parts = {}
+	for _, n in ipairs(v) do parts[#parts + 1] = tostring(n) end
+	return table.concat(parts, ".")
+end
+
+--- Copies the latest bundle to the user's Keyboard Layouts directory.
+--- Existing Ergopti_v*.bundle entries are removed first so the layout list
+--- doesn't end up with multiple side-by-side versions.
 --- @param bundles_dir string Absolute path of the source bundles directory.
 --- @param bundle_name string Basename of the bundle to install.
 --- @return boolean true on success.
 local function install_user(bundles_dir, bundle_name)
 	Logger.start(LOG, "Installing %s into the user Keyboard Layouts folder…", bundle_name)
 	local cmd = string.format(
-		"mkdir -p \"%s\" && cp -R \"%s%s\" \"%s\"",
-		USER_LAYOUTS_DIR, bundles_dir, bundle_name, USER_LAYOUTS_DIR
+		'mkdir -p %q && rm -rf %q/Ergopti_v*.bundle && cp -R %q %q',
+		USER_LAYOUTS_DIR,
+		USER_LAYOUTS_DIR:gsub("/$", ""),
+		bundles_dir .. bundle_name,
+		USER_LAYOUTS_DIR
 	)
 	local out, ok = hs.execute(cmd)
 	if ok then
@@ -179,17 +230,17 @@ local function install_user(bundles_dir, bundle_name)
 	return false
 end
 
---- Copies the bundle to /Library/Keyboard Layouts/ via osascript with admin privileges.
---- Triggers a macOS password prompt.
+--- Copies the latest bundle to /Library/Keyboard Layouts/ via osascript with
+--- administrator privileges. Triggers a macOS password prompt. Existing
+--- Ergopti_v*.bundle entries are removed first to keep the list clean.
 --- @param bundles_dir string Absolute path of the source bundles directory.
 --- @param bundle_name string Basename of the bundle to install.
 --- @return boolean true on success.
 local function install_system(bundles_dir, bundle_name)
 	Logger.start(LOG, "Installing %s into the system Keyboard Layouts folder (sudo)…", bundle_name)
-	-- Escape double quotes inside the AppleScript string
 	local shell_cmd = string.format(
-		"cp -R '%s%s' '%s'",
-		bundles_dir, bundle_name, SYSTEM_LAYOUTS_DIR
+		"rm -rf '%sErgopti_v'*.bundle && cp -R '%s%s' '%s'",
+		SYSTEM_LAYOUTS_DIR, bundles_dir, bundle_name, SYSTEM_LAYOUTS_DIR
 	)
 	local script = string.format(
 		"do shell script \"%s\" with administrator privileges",
@@ -259,18 +310,52 @@ local function set_input_source(name)
 	return ok
 end
 
---- Returns true if any enabled layout name contains "Ergopti" (case-insensitive).
---- The .bundle's input source name is what shows up in the macOS menubar list,
---- so a substring match is more robust than trying to parse the bundle plist.
+--- Strips the Apple keylayout / keyboardlayout / inputmethod prefixes from a
+--- raw input-source identifier so the menu shows readable names like "French"
+--- or "ergopti.v2_2_0" instead of the verbose com.apple.* form.
+--- @param name string Raw layout name as returned by hs.keycodes.layouts.
+--- @return string Cleaned name suitable for display.
+local function clean_layout_name(name)
+	if type(name) ~= "string" then return tostring(name) end
+	return (name
+		:gsub("^com%.apple%.keylayout%.", "")
+		:gsub("^com%.apple%.keyboardlayout%.", "")
+		:gsub("^com%.apple%.inputmethod%.", "")
+		:gsub("^com%.apple%.inputsource%.", ""))
+end
+
+--- Extracts the Ergopti version embedded in an input-source identifier.
+--- Supports both legacy ("com.apple.keyboardlayout.ergopti.v2_2_0") and
+--- current macOS-standard ("com.apple.keylayout.ergopti.v2.2.1") forms.
+--- @param name string Raw or cleaned layout name.
+--- @return table|nil Numeric version components or nil if not an Ergopti id.
+local function extract_ergopti_version(name)
+	if type(name) ~= "string" then return nil end
+	local lower = name:lower()
+	if not lower:find("ergopti", 1, true) then return nil end
+	-- Match v<major>(_|.)<minor>(_|.)<patch> after the ergopti keyword
+	local maj, min, pat = lower:match("ergopti[._]v(%d+)[._%-](%d+)[._%-](%d+)")
+	if maj then return { tonumber(maj), tonumber(min), tonumber(pat) } end
+	-- Match shorter forms like ergopti_v2.2 or ergopti.v2
+	local m1, m2 = lower:match("ergopti[._]v(%d+)[._%-](%d+)")
+	if m1 then return { tonumber(m1), tonumber(m2), 0 } end
+	local m = lower:match("ergopti[._]v(%d+)")
+	if m then return { tonumber(m), 0, 0 } end
+	-- An Ergopti layout with no version suffix is treated as version 0
+	return { 0, 0, 0 }
+end
+
+--- Inspects the active input-source list and reports whether an Ergopti
+--- layout is present along with its installed version (if extractable).
 --- @param sources table List of layout names returned by list_enabled_input_sources.
---- @return boolean
+--- @return table { present = boolean, name = string|nil, version = table|nil }
 local function ergopti_in_active_layouts(sources)
 	for _, n in ipairs(sources) do
 		if type(n) == "string" and n:lower():find("ergopti", 1, true) then
-			return true
+			return { present = true, name = n, version = extract_ergopti_version(n) }
 		end
 	end
-	return false
+	return { present = false }
 end
 
 
@@ -285,6 +370,42 @@ end
 --- Builds the complete "Disposition clavier" submenu item.
 --- @param ctx table Global UI context. Must contain ctx.base_dir and ctx.updateMenu.
 --- @return table A single hs.menubar item with a populated submenu.
+--- Builds an install/update menu item for one scope (user or system).
+--- The label and click handler are derived from the relationship between the
+--- highest installed version and the latest available bundle:
+---   - latest already installed → greyed out with a success label
+---   - older version installed  → "Mettre à jour (vOLD → vLATEST)"
+---   - nothing installed        → "Installer (vLATEST)"
+--- @param scope_label string Short scope tag for the menu label ("utilisateur"|"système").
+--- @param emoji_install string Emoji prefix shown for the fresh-install label.
+--- @param installed table|nil { name, version } from highest_installed(target_dir).
+--- @param latest_name string Basename of the latest bundle.
+--- @param latest_ver table Numeric components of the latest version.
+--- @param do_install function Callback invoked when the user clicks install/update.
+--- @return table A single hs.menubar item.
+local function build_install_item(scope_label, emoji_install, installed, latest_name, latest_ver, do_install)
+	local latest_str = version_str(latest_ver)
+	if installed and not version_gt(latest_ver, installed.version) then
+		-- Latest already installed — nothing to do
+		return {
+			title    = string.format("Ergopti (%s) v%s installé ✅", scope_label, latest_str),
+			disabled = true,
+		}
+	end
+	if installed then
+		-- An older version is on disk; offer an in-place upgrade
+		local old_str = version_str(installed.version)
+		return {
+			title = string.format("📥 Mettre à jour Ergopti (%s) — v%s → v%s", scope_label, old_str, latest_str),
+			fn    = do_install,
+		}
+	end
+	return {
+		title = string.format("%s Installer Ergopti (%s) — v%s", emoji_install, scope_label, latest_str),
+		fn    = do_install,
+	}
+end
+
 function M.build(ctx)
 	local update_menu  = ctx and ctx.updateMenu
 	local refresh_icon = ctx and ctx.refresh_icon
@@ -294,38 +415,31 @@ function M.build(ctx)
 	local submenu = {}
 
 	-- Pull the live state once so the closures below capture stable values
-	local sources       = list_enabled_input_sources()
-	local already_in_list = ergopti_in_active_layouts(sources)
+	local sources    = list_enabled_input_sources()
+	local list_state = ergopti_in_active_layouts(sources)
 
 	local latest = M.pick_latest_bundle(bundles_dir)
 	if latest then
-		local user_target   = USER_LAYOUTS_DIR .. latest
-		local system_target = SYSTEM_LAYOUTS_DIR .. latest
-		local user_done     = path_exists(user_target)
-		local system_done   = path_exists(system_target)
-		Logger.debug(LOG, "Install probe — user=%s, system=%s, user_path=%s.",
-			tostring(user_done), tostring(system_done), user_target)
+		local latest_ver  = parse_version(latest)
+		local user_best   = highest_installed(USER_LAYOUTS_DIR)
+		local system_best = highest_installed(SYSTEM_LAYOUTS_DIR)
+		Logger.debug(LOG, "Install probe — latest=%s, user_best=%s, system_best=%s.",
+			latest, user_best and user_best.name or "none", system_best and system_best.name or "none")
 
-		submenu[#submenu + 1] = {
-			title    = user_done
-				and string.format("Ergopti (utilisateur) installé ✅ — %s", latest)
-				or  string.format("📥 Installer Ergopti (utilisateur) — %s", latest),
-			disabled = user_done or nil,
-			fn       = (not user_done) and function()
+		submenu[#submenu + 1] = build_install_item(
+			"utilisateur", "📥", user_best, latest, latest_ver,
+			function()
 				install_user(bundles_dir, latest)
 				if update_menu then update_menu() end
-			end or nil,
-		}
-		submenu[#submenu + 1] = {
-			title    = system_done
-				and string.format("Ergopti (système) installé ✅ — %s", latest)
-				or  string.format("🔐 Installer Ergopti (système, sudo) — %s", latest),
-			disabled = system_done or nil,
-			fn       = (not system_done) and function()
+			end
+		)
+		submenu[#submenu + 1] = build_install_item(
+			"système", "🔐", system_best, latest, latest_ver,
+			function()
 				install_system(bundles_dir, latest)
 				if update_menu then update_menu() end
-			end or nil,
-		}
+			end
+		)
 	else
 		Logger.warn(LOG, "No Ergopti bundle found in %s.", bundles_dir)
 		submenu[#submenu + 1] = {
@@ -334,19 +448,41 @@ function M.build(ctx)
 		}
 	end
 
-	-- Add-to-list: programmatic mutation of AppleEnabledInputSources is fragile
-	-- across macOS versions, so we defer to System Settings. When Ergopti is
-	-- already in the user's input-source list the item is greyed out with a
-	-- success label.
-	submenu[#submenu + 1] = {
-		title    = already_in_list
-			and "Ergopti dans la liste des dispositions ✅"
-			or  "➕ Ajouter Ergopti à la liste des dispositions",
-		disabled = already_in_list or nil,
-		fn       = (not already_in_list) and function()
+	-- Add / upgrade Ergopti in the macOS input-source list. macOS does not
+	-- expose a clean programmatic API for this, so we open the Keyboard panel
+	-- and let the user finish the action manually. The label adapts to:
+	--   - absent      → "➕ Ajouter Ergopti à la liste"
+	--   - older active → "📥 Mettre à jour Ergopti dans la liste (vOLD → vLATEST)"
+	--   - latest active → greyed-out success label
+	local latest_ver = latest and parse_version(latest) or nil
+	local list_label, list_disabled, list_fn
+	if list_state.present and latest_ver and list_state.version
+		and not version_gt(latest_ver, list_state.version) then
+		list_label    = string.format("Ergopti v%s dans la liste des dispositions ✅", version_str(list_state.version))
+		list_disabled = true
+	elseif list_state.present and latest_ver then
+		local old_str = version_str(list_state.version or { 0 })
+		local new_str = version_str(latest_ver)
+		list_label = string.format("📥 Mettre à jour Ergopti dans la liste — v%s → v%s", old_str, new_str)
+		list_fn    = function()
+			Logger.info(LOG, "Opening Keyboard panel for in-list upgrade (manual swap).")
+			if hs.alert then
+				pcall(hs.alert.show,
+					"Retirez l’ancienne version puis ajoutez la nouvelle dans la liste.", 4)
+			end
+			pcall(hs.execute, "open '" .. KEYBOARD_PREFS_URL .. "'")
+		end
+	else
+		list_label = "➕ Ajouter Ergopti à la liste des dispositions"
+		list_fn    = function()
 			Logger.info(LOG, "Opening Keyboard input-source preferences pane.")
 			pcall(hs.execute, "open '" .. KEYBOARD_PREFS_URL .. "'")
-		end or nil,
+		end
+	end
+	submenu[#submenu + 1] = {
+		title    = list_label,
+		disabled = list_disabled or nil,
+		fn       = list_fn,
 	}
 
 	submenu[#submenu + 1] = { title = "-" }
@@ -381,7 +517,8 @@ function M.build(ctx)
 
 	-- Active layouts list — one item per enabled input source, with a checkmark
 	-- on the currently selected one. Clicking a row switches the active layout
-	-- via hs.keycodes.setLayout.
+	-- via hs.keycodes.setLayout. Display names are stripped of the verbose
+	-- com.apple.{key,keyboard,input}* prefixes for readability.
 	submenu[#submenu + 1] = { title = "Dispositions actives", disabled = true }
 	if #sources == 0 then
 		submenu[#submenu + 1] = {
@@ -390,12 +527,15 @@ function M.build(ctx)
 		}
 	else
 		local active = current_input_source_name()
-		for _, name in ipairs(sources) do
+		for _, raw_name in ipairs(sources) do
+			local display = clean_layout_name(raw_name)
+			-- The original raw name is captured by the closure so that
+			-- hs.keycodes.setLayout still receives a value the API recognises
 			submenu[#submenu + 1] = {
-				title   = name,
-				checked = (name == active) or nil,
+				title   = display,
+				checked = (raw_name == active) or nil,
 				fn      = function()
-					set_input_source(name)
+					set_input_source(raw_name)
 					if update_menu then update_menu() end
 				end,
 			}
@@ -407,5 +547,11 @@ function M.build(ctx)
 		menu  = submenu,
 	}
 end
+
+-- Late-bound test hooks: the helpers below are defined after section 2, so we
+-- expose them here to keep section 2 self-contained.
+M._version_str             = version_str
+M._clean_layout_name       = clean_layout_name
+M._extract_ergopti_version = extract_ergopti_version
 
 return M
