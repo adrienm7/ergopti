@@ -38,7 +38,7 @@ if not ok_pe then prompt_editor = nil end
 --- @return string The formatted label ready for UI display.
 local function format_dynamic_label(label, num_preds)
 	if type(label) ~= "string" then return "" end
-	local n = tonumber(num_preds) or 1
+	local n = tonumber(num_preds) or llm_mod.DEFAULT_STATE.llm_num_predictions
 	local s = (n > 1) and "s" or ""
 	return label:gsub("{n}", tostring(n)):gsub("{s}", s)
 end

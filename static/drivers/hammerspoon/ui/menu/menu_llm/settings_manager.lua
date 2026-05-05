@@ -188,7 +188,7 @@ function M.new(deps)
 	end
 	
 	function obj.reset_max_words() 
-		reset_to_default(deps, "llm_max_words", llm_mod.DEFAULT_STATE.llm_max_words or 5, "set_llm_max_words") 
+		reset_to_default(deps, "llm_max_words", llm_mod.DEFAULT_STATE.llm_max_words, "set_llm_max_words")
 	end
 
 	--- Sets the minimum number of words generated per prediction.

@@ -416,7 +416,7 @@ function M.create(deps)
 
     --- Gets a human-readable label for a profile.
     local function get_profile_label(profile_id)
-        local current_preds = tonumber(state.llm_num_predictions) or 1
+        local current_preds = tonumber(state.llm_num_predictions) or llm_mod.DEFAULT_STATE.llm_num_predictions
         local batch_suffix = current_preds > 1 and "s" or ""
         
         local labels = {
@@ -1287,7 +1287,7 @@ function M.create(deps)
         profiles_item.disabled = is_disabled or nil
         table.insert(main_menu, profiles_item)
 
-        table.insert(main_menu, { title = "Nombre de suggestions : " .. tostring(state.llm_num_predictions or 1), disabled = is_disabled or nil, menu = build_num_pred_menu() })
+        table.insert(main_menu, { title = "Nombre de suggestions : " .. tostring(state.llm_num_predictions or llm_mod.DEFAULT_STATE.llm_num_predictions), disabled = is_disabled or nil, menu = build_num_pred_menu() })
         if state.llm_num_predictions ~= llm_mod.DEFAULT_STATE.llm_num_predictions then
             table.insert(main_menu, {
                 title    = "  ↳ Réinitialiser (défaut : " .. tostring(llm_mod.DEFAULT_STATE.llm_num_predictions) .. ")",
@@ -1322,12 +1322,12 @@ function M.create(deps)
             end
         })
 
-        local debounce_val = tonumber(state.llm_debounce) or llm_mod.DEFAULT_STATE.llm_debounce or 0.5
+        local debounce_val = tonumber(state.llm_debounce) or llm_mod.DEFAULT_STATE.llm_debounce
         local debounce_display = (debounce_val <= 0) and "Jamais" or (math.floor(debounce_val * 1000) .. " ms…")
 
         table.insert(trigger_menu, { title = "Temps d’inactivité avant suggestion : " .. debounce_display, disabled = is_disabled or nil, fn = settings_mgr.set_debounce })
         if state.llm_debounce ~= llm_mod.DEFAULT_STATE.llm_debounce then
-            table.insert(trigger_menu, { title = "  ↳ Réinitialiser (défaut : " .. math.floor((llm_mod.DEFAULT_STATE.llm_debounce or 0.5) * 1000) .. " ms)", disabled = is_disabled or nil, fn = settings_mgr.reset_debounce })
+            table.insert(trigger_menu, { title = "  ↳ Réinitialiser (défaut : " .. math.floor(llm_mod.DEFAULT_STATE.llm_debounce * 1000) .. " ms)", disabled = is_disabled or nil, fn = settings_mgr.reset_debounce })
         end
 
         table.insert(trigger_menu, {
@@ -1442,7 +1442,7 @@ function M.create(deps)
         table.insert(generation_menu, {
             title    = "  ↳ Hausser la temp. automatiquement (+0.1 par suggestion)",
             checked  = state.llm_auto_raise_temp,
-            disabled = (is_disabled or (tonumber(state.llm_num_predictions) or 1) < 2) or nil,
+            disabled = (is_disabled or (tonumber(state.llm_num_predictions) or llm_mod.DEFAULT_STATE.llm_num_predictions) < 2) or nil,
             fn       = function()
                 state.llm_auto_raise_temp = not state.llm_auto_raise_temp
                 if keymap and type(keymap.set_llm_auto_raise_temp) == "function" then
@@ -1459,7 +1459,7 @@ function M.create(deps)
 
         local display_menu = {}
 
-        local num_preds_safe = tonumber(state.llm_num_predictions) or 1
+        local num_preds_safe = tonumber(state.llm_num_predictions) or llm_mod.DEFAULT_STATE.llm_num_predictions
         table.insert(display_menu, {
             title    = "Indentation de la suggestion sélectionnée",
             disabled = (is_disabled or num_preds_safe < 2) or nil,
@@ -1480,7 +1480,7 @@ function M.create(deps)
         -- Streaming flags are nil-safe: old configs without these keys default to false
         local streaming_on       = (state.llm_streaming == true)
         local streaming_multi_on = (state.llm_streaming_multi == true)  -- true = show predictions as they arrive (progressive/parallel)
-        local num_preds_multi    = tonumber(state.llm_num_predictions) or 1
+        local num_preds_multi    = tonumber(state.llm_num_predictions) or llm_mod.DEFAULT_STATE.llm_num_predictions
         table.insert(display_menu, {
             title    = "Afficher chaque suggestion en streaming (token par token)",
             checked  = streaming_on,
@@ -1522,7 +1522,7 @@ function M.create(deps)
         if val_mods == nil then val_mods = llm_mod.DEFAULT_STATE.llm_val_modifiers end
         if keymap and type(keymap.set_llm_val_modifiers) == "function" then pcall(keymap.set_llm_val_modifiers, val_mods) end
 
-        local num_preds_safe = tonumber(state.llm_num_predictions) or 1
+        local num_preds_safe = tonumber(state.llm_num_predictions) or llm_mod.DEFAULT_STATE.llm_num_predictions
         local nav_title = format_shortcut_title("Naviguer dans les suggestions (↑/← et ↓/→)", nav_mods, "Flèches seules", "Flèches")
         table.insert(nav_menu_items, {
             title    = nav_title,

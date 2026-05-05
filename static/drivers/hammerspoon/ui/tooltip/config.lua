@@ -47,9 +47,19 @@ M.colors = {
 	loading    = { red = 0.94, green = 0.78, blue = 0.28, alpha = 1.0 }
 }
 
+-- Default tooltip durations (seconds). 0 means "infinite display".
+local DEFAULT_TIMEOUT_SEC     = 2.5
+local DEFAULT_LLM_TIMEOUT_SEC = 12.0
+
+-- Internal floor preserved when a positive timeout is requested. Any positive
+-- caller-provided value is reduced by TIMEOUT_DECREMENT_SEC so back-to-back
+-- tooltips do not visually overlap, but never below TIMEOUT_FLOOR_SEC.
+local TIMEOUT_FLOOR_SEC     = 0.05
+local TIMEOUT_DECREMENT_SEC = 0.1
+
 M.settings = {
-	timeout_sec          = 2.5,
-	llm_timeout_sec      = 12.0,
+	timeout_sec          = DEFAULT_TIMEOUT_SEC,
+	llm_timeout_sec      = DEFAULT_LLM_TIMEOUT_SEC,
 	colorization_enabled = true
 }
 
@@ -82,24 +92,24 @@ end
 --- Safely sets the general tooltip timeout.
 --- @param seconds number The duration in seconds. Uses 0 for infinite.
 function M.set_timeout(seconds)
-	local base_timeout = tonumber(seconds) or 2.5
+	local base_timeout = tonumber(seconds) or DEFAULT_TIMEOUT_SEC
 	if base_timeout <= 0 then
 		M.settings.timeout_sec = 0
 		Logger.info(LOG, "Standard timeout disabled (infinite).")
 	else
-		M.settings.timeout_sec = math.max(0.05, base_timeout - 0.1)
+		M.settings.timeout_sec = math.max(TIMEOUT_FLOOR_SEC, base_timeout - TIMEOUT_DECREMENT_SEC)
 	end
 end
 
 --- Safely sets the LLM specific tooltip timeout.
 --- @param seconds number The duration in seconds. Uses 0 for infinite.
 function M.set_llm_timeout(seconds)
-	local base_timeout = tonumber(seconds) or 12.0
+	local base_timeout = tonumber(seconds) or DEFAULT_LLM_TIMEOUT_SEC
 	if base_timeout <= 0 then
 		M.settings.llm_timeout_sec = 0
 		Logger.info(LOG, "LLM timeout disabled (infinite).")
 	else
-		M.settings.llm_timeout_sec = math.max(0.05, base_timeout - 0.1)
+		M.settings.llm_timeout_sec = math.max(TIMEOUT_FLOOR_SEC, base_timeout - TIMEOUT_DECREMENT_SEC)
 	end
 end
 
