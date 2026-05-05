@@ -154,7 +154,7 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 			-- icon to blow up to its native resolution. Canvas re-rendering forces
 			-- a clean downscale so any image (27×27, 512×512, SVG-export, …)
 			-- displays at the exact menubar size.
-			local TARGET = 20
+			local TARGET = 18
 			local scaled = ico
 			pcall(function()
 				local sz = ico.size and ico:size() or nil
