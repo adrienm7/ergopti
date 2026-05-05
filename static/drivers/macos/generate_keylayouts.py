@@ -299,4 +299,4 @@ def show_execution_summary(processed: int, errors: int) -> None:
 
 
 if __name__ == "__main__":
-    main("Ergopti_v2.2.1_v0.keylayout", overwrite=True)
+    main("Ergopti_v2.2.2_v0.keylayout", overwrite=True)

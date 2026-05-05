@@ -8,7 +8,16 @@ from pathlib import Path
 
 from utilities.logger import logger
 
-BUNDLE_IDENTIFIER = "com.apple.keyboardlayout.ergopti"
+# Apple's documented convention for keyboard layout bundle identifiers is
+# `com.apple.keylayout.<name>`. The previous `com.apple.keyboardlayout.…` form
+# was non-standard and caused two annoyances:
+#   1. The OS treated each version as a *different* input source, so an
+#      upgrade left the old entry sitting next to the new one.
+#   2. hs.keycodes (and System Settings) sometimes failed to resolve the
+#      localised display name and fell back to the raw identifier.
+# Bundle ID and TISInputSourceIDs are now stable across versions; the
+# version lives only in the bundle filename and CFBundleVersion.
+BUNDLE_IDENTIFIER = "com.apple.keylayout.ergopti"
 LOGS_INDENTATION = "\t"
 
 
@@ -38,8 +47,11 @@ def create_bundle(
     resources_path.mkdir(parents=True, exist_ok=True)
 
     info_plist_entries = []
-    # Each entry: (internal_name, variant, is_ansi)
-    layout_localization_infos: list[tuple[str, str, bool]] = []
+    # Each entry: (internal_name, variant, is_ansi, input_source_id)
+    # The input_source_id is needed because macOS looks up the localised display
+    # name by `kTISPropertyInputSourceID` — using anything else (e.g. the
+    # keylayout filename) silently falls back to the raw ID in System Settings.
+    layout_localization_infos: list[tuple[str, str, bool, str]] = []
 
     # Extract version for filename format
     match = re.search(r"(v\d+\.\d+\.\d+)", version)
@@ -104,8 +116,29 @@ def create_bundle(
         dest_layout = resources_path / dest_filename
         dest_layout.write_text(content, encoding="utf-8")
 
-        # Store variant and whether it's ANSI for localization
-        layout_localization_infos.append((new_name, variant, is_ansi))
+        # Build input source id WITHOUT version suffix. macOS treats two
+        # bundles with the same TISInputSourceID as the same input source,
+        # so an upgrade of v2.2.1 → v2.2.2 with stable IDs is recognised
+        # by the OS as the same layout (the user-enabled set, the active
+        # selection, and any layout-specific preferences are preserved).
+        if is_plusplus and is_ansi:
+            input_source_id = f"{BUNDLE_IDENTIFIER}.plus_plus.ansi"
+        elif is_plusplus:
+            input_source_id = f"{BUNDLE_IDENTIFIER}.plus_plus"
+        elif is_plus and is_ansi:
+            input_source_id = f"{BUNDLE_IDENTIFIER}.plus.ansi"
+        elif is_plus:
+            input_source_id = f"{BUNDLE_IDENTIFIER}.plus"
+        elif is_ansi:
+            input_source_id = f"{BUNDLE_IDENTIFIER}.ansi"
+        else:
+            input_source_id = BUNDLE_IDENTIFIER
+
+        # Store variant, ANSI flag, and the canonical input source id used
+        # later as the InfoPlist.strings key.
+        layout_localization_infos.append(
+            (new_name, variant, is_ansi, input_source_id)
+        )
 
         # Copy logo file with matching base name
         icon_tag = ""
@@ -125,25 +158,6 @@ def create_bundle(
             )
 
         plist_key = f"KLInfo_{new_name}"
-        # Build input source id and add .ansi suffix for ANSI variants
-        if is_plusplus and is_ansi:
-            input_source_id = (
-                f"{BUNDLE_IDENTIFIER}.{version_underscore}.plus_plus.ansi"
-            )
-        elif is_plusplus:
-            input_source_id = (
-                f"{BUNDLE_IDENTIFIER}.{version_underscore}.plus_plus"
-            )
-        elif is_plus and is_ansi:
-            input_source_id = (
-                f"{BUNDLE_IDENTIFIER}.{version_underscore}.plus.ansi"
-            )
-        elif is_plus:
-            input_source_id = f"{BUNDLE_IDENTIFIER}.{version_underscore}.plus"
-        elif is_ansi:
-            input_source_id = f"{BUNDLE_IDENTIFIER}.{version_underscore}.ansi"
-        else:
-            input_source_id = f"{BUNDLE_IDENTIFIER}.{version_underscore}"
 
         info_plist_entries.append(f"""<key>{plist_key}</key>
         <dict>
@@ -200,14 +214,23 @@ def generate_info_plist(version: str, entries: list[str]) -> str:
 
 
 def generate_localizations(
-    bundle_path: Path, version: str, layouts: list[tuple[str, str, bool]]
+    bundle_path: Path, version: str, layouts: list[tuple[str, str, bool, str]]
 ):
     """
     Generate localized InfoPlist.strings files (en and fr).
-    Each layout name is mapped to either:
-      - "Ergopti v{version}"  (standard)
-      - "Ergopti+ v{version}" (plus)
+
+    macOS resolves the layout's display name by looking up the
+    `kTISPropertyInputSourceID` value as the KEY in the bundle's
+    `InfoPlist.strings`. Using the keylayout filename here (the historical
+    behaviour) silently fell back to the raw input-source ID in System
+    Settings and `hs.keycodes.layouts()`, which is why entries showed up
+    as "Ergopti.v2_2_0" instead of "Ergopti v2.2.0".
+
+    Each input source id is mapped to either:
+      - "Ergopti v{version}"   (standard)
+      - "Ergopti+ v{version}"  (plus)
       - "Ergopti++ v{version}" (plus plus)
+    plus an optional " ANSI" suffix.
     """
     for lang in ("en", "fr"):
         lproj_dir = bundle_path / "Contents" / "Resources" / f"{lang}.lproj"
@@ -215,7 +238,7 @@ def generate_localizations(
         strings_path = lproj_dir / "InfoPlist.strings"
 
         lines = []
-        for original_name, variant, is_ansi in layouts:
+        for _original_name, variant, is_ansi, input_source_id in layouts:
             ansi_suffix = " ANSI" if is_ansi else ""
             if variant == "++":
                 localized = f"Ergopti++{ansi_suffix} {version}"
@@ -223,7 +246,7 @@ def generate_localizations(
                 localized = f"Ergopti+{ansi_suffix} {version}"
             else:
                 localized = f"Ergopti{ansi_suffix} {version}"
-            lines.append(f'"{original_name}" = "{localized}";')
+            lines.append(f'"{input_source_id}" = "{localized}";')
 
         strings_content = "\n".join(lines) + "\n"
         strings_path.write_text(strings_content, encoding="utf-16")
