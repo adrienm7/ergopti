@@ -1,4 +1,4 @@
---- tests/test_parser.lua
+--- tests/unit/modules/llm/test_parser.lua
 
 --- ==============================================================================
 --- MODULE: Parser Unit Tests
