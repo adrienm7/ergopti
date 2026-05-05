@@ -70,7 +70,8 @@ function switch_tab(tab_name) {
  * Updates the search query from the table header input and re-renders.
  */
 function handle_search() {
-	app_state.search_query = (document.getElementById("search_input")?.value ?? "").toLowerCase();
+	// Preserve original case — render_table() applies the case-sensitive toggle
+	app_state.search_query = document.getElementById("search_input")?.value ?? "";
 	render_table();
 }
 
@@ -138,24 +139,55 @@ function count_uppercase_shift() {
 	return total;
 }
 
+// Mapping from macOS virtual keycode string to canonical modifier name.
+// These keycodes are emitted via flagsChanged events (tracked by log_manager).
+const MODIFIER_KEYCODES = {
+	"54": "cmd",   "55": "cmd",
+	"56": "shift", "60": "shift",
+	"58": "alt",   "61": "alt",
+	"59": "ctrl",  "62": "ctrl",
+	"57": "capslock",
+	"63": "fn",
+};
+
 /**
- * Derives modifier-combo usage by aggregating shortcut entries by their modifier pattern.
- * Also infers Shift usage from uppercase letter presses in the character data so that
- * Shift appears in the Modifiers tab even when case-insensitive mode is active.
+ * Derives modifier usage from two sources:
+ * 1. Raw kc dict: flagsChanged keycode presses (standalone modifier key taps).
+ * 2. Shortcut sc dict: modifier+key combos aggregated by modifier pattern.
+ * 3. Uppercase letter inference: Shift usage from capital letters typed.
+ *
+ * This ensures that pressing Option (kc 58/61) for a symbol layer is counted,
+ * and that thumb keys (cmd-L=55, cmd-R=54, alt-L=58, etc.) appear correctly.
  * @param {Object} sc_dict - The processed shortcut dictionary from app_state.data.sc.
- * @returns {Object} A new dict keyed by canonical modifier combo ("cmd", "cmd+shift", …)
- *                   with count/time/errors summed across all matching shortcuts.
+ * @returns {Object} A new dict keyed by canonical modifier name or combo.
  */
 function derive_modifier_usage(sc_dict) {
 	const result = {};
 
-	// Seed Shift from uppercase letter usage (read directly from raw cache, layout-safe)
+	// ── Source 1: raw flagsChanged kc presses ────────────────────────────────
+	// Each entry in kc_dict where the keycode is a modifier contributes directly.
+	const kc_dict = app_state.data.kc || {};
+	Object.entries(kc_dict).forEach(([kc_str, kc_item]) => {
+		const mod_name = MODIFIER_KEYCODES[kc_str];
+		if (!mod_name) return;
+		if (!result[mod_name]) {
+			result[mod_name] = { count: 0, time: 0, errors: 0, synth_hs: 0, synth_llm: 0, synth_other: 0 };
+		}
+		result[mod_name].count += kc_item.count || 0;
+	});
+
+	// ── Source 2: Shift inferred from uppercase letter presses ───────────────
 	const shift_count = count_uppercase_shift();
 	if (shift_count > 0) {
-		result["shift"] = { count: shift_count, time: 0, errors: 0, synth_hs: 0, synth_llm: 0, synth_other: 0 };
+		if (!result["shift"]) {
+			result["shift"] = { count: 0, time: 0, errors: 0, synth_hs: 0, synth_llm: 0, synth_other: 0 };
+		}
+		// Add inferred shift presses on top of direct flagsChanged counts to get
+		// the total number of shift activations (direct key tap + held for uppercase).
+		result["shift"].count += shift_count;
 	}
 
-	// Aggregate modifier combos from shortcuts, merging into any existing entry
+	// ── Source 3: modifier combos from shortcuts ──────────────────────────────
 	Object.entries(sc_dict).forEach(([k, item]) => {
 		const parts = String(k).toLowerCase().split("+").map(p => p.trim()).filter(p => p.length > 0);
 		const mods  = parts.filter(p => MODIFIER_ORDER.includes(p));
@@ -213,6 +245,51 @@ function count_key_tokens(key) {
 
 // Expected token count for each fixed-length n-gram tab
 const NGRAM_EXPECTED_LEN = { bg: 2, tg: 3, qg: 4, pg: 5, hx: 6, hp: 7 };
+
+
+// ===========================================
+// ===========================================
+// ======= 2.5/ Gradient Color Helpers =======
+// ===========================================
+// ===========================================
+
+// Gradient stops: [value, r, g, b] — value is the threshold at which that color applies.
+// Values between stops are linearly interpolated.
+const PRECISION_GRADIENT = [
+	[100, 52,  199, 89],   // #34c759 green
+	[ 80, 255, 204,  0],   // #ffcc00 yellow
+	[ 65, 255, 149,  0],   // #ff9500 orange
+	[ 50, 255,  59, 48],   // #ff3b30 red
+	[  0, 255,  59, 48],   // red — stays red below 50%
+];
+
+const WPM_GRADIENT = [
+	[80, 52,  199, 89],    // #34c759 green  — fast typist
+	[50, 140, 200, 50],    // yellow-green   — good
+	[35, 255, 204,  0],    // #ffcc00 yellow — average
+	[20, 255, 149,  0],    // #ff9500 orange — slow
+	[ 0, 255,  59, 48],    // #ff3b30 red    — very slow
+];
+
+/**
+ * Returns an rgb() CSS string interpolated along a gradient stop array.
+ * @param {number}   value    - The metric value (e.g. 0–100 for precision, WPM for speed).
+ * @param {number[][]} stops  - Array of [threshold, r, g, b] in descending threshold order.
+ * @returns {string} A CSS rgb() color string.
+ */
+function gradient_color(value, stops) {
+	if (value >= stops[0][0]) return `rgb(${stops[0][1]},${stops[0][2]},${stops[0][3]})`;
+	for (let i = 0; i < stops.length - 1; i++) {
+		const [hi, r1, g1, b1] = stops[i];
+		const [lo, r2, g2, b2] = stops[i + 1];
+		if (value >= lo) {
+			const t = (value - lo) / (hi - lo);
+			return `rgb(${Math.round(r1 * t + r2 * (1 - t))},${Math.round(g1 * t + g2 * (1 - t))},${Math.round(b1 * t + b2 * (1 - t))})`;
+		}
+	}
+	const last = stops[stops.length - 1];
+	return `rgb(${last[1]},${last[2]},${last[3]})`;
+}
 
 
 
@@ -314,6 +391,7 @@ function compute_key_km_per_stroke(key, char_km_map, is_kc_tab, is_sc_tab) {
  */
 function render_current_tab() {
 	// "mods" draws from sc data and derives modifier patterns; "sc"/"sc_bg"/"w_bg" show as-is
+	// New word-ngram and shortcut-ngram tabs fall back to empty if backend hasn't produced data yet
 	const source_key      = app_state.current_tab === "mods" ? "sc" : app_state.current_tab;
 	const source_dict_raw = app_state.data[source_key] || {};
 	const source_dict     = app_state.current_tab === "mods"
@@ -327,7 +405,8 @@ function render_current_tab() {
 	// Text-based tabs should never show OS control characters (RS, SOH, BOM…).
 	// Shortcut and keycode tabs are exempt: raw keycodes and ctrl+key shortcuts
 	// are legitimate there. sc_bg uses "→" separator — also exempt.
-	const is_text_tab = !["sc", "sc_bg", "mods", "kc"].includes(app_state.current_tab);
+	const SC_TABS = ["sc", "sc_bg", "sc_tg", "sc_qg", "sc_pg", "mods"];
+	const is_text_tab = ![...SC_TABS, "kc"].includes(app_state.current_tab);
 
 	// ── Characters tab: expand multi-token keys into individual entries ───────
 	// The keylogger sometimes records multi-char sequences (e.g. NBSP+?) in the
@@ -487,9 +566,11 @@ function render_current_tab() {
 			synth_other: item.synth_other,
 			manual_count,
 			// avg: mean delay between consecutive keystrokes (manual chars only)
-			avg: isNaN(avg) ? 0 : avg,
-			// wpm: estimated WPM if this sequence were typed continuously
-			wpm: (!["sc", "sc_bg", "mods"].includes(app_state.current_tab) && !isNaN(avg) && avg > 0 && avg <= pause_thresh)
+			// avg only meaningful when >= MIN_PLAUSIBLE_AVG_MS (10ms) and <= pause_thresh
+			// Below 10ms is physically impossible for human inter-key timing
+			avg: (isNaN(avg) || avg < 10) ? 0 : avg,
+			// wpm: estimated WPM if this sequence were typed continuously (avg must be plausible and below pause_thresh)
+			wpm: (!["sc", "sc_bg", "sc_tg", "sc_qg", "sc_pg", "mods"].includes(app_state.current_tab) && !isNaN(avg) && avg >= 10 && avg <= pause_thresh)
 				? display_len / 5 / (avg / 60000)
 				: 0,
 			acc:      Math.max(0, acc),
@@ -596,7 +677,20 @@ function render_current_tab() {
 
 	// Update the occurrences subtitle in the table header (not the global KPI)
 	const occ_elem = document.getElementById("total_occurrences");
-	if (occ_elem) occ_elem.innerHTML = format_number(total_occ);
+	if (occ_elem) {
+		// For the chars tab, append a small mode badge so users know whether the
+		// total reflects raw keystrokes or output chars (controlled by the HS/LLM toggles).
+		let mode_badge = "";
+		if (app_state.current_tab === "c") {
+			const { show_hs, show_llm } = get_source_mode_flags();
+			// show_hs/show_llm=true means HS/LLM expansions are included (output view)
+			const mode_label = (show_hs && show_llm) ? "sortie écran"
+				: (show_hs || show_llm) ? "mixte"
+				: "frappes brutes";
+			mode_badge = ` <span style="font-size:0.8em;opacity:0.7;">(${mode_label})</span>`;
+		}
+		occ_elem.innerHTML = format_number(total_occ) + mode_badge;
+	}
 
 	// Compute weighted global metrics for the column sub-headers
 	let g_time = 0, g_man = 0, g_wpm = 0, g_wpm_n = 0, g_acc = 0, g_acc_n = 0;
@@ -620,16 +714,812 @@ function render_current_tab() {
 	const g_km_total = data_arr.reduce((s, i) => s + (i.km || 0), 0);
 	const km_stat_el = document.getElementById("col_global_km");
 	if (km_stat_el) {
-		if (g_km_total >= 1) {
-			km_stat_el.innerHTML = `~ ${format_number(g_km_total.toFixed(2))} km`;
-		} else if (g_km_total > 0.0005) {
-			km_stat_el.innerHTML = `~ ${format_number((g_km_total * 1000).toFixed(1))}\u00A0m`;
+		if (g_km_total > 0) {
+			km_stat_el.innerHTML = `~ ${format_number(g_km_total.toFixed(2))} km`;
 		} else {
 			km_stat_el.innerHTML = "";
 		}
 	}
 
+	// Always refresh the heatmap with current kc data regardless of active tab
+	const kc_data_for_heatmap = app_state.data.kc
+		? Object.entries(app_state.data.kc).map(([key, item]) => ({ key, count: item.count || 0 }))
+		: [];
+	render_kc_heatmap(kc_data_for_heatmap);
+
 	render_table();
+}
+
+
+// =============================================
+// =============================================
+// ======= 2.2) Keyboard Heatmap Render =======
+// =============================================
+
+/**
+ * Renders an SVG keyboard heatmap into #kc_heatmap_container.
+ * The heatmap is always visible above the tab buttons and updates on every
+ * filter change. Each key shows the user's actual layout label (from Lua
+ * injection) and a full hover tooltip with frequency, counts, and bigram info.
+ * @param {Array} kc_data_arr - Array of { key: kc_str, count } objects.
+ */
+function render_kc_heatmap(kc_data_arr) {
+	const container = document.getElementById("kc_heatmap_container");
+	if (!container) return;
+
+	// Build lookup maps: kc_str → count and kc_str → full item for tooltip
+	const count_map = {};
+	const item_map  = {};
+	let max_count   = 1;
+	kc_data_arr.forEach(item => {
+		const c = item.count || 0;
+		count_map[item.key] = c;
+		item_map[item.key]  = item;
+		if (c > max_count) max_count = c;
+	});
+
+	// Also collect the full kc item from app_state for extra stats in tooltips
+	const kc_full = app_state.data.kc || {};
+
+	const kc_name_map = (window.keycode_layout && Object.keys(window.keycode_layout).length > 0)
+		? window.keycode_layout
+		: KEYCODE_NAMES;
+
+	// ── SVG layout constants ──────────────────────────────────────────────────
+	// 1 unit = U px; PAD adds breathing room so wide/edge keys aren't clipped
+	const U     = 50;
+	const GAP   = 4;
+	const R     = 5;
+	const KW    = U - GAP;
+	const KH    = Math.round(U * 0.88 - GAP);
+	const PAD   = 8; // padding around the full keyboard in px
+
+	// Key y-coordinates span Y_BOT (thumb row) to Y_TOP (fn row)
+	const Y_TOP  = 2.70;
+	const Y_BOT  = -1.80;
+	const Y_SPAN = Y_TOP - Y_BOT;
+
+	// Widths of non-standard keys in key-units
+	const WIDE_KEYS = {
+		"36":  1.50, // return — top-row width on the QWERTY row (L-shape)
+		"48":  1.50, // tab — left edge at x=0, flush against Q
+		"51":  1.50, // backspace — 1.5u; right edge aligns with Return stem and r-shift (698 px)
+		"56":  1.25, // l-shift (ISO) — 1.25u, left-anchored; 4 px gap before ISO extra key
+		"57":  1.75, // capslock
+		"60":  2.26, // r-shift (ISO) — 2.26u right-anchored; right edge aligns with Return (698 px), 4 px gap after /
+		"49":  5.00, // space bar — fills cmd-L → cmd-R gap (exactly 5u wide)
+		"63":  1.00, // fn — 1u; right-anchored so left edge aligns with Esc/Tab/Shift
+		"59":  1.00, // ctrl-L
+		"55":  1.25, // cmd-L — 1.25u; right-anchored so right edge aligns space bar left with V
+		"54":  1.25, // cmd-R — 1.25u; left-anchored; same width as cmd-L
+		"61":  1.00, // alt-R
+		"62":  1.00, // ctrl-R
+	};
+
+	// Anchor side for each wide key — determines whether the key extends from its
+	// pos.x toward the left, the right, or both sides of its declared centre.
+	// "right": right edge butts against the next 1u key on the same row (GAP between).
+	// "left":  left edge butts against the previous 1u key on the same row.
+	// "centre": symmetric around pos.x (default for unspecified keys).
+	// "stretch": fills the gap between two neighbours given as { left_kc, right_kc }.
+	const WIDE_KEY_ANCHOR = {
+		"48": "right",   // tab
+		"57": "right",   // capslock
+		"36": "right",   // return (L-shape uses anchor for the QWERTY-row top portion)
+		"51": "left",    // backspace
+		"56": "left",    // l-shift — left-anchored: left edge aligns with Esc/Tab/Shift/FN
+		"63": "right",   // fn — right-anchored: left edge aligns with Esc/Tab/Shift
+		"55": "right",   // cmd-L — right-anchored: right edge is adjacent to space
+		"60": "right",   // r-shift — right-anchored: right edge aligns with Return
+		"49": "stretch", // space — fills cmd-L → cmd-R
+		"54": "left",    // cmd-R — left-anchored: left edge is adjacent to space, right edge adjacent to alt-R
+	};
+	const SPACE_LEFT_NEIGHBOUR  = "55"; // cmd-L
+	const SPACE_RIGHT_NEIGHBOUR = "54"; // cmd-R
+
+	/** Returns the visual sx (left edge, in raw px) for a key. Wide keys are anchored
+	 * to their neighbour rather than centred on pos.x so that horizontal gaps stay
+	 * uniform (= GAP px) regardless of key width. */
+	const compute_sx = (kc_str, pos) => {
+		const w_units = WIDE_KEYS[kc_str] ?? 1;
+		const key_w   = Math.round(w_units * U - GAP);
+		const anchor  = WIDE_KEY_ANCHOR[kc_str];
+		if (anchor === "right") {
+			// Right edge sits GAP px to the left of pos.x*U + KW/2 + GAP/2
+			// (i.e. flush against the next 1u key whose centre is pos.x + 1).
+			return Math.round((pos.x + 0.5) * U) - Math.round(GAP / 2) - key_w;
+		}
+		if (anchor === "left") {
+			return Math.round((pos.x - 0.5) * U) + Math.round(GAP / 2);
+		}
+		if (anchor === "stretch") {
+			const lp = KEY_POSITIONS[SPACE_LEFT_NEIGHBOUR];
+			const rp = KEY_POSITIONS[SPACE_RIGHT_NEIGHBOUR];
+			if (lp && rp) {
+				return Math.round((lp.x + 0.5) * U) + Math.round(GAP / 2);
+			}
+		}
+		// Default: centred on pos.x
+		const extra_w = (w_units - 1) * U / 2;
+		return Math.round(pos.x * U) - Math.round(KW / 2) - Math.round(extra_w);
+	};
+
+	/** Returns the visible width in px for a key, taking stretch into account. */
+	const compute_kw = (kc_str, pos) => {
+		const w_units = WIDE_KEYS[kc_str] ?? 1;
+		if (WIDE_KEY_ANCHOR[kc_str] === "stretch") {
+			const lp = KEY_POSITIONS[SPACE_LEFT_NEIGHBOUR];
+			const rp = KEY_POSITIONS[SPACE_RIGHT_NEIGHBOUR];
+			if (lp && rp) {
+				const left  = Math.round((lp.x + 0.5) * U) + Math.round(GAP / 2);
+				const right = Math.round((rp.x - 0.5) * U) - Math.round(GAP / 2);
+				return Math.max(0, right - left);
+			}
+		}
+		return Math.round(w_units * U - GAP);
+	};
+
+	// Compute pixel canvas size including padding
+	let min_x_px = Infinity, max_x_px = -Infinity;
+	let min_y_px = Infinity, max_y_px = -Infinity;
+	const key_entries = Object.entries(KEY_POSITIONS);
+
+	// First pass: determine canvas bounds.
+	// The ISO Return key (kc 36) draws a wing that extends one full row above its
+	// sy, so we must account for that extra vertical extent when computing the
+	// SVG canvas height, otherwise the wing is clipped at the top.
+	const ROW_PX = Math.round(U * 0.90); // vertical distance between rows (px)
+	key_entries.forEach(([kc_str, pos]) => {
+		const key_w   = compute_kw(kc_str, pos);
+		const sx      = compute_sx(kc_str, pos);
+		const sy      = Math.round((Y_TOP - pos.y) / Y_SPAN * (5.5 * U)) - Math.round(KH / 2);
+		const top_ext = kc_str === "36" ? ROW_PX : 0; // Return: wing extends one row up
+		min_x_px = Math.min(min_x_px, sx);
+		max_x_px = Math.max(max_x_px, sx + key_w);
+		min_y_px = Math.min(min_y_px, sy - top_ext);
+		max_y_px = Math.max(max_y_px, sy + KH);
+	});
+
+	const SVG_W = max_x_px - min_x_px + PAD * 2;
+	const SVG_H = max_y_px - min_y_px + PAD * 2;
+	const off_x = -min_x_px + PAD;
+	const off_y = -min_y_px + PAD;
+
+	// Heat colour: dark blue (cold) → orange (mid) → bright red (hot)
+	const heat_color = (count) => {
+		if (count === 0) return "#1e1e2e";
+		const t = Math.pow(count / max_count, 0.40);
+		if (t < 0.5) {
+			const tt = t * 2;
+			const r  = Math.round(30  + tt * (220 - 30));
+			const g  = Math.round(50  + tt * (130 - 50));
+			const b  = Math.round(130 + tt * (20  - 130));
+			return `rgb(${r},${g},${b})`;
+		}
+		const tt = (t - 0.5) * 2;
+		const r  = Math.round(220 + tt * (255 - 220));
+		const g  = Math.round(130 + tt * (20  - 130));
+		const b  = Math.round(20  + tt * (0   - 20));
+		return `rgb(${r},${g},${b})`;
+	};
+
+	// Compute total presses for frequency percentage
+	const grand_total = kc_data_arr.reduce((s, i) => s + (i.count || 0), 0);
+
+	// Aggregate kc_hold across all filtered apps so the tooltip can surface
+	// a per-keycode tap / hold breakdown plus tap%-of-all-taps and
+	// hold%-of-all-holds. _foreach_filtered_app is defined in data.js.
+	const kc_hold_total = {}; // kc_str → { tap, hold, s, n, m }
+	let total_taps = 0, total_holds = 0;
+	if (typeof _foreach_filtered_app === "function") {
+		_foreach_filtered_app(app => {
+			const kh = app.kc_hold || {};
+			Object.entries(kh).forEach(([kc_str, h]) => {
+				const t = kc_hold_total[kc_str] || (kc_hold_total[kc_str] = { tap: 0, hold: 0, s: 0, n: 0, m: 0 });
+				t.tap  += h.tap  || 0;
+				t.hold += h.hold || 0;
+				t.s    += h.s    || 0;
+				t.n    += h.n    || 0;
+				if ((h.m || 0) > t.m) t.m = h.m;
+				total_taps  += h.tap  || 0;
+				total_holds += h.hold || 0;
+			});
+		});
+	}
+
+	// Collect per-modifier combo counts for tooltip breakdown
+	const sc_dict   = app_state.data.sc || {};
+	// Build a map: kc_str → list of modifier combos that used this key
+	const mod_by_kc = {};
+	Object.entries(sc_dict).forEach(([sc_key, sc_item]) => {
+		if (!sc_key.includes("+")) return;
+		const parts = sc_key.toLowerCase().split("+").map(p => p.trim());
+		const mods  = parts.filter(p => MODIFIER_ORDER.includes(p));
+		const keys  = parts.filter(p => !MODIFIER_ORDER.includes(p));
+		if (mods.length === 0 || keys.length === 0) return;
+		keys.forEach(key_name => {
+			// Try to resolve key_name back to a kc_str
+			Object.entries(kc_name_map).forEach(([kc_str, kc_label]) => {
+				if (kc_label.toLowerCase() === key_name) {
+					if (!mod_by_kc[kc_str]) mod_by_kc[kc_str] = {};
+					const mod_key = mods.join("+");
+					mod_by_kc[kc_str][mod_key] = (mod_by_kc[kc_str][mod_key] || 0) + (sc_item.count || 0);
+				}
+			});
+		});
+	});
+
+	// Build bigram following-key data from app_state.data.bg for tooltip
+	// We'll build a map: char → top-3 following chars by frequency
+	const bg_dict    = app_state.data.bg || {};
+	const follow_map = {}; // char_lower → [{char, count}]
+	const kc_chars   = {}; // kc_str → the char label it produces
+	Object.entries(kc_name_map).forEach(([kc_str, label]) => {
+		kc_chars[kc_str] = label;
+	});
+	Object.entries(bg_dict).forEach(([bg_key, bg_item]) => {
+		const chars = Array.from(bg_key);
+		if (chars.length !== 2) return;
+		const first = chars[0];
+		if (!follow_map[first]) follow_map[first] = {};
+		follow_map[first][chars[1]] = (follow_map[first][chars[1]] || 0) + (bg_item.count || 0);
+	});
+
+	let rects  = "";
+	let labels = "";
+	let tooltips = ""; // foreignObject-based tooltip divs (CSS-positioned via JS)
+
+	// Generate a unique id prefix for tooltip elements
+	const uid = "hm_" + Date.now().toString(36);
+
+	key_entries.forEach(([kc_str, pos]) => {
+		const count    = count_map[kc_str] || 0;
+		const fill     = heat_color(count);
+		const key_w    = compute_kw(kc_str, pos);
+		const sx       = compute_sx(kc_str, pos) + off_x;
+		const base_sy  = Math.round((Y_TOP - pos.y) / Y_SPAN * (5.5 * U)) - Math.round(KH / 2) + off_y;
+
+		// Half-height keys: up and down arrows share the same grid cell, stacked vertically
+		const half_slot = HALF_HEIGHT_KEYS[kc_str];
+		const key_h     = half_slot ? Math.round(KH / 2) - Math.round(GAP / 2) : KH;
+		const sy        = half_slot === "bottom" ? base_sy + Math.round(KH / 2) + Math.round(GAP / 2) : base_sy;
+		const cx        = sx + key_w / 2;
+		const cy        = sy + key_h / 2;
+
+		const text_color = count === 0 ? "#555" : "#fff";
+
+		// Label: user's layout label, uppercase. Force a few well-known wide-key
+		// short forms so they render clearly (Esc, Ret, Tab, Bksp, Caps, Shft).
+		const label_raw  = kc_name_map[kc_str] ?? KEYCODE_NAMES[kc_str] ?? "";
+		// MacBook-style symbols matching what is printed on the physical keycap
+		const SHORT_LABELS = {
+			"53":  "⎋",   // escape
+			"36":  "⏎",   // return
+			"48":  "⇥",   // tab
+			"51":  "⌫",   // backspace / delete
+			"56":  "⇧",   // left shift
+			"60":  "⇧",   // right shift
+			"57":  "⇪",   // caps lock
+			"49":  "",    // spacebar — no label needed
+			"59":  "⌃",   // left ctrl
+			"55":  "⌘",   // left cmd
+			"54":  "⌘",   // right cmd
+			"58":  "⌥",   // left alt / option
+			"61":  "⌥",   // right alt / option
+			"63":  "Fn",  // fn key
+			"114": "?",   // help
+			"123": "←",
+			"124": "→",
+			"125": "↓",
+			"126": "↑",
+			"76":  "↵",   // numpad enter
+		};
+		// Truncate only when truly too long for the cell. Most names ≤ 6 chars fit
+		// at font_size 9; longer ones get the ellipsis fallback.
+		let label_disp;
+		if (SHORT_LABELS[kc_str] !== undefined) {
+			label_disp = SHORT_LABELS[kc_str];
+		} else if (label_raw.length > 6) {
+			label_disp = label_raw.slice(0, 5).toUpperCase() + "…";
+		} else {
+			label_disp = label_raw.toUpperCase();
+		}
+
+		// Emoji and Unicode symbols are single codepoints but wide — treat them as length 1
+		const disp_len   = [...label_disp].length;
+		const base_font  = disp_len > 7 ? 8 : disp_len > 4 ? 10 : disp_len > 2 ? 11 : 14;
+		// Special keys (shift, ctrl, cmd, etc.) get 1.5× font to match their keycap symbols
+		// Fn is text, not a symbol — use the same scale as alphabetic keys
+		const is_special = SHORT_LABELS[kc_str] !== undefined && label_disp !== "" && label_disp !== "Fn";
+		const font_size  = is_special ? Math.round(base_font * 1.5) : base_font;
+
+
+		// Tooltip content assembled as a data attribute string; rendered by JS onmouseover
+		const freq_pct  = grand_total > 0 ? ((count / grand_total) * 100).toFixed(2) : "0.00";
+		let tip_lines   = [
+			`<b>${escape_html(label_raw || kc_str)}</b> (kc ${kc_str})`,
+		];
+		// Tap / hold breakdown (only when the bridge or flagsChanged path
+		// actually observed releases for this key — regular letters never
+		// have hold data and fall back to a single-line "Presses" view).
+		const kh = kc_hold_total[kc_str];
+		if (kh && (kh.tap > 0 || kh.hold > 0)) {
+			const tap_n  = kh.tap  || 0;
+			const hold_n = kh.hold || 0;
+			const tap_pct  = total_taps  > 0 ? ((tap_n  / total_taps)  * 100).toFixed(2) : "0.00";
+			const hold_pct = total_holds > 0 ? ((hold_n / total_holds) * 100).toFixed(2) : "0.00";
+			tip_lines.push(`Tap + hold : <b>${format_number(count)}</b>`);
+			tip_lines.push(`&nbsp;&nbsp;Tap&nbsp;&nbsp;: <b>${format_number(tap_n)}</b> (${tap_pct}% des taps)`);
+			tip_lines.push(`&nbsp;&nbsp;Hold : <b>${format_number(hold_n)}</b> (${hold_pct}% des holds)`);
+			tip_lines.push(`Fréquence totale : <b>${freq_pct}%</b>`);
+			if (kh.n > 0) {
+				const mean = Math.round(kh.s / kh.n);
+				tip_lines.push(`Durée moy. : <b>${mean} ms</b> (max ${kh.m})`);
+			}
+		} else {
+			tip_lines.push(`Presses : <b>${format_number(count)}</b>`);
+			tip_lines.push(`Fréquence : <b>${freq_pct}%</b>`);
+		}
+
+		// Modifier combos
+		const mods = mod_by_kc[kc_str];
+		if (mods) {
+			const mod_sorted = Object.entries(mods).sort((a, b) => b[1] - a[1]).slice(0, 4);
+			if (mod_sorted.length > 0) {
+				tip_lines.push(`<hr style="border-color:#444;margin:3px 0">`);
+				tip_lines.push(`Combos modificateurs :`);
+				mod_sorted.forEach(([mod, mc]) => {
+					tip_lines.push(`&nbsp;&nbsp;${escape_html(mod)} : <b>${format_number(mc)}</b>`);
+				});
+			}
+		}
+
+		// Top following characters (bigrams)
+		if (label_raw && label_raw.length === 1) {
+			const follows = follow_map[label_raw.toLowerCase()];
+			if (follows) {
+				const top3 = Object.entries(follows).sort((a, b) => b[1] - a[1]).slice(0, 3);
+				if (top3.length > 0) {
+					tip_lines.push(`<hr style="border-color:#444;margin:3px 0">`);
+					tip_lines.push(`Top lettres suivantes :`);
+					top3.forEach(([ch, n]) => {
+						const disp = ch === " " ? "Espace" : ch === " " ? "NBSP" : escape_html(ch.toUpperCase());
+						tip_lines.push(`&nbsp;&nbsp;${disp} : <b>${format_number(n)}</b>`);
+					});
+				}
+			}
+		}
+
+		const tip_html  = tip_lines.join("<br>");
+		const tip_id    = `${uid}_${kc_str}`;
+
+		// ISO Return (kc 36) gets an L-shaped path spanning home + QWERTY rows.
+		// For all other keys a standard rounded-rect is drawn.
+		if (kc_str === "36") {
+			// ISO Return: wing on QWERTY row, stem on home row.
+			//   Wing left  = right edge of ] (kc 30, QWERTY row) + GAP
+			//   Stem left  = left edge of r-shift (kc 60) — stem and r-shift share the same column
+			//   Right edge = right edge of r-shift (kc 60) — aligns backspace, Return stem, and r-shift
+			const pos_bracket   = KEY_POSITIONS["30"];  // ] — QWERTY row
+			const pos_backslash = KEY_POSITIONS["42"];  // \ — home row ISO backslash
+			const wing_lx = compute_sx("30", pos_bracket)   + off_x + compute_kw("30", pos_bracket)   + GAP;
+			const stem_lx = compute_sx("42", pos_backslash) + off_x + compute_kw("42", pos_backslash) + GAP;
+			const stem_w  = 34;  // ≈ 0.76u — Apple ISO Return stem is narrower than 1u
+			const rx_ret  = stem_lx + stem_w;
+
+			const sy_qwerty = Math.round((Y_TOP - 0.84) / Y_SPAN * (5.5 * U)) - Math.round(KH / 2) + off_y;
+			const sy_home   = sy; // Return pos.y = 0 (home row), so sy is already the home-row sy
+			const top_y     = sy_qwerty;         // top of wing (QWERTY row)
+			const wing_bot  = sy_qwerty + KH;    // bottom of wing rect
+			const bot_y     = sy_home   + KH;    // bottom of stem
+
+			// Clockwise path. The inner concave corner (stem_lx, wing_bot) uses
+			// sweep=0 (counter-clockwise arc) to produce the correct inward curve.
+			const d = [
+				`M ${wing_lx} ${top_y+R}`,
+				`A ${R} ${R} 0 0 1 ${wing_lx+R} ${top_y}`,
+				`L ${rx_ret-R} ${top_y}`,
+				`A ${R} ${R} 0 0 1 ${rx_ret} ${top_y+R}`,
+				`L ${rx_ret} ${bot_y-R}`,
+				`A ${R} ${R} 0 0 1 ${rx_ret-R} ${bot_y}`,
+				`L ${stem_lx+R} ${bot_y}`,
+				`A ${R} ${R} 0 0 1 ${stem_lx} ${bot_y-R}`,
+				`L ${stem_lx} ${wing_bot+R}`,
+				`A ${R} ${R} 0 0 0 ${stem_lx-R} ${wing_bot}`,
+				`L ${wing_lx+R} ${wing_bot}`,
+				`A ${R} ${R} 0 0 1 ${wing_lx} ${wing_bot-R}`,
+				`L ${wing_lx} ${top_y+R}`,
+				"Z",
+			].join(" ");
+			rects += `<path d="${d}" fill="${fill}" stroke="#0d0d1a" stroke-width="1.5" paint-order="stroke fill"
+				data-tip="${tip_id}" class="hm-key"
+				onmouseenter="hm_show_tip('${tip_id}')" onmouseleave="hm_hide_tip('${tip_id}')"/>`;
+			// Label centred in the wing portion (wider area, more legible than the narrow stem)
+			const ret_font = 15;
+			const ret_cx   = (wing_lx + rx_ret) / 2;
+			const ret_cy   = sy_qwerty + KH / 2;
+			labels += `<text x="${Math.round(ret_cx)}" y="${Math.round(ret_cy + ret_font * 0.38)}"
+				text-anchor="middle" font-size="${ret_font}"
+				font-family="monospace,sans-serif" fill="${text_color}"
+				pointer-events="none">${escape_html(label_disp)}</text>`;
+
+		} else {
+			// Standard or half-height rounded rect
+			rects += `<rect x="${sx}" y="${sy}" width="${key_w}" height="${key_h}" rx="${R}"
+				fill="${fill}" stroke="#0d0d1a" stroke-width="1.5" paint-order="stroke fill"
+				data-tip="${tip_id}" class="hm-key"
+				onmouseenter="hm_show_tip('${tip_id}')" onmouseleave="hm_hide_tip('${tip_id}')"/>`;
+		}
+
+		// ISO Return renders its own label (centred in the wing); skip the generic one
+		if (kc_str !== "36") {
+			labels += `<text x="${Math.round(cx)}" y="${Math.round(cy + font_size * 0.38)}"
+				text-anchor="middle" font-size="${font_size}"
+				font-family="monospace,sans-serif" fill="${text_color}"
+				pointer-events="none">${escape_html(label_disp)}</text>`;
+		}
+
+		// Tooltip div — absolutely positioned, hidden by default
+		tooltips += `<div id="${tip_id}" class="hm-tooltip" style="display:none;position:fixed;z-index:9999;` +
+			`background:#1a1a2e;border:1px solid #444;border-radius:6px;padding:7px 10px;` +
+			`font-size:12px;line-height:1.5;color:#ddd;pointer-events:none;max-width:220px;white-space:nowrap;text-align:left;">` +
+			tip_html + `</div>`;
+	});
+
+	container.innerHTML =
+		`<div style="display:inline-block;position:relative;">` +
+		`<div style="font-size:17px;font-weight:bold;color:#1e96ff;margin-bottom:6px;text-align:left;">` +
+		`Heatmap de l'utilisation physique des touches</div>` +
+		`<svg width="${SVG_W}" height="${SVG_H}" xmlns="http://www.w3.org/2000/svg" ` +
+		`style="background:#12121e;border-radius:10px;display:block;"` +
+		`onmousemove="hm_track_mouse(event)">` +
+		rects + labels +
+		`</svg>` +
+		tooltips +
+		`</div>`;
+}
+
+/**
+ * Shows a heatmap tooltip positioned near the cursor.
+ * @param {string} tip_id - The DOM id of the tooltip element.
+ */
+function hm_show_tip(tip_id) {
+	const el = document.getElementById(tip_id);
+	if (el) el.style.display = "block";
+}
+
+/**
+ * Hides a heatmap tooltip.
+ * @param {string} tip_id - The DOM id of the tooltip element.
+ */
+function hm_hide_tip(tip_id) {
+	const el = document.getElementById(tip_id);
+	if (el) el.style.display = "none";
+}
+
+/** Tracks mouse position and repositions any visible heatmap tooltip near the cursor. */
+function hm_track_mouse(evt) {
+	document.querySelectorAll(".hm-tooltip").forEach(el => {
+		if (el.style.display === "none") return;
+		const vw  = window.innerWidth;
+		const vh  = window.innerHeight;
+		const tw  = el.offsetWidth  || 200;
+		const th  = el.offsetHeight || 80;
+		let   lft = evt.clientX + 14;
+		let   top = evt.clientY + 14;
+		if (lft + tw > vw - 8) lft = evt.clientX - tw - 8;
+		if (top + th > vh - 8) top = evt.clientY - th - 8;
+		el.style.left = lft + "px";
+		el.style.top  = top + "px";
+	});
+}
+
+
+// ==================================================
+// ==================================================
+// ======= 2b/ SFB Heatmap (Same-Finger Bigrams) ======
+// ==================================================
+// ==================================================
+
+/**
+ * Renders the Same-Finger Bigram heatmap keyboard SVG into #sfb_heatmap_container.
+ * Uses the same layout geometry as render_kc_heatmap() but with a green→red gradient
+ * (cold = no SFBs, hot = many SFBs). Tooltip lists the top SFB pairs per key.
+ * @param {Object} sfb_by_kc       - Map of kc_str → total SFB count for that key.
+ * @param {Object} sfb_pairs_by_kc - Map of kc_str → [{partner_kc, pair_label, count}].
+ * @param {Object} kc_raw          - Raw keycode data map (kc_str → {count, …}).
+ */
+function render_sfb_heatmap(sfb_by_kc, sfb_pairs_by_kc, kc_raw) {
+	const container = document.getElementById("sfb_heatmap_container");
+	if (!container) return;
+
+	let max_count = 1;
+	Object.values(sfb_by_kc).forEach(c => { if (c > max_count) max_count = c; });
+
+	const kc_name_map = (window.keycode_layout && Object.keys(window.keycode_layout).length > 0)
+		? window.keycode_layout
+		: KEYCODE_NAMES;
+
+	// ── SVG layout constants (same as kc heatmap) ──────────────────────────────
+	const U    = 50;
+	const GAP  = 4;
+	const R    = 5;
+	const KW   = U - GAP;
+	const KH   = Math.round(U * 0.88 - GAP);
+	const PAD  = 8;
+
+	const Y_TOP  = 2.70;
+	const Y_BOT  = -1.80;
+	const Y_SPAN = Y_TOP - Y_BOT;
+
+	const WIDE_KEYS = {
+		"36":  1.50, "48":  1.50, "51":  1.50, "56":  1.25, "57":  1.75,
+		"60":  2.26, "49":  5.00, "63":  1.00, "59":  1.00, "55":  1.25,
+		"54":  1.25, "61":  1.00, "62":  1.00,
+	};
+	const WIDE_KEY_ANCHOR = {
+		"48": "right", "57": "right", "36": "right", "51": "left",
+		"56": "left",  "63": "right", "55": "right", "60": "right",
+		"49": "stretch", "54": "left",
+	};
+	const SPACE_LEFT_NEIGHBOUR  = "55";
+	const SPACE_RIGHT_NEIGHBOUR = "54";
+
+	const compute_sx = (kc_str, pos) => {
+		const w_units = WIDE_KEYS[kc_str] ?? 1;
+		const key_w   = Math.round(w_units * U - GAP);
+		const anchor  = WIDE_KEY_ANCHOR[kc_str];
+		if (anchor === "right") return Math.round((pos.x + 0.5) * U) - Math.round(GAP / 2) - key_w;
+		if (anchor === "left")  return Math.round((pos.x - 0.5) * U) + Math.round(GAP / 2);
+		if (anchor === "stretch") {
+			const lp = KEY_POSITIONS[SPACE_LEFT_NEIGHBOUR];
+			const rp = KEY_POSITIONS[SPACE_RIGHT_NEIGHBOUR];
+			if (lp && rp) return Math.round((lp.x + 0.5) * U) + Math.round(GAP / 2);
+		}
+		const extra_w = (w_units - 1) * U / 2;
+		return Math.round(pos.x * U) - Math.round(KW / 2) - Math.round(extra_w);
+	};
+	const compute_kw = (kc_str, pos) => {
+		if (WIDE_KEY_ANCHOR[kc_str] === "stretch") {
+			const lp = KEY_POSITIONS[SPACE_LEFT_NEIGHBOUR];
+			const rp = KEY_POSITIONS[SPACE_RIGHT_NEIGHBOUR];
+			if (lp && rp) {
+				const left  = Math.round((lp.x + 0.5) * U) + Math.round(GAP / 2);
+				const right = Math.round((rp.x - 0.5) * U) - Math.round(GAP / 2);
+				return Math.max(0, right - left);
+			}
+		}
+		return Math.round((WIDE_KEYS[kc_str] ?? 1) * U - GAP);
+	};
+
+	// Determine canvas bounds
+	let min_x_px = Infinity, max_x_px = -Infinity;
+	let min_y_px = Infinity, max_y_px = -Infinity;
+	const key_entries = Object.entries(KEY_POSITIONS);
+	const ROW_PX = Math.round(U * 0.90);
+	key_entries.forEach(([kc_str, pos]) => {
+		const key_w   = compute_kw(kc_str, pos);
+		const sx      = compute_sx(kc_str, pos);
+		const sy      = Math.round((Y_TOP - pos.y) / Y_SPAN * (5.5 * U)) - Math.round(KH / 2);
+		const top_ext = kc_str === "36" ? ROW_PX : 0;
+		min_x_px = Math.min(min_x_px, sx);
+		max_x_px = Math.max(max_x_px, sx + key_w);
+		min_y_px = Math.min(min_y_px, sy - top_ext);
+		max_y_px = Math.max(max_y_px, sy + KH);
+	});
+
+	const SVG_W = max_x_px - min_x_px + PAD * 2;
+	const SVG_H = max_y_px - min_y_px + PAD * 2;
+	const off_x = -min_x_px + PAD;
+	const off_y = -min_y_px + PAD;
+
+	// Green (cold, 0 SFBs) → red (hot, many SFBs)
+	const heat_color = (count) => {
+		if (count === 0) return "#1e2e1e";
+		const t = Math.pow(count / max_count, 0.40);
+		if (t < 0.5) {
+			const tt = t * 2;
+			const r  = Math.round(52  + tt * (220 - 52));
+			const g  = Math.round(199 + tt * (140 - 199));
+			const b  = Math.round(89  + tt * (20  - 89));
+			return `rgb(${r},${g},${b})`;
+		}
+		const tt = (t - 0.5) * 2;
+		const r  = Math.round(220 + tt * (255 - 220));
+		const g  = Math.round(140 + tt * (59  - 140));
+		const b  = Math.round(20  + tt * (48  - 20));
+		return `rgb(${r},${g},${b})`;
+	};
+
+	const grand_total = Object.values(sfb_by_kc).reduce((s, c) => s + c, 0);
+	const uid = "sfbhm_" + Date.now().toString(36);
+
+	const SHORT_LABELS = {
+		"53": "⎋", "36": "⏎", "48": "⇥", "51": "⌫", "56": "⇧", "60": "⇧",
+		"57": "⇪", "49": "",  "59": "⌃", "55": "⌘", "54": "⌘", "58": "⌥",
+		"61": "⌥", "63": "Fn",  "114": "?", "123": "←", "124": "→", "125": "↓",
+		"126": "↑", "76": "⏎",
+	};
+
+	let rects    = "";
+	let labels   = "";
+	let tooltips = "";
+
+	key_entries.forEach(([kc_str, pos]) => {
+		const count    = sfb_by_kc[kc_str] || 0;
+		const fill     = heat_color(count);
+		const key_w    = compute_kw(kc_str, pos);
+		const sx       = compute_sx(kc_str, pos) + off_x;
+		const base_sy  = Math.round((Y_TOP - pos.y) / Y_SPAN * (5.5 * U)) - Math.round(KH / 2) + off_y;
+		const half_slot = HALF_HEIGHT_KEYS[kc_str];
+		const key_h     = half_slot ? Math.round(KH / 2) - Math.round(GAP / 2) : KH;
+		const sy        = half_slot === "bottom" ? base_sy + Math.round(KH / 2) + Math.round(GAP / 2) : base_sy;
+		const cx        = sx + key_w / 2;
+		const cy        = sy + key_h / 2;
+		const text_color = count === 0 ? "#555" : "#fff";
+		const label_raw  = kc_name_map[kc_str] ?? KEYCODE_NAMES[kc_str] ?? "";
+		let label_disp;
+		if (SHORT_LABELS[kc_str] !== undefined) {
+			label_disp = SHORT_LABELS[kc_str];
+		} else if (label_raw.length > 6) {
+			label_disp = label_raw.slice(0, 5).toUpperCase() + "…";
+		} else {
+			label_disp = label_raw.toUpperCase();
+		}
+		const disp_len   = [...label_disp].length;
+		const base_font  = disp_len > 7 ? 8 : disp_len > 4 ? 10 : disp_len > 2 ? 12 : 14;
+		// Fn is text, not a symbol — use the same scale as alphabetic keys
+		const is_special = SHORT_LABELS[kc_str] !== undefined && label_disp !== "" && label_disp !== "Fn";
+		const font_size  = is_special ? Math.round(base_font * 1.5) : base_font;
+
+		// Build tooltip
+		const key_occurrences = (kc_raw[kc_str] && kc_raw[kc_str].count) ? kc_raw[kc_str].count : 0;
+		const sfb_key_count = count; // total SFBs for this key
+		const sfb_key_rate  = key_occurrences > 0 ? ((sfb_key_count / key_occurrences) * 100).toFixed(1) : "0.0";
+
+		const tip_lines = [
+			`<b>${escape_html(label_raw || kc_str)}</b> <span style="color:#888;font-size:10px;">(kc ${kc_str})</span><br>`,
+			`Occurrences : <b>${format_number(key_occurrences)}</b>`,
+		];
+
+		if (sfb_key_count > 0) {
+			tip_lines.push(`<br>SFBs : ${format_number(sfb_key_count)} — taux : <b style="color:#f87171;">${sfb_key_rate}%</b>`);
+		}
+
+		// Build the full list of finger-mates for this key (from SFB_COLUMNS)
+		// so we can show all possible pairs, including those with count = 0.
+		const this_col = SFB_COLUMNS[kc_str];
+		const finger_mates = this_col
+			? Object.entries(SFB_COLUMNS)
+				.filter(([k]) => k !== kc_str && SFB_COLUMNS[k] === this_col)
+				.map(([k]) => k)
+			: [];
+
+		// Collect counts from sfb_pairs_by_kc; pairs are keyed by partner kc
+		const pairs_map = {}; // partner_kc → count
+		const raw_pairs = sfb_pairs_by_kc[kc_str] || [];
+		raw_pairs.forEach(p => {
+			pairs_map[p.partner_kc] = (pairs_map[p.partner_kc] || 0) + p.count;
+		});
+
+		// Self-doubling: partner_kc === kc_str (AA, BB…)
+		const self_count = pairs_map[kc_str] || 0;
+
+		// All possible partners: finger-mates + self (for doubling)
+		const all_partner_kcs = [kc_str, ...finger_mates]; // self first, then others
+		const all_rows = all_partner_kcs.map(pk => ({
+			partner_kc: pk,
+			count: pairs_map[pk] || 0,
+		})).sort((a, b) => b.count - a.count); // sort by count descending
+
+		const sfb_total_all = grand_total;
+
+		if (all_rows.length > 0) {
+			tip_lines.push(`<hr style="border-color:#555;margin:4px 0">`);
+			// Table header
+			tip_lines.push(
+				`<table style="border-collapse:collapse;width:100%;font-size:11px;">` +
+				`<tr style="color:#888;">` +
+				`<td style="padding:1px 6px 1px 0;">Paire</td>` +
+				`<td style="padding:1px 4px;text-align:right;">nb</td>` +
+				`<td style="padding:1px 4px;text-align:right;" title="Part de ce SFB parmi les SFBs de la touche">% /SFBs touche</td>` +
+				`<td style="padding:1px 4px;text-align:right;" title="Fréquence : nb SFB / nb occurrences de la touche">taux</td>` +
+				`<td style="padding:1px 0 1px 4px;text-align:right;" title="Part de ce SFB parmi tous les SFBs">% SFBs tot.</td>` +
+				`</tr>`
+			);
+
+			all_rows.forEach(({ partner_kc: pk, count: p_count }) => {
+				// Always display as "current_key + partner_key" regardless of stored pair_label direction
+				const partner_label = pk === kc_str
+					? (label_raw || kc_str) // self-doubling: show key twice
+					: (kc_name_map[pk] ?? KEYCODE_NAMES[pk] ?? pk);
+				const pair_str = escape_html((label_raw || kc_str) + partner_label);
+				const pct_of_key_sfb = sfb_key_count > 0 ? ((p_count / sfb_key_count) * 100).toFixed(0) : "0";
+				const pct_key_use    = key_occurrences > 0 ? ((p_count / key_occurrences) * 100).toFixed(1) : "0.0";
+				const pct_sfb_total  = sfb_total_all > 0 ? ((p_count / sfb_total_all) * 100).toFixed(2) : "0.00";
+				const row_color = p_count === 0 ? "color:#555;" : "color:#ddd;";
+				const val_color = p_count === 0 ? "color:#555;" : "color:#ddd;";
+				tip_lines.push(
+					`<tr>` +
+					`<td style="padding:1px 6px 1px 0;${row_color}">${pair_str}</td>` +
+					`<td style="padding:1px 4px;text-align:right;${val_color}"><b>${p_count > 0 ? format_number(p_count) : "—"}</b></td>` +
+					`<td style="padding:1px 4px;text-align:right;color:#aaa;">${p_count > 0 ? pct_of_key_sfb + "%" : "—"}</td>` +
+					`<td style="padding:1px 4px;text-align:right;color:#aaa;">${p_count > 0 ? pct_key_use + "%" : "—"}</td>` +
+					`<td style="padding:1px 0 1px 4px;text-align:right;color:#aaa;">${p_count > 0 ? pct_sfb_total + "%" : "—"}</td>` +
+					`</tr>`
+				);
+			});
+
+			tip_lines.push(`</table>`);
+		}
+
+		const tip_html = tip_lines.join("");
+		const tip_id   = `${uid}_${kc_str}`;
+
+		if (kc_str === "36") {
+			// ISO Return L-shape — identical geometry to kc heatmap
+			const pos_bracket   = KEY_POSITIONS["30"];  // ] — QWERTY row
+			const pos_backslash = KEY_POSITIONS["42"];  // \ — home row ISO backslash
+			const wing_lx = compute_sx("30", pos_bracket)   + off_x + compute_kw("30", pos_bracket)   + GAP;
+			const stem_lx = compute_sx("42", pos_backslash) + off_x + compute_kw("42", pos_backslash) + GAP;
+			const stem_w  = 34;  // ≈ 0.76u — Apple ISO Return stem is narrower than 1u
+			const rx_ret  = stem_lx + stem_w;
+			const sy_qwerty = Math.round((Y_TOP - 0.84) / Y_SPAN * (5.5 * U)) - Math.round(KH / 2) + off_y;
+			const sy_home   = sy;
+			const top_y     = sy_qwerty;
+			const wing_bot  = sy_qwerty + KH;
+			const bot_y     = sy_home   + KH;
+			const d = [
+				`M ${wing_lx} ${top_y+R}`, `A ${R} ${R} 0 0 1 ${wing_lx+R} ${top_y}`,
+				`L ${rx_ret-R} ${top_y}`,  `A ${R} ${R} 0 0 1 ${rx_ret} ${top_y+R}`,
+				`L ${rx_ret} ${bot_y-R}`,  `A ${R} ${R} 0 0 1 ${rx_ret-R} ${bot_y}`,
+				`L ${stem_lx+R} ${bot_y}`, `A ${R} ${R} 0 0 1 ${stem_lx} ${bot_y-R}`,
+				`L ${stem_lx} ${wing_bot+R}`, `A ${R} ${R} 0 0 0 ${stem_lx-R} ${wing_bot}`,
+				`L ${wing_lx+R} ${wing_bot}`,  `A ${R} ${R} 0 0 1 ${wing_lx} ${wing_bot-R}`,
+				`L ${wing_lx} ${top_y+R}`, "Z",
+			].join(" ");
+			rects += `<path d="${d}" fill="${fill}" stroke="#0d1a0d" stroke-width="1.5" paint-order="stroke fill"
+				data-tip="${tip_id}" class="hm-key"
+				onmouseenter="hm_show_tip('${tip_id}')" onmouseleave="hm_hide_tip('${tip_id}')"/>`;
+			const ret_font = 15;
+			const ret_cx   = (wing_lx + rx_ret) / 2;
+			const ret_cy   = sy_qwerty + KH / 2;
+			labels += `<text x="${Math.round(ret_cx)}" y="${Math.round(ret_cy + ret_font * 0.38)}"
+				text-anchor="middle" font-size="${ret_font}"
+				font-family="monospace,sans-serif" fill="${text_color}"
+				pointer-events="none">${escape_html(label_disp)}</text>`;
+		} else {
+			rects += `<rect x="${sx}" y="${sy}" width="${key_w}" height="${key_h}" rx="${R}"
+				fill="${fill}" stroke="#0d1a0d" stroke-width="1.5" paint-order="stroke fill"
+				data-tip="${tip_id}" class="hm-key"
+				onmouseenter="hm_show_tip('${tip_id}')" onmouseleave="hm_hide_tip('${tip_id}')"/>`;
+		}
+
+		if (kc_str !== "36") {
+			labels += `<text x="${Math.round(cx)}" y="${Math.round(cy + font_size * 0.38)}"
+				text-anchor="middle" font-size="${font_size}"
+				font-family="monospace,sans-serif" fill="${text_color}"
+				pointer-events="none">${escape_html(label_disp)}</text>`;
+		}
+
+		tooltips += `<div id="${tip_id}" class="hm-tooltip" style="display:none;position:fixed;z-index:9999;` +
+			`background:#1a2e1a;border:1px solid #444;border-radius:6px;padding:7px 10px;` +
+			`font-size:12px;line-height:1.5;color:#ddd;pointer-events:none;max-width:280px;white-space:nowrap;text-align:left;">` +
+			`<style scoped>.hm-tooltip hr{margin:4px 0;border-color:#555;}</style>` +
+			tip_html + `</div>`;
+	});
+
+	container.innerHTML =
+		`<div style="display:inline-block;position:relative;">` +
+		`<div style="font-size:17px;font-weight:bold;color:#22c55e;margin-bottom:6px;text-align:left;">` +
+		`Heatmap des SFBs par touche</div>` +
+		`<svg width="${SVG_W}" height="${SVG_H}" xmlns="http://www.w3.org/2000/svg" ` +
+		`style="background:#1e1608;border-radius:10px;display:block;"` +
+		`onmousemove="hm_track_mouse(event)">` +
+		rects + labels +
+		`</svg>` +
+		tooltips +
+		`</div>`;
 }
 
 
@@ -647,8 +1537,8 @@ function render_current_tab() {
  * @param {string} raw_key - The raw key string from the data dictionary.
  * @returns {string} Lowercase composite string including all aliases.
  */
-function build_searchable_key(raw_key) {
-	let s = raw_key.toLowerCase();
+function build_searchable_key(raw_key, case_sensitive) {
+	let s = case_sensitive ? raw_key : raw_key.toLowerCase();
 	// Space character variants
 	if (raw_key.includes("\u00A0")) s += " nbsp";
 	if (raw_key.includes("\u202F")) s += " nnbsp";
@@ -657,28 +1547,31 @@ function build_searchable_key(raw_key) {
 	// Single ASCII control characters → add their CONTROL_CHAR_NAMES abbreviation
 	if (raw_key.length === 1) {
 		const code = raw_key.charCodeAt(0);
-		if (CONTROL_CHAR_NAMES[code]) s += " " + CONTROL_CHAR_NAMES[code].toLowerCase();
+		if (CONTROL_CHAR_NAMES[code]) {
+			const name = CONTROL_CHAR_NAMES[code];
+			s += " " + (case_sensitive ? name : name.toLowerCase());
+		}
 	}
 	// Keycode tab → add the resolved human-readable name (custom layout > static map)
 	if (app_state.current_tab === "kc") {
 		const kc_resolved = (window.keycode_layout && window.keycode_layout[raw_key])
 			|| KEYCODE_NAMES[raw_key];
-		if (kc_resolved) s += " " + kc_resolved.toLowerCase();
+		if (kc_resolved) s += " " + (case_sensitive ? kc_resolved : kc_resolved.toLowerCase());
 	}
 	// Add the text label for the exact key (lowercased for case-insensitive search)
 	// so that typing "backspace", "left", "space", etc. finds the matching entries.
 	const exact_sym = CONTROL_KEY_SYMBOLS[raw_key.toLowerCase()];
 	if (exact_sym) {
-		const exact_lower = exact_sym.toLowerCase();
-		if (!s.includes(exact_lower)) s += " " + exact_lower;
+		const candidate = case_sensitive ? exact_sym : exact_sym.toLowerCase();
+		if (!s.includes(candidate)) s += " " + candidate;
 	}
 	// For sequences: also add labels for each embedded bracket marker (e.g. in bigrams)
 	const bracket_matches = raw_key.match(/\[[^\]]+\]/gi) || [];
 	bracket_matches.forEach(m => {
 		const m_sym = CONTROL_KEY_SYMBOLS[m.toLowerCase()];
 		if (m_sym) {
-			const m_lower = m_sym.toLowerCase();
-			if (!s.includes(m_lower)) s += " " + m_lower;
+			const candidate = case_sensitive ? m_sym : m_sym.toLowerCase();
+			if (!s.includes(candidate)) s += " " + candidate;
 		}
 	});
 	return s;
@@ -695,13 +1588,31 @@ function render_table() {
 		let arr = [...app_state.rendered_list];
 
 		// Apply search filter using enriched searchable key so special characters
-		// like NBSP, NNBSP, and [BS] can be found by typing their alias names
+		// like NBSP, NNBSP, and [BS] can be found by typing their alias names.
+		// Case sensitivity follows the dedicated toggle button — when active, "e"
+		// must not match "Enter" and capitalised aliases are preserved verbatim.
+		const case_sensitive_search = !!document.getElementById("btn_case_sensitive")?.classList.contains("active");
+		const match_positions = new Map();
 		if (app_state.search_query) {
-			arr = arr.filter((i) => build_searchable_key(i.key).includes(app_state.search_query));
+			const q = app_state.search_query;
+			arr = arr.filter((i) => {
+				const haystack = build_searchable_key(i.key, case_sensitive_search);
+				const idx = haystack.indexOf(q);
+				if (idx === -1) return false;
+				match_positions.set(i, idx);
+				return true;
+			});
 		}
 
-		// Sort
+		// Sort. When a search is active, rows whose match position is further left
+		// rank first — typing "e" should surface "e" itself before words containing
+		// "e" further inside. Ties fall back to the regular column-based sort.
 		arr.sort((a, b) => {
+			if (app_state.search_query) {
+				const pa = match_positions.get(a) ?? Infinity;
+				const pb = match_positions.get(b) ?? Infinity;
+				if (pa !== pb) return pa - pb;
+			}
 			const v_a = a[app_state.sort_col] ?? 0;
 			const v_b = b[app_state.sort_col] ?? 0;
 			if (typeof v_a === "string") {
@@ -722,12 +1633,12 @@ function render_table() {
 		if (!tbody) return;
 
 		const is_kc_tab       = app_state.current_tab === "kc";
-		const is_shortcut_tab = ["sc", "sc_bg", "mods"].includes(app_state.current_tab);
+		const is_shortcut_tab = ["sc", "sc_bg", "sc_tg", "sc_qg", "sc_pg", "mods"].includes(app_state.current_tab);
 		// Repetition column is meaningful for chars, bigrams, trigrams, words, and shortcuts tabs
 		const rep_available   = ["c", "bg", "tg", "w", "sc"].includes(app_state.current_tab);
-		// Hide the repetition column entirely for n-grams with more than 3 tokens and
-		// for sc_bg/w_bg where consecutive-pair data doesn't apply
-		const show_rep_col    = !["qg", "pg", "hx", "hp", "sc_bg", "w_bg"].includes(app_state.current_tab);
+		// Hide the repetition column for n-grams > 3 tokens and for all bigram/sequence pair tabs
+		const NO_REP_TABS     = ["qg", "pg", "hx", "hp", "sc_bg", "sc_tg", "sc_qg", "sc_pg", "w_bg", "w_tg", "w_qg", "w_pg"];
+		const show_rep_col    = !NO_REP_TABS.includes(app_state.current_tab);
 		const table_el        = document.getElementById("metrics_table");
 		if (table_el) table_el.classList.toggle("hide-rep", !show_rep_col);
 
@@ -755,23 +1666,24 @@ function render_table() {
 					? `kc ${item.key}&nbsp;<span class="kc-name">(${escape_html(kc_name)})</span>`
 					: `kc ${item.key}`;
 				key_html = `<span class="mono-space kc-chip">${kc_label}</span>`;
-			} else if (app_state.current_tab === "sc_bg") {
-				// Keys are "PrevShortcut→NextShortcut" — split on → and render each half
-				const sep_idx = item.key.indexOf("\u2192");
-				const sc1 = sep_idx !== -1 ? item.key.slice(0, sep_idx) : item.key;
-				const sc2 = sep_idx !== -1 ? item.key.slice(sep_idx + 1) : "";
-				key_html = `<span class="shortcut-seq">${format_shortcut_key(sc1)}` +
-					(sc2 ? `\u00A0<span style="color:var(--text-muted);">\u2192</span>\u00A0${format_shortcut_key(sc2)}` : "") +
+			} else if (["sc_bg", "sc_tg", "sc_qg", "sc_pg"].includes(app_state.current_tab)) {
+				// Keys are shortcut sequences joined by →; split and render each part
+				const sc_parts = item.key.split("→");
+				key_html = `<span class="shortcut-seq">` +
+					sc_parts.map((p, i) =>
+						(i > 0 ? ` <span style="color:var(--text-muted);">→</span> ` : "") +
+						format_shortcut_key(p)
+					).join("") +
 					`</span>`;
-			} else if (app_state.current_tab === "w_bg") {
-				// Keys are "word1 word2" — render as two plain-text chips with an arrow
-				const sp = item.key.indexOf(" ");
-				const w1 = sp !== -1 ? item.key.slice(0, sp) : item.key;
-				const w2 = sp !== -1 ? item.key.slice(sp + 1) : "";
-				key_html = `<span class="seq-chips"><span class="mono-space">${escape_html(w1)}</span>` +
-					(w2 ? `\u00A0<span style="color:var(--text-muted);">\u2192</span>\u00A0<span class="mono-space">${escape_html(w2)}</span>` : "") +
+			} else if (["w_bg", "w_tg", "w_qg", "w_pg"].includes(app_state.current_tab)) {
+				// Keys are words joined by space; render as plain-text chips with arrows
+				const w_parts = item.key.split(" ");
+				key_html = `<span class="seq-chips">` +
+					w_parts.map((p, i) =>
+						(i > 0 ? ` <span style="color:var(--text-muted);">→</span> ` : "") +
+						`<span class="mono-space">${escape_html(p)}</span>`
+					).join("") +
 					`</span>`;
-			} else if (is_shortcut_tab) {
 				key_html = `<span class="shortcut-seq">${format_shortcut_key(item.key)}</span>`;
 			} else if (is_ctrl_display) {
 				// Resolve the best label: pretty symbol > ASCII abbreviation > uppercase name
@@ -802,10 +1714,10 @@ function render_table() {
 				? `${format_number(item.avg.toFixed(1))} ms`
 				: "-";
 
-			const wpm_color = item.wpm > 60 ? "#34c759" : (item.wpm > 0 && item.wpm < 30 ? "#ff3b30" : "inherit");
+			const wpm_color = item.wpm > 0 ? gradient_color(item.wpm, WPM_GRADIENT) : "inherit";
 			const wpm_str   = item.wpm > 0 ? `${format_number(item.wpm.toFixed(1))} MPM` : "-";
 
-			const acc_color = item.acc >= 95 ? "#34c759" : (item.acc < 80 ? "#ff3b30" : "#ffcc00");
+			const acc_color = gradient_color(item.acc, PRECISION_GRADIENT);
 
 			// Repetition cell: show count · rate% on one line, breakdown below when ★ involved.
 			// null = tab type doesn't support rep (no next-level data); show "—".
@@ -813,33 +1725,22 @@ function render_table() {
 			//       no-data tabs, so the user knows it was truly zero repetitions found.
 			let rep_html;
 			if (!rep_available || item.rep === null) {
-				rep_html = `<span style="color:var(--text-muted);">\u2014</span>`;
+				rep_html = `<span style="color:var(--text-muted);">—</span>`;
 			} else if (item.rep === 0) {
-				rep_html = `<span style="color:var(--text-muted);">0</span>`;
+				rep_html = `0`;
 			} else {
-				const rep_color  = item.rep_rate >= 20 ? "#ff3b30" : (item.rep_rate >= 10 ? "#ffcc00" : "inherit");
-				const rate_str   = format_number(item.rep_rate.toFixed(1)) + "\u00A0%";
-				// Show manual/★ breakdown only when the ★ key contributed — avoids the line when
-				// all repetitions are manual (the star column would just be "0" which adds no info).
-				const detail_str = item.rep_star > 0
-					? `<br><span style="font-size:10px;color:var(--text-muted);">` +
-					  `dont ${format_number(item.rep_manual)}\u00A0brutes, ${format_number(item.rep_star)}\u00A0\u2605</span>`
-					: "";
-				rep_html =
-					`<strong style="color:${rep_color}">${format_number(item.rep)}</strong>` +
-					`<span style="font-size:10px;color:var(--text-muted);"> \u00B7 ${rate_str}</span>` +
-					detail_str;
+				const rep_color = item.rep_rate >= 20 ? "#ff3b30" : (item.rep_rate >= 10 ? "#ffcc00" : "inherit");
+				const rate_str  = format_number(item.rep_rate.toFixed(1)) + " %";
+				rep_html = `<span style="color:${rep_color}">${format_number(item.rep)} (${rate_str})</span>`;
 			}
 
 			// Km cell: total finger distance for all occurrences of this sequence.
 			// "—" for home-row keys and sequences whose geometry can't be resolved.
 			let km_html;
 			if (item.km <= 0) {
-				km_html = `<span style="color:var(--text-muted);">\u2014</span>`;
-			} else if (item.km >= 1) {
-				km_html = `${format_number(item.km.toFixed(2))}\u00A0<span class="stat-unit">km</span>`;
+				km_html = `<span style="color:var(--text-muted);">—</span>`;
 			} else {
-				km_html = `${format_number((item.km * 1000).toFixed(1))}\u00A0<span class="stat-unit">m</span>`;
+				km_html = `${format_number(item.km.toFixed(4))} km`;
 			}
 
 			return `<tr>

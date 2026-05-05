@@ -156,39 +156,42 @@ const CONTROL_KEY_SYMBOLS = {
 const KEY_UNIT_MM = 19.05;
 
 const KEY_POSITIONS = {
-	// Home row (y = 0)
-	"0":   { x: 1.75,  y: 0     }, // a — left pinky home
-	"1":   { x: 2.75,  y: 0     }, // s — left ring home
-	"2":   { x: 3.75,  y: 0     }, // d — left middle home
-	"3":   { x: 4.75,  y: 0     }, // f — left index home (bump)
-	"5":   { x: 5.75,  y: 0     }, // g — left index stretch
-	"4":   { x: 6.75,  y: 0     }, // h — right index stretch
-	"38":  { x: 7.75,  y: 0     }, // j — right index home (bump)
-	"40":  { x: 8.75,  y: 0     }, // k — right middle home
-	"37":  { x: 9.75,  y: 0     }, // l — right ring home
-	"41":  { x: 10.75, y: 0     }, // ;  — right pinky home
-	"39":  { x: 11.75, y: 0     }, // '  — right pinky reach
-	"36":  { x: 13.0,  y: 0     }, // return
-	"57":  { x: 0.75,  y: 0     }, // capslock
+	// Home row (y = 0.12) — shifted up by half the inter-row reduction to tighten letter-row spacing
+	"0":   { x: 1.75,  y: 0.12  }, // a — left pinky home
+	"1":   { x: 2.75,  y: 0.12  }, // s — left ring home
+	"2":   { x: 3.75,  y: 0.12  }, // d — left middle home
+	"3":   { x: 4.75,  y: 0.12  }, // f — left index home (bump)
+	"5":   { x: 5.75,  y: 0.12  }, // g — left index stretch
+	"4":   { x: 6.75,  y: 0.12  }, // h — right index stretch
+	"38":  { x: 7.75,  y: 0.12  }, // j — right index home (bump)
+	"40":  { x: 8.75,  y: 0.12  }, // k — right middle home
+	"37":  { x: 9.75,  y: 0.12  }, // l — right ring home
+	"41":  { x: 10.75, y: 0.12  }, // ;  — right pinky home
+	"39":  { x: 11.75, y: 0.12  }, // '  — right pinky reach
+	"36":  { x: 13.5,  y: 0.12  }, // return — right-anchored; wing right edge aligns with r-shift/backspace (698 px)
+	"57":  { x: 0.75,  y: 0.12  }, // capslock — 1.75u wide, anchored so right edge has normal gap with A
 
-	// QWERTY row (y = 0.90)
-	"48":  { x: 0.75,  y: 0.90  }, // tab
-	"12":  { x: 1.5,   y: 0.90  }, // q
-	"13":  { x: 2.5,   y: 0.90  }, // w
-	"14":  { x: 3.5,   y: 0.90  }, // e
-	"15":  { x: 4.5,   y: 0.90  }, // r
-	"17":  { x: 5.5,   y: 0.90  }, // t
-	"16":  { x: 6.5,   y: 0.90  }, // y
-	"32":  { x: 7.5,   y: 0.90  }, // u
-	"34":  { x: 8.5,   y: 0.90  }, // i
-	"31":  { x: 9.5,   y: 0.90  }, // o
-	"35":  { x: 10.5,  y: 0.90  }, // p
-	"33":  { x: 11.5,  y: 0.90  }, // [
-	"30":  { x: 12.5,  y: 0.90  }, // ]
-	"42":  { x: 12.75, y: 0     }, // \ — ISO backslash is on the home row, between ' and Return
+	// QWERTY row (y = 0.84)
+	"48":  { x: 0.5,   y: 0.84  }, // tab — 1.5u wide, anchored so right edge has normal gap with Q
+	"12":  { x: 1.5,   y: 0.84  }, // q
+	"13":  { x: 2.5,   y: 0.84  }, // w
+	"14":  { x: 3.5,   y: 0.84  }, // e
+	"15":  { x: 4.5,   y: 0.84  }, // r
+	"17":  { x: 5.5,   y: 0.84  }, // t
+	"16":  { x: 6.5,   y: 0.84  }, // y
+	"32":  { x: 7.5,   y: 0.84  }, // u
+	"34":  { x: 8.5,   y: 0.84  }, // i
+	"31":  { x: 9.5,   y: 0.84  }, // o
+	"35":  { x: 10.5,  y: 0.84  }, // p
+	"33":  { x: 11.5,  y: 0.84  }, // [
+	"30":  { x: 12.5,  y: 0.84  }, // ]
+	"42":  { x: 12.75, y: 0.12  }, // \ — ISO backslash is on the home row, between ' and Return
 
 	// Number row (y = 1.80)
-	"50":  { x: 0,     y: 1.80  }, // `
+	// Apple ISO keyboard quirk: the OS-reported keycode for the backtick key (left of 1)
+	// is kc 10, and the ISO extra key (< >, right of left-shift) is kc 50.
+	// kc 10 is placed here (number row) so the ` label sits at the correct position.
+	"10":  { x: 0,     y: 1.80  }, // ` (number row, left of 1) — Apple ISO: kc10 is physically the ` key
 	"18":  { x: 1,     y: 1.80  }, // 1
 	"19":  { x: 2,     y: 1.80  }, // 2
 	"20":  { x: 3,     y: 1.80  }, // 3
@@ -201,131 +204,244 @@ const KEY_POSITIONS = {
 	"29":  { x: 10,    y: 1.80  }, // 0
 	"27":  { x: 11,    y: 1.80  }, // -
 	"24":  { x: 12,    y: 1.80  }, // =
-	"51":  { x: 13.5,  y: 1.80  }, // backspace
+	"51":  { x: 13.0,  y: 1.80  }, // backspace — left anchor; right edge aligns with Return stem
 
-	// Bottom row (y = -0.90) — ISO layout
-	// Left Shift is 1.25u on ISO (vs 2.25u ANSI); ISO extra key (kc 10) fills the gap.
-	// Z and every key after it sit at the same x as ANSI because 1.25u + 1u = 2.25u total offset.
-	"56":  { x: 0.625, y: -0.90 }, // shift (L) — 1.25u ISO key, centre at 0.625
-	"10":  { x: 1.75,  y: -0.90 }, // ISO extra key (< > on AZERTY, § on UK) — not in ANSI
-	"6":   { x: 2.75,  y: -0.90 }, // z
-	"7":   { x: 3.75,  y: -0.90 }, // x
-	"8":   { x: 4.75,  y: -0.90 }, // c
-	"9":   { x: 5.75,  y: -0.90 }, // v
-	"11":  { x: 6.75,  y: -0.90 }, // b
-	"45":  { x: 7.75,  y: -0.90 }, // n
-	"46":  { x: 8.75,  y: -0.90 }, // m
-	"43":  { x: 9.75,  y: -0.90 }, // ,
-	"47":  { x: 10.75, y: -0.90 }, // .
-	"44":  { x: 11.75, y: -0.90 }, // /
-	"60":  { x: 12.875,y: -0.90 }, // shift (R) — 1.75u ISO right shift
+	// Bottom row (y = -0.60) — ISO layout; shifted up by 0.24 to halve inter-row gap vs home
+	// Left Shift is 0.75u on ISO (narrow); ISO extra key (kc 50) fills the gap to Z.
+	// Letter keys shifted -0.50u on x so B (x=6.25) sits exactly between G (5.75) and H (6.75).
+	"56":  { x: 0.00,  y: -0.60 }, // shift (L) — 0.75u, left-anchored from left edge
+	"50":  { x: 1.25,  y: -0.60 }, // ISO extra key (< > on AZERTY)
+	"6":   { x: 2.25,  y: -0.60 }, // z
+	"7":   { x: 3.25,  y: -0.60 }, // x
+	"8":   { x: 4.25,  y: -0.60 }, // c
+	"9":   { x: 5.25,  y: -0.60 }, // v
+	"11":  { x: 6.25,  y: -0.60 }, // b — exactly between G (5.75) and H (6.75)
+	"45":  { x: 7.25,  y: -0.60 }, // n
+	"46":  { x: 8.25,  y: -0.60 }, // m
+	"43":  { x: 9.25,  y: -0.60 }, // ,
+	"47":  { x: 10.25, y: -0.60 }, // .
+	"44":  { x: 11.25, y: -0.60 }, // /
+	"60":  { x: 13.5,  y: -0.60 }, // shift (R) — right-anchored; right edge aligns with Return (rx_ret ≈ 698 px)
 
-	// Thumb row (y = -1.80)
-	"59":  { x: 0.5,   y: -1.80 }, // ctrl (L) — left pinky (standard touch-typing)
-	"63":  { x: 1.5,   y: -1.80 }, // fn
-	"58":  { x: 2.5,   y: -1.80 }, // alt / option (L)
-	"55":  { x: 3.5,   y: -1.80 }, // cmd (L)
-	"49":  { x: 6.5,   y: -1.80 }, // space — left thumb rest position
-	"54":  { x: 9.5,   y: -1.80 }, // cmd (R) — right thumb rest position
-	"61":  { x: 10.5,  y: -1.80 }, // alt / option (R)
-	"62":  { x: 11.5,  y: -1.80 }, // ctrl (R)
+	// Thumb row (y = -1.32) — fn, ctrl-L, alt-L, cmd-L | space | cmd-R, alt-R
+	// ctrl-R removed; arrow cluster sits immediately after alt-R (4 px gap)
+	"63":  { x: 0.0,   y: -1.32 }, // fn — 1u wide, right-anchored; left edge aligns with Esc/Tab/Shift
+	"59":  { x: 1.0,   y: -1.32 }, // ctrl (L)
+	"58":  { x: 2.0,   y: -1.32 }, // alt / option (L)
+	"55":  { x: 3.25,  y: -1.32 }, // cmd (L) — 1.25u, right-anchored; 4 px gap after alt-L, space left = C.left
+	"49":  { x: 6.5,   y: -1.32 }, // space
+	"54":  { x: 9.25,  y: -1.32 }, // cmd (R) — 1.25u, left-anchored; space = exactly 5u wide
+	"61":  { x: 10.5,  y: -1.32 }, // alt / option (R) — 1 normal gap after cmd-R
+	// Arrow cluster: left-arrow left edge sits 4 px after alt-R right edge
+	// right-arrow right edge aligns with Return and right-shift (≈ 698 px)
+	"123": { x: 11.5,  y: -1.32 }, // left arrow  — 4 px gap after alt-R
+	"126": { x: 12.5,  y: -1.32 }, // up arrow   — top half
+	"125": { x: 12.5,  y: -1.32 }, // down arrow — bottom half (same x; renderer offsets y)
+	"124": { x: 13.5,  y: -1.32 }, // right arrow — right edge aligns with Return (rx_ret ≈ 698 px)
 
-	// Function row (y = 2.70)
+	// Function row (y = 2.70): Esc + F1-F12
 	"53":  { x: 0,     y: 2.70  }, // escape
-	"122": { x: 2.0,   y: 2.70  }, // f1  (gap between Esc and F1–F4)
-	"120": { x: 3.0,   y: 2.70  }, // f2
-	"99":  { x: 4.0,   y: 2.70  }, // f3
-	"118": { x: 5.0,   y: 2.70  }, // f4
-	"96":  { x: 6.0,   y: 2.70  }, // f5
-	"97":  { x: 7.0,   y: 2.70  }, // f6
-	"98":  { x: 8.0,   y: 2.70  }, // f7
-	"100": { x: 9.0,   y: 2.70  }, // f8
-	"101": { x: 10.0,  y: 2.70  }, // f9
-	"109": { x: 11.0,  y: 2.70  }, // f10
-	"103": { x: 12.0,  y: 2.70  }, // f11
-	"111": { x: 13.0,  y: 2.70  }, // f12
-
-	// Navigation cluster (right of main keyboard)
-	"114": { x: 15.0,  y: 2.70  }, // help / insert
-	"105": { x: 15.5,  y: 2.70  }, // f13
-	"107": { x: 16.5,  y: 2.70  }, // f14
-	"113": { x: 17.5,  y: 2.70  }, // f15
-	"117": { x: 16.0,  y: 1.80  }, // delete (forward)
-	"115": { x: 15.0,  y: 0.90  }, // home
-	"116": { x: 16.0,  y: 0.90  }, // page up
-	"119": { x: 15.0,  y: 0     }, // end
-	"121": { x: 16.0,  y: 0     }, // page down
-
-	// Arrow cluster
-	"123": { x: 14.5,  y: -0.90 }, // left
-	"124": { x: 15.5,  y: -0.90 }, // right
-	"125": { x: 15.5,  y: -1.80 }, // down
-	"126": { x: 15.5,  y: 0     }, // up
-
-	// Numpad enter
-	"76":  { x: 18.0,  y: -1.80 }, // enter (numpad)
+	"122": { x: 1.0,   y: 2.70  }, // f1
+	"120": { x: 2.0,   y: 2.70  }, // f2
+	"99":  { x: 3.0,   y: 2.70  }, // f3
+	"118": { x: 4.0,   y: 2.70  }, // f4
+	"96":  { x: 5.0,   y: 2.70  }, // f5
+	"97":  { x: 6.0,   y: 2.70  }, // f6
+	"98":  { x: 7.0,   y: 2.70  }, // f7
+	"100": { x: 8.0,   y: 2.70  }, // f8
+	"101": { x: 9.0,   y: 2.70  }, // f9
+	"109": { x: 10.0,  y: 2.70  }, // f10
+	"103": { x: 11.0,  y: 2.70  }, // f11
+	"111": { x: 12.0,  y: 2.70  }, // f12
 };
 
-// Maps each macOS virtual keycode to the finger that types it (standard touch typing).
-const KEY_FINGER = {
-	// Home row
-	"0": "l_pinky", "1": "l_ring",  "2": "l_mid",   "3": "l_idx",
-	"5": "l_idx",   "4": "r_idx",   "38": "r_idx",  "40": "r_mid",
-	"37": "r_ring", "41": "r_pinky","39": "r_pinky","36": "r_pinky",
-	"57": "l_pinky",
-	// QWERTY row
-	"48": "l_pinky","12": "l_pinky","13": "l_ring", "14": "l_mid",
-	"15": "l_idx",  "17": "l_idx",  "16": "r_idx",  "32": "r_idx",
-	"34": "r_mid",  "31": "r_ring", "35": "r_pinky","33": "r_pinky",
-	"30": "r_pinky","42": "r_pinky",
-	// Number row
-	"50": "l_pinky","18": "l_pinky","19": "l_ring", "20": "l_mid",
-	"21": "l_idx",  "23": "l_idx",  "22": "r_idx",  "26": "r_idx",
-	"28": "r_mid",  "25": "r_ring", "29": "r_pinky","27": "r_pinky",
-	"24": "r_pinky","51": "r_pinky",
-	// Bottom row
-	"56": "l_pinky","10": "l_pinky","6":  "l_pinky","7":  "l_ring", "8":  "l_mid",
-	"9":  "l_idx",  "11": "l_idx",  "45": "r_idx",  "46": "r_idx",
-	"43": "r_mid",  "47": "r_ring", "44": "r_pinky","60": "r_pinky",
-	// Thumb row (ctrl-L is typed with the left pinky in standard touch typing)
-	"59": "l_pinky","63": "l_thumb","58": "l_thumb","55": "l_thumb",
-	"49": "l_thumb","54": "r_thumb","61": "r_thumb","62": "r_thumb",
-	// Function row
-	"53": "l_pinky","122":"l_pinky","120":"l_ring", "99": "l_mid",
-	"118":"l_idx",  "96": "l_idx",  "97": "r_idx",  "98": "r_idx",
-	"100":"r_mid",  "101":"r_ring", "109":"r_pinky","103":"r_pinky",
-	"111":"r_pinky",
-	// Navigation cluster
-	"114":"r_pinky","105":"r_pinky","107":"r_pinky","113":"r_pinky",
-	"117":"r_pinky","115":"r_pinky","116":"r_pinky","119":"r_pinky",
-	"121":"r_pinky",
-	// Arrows
-	"123":"r_ring", "124":"r_pinky","125":"r_mid",  "126":"r_ring",
-	"76": "r_pinky",
+// Keys rendered at half the standard key height (KH / 2).
+// "top" = upper half, "bottom" = lower half of the cell.
+// Two keys sharing the same KEY_POSITIONS entry are stacked vertically.
+const HALF_HEIGHT_KEYS = {
+	"126": "top",    // up arrow — upper half
+	"125": "bottom", // down arrow — lower half
 };
 
-// Rest position for each finger (in KEY_POSITIONS coordinate units).
-const FINGER_HOME = {
-	l_pinky: { x: 1.75,  y: 0     }, // rests on a
-	l_ring:  { x: 2.75,  y: 0     }, // rests on s
-	l_mid:   { x: 3.75,  y: 0     }, // rests on d
-	l_idx:   { x: 4.75,  y: 0     }, // rests on f (bump)
-	l_thumb: { x: 6.5,   y: -1.80 }, // rests on the space bar
-	r_idx:   { x: 7.75,  y: 0     }, // rests on j (bump)
-	r_mid:   { x: 8.75,  y: 0     }, // rests on k
-	r_ring:  { x: 9.75,  y: 0     }, // rests on l
-	r_pinky: { x: 10.75, y: 0     }, // rests on ;
-	r_thumb: { x: 9.5,   y: -1.80 }, // rests on cmd (R), adjacent to space
-};
+// =================================================================================
+// Single source of truth for keycode → finger / hand / home assignments.
+// Mirrors `static/drivers/hammerspoon/data/keycodes_azerty.json` — both files must
+// stay in sync. The variante-en-A convention applies: the right hand types the
+// physical left columns and vice-versa (so kc 0, the QWERTY 'a' key on the
+// physical left, is assigned to r_pinky here). The `home: true` flag marks the
+// rest position of each finger.
+// =================================================================================
+const KEYCODE_DATA = [
+	{ kc: 0,   finger: "r_pinky", home: true  },
+	{ kc: 1,   finger: "r_ring",  home: true  },
+	{ kc: 2,   finger: "r_mid",   home: true  },
+	{ kc: 3,   finger: "r_idx",   home: true  },
+	{ kc: 4,   finger: "l_idx"   },
+	{ kc: 5,   finger: "r_idx"   },
+	{ kc: 6,   finger: "r_ring"  },
+	{ kc: 7,   finger: "r_mid"   },
+	{ kc: 8,   finger: "r_idx"   },
+	{ kc: 9,   finger: "r_idx"   },
+	{ kc: 10,  finger: "r_pinky" },
+	{ kc: 11,  finger: "r_idx"   },
+	{ kc: 12,  finger: "r_pinky" },
+	{ kc: 13,  finger: "r_ring"  },
+	{ kc: 14,  finger: "r_mid"   },
+	{ kc: 15,  finger: "r_idx"   },
+	{ kc: 16,  finger: "l_idx"   },
+	{ kc: 17,  finger: "r_idx"   },
+	{ kc: 18,  finger: "r_pinky" },
+	{ kc: 19,  finger: "r_ring"  },
+	{ kc: 20,  finger: "r_mid"   },
+	{ kc: 21,  finger: "r_idx"   },
+	{ kc: 22,  finger: "l_idx"   },
+	{ kc: 23,  finger: "r_idx"   },
+	{ kc: 24,  finger: "l_pinky" },
+	{ kc: 25,  finger: "l_ring"  },
+	{ kc: 26,  finger: "l_idx"   },
+	{ kc: 27,  finger: "l_pinky" },
+	{ kc: 28,  finger: "l_mid"   },
+	{ kc: 29,  finger: "l_pinky" },
+	{ kc: 30,  finger: "l_pinky" },
+	{ kc: 31,  finger: "l_ring"  },
+	{ kc: 32,  finger: "l_idx"   },
+	{ kc: 33,  finger: "l_pinky" },
+	{ kc: 34,  finger: "l_mid"   },
+	{ kc: 35,  finger: "l_pinky" },
+	{ kc: 36,  finger: "l_pinky" },
+	{ kc: 37,  finger: "l_ring",  home: true  },
+	{ kc: 38,  finger: "l_idx",   home: true  },
+	{ kc: 39,  finger: "l_pinky" },
+	{ kc: 40,  finger: "l_mid",   home: true  },
+	{ kc: 41,  finger: "l_pinky", home: true  },
+	{ kc: 42,  finger: "l_pinky" },
+	{ kc: 43,  finger: "l_mid"   },
+	{ kc: 44,  finger: "l_pinky" },
+	{ kc: 45,  finger: "l_idx"   },
+	{ kc: 46,  finger: "l_idx"   },
+	{ kc: 47,  finger: "l_ring"  },
+	{ kc: 49,  finger: "l_thumb", home: true  },
+	{ kc: 50,  finger: "r_pinky" },
+	{ kc: 51,  finger: "l_pinky" },
+	{ kc: 53,  finger: "r_pinky" },
+	{ kc: 54,  finger: "r_thumb", home: true  },
+	{ kc: 55,  finger: "l_thumb" },
+	{ kc: 56,  finger: "r_pinky" },
+	{ kc: 57,  finger: "r_pinky" },
+	{ kc: 58,  finger: "l_thumb" },
+	{ kc: 59,  finger: "l_pinky" },
+	{ kc: 60,  finger: "l_pinky" },
+	{ kc: 61,  finger: "r_thumb" },
+	{ kc: 63,  finger: "r_pinky" },
+	{ kc: 96,  finger: "r_idx"   },
+	{ kc: 97,  finger: "l_idx"   },
+	{ kc: 98,  finger: "l_idx"   },
+	{ kc: 99,  finger: "r_mid"   },
+	{ kc: 100, finger: "l_mid"   },
+	{ kc: 101, finger: "l_ring"  },
+	{ kc: 103, finger: "l_pinky" },
+	{ kc: 109, finger: "l_pinky" },
+	{ kc: 111, finger: "l_pinky" },
+	{ kc: 118, finger: "r_idx"   },
+	{ kc: 120, finger: "r_ring"  },
+	{ kc: 122, finger: "r_pinky" },
+	{ kc: 123, finger: "l_ring"  },
+	{ kc: 124, finger: "l_pinky" },
+	{ kc: 125, finger: "l_mid"   },
+	{ kc: 126, finger: "l_ring"  },
+];
+
+// Fingers excluded from SFB analysis: thumbs press only space/modifiers (no content),
+// and are anatomically free to alternate, so they cannot produce a same-finger bigram.
+const SFB_EXCLUDED_FINGERS = new Set(["l_thumb", "r_thumb"]);
+// Modifier/function-only keys excluded from SFB even though their finger is a content
+// finger — pressing Shift/Ctrl/Tab etc. does not type a character, so they cannot
+// participate in a content bigram.
+const SFB_EXCLUDED_KCS = new Set(["48", "57", "56", "59", "55", "58", "61", "62", "63", "51", "36", "60"]);
+
+// Derived: kc_str → finger column (used for SFB pair detection).
+const SFB_COLUMNS = (() => {
+	const map = {};
+	KEYCODE_DATA.forEach(({ kc, finger }) => {
+		const kc_str = String(kc);
+		if (SFB_EXCLUDED_FINGERS.has(finger)) return;
+		if (SFB_EXCLUDED_KCS.has(kc_str))    return;
+		map[kc_str] = finger;
+	});
+	return map;
+})();
+
+// Derived: kc_str → finger that types it (used by the distance metric).
+const KEY_FINGER = (() => {
+	const map = {};
+	KEYCODE_DATA.forEach(({ kc, finger }) => { map[String(kc)] = finger; });
+	return map;
+})();
+
+// Derived: finger → rest position { x, y } in KEY_POSITIONS coordinate units.
+// Each finger's home key is the entry tagged `home: true` in KEYCODE_DATA;
+// its physical position comes from KEY_POSITIONS.
+const FINGER_HOME = (() => {
+	const map = {};
+	KEYCODE_DATA.forEach(({ kc, finger, home }) => {
+		if (!home) return;
+		const pos = KEY_POSITIONS[String(kc)];
+		if (pos) map[finger] = { x: pos.x, y: pos.y };
+	});
+	return map;
+})();
 
 // French display labels for each finger identifier.
+// In "variante-en-A" the right hand types the physical left columns and vice-versa,
+// so the display label swaps G/D vs. the logical finger name to match physical key position.
 const FINGER_LABELS_FR = {
-	l_pinky: "Auriculaire G", l_ring: "Annulaire G",
-	l_mid:   "Majeur G",      l_idx:  "Index G",
-	l_thumb: "Pouce G",       r_idx:  "Index D",
-	r_mid:   "Majeur D",      r_ring: "Annulaire D",
-	r_pinky: "Auriculaire D", r_thumb:"Pouce D",
+	l_pinky: "Auriculaire D", l_ring: "Annulaire D",
+	l_mid:   "Majeur D",      l_idx:  "Index D",
+	l_thumb: "Pouce D",       r_idx:  "Index G",
+	r_mid:   "Majeur G",      r_ring: "Annulaire G",
+	r_pinky: "Auriculaire G", r_thumb:"Pouce G",
 };
+
+// Pause-threshold buckets emitted by the keylogger as cumulative cache fields.
+// MUST stay in sync with UI_PAUSE_BUCKETS_MS in modules/keylogger/log_manager.lua
+// — the JS side reads the bucket whose key matches the user-selected pause
+// threshold. Adding a new value here requires also adding it to the Lua list
+// and re-deploying so the buckets are populated for new data.
+const UI_PAUSE_BUCKETS_MS = [1000, 2000, 3000, 5000, 10000, 20000, 30000, 60000];
+
+/**
+ * Returns the string-keyed bucket name that exactly matches `pause_thresh`.
+ * If the user value is not one of the pre-aggregated thresholds (e.g. they
+ * picked "sans filtrage" = 99999999), falls back to the largest bucket so
+ * the cache still gives a useful answer.
+ * @param {number} pause_thresh - User-selected pause threshold in ms.
+ * @returns {string} The bucket key (e.g. "5000") used to index the cache maps.
+ */
+function pause_thresh_to_bucket_key(pause_thresh) {
+	if (UI_PAUSE_BUCKETS_MS.includes(pause_thresh)) return String(pause_thresh);
+	let chosen = UI_PAUSE_BUCKETS_MS[UI_PAUSE_BUCKETS_MS.length - 1];
+	for (const t of UI_PAUSE_BUCKETS_MS) {
+		if (t <= pause_thresh) chosen = t;
+	}
+	return String(chosen);
+}
+
+// Centralised tooltip text for the finger-travel distance metric. Reused by
+// every UI surface that exposes "km parcourus" so the explanation stays
+// consistent and updates in a single place.
+const FINGER_DISTANCE_TOOLTIP_HTML = (() => {
+	const NBSP = String.fromCharCode(160);
+	return (
+		`<strong>Calcul de la distance${NBSP}:</strong><br>` +
+		`&nbsp;&nbsp;Pour chaque touche frappée, on calcule la distance euclidienne (en unités de touche, 1${NBSP}u${NBSP}=${NBSP}19,05${NBSP}mm) entre le centre de la touche et la position de repos du doigt qui l'a tapée${NBSP}: F${NBSP}/${NBSP}J pour les index, A${NBSP}S${NBSP}D et K${NBSP}L${NBSP};${NBSP}pour les autres, espace pour le pouce gauche, cmd droite pour le pouce droit. ` +
+		`On compte un aller-retour (×${NBSP}2) puisque le doigt revient au repos.<br><br>` +
+		`<strong>Cas particuliers${NBSP}:</strong><br>` +
+		`&nbsp;&nbsp;• Si la touche frappée est la touche de repos elle-même (espace pour le pouce gauche par exemple), la distance est de 0.<br>` +
+		`&nbsp;&nbsp;• Le décalage horizontal entre rangées d'un clavier ISO n'est pas pris en compte${NBSP}: on traite le clavier comme une grille orthogonale, ce qui simplifie le calcul et reste valide pour les claviers ortholinéaires.<br>` +
+		`&nbsp;&nbsp;• Frapper deux fois la même touche ne compte pas deux allers-retours complets : la distance est sommée par-dessus le compteur de la touche, ce qui sous-estime légèrement les répétitions mais reflète bien la fatigue cumulée.<br><br>` +
+		`<strong>Effet des toggles${NBSP}:</strong> diminue significativement quand les hotstrings ou l'IA génèrent des caractères à votre place — vos doigts ne se déplacent plus pour ces caractères-là.`
+	);
+})();
 
 
 // Standard 2–3-letter abbreviations for ASCII non-printable characters (codes 0–31 and 127).

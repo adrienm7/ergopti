@@ -298,6 +298,13 @@ function M.app_watcher_cb(app_name, event_type, app_object)
 	_state.active_app_path   = new_path
 	_state.active_app_pid    = new_pid
 
+	-- Arm the "time-to-first-key after focus" measurement: the next manual
+	-- keystroke in this app will compute (now - focus_pending_at) and feed the
+	-- focus_to_first_key_* manifest counters. Cleared after the first hit so
+	-- subsequent keystrokes don't all count as zero-latency.
+	_state.focus_pending_at  = now
+	_state.focus_pending_app = app_name
+
 	-- Reset secure field flag on every app switch to avoid false-positive suppression
 	_state.is_secure_field = false
 

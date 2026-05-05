@@ -354,8 +354,22 @@ end
 --- Inner keyboard handler — never called directly; always wrapped in a pcall.
 --- @param e table The macOS keystroke event payload.
 --- @return boolean True to consume the event, false to pass it through.
+-- Synthetic OS-signal keycodes that must NEVER drive any keymap logic:
+-- F18 (79) is fired by the keep-awake jiggler to wake the OS, F19 (80) is the
+-- volume-scroll modifier, F20 (90) is the Karabiner nav-layer sentinel. None
+-- of them are real keystrokes the user produced, so they must not arm the LLM
+-- inactivity timer, mutate the buffer, or refresh predictions.
+local SYNTHETIC_SIGNAL_KEYCODES = {
+	[79] = true, [80] = true, [90] = true,
+}
+
 local function onKeyDownRaw(e)
 	if CoreState.processing_paused then return false end
+
+	-- Drop synthetic OS-signal keystrokes BEFORE updating last_key_time so
+	-- they don't reset the inactivity timer or trigger predictions.
+	local _early_kc = e:getKeyCode()
+	if SYNTHETIC_SIGNAL_KEYCODES[_early_kc] then return false end
 
 	local now = hs.timer.secondsSinceEpoch()
 	local dt  = now - CoreState.last_key_time

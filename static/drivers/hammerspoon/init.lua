@@ -589,6 +589,13 @@ hs.shutdownCallback = function()
 	Logger.info(LOG, "Hammerspoon arrêté")
 end
 
+-- Warm up macOS WebKit in the background so the first dashboard open is
+-- not penalised by the framework load (~1-2 s).  Deferred so it never
+-- blocks the boot critical path.
+hs.timer.doAfter(2, function()
+	pcall(function() require("ui.ui_builder").warmup_webkit() end)
+end)
+
 Logger.info(LOG, "════════════════════════════════════════════════════════════")
 Logger.info(LOG, "✅ Hammerspoon boot SUCCESSFUL.")
 Logger.info(LOG, "════════════════════════════════════════════════════════════")

@@ -58,66 +58,32 @@
 					</button>
 
 					<!-- Source toggles : indépendants — HS et IA peuvent être actifs séparément -->
-					<!-- Sans aucun toggle actif = uniquement les triggers manuels tapés -->
+					<!-- Sans aucun toggle actif = texte final affiché à l'écran (output) -->
+					<!-- Avec un toggle actif = frappe brute pour produire cet output (input) -->
 					<button
-						class="filter-btn source-toggle active"
-						id="btn_toggle_hs"
-						onclick="toggle_hs_source()"
-						title="+ Hotstrings : inclure les caractères générés par les hotstrings (touche ★, abréviations…). Désactiver masquera aussi les caractères synthétiques comme NBSP/NNBSP générés par hotstrings."
-					>
-						+ Hotstrings
-					</button>
-					<button
-						class="filter-btn source-toggle active"
+						class="filter-btn source-toggle"
 						id="btn_toggle_llm"
 						onclick="toggle_llm_source()"
-						title="+ IA : inclure les caractères générés par l'IA (complétion, correction…). Indépendant de Hotstrings."
+						title="+ IA : ajoute les caractères générés par l'IA aux statistiques (vitesse, précision, tableaux). Désactivé : seules les frappes manuelles sont prises en compte."
 					>
 						+ IA
 					</button>
-					<!-- Sans Ergopti+ : mode alternatif — montre le texte brut total inféré sans Ergopti+ -->
-					<!-- La vitesse est inférée à votre vitesse manuelle ; le volume inclut toutes les expansions -->
 					<button
 						class="filter-btn source-toggle"
-						id="btn_texte_final"
-						onclick="toggle_texte_final()"
-						title="Sans Ergopti+ : affiche le texte complet qui aurait été saisi sans Ergopti+. Le volume inclut hotstrings + IA ; la vitesse (MPM) est votre vitesse manuelle naturelle — les frappes synthétiques sont inférées à ce rythme."
+						id="btn_toggle_hs"
+						onclick="toggle_hs_source()"
+						title="+ Hotstrings : ajoute les caractères générés par les hotstrings aux statistiques. Désactivé : seules les frappes manuelles sont prises en compte."
 					>
-						Sans Ergopti+
+						+ Hotstrings
 					</button>
 
-					<button
-						class="filter-btn active"
-						id="btn_show_spaces"
-						onclick="toggle_filter('btn_show_spaces')"
-					>
-						Espaces
-					</button>
 					<button
 						class="filter-btn"
 						id="btn_case_sensitive"
 						onclick="toggle_filter('btn_case_sensitive')"
 					>
 						Sensible à la casse
-					</button>
-
-					<select
-						id="pause_threshold"
-						class="filter-btn"
-						onchange="apply_date_app_filters()"
-						title="Seuil de pause : délai au-delà duquel une interruption est ignorée dans le calcul de vitesse"
-					>
-						<option value="1000">Pauses &gt; 1 s</option>
-						<option value="2000" selected>Pauses &gt; 2 s</option>
-						<option value="3000">Pauses &gt; 3 s</option>
-						<option value="5000">Pauses &gt; 5 s</option>
-						<option value="10000">Pauses &gt; 10 s</option>
-						<option value="20000">Pauses &gt; 20 s</option>
-						<option value="30000">Pauses &gt; 30 s</option>
-						<option value="60000">Pauses &gt; 1 min</option>
-						<option value="99999999">Sans filtrage</option>
-					</select>
-				</div>
+					</button>				</div>
 
 				<button class="filter-btn filter-reset" onclick="reset_filters()">Réinitialiser</button>
 			</div>
@@ -125,28 +91,6 @@
 
 		<div class="main-content">
 			<div class="stats-grid" id="main_stats_grid">
-				<div class="stat-card card-hs" id="hs_card">
-					<h2>Hotstrings <span id="hs_trend"></span></h2>
-					<div class="stat-value" id="hs_val">0 <span class="stat-unit">activations</span></div>
-
-					<div class="stat-details" id="hs_loading">Calcul en cours...</div>
-					<div class="stat-details-split" id="hs_details" style="display: none">
-						<div class="split-col" title="Différence nette entre caractères tapés et générés">
-							<div class="split-label">Économisées</div>
-							<div class="split-val"><strong id="hs_net_val">0</strong> frappes</div>
-						</div>
-						<div class="split-col">
-							<div class="split-label">Acceptées</div>
-							<div class="split-val">
-								<strong id="hs_acc_pct">0%</strong>
-								<span class="split-sub" id="hs_acc_raw">(0/0)</span>
-							</div>
-						</div>
-					</div>
-
-					<div class="sparkline-container"><canvas id="hs_sparkline"></canvas></div>
-				</div>
-
 				<div class="stat-card card-llm" id="llm_card">
 					<h2>Intelligence artificielle <span id="llm_trend"></span></h2>
 					<div class="stat-value" id="llm_val">0 <span class="stat-unit">activations</span></div>
@@ -169,6 +113,28 @@
 					<div class="sparkline-container"><canvas id="llm_sparkline"></canvas></div>
 				</div>
 
+				<div class="stat-card card-hs" id="hs_card">
+					<h2>Hotstrings <span id="hs_trend"></span></h2>
+					<div class="stat-value" id="hs_val">0 <span class="stat-unit">activations</span></div>
+
+					<div class="stat-details" id="hs_loading">Calcul en cours...</div>
+					<div class="stat-details-split" id="hs_details" style="display: none">
+						<div class="split-col" title="Différence nette entre caractères tapés et générés">
+							<div class="split-label">Économisées</div>
+							<div class="split-val"><strong id="hs_net_val">0</strong> frappes</div>
+						</div>
+						<div class="split-col">
+							<div class="split-label">Acceptées</div>
+							<div class="split-val">
+								<strong id="hs_acc_pct">0%</strong>
+								<span class="split-sub" id="hs_acc_raw">(0/0)</span>
+							</div>
+						</div>
+					</div>
+
+					<div class="sparkline-container"><canvas id="hs_sparkline"></canvas></div>
+				</div>
+
 				<div class="stat-card card-global" id="global_card">
 					<h2>Vitesse moyenne <span id="wpm_trend"></span></h2>
 					<div class="stat-value" id="wpm_val" style="margin: 5px 0">0</div>
@@ -179,27 +145,33 @@
 						</div>
 					</div>
 					<div id="wpm_words_sub"></div>
+					<div style="margin-top:8px;">
+						<select
+							id="pause_threshold"
+							class="filter-btn"
+							onchange="apply_local_filters()"
+							title="Seuil de pause : pauses supérieures à ce seuil sont exclues du temps actif pour le calcul MPM."
+							style="font-size:11px;padding:3px 6px;height:auto;"
+						>
+							<option value="1000">Pauses &gt; 1 s</option>
+							<option value="2000">Pauses &gt; 2 s</option>
+							<option value="3000">Pauses &gt; 3 s</option>
+							<option value="5000" selected>Pauses &gt; 5 s</option>
+							<option value="10000">Pauses &gt; 10 s</option>
+							<option value="20000">Pauses &gt; 20 s</option>
+							<option value="30000">Pauses &gt; 30 s</option>
+							<option value="60000">Pauses &gt; 1 min</option>
+							<option value="99999999">Sans filtrage</option>
+						</select>
+					</div>
 				</div>
 			</div>
 
-			<div style="display: flex; gap: 20px; margin-bottom: 20px">
-				<div
-					class="chart-container"
-					style="
-						flex: 1;
-						height: 220px;
-						background: var(--precision-bg);
-						border-color: var(--precision-border);
-					"
-				>
-					<div
-						style="
-							display: flex;
-							justify-content: space-between;
-							align-items: center;
-							margin-bottom: 5px;
-						"
-					>
+			<!-- align-items:flex-start prevents cross-axis stretching of side-by-side
+			     chart containers so each sizes to its own content height only -->
+			<div style="display: flex; flex-wrap: wrap; gap: 16px; margin-bottom: 16px; align-items: flex-start;">
+				<div class="chart-row-block is-precision">
+					<div class="chart-row-block-header">
 						<div style="display: flex; align-items: baseline; gap: 10px">
 							<h3
 								id="precision_chart_title"
@@ -207,57 +179,47 @@
 							>
 								Précision (%)
 							</h3>
-							<div class="chart-help" style="margin: 0">Pincez (trackpad) pour zoomer.</div>
+							<span
+								id="precision_info"
+								class="tooltip stat-inline-tooltip"
+								style="color: var(--kpi-precision-color)"
+							></span>
+							<div class="chart-help" style="margin: 0">Pincer (trackpad) pour zoomer.</div>
 						</div>
 						<button
 							class="tab-btn"
-							style="padding: 2px 8px; font-size: 11px"
+							style="padding: 2px 8px; font-size: 11px; border-color: var(--precision-border)"
 							onclick="reset_chart_zoom('precision')"
 						>
 							Restaurer le zoom
 						</button>
 					</div>
-					<div style="flex-grow: 1; position: relative; height: 100%">
-						<canvas id="precision_chart"></canvas>
+					<div class="chart-row-block-canvas">
+						<canvas id="precision_chart" style="position: absolute; inset: 0; width: 100%; height: 100%;"></canvas>
 					</div>
 				</div>
 
-				<div
-					class="chart-container"
-					style="
-						flex: 1;
-						height: 220px;
-						background: var(--global-bg);
-						border-color: var(--global-border);
-					"
-				>
-					<div
-						style="
-							display: flex;
-							justify-content: space-between;
-							align-items: center;
-							margin-bottom: 5px;
-						"
-					>
+				<div class="chart-row-block is-speed">
+					<div class="chart-row-block-header">
 						<div style="display: flex; align-items: baseline; gap: 10px">
 							<h3
 								id="wpm_chart_title"
-								style="margin: 0; font-size: 14px; color: var(--kpi-wpm-color)"
+								style="margin: 0; font-size: 14px; color: var(--chart-wpm-color)"
 							>
 								Vitesse (MPM)
 							</h3>
-							<div class="chart-help" style="margin: 0">Pincez (trackpad) pour zoomer.</div>
+							<div class="chart-help" style="margin: 0">Pincer (trackpad) pour zoomer.</div>
 						</div>
 						<button
 							class="tab-btn"
-							style="padding: 2px 8px; font-size: 11px"
+							style="padding: 2px 8px; font-size: 11px; border-color: var(--global-border)"
 							onclick="reset_chart_zoom('wpm')"
 						>
 							Restaurer le zoom
 						</button>
 					</div>
-					<div style="flex-grow: 1; position: relative; height: 100%">
-						<canvas id="wpm_chart"></canvas>
+					<div class="chart-row-block-canvas">
+						<canvas id="wpm_chart" style="position: absolute; inset: 0; width: 100%; height: 100%;"></canvas>
 					</div>
 				</div>
 			</div>
@@ -266,7 +228,7 @@
 				class="chart-container"
 				style="
 					height: 240px;
-					margin-bottom: 20px;
+					margin-bottom: 16px;
 					background: var(--delegation-bg);
 					border-color: var(--delegation-border);
 				"
@@ -283,20 +245,37 @@
 						<h3 style="margin: 0; font-size: 14px; color: var(--text-color)">
 							Origine des frappes
 						</h3>
-						<div class="chart-help" style="margin: 0">Pincez (trackpad) pour zoomer.</div>
+					<div class="chart-help" style="margin: 0">Pincer (trackpad) pour zoomer.</div>
 					</div>
 					<button
 						class="tab-btn"
-						style="padding: 2px 8px; font-size: 11px"
+					style="padding: 2px 8px; font-size: 11px; border-color: var(--delegation-border)"
 						onclick="reset_chart_zoom('delegation')"
 					>
 						Restaurer le zoom
 					</button>
 				</div>
-				<div style="flex-grow: 1; position: relative; height: 100%">
+				<div style="flex: 1; min-height: 0; position: relative;">
 					<canvas id="delegation_chart"></canvas>
 				</div>
 			</div>
+
+			<!-- Keyboard heatmaps — always visible above the tab buttons -->
+			<div class="heatmaps-row">
+				<div id="kc_heatmap_container" style="flex:1;text-align:center;"></div>
+				<div style="flex:1;text-align:center;display:flex;flex-direction:column;align-items:center;">
+					<div style="margin-bottom:6px;">
+						<button id="sfb_heatmap_same_key_btn" class="filter-btn sfb-toggle-btn active" onclick="toggle_sfb_heatmap_same_key()" title="Inclure ou exclure les redoublements de même touche (AA, BB…) dans la heatmap SFB. Indépendant du bouton du bloc SFB.">Doublons inclus</button>
+					</div>
+					<div id="sfb_heatmap_container" style="width:100%;"></div>
+				</div>
+			</div>
+
+			<!-- Calendrier d'activité : 12 mois glissants. Intensité = caractères tapés ce jour-là. -->
+			<div id="activity_calendar_container" style="margin-bottom:16px;"></div>
+
+			<!-- Heatmap heure × jour de semaine : volume / cadence par créneau, agrégé sur tout l'historique. -->
+			<div id="hour_weekday_heatmap_container" style="margin-bottom:16px;"></div>
 
 			<!-- Expanded KPI row: Distance des doigts + Redoublements, placés sous le graphique
 			     Origine des frappes pour rester dans le contexte des données analysées. -->
@@ -314,6 +293,13 @@
 								<div class="split-label">Doigt le + actif</div>
 								<div class="split-val"><strong id="dist_top_finger">—</strong></div>
 							</div>
+							<div
+								class="split-col"
+								title="Équilibre des frappes entre la main gauche et la main droite. 50/50 = équilibre parfait."
+							>
+								<div class="split-label">Équilibre G/D</div>
+								<div class="split-val"><strong id="dist_hand_balance">—</strong></div>
+							</div>
 						</div>
 					</div>
 					<div class="ekpi-table-wrap" id="dist_fingers_container">
@@ -325,17 +311,17 @@
 					<div class="ekpi-header">
 						<h2>Redoublements</h2>
 						<div class="stat-value" id="rep_val">
-							0 <span class="stat-unit">redoublements</span>
+							0<span class="stat-unit">%</span>
 						</div>
 						<div class="stat-details" id="rep_loading">Calcul en cours...</div>
 						<div class="stat-details-split" id="rep_details" style="display: none">
-							<div class="split-col" title="Part des bigrammes totaux qui sont des redoublements">
-								<div class="split-label">Des bigrammes</div>
-								<div class="split-val"><strong id="rep_pct">0%</strong></div>
+							<div class="split-col" title="Nombre total de redoublements sur la période">
+								<div class="split-label">Total</div>
+								<div class="split-val"><strong id="rep_pct">0 redoublements</strong></div>
 							</div>
 							<div
 								class="split-col"
-								title="Part des redoublements générés par la touche ★ (hotstring de répétition). Non nul uniquement en mode + Hotstrings ou + IA."
+								title="Part des redoublements générés par la touche ★ (hotstring de répétition). Non nul uniquement en mode + Hotstrings."
 							>
 								<div class="split-label">Via touche ★</div>
 								<div class="split-val">
@@ -349,24 +335,396 @@
 						<!-- Table injected by render_rep_table() -->
 					</div>
 				</div>
+
+				<div class="expanded-kpi-block card-sfb" id="sfb_card">
+					<div class="ekpi-header">
+						<h2>SFBs <button id="sfb_same_key_btn" class="filter-btn sfb-toggle-btn active" onclick="toggle_sfb_same_key()" title="Inclure les redoublements de même touche (AA, BB…) dans le calcul des SFBs">Doublons inclus</button></h2>
+						<div class="stat-value" id="sfb_val">
+							0<span class="stat-unit">%</span>
+						</div>
+						<div class="stat-details" id="sfb_loading">Calcul en cours...</div>
+						<div class="stat-details-split" id="sfb_details" style="display: none">
+							<div class="split-col" title="SFBs bruts — bigrammes manuels frappés par le même doigt">
+								<div class="split-label">SFBs bruts</div>
+								<div class="split-val"><strong id="sfb_pct">0 SFBs</strong></div>
+							</div>
+							<div class="split-col" title="SFBs évités grâce aux hotstrings — bigrammes dans les expansions HS qui auraient été des SFBs si typés manuellement">
+								<div class="split-label" style="font-size:11px;">Via hotstrings</div>
+								<div class="split-val"><strong id="sfb_avoided" style="font-size:11px;color:var(--kpi-hs-color);">0 évités</strong></div>
+							</div>
+						</div>
+					</div>
+					<div class="ekpi-table-wrap" id="sfb_pairs_container">
+						<!-- Table injected by render_sfb_table() -->
+					</div>
+				</div>
 			</div>
 
-			<div class="tabs">
-				<button class="tab-btn active" data-tab="c" onclick="switch_tab('c')">Caractères</button>
-				<button class="tab-btn" data-tab="bg" onclick="switch_tab('bg')">Bigrammes</button>
-				<button class="tab-btn" data-tab="tg" onclick="switch_tab('tg')">Trigrammes</button>
-				<button class="tab-btn" data-tab="qg" onclick="switch_tab('qg')">Quadrigrammes</button>
-				<button class="tab-btn" data-tab="pg" onclick="switch_tab('pg')">Pentagrammes</button>
-				<button class="tab-btn" data-tab="hx" onclick="switch_tab('hx')">Hexagrammes</button>
-				<button class="tab-btn" data-tab="hp" onclick="switch_tab('hp')">Heptagrammes</button>
-				<button class="tab-btn" data-tab="w" onclick="switch_tab('w')">Mots</button>
-				<button class="tab-btn" data-tab="kc" onclick="switch_tab('kc')">Keycodes</button>
-				<button class="tab-btn" data-tab="mods" onclick="switch_tab('mods')">Modificateurs</button>
-				<button class="tab-btn" data-tab="sc" onclick="switch_tab('sc')">Raccourcis</button>
-				<button class="tab-btn" data-tab="sc_bg" onclick="switch_tab('sc_bg')">
-					Séq. raccourcis
-				</button>
+			<!-- Ergonomie bigrammes : SHB / SHU, LSB, ciseaux, roulements. -->
+			<div class="expanded-kpi-row">
+				<div class="expanded-kpi-block card-ergo-bigram" id="ergo_bigram_card">
+					<div class="ekpi-header">
+						<h2>Ergonomie bigrammes <span class="tooltip stat-inline-tooltip" id="ergo_bigram_info"></span></h2>
+						<div class="stat-value" id="ergo_shu_val">0<span class="stat-unit">% SHU</span></div>
+						<div class="stat-details" id="ergo_bigram_loading">Calcul en cours…</div>
+						<div class="stat-details-split" id="ergo_bigram_details" style="display: none">
+							<div class="split-col" title="Roulement intérieur : main vers le pouce (auriculaire vers index). Le plus confortable.">
+								<div class="split-label">Roul. int.</div>
+								<div class="split-val"><strong id="ergo_roll_in_pct">0%</strong></div>
+							</div>
+							<div class="split-col" title="Roulement extérieur : main vers le bord (index vers auriculaire).">
+								<div class="split-label">Roul. ext.</div>
+								<div class="split-val"><strong id="ergo_roll_out_pct">0%</strong></div>
+							</div>
+							<div class="split-col" title="Lateral Stretch Bigrams : bigramme même main avec une extension latérale.">
+								<div class="split-label">LSB</div>
+								<div class="split-val"><strong id="ergo_lsb_pct">0%</strong></div>
+							</div>
+							<div class="split-col" title="Ciseaux : changement de rangée inconfortable sur la même main.">
+								<div class="split-label">Ciseaux</div>
+								<div class="split-val"><strong id="ergo_scissor_pct">0%</strong></div>
+							</div>
+						</div>
+					</div>
+					<div class="ekpi-table-wrap" id="ergo_bigram_table_container"></div>
+				</div>
+			</div>
+
+			<!-- Ergonomie trigrammes : SFS, SKS, redirections, mauvaises redirections. -->
+			<div class="expanded-kpi-row">
+				<div class="expanded-kpi-block card-ergo-trigram" id="ergo_trigram_card">
+					<div class="ekpi-header">
+						<h2>Ergonomie trigrammes <span class="tooltip stat-inline-tooltip" id="ergo_trigram_info"></span></h2>
+						<div class="stat-value" id="ergo_trigram_val">0<span class="stat-unit">% Redir.</span></div>
+						<div class="stat-details" id="ergo_trigram_loading">Calcul en cours…</div>
+						<div class="stat-details-split" id="ergo_trigram_details" style="display: none">
+							<div class="split-col" title="Same-Finger Skipgram : un SFB avec une touche d un autre doigt intercalée.">
+								<div class="split-label">SFS</div>
+								<div class="split-val"><strong id="ergo_sfs_pct">0%</strong></div>
+							</div>
+							<div class="split-col" title="Same-Key Skipgram : ABA, la même touche en positions 1 et 3.">
+								<div class="split-label">SKS</div>
+								<div class="split-val"><strong id="ergo_sks_pct">0%</strong></div>
+							</div>
+							<div class="split-col" title="Redirection : trois touches même main avec un changement de direction.">
+								<div class="split-label">Redir.</div>
+								<div class="split-val"><strong id="ergo_redir_pct">0%</strong></div>
+							</div>
+							<div class="split-col" title="Mauvaise redirection : redirection sans que l index intervienne.">
+								<div class="split-label">Mauv. redir.</div>
+								<div class="split-val"><strong id="ergo_bad_redir_pct">0%</strong></div>
+							</div>
+						</div>
+					</div>
+					<div class="ekpi-table-wrap" id="ergo_trigram_table_container"></div>
+				</div>
+			</div>
+
+			<!-- Erreurs : top des séquences les plus corrigées. -->
+			<div class="expanded-kpi-row">
+				<div class="expanded-kpi-block card-errors" id="errors_card">
+					<div class="ekpi-header">
+						<h2>Bigrammes les plus corrigés <span class="tooltip stat-inline-tooltip" id="errors_info"></span></h2>
+						<div class="stat-value" id="errors_val">0<span class="stat-unit">% taux global</span></div>
+						<div class="stat-details" id="errors_loading">Calcul en cours…</div>
+						<div class="stat-details-split" id="errors_details" style="display: none">
+							<div class="split-col" title="Total des bigrammes manuels qui ont été suivis d un backspace.">
+								<div class="split-label">Bigrammes corrigés</div>
+								<div class="split-val"><strong id="errors_total">0</strong></div>
+							</div>
+							<div class="split-col" title="Bigramme qui se trompe le plus souvent (taux d erreur le plus élevé).">
+								<div class="split-label">Pire bigramme</div>
+								<div class="split-val"><strong id="errors_worst">—</strong></div>
+							</div>
+							<div class="split-col" title="Cascades : runs de ≥ 3 backspaces consécutifs, signalant une correction majeure (mot ou phrase entière effacée).">
+								<div class="split-label">Cascades</div>
+								<div class="split-val"><strong id="errors_cascades">—</strong></div>
+							</div>
+							<div class="split-col" title="Délai moyen entre un backspace et la frappe suivante. Plus c\'est long, plus la correction interrompt votre flux.">
+								<div class="split-label">Temps de récup.</div>
+								<div class="split-val"><strong id="errors_recovery">—</strong></div>
+							</div>
+						</div>
+					</div>
+					<div class="ekpi-table-wrap" id="errors_bigrams_container"></div>
+				</div>
+			</div>
+
+			<!-- Productivité HS / IA. -->
+			<div class="expanded-kpi-row">
+				<div class="expanded-kpi-block card-roi" id="roi_card">
+					<div class="ekpi-header">
+						<h2>Productivité HS / IA <span class="tooltip stat-inline-tooltip" id="roi_info"></span></h2>
+						<div class="stat-value" id="roi_val">0<span class="stat-unit">caractères économisés</span></div>
+						<div class="stat-details" id="roi_loading">Calcul en cours…</div>
+						<div class="stat-details-split" id="roi_details" style="display: none">
+							<div class="split-col" title="Estimation du temps économisé.">
+								<div class="split-label">Temps économisé</div>
+								<div class="split-val"><strong id="roi_time_saved">—</strong></div>
+							</div>
+							<div class="split-col" title="Caractères nets ajoutés par les hotstrings.">
+								<div class="split-label">Via hotstrings</div>
+								<div class="split-val"><strong id="roi_hs_saved" style="color:var(--kpi-hs-color)">0</strong></div>
+							</div>
+							<div class="split-col" title="Caractères nets ajoutés par l IA.">
+								<div class="split-label">Via IA</div>
+								<div class="split-val"><strong id="roi_llm_saved" style="color:var(--kpi-llm-color)">0</strong></div>
+							</div>
+							<div class="split-col" title="Part des suggestions IA acceptées.">
+								<div class="split-label">Acceptation IA</div>
+								<div class="split-val"><strong id="roi_llm_acc">—</strong></div>
+							</div>
+						</div>
+					</div>
+				</div>
+			</div>
+
+			<!-- Lexique : richesse du vocabulaire et longueur des mots. -->
+			<div class="expanded-kpi-row">
+				<div class="expanded-kpi-block card-lexical" id="lexical_card">
+					<div class="ekpi-header">
+						<h2>Lexique <span class="tooltip stat-inline-tooltip" id="lexical_info"></span></h2>
+						<div class="stat-value" id="lexical_val">0<span class="stat-unit">% richesse</span></div>
+						<div class="stat-details" id="lexical_loading">Calcul en cours…</div>
+						<div class="stat-details-split" id="lexical_details" style="display: none">
+							<div class="split-col" title="Nombre de mots distincts produits sur la période.">
+								<div class="split-label">Mots uniques</div>
+								<div class="split-val"><strong id="lexical_unique">0</strong></div>
+							</div>
+							<div class="split-col" title="Nombre total de mots tapés (avec leurs répétitions).">
+								<div class="split-label">Mots totaux</div>
+								<div class="split-val"><strong id="lexical_total">0</strong></div>
+							</div>
+							<div class="split-col" title="Longueur moyenne d un mot, pondérée par sa fréquence d utilisation.">
+								<div class="split-label">Longueur moyenne</div>
+								<div class="split-val"><strong id="lexical_avg_len">0</strong></div>
+							</div>
+							<div class="split-col" title="Le mot le plus tapé sur la période.">
+								<div class="split-label">Mot le + utilisé</div>
+								<div class="split-val"><strong id="lexical_top">—</strong></div>
+							</div>
+						</div>
+					</div>
+					<div class="ekpi-table-wrap" id="lexical_distribution_container"></div>
+				</div>
+			</div>
+			<!-- Rythme & rafales : longueur des bursts, vitesse pic, régularité du tempo. -->
+			<div class="expanded-kpi-row">
+				<div class="expanded-kpi-block card-rhythm" id="rhythm_card">
+					<div class="ekpi-header">
+						<h2>Rythme &amp; rafales <span class="tooltip stat-inline-tooltip" id="rhythm_info"></span></h2>
+						<div class="stat-value" id="rhythm_val">0<span class="stat-unit">CPM pic (rafale)</span></div>
+						<div class="stat-details" id="rhythm_loading">Calcul en cours…</div>
+						<div class="stat-details-split" id="rhythm_details" style="display: none">
+							<div class="split-col" title="Plus longue rafale ininterrompue (gap < 1 s) sur la période.">
+								<div class="split-label">Plus longue rafale</div>
+								<div class="split-val"><strong id="rhythm_max_chars">—</strong></div>
+							</div>
+							<div class="split-col" title="Nombre total de rafales finalisées sur la période.">
+								<div class="split-label">Total rafales</div>
+								<div class="split-val"><strong id="rhythm_count">—</strong></div>
+							</div>
+							<div class="split-col" title="Délai inter-touches moyen pendant les rafales (en ms).">
+								<div class="split-label">Délai moyen</div>
+								<div class="split-val"><strong id="rhythm_mean_delay">—</strong></div>
+							</div>
+							<div class="split-col" title="Coefficient de variation des délais inter-touches : écart-type ÷ moyenne. Plus c'est bas, plus le rythme est régulier.">
+								<div class="split-label">Régularité (CV)</div>
+								<div class="split-val"><strong id="rhythm_cv">—</strong></div>
+							</div>
+						</div>
+					</div>
+					<div class="ekpi-table-wrap" id="rhythm_distribution_container"></div>
+				</div>
+			</div>
+			<!-- Séances : blocs de typing détectés (gap < 5 min). -->
+			<div class="expanded-kpi-row">
+				<div class="expanded-kpi-block card-sessions" id="sessions_card">
+					<div class="ekpi-header">
+						<h2>Séances <span class="tooltip stat-inline-tooltip" id="sessions_info"></span></h2>
+						<div class="stat-value" id="sessions_val">0<span class="stat-unit">séances</span></div>
+						<div class="stat-details" id="sessions_loading">Calcul en cours…</div>
+						<div class="stat-details-split" id="sessions_details" style="display: none">
+							<div class="split-col" title="Durée cumulée passée à taper réellement (somme des durées de chaque séance).">
+								<div class="split-label">Temps actif total</div>
+								<div class="split-val"><strong id="sessions_total_time">—</strong></div>
+							</div>
+							<div class="split-col" title="Plus longue séance par durée (en minutes).">
+								<div class="split-label">Plus longue (durée)</div>
+								<div class="split-val"><strong id="sessions_longest_time">—</strong></div>
+							</div>
+							<div class="split-col" title="Plus longue séance par nombre de caractères tapés.">
+								<div class="split-label">Plus longue (chars)</div>
+								<div class="split-val"><strong id="sessions_longest_chars">—</strong></div>
+							</div>
+							<div class="split-col" title="Durée moyenne d'une séance.">
+								<div class="split-label">Durée moyenne</div>
+								<div class="split-val"><strong id="sessions_avg_time">—</strong></div>
+							</div>
+						</div>
+					</div>
+				</div>
+			</div>
+			<!-- Records personnels : meilleurs scores, sur toute la base de données (ignorent le filtre de dates). -->
+			<div class="expanded-kpi-row">
+				<div class="expanded-kpi-block card-records" id="records_card">
+					<div class="ekpi-header">
+						<h2>Records personnels <span class="tooltip stat-inline-tooltip" id="records_info"></span></h2>
+						<div class="stat-value" id="records_val">0<span class="stat-unit">CPM record</span></div>
+						<div class="stat-details" id="records_loading">Calcul en cours…</div>
+						<div class="stat-details-split" id="records_details" style="display: none">
+							<div class="split-col" title="Plus longue rafale ininterrompue (gap < 1 s) jamais enregistrée.">
+								<div class="split-label">Plus longue rafale</div>
+								<div class="split-val"><strong id="records_burst_chars">—</strong></div>
+							</div>
+							<div class="split-col" title="Plus longue séance par durée jamais enregistrée.">
+								<div class="split-label">Plus longue séance</div>
+								<div class="split-val"><strong id="records_session">—</strong></div>
+							</div>
+							<div class="split-col" title="Journée avec le plus de caractères tapés.">
+								<div class="split-label">Meilleur jour</div>
+								<div class="split-val"><strong id="records_best_day">—</strong></div>
+							</div>
+							<div class="split-col" title="Plus longue suite de jours consécutifs avec au moins une frappe.">
+								<div class="split-label">Streak</div>
+								<div class="split-val"><strong id="records_streak">—</strong></div>
+							</div>
+						</div>
+					</div>
+				</div>
+			</div>
+			<!-- Mix de caractères : répartition lettres / chiffres / ponctuation / espaces / autres. -->
+			<div class="expanded-kpi-row">
+				<div class="expanded-kpi-block card-charmix" id="charmix_card">
+					<div class="ekpi-header">
+						<h2>Mix de caractères <span class="tooltip stat-inline-tooltip" id="charmix_info"></span></h2>
+						<div class="stat-value" id="charmix_val">—</div>
+						<div class="stat-details" id="charmix_loading">Calcul en cours…</div>
+						<div class="stat-details-split" id="charmix_details" style="display: none">
+							<div class="split-col" title="Lettres alphabétiques (latin de base + extensions courantes).">
+								<div class="split-label" style="color:rgb(96,165,250)">Lettres</div>
+								<div class="split-val"><strong id="charmix_letter">—</strong></div>
+							</div>
+							<div class="split-col" title="Chiffres 0–9.">
+								<div class="split-label" style="color:rgb(251,191,36)">Chiffres</div>
+								<div class="split-val"><strong id="charmix_digit">—</strong></div>
+							</div>
+							<div class="split-col" title="Ponctuation et symboles courants (.,;:!? '" ()[]{}<>=+*/\|-).">
+								<div class="split-label" style="color:rgb(248,113,113)">Ponctuation</div>
+								<div class="split-val"><strong id="charmix_punct">—</strong></div>
+							</div>
+							<div class="split-col" title="Espace, tabulation, retour à la ligne, NBSP, NNBSP.">
+								<div class="split-label" style="color:rgb(74,222,128)">Espaces</div>
+								<div class="split-val"><strong id="charmix_space">—</strong></div>
+							</div>
+							<div class="split-col" title="Tout le reste : caractères non latins, marqueurs spéciaux ([BS], [F1]…), etc.">
+								<div class="split-label" style="color:rgb(168,162,158)">Autres</div>
+								<div class="split-val"><strong id="charmix_other">—</strong></div>
+							</div>
+						</div>
+					</div>
+					<div class="ekpi-table-wrap" id="charmix_bar_container"></div>
+				</div>
+			</div>
+			<!-- Apps : vitesse moyenne, volume et co-occurrence par application. -->
+			<div class="expanded-kpi-row">
+				<div class="expanded-kpi-block card-apps" id="apps_card">
+					<div class="ekpi-header">
+						<h2>Activité par app <span class="tooltip stat-inline-tooltip" id="apps_info"></span></h2>
+						<div class="stat-value" id="apps_val">0<span class="stat-unit">apps actives</span></div>
+						<div class="stat-details" id="apps_loading">Calcul en cours…</div>
+						<div class="stat-details-split" id="apps_details" style="display: none">
+							<div class="split-col" title="App où votre vitesse moyenne (CPM) est la plus élevée — où vous êtes le plus à l'aise.">
+								<div class="split-label">App la + rapide</div>
+								<div class="split-val"><strong id="apps_fastest">—</strong></div>
+							</div>
+							<div class="split-col" title="App qui concentre le plus de caractères tapés sur la période.">
+								<div class="split-label">App la + utilisée</div>
+								<div class="split-val"><strong id="apps_top_volume">—</strong></div>
+							</div>
+							<div class="split-col" title="Paire d'apps entre lesquelles vous alternez le plus — révèle le workflow type.">
+								<div class="split-label">Paire fréquente</div>
+								<div class="split-val"><strong id="apps_top_pair">—</strong></div>
+							</div>
+							<div class="split-col" title="Layouts clavier détectés sur la période (selon hs.keycodes.currentLayout au moment du flush). Format : layout (occurrences).">
+								<div class="split-label">Layouts utilisés</div>
+								<div class="split-val"><strong id="apps_layouts">—</strong></div>
+							</div>
+							<div class="split-col" title="Modifieur dont la durée moyenne de maintien est la plus élevée. Un modifieur tenu très longtemps en moyenne signale un chord-typing lent ou un layer prolongé.">
+								<div class="split-label">Modifieur le + tenu</div>
+								<div class="split-val"><strong id="apps_top_mod_hold">—</strong></div>
+							</div>
+						</div>
+					</div>
+					<div class="ekpi-table-wrap" id="apps_table_container"></div>
+				</div>
+			</div>
+			<!-- Santé & Ergonomie : indicateurs de fatigue, déséquilibres, charge cumulée. -->
+			<div class="expanded-kpi-row">
+				<div class="expanded-kpi-block card-wellness" id="wellness_card">
+					<div class="ekpi-header">
+						<h2>Santé &amp; ergonomie <span class="tooltip stat-inline-tooltip" id="wellness_info"></span></h2>
+						<div class="stat-value" id="wellness_val">—</div>
+						<div class="stat-details" id="wellness_loading">Calcul en cours…</div>
+						<div class="stat-details-split" id="wellness_details" style="display: none">
+							<div class="split-col" title="Temps actif typing ÷ temps total où l'app était au foreground. 100% = vous tapez en continu, 20% = vous lisez beaucoup.">
+								<div class="split-label">Ratio actif</div>
+								<div class="split-val"><strong id="wellness_active_ratio">—</strong></div>
+							</div>
+							<div class="split-col" title="Plus longue suite de touches frappées par le même doigt sans alternance. Au-delà de 4-5, le doigt accumule la fatigue.">
+								<div class="split-label">Streak même doigt</div>
+								<div class="split-val"><strong id="wellness_finger_streak">—</strong></div>
+							</div>
+							<div class="split-col" title="Plus longue suite sur la même main. Une bonne disposition vise à alterner les mains régulièrement.">
+								<div class="split-label">Streak même main</div>
+								<div class="split-val"><strong id="wellness_hand_streak">—</strong></div>
+							</div>
+							<div class="split-col" title="Nombre de séances dépassant 90 min sans pause de 5+ min. Au-delà, le risque ergonomique augmente sensiblement.">
+								<div class="split-label">Séances longues</div>
+								<div class="split-val"><strong id="wellness_long_sessions">—</strong></div>
+							</div>
+							<div class="split-col" title="Frappes considérées comme auto-repeat (touche maintenue, ex. flèche). Soustraites des compteurs effectifs car une seule décision motrice.">
+								<div class="split-label">Auto-repeat</div>
+								<div class="split-val"><strong id="wellness_autorepeat">—</strong></div>
+							</div>
+							<div class="split-col" title="Latence moyenne entre l'activation d'une app et votre première frappe — proxy de votre temps de réflexion / réorientation au changement de contexte.">
+								<div class="split-label">Latence focus → 1ʳᵉ touche</div>
+								<div class="split-val"><strong id="wellness_focus_latency">—</strong></div>
+							</div>
+							<div class="split-col" title="Temps cumulé pendant lequel l'écran était verrouillé ou la machine en veille. Soustrait du temps d'app pour un ratio actif précis (et non gonflé par les pauses physiques).">
+								<div class="split-label">Temps passif système</div>
+								<div class="split-val"><strong id="wellness_passive_ms">—</strong></div>
+							</div>
+						</div>
+					</div>
+					<div class="ekpi-table-wrap" id="wellness_finger_load_container"></div>
+				</div>
+			</div>
+
+			<div class="tabs tabs-row">
+				<button class="tab-btn" data-tab="kc"     onclick="switch_tab('kc')">Keycodes</button>
+				<button class="tab-btn active" data-tab="c"  onclick="switch_tab('c')">Caract&egrave;res</button>
+				<button class="tab-btn" data-tab="bg"  onclick="switch_tab('bg')">Bigrammes</button>
+				<button class="tab-btn" data-tab="tg"  onclick="switch_tab('tg')">Trigrammes</button>
+				<button class="tab-btn" data-tab="qg"  onclick="switch_tab('qg')">Quadrigrammes</button>
+				<button class="tab-btn" data-tab="pg"  onclick="switch_tab('pg')">Pentagrammes</button>
+				<button class="tab-btn" data-tab="hx"  onclick="switch_tab('hx')">Hexagrammes</button>
+				<button class="tab-btn" data-tab="hp"  onclick="switch_tab('hp')">Heptagrammes</button>
+			</div>
+			<div class="tabs tabs-row">
+				<button class="tab-btn" data-tab="w"    onclick="switch_tab('w')">Mots</button>
 				<button class="tab-btn" data-tab="w_bg" onclick="switch_tab('w_bg')">Bigrammes mots</button>
+				<button class="tab-btn" data-tab="w_tg" onclick="switch_tab('w_tg')">Trigrammes mots</button>
+				<button class="tab-btn" data-tab="w_qg" onclick="switch_tab('w_qg')">Quadrigrammes mots</button>
+				<button class="tab-btn" data-tab="w_pg" onclick="switch_tab('w_pg')">Pentagrammes mots</button>
+			</div>
+			<div class="tabs tabs-row">
+				<button class="tab-btn" data-tab="mods"   onclick="switch_tab('mods')">Modificateurs</button>
+				<button class="tab-btn" data-tab="sc"     onclick="switch_tab('sc')">Raccourcis</button>
+				<button class="tab-btn" data-tab="sc_bg"  onclick="switch_tab('sc_bg')">Bigrammes raccourcis</button>
+				<button class="tab-btn" data-tab="sc_tg"  onclick="switch_tab('sc_tg')">Trigrammes raccourcis</button>
+				<button class="tab-btn" data-tab="sc_qg"  onclick="switch_tab('sc_qg')">Quadrigrammes raccourcis</button>
+				<button class="tab-btn" data-tab="sc_pg"  onclick="switch_tab('sc_pg')">Pentagrammes raccourcis</button>
 			</div>
 
 			<div class="table-container">

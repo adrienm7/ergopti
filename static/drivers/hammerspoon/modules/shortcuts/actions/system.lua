@@ -54,11 +54,11 @@ local Keycodes               = require("lib.keycodes")
 local KEYCODE_F18            = Keycodes.to_name(Keycodes.F18_WAKE_OS)
 
 -- Keep-awake jitter parameters
-local AWAKE_TICK_MIN_SEC     = 1     -- Minimum interval between mouse-jitter ticks
-local AWAKE_TICK_MAX_SEC     = 5     -- Maximum interval between mouse-jitter ticks
-local AWAKE_JITTER_X         = 120   -- Max horizontal pixel offset per tick
-local AWAKE_JITTER_Y         = 80    -- Max vertical pixel offset per tick
-local AWAKE_RETURN_DELAY_SEC = 0.2   -- Seconds to hold offset before returning to origin
+local AWAKE_TICK_MIN_SEC     = 1    -- Minimum interval between mouse-jitter ticks
+local AWAKE_TICK_MAX_SEC     = 5    -- Maximum interval between mouse-jitter ticks
+local AWAKE_JITTER_X         = 2    -- Max horizontal pixel offset per tick (imperceptible)
+local AWAKE_JITTER_Y         = 1    -- Max vertical pixel offset per tick (imperceptible)
+local AWAKE_RETURN_DELAY_SEC = 0.2  -- Seconds to hold offset before returning to origin
 
 -- Spotlight ring color (circle on the screen that holds the cursor)
 local SPOTLIGHT_COLOR = {red = 1, green = 0.85, blue = 0}    -- Yellow
@@ -92,6 +92,14 @@ local awake_timer      = nil
 local awake_alert_id   = nil
 local awake_active     = false
 local awake_origin_pos = nil
+-- Timestamp (seconds since epoch) when keep-awake was last toggled ON; used
+-- to log the duration as an "awake" passive period on toggle OFF so the
+-- dashboard can subtract it from focus stats when the toggle is disabled.
+local awake_started_at = nil
+-- Name of the focused app at the moment keep-awake was enabled. The
+-- jiggler keeps this app at the foreground for the duration, so the
+-- dashboard can credit the awake_ms back to that app on toggle OFF.
+local awake_focused_app = nil
 
 -- Spotlight state
 local _spotlight_dismiss = nil  -- Dismiss fn for the active spotlight; nil when none active
@@ -172,10 +180,37 @@ function M.toggle_awake()
 			awake_alert_id = nil
 		end
 
+		-- Log the keep-awake duration as a special passive period AND tag the
+		-- focused app so the dashboard can subtract it from per-app stats
+		-- when the user opted out of counting keep-awake time.
+		if awake_started_at then
+			local dur_ms = math.floor((hs.timer.secondsSinceEpoch() - awake_started_at) * 1000)
+			if dur_ms > 0 then
+				local ok_lm, log_manager = pcall(require, "modules.keylogger.log_manager")
+				if ok_lm and log_manager then
+					if type(log_manager.log_passive_period) == "function" then
+						pcall(log_manager.log_passive_period, "awake", dur_ms)
+					end
+					if awake_focused_app and type(log_manager.tag_awake_focus) == "function" then
+						pcall(log_manager.tag_awake_focus, awake_focused_app, dur_ms)
+					end
+				end
+			end
+			awake_started_at  = nil
+			awake_focused_app = nil
+		end
+
 		Logger.info(LOG, "Keep-awake disabled.")
 		pcall(hs.alert.show, "☕ Keep-awake désactivé", 2)
 	else
 		awake_active = true
+		awake_started_at = hs.timer.secondsSinceEpoch()
+		-- Capture the focused app at toggle-on so we can credit the keep-awake
+		-- duration back to it on toggle-off.
+		local _ok_app, _front = pcall(hs.application.frontmostApplication)
+		if _ok_app and _front and type(_front.name) == "function" then
+			awake_focused_app = _front:name()
+		end
 		math.randomseed(os.time())
 
 		local ok, aid = pcall(hs.alert.show, "☕ Keep-awake actif — Ctrl+M pour désactiver", math.huge)
@@ -186,15 +221,9 @@ function M.toggle_awake()
 		if ok_pos and pos then
 			awake_origin_pos = {x = pos.x, y = pos.y}
 
-			-- Make a small initial move so the OS registers activity immediately
-			local screen = hs.mouse.getCurrentScreen() or hs.screen.mainScreen()
-			local frame  = screen and type(screen.frame) == "function" and screen:frame() or nil
-			local dx     = (math.random(0, 1) == 0) and -80 or 80
-			local nx     = pos.x + dx
-			if frame then
-				nx = math.max(frame.x, math.min(frame.x + frame.w - 1, nx))
-			end
-			pcall(hs.mouse.absolutePosition, {x = nx, y = pos.y})
+			-- Move 1 px to immediately register OS activity without visible displacement
+			local dx = (math.random(0, 1) == 0) and -1 or 1
+			pcall(hs.mouse.absolutePosition, {x = pos.x + dx, y = pos.y})
 		end
 
 		schedule_awake_tick()

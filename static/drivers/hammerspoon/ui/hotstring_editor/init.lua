@@ -360,6 +360,12 @@ function M.open(open_mode)
 	})
 end
 
+--- Returns true when the editor window is currently open.
+--- @return boolean
+function M.is_open()
+	return _webview ~= nil
+end
+
 --- Closes the Hotstring Editor window and cleans up resources.
 function M.close()
 	if _webview then
@@ -460,8 +466,11 @@ end
 function M.set_shortcut(mods, key)
 	M.clear_shortcut()
 	if type(mods) == "table" and type(key) == "string" and key ~= "" then
-		local ok, hk = pcall(hs.hotkey.new, mods, key, function() M.open("shortcut") end)
-		if ok and hk then 
+		-- Toggle: close the editor if already open, otherwise open it.
+		local ok, hk = pcall(hs.hotkey.new, mods, key, function()
+			if _webview then M.close() else M.open("shortcut") end
+		end)
+		if ok and hk then
 			_hotkey = hk
 			pcall(function() _hotkey:enable() end)
 		end
