@@ -154,7 +154,13 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 			-- icon to blow up to its native resolution. Canvas re-rendering forces
 			-- a clean downscale so any image (27×27, 512×512, SVG-export, …)
 			-- displays at the exact menubar size.
-			local TARGET = 18
+			-- Per-variant target sizes — the simple logo is a tight glyph that
+			-- reads well at the standard menubar height; the complex Ergopti
+			-- logo carries finer detail and needs a couple more pixels to stay
+			-- legible. Keep both constants here so future tweaks live in one spot
+			local TARGET_SIMPLE  = 18
+			local TARGET_COMPLEX = 22
+			local TARGET = (variant == "complex") and TARGET_COMPLEX or TARGET_SIMPLE
 			local scaled = ico
 			pcall(function()
 				local sz = ico.size and ico:size() or nil
@@ -645,6 +651,7 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 			paused                   = core_mods.shortcuts_mod and type(core_mods.shortcuts_mod.is_paused) == "function" and core_mods.shortcuts_mod.is_paused() or false,
 			save_prefs               = save_prefs,
 			updateMenu               = updateMenu,
+			refresh_icon             = function() pcall(update_icon) end,
 			notify_feature           = notify_feature,
 			do_reload                = do_reload,
 			applyTriggerChar         = applyTriggerChar,

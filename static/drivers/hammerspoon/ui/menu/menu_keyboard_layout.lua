@@ -136,13 +136,25 @@ M._version_gt    = version_gt
 -- =====================================
 
 --- Returns true if the file/dir at the given path exists (best-effort).
+--- io.open(path, "r") fails on directories on macOS, and os.rename() on a
+--- system-protected location like "/Library/Keyboard Layouts" can hit SIP
+--- restrictions even for stat-style probes — so we shell out to /bin/test
+--- which handles files, directories, and bundles uniformly.
 --- @param path string Absolute path.
 --- @return boolean
 local function path_exists(path)
 	if type(path) ~= "string" or path == "" then return false end
+	if hs and hs.fs and type(hs.fs.attributes) == "function" then
+		local attrs = hs.fs.attributes(path)
+		if attrs then return true end
+	end
+	-- Shell fallback. -e tests for any kind of filesystem object.
+	local cmd = string.format("/bin/test -e %q && echo OK", path)
+	local out = hs.execute and hs.execute(cmd) or nil
+	if type(out) == "string" and out:find("OK") then return true end
+	-- Last-resort fallbacks for plain Lua test runs (no hs available)
 	local f = io.open(path, "r")
 	if f then f:close(); return true end
-	-- io.open fails on directories on some systems; try a stat fallback via os.rename to itself
 	local ok = os.rename(path, path)
 	return ok == true
 end
@@ -205,37 +217,60 @@ end
 -- ============================================
 -- ============================================
 
---- Reads the user's enabled input sources via `defaults read` and parses out
---- the layout names. macOS preferences are notoriously brittle to parse, so a
---- best-effort approach is used: extract any "KeyboardLayout Name" entries.
---- @return table List of {name = string} entries, may be empty on failure.
+--- Lists the keyboard layouts currently enabled in macOS, using the proper
+--- Hammerspoon API. `hs.keycodes.layouts(true)` returns only the user-selected
+--- (sourceable) layouts, mirroring exactly what the macOS menubar input-source
+--- icon shows. Falls back to an empty list when the API is unavailable.
+--- @return table Sorted list of layout names.
 local function list_enabled_input_sources()
-	local out, ok = hs.execute("/usr/bin/defaults read com.apple.HIToolbox AppleEnabledInputSources 2>/dev/null")
-	if not ok or type(out) ~= "string" or out == "" then
-		Logger.warn(LOG, "Could not read AppleEnabledInputSources — falling back to empty list.")
+	if not (hs.keycodes and type(hs.keycodes.layouts) == "function") then
+		Logger.warn(LOG, "hs.keycodes.layouts unavailable — returning empty list.")
 		return {}
 	end
-	local sources = {}
-	for name in out:gmatch("KeyboardLayout Name%s*=%s*\"([^\"]+)\"") do
-		sources[#sources + 1] = { name = name }
+	local ok, layouts = pcall(hs.keycodes.layouts, true)
+	if not ok or type(layouts) ~= "table" then
+		Logger.warn(LOG, "hs.keycodes.layouts() failed: %s.", tostring(layouts))
+		return {}
 	end
-	-- Catch unquoted names too (defaults output sometimes omits quotes)
-	if #sources == 0 then
-		for name in out:gmatch("KeyboardLayout Name%s*=%s*([%w_%-]+);") do
-			sources[#sources + 1] = { name = name }
-		end
-	end
-	return sources
+	table.sort(layouts)
+	return layouts
 end
 
---- Reads the currently-selected input source name (best-effort).
+--- Returns the name of the currently-selected keyboard layout.
 --- @return string|nil
 local function current_input_source_name()
-	local out, ok = hs.execute("/usr/bin/defaults read com.apple.HIToolbox AppleSelectedInputSources 2>/dev/null")
-	if not ok or type(out) ~= "string" then return nil end
-	local name = out:match("KeyboardLayout Name%s*=%s*\"([^\"]+)\"")
-		or out:match("KeyboardLayout Name%s*=%s*([%w_%-]+);")
-	return name
+	if not (hs.keycodes and type(hs.keycodes.currentLayout) == "function") then return nil end
+	local ok, name = pcall(hs.keycodes.currentLayout)
+	if ok and type(name) == "string" and name ~= "" then return name end
+	return nil
+end
+
+--- Activates the given keyboard layout via the proper Hammerspoon API.
+--- @param name string Layout name as returned by hs.keycodes.layouts.
+--- @return boolean true on success.
+local function set_input_source(name)
+	if not (hs.keycodes and type(hs.keycodes.setLayout) == "function") then return false end
+	local ok = pcall(hs.keycodes.setLayout, name)
+	if ok then
+		Logger.info(LOG, "Active layout switched to '%s'.", name)
+	else
+		Logger.warn(LOG, "Failed to switch active layout to '%s'.", name)
+	end
+	return ok
+end
+
+--- Returns true if any enabled layout name contains "Ergopti" (case-insensitive).
+--- The .bundle's input source name is what shows up in the macOS menubar list,
+--- so a substring match is more robust than trying to parse the bundle plist.
+--- @param sources table List of layout names returned by list_enabled_input_sources.
+--- @return boolean
+local function ergopti_in_active_layouts(sources)
+	for _, n in ipairs(sources) do
+		if type(n) == "string" and n:lower():find("ergopti", 1, true) then
+			return true
+		end
+	end
+	return false
 end
 
 
@@ -251,11 +286,16 @@ end
 --- @param ctx table Global UI context. Must contain ctx.base_dir and ctx.updateMenu.
 --- @return table A single hs.menubar item with a populated submenu.
 function M.build(ctx)
-	local update_menu = ctx and ctx.updateMenu
-	local base_dir    = ctx and ctx.base_dir or ""
-	local bundles_dir = base_dir .. BUNDLES_RELDIR
+	local update_menu  = ctx and ctx.updateMenu
+	local refresh_icon = ctx and ctx.refresh_icon
+	local base_dir     = ctx and ctx.base_dir or ""
+	local bundles_dir  = base_dir .. BUNDLES_RELDIR
 
 	local submenu = {}
+
+	-- Pull the live state once so the closures below capture stable values
+	local sources       = list_enabled_input_sources()
+	local already_in_list = ergopti_in_active_layouts(sources)
 
 	local latest = M.pick_latest_bundle(bundles_dir)
 	if latest then
@@ -263,6 +303,8 @@ function M.build(ctx)
 		local system_target = SYSTEM_LAYOUTS_DIR .. latest
 		local user_done     = path_exists(user_target)
 		local system_done   = path_exists(system_target)
+		Logger.debug(LOG, "Install probe — user=%s, system=%s, user_path=%s.",
+			tostring(user_done), tostring(system_done), user_target)
 
 		submenu[#submenu + 1] = {
 			title    = user_done
@@ -292,14 +334,19 @@ function M.build(ctx)
 		}
 	end
 
-	-- Programmatic mutation of AppleEnabledInputSources is fragile across macOS
-	-- versions, so we defer to System Settings — the user adds the layout there
+	-- Add-to-list: programmatic mutation of AppleEnabledInputSources is fragile
+	-- across macOS versions, so we defer to System Settings. When Ergopti is
+	-- already in the user's input-source list the item is greyed out with a
+	-- success label.
 	submenu[#submenu + 1] = {
-		title = "➕ Ajouter Ergopti à la liste des dispositions",
-		fn    = function()
+		title    = already_in_list
+			and "Ergopti dans la liste des dispositions ✅"
+			or  "➕ Ajouter Ergopti à la liste des dispositions",
+		disabled = already_in_list or nil,
+		fn       = (not already_in_list) and function()
 			Logger.info(LOG, "Opening Keyboard input-source preferences pane.")
 			pcall(hs.execute, "open '" .. KEYBOARD_PREFS_URL .. "'")
-		end,
+		end or nil,
 	}
 
 	submenu[#submenu + 1] = { title = "-" }
@@ -311,29 +358,31 @@ function M.build(ctx)
 			pcall(hs.settings.set, LOGO_VARIANT_KEY, v)
 		end
 		Logger.debug(LOG, "Logo variant: %s.", tostring(v))
-		-- Trigger a live re-render of the menubar icon
-		local ok_init, menu_init = pcall(require, "ui.menu.init")
-		if ok_init and type(menu_init.refresh_icon) == "function" then
-			pcall(menu_init.refresh_icon)
-		end
-		if update_menu then update_menu() end
+		-- Re-render the menubar icon and rebuild the submenu so the checkmarks
+		-- reflect the new state. refresh_icon is provided directly by ui.menu.init
+		-- via ctx, avoiding a require() round-trip that previously could re-enter
+		-- a partially-initialized module
+		if type(refresh_icon) == "function" then pcall(refresh_icon) end
+		-- pcall guards a hard crash from any rebuild path
+		if type(update_menu) == "function" then pcall(update_menu) end
 	end
 	submenu[#submenu + 1] = {
-		title   = "🌟 Logo simple (par défaut)",
+		title   = "🌟 Logo par défaut",
 		checked = current_variant == "simple",
 		fn      = function() set_variant("simple") end,
 	}
 	submenu[#submenu + 1] = {
-		title   = "🎨 Logo complexe (Ergopti)",
+		title   = "🎨 Logo distinct de l’icône de la disposition",
 		checked = current_variant == "complex",
 		fn      = function() set_variant("complex") end,
 	}
 
 	submenu[#submenu + 1] = { title = "-" }
 
-	-- Active layouts list
-	submenu[#submenu + 1] = { title = "Disposition active", disabled = true }
-	local sources = list_enabled_input_sources()
+	-- Active layouts list — one item per enabled input source, with a checkmark
+	-- on the currently selected one. Clicking a row switches the active layout
+	-- via hs.keycodes.setLayout.
+	submenu[#submenu + 1] = { title = "Dispositions actives", disabled = true }
 	if #sources == 0 then
 		submenu[#submenu + 1] = {
 			title = "Ouvrir Préférences Système → Clavier",
@@ -341,19 +390,12 @@ function M.build(ctx)
 		}
 	else
 		local active = current_input_source_name()
-		for _, src in ipairs(sources) do
-			local name = src.name
+		for _, name in ipairs(sources) do
 			submenu[#submenu + 1] = {
 				title   = name,
 				checked = (name == active) or nil,
 				fn      = function()
-					-- Best-effort switch via AppleScript / shell; macOS makes this fragile
-					-- so we log explicitly and rely on the user to verify the change
-					Logger.info(LOG, "Switching input source to %s (best-effort).", name)
-					local script = string.format(
-						"tell application \"System Events\" to keystroke \" \" using {control down, option down}"
-					)
-					pcall(function() hs.osascript.applescript(script) end)
+					set_input_source(name)
 					if update_menu then update_menu() end
 				end,
 			}
