@@ -159,7 +159,7 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 			-- logo carries finer detail and needs a couple more pixels to stay
 			-- legible. Keep both constants here so future tweaks live in one spot
 			local TARGET_SIMPLE  = 18
-			local TARGET_COMPLEX = 22
+			local TARGET_COMPLEX = 24
 			local TARGET = (variant == "complex") and TARGET_COMPLEX or TARGET_SIMPLE
 			local scaled = ico
 			pcall(function()
