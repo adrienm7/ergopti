@@ -54,6 +54,12 @@ function M.generate(ctx, menu_mods, actions)
 		push_into(items, label, fn, arg)
 	end
 
+	-- Keyboard layout zone — placed just before hotstrings so it sits at the
+	-- top of the user-facing submenus
+	if type(menu_mods.keyboard_layout) == "table" and type(menu_mods.keyboard_layout.build) == "function" then
+		push("keyboard_layout.build", menu_mods.keyboard_layout.build, ctx)
+	end
+
 	-- Hotstrings zone avec activation globale
 	if type(menu_mods.hotstrings) == "table" then
 		Logger.debug(LOG, "Building hotstrings submenu…")
@@ -99,7 +105,7 @@ function M.generate(ctx, menu_mods, actions)
 
 		if #hotstrings_menu > 0 then
 			table.insert(items, {
-				title = "Hotstrings ⚡",
+				title = "⚡ Hotstrings",
 				menu = hotstrings_menu,
 				checked = all_enabled and not ctx.paused or nil,
 				fn = not ctx.paused and toggle_all_hotstrings or nil

@@ -707,7 +707,7 @@ function M.build(ctx)
 	end
 
 	return {
-		title   = "Karabiner ⌨️",
+		title   = "⌨️ Karabiner",
 		checked = enabled,
 		-- Clicking the item title toggles enabled state
 		fn      = function()

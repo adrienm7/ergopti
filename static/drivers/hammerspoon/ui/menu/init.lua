@@ -46,6 +46,7 @@ end
 local menu_mods = {
 	gestures   = safe_require("ui.menu.menu_gestures",   "gestures menu"),
 	shortcuts  = safe_require("ui.menu.menu_shortcuts",  "shortcuts menu"),
+	keyboard_layout = safe_require("ui.menu.menu_keyboard_layout", "keyboard layout menu"),
 	hotstrings = safe_require("ui.menu.menu_hotstrings", "hotstrings menu"),
 	llm        = safe_require("ui.menu.menu_llm",        "AI menu"),
 	keylogger  = safe_require("ui.menu.menu_metrics",    "metrics menu"),
@@ -120,16 +121,58 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 	local function update_icon(custom_text)
 		local shortcuts = core_mods.shortcuts_mod
 		local paused    = shortcuts and type(shortcuts.is_paused) == "function" and shortcuts.is_paused() or false
-		
-		local logo_file = paused and "logo_black.png" or "logo_white.png"
-		
-		local ok_img, ico = pcall(hs.image.imageFromPath, base_dir .. "images/" .. logo_file)
-		
+
+		-- Logo variant is persisted via hs.settings; default is "simple"
+		local variant = hs.settings.get("ergopti_menubar_logo_variant") or "simple"
+
+		-- The shared logo directory lives at static/img/logo (two levels up from
+		-- static/drivers/hammerspoon, where base_dir points)
+		local logo_dir = base_dir .. "../../img/logo/"
+		local logo_file
+		if variant == "simple" then
+			-- A dedicated disabled simple logo may not yet exist — fall back to logo_simple.png
+			if paused then
+				local disabled_path = logo_dir .. "logo_simple_disabled.png"
+				local f = io.open(disabled_path, "r")
+				if f then f:close(); logo_file = "logo_simple_disabled.png" else logo_file = "logo_simple.png" end
+			else
+				logo_file = "logo_simple.png"
+			end
+		else
+			logo_file = paused and "logo_black.png" or "logo_white.png"
+		end
+
+		local ok_img, ico = pcall(hs.image.imageFromPath, logo_dir .. logo_file)
+
 		pcall(function() myMenu:setTitle(custom_text and (" " .. tostring(custom_text)) or "") end)
-		
+
 		if ok_img and ico then
-			pcall(function() if type(ico.setSize) == "function" then ico:setSize({ w = 18, h = 18 }) end end)
-			pcall(function() myMenu:setIcon(ico, false) end)
+			-- Re-render through hs.canvas at the menubar target size whenever the
+			-- source image is materially larger than the menubar height. NSImage's
+			-- own setSize() only updates the displayed dimensions and leaves the
+			-- backing pixel data untouched, which on retina displays causes the
+			-- icon to blow up to its native resolution. Canvas re-rendering forces
+			-- a clean downscale so any image (27×27, 512×512, SVG-export, …)
+			-- displays at the exact menubar size.
+			local TARGET = 20
+			local scaled = ico
+			pcall(function()
+				local sz = ico.size and ico:size() or nil
+				if sz and (sz.w > TARGET + 4 or sz.h > TARGET + 4) and hs.canvas then
+					local c = hs.canvas.new({ x = 0, y = 0, w = TARGET, h = TARGET })
+					c[1] = {
+						type         = "image",
+						image        = ico,
+						frame        = { x = 0, y = 0, w = TARGET, h = TARGET },
+						imageScaling = "scaleProportionally",
+					}
+					local rendered = c:imageFromCanvas()
+					c:delete()
+					if rendered then scaled = rendered end
+				end
+			end)
+			pcall(function() if type(scaled.setSize) == "function" then scaled:setSize({ w = TARGET, h = TARGET }) end end)
+			pcall(function() myMenu:setIcon(scaled, false) end)
 			-- Ensure title is cleared when no custom text provided.
 			if not custom_text then pcall(function() myMenu:setTitle("") end) end
 		else
@@ -493,6 +536,10 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 
 	pcall(update_icon)
 
+	-- Expose a refresh hook so submenus can re-render the menubar icon after
+	-- toggling persisted preferences (e.g. logo variant)
+	M.refresh_icon = function() pcall(update_icon) end
+
 	local saved = Preferences.load(base_dir .. "config.json")
 	local config_absent = (next(saved) == nil)
 
@@ -593,6 +640,7 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 
 	updateMenu = function()
 		local ctx = {
+			base_dir                 = base_dir,
 			state                    = state,
 			paused                   = core_mods.shortcuts_mod and type(core_mods.shortcuts_mod.is_paused) == "function" and core_mods.shortcuts_mod.is_paused() or false,
 			save_prefs               = save_prefs,

@@ -134,13 +134,13 @@
 </div>
 <p>
 	Il est également conseillé (mais c’est optionnel) de télécharger les 2 fichiers suivants : <a
-		href="drivers/autohotkey/ErgoptiPlus_Icon.ico"
+		href="img/logo/logo_simple.ico"
 		download
-		class="link">ErgoptiPlus_Icon.ico</a
+		class="link">logo_simple.ico</
 	>
 	ainsi que
-	<a href="drivers/autohotkey/ErgoptiPlus_Icon_Disabled.ico" download class="link"
-		>ErgoptiPlus_Icon_Disabled.ico</a
+	<a href="img/logo/logo_simple_disabled.ico" download class="link"
+		>logo_simple_disabled.ico</a
 	>. Ils sont à placer dans le même dossier que celui du script <em>.ahk</em> et permettent d’en modifier
 	l’icône dans la barre des tâches.
 </p>

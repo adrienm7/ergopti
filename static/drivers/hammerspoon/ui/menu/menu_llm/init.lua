@@ -1540,7 +1540,7 @@ function M.create(deps)
         table.insert(main_menu, { title = "Navigation", disabled = is_disabled or nil, menu = nav_menu_items })
 
         return {
-            title   = "Intelligence Artificielle ✨",
+            title   = "✨ Intelligence Artificielle",
             checked = (state.llm_enabled and not paused) or nil,
             fn      = not paused and function()
                 local function toggle_state()

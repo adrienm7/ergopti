@@ -48,7 +48,7 @@ function M.build(ctx)
 	local paused = ctx.paused
 
 	local item = {
-		title   = "Raccourcis 🎯",
+		title   = "🎯 Raccourcis",
 		checked = (state.shortcuts and not paused) or nil,
 		fn      = function()
 			state.shortcuts = not state.shortcuts
