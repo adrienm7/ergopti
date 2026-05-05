@@ -50,14 +50,15 @@ local LOGO_VARIANT_DEFAULT = "simple"
 local KEYBOARD_PREFS_URL = "x-apple.systempreferences:com.apple.preference.keyboard?InputSources"
 
 -- All Ergopti variants packaged in the bundle. Used to expose a submenu with
--- a one-click TISEnableInputSource entry for each. The order matters — it is
--- the order shown in the menu, with the most useful variant first.
+-- a one-click TISEnableInputSource entry for each. The order shown in the
+-- menu mirrors the natural progression: base → ANSI → plus → plus ANSI →
+-- plus_plus → plus_plus ANSI.
 local ERGOPTI_VARIANTS = {
-	{ id = "com.apple.keylayout.ergopti.plus",          label = "Ergopti+" },
-	{ id = "com.apple.keylayout.ergopti",               label = "Ergopti" },
-	{ id = "com.apple.keylayout.ergopti.plus_plus",     label = "Ergopti++" },
-	{ id = "com.apple.keylayout.ergopti.ansi",          label = "Ergopti ANSI" },
-	{ id = "com.apple.keylayout.ergopti.plus.ansi",     label = "Ergopti+ ANSI" },
+	{ id = "com.apple.keylayout.ergopti",                label = "Ergopti" },
+	{ id = "com.apple.keylayout.ergopti.ansi",           label = "Ergopti ANSI" },
+	{ id = "com.apple.keylayout.ergopti.plus",           label = "Ergopti+" },
+	{ id = "com.apple.keylayout.ergopti.plus.ansi",      label = "Ergopti+ ANSI" },
+	{ id = "com.apple.keylayout.ergopti.plus_plus",      label = "Ergopti++" },
 	{ id = "com.apple.keylayout.ergopti.plus_plus.ansi", label = "Ergopti++ ANSI" },
 }
 
@@ -65,6 +66,14 @@ local ERGOPTI_VARIANTS = {
 -- input-source list asynchronously; calling hs.keycodes too quickly during
 -- that window has been observed to crash Hammerspoon. 1.5 s is a safe margin.
 local POST_INSTALL_REFRESH_DELAY = 1.5
+
+-- Delay before firing a TIS (Text Input Sources) call from a menu-click
+-- handler. macOS posts kTISNotifyEnabledKeyboardInputSourcesChanged /
+-- kTISNotifySelectedKeyboardInputSourceChanged synchronously when those
+-- functions run, and Hammerspoon's hs.keycodes observers can re-enter Lua
+-- state mid-handler. Bouncing through hs.timer guarantees the menu click
+-- has fully unwound before the TIS call mutates input-source state.
+local TIS_CALL_DELAY = 0.1
 
 
 
@@ -591,6 +600,23 @@ local function schedule_menu_refresh(update_menu)
 	end
 end
 
+--- Defers `fn` so it runs AFTER the current menu-click handler has unwound.
+--- TIS (Text Input Sources) calls — TISEnableInputSource, TISSelectInputSource,
+--- TISDisableInputSource — synchronously trigger macOS input-source change
+--- notifications that hs.keycodes observes. Running them inside the menu
+--- callback frame has been observed to re-enter Lua state and crash
+--- Hammerspoon. A short hs.timer.doAfter() gives the click handler a chance
+--- to return before the TIS mutation is dispatched.
+--- @param fn function The TIS-touching callback to defer.
+local function defer_tis_call(fn)
+	if type(fn) ~= "function" then return end
+	if hs.timer and type(hs.timer.doAfter) == "function" then
+		hs.timer.doAfter(TIS_CALL_DELAY, function() pcall(fn) end)
+	else
+		pcall(fn)
+	end
+end
+
 --- Wraps an install action so that, on success, every legacy Ergopti entry
 --- still sitting in the user's enabled-list is replaced by its stable-id
 --- counterpart, and the menu is rebuilt after a small delay.
@@ -735,12 +761,15 @@ function M.build(ctx)
 		submenu[#submenu + 1] = {
 			title = string.format("📥 Mettre à jour Ergopti dans la liste — v%s → v%s", old_str, latest_str),
 			fn    = function()
-				local ok = upgrade_active_list(legacy_active)
-				if ok and hs.alert then pcall(hs.alert.show, "Liste des dispositions mise à jour.") end
-				if not ok and hs.alert then
-					pcall(hs.alert.show, "Échec de la mise à jour — voir la console.", 3)
-				end
-				schedule_menu_refresh(update_menu)
+				-- Same crash-avoidance pattern as the add-variant items below
+				defer_tis_call(function()
+					local ok = upgrade_active_list(legacy_active)
+					if ok and hs.alert then pcall(hs.alert.show, "Liste des dispositions mise à jour.") end
+					if not ok and hs.alert then
+						pcall(hs.alert.show, "Échec de la mise à jour — voir la console.", 3)
+					end
+					schedule_menu_refresh(update_menu)
+				end)
 			end,
 		}
 	elseif latest_installed_anywhere then
@@ -753,14 +782,19 @@ function M.build(ctx)
 			add_sub[#add_sub + 1] = {
 				title = string.format("%s v%s", var.label, latest_str),
 				fn    = function()
-					local ok = enable_and_select_source(id)
-					if ok and hs.alert then
-						pcall(hs.alert.show, string.format("%s ajouté à la liste.", var.label))
-					end
-					if not ok and hs.alert then
-						pcall(hs.alert.show, "Échec de l’ajout — voir la console.", 3)
-					end
-					schedule_menu_refresh(update_menu)
+					-- Bounce the TIS call out of the menu-click frame so macOS
+					-- can dispatch the resulting input-source notifications
+					-- without re-entering us mid-handler (was crashing HS).
+					defer_tis_call(function()
+						local ok = enable_and_select_source(id)
+						if ok and hs.alert then
+							pcall(hs.alert.show, string.format("%s ajouté à la liste.", var.label))
+						end
+						if not ok and hs.alert then
+							pcall(hs.alert.show, "Échec de l’ajout — voir la console.", 3)
+						end
+						schedule_menu_refresh(update_menu)
+					end)
 				end,
 			}
 		end
@@ -826,8 +860,12 @@ function M.build(ctx)
 				title   = display,
 				checked = (raw_name == active) or nil,
 				fn      = function()
-					set_input_source(raw_name)
-					if update_menu then update_menu() end
+					-- Defer the TIS call out of the menu-click frame so the
+					-- input-source change notification doesn't re-enter HS
+					defer_tis_call(function()
+						set_input_source(raw_name)
+						schedule_menu_refresh(update_menu)
+					end)
 				end,
 			}
 		end
