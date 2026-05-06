@@ -30,8 +30,8 @@ local _actions = nil
 -- =========================================
 -- =========================================
 
-local TAP_MAX_SEC    = 0.35
-local TAP_MAX_DELTA  = 2.0
+local TAP_MAX_SEC    = 0.50   -- Capture slightly slow multi-finger taps
+local TAP_MAX_DELTA  = 5.0    -- Involuntary drift during a tap
 local SWIPE_MIN      = 1.5    -- 3/4/5 fingers: minimum distance to validate a swipe
 local SWIPE_MIN_2    = 3.0    -- 2 fingers horiz/vert (left to macOS, diagonal only)
 local DIAG_MIN_2     = 5.0    -- 2 fingers: minimum total distance to validate a diagonal
@@ -268,15 +268,26 @@ function M.process_frame(touches)
 		if gs.active and gs.startPos and gs.endPos then
 			pcall(commitGesture, now)
 		end
+		-- Signal the actions module that the gesture is over before resetting,
+		-- so leftMouseUp events generated after the finger lift are not silenced
+		-- beyond the gesture boundary.
+		if _actions and type(_actions.set_gesture_in_progress) == "function" then
+			pcall(_actions.set_gesture_in_progress, false)
+		end
 		resetGS()
 		return
 	end
-	
+
 	if n >= 3 then startScrollBlock() end
-	
+
 	if n >= 2 then
 		local pos = avgPos(touches)
 		if not gs.active then
+			-- Signal the actions module that a new gesture has begun, so any
+			-- leftMouseUp from trackpad contact does not cancel drag selection.
+			if _actions and type(_actions.set_gesture_in_progress) == "function" then
+				pcall(_actions.set_gesture_in_progress, true)
+			end
 			gs.active         = true
 			gs.startTime      = now
 			gs.startPos       = pos
