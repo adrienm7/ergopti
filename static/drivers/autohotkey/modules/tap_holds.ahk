@@ -8,7 +8,6 @@
 ; the full navigation layer (arrows, window management, volume…).
 ; ==============================================================================
 
-
 ; ==============================
 ; ==============================
 ; ======= 1/ Constants =======
@@ -29,9 +28,6 @@ global KEY_REPEAT_INTERVAL_MS := 100
 ; character before giving up and leaving the shift state active.
 global ONE_SHOT_SHIFT_TIMEOUT_SEC := 2
 
-
-
-
 ; ==============================
 ; ==============================
 ; ======= 2/ CAPSLOCK =======
@@ -40,100 +36,99 @@ global ONE_SHOT_SHIFT_TIMEOUT_SEC := 2
 
 ; Fix for using the LAltCapsLockShortcut with LAlt remapped to OneShotShift and CapsLock not remapped
 #HotIf (
-	Features["TapHolds"]["LAlt"]["OneShotShift"].Enabled
-	and not Features["TapHolds"]["CapsLock"]["BackSpace"].Enabled
-	and not CapsLockRemappedCondition()
-	and not LayerEnabled
+    Features["TapHolds"]["LAlt"]["OneShotShift"].Enabled
+    and not Features["TapHolds"]["CapsLock"]["BackSpace"].Enabled
+    and not CapsLockRemappedCondition()
+    and not LayerEnabled
 )
 SC03A:: {
-	if (GetKeyState("SC038", "P")) {
-		LAltCapsLockShortcut()
-		return
-	}
-	ToggleCapsLock()
+    if (GetKeyState("SC038", "P")) {
+        LAltCapsLockShortcut()
+        return
+    }
+    ToggleCapsLock()
 }
 #HotIf
 
 #HotIf Features["TapHolds"]["CapsLock"]["BackSpace"].Enabled and not LayerEnabled
 *SC03A:: {
-	if (GetKeyState("SC038", "P")) {
-		LAltCapsLockShortcut()
-		return
-	}
+    if (GetKeyState("SC038", "P")) {
+        LAltCapsLockShortcut()
+        return
+    }
 
-	SendEvent("{Blind}{BackSpace}")
+    SendEvent("{Blind}{BackSpace}")
 }
 #HotIf
 
 CapsLockRemappedCondition() {
-	return (
-		Features["TapHolds"]["CapsLock"]["BackSpaceCtrl"].Enabled
-		or Features["TapHolds"]["CapsLock"]["CapsLockCtrl"].Enabled
-		or Features["TapHolds"]["CapsLock"]["CapsWordCtrl"].Enabled
-		or Features["TapHolds"]["CapsLock"]["CtrlBackSpaceCtrl"].Enabled
-		or Features["TapHolds"]["CapsLock"]["CtrlDeleteCtrl"].Enabled
-		or Features["TapHolds"]["CapsLock"]["DeleteCtrl"].Enabled
-		or Features["TapHolds"]["CapsLock"]["EnterCtrl"].Enabled
-		or Features["TapHolds"]["CapsLock"]["EscapeCtrl"].Enabled
-		or Features["TapHolds"]["CapsLock"]["OneShotShiftCtrl"].Enabled
-		or Features["TapHolds"]["CapsLock"]["TabCtrl"].Enabled
-	)
+    return (
+        Features["TapHolds"]["CapsLock"]["BackSpaceCtrl"].Enabled
+        or Features["TapHolds"]["CapsLock"]["CapsLockCtrl"].Enabled
+        or Features["TapHolds"]["CapsLock"]["CapsWordCtrl"].Enabled
+        or Features["TapHolds"]["CapsLock"]["CtrlBackSpaceCtrl"].Enabled
+        or Features["TapHolds"]["CapsLock"]["CtrlDeleteCtrl"].Enabled
+        or Features["TapHolds"]["CapsLock"]["DeleteCtrl"].Enabled
+        or Features["TapHolds"]["CapsLock"]["EnterCtrl"].Enabled
+        or Features["TapHolds"]["CapsLock"]["EscapeCtrl"].Enabled
+        or Features["TapHolds"]["CapsLock"]["OneShotShiftCtrl"].Enabled
+        or Features["TapHolds"]["CapsLock"]["TabCtrl"].Enabled
+    )
 }
 
 #HotIf CapsLockRemappedCondition() and not LayerEnabled
 *SC03A:: {
-	CtrlActivated := False
-	if (GetKeyState("SC01D", "P")) {
-		CtrlActivated := True
-	}
+    CtrlActivated := False
+    if (GetKeyState("SC01D", "P")) {
+        CtrlActivated := True
+    }
 
-	if (GetKeyState("SC038", "P")) {
-		; Fix for using the LAltCapsLockShortcut with LAlt remapped to OneShotShift and CapsLock remapped
-		LAltCapsLockShortcut()
-		return
-	}
+    if (GetKeyState("SC038", "P")) {
+        ; Fix for using the LAltCapsLockShortcut with LAlt remapped to OneShotShift and CapsLock remapped
+        LAltCapsLockShortcut()
+        return
+    }
 
-	SendEvent("{LCtrl Down}")
-	tap := KeyWait("CapsLock", "T" . Features["TapHolds"]["CapsLock"]["__Configuration"].TimeActivationSeconds)
-	if (tap and A_PriorKey == "LControl") {
-		SendEvent("{LCtrl Up}")
-		CapsLockShortcut(CtrlActivated)
-	}
-	SendEvent("{LCtrl Up}")
+    SendEvent("{LCtrl Down}")
+    tap := KeyWait("CapsLock", "T" . Features["TapHolds"]["CapsLock"]["__Configuration"].TimeActivationSeconds)
+    if (tap and A_PriorKey == "LControl") {
+        SendEvent("{LCtrl Up}")
+        CapsLockShortcut(CtrlActivated)
+    }
+    SendEvent("{LCtrl Up}")
 }
 #HotIf
 
 CapsLockShortcut(CtrlActivated) {
-	if CtrlActivated {
-		SendEvent("{LCtrl Down}")
-	}
+    if CtrlActivated {
+        SendEvent("{LCtrl Down}")
+    }
 
-	if Features["TapHolds"]["CapsLock"]["BackSpaceCtrl"].Enabled {
-		SendEvent("{Blind}{BackSpace}")
-	} else if Features["TapHolds"]["CapsLock"]["CapsLockCtrl"].Enabled {
-		ToggleCapsLock()
-	} else if Features["TapHolds"]["CapsLock"]["CapsWordCtrl"].Enabled {
-		ToggleCapsWord()
-	} else if Features["TapHolds"]["CapsLock"]["CtrlBackSpaceCtrl"].Enabled {
-		SendInput("^{BackSpace}")
-	} else if Features["TapHolds"]["CapsLock"]["CtrlDeleteCtrl"].Enabled {
-		SendInput("^{Delete}")
-	} else if Features["TapHolds"]["CapsLock"]["DeleteCtrl"].Enabled {
-		SendEvent("{Blind}{Delete}")
-	} else if Features["TapHolds"]["CapsLock"]["EnterCtrl"].Enabled {
-		SendEvent("{Blind}{Enter}")
-		DisableCapsWord()
-	} else if Features["TapHolds"]["CapsLock"]["EscapeCtrl"].Enabled {
-		SendEvent("{Blind}{Escape}")
-	} else if Features["TapHolds"]["CapsLock"]["OneShotShiftCtrl"].Enabled {
-		OneShotShift()
-	} else if Features["TapHolds"]["CapsLock"]["TabCtrl"].Enabled {
-		SendEvent("{Blind}{Tab}")
-	}
+    if Features["TapHolds"]["CapsLock"]["BackSpaceCtrl"].Enabled {
+        SendEvent("{Blind}{BackSpace}")
+    } else if Features["TapHolds"]["CapsLock"]["CapsLockCtrl"].Enabled {
+        ToggleCapsLock()
+    } else if Features["TapHolds"]["CapsLock"]["CapsWordCtrl"].Enabled {
+        ToggleCapsWord()
+    } else if Features["TapHolds"]["CapsLock"]["CtrlBackSpaceCtrl"].Enabled {
+        SendInput("^{BackSpace}")
+    } else if Features["TapHolds"]["CapsLock"]["CtrlDeleteCtrl"].Enabled {
+        SendInput("^{Delete}")
+    } else if Features["TapHolds"]["CapsLock"]["DeleteCtrl"].Enabled {
+        SendEvent("{Blind}{Delete}")
+    } else if Features["TapHolds"]["CapsLock"]["EnterCtrl"].Enabled {
+        SendEvent("{Blind}{Enter}")
+        DisableCapsWord()
+    } else if Features["TapHolds"]["CapsLock"]["EscapeCtrl"].Enabled {
+        SendEvent("{Blind}{Escape}")
+    } else if Features["TapHolds"]["CapsLock"]["OneShotShiftCtrl"].Enabled {
+        OneShotShift()
+    } else if Features["TapHolds"]["CapsLock"]["TabCtrl"].Enabled {
+        SendEvent("{Blind}{Tab}")
+    }
 
-	SendEvent("{LCtrl Up}")
+    SendEvent("{LCtrl Up}")
 }
-
 
 ; ==========================================
 ; ==========================================
@@ -145,17 +140,17 @@ CapsLockShortcut(CtrlActivated) {
 ; Tap-hold on "LShift" : Ctrl + C on tap, Shift on hold
 ~$SC02A::
 {
-	TimeBefore := A_TickCount
-	KeyWait("SC02A")
-	TimeAfter := A_TickCount
-	tap := ((TimeAfter - TimeBefore) <= Features["TapHolds"]["LShiftCopy"].TimeActivationSeconds * 1000)
-	if (
-		tap
-		and (TimeAfter - TimeBefore) >= TAP_MIN_DURATION_MS
-		and A_PriorKey == "LShift"
-	) { ; A_PriorKey is to be able to fire shortcuts very quickly, under the tap time
-		SendInput("{LCtrl Down}c{LCtrl Up}")
-	}
+    TimeBefore := A_TickCount
+    KeyWait("SC02A")
+    TimeAfter := A_TickCount
+    tap := ((TimeAfter - TimeBefore) <= Features["TapHolds"]["LShiftCopy"].TimeActivationSeconds * 1000)
+    if (
+        tap
+        and (TimeAfter - TimeBefore) >= TAP_MIN_DURATION_MS
+        and A_PriorKey == "LShift"
+    ) { ; A_PriorKey is to be able to fire shortcuts very quickly, under the tap time
+        SendInput("{LCtrl Down}c{LCtrl Up}")
+    }
 }
 #HotIf
 
@@ -166,23 +161,22 @@ CapsLockShortcut(CtrlActivated) {
 ; Tap-hold on "LControl" : Ctrl + V on tap, Ctrl on hold
 ~$SC01D::
 {
-	UpdateLastSentCharacter("LControl")
-	TimeBefore := A_TickCount
-	KeyWait("SC01D")
-	TimeAfter := A_TickCount
-	tap := ((TimeAfter - TimeBefore) <= Features["TapHolds"]["LCtrlPaste"].TimeActivationSeconds * 1000)
-	if (
-		tap
-		and (TimeAfter - TimeBefore) >= TAP_MIN_DURATION_MS
-		and A_PriorKey == "LControl"
-		and not GetKeyState("SC03A", "P") ; "CapsLock"
-		and not GetKeyState("SC038", "P") ; "LAlt"
-	) {
-		SendInput("{LCtrl Down}v{LCtrl Up}")
-	}
+    UpdateLastSentCharacter("LControl")
+    TimeBefore := A_TickCount
+    KeyWait("SC01D")
+    TimeAfter := A_TickCount
+    tap := ((TimeAfter - TimeBefore) <= Features["TapHolds"]["LCtrlPaste"].TimeActivationSeconds * 1000)
+    if (
+        tap
+        and (TimeAfter - TimeBefore) >= TAP_MIN_DURATION_MS
+        and A_PriorKey == "LControl"
+        and not GetKeyState("SC03A", "P") ; "CapsLock"
+        and not GetKeyState("SC038", "P") ; "LAlt"
+    ) {
+        SendInput("{LCtrl Down}v{LCtrl Up}")
+    }
 }
 #HotIf
-
 
 ; ==============================
 ; ==============================
@@ -193,21 +187,21 @@ CapsLockShortcut(CtrlActivated) {
 #HotIf Features["TapHolds"]["LAlt"]["OneShotShift"].Enabled and not LayerEnabled
 ; Tap-hold on "LAlt" : OneShotShift on tap, Shift on hold
 SC038:: {
-	if (
-		GetKeyState("SC11D", "P")
-		or GetKeyState("SC03A", "P")
-		or GetKeyState("LShift", "P")
-		or GetKeyState("LCtrl", "P")
-	) {
-		; Solves a problem where shorcuts consisting of another key (pressed first) + SC038 (pressed second) triggers the shortcut, but also OneShotShift()
-		return
-	}
+    if (
+        GetKeyState("SC11D", "P")
+        or GetKeyState("SC03A", "P")
+        or GetKeyState("LShift", "P")
+        or GetKeyState("LCtrl", "P")
+    ) {
+        ; Solves a problem where shorcuts consisting of another key (pressed first) + SC038 (pressed second) triggers the shortcut, but also OneShotShift()
+        return
+    }
 
-	SendEvent("{LAlt Up}")
-	OneShotShift()
-	SendInput("{LShift Down}")
-	KeyWait("SC038")
-	SendInput("{LShift Up}")
+    SendEvent("{LAlt Up}")
+    OneShotShift()
+    SendInput("{LShift Down}")
+    KeyWait("SC038")
+    SendInput("{LShift Up}")
 }
 #HotIf
 
@@ -215,26 +209,26 @@ SC038:: {
 ; Tap-hold on "LAlt" : Tab on tap, Layer on hold
 SC038::
 {
-	UpdateLastSentCharacter("LAlt")
+    UpdateLastSentCharacter("LAlt")
 
-	ActivateLayer()
-	KeyWait("SC038")
-	DisableLayer()
+    ActivateLayer()
+    KeyWait("SC038")
+    DisableLayer()
 
-	Now := A_TickCount
-	CharacterSentTime := LastSentCharacterKeyTime.Has("LAlt") ? LastSentCharacterKeyTime["LAlt"] : Now
-	tap := (Now - CharacterSentTime <= Features["TapHolds"]["LAlt"]["TabLayer"].TimeActivationSeconds * 1000)
-	if tap {
-		SendEvent("{Tab}")
-	}
+    Now := A_TickCount
+    CharacterSentTime := LastSentCharacterKeyTime.Has("LAlt") ? LastSentCharacterKeyTime["LAlt"] : Now
+    tap := (Now - CharacterSentTime <= Features["TapHolds"]["LAlt"]["TabLayer"].TimeActivationSeconds * 1000)
+    if tap {
+        SendEvent("{Tab}")
+    }
 }
 
 SC02A & SC038:: SendInput("+{Tab}") ; On "LShift"
 if Features["TapHolds"]["RCtrl"]["OneShotShift"].Enabled {
-	SC11D & SC038:: {
-		OneShotShiftFix()
-		SendInput("+{Tab}")
-	}
+    SC11D & SC038:: {
+        OneShotShiftFix()
+        SendInput("+{Tab}")
+    }
 }
 #SC038:: SendEvent("#{Tab}") ; Doesn't fire when SendInput is used
 !SC038:: SendInput("!{Tab}")
@@ -244,15 +238,15 @@ if Features["TapHolds"]["RCtrl"]["OneShotShift"].Enabled {
 ; Tap-hold on "LAlt" : AltTabMonitor on tap, Alt on hold
 SC038::
 {
-	Send("{LAlt Down}")
-	tap := KeyWait("SC038", "T" . Features["TapHolds"]["LAlt"]["AltTabMonitor"].TimeActivationSeconds)
-	if tap {
-		Send("{LAlt Up}")
-		AltTabMonitor()
-	} else {
-		KeyWait("SC038")
-		Send("{LAlt Up}")
-	}
+    Send("{LAlt Down}")
+    tap := KeyWait("SC038", "T" . Features["TapHolds"]["LAlt"]["AltTabMonitor"].TimeActivationSeconds)
+    if tap {
+        Send("{LAlt Up}")
+        AltTabMonitor()
+    } else {
+        KeyWait("SC038")
+        Send("{LAlt Up}")
+    }
 }
 #HotIf
 
@@ -260,16 +254,16 @@ SC038::
 ; "LAlt" becomes BackSpace, and Delete on Shift
 *SC038::
 {
-	BackSpaceActionWithModifiers := BackSpaceLogic()
-	if not BackSpaceActionWithModifiers {
-		; If no modifier was pressed
-		SendEvent("{BackSpace}") ; Event to be able to correct hostrings and still trigger them afterwards
-		Sleep(KEY_REPEAT_INITIAL_DELAY_MS)
-		while GetKeyState("SC038", "P") {
-			SendEvent("{BackSpace}")
-			Sleep(KEY_REPEAT_INTERVAL_MS)
-		}
-	}
+    BackSpaceActionWithModifiers := BackSpaceLogic()
+    if not BackSpaceActionWithModifiers {
+        ; If no modifier was pressed
+        SendEvent("{BackSpace}") ; Event to be able to correct hostrings and still trigger them afterwards
+        Sleep(KEY_REPEAT_INITIAL_DELAY_MS)
+        while GetKeyState("SC038", "P") {
+            SendEvent("{BackSpace}")
+            Sleep(KEY_REPEAT_INTERVAL_MS)
+        }
+    }
 }
 #HotIf
 
@@ -277,82 +271,81 @@ SC038::
 ; Tap-hold on "LAlt" : BackSpace on tap, Layer on hold
 *SC038::
 {
-	UpdateLastSentCharacter("LAlt")
+    UpdateLastSentCharacter("LAlt")
 
-	ActivateLayer()
-	KeyWait("SC038")
-	DisableLayer()
+    ActivateLayer()
+    KeyWait("SC038")
+    DisableLayer()
 
-	Now := A_TickCount
-	CharacterSentTime := LastSentCharacterKeyTime.Has("LAlt") ? LastSentCharacterKeyTime["LAlt"] : Now
-	tap := (Now - CharacterSentTime <= Features["TapHolds"]["LAlt"]["BackSpaceLayer"].TimeActivationSeconds * 1000)
+    Now := A_TickCount
+    CharacterSentTime := LastSentCharacterKeyTime.Has("LAlt") ? LastSentCharacterKeyTime["LAlt"] : Now
+    tap := (Now - CharacterSentTime <= Features["TapHolds"]["LAlt"]["BackSpaceLayer"].TimeActivationSeconds * 1000)
 
-	if (
-		tap
-		and A_PriorKey == "LAlt" ; Prevents triggering BackSpace when the layer is quickly used and then released
-		and not GetKeyState("SC03A", "P") ; Fix a sent BackSpace when triggering quickly "LAlt" + "CapsLock"
-	) {
-		BackSpaceActionWithModifiers := BackSpaceLogic()
-		if not BackSpaceActionWithModifiers {
-			; If no modifier was pressed
-			SendEvent("{BackSpace}")
-		}
-	}
+    if (
+        tap
+        and A_PriorKey == "LAlt" ; Prevents triggering BackSpace when the layer is quickly used and then released
+        and not GetKeyState("SC03A", "P") ; Fix a sent BackSpace when triggering quickly "LAlt" + "CapsLock"
+    ) {
+        BackSpaceActionWithModifiers := BackSpaceLogic()
+        if not BackSpaceActionWithModifiers {
+            ; If no modifier was pressed
+            SendEvent("{BackSpace}")
+        }
+    }
 }
 #HotIf
 
 BackSpaceLogic() {
-	if (
-		GetKeyState("SC01D", "P")
-		and GetKeyState("Shift", "P")
-	) {
-		; "LCtrl" and Shift
-		SendInput("^{Delete}")
-		return True
-	} else if (
-		GetKeyState("SC11D", "P")
-		and not Features["TapHolds"]["RCtrl"]["OneShotShift"].Enabled
-		and GetKeyState("Shift", "P")
-	) {
-		; "RCtrl" when it stays RCtrl and Shift
-		SendInput("^{Delete}")
-		return True
-	} else if (
-		GetKeyState("SC01D", "P")
-		and Features["TapHolds"]["RCtrl"]["OneShotShift"].Enabled
-		and GetKeyState("SC11D", "P")
-	) {
-		; "LCtrl" and Shift on "RCtrl"
-		OneShotShiftFix()
-		SendInput("^{Right}^{BackSpace}") ; = ^Delete, but we cannot simply use Delete, as it would do Ctrl + Alt + Delete and Windows would interpret it
-		return True
-	} else if (
-		Features["TapHolds"]["RCtrl"]["OneShotShift"].Enabled
-		and GetKeyState("SC11D", "P")
-	) {
-		; Shift on "RCtrl"
-		OneShotShiftFix()
-		SendInput("{Right}{BackSpace}") ; = Delete, but we cannot simply use Delete, as it would do Ctrl + Alt + Delete and Windows would interpret it
-		return True
-	} else if GetKeyState("Shift", "P") {
-		; Shift
-		SendInput("{Delete}")
-		return True
-	} else if GetKeyState("SC01D", "P") {
-		; "LCtrl"
-		SendInput("^{BackSpace}")
-		return True
-	} else if (
-		not Features["TapHolds"]["RCtrl"]["OneShotShift"].Enabled
-		and GetKeyState("SC11D", "P")
-	) {
-		; "RCtrl" when it stays RCtrl
-		SendInput("^{BackSpace}")
-		return True
-	}
-	return False
+    if (
+        GetKeyState("SC01D", "P")
+        and GetKeyState("Shift", "P")
+    ) {
+        ; "LCtrl" and Shift
+        SendInput("^{Delete}")
+        return True
+    } else if (
+        GetKeyState("SC11D", "P")
+        and not Features["TapHolds"]["RCtrl"]["OneShotShift"].Enabled
+        and GetKeyState("Shift", "P")
+    ) {
+        ; "RCtrl" when it stays RCtrl and Shift
+        SendInput("^{Delete}")
+        return True
+    } else if (
+        GetKeyState("SC01D", "P")
+        and Features["TapHolds"]["RCtrl"]["OneShotShift"].Enabled
+        and GetKeyState("SC11D", "P")
+    ) {
+        ; "LCtrl" and Shift on "RCtrl"
+        OneShotShiftFix()
+        SendInput("^{Right}^{BackSpace}") ; = ^Delete, but we cannot simply use Delete, as it would do Ctrl + Alt + Delete and Windows would interpret it
+        return True
+    } else if (
+        Features["TapHolds"]["RCtrl"]["OneShotShift"].Enabled
+        and GetKeyState("SC11D", "P")
+    ) {
+        ; Shift on "RCtrl"
+        OneShotShiftFix()
+        SendInput("{Right}{BackSpace}") ; = Delete, but we cannot simply use Delete, as it would do Ctrl + Alt + Delete and Windows would interpret it
+        return True
+    } else if GetKeyState("Shift", "P") {
+        ; Shift
+        SendInput("{Delete}")
+        return True
+    } else if GetKeyState("SC01D", "P") {
+        ; "LCtrl"
+        SendInput("^{BackSpace}")
+        return True
+    } else if (
+        not Features["TapHolds"]["RCtrl"]["OneShotShift"].Enabled
+        and GetKeyState("SC11D", "P")
+    ) {
+        ; "RCtrl" when it stays RCtrl
+        SendInput("^{BackSpace}")
+        return True
+    }
+    return False
 }
-
 
 ; ==============================
 ; ==============================
@@ -366,20 +359,20 @@ BackSpaceLogic() {
 ; HoldFn, which is responsible for activating the held modifier and blocking
 ; until SC039 is released. Returns true when the timeout (hold) branch fired.
 SpaceTapHold(FeatureKey, HoldFn) {
-	TimeoutSec := Features["TapHolds"]["Space"][FeatureKey].TimeActivationSeconds
-	ih := InputHook("L1 T" . TimeoutSec)
-	ih.Start()
-	ih.Wait()
-	if ih.EndReason != "Timeout" {
-		; Tap path: send the Space that was intercepted, then the captured character
-		; (omit it when it is itself a Space to avoid a double-space).
-		Text := (ih.Input == " ") ? "" : ih.Input
-		SendEvent("{Space}" Text)
-		UpdateLastSentCharacter(" ")
-		return False
-	}
-	HoldFn()
-	return True
+    TimeoutSec := Features["TapHolds"]["Space"][FeatureKey].TimeActivationSeconds
+    ih := InputHook("L1 T" . TimeoutSec)
+    ih.Start()
+    ih.Wait()
+    if ih.EndReason != "Timeout" {
+        ; Tap path: send the Space that was intercepted, then the captured character
+        ; (omit it when it is itself a Space to avoid a double-space).
+        Text := (ih.Input == " ") ? "" : ih.Input
+        SendEvent("{Space}" Text)
+        UpdateLastSentCharacter(" ")
+        return False
+    }
+    HoldFn()
+    return True
 }
 
 ; Each #HotIf block maps exactly one SC039 condition to one hold action.
@@ -387,32 +380,32 @@ SpaceTapHold(FeatureKey, HoldFn) {
 ; before the InputHook timeout elapsed and no tap was already sent.
 
 _SpaceHoldCtrl() {
-	SendEvent("{LCtrl Down}")
-	KeyWait("SC039")
-	SendEvent("{LCtrl Up}")
+    SendEvent("{LCtrl Down}")
+    KeyWait("SC039")
+    SendEvent("{LCtrl Up}")
 }
 _SpaceHoldLayer() {
-	ActivateLayer()
-	KeyWait("SC039")
-	DisableLayer()
+    ActivateLayer()
+    KeyWait("SC039")
+    DisableLayer()
 }
 _SpaceHoldShift() {
-	SendEvent("{LShift Down}")
-	KeyWait("SC039")
-	SendEvent("{LShift Up}")
+    SendEvent("{LShift Down}")
+    KeyWait("SC039")
+    SendEvent("{LShift Up}")
 }
 
 #HotIf Features["TapHolds"]["Space"]["Ctrl"].Enabled and not LayerEnabled
 ; Tap-hold on "Space" : Space on tap, Ctrl on hold
 SC039:: SpaceTapHold("Ctrl", _SpaceHoldCtrl)
 SC039 Up:: {
-	if (
-		A_PriorHotkey == "SC039"
-		and not CapsWordEnabled
-		and A_TimeSinceThisHotkey <= Features["TapHolds"]["Space"]["Ctrl"].TimeActivationSeconds
-	) {
-		SendEvent("{Space}")
-	}
+    if (
+        A_PriorHotkey == "SC039"
+        and not CapsWordEnabled
+        and A_TimeSinceThisHotkey <= Features["TapHolds"]["Space"]["Ctrl"].TimeActivationSeconds
+    ) {
+        SendEvent("{Space}")
+    }
 }
 #HotIf
 
@@ -420,14 +413,14 @@ SC039 Up:: {
 ; Tap-hold on "Space" : Space on tap, Layer on hold
 SC039:: SpaceTapHold("Layer", _SpaceHoldLayer)
 SC039 Up:: {
-	if (
-		A_PriorHotkey == "SC039"
-		and not CapsWordEnabled
-		and A_TimeSinceThisHotkey <= Features["TapHolds"]["Space"]["Layer"].TimeActivationSeconds
-	) {
-		SendEvent("{Space}")
-		UpdateLastSentCharacter(" ")
-	}
+    if (
+        A_PriorHotkey == "SC039"
+        and not CapsWordEnabled
+        and A_TimeSinceThisHotkey <= Features["TapHolds"]["Space"]["Layer"].TimeActivationSeconds
+    ) {
+        SendEvent("{Space}")
+        UpdateLastSentCharacter(" ")
+    }
 }
 #HotIf
 
@@ -435,16 +428,15 @@ SC039 Up:: {
 ; Tap-hold on "Space" : Space on tap, Shift on hold
 SC039:: SpaceTapHold("Shift", _SpaceHoldShift)
 SC039 Up:: {
-	if (
-		A_PriorHotkey == "SC039"
-		and not CapsWordEnabled
-		and A_TimeSinceThisHotkey <= Features["TapHolds"]["Space"]["Shift"].TimeActivationSeconds
-	) {
-		SendEvent("{Space}")
-	}
+    if (
+        A_PriorHotkey == "SC039"
+        and not CapsWordEnabled
+        and A_TimeSinceThisHotkey <= Features["TapHolds"]["Space"]["Shift"].TimeActivationSeconds
+    ) {
+        SendEvent("{Space}")
+    }
 }
 #HotIf
-
 
 ; ==============================
 ; ==============================
@@ -460,19 +452,18 @@ global _TAPHOLD_ALTGR_ENABLED := HasAnyEnabled(Features["TapHolds"]["AltGr"])
 SC01D & ~SC138:: ; LControl & RAlt is the only way to make it fire on tap directly
 RAlt:: ; Necessary to work on layouts like QWERTY
 {
-	tap := KeyWait("RAlt", "T" . Features["TapHolds"]["AltGr"]["__Configuration"].TimeActivationSeconds)
-	if (tap and (A_PriorKey == "RAlt" or A_PriorKey == "^")) {
-		DisableCapsWord()
-		RunFirstAltGrTapHoldAction(Features["TapHolds"]["AltGr"])
-	}
+    tap := KeyWait("RAlt", "T" . Features["TapHolds"]["AltGr"]["__Configuration"].TimeActivationSeconds)
+    if (tap and (A_PriorKey == "RAlt" or A_PriorKey == "^")) {
+        DisableCapsWord()
+        RunFirstAltGrTapHoldAction(Features["TapHolds"]["AltGr"])
+    }
 }
 
 SC01D & ~SC138 Up::
 RAlt Up:: {
-	UpdateLastSentCharacter("")
+    UpdateLastSentCharacter("")
 }
 #HotIf
-
 
 ; ==============================
 ; ==============================
@@ -484,30 +475,30 @@ RAlt Up:: {
 ; RCtrl becomes BackSpace, and Delete on Shift
 SC11D::
 {
-	if GetKeyState("LShift", "P") {
-		SendInput("{Delete}")
-	} else if Features["TapHolds"]["LAlt"]["OneShotShift"].Enabled and GetKeyState("SC038", "P") {
-		OneShotShiftFix()
-		SendInput("{Right}{BackSpace}") ; = Delete, but we cannot simply use Delete, as it would do Ctrl + Alt + Delete and Windows would interpret it
-	} else {
-		SendEvent("{BackSpace}") ; Event to be able to correct hostrings and still trigger them afterwards
-		Sleep(KEY_REPEAT_INITIAL_DELAY_MS)
-		while GetKeyState("SC11D", "P") {
-			SendEvent("{BackSpace}")
-			Sleep(KEY_REPEAT_INTERVAL_MS)
-		}
-	}
+    if GetKeyState("LShift", "P") {
+        SendInput("{Delete}")
+    } else if Features["TapHolds"]["LAlt"]["OneShotShift"].Enabled and GetKeyState("SC038", "P") {
+        OneShotShiftFix()
+        SendInput("{Right}{BackSpace}") ; = Delete, but we cannot simply use Delete, as it would do Ctrl + Alt + Delete and Windows would interpret it
+    } else {
+        SendEvent("{BackSpace}") ; Event to be able to correct hostrings and still trigger them afterwards
+        Sleep(KEY_REPEAT_INITIAL_DELAY_MS)
+        while GetKeyState("SC11D", "P") {
+            SendEvent("{BackSpace}")
+            Sleep(KEY_REPEAT_INTERVAL_MS)
+        }
+    }
 }
 #HotIf
 
 #HotIf Features["TapHolds"]["RCtrl"]["Tab"].Enabled and not LayerEnabled
 ; Tap-hold on "RCtrl" : Tab on tap, Ctrl on hold
 ~SC11D:: {
-	tap := KeyWait("RControl", "T" . Features["TapHolds"]["RCtrl"]["Tab"].TimeActivationSeconds)
-	if (tap and A_PriorKey == "RControl") {
-		SendEvent("{RCtrl Up}")
-		SendEvent("{Tab}") ; To be able to trigger hotstrings with a Tab ending character
-	}
+    tap := KeyWait("RControl", "T" . Features["TapHolds"]["RCtrl"]["Tab"].TimeActivationSeconds)
+    if (tap and A_PriorKey == "RControl") {
+        SendEvent("{RCtrl Up}")
+        SendEvent("{Tab}") ; To be able to trigger hotstrings with a Tab ending character
+    }
 }
 
 +SC11D:: SendInput("+{Tab}")
@@ -519,13 +510,12 @@ SC11D::
 #HotIf Features["TapHolds"]["RCtrl"]["OneShotShift"].Enabled and not LayerEnabled
 ; Tap-hold on "RCtrl" : OneShotShift on tap, Shift on hold
 SC11D:: {
-	OneShotShift()
-	SendEvent("{LShift Down}")
-	KeyWait("SC11D")
-	SendEvent("{LShift Up}")
+    OneShotShift()
+    SendEvent("{LShift Down}")
+    KeyWait("SC11D")
+    SendEvent("{LShift Up}")
 }
 #HotIf
-
 
 ; ==============================
 ; ==============================
@@ -538,94 +528,100 @@ SC11D:: {
 SC00F::LAlt
 SC00F::
 {
-	SendInput("{LAlt Down}")
-	tap := KeyWait("SC00F", "T" . Features["TapHolds"]["TabAlt"].TimeActivationSeconds)
-	if tap {
-		if Features["TapHolds"]["LAlt"]["TabLayer"].Enabled and GetKeyState("SC038", "P") {
-			SendInput("!{Tab}")
-		} else {
-			SendInput("{LAlt Up}")
-			AltTabMonitor()
-		}
+    SendInput("{LAlt Down}")
+    tap := KeyWait("SC00F", "T" . Features["TapHolds"]["TabAlt"].TimeActivationSeconds)
+    if tap {
+        if Features["TapHolds"]["LAlt"]["TabLayer"].Enabled and GetKeyState("SC038", "P") {
+            SendInput("!{Tab}")
+        } else {
+            SendInput("{LAlt Up}")
+            AltTabMonitor()
+        }
 
-	}
+    }
 }
 SC00F Up:: SendInput("{LAlt Up}")
+
+; Pass-through for Tab with modifiers so Ctrl+Tab, Shift+Tab etc. still work
+; despite the tap-hold intercepting the bare key
+^SC00F:: SendEvent("^{Tab}")
+^+SC00F:: SendEvent("^+{Tab}")
++SC00F:: SendInput("+{Tab}")
+#SC00F:: SendEvent("#{Tab}")
 #HotIf
 
 AltTabMonitor() {
-	CoordMode("Mouse", "Screen")
-	MouseGetPos(&MousePosX, &MousePosY)
-	MonitorNum := GetMonitorFromPoint(MousePosX, MousePosY)
-	if MonitorNum == 0 {
-		return ; No monitor found
-	}
+    CoordMode("Mouse", "Screen")
+    MouseGetPos(&MousePosX, &MousePosY)
+    MonitorNum := GetMonitorFromPoint(MousePosX, MousePosY)
+    if MonitorNum == 0 {
+        return ; No monitor found
+    }
 
-	CurrentWindowId := WinExist("A")
-	AppWindowsOnMonitorFiltered := []
+    CurrentWindowId := WinExist("A")
+    AppWindowsOnMonitorFiltered := []
 
-	for WindowId in WinGetList() {
-		; Skip the currently active window
-		if WindowId == CurrentWindowId {
-			continue
-		}
+    for WindowId in WinGetList() {
+        ; Skip the currently active window
+        if WindowId == CurrentWindowId {
+            continue
+        }
 
-		; Get window position and size
-		WinGetPos(&x, &y, &w, &h, WindowId)
+        ; Get window position and size
+        WinGetPos(&x, &y, &w, &h, WindowId)
 
-		; Filter out windows that are too small to be usable
-		if (w < 100 || h < 100) {
-			continue
-		}
+        ; Filter out windows that are too small to be usable
+        if (w < 100 || h < 100) {
+            continue
+        }
 
-		; Determine which monitor contains the center of the window
-		CenterX := x + w // 2
-		CenterY := y + h // 2
-		if GetMonitorFromPoint(CenterX, CenterY) != MonitorNum {
-			continue ; Window is not on the target monitor
-		}
+        ; Determine which monitor contains the center of the window
+        CenterX := x + w // 2
+        CenterY := y + h // 2
+        if GetMonitorFromPoint(CenterX, CenterY) != MonitorNum {
+            continue ; Window is not on the target monitor
+        }
 
-		; Skip windows with no title — often tooltips, overlays, or hidden UI elements, and when dragging files, and windows when a file operation is happening
-		if WinGetTitle(WindowId) == "" or WinGetTitle(WindowId) == "Drag" or WinGetClass(WindowId) ==
-		"OperationStatusWindow" {
-			continue
-		}
+        ; Skip windows with no title — often tooltips, overlays, or hidden UI elements, and when dragging files, and windows when a file operation is happening
+        if WinGetTitle(WindowId) == "" or WinGetTitle(WindowId) == "Drag" or WinGetClass(WindowId) ==
+        "OperationStatusWindow" {
+            continue
+        }
 
-		; Exclude known system window classes:
-		; - Shell_TrayWnd: Windows taskbar
-		; - Progman: desktop background
-		; - WorkerW: hidden background windows
-		if ["Shell_TrayWnd", "Progman", "WorkerW"].Has(WinGetClass(WindowId)) {
-			continue
-		}
+        ; Exclude known system window classes:
+        ; - Shell_TrayWnd: Windows taskbar
+        ; - Progman: desktop background
+        ; - WorkerW: hidden background windows
+        if ["Shell_TrayWnd", "Progman", "WorkerW"].Has(WinGetClass(WindowId)) {
+            continue
+        }
 
-		; WindowId passed all filters — add to list
-		AppWindowsOnMonitorFiltered.Push(WindowId)
-	}
+        ; WindowId passed all filters — add to list
+        AppWindowsOnMonitorFiltered.Push(WindowId)
+    }
 
-	; Activate the first relevant window found
-	if AppWindowsOnMonitorFiltered.Length > 0 {
-		WinActivate(AppWindowsOnMonitorFiltered[1])
-	}
+    ; Activate the first relevant window found
+    if AppWindowsOnMonitorFiltered.Length > 0 {
+        WinActivate(AppWindowsOnMonitorFiltered[1])
+    }
 }
 
 GetMonitorFromPoint(X, Y) {
-	MonitorCount := MonitorGetCount()
+    MonitorCount := MonitorGetCount()
 
-	loop MonitorCount {
-		; Get the monitor's rectangle bounding coordinates, for monitor number A_Index
-		MonitorGet(A_Index, &MonitorLeft, &MonitorTop, &MonitorRight, &MonitorBottom)
+    loop MonitorCount {
+        ; Get the monitor's rectangle bounding coordinates, for monitor number A_Index
+        MonitorGet(A_Index, &MonitorLeft, &MonitorTop, &MonitorRight, &MonitorBottom)
 
-		; Check if the mouse is inside the monitor
-		if (X >= MonitorLeft && X < MonitorRight && Y >= MonitorTop && Y <
-			MonitorBottom) {
-			return A_Index
-		}
-	}
+        ; Check if the mouse is inside the monitor
+        if (X >= MonitorLeft && X < MonitorRight && Y >= MonitorTop && Y <
+            MonitorBottom) {
+            return A_Index
+        }
+    }
 
-	return 0 ; No monitor found
+    return 0 ; No monitor found
 }
-
 
 ; ========================================
 ; ========================================
@@ -634,67 +630,66 @@ GetMonitorFromPoint(X, Y) {
 ; ========================================
 
 OneShotShift() {
-	global OneShotShiftEnabled := True
-	ihvText := InputHook("L1 T" . ONE_SHOT_SHIFT_TIMEOUT_SEC . " E", "=%$.', " . ScriptInformation["MagicKey"])
-	ihvText.KeyOpt("{BackSpace}{Enter}{Delete}", "E") ; End keys to not swallow
-	ihvText.Start()
-	ihvText.Wait()
-	SpecialCharacter := ""
+    global OneShotShiftEnabled := True
+    ihvText := InputHook("L1 T" . ONE_SHOT_SHIFT_TIMEOUT_SEC . " E", "=%$.', " . ScriptInformation["MagicKey"])
+    ihvText.KeyOpt("{BackSpace}{Enter}{Delete}", "E") ; End keys to not swallow
+    ihvText.Start()
+    ihvText.Wait()
+    SpecialCharacter := ""
 
-	if (ihvText.EndKey == "=") {
-		SpecialCharacter := "º"
-	} else if (ihvText.EndKey == "%") {
-		SpecialCharacter := " %"
-	} else if (ihvText.EndKey == "$") {
-		SpecialCharacter := " €"
-	} else if (ihvText.EndKey == ".") {
-		SpecialCharacter := " :"
-	} else if (ihvText.EndKey == ScriptInformation["MagicKey"]) {
-		SpecialCharacter := "J" ; OneShotShift + ★ gives J directly
-	} else if (ihvText.EndKey == ",") {
-		SpecialCharacter := " " Chr(0x3B) ; Chr avoids AHK parser misreading ";" as comment
-	} else if (ihvText.EndKey == "'") {
-		SpecialCharacter := " ?"
-	} else if (ihvText.EndKey == " ") {
-		SpecialCharacter := "-"
-	}
+    if (ihvText.EndKey == "=") {
+        SpecialCharacter := "º"
+    } else if (ihvText.EndKey == "%") {
+        SpecialCharacter := " %"
+    } else if (ihvText.EndKey == "$") {
+        SpecialCharacter := " €"
+    } else if (ihvText.EndKey == ".") {
+        SpecialCharacter := " :"
+    } else if (ihvText.EndKey == ScriptInformation["MagicKey"]) {
+        SpecialCharacter := "J" ; OneShotShift + ★ gives J directly
+    } else if (ihvText.EndKey == ",") {
+        SpecialCharacter := " " Chr(0x3B) ; Chr avoids AHK parser misreading ";" as comment
+    } else if (ihvText.EndKey == "'") {
+        SpecialCharacter := " ?"
+    } else if (ihvText.EndKey == " ") {
+        SpecialCharacter := "-"
+    }
 
-	if (ihvText.EndReason == "Timeout") {
-		return
-	} else if SpecialCharacter != "" {
-		if OneShotShiftEnabled {
-			ActivateHotstrings()
-			SendNewResult(SpecialCharacter)
-		} else {
-			SendNewResult(ihvText.EndKey)
-		}
-	} else {
-		if OneShotShiftEnabled {
-			TitleCaseText := Format("{:T}", ihvText.Input)
-			SendNewResult(TitleCaseText)
-		} else {
-			SendNewResult(ihvText.Input)
-		}
-	}
+    if (ihvText.EndReason == "Timeout") {
+        return
+    } else if SpecialCharacter != "" {
+        if OneShotShiftEnabled {
+            ActivateHotstrings()
+            SendNewResult(SpecialCharacter)
+        } else {
+            SendNewResult(ihvText.EndKey)
+        }
+    } else {
+        if OneShotShiftEnabled {
+            TitleCaseText := Format("{:T}", ihvText.Input)
+            SendNewResult(TitleCaseText)
+        } else {
+            SendNewResult(ihvText.Input)
+        }
+    }
 }
 
 OneShotShiftFix() {
-	; This function and global variable solves a problem when we use the OneShotShift key as a modifier.
-	; In that case, we first press this key, thus firing the OneShotShift() function that will uppercase the next character in the next 2 seconds.
-	; The only way to disable it after it has fired is to modify this global variable by setting global OneShotShiftEnabled := False.
-	; That way, calling this function OneShotShiftFix() won't uppercase the next character in our shortcuts involving the OneShotShift key.
-	global OneShotShiftEnabled := False
+    ; This function and global variable solves a problem when we use the OneShotShift key as a modifier.
+    ; In that case, we first press this key, thus firing the OneShotShift() function that will uppercase the next character in the next 2 seconds.
+    ; The only way to disable it after it has fired is to modify this global variable by setting global OneShotShiftEnabled := False.
+    ; That way, calling this function OneShotShiftFix() won't uppercase the next character in our shortcuts involving the OneShotShift key.
+    global OneShotShiftEnabled := False
 }
 
 ToggleCapsLock() {
-	global CapsWordEnabled := False
-	if GetKeyState("CapsLock", "T") {
-		SetCapsLockState("Off")
-	} else {
-		SetCapsLockState("On")
-	}
+    global CapsWordEnabled := False
+    if GetKeyState("CapsLock", "T") {
+        SetCapsLockState("Off")
+    } else {
+        SetCapsLockState("On")
+    }
 }
-
 
 ; ====================================
 ; ====================================
@@ -703,59 +698,59 @@ ToggleCapsLock() {
 ; ====================================
 
 ActivateLayer() {
-	global LayerEnabled := True
-	ResetNumberOfRepetitions()
-	UpdateCapsLockLED()
+    global LayerEnabled := True
+    ResetNumberOfRepetitions()
+    UpdateCapsLockLED()
 }
 DisableLayer() {
-	global LayerEnabled := False
-	A_MaxHotkeysPerInterval := 150 ; Restore old value
-	UpdateCapsLockLED()
+    global LayerEnabled := False
+    A_MaxHotkeysPerInterval := 150 ; Restore old value
+    UpdateCapsLockLED()
 }
 ResetNumberOfRepetitions() {
-	SetNumberOfRepetitions(1)
+    SetNumberOfRepetitions(1)
 }
 SetNumberOfRepetitions(NewNumber) {
-	global NumberOfRepetitions := NewNumber
+    global NumberOfRepetitions := NewNumber
 }
 ActionLayer(action) {
-	SendInput(action)
-	ResetNumberOfRepetitions()
+    SendInput(action)
+    ResetNumberOfRepetitions()
 }
 
 ; Fix to get the CapsWord shortcut working when pressing "LAlt" activates the layer
 #HotIf (LayerEnabled
-	and (
-		Features["TapHolds"]["LAlt"]["BackSpaceLayer"].Enabled
-		or Features["TapHolds"]["LAlt"]["TabLayer"].Enabled
-	) and (
-		Features["Shortcuts"]["LAltCapsLock"]["BackSpace"].Enabled
-		or Features["Shortcuts"]["LAltCapsLock"]["CapsLock"].Enabled
-		or Features["Shortcuts"]["LAltCapsLock"]["CapsWord"].Enabled
-		or Features["Shortcuts"]["LAltCapsLock"]["CtrlBackSpace"].Enabled
-		or Features["Shortcuts"]["LAltCapsLock"]["CtrlDelete"].Enabled
-		or Features["Shortcuts"]["LAltCapsLock"]["Delete"].Enabled
-		or Features["Shortcuts"]["LAltCapsLock"]["OneShotShift"].Enabled
-	)
+    and (
+        Features["TapHolds"]["LAlt"]["BackSpaceLayer"].Enabled
+        or Features["TapHolds"]["LAlt"]["TabLayer"].Enabled
+    ) and (
+        Features["Shortcuts"]["LAltCapsLock"]["BackSpace"].Enabled
+        or Features["Shortcuts"]["LAltCapsLock"]["CapsLock"].Enabled
+        or Features["Shortcuts"]["LAltCapsLock"]["CapsWord"].Enabled
+        or Features["Shortcuts"]["LAltCapsLock"]["CtrlBackSpace"].Enabled
+        or Features["Shortcuts"]["LAltCapsLock"]["CtrlDelete"].Enabled
+        or Features["Shortcuts"]["LAltCapsLock"]["Delete"].Enabled
+        or Features["Shortcuts"]["LAltCapsLock"]["OneShotShift"].Enabled
+    )
 )
 ; Overrides the "BackSpace" shortcut on the layer
 SC03A:: {
-	DisableLayer() LAltCapsLockShortcut()
+    DisableLayer() LAltCapsLockShortcut()
 }
 #HotIf
 
 ; Fix when LAlt triggers the layer
 #HotIf (
-	Features["TapHolds"]["LAlt"]["BackSpaceLayer"].Enabled
-	and LayerEnabled
+    Features["TapHolds"]["LAlt"]["BackSpaceLayer"].Enabled
+    and LayerEnabled
 )
 SC038:: SendInput("{LAlt Up}") ; Necessary to do this, otherwise multicursor triger in VSCode when scrolling in the layer and then leaving it
 #HotIf
 
 ; Fix when Space triggers the layer
 #HotIf (
-	Features["TapHolds"]["Space"]["Layer"].Enabled
-	and LayerEnabled
+    Features["TapHolds"]["Space"]["Layer"].Enabled
+    and LayerEnabled
 )
 SC039:: return ; Necessary to do this, otherwise Space keeps being sent while it is held to get the layer
 #HotIf
@@ -764,18 +759,18 @@ SC039:: return ; Necessary to do this, otherwise Space keeps being sent while it
 ; The base layer will become this one when the navigation layer variable is set to True
 
 *WheelUp:: {
-	A_MaxHotkeysPerInterval := 1000 ; Reduce messages saying too many hotkeys pressed in the interval
-	ActionLayer("{Volume_Up " . NumberOfRepetitions . "}") ; Turn on the volume by scrolling up
+    A_MaxHotkeysPerInterval := 1000 ; Reduce messages saying too many hotkeys pressed in the interval
+    ActionLayer("{Volume_Up " . NumberOfRepetitions . "}") ; Turn on the volume by scrolling up
 }
 *WheelDown:: {
-	A_MaxHotkeysPerInterval := 1000 ; Reduce messages saying too many hotkeys pressed in the interval
-	ActionLayer("{Volume_Down " . NumberOfRepetitions . "}") ; Turn down the volume by scrolling down
+    A_MaxHotkeysPerInterval := 1000 ; Reduce messages saying too many hotkeys pressed in the interval
+    ActionLayer("{Volume_Down " . NumberOfRepetitions . "}") ; Turn down the volume by scrolling down
 }
 
 SC01D & ~SC138:: ; RAlt
 RAlt:: ; RAlt on QWERTY
 {
-	ActionLayer("{Escape " . NumberOfRepetitions . "}")
+    ActionLayer("{Escape " . NumberOfRepetitions . "}")
 }
 
 ; === Number row ===

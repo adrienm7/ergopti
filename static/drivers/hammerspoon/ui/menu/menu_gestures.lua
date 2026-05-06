@@ -99,9 +99,22 @@ function M.build(ctx)
 		local actionLbl = type(gestures.get_action_label) == "function" and gestures.get_action_label(current) or "Inconnu"
 		local names     = isAxis and gestures.AX_NAMES or gestures.SG_NAMES
 		local submenu   = {}
+
+		-- Actions that start a new logical group — separator before them
+		local group_starters = {
+			selection_toggle = true, copy = true, enter = true,
+			tab_new = true, win_prev = true, space_prev = true,
+			word_prev = true, vol_up = true, screenshot = true,
+			hs_reload = true,
+			-- Axis groups
+			tabs = true, volume = true, words = true,
+		}
 		
 		if type(names) == "table" then
 			for _, aname in ipairs(names) do
+				if aname ~= "none" and group_starters[aname] then
+					table.insert(submenu, { title = "-" })
+				end
 				table.insert(submenu, {
 					title    = type(gestures.get_action_label) == "function" and gestures.get_action_label(aname) or aname,
 					checked  = ((current == aname) and not paused) or nil,

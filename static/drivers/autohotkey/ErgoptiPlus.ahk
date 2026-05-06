@@ -36,7 +36,8 @@ ErgoptiGlobalErrorHandler(Exc, Mode) {
         Exc.Message . (Exc.HasProp("Stack") ? " | " . Exc.Stack : ""))
     ; Surface the error to the user once, without blocking subsequent keys
     try {
-        MsgBox("ErgoptiPlus — erreur interne capturée :`n`n" . Exc.Message . "`n`n" . (Exc.HasProp("Stack") ? Exc.Stack : ""), "ErgoptiPlus", "Icon!")
+        MsgBox("ErgoptiPlus — erreur interne capturée :`n`n" . Exc.Message . "`n`n" . (Exc.HasProp("Stack") ? Exc.Stack :
+            ""), "ErgoptiPlus", "Icon!")
     }
     return true
 }
@@ -132,7 +133,7 @@ global _LogoDir := _StaticDir . "\img\logo"
 ; ErgoptiPlus_Configuration.ini — historical configs still hold stale paths
 ; pointing at the old static/drivers/autohotkey/icons/ location and would
 ; otherwise silently break the tray icon after each project-level move
-global IconPath         := _LogoDir . "\logo_simple.ico"
+global IconPath := _LogoDir . "\logo_simple.ico"
 global IconPathDisabled := _LogoDir . "\logo_simple_disabled.ico"
 
 global ScriptInformation := Map(
@@ -317,11 +318,11 @@ for _Cat in ["Autocorrection", "DistancesReduction", "MagicKey", "Rolls", "SFBsR
 ; This must stay in sync with the registration code whenever prefix rules change.
 CountDynamicSection(SectionName) {
     global PersonalInformation
-    Phone  := PersonalInformation["PhoneNumber"]
+    Phone := PersonalInformation["PhoneNumber"]
     FPhone := PersonalInformation["PhoneNumberClean"]
-    Ssn    := PersonalInformation["SocialSecurityNumber"]
-    Iban   := PersonalInformation["IBAN"]
-    SsnRaw  := StrReplace(Ssn,  " ", "")
+    Ssn := PersonalInformation["SocialSecurityNumber"]
+    Iban := PersonalInformation["IBAN"]
+    SsnRaw := StrReplace(Ssn, " ", "")
     IbanRaw := StrReplace(Iban, " ", "")
 
     switch SectionName {
@@ -361,9 +362,11 @@ if Features.Has("DynamicHotstrings") {
         CountSuffix := N > 0 ? " (" . N . ")" : ""
         switch _DynKey {
             case "DateFr":
-                _DynVal.Description := "dt" . MK . " insère la date courante (" . FormatTime(, "dd/MM/yyyy") . ")" . CountSuffix
+                _DynVal.Description := "dt" . MK . " insère la date courante (" . FormatTime(, "dd/MM/yyyy") . ")" .
+                CountSuffix
             case "Date":
-                _DynVal.Description := "td" . MK . " insère la date courante (" . FormatTime(, "yyyy_MM_dd") . ")" . CountSuffix
+                _DynVal.Description := "td" . MK . " insère la date courante (" . FormatTime(, "yyyy_MM_dd") . ")" .
+                CountSuffix
             default:
                 if (_DynVal.HasOwnProp("Description") and _DynVal.Description != "" and N > 0) {
                     _DynVal.Description := _DynVal.Description . CountSuffix
@@ -512,8 +515,125 @@ GetCategoryTitle(Category) {
             return "🎯 Raccourcis"
         case "TapHolds":
             return "⌨️ Tap-Holds"
+        case "Gestures":
+            return "🖐️ Gestes"
         default:
             return ""
+    }
+}
+
+; ===================================
+; Gestures menu builder
+; ===================================
+
+BuildGesturesMenu() {
+    global Features, GestureAssignments, GESTURE_SLOTS, GESTURE_ACTIONS
+    global GESTURE_ACTION_NAMES, GESTURE_SLOT_LABELS
+
+    GMenu := Menu()
+
+    ; Enable/Disable toggle
+    EnabledLabel := "Activer les gestes du touchpad"
+    GMenu.Add(EnabledLabel, (*) => ToggleGesturesEnabled())
+    if Features["Gestures"]["Enabled"].Enabled {
+        GMenu.Check(EnabledLabel)
+    }
+    GMenu.Add() ; Separator
+
+    ; Per-slot submenus — each slot shows all available actions as radio items
+    ; Actions that start a new logical group get a separator before them
+    static GroupStarters := Map(
+        "selection_toggle", true,
+        "copy", true,
+        "enter", true,
+        "tab_new", true,
+        "win_prev", true,
+        "desktop_prev", true,
+        "vol_up", true,
+        "screenshot", true,
+        "ahk_reload", true,
+    )
+
+    for Slot in GESTURE_SLOTS {
+        ; Separator between 3-finger and 4-finger groups
+        if (Slot == "tap_4") {
+            GMenu.Add()
+        }
+        SlotLabel := GESTURE_SLOT_LABELS[Slot]
+        CurrentAction := GestureAssignments.Has(Slot) ? GestureAssignments[Slot] : "none"
+        CurrentActionLabel := GESTURE_ACTIONS.Has(CurrentAction) ? GESTURE_ACTIONS[CurrentAction].Label : "Désactivé"
+
+        SlotMenu := Menu()
+        for ActionName in GESTURE_ACTION_NAMES {
+            if (ActionName != "none" and GroupStarters.Has(ActionName)) {
+                SlotMenu.Add() ; Separator between groups
+            }
+            ActionLabel := GESTURE_ACTIONS[ActionName].Label
+            SlotMenu.Add(ActionLabel, MakeGestureSlotHandler(Slot, ActionName))
+            if (ActionName == CurrentAction) {
+                SlotMenu.Check(ActionLabel)
+            }
+            if !Features["Gestures"]["Enabled"].Enabled {
+                SlotMenu.Disable(ActionLabel)
+            }
+        }
+        GMenu.Add(SlotLabel . " : " . CurrentActionLabel, SlotMenu)
+    }
+
+    GMenu.Add() ; Separator
+
+    ; Setup items
+    GMenu.Add("🔧 Configurer automatiquement (registre)", (*) => GestureAutoConfigureAction())
+    GMenu.Add("📋 Instructions de configuration", (*) => GestureShowSetupInstructions())
+    GMenu.Add("⚙ Ouvrir les paramètres du pavé tactile", (*) => GestureOpenTouchpadSettings())
+
+    return GMenu
+}
+
+; Creates a closure for a gesture slot action handler.
+MakeGestureSlotHandler(Slot, ActionName) {
+    return (*) => SetGestureSlotAction(Slot, ActionName)
+}
+
+; Applies a new action to a gesture slot and reloads.
+SetGestureSlotAction(Slot, ActionName) {
+    GestureSaveAssignment(Slot, ActionName)
+    Reload
+}
+
+; Toggles the Gestures enabled state and reloads.
+ToggleGesturesEnabled() {
+    global Features, ConfigurationFile
+    Features["Gestures"]["Enabled"].Enabled := !Features["Gestures"]["Enabled"].Enabled
+    IniWrite(Features["Gestures"]["Enabled"].Enabled, ConfigurationFile, "Gestures", "Enabled.Enabled")
+    Reload
+}
+
+; Runs the auto-configure and shows the result to the user.
+GestureAutoConfigureAction() {
+    Success := GestureAutoConfigureRegistry()
+    if (Success) {
+        Result := MsgBox(
+            "Les valeurs du registre ont été écrites avec succès.`n`n"
+            . "⚠ Il faut maintenant définir les raccourcis clavier pour chaque geste :`n`n"
+            . "1. Ouvrir Paramètres > Pavé tactile > Configuration avancée des mouvements`n"
+            . "2. Pour chaque geste, sélectionner « Raccourci personnalisé »`n"
+            . "3. Taper le raccourci correspondant (voir Instructions)`n`n"
+            . "Ouvrir les paramètres du pavé tactile maintenant ?",
+            "ErgoptiPlus — Configuration des gestes",
+            "YesNo Iconi"
+        )
+        if (Result == "Yes") {
+            GestureOpenTouchpadSettings()
+        }
+    } else {
+        MsgBox(
+            "Erreur lors de l'écriture du registre.`n`n"
+            . "Essayez d'exécuter le script en tant qu'administrateur,`n"
+            . "ou configurez manuellement (voir Instructions).",
+            "ErgoptiPlus — Erreur",
+            "Icon!"
+        )
     }
 }
 
@@ -579,12 +699,12 @@ initMenu() {
         DynTotal := 0
         for _DSec in Features["DynamicHotstrings"]["__Order"] {
             if (_DSec != "-" and Features["DynamicHotstrings"].Has(_DSec)
-                    and Features["DynamicHotstrings"][_DSec].Enabled) {
+            and Features["DynamicHotstrings"][_DSec].Enabled) {
                 DynTotal += CountDynamicSection(_DSec)
             }
         }
         DynTitle := GetCategoryTitle("DynamicHotstrings")
-            . (DynTotal > 0 ? " (" . FmtCount(DynTotal) . ")" : "")
+        . (DynTotal > 0 ? " (" . FmtCount(DynTotal) . ")" : "")
         HotstringsMenu.Add(DynTitle, DynMenu)
     }
 
@@ -597,8 +717,8 @@ initMenu() {
         ; Enrich Features["Personal"] descriptions with entry counts so that
         ; MenuAddItem / GetMenuTitleByPath display them alongside the checkbox
         for _, SecName in TomlData["sections_order"] {
-            SecData  := TomlData["sections"][SecName]
-            Count    := SecData["entries"].Length
+            SecData := TomlData["sections"][SecName]
+            Count := SecData["entries"].Length
             BaseDesc := SecData["description"]
             ; Match lowercase TOML key to the PascalCase Features key
             for FeatKey in Features["Personal"] {
@@ -616,7 +736,8 @@ initMenu() {
         ; Default section — submenu with "Aucune" + one item per TOML section
         CurDefaultSec := _EditorPrefGet("DefaultSection", "")
         DefaultSectionMenu := Menu()
-        DefaultSectionMenu.Add("Aucune", (*) => _SetPersonalDefaultSection("", PersonalMenu, TomlData, DefaultSectionMenu))
+        DefaultSectionMenu.Add("Aucune", (*) => _SetPersonalDefaultSection("", PersonalMenu, TomlData,
+            DefaultSectionMenu))
         if (CurDefaultSec == "") {
             DefaultSectionMenu.Check("Aucune")
         }
@@ -625,16 +746,18 @@ initMenu() {
             if (SecName == "-") {
                 continue
             }
-            SecData  := TomlData["sections"][SecName]
+            SecData := TomlData["sections"][SecName]
             SecLabel := SecData["description"]
-            DefaultSectionMenu.Add(SecLabel, _MakeSetDefaultSectionFn(SecName, PersonalMenu, TomlData, DefaultSectionMenu))
+            DefaultSectionMenu.Add(SecLabel, _MakeSetDefaultSectionFn(SecName, PersonalMenu, TomlData,
+                DefaultSectionMenu))
             if (CurDefaultSec == SecName) {
                 DefaultSectionMenu.Check(SecLabel)
             }
         }
         ; Title reflects the currently selected section
         CurDefaultLabel := (CurDefaultSec == "") ? "Aucune"
-            : (TomlData["sections"].Has(CurDefaultSec) ? TomlData["sections"][CurDefaultSec]["description"] : CurDefaultSec)
+            : (TomlData["sections"].Has(CurDefaultSec) ? TomlData["sections"][CurDefaultSec]["description"] :
+                CurDefaultSec)
         global _PrevDefaultLabel := CurDefaultLabel
         PersonalMenu.Add("Catégorie par défaut : " . CurDefaultLabel, DefaultSectionMenu)
         ; Close-on-add toggle — mirrors HS "Fermer l'UI après ajout"
@@ -659,7 +782,7 @@ initMenu() {
             TotalPersonal += SecData["entries"].Length
         }
         PersonalTitle := GetCategoryTitle("Personal")
-            . (TotalPersonal > 0 ? " (" . FmtCount(TotalPersonal) . ")" : "")
+        . (TotalPersonal > 0 ? " (" . FmtCount(TotalPersonal) . ")" : "")
         HotstringsMenu.Add(PersonalTitle, PersonalMenu)
     }
     HotstringsMenu.Add() ; Separating line
@@ -677,6 +800,10 @@ initMenu() {
     if SubMenus.Has("TapHolds") {
         A_TrayMenu.Add(GetCategoryTitle("TapHolds"), SubMenus["TapHolds"])
     }
+
+    ; ── Gestes — custom submenu mirroring Hammerspoon's gesture picker ──
+    GesturesMenu := BuildGesturesMenu()
+    A_TrayMenu.Add(GetCategoryTitle("Gestures"), GesturesMenu)
 
     A_TrayMenu.Add() ; Separating line
 
@@ -925,7 +1052,7 @@ ModifyLink(gui, NewValue) {
 FmtCount(N) {
     S := String(Round(N))
     Result := ""
-    Loop StrLen(S) {
+    loop StrLen(S) {
         Pos := StrLen(S) - A_Index + 1
         Result := SubStr(S, Pos, 1) . Result
         if (Mod(A_Index, 3) == 0 and A_Index < StrLen(S)) {
@@ -1143,33 +1270,33 @@ FilePathsEditor(*) {
     SaveFilePaths(*) {
         global ScriptInformation, ConfigurationFile, _BootstrapFile
 
-        NewAhkPath      := Trim(AhkEdit.Value)
-        NewTomlPath     := Trim(TomlEdit.Value)
+        NewAhkPath := Trim(AhkEdit.Value)
+        NewTomlPath := Trim(TomlEdit.Value)
         NewInfoTomlPath := Trim(InfoTomlEdit.Value)
-        NewIniPath      := Trim(IniEdit.Value)
+        NewIniPath := Trim(IniEdit.Value)
 
-        DefaultAhkPath      := A_ScriptDir . "\personal.ahk"
-        DefaultTomlPath     := A_ScriptDir . "\..\hotstrings\personal.toml"
+        DefaultAhkPath := A_ScriptDir . "\personal.ahk"
+        DefaultTomlPath := A_ScriptDir . "\..\hotstrings\personal.toml"
         DefaultInfoTomlPath := A_ScriptDir . "\..\hotstrings\personal_info.toml"
-        DefaultIniPath      := A_ScriptDir . "\ErgoptiPlus_Configuration.ini"
+        DefaultIniPath := A_ScriptDir . "\ErgoptiPlus_Configuration.ini"
 
-        FinalAhkPath      := (NewAhkPath      == "") ? DefaultAhkPath      : NewAhkPath
-        FinalTomlPath     := (NewTomlPath     == "") ? DefaultTomlPath     : NewTomlPath
+        FinalAhkPath := (NewAhkPath == "") ? DefaultAhkPath : NewAhkPath
+        FinalTomlPath := (NewTomlPath == "") ? DefaultTomlPath : NewTomlPath
         FinalInfoTomlPath := (NewInfoTomlPath == "") ? DefaultInfoTomlPath : NewInfoTomlPath
-        FinalIniPath      := (NewIniPath      == "") ? DefaultIniPath      : NewIniPath
+        FinalIniPath := (NewIniPath == "") ? DefaultIniPath : NewIniPath
 
         ; Persist the ini path in the bootstrap file (it cannot live in the ini itself)
         IniWrite(FinalIniPath, _BootstrapFile, "Bootstrap", "ConfigurationFilePath")
 
         ; Persist the file paths in the ini under [Script]
-        IniWrite(FinalAhkPath,      FinalIniPath, "Script", "PersonalAhkPath")
-        IniWrite(FinalTomlPath,     FinalIniPath, "Script", "PersonalTomlPath")
+        IniWrite(FinalAhkPath, FinalIniPath, "Script", "PersonalAhkPath")
+        IniWrite(FinalTomlPath, FinalIniPath, "Script", "PersonalTomlPath")
         IniWrite(FinalInfoTomlPath, FinalIniPath, "Script", "PersonalInfoTomlPath")
 
         TomlChanged := (FinalTomlPath != ScriptInformation["PersonalTomlPath"])
 
-        ScriptInformation["PersonalAhkPath"]      := FinalAhkPath
-        ScriptInformation["PersonalTomlPath"]     := FinalTomlPath
+        ScriptInformation["PersonalAhkPath"] := FinalAhkPath
+        ScriptInformation["PersonalTomlPath"] := FinalTomlPath
         ScriptInformation["PersonalInfoTomlPath"] := FinalInfoTomlPath
         ConfigurationFile := FinalIniPath
 
@@ -1359,6 +1486,7 @@ if Features.Has("Personal") {
 #Include modules\shortcuts.ahk
 #Include modules\tap_holds.ahk
 #Include modules\hotstrings.ahk
+#Include modules\gestures.ahk
 
 ; Final lifecycle marker — all hotkeys and hotstrings are registered, the
 ; script is ready to handle keystrokes. A missing SUCCESS in the log file

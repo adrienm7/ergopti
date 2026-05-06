@@ -303,45 +303,94 @@ ax("document",   "Document (début/fin)",
 
 -- Single actions
 sg("none",             "Désactivé",            function() end)
+
+-- Selection & navigation cursor
 sg("selection_toggle", "Toggle sélection",     M.toggle_selection)
 sg("lookup",           "Définition du mot",    M.trigger_lookup)
+sg("app_switcher",     "Alt-Tab",              function() pcall(hs.eventtap.keyStroke, {"cmd"}, "tab") end)
 
+-- Editing
+sg("copy",             "Copier",               function() pcall(hs.eventtap.keyStroke, {"cmd"}, "c") end)
+sg("paste",            "Coller",               function() pcall(hs.eventtap.keyStroke, {"cmd"}, "v") end)
+sg("cut",              "Couper",               function() pcall(hs.eventtap.keyStroke, {"cmd"}, "x") end)
+sg("undo",             "Annuler",              function() pcall(hs.eventtap.keyStroke, {"cmd"}, "z") end)
+sg("redo",             "Rétablir",             function() pcall(hs.eventtap.keyStroke, {"cmd", "shift"}, "z") end)
+sg("select_all",       "Tout sélectionner",    function() pcall(hs.eventtap.keyStroke, {"cmd"}, "a") end)
+sg("find",             "Rechercher",           function() pcall(hs.eventtap.keyStroke, {"cmd"}, "f") end)
+
+-- Keys
+sg("enter",            "Entrée",               function() pcall(hs.eventtap.keyStroke, {}, "return") end)
+sg("tab",              "Tab",                  function() pcall(hs.eventtap.keyStroke, {}, "tab") end)
+sg("escape",           "Échap",                function() pcall(hs.eventtap.keyStroke, {}, "escape") end)
+sg("backspace",        "Suppr. arrière",       function() pcall(hs.eventtap.keyStroke, {}, "delete") end)
+sg("delete",           "Supprimer",            function() pcall(hs.eventtap.keyStroke, {}, "forwarddelete") end)
+
+-- Tabs
 sg("tab_new",          "Nouvel onglet",        function() pcall(hs.eventtap.keyStroke, {"cmd"}, "t") end)
 sg("tab_close",        "Fermer onglet",        function() pcall(hs.eventtap.keyStroke, {"cmd"}, "w") end)
 sg("tab_prev",         "Onglet précédent",     function() pcall(hs.eventtap.keyStroke, {"ctrl", "shift"}, "tab") end)
 sg("tab_next",         "Onglet suivant",       function() pcall(hs.eventtap.keyStroke, {"ctrl"}, "tab") end)
 
+-- Windows & Spaces
 sg("win_prev",         "Fenêtre précédente",   function() winNav(false) end)
 sg("win_next",         "Fenêtre suivante",     function() winNav(true) end)
-
+sg("close_window",     "Fermer la fenêtre",    function() pcall(hs.eventtap.keyStroke, {"cmd"}, "w") end)
+sg("fullscreen",       "Plein écran",          function() pcall(hs.eventtap.keyStroke, {"cmd", "ctrl"}, "f") end)
+sg("snap_left",        "Ancrer à gauche",      function()
+	local win = hs.window.focusedWindow()
+	if win then pcall(function() win:moveToUnit(hs.layout.left50) end) end
+end)
+sg("snap_right",       "Ancrer à droite",      function()
+	local win = hs.window.focusedWindow()
+	if win then pcall(function() win:moveToUnit(hs.layout.right50) end) end
+end)
+sg("maximize",         "Maximiser",            function()
+	local win = hs.window.focusedWindow()
+	if win then pcall(function() win:maximize() end) end
+end)
 sg("space_prev",       "Space précédent",      function() spaceNav(false) end)
 sg("space_next",       "Space suivant",        function() spaceNav(true) end)
-
 sg("mission_control",  "Mission Control",      function() pcall(hs.osascript.applescript, "tell application \"System Events\" to key code 160") end)
 sg("app_expose",       "App Exposé",           function() pcall(hs.osascript.applescript, "tell application \"System Events\" to key code 125 using {control down}") end)
 
+-- Cursor movement
+sg("word_prev",        "Mot précédent",        function() pcall(hs.eventtap.keyStroke, {"alt"}, "left") end)
+sg("word_next",        "Mot suivant",          function() pcall(hs.eventtap.keyStroke, {"alt"}, "right") end)
+sg("line_start",       "Début de ligne",       function() pcall(hs.eventtap.keyStroke, {"cmd"}, "left") end)
+sg("line_end",         "Fin de ligne",         function() pcall(hs.eventtap.keyStroke, {"cmd"}, "right") end)
+sg("para_prev",        "Paragraphe précédent", function() pcall(hs.eventtap.keyStroke, {"alt"}, "up") end)
+sg("para_next",        "Paragraphe suivant",   function() pcall(hs.eventtap.keyStroke, {"alt"}, "down") end)
+sg("doc_start",        "Début du document",    function() pcall(hs.eventtap.keyStroke, {"cmd"}, "up") end)
+sg("doc_end",          "Fin du document",      function() pcall(hs.eventtap.keyStroke, {"cmd"}, "down") end)
+
+-- Media
 sg("vol_up",           "Volume +",             function() sysKey("SOUND_UP") end)
 sg("vol_down",         "Volume -",             function() sysKey("SOUND_DOWN") end)
-
+sg("mute",             "Muet/Unmute",          function() sysKey("MUTE") end)
 sg("brightness_up",    "Luminosité +",         function() sysKey("BRIGHTNESS_UP") end)
 sg("brightness_down",  "Luminosité -",         function() sysKey("BRIGHTNESS_DOWN") end)
-
-sg("mute",             "Muet/Unmute",          function() sysKey("MUTE") end)
 sg("track_play",       "Lecture/Pause",        function() sysKey("PLAY") end)
 sg("track_next",       "Piste suivante",       function() sysKey("NEXT") end)
 sg("track_prev",       "Piste précédente",     function() sysKey("PREVIOUS") end)
 
-sg("word_prev",        "Mot précédent",        function() pcall(hs.eventtap.keyStroke, {"alt"}, "left") end)
-sg("word_next",        "Mot suivant",          function() pcall(hs.eventtap.keyStroke, {"alt"}, "right") end)
+-- System
+sg("screenshot",       "Capture d'écran",      function() pcall(hs.eventtap.keyStroke, {"cmd", "shift"}, "4") end)
+sg("lock_screen",      "Verrouiller",          function() pcall(hs.eventtap.keyStroke, {"cmd", "ctrl"}, "q") end)
+sg("notification_center", "Notifications",    function() pcall(hs.eventtap.keyStroke, {}, "F12") end)
 
-sg("line_start",       "Début de ligne",       function() pcall(hs.eventtap.keyStroke, {"cmd"}, "left") end)
-sg("line_end",         "Fin de ligne",         function() pcall(hs.eventtap.keyStroke, {"cmd"}, "right") end)
-
-sg("para_prev",        "Paragraphe précédent", function() pcall(hs.eventtap.keyStroke, {"alt"}, "up") end)
-sg("para_next",        "Paragraphe suivant",   function() pcall(hs.eventtap.keyStroke, {"alt"}, "down") end)
-
-sg("doc_start",        "Début du document",    function() pcall(hs.eventtap.keyStroke, {"cmd"}, "up") end)
-sg("doc_end",          "Fin du document",      function() pcall(hs.eventtap.keyStroke, {"cmd"}, "down") end)
+-- Script management
+sg("hs_reload",        "Recharger Hammerspoon", function() pcall(hs.reload) end)
+sg("hs_console",       "Console Hammerspoon",   function() pcall(hs.openConsole) end)
+sg("hs_quit",          "Quitter Hammerspoon",   function()
+	pcall(function() hs.closeConsole() end)
+	pcall(function()
+		hs.timer.doAfter(0.1, function() os.exit(0) end)
+	end)
+end)
+sg("hs_open_config",   "Ouvrir config.json",    function()
+	local ok, conf_dir = pcall(hs.configdir)
+	if ok and conf_dir then pcall(hs.execute, string.format("open \"%s/config.json\"", conf_dir)) end
+end)
 
 
 
@@ -360,14 +409,30 @@ M.AX_NAMES = {
 }
 
 M.SG_NAMES = {
-	"none", "selection_toggle", "lookup",
+	"none",
+	-- Selection & navigation
+	"selection_toggle", "lookup", "app_switcher",
+	-- Editing
+	"copy", "paste", "cut", "undo", "redo", "select_all", "find",
+	-- Keys
+	"enter", "tab", "escape", "backspace", "delete",
+	-- Tabs
 	"tab_new", "tab_close", "tab_prev", "tab_next",
-	"win_prev", "win_next", "space_prev", "space_next",
-	"mission_control", "app_expose",
-	"vol_up", "vol_down", "brightness_up", "brightness_down", "mute",
-	"track_play", "track_next", "track_prev",
+	-- Windows & Spaces
+	"win_prev", "win_next", "close_window", "fullscreen",
+	"snap_left", "snap_right", "maximize",
+	"space_prev", "space_next", "mission_control", "app_expose",
+	-- Cursor movement
 	"word_prev", "word_next", "line_start", "line_end",
 	"para_prev", "para_next", "doc_start", "doc_end",
+	-- Media
+	"vol_up", "vol_down", "mute",
+	"brightness_up", "brightness_down",
+	"track_play", "track_next", "track_prev",
+	-- System
+	"screenshot", "lock_screen", "notification_center",
+	-- Script management
+	"hs_reload", "hs_console", "hs_quit", "hs_open_config",
 }
 
 --- Retrieves the localized label for a given action ID.
