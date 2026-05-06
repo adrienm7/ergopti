@@ -37,7 +37,7 @@ local Conflicts = require("modules.gestures.conflicts")
 -- =======================================
 
 M.DEFAULT_GESTURES = {
-	tap_3         = "none",
+	tap_3         = "selection_toggle",
 	tap_4         = "none",
 	tap_5         = "none",
 	swipe_2_diag  = "none",

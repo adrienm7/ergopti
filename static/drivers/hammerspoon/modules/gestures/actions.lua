@@ -19,6 +19,7 @@ local LOG    = "gestures.actions"
 
 local leftClickPressed  = false
 local mouseEventTap     = nil
+local keyboardWatcher   = nil
 local gestureInProgress = false
 
 -- Delay after activation before reacting to leftMouseUp events.
@@ -36,9 +37,35 @@ local SELECTION_COOLDOWN_SEC = 0.15
 -- =========================================
 -- =========================================
 
+--- Stops the keyboard watcher that auto-cancels selection on key press.
+local function stopKeyboardWatcher()
+	if keyboardWatcher and type(keyboardWatcher.stop) == "function" then
+		pcall(function() keyboardWatcher:stop() end)
+		keyboardWatcher = nil
+	end
+end
+
+--- Starts a keyboard watcher that cancels selection on any key press or modifier.
+local function startKeyboardWatcher()
+	stopKeyboardWatcher()
+	local evTypes = hs.eventtap.event.types
+	keyboardWatcher = hs.eventtap.new(
+		{ evTypes.keyDown, evTypes.flagsChanged },
+		function()
+			-- Any keystroke or modifier change cancels drag selection
+			hs.timer.doAfter(0, M.force_cleanup)
+			return false
+		end
+	)
+	if keyboardWatcher then
+		pcall(function() keyboardWatcher:start() end)
+	end
+end
+
 --- Safely terminates the custom selection drag mode.
 function M.force_cleanup()
 	Logger.debug(LOG, "Forcefully disabling drag selection mode…")
+	stopKeyboardWatcher()
 	if mouseEventTap and type(mouseEventTap.stop) == "function" then
 		pcall(function() mouseEventTap:stop() end)
 		mouseEventTap = nil
@@ -75,6 +102,7 @@ function M.toggle_selection()
 		event:post()
 	end)
 	leftClickPressed = true
+	startKeyboardWatcher()
 
 	local activationTime = hs.timer.secondsSinceEpoch()
 	local evTypes = hs.eventtap.event.types
