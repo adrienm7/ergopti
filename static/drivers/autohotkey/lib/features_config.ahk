@@ -20,7 +20,7 @@
 
 global Features := Map(
     "__Order", ["Layout", "DistancesReduction", "SFBsReduction", "Rolls", "Autocorrection", "MagicKey",
-        "DynamicHotstrings", "Shortcuts", "TapHolds"],
+        "DynamicHotstrings", "Shortcuts", "TapHolds", "Gestures"],
     "DynamicHotstrings", Map(
         "__Order", ["DateFr", "Date", "PhonePrefixes", "SsnPrefixes", "IbanPrefixes"],
         "DateFr", {
@@ -683,6 +683,12 @@ global Features := Map(
             Enabled: True,
             Description: "`"Tab`" : Alt-Tab sur le moniteur en tap, Alt en hold. À activer pour ne pas perdre Alt",
             TimeActivationSeconds: 0.2,
+        },
+    ),
+    "Gestures", Map(
+        "Enabled", {
+            Enabled: False,
+            Description: "Gestes du touchpad (nécessite configuration Windows)",
         },
     ),
 )

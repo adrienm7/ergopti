@@ -23,9 +23,6 @@
 ;    override is visible to the lib code under test.
 ; ==============================================================================
 
-
-
-
 ; ============================================
 ; ============================================
 ; ======= 1/ Side-effect recorders =======
@@ -43,22 +40,19 @@ global _Stub_HotstringRegistrations := []   ; { spec, callback }
 global _Stub_RecordedSends := []            ; { fn, args }
 
 ResetStubRecorders() {
-	global _Stub_SentText, _Stub_LastChars, _Stub_HotstringCalls, _Stub_DeadKeyCalls
-	_Stub_SentText := []
-	_Stub_LastChars := []
-	_Stub_HotstringCalls := []
-	_Stub_DeadKeyCalls := []
+    global _Stub_SentText, _Stub_LastChars, _Stub_HotstringCalls, _Stub_DeadKeyCalls
+    _Stub_SentText := []
+    _Stub_LastChars := []
+    _Stub_HotstringCalls := []
+    _Stub_DeadKeyCalls := []
 }
 
 ResetHotstringRecorders() {
-	global _Stub_HotstringRegistrations, _Stub_RecordedSends, _Stub_LastChars
-	_Stub_HotstringRegistrations := []
-	_Stub_RecordedSends := []
-	_Stub_LastChars := []
+    global _Stub_HotstringRegistrations, _Stub_RecordedSends, _Stub_LastChars
+    _Stub_HotstringRegistrations := []
+    _Stub_RecordedSends := []
+    _Stub_LastChars := []
 }
-
-
-
 
 ; =====================================
 ; =====================================
@@ -68,31 +62,34 @@ ResetHotstringRecorders() {
 
 ; Mimics the user-configurable script identity from ErgoptiPlus.ahk.
 global ScriptInformation := Map(
-	"MagicKey", "★",
-	"PersonalAhkPath", A_ScriptDir . "\..\personal.ahk",
-	"PersonalTomlPath", A_ScriptDir . "\..\..\hotstrings\personal.toml",
+    "MagicKey", "★",
+    "PersonalAhkPath", A_ScriptDir . "\..\personal.ahk",
+    "PersonalTomlPath", A_ScriptDir . "\..\..\hotstrings\personal.toml",
 )
 
 ; Empty Features Map so HasAnyEnabled / Features lookups have a target.
 global Features := Map(
-	"Layout", Map(
-		"ErgoptiBase", { Enabled: true },
-		"ErgoptiAltGr", { Enabled: true },
-		"ErgoptiPlus", { Enabled: false },
-	),
-	"Shortcuts", Map(
-		"AltGrLAlt", Map(
-			"BackSpace", { Enabled: false },
-			"Tab", { Enabled: true },
-		),
-		"AltGrCapsLock", Map(
-			"BackSpace", { Enabled: false },
-			"CapsLock", { Enabled: false },
-		),
-	),
-	"DistancesReduction", Map(
-		"SpaceAroundSymbols", { Enabled: false },
-	),
+    "Layout", Map(
+        "ErgoptiBase", { Enabled: true },
+        "ErgoptiAltGr", { Enabled: true },
+        "ErgoptiPlus", { Enabled: false },
+    ),
+    "Shortcuts", Map(
+        "AltGrLAlt", Map(
+            "BackSpace", { Enabled: false },
+            "Tab", { Enabled: true },
+        ),
+        "AltGrCapsLock", Map(
+            "BackSpace", { Enabled: false },
+            "CapsLock", { Enabled: false },
+        ),
+    ),
+    "DistancesReduction", Map(
+        "SpaceAroundSymbols", { Enabled: false },
+    ),
+    "Gestures", Map(
+        "Enabled", { Enabled: true },
+    ),
 )
 
 global ConfigurationFile := A_ScriptDir . "\test_config.ini"
@@ -112,15 +109,12 @@ global ActivitySimulation := false
 
 ; Dummy deadkey Maps so layout_altgr.ahk's _BuildAltGrTables can run.
 global DeadkeyMappingCircumflex := Map()
-global DeadkeyMappingDiaresis   := Map()
+global DeadkeyMappingDiaresis := Map()
 global DeadkeyMappingSuperscript := Map()
-global DeadkeyMappingSubscript   := Map()
-global DeadkeyMappingGreek       := Map()
-global DeadkeyMappingR           := Map()
-global DeadkeyMappingCurrency    := Map()
-
-
-
+global DeadkeyMappingSubscript := Map()
+global DeadkeyMappingGreek := Map()
+global DeadkeyMappingR := Map()
+global DeadkeyMappingCurrency := Map()
 
 ; ==================================
 ; ==================================
@@ -138,50 +132,52 @@ global DeadkeyMappingCurrency    := Map()
 ; updates) are the observable surface we assert against.
 
 WrapTextIfSelected(Symbol, LeftSymbol, RightSymbol) {
-	global _Stub_SentText
-	_Stub_SentText.Push({ kind: "wrap", symbol: Symbol, left: LeftSymbol, right: RightSymbol })
+    global _Stub_SentText
+    _Stub_SentText.Push({ kind: "wrap", symbol: Symbol, left: LeftSymbol, right: RightSymbol })
 }
 
 UpdateLastSentCharacter(Character) {
-	global _Stub_LastChars, LastSentCharacterKeyTime
-	_Stub_LastChars.Push(Character)
-	_LSCPush(Character)
-	LastSentCharacterKeyTime[Character] := A_TickCount
+    global _Stub_LastChars, LastSentCharacterKeyTime
+    _Stub_LastChars.Push(Character)
+    _LSCPush(Character)
+    LastSentCharacterKeyTime[Character] := A_TickCount
 }
 
 DeadKey(Mapping) {
-	global _Stub_DeadKeyCalls
-	_Stub_DeadKeyCalls.Push(Mapping)
+    global _Stub_DeadKeyCalls
+    _Stub_DeadKeyCalls.Push(Mapping)
 }
 
 ; Toggle helpers consulted by the SIMPLE_ACTIONS / TAPHOLD_ALTGR_ACTIONS Maps.
 ; Real implementations live in modules/tap_holds.ahk (not included by tests).
 ToggleCapsLock() {
-	global _Stub_SentText
-	_Stub_SentText.Push({ kind: "toggle_capslock" })
+    global _Stub_SentText
+    _Stub_SentText.Push({ kind: "toggle_capslock" })
 }
 
 ToggleCapsWord() {
-	global _Stub_SentText
-	_Stub_SentText.Push({ kind: "toggle_capsword" })
+    global _Stub_SentText
+    _Stub_SentText.Push({ kind: "toggle_capsword" })
+}
+
+ToggleSuspend() {
+    global _Stub_SentText
+    _Stub_SentText.Push({ kind: "toggle_suspend" })
 }
 
 OneShotShift() {
-	global _Stub_SentText
-	_Stub_SentText.Push({ kind: "one_shot_shift" })
+    global _Stub_SentText
+    _Stub_SentText.Push({ kind: "one_shot_shift" })
 }
 
 DisableCapsWord() {
-	global CapsWordEnabled
-	CapsWordEnabled := false
+    global CapsWordEnabled
+    CapsWordEnabled := false
 }
 
 GetCapsLockCondition() {
-	return false
+    return false
 }
-
-
-
 
 ; ==========================================
 ; ==========================================
@@ -194,8 +190,8 @@ GetCapsLockCondition() {
 ; both count registrations and invoke the callback directly to drive
 ; HotstringHandler with controlled inputs.
 _HOOK_RecordHotstring(TriggerSpec, Callback) {
-	global _Stub_HotstringRegistrations
-	_Stub_HotstringRegistrations.Push({ spec: TriggerSpec, callback: Callback })
+    global _Stub_HotstringRegistrations
+    _Stub_HotstringRegistrations.Push({ spec: TriggerSpec, callback: Callback })
 }
 
 ; Recorder consumed by ``_SendHook``. Captures every send primitive call as
@@ -203,49 +199,49 @@ _HOOK_RecordHotstring(TriggerSpec, Callback) {
 ; arguments after the function name. Tests assert on the ordered sequence
 ; to verify backspace counts, replacement payloads and end-character emission.
 _HOOK_RecordSend(FnName, Args*) {
-	global _Stub_RecordedSends
-	_Stub_RecordedSends.Push({ fn: FnName, args: Args })
+    global _Stub_RecordedSends
+    _Stub_RecordedSends.Push({ fn: FnName, args: Args })
 }
 
 ; Wire both hooks into the production globals so subsequent CreateHotstring /
 ; HotstringHandler / Send* calls record instead of touching the OS.
 InstallHotstringHooks() {
-	global _HotstringRegistrar, _SendHook
-	_HotstringRegistrar := _HOOK_RecordHotstring
-	_SendHook := _HOOK_RecordSend
+    global _HotstringRegistrar, _SendHook
+    _HotstringRegistrar := _HOOK_RecordHotstring
+    _SendHook := _HOOK_RecordSend
 }
 
 UninstallHotstringHooks() {
-	global _HotstringRegistrar, _SendHook
-	_HotstringRegistrar := 0
-	_SendHook := 0
+    global _HotstringRegistrar, _SendHook
+    _HotstringRegistrar := 0
+    _SendHook := 0
 }
 
 ; ── Active-app cache simulators — bypass GetActiveApp's WinGet* calls so the
 ; ── Notepad / Office branches of HotstringHandler can be exercised in tests.
 SimulateNotepadActive() {
-	global _ActiveAppCache
-	_ActiveAppCache.ts := A_TickCount
-	_ActiveAppCache.Class := "Notepad"
-	_ActiveAppCache.Exe := "notepad.exe"
-	_ActiveAppCache.IsNotepad := true
-	_ActiveAppCache.IsMicrosoftOffice := false
+    global _ActiveAppCache
+    _ActiveAppCache.ts := A_TickCount
+    _ActiveAppCache.Class := "Notepad"
+    _ActiveAppCache.Exe := "notepad.exe"
+    _ActiveAppCache.IsNotepad := true
+    _ActiveAppCache.IsMicrosoftOffice := false
 }
 
 SimulateRegularApp() {
-	global _ActiveAppCache
-	_ActiveAppCache.ts := A_TickCount
-	_ActiveAppCache.Class := "TestApp"
-	_ActiveAppCache.Exe := "test.exe"
-	_ActiveAppCache.IsNotepad := false
-	_ActiveAppCache.IsMicrosoftOffice := false
+    global _ActiveAppCache
+    _ActiveAppCache.ts := A_TickCount
+    _ActiveAppCache.Class := "TestApp"
+    _ActiveAppCache.Exe := "test.exe"
+    _ActiveAppCache.IsNotepad := false
+    _ActiveAppCache.IsMicrosoftOffice := false
 }
 
 SimulateMicrosoftOffice() {
-	global _ActiveAppCache
-	_ActiveAppCache.ts := A_TickCount
-	_ActiveAppCache.Class := "OpusApp"
-	_ActiveAppCache.Exe := "WINWORD.EXE"
-	_ActiveAppCache.IsNotepad := false
-	_ActiveAppCache.IsMicrosoftOffice := true
+    global _ActiveAppCache
+    _ActiveAppCache.ts := A_TickCount
+    _ActiveAppCache.Class := "OpusApp"
+    _ActiveAppCache.Exe := "WINWORD.EXE"
+    _ActiveAppCache.IsNotepad := false
+    _ActiveAppCache.IsMicrosoftOffice := true
 }

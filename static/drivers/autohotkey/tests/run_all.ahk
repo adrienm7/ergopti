@@ -65,6 +65,12 @@ InstallHotstringHooks()
 #Include test_config.ahk
 #Include test_hotstrings_full.ahk
 
+; Gestures module — included here because its pure logic (assignments, action
+; registry, dispatch) is testable. The hotkeys it registers are harmless since
+; RunTests() calls ExitApp immediately after completion.
+#Include ..\modules\gestures.ahk
+#Include test_gestures.ahk
+
 ; Drive everything. RunTests prints a TAP-style report to stdout and exits
 ; with the appropriate code — control never returns from this call.
 RunTests()
