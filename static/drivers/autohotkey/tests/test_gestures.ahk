@@ -21,7 +21,7 @@ TestGestures_DefaultAssignments() {
     AssertEqual("tab_close", GestureAssignments["swipe_3_down"], "swipe_3_down default")
     AssertEqual("tab_prev", GestureAssignments["swipe_3_left"], "swipe_3_left default")
     AssertEqual("tab_next", GestureAssignments["swipe_3_right"], "swipe_3_right default")
-    AssertEqual("screenshot_window", GestureAssignments["tap_4"], "tap_4 default")
+    AssertEqual("screenshot_window_clipboard", GestureAssignments["tap_4"], "tap_4 default")
     AssertEqual("win_app_next", GestureAssignments["swipe_4_up"], "swipe_4_up default")
     AssertEqual("win_app_prev", GestureAssignments["swipe_4_down"], "swipe_4_down default")
     AssertEqual("desktop_prev", GestureAssignments["swipe_4_left"], "swipe_4_left default")
@@ -137,8 +137,10 @@ Test("Gestures: slot count is 10", TestGestures_SlotCountMatchesExpected)
 TestGestures_NewActionsRegistered() {
     for Name in ["win_prev", "win_next", "win_app_prev", "win_app_next",
                   "nav_back", "nav_forward",
-                  "screenshot_window", "screenshot_region", "screenshot_fullscreen",
-                  "screenshot_clipboard", "screen_record"] {
+                  "screenshot_window_clipboard", "screenshot_window_save",
+                  "screenshot_region_clipboard", "screenshot_region_save",
+                  "screenshot_fullscreen_clipboard", "screenshot_fullscreen_save",
+                  "screen_record"] {
         AssertTrue(GESTURE_ACTIONS.Has(Name), "missing action: " . Name)
     }
 }

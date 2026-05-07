@@ -340,21 +340,36 @@ global GESTURE_ACTIONS := Map(
         Fn: (*) => SendInput("{Media_Prev}"),
     },
     ; --- System ---
-    "screenshot_window", {
-        Label: "Capture d'écran (fenêtre active)",
-        Fn: (*) => GestureScreenshotWindow(),
+    ; Each capture target ships in two flavours: the *_clipboard variant
+    ; copies the image to the Windows clipboard for immediate paste into
+    ; the focused app, and the *_save variant writes a timestamped PNG
+    ; to %USERPROFILE%\Pictures\screenshots\. Defaults across the project
+    ; favour the clipboard variants because they keep the user inside
+    ; their current workflow without producing files they then have to
+    ; clean up.
+    "screenshot_window_clipboard", {
+        Label: "Capture d'écran de la fenêtre active (presse-papiers)",
+        Fn: (*) => GestureScreenshotWindow("clipboard"),
     },
-    "screenshot_region", {
-        Label: "Capture d'écran (zone à sélectionner)",
-        Fn: (*) => GestureScreenshotRegion(),
+    "screenshot_window_save", {
+        Label: "Capture d'écran de la fenêtre active (sauver sur disque)",
+        Fn: (*) => GestureScreenshotWindow("save"),
     },
-    "screenshot_fullscreen", {
-        Label: "Capture d'écran (écran entier)",
-        Fn: (*) => GestureScreenshotFullscreen(),
+    "screenshot_region_clipboard", {
+        Label: "Capture d'écran d'une zone à sélectionner (presse-papiers)",
+        Fn: (*) => GestureScreenshotRegion("clipboard"),
     },
-    "screenshot_clipboard", {
-        Label: "Capture d'écran (presse-papiers, zone)",
-        Fn: (*) => SendInput("#+s"),
+    "screenshot_region_save", {
+        Label: "Capture d'écran d'une zone à sélectionner (sauver sur disque)",
+        Fn: (*) => GestureScreenshotRegion("save"),
+    },
+    "screenshot_fullscreen_clipboard", {
+        Label: "Capture d'écran entier (presse-papiers)",
+        Fn: (*) => GestureScreenshotFullscreen("clipboard"),
+    },
+    "screenshot_fullscreen_save", {
+        Label: "Capture d'écran entier (sauver sur disque)",
+        Fn: (*) => GestureScreenshotFullscreen("save"),
     },
     "screen_record", {
         Label: "Capture vidéo (Xbox Game Bar)",
@@ -429,8 +444,10 @@ global GESTURE_ACTION_NAMES := [
     "vol_up", "vol_down", "mute",
     "track_play", "track_next", "track_prev",
     ; System
-    "screenshot_window", "screenshot_region", "screenshot_fullscreen",
-    "screenshot_clipboard", "screen_record",
+    "screenshot_window_clipboard", "screenshot_window_save",
+    "screenshot_region_clipboard", "screenshot_region_save",
+    "screenshot_fullscreen_clipboard", "screenshot_fullscreen_save",
+    "screen_record",
     "lock_screen", "notification_center",
     ; Script management
     "ahk_reload", "ahk_save_reload", "ahk_suspend", "ahk_edit", "ahk_quit",
@@ -443,7 +460,7 @@ global GestureAssignments := Map(
     "swipe_3_down", "tab_close",
     "swipe_3_left", "tab_prev",
     "swipe_3_right", "tab_next",
-    "tap_4", "screenshot_window",
+    "tap_4", "screenshot_window_clipboard",
     "swipe_4_up", "win_app_next",
     "swipe_4_down", "win_app_prev",
     "swipe_4_left", "desktop_prev",
@@ -551,28 +568,51 @@ GestureScreenshotPath() {
     return GestureScreenshotsDir() . "\screenshot_" . FormatTime(, "yyyy_MM_dd_HH'h'_mm'min'_ss's'") . ".png"
 }
 
-; Captures a region using PowerShell + System.Drawing and saves it to Path.
-; Coordinates are in screen pixels.
-GestureCaptureRegion(X, Y, W, H, Path) {
-    EscapedPath := StrReplace(Path, "'", "''")
-    PSScript :=
-        "Add-Type -AssemblyName System.Drawing;" .
-        "$bmp = New-Object System.Drawing.Bitmap " . W . "," . H . ";" .
-        "$g = [System.Drawing.Graphics]::FromImage($bmp);" .
-        "$g.CopyFromScreen(" . X . "," . Y . ",0,0,(New-Object System.Drawing.Size " . W . "," . H . "));" .
-        "$bmp.Save('" . EscapedPath . "', [System.Drawing.Imaging.ImageFormat]::Png);" .
-        "$g.Dispose(); $bmp.Dispose();"
+; Captures a region using PowerShell + System.Drawing and routes it to the
+; requested destination. Coordinates are in screen pixels.
+;   Mode = "save"      → write a PNG to Path (must be a valid file path).
+;   Mode = "clipboard" → copy the bitmap to the Windows clipboard via
+;                        System.Windows.Forms.Clipboard. PowerShell is
+;                        launched with -STA because Clipboard.SetImage
+;                        requires the calling thread to be in single-
+;                        threaded apartment state.
+; Returns True on success, False otherwise.
+GestureCaptureRegion(X, Y, W, H, Mode, Path := "") {
+    if (Mode == "save") {
+        EscapedPath := StrReplace(Path, "'", "''")
+        PSScript :=
+            "Add-Type -AssemblyName System.Drawing;" .
+            "$bmp = New-Object System.Drawing.Bitmap " . W . "," . H . ";" .
+            "$g = [System.Drawing.Graphics]::FromImage($bmp);" .
+            "$g.CopyFromScreen(" . X . "," . Y . ",0,0,(New-Object System.Drawing.Size " . W . "," . H . "));" .
+            "$bmp.Save('" . EscapedPath . "', [System.Drawing.Imaging.ImageFormat]::Png);" .
+            "$g.Dispose(); $bmp.Dispose();"
+        PSArgs := '-NoProfile -WindowStyle Hidden -Command "' . PSScript . '"'
+    } else {
+        PSScript :=
+            "Add-Type -AssemblyName System.Drawing;" .
+            "Add-Type -AssemblyName System.Windows.Forms;" .
+            "$bmp = New-Object System.Drawing.Bitmap " . W . "," . H . ";" .
+            "$g = [System.Drawing.Graphics]::FromImage($bmp);" .
+            "$g.CopyFromScreen(" . X . "," . Y . ",0,0,(New-Object System.Drawing.Size " . W . "," . H . "));" .
+            "[System.Windows.Forms.Clipboard]::SetImage($bmp);" .
+            "$g.Dispose(); $bmp.Dispose();"
+        ; -STA is required for Clipboard interop
+        PSArgs := '-NoProfile -Sta -WindowStyle Hidden -Command "' . PSScript . '"'
+    }
     try {
-        RunWait('powershell.exe -NoProfile -WindowStyle Hidden -Command "' . PSScript . '"', , "Hide")
-        return FileExist(Path) ? True : False
+        RunWait('powershell.exe ' . PSArgs, , "Hide")
+        return (Mode == "save") ? (FileExist(Path) ? True : False) : True
     } catch as e {
         LoggerError("gestures", "Screenshot failed: {1}.", e.Message)
         return False
     }
 }
 
-; Captures the entire active window (client + non-client area) to disk.
-GestureScreenshotWindow() {
+; Captures the active window (client + non-client area).
+;   Mode = "save"      → write a PNG to disk and TrayTip the path.
+;   Mode = "clipboard" → copy the bitmap to the Windows clipboard.
+GestureScreenshotWindow(Mode) {
     HWnd := WinExist("A")
     if (!HWnd) {
         LoggerWarn("gestures", "screenshot_window: no active window.")
@@ -584,33 +624,59 @@ GestureScreenshotWindow() {
         LoggerWarn("gestures", "screenshot_window: WinGetPos failed.")
         return
     }
-    Path := GestureScreenshotPath()
-    LoggerStart("gestures", "Capturing window to '{1}'…", Path)
-    if GestureCaptureRegion(X, Y, W, H, Path) {
-        LoggerSuccess("gestures", "Window screenshot saved: '{1}'.", Path)
-        TrayTip("Capture sauvegardée", Path, "Iconi Mute")
+    if (Mode == "save") {
+        Path := GestureScreenshotPath()
+        LoggerStart("gestures", "Capturing window to '{1}'…", Path)
+        if GestureCaptureRegion(X, Y, W, H, "save", Path) {
+            LoggerSuccess("gestures", "Window screenshot saved: '{1}'.", Path)
+            TrayTip("Capture sauvegardée", Path, "Iconi Mute")
+        }
+    } else {
+        LoggerStart("gestures", "Capturing window to clipboard…")
+        if GestureCaptureRegion(X, Y, W, H, "clipboard") {
+            LoggerSuccess("gestures", "Window screenshot copied to clipboard.")
+            TrayTip("Capture copiée", "Presse-papiers", "Iconi Mute")
+        }
     }
 }
 
-; Captures the full virtual screen (all monitors) to disk.
-GestureScreenshotFullscreen() {
+; Captures the full virtual screen (all monitors) to disk or clipboard.
+GestureScreenshotFullscreen(Mode) {
     X := SysGet(76)  ; SM_XVIRTUALSCREEN
     Y := SysGet(77)  ; SM_YVIRTUALSCREEN
     W := SysGet(78)  ; SM_CXVIRTUALSCREEN
     H := SysGet(79)  ; SM_CYVIRTUALSCREEN
-    Path := GestureScreenshotPath()
-    LoggerStart("gestures", "Capturing fullscreen to '{1}'…", Path)
-    if GestureCaptureRegion(X, Y, W, H, Path) {
-        LoggerSuccess("gestures", "Fullscreen screenshot saved: '{1}'.", Path)
-        TrayTip("Capture sauvegardée", Path, "Iconi Mute")
+    if (Mode == "save") {
+        Path := GestureScreenshotPath()
+        LoggerStart("gestures", "Capturing fullscreen to '{1}'…", Path)
+        if GestureCaptureRegion(X, Y, W, H, "save", Path) {
+            LoggerSuccess("gestures", "Fullscreen screenshot saved: '{1}'.", Path)
+            TrayTip("Capture sauvegardée", Path, "Iconi Mute")
+        }
+    } else {
+        LoggerStart("gestures", "Capturing fullscreen to clipboard…")
+        if GestureCaptureRegion(X, Y, W, H, "clipboard") {
+            LoggerSuccess("gestures", "Fullscreen screenshot copied to clipboard.")
+            TrayTip("Capture copiée", "Presse-papiers", "Iconi Mute")
+        }
     }
 }
 
-; Triggers Windows' built-in Snip & Sketch region selector via Win+Shift+S,
-; then watches the clipboard for the resulting image and saves it to disk.
-GestureScreenshotRegion() {
+; Triggers Windows' built-in Snip & Sketch region selector via Win+Shift+S.
+; Snip & Sketch always copies the result to the clipboard — for the "save"
+; mode we additionally watch the clipboard for the resulting image and dump
+; it to a timestamped PNG on disk.
+GestureScreenshotRegion(Mode) {
+    if (Mode == "clipboard") {
+        ; Snip & Sketch already places the image on the clipboard — nothing
+        ; further to do. Fire-and-forget so the user can keep typing.
+        LoggerStart("gestures", "Region screenshot to clipboard — opening Snip & Sketch…")
+        SendInput("#+s")
+        LoggerSuccess("gestures", "Snip & Sketch invoked (clipboard mode).")
+        return
+    }
     Path := GestureScreenshotPath()
-    LoggerStart("gestures", "Region screenshot — opening Snip & Sketch…")
+    LoggerStart("gestures", "Region screenshot to disk — opening Snip & Sketch…")
     A_Clipboard := ""
     SendEvent("#+s")
     ; Wait up to 30 s for the user to finish their selection
@@ -626,7 +692,7 @@ GestureScreenshotRegion() {
         "$img = [System.Windows.Forms.Clipboard]::GetImage();" .
         "if ($img) { $img.Save('" . EscapedPath . "', [System.Drawing.Imaging.ImageFormat]::Png) }"
     try {
-        RunWait('powershell.exe -NoProfile -WindowStyle Hidden -Command "' . PSScript . '"', , "Hide")
+        RunWait('powershell.exe -NoProfile -Sta -WindowStyle Hidden -Command "' . PSScript . '"', , "Hide")
         if FileExist(Path) {
             LoggerSuccess("gestures", "Region screenshot saved: '{1}'.", Path)
             TrayTip("Capture sauvegardée", Path, "Iconi Mute")

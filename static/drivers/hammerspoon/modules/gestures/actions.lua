@@ -383,7 +383,43 @@ sg("track_next",       "Piste suivante",       function() sysKey("NEXT") end)
 sg("track_prev",       "Piste précédente",     function() sysKey("PREVIOUS") end)
 
 -- System
-sg("screenshot",       "Capture d'écran",      function() pcall(hs.eventtap.keyStroke, {"cmd", "shift"}, "4") end)
+-- Each capture target ships in two flavours: the *_clipboard variant copies
+-- the image to the macOS clipboard for immediate paste into the focused
+-- app, and the *_save variant writes a timestamped PNG to
+-- ~/Pictures/screenshots/. Defaults across the project favour the
+-- clipboard variants because they keep the user inside their current
+-- workflow without producing files they then have to clean up. The
+-- screencapture(1) CLI is preferred over keystroke synthesis because it
+-- bypasses the macOS preview overlay and works reliably regardless of
+-- whether Cmd-Shift-N is currently bound by another app.
+local function screenshots_dir()
+	local home = os.getenv("HOME") or ""
+	local dir  = home .. "/Pictures/screenshots"
+	pcall(function() hs.fs.mkdir(dir) end)
+	return dir
+end
+
+local function screenshot_path()
+	return screenshots_dir() .. "/screenshot_" .. os.date("%Y_%m_%d_%Hh_%Mmin_%Ss") .. ".png"
+end
+
+local function run_screencapture(args)
+	pcall(function() hs.execute("/usr/sbin/screencapture " .. args, true) end)
+end
+
+sg("screenshot_window_clipboard",     "Capture d'écran de la fenêtre active (presse-papiers)",
+	function() run_screencapture("-w -c") end)
+sg("screenshot_window_save",          "Capture d'écran de la fenêtre active (sauver sur disque)",
+	function() run_screencapture("-w '" .. screenshot_path() .. "'") end)
+sg("screenshot_region_clipboard",     "Capture d'écran d'une zone à sélectionner (presse-papiers)",
+	function() run_screencapture("-i -c") end)
+sg("screenshot_region_save",          "Capture d'écran d'une zone à sélectionner (sauver sur disque)",
+	function() run_screencapture("-i '" .. screenshot_path() .. "'") end)
+sg("screenshot_fullscreen_clipboard", "Capture d'écran entier (presse-papiers)",
+	function() run_screencapture("-c") end)
+sg("screenshot_fullscreen_save",      "Capture d'écran entier (sauver sur disque)",
+	function() run_screencapture("'" .. screenshot_path() .. "'") end)
+
 sg("lock_screen",      "Verrouiller",          function() pcall(hs.eventtap.keyStroke, {"cmd", "ctrl"}, "q") end)
 sg("notification_center", "Notifications",    function() pcall(hs.eventtap.keyStroke, {}, "F12") end)
 
@@ -439,7 +475,10 @@ M.SG_NAMES = {
 	"brightness_up", "brightness_down",
 	"track_play", "track_next", "track_prev",
 	-- System
-	"screenshot", "lock_screen", "notification_center",
+	"screenshot_window_clipboard", "screenshot_window_save",
+	"screenshot_region_clipboard", "screenshot_region_save",
+	"screenshot_fullscreen_clipboard", "screenshot_fullscreen_save",
+	"lock_screen", "notification_center",
 	-- Script management
 	"hs_reload", "hs_console", "hs_quit", "hs_open_config",
 }

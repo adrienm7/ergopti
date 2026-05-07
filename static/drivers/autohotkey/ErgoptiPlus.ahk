@@ -627,7 +627,7 @@ BuildGesturesMenu() {
         "win_prev", true,
         "desktop_prev", true,
         "vol_up", true,
-        "screenshot", true,
+        "screenshot_window_clipboard", true,
         "ahk_reload", true,
     )
 

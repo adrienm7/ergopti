@@ -104,7 +104,7 @@ function M.build(ctx)
 		local group_starters = {
 			right_click_toggle = true, copy = true, enter = true,
 			tab_new = true, win_prev = true, space_prev = true,
-			word_prev = true, vol_up = true, screenshot = true,
+			word_prev = true, vol_up = true, screenshot_window_clipboard = true,
 			hs_reload = true,
 			-- Axis groups
 			tabs = true, volume = true, words = true,
