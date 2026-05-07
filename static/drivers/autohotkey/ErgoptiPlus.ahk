@@ -187,7 +187,7 @@ global SCRIPT_SHORTCUT_SLOTS := [
     "script_altgr_escape",
 ]
 global SCRIPT_SHORTCUT_LABELS := Map(
-    "script_altgr_enter", "AltGr + ⏎",
+    "script_altgr_enter", "AltGr + Entrée",
     "script_altgr_backspace", "AltGr + ⌫",
     "script_altgr_delete", "AltGr + ⌦",
     "script_altgr_escape", "AltGr + Échap",
@@ -481,9 +481,12 @@ CreateSubMenusRecursiveCommonCode(MenuParent, Key, Val, CategoryPath) {
     FullPath := CategoryPath "." Key
 
     if (Type(Val) == "Map") {
-        ; Create submenu and store in SubMenus
+        ; Create submenu and store in SubMenus. The visible label defaults to
+        ; the raw map key but can be overridden by GetSubMenuLabel for paths
+        ; whose code identifier is intentionally English while the menu UI is
+        ; French (Shortcuts.Personal → « Raccourcis personnels », …).
         SubMenu := Menu()
-        MenuParent.Add(Key, SubMenu)
+        MenuParent.Add(GetSubMenuLabel(FullPath, Key), SubMenu)
         SubMenus[FullPath] := SubMenu
         ; Recursively create nested submenus
         CreateSubMenusRecursive(SubMenu, Val, FullPath)
@@ -526,8 +529,8 @@ MenuAddItem(MenuParent, FeatureCategoryPath, FeatureName) {
 ; whenever the feature is enabled, and its label remains the canonical
 ; "<description><LETTER>" string built by GetMenuTitleByPath.
 MenuAddLetterPicker(MenuParent, FeatureCategoryPath, FeatureName) {
-    FullPath  := FeatureCategoryPath "." FeatureName
-    Feature   := GetFeatureByPath(FullPath)
+    FullPath := FeatureCategoryPath "." FeatureName
+    Feature := GetFeatureByPath(FullPath)
     MenuTitle := GetMenuTitleByPath(FullPath)
 
     LetterMenu := Menu()
@@ -543,7 +546,7 @@ MenuAddLetterPicker(MenuParent, FeatureCategoryPath, FeatureName) {
 
     ; 26 letters a-z, displayed uppercase for menu legibility
     CurrentLetter := Feature.HasOwnProp("Letter") ? StrLower(Feature.Letter) : ""
-    Loop 26 {
+    loop 26 {
         L := Chr(Ord("a") + A_Index - 1)
         UpperL := StrUpper(L)
         LetterMenu.Add(UpperL, ((p, l) => (*) => SetFeatureLetter(p, l))(FullPath, L))
@@ -565,11 +568,11 @@ SetFeatureLetter(FullPath, Letter) {
     Feature := GetFeatureByPath(FullPath)
     pos := InStr(FullPath, ".", , -1)
     FeatureCategoryPath := SubStr(FullPath, 1, pos - 1)
-    FeatureName         := SubStr(FullPath, pos + 1)
+    FeatureName := SubStr(FullPath, pos + 1)
 
     Feature.Enabled := true
-    Feature.Letter  := Letter
-    IniWrite(true,  ConfigurationFile, FeatureCategoryPath, FeatureName . ".Enabled")
+    Feature.Letter := Letter
+    IniWrite(true, ConfigurationFile, FeatureCategoryPath, FeatureName . ".Enabled")
     IniWrite(Letter, ConfigurationFile, FeatureCategoryPath, FeatureName . ".Letter")
     Reload
 }
@@ -580,11 +583,25 @@ SetFeatureLetterOff(FullPath) {
     Feature := GetFeatureByPath(FullPath)
     pos := InStr(FullPath, ".", , -1)
     FeatureCategoryPath := SubStr(FullPath, 1, pos - 1)
-    FeatureName         := SubStr(FullPath, pos + 1)
+    FeatureName := SubStr(FullPath, pos + 1)
 
     Feature.Enabled := false
     IniWrite(false, ConfigurationFile, FeatureCategoryPath, FeatureName . ".Enabled")
     Reload
+}
+
+; Resolve the visible label of a sub-Map menu entry. Defaults to the raw
+; FallbackKey (the map key as written in features_config.ahk), but lets us
+; localise specific paths whose code identifier is intentionally English
+; while the menu UI is French. Add a case here whenever a new sub-Map needs
+; a different label than its key — the rest of the menu builder picks it up
+; automatically through CreateSubMenusRecursiveCommonCode.
+GetSubMenuLabel(FullPath, FallbackKey) {
+    switch FullPath {
+        case "Shortcuts.Personal":
+            return "Raccourcis personnels"
+    }
+    return FallbackKey
 }
 
 ; Retrieve a feature title by its path
@@ -1076,7 +1093,7 @@ global PERSONAL_SHORTCUTS_TEMPLATE := "; personal_shortcuts.ahk`r`n"
     . "; FEATURES & RATIONALE:`r`n"
     . "; 1. Toggle-gated bindings — every binding is wrapped in`r`n"
     . ";    #HotIf Features[`"Shortcuts`"][`"Personal`"][`"<Name>`"].Enabled so the matching`r`n"
-    . ";    tray-menu checkbox in « 🎯 Raccourcis » → « Personal » fully controls`r`n"
+    . ";    tray-menu checkbox in « 🎯 Raccourcis » → « Raccourcis personnels » fully controls`r`n"
     . ";    whether the binding fires, with persistence in the configuration INI.`r`n"
     . "; 2. Two-section layout — every feature is registered in section 1 and bound`r`n"
     . ";    (along with any helper functions it needs) in section 2 with matching`r`n"
@@ -1088,7 +1105,7 @@ global PERSONAL_SHORTCUTS_TEMPLATE := "; personal_shortcuts.ahk`r`n"
     . ";`r`n"
     . "; ADDING A FEATURE — drop a RegisterPersonalFeature call into section 1 and`r`n"
     . "; the matching #HotIf-gated binding into section 2. The toggle then appears`r`n"
-    . "; in the tray under « 🎯 Raccourcis » → « Personal ». Example:`r`n"
+    . "; in the tray under « 🎯 Raccourcis » → « Raccourcis personnels ». Example:`r`n"
     . ";`r`n"
     . ";     RegisterPersonalFeature(`"LockScreen`", true,`r`n"
     . ";         `"Lock the workstation with Ctrl + Alt + L`")`r`n"
@@ -1129,7 +1146,8 @@ global PERSONAL_SHORTCUTS_TEMPLATE := "; personal_shortcuts.ahk`r`n"
 ; personal_shortcuts.ahk. Toggles are stored under the nested namespace
 ; Features["Shortcuts"]["Personal"][Name] so that user-chosen names cannot
 ; collide with the built-in Shortcuts entries (EGrave, MicrosoftBold, …) and
-; show up as a dedicated « Personal » sub-submenu inside « 🎯 Raccourcis ».
+; show up as a dedicated « Raccourcis personnels » sub-submenu inside
+; « 🎯 Raccourcis ».
 ; Their on/off state is persisted in the configuration INI under the
 ; [Shortcuts.Personal] section. The persisted value is looked up at
 ; registration time so previously-saved toggles survive across reloads even
@@ -1774,7 +1792,7 @@ FilePathsEditor(*) {
             f := FileOpen(_PathsFile, "w", "UTF-8")
             if f {
                 DefaultDirFwd := StrReplace(_DefaultConfigDir, "\", "/")
-                NewDirFwd     := StrReplace(NewDir, "\", "/")
+                NewDirFwd := StrReplace(NewDir, "\", "/")
                 f.Write("# Custom paths — auto-generated by ErgoptiPlus.`r`n")
                 f.Write("# Edit this file to point to your personal configuration folder.`r`n")
                 f.Write("# If absent or commented out, files are looked up in: " . DefaultDirFwd . "`r`n")
