@@ -102,7 +102,7 @@ function M.build(ctx)
 
 		-- Actions that start a new logical group — separator before them
 		local group_starters = {
-			selection_toggle = true, copy = true, enter = true,
+			right_click_toggle = true, copy = true, enter = true,
 			tab_new = true, win_prev = true, space_prev = true,
 			word_prev = true, vol_up = true, screenshot = true,
 			hs_reload = true,
