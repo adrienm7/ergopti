@@ -16,7 +16,7 @@
 
 TestGestures_DefaultAssignments() {
     AssertTrue(GestureAssignments.Has("tap_3"), "tap_3 should exist")
-    AssertEqual("selection_toggle", GestureAssignments["tap_3"], "tap_3 default")
+    AssertEqual("right_click_toggle", GestureAssignments["tap_3"], "tap_3 default")
     AssertEqual("tab_new", GestureAssignments["swipe_3_up"], "swipe_3_up default")
     AssertEqual("tab_close", GestureAssignments["swipe_3_down"], "swipe_3_down default")
     AssertEqual("tab_prev", GestureAssignments["swipe_3_left"], "swipe_3_left default")
@@ -76,24 +76,25 @@ TestGestures_RegistrySizeMatchesNames() {
 }
 Test("Gestures: action count matches GESTURE_ACTION_NAMES length", TestGestures_RegistrySizeMatchesNames)
 
-; ===========================================
-; ===========================================
-; ======= 3/ Selection State Machine =======
-; ===========================================
-; ===========================================
+; ===============================================
+; ===============================================
+; ======= 3/ Right-Click Hold State Machine =====
+; ===============================================
+; ===============================================
 
-TestGestures_DragStartsDisabled() {
-    AssertFalse(GestureDragEnabled, "drag should start disabled")
+TestGestures_RightClickStartsReleased() {
+    AssertFalse(GestureRightClickHeld, "right-click hold should start released")
 }
-Test("Gestures: drag starts disabled", TestGestures_DragStartsDisabled)
+Test("Gestures: right-click hold starts released", TestGestures_RightClickStartsReleased)
 
-TestGestures_StopSelectionSafeWhenDisabled() {
-    ; Should not throw even when nothing is active
-    GestureDragEnabled := False
-    GestureStopSelection()
-    AssertFalse(GestureDragEnabled, "still disabled after redundant stop")
+TestGestures_ReleaseRightClickSafeWhenIdle() {
+    ; Should not throw even when nothing is held
+    GestureRightClickHeld := False
+    GestureReleaseRightClick()
+    AssertFalse(GestureRightClickHeld, "still released after redundant release call")
 }
-Test("Gestures: GestureStopSelection is safe when already stopped", TestGestures_StopSelectionSafeWhenDisabled)
+Test("Gestures: GestureReleaseRightClick is safe when already released",
+    TestGestures_ReleaseRightClickSafeWhenIdle)
 
 ; ====================================
 ; ====================================
