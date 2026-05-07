@@ -620,7 +620,7 @@ BuildGesturesMenu() {
     ; Per-slot submenus — each slot shows all available actions as radio items
     ; Actions that start a new logical group get a separator before them
     static GroupStarters := Map(
-        "selection_toggle", true,
+        "right_click_toggle", true,
         "copy", true,
         "enter", true,
         "tab_new", true,

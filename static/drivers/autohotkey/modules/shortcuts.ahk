@@ -512,8 +512,8 @@ SC01C::
 ~LButton::
 ~RButton::
 {
-    if (GestureDragEnabled) {
-        GestureStopSelection()
+    if (GestureRightClickHeld) {
+        GestureReleaseRightClick()
     }
     DisableCapsWord()
 }

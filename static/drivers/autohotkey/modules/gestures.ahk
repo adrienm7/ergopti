@@ -169,9 +169,9 @@ global GESTURE_ACTIONS := Map(
         Fn: (*) => 0,
     },
     ; --- Selection & navigation ---
-    "selection_toggle", {
-        Label: "Toggle sélection",
-        Fn: (*) => GestureToggleSelection(),
+    "right_click_toggle", {
+        Label: "Toggle clic droit maintenu",
+        Fn: (*) => GestureToggleRightClick(),
     },
     "app_switcher", {
         Label: "Alt-Tab",
@@ -411,7 +411,7 @@ GestureEditPersonalShortcuts() {
 global GESTURE_ACTION_NAMES := [
     "none",
     ; Selection & navigation
-    "selection_toggle", "app_switcher",
+    "right_click_toggle", "app_switcher",
     ; Editing
     "copy", "paste", "cut", "undo", "redo", "select_all", "find",
     ; Keys
@@ -438,7 +438,7 @@ global GESTURE_ACTION_NAMES := [
 
 ; Current action assignments — read from INI or defaults
 global GestureAssignments := Map(
-    "tap_3", "selection_toggle",
+    "tap_3", "right_click_toggle",
     "swipe_3_up", "tab_new",
     "swipe_3_down", "tab_close",
     "swipe_3_left", "tab_prev",
@@ -450,15 +450,15 @@ global GestureAssignments := Map(
     "swipe_4_right", "desktop_next",
 )
 
-; Selection mode state
-global GestureDragEnabled := False
+; Right-click hold mode state
+global GestureRightClickHeld := False
 global GestureKeyboardHook := 0
 
-; ==========================================
-; ==========================================
-; ======= 2/ Selection Toggle Engine =======
-; ==========================================
-; ==========================================
+; ===========================================
+; ===========================================
+; ======= 2/ Right-Click Hold Toggle =======
+; ===========================================
+; ===========================================
 
 ; Sends a shortcut while neutralising the Ctrl+Win+Shift modifiers that the
 ; touchpad gesture itself is still holding down at callback time. Without this,
@@ -759,38 +759,44 @@ GestureCycleAppWindows(Forward) {
     LoggerWarn("gestures", "CycleAppWindows: no candidate could be activated.")
 }
 
-; Activates or deactivates drag selection mode.
-; Any subsequent keystroke automatically cancels it.
-GestureToggleSelection() {
-    global GestureDragEnabled
+; Activates or deactivates a right-button-held mode. Any subsequent keystroke
+; (or physical right-click) automatically releases the button — typically
+; firing the system's right-click action wherever the cursor is at that
+; moment. Useful as a generic "press right button until I do something"
+; toggle which covers context menus, drag-with-right-button workflows
+; (browser gestures, 3D viewport rotation, …) and whatever else right-
+; click means in the focused app, hence the broader naming over the
+; previous "selection" wording.
+GestureToggleRightClick() {
+    global GestureRightClickHeld
 
-    if (GestureDragEnabled) {
-        GestureStopSelection()
+    if (GestureRightClickHeld) {
+        GestureReleaseRightClick()
         return
     }
 
-    LoggerDebug("gestures", "Enabling drag selection mode…")
-    Click("Left", "Down")
-    GestureDragEnabled := True
+    LoggerDebug("gestures", "Enabling right-click hold mode…")
+    Click("Right", "Down")
+    GestureRightClickHeld := True
 
-    ; Install a keyboard hook that cancels selection on any key press
+    ; Install a keyboard hook that releases the button on any key press
     GestureStartKeyboardWatcher()
-    LoggerInfo("gestures", "Drag selection mode enabled.")
+    LoggerInfo("gestures", "Right-click hold mode enabled.")
 }
 
-; Cancels drag selection and releases the mouse button.
-GestureStopSelection() {
-    global GestureDragEnabled
+; Releases the right mouse button if it is currently held by the toggle.
+GestureReleaseRightClick() {
+    global GestureRightClickHeld
 
-    if (!GestureDragEnabled) {
+    if (!GestureRightClickHeld) {
         return
     }
 
-    LoggerDebug("gestures", "Disabling drag selection mode…")
+    LoggerDebug("gestures", "Disabling right-click hold mode…")
     GestureStopKeyboardWatcher()
-    Click("Left", "Up")
-    GestureDragEnabled := False
-    LoggerInfo("gestures", "Drag selection mode disabled.")
+    Click("Right", "Up")
+    GestureRightClickHeld := False
+    LoggerInfo("gestures", "Right-click hold mode disabled.")
 }
 
 ; Installs a low-level keyboard hook to detect any key press.
@@ -816,22 +822,23 @@ GestureStopKeyboardWatcher() {
     }
 }
 
-; Callback fired on any key press while selection is active.
+; Callback fired on any key press while right-click hold is active.
 GestureOnKeyDown(ih, vk, sc) {
-    ; Any keystroke cancels drag selection
-    GestureStopSelection()
+    ; Any keystroke releases the held right button
+    GestureReleaseRightClick()
 }
 
 ; Wrapper required: #HotIf evaluates before globals are assigned at runtime
-IsGestureDragEnabled() {
-    global GestureDragEnabled
-    return IsSet(GestureDragEnabled) ? GestureDragEnabled : False
+IsGestureRightClickHeld() {
+    global GestureRightClickHeld
+    return IsSet(GestureRightClickHeld) ? GestureRightClickHeld : False
 }
 
-; Also cancel on physical left click — user clicked manually
-#HotIf IsGestureDragEnabled()
-~LButton:: {
-    GestureStopSelection()
+; Also release on a physical right click — user has clicked manually so the
+; toggle should hand control back rather than trap the next event.
+#HotIf IsGestureRightClickHeld()
+~RButton:: {
+    GestureReleaseRightClick()
 }
 #HotIf
 
