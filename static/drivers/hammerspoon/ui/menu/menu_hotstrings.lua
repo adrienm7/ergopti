@@ -548,15 +548,23 @@ function M.build_management(ctx)
 		Logger.warn(LOG, "keymap.DELAYS_DEFAULT missing — individual delays undefined.")
 	end
 
+	-- The per-group delays for TOML-backed categories (rolls, autocorrection,
+	-- magickey, sfbsreduction, distancesreduction, personal) live in the
+	-- dedicated configuration window where colors can also be tuned. Categories
+	-- that do not have a TOML counterpart (llm_prediction, dynamichotstrings)
+	-- and the global baseline keep their per-prompt menu items as quick access.
+	table.insert(delay_menu, {
+		title    = "Délais et couleurs des hotstrings…",
+		disabled = paused or nil,
+		fn       = not paused and function()
+			local ok, win = pcall(require, "ui.hotstrings_config_window")
+			if ok and win and type(win.open) == "function" then pcall(win.open) end
+		end or nil,
+	})
+	table.insert(delay_menu, { title = "-" })
 	if def_delays then
-		table.insert(delay_menu, make_delay_item("Touche ★", "STAR_TRIGGER", def_delays.STAR_TRIGGER, false))
 		table.insert(delay_menu, make_delay_item("Intelligence Artificielle (Acceptation)", "llm_prediction", def_delays.llm_prediction, false))
 		table.insert(delay_menu, make_delay_item("Auto-complétions (ex: numéros)", "dynamichotstrings", def_delays.dynamichotstrings, false))
-		table.insert(delay_menu, make_delay_item("Autocorrections", "autocorrection", def_delays.autocorrection, false))
-		table.insert(delay_menu, make_delay_item("Roulements", "rolls", def_delays.rolls, false))
-		table.insert(delay_menu, make_delay_item("Réductions de SFBs", "sfbsreduction", def_delays.sfbsreduction, false))
-		table.insert(delay_menu, make_delay_item("Réductions de distances", "distancesreduction", def_delays.distancesreduction, false))
-		table.insert(delay_menu, { title = "-" })
 	end
 	if def_base then
 		table.insert(delay_menu, make_delay_item("Défaut (autres catégories)", nil, def_base, true))

@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="fr">
+	<head>
+		<meta charset="UTF-8" />
+		<link rel="stylesheet" href="style.css" />
+	</head>
+	<body>
+		<header class="topbar">
+			<div class="title">
+				<h1>Délais et couleurs des hotstrings</h1>
+				<p class="hint">
+					Ajustez par cat&eacute;gorie ou par section. Toute modification est enregistr&eacute;e
+					imm&eacute;diatement dans <code>~/.config/ergopti_plus/hotstrings_config.toml</code>.
+				</p>
+			</div>
+			<div class="actions">
+				<button class="btn btn-danger" onclick="resetAll()">Tout r&eacute;initialiser</button>
+				<button class="btn" onclick="closeWindow()">Fermer</button>
+			</div>
+		</header>
+
+		<main id="content"></main>
+
+		<template id="tpl-category">
+			<section class="cat">
+				<header class="cat-head">
+					<button class="caret" data-role="toggle">▸</button>
+					<h2 class="cat-title"></h2>
+					<div class="row">
+						<div class="field field-delay" data-level="file" data-field="delay">
+							<label>D&eacute;lai (ms)</label>
+							<div class="ctrl">
+								<input type="number" min="0" step="50" />
+								<button class="reset" title="Revenir au d&eacute;faut">↺</button>
+							</div>
+						</div>
+						<div class="field field-color" data-level="file" data-field="color">
+							<label>Couleur</label>
+							<div class="ctrl">
+								<span class="swatch"></span>
+								<select></select>
+								<button class="reset" title="Revenir au d&eacute;faut">↺</button>
+							</div>
+						</div>
+					</div>
+				</header>
+				<div class="sections" hidden></div>
+			</section>
+		</template>
+
+		<template id="tpl-section">
+			<div class="sec">
+				<div class="sec-title"></div>
+				<div class="row">
+					<div class="field field-delay" data-level="section" data-field="delay">
+						<label>D&eacute;lai (ms)</label>
+						<div class="ctrl">
+							<input type="number" min="0" step="50" />
+							<button class="reset" title="Revenir au d&eacute;faut">↺</button>
+						</div>
+					</div>
+					<div class="field field-color" data-level="section" data-field="color">
+						<label>Couleur</label>
+						<div class="ctrl">
+							<span class="swatch"></span>
+							<select></select>
+							<button class="reset" title="Revenir au d&eacute;faut">↺</button>
+						</div>
+					</div>
+				</div>
+			</div>
+		</template>
+
+		<script src="script.js"></script>
+	</body>
+</html>

@@ -367,4 +367,67 @@ function M.reload()
 	return true
 end
 
+
+-- =================================================
+-- =================================================
+-- ======= 6/ Introspection helpers (UI) ===========
+-- =================================================
+-- =================================================
+
+--- Returns the ordered list of sections defined in a category TOML.
+--- Each entry is { name = string, description = string }; separators ("-")
+--- are filtered out. Used by the configuration window to render the section
+--- list under each category.
+--- @param category string Category name (lowercase).
+--- @return table List of section descriptors in TOML declaration order.
+function M.get_sections(category)
+	if not require_state("get_sections") then return {} end
+	local toml_path = _state.toml_resolver(category)
+	if type(toml_path) ~= "string" or toml_path == "" then return {} end
+	local parsed = TomlReader.parse(toml_path)
+	local out = {}
+	for _, name in ipairs(parsed.sections_order or {}) do
+		if name ~= "-" then
+			local section = parsed.sections[name]
+			local desc = (section and section.description) or name
+			table.insert(out, { name = name, description = desc })
+		end
+	end
+	return out
+end
+
+--- Returns the TOML-default delay/color for a (category, section) pair —
+--- the values that would apply if the user override layer were empty.
+--- Used by the UI to show "back to default" state and to drive the reset button.
+--- @param category string
+--- @param section string|nil
+--- @return table { delay = number, color = string|nil }
+function M.get_toml_defaults(category, section)
+	if not require_state("get_toml_defaults") then
+		return { delay = GLOBAL_DEFAULT_DELAY, color = nil }
+	end
+	local meta = get_toml_meta(category)
+	local meta_sec = section and meta.sections[section] or nil
+	return {
+		delay = (meta_sec and meta_sec.delay) or meta.delay or GLOBAL_DEFAULT_DELAY,
+		color = (meta_sec and meta_sec.color) or meta.color,
+	}
+end
+
+--- Returns the raw user override entry (or nil) for a (category, section)
+--- pair. Distinguishing between "no override" and "override = TOML default"
+--- is important for the UI's reset button state.
+--- @param category string
+--- @param section string|nil
+--- @return table|nil { delay = number|nil, color = string|nil }
+function M.get_user_override(category, section)
+	if not require_state("get_user_override") then return nil end
+	local cat = _state.overrides[category]
+	if not cat then return nil end
+	local target = section and (cat.sections or {})[section] or cat
+	if not target then return nil end
+	if target.delay == nil and target.color == nil then return nil end
+	return { delay = target.delay, color = target.color }
+end
+
 return M
