@@ -307,14 +307,27 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 			end
 		end
 
-		-- Sync delays
+		-- Sync delays — resolution chain (highest priority first):
+		--   1. legacy `state.delays[k]` (loaded from config.json) — kept for
+		--      users upgrading from a version that wrote delays there.
+		--   2. `hotstrings_config.resolve(category).delay` for TOML-backed keys —
+		--      this is the new authoritative source (TOML metadata + user override).
+		--   3. `keymap.DELAYS_DEFAULT[k]` — ultimate hardcoded fallback.
 		if type(state.expansion_delay) == "number" then
 			if keymap and type(keymap.set_base_delay) == "function" then pcall(keymap.set_base_delay, state.expansion_delay) end
 		end
 		if keymap and type(keymap.set_delay) == "function" then
-			local defs = keymap.DELAYS_DEFAULT or {}
+			local defs       = keymap.DELAYS_DEFAULT or {}
+			local key_to_cat = keymap.DELAY_KEY_TO_CATEGORY or {}
+			local ok_cfg, hs_cfg = pcall(require, "modules.hotstrings_config")
+			if not ok_cfg then hs_cfg = nil end
 			for k, default_val in pairs(defs) do
-				pcall(keymap.set_delay, k, state.delays[k] or default_val)
+				local resolved = nil
+				if hs_cfg and key_to_cat[k] then
+					local r = hs_cfg.resolve(key_to_cat[k], nil)
+					if r and type(r.delay) == "number" then resolved = r.delay end
+				end
+				pcall(keymap.set_delay, k, state.delays[k] or resolved or default_val)
 			end
 		end
 

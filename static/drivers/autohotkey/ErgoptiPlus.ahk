@@ -70,6 +70,7 @@ SendMode("Event") ; Everything concerning hotstrings MUST use SendEvent and not 
 ; submodules so the main file stays focused on ErgoptiPlus-specific logic.
 #Include lib\hotstring_engine.ahk
 #Include lib\toml_loader.ahk
+#Include lib\hotstrings_config.ahk
 ; Auto-generated registrar for the bundled hotstring TOMLs. ``*i`` keeps the
 ; driver runnable from a fresh clone before ``tools/compile_hotstrings.py`` has
 ; been executed — ``LoadHotstringsSection`` falls back to the regex parser when
@@ -132,6 +133,12 @@ if !DirExist(_ConfigDir) {
 }
 
 global ConfigurationFile := _ConfigDir . "ErgoptiPlus_Configuration.ini"
+
+; Initialise the hotstrings_config module so per-group delays and tooltip
+; colors can be resolved from the TOML metadata + the shared user override
+; file. The override file lives in the same shared config directory used by
+; Hammerspoon, so edits made from either menu apply to both at next reload.
+HotstringsConfigInit(_ConfigDir . "hotstrings_config.toml")
 
 ; Resolve the shared static/img/logo directory by walking up two levels from
 ; the script location (static/drivers/autohotkey → static/drivers → static).
