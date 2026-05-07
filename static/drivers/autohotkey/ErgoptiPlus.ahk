@@ -753,14 +753,25 @@ initMenu() {
     A_TrayMenu.Delete()
 
     ; Prepend a global on/off toggle at the top of the Raccourcis submenu —
-    ; mirrors the HS pattern where clicking the parent title toggles the category.
-    ; AHK does not support clickable parent titles, so the first item is the toggle.
+    ; mirrors the HS pattern where clicking the parent title toggles the
+    ; category. AHK does not support clickable parent titles, so the first
+    ; item is the toggle.
+    ;
+    ; The checkbox reflects « at least one shortcut enabled » rather than
+    ; « every shortcut enabled »: several built-ins (Save, CtrlJ, the AltGr
+    ; combo variants, …) ship as off-by-default on purpose, so an « all
+    ; enabled » metric would always render the toggle unchecked at first
+    ; launch and falsely suggest the category is inactive. With « any
+    ; enabled », the toggle ships checked for a fresh install (where most
+    ; leaf features default to true) and the click action remains intuitive
+    ; — when checked, click disables every shortcut; when unchecked, click
+    ; re-enables every shortcut.
     if SubMenus.Has("Shortcuts") {
-        ShortcutsAllEnabled := IsCategoryAllEnabled(["Shortcuts"])
+        ShortcutsAnyEnabled := HasAnyEnabled(Features["Shortcuts"])
         ShortcutsToggleLabel := "Activer les raccourcis"
         SubMenus["Shortcuts"].Insert("1&", ShortcutsToggleLabel,
-            (*) => ToggleCategoryAllFeatures("Shortcuts", !ShortcutsAllEnabled))
-        if ShortcutsAllEnabled {
+            (*) => ToggleCategoryAllFeatures("Shortcuts", !ShortcutsAnyEnabled))
+        if ShortcutsAnyEnabled {
             SubMenus["Shortcuts"].Check(ShortcutsToggleLabel)
         }
         SubMenus["Shortcuts"].Insert("2&")  ; Separator after toggle
