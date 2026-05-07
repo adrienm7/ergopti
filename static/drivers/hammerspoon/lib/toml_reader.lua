@@ -180,15 +180,15 @@ local function parse_entry(line)
 	}
 end
 
---- Parses a plain key equals value line.
+--- Parses a plain key equals value line where the value is a quoted string.
 --- @param line string The line to parse.
 --- @return string|nil, string|nil Returns key and value.
 local function parse_kv_string(line)
 	if type(line) ~= "string" then return nil, nil end
-	
+
 	local i = skip_ws(line, 1)
 	local key, j
-	
+
 	if line:sub(i, i) == "\"" then
 		key, j = parse_dq_string(line, i)
 	else
@@ -196,17 +196,64 @@ local function parse_kv_string(line)
 		while j <= #line and line:sub(j, j):match("[%w_]") do j = j + 1 end
 		key = line:sub(i, j - 1)
 	end
-	
+
 	if not key or key == "" then return nil, nil end
-	
+
 	i = skip_ws(line, j)
 	if line:sub(i, i) ~= "=" then return nil, nil end
-	
+
 	i = skip_ws(line, i + 1)
 	if line:sub(i, i) ~= "\"" then return nil, nil end
-	
+
 	local val = select(1, parse_dq_string(line, i))
 	return key, val
+end
+
+--- Parses a key=value line where the value can be a quoted string, a number,
+--- or a boolean. Used for the new `_meta` scalar fields (`defaut`, `color`).
+--- @param line string The line to parse.
+--- @return string|nil, any Returns key and typed value.
+local function parse_kv_value(line)
+	if type(line) ~= "string" then return nil, nil end
+
+	local i = skip_ws(line, 1)
+	local key, j
+
+	if line:sub(i, i) == "\"" then
+		key, j = parse_dq_string(line, i)
+	else
+		j = i
+		while j <= #line and line:sub(j, j):match("[%w_]") do j = j + 1 end
+		key = line:sub(i, j - 1)
+	end
+
+	if not key or key == "" then return nil, nil end
+
+	i = skip_ws(line, j)
+	if line:sub(i, i) ~= "=" then return nil, nil end
+	i = skip_ws(line, i + 1)
+
+	local c = line:sub(i, i)
+	if c == "\"" then
+		local val = select(1, parse_dq_string(line, i))
+		return key, val
+	elseif line:sub(i, i + 3) == "true" then
+		return key, true
+	elseif line:sub(i, i + 4) == "false" then
+		return key, false
+	else
+		-- Numeric value: stop at whitespace, comment, or end of line
+		local k = i
+		while k <= #line do
+			local cc = line:sub(k, k)
+			if cc:match("%s") or cc == "#" then break end
+			k = k + 1
+		end
+		local raw = line:sub(i, k - 1)
+		local num = tonumber(raw)
+		if num then return key, num end
+		return key, nil
+	end
 end
 
 
@@ -253,9 +300,22 @@ function M.parse(path)
     -- Raw file order (order [[sec]] headers appear) – used as fallback
 	local file_order = {}
 
+    -- Lazily creates a meta-section entry so per-section metadata (description,
+    -- defaut, color) can be filled in any order regardless of how the TOML
+    -- declares them ([_meta.sections] flat form vs [_meta.sections.<name>] table).
+	local function ensure_meta_section(name)
+		local entry = result.meta.sections[name]
+		if type(entry) ~= "table" then
+			entry = { description = "" }
+			result.meta.sections[name] = entry
+		end
+		return entry
+	end
+
     -- Parser state
-    local mode        = "top"   -- "top" | "meta" | "meta_sections" | "section"
-	local current_sec = nil
+    local mode             = "top"   -- "top" | "meta" | "meta_sections" | "meta_section" | "section"
+	local current_sec      = nil
+	local current_meta_sec = nil
 
 	local read_ok, read_err = pcall(function()
 		for raw_line in f:lines() do
@@ -270,6 +330,15 @@ function M.parse(path)
 				goto continue
 			end
 
+            -- Per-section meta block: [_meta.sections.<name>]
+			local meta_sec_name = line:match("^%[_meta%.sections%.([%w_%-]+)%]$")
+			if meta_sec_name then
+				mode             = "meta_section"
+				current_meta_sec = meta_sec_name
+				ensure_meta_section(current_meta_sec)
+				goto continue
+			end
+
 			if line == "[_meta]" then
 				mode = "meta"
 				goto continue
@@ -281,8 +350,10 @@ function M.parse(path)
 				current_sec  = sec_name
 				if not result.sections[current_sec] then
 					table.insert(file_order, current_sec)
+					local existing_meta = result.meta.sections[current_sec]
+					local desc = (type(existing_meta) == "table") and existing_meta.description or ""
 					result.sections[current_sec] = {
-						description = result.meta.sections[current_sec] or "",
+						description = desc,
 						entries     = {},
 					}
 				end
@@ -301,19 +372,40 @@ function M.parse(path)
 				if arr_val then
 					result.meta.sections_order = parse_string_array(arr_val)
 				else
-					local key, val = parse_kv_string(line)
-					if key == "description" and val then
+					local key, val = parse_kv_value(line)
+					if key == "description" and type(val) == "string" then
 						result.meta.description = val
+					elseif key == "delay" and type(val) == "number" then
+						result.meta.delay = val
+					elseif key == "color" and type(val) == "string" then
+						result.meta.color = val
 					end
 				end
 
 			elseif mode == "meta_sections" then
 				local key, val = parse_kv_string(line)
 				if key and val then
-					result.meta.sections[key] = val
+					local entry = ensure_meta_section(key)
+					entry.description = val
                     -- Back-fill description for already-created sections
 					if result.sections[key] then
 						result.sections[key].description = val
+					end
+				end
+
+			elseif mode == "meta_section" and current_meta_sec then
+				local key, val = parse_kv_value(line)
+				if key then
+					local entry = ensure_meta_section(current_meta_sec)
+					if key == "description" and type(val) == "string" then
+						entry.description = val
+						if result.sections[current_meta_sec] then
+							result.sections[current_meta_sec].description = val
+						end
+					elseif key == "delay" and type(val) == "number" then
+						entry.delay = val
+					elseif key == "color" and type(val) == "string" then
+						entry.color = val
 					end
 				end
 
@@ -350,9 +442,11 @@ function M.parse(path)
 				elseif result.meta.sections[item] then
                     -- Section listed in Order with a description but no [[]] block
                     -- create an empty placeholder so keymap.lua can detect it
+					local meta_entry = result.meta.sections[item]
+					local desc = (type(meta_entry) == "table") and meta_entry.description or meta_entry
 					result.sections[item] = {
-						description = result.meta.sections[item],
-						entries     = {},
+						description    = desc or "",
+						entries        = {},
 						is_placeholder = true,
 					}
 					table.insert(result.sections_order, item)

@@ -1,6 +1,8 @@
 [_meta]
 description = "Réduction des distances"
 sections_order = ["qu", "suffixesa", "-", "commaj", "commafarletters", "-", "deadkeyecircumflex", "ecircumflexe", "-", "spacearoundsymbols"]
+delay = 0.5
+color = "#fb8c00"
 
 [_meta.sections]
 qu = "Q devient QU quand elle est suivie d’une voyelle : qa = qua, qo = quo, …"

@@ -1,6 +1,8 @@
 [_meta]
 description = "Touche ★ et expansion de texte"
 sections_order = ["replace", "repeat", "-", "textexpansion", "textexpansionauto", "textexpansionemojis", "textexpansionsymbols", "textexpansionsymbolstypst", "-", "textexpansionpersonalinformation"]
+delay = 2.0
+color = "#e53935"
 
 [_meta.sections]
 replace = "Transformer la touche J en ★"
