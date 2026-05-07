@@ -925,7 +925,7 @@ initMenu() {
     ; ── Raccourcis and Tap-Holds — standalone, like HS Raccourcis and Karabiner ──
     if SubMenus.Has("Shortcuts") {
         A_TrayMenu.Add(GetCategoryTitle("Shortcuts"), SubMenus["Shortcuts"])
-        if ShortcutsAllEnabled {
+        if ShortcutsAnyEnabled {
             A_TrayMenu.Check(GetCategoryTitle("Shortcuts"))
         }
     }
