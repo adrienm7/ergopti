@@ -170,6 +170,17 @@ local function on_message(msg)
 				hotstrings_config.clear_override(c, s.name, nil)
 			end
 		end
+	elseif action == "set_all_grey" then
+		-- Set every category's file-level colour to grey and wipe any
+		-- per-section colour override so the grey cascades down. Delays
+		-- are left untouched.
+		local grey = "#6e6e73"
+		for _, c in ipairs(CATEGORY_ORDER) do
+			hotstrings_config.set_override(c, nil, "color", grey)
+			for _, s in ipairs(hotstrings_config.get_sections(c)) do
+				hotstrings_config.clear_override(c, s.name, "color")
+			end
+		end
 	elseif action == "close" then
 		M.close()
 		return

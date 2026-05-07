@@ -41,6 +41,10 @@ function resetAll() {
 	send({ action: "reset_all" });
 }
 
+function setAllGrey() {
+	send({ action: "set_all_grey" });
+}
+
 // ============================================================
 // 2/ Rendering
 // ============================================================
