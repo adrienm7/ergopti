@@ -38,6 +38,12 @@ global _TomlFileCache := Map()
 ;   }
 global HotstringGroupConfig := Map()
 
+; Pre-compiled regex for a full TOML hotstring entry line. Defined once at
+; module level so AHK does not recompile this ~100-char pattern for every line
+; scanned by LoadHotstringsSection (thousands of iterations at boot).
+global _HOTSTRING_ENTRY_PATTERN :=
+	'i)^"([^"\\]*(?:\\.[^"\\]*)*)"\s*=\s*\{\s*output\s*=\s*"([^"\\]*(?:\\.[^"\\]*)*)"\s*,\s*is_word\s*=\s*(true|false)\s*,\s*auto_expand\s*=\s*(true|false)\s*,\s*is_case_sensitive\s*=\s*(true|false)\s*,\s*final_result\s*=\s*(true|false)(?:\s*,\s*is_case_sensitive_strict\s*=\s*(true|false))?\s*\}'
+
 
 ; ========================================================
 ; ========================================================
@@ -150,14 +156,6 @@ LoadHotstringsSection(CategoryName, SectionName, FeatureConfig, ExtraOptions := 
     TargetSection := StrLower(SectionName)
     CurrentSection := ""
 
-    ; Build once and reuse for every matching entry; individual fields are
-    ; overridden per entry below when they differ from the section defaults.
-    ; The trailing ``(?:,\s*is_case_sensitive_strict\s*=\s*(true|false)\s*)?``
-    ; group makes the strict-case field optional — the generator only emits it
-    ; when true, and a missing field must be treated as false by the loader.
-    EntryPattern :=
-        'i)^"([^"\\]*(?:\\.[^"\\]*)*)"\s*=\s*\{\s*output\s*=\s*"([^"\\]*(?:\\.[^"\\]*)*)"\s*,\s*is_word\s*=\s*(true|false)\s*,\s*auto_expand\s*=\s*(true|false)\s*,\s*is_case_sensitive\s*=\s*(true|false)\s*,\s*final_result\s*=\s*(true|false)(?:\s*,\s*is_case_sensitive_strict\s*=\s*(true|false))?\s*\}'
-
     FileContent := ReadTomlFile(FilePath)
     loop parse, FileContent, "`n", "`r" {
         Line := Trim(A_LoopField, " `t")
@@ -180,7 +178,7 @@ LoadHotstringsSection(CategoryName, SectionName, FeatureConfig, ExtraOptions := 
             continue
         }
 
-        if !RegExMatch(Line, EntryPattern, &Match) {
+        if !RegExMatch(Line, _HOTSTRING_ENTRY_PATTERN, &Match) {
             continue
         }
 
@@ -413,7 +411,8 @@ ApplyTomlMetadataToFeatures(CategoryName) {
     if SectionsOrderRaw != "" {
         NewOrder := []
         Pos := 1
-        while (Pos <= StrLen(SectionsOrderRaw) and RegExMatch(SectionsOrderRaw, "`"([^`"]*)`"", &TokenMatch, Pos)) {
+        SectionsOrderRawLen := StrLen(SectionsOrderRaw)
+        while (Pos <= SectionsOrderRawLen and RegExMatch(SectionsOrderRaw, "`"([^`"]*)`"", &TokenMatch, Pos)) {
             Token := StrLower(TokenMatch[1])
             if Token == "-" {
                 NewOrder.Push("-")

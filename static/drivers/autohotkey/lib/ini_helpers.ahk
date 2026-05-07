@@ -155,16 +155,16 @@ IniBatchWrite(Path, Updates) {
 
     ; Single write. Use UTF-8 with BOM so downstream ``IniRead`` (Win32) sees
     ; the same encoding it would after a plain ``IniWrite`` call.
-    Blob := ""
-    for _, LineOut in Out {
-        Blob .= LineOut . "`r`n"
-    }
+    ; Streaming line by line avoids the O(n²) string reallocations that a
+    ; naive Blob .= line loop would cause for large INI files.
     try {
         f := FileOpen(Path, "w", "UTF-8")
         if !f {
             return false
         }
-        f.Write(Blob)
+        for _, LineOut in Out {
+            f.Write(LineOut . "`r`n")
+        }
         f.Close()
     } catch {
         return false
