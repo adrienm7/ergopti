@@ -488,7 +488,15 @@ CreateSubMenusRecursiveCommonCode(MenuParent, Key, Val, CategoryPath) {
         ; Recursively create nested submenus
         CreateSubMenusRecursive(SubMenu, Val, FullPath)
     } else if IsObject(Val) and Val.HasOwnProp("Enabled") {
-        MenuAddItem(MenuParent, CategoryPath, Key)
+        ; Features that carry a remap target letter (the EGrave/ECirc/EAcute/
+        ; AGrave accent shortcuts) render as a letter-picker sub-submenu so
+        ; the user can pick any of a-z directly from the tray instead of
+        ; juggling a binary toggle plus a separate Gui editor.
+        if Val.HasOwnProp("Letter") {
+            MenuAddLetterPicker(MenuParent, CategoryPath, Key)
+        } else {
+            MenuAddItem(MenuParent, CategoryPath, Key)
+        }
         ; Mirror HS personal_info module_placeholder: add an editor shortcut
         ; below the "Remplissage de formulaires" toggle
         if (StrLower(Key) == "textexpansionpersonalinformation") {
@@ -508,6 +516,75 @@ MenuAddItem(MenuParent, FeatureCategoryPath, FeatureName) {
     } else {
         MenuParent.Uncheck(MenuTitle)
     }
+}
+
+; Build a sub-submenu listing « Désactivé » + a-z, with the currently active
+; letter checked. Picking a letter sets it as the new mapping and enables
+; the feature; picking « Désactivé » turns the feature off without losing
+; the previously-selected letter (it is re-checked the next time the user
+; re-enables via picking any letter). The parent menu entry stays checked
+; whenever the feature is enabled, and its label remains the canonical
+; "<description><LETTER>" string built by GetMenuTitleByPath.
+MenuAddLetterPicker(MenuParent, FeatureCategoryPath, FeatureName) {
+    FullPath  := FeatureCategoryPath "." FeatureName
+    Feature   := GetFeatureByPath(FullPath)
+    MenuTitle := GetMenuTitleByPath(FullPath)
+
+    LetterMenu := Menu()
+
+    ; "Désactivé" entry — disables the remap without touching Letter
+    DisabledLabel := "Désactivé"
+    LetterMenu.Add(DisabledLabel, ((p) => (*) => SetFeatureLetterOff(p))(FullPath))
+    if !Feature.Enabled {
+        LetterMenu.Check(DisabledLabel)
+    }
+
+    LetterMenu.Add() ; Separator
+
+    ; 26 letters a-z, displayed uppercase for menu legibility
+    CurrentLetter := Feature.HasOwnProp("Letter") ? StrLower(Feature.Letter) : ""
+    Loop 26 {
+        L := Chr(Ord("a") + A_Index - 1)
+        UpperL := StrUpper(L)
+        LetterMenu.Add(UpperL, ((p, l) => (*) => SetFeatureLetter(p, l))(FullPath, L))
+        if Feature.Enabled and CurrentLetter == L {
+            LetterMenu.Check(UpperL)
+        }
+    }
+
+    MenuParent.Add(MenuTitle, LetterMenu)
+    if Feature.Enabled {
+        MenuParent.Check(MenuTitle)
+    }
+}
+
+; Sets the remap target letter on a feature and enables it. Persists both
+; flags via IniWrite so the change survives reload, then reloads to wire
+; the new shortcut at the layer level.
+SetFeatureLetter(FullPath, Letter) {
+    Feature := GetFeatureByPath(FullPath)
+    pos := InStr(FullPath, ".", , -1)
+    FeatureCategoryPath := SubStr(FullPath, 1, pos - 1)
+    FeatureName         := SubStr(FullPath, pos + 1)
+
+    Feature.Enabled := true
+    Feature.Letter  := Letter
+    IniWrite(true,  ConfigurationFile, FeatureCategoryPath, FeatureName . ".Enabled")
+    IniWrite(Letter, ConfigurationFile, FeatureCategoryPath, FeatureName . ".Letter")
+    Reload
+}
+
+; Disables a letter-picker feature without touching its Letter, so the
+; previously-selected mapping is restored on the next picker selection.
+SetFeatureLetterOff(FullPath) {
+    Feature := GetFeatureByPath(FullPath)
+    pos := InStr(FullPath, ".", , -1)
+    FeatureCategoryPath := SubStr(FullPath, 1, pos - 1)
+    FeatureName         := SubStr(FullPath, pos + 1)
+
+    Feature.Enabled := false
+    IniWrite(false, ConfigurationFile, FeatureCategoryPath, FeatureName . ".Enabled")
+    Reload
 }
 
 ; Retrieve a feature title by its path
@@ -783,7 +860,6 @@ initMenu() {
     if SubMenus.Has("Shortcuts") {
         SubMenus["Shortcuts"].Add()
         SubMenus["Shortcuts"].Add(MenuConfigurationShortcuts, BuildScriptShortcutsMenu())
-        SubMenus["Shortcuts"].Add("Modifier les raccourcis sur les lettres accentuées", ShortcutsEditor)
     }
 
     ; ── 🌐 Disposition clavier — mirrors the HS layout submenu naming ──
@@ -1358,54 +1434,6 @@ ProcessUserInput(gui, edits) {
     }
 
     MsgBox("Nouvelles coordonnées :`n`n" PersonalInformationSummary)
-    Reload
-}
-
-ShortcutsEditor(*) {
-    GuiToShow := Gui(, "Modifier les raccourcis par défaut")
-
-    GuiToShow.SetFont("bold")
-    GuiToShow.Add("Text", , "Raccourcis sur la touche È")
-    GuiToShow.SetFont("norm")
-    NewEGraveValue := GuiToShow.Add("Edit", "w300", Features["Shortcuts"]["EGrave"].Letter)
-
-    GuiToShow.SetFont("bold")
-    GuiToShow.Add("Text", , "Raccourcis sur la touche Ê")
-    GuiToShow.SetFont("norm")
-    NewECircValue := GuiToShow.Add("Edit", "w300", Features["Shortcuts"]["ECirc"].Letter)
-
-    GuiToShow.SetFont("bold")
-    GuiToShow.Add("Text", , "Raccourcis sur la touche É")
-    GuiToShow.SetFont("norm")
-    NewEAcuteValue := GuiToShow.Add("Edit", "w300", Features["Shortcuts"]["EAcute"].Letter)
-
-    GuiToShow.SetFont("bold")
-    GuiToShow.Add("Text", , "Raccourcis sur la touche À")
-    GuiToShow.SetFont("norm")
-    NewAGraveValue := GuiToShow.Add("Edit", "w300", Features["Shortcuts"]["AGrave"].Letter)
-
-    GuiToShow.Add("Button", "w100 Center", "OK").OnEvent(
-        "Click",
-        (*) => ModifyValues(GuiToShow, NewEGraveValue.Text, NewECircValue.Text, NewEAcuteValue.Text, NewAGraveValue
-            .Text
-        )
-    )
-    GuiToShow.Show("Center")
-}
-ModifyValues(gui, NewEGraveValue, NewECircValue, NewEAcuteValue, NewAGraveValue) {
-    Features["Shortcuts"]["EGrave"].Letter := NewEGraveValue
-    IniWrite(NewEGraveValue, ConfigurationFile, "Shortcuts", "EGrave" . "." . "Letter")
-
-    Features["Shortcuts"]["ECirc"].Letter := NewECircValue
-    IniWrite(NewECircValue, ConfigurationFile, "Shortcuts", "ECirc" . "." . "Letter")
-
-    Features["Shortcuts"]["EAcute"].Letter := NewEAcuteValue
-    IniWrite(NewEAcuteValue, ConfigurationFile, "Shortcuts", "EAcute" . "." . "Letter")
-
-    Features["Shortcuts"]["AGrave"].Letter := NewAGraveValue
-    IniWrite(NewAGraveValue, ConfigurationFile, "Shortcuts", "AGrave" . "." . "Letter")
-
-    gui.Destroy()
     Reload
 }
 
