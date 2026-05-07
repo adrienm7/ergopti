@@ -12,6 +12,8 @@
 ; 1. Single reused Gui v2 — created on first show, then mutated on subsequent
 ;    calls. Reduces flicker and keeps allocations bounded for high-frequency
 ;    updates while the user is still typing the trigger.
+;    Rounded-corner DllCalls fire on every Gui rebuild (required since the
+;    window handle changes each time the Gui is destroyed and recreated).
 ; 2. Click-through via WS_EX_TRANSPARENT (E0x20) so the tooltip never steals
 ;    focus from the editor underneath, and never blocks selection.
 ; 3. Caret-anchored positioning via CaretGetPos with a fallback to the mouse
