@@ -101,6 +101,18 @@ UnescapeTomlString(s) {
 LoadHotstringsSection(CategoryName, SectionName, FeatureConfig, ExtraOptions := Map()) {
     global ScriptInformation, _GENERATED_HOTSTRINGS
 
+    ; Per-group delay gating — override the per-feature TimeActivationSeconds
+    ; with the value resolved from the TOML metadata + user override file.
+    ; This makes the gating identical across drivers without having to keep
+    ; a separate config table per feature. The same FeatureConfig field is
+    ; consumed by both the regex fallback below and the generated fast path.
+    try {
+        Resolved := HotstringsResolve(CategoryName, SectionName)
+        if (Resolved.Delay != "") {
+            FeatureConfig.TimeActivationSeconds := Resolved.Delay
+        }
+    }
+
     ; Fast path — bundled categories were pre-compiled to literal AHK calls by
     ; ``tools/compile_hotstrings.py``. The generated loader registers the
     ; hotstrings directly without touching the TOML file or regex parser.
