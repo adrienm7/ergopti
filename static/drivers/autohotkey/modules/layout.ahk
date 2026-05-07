@@ -1,4 +1,4 @@
-﻿; static/drivers/autohotkey/modules/layout.ahk
+; static/drivers/autohotkey/modules/layout.ahk
 
 ; ==============================================================================
 ; MODULE: Layout
@@ -573,7 +573,7 @@ AddRollEqual() {
 	LastSentCharacter := GetLastSentCharacterAt(-1)
 	if (
 		LastSentCharacter == "<" or LastSentCharacter == ">")
-	and A_TimeSincePriorHotkey < (Features["Rolls"]["ChevronEqual"].TimeActivationSeconds * 1000
+	and A_TimeSincePriorHotkey < (HotstringsResolve("rolls", "ChevronEqual").Delay * 1000
 	) {
 		SendNewResult("=")
 		UpdateLastSentCharacter("=")
@@ -597,7 +597,7 @@ HashtagOrQuote() {
 	LastSentCharacter := GetLastSentCharacterAt(-1)
 	if (
 		LastSentCharacter == "(" or LastSentCharacter == "[")
-	and A_TimeSincePriorHotkey < (Features["Rolls"]["HashtagQuote"].TimeActivationSeconds * 1000
+	and A_TimeSincePriorHotkey < (HotstringsResolve("rolls", "HashtagQuote").Delay * 1000
 	) {
 		SendNewResult("`"")
 		UpdateLastSentCharacter("`"")

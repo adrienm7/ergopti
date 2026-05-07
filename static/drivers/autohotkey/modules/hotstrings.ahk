@@ -1,4 +1,4 @@
-﻿; static/drivers/autohotkey/modules/hotstrings.ahk
+; static/drivers/autohotkey/modules/hotstrings.ahk
 
 ; ==============================================================================
 ; MODULE: Hotstrings
@@ -37,7 +37,7 @@ if Features["DistancesReduction"]["DeadKeyECircumflex"].Enabled {
 		; We specify the result with the vowels first to be sure it will override any problems
 		CreateCaseSensitiveHotstrings(
 			"*?", "ê" . Vowel, DeadkeyMappingCircumflex[Vowel],
-			Map("TimeActivationSeconds", Features["DistancesReduction"]["DeadKeyECircumflex"].TimeActivationSeconds
+			Map("TimeActivationSeconds", HotstringsResolve("distancesreduction", "DeadKeyECircumflex").Delay
 			)
 		)
 		; Necessary for things to work, as we define them already
@@ -92,7 +92,7 @@ if Features["DistancesReduction"]["ECircumflexE"].Enabled {
 ; ========================================================
 
 if Features["DistancesReduction"]["CommaJ"].Enabled {
-	CommaJOptions := Map("TimeActivationSeconds", Features["DistancesReduction"]["CommaJ"].TimeActivationSeconds)
+	CommaJOptions := Map("TimeActivationSeconds", HotstringsResolve("distancesreduction", "CommaJ").Delay)
 	CreateCaseSensitiveHotstrings("*?", ",à", "j", CommaJOptions)
 	CreateCaseSensitiveHotstrings("*?", ",a", "ja", CommaJOptions)
 	CreateCaseSensitiveHotstrings("*?", ",e", "je", CommaJOptions)
@@ -112,7 +112,7 @@ if Features["DistancesReduction"]["CommaJ"].Enabled {
 ; ============================================================================
 
 if Features["DistancesReduction"]["CommaFarLetters"].Enabled {
-	CommaFarOptions := Map("TimeActivationSeconds", Features["DistancesReduction"]["CommaFarLetters"].TimeActivationSeconds)
+	CommaFarOptions := Map("TimeActivationSeconds", HotstringsResolve("distancesreduction", "CommaFarLetters").Delay)
 	; === Top row ===
 	CreateCaseSensitiveHotstrings("*?", ",è", "z", CommaFarOptions)
 	CreateCaseSensitiveHotstrings("*?", ",y", "k", CommaFarOptions)
@@ -172,27 +172,27 @@ if Features["SFBsReduction"]["IÉ"].Enabled and Features["SFBsReduction"]["BU"].
 	CreateCaseSensitiveHotstrings(
 		; Fix éà★ ➜ ébu insteaf of iéé
 		"*?", "ié★", "ébu",
-		Map("TimeActivationSeconds", Features["SFBsReduction"]["BU"].TimeActivationSeconds)
+		Map("TimeActivationSeconds", HotstringsResolve("sfbsreduction", "BU").Delay)
 	)
 }
 if Features["SFBsReduction"]["BU"].Enabled {
 	CreateCaseSensitiveHotstrings(
 		"*?", "à★", "bu",
-		Map("TimeActivationSeconds", Features["SFBsReduction"]["BU"].TimeActivationSeconds)
+		Map("TimeActivationSeconds", HotstringsResolve("sfbsreduction", "BU").Delay)
 	)
 	CreateCaseSensitiveHotstrings(
 		"*?", "àu", "ub",
-		Map("TimeActivationSeconds", Features["SFBsReduction"]["BU"].TimeActivationSeconds)
+		Map("TimeActivationSeconds", HotstringsResolve("sfbsreduction", "BU").Delay)
 	)
 }
 if Features["SFBsReduction"]["IÉ"].Enabled {
 	CreateCaseSensitiveHotstrings(
 		"*?", "àé", "éi",
-		Map("TimeActivationSeconds", Features["SFBsReduction"]["IÉ"].TimeActivationSeconds)
+		Map("TimeActivationSeconds", HotstringsResolve("sfbsreduction", "IÉ").Delay)
 	)
 	CreateCaseSensitiveHotstrings(
 		"*?", "éà", "ié",
-		Map("TimeActivationSeconds", Features["SFBsReduction"]["IÉ"].TimeActivationSeconds)
+		Map("TimeActivationSeconds", HotstringsResolve("sfbsreduction", "IÉ").Delay)
 	)
 }
 
@@ -241,7 +241,7 @@ if Features["Rolls"]["HC"].Enabled {
 	LoadHotstringsSection("rolls", "hc", Features["Rolls"]["HC"])
 }
 if Features["Rolls"]["Assign"].Enabled {
-	AssignOptions := Map("TimeActivationSeconds", Features["Rolls"]["Assign"].TimeActivationSeconds)
+	AssignOptions := Map("TimeActivationSeconds", HotstringsResolve("rolls", "Assign").Delay)
 	AssignReplacement := SpaceAroundSymbols . ":=" . SpaceAroundSymbols
 	CreateHotstring("*?", " #ç", AssignReplacement, AssignOptions)
 	CreateHotstring("*?", " #!", AssignReplacement, AssignOptions)
@@ -249,7 +249,7 @@ if Features["Rolls"]["Assign"].Enabled {
 	CreateHotstring("*?", "#!", AssignReplacement, AssignOptions)
 }
 if Features["Rolls"]["NotEqual"].Enabled {
-	NotEqualOptions := Map("TimeActivationSeconds", Features["Rolls"]["NotEqual"].TimeActivationSeconds)
+	NotEqualOptions := Map("TimeActivationSeconds", HotstringsResolve("rolls", "NotEqual").Delay)
 	NotEqualReplacement := SpaceAroundSymbols . "!=" . SpaceAroundSymbols
 	CreateHotstring("*?", " ç#", NotEqualReplacement, NotEqualOptions)
 	CreateHotstring("*?", " !#", NotEqualReplacement, NotEqualOptions)
@@ -265,7 +265,7 @@ if Features["Rolls"]["CX"].Enabled {
 
 ; === Middle row ===
 if Features["Rolls"]["EqualString"].Enabled {
-	EqualStringOpts := Map("OnlyText", False, "TimeActivationSeconds", Features["Rolls"]["EqualString"].TimeActivationSeconds)
+	EqualStringOpts := Map("OnlyText", False, "TimeActivationSeconds", HotstringsResolve("rolls", "EqualString").Delay)
 	EqualStringRepl := SpaceAroundSymbols . "=" . SpaceAroundSymbols . "`"`"{Left}"
 	CreateHotstring("*?", " [)", EqualStringRepl, EqualStringOpts)
 	CreateHotstring("*?", "[)", EqualStringRepl, EqualStringOpts)
@@ -275,7 +275,7 @@ if Features["Rolls"]["EnglishNegation"].Enabled {
 	; straight apostrophe is converted downstream when relevant.
 	CreateHotstring(
 		"*?", "nt'", "n't",
-		Map("TimeActivationSeconds", Features["Rolls"]["EnglishNegation"].TimeActivationSeconds)
+		Map("TimeActivationSeconds", HotstringsResolve("rolls", "EnglishNegation").Delay)
 	)
 }
 
@@ -283,31 +283,31 @@ if Features["Rolls"]["EnglishNegation"].Enabled {
 ; Each operator roll registers two triggers: one with a leading space (so the
 ; operator fires mid-sentence) and one without (start of expression / line).
 if Features["Rolls"]["LeftArrow"].Enabled {
-	Opts := Map("TimeActivationSeconds", Features["Rolls"]["LeftArrow"].TimeActivationSeconds)
+	Opts := Map("TimeActivationSeconds", HotstringsResolve("rolls", "LeftArrow").Delay)
 	Repl := SpaceAroundSymbols . "➜" . SpaceAroundSymbols
 	CreateHotstring("*?", " =+", Repl, Opts)
 	CreateHotstring("*?", "=+", Repl, Opts)
 }
 if Features["Rolls"]["AssignArrowEqualRight"].Enabled {
-	Opts := Map("TimeActivationSeconds", Features["Rolls"]["AssignArrowEqualRight"].TimeActivationSeconds)
+	Opts := Map("TimeActivationSeconds", HotstringsResolve("rolls", "AssignArrowEqualRight").Delay)
 	Repl := SpaceAroundSymbols . "=>" . SpaceAroundSymbols
 	CreateHotstring("*?", " $=", Repl, Opts)
 	CreateHotstring("*?", "$=", Repl, Opts)
 }
 if Features["Rolls"]["AssignArrowEqualLeft"].Enabled {
-	Opts := Map("TimeActivationSeconds", Features["Rolls"]["AssignArrowEqualLeft"].TimeActivationSeconds)
+	Opts := Map("TimeActivationSeconds", HotstringsResolve("rolls", "AssignArrowEqualLeft").Delay)
 	Repl := SpaceAroundSymbols . "<=" . SpaceAroundSymbols
 	CreateHotstring("*?", " =$", Repl, Opts)
 	CreateHotstring("*?", "=$", Repl, Opts)
 }
 if Features["Rolls"]["AssignArrowMinusRight"].Enabled {
-	Opts := Map("TimeActivationSeconds", Features["Rolls"]["AssignArrowMinusRight"].TimeActivationSeconds)
+	Opts := Map("TimeActivationSeconds", HotstringsResolve("rolls", "AssignArrowMinusRight").Delay)
 	Repl := SpaceAroundSymbols . "->" . SpaceAroundSymbols
 	CreateHotstring("*?", " +?", Repl, Opts)
 	CreateHotstring("*?", "+?", Repl, Opts)
 }
 if Features["Rolls"]["AssignArrowMinusLeft"].Enabled {
-	Opts := Map("TimeActivationSeconds", Features["Rolls"]["AssignArrowMinusLeft"].TimeActivationSeconds)
+	Opts := Map("TimeActivationSeconds", HotstringsResolve("rolls", "AssignArrowMinusLeft").Delay)
 	Repl := SpaceAroundSymbols . "<-" . SpaceAroundSymbols
 	CreateHotstring("*?", " ?+", Repl, Opts)
 	CreateHotstring("*?", "?+", Repl, Opts)
@@ -337,7 +337,7 @@ if Features["Autocorrection"]["TypographicApostrophe"].Enabled {
 	for Letter in StrSplit("abcdefghijklmnopqrstuvwxyz") {
 		CreateCaseSensitiveHotstrings(
 			"*?", "y'" . Letter, "y'" . Letter,
-			Map("TimeActivationSeconds", Features["Autocorrection"]["TypographicApostrophe"].TimeActivationSeconds)
+			Map("TimeActivationSeconds", HotstringsResolve("autocorrection", "TypographicApostrophe").Delay)
 		)
 	}
 }

@@ -210,7 +210,11 @@ _SortStringsInPlace(Arr) {
 HotstringsResolve(CategoryName, SectionName := "") {
     global _HotstringsOverrides, GLOBAL_DEFAULT_DELAY
     Cat := StrLower(CategoryName)
-    Sec := StrLower(SectionName)
+    ; Section names in features_config use PascalCase that may contain French
+    ; letters (``IÉ``, ``ÊCirc``…). The TOML keeps the ASCII-folded lowercase
+    ; form (``ie``, ``ecirc``…), so fold on the way in to keep call-sites
+    ; ergonomic — they can pass the same string they already use elsewhere.
+    Sec := SectionName != "" ? FoldAsciiLower(SectionName) : ""
 
     UserCat := _HotstringsOverrides.Has(Cat) ? _HotstringsOverrides[Cat] : ""
     UserSec := (UserCat != "" and Sec != "" and UserCat.Sections.Has(Sec))

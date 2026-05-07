@@ -29,11 +29,29 @@ global _TooltipTimer := 0
 ; Style constants.
 global _TOOLTIP_FONT_NAME      := "Segoe UI"
 global _TOOLTIP_FONT_SIZE      := 11
-global _TOOLTIP_PADDING_X      := 10
-global _TOOLTIP_PADDING_Y      := 6
+global _TOOLTIP_PADDING_X      := 14
+global _TOOLTIP_PADDING_Y      := 8
 global _TOOLTIP_OFFSET_BELOW   := 18   ; pixels below the anchor (caret / box)
 global _TOOLTIP_OFFSET_RIGHT   := 4    ; small horizontal nudge for caret anchor
-global _TOOLTIP_DEFAULT_BG_HEX := "303030"
+global _TOOLTIP_DEFAULT_BG_HEX := "1A1A1A"
+; Pixel radius for the rounded corners. Capped at runtime to half of the
+; smallest gui dimension so a small tooltip (e.g. just "c'") does not have
+; its content clipped by overlapping corner arcs.
+global _TOOLTIP_CORNER_RADIUS  := 8
+
+; Tint mixing — mirrors Hammerspoon's renderer.lua (lightness 0.10, saturation
+; 0.40). The accent colour only contributes its hue; the background stays a
+; near-black with a subtle wash so the text remains readable on every group.
+global _TOOLTIP_LIGHTNESS  := 0.10
+global _TOOLTIP_SATURATION := 0.40
+
+; Auto-hide is shortened by this many seconds (with a hard floor) so the
+; tooltip vanishes a beat before the actual expansion window closes —
+; otherwise the user can still see the preview and press the magic key
+; just past the deadline, where the expansion silently does not fire.
+; Mirrors Hammerspoon's TIMEOUT_DECREMENT_SEC / TIMEOUT_FLOOR_SEC.
+global _TOOLTIP_TIMEOUT_DECREMENT_SEC := 0.15
+global _TOOLTIP_TIMEOUT_FLOOR_SEC     := 0.05
 
 ; Mirrors Hammerspoon's max_caret_height = 80 — when the focused element is
 ; tall (e.g. a multi-line text area, a list, a whole panel) we treat it as
@@ -57,19 +75,21 @@ global _TOOLTIP_WINDOW_BOTTOM_INSET_PX := 60
 ; back to the neutral default. DurationSec is optional — pass 0 (or omit) to
 ; let the tooltip stay visible until TooltipHide() is called explicitly.
 TooltipShow(Text, ColorHex := "", DurationSec := 0) {
-    global _TooltipText, _TooltipTimer
-    BgHex := _TooltipNormaliseHex(ColorHex)
-    FgHex := _TooltipPickForeground(BgHex)
+    global _TooltipTimer
+    ; The accent only contributes its hue — the actual background is a near-
+    ; black tinted with that hue (mirrors Hammerspoon's renderer behaviour).
+    BgHex := _TooltipMixTintHex(ColorHex)
+    FgHex := "FFFFFF"   ; always white on the dark mixed background
 
-    _TooltipEnsureGui(BgHex, FgHex)
-    _TooltipText.Value := Text
-
-    ; Resize the tooltip to fit the new content. Setting Width auto-recomputes
-    ; the height because the Text control auto-wraps.
-    _TooltipText.Move(, , , )
+    ; Recreate the Gui (and its Text control) on every show so the control
+    ; auto-sizes to the new content. AHK v2 does not resize a Text control
+    ; when its `.Value` changes, so reusing the previous Gui produced a
+    ; truncated tooltip ("c'" instead of "c'était").
+    _TooltipBuildGui(BgHex, FgHex, Text)
 
     Pos := _TooltipResolvePosition()
-    _TooltipGui.Show(Format("x{1} y{2} NoActivate", Pos.X, Pos.Y))
+    _TooltipGui.Show(Format("AutoSize x{1} y{2} NoActivate", Pos.X, Pos.Y))
+    _TooltipApplyRoundedCorners()
 
     ; Reset the auto-hide timer on every refresh so a flurry of partial-prefix
     ; updates does not race with a stale timer firing mid-update.
@@ -77,8 +97,11 @@ TooltipShow(Text, ColorHex := "", DurationSec := 0) {
         SetTimer(_TooltipTimer, 0)
     }
     if (DurationSec > 0) {
+        global _TOOLTIP_TIMEOUT_DECREMENT_SEC, _TOOLTIP_TIMEOUT_FLOOR_SEC
+        Effective := Max(_TOOLTIP_TIMEOUT_FLOOR_SEC,
+            DurationSec - _TOOLTIP_TIMEOUT_DECREMENT_SEC)
         _TooltipTimer := () => TooltipHide()
-        SetTimer(_TooltipTimer, -Round(DurationSec * 1000))
+        SetTimer(_TooltipTimer, -Round(Effective * 1000))
     }
 }
 
@@ -101,59 +124,209 @@ TooltipHide() {
 ; ============================================================
 ; ============================================================
 
-; Lazily create (or recreate, when the background colour changed) the shared
-; Gui v2. Re-creation is needed because AHK v2 only honours BackColor at
-; construction time; mutating it on a live Gui has no effect.
-_TooltipEnsureGui(BgHex, FgHex) {
+; Build a fresh Gui + Text control sized for the given content. We rebuild
+; on every show because AHK v2 does not resize a Text control after its
+; `.Value` is set; reusing the previous Gui truncated the visible string.
+;
+; The Static (Text) control's auto-sizing in AHK v2 does not always pick up
+; the gui's SetFont when measuring the natural width — short strings can
+; end up clipped because the measurement is done with a smaller fallback
+; font. We therefore measure the text ourselves with GetTextExtentPoint32W
+; against a font handle matching what the control will actually render with,
+; then pass explicit `w` / `h` options so the control is the right size.
+_TooltipBuildGui(BgHex, FgHex, Text) {
     global _TooltipGui, _TooltipText
     global _TOOLTIP_FONT_NAME, _TOOLTIP_FONT_SIZE
     global _TOOLTIP_PADDING_X, _TOOLTIP_PADDING_Y
 
     if _TooltipGui {
-        ; Refresh background only when it changes — otherwise we're done.
-        if (_TooltipGui.BackColor == BgHex) {
-            return
-        }
         try _TooltipGui.Destroy()
-        _TooltipGui := 0
-        _TooltipText := 0
     }
+    _TooltipGui := 0
+    _TooltipText := 0
 
     G := Gui("+AlwaysOnTop +ToolWindow -Caption +E0x20 +LastFound")
     G.BackColor := BgHex
     G.MarginX := _TOOLTIP_PADDING_X
     G.MarginY := _TOOLTIP_PADDING_Y
     G.SetFont("c" . FgHex . " s" . _TOOLTIP_FONT_SIZE, _TOOLTIP_FONT_NAME)
-    Ctrl := G.Add("Text", "BackgroundTrans", "")
+
+    Size := _TooltipMeasureText(Text)
+    ; +4 px horizontal slack — Windows kerning / italic overhang sometimes
+    ; needs a hair more pixels than GetTextExtentPoint32W reports.
+    Opts := "BackgroundTrans 0xC w" . (Size.W + 4) . " h" . Size.H
+    _TooltipText := G.Add("Text", Opts, Text)
     _TooltipGui := G
-    _TooltipText := Ctrl
 }
 
-; Strip leading "#", upper-case, fall back to default when empty / malformed.
-_TooltipNormaliseHex(ColorHex) {
-    global _TOOLTIP_DEFAULT_BG_HEX
-    H := Trim(ColorHex)
+; Measure ``Text`` width and height in pixels using a transient GDI font
+; that mirrors the one ``Gui.SetFont`` will apply to the control. Returns
+; { W, H } with sensible fallbacks if any DllCall fails (the tooltip
+; should never crash the script over a measurement glitch).
+_TooltipMeasureText(Text) {
+    global _TOOLTIP_FONT_NAME, _TOOLTIP_FONT_SIZE
+
+    Fallback := { W: Max(80, StrLen(Text) * Round(_TOOLTIP_FONT_SIZE * 0.75)),
+                  H: _TOOLTIP_FONT_SIZE + 8 }
+
+    HDC := DllCall("User32\GetDC", "Ptr", 0, "Ptr")
+    if !HDC {
+        return Fallback
+    }
+
+    ; Convert point size to device units. CreateFont expects a negative
+    ; lfHeight in pixels for character-cell height matching SetFont points.
+    DPI := DllCall("Gdi32\GetDeviceCaps", "Ptr", HDC, "Int", 90, "Int")  ; LOGPIXELSY
+    if (DPI <= 0) {
+        DPI := 96
+    }
+    HeightPx := -Round(_TOOLTIP_FONT_SIZE * DPI / 72)
+
+    HFont := DllCall("Gdi32\CreateFontW",
+        "Int", HeightPx, "Int", 0, "Int", 0, "Int", 0,
+        "Int", 400, "UInt", 0, "UInt", 0, "UInt", 0,
+        "UInt", 1, "UInt", 0, "UInt", 0, "UInt", 0, "UInt", 0,
+        "WStr", _TOOLTIP_FONT_NAME,
+        "Ptr")
+    if !HFont {
+        DllCall("User32\ReleaseDC", "Ptr", 0, "Ptr", HDC)
+        return Fallback
+    }
+
+    OldFont := DllCall("Gdi32\SelectObject", "Ptr", HDC, "Ptr", HFont, "Ptr")
+    Size := Buffer(8, 0)
+    Ok := DllCall("Gdi32\GetTextExtentPoint32W",
+        "Ptr", HDC, "WStr", Text, "Int", StrLen(Text), "Ptr", Size)
+
+    Width := Ok ? NumGet(Size, 0, "Int") : Fallback.W
+    Height := Ok ? NumGet(Size, 4, "Int") : Fallback.H
+
+    DllCall("Gdi32\SelectObject", "Ptr", HDC, "Ptr", OldFont)
+    DllCall("Gdi32\DeleteObject", "Ptr", HFont)
+    DllCall("User32\ReleaseDC", "Ptr", 0, "Ptr", HDC)
+
+    if (Width <= 0 or Height <= 0) {
+        return Fallback
+    }
+    return { W: Width, H: Height }
+}
+
+; Apply a rounded-rectangle clipping region to the tooltip window so the
+; final shape matches the Hammerspoon look (12 px radius). Done after
+; Show() because the window must already exist for SetWindowRgn to apply.
+; CreateRoundRectRgn is owned by the system once we hand it to SetWindowRgn
+; (last argument bDelete = 1), so we never call DeleteObject ourselves.
+_TooltipApplyRoundedCorners() {
+    global _TooltipGui, _TOOLTIP_CORNER_RADIUS
+    if !_TooltipGui {
+        return
+    }
+    W := 0
+    H := 0
+    try _TooltipGui.GetClientPos(, , &W, &H)
+    if (W <= 0 or H <= 0) {
+        return
+    }
+    ; Cap the radius so the corner arcs never overlap and clip the content.
+    ; Without this guard, a small tooltip (W or H < 2 * radius) ends up with
+    ; opposing corners eating into the same pixels and the text is cut.
+    Radius := _TOOLTIP_CORNER_RADIUS
+    if (Radius * 2 > W) {
+        Radius := W // 2
+    }
+    if (Radius * 2 > H) {
+        Radius := H // 2
+    }
+    Rgn := DllCall("Gdi32\CreateRoundRectRgn",
+        "Int", 0, "Int", 0,
+        "Int", W + 1, "Int", H + 1,
+        "Int", Radius * 2,
+        "Int", Radius * 2,
+        "Ptr")
+    if Rgn {
+        DllCall("User32\SetWindowRgn", "Ptr", _TooltipGui.Hwnd, "Ptr", Rgn, "Int", 1)
+    }
+}
+
+; Mix an accent colour with a near-black background, mirroring Hammerspoon's
+; renderer.lua: only the hue of the accent contributes — lightness is fixed
+; at _TOOLTIP_LIGHTNESS and saturation at _TOOLTIP_SATURATION, producing the
+; characteristic "dark grey with a coloured wash" look. An empty / invalid
+; hex falls back to the neutral default background. Returns a hex string
+; without the leading '#', upper-case (the form Gui.BackColor expects).
+_TooltipMixTintHex(AccentHex) {
+    global _TOOLTIP_DEFAULT_BG_HEX, _TOOLTIP_LIGHTNESS, _TOOLTIP_SATURATION
+
+    H := Trim(AccentHex)
     if (SubStr(H, 1, 1) == "#") {
         H := SubStr(H, 2)
     }
     if !RegExMatch(H, "^[0-9A-Fa-f]{6}$") {
         return _TOOLTIP_DEFAULT_BG_HEX
     }
-    return StrUpper(H)
-}
 
-; Pick a readable foreground color (white / black) given a background hex
-; using a perceptual-luminance threshold — same heuristic Hammerspoon uses
-; via NSColor's whitestComponent comparison. The boundary 0.55 yields good
-; contrast on the saturated mid-tones we use for group colours (red/green/
-; blue/orange) without flipping on edge cases.
-_TooltipPickForeground(BgHex) {
-    R := Integer("0x" . SubStr(BgHex, 1, 2))
-    G := Integer("0x" . SubStr(BgHex, 3, 2))
-    B := Integer("0x" . SubStr(BgHex, 5, 2))
-    ; Rec.601 luminance, scaled to [0,1].
-    L := (0.299 * R + 0.587 * G + 0.114 * B) / 255
-    return (L > 0.55) ? "000000" : "FFFFFF"
+    R := Integer("0x" . SubStr(H, 1, 2)) / 255.0
+    G := Integer("0x" . SubStr(H, 3, 2)) / 255.0
+    B := Integer("0x" . SubStr(H, 5, 2)) / 255.0
+
+    MaxC := Max(R, G, B)
+    MinC := Min(R, G, B)
+    Delta := MaxC - MinC
+    Hue := 0.0
+    if (Delta > 0.0001) {
+        if (MaxC == R) {
+            Hue := Mod((G - B) / Delta + 6, 6)
+        } else if (MaxC == G) {
+            Hue := (B - R) / Delta + 2
+        } else {
+            Hue := (R - G) / Delta + 4
+        }
+        Hue := Hue / 6
+    }
+
+    L := _TOOLTIP_LIGHTNESS
+    S := _TOOLTIP_SATURATION
+    C := (1 - Abs(2 * L - 1)) * S
+    H6 := Hue * 6
+    X := C * (1 - Abs(Mod(H6, 2) - 1))
+    M := L - C / 2
+
+    Nr := 0.0
+    Ng := 0.0
+    Nb := 0.0
+    if (H6 < 1) {
+        Nr := C
+        Ng := X
+        Nb := 0
+    } else if (H6 < 2) {
+        Nr := X
+        Ng := C
+        Nb := 0
+    } else if (H6 < 3) {
+        Nr := 0
+        Ng := C
+        Nb := X
+    } else if (H6 < 4) {
+        Nr := 0
+        Ng := X
+        Nb := C
+    } else if (H6 < 5) {
+        Nr := X
+        Ng := 0
+        Nb := C
+    } else {
+        Nr := C
+        Ng := 0
+        Nb := X
+    }
+
+    R8 := Round((Nr + M) * 255)
+    G8 := Round((Ng + M) * 255)
+    B8 := Round((Nb + M) * 255)
+    R8 := Max(0, Min(255, R8))
+    G8 := Max(0, Min(255, G8))
+    B8 := Max(0, Min(255, B8))
+    return Format("{1:02X}{2:02X}{3:02X}", R8, G8, B8)
 }
 
 ; Resolve the screen position where the tooltip should appear, mirroring the
@@ -175,7 +348,8 @@ _TooltipResolvePosition() {
     global _TOOLTIP_MAX_CARET_HEIGHT_PX, _TOOLTIP_WINDOW_BOTTOM_INSET_PX
 
     ; ----- 1. Native caret -----------------------------------------------
-    Cx := 0, Cy := 0
+    Cx := 0
+    Cy := 0
     GotCaret := false
     try GotCaret := CaretGetPos(&Cx, &Cy)
     if (GotCaret and (Cx != 0 or Cy != 0)) {
@@ -209,7 +383,10 @@ _TooltipResolvePosition() {
 
     ; ----- 3. Active window frame ----------------------------------------
     try {
-        Wx := 0, Wy := 0, Ww := 0, Wh := 0
+        Wx := 0
+        Wy := 0
+        Ww := 0
+        Wh := 0
         WinGetPos(&Wx, &Wy, &Ww, &Wh, "A")
         if (Ww > 0 and Wh > 0) {
             return { X: Wx + Ww // 2,
@@ -218,7 +395,8 @@ _TooltipResolvePosition() {
     }
 
     ; ----- 4. Mouse cursor -----------------------------------------------
-    Mx := 0, My := 0
+    Mx := 0
+    My := 0
     try MouseGetPos(&Mx, &My)
     return { X: Mx, Y: My + _TOOLTIP_OFFSET_BELOW }
 }
