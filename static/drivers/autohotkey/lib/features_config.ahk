@@ -243,6 +243,7 @@ global Features := Map(
             "MicrosoftBold",
             "Save",
             "CtrlJ",
+            "PasteWithoutFormatting",
             "<",
             ">Combinaisons modificateurs",
             "AltGrLAlt",
@@ -299,6 +300,10 @@ global Features := Map(
         "CtrlJ", {
             Enabled: False,
             Description: "Ctrl + S = Ctrl + J",
+        },
+        "PasteWithoutFormatting", {
+            Enabled: False,
+            Description: "Ctrl + Shift + V : coller sans la mise en forme. Excel garde son comportement natif",
         },
         "AltGrLAlt", Map(
             "BackSpace", {

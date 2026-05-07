@@ -71,6 +71,22 @@ if Features["Shortcuts"]["MicrosoftBold"].Enabled {
     )
 }
 
+if Features["Shortcuts"]["PasteWithoutFormatting"].Enabled {
+    ; Ctrl + Shift + V — paste plain text everywhere except Excel, which keeps
+    ; its native paste-special behaviour (re-assigning the standard combo there
+    ; would break the user's expected workflow).
+    AddShortcut("^+", "v", PasteWithoutFormatting)
+
+    PasteWithoutFormatting(*) {
+        if not WinActive("ahk_exe EXCEL.EXE") {
+            A_Clipboard := A_Clipboard
+            SendFinalResult("^v")
+        } else {
+            SendFinalResult("^+v")
+        }
+    }
+}
+
 ; ==================================
 ; ==================================
 ; ======= 4/ ALTGR SHORTCUTS =======
