@@ -114,7 +114,7 @@ end
 local function normalise_output(s)
 	if type(s) ~= "string" then return "" end
 	
-	s = s:gsub("\r\n", "{Enter}"):gsub("\r", "{Enter}"):gsub("\n", "{Enter}")
+	s = s:gsub("\r\n", "{Enter}"):gsub("\r", "{Enter}"):gsub("\n", "{Enter}"):gsub("\t", "{Tab}")
 	
 	local aliases = {
 		esc="Escape", escape="Escape",

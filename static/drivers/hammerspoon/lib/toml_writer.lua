@@ -51,11 +51,13 @@ local function esc(s)
 	s = s:gsub("\\", "\\\\")
 	s = s:gsub("\"",  "\\\"")
 	
-    -- Normalize literal newlines → {Enter} (never store raw \n in TOML)
+    -- Normalize literal newlines → {Enter} and tabs → {Tab} so the on-disk
+    -- format never mixes raw \n / \t with {Enter} / {Tab} for the same kind
+    -- of payload (matches the AHK side's EscapeTomlValue behaviour).
 	s = s:gsub("\r\n", "{Enter}")
 	s = s:gsub("\r",   "{Enter}")
 	s = s:gsub("\n",   "{Enter}")
-	s = s:gsub("\t", "\\t")
+	s = s:gsub("\t",   "{Tab}")
 	
     -- Normalize token aliases  e.g. {Esc} → {Escape}, {return} → {Enter}
 	s = s:gsub("{([^}]+)}", function(name)

@@ -54,21 +54,32 @@ PersonalInfoTomlPath() {
 ; ==========================================================
 
 ; Escape a raw string for a TOML double-quoted value field.
+; Escape a value for inclusion inside a TOML double-quoted string. Newlines
+; and tabs are normalised to {Enter} and {Tab} tokens (rather than the TOML
+; escape sequences \n / \t) so that the saved file uses a single canonical
+; representation matching what NormaliseOutput emits and what the runtime
+; Send treats as a key press. This guarantees the on-disk format never
+; mixes raw \n with {Enter} for the same kind of payload.
 EscapeTomlValue(s) {
     s := StrReplace(s, "\", "\\")
     s := StrReplace(s, "`"", "\`"")
-    s := StrReplace(s, "`n", "\n")
-    s := StrReplace(s, "`r", "\r")
-    s := StrReplace(s, "`t", "\t")
+    s := StrReplace(s, "`r`n", "{Enter}")
+    s := StrReplace(s, "`r", "{Enter}")
+    s := StrReplace(s, "`n", "{Enter}")
+    s := StrReplace(s, "`t", "{Tab}")
     return s
 }
 
-; Mirrors HS normalise_output: bare CRLF/LF become {Enter}; {alias} tokens are
-; canonicalised to their proper AHK {Token} form.
+; Mirrors HS normalise_output: bare CRLF/LF become {Enter}, bare tabs become
+; {Tab}, and {alias} tokens are canonicalised to their proper AHK {Token}
+; form. Keeping newline/tab handling here as well as in EscapeTomlValue means
+; outputs read from any source (textarea, legacy TOML, paste) end up with the
+; same tokenised representation before serialisation.
 NormaliseOutput(s) {
     s := StrReplace(s, "`r`n", "{Enter}")
     s := StrReplace(s, "`r", "{Enter}")
     s := StrReplace(s, "`n", "{Enter}")
+    s := StrReplace(s, "`t", "{Tab}")
 
     Aliases := Map(
         "esc", "Escape", "escape", "Escape",

@@ -29,26 +29,43 @@ TestPE_EscapeQuote() {
 Test("EscapeTomlValue: double-quote is escaped", TestPE_EscapeQuote)
 
 TestPE_EscapeNewline() {
-	AssertEqual("a\nb", EscapeTomlValue("a`nb"))
+	AssertEqual("a{Enter}b", EscapeTomlValue("a`nb"))
 }
-Test("EscapeTomlValue: newline becomes \\n", TestPE_EscapeNewline)
+Test("EscapeTomlValue: newline becomes {Enter} token", TestPE_EscapeNewline)
 
 TestPE_EscapeTab() {
-	AssertEqual("a\tb", EscapeTomlValue("a`tb"))
+	AssertEqual("a{Tab}b", EscapeTomlValue("a`tb"))
 }
-Test("EscapeTomlValue: tab becomes \\t", TestPE_EscapeTab)
+Test("EscapeTomlValue: tab becomes {Tab} token", TestPE_EscapeTab)
 
 TestPE_EscapeCR() {
-	AssertEqual("a\rb", EscapeTomlValue("a`rb"))
+	AssertEqual("a{Enter}b", EscapeTomlValue("a`rb"))
 }
-Test("EscapeTomlValue: carriage return becomes \\r", TestPE_EscapeCR)
+Test("EscapeTomlValue: carriage return becomes {Enter} token", TestPE_EscapeCR)
+
+TestPE_EscapeCRLF() {
+	AssertEqual("a{Enter}b", EscapeTomlValue("a`r`nb"))
+}
+Test("EscapeTomlValue: CRLF becomes a single {Enter} token", TestPE_EscapeCRLF)
 
 TestPE_EscapeRoundTrip() {
-	Original := "Mix `nof\things\rand `"quotes`" and tabs`t and slashes\\."
+	; Plain values with no newline/tab characters round-trip exactly through
+	; Escape → Unescape. Newlines/tabs are deliberately one-way (replaced with
+	; {Enter}/{Tab} tokens at write time) so they do not feature in this test.
+	Original := "Mix of `"quotes`" and slashes\\."
 	Recovered := UnescapeTomlString(EscapeTomlValue(Original))
 	AssertEqual(Original, Recovered)
 }
-Test("Escape/Unescape round-trip preserves the value", TestPE_EscapeRoundTrip)
+Test("Escape/Unescape round-trip preserves plain values", TestPE_EscapeRoundTrip)
+
+TestPE_EscapeNewlinesTokenisedNotEscaped() {
+	; Confirm we never store raw \n / \t / \r escape sequences for output-style
+	; payloads — the canonical on-disk form is {Enter} / {Tab} tokens.
+	Out := EscapeTomlValue("line1`nline2`tindented")
+	AssertEqual("line1{Enter}line2{Tab}indented", Out)
+}
+Test("EscapeTomlValue: newlines and tabs are tokenised, not TOML-escaped",
+	TestPE_EscapeNewlinesTokenisedNotEscaped)
 
 
 
@@ -65,6 +82,11 @@ TestPE_NormCRLF() {
 	AssertEqual("a{Enter}b", NormaliseOutput("a`r`nb"))
 }
 Test("NormaliseOutput: bare CRLF becomes {Enter}", TestPE_NormCRLF)
+
+TestPE_NormTab() {
+	AssertEqual("a{Tab}b", NormaliseOutput("a`tb"))
+}
+Test("NormaliseOutput: bare tab becomes {Tab}", TestPE_NormTab)
 
 TestPE_NormEsc() {
 	AssertEqual("{Escape}", NormaliseOutput("{esc}"))
@@ -290,20 +312,16 @@ Test("Property: EscapeTomlValue/UnescapeTomlString ASCII round-trip (50 strings)
 	TestPE_PropertyRoundTripAscii)
 
 TestPE_PropertyRoundTripSpecialChars() {
-	; Explicitly test strings that combine the four special characters
+	; Explicitly test strings that combine the special TOML escape characters
+	; that DO round-trip symmetrically (backslash and double-quote). Newline,
+	; CR and tab are deliberately excluded — they are stored as {Enter}/{Tab}
+	; tokens by EscapeTomlValue, which is a one-way transformation.
 	SpecialSets := [
 		"\",
 		"`"",
-		"`n",
-		"`r",
-		"`t",
 		"a\b",
 		'a"b',
-		"a`nb",
-		"a`rb",
-		"a`tb",
 		"\`"",
-		"`n`r`t\`"",
 		"hello `"world`" \ done",
 	]
 	for _, Src in SpecialSets {
@@ -311,8 +329,24 @@ TestPE_PropertyRoundTripSpecialChars() {
 		AssertEqual(Src, Recovered, "Round-trip failed for special string")
 	}
 }
-Test("Property: EscapeTomlValue/UnescapeTomlString special-char round-trip (13 strings)",
+Test("Property: EscapeTomlValue/UnescapeTomlString special-char round-trip (6 strings)",
 	TestPE_PropertyRoundTripSpecialChars)
+
+TestPE_PropertyNewlinesTabsTokenised() {
+	; Companion test to PropertyRoundTripSpecialChars: confirm that newline,
+	; CR and tab characters always become {Enter} / {Tab} tokens at write
+	; time, never the TOML escape sequences \n / \r / \t.
+	AssertEqual("{Enter}", EscapeTomlValue("`n"))
+	AssertEqual("{Enter}", EscapeTomlValue("`r"))
+	AssertEqual("{Enter}", EscapeTomlValue("`r`n"))
+	AssertEqual("{Tab}",   EscapeTomlValue("`t"))
+	AssertEqual("a{Enter}b", EscapeTomlValue("a`nb"))
+	AssertEqual("a{Enter}b", EscapeTomlValue("a`rb"))
+	AssertEqual("a{Tab}b",   EscapeTomlValue("a`tb"))
+	AssertEqual("{Enter}{Enter}{Tab}\`"", EscapeTomlValue("`n`r`t\`""))
+}
+Test("Property: newlines and tabs are always tokenised on write",
+	TestPE_PropertyNewlinesTabsTokenised)
 
 
 
