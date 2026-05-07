@@ -43,6 +43,9 @@ local LOG = "keymap"
 
 -- Per-group expansion delay thresholds (in seconds).
 -- A value of 0 means the expansion fires regardless of typing speed.
+-- These values are the ULTIMATE fallback. The live values are resolved at
+-- startup by `modules.hotstrings_config` from each category TOML's `[_meta]`
+-- block and from `~/.config/ergopti_plus/hotstrings_config.toml` user overrides.
 M.DELAYS_DEFAULT = {
 	STAR_TRIGGER       = 2.0,  -- Manual expansions with ★ (magic key)
 	dynamichotstrings  = 2.0,  -- Phone numbers, SSN, dates…
@@ -51,6 +54,18 @@ M.DELAYS_DEFAULT = {
 	sfbsreduction      = 0.5,  -- Comma combos (e.g. ,t → pt)
 	distancesreduction = 0.5,  -- Dead keys and suffixes
 	llm_prediction     = 20.0, -- AI prediction tooltip timeout
+}
+
+-- Maps DELAYS_DEFAULT keys to the category names used by `hotstrings_config`
+-- (i.e. the basename of each hotstring TOML file). Keys present here have
+-- their delay sourced from the TOML metadata + user overrides; keys absent
+-- (`dynamichotstrings`, `llm_prediction`) keep DELAYS_DEFAULT as authoritative.
+M.DELAY_KEY_TO_CATEGORY = {
+	STAR_TRIGGER       = "magickey",
+	autocorrection     = "autocorrection",
+	rolls              = "rolls",
+	sfbsreduction      = "sfbsreduction",
+	distancesreduction = "distancesreduction",
 }
 
 --- Canonical defaults exposed to menu modules (single source of truth).

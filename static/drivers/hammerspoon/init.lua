@@ -188,6 +188,26 @@ end
 local hotstrings_dir = menu_paths.get("HotstringsDirPath")
 local config_file    = menu_paths.get("ConfigJsonPath")
 
+-- Initialise the hotstrings_config module so per-group delays and tooltip
+-- colors can be resolved from the TOML metadata + the shared user override
+-- file. The resolver routes the personal category through the (possibly
+-- relocated) personal_hotstrings.toml; everything else lives in `hotstrings_dir`.
+do
+	local hotstrings_config = require("modules.hotstrings_config")
+	local override_path = menu_paths.get_config_dir()
+	if not override_path:match("[/\\]$") then override_path = override_path .. "/" end
+	override_path = override_path .. "hotstrings_config.toml"
+	hotstrings_config.init({
+		override_path = override_path,
+		toml_resolver = function(category)
+			if category == "personal" then
+				return menu_paths.get("PersonalTomlPath")
+			end
+			return hotstrings_dir .. category .. ".toml"
+		end,
+	})
+end
+
 
 
 
