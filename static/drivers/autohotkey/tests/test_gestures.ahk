@@ -177,8 +177,10 @@ Test("Gestures: GestureNextIndex handles index=0 (active not in list)",
 ; ===========================================================
 
 TestGestures_KeyParamsEncodingF1() {
-    ; F1 = VK 0x70, modifiers Ctrl+Win+Shift = 0x07 → KeyParams = (0x70<<8)|0x07
-    Expected := (0x70 << 8) | 0x07  ; = 0x7007 = 28 679
+    ; F1 = VK 0x70, modifiers Ctrl+Win+Shift = 0x07. The registry layout
+    ; confirmed by reading Windows after a manual touchpad-shortcut config
+    ; is (VK << 16) | mods, so the encoding here mirrors that.
+    Expected := (0x70 << 16) | 0x07  ; = 0x700007 = 7 340 039
     AssertEqual(Expected, GESTURE_REG_KEY_PARAMS["tap_3"],
         "tap_3 KeyParams should encode Ctrl+Win+Shift+F1")
 }
@@ -187,7 +189,7 @@ Test("Gestures: KeyParams for tap_3 encodes Ctrl+Win+Shift+F1",
 
 TestGestures_KeyParamsEncodingF10() {
     ; F10 = VK 0x79
-    Expected := (0x79 << 8) | 0x07
+    Expected := (0x79 << 16) | 0x07
     AssertEqual(Expected, GESTURE_REG_KEY_PARAMS["swipe_4_right"],
         "swipe_4_right KeyParams should encode Ctrl+Win+Shift+F10")
 }

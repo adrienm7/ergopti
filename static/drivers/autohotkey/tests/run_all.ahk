@@ -43,6 +43,7 @@ SetWorkingDir(A_ScriptDir)
 #Include ..\lib\active_app_cache.ahk
 #Include ..\lib\hotstring_engine.ahk
 #Include ..\lib\toml_loader.ahk
+#Include ..\lib\hotstrings_config.ahk
 #Include ..\lib\personal_toml_editor.ahk
 #Include ..\lib\dispatchers.ahk
 #Include ..\lib\layout_altgr.ahk
@@ -64,6 +65,7 @@ NeutralizeDispatcherKeySends()
 #Include test_logger.ahk
 #Include test_hotstring_engine.ahk
 #Include test_toml_loader.ahk
+#Include test_hotstrings_config.ahk
 #Include test_personal_toml_editor.ahk
 #Include test_dispatchers.ahk
 #Include test_layout_tables.ahk
