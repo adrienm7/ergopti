@@ -132,13 +132,14 @@ end
 
 --- Reads personal_info.toml and returns a config table compatible with DEFAULT_CONFIG.
 --- @param toml_path string Absolute path to personal_info.toml.
---- @return table The loaded or default configuration.
+--- @return table config The loaded or default configuration.
+--- @return boolean was_missing True if the file did not exist on disk and defaults were used.
 local function load_config(toml_path)
 	Logger.debug(LOG, "Loading personal info from '%s'…", toml_path)
 	local fh = io.open(toml_path, "r")
 	if not fh then
 		Logger.info(LOG, "personal_info.toml not found — using default values.")
-		return DEFAULT_CONFIG
+		return DEFAULT_CONFIG, true
 	end
 	local content = fh:read("*a")
 	fh:close()
@@ -157,7 +158,7 @@ local function load_config(toml_path)
 		trigger_char = DEFAULT_CONFIG.trigger_char,
 		info         = merged_info,
 		letters      = merged_letters,
-	}
+	}, false
 end
 
 --- Persists updated info fields into personal_info.toml.
@@ -413,7 +414,7 @@ function M.start(base_dir, keymap_module, info_toml_path)
 		_info_toml_path = _base_dir .. "../hotstrings/personal_info.toml"
 	end
 
-	local config = load_config(_info_toml_path)
+	local config, was_missing = load_config(_info_toml_path)
 	if type(config) ~= "table" then
 		Logger.warn(LOG, "Module disabled because configuration is missing or invalid.")
 		return
@@ -422,6 +423,14 @@ function M.start(base_dir, keymap_module, info_toml_path)
 	_trigger = tostring(config.trigger_char or "★")
 	_info    = type(config.info) == "table" and config.info or {}
 	_letters = type(config.letters) == "table" and config.letters or {}
+
+	-- Materialise defaults to disk if the file did not exist, so the user can
+	-- edit it directly and so renaming or deleting it triggers a fresh
+	-- re-creation on the next launch (mirrors the AHK side's behaviour).
+	if was_missing then
+		Logger.info(LOG, "Writing default personal_info.toml at '%s'…", _info_toml_path)
+		M.save_info({})
+	end
 
 	_state     = STATE_IDLE
 	_combo     = ""

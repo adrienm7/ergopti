@@ -326,6 +326,10 @@ ReadConfiguration(Cache) {
 }
 
 ReadConfiguration(_IniCache)
+; Materialise personal_info.toml from defaults if missing, so renaming or
+; deleting the file simply triggers a fresh re-creation on the next launch
+; (same guarantee EnsurePersonalShortcutsFile gives for personal_shortcuts.ahk).
+EnsurePersonalInfoTomlFile(ScriptInformation["PersonalInfoTomlPath"])
 ReadPersonalInfoToml(ScriptInformation["PersonalInfoTomlPath"])
 
 ; Pull menu titles and submenu ordering from the per-category TOML files so

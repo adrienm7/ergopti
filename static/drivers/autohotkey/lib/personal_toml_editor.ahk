@@ -386,6 +386,31 @@ WritePersonalInfoToml(FilePath) {
     return True
 }
 
+; Make sure personal_info.toml exists at FilePath, materialising the in-memory
+; defaults from PersonalInformation / PersonalInformationLetters when it does
+; not. Called at script load so that renaming or deleting the file simply
+; triggers a fresh re-creation on the next launch — same UX guarantee as
+; EnsurePersonalShortcutsFile gives for personal_shortcuts.ahk.
+EnsurePersonalInfoTomlFile(FilePath) {
+    if FileExist(FilePath) {
+        return
+    }
+    try {
+        Dir := RegExReplace(FilePath, "\\[^\\]+$", "")
+        if (Dir != "" and !DirExist(Dir)) {
+            DirCreate(Dir)
+        }
+        if WritePersonalInfoToml(FilePath) {
+            try LoggerInfo("ErgoptiPlus", "Personal info file created from defaults at '{1}'.", FilePath)
+        } else {
+            try LoggerWarn("ErgoptiPlus", "Could not create personal info file at '{1}'.", FilePath)
+        }
+    } catch as e {
+        try LoggerWarn("ErgoptiPlus", "Could not create personal info file at '{1}': {2}.",
+            FilePath, e.Message)
+    }
+}
+
 ; Helper: join an Array of strings with a separator.
 ArrayJoin(Arr, Sep) {
     Out := ""
