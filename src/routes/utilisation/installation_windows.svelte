@@ -136,7 +136,7 @@
 	Il est également conseillé (mais c’est optionnel) de télécharger les 2 fichiers suivants : <a
 		href="img/logo/logo_simple.ico"
 		download
-		class="link">logo_simple.ico</
+		class="link">logo_simple.ico</a
 	>
 	ainsi que
 	<a href="img/logo/logo_simple_disabled.ico" download class="link"
