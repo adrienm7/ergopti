@@ -749,3 +749,60 @@ if Features["MagicKey"]["Repeat"].Enabled {
 }
 
 CreateHotstring("*", "clé" . ScriptInformation["MagicKey"], "🔑")
+
+
+
+
+; ===========================================
+; ===========================================
+; ======= 6/ Personal hotstrings =======
+; ===========================================
+; ===========================================
+
+; Load every section declared in personal_hotstrings.toml (e.g. emailshortcuts,
+; code, professionalvocabulary, autocorrection). Each section has its own
+; toggle in Features["Personal"] — disabled sections are skipped silently.
+;
+; Order matters: AHK fires the LAST-registered hotstring that matches, so we
+; must register longer / more-specific triggers AFTER shorter ones. Sections
+; whose triggers start with a special prefix (@, ., :, etc.) are typically
+; longer composites of plain triggers, so we load them LAST. We achieve this
+; by iterating sections_order in reverse — the user's preferred order in the
+; TOML places "emailshortcuts" first because it's the most prominent, but at
+; load time the prominent ones must come last so they win on collision.
+if Features.Has("Personal") {
+    PersonalKeys := []
+    if (Features["Personal"].Has("__Order")
+            and IsObject(Features["Personal"]["__Order"])
+            and Features["Personal"]["__Order"].Length > 0) {
+        ; Walk __Order in reverse so the first declared section is loaded last
+        ; (and therefore wins when its trigger is a prefix-collision of a
+        ; shorter trigger registered by an earlier section).
+        Idx := Features["Personal"]["__Order"].Length
+        while (Idx >= 1) {
+            Entry := Features["Personal"]["__Order"][Idx]
+            if (Entry != "-") {
+                PersonalKeys.Push(Entry)
+            }
+            Idx -= 1
+        }
+    } else {
+        for FeatKey in Features["Personal"] {
+            if FeatKey != "__Order" {
+                PersonalKeys.Push(FeatKey)
+            }
+        }
+    }
+
+    for _, FeatKey in PersonalKeys {
+        if !Features["Personal"].Has(FeatKey) {
+            continue
+        }
+        FeatObj := Features["Personal"][FeatKey]
+        if !(IsObject(FeatObj) and FeatObj.HasOwnProp("Enabled") and FeatObj.Enabled) {
+            continue
+        }
+        TomlSection := FeatObj.HasOwnProp("TomlSection") ? FeatObj.TomlSection : StrLower(FeatKey)
+        LoadHotstringsSection("personal", TomlSection, FeatObj)
+    }
+}

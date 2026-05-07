@@ -171,7 +171,13 @@ function M.save_info(new_info)
 		_info[k] = v
 	end
 
-	local lines = { "[info]" }
+	local lines = {
+		"# personal_info.toml — Personal information",
+		"# Auto-managed by the personal information editor.",
+		"# Do not edit manually unless you know what you are doing.",
+		"",
+		"[info]",
+	}
 	for k, v in pairs(_info) do
 		lines[#lines + 1] = k .. ' = "' .. escape_toml(tostring(v)) .. '"'
 	end

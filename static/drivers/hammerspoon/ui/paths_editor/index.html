@@ -3,15 +3,25 @@
 <html lang="fr">
 	<head>
 		<meta charset="utf-8" />
-		<title>Chemins des fichiers</title>
+		<title>Dossier de configuration</title>
 		<link rel="stylesheet" href="style.css" />
 	</head>
 	<body>
-		<h1>Chemins des fichiers</h1>
-		<p class="subtitle">Personnalisez les emplacements des fichiers utilisés par Ergopti.</p>
+		<h1>Dossier de configuration</h1>
+		<p class="subtitle">Tous les fichiers personnels (hotstrings, raccourcis, info…) seront cherchés dans ce dossier.</p>
 
 		<form id="paths-form">
-			<!-- Rows injected dynamically by script.js via window.initData() -->
+			<div class="row">
+				<div class="row-header">
+					<span class="row-icon">📁</span>
+					<label for="input-config-dir">Dossier de configuration</label>
+					<span id="tag-config-dir" class="tag-default">par défaut</span>
+				</div>
+				<div class="path-input-wrap">
+					<input type="text" id="input-config-dir" value="" />
+					<button type="button" id="btn-browse" class="btn-browse">Parcourir…</button>
+				</div>
+			</div>
 		</form>
 
 		<div class="btns">

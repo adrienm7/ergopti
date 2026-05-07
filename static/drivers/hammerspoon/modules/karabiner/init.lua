@@ -46,11 +46,10 @@ local _SELF_DIR = (debug.getinfo(1, "S").source:sub(2):match("^(.*[/\\])") or ".
 
 local KARABINER_OUT   = os.getenv("HOME") .. "/.config/karabiner/karabiner.json"
 
--- Go up from modules/karabiner/ to the Hammerspoon config root so generated
--- and user files are kept at the root level, not buried in the module.
-local HS_ROOT       = _SELF_DIR .. "../../"
-local KARABINER_GEN = HS_ROOT .. "karabiner.json"
-local USER_CONFIG   = HS_ROOT .. "karabiner_user_config.json"
+-- Go up from modules/karabiner/ to the Hammerspoon config root so user files
+-- are kept at the root level, not buried in the module.
+local HS_ROOT     = _SELF_DIR .. "../../"
+local USER_CONFIG = HS_ROOT .. "karabiner_user_config.json"
 local ACTIONS_FILE    = _SELF_DIR .. "data/actions.json"
 local TAP_HOLD_FILE   = _SELF_DIR .. "data/tap_hold_keys.json"
 local MOD_COMBOS_FILE = _SELF_DIR .. "data/mod_combos.json"
@@ -404,14 +403,6 @@ function M.regenerate()
 	local merged   = Generator.merge_into_existing_config(result, KARABINER_OUT)
 	local json_str = hs.json.encode(merged, true)
 
-	local fh = io.open(KARABINER_GEN, "w")
-	if not fh then
-		Logger.error(LOG, "Cannot write generated config at '%s'.", KARABINER_GEN)
-		return
-	end
-	fh:write(json_str)
-	fh:close()
-
 	-- Stop KE completely before writing: otherwise a live session_monitor or an
 	-- open Preferences window may rewrite karabiner.json from its cached state
 	-- within seconds, silently reverting our menu changes.
@@ -419,7 +410,7 @@ function M.regenerate()
 	pcall(function() hs.execute(KeLifecycle.KILL_CMD) end)
 	Logger.done(LOG, "Karabiner-Elements stopped.")
 
-	local ok_copy, cp_detail = Generator.deploy_file(KARABINER_GEN, KARABINER_OUT)
+	local ok_copy, cp_detail = Generator.deploy_string(json_str, KARABINER_OUT)
 	if not ok_copy then
 		Logger.error(LOG, "Deploy failed → '%s': %s.", KARABINER_OUT, cp_detail)
 		-- Still relaunch so the user is not left without their keyboard config
@@ -465,14 +456,7 @@ function M.pause()
 	Logger.start(LOG, "Pausing Karabiner-Elements…")
 	local merged   = Generator.merge_into_existing_config(EMPTY_KE_CONFIG, KARABINER_OUT)
 	local json_str = hs.json.encode(merged, true)
-	local fh = io.open(KARABINER_GEN, "w")
-	if not fh then
-		Logger.error(LOG, "Cannot write empty config for pause at '%s'.", KARABINER_GEN)
-		return
-	end
-	fh:write(json_str)
-	fh:close()
-	local ok, detail = Generator.deploy_file(KARABINER_GEN, KARABINER_OUT)
+	local ok, detail = Generator.deploy_string(json_str, KARABINER_OUT)
 	if not ok then
 		Logger.error(LOG, "Pause deploy failed: %s.", detail)
 		return

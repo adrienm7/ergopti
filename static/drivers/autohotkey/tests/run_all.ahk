@@ -54,6 +54,12 @@ SetWorkingDir(A_ScriptDir)
 ; UpdateLastSentCharacter (the hook only intercepts the lower-level emission).
 InstallHotstringHooks()
 
+; Neutralize SendInput/SendEvent inside SIMPLE_ACTIONS / TAPHOLD_ALTGR_ACTIONS
+; so dispatcher tests for Tab/Enter/Escape/BackSpace/Delete don't type real
+; keystrokes into the terminal that launched the runner (Tab triggers shell
+; completion, e.g. ".android" on Windows).
+NeutralizeDispatcherKeySends()
+
 ; ── Per-module test files (each registers Test() cases) ──
 #Include test_logger.ahk
 #Include test_hotstring_engine.ahk

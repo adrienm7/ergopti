@@ -612,7 +612,7 @@ function M.build_management(ctx)
 	return { title = "⚙️ Paramètres hotstrings", menu = menu }
 end
 
---- Builds the unified personal hotstrings menu (personal.toml sections +
+--- Builds the unified personal hotstrings menu (personal_hotstrings.toml sections +
 --- custom/dynamic hotstrings), with editor button, shortcut, and per-section
 --- toggles and counts for both groups.
 --- @param ctx table Context.
@@ -627,7 +627,7 @@ function M.build_custom(ctx)
 	local personal_secs    = ctx.keymap and type(ctx.keymap.get_sections) == "function" and ctx.keymap.get_sections("personal") or nil
 	local custom_secs      = ctx.keymap and type(ctx.keymap.get_sections) == "function" and ctx.keymap.get_sections("custom")   or nil
 
-	-- personal.toml group present in hotfiles?
+	-- personal_hotstrings.toml group present in hotfiles?
 	local has_personal = false
 	for _, f in ipairs(type(ctx.hotfiles) == "table" and ctx.hotfiles or {}) do
 		if ctx.get_group_name(f) == "personal" then has_personal = true; break end
@@ -858,7 +858,7 @@ function M.build_custom(ctx)
 		},
 	}
 
-	-- personal.toml sections (group "personal")
+	-- personal_hotstrings.toml sections (group "personal")
 	if has_personal then
 		local personal_rows = {}
 		append_section_rows(personal_rows, "personal", personal_secs, personal_enabled)

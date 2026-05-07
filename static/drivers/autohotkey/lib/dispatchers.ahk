@@ -106,7 +106,7 @@ _RunFirstActionFromMap(FeatureGroup, ActionMap) {
 			and Cfg.Enabled
 			and ActionMap.Has(ActionName)
 		) {
-			try LoggerDebug("Dispatch", "Firing action %s", ActionName)
+			try LoggerDebug("Dispatch", "Firing action {1}", ActionName)
 			; Extract to local first to avoid AHK's obj.method() implicit
 			; first-arg passing for property-stored Funcs (would overflow
 			; BoundFuncs that already have all positional params bound).

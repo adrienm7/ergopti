@@ -444,10 +444,7 @@ SC039 Up:: {
 ; ==============================
 ; ==============================
 
-; Pre-computed at boot to avoid evaluating ten ORs on every AltGr release.
-global _TAPHOLD_ALTGR_ENABLED := HasAnyEnabled(Features["TapHolds"]["AltGr"])
-
-#HotIf not LayerEnabled and _TAPHOLD_ALTGR_ENABLED
+#HotIf not LayerEnabled and HasAnyEnabled(Features["TapHolds"]["AltGr"])
 ; Tap-hold on "AltGr"
 SC01D & ~SC138:: ; LControl & RAlt is the only way to make it fire on tap directly
 RAlt:: ; Necessary to work on layouts like QWERTY

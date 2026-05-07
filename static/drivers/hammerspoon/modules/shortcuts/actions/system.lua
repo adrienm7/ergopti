@@ -392,7 +392,7 @@ function M.bind_instant_screenshot()
 		local dir      = home .. "/Pictures/screenshots"
 		pcall(hs.execute, "mkdir -p \"" .. dir .. "\"")
 
-		local filename = string.format("%s/screenshot_%s.png", dir, os.date("%Y_%m_%d_%H_%M_%S"))
+		local filename = string.format("%s/screenshot_%s.png", dir, os.date("%Y_%m_%d_%Hh_%Mmin_%Ss"))
 		pcall(hs.execute, "screencapture -l " .. id .. " \"" .. filename .. "\"")
 		notifications.notify("Sauvegardé : " .. filename)
 		return true

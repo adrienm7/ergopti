@@ -87,3 +87,42 @@ helpers.describe("Logger: build wrapper", function()
 		helpers.assert_nil(v)
 	end)
 end)
+
+helpers.describe("Logger: init_log_path", function()
+	helpers.it("re-points UNIFIED_LOG_FILE under <config_dir>/logs/", function()
+		Logger.init_log_path("/tmp/ergopti_test_config/", 14)
+		helpers.assert_true(
+			Logger.UNIFIED_LOG_FILE:find("/tmp/ergopti_test_config/logs/ErgoptiPlus_") ~= nil,
+			"UNIFIED_LOG_FILE should be re-pointed under logs/"
+		)
+		helpers.assert_true(
+			Logger.UNIFIED_LOG_FILE:find("%.log$") ~= nil,
+			"UNIFIED_LOG_FILE should end with .log"
+		)
+	end)
+
+	helpers.it("appends a trailing slash to config_dir if missing", function()
+		Logger.init_log_path("/tmp/ergopti_test_no_slash", 14)
+		helpers.assert_true(
+			Logger.UNIFIED_LOG_FILE:find("/tmp/ergopti_test_no_slash/logs/") ~= nil,
+			"missing trailing slash on config_dir should be added"
+		)
+	end)
+
+	helpers.it("uses today's date in the filename", function()
+		Logger.init_log_path("/tmp/ergopti_test_date/", 14)
+		local today = os.date("%Y-%m-%d")
+		helpers.assert_true(
+			Logger.UNIFIED_LOG_FILE:find(today, 1, true) ~= nil,
+			"UNIFIED_LOG_FILE should contain today's date"
+		)
+	end)
+
+	helpers.it("ignores empty / nil config_dir", function()
+		local before = Logger.UNIFIED_LOG_FILE
+		Logger.init_log_path("", 14)
+		helpers.assert_eq(Logger.UNIFIED_LOG_FILE, before)
+		Logger.init_log_path(nil, 14)
+		helpers.assert_eq(Logger.UNIFIED_LOG_FILE, before)
+	end)
+end)

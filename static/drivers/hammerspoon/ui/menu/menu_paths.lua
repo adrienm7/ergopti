@@ -4,21 +4,19 @@
 --- MODULE: Menu Paths
 --- DESCRIPTION:
 --- Provides a menu item and a webview-based form panel that lets the user
---- configure all machine-specific file paths used by Hammerspoon: personal.toml,
---- the driver config.json, the Karabiner user config, and the hotstrings
---- directory.
+--- configure the single machine-specific configuration directory used by
+--- Hammerspoon. All personal files are resolved relative to that directory.
 ---
 --- FEATURES & RATIONALE:
---- 1. Bootstrap File: Paths are persisted in a gitignored bootstrap JSON file
----    (ergopti_bootstrap.json next to init.lua) so users can relocate every
----    personal file outside the repository for private version control.
---- 2. Driver-Agnostic Defaults: Default paths mirror the repository layout,
----    identical to the defaults used by the AutoHotkey driver.
---- 3. Live Reload: A path change that affects loaded data (personal.toml,
----    hotstrings dir) triggers a Hammerspoon reload automatically.
---- 4. WebView Form: All five paths are presented simultaneously in a single
----    native-looking form, with per-field "Parcourir…" buttons that open a
----    proper file/folder picker.  Replaces the old sequential blockAlert loop.
+--- 1. Single Key: Only ConfigDirPath is stored in paths.toml; all file paths
+---    are derived from it with fixed names, keeping the form simple.
+--- 2. Bootstrap File: Paths are persisted in a gitignored paths.toml file
+---    (next to init.lua) so users can relocate every personal file outside
+---    the repository for private version control.
+--- 3. Live Reload: Any directory change triggers a Hammerspoon reload so that
+---    all modules immediately pick up files from the new location.
+--- 4. WebView Form: A single folder field with a "Parcourir…" button replaces
+---    the old five-field form.
 --- ==============================================================================
 
 local M = {}
@@ -27,43 +25,19 @@ local Logger = require("lib.logger")
 local LOG    = "menu_paths"
 
 -- Bootstrap file lives next to init.lua (gitignored).
--- Holds absolute paths so the user can store personal files anywhere.
-local BOOTSTRAP_FILENAME = "ergopti_bootstrap.json"
+local PATHS_FILENAME = "paths.toml"
 
--- Keys present in the bootstrap file — mirrors AHK's ScriptInformation map.
-local PATH_KEYS = {
-	"PersonalTomlPath",
-	"PersonalInfoTomlPath",
-	"HotstringsDirPath",
-	"ConfigJsonPath",
-	"KarabinerConfigPath",
-}
-
--- Human labels shown in the form for each key (French, user-facing).
-local PATH_LABELS = {
-	PersonalTomlPath     = "Fichier personal.toml",
-	PersonalInfoTomlPath = "Fichier personal_info.toml (coordonnées personnelles)",
-	HotstringsDirPath    = "Dossier des hotstrings",
-	ConfigJsonPath       = "Fichier de configuration (config.json)",
-	KarabinerConfigPath  = "Configuration Karabiner (karabiner_user_config.json)",
-}
-
--- File-type filter hints for each key (used in the open-panel title).
-local PATH_FILTERS = {
-	PersonalTomlPath     = { kind = "file",   ext = "toml" },
-	PersonalInfoTomlPath = { kind = "file",   ext = "toml" },
-	HotstringsDirPath    = { kind = "folder"              },
-	ConfigJsonPath       = { kind = "file",   ext = "json" },
-	KarabinerConfigPath  = { kind = "file",   ext = "json" },
-}
+-- The single key stored in paths.toml.
+local CONFIG_DIR_KEY = "ConfigDirPath"
 
 -- Absolute path to the assets directory (same folder as this file).
 local _src       = debug.getinfo(1, "S").source:sub(2)
 local ASSETS_DIR = (_src:match("^(.*[/\\])") or "./"):gsub("menu[/\\]$", "") .. "paths_editor/"
 
-local _base_dir  = nil
+local _base_dir  = nil  -- driver root (where paths.toml lives — gitignored)
+local _default_config_dir = nil  -- ~/.config/ergopti_plus/ — default user config dir
 local _reload_fn = nil
-local _bootstrap = {}   -- in-memory cache of the loaded bootstrap table
+local _bootstrap = {}   -- in-memory cache: { ConfigDirPath = "..." } or {}
 
 -- WebView state (singleton)
 local _webview     = nil
@@ -78,51 +52,97 @@ local _usercontent = nil
 -- ====================================
 -- ====================================
 
---- Computes the absolute default path for a given key relative to base_dir.
---- @param key string One of the PATH_KEYS.
---- @return string The default absolute path.
-local function default_path(key)
-	local b = _base_dir or ""
-	if key == "PersonalTomlPath"     then return b .. "../hotstrings/personal.toml"           end
-	if key == "PersonalInfoTomlPath" then return b .. "../hotstrings/personal_info.toml"      end
-	if key == "HotstringsDirPath"    then return b .. "../hotstrings/"                        end
-	if key == "ConfigJsonPath"       then return b .. "config.json"                           end
-	if key == "KarabinerConfigPath"  then return b .. "karabiner_user_config.json"            end
-	return ""
-end
-
---- Returns the bootstrap file path.
+--- Returns the absolute path to paths.toml.
 --- @return string
-local function bootstrap_file()
-	return (_base_dir or "") .. BOOTSTRAP_FILENAME
+local function paths_file()
+	return (_base_dir or "") .. PATHS_FILENAME
 end
 
---- Loads the bootstrap JSON from disk into _bootstrap.
+--- Returns the resolved config directory (with trailing slash).
+--- Falls back to ~/.config/ergopti_plus/ when no override is set.
+--- @return string
+local function config_dir()
+	local v = _bootstrap[CONFIG_DIR_KEY]
+	if type(v) == "string" and v ~= "" then return v end
+	return _default_config_dir or _base_dir or ""
+end
+
+--- Ensures a directory exists (idempotent), creating parents as needed.
+--- @param path string Absolute path with trailing slash.
+local function ensure_dir(path)
+	if not path or path == "" then return end
+	pcall(hs.execute, string.format("mkdir -p %q", path))
+end
+
+--- Returns the absolute path for a named personal file inside config_dir().
+--- @param filename string Bare filename (e.g. "personal_hotstrings.toml").
+--- @return string
+local function file_in_config(filename)
+	local d = config_dir()
+	if not d:match("[/\\]$") then d = d .. "/" end
+	return d .. filename
+end
+
+--- Parses a simple flat TOML file (key = "value" pairs, ignoring comments).
+--- @param content string Raw file content.
+--- @return table Parsed key-value map.
+local function parse_toml(content)
+	local result = {}
+	for line in content:gmatch("[^\r\n]+") do
+		local trimmed = line:match("^%s*(.-)%s*$")
+		if trimmed ~= "" and trimmed:sub(1, 1) ~= "#" then
+			local key, val = trimmed:match('^(%S+)%s*=%s*"(.*)"$')
+			if key and val then
+				result[key] = val
+			end
+		end
+	end
+	return result
+end
+
+--- Serializes the bootstrap table to TOML.
+--- @return string
+local function serialize_toml()
+	local lines = { "# Chemins personnalisés — auto-généré par Hammerspoon." }
+	lines[#lines + 1] = "# Modifier ce fichier pour pointer vers votre dossier de configuration personnel."
+	lines[#lines + 1] = ""
+	local v = _bootstrap[CONFIG_DIR_KEY]
+	if type(v) == "string" and v ~= "" then
+		lines[#lines + 1] = string.format('%s = "%s"', CONFIG_DIR_KEY, v)
+	else
+		lines[#lines + 1] = '# ConfigDirPath = "/Users/VotreNom/.config/ergopti_plus/"'
+	end
+	lines[#lines + 1] = ""
+	return table.concat(lines, "\n")
+end
+
+--- Persists the current _bootstrap table to disk as TOML.
+local function save_bootstrap()
+	local content = serialize_toml()
+	local fh = io.open(paths_file(), "w")
+	if not fh then
+		Logger.error(LOG, "Cannot open paths file for writing: '{1}'.", paths_file())
+		return
+	end
+	fh:write(content)
+	fh:close()
+	Logger.info(LOG, "Paths saved to '{1}'.", paths_file())
+end
+
+--- Loads paths.toml from disk into _bootstrap.
+--- Creates the file with a commented example if it does not exist yet.
 local function load_bootstrap()
-	local fh = io.open(bootstrap_file(), "r")
-	if not fh then _bootstrap = {}; return end
+	local fh = io.open(paths_file(), "r")
+	if not fh then
+		Logger.info(LOG, "paths.toml not found — generating with defaults at '{1}'.", paths_file())
+		_bootstrap = {}
+		save_bootstrap()
+		return
+	end
 	local raw = fh:read("*a")
 	fh:close()
-	local ok, tbl = pcall(hs.json.decode, raw)
-	_bootstrap = (ok and type(tbl) == "table") and tbl or {}
-	Logger.debug(LOG, "Bootstrap loaded from '%s'.", bootstrap_file())
-end
-
---- Persists the current _bootstrap table to disk.
-local function save_bootstrap()
-	local ok_enc, encoded = pcall(hs.json.encode, _bootstrap, true)
-	if not ok_enc or not encoded then
-		Logger.error(LOG, "Failed to encode bootstrap JSON.")
-		return
-	end
-	local fh = io.open(bootstrap_file(), "w")
-	if not fh then
-		Logger.error(LOG, "Cannot open bootstrap file for writing: '%s'.", bootstrap_file())
-		return
-	end
-	fh:write(encoded)
-	fh:close()
-	Logger.info(LOG, "Bootstrap saved to '%s'.", bootstrap_file())
+	_bootstrap = parse_toml(raw)
+	Logger.debug(LOG, "Paths loaded from '{1}'.", paths_file())
 end
 
 
@@ -144,9 +164,13 @@ function M.init(base_dir, reload_fn)
 		return
 	end
 	_base_dir  = base_dir
+	local home = os.getenv("HOME") or ""
+	_default_config_dir = home .. "/.config/ergopti_plus/"
 	_reload_fn = reload_fn
+	ensure_dir(_default_config_dir)
 	load_bootstrap()
-	Logger.info(LOG, "Paths module initialized (base: '%s').", base_dir)
+	Logger.info(LOG, "Paths module initialized (base: '{1}', default config: '{2}').",
+		base_dir, _default_config_dir)
 end
 
 --- Returns true if M.init() has already been called successfully.
@@ -155,13 +179,24 @@ function M.is_initialized()
 	return _base_dir ~= nil
 end
 
---- Returns the resolved path for a given key, falling back to the default.
---- @param key string One of the PATH_KEYS.
+--- Returns the resolved path for a well-known personal file.
+--- Callers use named constants rather than bare filenames.
+--- @param key string One of: "PersonalTomlPath", "PersonalInfoTomlPath",
+---   "HotstringsDirPath", "ConfigJsonPath", "KarabinerConfigPath".
 --- @return string The resolved absolute path.
 function M.get(key)
-	local override = _bootstrap[key]
-	if type(override) == "string" and override ~= "" then return override end
-	return default_path(key)
+	if key == "PersonalTomlPath"     then return file_in_config("personal_hotstrings.toml") end
+	if key == "PersonalInfoTomlPath" then return file_in_config("personal_info.toml")       end
+	if key == "HotstringsDirPath"    then return config_dir()                               end
+	if key == "ConfigJsonPath"       then return file_in_config("config.json")              end
+	if key == "KarabinerConfigPath"  then return file_in_config("karabiner_user_config.json") end
+	return ""
+end
+
+--- Returns the current config directory (with trailing slash).
+--- @return string
+function M.get_config_dir()
+	return config_dir()
 end
 
 
@@ -175,19 +210,15 @@ end
 
 
 -- =========================================
--- ===== 3.1) Native File/Folder Picker =====
+-- ===== 3.1) Native Folder Picker =====
 -- =========================================
 
---- Opens a native AppleScript-based dialog to pick a file or folder.
---- Returns the selected path, or nil if cancelled.
---- @param current string Currently configured path shown as default location.
---- @param filter table {kind="file"|"folder", ext="toml"|"json"|nil}
+--- Opens a native AppleScript-based dialog to pick a folder.
+--- Returns the selected path (with trailing slash), or nil if cancelled.
+--- @param current string Currently configured directory shown as default location.
 --- @return string|nil
-local function pick_path(current, filter)
-	-- Resolve a default location that exists as a directory on disk.
-	-- choose file/folder default location requires a directory alias, not a file path.
-	local default_dir = current or ""
-	-- Strip to parent directory if current is a file path
+local function pick_dir(current)
+	local default_dir = current or _base_dir or "/"
 	if not default_dir:match("[/\\]$") then
 		default_dir = default_dir:match("^(.+[/\\])") or default_dir
 	end
@@ -196,34 +227,30 @@ local function pick_path(current, filter)
 		default_dir = os.getenv("HOME") or "/"
 	end
 
-	local is_folder = filter and filter.kind == "folder"
-	local verb      = is_folder and "choose folder" or "choose file"
-	local prompt    = is_folder and "Sélectionner un dossier" or "Sélectionner un fichier"
-
-	-- Use 'POSIX file ... as alias' which works for both file and folder defaults.
-	-- AppleScript raises error -128 on user cancel — we capture and treat as nil.
 	local escaped = default_dir:gsub('"', '\\"')
 	local script  = string.format([[
 		try
-			set r to %s with prompt "%s" default location ((POSIX file "%s") as alias)
+			set r to choose folder with prompt "Sélectionner le dossier de configuration" default location ((POSIX file "%s") as alias)
 			return POSIX path of r
-		on error errMsg number errNum
+		on error
 			return ""
 		end try
-	]], verb, prompt, escaped)
+	]], escaped)
 
-	Logger.debug(LOG, "pick_path: AppleScript with default_dir='%s'.", default_dir)
 	local ok, r2, raw = hs.osascript.applescript(script)
-	Logger.debug(LOG, "pick_path: ok=%s r2=%s raw=%s.", tostring(ok), tostring(r2), tostring(raw))
+	Logger.debug(LOG, "pick_dir: ok={1} r2={2}.", tostring(ok), tostring(r2))
 
 	if type(r2) == "string" and r2 ~= "" then
-		return (r2:match("^(.-)%s*$"))
+		local p = r2:match("^(.-)%s*$")
+		if not p:match("[/\\]$") then p = p .. "/" end
+		return p
 	end
-	-- Fallback: parse raw string if r2 isn't a clean string
 	if type(raw) == "string" and raw ~= "" then
-		local stripped = raw:match('^"(.*)"$') or raw
-		stripped = stripped:match("^(.-)%s*$")
-		if stripped ~= "" then return stripped end
+		local stripped = (raw:match('^"(.*)"$') or raw):match("^(.-)%s*$")
+		if stripped ~= "" then
+			if not stripped:match("[/\\]$") then stripped = stripped .. "/" end
+			return stripped
+		end
 	end
 	return nil
 end
@@ -242,30 +269,33 @@ local function close_webview()
 	end
 end
 
---- Applies changed paths to the bootstrap file and triggers a reload.
---- @param new_values table key → path string for all keys.
-local function apply_and_reload(new_values)
-	local changed = false
-	for _, key in ipairs(PATH_KEYS) do
-		local v = type(new_values[key]) == "string" and new_values[key] or ""
-		-- Omit from bootstrap when equal to default, keeping the file portable
-		if v == default_path(key) then
-			if _bootstrap[key] ~= nil then _bootstrap[key] = nil; changed = true end
-		else
-			if _bootstrap[key] ~= v then _bootstrap[key] = v; changed = true end
-		end
+--- Applies the new config directory and triggers a reload.
+--- @param new_dir string The chosen directory (with trailing slash).
+local function apply_and_reload(new_dir)
+	if type(new_dir) ~= "string" or new_dir == "" then
+		new_dir = _default_config_dir or _base_dir or ""
 	end
+	if not new_dir:match("[/\\]$") then new_dir = new_dir .. "/" end
 
-	if not changed then
-		Logger.debug(LOG, "Paths editor: no effective changes, skipping reload.")
+	local old_dir = config_dir()
+	if new_dir == old_dir then
+		Logger.debug(LOG, "Paths editor: directory unchanged, skipping reload.")
 		close_webview()
 		return
+	end
+
+	-- Store only when it differs from the default
+	if new_dir == _default_config_dir then
+		_bootstrap[CONFIG_DIR_KEY] = nil
+	else
+		_bootstrap[CONFIG_DIR_KEY] = new_dir
+		ensure_dir(new_dir)
 	end
 
 	save_bootstrap()
 	close_webview()
 
-	Logger.start(LOG, "Applying new paths and reloading…")
+	Logger.start(LOG, "Applying new config directory and reloading…")
 	if type(_reload_fn) == "function" then
 		_reload_fn()
 	else
@@ -277,18 +307,12 @@ end
 local function inject_init_data()
 	if not _webview then return end
 
-	local defaults = {}
-	local current  = {}
-	for _, key in ipairs(PATH_KEYS) do
-		defaults[key] = default_path(key)
-		current[key]  = M.get(key)
-	end
+	local current_dir = config_dir()
+	local default_dir = _default_config_dir or _base_dir or ""
 
 	local payload = {
-		keys     = PATH_KEYS,
-		labels   = PATH_LABELS,
-		defaults = defaults,
-		current  = current,
+		configDir        = current_dir,
+		defaultConfigDir = default_dir,
 	}
 
 	local ok_enc, json = pcall(hs.json.encode, payload)
@@ -308,55 +332,31 @@ end
 local function handle_message(body)
 	if type(body) ~= "table" then return end
 	local action = body.action
-	Logger.debug(LOG, "usercontent message received: action='%s'.", tostring(action))
+	Logger.debug(LOG, "usercontent message received: action='{1}'.", tostring(action))
 
 	if action == "ready" then
 		inject_init_data()
 	elseif action == "browse" then
-		local key    = body.key
-		local filter = PATH_FILTERS[key]
-		Logger.debug(LOG, "browse: key='%s', filter.kind='%s', filter.ext='%s'.",
-			tostring(key), tostring(filter and filter.kind), tostring(filter and filter.ext))
-		if not filter then
-			Logger.error(LOG, "browse: no filter for key '%s'.", tostring(key))
-			return
-		end
 		hs.timer.doAfter(0, function()
-			local cur_val  = M.get(key)
-			local base_loc = filter.kind == "folder"
-				and (cur_val:match("^(.+[/\\])") or cur_val)
-				or  (cur_val:match("^(.+[/\\])") or (_base_dir or ""))
-			Logger.debug(LOG, "browse: cur_val='%s', base_loc='%s'.", tostring(cur_val), tostring(base_loc))
-			Logger.start(LOG, "Opening native file picker…")
-			local picked = pick_path(base_loc, filter)
-			Logger.success(LOG, "Picker returned: '%s' (type=%s).", tostring(picked), type(picked))
+			Logger.start(LOG, "Opening native folder picker…")
+			local picked = pick_dir(config_dir())
+			Logger.success(LOG, "Picker returned: '{1}'.", tostring(picked))
 			if picked and picked ~= "" then
-				if filter.kind == "folder" and not picked:match("[/\\]$") then picked = picked .. "/" end
-				-- Manual JS string escaping — avoids hs.json.encode pitfalls on bare strings
 				local function js_str(s)
 					return '"' .. s:gsub("\\", "\\\\"):gsub('"', '\\"'):gsub("\n", "\\n") .. '"'
 				end
-				local js = "window.applyBrowseResult(" .. js_str(key) .. "," .. js_str(picked) .. ")"
-				Logger.debug(LOG, "browse: injecting JS: %s.", js)
+				local js = "window.applyBrowseResult(" .. js_str(picked) .. ")"
 				hs.timer.doAfter(0.1, function()
 					if _webview then
-						local ok_js, err_js = pcall(function() _webview:evaluateJavaScript(js) end)
-						if ok_js then
-							Logger.success(LOG, "browse: applyBrowseResult JS dispatched.")
-						else
-							Logger.error(LOG, "browse: evaluateJavaScript failed: %s.", tostring(err_js))
-						end
-					else
-						Logger.error(LOG, "browse: _webview is nil when applying result.")
+						pcall(function() _webview:evaluateJavaScript(js) end)
 					end
 				end)
 			else
-				Logger.warn(LOG, "browse: picker returned nothing — user cancelled or AppleScript failed.")
+				Logger.warn(LOG, "browse: picker returned nothing — user cancelled.")
 			end
 		end)
 	elseif action == "save" then
-		local vals = type(body.current) == "table" and body.current or {}
-		apply_and_reload(vals)
+		apply_and_reload(type(body.configDir) == "string" and body.configDir or "")
 	elseif action == "cancel" then
 		close_webview()
 	end
@@ -369,7 +369,6 @@ function M.open_editor()
 		return
 	end
 
-	-- Reuse the existing window if already open
 	if _webview then
 		local ok_ui = pcall(require, "ui.ui_builder")
 		if ok_ui then
@@ -381,7 +380,6 @@ function M.open_editor()
 		return
 	end
 
-	-- Initialize the User Content bridge
 	local ok_uc, uc = pcall(hs.webview.usercontent.new, "hsPaths")
 	if not ok_uc or not uc then
 		Logger.error(LOG, "Failed to create webview usercontent bridge.")
@@ -404,17 +402,14 @@ function M.open_editor()
 	local masks       = hs.webview.windowMasks
 	local style_masks = (masks["titled"] or 1) + (masks["closable"] or 2)
 
-	-- Compute a height that fits comfortably on the current screen without
-	-- overflowing: 88 % of usable height, capped at 540 px so it is never
-	-- taller than a 13" MacBook allows without feeling cramped.
-	local screen    = hs.screen.mainScreen()
-	local sf        = screen and type(screen.frame) == "function" and screen:frame() or { h = 800 }
-	local win_h     = math.min(500, math.floor(sf.h * 0.80))
-	local win_w     = math.min(900, math.floor((sf.w or 1440) * 0.7))
+	local screen  = hs.screen.mainScreen()
+	local sf      = screen and type(screen.frame) == "function" and screen:frame() or { h = 800 }
+	local win_h   = math.min(220, math.floor(sf.h * 0.35))
+	local win_w   = math.min(700, math.floor((sf.w or 1440) * 0.55))
 
 	_webview = ui_builder.show_webview({
 		frame       = ui_builder.get_centered_frame(win_w, win_h),
-		title       = "Chemins des fichiers — Ergopti",
+		title       = "Dossier de configuration — Ergopti",
 		style_masks = style_masks,
 		usercontent = _usercontent,
 		assets_dir  = ASSETS_DIR,
@@ -422,7 +417,6 @@ function M.open_editor()
 			_webview     = nil
 			_usercontent = nil
 		end,
-		-- Inject initData once the page has finished loading
 		on_navigation = function(action)
 			if action == "didFinishNavigation" then
 				Logger.debug(LOG, "Navigation finished — injecting initData.")
@@ -442,11 +436,11 @@ end
 -- ============================================
 -- ============================================
 
---- Builds the "Chemins des fichiers…" menu item for the tray menu.
+--- Builds the "Dossier de configuration…" menu item for the tray menu.
 --- @return table Menu item table.
 function M.build_menu_item()
 	return {
-		title = "Chemins des fichiers…",
+		title = "Dossier de configuration…",
 		fn    = function()
 			hs.timer.doAfter(0.05, function() pcall(M.open_editor) end)
 		end,

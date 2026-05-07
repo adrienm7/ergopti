@@ -97,10 +97,10 @@ function M.write(path, data)
 	local L = {}
 	local function w(line) table.insert(L, line) end
 
-    -- File headers (Kept in French as they are directly visible to the end user)
-	w("# personal.toml — Hotstrings personnels")
-	w("# Géré automatiquement par l’éditeur de hotstrings personnels.")
-	w("# Ne pas modifier manuellement sauf si vous savez ce que vous faites.")
+    -- File header
+	w("# personal_hotstrings.toml — Personal hotstrings")
+	w("# Auto-managed by the personal hotstrings editor.")
+	w("# Do not edit manually unless you know what you are doing.")
 	w("")
 
     -- [_meta]

@@ -88,6 +88,20 @@ global LOGGER_FLUSH_INTERVAL_MS := 500
 global _LOGGER_PENDING := []
 global _LOGGER_FLUSH_TIMER_STARTED := False
 
+; Sub-file fan-out: each entry maps a filename suffix to a list of tag substrings.
+; Lines whose [Tag] matches any pattern are appended to that sub-file in addition
+; to the main unified log. Sub-files are ephemeral (today only) — stale ones from
+; previous days are deleted at init time. Paths are resolved relative to LogDir.
+global LOGGER_SUB_FILES := [
+    Map("name", "ErgoptiPlus_gestures.log",  "tags", ["gestures"]),
+    Map("name", "ErgoptiPlus_layout.log",    "tags", ["LayoutShift", "LayoutCaps", "LayoutAltGr"]),
+    Map("name", "ErgoptiPlus_dispatch.log",  "tags", ["Dispatch", "ScriptShortcuts", "TomlLoader"]),
+    Map("name", "ErgoptiPlus_tray.log",      "tags", ["ErgoptiPlus"]),
+]
+
+; Resolved absolute paths for each sub-file (populated by LoggerInit).
+global _LOGGER_SUB_PATHS := Map()
+
 
 
 
@@ -102,8 +116,19 @@ global _LOGGER_FLUSH_TIMER_STARTED := False
 ; minimum level (e.g. after the user changes it via the menu).
 LoggerInit() {
     global LOGGER_LOG_PATH, LOGGER_MIN_LEVEL, LOGGER_DEFAULT_LEVEL, ConfigurationFile
-    global _LOGGER_FLUSH_TIMER_STARTED, LOGGER_FLUSH_INTERVAL_MS
-    LOGGER_LOG_PATH := A_ScriptDir . "\ErgoptiPlus.log"
+    global _LOGGER_FLUSH_TIMER_STARTED, LOGGER_FLUSH_INTERVAL_MS, _ConfigDir
+
+    ; Daily-rotating log file under <ConfigDir>/logs/. Resolves _ConfigDir at
+    ; call time so any later override (paths.toml) is picked up.
+    LogDir := (IsSet(_ConfigDir) and _ConfigDir != "")
+        ? _ConfigDir . "logs\"
+        : A_ScriptDir . "\logs\"
+    if !DirExist(LogDir) {
+        try DirCreate(LogDir)
+    }
+    LOGGER_LOG_PATH := LogDir . "ErgoptiPlus_" . FormatTime(, "yyyy-MM-dd") . ".log"
+    _LoggerPurgeOldLogs(LogDir, 14)
+    _LoggerInitSubFiles(LogDir)
     LOGGER_MIN_LEVEL := LOGGER_DEFAULT_LEVEL
     if IsSet(ConfigurationFile) and FileExist(ConfigurationFile) {
         try {
@@ -315,10 +340,8 @@ _LoggerEmit(Level, Tag, Msg, Args*) {
             Body := Msg
         }
     }
-    Stamp := FormatTime(, "yyyy-MM-dd HH:mm:ss")
-    ; AHK Format uses ``{N:flags width}`` (printf-like) and a colon — the
-    ; ``-7`` flag/width pair pads Level to 7 characters left-aligned.
-    Line := Format("{1} [{2:-7}] [{3}] {4}", Stamp, Level, Tag, Body)
+    Stamp := FormatTime(, "yyyy-MM-dd HH:mm:ss") . ":" . Format("{:03}", A_MSec)
+    Line := Format("{1} [{2}] [{3}] {4}", Stamp, Level, Tag, Body)
     _LoggerPushRing(Line)
     if LOGGER_LOG_PATH != "" {
         _LOGGER_PENDING.Push(Line)
@@ -328,6 +351,70 @@ _LoggerEmit(Level, Tag, Msg, Args*) {
         ; the buffered ``FileAppend`` path.
         if LOGGER_SEVERITY[Level] >= LOGGER_SEVERITY["WARNING"] {
             _LoggerFlush(true)
+        }
+    }
+    _LoggerFanOut(Tag, Line)
+}
+
+; Resolves absolute paths for every sub-file and deletes any stale sub-file
+; whose date does not match today. Sub-files are ephemeral (today only) — they
+; are a filtered view of the main unified log, not an independent archive.
+_LoggerInitSubFiles(LogDir) {
+    global LOGGER_SUB_FILES, _LOGGER_SUB_PATHS
+    Today := FormatTime(, "yyyy-MM-dd")
+    _LOGGER_SUB_PATHS := Map()
+    for Entry in LOGGER_SUB_FILES {
+        SubPath := LogDir . Entry["name"]
+        _LOGGER_SUB_PATHS[Entry["name"]] := SubPath
+        ; Delete if the file exists but belongs to a previous day
+        if FileExist(SubPath) {
+            FileDate := ""
+            try FileDate := FileGetTime(SubPath, "M")  ; last-modified YYYYMMDDHHMMSS
+            FileDate := SubStr(FileDate, 1, 4) . "-" . SubStr(FileDate, 5, 2) . "-" . SubStr(FileDate, 7, 2)
+            if (FileDate != Today) {
+                try FileDelete(SubPath)
+            }
+        }
+    }
+}
+
+; Appends Line to every sub-file whose tag list contains Tag. Best-effort —
+; never raises so a sub-file I/O error cannot break the main logging path.
+_LoggerFanOut(Tag, Line) {
+    global LOGGER_SUB_FILES, _LOGGER_SUB_PATHS
+    if !IsSet(_LOGGER_SUB_PATHS) or _LOGGER_SUB_PATHS.Count == 0 {
+        return
+    }
+    for Entry in LOGGER_SUB_FILES {
+        for TagPattern in Entry["tags"] {
+            if (Tag = TagPattern) {
+                SubPath := _LOGGER_SUB_PATHS[Entry["name"]]
+                try FileAppend(Line . "`r`n", SubPath, "UTF-8")
+                break
+            }
+        }
+    }
+}
+
+; Removes ErgoptiPlus_*.log files in LogDir whose date prefix is older than
+; MaxAgeDays. Filename format: ErgoptiPlus_YYYY-MM-DD.log. Best-effort: errors
+; are swallowed so a permission issue cannot break logger init.
+_LoggerPurgeOldLogs(LogDir, MaxAgeDays) {
+    if !DirExist(LogDir) {
+        return
+    }
+    CutoffStamp := DateAdd(A_Now, -MaxAgeDays, "Days")
+    CutoffDate  := SubStr(CutoffStamp, 1, 8)  ; YYYYMMDD
+    try {
+        Loop Files, LogDir . "ErgoptiPlus_*.log" {
+            ; Extract the date from the filename: ErgoptiPlus_YYYY-MM-DD.log
+            if RegExMatch(A_LoopFileName, "^ErgoptiPlus_(\d{4})-(\d{2})-(\d{2})\.log$",
+                &Match) {
+                FileDate := Match[1] . Match[2] . Match[3]
+                if (FileDate < CutoffDate) {
+                    try FileDelete(A_LoopFileFullPath)
+                }
+            }
         }
     }
 }

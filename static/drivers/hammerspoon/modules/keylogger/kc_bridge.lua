@@ -28,9 +28,20 @@ local hs     = hs
 local Logger = require("lib.logger")
 local LOG    = "keylogger.kc_bridge"
 
--- Absolute path to the log file written by KE shell_command actions.
+-- Absolute path to the hand-off log file written by KE shell_command actions.
 -- Must match the KE_PHYSICAL_KC_LOG constant in modules/karabiner/generator.lua.
-local KC_LOG_PATH = hs.configdir .. "/karabiner_kc.log"
+local KC_LOG_PATH
+do
+	local ok, mp = pcall(require, "ui.menu.menu_paths")
+	if ok and mp and type(mp.get_config_dir) == "function" then
+		local d = mp.get_config_dir()
+		if type(d) == "string" and d ~= "" then
+			if not d:match("[/\\]$") then d = d .. "/" end
+			KC_LOG_PATH = d .. "metrics/karabiner_kc.log"
+		end
+	end
+	KC_LOG_PATH = KC_LOG_PATH or (hs.configdir .. "/metrics/karabiner_kc.log")
+end
 
 -- Maximum lines drained per watcher callback to avoid monopolising the run loop
 -- when a burst of key presses writes many lines before the watcher fires.

@@ -334,3 +334,82 @@ TestLogger_SnapshotAfterDoubleWrap() {
 }
 Test("Ring buffer: snapshot is correct after double wrap-around",
 	TestLogger_SnapshotAfterDoubleWrap)
+
+
+
+
+; ==========================
+; Daily-rotation log purge
+; ==========================
+; Helper: writes a log file with a date-stamp, optionally back-dated, then
+; touches its timestamp via FileSetTime so tests don't depend on real wall time.
+TestLogger_MakeOldLog(LogDir, DateStr) {
+	Path := LogDir . "ErgoptiPlus_" . DateStr . ".log"
+	fh := FileOpen(Path, "w", "UTF-8")
+	fh.Write("test content")
+	fh.Close()
+	return Path
+}
+
+TestLogger_PurgeRemovesOldFiles() {
+	LogDir := A_Temp . "\ergopti_purge_test_" . A_Now . "\"
+	if !DirExist(LogDir) {
+		DirCreate(LogDir)
+	}
+
+	; Today's file (must survive)
+	Today := FormatTime(, "yyyy-MM-dd")
+	TodayPath := TestLogger_MakeOldLog(LogDir, Today)
+
+	; A file 7 days ago (must survive — within 14-day window)
+	Recent := SubStr(DateAdd(A_Now, -7, "Days"), 1, 8)
+	RecentDateStr := SubStr(Recent, 1, 4) . "-" . SubStr(Recent, 5, 2) . "-" . SubStr(Recent, 7, 2)
+	RecentPath := TestLogger_MakeOldLog(LogDir, RecentDateStr)
+
+	; A file 30 days ago (must be deleted)
+	Old := SubStr(DateAdd(A_Now, -30, "Days"), 1, 8)
+	OldDateStr := SubStr(Old, 1, 4) . "-" . SubStr(Old, 5, 2) . "-" . SubStr(Old, 7, 2)
+	OldPath := TestLogger_MakeOldLog(LogDir, OldDateStr)
+
+	_LoggerPurgeOldLogs(LogDir, 14)
+
+	AssertTrue(FileExist(TodayPath) != "", "today's log should survive")
+	AssertTrue(FileExist(RecentPath) != "", "7-day-old log should survive (within 14 days)")
+	AssertEqual("", FileExist(OldPath), "30-day-old log should be deleted")
+
+	; Cleanup — best-effort
+	try FileDelete(TodayPath)
+	try FileDelete(RecentPath)
+	try DirDelete(LogDir)
+}
+Test("LoggerPurgeOldLogs: deletes files older than max age, keeps recent ones",
+	TestLogger_PurgeRemovesOldFiles)
+
+TestLogger_PurgeIgnoresUnrelatedFiles() {
+	; Files not matching the ErgoptiPlus_YYYY-MM-DD.log pattern must not be touched.
+	LogDir := A_Temp . "\ergopti_purge_unrelated_" . A_Now . "\"
+	if !DirExist(LogDir) {
+		DirCreate(LogDir)
+	}
+	OtherPath := LogDir . "random_file.log"
+	fh := FileOpen(OtherPath, "w", "UTF-8")
+	fh.Write("not ours")
+	fh.Close()
+
+	_LoggerPurgeOldLogs(LogDir, 1)
+
+	AssertTrue(FileExist(OtherPath) != "", "non-matching file must not be deleted")
+	try FileDelete(OtherPath)
+	try DirDelete(LogDir)
+}
+Test("LoggerPurgeOldLogs: leaves files that don't match the pattern alone",
+	TestLogger_PurgeIgnoresUnrelatedFiles)
+
+TestLogger_PurgeMissingDir() {
+	; A non-existent dir must not throw.
+	NoDir := A_Temp . "\definitely_missing_" . A_Now . "\"
+	_LoggerPurgeOldLogs(NoDir, 14)
+	AssertTrue(true, "purge with missing dir should not throw")
+}
+Test("LoggerPurgeOldLogs: missing directory is silently ignored",
+	TestLogger_PurgeMissingDir)

@@ -114,7 +114,7 @@ _ucc:setCallback(function(msg)
 
     elseif msg.body == "terminal" then
         -- In bootstrap mode, show the live Hammerspoon log; in download mode, use the model-specific cmd
-        local cmd = _mode == "bootstrap" and "tail -f /tmp/ergopti.log" or (M._terminal_cmd or ("ollama pull " .. (M._current_model or "")))
+        local cmd = _mode == "bootstrap" and ("tail -f " .. Logger.UNIFIED_LOG_FILE) or (M._terminal_cmd or ("ollama pull " .. (M._current_model or "")))
         local apple_script = string.format(
             "osascript -e 'tell application \"Terminal\" to do script \"%s\"' -e 'tell application \"Terminal\" to activate'",
             cmd:gsub("\"", "\\\"")

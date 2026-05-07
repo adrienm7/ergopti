@@ -105,9 +105,22 @@ local LAYER_NAV_SENTINEL_NAME  = Keycodes.to_name(Keycodes.F20_LAYER_NAV_ENTERED
 -- Each line written by the shell_command is: "<physical_key_code_name>\n"
 -- so Hammerspoon can map the name back to a numeric kc and record true
 -- physical key frequency — bypassing the Karabiner remap layer.
--- Path uses hs.configdir to stay aligned with the bridge's reader regardless
--- of the user's HAMMERSPOON_CONFIG_HOME override.
-local KE_PHYSICAL_KC_LOG = hs.configdir .. "/karabiner_kc.log"
+-- Lives under <config_dir>/metrics/ so the user can relocate everything by
+-- pointing ConfigDirPath elsewhere; bridge reader resolves the same path.
+local KE_PHYSICAL_KC_LOG
+do
+	local ok, mp = pcall(require, "ui.menu.menu_paths")
+	if ok and mp and type(mp.get_config_dir) == "function" then
+		local d = mp.get_config_dir()
+		if type(d) == "string" and d ~= "" then
+			if not d:match("[/\\]$") then d = d .. "/" end
+			KE_PHYSICAL_KC_LOG = d .. "metrics/karabiner_kc.log"
+		end
+	end
+	KE_PHYSICAL_KC_LOG = KE_PHYSICAL_KC_LOG or (hs.configdir .. "/metrics/karabiner_kc.log")
+	-- Ensure the parent dir exists before Karabiner attempts shell-redirect.
+	pcall(hs.execute, string.format("mkdir -p %q", KE_PHYSICAL_KC_LOG:match("^(.*)/[^/]+$") or ""))
+end
 
 
 
@@ -860,18 +873,13 @@ end
 --- @param src string Source path (real POSIX path, not an alias).
 --- @param dst string Destination path.
 --- @return boolean success, string detail Human-readable result.
-function M.deploy_file(src, dst)
-	Logger.trace(LOG, "Deploy: '%s' → '%s'…", src, dst)
-
-	-- Read source — fail fast before touching the destination
-	local src_fh = io.open(src, "r")
-	if not src_fh then
-		Logger.error(LOG, "Deploy aborted — source not readable: '%s'.", src)
-		return false, "source file not found: " .. src
-	end
-	local content = src_fh:read("*a")
-	src_fh:close()
-	Logger.debug(LOG, "Deploy: read %d byte(s) from source.", #content)
+--- Writes `content` directly to `dst`, creating parent directories if needed.
+--- Two strategies: direct write (S1), then mkdir + retry (S2).
+--- @param content string The string content to write.
+--- @param dst string Absolute destination path.
+--- @return boolean, string ok, detail.
+function M.deploy_string(content, dst)
+	Logger.trace(LOG, "Deploy: writing %d byte(s) → '%s'…", #content, dst)
 
 	local parent = dst:match("^(.*)/[^/]+$")
 
@@ -910,6 +918,26 @@ function M.deploy_file(src, dst)
 	Logger.error(LOG, "Tip: if '%s' is a Finder alias, replace it with a Unix symlink:", dst)
 	Logger.error(LOG, "  ln -sfn /real/karabiner/dir '%s'", parent or dst)
 	return false, detail
+end
+
+--- Reads `src` then delegates to `deploy_string`. Kept for callers that still
+--- have a file path rather than an in-memory string.
+--- @param src string Absolute source path.
+--- @param dst string Absolute destination path.
+--- @return boolean, string ok, detail.
+function M.deploy_file(src, dst)
+	Logger.trace(LOG, "Deploy: '%s' → '%s'…", src, dst)
+
+	local src_fh = io.open(src, "r")
+	if not src_fh then
+		Logger.error(LOG, "Deploy aborted — source not readable: '%s'.", src)
+		return false, "source file not found: " .. src
+	end
+	local content = src_fh:read("*a")
+	src_fh:close()
+	Logger.debug(LOG, "Deploy: read %d byte(s) from source.", #content)
+
+	return M.deploy_string(content, dst)
 end
 
 return M
