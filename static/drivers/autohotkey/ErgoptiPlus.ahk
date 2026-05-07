@@ -71,6 +71,7 @@ SendMode("Event") ; Everything concerning hotstrings MUST use SendEvent and not 
 #Include lib\hotstring_engine.ahk
 #Include lib\toml_loader.ahk
 #Include lib\hotstrings_config.ahk
+#Include lib\hotstrings_config_window.ahk
 #Include lib\tooltip.ahk
 #Include lib\hotstring_prefix_watcher.ahk
 ; Auto-generated registrar for the bundled hotstring TOMLs. ``*i`` keeps the
@@ -890,6 +891,12 @@ initMenu() {
         . (TotalPersonal > 0 ? " (" . FmtCount(TotalPersonal) . ")" : "")
         HotstringsMenu.Add(PersonalTitle, PersonalMenu)
     }
+    HotstringsMenu.Add() ; Separating line
+    ; Hotstrings configuration window — per-group delay and tooltip color.
+    ; Edits the same shared override file consumed by Hammerspoon, so any
+    ; change here applies to both drivers at next reload.
+    HotstringsMenu.Add("Délais et couleurs des hotstrings…",
+        (*) => OpenHotstringsConfigWindow())
     HotstringsMenu.Add() ; Separating line
     ; Magic key editor — mirrors HS menu_hotstrings build_management placement
     HotstringsMenu.Add("Touche magique : " . ScriptInformation["MagicKey"], MagicKeyEditor)
