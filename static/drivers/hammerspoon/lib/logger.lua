@@ -4,8 +4,8 @@
 --- MODULE: Logger
 --- DESCRIPTION:
 --- Centralized, level-aware logging system for the entire Hammerspoon runtime.
---- Provides consistent formatting, level filtering, and colored console output
---- so each log type is immediately recognizable at a glance.
+--- Provides consistent formatting, level filtering, colored console output, and
+--- a unified rotating file sink so every subsystem's output lands in one place.
 ---
 --- FEATURES & RATIONALE:
 --- 1. Level Filtering: Avoids console noise in production while preserving full
@@ -15,23 +15,34 @@
 --- 3. Colored Output: Each variant has a distinct console color — errors in red,
 ---    warnings in orange, successes in green, debug in gray, etc.
 --- 4. Two-axis Lifecycle Logs:
----    - DEBUG axis: Logger.trace (start) / Logger.done (end) — fine-grained internal ops
----    - INFO  axis: Logger.start (start) / Logger.success (end) — important operations
+---    - DEBUG axis: Logger.trace (start) / Logger.done (end) — fine-grained ops
+---    - INFO  axis: Logger.start (start) / Logger.success (end) — significant ops
 ---    Seeing a START without a following SUCCESS points to a silent failure.
 --- 5. Deduplication: consecutive identical lines are suppressed automatically;
 ---    a count summary is printed when the run breaks, using the same color/level.
---- 6. Unified file sink: every log line is also appended to /tmp/ergopti.log so
----    HS, MLX server output, Ollama server output and any other subsystem land
----    in a single rotating file the user can tail. The file is truncated
----    automatically on the first log of a new day so it never grows unbounded.
+--- 6. Unified rotating file sink: one file per calendar day under <config>/logs/,
+---    named ErgoptiPlus_YYYY-MM-DD.log (mirrors the AHK driver naming convention).
+---    Files older than max_age_days are purged automatically on init.
+--- 7. Topical sub-files: lines are fan-out to per-subsystem logs (llm, karabiner…)
+---    based on module tag matching, giving focused tail targets per feature area.
+--- 8. Timestamp format: HHhMMminSSsNNNms — matches the AHK driver exactly so both
+---    log files look identical when tailed side by side.
 --- ==============================================================================
 
 local M = {}
 local hs = hs
 
--- Single rotating file for the whole stack. MLX / Ollama subprocesses append
--- here too via shell redirection (see models_manager_mlx.lua / api_ollama.lua).
-M.UNIFIED_LOG_FILE = "/tmp/ergopti.log"
+-- socket.gettime() gives sub-second precision for the millisecond component.
+-- Loaded via pcall so headless unit tests that lack the hs sandbox still work.
+local _ok_socket, _socket = pcall(require, "socket")
+local _gettime = (_ok_socket and _socket and _socket.gettime) or os.time
+
+-- Main unified log file. Set to a safe early-boot fallback; overridden by
+-- M.init_log_path() once the user config directory is known.
+M.UNIFIED_LOG_FILE = "/tmp/ErgoptiPlus_boot.log"
+
+-- Log directory resolved after M.init_log_path(); used by sub-file fan-out.
+local _log_dir = "/tmp/"
 
 
 
@@ -53,29 +64,28 @@ M.LEVELS = {
 -- Full variant table: each entry drives its label, color, and severity level.
 --
 -- Two lifecycle axes:
---   DEBUG axis (level 1): TRACE → start of a routine internal op  |  DONE → its completion
---   INFO  axis (level 2): START → start of a significant action   |  SUCCESS → its completion
+--   DEBUG axis (level 1): TRACE → start of a routine internal op  |  DONE → end
+--   INFO  axis (level 2): START → start of a significant action   |  SUCCESS → end
 --
 local VARIANTS = {
-	-- ── Debug axis ────────────────────────────────────────────────────────────
+	-- ── Debug axis ──────────────────────────────────────────────────────────
 	DEBUG   = { level = 1, label = "DEBUG",   color = { white = 0.65, alpha = 1.0 } },
 	TRACE   = { level = 1, label = "TRACE",   color = { red = 0.20, green = 0.55, blue = 0.75, alpha = 1.0 } },
 	DONE    = { level = 1, label = "DONE",    color = { red = 0.10, green = 0.50, blue = 0.18, alpha = 1.0 } },
-	-- ── Info axis ─────────────────────────────────────────────────────────────
-	INFO    = { level = 2, label = "INFO",    color = { white = 0.20,  alpha = 1.0 } },
+	-- ── Info axis ───────────────────────────────────────────────────────────
+	INFO    = { level = 2, label = "INFO",    color = { white = 0.20, alpha = 1.0 } },
 	START   = { level = 2, label = "START",   color = { red = 0.40, green = 0.80, blue = 1.00, alpha = 1.0 } },
 	SUCCESS = { level = 2, label = "SUCCESS", color = { red = 0.15, green = 0.65, blue = 0.22, alpha = 1.0 } },
-	-- ── Warning / Error ───────────────────────────────────────────────────────
+	-- ── Warning / Error ─────────────────────────────────────────────────────
 	WARNING = { level = 3, label = "WARNING", color = { red = 1.00, green = 0.60, blue = 0.00, alpha = 1.0 } },
 	ERROR   = { level = 4, label = "ERROR",   color = { red = 1.00, green = 0.20, blue = 0.20, alpha = 1.0 } },
 }
 
---- Current active level — only messages at or above this level are printed.
+--- Current active level — only messages at or above this level are emitted.
 M.current_level = M.LEVELS.WARNING
 
--- Optional hook set by the bootstrapper (init.lua) after all modules are loaded.
--- Called with (module_name, formatted_message) on every Logger.error invocation.
--- Kept nil by default so the logger has zero dependency on the notifications module.
+-- Optional hook set by the bootstrapper after all modules are loaded.
+-- Called with (module_name, formatted_message) on every Logger.error call.
 local _error_notification_handler = nil
 
 
@@ -87,16 +97,69 @@ local _error_notification_handler = nil
 -- =======================================
 -- =======================================
 
+--- Configures the log file path under <config_dir>/logs/ with daily rotation
+--- (ErgoptiPlus_YYYY-MM-DD.log) and purges files older than max_age_days.
+--- Mirrors the AHK driver naming exactly so both logs sort together.
+--- Best-effort: any I/O error is swallowed so a permission issue cannot block init.
+--- @param config_dir string Absolute path to the user config directory (trailing slash optional).
+--- @param max_age_days integer Days to keep before purging (default 14).
+function M.init_log_path(config_dir, max_age_days)
+	max_age_days = max_age_days or 14
+	if type(config_dir) ~= "string" or config_dir == "" then return end
+	if not config_dir:match("[/\\]$") then config_dir = config_dir .. "/" end
+
+	local log_dir = config_dir .. "logs/"
+	pcall(hs.execute, string.format("mkdir -p %q", log_dir))
+	_log_dir = log_dir
+
+	-- Close any handle open on the old path so the next write re-opens cleanly
+	if _file_handle then
+		pcall(function() _file_handle:close() end)
+		_file_handle   = nil
+		_last_log_date = nil
+		_last_log_path = nil
+	end
+
+	M.UNIFIED_LOG_FILE = log_dir .. "ErgoptiPlus_" .. os.date("%Y-%m-%d") .. ".log"
+
+	-- Purge main log files older than max_age_days by comparing the date in the
+	-- filename (YYYY-MM-DD) rather than mtime, so moved/copied files age correctly.
+	pcall(hs.execute, string.format(
+		"find %q -name 'ErgoptiPlus_*.log' -type f | while read f; do"
+		.. " d=$(basename \"$f\" .log | sed 's/ErgoptiPlus_//'); "
+		.. " [ \"$(date -j -f '%%Y-%%m-%%d' \"$d\" '+%%s' 2>/dev/null)\" -lt"
+		.. " \"$(date -j -v-%dd '+%%s' 2>/dev/null)\" ] && rm -f \"$f\"; "
+		.. "done 2>/dev/null",
+		log_dir, max_age_days))
+
+	-- Sub-files are ephemeral (today only). Delete any that belong to a previous
+	-- day — they are a filtered view of the main log, not an independent archive.
+	local today = os.date("%Y-%m-%d")
+	for _, sub in ipairs(SUB_LOG_NAMES) do
+		local sub_path = log_dir .. sub.name
+		-- Read the file's last-modified date via stat; delete if it differs from today
+		pcall(function()
+			local stat_out = hs.execute(string.format(
+				"stat -f '%%Sm' -t '%%Y-%%m-%%d' %q 2>/dev/null", sub_path))
+			if stat_out then
+				local file_date = stat_out:match("^(%d%d%d%d%-%d%d%-%d%d)")
+				if file_date and file_date ~= today then
+					os.remove(sub_path)
+				end
+			end
+		end)
+	end
+end
+
 --- Registers a callback invoked on every Logger.error call to surface errors as
---- system notifications. Set once from init.lua after all modules are loaded so the
---- logger itself stays free of any dependency on the notifications module.
+--- system notifications. Set once from init.lua after all modules are loaded.
 --- @param fn function|nil Callback with signature fn(module_name, message).
 function M.set_error_notification_handler(fn)
 	_error_notification_handler = (type(fn) == "function") and fn or nil
 end
 
 --- Sets the active log level. Messages below this threshold are silently dropped.
---- @param level number|string Numeric constant (M.LEVELS.DEBUG) or name ("DEBUG", "INFO", …).
+--- @param level number|string Numeric constant (M.LEVELS.DEBUG) or name ("DEBUG", …).
 function M.set_level(level)
 	if type(level) == "number" then
 		M.current_level = level
@@ -105,7 +168,7 @@ function M.set_level(level)
 	end
 end
 
---- Returns true when messages at the given level would be printed.
+--- Returns true when messages at the given level would be emitted.
 --- @param level number Level constant to test.
 --- @return boolean
 function M.is_enabled(level)
@@ -122,96 +185,45 @@ end
 -- ===================================
 
 -- Deduplication state: suppresses consecutive identical log lines to prevent spam.
--- Stores the variant so the summary line uses the same color/label as the suppressed messages.
 local _dedup = { line = nil, count = 0, variant_key = nil }
 
 
+-- =============================================
+-- ===== 3.1) File Sink Helpers =====
+-- =============================================
 
-
--- ===============================================
--- ===============================================
--- ===== 3.1) Unified File Sink Helpers ==========
--- ===============================================
-
--- File sink state — opened lazily on first write, kept open for the life of
--- the Hammerspoon process to avoid open/close overhead on every log line.
--- _last_log_date carries the YYYY-MM-DD of the last write so we can detect a
--- day rollover and truncate the file to keep it bounded to one day at a time.
+-- File sink state — handle kept open for the life of the HS process to avoid
+-- open/close overhead. _last_log_date detects day rollovers; _last_log_path
+-- detects init_log_path() re-points after early-boot.
 local _file_handle    = nil
 local _last_log_date  = nil
+local _last_log_path  = nil
 
---- Returns an open file handle to the unified log file, ready for append. On
---- the very first call of a new calendar day, the file is truncated so daily
---- rotation happens transparently without any external rotation daemon. Also
---- handles the cold-start case: if Hammerspoon starts up and finds an
---- existing log file from a previous day, it gets truncated before the first
---- new line is written.
---- @return file*|nil The open handle, or nil if the file could not be opened.
-local function _ensure_log_file()
-	local today = os.date("%Y-%m-%d")
-
-	-- Hot path: handle still valid for the same calendar day
-	if _file_handle and _last_log_date == today then
-		return _file_handle
-	end
-
-	-- Either first call of the session or the day just rolled over
-	if _file_handle then
-		pcall(function() _file_handle:close() end)
-		_file_handle = nil
-	end
-
-	local should_truncate = true
-	if _last_log_date == nil then
-		-- First write this session: keep yesterday's log only if its mtime
-		-- is from today (e.g. Hammerspoon was reloaded mid-day)
-		local attrs = (hs and hs.fs and hs.fs.attributes) and hs.fs.attributes(M.UNIFIED_LOG_FILE) or nil
-		if attrs and attrs.modification then
-			local file_date = os.date("%Y-%m-%d", attrs.modification)
-			if file_date == today then should_truncate = false end
-		else
-			-- File does not exist — open in append mode (which creates it)
-			should_truncate = false
-		end
-	end
-
-	local mode = should_truncate and "w" or "a"
-	local ok, fh = pcall(io.open, M.UNIFIED_LOG_FILE, mode)
-	if not ok or not fh then return nil end
-	_file_handle   = fh
-	_last_log_date = today
-
-	-- Stamp every truncation / fresh open with a session header so the user
-	-- can tell where one Hammerspoon session ends and the next one begins
-	pcall(function()
-		fh:write("\n", "===== ", os.date("%Y-%m-%d %H:%M:%S"),
-			" — Ergopti unified log opened (mode=", mode, ") =====", "\n")
-		fh:flush()
-	end)
-	return _file_handle
-end
-
---- Appends a single already-formatted log line to the unified file with a
---- compact HH:MM:SS prefix. Each call is line-flushed so a tail -f sees output
---- in real time and an unexpected Hammerspoon crash does not lose buffered
---- entries. Failures are silent on purpose: we never want logging to abort the
---- caller's work, e.g. when /tmp is full.
---- @param line string The fully-formatted line to append.
---- Routes a formatted log line into one or more topical sub-files in addition
---- to the main /tmp/ergopti.log sink. The classification is purely based on
---- substring matches in the rendered line (which always contains the module
---- tag, e.g. "[menu_llm.mlx]") so a module never has to know which file it
---- writes to. A line can land in multiple sub-files (e.g. "[mlx_deps]" lines
---- in both ergopti_mlx.log and ergopti_llm.log).
-local SUB_LOG_FILES = {
-	{ path = "/tmp/ergopti_mlx.log",        patterns = { "[mlx", "MLX-", "[menu_llm.mlx]", "[llm.api_mlx]" } },
-	{ path = "/tmp/ergopti_ollama.log",     patterns = { "[ollama", "[menu_llm.ollama]", "[llm.api_ollama]" } },
-	{ path = "/tmp/ergopti_llm.log",        patterns = { "[llm.", "[menu_llm", "[mlx_deps]", "[ollama_deps]", "WARMUP", "[TOGGLE]" } },
-	{ path = "/tmp/ergopti_hotstrings.log", patterns = { "[keymap.registry]", "[dynamic_hotstrings", "[personal_info]", "hotstring", "[toml_reader]" } },
-	{ path = "/tmp/ergopti_keylogger.log",  patterns = { "[keylogger" } },
-	{ path = "/tmp/ergopti_karabiner.log",  patterns = { "[karabiner" } },
-	{ path = "/tmp/ergopti_gestures.log",   patterns = { "[gestures" } },
-	{ path = "/tmp/ergopti_menu.log",       patterns = { "[menu]", "[menu_", "[builder]", "[ui_builder]", "[app_picker]" } },
+-- Topical sub-files: lines whose rendered "[tag]" matches any pattern are
+-- fan-out here in addition to the main unified file. Sub-files are ephemeral
+-- (today only) — they are a filtered view of the main log, not an archive.
+-- Paths are resolved at runtime relative to _log_dir (set by init_log_path).
+local SUB_LOG_NAMES = {
+	-- MLX inference server: startup, model loads, per-token latency
+	{ name = "ErgoptiPlus_mlx.log",        patterns = { "[mlx",        "[llm.api_mlx]",     "MLX-",        "[mlx_deps]"    } },
+	-- Ollama daemon: startup, model pulls, inference calls
+	{ name = "ErgoptiPlus_ollama.log",      patterns = { "[ollama",     "[llm.api_ollama]",  "[ollama_deps]"                } },
+	-- LLM bridge: prompt dispatch, temperature, model switching, warmup
+	{ name = "ErgoptiPlus_llm.log",         patterns = { "[llm.",       "[menu_llm",         "[keymap.llm", "WARMUP",  "[TOGGLE]" } },
+	-- Hotstrings & keymap: registry, dynamic expansions, personal shortcuts
+	{ name = "ErgoptiPlus_hotstrings.log",  patterns = { "[keymap.",    "[dynamic_hotstring", "[personal_info]", "[toml_reader]", "hotstring" } },
+	-- Raw keystroke capture and n-gram analysis
+	{ name = "ErgoptiPlus_keylogger.log",   patterns = { "[keylogger"                                                       } },
+	-- Karabiner-Elements config generation and deployment
+	{ name = "ErgoptiPlus_karabiner.log",   patterns = { "[karabiner"                                                       } },
+	-- Touchpad & mouse gesture recognition
+	{ name = "ErgoptiPlus_gestures.log",    patterns = { "[gestures"                                                        } },
+	-- Menubar, tray, modal dialogs, app picker, UI builders
+	{ name = "ErgoptiPlus_menu.log",        patterns = { "[menu]",      "[menu_",            "[builder]",   "[ui_builder]", "[app_picker]", "[download_window]" } },
+	-- Notification routing and system alerts
+	{ name = "ErgoptiPlus_notify.log",      patterns = { "[notify",     "[notifications"                                    } },
+	-- Boot sequence, path resolution, config loading
+	{ name = "ErgoptiPlus_boot.log",        patterns = { "[init]",      "[menu_paths]",      "[paths]",     "[config"       } },
 }
 
 local function _matches_any(line, patterns)
@@ -221,25 +233,60 @@ local function _matches_any(line, patterns)
 	return false
 end
 
-local function _write_to_file(line)
+--- Builds the HHhMMminSSsNNNms timestamp string matching the AHK driver format.
+local function _timestamp()
+	local t    = _gettime()
+	local sec  = math.floor(t)
+	local ms   = math.floor((t - sec) * 1000)
+	return os.date("%Y-%m-%d %H:%M:%S", sec) .. string.format(":%03d", ms)
+end
+
+--- Returns an open append handle to the current daily log file, re-opening on
+--- day rollover or after init_log_path() re-points UNIFIED_LOG_FILE.
+local function _ensure_log_file()
+	local today = os.date("%Y-%m-%d")
+	if _file_handle and _last_log_date == today and _last_log_path == M.UNIFIED_LOG_FILE then
+		return _file_handle
+	end
+	if _file_handle then
+		pcall(function() _file_handle:close() end)
+		_file_handle = nil
+	end
+	local ok, fh = pcall(io.open, M.UNIFIED_LOG_FILE, "a")
+	if not ok or not fh then return nil end
+	_file_handle   = fh
+	_last_log_date = today
+	_last_log_path = M.UNIFIED_LOG_FILE
+	-- Session boundary marker so tailing reveals where HS restarted
+	pcall(function()
+		fh:write("\n===== " .. _timestamp() .. " — ErgoptiPlus session opened =====\n")
+		fh:flush()
+	end)
+	return _file_handle
+end
+
+--- Appends a fully-formatted line to the main log and any matching sub-files.
+--- All writes are line-flushed so `tail -f` sees output in real time and an
+--- unexpected HS crash does not lose buffered entries. Failures are silent.
+--- @param stamp string Pre-built timestamp string.
+--- @param line string The line to write (without timestamp).
+local function _write_to_file(stamp, line)
+	local full = stamp .. " " .. line .. "\n"
 	local fh = _ensure_log_file()
-	local stamped = os.date("%H:%M:%S ") .. line .. "\n"
 	if fh then
 		pcall(function()
-			fh:write(stamped)
+			fh:write(full)
 			fh:flush()
 		end)
 	end
-	-- Fan out to topical sub-files. Each sub-file is opened/closed per write
-	-- so a crash never leaves a stale handle, and the file count is bounded
-	-- (one open at a time). Cost is negligible vs. the network/MLX work
-	-- already happening on every interesting log line.
-	for _, sub in ipairs(SUB_LOG_FILES) do
+	-- Fan-out to topical sub-files. Each is opened/closed per write so a crash
+	-- never leaves a stale handle. Cost is negligible vs. the operations logged.
+	for _, sub in ipairs(SUB_LOG_NAMES) do
 		if _matches_any(line, sub.patterns) then
 			pcall(function()
-				local f = io.open(sub.path, "a")
+				local f = io.open(_log_dir .. sub.name, "a")
 				if f then
-					f:write(stamped)
+					f:write(full)
 					f:close()
 				end
 			end)
@@ -247,7 +294,12 @@ local function _write_to_file(line)
 	end
 end
 
---- Emits a count summary using the same variant as the suppressed messages, then resets state.
+
+-- =============================================
+-- ===== 3.2) Dedup & Dispatch =====
+-- =============================================
+
+--- Emits a count summary using the same variant as the suppressed messages, then resets.
 local function _flush_dedup_summary()
 	if _dedup.count == 0 then return end
 	local variant = VARIANTS[_dedup.variant_key] or VARIANTS["INFO"]
@@ -260,16 +312,15 @@ local function _flush_dedup_summary()
 	else
 		print(summary)
 	end
-	_write_to_file(summary)
+	local stamp = _timestamp()
+	_write_to_file(stamp, summary)
 	_dedup.count       = 0
 	_dedup.line        = nil
 	_dedup.variant_key = nil
 end
 
 --- Internal dispatcher — formats and outputs one log entry.
---- Uses hs.console.printStyledtext for colored output; falls back to print if unavailable.
---- Consecutive identical lines are suppressed; a count summary is shown when the run breaks.
---- @param variant_key string Key into VARIANTS ("DEBUG", "TRACE", "DONE", "SUCCESS", …).
+--- @param variant_key string Key into VARIANTS.
 --- @param module_name string Short identifier of the calling module.
 --- @param msg string Message or printf-style format string.
 --- @param ... any Optional arguments for string.format.
@@ -277,22 +328,18 @@ local function _log(variant_key, module_name, msg, ...)
 	local variant = VARIANTS[variant_key]
 	if not variant or variant.level < M.current_level then return end
 
-	-- Format the message; guard against malformed format strings
-	local text
-	local ok, fmt = pcall(tostring, msg)
-	text = ok and fmt or "???"
-
+	local ok, base = pcall(tostring, msg)
+	local text = ok and base or "???"
 	if select("#", ...) > 0 then
 		local ok_f, formatted = pcall(string.format, text, ...)
 		text = ok_f and formatted or (text .. " [format error]")
 	end
 
-	-- DEBUG-axis variants (level 1) are indented so they visually nest under surrounding
-	-- INFO-axis events — e.g., per-item scan logs nest under the surrounding START/SUCCESS pair
+	-- DEBUG-axis variants are indented so they visually nest under INFO-axis events
 	local indent = (variant.level == 1) and string.rep(" ", 10) or ""
-	local line   = string.format("%s [%s] [%s] %s", indent, variant.label, tostring(module_name), text)
+	local line   = string.format("%s[%s] [%s] %s", indent, variant.label, tostring(module_name), text)
 
-	-- Deduplication: suppress repeated identical lines, emit a count summary on change
+	-- Deduplication: suppress repeated identical lines
 	if line == _dedup.line then
 		_dedup.count = _dedup.count + 1
 		return
@@ -301,33 +348,42 @@ local function _log(variant_key, module_name, msg, ...)
 	_dedup.line        = line
 	_dedup.variant_key = variant_key
 
-	-- Prefer styled output (colors); plain print is the fallback for headless contexts
+	local stamp = _timestamp()
+
+	-- Console output: styled (colors) when hs is available, plain print otherwise
+	local console_line = stamp .. " " .. line
 	if hs and hs.styledtext and hs.console and hs.console.printStyledtext then
-		local styled = hs.styledtext.new(line, { color = variant.color })
-		pcall(hs.console.printStyledtext, styled)
+		pcall(hs.console.printStyledtext, hs.styledtext.new(console_line, { color = variant.color }))
 	else
-		print(line)
+		print(console_line)
 	end
 
-	-- Mirror to the unified rotating file so the user has a single tail target
-	_write_to_file(line)
+	_write_to_file(stamp, line)
 end
 
+
+
+
+-- ===================================
+-- ===================================
+-- ======= 4/ Public Variants ========
+-- ===================================
+-- ===================================
+
 --- Logs a DEBUG message — verbose detail for development and troubleshooting.
---- Only visible when the active level is set to DEBUG.
 --- @param module_name string Short module identifier.
 --- @param msg string Message or format string.
 --- @param ... any Optional format arguments.
 function M.debug(module_name, msg, ...) _log("DEBUG", module_name, msg, ...) end
 
---- Logs a TRACE message — marks the start of a routine internal operation at DEBUG level.
---- Pair with Logger.done() to close the lifecycle loop at debug granularity.
+--- Logs a TRACE message — start of a routine internal operation at DEBUG level.
+--- Pair with Logger.done() to close the lifecycle loop.
 --- @param module_name string Short module identifier.
 --- @param msg string Message or format string.
 --- @param ... any Optional format arguments.
 function M.trace(module_name, msg, ...) _log("TRACE", module_name, msg, ...) end
 
---- Logs a DONE message — marks the successful end of a routine internal operation (DEBUG level).
+--- Logs a DONE message — end of a routine internal operation at DEBUG level.
 --- Pair with Logger.trace() that opened the same operation.
 --- @param module_name string Short module identifier.
 --- @param msg string Message or format string.
@@ -340,22 +396,21 @@ function M.done(module_name, msg, ...) _log("DONE", module_name, msg, ...) end
 --- @param ... any Optional format arguments.
 function M.info(module_name, msg, ...) _log("INFO", module_name, msg, ...) end
 
---- Logs a START message — marks the beginning of a significant action (INFO level).
---- Always pair with Logger.success() to close the lifecycle loop.
---- If you see a START in logs without a following SUCCESS, something failed silently.
+--- Logs a START message — start of a significant action at INFO level.
+--- Always pair with Logger.success(); a START without SUCCESS signals a silent failure.
 --- @param module_name string Short module identifier.
 --- @param msg string Message or format string.
 --- @param ... any Optional format arguments.
 function M.start(module_name, msg, ...) _log("START", module_name, msg, ...) end
 
---- Logs a SUCCESS message — marks the successful completion of a started action (INFO level).
+--- Logs a SUCCESS message — successful completion of a started action at INFO level.
 --- Always pair with Logger.start() that opened the same action.
 --- @param module_name string Short module identifier.
 --- @param msg string Message or format string.
 --- @param ... any Optional format arguments.
 function M.success(module_name, msg, ...) _log("SUCCESS", module_name, msg, ...) end
 
---- Logs a WARNING message — unexpected condition; execution continues but investigate.
+--- Logs a WARNING message — unexpected condition; execution continues but must be investigated.
 --- @param module_name string Short module identifier.
 --- @param msg string Message or format string.
 --- @param ... any Optional format arguments.
@@ -370,8 +425,6 @@ function M.warn(module_name, msg, ...) _log("WARNING", module_name, msg, ...) en
 function M.error(module_name, msg, ...)
 	_log("ERROR", module_name, msg, ...)
 	if _error_notification_handler then
-		-- Build the formatted message independently from _log so the handler
-		-- receives a clean string without the console prefix/indentation.
 		local ok, base = pcall(tostring, msg)
 		local text = ok and base or "???"
 		if select("#", ...) > 0 then
@@ -387,11 +440,11 @@ end
 
 -- ==================================
 -- ==================================
--- ======= 4/ Utility Helpers =======
+-- ======= 5/ Utility Helpers =======
 -- ==================================
 -- ==================================
 
---- Wraps pcall and logs any raised exception at the ERROR level.
+--- Wraps pcall and logs any raised exception at ERROR level.
 --- Identical call signature to pcall; return values are forwarded unchanged.
 --- @param module_name string Short module identifier used in the error log.
 --- @param fn function Function to call inside the protected block.
@@ -406,10 +459,10 @@ function M.pcall(module_name, fn, ...)
 	return table.unpack(results, 1, results.n)
 end
 
---- Wraps a builder function in a pcall and logs any failure at the ERROR level.
+--- Wraps a builder function in a pcall and logs any failure at ERROR level.
 --- Returns nil on failure so callers can use the result as a truthiness guard.
 --- @param module_name string Short module identifier.
---- @param label string Human-readable name of the component being built (for the error message).
+--- @param label string Human-readable name of the component being built.
 --- @param fn function Builder function to call.
 --- @param ctx table Context argument forwarded to fn.
 --- @return any|nil The return value of fn, or nil if it threw.

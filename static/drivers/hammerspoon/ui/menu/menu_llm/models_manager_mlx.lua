@@ -538,7 +538,7 @@ PY
 			-- the user has a single tail target. Each line is prefixed
 			-- [MLX-SERVER] downstream so it stands out from Hammerspoon's own
 			-- log entries.
-			local unified_log_file = "/tmp/ergopti.log"
+			local unified_log_file = Logger.UNIFIED_LOG_FILE
 			Logger.info(LOG, "Starting MLX server process for model %s — output prefixed [MLX-SERVER] in %s",
 				tostring(target_model), unified_log_file)
 			local startup_confirmed = false
@@ -820,7 +820,7 @@ PY
 			--- the MLX server stdout) into the Hammerspoon log so the Python
 			--- traceback header that triggered the crash detection lands in the
 			--- same log file as everything else. The full server output is
-			--- separately mirrored line-by-line into /tmp/ergopti.log via the
+			--- separately mirrored line-by-line into the unified rotating log via the
 			--- awk prefixer, so the user can grep for [MLX-SERVER] there to see
 			--- the complete trace if they need more than the last 15 lines.
 			local function dump_mlx_server_log(prefix)
@@ -879,7 +879,7 @@ PY
 				if code ~= 0 then
 					-- Look for the most informative line in the in-memory ring buffer
 					-- (last ~15 lines captured live). The full server output is in
-					-- /tmp/ergopti.log behind the [MLX-SERVER] prefix if needed.
+					-- The unified rotating log behind the [MLX-SERVER] prefix if needed.
 					local error_msg = ""
 					for _, line in ipairs(server_log_buffer) do
 						if line:lower():match("error") or line:match("Traceback") or line:match("Exception") or

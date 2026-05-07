@@ -48,16 +48,17 @@ local function ensure_ollama_running()
 		hs.timer.usleep(50 * 1000)
 		-- Funnel Ollama stdout/stderr into the unified Ergopti log behind an
 		-- [OLLAMA-SERVER] prefix so the user has a single tail target for the
-		-- whole stack (HS + MLX + Ollama land in the same /tmp/ergopti.log).
+		-- whole stack (HS + MLX + Ollama land in the same rotating daily file).
 		-- Uses a `while read` loop instead of awk: macOS' default BWK awk
 		-- does not implement the gawk-only strftime() / fflush(file) builtins,
 		-- so the previous awk pipeline crashed on the first line and killed
 		-- the ollama subprocess on SIGPIPE.
+		local log_path = Logger.UNIFIED_LOG_FILE
 		hs.execute(
 			"nohup bash -c \"/opt/homebrew/bin/ollama serve 2>&1 | " ..
 			"while IFS= read -r LINE; do " ..
 			"printf '%s [OLLAMA-SERVER] %s\\n' \\\"\\$(date +%H:%M:%S)\\\" \\\"\\$LINE\\\" " ..
-			">> /tmp/ergopti.log; " ..
+			">> " .. string.format("%q", log_path) .. "; " ..
 			"done\" &"
 		)
 	end)

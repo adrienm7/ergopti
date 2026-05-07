@@ -43,7 +43,7 @@ local ACTION_DEFINITIONS = {
 	{id = "open_console",       label = "Console Hammerspoon"},
 	{id = "quit_hammerspoon",   label = "Quitter Hammerspoon"},
 	{id = "open_init",          label = "Ouvrir init.lua"},
-	{id = "open_personal_toml", label = "Ouvrir personal.toml"},
+	{id = "open_personal_toml", label = "Ouvrir personal_hotstrings.toml"},
 	{id = "open_config",        label = "Ouvrir config.json"},
 	{id = "open_logs",          label = "Ouvrir le dossier de logs"},
 	{id = "add_hotstring",      label = "Ajouter un hotstring"},

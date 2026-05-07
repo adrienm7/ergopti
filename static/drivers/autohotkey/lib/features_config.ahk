@@ -263,22 +263,26 @@ global Features := Map(
     ),
     "Shortcuts", Map(
         "__Order", [
+            ">Lettres accentuées",
             "EGrave",
             "ECirc",
             "EAcute",
             "AGrave",
-            "-",
+            "<",
             "WrapTextIfSelected",
             "-",
+            ">Ctrl",
             "MicrosoftBold",
             "Save",
             "CtrlJ",
-            "-",
+            "<",
+            ">Combinaisons modificateurs",
             "AltGrLAlt",
             "AltGrCapsLock",
             "LAltCapsLock",
+            "<",
+            ">Windows",
             "WinCapsLock",
-            "-",
             "SelectLine",
             "Screen",
             "GPT",
@@ -289,7 +293,8 @@ global Features := Map(
             "Search",
             "TitleCase",
             "Uppercase",
-            "SelectWord"
+            "SelectWord",
+            "<",
         ],
         "EGrave", {
             Enabled: True,
@@ -313,7 +318,7 @@ global Features := Map(
         },
         "WrapTextIfSelected", {
             Enabled: True,
-            Description: "Taper un symbole lors d'une sélection de texte va encadrer celle-ci par le symbole. Fonctionne si émulation et si vendor/UIA.ahk est présent dans le dossier du script",
+            Description: "Taper un symbole lors d'une sélection de texte va encadrer celle-ci par le symbole. Fonctionne si émulation.",
         },
         "MicrosoftBold", {
             Enabled: True,

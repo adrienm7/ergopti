@@ -168,6 +168,23 @@ if not base_dir:match("[/\\]$") then base_dir = base_dir .. "/" end
 -- through it — the user may have relocated files via the paths editor.
 menu_paths.init(base_dir, function() hs.timer.doAfter(0.25, function() pcall(hs.reload) end) end)
 
+-- Re-point the logger to <config_dir>/logs/ErgoptiPlus_YYYY-MM-DD.log now that
+-- the user config dir is known. Earlier boot lines went to the fallback file.
+local Logger = require("lib.logger")
+Logger.init_log_path(menu_paths.get_config_dir(), 14)
+
+-- Apply optional user overrides from <config_dir>/config.toml on top of
+-- hs.settings. Missing file is fine — overrides are opt-in and exist for
+-- users who want a single hand-editable file mirroring the AHK driver layer.
+local config_overrides = require("lib.config_overrides")
+do
+	local cdir = menu_paths.get_config_dir()
+	if type(cdir) == "string" and cdir ~= "" then
+		if not cdir:match("[/\\]$") then cdir = cdir .. "/" end
+		config_overrides.apply(cdir .. "config.toml")
+	end
+end
+
 local hotstrings_dir = menu_paths.get("HotstringsDirPath")
 local config_file    = menu_paths.get("ConfigJsonPath")
 
@@ -411,8 +428,8 @@ Logger.debug(LOG, "Initializing custom hotstrings…")
 -- ===== 5.1) Custom Hotstrings =====
 -- ==================================
 
--- Personal hotstrings are stored in personal.toml (path configurable via the
--- paths editor — defaults to hotstrings/personal.toml next to the driver).
+-- Personal hotstrings are stored in personal_hotstrings.toml (path configurable
+-- via the paths editor — defaults to hotstrings/personal_hotstrings.toml).
 do
 	local personal_path = menu_paths.get("PersonalTomlPath")
 	hotstring_editor.init(personal_path, keymap)

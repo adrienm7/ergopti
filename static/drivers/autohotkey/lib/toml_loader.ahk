@@ -99,7 +99,7 @@ LoadHotstringsSection(CategoryName, SectionName, FeatureConfig, ExtraOptions := 
     if (IsSet(_GENERATED_HOTSTRINGS)
             and StrLower(CategoryName) != "personal"
             and _GENERATED_HOTSTRINGS.Has(LoaderKey)) {
-        try LoggerTrace("TomlLoader", "Using generated loader for [%s.%s].",
+        try LoggerTrace("TomlLoader", "Using generated loader for [{1}.{2}].",
             CategoryName, SectionName)
         GeneratedFn := _GENERATED_HOTSTRINGS[LoaderKey]
         GeneratedFn(FeatureConfig, ExtraOptions)
@@ -116,11 +116,11 @@ LoadHotstringsSection(CategoryName, SectionName, FeatureConfig, ExtraOptions := 
         FilePath := A_ScriptDir . "\..\hotstrings\" . CategoryName . ".toml"
     }
     if !FileExist(FilePath) {
-        try LoggerWarn("TomlLoader", "Section [%s.%s]: file %s not found.",
+        try LoggerWarn("TomlLoader", "Section [{1}.{2}]: file {3} not found.",
             CategoryName, SectionName, FilePath)
         return
     }
-    try LoggerTrace("TomlLoader", "Loading section [%s.%s]…", CategoryName, SectionName)
+    try LoggerTrace("TomlLoader", "Loading section [{1}.{2}]…", CategoryName, SectionName)
     Loaded := 0
 
     TimeActivationSeconds := FeatureConfig.HasOwnProp("TimeActivationSeconds") ? FeatureConfig.TimeActivationSeconds :
@@ -213,7 +213,7 @@ LoadHotstringsSection(CategoryName, SectionName, FeatureConfig, ExtraOptions := 
         }
         Loaded += 1
     }
-    try LoggerDone("TomlLoader", "Section [%s.%s]: %d entry(ies) loaded.",
+    try LoggerDone("TomlLoader", "Section [{1}.{2}]: {3} entry(ies) loaded.",
         CategoryName, SectionName, Loaded)
 }
 
@@ -249,6 +249,62 @@ FoldAsciiLower(Str) {
 ; by comparing their ``FoldAsciiLower`` form. The ``★`` placeholder in the
 ; TOML is swapped for the user's configured ``ScriptInformation["MagicKey"]``
 ; so that rebindings done via the tray menu are reflected in descriptions.
+; Bootstrap Features["Personal"] from the [_meta.sections] block of
+; personal_hotstrings.toml. Creates one feature entry per declared section,
+; enabled by default. Subsequent ApplyTomlMetadataToFeatures("Personal") will
+; then enrich those entries with descriptions and __Order from the same TOML.
+; Returns the list of section keys (lowercase) that were registered.
+BootstrapPersonalFeatures() {
+    global Features, ScriptInformation
+    Result := []
+    if !(IsSet(ScriptInformation) and ScriptInformation.Has("PersonalTomlPath")) {
+        return Result
+    }
+    FilePath := ScriptInformation["PersonalTomlPath"]
+    if !FileExist(FilePath) {
+        try LoggerInfo("TomlLoader", "Personal hotstrings file not found at '{1}' — skipping.",
+            FilePath)
+        return Result
+    }
+
+    if !Features.Has("Personal") {
+        Features["Personal"] := Map()
+    }
+
+    InMetaSections := false
+    FileContent := ReadTomlFile(FilePath)
+    loop parse, FileContent, "`n", "`r" {
+        Line := Trim(A_LoopField, " `t")
+        if (Line == "" or SubStr(Line, 1, 1) == "#") {
+            continue
+        }
+        if RegExMatch(Line, "^\[([^\[\]]+)\]$", &HeaderMatch) {
+            InMetaSections := (Trim(HeaderMatch[1]) == "_meta.sections")
+            continue
+        }
+        if (SubStr(Line, 1, 2) == "[[") {
+            break
+        }
+        if !InMetaSections {
+            continue
+        }
+        if RegExMatch(Line, "^([A-Za-z0-9_]+)\s*=\s*`"((?:[^`"\\]|\\.)*)`"\s*$", &SecMatch) {
+            SectionKey := SecMatch[1]
+            ; Use PascalCase for the Feature key (menu convention) but keep
+            ; the lowercase TOML key for the loader call.
+            FeatKey := StrUpper(SubStr(SectionKey, 1, 1)) . SubStr(SectionKey, 2)
+            if !Features["Personal"].Has(FeatKey) {
+                Features["Personal"][FeatKey] := { Enabled: true,
+                    Description: UnescapeTomlString(SecMatch[2]),
+                    TomlSection: StrLower(SectionKey) }
+            }
+            Result.Push(StrLower(SectionKey))
+            try LoggerDebug("TomlLoader", "Personal section registered: '{1}'.", FeatKey)
+        }
+    }
+    return Result
+}
+
 ApplyTomlMetadataToFeatures(CategoryName) {
     global ScriptInformation
     if (StrLower(CategoryName) == "personal"
@@ -414,4 +470,140 @@ CountTomlHotstrings(CategoryName) {
         }
     }
     return Count
+}
+
+
+
+
+; ==========================================
+; ==========================================
+; ======= User config.toml overrides =======
+; ==========================================
+; ==========================================
+
+; Coerce a raw TOML literal into the appropriate AHK type:
+;   - "true" / "false"      → boolean (1 / 0, matching Features.Enabled style)
+;   - bare integer / float  → number
+;   - "..." quoted string   → unescaped string
+;   - anything else         → raw literal as-is
+TomlCoerceValue(Raw) {
+    Trimmed := Trim(Raw, " `t")
+    Lower := StrLower(Trimmed)
+    if (Lower == "true") {
+        return 1
+    }
+    if (Lower == "false") {
+        return 0
+    }
+    if RegExMatch(Trimmed, "^-?\d+$") {
+        return Integer(Trimmed)
+    }
+    if RegExMatch(Trimmed, "^-?\d+\.\d+$") {
+        return Float(Trimmed)
+    }
+    Q := Chr(34)
+    if (StrLen(Trimmed) >= 2 and SubStr(Trimmed, 1, 1) == Q
+            and SubStr(Trimmed, StrLen(Trimmed), 1) == Q) {
+        return UnescapeTomlString(SubStr(Trimmed, 2, StrLen(Trimmed) - 2))
+    }
+    return Trimmed
+}
+
+; Apply user-editable overrides from <config_dir>/config.toml on top of the
+; INI-driven configuration. The TOML acts as an "expert" override layer:
+;   [script]
+;   LogLevel = "DEBUG"
+;   MagicKey = "★"
+;
+;   [features]
+;   "MagicKey.Repeat.Enabled" = false
+;   "Personal.Code.Enabled"   = false
+;
+; The keys under [features] use dotted paths matching the Features Map layout.
+; Missing file is silently ignored — TOML overrides are optional.
+; Returns the number of overrides applied (mostly for diagnostics).
+ApplyConfigTomlOverrides(FilePath) {
+    global Features, ScriptInformation
+    Applied := 0
+    if !FileExist(FilePath) {
+        try LoggerDebug("TomlLoader", "config.toml not found at '{1}' — skipping overrides.",
+            FilePath)
+        return Applied
+    }
+    try LoggerStart("TomlLoader", "Applying user overrides from '{1}'…", FilePath)
+
+    CurrentSection := ""
+    Q := Chr(34)
+    loop parse, ReadTomlFile(FilePath), "`n", "`r" {
+        Line := Trim(A_LoopField, " `t")
+        if (Line == "" or SubStr(Line, 1, 1) == "#") {
+            continue
+        }
+        if RegExMatch(Line, "^\[([^\[\]]+)\]$", &SecMatch) {
+            CurrentSection := StrLower(Trim(SecMatch[1]))
+            continue
+        }
+        ; Two key forms are accepted:
+        ;   key = value
+        ;   "dotted.path" = value
+        ; Try quoted key first, then bare identifier key
+        if RegExMatch(Line, "^`"([^`"\\]+)`"\s*=\s*(.+)$", &Match) {
+            Key := Match[1]
+            Value := TomlCoerceValue(Match[2])
+        } else if RegExMatch(Line, "^([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.+)$", &Match) {
+            Key := Match[1]
+            Value := TomlCoerceValue(Match[2])
+        } else {
+            continue
+        }
+
+        if (CurrentSection == "script") {
+            if ScriptInformation.Has(Key) {
+                ScriptInformation[Key] := Value
+                Applied++
+                try LoggerDebug("TomlLoader", "Override [script].{1} = {2}.", Key, Value)
+            }
+        } else if (CurrentSection == "features") {
+            ; Walk the dotted path in Features and set Enabled (or the named
+            ; property at the leaf if the key is e.g. "MagicKey.MagicKeyChar").
+            Parts := StrSplit(Key, ".")
+            Node := Features
+            Failed := false
+            Idx := 1
+            while (Idx < Parts.Length) {
+                Step := Parts[Idx]
+                if (Type(Node) == "Map") {
+                    if !Node.Has(Step) {
+                        Failed := true
+                        break
+                    }
+                    Node := Node[Step]
+                } else if (IsObject(Node) and Node.HasOwnProp(Step)) {
+                    Node := Node.%Step%
+                } else {
+                    Failed := true
+                    break
+                }
+                Idx++
+            }
+            if Failed {
+                try LoggerWarn("TomlLoader", "Override skipped — path not found: '{1}'.", Key)
+                continue
+            }
+            Leaf := Parts[Parts.Length]
+            try {
+                if (Type(Node) == "Map" and Node.Has(Leaf)) {
+                    Node[Leaf] := Value
+                } else {
+                    Node.%Leaf% := Value
+                }
+                Applied++
+                try LoggerDebug("TomlLoader", "Override [features].{1} = {2}.", Key, Value)
+            } catch as e {
+                try LoggerWarn("TomlLoader", "Override failed for '{1}': {2}.", Key, e.Message)
+            }
+        }
+    }
+    try LoggerSuccess("TomlLoader", "User overrides applied ({1} value(s)).", Applied)
+    return Applied
 }

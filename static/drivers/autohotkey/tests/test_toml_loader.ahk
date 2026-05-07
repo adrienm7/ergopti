@@ -390,3 +390,189 @@ TestTL_LoadHotstringsMultipleEntries() {
 }
 Test("LoadHotstringsSection: registers all three entries from a three-entry section",
 	TestTL_LoadHotstringsMultipleEntries)
+
+
+
+
+; ==========================================
+; BootstrapPersonalFeatures
+; ==========================================
+
+; Helper that writes a synthetic personal_hotstrings.toml, runs
+; BootstrapPersonalFeatures(), and returns the resulting Features["Personal"]
+; for assertions. Restores ScriptInformation and Features afterwards.
+TestTL_RunBootstrap(TomlContent) {
+	global Features, ScriptInformation
+	TmpPath := A_Temp . "\test_personal_bootstrap_" . A_Now . "_" . A_TickCount . ".toml"
+	if FileExist(TmpPath) {
+		FileDelete(TmpPath)
+	}
+	FileAppend(TomlContent, TmpPath, "UTF-8")
+
+	OldPath := ScriptInformation.Has("PersonalTomlPath") ? ScriptInformation["PersonalTomlPath"] : ""
+	OldPersonal := Features.Has("Personal") ? Features["Personal"] : ""
+	ScriptInformation["PersonalTomlPath"] := TmpPath
+	if Features.Has("Personal") {
+		Features.Delete("Personal")
+	}
+	; Clear the file cache so the synthetic file is actually re-read each run
+	global _TomlFileCache
+	if _TomlFileCache.Has(TmpPath) {
+		_TomlFileCache.Delete(TmpPath)
+	}
+
+	BootstrapPersonalFeatures()
+	Result := Features.Has("Personal") ? Features["Personal"] : Map()
+
+	; Cleanup
+	FileDelete(TmpPath)
+	ScriptInformation["PersonalTomlPath"] := OldPath
+	if OldPersonal != "" {
+		Features["Personal"] := OldPersonal
+	} else if Features.Has("Personal") {
+		Features.Delete("Personal")
+	}
+	return Result
+}
+
+TestTL_BootstrapRegistersAllSections() {
+	Toml := "[_meta]`r`nsections_order = [`"greetings`", `"code`"]`r`n`r`n"
+	Toml .= "[_meta.sections]`r`ngreetings = `"Greetings shortcuts`"`r`ncode = `"Code shortcuts`"`r`n`r`n"
+	Toml .= "[[greetings]]`r`n`r`n[[code]]`r`n"
+	Personal := TestTL_RunBootstrap(Toml)
+	AssertTrue(Personal.Count > 0, "Personal map should be non-empty after bootstrap")
+	AssertTrue(Personal.Has("Greetings"), "Greetings section should be registered")
+	AssertTrue(Personal.Has("Code"), "Code section should be registered")
+}
+Test("BootstrapPersonalFeatures: every [_meta.sections] entry creates a feature",
+	TestTL_BootstrapRegistersAllSections)
+
+TestTL_BootstrapEnabledByDefault() {
+	Toml := "[_meta.sections]`r`ngreetings = `"G`"`r`n`r`n[[greetings]]`r`n"
+	Personal := TestTL_RunBootstrap(Toml)
+	AssertTrue(Personal.Has("Greetings"), "Greetings must exist before checking Enabled")
+	AssertTrue(Personal["Greetings"].Enabled, "section should be enabled by default")
+}
+Test("BootstrapPersonalFeatures: sections are enabled by default",
+	TestTL_BootstrapEnabledByDefault)
+
+TestTL_BootstrapPreservesTomlSection() {
+	; The lowercase TOML key is stored on TomlSection so the loader can find
+	; the [[section]] block even when the Feature key was PascalCased.
+	Toml := "[_meta.sections]`r`nmySection = `"Test`"`r`n`r`n[[mySection]]`r`n"
+	Personal := TestTL_RunBootstrap(Toml)
+	AssertTrue(Personal.Has("MySection"), "PascalCase feature key expected — bootstrap may have failed silently")
+	if !Personal.Has("MySection") {
+		return
+	}
+	AssertEqual("mysection", Personal["MySection"].TomlSection,
+		"TomlSection should retain the original lowercase key")
+}
+Test("BootstrapPersonalFeatures: TomlSection stores the original lowercase key",
+	TestTL_BootstrapPreservesTomlSection)
+
+TestTL_BootstrapMissingFile() {
+	global Features, ScriptInformation
+	OldPath := ScriptInformation.Has("PersonalTomlPath") ? ScriptInformation["PersonalTomlPath"] : ""
+	ScriptInformation["PersonalTomlPath"] := A_Temp . "\definitely_does_not_exist_" . A_Now . ".toml"
+	if Features.Has("Personal") {
+		Features.Delete("Personal")
+	}
+
+	BootstrapPersonalFeatures()
+	; Should not have created the Personal map for a missing file
+	AssertFalse(Features.Has("Personal") and Features["Personal"].Count > 0,
+		"missing file should not populate Features.Personal")
+
+	ScriptInformation["PersonalTomlPath"] := OldPath
+}
+Test("BootstrapPersonalFeatures: missing TOML file is silently ignored",
+	TestTL_BootstrapMissingFile)
+
+
+
+
+; ==========================================
+; TomlCoerceValue
+; ==========================================
+
+TestTL_CoerceTrueFalse() {
+	AssertEqual(1, TomlCoerceValue("true"))
+	AssertEqual(0, TomlCoerceValue("false"))
+	AssertEqual(1, TomlCoerceValue("  TRUE "))
+}
+Test("TomlCoerceValue: true/false coerce to 1/0", TestTL_CoerceTrueFalse)
+
+TestTL_CoerceNumber() {
+	AssertEqual(42, TomlCoerceValue("42"))
+	AssertEqual(-7, TomlCoerceValue("-7"))
+	AssertEqual(3.14, TomlCoerceValue("3.14"))
+}
+Test("TomlCoerceValue: integers and floats are parsed", TestTL_CoerceNumber)
+
+TestTL_CoerceQuotedString() {
+	AssertEqual("hello", TomlCoerceValue('"hello"'))
+	AssertEqual("a`nb", TomlCoerceValue('"a\nb"'))
+}
+Test("TomlCoerceValue: quoted strings are unquoted and unescaped",
+	TestTL_CoerceQuotedString)
+
+
+; ==========================================
+; ApplyConfigTomlOverrides
+; ==========================================
+
+TestTL_OverridesScriptSection() {
+	global ScriptInformation
+	OldLog := ScriptInformation.Has("LogLevel") ? ScriptInformation["LogLevel"] : ""
+	ScriptInformation["LogLevel"] := "INFO"
+
+	TmpPath := A_Temp . "\test_config_override_" . A_Now . "_" . A_TickCount . ".toml"
+	if FileExist(TmpPath) {
+		FileDelete(TmpPath)
+	}
+	FileAppend("[script]`r`nLogLevel = `"DEBUG`"`r`n", TmpPath, "UTF-8")
+	global _TomlFileCache
+	if _TomlFileCache.Has(TmpPath) {
+		_TomlFileCache.Delete(TmpPath)
+	}
+
+	Applied := ApplyConfigTomlOverrides(TmpPath)
+	AssertTrue(Applied >= 1, "should apply at least one override")
+	AssertEqual("DEBUG", ScriptInformation["LogLevel"], "LogLevel must be overridden to DEBUG")
+
+	FileDelete(TmpPath)
+	ScriptInformation["LogLevel"] := OldLog
+}
+Test("ApplyConfigTomlOverrides: [script] section overrides ScriptInformation",
+	TestTL_OverridesScriptSection)
+
+TestTL_OverridesMissingFileNoOp() {
+	NoFile := A_Temp . "\definitely_missing_" . A_Now . ".toml"
+	Applied := ApplyConfigTomlOverrides(NoFile)
+	AssertEqual(0, Applied, "missing file should apply 0 overrides without throwing")
+}
+Test("ApplyConfigTomlOverrides: missing file applies zero overrides",
+	TestTL_OverridesMissingFileNoOp)
+
+TestTL_OverridesUnknownPathSkipped() {
+	; A dotted path that doesn't resolve in Features should be skipped silently
+	; (logged as a warning), not throw.
+	TmpPath := A_Temp . "\test_unknown_path_" . A_Now . "_" . A_TickCount . ".toml"
+	if FileExist(TmpPath) {
+		FileDelete(TmpPath)
+	}
+	FileAppend("[features]`r`n`"NoSuchCategory.NoSuchFeature.Enabled`" = false`r`n", TmpPath, "UTF-8")
+	global _TomlFileCache
+	if _TomlFileCache.Has(TmpPath) {
+		_TomlFileCache.Delete(TmpPath)
+	}
+
+	; Should not throw; returns 0 because nothing applied
+	Applied := ApplyConfigTomlOverrides(TmpPath)
+	AssertEqual(0, Applied)
+
+	FileDelete(TmpPath)
+}
+Test("ApplyConfigTomlOverrides: unknown feature path is skipped silently",
+	TestTL_OverridesUnknownPathSkipped)

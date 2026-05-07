@@ -63,8 +63,9 @@ ResetHotstringRecorders() {
 ; Mimics the user-configurable script identity from ErgoptiPlus.ahk.
 global ScriptInformation := Map(
     "MagicKey", "★",
-    "PersonalAhkPath", A_ScriptDir . "\..\personal.ahk",
-    "PersonalTomlPath", A_ScriptDir . "\..\..\hotstrings\personal.toml",
+    "PersonalAhkPath", A_ScriptDir . "\..\personal_shortcuts.ahk",
+    "PersonalTomlPath", A_Temp . "\ergopti_test_no_personal_hotstrings.toml",
+    "LogLevel", "INFO",
 )
 
 ; Empty Features Map so HasAnyEnabled / Features lookups have a target.
@@ -100,6 +101,8 @@ global SpaceAroundSymbols := ""
 ; tests seed it via _LSCResetFrom([...]) instead of touching it directly.
 global LastSentCharacterKeyTime := Map()
 global RemappedList := Map()
+; Stub for the INI cache — gestures.ahk reads it at load time via GesturesReadConfig()
+global _IniCache := Map()
 global InDeadKeySequence := false
 global LayerEnabled := false
 global CapsWordEnabled := false
@@ -215,6 +218,32 @@ UninstallHotstringHooks() {
     global _HotstringRegistrar, _SendHook
     _HotstringRegistrar := 0
     _SendHook := 0
+}
+
+; The dispatcher maps SIMPLE_ACTIONS / TAPHOLD_ALTGR_ACTIONS contain raw
+; SendInput / SendEvent calls for keys like Tab, Enter, Escape, BackSpace,
+; Delete, CtrlBackSpace, CtrlDelete. These bypass _SendHook and would type
+; real keystrokes into the terminal that launched AHK64.exe — Tab in
+; particular triggers shell completion (e.g. ".android" on Windows). Replace
+; those entries with stubs that record into _Stub_SentText so tests still
+; observe the action firing without leaking keys to the OS. Must be called
+; after dispatchers.ahk is included.
+NeutralizeDispatcherKeySends() {
+    global SIMPLE_ACTIONS, TAPHOLD_ALTGR_ACTIONS, _Stub_SentText
+    KeyNames := ["BackSpace", "CtrlBackSpace", "CtrlDelete", "Delete",
+        "Enter", "Escape", "Tab"]
+    for _, Name in KeyNames {
+        Key := Name
+        if SIMPLE_ACTIONS.Has(Key) {
+            SIMPLE_ACTIONS[Key] := ((K) => (*) => _Stub_SentText.Push({ kind: "simple_key", key: K }))(Key)
+        }
+        if TAPHOLD_ALTGR_ACTIONS.Has(Key) {
+            TAPHOLD_ALTGR_ACTIONS[Key] := ((K) => (*) => (
+                _Stub_SentText.Push({ kind: "altgr_key", key: K }),
+                UpdateLastSentCharacter(K)
+            ))(Key)
+        }
+    }
 }
 
 ; ── Active-app cache simulators — bypass GetActiveApp's WinGet* calls so the

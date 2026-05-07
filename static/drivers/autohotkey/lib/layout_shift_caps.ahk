@@ -137,7 +137,7 @@ RegisterShiftLayer() {
 		Hotkey("+" . SC, LayerDispatch.Bind(SC, SHIFT_SYMBOLS), "I2")
 	}
 	HotIf()
-	try LoggerSuccess("LayoutShift", "Shift layer registered (%d entries).",
+	try LoggerSuccess("LayoutShift", "Shift layer registered ({1} entries).",
 		SHIFTED_LETTERS.Count + SHIFT_SYMBOLS.Count)
 }
 
@@ -161,6 +161,6 @@ RegisterCapsLockLayer() {
 		Hotkey(SC, LayerDispatch.Bind(SC, CAPSLOCK_SYMBOLS), "I2")
 	}
 	HotIf()
-	try LoggerSuccess("LayoutCaps", "CapsLock layer registered (%d entries).",
+	try LoggerSuccess("LayoutCaps", "CapsLock layer registered ({1} entries).",
 		SHIFTED_LETTERS.Count + CAPSLOCK_SYMBOLS.Count + 1)
 }

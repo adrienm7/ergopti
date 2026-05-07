@@ -32,7 +32,7 @@ ErgoptiGlobalErrorHandler(Exc, Mode) {
     }
     ; Best-effort logging — guarded because the logger may not be initialised
     ; yet when an early-boot error fires the handler.
-    try LoggerError("ErgoptiPlus", "Uncaught error: %s",
+    try LoggerError("ErgoptiPlus", "Uncaught error: {1}",
         Exc.Message . (Exc.HasProp("Stack") ? " | " . Exc.Stack : ""))
     ; Surface the error to the user once, without blocking subsequent keys
     try {
@@ -113,12 +113,25 @@ global NumberOfRepetitions := 1 ; Same as Vim where 3w does the w action 3 times
 global ActivitySimulation := False
 global OneShotShiftEnabled := False
 
-; Read the configuration file path from a minimal bootstrap file so users can
-; store ErgoptiPlus_Configuration.ini outside the Ergopti repository.
-; The bootstrap file contains a single key: ConfigurationFilePath=<absolute path>
-global _BootstrapFile := A_ScriptDir . "\ErgoptiPlus_Bootstrap.ini"
-global ConfigurationFile := IniRead(_BootstrapFile, "Bootstrap", "ConfigurationFilePath",
-    A_ScriptDir . "\ErgoptiPlus_Configuration.ini")
+; Read path overrides from paths.toml — same file format as Hammerspoon.
+; Auto-generated with defaults if absent.
+global _PathsFile := A_ScriptDir . "\paths.toml"
+global _PathsOverrides := ReadPathsToml(_PathsFile)
+
+; ConfigDirPath is the single relocatable folder that holds all personal files.
+; Defaults to %USERPROFILE%\.config\ergopti_plus\ (mirrors XDG-style on Unix);
+; must end with a backslash.
+global _DefaultConfigDir := EnvGet("USERPROFILE") . "\.config\ergopti_plus\"
+global _ConfigDir := (_PathsOverrides.Has("ConfigDirPath") and _PathsOverrides["ConfigDirPath"] != "")
+    ? _PathsOverrides["ConfigDirPath"]
+    : _DefaultConfigDir
+if !(_ConfigDir ~= "[/\\]$")
+    _ConfigDir .= "\"
+if !DirExist(_ConfigDir) {
+    try DirCreate(_ConfigDir)
+}
+
+global ConfigurationFile := _ConfigDir . "ErgoptiPlus_Configuration.ini"
 
 ; Resolve the shared static/img/logo directory by walking up two levels from
 ; the script location (static/drivers/autohotkey → static/drivers → static).
@@ -138,15 +151,10 @@ global IconPathDisabled := _LogoDir . "\logo_simple_disabled.ico"
 
 global ScriptInformation := Map(
     "MagicKey", "★",
-    ; Shortcuts
-    "ShortcutSuspend", True,
-    "ShortcutSaveReload", True,
-    "ShortcutEdit", True,
-    ; Configurable file paths (overridable from the ini so users can keep their
-    ; personal files outside the Ergopti repository)
-    "PersonalAhkPath", A_ScriptDir . "\personal.ahk",
-    "PersonalTomlPath", A_ScriptDir . "\..\hotstrings\personal.toml",
-    "PersonalInfoTomlPath", A_ScriptDir . "\..\hotstrings\personal_info.toml",
+    ; Configurable file paths — all derived from _ConfigDir set above
+    "PersonalAhkPath", _ConfigDir . "personal_shortcuts.ahk",
+    "PersonalTomlPath", _ConfigDir . "personal_hotstrings.toml",
+    "PersonalInfoTomlPath", _ConfigDir . "personal_info.toml",
     ; Set to True only when AltGr (SC138) has been remapped to Kana at the
     ; driver level (KbdEdit, MSKLC). With that remap active, AHK still sees
     ; the virtual AltGr-down bit stuck after a hotstring, and we need to
@@ -155,11 +163,41 @@ global ScriptInformation := Map(
     "AltGrIsKanaRemap", False,
 )
 
-global ConfigurationShortcutsList := [
-    "ShortcutSuspend",
-    "ShortcutSaveReload",
-    "ShortcutEdit",
+; Script-management hotkey slots. Each AltGr+key combo dispatches to an action
+; from GESTURE_ACTIONS (see modules/gestures.ahk) so the user can re-purpose
+; them via the tray menu the same way they configure trackpad gestures.
+; ``Default`` is the action fired on a fresh install; ``Fallback`` is what we
+; send to the OS when the assignment is "none" (so the underlying key keeps
+; working). ``ScKey`` is the scancode of the secondary key for the GetKeyState
+; double-check guarding against AltGr+Enter pause-bug-style misfires.
+global SCRIPT_SHORTCUT_SLOTS := [
+    "script_altgr_enter",
+    "script_altgr_backspace",
+    "script_altgr_delete",
+    "script_altgr_escape",
 ]
+global SCRIPT_SHORTCUT_LABELS := Map(
+    "script_altgr_enter", "AltGr + ⏎",
+    "script_altgr_backspace", "AltGr + ⌫",
+    "script_altgr_delete", "AltGr + ⌦",
+    "script_altgr_escape", "AltGr + Échap",
+)
+global SCRIPT_SHORTCUT_DEFAULTS := Map(
+    "script_altgr_enter", "ahk_suspend",
+    "script_altgr_backspace", "ahk_save_reload",
+    "script_altgr_delete", "ahk_edit",
+    "script_altgr_escape", "ahk_quit",
+)
+global SCRIPT_SHORTCUT_FALLBACKS := Map(
+    "script_altgr_enter", "{Enter}",
+    "script_altgr_backspace", "{BackSpace}",
+    "script_altgr_delete", "{Delete}",
+    "script_altgr_escape", "{Escape}",
+)
+global ScriptShortcutAssignments := Map()
+for _Slot in SCRIPT_SHORTCUT_SLOTS {
+    ScriptShortcutAssignments[_Slot] := SCRIPT_SHORTCUT_DEFAULTS[_Slot]
+}
 
 ; ParseIniFile / IniCacheGet / ResolveConfigPath are defined in lib/ini_helpers.ahk
 ; (included above) so the test runner can exercise them in isolation.
@@ -258,7 +296,8 @@ ReadConfiguration(Cache) {
                 }
             } else {
                 for Prop in Props {
-                    Name := Feature . "." . Prop
+                    ; Avoid "Foo.Foo" when the feature key and the property share the same name
+                    Name := (Feature = Prop) ? Prop : Feature . "." . Prop
                     RawValue := IniCacheGet(Cache, Category, Name)
                     if RawValue != "_" {
                         Features[Category][Feature].%Prop% := RawValue
@@ -387,15 +426,32 @@ CreateSubMenusRecursive(MenuParent, Items, CategoryPath) {
     global SubMenus
 
     if GetFeatureByPath(CategoryPath).Has("__Order") {
+        ; Virtual grouping: ">Label" opens a transient submenu (no Features
+        ; counterpart needed) and "<" closes it. Lets us tidy long flat menus
+        ; without changing feature paths consumed elsewhere.
+        MenuStack := [MenuParent]
         for Feature in GetFeatureByPath(CategoryPath)["__Order"] {
+            CurrentMenu := MenuStack[MenuStack.Length]
             if Feature == "-" {
-                MenuParent.Add() ; Empty line
+                CurrentMenu.Add() ; Empty line
                 continue
             }
-
+            if (SubStr(Feature, 1, 1) == ">") {
+                GroupLabel := Trim(SubStr(Feature, 2))
+                GroupMenu := Menu()
+                CurrentMenu.Add(GroupLabel, GroupMenu)
+                MenuStack.Push(GroupMenu)
+                continue
+            }
+            if (Feature == "<") {
+                if (MenuStack.Length > 1) {
+                    MenuStack.Pop()
+                }
+                continue
+            }
             Key := Feature
             Val := GetFeatureByPath(CategoryPath)[Feature]
-            CreateSubMenusRecursiveCommonCode(MenuParent, Key, Val, CategoryPath)
+            CreateSubMenusRecursiveCommonCode(CurrentMenu, Key, Val, CategoryPath)
         }
     } else {
         for Key, Val in Items {
@@ -540,6 +596,13 @@ BuildGesturesMenu() {
     }
     GMenu.Add() ; Separator
 
+    ; Setup items
+    GMenu.Add("🔧 Configurer automatiquement (registre)", (*) => GestureAutoConfigureAction())
+    GMenu.Add("📋 Instructions de configuration", (*) => GestureShowSetupInstructions())
+    GMenu.Add("⚙ Ouvrir Pavé tactile (puis « Mouvements avancés »)", (*) => GestureOpenTouchpadSettings())
+
+    GMenu.Add() ; Separator
+
     ; Per-slot submenus — each slot shows all available actions as radio items
     ; Actions that start a new logical group get a separator before them
     static GroupStarters := Map(
@@ -577,15 +640,12 @@ BuildGesturesMenu() {
                 SlotMenu.Disable(ActionLabel)
             }
         }
-        GMenu.Add(SlotLabel . " : " . CurrentActionLabel, SlotMenu)
+        EntryLabel := SlotLabel . " : " . CurrentActionLabel
+        GMenu.Add(EntryLabel, SlotMenu)
+        if !Features["Gestures"]["Enabled"].Enabled {
+            GMenu.Disable(EntryLabel)
+        }
     }
-
-    GMenu.Add() ; Separator
-
-    ; Setup items
-    GMenu.Add("🔧 Configurer automatiquement (registre)", (*) => GestureAutoConfigureAction())
-    GMenu.Add("📋 Instructions de configuration", (*) => GestureShowSetupInstructions())
-    GMenu.Add("⚙ Ouvrir les paramètres du pavé tactile", (*) => GestureOpenTouchpadSettings())
 
     return GMenu
 }
@@ -605,7 +665,7 @@ SetGestureSlotAction(Slot, ActionName) {
 ToggleGesturesEnabled() {
     global Features, ConfigurationFile
     Features["Gestures"]["Enabled"].Enabled := !Features["Gestures"]["Enabled"].Enabled
-    IniWrite(Features["Gestures"]["Enabled"].Enabled, ConfigurationFile, "Gestures", "Enabled.Enabled")
+    IniWrite(Features["Gestures"]["Enabled"].Enabled, ConfigurationFile, "Gestures", "Enabled")
     Reload
 }
 
@@ -613,19 +673,15 @@ ToggleGesturesEnabled() {
 GestureAutoConfigureAction() {
     Success := GestureAutoConfigureRegistry()
     if (Success) {
-        Result := MsgBox(
-            "Les valeurs du registre ont été écrites avec succès.`n`n"
-            . "⚠ Il faut maintenant définir les raccourcis clavier pour chaque geste :`n`n"
-            . "1. Ouvrir Paramètres > Pavé tactile > Configuration avancée des mouvements`n"
-            . "2. Pour chaque geste, sélectionner « Raccourci personnalisé »`n"
-            . "3. Taper le raccourci correspondant (voir Instructions)`n`n"
-            . "Ouvrir les paramètres du pavé tactile maintenant ?",
+        MsgBox(
+            "Configuration des gestes appliquée avec succès.`n`n"
+            . "Les 10 gestes ont été configurés dans le registre Windows`n"
+            . "(Ctrl+Win+Shift+F1 à F10).`n`n"
+            . "Une déconnexion / reconnexion peut être nécessaire pour que`n"
+            . "Windows prenne les nouveaux raccourcis en compte.",
             "ErgoptiPlus — Configuration des gestes",
-            "YesNo Iconi"
+            "Iconi"
         )
-        if (Result == "Yes") {
-            GestureOpenTouchpadSettings()
-        }
     } else {
         MsgBox(
             "Erreur lors de l'écriture du registre.`n`n"
@@ -644,11 +700,18 @@ GestureAutoConfigureAction() {
 global MenuHotstrings := "⚡ Hotstrings"
 global MenuScriptManagement := "Gestion du script"
 global MenuConfigurationShortcuts := "Raccourcis de gestion du script"
-global MenuSuspend := "⏸︎ Suspendre" . (ScriptInformation["ShortcutSuspend"] ? " (AltGr + ↩)" : "")
+; Holds the « Suspendre » label so UpdateTrayIcon can check/uncheck the
+; entry by its exact text. Re-assigned in initMenu so future label tweaks
+; (icons, hints) only need to change the menu builder.
+global MenuSuspend := "⏸︎ Suspendre"
 global MenuDebugging := "⚠ Débogage"
+; Script-management submenu object — kept global so UpdateTrayIcon can
+; check/uncheck the « Suspendre » entry (which lives in the submenu, not
+; directly on A_TrayMenu).
+global ScriptMgmtMenu := ""
 
 ; Categories that live inside the Hotstrings submenu (ordered to match HS menu)
-global HotstringCategories := ["DistancesReduction", "SFBsReduction", "Rolls", "Autocorrection", "MagicKey"]
+global HotstringCategories := ["DistancesReduction", "SFBsReduction", "Rolls", "Autocorrection", "MagicKey", "Personal"]
 
 InitSubMenus() {
     global Features, SubMenus
@@ -661,8 +724,8 @@ InitSubMenus() {
         SubMenus[Category] := SubMenu ; Only top-level category stored
         CreateSubMenusRecursive(SubMenu, Items, Category)
     }
-    ; Personal is defined in personal.ahk (not in the static Features map), so it
-    ; must be wired separately after the loop — only when the user's file loaded it.
+    ; Personal is defined in personal_shortcuts.ahk (not in the static Features map),
+    ; so it must be wired separately after the loop — only when the user's file loaded it.
     if Features.Has("Personal") {
         PersonalSubMenu := Menu()
         SubMenus["Personal"] := PersonalSubMenu
@@ -675,6 +738,29 @@ initMenu() {
 
     A_TrayMenu.Delete()
 
+    ; Prepend a global on/off toggle at the top of the Raccourcis submenu —
+    ; mirrors the HS pattern where clicking the parent title toggles the category.
+    ; AHK does not support clickable parent titles, so the first item is the toggle.
+    if SubMenus.Has("Shortcuts") {
+        ShortcutsAllEnabled := IsCategoryAllEnabled(["Shortcuts"])
+        ShortcutsToggleLabel := "Activer les raccourcis"
+        SubMenus["Shortcuts"].Insert("1&", ShortcutsToggleLabel,
+            (*) => ToggleCategoryAllFeatures("Shortcuts", !ShortcutsAllEnabled))
+        if ShortcutsAllEnabled {
+            SubMenus["Shortcuts"].Check(ShortcutsToggleLabel)
+        }
+        SubMenus["Shortcuts"].Insert("2&")  ; Separator after toggle
+    }
+
+    ; Append the « Raccourcis de gestion du script » sub-submenu at the bottom
+    ; of the « Raccourcis » category so the per-slot action assignments live
+    ; alongside the other shortcut configuration rather than at the tray root.
+    if SubMenus.Has("Shortcuts") {
+        SubMenus["Shortcuts"].Add()
+        SubMenus["Shortcuts"].Add(MenuConfigurationShortcuts, BuildScriptShortcutsMenu())
+        SubMenus["Shortcuts"].Add("Modifier les raccourcis sur les lettres accentuées", ShortcutsEditor)
+    }
+
     ; ── 🌐 Disposition clavier — mirrors the HS layout submenu naming ──
     LayoutMenu := Menu()
     for FeatureName in Features["Layout"]["__Order"] {
@@ -684,6 +770,16 @@ initMenu() {
 
     ; ── Hotstrings ⚡ — single submenu grouping all hotstring categories ──
     HotstringsMenu := Menu()
+    ; On/off toggle for the entire hotstrings category — workaround for AHK not
+    ; supporting a clickable parent title like Hammerspoon's checked submenu item.
+    HotstringsAllEnabled := IsCategoryAllEnabled(HotstringCategories)
+    HotstringsToggleLabel := "Activer les hotstrings"
+    HotstringsMenu.Add(HotstringsToggleLabel,
+        HotstringsAllEnabled ? ToggleAllHotstringsOff : ToggleAllHotstringsOn)
+    if HotstringsAllEnabled {
+        HotstringsMenu.Check(HotstringsToggleLabel)
+    }
+    HotstringsMenu.Add() ; Separator below the global toggle
     for Category in HotstringCategories {
         if SubMenus.Has(Category) {
             Total := CountTomlHotstrings(Category)
@@ -712,7 +808,7 @@ initMenu() {
     ; editor button + shortcut hint up top, then per-section toggle checkboxes
     ; with hotstring counts, replacing the old separate editor-only submenu.
     if Features.Has("Personal") {
-        ; Read personal.toml once to get section order, descriptions, and counts
+        ; Read personal_hotstrings.toml once to get section order, descriptions, and counts
         TomlData := ReadPersonalToml()
         ; Enrich Features["Personal"] descriptions with entry counts so that
         ; MenuAddItem / GetMenuTitleByPath display them alongside the checkbox
@@ -763,7 +859,7 @@ initMenu() {
         ; Close-on-add toggle — mirrors HS "Fermer l'UI après ajout"
         PersonalMenu.Add("Fermer l'UI après ajout d'un hotstring par le raccourci",
             (*) => _TogglePersonalCloseOnAdd(PersonalMenu))
-        if (_EditorPrefGet("CloseOnAdd", "0") == "1") {
+        if (_EditorPrefGet("CloseOnAdd", "1") == "1") {
             PersonalMenu.Check("Fermer l'UI après ajout d'un hotstring par le raccourci")
         }
         if (Features["Personal"].Has("__Order") and Features["Personal"]["__Order"].Length > 0) {
@@ -786,26 +882,47 @@ initMenu() {
         HotstringsMenu.Add(PersonalTitle, PersonalMenu)
     }
     HotstringsMenu.Add() ; Separating line
-    HotstringsMenu.Add("☑ Activer tous les hotstrings", ToggleAllHotstringsOn)
-    HotstringsMenu.Add("☐ Désactiver tous les hotstrings", ToggleAllHotstringsOff)
-    HotstringsMenu.Add() ; Separating line
     ; Magic key editor — mirrors HS menu_hotstrings build_management placement
     HotstringsMenu.Add("Touche magique : " . ScriptInformation["MagicKey"], MagicKeyEditor)
+    HotstringsMenu.Add("Modifier le lien ouvert par Win + G", GPTLinkEditor)
     A_TrayMenu.Add(MenuHotstrings, HotstringsMenu)
+    ; Check the parent title when all hotstrings are enabled — mirrors HS checked submenu.
+    if HotstringsAllEnabled {
+        A_TrayMenu.Check(MenuHotstrings)
+    }
 
     ; ── Raccourcis and Tap-Holds — standalone, like HS Raccourcis and Karabiner ──
     if SubMenus.Has("Shortcuts") {
         A_TrayMenu.Add(GetCategoryTitle("Shortcuts"), SubMenus["Shortcuts"])
+        if ShortcutsAllEnabled {
+            A_TrayMenu.Check(GetCategoryTitle("Shortcuts"))
+        }
     }
+    ; TapHolds: prepend a global on/off toggle before adding to the tray
     if SubMenus.Has("TapHolds") {
+        TapHoldsAllEnabled := IsCategoryAllEnabled(["TapHolds"])
+        TapHoldsToggleLabel := "Activer les tap-holds"
+        SubMenus["TapHolds"].Insert("1&", TapHoldsToggleLabel,
+            (*) => ToggleCategoryAllFeatures("TapHolds", !TapHoldsAllEnabled))
+        if TapHoldsAllEnabled {
+            SubMenus["TapHolds"].Check(TapHoldsToggleLabel)
+        }
+        SubMenus["TapHolds"].Insert("2&")  ; Separator after toggle
         A_TrayMenu.Add(GetCategoryTitle("TapHolds"), SubMenus["TapHolds"])
+        ; Check the parent title when all tap-holds are enabled — mirrors HS checked submenu.
+        if TapHoldsAllEnabled {
+            A_TrayMenu.Check(GetCategoryTitle("TapHolds"))
+        }
     }
 
     ; ── Gestes — custom submenu mirroring Hammerspoon's gesture picker ──
     GesturesMenu := BuildGesturesMenu()
     A_TrayMenu.Add(GetCategoryTitle("Gestures"), GesturesMenu)
+    if Features["Gestures"]["Enabled"].Enabled {
+        A_TrayMenu.Check(GetCategoryTitle("Gestures"))
+    }
 
-    A_TrayMenu.Add() ; Separating line
+    A_TrayMenu.Add() ; Single separator between feature submenus and configuration items
 
     ; ── Actions globales — mirrors HS "Actions globales" submenu ──
     GlobalActionsMenu := Menu()
@@ -814,46 +931,143 @@ initMenu() {
     GlobalActionsMenu.Add("↺ Valeurs par défaut", ReloadWithDefaultConfig)
     A_TrayMenu.Add("Actions globales", GlobalActionsMenu)
 
-    ; ── Préférences — mirrors HS bottom items (Préférences, Console, open file…) ──
-    PrefsMenu := Menu()
-    PrefsMenu.Add("Modifier les raccourcis sur les lettres accentuées", ShortcutsEditor)
-    PrefsMenu.Add("Modifier le lien ouvert par Win + G", GPTLinkEditor)
-    PrefsMenu.Add("📂 Chemins des fichiers personnels", FilePathsEditor)
-    A_TrayMenu.Add("Préférences…", PrefsMenu)
+    ; ── Script management — single submenu grouping Éditer / Suspendre /
+    ; Recharger / Quitter (binding hints live in the « Raccourcis » submenu). ──
+    global MenuSuspend, ScriptMgmtMenu
+    MenuSuspend := "⏸︎ Suspendre"
+    ScriptMgmtMenu := Menu()
+    ScriptMgmtMenu.Add("✎ Éditer", ActivateEdit)
+    ScriptMgmtMenu.Add(MenuSuspend, ToggleSuspend)
+    ScriptMgmtMenu.Add("🔄 Recharger", ActivateReload)
+    ScriptMgmtMenu.Add("⏹ Quitter", ActivateExitApp)
+    ScriptMgmtMenu.Add() ; Separator before config folder
+    ScriptMgmtMenu.Add("📂 Dossier de configuration…", FilePathsEditor)
+    A_TrayMenu.Add(MenuScriptManagement, ScriptMgmtMenu)
 
-    ; ── Script management section ──
-    A_TrayMenu.Add() ; Separating line
-    A_TrayMenu.Add(MenuScriptManagement, NoAction)
-    A_TrayMenu.Disable(MenuScriptManagement)
+    ; ── Débogage — tools grouped in a submenu to keep the top-level menu tidy ──
+    DebuggingMenu := Menu()
+    DebuggingMenu.Add("Window Spy", WindowSpy)
+    DebuggingMenu.Add("État des variables", ActivateListVars)
+    DebuggingMenu.Add("Historique des touches", ActivateKeyHistory)
+    A_TrayMenu.Add(MenuDebugging, DebuggingMenu)
+}
 
-    A_TrayMenu.Add(MenuConfigurationShortcuts, ToggleConfigurationShortcuts)
-    if AllConfigurationShortcutsEnabled() {
-        A_TrayMenu.Check(MenuConfigurationShortcuts)
-    } else {
-        A_TrayMenu.Uncheck(MenuConfigurationShortcuts)
+; Minimal template for personal_shortcuts.ahk — created on first launch so the
+; user has a starter file with the canonical banner and an example showing how
+; to register a behavioural toggle that appears in the « Personal » tray menu.
+global PERSONAL_SHORTCUTS_TEMPLATE := "#Requires AutoHotkey v2.0`r`n"
+    . "`r`n"
+    . "; =======================================================`r`n"
+    . "; =======================================================`r`n"
+    . "; =======================================================`r`n"
+    . "; ================ 2/ PERSONAL SHORTCUTS ================`r`n"
+    . "; =======================================================`r`n"
+    . "; =======================================================`r`n"
+    . "; =======================================================`r`n"
+    . "`r`n"
+    . "; Here you can add your own hotkeys and hotstrings.`r`n"
+    .
+    "; As they are defined before everything else, they will override any existing definitions if there are duplicates`r`n"
+    . "; Putting everything in this part makes is easy to update your ErgoptiPlus version, as you will only need`r`n"
+    . "; to paste this part into the « 2/ PERSONAL SHORTCUTS » part of the new version.`r`n"
+    . "`r`n"
+    . "; --- Adding a personal feature toggle to the tray menu ---`r`n"
+    . "; Use RegisterPersonalFeature(Name, DefaultEnabled, Description) to declare`r`n"
+    . "; a behavioural toggle. It will appear as an on/off entry in the « Personal »`r`n"
+    . "; submenu and its state is persisted in the configuration INI. Gate your`r`n"
+    . "; hotkeys with #HotIf Features[`"Personal`"][`"<Name>`"].Enabled to enable them`r`n"
+    . "; only when the toggle is on. Example:`r`n"
+    . ";`r`n"
+    . ";     RegisterPersonalFeature(`"DotKeyMissing`", true,`r`n"
+    . ";         `"Map a fallback for the broken . key on this laptop`")`r`n"
+    . ";`r`n"
+    . ";     #HotIf Features[`"Personal`"][`"DotKeyMissing`"].Enabled`r`n"
+    . ";     SC022:: SendNewResult(`",`")`r`n"
+    . ";     #HotIf`r`n"
+    . "`r`n"
+
+; Register a behavioural toggle that the user can flip on/off via the tray
+; « Personal » submenu. Initializes Features["Personal"] if needed; existing
+; entries (e.g. populated earlier by BootstrapPersonalFeatures from the
+; personal TOML metadata) are not overwritten so TOML descriptions win.
+RegisterPersonalFeature(Name, DefaultEnabled := false, Description := "") {
+    global Features
+    if !Features.Has("Personal") {
+        Features["Personal"] := Map()
     }
+    if !Features["Personal"].Has(Name) {
+        Features["Personal"][Name] := { Enabled: DefaultEnabled, Description: Description }
+    }
+}
 
-    A_TrayMenu.Add("✎ Éditer" . (ScriptInformation["ShortcutEdit"] ? " (AltGr + ⌦)" : ""), ActivateEdit)
-    A_TrayMenu.Add(MenuSuspend, ToggleSuspend)
-    A_TrayMenu.Add("🔄 Recharger" . (ScriptInformation["ShortcutSaveReload"] ? " (AltGr + ⌫)" : ""),
-    ActivateReload)
-    A_TrayMenu.Add("⏹ Quitter (AltGr + ⎋)", ActivateExitApp)
-
-    ; ── Debugging section ──
-    A_TrayMenu.Add() ; Separating line
-    A_TrayMenu.Add(MenuDebugging, NoAction)
-    A_TrayMenu.Disable(MenuDebugging)
-    A_TrayMenu.Add("Window Spy", WindowSpy)
-    A_TrayMenu.Add("État des variables", ActivateListVars)
-    A_TrayMenu.Add("Historique des touches", ActivateKeyHistory)
+; Create the user's personal_shortcuts.ahk from PERSONAL_SHORTCUTS_TEMPLATE if
+; it does not exist yet. Best-effort: any failure is logged and ignored so a
+; read-only config dir cannot prevent the driver from starting.
+EnsurePersonalShortcutsFile(Path) {
+    global PERSONAL_SHORTCUTS_TEMPLATE
+    if FileExist(Path) {
+        return
+    }
+    try {
+        Dir := RegExReplace(Path, "\\[^\\]+$", "")
+        if (Dir != "" and !DirExist(Dir)) {
+            DirCreate(Dir)
+        }
+        FileAppend(PERSONAL_SHORTCUTS_TEMPLATE, Path, "UTF-8-RAW")
+        try LoggerInfo("ErgoptiPlus", "Personal shortcuts file created from template at '{1}'.", Path)
+    } catch as e {
+        try LoggerWarn("ErgoptiPlus", "Could not create personal shortcuts file at '{1}': {2}.",
+            Path, e.Message)
+    }
 }
 
 ; Personal file and TOML loaded here — before menu build — so Features["Personal"]
-; exists by the time InitSubMenus / initMenu run.
-#Include *i personal.ahk
+; exists by the time InitSubMenus / initMenu run. Create the file from a minimal
+; template if the user has not authored one yet, so #Include *i has something to
+; load on first launch (and the user can find it via the tray menu shortcut).
+EnsurePersonalShortcutsFile(ScriptInformation["PersonalAhkPath"])
+; #InputLevel 2 is required for the user's personal hotkeys to fire after the
+; layout's key remappings (which run at the default level 0). We set it here so
+; the user does not have to know about input levels in their personal file.
+#InputLevel 2
+#Include *i personal_shortcuts.ahk
+#InputLevel 0
+; Apply user overrides from <config_dir>/config.toml on top of the INI-driven
+; configuration. The TOML is an optional "expert" layer the user can edit by
+; hand to override anything the menu exposes (LogLevel, MagicKey, individual
+; feature flags). Missing file is silently ignored.
+ApplyConfigTomlOverrides(_ConfigDir . "config.toml")
+
+; Bootstrap Features["Personal"] from personal_hotstrings.toml _meta.sections
+; before applying TOML metadata, so the user's section toggles appear in the menu.
+BootstrapPersonalFeatures()
 if Features.Has("Personal") {
     ApplyTomlMetadataToFeatures("Personal")
+    ; Apply [Personal] INI overrides AFTER bootstrap — the generic
+    ; ReadConfiguration() ran before bootstrap so it had no Features.Personal
+    ; entries to write into. Without this, user-disabled sections always come
+    ; back enabled on reload.
+    for FeatKey, FeatVal in Features["Personal"] {
+        if FeatKey == "__Order" {
+            continue
+        }
+        if !(IsObject(FeatVal) and FeatVal.HasOwnProp("Enabled")) {
+            continue
+        }
+        RawValue := IniCacheGet(_IniCache, "Personal", FeatKey . ".Enabled")
+        if RawValue != "_" {
+            Features["Personal"][FeatKey].Enabled := RawValue
+        }
+    }
 }
+
+; Gestures module included here — before menu build — so GESTURE_SLOTS,
+; GESTURE_ACTIONS and GESTURE_SLOT_LABELS exist when BuildGesturesMenu runs.
+#Include modules\gestures.ahk
+
+; Load script-shortcut overrides now that GESTURE_ACTIONS is defined — the
+; reader validates each candidate action name against the registry.
+ReadScriptShortcutsConfig()
 
 InitSubMenus()
 initMenu()
@@ -904,7 +1118,7 @@ _MakeSetDefaultSectionFn(SecName, PersonalMenu, TomlData, DefaultSectionMenu) {
 ; Toggles the close-on-add pref and the corresponding checkmark.
 _TogglePersonalCloseOnAdd(PersonalMenu) {
     Label := "Fermer l'UI après ajout d'un hotstring par le raccourci"
-    NewVal := (_EditorPrefGet("CloseOnAdd", "0") == "1") ? "0" : "1"
+    NewVal := (_EditorPrefGet("CloseOnAdd", "1") == "1") ? "0" : "1"
     _EditorPrefSet("CloseOnAdd", NewVal)
     if (NewVal == "1") {
         PersonalMenu.Check(Label)
@@ -1195,6 +1409,47 @@ ToggleAllHotstrings(Value) {
     Reload
 }
 
+; Returns true when every leaf feature in the given category list is enabled.
+; Used by initMenu to decide the initial state of the per-submenu on/off toggle.
+IsCategoryAllEnabled(Categories) {
+    global Features
+    for Category in Categories {
+        if !Features.Has(Category) {
+            continue
+        }
+        for FeatureName, Val in Features[Category] {
+            if FeatureName == "__Order" {
+                continue
+            }
+            if IsObject(Val) and Val.HasOwnProp("Enabled") and !Val.Enabled {
+                return false
+            }
+        }
+    }
+    return true
+}
+
+; Toggle all leaf features of a single category to Value (true/false) and reload.
+; Mirrors ToggleAllHotstrings for non-hotstring categories (Shortcuts, TapHolds).
+ToggleCategoryAllFeatures(Category, Value) {
+    global Features, ConfigurationFile
+    if !Features.Has(Category) {
+        return
+    }
+    Updates := []
+    for FeatureName, Val in Features[Category] {
+        if FeatureName == "__Order" {
+            continue
+        }
+        if IsObject(Val) and Val.HasOwnProp("Enabled") {
+            Val.Enabled := Value
+            Updates.Push({ Section: Category, Key: FeatureName . ".Enabled", Value: Value })
+        }
+    }
+    IniBatchWrite(ConfigurationFile, Updates)
+    Reload
+}
+
 ReloadWithDefaultConfig(*) {
     ; Delete the ini so the next startup uses all default values, then reload
     if FileExist(ConfigurationFile) {
@@ -1203,110 +1458,147 @@ ReloadWithDefaultConfig(*) {
     Reload
 }
 
-ToggleConfigurationShortcuts(*) {
-    NewValue := not AllConfigurationShortcutsEnabled()
-    Updates := []
-    for Shortcut in ConfigurationShortcutsList {
-        ScriptInformation[Shortcut] := NewValue
-        Updates.Push({ Section: "Script", Key: Shortcut, Value: NewValue })
-    }
-    IniBatchWrite(ConfigurationFile, Updates)
-    Reload
-}
-AllConfigurationShortcutsEnabled(*) {
-    for Shortcut in ConfigurationShortcutsList {
-        if ( not ScriptInformation[Shortcut]) {
-            return False
+; Read the user's per-slot action overrides from the ini's [ScriptShortcuts]
+; section. Defaults stay in place when the key is absent or the action name is
+; unknown. Called once at boot from initMenu's preamble.
+ReadScriptShortcutsConfig() {
+    global ScriptShortcutAssignments, SCRIPT_SHORTCUT_SLOTS, _IniCache, GESTURE_ACTIONS
+    for Slot in SCRIPT_SHORTCUT_SLOTS {
+        Value := IniCacheGet(_IniCache, "ScriptShortcuts", Slot)
+        if (Value != "_" and (Value == "none" or GESTURE_ACTIONS.Has(Value))) {
+            ScriptShortcutAssignments[Slot] := Value
         }
     }
-    return True
+}
+
+; Dispatch the configured action for a script-shortcut slot. ``none`` lets the
+; underlying key fall through (the hotkey handler already SendInputs the
+; fallback in its else-branch — here we additionally return early so a slot
+; explicitly set to "none" produces no action at all).
+RunScriptShortcutAction(Slot) {
+    global ScriptShortcutAssignments, GESTURE_ACTIONS, SCRIPT_SHORTCUT_FALLBACKS
+    Action := ScriptShortcutAssignments.Has(Slot) ? ScriptShortcutAssignments[Slot] : "none"
+    if (Action == "none") {
+        SendInput(SCRIPT_SHORTCUT_FALLBACKS[Slot])
+        return
+    }
+    if !GESTURE_ACTIONS.Has(Action) {
+        try LoggerWarn("ScriptShortcuts", "Unknown action '{1}' for slot {2} — falling back.",
+            Action, Slot)
+        SendInput(SCRIPT_SHORTCUT_FALLBACKS[Slot])
+        return
+    }
+    GESTURE_ACTIONS[Action].Fn.Call()
+}
+
+; Persist a single slot assignment and reload so the new binding is picked up
+; by the tray menu hints and by future hotkey firings.
+SetScriptShortcutAction(Slot, ActionName) {
+    global ScriptShortcutAssignments, ConfigurationFile
+    ScriptShortcutAssignments[Slot] := ActionName
+    IniWrite(ActionName, ConfigurationFile, "ScriptShortcuts", Slot)
+    Reload
+}
+
+_MakeScriptShortcutHandler(Slot, ActionName) {
+    return (*) => SetScriptShortcutAction(Slot, ActionName)
+}
+
+; Build the « Raccourcis de gestion du script » submenu — one entry per slot,
+; each opening a sub-submenu listing every gesture action so the user can
+; rebind the AltGr+ combos to any of them.
+BuildScriptShortcutsMenu() {
+    global SCRIPT_SHORTCUT_SLOTS, SCRIPT_SHORTCUT_LABELS, SCRIPT_SHORTCUT_DEFAULTS
+    global ScriptShortcutAssignments, GESTURE_ACTIONS, GESTURE_ACTION_NAMES
+
+    SMenu := Menu()
+    for Slot in SCRIPT_SHORTCUT_SLOTS {
+        Current := ScriptShortcutAssignments.Has(Slot) ? ScriptShortcutAssignments[Slot] : "none"
+        CurrentLabel := GESTURE_ACTIONS.Has(Current)
+            ? GESTURE_ACTIONS[Current].Label
+            : "Désactivé"
+        SlotMenu := Menu()
+        for ActionName in GESTURE_ACTION_NAMES {
+            ActionLabel := GESTURE_ACTIONS[ActionName].Label
+            SlotMenu.Add(ActionLabel, _MakeScriptShortcutHandler(Slot, ActionName))
+            if (ActionName == Current) {
+                SlotMenu.Check(ActionLabel)
+            }
+        }
+        SMenu.Add(SCRIPT_SHORTCUT_LABELS[Slot] . " : " . CurrentLabel, SlotMenu)
+    }
+    return SMenu
 }
 
 FilePathsEditor(*) {
-    global ScriptInformation, ConfigurationFile, _BootstrapFile
+    global _ConfigDir, _PathsFile
 
-    W := Gui(, "Chemins des fichiers personnels")
+    W := Gui(, "Dossier de configuration")
     W.SetFont("s10", "Segoe UI")
     W.MarginX := 12
     W.MarginY := 12
 
-    ; --- ErgoptiPlus_Configuration.ini (first: all other paths are stored in it) ---
-    W.Add("Text", "xm", "Fichier de configuration (.ini) :")
-    IniEdit := W.Add("Edit", "xm w480", ConfigurationFile)
-    W.Add("Button", "x+6 w80", "Parcourir…").OnEvent("Click", (*) => BrowseFile(
-        IniEdit, "Fichiers INI (*.ini)", "*.ini"))
-
-    ; --- personal.ahk ---
-    W.Add("Text", "xm y+10", "Fichier personal.ahk :")
-    AhkEdit := W.Add("Edit", "xm w480", ScriptInformation["PersonalAhkPath"])
-    W.Add("Button", "x+6 w80", "Parcourir…").OnEvent("Click", (*) => BrowseFile(
-        AhkEdit, "Fichiers AHK (*.ahk)", "*.ahk"))
-
-    ; --- personal.toml ---
-    W.Add("Text", "xm y+10", "Fichier personal.toml :")
-    TomlEdit := W.Add("Edit", "xm w480", ScriptInformation["PersonalTomlPath"])
-    W.Add("Button", "x+6 w80", "Parcourir…").OnEvent("Click", (*) => BrowseFile(
-        TomlEdit, "Fichiers TOML (*.toml)", "*.toml"))
-
-    ; --- personal_info.toml ---
-    W.Add("Text", "xm y+10", "Fichier personal_info.toml (coordonnées personnelles) :")
-    InfoTomlEdit := W.Add("Edit", "xm w480", ScriptInformation["PersonalInfoTomlPath"])
-    W.Add("Button", "x+6 w80", "Parcourir…").OnEvent("Click", (*) => BrowseFile(
-        InfoTomlEdit, "Fichiers TOML (*.toml)", "*.toml"))
+    W.Add("Text", "xm", "Dossier de configuration personnel :")
+    DirEdit := W.Add("Edit", "xm w480", _ConfigDir)
+    W.Add("Button", "x+6 w80", "Parcourir…").OnEvent("Click", BrowseDir)
 
     W.Add("Text", "xm y+14 cGray",
-        "Laissez un champ vide pour utiliser le chemin par défaut.")
+        "Tous les fichiers personnels (personal_shortcuts.ahk, personal_hotstrings.toml…)`n"
+        . "seront cherchés dans ce dossier. Laisser vide pour utiliser le dossier par défaut.")
 
-    W.Add("Button", "xm y+10 w80", "OK").OnEvent("Click", SaveFilePaths)
+    W.Add("Button", "xm y+10 w80", "OK").OnEvent("Click", SaveConfigDir)
     W.Add("Button", "x+6 w80", "Annuler").OnEvent("Click", (*) => W.Destroy())
 
-    BrowseFile(EditCtrl, FilterDesc, FilterExts) {
-        Selected := FileSelect(3, EditCtrl.Value, "Sélectionner un fichier", FilterDesc . " (" . FilterExts . ")")
+    BrowseDir(*) {
+        ; Start from the current field value if it exists, otherwise fall back to
+        ; My Documents so the dialog opens somewhere useful rather than the script root.
+        StartDir := Trim(DirEdit.Value)
+        if (StartDir == "" or !DirExist(StartDir)) {
+            StartDir := A_MyDocuments
+        }
+        Selected := DirSelect("*" . StartDir, 1, "Sélectionner le dossier de configuration")
         if (Selected != "") {
-            EditCtrl.Value := Selected
+            if !RegExMatch(Selected, "\\$")
+                Selected .= "\"
+            DirEdit.Value := Selected
         }
     }
 
-    SaveFilePaths(*) {
-        global ScriptInformation, ConfigurationFile, _BootstrapFile
+    SaveConfigDir(*) {
+        global _ConfigDir, _DefaultConfigDir, _PathsFile, ScriptInformation, ConfigurationFile
 
-        NewAhkPath := Trim(AhkEdit.Value)
-        NewTomlPath := Trim(TomlEdit.Value)
-        NewInfoTomlPath := Trim(InfoTomlEdit.Value)
-        NewIniPath := Trim(IniEdit.Value)
-
-        DefaultAhkPath := A_ScriptDir . "\personal.ahk"
-        DefaultTomlPath := A_ScriptDir . "\..\hotstrings\personal.toml"
-        DefaultInfoTomlPath := A_ScriptDir . "\..\hotstrings\personal_info.toml"
-        DefaultIniPath := A_ScriptDir . "\ErgoptiPlus_Configuration.ini"
-
-        FinalAhkPath := (NewAhkPath == "") ? DefaultAhkPath : NewAhkPath
-        FinalTomlPath := (NewTomlPath == "") ? DefaultTomlPath : NewTomlPath
-        FinalInfoTomlPath := (NewInfoTomlPath == "") ? DefaultInfoTomlPath : NewInfoTomlPath
-        FinalIniPath := (NewIniPath == "") ? DefaultIniPath : NewIniPath
-
-        ; Persist the ini path in the bootstrap file (it cannot live in the ini itself)
-        IniWrite(FinalIniPath, _BootstrapFile, "Bootstrap", "ConfigurationFilePath")
-
-        ; Persist the file paths in the ini under [Script]
-        IniWrite(FinalAhkPath, FinalIniPath, "Script", "PersonalAhkPath")
-        IniWrite(FinalTomlPath, FinalIniPath, "Script", "PersonalTomlPath")
-        IniWrite(FinalInfoTomlPath, FinalIniPath, "Script", "PersonalInfoTomlPath")
-
-        TomlChanged := (FinalTomlPath != ScriptInformation["PersonalTomlPath"])
-
-        ScriptInformation["PersonalAhkPath"] := FinalAhkPath
-        ScriptInformation["PersonalTomlPath"] := FinalTomlPath
-        ScriptInformation["PersonalInfoTomlPath"] := FinalInfoTomlPath
-        ConfigurationFile := FinalIniPath
+        NewDir := Trim(DirEdit.Value)
+        if (NewDir == "") {
+            NewDir := _DefaultConfigDir
+        } else if !RegExMatch(NewDir, "\\$") {
+            NewDir .= "\"
+        }
 
         W.Destroy()
 
-        if TomlChanged {
-            ; The TOML path changed — a full reload is required to re-register hotstrings
-            MsgBox("Le chemin du fichier TOML a changé.`nLe script va être rechargé.", "Rechargement", "Icon!")
-            Reload
+        if (NewDir == _ConfigDir)
+            return
+
+        ; Persist the new config dir into paths.toml
+        try {
+            f := FileOpen(_PathsFile, "w", "UTF-8")
+            if f {
+                DefaultDirFwd := StrReplace(_DefaultConfigDir, "\", "/")
+                NewDirFwd     := StrReplace(NewDir, "\", "/")
+                f.Write("# Custom paths — auto-generated by ErgoptiPlus.`r`n")
+                f.Write("# Edit this file to point to your personal configuration folder.`r`n")
+                f.Write("# If absent or commented out, files are looked up in: " . DefaultDirFwd . "`r`n")
+                f.Write("`r`n")
+                if (NewDir != _DefaultConfigDir) {
+                    f.Write('ConfigDirPath = "' . NewDirFwd . '"`r`n')
+                } else {
+                    f.Write('# ConfigDirPath = "' . DefaultDirFwd . '"`r`n')
+                }
+                f.Close()
+            }
         }
+
+        Reload
     }
 
     W.Show("Center")
@@ -1317,26 +1609,24 @@ ActivateEdit(*) {
 }
 
 ToggleSuspend(*) {
-    SuspendScript := not A_IsSuspended
-    if SuspendScript {
-        Suspend(1)
-        Pause(1) ; Freeze currently executing things in the thread
-    } else {
+    if A_IsSuspended {
         Suspend(0)
-        Pause(0) ; Unfreeze the thread
+    } else {
+        Suspend(1)
     }
     UpdateTrayIcon()
-    LoggerInfo("ErgoptiPlus", "Suspend toggled: %s.", SuspendScript ? "ON" : "OFF")
+    LoggerInfo("ErgoptiPlus", "Suspend toggled: {1}.", A_IsSuspended ? "ON" : "OFF")
 }
 
 UpdateTrayIcon() {
+    global ScriptMgmtMenu
     if A_IsSuspended {
-        A_TrayMenu.Check(MenuSuspend)
+        ScriptMgmtMenu.Check(MenuSuspend)
         if FileExist(IconPathDisabled) {
             TraySetIcon(IconPathDisabled, , True)
         }
     } else {
-        A_TrayMenu.Uncheck(MenuSuspend)
+        ScriptMgmtMenu.Uncheck(MenuSuspend)
         if FileExist(IconPath) {
             TraySetIcon(IconPath)
         }
@@ -1387,68 +1677,53 @@ ActivateKeyHistory(*) {
 ; It avoids a bug where AltGr + Enter pauses the script, but then pressing BackSpace alone triggers a reload
 ; This bug for example happens if the keyboard layout is QWERTY
 
+; Each combo double-checks both keys with GetKeyState — works around an
+; AltGr+Enter quirk on some QWERTY layouts where pressing BackSpace alone
+; would otherwise replay a stale AltGr+BackSpace event and reload the script.
+
+; Known limitation: suspending via the tray menu disables these combos as
+; well. Suspend(1) drops the SC138 / RAlt prefix from AHK's keyboard hook
+; once the 60+ non-exempt SC138 & xxx combos from layout_altgr.ahk get
+; suspended — and the #SuspendExempt directive does not survive that.
+; Workaround for the user: resume by clicking the tray menu entry again.
+
 #SuspendExempt
 
-#HotIf ScriptInformation["ShortcutSuspend"]
-; Activate/Deactivate the script with AltGr + Enter
 RAlt & Enter::
 SC138 & SC01C::
 {
     if (GetKeyState("SC138", "P") and GetKeyState("SC01C", "P")) {
-        ToggleSuspend()
+        RunScriptShortcutAction("script_altgr_enter")
     } else {
         SendInput("{Enter}")
     }
 }
-#HotIf
 
-#HotIf ScriptInformation["ShortcutSaveReload"]
-; Save and reload the script with AltGr + BackSpace
 RAlt & BackSpace::
 SC138 & SC00E::
 {
     if (GetKeyState("SC138", "P") and GetKeyState("SC00E", "P")) {
-        SendInput("{LControl Down}s{LControl Up}") ; Save the script by sending Ctrl + S
-        Sleep(300) ; Leave time for the file to be saved
-        Reload
+        RunScriptShortcutAction("script_altgr_backspace")
     } else {
         SendInput("{BackSpace}")
     }
 }
-#HotIf
 
-#HotIf ScriptInformation["ShortcutEdit"]
-; Open personal.ahk (user config file) with AltGr + Delete (Suppr.)
 RAlt & Delete::
 SC138 & SC153::
 {
     if (GetKeyState("SC138", "P") and GetKeyState("SC153", "P")) {
-        PersonalAhkPath := ScriptInformation["PersonalAhkPath"]
-        if !FileExist(PersonalAhkPath) {
-            FileAppend(
-                "; drivers/autohotkey/personal.ahk`r`n"
-                . "; Fichier de configuration personnelle — non suivi par git.`r`n"
-                . "; Ajouter ici vos propres raccourcis clavier et hotstrings.`r`n"
-                . "; Ce fichier est chargé en priorité maximale par ErgoptiPlus.ahk.`r`n"
-                . "`r`n"
-                . "#Requires AutoHotkey v2.0`r`n",
-                PersonalAhkPath,
-                "UTF-8-RAW"
-            )
-        }
-        Run('notepad.exe "' . PersonalAhkPath . '"')
+        RunScriptShortcutAction("script_altgr_delete")
     } else {
         SendInput("{Delete}")
     }
 }
-#HotIf
 
-; Quit the script entirely with AltGr + Escape
 RAlt & Escape::
 SC138 & SC001::
 {
     if (GetKeyState("SC138", "P") and GetKeyState("SC001", "P")) {
-        ExitApp
+        RunScriptShortcutAction("script_altgr_escape")
     } else {
         SendInput("{Escape}")
     }
@@ -1464,8 +1739,8 @@ SC138 & SC001::
 ; =======================================================
 ; =======================================================
 
-; personal.ahk is included earlier (before menu build) so Features["Personal"]
-; is populated before InitSubMenus/initMenu run.
+; personal_shortcuts.ahk is included earlier (before menu build) so
+; Features["Personal"] is populated before InitSubMenus/initMenu run.
 ; TOML hotstrings are loaded here with maximum priority so they shadow any
 ; conflicting built-in entry (registered before the layout section below).
 if Features.Has("Personal") {
@@ -1486,7 +1761,6 @@ if Features.Has("Personal") {
 #Include modules\shortcuts.ahk
 #Include modules\tap_holds.ahk
 #Include modules\hotstrings.ahk
-#Include modules\gestures.ahk
 
 ; Final lifecycle marker — all hotkeys and hotstrings are registered, the
 ; script is ready to handle keystrokes. A missing SUCCESS in the log file

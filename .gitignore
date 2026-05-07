@@ -1,5 +1,6 @@
 # OS generated files
 .DS_Store
+Thumbs.db
 
 # NPM and SvelteKit files
 node_modules
@@ -11,32 +12,25 @@ vite.config.ts.timestamp-*
 
 # Python files
 __pycache__
+.venv
 .env
 .env.*
 !.env.example
 
-# Other files to exclude
+# Logs
 logs/
 *.log
+
+# Build artifacts
+static/drivers/autohotkey/tests/test_results.txt
 static/corpus/modifie/
 static/version.json
 version.json
 
 # Personal configuration files
 .claude/settings.local.json
-static/drivers/autohotkey/personal.ahk
-# Bootstrap file is machine-specific (contains absolute path to user's ini)
-static/drivers/autohotkey/ErgoptiPlus_Bootstrap.ini
-# Default ini location — user-specific, never committed
-static/drivers/autohotkey/ErgoptiPlus_Configuration.ini
-static/drivers/hammerspoon/config.json
-static/drivers/hammerspoon/karabiner_user_config.json
-# Karabiner build artifact — generated at runtime by the HS bridge
-static/drivers/hammerspoon/karabiner.json
-# Bootstrap file — machine-specific absolute paths, never committed
-static/drivers/hammerspoon/ergopti_bootstrap.json
-static/drivers/hotstrings/personal.toml
-static/drivers/hotstrings/personal_info.toml
 
-# Hammerspoon Python virtualenv (provisioned by modules/llm/ensure-mlx-deps.sh)
-static/drivers/hammerspoon/.venv/
+# Machine-specific paths bootstrap — points at the user's config dir
+# (defaults to ~/.config/ergopti_plus/). Auto-generated, never committed.
+static/drivers/autohotkey/paths.toml
+static/drivers/hammerspoon/paths.toml

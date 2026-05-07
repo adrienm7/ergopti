@@ -22,7 +22,7 @@
 ---    every raw stderr line to ui.download_window.set_detail so the user sees
 ---    live verbose output (uv "Downloading torch (220 MB)…").
 --- 3. Verbose live log: every line of the script's stderr is also
----    forwarded to Logger.info so 'tail -f /tmp/ergopti.log' shows the
+---    forwarded to Logger.info so 'tail -f <config>/logs/ErgoptiPlus_*.log' shows the
 ---    same live download progress instead of a 4-minute frozen silence.
 --- 4. Final state reporting: a successful slow-path run posts a final
 ---    "Moteur IA prêt." step then auto-hides 1.5s later. Any failure
@@ -513,7 +513,7 @@ function M.check_and_install_deps(on_complete)
 		else
 			_bootstrap_state = "failed"
 			local tail = tail_for_error(combined)
-			if tail == "" then tail = "Cause inconnue. Consultez /tmp/ergopti.log." end
+			if tail == "" then tail = "Cause inconnue. Consultez " .. Logger.UNIFIED_LOG_FILE .. "." end
 			_last_failure_message = tail
 			Logger.error(LOG, "MLX bootstrap failed (exit=%d) — %s",
 				tonumber(exit_code) or -1, tail:gsub("\n", " | "))

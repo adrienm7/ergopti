@@ -140,11 +140,12 @@ function M.new(deps, presets, ram_getter)
 		-- Uses a `while read` loop instead of awk: macOS' default BWK awk
 		-- lacks gawk's strftime() / fflush(file) builtins, so the previous
 		-- awk pipeline crashed on the first line and killed ollama on SIGPIPE.
+		local log_path = Logger.UNIFIED_LOG_FILE
 		local ok = pcall(hs.execute,
 			"nohup bash -c \"" .. ollama_bin .. " serve 2>&1 | " ..
 			"while IFS= read -r LINE; do " ..
 			"printf '%s [OLLAMA-SERVER] %s\\n' \\\"\\$(date +%H:%M:%S)\\\" \\\"\\$LINE\\\" " ..
-			">> /tmp/ergopti.log; " ..
+			">> " .. string.format("%q", log_path) .. "; " ..
 			"done\" &")
 		return ok == true
 	end

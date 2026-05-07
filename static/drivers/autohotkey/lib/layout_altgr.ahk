@@ -253,7 +253,7 @@ RegisterAltGrLayer() {
     }
 
     HotIf() ; Reset to no condition
-    try LoggerSuccess("LayoutAltGr", "AltGr layer registered (%d entries).",
+    try LoggerSuccess("LayoutAltGr", "AltGr layer registered ({1} entries).",
         ALTGR_PLUS_OVERRIDES.Count + ALTGR_NUMBER_ROW.Count + CTRL_ALT_NUMPAD.Count
         + ALTGR_BASE_ROWS.Count)
 }

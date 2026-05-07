@@ -154,8 +154,20 @@ M.DEFAULT_STATE = {
 --- Central shared-state table passed by reference to all sub-modules.
 --- Fields are grouped by concern for readability.
 local CoreState = {
-	-- Paths
-	LOG_DIR = hs.configdir .. "/logs",
+	-- Paths — keystroke / metrics data goes under <config_dir>/metrics/.
+	-- Resolved at module-load time via menu_paths so a relocated config dir
+	-- is picked up automatically.
+	LOG_DIR = (function()
+		local ok, mp = pcall(require, "ui.menu.menu_paths")
+		if ok and mp and type(mp.get_config_dir) == "function" then
+			local d = mp.get_config_dir()
+			if type(d) == "string" and d ~= "" then
+				if not d:match("[/\\]$") then d = d .. "/" end
+				return d .. "metrics"
+			end
+		end
+		return hs.configdir .. "/metrics"
+	end)(),
 
 	-- Enablement
 	options    = { encrypt = false },

@@ -127,10 +127,14 @@ Test(Name, Callback) {
 	TEST_REGISTRY.Push({ name: Name, callback: Callback })
 }
 
-; Print a line to stdout. ``*`` is the AHK v2 sentinel for the standard
-; output stream; FileAppend is non-blocking and inexpensive.
+; Path of the TAP results file written alongside the test runner.
+global TEST_RESULTS_FILE := A_ScriptDir . "\test_results.txt"
+
+; Print a line to stdout and append it to TEST_RESULTS_FILE so the output
+; is readable even when AHK64 does not inherit the shell's stdout handle.
 _TestPrint(Line) {
 	try FileAppend(Line . "`r`n", "*")
+	try FileAppend(Line . "`r`n", TEST_RESULTS_FILE)
 }
 
 ; Execute every registered test, print TAP-style results and exit with
@@ -148,7 +152,7 @@ RunTests() {
 			T.callback.Call()
 		} catch as e {
 			Status := "not ok"
-			Detail := " — " . e.Message
+			Detail := " — " . e.Message . " [" . e.File . ":" . e.Line . "]"
 		}
 		if (Status == "ok") {
 			TEST_PASS_COUNT += 1

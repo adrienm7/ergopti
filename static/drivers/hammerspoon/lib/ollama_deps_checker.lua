@@ -209,7 +209,7 @@ function M.check_and_install_deps()
 		else
 			_bootstrap_state = "failed"
 			local tail = tail_for_error(combined)
-			if tail == "" then tail = "Cause inconnue. Consultez /tmp/ergopti.log." end
+			if tail == "" then tail = "Cause inconnue. Consultez " .. Logger.UNIFIED_LOG_FILE .. "." end
 			_last_failure_message = tail
 			Logger.error(LOG, "Ollama bootstrap failed (exit=%d) — %s",
 				tonumber(exit_code) or -1, tail:gsub("\n", " | "))
