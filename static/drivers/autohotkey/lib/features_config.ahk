@@ -1,10 +1,15 @@
-﻿; drivers/autohotkey/lib/features_config.ahk
+; drivers/autohotkey/lib/features_config.ahk
 
 ; ==============================================================================
 ; MODULE: Features Configuration
 ; DESCRIPTION:
 ; Single source of truth for which ErgoptiPlus features are enabled by default
-; and for their default parameters (``TimeActivationSeconds``, patterns, etc.).
+; and for their default parameters (patterns, links, letters, tap-hold timeouts).
+; Per-group hotstring expansion delays are no longer set here — they live in
+; each category TOML's ``[_meta] delay`` field and are resolved at registration
+; time via ``HotstringsResolve`` (see ``lib/hotstrings_config.ahk``). The
+; ``TimeActivationSeconds`` entries that remain in this file are tap-hold
+; activation thresholds (``TapHolds`` category) which serve a different purpose.
 ;
 ; FEATURES & RATIONALE:
 ; 1. ``Features`` is the hierarchical Map consumed by ``ReadConfiguration`` to
@@ -66,149 +71,114 @@ global Features := Map(
     "DistancesReduction", Map(
         "QU", {
             Enabled: True,
-            TimeActivationSeconds: 1,
         },
         "SuffixesA", {
             Enabled: True,
-            TimeActivationSeconds: 1,
         },
         "CommaJ", {
             Enabled: True,
-            TimeActivationSeconds: 1,
         },
         "CommaFarLetters", {
             Enabled: True,
-            TimeActivationSeconds: 1,
         },
         "DeadKeyECircumflex", {
             Enabled: True,
-            TimeActivationSeconds: 1,
         },
         "ECircumflexE", {
             Enabled: True,
-            TimeActivationSeconds: 1,
         },
         "SpaceAroundSymbols", {
             Enabled: True,
-            TimeActivationSeconds: 1,
         },
     ),
     "SFBsReduction", Map(
         "Comma", {
             Enabled: True,
-            TimeActivationSeconds: 1,
         },
         "ECirc", {
             Enabled: True,
-            TimeActivationSeconds: 1,
         },
         "EGrave", {
             Enabled: True,
-            TimeActivationSeconds: 1,
         },
         "BU", {
             Enabled: True,
-            TimeActivationSeconds: 1,
         },
         "IÉ", {
             Enabled: True,
-            TimeActivationSeconds: 1,
         },
     ),
     "Rolls", Map(
         "HC", {
             Enabled: True,
-            TimeActivationSeconds: 0.5,
         },
         "SX", {
             Enabled: True,
-            TimeActivationSeconds: 0.5,
         },
         "CX", {
             Enabled: True,
-            TimeActivationSeconds: 0.5,
         },
         "EnglishNegation", {
             Enabled: True,
-            TimeActivationSeconds: 0.5,
         },
         "EZ", {
             Enabled: True,
-            TimeActivationSeconds: 0.5,
         },
         "CT", {
             Enabled: True,
-            TimeActivationSeconds: 0.5,
         },
         "CloseChevronTag", {
             Enabled: True,
-            TimeActivationSeconds: 0.5,
         },
         "ChevronEqual", {
             Enabled: True,
-            TimeActivationSeconds: 0.5,
         },
         "Comment", {
             Enabled: True,
-            TimeActivationSeconds: 0.5,
         },
         "Assign", {
             Enabled: True,
-            TimeActivationSeconds: 0.5,
         },
         "NotEqual", {
             Enabled: True,
-            TimeActivationSeconds: 0.5,
         },
         "HashtagQuote", {
             Enabled: True,
-            TimeActivationSeconds: 1,
         },
         "HashtagParenthesis", {
             Enabled: True,
-            TimeActivationSeconds: 0.5,
         },
         "HashtagBracket", {
             Enabled: True,
-            TimeActivationSeconds: 0.5,
         },
         "EqualString", {
             Enabled: True,
-            TimeActivationSeconds: 0.5,
         },
         "LeftArrow", {
             Enabled: True,
-            TimeActivationSeconds: 0.5,
         },
         "AssignArrowEqualRight", {
             Enabled: True,
-            TimeActivationSeconds: 0.5,
         },
         "AssignArrowEqualLeft", {
             Enabled: True,
-            TimeActivationSeconds: 0.5,
         },
         "AssignArrowMinusRight", {
             Enabled: True,
-            TimeActivationSeconds: 0.5,
         },
         "AssignArrowMinusLeft", {
             Enabled: True,
-            TimeActivationSeconds: 0.5,
         },
     ),
     "Autocorrection", Map(
         "TypographicApostrophe", {
             Enabled: True,
-            TimeActivationSeconds: 1,
         },
         "Errors", {
             Enabled: True,
-            TimeActivationSeconds: 1,
         },
         "SuffixesAChaining", {
             Enabled: True,
-            TimeActivationSeconds: 1,
         },
         "Accents", {
             Enabled: True,
@@ -227,11 +197,9 @@ global Features := Map(
         },
         "OU", {
             Enabled: True,
-            TimeActivationSeconds: 1,
         },
         "MultiplePunctuationMarks", {
             Enabled: True,
-            TimeActivationSeconds: 1,
         },
     ),
     "MagicKey", Map(
