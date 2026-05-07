@@ -134,15 +134,30 @@ end
 --- character immediately before the trigger's start position is a letter
 --- (or "@", which marks personal-info triggers). Centralised here so auto
 --- and terminator expansion apply the exact same word-boundary policy.
+---
+--- When the trigger starts at byte index 1 of the buffer, the buffer holds
+--- no observable left-hand context. The decision is then delegated to
+--- `_state.start_is_word_boundary`: true means the buffer's start is known
+--- to abut a word terminator (fresh launch, post-expansion, post-Cmd+A,
+--- post-word-timeout) and the match is allowed; false means the cursor
+--- moved into territory we never observed (BS past the buffer's start,
+--- nav keys, mouse click, Ctrl/Cmd combos other than select-all, paste,
+--- undo, etc.) and the match is rejected. This is the Hammerspoon mirror
+--- of the AHK HSEv2 word-boundary contract.
+---
 --- @param buffer string The current rolling buffer.
 --- @param trigger string The trigger whose match is being considered.
 --- @param trigger_start_byte number 1-based byte index where the trigger
 ---   starts inside `buffer`. Must be >= 1.
+--- @param start_is_word_boundary boolean Whether the buffer's start
+---   abuts a known word terminator.
 --- @return boolean True when the word boundary blocks the match.
-local function word_boundary_blocks(buffer, trigger, trigger_start_byte)
+local function word_boundary_blocks(buffer, trigger, trigger_start_byte, start_is_word_boundary)
 	-- Triggers that start with whitespace carry their own boundary and skip this check.
 	if trigger:match("^[ \194\160\226\128\175]") then return false end
-	if trigger_start_byte <= 1 then return false end
+	if trigger_start_byte <= 1 then
+		return not start_is_word_boundary
+	end
 	local before    = buffer:sub(1, trigger_start_byte - 1)
 	local prev_off  = utf8.offset(before, -1)
 	local prev_char = prev_off and before:sub(prev_off) or ""
@@ -194,7 +209,7 @@ function M.try_auto_expand(m, char_len, is_ignored)
 	-- Word-boundary check (delegated to shared helper). tstart_byte is the
 	-- 1-based byte index where the trigger begins inside the buffer.
 	local tstart_byte = #_state.buffer - tb + 1
-	if m.is_word and word_boundary_blocks(_state.buffer, trigger, tstart_byte) then
+	if m.is_word and word_boundary_blocks(_state.buffer, trigger, tstart_byte, _state.start_is_word_boundary) then
 		return false
 	end
 
@@ -271,7 +286,7 @@ function M.try_terminator_expand(m, chars, char_len, is_ignored)
 	local trig_len    = m.tlen
 
 	-- Word-boundary check (shared helper — same policy as try_auto_expand).
-	if m.is_word and word_boundary_blocks(buf, trigger, buf_start) then
+	if m.is_word and word_boundary_blocks(buf, trigger, buf_start, _state.start_is_word_boundary) then
 		return false
 	end
 

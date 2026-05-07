@@ -69,6 +69,7 @@ SendMode("Event") ; Everything concerning hotstrings MUST use SendEvent and not 
 ; FoldAsciiLower, ApplyTomlMetadataToFeatures) extracted into dedicated
 ; submodules so the main file stays focused on ErgoptiPlus-specific logic.
 #Include lib\hotstring_engine.ahk
+#Include lib\hotstring_engine_v2.ahk
 #Include lib\toml_loader.ahk
 #Include lib\hotstrings_config.ahk
 #Include lib\hotstrings_config_window.ahk

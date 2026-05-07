@@ -44,6 +44,36 @@ M.UNIFIED_LOG_FILE = "/tmp/ErgoptiPlus_boot.log"
 -- Log directory resolved after M.init_log_path(); used by sub-file fan-out.
 local _log_dir = "/tmp/"
 
+-- Topical sub-files: lines whose rendered "[tag]" matches any pattern are
+-- fan-out here in addition to the main unified file. Sub-files are ephemeral
+-- (today only) — they are a filtered view of the main log, not an archive.
+-- Paths are resolved at runtime relative to _log_dir (set by init_log_path).
+-- Declared up here (rather than alongside the file-sink state further down)
+-- because init_log_path iterates this list to purge stale sub-files, and a
+-- forward reference would resolve to nil at call time.
+local SUB_LOG_NAMES = {
+	-- MLX inference server: startup, model loads, per-token latency
+	{ name = "ErgoptiPlus_mlx.log",        patterns = { "[mlx",        "[llm.api_mlx]",     "MLX-",        "[mlx_deps]"    } },
+	-- Ollama daemon: startup, model pulls, inference calls
+	{ name = "ErgoptiPlus_ollama.log",      patterns = { "[ollama",     "[llm.api_ollama]",  "[ollama_deps]"                } },
+	-- LLM bridge: prompt dispatch, temperature, model switching, warmup
+	{ name = "ErgoptiPlus_llm.log",         patterns = { "[llm.",       "[menu_llm",         "[keymap.llm", "WARMUP",  "[TOGGLE]" } },
+	-- Hotstrings & keymap: registry, dynamic expansions, personal shortcuts
+	{ name = "ErgoptiPlus_hotstrings.log",  patterns = { "[keymap.",    "[dynamic_hotstring", "[personal_info]", "[toml_reader]", "hotstring" } },
+	-- Raw keystroke capture and n-gram analysis
+	{ name = "ErgoptiPlus_keylogger.log",   patterns = { "[keylogger"                                                       } },
+	-- Karabiner-Elements config generation and deployment
+	{ name = "ErgoptiPlus_karabiner.log",   patterns = { "[karabiner"                                                       } },
+	-- Touchpad & mouse gesture recognition
+	{ name = "ErgoptiPlus_gestures.log",    patterns = { "[gestures"                                                        } },
+	-- Menubar, tray, modal dialogs, app picker, UI builders
+	{ name = "ErgoptiPlus_menu.log",        patterns = { "[menu]",      "[menu_",            "[builder]",   "[ui_builder]", "[app_picker]", "[download_window]" } },
+	-- Notification routing and system alerts
+	{ name = "ErgoptiPlus_notify.log",      patterns = { "[notify",     "[notifications"                                    } },
+	-- Boot sequence, path resolution, config loading
+	{ name = "ErgoptiPlus_boot.log",        patterns = { "[init]",      "[menu_paths]",      "[paths]",     "[config"       } },
+}
+
 
 
 
@@ -198,33 +228,6 @@ local _dedup = { line = nil, count = 0, variant_key = nil }
 local _file_handle    = nil
 local _last_log_date  = nil
 local _last_log_path  = nil
-
--- Topical sub-files: lines whose rendered "[tag]" matches any pattern are
--- fan-out here in addition to the main unified file. Sub-files are ephemeral
--- (today only) — they are a filtered view of the main log, not an archive.
--- Paths are resolved at runtime relative to _log_dir (set by init_log_path).
-local SUB_LOG_NAMES = {
-	-- MLX inference server: startup, model loads, per-token latency
-	{ name = "ErgoptiPlus_mlx.log",        patterns = { "[mlx",        "[llm.api_mlx]",     "MLX-",        "[mlx_deps]"    } },
-	-- Ollama daemon: startup, model pulls, inference calls
-	{ name = "ErgoptiPlus_ollama.log",      patterns = { "[ollama",     "[llm.api_ollama]",  "[ollama_deps]"                } },
-	-- LLM bridge: prompt dispatch, temperature, model switching, warmup
-	{ name = "ErgoptiPlus_llm.log",         patterns = { "[llm.",       "[menu_llm",         "[keymap.llm", "WARMUP",  "[TOGGLE]" } },
-	-- Hotstrings & keymap: registry, dynamic expansions, personal shortcuts
-	{ name = "ErgoptiPlus_hotstrings.log",  patterns = { "[keymap.",    "[dynamic_hotstring", "[personal_info]", "[toml_reader]", "hotstring" } },
-	-- Raw keystroke capture and n-gram analysis
-	{ name = "ErgoptiPlus_keylogger.log",   patterns = { "[keylogger"                                                       } },
-	-- Karabiner-Elements config generation and deployment
-	{ name = "ErgoptiPlus_karabiner.log",   patterns = { "[karabiner"                                                       } },
-	-- Touchpad & mouse gesture recognition
-	{ name = "ErgoptiPlus_gestures.log",    patterns = { "[gestures"                                                        } },
-	-- Menubar, tray, modal dialogs, app picker, UI builders
-	{ name = "ErgoptiPlus_menu.log",        patterns = { "[menu]",      "[menu_",            "[builder]",   "[ui_builder]", "[app_picker]", "[download_window]" } },
-	-- Notification routing and system alerts
-	{ name = "ErgoptiPlus_notify.log",      patterns = { "[notify",     "[notifications"                                    } },
-	-- Boot sequence, path resolution, config loading
-	{ name = "ErgoptiPlus_boot.log",        patterns = { "[init]",      "[menu_paths]",      "[paths]",     "[config"       } },
-}
 
 local function _matches_any(line, patterns)
 	for _, p in ipairs(patterns) do

@@ -42,6 +42,7 @@ SetWorkingDir(A_ScriptDir)
 #Include ..\lib\ini_helpers.ahk
 #Include ..\lib\active_app_cache.ahk
 #Include ..\lib\hotstring_engine.ahk
+#Include ..\lib\hotstring_engine_v2.ahk
 #Include ..\lib\toml_loader.ahk
 #Include ..\lib\hotstrings_config.ahk
 #Include ..\lib\personal_toml_editor.ahk
@@ -64,6 +65,7 @@ NeutralizeDispatcherKeySends()
 ; ── Per-module test files (each registers Test() cases) ──
 #Include test_logger.ahk
 #Include test_hotstring_engine.ahk
+#Include test_hotstring_engine_v2.ahk
 #Include test_toml_loader.ahk
 #Include test_hotstrings_config.ahk
 #Include test_personal_toml_editor.ahk

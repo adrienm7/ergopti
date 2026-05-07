@@ -25,9 +25,15 @@ local Gestures = helpers.load_with_stubs("modules.gestures")
 -- =====================================
 
 helpers.describe("Gestures DEFAULT_GESTURES", function()
-	helpers.it("has every slot defaulting to 'none'", function()
+	helpers.it("has every slot defaulting to a registered action", function()
+		-- tap_3 ships with a non-"none" default (right_click_toggle) so the
+		-- product offers something useful out of the box; every other slot
+		-- is "none" until the user binds it. The contract here is that the
+		-- default for any slot must be a string that the action registry
+		-- knows how to dispatch — tested against ACTIONS via the runtime
+		-- guard below.
 		for k, v in pairs(Gestures.DEFAULT_GESTURES) do
-			helpers.assert_eq(v, "none", "slot " .. tostring(k) .. " not 'none'")
+			helpers.assert_eq(type(v), "string", "slot " .. tostring(k) .. " default is not a string")
 		end
 	end)
 

@@ -398,9 +398,12 @@ local function onKeyDownRaw(e)
 	end
 
 	-- Wipe the buffer after the user pauses long enough that the next keystroke
-	-- cannot possibly belong to the same word.
+	-- cannot possibly belong to the same word. The pause itself stands in for
+	-- a word terminator, so the post-wipe context starts on a fresh word
+	-- boundary and word-boundary-required triggers are allowed to fire.
 	if CoreState.WORD_TIMEOUT_SEC > 0 and dt > CoreState.WORD_TIMEOUT_SEC then
 		CoreState.buffer = ""
+		CoreState.start_is_word_boundary = true
 		LLMBridge.reset_predictions()
 	end
 
@@ -448,20 +451,32 @@ local function onKeyDownRaw(e)
 	end
 
 	-- 4. Handle Escape — dismiss predictions or optionally clear the buffer.
-	if keyCode == Keycodes.ESCAPE then return LLMBridge.check_escape_reset() end
+	-- Either way the cursor's left-hand context is no longer known to the
+	-- buffer, so refuse to assume a word boundary on its left.
+	if keyCode == Keycodes.ESCAPE then
+		CoreState.start_is_word_boundary = false
+		return LLMBridge.check_escape_reset()
+	end
 
 	-- 5. Modifier shortcuts (Cmd/Ctrl) break the current word context.
+	-- Cmd+A / Ctrl+A is the one exception — select-all replaces the entire
+	-- selection with the next typed char, so the new context starts at a
+	-- fresh word-start. Every other Cmd/Ctrl combo (cut, paste, undo,
+	-- redo, app shortcuts, …) leaves the cursor in unobservable territory.
 	if flags.cmd or flags.ctrl then
 		CoreState.buffer = ""
+		CoreState.start_is_word_boundary = (keyCode == hs.keycodes.map["a"])
 		LLMBridge.check_nav_reset()
 		return false
 	end
 
 	-- 6. Handle Backspace.
 	if keyCode == Keycodes.BACKSPACE then
-		-- Cmd+Backspace / Alt+Backspace delete whole words — wipe the buffer.
+		-- Cmd+Backspace / Alt+Backspace delete whole words — wipe the buffer
+		-- and refuse to assume a word boundary on the new cursor's left.
 		if flags.cmd or flags.alt then
 			CoreState.buffer = ""
+			CoreState.start_is_word_boundary = false
 			LLMBridge.check_nav_reset()
 			return false
 		end
@@ -470,13 +485,23 @@ local function onKeyDownRaw(e)
 			local ok, offset = pcall(utf8.offset, CoreState.buffer, -1)
 			CoreState.buffer = (ok and offset) and CoreState.buffer:sub(1, offset - 1) or ""
 			if not is_ignored then LLMBridge.update_preview(CoreState.buffer) end
+		else
+			-- Backspace pressed against an already-empty buffer: the user
+			-- has just deleted a character that lived to the LEFT of where
+			-- the buffer ever started, into territory we never observed.
+			-- Flip the boundary flag so subsequent word-boundary-required
+			-- triggers refuse to fire until a real terminator is observed.
+			CoreState.start_is_word_boundary = false
 		end
 		return false
 	end
 
-	-- 7. Arrow / navigation keys break word context; delegate to nav-reset handler.
+	-- 7. Arrow / navigation keys break word context; delegate to nav-reset
+	-- handler and flip the boundary flag — the cursor moved to a position
+	-- whose left-hand context the buffer cannot describe.
 	if keyCode == 117 or keyCode == 115 or keyCode == 116 or keyCode == 119 or keyCode == 121
 		or (keyCode >= 123 and keyCode <= 126) then
+		CoreState.start_is_word_boundary = false
 		LLMBridge.check_nav_reset()
 		return false
 	end
@@ -520,6 +545,10 @@ local function onKeyDownRaw(e)
 		-- keeping the full overgrown buffer — losing ≤500 chars of history is
 		-- acceptable, unbounded growth is not.
 		CoreState.buffer = (ok and off) and CoreState.buffer:sub(off) or ""
+		-- The trimmed buffer's start no longer corresponds to a known word
+		-- boundary on screen — flip the flag so word-boundary-required
+		-- triggers do not fire flush against the new (mid-screen) start.
+		CoreState.start_is_word_boundary = false
 	end
 
 	-- 9. Run expansion trigger checks. The LLM preview used to be refreshed
@@ -747,6 +776,13 @@ mouse_tap = eventtap.new(
 	},
 	function()
 		local ok, result = pcall(function()
+			-- Mouse click moves the cursor to a position whose left-hand
+			-- context the buffer cannot describe. Flip the boundary flag
+			-- so word-boundary-required triggers refuse to fire flush
+			-- against the buffer's start until a real terminator is
+			-- observed. check_nav_reset may also wipe the buffer when
+			-- reset_buffer_on_navigation is enabled.
+			CoreState.start_is_word_boundary = false
 			LLMBridge.check_nav_reset()
 			LLMBridge.reset_predictions()
 			return false

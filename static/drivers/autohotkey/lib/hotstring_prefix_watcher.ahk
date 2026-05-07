@@ -86,7 +86,28 @@ HotstringPrefixWatcherInit() {
     }
 
     _StartInputHook()
+    _InstallMouseClickResetHooks()
     LoggerSuccess("PrefixWatcher", "Watcher started ({1} trigger(s) indexed).", EntryCount)
+}
+
+; Mouse clicks move the cursor to a position we cannot observe — the
+; InputHook never sees them. Register pass-through hotkeys on the three
+; primary buttons so HSEv2 can wipe its buffer and refuse to assume a
+; word boundary on the new cursor's left. ``~`` keeps the click going
+; through to the active window unchanged.
+_InstallMouseClickResetHooks() {
+    Hotkey("~LButton", _OnMouseClickReset)
+    Hotkey("~MButton", _OnMouseClickReset)
+    Hotkey("~RButton", _OnMouseClickReset)
+}
+
+_OnMouseClickReset(*) {
+    try {
+        HSE_FeedReset(false)
+        _ResetPrefixBuffer()
+    } catch as Err {
+        LoggerError("PrefixWatcher", "Mouse-click reset failed: {1}.", Err.Message)
+    }
 }
 
 ; Toggle the suppression flag. The hotstring engine wraps its SendEvent
@@ -98,6 +119,11 @@ HotstringPrefixWatcherInit() {
 PrefixWatcherSuppress(YesNo) {
     global _PrefixWatcherSuppressed, _PrefixBuffer
     _PrefixWatcherSuppressed := !!YesNo
+    ; Mirror the suppression into HSEv2 so its parallel buffer stays aligned
+    ; with the prefix watcher during SendEvent bursts. Releasing the flag
+    ; also clears the HSE buffer (HSE_Suppress(false) does that), matching
+    ; the watcher's own reset of _PrefixBuffer below.
+    HSE_Suppress(YesNo)
     if !YesNo {
         _PrefixBuffer := ""
         TooltipHide()
@@ -224,28 +250,51 @@ _AddTriggerVariants(Trigger, Output, Category, Section, IsCaseSensitive, IsStric
     _AddTriggerToIndex(StrUpper(Trigger), StrUpper(Output), Category, Section)
 }
 
-; Add every prefix of Trigger (of length >= _MIN_PREFIX_LEN) to _PrefixIndex.
-; The prefix key preserves the original casing of the variant; the runtime
-; lookup uses the raw user buffer so an exact match is required for the
-; tooltip to surface — which is what we want for a faithful preview.
+; Add at most ONE prefix entry per trigger so the tooltip only surfaces
+; at a moment that genuinely reflects « what is about to be output ».
+; Mirror of the Hammerspoon split (modules/keymap/llm_bridge.lua):
+;
+;   - Magic-key triggers (last char(s) == the user's magic key, e.g.
+;     « c★ », « gt★ »): the user types the body then ★ to fire.
+;     Index « trigger minus magic key » — the tooltip surfaces while
+;     the body is on screen and pressing ★ completes the expansion.
+;
+;   - Every other trigger (autocorrects fired on word terminators,
+;     full-word matches, …): index the FULL trigger. The tooltip
+;     surfaces when the body is fully typed — pressing space / tab /
+;     enter / punctuation completes the expansion. This is the
+;     subtlety the magic-key path differs from: those tooltips
+;     preview « one keystroke » away (the ★), end-char-gated ones
+;     preview « one terminator » away.
+;
+; Triggers below _MIN_PREFIX_LEN-1 (magic) or _MIN_PREFIX_LEN
+; (everything else) are not indexed at all — their previews would
+; fire on a single-letter typed buffer, which is too noisy to be
+; useful.
 _AddTriggerToIndex(Trigger, Output, Category, Section) {
-    global _PrefixIndex, _MIN_PREFIX_LEN
+    global _PrefixIndex, _MIN_PREFIX_LEN, ScriptInformation
+
+    MagicKey := (IsSet(ScriptInformation) and ScriptInformation.Has("MagicKey"))
+        ? ScriptInformation["MagicKey"] : "★"
+    MkLen := StrLen(MagicKey)
+    Len := StrLen(Trigger)
+    HasMagic := (MkLen > 0 and Len > MkLen and SubStr(Trigger, -MkLen) == MagicKey)
+
     Entry := { Trigger:  Trigger,
                Output:   Output,
                Category: Category,
                Section:  Section,
-               Length:   StrLen(Trigger) }
+               Length:   Len }
 
-    Len := StrLen(Trigger)
-    i := _MIN_PREFIX_LEN
-    while (i <= Len) {
-        Prefix := SubStr(Trigger, 1, i)
-        if !_PrefixIndex.Has(Prefix) {
-            _PrefixIndex[Prefix] := []
-        }
-        _PrefixIndex[Prefix].Push(Entry)
-        i += 1
+    KeyLen := HasMagic ? (Len - MkLen) : Len
+    if (KeyLen < _MIN_PREFIX_LEN) {
+        return
     }
+    Prefix := SubStr(Trigger, 1, KeyLen)
+    if !_PrefixIndex.Has(Prefix) {
+        _PrefixIndex[Prefix] := []
+    }
+    _PrefixIndex[Prefix].Push(Entry)
 }
 
 
@@ -281,6 +330,25 @@ _OnPrefixChar(IH, Char) {
         return
     }
     try {
+        ; Feed HSEv2 — when HSE_FeedChar reports a match, fire the
+        ; expansion right here. HSE_LastEndChar is the authoritative end
+        ; character: empty for star (immediate) triggers, the just-typed
+        ; terminator for end-char-gated triggers. We can no longer derive
+        ; it from « is Char a terminator? » alone because the new HSEv2
+        ; keeps terminators in its buffer, which means a terminator may
+        ; trigger a STAR match (e.g. a personal ``,a → ja`` rule fires
+        ; on the « a », not on the comma).
+        HSEMatch := HSE_FeedChar(Char)
+        if (HSEMatch != "") {
+            HSE_DispatchMatch(HSEMatch, HSE_LastEndChar)
+            ; Wipe the prefix watcher's own buffer so the post-expansion
+            ; tail (which the user just observed on screen) does not
+            ; surface a stale tooltip preview from the trigger we just
+            ; fired.
+            _ResetPrefixBuffer()
+            return
+        }
+
         ; Space and other non-word characters reset the buffer — the trigger
         ; index only contains word-internal sequences, and a leading space
         ; would prevent any match from being found. OnKeyDown handles the VK
@@ -326,6 +394,49 @@ _OnPrefixKeyDown(IH, VK, SC) {
     ; Same try guard as _OnPrefixChar — an unhandled error here permanently
     ; silences the OnKeyDown callback for all subsequent keystrokes.
     try {
+        ; Detect Ctrl-modified combos that mutate the document context but
+        ; do not produce a printable char observable by OnChar. Held Ctrl
+        ; is read off the live keyboard state since the InputHook does
+        ; not surface modifier flags. Done before the plain-VK branches
+        ; so Ctrl+A/X/V/Z/Y do not also fall through to (e.g.) the « no
+        ; printable » case.
+        CtrlHeld := GetKeyState("Control", "P")
+        if CtrlHeld {
+            if (VK == 0x41) {
+                ; Ctrl+A — select-all. The next typed char replaces the
+                ; entire selection, landing at a fresh word-start.
+                HSE_FeedReset(true)
+                _ResetPrefixBuffer()
+                return
+            }
+            if (VK == 0x58 or VK == 0x56 or VK == 0x5A or VK == 0x59) {
+                ; Ctrl+X (cut) / Ctrl+V (paste) / Ctrl+Z (undo) /
+                ; Ctrl+Y (redo) — document content rewritten by an
+                ; unknown amount, cursor lands somewhere we cannot
+                ; observe. Wipe the buffer and refuse to assume a
+                ; word boundary on its left.
+                HSE_FeedReset(false)
+                _ResetPrefixBuffer()
+                return
+            }
+        }
+
+        ; Feed HSEv2 with the appropriate buffer mutation. Backspace
+        ; decrements its buffer (preserving word context, the whole point
+        ; of the rewrite); Tab/Enter declare a new word boundary; arrows /
+        ; Escape / Space wipe to an unknown left-hand context. Space is
+        ; already handled by HSE_FeedChar via OnChar's terminator path,
+        ; but we also reset here so a Space whose char event was swallowed
+        ; (e.g. layered on tap-hold) still flips the boundary flag.
+        if (VK == 0x08) {
+            HSE_FeedBackspace()
+        } else if (VK == 0x09 or VK == 0x0D) {
+            HSE_FeedReset(true)
+        } else if (VK == 0x1B
+                or VK == 0x25 or VK == 0x26
+                or VK == 0x27 or VK == 0x28) {
+            HSE_FeedReset(false)
+        }
         if ResetVKs.Has(VK) {
             _ResetPrefixBuffer()
         }
