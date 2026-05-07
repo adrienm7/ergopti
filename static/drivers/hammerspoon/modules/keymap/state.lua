@@ -80,6 +80,16 @@ function M.new(defaults, delays_default)
 
 	local s = {
 		buffer                     = "",
+		-- True when the character immediately to the LEFT of `buffer` is
+		-- known to be a word terminator (or there is no character at all
+		-- — start of input). Flipped to false whenever the cursor moves
+		-- into an unobservable context (Backspace past the buffer's start,
+		-- arrow / nav keys, mouse click, Ctrl/Cmd combos other than
+		-- select-all, paste, undo, etc.). The expander consults this flag
+		-- when an `is_word` mapping matches at byte index 1 of the buffer
+		-- — without it we cannot distinguish « fresh document » from
+		-- « cursor moved mid-word and buffer was wiped ».
+		start_is_word_boundary     = true,
 		magic_key                  = defaults.trigger_char,
 		-- Flat list of mapping entries, sorted longest-first. See the
 		-- invariants comment above for how the adjacent indexes must stay
@@ -120,6 +130,11 @@ function M.new(defaults, delays_default)
 	s.suppress_rescan = function(duration)
 		s.no_rescan_until = hs.timer.secondsSinceEpoch() + (tonumber(duration) or DEFAULT_SUPPRESS_SEC)
 		s.buffer = ""
+		-- Post-expansion: the replacement just landed on screen. Treat the
+		-- new cursor position as abutting a word boundary so the next typed
+		-- char can fire word-boundary-required triggers — that mirrors the
+		-- AHK HSEv2 contract (HSE_ApplyExpansion semantics).
+		s.start_is_word_boundary = true
 	end
 
 	s.suppress_rescan_keep_buffer = function(duration)

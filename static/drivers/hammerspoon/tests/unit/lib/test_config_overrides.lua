@@ -10,15 +10,26 @@
 
 local helpers = require("tests.helpers")
 
--- Stub hs.settings with an in-memory store the tests can inspect.
+-- Stub hs.settings with an in-memory store the tests can inspect. Captured
+-- the canonical settings table first so we can restore it at the end of
+-- this file — without that restore, the override leaks into every test
+-- that runs afterwards (e.g. the backend_detector tests use hs.settings
+-- via the canonical stub and would observe values written by these tests).
 local stored = {}
 _G.hs = _G.hs or {}
+local _ORIGINAL_SETTINGS = _G.hs.settings
 _G.hs.settings = {
 	set = function(key, value) stored[key] = value end,
 	get = function(key) return stored[key] end,
 }
 
 local Overrides = helpers.load_with_stubs("lib.config_overrides")
+-- helpers.load_with_stubs may have re-pointed _G.hs to a fresh stub via
+-- __reset; re-apply the override so the describes below still observe it.
+_G.hs.settings = {
+	set = function(key, value) stored[key] = value end,
+	get = function(key) return stored[key] end,
+}
 
 helpers.describe("config_overrides.coerce", function()
 	helpers.it("coerces true/false to booleans", function()
@@ -106,3 +117,12 @@ KeptKey = 1
 		end)
 	end)
 end)
+
+
+-- Restore the canonical hs.settings so subsequent tests do not see the
+-- override above (it would leak the per-test `stored` table and mask
+-- __reset() in tests like backend_detector that rely on the canonical
+-- SETTINGS_STORE).
+if _ORIGINAL_SETTINGS then
+	_G.hs.settings = _ORIGINAL_SETTINGS
+end

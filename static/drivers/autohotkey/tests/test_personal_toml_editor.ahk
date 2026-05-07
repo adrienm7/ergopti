@@ -201,14 +201,15 @@ TestPE_EscapeOnlyQuote() {
 Test("EscapeTomlValue: lone double-quote is escaped", TestPE_EscapeOnlyQuote)
 
 TestPE_EscapeAllSpecials() {
-	; All four special chars in one string
+	; All four special chars in one string. Backslash and double-quote stay
+	; as TOML escapes; newline / CR / tab become {Enter} / {Tab} tokens by
+	; design (one-way tokenisation locked in by the writer commit).
 	Src := "\" . "`"`n`r`t"
 	Esc := EscapeTomlValue(Src)
 	AssertContains(Esc, "\\")
 	AssertContains(Esc, '\"')
-	AssertContains(Esc, "\n")
-	AssertContains(Esc, "\r")
-	AssertContains(Esc, "\t")
+	AssertContains(Esc, "{Enter}")
+	AssertContains(Esc, "{Tab}")
 }
 Test("EscapeTomlValue: all special characters are present in the escaped output",
 	TestPE_EscapeAllSpecials)
@@ -343,7 +344,10 @@ TestPE_PropertyNewlinesTabsTokenised() {
 	AssertEqual("a{Enter}b", EscapeTomlValue("a`nb"))
 	AssertEqual("a{Enter}b", EscapeTomlValue("a`rb"))
 	AssertEqual("a{Tab}b",   EscapeTomlValue("a`tb"))
-	AssertEqual("{Enter}{Enter}{Tab}\`"", EscapeTomlValue("`n`r`t\`""))
+	; Backslash gets doubled and the quote escaped, so the trailing \" turns
+	; into \\\" in the on-disk representation alongside the {Enter}/{Tab}
+	; tokens that replace the newlines and tab.
+	AssertEqual("{Enter}{Enter}{Tab}\\\`"", EscapeTomlValue("`n`r`t\`""))
 }
 Test("Property: newlines and tabs are always tokenised on write",
 	TestPE_PropertyNewlinesTabsTokenised)

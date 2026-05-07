@@ -91,16 +91,49 @@ HotstringEngineInit() {
 ; =======================================
 ; =======================================
 
-; Internal — registers a hotstring through ``_HotstringRegistrar`` when the
-; test seam is installed, otherwise falls through to AHK's built-in
-; ``Hotstring()``. Centralised so CreateHotstring and the
-; CreateCaseSensitiveHotstrings RegisterVariant lambda share one indirection.
-_RegisterHotstring(TriggerSpec, Callback) {
+; Internal — registers a hotstring with HSEv2 (the production dispatcher
+; since Session 2 of the migration). The test seam ``_HotstringRegistrar``
+; still receives the registration for harnesses that want to record what
+; was registered without firing real expansions; the AHK native engine is
+; no longer involved at all.
+;
+; Meta carries dispatch metadata (Replacement, OnlyText, FinalResult,
+; TimeActivationSeconds, PrevCharKey). When omitted, HSE_DispatchMatch
+; falls back to invoking Callback directly — the path used by tests that
+; register bare lambdas.
+_RegisterHotstring(TriggerSpec, Callback, Meta := unset) {
     if _HotstringRegistrar {
         Reg := _HotstringRegistrar
         Reg(TriggerSpec, Callback)
+    }
+    _MirrorRegistrationToHSEv2(TriggerSpec, Callback, Meta?)
+}
+
+; Parse the AHK ``:flags:abbrev`` trigger spec and forward to HSE_Register.
+; Flag letters that HSEv2 understands (``*``, ``?``, ``C``) are passed
+; through verbatim; the rest (``B0``, ``O`` — both irrelevant to matching)
+; are dropped. Abbreviations are registered as-is so the HSEv2 bucket
+; index stays in lockstep with the upstream registration call.
+_MirrorRegistrationToHSEv2(TriggerSpec, Callback, Meta := unset) {
+    if !RegExMatch(TriggerSpec, "^:([^:]*):(.+)$", &Match) {
+        return
+    }
+    RawFlags := Match[1]
+    Abbrev   := Match[2]
+    HseFlags := ""
+    if InStr(RawFlags, "*") {
+        HseFlags .= "*"
+    }
+    if InStr(RawFlags, "?") {
+        HseFlags .= "?"
+    }
+    if InStr(RawFlags, "C") {
+        HseFlags .= "C"
+    }
+    if IsSet(Meta) {
+        HSE_Register(HseFlags, Abbrev, Callback, Meta)
     } else {
-        Hotstring(TriggerSpec, Callback)
+        HSE_Register(HseFlags, Abbrev, Callback)
     }
 }
 
@@ -208,8 +241,22 @@ CreateHotstring(Flags, Abbreviation, Replacement, options := unset) {
     FlagsPortion := ":" Flags "B0O:" ; O omits the ending character from the abbreviation
     _RegisterHotstring(
         FlagsPortion Abbreviation,
-        _MakeHotstringCallback(Replacement, Abbreviation, OnlyText, FinalResult, TimeActivationSeconds)
+        _MakeHotstringCallback(Replacement, Abbreviation, OnlyText, FinalResult, TimeActivationSeconds),
+        _MakeHotstringMeta(Replacement, Abbreviation, OnlyText, FinalResult, TimeActivationSeconds)
     )
+}
+
+; Build the dispatch-metadata object HSE_DispatchMatch consumes. Kept next
+; to the callback factory so the two stay in lockstep — every field used
+; by the dispatcher has a clear origin in the original options dict.
+_MakeHotstringMeta(Replacement, Abbreviation, OnlyText, FinalResult, TimeActivationSeconds) {
+    return {
+        Replacement:           Replacement,
+        OnlyText:              OnlyText,
+        FinalResult:           FinalResult,
+        TimeActivationSeconds: TimeActivationSeconds,
+        PrevCharKey:           SubStr(Abbreviation, -2, 1)
+    }
 }
 
 ; Builds the per-keystroke callback for a single hotstring variant. Computes
@@ -328,7 +375,8 @@ CreateCaseSensitiveHotstrings(Flags, Abbreviation, Replacement, options := unset
     ; ``f() {}`` functions in AHK v2 do not capture the enclosing scope.
     RegisterVariant := (Abbr, Repl) => _RegisterHotstring(
         FlagsPortion Abbr,
-        _MakeHotstringCallback(Repl, Abbr, OnlyText, FinalResult, TimeActivationSeconds)
+        _MakeHotstringCallback(Repl, Abbr, OnlyText, FinalResult, TimeActivationSeconds),
+        _MakeHotstringMeta(Repl, Abbr, OnlyText, FinalResult, TimeActivationSeconds)
     )
 
     RegisterVariant(AbbreviationLowerCase, ReplacementLowerCase)
