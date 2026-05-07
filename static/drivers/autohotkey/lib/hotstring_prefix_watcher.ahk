@@ -41,6 +41,13 @@ global _PrefixBuffer := ""
 ; it and so that the watcher can be reset / stopped at shutdown).
 global _PrefixInputHook := 0
 
+; When True, OnChar / OnKeyDown callbacks short-circuit. Toggled by the
+; hotstring engine while it is replaying characters via SendEvent so the
+; InputHook does not mistake AHK's own output for fresh user input. After
+; an expansion fires, the buffer would otherwise drift into ``c'était`` and
+; surface unrelated triggers like ``taiwan`` (Taïwan) on the next refresh.
+global _PrefixWatcherSuppressed := false
+
 ; Configuration constants.
 global _MIN_PREFIX_LEN := 2
 global _MAX_BUFFER_LEN := 64    ; longest trigger we expect, with margin
@@ -77,6 +84,21 @@ HotstringPrefixWatcherInit() {
 
     _StartInputHook()
     try LoggerSuccess("PrefixWatcher", "Watcher started ({1} trigger(s) indexed).", EntryCount)
+}
+
+; Toggle the suppression flag. The hotstring engine wraps its SendEvent
+; bursts in ``PrefixWatcherSuppress(true)`` / ``PrefixWatcherSuppress(false)``
+; pairs (with a small SetTimer delay on the release) so the InputHook
+; ignores AHK-generated characters. Releasing the flag also wipes the
+; live buffer and hides any leftover tooltip — by the time we re-enable
+; observation, the user is starting a fresh keystroke run.
+PrefixWatcherSuppress(YesNo) {
+    global _PrefixWatcherSuppressed, _PrefixBuffer
+    _PrefixWatcherSuppressed := !!YesNo
+    if !YesNo {
+        _PrefixBuffer := ""
+        TooltipHide()
+    }
 }
 
 ; Stop the InputHook and clear the index. Useful when the user disables the
@@ -213,7 +235,10 @@ _StartInputHook() {
 ; keyboard layout. We keep this fast: append, trim, lookup, render. Anything
 ; heavy belongs out of the hot path.
 _OnPrefixChar(IH, Char) {
-    global _PrefixBuffer, _MAX_BUFFER_LEN
+    global _PrefixBuffer, _MAX_BUFFER_LEN, _PrefixWatcherSuppressed
+    if _PrefixWatcherSuppressed {
+        return
+    }
     _PrefixBuffer .= StrLower(Char)
     if (StrLen(_PrefixBuffer) > _MAX_BUFFER_LEN) {
         _PrefixBuffer := SubStr(_PrefixBuffer, -_MAX_BUFFER_LEN)
@@ -227,6 +252,10 @@ _OnPrefixChar(IH, Char) {
 ; are not handled here; the InputHook does not see them. We rely on the
 ; tooltip's auto-hide timer for that case.
 _OnPrefixKeyDown(IH, VK, SC) {
+    global _PrefixWatcherSuppressed
+    if _PrefixWatcherSuppressed {
+        return
+    }
     static ResetVKs := Map(
         0x08, true,  ; VK_BACK
         0x09, true,  ; VK_TAB
@@ -250,10 +279,11 @@ _ResetPrefixBuffer() {
 }
 
 ; Look up the current buffer in the prefix index and update the tooltip.
-; Strategy: try the longest possible suffix of the buffer first, then shrink
-; until either a match is found or the buffer falls below MIN_PREFIX_LEN.
-; The shrink lets us recover when the buffer carries leading "noise" from
-; an earlier word that no longer matches anything in the registry.
+; The buffer must match a trigger prefix exactly — the previous suffix-shrink
+; recovery loop turned out to be unsafe: typing ``bon`` would shrink to
+; ``on`` and surface the ``onu``→``ONU`` trigger from autocorrection. The
+; buffer is already reset on every word-breaker (Space / Enter / Tab / arrow
+; keys / Backspace), so leading noise is not a real concern.
 _LookupAndRender() {
     global _PrefixBuffer, _PrefixIndex, _MIN_PREFIX_LEN
     Buffer := _PrefixBuffer
@@ -262,8 +292,12 @@ _LookupAndRender() {
         TooltipHide()
         return
     }
+    if !_PrefixIndex.Has(Buffer) {
+        TooltipHide()
+        return
+    }
 
-    Match := _BestMatchForBuffer(Buffer, Len)
+    Match := _BestCandidate(_PrefixIndex[Buffer])
     if (Match == "") {
         TooltipHide()
         return
@@ -275,26 +309,18 @@ _LookupAndRender() {
     TooltipShow(Match.Output, Color, Delay)
 }
 
-; Returns the best matching entry for a buffer, or "" if none is found.
-; Preference: shortest trigger that still has the buffer as its prefix —
-; that minimises remaining keystrokes the user has to type, which feels
-; more like a "you're almost there" preview.
-_BestMatchForBuffer(Buffer, Len) {
-    global _PrefixIndex, _MIN_PREFIX_LEN
-    StartLen := Len
-    while (StartLen >= _MIN_PREFIX_LEN) {
-        Suffix := SubStr(Buffer, -StartLen)
-        if _PrefixIndex.Has(Suffix) {
-            Candidates := _PrefixIndex[Suffix]
-            Best := Candidates[1]
-            for _, Entry in Candidates {
-                if (Entry.Length < Best.Length) {
-                    Best := Entry
-                }
-            }
-            return Best
-        }
-        StartLen -= 1
+; Pick the shortest trigger from a candidate list. Prefering the shortest
+; trigger feels more like a "you're almost there" preview because it
+; minimises the remaining keystrokes before the expansion fires.
+_BestCandidate(Candidates) {
+    if !IsObject(Candidates) or Candidates.Length == 0 {
+        return ""
     }
-    return ""
+    Best := Candidates[1]
+    for _, Entry in Candidates {
+        if (Entry.Length < Best.Length) {
+            Best := Entry
+        }
+    }
+    return Best
 }
