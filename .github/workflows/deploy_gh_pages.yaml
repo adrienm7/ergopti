@@ -74,10 +74,15 @@ jobs:
               with:
                   path: ./staging
 
-    # Étape de déploiement
+    # Étape de déploiement — uniquement sur main. Sur dev, le job build a
+    # produit l'artefact mais on ne le pousse pas vers GitHub Pages : la
+    # branche dev n'est pas censée écraser le site officiel et l'environment
+    # `github-pages` n'a qu'un seul slot. Sans cette garde, l'action
+    # `deploy-pages` plante avec un environment vide quand on push sur dev.
     deploy:
+        if: github.ref_name == 'main'
         environment:
-            name: ${{ github.ref_name == 'main' && 'github-pages' || '' }}
+            name: github-pages
             url: ${{ steps.deployment.outputs.page_url }}
         runs-on: ubuntu-latest
         needs: build
