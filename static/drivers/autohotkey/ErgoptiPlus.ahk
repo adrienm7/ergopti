@@ -71,6 +71,8 @@ SendMode("Event") ; Everything concerning hotstrings MUST use SendEvent and not 
 #Include lib\hotstring_engine.ahk
 #Include lib\toml_loader.ahk
 #Include lib\hotstrings_config.ahk
+#Include lib\tooltip.ahk
+#Include lib\hotstring_prefix_watcher.ahk
 ; Auto-generated registrar for the bundled hotstring TOMLs. ``*i`` keeps the
 ; driver runnable from a fresh clone before ``tools/compile_hotstrings.py`` has
 ; been executed — ``LoadHotstringsSection`` falls back to the regex parser when
@@ -1768,6 +1770,13 @@ if Features.Has("Personal") {
 #Include modules\shortcuts.ahk
 #Include modules\tap_holds.ahk
 #Include modules\hotstrings.ahk
+
+; Hotstrings are now registered — start the prefix watcher so typing a
+; partial trigger surfaces a tinted tooltip preview (parity with the
+; Hammerspoon driver). The watcher reads its own copy of the TOML registry,
+; so it works regardless of whether the fast-path generated loader or the
+; regex parser was used to register the live hotstrings.
+HotstringPrefixWatcherInit()
 
 ; Final lifecycle marker — all hotkeys and hotstrings are registered, the
 ; script is ready to handle keystrokes. A missing SUCCESS in the log file
