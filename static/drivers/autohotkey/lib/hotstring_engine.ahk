@@ -237,22 +237,41 @@ _HotstringDispatch(Replacement, EndChar, BackSpaceSeq, PrevCharKey, OnlyText, Fi
         SendEvent("{SC138 Up}")
     }
 
-    if GetActiveApp().IsNotepad {
-        ; Windows 11 Notepad mis-handles hotstrings (Windows bug, not AHK),
-        ; so we route replacement through the clipboard.
-        SendNewResult(BackSpaceSeq, False)
-        SendInstant(Replacement . EndChar)
-        return
+    ; Mute the prefix watcher's InputHook for the duration of the send burst.
+    ; SendEvent re-injects characters that the hook would otherwise observe
+    ; in pass-through mode, polluting the buffer with our own replacement
+    ; (typing ``ct`` then ★ would surface a ``Taïwan`` preview right after
+    ; the expansion because ``c'était`` ends with ``tai``). The release is
+    ; deferred via SetTimer so any character still queued in the OS message
+    ; loop is silently dropped before observation resumes.
+    if IsSet(PrefixWatcherSuppress) {
+        try PrefixWatcherSuppress(true)
     }
 
-    if FinalResult {
-        SendFinalResult(BackSpaceSeq, False)
-        SendFinalResult(Replacement, OnlyText)
-        SendFinalResult(EndChar, False)
-    } else {
-        SendNewResult(BackSpaceSeq, False)
-        SendNewResult(Replacement, OnlyText)
-        SendNewResult(EndChar, False)
+    try {
+        if GetActiveApp().IsNotepad {
+            ; Windows 11 Notepad mis-handles hotstrings (Windows bug, not AHK),
+            ; so we route replacement through the clipboard.
+            SendNewResult(BackSpaceSeq, False)
+            SendInstant(Replacement . EndChar)
+        } else if FinalResult {
+            SendFinalResult(BackSpaceSeq, False)
+            SendFinalResult(Replacement, OnlyText)
+            SendFinalResult(EndChar, False)
+        } else {
+            SendNewResult(BackSpaceSeq, False)
+            SendNewResult(Replacement, OnlyText)
+            SendNewResult(EndChar, False)
+        }
+    }
+    finally {
+        ; 60 ms is enough margin for the OS to flush the SendEvent bursts
+        ; into the InputHook before observation resumes. Tested against the
+        ; longest replacements we ship (~30 chars) and against the Notepad
+        ; clipboard path which is slower than the direct event injection.
+        if IsSet(PrefixWatcherSuppress) {
+            SetTimer((*) => PrefixWatcherSuppress(false), -60)
+        }
     }
 }
 
