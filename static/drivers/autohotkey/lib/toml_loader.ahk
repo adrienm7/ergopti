@@ -28,6 +28,16 @@
 ; once even when many sections are loaded from the same file.
 global _TomlFileCache := Map()
 
+; Per-category hotstring group configuration (default delay + tooltip color),
+; populated lazily by ParseTomlGroupConfig and consumed by the tooltip and
+; per-group delay gating layers. Keyed by lowercase category name. Shape:
+;   {
+;       Delay:    Number | "",   ; file-level default delay in seconds
+;       Color:    String | "",   ; file-level tooltip color (hex e.g. "#e53935")
+;       Sections: Map(name -> { Delay, Color, Description })
+;   }
+global HotstringGroupConfig := Map()
+
 
 ; ========================================================
 ; ========================================================
@@ -404,6 +414,96 @@ ApplyTomlMetadataToFeatures(CategoryName) {
             Features[CategoryName]["__Order"] := NewOrder
         }
     }
+}
+
+; Parse the ``[_meta]`` and ``[_meta.sections.<name>]`` blocks of a category
+; TOML to extract the file-level and per-section default delay (seconds) and
+; tooltip color (hex). The result is cached in ``HotstringGroupConfig`` keyed
+; by lowercase category name so subsequent calls are free.
+;
+; Recognised keys:
+;   [_meta]                       delay = <number>     color = "<hex>"
+;   [_meta.sections.<name>]       delay = <number>     color = "<hex>"
+;                                 description = "<...>"
+;
+; The legacy flat ``[_meta.sections]`` form (``key = "description"`` only) is
+; left untouched here — ApplyTomlMetadataToFeatures already consumes it.
+ParseTomlGroupConfig(CategoryName) {
+    global ScriptInformation, HotstringGroupConfig
+    LowerCat := StrLower(CategoryName)
+    if HotstringGroupConfig.Has(LowerCat) {
+        return HotstringGroupConfig[LowerCat]
+    }
+
+    if (LowerCat == "personal"
+            and IsSet(ScriptInformation)
+            and ScriptInformation.Has("PersonalTomlPath")) {
+        FilePath := ScriptInformation["PersonalTomlPath"]
+    } else {
+        FilePath := A_ScriptDir . "\..\hotstrings\" . LowerCat . ".toml"
+    }
+
+    Config := { Delay: "", Color: "", Sections: Map() }
+    if !FileExist(FilePath) {
+        HotstringGroupConfig[LowerCat] := Config
+        return Config
+    }
+
+    Mode := ""              ; "" | "meta" | "meta_section"
+    CurrentSec := ""
+
+    FileContent := ReadTomlFile(FilePath)
+    loop parse, FileContent, "`n", "`r" {
+        Line := Trim(A_LoopField, " `t")
+        if (Line == "" or SubStr(Line, 1, 1) == "#") {
+            continue
+        }
+
+        ; Stop scanning as soon as the first hotstring payload section starts —
+        ; everything below is per-entry data, not metadata.
+        if (SubStr(Line, 1, 2) == "[[") {
+            break
+        }
+
+        if RegExMatch(Line, "^\[_meta\.sections\.([A-Za-z0-9_\-]+)\]$", &SecMatch) {
+            Mode := "meta_section"
+            CurrentSec := StrLower(SecMatch[1])
+            if !Config.Sections.Has(CurrentSec) {
+                Config.Sections[CurrentSec] := { Delay: "", Color: "", Description: "" }
+            }
+            continue
+        }
+        if (Line == "[_meta]") {
+            Mode := "meta"
+            continue
+        }
+        if RegExMatch(Line, "^\[([^\[\]]+)\]$", &HeaderMatch) {
+            ; Any other [...] header (including [_meta.sections]) ends our scope.
+            Mode := ""
+            CurrentSec := ""
+            continue
+        }
+
+        if (Mode == "meta") {
+            if RegExMatch(Line, "^delay\s*=\s*([0-9]+(?:\.[0-9]+)?)\s*$", &NumMatch) {
+                Config.Delay := NumMatch[1] + 0
+            } else if RegExMatch(Line, "^color\s*=\s*`"((?:[^`"\\]|\\.)*)`"\s*$", &ColMatch) {
+                Config.Color := UnescapeTomlString(ColMatch[1])
+            }
+        } else if (Mode == "meta_section" and CurrentSec != "") {
+            Sec := Config.Sections[CurrentSec]
+            if RegExMatch(Line, "^delay\s*=\s*([0-9]+(?:\.[0-9]+)?)\s*$", &NumMatch) {
+                Sec.Delay := NumMatch[1] + 0
+            } else if RegExMatch(Line, "^color\s*=\s*`"((?:[^`"\\]|\\.)*)`"\s*$", &ColMatch) {
+                Sec.Color := UnescapeTomlString(ColMatch[1])
+            } else if RegExMatch(Line, "^description\s*=\s*`"((?:[^`"\\]|\\.)*)`"\s*$", &DescMatch) {
+                Sec.Description := UnescapeTomlString(DescMatch[1])
+            }
+        }
+    }
+
+    HotstringGroupConfig[LowerCat] := Config
+    return Config
 }
 
 ; Count hotstring entries inside a specific [[section]] of a TOML category file.
