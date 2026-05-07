@@ -78,13 +78,7 @@
 					> ;
 				</li>
 				<li>
-					macOS ;
-					<a href="https://karabiner-elements.pqrs.org/" target="_blank" class="link"
-						>Karabiner Elements</a
-					>
-					(tap-holds et layer de navigation) +
-					<a href="https://www.hammerspoon.org/" target="_blank" class="link">Hammerspoon</a> (autocorrection,
-					snippets, raccourcis, etc.) ;
+					macOS : <a href="https://www.hammerspoon.org/" target="_blank" class="link">Hammerspoon</a> (tap-holds, autocorrection, snippets, raccourcis, gestes trackpad, etc.) ;
 				</li>
 				<li>
 					Linux : les meilleurs outils sont actuellement <a
