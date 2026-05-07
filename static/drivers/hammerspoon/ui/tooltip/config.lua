@@ -140,12 +140,55 @@ end
 -- ==========================================
 -- ==========================================
 
+-- Maps tooltip-context keys to the hotstring category whose TOML metadata +
+-- user override should drive their tint. Keys without an entry stay
+-- governed by the legacy `M.accent_colors` table (`ai_loading`, `ai_prediction`).
+local TINT_KEY_TO_CATEGORY = {
+	hotstring_star        = "magickey",
+	hotstring_autocorrect = "autocorrection",
+	hotstring_personal    = "personal",
+}
+
+--- Parse a hex string ("#rrggbb" or "rrggbb") into an RGBA table the canvas
+--- subsystem accepts. Returns nil for malformed input so callers can fall
+--- back to the static accent_colors table.
+--- @param hex string|nil
+--- @return table|nil
+local function parse_hex_color(hex)
+	if type(hex) ~= "string" or hex == "" then return nil end
+	if hex:sub(1, 1) == "#" then hex = hex:sub(2) end
+	if #hex ~= 6 then return nil end
+	local r = tonumber(hex:sub(1, 2), 16)
+	local g = tonumber(hex:sub(3, 4), 16)
+	local b = tonumber(hex:sub(5, 6), 16)
+	if not (r and g and b) then return nil end
+	return { red = r / 255, green = g / 255, blue = b / 255, alpha = 1.0 }
+end
+
 --- Returns the accent color for a display context, gated by the colorization setting.
---- Returns nil when colorization is disabled or the key has no color defined.
+--- Resolution order:
+---   1. `hotstrings_config.resolve(category).color` for keys that map to a
+---      hotstring category — this is the new authoritative source (TOML
+---      metadata + shared user override file).
+---   2. The legacy in-memory `M.accent_colors[key]` table for keys that do
+---      not correspond to a hotstring category (`ai_*`).
+--- Returns nil when colorization is disabled, the lookup fails, or the
+--- key has no color defined.
 --- @param key string The context key ("hotstring_star", "ai_loading", etc.).
 --- @return table|nil The RGBA color table, or nil.
 function M.tint(key)
 	if not M.settings.colorization_enabled then return nil end
+
+	local category = TINT_KEY_TO_CATEGORY[key]
+	if category then
+		local ok, hs_cfg = pcall(require, "modules.hotstrings_config")
+		if ok and hs_cfg and type(hs_cfg.resolve) == "function" then
+			local resolved = hs_cfg.resolve(category, nil)
+			local rgba = resolved and parse_hex_color(resolved.color)
+			if rgba then return rgba end
+		end
+	end
+
 	return M.accent_colors[key]
 end
 
