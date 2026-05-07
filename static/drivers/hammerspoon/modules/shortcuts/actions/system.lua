@@ -414,9 +414,9 @@ function M.bind_layer_scroll()
 			if event:getKeyCode() ~= f19_keycode then return false end
 
 			if event:getType() == hs.eventtap.event.types.keyDown then
-				-- Release any in-progress left-click gesture that would conflict
-				if gestures and type(gestures.isLeftClickPressed) == "function" then
-					if gestures.isLeftClickPressed() then
+				-- Release any in-progress right-click hold gesture that would conflict
+				if gestures and type(gestures.isRightClickHeld) == "function" then
+					if gestures.isRightClickHeld() then
 						pcall(function() gestures.forceCleanup() end)
 					end
 				end
@@ -431,8 +431,8 @@ function M.bind_layer_scroll()
 	local scroll_tap = hs.eventtap.new({hs.eventtap.event.types.scrollWheel}, function(event)
 		if not layer_held then return false end
 
-		if gestures and type(gestures.isLeftClickPressed) == "function" then
-			if gestures.isLeftClickPressed() then
+		if gestures and type(gestures.isRightClickHeld) == "function" then
+			if gestures.isRightClickHeld() then
 				pcall(function() gestures.forceCleanup() end)
 			end
 		end

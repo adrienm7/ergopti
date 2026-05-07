@@ -44,8 +44,8 @@ helpers.describe("gestures.actions: public API", function()
 		helpers.assert_eq(type(Actions.execute_single),       "function")
 		helpers.assert_eq(type(Actions.execute_axis),         "function")
 		helpers.assert_eq(type(Actions.is_scalable),          "function")
-		helpers.assert_eq(type(Actions.is_left_click_pressed),"function")
-		helpers.assert_eq(type(Actions.toggle_selection),     "function")
+		helpers.assert_eq(type(Actions.is_right_click_held),  "function")
+		helpers.assert_eq(type(Actions.toggle_right_click),   "function")
 		helpers.assert_eq(type(Actions.force_cleanup),        "function")
 		helpers.assert_eq(type(Actions.trigger_lookup),       "function")
 	end)
@@ -98,7 +98,7 @@ helpers.describe("gestures.actions: SG_NAMES contents", function()
 
 	helpers.it("includes the navigation single-action ids", function()
 		for _, id in ipairs({
-			"selection_toggle", "lookup",
+			"right_click_toggle", "lookup",
 			"tab_new", "tab_close", "tab_prev", "tab_next",
 			"win_prev", "win_next", "space_prev", "space_next",
 			"mission_control", "app_expose",
@@ -207,8 +207,8 @@ helpers.describe("gestures.actions: execute helpers do not crash", function()
 		Actions.execute_single("none")
 	end)
 
-	helpers.it("is_left_click_pressed returns a boolean", function()
-		local v = Actions.is_left_click_pressed()
+	helpers.it("is_right_click_held returns a boolean", function()
+		local v = Actions.is_right_click_held()
 		helpers.assert_true(v == true or v == false)
 	end)
 end)

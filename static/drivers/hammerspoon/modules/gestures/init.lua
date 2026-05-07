@@ -37,7 +37,7 @@ local Conflicts = require("modules.gestures.conflicts")
 -- =======================================
 
 M.DEFAULT_GESTURES = {
-	tap_3         = "selection_toggle",
+	tap_3         = "right_click_toggle",
 	tap_4         = "none",
 	tap_5         = "none",
 	swipe_2_diag  = "none",
@@ -168,9 +168,9 @@ M.AX_NAMES           = Actions.AX_NAMES
 M.SG_NAMES           = Actions.SG_NAMES
 M.get_action_label   = Actions.get_label
 M.forceCleanup       = Actions.force_cleanup
-M.toggleSelection    = Actions.toggle_selection
+M.toggleRightClick   = Actions.toggle_right_click
 M.triggerLookup      = Actions.trigger_lookup
-M.isLeftClickPressed = Actions.is_left_click_pressed
+M.isRightClickHeld   = Actions.is_right_click_held
 
 -- Expose Conflict management
 M.on_action_changed = Conflicts.on_action_changed
