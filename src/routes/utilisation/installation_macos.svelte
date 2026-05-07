@@ -116,8 +116,8 @@
 	<kbd-output>Entrée</kbd-output>. Les touches mortes ne fonctionnent pas non plus sur l’écran de
 	verrouillage, ce qui peut carrément empêcher la saisie de son mot de passe. Enfin, la fermeture
 	automatique des parenthèses ne fonctionne pas dans les éditeurs de code. Pour toutes ces raisons,
-	il est donc conseillé de plutôt utiliser <strong>Ergopti+</strong> avec Karabiner pour y définir ces
-	roulements.
+	il est donc conseillé de plutôt utiliser <strong>Ergopti+</strong> avec Hammerspoon pour y définir
+	ces roulements.
 </p>
 <p>
 	Des <strong>variantes ANSI</strong> de ces dispositions sont également disponibles. En effet, sur
@@ -142,7 +142,7 @@
 	<li>
 		Les touches mortes suivies d’<kbd>Entrée</kbd> nécessitent un double appui sur
 		<kbd>Entrée</kbd>. En effet, il faut un premier appui pour valider la touche morte, puis un
-		second appui pour envoyer <kbd>Entrée</kbd>. Ce problème peut se résoudre avec Karabiner, en
+		second appui pour envoyer <kbd>Entrée</kbd>. Ce problème peut se résoudre avec Hammerspoon, en
 		envoyant un appui "inutile" lors d’un appui sur <kbd>Entrée</kbd>. Par exemple en envoyant un
 		appui sur <kbd-output>F20</kbd-output> puis un appui sur <kbd-output>Entrée</kbd-output> lors de
 		l’appui sur <kbd>Entrée</kbd>.
@@ -174,61 +174,6 @@
 	<enhanced:img src="$lib/images/macos_open_bundle.jpg" alt="Ouverture du bundle" />
 </ul>
 
-<h3>
-	<i class="icon-karabiner" style="font-size:0.8em; vertical-align:0; margin-right:0.25em"
-	></i>Karabiner
-</h3>
-
-<tiny-space></tiny-space>
-
-<div class="download-buttons">
-	<a href={base + '/drivers/karabiner/karabiner.json'} target="_blank">
-		<button
-			><i class="icon-karabiner" style="font-size:0.8em; vertical-align:0; margin-right:0.25em"></i>
-			karabiner.json</button
-		>
-	</a>
-</div>
-<p>
-	<a href="https://karabiner-elements.pqrs.org/" class="link">Karabiner-Elements</a> est un logiciel
-	open source permettant de remapper les touches sur macOS. Il est particulièrement utile avec la
-	disposition <ErgoptiPlus></ErgoptiPlus> pour ajouter des tap-holds, définir des roulements personnalisés,
-	etc. Voici ce qui est inclus dans le fichier de configuration fourni :
-</p>
-<ul>
-	<li>
-		Interversion des touches <kbd>ROption</kbd> et <kbd>RCmd</kbd> pour avoir la couche
-		<kbd-output>AltGr</kbd-output> aussi facilement accessible que sur Windows ;
-	</li>
-	<li>
-		Tap-hold sur <kbd>CapsLock</kbd> avec <kbd-output>Entrée</kbd-output> en tap et
-		<kbd-output>Cmd</kbd-output> en hold ;
-	</li>
-	<li>
-		Tap-hold sur <kbd>ROption</kbd> (intervertie en <kbd>RCmd</kbd>) avec
-		<kbd-output>One-Shot Shift</kbd-output>
-		en tap et
-		<kbd-output>Shift</kbd-output> en hold ;
-	</li>
-	<li>
-		Tap-hold sur <kbd>LShift</kbd> avec <kbd-output>Copier</kbd-output> en tap ;
-	</li>
-	<li>
-		Tap-hold sur <kbd>Fn</kbd> avec <kbd-output>Coller</kbd-output> en tap ;
-	</li>
-	<li>
-		Tap-hold sur <kbd>LCtrl</kbd> avec <kbd-output>Couper</kbd-output> en tap ;
-	</li>
-	<li>
-		Tap-hold sur <kbd>LOption</kbd> avec <kbd-output>BackSpace</kbd-output> en tap ;
-	</li>
-	<li>
-		Définition de tous les roulements personnalisés d’Ergopti++ comme
-		<kbd>hc</kbd> → <kbd-output>wh</kbd-output>, <kbd>qa</kbd> → <kbd-output>qua</kbd-output>,
-		<kbd>(#</kbd>
-		→ <kbd-output>("</kbd-output>, etc. ;
-	</li>
-</ul>
 
 <h3>
 	<i class="icon-hammerspoon" style="font-size:0.8em; vertical-align:0; margin-right:0.25em"
@@ -237,11 +182,37 @@
 </h3>
 
 <p>
-	<a href="https://www.hammerspoon.org/" target="_blank" class="link">Hammerspoon</a> est un outil d'automatisation
-	puissant et open source pour macOS, permettant d'interagir avec le système via des scripts Lua. Cet
-	outil très complet permet de créer des hotstrings sur macOS. Il permet également de définir des gestes
-	personnalisés sur le trackpad.
+	<a href="https://www.hammerspoon.org/" target="_blank" class="link">Hammerspoon</a> est un outil
+	d'automatisation puissant et open source pour macOS, permettant d'interagir avec le système via
+	des scripts Lua. Le driver fourni couvre l’intégralité des fonctionnalités complémentaires
+	d’<ErgoptiPlus></ErgoptiPlus> sur macOS — il n’est plus nécessaire d’installer Karabiner-Elements
+	en parallèle. Voici ce que le driver Hammerspoon ajoute :
 </p>
+<ul>
+	<li>
+		Hotstrings et expansion de texte (<kbd>ct</kbd> → <kbd-output>c’était</kbd-output>,
+		autocorrection, informations personnelles…) avec un tooltip temps réel teinté par groupe ;
+	</li>
+	<li>
+		Définition de tous les roulements personnalisés d’Ergopti++ comme
+		<kbd>hc</kbd> → <kbd-output>wh</kbd-output>, <kbd>qa</kbd> → <kbd-output>qua</kbd-output>,
+		<kbd>(#</kbd>
+		→ <kbd-output>("</kbd-output>, etc. ;
+	</li>
+	<li>
+		Tap-holds sur les modificateurs : <kbd>CapsLock</kbd> avec <kbd-output>Entrée</kbd-output> en
+		tap et <kbd-output>Cmd</kbd-output> en hold, <kbd>LShift</kbd> avec
+		<kbd-output>Copier</kbd-output> en tap, <kbd>LCtrl</kbd> avec <kbd-output>Coller</kbd-output> en
+		tap, <kbd>LOption</kbd> avec <kbd-output>BackSpace</kbd-output> en tap, etc. ;
+	</li>
+	<li>
+		Gestes personnalisés sur le trackpad (taps et swipes à 3 et 4 doigts) ;
+	</li>
+	<li>
+		Menu de configuration intégré pour ajuster les délais d’expansion par groupe et la couleur du
+		tooltip sans toucher au code.
+	</li>
+</ul>
 
 <tiny-space></tiny-space>
 
