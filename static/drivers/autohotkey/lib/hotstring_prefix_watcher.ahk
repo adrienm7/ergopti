@@ -33,8 +33,11 @@
 ; each entry is { Trigger, Output, Category, Section, Length }.
 global _PrefixIndex := Map()
 
-; Live keystroke buffer (lowercased). Trimmed to MAX_BUFFER_LEN whenever it
-; would overflow so memory and lookup cost stay bounded.
+; Live keystroke buffer with original casing preserved — the index now holds
+; one entry per case variant (``ct`` / ``Ct`` / ``CT`` for non-strict
+; triggers, exactly mirroring CreateCaseSensitiveHotstrings), so the lookup
+; is a byte-for-byte match against this buffer. Trimmed to MAX_BUFFER_LEN
+; whenever it would overflow so memory and lookup cost stay bounded.
 global _PrefixBuffer := ""
 
 ; Reference to the running InputHook (kept global so the GC does not collect
@@ -72,10 +75,10 @@ global _PREFIX_WATCHER_CATEGORIES := [
 HotstringPrefixWatcherInit() {
     global _PrefixInputHook, _PrefixIndex, _PREFIX_WATCHER_CATEGORIES
     if _PrefixInputHook {
-        try LoggerWarn("PrefixWatcher", "Init called twice — ignoring duplicate.")
+        LoggerWarn("PrefixWatcher", "Init called twice — ignoring duplicate.")
         return
     }
-    try LoggerStart("PrefixWatcher", "Initializing prefix watcher…")
+    LoggerStart("PrefixWatcher", "Initializing prefix watcher…")
 
     EntryCount := 0
     for _, Category in _PREFIX_WATCHER_CATEGORIES {
@@ -83,7 +86,7 @@ HotstringPrefixWatcherInit() {
     }
 
     _StartInputHook()
-    try LoggerSuccess("PrefixWatcher", "Watcher started ({1} trigger(s) indexed).", EntryCount)
+    LoggerSuccess("PrefixWatcher", "Watcher started ({1} trigger(s) indexed).", EntryCount)
 }
 
 ; Toggle the suppression flag. The hotstring engine wraps its SendEvent
@@ -137,8 +140,8 @@ _PrefixWatcherTomlPath(Category) {
 
 ; Scan a category TOML and add every (trigger, output) pair to the prefix
 ; index. Returns the number of entries registered. Lightweight regex scan —
-; we do not need the full feature flags here, just trigger and output, so we
-; deliberately avoid coupling to LoadHotstringsSection.
+; we capture trigger, output and the case-sensitivity flags so we can
+; pre-compute the exact same case variants the engine registers.
 _RegisterCategoryTriggers(Category) {
     global ScriptInformation
     Path := _PrefixWatcherTomlPath(Category)
@@ -146,8 +149,10 @@ _RegisterCategoryTriggers(Category) {
         return 0
     }
 
+    ; Capture: 1=trigger, 2=output, 3=is_case_sensitive,
+    ; 4=is_case_sensitive_strict (optional, defaults to false when missing).
     EntryPattern :=
-        'i)^"([^"\\]*(?:\\.[^"\\]*)*)"\s*=\s*\{\s*output\s*=\s*"([^"\\]*(?:\\.[^"\\]*)*)"'
+        'i)^"([^"\\]*(?:\\.[^"\\]*)*)"\s*=\s*\{\s*output\s*=\s*"([^"\\]*(?:\\.[^"\\]*)*)"\s*,\s*is_word\s*=\s*(?:true|false)\s*,\s*auto_expand\s*=\s*(?:true|false)\s*,\s*is_case_sensitive\s*=\s*(true|false)\s*,\s*final_result\s*=\s*(?:true|false)(?:\s*,\s*is_case_sensitive_strict\s*=\s*(true|false))?\s*\}'
 
     CurrentSection := ""
     Count := 0
@@ -173,22 +178,56 @@ _RegisterCategoryTriggers(Category) {
         }
         Trigger := UnescapeTomlString(Match[1])
         Output  := UnescapeTomlString(Match[2])
+        ; Generator semantics: ``is_case_sensitive = not case_sensitive``.
+        ; When false, the engine runs CreateCaseSensitiveHotstrings which
+        ; registers all three case variants. When true, only the literal
+        ; trigger is registered (case-sensitive but with the C0 option, so
+        ; AHK still uppercases the result if the user types in uppercase).
+        ; Strict means even the case-folded variants are not registered —
+        ; the trigger only fires on the exact casing in the TOML.
+        IsCaseSensitive := (Match[3] == "true")
+        IsStrict := (Match.Count >= 4 and Match[4] == "true")
         ; Substitute ★ with the user's configured magic key so the prefix
         ; index reflects what the user actually types at runtime.
         if (IsSet(ScriptInformation) and ScriptInformation.Has("MagicKey")) {
             Trigger := StrReplace(Trigger, "★", ScriptInformation["MagicKey"])
             Output  := StrReplace(Output,  "★", ScriptInformation["MagicKey"])
         }
-        _AddTriggerToIndex(Trigger, Output, Category, CurrentSection)
+        _AddTriggerVariants(Trigger, Output, Category, CurrentSection, IsCaseSensitive, IsStrict)
         Count += 1
     }
     return Count
 }
 
+; Mirror what CreateCaseSensitiveHotstrings registers in the live engine: for
+; non-strict, non-case-sensitive triggers it emits three variants (lowercase
+; + titlecase + uppercase) each paired with its own pre-cased output. We
+; index every variant so the runtime lookup never has to transform anything
+; — what the user types either matches a variant exactly (exact preview) or
+; matches none (no tooltip, in line with the engine not firing either).
+_AddTriggerVariants(Trigger, Output, Category, Section, IsCaseSensitive, IsStrict) {
+    if IsStrict {
+        ; Strict triggers only match the exact casing in the TOML — anything
+        ; else neither fires nor previews.
+        _AddTriggerToIndex(Trigger, Output, Category, Section)
+        return
+    }
+    if IsCaseSensitive {
+        ; Single registration via plain CreateHotstring (no auto-folding) —
+        ; only the literal lowercase form is matched in practice.
+        _AddTriggerToIndex(Trigger, Output, Category, Section)
+        return
+    }
+    ; Three case variants — exact mirror of CreateCaseSensitiveHotstrings.
+    _AddTriggerToIndex(StrLower(Trigger), StrLower(Output), Category, Section)
+    _AddTriggerToIndex(StrTitle(Trigger), StrTitle(Output), Category, Section)
+    _AddTriggerToIndex(StrUpper(Trigger), StrUpper(Output), Category, Section)
+}
+
 ; Add every prefix of Trigger (of length >= _MIN_PREFIX_LEN) to _PrefixIndex.
-; Multiple triggers can share a prefix; entries are appended in registration
-; order so the lookup returns the first registered match, mirroring how
-; CreateHotstring conflicts are resolved (first registered wins).
+; The prefix key preserves the original casing of the variant; the runtime
+; lookup uses the raw user buffer so an exact match is required for the
+; tooltip to surface — which is what we want for a faithful preview.
 _AddTriggerToIndex(Trigger, Output, Category, Section) {
     global _PrefixIndex, _MIN_PREFIX_LEN
     Entry := { Trigger:  Trigger,
@@ -197,11 +236,10 @@ _AddTriggerToIndex(Trigger, Output, Category, Section) {
                Section:  Section,
                Length:   StrLen(Trigger) }
 
-    Lower := StrLower(Trigger)
-    Len := StrLen(Lower)
+    Len := StrLen(Trigger)
     i := _MIN_PREFIX_LEN
     while (i <= Len) {
-        Prefix := SubStr(Lower, 1, i)
+        Prefix := SubStr(Trigger, 1, i)
         if !_PrefixIndex.Has(Prefix) {
             _PrefixIndex[Prefix] := []
         }
@@ -234,16 +272,34 @@ _StartInputHook() {
 ; OnChar — called for every printable character produced by the active
 ; keyboard layout. We keep this fast: append, trim, lookup, render. Anything
 ; heavy belongs out of the hot path.
+; Wrapped in try so that any exception from _LookupAndRender / TooltipShow
+; does not silently kill the InputHook callback chain — AHK v2 stops invoking
+; the OnChar callback permanently if an unhandled error propagates out of it.
 _OnPrefixChar(IH, Char) {
     global _PrefixBuffer, _MAX_BUFFER_LEN, _PrefixWatcherSuppressed
     if _PrefixWatcherSuppressed {
         return
     }
-    _PrefixBuffer .= StrLower(Char)
-    if (StrLen(_PrefixBuffer) > _MAX_BUFFER_LEN) {
-        _PrefixBuffer := SubStr(_PrefixBuffer, -_MAX_BUFFER_LEN)
+    try {
+        ; Space and other non-word characters reset the buffer — the trigger
+        ; index only contains word-internal sequences, and a leading space
+        ; would prevent any match from being found. OnKeyDown handles the VK
+        ; path for keys that produce no character (arrows, Escape…); this
+        ; guard covers keys that do produce a character (Space via tap-hold
+        ; or AltGr layers) but whose VK event may be swallowed by AHK before
+        ; reaching the InputHook.
+        if (Char == " " or Char == "`t") {
+            _ResetPrefixBuffer()
+            return
+        }
+        _PrefixBuffer .= Char
+        if (StrLen(_PrefixBuffer) > _MAX_BUFFER_LEN) {
+            _PrefixBuffer := SubStr(_PrefixBuffer, -_MAX_BUFFER_LEN)
+        }
+        _LookupAndRender()
+    } catch as Err {
+        LoggerError("PrefixWatcher", "OnChar error for char '{1}': {2}.", Char, Err.Message)
     }
-    _LookupAndRender()
 }
 
 ; OnKeyDown — handles word-breaking / navigation keys that should reset the
@@ -267,8 +323,14 @@ _OnPrefixKeyDown(IH, VK, SC) {
         0x27, true,  ; VK_RIGHT
         0x28, true,  ; VK_DOWN
     )
-    if ResetVKs.Has(VK) {
-        _ResetPrefixBuffer()
+    ; Same try guard as _OnPrefixChar — an unhandled error here permanently
+    ; silences the OnKeyDown callback for all subsequent keystrokes.
+    try {
+        if ResetVKs.Has(VK) {
+            _ResetPrefixBuffer()
+        }
+    } catch as Err {
+        LoggerError("PrefixWatcher", "OnKeyDown error for VK {1}: {2}.", VK, Err.Message)
     }
 }
 
@@ -292,6 +354,9 @@ _LookupAndRender() {
         TooltipHide()
         return
     }
+    ; AHK v2's Map is case-sensitive by default, so this lookup distinguishes
+    ; ``ct`` from ``CT`` — the index registers each case variant separately
+    ; with its pre-cased output, exactly mirroring CreateCaseSensitiveHotstrings.
     if !_PrefixIndex.Has(Buffer) {
         TooltipHide()
         return

@@ -33,12 +33,14 @@ if Features["DistancesReduction"]["QU"].Enabled {
 
 if Features["DistancesReduction"]["DeadKeyECircumflex"].Enabled {
 	DeadkeyMappingCircumflexModified := DeadkeyMappingCircumflex.Clone()
+	; Resolve the activation delay once at registration time — the Features
+	; object only carries Enabled, the actual delay lives in the TOML metadata.
+	DeadKeyECircumflexDelay := HotstringsResolve("distancesreduction", "DeadKeyECircumflex").Delay
 	for Vowel in ["a", "à", "i", "o", "u", "s"] {
 		; We specify the result with the vowels first to be sure it will override any problems
 		CreateCaseSensitiveHotstrings(
 			"*?", "ê" . Vowel, DeadkeyMappingCircumflex[Vowel],
-			Map("TimeActivationSeconds", HotstringsResolve("distancesreduction", "DeadKeyECircumflex").Delay
-			)
+			Map("TimeActivationSeconds", DeadKeyECircumflexDelay)
 		)
 		; Necessary for things to work, as we define them already
 		DeadkeyMappingCircumflexModified.Delete(Vowel)
@@ -62,10 +64,7 @@ if Features["DistancesReduction"]["DeadKeyECircumflex"].Enabled {
 	}
 
 	ShouldActivateDeadkey(Combination, MappedValue) {
-		if not IsTimeActivationExpired(GetLastSentCharacterAt(-2), Features["DistancesReduction"][
-			"DeadKeyECircumflex"]
-		.TimeActivationSeconds
-		) {
+		if not IsTimeActivationExpired(GetLastSentCharacterAt(-2), DeadKeyECircumflexDelay) {
 			; We only activate the deadkey if it is the start of a new word, as symbols aren't put in words
 			; This condition corrects problems such as writing "même" that give "mê⁂e"
 			; We could simply have removed the "?" flag in the Hotstring definition, but we want to get the symbols also if we are typing numbers.
