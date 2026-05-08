@@ -875,6 +875,7 @@
 		<script src="data.js"></script>
 		<script src="charts.js"></script>
 		<script src="table.js"></script>
+		<script src="heatmap_win.js"></script>
 		<script src="main.js"></script>
 
 		<!--
@@ -899,19 +900,32 @@
 					if (!blob) return;
 					window.metrics_manifest = blob.metrics_manifest || {};
 					window.app_icons        = blob.app_icons || {};
-					window.keycode_layout   = blob.keycode_layout || {};
 					window.driver_meta      = blob.driver_meta || window.driver_meta || { os: "mac", heatmap_id: "kc" };
+					// On Windows the dashboard renders against macOS-style
+					// HS keycodes — translate the labels (and the n-gram
+					// data, below) so the heatmap geometry stays unchanged.
+					window.keycode_layout   = (typeof window.build_keycode_layout_for_driver === "function")
+						? window.build_keycode_layout_for_driver(window.driver_meta)
+						: (blob.keycode_layout || {});
 					const has_prefetch = blob._prefetch_data !== undefined;
 					let merged = null;
 					if (has_prefetch) {
 						const incoming = blob._prefetch_data || {};
-						const incoming_hist = incoming.historical || {};
+						let incoming_hist = incoming.historical || {};
+						let incoming_today = incoming.today || {};
+						// Windows driver: translate sc_kb → kc per app so
+						// the renderer keeps reading the same field.
+						if (window.driver_meta && window.driver_meta.os === "win"
+								&& typeof window.translate_win_today === "function") {
+							incoming_today = window.translate_win_today(incoming_today);
+							incoming_hist  = window.translate_win_today(incoming_hist);
+						}
 						if (Object.keys(incoming_hist).length > 0) {
 							cached_historical = incoming_hist;
 						}
 						merged = {
 							historical: cached_historical || incoming_hist || {},
-							today: incoming.today || {},
+							today: incoming_today,
 						};
 						window._prefetch_data = merged;
 					}
