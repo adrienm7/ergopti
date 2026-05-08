@@ -3,14 +3,16 @@
 ; ==============================================================================
 ; MODULE: Config Shortcuts (TOML section)
 ; DESCRIPTION:
-; UI-shortcut preferences and per-feature privacy toggles. Lives as a
-; ``[shortcuts]`` section inside the existing ``<config_dir>/config.toml``
-; — the same file the Hammerspoon side reads (lib/config_shortcuts.lua),
-; so syncing one folder between a Mac and a PC keeps the same hotkeys
-; live on both. A single shared file means no risk of two drivers
-; fighting over different files; one TOML schema, two implementations.
+; UI-shortcut preferences and per-feature privacy toggles, persisted as a
+; ``[shortcuts]`` section inside the AHK-specific TOML at
+; ``<config_dir>/ahk/config.toml``. Driver-specific because what feels
+; right on macOS (Cmd-based shortcuts) and on Windows (Ctrl-based) is
+; not interchangeable — ``ctrl+alt+m`` on a Mac collides with system
+; bindings, while ``cmd+alt+m`` on Windows has no equivalent. Each
+; driver owns its own file under its own subfolder so a shared config
+; directory can hold both side by side without any value bleeding.
 ;
-; SECTION LAYOUT inside config.toml:
+; SECTION LAYOUT inside ahk/config.toml:
 ;
 ;   [shortcuts]
 ;   metrics_enabled                 = true
@@ -24,12 +26,12 @@
 ; ``<feature>_*`` keys in the same section.
 ;
 ; FEATURES & RATIONALE:
-; 1. Inside config.toml: one config file, no extra naming to invent. The
-;    existing AHK ApplyConfigTomlOverrides reads [script] / [features];
-;    we own [shortcuts] disjointly.
+; 1. Per-driver subfolder: ``<config_dir>/ahk/`` is auto-created on first
+;    save. Disjoint from ``<config_dir>/hammerspoon/`` so the two drivers
+;    never touch the same file.
 ; 2. Section-preserving writer: CS_Save merges back into the existing
-;    file without touching other sections, so user-edited [script] /
-;    [features] / [hotstrings] keys survive a shortcut change.
+;    file without touching other sections, so any future hand-written
+;    sections survive a shortcut change.
 ; 3. Tiny dedicated parser: full TOML is overkill for our flat scalars
 ;    + arrays. Keeping ~150 lines here avoids deeper coupling to the
 ;    hotstrings TOML loader, which has different parsing needs.
@@ -47,10 +49,14 @@
 ; ===================================
 
 CS_GetTomlPath() {
+    ; Driver-specific subfolder under the user's resolved config dir.
+    ; Auto-created here so callers can read/write straight away without
+    ; worrying about ENOENT on a fresh install.
     global _ConfigDir
-    if IsSet(_ConfigDir) && (_ConfigDir != "")
-        return _ConfigDir . "config.toml"
-    return A_ScriptDir . "\config.toml"
+    base := (IsSet(_ConfigDir) && _ConfigDir != "") ? _ConfigDir : A_ScriptDir . "\"
+    dir  := base . "ahk\"
+    try DirCreate(dir)
+    return dir . "config.toml"
 }
 
 ; The single section we own inside config.toml. Other sections
