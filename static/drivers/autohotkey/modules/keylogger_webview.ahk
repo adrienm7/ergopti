@@ -214,35 +214,7 @@ KLWV_Open(which, metrics_dir) {
         "udir",       udir
     )
     KLWV_FitWebView(which)
-    KLWV_StartFullPushTimer()
     return true
-}
-
-; Start a low-frequency timer that pushes a FULL prefetch blob (with
-; n-gram tables) to every open dashboard. The fast 500 ms flush tick
-; only pushes a manifest-only blob so the KPI counters stay snappy;
-; this slow tick keeps the n-gram tables fresh without blocking the
-; main loop on every keystroke.
-KLWV_StartFullPushTimer() {
-    if KLWV.HasOwnProp("_full_timer") && IsObject(KLWV._full_timer)
-        return
-    KLWV._full_timer := KLWV_FullPushTick.Bind()
-    SetTimer(KLWV._full_timer, 5000)
-}
-
-KLWV_StopFullPushTimer() {
-    if KLWV.HasOwnProp("_full_timer") && IsObject(KLWV._full_timer) {
-        try SetTimer(KLWV._full_timer, 0)
-        KLWV._full_timer := unset
-    }
-}
-
-KLWV_FullPushTick() {
-    if (KLWV.windows.Count = 0) {
-        KLWV_StopFullPushTimer()
-        return
-    }
-    KLWV_NotifyIngest("full")
 }
 
 KLWV_IsAlive(entry) {
@@ -394,6 +366,15 @@ KLWV_MonitorFromPoint(x, y) {
 KLWV_DelayedFirstPush(which) {
     if !KLWV.windows.Has(which)
         return
+    ; First paint after navigation: do a single FULL projection so the
+    ; n-gram tables, KPIs and charts all get populated. After that,
+    ; the live updates flow through KLWV_NotifyIngest() in 'manifest'
+    ; mode (the default) which is ~50 ms and fires on every flush
+    ; tick. The slow ~3 s n-gram projection no longer runs on a
+    ; periodic timer because each iteration would block AHK long
+    ; enough to swallow several manifest pushes' worth of latency.
+    if KLWV.metrics_dir
+        try KLPF_BuildAndWrite(which, KLWV.metrics_dir, , "full")
     KLWV_PushPrefetch(which)
 }
 
