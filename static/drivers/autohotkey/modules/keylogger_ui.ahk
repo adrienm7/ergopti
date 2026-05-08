@@ -125,9 +125,20 @@ KLUI_LaunchWindow(url, title) {
     ; does not nuke their tabs. --window-size starts large but resizable.
     udir := A_Temp . "\ergopti_metrics_edge"
     DirCreate(udir)
+    ; --allow-file-access-from-files: lift the same-origin restriction that
+    ; treats every file:// URL as a unique origin. Without it, the page
+    ; bootstrap's fetch('./prefetch.json') is blocked by Chromium's
+    ; default policy and the dashboard stays empty. Safe here because
+    ; --user-data-dir isolates this profile from the user's main Edge
+    ; session, so the relaxed flag never bleeds into general browsing.
+    ; --disable-features=msEdgeTrackingPrevention silences the noisy
+    ; "Tracking Prevention blocked storage" console spam — the dashboard
+    ; uses no third-party storage anyway.
     args := "--app=" . url
         . " --user-data-dir=" . '"' . udir . '"'
         . " --window-size=1400,900"
+        . " --allow-file-access-from-files"
+        . " --disable-features=msEdgeTrackingPrevention"
     pid := 0
     try Run('"' . edge . '" ' . args, , , &pid)
     catch as err {

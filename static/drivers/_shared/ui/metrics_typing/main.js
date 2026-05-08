@@ -343,6 +343,9 @@ document.addEventListener("DOMContentLoaded", () => {
 	// right edge of the viewport. Uses event delegation so dynamically injected tooltips
 	// (KPI cards rebuilt by data.js) are handled without re-binding.
 	document.addEventListener("mouseenter", (e) => {
+		// e.target may be a text node when mouseenter bubbles in capture-mode
+		// from document — text nodes have no .closest(). Guard with Element.
+		if (!(e.target instanceof Element)) return;
 		const tooltip = e.target.closest(".tooltip");
 		if (!tooltip) return;
 		const text_box = tooltip.querySelector(".tooltiptext");
