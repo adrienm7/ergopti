@@ -1149,8 +1149,8 @@ initMenu() {
     HotstringsMenu := Menu()
     HotstringsAllEnabled := IsCategoryAllEnabled(HotstringCategories)
     AddCategoryToggleItem(HotstringsMenu,
-        "✅ Hotstrings activées (cliquer pour désactiver)",
-        "❌ Hotstrings désactivées (cliquer pour activer)",
+        "✅ Hotstrings activés (cliquer pour désactiver)",
+        "❌ Hotstrings désactivés (cliquer pour activer)",
         HotstringsAllEnabled,
         HotstringsAllEnabled ? ToggleAllHotstringsOff : ToggleAllHotstringsOn)
     for Category in HotstringCategories {

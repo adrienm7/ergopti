@@ -68,7 +68,7 @@ function M.generate(ctx, menu_mods, actions)
 		push_into(hotstrings_menu, "hotstrings.build_custom", menu_mods.hotstrings.build_custom, ctx)
 		push_into(hotstrings_menu, "hotstrings.build_management", menu_mods.hotstrings.build_management, ctx)
 
-		-- Détection de l’état global : toutes les hotstrings activées ?
+		-- Détection de l’état global : tous les hotstrings activés ?
 		local all_enabled = true
 		local any_enabled = false
 		if ctx and ctx.hotfiles and type(ctx.hotfiles) == "table" then
