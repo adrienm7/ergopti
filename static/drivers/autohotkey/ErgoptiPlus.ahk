@@ -102,6 +102,7 @@ SendMode("Event") ; Everything concerning hotstrings MUST use SendEvent and not 
 #Include modules\keylogger_sensors.ahk
 #Include modules\keylogger_ergonomics.ahk
 #Include modules\keylogger_window_topology.ahk
+#Include modules\keylogger_av_state.ahk
 #Include modules\keylogger_reader.ahk
 #Include modules\keylogger_prefetch.ahk
 #Include modules\keylogger_webview.ahk
@@ -1631,6 +1632,7 @@ if MetricsShortcuts.enabled {
     KL_Mouse_Start()
     KL_Sensors_Start()
     KL_Topo_Start()
+    KL_AV_Start()
 }
 
 LoggerSuccess("ErgoptiPlus", "Tray menu built and icon set.")
