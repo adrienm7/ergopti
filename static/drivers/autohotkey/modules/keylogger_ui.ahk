@@ -226,22 +226,22 @@ KLUI_RequireEnabled() {
 KLUI_ToggleTyping(*) {
     if !KLUI_RequireEnabled()
         return
-    KLUI_ToggleDashboard("typing", &KLUI.typing_pid, &KLUI.typing_url, "Métriques de frappe")
+    KLUI_ToggleDashboard("typing", "Métriques de frappe")
 }
 
 KLUI_ToggleApps(*) {
     if !KLUI_RequireEnabled()
         return
-    KLUI_ToggleDashboard("apps", &KLUI.apps_pid, &KLUI.apps_url, "Temps sur les applications")
+    KLUI_ToggleDashboard("apps", "Temps sur les applications")
 }
 
 ; Shared toggle implementation. Tries WebView2 first (B niveau 2 — live
 ; push channel + chrome-less Gui). Falls back to Edge --app= when
-; WebView2 Runtime / vendored deps are unavailable.
-KLUI_ToggleDashboard(which, &pid_ref, &url_ref, title) {
+; WebView2 Runtime / vendored deps are unavailable. Reads / writes the
+; KLUI class properties directly because AHK v2's `&` ref syntax does
+; not work on object properties.
+KLUI_ToggleDashboard(which, title) {
     KLUI_EnsureUrls()
-    if (url_ref = "")
-        url_ref := KLUI_ResolveAssetUrl("metrics_" . which)
     global _ConfigDir
     metrics_dir := _ConfigDir . "metrics"
 
@@ -255,12 +255,21 @@ KLUI_ToggleDashboard(which, &pid_ref, &url_ref, title) {
     }
 
     ; Fallback: legacy Edge --app= launcher.
-    if KLUI_IsRunning(pid_ref) {
-        KLUI_KillWindow(pid_ref)
-        pid_ref := 0
-        return
+    if (which = "typing") {
+        if KLUI_IsRunning(KLUI.typing_pid) {
+            KLUI_KillWindow(KLUI.typing_pid)
+            KLUI.typing_pid := 0
+            return
+        }
+        KLUI.typing_pid := KLUI_LaunchWindow(KLUI.typing_url, title)
+    } else {
+        if KLUI_IsRunning(KLUI.apps_pid) {
+            KLUI_KillWindow(KLUI.apps_pid)
+            KLUI.apps_pid := 0
+            return
+        }
+        KLUI.apps_pid := KLUI_LaunchWindow(KLUI.apps_url, title)
     }
-    pid_ref := KLUI_LaunchWindow(url_ref, title)
 }
 
 KLUI_OpenTyping(*) {
