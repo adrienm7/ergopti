@@ -210,6 +210,14 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 
 	local function save_prefs()
 		Preferences.save(base_dir .. "config.json", state, hotfiles, core_mods)
+		-- Mirror the cross-driver subset to <config_dir>/config.toml so the
+		-- AHK driver picks up the same hotkeys / toggles next time it loads.
+		-- Failures stay non-fatal — config.json remains the canonical local
+		-- store; the TOML is a sync convenience.
+		pcall(function()
+			local CS = require("lib.config_shortcuts")
+			if type(CS.save_from_state) == "function" then CS.save_from_state(state) end
+		end)
 	end
 
 
@@ -581,6 +589,17 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 	end
 
 	Preferences.merge_saved_data(state, saved)
+
+	-- Overlay the cross-driver [shortcuts] section from config.toml on
+	-- top of the legacy config.json state. The TOML wins because it is
+	-- the single shared source between the AHK and HS drivers; users
+	-- syncing the config folder expect the file they edited last to
+	-- take effect on whichever driver they reload next.
+	pcall(function()
+		local CS = require("lib.config_shortcuts")
+		if type(CS.apply_to_state) == "function" then CS.apply_to_state(state) end
+	end)
+
 	sync_state_to_modules(saved, config_absent)
 
 	local llm_handler = nil
