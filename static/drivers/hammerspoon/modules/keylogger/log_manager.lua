@@ -1942,6 +1942,25 @@ function M.get_device_short_id()
 	return _device_id:sub(1, 8) .. "…"
 end
 
+--- Absolute path to the SQLite cache. The UI bridges read it via the
+--- `sqlite_reader` module — they never touch the legacy openssl pipeline.
+--- @return string|nil Path, or nil if the log manager is not initialized.
+function M.get_sqlite_path()
+	if not _paths or not _paths.sqlite_path then return nil end
+	return _paths.sqlite_path
+end
+
+--- Snapshot of the current `meta.rev` value. The UI uses this as a cache
+--- key — when rev advances, cached query results are invalidated.
+--- @return integer Monotonic revision counter (0 if DB not open).
+function M.get_db_rev()
+	if not _db then return 0 end
+	for r in _db:nrows("SELECT value FROM meta WHERE key='rev'") do
+		return tonumber(r.value) or 0
+	end
+	return 0
+end
+
 
 
 
