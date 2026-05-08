@@ -154,11 +154,11 @@ KLPF_BuildTyping(db, mode := "full") {
     ; The n-gram projection is the dominant cost (~2-3 s for tens of
     ; thousands of rows + AHK Map allocation). When the caller only
     ; needs to refresh the KPI counters / charts (every flush tick),
-    ; skip it entirely — process_manifest still re-renders KPIs from
-    ; the manifest alone, and the n-gram tables get refreshed by the
-    ; slower 5 s "full" cadence.
+    ; skip it entirely AND OMIT the _prefetch_data key altogether so
+    ; the JS bootstrap leaves the existing n-gram tables alone — an
+    ; empty {historical, today} object would otherwise wipe every
+    ; tab to "no data".
     if (mode = "manifest") {
-        blob["_prefetch_data"] := Map("historical", Map(), "today", Map())
         return blob
     }
 

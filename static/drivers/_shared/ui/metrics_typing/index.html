@@ -896,18 +896,20 @@
 					if (!blob) return;
 					window.metrics_manifest = blob.metrics_manifest || {};
 					window.app_icons        = blob.app_icons || {};
-					window._prefetch_data   = blob._prefetch_data || null;
 					window.keycode_layout   = blob.keycode_layout || {};
+					// Only refresh the n-gram tables when the AHK side
+					// actually included a fresh _prefetch_data slice. The
+					// fast 'manifest' pushes (every 500 ms) omit the key
+					// entirely so the existing tables stay intact while
+					// the KPI counters update in real time.
+					const has_prefetch = blob._prefetch_data !== undefined;
+					if (has_prefetch) {
+						window._prefetch_data = blob._prefetch_data;
+					}
 					if (typeof window.process_manifest === "function") {
 						window.process_manifest();
 					}
-					// On subsequent pushes process_manifest queues a Lua-side
-					// range request that no one services in our setup, leaving
-					// the n-gram tables stale even though the KPIs refreshed.
-					// Feed receive_range_data the blob's range data directly
-					// so the table re-renders with the freshest data on every
-					// push, not just on first paint.
-					if (window._prefetch_data && typeof window.receive_range_data === "function") {
+					if (has_prefetch && window._prefetch_data && typeof window.receive_range_data === "function") {
 						try {
 							window._lua_request = null;
 							window.receive_range_data(window._prefetch_data);
