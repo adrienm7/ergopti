@@ -525,6 +525,19 @@ global KLR_NGRAM_TYPE_TABLE := Map(
     "w_bg",  "ngram_word_bigrams"
 )
 
+; Subset of n-gram tables fetched on the fast 500 ms 'live' path. The
+; deeper tables (penta/hexa/hepta) explode in unique-token count and
+; are rarely viewed, so we skip them on the hot path; the slower 'full'
+; cadence (first paint) still fetches everything.
+global KLR_NGRAM_LIVE_TABLE := Map(
+    "c",     "ngram_chars",
+    "bg",    "ngram_bigrams",
+    "tg",    "ngram_trigrams",
+    "qg",    "ngram_quadgrams",
+    "w",     "ngram_words",
+    "w_bg",  "ngram_word_bigrams"
+)
+
 KLR_BuildNgramFilter(start_date, end_date, selected_apps) {
     clauses := []
     if (start_date != "")
@@ -604,6 +617,86 @@ KLR_ReadNgrams(db, start_date := "", end_date := "", selected_apps := unset) {
         out["kc"][String(r["keycode"])] := KLR_NewNgramItem(r["c"], 0, 0, "")
 
     return out
+}
+
+; Fast path used by the 500 ms live update tick. Returns the same
+; { historical, today } shape KLR_ReadRangeSplitToday produces, but:
+;   - historical is empty (cached client-side from the first paint).
+;   - today fetches only the most-frequent KLR_FAST_LIMIT tokens per
+;     table, skipping pentagrams/hexagrams/heptagrams entirely.
+; Result: a few hundred Map allocations instead of tens of thousands,
+; which keeps the per-tick cost well under 500 ms even on big DBs.
+KLR_FAST_LIMIT := 500
+
+KLR_ReadRangeSplitTodayFast(db, selected_apps := unset) {
+    if !IsSet(selected_apps)
+        selected_apps := []
+    today := FormatTime(A_Now, "yyyy-MM-dd")
+    today_idx := Map()
+    if !db
+        return Map("historical", Map(), "today", today_idx)
+
+    app_clause := ""
+    if (selected_apps is Array && selected_apps.Length > 0) {
+        quoted := []
+        for a in selected_apps
+            quoted.Push(SQLite_Q(a))
+        app_clause := " AND app IN ("
+        for i, q in quoted
+            app_clause .= (i = 1 ? "" : ",") . q
+        app_clause .= ")"
+    }
+
+    for code, tbl in KLR_NGRAM_LIVE_TABLE {
+        sql := "SELECT app, token,"
+            . " SUM(c) AS c, SUM(td) AS t, SUM(e) AS e,"
+            . " MIN(esrc_json) AS esrc_json"
+            . " FROM " . tbl
+            . " WHERE date = " . SQLite_Q(today) . app_clause
+            . " GROUP BY app, token"
+            . " ORDER BY c DESC"
+            . " LIMIT " . KLR_FAST_LIMIT
+        for r in SQLite_Query(db, sql) {
+            app := r["app"]
+            if !today_idx.Has(app)
+                today_idx[app] := KLR_NewTodayBucket()
+            today_idx[app][code][r["token"]] := KLR_NewNgramItem(r["c"], r["t"], r["e"], r["esrc_json"])
+        }
+    }
+
+    ; Keycode heatmap data (ngram_keycodes). The dashboard renders a
+    ; per-keyboard-key colour map from this table; the user expects it
+    ; to track typing live.
+    kc_sql := "SELECT app, keycode, SUM(c) AS c FROM ngram_keycodes"
+        . " WHERE date = " . SQLite_Q(today) . app_clause
+        . " GROUP BY app, keycode"
+    for r in SQLite_Query(db, kc_sql) {
+        app := r["app"]
+        if !today_idx.Has(app)
+            today_idx[app] := KLR_NewTodayBucket()
+        today_idx[app]["kc"][String(r["keycode"])] := KLR_NewNgramItem(r["c"], 0, 0, "")
+    }
+
+    ; Shortcuts (sc) and shortcut bigrams — also commonly viewed tabs.
+    sc_sql := "SELECT app, token, SUM(c) AS c FROM ngram_shortcuts"
+        . " WHERE date = " . SQLite_Q(today) . app_clause
+        . " GROUP BY app, token"
+    for r in SQLite_Query(db, sc_sql) {
+        app := r["app"]
+        if !today_idx.Has(app)
+            today_idx[app] := KLR_NewTodayBucket()
+        today_idx[app]["sc"][r["token"]] := KLR_NewNgramItem(r["c"], 0, 0, "")
+    }
+    scbg_sql := "SELECT app, token, SUM(c) AS c FROM ngram_shortcut_bigrams"
+        . " WHERE date = " . SQLite_Q(today) . app_clause
+        . " GROUP BY app, token"
+    for r in SQLite_Query(db, scbg_sql) {
+        app := r["app"]
+        if !today_idx.Has(app)
+            today_idx[app] := KLR_NewTodayBucket()
+        today_idx[app]["sc_bg"][r["token"]] := KLR_NewNgramItem(r["c"], 0, 0, "")
+    }
+    return Map("historical", Map(), "today", today_idx)
 }
 
 KLR_ReadRangeSplitToday(db, start_date := "", end_date := "", selected_apps := unset) {

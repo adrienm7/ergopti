@@ -897,14 +897,30 @@
 					window.metrics_manifest = blob.metrics_manifest || {};
 					window.app_icons        = blob.app_icons || {};
 					window.keycode_layout   = blob.keycode_layout || {};
-					// Only refresh the n-gram tables when the AHK side
-					// actually included a fresh _prefetch_data slice. The
-					// fast 'manifest' pushes (every 500 ms) omit the key
-					// entirely so the existing tables stay intact while
-					// the KPI counters update in real time.
+					// Three-mode merge:
+					//   - blob has no _prefetch_data → manifest-only push
+					//     from the live tick: leave the cached n-grams
+					//     intact; KPIs alone refresh.
+					//   - blob has _prefetch_data with empty historical
+					//     and a populated today → 'live' push: keep the
+					//     historical we already received at first paint,
+					//     replace today with the freshest slice.
+					//   - blob has both populated → 'full' push (first
+					//     paint or explicit refresh): replace everything.
 					const has_prefetch = blob._prefetch_data !== undefined;
 					if (has_prefetch) {
-						window._prefetch_data = blob._prefetch_data;
+						const incoming = blob._prefetch_data || {};
+						const incoming_hist = incoming.historical || {};
+						const has_historical_payload = Object.keys(incoming_hist).length > 0;
+						const cached = window._prefetch_data || {};
+						if (has_historical_payload) {
+							window._prefetch_data = incoming;
+						} else {
+							window._prefetch_data = {
+								historical: cached.historical || {},
+								today: incoming.today || {},
+							};
+						}
 					}
 					if (typeof window.process_manifest === "function") {
 						window.process_manifest();
