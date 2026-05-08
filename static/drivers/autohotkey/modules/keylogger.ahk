@@ -706,6 +706,7 @@ KL_LogHotstring(trigger, replacement, h_type := "unknown", app_name := "") {
         "tag",             "<hotstring>" . replacement . "</hotstring>"
     ))
     Keylogger.last_flush_time := A_TickCount
+    try KL_Roi_OnHotstring(trigger, net_saved)
 }
 
 ; Logs that a hotstring tooltip was shown to the user. Mirrors HS init.lua:1196.
@@ -1341,6 +1342,7 @@ KL_Stop() {
     try KL_AV_Stop()
     try KL_Net_Stop()
     try KL_Clip_Stop()
+    try KL_Roi_Stop()
     if Keylogger.HasProp("_ingest_timer")
         SetTimer(Keylogger._ingest_timer, 0)
     if Keylogger.HasProp("_midnight_timer")
