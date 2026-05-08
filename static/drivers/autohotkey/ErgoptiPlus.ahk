@@ -86,6 +86,7 @@ SendMode("Event") ; Everything concerning hotstrings MUST use SendEvent and not 
 #Include lib\layout_shift_caps.ahk
 #Include lib\metrics_shortcuts.ahk
 #Include modules\keylogger.ahk
+#Include modules\keylogger_walker.ahk
 #Include modules\keylogger_ui.ahk
 
 ; ======================================================

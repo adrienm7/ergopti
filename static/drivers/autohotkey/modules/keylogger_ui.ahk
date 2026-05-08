@@ -178,6 +178,8 @@ KLUI_OpenApps(*) {
 }
 
 KLUI_CloseAll() {
-    KLUI_KillWindow(KLUI.typing_pid); KLUI.typing_pid := 0
-    KLUI_KillWindow(KLUI.apps_pid);   KLUI.apps_pid   := 0
+    KLUI_KillWindow(KLUI.typing_pid)
+    KLUI.typing_pid := 0
+    KLUI_KillWindow(KLUI.apps_pid)
+    KLUI.apps_pid := 0
 }
