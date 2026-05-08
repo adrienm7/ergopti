@@ -204,10 +204,10 @@ KLPF_BuildApps(db) {
 ; expects is stable enough across layouts that we ship a static map.
 ; A future iteration can read the active layout via GetKeyboardLayout.
 KLPF_KeycodeLayout() {
-    static MAP := unset
-    if IsSet(MAP)
-        return MAP
-    MAP := Map()
+    ; ~40 entries, cheap to rebuild on each call. The earlier lazy-init
+    ; via `static MAP := unset` + `if IsSet(MAP)` choked on AHK v2's
+    ; « static variable has not been assigned a value » contract.
+    out    := Map()
     static QWERTY := Map(
         65,  "a", 66, "b", 67, "c", 68, "d", 69, "e", 70, "f",
         71,  "g", 72, "h", 73, "i", 74, "j", 75, "k", 76, "l",
@@ -220,8 +220,8 @@ KLPF_KeycodeLayout() {
         37, "[LEFT]", 38, "[UP]", 39, "[RIGHT]", 40, "[DOWN]"
     )
     for vk, ch in QWERTY
-        MAP[String(vk)] := ch
-    return MAP
+        out[String(vk)] := ch
+    return out
 }
 
 
