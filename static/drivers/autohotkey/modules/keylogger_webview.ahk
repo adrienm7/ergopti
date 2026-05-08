@@ -127,15 +127,21 @@ KLWV_Open(which, metrics_dir) {
     g.MarginX := 0
     g.MarginY := 0
 
-    ; Default window size: 80% of the primary monitor's work area
-    ; (which already excludes the taskbar) and centred. The previous
-    ; default reserved only 100 px of slack which left the title bar
-    ; clipped above the top of the screen on some configurations.
-    MonitorGetWorkArea(MonitorGetPrimary(), &L, &T, &R, &B)
+    ; Pick the monitor under the mouse cursor (where the user just
+    ; clicked the tray menu) — defaulting to the primary monitor stuck
+    ; the window on the wrong screen on multi-monitor setups. From
+    ; there, take 70 % of the work area (taskbar already excluded by
+    ; MonitorGetWorkArea) so the window comfortably fits with both
+    ; the title bar AND a bit of breathing room around it.
+    MouseGetPos(&mx, &my)
+    mon := KLWV_MonitorFromPoint(mx, my)
+    if !mon
+        mon := MonitorGetPrimary()
+    MonitorGetWorkArea(mon, &L, &T, &R, &B)
     work_w := R - L
     work_h := B - T
-    initial_w := Min(Round(work_w * 0.80), 1400)
-    initial_h := Min(Round(work_h * 0.85), 900)
+    initial_w := Min(Round(work_w * 0.70), 1300)
+    initial_h := Min(Round(work_h * 0.70), 800)
     pos_x := L + ((work_w - initial_w) // 2)
     pos_y := T + ((work_h - initial_h) // 2)
 
@@ -330,6 +336,21 @@ KLWV_PushPrefetch(which) {
     } catch as err {
         FileAppend("[" . A_Now . "] PushPrefetch(" . which . "): FAIL " . err.Message . "`r`n", log, "UTF-8")
     }
+}
+
+; Resolve which AHK monitor index contains the (x, y) point. Walks the
+; monitor list and returns the first match. AHK v2 has no built-in
+; helper for this; a Win32 MonitorFromPoint call would return an HMONITOR
+; we'd then have to map back to an index — easier to iterate ourselves.
+KLWV_MonitorFromPoint(x, y) {
+    Loop MonitorGetCount() {
+        try {
+            MonitorGet(A_Index, &L, &T, &R, &B)
+            if (x >= L && x < R && y >= T && y < B)
+                return A_Index
+        }
+    }
+    return 0
 }
 
 KLWV_DelayedFirstPush(which) {
