@@ -1265,6 +1265,7 @@ KL_Stop() {
     ; Drain idle / session state and unhook OnMessage handlers so the
     ; JSONL never ends with a dangling session_start / idle_start.
     try KL_Watchers_Stop()
+    try KL_Mouse_Stop()
     if Keylogger.HasProp("_ingest_timer")
         SetTimer(Keylogger._ingest_timer, 0)
     if Keylogger.HasProp("_midnight_timer")

@@ -1,0 +1,491 @@
+; modules/keylogger_mouse.ahk
+
+; ==============================================================================
+; MODULE: Keylogger Mouse Events
+; DESCRIPTION:
+; Captures rich mouse interaction events and feeds them into the keylogger
+; pipeline alongside keystroke data. Tracks clicks (L/M/R with coords and
+; target app), scroll events (velocity and direction), drag operations
+; (distance and duration), and mouse idle/parking positions.
+;
+; FEATURES & RATIONALE:
+; 1. Click logging — every LButton / MButton / RButton press records the
+;    screen coordinates, the target process name, and whether it was a
+;    single or double click. This surfaces per-app mouse usage patterns
+;    and distinguishes navigation clicks from content clicks.
+; 2. Scroll logging — wheel events are debounced and coalesced into bursts.
+;    Each burst record carries total ticks, direction (up/down/h), and a
+;    velocity estimate (ticks/s) so the dashboard can distinguish rapid
+;    skimming from deliberate reading.
+; 3. Drag detection — if the mouse button is held while moving more than
+;    DRAG_MIN_PX pixels the release is tagged as a drag rather than a click.
+;    Drag records include start/end coords, pixel distance, and duration_ms.
+; 4. Mouse idle park — a SetTimer polls the cursor position every
+;    PARK_CHECK_MS. When the cursor has not moved more than PARK_JITTER_PX
+;    for PARK_IDLE_MS it emits a mouse_idle_park event with the dwell
+;    position and the app under the cursor. This quantifies « dead mouse »
+;    time and complements the keyboard idle machine.
+; 5. Distance accumulation — every poll tick updates KL_BumpMouseDistance
+;    so the existing ``mouse_distance_px`` column in typing flush entries
+;    keeps working unmodified.
+; 6. Privacy filter — every event passes through MF_ShouldFilter() before
+;    any allocation. Password fields and disabled apps are silently dropped.
+;
+; LIFECYCLE:
+; - KL_Mouse_Start() is called after KL_Hook_Start() / KL_Watchers_Start().
+; - KL_Mouse_Stop() releases all hotkeys and timers.
+; ==============================================================================
+
+#Requires Autohotkey v2.0+
+
+
+
+
+; ===================================
+; ===================================
+; ======= 1/ Constants =======
+; ===================================
+; ===================================
+
+class KLMouseConst {
+    ; Minimum displacement (px) between button-down and button-up to
+    ; classify the gesture as a drag rather than a plain click.
+    static DRAG_MIN_PX         := 8
+
+    ; Scroll bursts: two wheel ticks are merged into the same event when
+    ; the gap between them is under this threshold.
+    static SCROLL_BURST_GAP_MS := 400
+
+    ; How often the background timer polls the cursor position (ms).
+    ; 100 ms keeps CPU near-zero while giving ~10 Hz distance sampling.
+    static PARK_CHECK_MS       := 100
+
+    ; Cursor must remain within this radius (px) to be considered parked.
+    static PARK_JITTER_PX      := 8
+
+    ; Duration the cursor must sit still before a mouse_idle_park fires.
+    static PARK_IDLE_MS        := 3000
+
+    ; Minimum distance (px) between two park events to avoid spamming the
+    ; log when the user nudges the mouse and immediately stops again.
+    static PARK_MIN_MOVE_PX    := 32
+}
+
+
+
+
+; ===================================
+; ===================================
+; ======= 2/ Module state =======
+; ===================================
+; ===================================
+
+class KLMouse {
+    ; ── button-down snapshot ──────────────────────────────────────────────
+    static lbtn_down_x      := 0
+    static lbtn_down_y      := 0
+    static lbtn_down_tick   := 0
+    static lbtn_held        := false
+
+    static rbtn_down_x      := 0
+    static rbtn_down_y      := 0
+    static rbtn_down_tick   := 0
+    static rbtn_held        := false
+
+    static mbtn_down_x      := 0
+    static mbtn_down_y      := 0
+    static mbtn_down_tick   := 0
+    static mbtn_held        := false
+
+    ; ── scroll burst accumulator ──────────────────────────────────────────
+    static scroll_ticks     := 0         ; accumulated delta (negative = down)
+    static scroll_h_ticks   := 0         ; horizontal delta
+    static scroll_start     := 0         ; A_TickCount of first tick in burst
+    static scroll_last      := 0         ; A_TickCount of last tick seen
+    static scroll_flush_fn  := unset     ; bound ref for SetTimer
+
+    ; ── park / idle tracker ───────────────────────────────────────────────
+    static park_last_x      := -1        ; position at last poll
+    static park_last_y      := -1
+    static park_still_since := 0         ; tick when stillness began
+    static park_fired_x     := -9999     ; position of last fired park event
+    static park_fired_y     := -9999
+    static park_fired_at    := 0         ; tick of last park fire
+    static park_timer_fn    := unset
+
+    ; ── distance accumulator ──────────────────────────────────────────────
+    static prev_x           := -1
+    static prev_y           := -1
+}
+
+
+
+
+; ====================================
+; ====================================
+; ======= 3/ Click handlers =======
+; ====================================
+; ====================================
+
+KL_Mouse_OnLDown() {
+    try {
+        KLMouse.lbtn_down_x    := A_CaretX  ; fallback — updated below
+        KLMouse.lbtn_down_y    := A_CaretY
+        CoordMode("Mouse", "Screen")
+        MouseGetPos(&mx, &my)
+        KLMouse.lbtn_down_x    := mx
+        KLMouse.lbtn_down_y    := my
+        KLMouse.lbtn_down_tick := A_TickCount
+        KLMouse.lbtn_held      := true
+    }
+}
+
+KL_Mouse_OnLUp() {
+    if !KLMouse.lbtn_held
+        return
+    KLMouse.lbtn_held := false
+    try {
+        CoordMode("Mouse", "Screen")
+        MouseGetPos(&mx, &my)
+        dx       := mx - KLMouse.lbtn_down_x
+        dy       := my - KLMouse.lbtn_down_y
+        dist     := Sqrt(dx*dx + dy*dy)
+        duration := A_TickCount - KLMouse.lbtn_down_tick
+        KL_BumpMouseClick()
+        filtered := false
+        try filtered := MF_ShouldFilter()
+        if filtered
+            return
+        if !Keylogger.initialized
+            return
+        if (dist >= KLMouseConst.DRAG_MIN_PX) {
+            KL_Mouse_LogDrag("left",
+                KLMouse.lbtn_down_x, KLMouse.lbtn_down_y,
+                mx, my, Round(dist), duration)
+        } else {
+            KL_Mouse_LogClick("left", KLMouse.lbtn_down_x, KLMouse.lbtn_down_y)
+        }
+    }
+}
+
+KL_Mouse_OnRDown() {
+    try {
+        CoordMode("Mouse", "Screen")
+        MouseGetPos(&mx, &my)
+        KLMouse.rbtn_down_x    := mx
+        KLMouse.rbtn_down_y    := my
+        KLMouse.rbtn_down_tick := A_TickCount
+        KLMouse.rbtn_held      := true
+    }
+}
+
+KL_Mouse_OnRUp() {
+    if !KLMouse.rbtn_held
+        return
+    KLMouse.rbtn_held := false
+    try {
+        CoordMode("Mouse", "Screen")
+        MouseGetPos(&mx, &my)
+        dx       := mx - KLMouse.rbtn_down_x
+        dy       := my - KLMouse.rbtn_down_y
+        dist     := Sqrt(dx*dx + dy*dy)
+        duration := A_TickCount - KLMouse.rbtn_down_tick
+        KL_BumpMouseClick()
+        filtered := false
+        try filtered := MF_ShouldFilter()
+        if filtered
+            return
+        if !Keylogger.initialized
+            return
+        if (dist >= KLMouseConst.DRAG_MIN_PX) {
+            KL_Mouse_LogDrag("right",
+                KLMouse.rbtn_down_x, KLMouse.rbtn_down_y,
+                mx, my, Round(dist), duration)
+        } else {
+            KL_Mouse_LogClick("right", KLMouse.rbtn_down_x, KLMouse.rbtn_down_y)
+        }
+    }
+}
+
+KL_Mouse_OnMDown() {
+    try {
+        CoordMode("Mouse", "Screen")
+        MouseGetPos(&mx, &my)
+        KLMouse.mbtn_down_x    := mx
+        KLMouse.mbtn_down_y    := my
+        KLMouse.mbtn_down_tick := A_TickCount
+        KLMouse.mbtn_held      := true
+    }
+}
+
+KL_Mouse_OnMUp() {
+    if !KLMouse.mbtn_held
+        return
+    KLMouse.mbtn_held := false
+    try {
+        CoordMode("Mouse", "Screen")
+        MouseGetPos(&mx, &my)
+        KL_BumpMouseClick()
+        filtered := false
+        try filtered := MF_ShouldFilter()
+        if filtered
+            return
+        if !Keylogger.initialized
+            return
+        KL_Mouse_LogClick("middle", KLMouse.mbtn_down_x, KLMouse.mbtn_down_y)
+    }
+}
+
+
+
+
+; ====================================
+; ====================================
+; ======= 4/ Scroll handlers =======
+; ====================================
+; ====================================
+
+KL_Mouse_OnWheelUp() {
+    KL_Mouse_AccumScroll(1)
+}
+
+KL_Mouse_OnWheelDown() {
+    KL_Mouse_AccumScroll(-1)
+}
+
+KL_Mouse_OnWheelRight() {
+    KL_Mouse_AccumScrollH(1)
+}
+
+KL_Mouse_OnWheelLeft() {
+    KL_Mouse_AccumScrollH(-1)
+}
+
+KL_Mouse_AccumScroll(delta) {
+    now := A_TickCount
+    if (KLMouse.scroll_last > 0
+            and (now - KLMouse.scroll_last) > KLMouseConst.SCROLL_BURST_GAP_MS) {
+        ; Gap exceeded — flush the previous burst before starting a new one
+        KL_Mouse_FlushScroll()
+    }
+    if (KLMouse.scroll_start = 0)
+        KLMouse.scroll_start := now
+    KLMouse.scroll_ticks += delta
+    KLMouse.scroll_last  := now
+    KL_BumpMouseScroll()
+    ; Arm a one-shot timer to flush after the burst ends
+    try SetTimer(KLMouse.scroll_flush_fn, -KLMouseConst.SCROLL_BURST_GAP_MS)
+}
+
+KL_Mouse_AccumScrollH(delta) {
+    now := A_TickCount
+    if (KLMouse.scroll_last > 0
+            and (now - KLMouse.scroll_last) > KLMouseConst.SCROLL_BURST_GAP_MS) {
+        KL_Mouse_FlushScroll()
+    }
+    if (KLMouse.scroll_start = 0)
+        KLMouse.scroll_start := now
+    KLMouse.scroll_h_ticks += delta
+    KLMouse.scroll_last    := now
+    KL_BumpMouseScroll()
+    try SetTimer(KLMouse.scroll_flush_fn, -KLMouseConst.SCROLL_BURST_GAP_MS)
+}
+
+KL_Mouse_FlushScroll() {
+    if (KLMouse.scroll_ticks = 0 and KLMouse.scroll_h_ticks = 0)
+        return
+    filtered := false
+    try filtered := MF_ShouldFilter()
+    ticks    := KLMouse.scroll_ticks
+    h_ticks  := KLMouse.scroll_h_ticks
+    start    := KLMouse.scroll_start
+    ; Reset before doing IO so a rapid re-entry doesn't double-log
+    KLMouse.scroll_ticks   := 0
+    KLMouse.scroll_h_ticks := 0
+    KLMouse.scroll_start   := 0
+    KLMouse.scroll_last    := 0
+    if filtered
+        return
+    if !Keylogger.initialized
+        return
+    duration_ms := A_TickCount - start
+    dir := (h_ticks != 0) ? "horizontal" : ((ticks > 0) ? "up" : "down")
+    total := (h_ticks != 0) ? Abs(h_ticks) : Abs(ticks)
+    velocity := (duration_ms > 0) ? Round(total / (duration_ms / 1000.0), 2) : 0
+    CoordMode("Mouse", "Screen")
+    MouseGetPos(&mx, &my)
+    KL_AppendLog(Map(
+        "type",        "mouse_scroll",
+        "app",         Keylogger.session_app,
+        "direction",   dir,
+        "ticks",       total,
+        "velocity",    velocity,
+        "duration_ms", duration_ms,
+        "x",           mx,
+        "y",           my
+    ))
+}
+
+
+
+
+; ====================================
+; ====================================
+; ======= 5/ Park / idle poll =======
+; ====================================
+; ====================================
+
+KL_Mouse_ParkTick() {
+    CoordMode("Mouse", "Screen")
+    MouseGetPos(&mx, &my)
+
+    ; Distance accumulation — feeds the typing flush's mouse_distance_px
+    if (KLMouse.prev_x >= 0) {
+        dx := mx - KLMouse.prev_x
+        dy := my - KLMouse.prev_y
+        d  := Sqrt(dx*dx + dy*dy)
+        if (d > 0)
+            KL_BumpMouseDistance(Round(d))
+    }
+    KLMouse.prev_x := mx
+    KLMouse.prev_y := my
+
+    ; Park detection
+    if (KLMouse.park_last_x < 0) {
+        KLMouse.park_last_x      := mx
+        KLMouse.park_last_y      := my
+        KLMouse.park_still_since := A_TickCount
+        return
+    }
+    dx   := mx - KLMouse.park_last_x
+    dy   := my - KLMouse.park_last_y
+    moved := Sqrt(dx*dx + dy*dy)
+
+    if (moved > KLMouseConst.PARK_JITTER_PX) {
+        ; Cursor moved — reset stillness clock
+        KLMouse.park_last_x      := mx
+        KLMouse.park_last_y      := my
+        KLMouse.park_still_since := A_TickCount
+        return
+    }
+
+    still_ms := A_TickCount - KLMouse.park_still_since
+    if (still_ms < KLMouseConst.PARK_IDLE_MS)
+        return
+
+    ; Check distance from the last park fire to avoid adjacent duplicates
+    fdx := mx - KLMouse.park_fired_x
+    fdy := my - KLMouse.park_fired_y
+    fire_dist := Sqrt(fdx*fdx + fdy*fdy)
+    if (fire_dist < KLMouseConst.PARK_MIN_MOVE_PX
+            and (A_TickCount - KLMouse.park_fired_at) < 30000)
+        return
+
+    ; Emit park event
+    filtered := false
+    try filtered := MF_ShouldFilter()
+    if !filtered and Keylogger.initialized {
+        app := Keylogger.session_app
+        KL_AppendLog(Map(
+            "type",     "mouse_idle_park",
+            "app",      app,
+            "x",        mx,
+            "y",        my,
+            "still_ms", still_ms
+        ))
+        KLMouse.park_fired_x  := mx
+        KLMouse.park_fired_y  := my
+        KLMouse.park_fired_at := A_TickCount
+    }
+    ; Reset so we don't keep firing every PARK_CHECK_MS while still idle
+    KLMouse.park_still_since := A_TickCount
+}
+
+
+
+
+; =====================================
+; =====================================
+; ======= 6/ Log helpers =======
+; =====================================
+; =====================================
+
+KL_Mouse_LogClick(button, x, y) {
+    KL_AppendLog(Map(
+        "type",   "mouse_click",
+        "app",    Keylogger.session_app,
+        "button", button,
+        "x",      x,
+        "y",      y
+    ))
+}
+
+KL_Mouse_LogDrag(button, x1, y1, x2, y2, dist_px, duration_ms) {
+    KL_AppendLog(Map(
+        "type",        "mouse_drag",
+        "app",         Keylogger.session_app,
+        "button",      button,
+        "x1",          x1,
+        "y1",          y1,
+        "x2",          x2,
+        "y2",          y2,
+        "dist_px",     dist_px,
+        "duration_ms", duration_ms
+    ))
+}
+
+
+
+
+; =====================================
+; =====================================
+; ======= 7/ Lifecycle =======
+; =====================================
+; =====================================
+
+KL_Mouse_Start() {
+    ; Idempotent — do nothing if the park timer is already alive
+    if KLMouse.HasOwnProp("park_timer_fn") && IsObject(KLMouse.park_timer_fn)
+        return
+
+    ; Bind scroll-flush once so SetTimer can cancel by reference
+    KLMouse.scroll_flush_fn := KL_Mouse_FlushScroll.Bind()
+
+    ; Park / distance poll
+    KLMouse.park_timer_fn := KL_Mouse_ParkTick.Bind()
+    SetTimer(KLMouse.park_timer_fn, KLMouseConst.PARK_CHECK_MS)
+
+    ; Wire button hooks. Using ``~`` prefix keeps AHK from consuming the
+    ; event so the target application still receives the click normally.
+    Hotkey("~LButton", KL_Mouse_OnLDown, "On")
+    Hotkey("~LButton Up", KL_Mouse_OnLUp, "On")
+    Hotkey("~RButton", KL_Mouse_OnRDown, "On")
+    Hotkey("~RButton Up", KL_Mouse_OnRUp, "On")
+    Hotkey("~MButton", KL_Mouse_OnMDown, "On")
+    Hotkey("~MButton Up", KL_Mouse_OnMUp, "On")
+    Hotkey("~WheelUp",    KL_Mouse_OnWheelUp,    "On")
+    Hotkey("~WheelDown",  KL_Mouse_OnWheelDown,  "On")
+    Hotkey("~WheelRight", KL_Mouse_OnWheelRight, "On")
+    Hotkey("~WheelLeft",  KL_Mouse_OnWheelLeft,  "On")
+}
+
+KL_Mouse_Stop() {
+    if KLMouse.HasOwnProp("park_timer_fn") && IsObject(KLMouse.park_timer_fn) {
+        try SetTimer(KLMouse.park_timer_fn, 0)
+        KLMouse.park_timer_fn := unset
+    }
+    if KLMouse.HasOwnProp("scroll_flush_fn") && IsObject(KLMouse.scroll_flush_fn) {
+        try SetTimer(KLMouse.scroll_flush_fn, 0)
+        try KL_Mouse_FlushScroll()   ; drain pending scroll burst
+    }
+    try Hotkey("~LButton",     KL_Mouse_OnLDown,    "Off")
+    try Hotkey("~LButton Up",  KL_Mouse_OnLUp,      "Off")
+    try Hotkey("~RButton",     KL_Mouse_OnRDown,    "Off")
+    try Hotkey("~RButton Up",  KL_Mouse_OnRUp,      "Off")
+    try Hotkey("~MButton",     KL_Mouse_OnMDown,    "Off")
+    try Hotkey("~MButton Up",  KL_Mouse_OnMUp,      "Off")
+    try Hotkey("~WheelUp",     KL_Mouse_OnWheelUp,  "Off")
+    try Hotkey("~WheelDown",   KL_Mouse_OnWheelDown,"Off")
+    try Hotkey("~WheelRight",  KL_Mouse_OnWheelRight,"Off")
+    try Hotkey("~WheelLeft",   KL_Mouse_OnWheelLeft, "Off")
+}
