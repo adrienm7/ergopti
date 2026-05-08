@@ -992,7 +992,7 @@ function render_kc_heatmap(kc_data_arr) {
 		// short forms so they render clearly (Esc, Ret, Tab, Bksp, Caps, Shft).
 		const label_raw  = kc_name_map[kc_str] ?? KEYCODE_NAMES[kc_str] ?? "";
 		// MacBook-style symbols matching what is printed on the physical keycap
-		const SHORT_LABELS = {
+		const SHORT_LABELS_MAC = {
 			"53":  "⎋",   // escape
 			"36":  "⏎",   // return
 			"48":  "⇥",   // tab
@@ -1006,14 +1006,32 @@ function render_kc_heatmap(kc_data_arr) {
 			"54":  "⌘",   // right cmd
 			"58":  "⌥",   // left alt / option
 			"61":  "⌥",   // right alt / option
-			"63":  "Fn",  // fn key
-			"114": "?",   // help
-			"123": "←",
-			"124": "→",
-			"125": "↓",
-			"126": "↑",
-			"76":  "↵",   // numpad enter
+			"63":  "Fn",
+			"114": "?",
+			"123": "←", "124": "→", "125": "↓", "126": "↑",
+			"76":  "↵",
 		};
+		const SHORT_LABELS_WIN = {
+			"53":  "Échap",
+			"36":  "Entrée",
+			"48":  "Tab",
+			"51":  "←",       // backspace arrow
+			"56":  "Maj",
+			"60":  "Maj",
+			"57":  "Verr.",
+			"49":  "",
+			"59":  "Ctrl",
+			"55":  "Win",
+			"54":  "Win",
+			"58":  "Alt",
+			"61":  "AltGr",
+			"63":  "Fn",
+			"114": "?",
+			"123": "←", "124": "→", "125": "↓", "126": "↑",
+			"76":  "↵",
+		};
+		const SHORT_LABELS = (window.driver_meta && window.driver_meta.os === "win")
+			? SHORT_LABELS_WIN : SHORT_LABELS_MAC;
 		// Truncate only when truly too long for the cell. Most names ≤ 6 chars fit
 		// at font_size 9; longer ones get the ellipsis fallback.
 		let label_disp;
@@ -1334,12 +1352,21 @@ function render_sfb_heatmap(sfb_by_kc, sfb_pairs_by_kc, kc_raw) {
 	const grand_total = Object.values(sfb_by_kc).reduce((s, c) => s + c, 0);
 	const uid = "sfbhm_" + Date.now().toString(36);
 
-	const SHORT_LABELS = {
+	const SHORT_LABELS_MAC = {
 		"53": "⎋", "36": "⏎", "48": "⇥", "51": "⌫", "56": "⇧", "60": "⇧",
 		"57": "⇪", "49": "",  "59": "⌃", "55": "⌘", "54": "⌘", "58": "⌥",
 		"61": "⌥", "63": "Fn",  "114": "?", "123": "←", "124": "→", "125": "↓",
 		"126": "↑", "76": "⏎",
 	};
+	const SHORT_LABELS_WIN = {
+		"53": "Échap", "36": "Entrée", "48": "Tab", "51": "←",
+		"56": "Maj", "60": "Maj", "57": "Verr.", "49": "",
+		"59": "Ctrl", "55": "Win", "54": "Win", "58": "Alt",
+		"61": "AltGr", "63": "Fn", "114": "?",
+		"123": "←", "124": "→", "125": "↓", "126": "↑", "76": "⏎",
+	};
+	const SHORT_LABELS = (window.driver_meta && window.driver_meta.os === "win")
+		? SHORT_LABELS_WIN : SHORT_LABELS_MAC;
 
 	let rects    = "";
 	let labels   = "";
