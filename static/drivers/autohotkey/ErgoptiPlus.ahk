@@ -2202,6 +2202,11 @@ ActivateKeyHistory(*) {
 
 #SuspendExempt
 
+; Gate on physical RAlt so a ghost SC138 (injected by an OS driver for AltGr-
+; mapped keys like Bépo's `'`) does not trigger these script shortcuts on
+; the next Enter/BackSpace/Delete/Escape press.
+#HotIf GetKeyState("RAlt", "P")
+
 RAlt & Enter::
 SC138 & SC01C::
 {
@@ -2241,6 +2246,8 @@ SC138 & SC001::
         SendInput("{Escape}")
     }
 }
+
+#HotIf
 
 #SuspendExempt False
 

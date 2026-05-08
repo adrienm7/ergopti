@@ -95,7 +95,18 @@ if Features["Shortcuts"]["PasteWithoutFormatting"].Enabled {
 
 ; Pre-computed at boot — evaluated once instead of 10 OR comparisons per key press.
 global _ALTGR_LALT_ENABLED := HasAnyEnabled(Features["Shortcuts"]["AltGrLAlt"])
-#HotIf _ALTGR_LALT_ENABLED
+
+; Wrapper required: #HotIf re-evaluates its expression every time the hotkey
+; is tested. If the global is read before auto-execute has assigned it, AHK
+; raises "global variable has not been assigned a value".
+IsAltGrLAltEnabled() {
+    global _ALTGR_LALT_ENABLED
+    return IsSet(_ALTGR_LALT_ENABLED) ? _ALTGR_LALT_ENABLED : False
+}
+
+; Gate on physical RAlt so a ghost SC138 (injected by an OS driver for AltGr-
+; mapped keys like Bépo's `'`) cannot trigger this shortcut spuriously.
+#HotIf IsAltGrLAltEnabled() and GetKeyState("RAlt", "P")
 SC138 & SC038:: AltGrLAltShortcut()
 #HotIf
 
@@ -148,7 +159,17 @@ AltGrLAltShortcut() {
 }
 
 global _ALTGR_CAPSLOCK_ENABLED := HasAnyEnabled(Features["Shortcuts"]["AltGrCapsLock"])
-#HotIf _ALTGR_CAPSLOCK_ENABLED
+
+; Wrapper required: #HotIf re-evaluates its expression every time the hotkey
+; is tested. If the global is read before auto-execute has assigned it, AHK
+; raises "global variable has not been assigned a value".
+IsAltGrCapsLockEnabled() {
+    global _ALTGR_CAPSLOCK_ENABLED
+    return IsSet(_ALTGR_CAPSLOCK_ENABLED) ? _ALTGR_CAPSLOCK_ENABLED : False
+}
+
+; Gate on physical RAlt — same rationale as the AltGrLAlt block above.
+#HotIf IsAltGrCapsLockEnabled() and GetKeyState("RAlt", "P")
 SC138 & SC03A:: AltGrCapsLockShortcut()
 #HotIf
 
