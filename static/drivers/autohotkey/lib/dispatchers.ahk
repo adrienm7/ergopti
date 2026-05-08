@@ -53,6 +53,10 @@ global SIMPLE_ACTIONS := Map(
 	"Escape",        () => SendInput("{Escape}"),
 	"OneShotShift",  () => OneShotShift(),
 	"Tab",           () => SendInput("{Tab}"),
+	; Métriques dashboards — toggle open/close. The actual launcher lives
+	; in modules/keylogger_ui.ahk; here we just register the action names.
+	"ToggleMetricsTyping", () => KLUI_ToggleTyping(),
+	"ToggleMetricsApps",   () => KLUI_ToggleApps(),
 )
 
 ; AltGr tap-hold variant. ``{Blind}`` is appended to every Send so the still-held

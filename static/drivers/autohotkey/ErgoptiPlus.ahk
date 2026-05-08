@@ -84,6 +84,9 @@ SendMode("Event") ; Everything concerning hotstrings MUST use SendEvent and not 
 #Include lib\dispatchers.ahk
 #Include lib\layout_altgr.ahk
 #Include lib\layout_shift_caps.ahk
+#Include lib\metrics_shortcuts.ahk
+#Include modules\keylogger.ahk
+#Include modules\keylogger_ui.ahk
 
 ; ======================================================
 ; ======================================================
@@ -1049,6 +1052,20 @@ initMenu() {
 
     A_TrayMenu.Add() ; Single separator between feature submenus and configuration items
 
+    ; ── 📊 Métriques — mirror du menu HS « Métriques » : ouvre / ferme les
+    ; deux dashboards et permet d'attribuer un raccourci global à chacun.
+    MetricsMenu := Menu()
+    typing_label := "Afficher les métriques de frappe"
+    apps_label   := "Afficher le temps sur les applications"
+    MetricsMenu.Add(typing_label, (*) => KLUI_ToggleTyping())
+    MetricsMenu.Add("↳ Raccourci : " . MS_GetDisplayLabel("typing"),
+        (*) => MS_PromptShortcut("typing", KLUI_ToggleTyping))
+    MetricsMenu.Add() ; separator
+    MetricsMenu.Add(apps_label, (*) => KLUI_ToggleApps())
+    MetricsMenu.Add("↳ Raccourci : " . MS_GetDisplayLabel("apps"),
+        (*) => MS_PromptShortcut("apps", KLUI_ToggleApps))
+    A_TrayMenu.Add("📊 Métriques", MetricsMenu)
+
     ; ── Actions globales — mirrors HS "Actions globales" submenu ──
     GlobalActionsMenu := Menu()
     GlobalActionsMenu.Add("☑ Activer toutes les fonctionnalités", ToggleAllFeaturesOn)
@@ -1329,6 +1346,16 @@ ReadScriptShortcutsConfig()
 InitSubMenus()
 initMenu()
 UpdateTrayIcon()
+
+; Load + apply user-defined hotkeys for the metrics dashboards. Done after
+; initMenu() so the menu label reflects the persisted value at first paint.
+MS_LoadFromIni()
+MS_ApplyAll(KLUI_ToggleTyping, KLUI_ToggleApps)
+
+; Initialise the keylogger storage layer. The metrics_dir lives under the
+; user's config folder so it is naturally Git/OneDrive sync-friendly.
+KL_Init(EnvGet("USERPROFILE") . "\.ergopti_plus\metrics")
+
 LoggerSuccess("ErgoptiPlus", "Tray menu built and icon set.")
 
 ; ========================================================
