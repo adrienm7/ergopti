@@ -517,3 +517,57 @@ agg_app_day row count = 6
 OK: blob projected (4 top-level keys)
 OK: JSON encoded, len=892611
 OK: wrote D:\Documents\GitHub\ergopti\static\drivers\autohotkey\..\_shared\ui\metrics_typing\prefetch.json
+=== 20260508143902 — which=typing md=D:\Documents\GitHub\config\ergopti_plus\metrics
+PERF db=1969ms
+agg_app_day row count = 6
+PERF projection=1765ms
+PERF json_encode=1000ms len=892611
+PERF write=0ms total=4734ms
+=== 20260508143925 — which=typing md=D:\Documents\GitHub\config\ergopti_plus\metrics
+PERF db=0ms
+agg_app_day row count = 6
+PERF projection=2031ms
+PERF json_encode=1625ms len=892611
+PERF write=0ms total=3656ms
+=== 20260508143929 — which=typing md=D:\Documents\GitHub\config\ergopti_plus\metrics
+PERF db=31ms
+agg_app_day row count = 6
+PERF projection=3078ms
+PERF json_encode=891ms len=894249
+PERF write=15ms total=4015ms
+=== 20260508143933 — which=typing md=D:\Documents\GitHub\config\ergopti_plus\metrics
+PERF db=31ms
+agg_app_day row count = 6
+PERF projection=2031ms
+PERF json_encode=1219ms len=896758
+PERF write=0ms total=3281ms
+=== 20260508143937 — which=typing md=D:\Documents\GitHub\config\ergopti_plus\metrics
+PERF db=31ms
+agg_app_day row count = 6
+PERF projection=3000ms
+PERF json_encode=1141ms len=905425
+PERF write=16ms total=4188ms
+=== 20260508143941 — which=typing md=D:\Documents\GitHub\config\ergopti_plus\metrics
+PERF db=31ms
+agg_app_day row count = 6
+PERF projection=2359ms
+PERF json_encode=985ms len=911961
+PERF write=15ms total=3390ms
+=== 20260508143952 — which=typing md=D:\Documents\GitHub\config\ergopti_plus\metrics
+PERF db=15ms
+agg_app_day row count = 6
+PERF projection=2094ms
+PERF json_encode=1438ms len=911779
+PERF write=0ms total=3547ms
+=== 20260508143955 — which=typing md=D:\Documents\GitHub\config\ergopti_plus\metrics
+PERF db=15ms
+agg_app_day row count = 6
+PERF projection=2454ms
+PERF json_encode=1062ms len=911963
+PERF write=16ms total=3547ms
+=== 20260508143959 — which=typing md=D:\Documents\GitHub\config\ergopti_plus\metrics
+PERF db=0ms
+agg_app_day row count = 6
+PERF projection=2734ms
+PERF json_encode=953ms len=912276
+PERF write=0ms total=3687ms
