@@ -125,6 +125,7 @@ KLW_ResetBatch() {
             "ngram_word_bigrams", Map()
         ),
         "kc_ngram",    Map(),
+        "sc_kb_ngram", Map(),
         "sc_ngram",    Map(
             "ngram_shortcuts",        Map(),
             "ngram_shortcut_bigrams", Map()
@@ -775,7 +776,7 @@ KLW_WalkTypingEntry(entry) {
             }
         }
 
-        ; Physical keycode tally (non-synthetic only).
+        ; Physical keycode + scancode tally (non-synthetic only).
         if !is_synthetic {
             kc := KLW_GetMap(meta, "kc", "")
             if (kc != "" && IsNumber(kc)) {
@@ -784,6 +785,14 @@ KLW_WalkTypingEntry(entry) {
                     KLW.batch["kc_ngram"][kk] := Map("date", date_str, "app", app,
                         "keycode", Integer(kc), "count", 0)
                 KLW.batch["kc_ngram"][kk]["count"] += 1
+            }
+            sc := KLW_GetMap(meta, "sc", "")
+            if (sc != "" && IsNumber(sc)) {
+                sk := app_day_key . Chr(1) . String(sc)
+                if !KLW.batch["sc_kb_ngram"].Has(sk)
+                    KLW.batch["sc_kb_ngram"][sk] := Map("date", date_str, "app", app,
+                        "scancode", Integer(sc), "count", 0)
+                KLW.batch["sc_kb_ngram"][sk]["count"] += 1
             }
         }
     }
@@ -1019,6 +1028,14 @@ KLW_BuildBatchSql() {
             "INSERT INTO ngram_keycodes (device_id, date, app, keycode, c) VALUES ({1},{2},{3},{4},{5}) ON CONFLICT(device_id, date, app, keycode) DO UPDATE SET c=c+excluded.c;`n",
             d, KLW_SqlEscape(row["date"]), KLW_SqlEscape(row["app"]),
             row["keycode"], row["count"])
+    }
+
+    ; ngram_scancodes (Windows hardware scancodes — independent of layout).
+    for key, row in KLW.batch["sc_kb_ngram"] {
+        out .= Format(
+            "INSERT INTO ngram_scancodes (device_id, date, app, scancode, c) VALUES ({1},{2},{3},{4},{5}) ON CONFLICT(device_id, date, app, scancode) DO UPDATE SET c=c+excluded.c;`n",
+            d, KLW_SqlEscape(row["date"]), KLW_SqlEscape(row["app"]),
+            row["scancode"], row["count"])
     }
 
     ; ngram_shortcuts / ngram_shortcut_bigrams.

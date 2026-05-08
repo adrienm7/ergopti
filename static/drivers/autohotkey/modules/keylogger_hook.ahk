@@ -62,7 +62,7 @@ class KLHookConst {
     ; Hot path → today.log. 500 ms keeps the live dashboard reactive
     ; (the user sees their own keystrokes within ~half a second) while
     ; still bounding typing entries to ~25-30 events at peak rate.
-    static FLUSH_PERIOD_MS := 500
+    static FLUSH_PERIOD_MS := 200
 
     ; Window context (active app + title) is cheap to refresh but the
     ; per-keystroke cost adds up — cache for this many ms.
@@ -101,6 +101,13 @@ class KLHook {
     static ih           := unset   ; the live InputHook object
     static flush_timer  := unset   ; bound function reference for SetTimer
     static last_tick    := 0       ; A_TickCount of the last captured event
+
+    ; Last (vk, sc) seen by OnKeyDown — paired with OnChar so each
+    ; printable char carries both the virtual keycode AND the hardware
+    ; scancode. The scancode is layout-independent and is what the
+    ; Windows heatmap renders against.
+    static last_vk      := 0
+    static last_sc      := 0
 
     ; Active-window context cache. Avoids hammering Win32 on every
     ; keystroke; refreshed at most every CONTEXT_TTL_MS.
@@ -153,19 +160,24 @@ KL_Hook_OnChar(ih, c) {
     KLHook.last_tick := now
 
     ; Per-keystroke metadata. The walker reads ``kc`` for ergonomic
-    ; streaks and writes it to ngram_keycodes.
+    ; streaks and writes it to ngram_keycodes; ``sc`` is the hardware
+    ; scancode used by the Windows heatmap.
     meta := Map()
-    try {
-        ih_vk := ih.EndKey  ; populated when the key ended the input
-        if IsNumber(ih_vk)
-            meta["kc"] := ih_vk
-    }
+    if (KLHook.last_vk > 0)
+        meta["kc"] := KLHook.last_vk
+    if (KLHook.last_sc > 0)
+        meta["sc"] := KLHook.last_sc
 
     Keylogger.buffer_events.Push([c, delay, meta])
     Keylogger.buffer_text .= c
 }
 
 KL_Hook_OnKeyDown(ih, vk, sc) {
+    ; Always stash (vk, sc) for the next OnChar callback — printable
+    ; characters reach OnChar after this fires, and we need the sc to
+    ; populate the heatmap.
+    KLHook.last_vk := vk
+    KLHook.last_sc := sc
     ; Special keys only — printable chars are handled by OnChar above.
     if !KLHOOK_SPECIAL.Has(vk)
         return
@@ -184,7 +196,7 @@ KL_Hook_OnKeyDown(ih, vk, sc) {
     KLHook.last_tick := now
 
     bracket := KLHOOK_SPECIAL[vk]
-    meta := Map("kc", vk)
+    meta := Map("kc", vk, "sc", sc)
 
     Keylogger.buffer_events.Push([bracket, delay, meta])
 

@@ -122,6 +122,14 @@ KLPF_BuildAndWrite(which, metrics_dir, dbg := "", mode := "full") {
     t_json := A_TickCount
     KLPF_DbgWrite(dbg, "PERF json_encode=" . (t_json - t_proj) . "ms len=" . StrLen(json))
 
+    ; Cache JSON in memory so the WebView2 push path can skip the
+    ; round-trip through disk. The Edge --app= fallback still reads
+    ; the sidecar file from disk on first paint.
+    global KLPF_LAST_JSON
+    if !IsSet(KLPF_LAST_JSON)
+        KLPF_LAST_JSON := Map()
+    KLPF_LAST_JSON[which] := json
+
     path := KLPF_PrefetchPath(which)
     written := KLPF_WriteAtomic(path, json)
     t_write := A_TickCount
@@ -156,13 +164,38 @@ KLPF_WriteAtomic(path, content) {
 ; =========================================
 ; =========================================
 
+; Manifest cache: historical days never change once persisted, so we keep
+; the full projection and only re-query today's row on live ticks. Drops
+; the per-tick manifest cost from ~150 ms to ~20 ms.
+global KLPF_MANIFEST_CACHE := unset
+
 KLPF_BuildTyping(db, mode := "full") {
-    manifest := KLR_ReadManifest(db)
+    global KLPF_MANIFEST_CACHE
+    today := FormatTime(A_Now, "yyyy-MM-dd")
+    use_cache := (mode = "live" || mode = "manifest") && IsSet(KLPF_MANIFEST_CACHE) && KLPF_MANIFEST_CACHE
+    if use_cache {
+        manifest := KLPF_MANIFEST_CACHE
+        ; Re-project ONLY today's entry and overwrite that date in the cache.
+        today_only := KLR_ReadManifest(db, today, today)
+        if today_only.Has(today) {
+            manifest[today] := today_only[today]
+        } else if manifest.Has(today) {
+            manifest.Delete(today)
+        }
+    } else {
+        manifest := KLR_ReadManifest(db)
+        KLPF_MANIFEST_CACHE := manifest
+    }
+    ; OS hint — the UI uses this to pick between the macOS keycode
+    ; layout (kc) and the Windows scancode layout (sc_kb) when rendering
+    ; the heatmap.
+    driver_os := Map("os", "win", "heatmap_id", "sc_kb")
 
     blob := Map(
         "metrics_manifest",  manifest,
         "app_icons",         Map(),                      ; icon extraction is HS-only for now.
-        "keycode_layout",    KLPF_KeycodeLayout()
+        "keycode_layout",    KLPF_KeycodeLayout(),
+        "driver_meta",       driver_os
     )
 
     ; The full n-gram projection is the dominant cost (~2-3 s).
@@ -219,7 +252,6 @@ KLPF_BuildTyping(db, mode := "full") {
     }
     KLPF_SortInPlace(apps_list)
 
-    today := FormatTime(A_Now, "yyyy-MM-dd")
     range_data := Map("historical", Map(), "today", Map())
     if (first_date != "")
         range_data := KLR_ReadRangeSplitToday(db, first_date, today, apps_list)

@@ -526,6 +526,19 @@ CREATE TABLE IF NOT EXISTS ngram_keycodes (
 	PRIMARY KEY (device_id, date, app, keycode)
 );
 
+-- Hardware scancodes — populated by the Windows/AHK driver. Layout-
+-- independent (a given physical key always reports the same scancode
+-- regardless of the active keyboard layout), which is what the heatmap
+-- needs to colour the correct physical position.
+CREATE TABLE IF NOT EXISTS ngram_scancodes (
+	device_id TEXT NOT NULL,
+	date      TEXT NOT NULL,
+	app       TEXT NOT NULL,
+	scancode  INTEGER NOT NULL,
+	c         INTEGER NOT NULL DEFAULT 0,
+	PRIMARY KEY (device_id, date, app, scancode)
+);
+
 
 -- ============================================================================
 -- 5. VIEW CACHE
