@@ -69,12 +69,26 @@ KLPF_PrefetchPath(which) {
 ; intact so the page degrades gracefully to the old data rather than to
 ; an empty state).
 KLPF_BuildAndWrite(which, metrics_dir, dbg := "") {
-    ; Step-by-step diagnostic so a silent failure points us straight at
-    ; the broken stage. Caller provides a log path; default is alongside
-    ; the prefetch sidecar so the function still works on its own.
+    ; ─────────────────────────────────────────────────────────────────
+    ; B niveau 1 is currently DISABLED on Windows.
+    ;
+    ; The implementation depended on winsqlite3.dll (the SQLite shipped
+    ; with every Windows install). Microsoft explicitly documents
+    ; winsqlite3 as OS-internal and not callable by third-party apps,
+    ; and indeed every DllCall after sqlite3_open_v2 either returned
+    ; 0xc0000005 or crashed the AHK process outright.
+    ;
+    ; To re-enable, vendor the official precompiled sqlite3.dll from
+    ; https://www.sqlite.org/download.html (the « Precompiled Binaries
+    ; for Windows / sqlite-dll-win-x64-*.zip » bundle, ~1 MB) into
+    ; static/drivers/autohotkey/vendor/sqlite3.dll and flip the DLL
+    ; constant in lib/sqlite3.ahk. The rest of the pipeline already
+    ; works the moment a non-OS SQLite answers the call.
+    ; ─────────────────────────────────────────────────────────────────
     if (dbg = "")
         dbg := KLPF_AssetsDir(which) . "prefetch_debug.txt"
-    KLPF_DbgWrite(dbg, "=== " . A_Now . " — which=" . which . " md=" . metrics_dir)
+    KLPF_DbgWrite(dbg, "=== " . A_Now . " — disabled (winsqlite3 unsafe). Vendor sqlite3.dll to enable.")
+    return false
 
     db := KLR_BuildDatabase(metrics_dir)
     if !db {
