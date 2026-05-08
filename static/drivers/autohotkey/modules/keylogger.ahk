@@ -126,6 +126,13 @@ class Keylogger {
     ; Logger reference (lib/logger.ahk).
     static log              := unset
 
+    ; In-RAM queue of entries awaiting ingest. Populated by KL_AppendLog
+    ; alongside the JSONL today.log write, drained by KL_IngestOnce.
+    ; This avoids the round-trip through KL_JsonDecode (COM ScriptControl
+    ; is x86-only and silently returns empty Maps on 64-bit AHK) which
+    ; would otherwise leave data.sql empty even when today.log fills.
+    static _pending_entries := []
+
     ; ─── Hot-path latency caches ─────────────────────────────────────────
     ; Keeping today.log open across calls eliminates the open+close cost
     ; on every keystroke flush (NTFS + antivirus filter drivers turn that
@@ -548,6 +555,9 @@ KL_AppendLog(entry) {
         return
     if !entry.Has("timestamp")
         entry["timestamp"] := KL_NowTimestamp()
+    ; Queue the live Map for the ingest tick — no JSON round-trip needed
+    ; for entries originating in this process.
+    Keylogger._pending_entries.Push(entry)
     line := KL_JsonEncode(entry)
     line := StrReplace(line, "`n", "\n")
     line := StrReplace(line, "`r", "")
@@ -931,11 +941,27 @@ KL_ReadNewTodayLog() {
 KL_IngestOnce() {
     if !Keylogger.initialized
         return
+    ; Prefer the in-RAM queue when available — it sidesteps KL_JsonDecode
+    ; entirely (COM ScriptControl is x86-only and silently empties Maps
+    ; on 64-bit hosts). The JSONL pass is still used to drain anything
+    ; that landed on disk while this process was not running.
     pair := KL_ReadNewTodayLog()
     new_offset := pair[1]
     entries    := pair[2]
-    if (entries.Length = 0)
+    if (Keylogger._pending_entries.Length > 0) {
+        for e in Keylogger._pending_entries
+            entries.Push(e)
+        Keylogger._pending_entries := []
+    }
+    if (entries.Length = 0) {
+        ; Still advance today_log_offset so the cold-replay window keeps
+        ; shrinking even when no entries were decodable on disk.
+        if (new_offset != Keylogger.today_log_offset) {
+            Keylogger.today_log_offset := new_offset
+            KL_SaveState()
+        }
         return
+    }
 
     statements := []
     for entry in entries {
