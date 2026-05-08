@@ -545,7 +545,11 @@ function M.show(log_dir)
 		frame       = frame,
 		title       = "Temps sur les applications",
 		style_masks = 15,
-		assets_dir  = hs.configdir .. "/ui/metrics_apps/",
+		-- HTML/CSS/JS assets are now shared with the AHK driver and live in
+		-- ../_shared/ui/metrics_apps/ (sibling of hammerspoon/ in the repo).
+		-- Resolved relative to hs.configdir so deploying the repo as
+		-- ~/.hammerspoon picks the canonical _shared/ folder automatically.
+		assets_dir  = hs.configdir .. "/../_shared/ui/metrics_apps/",
 		usercontent = ucc,
 		on_close    = function()
 			M._wv = nil
