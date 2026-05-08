@@ -92,18 +92,24 @@ KLR_BuildDatabase(metrics_dir) {
         md .= "\"
     global _ConfigDir
     log := _ConfigDir . "logs\prefetch.log"
-    try FileAppend("[" . A_Now . "] KLR opening :memory: (PtrSize=" . A_PtrSize . ")`r`n", log, "UTF-8")
+    try FileAppend("[" . A_Now . "] KLR PtrSize=" . A_PtrSize . " DLL=" . SQLiteConst.DLL . "`r`n", log, "UTF-8")
+    try FileAppend("[" . A_Now . "] KLR DLL exists=" . (FileExist(SQLiteConst.DLL) ? "yes" : "NO!") . "`r`n", log, "UTF-8")
+    ; Pre-flight: probe libversion BEFORE opening anything. If the DLL
+    ; is loadable and properly built, this call has no side effects and
+    ; cannot fail. If it crashes the process, the DLL itself is wrong.
+    try {
+        ver_ptr := DllCall(SQLiteConst.DLL . "\sqlite3_libversion", "Ptr")
+        ver := ver_ptr ? StrGet(ver_ptr, "UTF-8") : "(null)"
+        FileAppend("[" . A_Now . "] pre-open libversion=" . ver . "`r`n", log, "UTF-8")
+    } catch as err {
+        FileAppend("[" . A_Now . "] pre-open libversion FAILED: " . err.Message . "`r`n", log, "UTF-8")
+        return 0
+    }
+    try FileAppend("[" . A_Now . "] KLR opening :memory:`r`n", log, "UTF-8")
     db := SQLite_Open(":memory:")
     try FileAppend("[" . A_Now . "] KLR open returned db=" . db . "`r`n", log, "UTF-8")
     if !db
         return 0
-    try {
-        ver_ptr := DllCall(SQLiteConst.DLL . "\sqlite3_libversion", "Ptr")
-        ver := ver_ptr ? StrGet(ver_ptr, "UTF-8") : "(null)"
-        FileAppend("[" . A_Now . "] sqlite3_libversion=" . ver . "`r`n", log, "UTF-8")
-    } catch as err {
-        FileAppend("[" . A_Now . "] sqlite3_libversion FAILED: " . err.Message . "`r`n", log, "UTF-8")
-    }
     try FileAppend("[" . A_Now . "] KLR loading schema…`r`n", log, "UTF-8")
     if !KLR_LoadSchema(db) {
         try FileAppend("[" . A_Now . "] KLR schema load FAILED`r`n", log, "UTF-8")
