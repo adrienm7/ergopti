@@ -90,6 +90,7 @@ SendMode("Event") ; Everything concerning hotstrings MUST use SendEvent and not 
 #Include lib\metrics_filters.ahk
 #Include modules\keylogger.ahk
 #Include modules\keylogger_walker.ahk
+#Include modules\keylogger_hook.ahk
 #Include modules\keylogger_ui.ahk
 
 ; ======================================================
@@ -1589,6 +1590,9 @@ if MetricsShortcuts.enabled {
     ; metrics folder follows the user's relocated config when applicable.
     KL_Init(_ConfigDir . "metrics")
     MS_ApplyAll(KLUI_ToggleTyping, KLUI_ToggleApps)
+    ; Wire the InputHook AFTER KL_Init so Keylogger.initialized is true
+    ; by the time the first OnChar fires.
+    KL_Hook_Start()
 }
 
 LoggerSuccess("ErgoptiPlus", "Tray menu built and icon set.")
