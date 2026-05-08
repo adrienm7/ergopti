@@ -889,23 +889,23 @@
 		<script>
 			(function () {
 				if (window.metrics_manifest) return;
-				// Load prefetch.js dynamically with a timestamp query so Edge
-				// never serves a cached blob from a previous launch. <script>
-				// tags work cross file:// where fetch() is blocked.
-				const s = document.createElement("script");
-				s.src = "./prefetch.js?t=" + Date.now();
-				s.onload = function () {
-					const blob = window._ergopti_prefetch;
-					if (!blob) return;
-					window.metrics_manifest = blob.metrics_manifest || {};
-					window.app_icons        = blob.app_icons || {};
-					window._prefetch_data   = blob._prefetch_data || null;
-					window.keycode_layout   = blob.keycode_layout || {};
-					if (typeof window.process_manifest === "function") {
-						window.process_manifest();
-					}
-				};
-				document.head.appendChild(s);
+				fetch("./prefetch.json")
+					.then((r) => (r.ok ? r.json() : null))
+					.then((blob) => {
+						if (!blob) {
+							console.error("prefetch.json missing or unreadable");
+							return;
+						}
+						console.log("prefetch loaded:", Object.keys(blob));
+						window.metrics_manifest = blob.metrics_manifest || {};
+						window.app_icons        = blob.app_icons || {};
+						window._prefetch_data   = blob._prefetch_data || null;
+						window.keycode_layout   = blob.keycode_layout || {};
+						if (typeof window.process_manifest === "function") {
+							window.process_manifest();
+						}
+					})
+					.catch((e) => console.error("prefetch fetch failed:", e));
 			})();
 		</script>
 	</body>
