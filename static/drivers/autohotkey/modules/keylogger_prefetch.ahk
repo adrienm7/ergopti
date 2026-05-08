@@ -69,9 +69,23 @@ KLPF_PrefetchPath(which) {
 ; intact so the page degrades gracefully to the old data rather than to
 ; an empty state).
 KLPF_BuildAndWrite(which, metrics_dir) {
+    ; Step-by-step diagnostic so a silent failure points us straight at
+    ; the broken stage. Written next to the prefetch sidecar.
+    dbg := KLPF_AssetsDir(which) . "prefetch_debug.txt"
+    KLPF_DbgWrite(dbg, "=== " . A_Now . " — which=" . which . " md=" . metrics_dir)
+
     db := KLR_BuildDatabase(metrics_dir)
-    if !db
+    if !db {
+        KLPF_DbgWrite(dbg, "FAIL: KLR_BuildDatabase returned 0 (winsqlite3 open or schema load failed)")
         return false
+    }
+    KLPF_DbgWrite(dbg, "OK: db opened, schema + data.sql loaded")
+
+    ; Cheap sanity probe — count agg_app_day rows so we know the data
+    ; actually landed. SQLite_Query returns Array<Map>.
+    rows := SQLite_Query(db, "SELECT COUNT(*) AS n FROM agg_app_day")
+    n := (rows.Length > 0 && rows[1].Has("n")) ? rows[1]["n"] : "?"
+    KLPF_DbgWrite(dbg, "agg_app_day row count = " . n)
 
     blob := Map()
     if (which = "typing") {
@@ -80,13 +94,20 @@ KLPF_BuildAndWrite(which, metrics_dir) {
         blob := KLPF_BuildApps(db)
     }
     SQLite_Close(db)
+    KLPF_DbgWrite(dbg, "OK: blob projected (" . (blob is Map ? blob.Count : "?") . " top-level keys)")
 
     json := KL_JsonEncode(blob)
-    ; Wrap as JS so a plain <script src> can load it cross file:// — the
-    ; bootstrap reads window._ergopti_prefetch off the global.
+    KLPF_DbgWrite(dbg, "OK: JSON encoded, len=" . StrLen(json))
+
     body := "window._ergopti_prefetch = " . json . ";"
     path := KLPF_PrefetchPath(which)
-    return KLPF_WriteAtomic(path, body)
+    written := KLPF_WriteAtomic(path, body)
+    KLPF_DbgWrite(dbg, written ? ("OK: wrote " . path) : ("FAIL: WriteAtomic to " . path))
+    return written
+}
+
+KLPF_DbgWrite(path, line) {
+    try FileAppend(line . "`r`n", path, "UTF-8")
 }
 
 KLPF_WriteAtomic(path, content) {
