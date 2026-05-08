@@ -2238,5 +2238,7 @@ CoTaskMem_String(ptr) {
 	s := StrGet(ptr), DllCall('ole32\CoTaskMemFree', 'ptr', ptr)
 	return s
 }
-#Include ..\ComVar.ahk
-#Include ..\Promise.ahk
+; Dependency #Include lines stripped — ComVar.ahk and Promise.ahk are
+; siblings in vendor/ and are loaded explicitly from ErgoptiPlus.ahk
+; before this file. The original paths (..\ComVar.ahk) assumed thqby's
+; WebView2/ subfolder layout which we flattened into vendor/.
