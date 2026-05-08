@@ -155,7 +155,7 @@ KLUI_RequireEnabled() {
     MsgBox(
         "Les métriques sont désactivées.`n`n"
         . "Pour les activer : icône de la zone de notification → 📊 Métriques → "
-        . "« ⚠️ Métriques désactivées (cliquer pour activer) ».",
+        . "« ❌ Métriques désactivées (cliquer pour activer) ».",
         "📊 Métriques", "Iconi"
     )
     return false
