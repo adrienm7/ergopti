@@ -717,13 +717,15 @@ BuildGesturesMenu() {
 
     GMenu := Menu()
 
-    ; Enable/Disable toggle
-    EnabledLabel := "Activer les gestes du touchpad"
-    GMenu.Add(EnabledLabel, (*) => ToggleGesturesEnabled())
-    if Features["Gestures"]["Enabled"].Enabled {
-        GMenu.Check(EnabledLabel)
-    }
-    GMenu.Add() ; Separator
+    ; Canonical category toggle. AddCategoryToggleItem inserts at position
+    ; 1 (and a separator at 2), so the rest of the submenu is appended
+    ; AFTER and ends up at positions 3+.
+    GestEnabled := Features["Gestures"]["Enabled"].Enabled
+    AddCategoryToggleItem(GMenu,
+        "✅ Gestes activés (cliquer pour désactiver)",
+        "❌ Gestes désactivés (cliquer pour activer)",
+        GestEnabled,
+        (*) => ToggleGesturesEnabled())
 
     ; Setup items
     GMenu.Add("🔧 Configurer automatiquement (registre)", (*) => GestureAutoConfigureAction())
@@ -796,6 +798,32 @@ ToggleGesturesEnabled() {
     Features["Gestures"]["Enabled"].Enabled := !Features["Gestures"]["Enabled"].Enabled
     IniWrite(Features["Gestures"]["Enabled"].Enabled, ConfigurationFile, "Gestures", "Enabled")
     Reload
+}
+
+
+
+
+; ====================================
+; ====================================
+; ======= 1.X / Category toggle =======
+; ====================================
+; ====================================
+
+; Insert the canonical « ✅ X activé(s) (cliquer pour désactiver) » /
+; « ❌ X désactivé(s) (cliquer pour activer) » synthetic top item into a
+; submenu, followed by a separator at position 2. AHK does not let us
+; bind a callback on the parent label of a submenu (clicks open the
+; submenu), so this is how every category exposes its global on/off
+; toggle in a uniform way — same pattern Métriques uses.
+;
+; ``on_label`` and ``off_label`` are passed in full (not built from a
+; template) so each category keeps its own French gender/number
+; agreement: « activée » for « Disposition », « activés » for
+; « Raccourcis », « activées » for « Métriques », etc.
+AddCategoryToggleItem(menu, on_label, off_label, is_enabled, on_click) {
+    label := is_enabled ? on_label : off_label
+    menu.Insert("1&", label, on_click)
+    menu.Insert("2&")  ; separator
 }
 
 
@@ -879,14 +907,15 @@ BuildMetricsMenu() {
     }
 
     A_TrayMenu.Add("📊 Métriques", MetricsMenu)
-    ; Implementation note: AHK does not expose a "click parent" callback
-    ; when the entry has a submenu. We mirror the HS « click parent =
-    ; toggle » behaviour with a synthetic first item inside the submenu.
-    on_off_label := MetricsShortcuts.enabled
-        ? "✅ Métriques activées (cliquer pour désactiver)"
-        : "⚠️ Métriques désactivées (cliquer pour activer)"
-    MetricsMenu.Insert("1&", on_off_label, (*) => ToggleMetricsEnabled())
-    MetricsMenu.Insert("2&") ; separator after the toggle
+    ; Aligned with the canonical ✅/❌ pattern used by every other
+    ; category submenu. The security-warning dialog still fires inside
+    ; ToggleMetricsEnabled() before flipping ON, so the privacy
+    ; safeguard stays in place — the icon change is purely cosmetic.
+    AddCategoryToggleItem(MetricsMenu,
+        "✅ Métriques activées (cliquer pour désactiver)",
+        "❌ Métriques désactivées (cliquer pour activer)",
+        MetricsShortcuts.enabled,
+        (*) => ToggleMetricsEnabled())
 }
 
 ; ── Filter toggles. Each persists + flips the corresponding flag and
@@ -1066,13 +1095,11 @@ initMenu() {
     ; re-enables every shortcut.
     if SubMenus.Has("Shortcuts") {
         ShortcutsAnyEnabled := HasAnyEnabled(Features["Shortcuts"])
-        ShortcutsToggleLabel := "Activer les raccourcis"
-        SubMenus["Shortcuts"].Insert("1&", ShortcutsToggleLabel,
+        AddCategoryToggleItem(SubMenus["Shortcuts"],
+            "✅ Raccourcis activés (cliquer pour désactiver)",
+            "❌ Raccourcis désactivés (cliquer pour activer)",
+            ShortcutsAnyEnabled,
             (*) => ToggleCategoryAllFeatures("Shortcuts", !ShortcutsAnyEnabled))
-        if ShortcutsAnyEnabled {
-            SubMenus["Shortcuts"].Check(ShortcutsToggleLabel)
-        }
-        SubMenus["Shortcuts"].Insert("2&")  ; Separator after toggle
     }
 
     ; Append the « Raccourcis de gestion du script » sub-submenu at the bottom
@@ -1085,23 +1112,28 @@ initMenu() {
 
     ; ── 🌐 Disposition clavier — mirrors the HS layout submenu naming ──
     LayoutMenu := Menu()
+    LayoutAnyEnabled := HasAnyEnabled(Features["Layout"])
+    AddCategoryToggleItem(LayoutMenu,
+        "✅ Disposition activée (cliquer pour désactiver)",
+        "❌ Disposition désactivée (cliquer pour activer)",
+        LayoutAnyEnabled,
+        (*) => ToggleCategoryAllFeatures("Layout", !LayoutAnyEnabled))
     for FeatureName in Features["Layout"]["__Order"] {
         MenuAddItem(LayoutMenu, "Layout", FeatureName)
     }
     A_TrayMenu.Add("🌐 Disposition clavier", LayoutMenu)
+    if LayoutAnyEnabled {
+        A_TrayMenu.Check("🌐 Disposition clavier")
+    }
 
     ; ── Hotstrings ⚡ — single submenu grouping all hotstring categories ──
     HotstringsMenu := Menu()
-    ; On/off toggle for the entire hotstrings category — workaround for AHK not
-    ; supporting a clickable parent title like Hammerspoon's checked submenu item.
     HotstringsAllEnabled := IsCategoryAllEnabled(HotstringCategories)
-    HotstringsToggleLabel := "Activer les hotstrings"
-    HotstringsMenu.Add(HotstringsToggleLabel,
+    AddCategoryToggleItem(HotstringsMenu,
+        "✅ Hotstrings activées (cliquer pour désactiver)",
+        "❌ Hotstrings désactivées (cliquer pour activer)",
+        HotstringsAllEnabled,
         HotstringsAllEnabled ? ToggleAllHotstringsOff : ToggleAllHotstringsOn)
-    if HotstringsAllEnabled {
-        HotstringsMenu.Check(HotstringsToggleLabel)
-    }
-    HotstringsMenu.Add() ; Separator below the global toggle
     for Category in HotstringCategories {
         if SubMenus.Has(Category) {
             Total := CountTomlHotstrings(Category)
@@ -1241,13 +1273,11 @@ initMenu() {
     ; TapHolds: prepend a global on/off toggle before adding to the tray
     if SubMenus.Has("TapHolds") {
         TapHoldsAllEnabled := IsCategoryAllEnabled(["TapHolds"])
-        TapHoldsToggleLabel := "Activer les tap-holds"
-        SubMenus["TapHolds"].Insert("1&", TapHoldsToggleLabel,
+        AddCategoryToggleItem(SubMenus["TapHolds"],
+            "✅ Tap-holds activés (cliquer pour désactiver)",
+            "❌ Tap-holds désactivés (cliquer pour activer)",
+            TapHoldsAllEnabled,
             (*) => ToggleCategoryAllFeatures("TapHolds", !TapHoldsAllEnabled))
-        if TapHoldsAllEnabled {
-            SubMenus["TapHolds"].Check(TapHoldsToggleLabel)
-        }
-        SubMenus["TapHolds"].Insert("2&")  ; Separator after toggle
         A_TrayMenu.Add(GetCategoryTitle("TapHolds"), SubMenus["TapHolds"])
         ; Check the parent title when all tap-holds are enabled — mirrors HS checked submenu.
         if TapHoldsAllEnabled {
