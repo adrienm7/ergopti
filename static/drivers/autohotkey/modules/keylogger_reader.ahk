@@ -587,7 +587,8 @@ KLR_ReadNgrams(db, start_date := "", end_date := "", selected_apps := unset) {
         "sc",    Map(),
         "sc_bg", Map(),
         "w_bg",  Map(),
-        "kc",    Map()
+        "kc",    Map(),
+        "sc_kb", Map()
     )
     if !db
         return out
@@ -675,7 +676,7 @@ KLR_BuildTodayIdxJson(db, selected_apps := unset) {
             KLR__StashAppTypeJson(per_app, r["app"], code, r["j"])
     }
 
-    ; Keycode heatmap.
+    ; Keycode heatmap (macOS / virtual keycode side).
     kc_sql := "SELECT app, json_group_object(CAST(keycode AS TEXT), json_object("
         . "'c', c, 't', 0, 'e', 0, 'hs', 0, 'llm', 0, 'o', 0)) AS j"
         . " FROM (SELECT app, keycode, SUM(c) AS c FROM ngram_keycodes"
@@ -684,6 +685,16 @@ KLR_BuildTodayIdxJson(db, selected_apps := unset) {
         . " GROUP BY app"
     for r in SQLite_Query(db, kc_sql)
         KLR__StashAppTypeJson(per_app, r["app"], "kc", r["j"])
+
+    ; Scancode heatmap (Windows / hardware scancode side).
+    sc_kb_sql := "SELECT app, json_group_object(CAST(scancode AS TEXT), json_object("
+        . "'c', c, 't', 0, 'e', 0, 'hs', 0, 'llm', 0, 'o', 0)) AS j"
+        . " FROM (SELECT app, scancode, SUM(c) AS c FROM ngram_scancodes"
+        . "        WHERE date = " . SQLite_Q(today) . app_clause
+        . "        GROUP BY app, scancode)"
+        . " GROUP BY app"
+    for r in SQLite_Query(db, sc_kb_sql)
+        KLR__StashAppTypeJson(per_app, r["app"], "sc_kb", r["j"])
 
     ; Shortcuts + shortcut bigrams.
     sc_sql := "SELECT app, json_group_object(token, json_object("
@@ -715,7 +726,7 @@ KLR_BuildTodayIdxJson(db, selected_apps := unset) {
         ; A complete bucket has all 11 type slots so the JS side can
         ; always read out[code][token] without a defensive check.
         type_parts := []
-        for code in ["c", "bg", "tg", "qg", "pg", "hx", "hp", "w", "sc", "sc_bg", "w_bg", "kc"] {
+        for code in ["c", "bg", "tg", "qg", "pg", "hx", "hp", "w", "sc", "sc_bg", "w_bg", "kc", "sc_kb"] {
             j := types.Has(code) ? types[code] : empty
             type_parts.Push('"' . code . '":' . (j != "" ? j : empty))
         }
@@ -792,6 +803,17 @@ KLR_ReadRangeSplitTodayFast(db, selected_apps := unset) {
         if !today_idx.Has(app)
             today_idx[app] := KLR_NewTodayBucket()
         today_idx[app]["kc"][String(r["keycode"])] := KLR_NewNgramItem(r["c"], 0, 0, "")
+    }
+
+    ; Scancode heatmap data (ngram_scancodes) — Windows side.
+    sc_kb_sql := "SELECT app, scancode, SUM(c) AS c FROM ngram_scancodes"
+        . " WHERE date = " . SQLite_Q(today) . app_clause
+        . " GROUP BY app, scancode"
+    for r in SQLite_Query(db, sc_kb_sql) {
+        app := r["app"]
+        if !today_idx.Has(app)
+            today_idx[app] := KLR_NewTodayBucket()
+        today_idx[app]["sc_kb"][String(r["scancode"])] := KLR_NewNgramItem(r["c"], 0, 0, "")
     }
 
     ; Shortcuts (sc) and shortcut bigrams — also commonly viewed tabs.
@@ -876,7 +898,8 @@ KLR_NewTodayBucket() {
         "sc",    Map(),
         "sc_bg", Map(),
         "w_bg",  Map(),
-        "kc",    Map()
+        "kc",    Map(),
+        "sc_kb", Map()
     )
 }
 

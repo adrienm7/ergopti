@@ -335,12 +335,21 @@ KLWV_PushPrefetch(which) {
         try FileAppend("[" . A_Now . "] PushPrefetch(" . which . "): no window`r`n", log, "UTF-8")
         return
     }
-    path := KLPF_PrefetchPath(which)
-    if !FileExist(path) {
-        try FileAppend("[" . A_Now . "] PushPrefetch(" . which . "): prefetch.json missing at " . path . "`r`n", log, "UTF-8")
-        return
+    ; Prefer the in-memory JSON cache populated by KLPF_BuildAndWrite —
+    ; saves a 300 KB FileRead per push. Fall back to disk if the cache is
+    ; empty (e.g. dashboard opened from a stale prefetch.json).
+    global KLPF_LAST_JSON
+    body := ""
+    if IsSet(KLPF_LAST_JSON) && KLPF_LAST_JSON.Has(which)
+        body := KLPF_LAST_JSON[which]
+    if (body = "") {
+        path := KLPF_PrefetchPath(which)
+        if !FileExist(path) {
+            try FileAppend("[" . A_Now . "] PushPrefetch(" . which . "): prefetch.json missing at " . path . "`r`n", log, "UTF-8")
+            return
+        }
+        body := FileRead(path, "UTF-8")
     }
-    body := FileRead(path, "UTF-8")
     if (body = "")
         return
     msg := '{"type":"prefetch","blob":' . body . '}'
@@ -371,16 +380,12 @@ KLWV_MonitorFromPoint(x, y) {
 KLWV_DelayedFirstPush(which) {
     if !KLWV.windows.Has(which)
         return
-    ; First paint after navigation: do a single FULL projection so the
-    ; n-gram tables, KPIs and charts all get populated. After that,
-    ; the live updates flow through KLWV_NotifyIngest() in 'manifest'
-    ; mode (the default) which is ~50 ms and fires on every flush
-    ; tick. The slow ~3 s n-gram projection no longer runs on a
-    ; periodic timer because each iteration would block AHK long
-    ; enough to swallow several manifest pushes' worth of latency.
     if KLWV.metrics_dir
         try KLPF_BuildAndWrite(which, KLWV.metrics_dir, , "full")
     KLWV_PushPrefetch(which)
+    ; Mark first paint done so live ticks can fan out from now on.
+    if KLWV.windows.Has(which)
+        KLWV.windows[which]["first_paint_done"] := true
 }
 
 ; Called by the ingest tick after data.sql has new rows. Rebuilds the
@@ -402,7 +407,12 @@ KLWV_NotifyIngest(mode := "live") {
         return
     }
     n := 0
-    for which, _ in KLWV.windows {
+    for which, entry in KLWV.windows {
+        ; Skip live ticks until the first FULL paint has landed —
+        ; otherwise an empty-historical live blob would race the full
+        ; one and leave the dashboard with wiped n-gram tables.
+        if !(entry is Map && entry.Has("first_paint_done") && entry["first_paint_done"])
+            continue
         n += 1
         try KLPF_BuildAndWrite(which, KLWV.metrics_dir, , mode)
         KLWV_PushPrefetch(which)

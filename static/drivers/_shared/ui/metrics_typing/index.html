@@ -888,47 +888,39 @@
 		-->
 		<script>
 			(function () {
+				// Persistent historical cache. process_manifest() nulls
+				// window._prefetch_data on the first paint, so we can't rely on
+				// it for the live merge — we keep our own copy here instead.
+				let cached_historical = null;
 				// Apply a prefetch blob (initial fetch or live push) onto the
-				// global state and re-render. Idempotent so the WebView2
-				// "prefetch" push event can call it as often as the ingest
-				// tick fires without breaking anything.
+				// global state and re-render.
 				function apply_prefetch(blob) {
 					if (!blob) return;
 					window.metrics_manifest = blob.metrics_manifest || {};
 					window.app_icons        = blob.app_icons || {};
 					window.keycode_layout   = blob.keycode_layout || {};
-					// Three-mode merge:
-					//   - blob has no _prefetch_data → manifest-only push
-					//     from the live tick: leave the cached n-grams
-					//     intact; KPIs alone refresh.
-					//   - blob has _prefetch_data with empty historical
-					//     and a populated today → 'live' push: keep the
-					//     historical we already received at first paint,
-					//     replace today with the freshest slice.
-					//   - blob has both populated → 'full' push (first
-					//     paint or explicit refresh): replace everything.
+					window.driver_meta      = blob.driver_meta || window.driver_meta || { os: "mac", heatmap_id: "kc" };
 					const has_prefetch = blob._prefetch_data !== undefined;
+					let merged = null;
 					if (has_prefetch) {
 						const incoming = blob._prefetch_data || {};
 						const incoming_hist = incoming.historical || {};
-						const has_historical_payload = Object.keys(incoming_hist).length > 0;
-						const cached = window._prefetch_data || {};
-						if (has_historical_payload) {
-							window._prefetch_data = incoming;
-						} else {
-							window._prefetch_data = {
-								historical: cached.historical || {},
-								today: incoming.today || {},
-							};
+						if (Object.keys(incoming_hist).length > 0) {
+							cached_historical = incoming_hist;
 						}
+						merged = {
+							historical: cached_historical || incoming_hist || {},
+							today: incoming.today || {},
+						};
+						window._prefetch_data = merged;
 					}
 					if (typeof window.process_manifest === "function") {
 						window.process_manifest();
 					}
-					if (has_prefetch && window._prefetch_data && typeof window.receive_range_data === "function") {
+					if (merged && typeof window.receive_range_data === "function") {
 						try {
 							window._lua_request = null;
-							window.receive_range_data(window._prefetch_data);
+							window.receive_range_data(merged);
 						} catch (e) {
 							console.error("receive_range_data failed:", e);
 						}
@@ -948,7 +940,7 @@
 					// queue build up and updates lag by seconds. We keep
 					// only the LATEST blob and run apply_prefetch via
 					// requestAnimationFrame so the renderer stays in
-					; sync with the freshest data instead of catching up
+					// sync with the freshest data instead of catching up
 					// from stale snapshots.
 					let pending_blob = null;
 					let frame_scheduled = false;
@@ -976,24 +968,9 @@
 						}
 						if (!payload || payload.type !== "prefetch") return;
 						push_count++;
-						const blob = payload.blob;
-						// The very first push (regardless of mode) must
-						// never be dropped — process_manifest only seeds
-						// the dashboard once, and a later live push
-						// beating it to the rAF flush would leave the
-						// page empty. Apply the first one synchronously.
-						if (!first_paint_done) {
-							first_paint_done = true;
-							processed_count++;
-							console.log("apply FIRST push#" + processed_count);
-							apply_prefetch(blob);
-							return;
-						}
-						pending_blob = blob;
-						if (!frame_scheduled) {
-							frame_scheduled = true;
-							requestAnimationFrame(flush_pending);
-						}
+						processed_count++;
+						console.log("apply push#" + processed_count + " keys=" + Object.keys(payload.blob||{}).join(","));
+						apply_prefetch(payload.blob);
 					});
 					try {
 						window.chrome.webview.postMessage(JSON.stringify({ action: "ready" }));
