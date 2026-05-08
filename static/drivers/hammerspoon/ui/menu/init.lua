@@ -690,6 +690,10 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 			open_console    = function() pcall(hs.openConsole) end,
 			open_init       = function() pcall(hs.execute, string.format("open \"%sinit.lua\"", base_dir)) end,
 			open_paths      = function() hs.timer.doAfter(0.05, function() pcall(MenuPaths.open_editor) end) end,
+			open_personal_shortcuts = function()
+				local ok, ps = pcall(require, "lib.personal_shortcuts")
+				if ok and type(ps.open) == "function" then pcall(ps.open) end
+			end,
 			reload          = function() do_reload("menu") end,
 			quit            = function() hs.timer.doAfter(0.1, function() os.exit(0) end) end,
 		}
@@ -704,6 +708,15 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 	end
 
 	updateMenu()
+
+	-- Load the user's personal_shortcuts.lua. Done after the menu is built
+	-- so any hs.hotkey.bind defined in the user file finds the rest of the
+	-- driver fully wired. Errors are caught inside the module so a broken
+	-- user file logs to the console without preventing boot.
+	pcall(function()
+		local ok, ps = pcall(require, "lib.personal_shortcuts")
+		if ok and type(ps.load) == "function" then ps.load() end
+	end)
 
 	local function reloadConfig(files)
 		-- HTML/CSS/JS are webview assets loaded at open-time — changing them

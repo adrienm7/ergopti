@@ -190,6 +190,12 @@ function M.get(key)
 	if key == "HotstringsDirPath"    then return config_dir()                               end
 	if key == "ConfigJsonPath"       then return file_in_config("config.json")              end
 	if key == "KarabinerConfigPath"  then return file_in_config("karabiner_user_config.json") end
+	-- Personal Lua hotkeys file. Mirrors the role of personal_shortcuts.ahk
+	-- on the Windows driver: user-owned, loaded via dofile at boot, lives
+	-- in the synced config dir so a Mac + PC setup can keep platform-
+	-- specific hotkey definitions side by side (.lua vs .ahk extensions
+	-- avoid any name collision when the folder is shared).
+	if key == "PersonalShortcutsLuaPath" then return file_in_config("personal_shortcuts.lua") end
 	return ""
 end
 
