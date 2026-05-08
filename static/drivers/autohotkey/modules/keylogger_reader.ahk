@@ -97,6 +97,18 @@ KLR_BuildDatabase(metrics_dir) {
     try FileAppend("[" . A_Now . "] KLR open returned db=" . db . "`r`n", log, "UTF-8")
     if !db
         return 0
+    ; Sanity probe: call a side-effect-free function on the DLL to see
+    ; whether the lib is generally callable from this process. If this
+    ; succeeds but sqlite3_prepare_v2 crashes, the issue is specific to
+    ; calls that use the db handle — i.e. either a corrupt handle or a
+    ; winsqlite3 quirk forbidding third-party prepare calls.
+    try {
+        ver_ptr := DllCall("C:\Windows\System32\winsqlite3.dll\sqlite3_libversion", "Ptr")
+        ver := ver_ptr ? StrGet(ver_ptr, "UTF-8") : "(null)"
+        FileAppend("[" . A_Now . "] sqlite3_libversion=" . ver . "`r`n", log, "UTF-8")
+    } catch as err {
+        FileAppend("[" . A_Now . "] sqlite3_libversion FAILED: " . err.Message . "`r`n", log, "UTF-8")
+    }
     try FileAppend("[" . A_Now . "] KLR loading schema…`r`n", log, "UTF-8")
     if !KLR_LoadSchema(db) {
         try FileAppend("[" . A_Now . "] KLR schema load FAILED`r`n", log, "UTF-8")

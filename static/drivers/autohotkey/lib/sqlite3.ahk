@@ -46,7 +46,7 @@ class SQLiteConst {
     static TYPE_TXT   := 3
     static TYPE_BLOB  := 4
     static TYPE_NULL  := 5
-    static DLL        := "winsqlite3"
+    static DLL        := "C:\Windows\System32\winsqlite3.dll"
     static UTF8_PAGE  := 65001
 }
 
