@@ -387,12 +387,15 @@ KLWV_DelayedFirstPush(which) {
 ; prefetch blob and pushes it to every open dashboard.
 ;
 ; mode:
-;   "manifest" — KPIs only, ~100-200 ms total. Used by the 500 ms flush
-;                tick so the user's keystrokes show up near-instantly.
-;   "full"     — manifest + n-grams, ~3-4 s total. Used by a slower
-;                cadence so the n-gram tables stay fresh without
-;                blocking the KPI updates.
-KLWV_NotifyIngest(mode := "manifest") {
+;   "manifest" — KPIs only, ~50 ms total. Omits _prefetch_data so the
+;                page keeps the existing n-gram tables.
+;   "live"     — manifest + today's top-500 n-grams (chars/bg/tg/qg/
+;                words/word_bigrams) + kc heatmap + shortcuts. ~150-
+;                300 ms. Default for the live tick so the keycode
+;                heatmap, SFB heatmap and tables all track typing.
+;   "full"     — full projection including historical. Used at first
+;                paint to seed the cached historical block.
+KLWV_NotifyIngest(mode := "live") {
     global _ConfigDir
     log := _ConfigDir . "logs\webview.log"
     if !KLWV.metrics_dir {

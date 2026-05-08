@@ -151,14 +151,29 @@ KLPF_BuildTyping(db, mode := "full") {
         "keycode_layout",    KLPF_KeycodeLayout()
     )
 
-    ; The n-gram projection is the dominant cost (~2-3 s for tens of
-    ; thousands of rows + AHK Map allocation). When the caller only
-    ; needs to refresh the KPI counters / charts (every flush tick),
-    ; skip it entirely AND OMIT the _prefetch_data key altogether so
-    ; the JS bootstrap leaves the existing n-gram tables alone — an
-    ; empty {historical, today} object would otherwise wipe every
-    ; tab to "no data".
+    ; The full n-gram projection is the dominant cost (~2-3 s).
+    ; Mode dispatch:
+    ;   manifest — KPIs only, ~50 ms. Omits _prefetch_data so the JS
+    ;              bootstrap keeps the existing n-gram tables.
+    ;   live     — KPIs + today's top-500 n-grams across the most-
+    ;              viewed tables (chars/bigrams/.../words). Historical
+    ;              stays cached client-side from the first paint.
+    ;              ~150-300 ms.
+    ;   full     — full projection (default), used at first paint to
+    ;              seed the historical block.
     if (mode = "manifest") {
+        return blob
+    }
+    if (mode = "live") {
+        apps_list := []
+        for date_str, day_data in manifest {
+            for app_name, _ in day_data {
+                if (app_name = "Unknown")
+                    continue
+                apps_list.Push(app_name)
+            }
+        }
+        blob["_prefetch_data"] := KLR_ReadRangeSplitTodayFast(db, apps_list)
         return blob
     }
 
