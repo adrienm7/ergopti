@@ -2006,12 +2006,26 @@ BuildScriptShortcutsMenu() {
             ? GESTURE_ACTIONS[Current].Label
             : "Désactivé"
         SlotMenu := Menu()
+        ; "--" sentinels in GESTURE_ACTION_NAMES become visual separators
+        ; in the slot picker so the user can see category boundaries
+        ; (Selection / Editing / Keys / Tabs / Windows / …).
+        last_was_separator := true   ; suppress leading separators
         for ActionName in GESTURE_ACTION_NAMES {
+            if (ActionName == "--") {
+                if !last_was_separator {
+                    SlotMenu.Add()
+                    last_was_separator := true
+                }
+                continue
+            }
+            if !GESTURE_ACTIONS.Has(ActionName)
+                continue
             ActionLabel := GESTURE_ACTIONS[ActionName].Label
             SlotMenu.Add(ActionLabel, _MakeScriptShortcutHandler(Slot, ActionName))
             if (ActionName == Current) {
                 SlotMenu.Check(ActionLabel)
             }
+            last_was_separator := false
         }
         SMenu.Add(SCRIPT_SHORTCUT_LABELS[Slot] . " : " . CurrentLabel, SlotMenu)
     }

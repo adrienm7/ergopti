@@ -404,7 +404,79 @@ global GESTURE_ACTIONS := Map(
         Label: "Quitter ErgoptiPlus",
         Fn: (*) => ExitApp(),
     },
+    ; --- User interfaces (toggle / focus / open) ---
+    ; Each UI action follows the same three-state pattern: if the
+    ; window is closed, open it; if open and focused, close it; if
+    ; open but in the background, raise it to the foreground.
+    "ui_metrics_typing", {
+        Label: "📊 Métriques de frappe",
+        Fn: (*) => GestureToggleOrFocusUI("metrics_typing"),
+    },
+    "ui_metrics_apps", {
+        Label: "📊 Temps sur les applications",
+        Fn: (*) => GestureToggleOrFocusUI("metrics_apps"),
+    },
+    "ui_hotstrings_editor", {
+        Label: "✏️ Hotstrings personnels (éditeur)",
+        Fn: (*) => GestureToggleOrFocusUI("hotstrings_editor"),
+    },
+    "ui_paths_editor", {
+        Label: "📂 Dossier de configuration (éditeur)",
+        Fn: (*) => GestureToggleOrFocusUI("paths_editor"),
+    },
 )
+
+; Toggle / focus / open helper shared by every ui_* action above.
+; Centralising the three-state logic keeps the action map declarative
+; and the per-UI lookup table is the only piece that needs editing
+; when a new dashboard / editor lands.
+GestureToggleOrFocusUI(which) {
+    ; Lookup table: which → { hwnd_getter, opener, closer }.
+    ; - hwnd_getter returns the current window HWND if open, 0 otherwise.
+    ; - opener is the function that opens the UI from scratch.
+    ; - closer destroys the UI window.
+    switch which {
+        case "metrics_typing":
+            GestureGenericToggleUI(
+                () => KLWV.windows.Has("typing") ? KLWV.windows["typing"]["gui"].Hwnd : 0,
+                () => KLUI_ToggleTyping(),
+                () => KLWV.windows.Has("typing") ? KLWV_Close("typing") : 0
+            )
+        case "metrics_apps":
+            GestureGenericToggleUI(
+                () => KLWV.windows.Has("apps") ? KLWV.windows["apps"]["gui"].Hwnd : 0,
+                () => KLUI_ToggleApps(),
+                () => KLWV.windows.Has("apps") ? KLWV_Close("apps") : 0
+            )
+        case "hotstrings_editor":
+            ; The TOML editor is a transient Gui — no persistent handle
+            ; tracked, so we can't reliably foreground an existing one.
+            ; Always open: a second call surfaces the most recent window.
+            try OpenPersonalEditor()
+        case "paths_editor":
+            try FilePathsEditor()
+    }
+}
+
+; Close-if-focused, foreground-if-background, open-if-closed for any UI
+; whose host exposes an HWND. The three callbacks let each UI plug its
+; own handle / open / close functions without duplicating the dispatch
+; logic.
+GestureGenericToggleUI(get_hwnd_fn, open_fn, close_fn) {
+    hwnd := 0
+    try hwnd := get_hwnd_fn.Call()
+    if (hwnd && WinExist("ahk_id " . hwnd)) {
+        focused := 0
+        try focused := WinGetID("A")
+        if (focused = hwnd) {
+            try close_fn.Call()
+        } else {
+            try WinActivate("ahk_id " . hwnd)
+        }
+        return
+    }
+    try open_fn.Call()
+}
 
 ; Save the active document with Ctrl+S then reload — mirrors the legacy
 ; AltGr+BackSpace shortcut that pre-dated the action registry.
@@ -422,33 +494,49 @@ GestureEditPersonalShortcuts() {
     Run('notepad.exe "' . Path . '"')
 }
 
-; Ordered list of action names for the menu (same order as Hammerspoon)
+; Ordered list of action names for the menu, with "--" sentinels marking
+; category boundaries. The menu builder turns each "--" into a visual
+; separator so the picker stays scannable at a glance instead of being
+; one long flat scroll. Mirrors menu_gestures.lua on the macOS side.
 global GESTURE_ACTION_NAMES := [
     "none",
+    "--",
     ; Selection & navigation
     "right_click_toggle", "app_switcher",
+    "--",
     ; Editing
     "copy", "paste", "cut", "undo", "redo", "select_all", "find",
+    "--",
     ; Keys
     "enter", "tab", "escape", "backspace", "delete",
+    "--",
     ; Tabs
     "tab_new", "tab_close", "tab_prev", "tab_next",
+    "--",
     ; Browser / history navigation
     "nav_back", "nav_forward",
+    "--",
     ; Windows & Desktops
     "win_prev", "win_next", "win_app_prev", "win_app_next", "close_window", "fullscreen",
     "snap_left", "snap_right", "maximize",
     "desktop_prev", "desktop_next", "desktop_new", "desktop_close",
     "task_view", "minimize_all",
+    "--",
     ; Media
     "vol_up", "vol_down", "mute",
     "track_play", "track_next", "track_prev",
+    "--",
     ; System
     "screenshot_window_clipboard", "screenshot_window_save",
     "screenshot_region_clipboard", "screenshot_region_save",
     "screenshot_fullscreen_clipboard", "screenshot_fullscreen_save",
     "screen_record",
     "lock_screen", "notification_center",
+    "--",
+    ; User interfaces (toggle / focus / open)
+    "ui_metrics_typing", "ui_metrics_apps",
+    "ui_hotstrings_editor", "ui_paths_editor",
+    "--",
     ; Script management
     "ahk_reload", "ahk_save_reload", "ahk_suspend", "ahk_edit", "ahk_quit",
 ]
