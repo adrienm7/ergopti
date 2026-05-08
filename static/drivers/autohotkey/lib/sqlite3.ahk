@@ -134,24 +134,48 @@ SQLite_LastError(db) {
 ; ===================================
 
 SQLite_Exec(db, sql) {
+    ; winsqlite3.dll's sqlite3_exec entry point access-violates when
+    ; called from AHK no matter how we shape the parameters (verified
+    ; against several well-formed signatures). The standard prepare /
+    ; step / finalize loop works fine, so we drive the multi-statement
+    ; script ourselves: prepare consumes one statement at a time and
+    ; returns a tail pointer to the leftover SQL.
     if !db
         return false
-    ; Encode UTF-8 manually and keep the Buffer alive in this scope so
-    ; the DllCall's Ptr stays valid for the entire call. The previous
-    ; helper-via-VarRef indirection produced an access violation on
-    ; winsqlite3 — likely because the helper's Buffer reference was
-    ; collected between DllCall arg marshalling and the actual call.
     n := StrPut(sql, "UTF-8")
     sql_buf := Buffer(n, 0)
     StrPut(sql, sql_buf, "UTF-8")
-    rc := DllCall(SQLiteConst.DLL . "\sqlite3_exec",
-        "Ptr", db,
-        "Ptr", sql_buf.Ptr,
-        "Ptr", 0,        ; callback
-        "Ptr", 0,        ; user-data
-        "Ptr", 0,        ; errmsg outparam — we don't need it
-        "Int")
-    return (rc = SQLiteConst.OK)
+
+    cur  := sql_buf.Ptr
+    end_ := cur + n - 1   ; exclude the trailing NUL.
+    while (cur < end_) {
+        pstmt := 0
+        ptail := 0
+        rc := DllCall(SQLiteConst.DLL . "\sqlite3_prepare_v2",
+            "Ptr",  db,
+            "Ptr",  cur,
+            "Int",  -1,
+            "Ptr*", &pstmt,
+            "Ptr*", &ptail,
+            "Int")
+        if (rc != SQLiteConst.OK)
+            return false
+        if pstmt {
+            ; Drive the statement to completion. Most schema/INSERT
+            ; statements step once and return DONE; SELECTs would loop.
+            Loop {
+                step_rc := DllCall(SQLiteConst.DLL . "\sqlite3_step",
+                    "Ptr", pstmt, "Int")
+                if (step_rc != SQLiteConst.ROW)
+                    break
+            }
+            DllCall(SQLiteConst.DLL . "\sqlite3_finalize", "Ptr", pstmt)
+        }
+        if (!ptail || ptail = cur)
+            break
+        cur := ptail
+    }
+    return true
 }
 
 
