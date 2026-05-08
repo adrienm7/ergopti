@@ -787,18 +787,33 @@
 		-->
 		<script>
 			(function () {
+				function apply_prefetch(blob) {
+					if (!blob) return;
+					const manifest   = blob.metrics_manifest || {};
+					const categories = blob.user_categories  || {};
+					const icons      = blob.app_icons        || {};
+					if (typeof window.bootstrapMetricsAppsData === "function") {
+						window.bootstrapMetricsAppsData(manifest, categories, icons);
+					}
+				}
+
+				if (window.chrome && window.chrome.webview) {
+					window.chrome.webview.addEventListener("message", (e) => {
+						let payload = e.data;
+						if (typeof payload === "string") {
+							try { payload = JSON.parse(payload); } catch (_) { return; }
+						}
+						if (!payload || payload.type !== "prefetch") return;
+						apply_prefetch(payload.blob);
+					});
+					try { window.chrome.webview.postMessage(JSON.stringify({ action: "ready" })); } catch (_) {}
+					return;
+				}
+
 				if (window.ManifestData && Object.keys(window.ManifestData).length) return;
 				fetch("./prefetch.json")
 					.then((r) => (r.ok ? r.json() : null))
-					.then((blob) => {
-						if (!blob) return;
-						const manifest   = blob.metrics_manifest || {};
-						const categories = blob.user_categories  || {};
-						const icons      = blob.app_icons        || {};
-						if (typeof window.bootstrapMetricsAppsData === "function") {
-							window.bootstrapMetricsAppsData(manifest, categories, icons);
-						}
-					})
+					.then((blob) => apply_prefetch(blob))
 					.catch(() => {});
 			})();
 		</script>

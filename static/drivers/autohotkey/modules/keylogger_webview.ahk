@@ -1,0 +1,307 @@
+; modules/keylogger_webview.ahk
+
+; ==============================================================================
+; MODULE: Keylogger WebView2 Host (B niveau 2)
+; DESCRIPTION:
+; AHK Gui that embeds Microsoft Edge WebView2 to host the metrics
+; dashboards. Replaces the standalone Edge --app= launcher of B niveau 1
+; with an in-process WebView2 control so the AHK script can push live
+; updates to the page (and conversely receive filter/query requests
+; from JS) via the WebView2 message bridge.
+;
+; FEATURES & RATIONALE:
+; 1. In-process bridge: ``WebView2.WebMessageReceived`` lets JS call
+;    ``window.chrome.webview.postMessage(obj)`` and that lands directly
+;    in our AHK callback — no file polling, no IPC.
+; 2. Push side: ``CoreWebView2.PostWebMessageAsString(json)`` shoves a
+;    payload into the page, which dispatches a ``message`` event the
+;    bootstrap listens for. Used by the ingest tick to deliver fresh
+;    prefetch blobs without reloading the page.
+; 3. Per-dashboard window: each dashboard (typing / apps) gets its own
+;    Gui so opening one doesn't yank focus from the other. State is
+;    tracked per-key in the KLWV.windows Map.
+; 4. Edge fallback retained: KLUI keeps the Edge --app= path as a
+;    documented fallback when WebView2 Runtime is missing — the
+;    initialiser sets KLWV.available to false in that case.
+; ==============================================================================
+
+#Requires Autohotkey v2.0+
+
+
+
+
+; ===================================
+; ===================================
+; ======= 1/ Module state =======
+; ===================================
+; ===================================
+
+class KLWV {
+    ; Whether WebView2 Runtime + the vendored wrapper are loadable.
+    ; Probed once on first call; KLUI checks this before deciding
+    ; between WebView2 and Edge --app=.
+    static available := unset
+
+    ; windows[key] := { which, gui, controller, webview, hwnd_host }
+    ; key is "typing" or "apps".
+    static windows := Map()
+
+    ; Last metrics_dir we built a prefetch for. Used by the ingest tick
+    ; refresh path so callers don't have to re-pass the dir.
+    static metrics_dir := ""
+}
+
+
+
+
+; =====================================
+; =====================================
+; ======= 2/ Probe / availability =======
+; =====================================
+; =====================================
+
+KLWV_IsAvailable() {
+    ; Probe once: does the wrapper class load + does WebView2Loader.dll
+    ; sit in the expected vendor path? We don't try to instantiate the
+    ; control here (that would spawn a runtime probe and slow startup);
+    ; that happens lazily on first KLWV_Open.
+    if KLWV.HasOwnProp("available") && KLWV.available != ""
+        return KLWV.available
+    KLWV.available := false
+    loader := A_ScriptDir . "\vendor\64bit\WebView2Loader.dll"
+    if !FileExist(loader)
+        return false
+    if !IsSet(WebView2)
+        return false
+    KLWV.available := true
+    return true
+}
+
+
+
+
+; ===================================
+; ===================================
+; ======= 3/ Asset paths =======
+; ===================================
+; ===================================
+
+; Resolve the absolute file:// URL of a dashboard's index.html.
+KLWV_AssetUrl(which) {
+    base := A_ScriptDir . "\..\_shared\ui\metrics_" . which . "\index.html"
+    Loop Files, base
+        base := A_LoopFileFullPath
+    return "file:///" . StrReplace(base, "\", "/")
+}
+
+
+
+
+; ============================================
+; ============================================
+; ======= 4/ Lifecycle (open / close) =======
+; ============================================
+; ============================================
+
+KLWV_Open(which, metrics_dir) {
+    if !KLWV_IsAvailable()
+        return false
+    if KLWV.windows.Has(which) && KLWV_IsAlive(KLWV.windows[which])
+        return true   ; Already open; caller should foreground via KLWV_Focus.
+
+    KLWV.metrics_dir := metrics_dir
+
+    ; Generate a fresh prefetch.json before navigating so the page's
+    ; bootstrap fetch always sees the freshest data.
+    try KLPF_BuildAndWrite(which, metrics_dir)
+
+    title := (which = "typing") ? "Métriques de frappe" : "Temps sur les applications"
+    g := Gui("+Resize +MinSize800x600", title)
+    g.MarginX := 0
+    g.MarginY := 0
+
+    ; Reserve the full client area for the WebView2 control. The Gui
+    ; resize event below routes its new size into the controller bounds.
+    sf := MonitorGetWorkArea(MonitorGetPrimary(), &L, &T, &R, &B)
+    initial_w := Min(R - L - 100, 1400)
+    initial_h := Min(B - T - 100, 900)
+
+    g.OnEvent("Size",  KLWV_OnGuiSize.Bind(which))
+    g.OnEvent("Close", KLWV_OnGuiClose.Bind(which))
+    g.Show("w" . initial_w . " h" . initial_h)
+
+    ; Spin up WebView2 inside the Gui's HWND. dataDir is unique per
+    ; launch so cached state from a previous open never bleeds in.
+    udir := A_Temp . "\ergopti_webview2_" . A_TickCount
+    DirCreate(udir)
+    loader := A_ScriptDir . "\vendor\64bit\WebView2Loader.dll"
+
+    ; thqby's wrapper resolves WebView2 asynchronously through a
+    ; Promise; we await it inline so the rest of the wiring runs
+    ; synchronously against a ready controller.
+    controller := WebView2.create(g.Hwnd, , 0, udir, "", 0, loader)
+    webview := controller.CoreWebView2
+
+    ; Disable Edge UI surfaces we don't want bleeding through —
+    ; the dashboard is a chromeless single-page app.
+    settings := webview.Settings
+    try settings.AreDevToolsEnabled       := true   ; F12 stays useful for debugging.
+    try settings.AreDefaultContextMenusEnabled := false
+    try settings.IsStatusBarEnabled       := false
+    try settings.AreBrowserAcceleratorKeysEnabled := false
+
+    ; Bridge: JS → AHK. Page sends `chrome.webview.postMessage(obj)`;
+    ; we receive a string here.
+    webview.WebMessageReceived := KLWV_OnWebMessage.Bind(which)
+
+    webview.Navigate(KLWV_AssetUrl(which))
+
+    KLWV.windows[which] := Map(
+        "which",      which,
+        "gui",        g,
+        "controller", controller,
+        "webview",    webview,
+        "udir",       udir
+    )
+    KLWV_FitWebView(which)
+    return true
+}
+
+KLWV_IsAlive(entry) {
+    if !(entry is Map) || !entry.Has("gui")
+        return false
+    try return WinExist("ahk_id " . entry["gui"].Hwnd) ? true : false
+    return false
+}
+
+KLWV_Focus(which) {
+    if !KLWV.windows.Has(which)
+        return
+    try KLWV.windows[which]["gui"].Show()
+}
+
+KLWV_Close(which) {
+    if !KLWV.windows.Has(which)
+        return
+    entry := KLWV.windows[which]
+    try entry["controller"].Close()
+    try entry["gui"].Destroy()
+    KLWV.windows.Delete(which)
+}
+
+KLWV_CloseAll() {
+    for which, _ in KLWV.windows.Clone()
+        KLWV_Close(which)
+}
+
+
+
+
+; ===================================
+; ===================================
+; ======= 5/ Sizing =======
+; ===================================
+; ===================================
+
+KLWV_FitWebView(which) {
+    if !KLWV.windows.Has(which)
+        return
+    entry := KLWV.windows[which]
+    g := entry["gui"]
+    g.GetClientPos(, , &w, &h)
+    try entry["controller"].Bounds := Buffer(16, 0)  ; placeholder; real call below
+    ; thqby's wrapper exposes Bounds as { left, top, right, bottom }
+    ; via an explicit setter-friendly object. We fall back to a manual
+    ; ComCall when the property is not directly assignable.
+    try {
+        rc := Buffer(16, 0)
+        NumPut("Int", 0, rc, 0)
+        NumPut("Int", 0, rc, 4)
+        NumPut("Int", w, rc, 8)
+        NumPut("Int", h, rc, 12)
+        ComCall(4, entry["controller"], "Ptr", rc.Ptr)  ; ICoreWebView2Controller::put_Bounds
+    }
+}
+
+KLWV_OnGuiSize(which, gui, minMax, w, h) {
+    if (minMax = -1)
+        return
+    KLWV_FitWebView(which)
+}
+
+KLWV_OnGuiClose(which, *) {
+    KLWV_Close(which)
+}
+
+
+
+
+; ====================================
+; ====================================
+; ======= 6/ Bridge (JS → AHK) =======
+; ====================================
+; ====================================
+
+; Receive a message posted by the page via chrome.webview.postMessage.
+; The wrapper exposes the payload as a UTF-16 string; we treat it as a
+; JSON command of the form {"action":"...", ...}.
+KLWV_OnWebMessage(which, sender, args) {
+    msg := ""
+    try msg := args.TryGetWebMessageAsString()
+    if (msg = "")
+        return
+    ; Tiny ad-hoc parser for the action verb — the only field we need
+    ; right now is "action". Full payload parsing is deferred until we
+    ; add filter pushdown commands.
+    action := ""
+    if RegExMatch(msg, '"action"\s*:\s*"([^"]+)"', &m)
+        action := m[1]
+    switch action {
+        case "ready":
+            ; Page just finished loading and signals it's ready to
+            ; receive pushes. Send the latest prefetch immediately so
+            ; the dashboard renders without waiting for the next ingest
+            ; tick.
+            KLWV_PushPrefetch(which)
+        case "request_refresh":
+            try KLPF_BuildAndWrite(which, KLWV.metrics_dir)
+            KLWV_PushPrefetch(which)
+    }
+}
+
+
+
+
+; ====================================
+; ====================================
+; ======= 7/ Push (AHK → JS) =======
+; ====================================
+; ====================================
+
+; Push the contents of the freshly-built prefetch.json to the page as a
+; structured WebView2 message. The page bootstrap dispatches it to
+; process_manifest just like the initial fetch.
+KLWV_PushPrefetch(which) {
+    if !KLWV.windows.Has(which)
+        return
+    path := KLPF_PrefetchPath(which)
+    if !FileExist(path)
+        return
+    body := FileRead(path, "UTF-8")
+    if (body = "")
+        return
+    msg := '{"type":"prefetch","blob":' . body . '}'
+    entry := KLWV.windows[which]
+    try entry["webview"].PostWebMessageAsString(msg)
+}
+
+; Called by the ingest tick after data.sql has new rows. Rebuilds the
+; prefetch blob and pushes it to every open dashboard.
+KLWV_NotifyIngest() {
+    if !KLWV.metrics_dir
+        return
+    for which, _ in KLWV.windows.Clone() {
+        try KLPF_BuildAndWrite(which, KLWV.metrics_dir)
+        KLWV_PushPrefetch(which)
+    }
+}

@@ -89,11 +89,15 @@ SendMode("Event") ; Everything concerning hotstrings MUST use SendEvent and not 
 #Include lib\metrics_shortcuts.ahk
 #Include lib\metrics_filters.ahk
 #Include lib\sqlite3.ahk
+#Include vendor\ComVar.ahk
+#Include vendor\Promise.ahk
+#Include vendor\WebView2.ahk
 #Include modules\keylogger.ahk
 #Include modules\keylogger_walker.ahk
 #Include modules\keylogger_hook.ahk
 #Include modules\keylogger_reader.ahk
 #Include modules\keylogger_prefetch.ahk
+#Include modules\keylogger_webview.ahk
 #Include modules\keylogger_ui.ahk
 
 ; ======================================================
