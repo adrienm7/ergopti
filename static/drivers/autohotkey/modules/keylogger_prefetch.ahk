@@ -101,10 +101,24 @@ KLPF_BuildAndWrite(which, metrics_dir, dbg := "", mode := "full") {
     } else if (which = "apps") {
         blob := KLPF_BuildApps(db)
     }
+    ; Pull and remove the side-channel today JSON before encoding —
+    ; it would otherwise leak into the output as "__klpf_today_json"
+    ; and the placeholder substitution wouldn't fire.
+    today_json_raw := ""
+    if blob.Has("__klpf_today_json") {
+        today_json_raw := blob["__klpf_today_json"]
+        blob.Delete("__klpf_today_json")
+    }
     t_proj := A_TickCount
     KLPF_DbgWrite(dbg, "PERF projection=" . (t_proj - t_db) . "ms")
 
     json := KL_JsonEncode(blob)
+    if (today_json_raw != "") {
+        ; Replace the quoted sentinel with the raw object literal so
+        ; the final output is valid JSON: "today":<...> without the
+        ; encoder having had to walk thousands of n-gram rows itself.
+        json := StrReplace(json, '"__KLPF_TODAY_PLACEHOLDER__"', today_json_raw)
+    }
     t_json := A_TickCount
     KLPF_DbgWrite(dbg, "PERF json_encode=" . (t_json - t_proj) . "ms len=" . StrLen(json))
 
@@ -165,6 +179,12 @@ KLPF_BuildTyping(db, mode := "full") {
         return blob
     }
     if (mode = "live") {
+        ; Splice the SQL-built today JSON in as a magic placeholder
+        ; the encoder leaves alone. KLPF_BuildAndWrite detects the
+        ; sentinel and post-substitutes the real JSON string after
+        ; KL_JsonEncode runs. This bypasses ~600 ms of per-row Map
+        ; allocation + ~300 ms of AHK-side JSON encoding for the
+        ; n-gram tables, dropping live-tick total to under 200 ms.
         apps_list := []
         for date_str, day_data in manifest {
             for app_name, _ in day_data {
@@ -173,7 +193,12 @@ KLPF_BuildTyping(db, mode := "full") {
                 apps_list.Push(app_name)
             }
         }
-        blob["_prefetch_data"] := KLR_ReadRangeSplitTodayFast(db, apps_list)
+        today_json := KLR_BuildTodayIdxJson(db, apps_list)
+        blob["_prefetch_data"] := Map(
+            "historical", Map(),
+            "today",      "__KLPF_TODAY_PLACEHOLDER__"
+        )
+        blob["__klpf_today_json"] := today_json
         return blob
     }
 

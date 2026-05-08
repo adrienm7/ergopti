@@ -628,6 +628,123 @@ KLR_ReadNgrams(db, start_date := "", end_date := "", selected_apps := unset) {
 ; which keeps the per-tick cost well under 500 ms even on big DBs.
 KLR_FAST_LIMIT := 500
 
+; SQL-side JSON projection. Builds the entire today_idx JSON string
+; directly via SQLite's json_group_object / json_object aggregations.
+; Iterating thousands of n-gram rows in AHK + per-row Map allocation
+; was making the live tick take ~1 s; this version pushes the work
+; into SQLite which produces the final JSON in well under 100 ms.
+;
+; Returns a string fragment ready to splice into prefetch JSON:
+;   {"app1": {"c": {…}, "bg": {…}, …}, "app2": {…}, …}
+KLR_BuildTodayIdxJson(db, selected_apps := unset) {
+    if !IsSet(selected_apps)
+        selected_apps := []
+    if !db
+        return "{}"
+    today := FormatTime(A_Now, "yyyy-MM-dd")
+
+    app_clause := ""
+    if (selected_apps is Array && selected_apps.Length > 0) {
+        quoted := []
+        for a in selected_apps
+            quoted.Push(SQLite_Q(a))
+        app_clause := " AND app IN ("
+        for i, q in quoted
+            app_clause .= (i = 1 ? "" : ",") . q
+        app_clause .= ")"
+    }
+
+    ; Per-(app, type) aggregations. Each row maps a single app to a
+    ; JSON object of all its tokens for that ngram type. We accumulate
+    ; into a per-app dict here, then assemble the outer JSON.
+    per_app := Map()
+
+    ; Generic n-gram types (chars / bigrams / trigrams / quadgrams /
+    ; words / word_bigrams). 6 SELECT queries; each returns 1 row per
+    ; app in O(rows-aggregated) on the SQLite side.
+    for code, tbl in KLR_NGRAM_LIVE_TABLE {
+        sql := "SELECT app, json_group_object(token, json_object("
+            . "'c', c, 't', t, 'e', e, 'hs', 0, 'llm', 0, 'o', 0)) AS j"
+            . " FROM (SELECT app, token,"
+            . "        SUM(c) AS c, SUM(td) AS t, SUM(e) AS e"
+            . "        FROM " . tbl
+            . "        WHERE date = " . SQLite_Q(today) . app_clause
+            . "        GROUP BY app, token)"
+            . " GROUP BY app"
+        for r in SQLite_Query(db, sql)
+            KLR__StashAppTypeJson(per_app, r["app"], code, r["j"])
+    }
+
+    ; Keycode heatmap.
+    kc_sql := "SELECT app, json_group_object(CAST(keycode AS TEXT), json_object("
+        . "'c', c, 't', 0, 'e', 0, 'hs', 0, 'llm', 0, 'o', 0)) AS j"
+        . " FROM (SELECT app, keycode, SUM(c) AS c FROM ngram_keycodes"
+        . "        WHERE date = " . SQLite_Q(today) . app_clause
+        . "        GROUP BY app, keycode)"
+        . " GROUP BY app"
+    for r in SQLite_Query(db, kc_sql)
+        KLR__StashAppTypeJson(per_app, r["app"], "kc", r["j"])
+
+    ; Shortcuts + shortcut bigrams.
+    sc_sql := "SELECT app, json_group_object(token, json_object("
+        . "'c', c, 't', 0, 'e', 0, 'hs', 0, 'llm', 0, 'o', 0)) AS j"
+        . " FROM (SELECT app, token, SUM(c) AS c FROM ngram_shortcuts"
+        . "        WHERE date = " . SQLite_Q(today) . app_clause
+        . "        GROUP BY app, token)"
+        . " GROUP BY app"
+    for r in SQLite_Query(db, sc_sql)
+        KLR__StashAppTypeJson(per_app, r["app"], "sc", r["j"])
+
+    scbg_sql := "SELECT app, json_group_object(token, json_object("
+        . "'c', c, 't', 0, 'e', 0, 'hs', 0, 'llm', 0, 'o', 0)) AS j"
+        . " FROM (SELECT app, token, SUM(c) AS c FROM ngram_shortcut_bigrams"
+        . "        WHERE date = " . SQLite_Q(today) . app_clause
+        . "        GROUP BY app, token)"
+        . " GROUP BY app"
+    for r in SQLite_Query(db, scbg_sql)
+        KLR__StashAppTypeJson(per_app, r["app"], "sc_bg", r["j"])
+
+    ; Stitch the per-app dict into one outer JSON object. We trust the
+    ; per-type fragments coming from json_group_object are valid JSON
+    ; objects already.
+    if (per_app.Count = 0)
+        return "{}"
+    parts := []
+    empty := '{}'
+    for app, types in per_app {
+        ; A complete bucket has all 11 type slots so the JS side can
+        ; always read out[code][token] without a defensive check.
+        type_parts := []
+        for code in ["c", "bg", "tg", "qg", "pg", "hx", "hp", "w", "sc", "sc_bg", "w_bg", "kc"] {
+            j := types.Has(code) ? types[code] : empty
+            type_parts.Push('"' . code . '":' . (j != "" ? j : empty))
+        }
+        joined := ""
+        for i, tp in type_parts
+            joined .= (i = 1 ? "" : ",") . tp
+        parts.Push('"' . KLR__JsonEscape(app) . '":{' . joined . '}')
+    }
+    out := "{"
+    for i, p in parts
+        out .= (i = 1 ? "" : ",") . p
+    out .= "}"
+    return out
+}
+
+KLR__StashAppTypeJson(per_app, app, code, j) {
+    if (j = "")
+        return
+    if !per_app.Has(app)
+        per_app[app] := Map()
+    per_app[app][code] := j
+}
+
+KLR__JsonEscape(s) {
+    s := StrReplace(s, "\", "\\")
+    s := StrReplace(s, '"', '\"')
+    return s
+}
+
 KLR_ReadRangeSplitTodayFast(db, selected_apps := unset) {
     if !IsSet(selected_apps)
         selected_apps := []
