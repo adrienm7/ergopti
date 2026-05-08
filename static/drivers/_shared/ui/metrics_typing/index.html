@@ -954,7 +954,7 @@
 					let frame_scheduled = false;
 					let push_count = 0;
 					let processed_count = 0;
-					let first_full_applied = false;
+					let first_paint_done = false;
 					function flush_pending() {
 						frame_scheduled = false;
 						if (!pending_blob) return;
@@ -963,11 +963,6 @@
 						processed_count++;
 						console.log("apply push#" + processed_count + " (received#" + push_count + ")");
 						apply_prefetch(blob);
-					}
-					function blob_has_historical(blob) {
-						if (!blob || !blob._prefetch_data) return false;
-						const h = blob._prefetch_data.historical;
-						return h && Object.keys(h).length > 0;
 					}
 					window.chrome.webview.addEventListener("message", (e) => {
 						let payload = e.data;
@@ -982,14 +977,15 @@
 						if (!payload || payload.type !== "prefetch") return;
 						push_count++;
 						const blob = payload.blob;
-						// First-paint full push must never be dropped by a
-						// later 'live' push beating it to the rAF flush —
-						// historical data only ships in full mode and the
-						// page needs it once. Apply it synchronously.
-						if (!first_full_applied && blob_has_historical(blob)) {
-							first_full_applied = true;
+						// The very first push (regardless of mode) must
+						// never be dropped — process_manifest only seeds
+						// the dashboard once, and a later live push
+						// beating it to the rAF flush would leave the
+						// page empty. Apply the first one synchronously.
+						if (!first_paint_done) {
+							first_paint_done = true;
 							processed_count++;
-							console.log("apply FIRST FULL push#" + processed_count);
+							console.log("apply FIRST push#" + processed_count);
 							apply_prefetch(blob);
 							return;
 						}
