@@ -358,14 +358,22 @@ KL_LoadState() {
             Keylogger.today_log_offset := Integer(s["today_log_offset"])
         if s.Has("today_log_date")
             Keylogger.today_log_date   := String(s["today_log_date"])
+        ; Restore the walker context if present. A missing key is fine:
+        ; the walker rebuilds context on the next typing entry.
+        if s.Has("ngram_ctx") {
+            try KLW_RestoreCtx(s["ngram_ctx"])
+        }
     }
 }
 
 KL_SaveState() {
+    ngram_ctx := Map()
+    try ngram_ctx := KLW_SerializeCtx()
     s := Map(
         "next_event_id",    Keylogger.next_event_id,
         "today_log_offset", Keylogger.today_log_offset,
-        "today_log_date",   Keylogger.today_log_date
+        "today_log_date",   Keylogger.today_log_date,
+        "ngram_ctx",        ngram_ctx
     )
     KL_WriteAtomic(Keylogger.state_json_path, KL_JsonEncode(s))
 }
@@ -901,8 +909,26 @@ KL_IngestOnce() {
     for entry in entries {
         for sql in KL_BuildInserts(entry)
             statements.Push(sql)
+        ; Walk for aggregations (n-grams, bursts, sessions, …). The walker
+        ; accumulates into KLW.batch; we flush below as a single SQL block
+        ; appended to data.sql in the same transaction as the raw INSERTs.
+        try {
+            t := entry["type"]
+            if (t = "typing") {
+                KLW_WalkTypingEntry(entry)
+            } else if (t = "app_switch") {
+                KLW_WalkAppSwitch(entry)
+            } else if (t = "window_switch") {
+                KLW_WalkWindowSwitch(entry)
+            } else if (t = "system_event") {
+                KLW_WalkSystemEvent(entry)
+            }
+        }
     }
-    if (statements.Length = 0) {
+    agg_sql := ""
+    try agg_sql := KLW_BuildBatchSql()
+
+    if (statements.Length = 0 && agg_sql = "") {
         Keylogger.today_log_offset := new_offset
         KL_SaveState()
         return
@@ -914,6 +940,8 @@ KL_IngestOnce() {
         .  ", " . entries.Length . " entry(ies)) ===`nBEGIN TRANSACTION;`n"
     for sql in statements
         body .= sql . "`n"
+    if (agg_sql != "")
+        body .= agg_sql
     body .= "COMMIT;`n"
 
     try FileAppend(body, Keylogger.data_sql_path, "UTF-8")
@@ -939,6 +967,9 @@ KL_DayRollover() {
     try FileDelete(Keylogger.today_log_path)
     Keylogger.today_log_offset := 0
     Keylogger.today_log_date   := KL_Today()
+    ; A new day starts every walker context fresh. Yesterday's partial
+    ; word / streak / current_burst is meaningless at midnight.
+    try KLW_DayRolloverReset()
     KL_SaveState()
 }
 
@@ -1099,6 +1130,10 @@ KL_Init(metrics_dir) {
 
     Keylogger.initialized := true
     KL_BootstrapDataSql()
+
+    ; Initialise the walker batch dicts. KL_LoadState() above already
+    ; restored the per-app n-gram context (KLW.ctx) if state.json had one.
+    try KLW_ResetBatch()
 
     ; Background timers — Bind() captures the function reference for SetTimer.
     Keylogger._ingest_timer   := KL_IngestOnce.Bind()
