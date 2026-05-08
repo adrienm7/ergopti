@@ -1181,6 +1181,9 @@ KL_Init(metrics_dir) {
 KL_Stop() {
     if !Keylogger.initialized
         return
+    ; Release the keystroke hook FIRST so no late event lands in a
+    ; buffer we are about to flush + serialise.
+    try KL_Hook_Stop()
     if Keylogger.HasProp("_ingest_timer")
         SetTimer(Keylogger._ingest_timer, 0)
     if Keylogger.HasProp("_midnight_timer")
