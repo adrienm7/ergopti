@@ -105,6 +105,20 @@ KLUI_LaunchWindow(url, title) {
     ; Flush today.log → data.sql so the page sees fresh data.
     try KL_IngestOnce()
 
+    ; Build the prefetch sidecar before opening the window. The page
+    ; reads ./prefetch.json on load (B niveau 1 contract — no JS bridge,
+    ; full client-side filtering on the projected dataset). The which
+    ; key is recovered from the URL by matching the parent folder name.
+    which := ""
+    if InStr(url, "metrics_typing")
+        which := "typing"
+    else if InStr(url, "metrics_apps")
+        which := "apps"
+    if (which != "") {
+        global _ConfigDir
+        try KLPF_BuildAndWrite(which, _ConfigDir . "metrics")
+    }
+
     edge := KLUI_FindMsedge()
     ; --app=URL launches a chromeless window pinned to URL. --user-data-dir
     ; isolates from the user's main Edge session so closing this window

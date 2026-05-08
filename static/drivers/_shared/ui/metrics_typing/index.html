@@ -876,5 +876,33 @@
 		<script src="charts.js"></script>
 		<script src="table.js"></script>
 		<script src="main.js"></script>
+
+		<!--
+			Edge --app= bootstrap (B niveau 1 contract — AHK driver only).
+			Hammerspoon injects metrics_manifest / app_icons / _prefetch_data /
+			keycode_layout via evaluateJavaScript before calling process_manifest.
+			Edge has no equivalent bridge, so the AHK launcher writes a
+			prefetch.json sidecar next to this file and we read it here on load.
+			A pre-set window.metrics_manifest means HS got there first — leave
+			it alone so the two drivers can share these assets unchanged.
+		-->
+		<script>
+			(function () {
+				if (window.metrics_manifest) return;
+				fetch("./prefetch.json", { cache: "no-store" })
+					.then((r) => (r.ok ? r.json() : null))
+					.then((blob) => {
+						if (!blob) return;
+						window.metrics_manifest = blob.metrics_manifest || {};
+						window.app_icons        = blob.app_icons || {};
+						window._prefetch_data   = blob._prefetch_data || null;
+						window.keycode_layout   = blob.keycode_layout || {};
+						if (typeof window.process_manifest === "function") {
+							window.process_manifest();
+						}
+					})
+					.catch(() => {});
+			})();
+		</script>
 	</body>
 </html>
