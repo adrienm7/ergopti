@@ -69,19 +69,18 @@ KLPF_PrefetchPath(which) {
 ; intact so the page degrades gracefully to the old data rather than to
 ; an empty state).
 KLPF_BuildAndWrite(which, metrics_dir, dbg := "") {
-    ; Step-by-step diagnostic so a silent failure points us straight at
-    ; the broken stage. Caller provides a log path; default is alongside
-    ; the prefetch sidecar so the function still works on its own.
     if (dbg = "")
         dbg := KLPF_AssetsDir(which) . "prefetch_debug.txt"
     KLPF_DbgWrite(dbg, "=== " . A_Now . " — which=" . which . " md=" . metrics_dir)
+    t0 := A_TickCount
 
     db := KLR_BuildDatabase(metrics_dir)
     if !db {
-        KLPF_DbgWrite(dbg, "FAIL: KLR_BuildDatabase returned 0 (winsqlite3 open or schema load failed)")
+        KLPF_DbgWrite(dbg, "FAIL: KLR_BuildDatabase returned 0")
         return false
     }
-    KLPF_DbgWrite(dbg, "OK: db opened, schema + data.sql loaded")
+    t_db := A_TickCount
+    KLPF_DbgWrite(dbg, "PERF db=" . (t_db - t0) . "ms")
 
     ; Cheap sanity probe — count agg_app_day rows so we know the data
     ; actually landed. SQLite_Query returns Array<Map>.
@@ -95,17 +94,17 @@ KLPF_BuildAndWrite(which, metrics_dir, dbg := "") {
     } else if (which = "apps") {
         blob := KLPF_BuildApps(db)
     }
-    ; Do NOT close the DB — KLR caches it across calls so the next
-    ; ingest tick only has to exec the new data.sql bytes instead of
-    ; re-loading the full schema + every device's history.
-    KLPF_DbgWrite(dbg, "OK: blob projected (" . (blob is Map ? blob.Count : "?") . " top-level keys)")
+    t_proj := A_TickCount
+    KLPF_DbgWrite(dbg, "PERF projection=" . (t_proj - t_db) . "ms")
 
     json := KL_JsonEncode(blob)
-    KLPF_DbgWrite(dbg, "OK: JSON encoded, len=" . StrLen(json))
+    t_json := A_TickCount
+    KLPF_DbgWrite(dbg, "PERF json_encode=" . (t_json - t_proj) . "ms len=" . StrLen(json))
 
     path := KLPF_PrefetchPath(which)
     written := KLPF_WriteAtomic(path, json)
-    KLPF_DbgWrite(dbg, written ? ("OK: wrote " . path) : ("FAIL: WriteAtomic to " . path))
+    t_write := A_TickCount
+    KLPF_DbgWrite(dbg, "PERF write=" . (t_write - t_json) . "ms total=" . (t_write - t0) . "ms")
     return written
 }
 
