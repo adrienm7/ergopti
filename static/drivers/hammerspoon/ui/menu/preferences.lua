@@ -3,15 +3,33 @@
 --- ==============================================================================
 --- MODULE: Menu Preferences
 --- DESCRIPTION:
---- Manages the persistence of the global state to and from the disk.
+--- Manages the persistence of the global state to and from the disk. The
+--- format is TOML — see lib/toml_codec for the encoder/decoder. The file
+--- lives at <config_dir>/hammerspoon/config.toml; legacy config.json is
+--- no longer read or written.
 ---
 --- FEATURES & RATIONALE:
---- 1. Single Source of Truth: Centralizes config.json reading and writing.
---- 2. Dynamic Hydration: Merges default module states with user overrides.
+--- 1. Single Source of Truth: every menu toggle, gesture assignment,
+---    section-state, terminator, and shortcut binding is round-tripped
+---    through one TOML file. No JSON shadow store, no per-feature
+---    side files.
+--- 2. Dynamic Hydration: defaults from each module's DEFAULT_STATE
+---    table are folded into the live state at boot; the on-disk TOML
+---    overlays user overrides on top.
+--- 3. Stable diffs: the encoder sorts keys within each section so two
+---    saves of the same state produce byte-identical TOML. Helpful for
+---    git-tracked configs and for spotting menu-driven mutations.
+--- 4. Deeply nested support: section_states (depth 2) and shortcut
+---    records (mods/key sub-tables) are emitted as
+---    ``[parent.child]`` headers — no flattening, no lossy escaping.
+---
+--- DEPENDENCIES:
+--- - lib.toml_codec
 --- ==============================================================================
 
 local M = {}
-local hs = hs
+local hs       = hs
+local TomlCodec = require("lib.toml_codec")
 
 
 
@@ -83,28 +101,30 @@ end
 -- ==================================
 -- ==================================
 
---- Loads user preferences from the JSON configuration file.
---- @param prefs_file string Path to the config.json file.
---- @return table The loaded preferences.
+--- Load preferences from the TOML configuration file.
+--- @param prefs_file string Path to <config_dir>/hammerspoon/config.toml.
+--- @return table The decoded preferences (empty when the file is absent or invalid).
 function M.load(prefs_file)
 	local ok, fh = pcall(io.open, prefs_file, "r")
 	if not ok or not fh then return {} end
-	
+
 	local content = fh:read("*a")
 	pcall(function() fh:close() end)
-	
-	local dec_ok, tbl = pcall(hs.json.decode, content)
+
+	local dec_ok, tbl = pcall(TomlCodec.decode, content)
 	return (dec_ok and type(tbl) == "table") and tbl or {}
 end
 
---- Saves the current state to the JSON configuration file.
---- @param prefs_file string Path to the config.json file.
+--- Save the current state to the TOML configuration file. Atomic via
+--- .tmp + rename so a crash mid-write cannot leave a half-written
+--- file on disk.
+--- @param prefs_file string Path to the config.toml file.
 --- @param state table The current global state.
 --- @param hotfiles table List of hotstring files.
 --- @param core_mods table Loaded core modules.
 function M.save(prefs_file, state, hotfiles, core_mods)
 	local existing = M.load(prefs_file)
-	
+
 	for k, v in pairs(state) do
 		existing[k] = v
 	end
@@ -118,7 +138,7 @@ function M.save(prefs_file, state, hotfiles, core_mods)
 			section_states[name] = {}
 			for _, sec in ipairs(secs) do
 				if type(sec) == "table" and sec.name ~= "-" and not sec.is_module_placeholder then
-					local is_en = keymap and type(keymap.is_section_enabled) == "function" 
+					local is_en = keymap and type(keymap.is_section_enabled) == "function"
 								  and keymap.is_section_enabled(name, sec.name) or false
 					section_states[name][sec.name] = is_en
 				end
@@ -129,7 +149,7 @@ function M.save(prefs_file, state, hotfiles, core_mods)
 
 	local gestures = core_mods.gestures
 	existing.gesture_actions = (gestures and type(gestures.get_all_actions) == "function") and gestures.get_all_actions() or {}
-	
+
 	existing.shortcut_keys = {}
 	local shortcuts_mod = core_mods.shortcuts_mod
 	if shortcuts_mod and type(shortcuts_mod.list_shortcuts) == "function" then
@@ -143,14 +163,16 @@ function M.save(prefs_file, state, hotfiles, core_mods)
 		end
 	end
 
-	local ok, encoded = pcall(hs.json.encode, existing, true)
-	if ok and encoded then
-		local file_ok, fh = pcall(io.open, prefs_file, "w")
-		if file_ok and fh then 
-			fh:write(encoded)
-			pcall(function() fh:close() end) 
-		end
-	end
+	local ok, encoded = pcall(TomlCodec.encode, existing)
+	if not ok or type(encoded) ~= "string" then return end
+
+	local tmp_path = prefs_file .. ".tmp"
+	local file_ok, fh = pcall(io.open, tmp_path, "w")
+	if not file_ok or not fh then return end
+	fh:write(encoded)
+	pcall(function() fh:close() end)
+	-- os.rename overwrites existing files on POSIX (Hammerspoon is macOS-only).
+	pcall(os.rename, tmp_path, prefs_file)
 end
 
 --- Merges the saved disk state into the current memory state.
