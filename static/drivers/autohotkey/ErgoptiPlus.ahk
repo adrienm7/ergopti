@@ -1344,13 +1344,12 @@ initMenu() {
     MenuSuspend := "⏸︎ Suspendre"
     ScriptMgmtMenu := Menu()
     ScriptMgmtMenu.Add("Actions globales", GlobalActionsMenu)
-    ScriptMgmtMenu.Add() ; Separator after Actions globales
+    ScriptMgmtMenu.Add("📂 Dossier de configuration…", FilePathsEditor)
+    ScriptMgmtMenu.Add() ; Separator before lifecycle actions
     ScriptMgmtMenu.Add("✎ Éditer", ActivateEdit)
     ScriptMgmtMenu.Add(MenuSuspend, ToggleSuspend)
     ScriptMgmtMenu.Add("🔄 Recharger", ActivateReload)
     ScriptMgmtMenu.Add("⏹ Quitter", ActivateExitApp)
-    ScriptMgmtMenu.Add() ; Separator before config folder
-    ScriptMgmtMenu.Add("📂 Dossier de configuration…", FilePathsEditor)
     A_TrayMenu.Add(MenuScriptManagement, ScriptMgmtMenu)
 
     ; ── Débogage — tools grouped in a submenu to keep the top-level menu tidy ──

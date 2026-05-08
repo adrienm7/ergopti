@@ -169,13 +169,41 @@ KL_ReadAll(path) {
 }
 
 KL_WriteAtomic(path, content) {
-    ; Write via .tmp + rename so a crash mid-write cannot corrupt the file.
+    ; Write via .tmp + atomic rename so a crash mid-write cannot corrupt the
+    ; final file. The previous implementation did FileDelete(path) + FileMove
+    ; which left a window where ``path`` did not exist; an antivirus scanner
+    ; or file indexer holding a transient handle on the freshly-deleted name
+    ; would then make FileMove fail with "Failed", taking the whole timer
+    ; tick down with it.
+    ;
+    ; MoveFileExW with MOVEFILE_REPLACE_EXISTING (1) | MOVEFILE_WRITE_THROUGH
+    ; (8) is the documented atomic-rename primitive on NTFS — kernel-level
+    ; rename that swaps the directory entry without an unlink-then-create
+    ; window. We retry once on transient failure (AV briefly holds the file)
+    ; before bubbling up; that is enough in practice to absorb scanner
+    ; flakiness without masking real I/O errors.
+    static MOVEFILE_REPLACE_EXISTING := 0x1
+    static MOVEFILE_WRITE_THROUGH    := 0x8
+    static FLAGS := MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH
+
     tmp := path . ".tmp"
     try FileDelete(tmp)
     FileAppend(content, tmp, "UTF-8")
-    if FileExist(path)
-        FileDelete(path)
-    FileMove(tmp, path)
+
+    if !DllCall("Kernel32\MoveFileExW", "Str", tmp, "Str", path,
+            "UInt", FLAGS, "Int") {
+        ; Retry once after a brief pause to ride out a transient AV / indexer
+        ; lock on ``path``. Sleep on the timer thread is acceptable here —
+        ; SaveState already runs off the hot keyboard path.
+        Sleep 50
+        if !DllCall("Kernel32\MoveFileExW", "Str", tmp, "Str", path,
+                "UInt", FLAGS, "Int") {
+            err := A_LastError
+            try FileDelete(tmp)
+            throw OSError(err, A_ThisFunc,
+                "MoveFileExW failed for '" . path . "'.")
+        }
+    }
 }
 
 KL_AppendLine(path, line) {
@@ -405,7 +433,16 @@ KL_SaveState() {
         "today_log_date",   Keylogger.today_log_date,
         "ngram_ctx",        ngram_ctx
     )
-    KL_WriteAtomic(Keylogger.state_json_path, KL_JsonEncode(s))
+    ; Best-effort: a transient antivirus / indexer lock on state.json must
+    ; not propagate up the timer stack and kill the ingest tick. The next
+    ; KL_SaveState a few seconds later will retry on a fresh write.
+    try {
+        KL_WriteAtomic(Keylogger.state_json_path, KL_JsonEncode(s))
+    } catch as e {
+        try LoggerWarn("Keylogger",
+            "KL_SaveState: KL_WriteAtomic failed ('{1}') — will retry next tick.",
+            e.Message)
+    }
 }
 
 
