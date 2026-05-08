@@ -95,7 +95,9 @@ KLPF_BuildAndWrite(which, metrics_dir, dbg := "") {
     } else if (which = "apps") {
         blob := KLPF_BuildApps(db)
     }
-    SQLite_Close(db)
+    ; Do NOT close the DB — KLR caches it across calls so the next
+    ; ingest tick only has to exec the new data.sql bytes instead of
+    ; re-loading the full schema + every device's history.
     KLPF_DbgWrite(dbg, "OK: blob projected (" . (blob is Map ? blob.Count : "?") . " top-level keys)")
 
     json := KL_JsonEncode(blob)
