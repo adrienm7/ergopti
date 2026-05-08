@@ -1493,7 +1493,13 @@ EnsurePersonalShortcutsFile(Path) {
     ; the loader to the canonical _ConfigDir copy. The inner `*i` is required
     ; so renaming or deleting the user's file does not break script loading
     ; before EnsurePersonalShortcutsFile gets a chance to recreate it.
-    StubPath := A_ScriptDir . "\personal_shortcuts.ahk"
+    ; Hide the stub in a sibling _generated/ folder so it does not clutter
+    ; the source tree alongside the actual driver files. The folder is
+    ; gitignored; AHK resolves `#Include *i _generated\personal_shortcuts.ahk`
+    ; relative to A_ScriptDir at parse time.
+    StubDir  := A_ScriptDir . "\_generated"
+    try DirCreate(StubDir)
+    StubPath := StubDir . "\personal_shortcuts.ahk"
     DesiredStub := "; Auto-generated forwarding stub — do not edit.`r`n"
         . "; Forwards to the user's personal shortcuts file located at:`r`n"
         . ";     " . Path . "`r`n"
@@ -1536,7 +1542,7 @@ EnsurePersonalShortcutsFile(ScriptInformation["PersonalAhkPath"])
 ; layout's key remappings (which run at the default level 0). We set it here so
 ; the user does not have to know about input levels in their personal file.
 #InputLevel 2
-#Include *i personal_shortcuts.ahk
+#Include *i _generated\personal_shortcuts.ahk
 #InputLevel 0
 ; Apply user overrides from <config_dir>/config.toml on top of the INI-driven
 ; configuration. The TOML is an optional "expert" layer the user can edit by
