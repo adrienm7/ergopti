@@ -835,9 +835,11 @@ local function perform_maintenance()
 	if _current_day ~= today then
 		Logger.start(LOG, "Midnight rotation: archiving %s…", _current_day)
 		LogManager.flush_buffer()
-		LogManager.save_today_index()
-		LogManager.merge_day_to_db(_current_day, CoreState.today_idx, CoreState.manifest[_current_day])
-		CoreState.today_idx    = {}
+		-- New model: day_rollover drains today.log into data.sql + sqlite,
+		-- then deletes today.log. The in-memory today_idx / ngram context
+		-- are reset because the next day starts fresh.
+		LogManager.day_rollover()
+		CoreState.today_idx     = {}
 		CoreState.ngram_context = nil
 		_current_day = today
 		Logger.success(LOG, "Midnight rotation complete — now tracking %s.", today)
@@ -1378,17 +1380,11 @@ function M.start(script_control)
 		Logger.success(LOG, "Keylogger engine started.")
 	end)
 
-	-- Run the index evaluation asynchronously so the openssl PBKDF2 passes
-	-- (decrypt/re-encrypt, potentially several seconds each) and the raw-log
-	-- replay never block the HID event tap. Without this, reactivating the
-	-- keylogger on a machine with pending past-day .idx files froze keyboard
-	-- input and the Hammerspoon menu for tens of seconds.
-	hs.timer.doAfter(2, function()
-		local ok, err = pcall(LogManager.rebuild_index_if_needed_async)
-		if not ok then
-			Logger.error(LOG, "Index rebuild on startup failed: %s.", tostring(err))
-		end
-	end)
+	-- New persistence model: data.sql is the canonical source of truth and
+	-- the SQLite cache in tmpdir is reconstructed by log_manager.M.init().
+	-- No deferred rebuild dance is needed at boot — the ingest tick will
+	-- catch up on any today.log entries written by a previous keylogger
+	-- session that did not get flushed before exit.
 end
 
 --- Halts all tracking, stops all timers and watchers, and flushes the buffer.
@@ -1417,6 +1413,11 @@ function M.stop()
 
 	stop_hardware_watchers()
 	KcBridge.stop()
+
+	-- Close the SQLite cache cleanly (drains any pending today.log entries
+	-- one last time before stopping). Safe to call even if init never ran.
+	pcall(LogManager.stop)
+
 	Logger.success(LOG, "Keylogger engine stopped.")
 end
 
