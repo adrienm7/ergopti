@@ -116,6 +116,18 @@ class KLMouse {
     ; ── distance accumulator ──────────────────────────────────────────────
     static prev_x           := -1
     static prev_y           := -1
+
+    ; ── hotkey callback references (set by Start, used by Stop) ──────────
+    static hk_ldown         := unset
+    static hk_lup           := unset
+    static hk_rdown         := unset
+    static hk_rup           := unset
+    static hk_mdown         := unset
+    static hk_mup           := unset
+    static hk_wup           := unset
+    static hk_wdn           := unset
+    static hk_wright         := unset
+    static hk_wleft          := unset
 }
 
 
@@ -455,18 +467,32 @@ KL_Mouse_Start() {
     KLMouse.park_timer_fn := KL_Mouse_ParkTick.Bind()
     SetTimer(KLMouse.park_timer_fn, KLMouseConst.PARK_CHECK_MS)
 
+    ; Bind hotkey callbacks — AHK v2 Hotkey() requires a function object,
+    ; not a bare name. Storing the refs also lets Stop() pass the exact
+    ; same object to disable the hotkey.
+    KLMouse.hk_ldown   := KL_Mouse_OnLDown.Bind()
+    KLMouse.hk_lup     := KL_Mouse_OnLUp.Bind()
+    KLMouse.hk_rdown   := KL_Mouse_OnRDown.Bind()
+    KLMouse.hk_rup     := KL_Mouse_OnRUp.Bind()
+    KLMouse.hk_mdown   := KL_Mouse_OnMDown.Bind()
+    KLMouse.hk_mup     := KL_Mouse_OnMUp.Bind()
+    KLMouse.hk_wup     := KL_Mouse_OnWheelUp.Bind()
+    KLMouse.hk_wdn     := KL_Mouse_OnWheelDown.Bind()
+    KLMouse.hk_wright  := KL_Mouse_OnWheelRight.Bind()
+    KLMouse.hk_wleft   := KL_Mouse_OnWheelLeft.Bind()
+
     ; Wire button hooks. Using ``~`` prefix keeps AHK from consuming the
     ; event so the target application still receives the click normally.
-    Hotkey("~LButton", KL_Mouse_OnLDown, "On")
-    Hotkey("~LButton Up", KL_Mouse_OnLUp, "On")
-    Hotkey("~RButton", KL_Mouse_OnRDown, "On")
-    Hotkey("~RButton Up", KL_Mouse_OnRUp, "On")
-    Hotkey("~MButton", KL_Mouse_OnMDown, "On")
-    Hotkey("~MButton Up", KL_Mouse_OnMUp, "On")
-    Hotkey("~WheelUp",    KL_Mouse_OnWheelUp,    "On")
-    Hotkey("~WheelDown",  KL_Mouse_OnWheelDown,  "On")
-    Hotkey("~WheelRight", KL_Mouse_OnWheelRight, "On")
-    Hotkey("~WheelLeft",  KL_Mouse_OnWheelLeft,  "On")
+    Hotkey("~LButton",    KLMouse.hk_ldown,  "On")
+    Hotkey("~LButton Up", KLMouse.hk_lup,    "On")
+    Hotkey("~RButton",    KLMouse.hk_rdown,  "On")
+    Hotkey("~RButton Up", KLMouse.hk_rup,    "On")
+    Hotkey("~MButton",    KLMouse.hk_mdown,  "On")
+    Hotkey("~MButton Up", KLMouse.hk_mup,    "On")
+    Hotkey("~WheelUp",    KLMouse.hk_wup,    "On")
+    Hotkey("~WheelDown",  KLMouse.hk_wdn,    "On")
+    Hotkey("~WheelRight", KLMouse.hk_wright, "On")
+    Hotkey("~WheelLeft",  KLMouse.hk_wleft,  "On")
 }
 
 KL_Mouse_Stop() {
@@ -478,14 +504,16 @@ KL_Mouse_Stop() {
         try SetTimer(KLMouse.scroll_flush_fn, 0)
         try KL_Mouse_FlushScroll()   ; drain pending scroll burst
     }
-    try Hotkey("~LButton",     KL_Mouse_OnLDown,    "Off")
-    try Hotkey("~LButton Up",  KL_Mouse_OnLUp,      "Off")
-    try Hotkey("~RButton",     KL_Mouse_OnRDown,    "Off")
-    try Hotkey("~RButton Up",  KL_Mouse_OnRUp,      "Off")
-    try Hotkey("~MButton",     KL_Mouse_OnMDown,    "Off")
-    try Hotkey("~MButton Up",  KL_Mouse_OnMUp,      "Off")
-    try Hotkey("~WheelUp",     KL_Mouse_OnWheelUp,  "Off")
-    try Hotkey("~WheelDown",   KL_Mouse_OnWheelDown,"Off")
-    try Hotkey("~WheelRight",  KL_Mouse_OnWheelRight,"Off")
-    try Hotkey("~WheelLeft",   KL_Mouse_OnWheelLeft, "Off")
+    if KLMouse.HasOwnProp("hk_ldown") {
+        try Hotkey("~LButton",    KLMouse.hk_ldown,  "Off")
+        try Hotkey("~LButton Up", KLMouse.hk_lup,    "Off")
+        try Hotkey("~RButton",    KLMouse.hk_rdown,  "Off")
+        try Hotkey("~RButton Up", KLMouse.hk_rup,    "Off")
+        try Hotkey("~MButton",    KLMouse.hk_mdown,  "Off")
+        try Hotkey("~MButton Up", KLMouse.hk_mup,    "Off")
+        try Hotkey("~WheelUp",    KLMouse.hk_wup,    "Off")
+        try Hotkey("~WheelDown",  KLMouse.hk_wdn,    "Off")
+        try Hotkey("~WheelRight", KLMouse.hk_wright, "Off")
+        try Hotkey("~WheelLeft",  KLMouse.hk_wleft,  "Off")
+    }
 }
