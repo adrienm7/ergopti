@@ -139,7 +139,7 @@ class KLMouse {
 ; ====================================
 ; ====================================
 
-KL_Mouse_OnLDown() {
+KL_Mouse_OnLDown(*) {
     try {
         KLMouse.lbtn_down_x    := A_CaretX  ; fallback — updated below
         KLMouse.lbtn_down_y    := A_CaretY
@@ -152,7 +152,7 @@ KL_Mouse_OnLDown() {
     }
 }
 
-KL_Mouse_OnLUp() {
+KL_Mouse_OnLUp(*) {
     if !KLMouse.lbtn_held
         return
     KLMouse.lbtn_held := false
@@ -180,7 +180,7 @@ KL_Mouse_OnLUp() {
     }
 }
 
-KL_Mouse_OnRDown() {
+KL_Mouse_OnRDown(*) {
     try {
         CoordMode("Mouse", "Screen")
         MouseGetPos(&mx, &my)
@@ -191,7 +191,7 @@ KL_Mouse_OnRDown() {
     }
 }
 
-KL_Mouse_OnRUp() {
+KL_Mouse_OnRUp(*) {
     if !KLMouse.rbtn_held
         return
     KLMouse.rbtn_held := false
@@ -219,7 +219,7 @@ KL_Mouse_OnRUp() {
     }
 }
 
-KL_Mouse_OnMDown() {
+KL_Mouse_OnMDown(*) {
     try {
         CoordMode("Mouse", "Screen")
         MouseGetPos(&mx, &my)
@@ -230,7 +230,7 @@ KL_Mouse_OnMDown() {
     }
 }
 
-KL_Mouse_OnMUp() {
+KL_Mouse_OnMUp(*) {
     if !KLMouse.mbtn_held
         return
     KLMouse.mbtn_held := false
@@ -257,19 +257,19 @@ KL_Mouse_OnMUp() {
 ; ====================================
 ; ====================================
 
-KL_Mouse_OnWheelUp() {
+KL_Mouse_OnWheelUp(*) {
     KL_Mouse_AccumScroll(1)
 }
 
-KL_Mouse_OnWheelDown() {
+KL_Mouse_OnWheelDown(*) {
     KL_Mouse_AccumScroll(-1)
 }
 
-KL_Mouse_OnWheelRight() {
+KL_Mouse_OnWheelRight(*) {
     KL_Mouse_AccumScrollH(1)
 }
 
-KL_Mouse_OnWheelLeft() {
+KL_Mouse_OnWheelLeft(*) {
     KL_Mouse_AccumScrollH(-1)
 }
 
