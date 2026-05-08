@@ -3,21 +3,21 @@
 ; ==============================================================================
 ; MODULE: Configuration Helpers Tests
 ; DESCRIPTION:
-; Covers the INI-cache parser and accessors lifted into lib/ini_helpers.ahk.
+; Covers the TOML parser and cache accessors in lib/toml_helpers.ahk.
 ; ==============================================================================
 
 
 
 
 ; ==========================
-; ParseIniFile
+; ParseTomlFile
 ; ==========================
 TestCfg_MissingFile() {
-	Result := ParseIniFile(A_ScriptDir . "\does_not_exist.ini")
+	Result := ParseTomlFile(A_ScriptDir . "\does_not_exist.ini")
 	AssertEqual("Map", Type(Result))
 	AssertEqual(0, Result.Count)
 }
-Test("ParseIniFile: missing file returns empty Map", TestCfg_MissingFile)
+Test("ParseTomlFile: missing file returns empty Map", TestCfg_MissingFile)
 
 TestCfg_ParseSections() {
 	TmpPath := A_ScriptDir . "\test_ini_parse.ini"
@@ -26,7 +26,7 @@ TestCfg_ParseSections() {
 	}
 	FileAppend("[Section1]`r`nkey1=value1`r`nkey2=value2`r`n[Section2]`r`nkey3=value3`r`n",
 		TmpPath, "UTF-8")
-	Cache := ParseIniFile(TmpPath)
+	Cache := ParseTomlFile(TmpPath)
 	AssertTrue(Cache.Has("Section1"))
 	AssertTrue(Cache.Has("Section2"))
 	AssertEqual("value1", Cache["Section1"]["key1"])
@@ -34,7 +34,7 @@ TestCfg_ParseSections() {
 	AssertEqual("value3", Cache["Section2"]["key3"])
 	FileDelete(TmpPath)
 }
-Test("ParseIniFile: parses sections and key/value pairs", TestCfg_ParseSections)
+Test("ParseTomlFile: parses sections and key/value pairs", TestCfg_ParseSections)
 
 TestCfg_IgnoresMalformed() {
 	TmpPath := A_ScriptDir . "\test_ini_noeq.ini"
@@ -42,12 +42,12 @@ TestCfg_IgnoresMalformed() {
 		FileDelete(TmpPath)
 	}
 	FileAppend("[S]`r`nbroken-line-without-eq`r`nkey=ok`r`n", TmpPath, "UTF-8")
-	Cache := ParseIniFile(TmpPath)
+	Cache := ParseTomlFile(TmpPath)
 	AssertEqual(1, Cache["S"].Count)
 	AssertEqual("ok", Cache["S"]["key"])
 	FileDelete(TmpPath)
 }
-Test("ParseIniFile: ignores lines without an equals sign", TestCfg_IgnoresMalformed)
+Test("ParseTomlFile: ignores lines without an equals sign", TestCfg_IgnoresMalformed)
 
 TestCfg_TrimsKey() {
 	TmpPath := A_ScriptDir . "\test_ini_trim.ini"
@@ -55,12 +55,12 @@ TestCfg_TrimsKey() {
 		FileDelete(TmpPath)
 	}
 	FileAppend("[S]`r`n  key  =value`r`n", TmpPath, "UTF-8")
-	Cache := ParseIniFile(TmpPath)
+	Cache := ParseTomlFile(TmpPath)
 	AssertTrue(Cache["S"].Has("key"))
 	AssertEqual("value", Cache["S"]["key"])
 	FileDelete(TmpPath)
 }
-Test("ParseIniFile: trims whitespace around the key", TestCfg_TrimsKey)
+Test("ParseTomlFile: trims whitespace around the key", TestCfg_TrimsKey)
 
 
 
@@ -124,7 +124,7 @@ Test("ResolveConfigPath: real value passes through unchanged", TestCfg_ResolvePa
 
 
 ; ==========================
-; ParseIniFile — additional cases
+; ParseTomlFile — additional cases
 ; ==========================
 TestCfg_EmptyFile() {
 	TmpPath := A_ScriptDir . "\test_ini_empty.ini"
@@ -132,11 +132,11 @@ TestCfg_EmptyFile() {
 		FileDelete(TmpPath)
 	}
 	FileAppend("", TmpPath, "UTF-8")
-	Result := ParseIniFile(TmpPath)
+	Result := ParseTomlFile(TmpPath)
 	AssertEqual(0, Result.Count)
 	FileDelete(TmpPath)
 }
-Test("ParseIniFile: empty file returns empty Map", TestCfg_EmptyFile)
+Test("ParseTomlFile: empty file returns empty Map", TestCfg_EmptyFile)
 
 TestCfg_CommentsIgnored() {
 	TmpPath := A_ScriptDir . "\test_ini_comments.ini"
@@ -144,7 +144,7 @@ TestCfg_CommentsIgnored() {
 		FileDelete(TmpPath)
 	}
 	FileAppend("[S]`r`n; this is a comment`r`nkey=value`r`n", TmpPath, "UTF-8")
-	Cache := ParseIniFile(TmpPath)
+	Cache := ParseTomlFile(TmpPath)
 	AssertTrue(Cache.Has("S"))
 	; Only "key" should be in the section — the comment line has no "="
 	; and the line is not a section header, so it's skipped as malformed
@@ -152,7 +152,7 @@ TestCfg_CommentsIgnored() {
 	AssertEqual("value", Cache["S"]["key"])
 	FileDelete(TmpPath)
 }
-Test("ParseIniFile: comment lines (no =) are treated as malformed and skipped",
+Test("ParseTomlFile: comment lines (no =) are treated as malformed and skipped",
 	TestCfg_CommentsIgnored)
 
 TestCfg_MultipleValuesPerSection() {
@@ -161,14 +161,14 @@ TestCfg_MultipleValuesPerSection() {
 		FileDelete(TmpPath)
 	}
 	FileAppend("[S]`r`na=1`r`nb=2`r`nc=3`r`n", TmpPath, "UTF-8")
-	Cache := ParseIniFile(TmpPath)
+	Cache := ParseTomlFile(TmpPath)
 	AssertEqual(3, Cache["S"].Count)
 	AssertEqual("1", Cache["S"]["a"])
 	AssertEqual("2", Cache["S"]["b"])
 	AssertEqual("3", Cache["S"]["c"])
 	FileDelete(TmpPath)
 }
-Test("ParseIniFile: reads multiple keys in a single section",
+Test("ParseTomlFile: reads multiple keys in a single section",
 	TestCfg_MultipleValuesPerSection)
 
 TestCfg_ValueWithEqualsSign() {
@@ -178,11 +178,11 @@ TestCfg_ValueWithEqualsSign() {
 	}
 	; Value itself contains an equals sign — split on the FIRST = only
 	FileAppend("[S]`r`nformula=a=b+c`r`n", TmpPath, "UTF-8")
-	Cache := ParseIniFile(TmpPath)
+	Cache := ParseTomlFile(TmpPath)
 	AssertEqual("a=b+c", Cache["S"]["formula"])
 	FileDelete(TmpPath)
 }
-Test("ParseIniFile: value containing '=' is preserved (split on first = only)",
+Test("ParseTomlFile: value containing '=' is preserved (split on first = only)",
 	TestCfg_ValueWithEqualsSign)
 
 

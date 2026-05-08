@@ -1076,7 +1076,7 @@ GestureSaveAssignment(slot, action) {
     global GestureAssignments, ConfigurationFile
 
     GestureAssignments[slot] := action
-    IniWrite(action, ConfigurationFile, "Gestures", slot)
+    TOML_Write(action, ConfigurationFile, "Gestures", slot)
 }
 
 ; Writes a single REG_DWORD value, logging and counting failures.

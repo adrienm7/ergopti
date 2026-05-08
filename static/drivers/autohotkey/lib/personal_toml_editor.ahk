@@ -471,13 +471,13 @@ _EditorPrefGet(Key, Default) {
     if !IsSet(ConfigurationFile) or !FileExist(ConfigurationFile) {
         return Default
     }
-    Val := IniRead(ConfigurationFile, "PersonalEditor", Key, "_MISSING_")
+    Val := TOML_Read(ConfigurationFile, "PersonalEditor", Key, "_MISSING_")
     return (Val == "_MISSING_") ? Default : Val
 }
 _EditorPrefSet(Key, Value) {
     global ConfigurationFile
     if IsSet(ConfigurationFile) {
-        IniWrite(Value, ConfigurationFile, "PersonalEditor", Key)
+        TOML_Write(Value, ConfigurationFile, "PersonalEditor", Key)
     }
 }
 
