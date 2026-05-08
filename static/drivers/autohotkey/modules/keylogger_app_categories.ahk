@@ -279,9 +279,10 @@ KL_JsonEncodeObject(obj) {
     parts := []
     for _, k in keys {
         v := obj[k]
-        parts.Push(KL_JsonStr(k) . ": " . KL_JsonStr(v))
+        parts.Push("  " . KL_JsonStr(k) . ": " . KL_JsonStr(v))
     }
-    return "{`n" . KL_JoinArray(parts, ",`n", "  ") . "`n}"
+    ; KL_JoinArray is defined in keylogger.ahk (no prefix param)
+    return "{`n" . KL_JoinArray(parts, ",`n") . "`n}"
 }
 
 KL_JsonDecodeObject(raw) {
@@ -308,18 +309,11 @@ KL_SortArray(arr) {
         loop n - i {
             j := A_Index
             if (arr[j] > arr[j + 1]) {
-                tmp       := arr[j]
-                arr[j]    := arr[j + 1]
+                tmp        := arr[j]
+                arr[j]     := arr[j + 1]
                 arr[j + 1] := tmp
             }
         }
     }
     return arr
-}
-
-KL_JoinArray(arr, sep, prefix := "") {
-    out := ""
-    for i, v in arr
-        out .= (i = 1 ? "" : sep) . prefix . v
-    return out
 }
