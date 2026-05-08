@@ -298,16 +298,13 @@ KLPF_BuildApps(db) {
 ; return the precomposed character of the next call (« Ä » instead
 ; of « a »).
 KLPF_KeycodeLayout() {
+    global Features
     out := Map()
 
-    ergopti_active := false
-    try {
-        global Features
-        if (IsSet(Features) && Features.Has("Layout")
-                && Features["Layout"].Has("ErgoptiBase")
-                && Features["Layout"]["ErgoptiBase"].Enabled)
-            ergopti_active := true
-    }
+    ergopti_active := IsSet(Features)
+        && Features.Has("Layout")
+        && Features["Layout"].Has("ErgoptiBase")
+        && Features["Layout"]["ErgoptiBase"].Enabled
     if ergopti_active {
         for sc, ch in ErgoptiBaseLabels()
             out[String(sc)] := ch

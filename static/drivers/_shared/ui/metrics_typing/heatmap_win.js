@@ -68,19 +68,17 @@ const SC_TO_KC = {
 	49: 45, 50: 46, 51: 43, 52: 47, 53: 44,  // n m , . /
 	54: 60,                                  // shift_r
 
-	// Thumb row + modifiers (AHK reports extended scancodes for some;
-	// non-extended values picked when AHK normalises them).
-	// Windows physical order: Ctrl | Fn | Win | Alt | Space | AltGr | Ctrl
-	// KEY_POSITIONS: kc59=x1 (ctrl) kc58=x2 (alt slot) kc55=x3.25 (cmd slot)
-	// We place Win at the alt slot (kc58) and Alt at the cmd slot (kc55) to
-	// match the Windows thumb row order (Win is left of Alt).
-	29:  59,  // ctrl_l  → ctrl-L position (x=1)
-	91:  58,  // lwin    → alt-L slot (x=2), left of Alt
-	56:  55,  // alt_l   → cmd-L slot (x=3.25), right of Win
+	// Thumb row + modifiers.
+	// Windows physical order (left→right): Ctrl | Fn | Win | Alt | Space | AltGr | (Menu) | Ctrl
+	// KEY_POSITIONS reuse: kc63=x0 (fn slot) kc59=x1 kc58=x2 kc55=x3.25 | space | kc54=x9.25 kc61=x10.5
+	// We map each SC to the kc whose x-position matches the physical Windows position.
+	29:  63,  // ctrl_l  → fn slot (x=0), leftmost key on Windows
+	91:  58,  // lwin    → x=2 slot, between Fn and Alt
+	56:  55,  // alt_l   → x=3.25 slot, right of Win
 	57:  49,  // space
-	312: 61,  // altgr (right-alt extended = SC 56 + 256 = 312, AHK representation)
-	92:  54,  // rwin → cmd_r position
-	93:  61,  // app/menu — reuse altgr position for label
+	312: 54,  // altgr (right-alt, SC 56 + 256 = 312) → x=9.25, first key right of space
+	92:  61,  // rwin / app menu → x=10.5
+	93:  61,  // app/menu key → same slot
 
 	// Arrows (AHK extended scancodes 0xE048..0xE0CB usually surface as
 	// raw codes; cover both the bare and high-byte forms).
@@ -110,14 +108,15 @@ const WIN_KEYCODE_LABELS = {
 	"56":  "Maj",
 	"60":  "Maj",
 	"57":  "Verr. Maj",
-	// kc58 = alt-slot → Win key (physical position left of Alt on Windows)
+	// Windows thumb row (left→right): Ctrl | Fn | Win | Alt | Space | AltGr | (Menu)
+	// kc63=x0 → Ctrl (leftmost), kc59=x1 → Fn, kc58=x2 → Win, kc55=x3.25 → Alt
+	// kc54=x9.25 → AltGr (first key right of Space), kc61=x10.5 → Menu
+	"63":  "Ctrl",
+	"59":  "Fn",
 	"58":  "Win",
-	"61":  "AltGr",
-	// kc55 = cmd-slot → Alt key (physical position right of Win on Windows)
 	"55":  "Alt",
-	"54":  "Win",
-	"59":  "Ctrl",
-	"63":  "Fn",
+	"54":  "AltGr",
+	"61":  "Menu",
 	"123": "←", "126": "↑", "124": "→", "125": "↓",
 };
 
