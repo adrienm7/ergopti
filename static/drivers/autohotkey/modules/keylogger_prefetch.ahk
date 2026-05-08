@@ -287,29 +287,57 @@ KLPF_BuildApps(db) {
 ; ============================================
 ; ============================================
 
-; The HS dashboard injects a numeric-keycode → character map computed
-; from hs.keycodes.map. On Windows the closest equivalent is the
-; user-active layout, but the QWERTY VK→char lookup the n-gram heatmap
-; expects is stable enough across layouts that we ship a static map.
-; A future iteration can read the active layout via GetKeyboardLayout.
+; Build the « scancode → printable label » map for the active Windows
+; keyboard layout. Returned as a flat ``{sc_str: char}`` Map. The JS
+; bootstrap walks SC_TO_KC and picks the corresponding label, so the
+; heatmap follows whatever layout the user has loaded (AZERTY-fr,
+; QWERTY-us, …) without us shipping a per-layout fork.
+;
+; Modifier / non-printable keys (Ctrl, Alt, Shift, Tab, Esc …) are not
+; included here — the JS overlays its own Windows-style labels on top.
 KLPF_KeycodeLayout() {
-    ; ~40 entries, cheap to rebuild on each call. The earlier lazy-init
-    ; via `static MAP := unset` + `if IsSet(MAP)` choked on AHK v2's
-    ; « static variable has not been assigned a value » contract.
-    out    := Map()
-    static QWERTY := Map(
-        65,  "a", 66, "b", 67, "c", 68, "d", 69, "e", 70, "f",
-        71,  "g", 72, "h", 73, "i", 74, "j", 75, "k", 76, "l",
-        77,  "m", 78, "n", 79, "o", 80, "p", 81, "q", 82, "r",
-        83,  "s", 84, "t", 85, "u", 86, "v", 87, "w", 88, "x",
-        89,  "y", 90, "z",
-        48, "0", 49, "1", 50, "2", 51, "3", 52, "4",
-        53, "5", 54, "6", 55, "7", 56, "8", 57, "9",
-        32, " ", 8, "[BS]", 9, "[TAB]", 13, "[ENTER]", 27, "[ESC]",
-        37, "[LEFT]", 38, "[UP]", 39, "[RIGHT]", 40, "[DOWN]"
-    )
-    for vk, ch in QWERTY
-        out[String(vk)] := ch
+    out := Map()
+    ; Resolve the keyboard layout of the foreground window so the
+    ; labels match what the user is actually typing in. Falls back to
+    ; the script thread's layout if the call fails.
+    hkl := 0
+    try {
+        hwnd := DllCall("GetForegroundWindow", "ptr")
+        tid  := DllCall("GetWindowThreadProcessId", "ptr", hwnd, "ptr", 0, "uint")
+        hkl  := DllCall("GetKeyboardLayout", "uint", tid, "ptr")
+    }
+    if !hkl
+        try hkl := DllCall("GetKeyboardLayout", "uint", 0, "ptr")
+
+    ; Walk the alpha-numeric scancode range. Each iteration uses
+    ; MapVirtualKeyEx(MAPVK_VSC_TO_VK_EX) to resolve the layout-dependent
+    ; VK, then ToUnicodeEx to get the unshifted printable character.
+    keystate := Buffer(256, 0)
+    bufsize  := 8
+    Loop 87 {
+        sc := A_Index
+        ; Skip scancodes the JS side will label itself (modifiers,
+        ; whitespace, F-row); spelled out so the resulting Map stays
+        ; small and the JS overlay is never overwritten.
+        if (sc = 1 || sc = 14 || sc = 15 || sc = 28 || sc = 29
+            || sc = 42 || sc = 54 || sc = 56 || sc = 57 || sc = 58
+            || (sc >= 59 && sc <= 68) || sc = 87 || sc = 88)
+            continue
+        vk := DllCall("MapVirtualKeyExW", "uint", sc, "uint", 3, "ptr", hkl, "uint")
+        if !vk
+            continue
+        buf := Buffer(bufsize * 2, 0)
+        n := DllCall("ToUnicodeEx", "uint", vk, "uint", sc,
+            "ptr", keystate, "ptr", buf, "int", bufsize,
+            "uint", 0, "ptr", hkl, "int")
+        if (n <= 0)
+            continue
+        ch := StrGet(buf, n, "UTF-16")
+        ch := Trim(ch)
+        if (ch = "")
+            continue
+        out[String(sc)] := ch
+    }
     return out
 }
 
