@@ -849,6 +849,11 @@ BuildMetricsMenu() {
     if MetricsFilters.private_browsing
         MetricsMenu.Check(private_label)
 
+    secure_label := "Ignorer les champs mot de passe"
+    MetricsMenu.Add(secure_label, ToggleFilterSecureField)
+    if MetricsFilters.secure_field
+        MetricsMenu.Check(secure_label)
+
     sysauth_label := "Ignorer les boîtes de dialogue d'authentification système"
     MetricsMenu.Add(sysauth_label, ToggleFilterSystemAuth)
     if MetricsFilters.system_auth
@@ -868,6 +873,7 @@ BuildMetricsMenu() {
         MetricsMenu.Disable(apps_label)
         MetricsMenu.Disable(apps_sc)
         MetricsMenu.Disable(private_label)
+        MetricsMenu.Disable(secure_label)
         MetricsMenu.Disable(sysauth_label)
         MetricsMenu.Disable(excl_label)
     }
@@ -890,6 +896,12 @@ BuildMetricsMenu() {
 ; than playing with .ToggleCheck on a stale label).
 ToggleFilterPrivate(*) {
     MetricsFilters.private_browsing := !MetricsFilters.private_browsing
+    MF_SaveToIni()
+    Reload
+}
+
+ToggleFilterSecureField(*) {
+    MetricsFilters.secure_field := !MetricsFilters.secure_field
     MF_SaveToIni()
     Reload
 }

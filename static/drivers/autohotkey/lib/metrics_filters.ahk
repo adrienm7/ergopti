@@ -40,10 +40,12 @@
 ; ===================================
 
 class MetricsFilters {
-    ; Privacy filters — both default ON. They only matter when the keylogger
-    ; itself is enabled; KL_AppendLog short-circuits anyway when off.
-    static private_browsing := true
-    static system_auth      := true
+    ; Privacy filters — all three default ON. They only matter when the
+    ; keylogger itself is enabled; KL_AppendLog short-circuits anyway
+    ; when off.
+    static private_browsing  := true
+    static secure_field      := true   ; Ignorer les champs mot de passe (UIA)
+    static system_auth       := true
 
     ; Per-app exclusion list. Keys are process names (e.g. "chrome.exe");
     ; presence of the key means « do not log this app ». Map for O(1)
@@ -162,7 +164,18 @@ MF_ShouldFilter() {
     if (proc != "" && MetricsFilters.disabled_apps.Has(proc))
         return true
 
-    ; 2. System-auth dialogs.
+    ; 2. Password field — relies on the UIA-backed detector in
+    ;    modules/keylogger.ahk §13. Wrapped in try because the function
+    ;    is loaded later in the include order and an early caller (e.g.
+    ;    boot-time metrics) might race ahead of it.
+    if MetricsFilters.secure_field {
+        is_pw := false
+        try is_pw := KL_IsFocusedFieldPassword()
+        if is_pw
+            return true
+    }
+
+    ; 3. System-auth dialogs.
     if MetricsFilters.system_auth {
         if (proc != "" && MF_SYSTEM_AUTH_PROCESSES.Has(proc))
             return true
@@ -170,7 +183,7 @@ MF_ShouldFilter() {
             return true
     }
 
-    ; 3. Private browsing (title pattern match).
+    ; 4. Private browsing (title pattern match).
     if MetricsFilters.private_browsing && title != "" {
         for pat in MF_PRIVATE_TITLE_PATTERNS {
             if RegExMatch(title, pat)

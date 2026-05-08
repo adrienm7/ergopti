@@ -311,6 +311,8 @@ CS_Load() {
 
     if s.Has("metrics_filter_private_browsing")
         MetricsFilters.private_browsing := s["metrics_filter_private_browsing"] ? true : false
+    if s.Has("metrics_filter_secure_field")
+        MetricsFilters.secure_field     := s["metrics_filter_secure_field"]     ? true : false
     if s.Has("metrics_filter_system_auth")
         MetricsFilters.system_auth      := s["metrics_filter_system_auth"]      ? true : false
 
@@ -336,6 +338,7 @@ CS_Save() {
         "metrics_shortcut_typing",         MetricsShortcuts.typing_str,
         "metrics_shortcut_apps",           MetricsShortcuts.apps_str,
         "metrics_filter_private_browsing", MetricsFilters.private_browsing,
+        "metrics_filter_secure_field",     MetricsFilters.secure_field,
         "metrics_filter_system_auth",      MetricsFilters.system_auth,
         "metrics_disabled_apps",           apps
     )
