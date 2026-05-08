@@ -142,12 +142,19 @@ KLWV_Open(which, metrics_dir) {
     work_h := B - T
     initial_w := Min(Round(work_w * 0.70), 1300)
     initial_h := Min(Round(work_h * 0.70), 800)
-    pos_x := L + ((work_w - initial_w) // 2)
-    pos_y := T + ((work_h - initial_h) // 2)
 
     g.OnEvent("Size",  KLWV_OnGuiSize.Bind(which))
     g.OnEvent("Close", KLWV_OnGuiClose.Bind(which))
-    g.Show("x" . pos_x . " y" . pos_y . " w" . initial_w . " h" . initial_h)
+    ; Show first with the requested client size, then centre the actual
+    ; outer window rectangle (including title bar + borders) on the
+    ; chosen monitor's work area. Computing the centre from the client
+    ; size alone left the window biased toward bottom-right on some
+    ; configurations because the title bar adds extra height on top.
+    g.Show("w" . initial_w . " h" . initial_h . " Hide")
+    WinGetPos(&_, &_, &win_w, &win_h, "ahk_id " . g.Hwnd)
+    pos_x := L + ((work_w - win_w) // 2)
+    pos_y := T + ((work_h - win_h) // 2)
+    g.Show("x" . pos_x . " y" . pos_y)
 
     ; Spin up WebView2 inside the Gui's HWND. dataDir is unique per
     ; launch so cached state from a previous open never bleeds in.
@@ -204,7 +211,35 @@ KLWV_Open(which, metrics_dir) {
         "udir",       udir
     )
     KLWV_FitWebView(which)
+    KLWV_StartFullPushTimer()
     return true
+}
+
+; Start a low-frequency timer that pushes a FULL prefetch blob (with
+; n-gram tables) to every open dashboard. The fast 500 ms flush tick
+; only pushes a manifest-only blob so the KPI counters stay snappy;
+; this slow tick keeps the n-gram tables fresh without blocking the
+; main loop on every keystroke.
+KLWV_StartFullPushTimer() {
+    if KLWV.HasOwnProp("_full_timer") && IsObject(KLWV._full_timer)
+        return
+    KLWV._full_timer := KLWV_FullPushTick.Bind()
+    SetTimer(KLWV._full_timer, 5000)
+}
+
+KLWV_StopFullPushTimer() {
+    if KLWV.HasOwnProp("_full_timer") && IsObject(KLWV._full_timer) {
+        try SetTimer(KLWV._full_timer, 0)
+        KLWV._full_timer := unset
+    }
+}
+
+KLWV_FullPushTick() {
+    if (KLWV.windows.Count = 0) {
+        KLWV_StopFullPushTimer()
+        return
+    }
+    KLWV_NotifyIngest("full")
 }
 
 KLWV_IsAlive(entry) {
@@ -361,7 +396,14 @@ KLWV_DelayedFirstPush(which) {
 
 ; Called by the ingest tick after data.sql has new rows. Rebuilds the
 ; prefetch blob and pushes it to every open dashboard.
-KLWV_NotifyIngest() {
+;
+; mode:
+;   "manifest" — KPIs only, ~100-200 ms total. Used by the 500 ms flush
+;                tick so the user's keystrokes show up near-instantly.
+;   "full"     — manifest + n-grams, ~3-4 s total. Used by a slower
+;                cadence so the n-gram tables stay fresh without
+;                blocking the KPI updates.
+KLWV_NotifyIngest(mode := "manifest") {
     global _ConfigDir
     log := _ConfigDir . "logs\webview.log"
     if !KLWV.metrics_dir {
@@ -370,9 +412,9 @@ KLWV_NotifyIngest() {
     n := 0
     for which, _ in KLWV.windows {
         n += 1
-        try KLPF_BuildAndWrite(which, KLWV.metrics_dir)
+        try KLPF_BuildAndWrite(which, KLWV.metrics_dir, , mode)
         KLWV_PushPrefetch(which)
     }
     if n
-        try FileAppend("[" . A_Now . "] NotifyIngest fanned out to " . n . " window(s)`r`n", log, "UTF-8")
+        try FileAppend("[" . A_Now . "] NotifyIngest(" . mode . ") fanned out to " . n . " window(s)`r`n", log, "UTF-8")
 }
