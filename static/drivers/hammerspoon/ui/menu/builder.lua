@@ -166,6 +166,7 @@ function M.generate(ctx, menu_mods, actions)
 	table.insert(items, { title = "Chemins des fichiers…", fn = actions.open_paths })
 	table.insert(items, { title = "Console", fn = actions.open_console })
 	table.insert(items, { title = "Ouvrir init.lua", fn = actions.open_init })
+	table.insert(items, { title = "Ouvrir personal_shortcuts.lua", fn = actions.open_personal_shortcuts })
 	table.insert(items, { title = "Recharger", fn = actions.reload })
 	table.insert(items, { title = "Quitter", fn = actions.quit })
 
