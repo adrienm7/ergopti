@@ -130,10 +130,18 @@ KL_Topo_Tick() {
     KLTopo.prev_hwnd := hwnd
     KLTopo.seen_hwnds[hwnd] := A_TickCount
 
-    ; Get current geometry
+    ; Get current geometry. WinGetPos with output parameters leaves them
+    ; UNSET when the call throws (e.g. window vanished between WinExist and
+    ; WinGetPos), so the post-call ``cw = 0`` test must be guarded too —
+    ; otherwise reading cw raises "local variable not assigned" and the
+    ; whole tick aborts up the call stack.
     cx := 0, cy := 0, cw := 0, ch := 0
-    try WinGetPos(&cx, &cy, &cw, &ch, "ahk_id " . hwnd)
-    if (cw = 0)
+    ok := false
+    try {
+        WinGetPos(&cx, &cy, &cw, &ch, "ahk_id " . hwnd)
+        ok := true
+    }
+    if (!ok or !IsSet(cw) or cw = 0)
         return
 
     ; Determine window state
