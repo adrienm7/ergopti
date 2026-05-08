@@ -51,6 +51,15 @@ global _PrefixInputHook := 0
 ; surface unrelated triggers like ``taiwan`` (Taïwan) on the next refresh.
 global _PrefixWatcherSuppressed := false
 
+; Currently-suggested hotstring — populated when a tooltip transitions
+; from hidden to visible, cleared when the tooltip hides (and a dismissed
+; event is logged) or when a fire consumes the suggestion (silent clear).
+; Object shape: { Trigger, Output, Category } or "" when no tooltip is up.
+; Used to mirror Hammerspoon's M.log_hotstring_suggested / dismissed pair
+; logging — HS pairs every "suggested" with exactly one "dismissed" or one
+; "fired", never both, so we track state here to enforce the same contract.
+global _KLLastShownSuggestion := ""
+
 ; Configuration constants.
 global _MIN_PREFIX_LEN := 2
 global _MAX_BUFFER_LEN := 64    ; longest trigger we expect, with margin
@@ -110,6 +119,70 @@ _OnMouseClickReset(*) {
     }
 }
 
+; ─── Suggestion lifecycle helpers ────────────────────────────────────────
+; Suggested / dismissed events are written from a single state machine so
+; the JSONL never contains an unmatched dismissed event, nor two suggested
+; events back-to-back for the same trigger. The state lives in
+; ``_KLLastShownSuggestion``: "" when no tooltip is up, an object otherwise.
+;
+; ``_NotifySuggestionShown`` fires when a tooltip is rendered. If the same
+; trigger is re-displayed (the user kept typing characters that all map to
+; the same suggested expansion), we do NOT re-emit a suggested event — HS
+; only logs once per visibility cycle. When a different trigger replaces
+; the previous one, we emit a dismissed for the old one then a suggested
+; for the new one.
+;
+; ``_NotifySuggestionDismissed`` fires when the tooltip hides for any
+; reason other than a fire (buffer reset, prefix lost, word terminator,
+; mouse click). The fire path uses the silent-clear variant below so the
+; suggestion is not double-counted as both fired and dismissed.
+_NotifySuggestionShown(Trigger, Output, Category) {
+    global _KLLastShownSuggestion
+    Prev := _KLLastShownSuggestion
+    if (IsObject(Prev) and Prev.Trigger == Trigger and Prev.Output == Output) {
+        return
+    }
+    if IsObject(Prev) {
+        try KL_LogHotstringDismissed(Prev.Trigger, Prev.Output, Prev.Category)
+    }
+    _KLLastShownSuggestion := { Trigger: Trigger, Output: Output, Category: Category }
+    try KL_LogHotstringSuggested(Trigger, Output, Category)
+}
+
+_NotifySuggestionDismissed() {
+    global _KLLastShownSuggestion
+    Prev := _KLLastShownSuggestion
+    if !IsObject(Prev) {
+        return
+    }
+    _KLLastShownSuggestion := ""
+    try KL_LogHotstringDismissed(Prev.Trigger, Prev.Output, Prev.Category)
+}
+
+; Silent clear — used by the fire path so a single user action emits
+; ``hotstring`` (fired) without a paired ``hotstring_dismissed``.
+_NotifySuggestionConsumed() {
+    global _KLLastShownSuggestion
+    _KLLastShownSuggestion := ""
+}
+
+; Decide which ``h_type`` value to log for a fired hotstring. The richest
+; source is the matching active suggestion: its TOML Category names the
+; group ("autocorrection", "personal", "magickey"…) and is far more
+; informative than HS's generic "unknown". When the fire happens without
+; a preceding suggestion (single-char-after-magic-key triggers that fire
+; below the prefix watcher's MIN_PREFIX_LEN, or fires that race the
+; tooltip render), fall back to a basic star/endchar tag derived from
+; ``Spec.Star`` so the field is never empty.
+_ResolveFireHType(Spec) {
+    global _KLLastShownSuggestion
+    Prev := _KLLastShownSuggestion
+    if (IsObject(Prev) and Prev.Trigger == Spec.Trigger) {
+        return Prev.Category
+    }
+    return (Spec.HasOwnProp("Star") and Spec.Star) ? "star" : "endchar"
+}
+
 ; Toggle the suppression flag. The hotstring engine wraps its SendEvent
 ; bursts in ``PrefixWatcherSuppress(true)`` / ``PrefixWatcherSuppress(false)``
 ; pairs (with a small SetTimer delay on the release) so the InputHook
@@ -141,6 +214,9 @@ HotstringPrefixWatcherStop() {
     _PrefixIndex := Map()
     _PrefixBuffer := ""
     TooltipHide()
+    ; Close out any tooltip that was on screen — the user disabling the
+    ; watcher mid-suggestion is functionally a dismissal, not a fire.
+    _NotifySuggestionDismissed()
 }
 
 
@@ -341,11 +417,22 @@ _OnPrefixChar(IH, Char) {
         HSEMatch := HSE_FeedChar(Char)
         if (HSEMatch != "") {
             HSE_DispatchMatch(HSEMatch, HSE_LastEndChar)
+            ; Log the fired hotstring. ``h_type`` is taken from the
+            ; preceding suggestion when available (richest categorisation —
+            ; "autocorrection", "personal", …) and falls back to a basic
+            ; star/endchar tag so dispatch paths that bypass the tooltip
+            ; (single-char-after-magic-key triggers that fire below
+            ; _MIN_PREFIX_LEN) still carry meaningful metadata.
+            HotstringHType := _ResolveFireHType(HSEMatch)
+            HotstringRepl := HSEMatch.HasOwnProp("Replacement") ? HSEMatch.Replacement : HSEMatch.Trigger
+            try KL_LogHotstring(HSEMatch.Trigger, HotstringRepl, HotstringHType)
             ; Wipe the prefix watcher's own buffer so the post-expansion
             ; tail (which the user just observed on screen) does not
             ; surface a stale tooltip preview from the trigger we just
-            ; fired.
-            _ResetPrefixBuffer()
+            ; fired. Pass ``true`` so the active suggestion is consumed
+            ; silently — the fire is the answer to the suggestion, no
+            ; ``dismissed`` event should pair with the ``suggested``.
+            _ResetPrefixBuffer(true)
             return
         }
 
@@ -445,10 +532,22 @@ _OnPrefixKeyDown(IH, VK, SC) {
     }
 }
 
-_ResetPrefixBuffer() {
+; ConsumedByFire ─ true when the reset is the consequence of a hotstring
+; firing. The currently-suggested entry is then cleared silently so the
+; logger does not emit a ``hotstring_dismissed`` event paired with the
+; ``hotstring`` (fired) one — HS treats the fire as the resolution of the
+; suggestion, never a parallel dismissal. Every other caller (word
+; terminator, mouse click, navigation key, prefix lost) leaves the default
+; in place so the tooltip's disappearance is properly logged.
+_ResetPrefixBuffer(ConsumedByFire := false) {
     global _PrefixBuffer
     _PrefixBuffer := ""
     TooltipHide()
+    if ConsumedByFire {
+        _NotifySuggestionConsumed()
+    } else {
+        _NotifySuggestionDismissed()
+    }
 }
 
 ; Look up the current buffer in the prefix index and update the tooltip.
@@ -463,6 +562,7 @@ _LookupAndRender() {
     Len := StrLen(Buffer)
     if (Len < _MIN_PREFIX_LEN) {
         TooltipHide()
+        _NotifySuggestionDismissed()
         return
     }
     ; AHK v2's Map is case-sensitive by default, so this lookup distinguishes
@@ -470,12 +570,14 @@ _LookupAndRender() {
     ; with its pre-cased output, exactly mirroring CreateCaseSensitiveHotstrings.
     if !_PrefixIndex.Has(Buffer) {
         TooltipHide()
+        _NotifySuggestionDismissed()
         return
     }
 
     Match := _BestCandidate(_PrefixIndex[Buffer])
     if (Match == "") {
         TooltipHide()
+        _NotifySuggestionDismissed()
         return
     }
 
@@ -483,6 +585,12 @@ _LookupAndRender() {
     Color := (Cfg.Color != "") ? Cfg.Color : ""
     Delay := (Cfg.Delay != "") ? Cfg.Delay : 0
     TooltipShow(Match.Output, Color, Delay)
+    ; Log the suggestion only when the displayed trigger actually changed
+    ; (typing the next char of the same trigger keeps the same tooltip up
+    ; on screen but we already logged that suggestion). The category is
+    ; mirrored as ``h_type`` — this is richer than the macOS side which
+    ; defaults to "unknown" for tooltip events without a TOML category.
+    _NotifySuggestionShown(Match.Trigger, Match.Output, Match.Category)
 }
 
 ; Pick the shortest trigger from a candidate list. Prefering the shortest

@@ -678,14 +678,60 @@ KL_LogSystemEvent(action, metadata := unset) {
     KL_AppendLog(e)
 }
 
-KL_LogHotstring(trigger, replacement, h_type, app_name := "Unknown", net_saved_chars := 0) {
+; Logs a hotstring expansion event. Mirrors hammerspoon/modules/keylogger/init.lua:1148
+; (M.log_hotstring) byte-for-byte:
+;   - flushes the typing buffer FIRST so the fire is ordered after the
+;     trigger characters that produced it,
+;   - auto-computes ``net_saved_chars`` from StrLen so callers do not have
+;     to (HS does the same with utf8.len),
+;   - falls back to the session app when the caller omits ``app_name``,
+;   - emits the same ``tag`` marker (`<hotstring>…</hotstring>`) HS writes.
+KL_LogHotstring(trigger, replacement, h_type := "unknown", app_name := "") {
+    if !Keylogger.initialized
+        return
+    KL_FlushBuffer()
+    app := (app_name != "") ? app_name : Keylogger.session_app
+    net_saved := StrLen(replacement) - StrLen(trigger)
     KL_AppendLog(Map(
         "type",            "hotstring",
-        "app",             app_name,
+        "app",             app,
         "trigger",         trigger,
         "replacement",     replacement,
         "h_type",          h_type,
-        "net_saved_chars", net_saved_chars
+        "net_saved_chars", net_saved,
+        "tag",             "<hotstring>" . replacement . "</hotstring>"
+    ))
+    Keylogger.last_flush_time := A_TickCount
+}
+
+; Logs that a hotstring tooltip was shown to the user. Mirrors HS init.lua:1196.
+; The call site (prefix watcher) drives suggested/dismissed pairing — there
+; is at most one suggestion live at any time per device.
+KL_LogHotstringSuggested(trigger, replacement, h_type := "unknown", app_name := "") {
+    if !Keylogger.initialized
+        return
+    app := (app_name != "") ? app_name : Keylogger.session_app
+    KL_AppendLog(Map(
+        "type",        "hotstring_suggested",
+        "app",         app,
+        "trigger",     trigger,
+        "replacement", replacement,
+        "h_type",      h_type
+    ))
+}
+
+; Logs that a previously-suggested hotstring tooltip was dismissed without
+; firing. Mirrors HS init.lua:1214.
+KL_LogHotstringDismissed(trigger, replacement, h_type := "unknown", app_name := "") {
+    if !Keylogger.initialized
+        return
+    app := (app_name != "") ? app_name : Keylogger.session_app
+    KL_AppendLog(Map(
+        "type",        "hotstring_dismissed",
+        "app",         app,
+        "trigger",     trigger,
+        "replacement", replacement,
+        "h_type",      h_type
     ))
 }
 
