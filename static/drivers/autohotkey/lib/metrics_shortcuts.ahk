@@ -53,6 +53,10 @@ global METRICS_MOD_MAP := Map(
 ; ===================================
 
 class MetricsShortcuts {
+    ; OFF by default. The keylogger captures every keystroke, so we never
+    ; auto-enable it: the user must tick it on once and confirm the
+    ; warning dialog. The choice persists across reloads via INI.
+    static enabled    := false
     static typing_str := ""    ; e.g. "ctrl+alt+m"
     static apps_str   := ""
     static typing_ahk := ""    ; e.g. "^!m"  (active hotkey string)
@@ -80,12 +84,17 @@ MS_LoadFromIni() {
         return
     try MetricsShortcuts.typing_str := IniRead(path, "shortcuts", "typing", "")
     try MetricsShortcuts.apps_str   := IniRead(path, "shortcuts", "apps",   "")
+    try {
+        v := IniRead(path, "shortcuts", "enabled", "0")
+        MetricsShortcuts.enabled := (v = "1" || v = "true") ? true : false
+    }
 }
 
 MS_SaveToIni() {
     path := MS_GetIniPath()
     try IniWrite(MetricsShortcuts.typing_str, path, "shortcuts", "typing")
     try IniWrite(MetricsShortcuts.apps_str,   path, "shortcuts", "apps")
+    try IniWrite(MetricsShortcuts.enabled ? "1" : "0", path, "shortcuts", "enabled")
 }
 
 
