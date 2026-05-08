@@ -782,6 +782,101 @@ ToggleGesturesEnabled() {
     Reload
 }
 
+
+
+
+; ====================================
+; ====================================
+; ======= 1.X / Metrics menu =======
+; ====================================
+; ====================================
+
+; Build the « 📊 Métriques » submenu and attach it to the tray. The parent
+; entry doubles as an ON/OFF toggle for the global keylogger feature: the
+; checkmark reflects MetricsShortcuts.enabled, and clicking it triggers
+; ToggleMetricsEnabled() with a confirmation dialog before turning ON.
+;
+; When the feature is OFF, the sub-items remain visible (so the user can
+; still see what the menu looks like) but are disabled — no dashboard can
+; open, no shortcut binding takes effect.
+BuildMetricsMenu() {
+    global A_TrayMenu
+    MetricsMenu := Menu()
+
+    enabled := MetricsShortcuts.enabled
+    typing_label := "Afficher les métriques de frappe"
+    apps_label   := "Afficher le temps sur les applications"
+    typing_sc    := "↳ Raccourci : " . MS_GetDisplayLabel("typing")
+    apps_sc      := "↳ Raccourci : " . MS_GetDisplayLabel("apps")
+
+    MetricsMenu.Add(typing_label, (*) => KLUI_ToggleTyping())
+    MetricsMenu.Add(typing_sc, (*) => MS_PromptShortcut("typing", KLUI_ToggleTyping))
+    MetricsMenu.Add() ; separator
+    MetricsMenu.Add(apps_label, (*) => KLUI_ToggleApps())
+    MetricsMenu.Add(apps_sc, (*) => MS_PromptShortcut("apps", KLUI_ToggleApps))
+
+    if !enabled {
+        MetricsMenu.Disable(typing_label)
+        MetricsMenu.Disable(typing_sc)
+        MetricsMenu.Disable(apps_label)
+        MetricsMenu.Disable(apps_sc)
+    }
+
+    A_TrayMenu.Add("📊 Métriques", MetricsMenu)
+    ; Bind the parent click to the global toggle. AHK menu API requires a
+    ; second Add() with the same label to override the default behaviour
+    ; (which is "open the submenu"). We instead overload the parent label
+    ; to a function that fires the toggle dialog — the submenu still opens
+    ; on hover, only the click-on-label path runs the toggle.
+    ; Implementation note: AHK does not expose a clean "click parent"
+    ; callback when the entry has a submenu. We mirror the HS behaviour
+    ; by adding a synthetic top item INSIDE the submenu so the user has
+    ; one obvious place to flip the master switch.
+    on_off_label := MetricsShortcuts.enabled
+        ? "✅ Métriques activées (cliquer pour désactiver)"
+        : "⚠️ Métriques désactivées (cliquer pour activer)"
+    MetricsMenu.Insert("1&", on_off_label, (*) => ToggleMetricsEnabled())
+    MetricsMenu.Insert("2&") ; separator after the toggle
+}
+
+; Flip the global keylogger feature with a warning dialog before enabling.
+; Persisted via metrics_shortcuts.ini and applied on Reload (the keylogger
+; can only initialise its file IO at boot, not mid-session, mirroring the
+; Hammerspoon behaviour where toggling the feature triggers HS reload).
+ToggleMetricsEnabled() {
+    if MetricsShortcuts.enabled {
+        ; Disabling — no warning needed, just confirm.
+        res := MsgBox(
+            "Désactiver les métriques ?`n`n"
+            . "Le keylogger ne capturera plus aucune frappe. Les données déjà "
+            . "enregistrées sont conservées.",
+            "📊 Métriques",
+            "OKCancel Icon?"
+        )
+        if (res != "OK")
+            return
+        MetricsShortcuts.enabled := false
+        MS_SaveToIni()
+        Reload
+        return
+    }
+
+    ; Enabling — explicit warning, OK is the dangerous action.
+    warn := "ATTENTION : Vous êtes sur le point d'activer le keylogger.`n`n"
+        .  "Il enregistre vos frappes au clavier à la milliseconde près. "
+        .  "Ces logs sont stockés en local sous %USERPROFILE%\.ergopti_plus\metrics.`n`n"
+        .  "Bien que les champs de mots de passe soient ignorés automatiquement "
+        .  "(filtre UIA), il est recommandé de mettre le script en PAUSE lors "
+        .  "de la saisie de données sensibles.`n`n"
+        .  "Activer ?"
+    res := MsgBox(warn, "⚠ Avertissement de sécurité — Métriques", "OKCancel Iconx")
+    if (res != "OK")
+        return
+    MetricsShortcuts.enabled := true
+    MS_SaveToIni()
+    Reload
+}
+
 ; Runs the auto-configure and shows the result to the user.
 GestureAutoConfigureAction() {
     Success := GestureAutoConfigureRegistry()
@@ -1020,6 +1115,18 @@ initMenu() {
         A_TrayMenu.Check(MenuHotstrings)
     }
 
+    ; ── 📊 Métriques — mirrors the HS Métriques submenu position exactly:
+    ; sits between Hotstrings (+ the AI item, absent on the AHK side) and
+    ; the Shortcuts (Raccourcis) submenu. The parent entry doubles as a
+    ; global ON/OFF toggle for the keylogger feature. OFF by default — it
+    ; *is* a keylogger — and only flips ON after the user explicitly
+    ; acknowledges the security warning. While OFF, the sub-items remain
+    ; visible but greyed out so the menu shape stays familiar.
+    BuildMetricsMenu()
+    if MetricsShortcuts.enabled {
+        A_TrayMenu.Check("📊 Métriques")
+    }
+
     ; ── Raccourcis and Tap-Holds — standalone, like HS Raccourcis and Karabiner ──
     if SubMenus.Has("Shortcuts") {
         A_TrayMenu.Add(GetCategoryTitle("Shortcuts"), SubMenus["Shortcuts"])
@@ -1052,20 +1159,6 @@ initMenu() {
     }
 
     A_TrayMenu.Add() ; Single separator between feature submenus and configuration items
-
-    ; ── 📊 Métriques — mirror du menu HS « Métriques » : ouvre / ferme les
-    ; deux dashboards et permet d'attribuer un raccourci global à chacun.
-    MetricsMenu := Menu()
-    typing_label := "Afficher les métriques de frappe"
-    apps_label   := "Afficher le temps sur les applications"
-    MetricsMenu.Add(typing_label, (*) => KLUI_ToggleTyping())
-    MetricsMenu.Add("↳ Raccourci : " . MS_GetDisplayLabel("typing"),
-        (*) => MS_PromptShortcut("typing", KLUI_ToggleTyping))
-    MetricsMenu.Add() ; separator
-    MetricsMenu.Add(apps_label, (*) => KLUI_ToggleApps())
-    MetricsMenu.Add("↳ Raccourci : " . MS_GetDisplayLabel("apps"),
-        (*) => MS_PromptShortcut("apps", KLUI_ToggleApps))
-    A_TrayMenu.Add("📊 Métriques", MetricsMenu)
 
     ; ── Actions globales — mirrors HS "Actions globales" submenu ──
     GlobalActionsMenu := Menu()
@@ -1344,18 +1437,21 @@ if Features.Has("Personal") {
 ; reader validates each candidate action name against the registry.
 ReadScriptShortcutsConfig()
 
+; Load metrics config first so the « 📊 Métriques » submenu paints with
+; the correct ON/OFF state on the very first frame.
+MS_LoadFromIni()
+
 InitSubMenus()
 initMenu()
 UpdateTrayIcon()
 
-; Load + apply user-defined hotkeys for the metrics dashboards. Done after
-; initMenu() so the menu label reflects the persisted value at first paint.
-MS_LoadFromIni()
-MS_ApplyAll(KLUI_ToggleTyping, KLUI_ToggleApps)
-
-; Initialise the keylogger storage layer. The metrics_dir lives under the
-; user's config folder so it is naturally Git/OneDrive sync-friendly.
-KL_Init(EnvGet("USERPROFILE") . "\.ergopti_plus\metrics")
+; The keylogger storage layer + the dashboard hotkeys only come up when
+; the user has explicitly opted in. A fresh install starts OFF — this is
+; a keylogger; the privacy default must be the safe one.
+if MetricsShortcuts.enabled {
+    KL_Init(EnvGet("USERPROFILE") . "\.ergopti_plus\metrics")
+    MS_ApplyAll(KLUI_ToggleTyping, KLUI_ToggleApps)
+}
 
 LoggerSuccess("ErgoptiPlus", "Tray menu built and icon set.")
 

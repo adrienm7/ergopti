@@ -145,7 +145,25 @@ KLUI_IsRunning(pid) {
 ; =========================================
 ; =========================================
 
+; Bail-out helper. The dashboards are tightly coupled to the keylogger
+; storage layer, so opening one while the feature is OFF would only show
+; an empty page (and silently signal the user that the keylogger is
+; capturing). Better: refuse with a friendly hint pointing to the toggle.
+KLUI_RequireEnabled() {
+    if MetricsShortcuts.enabled
+        return true
+    MsgBox(
+        "Les métriques sont désactivées.`n`n"
+        . "Pour les activer : icône de la zone de notification → 📊 Métriques → "
+        . "« ⚠️ Métriques désactivées (cliquer pour activer) ».",
+        "📊 Métriques", "Iconi"
+    )
+    return false
+}
+
 KLUI_ToggleTyping(*) {
+    if !KLUI_RequireEnabled()
+        return
     KLUI_EnsureUrls()
     if KLUI_IsRunning(KLUI.typing_pid) {
         KLUI_KillWindow(KLUI.typing_pid)
@@ -156,6 +174,8 @@ KLUI_ToggleTyping(*) {
 }
 
 KLUI_ToggleApps(*) {
+    if !KLUI_RequireEnabled()
+        return
     KLUI_EnsureUrls()
     if KLUI_IsRunning(KLUI.apps_pid) {
         KLUI_KillWindow(KLUI.apps_pid)
