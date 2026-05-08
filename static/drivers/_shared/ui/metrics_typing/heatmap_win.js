@@ -70,12 +70,17 @@ const SC_TO_KC = {
 
 	// Thumb row + modifiers (AHK reports extended scancodes for some;
 	// non-extended values picked when AHK normalises them).
-	29:  59,  // ctrl_l
-	56:  58,  // alt_l
+	// Windows physical order: Ctrl | Fn | Win | Alt | Space | AltGr | Ctrl
+	// KEY_POSITIONS: kc59=x1 (ctrl) kc58=x2 (alt slot) kc55=x3.25 (cmd slot)
+	// We place Win at the alt slot (kc58) and Alt at the cmd slot (kc55) to
+	// match the Windows thumb row order (Win is left of Alt).
+	29:  59,  // ctrl_l  → ctrl-L position (x=1)
+	91:  58,  // lwin    → alt-L slot (x=2), left of Alt
+	56:  55,  // alt_l   → cmd-L slot (x=3.25), right of Win
 	57:  49,  // space
-	91:  55,  // lwin (extended-but-AHK-reports-as-0x5B)
+	312: 61,  // altgr (right-alt extended = SC 56 + 256 = 312, AHK representation)
 	92:  54,  // rwin → cmd_r position
-	93:  58,  // app/menu — reuse alt position for label
+	93:  61,  // app/menu — reuse altgr position for label
 
 	// Arrows (AHK extended scancodes 0xE048..0xE0CB usually surface as
 	// raw codes; cover both the bare and high-byte forms).
@@ -105,9 +110,11 @@ const WIN_KEYCODE_LABELS = {
 	"56":  "Maj",
 	"60":  "Maj",
 	"57":  "Verr. Maj",
-	"58":  "Alt",
+	// kc58 = alt-slot → Win key (physical position left of Alt on Windows)
+	"58":  "Win",
 	"61":  "AltGr",
-	"55":  "Win",
+	// kc55 = cmd-slot → Alt key (physical position right of Win on Windows)
+	"55":  "Alt",
 	"54":  "Win",
 	"59":  "Ctrl",
 	"63":  "Fn",

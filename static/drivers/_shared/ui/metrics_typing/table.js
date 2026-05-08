@@ -1021,9 +1021,9 @@ function render_kc_heatmap(kc_data_arr) {
 			"57":  "Verr.",
 			"49":  "",
 			"59":  "Ctrl",
-			"55":  "Win",
+			"58":  "Win",   // kc58 slot = Win key on Windows (left of Alt)
+			"55":  "Alt",   // kc55 slot = Alt key on Windows (right of Win)
 			"54":  "Win",
-			"58":  "Alt",
 			"61":  "AltGr",
 			"63":  "Fn",
 			"114": "?",
@@ -1361,7 +1361,7 @@ function render_sfb_heatmap(sfb_by_kc, sfb_pairs_by_kc, kc_raw) {
 	const SHORT_LABELS_WIN = {
 		"53": "Échap", "36": "Entrée", "48": "Tab", "51": "←",
 		"56": "Maj", "60": "Maj", "57": "Verr.", "49": "",
-		"59": "Ctrl", "55": "Win", "54": "Win", "58": "Alt",
+		"59": "Ctrl", "58": "Win", "55": "Alt", "54": "Win",
 		"61": "AltGr", "63": "Fn", "114": "?",
 		"123": "←", "124": "→", "125": "↓", "126": "↑", "76": "⏎",
 	};
