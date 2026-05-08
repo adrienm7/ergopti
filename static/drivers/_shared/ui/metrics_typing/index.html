@@ -262,8 +262,8 @@
 
 			<!-- Keyboard heatmaps — always visible above the tab buttons -->
 			<div class="heatmaps-row">
-				<div id="kc_heatmap_container" style="flex:1;text-align:center;"></div>
-				<div style="flex:1;text-align:center;display:flex;flex-direction:column;align-items:center;">
+				<div id="kc_heatmap_container" style="text-align:center;"></div>
+				<div style="text-align:center;display:flex;flex-direction:column;align-items:center;">
 					<div style="margin-bottom:6px;">
 						<button id="sfb_heatmap_same_key_btn" class="filter-btn sfb-toggle-btn active" onclick="toggle_sfb_heatmap_same_key()" title="Inclure ou exclure les redoublements de même touche (AA, BB…) dans la heatmap SFB. Indépendant du bouton du bloc SFB.">Doublons inclus</button>
 					</div>
@@ -905,7 +905,7 @@
 					// HS keycodes — translate the labels (and the n-gram
 					// data, below) so the heatmap geometry stays unchanged.
 					window.keycode_layout   = (typeof window.build_keycode_layout_for_driver === "function")
-						? window.build_keycode_layout_for_driver(window.driver_meta)
+						? window.build_keycode_layout_for_driver(window.driver_meta, blob.keycode_layout)
 						: (blob.keycode_layout || {});
 					const has_prefetch = blob._prefetch_data !== undefined;
 					let merged = null;

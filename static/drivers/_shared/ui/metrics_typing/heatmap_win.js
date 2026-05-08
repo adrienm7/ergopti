@@ -178,16 +178,32 @@ function translate_win_today(today) {
 
 /**
  * Build the keycode_layout map (kc_str → display label) appropriate for
- * the active driver. Falls back to the static KEYCODE_NAMES table when
- * the driver is macOS or unknown.
+ * the active driver.
+ *
+ *   macOS payloads return KEYCODE_NAMES untouched.
+ *   Windows payloads merge three layers, in increasing priority:
+ *     1. KEYCODE_NAMES                     — static QWERTY fallback
+ *     2. AHK-provided sc → char (translated via SC_TO_KC) — reflects
+ *        the user's active Windows layout (AZERTY, QWERTY-US, …).
+ *     3. WIN_KEYCODE_LABELS                — explicit Win modifier names.
  *
  * @param {Object} driver_meta - Optional `{ os, heatmap_id }` from blob.
+ * @param {Object} ahk_layout - Optional `{ sc_str: char }` from blob.
  * @returns {Object} Map of `kc_str` → display label string.
  */
-function build_keycode_layout_for_driver(driver_meta) {
+function build_keycode_layout_for_driver(driver_meta, ahk_layout) {
 	const base = (typeof KEYCODE_NAMES === "object" && KEYCODE_NAMES) ? KEYCODE_NAMES : {};
 	if (!driver_meta || driver_meta.os !== "win") return { ...base };
-	return { ...base, ...WIN_KEYCODE_LABELS };
+	const out = { ...base };
+	if (ahk_layout && typeof ahk_layout === "object") {
+		Object.entries(ahk_layout).forEach(([sc_str, ch]) => {
+			const kc = SC_TO_KC[Number(sc_str)];
+			if (kc === undefined) return;
+			out[String(kc)] = ch;
+		});
+	}
+	Object.entries(WIN_KEYCODE_LABELS).forEach(([k, v]) => { out[k] = v; });
+	return out;
 }
 
 window.translate_win_today  = translate_win_today;
