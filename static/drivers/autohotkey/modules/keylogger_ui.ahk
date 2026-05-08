@@ -116,15 +116,18 @@ KLUI_LaunchWindow(url, title) {
         which := "apps"
     if (which != "") {
         global _ConfigDir
-        ; Proof-of-life trace from the call site so we can tell apart
-        ; "function never invoked" from "function ran and bailed".
+        log_path := _ConfigDir . "logs\prefetch.log"
+        try DirCreate(_ConfigDir . "logs")
         try FileAppend("[" . A_Now . "] KLUI calling KLPF_BuildAndWrite(" . which . ", " . _ConfigDir . "metrics)`r`n",
-            KLPF_AssetsDir(which) . "prefetch_debug.txt", "UTF-8")
+            log_path, "UTF-8")
         try {
-            KLPF_BuildAndWrite(which, _ConfigDir . "metrics")
+            KLPF_BuildAndWrite(which, _ConfigDir . "metrics", log_path)
         } catch as err {
-            try FileAppend("[" . A_Now . "] KLUI caught: " . err.Message . "`r`n",
-                KLPF_AssetsDir(which) . "prefetch_debug.txt", "UTF-8")
+            try FileAppend("[" . A_Now . "] KLUI caught: " . err.Message
+                . " | What=" . err.What
+                . " | File=" . err.File . ":" . err.Line
+                . " | Extra=" . err.Extra . "`r`n",
+                log_path, "UTF-8")
         }
     }
 
