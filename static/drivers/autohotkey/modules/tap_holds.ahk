@@ -18,6 +18,14 @@
 ; spurious firings when another key is chord-pressed with LShift or LCtrl.
 global TAP_MIN_DURATION_MS := 50
 
+; Wrapper required: hotkey bodies may fire (e.g. via timers) before the top-
+; level auto-execute has finished, so a direct read of TAP_MIN_DURATION_MS
+; would error with "global variable has not been assigned a value".
+TapMinDurationMs() {
+	global TAP_MIN_DURATION_MS
+	return IsSet(TAP_MIN_DURATION_MS) ? TAP_MIN_DURATION_MS : 50
+}
+
 ; Initial delay (ms) before key-repeat starts when BackSpace is held on LAlt or RCtrl.
 global KEY_REPEAT_INITIAL_DELAY_MS := 300
 
@@ -146,7 +154,7 @@ CapsLockShortcut(CtrlActivated) {
     tap := ((TimeAfter - TimeBefore) <= Features["TapHolds"]["LShiftCopy"].TimeActivationSeconds * 1000)
     if (
         tap
-        and (TimeAfter - TimeBefore) >= TAP_MIN_DURATION_MS
+        and (TimeAfter - TimeBefore) >= TapMinDurationMs()
         and A_PriorKey == "LShift"
     ) { ; A_PriorKey is to be able to fire shortcuts very quickly, under the tap time
         SendInput("{LCtrl Down}c{LCtrl Up}")
@@ -168,7 +176,7 @@ CapsLockShortcut(CtrlActivated) {
     tap := ((TimeAfter - TimeBefore) <= Features["TapHolds"]["LCtrlPaste"].TimeActivationSeconds * 1000)
     if (
         tap
-        and (TimeAfter - TimeBefore) >= TAP_MIN_DURATION_MS
+        and (TimeAfter - TimeBefore) >= TapMinDurationMs()
         and A_PriorKey == "LControl"
         and not GetKeyState("SC03A", "P") ; "CapsLock"
         and not GetKeyState("SC038", "P") ; "LAlt"

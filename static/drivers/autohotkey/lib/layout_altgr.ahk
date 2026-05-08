@@ -213,6 +213,11 @@ AltGrShiftDispatch(SC, Table, *) {
     if !Table.Has(SC) {
         return
     }
+    ; This dispatcher only runs when RAlt is PHYSICALLY held — the HotIf in
+    ; RegisterAltGrLayer guards every SC138 hotkey on GetKeyState("RAlt","P").
+    ; Ghost SC138 prefixes (injected by an OS driver for AltGr-mapped keys
+    ; like Bépo's `'`) therefore fall through to the regular *SC<key>/SC<key>
+    ; remap hotkeys and produce the correct base-layer character.
     Entry := Table[SC]
     Cb := GetKeyState("Shift", "P") ? Entry.Shifted : Entry.Plain
     Cb()
@@ -230,15 +235,22 @@ RegisterAltGrLayer() {
     _BuildAltGrTables()
     try LoggerStart("LayoutAltGr", "Registering AltGr layer hotkeys…")
 
+    ; AltGr hotkeys must only fire when the user is PHYSICALLY holding RAlt.
+    ; Otherwise the OS driver's ghost SC138 (injected for AltGr-mapped keys
+    ; like Bépo's `'`) would route every following keypress through our
+    ; AltGr handler, which conflicts with the *SC<key> shortcut hotkeys
+    ; (e.g. SC02C → `c` with modifiers, → `é` without).
+
     ; --- ErgoptiPlus overrides (registered first, lowest precedence) ---
-    HotIf((*) => Features["Layout"]["ErgoptiPlus"].Enabled)
+    HotIf((*) => Features["Layout"]["ErgoptiPlus"].Enabled and GetKeyState("RAlt", "P"))
     for SC, _ in ALTGR_PLUS_OVERRIDES {
         Hotkey("SC138 & " . SC, AltGrShiftDispatch.Bind(SC, ALTGR_PLUS_OVERRIDES), "I2")
     }
 
     ; --- ErgoptiAltGr Number row + Ctrl+Alt Numpad mappings ---
     HotIf((*) => Features["Layout"]["ErgoptiAltGr"].Enabled
-        and Features["Layout"]["ErgoptiBase"].Enabled)
+        and Features["Layout"]["ErgoptiBase"].Enabled
+        and GetKeyState("RAlt", "P"))
     for SC, _ in ALTGR_NUMBER_ROW {
         Hotkey("SC138 & " . SC, AltGrShiftDispatch.Bind(SC, ALTGR_NUMBER_ROW), "I2")
     }
@@ -247,7 +259,7 @@ RegisterAltGrLayer() {
     }
 
     ; --- ErgoptiAltGr base rows (registered last, highest precedence) ---
-    HotIf((*) => Features["Layout"]["ErgoptiAltGr"].Enabled)
+    HotIf((*) => Features["Layout"]["ErgoptiAltGr"].Enabled and GetKeyState("RAlt", "P"))
     for SC, _ in ALTGR_BASE_ROWS {
         Hotkey("SC138 & " . SC, AltGrShiftDispatch.Bind(SC, ALTGR_BASE_ROWS), "I2")
     }
