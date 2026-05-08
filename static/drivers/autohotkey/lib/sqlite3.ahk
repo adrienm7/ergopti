@@ -46,7 +46,12 @@ class SQLiteConst {
     static TYPE_TXT   := 3
     static TYPE_BLOB  := 4
     static TYPE_NULL  := 5
-    static DLL        := "C:\Windows\System32\winsqlite3.dll"
+    ; Vendored sqlite.org official x64 build (public domain). Resolved
+    ; relative to A_ScriptDir (autohotkey/) → vendor/sqlite3.dll. We do
+    ; NOT use Windows' winsqlite3.dll: Microsoft documents it as OS-
+    ; internal and every third-party DllCall path through it either
+    ; access-violated or hard-crashed the AHK process.
+    static DLL        := A_ScriptDir . "\vendor\sqlite3.dll"
     static UTF8_PAGE  := 65001
 }
 
