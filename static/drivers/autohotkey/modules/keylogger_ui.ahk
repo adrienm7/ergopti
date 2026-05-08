@@ -226,25 +226,41 @@ KLUI_RequireEnabled() {
 KLUI_ToggleTyping(*) {
     if !KLUI_RequireEnabled()
         return
-    KLUI_EnsureUrls()
-    if KLUI_IsRunning(KLUI.typing_pid) {
-        KLUI_KillWindow(KLUI.typing_pid)
-        KLUI.typing_pid := 0
-        return
-    }
-    KLUI.typing_pid := KLUI_LaunchWindow(KLUI.typing_url, "Métriques de frappe")
+    KLUI_ToggleDashboard("typing", &KLUI.typing_pid, &KLUI.typing_url, "Métriques de frappe")
 }
 
 KLUI_ToggleApps(*) {
     if !KLUI_RequireEnabled()
         return
+    KLUI_ToggleDashboard("apps", &KLUI.apps_pid, &KLUI.apps_url, "Temps sur les applications")
+}
+
+; Shared toggle implementation. Tries WebView2 first (B niveau 2 — live
+; push channel + chrome-less Gui). Falls back to Edge --app= when
+; WebView2 Runtime / vendored deps are unavailable.
+KLUI_ToggleDashboard(which, &pid_ref, &url_ref, title) {
     KLUI_EnsureUrls()
-    if KLUI_IsRunning(KLUI.apps_pid) {
-        KLUI_KillWindow(KLUI.apps_pid)
-        KLUI.apps_pid := 0
+    if (url_ref = "")
+        url_ref := KLUI_ResolveAssetUrl("metrics_" . which)
+    global _ConfigDir
+    metrics_dir := _ConfigDir . "metrics"
+
+    if KLWV_IsAvailable() {
+        if KLWV.windows.Has(which) {
+            KLWV_Close(which)
+            return
+        }
+        KLWV_Open(which, metrics_dir)
         return
     }
-    KLUI.apps_pid := KLUI_LaunchWindow(KLUI.apps_url, "Temps sur les applications")
+
+    ; Fallback: legacy Edge --app= launcher.
+    if KLUI_IsRunning(pid_ref) {
+        KLUI_KillWindow(pid_ref)
+        pid_ref := 0
+        return
+    }
+    pid_ref := KLUI_LaunchWindow(url_ref, title)
 }
 
 KLUI_OpenTyping(*) {
@@ -260,6 +276,7 @@ KLUI_OpenApps(*) {
 }
 
 KLUI_CloseAll() {
+    try KLWV_CloseAll()
     KLUI_KillWindow(KLUI.typing_pid)
     KLUI.typing_pid := 0
     KLUI_KillWindow(KLUI.apps_pid)

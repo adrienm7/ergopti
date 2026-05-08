@@ -1012,6 +1012,12 @@ KL_IngestOnce() {
     }
     Keylogger.today_log_offset := new_offset
     KL_SaveState()
+
+    ; B niveau 2 hook: when the dashboard is hosted via WebView2, push
+    ; the freshly-projected prefetch blob to the page so the user sees
+    ; the new data without reloading. No-op when no WebView2 dashboards
+    ; are open (KLWV.windows is empty) or the module is not loaded.
+    try KLWV_NotifyIngest()
 }
 
 KL_DayRollover() {
