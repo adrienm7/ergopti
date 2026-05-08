@@ -302,16 +302,39 @@ KL_ResolveDevice(metrics_dir) {
 
     ; Scan existing device folders, reuse the one whose host_signature
     ; matches this machine.
+    ;
+    ; We use a regex over the raw bytes rather than a full JSON parse —
+    ; AHK v2 64-bit has no built-in JSON decoder and the COM
+    ; ScriptControl bridge we used initially is x86-only, which made
+    ; this scan silently fail on 64-bit hosts and mint a new device
+    ; folder on every reload. The shape of device.json is fixed (we
+    ; write it ourselves), so a targeted regex is both faster and
+    ; impervious to the bitness mismatch.
     if DirExist(by_root) {
         Loop Files, by_root . "*", "D" {
             djpath := A_LoopFileFullPath . "\device.json"
             if FileExist(djpath) {
                 try {
                     raw := FileRead(djpath, "UTF-8")
-                    obj := KL_JsonDecode(raw)
-                    if (obj is Map && obj.Has("host_signature")
-                            && obj["host_signature"] = current_host) {
-                        return obj
+                    if RegExMatch(raw, '"host_signature"\s*:\s*"([^"]+)"', &m) {
+                        if (m[1] = current_host) {
+                            ; Reconstruct the minimal Map we need from
+                            ; the same raw blob — same regex trick.
+                            obj := Map(
+                                "device_id",      "",
+                                "name",           "",
+                                "os",             "windows",
+                                "os_version",     "",
+                                "host_signature", current_host,
+                                "created_at",     "",
+                                "schema_version", KeylogConst.SCHEMA_VERSION
+                            )
+                            for field in ["device_id", "name", "os", "os_version", "created_at"] {
+                                if RegExMatch(raw, '"' . field . '"\s*:\s*"([^"]+)"', &mm)
+                                    obj[field] := mm[1]
+                            }
+                            return obj
+                        }
                     }
                 }
             }
