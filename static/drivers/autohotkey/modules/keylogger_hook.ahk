@@ -222,6 +222,7 @@ KL_Hook_OnChar(ih, c) {
     Keylogger.buffer_events.Push([c, delay, meta])
     Keylogger.buffer_text .= c
     try KL_Ergo_OnKeystroke(delay, KLHook.last_vk)
+    try KL_Roi_OnChar(c)
 }
 
 KL_Hook_OnKeyDown(ih, vk, sc) {

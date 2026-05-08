@@ -105,6 +105,7 @@ SendMode("Event") ; Everything concerning hotstrings MUST use SendEvent and not 
 #Include modules\keylogger_av_state.ahk
 #Include modules\keylogger_network.ahk
 #Include modules\keylogger_clipboard.ahk
+#Include modules\keylogger_trigger_roi.ahk
 #Include modules\keylogger_reader.ahk
 #Include modules\keylogger_prefetch.ahk
 #Include modules\keylogger_webview.ahk
@@ -1637,6 +1638,7 @@ if MetricsShortcuts.enabled {
     KL_AV_Start()
     KL_Net_Start()
     KL_Clip_Start()
+    KL_Roi_Start()
 }
 
 LoggerSuccess("ErgoptiPlus", "Tray menu built and icon set.")
