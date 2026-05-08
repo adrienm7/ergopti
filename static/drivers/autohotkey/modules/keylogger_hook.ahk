@@ -112,6 +112,17 @@ class KLHook {
     ; Active-window context cache. Avoids hammering Win32 on every
     ; keystroke; refreshed at most every CONTEXT_TTL_MS.
     static context_at   := 0
+
+    ; Previous (app, title) values + their entry tick — used to emit
+    ; ``app_switch`` / ``window_switch`` events when the focused app or
+    ; title changes. Mirrors HS init.lua:862 / context_tracker.lua:230.
+    ; ``"" / 0`` signals « no observation yet », so the first refresh
+    ; only seeds the values without emitting a spurious switch from
+    ; the static "Unknown" defaults.
+    static prev_app       := ""
+    static prev_title     := ""
+    static app_entered_at := 0
+    static title_entered_at := 0
 }
 
 
@@ -126,13 +137,45 @@ class KLHook {
 KL_Hook_RefreshContext() {
     if (A_TickCount - KLHook.context_at) < KLHookConst.CONTEXT_TTL_MS
         return
+    NewTitle := ""
+    NewApp   := ""
     try {
-        Keylogger.session_title := WinGetTitle("A")
+        NewTitle := WinGetTitle("A")
     }
     try {
-        Keylogger.session_app := WinGetProcessName("A")
+        NewApp := WinGetProcessName("A")
     }
-    KLHook.context_at := A_TickCount
+    Now := A_TickCount
+
+    ; Emit app_switch / window_switch the first time we observe a change.
+    ; HS tracks app and title separately because a window-title-only change
+    ; (e.g. switching tabs in a browser) is interesting on its own — it
+    ; surfaces in the metrics dashboard as a per-app context shift without
+    ; double-counting as an app switch.
+    if (NewApp != "" and NewApp != KLHook.prev_app) {
+        if (KLHook.prev_app != "") {
+            duration := Now - KLHook.app_entered_at
+            ; Flush before logging so the typing buffer is attributed to the
+            ; previous app, not the new one. Mirrors HS log_manager flush_buffer
+            ; calls on app_switch.
+            try KL_FlushBuffer()
+            try KL_LogAppSwitch(KLHook.prev_app, NewApp, duration)
+        }
+        KLHook.prev_app := NewApp
+        KLHook.app_entered_at := Now
+    }
+    if (NewTitle != KLHook.prev_title) {
+        if (KLHook.prev_title != "" and KLHook.prev_app != "") {
+            duration := Now - KLHook.title_entered_at
+            try KL_LogWindowSwitch(KLHook.prev_app, KLHook.prev_title, NewTitle, duration)
+        }
+        KLHook.prev_title := NewTitle
+        KLHook.title_entered_at := Now
+    }
+
+    Keylogger.session_title := NewTitle
+    Keylogger.session_app   := NewApp
+    KLHook.context_at       := Now
 }
 
 
