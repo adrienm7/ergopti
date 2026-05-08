@@ -1340,6 +1340,7 @@ KL_Stop() {
     try KL_Topo_Stop()
     try KL_AV_Stop()
     try KL_Net_Stop()
+    try KL_Clip_Stop()
     if Keylogger.HasProp("_ingest_timer")
         SetTimer(Keylogger._ingest_timer, 0)
     if Keylogger.HasProp("_midnight_timer")
