@@ -84,7 +84,10 @@ SendMode("Event") ; Everything concerning hotstrings MUST use SendEvent and not 
 #Include lib\dispatchers.ahk
 #Include lib\layout_altgr.ahk
 #Include lib\layout_shift_caps.ahk
+#Include lib\app_picker.ahk
+#Include lib\config_shortcuts.ahk
 #Include lib\metrics_shortcuts.ahk
+#Include lib\metrics_filters.ahk
 #Include modules\keylogger.ahk
 #Include modules\keylogger_walker.ahk
 #Include modules\keylogger_ui.ahk
@@ -818,28 +821,92 @@ BuildMetricsMenu() {
     MetricsMenu.Add(apps_label, (*) => KLUI_ToggleApps())
     MetricsMenu.Add(apps_sc, (*) => MS_PromptShortcut("apps", KLUI_ToggleApps))
 
+    ; ── Privacy filters — same section as HS menu_metrics.lua « FILTRES
+    ; DE CONFIDENTIALITÉ ». Each toggle persists immediately to
+    ; metrics_shortcuts.ini and takes effect on the next keystroke
+    ; flushed from the buffer (no Reload required because filters live
+    ; in RAM and the next MF_ShouldFilter call picks the new value).
+    MetricsMenu.Add()
+    privacy_header := "— FILTRES DE CONFIDENTIALITÉ —"
+    MetricsMenu.Add(privacy_header, (*) => "")
+    MetricsMenu.Disable(privacy_header)
+
+    private_label := "Ignorer la navigation privée"
+    MetricsMenu.Add(private_label, ToggleFilterPrivate)
+    if MetricsFilters.private_browsing
+        MetricsMenu.Check(private_label)
+
+    sysauth_label := "Ignorer les boîtes de dialogue d'authentification système"
+    MetricsMenu.Add(sysauth_label, ToggleFilterSystemAuth)
+    if MetricsFilters.system_auth
+        MetricsMenu.Check(sysauth_label)
+
+    ; App exclusion entry — label reflects the count, click opens the
+    ; reusable AppPicker Gui. Mirror of HS « Désactivé dans N application(s) ».
+    n := MF_DisabledCount()
+    excl_label := (n > 0)
+        ? "Désactivé dans " . n . " application" . (n > 1 ? "s" : "")
+        : "Exclure des applications du keylogger…"
+    MetricsMenu.Add(excl_label, OpenMetricsAppPicker)
+
     if !enabled {
         MetricsMenu.Disable(typing_label)
         MetricsMenu.Disable(typing_sc)
         MetricsMenu.Disable(apps_label)
         MetricsMenu.Disable(apps_sc)
+        MetricsMenu.Disable(private_label)
+        MetricsMenu.Disable(sysauth_label)
+        MetricsMenu.Disable(excl_label)
     }
 
     A_TrayMenu.Add("📊 Métriques", MetricsMenu)
-    ; Bind the parent click to the global toggle. AHK menu API requires a
-    ; second Add() with the same label to override the default behaviour
-    ; (which is "open the submenu"). We instead overload the parent label
-    ; to a function that fires the toggle dialog — the submenu still opens
-    ; on hover, only the click-on-label path runs the toggle.
-    ; Implementation note: AHK does not expose a clean "click parent"
-    ; callback when the entry has a submenu. We mirror the HS behaviour
-    ; by adding a synthetic top item INSIDE the submenu so the user has
-    ; one obvious place to flip the master switch.
+    ; Implementation note: AHK does not expose a "click parent" callback
+    ; when the entry has a submenu. We mirror the HS « click parent =
+    ; toggle » behaviour with a synthetic first item inside the submenu.
     on_off_label := MetricsShortcuts.enabled
         ? "✅ Métriques activées (cliquer pour désactiver)"
         : "⚠️ Métriques désactivées (cliquer pour activer)"
     MetricsMenu.Insert("1&", on_off_label, (*) => ToggleMetricsEnabled())
     MetricsMenu.Insert("2&") ; separator after the toggle
+}
+
+; ── Filter toggles. Each persists + flips the corresponding flag and
+; triggers a Reload so the menu rerenders with the new checkmark state
+; (AHK Menu.Check / Uncheck cannot retro-update an entry whose label was
+; built into the submenu reference; rebuilding the whole tray is cleaner
+; than playing with .ToggleCheck on a stale label).
+ToggleFilterPrivate(*) {
+    MetricsFilters.private_browsing := !MetricsFilters.private_browsing
+    MF_SaveToIni()
+    Reload
+}
+
+ToggleFilterSystemAuth(*) {
+    MetricsFilters.system_auth := !MetricsFilters.system_auth
+    MF_SaveToIni()
+    Reload
+}
+
+OpenMetricsAppPicker(*) {
+    AppPicker_Show(Map(
+        "title",    "Exclure des applications — Métriques",
+        "prompt",   "Sélectionnez les applications dont les frappes ne "
+                .   "seront jamais enregistrées par le keylogger.",
+        "ok_label", "Enregistrer",
+        "initial",  MF_DisabledList(),
+        "on_save",  OnMetricsAppPickerSave
+    ))
+}
+
+OnMetricsAppPickerSave(selected) {
+    ; Replace the disabled-apps map wholesale with the picker's result —
+    ; the user expects "what's checked = what's filtered", not "diff
+    ; against the previous state".
+    MetricsFilters.disabled_apps := Map()
+    for proc in selected
+        MetricsFilters.disabled_apps[StrLower(proc)] := true
+    MF_SaveToIni()
+    Reload
 }
 
 ; Flip the global keylogger feature with a warning dialog before enabling.
@@ -1449,9 +1516,11 @@ if Features.Has("Personal") {
 ; reader validates each candidate action name against the registry.
 ReadScriptShortcutsConfig()
 
-; Load metrics config first so the « 📊 Métriques » submenu paints with
-; the correct ON/OFF state on the very first frame.
-MS_LoadFromIni()
+; Load every UI shortcut + privacy filter from the [shortcuts] section
+; of <config_dir>/config.toml. CS_Load() populates both MetricsShortcuts
+; and MetricsFilters in one pass; the legacy MS_LoadFromIni shim still
+; exists for callers that have not migrated yet.
+CS_Load()
 
 InitSubMenus()
 initMenu()

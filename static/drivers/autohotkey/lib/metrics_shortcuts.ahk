@@ -72,29 +72,16 @@ class MetricsShortcuts {
 ; ============================================
 ; ============================================
 
-MS_GetIniPath() {
-    ; Sit next to A_ScriptFullPath. The user's per-config folder sees this
-    ; file too thanks to the existing personal_shortcuts forwarding pattern.
-    return A_ScriptDir . "\metrics_shortcuts.ini"
-}
-
+; Persistence delegates to lib/config_shortcuts.ahk which owns the
+; [shortcuts] section inside <config_dir>/config.toml. The MS_* names
+; survive as thin shims so existing call sites keep working without
+; needing a global rename.
 MS_LoadFromIni() {
-    path := MS_GetIniPath()
-    if !FileExist(path)
-        return
-    try MetricsShortcuts.typing_str := IniRead(path, "shortcuts", "typing", "")
-    try MetricsShortcuts.apps_str   := IniRead(path, "shortcuts", "apps",   "")
-    try {
-        v := IniRead(path, "shortcuts", "enabled", "0")
-        MetricsShortcuts.enabled := (v = "1" || v = "true") ? true : false
-    }
+    CS_Load()
 }
 
 MS_SaveToIni() {
-    path := MS_GetIniPath()
-    try IniWrite(MetricsShortcuts.typing_str, path, "shortcuts", "typing")
-    try IniWrite(MetricsShortcuts.apps_str,   path, "shortcuts", "apps")
-    try IniWrite(MetricsShortcuts.enabled ? "1" : "0", path, "shortcuts", "enabled")
+    CS_Save()
 }
 
 
