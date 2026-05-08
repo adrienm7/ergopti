@@ -47,10 +47,12 @@ KLPF_AssetsDir(which) {
     return base
 }
 
-; The prefetch file lives alongside index.html. Edge's --app=file:// can
-; read sibling files via fetch() because they share the file:// origin.
+; The prefetch file lives alongside index.html and is loaded via a
+; <script src="prefetch.js"> tag rather than fetch(). Chromium blocks
+; fetch() across file:// URLs (every file:// is a unique origin) but
+; <script> tags work fine, so we ship a tiny JS that assigns a global.
 KLPF_PrefetchPath(which) {
-    return KLPF_AssetsDir(which) . "prefetch.json"
+    return KLPF_AssetsDir(which) . "prefetch.js"
 }
 
 
@@ -80,8 +82,11 @@ KLPF_BuildAndWrite(which, metrics_dir) {
     SQLite_Close(db)
 
     json := KL_JsonEncode(blob)
+    ; Wrap as JS so a plain <script src> can load it cross file:// — the
+    ; bootstrap reads window._ergopti_prefetch off the global.
+    body := "window._ergopti_prefetch = " . json . ";"
     path := KLPF_PrefetchPath(which)
-    return KLPF_WriteAtomic(path, json)
+    return KLPF_WriteAtomic(path, body)
 }
 
 KLPF_WriteAtomic(path, content) {
