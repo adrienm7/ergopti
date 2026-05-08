@@ -58,7 +58,7 @@ SendMode("Event") ; Everything concerning hotstrings MUST use SendEvent and not 
 
 ; INI helpers extracted to their own lib so the test runner can ``#Include``
 ; them without bootstrapping the rest of the driver.
-#Include lib\ini_helpers.ahk
+#Include lib\toml_helpers.ahk
 
 ; Active-app cache must come before hotstring_engine.ahk because both
 ; ``HotstringHandler`` and ``MicrosoftApps`` consult ``GetActiveApp``.
@@ -154,7 +154,7 @@ if !DirExist(_ConfigDir) {
 ; AHK-specific INI lives under the driver subfolder. The legacy root path
 ; is no longer searched — users coming from the older layout move the
 ; file into <config_dir>/ahk/ once.
-global ConfigurationFile := _ConfigDir . "ahk\ErgoptiPlus_Configuration.ini"
+global ConfigurationFile := _ConfigDir . "ahk\config.toml"
 
 ; Initialise the hotstrings_config module so per-group delays and tooltip
 ; colors can be resolved from the TOML metadata + the shared user override
@@ -238,7 +238,7 @@ for _Slot in SCRIPT_SHORTCUT_SLOTS {
     ScriptShortcutAssignments[_Slot] := SCRIPT_SHORTCUT_DEFAULTS[_Slot]
 }
 
-; ParseIniFile / IniCacheGet / ResolveConfigPath are defined in lib/ini_helpers.ahk
+; ParseTomlFile / IniCacheGet / ResolveConfigPath are defined in lib/ini_helpers.ahk
 ; (included above) so the test runner can exercise them in isolation.
 
 ReadScriptConfig(Cache) {
@@ -250,7 +250,7 @@ ReadScriptConfig(Cache) {
     }
 }
 
-global _IniCache := ParseIniFile(ConfigurationFile)
+global _IniCache := ParseTomlFile(ConfigurationFile)
 ReadScriptConfig(_IniCache)
 
 ; Resolve hot-path flags cached by the hotstring engine (AltGrIsKanaRemap)
@@ -591,7 +591,7 @@ MenuAddLetterPicker(MenuParent, FeatureCategoryPath, FeatureName) {
 }
 
 ; Sets the remap target letter on a feature and enables it. Persists both
-; flags via IniWrite so the change survives reload, then reloads to wire
+; flags via TOML_Write so the change survives reload, then reloads to wire
 ; the new shortcut at the layer level.
 SetFeatureLetter(FullPath, Letter) {
     Feature := GetFeatureByPath(FullPath)
@@ -601,8 +601,8 @@ SetFeatureLetter(FullPath, Letter) {
 
     Feature.Enabled := true
     Feature.Letter := Letter
-    IniWrite(true, ConfigurationFile, FeatureCategoryPath, FeatureName . ".Enabled")
-    IniWrite(Letter, ConfigurationFile, FeatureCategoryPath, FeatureName . ".Letter")
+    TOML_Write(true, ConfigurationFile, FeatureCategoryPath, FeatureName . ".Enabled")
+    TOML_Write(Letter, ConfigurationFile, FeatureCategoryPath, FeatureName . ".Letter")
     Reload
 }
 
@@ -615,7 +615,7 @@ SetFeatureLetterOff(FullPath) {
     FeatureName := SubStr(FullPath, pos + 1)
 
     Feature.Enabled := false
-    IniWrite(false, ConfigurationFile, FeatureCategoryPath, FeatureName . ".Enabled")
+    TOML_Write(false, ConfigurationFile, FeatureCategoryPath, FeatureName . ".Enabled")
     Reload
 }
 
@@ -680,11 +680,11 @@ ToggleMenuVariableByPath(FullPath) {
         for ShortcutName in FeatureCategory {
             Shortcut := FeatureCategory.Get(ShortcutName)
             Shortcut.Enabled := False
-            IniWrite(Shortcut.Enabled, ConfigurationFile, FeatureCategoryPath, ShortcutName . ".Enabled")
+            TOML_Write(Shortcut.Enabled, ConfigurationFile, FeatureCategoryPath, ShortcutName . ".Enabled")
         }
     }
     Feature.Enabled := !CurrentFeatureActivation
-    IniWrite(Feature.Enabled, ConfigurationFile, FeatureCategoryPath, FeatureName . ".Enabled")
+    TOML_Write(Feature.Enabled, ConfigurationFile, FeatureCategoryPath, FeatureName . ".Enabled")
     Reload
 }
 
@@ -814,7 +814,7 @@ SetGestureSlotAction(Slot, ActionName) {
 ToggleGesturesEnabled() {
     global Features, ConfigurationFile
     Features["Gestures"]["Enabled"].Enabled := !Features["Gestures"]["Enabled"].Enabled
-    IniWrite(Features["Gestures"]["Enabled"].Enabled, ConfigurationFile, "Gestures", "Enabled")
+    TOML_Write(Features["Gestures"]["Enabled"].Enabled, ConfigurationFile, "Gestures", "Enabled")
     Reload
 }
 
@@ -1684,7 +1684,7 @@ MagicKeyEditor(*) {
 ModifyMagicKey(gui, NewValue) {
     global ScriptInformation, ConfigurationFile
     ScriptInformation["MagicKey"] := NewValue
-    IniWrite(NewValue, ConfigurationFile, "Script", "MagicKey")
+    TOML_Write(NewValue, ConfigurationFile, "Script", "MagicKey")
 
     gui.Destroy()
     Reload
@@ -1754,7 +1754,7 @@ GPTLinkEditor(*) {
 }
 ModifyLink(gui, NewValue) {
     Features["Shortcuts"]["GPT"].Link := NewValue
-    IniWrite(NewValue, ConfigurationFile, "Shortcuts", "GPT" . "." . "Link")
+    TOML_Write(NewValue, ConfigurationFile, "Shortcuts", "GPT" . "." . "Link")
 
     gui.Destroy()
     Reload
@@ -1791,7 +1791,7 @@ ToggleAllFeatures(Value) {
     ; - If Value == 0 : set everything to 0 recursively (including sub-sub-menus)
     ; - If Value == 1 : set only first-level features (the defaults) to 1; do not enable nested choices
     ; Collect all INI mutations into a single batch — writing them one by one
-    ; through IniWrite does 50+ FileOpen/Write/Close round-trips and produces a
+    ; through TOML_Write does 50+ FileOpen/Write/Close round-trips and produces a
     ; visible delay in the tray menu.
     global Features
     Updates := []
@@ -1853,7 +1853,7 @@ ToggleAllFeatures(Value) {
             }
         }
     }
-    IniBatchWrite(ConfigurationFile, Updates)
+    TOML_BatchWrite(ConfigurationFile, Updates)
     Reload
 }
 
@@ -1903,7 +1903,7 @@ ToggleAllHotstrings(Value) {
             }
         }
     }
-    IniBatchWrite(ConfigurationFile, Updates)
+    TOML_BatchWrite(ConfigurationFile, Updates)
     Reload
 }
 
@@ -1944,7 +1944,7 @@ ToggleCategoryAllFeatures(Category, Value) {
             Updates.Push({ Section: Category, Key: FeatureName . ".Enabled", Value: Value })
         }
     }
-    IniBatchWrite(ConfigurationFile, Updates)
+    TOML_BatchWrite(ConfigurationFile, Updates)
     Reload
 }
 
@@ -1994,7 +1994,7 @@ RunScriptShortcutAction(Slot) {
 SetScriptShortcutAction(Slot, ActionName) {
     global ScriptShortcutAssignments, ConfigurationFile
     ScriptShortcutAssignments[Slot] := ActionName
-    IniWrite(ActionName, ConfigurationFile, "ScriptShortcuts", Slot)
+    TOML_Write(ActionName, ConfigurationFile, "ScriptShortcuts", Slot)
     Reload
 }
 
