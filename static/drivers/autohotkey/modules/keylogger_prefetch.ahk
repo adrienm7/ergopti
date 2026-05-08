@@ -68,10 +68,12 @@ KLPF_PrefetchPath(which) {
 ; on success, false on any failure (a failure leaves the previous file
 ; intact so the page degrades gracefully to the old data rather than to
 ; an empty state).
-KLPF_BuildAndWrite(which, metrics_dir) {
+KLPF_BuildAndWrite(which, metrics_dir, dbg := "") {
     ; Step-by-step diagnostic so a silent failure points us straight at
-    ; the broken stage. Written next to the prefetch sidecar.
-    dbg := KLPF_AssetsDir(which) . "prefetch_debug.txt"
+    ; the broken stage. Caller provides a log path; default is alongside
+    ; the prefetch sidecar so the function still works on its own.
+    if (dbg = "")
+        dbg := KLPF_AssetsDir(which) . "prefetch_debug.txt"
     KLPF_DbgWrite(dbg, "=== " . A_Now . " — which=" . which . " md=" . metrics_dir)
 
     db := KLR_BuildDatabase(metrics_dir)
