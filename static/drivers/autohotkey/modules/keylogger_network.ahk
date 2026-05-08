@@ -94,36 +94,134 @@ class KLNet {
 ; =========================================
 ; =========================================
 
+; Queries the active Wi-Fi connection via the Win32 WLAN API. Returns a Map
+; with "ssid" and "signal_pct" (0-100) on success, or an empty Map when no
+; Wi-Fi adapter is connected / the API is unavailable.
+;
+; Why this rather than ``netsh wlan show interfaces``: the WScript.Shell.Exec
+; path spawned a visible cmd.exe console window every NETWORK_TICK_MS — a
+; flash + brief input freeze on every poll, completely unacceptable on a
+; keyboard driver. wlanapi.dll is a native API, no subprocess, no console.
+;
+; Layout of the structures we touch (see wlantypes.h on Microsoft Learn):
+;   WLAN_INTERFACE_INFO_LIST = { dwNumberOfItems: DWORD, dwIndex: DWORD,
+;       InterfaceInfo: WLAN_INTERFACE_INFO[] }
+;   WLAN_INTERFACE_INFO      = { InterfaceGuid: 16 bytes,
+;       strInterfaceDescription: 256 WCHAR, isState: DWORD }
+;   WLAN_CONNECTION_ATTRIBUTES = { isState: 4, wlanConnectionMode: 4,
+;       strProfileName: 256 WCHAR (=512 bytes), wlanAssociationAttributes: 152,
+;       wlanSecurityAttributes: 16 }
+;   WLAN_ASSOCIATION_ATTRIBUTES (152 bytes) starts with:
+;       dot11Ssid (DOT11_SSID = uLength DWORD + ucSSID 32 bytes), …
+;       wlanSignalQuality DWORD at offset 132
+KL_Net_QueryWifi() {
+    static WLAN_API_VERSION                   := 2
+    static WLAN_INTF_OPCODE_CURRENT_CONNECTION := 7
+    static ERROR_SUCCESS                       := 0
+
+    result := Map()
+
+    hClient   := 0
+    pdwNeg    := 0
+    rc := DllCall("Wlanapi\WlanOpenHandle",
+        "UInt", WLAN_API_VERSION, "Ptr", 0,
+        "UInt*", &pdwNeg, "Ptr*", &hClient, "UInt")
+    if (rc != ERROR_SUCCESS or hClient = 0) {
+        return result
+    }
+
+    pIfaceList := 0
+    rc := DllCall("Wlanapi\WlanEnumInterfaces",
+        "Ptr", hClient, "Ptr", 0, "Ptr*", &pIfaceList, "UInt")
+    if (rc != ERROR_SUCCESS or pIfaceList = 0) {
+        DllCall("Wlanapi\WlanCloseHandle", "Ptr", hClient, "Ptr", 0)
+        return result
+    }
+
+    nItems := NumGet(pIfaceList, 0, "UInt")
+    ; First WLAN_INTERFACE_INFO sits 8 bytes in (dwNumberOfItems + dwIndex).
+    ; Each entry is GUID(16) + WCHAR[256](512) + isState(4) = 532 bytes; we
+    ; only inspect the first connected interface — sufficient for the
+    ; common single-radio laptop case.
+    Loop nItems {
+        pIface := pIfaceList + 8 + (A_Index - 1) * 532
+        ; isState lives at offset 16 + 512 = 528. State 1 = connected.
+        if (NumGet(pIface, 528, "UInt") != 1) {
+            continue
+        }
+        ; Copy the 16-byte interface GUID for the query call.
+        guid := Buffer(16, 0)
+        DllCall("RtlMoveMemory", "Ptr", guid, "Ptr", pIface, "UPtr", 16)
+
+        pData     := 0
+        cbData    := 0
+        valueType := 0
+        rc := DllCall("Wlanapi\WlanQueryInterface",
+            "Ptr",   hClient,
+            "Ptr",   guid,
+            "UInt",  WLAN_INTF_OPCODE_CURRENT_CONNECTION,
+            "Ptr",   0,
+            "UInt*", &cbData,
+            "Ptr*",  &pData,
+            "UInt*", &valueType,
+            "UInt")
+        if (rc = ERROR_SUCCESS and pData) {
+            ; pData → WLAN_CONNECTION_ATTRIBUTES.
+            ; isState(4) + wlanConnectionMode(4) + strProfileName(512)
+            ;   = 520 → start of WLAN_ASSOCIATION_ATTRIBUTES.
+            ; DOT11_SSID = uSSIDLength(4) + ucSSID(32 bytes).
+            ssid_len := NumGet(pData, 520, "UInt")
+            if (ssid_len > 0 and ssid_len <= 32) {
+                ssid := StrGet(pData + 524, ssid_len, "UTF-8")
+                ; wlanSignalQuality offset within WLAN_ASSOCIATION_ATTRIBUTES:
+                ;   DOT11_SSID            36 bytes  (uLength 4 + ucSSID 32)
+                ;   DOT11_BSS_TYPE         4 bytes
+                ;   DOT11_MAC_ADDRESS      6 bytes  (+2 padding to 4-byte align)
+                ;   DOT11_PHY_TYPE         4 bytes
+                ;   uDot11PhyIndex         4 bytes
+                ;   = 56 → assoc base is 520 → 520 + 56 = 576.
+                signal_pct := NumGet(pData, 576, "UInt")
+                if (signal_pct > 100) {
+                    signal_pct := 100
+                }
+                result["ssid"]       := ssid
+                result["signal_pct"] := signal_pct
+            }
+            DllCall("Wlanapi\WlanFreeMemory", "Ptr", pData)
+        }
+        if (result.Count > 0) {
+            break
+        }
+    }
+
+    DllCall("Wlanapi\WlanFreeMemory", "Ptr", pIfaceList)
+    DllCall("Wlanapi\WlanCloseHandle", "Ptr", hClient, "Ptr", 0)
+    return result
+}
+
 KL_Net_WifiTick() {
     if !Keylogger.initialized
         return
-    ssid    := ""
-    rssi    := 0
-    try {
-        ; Run netsh silently and parse output
-        sh   := ComObject("WScript.Shell")
-        out  := sh.Exec("netsh wlan show interfaces").StdOut.ReadAll()
-        for line in StrSplit(out, "`n") {
-            line := Trim(line)
-            if RegExMatch(line, "i)^\s*SSID\s*:\s*(.+)", &m)
-                ssid := Trim(m[1])
-            if RegExMatch(line, "i)Signal\s*:\s*(\d+)%", &m)
-                rssi := Integer(m[1])
-        }
-    }
-    if (ssid = "")
-        return   ; not on Wi-Fi or command failed
+
+    info := Map()
+    try info := KL_Net_QueryWifi()
+    if (info.Count = 0)
+        return   ; not on Wi-Fi or API unavailable
+
+    ssid       := info["ssid"]
+    signal_pct := info["signal_pct"]
 
     ; Hash SSID
     ssid_hash := KL_Net_HashStr(ssid)
 
-    ; Signal bracket
+    ; Signal bracket (signal_pct is 0-100, not dBm, so the brackets here
+    ; differ from KLNetConst.RSSI_* which target the netsh dBm output).
     signal := "poor"
-    if (rssi >= 80)
+    if (signal_pct >= 80)
         signal := "excellent"
-    else if (rssi >= 60)
+    else if (signal_pct >= 60)
         signal := "good"
-    else if (rssi >= 40)
+    else if (signal_pct >= 40)
         signal := "fair"
 
     if (ssid_hash != KLNet.last_ssid_hash or signal != KLNet.last_signal) {
@@ -153,16 +251,18 @@ KL_Net_WifiTick() {
 KL_Net_ReachTick() {
     if !Keylogger.initialized
         return
-    up := false
-    try {
-        ; Use WinHTTP to do a lightweight HEAD request to the NCSI endpoint.
-        ; On failure (timeout or NXDOMAIN) we treat as down.
-        wh  := ComObject("WinHttp.WinHttpRequest.5.1")
-        wh.Open("HEAD", "http://" . KLNetConst.NCSI_HOST . "/ncsi.txt", false)
-        wh.SetTimeouts(3000, 3000, 3000, 3000)
-        wh.Send()
-        up := (wh.Status >= 200 and wh.Status < 400)
-    }
+
+    ; InternetGetConnectedState is part of wininet.dll and resolves
+    ; instantly from the Network List service's cached state — no socket
+    ; opened, no DNS lookup, no risk of freezing the AHK thread. The
+    ; previous WinHttpRequest.Send(bAsync=false) blocked the entire
+    ; script for up to 4 × 3 s on a flaky link, which is unacceptable on
+    ; a keyboard driver.
+    flags := 0
+    up    := false
+    try up := !!DllCall("Wininet\InternetGetConnectedState",
+        "UInt*", &flags, "UInt", 0, "Int")
+
     if (up and !KLNet.internet_up) {
         KLNet.internet_up := true
         KL_AppendLog(Map("type", "internet_up", "app", Keylogger.session_app))
@@ -181,23 +281,85 @@ KL_Net_ReachTick() {
 ; ==========================================
 ; ==========================================
 
+; Walks the Win32 GetAdaptersAddresses linked list looking for an enabled
+; adapter whose FriendlyName contains a known VPN substring. Returns the
+; adapter's friendly name on hit, "" otherwise.
+;
+; Why this rather than WMI Win32_NetworkAdapter: ComObjGet("winmgmts:")
+; followed by ExecQuery is notoriously slow on cold-start (WMI service
+; spinning up: 1-3 s on a typical machine) and synchronous on the AHK
+; main thread, so every poll could starve keyboard input. iphlpapi is
+; native, in-process, microsecond latency.
+;
+; IP_ADAPTER_ADDRESSES layout (only the fields we read):
+;   ULONG          Length;             // 0  (or 8 on 64-bit due to union)
+;   IF_INDEX       IfIndex;            // 4
+;   PIP_ADAPTER_ADDRESSES Next;        // 8
+;   PCHAR          AdapterName;        // 16
+;   ...
+;   PWCHAR         FriendlyName;       // offset varies — see below
+;   ...
+;   IF_OPER_STATUS OperStatus;         // 4 bytes, see PSDK
+; The FriendlyName offset depends on alignment / version, so we use the
+; documented offset for the v1 base structure on 64-bit Windows: 64.
+KL_Net_FindVpnAdapter() {
+    static GAA_FLAG_SKIP_UNICAST       := 0x0001
+    static GAA_FLAG_SKIP_ANYCAST       := 0x0002
+    static GAA_FLAG_SKIP_MULTICAST     := 0x0004
+    static GAA_FLAG_SKIP_DNS_SERVER    := 0x0008
+    static GAA_FLAG_SKIP_FRIENDLY_NAME := 0x0020
+    static AF_UNSPEC                   := 0
+    static ERROR_BUFFER_OVERFLOW       := 111
+    static IF_OPER_STATUS_UP           := 1
+
+    flags := GAA_FLAG_SKIP_UNICAST | GAA_FLAG_SKIP_ANYCAST
+          | GAA_FLAG_SKIP_MULTICAST | GAA_FLAG_SKIP_DNS_SERVER
+
+    ; Two-call idiom — first call sizes the buffer, second fills it.
+    cb := 0
+    DllCall("Iphlpapi\GetAdaptersAddresses",
+        "UInt", AF_UNSPEC, "UInt", flags, "Ptr", 0,
+        "Ptr",  0,         "UInt*", &cb, "UInt")
+    if (cb = 0) {
+        return ""
+    }
+    buf := Buffer(cb, 0)
+    rc := DllCall("Iphlpapi\GetAdaptersAddresses",
+        "UInt", AF_UNSPEC, "UInt", flags, "Ptr", 0,
+        "Ptr",  buf,       "UInt*", &cb, "UInt")
+    if (rc != 0) {
+        return ""
+    }
+
+    ; Walk the linked list. ``Next`` lives at offset 8.
+    p := buf.Ptr
+    while (p) {
+        ; Skip adapters that are not currently up. OperStatus is at offset
+        ; 56 on 64-bit Windows (after the v1 base header).
+        oper_status := NumGet(p, 56, "UInt")
+        if (oper_status = IF_OPER_STATUS_UP) {
+            ; FriendlyName (PWCHAR) sits at offset 64 on 64-bit Windows.
+            pname := NumGet(p, 64, "Ptr")
+            if (pname) {
+                name       := StrGet(pname, "UTF-16")
+                lower_name := StrLower(name)
+                for _, hint in KLNetConst.VPN_NAME_HINTS {
+                    if InStr(lower_name, hint) {
+                        return name
+                    }
+                }
+            }
+        }
+        p := NumGet(p, 8, "Ptr")
+    }
+    return ""
+}
+
 KL_Net_VpnTick() {
     if !Keylogger.initialized
         return
     found_name := ""
-    try {
-        q := ComObjGet("winmgmts:").ExecQuery(
-            "SELECT Name FROM Win32_NetworkAdapter WHERE NetEnabled = TRUE")
-        for adapter in q {
-            name := StrLower(adapter.Name)
-            for _, hint in KLNetConst.VPN_NAME_HINTS {
-                if InStr(name, hint) {
-                    found_name := adapter.Name
-                    break 2
-                }
-            }
-        }
-    }
+    try found_name := KL_Net_FindVpnAdapter()
     now_active := (found_name != "")
     if (now_active and !KLNet.vpn_active) {
         KLNet.vpn_active       := true
