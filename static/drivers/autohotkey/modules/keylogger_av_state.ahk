@@ -160,26 +160,14 @@ KL_AV_PollVolume() {
 }
 
 KL_AV_GetMasterVolume() {
-    ; Policy-based query via rundll32 path is unreliable. Use WScript.Shell
-    ; to run a PowerShell one-liner. The result is a float 0.0-1.0.
-    ; This is slow (~200 ms) so it runs in the 1 s tick which absorbs it.
+    ; Query system master volume via winmm waveOutGetVolume (left channel,
+    ; 0-65535). Returns a float 0.0-1.0, or -1.0 on failure.
     vol := -1.0
     try {
-        sh  := ComObject("WScript.Shell")
-        out := sh.Exec("powershell -NoProfile -Command "
-            . """[math]::Round((Get-AudioVolume 2>$null | Select -Exp Level),4)"""
-            ).StdOut.ReadAll()
-        if (out != "" and IsNumber(Trim(out)))
-            vol := Float(Trim(out))
-    }
-    ; Fallback: SndVol via winmm.dll waveOutGetVolume — coarse L/R average
-    if (vol < 0) {
-        try {
-            buf := Buffer(4, 0)
-            if (DllCall("winmm\waveOutGetVolume", "Ptr", 0, "Ptr", buf.Ptr) = 0) {
-                raw := NumGet(buf, 0, "UShort")   ; left channel 0-65535
-                vol := raw / 65535.0
-            }
+        buf := Buffer(4, 0)
+        if (DllCall("winmm\waveOutGetVolume", "Ptr", 0, "Ptr", buf.Ptr) = 0) {
+            raw := NumGet(buf, 0, "UShort")   ; left channel 0-65535
+            vol := raw / 65535.0
         }
     }
     return vol
