@@ -59,6 +59,7 @@ SendMode("Event") ; Everything concerning hotstrings MUST use SendEvent and not 
 ; INI helpers extracted to their own lib so the test runner can ``#Include``
 ; them without bootstrapping the rest of the driver.
 #Include lib\toml_helpers.ahk
+#Include lib\layout_ergopti.ahk
 
 ; Active-app cache must come before hotstring_engine.ahk because both
 ; ``HotstringHandler`` and ``MicrosoftApps`` consult ``GetActiveApp``.

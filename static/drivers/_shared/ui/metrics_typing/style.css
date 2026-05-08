@@ -711,8 +711,13 @@ input[type='date']::-webkit-datetime-edit-year-field {
 }
 
 .heatmaps-row > div {
-	flex: 1 1 500px;
+	/* Each heatmap is ~ 760 px wide at native size; below ~ 1550 px of
+	   row width the two would overlap. Setting the flex-basis to the
+	   actual ideal width forces the wrap before any overlap. */
+	flex: 1 1 760px;
 	min-width: 0;
+	max-width: 100%;
+	overflow-x: auto;
 }
 
 /* ================================== */

@@ -287,19 +287,35 @@ KLPF_BuildApps(db) {
 ; ============================================
 ; ============================================
 
-; Build the « scancode → printable label » map for the active Windows
-; keyboard layout. Returned as a flat ``{sc_str: char}`` Map. The JS
-; bootstrap walks SC_TO_KC and picks the corresponding label, so the
-; heatmap follows whatever layout the user has loaded (AZERTY-fr,
-; QWERTY-us, …) without us shipping a per-layout fork.
-;
-; Modifier / non-printable keys (Ctrl, Alt, Shift, Tab, Esc …) are not
-; included here — the JS overlays its own Windows-style labels on top.
+; Build the « scancode → printable label » map for the heatmap. When
+; the Ergopti base-layer emulation is enabled (Features["Layout"]
+; ["ErgoptiBase"].Enabled), we read the canonical mapping from
+; lib/layout_ergopti.ahk — the SAME data layout.ahk uses to install
+; the actual remaps. Otherwise we resolve each scancode through the
+; active Windows keyboard layout using MapVirtualKeyEx(MAPVK_VK_TO_CHAR).
+; The latter sidesteps the dead-key state ToUnicodeEx leaves behind —
+; passing through a dead key (¨, ^, …) on AZERTY-fr would otherwise
+; return the precomposed character of the next call (« Ä » instead
+; of « a »).
 KLPF_KeycodeLayout() {
     out := Map()
-    ; Resolve the keyboard layout of the foreground window so the
-    ; labels match what the user is actually typing in. Falls back to
-    ; the script thread's layout if the call fails.
+
+    ergopti_active := false
+    try {
+        global Features
+        if (IsSet(Features) && Features.Has("Layout")
+                && Features["Layout"].Has("ErgoptiBase")
+                && Features["Layout"]["ErgoptiBase"].Enabled)
+            ergopti_active := true
+    }
+    if ergopti_active {
+        for sc, ch in ErgoptiBaseLabels()
+            out[String(sc)] := ch
+        return out
+    }
+
+    ; Resolve the active layout for the foreground window. Falls back
+    ; to the script thread's layout if the lookup fails.
     hkl := 0
     try {
         hwnd := DllCall("GetForegroundWindow", "ptr")
@@ -309,16 +325,10 @@ KLPF_KeycodeLayout() {
     if !hkl
         try hkl := DllCall("GetKeyboardLayout", "uint", 0, "ptr")
 
-    ; Walk the alpha-numeric scancode range. Each iteration uses
-    ; MapVirtualKeyEx(MAPVK_VSC_TO_VK_EX) to resolve the layout-dependent
-    ; VK, then ToUnicodeEx to get the unshifted printable character.
-    keystate := Buffer(256, 0)
-    bufsize  := 8
     Loop 87 {
         sc := A_Index
-        ; Skip scancodes the JS side will label itself (modifiers,
-        ; whitespace, F-row); spelled out so the resulting Map stays
-        ; small and the JS overlay is never overwritten.
+        ; Skip scancodes the JS side overlays (modifiers, whitespace,
+        ; F-row) so the AHK map stays out of its way.
         if (sc = 1 || sc = 14 || sc = 15 || sc = 28 || sc = 29
             || sc = 42 || sc = 54 || sc = 56 || sc = 57 || sc = 58
             || (sc >= 59 && sc <= 68) || sc = 87 || sc = 88)
@@ -326,14 +336,21 @@ KLPF_KeycodeLayout() {
         vk := DllCall("MapVirtualKeyExW", "uint", sc, "uint", 3, "ptr", hkl, "uint")
         if !vk
             continue
-        buf := Buffer(bufsize * 2, 0)
-        n := DllCall("ToUnicodeEx", "uint", vk, "uint", sc,
-            "ptr", keystate, "ptr", buf, "int", bufsize,
-            "uint", 0, "ptr", hkl, "int")
-        if (n <= 0)
+        ; MAPVK_VK_TO_CHAR (uMapType=2) — returns the unshifted Unicode
+        ; codepoint in the low 16 bits. The top bit signals a dead key
+        ; (¨, ^, …). The next-higher bits encode the dead-key class on
+        ; some layouts; mask them all to keep the literal codepoint.
+        raw := DllCall("MapVirtualKeyExW", "uint", vk, "uint", 2, "ptr", hkl, "uint")
+        if !raw
             continue
-        ch := StrGet(buf, n, "UTF-16")
-        ch := Trim(ch)
+        cp := raw & 0xFFFF
+        ; Strip any pending dead-key flag — the heatmap label is the
+        ; resting form (¨, ^), not the composed accent.
+        if (raw & 0x80000000)
+            cp := cp & 0x7FFF
+        if (cp <= 0)
+            continue
+        ch := Chr(cp)
         if (ch = "")
             continue
         out[String(sc)] := ch

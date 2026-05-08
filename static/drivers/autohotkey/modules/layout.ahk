@@ -466,58 +466,33 @@ SC00C:: SendNewResult("%")
 SC00D:: SendNewResult("=")
 #HotIf
 
-; Cannot be HotIf because the remapping is done with Hotkey function and cannot be undone afterwards
+; Cannot be HotIf because the remapping is done with Hotkey function and cannot be undone afterwards.
+; The character mapping itself lives in lib/layout_ergopti.ahk so the
+; keylogger heatmap can read the same source of truth without drifting.
 if Features["Layout"]["ErgoptiBase"].Enabled {
-	RemapKey("SC039", " ")
-
-	; === Top row ===
-	RemapKey("SC010", Features["Shortcuts"]["EGrave"].Letter, "è")
-	RemapKey("SC011", "y")
-	RemapKey("SC012", "o")
-	RemapKey("SC013", "w")
-	RemapKey("SC014", "b")
-	RemapKey("SC015", "f")
-	RemapKey("SC016", "g")
-	RemapKey("SC017", "h")
-	RemapKey("SC018", "c")
-	RemapKey("SC019", "x")
-	RemapKey("SC01A", "z")
+	for sc_int, entry in ErgoptiBaseMapping() {
+		sc_str := Format("SC{:03X}", sc_int)
+		if (entry is String) {
+			RemapKey(sc_str, entry)
+		} else if IsObject(entry) {
+			alt := entry.HasOwnProp("alt") ? entry.alt : ""
+			RemapKey(sc_str, entry.c, alt)
+		}
+	}
+	; Dead keys (¨ and ^) — their behaviour goes through DeadKey()
+	; rather than RemapKey, so they stay inline next to their state
+	; machine. Their *positions* are still listed in
+	; ErgoptiBaseLabels() so the heatmap can label them.
 	Hotkey(
 		"SC01B",
 		(*) => (InDeadKeySequence ? SendNewResult("¨") : DeadKey(DeadkeyMappingDiaresis)),
 		"I2"
 	)
-
-	; === Middle row ===
-	RemapKey("SC01E", "a")
-	RemapKey("SC01F", "i")
-	RemapKey("SC020", "e")
-	RemapKey("SC021", "u")
-	RemapKey("SC022", ".")
-	RemapKey("SC023", "v")
-	RemapKey("SC024", "s")
-	RemapKey("SC025", "n")
-	RemapKey("SC026", "t")
-	RemapKey("SC027", "r")
-	RemapKey("SC028", "q")
 	Hotkey(
 		"SC02B",
 		(*) => (InDeadKeySequence ? SendNewResult("^") : DeadKey(DeadkeyMappingCircumflex)),
 		"I2"
 	)
-
-	; === Bottom row ===
-	RemapKey("SC056", Features["Shortcuts"]["ECirc"].Letter, "ê")
-	RemapKey("SC02C", Features["Shortcuts"]["EAcute"].Letter, "é")
-	RemapKey("SC02D", Features["Shortcuts"]["AGrave"].Letter, "à")
-	RemapKey("SC02E", "j")
-	RemapKey("SC02F", ",")
-	RemapKey("SC030", "k")
-	RemapKey("SC031", "m")
-	RemapKey("SC032", "d")
-	RemapKey("SC033", "l")
-	RemapKey("SC034", "p")
-	RemapKey("SC035", "'")
 }
 
 if Features["MagicKey"]["Replace"].Enabled {
