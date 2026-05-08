@@ -10,11 +10,12 @@
 ; existing flush / ingest tick handles persistence.
 ;
 ; FEATURES & RATIONALE:
-; 1. Passive observation: ``InputHook("V I0 L0")`` runs visible (events
-;    keep flowing to apps), ignores Send* injected by the script
-;    itself (``I0`` = SendLevel 0 stays invisible to us, prevents
-;    double-logging), and accepts every key (``L0`` = no length
-;    cutoff).
+; 1. Passive observation: ``InputHook("V L0")`` runs visible (events
+;    keep flowing to apps) and accepts every key (``L0`` = no length
+;    cutoff). We deliberately do NOT pass ``I0`` because the layout's
+;    remap hotkeys (``*X::Send "y"``) consume the raw key — InputHook
+;    only sees the resolved ``Send`` output. ``I0`` would filter that
+;    out and we would capture nothing at all.
 ; 2. Two complementary callbacks:
 ;    - OnChar(ih, c)            — printable characters AFTER the layout
 ;                                  has resolved deadkeys / remaps. This
@@ -233,7 +234,7 @@ KL_Hook_Start() {
     if KLHook.HasOwnProp("ih") && IsObject(KLHook.ih)
         return
 
-    ih := InputHook("V I0 L0")
+    ih := InputHook("V L0")
     ; Notify on every key (no end-key needed). Without this, OnKeyDown
     ; only fires for the keys passed to KeyOpt with the "+N" option.
     ih.KeyOpt("{All}", "+N")
