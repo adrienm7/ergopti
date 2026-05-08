@@ -91,17 +91,23 @@ SQLite_Open(path, flags := 0) {
     ; flags = 0 → defaults to OPEN_RW | OPEN_CRT (rebuild semantics).
     if (flags = 0)
         flags := SQLiteConst.OPEN_RW | SQLiteConst.OPEN_CRT
-    pdb := 0
     ; Encode the path inline (Buffer lifetime tied to this scope).
     n := StrPut(path, "UTF-8")
     p_buf := Buffer(n, 0)
     StrPut(path, p_buf, "UTF-8")
+    ; Use an explicit 8-byte Buffer for the out-pointer rather than the
+    ; "Ptr*" + &pdb syntax. AHK 2.0's Ptr* outparam was returning the
+    ; pointer truncated to 32 bits even with A_PtrSize=8, which made
+    ; every subsequent DllCall (sqlite3_exec, sqlite3_prepare_v2) crash
+    ; with 0xc0000005 because the truncated handle pointed to garbage.
+    pdb_buf := Buffer(8, 0)
     rc := DllCall(SQLiteConst.DLL . "\sqlite3_open_v2",
         "Ptr",  p_buf.Ptr,
-        "Ptr*", &pdb,
+        "Ptr",  pdb_buf.Ptr,
         "Int",  flags,
         "Ptr",  0,
         "Int")
+    pdb := NumGet(pdb_buf, 0, "Ptr")
     if (rc != SQLiteConst.OK) {
         if pdb
             DllCall(SQLiteConst.DLL . "\sqlite3_close_v2", "Ptr", pdb)
@@ -148,16 +154,20 @@ SQLite_Exec(db, sql) {
 
     cur  := sql_buf.Ptr
     end_ := cur + n - 1   ; exclude the trailing NUL.
+    pstmt_buf := Buffer(8, 0)
+    ptail_buf := Buffer(8, 0)
     while (cur < end_) {
-        pstmt := 0
-        ptail := 0
+        NumPut("Ptr", 0, pstmt_buf, 0)
+        NumPut("Ptr", 0, ptail_buf, 0)
         rc := DllCall(SQLiteConst.DLL . "\sqlite3_prepare_v2",
             "Ptr",  db,
             "Ptr",  cur,
             "Int",  -1,
-            "Ptr*", &pstmt,
-            "Ptr*", &ptail,
+            "Ptr",  pstmt_buf.Ptr,
+            "Ptr",  ptail_buf.Ptr,
             "Int")
+        pstmt := NumGet(pstmt_buf, 0, "Ptr")
+        ptail := NumGet(ptail_buf, 0, "Ptr")
         if (rc != SQLiteConst.OK)
             return false
         if pstmt {
@@ -196,14 +206,15 @@ SQLite_Query(db, sql) {
     n := StrPut(sql, "UTF-8")
     sql_buf := Buffer(n, 0)
     StrPut(sql, sql_buf, "UTF-8")
-    pstmt := 0
+    pstmt_buf := Buffer(8, 0)
     rc := DllCall(SQLiteConst.DLL . "\sqlite3_prepare_v2",
         "Ptr", db,
         "Ptr", sql_buf.Ptr,
         "Int", -1,
-        "Ptr*", &pstmt,
+        "Ptr", pstmt_buf.Ptr,
         "Ptr", 0,
         "Int")
+    pstmt := NumGet(pstmt_buf, 0, "Ptr")
     if (rc != SQLiteConst.OK || !pstmt)
         return out
 
