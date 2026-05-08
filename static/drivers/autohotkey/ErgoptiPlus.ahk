@@ -100,6 +100,7 @@ SendMode("Event") ; Everything concerning hotstrings MUST use SendEvent and not 
 #Include modules\keylogger_watchers.ahk
 #Include modules\keylogger_mouse.ahk
 #Include modules\keylogger_sensors.ahk
+#Include modules\keylogger_ergonomics.ahk
 #Include modules\keylogger_reader.ahk
 #Include modules\keylogger_prefetch.ahk
 #Include modules\keylogger_webview.ahk
