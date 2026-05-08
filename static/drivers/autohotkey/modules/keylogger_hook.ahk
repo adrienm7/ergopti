@@ -59,10 +59,10 @@
 ; ===================================
 
 class KLHookConst {
-    ; Hot path → today.log. Keeping this short means the dashboard sees
-    ; new data within ~2 s of the last keystroke, while still bounding
-    ; the typing entry size (~50-100 events at typical wpm).
-    static FLUSH_PERIOD_MS := 2000
+    ; Hot path → today.log. 500 ms keeps the live dashboard reactive
+    ; (the user sees their own keystrokes within ~half a second) while
+    ; still bounding typing entries to ~25-30 events at peak rate.
+    static FLUSH_PERIOD_MS := 500
 
     ; Window context (active app + title) is cheap to refresh but the
     ; per-keystroke cost adds up — cache for this many ms.
@@ -214,10 +214,17 @@ KL_Hook_OnKeyDown(ih, vk, sc) {
 ; =====================================
 
 KL_Hook_Tick() {
-    ; The flush itself is no-op when the buffer is empty (KL_FlushBuffer
-    ; checks). Still fast enough to fire every 2 s without breaking a
-    ; sweat — the typical buffer is a few dozen events tops.
+    ; Fire only when the buffer has something to commit. We then flush
+    ; AND chain straight into KL_IngestOnce so the dashboard's live
+    ; channel sees the new keystrokes within ~500 ms instead of waiting
+    ; for the slower 5 s ingest cadence. The cached SQLite DB makes
+    ; this near-free (only the new INSERTs are exec'd).
+    if (Keylogger.buffer_events.Length = 0
+        && Keylogger.session_clicks  = 0
+        && Keylogger.session_scrolls = 0)
+        return
     try KL_FlushBuffer()
+    try KL_IngestOnce()
 }
 
 
