@@ -201,6 +201,30 @@ _BuildAltGrTables() {
 ; ==============================================
 ; ==============================================
 
+; Discriminate a real AltGr/Kana keypress from a ghost SC138 prefix injected
+; by an OS keyboard driver (e.g. Bépo) around AltGr-mapped keys like `'`.
+;
+; Two valid scenarios must be allowed through:
+;   1. Vanilla AltGr layouts (Bépo, US-International, …): AltGr is physical
+;      RAlt. The OS injects a ghost LCtrl+RAlt prefix around AltGr-mapped
+;      keys; that ghost releases RAlt before the next key, so requiring
+;      GetKeyState("RAlt","P") filters it out reliably.
+;   2. AltGr-as-Kana driver remap (KbdEdit/MSKLC): AltGr is mapped to the
+;      Kana virtual key, which sends SC138 with no LCtrl/RAlt modifiers.
+;      Physical RAlt is never down, so the gate must accept SC138 directly.
+;
+; The discriminator is _ALTGR_KANA_FIXUP, auto-detected at boot (and on every
+; layout change) by DetectAltGrKanaRemap() in lib/hotstring_engine.ahk.
+IsRealAltGrPress() {
+    global _ALTGR_KANA_FIXUP
+    if (IsSet(_ALTGR_KANA_FIXUP) and _ALTGR_KANA_FIXUP) {
+        ; Kana remap: SC138 stands alone, no LCtrl/RAlt — no ghost to filter.
+        return true
+    }
+    ; Vanilla AltGr: real press keeps RAlt physically held; ghost releases it.
+    return GetKeyState("RAlt", "P")
+}
+
 ; Run the Plain or Shifted callable from ``Table[SC]`` depending on the
 ; current Shift state. The ``*`` parameter swallows the hotkey name that
 ; AHK passes when invoking a hotkey callback.
@@ -209,12 +233,13 @@ _BuildAltGrTables() {
 ; AHK does not invoke it as a method on ``Entry`` and silently pass ``Entry``
 ; as an implicit first argument — that would overflow BoundFuncs which
 ; already have all positional parameters bound (e.g. ``WrapTextIfSelected``).
+
 AltGrShiftDispatch(SC, Table, *) {
     if !Table.Has(SC) {
         return
     }
-    ; This dispatcher only runs when RAlt is PHYSICALLY held — the HotIf in
-    ; RegisterAltGrLayer guards every SC138 hotkey on GetKeyState("RAlt","P").
+    ; This dispatcher only runs on a real AltGr/Kana press — the HotIf in
+    ; RegisterAltGrLayer guards every SC138 hotkey on IsRealAltGrPress().
     ; Ghost SC138 prefixes (injected by an OS driver for AltGr-mapped keys
     ; like Bépo's `'`) therefore fall through to the regular *SC<key>/SC<key>
     ; remap hotkeys and produce the correct base-layer character.
@@ -235,14 +260,13 @@ RegisterAltGrLayer() {
     _BuildAltGrTables()
     try LoggerStart("LayoutAltGr", "Registering AltGr layer hotkeys…")
 
-    ; AltGr hotkeys must only fire when the user is PHYSICALLY holding RAlt.
-    ; Otherwise the OS driver's ghost SC138 (injected for AltGr-mapped keys
-    ; like Bépo's `'`) would route every following keypress through our
-    ; AltGr handler, which conflicts with the *SC<key> shortcut hotkeys
-    ; (e.g. SC02C → `c` with modifiers, → `é` without).
+    ; AltGr hotkeys must only fire on a real AltGr/Kana press. The
+    ; IsRealAltGrPress() helper accepts physical RAlt (Bépo OS) or any SC138
+    ; press without LCtrl held (Kana / custom layouts), and rejects the OS
+    ; driver's ghost SC138 prefix which arrives with LCtrl still held.
 
     ; --- ErgoptiPlus overrides (registered first, lowest precedence) ---
-    HotIf((*) => Features["Layout"]["ErgoptiPlus"].Enabled and GetKeyState("RAlt", "P"))
+    HotIf((*) => Features["Layout"]["ErgoptiPlus"].Enabled and IsRealAltGrPress())
     for SC, _ in ALTGR_PLUS_OVERRIDES {
         Hotkey("SC138 & " . SC, AltGrShiftDispatch.Bind(SC, ALTGR_PLUS_OVERRIDES), "I2")
     }
@@ -250,7 +274,7 @@ RegisterAltGrLayer() {
     ; --- ErgoptiAltGr Number row + Ctrl+Alt Numpad mappings ---
     HotIf((*) => Features["Layout"]["ErgoptiAltGr"].Enabled
         and Features["Layout"]["ErgoptiBase"].Enabled
-        and GetKeyState("RAlt", "P"))
+        and IsRealAltGrPress())
     for SC, _ in ALTGR_NUMBER_ROW {
         Hotkey("SC138 & " . SC, AltGrShiftDispatch.Bind(SC, ALTGR_NUMBER_ROW), "I2")
     }
@@ -259,7 +283,7 @@ RegisterAltGrLayer() {
     }
 
     ; --- ErgoptiAltGr base rows (registered last, highest precedence) ---
-    HotIf((*) => Features["Layout"]["ErgoptiAltGr"].Enabled and GetKeyState("RAlt", "P"))
+    HotIf((*) => Features["Layout"]["ErgoptiAltGr"].Enabled and IsRealAltGrPress())
     for SC, _ in ALTGR_BASE_ROWS {
         Hotkey("SC138 & " . SC, AltGrShiftDispatch.Bind(SC, ALTGR_BASE_ROWS), "I2")
     }

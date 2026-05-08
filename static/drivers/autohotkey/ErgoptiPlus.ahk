@@ -205,12 +205,6 @@ global ScriptInformation := Map(
     "PersonalAhkPath", _ConfigDir . "ahk\personal_shortcuts.ahk",
     "PersonalTomlPath", _ConfigDir . "personal_hotstrings.toml",
     "PersonalInfoTomlPath", _ConfigDir . "personal_info.toml",
-    ; Set to True only when AltGr (SC138) has been remapped to Kana at the
-    ; driver level (KbdEdit, MSKLC). With that remap active, AHK still sees
-    ; the virtual AltGr-down bit stuck after a hotstring, and we need to
-    ; inject {SC138 Up} before sending the replacement. Default is False:
-    ; this spares one SendEvent per hotstring firing on standard setups.
-    "AltGrIsKanaRemap", False,
 )
 
 ; Script-management hotkey slots. Each AltGr+key combo dispatches to an action
@@ -264,15 +258,27 @@ ReadScriptConfig(Cache) {
 global _IniCache := ParseTomlFile(ConfigurationFile)
 ReadScriptConfig(_IniCache)
 
-; Resolve hot-path flags cached by the hotstring engine (AltGrIsKanaRemap)
-; now that ScriptInformation reflects the INI overrides. Must run before the
-; first hotstring fires.
+; Auto-detect whether the active OS layout remaps AltGr to VK_KANA and cache
+; the resolved bool in _ALTGR_KANA_FIXUP. Must run before the first hotstring
+; fires. The layout-poll timer at the bottom of this file triggers a full
+; Reload() on layout switch, so this runs again automatically.
 HotstringEngineInit()
 
 ; Initialise the logger now that the ini cache is built and ScriptInformation
 ; reflects user overrides — LoggerInit reads [Script] LogLevel from the ini.
 LoggerInit()
 LoggerStart("ErgoptiPlus", "Booting ErgoptiPlus driver…")
+
+; Probe SC138 → VK directly so we can see what MapVirtualKeyExW actually
+; returns on this layout (VK_RMENU=0xA5, VK_KANA=0x15, anything else means
+; the heuristic needs adjustment).
+_DetectVK := DllCall("MapVirtualKeyExW",
+    "UInt", 0x38, "UInt", 3,
+    "Ptr",  GetForegroundKeyboardLayout(), "UInt")
+LoggerInfo("AltGrDetect",
+    "HKL=0x{1:X}, SC138→VK=0x{2:X}, _ALTGR_KANA_FIXUP={3}.",
+    GetForegroundKeyboardLayout(), _DetectVK,
+    _ALTGR_KANA_FIXUP ? "true" : "false")
 
 ; Under this text is the configuration of the features, especially whether or not they are enabled.
 ; It is advised to modify which features are enabled by using the ErgoptiPlus_Configuration.ini file.
@@ -2224,10 +2230,10 @@ ActivateKeyHistory(*) {
 
 #SuspendExempt
 
-; Gate on physical RAlt so a ghost SC138 (injected by an OS driver for AltGr-
-; mapped keys like Bépo's `'`) does not trigger these script shortcuts on
-; the next Enter/BackSpace/Delete/Escape press.
-#HotIf GetKeyState("RAlt", "P")
+; Gate on a real AltGr/Kana press so a ghost SC138 (injected by an OS driver
+; for AltGr-mapped keys like Bépo's `'`) does not trigger these script
+; shortcuts on the next Enter/BackSpace/Delete/Escape press.
+#HotIf IsRealAltGrPress()
 
 RAlt & Enter::
 SC138 & SC01C::
@@ -2315,3 +2321,36 @@ HotstringPrefixWatcherInit()
 ; script is ready to handle keystrokes. A missing SUCCESS in the log file
 ; pinpoints which #Include above failed silently.
 LoggerSuccess("ErgoptiPlus", "Driver fully initialised — ready.")
+
+
+
+
+; =========================================
+; =========================================
+; ======= 99/ Keyboard layout watch =======
+; =========================================
+; =========================================
+
+; Polls the foreground keyboard layout once per second. WM_INPUTLANGCHANGE
+; only reaches the focused window, so polling is the simplest cross-process
+; signal. A change means SC138 may have flipped between RAlt and Kana, and
+; #HotIf gates / _ALTGR_KANA_FIXUP must re-resolve. Reload() is the
+; cheapest way to guarantee every dependent global, hotkey and BoundFunc
+; reflects the new layout — partial in-place updates would be brittle.
+global _LAYOUT_POLL_INTERVAL_MS := 1000
+global _LAST_KEYBOARD_HKL := GetForegroundKeyboardLayout()
+
+CheckKeyboardLayoutChange() {
+    global _LAST_KEYBOARD_HKL
+    HKL := GetForegroundKeyboardLayout()
+    if (HKL = 0 or HKL = _LAST_KEYBOARD_HKL) {
+        return
+    }
+    try LoggerInfo("LayoutWatch",
+        "Keyboard layout changed (0x{1:X} → 0x{2:X}) — reloading script.",
+        _LAST_KEYBOARD_HKL, HKL)
+    _LAST_KEYBOARD_HKL := HKL
+    Reload()
+}
+
+SetTimer(CheckKeyboardLayoutChange, _LAYOUT_POLL_INTERVAL_MS)
