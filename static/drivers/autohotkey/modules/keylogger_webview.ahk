@@ -127,15 +127,21 @@ KLWV_Open(which, metrics_dir) {
     g.MarginX := 0
     g.MarginY := 0
 
-    ; Reserve the full client area for the WebView2 control. The Gui
-    ; resize event below routes its new size into the controller bounds.
-    sf := MonitorGetWorkArea(MonitorGetPrimary(), &L, &T, &R, &B)
-    initial_w := Min(R - L - 100, 1400)
-    initial_h := Min(B - T - 100, 900)
+    ; Default window size: 80% of the primary monitor's work area
+    ; (which already excludes the taskbar) and centred. The previous
+    ; default reserved only 100 px of slack which left the title bar
+    ; clipped above the top of the screen on some configurations.
+    MonitorGetWorkArea(MonitorGetPrimary(), &L, &T, &R, &B)
+    work_w := R - L
+    work_h := B - T
+    initial_w := Min(Round(work_w * 0.80), 1400)
+    initial_h := Min(Round(work_h * 0.85), 900)
+    pos_x := L + ((work_w - initial_w) // 2)
+    pos_y := T + ((work_h - initial_h) // 2)
 
     g.OnEvent("Size",  KLWV_OnGuiSize.Bind(which))
     g.OnEvent("Close", KLWV_OnGuiClose.Bind(which))
-    g.Show("w" . initial_w . " h" . initial_h)
+    g.Show("x" . pos_x . " y" . pos_y . " w" . initial_w . " h" . initial_h)
 
     ; Spin up WebView2 inside the Gui's HWND. dataDir is unique per
     ; launch so cached state from a previous open never bleeds in.
