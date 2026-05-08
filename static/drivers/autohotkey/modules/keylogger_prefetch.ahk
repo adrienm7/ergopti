@@ -68,10 +68,17 @@ KLPF_PrefetchPath(which) {
 ; on success, false on any failure (a failure leaves the previous file
 ; intact so the page degrades gracefully to the old data rather than to
 ; an empty state).
-KLPF_BuildAndWrite(which, metrics_dir, dbg := "") {
-    if (dbg = "")
-        dbg := KLPF_AssetsDir(which) . "prefetch_debug.txt"
-    KLPF_DbgWrite(dbg, "=== " . A_Now . " — which=" . which . " md=" . metrics_dir)
+; mode: "full" (default) — manifest + n-grams + range data.
+;       "manifest" — skip n-grams. Used by the fast 500 ms flush tick
+;       so the dashboard's KPI counters update near-instantly without
+;       paying the ~2-3 s n-gram projection + ~1 s JSON encode cost.
+KLPF_BuildAndWrite(which, metrics_dir, dbg := "", mode := "full") {
+    if (dbg = "") {
+        global _ConfigDir
+        try DirCreate(_ConfigDir . "logs")
+        dbg := _ConfigDir . "logs\prefetch_debug.log"
+    }
+    KLPF_DbgWrite(dbg, "=== " . A_Now . " — which=" . which . " mode=" . mode)
     t0 := A_TickCount
 
     db := KLR_BuildDatabase(metrics_dir)
@@ -90,7 +97,7 @@ KLPF_BuildAndWrite(which, metrics_dir, dbg := "") {
 
     blob := Map()
     if (which = "typing") {
-        blob := KLPF_BuildTyping(db)
+        blob := KLPF_BuildTyping(db, mode)
     } else if (which = "apps") {
         blob := KLPF_BuildApps(db)
     }
@@ -135,11 +142,26 @@ KLPF_WriteAtomic(path, content) {
 ; =========================================
 ; =========================================
 
-KLPF_BuildTyping(db) {
-    manifest  := KLR_ReadManifest(db)
+KLPF_BuildTyping(db, mode := "full") {
+    manifest := KLR_ReadManifest(db)
 
-    ; Date range = (first manifest date) → today. Mirrors HS first_date
-    ; computation in ui/metrics_typing/init.lua §4.
+    blob := Map(
+        "metrics_manifest",  manifest,
+        "app_icons",         Map(),                      ; icon extraction is HS-only for now.
+        "keycode_layout",    KLPF_KeycodeLayout()
+    )
+
+    ; The n-gram projection is the dominant cost (~2-3 s for tens of
+    ; thousands of rows + AHK Map allocation). When the caller only
+    ; needs to refresh the KPI counters / charts (every flush tick),
+    ; skip it entirely — process_manifest still re-renders KPIs from
+    ; the manifest alone, and the n-gram tables get refreshed by the
+    ; slower 5 s "full" cadence.
+    if (mode = "manifest") {
+        blob["_prefetch_data"] := Map("historical", Map(), "today", Map())
+        return blob
+    }
+
     first_date := ""
     apps_set   := Map()
     apps_list  := []
@@ -161,13 +183,8 @@ KLPF_BuildTyping(db) {
     range_data := Map("historical", Map(), "today", Map())
     if (first_date != "")
         range_data := KLR_ReadRangeSplitToday(db, first_date, today, apps_list)
-
-    return Map(
-        "metrics_manifest",  manifest,
-        "app_icons",         Map(),                      ; icon extraction is HS-only for now.
-        "_prefetch_data",    range_data,
-        "keycode_layout",    KLPF_KeycodeLayout()
-    )
+    blob["_prefetch_data"] := range_data
+    return blob
 }
 
 

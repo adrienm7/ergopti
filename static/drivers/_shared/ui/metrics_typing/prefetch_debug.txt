@@ -571,3 +571,117 @@ agg_app_day row count = 6
 PERF projection=2734ms
 PERF json_encode=953ms len=912276
 PERF write=0ms total=3687ms
+=== 20260508144040 — which=typing md=D:\Documents\GitHub\config\ergopti_plus\metrics
+PERF db=15ms
+agg_app_day row count = 6
+PERF projection=2219ms
+PERF json_encode=1953ms len=912236
+PERF write=0ms total=4187ms
+=== 20260508144044 — which=typing md=D:\Documents\GitHub\config\ergopti_plus\metrics
+PERF db=32ms
+agg_app_day row count = 6
+PERF projection=2421ms
+PERF json_encode=1297ms len=917834
+PERF write=16ms total=3766ms
+=== 20260508144048 — which=typing md=D:\Documents\GitHub\config\ergopti_plus\metrics
+PERF db=62ms
+agg_app_day row count = 6
+PERF projection=2594ms
+PERF json_encode=1437ms len=925625
+PERF write=0ms total=4093ms
+=== 20260508144052 — which=typing md=D:\Documents\GitHub\config\ergopti_plus\metrics
+PERF db=31ms
+agg_app_day row count = 6
+PERF projection=2438ms
+PERF json_encode=1421ms len=931415
+PERF write=16ms total=3906ms
+=== 20260508144056 — which=typing md=D:\Documents\GitHub\config\ergopti_plus\metrics
+PERF db=31ms
+agg_app_day row count = 6
+PERF projection=3141ms
+PERF json_encode=1469ms len=934693
+PERF write=0ms total=4641ms
+=== 20260508144101 — which=typing md=D:\Documents\GitHub\config\ergopti_plus\metrics
+PERF db=15ms
+agg_app_day row count = 6
+PERF projection=2735ms
+PERF json_encode=1500ms len=940624
+PERF write=15ms total=4265ms
+=== 20260508144110 — which=typing md=D:\Documents\GitHub\config\ergopti_plus\metrics
+PERF db=1562ms
+agg_app_day row count = 6
+PERF projection=1797ms
+PERF json_encode=875ms len=940624
+PERF write=0ms total=4234ms
+=== 20260508144123 — which=typing md=D:\Documents\GitHub\config\ergopti_plus\metrics
+PERF db=0ms
+agg_app_day row count = 6
+PERF projection=1813ms
+PERF json_encode=890ms len=940624
+PERF write=0ms total=2703ms
+=== 20260508144139 — which=typing md=D:\Documents\GitHub\config\ergopti_plus\metrics
+PERF db=0ms
+agg_app_day row count = 6
+PERF projection=2016ms
+PERF json_encode=953ms len=940624
+PERF write=0ms total=2969ms
+=== 20260508144142 — which=typing md=D:\Documents\GitHub\config\ergopti_plus\metrics
+PERF db=16ms
+agg_app_day row count = 6
+PERF projection=2406ms
+PERF json_encode=1016ms len=943242
+PERF write=0ms total=3438ms
+=== 20260508144145 — which=typing md=D:\Documents\GitHub\config\ergopti_plus\metrics
+PERF db=31ms
+agg_app_day row count = 6
+PERF projection=2078ms
+PERF json_encode=1016ms len=946671
+PERF write=15ms total=3140ms
+=== 20260508144148 — which=typing md=D:\Documents\GitHub\config\ergopti_plus\metrics
+PERF db=0ms
+agg_app_day row count = 6
+PERF projection=2203ms
+PERF json_encode=922ms len=946561
+PERF write=0ms total=3125ms
+=== 20260508144152 — which=typing md=D:\Documents\GitHub\config\ergopti_plus\metrics
+PERF db=16ms
+agg_app_day row count = 6
+PERF projection=2719ms
+PERF json_encode=1109ms len=947923
+PERF write=0ms total=3844ms
+=== 20260508144156 — which=typing md=D:\Documents\GitHub\config\ergopti_plus\metrics
+PERF db=32ms
+agg_app_day row count = 6
+PERF projection=2218ms
+PERF json_encode=1282ms len=954432
+PERF write=15ms total=3547ms
+=== 20260508144159 — which=typing md=D:\Documents\GitHub\config\ergopti_plus\metrics
+PERF db=32ms
+agg_app_day row count = 6
+PERF projection=2234ms
+PERF json_encode=1109ms len=958228
+PERF write=0ms total=3375ms
+=== 20260508144203 — which=typing md=D:\Documents\GitHub\config\ergopti_plus\metrics
+PERF db=0ms
+agg_app_day row count = 6
+PERF projection=2562ms
+PERF json_encode=1141ms len=961982
+PERF write=0ms total=3703ms
+=== 20260508144206 — which=typing md=D:\Documents\GitHub\config\ergopti_plus\metrics
+PERF db=0ms
+agg_app_day row count = 6
+PERF projection=2281ms
+PERF json_encode=1031ms len=962924
+PERF write=16ms total=3328ms
+=== 20260508144240 — which=typing md=D:\Documents\GitHub\config\ergopti_plus\metrics
+PERF db=0ms
+agg_app_day row count = 6
+PERF projection=2188ms
+PERF json_encode=1297ms len=962946
+PERF write=0ms total=3485ms
+=== 20260508144250 — which=typing md=D:\Documents\GitHub\config\ergopti_plus\metrics
+PERF db=0ms
+agg_app_day row count = 6
+PERF projection=2000ms
+PERF json_encode=1156ms len=963018
+PERF write=0ms total=3156ms
