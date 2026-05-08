@@ -145,13 +145,15 @@ KLWV_Open(which, metrics_dir) {
 
     g.OnEvent("Size",  KLWV_OnGuiSize.Bind(which))
     g.OnEvent("Close", KLWV_OnGuiClose.Bind(which))
-    ; Show first with the requested client size, then centre the actual
-    ; outer window rectangle (including title bar + borders) on the
-    ; chosen monitor's work area. Computing the centre from the client
-    ; size alone left the window biased toward bottom-right on some
-    ; configurations because the title bar adds extra height on top.
+    ; Show hidden first so we can read the real outer-window size
+    ; (including title bar + borders) via Gui.GetPos, then re-show at
+    ; the centred coordinates. Computing the centre from the client
+    ; size alone left the window biased toward bottom-right because
+    ; the title bar adds extra height on top. WinGetPos on the HWND
+    ; would miss it (hidden windows are filtered out by default), so
+    ; we use the Gui's own GetPos which reads it directly.
     g.Show("w" . initial_w . " h" . initial_h . " Hide")
-    WinGetPos(&_, &_, &win_w, &win_h, "ahk_id " . g.Hwnd)
+    g.GetPos(, , &win_w, &win_h)
     pos_x := L + ((work_w - win_w) // 2)
     pos_y := T + ((work_h - win_h) // 2)
     g.Show("x" . pos_x . " y" . pos_y)
