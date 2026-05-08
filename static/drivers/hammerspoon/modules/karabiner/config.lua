@@ -5,7 +5,7 @@
 --- DESCRIPTION:
 --- Handles all data loading and user configuration persistence for the
 --- Karabiner bridge: JSON data files (actions, keys, combos), default state
---- construction, and reading/writing karabiner_user_config.json.
+--- construction, and reading/writing config_karabiner.toml.
 ---
 --- FEATURES & RATIONALE:
 --- 1. Shared Data Files: actions.json, tap_hold_keys.json and mod_combos.json
@@ -47,6 +47,18 @@ local COMBO_SYMMETRIC_DEFAULT           = Defaults.combo_symmetric
 --- Loads and parses a JSON file. Logs an error and returns nil on any failure.
 --- @param path string Absolute path to the JSON file.
 --- @return table|nil Decoded table, or nil.
+local TomlCodec = require("lib.toml_codec")
+
+--- Load a TOML user-config file. Returns a Lua table or nil if absent.
+function M._load_toml_file(path)
+	local fh = io.open(path, "r")
+	if not fh then return nil end
+	local raw = fh:read("*a"); fh:close()
+	local ok, data = pcall(TomlCodec.decode, raw)
+	if not ok or type(data) ~= "table" then return nil end
+	return data
+end
+
 local function load_json_file(path)
 	local fh = io.open(path, "r")
 	if not fh then
@@ -216,15 +228,15 @@ end
 -- ==========================================
 -- ==========================================
 
---- Loads karabiner_user_config.json.
+--- Loads config_karabiner.toml.
 --- If the file is absent (first launch), builds and returns the default state.
 --- Silently migrates legacy JSON shapes and seeds missing combos from defaults.
 --- @param tap_hold_keys table List from load_tap_hold_keys.
 --- @param mod_combos table List from load_mod_combos.
---- @param user_config_path string Absolute path to karabiner_user_config.json.
+--- @param user_config_path string Absolute path to config_karabiner.toml.
 --- @return table Full state: {enabled, tap_hold_config, mod_combos_config, timeouts…}
 function M.load_user_config(tap_hold_keys, mod_combos, user_config_path)
-	local data = load_json_file(user_config_path)
+	local data = M._load_toml_file(user_config_path)
 
 	if not data then
 		Logger.info(LOG, "No user config found — initializing from defaults.")
@@ -311,27 +323,33 @@ function M.load_user_config(tap_hold_keys, mod_combos, user_config_path)
 	}
 end
 
---- Persists the current full state to karabiner_user_config.json.
+--- Persists the current full state to config_karabiner.toml.
 --- @param state table The current module state table.
---- @param user_config_path string Absolute path to karabiner_user_config.json.
+--- @param user_config_path string Absolute path to config_karabiner.toml.
 function M.save_user_config(state, user_config_path)
-	local payload = hs.json.encode({
-		enabled                   = state.enabled,
-		tap_hold_config           = state.tap_hold_config,
-		mod_combos_config         = state.mod_combos_config,
+	local ok, payload = pcall(TomlCodec.encode, {
+		enabled                   = state.enabled == true,
+		tap_hold_config           = state.tap_hold_config           or {},
+		mod_combos_config         = state.mod_combos_config         or {},
 		tap_hold_timeout_ms       = state.tap_hold_timeout_ms,
 		sticky_timeout_ms         = state.sticky_timeout_ms,
 		simultaneous_threshold_ms = state.simultaneous_threshold_ms,
-		combo_symmetric           = state.combo_symmetric,
-	}, true)
+		combo_symmetric           = state.combo_symmetric == true,
+	})
+	if not ok or type(payload) ~= "string" then
+		Logger.error(LOG, "Failed to encode user config as TOML.")
+		return
+	end
 
-	local fh = io.open(user_config_path, "w")
+	-- Atomic write via .tmp + rename.
+	local tmp = user_config_path .. ".tmp"
+	local fh  = io.open(tmp, "w")
 	if not fh then
 		Logger.error(LOG, "Cannot write user config at '%s'.", user_config_path)
 		return
 	end
-	fh:write(payload)
-	fh:close()
+	fh:write(payload); fh:close()
+	pcall(os.rename, tmp, user_config_path)
 	Logger.debug(LOG, "User config saved.")
 end
 

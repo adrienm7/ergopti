@@ -87,10 +87,10 @@ end
 
 --- Returns the absolute path for a HS-specific file under the
 --- ``hammerspoon/`` subfolder of config_dir(). Used for files whose
---- semantics differ from the AHK side (config.json with macOS bundle
---- IDs, karabiner_user_config.json which is Mac-only by definition,
---- etc.). The subfolder is auto-created on first call so callers do
---- not have to worry about ENOENT on a fresh install.
+--- semantics differ from the AHK side (config.toml with macOS bundle
+--- IDs, config_karabiner.toml which is Mac-only by definition, etc.).
+--- The subfolder is auto-created on first call so callers do not have
+--- to worry about ENOENT on a fresh install.
 --- @param filename string Bare filename inside the hammerspoon/ folder.
 --- @return string
 local function file_in_driver_subdir(filename)
@@ -201,7 +201,7 @@ end
 --- Returns the resolved path for a well-known personal file.
 --- Callers use named constants rather than bare filenames.
 --- @param key string One of: "PersonalTomlPath", "PersonalInfoTomlPath",
----   "HotstringsDirPath", "ConfigJsonPath", "KarabinerConfigPath".
+---   "HotstringsDirPath", "ConfigTomlPath", "KarabinerConfigPath".
 --- @return string The resolved absolute path.
 function M.get(key)
 	-- Shared at the root of config_dir (both drivers may read these):
@@ -209,9 +209,8 @@ function M.get(key)
 	if key == "PersonalInfoTomlPath" then return file_in_config("personal_info.toml")       end
 	if key == "HotstringsDirPath"    then return config_dir()                               end
 	-- Hammerspoon-specific (under <config_dir>/hammerspoon/):
-	if key == "ConfigJsonPath"           then return file_in_driver_subdir("config.json")              end
 	if key == "ConfigTomlPath"           then return file_in_driver_subdir("config.toml")              end
-	if key == "KarabinerConfigPath"      then return file_in_driver_subdir("karabiner_user_config.json") end
+	if key == "KarabinerConfigPath"      then return file_in_driver_subdir("config_karabiner.toml")      end
 	if key == "PersonalShortcutsLuaPath" then return file_in_driver_subdir("personal_shortcuts.lua")   end
 	return ""
 end

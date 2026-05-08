@@ -186,7 +186,7 @@ do
 end
 
 local hotstrings_dir = menu_paths.get("HotstringsDirPath")
-local config_file    = menu_paths.get("ConfigJsonPath")
+local config_file    = menu_paths.get("ConfigTomlPath")
 
 -- Initialise the hotstrings_config module so per-group delays and tooltip
 -- colors can be resolved from the TOML metadata + the shared user override

@@ -209,15 +209,7 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 	end
 
 	local function save_prefs()
-		Preferences.save(MenuPaths.get("ConfigJsonPath"), state, hotfiles, core_mods)
-		-- Mirror the cross-driver subset to <config_dir>/config.toml so the
-		-- AHK driver picks up the same hotkeys / toggles next time it loads.
-		-- Failures stay non-fatal — config.json remains the canonical local
-		-- store; the TOML is a sync convenience.
-		pcall(function()
-			local CS = require("lib.config_shortcuts")
-			if type(CS.save_from_state) == "function" then CS.save_from_state(state) end
-		end)
+		Preferences.save(MenuPaths.get("ConfigTomlPath"), state, hotfiles, core_mods)
 	end
 
 
@@ -550,7 +542,7 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 
 	local function reset_all_defaults()
 		-- Delete config.json so that the next startup uses the default module settings
-		pcall(os.remove, MenuPaths.get("ConfigJsonPath"))
+		pcall(os.remove, MenuPaths.get("ConfigTomlPath"))
 		pcall(notifications.notify, "↺ Valeurs par défaut réinitialisées — Rechargement…")
 		hs.timer.doAfter(0.25, function() pcall(hs.reload) end)
 	end
@@ -567,7 +559,7 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 	-- toggling persisted preferences (e.g. logo variant)
 	M.refresh_icon = function() pcall(update_icon) end
 
-	local saved = Preferences.load(MenuPaths.get("ConfigJsonPath"))
+	local saved = Preferences.load(MenuPaths.get("ConfigTomlPath"))
 	local config_absent = (next(saved) == nil)
 
 	if config_absent then
@@ -589,17 +581,6 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 	end
 
 	Preferences.merge_saved_data(state, saved)
-
-	-- Overlay the cross-driver [shortcuts] section from config.toml on
-	-- top of the legacy config.json state. The TOML wins because it is
-	-- the single shared source between the AHK and HS drivers; users
-	-- syncing the config folder expect the file they edited last to
-	-- take effect on whichever driver they reload next.
-	pcall(function()
-		local CS = require("lib.config_shortcuts")
-		if type(CS.apply_to_state) == "function" then CS.apply_to_state(state) end
-	end)
-
 	sync_state_to_modules(saved, config_absent)
 
 	local llm_handler = nil
@@ -671,7 +652,7 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 				end
 				local ok_at, at = pcall(require, "ui.metrics_apps"); if ok_at and type(at.show) == "function" then pcall(at.show, base_dir .. "logs") end
 			end,
-			open_config = function() hs.timer.doAfter(0, function() _suppress_watcher_until = hs.timer.secondsSinceEpoch() + 8; pcall(hs.execute, "open \"" .. MenuPaths.get("ConfigJsonPath") .. "\"") end) end,
+			open_config = function() hs.timer.doAfter(0, function() _suppress_watcher_until = hs.timer.secondsSinceEpoch() + 8; pcall(hs.execute, "open \"" .. MenuPaths.get("ConfigTomlPath") .. "\"") end) end,
 			open_logs = function() hs.timer.doAfter(0, function() pcall(hs.execute, "open \"" .. base_dir .. "logs\"") end) end,
 		})
 	end

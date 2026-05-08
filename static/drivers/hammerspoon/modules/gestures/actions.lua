@@ -432,9 +432,16 @@ sg("hs_quit",          "Quitter Hammerspoon",   function()
 		hs.timer.doAfter(0.1, function() os.exit(0) end)
 	end)
 end)
-sg("hs_open_config",   "Ouvrir config.json",    function()
-	local ok, conf_dir = pcall(hs.configdir)
-	if ok and conf_dir then pcall(hs.execute, string.format("open \"%s/config.json\"", conf_dir)) end
+sg("hs_open_config",   "Ouvrir config.toml",    function()
+	-- Resolve via MenuPaths so the gesture honours the user's
+	-- configurable ConfigDirPath instead of the hardcoded ~/.hammerspoon.
+	local ok_mp, MenuPaths = pcall(require, "ui.menu.menu_paths")
+	if ok_mp and MenuPaths and type(MenuPaths.get) == "function" then
+		local p = MenuPaths.get("ConfigTomlPath")
+		if type(p) == "string" and p ~= "" then
+			pcall(hs.execute, string.format("open %q", p))
+		end
+	end
 end)
 
 

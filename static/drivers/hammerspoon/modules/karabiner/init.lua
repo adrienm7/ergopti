@@ -10,7 +10,7 @@
 --- FEATURES & RATIONALE:
 --- 1. CapsWord Watcher: Detects trackpad scroll/gesture events and deactivates
 ---    CapsWord so the user never gets stuck in caps mode after using the trackpad.
---- 2. User Config: karabiner_user_config.json is the single runtime truth.
+--- 2. User Config: config_karabiner.toml is the single runtime truth.
 ---    On first launch it is created from defaults; after that it is the full
 ---    persisted state — defaults are never recomputed at runtime except when
 ---    the user explicitly clicks "Reset to defaults".
@@ -46,10 +46,20 @@ local _SELF_DIR = (debug.getinfo(1, "S").source:sub(2):match("^(.*[/\\])") or ".
 
 local KARABINER_OUT   = os.getenv("HOME") .. "/.config/karabiner/karabiner.json"
 
--- Go up from modules/karabiner/ to the Hammerspoon config root so user files
--- are kept at the root level, not buried in the module.
-local HS_ROOT     = _SELF_DIR .. "../../"
-local USER_CONFIG = HS_ROOT .. "karabiner_user_config.json"
+-- The user-editable Karabiner config lives under the user's resolved
+-- config dir (paths.toml override honoured) at:
+--     <config_dir>/hammerspoon/config_karabiner.toml
+-- Resolution is deferred to MenuPaths so a relocated config follows.
+local function resolve_user_config()
+	local ok, MenuPaths = pcall(require, "ui.menu.menu_paths")
+	if ok and type(MenuPaths.is_initialized) == "function" and MenuPaths.is_initialized() then
+		local p = MenuPaths.get("KarabinerConfigPath")
+		if type(p) == "string" and p ~= "" then return p end
+	end
+	-- Defensive fallback when MenuPaths has not yet bootstrapped.
+	local home = os.getenv("HOME") or ""
+	return home .. "/.config/ergopti_plus/hammerspoon/config_karabiner.toml"
+end
 local ACTIONS_FILE    = _SELF_DIR .. "data/actions.json"
 local TAP_HOLD_FILE   = _SELF_DIR .. "data/tap_hold_keys.json"
 local MOD_COMBOS_FILE = _SELF_DIR .. "data/mod_combos.json"
@@ -138,7 +148,7 @@ function M.set_enabled(value)
 	if not require_state("set_enabled") then return end
 	_state.enabled = value == true
 	Logger.info(LOG, "Karabiner integration %s.", _state.enabled and "enabled" or "disabled")
-	Config.save_user_config(_state, USER_CONFIG)
+	Config.save_user_config(_state, resolve_user_config())
 	if _state.enabled then
 		KeLifecycle.launch_headless()
 	else
@@ -174,7 +184,7 @@ function M.set_tap_action(key_id, action_id)
 	local cfg = _state.tap_hold_config[key_id] or {}
 	_state.tap_hold_config[key_id] = { tap = action_id, hold = cfg.hold or "none" }
 	Logger.debug(LOG, "Key '%s' tap → '%s'.", key_id, action_id)
-	Config.save_user_config(_state, USER_CONFIG)
+	Config.save_user_config(_state, resolve_user_config())
 end
 
 --- Sets the hold action for a key and saves the user config.
@@ -186,7 +196,7 @@ function M.set_hold_action(key_id, action_id)
 	local cfg = _state.tap_hold_config[key_id] or {}
 	_state.tap_hold_config[key_id] = { tap = cfg.tap or "none", hold = action_id }
 	Logger.debug(LOG, "Key '%s' hold → '%s'.", key_id, action_id)
-	Config.save_user_config(_state, USER_CONFIG)
+	Config.save_user_config(_state, resolve_user_config())
 end
 
 
@@ -244,7 +254,7 @@ function M.set_combo_tap_action(combo_id, action_id)
 	if not require_state("set_combo_tap_action") then return end
 	_state.mod_combos_config[combo_id] = update_combo_slot(combo_id, "tap", action_id)
 	Logger.debug(LOG, "Combo '%s' tap → '%s'.", combo_id, action_id)
-	Config.save_user_config(_state, USER_CONFIG)
+	Config.save_user_config(_state, resolve_user_config())
 end
 
 --- Sets the hold action for a modifier combo and saves the user config.
@@ -255,7 +265,7 @@ function M.set_combo_hold_action(combo_id, action_id)
 	if not require_state("set_combo_hold_action") then return end
 	_state.mod_combos_config[combo_id] = update_combo_slot(combo_id, "hold", action_id)
 	Logger.debug(LOG, "Combo '%s' hold → '%s'.", combo_id, action_id)
-	Config.save_user_config(_state, USER_CONFIG)
+	Config.save_user_config(_state, resolve_user_config())
 end
 
 --- Sets the chord action for a modifier combo and saves the user config.
@@ -266,7 +276,7 @@ function M.set_combo_combo_action(combo_id, action_id)
 	if not require_state("set_combo_combo_action") then return end
 	_state.mod_combos_config[combo_id] = update_combo_slot(combo_id, "combo", action_id)
 	Logger.debug(LOG, "Combo '%s' combo → '%s'.", combo_id, action_id)
-	Config.save_user_config(_state, USER_CONFIG)
+	Config.save_user_config(_state, resolve_user_config())
 end
 
 
@@ -290,7 +300,7 @@ function M.set_tap_hold_timeout(ms)
 	end
 	_state.tap_hold_timeout_ms = math.floor(value)
 	Logger.debug(LOG, "Tap/hold timeout: %d ms.", _state.tap_hold_timeout_ms)
-	Config.save_user_config(_state, USER_CONFIG)
+	Config.save_user_config(_state, resolve_user_config())
 end
 
 --- Returns the sticky/one-shot modifier timeout in milliseconds.
@@ -312,7 +322,7 @@ function M.set_sticky_timeout(ms)
 	end
 	_state.sticky_timeout_ms = math.floor(value)
 	Logger.debug(LOG, "Sticky timeout: %d ms.", _state.sticky_timeout_ms)
-	Config.save_user_config(_state, USER_CONFIG)
+	Config.save_user_config(_state, resolve_user_config())
 end
 
 --- Returns the current simultaneous-combo threshold in milliseconds.
@@ -334,7 +344,7 @@ function M.set_simultaneous_threshold(ms)
 	end
 	_state.simultaneous_threshold_ms = math.floor(value)
 	Logger.debug(LOG, "Simultaneous threshold: %d ms.", _state.simultaneous_threshold_ms)
-	Config.save_user_config(_state, USER_CONFIG)
+	Config.save_user_config(_state, resolve_user_config())
 end
 
 --- Returns true when combo symmetric mode is active (A+B = B+A).
@@ -353,7 +363,7 @@ function M.set_combo_symmetric(value)
 	if not require_state("set_combo_symmetric") then return end
 	_state.combo_symmetric = value == true
 	Logger.debug(LOG, "Combo symmetric: %s.", tostring(_state.combo_symmetric))
-	Config.save_user_config(_state, USER_CONFIG)
+	Config.save_user_config(_state, resolve_user_config())
 end
 
 --- Resets all settings to their defaults and saves the user config.
@@ -368,7 +378,7 @@ function M.reset_to_defaults()
 	_state.sticky_timeout_ms         = defaults.sticky_timeout_ms
 	_state.simultaneous_threshold_ms = defaults.simultaneous_threshold_ms
 	_state.combo_symmetric           = defaults.combo_symmetric
-	Config.save_user_config(_state, USER_CONFIG)
+	Config.save_user_config(_state, resolve_user_config())
 	Logger.success(LOG, "All settings reset to defaults.")
 end
 
@@ -507,8 +517,8 @@ function M.init()
 		return
 	end
 
-	local first_launch = io.open(USER_CONFIG, "r") == nil
-	local user_cfg     = Config.load_user_config(M.TAP_HOLD_KEYS, M.MOD_COMBOS, USER_CONFIG)
+	local first_launch = io.open(resolve_user_config(), "r") == nil
+	local user_cfg     = Config.load_user_config(M.TAP_HOLD_KEYS, M.MOD_COMBOS, resolve_user_config())
 
 	_state = {
 		enabled                   = user_cfg.enabled,
@@ -541,8 +551,8 @@ function M.init()
 
 	-- Persist immediately on first launch so the file exists for future runs
 	if first_launch then
-		Config.save_user_config(_state, USER_CONFIG)
-		Logger.info(LOG, "Default config written to '%s'.", USER_CONFIG)
+		Config.save_user_config(_state, resolve_user_config())
+		Logger.info(LOG, "Default config written to '%s'.", resolve_user_config())
 	end
 
 	_state.watcher              = Watchers.start_gesture_watcher()
