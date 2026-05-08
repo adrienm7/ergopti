@@ -256,8 +256,11 @@ KLWV_OnGuiClose(which, *) {
 ; The wrapper exposes the payload as a UTF-16 string; we treat it as a
 ; JSON command of the form {"action":"...", ...}.
 KLWV_OnWebMessage(which, sender, args) {
+    global _ConfigDir
+    log := _ConfigDir . "logs\webview.log"
     msg := ""
     try msg := args.TryGetWebMessageAsString()
+    try FileAppend("[" . A_Now . "] OnWebMessage(" . which . "): " . SubStr(msg, 1, 100) . "`r`n", log, "UTF-8")
     if (msg = "")
         return
     ; Tiny ad-hoc parser for the action verb — the only field we need
@@ -292,26 +295,44 @@ KLWV_OnWebMessage(which, sender, args) {
 ; structured WebView2 message. The page bootstrap dispatches it to
 ; process_manifest just like the initial fetch.
 KLWV_PushPrefetch(which) {
-    if !KLWV.windows.Has(which)
+    global _ConfigDir
+    log := _ConfigDir . "logs\webview.log"
+    if !KLWV.windows.Has(which) {
+        try FileAppend("[" . A_Now . "] PushPrefetch(" . which . "): no window`r`n", log, "UTF-8")
         return
+    }
     path := KLPF_PrefetchPath(which)
-    if !FileExist(path)
+    if !FileExist(path) {
+        try FileAppend("[" . A_Now . "] PushPrefetch(" . which . "): prefetch.json missing at " . path . "`r`n", log, "UTF-8")
         return
+    }
     body := FileRead(path, "UTF-8")
     if (body = "")
         return
     msg := '{"type":"prefetch","blob":' . body . '}'
     entry := KLWV.windows[which]
-    try entry["webview"].PostWebMessageAsString(msg)
+    try {
+        entry["webview"].PostWebMessageAsString(msg)
+        FileAppend("[" . A_Now . "] PushPrefetch(" . which . "): pushed " . StrLen(msg) . " bytes`r`n", log, "UTF-8")
+    } catch as err {
+        FileAppend("[" . A_Now . "] PushPrefetch(" . which . "): FAIL " . err.Message . "`r`n", log, "UTF-8")
+    }
 }
 
 ; Called by the ingest tick after data.sql has new rows. Rebuilds the
 ; prefetch blob and pushes it to every open dashboard.
 KLWV_NotifyIngest() {
-    if !KLWV.metrics_dir
+    global _ConfigDir
+    log := _ConfigDir . "logs\webview.log"
+    if !KLWV.metrics_dir {
         return
-    for which, _ in KLWV.windows.Clone() {
+    }
+    n := 0
+    for which, _ in KLWV.windows {
+        n += 1
         try KLPF_BuildAndWrite(which, KLWV.metrics_dir)
         KLWV_PushPrefetch(which)
     }
+    if n
+        try FileAppend("[" . A_Now . "] NotifyIngest fanned out to " . n . " window(s)`r`n", log, "UTF-8")
 }
