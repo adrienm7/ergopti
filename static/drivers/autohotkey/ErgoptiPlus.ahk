@@ -766,10 +766,19 @@ BuildGesturesMenu() {
         CurrentActionLabel := GESTURE_ACTIONS.Has(CurrentAction) ? GESTURE_ACTIONS[CurrentAction].Label : "Désactivé"
 
         SlotMenu := Menu()
+        last_was_separator := true   ; suppress leading separators
         for ActionName in GESTURE_ACTION_NAMES {
-            if (ActionName != "none" and GroupStarters.Has(ActionName)) {
-                SlotMenu.Add() ; Separator between groups
+            ; "--" sentinels mark category boundaries — render as a
+            ; menu separator (collapsing consecutive ones).
+            if (ActionName == "--") {
+                if !last_was_separator {
+                    SlotMenu.Add()
+                    last_was_separator := true
+                }
+                continue
             }
+            if !GESTURE_ACTIONS.Has(ActionName)
+                continue
             ActionLabel := GESTURE_ACTIONS[ActionName].Label
             SlotMenu.Add(ActionLabel, MakeGestureSlotHandler(Slot, ActionName))
             if (ActionName == CurrentAction) {
@@ -778,6 +787,7 @@ BuildGesturesMenu() {
             if !Features["Gestures"]["Enabled"].Enabled {
                 SlotMenu.Disable(ActionLabel)
             }
+            last_was_separator := false
         }
         EntryLabel := SlotLabel . " : " . CurrentActionLabel
         GMenu.Add(EntryLabel, SlotMenu)
