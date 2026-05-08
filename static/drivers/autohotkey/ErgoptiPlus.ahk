@@ -1329,18 +1329,22 @@ initMenu() {
 
     A_TrayMenu.Add() ; Single separator between feature submenus and configuration items
 
-    ; ── Actions globales — mirrors HS "Actions globales" submenu ──
+    ; ── Actions globales — nested inside "Gestion du script" because the
+    ; bulk-toggle / reset-defaults actions logically belong to script-wide
+    ; management rather than the top-level feature toggles above. ──
     GlobalActionsMenu := Menu()
     GlobalActionsMenu.Add("☑ Activer toutes les fonctionnalités", ToggleAllFeaturesOn)
     GlobalActionsMenu.Add("☐ Désactiver toutes les fonctionnalités", ToggleAllFeaturesOff)
     GlobalActionsMenu.Add("↺ Valeurs par défaut", ReloadWithDefaultConfig)
-    A_TrayMenu.Add("Actions globales", GlobalActionsMenu)
 
-    ; ── Script management — single submenu grouping Éditer / Suspendre /
-    ; Recharger / Quitter (binding hints live in the « Raccourcis » submenu). ──
+    ; ── Script management — single submenu grouping Actions globales /
+    ; Éditer / Suspendre / Recharger / Quitter (binding hints live in the
+    ; « Raccourcis » submenu). ──
     global MenuSuspend, ScriptMgmtMenu
     MenuSuspend := "⏸︎ Suspendre"
     ScriptMgmtMenu := Menu()
+    ScriptMgmtMenu.Add("Actions globales", GlobalActionsMenu)
+    ScriptMgmtMenu.Add() ; Separator after Actions globales
     ScriptMgmtMenu.Add("✎ Éditer", ActivateEdit)
     ScriptMgmtMenu.Add(MenuSuspend, ToggleSuspend)
     ScriptMgmtMenu.Add("🔄 Recharger", ActivateReload)
