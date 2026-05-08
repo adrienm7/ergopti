@@ -116,7 +116,16 @@ KLUI_LaunchWindow(url, title) {
         which := "apps"
     if (which != "") {
         global _ConfigDir
-        try KLPF_BuildAndWrite(which, _ConfigDir . "metrics")
+        ; Proof-of-life trace from the call site so we can tell apart
+        ; "function never invoked" from "function ran and bailed".
+        try FileAppend("[" . A_Now . "] KLUI calling KLPF_BuildAndWrite(" . which . ", " . _ConfigDir . "metrics)`r`n",
+            KLPF_AssetsDir(which) . "prefetch_debug.txt", "UTF-8")
+        try {
+            KLPF_BuildAndWrite(which, _ConfigDir . "metrics")
+        } catch as err {
+            try FileAppend("[" . A_Now . "] KLUI caught: " . err.Message . "`r`n",
+                KLPF_AssetsDir(which) . "prefetch_debug.txt", "UTF-8")
+        }
     }
 
     edge := KLUI_FindMsedge()
