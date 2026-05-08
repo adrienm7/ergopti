@@ -514,6 +514,15 @@ KL_AppendLog(entry) {
         return
     if !(entry is Map) || !entry.Has("type")
         return
+    ; Privacy filters — drop anything captured while the focused window is
+    ; on the user's exclusion list, in private browsing, or in a system-
+    ; auth dialog. The check is cached for ~250 ms so the per-keystroke
+    ; cost is negligible. Wrapped in try so an unloaded module degrades
+    ; gracefully (filters stay off rather than crashing the hot path).
+    filtered := false
+    try filtered := MF_ShouldFilter()
+    if filtered
+        return
     if !entry.Has("timestamp")
         entry["timestamp"] := KL_NowTimestamp()
     line := KL_JsonEncode(entry)

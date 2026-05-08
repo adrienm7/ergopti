@@ -1,0 +1,337 @@
+; lib/config_shortcuts.ahk
+
+; ==============================================================================
+; MODULE: Config Shortcuts (TOML section)
+; DESCRIPTION:
+; UI-shortcut preferences and per-feature privacy toggles. Lives as a
+; ``[shortcuts]`` section inside the existing ``<config_dir>/config.toml``
+; — the same file the Hammerspoon side reads (lib/config_shortcuts.lua),
+; so syncing one folder between a Mac and a PC keeps the same hotkeys
+; live on both. A single shared file means no risk of two drivers
+; fighting over different files; one TOML schema, two implementations.
+;
+; SECTION LAYOUT inside config.toml:
+;
+;   [shortcuts]
+;   metrics_enabled                 = true
+;   metrics_shortcut_typing         = "ctrl+alt+m"
+;   metrics_shortcut_apps           = "ctrl+alt+t"
+;   metrics_filter_private_browsing = true
+;   metrics_filter_system_auth      = true
+;   metrics_disabled_apps           = ["chrome.exe", "firefox.exe"]
+;
+; Future features (AI exclusion list, gesture triggers, …) get their own
+; ``<feature>_*`` keys in the same section.
+;
+; FEATURES & RATIONALE:
+; 1. Inside config.toml: one config file, no extra naming to invent. The
+;    existing AHK ApplyConfigTomlOverrides reads [script] / [features];
+;    we own [shortcuts] disjointly.
+; 2. Section-preserving writer: CS_Save merges back into the existing
+;    file without touching other sections, so user-edited [script] /
+;    [features] / [hotstrings] keys survive a shortcut change.
+; 3. Tiny dedicated parser: full TOML is overkill for our flat scalars
+;    + arrays. Keeping ~150 lines here avoids deeper coupling to the
+;    hotstrings TOML loader, which has different parsing needs.
+; ==============================================================================
+
+#Requires Autohotkey v2.0+
+
+
+
+
+; ===================================
+; ===================================
+; ======= 1/ Path resolution =======
+; ===================================
+; ===================================
+
+CS_GetTomlPath() {
+    global _ConfigDir
+    if IsSet(_ConfigDir) && (_ConfigDir != "")
+        return _ConfigDir . "config.toml"
+    return A_ScriptDir . "\config.toml"
+}
+
+; The single section we own inside config.toml. Other sections
+; ([script], [features], [hotstrings] …) are preserved verbatim by the
+; section-aware writer below.
+global CS_SECTION := "shortcuts"
+
+
+
+
+; ===================================
+; ===================================
+; ======= 2/ Reader =======
+; ===================================
+; ===================================
+
+; Returns a Map of { section_name => Map(key => value) }. Values are
+; strings, integers, booleans (1/0), or Arrays of strings.
+; Comments (lines starting with #) and blank lines are skipped.
+CS_Read() {
+    out := Map()
+    path := CS_GetTomlPath()
+    if !FileExist(path)
+        return out
+    content := ""
+    try content := FileRead(path, "UTF-8")
+    if (content = "")
+        return out
+
+    section := ""
+    Loop Parse, content, "`n", "`r" {
+        line := Trim(A_LoopField)
+        if (line = "" || SubStr(line, 1, 1) = "#")
+            continue
+        ; Section header: [name]
+        if (SubStr(line, 1, 1) = "[" && SubStr(line, -1) = "]") {
+            section := Trim(SubStr(line, 2, StrLen(line) - 2))
+            if !out.Has(section)
+                out[section] := Map()
+            continue
+        }
+        ; Key = value
+        eq := InStr(line, "=")
+        if !eq
+            continue
+        key := Trim(SubStr(line, 1, eq - 1))
+        val := Trim(SubStr(line, eq + 1))
+        if (section = "")
+            continue
+        out[section][key] := CS_CoerceValue(val)
+    }
+    return out
+}
+
+CS_CoerceValue(raw) {
+    raw := Trim(raw)
+    if (raw = "")
+        return ""
+    ; Booleans.
+    if (StrLower(raw) = "true")
+        return true
+    if (StrLower(raw) = "false")
+        return false
+    ; Quoted string.
+    if (SubStr(raw, 1, 1) = '"' && SubStr(raw, -1) = '"')
+        return CS_Unescape(SubStr(raw, 2, StrLen(raw) - 2))
+    ; Array of strings: [ "a", "b", ... ]
+    if (SubStr(raw, 1, 1) = "[" && SubStr(raw, -1) = "]") {
+        body := Trim(SubStr(raw, 2, StrLen(raw) - 2))
+        out := []
+        if (body = "")
+            return out
+        ; Split on commas at depth 0. For our schema (no nested arrays)
+        ; a plain split works — quotes never contain commas in practice
+        ; for process names, but we still support it via a simple state
+        ; machine.
+        depth   := 0
+        in_str  := false
+        cur     := ""
+        Loop Parse, body {
+            c := A_LoopField
+            if (c = '"' && SubStr(cur, -1) != "\")
+                in_str := !in_str
+            if (!in_str && c = ",") {
+                out.Push(CS_CoerceValue(Trim(cur)))
+                cur := ""
+                continue
+            }
+            cur .= c
+        }
+        if (Trim(cur) != "")
+            out.Push(CS_CoerceValue(Trim(cur)))
+        return out
+    }
+    ; Integer.
+    if RegExMatch(raw, "^-?\d+$")
+        return Integer(raw)
+    ; Bare string fallback.
+    return raw
+}
+
+CS_Unescape(s) {
+    s := StrReplace(s, '\"', '"')
+    s := StrReplace(s, "\\", "\")
+    s := StrReplace(s, "\n", "`n")
+    s := StrReplace(s, "\t", "`t")
+    s := StrReplace(s, "\r", "`r")
+    return s
+}
+
+
+
+
+; ===================================
+; ===================================
+; ======= 3/ Writer =======
+; ===================================
+; ===================================
+
+; Replaces the [shortcuts] section in the on-disk config.toml without
+; touching any other section. Atomic via .tmp + rename. ``new_kv`` is a
+; Map of key → value pairs that becomes the new contents of the section.
+CS_WriteShortcutsSection(new_kv) {
+    global CS_SECTION
+    path := CS_GetTomlPath()
+    body := ""
+    if FileExist(path)
+        try body := FileRead(path, "UTF-8")
+
+    rendered := CS_RenderSection(CS_SECTION, new_kv)
+    new_body := CS_ReplaceSection(body, CS_SECTION, rendered)
+
+    tmp := path . ".tmp"
+    try FileDelete(tmp)
+    FileAppend(new_body, tmp, "UTF-8")
+    if FileExist(path)
+        FileDelete(path)
+    FileMove(tmp, path)
+}
+
+; Render a single section to its [section]\nkey = value\n… form. A
+; trailing blank line keeps the file readable when more sections follow.
+CS_RenderSection(name, kv) {
+    out := "[" . name . "]`n"
+    for k, v in kv
+        out .= k . " = " . CS_RenderValue(v) . "`n"
+    return out
+}
+
+; Take an existing TOML body and either replace the named section in
+; place (preserving its blank-line surroundings) or append it at the
+; end when the section is missing.
+CS_ReplaceSection(body, section_name, replacement) {
+    if (body = "")
+        return replacement . "`n"
+
+    lines := StrSplit(body, "`n", "`r")
+    out_before := []
+    out_after  := []
+    in_target  := false
+    seen       := false
+    Loop lines.Length {
+        line := lines[A_Index]
+        trimmed := Trim(line)
+        is_section := (SubStr(trimmed, 1, 1) = "[" && SubStr(trimmed, -1) = "]")
+        if is_section {
+            sec_name := Trim(SubStr(trimmed, 2, StrLen(trimmed) - 2))
+            if (sec_name = section_name) {
+                in_target := true
+                seen      := true
+                continue
+            }
+            if in_target {
+                in_target := false
+                ; fallthrough — this section header belongs to the « after » bucket
+            }
+        }
+        if in_target
+            continue
+        if !seen
+            out_before.Push(line)
+        else
+            out_after.Push(line)
+    }
+
+    head := CS_Join(out_before, "`n")
+    tail := CS_Join(out_after, "`n")
+    if (head != "" && SubStr(head, -1) != "`n")
+        head .= "`n"
+    if (tail = "")
+        return head . replacement
+    return head . replacement . "`n" . tail
+}
+
+CS_RenderValue(v) {
+    if (v = true)
+        return "true"
+    if (v = false)
+        return "false"
+    if (v is Array) {
+        parts := []
+        for s in v
+            parts.Push(CS_RenderString(s))
+        return "[" . CS_Join(parts, ", ") . "]"
+    }
+    if IsNumber(v)
+        return String(v)
+    return CS_RenderString(String(v))
+}
+
+CS_RenderString(s) {
+    s := StrReplace(s, "\", "\\")
+    s := StrReplace(s, '"', '\"')
+    s := StrReplace(s, "`n", "\n")
+    s := StrReplace(s, "`r", "\r")
+    s := StrReplace(s, "`t", "\t")
+    return '"' . s . '"'
+}
+
+CS_Join(arr, sep) {
+    out := ""
+    for i, v in arr
+        out .= (i = 1 ? "" : sep) . v
+    return out
+}
+
+
+
+
+; ============================================
+; ============================================
+; ======= 4/ Public load + save API =======
+; ============================================
+; ============================================
+
+; Populate MetricsShortcuts + MetricsFilters from disk. Safe to call once
+; at boot — missing file or missing keys leave the in-memory defaults
+; untouched.
+CS_Load() {
+    global CS_SECTION
+    data := CS_Read()
+    if !data.Has(CS_SECTION)
+        return
+    s := data[CS_SECTION]
+
+    if s.Has("metrics_enabled")
+        MetricsShortcuts.enabled := s["metrics_enabled"] ? true : false
+    if s.Has("metrics_shortcut_typing")
+        MetricsShortcuts.typing_str := String(s["metrics_shortcut_typing"])
+    if s.Has("metrics_shortcut_apps")
+        MetricsShortcuts.apps_str   := String(s["metrics_shortcut_apps"])
+
+    if s.Has("metrics_filter_private_browsing")
+        MetricsFilters.private_browsing := s["metrics_filter_private_browsing"] ? true : false
+    if s.Has("metrics_filter_system_auth")
+        MetricsFilters.system_auth      := s["metrics_filter_system_auth"]      ? true : false
+
+    if s.Has("metrics_disabled_apps") && (s["metrics_disabled_apps"] is Array) {
+        MetricsFilters.disabled_apps := Map()
+        for name in s["metrics_disabled_apps"] {
+            t := Trim(String(name))
+            if (t != "")
+                MetricsFilters.disabled_apps[StrLower(t)] := true
+        }
+    }
+}
+
+; Serialise the in-memory state back to disk. Only the [shortcuts]
+; section is rewritten; every other section in config.toml stays put.
+CS_Save() {
+    apps := []
+    for proc, _ in MetricsFilters.disabled_apps
+        apps.Push(proc)
+
+    kv := Map(
+        "metrics_enabled",                 MetricsShortcuts.enabled,
+        "metrics_shortcut_typing",         MetricsShortcuts.typing_str,
+        "metrics_shortcut_apps",           MetricsShortcuts.apps_str,
+        "metrics_filter_private_browsing", MetricsFilters.private_browsing,
+        "metrics_filter_system_auth",      MetricsFilters.system_auth,
+        "metrics_disabled_apps",           apps
+    )
+    CS_WriteShortcutsSection(kv)
+}
