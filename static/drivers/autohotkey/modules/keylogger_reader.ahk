@@ -546,7 +546,9 @@ KLR_ReadRangeSplitToday(db, start_date := "", end_date := "", selected_apps := u
 
     ; Historical: everything strictly before today.
     yesterday := KLR_PrevDay(today)
-    hist_end  := (end_date != "" && end_date < today) ? end_date : yesterday
+    ; AHK v2 throws « Expected a Number but got a String » when comparing
+    ; two strings with `<`. Use StrCompare for the lexicographic test.
+    hist_end  := (end_date != "" && StrCompare(end_date, today) < 0) ? end_date : yesterday
     historical := KLR_ReadNgrams(db, start_date, hist_end, selected_apps)
 
     ; Today: per-app n-gram dict for each app touched today.
