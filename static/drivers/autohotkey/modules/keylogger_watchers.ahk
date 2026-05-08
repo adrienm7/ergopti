@@ -267,10 +267,11 @@ KL_Watchers_DetectShortcut(vk) {
 ; (WTS_SESSION_LOCK / UNLOCK among others). lParam is the session id,
 ; ignored here because we only registered for THIS session.
 KL_Watchers_OnSessionChange(wParam, lParam, msg, hwnd) {
-    if (wParam = KLWatchConst.WTS_SESSION_LOCK)
+    if (wParam = KLWatchConst.WTS_SESSION_LOCK) {
         try KL_LogSystemEvent("lock")
-    else if (wParam = KLWatchConst.WTS_SESSION_UNLOCK)
+    } else if (wParam = KLWatchConst.WTS_SESSION_UNLOCK) {
         try KL_LogSystemEvent("unlock")
+    }
 }
 
 ; WM_POWERBROADCAST handler — emits sleep on PBT_APMSUSPEND and wake on
@@ -279,11 +280,12 @@ KL_Watchers_OnSessionChange(wParam, lParam, msg, hwnd) {
 ; explicitly wakes the machine. Both translate to "wake" for our
 ; metrics purposes.
 KL_Watchers_OnPowerBroadcast(wParam, lParam, msg, hwnd) {
-    if (wParam = KLWatchConst.PBT_APMSUSPEND)
+    if (wParam = KLWatchConst.PBT_APMSUSPEND) {
         try KL_LogSystemEvent("sleep")
-    else if (wParam = KLWatchConst.PBT_APMRESUMESUSPEND
-            or wParam = KLWatchConst.PBT_APMRESUMEAUTOMATIC)
+    } else if (wParam = KLWatchConst.PBT_APMRESUMESUSPEND
+            or wParam = KLWatchConst.PBT_APMRESUMEAUTOMATIC) {
         try KL_LogSystemEvent("wake")
+    }
 }
 
 
