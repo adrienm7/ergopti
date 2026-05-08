@@ -932,7 +932,12 @@ KL_BuildInserts(entry) {
         case "session_end":         return [KL_BuildInsertSession(entry, id, "session_end")]
         case "idle_start":          return [KL_BuildInsertSession(entry, id, "idle_start")]
         case "idle_end":            return [KL_BuildInsertSession(entry, id, "idle_end")]
-        case "ergo_event":          return [KL_BuildInsertErgoEvent(entry, id)]
+        case "ergo_event":              return [KL_BuildInsertErgoEvent(entry, id)]
+        case "window_resize":
+        case "window_move":
+        case "window_state_change":
+        case "monitor_focus_change":
+        case "virtual_desktop_switch": return [KL_BuildInsertWindowTopoEvent(entry, id)]
         case "mouse_click":
         case "mouse_drag":
         case "mouse_scroll":
@@ -940,6 +945,24 @@ KL_BuildInserts(entry) {
     }
     ; Unknown type — silently skip; future schemas may handle it on replay.
     return []
+}
+
+KL_BuildInsertWindowTopoEvent(e, id) {
+    ts   := e["timestamp"]
+    t    := e["type"]
+    meta := Map()
+    for k, v in e {
+        if (k != "type" && k != "timestamp" && k != "app")
+            meta[k] := v
+    }
+    return Format(
+        "INSERT OR IGNORE INTO events_window_topo (device_id, id, ts, date, kind, app, meta_json) VALUES ({1}, {2}, {3}, {4}, {5}, {6}, {7});",
+        Keylogger._device_id_lit, id,
+        KL_SqlStr(ts), KL_SqlStr(SubStr(ts, 1, 10)),
+        KL_SqlStr(t),
+        KL_SqlStr(KL_GetMap(e, "app", "Unknown")),
+        KL_SqlJson(meta)
+    )
 }
 
 KL_BuildInsertErgoEvent(e, id) {
@@ -1314,6 +1337,7 @@ KL_Stop() {
     try KL_Watchers_Stop()
     try KL_Mouse_Stop()
     try KL_Sensors_Stop()
+    try KL_Topo_Stop()
     if Keylogger.HasProp("_ingest_timer")
         SetTimer(Keylogger._ingest_timer, 0)
     if Keylogger.HasProp("_midnight_timer")
