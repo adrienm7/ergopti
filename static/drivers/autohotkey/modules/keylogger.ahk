@@ -930,9 +930,49 @@ KL_BuildInserts(entry) {
         case "session_end":         return [KL_BuildInsertSession(entry, id, "session_end")]
         case "idle_start":          return [KL_BuildInsertSession(entry, id, "idle_start")]
         case "idle_end":            return [KL_BuildInsertSession(entry, id, "idle_end")]
+        case "ergo_event":          return [KL_BuildInsertErgoEvent(entry, id)]
+        case "mouse_click":
+        case "mouse_drag":
+        case "mouse_scroll":
+        case "mouse_idle_park":     return [KL_BuildInsertMouseEvent(entry, id)]
     }
     ; Unknown type — silently skip; future schemas may handle it on replay.
     return []
+}
+
+KL_BuildInsertErgoEvent(e, id) {
+    ts   := e["timestamp"]
+    meta := Map()
+    for k, v in e {
+        if (k != "type" && k != "timestamp" && k != "kind" && k != "app")
+            meta[k] := v
+    }
+    return Format(
+        "INSERT OR IGNORE INTO events_ergo (device_id, id, ts, date, kind, app, meta_json) VALUES ({1}, {2}, {3}, {4}, {5}, {6}, {7});",
+        Keylogger._device_id_lit, id,
+        KL_SqlStr(ts), KL_SqlStr(SubStr(ts, 1, 10)),
+        KL_SqlStr(KL_GetMap(e, "kind", "")),
+        KL_SqlStr(KL_GetMap(e, "app", "Unknown")),
+        KL_SqlJson(meta)
+    )
+}
+
+KL_BuildInsertMouseEvent(e, id) {
+    ts   := e["timestamp"]
+    t    := e["type"]
+    meta := Map()
+    for k, v in e {
+        if (k != "type" && k != "timestamp" && k != "app")
+            meta[k] := v
+    }
+    return Format(
+        "INSERT OR IGNORE INTO events_mouse (device_id, id, ts, date, kind, app, meta_json) VALUES ({1}, {2}, {3}, {4}, {5}, {6}, {7});",
+        Keylogger._device_id_lit, id,
+        KL_SqlStr(ts), KL_SqlStr(SubStr(ts, 1, 10)),
+        KL_SqlStr(t),
+        KL_SqlStr(KL_GetMap(e, "app", "Unknown")),
+        KL_SqlJson(meta)
+    )
 }
 
 
