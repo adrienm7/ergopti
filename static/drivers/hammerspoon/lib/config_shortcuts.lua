@@ -260,6 +260,10 @@ function M.apply_to_state(state)
 		state.keylogger_private_filter_enabled = kv.metrics_filter_private_browsing and true or false
 		applied[#applied + 1] = "metrics_filter_private_browsing"
 	end
+	if kv.metrics_filter_secure_field ~= nil then
+		state.keylogger_secure_filter_enabled = kv.metrics_filter_secure_field and true or false
+		applied[#applied + 1] = "metrics_filter_secure_field"
+	end
 	if kv.metrics_filter_system_auth ~= nil then
 		state.keylogger_system_auth_filter_enabled = kv.metrics_filter_system_auth and true or false
 		applied[#applied + 1] = "metrics_filter_system_auth"
@@ -294,6 +298,7 @@ function M.save_from_state(state)
 		metrics_shortcut_typing         = combo_to_str(state.metrics_shortcut),
 		metrics_shortcut_apps           = combo_to_str(state.apps_time_shortcut),
 		metrics_filter_private_browsing = state.keylogger_private_filter_enabled ~= false,
+		metrics_filter_secure_field     = state.keylogger_secure_filter_enabled ~= false,
 		metrics_filter_system_auth      = state.keylogger_system_auth_filter_enabled ~= false,
 		metrics_disabled_apps           = type(state.keylogger_disabled_apps) == "table"
 			and state.keylogger_disabled_apps or {},
