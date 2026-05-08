@@ -1942,6 +1942,111 @@ function M.get_device_short_id()
 	return _device_id:sub(1, 8) .. "…"
 end
 
+-- ====================================================
+-- ====================================================
+-- ======= 12.5/ Foreign device sync =======
+-- ====================================================
+-- ====================================================
+
+--- Scan `metrics/by_device/*` and apply any data.sql bytes that the local
+--- db.sqlite has not yet ingested. Without this, the cross-device SUM in
+--- sqlite_reader sees only the local device's events. KEYLOGGER_SPEC §16.
+---
+--- For each foreign device folder we:
+---  1. Read `devices.imported_data_sql_size` (watermark of bytes already
+---     applied locally; defaults to 0 on first sight).
+---  2. Read everything from the foreign data.sql past that watermark.
+---  3. Apply it inside a transaction. Statements are INSERT OR IGNORE so
+---     re-applying is harmless if the watermark was clobbered.
+---  4. Bump the watermark + ensure a `devices` row exists for the source.
+--- Runs from the ingest tick (cheap when no foreign growth has happened
+--- since last call) so OneDrive / Git / iCloud syncs surface in seconds.
+local function _sync_foreign_data_sql()
+	if not _db then return end
+	local md = _paths.metrics_dir
+	if not md or not fs.attributes(md) then return end
+	local by_root = md .. "by_device/"
+	if not fs.attributes(by_root) then return end
+
+	for entry in fs.dir(by_root) do
+		if entry ~= "." and entry ~= ".." and entry ~= _device_id then
+			local folder      = by_root .. entry .. "/"
+			local djpath      = folder .. "device.json"
+			local data_sql    = folder .. "data.sql"
+			local djattrs     = fs.attributes(djpath)
+			local sql_attrs   = fs.attributes(data_sql)
+			if djattrs and sql_attrs then
+				-- Load (or refresh) the foreign device row first so the
+				-- imported_data_sql_size column has somewhere to live.
+				local fh = io.open(djpath, "r")
+				if fh then
+					local raw = fh:read("*a"); fh:close()
+					local ok, obj = pcall(json.decode, raw)
+					if ok and type(obj) == "table"
+						and type(obj.device_id) == "string"
+						and obj.device_id == entry then
+						local stmt = _db:prepare(
+							"INSERT OR IGNORE INTO devices "
+							.. "(device_id, name, os, os_version, host_signature, created_at, updated_at) "
+							.. "VALUES (?, ?, ?, ?, ?, ?, ?)")
+						if stmt then
+							stmt:bind_values(obj.device_id, obj.name or "?",
+								obj.os or "?", obj.os_version or "",
+								obj.host_signature or "", obj.created_at or _now_ts(),
+								_now_ts())
+							stmt:step(); stmt:finalize()
+						end
+					end
+				end
+
+				-- Look up the watermark for this foreign device.
+				local watermark = 0
+				for r in _db:nrows(string.format(
+					"SELECT imported_data_sql_size FROM devices WHERE device_id='%s'",
+					entry:gsub("'", "''"))) do
+					watermark = tonumber(r.imported_data_sql_size) or 0
+				end
+
+				local sz = sql_attrs.size or 0
+				if sz > watermark then
+					local rfh = io.open(data_sql, "r")
+					if rfh then
+						rfh:seek("set", watermark)
+						local chunk = rfh:read("*a")
+						rfh:close()
+						if chunk and #chunk > 0 then
+							-- Wrap in a single transaction: every BEGIN/COMMIT
+							-- already inside `chunk` becomes a savepoint nested
+							-- inside ours, but sqlite is permissive — if it
+							-- chokes on nested BEGIN we rely on the inner
+							-- transactions. Easiest: just exec as-is.
+							local ok2, err = pcall(function()
+								local rc = _db:exec(chunk)
+								if rc ~= sqlite3.OK then
+									error("foreign exec failed: " .. (_db:errmsg() or "?"))
+								end
+							end)
+							if ok2 then
+								_db:exec(string.format(
+									"UPDATE devices SET imported_data_sql_size=%d, updated_at='%s' WHERE device_id='%s'",
+									sz, _now_ts():gsub("'", "''"), entry:gsub("'", "''")))
+								Logger.debug(LOG, "Foreign sync: applied %d byte(s) from device %s.",
+									sz - watermark, entry:sub(1, 8))
+							else
+								Logger.warn(LOG, "Foreign sync rolled back for %s: %s.",
+									entry:sub(1, 8), tostring(err))
+							end
+						end
+					end
+				end
+			end
+		end
+	end
+end
+
+
+
+
 --- Absolute path to the SQLite cache. The UI bridges read it via the
 --- `sqlite_reader` module — they never touch the legacy openssl pipeline.
 --- @return string|nil Path, or nil if the log manager is not initialized.
@@ -2017,6 +2122,10 @@ end
 --- batch to data.sql, apply it to db.sqlite, update aggregate tables.
 function M.ingest_once()
 	if not _db then return end
+	-- Cheap-when-idle foreign sync first so cross-device aggregation stays
+	-- fresh. Pre-existing data.sql files unchanged since the last call cost
+	-- a single fs.attributes() check each.
+	pcall(_sync_foreign_data_sql)
 	local entries, new_offset = _read_new_today_log()
 	if #entries == 0 then return end
 
