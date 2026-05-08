@@ -90,13 +90,20 @@ KLR_BuildDatabase(metrics_dir) {
     md := metrics_dir
     if !RegExMatch(md, "[\\/]$")
         md .= "\"
+    global _ConfigDir
+    log := _ConfigDir . "logs\prefetch.log"
+    try FileAppend("[" . A_Now . "] KLR opening :memory: (PtrSize=" . A_PtrSize . ")`r`n", log, "UTF-8")
     db := SQLite_Open(":memory:")
+    try FileAppend("[" . A_Now . "] KLR open returned db=" . db . "`r`n", log, "UTF-8")
     if !db
         return 0
+    try FileAppend("[" . A_Now . "] KLR loading schema…`r`n", log, "UTF-8")
     if !KLR_LoadSchema(db) {
+        try FileAppend("[" . A_Now . "] KLR schema load FAILED`r`n", log, "UTF-8")
         SQLite_Close(db)
         return 0
     }
+    try FileAppend("[" . A_Now . "] KLR schema OK`r`n", log, "UTF-8")
 
     ; Fan out: every per-device folder under by_device/<uuid>/data.sql
     ; gets exec()-ed in. The schema's INSERT OR IGNORE / UPSERT clauses
