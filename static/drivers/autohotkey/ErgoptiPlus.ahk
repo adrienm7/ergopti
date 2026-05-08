@@ -143,7 +143,10 @@ if !DirExist(_ConfigDir) {
     try DirCreate(_ConfigDir)
 }
 
-global ConfigurationFile := _ConfigDir . "ErgoptiPlus_Configuration.ini"
+; AHK-specific INI lives under the driver subfolder. The legacy root path
+; is no longer searched — users coming from the older layout move the
+; file into <config_dir>/ahk/ once.
+global ConfigurationFile := _ConfigDir . "ahk\ErgoptiPlus_Configuration.ini"
 
 ; Initialise the hotstrings_config module so per-group delays and tooltip
 ; colors can be resolved from the TOML metadata + the shared user override
@@ -167,10 +170,20 @@ global _LogoDir := _StaticDir . "\img\logo"
 global IconPath := _LogoDir . "\logo_simple.ico"
 global IconPathDisabled := _LogoDir . "\logo_simple_disabled.ico"
 
+; Auto-create the AHK driver subfolder under _ConfigDir on first launch.
+; Driver-specific files (personal_shortcuts.ahk, config.toml, …) live
+; here so a Mac+PC setup can keep ahk/ and hammerspoon/ side by side
+; without any name collision.
+DirCreate(_ConfigDir . "ahk")
+
 global ScriptInformation := Map(
     "MagicKey", "★",
-    ; Configurable file paths — all derived from _ConfigDir set above
-    "PersonalAhkPath", _ConfigDir . "personal_shortcuts.ahk",
+    ; Configurable file paths — all derived from _ConfigDir set above.
+    ; AHK-specific files (.ahk, AHK config.toml) go under ``ahk/`` so the
+    ; folder can be safely shared with the Hammerspoon driver via cloud
+    ; sync. Shared neutral files (hotstrings TOML, personal info) stay
+    ; at the root of _ConfigDir.
+    "PersonalAhkPath", _ConfigDir . "ahk\personal_shortcuts.ahk",
     "PersonalTomlPath", _ConfigDir . "personal_hotstrings.toml",
     "PersonalInfoTomlPath", _ConfigDir . "personal_info.toml",
     ; Set to True only when AltGr (SC138) has been remapped to Kana at the

@@ -209,7 +209,7 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 	end
 
 	local function save_prefs()
-		Preferences.save(base_dir .. "config.json", state, hotfiles, core_mods)
+		Preferences.save(MenuPaths.get("ConfigJsonPath"), state, hotfiles, core_mods)
 		-- Mirror the cross-driver subset to <config_dir>/config.toml so the
 		-- AHK driver picks up the same hotkeys / toggles next time it loads.
 		-- Failures stay non-fatal — config.json remains the canonical local
@@ -550,7 +550,7 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 
 	local function reset_all_defaults()
 		-- Delete config.json so that the next startup uses the default module settings
-		pcall(os.remove, base_dir .. "config.json")
+		pcall(os.remove, MenuPaths.get("ConfigJsonPath"))
 		pcall(notifications.notify, "↺ Valeurs par défaut réinitialisées — Rechargement…")
 		hs.timer.doAfter(0.25, function() pcall(hs.reload) end)
 	end
@@ -567,7 +567,7 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 	-- toggling persisted preferences (e.g. logo variant)
 	M.refresh_icon = function() pcall(update_icon) end
 
-	local saved = Preferences.load(base_dir .. "config.json")
+	local saved = Preferences.load(MenuPaths.get("ConfigJsonPath"))
 	local config_absent = (next(saved) == nil)
 
 	if config_absent then
@@ -671,7 +671,7 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 				end
 				local ok_at, at = pcall(require, "ui.metrics_apps"); if ok_at and type(at.show) == "function" then pcall(at.show, base_dir .. "logs") end
 			end,
-			open_config = function() hs.timer.doAfter(0, function() _suppress_watcher_until = hs.timer.secondsSinceEpoch() + 8; pcall(hs.execute, "open \"" .. base_dir .. "config.json\"") end) end,
+			open_config = function() hs.timer.doAfter(0, function() _suppress_watcher_until = hs.timer.secondsSinceEpoch() + 8; pcall(hs.execute, "open \"" .. MenuPaths.get("ConfigJsonPath") .. "\"") end) end,
 			open_logs = function() hs.timer.doAfter(0, function() pcall(hs.execute, "open \"" .. base_dir .. "logs\"") end) end,
 		})
 	end

@@ -75,6 +75,8 @@ local function ensure_dir(path)
 end
 
 --- Returns the absolute path for a named personal file inside config_dir().
+--- Used for SHARED files (hotstrings TOML, personal info) that live at
+--- the root of the synced config dir and can be read by either driver.
 --- @param filename string Bare filename (e.g. "personal_hotstrings.toml").
 --- @return string
 local function file_in_config(filename)
@@ -82,6 +84,23 @@ local function file_in_config(filename)
 	if not d:match("[/\\]$") then d = d .. "/" end
 	return d .. filename
 end
+
+--- Returns the absolute path for a HS-specific file under the
+--- ``hammerspoon/`` subfolder of config_dir(). Used for files whose
+--- semantics differ from the AHK side (config.json with macOS bundle
+--- IDs, karabiner_user_config.json which is Mac-only by definition,
+--- etc.). The subfolder is auto-created on first call so callers do
+--- not have to worry about ENOENT on a fresh install.
+--- @param filename string Bare filename inside the hammerspoon/ folder.
+--- @return string
+local function file_in_driver_subdir(filename)
+	local d = config_dir()
+	if not d:match("[/\\]$") then d = d .. "/" end
+	local sub = d .. "hammerspoon/"
+	ensure_dir(sub)
+	return sub .. filename
+end
+
 
 --- Parses a simple flat TOML file (key = "value" pairs, ignoring comments).
 --- @param content string Raw file content.
@@ -185,17 +204,15 @@ end
 ---   "HotstringsDirPath", "ConfigJsonPath", "KarabinerConfigPath".
 --- @return string The resolved absolute path.
 function M.get(key)
+	-- Shared at the root of config_dir (both drivers may read these):
 	if key == "PersonalTomlPath"     then return file_in_config("personal_hotstrings.toml") end
 	if key == "PersonalInfoTomlPath" then return file_in_config("personal_info.toml")       end
 	if key == "HotstringsDirPath"    then return config_dir()                               end
-	if key == "ConfigJsonPath"       then return file_in_config("config.json")              end
-	if key == "KarabinerConfigPath"  then return file_in_config("karabiner_user_config.json") end
-	-- Personal Lua hotkeys file. Mirrors the role of personal_shortcuts.ahk
-	-- on the Windows driver: user-owned, loaded via dofile at boot, lives
-	-- in the synced config dir so a Mac + PC setup can keep platform-
-	-- specific hotkey definitions side by side (.lua vs .ahk extensions
-	-- avoid any name collision when the folder is shared).
-	if key == "PersonalShortcutsLuaPath" then return file_in_config("personal_shortcuts.lua") end
+	-- Hammerspoon-specific (under <config_dir>/hammerspoon/):
+	if key == "ConfigJsonPath"           then return file_in_driver_subdir("config.json")              end
+	if key == "ConfigTomlPath"           then return file_in_driver_subdir("config.toml")              end
+	if key == "KarabinerConfigPath"      then return file_in_driver_subdir("karabiner_user_config.json") end
+	if key == "PersonalShortcutsLuaPath" then return file_in_driver_subdir("personal_shortcuts.lua")   end
 	return ""
 end
 

@@ -3,34 +3,34 @@
 --- ==============================================================================
 --- MODULE: Config Shortcuts (TOML section)
 --- DESCRIPTION:
---- Cross-driver UI-shortcut store. Reads / writes the ``[shortcuts]``
---- section of ``<config_dir>/config.toml`` — the same file and the same
---- schema the AHK driver uses (lib/config_shortcuts.ahk). Syncing one
---- folder between a Mac and a PC keeps the same hotkey bindings live on
---- both drivers.
+--- HS-specific UI-shortcut store. Reads / writes the ``[shortcuts]``
+--- section of ``<config_dir>/hammerspoon/config.toml``. The schema is
+--- identical to the AHK driver's ``<config_dir>/ahk/config.toml`` but the
+--- file itself is driver-specific because what feels right on macOS
+--- (Cmd-based shortcuts) and on Windows (Ctrl-based) is not
+--- interchangeable. Each driver owns its own file under its own
+--- subfolder so a shared config directory can hold both side by side
+--- without any value bleeding.
 ---
---- SECTION LAYOUT (config.toml):
+--- SECTION LAYOUT (hammerspoon/config.toml):
 ---
 ---   [shortcuts]
 ---   metrics_enabled                 = true
----   metrics_shortcut_typing         = "ctrl+alt+m"
----   metrics_shortcut_apps           = "ctrl+alt+t"
+---   metrics_shortcut_typing         = "cmd+alt+m"
+---   metrics_shortcut_apps           = "cmd+alt+t"
 ---   metrics_filter_private_browsing = true
 ---   metrics_filter_system_auth      = true
----   metrics_disabled_apps           = ["..."]   # platform-specific values
----
---- The keys whose values are platform-specific (typically the
---- ``*_disabled_apps`` lists, which contain process names on Windows
---- but bundle IDs on macOS) are still parsed but stay strictly
---- per-driver: each driver writes its own list and ignores the other's.
---- The cross-driver values are the hotkey strings + the boolean toggles.
+---   metrics_disabled_apps           = ["com.google.Chrome", ...]   # bundle IDs
 ---
 --- FEATURES & RATIONALE:
---- 1. Section-preserving writer: replaces only the [shortcuts] block,
----    leaving every other section in config.toml untouched.
---- 2. Defensive parser: handles strings, booleans, integers, and arrays
+--- 1. Per-driver subfolder: ``<config_dir>/hammerspoon/`` is auto-created
+---    on first save. Disjoint from ``<config_dir>/ahk/`` so the two
+---    drivers never touch the same file.
+--- 2. Section-preserving writer: replaces only the [shortcuts] block,
+---    leaving every other section untouched.
+--- 3. Defensive parser: handles strings, booleans, integers, and arrays
 ---    of strings. Comments and blank lines are skipped.
---- 3. Stateless API: the caller passes a state table on read and gets
+--- 4. Stateless API: the caller passes a state table on read and gets
 ---    the persisted values folded back into it; on write the caller
 ---    hands over the canonical values.
 --- ==============================================================================
@@ -46,16 +46,16 @@ local M = {}
 -- ===================================
 -- ===================================
 
---- Returns the absolute path to <config_dir>/config.toml.
+--- Returns the absolute path to <config_dir>/hammerspoon/config.toml.
 local function toml_path()
 	local ok, MenuPaths = pcall(require, "ui.menu.menu_paths")
 	if ok and type(MenuPaths.is_initialized) == "function" and MenuPaths.is_initialized() then
-		local d = MenuPaths.get_config_dir()
-		if not d:match("[/\\]$") then d = d .. "/" end
-		return d .. "config.toml"
+		local p = MenuPaths.get("ConfigTomlPath")
+		if type(p) == "string" and p ~= "" then return p end
 	end
+	-- Defensive fallback: MenuPaths not yet ready (early bootstrap).
 	local home = os.getenv("HOME") or ""
-	return home .. "/.config/ergopti_plus/config.toml"
+	return home .. "/.config/ergopti_plus/hammerspoon/config.toml"
 end
 
 
