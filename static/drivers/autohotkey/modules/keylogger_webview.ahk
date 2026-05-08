@@ -182,10 +182,15 @@ KLWV_Open(which, metrics_dir) {
     ; Disable Edge UI surfaces we don't want bleeding through —
     ; the dashboard is a chromeless single-page app.
     settings := webview.Settings
-    try settings.AreDevToolsEnabled       := true   ; F12 stays useful for debugging.
-    try settings.AreDefaultContextMenusEnabled := false
-    try settings.IsStatusBarEnabled       := false
-    try settings.AreBrowserAcceleratorKeysEnabled := false
+    ; Keep DevTools accelerators (F12, Ctrl+Shift+I) AND right-click
+    ; "Inspect" available — they're the only way to triage live-update
+    ; problems in a chromeless --app= window. Other Edge UI surfaces
+    ; (status bar etc.) stay off; the dashboard is single-page and
+    ; doesn't benefit from them.
+    try settings.AreDevToolsEnabled := true
+    try settings.AreDefaultContextMenusEnabled := true
+    try settings.IsStatusBarEnabled := false
+    try settings.AreBrowserAcceleratorKeysEnabled := true
 
     ; Bridge: JS → AHK. Page sends `chrome.webview.postMessage(obj)`;
     ; we receive a string here.
