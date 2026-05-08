@@ -47,12 +47,12 @@ KLPF_AssetsDir(which) {
     return base
 }
 
-; The prefetch file lives alongside index.html and is loaded via a
-; <script src="prefetch.js"> tag rather than fetch(). Chromium blocks
-; fetch() across file:// URLs (every file:// is a unique origin) but
-; <script> tags work fine, so we ship a tiny JS that assigns a global.
+; The prefetch file lives alongside index.html and is loaded via fetch()
+; on page boot. Earlier crashes against fetch() turned out to be caused
+; by a query-string cache-buster on the URL; without it fetch works
+; fine cross file:// in Edge --app= mode.
 KLPF_PrefetchPath(which) {
-    return KLPF_AssetsDir(which) . "prefetch.js"
+    return KLPF_AssetsDir(which) . "prefetch.json"
 }
 
 
@@ -101,9 +101,8 @@ KLPF_BuildAndWrite(which, metrics_dir, dbg := "") {
     json := KL_JsonEncode(blob)
     KLPF_DbgWrite(dbg, "OK: JSON encoded, len=" . StrLen(json))
 
-    body := "window._ergopti_prefetch = " . json . ";"
     path := KLPF_PrefetchPath(which)
-    written := KLPF_WriteAtomic(path, body)
+    written := KLPF_WriteAtomic(path, json)
     KLPF_DbgWrite(dbg, written ? ("OK: wrote " . path) : ("FAIL: WriteAtomic to " . path))
     return written
 }
