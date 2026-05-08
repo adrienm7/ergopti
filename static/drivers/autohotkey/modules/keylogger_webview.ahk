@@ -104,8 +104,15 @@ KLWV_AssetUrl(which) {
 ; ============================================
 
 KLWV_Open(which, metrics_dir) {
-    if !KLWV_IsAvailable()
+    global _ConfigDir
+    log := _ConfigDir . "logs\webview.log"
+    try DirCreate(_ConfigDir . "logs")
+    try FileAppend("[" . A_Now . "] KLWV_Open(" . which . ") begin`r`n", log, "UTF-8")
+
+    if !KLWV_IsAvailable() {
+        try FileAppend("[" . A_Now . "] FAIL: WebView2 not available`r`n", log, "UTF-8")
         return false
+    }
     if KLWV.windows.Has(which) && KLWV_IsAlive(KLWV.windows[which])
         return true   ; Already open; caller should foreground via KLWV_Focus.
 
@@ -139,7 +146,15 @@ KLWV_Open(which, metrics_dir) {
     ; thqby's wrapper resolves WebView2 asynchronously through a
     ; Promise; we await it inline so the rest of the wiring runs
     ; synchronously against a ready controller.
-    controller := WebView2.create(g.Hwnd, , 0, udir, "", 0, loader)
+    try FileAppend("[" . A_Now . "] creating controller hwnd=" . g.Hwnd . " udir=" . udir . " loader=" . loader . "`r`n", log, "UTF-8")
+    try {
+        controller := WebView2.create(g.Hwnd, , 0, udir, "", 0, loader)
+    } catch as err {
+        try FileAppend("[" . A_Now . "] FAIL controller create: " . err.Message . " | " . err.File . ":" . err.Line . "`r`n", log, "UTF-8")
+        try g.Destroy()
+        return false
+    }
+    try FileAppend("[" . A_Now . "] controller created OK`r`n", log, "UTF-8")
     webview := controller.CoreWebView2
 
     ; Disable Edge UI surfaces we don't want bleeding through —
@@ -154,7 +169,13 @@ KLWV_Open(which, metrics_dir) {
     ; we receive a string here.
     webview.WebMessageReceived := KLWV_OnWebMessage.Bind(which)
 
-    webview.Navigate(KLWV_AssetUrl(which))
+    asset := KLWV_AssetUrl(which)
+    try FileAppend("[" . A_Now . "] navigating to " . asset . "`r`n", log, "UTF-8")
+    try {
+        webview.Navigate(asset)
+    } catch as err {
+        try FileAppend("[" . A_Now . "] FAIL navigate: " . err.Message . "`r`n", log, "UTF-8")
+    }
 
     KLWV.windows[which] := Map(
         "which",      which,
@@ -206,21 +227,10 @@ KLWV_CloseAll() {
 KLWV_FitWebView(which) {
     if !KLWV.windows.Has(which)
         return
-    entry := KLWV.windows[which]
-    g := entry["gui"]
-    g.GetClientPos(, , &w, &h)
-    try entry["controller"].Bounds := Buffer(16, 0)  ; placeholder; real call below
-    ; thqby's wrapper exposes Bounds as { left, top, right, bottom }
-    ; via an explicit setter-friendly object. We fall back to a manual
-    ; ComCall when the property is not directly assignable.
-    try {
-        rc := Buffer(16, 0)
-        NumPut("Int", 0, rc, 0)
-        NumPut("Int", 0, rc, 4)
-        NumPut("Int", w, rc, 8)
-        NumPut("Int", h, rc, 12)
-        ComCall(4, entry["controller"], "Ptr", rc.Ptr)  ; ICoreWebView2Controller::put_Bounds
-    }
+    ; thqby's wrapper provides Fill() which reads the parent window's
+    ; GetClientRect and assigns the RECT to Bounds — exactly what we
+    ; want every time the host Gui is resized.
+    try KLWV.windows[which]["controller"].Fill()
 }
 
 KLWV_OnGuiSize(which, gui, minMax, w, h) {
