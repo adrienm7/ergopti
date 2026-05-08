@@ -942,7 +942,27 @@
 				// away — no round-trip to the file system.
 				if (window.chrome && window.chrome.webview) {
 					console.log("WebView2 bridge active — using live push channel");
+					// Coalesce pushes: AHK fires every ~500 ms but each
+					// apply_prefetch + re-render takes longer than that
+					// when n-grams are included, so naive handling lets a
+					// queue build up and updates lag by seconds. We keep
+					// only the LATEST blob and run apply_prefetch via
+					// requestAnimationFrame so the renderer stays in
+					; sync with the freshest data instead of catching up
+					// from stale snapshots.
+					let pending_blob = null;
+					let frame_scheduled = false;
 					let push_count = 0;
+					let processed_count = 0;
+					function flush_pending() {
+						frame_scheduled = false;
+						if (!pending_blob) return;
+						const blob = pending_blob;
+						pending_blob = null;
+						processed_count++;
+						console.log("apply push#" + processed_count + " (received#" + push_count + ")");
+						apply_prefetch(blob);
+					}
 					window.chrome.webview.addEventListener("message", (e) => {
 						let payload = e.data;
 						if (typeof payload === "string") {
@@ -953,16 +973,13 @@
 								return;
 							}
 						}
-						if (!payload || payload.type !== "prefetch") {
-							console.warn("ignored message", payload && payload.type);
-							return;
-						}
+						if (!payload || payload.type !== "prefetch") return;
 						push_count++;
-						const has_prefetch = payload.blob && payload.blob._prefetch_data !== undefined;
-						const m = payload.blob && payload.blob.metrics_manifest;
-						const dates = m ? Object.keys(m) : [];
-						console.log("push#" + push_count, "has_prefetch=", has_prefetch, "dates=", dates.length, dates);
-						apply_prefetch(payload.blob);
+						pending_blob = payload.blob;
+						if (!frame_scheduled) {
+							frame_scheduled = true;
+							requestAnimationFrame(flush_pending);
+						}
 					});
 					try {
 						window.chrome.webview.postMessage(JSON.stringify({ action: "ready" }));
