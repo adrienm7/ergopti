@@ -806,8 +806,11 @@ BuildMetricsMenu() {
     enabled := MetricsShortcuts.enabled
     typing_label := "Afficher les métriques de frappe"
     apps_label   := "Afficher le temps sur les applications"
+    ; A trailing zero-width space differentiates the second « ↳ Raccourci :
+    ; Aucun » entry from the first — AHK's tray menu uses the label as a
+    ; unique key and would silently merge two identical strings into one.
     typing_sc    := "↳ Raccourci : " . MS_GetDisplayLabel("typing")
-    apps_sc      := "↳ Raccourci : " . MS_GetDisplayLabel("apps")
+    apps_sc      := "↳ Raccourci : " . MS_GetDisplayLabel("apps") . Chr(0x200B)
 
     MetricsMenu.Add(typing_label, (*) => KLUI_ToggleTyping())
     MetricsMenu.Add(typing_sc, (*) => MS_PromptShortcut("typing", KLUI_ToggleTyping))
@@ -869,7 +872,10 @@ ToggleMetricsEnabled() {
         .  "(filtre UIA), il est recommandé de mettre le script en PAUSE lors "
         .  "de la saisie de données sensibles.`n`n"
         .  "Activer ?"
-    res := MsgBox(warn, "⚠ Avertissement de sécurité — Métriques", "OKCancel Iconx")
+    ; Icon! = exclamation triangle (warning). Iconx is the red error stop
+    ; sign and was the wrong choice for a "you are about to enable a
+    ; logging feature" notice.
+    res := MsgBox(warn, "⚠ Avertissement de sécurité — Métriques", "OKCancel Icon!")
     if (res != "OK")
         return
     MetricsShortcuts.enabled := true
