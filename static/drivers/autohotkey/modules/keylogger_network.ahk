@@ -1,0 +1,299 @@
+; modules/keylogger_network.ahk
+
+; ==============================================================================
+; MODULE: Keylogger Network State
+; DESCRIPTION:
+; Tracks network connectivity transitions and emits events that help
+; correlate typing patterns with connection context (offline work, VPN
+; sessions, location changes via SSID hash).
+;
+; FEATURES & RATIONALE:
+; 1. Network change — polls the active Wi-Fi SSID and connection type
+;    every NETWORK_TICK_MS. On change emits a network_change event with
+;    a SHA-256 hash of the SSID (never the raw name — privacy) and the
+;    signal-strength bracket (excellent/good/fair/poor) derived from the
+;    RSSI reported by netsh wlan show interfaces.
+; 2. Internet reachability — polls internet connectivity via a lightweight
+;    DNS lookup (resolve a known stable hostname) every REACH_TICK_MS.
+;    Emits internet_up / internet_down events on transition. This surfaces
+;    offline writing sessions.
+; 3. VPN detection — checks for known VPN adapter names in the network
+;    interface list every VPN_TICK_MS. Emits vpn_connected / vpn_disconnected.
+;    VPN-on correlates with « work from external location » or « secure
+;    channel required » contexts.
+;
+; PRIVACY:
+; - SSID is SHA-256 hashed before storage; the raw string never touches
+;   today.log or data.sql.
+; - No packet content, no DNS response content, no IP addresses are logged.
+; - The DNS reachability check resolves "dns.msftncsi.com" (Windows NCSI
+;   host — always resolves when internet is available) without sending any
+;   user data.
+; ==============================================================================
+
+#Requires Autohotkey v2.0+
+
+
+
+
+; ===================================
+; ===================================
+; ======= 1/ Constants =======
+; ===================================
+; ===================================
+
+class KLNetConst {
+    static NETWORK_TICK_MS  := 15000   ; Wi-Fi / SSID poll interval
+    static REACH_TICK_MS    := 30000   ; Internet reachability check
+    static VPN_TICK_MS      := 20000   ; VPN adapter poll interval
+
+    ; RSSI thresholds (dBm) for signal-strength bracket
+    static RSSI_EXCELLENT   := -50
+    static RSSI_GOOD        := -65
+    static RSSI_FAIR        := -75
+    ; Below RSSI_FAIR → "poor"
+
+    ; Substring fragments in VPN adapter names (lower-cased)
+    static VPN_NAME_HINTS := [
+        "vpn", "wireguard", "nordvpn", "expressvpn", "protonvpn",
+        "openvpn", "fortinet", "cisco anyconnect", "globalprotect",
+        "zscaler", "tailscale", "mullvad"
+    ]
+
+    ; Windows NCSI hostname — always resolves when internet is up
+    static NCSI_HOST := "dns.msftncsi.com"
+}
+
+
+
+
+; ===================================
+; ===================================
+; ======= 2/ Module state =======
+; ===================================
+; ===================================
+
+class KLNet {
+    static last_ssid_hash   := ""
+    static last_signal      := ""
+    static internet_up      := true   ; assume up until first check
+    static vpn_active       := false
+    static vpn_adapter_name := ""
+
+    static wifi_fn          := unset
+    static reach_fn         := unset
+    static vpn_fn           := unset
+}
+
+
+
+
+; =========================================
+; =========================================
+; ======= 3/ Wi-Fi / SSID poll =======
+; =========================================
+; =========================================
+
+KL_Net_WifiTick() {
+    if !Keylogger.initialized
+        return
+    ssid    := ""
+    rssi    := 0
+    try {
+        ; Run netsh silently and parse output
+        sh   := ComObject("WScript.Shell")
+        out  := sh.Exec("netsh wlan show interfaces").StdOut.ReadAll()
+        for line in StrSplit(out, "`n") {
+            line := Trim(line)
+            if RegExMatch(line, "i)^\s*SSID\s*:\s*(.+)", &m)
+                ssid := Trim(m[1])
+            if RegExMatch(line, "i)Signal\s*:\s*(\d+)%", &m)
+                rssi := Integer(m[1])
+        }
+    }
+    if (ssid = "")
+        return   ; not on Wi-Fi or command failed
+
+    ; Hash SSID
+    ssid_hash := KL_Net_HashStr(ssid)
+
+    ; Signal bracket
+    signal := "poor"
+    if (rssi >= 80)
+        signal := "excellent"
+    else if (rssi >= 60)
+        signal := "good"
+    else if (rssi >= 40)
+        signal := "fair"
+
+    if (ssid_hash != KLNet.last_ssid_hash or signal != KLNet.last_signal) {
+        meta := Map("ssid_hash", ssid_hash, "signal", signal)
+        if (KLNet.last_ssid_hash != "")
+            meta["prev_ssid_hash"] := KLNet.last_ssid_hash
+        KL_AppendLog(Map(
+            "type", "network_change",
+            "app",  Keylogger.session_app,
+            "ssid_hash", ssid_hash,
+            "signal",    signal
+        ))
+        KLNet.last_ssid_hash := ssid_hash
+        KLNet.last_signal    := signal
+    }
+}
+
+
+
+
+; =============================================
+; =============================================
+; ======= 4/ Internet reachability poll =======
+; =============================================
+; =============================================
+
+KL_Net_ReachTick() {
+    if !Keylogger.initialized
+        return
+    up := false
+    try {
+        ; Use WinHTTP to do a lightweight HEAD request to the NCSI endpoint.
+        ; On failure (timeout or NXDOMAIN) we treat as down.
+        wh  := ComObject("WinHttp.WinHttpRequest.5.1")
+        wh.Open("HEAD", "http://" . KLNetConst.NCSI_HOST . "/ncsi.txt", false)
+        wh.SetTimeouts(3000, 3000, 3000, 3000)
+        wh.Send()
+        up := (wh.Status >= 200 and wh.Status < 400)
+    }
+    if (up and !KLNet.internet_up) {
+        KLNet.internet_up := true
+        KL_AppendLog(Map("type", "internet_up", "app", Keylogger.session_app))
+    } else if (!up and KLNet.internet_up) {
+        KLNet.internet_up := false
+        KL_AppendLog(Map("type", "internet_down", "app", Keylogger.session_app))
+    }
+}
+
+
+
+
+; ==========================================
+; ==========================================
+; ======= 5/ VPN adapter detection =======
+; ==========================================
+; ==========================================
+
+KL_Net_VpnTick() {
+    if !Keylogger.initialized
+        return
+    found_name := ""
+    try {
+        q := ComObjGet("winmgmts:").ExecQuery(
+            "SELECT Name FROM Win32_NetworkAdapter WHERE NetEnabled = TRUE")
+        for adapter in q {
+            name := StrLower(adapter.Name)
+            for _, hint in KLNetConst.VPN_NAME_HINTS {
+                if InStr(name, hint) {
+                    found_name := adapter.Name
+                    break 2
+                }
+            }
+        }
+    }
+    now_active := (found_name != "")
+    if (now_active and !KLNet.vpn_active) {
+        KLNet.vpn_active       := true
+        KLNet.vpn_adapter_name := found_name
+        KL_AppendLog(Map(
+            "type",    "vpn_connected",
+            "app",     Keylogger.session_app,
+            "adapter", found_name
+        ))
+    } else if (!now_active and KLNet.vpn_active) {
+        KLNet.vpn_active := false
+        KL_AppendLog(Map(
+            "type",    "vpn_disconnected",
+            "app",     Keylogger.session_app,
+            "adapter", KLNet.vpn_adapter_name
+        ))
+        KLNet.vpn_adapter_name := ""
+    }
+}
+
+
+
+
+; ======================================
+; ======================================
+; ======= 6/ Privacy hash helper =======
+; ======================================
+; ======================================
+
+; Returns a truncated hex SHA-256 of a string (first 16 hex chars = 64 bits).
+; Not cryptographic — just enough entropy to distinguish different networks
+; without storing the raw SSID.
+KL_Net_HashStr(s) {
+    try {
+        stream := ComObject("ADODB.Stream")
+        stream.Open()
+        stream.Type := 2   ; text
+        stream.WriteText(s)
+        stream.Position := 0
+        stream.Type := 1   ; binary
+        data := stream.Read()
+        stream.Close()
+
+        sha := ComObject("System.Security.Cryptography.SHA256Managed")
+        hash_bytes := sha.ComputeHash_2(data)
+        out := ""
+        for b in hash_bytes
+            out .= Format("{:02X}", b)
+        return SubStr(out, 1, 16)
+    }
+    ; Fallback: simple DJB2 hash when COM SHA is unavailable
+    h := 5381
+    loop StrLen(s) {
+        h := ((h << 5) + h) + Ord(SubStr(s, A_Index, 1))
+        h := h & 0xFFFFFFFF
+    }
+    return Format("{:08X}", h)
+}
+
+
+
+
+; =====================================
+; =====================================
+; ======= 7/ Lifecycle =======
+; =====================================
+; =====================================
+
+KL_Net_Start() {
+    if KLNet.HasOwnProp("wifi_fn") && IsObject(KLNet.wifi_fn)
+        return
+    KLNet.wifi_fn  := KL_Net_WifiTick.Bind()
+    KLNet.reach_fn := KL_Net_ReachTick.Bind()
+    KLNet.vpn_fn   := KL_Net_VpnTick.Bind()
+    ; Stagger initial fires to avoid a simultaneous WMI + netsh + WinHTTP burst
+    SetTimer(KLNet.wifi_fn,  -5000)
+    SetTimer(KLNet.reach_fn, -8000)
+    SetTimer(KLNet.vpn_fn,   -11000)
+    SetTimer(KLNet.wifi_fn,  KLNetConst.NETWORK_TICK_MS)
+    SetTimer(KLNet.reach_fn, KLNetConst.REACH_TICK_MS)
+    SetTimer(KLNet.vpn_fn,   KLNetConst.VPN_TICK_MS)
+}
+
+KL_Net_Stop() {
+    for prop in ["wifi_fn", "reach_fn", "vpn_fn"] {
+        if KLNet.HasOwnProp(prop) && IsObject(KLNet.%prop%) {
+            try SetTimer(KLNet.%prop%, 0)
+            KLNet.%prop% := unset
+        }
+    }
+    ; Emit vpn_disconnected on clean shutdown so the log is consistent
+    if KLNet.vpn_active {
+        try KL_AppendLog(Map(
+            "type",    "vpn_disconnected",
+            "app",     Keylogger.session_app,
+            "adapter", KLNet.vpn_adapter_name
+        ))
+    }
+}
