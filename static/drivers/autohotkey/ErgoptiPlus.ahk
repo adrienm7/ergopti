@@ -93,6 +93,7 @@ SendMode("Event") ; Everything concerning hotstrings MUST use SendEvent and not 
 #Include vendor\ComVar.ahk
 #Include vendor\Promise.ahk
 #Include vendor\WebView2.ahk
+#Include modules\keylogger_app_categories.ahk
 #Include modules\keylogger.ahk
 #Include modules\keylogger_walker.ahk
 #Include modules\keylogger_hook.ahk

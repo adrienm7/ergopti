@@ -601,11 +601,15 @@ KL_FlushBuffer() {
     }
     wpm := (total_time_ms > 0) ? ((total_chars / 5) / (total_time_ms / 60000)) : 0
 
+    app_cat := "unknown"
+    try app_cat := KL_AppCat_Get(Keylogger.session_app)
+
     entry := Map(
         "type",              "typing",
         "text",              Keylogger.buffer_text,
         "rich_text",         "",
         "app",               Keylogger.session_app,
+        "app_category",      app_cat,
         "title",             Keylogger.session_title,
         "url",               Keylogger.session_url,
         "field_role",        Keylogger.session_field_role,
@@ -1240,6 +1244,7 @@ KL_Init(metrics_dir) {
 
     Keylogger.initialized := true
     KL_BootstrapDataSql()
+    try KL_AppCat_Init(metrics_dir)
 
     ; Initialise the walker batch dicts. KL_LoadState() above already
     ; restored the per-app n-gram context (KLW.ctx) if state.json had one.
