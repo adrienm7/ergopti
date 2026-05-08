@@ -176,6 +176,13 @@ KLWV_Open(which, metrics_dir) {
     } catch as err {
         try FileAppend("[" . A_Now . "] FAIL navigate: " . err.Message . "`r`n", log, "UTF-8")
     }
+    ; The chrome.webview.postMessage('ready') handshake from JS goes
+    ; through ICoreWebView2WebMessageReceived which thqby's wrapper
+    ; binds via add_WebMessageReceived(TypedHandler) — a binding we
+    ; haven't wired up yet. Instead, push the freshest blob a beat
+    ; after navigation: 1.5 s is enough for a local file:// page +
+    ; CDN-backed scripts to be ready to receive a postMessage.
+    SetTimer(KLWV_DelayedFirstPush.Bind(which), -1500)
 
     KLWV.windows[which] := Map(
         "which",      which,
@@ -317,6 +324,12 @@ KLWV_PushPrefetch(which) {
     } catch as err {
         FileAppend("[" . A_Now . "] PushPrefetch(" . which . "): FAIL " . err.Message . "`r`n", log, "UTF-8")
     }
+}
+
+KLWV_DelayedFirstPush(which) {
+    if !KLWV.windows.Has(which)
+        return
+    KLWV_PushPrefetch(which)
 }
 
 ; Called by the ingest tick after data.sql has new rows. Rebuilds the

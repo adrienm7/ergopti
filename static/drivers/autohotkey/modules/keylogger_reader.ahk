@@ -83,6 +83,24 @@ KLR_LoadSchema(db) {
 ; =========================================
 ; =========================================
 
+; Module-level cache for the in-memory SQLite database. Rebuilding the
+; entire schema + every device's data.sql on every ingest tick was
+; turning each push into a multi-second freeze. We now keep the DB
+; alive across calls and only exec the NEW bytes appended to each
+; data.sql since the last call.
+class KLRCache {
+    static db          := 0
+    static last_sizes  := Map()    ; absolute_path → byte_offset already loaded
+}
+
+KLR_ResetCache() {
+    if KLRCache.db {
+        try SQLite_Close(KLRCache.db)
+        KLRCache.db := 0
+    }
+    KLRCache.last_sizes := Map()
+}
+
 ; Build a fresh in-memory SQLite from the union of every device's
 ; data.sql under the metrics directory. Returns a handle the caller
 ; closes via SQLite_Close when done.
@@ -121,6 +139,16 @@ KLR_BuildDatabase(metrics_dir) {
         return 0
     }
     try FileAppend("[" . A_Now . "] KLR opening :memory:`r`n", log, "UTF-8")
+    ; Reuse the cached DB when present — only the new bytes of each
+    ; device's data.sql get exec'd this round. First call (cache empty)
+    ; loads the schema + the entire current contents.
+    if KLRCache.db {
+        try FileAppend("[" . A_Now . "] KLR reusing cached db=" . KLRCache.db . "`r`n", log, "UTF-8")
+        ; Only need to exec deltas; skip the libversion / schema loads.
+        if !KLR_ApplyIncremental(KLRCache.db, md, log)
+            return 0
+        return KLRCache.db
+    }
     db := SQLite_Open(":memory:")
     try FileAppend("[" . A_Now . "] KLR open returned db=" . db . "`r`n", log, "UTF-8")
     if !db
@@ -148,8 +176,47 @@ KLR_BuildDatabase(metrics_dir) {
         if (sql = "")
             continue
         SQLite_Exec(db, sql)
+        try KLRCache.last_sizes[sql_path] := FileGetSize(sql_path)
     }
+    KLRCache.db := db
     return db
+}
+
+; Apply only the bytes appended to each device's data.sql since the
+; previous KLR_BuildDatabase / KLR_ApplyIncremental pass. Returns true
+; on success (regardless of whether anything actually changed); false
+; on a hard read failure.
+KLR_ApplyIncremental(db, md, log) {
+    by_root := md . "by_device\"
+    if !DirExist(by_root)
+        return true
+    total_new := 0
+    Loop Files, by_root . "*", "D" {
+        sql_path := A_LoopFileFullPath . "\data.sql"
+        if !FileExist(sql_path)
+            continue
+        size := FileGetSize(sql_path)
+        prev := KLRCache.last_sizes.Has(sql_path) ? KLRCache.last_sizes[sql_path] : 0
+        if (size <= prev)
+            continue   ; no new data on this device.
+        ; Read just the new tail. AHK's FileRead doesn't support offsets
+        ; so we open a FileObject and Seek explicitly. ReadString reads
+        ; the rest of the file from the current position. Encoding must
+        ; match what the writer produced (UTF-8 with BOM).
+        fh := FileOpen(sql_path, "r", "UTF-8")
+        if !fh
+            continue
+        try fh.Seek(prev, 0)
+        delta := fh.Read()
+        fh.Close()
+        if (delta = "")
+            continue
+        SQLite_Exec(db, delta)
+        KLRCache.last_sizes[sql_path] := size
+        total_new += size - prev
+    }
+    try FileAppend("[" . A_Now . "] KLR incremental: " . total_new . " new byte(s) exec'd`r`n", log, "UTF-8")
+    return true
 }
 
 
