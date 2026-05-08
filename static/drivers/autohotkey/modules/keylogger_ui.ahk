@@ -124,6 +124,11 @@ KLUI_LaunchWindow(url, title) {
     ; isolates from the user's main Edge session so closing this window
     ; does not nuke their tabs. --window-size starts large but resizable.
     udir := A_Temp . "\ergopti_metrics_edge"
+    ; Wipe the cache subfolders on every launch. Edge persists JS/CSS across
+    ; --app= sessions in this dir, which would serve a stale main.js after
+    ; we ship a frontend fix. The directory itself is recreated below.
+    try DirDelete(udir . "\Default\Cache", true)
+    try DirDelete(udir . "\Default\Code Cache", true)
     DirCreate(udir)
     ; --allow-file-access-from-files: lift the same-origin restriction that
     ; treats every file:// URL as a unique origin. Without it, the page

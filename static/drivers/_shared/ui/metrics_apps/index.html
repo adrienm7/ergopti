@@ -788,18 +788,19 @@
 		<script>
 			(function () {
 				if (window.ManifestData && Object.keys(window.ManifestData).length) return;
-				fetch("./prefetch.json", { cache: "no-store" })
-					.then((r) => (r.ok ? r.json() : null))
-					.then((blob) => {
-						if (!blob) return;
-						const manifest   = blob.metrics_manifest || {};
-						const categories = blob.user_categories  || {};
-						const icons      = blob.app_icons        || {};
-						if (typeof window.bootstrapMetricsAppsData === "function") {
-							window.bootstrapMetricsAppsData(manifest, categories, icons);
-						}
-					})
-					.catch(() => {});
+				const s = document.createElement("script");
+				s.src = "./prefetch.js?t=" + Date.now();
+				s.onload = function () {
+					const blob = window._ergopti_prefetch;
+					if (!blob) return;
+					const manifest   = blob.metrics_manifest || {};
+					const categories = blob.user_categories  || {};
+					const icons      = blob.app_icons        || {};
+					if (typeof window.bootstrapMetricsAppsData === "function") {
+						window.bootstrapMetricsAppsData(manifest, categories, icons);
+					}
+				};
+				document.head.appendChild(s);
 			})();
 		</script>
 	</body>
