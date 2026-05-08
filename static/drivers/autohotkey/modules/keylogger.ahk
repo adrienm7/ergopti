@@ -484,22 +484,31 @@ KL_JoinArray(arr, sep) {
 }
 
 KL_JsonDecode(s) {
-    ; AHK 2 has no built-in. Use COM ScriptControl bridge — works on every
-    ; Windows install with cscript-compatible scripting. For our use case
-    ; (small device.json / state.json) the perf cost is negligible.
+    ; ScriptControl is x86-only — silently unavailable on 64-bit AHK hosts.
+    ; A_PtrSize == 8 means 64-bit; skip the COM path entirely to avoid the
+    ; "Too many parameters" crash that ComObject("ScriptControl") throws there.
     static sc := ""
+    static sc_available := -1
+    if (sc_available = -1)
+        sc_available := (A_PtrSize = 4) ? 1 : 0
+    if (!sc_available)
+        return Map()
     if (sc = "") {
-        try sc := ComObject("ScriptControl")
-        catch
+        try {
+            sc := ComObject("ScriptControl")
+            sc.Language := "JScript"
+        } catch {
+            sc_available := 0
             return Map()
-        sc.Language := "JScript"
+        }
     }
     try {
         ; Wrap in parens so JS evaluates as expression, not block.
         result := sc.Eval("(function(){return " . s . ";})()")
         return KL_ComToMap(result)
+    } catch {
+        return Map()
     }
-    return Map()
 }
 
 KL_ComToMap(v) {

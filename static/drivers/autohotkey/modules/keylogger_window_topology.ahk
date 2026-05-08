@@ -208,8 +208,8 @@ KL_Topo_Tick() {
     }
 
     if (KLTopo.pending_ticks >= KLTopoConst.DEBOUNCE_TICKS) {
-        KL_AppendLog(KLTopo.pending_data.__Set("type", change_type,
-            "type", change_type))
+        KLTopo.pending_data["type"] := change_type
+        KL_AppendLog(KLTopo.pending_data)
         KL_Topo_LogEvent(change_type, KLTopo.pending_data)
         KLTopo.pending_ticks := 0
         KLTopo.pending_type  := ""
