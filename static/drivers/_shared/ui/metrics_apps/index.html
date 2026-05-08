@@ -777,5 +777,30 @@
 		</div>
 
 		<script src="script.js"></script>
+
+		<!--
+			Edge --app= bootstrap (B niveau 1 contract — AHK driver only).
+			See sibling metrics_typing/index.html for the full rationale: the
+			AHK launcher writes prefetch.json next to this file because Edge
+			has no JS bridge equivalent to evaluateJavaScript. Hammerspoon
+			calls bootstrapMetricsAppsData directly so it never reaches here.
+		-->
+		<script>
+			(function () {
+				if (window.ManifestData && Object.keys(window.ManifestData).length) return;
+				fetch("./prefetch.json", { cache: "no-store" })
+					.then((r) => (r.ok ? r.json() : null))
+					.then((blob) => {
+						if (!blob) return;
+						const manifest   = blob.metrics_manifest || {};
+						const categories = blob.user_categories  || {};
+						const icons      = blob.app_icons        || {};
+						if (typeof window.bootstrapMetricsAppsData === "function") {
+							window.bootstrapMetricsAppsData(manifest, categories, icons);
+						}
+					})
+					.catch(() => {});
+			})();
+		</script>
 	</body>
 </html>
