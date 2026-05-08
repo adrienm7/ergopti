@@ -123,12 +123,21 @@ KLUI_LaunchWindow(url, title) {
     ; --app=URL launches a chromeless window pinned to URL. --user-data-dir
     ; isolates from the user's main Edge session so closing this window
     ; does not nuke their tabs. --window-size starts large but resizable.
-    udir := A_Temp . "\ergopti_metrics_edge"
-    ; Wipe the cache subfolders on every launch. Edge persists JS/CSS across
-    ; --app= sessions in this dir, which would serve a stale main.js after
-    ; we ship a frontend fix. The directory itself is recreated below.
-    try DirDelete(udir . "\Default\Cache", true)
-    try DirDelete(udir . "\Default\Code Cache", true)
+    ; Use a per-launch user-data-dir suffixed with the current tick count.
+    ; Edge keeps every previous launch's HTML/JS in a Code Cache that even
+    ; a recursive DirDelete cannot always wipe (the dir stays locked by a
+    ; lingering helper process for a few seconds after the window closes).
+    ; Spinning up a fresh dir guarantees the freshest page every time and
+    ; the orphan ones are cleaned up below on a best-effort basis.
+    udir_root := A_Temp . "\ergopti_metrics_edge"
+    udir      := udir_root . "_" . A_TickCount
+    ; Sweep old siblings BEFORE creating the new dir so the loop never
+    ; touches the freshly-allocated path. Anything we can't delete (still
+    ; locked by Edge) gets retried on the next launch.
+    try {
+        Loop Files, udir_root . "_*", "D"
+            try DirDelete(A_LoopFileFullPath, true)
+    }
     DirCreate(udir)
     ; --allow-file-access-from-files: lift the same-origin restriction that
     ; treats every file:// URL as a unique origin. Without it, the page
