@@ -536,9 +536,9 @@ RegisterCapsLockLayer()
 ; =============================================
 
 ; This code comes before remapping ErgoptiAltGr to be able to override the keys
-; Gate on physical RAlt so a ghost SC138 (injected by an OS driver for AltGr-
-; mapped keys like Bépo's `'`) does not trigger this roll on the next key.
-#HotIf Features["Rolls"]["ChevronEqual"].Enabled and GetKeyState("RAlt", "P")
+; Gate on a real AltGr/Kana press so a ghost SC138 (injected by an OS driver
+; for AltGr-mapped keys like Bépo's `'`) does not trigger this roll.
+#HotIf Features["Rolls"]["ChevronEqual"].Enabled and IsRealAltGrPress()
 SC138 & SC012:: {
 	if GetKeyState("Shift", "P") {
 		Features["Layout"]["ErgoptiPlus"].Enabled ? SendNewResult(" %") : SendNewResult("Œ")
@@ -562,8 +562,8 @@ AddRollEqual() {
 }
 #HotIf
 
-; Same RAlt guard as above — prevents the roll from firing on a ghost SC138.
-#HotIf Features["Rolls"]["HashtagQuote"].Enabled and GetKeyState("RAlt", "P")
+; Same AltGr guard as above — prevents the roll from firing on a ghost SC138.
+#HotIf Features["Rolls"]["HashtagQuote"].Enabled and IsRealAltGrPress()
 SC138 & SC017:: {
 	if GetKeyState("Shift", "P") {
 		SendNewResult("%")

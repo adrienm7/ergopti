@@ -104,9 +104,9 @@ IsAltGrLAltEnabled() {
     return IsSet(_ALTGR_LALT_ENABLED) ? _ALTGR_LALT_ENABLED : False
 }
 
-; Gate on physical RAlt so a ghost SC138 (injected by an OS driver for AltGr-
-; mapped keys like Bépo's `'`) cannot trigger this shortcut spuriously.
-#HotIf IsAltGrLAltEnabled() and GetKeyState("RAlt", "P")
+; Gate on a real AltGr/Kana press so a ghost SC138 (injected by an OS driver
+; for AltGr-mapped keys like Bépo's `'`) cannot trigger this shortcut.
+#HotIf IsAltGrLAltEnabled() and IsRealAltGrPress()
 SC138 & SC038:: AltGrLAltShortcut()
 #HotIf
 
@@ -168,8 +168,8 @@ IsAltGrCapsLockEnabled() {
     return IsSet(_ALTGR_CAPSLOCK_ENABLED) ? _ALTGR_CAPSLOCK_ENABLED : False
 }
 
-; Gate on physical RAlt — same rationale as the AltGrLAlt block above.
-#HotIf IsAltGrCapsLockEnabled() and GetKeyState("RAlt", "P")
+; Gate on real AltGr/Kana press — same rationale as the AltGrLAlt block above.
+#HotIf IsAltGrCapsLockEnabled() and IsRealAltGrPress()
 SC138 & SC03A:: AltGrCapsLockShortcut()
 #HotIf
 
