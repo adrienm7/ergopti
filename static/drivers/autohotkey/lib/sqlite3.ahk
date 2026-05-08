@@ -96,23 +96,16 @@ SQLite_Open(path, flags := 0) {
     ; flags = 0 → defaults to OPEN_RW | OPEN_CRT (rebuild semantics).
     if (flags = 0)
         flags := SQLiteConst.OPEN_RW | SQLiteConst.OPEN_CRT
-    ; Encode the path inline (Buffer lifetime tied to this scope).
     n := StrPut(path, "UTF-8")
     p_buf := Buffer(n, 0)
     StrPut(path, p_buf, "UTF-8")
-    ; Use an explicit 8-byte Buffer for the out-pointer rather than the
-    ; "Ptr*" + &pdb syntax. AHK 2.0's Ptr* outparam was returning the
-    ; pointer truncated to 32 bits even with A_PtrSize=8, which made
-    ; every subsequent DllCall (sqlite3_exec, sqlite3_prepare_v2) crash
-    ; with 0xc0000005 because the truncated handle pointed to garbage.
-    pdb_buf := Buffer(8, 0)
+    pdb := 0
     rc := DllCall(SQLiteConst.DLL . "\sqlite3_open_v2",
         "Ptr",  p_buf.Ptr,
-        "Ptr",  pdb_buf.Ptr,
+        "Ptr*", &pdb,
         "Int",  flags,
         "Ptr",  0,
         "Int")
-    pdb := NumGet(pdb_buf, 0, "Ptr")
     if (rc != SQLiteConst.OK) {
         if pdb
             DllCall(SQLiteConst.DLL . "\sqlite3_close_v2", "Ptr", pdb)
