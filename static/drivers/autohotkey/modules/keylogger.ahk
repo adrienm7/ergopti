@@ -28,9 +28,11 @@
 ; The current iteration covers raw event persistence (typing, app_switch,
 ; window_switch, shortcut, hotstring, llm, system, session). The rich
 ; aggregation walker (n-grams, bursts, sessions, ergonomic streaks) is NOT
-; yet ported; agg_* / ngram_* tables stay empty until a future session
-; ports the Lua walker. This matches the staged delivery on the macOS side
-; (séances 2 → 3).
+; yet ported; agg_* / ngram_* tables stay empty on Windows-only setups
+; until the dedicated walker port lands. Mac users sharing a synced
+; metrics folder cover this gap automatically: the HS walker on the Mac
+; ingests the PC's data.sql via foreign-sync and populates the agg_*/
+; ngram_* tables for every device's events.
 ;
 ; HOT PATH LATENCY (KL_AppendLog):
 ; Every cost on the keystroke flush path was scrutinised:
@@ -950,20 +952,99 @@ KL_MidnightCheck() {
 
 ; ============================================================
 ; ============================================================
-; ======= 13/ Password field filter — TODO_UIA =======
+; ======= 13/ Password field filter (UIA + heuristics) =======
 ; ============================================================
 ; ============================================================
-; Marker for the dedicated session: the proper Windows password filter
-; combines UIA's IsPasswordPattern with focused-control class names
-; (PasswordBox, RichEdit50W with ES_PASSWORD style, etc.) and a small
-; allow-list of apps where the pattern is unreliable. See KEYLOGGER_SPEC
-; §6 for the full rationale. Stub returns false so nothing is filtered
-; until the real implementation lands.
+; Triple-layered detector — any positive layer returns true:
 ;
-; @return true when the focused control is a password field.
+;   1. Win32 Edit class with ES_PASSWORD style
+;      Native edit boxes (Win32 dialogs, old apps, RDP, Win Logon) expose
+;      their password mode through ES_PASSWORD (0x20). Cheapest check.
+;
+;   2. Class-name allow-list
+;      Some controls don't honour ES_PASSWORD but reliably advertise their
+;      role via class name (e.g. WPF "PasswordBox", winforms RichEdit50W
+;      hosted in credential dialogs).
+;
+;   3. UIA IsPasswordPattern (vendor/UIA.ahk)
+;      The canonical UIA property — works for modern Edge/Chrome web
+;      passwords, UWP password boxes, .NET WPF, Electron apps. Slowest
+;      check, called last.
+;
+; The result is cached per-HWND for ``KLPW_CACHE_TTL_MS`` because UIA
+; round-trips can take 5-15 ms; the focused control is unlikely to flip
+; password-vs-not within a few hundred milliseconds.
+
+global KLPW_CACHE_TTL_MS := 500
+
+class KLPasswordCache {
+    static last_hwnd := 0
+    static last_at   := 0
+    static last_val  := false
+}
 
 KL_IsFocusedFieldPassword() {
-    return false   ; TODO_UIA: replace with real UIA-backed detection.
+    hwnd := 0
+    try hwnd := ControlGetFocus("A")
+    if !hwnd
+        try hwnd := WinGetID("A")
+    if !hwnd
+        return false
+
+    ; Per-HWND cache.
+    if (KLPasswordCache.last_hwnd = hwnd
+        && (A_TickCount - KLPasswordCache.last_at) < KLPW_CACHE_TTL_MS)
+        return KLPasswordCache.last_val
+
+    result := KL_DetectPasswordFor(hwnd)
+    KLPasswordCache.last_hwnd := hwnd
+    KLPasswordCache.last_at   := A_TickCount
+    KLPasswordCache.last_val  := result
+    return result
+}
+
+KL_DetectPasswordFor(hwnd) {
+    ; Layer 1 — ES_PASSWORD style on a Win32 Edit.
+    try {
+        cls := WinGetClass("ahk_id " . hwnd)
+        if (cls = "Edit") {
+            style := WinGetStyle("ahk_id " . hwnd)
+            if (style & 0x20)   ; ES_PASSWORD
+                return true
+        }
+        ; Layer 2 — known password class names.
+        static PASSWORD_CLASSES := Map(
+            "PasswordBox", true,           ; WPF / UWP
+            "Edit;PASSWORD", true,         ; some older toolkits
+            "TPasswordEdit", true,         ; Delphi
+            "MaskedEdit", true,
+            "TFormPassword", true
+        )
+        if PASSWORD_CLASSES.Has(cls)
+            return true
+        ; RichEdit50W is too generic to flag unconditionally — it only
+        ; matters when hosted in a security dialog. Fall through to UIA.
+    }
+
+    ; Layer 3 — UIA.IsPasswordPattern. The vendor/UIA.ahk lib initialises
+    ; the global ``UIA`` object on first use. Any failure (UIA not loaded,
+    ; element not reachable) falls back to "not a password" so we keep
+    ; logging by default — better-safe-but-noisy beats silent loss.
+    if !IsSet(UIA)
+        return false
+    try {
+        el := UIA.ElementFromHandle(hwnd)
+        if !IsObject(el)
+            return false
+        ; IsPassword is exposed both as a direct property on the element
+        ; (UIA-v2) and via the Pattern. Prefer the direct property; fall
+        ; back to the pattern read.
+        if el.HasOwnProp("IsPassword")
+            return el.IsPassword ? true : false
+        try
+            return el.GetCurrentPropertyValue(UIA.Property.IsPassword) ? true : false
+    }
+    return false
 }
 
 
