@@ -144,7 +144,7 @@ KLPF_BuildTyping(db) {
     apps_set   := Map()
     apps_list  := []
     for date_str, day_data in manifest {
-        if (first_date = "" || date_str < first_date)
+        if (first_date = "" || StrCompare(date_str, first_date) < 0)
             first_date := date_str
         for app_name, _ in day_data {
             if (app_name = "Unknown")
