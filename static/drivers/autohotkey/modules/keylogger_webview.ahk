@@ -145,18 +145,19 @@ KLWV_Open(which, metrics_dir) {
 
     g.OnEvent("Size",  KLWV_OnGuiSize.Bind(which))
     g.OnEvent("Close", KLWV_OnGuiClose.Bind(which))
-    ; Show hidden first so we can read the real outer-window size
-    ; (including title bar + borders) via Gui.GetPos, then re-show at
-    ; the centred coordinates. Computing the centre from the client
-    ; size alone left the window biased toward bottom-right because
-    ; the title bar adds extra height on top. WinGetPos on the HWND
-    ; would miss it (hidden windows are filtered out by default), so
-    ; we use the Gui's own GetPos which reads it directly.
-    g.Show("w" . initial_w . " h" . initial_h . " Hide")
-    g.GetPos(, , &win_w, &win_h)
+    ; Show first with the requested size, read the real outer-window
+    ; rectangle, then WinMove to the centred position. Doing it in
+    ; this order — instead of computing the centre from the client
+    ; size up-front — accounts for the title bar + borders properly,
+    ; and unlike Gui.GetPos on a hidden window it always returns the
+    ; actual on-screen dimensions. The brief unmoved frame between
+    ; the Show and the WinMove is imperceptible in practice.
+    g.Show("w" . initial_w . " h" . initial_h)
+    WinGetPos(, , &win_w, &win_h, "ahk_id " . g.Hwnd)
     pos_x := L + ((work_w - win_w) // 2)
     pos_y := T + ((work_h - win_h) // 2)
-    g.Show("x" . pos_x . " y" . pos_y)
+    WinMove(pos_x, pos_y, , , "ahk_id " . g.Hwnd)
+    try FileAppend("[" . A_Now . "] center: mon work=" . work_w . "x" . work_h . " win=" . win_w . "x" . win_h . " pos=(" . pos_x . "," . pos_y . ")`r`n", log, "UTF-8")
 
     ; Spin up WebView2 inside the Gui's HWND. dataDir is unique per
     ; launch so cached state from a previous open never bleeds in.
