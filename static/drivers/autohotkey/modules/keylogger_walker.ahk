@@ -786,13 +786,16 @@ KLW_WalkTypingEntry(entry) {
                         "keycode", Integer(kc), "count", 0)
                 KLW.batch["kc_ngram"][kk]["count"] += 1
             }
-            sc := KLW_GetMap(meta, "sc", "")
-            if (sc != "" && IsNumber(sc)) {
-                sk := app_day_key . Chr(1) . String(sc)
-                if !KLW.batch["sc_kb_ngram"].Has(sk)
-                    KLW.batch["sc_kb_ngram"][sk] := Map("date", date_str, "app", app,
-                        "scancode", Integer(sc), "count", 0)
-                KLW.batch["sc_kb_ngram"][sk]["count"] += 1
+            ; ``sk`` is the hardware scancode (set by the AHK input hook).
+            ; The walker's ``sc`` meta slot is already taken by shortcut keys,
+            ; so we use a distinct identifier here.
+            sk_code := KLW_GetMap(meta, "sk", "")
+            if (sk_code != "" && IsNumber(sk_code)) {
+                skey := app_day_key . Chr(1) . String(sk_code)
+                if !KLW.batch["sc_kb_ngram"].Has(skey)
+                    KLW.batch["sc_kb_ngram"][skey] := Map("date", date_str, "app", app,
+                        "scancode", Integer(sk_code), "count", 0)
+                KLW.batch["sc_kb_ngram"][skey]["count"] += 1
             }
         }
     }
