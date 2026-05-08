@@ -892,6 +892,7 @@
 				// window._prefetch_data on the first paint, so we can't rely on
 				// it for the live merge — we keep our own copy here instead.
 				let cached_historical = null;
+				let manifest_seeded = false;
 				// Apply a prefetch blob (initial fetch or live push) onto the
 				// global state and re-render.
 				function apply_prefetch(blob) {
@@ -914,7 +915,13 @@
 						};
 						window._prefetch_data = merged;
 					}
-					if (typeof window.process_manifest === "function") {
+					// First apply seeds the dashboard (process_manifest does the
+					// initial reset, sets up filters, and triggers request_range_data
+					// — which synchronously paints the loader spinner). Subsequent
+					// live pushes go directly to receive_range_data so the spinner
+					// doesn't clobber the rendered tables every 200 ms.
+					if (!manifest_seeded && typeof window.process_manifest === "function") {
+						manifest_seeded = true;
 						window.process_manifest();
 					}
 					if (merged && typeof window.receive_range_data === "function") {

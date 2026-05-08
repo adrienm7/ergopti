@@ -163,10 +163,14 @@ KL_Hook_OnChar(ih, c) {
     ; streaks and writes it to ngram_keycodes; ``sc`` is the hardware
     ; scancode used by the Windows heatmap.
     meta := Map()
-    if (KLHook.last_vk > 0)
-        meta["kc"] := KLHook.last_vk
-    if (KLHook.last_sc > 0)
-        meta["sc"] := KLHook.last_sc
+    try {
+        if (KLHook.last_vk > 0)
+            meta["kc"] := KLHook.last_vk
+        ; ``sk`` (scan-key) — hardware scancode. Distinct from ``sc``
+        ; which the walker reserves for "shortcut key" identifiers.
+        if (KLHook.last_sc > 0)
+            meta["sk"] := KLHook.last_sc
+    }
 
     Keylogger.buffer_events.Push([c, delay, meta])
     Keylogger.buffer_text .= c
@@ -175,9 +179,14 @@ KL_Hook_OnChar(ih, c) {
 KL_Hook_OnKeyDown(ih, vk, sc) {
     ; Always stash (vk, sc) for the next OnChar callback — printable
     ; characters reach OnChar after this fires, and we need the sc to
-    ; populate the heatmap.
-    KLHook.last_vk := vk
-    KLHook.last_sc := sc
+    ; populate the heatmap. Wrap defensively: an uncaught error inside
+    ; an InputHook callback silently disables the hook.
+    try {
+        if IsNumber(vk)
+            KLHook.last_vk := vk
+        if IsNumber(sc)
+            KLHook.last_sc := sc
+    }
     ; Special keys only — printable chars are handled by OnChar above.
     if !KLHOOK_SPECIAL.Has(vk)
         return
@@ -196,7 +205,7 @@ KL_Hook_OnKeyDown(ih, vk, sc) {
     KLHook.last_tick := now
 
     bracket := KLHOOK_SPECIAL[vk]
-    meta := Map("kc", vk, "sc", sc)
+    meta := Map("kc", vk, "sk", sc)
 
     Keylogger.buffer_events.Push([bracket, delay, meta])
 
