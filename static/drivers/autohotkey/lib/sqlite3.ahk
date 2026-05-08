@@ -92,8 +92,12 @@ SQLite_Open(path, flags := 0) {
     if (flags = 0)
         flags := SQLiteConst.OPEN_RW | SQLiteConst.OPEN_CRT
     pdb := 0
+    ; Encode the path inline (Buffer lifetime tied to this scope).
+    n := StrPut(path, "UTF-8")
+    p_buf := Buffer(n, 0)
+    StrPut(path, p_buf, "UTF-8")
     rc := DllCall(SQLiteConst.DLL . "\sqlite3_open_v2",
-        "AStr", path,           ; UTF-8 path; AHK auto-marshals AStr
+        "Ptr",  p_buf.Ptr,
         "Ptr*", &pdb,
         "Int",  flags,
         "Ptr",  0,
@@ -103,9 +107,6 @@ SQLite_Open(path, flags := 0) {
             DllCall(SQLiteConst.DLL . "\sqlite3_close_v2", "Ptr", pdb)
         return 0
     }
-    ; query_only at the connection level — the dashboard pipeline never
-    ; mutates the cache it builds.
-    SQLite_Exec(pdb, "PRAGMA query_only = 0;")
     return pdb
 }
 
@@ -135,19 +136,21 @@ SQLite_LastError(db) {
 SQLite_Exec(db, sql) {
     if !db
         return false
-    SQLite_StrToUtf8(sql, &buf)
-    err_ptr := 0
+    ; Encode UTF-8 manually and keep the Buffer alive in this scope so
+    ; the DllCall's Ptr stays valid for the entire call. The previous
+    ; helper-via-VarRef indirection produced an access violation on
+    ; winsqlite3 — likely because the helper's Buffer reference was
+    ; collected between DllCall arg marshalling and the actual call.
+    n := StrPut(sql, "UTF-8")
+    sql_buf := Buffer(n, 0)
+    StrPut(sql, sql_buf, "UTF-8")
     rc := DllCall(SQLiteConst.DLL . "\sqlite3_exec",
         "Ptr", db,
-        "Ptr", buf.Ptr,
-        "Ptr", 0,
-        "Ptr", 0,
-        "Ptr*", &err_ptr,
+        "Ptr", sql_buf.Ptr,
+        "Ptr", 0,        ; callback
+        "Ptr", 0,        ; user-data
+        "Ptr", 0,        ; errmsg outparam — we don't need it
         "Int")
-    if (err_ptr) {
-        ; Free the SQLite-allocated error message buffer.
-        try DllCall(SQLiteConst.DLL . "\sqlite3_free", "Ptr", err_ptr)
-    }
     return (rc = SQLiteConst.OK)
 }
 
@@ -166,11 +169,13 @@ SQLite_Query(db, sql) {
     out := []
     if !db
         return out
-    SQLite_StrToUtf8(sql, &buf)
+    n := StrPut(sql, "UTF-8")
+    sql_buf := Buffer(n, 0)
+    StrPut(sql, sql_buf, "UTF-8")
     pstmt := 0
     rc := DllCall(SQLiteConst.DLL . "\sqlite3_prepare_v2",
         "Ptr", db,
-        "Ptr", buf.Ptr,
+        "Ptr", sql_buf.Ptr,
         "Int", -1,
         "Ptr*", &pstmt,
         "Ptr", 0,
