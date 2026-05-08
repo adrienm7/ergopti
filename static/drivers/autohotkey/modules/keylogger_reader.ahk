@@ -94,11 +94,26 @@ KLR_BuildDatabase(metrics_dir) {
     log := _ConfigDir . "logs\prefetch.log"
     try FileAppend("[" . A_Now . "] KLR PtrSize=" . A_PtrSize . " DLL=" . SQLiteConst.DLL . "`r`n", log, "UTF-8")
     try FileAppend("[" . A_Now . "] KLR DLL exists=" . (FileExist(SQLiteConst.DLL) ? "yes" : "NO!") . "`r`n", log, "UTF-8")
-    ; Pre-flight: probe libversion BEFORE opening anything. If the DLL
-    ; is loadable and properly built, this call has no side effects and
-    ; cannot fail. If it crashes the process, the DLL itself is wrong.
+    ; Explicit LoadLibrary so we know whether the DLL even maps into the
+    ; process. A nullptr from LoadLibrary means a dependency is missing
+    ; or the binary is malformed. AHK's DllCall hits LoadLibrary too,
+    ; but it does so silently and a load failure on some hosts comes
+    ; back as a hard process crash rather than an exception.
+    hmod := DllCall("kernel32\LoadLibraryW", "WStr", SQLiteConst.DLL, "Ptr")
+    try FileAppend("[" . A_Now . "] LoadLibrary returned hmod=" . hmod . "`r`n", log, "UTF-8")
+    if !hmod {
+        gle := DllCall("kernel32\GetLastError", "UInt")
+        try FileAppend("[" . A_Now . "] LoadLibrary FAILED, GetLastError=" . gle . "`r`n", log, "UTF-8")
+        return 0
+    }
+    proc := DllCall("kernel32\GetProcAddress", "Ptr", hmod, "AStr", "sqlite3_libversion", "Ptr")
+    try FileAppend("[" . A_Now . "] GetProcAddress(libversion)=" . proc . "`r`n", log, "UTF-8")
+    if !proc {
+        try FileAppend("[" . A_Now . "] symbol not found — wrong DLL?`r`n", log, "UTF-8")
+        return 0
+    }
     try {
-        ver_ptr := DllCall(SQLiteConst.DLL . "\sqlite3_libversion", "Ptr")
+        ver_ptr := DllCall(proc, "Ptr")
         ver := ver_ptr ? StrGet(ver_ptr, "UTF-8") : "(null)"
         FileAppend("[" . A_Now . "] pre-open libversion=" . ver . "`r`n", log, "UTF-8")
     } catch as err {
