@@ -176,10 +176,12 @@ AppPicker_BuildRows(initial) {
     ; no Array.Sort built-in for objects, so we delegate to a small
     ; insertion-sort that's plenty fast for the dozen-ish entries we
     ; typically deal with.
+    ; AHK v2: `<` on strings tries a numeric coerce and throws when the
+    ; operands are non-numeric. Use StrCompare() instead.
     Loop others.Length {
         i := A_Index
         j := i
-        while (j > 1 && StrLower(others[j].display) < StrLower(others[j - 1].display)) {
+        while (j > 1 && StrCompare(others[j].display, others[j - 1].display, false) < 0) {
             tmp := others[j]
             others[j] := others[j - 1]
             others[j - 1] := tmp
