@@ -164,7 +164,18 @@ KLUI_LaunchWindow(url, title) {
         . " --user-data-dir=" . '"' . udir . '"'
         . " --window-size=1400,900"
         . " --allow-file-access-from-files"
-        . " --disable-features=msEdgeTrackingPrevention"
+        ; Suppress Edge sync entirely so the isolated profile does NOT
+        ; pull in the user's account extensions, themes, bookmarks, or
+        ; "installed by sync" notification tabs. The dashboard is a
+        ; chromeless single-page view; nothing it does benefits from
+        ; sync, and the auto-installed extensions polluted the launch
+        ; with a second window full of unwanted tabs.
+        . " --disable-sync"
+        . " --disable-extensions"
+        . " --no-first-run"
+        . " --no-default-browser-check"
+        . " --disable-default-apps"
+        . " --disable-features=msEdgeTrackingPrevention,EdgeSync,MicrosoftEdgeAccountSignedIn"
     pid := 0
     try Run('"' . edge . '" ' . args, , , &pid)
     catch as err {
