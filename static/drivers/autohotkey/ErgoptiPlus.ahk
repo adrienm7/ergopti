@@ -864,10 +864,16 @@ ToggleMetricsEnabled() {
         return
     }
 
-    ; Enabling — explicit warning, OK is the dangerous action.
+    ; Enabling — explicit warning, OK is the dangerous action. The metrics
+    ; folder lives under the user-resolved _ConfigDir (paths.toml override
+    ; honoured) so the displayed path matches reality, even when the user
+    ; has relocated their config.
+    global _ConfigDir
+    metrics_path := _ConfigDir . "metrics"
     warn := "ATTENTION : Vous êtes sur le point d'activer le keylogger.`n`n"
         .  "Il enregistre vos frappes au clavier à la milliseconde près. "
-        .  "Ces logs sont stockés en local sous %USERPROFILE%\.ergopti_plus\metrics.`n`n"
+        .  "Ces logs sont stockés en local sous :`n"
+        .  "    " . metrics_path . "`n`n"
         .  "Bien que les champs de mots de passe soient ignorés automatiquement "
         .  "(filtre UIA), il est recommandé de mettre le script en PAUSE lors "
         .  "de la saisie de données sensibles.`n`n"
@@ -1455,7 +1461,9 @@ UpdateTrayIcon()
 ; the user has explicitly opted in. A fresh install starts OFF — this is
 ; a keylogger; the privacy default must be the safe one.
 if MetricsShortcuts.enabled {
-    KL_Init(EnvGet("USERPROFILE") . "\.ergopti_plus\metrics")
+    ; Use the resolved config dir (paths.toml override honoured) so the
+    ; metrics folder follows the user's relocated config when applicable.
+    KL_Init(_ConfigDir . "metrics")
     MS_ApplyAll(KLUI_ToggleTyping, KLUI_ToggleApps)
 }
 
