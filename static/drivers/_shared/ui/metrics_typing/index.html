@@ -888,7 +888,11 @@
 		-->
 		<script>
 			(function () {
-				if (window.metrics_manifest) return;
+				// state.js initialises window.metrics_manifest to {} so a plain
+				// truthy check would always bail. The HS path injects a non-
+				// empty manifest before this script runs, so an empty {} means
+				// we still need to fetch.
+				if (window.metrics_manifest && Object.keys(window.metrics_manifest).length) return;
 				fetch("./prefetch.json")
 					.then((r) => (r.ok ? r.json() : null))
 					.then((blob) => {
