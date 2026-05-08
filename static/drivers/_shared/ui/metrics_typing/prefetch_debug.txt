@@ -46,3 +46,63 @@ agg_app_day row count = 6
 OK: blob projected (4 top-level keys)
 OK: JSON encoded, len=514044
 OK: wrote D:\Documents\GitHub\ergopti\static\drivers\autohotkey\..\_shared\ui\metrics_typing\prefetch.json
+=== 20260508135841 — which=typing md=D:\Documents\GitHub\config\ergopti_plus\metrics
+OK: db opened, schema + data.sql loaded
+agg_app_day row count = 6
+OK: blob projected (4 top-level keys)
+OK: JSON encoded, len=619903
+OK: wrote D:\Documents\GitHub\ergopti\static\drivers\autohotkey\..\_shared\ui\metrics_typing\prefetch.json
+=== 20260508135921 — which=typing md=D:\Documents\GitHub\config\ergopti_plus\metrics
+OK: db opened, schema + data.sql loaded
+agg_app_day row count = 6
+OK: blob projected (4 top-level keys)
+OK: JSON encoded, len=621132
+OK: wrote D:\Documents\GitHub\ergopti\static\drivers\autohotkey\..\_shared\ui\metrics_typing\prefetch.json
+=== 20260508135926 — which=typing md=D:\Documents\GitHub\config\ergopti_plus\metrics
+OK: db opened, schema + data.sql loaded
+agg_app_day row count = 6
+OK: blob projected (4 top-level keys)
+OK: JSON encoded, len=633315
+OK: wrote D:\Documents\GitHub\ergopti\static\drivers\autohotkey\..\_shared\ui\metrics_typing\prefetch.json
+=== 20260508135931 — which=typing md=D:\Documents\GitHub\config\ergopti_plus\metrics
+OK: db opened, schema + data.sql loaded
+agg_app_day row count = 6
+OK: blob projected (4 top-level keys)
+OK: JSON encoded, len=638759
+OK: wrote D:\Documents\GitHub\ergopti\static\drivers\autohotkey\..\_shared\ui\metrics_typing\prefetch.json
+=== 20260508135936 — which=typing md=D:\Documents\GitHub\config\ergopti_plus\metrics
+OK: db opened, schema + data.sql loaded
+agg_app_day row count = 6
+OK: blob projected (4 top-level keys)
+OK: JSON encoded, len=646140
+OK: wrote D:\Documents\GitHub\ergopti\static\drivers\autohotkey\..\_shared\ui\metrics_typing\prefetch.json
+=== 20260508140006 — which=typing md=D:\Documents\GitHub\config\ergopti_plus\metrics
+OK: db opened, schema + data.sql loaded
+agg_app_day row count = 6
+OK: blob projected (4 top-level keys)
+OK: JSON encoded, len=646359
+OK: wrote D:\Documents\GitHub\ergopti\static\drivers\autohotkey\..\_shared\ui\metrics_typing\prefetch.json
+=== 20260508140026 — which=typing md=D:\Documents\GitHub\config\ergopti_plus\metrics
+OK: db opened, schema + data.sql loaded
+agg_app_day row count = 6
+OK: blob projected (4 top-level keys)
+OK: JSON encoded, len=653801
+OK: wrote D:\Documents\GitHub\ergopti\static\drivers\autohotkey\..\_shared\ui\metrics_typing\prefetch.json
+=== 20260508140031 — which=typing md=D:\Documents\GitHub\config\ergopti_plus\metrics
+OK: db opened, schema + data.sql loaded
+agg_app_day row count = 6
+OK: blob projected (4 top-level keys)
+OK: JSON encoded, len=660523
+OK: wrote D:\Documents\GitHub\ergopti\static\drivers\autohotkey\..\_shared\ui\metrics_typing\prefetch.json
+=== 20260508140037 — which=typing md=D:\Documents\GitHub\config\ergopti_plus\metrics
+OK: db opened, schema + data.sql loaded
+agg_app_day row count = 6
+OK: blob projected (4 top-level keys)
+OK: JSON encoded, len=660666
+OK: wrote D:\Documents\GitHub\ergopti\static\drivers\autohotkey\..\_shared\ui\metrics_typing\prefetch.json
+=== 20260508140047 — which=typing md=D:\Documents\GitHub\config\ergopti_plus\metrics
+OK: db opened, schema + data.sql loaded
+agg_app_day row count = 6
+OK: blob projected (4 top-level keys)
+OK: JSON encoded, len=661172
+OK: wrote D:\Documents\GitHub\ergopti\static\drivers\autohotkey\..\_shared\ui\metrics_typing\prefetch.json
