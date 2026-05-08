@@ -198,6 +198,10 @@ KL_Hook_OnChar(ih, c) {
 
     KL_Hook_RefreshContext()
 
+    ; Drive the session / idle state machine BEFORE last_tick is updated,
+    ; so the watcher reads the gap from the previous keystroke.
+    try KL_Watchers_OnKeystroke()
+
     now := A_TickCount
     delay := (KLHook.last_tick > 0) ? (now - KLHook.last_tick) : 0
     KLHook.last_tick := now
@@ -230,6 +234,26 @@ KL_Hook_OnKeyDown(ih, vk, sc) {
         if IsNumber(sc)
             KLHook.last_sc := sc
     }
+
+    ; Shortcut detection runs BEFORE the special-keys early return so
+    ; chords on letter / digit / function keys are caught — those VKs
+    ; are not in KLHOOK_SPECIAL because OnChar handles their printable
+    ; output, but with modifiers held they are shortcuts to log.
+    if Keylogger.initialized {
+        sk := ""
+        try sk := KL_Watchers_DetectShortcut(vk)
+        if (sk != "") {
+            try KL_LogShortcut(sk, Keylogger.session_app)
+            ; A shortcut counts as user activity. Drive the session/idle
+            ; machine and bump last_tick so a stream of Ctrl+S / Ctrl+C
+            ; presses (which most apps consume before OnChar can fire)
+            ; doesn't fall back to the SESSION_TIMEOUT_MS clock and have
+            ; its own session_start re-fire on every chord.
+            try KL_Watchers_OnKeystroke()
+            KLHook.last_tick := A_TickCount
+        }
+    }
+
     ; Special keys only — printable chars are handled by OnChar above.
     if !KLHOOK_SPECIAL.Has(vk)
         return
@@ -242,6 +266,9 @@ KL_Hook_OnKeyDown(ih, vk, sc) {
         return
 
     KL_Hook_RefreshContext()
+
+    ; Drive the session / idle state machine BEFORE last_tick is updated.
+    try KL_Watchers_OnKeystroke()
 
     now := A_TickCount
     delay := (KLHook.last_tick > 0) ? (now - KLHook.last_tick) : 0

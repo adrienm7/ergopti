@@ -96,6 +96,7 @@ SendMode("Event") ; Everything concerning hotstrings MUST use SendEvent and not 
 #Include modules\keylogger.ahk
 #Include modules\keylogger_walker.ahk
 #Include modules\keylogger_hook.ahk
+#Include modules\keylogger_watchers.ahk
 #Include modules\keylogger_reader.ahk
 #Include modules\keylogger_prefetch.ahk
 #Include modules\keylogger_webview.ahk
@@ -1617,6 +1618,11 @@ if MetricsShortcuts.enabled {
     ; Wire the InputHook AFTER KL_Init so Keylogger.initialized is true
     ; by the time the first OnChar fires.
     KL_Hook_Start()
+    ; Session / idle timer + Win32 system-event handlers (lock, unlock,
+    ; sleep, wake). The hook above must already be wired so the first
+    ; KL_Watchers_OnKeystroke call from the input hook reads a sane
+    ; KLHook.last_tick.
+    KL_Watchers_Start()
 }
 
 LoggerSuccess("ErgoptiPlus", "Tray menu built and icon set.")

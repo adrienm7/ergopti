@@ -1262,6 +1262,9 @@ KL_Stop() {
     ; Release the keystroke hook FIRST so no late event lands in a
     ; buffer we are about to flush + serialise.
     try KL_Hook_Stop()
+    ; Drain idle / session state and unhook OnMessage handlers so the
+    ; JSONL never ends with a dangling session_start / idle_start.
+    try KL_Watchers_Stop()
     if Keylogger.HasProp("_ingest_timer")
         SetTimer(Keylogger._ingest_timer, 0)
     if Keylogger.HasProp("_midnight_timer")
