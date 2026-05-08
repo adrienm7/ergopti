@@ -925,7 +925,9 @@ KL_BuildInserts(entry) {
         case "system_event":        return [KL_BuildInsertSystem(entry, id)]
         case "hotstring":           return [KL_BuildInsertHotstring(entry, id, "fired")]
         case "hotstring_suggested": return [KL_BuildInsertHotstring(entry, id, "suggested")]
-        case "hotstring_dismissed": return [KL_BuildInsertHotstring(entry, id, "dismissed")]
+        case "hotstring_dismissed":          return [KL_BuildInsertHotstring(entry, id, "dismissed")]
+        case "hotstring_near_miss":
+        case "manual_typed_known_trigger":   return [KL_BuildInsertHotstring(entry, id, t)]
         case "session_start":       return [KL_BuildInsertSession(entry, id, "session_start")]
         case "session_end":         return [KL_BuildInsertSession(entry, id, "session_end")]
         case "idle_start":          return [KL_BuildInsertSession(entry, id, "idle_start")]

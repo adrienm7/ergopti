@@ -33,6 +33,12 @@
 ; each entry is { Trigger, Output, Category, Section, Length }.
 global _PrefixIndex := Map()
 
+; Flat set of all known trigger strings (lower-cased) → entry object.
+; Used by the near-miss detector in _ResetPrefixBuffer so it can check
+; exact trigger equality and Levenshtein-1 neighbours without re-walking
+; the prefix tree.
+global _TriggerSet := Map()
+
 ; Live keystroke buffer with original casing preserved — the index now holds
 ; one entry per case variant (``ct`` / ``Ct`` / ``CT`` for non-strict
 ; triggers, exactly mirroring CreateCaseSensitiveHotstrings), so the lookup
@@ -371,6 +377,8 @@ _AddTriggerToIndex(Trigger, Output, Category, Section) {
         _PrefixIndex[Prefix] := []
     }
     _PrefixIndex[Prefix].Push(Entry)
+    ; Register exact trigger in the flat set for near-miss lookups
+    _TriggerSet[StrLower(Trigger)] := Entry
 }
 
 
@@ -540,14 +548,97 @@ _OnPrefixKeyDown(IH, VK, SC) {
 ; terminator, mouse click, navigation key, prefix lost) leaves the default
 ; in place so the tooltip's disappearance is properly logged.
 _ResetPrefixBuffer(ConsumedByFire := false) {
-    global _PrefixBuffer
+    global _PrefixBuffer, _TriggerSet
+    Buf := _PrefixBuffer
     _PrefixBuffer := ""
     TooltipHide()
     if ConsumedByFire {
         _NotifySuggestionConsumed()
     } else {
         _NotifySuggestionDismissed()
+        ; Near-miss and manual-trigger detection on non-fire resets.
+        ; Only worth checking when the buffer has meaningful length.
+        if (StrLen(Buf) >= 2)
+            try _CheckNearMiss(Buf)
     }
+}
+
+; Checks whether the typed buffer (at word boundary) is a known trigger
+; typed manually (manual_typed_known_trigger) or within edit distance 1
+; of a known trigger (hotstring_near_miss).
+_CheckNearMiss(Buf) {
+    global _TriggerSet
+    key := StrLower(Buf)
+    ; Exact match → user typed a known trigger without using the expansion
+    if _TriggerSet.Has(key) {
+        Entry := _TriggerSet[key]
+        try KL_LogHotstringNearMiss("manual_typed_known_trigger",
+            Entry.Trigger, Entry.Output, Entry.Category)
+        return
+    }
+    ; Edit-distance-1 check — scan triggers of same length ± 1
+    BufLen := StrLen(Buf)
+    for trig, Entry in _TriggerSet {
+        tLen := StrLen(trig)
+        if (Abs(tLen - BufLen) > 1)
+            continue
+        if (_EditDistance1(key, trig)) {
+            try KL_LogHotstringNearMiss("hotstring_near_miss",
+                Entry.Trigger, Entry.Output, Entry.Category)
+            ; Only report the first near-miss per reset to avoid spam
+            return
+        }
+    }
+}
+
+; Returns true when the Levenshtein distance between a and b is exactly 1.
+; Only evaluates strings whose lengths differ by at most 1 (pre-filtered).
+_EditDistance1(a, b) {
+    la := StrLen(a)
+    lb := StrLen(b)
+    if (la = lb) {
+        ; Same length — must be exactly one substitution
+        diffs := 0
+        loop la {
+            if (SubStr(a, A_Index, 1) != SubStr(b, A_Index, 1))
+                diffs += 1
+            if (diffs > 1)
+                return false
+        }
+        return diffs = 1
+    }
+    ; Length differs by 1 — one insertion or deletion
+    longer  := (la > lb) ? a : b
+    shorter := (la > lb) ? b : a
+    llong   := (la > lb) ? la : lb
+    lshort  := (la > lb) ? lb : la
+    i := 1
+    j := 1
+    skipped := false
+    while (i <= llong and j <= lshort) {
+        if (SubStr(longer, i, 1) != SubStr(shorter, j, 1)) {
+            if skipped
+                return false
+            skipped := true
+            i += 1
+        } else {
+            i += 1
+            j += 1
+        }
+    }
+    return true
+}
+
+KL_LogHotstringNearMiss(kind, trigger, replacement, h_type) {
+    if !Keylogger.initialized
+        return
+    KL_AppendLog(Map(
+        "type",        kind,
+        "app",         Keylogger.session_app,
+        "trigger",     trigger,
+        "replacement", replacement,
+        "h_type",      h_type
+    ))
 }
 
 ; Look up the current buffer in the prefix index and update the tooltip.
