@@ -1208,7 +1208,11 @@ PY
 
 			if download_window then
 				-- terminal_cmd points to the live log so the "Terminal" button shows real Python output
-				pcall(download_window.show, target_model, do_cancel, "tail -f " .. _log_path, ui_sizes, {
+				pcall(download_window.show, {
+					kind = "mlx_model",
+					model = target_model,
+					terminal_cmd = "tail -f " .. _log_path,
+					on_cancel = do_cancel,
 					on_resolve = do_resolve_gated,
 					on_retry = do_retry,
 				})
@@ -1547,7 +1551,11 @@ PY
 
 		-- Open (or re-focus) the download window
 		if download_window then
-			pcall(download_window.show, model, do_cancel_reattached, "tail -f " .. log_path, nil, {
+			pcall(download_window.show, {
+				kind = "mlx_model",
+				model = model,
+				terminal_cmd = "tail -f " .. log_path,
+				on_cancel = do_cancel_reattached,
 				on_retry = function()
 					do_cancel_reattached(true)
 					hs.timer.doAfter(0.05, function()

@@ -42,8 +42,7 @@ global HotstringGroupConfig := Map()
 ; module level so AHK does not recompile this ~100-char pattern for every line
 ; scanned by LoadHotstringsSection (thousands of iterations at boot).
 global _HOTSTRING_ENTRY_PATTERN :=
-	'i)^"([^"\\]*(?:\\.[^"\\]*)*)"\s*=\s*\{\s*output\s*=\s*"([^"\\]*(?:\\.[^"\\]*)*)"\s*,\s*is_word\s*=\s*(true|false)\s*,\s*auto_expand\s*=\s*(true|false)\s*,\s*is_case_sensitive\s*=\s*(true|false)\s*,\s*final_result\s*=\s*(true|false)(?:\s*,\s*is_case_sensitive_strict\s*=\s*(true|false))?\s*\}'
-
+    'i)^"([^"\\]*(?:\\.[^"\\]*)*)"\s*=\s*\{\s*output\s*=\s*"([^"\\]*(?:\\.[^"\\]*)*)"\s*,\s*is_word\s*=\s*(true|false)\s*,\s*auto_expand\s*=\s*(true|false)\s*,\s*is_case_sensitive\s*=\s*(true|false)\s*,\s*final_result\s*=\s*(true|false)(?:\s*,\s*is_case_sensitive_strict\s*=\s*(true|false))?\s*\}'
 
 ; ========================================================
 ; ========================================================
@@ -125,8 +124,8 @@ LoadHotstringsSection(CategoryName, SectionName, FeatureConfig, ExtraOptions := 
     ; ``personal`` is deliberately excluded: it can live outside the repo.
     LoaderKey := StrLower(CategoryName) . "." . StrLower(SectionName)
     if (IsSet(_GENERATED_HOTSTRINGS)
-            and StrLower(CategoryName) != "personal"
-            and _GENERATED_HOTSTRINGS.Has(LoaderKey)) {
+    and StrLower(CategoryName) != "personal"
+    and _GENERATED_HOTSTRINGS.Has(LoaderKey)) {
         try LoggerTrace("TomlLoader", "Using generated loader for [{1}.{2}].",
             CategoryName, SectionName)
         GeneratedFn := _GENERATED_HOTSTRINGS[LoaderKey]
@@ -137,8 +136,8 @@ LoadHotstringsSection(CategoryName, SectionName, FeatureConfig, ExtraOptions := 
     ; For the personal category, honour the user-configured path so the file can
     ; live outside the Ergopti repository (e.g. in a private config folder).
     if (StrLower(CategoryName) == "personal"
-            and IsSet(ScriptInformation)
-            and ScriptInformation.Has("PersonalTomlPath")) {
+    and IsSet(ScriptInformation)
+    and ScriptInformation.Has("PersonalTomlPath")) {
         FilePath := ScriptInformation["PersonalTomlPath"]
     } else {
         FilePath := A_ScriptDir . "\..\hotstrings\" . CategoryName . ".toml"
@@ -328,8 +327,8 @@ BootstrapPersonalFeatures() {
 ApplyTomlMetadataToFeatures(CategoryName) {
     global ScriptInformation
     if (StrLower(CategoryName) == "personal"
-            and IsSet(ScriptInformation)
-            and ScriptInformation.Has("PersonalTomlPath")) {
+    and IsSet(ScriptInformation)
+    and ScriptInformation.Has("PersonalTomlPath")) {
         FilePath := ScriptInformation["PersonalTomlPath"]
     } else {
         FilePath := A_ScriptDir . "\..\hotstrings\" . StrLower(CategoryName) . ".toml"
@@ -437,8 +436,6 @@ ApplyTomlMetadataToFeatures(CategoryName) {
 ;   [_meta.sections.<name>]       delay = <number>     color = "<hex>"
 ;                                 description = "<...>"
 ;
-; The legacy flat ``[_meta.sections]`` form (``key = "description"`` only) is
-; left untouched here — ApplyTomlMetadataToFeatures already consumes it.
 ParseTomlGroupConfig(CategoryName) {
     global ScriptInformation, HotstringGroupConfig
     LowerCat := StrLower(CategoryName)
@@ -447,8 +444,8 @@ ParseTomlGroupConfig(CategoryName) {
     }
 
     if (LowerCat == "personal"
-            and IsSet(ScriptInformation)
-            and ScriptInformation.Has("PersonalTomlPath")) {
+        and IsSet(ScriptInformation)
+        and ScriptInformation.Has("PersonalTomlPath")) {
         FilePath := ScriptInformation["PersonalTomlPath"]
     } else {
         FilePath := A_ScriptDir . "\..\hotstrings\" . LowerCat . ".toml"
@@ -523,8 +520,8 @@ ParseTomlGroupConfig(CategoryName) {
 CountTomlSection(CategoryName, SectionName) {
     global ScriptInformation
     if (StrLower(CategoryName) == "personal"
-            and IsSet(ScriptInformation)
-            and ScriptInformation.Has("PersonalTomlPath")) {
+    and IsSet(ScriptInformation)
+    and ScriptInformation.Has("PersonalTomlPath")) {
         FilePath := ScriptInformation["PersonalTomlPath"]
     } else {
         FilePath := A_ScriptDir . "\..\hotstrings\" . StrLower(CategoryName) . ".toml"
@@ -562,8 +559,8 @@ CountTomlSection(CategoryName, SectionName) {
 CountTomlHotstrings(CategoryName) {
     global ScriptInformation
     if (StrLower(CategoryName) == "personal"
-            and IsSet(ScriptInformation)
-            and ScriptInformation.Has("PersonalTomlPath")) {
+    and IsSet(ScriptInformation)
+    and ScriptInformation.Has("PersonalTomlPath")) {
         FilePath := ScriptInformation["PersonalTomlPath"]
     } else {
         FilePath := A_ScriptDir . "\..\hotstrings\" . StrLower(CategoryName) . ".toml"
@@ -582,9 +579,6 @@ CountTomlHotstrings(CategoryName) {
     }
     return Count
 }
-
-
-
 
 ; ==========================================
 ; ==========================================
@@ -614,7 +608,7 @@ TomlCoerceValue(Raw) {
     }
     Q := Chr(34)
     if (StrLen(Trimmed) >= 2 and SubStr(Trimmed, 1, 1) == Q
-            and SubStr(Trimmed, StrLen(Trimmed), 1) == Q) {
+    and SubStr(Trimmed, StrLen(Trimmed), 1) == Q) {
         return UnescapeTomlString(SubStr(Trimmed, 2, StrLen(Trimmed) - 2))
     }
     return Trimmed
