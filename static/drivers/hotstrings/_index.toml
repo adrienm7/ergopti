@@ -1,7 +1,13 @@
 # static/drivers/hotstrings/_index.toml
 
+# static/drivers/hotstrings/_index.toml
+
 # ==============================================================================
-# MODULE: Hotstrings Index
+# ==============================================================================
+# ===================== MODULE: Hotstrings Index =====================
+# ==============================================================================
+# ==============================================================================
+
 # DESCRIPTION:
 # Central manifest consumed by both the AutoHotkey and Hammerspoon drivers.
 # Defines category ordering and module-section metadata that both drivers read
@@ -11,7 +17,8 @@
 # [menu]            — display ordering for the driver menus
 # [modules] — per-group sections that map to built-in modules
 #                     (e.g. personal_info inside the magickey group)
-# ==============================================================================
+
+
 
 
 # ===========================
@@ -27,11 +34,13 @@
 categories_order = ["distancesreduction", "sfbsreduction", "rolls", "autocorrection", "magickey"]
 
 
-# =========================================
-# =========================================
+
+
+# ====================================================
+# ====================================================
 # ======= 2/ Built-in Module Sections =======
-# =========================================
-# =========================================
+# ====================================================
+# ====================================================
 
 # Sections inside a TOML group that are handled by a built-in module rather
 # than by static hotstrings.  Both drivers inject the appropriate UI widget
