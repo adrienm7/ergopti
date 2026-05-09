@@ -378,8 +378,6 @@ do
 			end
 			if type(data.modules) == "table" then
 				module_sections = data.modules
-			elseif type(data.module_sections) == "table" then
-				module_sections = data.module_sections
 			end
 		end
 	end
