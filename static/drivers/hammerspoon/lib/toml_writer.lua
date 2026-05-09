@@ -4,12 +4,50 @@
 --- MODULE: TOML Writer
 --- DESCRIPTION:
 --- Serializes a hotstrings data structure back to the TOML format used by
---- the application.
+--- the application. After writing, automatically calls the centralized Python
+--- formatter (format_toml.py) to ensure consistent styling and organization
+--- across all TOML files (sorts sections/keys, adds headers, etc.).
 --- ==============================================================================
 
 local M = {}
 local Logger = require("lib.logger")
 local LOG    = "toml_writer"
+
+
+-- ===================================
+-- ===================================
+-- ======= 0/ Python Formatter =======
+-- ===================================
+-- ===================================
+
+-- Locate the format_toml.py script at repo root/tools/
+local function get_format_script_path()
+	local _src = debug.getinfo(1, "S").source:sub(2)
+	local _script_dir = _src:match("^(.*[/\\])")
+	-- Walk up from static/drivers/hammerspoon/lib/ to repo root
+	local _repo_root = _script_dir
+		:gsub("static[/\\]drivers[/\\].*$", "")
+		:gsub("[/\\]$", "")
+	return _repo_root .. "/tools/format_toml.py"
+end
+
+--- Reformat a TOML file using the centralized Python formatter.
+--- Ensures consistent headers, sorted sections/keys across all TOML files.
+--- Called automatically after M.write() to guarantee consistent formatting.
+local function format_toml_via_python(path)
+	if type(path) ~= "string" or path == "" then return end
+	
+	local script_path = get_format_script_path()
+	local cmd = string.format("python3 '%s' '%s' 2>&1", script_path, path)
+	
+	local ok, output = pcall(os.execute, cmd)
+	if not ok then
+		Logger.warn(LOG, "Python formatter call failed: %s", tostring(output))
+		return
+	end
+	
+	Logger.trace(LOG, "Reformatted TOML: %s", path)
+end
 
 
 
@@ -99,13 +137,7 @@ function M.write(path, data)
 	local L = {}
 	local function w(line) table.insert(L, line) end
 
-    -- File header
-	w("# personal_hotstrings.toml — Personal hotstrings")
-	w("# Auto-managed by the personal hotstrings editor.")
-	w("# Do not edit manually unless you know what you are doing.")
-	w("")
-
-    -- [_meta]
+	-- [_meta]
 	w("[_meta]")
 	w(string.format("description = \"%s\"", esc(meta_desc)))
 
@@ -120,9 +152,8 @@ function M.write(path, data)
 	else
 		w("sections_order = []")
 	end
-	w("")
 
-    -- [_meta.sections]
+	-- [_meta.sections]
 	local has_sections = false
 	for _, name in ipairs(order) do
 		if name ~= "-" and type(sections[name]) == "table" then 
@@ -139,10 +170,9 @@ function M.write(path, data)
 				w(string.format("%s = \"%s\"", name, esc(desc)))
 			end
 		end
-		w("")
 	end
 
-    -- [[section]] blocks
+	-- [[section]] blocks
 	for _, name in ipairs(order) do
 		if name ~= "-" and type(sections[name]) == "table" then
 			local sec = sections[name]
@@ -150,7 +180,6 @@ function M.write(path, data)
 			
 			if type(sec.entries) == "table" then
 				for _, e in ipairs(sec.entries) do
-                    -- Ensure required fields are valid strings before formatting
 					if type(e) == "table" and type(e.trigger) == "string" and type(e.output) == "string" then
 						w(string.format(
 							"\"%s\" = { output = \"%s\", is_word = %s, auto_expand = %s, is_case_sensitive = %s, final_result = %s }",
@@ -164,7 +193,6 @@ function M.write(path, data)
 					end
 				end
 			end
-			w("")
 		end
 	end
 
@@ -186,8 +214,10 @@ function M.write(path, data)
 		return false, "Erreur lors de l’écriture : " .. tostring(write_err)
 	end
 	
-	Logger.info(LOG, "TOML configuration saved successfully.")
-	return true
+	Logger.info(LOG, "TOML configuration saved successfully.")	
+	-- Reformat using centralized Python script for consistent styling
+	format_toml_via_python(path)
+		return true
 end
 
 return M
