@@ -376,7 +376,9 @@ do
 			if type(menu) == "table" and type(menu.categories_order) == "table" then
 				ordered_names = menu.categories_order
 			end
-			if type(data.module_sections) == "table" then
+			if type(data.modules) == "table" then
+				module_sections = data.modules
+			elseif type(data.module_sections) == "table" then
 				module_sections = data.module_sections
 			end
 		end

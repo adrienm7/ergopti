@@ -80,6 +80,21 @@ end
 --- other.
 local encode_value, encode_table
 
+--- Ensures exactly `count` blank lines immediately before the next emitted line.
+local function ensure_blank_lines(out, count)
+	if count < 0 then count = 0 end
+	local trailing = 0
+	for i = #out, 1, -1 do
+		if out[i] == "" then trailing = trailing + 1
+		else break end
+	end
+	if trailing > count then
+		for _ = 1, (trailing - count) do out[#out] = nil end
+	elseif trailing < count then
+		for _ = 1, (count - trailing) do out[#out + 1] = "" end
+	end
+end
+
 encode_value = function(v)
 	local t = type(v)
 	if t == "string"  then return encode_string(v) end
@@ -113,7 +128,7 @@ end
 --- @param tbl table   The table to encode at this level.
 --- @param path string The dotted-section path; "" for the root.
 --- @param out  table  Mutable list of lines being built.
-encode_table = function(tbl, path, out)
+encode_table = function(tbl, path, out, depth)
 	-- Partition keys into scalars (and array values) vs sub-maps.
 	local scalars, submaps = {}, {}
 	for k, v in pairs(tbl) do
@@ -132,21 +147,19 @@ encode_table = function(tbl, path, out)
 	-- scalars: a present-but-empty section preserves the "this map
 	-- exists, just empty" semantic of the source state.
 	if path ~= "" and (#scalars > 0 or #submaps == 0) then
-		-- Blank line before a top-level section header for readability
-		if #out > 0 and out[#out] ~= "" then
-			out[#out + 1] = ""
-		end
+		local header_spacing = (depth == 1) and 5 or 3
+		ensure_blank_lines(out, header_spacing)
 		out[#out + 1] = "[" .. path .. "]"
 	end
 	for _, k in ipairs(scalars) do
 		out[#out + 1] = encode_key(k) .. " = " .. encode_value(tbl[k])
 	end
 	if #scalars > 0 then
-		out[#out + 1] = ""
+		ensure_blank_lines(out, 1)
 	end
 	for _, k in ipairs(submaps) do
 		local subpath = (path == "") and encode_key(k) or (path .. "." .. encode_key(k))
-		encode_table(tbl[k], subpath, out)
+		encode_table(tbl[k], subpath, out, depth + 1)
 	end
 end
 
@@ -160,7 +173,7 @@ function M.encode(tbl)
 		"# preserved across saves provided the file remains valid TOML.",
 		"",
 	}
-	encode_table(tbl, "", out)
+	encode_table(tbl, "", out, 0)
 	return table.concat(out, "\n")
 end
 
