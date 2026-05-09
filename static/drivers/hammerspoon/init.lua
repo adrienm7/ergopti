@@ -71,6 +71,28 @@ local keymap             = require("modules.keymap")
 _G.keymap = keymap
 local shortcuts          = require("modules.shortcuts")
 local dynamic_hotstrings = require("modules.dynamic_hotstrings")
+
+-- ===================================
+-- ===================================
+-- ======= 2/ Path Resolution =======
+-- ===================================
+-- ===================================
+
+-- Initialize the paths module EARLY (before karabiner/keylogger modules load)
+-- so they can access the user-configured config_dir instead of using fallbacks
+local script_path = debug.getinfo(1, "S").source
+if script_path:sub(1, 1) == "@" then script_path = script_path:sub(2) end
+
+local base_dir = script_path:match("^(.*[/\\])") or "./"
+if not base_dir:match("[/\\]$") then base_dir = base_dir .. "/" end
+
+menu_paths.init(base_dir, function() hs.timer.doAfter(0.25, function() pcall(hs.reload) end) end)
+
+-- Re-point the logger to <config_dir>/logs/ErgoptiPlus_YYYY-MM-DD.log now that
+-- the user config dir is known. Earlier boot lines went to the fallback file.
+Logger.init_log_path(menu_paths.get_config_dir(), 14)
+
+-- Now safe to load modules that depend on config_dir
 local karabiner          = require("modules.karabiner")
 local menu               = require("ui.menu")
 local hotstring_editor   = require("ui.hotstring_editor")
@@ -151,27 +173,11 @@ end
 
 
 
-
--- ==================================
--- ==================================
--- ======= 2/ Path Resolution =======
--- ==================================
--- ==================================
-
-local script_path = debug.getinfo(1, "S").source
-if script_path:sub(1, 1) == "@" then script_path = script_path:sub(2) end
-
-local base_dir = script_path:match("^(.*[/\\])") or "./"
-if not base_dir:match("[/\\]$") then base_dir = base_dir .. "/" end
-
--- Initialize the paths module early so every subsequent path lookup goes
--- through it — the user may have relocated files via the paths editor.
-menu_paths.init(base_dir, function() hs.timer.doAfter(0.25, function() pcall(hs.reload) end) end)
-
--- Re-point the logger to <config_dir>/logs/ErgoptiPlus_YYYY-MM-DD.log now that
--- the user config dir is known. Earlier boot lines went to the fallback file.
-local Logger = require("lib.logger")
-Logger.init_log_path(menu_paths.get_config_dir(), 14)
+-- =======================================
+-- =======================================
+-- ======= 3/ Config Loading & Setup =======
+-- =======================================
+-- =======================================
 
 -- Apply optional user overrides from hammerspoon/config.toml on top of
 -- hs.settings. The [script] and [features] sections are an optional "expert"
