@@ -1,3 +1,10 @@
+
+
+
+
+
+
+
 # ====================
 # ====================
 # ======= Meta =======
@@ -9,6 +16,7 @@ color = "#e53935"
 delay = 2.0
 description = "Touche ★ et expansion de texte"
 sections_order = ["replace", "repeat", "-", "textexpansion", "textexpansionauto", "textexpansionemojis", "textexpansionsymbols", "textexpansionsymbolstypst", "-", "textexpansionpersonalinformation"]
+
 
 # =========================
 # ===== Meta.Sections =====
@@ -23,6 +31,7 @@ textexpansionemojis = "Expansion de texte Emojis : voiture★ = 🚗, koala★ =
 textexpansionpersonalinformation = "Remplissage de formulaires avec le suffixe @ : @np★ = Nom ⇥ Prénom, etc."
 textexpansionsymbols = "Expansion de texte Symboles : -->★ = ➜, (v)★ = ✓, …"
 textexpansionsymbolstypst = "Expansion de texte Symboles Typst : $eq.not$ = ≠, $PP$ = ℙ, $integral$ = ∫ …"
+
 
 
 
@@ -113,6 +122,7 @@ textexpansionsymbolstypst = "Expansion de texte Symboles Typst : $eq.not$ = ≠,
 "è★" = { output = "èè", is_word = false, auto_expand = true, is_case_sensitive = false, final_result = false }
 "é★" = { output = "éé", is_word = false, auto_expand = true, is_case_sensitive = false, final_result = false }
 "ê★" = { output = "êê", is_word = false, auto_expand = true, is_case_sensitive = false, final_result = false }
+
 
 
 
@@ -656,6 +666,7 @@ textexpansionsymbolstypst = "Expansion de texte Symboles Typst : $eq.not$ = ≠,
 
 
 
+
 # =================================
 # =================================
 # ======= Textexpansionauto =======
@@ -665,6 +676,7 @@ textexpansionsymbolstypst = "Expansion de texte Symboles Typst : $eq.not$ = ≠,
 [[textexpansionauto]]
 "ju'" = { output = "jusqu’", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
 "ya" = { output = "y’a", is_word = true, auto_expand = false, is_case_sensitive = false, final_result = false }
+
 
 
 
@@ -949,6 +961,7 @@ textexpansionsymbolstypst = "Expansion de texte Symboles Typst : $eq.not$ = ≠,
 
 
 
+
 # ====================================
 # ====================================
 # ======= Textexpansionsymbols =======
@@ -1099,6 +1112,7 @@ textexpansionsymbolstypst = "Expansion de texte Symboles Typst : $eq.not$ = ≠,
 "|^★" = { output = "↓", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
 "°C★" = { output = "℃", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
 "ème★" = { output = "ᵉ", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false }
+
 
 
 

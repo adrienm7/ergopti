@@ -1,3 +1,10 @@
+
+
+
+
+
+
+
 # ====================
 # ====================
 # ======= Meta =======
@@ -9,6 +16,7 @@ color = "#fb8c00"
 delay = 0.5
 description = "Réduction des distances"
 sections_order = ["qu", "suffixesa", "-", "commaj", "commafarletters", "-", "deadkeyecircumflex", "ecircumflexe", "-", "spacearoundsymbols"]
+
 
 # =========================
 # ===== Meta.Sections =====
@@ -25,6 +33,7 @@ suffixesa = "À + lettre donne un suffixe : às = ement, àn = ation, àh = ight
 
 
 
+
 # ===============================
 # ===============================
 # ======= Commafarletters =======
@@ -37,6 +46,7 @@ suffixesa = "À + lettre donne un suffixe : às = ement, àn = ation, àh = ight
 ",x" = { output = "où ", is_word = false, auto_expand = true, is_case_sensitive = false, final_result = false }
 ",y" = { output = "k", is_word = false, auto_expand = true, is_case_sensitive = false, final_result = false }
 ",è" = { output = "z", is_word = false, auto_expand = true, is_case_sensitive = false, final_result = false }
+
 
 
 
@@ -56,6 +66,7 @@ suffixesa = "À + lettre donne un suffixe : às = ement, àn = ation, àh = ight
 ",à" = { output = "j", is_word = false, auto_expand = true, is_case_sensitive = false, final_result = false }
 ",é" = { output = "jé", is_word = false, auto_expand = true, is_case_sensitive = false, final_result = false }
 ",ê" = { output = "ju", is_word = false, auto_expand = true, is_case_sensitive = false, final_result = false }
+
 
 
 
@@ -145,6 +156,7 @@ suffixesa = "À + lettre donne un suffixe : às = ement, àn = ation, àh = ight
 
 
 
+
 # ============================
 # ============================
 # ======= Ecircumflexe =======
@@ -153,6 +165,7 @@ suffixesa = "À + lettre donne un suffixe : às = ement, àn = ation, àh = ight
 
 [[ecircumflexe]]
 "êe" = { output = "œ", is_word = false, auto_expand = true, is_case_sensitive = false, final_result = false }
+
 
 
 
@@ -173,6 +186,7 @@ suffixesa = "À + lettre donne un suffixe : às = ement, àn = ation, àh = ight
 "qé" = { output = "qué", is_word = false, auto_expand = true, is_case_sensitive = false, final_result = false }
 "qê" = { output = "quê", is_word = false, auto_expand = true, is_case_sensitive = false, final_result = false }
 "q’" = { output = "qu’", is_word = false, auto_expand = true, is_case_sensitive = false, final_result = false }
+
 
 
 
