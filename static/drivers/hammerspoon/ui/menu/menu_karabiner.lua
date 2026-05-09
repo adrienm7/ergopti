@@ -631,7 +631,7 @@ function M.build(ctx)
 		fn    = function() karabiner.open_gui() end,
 	}
 	submenu[#submenu + 1] = {
-		title    = "▶  Démarrer Karabiner",
+		title    = "▶ Démarrer Karabiner",
 		-- Force a fresh prime even if the session marker already exists.
 		-- Useful when the daemon was killed manually or by macOS.
 		disabled = bridge_live,
@@ -688,7 +688,7 @@ function M.build(ctx)
 	-- Management actions: clear-all first (destructive reset), then restore defaults,
 	-- then the tap→combo propagation helper.
 	submenu[#submenu + 1] = {
-		title = "🧹  Tout vider (tap/hold et raccourcis)",
+		title = "🧹 Tout vider (tap/hold et raccourcis)",
 		fn    = function()
 			Logger.start(LOG, "Clearing every tap/hold and combo slot…")
 			local cleared = 0
