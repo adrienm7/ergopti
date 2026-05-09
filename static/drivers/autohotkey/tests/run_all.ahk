@@ -39,16 +39,16 @@ SetWorkingDir(A_ScriptDir)
 
 ; ── Production lib files in dependency order ──
 #Include ../lib/logger.ahk
-#Include ../lib/ini_helpers.ahk
+#Include ../lib/toml/toml_helpers.ahk
 #Include ../lib/active_app_cache.ahk
-#Include ../lib/hotstring_engine.ahk
-#Include ../lib/hotstring_engine_v2.ahk
-#Include ../lib/toml_loader.ahk
-#Include ../lib/hotstrings_config.ahk
-#Include ../lib/personal_toml_editor.ahk
+#Include ../lib/hotstrings/hotstring_engine.ahk
+#Include ../lib/hotstrings/hotstring_engine_v2.ahk
+#Include ../lib/toml/toml_loader.ahk
+#Include ../lib/hotstrings/hotstrings_config.ahk
+#Include ../lib/hotstrings/personal_toml_editor.ahk
 #Include ../lib/dispatchers.ahk
-#Include ../lib/layout_altgr.ahk
-#Include ../lib/layout_shift_caps.ahk
+#Include ../lib/layout/layout_altgr.ahk
+#Include ../lib/layout/layout_shift_caps.ahk
 
 ; Install the hotstring hooks for the entire test process so neither real
 ; ``Hotstring()`` registrations nor real ``SendEvent`` keystrokes ever escape
