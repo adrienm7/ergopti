@@ -36,9 +36,7 @@ def create_header_line(equals_count: int) -> str:
     return "# " + "=" * equals_count
 
 
-def create_section_header(
-    section_name: str, is_subsection: bool = False
-) -> list:
+def create_section_header(section_name: str, is_subsection: bool = False) -> list:
     """Create a styled section header as a list of lines (header only, no spacing)."""
     # Strip leading/trailing whitespace from section_name FIRST to avoid double spaces
     section_name = section_name.strip()
@@ -162,11 +160,18 @@ def rebuild_toml_from_structure(structure: dict) -> str:
         is_subsection = depth > 1
 
         # Add blank lines before header (not the first section)
+        # We already have 1 blank after previous section, so we add:
+        # - 4 more blanks for h2 (total 5)
+        # - 2 more blanks for h3 (total 3)
         if not is_first:
             if is_subsection:
-                lines.append("")  # 1 blank before h3
+                lines.extend(
+                    ["", ""]
+                )  # 2 blanks before h3 (total 3 with the one after)
             else:
-                lines.extend(["", "", ""])  # 3 blanks before h2
+                lines.extend(
+                    ["", "", "", ""]
+                )  # 4 blanks before h2 (total 5 with the one after)
 
         display_name = section_key.replace("_", " ").title()
         header_lines = create_section_header(display_name, is_subsection)
@@ -234,11 +239,18 @@ def dict_to_toml(data: dict) -> str:
         is_subsection = depth > 1
 
         # Add blank lines before header (not the first section)
+        # We already have 1 blank after previous section, so we add:
+        # - 4 more blanks for h2 (total 5)
+        # - 2 more blanks for h3 (total 3)
         if not is_first:
             if is_subsection:
-                lines.append("")  # 1 blank before h3
+                lines.extend(
+                    ["", ""]
+                )  # 2 blanks before h3 (total 3 with the one after)
             else:
-                lines.extend(["", "", ""])  # 3 blanks before h2
+                lines.extend(
+                    ["", "", "", ""]
+                )  # 4 blanks before h2 (total 5 with the one after)
 
         display_name = section_key.replace("_", " ").title()
         header_lines = create_section_header(display_name, is_subsection)
