@@ -396,8 +396,10 @@ end
 --- the Karabiner-Elements config directory.
 --- Only the complex_modifications section is replaced; all other KE settings
 --- (devices, fn_function_keys, simple_modifications, global flags) are preserved.
---- Karabiner-Elements is fully stopped before the file is replaced and relaunched
---- afterwards, guaranteeing our deploy is never overwritten by a live KE process.
+---
+--- Always uses KILL_FAST_CMD (plain pkill, no sleep loops) to clear any stale
+--- bridge before writing, then re-primes via polling. This avoids a race where
+--- the shutdown async script kills the bridge after bridge_alive was sampled.
 function M.regenerate()
 	if not require_state("regenerate") then return end
 	Logger.start(LOG, "Regenerating Karabiner config…")
@@ -414,13 +416,12 @@ function M.regenerate()
 	local merged   = Generator.merge_into_existing_config(result, KARABINER_OUT)
 	local json_str = hs.json.encode(merged, true)
 
-	-- Stop the user-level KE bridge before writing so session_monitor cannot
-	-- rewrite karabiner.json from its cached state and silently revert our changes.
-	-- KILL_FAST_CMD is used here (not the full KILL_CMD) to keep regenerate fast:
-	-- a plain pkill is enough since we immediately re-prime after the deploy.
-	Logger.trace(LOG, "Stopping KE user agents before deploy…")
+	-- Kill the bridge before writing so no live daemon can overwrite our deploy.
+	-- KILL_FAST_CMD is a plain pkill with no sleep loops, so it takes ~50 ms.
+	-- prime_ke_for_session restarts the daemon immediately after.
+	Logger.trace(LOG, "Stopping KE bridge before deploy…")
 	pcall(function() hs.execute(KeLifecycle.KILL_FAST_CMD) end)
-	Logger.done(LOG, "KE user agents stopped.")
+	Logger.done(LOG, "KE bridge stopped.")
 
 	local ok_copy, cp_detail = Generator.deploy_string(json_str, KARABINER_OUT)
 	if not ok_copy then
@@ -447,14 +448,23 @@ function M.regenerate()
 		"Karabiner config regenerated: %d combo(s) + %d tap/hold key(s) deployed.",
 		active_combos, #M.TAP_HOLD_KEYS)
 
-	-- KE v15+ requires a live user-level bridge process (Menu or GUI) to push
-	-- karabiner.json into Core-Service. regenerate() stops user-level agents
-	-- before deploy, so we must re-prime after every successful regeneration.
+	-- Re-prime so Core-Service receives the newly written rules.
+	-- prime_ke_for_session polls until the daemon appears (up to 9.0 s total).
+	-- On rare slow boots we do one forced retry to avoid requiring manual start.
 	KeLifecycle.prime_ke_for_session(function(ok)
 		if ok then
-			Logger.success(LOG, "Karabiner bridge re-primed after regeneration.")
+			Logger.success(LOG, "Karabiner bridge primed after regeneration.")
 		else
-			Logger.error(LOG, "Karabiner bridge re-prime failed after regeneration.")
+			Logger.warn(LOG, "Karabiner bridge prime failed after regeneration — retrying once…")
+			hs.timer.doAfter(1.0, function()
+				KeLifecycle.prime_ke_for_session(function(ok_retry)
+					if ok_retry then
+						Logger.success(LOG, "Karabiner bridge primed after regeneration retry.")
+					else
+						Logger.error(LOG, "Karabiner bridge prime failed after regeneration retry.")
+					end
+				end, true)
+			end)
 		end
 	end)
 end

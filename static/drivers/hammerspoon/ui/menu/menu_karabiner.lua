@@ -563,10 +563,11 @@ function M.build(ctx)
 	-- bridge unprimed" (fixable via click) from "remapping not applied because
 	-- KE is not installed / daemon down" (user must install/check KE itself).
 	local grabber_only = KeLifecycle.is_grabber_running()
-	-- Transient state during the ~2 s prime cycle. Without this we would
-	-- render the alarming yellow "règles non appliquées" while a normal
-	-- prime is just running its course.
-	local priming      = KeLifecycle.is_priming()
+	-- Transient state during the ~2 s prime cycle. Only meaningful when the
+	-- bridge is not yet alive; if the bridge is already running the priming
+	-- cycle is a no-op and the icon should stay green.
+	local bridge_live  = KeLifecycle.is_bridge_running()
+	local priming      = KeLifecycle.is_priming() and not bridge_live
 	local action_index = build_action_index(karabiner)
 	local tap_hold     = build_tap_hold_items(karabiner, action_index, update_menu, enabled)
 	local raccourcis   = build_raccourcis_items(karabiner, action_index, update_menu, enabled)
@@ -627,8 +628,36 @@ function M.build(ctx)
 	}
 	submenu[#submenu + 1] = {
 		title = "Ouvrir Karabiner-Elements",
-		-- Stop the startup suppressor first, then open — avoids the watcher killing the app
 		fn    = function() karabiner.open_gui() end,
+	}
+	submenu[#submenu + 1] = {
+		title    = "▶  Démarrer Karabiner",
+		-- Force a fresh prime even if the session marker already exists.
+		-- Useful when the daemon was killed manually or by macOS.
+		disabled = bridge_live,
+		fn       = function()
+			Logger.start(LOG, "User requested KE bridge start…")
+			KeLifecycle.prime_ke_for_session(function(ok)
+				Logger.info(LOG, "Manual start: ok=%s.", tostring(ok))
+				if update_menu then hs.timer.doAfter(0.5, update_menu) end
+			end, true)
+		end,
+	}
+	submenu[#submenu + 1] = {
+		title    = "✕ Quitter Karabiner",
+		-- Grayed when bridge is not running — nothing to stop.
+		disabled = not bridge_live,
+		fn       = function()
+			Logger.start(LOG, "User requested KE bridge stop…")
+			local ok_l, kl = pcall(require, "modules.karabiner.ke_lifecycle")
+			if ok_l and kl and type(kl.run_total_reset_async) == "function" then
+				local out, ok = kl.run_total_reset_async()
+				Logger.info(LOG, "KE stop async: ok=%s out=%s.", tostring(ok), tostring(out))
+			else
+				pcall(function() hs.execute(KARABINER_KILL_CMD) end)
+			end
+			if update_menu then hs.timer.doAfter(2.5, update_menu) end
+		end,
 	}
 
 	-- Warning: integration disabled in our config but KE process is still live.
@@ -652,6 +681,9 @@ function M.build(ctx)
 			disabled = true,
 		}
 	end
+
+	-- Separator between process-control items and configuration-reset items.
+	submenu[#submenu + 1] = { title = "-" }
 
 	-- Management actions: clear-all first (destructive reset), then restore defaults,
 	-- then the tap→combo propagation helper.
