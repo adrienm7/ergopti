@@ -50,15 +50,16 @@ def create_section_header(
 
     title_line = f"# {equals_str} {section_name} {equals_str}"
 
-    # Before h2: 6 blank lines (7 with join newline = 7 total visible blank lines)
-    # Before h3: 0 blank lines (1 with join newline = 1 visible blank line)
-    blanks = 0 if is_subsection else 6
+    # Before h2: 2 blank lines (= 3 visible blank lines)
+    # Before h3: 0 blank lines (= 1 visible blank line after merge)
+    # After each title: 1 blank line
+    blanks = 0 if is_subsection else 2
     blank_lines = "\n" * blanks if (not is_first and blanks > 0) else ""
 
     if is_subsection:
-        return f"{blank_lines}{header_footer}\n{title_line}\n{header_footer}"
+        return f"{blank_lines}{header_footer}\n{title_line}\n{header_footer}\n"
     else:
-        return f"{blank_lines}{header_footer}\n{header_footer}\n{title_line}\n{header_footer}\n{header_footer}"
+        return f"{blank_lines}{header_footer}\n{header_footer}\n{title_line}\n{header_footer}\n{header_footer}\n"
 
 
 def parse_toml_structure(content: str) -> dict:
