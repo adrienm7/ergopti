@@ -11,6 +11,7 @@ description = "Réduction des distances"
 sections_order = ["qu", "suffixesa", "-", "commaj", "commafarletters", "-", "deadkeyecircumflex", "ecircumflexe", "-", "spacearoundsymbols"]
 
 
+
 # =========================
 # ===== Meta.Sections =====
 # =========================
@@ -23,6 +24,7 @@ ecircumflexe = "Ê suivi de E donne Œ"
 qu = "Q devient QU quand elle est suivie d’une voyelle : qa = qua, qo = quo, …"
 spacearoundsymbols = "Ajouter un espace avant et après les symboles obtenus par rolls ainsi qu’après la touche [où]"
 suffixesa = "À + lettre donne un suffixe : às = ement, àn = ation, àh = ight, …"
+
 
 
 
@@ -43,6 +45,7 @@ suffixesa = "À + lettre donne un suffixe : às = ement, àn = ation, àh = ight
 
 
 
+
 # ======================
 # ======================
 # ======= Commaj =======
@@ -59,6 +62,7 @@ suffixesa = "À + lettre donne un suffixe : às = ement, àn = ation, àh = ight
 ",à" = { output = "j", is_word = false, auto_expand = true, is_case_sensitive = false, final_result = false }
 ",é" = { output = "jé", is_word = false, auto_expand = true, is_case_sensitive = false, final_result = false }
 ",ê" = { output = "ju", is_word = false, auto_expand = true, is_case_sensitive = false, final_result = false }
+
 
 
 
@@ -150,6 +154,7 @@ suffixesa = "À + lettre donne un suffixe : às = ement, àn = ation, àh = ight
 
 
 
+
 # ============================
 # ============================
 # ======= Ecircumflexe =======
@@ -158,6 +163,7 @@ suffixesa = "À + lettre donne un suffixe : às = ement, àn = ation, àh = ight
 
 [[ecircumflexe]]
 "êe" = { output = "œ", is_word = false, auto_expand = true, is_case_sensitive = false, final_result = false }
+
 
 
 
@@ -179,6 +185,7 @@ suffixesa = "À + lettre donne un suffixe : às = ement, àn = ation, àh = ight
 "qé" = { output = "qué", is_word = false, auto_expand = true, is_case_sensitive = false, final_result = false }
 "qê" = { output = "quê", is_word = false, auto_expand = true, is_case_sensitive = false, final_result = false }
 "q’" = { output = "qu’", is_word = false, auto_expand = true, is_case_sensitive = false, final_result = false }
+
 
 
 
