@@ -722,7 +722,23 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 			-- the source of truth for gestures / script-control bindings.
 			open_paths                = function() hs.timer.doAfter(0.05, function() pcall(MenuPaths.open_editor) end) end,
 			reload                    = function() do_reload("menu") end,
-			quit                      = function() hs.timer.doAfter(0.1, function() os.exit(0) end) end,
+			quit                      = function()
+				hs.timer.doAfter(0.05, function()
+					-- Keep quit responsive: launch cleanup in background and exit.
+					pcall(function()
+						local ok_k, k = pcall(require, "modules.karabiner")
+						local ok_l, kl = pcall(require, "modules.karabiner.ke_lifecycle")
+						local ke_enabled = ok_k and k and type(k.get_enabled) == "function" and k.get_enabled() or false
+						local _, has_user_ke = hs.execute("/usr/bin/pgrep -x karabiner_console_user_server >/dev/null 2>&1 || /usr/bin/pgrep -x karabiner_session_monitor >/dev/null 2>&1 || /usr/bin/pgrep -x Karabiner-NotificationWindow >/dev/null 2>&1")
+						if (ke_enabled or has_user_ke == true) and ok_l and kl and type(kl.run_total_reset_async) == "function" then
+							local out, ok = kl.run_total_reset_async()
+							Logger.info(LOG, "Quit cleanup KE total reset async: ok=%s out=%s.", tostring(ok), tostring(out))
+						end
+					end)
+					pcall(function() require("ui.menu.menu_llm").stop_mlx_server() end)
+					os.exit(0)
+				end)
+			end,
 			open_logs                 = function()
 				local dir = logs_dir()
 				pcall(hs.execute, string.format("mkdir -p %q && open %q", dir, dir))

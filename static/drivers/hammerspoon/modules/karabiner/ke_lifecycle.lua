@@ -63,75 +63,162 @@ local KE_GRABBER_CHECK = "/usr/bin/pgrep -fq 'org.pqrs/Karabiner-Elements'"
 -- that pqrs ships gets booted out.
 local KARABINER_KILL_CMD =
 	"UID=$(/usr/bin/id -u)"
-	.. "; for label in $(/bin/launchctl list 2>/dev/null"
+	.. "; for pass in 1 2 3; do"
+	.. "   for label in $(/bin/launchctl list 2>/dev/null"
 	.. "                 | /usr/bin/awk '/[Kk]arabiner|pqrs/ {print $3}'); do"
-	.. "   /bin/launchctl bootout gui/$UID/$label 2>/dev/null; true;"
-	.. " done"
+	.. "     /bin/launchctl disable gui/$UID/$label 2>/dev/null; true;"
+	.. "     /bin/launchctl bootout gui/$UID/$label 2>/dev/null; true;"
+	.. "     /bin/launchctl disable user/$UID/$label 2>/dev/null; true;"
+	.. "     /bin/launchctl bootout user/$UID/$label 2>/dev/null; true;"
+	.. "   done"
 	.. "; /usr/bin/pkill -x Karabiner-Menu 2>/dev/null"
 	.. "; /usr/bin/pkill -x Karabiner-NotificationWindow 2>/dev/null"
+	.. "; /usr/bin/pkill -f 'Karabiner-Elements Non-Privileged Agents v2' 2>/dev/null"
 	.. "; /usr/bin/pkill -x Karabiner-Multitouch-Extension 2>/dev/null"
 	.. "; /usr/bin/pkill -x Karabiner-Elements 2>/dev/null"
 	.. "; /usr/bin/pkill -x Karabiner-EventViewer 2>/dev/null"
+	.. "; /usr/bin/pkill -x karabiner_console_user_server 2>/dev/null"
 	-- Legacy v14 helper names — no-op on v15 but kept for old installs.
 	.. "; /usr/bin/pkill -x karabiner_observer 2>/dev/null"
 	.. "; /usr/bin/pkill -x karabiner_session_monitor 2>/dev/null"
+	.. "; /bin/sleep 1"
+	.. "; done"
 	-- Clear the per-session prime marker so the next HS launch starts
 	-- with a clean slate and re-primes from scratch.
 	.. "; /bin/rm -f /tmp/ergopti_ke_primed_v2.txt 2>/dev/null"
+	.. "; /bin/rm -f /tmp/ergopti_ke_hs_owner_v1.txt 2>/dev/null"
 	.. "; true"
 
+-- Lightweight kill used only before a config deploy in regenerate().
+-- Stops the bridge processes immediately without bootout loops or sleeps;
+-- the prime step that follows the deploy will restart them in milliseconds.
+local KARABINER_KILL_FAST_CMD =
+	"/usr/bin/pkill -x karabiner_console_user_server 2>/dev/null; "
+	.. "/usr/bin/pkill -x karabiner_session_monitor 2>/dev/null; "
+	.. "/usr/bin/pkill -x Karabiner-Menu 2>/dev/null; "
+	.. "true"
+
+-- User-validated reset script: this exact flow was confirmed to stop
+-- user-level KE processes reliably on this machine.
+local KARABINER_KILL_TOTAL_SCRIPT = [[#!/bin/zsh
+UID=$(/usr/bin/id -u)
+for i in 1 2 3 4 5; do
+	for label in $(/bin/launchctl list 2>/dev/null | /usr/bin/awk '/[Kk]arabiner|pqrs/ {print $3}'); do
+		/bin/launchctl bootout "gui/$UID/$label" 2>/dev/null || true
+		/bin/launchctl bootout "user/$UID/$label" 2>/dev/null || true
+	done
+	/usr/bin/pkill -f "org.pqrs|karabiner|Karabiner" 2>/dev/null || true
+	/usr/bin/pkill -x Karabiner-Menu 2>/dev/null || true
+	/usr/bin/pkill -x Karabiner-NotificationWindow 2>/dev/null || true
+	/usr/bin/pkill -x Karabiner-Elements 2>/dev/null || true
+	/usr/bin/pkill -x Karabiner-EventViewer 2>/dev/null || true
+	/usr/bin/pkill -x Karabiner-Multitouch-Extension 2>/dev/null || true
+	/usr/bin/pkill -x karabiner_console_user_server 2>/dev/null || true
+	/usr/bin/pkill -x karabiner_session_monitor 2>/dev/null || true
+	/usr/bin/pkill -x karabiner_observer 2>/dev/null || true
+	/usr/bin/pkill -x karabiner_grabber 2>/dev/null || true
+	/bin/sleep 1
+done
+if /usr/bin/sudo -n true 2>/dev/null; then
+	for d in org.pqrs.service.daemon.Karabiner-Core-Service org.pqrs.service.daemon.Karabiner-VirtualHIDDevice-Daemon; do
+		/usr/bin/sudo /bin/launchctl bootout "system/$d" 2>/dev/null || true
+	done
+	/usr/bin/sudo /usr/bin/pkill -f "Karabiner-Core-Service|Karabiner-VirtualHIDDevice-Daemon|org.pqrs/Karabiner-Elements" 2>/dev/null || true
+fi
+/usr/bin/pkill -f "org.pqrs|karabiner|Karabiner" 2>/dev/null || true
+/bin/rm -f /tmp/ergopti_ke_primed_v2.txt /tmp/ergopti_ke_hs_owner_v1.txt 2>/dev/null || true
+exit 0
+]]
+
 --- Shell command to fully stop user-level KE agents — exposed for regenerate().
-M.KILL_CMD = KARABINER_KILL_CMD
+M.KILL_CMD      = KARABINER_KILL_CMD
+--- Fast kill (no sleep loops) used only during config deploy — exposed for regenerate().
+M.KILL_FAST_CMD = KARABINER_KILL_FAST_CMD
+
+local _last_async_reset_launch_ts = 0
+
+--- Writes the total reset script to a temporary file.
+--- @param script_path string Absolute path to the temporary script.
+--- @return boolean ok True when the script file has been written.
+local function write_total_reset_script(script_path)
+	local f = io.open(script_path, "w")
+	if not f then
+		return false
+	end
+	f:write(KARABINER_KILL_TOTAL_SCRIPT)
+	f:close()
+	hs.execute(string.format("/bin/chmod 700 %q", script_path))
+	return true
+end
+
+--- Runs the user-validated Karabiner total reset script via zsh.
+--- @return string output Combined stdout/stderr.
+--- @return boolean ok True when command exited with success.
+function M.run_total_reset()
+	local script_path = "/tmp/ergopti_ke_total_reset.sh"
+	if not write_total_reset_script(script_path) then
+		return "Unable to create reset script", false
+	end
+	local out, ok = hs.execute(string.format("/bin/zsh %q 2>&1", script_path))
+	hs.execute(string.format("/bin/rm -f %q", script_path))
+	return out or "", ok == true
+end
+
+--- Starts the total reset script in background and returns immediately.
+--- Consecutive calls within a short window are deduplicated.
+--- @return string output Launch status message.
+--- @return boolean ok True when background launch has been requested.
+function M.run_total_reset_async()
+	local now = os.time()
+	if (now - _last_async_reset_launch_ts) < 5 then
+		return "Skipped duplicate async launch", true
+	end
+	local script_path = string.format("/tmp/ergopti_ke_total_reset_async_%d.sh", now)
+	if not write_total_reset_script(script_path) then
+		return "Unable to create async reset script", false
+	end
+	local cmd = string.format("/usr/bin/nohup /bin/zsh %q >/tmp/ergopti_ke_total_reset_async.log 2>&1 </dev/null &", script_path)
+	local _, ok = hs.execute(cmd)
+	if ok == true then
+		_last_async_reset_launch_ts = now
+		return string.format("Async reset launched (%s)", script_path), true
+	end
+	hs.execute(string.format("/bin/rm -f %q", script_path))
+	return "Async reset launch failed", false
+end
+
 
 -- Per-session priming: launching Karabiner-Menu causes it to read
 -- karabiner.json and push the rules to Core-Service via IPC. Karabiner-Menu
 -- maintains the IPC link as long as it runs, so remapping stays alive
 -- across HS reloads.
 --
--- Why Karabiner-Menu and NOT Karabiner-Elements.app:
---   Karabiner-Menu has LSUIElement=true (menubar-only app, no main window,
---   no Dock icon, no Space affinity). Launching it cannot trigger a Space
---   switch and cannot show a window — both happen with the full GUI even
---   under `open -gj`. Karabiner-Menu also speaks the same IPC protocol as
---   the main GUI, so the rules get pushed without the user-visible cost.
---
--- Locating Karabiner-Menu.app: it ships inside the main bundle under
--- LoginItems on v15+, with a fallback path for older / custom installs.
--- Discovery is cached at module load.
-local KE_MENU_APP_PATH = (function()
-	local candidates = {
-		"/Applications/Karabiner-Elements.app/Contents/Library/LoginItems/Karabiner-Menu.app",
-		"/Library/Application Support/org.pqrs/Karabiner-Elements/Karabiner-Menu.app",
-	}
-	for _, p in ipairs(candidates) do
-		local f = io.open(p .. "/Contents/Info.plist", "r")
-		if f then f:close() return p end
-	end
-	return nil
-end)()
+-- Headless priming command validated on this setup: start the user-level
+-- Karabiner bridge daemon directly (no Dock icon, no app window, no Space switch).
+-- This process in turn starts session_monitor and notification agents as needed.
+local KE_PRIME_HEADLESS_CMD =
+	"/usr/bin/nohup '/Library/Application Support/org.pqrs/Karabiner-Elements/bin/karabiner_console_user_server'"
+	.. " >/tmp/ke_console_user_server.out 2>/tmp/ke_console_user_server.err </dev/null &"
 
--- Launch command, computed at module load. If Karabiner-Menu was found we
--- use it (silent, LSUIElement); otherwise we fall back to the main GUI
--- which has the visible-window + Space-switch downsides but at least
--- establishes the IPC bridge correctly. The latter is the legacy path
--- we keep for KE installs that lack the LoginItems bundle.
-local KE_PRIME_OPEN_CMD = (function()
-	if KE_MENU_APP_PATH then
-		return "/usr/bin/open -gj " .. string.format("%q", KE_MENU_APP_PATH)
-	end
-	return "/usr/bin/open -gj '/Applications/Karabiner-Elements.app'"
-end)()
+-- Best-effort suppression of Dock-visible KE helpers started by the bridge.
+-- Remapping stays active via console_user_server/session_monitor/Core-Service.
+local KE_SUPPRESS_DOCK_HELPERS_CMD =
+	"UID=$(/usr/bin/id -u)"
+	.. "; for label in $(/bin/launchctl list 2>/dev/null"
+	.. "                 | /usr/bin/awk '{print $3}'"
+	.. "                 | /usr/bin/grep -i karabiner"
+	.. "                 | /usr/bin/grep -iv 'console_user_server'"
+	.. "                 | /usr/bin/grep -iv 'session_monitor'"
+	.. "                 | /usr/bin/grep -iv 'Karabiner-Core-Service'); do"
+	.. "   /bin/launchctl bootout gui/$UID/$label 2>/dev/null; true;"
+	.. " done"
+	.. "; /usr/bin/pkill -x Karabiner-NotificationWindow 2>/dev/null"
+	.. "; /usr/bin/pkill -f 'Karabiner-Elements Non-Privileged Agents v2' 2>/dev/null"
+	.. "; /usr/bin/pkill -x Karabiner-Menu 2>/dev/null"
+	.. "; true"
 
--- True when the prime path uses Karabiner-Menu (silent). Used by the prime
--- cycle to skip the post-launch GUI cleanup that only matters in the
--- fallback main-GUI launch path.
-local KE_PRIME_USES_MENU = (KE_MENU_APP_PATH ~= nil)
-
--- pkill the main GUI process by exact name. Only used in the fallback
--- legacy path (when Karabiner-Menu.app is not found) to dismiss the main
--- window after the IPC push completes. -x matches only "Karabiner-Elements"
--- and never the system daemons or Karabiner-Menu.
-local KE_PRIME_KILL_GUI_CMD = "/usr/bin/pkill -x Karabiner-Elements 2>/dev/null"
+local DOCK_SUPPRESS_RETRY_COUNT = 6
+local DOCK_SUPPRESS_RETRY_INTERVAL_SEC = 0.6
 
 -- Set so macOS never restores prior window/Space state for KE. Without this,
 -- launching the GUI can drag focus to whichever Space last hosted a KE
@@ -145,10 +232,11 @@ local KE_PERSISTENCE_OFF_CMD =
 -- when the user already has the GUI open intentionally.
 local KE_GUI_CHECK_CMD = "/usr/bin/pgrep -fq '/Applications/Karabiner-Elements.app/Contents/MacOS/Karabiner-Elements'"
 
--- Time to wait between launching the GUI and quitting it. The GUI must
--- finish reading karabiner.json and pushing the rules over IPC before we
--- send Cmd+Q. Empirically ~2 s is enough on modern hardware.
-local KE_PRIME_DELAY_SEC = 2.0
+-- Polling constants for bridge-ready detection. Instead of waiting a fixed
+-- delay before checking, we poll every INTERVAL up to MAX_ATTEMPTS times
+-- so a fast daemon start resolves in ~300 ms instead of always waiting 2 s.
+local PRIME_POLL_INTERVAL_SEC = 0.3
+local PRIME_POLL_MAX_ATTEMPTS = 8   -- 2.4 s absolute maximum
 
 -- Per-boot-session marker so a single GUI prime serves all subsequent HS
 -- reloads in the same login session. The file content is the kernel boot
@@ -163,11 +251,16 @@ local KE_PRIME_DELAY_SEC = 2.0
 -- instead of inheriting a stale "already primed" claim.
 local PRIME_MARKER_PATH = "/tmp/ergopti_ke_primed_v2.txt"
 
+-- Marker written only when HS itself successfully bootstraps the KE bridge.
+-- Used to avoid killing a user-managed KE session on HS shutdown.
+local HS_OWNER_MARKER_PATH = "/tmp/ergopti_ke_hs_owner_v1.txt"
+
 -- Module-level flag set while a prime cycle is in flight. Exposed via
 -- M.is_priming() so the menu can render a transient "amorçage en cours"
 -- state instead of a misleading "rules not applied" yellow during the
 -- ~2 s prime delay.
 local _prime_in_progress = false
+local _hs_owned_runtime = false
 
 
 
@@ -184,18 +277,7 @@ local _prime_in_progress = false
 --- rather than a specific binary name (see KE_GRABBER_CHECK above).
 --- @return boolean
 function M.is_grabber_running()
-	-- Capture stderr in stdout so an unexpected pgrep failure (missing binary,
-	-- PATH issue, kernel-level oddity) is visible in the log instead of being
-	-- silently dropped. The exit code 1 from "no match" is normal and expected.
-	local out, ok, exit_type, rc = hs.execute(KE_GRABBER_CHECK .. " 2>&1")
-	-- Diagnostic: list every karabiner-related process so the log shows the
-	-- real KE state in case detection drifts again across versions. Does not
-	-- influence the return value — only the log line.
-	local list_out = hs.execute("/usr/bin/pgrep -fil karabiner 2>&1") or ""
-	Logger.debug(LOG,
-		"is_grabber_running: cmd=%q ok=%s type=%s rc=%s out=%q ; processes=%q.",
-		KE_GRABBER_CHECK, tostring(ok), tostring(exit_type), tostring(rc),
-		out or "", list_out:gsub("\n", " | "))
+	local _, ok = hs.execute(KE_GRABBER_CHECK .. " 2>/dev/null")
 	return ok == true
 end
 
@@ -280,6 +362,43 @@ local function mark_session_primed()
 	f:close()
 end
 
+--- Marks the bridge as spawned by Hammerspoon in the current boot session.
+local function mark_hs_owned_bridge()
+	_hs_owned_runtime = true
+	local boot_ts = get_boot_timestamp()
+	if not boot_ts then
+		Logger.warn(LOG, "mark_hs_owned_bridge: could not read boot timestamp — owner marker not written.")
+		return
+	end
+	local f = io.open(HS_OWNER_MARKER_PATH, "w")
+	if not f then
+		Logger.warn(LOG, "mark_hs_owned_bridge: could not write owner marker at '%s'.", HS_OWNER_MARKER_PATH)
+		return
+	end
+	f:write(boot_ts .. "\n")
+	f:write(tostring(os.time()) .. "\n")
+	f:close()
+end
+
+--- Clears the HS ownership marker.
+local function clear_hs_owned_bridge_marker()
+	_hs_owned_runtime = false
+	pcall(os.remove, HS_OWNER_MARKER_PATH)
+end
+
+--- True when the current KE bridge instance was spawned by HS in this boot session.
+--- @return boolean
+function M.is_hs_owned_bridge()
+	if _hs_owned_runtime then return true end
+	local boot_ts = get_boot_timestamp()
+	if not boot_ts then return false end
+	local f = io.open(HS_OWNER_MARKER_PATH, "r")
+	if not f then return false end
+	local saved_ts = f:read("*line")
+	f:close()
+	return saved_ts == boot_ts
+end
+
 --- True when any user-level KE process that maintains the IPC bridge is
 --- currently running — either the main Karabiner-Elements GUI (because the
 --- user opened it manually) or Karabiner-Menu (the silent menubar helper
@@ -287,10 +406,14 @@ end
 --- to Core-Service in this session.
 --- @return boolean
 local function is_ipc_bridge_running()
-	local _, gui_ok = hs.execute(KE_GUI_CHECK_CMD .. " 2>/dev/null")
-	if gui_ok == true then return true end
-	local _, menu_ok = hs.execute("/usr/bin/pgrep -x Karabiner-Menu 2>/dev/null")
-	return menu_ok == true
+	-- Single shell invocation: the shell short-circuits on the first matching
+	-- pgrep, avoiding up to three extra process-spawn round-trips.
+	local _, ok = hs.execute(
+		"/usr/bin/pgrep -qx karabiner_console_user_server 2>/dev/null"
+		.. " || /usr/bin/pgrep -qx karabiner_session_monitor 2>/dev/null"
+		.. " || /usr/bin/pgrep -qx Karabiner-Menu 2>/dev/null"
+	)
+	return ok == true
 end
 
 --- True while a prime cycle is in flight. Exposed so the menu can render a
@@ -332,17 +455,22 @@ end
 ---                          rules when the daemon has been restarted by macOS.
 function M.prime_ke_for_session(callback, force)
 	callback = callback or function() end
-	if not force and M.is_session_primed() then
-		Logger.debug(LOG, "KE bridge already primed for this boot session — skipping.")
+	local bridge_running = is_ipc_bridge_running()
+	if not force and M.is_session_primed() and bridge_running then
+		Logger.debug(LOG, "KE bridge already primed for this boot session and bridge is alive — skipping.")
 		callback(true)
 		return
 	end
 
-	if is_ipc_bridge_running() then
+	if bridge_running then
 		Logger.info(LOG, "KE IPC bridge already running (Menu or GUI) — recording marker.")
 		mark_session_primed()
 		callback(true)
 		return
+	end
+
+	if not force and M.is_session_primed() and not bridge_running then
+		Logger.warn(LOG, "Prime marker exists but bridge is not running — re-priming now.")
 	end
 
 	-- Disable window-state persistence so any GUI-fallback launch cannot
@@ -350,37 +478,55 @@ function M.prime_ke_for_session(callback, force)
 	-- Cheap (~5 ms), so we do it inline rather than once at module load.
 	hs.execute(KE_PERSISTENCE_OFF_CMD .. " 2>/dev/null")
 
-	if KE_PRIME_USES_MENU then
-		Logger.start(LOG, "Priming KE bridge (silent Karabiner-Menu launch)…")
-	else
-		Logger.start(LOG, "Priming KE bridge (legacy main-GUI fallback — visible window expected)…")
-	end
+	Logger.start(LOG, "Priming KE bridge (headless karabiner_console_user_server)…")
 	_prime_in_progress = true
+	-- Mark ownership immediately so a fast quit right after startup still knows
+	-- this bridge launch was initiated by Hammerspoon.
+	mark_hs_owned_bridge()
 
-	local _, open_ok = hs.execute(KE_PRIME_OPEN_CMD .. " 2>&1")
+	-- Start the user-level bridge daemon in background without opening the GUI app.
+	local _, open_ok = hs.execute(KE_PRIME_HEADLESS_CMD .. " 2>&1")
 	if open_ok ~= true then
-		Logger.error(LOG, "Failed to launch KE bridge for priming — config may not be applied.")
+		Logger.error(LOG, "Failed to start headless KE bridge daemon — config may not be applied.")
+		clear_hs_owned_bridge_marker()
 		_prime_in_progress = false
 		callback(false)
 		return
 	end
 
-	-- Wait long enough for the just-launched bridge process (Menu or full
-	-- GUI) to read karabiner.json and push the rules to Core-Service over
-	-- IPC. Empirically ~2 s is the floor on modern hardware.
-	hs.timer.doAfter(KE_PRIME_DELAY_SEC, function()
-		if not KE_PRIME_USES_MENU then
-			-- Fallback path only: pkill the visible main GUI now that the
-			-- IPC push is done. Karabiner-Menu, if it was auto-spawned by
-			-- the GUI launch, intentionally survives — it is what keeps
-			-- the bridge alive across HS reloads.
-			hs.execute(KE_PRIME_KILL_GUI_CMD)
+	-- Poll until the bridge process appears (or we exceed the deadline).
+	-- Polling avoids the fixed 2 s wait when the daemon starts quickly.
+	local attempts = 0
+	local function check_bridge()
+		attempts = attempts + 1
+		if is_ipc_bridge_running() then
+			-- Suppress Dock-visible KE helpers spawned as side-effects of the bridge start.
+			pcall(function() hs.execute(KE_SUPPRESS_DOCK_HELPERS_CMD) end)
+			-- launchd can respawn UI agents; re-apply several times so no Dock icon settles.
+			for i = 1, DOCK_SUPPRESS_RETRY_COUNT do
+				hs.timer.doAfter(i * DOCK_SUPPRESS_RETRY_INTERVAL_SEC, function()
+					pcall(function() hs.execute(KE_SUPPRESS_DOCK_HELPERS_CMD) end)
+				end)
+			end
+			mark_session_primed()
+			mark_hs_owned_bridge()
+			_prime_in_progress = false
+			Logger.success(LOG, "KE bridge primed in %d poll(s) (~%.1f s).",
+				attempts, attempts * PRIME_POLL_INTERVAL_SEC)
+			callback(true)
+			return
 		end
-		mark_session_primed()
-		_prime_in_progress = false
-		Logger.success(LOG, "KE bridge primed; menubar helper kept alive for the rest of the session.")
-		callback(true)
-	end)
+		if attempts >= PRIME_POLL_MAX_ATTEMPTS then
+			clear_hs_owned_bridge_marker()
+			_prime_in_progress = false
+			Logger.error(LOG, "KE bridge did not appear after %d polls (%.1f s) — config may not be applied.",
+				attempts, attempts * PRIME_POLL_INTERVAL_SEC)
+			callback(false)
+			return
+		end
+		hs.timer.doAfter(PRIME_POLL_INTERVAL_SEC, check_bridge)
+	end
+	hs.timer.doAfter(PRIME_POLL_INTERVAL_SEC, check_bridge)
 end
 
 --- True only when the KE stack is fully operational AND the bridge has been
