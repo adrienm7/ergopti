@@ -64,15 +64,15 @@ global GESTURE_REG_MODIFIERS_CTRL_WIN_SHIFT := 0x07
 ; All slots (taps and swipes) use (VK << 16) | modifiers — confirmed by
 ; reading the registry after manual configuration in Windows Settings.
 global GESTURE_REG_KEY_PARAMS := Map(
-    "tap_3",         (0x70 << 16) | GESTURE_REG_MODIFIERS_CTRL_WIN_SHIFT,  ; F1
-    "swipe_3_up",    (0x71 << 16) | GESTURE_REG_MODIFIERS_CTRL_WIN_SHIFT,  ; F2
-    "swipe_3_down",  (0x72 << 16) | GESTURE_REG_MODIFIERS_CTRL_WIN_SHIFT,  ; F3
-    "swipe_3_left",  (0x73 << 16) | GESTURE_REG_MODIFIERS_CTRL_WIN_SHIFT,  ; F4
+    "tap_3", (0x70 << 16) | GESTURE_REG_MODIFIERS_CTRL_WIN_SHIFT,  ; F1
+    "swipe_3_up", (0x71 << 16) | GESTURE_REG_MODIFIERS_CTRL_WIN_SHIFT,  ; F2
+    "swipe_3_down", (0x72 << 16) | GESTURE_REG_MODIFIERS_CTRL_WIN_SHIFT,  ; F3
+    "swipe_3_left", (0x73 << 16) | GESTURE_REG_MODIFIERS_CTRL_WIN_SHIFT,  ; F4
     "swipe_3_right", (0x74 << 16) | GESTURE_REG_MODIFIERS_CTRL_WIN_SHIFT,  ; F5
-    "tap_4",         (0x75 << 16) | GESTURE_REG_MODIFIERS_CTRL_WIN_SHIFT,  ; F6
-    "swipe_4_up",    (0x76 << 16) | GESTURE_REG_MODIFIERS_CTRL_WIN_SHIFT,  ; F7
-    "swipe_4_down",  (0x77 << 16) | GESTURE_REG_MODIFIERS_CTRL_WIN_SHIFT,  ; F8
-    "swipe_4_left",  (0x78 << 16) | GESTURE_REG_MODIFIERS_CTRL_WIN_SHIFT,  ; F9
+    "tap_4", (0x75 << 16) | GESTURE_REG_MODIFIERS_CTRL_WIN_SHIFT,  ; F6
+    "swipe_4_up", (0x76 << 16) | GESTURE_REG_MODIFIERS_CTRL_WIN_SHIFT,  ; F7
+    "swipe_4_down", (0x77 << 16) | GESTURE_REG_MODIFIERS_CTRL_WIN_SHIFT,  ; F8
+    "swipe_4_left", (0x78 << 16) | GESTURE_REG_MODIFIERS_CTRL_WIN_SHIFT,  ; F9
     "swipe_4_right", (0x79 << 16) | GESTURE_REG_MODIFIERS_CTRL_WIN_SHIFT,  ; F10
 )
 
@@ -80,28 +80,28 @@ global GESTURE_REG_KEY_PARAMS := Map(
 ; when sending the synthesised shortcut). Tap slots use Custom*Tap + KeyParams,
 ; swipe slots use direction-specific *KeyParams pair.
 global GESTURE_REG_KEY_PARAMS_NAMES := Map(
-    "tap_3",         "CustomThreeFingerTapKeyParams",
-    "swipe_3_up",    "ThreeFingerUpKeyParams",
-    "swipe_3_down",  "ThreeFingerDownKeyParams",
-    "swipe_3_left",  "ThreeFingerLeftKeyParams",
+    "tap_3", "CustomThreeFingerTapKeyParams",
+    "swipe_3_up", "ThreeFingerUpKeyParams",
+    "swipe_3_down", "ThreeFingerDownKeyParams",
+    "swipe_3_left", "ThreeFingerLeftKeyParams",
     "swipe_3_right", "ThreeFingerRightKeyParams",
-    "tap_4",         "CustomFourFingerTapKeyParams",
-    "swipe_4_up",    "FourFingerUpKeyParams",
-    "swipe_4_down",  "FourFingerDownKeyParams",
-    "swipe_4_left",  "FourFingerLeftKeyParams",
+    "tap_4", "CustomFourFingerTapKeyParams",
+    "swipe_4_up", "FourFingerUpKeyParams",
+    "swipe_4_down", "FourFingerDownKeyParams",
+    "swipe_4_left", "FourFingerLeftKeyParams",
     "swipe_4_right", "FourFingerRightKeyParams",
 )
 
 ; Old-system "enable" registry values that must be set to 65535 to activate
 ; the gesture / direction. Tap slots use a CustomXxxTap=7 sentinel instead.
 global GESTURE_REG_ENABLE_NAMES := Map(
-    "swipe_3_up",    "ThreeFingerUp",
-    "swipe_3_down",  "ThreeFingerDown",
-    "swipe_3_left",  "ThreeFingerLeft",
+    "swipe_3_up", "ThreeFingerUp",
+    "swipe_3_down", "ThreeFingerDown",
+    "swipe_3_left", "ThreeFingerLeft",
     "swipe_3_right", "ThreeFingerRight",
-    "swipe_4_up",    "FourFingerUp",
-    "swipe_4_down",  "FourFingerDown",
-    "swipe_4_left",  "FourFingerLeft",
+    "swipe_4_up", "FourFingerUp",
+    "swipe_4_down", "FourFingerDown",
+    "swipe_4_left", "FourFingerLeft",
     "swipe_4_right", "FourFingerRight",
 )
 
@@ -682,9 +682,9 @@ GestureGetCyclableWindows(ProcessFilter := "") {
     ; Without this sort, WinGetList()'s Z-order makes the cycle ping-pong
     ; between the 2 last-used windows (Alt+Tab behaviour).
     N := Result.Length
-    Loop N - 1 {
+    loop N - 1 {
         I := A_Index
-        Loop N - I {
+        loop N - I {
             J := A_Index
             if (Result[J] > Result[J + 1]) {
                 Tmp := Result[J]
@@ -864,10 +864,10 @@ GestureActivateWindow(HWnd) {
         }
         ; Bypass Windows foreground-stealing protection: AttachThreadInput to
         ; the current foreground window's thread, then SetForegroundWindow.
-        ForeHwnd   := DllCall("GetForegroundWindow", "Ptr")
+        ForeHwnd := DllCall("GetForegroundWindow", "Ptr")
         ForeThread := DllCall("GetWindowThreadProcessId", "Ptr", ForeHwnd, "Ptr", 0, "UInt")
         TargThread := DllCall("GetWindowThreadProcessId", "Ptr", HWnd, "Ptr", 0, "UInt")
-        Attached   := False
+        Attached := False
         if (ForeThread && TargThread && ForeThread != TargThread) {
             Attached := DllCall("AttachThreadInput", "UInt", ForeThread, "UInt", TargThread, "Int", True)
         }
@@ -907,7 +907,7 @@ GestureCycleWindows(Forward) {
         return
     }
     Active := WinExist("A")
-    Index  := 0
+    Index := 0
     for I, HWnd in Windows {
         if (HWnd = Active) {
             Index := I
@@ -926,7 +926,7 @@ GestureCycleWindows(Forward) {
 
     ; Try up to N-1 candidates so we wrap around even if some windows refuse activation.
     Target := Index
-    Loop N - 1 {
+    loop N - 1 {
         Target := GestureNextIndex(Target, N, Forward)
         if GestureActivateWindow(Windows[Target]) {
             LoggerDebug("gestures", "Activated HWND {1} (idx={2}).", Windows[Target], Target)
@@ -964,7 +964,7 @@ GestureCycleAppWindows(Forward) {
         ProcName, N, Index, Forward)
 
     Target := Index
-    Loop N - 1 {
+    loop N - 1 {
         Target := GestureNextIndex(Target, N, Forward)
         if GestureActivateWindow(Windows[Target]) {
             LoggerDebug("gestures", "Activated HWND {1} (idx={2}).", Windows[Target], Target)
