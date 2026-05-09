@@ -442,7 +442,7 @@ global GESTURE_ACTIONS := Map(
         Fn: (*) => Reload(),
     },
     "script_save_reload", {
-        Label: "💾 Sauver (Ctrl+S) et recharger",
+        Label: "↻ Sauver (Ctrl+S) et recharger",
         Fn: (*) => GestureSaveAndReload(),
     },
     "script_quit", {

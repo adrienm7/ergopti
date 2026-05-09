@@ -506,7 +506,7 @@ sg("script_pause_toggle",    "Suspendre / Reprendre le script", function()
 	if ok and type(sc.toggle) == "function" then pcall(sc.toggle) end
 end)
 sg("script_reload",          "↻ Recharger Hammerspoon", function() pcall(hs.reload) end)
-sg("script_save_reload",     "💾 Sauver (Cmd+S) et recharger", function()
+sg("script_save_reload",     "↻ Sauver (Cmd+S) et recharger", function()
 	pcall(hs.eventtap.keyStroke, {"cmd"}, "s")
 	hs.timer.doAfter(0.3, function() pcall(hs.reload) end)
 end)

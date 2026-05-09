@@ -45,7 +45,7 @@ local ACTION_DEFINITIONS = {
 	-- Script lifecycle
 	{id = "script_pause_toggle",      label = "Suspendre / Reprendre le script"},
 	{id = "script_reload",            label = "↻ Recharger Hammerspoon"},
-	{id = "script_save_reload",       label = "💾 Sauver (Cmd+S) et recharger"},
+	{id = "script_save_reload",       label = "↻ Sauver (Cmd+S) et recharger"},
 	{id = "script_quit",              label = "✕ Quitter Hammerspoon"},
 	{type = "separator"},
 	-- UI windows
