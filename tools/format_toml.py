@@ -37,9 +37,9 @@ def create_header_line(equals_count: int) -> str:
 
 
 def create_section_header(
-    section_name: str, is_subsection: bool = False, is_first: bool = False
+    section_name: str, is_subsection: bool = False
 ) -> list:
-    """Create a styled section header as a list of lines."""
+    """Create a styled section header as a list of lines (header only, no spacing)."""
     # Strip leading/trailing whitespace from section_name FIRST to avoid double spaces
     section_name = section_name.strip()
 
@@ -50,28 +50,15 @@ def create_section_header(
 
     title_line = f"# {equals_str} {section_name} {equals_str}"
 
-    # First section: no blank lines before
-    # h2 (subsequent sections): 3 blank lines
-    # h3 (subsections): 1 blank line
-    if is_first:
-        blanks_before = 0
-    elif is_subsection:
-        blanks_before = 1
-    else:
-        blanks_before = 3
-
-    lines_before = [""] * blanks_before if blanks_before > 0 else []
-
     if is_subsection:
-        return lines_before + [header_footer, title_line, header_footer, ""]
+        return [header_footer, title_line, header_footer]
     else:
-        return lines_before + [
+        return [
             header_footer,
             header_footer,
             title_line,
             header_footer,
             header_footer,
-            "",
         ]
 
 
@@ -174,11 +161,17 @@ def rebuild_toml_from_structure(structure: dict) -> str:
         depth = len(parts)
         is_subsection = depth > 1
 
+        # Add blank lines before header (not the first section)
+        if not is_first:
+            if is_subsection:
+                lines.append("")  # 1 blank before h3
+            else:
+                lines.extend(["", "", ""])  # 3 blanks before h2
+
         display_name = section_key.replace("_", " ").title()
-        header_lines = create_section_header(
-            display_name, is_subsection, is_first=is_first
-        )
+        header_lines = create_section_header(display_name, is_subsection)
         lines.extend(header_lines)
+        lines.append("")  # blank line after header
         is_first = False
 
         if isinstance(section_content, dict):
@@ -192,7 +185,11 @@ def rebuild_toml_from_structure(structure: dict) -> str:
                     for key, value in sorted(item.items()):
                         lines.append(f"{key} = {value}")
 
-        lines.append("")
+        lines.append("")  # blank line after section content
+
+    # Remove trailing blank lines (join will add the final newline)
+    while lines and lines[-1] == "":
+        lines.pop()
 
     return "\n".join(lines)
 
@@ -236,11 +233,17 @@ def dict_to_toml(data: dict) -> str:
         depth = len(parts)
         is_subsection = depth > 1
 
+        # Add blank lines before header (not the first section)
+        if not is_first:
+            if is_subsection:
+                lines.append("")  # 1 blank before h3
+            else:
+                lines.extend(["", "", ""])  # 3 blanks before h2
+
         display_name = section_key.replace("_", " ").title()
-        header_lines = create_section_header(
-            display_name, is_subsection, is_first=is_first
-        )
+        header_lines = create_section_header(display_name, is_subsection)
         lines.extend(header_lines)
+        lines.append("")  # blank line after header
         is_first = False
 
         lines.append(f"[{section_key}]")
@@ -257,7 +260,11 @@ def dict_to_toml(data: dict) -> str:
                         toml_value = value_to_toml_repr(value)
                         lines.append(f"{key} = {toml_value}")
 
-        lines.append("")
+        lines.append("")  # blank line after section content
+
+    # Remove trailing blank lines (join will add the final newline)
+    while lines and lines[-1] == "":
+        lines.pop()
 
     return "\n".join(lines)
 
