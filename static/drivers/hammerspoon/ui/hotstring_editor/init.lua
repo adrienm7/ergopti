@@ -276,7 +276,7 @@ local function handle_message(msg)
 			end
 			if type(_update_menu) == "function" then hs.timer.doAfter(0, function() pcall(_update_menu) end) end
 		else
-			pcall(notifications.notify, "Erreur de sauvegarde", tostring(err))
+			pcall(notifications.notify, "Erreur de sauvegarde", tostring(err), "error")
 		end
 		return
 	end

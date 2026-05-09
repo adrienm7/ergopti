@@ -31,12 +31,33 @@
 
 #Requires Autohotkey v2.0+
 
+; ==========================================
+; ==========================================
+; ======= 1/ Utilities =======
+; ==========================================
+; ==========================================
 
-
+; In-place alphabetical sort of a simple Array of strings via bubble sort.
+; The arrays are at most a few hundred entries; O(n²) is fine.
+SortArray(arr) {
+    n := arr.Length
+    loop n - 1 {
+        i := A_Index
+        loop n - i {
+            j := A_Index
+            if (arr[j] > arr[j + 1]) {
+                tmp := arr[j]
+                arr[j] := arr[j + 1]
+                arr[j + 1] := tmp
+            }
+        }
+    }
+    return arr
+}
 
 ; ===================================
 ; ===================================
-; ======= 1/ Reader =======
+; ======= 2/ Reader =======
 ; ===================================
 ; ===================================
 
@@ -46,95 +67,92 @@
 ; is missing so callers can rely on ``.Has`` checks without a prior
 ; ``FileExist``.
 ParseTomlFile(Path) {
-	Sections := Map()
-	if !FileExist(Path)
-		return Sections
-	Content := ""
-	try Content := FileRead(Path, "UTF-8")
-	if (Content = "")
-		return Sections
+    Sections := Map()
+    if !FileExist(Path)
+        return Sections
+    Content := ""
+    try Content := FileRead(Path, "UTF-8")
+    if (Content = "")
+        return Sections
 
-	Section := ""
-	Loop Parse, Content, "`n", "`r" {
-		Line := Trim(A_LoopField)
-		if (Line = "" || SubStr(Line, 1, 1) = "#")
-			continue
-		; Section header: [name]
-		if (SubStr(Line, 1, 1) = "[" && SubStr(Line, -1) = "]") {
-			Section := Trim(SubStr(Line, 2, StrLen(Line) - 2))
-			if !Sections.Has(Section)
-				Sections[Section] := Map()
-			continue
-		}
-		eq := InStr(Line, "=")
-		if !eq
-			continue
-		key := Trim(SubStr(Line, 1, eq - 1))
-		val := Trim(SubStr(Line, eq + 1))
-		; Quoted key: "Foo.Enabled" → Foo.Enabled
-		if (StrLen(key) >= 2 && SubStr(key, 1, 1) = '"' && SubStr(key, -1) = '"')
-			key := SubStr(key, 2, StrLen(key) - 2)
-		if (Section = "")
-			continue
-		Sections[Section][key] := TOML_CoerceValue(val)
-	}
-	return Sections
+    Section := ""
+    loop parse, Content, "`n", "`r" {
+        Line := Trim(A_LoopField)
+        if (Line = "" || SubStr(Line, 1, 1) = "#")
+            continue
+        ; Section header: [name]
+        if (SubStr(Line, 1, 1) = "[" && SubStr(Line, -1) = "]") {
+            Section := Trim(SubStr(Line, 2, StrLen(Line) - 2))
+            if !Sections.Has(Section)
+                Sections[Section] := Map()
+            continue
+        }
+        eq := InStr(Line, "=")
+        if !eq
+            continue
+        key := Trim(SubStr(Line, 1, eq - 1))
+        val := Trim(SubStr(Line, eq + 1))
+        ; Quoted key: "Foo.Enabled" → Foo.Enabled
+        if (StrLen(key) >= 2 && SubStr(key, 1, 1) = '"' && SubStr(key, -1) = '"')
+            key := SubStr(key, 2, StrLen(key) - 2)
+        if (Section = "")
+            continue
+        Sections[Section][key] := TOML_CoerceValue(val)
+    }
+    return Sections
 }
 
 TOML_CoerceValue(raw) {
-	raw := Trim(raw)
-	if (raw = "")
-		return ""
-	if (StrLower(raw) = "true")
-		return true
-	if (StrLower(raw) = "false")
-		return false
-	; Quoted string.
-	if (SubStr(raw, 1, 1) = '"' && SubStr(raw, -1) = '"')
-		return TOML_Unescape(SubStr(raw, 2, StrLen(raw) - 2))
-	; Array of strings: [ "a", "b", ... ]
-	if (SubStr(raw, 1, 1) = "[" && SubStr(raw, -1) = "]") {
-		body := Trim(SubStr(raw, 2, StrLen(raw) - 2))
-		out := []
-		if (body = "")
-			return out
-		in_str := false
-		cur    := ""
-		Loop Parse, body {
-			c := A_LoopField
-			if (c = '"' && SubStr(cur, -1) != "\")
-				in_str := !in_str
-			if (!in_str && c = ",") {
-				out.Push(TOML_CoerceValue(Trim(cur)))
-				cur := ""
-				continue
-			}
-			cur .= c
-		}
-		if (Trim(cur) != "")
-			out.Push(TOML_CoerceValue(Trim(cur)))
-		return out
-	}
-	if RegExMatch(raw, "^-?\d+$")
-		return Integer(raw)
-	return raw
+    raw := Trim(raw)
+    if (raw = "")
+        return ""
+    if (StrLower(raw) = "true")
+        return true
+    if (StrLower(raw) = "false")
+        return false
+    ; Quoted string.
+    if (SubStr(raw, 1, 1) = '"' && SubStr(raw, -1) = '"')
+        return TOML_Unescape(SubStr(raw, 2, StrLen(raw) - 2))
+    ; Array of strings: [ "a", "b", ... ]
+    if (SubStr(raw, 1, 1) = "[" && SubStr(raw, -1) = "]") {
+        body := Trim(SubStr(raw, 2, StrLen(raw) - 2))
+        out := []
+        if (body = "")
+            return out
+        in_str := false
+        cur := ""
+        loop parse, body {
+            c := A_LoopField
+            if (c = '"' && SubStr(cur, -1) != "\")
+                in_str := !in_str
+            if (!in_str && c = ",") {
+                out.Push(TOML_CoerceValue(Trim(cur)))
+                cur := ""
+                continue
+            }
+            cur .= c
+        }
+        if (Trim(cur) != "")
+            out.Push(TOML_CoerceValue(Trim(cur)))
+        return out
+    }
+    if RegExMatch(raw, "^-?\d+$")
+        return Integer(raw)
+    return raw
 }
 
 TOML_Unescape(s) {
-	s := StrReplace(s, '\"', '"')
-	s := StrReplace(s, "\\", "\")
-	s := StrReplace(s, "\n", "`n")
-	s := StrReplace(s, "\t", "`t")
-	s := StrReplace(s, "\r", "`r")
-	return s
+    s := StrReplace(s, '\"', '"')
+    s := StrReplace(s, "\\", "\")
+    s := StrReplace(s, "\n", "`n")
+    s := StrReplace(s, "\t", "`t")
+    s := StrReplace(s, "\r", "`r")
+    return s
 }
 
-
-
-
 ; ===================================
 ; ===================================
-; ======= 2/ Single-key API =======
+; ======= 3/ Single-key API =======
 ; ===================================
 ; ===================================
 
@@ -143,31 +161,28 @@ TOML_Unescape(s) {
 ; integers (1 / 0) so legacy callers that compare against ``true`` / ``1``
 ; keep working without changes.
 TOML_Read(Path, Section, Key, Default := "") {
-	Sections := ParseTomlFile(Path)
-	if !Sections.Has(Section) || !Sections[Section].Has(Key)
-		return Default
-	v := Sections[Section][Key]
-	if (v = true)
-		return 1
-	if (v = false)
-		return 0
-	return v
+    Sections := ParseTomlFile(Path)
+    if !Sections.Has(Section) || !Sections[Section].Has(Key)
+        return Default
+    v := Sections[Section][Key]
+    if (v = true)
+        return 1
+    if (v = false)
+        return 0
+    return v
 }
 
 ; Write a single (Section, Key, Value) triple. Atomic via .tmp + rename.
 ; Order matches Win32 ``IniWrite(Value, Path, Section, Key)`` so existing
 ; call sites stay symmetrical.
 TOML_Write(Value, Path, Section, Key) {
-	updates := [{ Section: Section, Key: Key, Value: Value }]
-	return TOML_BatchWrite(Path, updates)
+    updates := [{ Section: Section, Key: Key, Value: Value }]
+    return TOML_BatchWrite(Path, updates)
 }
 
-
-
-
 ; ===================================
 ; ===================================
-; ======= 3/ Batch writer =======
+; ======= 4/ Batch writer =======
 ; ===================================
 ; ===================================
 
@@ -175,103 +190,132 @@ TOML_Write(Value, Path, Section, Key) {
 ; Preserves keys we did not touch; sections appear in the original order
 ; followed by any newly introduced section. Returns true on success.
 TOML_BatchWrite(Path, Updates) {
-	if (Updates.Length = 0)
-		return true
+    if (Updates.Length = 0)
+        return true
 
-	Sections := ParseTomlFile(Path)
-	; Track section order so the on-disk layout stays stable across writes.
-	; ``ParseTomlFile`` already iterates the file in declaration order, so
-	; ``for`` over the resulting Map preserves it; we rebuild the order
-	; explicitly to make new sections deterministic.
-	order := []
-	for sec, _ in Sections
-		order.Push(sec)
+    Sections := ParseTomlFile(Path)
+    ; Track section order so the on-disk layout stays stable across writes.
+    ; ``ParseTomlFile`` already iterates the file in declaration order, so
+    ; ``for`` over the resulting Map preserves it; we rebuild the order
+    ; explicitly to make new sections deterministic.
+    order := []
+    for sec, _ in Sections
+        order.Push(sec)
 
-	for _, U in Updates {
-		Sec := U.Section
-		K   := U.Key
-		V   := U.Value
-		if !Sections.Has(Sec) {
-			Sections[Sec] := Map()
-			order.Push(Sec)
-		}
-		Sections[Sec][K] := V
-	}
+    for _, U in Updates {
+        Sec := U.Section
+        K := U.Key
+        V := U.Value
+        if !Sections.Has(Sec) {
+            Sections[Sec] := Map()
+            order.Push(Sec)
+        }
+        Sections[Sec][K] := V
+    }
 
-	body := ""
-	for _, sec in order {
-		if (body != "")
-			body .= "`n"
-		body .= "[" . sec . "]`n"
-		for k, v in Sections[sec]
-			body .= TOML_RenderKey(k) . " = " . TOML_RenderValue(v) . "`n"
-	}
+    body := ""
+    ; Sort sections alphabetically for stable, readable output
+    SortedSections := []
+    for _, sec in order
+        SortedSections.Push(sec)
+    SortedSections := SortArray(SortedSections)
+    for _, sec in SortedSections {
+        if (body != "")
+            body .= "`n"
+        body .= "[" . sec . "]`n"
+        ; Sort keys alphabetically within each section
+        SortedKeys := []
+        for k, v in Sections[sec]
+            SortedKeys.Push(k)
+        SortedKeys := SortArray(SortedKeys)
+        for _, k in SortedKeys
+            body .= TOML_RenderKey(k) . " = " . TOML_RenderValue(Sections[sec][k]) . "`n"
+    }
 
-	tmp := Path . ".tmp"
-	try FileDelete(tmp)
-	try {
-		f := FileOpen(tmp, "w", "UTF-8")
-		if !f
-			return false
-		f.Write(body)
-		f.Close()
-	} catch {
-		return false
-	}
-	if FileExist(Path)
-		try FileDelete(Path)
-	try FileMove(tmp, Path)
-	catch
-		return false
-	return true
+    tmp := Path . ".tmp"
+    try FileDelete(tmp)
+    try {
+        f := FileOpen(tmp, "w", "UTF-8")
+        if !f
+            return false
+        f.Write(body)
+        f.Close()
+    } catch {
+        return false
+    }
+    if FileExist(Path)
+        try FileDelete(Path)
+    try FileMove(tmp, Path)
+    catch
+        return false
+
+    TOML_RunStrictCanonicalization(Path)
+    return true
+}
+
+; Enforce a strict schema on the unified driver config: after any successful
+; TOML write targeting ConfigurationFile, rebuild the file from the in-memory
+; state via SaveFullConfig so stale sections/keys are dropped.
+TOML_RunStrictCanonicalization(Path) {
+    global _TOML_STRICT_CANON_IN_PROGRESS, ConfigurationFile
+
+    if (_TOML_STRICT_CANON_IN_PROGRESS = true)
+        return
+    if !IsSet(ConfigurationFile)
+        return
+    if (Path != ConfigurationFile)
+        return
+    if !IsSet(SaveFullConfig)
+        return
+
+    _TOML_STRICT_CANON_IN_PROGRESS := true
+    try SaveFullConfig()
+    finally _TOML_STRICT_CANON_IN_PROGRESS := false
 }
 
 TOML_RenderKey(k) {
-	; Bare key: only A-Z / a-z / 0-9 / _ / -. Otherwise quote.
-	if RegExMatch(k, "^[A-Za-z0-9_\-]+$")
-		return k
-	esc := StrReplace(k, "\", "\\")
-	esc := StrReplace(esc, '"', '\"')
-	return '"' . esc . '"'
+    ; Bare key: only A-Z / a-z / 0-9 / _ / -. Otherwise quote.
+    if RegExMatch(k, "^[A-Za-z0-9_\-]+$")
+        return k
+    esc := StrReplace(k, "\", "\\")
+    esc := StrReplace(esc, '"', '\"')
+    return '"' . esc . '"'
 }
 
 TOML_RenderValue(v) {
-	if (v = true)
-		return "true"
-	if (v = false)
-		return "false"
-	if (v is Array) {
-		parts := []
-		for s in v
-			parts.Push(TOML_RenderString(String(s)))
-		out := "["
-		for i, p in parts
-			out .= (i = 1 ? "" : ", ") . p
-		out .= "]"
-		return out
-	}
-	if IsNumber(v)
-		return String(v)
-	; AHK boolean stored as 0/1 reaches us as a number above; everything
-	; else is a string.
-	return TOML_RenderString(String(v))
+    if (v = true)
+        return "true"
+    if (v = false)
+        return "false"
+    if (v is Array) {
+        parts := []
+        for s in v
+            parts.Push(TOML_RenderString(String(s)))
+        out := "["
+        for i, p in parts
+            out .= (i = 1 ? "" : ", ") . p
+        out .= "]"
+        return out
+    }
+    if IsNumber(v)
+        return String(v)
+    ; AHK boolean stored as 0/1 reaches us as a number above; everything
+    ; else is a string.
+    return TOML_RenderString(String(v))
 }
 
 TOML_RenderString(s) {
-	s := StrReplace(s, "\", "\\")
-	s := StrReplace(s, '"', '\"')
-	s := StrReplace(s, "`n", "\n")
-	s := StrReplace(s, "`r", "\r")
-	s := StrReplace(s, "`t", "\t")
-	return '"' . s . '"'
+    s := StrReplace(s, "\", "\\")
+    s := StrReplace(s, '"', '\"')
+    s := StrReplace(s, "`n", "\n")
+    s := StrReplace(s, "`r", "\r")
+    s := StrReplace(s, "`t", "\t")
+    return '"' . s . '"'
 }
 
-
-
-
 ; ===================================
 ; ===================================
-; ======= 4/ Cache accessor =======
+; ======= 5/ Cache accessor =======
 ; ===================================
 ; ===================================
 
@@ -280,28 +324,25 @@ TOML_RenderString(s) {
 ; sentinel) when either the section or the key is absent. Callers compare
 ; against ``"_"`` to detect missing entries cheaply.
 IniCacheGet(Cache, Section, Key, Default := "_") {
-	if Cache.Has(Section) and Cache[Section].Has(Key) {
-		return Cache[Section][Key]
-	}
-	return Default
+    if Cache.Has(Section) and Cache[Section].Has(Key) {
+        return Cache[Section][Key]
+    }
+    return Default
 }
 
 ; Resolve a configured path: trim whitespace, treat empty / underscore as
 ; "use the default", otherwise return the trimmed value.
 ResolveConfigPath(RawValue, DefaultPath) {
-	Trimmed := Trim(RawValue)
-	if (Trimmed == "" or Trimmed == "_") {
-		return DefaultPath
-	}
-	return Trimmed
+    Trimmed := Trim(RawValue)
+    if (Trimmed == "" or Trimmed == "_") {
+        return DefaultPath
+    }
+    return Trimmed
 }
 
-
-
-
 ; =============================================
 ; =============================================
-; ======= 5/ paths.toml reader =======
+; ======= 6/ paths.toml reader =======
 ; =============================================
 ; =============================================
 
@@ -309,32 +350,32 @@ ResolveConfigPath(RawValue, DefaultPath) {
 ; Auto-generates the file with a header comment if it does not exist.
 ; Returns a Map of all parsed key-value pairs.
 ReadPathsToml(FilePath) {
-	Result := Map()
+    Result := Map()
 
-	if !FileExist(FilePath) {
-		try {
-			f := FileOpen(FilePath, "w", "UTF-8")
-			if f {
-				DefaultDir := StrReplace(EnvGet("USERPROFILE"), "\", "/") . "/.config/ergopti_plus/"
-				f.Write("# Custom paths — auto-generated by ErgoptiPlus.`r`n")
-				f.Write("# Edit this file to point to your personal configuration folder.`r`n")
-				f.Write("# If absent or commented out, files are looked up in: " . DefaultDir . "`r`n")
-				f.Write("`r`n")
-				f.Write('# ConfigDirPath = "' . DefaultDir . '"`r`n')
-				f.Close()
-			}
-		}
-		return Result
-	}
+    if !FileExist(FilePath) {
+        try {
+            f := FileOpen(FilePath, "w", "UTF-8")
+            if f {
+                DefaultDir := StrReplace(EnvGet("USERPROFILE"), "\", "/") . "/.config/ergopti_plus/"
+                f.Write("# Custom paths — auto-generated by ErgoptiPlus.`r`n")
+                f.Write("# Edit this file to point to your personal configuration folder.`r`n")
+                f.Write("# If absent or commented out, files are looked up in: " . DefaultDir . "`r`n")
+                f.Write("`r`n")
+                f.Write('# ConfigDirPath = "' . DefaultDir . '"`r`n')
+                f.Close()
+            }
+        }
+        return Result
+    }
 
-	loop parse, FileRead(FilePath), "`n", "`r" {
-		Line := Trim(A_LoopField, " `t")
-		if (Line == "" or SubStr(Line, 1, 1) == "#") {
-			continue
-		}
-		if RegExMatch(Line, '^(\S+)\s*=\s*"(.*)"$', &Match) {
-			Result[Match[1]] := StrReplace(Match[2], "/", "\")
-		}
-	}
-	return Result
+    loop parse, FileRead(FilePath), "`n", "`r" {
+        Line := Trim(A_LoopField, " `t")
+        if (Line == "" or SubStr(Line, 1, 1) == "#") {
+            continue
+        }
+        if RegExMatch(Line, '^(\S+)\s*=\s*"(.*)"$', &Match) {
+            Result[Match[1]] := StrReplace(Match[2], "/", "\")
+        }
+    }
+    return Result
 }

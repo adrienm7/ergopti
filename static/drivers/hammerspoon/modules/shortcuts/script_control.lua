@@ -35,29 +35,55 @@ local LOG = "shortcuts.script_control"
 -- ====================================
 -- ====================================
 
--- All available actions in display order (id + French label pairs)
+-- All available actions in display order. "--" sentinels mark group
+-- boundaries so the picker UI can render visual separators identical to the
+-- AutoHotkey side. The naming scheme mirrors modules/gestures/actions.lua so
+-- the same id can be bound to a gesture or to one of the right-Alt key slots.
 local ACTION_DEFINITIONS = {
-	{id = "none",               label = "Désactivé"},
-	{id = "pause",              label = "Pause / Reprendre"},
-	{id = "reload",             label = "Recharger"},
-	{id = "open_console",       label = "Console Hammerspoon"},
-	{id = "quit_hammerspoon",   label = "Quitter Hammerspoon"},
-	{id = "open_init",          label = "Ouvrir init.lua"},
-	{id = "open_personal_toml", label = "Ouvrir personal_hotstrings.toml"},
-	{id = "open_config",        label = "Ouvrir config.json"},
-	{id = "open_logs",          label = "Ouvrir le dossier de logs"},
-	{id = "add_hotstring",      label = "Ajouter un hotstring"},
-	{id = "trigger_prediction", label = "Déclencher une prédiction IA"},
-	{id = "show_metrics",       label = "Afficher les métriques de frappe"},
-	{id = "show_apps_time",     label = "Afficher le temps sur les applications"},
+	{id = "none",                     label = "Désactivé"},
+	{type = "separator"},
+	-- Script lifecycle
+	{id = "script_pause_toggle",      label = "Suspendre / Reprendre le script"},
+	{id = "script_reload",            label = "🔄 Recharger Hammerspoon"},
+	{id = "script_save_reload",       label = "💾 Sauver (Cmd+S) et recharger"},
+	{id = "script_quit",              label = "⏹ Quitter Hammerspoon"},
+	{type = "separator"},
+	-- UI windows
+	{id = "open_paths_editor",        label = "📂 Dossier de configuration (éditeur)"},
+	{id = "open_hotstrings_editor",   label = "✏️ Éditeur de hotstrings personnels"},
+	{id = "open_metrics_typing",      label = "📊 Métriques de frappe"},
+	{id = "open_metrics_apps",        label = "📊 Temps sur les applications"},
+	{type = "separator"},
+	-- Open user files / folders
+	{id = "open_script_source",       label = "✎ Ouvrir init.lua"},
+	{id = "open_personal_shortcuts",  label = "✎ Éditer personal_shortcuts.lua"},
+	{id = "open_personal_hotstrings", label = "Ouvrir personal_hotstrings.toml"},
+	{id = "open_personal_info",       label = "Ouvrir personal_info.toml"},
+	{id = "open_config",              label = "Ouvrir config.toml"},
+	{id = "open_logs_folder",         label = "Ouvrir le dossier de logs"},
+	{id = "open_today_log",           label = "Ouvrir le fichier de log du jour"},
+	{type = "separator"},
+	-- Hotstring / IA / metrics legacy actions (kept for the right-Alt slots)
+	{id = "add_hotstring",            label = "Ajouter un hotstring"},
+	{id = "trigger_prediction",       label = "Déclencher une prédiction IA"},
+	{type = "separator"},
+	-- Debug
+	{id = "open_console",             label = "Console Hammerspoon"},
 }
 
--- Flat look-up tables derived from ACTION_DEFINITIONS
+-- Flat look-up tables derived from ACTION_DEFINITIONS. "--" sentinels are
+-- preserved in ACTIONS_ORDER so the picker UI can render the visual
+-- separators where the source intends them; ACTION_LABELS only carries
+-- the addressable ids.
 local ACTION_LABELS = {}
 local ACTIONS_ORDER = {}
 for _, def in ipairs(ACTION_DEFINITIONS) do
-	ACTION_LABELS[def.id] = def.label
-	table.insert(ACTIONS_ORDER, def.id)
+	if def.type == "separator" then
+		table.insert(ACTIONS_ORDER, "--")
+	else
+		ACTION_LABELS[def.id] = def.label
+		table.insert(ACTIONS_ORDER, def.id)
+	end
 end
 
 -- Sentinel keycodes emitted by Karabiner's script-control rules
@@ -81,7 +107,7 @@ local KEYCODE_ESCAPE    = Keycodes.ESCAPE
 -- Module-level state
 local _is_paused       = false
 local _tap             = nil
-local _key_actions     = {return_key = "pause", backspace = "reload", escape = "quit_hammerspoon"}
+local _key_actions     = {return_key = "script_pause_toggle", backspace = "script_reload", escape = "script_quit"}
 local _on_pause_change = nil
 local _extras          = {}
 
@@ -172,10 +198,24 @@ end
 --- Dispatches a configured action by its identifier.
 --- @param action string The action id (e.g. "pause", "reload", "open_init").
 --- @return boolean True if the originating keystroke should be consumed.
-local function dispatch_action(action)
-	if type(action) ~= "string" or action == "none" then return false end
+--- Calls _extras[name] when present. Used as the fallback path for actions
+--- that need a context handler the script_control module doesn't own
+--- (file paths, hotstring editor, metrics windows, …).
+--- @param name string The extras key.
+--- @return boolean true if the handler ran (or returned without error).
+local function call_extra(name)
+	if type(_extras[name]) == "function" then
+		pcall(_extras[name])
+	else
+		Logger.debug(LOG, "Action '%s' has no registered handler in extras.", name)
+	end
+	return true
+end
 
-	if action == "pause" then
+local function dispatch_action(action)
+	if type(action) ~= "string" or action == "none" or action == "--" then return false end
+
+	if action == "script_pause_toggle" then
 		_is_paused = not _is_paused
 
 		if type(_on_pause_change) == "function" then
@@ -185,26 +225,28 @@ local function dispatch_action(action)
 		if _is_paused then
 			Logger.info(LOG, "Pausing all script operations.")
 			pause_all()
-			notifications.notify("Script mis en pause ⏸")
+			notifications.notify("Script mis en pause", nil, "warning")
 		else
 			Logger.info(LOG, "Resuming all script operations.")
 			resume_all()
-			notifications.notify("Script réactivé ▶")
+			notifications.notify("Script réactivé", nil, "success")
 		end
 		return true
 
-	elseif action == "reload" then
+	elseif action == "script_reload" then
 		Logger.info(LOG, "Triggering Hammerspoon configuration reload.")
-		notifications.notify("Rechargement du script… 🔄")
+		notifications.notify("Rechargement du script…", nil, "info")
 		-- Brief delay so the notification renders before the reload tears everything down
 		hs.timer.doAfter(0.3, function() pcall(hs.reload) end)
 		return true
 
-	elseif action == "open_console" then
-		pcall(hs.openConsole)
+	elseif action == "script_save_reload" then
+		pcall(hs.eventtap.keyStroke, {"cmd"}, "s")
+		notifications.notify("Sauvegarde puis rechargement…", nil, "info")
+		hs.timer.doAfter(0.5, function() pcall(hs.reload) end)
 		return true
 
-	elseif action == "quit_hammerspoon" then
+	elseif action == "script_quit" then
 		Logger.info(LOG, "Shutting down Hammerspoon and Karabiner-Elements.")
 		-- Kill KE synchronously before the exit timer fires; hs.execute blocks
 		-- briefly here but that is acceptable since we are about to exit anyway.
@@ -214,14 +256,28 @@ local function dispatch_action(action)
 		hs.timer.doAfter(0.1, function() os.exit(0) end)
 		return true
 
-	elseif action == "open_init"          then if type(_extras.open_init)          == "function" then pcall(_extras.open_init)          end; return true
-	elseif action == "open_personal_toml" then if type(_extras.open_personal_toml) == "function" then pcall(_extras.open_personal_toml) end; return true
-	elseif action == "open_config"        then if type(_extras.open_config)        == "function" then pcall(_extras.open_config)        end; return true
-	elseif action == "open_logs"          then if type(_extras.open_logs)          == "function" then pcall(_extras.open_logs)          end; return true
-	elseif action == "add_hotstring"      then if type(_extras.add_hotstring)      == "function" then pcall(_extras.add_hotstring)      end; return true
-	elseif action == "trigger_prediction" then if type(_extras.trigger_prediction) == "function" then pcall(_extras.trigger_prediction) end; return true
-	elseif action == "show_metrics"       then if type(_extras.show_metrics)       == "function" then pcall(_extras.show_metrics)       end; return true
-	elseif action == "show_apps_time"     then if type(_extras.show_apps_time)     == "function" then pcall(_extras.show_apps_time)     end; return true
+	elseif action == "open_console" then
+		pcall(hs.openConsole)
+		return true
+	end
+
+	-- Everything else delegates to _extras populated by ui.menu.init via
+	-- M.set_extras(). This keeps script_control free of UI/file knowledge.
+	if action == "open_paths_editor"
+		or action == "open_hotstrings_editor"
+		or action == "open_metrics_typing"
+		or action == "open_metrics_apps"
+		or action == "open_script_source"
+		or action == "open_personal_shortcuts"
+		or action == "open_personal_hotstrings"
+		or action == "open_personal_info"
+		or action == "open_config"
+		or action == "open_logs_folder"
+		or action == "open_today_log"
+		or action == "add_hotstring"
+		or action == "trigger_prediction"
+	then
+		return call_extra(action)
 	end
 
 	Logger.warn(LOG, "dispatch_action: unknown action '%s'.", tostring(action))
@@ -378,9 +434,17 @@ function M.set_on_pause_change(cb)
 	Logger.debug(LOG, "Pause-change callback registered.")
 end
 
---- Provides handlers for actions that require external context (file paths, etc.).
---- @param tbl table May contain: open_init, open_ahk, open_personal_toml, open_config,
----                   open_logs, add_hotstring, trigger_prediction, show_metrics, show_apps_time.
+--- Provides handlers for actions that require external context (file paths, UI windows, …).
+--- Recognised keys mirror the ids in ACTION_DEFINITIONS for the categories
+--- that script_control delegates rather than handles in-line:
+---   open_paths_editor, open_hotstrings_editor,
+---   open_metrics_typing, open_metrics_apps,
+---   open_script_source, open_personal_shortcuts,
+---   open_personal_hotstrings, open_personal_info,
+---   open_config, open_logs_folder, open_today_log,
+---   add_hotstring, trigger_prediction.
+--- Keys with no handler are quietly skipped (debug log) so the right-Alt key
+--- slots and gestures stay assignable on a fresh install.
 function M.set_extras(tbl)
 	if type(tbl) ~= "table" then
 		Logger.error(LOG, "set_extras(): argument must be a table.")
@@ -395,7 +459,7 @@ end
 --- Programmatically toggles the paused state (same as pressing the configured key).
 function M.toggle()
 	Logger.debug(LOG, "Programmatic pause toggle requested.")
-	pcall(dispatch_action, "pause")
+	pcall(dispatch_action, "script_pause_toggle")
 end
 
 return M

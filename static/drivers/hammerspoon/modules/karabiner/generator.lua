@@ -821,10 +821,36 @@ function M.build_karabiner_json(state, available_actions, tap_hold_keys, mod_com
 	}
 end
 
+--- Forces the global flags that headless operation requires. Mutates
+--- `cfg` in place. KE reads these via FSEvents on the file and applies
+--- them live; the menubar helper also picks them up on its own next start.
+--- @param cfg table A karabiner.json root-level table.
+local function enforce_headless_global(cfg)
+	if type(cfg.global) ~= "table" then cfg.global = {} end
+	-- Hide the menubar icon. Karabiner-Menu still runs (it owns the IPC link
+	-- to Core-Service that keeps remapping alive after our prime quits the
+	-- main GUI) but renders no icon when this flag is false.
+	cfg.global.show_in_menu_bar = false
+	cfg.global.show_profile_name_in_menu_bar = false
+	-- Disable the quit-confirmation dialog. When true, sending Cmd+Q (or the
+	-- equivalent Apple Event) opens a modal dialog that blocks the whole
+	-- AppleScript thread until dismissed. Our prime cycle relied on the
+	-- AppleScript quit returning quickly; if it blocks, _prime_in_progress
+	-- stays true forever and the menu shows 🔵 indefinitely. False is the
+	-- only safe value for headless operation.
+	cfg.global.ask_for_confirmation_before_quitting = false
+	-- Disable the update check on startup. Each prime cycle would otherwise
+	-- trigger an HTTP call and a popup if a new version is available — both
+	-- unwanted in our silent headless launch.
+	cfg.global.check_for_updates_on_startup = false
+end
+
 --- Merges HS-generated complex_modifications into the existing karabiner.json,
 --- preserving every other KE UI setting (devices, fn_function_keys,
 --- simple_modifications, global flags, etc.) in the selected profile.
 --- Falls back to the raw HS config when the existing file is absent or invalid.
+--- Always enforces the headless global flags via enforce_headless_global() so
+--- the menubar icon never appears even if a previous KE session toggled it on.
 --- @param hs_config table The profile structure returned by build_karabiner_json.
 --- @param karabiner_out string Absolute path to the live karabiner.json.
 --- @return table The merged configuration ready to be JSON-encoded.
@@ -832,6 +858,7 @@ function M.merge_into_existing_config(hs_config, karabiner_out)
 	local fh = io.open(karabiner_out, "r")
 	if not fh then
 		Logger.debug(LOG, "No existing karabiner.json — writing fresh HS config.")
+		enforce_headless_global(hs_config)
 		return hs_config
 	end
 	local raw = fh:read("*a")
@@ -840,15 +867,20 @@ function M.merge_into_existing_config(hs_config, karabiner_out)
 	local ok, existing = pcall(hs.json.decode, raw)
 	if not ok or type(existing) ~= "table" then
 		Logger.warn(LOG, "Existing karabiner.json is not valid JSON — overwriting from scratch.")
+		enforce_headless_global(hs_config)
 		return hs_config
 	end
 
 	local hs_profile = hs_config.profiles and hs_config.profiles[1]
-	if not hs_profile then return hs_config end
+	if not hs_profile then
+		enforce_headless_global(existing)
+		return existing
+	end
 
 	if type(existing.profiles) ~= "table" or #existing.profiles == 0 then
 		-- No profiles yet — write HS config wholesale but keep any global section
 		existing.profiles = hs_config.profiles
+		enforce_headless_global(existing)
 		return existing
 	end
 
@@ -860,7 +892,8 @@ function M.merge_into_existing_config(hs_config, karabiner_out)
 
 	-- Overwrite only complex_modifications so KE UI device/fn-key settings survive
 	existing.profiles[target_idx].complex_modifications = hs_profile.complex_modifications
-	Logger.debug(LOG, "Merged HS rules into profile %d of existing karabiner.json.", target_idx)
+	enforce_headless_global(existing)
+	Logger.debug(LOG, "Merged HS rules into profile %d of existing karabiner.json (menubar icon hidden).", target_idx)
 	return existing
 end
 

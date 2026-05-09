@@ -263,10 +263,12 @@ function M.show_webview(opts)
 	end
 
 	-- wv:html() loads content but does not show the window — explicit show() required.
-	-- Do NOT call force_focus here: the OS has not yet assigned a window handle
-	-- (hswindow()) at this point, so any raise/focus attempt is a no-op or crashes.
-	-- The caller is responsible for polling hswindow() and raising when ready.
+	-- force_focus is called with is_new=true so it skips the hide/show flicker path
+	-- and goes straight to the 50 ms delayed bringToFront + focus. This means every
+	-- UI opened through this factory automatically comes to the foreground and receives
+	-- keyboard focus without each caller having to remember to call it.
 	pcall(function() wv:show() end)
+	M.force_focus(wv, true)
 	Logger.info(LOG, "Webview window created successfully.")
 	return wv
 end

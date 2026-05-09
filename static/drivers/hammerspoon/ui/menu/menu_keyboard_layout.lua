@@ -21,9 +21,10 @@
 
 local M = {}
 
-local hs     = hs
-local Logger = require("lib.logger")
-local LOG    = "menu.keyboard_layout"
+local hs            = hs
+local Logger        = require("lib.logger")
+local notifications = require("lib.notifications")
+local LOG           = "menu.keyboard_layout"
 
 
 
@@ -53,13 +54,17 @@ local KEYBOARD_PREFS_URL = "x-apple.systempreferences:com.apple.preference.keybo
 -- a one-click TISEnableInputSource entry for each. The order shown in the
 -- menu mirrors the natural progression: base → ANSI → plus → plus ANSI →
 -- plus_plus → plus_plus ANSI.
+-- TIS IDs use the `com.apple.keyboardlayout.*` namespace (third-party convention).
+-- The shorter `com.apple.keylayout.*` namespace is reserved by macOS for system
+-- input sources; using it for a third-party bundle causes the OS to silently
+-- refuse to register the bundle, so it never appears in the input-source list.
+-- Note: Ergopti++ variants are intentionally absent here — they are not
+-- included in the current bundle and must not be offered to the user.
 local ERGOPTI_VARIANTS = {
-	{ id = "com.apple.keylayout.ergopti",                label = "Ergopti" },
-	{ id = "com.apple.keylayout.ergopti.ansi",           label = "Ergopti ANSI" },
-	{ id = "com.apple.keylayout.ergopti.plus",           label = "Ergopti+" },
-	{ id = "com.apple.keylayout.ergopti.plus.ansi",      label = "Ergopti+ ANSI" },
-	{ id = "com.apple.keylayout.ergopti.plus_plus",      label = "Ergopti++" },
-	{ id = "com.apple.keylayout.ergopti.plus_plus.ansi", label = "Ergopti++ ANSI" },
+	{ id = "com.apple.keyboardlayout.ergopti",           label = "Ergopti",      suffix = ""          },
+	{ id = "com.apple.keyboardlayout.ergopti.ansi",      label = "Ergopti ANSI", suffix = "_ansi"     },
+	{ id = "com.apple.keyboardlayout.ergopti.plus",      label = "Ergopti+",     suffix = "_plus"     },
+	{ id = "com.apple.keyboardlayout.ergopti.plus.ansi", label = "Ergopti+ ANSI", suffix = "_plus_ansi" },
 }
 
 -- Delay before rebuilding the menu after a bundle install. macOS reloads the
@@ -175,20 +180,31 @@ local function path_exists(path)
 		local attrs = hs.fs.attributes(path)
 		if attrs then return true end
 	end
-	-- Shell fallback. -e tests for any kind of filesystem object.
+	-- Shell fallback — handles SIP-protected paths that hs.fs.attributes can't stat.
+	-- /bin/test -e accepts any filesystem object (file, dir, bundle symlink).
 	local cmd = string.format("/bin/test -e %q && echo OK", path)
 	local out = hs.execute and hs.execute(cmd) or nil
 	if type(out) == "string" and out:find("OK") then return true end
-	-- Last-resort fallbacks for plain Lua test runs (no hs available)
+	-- Pure-Lua fallback for unit-test runs where hs is unavailable.
+	-- os.rename is intentionally omitted: on SIP-protected paths it returns true
+	-- even when the file does not exist, which would make find_installed_bundles
+	-- report a phantom installed bundle and show "Mettre à jour" instead of "Installer".
 	local f = io.open(path, "r")
 	if f then f:close(); return true end
-	local ok = os.rename(path, path)
-	return ok == true
+	return false
 end
 
 --- Lists every Ergopti_v*.bundle currently installed in `dir`.
 --- Returns the parsed version components for each so callers can compare to
 --- the latest available version without having to re-parse strings.
+---
+--- Bundle entries are only counted when their internal Contents/Info.plist
+--- exists — a stray empty .bundle directory left behind by a failed install
+--- (or by macOS while moving files between locations) would otherwise be
+--- picked up here, with the upstream menu builder then offering an
+--- "in-place upgrade" against a non-existent install. The structural check
+--- guarantees `installed` only points at bundles that the OS would itself
+--- treat as a real keyboard layout.
 --- @param dir string Absolute path of the Keyboard Layouts directory.
 --- @return table Array of { name = string, version = table } entries.
 local function find_installed_bundles(dir)
@@ -197,11 +213,17 @@ local function find_installed_bundles(dir)
 	local cmd = string.format("ls -1 %q 2>/dev/null", dir)
 	local p = io.popen(cmd)
 	if not p then return out end
+	local dir_with_slash = dir:match("[/\\]$") and dir or (dir .. "/")
 	for line in p:lines() do
 		line = line:gsub("[\r\n]+$", "")
 		if line:match("^Ergopti_v[%d%.]+%.bundle$") then
 			local v = parse_version(line)
-			if v then out[#out + 1] = { name = line, version = v } end
+			local info_plist = dir_with_slash .. line .. "/Contents/Info.plist"
+			local plist_ok = v and path_exists(info_plist)
+			Logger.debug(LOG, "Bundle probe — dir=%s name=%s plist_exists=%s.", dir, line, tostring(plist_ok))
+			if plist_ok then
+				out[#out + 1] = { name = line, version = v }
+			end
 		end
 	end
 	p:close()
@@ -232,13 +254,19 @@ local function version_str(v)
 end
 
 --- Copies the latest bundle to the user's Keyboard Layouts directory.
---- Existing Ergopti_v*.bundle entries are removed first so the layout list
---- doesn't end up with multiple side-by-side versions.
+--- Removes any Ergopti_v*.bundle from BOTH the user and system directories
+--- first, so a user install always becomes the single canonical copy.
 --- @param bundles_dir string Absolute path of the source bundles directory.
 --- @param bundle_name string Basename of the bundle to install.
 --- @return boolean true on success.
 local function install_user(bundles_dir, bundle_name)
 	Logger.start(LOG, "Installing %s into the user Keyboard Layouts folder…", bundle_name)
+	-- Remove the system-scope copy first (requires no privilege since we only
+	-- touch the user's own Library here — system removal is skipped silently
+	-- when it fails due to permission; the user will see an outdated entry in
+	-- the system folder but it won't conflict because macOS prefers the user
+	-- scope when both exist for the same bundle identifier).
+	hs.execute(string.format('rm -rf %q/Ergopti_v*.bundle', SYSTEM_LAYOUTS_DIR:gsub("/$", "")))
 	local cmd = string.format(
 		'mkdir -p %q && rm -rf %q/Ergopti_v*.bundle && cp -R %q %q',
 		USER_LAYOUTS_DIR,
@@ -249,7 +277,7 @@ local function install_user(bundles_dir, bundle_name)
 	local out, ok = hs.execute(cmd)
 	if ok then
 		Logger.success(LOG, "User install done — %s.", bundle_name)
-		if hs.alert then pcall(hs.alert.show, "Ergopti installé pour l'utilisateur.") end
+		pcall(notifications.notify, "Ergopti installé pour l'utilisateur.", nil, "success")
 		return true
 	end
 	Logger.error(LOG, "User install failed: %s.", tostring(out))
@@ -257,13 +285,17 @@ local function install_user(bundles_dir, bundle_name)
 end
 
 --- Copies the latest bundle to /Library/Keyboard Layouts/ via osascript with
---- administrator privileges. Triggers a macOS password prompt. Existing
---- Ergopti_v*.bundle entries are removed first to keep the list clean.
+--- administrator privileges. Triggers a macOS password prompt. Removes any
+--- Ergopti_v*.bundle from BOTH the user and system directories first, so the
+--- system copy becomes the single canonical installation.
 --- @param bundles_dir string Absolute path of the source bundles directory.
 --- @param bundle_name string Basename of the bundle to install.
 --- @return boolean true on success.
 local function install_system(bundles_dir, bundle_name)
 	Logger.start(LOG, "Installing %s into the system Keyboard Layouts folder (sudo)…", bundle_name)
+	-- Remove both the user copy (no privilege needed) and the old system copy
+	-- (done inside the privileged shell so both are cleaned atomically).
+	hs.execute(string.format('rm -rf %q/Ergopti_v*.bundle', USER_LAYOUTS_DIR:gsub("/$", "")))
 	local shell_cmd = string.format(
 		"rm -rf '%sErgopti_v'*.bundle && cp -R '%s%s' '%s'",
 		SYSTEM_LAYOUTS_DIR, bundles_dir, bundle_name, SYSTEM_LAYOUTS_DIR
@@ -278,7 +310,7 @@ local function install_system(bundles_dir, bundle_name)
 	end
 	if ok then
 		Logger.success(LOG, "System install done — %s.", bundle_name)
-		if hs.alert then pcall(hs.alert.show, "Ergopti installé pour le système.") end
+		pcall(notifications.notify, "Ergopti installé pour le système.", nil, "success")
 		return true
 	end
 	Logger.error(LOG, "System install failed (sudo cancelled or copy error).")
@@ -293,67 +325,6 @@ end
 -- ======= 4/ Input Source Enumeration ========
 -- ============================================
 -- ============================================
-
---- Reads the raw list of enabled input source identifiers straight from
---- com.apple.HIToolbox.plist. Unlike `hs.keycodes.layouts(true)` — which
---- silently drops entries it cannot resolve to an installed bundle — this
---- helper returns every entry in the user's enabled-list, including
---- orphaned legacy IDs that lost their backing bundle after an upgrade.
---- @return table Deduplicated list of identifiers (Bundle ID or KeyboardLayout Name).
-local function read_enabled_raw_ids()
-	if type(hs.execute) ~= "function" then return {} end
-	local out, ok = hs.execute("/usr/bin/defaults read com.apple.HIToolbox AppleEnabledInputSources 2>/dev/null")
-	if not ok or type(out) ~= "string" or out == "" then return {} end
-	local seen, sources = {}, {}
-	local function push(s)
-		if s and s ~= "" and not seen[s] then
-			seen[s] = true
-			sources[#sources + 1] = s
-		end
-	end
-	-- "Bundle ID" entries (custom keylayout bundles)
-	for id in out:gmatch('"Bundle ID"%s*=%s*"([^"]+)"') do push(id) end
-	for id in out:gmatch('Bundle ID%s*=%s*([%w%.%-_]+);') do push(id) end
-	-- "KeyboardLayout Name" entries (system layouts like French, U.S.)
-	for nm in out:gmatch('"KeyboardLayout Name"%s*=%s*"([^"]+)"') do push(nm) end
-	for nm in out:gmatch('KeyboardLayout Name%s*=%s*([%w%-_]+);') do push(nm) end
-	return sources
-end
-
---- Lists every keyboard layout currently enabled in macOS by combining the
---- raw enabled-list from preferences with whatever `hs.keycodes.layouts(true)`
---- returns. The raw list is authoritative — hs.keycodes filters orphaned
---- entries, but the user still wants to see them so they can clean up.
---- @return table Sorted list of layout identifiers / names.
-local function list_enabled_input_sources()
-	local raw = read_enabled_raw_ids()
-	if #raw > 0 then
-		table.sort(raw)
-		return raw
-	end
-	-- Fallback when defaults isn't available (e.g. test environment): use
-	-- the hs.keycodes API. Returns localised names rather than raw IDs.
-	if not (hs.keycodes and type(hs.keycodes.layouts) == "function") then
-		Logger.warn(LOG, "Both `defaults read` and hs.keycodes.layouts unavailable — empty list.")
-		return {}
-	end
-	local ok, layouts = pcall(hs.keycodes.layouts, true)
-	if not ok or type(layouts) ~= "table" then
-		Logger.warn(LOG, "hs.keycodes.layouts() failed: %s.", tostring(layouts))
-		return {}
-	end
-	table.sort(layouts)
-	return layouts
-end
-
---- Returns the name of the currently-selected keyboard layout.
---- @return string|nil
-local function current_input_source_name()
-	if not (hs.keycodes and type(hs.keycodes.currentLayout) == "function") then return nil end
-	local ok, name = pcall(hs.keycodes.currentLayout)
-	if ok and type(name) == "string" and name ~= "" then return name end
-	return nil
-end
 
 --- Runs an AppleScript in a child osascript process so that any failure or
 --- crash inside Carbon/TIS stays contained — `hs.osascript.applescript` runs
@@ -374,6 +345,101 @@ local function run_osascript_isolated(script)
 	local out, ok = hs.execute(string.format("/usr/bin/osascript %q", path))
 	os.remove(path)
 	return ok and true or false, out
+end
+
+--- Enumerates every enabled keyboard-layout input source via Carbon TIS
+--- in an isolated osascript subprocess. Returns a list of records:
+---
+---     { id = "com.apple.keylayout.ergopti.plus",
+---       name = "Ergopti+",
+---       selected = false }
+---
+--- The result is filtered to ``kTISTypeKeyboardLayout`` so non-keyboard
+--- entries that always sit in ``AppleEnabledInputSources`` (PressAndHold,
+--- CharacterPalette, IMEs) are dropped at the source rather than after the
+--- fact. Exactly one record carries ``selected = true`` — the layout
+--- macOS would route a keystroke to right now — which is what the menu
+--- uses to render the checkmark on the active row.
+---
+--- A defensive Lua-side filter also drops ids that look like input methods
+--- or services in case the TIS type predicate is partially honoured by
+--- older macOS versions.
+---
+--- Returns an empty list when osascript or TIS fails (logged), so callers
+--- can fall back to a "no layout" placeholder without having to handle
+--- nil. Pure-Lua test runs (no ``hs.execute``) hit this branch silently.
+--- @return table List of input-source records (possibly empty).
+--- Reads AppleEnabledInputSources from HIToolbox via a Python plist parser and
+--- returns a list of records {id, name, selected} for every enabled keyboard
+--- layout. Using Python avoids the regex-on-XML fragility that caused duplicate
+--- entries when the same KeyboardLayout Name appeared in multiple plist sections.
+--- HIToolbox is the macOS source of truth — changes in System Settings are
+--- reflected immediately, without the TIS cache lag from osascript/hs.keycodes.
+local function list_active_keyboard_layouts()
+	-- Read via `defaults export` (cfprefsd) — reflects deletions made in System
+	-- Settings immediately. Reading the plist file directly returned stale entries
+	-- for layouts the user had already removed.
+	local py = [[
+import subprocess, sys, plistlib, json
+
+DOMAIN = "com.apple.HIToolbox"
+KEY    = "AppleEnabledInputSources"
+
+# Read via cfprefsd (defaults export) — reflects System Settings changes
+# immediately, unlike reading the plist file directly which can be stale.
+try:
+    raw = subprocess.check_output(
+        ["defaults", "export", DOMAIN, "-"], stderr=subprocess.DEVNULL)
+    prefs = plistlib.loads(raw)
+except Exception as e:
+    print("ERR:" + str(e)); sys.exit(1)
+
+sources = prefs.get(KEY, [])
+out = []
+for s in sources:
+    kind = s.get("InputSourceKind", "")
+    name = s.get("KeyboardLayout Name", "")
+    if name and (kind == "Keyboard Layout" or kind == ""):
+        out.append(name)
+print(json.dumps(out))
+]]
+	local tmp = os.tmpname() .. ".py"
+	local fh = io.open(tmp, "w")
+	if not fh then
+		Logger.warn(LOG, "list_active_keyboard_layouts: cannot write temp script.")
+		return {}
+	end
+	fh:write(py); fh:close()
+	local raw_out, ok = hs.execute("/usr/bin/python3 " .. tmp .. " 2>&1")
+	os.remove(tmp)
+	Logger.debug(LOG, "HIToolbox defaults export raw: ok=%s out=%s.", tostring(ok), tostring(raw_out):gsub("[\r\n]", " "))
+
+	local current_name = (hs.keycodes and type(hs.keycodes.currentLayout) == "function")
+		and hs.keycodes.currentLayout() or nil
+
+	local out = {}
+	if ok and type(raw_out) == "string" and raw_out:sub(1, 1) == "[" then
+		-- Decode the JSON array of KeyboardLayout Name strings
+		for kl_name in raw_out:gmatch('"([^"]+)"') do
+			local display = kl_name:gsub("_", " "):gsub("%s+v%d.*$", "")
+			local selected = (current_name ~= nil and (
+				kl_name == current_name or display == current_name
+			)) or false
+			out[#out + 1] = { id = kl_name, name = display, selected = selected }
+		end
+	else
+		Logger.warn(LOG, "HIToolbox Python parse failed (%s) — falling back to hs.keycodes.", tostring(raw_out))
+		if hs.keycodes and type(hs.keycodes.layouts) == "function" then
+			local layouts = hs.keycodes.layouts() or {}
+			local current = (type(hs.keycodes.currentLayout) == "function") and hs.keycodes.currentLayout() or nil
+			for _, name in ipairs(layouts) do
+				out[#out + 1] = { id = name, name = name, selected = (current ~= nil and name == current) or false }
+			end
+		end
+	end
+
+	Logger.debug(LOG, "Active layouts from HIToolbox: %d.", #out)
+	return out
 end
 
 --- Activates the given keyboard layout. First tries hs.keycodes.setLayout
@@ -413,60 +479,199 @@ end run
 	return false
 end
 
---- Enables the given input source in the user's enabled-list and selects it,
---- via TISEnableInputSource + TISSelectInputSource. The bundle providing the
---- source MUST already be on disk, otherwise TISCreateInputSourceList returns
---- no match. The script runs in an isolated osascript subprocess (see
---- run_osascript_isolated) so any TIS-side error stays contained.
---- @param raw_id string TISInputSourceID, e.g. "com.apple.keylayout.ergopti.plus".
+--- Returns a set of TIS IDs for Ergopti variants currently present in
+--- AppleEnabledInputSources, read directly from HIToolbox via `defaults export`.
+--- Maps KeyboardLayout Name (internal name) back to TIS IDs via ERGOPTI_VARIANTS.
+--- This bypasses the TIS osascript path that fails on macOS Sequoia.
+--- @return table Set of TIS IDs, e.g. { ["com.apple.keyboardlayout.ergopti.plus"] = true }.
+--- Builds a mapping from KeyboardLayout Name (internal HIToolbox name) to stable TIS ID
+--- for every variant in the currently installed bundle. Returns nil if no bundle is installed.
+--- Example: { ["Ergopti_v2_2_2_plus"] = "com.apple.keyboardlayout.ergopti.plus", ... }
+--- @return table|nil
+local function build_kl_name_to_tis_id()
+	local sb_sys  = highest_installed(SYSTEM_LAYOUTS_DIR)
+	local sb_user = highest_installed(USER_LAYOUTS_DIR)
+	local sb      = sb_sys or sb_user
+	local sb_dir  = sb_sys and SYSTEM_LAYOUTS_DIR or (sb_user and USER_LAYOUTS_DIR) or nil
+	if not sb or not sb_dir then return nil end
+	local installed_bundle = sb.name:gsub("%.bundle$", ""):gsub("%.", "_")
+	local bundle_path = sb_dir:gsub("[/\\]$", "") .. "/" .. sb.name
+	local map = {}
+	for _, var in ipairs(ERGOPTI_VARIANTS) do
+		local internal   = installed_bundle .. (var.suffix or "")
+		local keylayout  = bundle_path .. "/Contents/Resources/" .. internal .. ".keylayout"
+		if path_exists(keylayout) then
+			map[internal] = var.id
+		end
+	end
+	return map
+end
+
+
+--- Adds the given TIS input source to the user's enabled-list via
+--- `defaults write com.apple.HIToolbox`, then restarts SystemUIServer so
+--- the change takes effect immediately.
+---
+--- The Carbon TIS ObjC-bridge approach (TISCreateInputSourceList +
+--- TISEnableInputSource called from osascript) was tried extensively but
+--- crashes silently on macOS Sequoia: NSMutableDictionary bridged to
+--- CFDictionaryRef causes osascript to exit without writing any output,
+--- leaving the Lua caller with status=<no-output>. The `defaults write`
+--- approach is what Karabiner-Elements and other third-party tools use and
+--- is known to work reliably on macOS 12–15.
+---
+--- The AppleEnabledInputSources preference is an array of dicts. We read
+--- the current list, check whether the target ID is already present, append
+--- it if not, and write back.  The whole operation is a single Python 3
+--- one-liner that ships with macOS and needs no extra dependencies.
+--- @param raw_id string TISInputSourceID, e.g. "com.apple.keyboardlayout.ergopti.plus".
+--- @param label string Human-readable label used in log messages.
 --- @return boolean true on success.
-local function enable_and_select_source(raw_id)
+local function enable_and_select_source(raw_id, label, bundle_path, internal_name)
 	if type(raw_id) ~= "string" or raw_id == "" then return false end
-	local script = string.format([[
-use framework "Carbon"
-use framework "Foundation"
-on run
-	set theProps to current application's NSDictionary's dictionaryWithObjects:{"%s"} forKeys:{"TISPropertyInputSourceID"}
-	set theSources to current application's TISCreateInputSourceList(theProps, true)
-	if theSources is missing value then return "MISS"
-	set theList to theSources as list
-	if (count of theList) = 0 then return "MISS"
-	set theSource to item 1 of theList
-	current application's TISEnableInputSource(theSource)
-	current application's TISSelectInputSource(theSource)
-	return "OK"
-end run
-]], raw_id:gsub('"', '\\"'))
-	local ok, out = run_osascript_isolated(script)
-	if ok and out and tostring(out):find("OK") then
-		Logger.success(LOG, "Enabled and selected '%s'.", raw_id)
+	if type(bundle_path) ~= "string" or bundle_path == "" then
+		Logger.error(LOG, "enable_and_select_source: bundle_path missing for '%s'.", raw_id)
+		return false
+	end
+	if type(internal_name) ~= "string" or internal_name == "" then
+		Logger.error(LOG, "enable_and_select_source: internal_name missing for '%s'.", raw_id)
+		return false
+	end
+	local display = (type(label) == "string" and label ~= "") and label or raw_id
+
+	-- bundle_path: absolute path to the installed .bundle directory
+	-- internal_name: the keylayout filename base (e.g. "Ergopti_v2_2_2_plus")
+	-- The correct HIToolbox entry format matches macOS built-in layouts (e.g. French):
+	--   InputSourceKind  → "Keyboard Layout"
+	--   KeyboardLayout ID   → integer id= from the .keylayout XML (no Bundle ID needed)
+	--   KeyboardLayout Name → name= from the .keylayout XML (= internal_name)
+	-- Adding a Bundle ID or using a string for KeyboardLayout ID causes macOS to silently
+	-- ignore the entry at next login / SystemUIServer restart.
+	local py_script = string.format([[
+import subprocess, sys, plistlib, re, os
+
+DOMAIN        = "com.apple.HIToolbox"
+KEY           = "AppleEnabledInputSources"
+BUNDLE_PATH   = "%s"
+INTERNAL_NAME = "%s"
+
+# Extract KeyboardLayout ID (integer) from the .keylayout XML
+keylayout_file = os.path.join(BUNDLE_PATH, "Contents", "Resources", INTERNAL_NAME + ".keylayout")
+try:
+    with open(keylayout_file, "r", encoding="utf-8") as f:
+        content = f.read(4096)
+    m = re.search(r'<keyboard\b[^>]*\bid=["\']?(-?\d+)["\']?', content)
+    if not m:
+        print("PARSE_ERR:no id= in " + keylayout_file); sys.exit(1)
+    kl_id = int(m.group(1))
+except Exception as e:
+    print("PARSE_ERR:" + str(e)); sys.exit(1)
+
+try:
+    raw = subprocess.check_output(
+        ["defaults", "export", DOMAIN, "-"], stderr=subprocess.DEVNULL)
+    prefs = plistlib.loads(raw)
+except Exception as e:
+    print("READ_ERR:" + str(e)); sys.exit(1)
+
+sources = prefs.get(KEY, [])
+
+# Remove only entries that are stale for THIS variant:
+#   - any Ergopti entry that still has a Bundle ID (wrong legacy format), OR
+#   - the exact same KeyboardLayout Name we are about to add (dedup).
+# Other Ergopti variants that are already clean are left untouched.
+def is_stale_entry(s):
+    bid  = s.get("Bundle ID", "")
+    name = s.get("KeyboardLayout Name", "")
+    if "ergopti" in bid.lower(): return True
+    if name == INTERNAL_NAME: return True
+    return False
+
+sources = [s for s in sources if not is_stale_entry(s)]
+
+# Format mirrors macOS built-in keyboard layout entries (e.g. French):
+# no Bundle ID, KeyboardLayout ID is a native integer in the plist.
+sources.append({
+    "InputSourceKind":     "Keyboard Layout",
+    "KeyboardLayout ID":   kl_id,
+    "KeyboardLayout Name": INTERNAL_NAME,
+})
+prefs[KEY] = sources
+
+plist_bytes = plistlib.dumps(prefs, fmt=plistlib.FMT_XML)
+import tempfile
+with tempfile.NamedTemporaryFile(suffix=".plist", delete=False) as f:
+    f.write(plist_bytes)
+    tmp = f.name
+
+try:
+    subprocess.check_call(
+        ["defaults", "import", DOMAIN, tmp],
+        stderr=subprocess.DEVNULL)
+finally:
+    os.unlink(tmp)
+
+# Reload the input-source list. launchctl kickstart is safer than killall
+# on Sequoia: it re-spawns the agent cleanly without flushing the cfprefsd cache.
+uid = str(os.getuid())
+subprocess.call(
+    ["launchctl", "kickstart", "-k", "user/" + uid + "/com.apple.SystemUIServer"],
+    stderr=subprocess.DEVNULL)
+print("OK")
+]], bundle_path, internal_name)
+
+	-- Write the Python script to a temp file and run it with the system Python 3.
+	local tmp_py = os.tmpname() .. ".py"
+	local fh = io.open(tmp_py, "w")
+	if not fh then
+		Logger.error(LOG, "enable_and_select_source: could not write temp script.")
+		return false
+	end
+	fh:write(py_script)
+	fh:close()
+
+	local out, ok = hs.execute("/usr/bin/python3 " .. tmp_py .. " 2>&1")
+	os.remove(tmp_py)
+
+	local out_text = tostring(out or ""):gsub("[\r\n]+$", "")
+	if ok and (out_text == "OK" or out_text == "ALREADY_PRESENT") then
+		Logger.success(LOG, "Input source '%s' (%s) added to enabled list (%s).",
+			display, raw_id, out_text)
 		return true
 	end
-	Logger.warn(LOG, "Failed to enable '%s' (out=%s).", raw_id, tostring(out))
+	Logger.warn(LOG, "Failed to add '%s' (%s) — status=%s.",
+		display, raw_id, (out_text ~= "") and out_text or "<no-output>")
 	return false
 end
 
---- Returns true if the given layout name looks like a legacy Ergopti bundle
---- identifier (the pre-v2.2.2 'com.apple.keyboardlayout.ergopti.vX_Y_Z…' form).
---- Used to decide whether the active list contains entries that need to be
---- replaced by their stable-id counterparts.
+--- Returns true if the given layout name looks like a legacy versioned Ergopti
+--- identifier (pre-v2.2.2 form: 'com.apple.keyboardlayout.ergopti.v2_2_1.plus'),
+--- OR the short-namespace form mistakenly used between v2.2.2 and the
+--- com.apple.keylayout.* fix ('com.apple.keylayout.ergopti.*' — never registered
+--- by macOS, but may be in users' active-list from a previous install attempt).
+--- Both forms must be replaced by their stable third-party counterparts.
 --- @param name string
 --- @return boolean
 local function is_legacy_ergopti_id(name)
 	if type(name) ~= "string" then return false end
 	local lower = name:lower()
-	return lower:find("keyboardlayout%.ergopti", 1) ~= nil
-		or lower:find("ergopti[._]v%d", 1) ~= nil
+	-- Versioned IDs (any namespace)
+	if lower:find("ergopti[._]v%d", 1) ~= nil then return true end
+	-- Short reserved namespace, only for Ergopti
+	if lower:find("^com%.apple%.keylayout%.ergopti", 1) ~= nil then return true end
+	return false
 end
 
 --- Maps a legacy Ergopti identifier to its v2.2.2+ stable equivalent.
---- com.apple.keyboardlayout.ergopti.v2_2_0[.suffix] → com.apple.keylayout.ergopti[.suffix]
+--- com.apple.keyboardlayout.ergopti.v2_2_0[.suffix] → com.apple.keyboardlayout.ergopti[.suffix]
+--- com.apple.keylayout.ergopti[.suffix]            → com.apple.keyboardlayout.ergopti[.suffix]
 --- @param old string
 --- @return string
 local function migrate_legacy_id(old)
 	if type(old) ~= "string" then return old end
-	local m = old:gsub("^com%.apple%.keyboardlayout%.", "com.apple.keylayout.")
-	-- Strip the version segment .vX_Y_Z (or .vX.Y.Z) wherever it appears
+	-- Lift the short reserved namespace to the third-party one.
+	local m = old:gsub("^com%.apple%.keylayout%.", "com.apple.keyboardlayout.")
+	-- Strip the version segment .vX_Y_Z (or .vX.Y.Z) wherever it appears.
 	m = m:gsub("%.v%d+[._]%d+[._]%d+", "")
 	m = m:gsub("%.v%d+[._]%d+", "")
 	m = m:gsub("%.v%d+", "")
@@ -479,7 +684,7 @@ end
 --- AppleScript ObjC bridge so no external tooling is required.
 --- The latest bundle MUST already be installed locally — TIS only enables
 --- input sources for layouts present on disk.
---- @param legacy_active table Names from list_enabled_input_sources() that look legacy.
+--- @param legacy_active table TIS ids from list_active_keyboard_layouts() that look legacy.
 --- @return boolean true on success.
 local function upgrade_active_list(legacy_active)
 	if type(legacy_active) ~= "table" or #legacy_active == 0 then return false end
@@ -566,11 +771,13 @@ local function format_ergopti_display(id)
 	if type(id) ~= "string" then return nil end
 	local lower = id:lower()
 	if not lower:find("ergopti", 1, true) then return nil end
-	-- Variant detection — order matters because "plus_plus" must match before "plus"
+	-- Variant detection — order matters: ++ before +, and symbol forms before word forms.
+	-- "plus_plus" / "plus.plus" cover bundle IDs; "++" / "+" cover localised names
+	-- returned by hs.keycodes (e.g. "Ergopti+" when TIS osascript is unavailable).
 	local variant
-	if lower:find("plus_plus") or lower:find("plus%.plus") then
+	if lower:find("plus_plus") or lower:find("plus%.plus") or id:find("%+%+") then
 		variant = "++"
-	elseif lower:find("plus") then
+	elseif lower:find("plus") or id:find("%+") then
 		variant = "+"
 	else
 		variant = ""
@@ -605,14 +812,41 @@ local function clean_layout_name(name)
 		:gsub("^com%.apple%.inputsource%.", ""))
 end
 
+--- Returns the highest Ergopti version installed across the user and system
+--- keyboard-layout directories, or nil when none is present.
+--- @return table|nil Numeric version components, e.g. {2,2,1}.
+local function resolve_installed_ergopti_version()
+	local user_best   = highest_installed(USER_LAYOUTS_DIR)
+	local system_best = highest_installed(SYSTEM_LAYOUTS_DIR)
+	if user_best and system_best then
+		return version_gt(user_best.version, system_best.version)
+			and user_best.version or system_best.version
+	end
+	return (user_best and user_best.version) or (system_best and system_best.version) or nil
+end
+
 --- Inspects the active input-source list and reports whether an Ergopti
---- layout is present along with its installed version (if extractable).
---- @param sources table List of layout names returned by list_enabled_input_sources.
---- @return table { present = boolean, name = string|nil, version = table|nil }
-local function ergopti_in_active_layouts(sources)
-	for _, n in ipairs(sources) do
-		if type(n) == "string" and n:lower():find("ergopti", 1, true) then
-			return { present = true, name = n, version = extract_ergopti_version(n) }
+--- layout is present along with the version the user is running.
+---
+--- v2.2.2+ bundles publish a stable TIS id (``com.apple.keylayout.ergopti.plus``)
+--- with no version segment, so :func:`extract_ergopti_version` returns
+--- ``{0,0,0}`` for those entries — the version lives only in the bundle
+--- filename. We fall back to the highest version found on disk so the menu
+--- never has to display ``v0.0.0`` for an entry that the user is happily
+--- running.
+--- @param records table List of records from :func:`list_active_keyboard_layouts`.
+--- @return table { present = boolean, name = string|nil, id = string|nil, version = table|nil }
+local function ergopti_in_active_layouts(records)
+	for _, r in ipairs(records) do
+		local id = (r and r.id) or ""
+		if type(id) == "string" and id:lower():find("ergopti", 1, true) then
+			local v = extract_ergopti_version(id)
+			-- Stable-id entries (no version embedded): substitute the version
+			-- of whatever bundle is installed locally.
+			if v and v[1] == 0 and v[2] == 0 and v[3] == 0 then
+				v = resolve_installed_ergopti_version() or v
+			end
+			return { present = true, name = r.name, id = id, version = v }
 		end
 	end
 	return { present = false }
@@ -721,24 +955,47 @@ function M.build(ctx)
 
 	local submenu = {}
 
-	-- Pull the live state once so the closures below capture stable values
-	local sources    = list_enabled_input_sources()
-	local list_state = ergopti_in_active_layouts(sources)
-	-- Legacy entries that need to be replaced by their stable-id counterparts
-	-- when the user clicks "upgrade in list".
-	local legacy_active = {}
-	for _, n in ipairs(sources) do
-		if is_legacy_ergopti_id(n) then legacy_active[#legacy_active + 1] = n end
+	-- Pull the live state once so the closures below capture stable values.
+	-- list_active_keyboard_layouts() returns rich records {id, name, selected}
+	-- filtered to actual keyboard layouts, so the menu never displays
+	-- internal services (PressAndHold, CharacterPalette, …).
+	local records    = list_active_keyboard_layouts()
+	-- Build the active-Ergopti set directly from records — the same source used
+	-- to display the "Dispositions actives" list below. If an entry appears there
+	-- it is truly active; no need to read HIToolbox separately.
+	--
+	-- records[i].id is the KeyboardLayout Name from HIToolbox (e.g. "Ergopti_v2_2_2_plus"),
+	-- NOT a TIS ID. We map it to a stable TIS ID via the installed bundle's keylayout files.
+	-- Records whose KeyboardLayout Name doesn't match any installed variant are orphan entries
+	-- (old bundle, different version) — we flag them so the menu can offer an upgrade.
+	local kl_name_to_tis = build_kl_name_to_tis_id() or {}
+	local active_id_set_pre = {}
+	local legacy_active     = {}
+	for _, r in ipairs(records) do
+		local kl_name = r.id or ""
+		if kl_name:lower():find("ergopti", 1, true) then
+			local stable_id = kl_name_to_tis[kl_name]
+			if stable_id then
+				-- Matches an installed variant → genuinely active
+				active_id_set_pre[stable_id] = true
+			else
+				-- No match in the installed bundle → orphan/legacy entry
+				legacy_active[#legacy_active + 1] = kl_name
+			end
+		end
 	end
+	local list_state = ergopti_in_active_layouts(records)
 
 	local latest = M.pick_latest_bundle(bundles_dir)
 	-- The list-upgrade only makes sense once the latest bundle is on disk —
 	-- TIS can't enable an input source whose .bundle isn't installed.
+	-- user_best and system_best are declared here so they remain in scope for the
+	-- "Ajouter" submenu closures below (which live outside the `if latest then` block).
+	local user_best   = highest_installed(USER_LAYOUTS_DIR)
+	local system_best = highest_installed(SYSTEM_LAYOUTS_DIR)
 	local latest_installed_anywhere = false
 	if latest then
 		local latest_ver  = parse_version(latest)
-		local user_best   = highest_installed(USER_LAYOUTS_DIR)
-		local system_best = highest_installed(SYSTEM_LAYOUTS_DIR)
 		latest_installed_anywhere =
 			(user_best   and not version_gt(latest_ver, user_best.version))
 			or (system_best and not version_gt(latest_ver, system_best.version))
@@ -748,20 +1005,24 @@ function M.build(ctx)
 			system_best and system_best.name or "none",
 			tostring(latest_installed_anywhere))
 
-		submenu[#submenu + 1] = build_install_item(
-			"utilisateur", "📥", user_best, latest, latest_ver,
-			function()
-				run_install_and_chain(
-					function() return install_user(bundles_dir, latest) end,
-					legacy_active, update_menu
-				)
-			end
-		)
+		-- System scope is listed first: it is the preferred install target
+		-- because it makes the layout available for all users and avoids
+		-- duplication between ~/Library and /Library. A system install also
+		-- removes the user copy automatically, keeping a single canonical bundle.
 		submenu[#submenu + 1] = build_install_item(
 			"système", "🔐", system_best, latest, latest_ver,
 			function()
 				run_install_and_chain(
 					function() return install_system(bundles_dir, latest) end,
+					legacy_active, update_menu
+				)
+			end
+		)
+		submenu[#submenu + 1] = build_install_item(
+			"utilisateur", "📥", user_best, latest, latest_ver,
+			function()
+				run_install_and_chain(
+					function() return install_user(bundles_dir, latest) end,
 					legacy_active, update_menu
 				)
 			end
@@ -777,58 +1038,76 @@ function M.build(ctx)
 	-- Add / upgrade Ergopti in the macOS input-source list.
 	--
 	-- Five possible states:
-	--   1. latest active in list           → greyed-out success label
+	--   1. ALL variants active in list     → greyed-out success label
 	--   2. older active, latest installed  → in-place TIS swap (programmatic)
 	--   3. older active, latest NOT installed → greyed: install latest first
-	--   4. absent, latest installed        → submenu of variants for one-click TIS add
+	--   4. some/no variants present, latest installed → submenu (added ones greyed)
 	--   5. absent, latest NOT installed    → greyed: install latest first
 	local latest_ver = latest and parse_version(latest) or nil
 	local latest_str = latest_ver and version_str(latest_ver) or "?"
-	if list_state.present and latest_ver and list_state.version
-		and not version_gt(latest_ver, list_state.version) then
-		-- 1. Already up to date
+	local all_variants_active = true
+	for _, var in ipairs(ERGOPTI_VARIANTS) do
+		if not active_id_set_pre[var.id] then all_variants_active = false; break end
+	end
+	-- Installed bundle version: system preferred, then user. Used for the label in state 1.
+	-- We derive this from the filesystem, not from TIS, which is unreliable on Sequoia.
+	local installed_ver = (system_best and system_best.version) or (user_best and user_best.version)
+	if all_variants_active and installed_ver then
+		-- 1. All variants already in list and up to date
 		submenu[#submenu + 1] = {
-			title    = string.format("Ergopti v%s dans la liste des dispositions ✅", version_str(list_state.version)),
+			title    = string.format("Ergopti v%s dans la liste des dispositions ✅", version_str(installed_ver)),
 			disabled = true,
 		}
-	elseif list_state.present and latest_ver and not latest_installed_anywhere then
-		-- 3. Older active but latest bundle missing — block the upgrade
-		local old_str = version_str(list_state.version or { 0 })
+	elseif #legacy_active > 0 and latest ~= nil and not latest_installed_anywhere then
+		-- 3. Legacy entry active but latest bundle missing — block the upgrade
+		-- Extract version from the first legacy KeyboardLayout Name (e.g. "Ergopti_v2_1_0" → "2.1.0")
+		local _m = (legacy_active[1] or ""):match("_v(%d+_%d+_%d+)")
+		local old_str = _m and _m:gsub("_", ".") or "?"
 		submenu[#submenu + 1] = {
 			title    = string.format("Mettre à jour la liste — installer Ergopti v%s d’abord (v%s actif)",
 				latest_str, old_str),
 			disabled = true,
 		}
-	elseif list_state.present and latest_ver then
-		-- 2. Older active and latest installed — programmatic swap via TIS
-		local old_str = version_str(list_state.version or { 0 })
+	elseif #legacy_active > 0 then
+		-- 2. Legacy entry active and latest installed — programmatic swap via TIS
+		local _m = (legacy_active[1] or ""):match("_v(%d+_%d+_%d+)")
+		local old_str = _m and _m:gsub("_", ".") or "?"
 		submenu[#submenu + 1] = {
 			title = string.format("📥 Mettre à jour Ergopti dans la liste — v%s → v%s", old_str, latest_str),
 			fn    = function()
-				-- Same crash-avoidance pattern as the add-variant items below
 				defer_tis_call(function()
 					local ok = upgrade_active_list(legacy_active)
-					if ok and hs.alert then pcall(hs.alert.show, "Liste des dispositions mise à jour.") end
-					if not ok and hs.alert then
-						pcall(hs.alert.show, "Échec de la mise à jour — voir la console.", 3)
-					end
+					if ok then pcall(notifications.notify, "Liste des dispositions mise à jour.", nil, "success") end
+					if not ok then pcall(notifications.notify, "Échec de la mise à jour — voir la console.", nil, "error") end
 					schedule_menu_refresh(update_menu)
 				end)
 			end,
 		}
 	elseif latest_installed_anywhere then
-		-- 4. Absent and bundle present — submenu listing each variant. Clicking
-		-- a variant calls TISEnableInputSource + TISSelectInputSource in an
-		-- isolated osascript subprocess, so the user no longer has to detour
-		-- through System Settings AND a TIS-side failure can no longer crash
-		-- Hammerspoon. Variants already enabled in the user's input-source
-		-- list are greyed out and prefixed with ✅.
-		local active_id_set = {}
-		for _, raw in ipairs(sources) do active_id_set[raw] = true end
+		-- 4. Some or no variants present, bundle installed — submenu listing each
+		-- variant. Already-added variants are greyed individually with ✅.
+		local active_id_set = active_id_set_pre
+
+		-- Resolve the installed bundle path (system preferred over user).
+		-- The keylayout internal name base is the bundle basename without ".bundle",
+		-- with dots replaced by underscores (e.g. "Ergopti_v2.2.2.bundle" → "Ergopti_v2_2_2").
+		local installed_dir, installed_name
+		if system_best then
+			installed_dir  = SYSTEM_LAYOUTS_DIR
+			installed_name = system_best.name
+		elseif user_best then
+			installed_dir  = USER_LAYOUTS_DIR
+			installed_name = user_best.name
+		end
+		local bundle_base = installed_name and installed_name:gsub("%.bundle$", ""):gsub("%.", "_") or ""
+		local bundle_full_path = (installed_dir and installed_name) and
+			(installed_dir:gsub("[/\\]$", "") .. "/" .. installed_name) or ""
 
 		local add_sub = {}
 		for _, var in ipairs(ERGOPTI_VARIANTS) do
-			local id = var.id
+			local id            = var.id
+			local suffix        = var.suffix or ""
+			local internal_name = bundle_base .. suffix
 			local already_added = active_id_set[id] == true
 			if already_added then
 				add_sub[#add_sub + 1] = {
@@ -839,17 +1118,10 @@ function M.build(ctx)
 				add_sub[#add_sub + 1] = {
 					title = string.format("%s v%s", var.label, latest_str),
 					fn    = function()
-						-- Bounce the TIS call out of the menu-click frame so macOS
-						-- can dispatch the resulting input-source notifications
-						-- without re-entering us mid-handler.
 						defer_tis_call(function()
-							local ok = enable_and_select_source(id)
-							if ok and hs.alert then
-								pcall(hs.alert.show, string.format("%s ajouté à la liste.", var.label))
-							end
-							if not ok and hs.alert then
-								pcall(hs.alert.show, "Échec de l’ajout — voir la console.", 3)
-							end
+							local ok = enable_and_select_source(id, var.label, bundle_full_path, internal_name)
+							if ok then pcall(notifications.notify, string.format("%s ajouté à la liste.", var.label), nil, "success") end
+							if not ok then pcall(notifications.notify, "Échec de l’ajout — voir la console.", nil, "error") end
 							schedule_menu_refresh(update_menu)
 						end)
 					end,
@@ -863,7 +1135,7 @@ function M.build(ctx)
 	else
 		-- 5. Absent and bundle missing — greyed
 		submenu[#submenu + 1] = {
-			title    = "Installer Ergopti d’abord pour pouvoir l’ajouter à la liste",
+			title    = "Installation préalable d’Ergopti nécessaire avant de pouvoir l’ajouter à la liste",
 			disabled = true,
 		}
 	end
@@ -898,30 +1170,55 @@ function M.build(ctx)
 
 	submenu[#submenu + 1] = { title = "-" }
 
-	-- Active layouts list — one item per enabled input source, with a checkmark
-	-- on the currently selected one. Clicking a row switches the active layout
-	-- via hs.keycodes.setLayout. Display names are stripped of the verbose
-	-- com.apple.{key,keyboard,input}* prefixes for readability.
+	-- Active layouts list — one item per enabled keyboard layout, with a
+	-- checkmark on the currently selected one. Clicking a row switches the
+	-- active layout via TISSelectInputSource (the TIS bundle id is captured
+	-- in each closure so we never have to round-trip through localised
+	-- names, which can collide across languages). Ergopti entries get the
+	-- bundle's actual installed version appended to their localised name
+	-- so a stable-id row no longer shows up as a bare "Ergopti+".
+	local resolved_ergopti_v = resolve_installed_ergopti_version()
+	local function display_for_record(r)
+		local id = r.id or ""
+		if id:lower():find("ergopti", 1, true) then
+			local pretty = format_ergopti_display(id)
+			if pretty and not pretty:find("v%d") and resolved_ergopti_v then
+				pretty = pretty .. " v" .. version_str(resolved_ergopti_v)
+			end
+			if pretty then return pretty end
+		end
+		-- Non-Ergopti rows: prefer the localised name macOS published; fall
+		-- back to a prefix-stripped id when it isn't available.
+		if type(r.name) == "string" and r.name ~= "" and r.name ~= id then
+			return r.name
+		end
+		return clean_layout_name(id)
+	end
+
 	submenu[#submenu + 1] = { title = "Dispositions actives", disabled = true }
-	if #sources == 0 then
+	if #records == 0 then
 		submenu[#submenu + 1] = {
 			title = "Ouvrir Préférences Système → Clavier",
 			fn    = function() pcall(hs.execute, "open '" .. KEYBOARD_PREFS_URL .. "'") end,
 		}
 	else
-		local active = current_input_source_name()
-		for _, raw_name in ipairs(sources) do
-			local display = clean_layout_name(raw_name)
-			-- The original raw name is captured by the closure so that
-			-- hs.keycodes.setLayout still receives a value the API recognises
+		for _, r in ipairs(records) do
+			local title    = display_for_record(r)
+			-- Pass the display name to set_input_source: hs.keycodes.setLayout expects
+			-- the localised name (e.g. "French"), not the internal KeyboardLayout Name.
+			local target_id = r.name
 			submenu[#submenu + 1] = {
-				title   = display,
-				checked = (raw_name == active) or nil,
-				fn      = function()
+				title   = title,
+				checked = r.selected or nil,
+				-- Greyed out when already selected — clicking the checked
+				-- row would be a no-op TIS call and confuse macOS' input
+				-- source watchers when the menu refreshes mid-frame.
+				disabled = r.selected or nil,
+				fn       = function()
 					-- Defer the TIS call out of the menu-click frame so the
-					-- input-source change notification doesn't re-enter HS
+					-- input-source change notification doesn't re-enter HS.
 					defer_tis_call(function()
-						set_input_source(raw_name)
+						set_input_source(target_id)
 						schedule_menu_refresh(update_menu)
 					end)
 				end,

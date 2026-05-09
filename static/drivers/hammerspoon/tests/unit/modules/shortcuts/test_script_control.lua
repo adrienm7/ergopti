@@ -33,26 +33,30 @@ helpers.describe("ScriptControl ACTIONS / ACTION_LABELS", function()
 		end
 	end)
 
-	helpers.it("'none', 'pause' and 'reload' are present", function()
+	helpers.it("'none', 'script_pause_toggle' and 'script_reload' are present", function()
 		local set = {}
 		for _, a in ipairs(SC.ACTIONS) do set[a] = true end
 		helpers.assert_true(set.none)
-		helpers.assert_true(set.pause)
-		helpers.assert_true(set.reload)
+		helpers.assert_true(set.script_pause_toggle)
+		helpers.assert_true(set.script_reload)
 	end)
 
-	helpers.it("ACTION_LABELS has a French label for every id", function()
+	helpers.it("ACTION_LABELS has a French label for every non-separator id", function()
 		for _, id in ipairs(SC.ACTIONS) do
-			helpers.assert_true(type(SC.ACTION_LABELS[id]) == "string"
-				and SC.ACTION_LABELS[id] ~= "")
+			if id ~= "--" then
+				helpers.assert_true(type(SC.ACTION_LABELS[id]) == "string"
+					and SC.ACTION_LABELS[id] ~= "")
+			end
 		end
 	end)
 
-	helpers.it("does not contain duplicate ids", function()
+	helpers.it("does not contain duplicate ids (separators excluded)", function()
 		local seen = {}
 		for _, id in ipairs(SC.ACTIONS) do
-			helpers.assert_eq(seen[id], nil, "duplicate id: " .. tostring(id))
-			seen[id] = true
+			if id ~= "--" then
+				helpers.assert_eq(seen[id], nil, "duplicate id: " .. tostring(id))
+				seen[id] = true
+			end
 		end
 	end)
 end)
@@ -83,13 +87,13 @@ end)
 
 helpers.describe("ScriptControl.set_shortcut_action", function()
 	helpers.it("accepts string keyname + action", function()
-		SC.set_shortcut_action("backspace", "reload")
-		SC.set_shortcut_action("return_key", "pause")
-		SC.set_shortcut_action("escape", "quit_hammerspoon")
+		SC.set_shortcut_action("backspace", "script_reload")
+		SC.set_shortcut_action("return_key", "script_pause_toggle")
+		SC.set_shortcut_action("escape", "script_quit")
 	end)
 
 	helpers.it("rejects non-string arguments without crashing", function()
-		SC.set_shortcut_action(nil, "reload")
+		SC.set_shortcut_action(nil, "script_reload")
 		SC.set_shortcut_action("backspace", nil)
 		SC.set_shortcut_action(42, true)
 	end)

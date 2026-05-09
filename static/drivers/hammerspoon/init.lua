@@ -84,7 +84,7 @@ local ui_restore         = require("lib.ui_restore")
 -- without any module needing to call notifications.notify() directly.
 -- Registered here (after notifications is loaded) to keep logger dependency-free.
 Logger.set_error_notification_handler(function(module_name, message)
-	pcall(notifications.notify, "⚠️ Erreur — " .. tostring(module_name), message)
+	pcall(notifications.notify, "Erreur — " .. tostring(module_name), message, "error")
 end)
 
 
@@ -173,20 +173,49 @@ menu_paths.init(base_dir, function() hs.timer.doAfter(0.25, function() pcall(hs.
 local Logger = require("lib.logger")
 Logger.init_log_path(menu_paths.get_config_dir(), 14)
 
--- Apply optional user overrides from <config_dir>/config.toml on top of
--- hs.settings. Missing file is fine — overrides are opt-in and exist for
--- users who want a single hand-editable file mirroring the AHK driver layer.
+-- Apply optional user overrides from hammerspoon/config.toml on top of
+-- hs.settings. The [script] and [features] sections are an optional "expert"
+-- layer the user can edit by hand to override anything the menu exposes
+-- (LogLevel, individual feature flags). All overrides live in the
+-- driver-specific config — no separate cross-driver config.toml.
 local config_overrides = require("lib.config_overrides")
-do
-	local cdir = menu_paths.get_config_dir()
-	if type(cdir) == "string" and cdir ~= "" then
-		if not cdir:match("[/\\]$") then cdir = cdir .. "/" end
-		config_overrides.apply(cdir .. "config.toml")
+config_overrides.apply(menu_paths.get("ConfigTomlPath"))
+
+local configured_hotstrings_dir = menu_paths.get("HotstringsDirPath")
+local bundled_hotstrings_dir    = base_dir .. "../hotstrings/"
+local hotstrings_dir            = configured_hotstrings_dir
+local config_file               = menu_paths.get("ConfigTomlPath")
+
+local HOTSTRINGS_EXCLUDED_STEMS = {
+	hotstrings_config = true,
+	personal_hotstrings = true,
+	personal_info = true,
+	config = true,
+	paths = true,
+}
+
+local function has_common_hotstring_groups(dir)
+	if type(dir) ~= "string" or dir == "" then return false end
+	local ok_attr, attr = pcall(hs.fs.attributes, dir)
+	if not ok_attr or type(attr) ~= "table" or attr.mode ~= "directory" then
+		return false
 	end
+	for fname in hs.fs.dir(dir) do
+		if fname:match("%.toml$") and not fname:match("^_") then
+			local stem = fname:match("^(.-)%.toml$")
+			if stem and not HOTSTRINGS_EXCLUDED_STEMS[stem] then
+				return true
+			end
+		end
+	end
+	return false
 end
 
-local hotstrings_dir = menu_paths.get("HotstringsDirPath")
-local config_file    = menu_paths.get("ConfigTomlPath")
+if not has_common_hotstring_groups(configured_hotstrings_dir) and has_common_hotstring_groups(bundled_hotstrings_dir) then
+	hotstrings_dir = bundled_hotstrings_dir
+	Logger.warn(LOG, "No shared hotstring groups in '{1}' — using bundled directory '{2}'.",
+		configured_hotstrings_dir, hotstrings_dir)
+end
 
 -- Initialise the hotstrings_config module so per-group delays and tooltip
 -- colors can be resolved from the TOML metadata + the shared user override
@@ -358,7 +387,10 @@ local toml_set = {}
 for fname in hs.fs.dir(hotstrings_dir) do
 	-- Skip manifest/index files (prefixed with _) — they are metadata, not hotstring groups
 	if fname:match("%.toml$") and not fname:match("^_") then
-		toml_set[fname:match("^(.-)%.toml$")] = fname
+		local stem = fname:match("^(.-)%.toml$")
+		if stem and not HOTSTRINGS_EXCLUDED_STEMS[stem] then
+			toml_set[stem] = fname
+		end
 	end
 end
 
@@ -536,7 +568,7 @@ do
 				-- snapshot() is a safety net for any UI still open at reload time;
 				-- under normal deferral they are already closed so it saves nothing
 				ui_restore.snapshot()
-				pcall(notifications.notify, "Hammerspoon", msg or "Fichiers modifiés — rechargement…")
+				pcall(notifications.notify, "Rechargement", msg or "Fichiers modifiés — rechargement…", "info")
 				hs.reload()
 			end)
 		end)
@@ -614,6 +646,19 @@ hs.shutdownCallback = function()
 	else
 		Logger.warn(LOG, "restore_all_overrides indisponible — arrêt sans restauration")
 	end
+	-- Stop Karabiner-Elements user-level helpers we spawned during priming.
+	-- Without this, Karabiner-Menu (the IPC bridge keeper) survives Hammerspoon
+	-- and the user's keyboard stays remapped even though HS is no longer
+	-- managing the config. The kill cmd bootouts launchd registrations first
+	-- (so KeepAlive=true plists do not respawn) then pkills any leftovers.
+	-- The system-level Core-Service and VirtualHIDDevice-Daemon remain alive
+	-- as they should — they are root-owned and harmless without an IPC bridge.
+	pcall(function()
+		local ok, karabiner = pcall(require, "modules.karabiner")
+		if ok and karabiner and type(karabiner.kill) == "function" then
+			karabiner.kill()
+		end
+	end)
 	-- Terminate any running MLX server process so no orphaned Python process lingers
 	-- after Hammerspoon exits. The require is cached, so this has no startup overhead.
 	pcall(function() require("ui.menu.menu_llm").stop_mlx_server() end)

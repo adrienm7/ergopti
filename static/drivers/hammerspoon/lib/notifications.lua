@@ -68,10 +68,21 @@ end
 -- =============================
 -- =============================
 
+--- Emoji prefix for each notification type.
+local TYPE_PREFIX = {
+	success = "✅",
+	error   = "❌",
+	warning = "⚠️",
+	info    = "ℹ️",
+}
+
 --- Sends a system notification with the Ergopti+ branding.
+--- An optional `kind` parameter ("success", "error", "warning", "info") prepends
+--- the matching emoji to the title so notifications are scannable at a glance.
 --- @param title_or_msg string Main title when body is provided, or message when body is omitted.
 --- @param body string|nil Optional detail body.
-function M.notify(title_or_msg, body)
+--- @param kind string|nil Optional type: "success" | "error" | "warning" | "info".
+function M.notify(title_or_msg, body, kind)
     if title_or_msg == nil then return end
     local title_text = "Ergopti+"
     local info_text = tostring(title_or_msg)
@@ -80,7 +91,12 @@ function M.notify(title_or_msg, body)
         title_text = tostring(title_or_msg)
         info_text = tostring(body)
     end
-    
+
+    local prefix = kind and TYPE_PREFIX[kind]
+    if prefix then
+        title_text = prefix .. " " .. title_text
+    end
+
     -- Ensure the notification process never crashes the script
     pcall(function()
         local n = hs.notify.new({
@@ -88,12 +104,12 @@ function M.notify(title_or_msg, body)
             informativeText = info_text,
             contentImage    = _get_logo(),
         })
-        if n and type(n.send) == "function" then 
-            n:send() 
+        if n and type(n.send) == "function" then
+            n:send()
         end
     end)
-	
-	Logger.info(LOG, "Notification dispatched successfully:", title_text, info_text)
+
+	Logger.info(LOG, "Notification dispatched (%s): %s — %s.", tostring(kind or "default"), title_text, info_text)
 end
 
 --- Prints styled debug information to the Hammerspoon console if DEBUG is enabled.

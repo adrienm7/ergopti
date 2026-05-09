@@ -156,7 +156,9 @@ M.DEFAULT_STATE = {
 local CoreState = {
 	-- Paths — keystroke / metrics data goes under <config_dir>/metrics/.
 	-- Resolved at module-load time via menu_paths so a relocated config dir
-	-- is picked up automatically.
+	-- is picked up automatically. The fallback uses ~/.config/ergopti_plus/
+	-- on purpose: persistence files MUST never land inside the source tree
+	-- (hs.configdir, which on a dev setup may be the repo itself).
 	LOG_DIR = (function()
 		local ok, mp = pcall(require, "ui.menu.menu_paths")
 		if ok and mp and type(mp.get_config_dir) == "function" then
@@ -166,7 +168,8 @@ local CoreState = {
 				return d .. "metrics"
 			end
 		end
-		return hs.configdir .. "/metrics"
+		local home = os.getenv("HOME") or ""
+		return home .. "/.config/ergopti_plus/metrics"
 	end)(),
 
 	-- Enablement

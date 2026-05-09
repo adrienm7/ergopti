@@ -260,7 +260,7 @@ function M.copy_or_open_path()
 		timer.doAfter(FINDER_PATH_SETTLE_SEC, function()
 			local ok_p, p = pcall(pasteboard.getContents)
 			if ok_p and p and p ~= "" then
-				notifications.notify("Chemin copié : " .. p)
+				notifications.notify("Chemin copié : " .. p, nil, "success")
 				return
 			end
 

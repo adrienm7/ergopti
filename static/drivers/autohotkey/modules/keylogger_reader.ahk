@@ -27,9 +27,6 @@
 
 #Requires Autohotkey v2.0+
 
-
-
-
 ; ===================================
 ; ===================================
 ; ======= 1/ Constants =======
@@ -46,9 +43,6 @@ class KLReadConst {
     static MAX_NGRAM_ROWS := 50000
 }
 
-
-
-
 ; ===================================
 ; ===================================
 ; ======= 2/ Schema loader =======
@@ -61,7 +55,7 @@ class KLReadConst {
 ; ``..\_shared\schema\schema.sql``.
 KLR_ResolveSchemaPath() {
     base := A_ScriptDir . "\..\_shared\schema\schema.sql"
-    Loop Files, base
+    loop files, base
         return A_LoopFileFullPath
     return base
 }
@@ -73,9 +67,6 @@ KLR_LoadSchema(db) {
     schema := FileRead(schema_path, "UTF-8")
     return SQLite_Exec(db, schema)
 }
-
-
-
 
 ; =========================================
 ; =========================================
@@ -89,8 +80,8 @@ KLR_LoadSchema(db) {
 ; alive across calls and only exec the NEW bytes appended to each
 ; data.sql since the last call.
 class KLRCache {
-    static db          := 0
-    static last_sizes  := Map()    ; absolute_path → byte_offset already loaded
+    static db := 0
+    static last_sizes := Map()    ; absolute_path → byte_offset already loaded
 }
 
 KLR_ResetCache() {
@@ -109,9 +100,10 @@ KLR_BuildDatabase(metrics_dir) {
     if !RegExMatch(md, "[\\/]$")
         md .= "\"
     global _ConfigDir
-    log := _ConfigDir . "logs\prefetch.log"
+    log := _ConfigDir . "ahk\logs\prefetch.log"
     try FileAppend("[" . A_Now . "] KLR PtrSize=" . A_PtrSize . " DLL=" . SQLiteConst.DLL . "`r`n", log, "UTF-8")
-    try FileAppend("[" . A_Now . "] KLR DLL exists=" . (FileExist(SQLiteConst.DLL) ? "yes" : "NO!") . "`r`n", log, "UTF-8")
+    try FileAppend("[" . A_Now . "] KLR DLL exists=" . (FileExist(SQLiteConst.DLL) ? "yes" : "NO!") . "`r`n", log,
+    "UTF-8")
     ; Explicit LoadLibrary so we know whether the DLL even maps into the
     ; process. A nullptr from LoadLibrary means a dependency is missing
     ; or the binary is malformed. AHK's DllCall hits LoadLibrary too,
@@ -168,7 +160,7 @@ KLR_BuildDatabase(metrics_dir) {
     if !DirExist(by_root) {
         return db   ; empty but valid handle.
     }
-    Loop Files, by_root . "*", "D" {
+    loop files, by_root . "*", "D" {
         sql_path := A_LoopFileFullPath . "\data.sql"
         if !FileExist(sql_path)
             continue
@@ -191,7 +183,7 @@ KLR_ApplyIncremental(db, md, log) {
     if !DirExist(by_root)
         return true
     total_new := 0
-    Loop Files, by_root . "*", "D" {
+    loop files, by_root . "*", "D" {
         sql_path := A_LoopFileFullPath . "\data.sql"
         if !FileExist(sql_path)
             continue
@@ -218,9 +210,6 @@ KLR_ApplyIncremental(db, md, log) {
     try FileAppend("[" . A_Now . "] KLR incremental: " . total_new . " new byte(s) exec'd`r`n", log, "UTF-8")
     return true
 }
-
-
-
 
 ; ===============================================
 ; ===============================================
@@ -311,18 +300,18 @@ KLR__SumAppDay(db, manifest, where) {
         . " FROM agg_app_day" . where . " GROUP BY date, app"
     for r in SQLite_Query(db, sql) {
         a := KLR_GetCell(manifest, r["date"], r["app"])
-        a["chars"]            := r["chars"]
-        a["pauses"]           := r["pauses"]
-        a["time"]             := r["time_ms"]
-        a["think_time"]       := r["think_time_ms"]
-        a["hs_chars"]         := r["hs_chars"]
-        a["llm_chars"]        := r["llm_chars"]
-        a["hs_triggers"]      := r["hs_triggers"]
-        a["llm_triggers"]     := r["llm_triggers"]
-        a["hs_input_chars"]   := r["hs_input_chars"]
-        a["llm_input_chars"]  := r["llm_input_chars"]
-        a["app_time"]         := r["app_time"]
-        a["category"]         := r["category"]
+        a["chars"] := r["chars"]
+        a["pauses"] := r["pauses"]
+        a["time"] := r["time_ms"]
+        a["think_time"] := r["think_time_ms"]
+        a["hs_chars"] := r["hs_chars"]
+        a["llm_chars"] := r["llm_chars"]
+        a["hs_triggers"] := r["hs_triggers"]
+        a["llm_triggers"] := r["llm_triggers"]
+        a["hs_input_chars"] := r["hs_input_chars"]
+        a["llm_input_chars"] := r["llm_input_chars"]
+        a["app_time"] := r["app_time"]
+        a["category"] := r["category"]
     }
 }
 
@@ -335,11 +324,11 @@ KLR__SumBuckets(db, manifest, where) {
     for r in SQLite_Query(db, sql) {
         a := KLR_GetCell(manifest, r["date"], r["app"])
         k := String(r["bucket_ms"])
-        KLR_BumpMap(a["time_buckets"],               k, r["time_sum"])
-        KLR_BumpMap(a["credited_buckets"],           k, r["credited"])
-        KLR_BumpMap(a["hs_input_time_buckets"],      k, r["hs_in_t"])
-        KLR_BumpMap(a["hs_input_credited_buckets"],  k, r["hs_in_c"])
-        KLR_BumpMap(a["llm_input_time_buckets"],     k, r["llm_in_t"])
+        KLR_BumpMap(a["time_buckets"], k, r["time_sum"])
+        KLR_BumpMap(a["credited_buckets"], k, r["credited"])
+        KLR_BumpMap(a["hs_input_time_buckets"], k, r["hs_in_t"])
+        KLR_BumpMap(a["hs_input_credited_buckets"], k, r["hs_in_c"])
+        KLR_BumpMap(a["llm_input_time_buckets"], k, r["llm_in_t"])
         KLR_BumpMap(a["llm_input_credited_buckets"], k, r["llm_in_c"])
     }
 }
@@ -361,11 +350,11 @@ KLR__SumBurst(db, manifest, where) {
         . " FROM agg_app_day_burst" . where . " GROUP BY date, app"
     for r in SQLite_Query(db, sql) {
         a := KLR_GetCell(manifest, r["date"], r["app"])
-        a["burst_count_total"]       := r["count_total"]
-        a["burst_max_cpm"]           := r["max_cpm"]
-        a["burst_max_chars"]         := r["max_chars"]
+        a["burst_count_total"] := r["count_total"]
+        a["burst_max_cpm"] := r["max_cpm"]
+        a["burst_max_chars"] := r["max_chars"]
         a["burst_inter_delay_count"] := r["inter_count"]
-        a["burst_inter_delay_sum"]   := r["inter_sum"]
+        a["burst_inter_delay_sum"] := r["inter_sum"]
         a["burst_inter_delay_sumsq"] := r["inter_sumsq"]
         ; Lossy passthrough — the JSON sub-blob is opaque to AHK; emit it
         ; back as a raw JSON-string field so JS can JSON.parse() if needed.
@@ -378,13 +367,14 @@ KLR__SumSession(db, manifest, where) {
         . " FROM agg_app_day_session" . where
     for r in SQLite_Query(db, sql) {
         a := KLR_GetCell(manifest, r["date"], r["app"])
-        a["session_count_total"]     := a["session_count_total"] + (r["count_total"] = "" ? 0 : r["count_total"])
+        a["session_count_total"] := a["session_count_total"] + (r["count_total"] = "" ? 0 : r["count_total"])
         if (IsNumber(r["longest_ms"]) && r["longest_ms"] > a["session_longest_ms"])
             a["session_longest_ms"] := r["longest_ms"]
         if (IsNumber(r["longest_chars"]) && r["longest_chars"] > a["session_longest_chars"])
             a["session_longest_chars"] := r["longest_chars"]
-        a["session_total_active_ms"] := a["session_total_active_ms"] + (r["total_active_ms"] = "" ? 0 : r["total_active_ms"])
-        a["session_durations_json"]  := r["durations_json"]
+        a["session_total_active_ms"] := a["session_total_active_ms"] + (r["total_active_ms"] = "" ? 0 : r[
+            "total_active_ms"])
+        a["session_durations_json"] := r["durations_json"]
     }
 }
 
@@ -397,12 +387,12 @@ KLR__SumCharsClass(db, manifest, where) {
     for r in SQLite_Query(db, sql) {
         a := KLR_GetCell(manifest, r["date"], r["app"])
         a["char_letter"] := r["letter"]
-        a["char_digit"]  := r["digit"]
-        a["char_punct"]  := r["punct"]
-        a["char_space"]  := r["space"]
-        a["char_other"]  := r["other"]
+        a["char_digit"] := r["digit"]
+        a["char_punct"] := r["punct"]
+        a["char_space"] := r["space"]
+        a["char_other"] := r["other"]
         a["first_typed_min"] := r["first_min"]
-        a["last_typed_min"]  := r["last_min"]
+        a["last_typed_min"] := r["last_min"]
     }
 }
 
@@ -414,11 +404,11 @@ KLR__SumErrors(db, manifest, where) {
         . " FROM agg_app_day_errors" . where . " GROUP BY date, app"
     for r in SQLite_Query(db, sql) {
         a := KLR_GetCell(manifest, r["date"], r["app"])
-        a["bs_total"]              := r["bs_total"]
-        a["cascade_count_total"]   := r["cascade_count"]
-        a["cascade_max_len"]       := r["cascade_max_len"]
-        a["recovery_time_sum_ms"]  := r["recovery_sum"]
-        a["recovery_time_count"]   := r["recovery_count"]
+        a["bs_total"] := r["bs_total"]
+        a["cascade_count_total"] := r["cascade_count"]
+        a["cascade_max_len"] := r["cascade_max_len"]
+        a["recovery_time_sum_ms"] := r["recovery_sum"]
+        a["recovery_time_count"] := r["recovery_count"]
     }
 }
 
@@ -431,8 +421,8 @@ KLR__SumErgo(db, manifest, where) {
     for r in SQLite_Query(db, sql) {
         a := KLR_GetCell(manifest, r["date"], r["app"])
         a["same_finger_streak_max"] := r["f_max"]
-        a["same_hand_streak_max"]   := r["h_max"]
-        a["auto_repeat_count"]      := r["ar_count"]
+        a["same_hand_streak_max"] := r["h_max"]
+        a["auto_repeat_count"] := r["ar_count"]
     }
 }
 
@@ -453,11 +443,11 @@ KLR__SumKcHold(db, manifest, where) {
     for r in SQLite_Query(db, sql) {
         a := KLR_GetCell(manifest, r["date"], r["app"])
         a["kc_hold"][String(r["keycode"])] := Map(
-            "sum",   r["s"],
+            "sum", r["s"],
             "count", r["c"],
-            "max",   r["mx"],
-            "tap",   r["t"],
-            "hold",  r["h"]
+            "max", r["mx"],
+            "tap", r["t"],
+            "hold", r["h"]
         )
     }
 }
@@ -479,8 +469,8 @@ KLR__SumHourly(db, manifest, where) {
     for r in SQLite_Query(db, sql) {
         a := KLR_GetCell(manifest, r["date"], r["app"])
         a["hourly"][r["hour"]] := Map(
-            "c",  r["c"],
-            "e",  r["e"],
+            "c", r["c"],
+            "e", r["e"],
             "em", r["em"],
             "es", r["es"],
             "e_buckets_json", r["e_buckets_json"]
@@ -496,16 +486,13 @@ KLR__SumHourlyMin5(db, manifest, where) {
     for r in SQLite_Query(db, sql) {
         a := KLR_GetCell(manifest, r["date"], r["app"])
         a["hourly_min5"][r["slot"]] := Map(
-            "c",  r["c"],
-            "e",  r["e"],
+            "c", r["c"],
+            "e", r["e"],
             "es", r["es"],
             "e_buckets_json", r["e_buckets_json"]
         )
     }
 }
-
-
-
 
 ; =====================================
 ; =====================================
@@ -514,15 +501,15 @@ KLR__SumHourlyMin5(db, manifest, where) {
 ; =====================================
 
 global KLR_NGRAM_TYPE_TABLE := Map(
-    "c",     "ngram_chars",
-    "bg",    "ngram_bigrams",
-    "tg",    "ngram_trigrams",
-    "qg",    "ngram_quadgrams",
-    "pg",    "ngram_pentagrams",
-    "hx",    "ngram_hexagrams",
-    "hp",    "ngram_heptagrams",
-    "w",     "ngram_words",
-    "w_bg",  "ngram_word_bigrams"
+    "c", "ngram_chars",
+    "bg", "ngram_bigrams",
+    "tg", "ngram_trigrams",
+    "qg", "ngram_quadgrams",
+    "pg", "ngram_pentagrams",
+    "hx", "ngram_hexagrams",
+    "hp", "ngram_heptagrams",
+    "w", "ngram_words",
+    "w_bg", "ngram_word_bigrams"
 )
 
 ; Subset of n-gram tables fetched on the fast 500 ms 'live' path. The
@@ -530,12 +517,12 @@ global KLR_NGRAM_TYPE_TABLE := Map(
 ; are rarely viewed, so we skip them on the hot path; the slower 'full'
 ; cadence (first paint) still fetches everything.
 global KLR_NGRAM_LIVE_TABLE := Map(
-    "c",     "ngram_chars",
-    "bg",    "ngram_bigrams",
-    "tg",    "ngram_trigrams",
-    "qg",    "ngram_quadgrams",
-    "w",     "ngram_words",
-    "w_bg",  "ngram_word_bigrams"
+    "c", "ngram_chars",
+    "bg", "ngram_bigrams",
+    "tg", "ngram_trigrams",
+    "qg", "ngram_quadgrams",
+    "w", "ngram_words",
+    "w_bg", "ngram_word_bigrams"
 )
 
 KLR_BuildNgramFilter(start_date, end_date, selected_apps) {
@@ -576,18 +563,18 @@ KLR_ReadNgrams(db, start_date := "", end_date := "", selected_apps := unset) {
     if !IsSet(selected_apps)
         selected_apps := []
     out := Map(
-        "c",     Map(),
-        "bg",    Map(),
-        "tg",    Map(),
-        "qg",    Map(),
-        "pg",    Map(),
-        "hx",    Map(),
-        "hp",    Map(),
-        "w",     Map(),
-        "sc",    Map(),
+        "c", Map(),
+        "bg", Map(),
+        "tg", Map(),
+        "qg", Map(),
+        "pg", Map(),
+        "hx", Map(),
+        "hp", Map(),
+        "w", Map(),
+        "sc", Map(),
         "sc_bg", Map(),
-        "w_bg",  Map(),
-        "kc",    Map(),
+        "w_bg", Map(),
+        "kc", Map(),
         "sc_kb", Map()
     )
     if !db
@@ -847,7 +834,7 @@ KLR_ReadRangeSplitToday(db, start_date := "", end_date := "", selected_apps := u
     yesterday := KLR_PrevDay(today)
     ; AHK v2 throws « Expected a Number but got a String » when comparing
     ; two strings with `<`. Use StrCompare for the lexicographic test.
-    hist_end  := (end_date != "" && StrCompare(end_date, today) < 0) ? end_date : yesterday
+    hist_end := (end_date != "" && StrCompare(end_date, today) < 0) ? end_date : yesterday
     historical := KLR_ReadNgrams(db, start_date, hist_end, selected_apps)
 
     ; Today: per-app n-gram dict for each app touched today.
@@ -887,18 +874,18 @@ KLR_ReadRangeSplitToday(db, start_date := "", end_date := "", selected_apps := u
 
 KLR_NewTodayBucket() {
     return Map(
-        "c",     Map(),
-        "bg",    Map(),
-        "tg",    Map(),
-        "qg",    Map(),
-        "pg",    Map(),
-        "hx",    Map(),
-        "hp",    Map(),
-        "w",     Map(),
-        "sc",    Map(),
+        "c", Map(),
+        "bg", Map(),
+        "tg", Map(),
+        "qg", Map(),
+        "pg", Map(),
+        "hx", Map(),
+        "hp", Map(),
+        "w", Map(),
+        "sc", Map(),
         "sc_bg", Map(),
-        "w_bg",  Map(),
-        "kc",    Map(),
+        "w_bg", Map(),
+        "kc", Map(),
         "sc_kb", Map()
     )
 }

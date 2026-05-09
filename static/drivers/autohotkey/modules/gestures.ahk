@@ -383,48 +383,96 @@ global GESTURE_ACTIONS := Map(
         Label: "Notifications",
         Fn: (*) => SendInput("#n"),
     },
-    ; --- Script management ---
-    "ahk_reload", {
-        Label: "Recharger ErgoptiPlus",
-        Fn: (*) => Reload(),
-    },
-    "ahk_save_reload", {
-        Label: "Sauver et recharger ErgoptiPlus",
-        Fn: (*) => GestureSaveAndReload(),
-    },
-    "ahk_suspend", {
-        Label: "Suspendre ErgoptiPlus",
-        Fn: (*) => ToggleSuspend(),
-    },
-    "ahk_edit", {
-        Label: "Ouvrir personal_shortcuts.ahk",
-        Fn: (*) => GestureEditPersonalShortcuts(),
-    },
-    "ahk_quit", {
-        Label: "Quitter ErgoptiPlus",
-        Fn: (*) => ExitApp(),
-    },
-    ; --- User interfaces (toggle / focus / open) ---
-    ; Each UI action follows the same three-state pattern: if the
-    ; window is closed, open it; if open and focused, close it; if
-    ; open but in the background, raise it to the foreground.
-    "ui_metrics_typing", {
+    ; --- UI windows ---
+    ; Each UI action follows the same three-state pattern: if the window is
+    ; closed, open it; if open and focused, close it; if open but in the
+    ; background, raise it to the foreground.
+    "open_metrics_typing", {
         Label: "📊 Métriques de frappe",
         Fn: (*) => GestureToggleOrFocusUI("metrics_typing"),
     },
-    "ui_metrics_apps", {
+    "open_metrics_apps", {
         Label: "📊 Temps sur les applications",
         Fn: (*) => GestureToggleOrFocusUI("metrics_apps"),
     },
-    "ui_hotstrings_editor", {
-        Label: "✏️ Hotstrings personnels (éditeur)",
+    "open_hotstrings_editor", {
+        Label: "✏️ Éditeur de hotstrings personnels",
         Fn: (*) => GestureToggleOrFocusUI("hotstrings_editor"),
     },
-    "ui_paths_editor", {
+    "open_paths_editor", {
         Label: "📂 Dossier de configuration (éditeur)",
         Fn: (*) => GestureToggleOrFocusUI("paths_editor"),
     },
+    ; --- Open user files / folders ---
+    "open_script_source", {
+        Label: "✎ Ouvrir ErgoptiPlus.ahk",
+        Fn: (*) => Run('notepad.exe "' . A_ScriptFullPath . '"'),
+    },
+    "open_personal_shortcuts", {
+        Label: "✎ Éditer personal_shortcuts.ahk",
+        Fn: (*) => GestureEditPersonalShortcuts(),
+    },
+    "open_personal_hotstrings", {
+        Label: "Ouvrir personal_hotstrings.toml",
+        Fn: (*) => GestureOpenIfExists(ScriptInformation["PersonalTomlPath"]),
+    },
+    "open_personal_info", {
+        Label: "Ouvrir personal_info.toml",
+        Fn: (*) => GestureOpenIfExists(ScriptInformation["PersonalInfoTomlPath"]),
+    },
+    "open_config", {
+        Label: "Ouvrir config.toml",
+        Fn: (*) => GestureOpenIfExists(IsSet(ConfigurationFile) ? ConfigurationFile : ""),
+    },
+    "open_logs_folder", {
+        Label: "Ouvrir le dossier de logs",
+        Fn: (*) => OpenLogsFolder(),
+    },
+    "open_today_log", {
+        Label: "Ouvrir le fichier de log du jour",
+        Fn: (*) => OpenTodayLog(),
+    },
+    ; --- Script management ---
+    "script_pause_toggle", {
+        Label: "Suspendre / Reprendre ErgoptiPlus",
+        Fn: (*) => ToggleSuspend(),
+    },
+    "script_reload", {
+        Label: "🔄 Recharger ErgoptiPlus",
+        Fn: (*) => Reload(),
+    },
+    "script_save_reload", {
+        Label: "💾 Sauver (Ctrl+S) et recharger",
+        Fn: (*) => GestureSaveAndReload(),
+    },
+    "script_quit", {
+        Label: "⏹ Quitter ErgoptiPlus",
+        Fn: (*) => ExitApp(),
+    },
+    ; --- Debug (AutoHotkey-only — Hammerspoon's Console covers all three) ---
+    "open_window_spy", {
+        Label: "Window Spy",
+        Fn: (*) => WindowSpy(),
+    },
+    "open_list_vars", {
+        Label: "État des variables",
+        Fn: (*) => ListVars(),
+    },
+    "open_key_history", {
+        Label: "Historique des touches",
+        Fn: (*) => KeyHistory(),
+    },
 )
+
+; Opens an arbitrary path in Notepad if it exists. Used by every "open user
+; file" gesture so a fresh install with no personal_info.toml yet quietly
+; falls through instead of spawning Notepad on a blank path.
+GestureOpenIfExists(Path) {
+    if (Path = "" or !FileExist(Path)) {
+        return
+    }
+    Run('notepad.exe "' . Path . '"')
+}
 
 ; Toggle / focus / open helper shared by every ui_* action above.
 ; Centralising the three-state logic keeps the action map declarative
@@ -497,7 +545,11 @@ GestureEditPersonalShortcuts() {
 ; Ordered list of action names for the menu, with "--" sentinels marking
 ; category boundaries. The menu builder turns each "--" into a visual
 ; separator so the picker stays scannable at a glance instead of being
-; one long flat scroll. Mirrors menu_gestures.lua on the macOS side.
+; one long flat scroll. Mirrors modules/gestures/actions.SG_NAMES on the
+; macOS side — same ids, same order, same separators — so a user moving
+; between platforms sees the exact same picker, with platform-specific
+; particularities (Hammerspoon Console vs AHK's Window Spy / List Vars /
+; Key History triplet, macOS-only spaces / cursor moves) where they belong.
 global GESTURE_ACTION_NAMES := [
     "none",
     "--",
@@ -533,12 +585,21 @@ global GESTURE_ACTION_NAMES := [
     "screen_record",
     "lock_screen", "notification_center",
     "--",
-    ; User interfaces (toggle / focus / open)
-    "ui_metrics_typing", "ui_metrics_apps",
-    "ui_hotstrings_editor", "ui_paths_editor",
+    ; UI windows
+    "open_metrics_typing", "open_metrics_apps",
+    "open_hotstrings_editor", "open_paths_editor",
+    "--",
+    ; Open user files / folders
+    "open_script_source", "open_personal_shortcuts",
+    "open_personal_hotstrings", "open_personal_info",
+    "open_config",
+    "open_logs_folder", "open_today_log",
     "--",
     ; Script management
-    "ahk_reload", "ahk_save_reload", "ahk_suspend", "ahk_edit", "ahk_quit",
+    "script_pause_toggle", "script_reload", "script_save_reload", "script_quit",
+    "--",
+    ; Debug (AutoHotkey-only — Hammerspoon's Console covers all three)
+    "open_window_spy", "open_list_vars", "open_key_history",
 ]
 
 ; Current action assignments — read from INI or defaults

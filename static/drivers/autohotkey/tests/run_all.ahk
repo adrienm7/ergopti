@@ -38,17 +38,17 @@ SetWorkingDir(A_ScriptDir)
 #Include test_stubs.ahk
 
 ; ── Production lib files in dependency order ──
-#Include ..\lib\logger.ahk
-#Include ..\lib\ini_helpers.ahk
-#Include ..\lib\active_app_cache.ahk
-#Include ..\lib\hotstring_engine.ahk
-#Include ..\lib\hotstring_engine_v2.ahk
-#Include ..\lib\toml_loader.ahk
-#Include ..\lib\hotstrings_config.ahk
-#Include ..\lib\personal_toml_editor.ahk
-#Include ..\lib\dispatchers.ahk
-#Include ..\lib\layout_altgr.ahk
-#Include ..\lib\layout_shift_caps.ahk
+#Include ../lib/logger.ahk
+#Include ../lib/ini_helpers.ahk
+#Include ../lib/active_app_cache.ahk
+#Include ../lib/hotstring_engine.ahk
+#Include ../lib/hotstring_engine_v2.ahk
+#Include ../lib/toml_loader.ahk
+#Include ../lib/hotstrings_config.ahk
+#Include ../lib/personal_toml_editor.ahk
+#Include ../lib/dispatchers.ahk
+#Include ../lib/layout_altgr.ahk
+#Include ../lib/layout_shift_caps.ahk
 
 ; Install the hotstring hooks for the entire test process so neither real
 ; ``Hotstring()`` registrations nor real ``SendEvent`` keystrokes ever escape
@@ -78,7 +78,7 @@ NeutralizeDispatcherKeySends()
 ; Gestures module — included here because its pure logic (assignments, action
 ; registry, dispatch) is testable. The hotkeys it registers are harmless since
 ; RunTests() calls ExitApp immediately after completion.
-#Include ..\modules\gestures.ahk
+#Include ../modules/gestures.ahk
 #Include test_gestures.ahk
 
 ; Drive everything. RunTests prints a TAP-style report to stdout and exits

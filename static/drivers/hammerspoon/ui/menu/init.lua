@@ -200,12 +200,12 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 		local msg = source == "watcher"
 			and "Fichiers modifiés — Rechargement…"
 			or  "Rechargement du script…"
-		pcall(notifications.notify, msg)
+		pcall(notifications.notify, msg, nil, "info")
 		hs.timer.doAfter(0.25, function() pcall(hs.reload) end)
 	end
 
 	local function notify_feature(label, is_enabled)
-		pcall(notifications.notify, is_enabled and "🟢 ACTIVÉ" or "🔴 DÉSACTIVÉ", tostring(label))
+		pcall(notifications.notify, tostring(label), nil, is_enabled and "success" or "error")
 	end
 
 	local function save_prefs()
@@ -543,7 +543,7 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 	local function reset_all_defaults()
 		-- Delete config.json so that the next startup uses the default module settings
 		pcall(os.remove, MenuPaths.get("ConfigTomlPath"))
-		pcall(notifications.notify, "↺ Valeurs par défaut réinitialisées — Rechargement…")
+		pcall(notifications.notify, "Valeurs par défaut réinitialisées — Rechargement…", nil, "info")
 		hs.timer.doAfter(0.25, function() pcall(hs.reload) end)
 	end
 
@@ -683,20 +683,91 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 			karabiner                = karabiner,
 		}
 
+		-- Resolves <config_dir>/hammerspoon/logs/ at click-time so a user who
+		-- relocates their config folder via the paths editor picks up the new
+		-- path without needing to reload the menu
+		local function logs_dir()
+			local d = MenuPaths.get_config_dir() or ""
+			if not d:match("[/\\]$") then d = d .. "/" end
+			return d .. "hammerspoon/logs/"
+		end
+
+		--- Helper that opens a path resolved through MenuPaths.get(key).
+		--- Returns silently when no path is configured (fresh install with no
+		--- personal_info.toml yet, etc.) so a gesture or shortcut binding
+		--- doesn't spawn an `open ""` shell with no target.
+		local function open_path_via_menu(key)
+			local p = MenuPaths.get(key)
+			if type(p) == "string" and p ~= "" then
+				pcall(hs.execute, string.format("open %q", p))
+			end
+		end
+
+		--- Action callbacks. Keys mirror the action ids declared in
+		--- modules/shortcuts/script_control.ACTION_DEFINITIONS and
+		--- modules/gestures/actions.SG_NAMES so the same handler runs whether
+		--- the user clicks the menu, fires a gesture, or hits a script-control
+		--- key slot. Anything UI-shaped (the bulk-toggle ☑/☐ entries, the
+		--- "Reset defaults" entry) lives only in the menu and keeps a
+		--- self-explanatory key.
 		local actions = {
-			enable_all      = function() set_all_enabled(true) end,
-			disable_all     = function() set_all_enabled(false) end,
-			reset_defaults  = function() reset_all_defaults() end,
-			open_console    = function() pcall(hs.openConsole) end,
-			open_init       = function() pcall(hs.execute, string.format("open \"%sinit.lua\"", base_dir)) end,
-			open_paths      = function() hs.timer.doAfter(0.05, function() pcall(MenuPaths.open_editor) end) end,
-			open_personal_shortcuts = function()
+			-- Menu-only bulk actions (no gesture / shortcut counterpart)
+			enable_all                = function() set_all_enabled(true) end,
+			disable_all               = function() set_all_enabled(false) end,
+			reset_defaults            = function() reset_all_defaults() end,
+			-- Aliases used by the menu builder; the canonical ids below remain
+			-- the source of truth for gestures / script-control bindings.
+			open_paths                = function() hs.timer.doAfter(0.05, function() pcall(MenuPaths.open_editor) end) end,
+			reload                    = function() do_reload("menu") end,
+			quit                      = function() hs.timer.doAfter(0.1, function() os.exit(0) end) end,
+			open_logs                 = function()
+				local dir = logs_dir()
+				pcall(hs.execute, string.format("mkdir -p %q && open %q", dir, dir))
+			end,
+			-- Canonical action ids (mirrored across HS gestures, HS script
+			-- control, and the AutoHotkey side):
+			open_console              = function() pcall(hs.openConsole) end,
+			open_paths_editor         = function() hs.timer.doAfter(0.05, function() pcall(MenuPaths.open_editor) end) end,
+			open_hotstrings_editor    = function()
+				local ok, ed = pcall(require, "ui.hotstring_editor")
+				if ok and type(ed.open) == "function" then pcall(ed.open) end
+			end,
+			open_metrics_typing       = function()
+				local ok, m = pcall(require, "ui.metrics_typing")
+				if ok and type(m.toggle) == "function" then pcall(m.toggle) end
+			end,
+			open_metrics_apps         = function()
+				local ok, m = pcall(require, "ui.metrics_apps")
+				if ok and type(m.toggle) == "function" then pcall(m.toggle) end
+			end,
+			open_script_source        = function() pcall(hs.execute, string.format("open \"%sinit.lua\"", base_dir)) end,
+			open_personal_shortcuts   = function()
 				local ok, ps = pcall(require, "lib.personal_shortcuts")
 				if ok and type(ps.open) == "function" then pcall(ps.open) end
 			end,
-			reload          = function() do_reload("menu") end,
-			quit            = function() hs.timer.doAfter(0.1, function() os.exit(0) end) end,
+			open_personal_hotstrings  = function() open_path_via_menu("PersonalTomlPath") end,
+			open_personal_info        = function() open_path_via_menu("PersonalInfoTomlPath") end,
+			open_config               = function() open_path_via_menu("ConfigTomlPath") end,
+			open_logs_folder          = function()
+				local dir = logs_dir()
+				pcall(hs.execute, string.format("mkdir -p %q && open %q", dir, dir))
+			end,
+			open_today_log            = function()
+				local Logger = require("lib.logger")
+				local path = Logger.UNIFIED_LOG_FILE
+				if type(path) ~= "string" or path == "" then
+					path = logs_dir() .. "ErgoptiPlus_" .. os.date("%Y-%m-%d") .. ".log"
+				end
+				pcall(hs.execute, string.format("open %q", path))
+			end,
 		}
+
+		-- Wire those callbacks into script_control so the right-Alt key slots
+		-- and the gesture-driven dispatch share one source of truth.
+		if type(core_mods.shortcuts_mod) == "table"
+			and type(core_mods.shortcuts_mod.set_extras) == "function" then
+			pcall(core_mods.shortcuts_mod.set_extras, actions)
+		end
 
 		-- Refresh menu on each click on the icon
 		pcall(function()
@@ -749,7 +820,7 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 	end, "AppleInterfaceThemeChangedNotification")
 	M._theme_watcher:start()
 
-	pcall(notifications.notify, "Script prêt ! 🚀")
+	pcall(notifications.notify, "Script prêt !", nil, "success")
 	return myMenu, configWatcher
 end
 

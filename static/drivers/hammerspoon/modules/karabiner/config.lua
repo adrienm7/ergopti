@@ -244,23 +244,22 @@ function M.load_user_config(tap_hold_keys, mod_combos, user_config_path)
 	end
 
 	local defaults = M.build_default_state(tap_hold_keys, mod_combos)
+	local tap_holds = type(data.tap_holds) == "table" and data.tap_holds or {}
+	local combos    = type(data.mod_combos) == "table" and data.mod_combos or {}
 
-	if type(data.tap_hold_config) ~= "table" then
+	if type(tap_holds.config) ~= "table" then
 		Logger.warn(LOG, "Missing tap_hold_config in saved config — using defaults.")
-		data.tap_hold_config = defaults.tap_hold_config
+		tap_holds.config = defaults.tap_hold_config
 	end
 
-	if type(data.mod_combos_config) ~= "table" then
+	if type(combos.config) ~= "table" then
 		Logger.warn(LOG, "Missing mod_combos_config in saved config — using defaults.")
-		data.mod_combos_config = defaults.mod_combos_config
+		combos.config = defaults.mod_combos_config
 	else
-		-- Migrate legacy shapes to the current {tap, hold, combo} table.
-		-- Oldest format: single action string (hold-only) — treat as hold slot.
-		-- Previous format: {tap, hold} — add a "none" combo slot.
-		for id, entry in pairs(data.mod_combos_config) do
+		for id, entry in pairs(combos.config) do
 			if type(entry) == "string" then
 				Logger.info(LOG, "Migrating combo '%s' from legacy string format.", id)
-				data.mod_combos_config[id] = { tap = "none", hold = entry, combo = "none" }
+				combos.config[id] = { tap = "none", hold = entry, combo = "none" }
 			elseif type(entry) == "table" and entry.combo == nil then
 				Logger.info(LOG, "Migrating combo '%s' to include combo slot.", id)
 				entry.combo = "none"
@@ -268,10 +267,10 @@ function M.load_user_config(tap_hold_keys, mod_combos, user_config_path)
 		end
 		-- Seed any combos that are missing from the persisted config (new combos added after save)
 		for _, combo_def in ipairs(mod_combos) do
-			if not data.mod_combos_config[combo_def.id] then
+			if not combos.config[combo_def.id] then
 				local d = Defaults.combos[combo_def.id]
 				Logger.info(LOG, "New combo '%s' not in saved config — seeding from defaults.", combo_def.id)
-				data.mod_combos_config[combo_def.id] = {
+				combos.config[combo_def.id] = {
 					combo = d and d[1] or "none",
 					tap   = d and d[2] or "none",
 					hold  = d and d[3] or "none",
@@ -281,21 +280,21 @@ function M.load_user_config(tap_hold_keys, mod_combos, user_config_path)
 	end
 
 	-- Fields absent in old saves get the canonical default, not a silent magic number
-	local timeout_ms = tonumber(data.tap_hold_timeout_ms)
+	local timeout_ms = tonumber(tap_holds.timeout_ms)
 	if not timeout_ms then
 		Logger.warn(LOG, "Missing tap_hold_timeout_ms in saved config — using default (%d ms).",
 			TAP_HOLD_TIMEOUT_MS_DEFAULT)
 		timeout_ms = TAP_HOLD_TIMEOUT_MS_DEFAULT
 	end
 
-	local sticky_ms = tonumber(data.sticky_timeout_ms)
+	local sticky_ms = tonumber(tap_holds.sticky_timeout_ms)
 	if not sticky_ms then
 		Logger.warn(LOG, "Missing sticky_timeout_ms in saved config — using default (%d ms).",
 			STICKY_TIMEOUT_MS_DEFAULT)
 		sticky_ms = STICKY_TIMEOUT_MS_DEFAULT
 	end
 
-	local simultaneous_ms = tonumber(data.simultaneous_threshold_ms)
+	local simultaneous_ms = tonumber(combos.simultaneous_threshold_ms)
 	if not simultaneous_ms then
 		Logger.warn(LOG, "Missing simultaneous_threshold_ms in saved config — using default (%d ms).",
 			SIMULTANEOUS_THRESHOLD_MS_DEFAULT)
@@ -303,19 +302,19 @@ function M.load_user_config(tap_hold_keys, mod_combos, user_config_path)
 	end
 
 	local combo_symmetric
-	if data.combo_symmetric == nil then
+	if combos.symmetric == nil then
 		Logger.warn(LOG, "Missing combo_symmetric in saved config — using default (%s).",
 			tostring(COMBO_SYMMETRIC_DEFAULT))
 		combo_symmetric = COMBO_SYMMETRIC_DEFAULT
 	else
-		combo_symmetric = data.combo_symmetric == true
+		combo_symmetric = combos.symmetric == true
 	end
 
 	Logger.info(LOG, "User config loaded.")
 	return {
 		enabled                   = data.enabled == true,
-		tap_hold_config           = data.tap_hold_config,
-		mod_combos_config         = data.mod_combos_config,
+		tap_hold_config           = tap_holds.config,
+		mod_combos_config         = combos.config,
 		tap_hold_timeout_ms       = timeout_ms,
 		sticky_timeout_ms         = sticky_ms,
 		simultaneous_threshold_ms = simultaneous_ms,
@@ -328,13 +327,17 @@ end
 --- @param user_config_path string Absolute path to config_karabiner.toml.
 function M.save_user_config(state, user_config_path)
 	local ok, payload = pcall(TomlCodec.encode, {
-		enabled                   = state.enabled == true,
-		tap_hold_config           = state.tap_hold_config           or {},
-		mod_combos_config         = state.mod_combos_config         or {},
-		tap_hold_timeout_ms       = state.tap_hold_timeout_ms,
-		sticky_timeout_ms         = state.sticky_timeout_ms,
-		simultaneous_threshold_ms = state.simultaneous_threshold_ms,
-		combo_symmetric           = state.combo_symmetric == true,
+		enabled = state.enabled == true,
+		tap_holds = {
+			config = state.tap_hold_config or {},
+			timeout_ms = state.tap_hold_timeout_ms,
+			sticky_timeout_ms = state.sticky_timeout_ms,
+		},
+		mod_combos = {
+			config = state.mod_combos_config or {},
+			simultaneous_threshold_ms = state.simultaneous_threshold_ms,
+			symmetric = state.combo_symmetric == true,
+		},
 	})
 	if not ok or type(payload) ~= "string" then
 		Logger.error(LOG, "Failed to encode user config as TOML.")

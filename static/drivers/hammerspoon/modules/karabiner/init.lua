@@ -113,11 +113,7 @@ local function require_state(func_name)
 end
 
 
---- Stops the KE GUI suppressor watcher, if active.
-function M.stop_gui_suppressor() KeLifecycle.stop_gui_suppressor() end
-
---- Opens the Karabiner-Elements GUI for the user.
---- Stops the startup suppressor first so the watcher does not fight the launch.
+--- Opens the Karabiner-Elements GUI for the user on explicit request.
 function M.open_gui() KeLifecycle.open_gui() end
 
 --- Ensures Karabiner-Elements background services are running.
@@ -141,18 +137,23 @@ function M.get_enabled()
 end
 
 --- Enables or disables the Karabiner integration and persists the choice.
---- When enabling, Karabiner-Elements is launched in the background.
---- When disabling, Karabiner-Elements is quit.
+--- When enabling: launches KE daemons headlessly and deploys the config.
+--- When disabling: kills the KE daemons we started — the user toggled the feature
+--- off intentionally, so KE must not keep running in the background.
 --- @param value boolean
 function M.set_enabled(value)
 	if not require_state("set_enabled") then return end
+	local was_enabled = _state.enabled == true
 	_state.enabled = value == true
 	Logger.info(LOG, "Karabiner integration %s.", _state.enabled and "enabled" or "disabled")
 	Config.save_user_config(_state, resolve_user_config())
 	if _state.enabled then
-		KeLifecycle.launch_headless()
-	else
-		hs.execute("osascript -e 'tell application \"Karabiner-Elements\" to quit' 2>/dev/null")
+		M.regenerate()
+	elseif was_enabled then
+		-- Only kill if we were the ones running KE — do not touch an independently
+		-- running KE instance if the feature was already off before this call.
+		pcall(function() hs.execute(KeLifecycle.KILL_CMD) end)
+		Logger.info(LOG, "KE daemons stopped (feature disabled).")
 	end
 end
 
@@ -413,30 +414,17 @@ function M.regenerate()
 	local merged   = Generator.merge_into_existing_config(result, KARABINER_OUT)
 	local json_str = hs.json.encode(merged, true)
 
-	-- Stop KE completely before writing: otherwise a live session_monitor or an
-	-- open Preferences window may rewrite karabiner.json from its cached state
-	-- within seconds, silently reverting our menu changes.
-	Logger.trace(LOG, "Stopping Karabiner-Elements before deploy…")
+	-- Stop the user-level KE agents before writing so session_monitor cannot
+	-- rewrite karabiner.json from its cached state and silently revert our changes.
+	Logger.trace(LOG, "Stopping KE user agents before deploy…")
 	pcall(function() hs.execute(KeLifecycle.KILL_CMD) end)
-	Logger.done(LOG, "Karabiner-Elements stopped.")
+	Logger.done(LOG, "KE user agents stopped.")
 
 	local ok_copy, cp_detail = Generator.deploy_string(json_str, KARABINER_OUT)
 	if not ok_copy then
 		Logger.error(LOG, "Deploy failed → '%s': %s.", KARABINER_OUT, cp_detail)
-		-- Still relaunch so the user is not left without their keyboard config
-		KeLifecycle.arm_ke_gui_suppressor()
-		pcall(function() hs.execute(KeLifecycle.OPEN_CMD) end)
 		return
 	end
-
-	-- Arm the GUI suppressor BEFORE relaunching: some KE LaunchAgents pop the
-	-- Preferences window during bootstrap. The watcher self-expires after its
-	-- grace period so manual opens remain possible afterwards.
-	KeLifecycle.arm_ke_gui_suppressor()
-
-	Logger.trace(LOG, "Relaunching Karabiner-Elements after deploy…")
-	pcall(function() hs.execute(KeLifecycle.OPEN_CMD) end)
-	Logger.done(LOG, "Karabiner-Elements relaunch command issued.")
 
 	local active_combos = 0
 	for _, combo_def in ipairs(M.MOD_COMBOS) do
@@ -502,9 +490,6 @@ function M.init()
 		return
 	end
 
-	-- Try to remove KE from Login Items so it no longer auto-launches on next login
-	KeLifecycle.remove_ke_from_login_items()
-
 	-- Load shared data files first — required before load_user_config() can
 	-- call build_default_state() on first launch
 	M.AVAILABLE_ACTIONS    = Config.load_available_actions(ACTIONS_FILE) or {}
@@ -539,14 +524,14 @@ function M.init()
 		KcBridge.refresh_managed_set(_state.tap_hold_config, M.AVAILABLE_ACTIONS)
 	end
 
-	-- Arm the suppressor watcher first so it catches any GUI activation triggered
-	-- by the config reload below (KE may activate its window on FSEvents reload).
-	KeLifecycle.arm_ke_gui_suppressor()
-
 	if _state.enabled then
 		Logger.info(LOG, "Integration enabled — deploying config…")
-		KeLifecycle.launch_headless()
 		M.regenerate()
+		-- Prime the KE bridge so Core-Service actually ingests our deployed
+		-- rules. Idempotent across HS reloads — only does work once per boot
+		-- session. Without this step, Core-Service runs but ignores
+		-- karabiner.json updates until the user manually opens the GUI.
+		KeLifecycle.prime_ke_for_session()
 	end
 
 	-- Persist immediately on first launch so the file exists for future runs
@@ -560,14 +545,20 @@ function M.init()
 
 	Watchers.start_input_source_watcher(function(layout_name)
 		Logger.start(LOG, "Layout change detected — refreshing actions for layout '%s'…", layout_name)
-		local new_actions = Config.load_available_actions(ACTIONS_FILE)
-		if new_actions then M.AVAILABLE_ACTIONS = new_actions end
-		if _state and _state.enabled then
-			M.regenerate()
-			Logger.success(LOG, "Layout-change rebuild complete — KE reloaded from '%s'.", KARABINER_OUT)
-		else
-			Logger.success(LOG, "Layout change processed — bridge disabled, no rebuild.")
-		end
+		-- Delay the rebuild slightly: hs.keycodes.map is updated by the macOS TIS
+		-- subsystem asynchronously after the notification fires. Without the delay,
+		-- key_code_for_char() would still read the previous layout's keycode map and
+		-- generate wrong physical keys in the Karabiner config.
+		hs.timer.doAfter(0.5, function()
+			local new_actions = Config.load_available_actions(ACTIONS_FILE)
+			if new_actions then M.AVAILABLE_ACTIONS = new_actions end
+			if _state and _state.enabled then
+				M.regenerate()
+				Logger.success(LOG, "Layout-change rebuild complete — KE reloaded from '%s'.", KARABINER_OUT)
+			else
+				Logger.success(LOG, "Layout change processed — bridge disabled, no rebuild.")
+			end
+		end)
 	end)
 
 	local active_combos = 0
@@ -577,6 +568,19 @@ function M.init()
 			and (cfg.tap ~= "none" or cfg.hold ~= "none" or cfg.combo ~= "none") then
 			active_combos = active_combos + 1
 		end
+	end
+
+	-- Defer the first-run health check so it never blocks boot. The wizard
+	-- only surfaces a dialog when a KE dependency is missing; otherwise it
+	-- exits silently. Pcall-wrapped so any onboarding failure cannot prevent
+	-- the bridge itself from finishing initialization.
+	if _state.enabled then
+		hs.timer.doAfter(2.0, function()
+			pcall(function()
+				local Onboarding = require("modules.karabiner.onboarding")
+				Onboarding.run_first_run_wizard()
+			end)
+		end)
 	end
 
 	Logger.success(LOG,
@@ -600,13 +604,20 @@ function M.stop()
 	Logger.success(LOG, "Karabiner bridge stopped.")
 end
 
---- Stops all HS-side watchers then fully kills the Karabiner-Elements processes.
---- Intended for use when quitting Hammerspoon so KE does not keep running headlessly.
+--- Stops all HS-side watchers and, if the feature was enabled, kills the KE
+--- daemons that Hammerspoon started. Called when quitting Hammerspoon so KE
+--- does not keep remapping the keyboard after HS exits.
+--- If the feature was disabled, KE is left untouched (user's own setup).
 function M.kill()
-	Logger.start(LOG, "Killing Karabiner bridge and KE processes…")
+	Logger.start(LOG, "Stopping Karabiner bridge…")
+	local was_enabled = _state and _state.enabled == true
 	M.stop()
-	pcall(function() hs.execute(KeLifecycle.KILL_CMD) end)
-	Logger.success(LOG, "Karabiner-Elements processes killed.")
+	if was_enabled then
+		pcall(function() hs.execute(KeLifecycle.KILL_CMD) end)
+		Logger.success(LOG, "Karabiner bridge stopped and KE daemons killed.")
+	else
+		Logger.success(LOG, "Karabiner bridge stopped (feature was disabled — KE untouched).")
+	end
 end
 
 return M

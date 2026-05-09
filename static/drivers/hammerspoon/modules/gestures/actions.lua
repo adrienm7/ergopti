@@ -423,26 +423,100 @@ sg("screenshot_fullscreen_save",      "Capture d'écran entier (sauver sur disqu
 sg("lock_screen",      "Verrouiller",          function() pcall(hs.eventtap.keyStroke, {"cmd", "ctrl"}, "q") end)
 sg("notification_center", "Notifications",    function() pcall(hs.eventtap.keyStroke, {}, "F12") end)
 
--- Script management
-sg("hs_reload",        "Recharger Hammerspoon", function() pcall(hs.reload) end)
-sg("hs_console",       "Console Hammerspoon",   function() pcall(hs.openConsole) end)
-sg("hs_quit",          "Quitter Hammerspoon",   function()
-	pcall(function() hs.closeConsole() end)
-	pcall(function()
-		hs.timer.doAfter(0.1, function() os.exit(0) end)
-	end)
-end)
-sg("hs_open_config",   "Ouvrir config.toml",    function()
-	-- Resolve via MenuPaths so the gesture honours the user's
-	-- configurable ConfigDirPath instead of the hardcoded ~/.hammerspoon.
+-- Resolves a path via MenuPaths.get(key) and opens it with `open`.
+-- Returns silently if the path is empty so a gesture bound to an unconfigured
+-- file (e.g. personal_info.toml on a fresh install) is a no-op rather than
+-- spawning `open ""`.
+local function open_via_menu_paths(key)
 	local ok_mp, MenuPaths = pcall(require, "ui.menu.menu_paths")
-	if ok_mp and MenuPaths and type(MenuPaths.get) == "function" then
-		local p = MenuPaths.get("ConfigTomlPath")
-		if type(p) == "string" and p ~= "" then
-			pcall(hs.execute, string.format("open %q", p))
-		end
+	if not ok_mp or type(MenuPaths) ~= "table" or type(MenuPaths.get) ~= "function" then return end
+	local p = MenuPaths.get(key)
+	if type(p) == "string" and p ~= "" then
+		pcall(hs.execute, string.format("open %q", p))
+	end
+end
+
+-- Resolves <config_dir>/hammerspoon/logs/ at call-time so a relocated
+-- config dir is honoured without restarting Hammerspoon
+local function logs_dir_at_call_time()
+	local ok_mp, MenuPaths = pcall(require, "ui.menu.menu_paths")
+	if not ok_mp or type(MenuPaths) ~= "table" or type(MenuPaths.get_config_dir) ~= "function" then
+		return ""
+	end
+	local d = MenuPaths.get_config_dir() or ""
+	if not d:match("[/\\]$") then d = d .. "/" end
+	return d .. "hammerspoon/logs/"
+end
+
+-- ===== UI windows =====
+sg("open_metrics_typing",    "📊 Métriques de frappe", function()
+	local ok, m = pcall(require, "ui.metrics_typing")
+	if ok and type(m.toggle) == "function" then pcall(m.toggle) end
+end)
+sg("open_metrics_apps",      "📊 Temps sur les applications", function()
+	local ok, m = pcall(require, "ui.metrics_apps")
+	if ok and type(m.toggle) == "function" then pcall(m.toggle) end
+end)
+sg("open_hotstrings_editor", "✏️ Éditeur de hotstrings personnels", function()
+	local ok, ed = pcall(require, "ui.hotstring_editor")
+	if ok and type(ed.open) == "function" then pcall(ed.open) end
+end)
+sg("open_paths_editor",      "📂 Dossier de configuration (éditeur)", function()
+	local ok_mp, MenuPaths = pcall(require, "ui.menu.menu_paths")
+	if ok_mp and type(MenuPaths.open_editor) == "function" then
+		hs.timer.doAfter(0.05, function() pcall(MenuPaths.open_editor) end)
 	end
 end)
+
+-- ===== Open user files / folders =====
+sg("open_script_source",     "✎ Ouvrir init.lua", function()
+	pcall(hs.execute, string.format("open %q", hs.configdir .. "/init.lua"))
+end)
+sg("open_personal_shortcuts", "✎ Éditer personal_shortcuts.lua", function()
+	local ok, ps = pcall(require, "lib.personal_shortcuts")
+	if ok and type(ps.open) == "function" then pcall(ps.open) end
+end)
+sg("open_personal_hotstrings", "Ouvrir personal_hotstrings.toml", function()
+	open_via_menu_paths("PersonalTomlPath")
+end)
+sg("open_personal_info",      "Ouvrir personal_info.toml", function()
+	open_via_menu_paths("PersonalInfoTomlPath")
+end)
+sg("open_config",             "Ouvrir config.toml", function()
+	open_via_menu_paths("ConfigTomlPath")
+end)
+sg("open_logs_folder",        "Ouvrir le dossier de logs", function()
+	local dir = logs_dir_at_call_time()
+	if dir ~= "" then
+		pcall(hs.execute, string.format("mkdir -p %q && open %q", dir, dir))
+	end
+end)
+sg("open_today_log",          "Ouvrir le fichier de log du jour", function()
+	local Logger = require("lib.logger")
+	local path = Logger.UNIFIED_LOG_FILE
+	if type(path) ~= "string" or path == "" then
+		path = logs_dir_at_call_time() .. "ErgoptiPlus_" .. os.date("%Y-%m-%d") .. ".log"
+	end
+	pcall(hs.execute, string.format("open %q", path))
+end)
+
+-- ===== Script management =====
+sg("script_pause_toggle",    "Suspendre / Reprendre le script", function()
+	local ok, sc = pcall(require, "modules.shortcuts.script_control")
+	if ok and type(sc.toggle) == "function" then pcall(sc.toggle) end
+end)
+sg("script_reload",          "🔄 Recharger Hammerspoon", function() pcall(hs.reload) end)
+sg("script_save_reload",     "💾 Sauver (Cmd+S) et recharger", function()
+	pcall(hs.eventtap.keyStroke, {"cmd"}, "s")
+	hs.timer.doAfter(0.3, function() pcall(hs.reload) end)
+end)
+sg("script_quit",            "⏹ Quitter Hammerspoon", function()
+	pcall(function() hs.closeConsole() end)
+	pcall(function() hs.timer.doAfter(0.1, function() os.exit(0) end) end)
+end)
+
+-- ===== Debug =====
+sg("open_console",           "Console Hammerspoon", function() pcall(hs.openConsole) end)
 
 
 
@@ -460,34 +534,63 @@ M.AX_NAMES = {
 	"words", "lines", "line_bounds", "paragraphs", "document",
 }
 
+-- Ordered list of action ids exposed in the gesture-picker menu, with "--"
+-- sentinels marking category boundaries. menu_gestures.lua turns each "--"
+-- into a visual separator so the list stays scannable. Mirrors the AutoHotkey
+-- driver's GESTURE_ACTION_NAMES (modules/gestures.ahk) so a user moving
+-- between platforms sees the same picker structure, with platform-specific
+-- particularities (Hammerspoon Console, macOS-only spaces / cursor moves)
+-- kept where they belong.
 M.SG_NAMES = {
 	"none",
+	"--",
 	-- Selection & navigation
 	"right_click_toggle", "lookup", "app_switcher",
+	"--",
 	-- Editing
 	"copy", "paste", "cut", "undo", "redo", "select_all", "find",
+	"--",
 	-- Keys
 	"enter", "tab", "escape", "backspace", "delete",
+	"--",
 	-- Tabs
 	"tab_new", "tab_close", "tab_prev", "tab_next",
+	"--",
 	-- Windows & Spaces
 	"win_prev", "win_next", "close_window", "fullscreen",
 	"snap_left", "snap_right", "maximize",
 	"space_prev", "space_next", "mission_control", "app_expose",
+	"--",
 	-- Cursor movement
 	"word_prev", "word_next", "line_start", "line_end",
 	"para_prev", "para_next", "doc_start", "doc_end",
+	"--",
 	-- Media
 	"vol_up", "vol_down", "mute",
 	"brightness_up", "brightness_down",
 	"track_play", "track_next", "track_prev",
+	"--",
 	-- System
 	"screenshot_window_clipboard", "screenshot_window_save",
 	"screenshot_region_clipboard", "screenshot_region_save",
 	"screenshot_fullscreen_clipboard", "screenshot_fullscreen_save",
 	"lock_screen", "notification_center",
+	"--",
+	-- UI windows
+	"open_metrics_typing", "open_metrics_apps",
+	"open_hotstrings_editor", "open_paths_editor",
+	"--",
+	-- Open user files / folders
+	"open_script_source", "open_personal_shortcuts",
+	"open_personal_hotstrings", "open_personal_info",
+	"open_config",
+	"open_logs_folder", "open_today_log",
+	"--",
 	-- Script management
-	"hs_reload", "hs_console", "hs_quit", "hs_open_config",
+	"script_pause_toggle", "script_reload", "script_save_reload", "script_quit",
+	"--",
+	-- Debug (Hammerspoon-only — Console replaces AHK's Window Spy / List Vars / Key History)
+	"open_console",
 }
 
 --- Retrieves the localized label for a given action ID.

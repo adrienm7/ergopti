@@ -127,10 +127,10 @@ local _error_notification_handler = nil
 -- =======================================
 -- =======================================
 
---- Configures the log file path under <config_dir>/logs/ with daily rotation
---- (ErgoptiPlus_YYYY-MM-DD.log) and purges files older than max_age_days.
---- Mirrors the AHK driver naming exactly so both logs sort together.
---- Best-effort: any I/O error is swallowed so a permission issue cannot block init.
+--- Configures the log file path under <config_dir>/hammerspoon/logs/ with
+--- daily rotation (ErgoptiPlus_YYYY-MM-DD.log) and purges files older than
+--- max_age_days. Best-effort: any I/O error is swallowed so a permission
+--- issue cannot block init.
 --- @param config_dir string Absolute path to the user config directory (trailing slash optional).
 --- @param max_age_days integer Days to keep before purging (default 14).
 function M.init_log_path(config_dir, max_age_days)
@@ -138,7 +138,7 @@ function M.init_log_path(config_dir, max_age_days)
 	if type(config_dir) ~= "string" or config_dir == "" then return end
 	if not config_dir:match("[/\\]$") then config_dir = config_dir .. "/" end
 
-	local log_dir = config_dir .. "logs/"
+	local log_dir = config_dir .. "hammerspoon/logs/"
 	pcall(hs.execute, string.format("mkdir -p %q", log_dir))
 	_log_dir = log_dir
 

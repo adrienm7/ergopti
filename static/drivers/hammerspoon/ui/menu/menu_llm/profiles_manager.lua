@@ -108,7 +108,7 @@ local function build_profile_menu(deps, models_mgr)
 			local model_name = state.llm_model
 			if type(model_name) ~= "string" or model_name == "" or not models_mgr then return end
 
-			pcall(notifications.notify, "Profil recommandé indisponible", "Impossible d’appliquer la détection automatique dans ce contexte")
+			pcall(notifications.notify, "Profil recommandé indisponible", "Impossible d’appliquer la détection automatique dans ce contexte", "warning")
 		end or nil,
 	})
 	table.insert(menu, { title = "-" })
@@ -213,7 +213,7 @@ local function build_profile_menu(deps, models_mgr)
 										sync_profiles(state)
 										pcall(deps.save_prefs)
 										pcall(deps.update_menu)
-										pcall(notifications.notify, "✅ Profil modifié", format_dynamic_label(updated.label, state.llm_num_predictions))
+										pcall(notifications.notify, "Profil modifié", format_dynamic_label(updated.label, state.llm_num_predictions), "success")
 									end
 								end)
 							end)
@@ -267,7 +267,7 @@ local function build_profile_menu(deps, models_mgr)
 							sync_profiles(state)
 							pcall(deps.save_prefs)
 							pcall(deps.update_menu)
-							pcall(notifications.notify, "✅ Profil créé", format_dynamic_label(new_profile.label, state.llm_num_predictions))
+							pcall(notifications.notify, "Profil créé", format_dynamic_label(new_profile.label, state.llm_num_predictions), "success")
 							Logger.info(LOG, string.format("Custom profile %s created.", new_profile.id))
 						end
 					end)

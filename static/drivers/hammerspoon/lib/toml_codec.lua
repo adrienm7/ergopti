@@ -132,12 +132,16 @@ encode_table = function(tbl, path, out)
 	-- scalars: a present-but-empty section preserves the "this map
 	-- exists, just empty" semantic of the source state.
 	if path ~= "" and (#scalars > 0 or #submaps == 0) then
+		-- Blank line before a top-level section header for readability
+		if #out > 0 and out[#out] ~= "" then
+			out[#out + 1] = ""
+		end
 		out[#out + 1] = "[" .. path .. "]"
 	end
 	for _, k in ipairs(scalars) do
 		out[#out + 1] = encode_key(k) .. " = " .. encode_value(tbl[k])
 	end
-	if #scalars > 0 or path == "" then
+	if #scalars > 0 then
 		out[#out + 1] = ""
 	end
 	for _, k in ipairs(submaps) do
