@@ -72,8 +72,8 @@ global _ALTGR_KANA_FIXUP := False
 ; Win32 constants for MapVirtualKeyEx — see learn.microsoft.com/en-us/
 ; windows/win32/api/winuser/nf-winuser-mapvirtualkeyexw.
 global _MAPVK_VSC_TO_VK_EX := 3
-global _VK_RMENU           := 0xA5
-global _SC_ALTGR           := 0x38   ; SC138 lower byte once stripped of E0.
+global _VK_RMENU := 0xA5
+global _SC_ALTGR := 0x38   ; SC138 lower byte once stripped of E0.
 
 ; Probe the active keyboard layout: does scancode 0x38 (the right half of
 ; the SC138 prefix that AHK's combo hotkeys key off) map to VK_RMENU? On a
@@ -96,7 +96,7 @@ DetectAltGrKanaRemap() {
     VK := DllCall("MapVirtualKeyExW",
         "UInt", _SC_ALTGR,
         "UInt", _MAPVK_VSC_TO_VK_EX,
-        "Ptr",  HKL,
+        "Ptr", HKL,
         "UInt")
     return (VK != _VK_RMENU)
 }
@@ -120,7 +120,6 @@ HotstringEngineInit() {
     global _ALTGR_KANA_FIXUP
     _ALTGR_KANA_FIXUP := DetectAltGrKanaRemap()
 }
-
 
 ; =======================================
 ; =======================================
@@ -156,7 +155,7 @@ _MirrorRegistrationToHSEv2(TriggerSpec, Callback, Meta := unset) {
         return
     }
     RawFlags := Match[1]
-    Abbrev   := Match[2]
+    Abbrev := Match[2]
     HseFlags := ""
     if InStr(RawFlags, "*") {
         HseFlags .= "*"
@@ -273,7 +272,8 @@ MicrosoftApps() {
 CreateHotstring(Flags, Abbreviation, Replacement, options := unset) {
     OnlyText := (IsSet(options) and options.Has("OnlyText")) ? options["OnlyText"] : True
     FinalResult := (IsSet(options) and options.Has("FinalResult")) ? options["FinalResult"] : False
-    TimeActivationSeconds := (IsSet(options) and options.Has("TimeActivationSeconds")) ? options["TimeActivationSeconds"] : 0
+    TimeActivationSeconds := (IsSet(options) and options.Has("TimeActivationSeconds")) ? options[
+        "TimeActivationSeconds"] : 0
 
     FlagsPortion := ":" Flags "B0O:" ; O omits the ending character from the abbreviation
     _RegisterHotstring(
@@ -288,11 +288,11 @@ CreateHotstring(Flags, Abbreviation, Replacement, options := unset) {
 ; by the dispatcher has a clear origin in the original options dict.
 _MakeHotstringMeta(Replacement, Abbreviation, OnlyText, FinalResult, TimeActivationSeconds) {
     return {
-        Replacement:           Replacement,
-        OnlyText:              OnlyText,
-        FinalResult:           FinalResult,
+        Replacement: Replacement,
+        OnlyText: OnlyText,
+        FinalResult: FinalResult,
         TimeActivationSeconds: TimeActivationSeconds,
-        PrevCharKey:           SubStr(Abbreviation, -2, 1)
+        PrevCharKey: SubStr(Abbreviation, -2, 1)
     }
 }
 
@@ -303,7 +303,8 @@ _MakeHotstringMeta(Replacement, Abbreviation, OnlyText, FinalResult, TimeActivat
 _MakeHotstringCallback(Replacement, Abbreviation, OnlyText, FinalResult, TimeActivationSeconds) {
     BackSpaceSeq := "{BackSpace " . StrLen(Abbreviation) . "}"
     PrevCharKey := SubStr(Abbreviation, -2, 1)
-    return (*) => _HotstringDispatch(Replacement, A_EndChar, BackSpaceSeq, PrevCharKey, OnlyText, FinalResult, TimeActivationSeconds)
+    return (*) => _HotstringDispatch(Replacement, A_EndChar, BackSpaceSeq, PrevCharKey, OnlyText, FinalResult,
+        TimeActivationSeconds)
 }
 
 ; Hot path — runs on every hotstring firing. ``BackSpaceSeq`` and
@@ -359,16 +360,6 @@ _HotstringDispatch(Replacement, EndChar, BackSpaceSeq, PrevCharKey, OnlyText, Fi
     }
 }
 
-; Compatibility shim preserving the pre-refactor signature so tests that
-; invoke ``HotstringHandler`` directly keep working. Computes the same
-; ``BackSpaceSeq`` / ``PrevCharKey`` values that ``CreateHotstring`` bakes
-; in at registration time.
-HotstringHandler(Abbreviation, Replacement, EndChar, OnlyText := True, FinalResult := False, TimeActivationSeconds := 0) {
-    BackSpaceSeq := "{BackSpace " . StrLen(Abbreviation) . "}"
-    PrevCharKey := SubStr(Abbreviation, -2, 1)
-    _HotstringDispatch(Replacement, EndChar, BackSpaceSeq, PrevCharKey, OnlyText, FinalResult, TimeActivationSeconds)
-}
-
 IsTimeActivationExpired(PreviousCharacter, OptionTimeActivationSeconds) {
     ; Don't activate the hotstring if taped too slowly
     Now := A_TickCount
@@ -386,7 +377,8 @@ IsTimeActivationExpired(PreviousCharacter, OptionTimeActivationSeconds) {
 CreateCaseSensitiveHotstrings(Flags, Abbreviation, Replacement, options := unset) {
     OnlyText := (IsSet(options) and options.Has("OnlyText")) ? options["OnlyText"] : True
     FinalResult := (IsSet(options) and options.Has("FinalResult")) ? options["FinalResult"] : False
-    TimeActivationSeconds := (IsSet(options) and options.Has("TimeActivationSeconds")) ? options["TimeActivationSeconds"] : 0
+    TimeActivationSeconds := (IsSet(options) and options.Has("TimeActivationSeconds")) ? options[
+        "TimeActivationSeconds"] : 0
 
     FlagsPortion := ":" Flags "CB0O:" ; O omits the ending character from the abbreviation
 
@@ -486,9 +478,6 @@ _LSCResetFrom(Chars) {
         _LSCPush(c)
     }
 }
-
-
-
 
 ; ==========================================
 ; ==========================================

@@ -76,8 +76,12 @@ function M.new(deps, presets, ram_getter)
 
 	local function show_progress_ui(title, terminal_cmd, initial_message, cancel_cb, retry_cb)
 		if not download_window then return end
-		pcall(download_window.show, title, cancel_cb or cancel_pull_and_upgrade, terminal_cmd, nil, {
-			on_retry = retry_cb
+		pcall(download_window.show, {
+			kind = "ollama_model",
+			model = title,
+			terminal_cmd = terminal_cmd,
+			on_cancel = cancel_cb or cancel_pull_and_upgrade,
+			on_retry = retry_cb,
 		})
 		if type(initial_message) == "string" and initial_message ~= "" then
 			pcall(download_window.update, 0, nil, nil, initial_message)

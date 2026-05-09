@@ -346,57 +346,48 @@ end
 -- =============================================
 
 --- Shows the progress window for a download or bootstrap operation.
---- Two calling conventions:
----   • Bootstrap / kind-driven: M.show({ kind = "mlx_install", title?, subtitle? })
----   • Legacy model download:  M.show(model_name_or_table, on_cancel, terminal_cmd, sizes, actions)
---- The two are dispatched on the shape of the first argument.
---- @param model_or_opts string|table Either the legacy model arg or an opts table with .kind.
---- @param on_cancel function|nil Legacy: callback invoked if the user cancels.
---- @param terminal_cmd string|nil Legacy: override for the terminal fallback command.
---- @param sizes table|nil Legacy: explicit sizes metadata.
---- @param actions table|nil Legacy: {on_resolve, on_retry} callbacks.
-function M.show(model_or_opts, on_cancel, terminal_cmd, sizes, actions)
-    -- Bootstrap path: opts table carrying a known kind.
-    if type(model_or_opts) == "table" and type(model_or_opts.kind) == "string" and PRESETS[model_or_opts.kind] then
-        local opts   = model_or_opts
-        local preset = PRESETS[opts.kind]
-        local title    = (type(opts.title)    == "string" and opts.title    ~= "") and opts.title    or preset.default_title
-        local subtitle = (type(opts.subtitle) == "string" and opts.subtitle ~= "") and opts.subtitle or preset.default_subtitle
-
-        Logger.start(LOG, "Showing progress UI (kind=%s, mode=%s).", opts.kind, preset.mode)
-
-        _kind = opts.kind
-        _mode = preset.mode
-
-        if _wv then
-            -- Reuse existing window: just refresh kind and titles
-            eval(string.format("setKind(%s,%s,%s)", js_str(_kind), js_str(title), js_str(subtitle)))
-        else
-            ensure_webview(title)
-            -- Push the kind first so the page initialises in the correct mode
-            eval(string.format("setKind(%s,%s,%s)", js_str(_kind), js_str(title), js_str(subtitle)))
-        end
-
-        Logger.success(LOG, "Progress UI shown (title=%q).", title)
+--- @param opts table Configuration: {kind, title?, subtitle?, on_cancel?, on_resolve?, on_retry?, terminal_cmd?, model?}
+---   • kind: required bootstrap kind (e.g. "mlx_install", "mlx_model", "ollama_model")
+---   • title, subtitle: window titles (preset defaults if omitted)
+---   • on_cancel, on_resolve, on_retry: event callbacks
+---   • terminal_cmd: command for terminal output (download mode only)
+---   • model: model name or table with .name/.repo (download mode only)
+function M.show(opts)
+    if type(opts) ~= "table" or type(opts.kind) ~= "string" or not PRESETS[opts.kind] then
+        Logger.error(LOG, "M.show() requires opts.kind as valid preset.")
         return
     end
 
-    -- Legacy model-download path.
-    local model = model_or_opts
-    local model_name = type(model) == "table" and (model.name or model.repo) or model
-    M._current_model = type(model_name) == "string" and model_name or "inconnu"
-    M._terminal_cmd  = type(terminal_cmd) == "string" and terminal_cmd or ("ollama pull " .. M._current_model)
+    local preset = PRESETS[opts.kind]
+    local title    = (type(opts.title)    == "string" and opts.title    ~= "") and opts.title    or preset.default_title
+    local subtitle = (type(opts.subtitle) == "string" and opts.subtitle ~= "") and opts.subtitle or preset.default_subtitle
 
-    _on_cancel  = type(on_cancel) == "function" and on_cancel or nil
-    _on_resolve = type(actions) == "table" and type(actions.on_resolve) == "function" and actions.on_resolve or nil
-    _on_retry   = type(actions) == "table" and type(actions.on_retry)   == "function" and actions.on_retry   or nil
-    -- Detect backend from terminal_cmd to set correct kind; reset from any prior bootstrap mode
-    if type(M._terminal_cmd) == "string" and (M._terminal_cmd:find("mlx", 1, true) or M._terminal_cmd:find("huggingface", 1, true)) then
-        _kind = "mlx_model"
-    else
-        _kind = "ollama_model"
+    Logger.start(LOG, "Showing progress UI (kind=%s, mode=%s).", opts.kind, preset.mode)
+
+    _kind = opts.kind
+    _mode = preset.mode
+    _on_cancel  = type(opts.on_cancel)  == "function" and opts.on_cancel  or nil
+    _on_resolve = type(opts.on_resolve) == "function" and opts.on_resolve or nil
+    _on_retry   = type(opts.on_retry)   == "function" and opts.on_retry   or nil
+
+    -- Download mode: extract model and terminal command
+    if opts.kind == "mlx_model" or opts.kind == "ollama_model" then
+        local model = opts.model
+        local model_name = type(model) == "table" and (model.name or model.repo) or model
+        M._current_model = type(model_name) == "string" and model_name or "inconnu"
+        M._terminal_cmd  = type(opts.terminal_cmd) == "string" and opts.terminal_cmd or ("ollama pull " .. M._current_model)
     end
-    _mode = "download"
+
+    if _wv then
+        -- Reuse existing window: just refresh kind and titles
+        eval(string.format("setKind(%s,%s,%s)", js_str(_kind), js_str(title), js_str(subtitle)))
+    else
+        ensure_webview(title)
+        -- Push the kind first so the page initialises in the correct mode
+        eval(string.format("setKind(%s,%s,%s)", js_str(_kind), js_str(title), js_str(subtitle)))
+    end
+
+    Logger.success(LOG, "Progress UI shown (title=%q).", title)
 
     if _wv then
         -- Window already open — reset state to prevent zombie placeholders
