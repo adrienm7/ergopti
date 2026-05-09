@@ -655,8 +655,14 @@ hs.shutdownCallback = function()
 	-- as they should — they are root-owned and harmless without an IPC bridge.
 	pcall(function()
 		local ok, karabiner = pcall(require, "modules.karabiner")
-		if ok and karabiner and type(karabiner.kill) == "function" then
-			karabiner.kill()
+		local ke_enabled = ok and karabiner and type(karabiner.get_enabled) == "function" and karabiner.get_enabled() or false
+		local _, has_user_ke = hs.execute("/usr/bin/pgrep -x karabiner_console_user_server >/dev/null 2>&1 || /usr/bin/pgrep -x karabiner_session_monitor >/dev/null 2>&1 || /usr/bin/pgrep -x Karabiner-NotificationWindow >/dev/null 2>&1")
+		if ke_enabled or has_user_ke == true then
+			local ok_l, kl = pcall(require, "modules.karabiner.ke_lifecycle")
+			if ok_l and kl and type(kl.run_total_reset_async) == "function" then
+				local out, ok_reset = kl.run_total_reset_async()
+				Logger.info(LOG, "Shutdown fallback KE total reset async: ok=%s out=%s.", tostring(ok_reset), tostring(out))
+			end
 		end
 	end)
 	-- Terminate any running MLX server process so no orphaned Python process lingers

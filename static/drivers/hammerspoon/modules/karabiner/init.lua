@@ -414,10 +414,12 @@ function M.regenerate()
 	local merged   = Generator.merge_into_existing_config(result, KARABINER_OUT)
 	local json_str = hs.json.encode(merged, true)
 
-	-- Stop the user-level KE agents before writing so session_monitor cannot
+	-- Stop the user-level KE bridge before writing so session_monitor cannot
 	-- rewrite karabiner.json from its cached state and silently revert our changes.
+	-- KILL_FAST_CMD is used here (not the full KILL_CMD) to keep regenerate fast:
+	-- a plain pkill is enough since we immediately re-prime after the deploy.
 	Logger.trace(LOG, "Stopping KE user agents before deploy…")
-	pcall(function() hs.execute(KeLifecycle.KILL_CMD) end)
+	pcall(function() hs.execute(KeLifecycle.KILL_FAST_CMD) end)
 	Logger.done(LOG, "KE user agents stopped.")
 
 	local ok_copy, cp_detail = Generator.deploy_string(json_str, KARABINER_OUT)
@@ -444,6 +446,17 @@ function M.regenerate()
 	Logger.success(LOG,
 		"Karabiner config regenerated: %d combo(s) + %d tap/hold key(s) deployed.",
 		active_combos, #M.TAP_HOLD_KEYS)
+
+	-- KE v15+ requires a live user-level bridge process (Menu or GUI) to push
+	-- karabiner.json into Core-Service. regenerate() stops user-level agents
+	-- before deploy, so we must re-prime after every successful regeneration.
+	KeLifecycle.prime_ke_for_session(function(ok)
+		if ok then
+			Logger.success(LOG, "Karabiner bridge re-primed after regeneration.")
+		else
+			Logger.error(LOG, "Karabiner bridge re-prime failed after regeneration.")
+		end
+	end)
 end
 
 --- Deploys an empty Karabiner config so remapping stops without killing any process.
@@ -526,12 +539,7 @@ function M.init()
 
 	if _state.enabled then
 		Logger.info(LOG, "Integration enabled — deploying config…")
-		M.regenerate()
-		-- Prime the KE bridge so Core-Service actually ingests our deployed
-		-- rules. Idempotent across HS reloads — only does work once per boot
-		-- session. Without this step, Core-Service runs but ignores
-		-- karabiner.json updates until the user manually opens the GUI.
-		KeLifecycle.prime_ke_for_session()
+		M.regenerate() -- regenerate() calls prime_ke_for_session internally
 	end
 
 	-- Persist immediately on first launch so the file exists for future runs
@@ -611,10 +619,13 @@ end
 function M.kill()
 	Logger.start(LOG, "Stopping Karabiner bridge…")
 	local was_enabled = _state and _state.enabled == true
+	local hs_owned = type(KeLifecycle.is_hs_owned_bridge) == "function" and KeLifecycle.is_hs_owned_bridge() or false
 	M.stop()
-	if was_enabled then
+	if was_enabled and hs_owned then
 		pcall(function() hs.execute(KeLifecycle.KILL_CMD) end)
-		Logger.success(LOG, "Karabiner bridge stopped and KE daemons killed.")
+		Logger.success(LOG, "Karabiner bridge stopped and HS-owned KE daemons killed.")
+	elseif was_enabled then
+		Logger.success(LOG, "Karabiner bridge stopped (KE kept alive — session appears user-managed).")
 	else
 		Logger.success(LOG, "Karabiner bridge stopped (feature was disabled — KE untouched).")
 	end
