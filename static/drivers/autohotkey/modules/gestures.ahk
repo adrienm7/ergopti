@@ -438,7 +438,7 @@ global GESTURE_ACTIONS := Map(
         Fn: (*) => ToggleSuspend(),
     },
     "script_reload", {
-        Label: "🔄 Recharger ErgoptiPlus",
+        Label: "↻ Recharger ErgoptiPlus",
         Fn: (*) => Reload(),
     },
     "script_save_reload", {
@@ -446,7 +446,7 @@ global GESTURE_ACTIONS := Map(
         Fn: (*) => GestureSaveAndReload(),
     },
     "script_quit", {
-        Label: "⏹ Quitter ErgoptiPlus",
+        Label: "✕ Quitter ErgoptiPlus",
         Fn: (*) => ExitApp(),
     },
     ; --- Debug (AutoHotkey-only — Hammerspoon's Console covers all three) ---
