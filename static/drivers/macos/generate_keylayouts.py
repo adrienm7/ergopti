@@ -152,30 +152,36 @@ def generate_bundle_with_all_temp_files(
         content_plus_ansi = create_keylayout_ansi(content_plus, 4)
         plus_ansi_temp_path.write_text(content_plus_ansi, encoding="utf-8")
 
-        # Create Plus Plus variant in temp directory
-        plus_plus_temp_path = temp_path / (
-            f"Ergopti_{version_underscore}_plus_plus" + kbdedit_file_path.suffix
-        )
-        content_plus_plus = create_keylayout_plus_plus(content_plus, 5)
-        plus_plus_temp_path.write_text(content_plus_plus, encoding="utf-8")
-
-        # Create Plus Plus ANSI variant in temp directory
-        plus_plus_ansi_temp_path = temp_path / (
-            f"Ergopti_{version_underscore}_plus_plus_ANSI"
-            + kbdedit_file_path.suffix
-        )
-        content_plus_plus_ansi = create_keylayout_ansi(content_plus_plus, 6)
-        plus_plus_ansi_temp_path.write_text(
-            content_plus_plus_ansi, encoding="utf-8"
-        )
+        # Plus Plus variants are intentionally disabled for v2.2.2+ until
+        # the layout is finalised. The generation code below is kept on
+        # purpose so re-enabling the variant only requires uncommenting
+        # these blocks (and the corresponding entries in keylayout_paths /
+        # logo_paths further down).
+        #
+        # # Create Plus Plus variant in temp directory
+        # plus_plus_temp_path = temp_path / (
+        #     f"Ergopti_{version_underscore}_plus_plus" + kbdedit_file_path.suffix
+        # )
+        # content_plus_plus = create_keylayout_plus_plus(content_plus, 5)
+        # plus_plus_temp_path.write_text(content_plus_plus, encoding="utf-8")
+        #
+        # # Create Plus Plus ANSI variant in temp directory
+        # plus_plus_ansi_temp_path = temp_path / (
+        #     f"Ergopti_{version_underscore}_plus_plus_ANSI"
+        #     + kbdedit_file_path.suffix
+        # )
+        # content_plus_plus_ansi = create_keylayout_ansi(content_plus_plus, 6)
+        # plus_plus_ansi_temp_path.write_text(
+        #     content_plus_plus_ansi, encoding="utf-8"
+        # )
 
         logger.info("Created ALL temporary keylayout files:")
         logger.info("\t📄 %s", base_temp_path.name)
         logger.info("\t📄 %s", base_ansi_temp_path.name)
         logger.info("\t📄 %s", plus_temp_path.name)
         logger.info("\t📄 %s", plus_ansi_temp_path.name)
-        logger.info("\t📄 %s", plus_plus_temp_path.name)
-        logger.info("\t📄 %s", plus_plus_ansi_temp_path.name)
+        # logger.info("\t📄 %s", plus_plus_temp_path.name)
+        # logger.info("\t📄 %s", plus_plus_ansi_temp_path.name)
 
         # Prepare bundle path
         match = re.search(r"(v\d+\.\d+\.\d+)", version)
@@ -197,16 +203,19 @@ def generate_bundle_with_all_temp_files(
             / "data"
             / "logo_ergopti_plus.icns"
         )
-        logo_paths = [logo, logo, logo_plus, logo_plus, logo_plus, logo_plus]
+        # Plus Plus variants are disabled — see the commented blocks above.
+        # Re-add `logo_plus, logo_plus` and `plus_plus_temp_path,
+        # plus_plus_ansi_temp_path` here when re-enabling them.
+        logo_paths = [logo, logo, logo_plus, logo_plus]
 
-        # Create bundle with all three temporary files (keep both bundle folder and zip)
+        # Create bundle with the active temporary files
         keylayout_paths = [
             base_temp_path,
             base_ansi_temp_path,
             plus_temp_path,
             plus_ansi_temp_path,
-            plus_plus_temp_path,
-            plus_plus_ansi_temp_path,
+            # plus_plus_temp_path,
+            # plus_plus_ansi_temp_path,
         ]
         bundle_dir, zip_path = create_bundle(
             bundle_path=bundle_path,
