@@ -27,9 +27,6 @@
 
 #Requires Autohotkey v2.0+
 
-
-
-
 ; ===================================
 ; ===================================
 ; ======= 1/ Module state =======
@@ -50,9 +47,6 @@ class KLWV {
     ; refresh path so callers don't have to re-pass the dir.
     static metrics_dir := ""
 }
-
-
-
 
 ; =====================================
 ; =====================================
@@ -77,9 +71,6 @@ KLWV_IsAvailable() {
     return true
 }
 
-
-
-
 ; ===================================
 ; ===================================
 ; ======= 3/ Asset paths =======
@@ -89,13 +80,10 @@ KLWV_IsAvailable() {
 ; Resolve the absolute file:// URL of a dashboard's index.html.
 KLWV_AssetUrl(which) {
     base := A_ScriptDir . "\..\_shared\ui\metrics_" . which . "\index.html"
-    Loop Files, base
+    loop files, base
         base := A_LoopFileFullPath
     return "file:///" . StrReplace(base, "\", "/")
 }
-
-
-
 
 ; ============================================
 ; ============================================
@@ -105,8 +93,8 @@ KLWV_AssetUrl(which) {
 
 KLWV_Open(which, metrics_dir) {
     global _ConfigDir
-    log := _ConfigDir . "logs\webview.log"
-    try DirCreate(_ConfigDir . "logs")
+    log := _ConfigDir . "ahk\logs\webview.log"
+    try DirCreate(_ConfigDir . "ahk\logs")
     try FileAppend("[" . A_Now . "] KLWV_Open(" . which . ") begin`r`n", log, "UTF-8")
 
     if !KLWV_IsAvailable() {
@@ -143,7 +131,7 @@ KLWV_Open(which, metrics_dir) {
     initial_w := Min(Round(work_w * 0.70), 1300)
     initial_h := Min(Round(work_h * 0.70), 800)
 
-    g.OnEvent("Size",  KLWV_OnGuiSize.Bind(which))
+    g.OnEvent("Size", KLWV_OnGuiSize.Bind(which))
     g.OnEvent("Close", KLWV_OnGuiClose.Bind(which))
     ; Show first with the requested size, read the real outer-window
     ; rectangle, then WinMove to the centred position. Doing it in
@@ -157,7 +145,8 @@ KLWV_Open(which, metrics_dir) {
     pos_x := L + ((work_w - win_w) // 2)
     pos_y := T + ((work_h - win_h) // 2)
     WinMove(pos_x, pos_y, , , "ahk_id " . g.Hwnd)
-    try FileAppend("[" . A_Now . "] center: mon work=" . work_w . "x" . work_h . " win=" . win_w . "x" . win_h . " pos=(" . pos_x . "," . pos_y . ")`r`n", log, "UTF-8")
+    try FileAppend("[" . A_Now . "] center: mon work=" . work_w . "x" . work_h . " win=" . win_w . "x" . win_h .
+        " pos=(" . pos_x . "," . pos_y . ")`r`n", log, "UTF-8")
 
     ; Spin up WebView2 inside the Gui's HWND. dataDir is unique per
     ; launch so cached state from a previous open never bleeds in.
@@ -168,11 +157,13 @@ KLWV_Open(which, metrics_dir) {
     ; thqby's wrapper resolves WebView2 asynchronously through a
     ; Promise; we await it inline so the rest of the wiring runs
     ; synchronously against a ready controller.
-    try FileAppend("[" . A_Now . "] creating controller hwnd=" . g.Hwnd . " udir=" . udir . " loader=" . loader . "`r`n", log, "UTF-8")
+    try FileAppend("[" . A_Now . "] creating controller hwnd=" . g.Hwnd . " udir=" . udir . " loader=" . loader .
+        "`r`n", log, "UTF-8")
     try {
         controller := WebView2.create(g.Hwnd, , 0, udir, "", 0, loader)
     } catch as err {
-        try FileAppend("[" . A_Now . "] FAIL controller create: " . err.Message . " | " . err.File . ":" . err.Line . "`r`n", log, "UTF-8")
+        try FileAppend("[" . A_Now . "] FAIL controller create: " . err.Message . " | " . err.File . ":" . err.Line .
+            "`r`n", log, "UTF-8")
         try g.Destroy()
         return false
     }
@@ -212,11 +203,11 @@ KLWV_Open(which, metrics_dir) {
     SetTimer(KLWV_DelayedFirstPush.Bind(which), -1500)
 
     KLWV.windows[which] := Map(
-        "which",      which,
-        "gui",        g,
+        "which", which,
+        "gui", g,
         "controller", controller,
-        "webview",    webview,
-        "udir",       udir
+        "webview", webview,
+        "udir", udir
     )
     KLWV_FitWebView(which)
     return true
@@ -249,9 +240,6 @@ KLWV_CloseAll() {
         KLWV_Close(which)
 }
 
-
-
-
 ; ===================================
 ; ===================================
 ; ======= 5/ Sizing =======
@@ -277,9 +265,6 @@ KLWV_OnGuiClose(which, *) {
     KLWV_Close(which)
 }
 
-
-
-
 ; ====================================
 ; ====================================
 ; ======= 6/ Bridge (JS → AHK) =======
@@ -291,7 +276,7 @@ KLWV_OnGuiClose(which, *) {
 ; JSON command of the form {"action":"...", ...}.
 KLWV_OnWebMessage(which, sender, args) {
     global _ConfigDir
-    log := _ConfigDir . "logs\webview.log"
+    log := _ConfigDir . "ahk\logs\webview.log"
     msg := ""
     try msg := args.TryGetWebMessageAsString()
     try FileAppend("[" . A_Now . "] OnWebMessage(" . which . "): " . SubStr(msg, 1, 100) . "`r`n", log, "UTF-8")
@@ -316,9 +301,6 @@ KLWV_OnWebMessage(which, sender, args) {
     }
 }
 
-
-
-
 ; ====================================
 ; ====================================
 ; ======= 7/ Push (AHK → JS) =======
@@ -330,7 +312,7 @@ KLWV_OnWebMessage(which, sender, args) {
 ; process_manifest just like the initial fetch.
 KLWV_PushPrefetch(which) {
     global _ConfigDir
-    log := _ConfigDir . "logs\webview.log"
+    log := _ConfigDir . "ahk\logs\webview.log"
     if !KLWV.windows.Has(which) {
         try FileAppend("[" . A_Now . "] PushPrefetch(" . which . "): no window`r`n", log, "UTF-8")
         return
@@ -345,7 +327,8 @@ KLWV_PushPrefetch(which) {
     if (body = "") {
         path := KLPF_PrefetchPath(which)
         if !FileExist(path) {
-            try FileAppend("[" . A_Now . "] PushPrefetch(" . which . "): prefetch.json missing at " . path . "`r`n", log, "UTF-8")
+            try FileAppend("[" . A_Now . "] PushPrefetch(" . which . "): prefetch.json missing at " . path . "`r`n",
+                log, "UTF-8")
             return
         }
         body := FileRead(path, "UTF-8")
@@ -367,7 +350,7 @@ KLWV_PushPrefetch(which) {
 ; helper for this; a Win32 MonitorFromPoint call would return an HMONITOR
 ; we'd then have to map back to an index — easier to iterate ourselves.
 KLWV_MonitorFromPoint(x, y) {
-    Loop MonitorGetCount() {
+    loop MonitorGetCount() {
         try {
             MonitorGet(A_Index, &L, &T, &R, &B)
             if (x >= L && x < R && y >= T && y < B)
@@ -402,7 +385,7 @@ KLWV_DelayedFirstPush(which) {
 ;                paint to seed the cached historical block.
 KLWV_NotifyIngest(mode := "live") {
     global _ConfigDir
-    log := _ConfigDir . "logs\webview.log"
+    log := _ConfigDir . "ahk\logs\webview.log"
     if !KLWV.metrics_dir {
         return
     }
@@ -418,5 +401,6 @@ KLWV_NotifyIngest(mode := "live") {
         KLWV_PushPrefetch(which)
     }
     if n
-        try FileAppend("[" . A_Now . "] NotifyIngest(" . mode . ") fanned out to " . n . " window(s)`r`n", log, "UTF-8")
+        try FileAppend("[" . A_Now . "] NotifyIngest(" . mode . ") fanned out to " . n . " window(s)`r`n", log, "UTF-8"
+        )
 }

@@ -318,12 +318,12 @@ function M.copy_pixel_color()
 
 	local hex = pixel_hex_at(math.floor(pos.x), math.floor(pos.y))
 	if not hex then
-		notifications.notify("Impossible de lire la couleur du pixel")
+		notifications.notify("Impossible de lire la couleur du pixel", nil, "error")
 		return
 	end
 
 	pcall(pasteboard.setContents, hex)
-	notifications.notify("Couleur copiée : " .. hex)
+	notifications.notify("Couleur copiée : " .. hex, nil, "success")
 end
 
 --- Launches the native macOS interactive screenshot tool and copies the result to the clipboard.
@@ -333,7 +333,7 @@ function M.interactive_screenshot()
 		"/usr/sbin/screencapture",
 		function(exit_code, _, _)
 			if exit_code == 0 then
-				notifications.notify("Capture d'écran copiée dans le presse-papiers")
+				notifications.notify("Capture d'écran copiée dans le presse-papiers", nil, "success")
 				Logger.done(LOG, "Interactive screenshot completed.")
 			else
 				Logger.warn(LOG, "Interactive screenshot failed or was cancelled.")
@@ -383,7 +383,7 @@ function M.bind_instant_screenshot()
 
 		local ok, w = pcall(hs.window.frontmostWindow)
 		if not ok or not w then
-			notifications.notify("Aucune fenêtre active")
+			notifications.notify("Aucune fenêtre active", nil, "warning")
 			return true
 		end
 
@@ -394,7 +394,7 @@ function M.bind_instant_screenshot()
 
 		local filename = string.format("%s/screenshot_%s.png", dir, os.date("%Y_%m_%d_%Hh_%Mmin_%Ss"))
 		pcall(hs.execute, "screencapture -l " .. id .. " \"" .. filename .. "\"")
-		notifications.notify("Sauvegardé : " .. filename)
+		notifications.notify("Sauvegardé : " .. filename, nil, "success")
 		return true
 	end)
 	tap:start()
@@ -531,7 +531,7 @@ function M.teleport_mouse()
 
 	local all = hs.screen.allScreens()
 	if #all < 2 then
-		notifications.notify("Aucun autre moniteur détecté")
+		notifications.notify("Aucun autre moniteur détecté", nil, "warning")
 		Logger.info(LOG, "teleport_mouse: single screen — nothing to do.")
 		return
 	end

@@ -40,7 +40,13 @@ do
 			KC_LOG_PATH = d .. "metrics/karabiner_kc.log"
 		end
 	end
-	KC_LOG_PATH = KC_LOG_PATH or (hs.configdir .. "/metrics/karabiner_kc.log")
+	-- Fallback uses ~/.config/ergopti_plus/ rather than hs.configdir: the latter
+	-- can point at the source tree on a dev setup, and persistence files must
+	-- never land there.
+	if not KC_LOG_PATH then
+		local home = os.getenv("HOME") or ""
+		KC_LOG_PATH = home .. "/.config/ergopti_plus/metrics/karabiner_kc.log"
+	end
 end
 
 -- Maximum lines drained per watcher callback to avoid monopolising the run loop

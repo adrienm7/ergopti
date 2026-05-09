@@ -16,8 +16,9 @@
 
 local M = {}
 
-local Logger = require("lib.logger")
-local LOG    = "menu.karabiner"
+local Logger      = require("lib.logger")
+local KeLifecycle = require("modules.karabiner.ke_lifecycle")
+local LOG         = "menu.karabiner"
 
 -- Stop all KE launchd services for the current user, then kill any remaining
 -- processes. launchctl bootout must run first so launchd does not restart them.
@@ -29,11 +30,6 @@ local KARABINER_KILL_CMD =
 	.. " | /usr/bin/awk '{print $3}'"
 	.. " | /usr/bin/xargs -I{} /bin/launchctl bootout gui/$(/usr/bin/id -u)/{} 2>/dev/null"
 	.. "; /usr/bin/pkill -if karabiner 2>/dev/null"
-
--- karabiner_session_monitor is a user-level launchd agent that runs only when
--- KE is actively remapping. System-level daemons (DriverKit, core service) are
--- always present when KE is installed and must not be used as the active signal.
-local GRABBER_CHECK_CMD = "/bin/launchctl list | /usr/bin/grep -q karabiner_session_monitor"
 
 -- Label displayed when both tap and hold are "none"
 local NONE_DISPLAY = "—"
@@ -47,11 +43,13 @@ local NONE_DISPLAY = "—"
 -- =====================================
 -- =====================================
 
---- Returns true when any Karabiner process is currently running.
+--- Returns true when KE is *actually applying* our remappings — i.e. the
+--- daemon is detected AND the bridge has been primed in this boot session.
+--- This is the honest signal for the green-dot status indicator: it never
+--- claims success when remapping is silently inactive.
 --- @return boolean
-local function is_karabiner_running()
-	local _, ok = hs.execute(GRABBER_CHECK_CMD)
-	return ok == true
+local function is_remapping_active()
+	return KeLifecycle.is_remapping_active()
 end
 
 --- Builds an index of action id → action definition for fast lookup.
@@ -560,18 +558,35 @@ function M.build(ctx)
 	end
 
 	local enabled      = karabiner.get_enabled()
-	local running      = is_karabiner_running()
+	local active       = is_remapping_active()
+	-- Daemon-only signal so we can distinguish "remapping not applied because
+	-- bridge unprimed" (fixable via click) from "remapping not applied because
+	-- KE is not installed / daemon down" (user must install/check KE itself).
+	local grabber_only = KeLifecycle.is_grabber_running()
+	-- Transient state during the ~2 s prime cycle. Without this we would
+	-- render the alarming yellow "règles non appliquées" while a normal
+	-- prime is just running its course.
+	local priming      = KeLifecycle.is_priming()
 	local action_index = build_action_index(karabiner)
 	local tap_hold     = build_tap_hold_items(karabiner, action_index, update_menu, enabled)
 	local raccourcis   = build_raccourcis_items(karabiner, action_index, update_menu, enabled)
 
-	-- Status icon reflects the actual process state, independent of our toggle.
-	-- 🟢 running, 🟡 enabled in config but process not detected, 🔴 not running.
+	-- Status icon reflects whether KE is *actually applying* our remappings.
+	-- 🟢 daemon detected AND bridge primed — remapping is genuinely active.
+	-- 🔵 prime cycle currently in flight — transient (~2 s); will resolve to 🟢.
+	-- 🟡 daemon detected but bridge not primed — rules are NOT pushed yet,
+	--    cliquer pour amorcer (re-prime) Core-Service via le GUI silencieux.
+	-- 🟡 enabled but daemon not detected — KE not installed or not started.
+	-- 🔴 integration disabled in our config (independent of KE state).
 	local status_title
-	if running then
+	if active then
 		status_title = "🟢 Karabiner actif"
+	elseif priming then
+		status_title = "🔵 Karabiner — amorçage en cours…"
+	elseif enabled and grabber_only then
+		status_title = "🟡 Karabiner activé — règles non appliquées (cliquer pour amorcer)"
 	elseif enabled then
-		status_title = "🟡 Karabiner actif — processus non détecté, cliquer pour relancer"
+		status_title = "🟡 Karabiner activé — daemon non détecté (KE installé ?)"
 	else
 		status_title = "🔴 Karabiner inactif — cliquer pour relancer"
 	end
@@ -579,10 +594,10 @@ function M.build(ctx)
 	local submenu = {}
 
 	-- Status item: behavior depends on enabled state.
-	-- When disabled but running: clicking stops KE (no relaunch — user wants it off).
-	-- Otherwise: stop all services then relaunch (restart / wake up KE).
+	-- When disabled but daemon still running: clicking stops KE (no relaunch — user wants it off).
+	-- Otherwise: stop legacy user agents, force a fresh prime via the silent GUI bridge.
 	local status_fn
-	if not enabled and running then
+	if not enabled and grabber_only then
 		status_fn = function()
 			Logger.info(LOG, "Status clicked — menu disabled, KE running → stopping all KE services…")
 			local out, status = hs.execute(KARABINER_KILL_CMD)
@@ -591,11 +606,18 @@ function M.build(ctx)
 		end
 	else
 		status_fn = function()
-			Logger.info(LOG, "Status clicked — stopping then relaunching KE headless…")
+			Logger.info(LOG, "Status clicked — stopping legacy agents then forcing a re-prime…")
 			local out, status = hs.execute(KARABINER_KILL_CMD)
 			Logger.info(LOG, "Kill done (status=%s, out=%s).", tostring(status), tostring(out))
-			hs.timer.doAfter(1.5, function() karabiner.launch_headless() end)
-			if update_menu then hs.timer.doAfter(4, update_menu) end
+			-- Force re-prime so Core-Service re-ingests the on-disk config,
+			-- ignoring the per-session marker. This is the user's escape
+			-- hatch when the green dot is wrong or KE was restarted by macOS.
+			hs.timer.doAfter(1.0, function()
+				KeLifecycle.prime_ke_for_session(function(ok)
+					Logger.info(LOG, "Re-prime callback: ok=%s.", tostring(ok))
+					if update_menu then hs.timer.doAfter(0.5, update_menu) end
+				end, true)
+			end)
 		end
 	end
 
@@ -612,7 +634,7 @@ function M.build(ctx)
 	-- Warning: integration disabled in our config but KE process is still live.
 	-- The user must quit KE (and optionally remove it from Login Items) to fully
 	-- stop its remappings — our toggle alone does not kill the process.
-	if not enabled and running then
+	if not enabled and grabber_only then
 		submenu[#submenu + 1] = {
 			title    = "⚠️  Menu désactivé mais Karabiner tourne encore.",
 			disabled = true,

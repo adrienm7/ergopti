@@ -28,9 +28,6 @@
 
 #Requires Autohotkey v2.0+
 
-
-
-
 ; =====================================
 ; =====================================
 ; ======= 1/ Path resolution =======
@@ -42,7 +39,7 @@
 ; ``<repo>/static/drivers/_shared/ui/metrics_<key>/``.
 KLPF_AssetsDir(which) {
     base := A_ScriptDir . "\..\_shared\ui\metrics_" . which . "\"
-    Loop Files, base, "D"
+    loop files, base, "D"
         return A_LoopFileFullPath . "\"
     return base
 }
@@ -54,9 +51,6 @@ KLPF_AssetsDir(which) {
 KLPF_PrefetchPath(which) {
     return KLPF_AssetsDir(which) . "prefetch.json"
 }
-
-
-
 
 ; ====================================
 ; ====================================
@@ -75,8 +69,8 @@ KLPF_PrefetchPath(which) {
 KLPF_BuildAndWrite(which, metrics_dir, dbg := "", mode := "full") {
     if (dbg = "") {
         global _ConfigDir
-        try DirCreate(_ConfigDir . "logs")
-        dbg := _ConfigDir . "logs\prefetch_debug.log"
+        try DirCreate(_ConfigDir . "ahk\logs")
+        dbg := _ConfigDir . "ahk\logs\prefetch_debug.log"
     }
     KLPF_DbgWrite(dbg, "=== " . A_Now . " — which=" . which . " mode=" . mode)
     t0 := A_TickCount
@@ -155,9 +149,6 @@ KLPF_WriteAtomic(path, content) {
     return true
 }
 
-
-
-
 ; =========================================
 ; =========================================
 ; ======= 3/ Typing dashboard blob =======
@@ -192,10 +183,10 @@ KLPF_BuildTyping(db, mode := "full") {
     driver_os := Map("os", "win", "heatmap_id", "sc_kb")
 
     blob := Map(
-        "metrics_manifest",  manifest,
-        "app_icons",         Map(),                      ; icon extraction is HS-only for now.
-        "keycode_layout",    KLPF_KeycodeLayout(),
-        "driver_meta",       driver_os
+        "metrics_manifest", manifest,
+        "app_icons", Map(),                      ; icon extraction is HS-only for now.
+        "keycode_layout", KLPF_KeycodeLayout(),
+        "driver_meta", driver_os
     )
 
     ; The full n-gram projection is the dominant cost (~2-3 s).
@@ -229,15 +220,15 @@ KLPF_BuildTyping(db, mode := "full") {
         today_json := KLR_BuildTodayIdxJson(db, apps_list)
         blob["_prefetch_data"] := Map(
             "historical", Map(),
-            "today",      "__KLPF_TODAY_PLACEHOLDER__"
+            "today", "__KLPF_TODAY_PLACEHOLDER__"
         )
         blob["__klpf_today_json"] := today_json
         return blob
     }
 
     first_date := ""
-    apps_set   := Map()
-    apps_list  := []
+    apps_set := Map()
+    apps_list := []
     for date_str, day_data in manifest {
         if (first_date = "" || StrCompare(date_str, first_date) < 0)
             first_date := date_str
@@ -259,9 +250,6 @@ KLPF_BuildTyping(db, mode := "full") {
     return blob
 }
 
-
-
-
 ; =======================================
 ; =======================================
 ; ======= 4/ Apps dashboard blob =======
@@ -273,13 +261,10 @@ KLPF_BuildApps(db) {
     ; manifest projection covers it.
     manifest := KLR_ReadManifest(db)
     return Map(
-        "metrics_manifest",  manifest,
-        "app_icons",         Map()
+        "metrics_manifest", manifest,
+        "app_icons", Map()
     )
 }
-
-
-
 
 ; ============================================
 ; ============================================
@@ -302,9 +287,9 @@ KLPF_KeycodeLayout() {
     out := Map()
 
     ergopti_active := IsSet(Features)
-        && Features.Has("Layout")
-        && Features["Layout"].Has("ErgoptiBase")
-        && Features["Layout"]["ErgoptiBase"].Enabled
+    && Features.Has("Layout")
+    && Features["Layout"].Has("ErgoptiBase")
+    && Features["Layout"]["ErgoptiBase"].Enabled
     if ergopti_active {
         for sc, ch in ErgoptiBaseLabels()
             out[String(sc)] := ch
@@ -316,13 +301,13 @@ KLPF_KeycodeLayout() {
     hkl := 0
     try {
         hwnd := DllCall("GetForegroundWindow", "ptr")
-        tid  := DllCall("GetWindowThreadProcessId", "ptr", hwnd, "ptr", 0, "uint")
-        hkl  := DllCall("GetKeyboardLayout", "uint", tid, "ptr")
+        tid := DllCall("GetWindowThreadProcessId", "ptr", hwnd, "ptr", 0, "uint")
+        hkl := DllCall("GetKeyboardLayout", "uint", tid, "ptr")
     }
     if !hkl
         try hkl := DllCall("GetKeyboardLayout", "uint", 0, "ptr")
 
-    Loop 87 {
+    loop 87 {
         sc := A_Index
         ; Skip scancodes the JS side overlays (modifiers, whitespace,
         ; F-row) so the AHK map stays out of its way.
@@ -355,9 +340,6 @@ KLPF_KeycodeLayout() {
     return out
 }
 
-
-
-
 ; ===================================
 ; ===================================
 ; ======= 6/ Tiny helpers =======
@@ -368,7 +350,7 @@ KLPF_KeycodeLayout() {
 ; for the typical "few dozen apps" range; AHK has no built-in Array.Sort.
 KLPF_SortInPlace(arr) {
     n := arr.Length
-    Loop n {
+    loop n {
         i := A_Index
         j := i
         while (j > 1 && StrCompare(arr[j], arr[j - 1], false) < 0) {

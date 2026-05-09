@@ -3,10 +3,10 @@
 --- ==============================================================================
 --- MODULE: User Config Overrides
 --- DESCRIPTION:
---- Loads <config_dir>/config.toml — the optional user-editable layer that
---- overrides hs.settings / runtime config values. Mirror of the AHK driver's
---- ApplyConfigTomlOverrides() so both halves of the stack share one config
---- format the user can hand-edit.
+--- Loads the [script] / [features] sections from the driver-specific
+--- config.toml (hammerspoon/config.toml) and applies them as overrides
+--- to hs.settings. Mirror of the AHK driver's ApplyConfigTomlOverrides()
+--- so both drivers share the same config format.
 ---
 --- FEATURES & RATIONALE:
 --- 1. Optional File: A missing config.toml is fine — overrides are opt-in.
@@ -14,7 +14,9 @@
 ---            [features] holds dotted-path keys, each setting a single value
 ---            in hs.settings keyed by the path. Callers read hs.settings to
 ---            consume the override at runtime.
---- 3. Lightweight Parser: Only flat key=value lines are supported, no arrays /
+--- 3. Single File: Overrides live in the driver-specific config file
+---    (hammerspoon/config.toml) alongside GUI-managed preferences.
+--- 4. Lightweight Parser: Only flat key=value lines are supported, no arrays /
 ---    nested tables. Anything more complex belongs in dedicated TOML files.
 --- ==============================================================================
 

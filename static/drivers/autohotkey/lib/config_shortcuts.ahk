@@ -4,26 +4,19 @@
 ; MODULE: Config Shortcuts (TOML section)
 ; DESCRIPTION:
 ; UI-shortcut preferences and per-feature privacy toggles, persisted as a
-; ``[shortcuts]`` section inside the AHK-specific TOML at
-; ``<config_dir>/ahk/config.toml``. Driver-specific because what feels
-; right on macOS (Cmd-based shortcuts) and on Windows (Ctrl-based) is
-; not interchangeable — ``ctrl+alt+m`` on a Mac collides with system
-; bindings, while ``cmd+alt+m`` on Windows has no equivalent. Each
-; driver owns its own file under its own subfolder so a shared config
-; directory can hold both side by side without any value bleeding.
+; ``[Metrics]`` section inside the unified AHK config at
+; ``<config_dir>/ahk/config.toml``. All driver configuration (features,
+; script settings, gestures, expert overrides) lives in this single file.
 ;
 ; SECTION LAYOUT inside ahk/config.toml:
 ;
-;   [shortcuts]
+;   [Metrics]
 ;   metrics_enabled                 = true
 ;   metrics_shortcut_typing         = "ctrl+alt+m"
 ;   metrics_shortcut_apps           = "ctrl+alt+t"
 ;   metrics_filter_private_browsing = true
 ;   metrics_filter_system_auth      = true
 ;   metrics_disabled_apps           = ["chrome.exe", "firefox.exe"]
-;
-; Future features (AI exclusion list, gesture triggers, …) get their own
-; ``<feature>_*`` keys in the same section.
 ;
 ; FEATURES & RATIONALE:
 ; 1. Per-driver subfolder: ``<config_dir>/ahk/`` is auto-created on first
@@ -32,15 +25,9 @@
 ; 2. Section-preserving writer: CS_Save merges back into the existing
 ;    file without touching other sections, so any future hand-written
 ;    sections survive a shortcut change.
-; 3. Tiny dedicated parser: full TOML is overkill for our flat scalars
-;    + arrays. Keeping ~150 lines here avoids deeper coupling to the
-;    hotstrings TOML loader, which has different parsing needs.
 ; ==============================================================================
 
 #Requires Autohotkey v2.0+
-
-
-
 
 ; ===================================
 ; ===================================
@@ -54,18 +41,15 @@ CS_GetTomlPath() {
     ; worrying about ENOENT on a fresh install.
     global _ConfigDir
     base := (IsSet(_ConfigDir) && _ConfigDir != "") ? _ConfigDir : A_ScriptDir . "\"
-    dir  := base . "ahk\"
+    dir := base . "ahk\"
     try DirCreate(dir)
     return dir . "config.toml"
 }
 
 ; The single section we own inside config.toml. Other sections
-; ([script], [features], [hotstrings] …) are preserved verbatim by the
-; section-aware writer below.
-global CS_SECTION := "shortcuts"
-
-
-
+; ([Script], [Shortcuts.ScriptControl], [Gestures], feature sections …) are
+; preserved verbatim by the section-aware writer below.
+global CS_SECTION := "Metrics"
 
 ; ===================================
 ; ===================================
@@ -87,7 +71,7 @@ CS_Read() {
         return out
 
     section := ""
-    Loop Parse, content, "`n", "`r" {
+    loop parse, content, "`n", "`r" {
         line := Trim(A_LoopField)
         if (line = "" || SubStr(line, 1, 1) = "#")
             continue
@@ -133,10 +117,10 @@ CS_CoerceValue(raw) {
         ; a plain split works — quotes never contain commas in practice
         ; for process names, but we still support it via a simple state
         ; machine.
-        depth   := 0
-        in_str  := false
-        cur     := ""
-        Loop Parse, body {
+        depth := 0
+        in_str := false
+        cur := ""
+        loop parse, body {
             c := A_LoopField
             if (c = '"' && SubStr(cur, -1) != "\")
                 in_str := !in_str
@@ -167,16 +151,13 @@ CS_Unescape(s) {
     return s
 }
 
-
-
-
 ; ===================================
 ; ===================================
 ; ======= 3/ Writer =======
 ; ===================================
 ; ===================================
 
-; Replaces the [shortcuts] section in the on-disk config.toml without
+; Replaces the [Metrics] section in the on-disk config.toml without
 ; touching any other section. Atomic via .tmp + rename. ``new_kv`` is a
 ; Map of key → value pairs that becomes the new contents of the section.
 CS_WriteShortcutsSection(new_kv) {
@@ -215,10 +196,10 @@ CS_ReplaceSection(body, section_name, replacement) {
 
     lines := StrSplit(body, "`n", "`r")
     out_before := []
-    out_after  := []
-    in_target  := false
-    seen       := false
-    Loop lines.Length {
+    out_after := []
+    in_target := false
+    seen := false
+    loop lines.Length {
         line := lines[A_Index]
         trimmed := Trim(line)
         is_section := (SubStr(trimmed, 1, 1) = "[" && SubStr(trimmed, -1) = "]")
@@ -226,7 +207,7 @@ CS_ReplaceSection(body, section_name, replacement) {
             sec_name := Trim(SubStr(trimmed, 2, StrLen(trimmed) - 2))
             if (sec_name = section_name) {
                 in_target := true
-                seen      := true
+                seen := true
                 continue
             }
             if in_target {
@@ -283,9 +264,6 @@ CS_Join(arr, sep) {
     return out
 }
 
-
-
-
 ; ============================================
 ; ============================================
 ; ======= 4/ Public load + save API =======
@@ -298,8 +276,9 @@ CS_Join(arr, sep) {
 CS_Load() {
     global CS_SECTION
     data := CS_Read()
-    if !data.Has(CS_SECTION)
+    if !data.Has(CS_SECTION) {
         return
+    }
     s := data[CS_SECTION]
 
     if s.Has("metrics_enabled")
@@ -307,14 +286,14 @@ CS_Load() {
     if s.Has("metrics_shortcut_typing")
         MetricsShortcuts.typing_str := String(s["metrics_shortcut_typing"])
     if s.Has("metrics_shortcut_apps")
-        MetricsShortcuts.apps_str   := String(s["metrics_shortcut_apps"])
+        MetricsShortcuts.apps_str := String(s["metrics_shortcut_apps"])
 
     if s.Has("metrics_filter_private_browsing")
         MetricsFilters.private_browsing := s["metrics_filter_private_browsing"] ? true : false
     if s.Has("metrics_filter_secure_field")
-        MetricsFilters.secure_field     := s["metrics_filter_secure_field"]     ? true : false
+        MetricsFilters.secure_field := s["metrics_filter_secure_field"] ? true : false
     if s.Has("metrics_filter_system_auth")
-        MetricsFilters.system_auth      := s["metrics_filter_system_auth"]      ? true : false
+        MetricsFilters.system_auth := s["metrics_filter_system_auth"] ? true : false
 
     if s.Has("metrics_disabled_apps") && (s["metrics_disabled_apps"] is Array) {
         MetricsFilters.disabled_apps := Map()
@@ -326,21 +305,26 @@ CS_Load() {
     }
 }
 
-; Serialise the in-memory state back to disk. Only the [shortcuts]
+; Serialise the in-memory state back to disk. Only the [Metrics]
 ; section is rewritten; every other section in config.toml stays put.
 CS_Save() {
+    if IsSet(SaveFullConfig) {
+        SaveFullConfig()
+        return
+    }
+
     apps := []
     for proc, _ in MetricsFilters.disabled_apps
         apps.Push(proc)
 
     kv := Map(
-        "metrics_enabled",                 MetricsShortcuts.enabled,
-        "metrics_shortcut_typing",         MetricsShortcuts.typing_str,
-        "metrics_shortcut_apps",           MetricsShortcuts.apps_str,
+        "metrics_enabled", MetricsShortcuts.enabled,
+        "metrics_shortcut_typing", MetricsShortcuts.typing_str,
+        "metrics_shortcut_apps", MetricsShortcuts.apps_str,
         "metrics_filter_private_browsing", MetricsFilters.private_browsing,
-        "metrics_filter_secure_field",     MetricsFilters.secure_field,
-        "metrics_filter_system_auth",      MetricsFilters.system_auth,
-        "metrics_disabled_apps",           apps
+        "metrics_filter_secure_field", MetricsFilters.secure_field,
+        "metrics_filter_system_auth", MetricsFilters.system_auth,
+        "metrics_disabled_apps", apps
     )
     CS_WriteShortcutsSection(kv)
 }

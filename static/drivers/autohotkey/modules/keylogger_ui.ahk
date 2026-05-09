@@ -30,9 +30,6 @@
 
 #Requires Autohotkey v2.0+
 
-
-
-
 ; ===================================
 ; ===================================
 ; ======= 1/ Module state =======
@@ -42,15 +39,12 @@
 class KLUI {
     ; PID of the currently-open dashboard process (0 = closed).
     static typing_pid := 0
-    static apps_pid   := 0
+    static apps_pid := 0
 
     ; Resolved file URLs to the shared HTML assets. Set lazily on first call.
     static typing_url := ""
-    static apps_url   := ""
+    static apps_url := ""
 }
-
-
-
 
 ; ============================================
 ; ============================================
@@ -63,7 +57,7 @@ KLUI_ResolveAssetUrl(which) {
     ; The shared UI assets live in the sibling _shared/ folder.
     base := A_ScriptDir . "\..\_shared\ui\" . which . "\index.html"
     ; Resolve to absolute, normalised path.
-    Loop Files, base
+    loop files, base
         base := A_LoopFileFullPath
     ; file:// URL: replace backslashes with forward slashes.
     url := "file:///" . StrReplace(base, "\", "/")
@@ -76,9 +70,6 @@ KLUI_EnsureUrls() {
     if (KLUI.apps_url = "")
         KLUI.apps_url := KLUI_ResolveAssetUrl("metrics_apps")
 }
-
-
-
 
 ; =========================================
 ; =========================================
@@ -116,8 +107,8 @@ KLUI_LaunchWindow(url, title) {
         which := "apps"
     if (which != "") {
         global _ConfigDir
-        log_path := _ConfigDir . "logs\prefetch.log"
-        try DirCreate(_ConfigDir . "logs")
+        log_path := _ConfigDir . "ahk\logs\prefetch.log"
+        try DirCreate(_ConfigDir . "ahk\logs")
         try FileAppend("[" . A_Now . "] KLUI calling KLPF_BuildAndWrite(" . which . ", " . _ConfigDir . "metrics)`r`n",
             log_path, "UTF-8")
         try {
@@ -142,12 +133,12 @@ KLUI_LaunchWindow(url, title) {
     ; Spinning up a fresh dir guarantees the freshest page every time and
     ; the orphan ones are cleaned up below on a best-effort basis.
     udir_root := A_Temp . "\ergopti_metrics_edge"
-    udir      := udir_root . "_" . A_TickCount
+    udir := udir_root . "_" . A_TickCount
     ; Sweep old siblings BEFORE creating the new dir so the loop never
     ; touches the freshly-allocated path. Anything we can't delete (still
     ; locked by Edge) gets retried on the next launch.
     try {
-        Loop Files, udir_root . "_*", "D"
+        loop files, udir_root . "_*", "D"
             try DirDelete(A_LoopFileFullPath, true)
     }
     DirCreate(udir)
@@ -197,9 +188,6 @@ KLUI_IsRunning(pid) {
         return false
     return ProcessExist(pid) != 0
 }
-
-
-
 
 ; =========================================
 ; =========================================

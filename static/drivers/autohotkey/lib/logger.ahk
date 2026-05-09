@@ -24,9 +24,6 @@
 ;    "Dump recent logs" menu entry without needing a file read.
 ; ==============================================================================
 
-
-
-
 ; ==============================================================
 ; ==============================================================
 ; ======= 1/ Constants and shared state =======
@@ -41,14 +38,14 @@ global LOGGER_RING_BUFFER_SIZE := 200
 ; Numeric severity used to filter messages against the user-configured minimum
 ; level. Lifecycle helpers map back onto these via _LevelSeverity().
 global LOGGER_SEVERITY := Map(
-    "DEBUG",   10,
-    "TRACE",   10,
-    "DONE",    10,
-    "INFO",    20,
-    "START",   20,
+    "DEBUG", 10,
+    "TRACE", 10,
+    "DONE", 10,
+    "INFO", 20,
+    "START", 20,
     "SUCCESS", 20,
     "WARNING", 30,
-    "ERROR",   40,
+    "ERROR", 40,
 )
 
 ; Default log level when nothing is configured in the ini. INFO keeps the file
@@ -93,17 +90,14 @@ global _LOGGER_FLUSH_TIMER_STARTED := False
 ; to the main unified log. Sub-files are ephemeral (today only) — stale ones from
 ; previous days are deleted at init time. Paths are resolved relative to LogDir.
 global LOGGER_SUB_FILES := [
-    Map("name", "ErgoptiPlus_gestures.log",  "tags", ["gestures"]),
-    Map("name", "ErgoptiPlus_layout.log",    "tags", ["LayoutShift", "LayoutCaps", "LayoutAltGr"]),
-    Map("name", "ErgoptiPlus_dispatch.log",  "tags", ["Dispatch", "ScriptShortcuts", "TomlLoader"]),
-    Map("name", "ErgoptiPlus_tray.log",      "tags", ["ErgoptiPlus"]),
+    Map("name", "ErgoptiPlus_gestures.log", "tags", ["gestures"]),
+    Map("name", "ErgoptiPlus_layout.log", "tags", ["LayoutShift", "LayoutCaps", "LayoutAltGr"]),
+    Map("name", "ErgoptiPlus_dispatch.log", "tags", ["Dispatch", "ScriptShortcuts", "TomlLoader"]),
+    Map("name", "ErgoptiPlus_tray.log", "tags", ["ErgoptiPlus"]),
 ]
 
 ; Resolved absolute paths for each sub-file (populated by LoggerInit).
 global _LOGGER_SUB_PATHS := Map()
-
-
-
 
 ; ==================================================
 ; ==================================================
@@ -118,10 +112,10 @@ LoggerInit() {
     global LOGGER_LOG_PATH, LOGGER_MIN_LEVEL, LOGGER_DEFAULT_LEVEL, ConfigurationFile
     global _LOGGER_FLUSH_TIMER_STARTED, LOGGER_FLUSH_INTERVAL_MS, _ConfigDir
 
-    ; Daily-rotating log file under <ConfigDir>/logs/. Resolves _ConfigDir at
-    ; call time so any later override (paths.toml) is picked up.
+    ; Daily-rotating log file under <ConfigDir>/ahk/logs/. Resolves _ConfigDir
+    ; at call time so any later override (paths.toml) is picked up
     LogDir := (IsSet(_ConfigDir) and _ConfigDir != "")
-        ? _ConfigDir . "logs\"
+        ? _ConfigDir . "ahk\logs\"
         : A_ScriptDir . "\logs\"
     if !DirExist(LogDir) {
         try DirCreate(LogDir)
@@ -207,8 +201,8 @@ _LoggerRefreshFastFlags() {
         ? LOGGER_SEVERITY[LOGGER_MIN_LEVEL]
         : 20
     _LOGGER_DEBUG_ENABLED := (_LOGGER_MIN_SEVERITY <= 10)
-    _LOGGER_INFO_ENABLED  := (_LOGGER_MIN_SEVERITY <= 20)
-    _LOGGER_WARN_ENABLED  := (_LOGGER_MIN_SEVERITY <= 30)
+    _LOGGER_INFO_ENABLED := (_LOGGER_MIN_SEVERITY <= 20)
+    _LOGGER_WARN_ENABLED := (_LOGGER_MIN_SEVERITY <= 30)
     _LOGGER_ERROR_ENABLED := (_LOGGER_MIN_SEVERITY <= 40)
 }
 
@@ -312,9 +306,6 @@ LoggerRingBufferSnapshot() {
     return Snapshot
 }
 
-
-
-
 ; ==========================================
 ; ==========================================
 ; ======= 3/ Internal helpers =======
@@ -404,9 +395,9 @@ _LoggerPurgeOldLogs(LogDir, MaxAgeDays) {
         return
     }
     CutoffStamp := DateAdd(A_Now, -MaxAgeDays, "Days")
-    CutoffDate  := SubStr(CutoffStamp, 1, 8)  ; YYYYMMDD
+    CutoffDate := SubStr(CutoffStamp, 1, 8)  ; YYYYMMDD
     try {
-        Loop Files, LogDir . "ErgoptiPlus_*.log" {
+        loop files, LogDir . "ErgoptiPlus_*.log" {
             ; Extract the date from the filename: ErgoptiPlus_YYYY-MM-DD.log
             if RegExMatch(A_LoopFileName, "^ErgoptiPlus_(\d{4})-(\d{2})-(\d{2})\.log$",
                 &Match) {

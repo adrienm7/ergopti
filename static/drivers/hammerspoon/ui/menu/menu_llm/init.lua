@@ -475,8 +475,7 @@ function M.create(deps)
                 "Le modèle peut ne pas être assez puissant.",
                 rec_label, selected_label
             )
-            -- Non-blocking alert that disappears after 3 seconds
-            hs.alert(msg, 3)
+            pcall(notifications.notify, msg, nil, "warning")
         end
     end
 
@@ -1781,7 +1780,7 @@ function M.create(deps)
                     pcall(_dw.focus)
                 elseif _dw and type(_dw.is_active) == "function" and not _dw.is_active() then
                     -- Window was closed without cancelling — download still runs in background
-                    pcall(notifications.notify, "Fenêtre de téléchargement introuvable", "Le téléchargement est toujours en cours en arrière-plan.")
+                    pcall(notifications.notify, "Fenêtre de téléchargement introuvable", "Le téléchargement est toujours en cours en arrière-plan.", "info")
                 end
             end
         }

@@ -47,6 +47,16 @@ local CAPSWORD_CHECK_INTERVAL_S = 0.1
 -- window supersede the previous one instead of triggering parallel rebuilds.
 local _input_source_timer = nil
 
+-- Last known layout name — used by the HIToolbox poll to detect changes when
+-- hs.keycodes.inputSourceChanged is unreliable (Sequoia regression).
+local _last_known_layout = nil
+
+-- Poll interval for the HIToolbox fallback watcher.
+local LAYOUT_POLL_SEC = 2.0
+
+-- Holds the fallback poll timer so it can be cancelled on stop.
+local _layout_poll_timer = nil
+
 -- Timestamp (fractional seconds) of the last CapsWord subprocess check.
 local _capsword_last_check_s = 0
 
@@ -126,41 +136,86 @@ end
 -- =======================================
 -- =======================================
 
---- Registers a debounced hs.keycodes.inputSourceChanged callback.
---- The provided on_change callback is invoked once per layout switch, after the
---- debounce window, with the new layout name as its only argument.
---- The hs.keycodes callback slot is global — this module assumes exclusive ownership.
+--- Reads the current keyboard layout name from HIToolbox (AppleSelectedInputSources).
+--- More reliable than hs.keycodes.currentLayout() on Sequoia which can return
+--- stale values from the TIS cache.
+--- @return string|nil
+local function read_current_layout_from_hitoolbox()
+	local raw, ok = hs.execute("defaults read com.apple.HIToolbox AppleSelectedInputSources 2>/dev/null")
+	if not ok or type(raw) ~= "string" or raw == "" then return nil end
+	local name = raw:match('"KeyboardLayout Name"%s*=%s*"([^"]+)"')
+		or raw:match("KeyboardLayout Name%s*=%s*([^;%s]+)")
+	return name
+end
+
+--- Fires the on_change callback with proper debouncing, updating _last_known_layout.
+--- @param on_change fun(layout_name: string)
+--- @param layout_name string
+local function fire_layout_change(on_change, layout_name)
+	if _input_source_timer then
+		pcall(function() _input_source_timer:stop() end)
+	end
+	_input_source_timer = hs.timer.doAfter(INPUT_SOURCE_DEBOUNCE_SEC, function()
+		_input_source_timer = nil
+		_last_known_layout  = layout_name
+		local ok_cb, err = pcall(on_change, layout_name)
+		if not ok_cb then
+			Logger.error(LOG, "Input source change handler failed: %s.", tostring(err))
+		end
+	end)
+end
+
+--- Registers a debounced layout-change watcher.
+--- Uses both hs.keycodes.inputSourceChanged (immediate notification) AND a
+--- periodic HIToolbox poll (fallback for Sequoia where the TIS callback is
+--- unreliable). The on_change callback fires at most once per debounce window.
 --- @param on_change fun(layout_name: string) Called on each debounced layout change.
 function M.start_input_source_watcher(on_change)
 	Logger.trace(LOG, "Registering input source watcher…")
+
+	-- Seed the initial known layout from HIToolbox
+	_last_known_layout = read_current_layout_from_hitoolbox()
+		or (pcall(function() return hs.keycodes.currentLayout() end) and hs.keycodes.currentLayout())
+		or nil
+	Logger.debug(LOG, "Initial layout: '%s'.", tostring(_last_known_layout))
+
+	-- Primary: hs.keycodes notification (fires immediately on most macOS versions)
 	hs.keycodes.inputSourceChanged(function()
 		Logger.debug(LOG, "Input source notification received — debouncing (%.0fms)…",
 			INPUT_SOURCE_DEBOUNCE_SEC * 1000)
-		if _input_source_timer then
-			pcall(function() _input_source_timer:stop() end)
-		end
-		_input_source_timer = hs.timer.doAfter(INPUT_SOURCE_DEBOUNCE_SEC, function()
-			_input_source_timer = nil
-			local layout_name  = "<unknown>"
-			local ok, current  = pcall(function() return hs.keycodes.currentLayout() end)
-			if ok and current then layout_name = tostring(current) end
-			local ok_cb, err = pcall(on_change, layout_name)
-			if not ok_cb then
-				Logger.error(LOG, "Input source change handler failed: %s.", tostring(err))
-			end
-		end)
+		-- Read from HIToolbox, not hs.keycodes.currentLayout(), to avoid TIS cache lag
+		local new_layout = read_current_layout_from_hitoolbox()
+			or (pcall(function() return hs.keycodes.currentLayout() end) and hs.keycodes.currentLayout())
+			or "<unknown>"
+		fire_layout_change(on_change, new_layout)
 	end)
-	Logger.done(LOG, "Input source watcher registered.")
+
+	-- Fallback: poll HIToolbox every LAYOUT_POLL_SEC — catches layout changes that
+	-- didn't trigger hs.keycodes.inputSourceChanged (Sequoia regression).
+	_layout_poll_timer = hs.timer.doEvery(LAYOUT_POLL_SEC, function()
+		local current = read_current_layout_from_hitoolbox()
+		if current and current ~= _last_known_layout then
+			Logger.info(LOG, "Layout poll detected change: '%s' → '%s'.",
+				tostring(_last_known_layout), current)
+			fire_layout_change(on_change, current)
+		end
+	end)
+
+	Logger.done(LOG, "Input source watcher registered (poll every %.0fs).", LAYOUT_POLL_SEC)
 end
 
---- Clears the hs.keycodes.inputSourceChanged callback and cancels any
---- pending debounced rebuild.
+--- Clears the hs.keycodes.inputSourceChanged callback, cancels the poll timer,
+--- and cancels any pending debounced rebuild.
 function M.stop_input_source_watcher()
 	Logger.trace(LOG, "Stopping input source watcher…")
 	pcall(function() hs.keycodes.inputSourceChanged(nil) end)
 	if _input_source_timer then
 		pcall(function() _input_source_timer:stop() end)
 		_input_source_timer = nil
+	end
+	if _layout_poll_timer then
+		pcall(function() _layout_poll_timer:stop() end)
+		_layout_poll_timer = nil
 	end
 	Logger.done(LOG, "Input source watcher stopped.")
 end

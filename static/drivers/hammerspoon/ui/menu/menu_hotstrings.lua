@@ -238,17 +238,7 @@ function M.build_groups(ctx)
 						local ms_entry = type(ms) == "table" and ms[sec.name]
 						local mod_id   = type(ms_entry) == "table" and ms_entry.mod_id or ms_entry
 						if mod_id == "personal_info" then
-							local ms_desc  = type(ms_entry) == "table" and ms_entry.description or nil
-							local pi_items = buildPersonalInfoItems(ctx, ms_desc)
-							if type(pi_items) == "table" then
-								for _, pi in ipairs(pi_items) do
-									if type(pi) == "table" then
-										if pi.checked ~= nil and ctx.paused then pi.checked = nil end
-										if not enabled or ctx.paused then pi.fn = nil; pi.disabled = true end
-										sec_menu[#sec_menu + 1] = pi
-									end
-								end
-							end
+							-- personal_info is managed by dynamic hotstrings, not in static groups menu
 						end
 					else
 						local sec_on = ctx.keymap and type(ctx.keymap.is_section_enabled) == "function" and ctx.keymap.is_section_enabled(name, sec.name) or false
@@ -517,7 +507,7 @@ function M.build_management(ctx)
 				
 				local val = tonumber(raw)
 				if not val or val < 0 or val ~= math.floor(val) then
-					pcall(notifications.notify, "Délai invalide", "Veuillez saisir un entier ≥ 0.")
+					pcall(notifications.notify, "Délai invalide", "Veuillez saisir un entier ≥ 0.", "error")
 					return
 				end
 				

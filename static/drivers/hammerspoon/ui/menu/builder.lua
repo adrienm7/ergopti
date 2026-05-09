@@ -154,21 +154,36 @@ function M.generate(ctx, menu_mods, actions)
 	end
 
 
+	-- Script-management zone — kept iso with the AutoHotkey tray menu so users
+	-- moving between platforms see the same labels, icons and ordering. The
+	-- only difference is the missing "⏸︎ Suspendre" entry: pause/resume on the
+	-- macOS side is driven by the big title button at the very top of the menu.
 	table.insert(items, { title = "-" })
 	table.insert(items, {
 		title = "Actions globales",
 		menu = {
 			{ title = "☑ Activer toutes les fonctionnalités", fn = actions.enable_all },
 			{ title = "☐ Désactiver toutes les fonctionnalités", fn = actions.disable_all },
-			{ title = "↺ Réinitialiser les valeurs par défaut", fn = actions.reset_defaults }
+			{ title = "↺ Valeurs par défaut", fn = actions.reset_defaults }
 		}
 	})
-	table.insert(items, { title = "Chemins des fichiers…", fn = actions.open_paths })
-	table.insert(items, { title = "Console", fn = actions.open_console })
-	table.insert(items, { title = "Ouvrir init.lua", fn = actions.open_init })
-	table.insert(items, { title = "Ouvrir personal_shortcuts.lua", fn = actions.open_personal_shortcuts })
-	table.insert(items, { title = "Recharger", fn = actions.reload })
-	table.insert(items, { title = "Quitter", fn = actions.quit })
+	table.insert(items, { title = "📂 Dossier de configuration…", fn = actions.open_paths })
+	table.insert(items, { title = "-" })
+	table.insert(items, { title = "✎ Éditer personal_shortcuts.lua", fn = actions.open_personal_shortcuts })
+	table.insert(items, { title = "↻ Recharger", fn = actions.reload })
+	table.insert(items, { title = "✕ Quitter", fn = actions.quit })
+	-- Debug submenu — groups the developer-facing tools (Hammerspoon Console,
+	-- log-folder shortcut, today's log) so the top-level tray stays scannable.
+	-- Mirrors AutoHotkey's "⚠ Débogage" entry, which adds Window Spy / List Vars
+	-- / Key History on top of the same log shortcuts.
+	table.insert(items, {
+		title = "⚠ Débogage",
+		menu = {
+			{ title = "Console", fn = actions.open_console },
+			{ title = "Ouvrir le dossier de logs", fn = actions.open_logs },
+			{ title = "Ouvrir le fichier de log du jour", fn = actions.open_today_log },
+		}
+	})
 
 	-- Collect the download item now so it participates in canvas width calculation below
 	local _dl_item = nil

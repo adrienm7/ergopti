@@ -10,7 +10,7 @@ SetWorkingDir(A_ScriptDir) ; Set the working directory where the script is locat
 #Warn VarUnset, Off
 #Warn LocalSameAsGlobal, Off
 
-#Include *i vendor\UIA.ahk ; UIA v2 library — third-party, kept verbatim in vendor\ (source: https://github.com/Descolada/UIA-v2)
+#Include *i vendor/UIA.ahk ; UIA v2 library — third-party, kept verbatim in vendor/ (source: https://github.com/Descolada/UIA-v2)
 ; *i = no error if the file isn't found. UIA is only used by WrapTextIfSelected
 ; (a Shift/AltGr shortcut that wraps the selection with the typed symbol). If
 ; that feature is disabled in your INI and you want to trim boot time / memory,
@@ -54,62 +54,62 @@ SendMode("Event") ; Everything concerning hotstrings MUST use SendEvent and not 
 ; Logger pulled in first so every other lib/module can call it during init.
 ; ``LoggerInit()`` is invoked after the configuration file is parsed so the
 ; minimum log level can be honoured from the very first INFO/START line.
-#Include lib\logger.ahk
+#Include lib/logger.ahk
 
 ; INI helpers extracted to their own lib so the test runner can ``#Include``
 ; them without bootstrapping the rest of the driver.
-#Include lib\toml_helpers.ahk
-#Include lib\layout_ergopti.ahk
+#Include lib/toml_helpers.ahk
+#Include lib/layout_ergopti.ahk
 
 ; Active-app cache must come before hotstring_engine.ahk because both
 ; ``HotstringHandler`` and ``MicrosoftApps`` consult ``GetActiveApp``.
-#Include lib\active_app_cache.ahk
+#Include lib/active_app_cache.ahk
 
 ; Core hotstring engine (send primitives, hotstring builders, text helpers)
 ; and TOML reader helpers (UnescapeTomlString, LoadHotstringsSection,
 ; FoldAsciiLower, ApplyTomlMetadataToFeatures) extracted into dedicated
 ; submodules so the main file stays focused on ErgoptiPlus-specific logic.
-#Include lib\hotstring_engine.ahk
-#Include lib\hotstring_engine_v2.ahk
-#Include lib\toml_loader.ahk
-#Include lib\hotstrings_config.ahk
-#Include lib\hotstrings_config_window.ahk
-#Include lib\tooltip.ahk
-#Include lib\hotstring_prefix_watcher.ahk
+#Include lib/hotstring_engine.ahk
+#Include lib/hotstring_engine_v2.ahk
+#Include lib/toml_loader.ahk
+#Include lib/hotstrings_config.ahk
+#Include lib/hotstrings_config_window.ahk
+#Include lib/tooltip.ahk
+#Include lib/hotstring_prefix_watcher.ahk
 ; Auto-generated registrar for the bundled hotstring TOMLs. ``*i`` keeps the
 ; driver runnable from a fresh clone before ``tools/compile_hotstrings.py`` has
 ; been executed — ``LoadHotstringsSection`` falls back to the regex parser when
 ; ``_GENERATED_HOTSTRINGS`` is undefined.
-#Include *i lib\hotstrings_generated.ahk
-#Include lib\personal_toml_editor.ahk
-#Include lib\dispatchers.ahk
-#Include lib\layout_altgr.ahk
-#Include lib\layout_shift_caps.ahk
-#Include lib\app_picker.ahk
-#Include lib\config_shortcuts.ahk
-#Include lib\metrics_shortcuts.ahk
-#Include lib\metrics_filters.ahk
-#Include lib\sqlite3.ahk
-#Include vendor\ComVar.ahk
-#Include vendor\Promise.ahk
-#Include vendor\WebView2.ahk
-#Include modules\keylogger_app_categories.ahk
-#Include modules\keylogger.ahk
-#Include modules\keylogger_walker.ahk
-#Include modules\keylogger_hook.ahk
-#Include modules\keylogger_watchers.ahk
-#Include modules\keylogger_mouse.ahk
-#Include modules\keylogger_sensors.ahk
-#Include modules\keylogger_ergonomics.ahk
-#Include modules\keylogger_window_topology.ahk
-#Include modules\keylogger_av_state.ahk
-#Include modules\keylogger_network.ahk
-#Include modules\keylogger_clipboard.ahk
-#Include modules\keylogger_trigger_roi.ahk
-#Include modules\keylogger_reader.ahk
-#Include modules\keylogger_prefetch.ahk
-#Include modules\keylogger_webview.ahk
-#Include modules\keylogger_ui.ahk
+#Include *i lib/hotstrings_generated.ahk
+#Include lib/personal_toml_editor.ahk
+#Include lib/dispatchers.ahk
+#Include lib/layout_altgr.ahk
+#Include lib/layout_shift_caps.ahk
+#Include lib/app_picker.ahk
+#Include lib/config_shortcuts.ahk
+#Include lib/metrics_shortcuts.ahk
+#Include lib/metrics_filters.ahk
+#Include lib/sqlite3.ahk
+#Include vendor/ComVar.ahk
+#Include vendor/Promise.ahk
+#Include vendor/WebView2.ahk
+#Include modules/keylogger_app_categories.ahk
+#Include modules/keylogger.ahk
+#Include modules/keylogger_walker.ahk
+#Include modules/keylogger_hook.ahk
+#Include modules/keylogger_watchers.ahk
+#Include modules/keylogger_mouse.ahk
+#Include modules/keylogger_sensors.ahk
+#Include modules/keylogger_ergonomics.ahk
+#Include modules/keylogger_window_topology.ahk
+#Include modules/keylogger_av_state.ahk
+#Include modules/keylogger_network.ahk
+#Include modules/keylogger_clipboard.ahk
+#Include modules/keylogger_trigger_roi.ahk
+#Include modules/keylogger_reader.ahk
+#Include modules/keylogger_prefetch.ahk
+#Include modules/keylogger_webview.ahk
+#Include modules/keylogger_ui.ahk
 
 ; ======================================================
 ; ======================================================
@@ -162,9 +162,9 @@ if !DirExist(_ConfigDir) {
     try DirCreate(_ConfigDir)
 }
 
-; AHK-specific INI lives under the driver subfolder. The legacy root path
-; is no longer searched — users coming from the older layout move the
-; file into <config_dir>/ahk/ once.
+; All AHK driver configuration lives in a single unified TOML under the
+; driver subfolder: features, script settings, shortcuts, gestures, and
+; expert overrides ([script] / [features]) are sections of this one file.
 global ConfigurationFile := _ConfigDir . "ahk\config.toml"
 
 ; Initialise the hotstrings_config module so per-group delays and tooltip
@@ -227,10 +227,10 @@ global SCRIPT_SHORTCUT_LABELS := Map(
     "script_altgr_escape", "AltGr + Échap",
 )
 global SCRIPT_SHORTCUT_DEFAULTS := Map(
-    "script_altgr_enter", "ahk_suspend",
-    "script_altgr_backspace", "ahk_save_reload",
-    "script_altgr_delete", "ahk_edit",
-    "script_altgr_escape", "ahk_quit",
+    "script_altgr_enter", "script_pause_toggle",
+    "script_altgr_backspace", "script_save_reload",
+    "script_altgr_delete", "open_personal_shortcuts",
+    "script_altgr_escape", "script_quit",
 )
 global SCRIPT_SHORTCUT_FALLBACKS := Map(
     "script_altgr_enter", "{Enter}",
@@ -274,7 +274,7 @@ LoggerStart("ErgoptiPlus", "Booting ErgoptiPlus driver…")
 ; the heuristic needs adjustment).
 _DetectVK := DllCall("MapVirtualKeyExW",
     "UInt", 0x38, "UInt", 3,
-    "Ptr",  GetForegroundKeyboardLayout(), "UInt")
+    "Ptr", GetForegroundKeyboardLayout(), "UInt")
 LoggerInfo("AltGrDetect",
     "HKL=0x{1:X}, SC138→VK=0x{2:X}, _ALTGR_KANA_FIXUP={3}.",
     GetForegroundKeyboardLayout(), _DetectVK,
@@ -293,7 +293,7 @@ LoggerInfo("AltGrDetect",
 ; extracted to its own submodule so the main file is not dominated by a 650-line
 ; data literal. INI overrides are still applied by ReadConfiguration() below, and
 ; TOML metadata is still injected by ApplyTomlMetadataToFeatures() after that.
-#Include lib\features_config.ahk
+#Include lib/features_config.ahk
 
 ; It is best to modify those values by using the option in the script menu
 global PersonalInformation := Map(
@@ -759,19 +759,10 @@ BuildGesturesMenu() {
 
     GMenu.Add() ; Separator
 
-    ; Per-slot submenus — each slot shows all available actions as radio items
-    ; Actions that start a new logical group get a separator before them
-    static GroupStarters := Map(
-        "right_click_toggle", true,
-        "copy", true,
-        "enter", true,
-        "tab_new", true,
-        "win_prev", true,
-        "desktop_prev", true,
-        "vol_up", true,
-        "screenshot_window_clipboard", true,
-        "ahk_reload", true,
-    )
+    ; Per-slot submenus — each slot shows all available actions as radio
+    ; items. Group separators are driven by the "--" sentinels embedded in
+    ; GESTURE_ACTION_NAMES (see modules/gestures.ahk), so this loop only
+    ; needs to translate sentinel → menu separator and skip duplicates.
 
     for Slot in GESTURE_SLOTS {
         ; Separator between 3-finger and 4-finger groups
@@ -835,9 +826,6 @@ ToggleGesturesEnabled() {
     Reload
 }
 
-
-
-
 ; ====================================
 ; ====================================
 ; ======= 1.X / Category toggle =======
@@ -861,9 +849,6 @@ AddCategoryToggleItem(menu, on_label, off_label, is_enabled, on_click) {
     menu.Insert("2&")  ; separator
 }
 
-
-
-
 ; ====================================
 ; ====================================
 ; ======= 1.X / Metrics menu =======
@@ -884,12 +869,12 @@ BuildMetricsMenu() {
 
     enabled := MetricsShortcuts.enabled
     typing_label := "Afficher les métriques de frappe"
-    apps_label   := "Afficher le temps sur les applications"
+    apps_label := "Afficher le temps sur les applications"
     ; A trailing zero-width space differentiates the second « ↳ Raccourci :
     ; Aucun » entry from the first — AHK's tray menu uses the label as a
     ; unique key and would silently merge two identical strings into one.
-    typing_sc    := "↳ Raccourci : " . MS_GetDisplayLabel("typing")
-    apps_sc      := "↳ Raccourci : " . MS_GetDisplayLabel("apps") . Chr(0x200B)
+    typing_sc := "↳ Raccourci : " . MS_GetDisplayLabel("typing")
+    apps_sc := "↳ Raccourci : " . MS_GetDisplayLabel("apps") . Chr(0x200B)
 
     MetricsMenu.Add(typing_label, (*) => KLUI_ToggleTyping())
     MetricsMenu.Add(typing_sc, (*) => MS_PromptShortcut("typing", KLUI_ToggleTyping))
@@ -978,12 +963,12 @@ ToggleFilterSystemAuth(*) {
 
 OpenMetricsAppPicker(*) {
     AppPicker_Show(Map(
-        "title",    "Exclure des applications — Métriques",
-        "prompt",   "Sélectionnez les applications dont les frappes ne "
-                .   "seront jamais enregistrées par le keylogger.",
+        "title", "Exclure des applications — Métriques",
+        "prompt", "Sélectionnez les applications dont les frappes ne "
+        . "seront jamais enregistrées par le keylogger.",
         "ok_label", "Enregistrer",
-        "initial",  MF_DisabledList(),
-        "on_save",  OnMetricsAppPickerSave
+        "initial", MF_DisabledList(),
+        "on_save", OnMetricsAppPickerSave
     ))
 }
 
@@ -1027,13 +1012,13 @@ ToggleMetricsEnabled() {
     global _ConfigDir
     metrics_path := _ConfigDir . "metrics"
     warn := "ATTENTION : Vous êtes sur le point d'activer le keylogger.`n`n"
-        .  "Il enregistre vos frappes au clavier à la milliseconde près. "
-        .  "Ces logs sont stockés en local sous :`n"
-        .  "    " . metrics_path . "`n`n"
-        .  "Bien que les champs de mots de passe soient ignorés automatiquement "
-        .  "(filtre UIA), il est recommandé de mettre le script en PAUSE lors "
-        .  "de la saisie de données sensibles.`n`n"
-        .  "Activer ?"
+        . "Il enregistre vos frappes au clavier à la milliseconde près. "
+        . "Ces logs sont stockés en local sous :`n"
+        . "    " . metrics_path . "`n`n"
+        . "Bien que les champs de mots de passe soient ignorés automatiquement "
+        . "(filtre UIA), il est recommandé de mettre le script en PAUSE lors "
+        . "de la saisie de données sensibles.`n`n"
+        . "Activer ?"
     ; Icon! = exclamation triangle (warning). Iconx is the red error stop
     ; sign and was the wrong choice for a "you are about to enable a
     ; logging feature" notice.
@@ -1074,17 +1059,12 @@ GestureAutoConfigureAction() {
 ; =========================
 
 global MenuHotstrings := "⚡ Hotstrings"
-global MenuScriptManagement := "Gestion du script"
 global MenuConfigurationShortcuts := "Raccourcis de gestion du script"
 ; Holds the « Suspendre » label so UpdateTrayIcon can check/uncheck the
-; entry by its exact text. Re-assigned in initMenu so future label tweaks
-; (icons, hints) only need to change the menu builder.
+; entry by its exact text on A_TrayMenu. Re-assigned in initMenu so future
+; label tweaks (icons, hints) only need to change the menu builder.
 global MenuSuspend := "⏸︎ Suspendre"
 global MenuDebugging := "⚠ Débogage"
-; Script-management submenu object — kept global so UpdateTrayIcon can
-; check/uncheck the « Suspendre » entry (which lives in the submenu, not
-; directly on A_TrayMenu).
-global ScriptMgmtMenu := ""
 
 ; Categories that live inside the Hotstrings submenu (ordered to match HS menu)
 global HotstringCategories := ["DistancesReduction", "SFBsReduction", "Rolls", "Autocorrection", "MagicKey", "Personal"]
@@ -1329,35 +1309,75 @@ initMenu() {
 
     A_TrayMenu.Add() ; Single separator between feature submenus and configuration items
 
-    ; ── Actions globales — nested inside "Gestion du script" because the
-    ; bulk-toggle / reset-defaults actions logically belong to script-wide
-    ; management rather than the top-level feature toggles above. ──
+    ; ── Actions globales — bulk-toggle / reset-defaults actions kept as a
+    ; single submenu so the top-level tray stays scannable. ──
     GlobalActionsMenu := Menu()
     GlobalActionsMenu.Add("☑ Activer toutes les fonctionnalités", ToggleAllFeaturesOn)
     GlobalActionsMenu.Add("☐ Désactiver toutes les fonctionnalités", ToggleAllFeaturesOff)
     GlobalActionsMenu.Add("↺ Valeurs par défaut", ReloadWithDefaultConfig)
 
-    ; ── Script management — single submenu grouping Actions globales /
-    ; Éditer / Suspendre / Recharger / Quitter (binding hints live in the
-    ; « Raccourcis » submenu). ──
-    global MenuSuspend, ScriptMgmtMenu
+    ; ── Script management — flattened into the top-level tray menu (used to
+    ; live in a "Gestion du script" submenu). The lifecycle actions sit one
+    ; click closer to the tray icon and stay grouped via separators. ──
+    global MenuSuspend
     MenuSuspend := "⏸︎ Suspendre"
-    ScriptMgmtMenu := Menu()
-    ScriptMgmtMenu.Add("Actions globales", GlobalActionsMenu)
-    ScriptMgmtMenu.Add("📂 Dossier de configuration…", FilePathsEditor)
-    ScriptMgmtMenu.Add() ; Separator before lifecycle actions
-    ScriptMgmtMenu.Add("✎ Éditer", ActivateEdit)
-    ScriptMgmtMenu.Add(MenuSuspend, ToggleSuspend)
-    ScriptMgmtMenu.Add("🔄 Recharger", ActivateReload)
-    ScriptMgmtMenu.Add("⏹ Quitter", ActivateExitApp)
-    A_TrayMenu.Add(MenuScriptManagement, ScriptMgmtMenu)
+    A_TrayMenu.Add("Actions globales", GlobalActionsMenu)
+    A_TrayMenu.Add("📂 Dossier de configuration…", FilePathsEditor)
+    A_TrayMenu.Add() ; Separator before lifecycle actions
+    A_TrayMenu.Add("✎ Éditer personal_shortcuts.ahk", OpenPersonalShortcuts)
+    A_TrayMenu.Add(MenuSuspend, ToggleSuspend)
+    A_TrayMenu.Add("🔄 Recharger", ActivateReload)
+    A_TrayMenu.Add("⏹ Quitter", ActivateExitApp)
 
-    ; ── Débogage — tools grouped in a submenu to keep the top-level menu tidy ──
+    ; ── Débogage — tools grouped in a submenu to keep the top-level menu tidy.
+    ; Mirrors Hammerspoon's "⚠ Débogage" entry (Console + log shortcuts);
+    ; Window Spy / List Vars / Key History are AutoHotkey-specific particulars. ──
     DebuggingMenu := Menu()
     DebuggingMenu.Add("Window Spy", WindowSpy)
     DebuggingMenu.Add("État des variables", ActivateListVars)
     DebuggingMenu.Add("Historique des touches", ActivateKeyHistory)
+    DebuggingMenu.Add("Ouvrir le dossier de logs", OpenLogsFolder)
+    DebuggingMenu.Add("Ouvrir le fichier de log du jour", OpenTodayLog)
     A_TrayMenu.Add(MenuDebugging, DebuggingMenu)
+}
+
+; Opens personal_shortcuts.ahk in Notepad. Same function the gesture binding
+; uses (modules/gestures.ahk:GestureEditPersonalShortcuts), but kept callable
+; from the tray menu so the user has both entry points.
+OpenPersonalShortcuts(*) {
+    Path := ScriptInformation["PersonalAhkPath"]
+    EnsurePersonalShortcutsFile(Path)
+    Run('notepad.exe "' . Path . '"')
+}
+
+; Opens the per-user log directory (under <ConfigDir>/ahk/logs/) in Explorer.
+; Creates it on first use so the user never sees an "introuvable" dialog
+OpenLogsFolder(*) {
+    LogDir := (IsSet(_ConfigDir) and _ConfigDir != "")
+        ? _ConfigDir . "ahk\logs\"
+        : A_ScriptDir . "\logs\"
+    if !DirExist(LogDir) {
+        try DirCreate(LogDir)
+    }
+    Run('explorer.exe "' . LogDir . '"')
+}
+
+; Opens today's rolling log file in Notepad. LOGGER_LOG_PATH is refreshed by
+; LoggerInit() at every menu rebuild, so the path follows day rollover.
+OpenTodayLog(*) {
+    global LOGGER_LOG_PATH
+    Path := (IsSet(LOGGER_LOG_PATH) and LOGGER_LOG_PATH != "")
+        ? LOGGER_LOG_PATH
+        : ""
+    if Path = "" or !FileExist(Path) {
+        ; Fall back to the day-stamped path under <ConfigDir>/ahk/logs/ even if the
+        ; logger hasn't initialised yet (very early boot, edge case)
+        LogDir := (IsSet(_ConfigDir) and _ConfigDir != "")
+            ? _ConfigDir . "ahk\logs\"
+            : A_ScriptDir . "\logs\"
+        Path := LogDir . "ErgoptiPlus_" . FormatTime(, "yyyy-MM-dd") . ".log"
+    }
+    Run('notepad.exe "' . Path . '"')
 }
 
 ; Minimal template for personal_shortcuts.ahk — created on first launch so the
@@ -1531,7 +1551,7 @@ EnsurePersonalShortcutsFile(Path) {
     ; the source tree alongside the actual driver files. The folder is
     ; gitignored; AHK resolves `#Include *i _generated\personal_shortcuts.ahk`
     ; relative to A_ScriptDir at parse time.
-    StubDir  := A_ScriptDir . "\_generated"
+    StubDir := A_ScriptDir . "\_generated"
     try DirCreate(StubDir)
     StubPath := StubDir . "\personal_shortcuts.ahk"
     DesiredStub := "; Auto-generated forwarding stub — do not edit.`r`n"
@@ -1576,13 +1596,14 @@ EnsurePersonalShortcutsFile(ScriptInformation["PersonalAhkPath"])
 ; layout's key remappings (which run at the default level 0). We set it here so
 ; the user does not have to know about input levels in their personal file.
 #InputLevel 2
-#Include *i _generated\personal_shortcuts.ahk
+#Include *i _generated/personal_shortcuts.ahk
 #InputLevel 0
-; Apply user overrides from <config_dir>/config.toml on top of the INI-driven
-; configuration. The TOML is an optional "expert" layer the user can edit by
-; hand to override anything the menu exposes (LogLevel, MagicKey, individual
-; feature flags). Missing file is silently ignored.
-ApplyConfigTomlOverrides(_ConfigDir . "config.toml")
+; Apply user overrides from ahk/config.toml on top of the INI-driven
+; configuration. The [script] and [features] sections are an optional "expert"
+; layer the user can edit by hand to override anything the menu exposes
+; (LogLevel, MagicKey, individual feature flags). All sections live in a
+; single unified config file — no separate cross-driver config.toml.
+ApplyConfigTomlOverrides(ConfigurationFile)
 
 ; Bootstrap Features["Personal"] from personal_hotstrings.toml _meta.sections
 ; before applying TOML metadata, so the user's section toggles appear in the menu.
@@ -1609,17 +1630,22 @@ if Features.Has("Personal") {
 
 ; Gestures module included here — before menu build — so GESTURE_SLOTS,
 ; GESTURE_ACTIONS and GESTURE_SLOT_LABELS exist when BuildGesturesMenu runs.
-#Include modules\gestures.ahk
+#Include modules/gestures.ahk
 
 ; Load script-shortcut overrides now that GESTURE_ACTIONS is defined — the
 ; reader validates each candidate action name against the registry.
 ReadScriptShortcutsConfig()
 
 ; Load every UI shortcut + privacy filter from the [shortcuts] section
-; of <config_dir>/config.toml. CS_Load() populates both MetricsShortcuts
-; and MetricsFilters in one pass; the legacy MS_LoadFromIni shim still
-; exists for callers that have not migrated yet.
+; of ahk/config.toml. CS_Load() populates both MetricsShortcuts
+; and MetricsFilters in one pass.
 CS_Load()
+
+; Now that all modules are loaded and config is hydrated, persist the
+; complete state to ensure the on-disk TOML contains every key — not
+; just the ones the user has ever toggled. This makes the file a
+; human-readable, complete reference of the current configuration.
+SaveFullConfig()
 
 InitSubMenus()
 initMenu()
@@ -1980,21 +2006,118 @@ ToggleCategoryAllFeatures(Category, Value) {
     Reload
 }
 
+; Persist the complete in-memory state to the unified ahk/config.toml.
+; Every feature flag, script setting, script shortcut assignment, and
+; gesture assignment is written — not just the delta from defaults.
+; Sections and keys within sections are sorted alphabetically by the
+; TOML_BatchWrite writer for stable, human-readable output.
+SaveFullConfig() {
+    global Features, ScriptInformation, ScriptShortcutAssignments
+    global GestureAssignments, ConfigurationFile, _TOML_STRICT_CANON_IN_PROGRESS
+    Updates := []
+
+    ; Collect all feature flags recursively
+    _CollectFeatureUpdates(Updates, "", Features)
+
+    ; [Script] section — all entries from ScriptInformation
+    for Key, Value in ScriptInformation {
+        Updates.Push({ Section: "Script", Key: Key, Value: Value })
+    }
+
+    ; [Shortcuts.ScriptControl] section
+    if IsSet(ScriptShortcutAssignments) {
+        for Slot, Action in ScriptShortcutAssignments {
+            Updates.Push({ Section: "Shortcuts.ScriptControl", Key: Slot, Value: Action })
+        }
+    }
+
+    ; [Gestures] assignments (trackpad gesture slots)
+    if IsSet(GestureAssignments) {
+        for Slot, Action in GestureAssignments {
+            Updates.Push({ Section: "Gestures", Key: Slot, Value: Action })
+        }
+    }
+
+    ; [Metrics] section — metrics shortcut bindings and privacy filters
+    apps := []
+    for proc, _ in MetricsFilters.disabled_apps
+        apps.Push(proc)
+    Updates.Push({ Section: "Metrics", Key: "metrics_enabled", Value: MetricsShortcuts.enabled })
+    Updates.Push({ Section: "Metrics", Key: "metrics_shortcut_typing", Value: MetricsShortcuts.typing_str })
+    Updates.Push({ Section: "Metrics", Key: "metrics_shortcut_apps", Value: MetricsShortcuts.apps_str })
+    Updates.Push({ Section: "Metrics", Key: "metrics_filter_private_browsing", Value: MetricsFilters.private_browsing })
+    Updates.Push({ Section: "Metrics", Key: "metrics_filter_secure_field", Value: MetricsFilters.secure_field })
+    Updates.Push({ Section: "Metrics", Key: "metrics_filter_system_auth", Value: MetricsFilters.system_auth })
+    Updates.Push({ Section: "Metrics", Key: "metrics_disabled_apps", Value: apps })
+
+    ; Strict schema: rewrite from scratch so stale/unknown sections and keys
+    ; are removed on each full save
+    if FileExist(ConfigurationFile) {
+        try FileDelete(ConfigurationFile)
+    }
+
+    PrevCanonState := _TOML_STRICT_CANON_IN_PROGRESS
+    _TOML_STRICT_CANON_IN_PROGRESS := true
+    try TOML_BatchWrite(ConfigurationFile, Updates)
+    finally _TOML_STRICT_CANON_IN_PROGRESS := PrevCanonState
+}
+
+; Recursively walk the Features map to collect all persistable properties
+; into the Updates array. The key format mirrors ReadConfiguration so the
+; round-trip is lossless.
+_CollectFeatureUpdates(Updates, ParentPath, Node) {
+    Props := ["Enabled", "TimeActivationSeconds", "Letter", "PatternMaxLength",
+        "Link", "DestinationFolder", "DatedNotes", "SearchEngine", "SearchEngineURLQuery"]
+
+    for Key, Value in Node {
+        if Key == "__Order" or Key == "__Configuration" {
+            continue
+        }
+        CurrentPath := (ParentPath == "") ? Key : ParentPath "." Key
+
+        if Type(Value) == "Map" {
+            ; Nested sub-map: persist __Configuration if present, then recurse
+            if Value.Has("__Configuration") {
+                Cfg := Value["__Configuration"]
+                for Prop in Props {
+                    if Cfg.HasOwnProp(Prop) {
+                        ConfigKey := (Key == Prop) ? Prop : Key "." Prop
+                        Updates.Push({ Section: ParentPath == "" ? Key : ParentPath,
+                            Key: ConfigKey, Value: Cfg.%Prop% })
+                    }
+                }
+            }
+            _CollectFeatureUpdates(Updates, CurrentPath, Value)
+        } else if IsObject(Value) {
+            ; Leaf feature object: persist all known properties
+            Section := (ParentPath == "") ? Key : ParentPath
+            for Prop in Props {
+                if Value.HasOwnProp(Prop) {
+                    ; Mirror ReadConfiguration: avoid "Foo.Foo" when the key
+                    ; and property share the same name
+                    ConfigKey := (Key == Prop) ? Prop : Key "." Prop
+                    Updates.Push({ Section: Section, Key: ConfigKey, Value: Value.%Prop% })
+                }
+            }
+        }
+    }
+}
+
 ReloadWithDefaultConfig(*) {
-    ; Delete the ini so the next startup uses all default values, then reload
+    ; Delete the config so the next startup uses all default values, then reload
     if FileExist(ConfigurationFile) {
         FileDelete(ConfigurationFile)
     }
     Reload
 }
 
-; Read the user's per-slot action overrides from the ini's [ScriptShortcuts]
-; section. Defaults stay in place when the key is absent or the action name is
+; Read the user's per-slot action overrides from the config's
+; [Shortcuts.ScriptControl] section. Defaults stay in place when the key is absent or the action name is
 ; unknown. Called once at boot from initMenu's preamble.
 ReadScriptShortcutsConfig() {
     global ScriptShortcutAssignments, SCRIPT_SHORTCUT_SLOTS, _IniCache, GESTURE_ACTIONS
     for Slot in SCRIPT_SHORTCUT_SLOTS {
-        Value := IniCacheGet(_IniCache, "ScriptShortcuts", Slot)
+        Value := IniCacheGet(_IniCache, "Shortcuts.ScriptControl", Slot)
         if (Value != "_" and (Value == "none" or GESTURE_ACTIONS.Has(Value))) {
             ScriptShortcutAssignments[Slot] := Value
         }
@@ -2026,7 +2149,7 @@ RunScriptShortcutAction(Slot) {
 SetScriptShortcutAction(Slot, ActionName) {
     global ScriptShortcutAssignments, ConfigurationFile
     ScriptShortcutAssignments[Slot] := ActionName
-    TOML_Write(ActionName, ConfigurationFile, "ScriptShortcuts", Slot)
+    TOML_Write(ActionName, ConfigurationFile, "Shortcuts.ScriptControl", Slot)
     Reload
 }
 
@@ -2163,14 +2286,15 @@ ToggleSuspend(*) {
 }
 
 UpdateTrayIcon() {
-    global ScriptMgmtMenu
+    ; The Suspend entry now lives directly on the tray menu; tick/untick it
+    ; there since the old ScriptMgmtMenu submenu was flattened away.
     if A_IsSuspended {
-        ScriptMgmtMenu.Check(MenuSuspend)
+        A_TrayMenu.Check(MenuSuspend)
         if FileExist(IconPathDisabled) {
             TraySetIcon(IconPathDisabled, , True)
         }
     } else {
-        ScriptMgmtMenu.Uncheck(MenuSuspend)
+        A_TrayMenu.Uncheck(MenuSuspend)
         if FileExist(IconPath) {
             TraySetIcon(IconPath)
         }
@@ -2308,10 +2432,10 @@ if Features.Has("Personal") {
 #InputLevel 2 ; Very important, we need to be at a higher InputLevel to remap the keys into something else.
 ; It is because we will then remap keys we just remapped, so the InputLevel of those other shortcuts must be lower.
 ; This is especially important for the "★" key, otherwise the hotstrings involving this key won't trigger.
-#Include modules\layout.ahk
-#Include modules\shortcuts.ahk
-#Include modules\tap_holds.ahk
-#Include modules\hotstrings.ahk
+#Include modules/layout.ahk
+#Include modules/shortcuts.ahk
+#Include modules/tap_holds.ahk
+#Include modules/hotstrings.ahk
 
 ; Hotstrings are now registered — start the prefix watcher so typing a
 ; partial trigger surfaces a tinted tooltip preview (parity with the
@@ -2324,9 +2448,6 @@ HotstringPrefixWatcherInit()
 ; script is ready to handle keystrokes. A missing SUCCESS in the log file
 ; pinpoints which #Include above failed silently.
 LoggerSuccess("ErgoptiPlus", "Driver fully initialised — ready.")
-
-
-
 
 ; =========================================
 ; =========================================

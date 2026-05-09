@@ -302,23 +302,10 @@ local function _resolve_paths(metrics_dir, device_id)
 		device_json_path  = by_dev .. "device.json",
 		data_sql_path     = by_dev .. "data.sql",
 		today_log_path    = by_dev .. "today.log",
-		gitignore_path    = md .. ".gitignore",
 		tmpdir_dir        = tmp_dir,
 		sqlite_path       = tmp_dir .. "db.sqlite",
 		schema_sql_path   = schema_path,
 	}
-end
-
---- Write the user-facing .gitignore at the metrics root if missing.
-local function _ensure_gitignore()
-	if fs.attributes(_paths.gitignore_path) then return end
-	local f = io.open(_paths.gitignore_path, "w")
-	if not f then return end
-	f:write("# Local hot-path log — never commit, never sync.\n")
-	f:write("# One writer per device; another machine appending here would\n")
-	f:write("# corrupt the file. Ingested into data.sql by the keylogger.\n")
-	f:write("today.log\n")
-	f:close()
 end
 
 
@@ -2267,7 +2254,6 @@ function M.init(core_state)
 	_mkdir_p(_paths.metrics_dir)
 	_mkdir_p(_paths.by_device_dir)
 	_mkdir_p(_paths.tmpdir_dir)
-	_ensure_gitignore()
 
 	-- Persist device.json (idempotent — writes back the resolved/new object).
 	_write_device_json(_device_obj)

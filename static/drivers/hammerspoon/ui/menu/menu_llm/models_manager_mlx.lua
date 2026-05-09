@@ -174,18 +174,18 @@ function M.new(deps, presets)
 	function obj.open_model_source_page(model_name)
 		local repo = obj.get_mlx_repo(model_name)
 		if type(repo) ~= "string" or repo == "" then
-			pcall(notifications.notify, "Source introuvable", "Aucun dépôt MLX trouvé pour ce modèle")
+			pcall(notifications.notify, "Source introuvable", "Aucun dépôt MLX trouvé pour ce modèle", "error")
 			return false
 		end
 
 		local url = "https://huggingface.co/" .. repo
 		local ok_open = pcall(hs.urlevent.openURL, url)
 		if not ok_open then
-			pcall(notifications.notify, "Ouverture impossible", "Impossible d’ouvrir la page HuggingFace")
+			pcall(notifications.notify, "Ouverture impossible", "Impossible d’ouvrir la page HuggingFace", "error")
 			return false
 		end
 
-		pcall(notifications.notify, "🌐 HuggingFace", "Page du modèle ouverte dans votre navigateur")
+		pcall(notifications.notify, "HuggingFace", "Page du modèle ouverte dans votre navigateur", "info")
 		return true
 	end
 
@@ -232,14 +232,14 @@ function M.new(deps, presets)
 					
 					if token == "" and token_seed ~= "" then
 						token = token_seed
-						pcall(notifications.notify, "✅ Token détecté", "Token récupéré depuis le presse-papiers")
+						pcall(notifications.notify, "Token détecté", "Token récupéré depuis le presse-papiers", "success")
 					elseif token ~= "" and token_seed ~= "" and #token_seed > #token and token_seed:sub(-#token) == token then
 						token = token_seed
-						pcall(notifications.notify, "✅ Token corrigé", "Le token du presse-papiers complet a été utilisé")
+						pcall(notifications.notify, "Token corrigé", "Le token du presse-papiers complet a été utilisé", "success")
 					end
 					
 					if token == "" then
-						pcall(notifications.notify, "Token manquant", "Aucun token fourni")
+						pcall(notifications.notify, "Token manquant", "Aucun token fourni", "error")
 						if type(on_done) == "function" then pcall(on_done, false) end
 						return
 					end
@@ -358,10 +358,10 @@ PY
 			if deps.active_tasks then deps.active_tasks["hf_login"] = nil end
 
 			if code == 0 then
-				pcall(notifications.notify, "🔓 HuggingFace connecté", "Token sauvegardé. Vous pouvez maintenant télécharger les modèles beaucoup plus rapidement !")
+				pcall(notifications.notify, "HuggingFace connecté", "Token sauvegardé. Vous pouvez maintenant télécharger les modèles beaucoup plus rapidement !", "success")
 				if type(on_done) == "function" then pcall(on_done, true) end
 			else
-				pcall(notifications.notify, "❌ Connexion HuggingFace", "Échec de connexion. Vérifiez votre token.")
+				pcall(notifications.notify, "Connexion HuggingFace", "Échec de connexion. Vérifiez votre token.", "error")
 				if type(on_done) == "function" then pcall(on_done, false) end
 			end
 		end, function(_, stdout, stderr)
@@ -376,7 +376,7 @@ PY
 			deps.active_tasks["hf_login"] = task
 			pcall(function() task:start() end)
 		else
-			pcall(notifications.notify, "Erreur", "Impossible de lancer la connexion HuggingFace")
+			pcall(notifications.notify, "Connexion HuggingFace impossible", nil, "error")
 			if type(on_done) == "function" then pcall(on_done, false) end
 		end
 	end
@@ -847,9 +847,9 @@ PY
 					tostring(target_model), tostring(reason_line))
 				dump_mlx_server_log("MLX crash for ‘" .. tostring(target_model) .. "’")
 				if not silent_notifications then
-					pcall(notifications.notify, "❌ MLX incompatible",
+					pcall(notifications.notify, "MLX incompatible",
 						"Le modèle " .. tostring(target_model) ..
-						" n’est pas compatible avec mlx-lm. Choisissez un autre modèle.")
+						" n’est pas compatible avec mlx-lm. Choisissez un autre modèle.", "error")
 				end
 				-- Release the caller’s prediction lock so the user can switch to a working
 				-- model without having to reload Hammerspoon
@@ -995,7 +995,7 @@ PY
 				pcall(deps.update_icon)
 				os.execute("rm -f /tmp/hs_mlx_active_download.json 2>/dev/null")
 				if not silent then
-					pcall(notifications.notify, "🛑 Annulé", "Téléchargement de " .. target_model .. " interrompu.")
+					pcall(notifications.notify, "Annulé", "Téléchargement de " .. target_model .. " interrompu.", "warning")
 					if download_window then pcall(download_window.complete, false, target_model) end
 				end
 			end
@@ -1059,7 +1059,7 @@ PY
 			-- heredoc — a detached process cannot read from stdin after the shell exits anyway
 			local py = io.open(py_path, "w")
 			if not py then
-				pcall(notifications.notify, "Erreur", "Écriture du script Python impossible dans /tmp")
+				pcall(notifications.notify, "Écriture du script Python impossible dans /tmp", nil, "error")
 				return
 			end
 			py:write("import sys, os, threading, atexit\n")
@@ -1150,7 +1150,7 @@ PY
 			-- then starts Python detached via nohup (shields SIGHUP) and reports its PID
 			local f = io.open(script_path, "w")
 			if not f then
-				pcall(notifications.notify, "Erreur", "Écriture du script Bash impossible dans /tmp")
+				pcall(notifications.notify, "Écriture du script Bash impossible dans /tmp", nil, "error")
 				return
 			end
 			f:write("#!/bin/bash\n")
@@ -1236,7 +1236,7 @@ PY
 						local reason = (_current_pct >= 99)
 							and "Aucun progrès détecté depuis 2 minutes à 99 %. Blocage probable."
 							or "Aucun progrès détecté depuis 5 minutes. Abandon."
-						pcall(notifications.notify, "⏳ Téléchargement MLX bloqué", reason)
+						pcall(notifications.notify, "Téléchargement MLX bloqué", reason, "warning")
 						if download_window then pcall(download_window.complete, false, target_model) end
 						-- Pass silent=true: notifications and window state already handled above
 						do_cancel(true)
@@ -1343,7 +1343,7 @@ PY
 				end
 
 				if exit_code == 0 then
-					pcall(notifications.notify, "🟢 MODÈLE MLX INSTALLÉ", target_model .. " est prêt !")
+					pcall(notifications.notify, "Modèle MLX installé", target_model .. " est prêt !", "success")
 					if download_window then pcall(download_window.complete, true, target_model) end
 					deps.state.llm_model = target_model
 					if deps.keymap and type(deps.keymap.set_llm_model) == "function" then pcall(deps.keymap.set_llm_model, target_model) end
@@ -1353,7 +1353,7 @@ PY
 					end)
 				else
 					if download_window then pcall(download_window.complete, false, target_model, _saw_gated_error and "gated" or nil) end
-					pcall(notifications.notify, "❌ Échec MLX", "Vérifiez les logs dans la fenêtre.")
+					pcall(notifications.notify, "Échec MLX", "Vérifiez les logs dans la fenêtre.", "error")
 				end
 			end
 
@@ -1397,7 +1397,7 @@ PY
 					-- Reset icon here: handle_download_done will not run after a launcher failure
 					pcall(deps.update_icon)
 					if download_window then pcall(download_window.complete, false, target_model) end
-					pcall(notifications.notify, "❌ Échec lancement MLX", "Le lanceur a échoué (code " .. tostring(code) .. ").")
+					pcall(notifications.notify, "Échec lancement MLX", "Le lanceur a échoué (code " .. tostring(code) .. ").", "error")
 					return
 				end
 				start_tail_monitor()
@@ -1460,9 +1460,9 @@ PY
 			os.execute("rm -f " .. exit_path .. " 2>/dev/null")
 			os.execute("rm -f /tmp/hs_mlx_active_download.json 2>/dev/null")
 			if code == 0 then
-				pcall(notifications.notify, "🟢 MODÈLE MLX INSTALLÉ", model .. " est prêt !")
+				pcall(notifications.notify, "Modèle MLX installé", model .. " est prêt !", "success")
 			else
-				pcall(notifications.notify, "❌ Échec MLX", "Le téléchargement de " .. model .. " a échoué pendant le rechargement.")
+				pcall(notifications.notify, "Échec MLX", "Le téléchargement de " .. model .. " a échoué pendant le rechargement.", "error")
 			end
 			Logger.info(LOG, "Reattach: download already finished (exit=%d) — no tail needed.", code)
 			return
@@ -1473,7 +1473,7 @@ PY
 			local alive = os.execute("kill -0 " .. tostring(pid) .. " 2>/dev/null")
 			if not alive then
 				os.execute("rm -f /tmp/hs_mlx_active_download.json 2>/dev/null")
-				pcall(notifications.notify, "❌ Téléchargement interrompu", "Le processus de téléchargement de " .. model .. " s'est arrêté pendant le rechargement.")
+				pcall(notifications.notify, "Téléchargement interrompu", "Le processus de téléchargement de " .. model .. " s'est arrêté pendant le rechargement.", "error")
 				Logger.warn(LOG, "Reattach: PID %d no longer alive — aborting reattach.", pid)
 				return
 			end
@@ -1495,7 +1495,7 @@ PY
 			pcall(deps.update_icon)
 			os.execute("rm -f /tmp/hs_mlx_active_download.json 2>/dev/null")
 			if not silent then
-				pcall(notifications.notify, "🛑 Annulé", "Téléchargement de " .. model .. " interrompu.")
+				pcall(notifications.notify, "Annulé", "Téléchargement de " .. model .. " interrompu.", "warning")
 				if download_window then pcall(download_window.complete, false, model) end
 			end
 		end
@@ -1515,12 +1515,12 @@ PY
 				os.execute("rm -f " .. exit_path .. " 2>/dev/null")
 			end
 			if exit_code == 0 then
-				pcall(notifications.notify, "🟢 MODÈLE MLX INSTALLÉ", model .. " est prêt !")
+				pcall(notifications.notify, "Modèle MLX installé", model .. " est prêt !", "success")
 				if download_window then pcall(download_window.complete, true, model) end
 				pcall(deps.save_prefs)
 			else
 				if download_window then pcall(download_window.complete, false, model) end
-				pcall(notifications.notify, "❌ Échec MLX", "Vérifiez les logs dans la fenêtre.")
+				pcall(notifications.notify, "Échec MLX", "Vérifiez les logs dans la fenêtre.", "error")
 			end
 		end
 
@@ -1603,7 +1603,7 @@ PY
 				Logger.warn(LOG, "MLX model %s not detected as installed. Starting download flow…", tostring(target_model))
 				local repo = obj.get_mlx_repo(target_model)
 				if not repo then 
-					pcall(notifications.notify, "❌ Modèle MLX non disponible", "Le modèle " .. target_model .. " n’est pas compatible MLX ou n’a pas de dépôt MLX configuré")
+					pcall(notifications.notify, "Modèle MLX non disponible", "Le modèle " .. target_model .. " n’est pas compatible MLX ou n’a pas de dépôt MLX configuré", "error")
 					if on_cancel then on_cancel() end 
 					return 
 				end
@@ -1651,11 +1651,11 @@ PY
 						or "Cause inconnue. Consultez la console Hammerspoon."
 					Logger.error(LOG, "MLX dependencies missing — bootstrap definitively failed: %s",
 						tostring(cause):gsub("\n", " | "))
-					pcall(notifications.notify, "❌ Dépendances MLX manquantes", cause)
+					pcall(notifications.notify, "Dépendances MLX manquantes", cause, "error")
 				else
 					Logger.error(LOG, "MLX dependencies missing in %s — auto-bootstrap may have failed.", project_venv_python_escaped)
-					pcall(notifications.notify, "❌ Dépendances MLX manquantes",
-						"Le bootstrap automatique du venv a échoué. Rechargez Hammerspoon et consultez la console.")
+					pcall(notifications.notify, "Dépendances MLX manquantes",
+						"Le bootstrap automatique du venv a échoué. Rechargez Hammerspoon et consultez la console.", "error")
 				end
 				if on_cancel then pcall(on_cancel) end
 			end
@@ -1677,7 +1677,7 @@ PY
 		local safe_repo = "models--" .. repo:gsub("/", "--")
 		local path = home .. "/.cache/huggingface/hub/" .. safe_repo
 		os.execute("rm -rf " .. path)
-		pcall(notifications.notify, "🗑️ Supprimé (MLX)", model_name)
+		pcall(notifications.notify, "Supprimé (MLX)", model_name, "success")
 		pcall(deps.update_menu)
 	end
 
