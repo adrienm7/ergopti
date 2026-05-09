@@ -38,8 +38,8 @@ def create_header_line(equals_count: int) -> str:
 
 def create_section_header(
     section_name: str, is_subsection: bool = False, is_first: bool = False
-) -> str:
-    """Create a styled section header."""
+) -> list:
+    """Create a styled section header as a list of lines."""
     # Strip leading/trailing whitespace from section_name FIRST to avoid double spaces
     section_name = section_name.strip()
 
@@ -50,16 +50,22 @@ def create_section_header(
 
     title_line = f"# {equals_str} {section_name} {equals_str}"
 
-    # Before h2: 2 blank lines (= 3 visible blank lines)
-    # Before h3: 0 blank lines (= 1 visible blank line after merge)
-    # After each title: 1 blank line
-    blanks = 0 if is_subsection else 2
-    blank_lines = "\n" * blanks if (not is_first and blanks > 0) else ""
+    # Before h1 (first section): 7 blank lines
+    # Before h2 (subsequent sections): 3 blank lines
+    # Before h3 (subsections): 1 blank line
+    if is_first and not is_subsection:
+        blanks_before = 7
+    elif is_subsection:
+        blanks_before = 1
+    else:
+        blanks_before = 3
+    
+    lines_before = [""] * blanks_before if blanks_before > 0 else []
 
     if is_subsection:
-        return f"{blank_lines}{header_footer}\n{title_line}\n{header_footer}\n"
+        return lines_before + [header_footer, title_line, header_footer, ""]
     else:
-        return f"{blank_lines}{header_footer}\n{header_footer}\n{title_line}\n{header_footer}\n{header_footer}\n"
+        return lines_before + [header_footer, header_footer, title_line, header_footer, header_footer, ""]
 
 
 def parse_toml_structure(content: str) -> dict:
@@ -162,8 +168,8 @@ def rebuild_toml_from_structure(structure: dict) -> str:
         is_subsection = depth > 1
 
         display_name = section_key.replace("_", " ").title()
-        header = create_section_header(display_name, is_subsection, is_first=is_first)
-        lines.append(header)
+        header_lines = create_section_header(display_name, is_subsection, is_first=is_first)
+        lines.extend(header_lines)
         is_first = False
 
         if isinstance(section_content, dict):
@@ -222,8 +228,8 @@ def dict_to_toml(data: dict) -> str:
         is_subsection = depth > 1
 
         display_name = section_key.replace("_", " ").title()
-        header = create_section_header(display_name, is_subsection, is_first=is_first)
-        lines.append(header)
+        header_lines = create_section_header(display_name, is_subsection, is_first=is_first)
+        lines.extend(header_lines)
         is_first = False
 
         lines.append(f"[{section_key}]")
