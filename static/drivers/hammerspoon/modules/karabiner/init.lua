@@ -419,9 +419,17 @@ function M.regenerate()
 	-- Kill the bridge before writing so no live daemon can overwrite our deploy.
 	-- KILL_FAST_CMD is a plain pkill with no sleep loops, so it takes ~50 ms.
 	-- prime_ke_for_session restarts the daemon immediately after.
-	Logger.trace(LOG, "Stopping KE bridge before deploy…")
-	pcall(function() hs.execute(KeLifecycle.KILL_FAST_CMD) end)
-	Logger.done(LOG, "KE bridge stopped.")
+	local prime_in_progress = type(KeLifecycle.is_priming) == "function"
+		and KeLifecycle.is_priming() or false
+	if prime_in_progress then
+		-- A concurrent regenerate can happen during startup; killing here can race
+		-- with the in-flight prime and leave the bridge down intermittently.
+		Logger.warn(LOG, "Skipping fast bridge kill — prime already in progress…")
+	else
+		Logger.trace(LOG, "Stopping KE bridge before deploy…")
+		pcall(function() hs.execute(KeLifecycle.KILL_FAST_CMD) end)
+		Logger.done(LOG, "KE bridge stopped.")
+	end
 
 	local ok_copy, cp_detail = Generator.deploy_string(json_str, KARABINER_OUT)
 	if not ok_copy then

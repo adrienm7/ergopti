@@ -66,9 +66,7 @@ local KARABINER_KILL_CMD =
 	.. "; for pass in 1 2 3; do"
 	.. "   for label in $(/bin/launchctl list 2>/dev/null"
 	.. "                 | /usr/bin/awk '/[Kk]arabiner|pqrs/ {print $3}'); do"
-	.. "     /bin/launchctl disable gui/$UID/$label 2>/dev/null; true;"
 	.. "     /bin/launchctl bootout gui/$UID/$label 2>/dev/null; true;"
-	.. "     /bin/launchctl disable user/$UID/$label 2>/dev/null; true;"
 	.. "     /bin/launchctl bootout user/$UID/$label 2>/dev/null; true;"
 	.. "   done"
 	.. "; /usr/bin/pkill -x Karabiner-Menu 2>/dev/null"
@@ -196,14 +194,30 @@ end
 -- Headless priming command validated on this setup: start the user-level
 -- Karabiner bridge daemon directly (no Dock icon, no app window, no Space switch).
 -- This process in turn starts session_monitor and notification agents as needed.
+local KE_CONSOLE_USER_SERVER_BIN =
+	"/Library/Application Support/org.pqrs/Karabiner-Elements/bin/karabiner_console_user_server"
+
 local KE_PRIME_HEADLESS_CMD =
-	"/usr/bin/nohup '/Library/Application Support/org.pqrs/Karabiner-Elements/bin/karabiner_console_user_server'"
+	string.format("/usr/bin/nohup %q", KE_CONSOLE_USER_SERVER_BIN)
 	.. " >/tmp/ke_console_user_server.out 2>/tmp/ke_console_user_server.err </dev/null &"
 
 -- Compatibility fallback for installs where the binary path above is not
 -- present (older/custom packaging). We still keep headless behavior.
 local KE_PRIME_HEADLESS_FALLBACK_CMD =
 	"/usr/bin/open -gj '/Applications/Karabiner-Elements.app'"
+
+-- Re-enables any pqrs launchd labels that may have been disabled by an older
+-- revision. This self-heals quit/reload failures where KE could no longer
+-- restart after the first HS shutdown.
+local KE_REENABLE_USER_LABELS_CMD =
+	"UID=$(/usr/bin/id -u)"
+	.. "; for plist in /Library/LaunchAgents/org.pqrs*.plist \"$HOME\"/Library/LaunchAgents/org.pqrs*.plist; do"
+	.. "     [ -e \"$plist\" ] || continue;"
+	.. "     label=$(/usr/bin/basename \"$plist\" .plist);"
+	.. "     /bin/launchctl enable gui/$UID/$label 2>/dev/null; true;"
+	.. "     /bin/launchctl enable user/$UID/$label 2>/dev/null; true;"
+	.. "   done"
+	.. "; true"
 
 -- Best-effort suppression of Dock-visible KE helpers started by the bridge.
 -- Remapping stays active via console_user_server/session_monitor/Core-Service.
@@ -242,6 +256,9 @@ local KE_GUI_CHECK_CMD = "/usr/bin/pgrep -fq '/Applications/Karabiner-Elements.a
 -- so a fast daemon start resolves in ~300 ms instead of always waiting 2 s.
 local PRIME_POLL_INTERVAL_SEC = 0.3
 local PRIME_POLL_MAX_ATTEMPTS = 30  -- 9.0 s absolute maximum (non-blocking)
+local PRIME_FALLBACK_AFTER_ATTEMPTS = 10  -- 3.0 s before GUI fallback
+local PRIME_RETRY_HEADLESS_EVERY_ATTEMPTS = 4
+local PRIME_MAX_HEADLESS_ATTEMPTS = 3
 
 -- Per-boot-session marker so a single GUI prime serves all subsequent HS
 -- reloads in the same login session. The file content is the kernel boot
@@ -266,6 +283,7 @@ local HS_OWNER_MARKER_PATH = "/tmp/ergopti_ke_hs_owner_v1.txt"
 -- ~2 s prime delay.
 local _prime_in_progress = false
 local _hs_owned_runtime = false
+local _prime_callbacks = {}
 
 
 
@@ -391,6 +409,26 @@ local function clear_hs_owned_bridge_marker()
 	pcall(os.remove, HS_OWNER_MARKER_PATH)
 end
 
+--- Returns true when a file exists and is readable.
+--- @param path string
+--- @return boolean
+local function file_exists(path)
+	local f = io.open(path, "r")
+	if not f then return false end
+	f:close()
+	return true
+end
+
+--- Resolves all callbacks waiting for the current prime cycle.
+--- @param ok boolean
+local function resolve_prime_callbacks(ok)
+	local callbacks = _prime_callbacks
+	_prime_callbacks = {}
+	for _, cb in ipairs(callbacks) do
+		pcall(cb, ok)
+	end
+end
+
 --- True when the current KE bridge instance was spawned by HS in this boot session.
 --- @return boolean
 function M.is_hs_owned_bridge()
@@ -462,17 +500,25 @@ end
 ---                          rules when the daemon has been restarted by macOS.
 function M.prime_ke_for_session(callback, force)
 	callback = callback or function() end
+	if _prime_in_progress then
+		Logger.debug(LOG, "Prime already in progress — callback queued.")
+		_prime_callbacks[#_prime_callbacks + 1] = callback
+		return
+	end
+
+	_prime_callbacks[#_prime_callbacks + 1] = callback
+
 	local bridge_running = is_ipc_bridge_running()
 	if not force and M.is_session_primed() and bridge_running then
 		Logger.debug(LOG, "KE bridge already primed for this boot session and bridge is alive — skipping.")
-		callback(true)
+		resolve_prime_callbacks(true)
 		return
 	end
 
 	if bridge_running then
 		Logger.info(LOG, "KE IPC bridge already running (Menu or GUI) — recording marker.")
 		mark_session_primed()
-		callback(true)
+		resolve_prime_callbacks(true)
 		return
 	end
 
@@ -484,6 +530,9 @@ function M.prime_ke_for_session(callback, force)
 	-- drag focus to whichever Space last hosted a KE window. Idempotent.
 	-- Cheap (~5 ms), so we do it inline rather than once at module load.
 	hs.execute(KE_PERSISTENCE_OFF_CMD .. " 2>/dev/null")
+	-- Self-heal any previously disabled launchd labels so quit/reload keeps
+	-- working even after older revisions that used launchctl disable.
+	hs.execute(KE_REENABLE_USER_LABELS_CMD)
 
 	Logger.start(LOG, "Priming KE bridge (headless karabiner_console_user_server)…")
 	_prime_in_progress = true
@@ -492,17 +541,22 @@ function M.prime_ke_for_session(callback, force)
 	mark_hs_owned_bridge()
 
 	-- Start the user-level bridge daemon in background without opening the GUI app.
-	local _, open_ok = hs.execute(KE_PRIME_HEADLESS_CMD .. " 2>&1")
-	if open_ok ~= true then
-		Logger.warn(LOG, "Primary headless launch failed — trying compatibility fallback…")
-		local _, fb_ok = hs.execute(KE_PRIME_HEADLESS_FALLBACK_CMD .. " 2>&1")
-		if fb_ok ~= true then
-			Logger.error(LOG, "Failed to start headless KE bridge daemon — config may not be applied.")
-			clear_hs_owned_bridge_marker()
-			_prime_in_progress = false
-			callback(false)
-			return
+	local fallback_attempted = false
+	local headless_launch_attempts = 0
+	local function launch_headless_once()
+		if not file_exists(KE_CONSOLE_USER_SERVER_BIN) then
+			return false
 		end
+		headless_launch_attempts = headless_launch_attempts + 1
+		Logger.trace(LOG, "Headless bridge launch requested (attempt %d)…", headless_launch_attempts)
+		hs.execute(KE_PRIME_HEADLESS_CMD)
+		return true
+	end
+
+	if not launch_headless_once() then
+		fallback_attempted = true
+		Logger.warn(LOG, "Headless bridge binary missing — trying compatibility fallback…")
+		hs.execute(KE_PRIME_HEADLESS_FALLBACK_CMD)
 	end
 
 	-- Poll until the bridge process appears (or we exceed the deadline).
@@ -524,15 +578,27 @@ function M.prime_ke_for_session(callback, force)
 			_prime_in_progress = false
 			Logger.success(LOG, "KE bridge primed in %d poll(s) (~%.1f s).",
 				attempts, attempts * PRIME_POLL_INTERVAL_SEC)
-			callback(true)
+			resolve_prime_callbacks(true)
 			return
+		end
+		if (not fallback_attempted)
+			and headless_launch_attempts > 0
+			and headless_launch_attempts < PRIME_MAX_HEADLESS_ATTEMPTS
+			and (attempts % PRIME_RETRY_HEADLESS_EVERY_ATTEMPTS == 0) then
+			Logger.warn(LOG, "Bridge still absent after %d poll(s) — retrying headless launch…", attempts)
+			launch_headless_once()
+		end
+		if (not fallback_attempted) and attempts >= PRIME_FALLBACK_AFTER_ATTEMPTS then
+			fallback_attempted = true
+			Logger.warn(LOG, "Primary headless launch still not visible — trying compatibility fallback…")
+			hs.execute(KE_PRIME_HEADLESS_FALLBACK_CMD)
 		end
 		if attempts >= PRIME_POLL_MAX_ATTEMPTS then
 			clear_hs_owned_bridge_marker()
 			_prime_in_progress = false
 			Logger.error(LOG, "KE bridge did not appear after %d polls (%.1f s) — config may not be applied.",
 				attempts, attempts * PRIME_POLL_INTERVAL_SEC)
-			callback(false)
+			resolve_prime_callbacks(false)
 			return
 		end
 		hs.timer.doAfter(PRIME_POLL_INTERVAL_SEC, check_bridge)
