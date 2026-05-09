@@ -8,6 +8,7 @@
 categories_order = ["distancesreduction", "sfbsreduction", "rolls", "autocorrection", "magickey"]
 
 
+
 # =============================================================
 # ===== Modules.Magickey.Textexpansionpersonalinformation =====
 # =============================================================

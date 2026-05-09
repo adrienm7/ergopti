@@ -11,6 +11,7 @@ description = "Roulements"
 sections_order = ["hc", "sx", "cx", "englishnegation", "ez", "ct", "-", "closechevrontag", "chevronequal", "comment", "-", "assign", "notequal", "-", "hashtagquote", "hashtagparenthesis", "hashtagbracket", "equalstring", "-", "leftarrow", "assignarrowequalright", "assignarrowequalleft", "assignarrowminusright", "assignarrowminusleft"]
 
 
+
 # =========================
 # ===== Meta.Sections =====
 # =========================
@@ -40,6 +41,7 @@ sx = "SX ➜ SK"
 
 
 
+
 # ======================
 # ======================
 # ======= Assign =======
@@ -55,6 +57,7 @@ sx = "SX ➜ SK"
 
 
 
+
 # ====================================
 # ====================================
 # ======= Assignarrowequalleft =======
@@ -63,6 +66,7 @@ sx = "SX ➜ SK"
 
 [[assignarrowequalleft]]
 " = $" = { output = " <= ", is_word = false, auto_expand = true, is_case_sensitive = true, final_result = true }
+
 
 
 
@@ -80,6 +84,7 @@ sx = "SX ➜ SK"
 
 
 
+
 # ====================================
 # ====================================
 # ======= Assignarrowminusleft =======
@@ -89,6 +94,7 @@ sx = "SX ➜ SK"
 [[assignarrowminusleft]]
 " ?+" = { output = " <- ", is_word = false, auto_expand = true, is_case_sensitive = true, final_result = true }
 "?+" = { output = " <- ", is_word = false, auto_expand = true, is_case_sensitive = true, final_result = true }
+
 
 
 
@@ -106,6 +112,7 @@ sx = "SX ➜ SK"
 
 
 
+
 # ============================
 # ============================
 # ======= Chevronequal =======
@@ -119,6 +126,7 @@ sx = "SX ➜ SK"
 
 
 
+
 # ===============================
 # ===============================
 # ======= Closechevrontag =======
@@ -127,6 +135,7 @@ sx = "SX ➜ SK"
 
 [[closechevrontag]]
 "<@" = { output = "</", is_word = false, auto_expand = true, is_case_sensitive = true, final_result = true }
+
 
 
 
@@ -144,6 +153,7 @@ sx = "SX ➜ SK"
 
 
 
+
 # ==================
 # ==================
 # ======= Ct =======
@@ -153,6 +163,7 @@ sx = "SX ➜ SK"
 [[ct]]
 "p'" = { output = "ct", is_word = false, auto_expand = true, is_case_sensitive = false, final_result = false }
 "p ?" = { output = "p ?", is_word = false, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
+
 
 
 
@@ -169,6 +180,7 @@ sx = "SX ➜ SK"
 
 
 
+
 # ===============================
 # ===============================
 # ======= Englishnegation =======
@@ -177,6 +189,7 @@ sx = "SX ➜ SK"
 
 [[englishnegation]]
 "nt'" = { output = "n’t", is_word = false, auto_expand = true, is_case_sensitive = true, final_result = false }
+
 
 
 
@@ -194,6 +207,7 @@ sx = "SX ➜ SK"
 
 
 
+
 # ==================
 # ==================
 # ======= Ez =======
@@ -202,6 +216,7 @@ sx = "SX ➜ SK"
 
 [[ez]]
 "eé" = { output = "ez", is_word = false, auto_expand = true, is_case_sensitive = false, final_result = false }
+
 
 
 
@@ -219,6 +234,7 @@ sx = "SX ➜ SK"
 
 
 
+
 # ==================================
 # ==================================
 # ======= Hashtagparenthesis =======
@@ -227,6 +243,7 @@ sx = "SX ➜ SK"
 
 [[hashtagparenthesis]]
 "#(" = { output = "\")", is_word = false, auto_expand = true, is_case_sensitive = true, final_result = true }
+
 
 
 
@@ -244,6 +261,7 @@ sx = "SX ➜ SK"
 
 
 
+
 # ==================
 # ==================
 # ======= Hc =======
@@ -252,6 +270,7 @@ sx = "SX ➜ SK"
 
 [[hc]]
 "hc" = { output = "wh", is_word = false, auto_expand = true, is_case_sensitive = false, final_result = false }
+
 
 
 
@@ -268,6 +287,7 @@ sx = "SX ➜ SK"
 
 
 
+
 # ========================
 # ========================
 # ======= Notequal =======
@@ -279,6 +299,7 @@ sx = "SX ➜ SK"
 " ç#" = { output = " != ", is_word = false, auto_expand = true, is_case_sensitive = true, final_result = true }
 "!#" = { output = " != ", is_word = false, auto_expand = true, is_case_sensitive = true, final_result = true }
 "ç#" = { output = " != ", is_word = false, auto_expand = true, is_case_sensitive = true, final_result = true }
+
 
 
 

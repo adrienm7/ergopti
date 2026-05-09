@@ -11,6 +11,7 @@ description = "Réduction des SFBs"
 sections_order = ["comma", "-", "ecirc", "egrave", "-", "bu", "ie"]
 
 
+
 # =========================
 # ===== Meta.Sections =====
 # =========================
@@ -21,6 +22,7 @@ comma = "Virgule + Consonne corrige de très nombreux SFBs : ,t = pt, ,d= ds, ,p
 ecirc = "Ê + touche sur la main gauche corrige 4 SFBs : êé = oe, éê = eo, ê, = u, et ê. = u."
 egrave = "È + touche Y corrige 2 SFBs : èy = aî et yè = â"
 ie = "À + É corrige 2 SFBs : éà = ié et àé = éi"
+
 
 
 
@@ -44,6 +46,7 @@ ie = "À + É corrige 2 SFBs : éà = ié et àé = éi"
 "tà★" = { output = "toujours", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
 "àu" = { output = "ub", is_word = false, auto_expand = true, is_case_sensitive = false, final_result = false }
 "à★" = { output = "bu", is_word = false, auto_expand = true, is_case_sensitive = false, final_result = false }
+
 
 
 
@@ -72,6 +75,7 @@ ie = "À + É corrige 2 SFBs : éà = ié et àé = éi"
 
 
 
+
 # =====================
 # =====================
 # ======= Ecirc =======
@@ -87,6 +91,7 @@ ie = "À + É corrige 2 SFBs : éà = ié et àé = éi"
 
 
 
+
 # ======================
 # ======================
 # ======= Egrave =======
@@ -96,6 +101,7 @@ ie = "À + É corrige 2 SFBs : éà = ié et àé = éi"
 [[egrave]]
 "yè" = { output = "â", is_word = false, auto_expand = true, is_case_sensitive = false, final_result = false }
 "èy" = { output = "aî", is_word = false, auto_expand = true, is_case_sensitive = false, final_result = false }
+
 
 
 
