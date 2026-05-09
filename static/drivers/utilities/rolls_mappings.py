@@ -20,9 +20,20 @@ LOGS_INDENTATION = "\t\t"
 
 
 def _get_config_files() -> list[Path]:
-    """Get list of hotstrings files to load from hotstrings/plus."""
-    plus_dir = Path(__file__).parent.parent / "hotstrings" / "plus"
-    return list(plus_dir.glob("*.toml"))
+    """Get list of hotstrings files providing dead-key triggers for Ergopti++.
+
+    Only TOMLs whose 2-char triggers map cleanly to a dead-key state are
+    included.  Files like ``autocorrection.toml`` and ``magickey.toml`` are
+    deliberately excluded: their 2-char triggers (``c'``, ``a★``, …) would
+    turn ordinary letters into dead keys and break normal typing.
+    """
+    hotstrings_dir = Path(__file__).parent.parent / "hotstrings"
+    filenames = [
+        "rolls.toml",
+        "distancesreduction.toml",
+        "sfbsreduction.toml",
+    ]
+    return [hotstrings_dir / name for name in filenames]
 
 
 def _merge_section_data(existing_data, new_data):
@@ -106,7 +117,6 @@ def _process_mappings(merged_toml_data: dict) -> dict:
                 continue
             trigger = key[0]
             remaining = key[1:]
-            print(f"trigger {trigger} and {remaining}")
 
             output_value = _extract_output_value(value_obj)
             trigger_groups[trigger].append((remaining, output_value))

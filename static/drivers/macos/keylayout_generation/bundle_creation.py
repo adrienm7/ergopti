@@ -8,16 +8,18 @@ from pathlib import Path
 
 from utilities.logger import logger
 
-# Apple's documented convention for keyboard layout bundle identifiers is
-# `com.apple.keylayout.<name>`. The previous `com.apple.keyboardlayout.…` form
-# was non-standard and caused two annoyances:
-#   1. The OS treated each version as a *different* input source, so an
-#      upgrade left the old entry sitting next to the new one.
-#   2. hs.keycodes (and System Settings) sometimes failed to resolve the
-#      localised display name and fell back to the raw identifier.
-# Bundle ID and TISInputSourceIDs are now stable across versions; the
-# version lives only in the bundle filename and CFBundleVersion.
-BUNDLE_IDENTIFIER = "com.apple.keylayout.ergopti"
+# macOS reserves the `com.apple.keylayout.*` namespace for input sources that
+# ship with the OS itself; third-party bundles must use `com.apple.keyboardlayout.*`
+# (note the longer form). When a third-party bundle declares an ID under the
+# reserved namespace, macOS silently refuses to register it — the bundle is
+# physically copied to /Library/Keyboard Layouts/ but never shows up in the
+# input-source list, regardless of whether Hammerspoon is running.
+#
+# The TIS IDs are kept stable across versions (no v2_2_X suffix) so that an
+# upgrade is recognised as the same input source: the user-enabled set, the
+# active selection, and any layout-specific preferences are preserved across
+# v2.2.1 → v2.2.2 → … upgrades.
+BUNDLE_IDENTIFIER = "com.apple.keyboardlayout.ergopti"
 LOGS_INDENTATION = "\t"
 
 
@@ -47,8 +49,8 @@ def create_bundle(
     resources_path.mkdir(parents=True, exist_ok=True)
 
     info_plist_entries = []
-    # Each entry: (internal_name, variant, is_ansi, input_source_id)
-    # The input_source_id is needed because macOS looks up the localised display
+    # Each entry: (internal_name, variant, is_ansi, input_source_id).
+    # input_source_id is needed because macOS looks up the localised display
     # name by `kTISPropertyInputSourceID` — using anything else (e.g. the
     # keylayout filename) silently falls back to the raw ID in System Settings.
     layout_localization_infos: list[tuple[str, str, bool, str]] = []
@@ -196,8 +198,9 @@ def create_bundle(
 
 def generate_info_plist(version: str, entries: list[str]) -> str:
     """Generate the full Info.plist content without localized translations."""
+    clean_version = version.lstrip("v")
     return f"""<?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" 
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
   "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
@@ -205,8 +208,10 @@ def generate_info_plist(version: str, entries: list[str]) -> str:
     <string>{BUNDLE_IDENTIFIER}</string>
     <key>CFBundleName</key>
     <string>Ergopti</string>
+    <key>CFBundleShortVersionString</key>
+    <string>{clean_version}</string>
     <key>CFBundleVersion</key>
-    <string>{version.lstrip("v")}</string>
+    <string>{clean_version}</string>
     {"\n\t".join(entries)}
 </dict>
 </plist>
@@ -214,19 +219,23 @@ def generate_info_plist(version: str, entries: list[str]) -> str:
 
 
 def generate_localizations(
-    bundle_path: Path, version: str, layouts: list[tuple[str, str, bool, str]]
+    bundle_path: Path,
+    version: str,
+    layouts: list[tuple[str, str, bool, str]],
 ):
     """
     Generate localized InfoPlist.strings files (en and fr).
 
-    macOS resolves the layout's display name by looking up the
-    `kTISPropertyInputSourceID` value as the KEY in the bundle's
-    `InfoPlist.strings`. Using the keylayout filename here (the historical
-    behaviour) silently fell back to the raw input-source ID in System
-    Settings and `hs.keycodes.layouts()`, which is why entries showed up
-    as "Ergopti.v2_2_0" instead of "Ergopti v2.2.0".
+    macOS resolves the layout's display name by looking up the keylayout's
+    INTERNAL NAME (the `name=` attribute of the <keyboard> element, which is
+    also the basename of the .keylayout file and the suffix used in the
+    `KLInfo_<name>` Info.plist key) as the KEY in the bundle's
+    `InfoPlist.strings`. Both the working v2.2.1 bundle and the reference
+    Optimot bundle follow this convention. An earlier attempt that used the
+    TISInputSourceID as the key broke the bundle entirely: macOS could not
+    resolve the localised name and silently refused to register the bundle.
 
-    Each input source id is mapped to either:
+    Each layout is mapped to either:
       - "Ergopti v{version}"   (standard)
       - "Ergopti+ v{version}"  (plus)
       - "Ergopti++ v{version}" (plus plus)
@@ -238,7 +247,7 @@ def generate_localizations(
         strings_path = lproj_dir / "InfoPlist.strings"
 
         lines = []
-        for _original_name, variant, is_ansi, input_source_id in layouts:
+        for internal_name, variant, is_ansi, _input_source_id in layouts:
             ansi_suffix = " ANSI" if is_ansi else ""
             if variant == "++":
                 localized = f"Ergopti++{ansi_suffix} {version}"
@@ -246,7 +255,10 @@ def generate_localizations(
                 localized = f"Ergopti+{ansi_suffix} {version}"
             else:
                 localized = f"Ergopti{ansi_suffix} {version}"
-            lines.append(f'"{input_source_id}" = "{localized}";')
+            # The lookup key MUST be the keylayout's internal name (= the
+            # `KLInfo_<name>` suffix). Using the TISInputSourceID here makes
+            # macOS reject the bundle entirely.
+            lines.append(f'"{internal_name}" = "{localized}";')
 
         strings_content = "\n".join(lines) + "\n"
         strings_path.write_text(strings_content, encoding="utf-16")
