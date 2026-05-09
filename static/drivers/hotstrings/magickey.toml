@@ -3,6 +3,7 @@
 # ======= Meta =======
 # ====================
 # ====================
+
 [_meta]
 color = "#e53935"
 delay = 2.0
@@ -12,6 +13,7 @@ sections_order = ["replace", "repeat", "-", "textexpansion", "textexpansionauto"
 # =========================
 # ===== Meta.Sections =====
 # =========================
+
 [_meta.sections]
 repeat = "La touche ★ permet la répétition"
 replace = "Transformer la touche J en ★"
@@ -24,15 +26,12 @@ textexpansionsymbolstypst = "Expansion de texte Symboles Typst : $eq.not$ = ≠,
 
 
 
-
-
-
-
 # ======================
 # ======================
 # ======= Repeat =======
 # ======================
 # ======================
+
 [[repeat]]
 " = ★" = { output = "==", is_word = false, auto_expand = true, is_case_sensitive = true, final_result = false }
 "!★" = { output = "!!", is_word = false, auto_expand = true, is_case_sensitive = true, final_result = false }
@@ -117,15 +116,12 @@ textexpansionsymbolstypst = "Expansion de texte Symboles Typst : $eq.not$ = ≠,
 
 
 
-
-
-
-
 # =============================
 # =============================
 # ======= Textexpansion =======
 # =============================
 # =============================
+
 [[textexpansion]]
 "+m★" = { output = "meilleur", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
 "//★" = { output = "rapport", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
@@ -660,22 +656,15 @@ textexpansionsymbolstypst = "Expansion de texte Symboles Typst : $eq.not$ = ≠,
 
 
 
-
-
-
-
 # =================================
 # =================================
 # ======= Textexpansionauto =======
 # =================================
 # =================================
+
 [[textexpansionauto]]
 "ju'" = { output = "jusqu’", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
 "ya" = { output = "y’a", is_word = true, auto_expand = false, is_case_sensitive = false, final_result = false }
-
-
-
-
 
 
 
@@ -684,6 +673,7 @@ textexpansionsymbolstypst = "Expansion de texte Symboles Typst : $eq.not$ = ≠,
 # ======= Textexpansionemojis =======
 # ===================================
 # ===================================
+
 [[textexpansionemojis]]
 "(n)★" = { output = "👎", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false }
 "(y)★" = { output = "👍", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false }
@@ -959,15 +949,12 @@ textexpansionsymbolstypst = "Expansion de texte Symboles Typst : $eq.not$ = ≠,
 
 
 
-
-
-
-
 # ====================================
 # ====================================
 # ======= Textexpansionsymbols =======
 # ====================================
 # ====================================
+
 [[textexpansionsymbols]]
 " = /=>★" = { output = "⇏", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
 " -> ★" = { output = " ➜ ", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
@@ -1115,15 +1102,12 @@ textexpansionsymbolstypst = "Expansion de texte Symboles Typst : $eq.not$ = ≠,
 
 
 
-
-
-
-
 # =========================================
 # =========================================
 # ======= Textexpansionsymbolstypst =======
 # =========================================
 # =========================================
+
 [[textexpansionsymbolstypst]]
 "$AA$" = { output = "𝔸", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
 "$Alpha$" = { output = "Α", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }

@@ -3,6 +3,7 @@
 # ======= Meta =======
 # ====================
 # ====================
+
 [_meta]
 color = "#fb8c00"
 delay = 0.5
@@ -12,6 +13,7 @@ sections_order = ["comma", "-", "ecirc", "egrave", "-", "bu", "ie"]
 # =========================
 # ===== Meta.Sections =====
 # =========================
+
 [_meta.sections]
 bu = "À + ★/U corrige 2 SFBs : à★ = bu et àu = ub"
 comma = "Virgule + Consonne corrige de très nombreux SFBs : ,t = pt, ,d= ds, ,p = xp, …"
@@ -21,15 +23,12 @@ ie = "À + É corrige 2 SFBs : éà = ié et àé = éi"
 
 
 
-
-
-
-
 # ==================
 # ==================
 # ======= Bu =======
 # ==================
 # ==================
+
 [[bu]]
 "e mà★" = { output = "e mise à jour", is_word = false, auto_expand = true, is_case_sensitive = false, final_result = false }
 "es mà★" = { output = "es mises à jour", is_word = false, auto_expand = true, is_case_sensitive = false, final_result = false }
@@ -46,15 +45,12 @@ ie = "À + É corrige 2 SFBs : éà = ié et àé = éi"
 
 
 
-
-
-
-
 # =====================
 # =====================
 # ======= Comma =======
 # =====================
 # =====================
+
 [[comma]]
 ",d" = { output = "ds", is_word = false, auto_expand = true, is_case_sensitive = false, final_result = false }
 ",f" = { output = "fl", is_word = false, auto_expand = true, is_case_sensitive = false, final_result = false }
@@ -72,15 +68,12 @@ ie = "À + É corrige 2 SFBs : éà = ié et àé = éi"
 
 
 
-
-
-
-
 # =====================
 # =====================
 # ======= Ecirc =======
 # =====================
 # =====================
+
 [[ecirc]]
 "éê" = { output = "eo", is_word = false, auto_expand = true, is_case_sensitive = false, final_result = false }
 "ê," = { output = "u,", is_word = false, auto_expand = true, is_case_sensitive = false, final_result = false }
@@ -89,22 +82,15 @@ ie = "À + É corrige 2 SFBs : éà = ié et àé = éi"
 
 
 
-
-
-
-
 # ======================
 # ======================
 # ======= Egrave =======
 # ======================
 # ======================
+
 [[egrave]]
 "yè" = { output = "â", is_word = false, auto_expand = true, is_case_sensitive = false, final_result = false }
 "èy" = { output = "aî", is_word = false, auto_expand = true, is_case_sensitive = false, final_result = false }
-
-
-
-
 
 
 
@@ -113,6 +99,7 @@ ie = "À + É corrige 2 SFBs : éà = ié et àé = éi"
 # ======= Ie =======
 # ==================
 # ==================
+
 [[ie]]
 "ié★" = { output = "ébu", is_word = false, auto_expand = true, is_case_sensitive = false, final_result = false }
 "àé" = { output = "éi", is_word = false, auto_expand = true, is_case_sensitive = false, final_result = false }

@@ -3,12 +3,14 @@
 # ======= Menu =======
 # ====================
 # ====================
+
 [menu]
 categories_order = ["distancesreduction", "sfbsreduction", "rolls", "autocorrection", "magickey"]
 
 # =============================================================
 # ===== Modules.Magickey.Textexpansionpersonalinformation =====
 # =============================================================
+
 [modules.magickey.textexpansionpersonalinformation]
 description = "Remplissage de formulaires avec le suffixe @ : @np★ = Nom ⇥ Prénom, etc."
 mod_id = "personal_info"

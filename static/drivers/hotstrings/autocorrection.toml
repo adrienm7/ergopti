@@ -3,6 +3,7 @@
 # ======= Meta =======
 # ====================
 # ====================
+
 [_meta]
 color = "#43a047"
 delay = 1.0
@@ -12,6 +13,7 @@ sections_order = ["accents", "names", "caps", "-", "typographicapostrophe", "-",
 # =========================
 # ===== Meta.Sections =====
 # =========================
+
 [_meta.sections]
 accents = "Autocorrection des accents de très nombreux mots"
 caps = "Majuscules automatiques : chatgpt = ChatGPT, powerpoint = PowerPoint, …"
@@ -26,15 +28,12 @@ typographicapostrophe = "L’apostrophe devient typographique lors de l’écrit
 
 
 
-
-
-
-
 # =======================
 # =======================
 # ======= Accents =======
 # =======================
 # =======================
+
 [[accents]]
 "abim" = { output = "abîm", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
 "accroit" = { output = "accroît", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
@@ -426,15 +425,12 @@ typographicapostrophe = "L’apostrophe devient typographique lors de l’écrit
 
 
 
-
-
-
-
 # ====================
 # ====================
 # ======= Caps =======
 # ====================
 # ====================
+
 [[caps]]
 "adaboost" = { output = "AdaBoost", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
 "adn" = { output = "ADN", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
@@ -567,15 +563,12 @@ typographicapostrophe = "L’apostrophe devient typographique lors de l’écrit
 
 
 
-
-
-
-
 # ======================
 # ======================
 # ======= Errors =======
 # ======================
 # ======================
+
 [[errors]]
 " = _" = { output = "= ", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false }
 "#_" = { output = "# ", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false }
@@ -605,15 +598,12 @@ typographicapostrophe = "L’apostrophe devient typographique lors de l’écrit
 
 
 
-
-
-
-
 # =====================
 # =====================
 # ======= Minus =======
 # =====================
 # =====================
+
 [[minus]]
 "aije" = { output = "ai-je", is_word = true, auto_expand = false, is_case_sensitive = false, final_result = false }
 "astu" = { output = "as-tu", is_word = true, auto_expand = false, is_case_sensitive = false, final_result = false }
@@ -655,15 +645,12 @@ typographicapostrophe = "L’apostrophe devient typographique lors de l’écrit
 
 
 
-
-
-
-
 # ===============================
 # ===============================
 # ======= Minusapostrophe =======
 # ===============================
 # ===============================
+
 [[minusapostrophe]]
 "a't" = { output = "a-t", is_word = false, auto_expand = true, is_case_sensitive = false, final_result = false }
 "a't'e" = { output = "a-t-e", is_word = false, auto_expand = true, is_case_sensitive = false, final_result = false }
@@ -688,15 +675,12 @@ typographicapostrophe = "L’apostrophe devient typographique lors de l’écrit
 
 
 
-
-
-
-
 # ========================================
 # ========================================
 # ======= Multiplepunctuationmarks =======
 # ========================================
 # ========================================
+
 [[multiplepunctuationmarks]]
 "! !" = { output = "!!", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false }
 "! ?" = { output = "!?", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = true }
@@ -709,15 +693,12 @@ typographicapostrophe = "L’apostrophe devient typographique lors de l’écrit
 
 
 
-
-
-
-
 # =====================
 # =====================
 # ======= Names =======
 # =====================
 # =====================
+
 [[names]]
 "Quaida" = { output = "Qaida", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = true }  # We can use it with the QU feature that way
 "Quatar" = { output = "Qatar", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = true }  # We can use it with the QU feature that way
@@ -764,22 +745,15 @@ typographicapostrophe = "L’apostrophe devient typographique lors de l’écrit
 
 
 
-
-
-
-
 # ==================
 # ==================
 # ======= Ou =======
 # ==================
 # ==================
+
 [[ou]]
 "où ," = { output = "où, ", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
 "où ." = { output = "où.", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
-
-
-
-
 
 
 
@@ -788,6 +762,7 @@ typographicapostrophe = "L’apostrophe devient typographique lors de l’écrit
 # ======= Suffixesachaining =======
 # =================================
 # =================================
+
 [[suffixesachaining]]
 "eàa" = { output = "aire", is_word = false, auto_expand = true, is_case_sensitive = false, final_result = false }
 "eàf" = { output = "iste", is_word = false, auto_expand = true, is_case_sensitive = false, final_result = false }
@@ -804,15 +779,12 @@ typographicapostrophe = "L’apostrophe devient typographique lors de l’écrit
 
 
 
-
-
-
-
 # =====================================
 # =====================================
 # ======= Typographicapostrophe =======
 # =====================================
 # =====================================
+
 [[typographicapostrophe]]
 "c'" = { output = "c’", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
 "d'" = { output = "d’", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }

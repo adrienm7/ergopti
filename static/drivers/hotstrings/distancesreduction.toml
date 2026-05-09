@@ -3,6 +3,7 @@
 # ======= Meta =======
 # ====================
 # ====================
+
 [_meta]
 color = "#fb8c00"
 delay = 0.5
@@ -12,6 +13,7 @@ sections_order = ["qu", "suffixesa", "-", "commaj", "commafarletters", "-", "dea
 # =========================
 # ===== Meta.Sections =====
 # =========================
+
 [_meta.sections]
 commafarletters = "Virgule permet de taper des lettres excentrées : ,è=z et ,y=k et ,c=ç et ,x=où et ,s=q"
 commaj = "Virgule + Voyelle donne J : ,a = ja, ,o = jo, ,' = j’, …"
@@ -23,15 +25,12 @@ suffixesa = "À + lettre donne un suffixe : às = ement, àn = ation, àh = ight
 
 
 
-
-
-
-
 # ===============================
 # ===============================
 # ======= Commafarletters =======
 # ===============================
 # ===============================
+
 [[commafarletters]]
 ",c" = { output = "ç", is_word = false, auto_expand = true, is_case_sensitive = false, final_result = false }
 ",s" = { output = "q", is_word = false, auto_expand = true, is_case_sensitive = false, final_result = false }
@@ -41,15 +40,12 @@ suffixesa = "À + lettre donne un suffixe : às = ement, àn = ation, àh = ight
 
 
 
-
-
-
-
 # ======================
 # ======================
 # ======= Commaj =======
 # ======================
 # ======================
+
 [[commaj]]
 ",'" = { output = "j’", is_word = false, auto_expand = true, is_case_sensitive = false, final_result = false }
 ",a" = { output = "ja", is_word = false, auto_expand = true, is_case_sensitive = false, final_result = false }
@@ -63,15 +59,12 @@ suffixesa = "À + lettre donne un suffixe : às = ement, àn = ation, àh = ight
 
 
 
-
-
-
-
 # ==================================
 # ==================================
 # ======= Deadkeyecircumflex =======
 # ==================================
 # ==================================
+
 [[deadkeyecircumflex]]
 "ê " = { output = "^", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false }
 "ê'" = { output = "⚠", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false }
@@ -152,21 +145,14 @@ suffixesa = "À + lettre donne un suffixe : às = ement, àn = ation, àh = ight
 
 
 
-
-
-
-
 # ============================
 # ============================
 # ======= Ecircumflexe =======
 # ============================
 # ============================
+
 [[ecircumflexe]]
 "êe" = { output = "œ", is_word = false, auto_expand = true, is_case_sensitive = false, final_result = false }
-
-
-
-
 
 
 
@@ -175,6 +161,7 @@ suffixesa = "À + lettre donne un suffixe : às = ement, àn = ation, àh = ight
 # ======= Qu =======
 # ==================
 # ==================
+
 [[qu]]
 "q'" = { output = "qu’", is_word = false, auto_expand = true, is_case_sensitive = false, final_result = false }
 "qa" = { output = "qua", is_word = false, auto_expand = true, is_case_sensitive = false, final_result = false }
@@ -189,15 +176,12 @@ suffixesa = "À + lettre donne un suffixe : às = ement, àn = ation, àh = ight
 
 
 
-
-
-
-
 # =========================
 # =========================
 # ======= Suffixesa =======
 # =========================
 # =========================
+
 [[suffixesa]]
 "càd" = { output = "could", is_word = false, auto_expand = true, is_case_sensitive = false, final_result = false }
 "shàd" = { output = "should", is_word = false, auto_expand = true, is_case_sensitive = false, final_result = false }
