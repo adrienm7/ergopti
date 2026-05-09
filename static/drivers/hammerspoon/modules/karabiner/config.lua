@@ -353,6 +353,14 @@ function M.save_user_config(state, user_config_path)
 	end
 	fh:write(payload); fh:close()
 	pcall(os.rename, tmp, user_config_path)
+	
+	-- Reformat using centralized Python formatter for consistent styling
+	local _src = debug.getinfo(1, "S").source:sub(2)
+	local _script_dir = _src:match("^(.*[/\\])")
+	local _repo_root = _script_dir:gsub("static[/\\]drivers[/\\].*$", ""):gsub("[/\\]$", "")
+	local _format_script = _repo_root .. "/tools/format_toml.py"
+	pcall(os.execute, string.format("python3 '%s' '%s' 2>&1", _format_script, user_config_path))
+	
 	Logger.debug(LOG, "User config saved.")
 end
 
