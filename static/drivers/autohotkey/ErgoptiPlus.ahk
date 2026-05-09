@@ -58,8 +58,8 @@ SendMode("Event") ; Everything concerning hotstrings MUST use SendEvent and not 
 
 ; INI helpers extracted to their own lib so the test runner can ``#Include``
 ; them without bootstrapping the rest of the driver.
-#Include lib/toml_helpers.ahk
-#Include lib/layout_ergopti.ahk
+#Include lib/toml/toml_helpers.ahk
+#Include lib/layout/layout_ergopti.ahk
 
 ; Active-app cache must come before hotstring_engine.ahk because both
 ; ``HotstringHandler`` and ``MicrosoftApps`` consult ``GetActiveApp``.
@@ -69,47 +69,47 @@ SendMode("Event") ; Everything concerning hotstrings MUST use SendEvent and not 
 ; and TOML reader helpers (UnescapeTomlString, LoadHotstringsSection,
 ; FoldAsciiLower, ApplyTomlMetadataToFeatures) extracted into dedicated
 ; submodules so the main file stays focused on ErgoptiPlus-specific logic.
-#Include lib/hotstring_engine.ahk
-#Include lib/hotstring_engine_v2.ahk
-#Include lib/toml_loader.ahk
-#Include lib/hotstrings_config.ahk
-#Include lib/hotstrings_config_window.ahk
+#Include lib/hotstrings/hotstring_engine.ahk
+#Include lib/hotstrings/hotstring_engine_v2.ahk
+#Include lib/toml/toml_loader.ahk
+#Include lib/hotstrings/hotstrings_config.ahk
+#Include lib/hotstrings/hotstrings_config_window.ahk
 #Include lib/tooltip.ahk
-#Include lib/hotstring_prefix_watcher.ahk
+#Include lib/hotstrings/hotstring_prefix_watcher.ahk
 ; Auto-generated registrar for the bundled hotstring TOMLs. ``*i`` keeps the
 ; driver runnable from a fresh clone before ``tools/compile_hotstrings.py`` has
 ; been executed — ``LoadHotstringsSection`` falls back to the regex parser when
 ; ``_GENERATED_HOTSTRINGS`` is undefined.
-#Include *i lib/hotstrings_generated.ahk
-#Include lib/personal_toml_editor.ahk
+#Include *i lib/hotstrings/hotstrings_generated.ahk
+#Include lib/hotstrings/personal_toml_editor.ahk
 #Include lib/dispatchers.ahk
-#Include lib/layout_altgr.ahk
-#Include lib/layout_shift_caps.ahk
+#Include lib/layout/layout_altgr.ahk
+#Include lib/layout/layout_shift_caps.ahk
 #Include lib/app_picker.ahk
 #Include lib/config_shortcuts.ahk
-#Include lib/metrics_shortcuts.ahk
-#Include lib/metrics_filters.ahk
+#Include lib/metrics/metrics_shortcuts.ahk
+#Include lib/metrics/metrics_filters.ahk
 #Include lib/sqlite3.ahk
 #Include vendor/ComVar.ahk
 #Include vendor/Promise.ahk
 #Include vendor/WebView2.ahk
-#Include modules/keylogger_app_categories.ahk
-#Include modules/keylogger.ahk
-#Include modules/keylogger_walker.ahk
-#Include modules/keylogger_hook.ahk
-#Include modules/keylogger_watchers.ahk
-#Include modules/keylogger_mouse.ahk
-#Include modules/keylogger_sensors.ahk
-#Include modules/keylogger_ergonomics.ahk
-#Include modules/keylogger_window_topology.ahk
-#Include modules/keylogger_av_state.ahk
-#Include modules/keylogger_network.ahk
-#Include modules/keylogger_clipboard.ahk
-#Include modules/keylogger_trigger_roi.ahk
-#Include modules/keylogger_reader.ahk
-#Include modules/keylogger_prefetch.ahk
-#Include modules/keylogger_webview.ahk
-#Include modules/keylogger_ui.ahk
+#Include modules/keylogger/keylogger_app_categories.ahk
+#Include modules/keylogger/keylogger.ahk
+#Include modules/keylogger/keylogger_walker.ahk
+#Include modules/keylogger/keylogger_hook.ahk
+#Include modules/keylogger/keylogger_watchers.ahk
+#Include modules/keylogger/keylogger_mouse.ahk
+#Include modules/keylogger/keylogger_sensors.ahk
+#Include modules/keylogger/keylogger_ergonomics.ahk
+#Include modules/keylogger/keylogger_window_topology.ahk
+#Include modules/keylogger/keylogger_av_state.ahk
+#Include modules/keylogger/keylogger_network.ahk
+#Include modules/keylogger/keylogger_clipboard.ahk
+#Include modules/keylogger/keylogger_trigger_roi.ahk
+#Include modules/keylogger/keylogger_reader.ahk
+#Include modules/keylogger/keylogger_prefetch.ahk
+#Include modules/keylogger/keylogger_webview.ahk
+#Include modules/keylogger/keylogger_ui.ahk
 
 ; ======================================================
 ; ======================================================
