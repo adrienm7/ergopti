@@ -206,6 +206,7 @@ function M.init(base_dir, reload_fn)
 	_base_dir  = base_dir
 	_reload_fn = reload_fn
 	ensure_dir(_default_config_dir)
+	ensure_dir(_base_dir)  -- Ensure the driver directory exists before loading paths.toml
 	load_bootstrap()
 	Logger.info(LOG, "Paths module initialized (base: '{1}', default config: '{2}').",
 		base_dir, _default_config_dir)
