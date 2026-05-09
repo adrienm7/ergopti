@@ -256,31 +256,6 @@ WritePersonalToml(Data) {
     Q := Chr(34)
     Lines := []
 
-    AddSectionSpacing(level) {
-        BlankTarget := (level = 1) ? 5 : 3
-        Trailing := 0
-        Loop Lines.Length {
-            idx := Lines.Length - A_Index + 1
-            if (Lines[idx] = "") {
-                Trailing += 1
-            } else {
-                break
-            }
-        }
-        while (Trailing < BlankTarget) {
-            Lines.Push("")
-            Trailing += 1
-        }
-        while (Trailing > BlankTarget) {
-            Lines.Pop()
-            Trailing -= 1
-        }
-    }
-
-    Lines.Push("# personal_hotstrings.toml — Personal hotstrings")
-    Lines.Push("# Auto-managed by the personal hotstrings editor.")
-    Lines.Push("# Do not edit manually unless you know what you are doing.")
-    AddSectionSpacing(1)
     MetaDesc := Data.Has("meta_description") ? Data["meta_description"] : "Hotstrings personnels"
     Lines.Push("[_meta]")
     Lines.Push("description = " . Q . EscapeTomlValue(MetaDesc) . Q)
@@ -292,7 +267,6 @@ WritePersonalToml(Data) {
     }
     Lines.Push("sections_order = [" . ArrayJoin(OrderParts, ", ") . "]")
 
-    AddSectionSpacing(1)
     Lines.Push("[_meta.sections]")
     for _, SecName in Data["sections_order"] {
         if Data["sections"].Has(SecName) {
@@ -306,7 +280,6 @@ WritePersonalToml(Data) {
             continue
         }
         Sec := Data["sections"][SecName]
-        AddSectionSpacing(2)
         Lines.Push("[[" . SecName . "]]")
         for _, E in Sec["entries"] {
             IsWord := E["is_word"] ? "true" : "false"
@@ -338,6 +311,17 @@ WritePersonalToml(Data) {
     }
     FileObj.Write(Content)
     FileObj.Close()
+    
+    ; Reformat using centralized Python script for consistent styling
+    ; Construct path: from A_ScriptDir (ErgoptiPlus.ahk location), walk up to repo root
+    ; Pattern: C:\Users\...\ergopti\static\drivers\autohotkey\ErgoptiPlus.ahk
+    ; Repo root: C:\Users\...\ergopti\
+    ScriptDir := SubStr(A_ScriptDir, 1, -31)  ; Remove "static\drivers\autohotkey"
+    FormatScript := ScriptDir . "tools\format_toml.py"
+    if (FileExist(FormatScript)) {
+        RunWait(Format('python3 "{}" "{}"', FormatScript, FilePath), , 0)
+    }
+    
     return True
 }
 
@@ -388,20 +372,15 @@ WritePersonalInfoToml(FilePath) {
     Q := Chr(34)
     Lines := []
 
-    Lines.Push("# personal_info.toml — Personal information")
-    Lines.Push("# Auto-managed by the personal information editor.")
-    Lines.Push("# Do not edit manually unless you know what you are doing.")
-    Lines.Push("")
     Lines.Push("[info]")
     for Key, Val in PersonalInformation {
         Lines.Push(Key . " = " . Q . EscapeTomlValue(Val) . Q)
     }
-    Lines.Push("")
+
     Lines.Push("[letters]")
     for Letter, Key in PersonalInformationLetters {
         Lines.Push(Letter . " = " . Q . EscapeTomlValue(Key) . Q)
     }
-    Lines.Push("")
 
     Content := ""
     for _, L in Lines {
@@ -414,6 +393,14 @@ WritePersonalInfoToml(FilePath) {
     }
     FileObj.Write(Content)
     FileObj.Close()
+
+    ; Reformat using centralized Python script for consistent styling
+    ScriptDir := SubStr(A_ScriptDir, 1, -31)  ; Remove "static\drivers\autohotkey"
+    FormatScript := ScriptDir . "tools\format_toml.py"
+    if (FileExist(FormatScript)) {
+        RunWait(Format('python3 "{}" "{}"', FormatScript, FilePath), , 0)
+    }
+
     return True
 }
 
