@@ -50,22 +50,29 @@ def create_section_header(
 
     title_line = f"# {equals_str} {section_name} {equals_str}"
 
-    # Before h1 (first section): 7 blank lines
-    # Before h2 (subsequent sections): 3 blank lines
-    # Before h3 (subsections): 1 blank line
-    if is_first and not is_subsection:
-        blanks_before = 7
+    # First section: no blank lines before
+    # h2 (subsequent sections): 3 blank lines
+    # h3 (subsections): 1 blank line
+    if is_first:
+        blanks_before = 0
     elif is_subsection:
         blanks_before = 1
     else:
         blanks_before = 3
-    
+
     lines_before = [""] * blanks_before if blanks_before > 0 else []
 
     if is_subsection:
         return lines_before + [header_footer, title_line, header_footer, ""]
     else:
-        return lines_before + [header_footer, header_footer, title_line, header_footer, header_footer, ""]
+        return lines_before + [
+            header_footer,
+            header_footer,
+            title_line,
+            header_footer,
+            header_footer,
+            "",
+        ]
 
 
 def parse_toml_structure(content: str) -> dict:
@@ -168,7 +175,9 @@ def rebuild_toml_from_structure(structure: dict) -> str:
         is_subsection = depth > 1
 
         display_name = section_key.replace("_", " ").title()
-        header_lines = create_section_header(display_name, is_subsection, is_first=is_first)
+        header_lines = create_section_header(
+            display_name, is_subsection, is_first=is_first
+        )
         lines.extend(header_lines)
         is_first = False
 
@@ -228,7 +237,9 @@ def dict_to_toml(data: dict) -> str:
         is_subsection = depth > 1
 
         display_name = section_key.replace("_", " ").title()
-        header_lines = create_section_header(display_name, is_subsection, is_first=is_first)
+        header_lines = create_section_header(
+            display_name, is_subsection, is_first=is_first
+        )
         lines.extend(header_lines)
         is_first = False
 
