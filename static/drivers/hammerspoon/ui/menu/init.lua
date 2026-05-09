@@ -158,18 +158,21 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 			-- reads well at the standard menubar height; the complex Ergopti
 			-- logo carries finer detail and needs a couple more pixels to stay
 			-- legible. Keep both constants here so future tweaks live in one spot
-			local TARGET_SIMPLE  = 18
-			local TARGET_COMPLEX = 24
+			local TARGET_SIMPLE  = 19
+			local TARGET_COMPLEX = 26
 			local TARGET = (variant == "complex") and TARGET_COMPLEX or TARGET_SIMPLE
 			local scaled = ico
 			pcall(function()
 				local sz = ico.size and ico:size() or nil
 				if sz and (sz.w > TARGET + 4 or sz.h > TARGET + 4) and hs.canvas then
+					-- Create canvas with tight frame to eliminate padding in source image
 					local c = hs.canvas.new({ x = 0, y = 0, w = TARGET, h = TARGET })
+					-- Shrink frame inward to crop any margins from the source image
+					local crop_margin = 1
 					c[1] = {
 						type         = "image",
 						image        = ico,
-						frame        = { x = 0, y = 0, w = TARGET, h = TARGET },
+						frame        = { x = crop_margin, y = crop_margin, w = TARGET - (crop_margin * 2), h = TARGET - (crop_margin * 2) },
 						imageScaling = "scaleProportionally",
 					}
 					local rendered = c:imageFromCanvas()
