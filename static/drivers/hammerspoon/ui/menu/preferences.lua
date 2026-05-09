@@ -85,8 +85,7 @@ local KEY_MAP = {
 
 	-- ── LLM ────────────────────────────────────────────────────────────────
 	llm_enabled                          = { sec = "llm", key = "enabled"                           },
-	llm_backend                          = { sec = "llm", path = "backend", key = "name"          },
-	llm_model                            = { sec = "llm", path = "models", key = "selected"       },
+	llm_backend                          = { sec = "llm", path = "models", key = "selected"       },
 	llm_model_mlx                        = { sec = "llm", path = "models", key = "mlx"            },
 	llm_model_ollama                     = { sec = "llm", path = "models", key = "ollama"         },
 	llm_active_profile                   = { sec = "llm", path = "profiles", key = "active"        },
@@ -128,8 +127,8 @@ local NESTED_KEY_MAP = {
 	-- Gesture slots merged flat into [gestures] (no sub-section header)
 	gesture_actions          = { sec = "gestures",   merge_into_sec = true             },
 	-- Hotstrings nested tables
-	hotstrings               = { sec = "hotstrings", key = "modules"                   },
-	section_states           = { sec = "hotstrings", key = "module_sections"           },
+	hotstrings               = { sec = "hotstrings", key = "groups"                    },
+	section_states           = { sec = "hotstrings", key = "modules"                   },
 	terminator_states        = { sec = "hotstrings", key = "terminator_states"          },
 	sections_order_overrides = { sec = "hotstrings", key = "order_overrides"            },
 	custom_editor_shortcut   = { sec = "hotstrings", key = "editor.shortcut"            },
@@ -289,6 +288,55 @@ local function flatten_from_disk(grouped)
 				end
 			end
 		end
+	end
+
+	-- Legacy migration: old layout had group toggles in [hotstrings.modules] and
+	-- section states in [hotstrings.module_sections]. New layout uses [hotstrings.groups]
+	-- for toggles and [hotstrings.modules] for section states.
+	local hs_sec = type(grouped.hotstrings) == "table" and grouped.hotstrings or nil
+	if hs_sec then
+		if type(flat.section_states) ~= "table" and type(hs_sec.module_sections) == "table" then
+			flat.section_states = hs_sec.module_sections
+		end
+
+		if type(flat.hotstrings) ~= "table" then
+			local old_modules = hs_sec.modules
+			if type(old_modules) == "table" then
+				local looks_like_groups = true
+				for _, val in pairs(old_modules) do
+					if type(val) ~= "boolean" then
+						looks_like_groups = false
+						break
+					end
+				end
+				if looks_like_groups then
+					flat.hotstrings = old_modules
+				end
+			end
+		end
+	end
+
+	-- LLM migration + simplification:
+	-- - New format: [llm.models] selected = "mlx"|"ollama".
+	-- - Legacy format: [llm.backend] name = "mlx"|"ollama" and/or
+	--   [llm.models] selected = "<model name>".
+	local llm_tbl = type(grouped.llm) == "table" and grouped.llm or nil
+	local models_tbl = llm_tbl and type(llm_tbl.models) == "table" and llm_tbl.models or nil
+	if llm_tbl and type(llm_tbl.backend) == "table" and type(llm_tbl.backend.name) == "string" then
+		flat.llm_backend = llm_tbl.backend.name
+	end
+	if models_tbl and type(models_tbl.selected) == "string" then
+		if models_tbl.selected == "mlx" or models_tbl.selected == "ollama" then
+			flat.llm_backend = models_tbl.selected
+		else
+			flat.llm_model = models_tbl.selected
+		end
+	end
+
+	if type(flat.llm_model) ~= "string" or flat.llm_model == "" then
+		local backend = flat.llm_backend
+		if backend == "mlx" then flat.llm_model = flat.llm_model_mlx
+		elseif backend == "ollama" then flat.llm_model = flat.llm_model_ollama end
 	end
 	return flat
 end

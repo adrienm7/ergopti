@@ -256,10 +256,31 @@ WritePersonalToml(Data) {
     Q := Chr(34)
     Lines := []
 
+    AddSectionSpacing(level) {
+        BlankTarget := (level = 1) ? 5 : 3
+        Trailing := 0
+        Loop Lines.Length {
+            idx := Lines.Length - A_Index + 1
+            if (Lines[idx] = "") {
+                Trailing += 1
+            } else {
+                break
+            }
+        }
+        while (Trailing < BlankTarget) {
+            Lines.Push("")
+            Trailing += 1
+        }
+        while (Trailing > BlankTarget) {
+            Lines.Pop()
+            Trailing -= 1
+        }
+    }
+
     Lines.Push("# personal_hotstrings.toml — Personal hotstrings")
     Lines.Push("# Auto-managed by the personal hotstrings editor.")
     Lines.Push("# Do not edit manually unless you know what you are doing.")
-    Lines.Push("")
+    AddSectionSpacing(1)
     MetaDesc := Data.Has("meta_description") ? Data["meta_description"] : "Hotstrings personnels"
     Lines.Push("[_meta]")
     Lines.Push("description = " . Q . EscapeTomlValue(MetaDesc) . Q)
@@ -270,8 +291,8 @@ WritePersonalToml(Data) {
         OrderParts.Push(Q . EscapeTomlValue(SecName) . Q)
     }
     Lines.Push("sections_order = [" . ArrayJoin(OrderParts, ", ") . "]")
-    Lines.Push("")
 
+    AddSectionSpacing(1)
     Lines.Push("[_meta.sections]")
     for _, SecName in Data["sections_order"] {
         if Data["sections"].Has(SecName) {
@@ -279,13 +300,13 @@ WritePersonalToml(Data) {
             Lines.Push(EscapeTomlValue(SecName) . " = " . Q . EscapeTomlValue(Desc) . Q)
         }
     }
-    Lines.Push("")
 
     for _, SecName in Data["sections_order"] {
         if !Data["sections"].Has(SecName) {
             continue
         }
         Sec := Data["sections"][SecName]
+        AddSectionSpacing(2)
         Lines.Push("[[" . SecName . "]]")
         for _, E in Sec["entries"] {
             IsWord := E["is_word"] ? "true" : "false"
@@ -304,7 +325,6 @@ WritePersonalToml(Data) {
             Line .= " }"
             Lines.Push(Line)
         }
-        Lines.Push("")
     }
 
     Content := ""

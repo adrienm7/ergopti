@@ -9,7 +9,7 @@
 #
 # STRUCTURE:
 # [menu]            — display ordering for the driver menus
-# [module_sections] — per-group sections that map to built-in modules
+# [modules] — per-group sections that map to built-in modules
 #                     (e.g. personal_info inside the magickey group)
 # ==============================================================================
 
@@ -38,10 +38,10 @@ categories_order = ["distancesreduction", "sfbsreduction", "rolls", "autocorrect
 # (toggle + editor button) in place of a static section list entry.
 #
 # Format:
-#   [module_sections.<group>.<section_id>]
+#   [modules.<group>.<section_id>]
 #   mod_id      = "<driver-agnostic module identifier>"
 #   description = "<label shown in the menu>"
 
-[module_sections.magickey.textexpansionpersonalinformation]
+[modules.magickey.textexpansionpersonalinformation]
 mod_id      = "personal_info"
 description = "Remplissage de formulaires avec le suffixe @ : @np★ = Nom ⇥ Prénom, etc."

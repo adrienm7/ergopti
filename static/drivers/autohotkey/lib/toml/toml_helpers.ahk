@@ -214,14 +214,38 @@ TOML_BatchWrite(Path, Updates) {
     }
 
     body := ""
+
+    EnsureTrailingBlankLines(count) {
+        newline_run := 0
+        i := StrLen(body)
+        while (i > 0 && SubStr(body, i, 1) = "`n") {
+            newline_run += 1
+            i -= 1
+        }
+        current := newline_run > 0 ? (newline_run - 1) : 0
+        while (current < count) {
+            body .= "`n"
+            newline_run += 1
+            current += 1
+        }
+        while (current > count) {
+            body := SubStr(body, 1, StrLen(body) - 1)
+            newline_run -= 1
+            current -= 1
+        }
+    }
+
     ; Sort sections alphabetically for stable, readable output
     SortedSections := []
     for _, sec in order
         SortedSections.Push(sec)
     SortedSections := SortArray(SortedSections)
+    FirstSection := true
     for _, sec in SortedSections {
-        if (body != "")
-            body .= "`n"
+        if !FirstSection {
+            EnsureTrailingBlankLines(5)
+        }
+        FirstSection := false
         body .= "[" . sec . "]`n"
         ; Sort keys alphabetically within each section
         SortedKeys := []
