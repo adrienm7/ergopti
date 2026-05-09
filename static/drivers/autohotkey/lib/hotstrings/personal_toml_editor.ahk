@@ -311,7 +311,7 @@ WritePersonalToml(Data) {
     }
     FileObj.Write(Content)
     FileObj.Close()
-    
+
     ; Reformat using centralized Python script for consistent styling
     ; Construct path: from A_ScriptDir (ErgoptiPlus.ahk location), walk up to repo root
     ; Pattern: C:\Users\...\ergopti\static\drivers\autohotkey\ErgoptiPlus.ahk
@@ -321,7 +321,7 @@ WritePersonalToml(Data) {
     if (FileExist(FormatScript)) {
         RunWait(Format('python3 "{}" "{}"', FormatScript, FilePath), , 0)
     }
-    
+
     return True
 }
 

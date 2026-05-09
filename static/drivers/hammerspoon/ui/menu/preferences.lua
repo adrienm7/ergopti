@@ -417,6 +417,13 @@ function M.save(prefs_file, state, hotfiles, core_mods)
 	pcall(function() fh:close() end)
 	-- os.rename overwrites existing files on POSIX (Hammerspoon is macOS-only).
 	pcall(os.rename, tmp_path, prefs_file)
+	
+	-- Reformat using centralized Python formatter for consistent styling
+	local _src = debug.getinfo(1, "S").source:sub(2)
+	local _script_dir = _src:match("^(.*[/\\])")
+	local _repo_root = _script_dir:gsub("static[/\\]drivers[/\\].*$", ""):gsub("[/\\]$", "")
+	local _format_script = _repo_root .. "/tools/format_toml.py"
+	pcall(os.execute, string.format("python3 '%s' '%s' 2>&1", _format_script, prefs_file))
 end
 
 --- Merges the saved disk state into the current memory state.
