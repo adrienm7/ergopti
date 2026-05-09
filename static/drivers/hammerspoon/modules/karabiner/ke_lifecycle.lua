@@ -200,6 +200,11 @@ local KE_PRIME_HEADLESS_CMD =
 	"/usr/bin/nohup '/Library/Application Support/org.pqrs/Karabiner-Elements/bin/karabiner_console_user_server'"
 	.. " >/tmp/ke_console_user_server.out 2>/tmp/ke_console_user_server.err </dev/null &"
 
+-- Compatibility fallback for installs where the binary path above is not
+-- present (older/custom packaging). We still keep headless behavior.
+local KE_PRIME_HEADLESS_FALLBACK_CMD =
+	"/usr/bin/open -gj '/Applications/Karabiner-Elements.app'"
+
 -- Best-effort suppression of Dock-visible KE helpers started by the bridge.
 -- Remapping stays active via console_user_server/session_monitor/Core-Service.
 local KE_SUPPRESS_DOCK_HELPERS_CMD =
@@ -236,7 +241,7 @@ local KE_GUI_CHECK_CMD = "/usr/bin/pgrep -fq '/Applications/Karabiner-Elements.a
 -- delay before checking, we poll every INTERVAL up to MAX_ATTEMPTS times
 -- so a fast daemon start resolves in ~300 ms instead of always waiting 2 s.
 local PRIME_POLL_INTERVAL_SEC = 0.3
-local PRIME_POLL_MAX_ATTEMPTS = 8   -- 2.4 s absolute maximum
+local PRIME_POLL_MAX_ATTEMPTS = 30  -- 9.0 s absolute maximum (non-blocking)
 
 -- Per-boot-session marker so a single GUI prime serves all subsequent HS
 -- reloads in the same login session. The file content is the kernel boot
@@ -399,21 +404,23 @@ function M.is_hs_owned_bridge()
 	return saved_ts == boot_ts
 end
 
---- True when any user-level KE process that maintains the IPC bridge is
---- currently running — either the main Karabiner-Elements GUI (because the
---- user opened it manually) or Karabiner-Menu (the silent menubar helper
---- our prime launches). Either implies that rules have already been pushed
---- to Core-Service in this session.
+--- True when any user-level KE bridge process is running.
+--- Single shell call with short-circuit so at most one pgrep ever spawns.
 --- @return boolean
 local function is_ipc_bridge_running()
-	-- Single shell invocation: the shell short-circuits on the first matching
-	-- pgrep, avoiding up to three extra process-spawn round-trips.
 	local _, ok = hs.execute(
 		"/usr/bin/pgrep -qx karabiner_console_user_server 2>/dev/null"
 		.. " || /usr/bin/pgrep -qx karabiner_session_monitor 2>/dev/null"
 		.. " || /usr/bin/pgrep -qx Karabiner-Menu 2>/dev/null"
 	)
 	return ok == true
+end
+
+--- Public alias so callers (e.g. karabiner/init.lua) can check bridge status
+--- without duplicating the detection logic.
+--- @return boolean
+function M.is_bridge_running()
+	return is_ipc_bridge_running()
 end
 
 --- True while a prime cycle is in flight. Exposed so the menu can render a
@@ -487,11 +494,15 @@ function M.prime_ke_for_session(callback, force)
 	-- Start the user-level bridge daemon in background without opening the GUI app.
 	local _, open_ok = hs.execute(KE_PRIME_HEADLESS_CMD .. " 2>&1")
 	if open_ok ~= true then
-		Logger.error(LOG, "Failed to start headless KE bridge daemon — config may not be applied.")
-		clear_hs_owned_bridge_marker()
-		_prime_in_progress = false
-		callback(false)
-		return
+		Logger.warn(LOG, "Primary headless launch failed — trying compatibility fallback…")
+		local _, fb_ok = hs.execute(KE_PRIME_HEADLESS_FALLBACK_CMD .. " 2>&1")
+		if fb_ok ~= true then
+			Logger.error(LOG, "Failed to start headless KE bridge daemon — config may not be applied.")
+			clear_hs_owned_bridge_marker()
+			_prime_in_progress = false
+			callback(false)
+			return
+		end
 	end
 
 	-- Poll until the bridge process appears (or we exceed the deadline).
@@ -533,9 +544,22 @@ end
 --- primed in the current boot session. This is the honest signal for the
 --- menu's green status indicator: a "yes" here means remapping is actually
 --- applied, not merely that processes happen to be running.
+---
+--- Lazy-marking: if the session marker is absent but the bridge is currently
+--- running, we write the marker now. This recovers from a polling timeout
+--- (the daemon took >2.4 s to appear) without waiting for a manual re-prime.
 --- @return boolean
 function M.is_remapping_active()
-	return M.is_grabber_running() and M.is_session_primed()
+	if not M.is_grabber_running() then return false end
+	if M.is_session_primed() then return true end
+	-- Lazy fallback: bridge is alive even though the polling callback missed it.
+	if is_ipc_bridge_running() then
+		mark_session_primed()
+		mark_hs_owned_bridge()
+		Logger.info(LOG, "Lazy prime marker written — bridge was already running.")
+		return true
+	end
+	return false
 end
 
 return M

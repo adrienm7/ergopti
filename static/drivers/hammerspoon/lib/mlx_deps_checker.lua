@@ -72,16 +72,9 @@ local FAILURE_TAIL_CHARS = 280
 -- not feel laggy.
 local SUCCESS_AUTO_HIDE_SEC = 1.5
 
--- Delay before proactively showing the progress UI when the script keeps
--- running without emitting any marker. Covers two cases that would
--- otherwise leave the user staring at a silent menubar:
---   1. uv sync downloads packages internally without producing one of our
---      protocol markers fast enough.
---   2. The python import probe at the fast-path gate stalls for a few
---      seconds while pulling in mlx_lm transitively.
--- Picked above the typical fast-path duration (~50 ms) so a silent reload
--- never flashes the UI, but well below the visible-stall threshold.
-local PROACTIVE_UI_DELAY_SEC = 1.5
+-- Keep UI hidden until the script proves a real sync is running by emitting
+-- VENV_SYNC_RAN / progress markers. This avoids a startup flash when the
+-- environment is already up to date and only quick validation is happening.
 
 -- Module-level state so callers can branch on the bootstrap outcome without
 -- re-running the script. The values are:
@@ -438,25 +431,6 @@ function M.check_and_install_deps(on_complete)
 	os.execute("chmod +x " .. pty_wrapper_path)
 	Logger.debug(LOG, "PTY wrapper created successfully at %s", pty_wrapper_path)
 
-	-- Proactive UI fallback: if no marker has surfaced within
-	-- PROACTIVE_UI_DELAY_SEC the user is staring at silence — show the
-	-- download_window so they have visible feedback that work is happening.
-	-- The streaming handler will keep refining the message as markers arrive.
-	local proactive_timer
-	proactive_timer = hs.timer.doAfter(PROACTIVE_UI_DELAY_SEC, function()
-		if not llm_progress.is_active() then
-			Logger.info(LOG, "Bootstrap silent for %.1fs — surfacing progress UI proactively.", PROACTIVE_UI_DELAY_SEC)
-			pcall(llm_progress.show, {
-				kind     = "mlx_install",
-				title    = "Initialisation du moteur IA (MLX)",
-				subtitle = "Préparation en cours…",
-			})
-			-- Seed the bar at a small visible value so the user sees movement
-			-- immediately. The streaming handler will override per-marker.
-			pcall(llm_progress.set_progress, 3)
-		end
-	end)
-
 	-- Wrap the bash invocation in a tiny Python pty.spawn shim so the child
 	-- processes (bash, uv, python install) see a real pseudo-TTY on their
 	-- stdio. Without a pty, uv (Rust) and any libc-using subprocess switch
@@ -475,11 +449,6 @@ function M.check_and_install_deps(on_complete)
 	-- The signature is: hs.task.new(launchPath, completionCallback, streamingCallback, arguments)
 	task = hs.task.new("/usr/bin/python3", function(exit_code, stdout, stderr)
 		-- Completion callback: fires when the process exits
-		-- Cancel the proactive-show fallback as soon as the script finishes
-		-- so a fast-path completion (~50 ms) never flashes the UI.
-		if proactive_timer and type(proactive_timer.stop) == "function" then
-			pcall(function() proactive_timer:stop() end)
-		end
 		local combined = (stdout or "") .. (stderr or "")
 		-- Clean up the temporary PTY wrapper script
 		os.execute("rm -f " .. pty_wrapper_path)
