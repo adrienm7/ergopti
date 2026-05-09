@@ -3,6 +3,7 @@
 # ======= Meta =======
 # ====================
 # ====================
+
 [_meta]
 color = "#fb8c00"
 delay = 0.5
@@ -12,6 +13,7 @@ sections_order = ["hc", "sx", "cx", "englishnegation", "ez", "ct", "-", "closech
 # =========================
 # ===== Meta.Sections =====
 # =========================
+
 [_meta.sections]
 assign = "#! ➜ :="
 assignarrowequalleft = "=$ ➜ <="
@@ -36,15 +38,12 @@ sx = "SX ➜ SK"
 
 
 
-
-
-
-
 # ======================
 # ======================
 # ======= Assign =======
 # ======================
 # ======================
+
 [[assign]]
 " #!" = { output = " := ", is_word = false, auto_expand = true, is_case_sensitive = true, final_result = true }
 " #ç" = { output = " := ", is_word = false, auto_expand = true, is_case_sensitive = true, final_result = true }
@@ -53,21 +52,14 @@ sx = "SX ➜ SK"
 
 
 
-
-
-
-
 # ====================================
 # ====================================
 # ======= Assignarrowequalleft =======
 # ====================================
 # ====================================
+
 [[assignarrowequalleft]]
 " = $" = { output = " <= ", is_word = false, auto_expand = true, is_case_sensitive = true, final_result = true }
-
-
-
-
 
 
 
@@ -76,13 +68,10 @@ sx = "SX ➜ SK"
 # ======= Assignarrowequalright =======
 # =====================================
 # =====================================
+
 [[assignarrowequalright]]
 " $ = " = { output = " => ", is_word = false, auto_expand = true, is_case_sensitive = true, final_result = true }
 "$ = " = { output = " => ", is_word = false, auto_expand = true, is_case_sensitive = true, final_result = true }
-
-
-
-
 
 
 
@@ -91,13 +80,10 @@ sx = "SX ➜ SK"
 # ======= Assignarrowminusleft =======
 # ====================================
 # ====================================
+
 [[assignarrowminusleft]]
 " ?+" = { output = " <- ", is_word = false, auto_expand = true, is_case_sensitive = true, final_result = true }
 "?+" = { output = " <- ", is_word = false, auto_expand = true, is_case_sensitive = true, final_result = true }
-
-
-
-
 
 
 
@@ -106,13 +92,10 @@ sx = "SX ➜ SK"
 # ======= Assignarrowminusright =======
 # =====================================
 # =====================================
+
 [[assignarrowminusright]]
 " +?" = { output = " -> ", is_word = false, auto_expand = true, is_case_sensitive = true, final_result = true }
 "+?" = { output = " -> ", is_word = false, auto_expand = true, is_case_sensitive = true, final_result = true }
-
-
-
-
 
 
 
@@ -121,13 +104,10 @@ sx = "SX ➜ SK"
 # ======= Chevronequal =======
 # ============================
 # ============================
+
 [[chevronequal]]
 "<%" = { output = "<=", is_word = false, auto_expand = true, is_case_sensitive = true, final_result = true }
 ">%" = { output = ">=", is_word = false, auto_expand = true, is_case_sensitive = true, final_result = true }
-
-
-
-
 
 
 
@@ -136,12 +116,9 @@ sx = "SX ➜ SK"
 # ======= Closechevrontag =======
 # ===============================
 # ===============================
+
 [[closechevrontag]]
 "<@" = { output = "</", is_word = false, auto_expand = true, is_case_sensitive = true, final_result = true }
-
-
-
-
 
 
 
@@ -150,13 +127,10 @@ sx = "SX ➜ SK"
 # ======= Comment =======
 # =======================
 # =======================
+
 [[comment]]
 "\"\\" = { output = "*/", is_word = false, auto_expand = true, is_case_sensitive = true, final_result = true }
 "\\\"" = { output = "/*", is_word = false, auto_expand = true, is_case_sensitive = true, final_result = true }
-
-
-
-
 
 
 
@@ -165,13 +139,10 @@ sx = "SX ➜ SK"
 # ======= Ct =======
 # ==================
 # ==================
+
 [[ct]]
 "p'" = { output = "ct", is_word = false, auto_expand = true, is_case_sensitive = false, final_result = false }
 "p ?" = { output = "p ?", is_word = false, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
-
-
-
-
 
 
 
@@ -180,12 +151,9 @@ sx = "SX ➜ SK"
 # ======= Cx =======
 # ==================
 # ==================
+
 [[cx]]
 "cx" = { output = "ck", is_word = false, auto_expand = true, is_case_sensitive = false, final_result = false }
-
-
-
-
 
 
 
@@ -194,12 +162,9 @@ sx = "SX ➜ SK"
 # ======= Englishnegation =======
 # ===============================
 # ===============================
+
 [[englishnegation]]
 "nt'" = { output = "n’t", is_word = false, auto_expand = true, is_case_sensitive = true, final_result = false }
-
-
-
-
 
 
 
@@ -208,13 +173,10 @@ sx = "SX ➜ SK"
 # ======= Equalstring =======
 # ===========================
 # ===========================
+
 [[equalstring]]
 " [)" = { output = " = \"\"", is_word = false, auto_expand = true, is_case_sensitive = true, final_result = true }
 "[)" = { output = " = \"\"", is_word = false, auto_expand = true, is_case_sensitive = true, final_result = true }
-
-
-
-
 
 
 
@@ -223,12 +185,9 @@ sx = "SX ➜ SK"
 # ======= Ez =======
 # ==================
 # ==================
+
 [[ez]]
 "eé" = { output = "ez", is_word = false, auto_expand = true, is_case_sensitive = false, final_result = false }
-
-
-
-
 
 
 
@@ -237,13 +196,10 @@ sx = "SX ➜ SK"
 # ======= Hashtagbracket =======
 # ==============================
 # ==============================
+
 [[hashtagbracket]]
 "#[" = { output = "\"]", is_word = false, auto_expand = true, is_case_sensitive = true, final_result = true }
 "#]" = { output = "\"]", is_word = false, auto_expand = true, is_case_sensitive = true, final_result = true }
-
-
-
-
 
 
 
@@ -252,12 +208,9 @@ sx = "SX ➜ SK"
 # ======= Hashtagparenthesis =======
 # ==================================
 # ==================================
+
 [[hashtagparenthesis]]
 "#(" = { output = "\")", is_word = false, auto_expand = true, is_case_sensitive = true, final_result = true }
-
-
-
-
 
 
 
@@ -266,13 +219,10 @@ sx = "SX ➜ SK"
 # ======= Hashtagquote =======
 # ============================
 # ============================
+
 [[hashtagquote]]
 "(#" = { output = "(\"", is_word = false, auto_expand = true, is_case_sensitive = true, final_result = true }
 "[#" = { output = "[\"", is_word = false, auto_expand = true, is_case_sensitive = true, final_result = true }
-
-
-
-
 
 
 
@@ -281,12 +231,9 @@ sx = "SX ➜ SK"
 # ======= Hc =======
 # ==================
 # ==================
+
 [[hc]]
 "hc" = { output = "wh", is_word = false, auto_expand = true, is_case_sensitive = false, final_result = false }
-
-
-
-
 
 
 
@@ -295,12 +242,9 @@ sx = "SX ➜ SK"
 # ======= Leftarrow =======
 # =========================
 # =========================
+
 [[leftarrow]]
 " = +" = { output = " ➜ ", is_word = false, auto_expand = true, is_case_sensitive = true, final_result = false }
-
-
-
-
 
 
 
@@ -309,6 +253,7 @@ sx = "SX ➜ SK"
 # ======= Notequal =======
 # ========================
 # ========================
+
 [[notequal]]
 " !#" = { output = " != ", is_word = false, auto_expand = true, is_case_sensitive = true, final_result = true }
 " ç#" = { output = " != ", is_word = false, auto_expand = true, is_case_sensitive = true, final_result = true }
@@ -317,15 +262,12 @@ sx = "SX ➜ SK"
 
 
 
-
-
-
-
 # ==================
 # ==================
 # ======= Sx =======
 # ==================
 # ==================
+
 [[sx]]
 "sx" = { output = "sk", is_word = false, auto_expand = true, is_case_sensitive = false, final_result = false }
 "xlsx" = { output = "xlsx", is_word = false, auto_expand = true, is_case_sensitive = false, final_result = false }  # To not trigger the replacement in this particular case
