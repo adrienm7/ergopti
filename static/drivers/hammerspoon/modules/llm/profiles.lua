@@ -137,17 +137,11 @@ end
 function M.get_active_profile(active_id, user_profiles)
 	local id = tostring(active_id)
 	
-	-- Auto-migrate legacy profiles to maintain compatibility
-	if id == "parallel" or id == "parallel_simple" then id = "basic" end
-	if id == "batch" or id == "batch_simple" then id = "batch_advanced" end
-	if id == "parallel_advanced" then id = "advanced" end
-	if id == "base_completion" then id = "raw" end
-	
 	for _, p in ipairs(M.get_all_profiles(user_profiles)) do
 		if type(p) == "table" and p.id == id then return p end
 	end
-	Logger.warn(LOG, string.format("Profile %s not found, falling back to basic.", id))
-	return M.BUILTIN_PROFILES[2]  -- Fallback: basic
+	Logger.error(LOG, "Profile %s not found — no fallback available.", id)
+	return M.BUILTIN_PROFILES[2]  -- Basic profile
 end
 
 --- Resolves the appropriate system prompt logic based on the current profile.
