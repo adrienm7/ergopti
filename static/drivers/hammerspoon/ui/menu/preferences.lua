@@ -52,7 +52,7 @@ local KEY_MAP = {
 	-- ── Hotstrings ─────────────────────────────────────────────────────────
 	keymap                               = { sec = "hotstrings", key = "enabled"                      },
 	expansion_delay                      = { sec = "hotstrings"                                        },
-	personal_info                        = { sec = "hotstrings"                                        },
+	personal_info                        = { sec = "hotstrings", path = "groups", key = "personal_info" },
 	preview_ai_enabled                   = { sec = "hotstrings"                                        },
 	preview_autocorrect_enabled          = { sec = "hotstrings"                                        },
 	preview_colored_tooltips             = { sec = "hotstrings"                                        },
@@ -128,8 +128,8 @@ local NESTED_KEY_MAP = {
 	-- Gesture slots merged flat into [gestures] (no sub-section header)
 	gesture_actions          = { sec = "gestures",   merge_into_sec = true             },
 	-- Hotstrings nested tables
-	hotstrings               = { sec = "hotstrings", key = "files"                     },
-	section_states           = { sec = "hotstrings", key = "section_states"            },
+	hotstrings               = { sec = "hotstrings", key = "groups"                    },
+	section_states           = { sec = "hotstrings", key = "sections"                  },
 	terminator_states        = { sec = "hotstrings", key = "terminator_states"          },
 	sections_order_overrides = { sec = "hotstrings", key = "order_overrides"            },
 	custom_editor_shortcut   = { sec = "hotstrings", key = "editor.shortcut"            },
