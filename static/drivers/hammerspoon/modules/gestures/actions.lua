@@ -408,7 +408,9 @@ local function spaceNav(goNext)
 					
 					if idx then
 						local total = #sps
-						local delta = goNext and 1 or -1
+						-- Invert direction: goNext=true should move right, goNext=false should move left
+						-- Natural scroll and horizontal detection may invert the direction from swipe engine
+						local delta = goNext and -1 or 1
 						local newIdx = ((idx - 1 + delta) % total) + 1
 						pcall(function() hs.eventtap.keyStroke({"ctrl"}, tostring(newIdx), 0) end)
 						return
