@@ -688,6 +688,12 @@ local function onKeyDown(e)
 	if t0 then Perf.sample("keymap_keydown", t0) end
 	if not ok then
 		Logger.error(LOG, "Keyboard interception failure: %s.", tostring(result))
+		-- An uncaught error inside the callback can cause macOS to disable the
+		-- tap on the next run-loop cycle; proactively re-arm it here
+		if tap and type(tap.isEnabled) == "function" and not tap:isEnabled() then
+			Logger.warn(LOG, "Event tap disabled after error — re-enabling.")
+			pcall(function() tap:start() end)
+		end
 		return false
 	end
 	return result
@@ -795,6 +801,26 @@ mouse_tap = eventtap.new(
 	end
 )
 
+-- macOS silently disables an event tap whose callback exceeds the system
+-- timeout (~300 ms). Once disabled, all keystrokes pass through but no
+-- expansion fires — from the user's perspective, letters are "swallowed".
+-- This watchdog checks the three taps every 5 s and re-arms any that
+-- the OS killed.
+local TAP_WATCHDOG_SEC = 5
+local _watchdog_timer  = nil
+
+local function tap_watchdog()
+	local function revive(name, t)
+		if t and type(t.isEnabled) == "function" and not t:isEnabled() then
+			Logger.warn(LOG, "macOS disabled the %s event tap — re-enabling.", name)
+			pcall(function() t:start() end)
+		end
+	end
+	revive("keyDown", tap)
+	revive("flagsChanged", shift_tap)
+	revive("mouse", mouse_tap)
+end
+
 --- Starts the eventtap listeners and attaches them to the OS event queue.
 function M.start()
 	Logger.start(LOG, "Starting keymap engine…")
@@ -809,12 +835,19 @@ function M.start()
 	tap:start()
 	shift_tap:start()
 	mouse_tap:start()
+
+	-- Arm the watchdog that re-enables taps killed by macOS
+	if _watchdog_timer then _watchdog_timer:stop() end
+	_watchdog_timer = hs.timer.new(TAP_WATCHDOG_SEC, tap_watchdog)
+	_watchdog_timer:start()
+
 	Logger.success(LOG, "Keymap engine started.")
 end
 
 --- Stops the eventtap listeners and cleans up prediction state.
 function M.stop()
 	Logger.start(LOG, "Stopping keymap engine…")
+	if _watchdog_timer then _watchdog_timer:stop(); _watchdog_timer = nil end
 	tap:stop()
 	shift_tap:stop()
 	mouse_tap:stop()
