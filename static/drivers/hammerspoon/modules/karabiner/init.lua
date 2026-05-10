@@ -560,15 +560,14 @@ function M.init()
 
 	if _state.enabled then
 		Logger.info(LOG, "Integration enabled — deploying config…")
-		-- Defer regenerate() until the event loop is active. During M.init(),
-		-- Hammerspoon is still in the module-loading phase and hs.timer.doAfter
-		-- callbacks are not yet being dispatched. Deferring ensures prime_ke_for_session's
-		-- polling timers will fire correctly when check_bridge() is scheduled.
-		local timer_handle = hs.timer.doAfter(0.1, function()
-			Logger.trace(LOG, "[DEFERRED TIMER FIRED] M.regenerate() starting…")
-			M.regenerate()
-		end)
-		Logger.trace(LOG, "[DEFERRED TIMER SCHEDULED] Timer handle: %s, will fire in 0.1s", tostring(timer_handle))
+		-- Call regenerate() directly (not deferred) but wrap in pcall to catch any errors
+		-- that might occur during initial config deployment. The polling timers inside
+		-- prime_ke_for_session will be scheduled relative to THIS moment, when the
+		-- event loop should already be receiving events from menu interactions.
+		local ok, err = pcall(M.regenerate)
+		if not ok then
+			Logger.error(LOG, "Initial regenerate() failed: %s", tostring(err))
+		end
 	end
 
 	-- Persist immediately on first launch so the file exists for future runs
