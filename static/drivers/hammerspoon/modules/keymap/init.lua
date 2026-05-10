@@ -358,6 +358,100 @@ function M.perf_reset(name)
 end
 
 
+-- Per-call state for run_trigger_checks, stored at module level to avoid
+-- allocating a closure on every keystroke. Updated by onKeyDownRaw just
+-- before calling run_trigger_checks().
+local _tc_chars        = ""
+local _tc_char_len     = 1
+local _tc_dt           = 0
+local _tc_complex_mult = 1
+local _tc_is_ignored   = false
+
+--- Per-mapping delay + group-enable gate, module-level to avoid closure allocation.
+--- @param m table The mapping entry.
+--- @return boolean True when the current timing/group state allows m to fire.
+local function mapping_fires(m)
+	if m.group and CoreState.groups[m.group] and not CoreState.groups[m.group].enabled then
+		return false
+	end
+	local specific_delay
+	if m.has_magic then
+		specific_delay = CoreState.DELAYS.STAR_TRIGGER
+	elseif m.group and CoreState.DELAYS[m.group] then
+		specific_delay = CoreState.DELAYS[m.group]
+	else
+		specific_delay = CoreState.BASE_DELAY_SEC
+	end
+	-- Autocorrections are never stretched for complex keystrokes (they
+	-- fire on letter combos, not on modifier+letter sequences)
+	local allow_complex_delay = (m.group ~= "autocorrection")
+	local allowed_delay       = allow_complex_delay and (specific_delay * _tc_complex_mult) or specific_delay
+	return allowed_delay == 0 or _tc_dt <= allowed_delay
+end
+
+--- Runs trigger matching against the current buffer. Module-level function
+--- instead of a per-keystroke closure — saves one closure allocation + one
+--- inner closure allocation (mapping_fires) on every single keyDown event.
+local function run_trigger_checks()
+	local chars        = _tc_chars
+	local char_len     = _tc_char_len
+	local is_ignored   = _tc_is_ignored
+	local complex_mult = _tc_complex_mult
+
+	-- Pre-evaluate once: avoids a 20-entry linear scan inside try_terminator_expand
+	-- for every non-auto mapping — on a normal letter keystroke that saves ~300 calls
+	local chars_is_terminator = Registry.is_terminator(chars)
+
+	-- Auto candidates: triggers whose last codepoint equals the just-typed
+	-- char. Bucketed by Registry so we scan a handful of entries instead of
+	-- the full ~10-15k global list.
+	local auto_bucket = Registry.mappings_for_tail(chars)
+	if auto_bucket then
+		for _, m in ipairs(auto_bucket) do
+			if m.auto and mapping_fires(m)
+				and Expander.try_auto_expand(m, char_len, is_ignored)
+			then
+				return true
+			end
+		end
+	end
+
+	-- Terminator candidates: triggers whose last codepoint equals the char
+	-- *before* the terminator that was just typed. Only meaningful when
+	-- chars is itself a terminator.
+	if chars_is_terminator then
+		local buf        = CoreState.buffer
+		local chars_b    = #chars
+		local before_end = #buf - chars_b
+		if before_end > 0 then
+			local prev_sub = buf:sub(1, before_end)
+			local poff     = utf8.offset(prev_sub, -1)
+			if poff then
+				local prev_char  = prev_sub:sub(poff)
+				local term_bucket = Registry.mappings_for_tail(prev_char)
+				if term_bucket then
+					for _, m in ipairs(term_bucket) do
+						if not m.auto and mapping_fires(m)
+							and Expander.try_terminator_expand(m, chars, char_len, is_ignored)
+						then
+							return true
+						end
+					end
+				end
+			end
+		end
+	end
+
+	local star_allowed = CoreState.DELAYS.STAR_TRIGGER * complex_mult
+	if (star_allowed == 0 or _tc_dt <= star_allowed)
+		and Expander.try_repeat_feature(chars, is_ignored) then
+		return true
+	end
+
+	return false
+end
+
+
 
 
 -- =========================================
@@ -369,22 +463,34 @@ end
 --- Inner keyboard handler — never called directly; always wrapped in a pcall.
 --- @param e table The macOS keystroke event payload.
 --- @return boolean True to consume the event, false to pass it through.
--- Synthetic OS-signal keycodes that must NEVER drive any keymap logic:
--- F18 (79) is fired by the keep-awake jiggler to wake the OS, F19 (80) is the
--- volume-scroll modifier, F20 (90) is the Karabiner nav-layer sentinel. None
--- of them are real keystrokes the user produced, so they must not arm the LLM
--- inactivity timer, mutate the buffer, or refresh predictions.
-local SYNTHETIC_SIGNAL_KEYCODES = {
-	[79] = true, [80] = true, [90] = true,
+-- Keycodes that must exit the callback immediately with no side-effects.
+-- Merges synthetic OS-signals (F18/F19/F20) and Karabiner/layer sentinels
+-- (F13–F17, LAYER_SYN_1–3) into a single O(1) set tested once at the very
+-- top of onKeyDownRaw, eliminating the old 12-branch `or` chain.
+local FAST_EXIT_KEYCODES = {
+	[79]  = true,  -- F18 keep-awake jiggler
+	[80]  = true,  -- F19 volume-scroll modifier
+	[90]  = true,  -- F20 Karabiner nav-layer sentinel
+	[105] = true,  -- F13 Karabiner Return sentinel
+	[107] = true,  -- F14 Karabiner Backspace sentinel
+	[113] = true,  -- F15 Karabiner Escape sentinel
+	[106] = true,  -- F16 LLM chain signal
+	[64]  = true,  -- F17 cycle-windows hotkey
+	[131] = true,  -- LAYER_SYN_1
+	[134] = true,  -- LAYER_SYN_2
+	[135] = true,  -- LAYER_SYN_3
 }
 
 local function onKeyDownRaw(e)
 	if CoreState.processing_paused then return false end
 
-	-- Drop synthetic OS-signal keystrokes BEFORE updating last_key_time so
-	-- they don't reset the inactivity timer or trigger predictions.
-	local _early_kc = e:getKeyCode()
-	if SYNTHETIC_SIGNAL_KEYCODES[_early_kc] then return false end
+	-- Single getKeyCode() call — reused for every subsequent keyCode check
+	local keyCode = e:getKeyCode()
+
+	-- O(1) fast-exit for synthetic signals and Karabiner/layer sentinels.
+	-- This replaces both the old SYNTHETIC_SIGNAL_KEYCODES check and the
+	-- 9-branch `or` chain further down, saving ~10 comparisons per keystroke.
+	if FAST_EXIT_KEYCODES[keyCode] then return false end
 
 	local now = hs.timer.secondsSinceEpoch()
 	local dt  = now - CoreState.last_key_time
@@ -407,20 +513,18 @@ local function onKeyDownRaw(e)
 		LLMBridge.reset_predictions()
 	end
 
-	local keyCode = e:getKeyCode()
-	local flags   = e:getFlags()
-
-	-- Determine whether the current window should suppress hotstring expansion.
-	-- The Hammerspoon console check is inside is_ignored_window() and covered
-	-- by its 0.5s cache. Pass `now` so the cache comparison reuses the timestamp
-	-- already computed above instead of making a second secondsSinceEpoch() call.
-	local is_ignored = km_utils.is_ignored_window(CoreState.ignored_window_titles, CoreState.ignored_window_patterns, now)
+	local flags = e:getFlags()
 
 	-- 1. Ignore our own synthetic "Delete" keystrokes to prevent double-deletion.
 	if keyCode == Keycodes.BACKSPACE and CoreState.expected_synthetic_deletes > 0 then
 		CoreState.expected_synthetic_deletes = CoreState.expected_synthetic_deletes - 1
 		return false
 	end
+
+	-- Defer is_ignored_window until after all cheap early-exits above have had
+	-- their chance. The AX call inside is_ignored_window is the single most
+	-- expensive per-keystroke operation when the cache has expired.
+	local is_ignored = km_utils.is_ignored_window(CoreState.ignored_window_titles, CoreState.ignored_window_patterns, now)
 
 	-- 2. Route LLM prediction keys (Enter / digits / arrows) before buffer logic.
 	if LLMBridge.handle_llm_keys(keyCode, flags, is_ignored) then return true end
@@ -433,21 +537,6 @@ local function onKeyDownRaw(e)
 			if result == "consume"   then return true end
 			if result == "suppress"  then suppress_triggers = true; break end
 		end
-	end
-
-	-- Ignore Karabiner sentinels (F13/F14/F15), the LLM chain signal (F16),
-	-- the cycle-windows hotkey (F17), the nav-layer-entered sentinel (F20),
-	-- and the relocated layer-syn no-op channel.
-	if keyCode == Keycodes.F13_KARABINER_RETURN
-		or keyCode == Keycodes.F14_KARABINER_BACKSPACE
-		or keyCode == Keycodes.F15_KARABINER_ESCAPE
-		or keyCode == Keycodes.F16_LLM_CHAIN_SIGNAL
-		or keyCode == Keycodes.F17_CYCLE_WINDOWS
-		or keyCode == Keycodes.F20_LAYER_NAV_ENTERED
-		or keyCode == Keycodes.LAYER_SYN_1
-		or keyCode == Keycodes.LAYER_SYN_2
-		or keyCode == Keycodes.LAYER_SYN_3 then
-		return false
 	end
 
 	-- 4. Handle Escape — dismiss predictions or optionally clear the buffer.
@@ -575,83 +664,15 @@ local function onKeyDownRaw(e)
 	local complex_mult     = (is_complex or carry_from_prev) and COMPLEX_DELAY_MULT or 1
 	CoreState.last_key_was_complex = is_complex
 
-	local function run_trigger_checks()
-		local char_len = text_utils.utf8_len(chars)
-		-- Pre-evaluate once: avoids a 20-entry linear scan inside try_terminator_expand
-		-- for every non-auto mapping — on a normal letter keystroke that saves ~300 calls
-		local chars_is_terminator = Registry.is_terminator(chars)
-
-		--- Per-mapping delay + gate check, extracted so both the auto and
-		--- terminator buckets apply the exact same policy.
-		--- @param m table The mapping entry.
-		--- @return boolean True when the current timing/group state allows m to fire.
-		local function mapping_fires(m)
-			if m.group and CoreState.groups[m.group] and not CoreState.groups[m.group].enabled then
-				return false
-			end
-			local specific_delay
-			if m.has_magic then
-				specific_delay = CoreState.DELAYS.STAR_TRIGGER
-			elseif m.group and CoreState.DELAYS[m.group] then
-				specific_delay = CoreState.DELAYS[m.group]
-			else
-				specific_delay = CoreState.BASE_DELAY_SEC
-			end
-			-- Autocorrections are never stretched for complex keystrokes (they
-			-- fire on letter combos, not on modifier+letter sequences).
-			local allow_complex_delay = (m.group ~= "autocorrection")
-			local allowed_delay       = allow_complex_delay and (specific_delay * complex_mult) or specific_delay
-			return allowed_delay == 0 or dt <= allowed_delay
-		end
-
-		-- Auto candidates: triggers whose last codepoint equals the just-typed
-		-- char. Bucketed by Registry so we scan a handful of entries instead of
-		-- the full ~10-15k global list.
-		local auto_bucket = Registry.mappings_for_tail(chars)
-		if auto_bucket then
-			for _, m in ipairs(auto_bucket) do
-				if m.auto and mapping_fires(m)
-					and Expander.try_auto_expand(m, char_len, is_ignored)
-				then
-					return true
-				end
-			end
-		end
-
-		-- Terminator candidates: triggers whose last codepoint equals the char
-		-- *before* the terminator that was just typed. Only meaningful when
-		-- chars is itself a terminator.
-		if chars_is_terminator then
-			local buf        = CoreState.buffer
-			local chars_b    = #chars
-			local before_end = #buf - chars_b
-			if before_end > 0 then
-				local prev_sub = buf:sub(1, before_end)
-				local poff     = utf8.offset(prev_sub, -1)
-				if poff then
-					local prev_char  = prev_sub:sub(poff)
-					local term_bucket = Registry.mappings_for_tail(prev_char)
-					if term_bucket then
-						for _, m in ipairs(term_bucket) do
-							if not m.auto and mapping_fires(m)
-								and Expander.try_terminator_expand(m, chars, char_len, is_ignored)
-							then
-								return true
-							end
-						end
-					end
-				end
-			end
-		end
-
-		local star_allowed = CoreState.DELAYS.STAR_TRIGGER * complex_mult
-		if (star_allowed == 0 or dt <= star_allowed)
-			and Expander.try_repeat_feature(chars, is_ignored) then
-			return true
-		end
-
-		return false
-	end
+	-- Populate module-level upvalues consumed by run_trigger_checks / mapping_fires.
+	-- Single-codepoint fast path: for ASCII and 2-byte latin, byte length IS
+	-- char length; the expensive pcall(utf8.len) is only needed for 3-4 byte chars.
+	local chars_bytes = #chars
+	_tc_chars        = chars
+	_tc_char_len     = (chars_bytes <= 2) and 1 or (text_utils.utf8_len(chars))
+	_tc_dt           = dt
+	_tc_complex_mult = complex_mult
+	_tc_is_ignored   = is_ignored
 
 	-- In ignored windows we still want repeatable features to work,
 	-- but must run them asynchronously to avoid blocking the event queue.
