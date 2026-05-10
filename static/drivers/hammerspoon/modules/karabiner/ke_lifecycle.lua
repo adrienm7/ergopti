@@ -88,11 +88,11 @@ local KARABINER_KILL_CMD =
 	.. "; true"
 
 -- Lightweight kill used only before a config deploy in regenerate().
--- Stops the bridge processes immediately without bootout loops or sleeps;
--- the prime step that follows the deploy will restart them in milliseconds.
+-- Uses -f (full path) to match processes regardless of their runtime name:
+-- KE v16 renames karabiner_console_user_server to org.pqrs.* so pkill -x misses it.
 local KARABINER_KILL_FAST_CMD =
-	"/usr/bin/pkill -x karabiner_console_user_server 2>/dev/null; "
-	.. "/usr/bin/pkill -x karabiner_session_monitor 2>/dev/null; "
+	"/usr/bin/pkill -f 'Karabiner-Elements/bin/karabiner_console_user_server' 2>/dev/null; "
+	.. "/usr/bin/pkill -f 'Karabiner-Elements/bin/karabiner_session_monitor' 2>/dev/null; "
 	.. "/usr/bin/pkill -x Karabiner-Menu 2>/dev/null; "
 	.. "true"
 
@@ -444,11 +444,14 @@ end
 
 --- True when any user-level KE bridge process is running.
 --- Single shell call with short-circuit so at most one pgrep ever spawns.
+--- Uses -f (full command-line match) instead of -x (exact process name) because
+--- KE v16 renames karabiner_console_user_server to org.pqrs.karabiner_console_user_server
+--- at runtime, which breaks -x exact matching even though the process is alive.
 --- @return boolean
 local function is_ipc_bridge_running()
 	local _, ok = hs.execute(
-		"/usr/bin/pgrep -qx karabiner_console_user_server 2>/dev/null"
-		.. " || /usr/bin/pgrep -qx karabiner_session_monitor 2>/dev/null"
+		"/usr/bin/pgrep -fq 'Karabiner-Elements/bin/karabiner_console_user_server' 2>/dev/null"
+		.. " || /usr/bin/pgrep -fq 'Karabiner-Elements/bin/karabiner_session_monitor' 2>/dev/null"
 		.. " || /usr/bin/pgrep -qx Karabiner-Menu 2>/dev/null"
 	)
 	return ok == true
