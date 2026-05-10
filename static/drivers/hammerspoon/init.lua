@@ -702,6 +702,19 @@ Logger.info(LOG, "════════════════════�
 Logger.info(LOG, "✅ Hammerspoon boot SUCCESSFUL.")
 Logger.info(LOG, "════════════════════════════════════════════════════════════")
 pcall(function() hs.settings.set(HS_BOOT_READY_SETTING_KEY, true) end)
+-- Trigger the first Karabiner deploy HERE, after init.lua fully completes.
+-- hs.timer callbacks scheduled during module init do not fire reliably;
+-- calling regenerate() from this top-level context guarantees the event loop
+-- is active and subsequent async timers in prime_ke_for_session will fire.
+pcall(function()
+	if type(karabiner) == "table"
+		and type(karabiner.get_enabled) == "function"
+		and karabiner.get_enabled()
+		and type(karabiner.regenerate) == "function" then
+		Logger.info(LOG, "Boot complete — triggering Karabiner async deploy…")
+		karabiner.regenerate()
+	end
+end)
 pcall(function()
 	local ok_l, kl = pcall(require, "modules.karabiner.ke_lifecycle")
 	if ok_l and kl and type(kl.flush_pending_ready_notification) == "function" then
