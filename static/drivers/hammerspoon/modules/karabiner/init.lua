@@ -559,15 +559,11 @@ function M.init()
 	end
 
 	if _state.enabled then
-		Logger.info(LOG, "Integration enabled — scheduling async deploy…")
-		-- Never block HS boot on Karabiner priming: launch the first regenerate
-		-- right after init returns so menu bar startup remains instantaneous.
-		hs.timer.doAfter(0, function()
-			local ok, err = pcall(M.regenerate)
-			if not ok then
-				Logger.error(LOG, "Async M.regenerate() after init failed: %s", tostring(err))
-			end
-		end)
+		Logger.info(LOG, "Integration enabled — deploy will be triggered from init.lua boot completion.")
+		-- Do NOT call M.regenerate() here: hs.timer callbacks scheduled during
+		-- module initialization do not fire reliably. The main init.lua calls
+		-- M.regenerate() explicitly at the very end of its boot sequence, once
+		-- the event loop is guaranteed to be running.
 	end
 
 	-- Persist immediately on first launch so the file exists for future runs
