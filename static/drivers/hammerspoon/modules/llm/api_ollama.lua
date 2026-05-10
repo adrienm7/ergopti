@@ -93,7 +93,7 @@ function M.warmup(model_name)
 				_is_ready = true
 				Logger.info(LOG, "Model '%s' warmed up — GPU cache ready.", model_name)
 				if became_ready then
-					Notifications.notify("LLM prêt (Ollama)", "Le serveur Ollama est prêt.", "success")
+					Notifications.notify("LLM actif", "Le serveur Ollama est prêt.", "success")
 				end
 			else
 				_is_ready = false
