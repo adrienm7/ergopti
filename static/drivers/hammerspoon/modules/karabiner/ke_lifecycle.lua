@@ -337,12 +337,12 @@ local function notify_karabiner_ready()
 		end
 		if not is_ipc_bridge_fully_ready() then
 			_pending_karabiner_ready_notify = true
-			Logger.warn(LOG, "Karabiner ready notification skipped — bridge not fully ready at send time.")
+			Logger.error(LOG, "Karabiner ready notification BLOCKED — bridge not fully ready at send time (check karabiner_console_user_server + karabiner_session_monitor).")
 			return
 		end
 		if not is_runtime_remapping_ready() then
 			_pending_karabiner_ready_notify = true
-			Logger.warn(LOG, "Karabiner ready notification skipped — runtime remapping probe failed at send time.")
+			Logger.error(LOG, "Karabiner ready notification BLOCKED — runtime remapping probe failed at send time (karabiner_cli --set-variables returned error).")
 			return
 		end
 
@@ -353,6 +353,7 @@ local function notify_karabiner_ready()
 			return
 		end
 		_last_karabiner_ready_notify_at = now
+				Logger.info(LOG, "✓ Karabiner ready notification sent.")
 		Notifications.notify("Karabiner prêt", "Le moteur Karabiner est prêt.", "success")
 	end)
 end
