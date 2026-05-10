@@ -18,14 +18,17 @@ local Logger = require("lib.logger")
 local LOG    = "gestures.actions"
 
 local rightClickHeld    = false
+local leftClickHeld     = false
 local mouseEventTap     = nil
+local leftMouseEventTap = nil
 local keyboardWatcher   = nil
 local gestureInProgress = false
 
--- Delay after activation before reacting to rightMouseUp events.
--- The gesture fires on finger-lift, which can generate a spurious rightMouseUp
--- that would immediately cancel right-click hold mode.
+-- Delay after activation before reacting to rightMouseUp / leftMouseUp events.
+-- The gesture fires on finger-lift, which can generate a spurious mouseUp
+-- that would immediately cancel the hold mode.
 local RIGHT_CLICK_COOLDOWN_SEC = 0.15
+local LEFT_CLICK_COOLDOWN_SEC  = 0.15
 
 
 
@@ -156,6 +159,78 @@ function M.toggle_right_click()
 	if mouseEventTap then
 		pcall(function() mouseEventTap:start() end)
 		Logger.info(LOG, "Right-click hold mode enabled.")
+	end
+end
+
+--- Toggles a left-button-held mode. Useful for drag-selection: activate,
+--- move the cursor to extend the selection, then tap again to release.
+--- Any keystroke or physical mouse event releases the button automatically.
+function M.toggle_left_click()
+	if leftClickHeld then
+		Logger.debug(LOG, "Releasing left-click hold mode…")
+		if leftMouseEventTap and type(leftMouseEventTap.stop) == "function" then
+			pcall(function() leftMouseEventTap:stop() end)
+			leftMouseEventTap = nil
+		end
+		stopKeyboardWatcher()
+		pcall(function()
+			hs.eventtap.event.newMouseEvent(
+				hs.eventtap.event.types.leftMouseUp,
+				hs.mouse.absolutePosition()
+			):post()
+		end)
+		leftClickHeld = false
+		Logger.info(LOG, "Left-click hold mode released.")
+		return
+	end
+
+	Logger.debug(LOG, "Enabling left-click hold mode…")
+	pcall(function()
+		local event = hs.eventtap.event.newMouseEvent(
+			hs.eventtap.event.types.leftMouseDown,
+			hs.mouse.absolutePosition()
+		)
+		pcall(function()
+			event:setProperty(hs.eventtap.event.properties.eventSourceStateID, 1)
+		end)
+		event:post()
+	end)
+	leftClickHeld = true
+	startKeyboardWatcher()
+
+	local activationTime = hs.timer.secondsSinceEpoch()
+	local evTypes = hs.eventtap.event.types
+	leftMouseEventTap = hs.eventtap.new(
+		{ evTypes.mouseMoved, evTypes.leftMouseUp },
+		function(e)
+			local t = e:getType()
+
+			if t == evTypes.leftMouseUp then
+				-- Ignore spurious mouseUp from the gesture's own finger-lift
+				if hs.timer.secondsSinceEpoch() - activationTime < LEFT_CLICK_COOLDOWN_SEC then
+					return true
+				end
+				if gestureInProgress then return true end
+					hs.timer.doAfter(0, M.toggle_left_click)
+				return true
+			end
+
+			-- Convert mouseMoved to leftMouseDragged so apps see a drag
+			if t == evTypes.mouseMoved then
+				pcall(function()
+					hs.eventtap.event.newMouseEvent(
+						evTypes.leftMouseDragged, e:location()
+					):post()
+				end)
+				return false
+			end
+
+			return false
+		end)
+
+	if leftMouseEventTap then
+		pcall(function() leftMouseEventTap:start() end)
+		Logger.info(LOG, "Left-click hold mode enabled.")
 	end
 end
 
@@ -314,7 +389,8 @@ ax("document",   "Document (début/fin)",
 sg("none",             "Désactivé",            function() end)
 
 -- Selection & navigation cursor
-sg("right_click_toggle", "Toggle clic droit maintenu", M.toggle_right_click)
+sg("left_click_toggle",  "Toggle clic gauche maintenu", M.toggle_left_click)
+sg("right_click_toggle", "Toggle clic droit maintenu",  M.toggle_right_click)
 sg("lookup",           "Définition du mot",    M.trigger_lookup)
 sg("app_switcher",     "Alt-Tab",              function() pcall(hs.eventtap.keyStroke, {"cmd"}, "tab") end)
 
@@ -545,7 +621,7 @@ M.SG_NAMES = {
 	"none",
 	"--",
 	-- Selection & navigation
-	"right_click_toggle", "lookup", "app_switcher",
+	"left_click_toggle", "right_click_toggle", "lookup", "app_switcher",
 	"--",
 	-- Editing
 	"copy", "paste", "cut", "undo", "redo", "select_all", "find",
