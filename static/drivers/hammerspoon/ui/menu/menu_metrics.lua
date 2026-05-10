@@ -550,37 +550,42 @@ function M.build(ctx)
 			end
 
 			state.keylogger_enabled = not state.keylogger_enabled
+			save_prefs()
 
-			local Keylogger  = require("modules.keylogger")
-			local WpmMenubar = require("ui.wpm.wpm_menubar")
-			local WpmWidget  = require("ui.wpm.wpm_widget")
+			local ok_kl, Keylogger = pcall(require, "modules.keylogger")
+			if not ok_kl then Keylogger = nil end
+			local ok_wm, WpmMenubar = pcall(require, "ui.wpm.wpm_menubar")
+			if not ok_wm then WpmMenubar = nil end
+			local ok_ww, WpmWidget = pcall(require, "ui.wpm.wpm_widget")
+			if not ok_ww then WpmWidget = nil end
 
 			if state.keylogger_enabled then
-				if type(Keylogger.set_options) == "function" then
-					Keylogger.set_options({ encrypt = state.keylogger_encrypt })
+				if Keylogger and type(Keylogger.set_options) == "function" then
+					pcall(Keylogger.set_options, { encrypt = state.keylogger_encrypt })
 				end
-				if type(Keylogger.set_disabled_apps) == "function" then
-					Keylogger.set_disabled_apps(state.keylogger_disabled_apps or {})
-				end
-
-				Keylogger.start(script_control)
-
-				if type(WpmMenubar.set_use_source_colors) == "function" then
-					WpmMenubar.set_use_source_colors(state.keylogger_menubar_colors)
-				end
-				if type(WpmWidget.set_use_source_colors) == "function" then
-					WpmWidget.set_use_source_colors(state.keylogger_float_colors)
+				if Keylogger and type(Keylogger.set_disabled_apps) == "function" then
+					pcall(Keylogger.set_disabled_apps, state.keylogger_disabled_apps or {})
 				end
 
-				if state.keylogger_menubar_wpm then WpmMenubar.start() end
-				if state.keylogger_float_wpm then WpmWidget.start(state.keylogger_float_graph) end
+				if Keylogger and type(Keylogger.start) == "function" then
+					pcall(Keylogger.start, script_control)
+				end
+
+				if WpmMenubar and type(WpmMenubar.set_use_source_colors) == "function" then
+					pcall(WpmMenubar.set_use_source_colors, state.keylogger_menubar_colors)
+				end
+				if WpmWidget and type(WpmWidget.set_use_source_colors) == "function" then
+					pcall(WpmWidget.set_use_source_colors, state.keylogger_float_colors)
+				end
+
+				if state.keylogger_menubar_wpm and WpmMenubar and type(WpmMenubar.start) == "function" then pcall(WpmMenubar.start) end
+				if state.keylogger_float_wpm and WpmWidget and type(WpmWidget.start) == "function" then pcall(WpmWidget.start, state.keylogger_float_graph) end
 			else
-				Keylogger.stop()
-				WpmMenubar.stop()
-				WpmWidget.stop()
+				if Keylogger and type(Keylogger.stop) == "function" then pcall(Keylogger.stop) end
+				if WpmMenubar and type(WpmMenubar.stop) == "function" then pcall(WpmMenubar.stop) end
+				if WpmWidget and type(WpmWidget.stop) == "function" then pcall(WpmWidget.stop) end
 			end
 
-			save_prefs()
 			updateMenu()
 		end,
 		menu = menu
