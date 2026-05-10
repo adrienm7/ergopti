@@ -74,7 +74,7 @@ function M.build(ctx)
 			local new_state = not state.gestures
 			if new_state then
 				-- Show warning when activating gestures
-				local warnMsg = "⚠️  Attention : L'activation des gestes trackpad peut interférer avec vos gestes macOS.\n\nPour éviter les conflits, supprimez ou désactivez les options macOS suivantes :\n\n• Gestes trackpad 3 doigts pour bouger les fenêtres\n• Gestes trackpad 3 doigts pour la sélection\n• Tap 3 doigts pour dictionnaire\n• Swipe 3 doigts horizontal/vertical pour spaces et mission control\n• Swipe 4 doigts horizontal/vertical pour spaces et mission control\n• App Exposé (si utilisé via gestes)"
+				local warnMsg = "⚠️ Attention : L'activation des gestes trackpad peut interférer avec les gestes système.\n\nPour éviter les conflits, désactiver les options macOS suivantes :\n\n• Gestes trackpad 3 doigts pour bouger les fenêtres et la sélection\n• Tap 3 doigts pour chercher le mot dans le dictionnaire\n• Swipe 3 doigts horizontal/vertical pour changer de spaces, activer App Exposé ou Mission Control\n• Swipe 4 doigts horizontal/vertical pour changer de spaces, activer App Exposé ou Mission Control\n\nIl est important de désactiver les gestes système utilisant 4 doigts afin de pouvoir définir des gestes à 5 doigts. Autrement, macOS ne ferait pas de distinction entre les deux et empêcherait les gestes à 5 doigts de fonctionner. C’est pourquoi les gestes à 4 doigts par défaut son redéfinis dans le module Gestes pour retrouver les fonctions système sans conflit avec les gestes à 5 doigts."
 				local res = dialog.block_alert("Avertissement Gestes", warnMsg, "Activer", "Annuler", "warning")
 				if res ~= "Activer" then return end
 			end

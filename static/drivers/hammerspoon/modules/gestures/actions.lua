@@ -379,52 +379,14 @@ end
 --- Cycles through macOS Spaces.
 --- @param goNext boolean True to navigate forward, false to navigate backward.
 local function spaceNav(goNext)
-	local ok, spaces = pcall(function() return require("hs.spaces") end)
-	if ok and type(spaces) == "table" then
-		local screen = hs.screen.mainScreen()
-		local uuid = screen and screen:getUUID()
-		
-		if uuid then
-			local ok_all, all = pcall(function() return spaces.allSpaces() end)
-			if ok_all and type(all) == "table" and all[uuid] and #all[uuid] > 0 then
-				local sps = all[uuid]
-				local active = nil
-				
-				if type(spaces.activeSpace) == "function" then
-					pcall(function() active = spaces.activeSpace() end)
-				else
-					local fw = hs.window.frontmostWindow()
-					if fw and type(spaces.windowSpaces) == "function" then
-						local okw, ws = pcall(function() return spaces.windowSpaces(fw) end)
-						if okw and type(ws) == "table" and #ws > 0 then active = ws[1] end
-					end
-				end
-				
-				if active then
-					local idx = nil
-					for i, id in ipairs(sps) do 
-						if tostring(id) == tostring(active) then idx = i; break end 
-					end
-					
-					if idx then
-						local total = #sps
-						-- Invert direction: goNext=true should move right, goNext=false should move left
-						-- Natural scroll and horizontal detection may invert the direction from swipe engine
-						local delta = goNext and -1 or 1
-						local newIdx = ((idx - 1 + delta) % total) + 1
-						pcall(function() hs.eventtap.keyStroke({"ctrl"}, tostring(newIdx), 0) end)
-						return
-					end
-				end
-			end
-		end
-	end
-	
-	-- Absolute fallback via AppleScript using raw keycodes (123=Left, 124=Right)
+	-- Use native Ctrl+Left/Right keycodes (123=Left, 124=Right) for reliable space navigation.
+	-- This is the only reliable method on macOS; Ctrl+1/2/3 do not change spaces.
+	Logger.debug(LOG, "Switching space (direction: %s)…", tostring(goNext))
 	pcall(hs.osascript.applescript, string.format(
 		"tell application \"System Events\" to key code %d using {control down}",
 		goNext and 124 or 123
 	))
+	Logger.info(LOG, "Space navigation executed (Ctrl+%s).", goNext and "Right" or "Left")
 end
 
 
