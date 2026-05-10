@@ -770,8 +770,23 @@ local function is_blocked_for_current_app()
 	if not front then return false end
 	local bid  = front:bundleID() or ""
 	local path = front:path() or ""
+	local name = (front:name() or ""):lower()
+
 	for _, app in ipairs(excluded_apps) do
-		if (app.bundleID and app.bundleID == bid) or (app.appPath and app.appPath == path) then
+		local has_path = type(app.appPath) == "string" and app.appPath ~= ""
+		local has_bid  = type(app.bundleID) == "string" and app.bundleID ~= ""
+		local configured_name = type(app.name) == "string" and app.name:lower() or ""
+		local same_name = (not has_path and not has_bid and configured_name ~= ""
+			and (configured_name == name
+			or name:find(configured_name, 1, true)
+			or configured_name:find(name, 1, true)))
+		local path_match = has_path and (app.appPath == path)
+		local bid_match  = (not has_path and has_bid and app.bundleID == bid)
+
+		if path_match
+			or bid_match
+			or same_name
+		then
 			Logger.debug(LOG, "App excluded: '%s' — LLM request skipped.", front:name() or bid)
 			return true
 		end

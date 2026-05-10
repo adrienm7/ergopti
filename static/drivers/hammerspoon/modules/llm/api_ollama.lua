@@ -9,6 +9,7 @@
 local M = {}
 local hs = hs
 local Logger  = require("lib.logger")
+local Notifications = require("lib.notifications")
 local Parser  = require("modules.llm.parser")
 local Profiles = require("modules.llm.profiles")
 local ApiCommon = require("modules.llm.api_common")
@@ -88,8 +89,12 @@ function M.warmup(model_name)
 		{ ["Content-Type"] = "application/json" },
 		function(status, _)
 			if status == 200 then
+				local became_ready = (_is_ready ~= true)
 				_is_ready = true
 				Logger.info(LOG, "Model '%s' warmed up — GPU cache ready.", model_name)
+				if became_ready then
+					Notifications.notify("LLM prêt (Ollama)", "Le serveur Ollama est prêt.", "success")
+				end
 			else
 				_is_ready = false
 				Logger.debug(LOG, "Warmup request returned %s — model may not be loaded yet.", tostring(status))
