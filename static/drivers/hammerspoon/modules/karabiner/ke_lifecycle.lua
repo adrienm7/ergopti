@@ -503,6 +503,7 @@ end
 ---                          rules when the daemon has been restarted by macOS.
 function M.prime_ke_for_session(callback, force)
 	callback = callback or function() end
+	Logger.trace(LOG, "prime_ke_for_session() called: force=%s, _prime_in_progress=%s", tostring(force), tostring(_prime_in_progress))
 	if _prime_in_progress then
 		Logger.debug(LOG, "Prime already in progress — callback queued.")
 		_prime_callbacks[#_prime_callbacks + 1] = callback
@@ -512,6 +513,8 @@ function M.prime_ke_for_session(callback, force)
 	_prime_callbacks[#_prime_callbacks + 1] = callback
 
 	local bridge_running = is_ipc_bridge_running()
+	Logger.trace(LOG, "Initial bridge check: bridge_running=%s, is_session_primed=%s, force=%s", 
+		tostring(bridge_running), tostring(M.is_session_primed()), tostring(force))
 	if not force and M.is_session_primed() and bridge_running then
 		Logger.debug(LOG, "KE bridge already primed for this boot session and bridge is alive — skipping.")
 		resolve_prime_callbacks(true)
@@ -569,11 +572,13 @@ function M.prime_ke_for_session(callback, force)
 	local headless_launch_attempts = 0
 	local function launch_headless_once()
 		if not file_exists(KE_CONSOLE_USER_SERVER_BIN) then
+			Logger.warn(LOG, "Headless bridge binary not found at '%s'", KE_CONSOLE_USER_SERVER_BIN)
 			return false
 		end
 		headless_launch_attempts = headless_launch_attempts + 1
 		Logger.trace(LOG, "Headless bridge launch requested (attempt %d)…", headless_launch_attempts)
-		hs.execute(KE_PRIME_HEADLESS_CMD)
+		local _, exec_ok = hs.execute(KE_PRIME_HEADLESS_CMD)
+		Logger.trace(LOG, "Headless launch command exit code: %s", tostring(exec_ok))
 		return true
 	end
 
@@ -588,7 +593,10 @@ function M.prime_ke_for_session(callback, force)
 	local attempts = 0
 	local function check_bridge()
 		attempts = attempts + 1
-		if is_ipc_bridge_running() then
+		Logger.trace(LOG, "Poll attempt %d: checking is_ipc_bridge_running()…", attempts)
+		local bridge_ok = is_ipc_bridge_running()
+		Logger.trace(LOG, "Poll attempt %d: is_ipc_bridge_running() = %s", attempts, tostring(bridge_ok))
+		if bridge_ok then
 			-- Suppress Dock-visible KE helpers spawned as side-effects of the bridge start.
 			pcall(function() hs.execute(KE_SUPPRESS_DOCK_HELPERS_CMD) end)
 			-- launchd can respawn UI agents; re-apply several times so no Dock icon settles.
@@ -625,8 +633,10 @@ function M.prime_ke_for_session(callback, force)
 			resolve_prime_callbacks(false)
 			return
 		end
+		Logger.trace(LOG, "Poll attempt %d: scheduling next poll in %.1f s…", attempts, PRIME_POLL_INTERVAL_SEC)
 		hs.timer.doAfter(PRIME_POLL_INTERVAL_SEC, check_bridge)
 	end
+	Logger.trace(LOG, "Scheduling initial bridge poll in %.1f s…", PRIME_POLL_INTERVAL_SEC)
 	hs.timer.doAfter(PRIME_POLL_INTERVAL_SEC, check_bridge)
 end
 
