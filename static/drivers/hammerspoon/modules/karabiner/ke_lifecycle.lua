@@ -556,7 +556,9 @@ function M.prime_ke_for_session(callback, force)
 	-- Disable window-state persistence so any GUI-fallback launch cannot
 	-- drag focus to whichever Space last hosted a KE window. Idempotent.
 	-- Cheap (~5 ms), so we do it inline rather than once at module load.
+	Logger.trace(LOG, "Executing KE persistence disable command…")
 	hs.execute(KE_PERSISTENCE_OFF_CMD .. " 2>/dev/null")
+	Logger.trace(LOG, "Executing KE re-enable user labels command…")
 	-- Self-heal any previously disabled launchd labels so quit/reload keeps
 	-- working even after older revisions that used launchctl disable.
 	hs.execute(KE_REENABLE_USER_LABELS_CMD)
@@ -593,7 +595,8 @@ function M.prime_ke_for_session(callback, force)
 	local attempts = 0
 	local function check_bridge()
 		attempts = attempts + 1
-		Logger.trace(LOG, "Poll attempt %d: checking is_ipc_bridge_running()…", attempts)
+		Logger.trace(LOG, "[check_bridge] Entered callback (attempt %d of max %d)", attempts, PRIME_POLL_MAX_ATTEMPTS)
+		Logger.trace(LOG, "[check_bridge] Calling is_ipc_bridge_running()…", attempts)
 		local bridge_ok = is_ipc_bridge_running()
 		Logger.trace(LOG, "Poll attempt %d: is_ipc_bridge_running() = %s", attempts, tostring(bridge_ok))
 		if bridge_ok then
@@ -634,10 +637,12 @@ function M.prime_ke_for_session(callback, force)
 			return
 		end
 		Logger.trace(LOG, "Poll attempt %d: scheduling next poll in %.1f s…", attempts, PRIME_POLL_INTERVAL_SEC)
-		hs.timer.doAfter(PRIME_POLL_INTERVAL_SEC, check_bridge)
+		local timer_handle = hs.timer.doAfter(PRIME_POLL_INTERVAL_SEC, check_bridge)
+		Logger.trace(LOG, "Timer scheduled: %s", tostring(timer_handle))
 	end
 	Logger.trace(LOG, "Scheduling initial bridge poll in %.1f s…", PRIME_POLL_INTERVAL_SEC)
-	hs.timer.doAfter(PRIME_POLL_INTERVAL_SEC, check_bridge)
+	local initial_timer_handle = hs.timer.doAfter(PRIME_POLL_INTERVAL_SEC, check_bridge)
+	Logger.trace(LOG, "Initial timer handle: %s", tostring(initial_timer_handle))
 end
 
 --- True only when the KE stack is fully operational AND the bridge has been
