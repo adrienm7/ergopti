@@ -255,8 +255,8 @@ local KE_GUI_CHECK_CMD = "/usr/bin/pgrep -fq '/Applications/Karabiner-Elements.a
 -- delay before checking, we poll every INTERVAL up to MAX_ATTEMPTS times
 -- so a fast daemon start resolves in ~300 ms instead of always waiting 2 s.
 local PRIME_POLL_INTERVAL_SEC = 0.3
-local PRIME_POLL_MAX_ATTEMPTS = 30  -- 9.0 s absolute maximum (non-blocking)
-local PRIME_FALLBACK_AFTER_ATTEMPTS = 10  -- 3.0 s before GUI fallback
+local PRIME_POLL_MAX_ATTEMPTS = 10  -- 3.0 s absolute maximum (synchronous blocking)
+local PRIME_FALLBACK_AFTER_ATTEMPTS = 6  -- 1.8 s before GUI fallback
 local PRIME_RETRY_HEADLESS_EVERY_ATTEMPTS = 4
 local PRIME_MAX_HEADLESS_ATTEMPTS = 3
 
@@ -503,7 +503,6 @@ end
 ---                          rules when the daemon has been restarted by macOS.
 function M.prime_ke_for_session(callback, force)
 	callback = callback or function() end
-	Logger.trace(LOG, "prime_ke_for_session() called: force=%s, _prime_in_progress=%s", tostring(force), tostring(_prime_in_progress))
 	if _prime_in_progress then
 		Logger.debug(LOG, "Prime already in progress — callback queued.")
 		_prime_callbacks[#_prime_callbacks + 1] = callback
@@ -513,8 +512,6 @@ function M.prime_ke_for_session(callback, force)
 	_prime_callbacks[#_prime_callbacks + 1] = callback
 
 	local bridge_running = is_ipc_bridge_running()
-	Logger.trace(LOG, "Initial bridge check: bridge_running=%s, is_session_primed=%s, force=%s", 
-		tostring(bridge_running), tostring(M.is_session_primed()), tostring(force))
 	if not force and M.is_session_primed() and bridge_running then
 		Logger.debug(LOG, "KE bridge already primed for this boot session and bridge is alive — skipping.")
 		resolve_prime_callbacks(true)
@@ -535,18 +532,18 @@ function M.prime_ke_for_session(callback, force)
 	end
 
 	if bridge_running and force then
-		Logger.info(LOG, "Bridge appears alive but force=true — waiting for pkill to settle before re-priming…")
-		-- Give pkill 150 ms to fully terminate the process so pgrep no longer sees it,
-		-- then proceed with a clean headless launch.
-		local pending_cb = _prime_callbacks
-		_prime_callbacks = {}
-		_prime_in_progress = false
-		hs.timer.doAfter(0.15, function()
-			M.prime_ke_for_session(function(ok)
-				for _, cb in ipairs(pending_cb) do pcall(cb, ok) end
-			end, false)
-		end)
-		return
+		Logger.info(LOG, "Bridge appears alive but force=true — waiting 200 ms for pkill to settle…")
+		-- Synchronous wait: pkill is async and the process may still be visible briefly
+		os.execute("sleep 0.2")
+		-- Re-check: if bridge is truly gone, proceed with headless launch below.
+		-- If still alive (pkill failed or process respawned), just mark primed.
+		if is_ipc_bridge_running() then
+			Logger.info(LOG, "Bridge still alive after pkill settle — marking primed.")
+			mark_session_primed()
+			_prime_in_progress = false
+			resolve_prime_callbacks(true)
+			return
+		end
 	end
 
 	if not force and M.is_session_primed() and not bridge_running then
@@ -555,10 +552,7 @@ function M.prime_ke_for_session(callback, force)
 
 	-- Disable window-state persistence so any GUI-fallback launch cannot
 	-- drag focus to whichever Space last hosted a KE window. Idempotent.
-	-- Cheap (~5 ms), so we do it inline rather than once at module load.
-	Logger.trace(LOG, "Executing KE persistence disable command…")
 	hs.execute(KE_PERSISTENCE_OFF_CMD .. " 2>/dev/null")
-	Logger.trace(LOG, "Executing KE re-enable user labels command…")
 	-- Self-heal any previously disabled launchd labels so quit/reload keeps
 	-- working even after older revisions that used launchctl disable.
 	hs.execute(KE_REENABLE_USER_LABELS_CMD)
@@ -574,13 +568,11 @@ function M.prime_ke_for_session(callback, force)
 	local headless_launch_attempts = 0
 	local function launch_headless_once()
 		if not file_exists(KE_CONSOLE_USER_SERVER_BIN) then
-			Logger.warn(LOG, "Headless bridge binary not found at '%s'", KE_CONSOLE_USER_SERVER_BIN)
+			Logger.warn(LOG, "Headless bridge binary not found at '%s'.", KE_CONSOLE_USER_SERVER_BIN)
 			return false
 		end
 		headless_launch_attempts = headless_launch_attempts + 1
-		Logger.trace(LOG, "Headless bridge launch requested (attempt %d)…", headless_launch_attempts)
-		local _, exec_ok = hs.execute(KE_PRIME_HEADLESS_CMD)
-		Logger.trace(LOG, "Headless launch command exit code: %s", tostring(exec_ok))
+		hs.execute(KE_PRIME_HEADLESS_CMD)
 		return true
 	end
 
@@ -590,59 +582,42 @@ function M.prime_ke_for_session(callback, force)
 		hs.execute(KE_PRIME_HEADLESS_FALLBACK_CMD)
 	end
 
-	-- Poll until the bridge process appears (or we exceed the deadline).
-	-- Polling avoids the fixed 2 s wait when the daemon starts quickly.
-	local attempts = 0
-	local function check_bridge()
-		attempts = attempts + 1
-		Logger.trace(LOG, "[check_bridge] Entered callback (attempt %d of max %d)", attempts, PRIME_POLL_MAX_ATTEMPTS)
-		Logger.trace(LOG, "[check_bridge] Calling is_ipc_bridge_running()…", attempts)
-		local bridge_ok = is_ipc_bridge_running()
-		Logger.trace(LOG, "Poll attempt %d: is_ipc_bridge_running() = %s", attempts, tostring(bridge_ok))
-		if bridge_ok then
-			-- Suppress Dock-visible KE helpers spawned as side-effects of the bridge start.
+	-- Synchronous polling: wait for the bridge to appear using os.execute("sleep")
+	-- instead of hs.timer.doAfter(). Timer callbacks do NOT fire during Hammerspoon
+	-- module initialization (the event loop is not yet running), so we must block.
+	-- This adds ~0.3-2 s to startup but guarantees Karabiner is primed.
+	for attempt = 1, PRIME_POLL_MAX_ATTEMPTS do
+		os.execute(string.format("sleep %.2f", PRIME_POLL_INTERVAL_SEC))
+		if is_ipc_bridge_running() then
+			-- Suppress Dock-visible KE helpers spawned as side-effects of the bridge start
 			pcall(function() hs.execute(KE_SUPPRESS_DOCK_HELPERS_CMD) end)
-			-- launchd can respawn UI agents; re-apply several times so no Dock icon settles.
-			for i = 1, DOCK_SUPPRESS_RETRY_COUNT do
-				hs.timer.doAfter(i * DOCK_SUPPRESS_RETRY_INTERVAL_SEC, function()
-					pcall(function() hs.execute(KE_SUPPRESS_DOCK_HELPERS_CMD) end)
-				end)
-			end
 			mark_session_primed()
 			mark_hs_owned_bridge()
 			_prime_in_progress = false
 			Logger.success(LOG, "KE bridge primed in %d poll(s) (~%.1f s).",
-				attempts, attempts * PRIME_POLL_INTERVAL_SEC)
+				attempt, attempt * PRIME_POLL_INTERVAL_SEC)
 			resolve_prime_callbacks(true)
 			return
 		end
 		if (not fallback_attempted)
 			and headless_launch_attempts > 0
 			and headless_launch_attempts < PRIME_MAX_HEADLESS_ATTEMPTS
-			and (attempts % PRIME_RETRY_HEADLESS_EVERY_ATTEMPTS == 0) then
-			Logger.warn(LOG, "Bridge still absent after %d poll(s) — retrying headless launch…", attempts)
+			and (attempt % PRIME_RETRY_HEADLESS_EVERY_ATTEMPTS == 0) then
+			Logger.warn(LOG, "Bridge still absent after %d poll(s) — retrying headless launch…", attempt)
 			launch_headless_once()
 		end
-		if (not fallback_attempted) and attempts >= PRIME_FALLBACK_AFTER_ATTEMPTS then
+		if (not fallback_attempted) and attempt >= PRIME_FALLBACK_AFTER_ATTEMPTS then
 			fallback_attempted = true
 			Logger.warn(LOG, "Primary headless launch still not visible — trying compatibility fallback…")
 			hs.execute(KE_PRIME_HEADLESS_FALLBACK_CMD)
 		end
-		if attempts >= PRIME_POLL_MAX_ATTEMPTS then
-			clear_hs_owned_bridge_marker()
-			_prime_in_progress = false
-			Logger.error(LOG, "KE bridge did not appear after %d polls (%.1f s) — config may not be applied.",
-				attempts, attempts * PRIME_POLL_INTERVAL_SEC)
-			resolve_prime_callbacks(false)
-			return
-		end
-		Logger.trace(LOG, "Poll attempt %d: scheduling next poll in %.1f s…", attempts, PRIME_POLL_INTERVAL_SEC)
-		local timer_handle = hs.timer.doAfter(PRIME_POLL_INTERVAL_SEC, check_bridge)
-		Logger.trace(LOG, "Timer scheduled: %s", tostring(timer_handle))
 	end
-	Logger.trace(LOG, "Scheduling initial bridge poll in %.1f s…", PRIME_POLL_INTERVAL_SEC)
-	local initial_timer_handle = hs.timer.doAfter(PRIME_POLL_INTERVAL_SEC, check_bridge)
-	Logger.trace(LOG, "Initial timer handle: %s", tostring(initial_timer_handle))
+	-- Timeout: bridge never appeared
+	clear_hs_owned_bridge_marker()
+	_prime_in_progress = false
+	Logger.error(LOG, "KE bridge did not appear after %d polls (%.1f s) — config may not be applied.",
+		PRIME_POLL_MAX_ATTEMPTS, PRIME_POLL_MAX_ATTEMPTS * PRIME_POLL_INTERVAL_SEC)
+	resolve_prime_callbacks(false)
 end
 
 --- True only when the KE stack is fully operational AND the bridge has been
