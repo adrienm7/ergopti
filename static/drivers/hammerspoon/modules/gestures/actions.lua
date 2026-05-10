@@ -28,6 +28,7 @@ local currentBundleID   = nil
 local previousBundleID  = nil
 local currentAppName    = nil
 local previousAppName   = nil
+local spacesModCache    = nil
 
 -- Delay after activation before reacting to rightMouseUp / leftMouseUp events.
 -- The gesture fires on finger-lift, which can generate a spurious mouseUp
@@ -349,6 +350,22 @@ local function sysKey(name)
 	end)
 end
 
+--- Returns the hs.spaces module with a one-time require cache.
+--- @return table|nil The hs.spaces module when available.
+local function get_spaces_module()
+	if spacesModCache == false then return nil end
+	if spacesModCache then return spacesModCache end
+
+	local ok_spaces, spaces = pcall(require, "hs.spaces")
+	if ok_spaces and type(spaces) == "table" then
+		spacesModCache = spaces
+		return spacesModCache
+	end
+
+	spacesModCache = false
+	return nil
+end
+
 --- Cycles through standard windows of the frontmost application.
 --- @param goNext boolean True to navigate forward, false to navigate backward.
 local function winNav(goNext)
@@ -379,14 +396,121 @@ end
 --- Cycles through macOS Spaces.
 --- @param goNext boolean True to navigate forward, false to navigate backward.
 local function spaceNav(goNext)
-	-- Use native Ctrl+Left/Right keycodes (123=Left, 124=Right) for reliable space navigation.
-	-- This is the only reliable method on macOS; Ctrl+1/2/3 do not change spaces.
-	Logger.debug(LOG, "Switching space (direction: %s)…", tostring(goNext))
-	pcall(hs.osascript.applescript, string.format(
-		"tell application \"System Events\" to key code %d using {control down}",
-		goNext and 124 or 123
-	))
-	Logger.info(LOG, "Space navigation executed (Ctrl+%s).", goNext and "Right" or "Left")
+	local function send_adjacent_space_switch(fallback_reason)
+		local key_code = goNext and 124 or 123
+		if fallback_reason then
+			Logger.warn(LOG, "Space state resolution failed (%s) — using animated adjacent switch.", fallback_reason)
+		end
+		Logger.debug(LOG, "Adjacent space switch via AppleScript Ctrl+Arrow (keycode=%d)…", key_code)
+		local ok_as, as_ok, as_result = pcall(hs.osascript.applescript, string.format(
+			"tell application \"System Events\" to key code %d using {control down}",
+			key_code
+		))
+		if ok_as and as_ok then
+			Logger.info(LOG, "Adjacent space switch executed via AppleScript (keycode=%d).", key_code)
+			return true
+		end
+
+		Logger.warn(LOG, "AppleScript adjacent switch failed (result=%s) — retrying with eventtap.", tostring(as_result))
+		local key = goNext and "right" or "left"
+		local ok_key, key_err = pcall(function()
+			hs.eventtap.keyStroke({"ctrl"}, key, 0)
+		end)
+		if not ok_key then
+			Logger.error(LOG, "Adjacent space switch failed via eventtap too: %s.", tostring(key_err))
+			return false
+		end
+		Logger.info(LOG, "Adjacent space switch executed via eventtap Ctrl+%s.", key)
+		return true
+	end
+
+	local function resolve_active_space(spaces_mod, screen_ref)
+		local resolved = nil
+		if type(spaces_mod.activeSpaceOnScreen) == "function" then
+			pcall(function() resolved = spaces_mod.activeSpaceOnScreen(screen_ref) end)
+		end
+		if not resolved and type(spaces_mod.activeSpace) == "function" then
+			pcall(function() resolved = spaces_mod.activeSpace() end)
+		end
+		if not resolved and type(spaces_mod.focusedSpace) == "function" then
+			pcall(function() resolved = spaces_mod.focusedSpace() end)
+		end
+		return resolved
+	end
+
+	local spaces = get_spaces_module()
+	if not spaces then
+		send_adjacent_space_switch("hs.spaces module unavailable")
+		return
+	end
+
+	local screen = hs.screen.mainScreen()
+	if not screen then
+		send_adjacent_space_switch("no main screen")
+		return
+	end
+
+	local uuid = screen:getUUID()
+	if not uuid then
+		send_adjacent_space_switch("screen UUID unavailable")
+		return
+	end
+
+	local ok_all, all_spaces = pcall(function() return spaces.allSpaces() end)
+	if not ok_all or type(all_spaces) ~= "table" then
+		send_adjacent_space_switch("failed to list spaces")
+		return
+	end
+
+	local screen_spaces = all_spaces[uuid]
+	if type(screen_spaces) ~= "table" or #screen_spaces <= 1 then
+		Logger.debug(LOG, "Space switch skipped: not enough spaces on current screen.")
+		return
+	end
+
+	local active_space = resolve_active_space(spaces, screen)
+	if not active_space then
+		send_adjacent_space_switch("active space unavailable")
+		return
+	end
+
+	local active_index = nil
+	for idx, sid in ipairs(screen_spaces) do
+		if tostring(sid) == tostring(active_space) then
+			active_index = idx
+			break
+		end
+	end
+	if not active_index then
+		send_adjacent_space_switch("active space not found in screen list")
+		return
+	end
+
+	local target_index = goNext and (active_index % #screen_spaces + 1) or ((active_index - 2) % #screen_spaces + 1)
+	local target_space = screen_spaces[target_index]
+	if not target_space then
+		send_adjacent_space_switch("computed target space is nil")
+		return
+	end
+
+	local wraps_forward = active_index == #screen_spaces and target_index == 1
+	local wraps_backward = active_index == 1 and target_index == #screen_spaces
+	local is_wrap_around = wraps_forward or wraps_backward
+
+	if is_wrap_around then
+		-- Preserve circular navigation (1↔n) only on edge transitions
+		Logger.debug(LOG, "Space wrap-around via gotoSpace (current=%s, target=%s)…", tostring(active_space), tostring(target_space))
+		local ok_goto, goto_result = pcall(function() return spaces.gotoSpace(target_space) end)
+		if not ok_goto then
+			Logger.error(LOG, "Space wrap-around failed: hs.spaces.gotoSpace errored.")
+			return
+		end
+		Logger.info(LOG, "Space wrap-around executed via hs.spaces.gotoSpace (result=%s).", tostring(goto_result))
+		return
+	end
+
+	-- Adjacent transitions must stay native and animated
+	send_adjacent_space_switch(nil)
 end
 
 
