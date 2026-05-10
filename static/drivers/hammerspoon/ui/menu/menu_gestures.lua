@@ -71,7 +71,14 @@ function M.build(ctx)
 		title   = "🖐️ Gestes",
 		checked = (state.gestures and not paused) or nil,
 		fn      = function()
-			state.gestures = not state.gestures
+			local new_state = not state.gestures
+			if new_state then
+				-- Show warning when activating gestures
+				local warnMsg = "⚠️  Attention : L'activation des gestes trackpad peut interférer avec vos gestes macOS.\n\nPour éviter les conflits, supprimez ou désactivez les options macOS suivantes :\n\n• Gestes trackpad 3 doigts pour bouger les fenêtres\n• Gestes trackpad 3 doigts pour la sélection\n• Tap 3 doigts pour dictionnaire\n• Swipe 3 doigts horizontal/vertical pour spaces et mission control\n• Swipe 4 doigts horizontal/vertical pour spaces et mission control\n• App Exposé (si utilisé via gestes)"
+				local res = dialog.block_alert("Avertissement Gestes", warnMsg, "Activer", "Annuler", "warning")
+				if res ~= "Activer" then return end
+			end
+			state.gestures = new_state
 			if gestures then
 				if state.gestures then 
 					if type(gestures.enable_all) == "function" then pcall(gestures.enable_all) end 

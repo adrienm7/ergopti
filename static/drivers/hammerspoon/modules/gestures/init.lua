@@ -45,10 +45,10 @@ M.DEFAULT_GESTURES = {
 	swipe_3_diag  = "none",
 	swipe_3_up    = "tab_new",
 	swipe_3_down  = "tab_close",
-	swipe_4_horiz = "none",
+	swipe_4_horiz = "spaces",
 	swipe_4_diag  = "none",
-	swipe_4_up    = "none",
-	swipe_4_down  = "none",
+	swipe_4_up    = "mission_control",
+	swipe_4_down  = "app_expose",
 	swipe_5_horiz = "windows",
 	swipe_5_diag  = "none",
 	swipe_5_up    = "doc_start",
@@ -56,7 +56,7 @@ M.DEFAULT_GESTURES = {
 }
 
 M.DEFAULT_STATE = {
-	gestures = true
+	gestures = false
 }
 
 M.AXIS_SLOTS = {

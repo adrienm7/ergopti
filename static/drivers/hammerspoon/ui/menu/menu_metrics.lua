@@ -544,8 +544,8 @@ function M.build(ctx)
 		checked = state.keylogger_enabled,
 		fn      = function()
 			if not state.keylogger_enabled then
-				local warnMsg = "ATTENTION : Vous êtes sur le point d’activer le keylogger.\n\nIl enregistre vos frappes au clavier à la milliseconde près.\nCes logs sont stockés dans le dossier Hammerspoon.\n\nBien que les champs de mots de passe soient ignorés automatiquement, il est recommandé de mettre le script en PAUSE lors de la saisie de données sensibles."
-				local res = dialog.block_alert("Avertissement de Sécurité", warnMsg, "Activer", "Annuler", "warning")
+			local warnMsg = "⚠️  ATTENTION : Métriques et keylogger vont être activés.\n\nCe système enregistre vos frappes au clavier et l'activation des gestes trackpad.\n\n• Les logs sont stockés dans le dossier Hammerspoon\n• Les champs de mots de passe sont ignorés automatiquement\n• Il est recommandé de mettre le script en PAUSE lors de la saisie de données sensibles\n\nPour éviter les interférences avec vos gestes personnalisés :\n• Supprimez les gestes macOS pour swipe 3/4 doigts si utilisés\n• Désactivez mission control et app exposé via gestes"
+			local res = dialog.block_alert("Avertissement Sécurité & Gestes", warnMsg, "Activer", "Annuler", "warning")
 				if res ~= "Activer" then return end
 			end
 
