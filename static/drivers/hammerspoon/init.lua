@@ -661,22 +661,17 @@ hs.shutdownCallback = function()
 		Logger.warn(LOG, "restore_all_overrides indisponible — arrêt sans restauration")
 	end
 	-- Stop Karabiner-Elements user-level helpers we spawned during priming.
-	-- Without this, Karabiner-Menu (the IPC bridge keeper) survives Hammerspoon
-	-- and the user's keyboard stays remapped even though HS is no longer
-	-- managing the config. The kill cmd bootouts launchd registrations first
-	-- (so KeepAlive=true plists do not respawn) then pkills any leftovers.
-	-- The system-level Core-Service and VirtualHIDDevice-Daemon remain alive
-	-- as they should — they are root-owned and harmless without an IPC bridge.
+	-- IMPORTANT: use KILL_FAST_CMD (synchronous plain pkill, ~50 ms) — NOT the
+	-- async total-reset script. run_total_reset_async() spawns a detached 5-second
+	-- kill loop that survives hs.reload(): the new session launches the bridge,
+	-- but the zombie kill script from the old session immediately terminates it,
+	-- causing 30 consecutive poll failures. KILL_FAST_CMD completes before HS
+	-- reloads so there is no race with the newly spawned bridge.
 	pcall(function()
-		local ok, karabiner = pcall(require, "modules.karabiner")
-		local ke_enabled = ok and karabiner and type(karabiner.get_enabled) == "function" and karabiner.get_enabled() or false
-		local _, has_user_ke = hs.execute("/usr/bin/pgrep -x karabiner_console_user_server >/dev/null 2>&1 || /usr/bin/pgrep -x karabiner_session_monitor >/dev/null 2>&1 || /usr/bin/pgrep -x Karabiner-NotificationWindow >/dev/null 2>&1")
-		if ke_enabled or has_user_ke == true then
-			local ok_l, kl = pcall(require, "modules.karabiner.ke_lifecycle")
-			if ok_l and kl and type(kl.run_total_reset_async) == "function" then
-				local out, ok_reset = kl.run_total_reset_async()
-				Logger.info(LOG, "Shutdown fallback KE total reset async: ok=%s out=%s.", tostring(ok_reset), tostring(out))
-			end
+		local ok_l, kl = pcall(require, "modules.karabiner.ke_lifecycle")
+		if ok_l and kl and kl.KILL_FAST_CMD then
+			hs.execute(kl.KILL_FAST_CMD)
+			Logger.info(LOG, "Shutdown KE fast kill done.")
 		end
 	end)
 	-- Terminate any running MLX server process so no orphaned Python process lingers

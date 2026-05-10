@@ -676,7 +676,7 @@ function M.warmup(model_name, profile)
 				Logger.warn(LOG, "MLX KV cache primed (profile: %s) — backend ready.",
 					(type(profile) == "table" and profile.id) or "default")
 				if became_ready then
-					Notifications.notify("LLM prêt (MLX)", "Le serveur MLX est prêt.", "success")
+					Notifications.notify("LLM actif", "Le serveur MLX est prêt.", "success")
 				end
 			else
 				_is_ready = false
