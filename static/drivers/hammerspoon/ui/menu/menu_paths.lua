@@ -205,11 +205,16 @@ function M.init(base_dir, reload_fn)
 	end
 	_base_dir  = base_dir
 	_reload_fn = reload_fn
-	ensure_dir(_default_config_dir)
 	ensure_dir(_base_dir)  -- Ensure the driver directory exists before loading paths.toml
 	load_bootstrap()
-	Logger.info(LOG, "Paths module initialized (base: '{1}', default config: '{2}').",
-		base_dir, _default_config_dir)
+	-- Only create the default fallback directory when no custom path is configured;
+	-- otherwise the user ends up with an unwanted ~/.config/ergopti_plus/ on every reload
+	local resolved = config_dir()
+	if resolved == _default_config_dir then
+		ensure_dir(_default_config_dir)
+	end
+	Logger.info(LOG, "Paths module initialized (base: '{1}', config: '{2}').",
+		base_dir, resolved)
 end
 
 --- Returns true if M.init() has already been called successfully.
