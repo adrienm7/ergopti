@@ -515,10 +515,31 @@ function M.prime_ke_for_session(callback, force)
 		return
 	end
 
-	if bridge_running then
+	-- When force=true (e.g. called after an explicit bridge kill in regenerate()),
+	-- do NOT treat a still-visible bridge as "already running": pkill is async and
+	-- the process may appear alive for tens of milliseconds after the signal.
+	-- Trusting it here would mark the session primed, return immediately, and leave
+	-- the bridge dead a moment later with no re-launch — the silent failure the user
+	-- sees as "Karabiner not started after reload".
+	if bridge_running and not force then
 		Logger.info(LOG, "KE IPC bridge already running (Menu or GUI) — recording marker.")
 		mark_session_primed()
 		resolve_prime_callbacks(true)
+		return
+	end
+
+	if bridge_running and force then
+		Logger.info(LOG, "Bridge appears alive but force=true — waiting for pkill to settle before re-priming…")
+		-- Give pkill 150 ms to fully terminate the process so pgrep no longer sees it,
+		-- then proceed with a clean headless launch.
+		local pending_cb = _prime_callbacks
+		_prime_callbacks = {}
+		_prime_in_progress = false
+		hs.timer.doAfter(0.15, function()
+			M.prime_ke_for_session(function(ok)
+				for _, cb in ipairs(pending_cb) do pcall(cb, ok) end
+			end, false)
+		end)
 		return
 	end
 

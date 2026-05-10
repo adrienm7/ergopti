@@ -458,8 +458,10 @@ function M.regenerate()
 		active_combos, #M.TAP_HOLD_KEYS)
 
 	-- Re-prime so Core-Service receives the newly written rules.
-	-- prime_ke_for_session polls until the daemon appears (up to 9.0 s total).
-	-- On rare slow boots we do one forced retry to avoid requiring manual start.
+	-- Always force=true after an explicit bridge kill: pkill is async and the
+	-- dying process can still be visible to pgrep for ~50-150 ms. Without force,
+	-- prime_ke_for_session would see it as "already running", mark the session
+	-- primed, and return — leaving the bridge dead a moment later with no relaunch.
 	KeLifecycle.prime_ke_for_session(function(ok)
 		if ok then
 			Logger.success(LOG, "Karabiner bridge primed after regeneration.")
@@ -475,7 +477,7 @@ function M.regenerate()
 				end, true)
 			end)
 		end
-	end)
+	end, true)  -- force=true: bridge was just killed, always re-launch regardless of pgrep state
 end
 
 --- Deploys an empty Karabiner config so remapping stops without killing any process.
