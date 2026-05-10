@@ -564,9 +564,11 @@ function M.init()
 		-- Hammerspoon is still in the module-loading phase and hs.timer.doAfter
 		-- callbacks are not yet being dispatched. Deferring ensures prime_ke_for_session's
 		-- polling timers will fire correctly when check_bridge() is scheduled.
-		hs.timer.doAfter(0.1, function()
+		local timer_handle = hs.timer.doAfter(0.1, function()
+			Logger.trace(LOG, "[DEFERRED TIMER FIRED] M.regenerate() starting…")
 			M.regenerate()
 		end)
+		Logger.trace(LOG, "[DEFERRED TIMER SCHEDULED] Timer handle: %s, will fire in 0.1s", tostring(timer_handle))
 	end
 
 	-- Persist immediately on first launch so the file exists for future runs
