@@ -32,6 +32,8 @@ local LOG = "karabiner"
 -- hs.hotkey accepts the macOS key name directly, derived here from the
 -- registry numeric keycode so the registry stays the canonical source.
 local KEYCODE_F17_NAME = Keycodes.to_name(Keycodes.F17_CYCLE_WINDOWS)
+local MOD_SHIFT = "shift"
+local MOD_ALT = "alt"
 
 local KARABINER_CLI = "/Library/Application Support/org.pqrs/Karabiner-Elements/bin/karabiner_cli"
 
@@ -62,6 +64,13 @@ local _capsword_last_check_s = 0
 
 -- Guard against spawning concurrent async checks while one is already in flight.
 local _capsword_check_pending = false
+
+-- App history cache for direct app-previous focus.
+local _current_bundle_id = nil
+local _previous_bundle_id = nil
+local _current_app_name = nil
+local _previous_app_name = nil
+local _app_switch_watcher = nil
 
 
 
@@ -259,6 +268,80 @@ local function cycle_windows_in_app()
 	visible[next_idx]:focus()
 end
 
+--- Starts app-activation tracking for direct previous-app switching.
+local function ensure_app_switch_watcher()
+	if _app_switch_watcher then return end
+
+	_app_switch_watcher = hs.application.watcher.new(function(_name, event_type, app)
+		if event_type ~= hs.application.watcher.activated then return end
+		if not app then return end
+
+		local bundle_id = app:bundleID()
+		local app_name = app:name()
+		if type(app_name) ~= "string" or app_name == "" then return end
+		if app_name == _current_app_name then return end
+
+		_previous_bundle_id = _current_bundle_id
+		_previous_app_name = _current_app_name
+		_current_bundle_id = bundle_id
+		_current_app_name = app_name
+	end)
+	_app_switch_watcher:start()
+
+	local front = hs.application.frontmostApplication()
+	if front then
+		_current_bundle_id = front:bundleID()
+		_current_app_name = front:name()
+	end
+end
+
+--- Focuses the globally previous standard window (MRU-2).
+local function focus_previous_window_global()
+	local wins = hs.window.orderedWindows()
+	if type(wins) ~= "table" or #wins <= 1 then return false end
+
+	local focused = hs.window.focusedWindow()
+	local focused_id = focused and focused:id() or nil
+
+	for _, w in ipairs(wins) do
+		local wid = w and w:id() or nil
+		if wid and (not focused_id or wid ~= focused_id)
+			and w:isStandard() and not w:isMinimized() then
+			w:focus()
+			return true
+		end
+	end
+
+	return false
+end
+
+--- Focuses the previously active application directly (no macOS switcher overlay).
+local function focus_previous_app_direct()
+	ensure_app_switch_watcher()
+
+	if type(_previous_bundle_id) == "string"
+		and _previous_bundle_id ~= ""
+		and type(hs.application.launchOrFocusByBundleID) == "function" then
+		local ok = pcall(hs.application.launchOrFocusByBundleID, _previous_bundle_id)
+		if ok then return true end
+	end
+
+	if type(_previous_app_name) == "string" and _previous_app_name ~= "" then
+		local ok = pcall(hs.application.launchOrFocus, _previous_app_name)
+		if ok then return true end
+	end
+
+	if type(_previous_bundle_id) == "string" and _previous_bundle_id ~= "" then
+		local target = hs.application.get(_previous_bundle_id)
+		if target then
+			target:activate()
+			return true
+		end
+	end
+
+	return false
+end
+
 --- Registers a global hotkey on F17 that cycles windows within the frontmost app.
 --- F17 is sent by the 'cycle_windows_in_app' Karabiner action, making the shortcut
 --- layout-independent — no dependency on the macOS Cmd+` binding, which is
@@ -272,6 +355,45 @@ function M.start_cycle_windows_hotkey()
 	hotkey:enable()
 	Logger.done(LOG, "Cycle-windows hotkey registered.")
 	return hotkey
+end
+
+--- Registers Shift+F17 as "global previous window".
+--- @return hs.hotkey
+function M.start_alt_tab_windows_hotkey()
+	Logger.trace(LOG, "Registering Alt+Tab windows hotkey (Shift+F17)…")
+	local hotkey = hs.hotkey.new({ MOD_SHIFT }, KEYCODE_F17_NAME, function()
+		local ok = pcall(focus_previous_window_global)
+		if not ok then
+			Logger.warn(LOG, "Shift+F17 callback failed while focusing previous window.")
+		end
+	end)
+	hotkey:enable()
+	Logger.done(LOG, "Alt+Tab windows hotkey registered.")
+	return hotkey
+end
+
+--- Registers Option+F17 as "direct previous app".
+--- @return hs.hotkey
+function M.start_alt_tab_apps_hotkey()
+	ensure_app_switch_watcher()
+	Logger.trace(LOG, "Registering Alt+Tab apps hotkey (Option+F17)…")
+	local hotkey = hs.hotkey.new({ MOD_ALT }, KEYCODE_F17_NAME, function()
+		local ok, switched = pcall(focus_previous_app_direct)
+		if not ok or not switched then
+			Logger.warn(LOG, "Option+F17 could not focus previous app.")
+		end
+	end)
+	hotkey:enable()
+	Logger.done(LOG, "Alt+Tab apps hotkey registered.")
+	return hotkey
+end
+
+--- Stops the internal app-switch watcher used by Alt+Tab app-previous.
+function M.stop_alt_tab_apps_tracker()
+	if _app_switch_watcher then
+		pcall(function() _app_switch_watcher:stop() end)
+		_app_switch_watcher = nil
+	end
 end
 
 return M

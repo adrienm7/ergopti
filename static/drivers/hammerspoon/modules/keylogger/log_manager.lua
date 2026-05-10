@@ -1352,6 +1352,10 @@ local function _sq(s)
 	return "'" .. tostring(s):gsub("'", "''") .. "'"
 end
 
+local function _i(n)
+	return math.floor(tonumber(n) or 0)
+end
+
 local function _flush_agg_batches()
 	if not _db then return end
 	local d = _sq(_device_id)
@@ -1375,10 +1379,10 @@ local function _flush_agg_batches()
 			.. "llm_input_chars=llm_input_chars+excluded.llm_input_chars,"
 			.. "category=COALESCE(agg_app_day.category, excluded.category)",
 			d, _sq(row.date), _sq(row.app),
-			row.chars or 0, row.pauses or 0, row.time_ms or 0, row.think_time_ms or 0,
-			row.hs_chars or 0, row.llm_chars or 0,
-			row.hs_triggers or 0, row.llm_triggers or 0,
-			row.hs_input_chars or 0, row.llm_input_chars or 0,
+			_i(row.chars), _i(row.pauses), _i(row.time_ms), _i(row.think_time_ms),
+			_i(row.hs_chars), _i(row.llm_chars),
+			_i(row.hs_triggers), _i(row.llm_triggers),
+			_i(row.hs_input_chars), _i(row.llm_input_chars),
 			_sq(cat)))
 	end
 
@@ -1390,7 +1394,7 @@ local function _flush_agg_batches()
 			.. "ON CONFLICT(device_id, date, app) DO UPDATE SET "
 			.. "app_time_ms=app_time_ms+excluded.app_time_ms,"
 			.. "category=COALESCE(agg_app_day.category, excluded.category)",
-			d, _sq(row.date), _sq(row.app), row.ms or 0, _sq(cat)))
+			d, _sq(row.date), _sq(row.app), _i(row.ms), _sq(cat)))
 	end
 
 	-- agg_app_day_buckets.
@@ -1404,10 +1408,10 @@ local function _flush_agg_batches()
 			.. "hs_input_credited=hs_input_credited+excluded.hs_input_credited,"
 			.. "llm_input_time_sum=llm_input_time_sum+excluded.llm_input_time_sum,"
 			.. "llm_input_credited=llm_input_credited+excluded.llm_input_credited",
-			d, _sq(row.date), _sq(row.app), row.bucket_ms,
-			row.time_sum or 0, row.credited or 0,
-			row.hs_in_t or 0, row.hs_in_c or 0,
-			row.llm_in_t or 0, row.llm_in_c or 0))
+			d, _sq(row.date), _sq(row.app), _i(row.bucket_ms),
+			_i(row.time_sum), _i(row.credited),
+			_i(row.hs_in_t), _i(row.hs_in_c),
+			_i(row.llm_in_t), _i(row.llm_in_c)))
 	end
 
 	-- N-grams (chars / bigrams / … / words / word_bigrams).
@@ -1426,7 +1430,7 @@ local function _flush_agg_batches()
 				.. "c=c+excluded.c, td=td+excluded.td, cd=cd+excluded.cd, e=e+excluded.e, "
 				.. "esrc_json=excluded.esrc_json",
 				tbl_name, d, _sq(date_str), _sq(app), _sq(token),
-				item.c or 0, item.td or 0, item.cd or 0, item.e or 0,
+				_i(item.c), _i(item.td), _i(item.cd), _i(item.e),
 				_json_lit(item.esrc)))
 		end
 	end
@@ -1436,7 +1440,7 @@ local function _flush_agg_batches()
 		_exec(string.format(
 			"INSERT INTO ngram_keycodes (device_id, date, app, keycode, c) VALUES (%s,%s,%s,%d,%d) "
 			.. "ON CONFLICT(device_id, date, app, keycode) DO UPDATE SET c=c+excluded.c",
-			d, _sq(row.date), _sq(row.app), row.keycode, row.count or 0))
+			d, _sq(row.date), _sq(row.app), _i(row.keycode), _i(row.count)))
 	end
 
 	-- ngram_shortcuts / ngram_shortcut_bigrams.
@@ -1445,7 +1449,7 @@ local function _flush_agg_batches()
 			_exec(string.format(
 				"INSERT INTO %s (device_id, date, app, token, c) VALUES (%s,%s,%s,%s,%d) "
 				.. "ON CONFLICT(device_id, date, app, token) DO UPDATE SET c=c+excluded.c",
-				tbl_name, d, _sq(row.date), _sq(row.app), _sq(row.token), row.count or 0))
+				tbl_name, d, _sq(row.date), _sq(row.app), _sq(row.token), _i(row.count)))
 		end
 	end
 
@@ -1459,8 +1463,8 @@ local function _flush_agg_batches()
 			.. "max_ms=MAX(max_ms, excluded.max_ms),"
 			.. "tap_count=tap_count+excluded.tap_count,"
 			.. "hold_count=hold_count+excluded.hold_count",
-			d, _sq(row.date), _sq(row.app), row.keycode,
-			row.sum_ms, row.count, row.max_ms, row.tap_count, row.hold_count))
+			d, _sq(row.date), _sq(row.app), _i(row.keycode),
+			_i(row.sum_ms), _i(row.count), _i(row.max_ms), _i(row.tap_count), _i(row.hold_count)))
 	end
 
 	-- agg_app_day_titles.
@@ -1469,7 +1473,7 @@ local function _flush_agg_batches()
 			"INSERT INTO agg_app_day_titles (device_id, date, app, title, c, ms) VALUES (%s,%s,%s,%s,%d,%d) "
 			.. "ON CONFLICT(device_id, date, app, title) DO UPDATE SET "
 			.. "c=c+excluded.c, ms=ms+excluded.ms",
-			d, _sq(row.date), _sq(row.app), _sq(row.title), row.c or 0, row.ms or 0))
+			d, _sq(row.date), _sq(row.app), _sq(row.title), _i(row.c), _i(row.ms)))
 	end
 	-- Trim titles past cap.
 	for key, _ in pairs(_agg_batch.titles) do
@@ -1493,7 +1497,7 @@ local function _flush_agg_batches()
 			.. "c=c+excluded.c, e=e+excluded.e, em=em+excluded.em, es=es+excluded.es, "
 			.. "e_buckets_json=excluded.e_buckets_json",
 			d, _sq(row.date), _sq(row.app), _sq(row.hour),
-			row.c, row.e, row.em, row.es, _json_lit(row.e_buckets)))
+			_i(row.c), _i(row.e), _i(row.em), _i(row.es), _json_lit(row.e_buckets)))
 	end
 
 	-- agg_app_day_hourly_min5.
@@ -1504,7 +1508,7 @@ local function _flush_agg_batches()
 			.. "c=c+excluded.c, e=e+excluded.e, es=es+excluded.es, "
 			.. "e_buckets_json=excluded.e_buckets_json",
 			d, _sq(row.date), _sq(row.app), _sq(row.slot),
-			row.c, row.e, row.es, _json_lit(row.e_buckets)))
+			_i(row.c), _i(row.e), _i(row.es), _json_lit(row.e_buckets)))
 	end
 
 	-- agg_app_day_layouts.
@@ -1512,7 +1516,7 @@ local function _flush_agg_batches()
 		_exec(string.format(
 			"INSERT INTO agg_app_day_layouts (device_id, date, app, layout, count) VALUES (%s,%s,%s,%s,%d) "
 			.. "ON CONFLICT(device_id, date, app, layout) DO UPDATE SET count=count+excluded.count",
-			d, _sq(row.date), _sq(row.app), _sq(row.layout), row.count))
+			d, _sq(row.date), _sq(row.app), _sq(row.layout), _i(row.count)))
 	end
 
 	-- agg_app_day_chars_class.
@@ -1528,7 +1532,7 @@ local function _flush_agg_batches()
 			.. "first_typed_min=COALESCE(agg_app_day_chars_class.first_typed_min, excluded.first_typed_min),"
 			.. "last_typed_min=COALESCE(excluded.last_typed_min, agg_app_day_chars_class.last_typed_min)",
 			d, _sq(row.date), _sq(row.app),
-			row.letter, row.digit, row.punct, row.space, row.other,
+			_i(row.letter), _i(row.digit), _i(row.punct), _i(row.space), _i(row.other),
 			row.first_typed_min and _sq(row.first_typed_min) or "NULL",
 			row.last_typed_min  and _sq(row.last_typed_min)  or "NULL"))
 	end
@@ -1544,8 +1548,8 @@ local function _flush_agg_batches()
 			.. "recovery_sum_ms=recovery_sum_ms+excluded.recovery_sum_ms,"
 			.. "recovery_count=recovery_count+excluded.recovery_count",
 			d, _sq(row.date), _sq(row.app),
-			row.bs_total, row.cascade_count, row.cascade_max_len,
-			row.recovery_sum_ms, row.recovery_count))
+			_i(row.bs_total), _i(row.cascade_count), _i(row.cascade_max_len),
+			_i(row.recovery_sum_ms), _i(row.recovery_count)))
 	end
 
 	-- agg_app_day_ergo.
@@ -1557,7 +1561,7 @@ local function _flush_agg_batches()
 			.. "same_hand_streak_max=MAX(same_hand_streak_max, excluded.same_hand_streak_max),"
 			.. "auto_repeat_count=auto_repeat_count+excluded.auto_repeat_count",
 			d, _sq(row.date), _sq(row.app),
-			row.same_finger_streak_max, row.same_hand_streak_max, row.auto_repeat_count))
+			_i(row.same_finger_streak_max), _i(row.same_hand_streak_max), _i(row.auto_repeat_count)))
 	end
 
 	-- agg_app_day_burst.
@@ -1573,9 +1577,9 @@ local function _flush_agg_batches()
 			.. "inter_delay_sum=inter_delay_sum+excluded.inter_delay_sum,"
 			.. "inter_delay_sumsq=inter_delay_sumsq+excluded.inter_delay_sumsq",
 			d, _sq(row.date), _sq(row.app),
-			row.count_total, row.max_cpm, row.max_chars,
+			_i(row.count_total), row.max_cpm, _i(row.max_chars),
 			_json_lit(row.length_buckets),
-			row.inter_count, row.inter_sum, row.inter_sumsq))
+			_i(row.inter_count), _i(row.inter_sum), _i(row.inter_sumsq)))
 	end
 
 	-- agg_app_day_session.
@@ -1589,7 +1593,7 @@ local function _flush_agg_batches()
 			.. "total_active_ms=total_active_ms+excluded.total_active_ms,"
 			.. "durations_json=excluded.durations_json",
 			d, _sq(row.date), _sq(row.app),
-			row.count_total, row.longest_ms, row.longest_chars, row.total_active_ms,
+			_i(row.count_total), _i(row.longest_ms), _i(row.longest_chars), _i(row.total_active_ms),
 			_json_lit(row.durations)))
 	end
 
@@ -1598,7 +1602,7 @@ local function _flush_agg_batches()
 		_exec(string.format(
 			"INSERT INTO agg_app_day_switches_to (device_id, date, app_from, app_to, count) VALUES (%s,%s,%s,%s,%d) "
 			.. "ON CONFLICT(device_id, date, app_from, app_to) DO UPDATE SET count=count+excluded.count",
-			d, _sq(row.date), _sq(row.app_from), _sq(row.app_to), row.count))
+			d, _sq(row.date), _sq(row.app_from), _sq(row.app_to), _i(row.count)))
 	end
 
 	-- agg_system_day.
@@ -1614,9 +1618,9 @@ local function _flush_agg_batches()
 			.. "awake_ms=awake_ms+excluded.awake_ms,"
 			.. "passive_count=passive_count+excluded.passive_count,"
 			.. "night_wake_count=night_wake_count+excluded.night_wake_count",
-			d, _sq(row.date), row.wifi_changes, row.space_switches,
-			row.audio_muted_ms, row.locked_ms, row.sleep_ms, row.awake_ms,
-			row.passive_count, row.night_wake_count))
+			d, _sq(row.date), _i(row.wifi_changes), _i(row.space_switches),
+			_i(row.audio_muted_ms), _i(row.locked_ms), _i(row.sleep_ms), _i(row.awake_ms),
+			_i(row.passive_count), _i(row.night_wake_count)))
 	end
 
 	_reset_batch()

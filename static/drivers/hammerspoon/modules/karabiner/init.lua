@@ -538,6 +538,12 @@ function M.init()
 
 	local first_launch = io.open(resolve_user_config(), "r") == nil
 	local user_cfg     = Config.load_user_config(M.TAP_HOLD_KEYS, M.MOD_COMBOS, resolve_user_config())
+	local tab_cfg      = user_cfg.tap_hold_config and user_cfg.tap_hold_config.tab
+	if type(tab_cfg) == "table" and tab_cfg.tap == "cmd_tab" then
+		tab_cfg.tap = "alt_tab_windows"
+		Config.save_user_config(user_cfg, resolve_user_config())
+		Logger.info(LOG, "Migrated tab.tap: 'cmd_tab' → 'alt_tab_windows'.")
+	end
 
 	_state = {
 		enabled                   = user_cfg.enabled,
@@ -549,6 +555,8 @@ function M.init()
 		combo_symmetric           = user_cfg.combo_symmetric,
 		watcher                   = nil,
 		hotkey_cycle_windows      = nil,
+		hotkey_alt_tab_windows    = nil,
+		hotkey_alt_tab_apps       = nil,
 	}
 
 	-- Propagate the tap/hold config to the KE physical-kc bridge so it knows
@@ -574,6 +582,8 @@ function M.init()
 
 	_state.watcher              = Watchers.start_gesture_watcher()
 	_state.hotkey_cycle_windows = Watchers.start_cycle_windows_hotkey()
+	_state.hotkey_alt_tab_windows = Watchers.start_alt_tab_windows_hotkey()
+	_state.hotkey_alt_tab_apps = Watchers.start_alt_tab_apps_hotkey()
 
 	Watchers.start_input_source_watcher(function(layout_name)
 		Logger.start(LOG, "Layout change detected — refreshing actions for layout '%s'…", layout_name)
@@ -631,6 +641,17 @@ function M.stop()
 	if _state.hotkey_cycle_windows then
 		pcall(function() _state.hotkey_cycle_windows:disable() end)
 		_state.hotkey_cycle_windows = nil
+	end
+	if _state.hotkey_alt_tab_windows then
+		pcall(function() _state.hotkey_alt_tab_windows:disable() end)
+		_state.hotkey_alt_tab_windows = nil
+	end
+	if _state.hotkey_alt_tab_apps then
+		pcall(function() _state.hotkey_alt_tab_apps:disable() end)
+		_state.hotkey_alt_tab_apps = nil
+	end
+	if type(Watchers.stop_alt_tab_apps_tracker) == "function" then
+		Watchers.stop_alt_tab_apps_tracker()
 	end
 	Watchers.stop_input_source_watcher()
 	Logger.success(LOG, "Karabiner bridge stopped.")
