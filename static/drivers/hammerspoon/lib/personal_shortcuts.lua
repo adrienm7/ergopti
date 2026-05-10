@@ -77,17 +77,11 @@ local TEMPLATE = [[
 -- =========================================
 -- =========================================
 
---- Resolve the absolute path. MenuPaths.get returns "" when the key is
---- unknown; we fall back to ~/.config/ergopti_plus/personal_shortcuts.lua
---- to keep the loader working before MenuPaths.init() has run (defensive).
+--- Resolve the absolute path via the central menu_paths module.
+--- No local fallback — menu_paths handles defaults internally.
 local function resolve_path()
-	local ok, MenuPaths = pcall(require, "ui.menu.menu_paths")
-	if ok and type(MenuPaths.is_initialized) == "function" and MenuPaths.is_initialized() then
-		local p = MenuPaths.get("PersonalShortcutsLuaPath")
-		if type(p) == "string" and p ~= "" then return p end
-	end
-	local home = os.getenv("HOME") or ""
-	return home .. "/.config/ergopti_plus/personal_shortcuts.lua"
+	local MenuPaths = require("ui.menu.menu_paths")
+	return MenuPaths.get("PersonalShortcutsLuaPath")
 end
 
 

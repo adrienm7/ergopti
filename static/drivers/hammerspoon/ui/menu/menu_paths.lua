@@ -34,7 +34,10 @@ local CONFIG_DIR_KEY = "ConfigDirPath"
 local _src       = debug.getinfo(1, "S").source:sub(2)
 local ASSETS_DIR = (_src:match("^(.*[/\\])") or "./"):gsub("menu[/\\]$", "") .. "paths_editor/"
 
-local _base_dir  = nil  -- driver root (where paths.toml lives — gitignored)
+-- Driver root (where paths.toml lives) — derived at module-load time from
+-- this file's own path so that get_config_dir() can read paths.toml even
+-- before M.init() has been called. M.init() may override this later.
+local _base_dir  = (_src:match("^(.*[/\\])") or "./"):gsub("ui[/\\]menu[/\\]$", "")
 -- Default user config dir is computed at module-load time, not in M.init(), so
 -- that get_config_dir() always returns a usable absolute path even when
 -- consumers (e.g. keylogger.init module-load IIFE) require this module before
@@ -48,7 +51,7 @@ local _default_config_dir = (function()
 	return ""
 end)()
 local _reload_fn = nil
-local _bootstrap = {}   -- in-memory cache: { ConfigDirPath = "..." } or {}
+local _bootstrap = nil   -- in-memory cache: { ConfigDirPath = "..." } or {}; nil = not yet loaded
 
 -- WebView state (singleton)
 local _webview     = nil
@@ -71,8 +74,26 @@ end
 
 --- Returns the resolved config directory (with trailing slash).
 --- Falls back to ~/.config/ergopti_plus/ when no override is set.
+--- Lazy-loads paths.toml on first call so that modules requiring this
+--- module before M.init() still get the user-configured path.
 --- @return string
 local function config_dir()
+	-- Lazy-load: read paths.toml once if _bootstrap has never been populated
+	if _bootstrap == nil then
+		_bootstrap = {}
+		local fh = io.open((_base_dir or "") .. PATHS_FILENAME, "r")
+		if fh then
+			local raw = fh:read("*a")
+			fh:close()
+			for line in raw:gmatch("[^\r\n]+") do
+				local trimmed = line:match("^%s*(.-)%s*$")
+				if trimmed ~= "" and trimmed:sub(1, 1) ~= "#" then
+					local key, val = trimmed:match('^(%S+)%s*=%s*"(.*)"$')
+					if key and val then _bootstrap[key] = val end
+				end
+			end
+		end
+	end
 	local v = _bootstrap[CONFIG_DIR_KEY]
 	if type(v) == "string" and v ~= "" then return v end
 	return _default_config_dir or _base_dir or ""

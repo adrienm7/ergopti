@@ -30,23 +30,13 @@ local LOG    = "keylogger.kc_bridge"
 
 -- Absolute path to the hand-off log file written by KE shell_command actions.
 -- Must match the KE_PHYSICAL_KC_LOG constant in modules/karabiner/generator.lua.
+-- Resolved via the central menu_paths module — no local fallback.
 local KC_LOG_PATH
 do
-	local ok, mp = pcall(require, "ui.menu.menu_paths")
-	if ok and mp and type(mp.get_config_dir) == "function" then
-		local d = mp.get_config_dir()
-		if type(d) == "string" and d ~= "" then
-			if not d:match("[/\\]$") then d = d .. "/" end
-			KC_LOG_PATH = d .. "metrics/karabiner_kc.log"
-		end
-	end
-	-- Fallback uses ~/.config/ergopti_plus/ rather than hs.configdir: the latter
-	-- can point at the source tree on a dev setup, and persistence files must
-	-- never land there.
-	if not KC_LOG_PATH then
-		local home = os.getenv("HOME") or ""
-		KC_LOG_PATH = home .. "/.config/ergopti_plus/metrics/karabiner_kc.log"
-	end
+	local mp = require("ui.menu.menu_paths")
+	local d  = mp.get_config_dir()
+	if not d:match("[/\\]$") then d = d .. "/" end
+	KC_LOG_PATH = d .. "metrics/karabiner_kc.log"
 end
 
 -- Maximum lines drained per watcher callback to avoid monopolising the run loop

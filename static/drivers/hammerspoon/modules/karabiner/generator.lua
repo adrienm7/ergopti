@@ -109,16 +109,11 @@ local LAYER_NAV_SENTINEL_NAME  = Keycodes.to_name(Keycodes.F20_LAYER_NAV_ENTERED
 -- pointing ConfigDirPath elsewhere; bridge reader resolves the same path.
 local KE_PHYSICAL_KC_LOG
 do
-	local ok, mp = pcall(require, "ui.menu.menu_paths")
-	if ok and mp and type(mp.get_config_dir) == "function" then
-		local d = mp.get_config_dir()
-		if type(d) == "string" and d ~= "" then
-			if not d:match("[/\\]$") then d = d .. "/" end
-			KE_PHYSICAL_KC_LOG = d .. "metrics/karabiner_kc.log"
-		end
-	end
-	KE_PHYSICAL_KC_LOG = KE_PHYSICAL_KC_LOG or (hs.configdir .. "/metrics/karabiner_kc.log")
-	-- Ensure the parent dir exists before Karabiner attempts shell-redirect.
+	local mp = require("ui.menu.menu_paths")
+	local d  = mp.get_config_dir()
+	if not d:match("[/\\]$") then d = d .. "/" end
+	KE_PHYSICAL_KC_LOG = d .. "metrics/karabiner_kc.log"
+	-- Ensure the parent dir exists before Karabiner attempts shell-redirect
 	pcall(hs.execute, string.format("mkdir -p %q", KE_PHYSICAL_KC_LOG:match("^(.*)/[^/]+$") or ""))
 end
 
