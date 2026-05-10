@@ -30,8 +30,12 @@ local _actions = nil
 -- =========================================
 -- =========================================
 
-local TAP_MAX_SEC    = 0.50   -- Capture slightly slow multi-finger taps
-local TAP_MAX_DELTA  = 5.0    -- Involuntary drift during a tap
+local TAP_MAX_SEC    = 0.70   -- Capture slightly slow multi-finger taps
+-- Minimum centroid displacement (Manhattan distance) to confirm a swipe on commit.
+-- Intentionally larger than SWIPE_MIN so brief frémissements during a tap that
+-- were enough to lock a direction during live tracking are not misclassified as
+-- swipes when fingers lift.
+local TAP_MAX_DELTA  = 8.0    -- Units below which a gesture is always treated as a tap on commit
 local SWIPE_MIN      = 1.5    -- 3/4/5 fingers: minimum distance to validate a swipe
 local SWIPE_MIN_2    = 3.0    -- 2 fingers horiz/vert (left to macOS, diagonal only)
 local DIAG_MIN_2     = 5.0    -- 2 fingers: minimum total distance to validate a diagonal
@@ -177,24 +181,29 @@ end
 --- @param now number Timestamp of the evaluation.
 local function commitGesture(now)
 	if not _state.enabled or not gs.startPos or not gs.endPos then return end
-	
+
 	local dx      = gs.endPos.x - gs.startPos.x
 	local dy      = gs.endPos.y - gs.startPos.y
-	local adx     = math.abs(dx)
-	local ady     = math.abs(dy)
 	local elapsed = now - (gs.startTime or now)
 	local mf      = gs.maxFingers
 
-	-- Tap detection
-	if elapsed <= TAP_MAX_SEC and (adx + ady) < TAP_MAX_DELTA then
-		local slot = nil
-		if     mf == 3 then slot = "tap_3"
-		elseif mf == 4 then slot = "tap_4"
-		elseif mf >= 5 then slot = "tap_5" end
-		
-		if slot and _state.ga[slot] then
-			Logger.info(LOG, string.format("Tap validated on slot: %s.", slot))
-			_actions.execute_single(_state.ga[slot])
+	-- Tap detection: if no direction was ever locked during the gesture, no swipe
+	-- motion was committed, so this is a tap (or an abandoned gesture).
+	-- Also treat as a tap when lockedDir was set by a brief frémissement (delta
+	-- below TAP_MAX_DELTA) — SWIPE_MIN is intentionally small for live tracking
+	-- responsiveness, but a real swipe always produces a larger final displacement.
+	local total_delta = math.abs(gs.endPos.x - gs.startPos.x) + math.abs(gs.endPos.y - gs.startPos.y)
+	if gs.lockedDir == nil or total_delta < TAP_MAX_DELTA then
+		if elapsed <= TAP_MAX_SEC then
+			local slot = nil
+			if     mf == 3 then slot = "tap_3"
+			elseif mf == 4 then slot = "tap_4"
+			elseif mf >= 5 then slot = "tap_5" end
+
+			if slot and _state.ga[slot] then
+				Logger.info(LOG, string.format("Tap validated on slot: %s (%.3fs, %d finger(s)).", slot, elapsed, mf))
+				_actions.execute_single(_state.ga[slot])
+			end
 		end
 		return
 	end
@@ -219,7 +228,7 @@ local function commitGesture(now)
 	if dir == "diag" then
 		local diag_slot = slotForDir(mf, dir)
 		if not diag_slot or _state.ga[diag_slot] == "none" then
-			dir = (adx >= ady) and "horiz" or "vert"
+			dir = (math.abs(dx) >= math.abs(dy)) and "horiz" or "vert"
 		end
 	end
 
@@ -298,15 +307,33 @@ function M.process_frame(touches)
 		else
 			if n < gs.maxFingers then
 				gs.lifting = true
-			else
+			elseif n > gs.maxFingers then
+				-- A new finger joined: reset the tap baseline so the centroid shift
+				-- from the new finger doesn't count as movement
 				gs.maxFingers = n
-			end
-			gs.endPos = pos
-
-			local adx_now = math.abs(pos.x - gs.startPos.x)
-			local ady_now = math.abs(pos.y - gs.startPos.y)
-			if (now - gs.startTime) < TAP_MAX_SEC and (adx_now + ady_now) < TAP_MAX_DELTA then
+				gs.startPos   = pos
+				gs.startTime  = now
+				gs.lifting    = false
+			elseif gs.lifting and n == gs.maxFingers then
+				-- Full finger count restored after a partial lift without a clean n=0
+				-- frame in between. This is a rapid successive tap: commit the current
+				-- gesture immediately and start fresh, keeping the scroll blocker alive
+				-- (fingers are still on the pad, tearing it down would add jitter).
+				Logger.debug(LOG, "Rapid re-tap detected (%d finger(s)) — committing and restarting.", n)
+				if gs.startPos then pcall(commitGesture, now) end
+				gs.startTime      = now
+				gs.startPos       = pos
+				gs.endPos         = pos
+				gs.lockedDir      = nil
+				gs.stepsCommitted = 0
+				gs.lifting        = false
 				return
+			end
+			-- Freeze endPos once lifting starts: the centroid of fewer fingers
+			-- drifts away from the full-contact centroid and would produce a false
+			-- delta in commitGesture, breaking both tap and swipe detection.
+			if not gs.lifting then
+				gs.endPos = pos
 			end
 
 			if not gs.lifting then
@@ -321,6 +348,8 @@ function M.process_frame(touches)
 							tentative = (math.abs(dx) >= math.abs(dy)) and "horiz" or "vert"
 						end
 					end
+					-- lockedDir stays nil until SWIPE_MIN is exceeded; commitGesture
+					-- interprets lockedDir==nil as a tap candidate
 					gs.lockedDir = tentative
 				end
 
