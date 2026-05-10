@@ -560,14 +560,16 @@ function M.init()
 
 	if _state.enabled then
 		Logger.info(LOG, "Integration enabled — deploying config…")
-		-- Call regenerate() directly (not deferred) but wrap in pcall to catch any errors
-		-- that might occur during initial config deployment. The polling timers inside
-		-- prime_ke_for_session will be scheduled relative to THIS moment, when the
-		-- event loop should already be receiving events from menu interactions.
-		local ok, err = pcall(M.regenerate)
-		if not ok then
-			Logger.error(LOG, "Initial regenerate() failed: %s", tostring(err))
-		end
+		-- Attempt deferred M.regenerate() with longer delay to ensure event loop is fully active
+		-- and ready to dispatch subsequent timer callbacks from prime_ke_for_session().
+		-- Using 2.0 second delay to get past all module initialization and UI setup.
+		hs.timer.doAfter(2.0, function()
+			Logger.trace(LOG, "[DEFERRED REGENERATE @ 2.0s] Timer callback fired, calling M.regenerate()…")
+			local ok, err = pcall(M.regenerate)
+			if not ok then
+				Logger.error(LOG, "Deferred M.regenerate() failed: %s", tostring(err))
+			end
+		end)
 	end
 
 	-- Persist immediately on first launch so the file exists for future runs
