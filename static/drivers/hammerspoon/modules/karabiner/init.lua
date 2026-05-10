@@ -51,14 +51,8 @@ local KARABINER_OUT   = os.getenv("HOME") .. "/.config/karabiner/karabiner.json"
 --     <config_dir>/hammerspoon/config_karabiner.toml
 -- Resolution is deferred to MenuPaths so a relocated config follows.
 local function resolve_user_config()
-	local ok, MenuPaths = pcall(require, "ui.menu.menu_paths")
-	if ok and type(MenuPaths.is_initialized) == "function" and MenuPaths.is_initialized() then
-		local p = MenuPaths.get("KarabinerConfigPath")
-		if type(p) == "string" and p ~= "" then return p end
-	end
-	-- Defensive fallback when MenuPaths has not yet bootstrapped.
-	local home = os.getenv("HOME") or ""
-	return home .. "/.config/ergopti_plus/hammerspoon/config_karabiner.toml"
+	local MenuPaths = require("ui.menu.menu_paths")
+	return MenuPaths.get("KarabinerConfigPath")
 end
 local ACTIONS_FILE    = _SELF_DIR .. "data/actions.json"
 local TAP_HOLD_FILE   = _SELF_DIR .. "data/tap_hold_keys.json"
