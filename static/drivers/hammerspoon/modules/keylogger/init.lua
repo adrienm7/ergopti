@@ -254,14 +254,16 @@ local CoreState = {
 	ngram_context         = nil,
 }
 
--- Wire sub-modules to the shared state immediately at load time.
--- KcBridge is also wired here (not in M.start) so the file watcher and poll
--- timer run regardless of whether the keylogger is currently enabled — KE
--- emits physical kc events unconditionally and the bridge must always be
+-- Wire KcBridge at load time so the file watcher and poll timer run
+-- regardless of whether the keylogger is currently enabled — KE emits
+-- physical kc events unconditionally and the bridge must always be
 -- ready to drain them.
-LogManager.init(CoreState)
-ContextTracker.init(CoreState, LogManager)
-KcBridge.init(CoreState, LogManager, nil, nil)
+-- LogManager and ContextTracker are deferred to M.start() so that
+-- metrics directories are not created when the feature is off.
+KcBridge.init(CoreState, nil, nil, nil)
+
+-- Tracks whether LogManager/ContextTracker have been initialized
+local _state                = nil
 
 -- Watcher and timer handles
 local _event_tap            = nil
@@ -1305,6 +1307,15 @@ function M.start(script_control)
 		Logger.debug(LOG, "Keymap module cached for shift-side detection.")
 	else
 		Logger.debug(LOG, "Keymap module not available — shift side will be 'none'.")
+	end
+
+	-- Initialise sub-modules on first start (deferred from require-time
+	-- so metrics directories are only created when the feature is on)
+	if not _state then
+		_state = true
+		LogManager.init(CoreState)
+		ContextTracker.init(CoreState, LogManager)
+		KcBridge.set_log_manager(LogManager)
 	end
 
 	CoreState.is_enabled    = true

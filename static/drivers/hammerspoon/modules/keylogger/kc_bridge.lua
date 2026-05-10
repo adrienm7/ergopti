@@ -185,6 +185,10 @@ end
 --- Each line is a Karabiner key_code name (e.g. "left_command").
 --- Converts to numeric kc and calls LogManager.log_karabiner_press().
 local function drain_log()
+	-- Skip draining when LogManager has not been injected yet
+	-- (keylogger feature is off but KE still writes to the log)
+	if not _log_manager then return end
+
 	local fh = io.open(KC_LOG_PATH, "r")
 	if not fh then
 		Logger.trace(LOG, "KC log not yet created — nothing to drain.")
@@ -305,10 +309,6 @@ function M.init(core_state, log_manager, tap_hold_config, available_actions)
 		Logger.error(LOG, "M.init(): core_state must be a table — bridge non-functional.")
 		return
 	end
-	if type(log_manager) ~= "table" or type(log_manager.log_karabiner_press) ~= "function" then
-		Logger.error(LOG, "M.init(): log_manager must expose log_karabiner_press() — bridge non-functional.")
-		return
-	end
 	if _state then
 		Logger.warn(LOG, "M.init() called more than once — ignoring duplicate call.")
 		return
@@ -364,6 +364,14 @@ function M.init(core_state, log_manager, tap_hold_config, available_actions)
 	_poll_timer:start()
 
 	Logger.success(LOG, "KE physical-kc bridge initialized (watching '%s').", KC_LOG_PATH)
+end
+
+--- Injects the LogManager reference after deferred initialization.
+--- Called by keylogger/init.lua when M.start() enables the feature.
+--- @param lm table The LogManager module reference.
+function M.set_log_manager(lm)
+	_log_manager = lm
+	Logger.debug(LOG, "LogManager injected into KcBridge.")
 end
 
 --- Diagnostic: returns the cumulative number of physical kc events drained,

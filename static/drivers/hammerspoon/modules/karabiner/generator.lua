@@ -113,8 +113,8 @@ do
 	local d  = mp.get_config_dir()
 	if not d:match("[/\\]$") then d = d .. "/" end
 	KE_PHYSICAL_KC_LOG = d .. "metrics/karabiner_kc.log"
-	-- Ensure the parent dir exists before Karabiner attempts shell-redirect
-	pcall(hs.execute, string.format("mkdir -p %q", KE_PHYSICAL_KC_LOG:match("^(.*)/[^/]+$") or ""))
+	-- Parent dir created lazily by deploy_json_file() or when keylogger starts;
+	-- no mkdir here to avoid creating metrics/ when the feature is off
 end
 
 
@@ -967,5 +967,9 @@ function M.deploy_file(src, dst)
 
 	return M.deploy_string(content, dst)
 end
+
+--- Exposes the resolved KC physical log path so karabiner/init can create
+--- the parent directory at deploy time (not at module load time).
+M.KE_PHYSICAL_KC_LOG = KE_PHYSICAL_KC_LOG
 
 return M
