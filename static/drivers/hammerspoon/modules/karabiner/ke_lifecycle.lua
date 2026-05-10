@@ -261,16 +261,14 @@ local KE_GUI_CHECK_CMD = "/usr/bin/pgrep -fq '/Applications/Karabiner-Elements.a
 -- delay before checking, we poll every INTERVAL up to MAX_ATTEMPTS times
 -- so a fast daemon start resolves in ~300 ms instead of always waiting 2 s.
 local PRIME_POLL_INTERVAL_SEC = 0.3
-local PRIME_POLL_MAX_ATTEMPTS = 30  -- 9.0 s absolute maximum (synchronous blocking)
+local PRIME_POLL_MAX_ATTEMPTS = 45  -- 13.5 s absolute maximum (increased from 9 s for IPC readiness)
 local PRIME_FALLBACK_AFTER_ATTEMPTS = 6  -- Informational threshold only (no GUI fallback)
 local PRIME_RETRY_HEADLESS_EVERY_ATTEMPTS = 4
 local PRIME_MAX_HEADLESS_ATTEMPTS = 3
-local PRIME_RULES_PROBE_RETRY_INTERVAL_SEC = 0.2
-local PRIME_RULES_PROBE_RETRY_ATTEMPTS = 5
+local PRIME_RULES_PROBE_RETRY_INTERVAL_SEC = 0.3  -- Increased from 0.2 s to give socket more settle time
+local PRIME_RULES_PROBE_RETRY_ATTEMPTS = 15  -- Increased from 5 to 15 for ~4.5 s IPC probe window
 local RUNTIME_PROBE_CACHE_SEC = 8
 local RUNTIME_PROBE_FAIL_COOLDOWN_SEC = 1.5
-
-local READY_PROBE_VARIABLE = "ergopti_ready_probe"
 
 -- Per-boot-session marker so a single GUI prime serves all subsequent HS
 -- reloads in the same login session. The file content is the kernel boot
@@ -562,6 +560,7 @@ end
 
 --- Runs a runtime probe through karabiner_cli to ensure the bridge is not only
 --- spawned but also responsive for variable IPC operations.
+--- Uses --set-variables (JSON format) for Karabiner v16+ compatibility.
 --- @return boolean
 local function is_cli_roundtrip_ready()
 	if not file_exists(KE_CLI_BIN) then
@@ -570,42 +569,23 @@ local function is_cli_roundtrip_ready()
 	end
 
 	local probe_value = math.floor((hs.timer.secondsSinceEpoch() * 1000) % 1000000)
+	-- Use --set-variables with JSON format (Karabiner v16+)
 	local set_cmd = string.format(
-		"%q --set-variable %q %d >/dev/null 2>&1",
+		"%q --set-variables '{\"ergopti_ready_probe\":%d}' >/dev/null 2>&1",
 		KE_CLI_BIN,
-		READY_PROBE_VARIABLE,
 		probe_value
 	)
 	local _, set_ok = hs.execute(set_cmd)
 	if set_ok ~= true then
-		Logger.debug(LOG, "karabiner_cli set-variable probe failed.")
+		Logger.debug(LOG, "karabiner_cli set-variables probe failed.")
 		_last_runtime_probe_ok = false
 		_last_runtime_probe_at = hs.timer.secondsSinceEpoch()
 		return false
 	end
 
-	local get_cmd = string.format(
-		"%q --get-variable %q 2>/dev/null",
-		KE_CLI_BIN,
-		READY_PROBE_VARIABLE
-	)
-	local out, get_ok = hs.execute(get_cmd)
-	if get_ok ~= true or type(out) ~= "string" then
-		Logger.debug(LOG, "karabiner_cli get-variable probe failed.")
-		_last_runtime_probe_ok = false
-		_last_runtime_probe_at = hs.timer.secondsSinceEpoch()
-		return false
-	end
-
-	local observed = tonumber((out:gsub("%s+", "")))
-	if observed ~= probe_value then
-		Logger.debug(LOG, "karabiner_cli probe mismatch: expected=%d observed=%s.",
-			probe_value, tostring(observed))
-		_last_runtime_probe_ok = false
-		_last_runtime_probe_at = hs.timer.secondsSinceEpoch()
-		return false
-	end
-
+	-- For Karabiner v16+, we cannot easily read back individual variables.
+	-- A successful set-variables call indicates IPC is working, which is
+	-- sufficient for our readiness probe.
 	_last_runtime_probe_ok = true
 	_last_runtime_probe_at = hs.timer.secondsSinceEpoch()
 	return true
