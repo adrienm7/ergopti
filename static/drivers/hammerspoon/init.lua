@@ -36,6 +36,13 @@ end
 
 local Logger             = require("lib.logger")
 local LOG                = "init"
+local HS_BOOT_READY_SETTING_KEY = "ergopti_hs_boot_ready_v1"
+
+-- Guard setting consumed by KE lifecycle notifications. It is set to false at
+-- boot start and flipped to true only once init has fully completed.
+pcall(function()
+	hs.settings.set(HS_BOOT_READY_SETTING_KEY, false)
+end)
 
 -- Set our logger level. Uncomment one to enable:
 Logger.set_level("DEBUG")  -- Show all logs (DEBUG, INFO, WARNING, ERROR)
@@ -646,6 +653,7 @@ end
 -- ====================================
 
 hs.shutdownCallback = function()
+	pcall(function() hs.settings.set(HS_BOOT_READY_SETTING_KEY, false) end)
 	Logger.info(LOG, "Arrêt système — restauration des overrides")
 	if type(gestures) == "table" and type(gestures.restore_all_overrides) == "function" then
 		pcall(gestures.restore_all_overrides)
@@ -693,3 +701,10 @@ end)
 Logger.info(LOG, "════════════════════════════════════════════════════════════")
 Logger.info(LOG, "✅ Hammerspoon boot SUCCESSFUL.")
 Logger.info(LOG, "════════════════════════════════════════════════════════════")
+pcall(function() hs.settings.set(HS_BOOT_READY_SETTING_KEY, true) end)
+pcall(function()
+	local ok_l, kl = pcall(require, "modules.karabiner.ke_lifecycle")
+	if ok_l and kl and type(kl.flush_pending_ready_notification) == "function" then
+		kl.flush_pending_ready_notification()
+	end
+end)

@@ -10,6 +10,7 @@ local M = {}
 
 local hs       = hs
 local Logger   = require("lib.logger")
+local Notifications = require("lib.notifications")
 local Parser   = require("modules.llm.parser")
 local Profiles = require("modules.llm.profiles")
 local ApiCommon = require("modules.llm.api_common")
@@ -670,9 +671,13 @@ function M.warmup(model_name, profile)
 				tostring(status), tostring(has_tokens),
 				tostring(type(body) == "string" and #body or "nil"))
 			if status == 200 and has_tokens then
+				local became_ready = (_is_ready ~= true)
 				_is_ready = true
 				Logger.warn(LOG, "MLX KV cache primed (profile: %s) — backend ready.",
 					(type(profile) == "table" and profile.id) or "default")
+				if became_ready then
+					Notifications.notify("LLM prêt (MLX)", "Le serveur MLX est prêt.", "success")
+				end
 			else
 				_is_ready = false
 				-- Reset discovery when the warmup itself returns 404 so the next

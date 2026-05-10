@@ -559,14 +559,15 @@ function M.init()
 	end
 
 	if _state.enabled then
-		Logger.info(LOG, "Integration enabled — deploying config…")
-		-- Call M.regenerate() directly. While timers within M.init() don't seem to fire,
-		-- M.regenerate() will schedule polling timers AFTER init completes, which should work.
-		-- Wrap in pcall to catch any errors.
-		local ok, err = pcall(M.regenerate)
-		if not ok then
-			Logger.error(LOG, "M.regenerate() during init failed: %s", tostring(err))
-		end
+		Logger.info(LOG, "Integration enabled — scheduling async deploy…")
+		-- Never block HS boot on Karabiner priming: launch the first regenerate
+		-- right after init returns so menu bar startup remains instantaneous.
+		hs.timer.doAfter(0, function()
+			local ok, err = pcall(M.regenerate)
+			if not ok then
+				Logger.error(LOG, "Async M.regenerate() after init failed: %s", tostring(err))
+			end
+		end)
 	end
 
 	-- Persist immediately on first launch so the file exists for future runs

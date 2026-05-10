@@ -13,9 +13,9 @@
 ---    karabiner.json from disk. The on-disk file is read and pushed to
 ---    Core-Service via IPC by the user-level GUI app — and only by the GUI.
 ---    Once Core-Service has received the rules in a given login session, they
----    persist in its memory until logout/reboot, even after the GUI quits and
----    even across HS reloads. We therefore launch the GUI silently with
----    `open -gj`, wait for it to push the rules, then quit it via Cmd+Q.
+---    persist in its memory until logout/reboot, even after the user-facing
+---    UI is closed and even across HS reloads. We therefore bootstrap the
+---    headless bridge daemon only (no app window, no Space switch).
 ---    Idempotent across HS reloads via a boot-timestamp marker file in /tmp.
 --- 2. Honest status: is_remapping_active() requires both the daemon to be
 ---    detectable AND the bridge to have been primed in this boot session.
@@ -30,6 +30,7 @@ local M = {}
 
 local hs     = hs
 local Logger = require("lib.logger")
+local Notifications = require("lib.notifications")
 
 local LOG = "karabiner"
 
@@ -76,9 +77,11 @@ local KARABINER_KILL_CMD =
 	.. "; /usr/bin/pkill -x Karabiner-Elements 2>/dev/null"
 	.. "; /usr/bin/pkill -x Karabiner-EventViewer 2>/dev/null"
 	.. "; /usr/bin/pkill -x karabiner_console_user_server 2>/dev/null"
+	.. "; /usr/bin/pkill -x org.pqrs.karabiner_console_user_server 2>/dev/null"
 	-- Legacy v14 helper names — no-op on v15 but kept for old installs.
 	.. "; /usr/bin/pkill -x karabiner_observer 2>/dev/null"
 	.. "; /usr/bin/pkill -x karabiner_session_monitor 2>/dev/null"
+	.. "; /usr/bin/pkill -x org.pqrs.karabiner_session_monitor 2>/dev/null"
 	.. "; /bin/sleep 1"
 	.. "; done"
 	-- Clear the per-session prime marker so the next HS launch starts
@@ -92,7 +95,9 @@ local KARABINER_KILL_CMD =
 -- KE v16 renames karabiner_console_user_server to org.pqrs.* so pkill -x misses it.
 local KARABINER_KILL_FAST_CMD =
 	"/usr/bin/pkill -f 'Karabiner-Elements/bin/karabiner_console_user_server' 2>/dev/null; "
+	.. "/usr/bin/pkill -x org.pqrs.karabiner_console_user_server 2>/dev/null; "
 	.. "/usr/bin/pkill -f 'Karabiner-Elements/bin/karabiner_session_monitor' 2>/dev/null; "
+	.. "/usr/bin/pkill -x org.pqrs.karabiner_session_monitor 2>/dev/null; "
 	.. "/usr/bin/pkill -x Karabiner-Menu 2>/dev/null; "
 	.. "true"
 
@@ -197,14 +202,15 @@ end
 local KE_CONSOLE_USER_SERVER_BIN =
 	"/Library/Application Support/org.pqrs/Karabiner-Elements/bin/karabiner_console_user_server"
 
+local KE_CLI_BIN =
+	"/Library/Application Support/org.pqrs/Karabiner-Elements/bin/karabiner_cli"
+
 local KE_PRIME_HEADLESS_CMD =
 	string.format("/usr/bin/nohup %q", KE_CONSOLE_USER_SERVER_BIN)
 	.. " >/tmp/ke_console_user_server.out 2>/tmp/ke_console_user_server.err </dev/null &"
 
--- Compatibility fallback for installs where the binary path above is not
--- present (older/custom packaging). We still keep headless behavior.
-local KE_PRIME_HEADLESS_FALLBACK_CMD =
-	"/usr/bin/open -gj '/Applications/Karabiner-Elements.app'"
+-- GUI fallback intentionally disabled: the user explicitly requires 100%
+-- headless behavior with no app/window activation side-effects.
 
 -- Re-enables any pqrs launchd labels that may have been disabled by an older
 -- revision. This self-heals quit/reload failures where KE could no longer
@@ -255,10 +261,16 @@ local KE_GUI_CHECK_CMD = "/usr/bin/pgrep -fq '/Applications/Karabiner-Elements.a
 -- delay before checking, we poll every INTERVAL up to MAX_ATTEMPTS times
 -- so a fast daemon start resolves in ~300 ms instead of always waiting 2 s.
 local PRIME_POLL_INTERVAL_SEC = 0.3
-local PRIME_POLL_MAX_ATTEMPTS = 10  -- 3.0 s absolute maximum (synchronous blocking)
-local PRIME_FALLBACK_AFTER_ATTEMPTS = 6  -- 1.8 s before GUI fallback
+local PRIME_POLL_MAX_ATTEMPTS = 30  -- 9.0 s absolute maximum (synchronous blocking)
+local PRIME_FALLBACK_AFTER_ATTEMPTS = 6  -- Informational threshold only (no GUI fallback)
 local PRIME_RETRY_HEADLESS_EVERY_ATTEMPTS = 4
 local PRIME_MAX_HEADLESS_ATTEMPTS = 3
+local PRIME_RULES_PROBE_RETRY_INTERVAL_SEC = 0.2
+local PRIME_RULES_PROBE_RETRY_ATTEMPTS = 5
+local RUNTIME_PROBE_CACHE_SEC = 8
+local RUNTIME_PROBE_FAIL_COOLDOWN_SEC = 1.5
+
+local READY_PROBE_VARIABLE = "ergopti_ready_probe"
 
 -- Per-boot-session marker so a single GUI prime serves all subsequent HS
 -- reloads in the same login session. The file content is the kernel boot
@@ -284,6 +296,76 @@ local HS_OWNER_MARKER_PATH = "/tmp/ergopti_ke_hs_owner_v1.txt"
 local _prime_in_progress = false
 local _hs_owned_runtime = false
 local _prime_callbacks = {}
+local _last_karabiner_ready_notify_at = 0
+local _pending_karabiner_ready_notify = false
+local _karabiner_ready_notify_timer = nil
+local is_ipc_bridge_fully_ready
+local _last_runtime_probe_ok = false
+local _last_runtime_probe_at = 0
+
+local KARABINER_READY_NOTIFY_COOLDOWN_SEC = 10
+local KARABINER_READY_NOTIFY_DELAY_SEC = 2.5
+local HS_BOOT_READY_SETTING_KEY = "ergopti_hs_boot_ready_v1"
+
+--- Returns true only when init.lua has completed the full boot sequence.
+--- @return boolean
+local function is_hs_boot_ready()
+	local ok, value = pcall(function()
+		return hs.settings.get(HS_BOOT_READY_SETTING_KEY)
+	end)
+	return ok and value == true
+end
+
+--- Dispatches a user-facing "Karabiner ready" notification with cooldown.
+local function notify_karabiner_ready()
+	if not is_hs_boot_ready() then
+		_pending_karabiner_ready_notify = true
+		Logger.debug(LOG, "Karabiner ready notification deferred until HS boot completes.")
+		return
+	end
+
+	if _karabiner_ready_notify_timer then
+		pcall(function() _karabiner_ready_notify_timer:stop() end)
+		_karabiner_ready_notify_timer = nil
+	end
+
+	_pending_karabiner_ready_notify = false
+	_karabiner_ready_notify_timer = hs.timer.doAfter(KARABINER_READY_NOTIFY_DELAY_SEC, function()
+		_karabiner_ready_notify_timer = nil
+		if not is_hs_boot_ready() then
+			_pending_karabiner_ready_notify = true
+			Logger.debug(LOG, "Karabiner ready notification postponed — HS boot not ready.")
+			return
+		end
+		if not is_ipc_bridge_fully_ready() then
+			_pending_karabiner_ready_notify = true
+			Logger.warn(LOG, "Karabiner ready notification skipped — bridge not fully ready at send time.")
+			return
+		end
+		if not is_runtime_remapping_ready() then
+			_pending_karabiner_ready_notify = true
+			Logger.warn(LOG, "Karabiner ready notification skipped — runtime remapping probe failed at send time.")
+			return
+		end
+
+		local now = hs.timer.secondsSinceEpoch()
+		if (now - _last_karabiner_ready_notify_at) < KARABINER_READY_NOTIFY_COOLDOWN_SEC then
+			Logger.debug(LOG, "Karabiner ready notification skipped (cooldown %.1fs).",
+				KARABINER_READY_NOTIFY_COOLDOWN_SEC)
+			return
+		end
+		_last_karabiner_ready_notify_at = now
+		Notifications.notify("Karabiner prêt", "Le moteur Karabiner est prêt.", "success")
+	end)
+end
+
+--- Flushes a deferred Karabiner ready notification once HS boot is complete.
+function M.flush_pending_ready_notification()
+	if not _pending_karabiner_ready_notify then return end
+	if not is_hs_boot_ready() then return end
+	_pending_karabiner_ready_notify = false
+	notify_karabiner_ready()
+end
 
 
 
@@ -451,10 +533,105 @@ end
 local function is_ipc_bridge_running()
 	local _, ok = hs.execute(
 		"/usr/bin/pgrep -fq 'Karabiner-Elements/bin/karabiner_console_user_server' 2>/dev/null"
+		.. " || /usr/bin/pgrep -qx org.pqrs.karabiner_console_user_server 2>/dev/null"
+		.. " || /usr/bin/pgrep -qx karabiner_console_user_server 2>/dev/null"
 		.. " || /usr/bin/pgrep -fq 'Karabiner-Elements/bin/karabiner_session_monitor' 2>/dev/null"
+		.. " || /usr/bin/pgrep -qx org.pqrs.karabiner_session_monitor 2>/dev/null"
+		.. " || /usr/bin/pgrep -qx karabiner_session_monitor 2>/dev/null"
 		.. " || /usr/bin/pgrep -qx Karabiner-Menu 2>/dev/null"
 	)
 	return ok == true
+end
+
+--- True only when the headless bridge runtime is fully up.
+--- We require BOTH user-level processes because console_user_server can be
+--- visible first while session_monitor is still starting; remapping is not
+--- reliably operational until both are alive.
+--- @return boolean
+is_ipc_bridge_fully_ready = function()
+	local _, ok = hs.execute(
+		"( /usr/bin/pgrep -fq 'Karabiner-Elements/bin/karabiner_console_user_server' 2>/dev/null"
+		.. " || /usr/bin/pgrep -qx org.pqrs.karabiner_console_user_server 2>/dev/null"
+		.. " || /usr/bin/pgrep -qx karabiner_console_user_server 2>/dev/null )"
+		.. " && ( /usr/bin/pgrep -fq 'Karabiner-Elements/bin/karabiner_session_monitor' 2>/dev/null"
+		.. " || /usr/bin/pgrep -qx org.pqrs.karabiner_session_monitor 2>/dev/null"
+		.. " || /usr/bin/pgrep -qx karabiner_session_monitor 2>/dev/null )"
+	)
+	return ok == true
+end
+
+--- Runs a runtime probe through karabiner_cli to ensure the bridge is not only
+--- spawned but also responsive for variable IPC operations.
+--- @return boolean
+local function is_cli_roundtrip_ready()
+	if not file_exists(KE_CLI_BIN) then
+		Logger.warn(LOG, "karabiner_cli not found at '%s'.", KE_CLI_BIN)
+		return false
+	end
+
+	local probe_value = math.floor((hs.timer.secondsSinceEpoch() * 1000) % 1000000)
+	local set_cmd = string.format(
+		"%q --set-variable %q %d >/dev/null 2>&1",
+		KE_CLI_BIN,
+		READY_PROBE_VARIABLE,
+		probe_value
+	)
+	local _, set_ok = hs.execute(set_cmd)
+	if set_ok ~= true then
+		Logger.debug(LOG, "karabiner_cli set-variable probe failed.")
+		_last_runtime_probe_ok = false
+		_last_runtime_probe_at = hs.timer.secondsSinceEpoch()
+		return false
+	end
+
+	local get_cmd = string.format(
+		"%q --get-variable %q 2>/dev/null",
+		KE_CLI_BIN,
+		READY_PROBE_VARIABLE
+	)
+	local out, get_ok = hs.execute(get_cmd)
+	if get_ok ~= true or type(out) ~= "string" then
+		Logger.debug(LOG, "karabiner_cli get-variable probe failed.")
+		_last_runtime_probe_ok = false
+		_last_runtime_probe_at = hs.timer.secondsSinceEpoch()
+		return false
+	end
+
+	local observed = tonumber((out:gsub("%s+", "")))
+	if observed ~= probe_value then
+		Logger.debug(LOG, "karabiner_cli probe mismatch: expected=%d observed=%s.",
+			probe_value, tostring(observed))
+		_last_runtime_probe_ok = false
+		_last_runtime_probe_at = hs.timer.secondsSinceEpoch()
+		return false
+	end
+
+	_last_runtime_probe_ok = true
+	_last_runtime_probe_at = hs.timer.secondsSinceEpoch()
+	return true
+end
+
+--- True only when the bridge processes are up and the runtime IPC roundtrip is
+--- functional through karabiner_cli.
+--- @return boolean
+local function is_runtime_remapping_ready(force_probe)
+	if not is_ipc_bridge_fully_ready() then
+		_last_runtime_probe_ok = false
+		_last_runtime_probe_at = hs.timer.secondsSinceEpoch()
+		return false
+	end
+
+	local now = hs.timer.secondsSinceEpoch()
+	if not force_probe and _last_runtime_probe_ok
+		and (now - _last_runtime_probe_at) <= RUNTIME_PROBE_CACHE_SEC then
+		return true
+	end
+
+	if not force_probe and (now - _last_runtime_probe_at) <= RUNTIME_PROBE_FAIL_COOLDOWN_SEC then
+		return _last_runtime_probe_ok
+	end
+
+	return is_cli_roundtrip_ready()
 end
 
 --- Public alias so callers (e.g. karabiner/init.lua) can check bridge status
@@ -473,34 +650,24 @@ function M.is_priming()
 	return _prime_in_progress
 end
 
---- Primes Karabiner-Elements for headless operation by silently launching
---- the KE GUI app, waiting for it to push the on-disk rules to Core-Service
---- via IPC, then quitting the GUI. KE keeps the loaded rules in
---- Core-Service's memory after the GUI quits, so remapping persists for the
---- rest of the boot session — even across HS reloads.
+--- Primes Karabiner-Elements for headless operation: launches the bridge
+--- daemon in background, then polls asynchronously via hs.timer.doAfter
+--- until the IPC roundtrip probe confirms the rules are live.
 ---
---- This step is mandatory: without it, Core-Service runs but does not apply
---- our deployed config. The GUI is the only known way to trigger the IPC
---- push (karabiner_cli has no --reload flag in v15).
+--- Fully non-blocking: Hammerspoon's event loop is never paused. The outer
+--- process poll and the CLI probe retries both use hs.timer so the menu bar
+--- and all other modules continue responding while KE starts up.
 ---
---- Launch target is Karabiner-Menu.app when available (LSUIElement=true →
---- no window, no Dock icon, no Space switch possible) — see KE_PRIME_OPEN_CMD
---- above for the discovery logic. Karabiner-Menu speaks the same IPC
---- protocol as the main GUI, so the rules reach Core-Service identically
---- but without any user-visible side effect.
----
---- Falls back to launching the full Karabiner-Elements.app when the Menu
---- bundle is not found. The fallback is visible (window flash + Space
---- switch) and is followed by a pkill to dismiss it; it exists only so
---- non-standard KE installs do not break.
+--- GUI fallback is intentionally disabled: if headless priming cannot start,
+--- we fail loudly and keep behavior fully background-only.
 ---
 --- Idempotent across HS reloads via the boot-timestamp marker file. Skipped
 --- (and the marker written) when an IPC bridge is already running.
 --- @param callback function|nil fun(success: boolean) called when done.
 --- @param force boolean|nil When true, ignore the per-session marker and
----                          always perform the prime cycle. Used by the
----                          Status menu item so the user can manually re-push
----                          rules when the daemon has been restarted by macOS.
+---                          always perform the prime cycle. Used after an
+---                          explicit bridge kill (regenerate) or on manual
+---                          re-prime from the menu.
 function M.prime_ke_for_session(callback, force)
 	callback = callback or function() end
 	if _prime_in_progress then
@@ -518,12 +685,7 @@ function M.prime_ke_for_session(callback, force)
 		return
 	end
 
-	-- When force=true (e.g. called after an explicit bridge kill in regenerate()),
-	-- do NOT treat a still-visible bridge as "already running": pkill is async and
-	-- the process may appear alive for tens of milliseconds after the signal.
-	-- Trusting it here would mark the session primed, return immediately, and leave
-	-- the bridge dead a moment later with no re-launch — the silent failure the user
-	-- sees as "Karabiner not started after reload".
+	-- When force=false and bridge is running but not yet marked, record the marker.
 	if bridge_running and not force then
 		Logger.info(LOG, "KE IPC bridge already running (Menu or GUI) — recording marker.")
 		mark_session_primed()
@@ -531,41 +693,21 @@ function M.prime_ke_for_session(callback, force)
 		return
 	end
 
-	if bridge_running and force then
-		Logger.info(LOG, "Bridge appears alive but force=true — waiting 200 ms for pkill to settle…")
-		-- Synchronous wait: pkill is async and the process may still be visible briefly
-		os.execute("sleep 0.2")
-		-- Re-check: if bridge is truly gone, proceed with headless launch below.
-		-- If still alive (pkill failed or process respawned), just mark primed.
-		if is_ipc_bridge_running() then
-			Logger.info(LOG, "Bridge still alive after pkill settle — marking primed.")
-			mark_session_primed()
-			_prime_in_progress = false
-			resolve_prime_callbacks(true)
-			return
-		end
-	end
-
 	if not force and M.is_session_primed() and not bridge_running then
 		Logger.warn(LOG, "Prime marker exists but bridge is not running — re-priming now.")
 	end
 
-	-- Disable window-state persistence so any GUI-fallback launch cannot
-	-- drag focus to whichever Space last hosted a KE window. Idempotent.
+	-- Idempotent defaults write — fast, kept synchronous (no UI side-effect).
 	hs.execute(KE_PERSISTENCE_OFF_CMD .. " 2>/dev/null")
-	-- Self-heal any previously disabled launchd labels so quit/reload keeps
-	-- working even after older revisions that used launchctl disable.
 	hs.execute(KE_REENABLE_USER_LABELS_CMD)
 
-	Logger.start(LOG, "Priming KE bridge (headless karabiner_console_user_server)…")
+	Logger.start(LOG, "Priming KE bridge (headless, async)…")
 	_prime_in_progress = true
-	-- Mark ownership immediately so a fast quit right after startup still knows
-	-- this bridge launch was initiated by Hammerspoon.
 	mark_hs_owned_bridge()
 
-	-- Start the user-level bridge daemon in background without opening the GUI app.
-	local fallback_attempted = false
 	local headless_launch_attempts = 0
+	local fallback_attempted       = false
+
 	local function launch_headless_once()
 		if not file_exists(KE_CONSOLE_USER_SERVER_BIN) then
 			Logger.warn(LOG, "Headless bridge binary not found at '%s'.", KE_CONSOLE_USER_SERVER_BIN)
@@ -576,48 +718,116 @@ function M.prime_ke_for_session(callback, force)
 		return true
 	end
 
-	if not launch_headless_once() then
-		fallback_attempted = true
-		Logger.warn(LOG, "Headless bridge binary missing — trying compatibility fallback…")
-		hs.execute(KE_PRIME_HEADLESS_FALLBACK_CMD)
-	end
+	-- Forward declaration: probe_and_commit and poll_attempt are mutually recursive.
+	-- probe_and_commit falls back to poll_attempt when all probe retries fail.
+	local poll_attempt
 
-	-- Synchronous polling: wait for the bridge to appear using os.execute("sleep")
-	-- instead of hs.timer.doAfter(). Timer callbacks do NOT fire during Hammerspoon
-	-- module initialization (the event loop is not yet running), so we must block.
-	-- This adds ~0.3-2 s to startup but guarantees Karabiner is primed.
-	for attempt = 1, PRIME_POLL_MAX_ATTEMPTS do
-		os.execute(string.format("sleep %.2f", PRIME_POLL_INTERVAL_SEC))
-		if is_ipc_bridge_running() then
-			-- Suppress Dock-visible KE helpers spawned as side-effects of the bridge start
+	-- Called once the bridge processes are visible. Runs the CLI roundtrip probe
+	-- and retries asynchronously up to PRIME_RULES_PROBE_RETRY_ATTEMPTS times.
+	-- Falls back to the next outer poll tick when all probe retries are exhausted.
+	local function probe_and_commit(outer_attempt, probe_attempt)
+		if is_cli_roundtrip_ready() then
 			pcall(function() hs.execute(KE_SUPPRESS_DOCK_HELPERS_CMD) end)
 			mark_session_primed()
 			mark_hs_owned_bridge()
 			_prime_in_progress = false
-			Logger.success(LOG, "KE bridge primed in %d poll(s) (~%.1f s).",
-				attempt, attempt * PRIME_POLL_INTERVAL_SEC)
+			Logger.success(LOG,
+				"KE bridge ready in %d poll(s), IPC probe ok on probe attempt %d.",
+				outer_attempt, probe_attempt)
+			notify_karabiner_ready()
 			resolve_prime_callbacks(true)
 			return
 		end
-		if (not fallback_attempted)
+
+		if probe_attempt < PRIME_RULES_PROBE_RETRY_ATTEMPTS then
+			Logger.debug(LOG, "IPC probe not ready (attempt %d/%d) — retrying in %.0f ms…",
+				probe_attempt, PRIME_RULES_PROBE_RETRY_ATTEMPTS,
+				PRIME_RULES_PROBE_RETRY_INTERVAL_SEC * 1000)
+			hs.timer.doAfter(PRIME_RULES_PROBE_RETRY_INTERVAL_SEC, function()
+				probe_and_commit(outer_attempt, probe_attempt + 1)
+			end)
+		else
+			-- All probe retries exhausted on this outer tick; bridge may still be
+			-- initialising its IPC socket — resume the outer poll.
+			Logger.debug(LOG,
+				"Bridge up but IPC probe still failing after %d retries — resuming outer poll…",
+				PRIME_RULES_PROBE_RETRY_ATTEMPTS)
+			hs.timer.doAfter(PRIME_POLL_INTERVAL_SEC, function()
+				poll_attempt(outer_attempt + 1)
+			end)
+		end
+	end
+
+	-- Outer async polling loop: checks for bridge process visibility on each tick,
+	-- then hands off to probe_and_commit. Schedules itself until success or timeout.
+	poll_attempt = function(attempt)
+		if attempt > PRIME_POLL_MAX_ATTEMPTS then
+			clear_hs_owned_bridge_marker()
+			_prime_in_progress = false
+			Logger.error(LOG,
+				"KE bridge did not appear after %d polls (%.1f s) — config may not be applied.",
+				PRIME_POLL_MAX_ATTEMPTS, PRIME_POLL_MAX_ATTEMPTS * PRIME_POLL_INTERVAL_SEC)
+			resolve_prime_callbacks(false)
+			return
+		end
+
+		if is_ipc_bridge_fully_ready() then
+			-- Bridge processes are visible: start the IPC probe sequence.
+			probe_and_commit(attempt, 1)
+			return
+		end
+
+		if attempt == PRIME_FALLBACK_AFTER_ATTEMPTS and is_ipc_bridge_running() then
+			Logger.info(LOG, "Bridge process visible but not fully ready yet — waiting…")
+		end
+
+		-- Periodically retry the headless launch if the bridge has not appeared yet.
+		if not fallback_attempted
 			and headless_launch_attempts > 0
 			and headless_launch_attempts < PRIME_MAX_HEADLESS_ATTEMPTS
 			and (attempt % PRIME_RETRY_HEADLESS_EVERY_ATTEMPTS == 0) then
 			Logger.warn(LOG, "Bridge still absent after %d poll(s) — retrying headless launch…", attempt)
 			launch_headless_once()
 		end
-		if (not fallback_attempted) and attempt >= PRIME_FALLBACK_AFTER_ATTEMPTS then
+
+		if not fallback_attempted and attempt >= PRIME_FALLBACK_AFTER_ATTEMPTS then
 			fallback_attempted = true
-			Logger.warn(LOG, "Primary headless launch still not visible — trying compatibility fallback…")
-			hs.execute(KE_PRIME_HEADLESS_FALLBACK_CMD)
+			Logger.warn(LOG, "Primary headless launch not yet visible — GUI fallback disabled, continuing…")
 		end
+
+		hs.timer.doAfter(PRIME_POLL_INTERVAL_SEC, function()
+			poll_attempt(attempt + 1)
+		end)
 	end
-	-- Timeout: bridge never appeared
-	clear_hs_owned_bridge_marker()
-	_prime_in_progress = false
-	Logger.error(LOG, "KE bridge did not appear after %d polls (%.1f s) — config may not be applied.",
-		PRIME_POLL_MAX_ATTEMPTS, PRIME_POLL_MAX_ATTEMPTS * PRIME_POLL_INTERVAL_SEC)
-	resolve_prime_callbacks(false)
+
+	-- Entry point: start the bridge, then begin async polling.
+	-- When force=true the old bridge was just pkill'd (async), so we wait briefly
+	-- before launching the new one to avoid a PID race.
+	local function start_launch_and_poll()
+		if not launch_headless_once() then
+			fallback_attempted = true
+			Logger.error(LOG, "Headless bridge binary missing — GUI fallback is disabled by design.")
+		end
+		hs.timer.doAfter(PRIME_POLL_INTERVAL_SEC, function()
+			poll_attempt(1)
+		end)
+	end
+
+	if bridge_running and force then
+		-- pkill is async; give it 200 ms to propagate before checking again.
+		Logger.info(LOG, "Bridge alive but force=true — waiting 200 ms for pkill to settle…")
+		hs.timer.doAfter(0.2, function()
+			if is_ipc_bridge_running() then
+				Logger.warn(LOG, "Bridge still alive after settle — firing extra kill before re-prime…")
+				pcall(function() hs.execute(KARABINER_KILL_FAST_CMD) end)
+				hs.timer.doAfter(0.2, start_launch_and_poll)
+			else
+				start_launch_and_poll()
+			end
+		end)
+	else
+		start_launch_and_poll()
+	end
 end
 
 --- True only when the KE stack is fully operational AND the bridge has been
@@ -631,12 +841,14 @@ end
 --- @return boolean
 function M.is_remapping_active()
 	if not M.is_grabber_running() then return false end
-	if M.is_session_primed() then return true end
+	if M.is_session_primed() then
+		return is_runtime_remapping_ready()
+	end
 	-- Lazy fallback: bridge is alive even though the polling callback missed it.
-	if is_ipc_bridge_running() then
+	if is_runtime_remapping_ready() then
 		mark_session_primed()
 		mark_hs_owned_bridge()
-		Logger.info(LOG, "Lazy prime marker written — bridge was already running.")
+		Logger.info(LOG, "Lazy prime marker written — runtime remapping probe is ready.")
 		return true
 	end
 	return false

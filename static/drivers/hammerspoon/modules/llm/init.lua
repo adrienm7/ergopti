@@ -347,11 +347,24 @@ function M.fetch_llm_prediction(full_text, tail_text, model_name, temperature,
 			if type(disabled) == "table" then
 				local bid  = type(front.bundleID) == "function" and front:bundleID() or ""
 				local path = type(front.path) == "function" and front:path() or ""
+				local name = type(front.name) == "function" and (front:name() or "") or ""
+				name = name:lower()
 				for _, app in ipairs(disabled) do
-					if type(app) == "table" and ((app.bundleID and app.bundleID == bid) or (app.appPath and app.appPath == path)) then
+					if type(app) == "table" then
+						local has_path = type(app.appPath) == "string" and app.appPath ~= ""
+						local has_bid  = type(app.bundleID) == "string" and app.bundleID ~= ""
+						local configured_name = type(app.name) == "string" and app.name:lower() or ""
+						local path_match = has_path and (app.appPath == path)
+						local bid_match  = (not has_path and has_bid and app.bundleID == bid)
+						local name_match = (not has_path and not has_bid and configured_name ~= ""
+							and (configured_name == name
+								or name:find(configured_name, 1, true)
+								or configured_name:find(name, 1, true)))
+						if path_match or bid_match or name_match then
 						Logger.info(LOG, "Prediction aborted due to application blacklist.")
 						if type(on_fail) == "function" then pcall(on_fail) end
 						return
+						end
 					end
 				end
 			end
