@@ -2,7 +2,7 @@ name: Lua Tests
 
 on:
   push:
-    branches: [main, dev]
+    branches: [main]
     paths:
       - "static/drivers/hammerspoon/**"
       - ".github/workflows/lua-tests.yml"
