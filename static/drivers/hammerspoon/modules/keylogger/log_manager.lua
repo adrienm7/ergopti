@@ -28,7 +28,7 @@
 --- DEPENDENCIES:
 --- - lib.logger (project-wide logger).
 --- - hs.json, hs.sqlite3, hs.fs, hs.timer.
---- - Canonical SQLite schema at <metrics_dir>/../../_shared/schema/schema.sql.
+--- - Canonical SQLite schema at static/drivers/_shared/schema/schema.sql.
 ---
 --- SCOPE OF THIS REWRITE:
 --- The full legacy aggregation pipeline (n-grams, bursts, sessions, ergonomic
@@ -279,6 +279,16 @@ local function _resolve_tmpdir()
 	return "/tmp/"
 end
 
+--- Resolve the schema.sql path from the source-file location so it works
+--- regardless of where metrics_dir points (config dir or repo dir).
+--- This file lives at static/drivers/hammerspoon/modules/keylogger/,
+--- so three levels up reaches static/drivers/ → _shared/schema/.
+local _SCHEMA_SQL_PATH = (function()
+	local src = debug.getinfo(1, "S").source:sub(2)
+	local dir = src:match("^(.*[/\\])")
+	return dir .. "../../../_shared/schema/schema.sql"
+end)()
+
 --- Compute every path the log manager touches once `device_id` is known.
 --- @param metrics_dir string The metrics root (CoreState.LOG_DIR).
 --- @param device_id   string The current device's UUID.
@@ -289,13 +299,6 @@ local function _resolve_paths(metrics_dir, device_id)
 	local by_dev = md .. "by_device/" .. device_id .. "/"
 	local tmp_dir = _resolve_tmpdir() .. "ergopti_metrics/" .. device_id .. "/"
 
-	-- The canonical schema lives outside the hammerspoon driver, in the
-	-- repo's _shared/schema/. metrics_dir is <hammerspoon>/metrics, so we
-	-- go two levels up to reach <repo>/static/drivers/ then into _shared.
-	local config_dir = md:gsub("[/\\]?metrics[/\\]?$", "")
-	if not config_dir:match("[/\\]$") then config_dir = config_dir .. "/" end
-	local schema_path = config_dir .. "../_shared/schema/schema.sql"
-
 	_paths = {
 		metrics_dir       = md,
 		by_device_dir     = by_dev,
@@ -304,7 +307,7 @@ local function _resolve_paths(metrics_dir, device_id)
 		today_log_path    = by_dev .. "today.log",
 		tmpdir_dir        = tmp_dir,
 		sqlite_path       = tmp_dir .. "db.sqlite",
-		schema_sql_path   = schema_path,
+		schema_sql_path   = _SCHEMA_SQL_PATH,
 	}
 end
 

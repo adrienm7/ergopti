@@ -311,8 +311,10 @@ function M.load_user_config(tap_hold_keys, mod_combos, user_config_path)
 	end
 
 	Logger.info(LOG, "User config loaded.")
+	-- Support both formats: new [karabiner] section and legacy root-level key
+	local karabiner_section = type(data.karabiner) == "table" and data.karabiner or data
 	return {
-		enabled                   = data.enabled == true,
+		enabled                   = karabiner_section.enabled == true,
 		tap_hold_config           = tap_holds.config,
 		mod_combos_config         = combos.config,
 		tap_hold_timeout_ms       = timeout_ms,
@@ -327,7 +329,9 @@ end
 --- @param user_config_path string Absolute path to config_karabiner.toml.
 function M.save_user_config(state, user_config_path)
 	local ok, payload = pcall(TomlCodec.encode, {
-		enabled = state.enabled == true,
+		karabiner = {
+			enabled = state.enabled == true,
+		},
 		tap_holds = {
 			config = state.tap_hold_config or {},
 			timeout_ms = state.tap_hold_timeout_ms,
