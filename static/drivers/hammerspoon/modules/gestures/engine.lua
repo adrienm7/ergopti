@@ -40,6 +40,8 @@ local SWIPE_MIN      = 1.5    -- 3/4/5 fingers: minimum distance to validate a s
 local SWIPE_MIN_2    = 3.0    -- 2 fingers horiz/vert (left to macOS, diagonal only)
 local DIAG_MIN_2     = 5.0    -- 2 fingers: minimum total distance to validate a diagonal
 local SCALE_DIV      = 3.5
+local LIVE_AXIS_MIN  = 1.5    -- Minimum signed distance to trigger non-scalable horizontal actions live
+local LIVE_REARM_SEC = 0.10   -- Minimum delay between opposite live axis triggers
 
 local scrollBlocker  = nil
 local gs             = {}
@@ -102,6 +104,8 @@ local function resetGS()
 		lockedDir      = nil, 
 		stepsCommitted = 0, 
 		lifting        = false,
+		liveAxisSign   = nil,
+		lastLiveFire   = 0,
 	}
 end
 resetGS()
@@ -177,6 +181,32 @@ local function signedDist(pos)
 	return (_state.natural_scroll and -dx) or dx
 end
 
+--- Triggers non-scalable horizontal actions during the gesture to reduce latency.
+--- @param slot string|nil The action slot resolved from direction and finger count.
+--- @param pos table Current centroid position.
+--- @param now number Current timestamp.
+local function triggerLiveAxisIfNeeded(slot, pos, now)
+	if not slot or not _state.ga[slot] or _state.ga[slot] == "none" then return end
+	if _actions.is_scalable(_state.ga[slot]) then return end
+
+	local sd = signedDist(pos)
+	if math.abs(sd) < LIVE_AXIS_MIN then return end
+
+	local sign = (sd > 0) and 1 or -1
+	if gs.liveAxisSign == sign then return end
+	if gs.lastLiveFire and (now - gs.lastLiveFire) < LIVE_REARM_SEC then return end
+
+	Logger.info(LOG, string.format("Horizontal swipe live trigger on slot: %s (sign=%d).", slot, sign))
+	_actions.execute_axis(_state.ga[slot], sign > 0)
+
+	-- Rebase after each live trigger so a quick direction reversal can fire promptly.
+	gs.liveAxisSign = sign
+	gs.lastLiveFire = now
+	gs.startPos     = pos
+	gs.endPos       = pos
+	gs.stepsCommitted = 0
+end
+
 --- Evaluates the gesture state upon release and issues the appropriate trigger.
 --- @param now number Timestamp of the evaluation.
 local function commitGesture(now)
@@ -247,6 +277,7 @@ local function commitGesture(now)
 	if not slot or _state.ga[slot] == "none" then return end
 	
 	if not _actions.is_scalable(_state.ga[slot]) then
+		if gs.liveAxisSign ~= nil then return end
 		local sd = signedDist(gs.endPos)
 		if math.abs(sd) >= SWIPE_MIN then
 			Logger.info(LOG, string.format("Horizontal swipe validated on slot: %s.", slot))
@@ -304,6 +335,10 @@ function M.process_frame(touches)
 			gs.maxFingers     = n
 			gs.stepsCommitted = 0
 			gs.lifting        = false
+			gs.liveAxisSign   = nil
+			gs.lastLiveFire   = 0
+			gs.liveAxisSign   = nil
+			gs.lastLiveFire   = 0
 		else
 			if n < gs.maxFingers then
 				gs.lifting = true
@@ -366,6 +401,8 @@ function M.process_frame(touches)
 							for _ = 1, -diff do _actions.execute_axis(_state.ga[slot], false) end
 						end
 						gs.stepsCommitted = targetSteps
+					elseif slot then
+						triggerLiveAxisIfNeeded(slot, pos, now)
 					end
 				end
 			end
