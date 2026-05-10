@@ -55,6 +55,8 @@ local SLOT_LABELS = {
 	swipe_5_down  = "Swipe 5 doigts ↓",
 }
 
+local DISABLED_GESTURE_ACTION = "none"
+
 --- Builds the gestures sub-menu.
 --- @param ctx table Context containing state, updateMenu, save_prefs, etc.
 --- @return table|nil The menu definition table.
@@ -153,13 +155,20 @@ function M.build(ctx)
 
 	-- Quick-action buttons at the top, mirroring the karabiner menu pattern
 	table.insert(gm, {
-		title = "✕ Tout désactiver",
+		title = "✕ Désactiver tous les gestes",
 		fn    = function()
+			local gestures_enabled = state.gestures == true
 			local all_slots = {}
 			for _, s in ipairs(gestures_mod.AXIS_SLOTS   or {}) do all_slots[#all_slots + 1] = s end
 			for _, s in ipairs(gestures_mod.SINGLE_SLOTS or {}) do all_slots[#all_slots + 1] = s end
 			for _, slot in ipairs(all_slots) do
-				if type(gestures.set_action) == "function" then pcall(gestures.set_action, slot, "none") end
+				if type(gestures.set_action) == "function" then pcall(gestures.set_action, slot, DISABLED_GESTURE_ACTION) end
+			end
+			state.gestures = gestures_enabled
+			if gestures_enabled then
+				if type(gestures.enable_all) == "function" then pcall(gestures.enable_all) end
+			else
+				if type(gestures.disable_all) == "function" then pcall(gestures.disable_all) end
 			end
 			ctx.save_prefs()
 			ctx.updateMenu()
