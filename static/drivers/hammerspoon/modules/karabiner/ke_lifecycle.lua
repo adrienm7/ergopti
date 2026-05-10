@@ -329,6 +329,7 @@ local function notify_karabiner_ready()
 
 	_pending_karabiner_ready_notify = false
 	_karabiner_ready_notify_timer = hs.timer.doAfter(KARABINER_READY_NOTIFY_DELAY_SEC, function()
+				Logger.debug(LOG, "Karabiner ready notification timer triggered (%.1f s delay).", KARABINER_READY_NOTIFY_DELAY_SEC)
 		_karabiner_ready_notify_timer = nil
 		if not is_hs_boot_ready() then
 			_pending_karabiner_ready_notify = true
@@ -362,6 +363,7 @@ end
 function M.flush_pending_ready_notification()
 	if not _pending_karabiner_ready_notify then return end
 	if not is_hs_boot_ready() then return end
+		Logger.debug(LOG, "Flushing pending Karabiner ready notification…")
 	_pending_karabiner_ready_notify = false
 	notify_karabiner_ready()
 end
