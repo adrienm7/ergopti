@@ -431,6 +431,13 @@ function M.regenerate()
 		return
 	end
 
+	-- Ensure the parent directory of the KC physical log exists before Karabiner
+	-- starts writing to it via shell_command echo redirects
+	local kc_parent = Generator.KE_PHYSICAL_KC_LOG and Generator.KE_PHYSICAL_KC_LOG:match("^(.*)/[^/]+$")
+	if kc_parent then
+		pcall(hs.execute, string.format("mkdir -p %q", kc_parent))
+	end
+
 	local active_combos = 0
 	for _, combo_def in ipairs(M.MOD_COMBOS) do
 		local cfg = _state.mod_combos_config[combo_def.id] or {}
