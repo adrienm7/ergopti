@@ -106,18 +106,19 @@ def parse_toml_structure(content: str) -> dict:
 
         # Parse key = value pairs
         if "=" in line and not stripped.startswith("#"):
-            if current_section is not None:
-                key_match = re.match(r"^([^=]+)=(.+)$", stripped)
-                if key_match:
-                    key = key_match.group(1).strip()
-                    value = key_match.group(2).strip()
+            key_match = re.match(r"^([^=]+)=(.+)$", stripped)
+            if key_match:
+                key = key_match.group(1).strip()
+                value = key_match.group(2).strip()
+                if current_section is not None:
                     structure[current_section][key] = value
-            elif current_array is not None and current_array_index >= 0:
-                key_match = re.match(r"^([^=]+)=(.+)$", stripped)
-                if key_match:
-                    key = key_match.group(1).strip()
-                    value = key_match.group(2).strip()
+                elif current_array is not None and current_array_index >= 0:
                     structure[current_array][current_array_index][key] = value
+                else:
+                    # Root-level key (before any [section])
+                    if "" not in structure:
+                        structure[""] = OrderedDict()
+                    structure[""][key] = value
 
     return structure
 
@@ -152,7 +153,17 @@ def rebuild_toml_from_structure(structure: dict) -> str:
     lines = []
     is_first = True
 
+    # Emit root-level keys first (no section header)
+    if "" in structure and isinstance(structure[""], dict):
+        for key, value in sorted(structure[""].items()):
+            lines.append(f"{key} = {value}")
+        lines.append("")
+        is_first = False
+
     for section_key in structure.keys():
+        if section_key == "":
+            continue
+
         section_content = structure[section_key]
 
         parts = section_key.split(".")

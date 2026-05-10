@@ -1181,6 +1181,7 @@ end
 --- @param shortcut_key string The canonical shortcut label (e.g. "Cmd+C").
 --- @param app_name string The frontmost application.
 function M.log_shortcut(shortcut_key, app_name)
+	if not CoreState.is_enabled then return end
 	LogManager.log_shortcut(shortcut_key, app_name or CoreState.session_app_name)
 end
 
