@@ -23,6 +23,11 @@ local mouseEventTap     = nil
 local leftMouseEventTap = nil
 local keyboardWatcher   = nil
 local gestureInProgress = false
+local appSwitchWatcher  = nil
+local currentBundleID   = nil
+local previousBundleID  = nil
+local currentAppName    = nil
+local previousAppName   = nil
 
 -- Delay after activation before reacting to rightMouseUp / leftMouseUp events.
 -- The gesture fires on finger-lift, which can generate a spurious mouseUp
@@ -241,6 +246,100 @@ function M.trigger_lookup()
 	Logger.info(LOG, "Dictionary lookup triggered.")
 end
 
+--- Ensures app-switch history tracking is active for previous-app toggling.
+local function ensure_window_switch_watcher()
+	if windowSwitchWatcher then return end
+	if type(hs.window) ~= "table" or type(hs.window.filter) ~= "table" then return end
+	if type(hs.window.filter.default) ~= "table" then return end
+	if type(hs.window.filter.windowFocused) ~= "number" then return end
+
+	windowSwitchWatcher = hs.window.filter.default
+	if type(windowSwitchWatcher.subscribe) ~= "function" then
+		windowSwitchWatcher = nil
+		return
+	end
+
+	pcall(function()
+		windowSwitchWatcher:subscribe(hs.window.filter.windowFocused, function(win, _)
+			if not win then return end
+
+			local ok_new_id, new_id = pcall(function() return win:id() end)
+			if not ok_new_id or type(new_id) ~= "number" then return end
+
+			local current_id = nil
+			if currentWindowRef then
+				pcall(function() current_id = currentWindowRef:id() end)
+			end
+			if current_id and current_id == new_id then return end
+
+			previousWindowRef = currentWindowRef
+			currentWindowRef = win
+		end)
+	end)
+
+	local ok_fw, focused_window = pcall(hs.window.focusedWindow)
+	if ok_fw and focused_window then
+		currentWindowRef = focused_window
+	end
+end
+
+--- Switches focus to the previously active application.
+local function switch_to_previous_application()
+	ensure_app_switch_watcher()
+
+	if type(previousBundleID) == "string" and previousBundleID ~= "" and type(hs.application.launchOrFocusByBundleID) == "function" then
+		local ok = pcall(hs.application.launchOrFocusByBundleID, previousBundleID)
+		if ok then return end
+	end
+
+	if type(previousAppName) == "string" and previousAppName ~= "" then
+		local ok = pcall(hs.application.launchOrFocus, previousAppName)
+		if ok then return end
+	end
+
+	if type(previousBundleID) == "string" and previousBundleID ~= "" then
+		local ok_target, target = pcall(hs.application.get, previousBundleID)
+		if ok_target and target then
+			pcall(function() target:activate() end)
+			return
+		end
+	end
+
+	if type(previousAppName) == "string" and previousAppName ~= "" then
+		Logger.warn(LOG, "Previous app '%s' could not be focused directly.", previousAppName)
+		return
+	end
+
+	Logger.warn(LOG, "No previous application is known yet for app_previous.")
+end
+
+local function switch_to_previous_window_precise()
+	if type(hs.window) == "table" and type(hs.window.orderedWindows) == "function" then
+		local ok_list, wins = pcall(hs.window.orderedWindows)
+		if ok_list and type(wins) == "table" and #wins > 1 then
+			local ok_cur, cur = pcall(hs.window.focusedWindow)
+			local cur_id = nil
+			if ok_cur and cur then
+				pcall(function() cur_id = cur:id() end)
+			end
+
+			for _, w in ipairs(wins) do
+				local ok_id, wid = pcall(function() return w:id() end)
+				if ok_id and wid and (not cur_id or wid ~= cur_id) and w:isStandard() and not w:isMinimized() then
+					local ok_focus = pcall(function() w:focus() end)
+					if ok_focus then return end
+				end
+			end
+		end
+	end
+
+	switch_to_previous_application()
+end
+
+local function show_application_switcher_overlay()
+	pcall(function() hs.eventtap.keyStroke({"cmd"}, "tab", 0) end)
+end
+
 --- Posts system media keys safely.
 --- @param name string The system key name.
 local function sysKey(name)
@@ -340,6 +439,11 @@ local AX, SG = {}, {}
 local function ax(n, lbl, p, nx, scalable) AX[n] = {label = lbl, prev = p, next = nx, scalable = scalable} end
 local function sg(n, lbl, fn)              SG[n] = {label = lbl, fn = fn} end
 
+local CMD_LETTERS = {
+	"a", "b", "c", "d", "e", "f", "g", "h", "i", "j", "k", "l", "m",
+	"n", "o", "p", "q", "r", "s", "t", "u", "v", "w", "x", "y", "z",
+}
+
 -- Axis actions (prev / next) — scalable=true for continuous actions
 ax("tabs",       "Onglets",
 	function() pcall(hs.eventtap.keyStroke, {"ctrl", "shift"}, "tab") end,
@@ -392,23 +496,16 @@ sg("none",             "Désactivé",            function() end)
 sg("left_click_toggle",  "Toggle clic gauche maintenu", M.toggle_left_click)
 sg("right_click_toggle", "Toggle clic droit maintenu",  M.toggle_right_click)
 sg("lookup",           "Définition du mot",    M.trigger_lookup)
-sg("app_switcher",     "Alt-Tab",              function() pcall(hs.eventtap.keyStroke, {"cmd"}, "tab") end)
-
--- Editing
-sg("copy",             "Copier",               function() pcall(hs.eventtap.keyStroke, {"cmd"}, "c") end)
-sg("paste",            "Coller",               function() pcall(hs.eventtap.keyStroke, {"cmd"}, "v") end)
-sg("cut",              "Couper",               function() pcall(hs.eventtap.keyStroke, {"cmd"}, "x") end)
-sg("undo",             "Annuler",              function() pcall(hs.eventtap.keyStroke, {"cmd"}, "z") end)
-sg("redo",             "Rétablir",             function() pcall(hs.eventtap.keyStroke, {"cmd", "shift"}, "z") end)
-sg("select_all",       "Tout sélectionner",    function() pcall(hs.eventtap.keyStroke, {"cmd"}, "a") end)
-sg("find",             "Rechercher",           function() pcall(hs.eventtap.keyStroke, {"cmd"}, "f") end)
+sg("app_switcher",     "Alt+Tab — Liste des apps", show_application_switcher_overlay)
+sg("app_previous",     "Alt+Tab — App précédente", switch_to_previous_application)
+sg("app_window_previous", "Alt+Tab — Fenêtre précédente", switch_to_previous_window_precise)
 
 -- Keys
 sg("enter",            "Entrée",               function() pcall(hs.eventtap.keyStroke, {}, "return") end)
 sg("tab",              "Tab",                  function() pcall(hs.eventtap.keyStroke, {}, "tab") end)
 sg("escape",           "Échap",                function() pcall(hs.eventtap.keyStroke, {}, "escape") end)
 sg("backspace",        "Suppr. arrière",       function() pcall(hs.eventtap.keyStroke, {}, "delete") end)
-sg("delete",           "Supprimer",            function() pcall(hs.eventtap.keyStroke, {}, "forwarddelete") end)
+sg("delete",           "Suppr. avant",         function() pcall(hs.eventtap.keyStroke, {}, "forwarddelete") end)
 
 -- Tabs
 sg("tab_new",          "Nouvel onglet",        function() pcall(hs.eventtap.keyStroke, {"cmd"}, "t") end)
@@ -594,6 +691,21 @@ end)
 -- ===== Debug =====
 sg("open_console",           "Console Hammerspoon", function() pcall(hs.openConsole) end)
 
+-- ===== Cmd letter shortcuts =====
+for _, letter in ipairs(CMD_LETTERS) do
+	local upper = string.upper(letter)
+	sg("cmd_" .. letter,
+		"⌘" .. upper .. " — Cmd+" .. upper,
+		function() pcall(hs.eventtap.keyStroke, {"cmd"}, letter) end)
+end
+
+for _, letter in ipairs(CMD_LETTERS) do
+	local upper = string.upper(letter)
+	sg("cmd_shift_" .. letter,
+		"⌘⇧" .. upper .. " — Cmd+Shift+" .. upper,
+		function() pcall(hs.eventtap.keyStroke, {"cmd", "shift"}, letter) end)
+end
+
 
 
 
@@ -621,10 +733,7 @@ M.SG_NAMES = {
 	"none",
 	"--",
 	-- Selection & navigation
-	"left_click_toggle", "right_click_toggle", "lookup", "app_switcher",
-	"--",
-	-- Editing
-	"copy", "paste", "cut", "undo", "redo", "select_all", "find",
+	"left_click_toggle", "right_click_toggle", "lookup", "app_switcher", "app_previous", "app_window_previous",
 	"--",
 	-- Keys
 	"enter", "tab", "escape", "backspace", "delete",
@@ -668,6 +777,35 @@ M.SG_NAMES = {
 	-- Debug (Hammerspoon-only — Console replaces AHK's Window Spy / List Vars / Key History)
 	"open_console",
 }
+
+local function insert_cmd_shortcuts_in_picker_order()
+	local insert_index = nil
+	for i, name in ipairs(M.SG_NAMES) do
+		if name == "enter" then
+			insert_index = i
+			break
+		end
+	end
+
+	if not insert_index then return end
+
+	for _, letter in ipairs(CMD_LETTERS) do
+		table.insert(M.SG_NAMES, insert_index, "cmd_" .. letter)
+		insert_index = insert_index + 1
+	end
+
+	table.insert(M.SG_NAMES, insert_index, "--")
+	insert_index = insert_index + 1
+
+	for _, letter in ipairs(CMD_LETTERS) do
+		table.insert(M.SG_NAMES, insert_index, "cmd_shift_" .. letter)
+		insert_index = insert_index + 1
+	end
+
+	table.insert(M.SG_NAMES, insert_index, "--")
+end
+
+insert_cmd_shortcuts_in_picker_order()
 
 --- Retrieves the localized label for a given action ID.
 --- @param name string The action ID.

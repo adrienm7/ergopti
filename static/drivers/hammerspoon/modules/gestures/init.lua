@@ -38,21 +38,21 @@ local Conflicts = require("modules.gestures.conflicts")
 
 M.DEFAULT_GESTURES = {
 	tap_3         = "left_click_toggle",
-	tap_4         = "none",
+	tap_4         = "app_window_previous",
 	tap_5         = "none",
 	swipe_2_diag  = "none",
-	swipe_3_horiz = "none",
+	swipe_3_horiz = "tabs",
 	swipe_3_diag  = "none",
-	swipe_3_up    = "none",
-	swipe_3_down  = "none",
+	swipe_3_up    = "tab_new",
+	swipe_3_down  = "tab_close",
 	swipe_4_horiz = "none",
 	swipe_4_diag  = "none",
 	swipe_4_up    = "none",
 	swipe_4_down  = "none",
-	swipe_5_horiz = "none",
+	swipe_5_horiz = "windows",
 	swipe_5_diag  = "none",
-	swipe_5_up    = "none",
-	swipe_5_down  = "none",
+	swipe_5_up    = "doc_start",
+	swipe_5_down  = "doc_end",
 }
 
 M.DEFAULT_STATE = {
