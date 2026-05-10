@@ -150,6 +150,34 @@ function M.build(ctx)
 	end
 
 	local gm = {}
+
+	-- Quick-action buttons at the top, mirroring the karabiner menu pattern
+	table.insert(gm, {
+		title = "🧹 Tout désactiver",
+		fn    = function()
+			local all_slots = {}
+			for _, s in ipairs(gestures_mod.AXIS_SLOTS   or {}) do all_slots[#all_slots + 1] = s end
+			for _, s in ipairs(gestures_mod.SINGLE_SLOTS or {}) do all_slots[#all_slots + 1] = s end
+			for _, slot in ipairs(all_slots) do
+				if type(gestures.set_action) == "function" then pcall(gestures.set_action, slot, "none") end
+			end
+			ctx.save_prefs()
+			ctx.updateMenu()
+		end,
+	})
+	table.insert(gm, {
+		title = "↩  Restaurer les valeurs par défaut",
+		fn    = function()
+			local defaults = gestures_mod.DEFAULT_GESTURES or {}
+			for slot, action in pairs(defaults) do
+				if type(gestures.set_action) == "function" then pcall(gestures.set_action, slot, action) end
+			end
+			ctx.save_prefs()
+			ctx.updateMenu()
+		end,
+	})
+	table.insert(gm, { title = "-" })
+
 	table.insert(gm, slotItem("swipe_2_diag", true)); table.insert(gm, { title = "-" })
 	table.insert(gm, slotItem("tap_3", false))
 	for _, it in ipairs(section({"swipe_3_horiz","swipe_3_diag"}, true))  do table.insert(gm, it) end
