@@ -1,0 +1,1 @@
+cb1eb0a4 feat(gestures): update default bindings and clarify delete labels

@@ -28,7 +28,7 @@ D.combo_symmetric            = false
 D.tap_hold = {
 --                              tap               hold
     escape              = { "none",           "none"      },
-    tab                 = { "cmd_tab",        "fn"        },
+    tab                 = { "alt_tab_windows", "fn"        },
     caps_lock           = { "return",         "cmd"       },
     left_shift          = { "copy",           "shift"     },
     fn                  = { "paste",          "cmd"       },

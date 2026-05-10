@@ -359,6 +359,51 @@
         ]
     },
     {
+        "id": "alt_tab_apps_list",
+        "short_label": "Alt+Tab — Liste apps",
+        "label": "Alt+Tab — Afficher la liste des apps",
+        "holdable": false,
+        "category": "Navigation",
+        "karabiner_to": [
+            {
+                "key_code": "tab",
+                "modifiers": [
+                    "left_command"
+                ]
+            }
+        ]
+    },
+    {
+        "id": "alt_tab_apps",
+        "short_label": "Alt+Tab — App préc.",
+        "label": "Alt+Tab — Aller à l'app précédente",
+        "holdable": false,
+        "category": "Navigation",
+        "karabiner_to": [
+            {
+                "key_code": "f17",
+                "modifiers": [
+                    "left_option"
+                ]
+            }
+        ]
+    },
+    {
+        "id": "alt_tab_windows",
+        "short_label": "Alt+Tab — Fenêtre préc.",
+        "label": "Alt+Tab — Aller à la fenêtre précédente",
+        "holdable": false,
+        "category": "Navigation",
+        "karabiner_to": [
+            {
+                "key_code": "f17",
+                "modifiers": [
+                    "left_shift"
+                ]
+            }
+        ]
+    },
+    {
         "id": "cmd_shift_tab",
         "short_label": "App précédente",
         "label": "⌘⇧⇥ — App précédente (Cmd+Shift+Tab)",
