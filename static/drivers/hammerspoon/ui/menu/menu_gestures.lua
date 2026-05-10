@@ -153,7 +153,7 @@ function M.build(ctx)
 
 	-- Quick-action buttons at the top, mirroring the karabiner menu pattern
 	table.insert(gm, {
-		title = "🧹 Tout désactiver",
+		title = "✕ Tout désactiver",
 		fn    = function()
 			local all_slots = {}
 			for _, s in ipairs(gestures_mod.AXIS_SLOTS   or {}) do all_slots[#all_slots + 1] = s end
@@ -166,7 +166,7 @@ function M.build(ctx)
 		end,
 	})
 	table.insert(gm, {
-		title = "↩  Restaurer les valeurs par défaut",
+		title = "↩ Restaurer les valeurs par défaut",
 		fn    = function()
 			local defaults = gestures_mod.DEFAULT_GESTURES or {}
 			for slot, action in pairs(defaults) do

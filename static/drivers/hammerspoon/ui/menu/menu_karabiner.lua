@@ -709,7 +709,7 @@ function M.build(ctx)
 		end,
 	}
 	submenu[#submenu + 1] = {
-		title = "↩  Restaurer les valeurs par défaut",
+		title = "↩ Restaurer les valeurs par défaut",
 		fn    = function()
 			pcall(karabiner.reset_to_defaults)
 			pcall(karabiner.regenerate)
