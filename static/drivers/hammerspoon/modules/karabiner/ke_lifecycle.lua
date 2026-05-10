@@ -329,33 +329,30 @@ local function notify_karabiner_ready()
 
 	_pending_karabiner_ready_notify = false
 	_karabiner_ready_notify_timer = hs.timer.doAfter(KARABINER_READY_NOTIFY_DELAY_SEC, function()
-				Logger.debug(LOG, "Karabiner ready notification timer triggered (%.1f s delay).", KARABINER_READY_NOTIFY_DELAY_SEC)
-		_karabiner_ready_notify_timer = nil
-		if not is_hs_boot_ready() then
-			_pending_karabiner_ready_notify = true
-			Logger.debug(LOG, "Karabiner ready notification postponed — HS boot not ready.")
-			return
-		end
-		if not is_ipc_bridge_fully_ready() then
-			_pending_karabiner_ready_notify = true
-			Logger.error(LOG, "Karabiner ready notification BLOCKED — bridge not fully ready at send time (check karabiner_console_user_server + karabiner_session_monitor).")
-			return
-		end
-		if not is_runtime_remapping_ready() then
-			_pending_karabiner_ready_notify = true
-			Logger.error(LOG, "Karabiner ready notification BLOCKED — runtime remapping probe failed at send time (karabiner_cli --set-variables returned error).")
-			return
-		end
+		local ok, err = pcall(function()
+			Logger.debug(LOG, "Karabiner ready notification timer triggered (%.1f s delay).", KARABINER_READY_NOTIFY_DELAY_SEC)
+			_karabiner_ready_notify_timer = nil
+			if not is_hs_boot_ready() then
+				_pending_karabiner_ready_notify = true
+				Logger.debug(LOG, "Karabiner ready notification postponed — HS boot not ready.")
+				return
+			end
 
-		local now = hs.timer.secondsSinceEpoch()
-		if (now - _last_karabiner_ready_notify_at) < KARABINER_READY_NOTIFY_COOLDOWN_SEC then
-			Logger.debug(LOG, "Karabiner ready notification skipped (cooldown %.1fs).",
-				KARABINER_READY_NOTIFY_COOLDOWN_SEC)
-			return
+			local now = hs.timer.secondsSinceEpoch()
+			if (now - _last_karabiner_ready_notify_at) < KARABINER_READY_NOTIFY_COOLDOWN_SEC then
+				Logger.debug(LOG, "Karabiner ready notification skipped (cooldown %.1fs).",
+					KARABINER_READY_NOTIFY_COOLDOWN_SEC)
+				return
+			end
+			_last_karabiner_ready_notify_at = now
+			Logger.info(LOG, "Karabiner ready notification sent.")
+			Notifications.notify("Karabiner prêt", "Le moteur Karabiner est prêt.", "success")
+		end)
+		if not ok then
+			_pending_karabiner_ready_notify = true
+			_karabiner_ready_notify_timer = nil
+			Logger.error(LOG, "Karabiner ready notification callback failed: %s.", tostring(err))
 		end
-		_last_karabiner_ready_notify_at = now
-				Logger.info(LOG, "✓ Karabiner ready notification sent.")
-		Notifications.notify("Karabiner prêt", "Le moteur Karabiner est prêt.", "success")
 	end)
 end
 
