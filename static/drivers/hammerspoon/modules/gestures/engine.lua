@@ -212,7 +212,7 @@ local function commitGesture(now)
 	if not dir then return end
 
 	if dir == "vert" then
-		local goDown = dy > 0
+		local goDown = dy < 0
 		local slot = nil
 		if     mf == 3 then slot = goDown and "swipe_3_down" or "swipe_3_up"
 		elseif mf == 4 then slot = goDown and "swipe_4_down" or "swipe_4_up"
@@ -233,7 +233,7 @@ local function commitGesture(now)
 	end
 
 	if dir == "vert" then
-		local goDown = dy > 0
+		local goDown = dy < 0
 		local slot = nil
 		if     mf == 3 then slot = goDown and "swipe_3_down" or "swipe_3_up"
 		elseif mf == 4 then slot = goDown and "swipe_4_down" or "swipe_4_up"
