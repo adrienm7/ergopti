@@ -40,8 +40,10 @@ local SWIPE_MIN      = 1.5    -- 3/4/5 fingers: minimum distance to validate a s
 local SWIPE_MIN_2    = 3.0    -- 2 fingers horiz/vert (left to macOS, diagonal only)
 local DIAG_MIN_2     = 5.0    -- 2 fingers: minimum total distance to validate a diagonal
 local SCALE_DIV      = 3.5
-local LIVE_AXIS_MIN  = 1.5    -- Minimum signed distance to trigger non-scalable horizontal actions live
-local LIVE_REARM_SEC = 0.10   -- Minimum delay between opposite live axis triggers
+local LIVE_AXIS_MIN               = 1.0   -- Minimum signed distance to trigger non-scalable horizontal actions live
+local LIVE_REARM_SEC              = 0.08  -- Minimum delay between consecutive live axis triggers
+local LIVE_REARM_REVERSE_FAST_SEC = 0.03  -- Faster rearm when user reverses direction strongly
+local LIVE_REVERSE_FAST_MIN       = 1.5   -- Signed distance threshold to unlock fast reversal rearm
 
 local scrollBlocker  = nil
 local gs             = {}
@@ -194,7 +196,12 @@ local function triggerLiveAxisIfNeeded(slot, pos, now)
 
 	local sign = (sd > 0) and 1 or -1
 	if gs.liveAxisSign == sign then return end
-	if gs.lastLiveFire and (now - gs.lastLiveFire) < LIVE_REARM_SEC then return end
+
+	local rearm_delay = LIVE_REARM_SEC
+	if gs.liveAxisSign and sign ~= gs.liveAxisSign and math.abs(sd) >= LIVE_REVERSE_FAST_MIN then
+		rearm_delay = LIVE_REARM_REVERSE_FAST_SEC
+	end
+	if gs.lastLiveFire and (now - gs.lastLiveFire) < rearm_delay then return end
 
 	Logger.info(LOG, string.format("Horizontal swipe live trigger on slot: %s (sign=%d).", slot, sign))
 	_actions.execute_axis(_state.ga[slot], sign > 0)
