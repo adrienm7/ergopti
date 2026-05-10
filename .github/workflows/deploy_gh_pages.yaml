@@ -3,7 +3,7 @@ name: Build and Deploy to GitHub Pages
 on:
     # Déclenchement sur un push vers la branche principale
     push:
-        branches: ["main", "dev"]
+        branches: ["main"]
 
     # Permet de lancer manuellement depuis l'onglet Actions
     workflow_dispatch:
