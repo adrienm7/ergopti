@@ -24,6 +24,9 @@ local notifications = require("lib.notifications")
 local Logger        = require("lib.logger")
 local Keycodes      = require("lib.keycodes")
 
+local Engine    = require("modules.gestures.engine")
+local GestActions = require("modules.gestures.actions")
+
 local LOG = "shortcuts.script_control"
 
 
@@ -34,57 +37,6 @@ local LOG = "shortcuts.script_control"
 -- ======= 1/ Constants & State =======
 -- ====================================
 -- ====================================
-
--- All available actions in display order. "--" sentinels mark group
--- boundaries so the picker UI can render visual separators identical to the
--- AutoHotkey side. The naming scheme mirrors modules/gestures/actions.lua so
--- the same id can be bound to a gesture or to one of the right-Alt key slots.
-local ACTION_DEFINITIONS = {
-	{id = "none",                     label = "Désactivé"},
-	{type = "separator"},
-	-- Script lifecycle
-	{id = "script_pause_toggle",      label = "Suspendre / Reprendre le script"},
-	{id = "script_reload",            label = "↻ Recharger Hammerspoon"},
-	{id = "script_save_reload",       label = "↻ Sauver (Cmd+S) et recharger"},
-	{id = "script_quit",              label = "✕ Quitter Hammerspoon"},
-	{type = "separator"},
-	-- UI windows
-	{id = "open_paths_editor",        label = "📂 Dossier de configuration (éditeur)"},
-	{id = "open_hotstrings_editor",   label = "✏️ Éditeur de hotstrings personnels"},
-	{id = "open_metrics_typing",      label = "📊 Métriques de frappe"},
-	{id = "open_metrics_apps",        label = "📊 Temps sur les applications"},
-	{type = "separator"},
-	-- Open user files / folders
-	{id = "open_script_source",       label = "✎ Ouvrir init.lua"},
-	{id = "open_personal_shortcuts",  label = "✎ Éditer personal_shortcuts.lua"},
-	{id = "open_personal_hotstrings", label = "Ouvrir personal_hotstrings.toml"},
-	{id = "open_personal_info",       label = "Ouvrir personal_info.toml"},
-	{id = "open_config",              label = "Ouvrir config.toml"},
-	{id = "open_logs_folder",         label = "Ouvrir le dossier de logs"},
-	{id = "open_today_log",           label = "Ouvrir le fichier de log du jour"},
-	{type = "separator"},
-	-- Hotstring / IA / metrics legacy actions (kept for the right-Alt slots)
-	{id = "add_hotstring",            label = "Ajouter un hotstring"},
-	{id = "trigger_prediction",       label = "Déclencher une prédiction IA"},
-	{type = "separator"},
-	-- Debug
-	{id = "open_console",             label = "Console Hammerspoon"},
-}
-
--- Flat look-up tables derived from ACTION_DEFINITIONS. "--" sentinels are
--- preserved in ACTIONS_ORDER so the picker UI can render the visual
--- separators where the source intends them; ACTION_LABELS only carries
--- the addressable ids.
-local ACTION_LABELS = {}
-local ACTIONS_ORDER = {}
-for _, def in ipairs(ACTION_DEFINITIONS) do
-	if def.type == "separator" then
-		table.insert(ACTIONS_ORDER, "--")
-	else
-		ACTION_LABELS[def.id] = def.label
-		table.insert(ACTIONS_ORDER, def.id)
-	end
-end
 
 -- Sentinel keycodes emitted by Karabiner's script-control rules
 -- (modules/karabiner/init.lua → build_script_control_sentinel_rules).
@@ -232,56 +184,12 @@ local function dispatch_action(action)
 			notifications.notify("Script réactivé", nil, "success")
 		end
 		return true
-
-	elseif action == "script_reload" then
-		Logger.info(LOG, "Triggering Hammerspoon configuration reload.")
-		notifications.notify("Rechargement du script…", nil, "info")
-		-- Brief delay so the notification renders before the reload tears everything down
-		hs.timer.doAfter(0.3, function() pcall(hs.reload) end)
-		return true
-
-	elseif action == "script_save_reload" then
-		pcall(hs.eventtap.keyStroke, {"cmd"}, "s")
-		notifications.notify("Sauvegarde puis rechargement…", nil, "info")
-		hs.timer.doAfter(0.5, function() pcall(hs.reload) end)
-		return true
-
-	elseif action == "script_quit" then
-		Logger.info(LOG, "Shutting down Hammerspoon and Karabiner-Elements.")
-		-- Kill KE synchronously before the exit timer fires; hs.execute blocks
-		-- briefly here but that is acceptable since we are about to exit anyway.
-		if _karabiner and type(_karabiner.kill) == "function" then
-			pcall(function() _karabiner.kill() end)
-		end
-		hs.timer.doAfter(0.1, function() os.exit(0) end)
-		return true
-
-	elseif action == "open_console" then
-		pcall(hs.openConsole)
-		return true
 	end
 
-	-- Everything else delegates to _extras populated by ui.menu.init via
-	-- M.set_extras(). This keeps script_control free of UI/file knowledge.
-	if action == "open_paths_editor"
-		or action == "open_hotstrings_editor"
-		or action == "open_metrics_typing"
-		or action == "open_metrics_apps"
-		or action == "open_script_source"
-		or action == "open_personal_shortcuts"
-		or action == "open_personal_hotstrings"
-		or action == "open_personal_info"
-		or action == "open_config"
-		or action == "open_logs_folder"
-		or action == "open_today_log"
-		or action == "add_hotstring"
-		or action == "trigger_prediction"
-	then
-		return call_extra(action)
-	end
-
-	Logger.warn(LOG, "dispatch_action: unknown action '%s'.", tostring(action))
-	return false
+	-- Use centralized action dispatcher for everything else
+	Logger.debug(LOG, "Dispatching centralized action: %s…", action)
+	pcall(GestActions.execute_single, action)
+	return true
 end
 
 --- Logs a shortcut activation via the keylogger if available.
@@ -356,8 +264,17 @@ end
 -- =============================
 -- =============================
 
-M.ACTIONS       = ACTIONS_ORDER
-M.ACTION_LABELS = ACTION_LABELS
+M.ACTIONS       = GestActions.SG_NAMES
+
+--- Retrieves the localized label for a given action ID.
+--- @param name string The action ID.
+--- @return string The human-readable label.
+function M.get_action_label(name)
+	if GestActions and type(GestActions.get_label) == "function" then
+		return GestActions.get_label(name)
+	end
+	return name
+end
 
 --- Starts the script-control eventtap with references to sibling modules.
 --- @param keymap table Keymap module (must expose pause_processing / resume_processing).

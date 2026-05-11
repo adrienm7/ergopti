@@ -3,38 +3,24 @@
 --- ==============================================================================
 --- MODULE: Gestures Actions Registry
 --- DESCRIPTION:
---- Maps internal logic representations to human-readable labels and executable
---- functions. Handles macOS window, space, and volume navigations.
----
---- FEATURES & RATIONALE:
---- 1. Decoupled Logic: Isolates action definitions from gesture detection.
---- 2. Scalable Actions: Supports both single-fire and continuous adjustments.
+--- Maps internal logic representations to human-readable labels and concrete
+--- Hammerspoon actions (keystrokes, system events, etc.).
 --- ==============================================================================
 
 local M = {}
 
-local hs     = hs
-local Logger = require("lib.logger")
-local LOG    = "gestures.actions"
+local hs            = hs
+local notifications = require("lib.notifications")
+local Logger        = require("lib.logger")
+local LOG           = "gestures.actions"
 
-local rightClickHeld    = false
-local leftClickHeld     = false
-local mouseEventTap     = nil
-local leftMouseEventTap = nil
-local keyboardWatcher   = nil
-local gestureInProgress = false
-local appSwitchWatcher  = nil
-local currentBundleID   = nil
-local previousBundleID  = nil
-local currentAppName    = nil
-local previousAppName   = nil
-local spacesModCache    = nil
+local _state = nil
 
--- Delay after activation before reacting to rightMouseUp / leftMouseUp events.
--- The gesture fires on finger-lift, which can generate a spurious mouseUp
--- that would immediately cancel the hold mode.
-local RIGHT_CLICK_COOLDOWN_SEC = 0.15
-local LEFT_CLICK_COOLDOWN_SEC  = 0.15
+--- Binds the global shared state reference.
+--- @param core_state table The shared state object from the core module.
+function M.init(core_state)
+	_state = core_state
+end
 
 
 
@@ -42,746 +28,319 @@ local LEFT_CLICK_COOLDOWN_SEC  = 0.15
 
 -- =========================================
 -- =========================================
--- ======= 1/ Interaction Primitives =======
+-- ======= 1/ Low-Level Key Helpers ========
 -- =========================================
 -- =========================================
 
---- Stops the keyboard watcher that auto-releases right-click on key press.
-local function stopKeyboardWatcher()
-	if keyboardWatcher and type(keyboardWatcher.stop) == "function" then
-		pcall(function() keyboardWatcher:stop() end)
-		keyboardWatcher = nil
-	end
+--- Sends a system-level media or hardware key event.
+--- @param key string The hardware key name (e.g. "SOUND_UP").
+local function sysKey(key)
+	pcall(function() hs.eventtap.event.newSystemKeyEvent(key, true):post() end)
+	pcall(function() hs.eventtap.event.newSystemKeyEvent(key, false):post() end)
 end
 
---- Starts a keyboard watcher that releases the held right-click on any key
---- press or modifier change.
-local function startKeyboardWatcher()
-	stopKeyboardWatcher()
-	local evTypes = hs.eventtap.event.types
-	keyboardWatcher = hs.eventtap.new(
-		{ evTypes.keyDown, evTypes.flagsChanged },
-		function()
-			-- Any keystroke or modifier change releases the held right-click
-			hs.timer.doAfter(0, M.force_cleanup)
-			return false
-		end
-	)
-	if keyboardWatcher then
-		pcall(function() keyboardWatcher:start() end)
-	end
+--- Simulates a keystroke with optional modifiers.
+--- @param mods table List of modifiers (e.g. {"cmd", "shift"}).
+--- @param key string The key code or character.
+local function postKeyStroke(mods, key)
+	pcall(function() hs.eventtap.keyStroke(mods, key, 0) end)
 end
 
---- Safely terminates the right-click hold mode.
-function M.force_cleanup()
-	Logger.debug(LOG, "Forcefully releasing right-click hold mode…")
-	stopKeyboardWatcher()
-	if mouseEventTap and type(mouseEventTap.stop) == "function" then
-		pcall(function() mouseEventTap:stop() end)
-		mouseEventTap = nil
-	end
 
-	if rightClickHeld then
-		pcall(function()
-			hs.eventtap.event.newMouseEvent(
-				hs.eventtap.event.types.rightMouseUp,
-				hs.mouse.absolutePosition()
-			):post()
-		end)
-	end
-	rightClickHeld = false
-	Logger.info(LOG, "Right-click hold mode forcefully released.")
+
+
+
+-- ===================================
+-- ===================================
+-- ======= 2/ Action Registry ========
+-- ===================================
+-- ===================================
+
+local AX = {} -- Axis actions (continuous/scalable)
+local SG = {} -- Single actions (discrete)
+
+--- Registers an axis-based action (scalable).
+local function ax(name, label, prev_fn, next_fn, scalable)
+	AX[name] = { label = label, prev = prev_fn, next = next_fn, scalable = scalable }
 end
 
---- Toggles a right-button-held mode mimicking a physical trackpad
---- right-click that stays pressed. Any subsequent keystroke (or physical
---- right-click) releases the button — typically firing the system's
---- right-click action wherever the cursor is at that moment. Useful as a
---- generic "press right button until I do something else" toggle which
---- covers context menus, drag-with-right-button workflows (browser
---- gestures, 3D viewport rotation, …) and whatever else right-click means
---- in the focused app, hence the broader naming over the previous
---- "selection" wording.
-function M.toggle_right_click()
-	if rightClickHeld then M.force_cleanup(); return end
-
-	Logger.debug(LOG, "Enabling right-click hold mode…")
-	pcall(function()
-		local event = hs.eventtap.event.newMouseEvent(
-			hs.eventtap.event.types.rightMouseDown,
-			hs.mouse.absolutePosition()
-		)
-		-- Mark the event as HID-sourced (kCGEventSourceStateHIDSystemState = 1).
-		-- This makes it reach areas that reject session-level synthetic events
-		-- (e.g. the WindowServer for title-bar drags).
-		pcall(function()
-			event:setProperty(hs.eventtap.event.properties.eventSourceStateID, 1)
-		end)
-		event:post()
-	end)
-	rightClickHeld = true
-	startKeyboardWatcher()
-
-	local activationTime = hs.timer.secondsSinceEpoch()
-	local evTypes = hs.eventtap.event.types
-	mouseEventTap = hs.eventtap.new(
-		{ evTypes.mouseMoved, evTypes.rightMouseUp },
-		function(e)
-			local t = e:getType()
-
-			if t == evTypes.rightMouseUp then
-				-- Ignore spurious mouseUp events generated by the gesture's own
-				-- finger-lift within the cooldown window; they would prematurely
-				-- release the right-click hold before the user has a chance to drag.
-				if hs.timer.secondsSinceEpoch() - activationTime < RIGHT_CLICK_COOLDOWN_SEC then
-					return true
-				end
-				-- Ignore rightMouseUp events generated by new trackpad contact when a
-				-- new gesture is starting; the engine will re-trigger right_click_toggle
-				-- on commit if needed, so discarding here prevents a phantom cleanup.
-				if gestureInProgress then
-					return true
-				end
-				hs.timer.doAfter(0, M.force_cleanup)
-				return true
-			end
-
-			-- In areas where the synthetic rightMouseDown was not accepted, the OS
-			-- emits mouseMoved instead of rightMouseDragged.  Converting here gives
-			-- a best-effort drag signal to apps that do honour rightMouseDragged
-			-- even without a prior anchor click.
-			if t == evTypes.mouseMoved then
-				pcall(function()
-					hs.eventtap.event.newMouseEvent(
-						evTypes.rightMouseDragged, e:location()
-					):post()
-				end)
-				return false
-			end
-
-			return false
-		end)
-
-	if mouseEventTap then
-		pcall(function() mouseEventTap:start() end)
-		Logger.info(LOG, "Right-click hold mode enabled.")
-	end
+--- Registers a discrete single-fire action.
+local function sg(name, label, fn)
+	SG[name] = { label = label, fn = fn }
 end
 
---- Toggles a left-button-held mode. Useful for drag-selection: activate,
---- move the cursor to extend the selection, then tap again to release.
---- Any keystroke or physical mouse event releases the button automatically.
-function M.toggle_left_click()
-	if leftClickHeld then
-		Logger.debug(LOG, "Releasing left-click hold mode…")
-		if leftMouseEventTap and type(leftMouseEventTap.stop) == "function" then
-			pcall(function() leftMouseEventTap:stop() end)
-			leftMouseEventTap = nil
-		end
-		stopKeyboardWatcher()
-		pcall(function()
-			hs.eventtap.event.newMouseEvent(
-				hs.eventtap.event.types.leftMouseUp,
-				hs.mouse.absolutePosition()
-			):post()
-		end)
-		leftClickHeld = false
-		Logger.info(LOG, "Left-click hold mode released.")
-		return
-	end
-
-	Logger.debug(LOG, "Enabling left-click hold mode…")
-	pcall(function()
-		local event = hs.eventtap.event.newMouseEvent(
-			hs.eventtap.event.types.leftMouseDown,
-			hs.mouse.absolutePosition()
-		)
-		pcall(function()
-			event:setProperty(hs.eventtap.event.properties.eventSourceStateID, 1)
-		end)
-		event:post()
-	end)
-	leftClickHeld = true
-	startKeyboardWatcher()
-
-	local activationTime = hs.timer.secondsSinceEpoch()
-	local evTypes = hs.eventtap.event.types
-	leftMouseEventTap = hs.eventtap.new(
-		{ evTypes.mouseMoved, evTypes.leftMouseUp },
-		function(e)
-			local t = e:getType()
-
-			if t == evTypes.leftMouseUp then
-				-- Ignore spurious mouseUp from the gesture's own finger-lift
-				if hs.timer.secondsSinceEpoch() - activationTime < LEFT_CLICK_COOLDOWN_SEC then
-					return true
-				end
-				if gestureInProgress then return true end
-					hs.timer.doAfter(0, M.toggle_left_click)
-				return true
-			end
-
-			-- Convert mouseMoved to leftMouseDragged so apps see a drag
-			if t == evTypes.mouseMoved then
-				pcall(function()
-					hs.eventtap.event.newMouseEvent(
-						evTypes.leftMouseDragged, e:location()
-					):post()
-				end)
-				return false
-			end
-
-			return false
-		end)
-
-	if leftMouseEventTap then
-		pcall(function() leftMouseEventTap:start() end)
-		Logger.info(LOG, "Left-click hold mode enabled.")
-	end
-end
-
---- Triggers macOS Dictionary Lookup (Cmd+Ctrl+D).
-function M.trigger_lookup()
-	Logger.debug(LOG, "Triggering dictionary lookup…")
-	pcall(function() hs.eventtap.keyStroke({"ctrl", "cmd"}, "d", 0) end)
-	Logger.info(LOG, "Dictionary lookup triggered.")
-end
-
---- Ensures app-switch history tracking is active for previous-app toggling.
-local function ensure_window_switch_watcher()
-	if windowSwitchWatcher then return end
-	if type(hs.window) ~= "table" or type(hs.window.filter) ~= "table" then return end
-	if type(hs.window.filter.default) ~= "table" then return end
-	if type(hs.window.filter.windowFocused) ~= "number" then return end
-
-	windowSwitchWatcher = hs.window.filter.default
-	if type(windowSwitchWatcher.subscribe) ~= "function" then
-		windowSwitchWatcher = nil
-		return
-	end
-
-	pcall(function()
-		windowSwitchWatcher:subscribe(hs.window.filter.windowFocused, function(win, _)
-			if not win then return end
-
-			local ok_new_id, new_id = pcall(function() return win:id() end)
-			if not ok_new_id or type(new_id) ~= "number" then return end
-
-			local current_id = nil
-			if currentWindowRef then
-				pcall(function() current_id = currentWindowRef:id() end)
-			end
-			if current_id and current_id == new_id then return end
-
-			previousWindowRef = currentWindowRef
-			currentWindowRef = win
-		end)
-	end)
-
-	local ok_fw, focused_window = pcall(hs.window.focusedWindow)
-	if ok_fw and focused_window then
-		currentWindowRef = focused_window
-	end
-end
-
---- Switches focus to the previously active application.
+--- Switch to the previous application in the MRU list.
 local function switch_to_previous_application()
-	ensure_app_switch_watcher()
-
-	if type(previousBundleID) == "string" and previousBundleID ~= "" and type(hs.application.launchOrFocusByBundleID) == "function" then
-		local ok = pcall(hs.application.launchOrFocusByBundleID, previousBundleID)
-		if ok then return end
-	end
-
-	if type(previousAppName) == "string" and previousAppName ~= "" then
-		local ok = pcall(hs.application.launchOrFocus, previousAppName)
-		if ok then return end
-	end
-
-	if type(previousBundleID) == "string" and previousBundleID ~= "" then
-		local ok_target, target = pcall(hs.application.get, previousBundleID)
-		if ok_target and target then
-			pcall(function() target:activate() end)
-			return
-		end
-	end
-
-	if type(previousAppName) == "string" and previousAppName ~= "" then
-		Logger.warn(LOG, "Previous app '%s' could not be focused directly.", previousAppName)
-		return
-	end
-
-	Logger.warn(LOG, "No previous application is known yet for app_previous.")
+    local ok, kl = pcall(require, "modules.karabiner.ke_lifecycle")
+    if ok and kl and type(kl.switch_to_previous_app) == "function" then
+        pcall(kl.switch_to_previous_app)
+    else
+        pcall(hs.eventtap.keyStroke, {"cmd"}, "tab")
+    end
 end
 
+--- Switch to the previous window precisely (same app or other).
 local function switch_to_previous_window_precise()
-	if type(hs.window) == "table" and type(hs.window.orderedWindows) == "function" then
-		local ok_list, wins = pcall(hs.window.orderedWindows)
-		if ok_list and type(wins) == "table" and #wins > 1 then
-			local ok_cur, cur = pcall(hs.window.focusedWindow)
-			local cur_id = nil
-			if ok_cur and cur then
-				pcall(function() cur_id = cur:id() end)
-			end
+    local ok, kl = pcall(require, "modules.karabiner.ke_lifecycle")
+    if ok and kl and type(kl.switch_to_previous_window) == "function" then
+        pcall(kl.switch_to_previous_window)
+    else
+        pcall(hs.eventtap.keyStroke, {"cmd"}, "tab")
+    end
+end
 
-			for _, w in ipairs(wins) do
-				local ok_id, wid = pcall(function() return w:id() end)
-				if ok_id and wid and (not cur_id or wid ~= cur_id) and w:isStandard() and not w:isMinimized() then
-					local ok_focus = pcall(function() w:focus() end)
-					if ok_focus then return end
-				end
-			end
-		end
+--- Triggers a macOS system-wide dictionary lookup/definition.
+function M.trigger_lookup()
+	local pos = hs.mouse.absolutePosition()
+	pcall(function() hs.eventtap.event.newMouseEvent(hs.eventtap.event.types.rightMouseDown, pos):post() end)
+	pcall(function() hs.eventtap.event.newMouseEvent(hs.eventtap.event.types.rightMouseUp, pos):post() end)
+	hs.timer.doAfter(0.05, function()
+		pcall(function() hs.eventtap.keyStroke({"cmd", "ctrl"}, "d") end)
+	end)
+end
+
+--- Toggles a synthetic right-click hold state.
+local rightClickHeld = false
+function M.toggle_right_click()
+	local pos = hs.mouse.absolutePosition()
+	if rightClickHeld then
+		pcall(function() hs.eventtap.event.newMouseEvent(hs.eventtap.event.types.rightMouseUp, pos):post() end)
+		rightClickHeld = false
+		Logger.info(LOG, "Synthetic Right-Click RELEASED.")
+	else
+		pcall(function() hs.eventtap.event.newMouseEvent(hs.eventtap.event.types.rightMouseDown, pos):post() end)
+		rightClickHeld = true
+		Logger.info(LOG, "Synthetic Right-Click HELD.")
 	end
+end
 
-	switch_to_previous_application()
+local leftClickHeld = false
+function M.toggle_left_click()
+	local pos = hs.mouse.absolutePosition()
+	if leftClickHeld then
+		pcall(function() hs.eventtap.event.newMouseEvent(hs.eventtap.event.types.leftMouseUp, pos):post() end)
+		leftClickHeld = false
+		Logger.info(LOG, "Synthetic Left-Click RELEASED.")
+	else
+		pcall(function() hs.eventtap.event.newMouseEvent(hs.eventtap.event.types.leftMouseDown, pos):post() end)
+		leftClickHeld = true
+		Logger.info(LOG, "Synthetic Left-Click HELD.")
+	end
 end
 
 local function show_application_switcher_overlay()
-	pcall(function() hs.eventtap.keyStroke({"cmd"}, "tab", 0) end)
+    pcall(hs.eventtap.keyStroke, {"cmd"}, "tab")
 end
 
---- Posts system media keys safely.
---- @param name string The system key name.
-local function sysKey(name)
-	pcall(function()
-		hs.eventtap.event.newSystemKeyEvent(name, true):post()
-		hs.eventtap.event.newSystemKeyEvent(name, false):post()
-	end)
-end
-
---- Posts a regular key stroke as an HID-sourced pair (down/up).
---- @param mods table|string Modifier keys (e.g. {"alt"} or "cmd").
---- @param key string The key name (e.g. "left").
-local function postKeyStroke(mods, key)
-	pcall(function()
-		local down = hs.eventtap.event.newKeyEvent(mods, key, true)
-		pcall(function() down:setProperty(hs.eventtap.event.properties.eventSourceStateID, 1) end)
-		down:post()
-		local up = hs.eventtap.event.newKeyEvent(mods, key, false)
-		pcall(function() up:setProperty(hs.eventtap.event.properties.eventSourceStateID, 1) end)
-		up:post()
-	end)
-end
-
---- Returns the hs.spaces module with a one-time require cache.
---- @return table|nil The hs.spaces module when available.
-local function get_spaces_module()
-	if spacesModCache == false then return nil end
-	if spacesModCache then return spacesModCache end
-
-	local ok_spaces, spaces = pcall(require, "hs.spaces")
-	if ok_spaces and type(spaces) == "table" then
-		spacesModCache = spaces
-		return spacesModCache
-	end
-
-	spacesModCache = false
-	return nil
-end
-
---- Cycles through standard windows of the frontmost application.
---- @param goNext boolean True to navigate forward, false to navigate backward.
+--- Navigates between windows of the current application.
 local function winNav(goNext)
-	local ok, app = pcall(hs.application.frontmostApplication)
-	if not ok or not app then return end
-	
-	local ok_wins, wins = pcall(function() return app:allWindows() end)
-	if not ok_wins or type(wins) ~= "table" then return end
-	
-	local visible = {}
-	for _, w in ipairs(wins) do
-		if w:isStandard() and not w:isMinimized() then table.insert(visible, w) end
-	end
-	
-	if #visible <= 1 then return end
-	table.sort(visible, function(a, b) return a:id() < b:id() end)
-	
-	local ok_cur, cur = pcall(hs.window.focusedWindow)
-	local idx = 1
-	for i, w in ipairs(visible) do
-		if ok_cur and cur and w:id() == cur:id() then idx = i; break end
-	end
-	
-	local target_idx = goNext and (idx % #visible + 1) or ((idx - 2) % #visible + 1)
-	pcall(function() visible[target_idx]:focus() end)
+	local key = goNext and "`" or "~"
+	pcall(function() hs.eventtap.keyStroke({"cmd"}, key) end)
 end
 
---- Cycles through macOS Spaces.
---- @param goNext boolean True to navigate forward, false to navigate backward.
+--- Navigates between macOS Spaces (Desktops).
 local function spaceNav(goNext)
-	local function send_adjacent_space_switch(fallback_reason)
-		local key_code = goNext and 124 or 123
-		if fallback_reason then
-			Logger.warn(LOG, "Space state resolution failed (%s) — using animated adjacent switch.", fallback_reason)
-		end
-		Logger.debug(LOG, "Adjacent space switch via AppleScript Ctrl+Arrow (keycode=%d)…", key_code)
-		local ok_as, as_ok, as_result = pcall(hs.osascript.applescript, string.format(
-			"tell application \"System Events\" to key code %d using {control down}",
-			key_code
-		))
-		if ok_as and as_ok then
-			Logger.info(LOG, "Adjacent space switch executed via AppleScript (keycode=%d).", key_code)
-			return true
-		end
-
-		Logger.warn(LOG, "AppleScript adjacent switch failed (result=%s) — retrying with eventtap.", tostring(as_result))
-		local key = goNext and "right" or "left"
-		local ok_key, key_err = pcall(function()
-			hs.eventtap.keyStroke({"ctrl"}, key, 0)
-		end)
-		if not ok_key then
-			Logger.error(LOG, "Adjacent space switch failed via eventtap too: %s.", tostring(key_err))
-			return false
-		end
-		Logger.info(LOG, "Adjacent space switch executed via eventtap Ctrl+%s.", key)
-		return true
-	end
-
-	local function resolve_active_space(spaces_mod, screen_ref)
-		local resolved = nil
-		if type(spaces_mod.activeSpaceOnScreen) == "function" then
-			pcall(function() resolved = spaces_mod.activeSpaceOnScreen(screen_ref) end)
-		end
-		if not resolved and type(spaces_mod.activeSpace) == "function" then
-			pcall(function() resolved = spaces_mod.activeSpace() end)
-		end
-		if not resolved and type(spaces_mod.focusedSpace) == "function" then
-			pcall(function() resolved = spaces_mod.focusedSpace() end)
-		end
-		return resolved
-	end
-
-	local spaces = get_spaces_module()
-	if not spaces then
-		send_adjacent_space_switch("hs.spaces module unavailable")
-		return
-	end
-
-	local screen = hs.screen.mainScreen()
-	if not screen then
-		send_adjacent_space_switch("no main screen")
-		return
-	end
-
-	local uuid = screen:getUUID()
-	if not uuid then
-		send_adjacent_space_switch("screen UUID unavailable")
-		return
-	end
-
-	local ok_all, all_spaces = pcall(function() return spaces.allSpaces() end)
-	if not ok_all or type(all_spaces) ~= "table" then
-		send_adjacent_space_switch("failed to list spaces")
-		return
-	end
-
-	local screen_spaces = all_spaces[uuid]
-	if type(screen_spaces) ~= "table" or #screen_spaces <= 1 then
-		Logger.debug(LOG, "Space switch skipped: not enough spaces on current screen.")
-		return
-	end
-
-	local active_space = resolve_active_space(spaces, screen)
-	if not active_space then
-		send_adjacent_space_switch("active space unavailable")
-		return
-	end
-
-	local active_index = nil
-	for idx, sid in ipairs(screen_spaces) do
-		if tostring(sid) == tostring(active_space) then
-			active_index = idx
-			break
-		end
-	end
-	if not active_index then
-		send_adjacent_space_switch("active space not found in screen list")
-		return
-	end
-
-	local target_index = goNext and (active_index % #screen_spaces + 1) or ((active_index - 2) % #screen_spaces + 1)
-	local target_space = screen_spaces[target_index]
-	if not target_space then
-		send_adjacent_space_switch("computed target space is nil")
-		return
-	end
-
-	local wraps_forward = active_index == #screen_spaces and target_index == 1
-	local wraps_backward = active_index == 1 and target_index == #screen_spaces
-	local is_wrap_around = wraps_forward or wraps_backward
-
-	if is_wrap_around then
-		-- Preserve circular navigation (1↔n) only on edge transitions
-		Logger.debug(LOG, "Space wrap-around via gotoSpace (current=%s, target=%s)…", tostring(active_space), tostring(target_space))
-		local ok_goto, goto_result = pcall(function() return spaces.gotoSpace(target_space) end)
-		if not ok_goto then
-			Logger.error(LOG, "Space wrap-around failed: hs.spaces.gotoSpace errored.")
-			return
-		end
-		Logger.info(LOG, "Space wrap-around executed via hs.spaces.gotoSpace (result=%s).", tostring(goto_result))
-		return
-	end
-
-	-- Adjacent transitions must stay native and animated
-	send_adjacent_space_switch(nil)
+	local key_code = goNext and 124 or 123 -- 124=Right, 123=Left
+	pcall(hs.osascript.applescript, string.format(
+		"tell application \"System Events\" to key code %d using {control down}",
+		key_code
+	))
 end
-
-
-
-
-
--- ==================================
--- ==================================
--- ======= 2/ Action Registry =======
--- ==================================
--- ==================================
-
-local AX, SG = {}, {}
-local function ax(n, lbl, p, nx, scalable) AX[n] = {label = lbl, prev = p, next = nx, scalable = scalable} end
-local function sg(n, lbl, fn)              SG[n] = {label = lbl, fn = fn} end
 
 local CMD_LETTERS = {
 	"a", "b", "c", "d", "e", "f", "g", "h", "i", "j", "k", "l", "m",
 	"n", "o", "p", "q", "r", "s", "t", "u", "v", "w", "x", "y", "z",
 }
 
--- Axis actions (prev / next) — scalable=true for continuous actions
-ax("tabs",       "Onglets",
+-- Axis actions (prev / next)
+ax("tabs",       "⧉ Onglets",
 	function() pcall(hs.eventtap.keyStroke, {"ctrl", "shift"}, "tab") end,
 	function() pcall(hs.eventtap.keyStroke, {"ctrl"}, "tab") end, true)
 
-ax("windows",    "Fenêtres",
-	function() winNav(false) end, 
-	function() winNav(true) end)
+ax("char",       "A Lettres",
+	function() postKeyStroke({}, "left") end,
+	function() postKeyStroke({}, "right") end, true)
 
-ax("spaces",     "Spaces",
-	function() spaceNav(false) end, 
-	function() spaceNav(true) end)
+ax("char_sel",   "✎ A Sél. Lettres",
+	function() postKeyStroke({"shift"}, "left") end,
+	function() postKeyStroke({"shift"}, "right") end, true)
 
-ax("volume",     "Volume",
-	function() sysKey("SOUND_DOWN") end, 
-	function() sysKey("SOUND_UP") end, true)
+ax("line_arrow", "↕ Lignes (Flèches)",
+	function() postKeyStroke({}, "up") end,
+	function() postKeyStroke({}, "down") end, true)
 
-ax("brightness", "Luminosité",
-	function() sysKey("BRIGHTNESS_DOWN") end, 
-	function() sysKey("BRIGHTNESS_UP") end, true)
+ax("line_sel",   "✎ ↕ Sél. Lignes",
+	function() postKeyStroke({"shift"}, "up") end,
+	function() postKeyStroke({"shift"}, "down") end, true)
 
-ax("tracks",     "Pistes",
-	function() sysKey("PREVIOUS") end, 
-	function() sysKey("NEXT") end)
-
-ax("words",      "Mots",
+ax("words",      "W Mots",
 	function() postKeyStroke({"alt"}, "left") end,
 	function() postKeyStroke({"alt"}, "right") end, true)
 
-ax("lines",      "Lignes",
+ax("words_sel",  "✎ W Sél. Mots",
+	function() postKeyStroke({"shift", "alt"}, "left") end,
+	function() postKeyStroke({"shift", "alt"}, "right") end, true)
+
+ax("windows",    "◱ Fenêtres",
+	function() winNav(false) end, 
+	function() winNav(true) end)
+
+ax("spaces",     "▢ Spaces",
+	function() spaceNav(false) end, 
+	function() spaceNav(true) end)
+
+ax("volume",     "🔊 Volume",
+	function() sysKey("SOUND_DOWN") end, 
+	function() sysKey("SOUND_UP") end, true)
+
+ax("brightness", "☀ Luminosité",
+	function() sysKey("BRIGHTNESS_DOWN") end, 
+	function() sysKey("BRIGHTNESS_UP") end, true)
+
+ax("tracks",     "♫ Pistes",
+	function() sysKey("PREVIOUS") end, 
+	function() sysKey("NEXT") end)
+
+ax("lines",      "↕ Lignes (Alt)",
 	function() hs.timer.doAfter(0, function() pcall(hs.eventtap.keyStroke, {"alt"}, "up") end) end,
 	function() hs.timer.doAfter(0, function() pcall(hs.eventtap.keyStroke, {"alt"}, "down") end) end, true)
 
-ax("line_bounds","Ligne (début/fin)",
+ax("line_bounds","↔ Ligne (début/fin)",
 	function() hs.timer.doAfter(0, function() pcall(hs.eventtap.keyStroke, {"cmd"}, "left") end) end,
 	function() hs.timer.doAfter(0, function() pcall(hs.eventtap.keyStroke, {"cmd"}, "right") end) end)
 
-ax("paragraphs", "Paragraphes",
+ax("paragraphs", "¶ Paragraphes",
 	function() pcall(hs.eventtap.keyStroke, {"alt"}, "up") end,
 	function() pcall(hs.eventtap.keyStroke, {"alt"}, "down") end, true)
 
-ax("document",   "Document (début/fin)",
+ax("document",   "📄 Document (début/fin)",
 	function() pcall(hs.eventtap.keyStroke, {"cmd"}, "up") end,
 	function() pcall(hs.eventtap.keyStroke, {"cmd"}, "down") end)
 
 -- Single actions
-sg("none",             "Désactivé",            function() end)
+sg("none",             "∅ Désactivé",            function() end)
 
 -- Selection & navigation cursor
-sg("left_click_toggle",  "Toggle clic gauche maintenu", M.toggle_left_click)
-sg("right_click_toggle", "Toggle clic droit maintenu",  M.toggle_right_click)
-sg("lookup",           "Définition du mot",    M.trigger_lookup)
-sg("app_switcher",     "Alt+Tab — Liste des apps", show_application_switcher_overlay)
-sg("app_previous",     "Alt+Tab — App précédente", switch_to_previous_application)
-sg("app_window_previous", "Alt+Tab — Fenêtre précédente", switch_to_previous_window_precise)
+sg("left_click_toggle",  "🖱 L Clic gauche (maint.)", M.toggle_left_click)
+sg("right_click_toggle", "🖱 R Clic droit (maint.)",  M.toggle_right_click)
+sg("lookup",           "🔍 Définition du mot",    M.trigger_lookup)
+sg("app_switcher",     "⇥ Alt+Tab — Liste apps", show_application_switcher_overlay)
+sg("app_previous",     "⇥ ← Alt+Tab — App préc.", switch_to_previous_application)
+sg("app_window_previous", "⇥ ◱ ← Alt+Tab — Fenêtre préc.", switch_to_previous_window_precise)
 
 -- Keys
-sg("enter",            "Entrée",               function() pcall(hs.eventtap.keyStroke, {}, "return") end)
-sg("tab",              "Tab",                  function() pcall(hs.eventtap.keyStroke, {}, "tab") end)
-sg("escape",           "Échap",                function() pcall(hs.eventtap.keyStroke, {}, "escape") end)
-sg("backspace",        "Suppr. arrière",       function() pcall(hs.eventtap.keyStroke, {}, "delete") end)
-sg("delete",           "Suppr. avant",         function() pcall(hs.eventtap.keyStroke, {}, "forwarddelete") end)
+sg("enter",            "↵ Entrée",               function() pcall(hs.eventtap.keyStroke, {}, "return") end)
+sg("tab",              "⇥ Tab",                  function() pcall(hs.eventtap.keyStroke, {}, "tab") end)
+sg("escape",           "⎋ Échap",                function() pcall(hs.eventtap.keyStroke, {}, "escape") end)
+sg("backspace",        "⌫ Suppr. arrière",       function() pcall(hs.eventtap.keyStroke, {}, "delete") end)
+sg("delete",           "⌦ Suppr. avant",         function() pcall(hs.eventtap.keyStroke, {}, "forwarddelete") end)
 
 -- Tabs
-sg("tab_new",          "Nouvel onglet",        function() pcall(hs.eventtap.keyStroke, {"cmd"}, "t") end)
-sg("tab_close",        "Fermer onglet",        function() pcall(hs.eventtap.keyStroke, {"cmd"}, "w") end)
-sg("tab_prev",         "Onglet précédent",     function() pcall(hs.eventtap.keyStroke, {"ctrl", "shift"}, "tab") end)
-sg("tab_next",         "Onglet suivant",       function() pcall(hs.eventtap.keyStroke, {"ctrl"}, "tab") end)
+sg("tab_new",          "⧉ + Nouvel onglet",        function() pcall(hs.eventtap.keyStroke, {"cmd"}, "t") end)
+sg("tab_close",        "⧉ × Fermer onglet",        function() pcall(hs.eventtap.keyStroke, {"cmd"}, "w") end)
+sg("tab_prev",         "⧉ ← Onglet précédent",     function() pcall(hs.eventtap.keyStroke, {"ctrl", "shift"}, "tab") end)
+sg("tab_next",         "⧉ → Onglet suivant",       function() pcall(hs.eventtap.keyStroke, {"ctrl"}, "tab") end)
 
 -- Windows & Spaces
-sg("win_prev",         "Fenêtre précédente",   function() winNav(false) end)
-sg("win_next",         "Fenêtre suivante",     function() winNav(true) end)
-sg("close_window",     "Fermer la fenêtre",    function() pcall(hs.eventtap.keyStroke, {"cmd"}, "w") end)
-sg("fullscreen",       "Plein écran",          function() pcall(hs.eventtap.keyStroke, {"cmd", "ctrl"}, "f") end)
-sg("snap_left",        "Ancrer à gauche",      function()
+sg("win_prev",         "◱ ← Fenêtre précédente",   function() winNav(false) end)
+sg("win_next",         "◱ → Fenêtre suivante",     function() winNav(true) end)
+sg("close_window",     "◱ × Fermer la fenêtre",    function() pcall(hs.eventtap.keyStroke, {"cmd"}, "w") end)
+sg("fullscreen",       "📺 Plein écran",          function() pcall(hs.eventtap.keyStroke, {"cmd", "ctrl"}, "f") end)
+sg("snap_left",        "◧ ← Ancrer à gauche",      function()
 	local win = hs.window.focusedWindow()
 	if win then pcall(function() win:moveToUnit(hs.layout.left50) end) end
 end)
-sg("snap_right",       "Ancrer à droite",      function()
-	local win = hs.window.focusedWindow()
-	if win then pcall(function() win:moveToUnit(hs.layout.right50) end) end
-end)
-sg("maximize",         "Maximiser",            function()
+sg("snap_right",       "◨ → Ancrer à droite",      function()
 	local win = hs.window.focusedWindow()
 	if win then pcall(function() win:maximize() end) end
 end)
-sg("space_prev",       "Space précédent",      function() spaceNav(false) end)
-sg("space_next",       "Space suivant",        function() spaceNav(true) end)
-sg("mission_control",  "Mission Control",      function() pcall(hs.osascript.applescript, "tell application \"System Events\" to key code 160") end)
-sg("app_expose",       "App Exposé",           function() pcall(hs.osascript.applescript, "tell application \"System Events\" to key code 125 using {control down}") end)
+sg("maximize",         "🔲 Maximiser",            function()
+	local win = hs.window.focusedWindow()
+	if win then pcall(function() win:maximize() end) end
+end)
+sg("space_prev",       "▢ ← Space précédent",      function() spaceNav(false) end)
+sg("space_next",       "▢ → Space suivant",        function() spaceNav(true) end)
+sg("mission_control",  "▢ Mission Control",      function() pcall(hs.osascript.applescript, "tell application \"System Events\" to key code 160") end)
+sg("app_expose",       "◱ App Exposé",           function() pcall(hs.osascript.applescript, "tell application \"System Events\" to key code 125 using {control down}") end)
 
 -- Cursor movement
-sg("word_prev",        "Mot précédent",        function() postKeyStroke({"alt"}, "left") end)
-sg("word_next",        "Mot suivant",          function() postKeyStroke({"alt"}, "right") end)
-sg("line_start",       "Début de ligne",       function() hs.timer.doAfter(0, function() pcall(hs.eventtap.keyStroke, {"cmd"}, "left") end) end)
-sg("line_end",         "Fin de ligne",         function() hs.timer.doAfter(0, function() pcall(hs.eventtap.keyStroke, {"cmd"}, "right") end) end)
-sg("para_prev",        "Paragraphe précédent", function() pcall(hs.eventtap.keyStroke, {"alt"}, "up") end)
-sg("para_next",        "Paragraphe suivant",   function() pcall(hs.eventtap.keyStroke, {"alt"}, "down") end)
-sg("doc_start",        "Début du document",    function() pcall(hs.eventtap.keyStroke, {"cmd"}, "up") end)
-sg("doc_end",          "Fin du document",      function() pcall(hs.eventtap.keyStroke, {"cmd"}, "down") end)
+sg("word_prev",        "W ← Mot précédent",        function() postKeyStroke({"alt"}, "left") end)
+sg("word_next",        "W → Mot suivant",          function() postKeyStroke({"alt"}, "right") end)
+sg("line_up",          "↕ ↑ Ligne précédente",     function() hs.timer.doAfter(0, function() pcall(hs.eventtap.keyStroke, {"alt"}, "up") end) end)
+sg("line_down",        "↕ ↓ Ligne suivante",       function() hs.timer.doAfter(0, function() pcall(hs.eventtap.keyStroke, {"alt"}, "down") end) end)
+sg("line_start",       "⇤ Début de ligne",       function() hs.timer.doAfter(0, function() pcall(hs.eventtap.keyStroke, {"cmd"}, "left") end) end)
+sg("line_end",         "⇥ Fin de ligne",         function() hs.timer.doAfter(0, function() pcall(hs.eventtap.keyStroke, {"cmd"}, "right") end) end)
+sg("para_prev",        "¶ ↑ Paragraphe précédent", function() pcall(hs.eventtap.keyStroke, {"alt"}, "up") end)
+sg("para_next",        "¶ ↓ Paragraphe suivant",   function() pcall(hs.eventtap.keyStroke, {"alt"}, "down") end)
+sg("doc_start",        "⤒ Début du document",    function() pcall(hs.eventtap.keyStroke, {"cmd"}, "up") end)
+sg("doc_end",          "⤓ Fin du document",      function() pcall(hs.eventtap.keyStroke, {"cmd"}, "down") end)
 
 -- Media
-sg("vol_up",           "Volume +",             function() sysKey("SOUND_UP") end)
-sg("vol_down",         "Volume -",             function() sysKey("SOUND_DOWN") end)
-sg("mute",             "Muet/Unmute",          function() sysKey("MUTE") end)
-sg("brightness_up",    "Luminosité +",         function() sysKey("BRIGHTNESS_UP") end)
-sg("brightness_down",  "Luminosité -",         function() sysKey("BRIGHTNESS_DOWN") end)
-sg("track_play",       "Lecture/Pause",        function() sysKey("PLAY") end)
-sg("track_next",       "Piste suivante",       function() sysKey("NEXT") end)
-sg("track_prev",       "Piste précédente",     function() sysKey("PREVIOUS") end)
+sg("vol_up",           "🔊 + Volume +",             function() sysKey("SOUND_UP") end)
+sg("vol_down",         "🔊 - Volume -",             function() sysKey("SOUND_DOWN") end)
+sg("mute",             "🔇 Muet/Unmute",          function() sysKey("MUTE") end)
+sg("brightness_up",    "☀ + Luminosité +",         function() sysKey("BRIGHTNESS_UP") end)
+sg("brightness_down",  "☀ - Luminosité -",         function() sysKey("BRIGHTNESS_DOWN") end)
+sg("track_play",       "⏯ Lecture/Pause",        function() sysKey("PLAY") end)
+sg("track_next",       "⏭ Piste suivante",       function() sysKey("NEXT") end)
+sg("track_prev",       "⏮ Piste précédente",     function() sysKey("PREVIOUS") end)
+
+-- Single arrows
+sg("arrow_up",         "↑ Flèche Haut",          function() postKeyStroke({}, "up") end)
+sg("arrow_down",       "↓ Flèche Bas",           function() postKeyStroke({}, "down") end)
+sg("arrow_left",       "← Flèche Gauche",        function() postKeyStroke({}, "left") end)
+sg("arrow_right",      "→ Flèche Droite",        function() postKeyStroke({}, "right") end)
+
+-- Shift + Arrows
+sg("sel_up",           "✎ ↑ Sélection Haut",       function() postKeyStroke({"shift"}, "up") end)
+sg("sel_down",         "✎ ↓ Sélection Bas",        function() postKeyStroke({"shift"}, "down") end)
+sg("sel_left",         "✎ ← Sélection Gauche",     function() postKeyStroke({"shift"}, "left") end)
+sg("sel_right",        "✎ → Sélection Droite",     function() postKeyStroke({"shift"}, "right") end)
+
+-- Shift + Alt + Arrows (Word selection)
+sg("sel_word_prev",    "✎ W ← Sél. Mot préc.", function() postKeyStroke({"shift", "alt"}, "left") end)
+sg("sel_word_next",    "✎ W → Sél. Mot suiv.",   function() postKeyStroke({"shift", "alt"}, "right") end)
 
 -- System
--- Each capture target ships in two flavours: the *_clipboard variant copies
--- the image to the macOS clipboard for immediate paste into the focused
--- app, and the *_save variant writes a timestamped PNG to
--- ~/Pictures/screenshots/. Defaults across the project favour the
--- clipboard variants because they keep the user inside their current
--- workflow without producing files they then have to clean up. The
--- screencapture(1) CLI is preferred over keystroke synthesis because it
--- bypasses the macOS preview overlay and works reliably regardless of
--- whether Cmd-Shift-N is currently bound by another app.
-local function screenshots_dir()
-	local home = os.getenv("HOME") or ""
-	local dir  = home .. "/Pictures/screenshots"
-	pcall(function() hs.fs.mkdir(dir) end)
-	return dir
-end
+sg("screenshot_window_clipboard",    "📸 ⊞ Copier fenêtre", function() pcall(hs.execute, "screencapture -cw") end)
+sg("screenshot_window_save",         "📸 ⊞ Sauver fenêtre", function() pcall(hs.execute, "screencapture -w ~/Pictures/screenshots/win_$(date +%Y%m%d%H%M%S).png") end)
+sg("screenshot_region_clipboard",    "📸 ⬚ Copier région",  function() pcall(hs.execute, "screencapture -ci") end)
+sg("screenshot_region_save",         "📸 ⬚ Sauver région",  function() pcall(hs.execute, "screencapture -i ~/Pictures/screenshots/reg_$(date +%Y%m%d%H%M%S).png") end)
+sg("screenshot_fullscreen_clipboard","📸 🖥 Copier écran",   function() pcall(hs.execute, "screencapture -c") end)
+sg("screenshot_fullscreen_save",     "📸 🖥 Sauver écran",   function() pcall(hs.execute, "screencapture ~/Pictures/screenshots/full_$(date +%Y%m%d%H%M%S).png") end)
 
-local function screenshot_path()
-	return screenshots_dir() .. "/screenshot_" .. os.date("%Y_%m_%d_%Hh_%Mmin_%Ss") .. ".png"
-end
+sg("lock_screen",           "🔒 Verrouiller",         function() pcall(hs.caffeinate.lockScreen) end)
+sg("notification_center",   "🔔 Notifications",       function() pcall(hs.osascript.applescript, "tell application \"System Events\" to click menu bar item \"Notification Center\" of menu bar 1 of application process \"ControlCenter\"") end)
 
-local function run_screencapture(args)
-	pcall(function() hs.execute("/usr/sbin/screencapture " .. args, true) end)
-end
-
-sg("screenshot_window_clipboard",     "Capture d'écran de la fenêtre active (presse-papiers)",
-	function() run_screencapture("-w -c") end)
-sg("screenshot_window_save",          "Capture d'écran de la fenêtre active (sauver sur disque)",
-	function() run_screencapture("-w '" .. screenshot_path() .. "'") end)
-sg("screenshot_region_clipboard",     "Capture d'écran d'une zone à sélectionner (presse-papiers)",
-	function() run_screencapture("-i -c") end)
-sg("screenshot_region_save",          "Capture d'écran d'une zone à sélectionner (sauver sur disque)",
-	function() run_screencapture("-i '" .. screenshot_path() .. "'") end)
-sg("screenshot_fullscreen_clipboard", "Capture d'écran entier (presse-papiers)",
-	function() run_screencapture("-c") end)
-sg("screenshot_fullscreen_save",      "Capture d'écran entier (sauver sur disque)",
-	function() run_screencapture("'" .. screenshot_path() .. "'") end)
-
-sg("lock_screen",      "Verrouiller",          function() pcall(hs.eventtap.keyStroke, {"cmd", "ctrl"}, "q") end)
-sg("notification_center", "Notifications",    function() pcall(hs.eventtap.keyStroke, {}, "F12") end)
-
--- Resolves a path via MenuPaths.get(key) and opens it with `open`.
--- Returns silently if the path is empty so a gesture bound to an unconfigured
--- file (e.g. personal_info.toml on a fresh install) is a no-op rather than
--- spawning `open ""`.
-local function open_via_menu_paths(key)
-	local ok_mp, MenuPaths = pcall(require, "ui.menu.menu_paths")
-	if not ok_mp or type(MenuPaths) ~= "table" or type(MenuPaths.get) ~= "function" then return end
-	local p = MenuPaths.get(key)
-	if type(p) == "string" and p ~= "" then
-		pcall(hs.execute, string.format("open %q", p))
-	end
-end
-
--- Resolves <config_dir>/hammerspoon/logs/ at call-time so a relocated
--- config dir is honoured without restarting Hammerspoon
-local function logs_dir_at_call_time()
-	local ok_mp, MenuPaths = pcall(require, "ui.menu.menu_paths")
-	if not ok_mp or type(MenuPaths) ~= "table" or type(MenuPaths.get_config_dir) ~= "function" then
-		return ""
-	end
-	local d = MenuPaths.get_config_dir() or ""
-	if not d:match("[/\\]$") then d = d .. "/" end
-	return d .. "hammerspoon/logs/"
-end
-
--- ===== UI windows =====
-sg("open_metrics_typing",    "📊 Métriques de frappe", function()
-	local ok, m = pcall(require, "ui.metrics_typing")
-	if ok and type(m.toggle) == "function" then pcall(m.toggle) end
-end)
-sg("open_metrics_apps",      "📊 Temps sur les applications", function()
-	local ok, m = pcall(require, "ui.metrics_apps")
-	if ok and type(m.toggle) == "function" then pcall(m.toggle) end
-end)
-sg("open_hotstrings_editor", "✏️ Éditeur de hotstrings personnels", function()
-	local ok, ed = pcall(require, "ui.hotstring_editor")
-	if ok and type(ed.open) == "function" then pcall(ed.open) end
-end)
-sg("open_paths_editor",      "📂 Dossier de configuration (éditeur)", function()
-	local ok_mp, MenuPaths = pcall(require, "ui.menu.menu_paths")
-	if ok_mp and type(MenuPaths.open_editor) == "function" then
-		hs.timer.doAfter(0.05, function() pcall(MenuPaths.open_editor) end)
-	end
-end)
-
--- ===== Open user files / folders =====
-sg("open_script_source",     "✎ Ouvrir init.lua", function()
-	pcall(hs.execute, string.format("open %q", hs.configdir .. "/init.lua"))
-end)
-sg("open_personal_shortcuts", "✎ Éditer personal_shortcuts.lua", function()
-	local ok, ps = pcall(require, "lib.personal_shortcuts")
-	if ok and type(ps.open) == "function" then pcall(ps.open) end
-end)
-sg("open_personal_hotstrings", "Ouvrir personal_hotstrings.toml", function()
-	open_via_menu_paths("PersonalTomlPath")
-end)
-sg("open_personal_info",      "Ouvrir personal_info.toml", function()
-	open_via_menu_paths("PersonalInfoTomlPath")
-end)
-sg("open_config",             "Ouvrir config.toml", function()
-	open_via_menu_paths("ConfigTomlPath")
-end)
-sg("open_logs_folder",        "Ouvrir le dossier de logs", function()
-	local dir = logs_dir_at_call_time()
-	if dir ~= "" then
-		pcall(hs.execute, string.format("mkdir -p %q && open %q", dir, dir))
-	end
-end)
-sg("open_today_log",          "Ouvrir le fichier de log du jour", function()
-	local Logger = require("lib.logger")
-	local path = Logger.UNIFIED_LOG_FILE
-	if type(path) ~= "string" or path == "" then
-		path = logs_dir_at_call_time() .. "ErgoptiPlus_" .. os.date("%Y-%m-%d") .. ".log"
-	end
+-- Applications and Stats
+sg("open_metrics_typing",    "📊 Stats Frappe",        function() pcall(function() require("ui.metrics_overlay").toggle("typing") end) end)
+sg("open_metrics_apps",      "📊 Stats Applications",  function() pcall(function() require("ui.metrics_overlay").toggle("apps") end) end)
+sg("open_hotstrings_editor", "⌨ Éditeur Hotstrings",   function() pcall(function() require("ui.hotstrings_editor").show() end) end)
+sg("open_paths_editor",      "📂 Éditeur Chemins",      function() pcall(function() require("ui.paths_editor").show() end) end)
+sg("open_script_source",     "🛠 Code Source",          function() pcall(hs.execute, string.format("open %q", hs.configdir)) end)
+sg("open_personal_shortcuts","👤 Raccourcis perso",     function() pcall(hs.execute, string.format("open %q/personal_shortcuts.toml", hs.configdir)) end)
+sg("open_personal_hotstrings","👤 Hotstrings perso",    function() pcall(hs.execute, string.format("open %q/personal_hotstrings.toml", hs.configdir)) end)
+sg("open_personal_info",     "👤 Infos perso",          function() pcall(hs.execute, string.format("open %q/personal_info.toml", hs.configdir)) end)
+sg("open_config",            "⚙ Configuration",        function() pcall(hs.execute, string.format("open %q/config.toml", hs.configdir)) end)
+sg("open_logs_folder",       "📁 Dossier Logs",         function() pcall(hs.execute, string.format("open %q/logs", hs.configdir)) end)
+sg("open_today_log",         "📄 Log du jour",          function()
+	local ok_p, path = pcall(function()
+		local ok_u, utils = pcall(require, "lib.utils")
+		if ok_u and type(utils.get_logs_dir) == "function" then
+			return utils.get_logs_dir() .. "ErgoptiPlus_" .. os.date("%Y-%m-%d") .. ".log"
+		end
+		return hs.configdir .. "/logs/ErgoptiPlus_" .. os.date("%Y-%m-%d") .. ".log"
+	end)
 	pcall(hs.execute, string.format("open %q", path))
 end)
 
--- ===== Script management =====
-sg("script_pause_toggle",    "Suspendre / Reprendre le script", function()
+-- Script management
+sg("script_pause_toggle",    "⏸/▶ Suspendre / Reprendre", function()
 	local ok, sc = pcall(require, "modules.shortcuts.script_control")
 	if ok and type(sc.toggle) == "function" then pcall(sc.toggle) end
 end)
 sg("script_reload",          "↻ Recharger Hammerspoon", function() pcall(hs.reload) end)
-sg("script_save_reload",     "↻ Sauver (Cmd+S) et recharger", function()
+sg("script_save_reload",     "↻ Sauver et recharger", function()
 	pcall(hs.eventtap.keyStroke, {"cmd"}, "s")
 	hs.timer.doAfter(0.3, function() pcall(hs.reload) end)
 end)
@@ -790,21 +349,21 @@ sg("script_quit",            "✕ Quitter Hammerspoon", function()
 	pcall(function() hs.timer.doAfter(0.1, function() os.exit(0) end) end)
 end)
 
--- ===== Debug =====
-sg("open_console",           "Console Hammerspoon", function() pcall(hs.openConsole) end)
+-- Debug
+sg("open_console",           "▤ Console Hammerspoon", function() pcall(hs.openConsole) end)
 
--- ===== Cmd letter shortcuts =====
+-- Cmd letter shortcuts
 for _, letter in ipairs(CMD_LETTERS) do
 	local upper = string.upper(letter)
 	sg("cmd_" .. letter,
-		"⌘" .. upper .. " — Cmd+" .. upper,
+		"⌘ " .. upper .. " — Cmd+" .. upper,
 		function() pcall(hs.eventtap.keyStroke, {"cmd"}, letter) end)
 end
 
 for _, letter in ipairs(CMD_LETTERS) do
 	local upper = string.upper(letter)
 	sg("cmd_shift_" .. letter,
-		"⌘⇧" .. upper .. " — Cmd+Shift+" .. upper,
+		"⌘⇧ " .. upper .. " — Cmd+Shift+" .. upper,
 		function() pcall(hs.eventtap.keyStroke, {"cmd", "shift"}, letter) end)
 end
 
@@ -819,149 +378,127 @@ end
 -- =============================
 
 M.AX_NAMES = {
-	"none", "tabs", "windows", "spaces",
-	"volume", "brightness", "tracks",
-	"words", "lines", "line_bounds", "paragraphs", "document",
+	"none", "char", "char_sel", "words", "words_sel",
+	"line_arrow", "line_sel", "lines", "paragraphs", "line_bounds", "document",
+	"tabs", "windows", "spaces", "volume", "brightness", "tracks",
 }
 
--- Ordered list of action ids exposed in the gesture-picker menu, with "--"
--- sentinels marking category boundaries. menu_gestures.lua turns each "--"
--- into a visual separator so the list stays scannable. Mirrors the AutoHotkey
--- driver's GESTURE_ACTION_NAMES (modules/gestures.ahk) so a user moving
--- between platforms sees the same picker structure, with platform-specific
--- particularities (Hammerspoon Console, macOS-only spaces / cursor moves)
--- kept where they belong.
 M.SG_NAMES = {
 	"none",
-	"--",
-	-- Selection & navigation
-	"left_click_toggle", "right_click_toggle", "lookup", "app_switcher", "app_previous", "app_window_previous",
-	"--",
-	-- Keys
-	"enter", "tab", "escape", "backspace", "delete",
-	"--",
-	-- Tabs
-	"tab_new", "tab_close", "tab_prev", "tab_next",
-	"--",
-	-- Windows & Spaces
+	"-",
+	"#Curseur et Texte",
+	"arrow_up", "arrow_down", "arrow_left", "arrow_right",
+	"word_prev", "word_next",
+	"line_up", "line_down", "line_start", "line_end",
+	"para_prev", "para_next", "doc_start", "doc_end",
+	"-",
+	"#Sélection de Texte",
+	"sel_up", "sel_down", "sel_left", "sel_right",
+	"sel_word_prev", "sel_word_next",
+	"-",
+	"#Onglets et Fenêtres",
+	"tab_prev", "tab_next", "tab_new", "tab_close",
 	"win_prev", "win_next", "close_window", "fullscreen",
 	"snap_left", "snap_right", "maximize",
+	"-",
+	"#Système et Espaces",
 	"space_prev", "space_next", "mission_control", "app_expose",
-	"--",
-	-- Cursor movement
-	"word_prev", "word_next", "line_start", "line_end",
-	"para_prev", "para_next", "doc_start", "doc_end",
-	"--",
-	-- Media
+	"app_switcher", "app_previous", "app_window_previous",
+	"lock_screen", "notification_center",
+	"-",
+	"#Sélection et Souris",
+	"left_click_toggle", "right_click_toggle", "lookup",
+	"-",
+	"#Édition et Touches",
+	"enter", "tab", "escape", "backspace", "delete",
+	"-",
+	"#Raccourcis ⌘ (Cmd)",
+	"-",
+	"#Raccourcis ⌘⇧ (Cmd+Shift)",
+	"-",
+	"#Multimédia",
 	"vol_up", "vol_down", "mute",
 	"brightness_up", "brightness_down",
 	"track_play", "track_next", "track_prev",
-	"--",
-	-- System
+	"-",
+	"#Captures d'écran",
 	"screenshot_window_clipboard", "screenshot_window_save",
 	"screenshot_region_clipboard", "screenshot_region_save",
 	"screenshot_fullscreen_clipboard", "screenshot_fullscreen_save",
-	"lock_screen", "notification_center",
-	"--",
-	-- UI windows
+	"-",
+	"#Applications et Statistiques",
 	"open_metrics_typing", "open_metrics_apps",
 	"open_hotstrings_editor", "open_paths_editor",
-	"--",
-	-- Open user files / folders
 	"open_script_source", "open_personal_shortcuts",
 	"open_personal_hotstrings", "open_personal_info",
-	"open_config",
-	"open_logs_folder", "open_today_log",
-	"--",
-	-- Script management
+	"open_config", "open_logs_folder", "open_today_log",
+	"-",
+	"#Gestion du Script",
 	"script_pause_toggle", "script_reload", "script_save_reload", "script_quit",
-	"--",
-	-- Debug (Hammerspoon-only — Console replaces AHK's Window Spy / List Vars / Key History)
 	"open_console",
 }
 
 local function insert_cmd_shortcuts_in_picker_order()
-	local insert_index = nil
-	for i, name in ipairs(M.SG_NAMES) do
-		if name == "enter" then
-			insert_index = i
-			break
+	local function find_index(title)
+		for i, name in ipairs(M.SG_NAMES) do
+			if name == title then return i end
+		end
+		return nil
+	end
+
+	local cmd_header_idx = find_index("#Raccourcis ⌘ (Cmd)")
+	if cmd_header_idx then
+		local insert_at = cmd_header_idx + 1
+		for _, letter in ipairs(CMD_LETTERS) do
+			table.insert(M.SG_NAMES, insert_at, "cmd_" .. letter)
+			insert_at = insert_at + 1
 		end
 	end
 
-	if not insert_index then return end
-
-	for _, letter in ipairs(CMD_LETTERS) do
-		table.insert(M.SG_NAMES, insert_index, "cmd_" .. letter)
-		insert_index = insert_index + 1
+	local cmd_shift_header_idx = find_index("#Raccourcis ⌘⇧ (Cmd+Shift)")
+	if cmd_shift_header_idx then
+		local insert_at = cmd_shift_header_idx + 1
+		for _, letter in ipairs(CMD_LETTERS) do
+			table.insert(M.SG_NAMES, insert_at, "cmd_shift_" .. letter)
+			insert_at = insert_at + 1
+		end
 	end
-
-	table.insert(M.SG_NAMES, insert_index, "--")
-	insert_index = insert_index + 1
-
-	for _, letter in ipairs(CMD_LETTERS) do
-		table.insert(M.SG_NAMES, insert_index, "cmd_shift_" .. letter)
-		insert_index = insert_index + 1
-	end
-
-	table.insert(M.SG_NAMES, insert_index, "--")
 end
 
 insert_cmd_shortcuts_in_picker_order()
 
---- Retrieves the localized label for a given action ID.
---- @param name string The action ID.
---- @return string The human-readable label.
 function M.get_label(name)
-	if not name or name == "none" then return "Désactivé" end
+	if not name then return AX["none"].label end
 	if AX[name] then return AX[name].label end
 	if SG[name] then return SG[name].label end
 	return name
 end
 
---- Executes a single-fire action based on its identifier.
---- @param name string The action ID.
 function M.execute_single(name)
 	local s = SG[name]
 	if s and type(s.fn) == "function" then
-		Logger.debug(LOG, string.format("Executing single action: %s…", name))
 		pcall(s.fn)
-		Logger.info(LOG, string.format("Action %s executed successfully.", name))
 	end
 end
 
---- Executes an axis-based action (forward or backward).
---- @param name string The action ID.
---- @param goNext boolean The direction to move.
 function M.execute_axis(name, goNext)
 	local a = AX[name]
 	if not a then return end
 	local fn = goNext and a.next or a.prev
 	if type(fn) == "function" then
-		Logger.debug(LOG, string.format("Executing axis action: %s (direction: %s)…", name, tostring(goNext)))
 		pcall(fn)
-		Logger.info(LOG, string.format("Axis action %s executed successfully.", name))
 	end
 end
 
---- Checks if an action scales continuously.
---- @param name string The action ID.
---- @return boolean True if scalable.
 function M.is_scalable(name)
 	local a = AX[name]
 	return a and a.scalable == true
 end
 
---- Returns whether the synthetic right-click hold mode is currently active.
---- @return boolean True if active.
 function M.is_right_click_held()
 	return rightClickHeld
 end
 
---- Signals that a new raw gesture frame has started or stopped.
---- Used by the engine to prevent rightMouseUp events generated by new trackpad
---- contact from prematurely releasing an active right-click hold.
---- @param active boolean True when a gesture is being processed, false when done.
 function M.set_gesture_in_progress(active)
 	gestureInProgress = active
 end

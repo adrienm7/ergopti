@@ -48,6 +48,7 @@ local KEY_MAP = {
 	-- ── Gestures ──────────────────────────────────────────────────────────
 	-- Gesture slot scalars are merged into [gestures] via NESTED_KEY_MAP.
 	gestures                             = { sec = "gestures",   key = "enabled"                      },
+	gesture_space_wrap                   = { sec = "gestures",   key = "space_wrap"                   },
 
 	-- ── Hotstrings ─────────────────────────────────────────────────────────
 	keymap                               = { sec = "hotstrings", key = "enabled"                      },
@@ -126,6 +127,8 @@ local KEY_MAP = {
 local NESTED_KEY_MAP = {
 	-- Gesture slots merged flat into [gestures] (no sub-section header)
 	gesture_actions          = { sec = "gestures",   merge_into_sec = true             },
+	gesture_modes            = { sec = "gestures",   key = "modes"                     },
+	gesture_sensitivities    = { sec = "gestures",   key = "sensitivities"             },
 	-- Hotstrings nested tables
 	hotstrings               = { sec = "hotstrings", key = "groups"                    },
 	section_states           = { sec = "hotstrings", key = "modules"                   },
@@ -393,6 +396,9 @@ function M.save(prefs_file, state, hotfiles, core_mods)
 
 	local gestures = core_mods.gestures
 	existing.gesture_actions = (gestures and type(gestures.get_all_actions) == "function") and gestures.get_all_actions() or {}
+	existing.gesture_modes = (gestures and type(gestures.get_all_modes) == "function") and gestures.get_all_modes() or {}
+	existing.gesture_sensitivities = (gestures and type(gestures.get_all_sensitivities) == "function") and gestures.get_all_sensitivities() or {}
+	existing.gesture_space_wrap = (gestures and type(gestures.get_space_wrap) == "function") and gestures.get_space_wrap() or true
 
 	existing.shortcut_keys = {}
 	local shortcuts_mod = core_mods.shortcuts_mod
@@ -432,7 +438,11 @@ end
 function M.merge_saved_data(state, saved)
 	if type(saved) ~= "table" then return end
 
-	local exclude_keys = { section_states = true, gesture_actions = true, shortcut_keys = true, hotstrings = true, script_control_shortcuts = true }
+	local exclude_keys = { 
+		section_states = true, gesture_actions = true, 
+		gesture_modes = true, gesture_sensitivities = true,
+		shortcut_keys = true, hotstrings = true, script_control_shortcuts = true 
+	}
 
 	for k, v in pairs(saved) do
 		if v ~= nil and not exclude_keys[k] then

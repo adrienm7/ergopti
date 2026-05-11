@@ -190,25 +190,40 @@ function M.build(ctx)
 		local enabled = state.script_control_enabled
 		local paused = ctx.paused
 		local actions = type(script_control.ACTIONS) == "table" and script_control.ACTIONS or {}
-		local act_labels = type(script_control.ACTION_LABELS) == "table" and script_control.ACTION_LABELS or {}
+		
 		local function get_label(act)
-			return act_labels[act] or act
+			if not act or act == "-" or act == "--" then return "-" end
+			if act:match("^#") then return act:sub(2) end -- Category headers
+
+			if ctx.gestures and type(ctx.gestures.get_action_label) == "function" then
+				return ctx.gestures.get_action_label(act)
+			end
+			return act
 		end
+
 		local function key_submenu(keyname)
 			local current = state.script_control_shortcuts[keyname] or "none"
 			local sub = {}
 			for _, act in ipairs(actions) do
-				table.insert(sub, {
-					title    = get_label(act),
-					checked  = ((current == act) and not paused) or nil,
-					disabled = not enabled or paused or nil,
-					fn       = (enabled and not paused) and (function(a) return function()
-						state.script_control_shortcuts[keyname] = a
-						if type(script_control.set_shortcut_action) == "function" then pcall(script_control.set_shortcut_action, keyname, a) end
-						ctx.save_prefs()
-						ctx.updateMenu()
-					end end)(act) or nil,
-				})
+				local label = get_label(act)
+				
+				if label == "-" then
+					table.insert(sub, { title = "-" })
+				elseif act:match("^#") then
+					table.insert(sub, { title = label, disabled = true })
+				else
+					table.insert(sub, {
+						title    = label,
+						checked  = ((current == act) and not paused) or nil,
+						disabled = not enabled or paused or nil,
+						fn       = (enabled and not paused) and (function(a) return function()
+							state.script_control_shortcuts[keyname] = a
+							if type(script_control.set_shortcut_action) == "function" then pcall(script_control.set_shortcut_action, keyname, a) end
+							ctx.save_prefs()
+							ctx.updateMenu()
+						end end)(act) or nil,
+					})
+				end
 			end
 			return sub
 		end
