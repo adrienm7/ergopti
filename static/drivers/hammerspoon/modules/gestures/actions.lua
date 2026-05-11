@@ -350,6 +350,20 @@ local function sysKey(name)
 	end)
 end
 
+--- Posts a regular key stroke as an HID-sourced pair (down/up).
+--- @param mods table|string Modifier keys (e.g. {"alt"} or "cmd").
+--- @param key string The key name (e.g. "left").
+local function postKeyStroke(mods, key)
+	pcall(function()
+		local down = hs.eventtap.event.newKeyEvent(mods, key, true)
+		pcall(function() down:setProperty(hs.eventtap.event.properties.eventSourceStateID, 1) end)
+		down:post()
+		local up = hs.eventtap.event.newKeyEvent(mods, key, false)
+		pcall(function() up:setProperty(hs.eventtap.event.properties.eventSourceStateID, 1) end)
+		up:post()
+	end)
+end
+
 --- Returns the hs.spaces module with a one-time require cache.
 --- @return table|nil The hs.spaces module when available.
 local function get_spaces_module()
@@ -558,16 +572,16 @@ ax("tracks",     "Pistes",
 	function() sysKey("NEXT") end)
 
 ax("words",      "Mots",
-	function() pcall(hs.eventtap.keyStroke, {"alt"}, "left") end,
-	function() pcall(hs.eventtap.keyStroke, {"alt"}, "right") end, true)
+	function() postKeyStroke({"alt"}, "left") end,
+	function() postKeyStroke({"alt"}, "right") end, true)
 
 ax("lines",      "Lignes",
-	function() pcall(hs.eventtap.keyStroke, {"alt"}, "up") end,
-	function() pcall(hs.eventtap.keyStroke, {"alt"}, "down") end, true)
+	function() hs.timer.doAfter(0, function() pcall(hs.eventtap.keyStroke, {"alt"}, "up") end) end,
+	function() hs.timer.doAfter(0, function() pcall(hs.eventtap.keyStroke, {"alt"}, "down") end) end, true)
 
 ax("line_bounds","Ligne (début/fin)",
-	function() pcall(hs.eventtap.keyStroke, {"cmd"}, "left") end,
-	function() pcall(hs.eventtap.keyStroke, {"cmd"}, "right") end)
+	function() hs.timer.doAfter(0, function() pcall(hs.eventtap.keyStroke, {"cmd"}, "left") end) end,
+	function() hs.timer.doAfter(0, function() pcall(hs.eventtap.keyStroke, {"cmd"}, "right") end) end)
 
 ax("paragraphs", "Paragraphes",
 	function() pcall(hs.eventtap.keyStroke, {"alt"}, "up") end,
@@ -624,10 +638,10 @@ sg("mission_control",  "Mission Control",      function() pcall(hs.osascript.app
 sg("app_expose",       "App Exposé",           function() pcall(hs.osascript.applescript, "tell application \"System Events\" to key code 125 using {control down}") end)
 
 -- Cursor movement
-sg("word_prev",        "Mot précédent",        function() pcall(hs.eventtap.keyStroke, {"alt"}, "left") end)
-sg("word_next",        "Mot suivant",          function() pcall(hs.eventtap.keyStroke, {"alt"}, "right") end)
-sg("line_start",       "Début de ligne",       function() pcall(hs.eventtap.keyStroke, {"cmd"}, "left") end)
-sg("line_end",         "Fin de ligne",         function() pcall(hs.eventtap.keyStroke, {"cmd"}, "right") end)
+sg("word_prev",        "Mot précédent",        function() postKeyStroke({"alt"}, "left") end)
+sg("word_next",        "Mot suivant",          function() postKeyStroke({"alt"}, "right") end)
+sg("line_start",       "Début de ligne",       function() hs.timer.doAfter(0, function() pcall(hs.eventtap.keyStroke, {"cmd"}, "left") end) end)
+sg("line_end",         "Fin de ligne",         function() hs.timer.doAfter(0, function() pcall(hs.eventtap.keyStroke, {"cmd"}, "right") end) end)
 sg("para_prev",        "Paragraphe précédent", function() pcall(hs.eventtap.keyStroke, {"alt"}, "up") end)
 sg("para_next",        "Paragraphe suivant",   function() pcall(hs.eventtap.keyStroke, {"alt"}, "down") end)
 sg("doc_start",        "Début du document",    function() pcall(hs.eventtap.keyStroke, {"cmd"}, "up") end)

@@ -45,6 +45,10 @@ local LIVE_REARM_SEC              = 0.08  -- Minimum delay between consecutive l
 local LIVE_REARM_REVERSE_FAST_SEC = 0.03  -- Faster rearm when user reverses direction strongly
 local LIVE_REVERSE_FAST_MIN       = 1.5   -- Signed distance threshold to unlock fast reversal rearm
 
+-- Candidate confirmation for noisy multi-finger spikes (e.g., 3→5 transient)
+local FINGER_CONFIRM_FRAMES = 4
+local FINGER_CONFIRM_MS     = 0.12
+
 local scrollBlocker  = nil
 local gs             = {}
 
@@ -108,6 +112,10 @@ local function resetGS()
 		lifting        = false,
 		liveAxisSign   = nil,
 		lastLiveFire   = 0,
+		-- Candidate spike confirmation state
+		candidateFingers = nil,
+		candidateSince   = nil,
+		candidateFrames  = 0,
 	}
 end
 resetGS()
@@ -350,12 +358,39 @@ function M.process_frame(touches)
 			if n < gs.maxFingers then
 				gs.lifting = true
 			elseif n > gs.maxFingers then
-				-- A new finger joined: reset the tap baseline so the centroid shift
-				-- from the new finger doesn't count as movement
-				gs.maxFingers = n
-				gs.startPos   = pos
-				gs.startTime  = now
-				gs.lifting    = false
+				-- A new finger joined. Accept single-finger joins immediately,
+				-- but require confirmation for large spikes (e.g., 3→5) which are often transient.
+				if n <= gs.maxFingers + 1 then
+					gs.maxFingers = n
+					gs.startPos   = pos
+					gs.startTime  = now
+					gs.lifting    = false
+					gs.candidateFingers = nil
+					gs.candidateSince   = nil
+					gs.candidateFrames  = 0
+				else
+					if gs.candidateFingers == n then
+						gs.candidateFrames = gs.candidateFrames + 1
+						local elapsed = now - (gs.candidateSince or now)
+						if gs.candidateFrames >= FINGER_CONFIRM_FRAMES and elapsed >= FINGER_CONFIRM_MS then
+							Logger.info(LOG, string.format("Confirmed multi-finger join: %d → %d (frames=%d, %.3fs).", gs.maxFingers, n, gs.candidateFrames, elapsed))
+							gs.maxFingers = n
+							gs.startPos   = pos
+							gs.startTime  = now
+							gs.lifting    = false
+							gs.candidateFingers = nil
+							gs.candidateSince   = nil
+							gs.candidateFrames  = 0
+						else
+							Logger.debug(LOG, string.format("Tentative finger spike persists (%d frames, %.3fs): %d → %d.", gs.candidateFrames, elapsed, gs.maxFingers, n))
+						end
+					else
+						gs.candidateFingers = n
+						gs.candidateSince   = now
+						gs.candidateFrames  = 1
+						Logger.warn(LOG, string.format("Observed spurious finger spike, awaiting confirmation: %d → %d.", gs.maxFingers, n))
+					end
+				end
 			elseif gs.lifting and n == gs.maxFingers then
 				-- Full finger count restored after a partial lift without a clean n=0
 				-- frame in between. This is a rapid successive tap: commit the current
