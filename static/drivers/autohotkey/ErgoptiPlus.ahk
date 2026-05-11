@@ -143,6 +143,7 @@ global LayerEnabled := False ; If the keyboard layer is currently in navigation 
 global NumberOfRepetitions := 1 ; Same as Vim where 3w does the w action 3 times, we can do the same in the navigation layer
 global ActivitySimulation := False
 global OneShotShiftEnabled := False
+global _TOML_STRICT_CANON_IN_PROGRESS := false
 
 ; Read path overrides from paths.toml — same file format as Hammerspoon.
 ; Auto-generated with defaults if absent.
@@ -2014,6 +2015,7 @@ ToggleCategoryAllFeatures(Category, Value) {
 SaveFullConfig() {
     global Features, ScriptInformation, ScriptShortcutAssignments
     global GestureAssignments, ConfigurationFile, _TOML_STRICT_CANON_IN_PROGRESS
+    global PrevCanonState
     Updates := []
 
     ; Collect all feature flags recursively
