@@ -348,27 +348,27 @@ global GESTURE_ACTIONS := Map(
     ; their current workflow without producing files they then have to
     ; clean up.
     "screenshot_window_clipboard", {
-        Label: "Capture d'écran de la fenêtre active (presse-papiers)",
+        Label: "Capture d’écran de la fenêtre active (presse-papiers)",
         Fn: (*) => GestureScreenshotWindow("clipboard"),
     },
     "screenshot_window_save", {
-        Label: "Capture d'écran de la fenêtre active (sauver sur disque)",
+        Label: "Capture d’écran de la fenêtre active (sauver sur disque)",
         Fn: (*) => GestureScreenshotWindow("save"),
     },
     "screenshot_region_clipboard", {
-        Label: "Capture d'écran d'une zone à sélectionner (presse-papiers)",
+        Label: "Capture d’écran d’une zone à sélectionner (presse-papiers)",
         Fn: (*) => GestureScreenshotRegion("clipboard"),
     },
     "screenshot_region_save", {
-        Label: "Capture d'écran d'une zone à sélectionner (sauver sur disque)",
+        Label: "Capture d’écran d’une zone à sélectionner (sauver sur disque)",
         Fn: (*) => GestureScreenshotRegion("save"),
     },
     "screenshot_fullscreen_clipboard", {
-        Label: "Capture d'écran entier (presse-papiers)",
+        Label: "Capture d’écran entier (presse-papiers)",
         Fn: (*) => GestureScreenshotFullscreen("clipboard"),
     },
     "screenshot_fullscreen_save", {
-        Label: "Capture d'écran entier (sauver sur disque)",
+        Label: "Capture d’écran entier (sauver sur disque)",
         Fn: (*) => GestureScreenshotFullscreen("save"),
     },
     "screen_record", {

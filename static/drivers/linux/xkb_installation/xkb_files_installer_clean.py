@@ -22,21 +22,20 @@ Example:
 """
 
 import argparse
+import glob
 import logging
 import os
-import shutil
-import sys
 import pwd
-import subprocess
 import re
-import glob
-import time
+import shutil
+import subprocess
+import sys
 from pathlib import Path
 from typing import Optional
 
 # --- Constants & Paths ---
 # Internal package name for folder organization
-PACKAGE_NAME = "ergopti" 
+PACKAGE_NAME = "ergopti"
 
 # Paths
 MODERN_XKB_PATH = Path("/usr/share/xkeyboard-config.d")
@@ -52,10 +51,13 @@ logging.basicConfig(level=logging.INFO, format="%(message)s")
 # ============== EXECUTION PHASE ===================
 # ==================================================
 
+
 def main():
     """Main execution flow."""
     parser = argparse.ArgumentParser(description="Universal XKB Layout Installer")
-    parser.add_argument("--xkb", type=Path, required=True, help="Path to the .xkb symbols file")
+    parser.add_argument(
+        "--xkb", type=Path, required=True, help="Path to the .xkb symbols file"
+    )
     parser.add_argument("--types", type=Path, help="Path to the types definition file")
     parser.add_argument("--xcompose", type=Path, help="Path to the .XCompose file")
     args = parser.parse_args()
@@ -105,11 +107,13 @@ def main():
 # ============= SYSTEM & PRIVILEGES ================
 # ==================================================
 
+
 def check_sudo():
     """Ensures the script is running with root privileges."""
     if os.geteuid() != 0:
         logging.error("❌ Ce script doit être lancé avec sudo (root).")
         sys.exit(1)
+
 
 def get_sudo_user_info() -> Optional[pwd.struct_passwd]:
     """Retrieves the actual user invoking sudo (to locate home dir)."""
@@ -126,23 +130,25 @@ def get_sudo_user_info() -> Optional[pwd.struct_passwd]:
 # ============ CLEANUP & FILESYSTEM ================
 # ==================================================
 
+
 def deep_cleanup_artifacts():
     """
     Aggressively removes old symlinks and files related to the package
     in the system XKB directories to prevent dead links or shadow files.
     """
     logging.info("   🧹 Nettoyage approfondi des anciennes versions...")
-    
+
     # Directories where artifacts might linger
     subdirs = ["symbols", "types", "rules", "compat"]
-    
+
     # Patterns to match (files containing the package name)
     # Adding variations to catch previous manual installs
     patterns = [f"*{PACKAGE_NAME}*", "*Ergopti*", "*ergopti*"]
 
     for subdir in subdirs:
         target_dir = SYSTEM_XKB_PATH / subdir
-        if not target_dir.exists(): continue
+        if not target_dir.exists():
+            continue
 
         # 1. Remove by name pattern
         for pattern in patterns:
@@ -182,33 +188,35 @@ def setup_package_directory() -> Path:
         os.chmod(target, 0o755)
     return pkg_dir
 
+
 def install_file(src: Path, dest: Path, patch_default: bool = False):
     """Copies source file to destination, optionally adding 'default' group."""
     if not src.exists():
         raise FileNotFoundError(f"Fichier introuvable : {src}")
     try:
-        with src.open('r', encoding='utf-8') as f:
+        with src.open("r", encoding="utf-8") as f:
             content = f.read()
-        
+
         if patch_default:
             # Ensure compatibility with Gnome/X11 requiring a default section
             content = re.sub(r'xkb_symbols\s+"[^"]+"', 'xkb_symbols "default"', content)
             if "default partial" not in content:
                 content = content.replace(
-                    'xkb_symbols "default"', 
-                    'default partial alphanumeric_keys\nxkb_symbols "default"'
+                    'xkb_symbols "default"',
+                    'default partial alphanumeric_keys\nxkb_symbols "default"',
                 )
-        
-        with dest.open('w', encoding='utf-8') as f:
+
+        with dest.open("w", encoding="utf-8") as f:
             f.write(content)
         os.chmod(dest, 0o644)
     except Exception as e:
-        raise IOError(f"Erreur d'installation pour {src.name} : {e}")
+        raise IOError(f"Erreur d’installation pour {src.name} : {e}")
 
 
 # ==================================================
 # ============ RULES PATCHING ======================
 # ==================================================
+
 
 def patch_system_evdev_rules(layout_name: str):
     """
@@ -222,24 +230,26 @@ def patch_system_evdev_rules(layout_name: str):
         return
 
     try:
-        with open(RULES_EVDEV_PATH, 'r', encoding='utf-8') as f:
+        with open(RULES_EVDEV_PATH, "r", encoding="utf-8") as f:
             lines = f.readlines()
-        
+
         # --- [MODIFICATION STARTED] ---
         # Clean up ANY old lines containing 'ergopti' or the package name.
         # This prevents accumulation of old variants like "Ergopti_v2", "Ergopti_v3", etc.
         clean_lines = []
         blacklist_terms = [PACKAGE_NAME.lower(), "ergopti"]
-        
+
         for line in lines:
             # If the line contains an equals sign (it's a rule) AND matches "ergopti"
             # we skip it (delete it).
             if "=" in line and any(term in line.lower() for term in blacklist_terms):
                 continue
             clean_lines.append(line)
-            
+
         if len(lines) != len(clean_lines):
-            logging.info(f"      🧹 {len(lines) - len(clean_lines)} anciennes entrées nettoyées dans evdev.")
+            logging.info(
+                f"      🧹 {len(lines) - len(clean_lines)} anciennes entrées nettoyées dans evdev."
+            )
             lines = clean_lines
         # --- [MODIFICATION ENDED] ---
 
@@ -258,19 +268,21 @@ def patch_system_evdev_rules(layout_name: str):
         if start_idx != -1:
             # Normal: Insert after the header
             lines.insert(start_idx + 1, patch_line)
-            with open(RULES_EVDEV_PATH, 'w', encoding='utf-8') as f:
+            with open(RULES_EVDEV_PATH, "w", encoding="utf-8") as f:
                 f.writelines(lines)
-            logging.info(f"      ✅ Règles mises à jour (Insertion).")
+            logging.info("      ✅ Règles mises à jour (Insertion).")
         else:
             # Fallback: Force append to end of file if section missing
-            needs_newline = lines and not lines[-1].endswith('\n')
-            with open(RULES_EVDEV_PATH, 'a', encoding='utf-8') as f:
-                if needs_newline: f.write("\n")
+            needs_newline = lines and not lines[-1].endswith("\n")
+            with open(RULES_EVDEV_PATH, "a", encoding="utf-8") as f:
+                if needs_newline:
+                    f.write("\n")
                 f.write(f"\n! layout = types\n{patch_line}")
-            logging.info(f"      ✅ Règles ajoutées à la fin (Force Append).")
+            logging.info("      ✅ Règles ajoutées à la fin (Force Append).")
 
     except Exception as e:
         logging.error(f"❌ Erreur patch rules : {e}")
+
 
 def create_partial_xml(pkg_dir: Path, layout_name: str, display_name: str):
     """Creates XML for GUI registry (Gnome Settings / KDE)."""
@@ -291,14 +303,17 @@ def create_partial_xml(pkg_dir: Path, layout_name: str, display_name: str):
 </xkbConfigRegistry>
 """
     try:
-        with xml_file.open('w', encoding='utf-8') as f: f.write(xml_content)
+        with xml_file.open("w", encoding="utf-8") as f:
+            f.write(xml_content)
         os.chmod(xml_file, 0o644)
-    except Exception: pass
+    except Exception:
+        pass
 
 
 # ==================================================
 # ========= SYSTEM INTEGRATION (BRIDGE) ============
 # ==================================================
+
 
 def create_system_symlinks(pkg_dir: Path, layout_name: str):
     """Create new symbolic links to bridge modern path to legacy system path."""
@@ -307,7 +322,7 @@ def create_system_symlinks(pkg_dir: Path, layout_name: str):
     for folder in folders:
         src = pkg_dir / folder / layout_name
         dest = SYSTEM_XKB_PATH / folder / layout_name
-        
+
         if src.exists():
             try:
                 # Determine if dest exists (symlink or file) and remove it
@@ -322,6 +337,7 @@ def create_system_symlinks(pkg_dir: Path, layout_name: str):
 # ======== USER ENVIRONMENT & ACTIVATION ===========
 # ==================================================
 
+
 def install_user_xcompose(src: Path):
     """
     Installs .XCompose. Forces overwrite to ensure update.
@@ -329,62 +345,91 @@ def install_user_xcompose(src: Path):
     if not src.exists():
         logging.warning("⚠️ Fichier source XCompose introuvable.")
         return
-    
+
     user = get_sudo_user_info()
     if not user:
         logging.warning("⚠️ Impossible de déterminer l'utilisateur sudo.")
         return
-    
+
     dest = Path(user.pw_dir) / ".XCompose"
-    
+
     try:
         # 1. Backup existing
         if dest.exists():
             shutil.copy2(dest, dest.with_suffix(".bak"))
-            dest.unlink() # Explicitly remove old file to break inodes
+            dest.unlink()  # Explicitly remove old file to break inodes
 
         # 2. Copy new file
         shutil.copy(src, dest)
-        
+
         # 3. Set Permissions
         os.chown(dest, user.pw_uid, user.pw_gid)
         os.chmod(dest, 0o644)
-        
+
         # 4. Verification log
         size = dest.stat().st_size
         logging.info(f"   ⌨️ .XCompose mis à jour pour {user.pw_name} ({size} octets)")
-        
+
     except Exception as e:
         logging.error(f"❌ Erreur critique .XCompose : {e}")
+
 
 def refresh_and_activate(layout_id: str):
     """Purge cache and attempt to activate configuration via CLI."""
     # 1. Purge XKB cache
     if XKB_CACHE_DIR.exists():
-        subprocess.run(f"rm -rf {XKB_CACHE_DIR}/*", shell=True, stderr=subprocess.DEVNULL)
+        subprocess.run(
+            f"rm -rf {XKB_CACHE_DIR}/*", shell=True, stderr=subprocess.DEVNULL
+        )
         logging.info("   🔄 Cache XKB purgé.")
 
     user = get_sudo_user_info()
-    if not user: return
+    if not user:
+        return
 
     def run_as_user(cmd_list):
         """Helper to run command as the real user."""
         try:
             env = os.environ.copy()
-            env['XDG_RUNTIME_DIR'] = f"/run/user/{user.pw_uid}"
-            subprocess.run(['su', user.pw_name, '-c', " ".join(cmd_list)],
-                env=env, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-        except Exception: pass
+            env["XDG_RUNTIME_DIR"] = f"/run/user/{user.pw_uid}"
+            subprocess.run(
+                ["su", user.pw_name, "-c", " ".join(cmd_list)],
+                env=env,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+            )
+        except Exception:
+            pass
 
     logging.info("   🚀 Rechargement de la configuration...")
-    
+
     # 2. Force types explicitly using setxkbmap (Immediate effect)
-    run_as_user(['setxkbmap', '-layout', layout_id, '-types', f"complete+{layout_id}"])
-    
+    run_as_user(["setxkbmap", "-layout", layout_id, "-types", f"complete+{layout_id}"])
+
     # 3. Update DE settings
-    run_as_user(['gsettings', 'set', 'org.gnome.desktop.input-sources', 'sources', f"[('xkb', '{layout_id}')]"])
-    run_as_user(['kwriteconfig6', '--file', 'kxkbrc', '--group', 'Layout', '--key', 'LayoutList', layout_id])
-    run_as_user(['qdbus', 'org.kde.KWin', '/KWin', 'org.kde.KWin.reconfigure'])
+    run_as_user(
+        [
+            "gsettings",
+            "set",
+            "org.gnome.desktop.input-sources",
+            "sources",
+            f"[('xkb', '{layout_id}')]",
+        ]
+    )
+    run_as_user(
+        [
+            "kwriteconfig6",
+            "--file",
+            "kxkbrc",
+            "--group",
+            "Layout",
+            "--key",
+            "LayoutList",
+            layout_id,
+        ]
+    )
+    run_as_user(["qdbus", "org.kde.KWin", "/KWin", "org.kde.KWin.reconfigure"])
+
 
 if __name__ == "__main__":
     main()

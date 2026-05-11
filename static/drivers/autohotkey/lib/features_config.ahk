@@ -65,7 +65,7 @@ global Features := Map(
         },
         "ErgoptiPlus", {
             Enabled: True,
-            Description: "Appliquer les légers changements en AltGr d'Ergopti➕",
+            Description: "Appliquer les légers changements en AltGr d’Ergopti➕",
         }
     ),
     "DistancesReduction", Map(
@@ -287,7 +287,7 @@ global Features := Map(
         },
         "WrapTextIfSelected", {
             Enabled: True,
-            Description: "Taper un symbole lors d'une sélection de texte va encadrer celle-ci par le symbole. Fonctionne si émulation.",
+            Description: "Taper un symbole lors d’une sélection de texte va encadrer celle-ci par le symbole. Fonctionne si émulation.",
         },
         "MicrosoftBold", {
             Enabled: True,
@@ -454,7 +454,7 @@ global Features := Map(
         },
         "TakeNote", {
             Enabled: True,
-            Description: "Win + N(ote) = Ouverture d'un fichier pour prendre des notes",
+            Description: "Win + N(ote) = Ouverture d’un fichier pour prendre des notes",
             DatedNotes: False,
             DestinationFolder: A_Desktop,
         },
@@ -464,7 +464,7 @@ global Features := Map(
         },
         "Move", {
             Enabled: True,
-            Description: "Win + M(ove) = Simulation d'une activité en bougeant la souris aléatoirement. Pour désactiver, réitérer le raccourci ou recharger le script",
+            Description: "Win + M(ove) = Simulation d’une activité en bougeant la souris aléatoirement. Pour désactiver, réitérer le raccourci ou recharger le script",
         },
         "Search", {
             Enabled: True,

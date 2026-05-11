@@ -139,9 +139,8 @@
 		class="link">logo_simple.ico</a
 	>
 	ainsi que
-	<a href="img/logo/logo_simple_disabled.ico" download class="link"
-		>logo_simple_disabled.ico</a
-	>. Ils sont à placer dans le même dossier que celui du script <em>.ahk</em> et permettent d’en modifier
+	<a href="img/logo/logo_simple_disabled.ico" download class="link">logo_simple_disabled.ico</a>.
+	Ils sont à placer dans le même dossier que celui du script <em>.ahk</em> et permettent d’en modifier
 	l’icône dans la barre des tâches.
 </p>
 
@@ -191,7 +190,7 @@
 <ol>
 	<li>
 		Presser simultanément la touche Windows et la touche R. Ce raccourci <kbd>Win</kbd> +
-		<kbd>R</kbd> permet d'ouvrir la fenêtre « Exécuter » de Windows ;
+		<kbd>R</kbd> permet d’ouvrir la fenêtre « Exécuter » de Windows ;
 	</li>
 	<li>Saisir <code>shell:startup</code> et valider en cliquant sur le bouton « OK » ;</li>
 	<li>

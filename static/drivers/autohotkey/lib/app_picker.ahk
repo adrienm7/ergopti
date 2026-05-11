@@ -39,9 +39,6 @@
 
 #Requires Autohotkey v2.0+
 
-
-
-
 ; ===================================
 ; ===================================
 ; ======= 1/ Public entry =======
@@ -53,10 +50,10 @@ AppPicker_Show(opts) {
         ; Defensive — mis-call must not crash the caller.
         return
     }
-    title    := opts.Has("title")    ? opts["title"]    : "Sélection d'applications"
-    prompt   := opts.Has("prompt")   ? opts["prompt"]   : "Sélectionnez les applications :"
+    title := opts.Has("title") ? opts["title"] : "Sélection d’applications"
+    prompt := opts.Has("prompt") ? opts["prompt"] : "Sélectionnez les applications :"
     ok_label := opts.Has("ok_label") ? opts["ok_label"] : "Valider"
-    on_save  := opts.Has("on_save")  ? opts["on_save"]  : ""
+    on_save := opts.Has("on_save") ? opts["on_save"] : ""
 
     initial := Map()
     if opts.Has("initial") && opts["initial"] is Array {
@@ -98,7 +95,7 @@ AppPicker_Show(opts) {
 AppPicker_OnOK(g, lv, rows, on_save) {
     selected := []
     row_idx := 0
-    Loop {
+    loop {
         row_idx := lv.GetNext(row_idx, "Checked")
         if !row_idx
             break
@@ -111,9 +108,6 @@ AppPicker_OnOK(g, lv, rows, on_save) {
         on_save(selected)
 }
 
-
-
-
 ; ===========================================
 ; ===========================================
 ; ======= 2/ Running-app discovery =======
@@ -124,8 +118,8 @@ AppPicker_OnOK(g, lv, rows, on_save) {
 ; { process, display, checked }. The currently focused app is pinned
 ; on top with " (en cours)" appended; everything else sorted alpha.
 AppPicker_BuildRows(initial) {
-    rows         := []
-    seen         := Map()
+    rows := []
+    seen := Map()
     focused_proc := ""
     focused_disp := ""
     try {
@@ -178,7 +172,7 @@ AppPicker_BuildRows(initial) {
     ; typically deal with.
     ; AHK v2: `<` on strings tries a numeric coerce and throws when the
     ; operands are non-numeric. Use StrCompare() instead.
-    Loop others.Length {
+    loop others.Length {
         i := A_Index
         j := i
         while (j > 1 && StrCompare(others[j].display, others[j - 1].display, false) < 0) {

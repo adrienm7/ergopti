@@ -18,10 +18,10 @@
 	</p>
 	<p>
 		La license MIT est une licence permissive, simple et courte, qui n'impose que quelques
-		conditions, notamment la préservation des mentions de droits d'auteur et de licence. Les travaux
+		conditions, notamment la préservation des mentions de droits d’auteur et de licence. Les travaux
 		sous cette licence, y compris les modifications et œuvres dérivées, peuvent être redistribués
-		sous d'autres termes, et ce, même sans fournir le code source. La seule condition est de
-		conserver les mentions de licence et de droits d'auteur.
+		sous d’autres termes, et ce, même sans fournir le code source. La seule condition est de
+		conserver les mentions de licence et de droits d’auteur.
 	</p>
 
 	<h3>Permissions</h3>
@@ -40,6 +40,6 @@
 
 	<h3>Conditions</h3>
 	<ul>
-		<li>Conservation des mentions de licence et des droits d'auteur.</li>
+		<li>Conservation des mentions de licence et des droits d’auteur.</li>
 	</ul>
 </section>

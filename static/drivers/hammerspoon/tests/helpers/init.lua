@@ -145,7 +145,7 @@ end
 
 local _suite_results = { passed = 0, failed = 0, failures = {} }
 
---- Declares a test suite (analogous to busted's `describe`).
+--- Declares a test suite (analogous to busted’s `describe`).
 --- @param name string Suite name, printed in the output.
 --- @param fn function Suite body that calls `it()`.
 function M.describe(name, fn)
@@ -157,7 +157,7 @@ function M.describe(name, fn)
 	end
 end
 
---- Declares a single test case (analogous to busted's `it`).
+--- Declares a single test case (analogous to busted’s `it`).
 --- @param name string Test name, printed in the output.
 --- @param fn function Test body.
 function M.it(name, fn)

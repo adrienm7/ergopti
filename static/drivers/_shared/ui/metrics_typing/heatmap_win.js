@@ -4,7 +4,7 @@
  * ==============================================================================
  * MODULE: Windows scancode → HS keycode bridge
  * DESCRIPTION:
- * The dashboard's heatmap geometry (KEY_POSITIONS, KEYCODE_DATA, SFB_COLUMNS)
+ * The dashboard’s heatmap geometry (KEY_POSITIONS, KEYCODE_DATA, SFB_COLUMNS)
  * is keyed by Hammerspoon keycodes — the macOS driver's native identifier.
  * The AHK driver captures hardware scancodes (set 1) instead. Rather than
  * forking the entire layout for Windows, we translate each scancode to its
@@ -24,9 +24,6 @@
  * ==============================================================================
  */
 
-
-
-
 // =============================================
 // =============================================
 // ======= 1/ Scancode → HS keycode map =======
@@ -39,57 +36,105 @@
 // macOS.
 const SC_TO_KC = {
 	// Function row
-	1:  53,                             // Esc
-	59: 122, 60: 120, 61: 99,  62: 118, // F1-F4
-	63: 96,  64: 97,  65: 98,  66: 100, // F5-F8
-	67: 101, 68: 109, 87: 103, 88: 111, // F9-F12
+	1: 53, // Esc
+	59: 122,
+	60: 120,
+	61: 99,
+	62: 118, // F1-F4
+	63: 96,
+	64: 97,
+	65: 98,
+	66: 100, // F5-F8
+	67: 101,
+	68: 109,
+	87: 103,
+	88: 111, // F9-F12
 
 	// Number row
-	2:  18, 3:  19, 4:  20, 5:  21, 6:  23,  // 1-5
-	7:  22, 8:  26, 9:  28, 10: 25, 11: 29,  // 6-0
-	12: 27, 13: 24, 14: 51,                  // - = backspace
-	41: 10,                                  // ` (left of 1)
+	2: 18,
+	3: 19,
+	4: 20,
+	5: 21,
+	6: 23, // 1-5
+	7: 22,
+	8: 26,
+	9: 28,
+	10: 25,
+	11: 29, // 6-0
+	12: 27,
+	13: 24,
+	14: 51, // - = backspace
+	41: 10, // ` (left of 1)
 
 	// QWERTY row
-	15: 48,                                  // tab
-	16: 12, 17: 13, 18: 14, 19: 15, 20: 17,  // q w e r t
-	21: 16, 22: 32, 23: 34, 24: 31, 25: 35,  // y u i o p
-	26: 33, 27: 30, 43: 42,                  // [ ] backslash
+	15: 48, // tab
+	16: 12,
+	17: 13,
+	18: 14,
+	19: 15,
+	20: 17, // q w e r t
+	21: 16,
+	22: 32,
+	23: 34,
+	24: 31,
+	25: 35, // y u i o p
+	26: 33,
+	27: 30,
+	43: 42, // [ ] backslash
 
 	// Home row
-	58: 57,                                  // capslock
-	30: 0,  31: 1,  32: 2,  33: 3,  34: 5,   // a s d f g
-	35: 4,  36: 38, 37: 40, 38: 37, 39: 41,  // h j k l ;
-	40: 39, 28: 36,                          // ' enter
+	58: 57, // capslock
+	30: 0,
+	31: 1,
+	32: 2,
+	33: 3,
+	34: 5, // a s d f g
+	35: 4,
+	36: 38,
+	37: 40,
+	38: 37,
+	39: 41, // h j k l ;
+	40: 39,
+	28: 36, // ' enter
 
 	// Bottom row (ISO)
-	42: 56, 86: 50,                          // shift_l, ISO < >
-	44: 6,  45: 7,  46: 8,  47: 9,  48: 11,  // z x c v b
-	49: 45, 50: 46, 51: 43, 52: 47, 53: 44,  // n m , . /
-	54: 60,                                  // shift_r
+	42: 56,
+	86: 50, // shift_l, ISO < >
+	44: 6,
+	45: 7,
+	46: 8,
+	47: 9,
+	48: 11, // z x c v b
+	49: 45,
+	50: 46,
+	51: 43,
+	52: 47,
+	53: 44, // n m , . /
+	54: 60, // shift_r
 
 	// Thumb row + modifiers.
 	// Windows physical order (left→right): Ctrl | Fn | Win | Alt | Space | AltGr | (Menu) | Ctrl
 	// KEY_POSITIONS reuse: kc63=x0 (fn slot) kc59=x1 kc58=x2 kc55=x3.25 | space | kc54=x9.25 kc61=x10.5
 	// We map each SC to the kc whose x-position matches the physical Windows position.
-	29:  63,  // ctrl_l  → fn slot (x=0), leftmost key on Windows
-	91:  58,  // lwin    → x=2 slot, between Fn and Alt
-	56:  55,  // alt_l   → x=3.25 slot, right of Win
-	57:  49,  // space
-	312: 54,  // altgr (right-alt, SC 56 + 256 = 312) → x=9.25, first key right of space
-	92:  61,  // rwin / app menu → x=10.5
-	93:  61,  // app/menu key → same slot
+	29: 63, // ctrl_l  → fn slot (x=0), leftmost key on Windows
+	91: 58, // lwin    → x=2 slot, between Fn and Alt
+	56: 55, // alt_l   → x=3.25 slot, right of Win
+	57: 49, // space
+	312: 54, // altgr (right-alt, SC 56 + 256 = 312) → x=9.25, first key right of space
+	92: 61, // rwin / app menu → x=10.5
+	93: 61, // app/menu key → same slot
 
 	// Arrows (AHK extended scancodes 0xE048..0xE0CB usually surface as
 	// raw codes; cover both the bare and high-byte forms).
-	75:  123, 203: 123, // left
-	72:  126, 200: 126, // up
-	77:  124, 205: 124, // right
-	80:  125, 208: 125, // down
+	75: 123,
+	203: 123, // left
+	72: 126,
+	200: 126, // up
+	77: 124,
+	205: 124, // right
+	80: 125,
+	208: 125 // down
 };
-
-
-
 
 // ==============================================
 // ==============================================
@@ -100,28 +145,28 @@ const SC_TO_KC = {
 // Override macOS modifier glyphs with Windows names. Keys NOT listed fall
 // back to KEYCODE_NAMES (which already covers letters / digits / punct).
 const WIN_KEYCODE_LABELS = {
-	"49":  "Espace",
-	"36":  "Entrée",
-	"48":  "Tab",
-	"51":  "Retour arr.",
-	"53":  "Échap",
-	"56":  "Maj",
-	"60":  "Maj",
-	"57":  "Verr. Maj",
+	49: 'Espace',
+	36: 'Entrée',
+	48: 'Tab',
+	51: 'Retour arr.',
+	53: 'Échap',
+	56: 'Maj',
+	60: 'Maj',
+	57: 'Verr. Maj',
 	// Windows thumb row (left→right): Ctrl | Fn | Win | Alt | Space | AltGr | (Menu)
 	// kc63=x0 → Ctrl (leftmost), kc59=x1 → Fn, kc58=x2 → Win, kc55=x3.25 → Alt
 	// kc54=x9.25 → AltGr (first key right of Space), kc61=x10.5 → Menu
-	"63":  "Ctrl",
-	"59":  "Fn",
-	"58":  "Win",
-	"55":  "Alt",
-	"54":  "AltGr",
-	"61":  "Menu",
-	"123": "←", "126": "↑", "124": "→", "125": "↓",
+	63: 'Ctrl',
+	59: 'Fn',
+	58: 'Win',
+	55: 'Alt',
+	54: 'AltGr',
+	61: 'Menu',
+	123: '←',
+	126: '↑',
+	124: '→',
+	125: '↓'
 };
-
-
-
 
 // ==============================================
 // ==============================================
@@ -158,7 +203,7 @@ function translate_win_bucket(app_bucket) {
 				e: (prev.e || 0) + (item.e || 0),
 				hs: (prev.hs || 0) + (item.hs || 0),
 				llm: (prev.llm || 0) + (item.llm || 0),
-				o: (prev.o || 0) + (item.o || 0),
+				o: (prev.o || 0) + (item.o || 0)
 			};
 		}
 	});
@@ -174,7 +219,7 @@ function translate_win_bucket(app_bucket) {
  * @returns {Object} A new today object with kc fields populated.
  */
 function translate_win_today(today) {
-	if (!today || typeof today !== "object") return today;
+	if (!today || typeof today !== 'object') return today;
 	const out = {};
 	Object.entries(today).forEach(([app, bucket]) => {
 		out[app] = translate_win_bucket(bucket);
@@ -198,19 +243,21 @@ function translate_win_today(today) {
  * @returns {Object} Map of `kc_str` → display label string.
  */
 function build_keycode_layout_for_driver(driver_meta, ahk_layout) {
-	const base = (typeof KEYCODE_NAMES === "object" && KEYCODE_NAMES) ? KEYCODE_NAMES : {};
-	if (!driver_meta || driver_meta.os !== "win") return { ...base };
+	const base = typeof KEYCODE_NAMES === 'object' && KEYCODE_NAMES ? KEYCODE_NAMES : {};
+	if (!driver_meta || driver_meta.os !== 'win') return { ...base };
 	const out = { ...base };
-	if (ahk_layout && typeof ahk_layout === "object") {
+	if (ahk_layout && typeof ahk_layout === 'object') {
 		Object.entries(ahk_layout).forEach(([sc_str, ch]) => {
 			const kc = SC_TO_KC[Number(sc_str)];
 			if (kc === undefined) return;
 			out[String(kc)] = ch;
 		});
 	}
-	Object.entries(WIN_KEYCODE_LABELS).forEach(([k, v]) => { out[k] = v; });
+	Object.entries(WIN_KEYCODE_LABELS).forEach(([k, v]) => {
+		out[k] = v;
+	});
 	return out;
 }
 
-window.translate_win_today  = translate_win_today;
+window.translate_win_today = translate_win_today;
 window.build_keycode_layout_for_driver = build_keycode_layout_for_driver;

@@ -277,7 +277,7 @@
 			title: 'Autocorrection',
 			color: '#43a047',
 			tag: 'Les fautes les plus fréquentes, balayées',
-			lead: "Apostrophes typographiques, capitalisation des marques, accents oubliés sur les noms propres et expressions courantes. Ce n’est pas du correcteur post-coup : c’est appliqué à la frappe.",
+			lead: 'Apostrophes typographiques, capitalisation des marques, accents oubliés sur les noms propres et expressions courantes. Ce n’est pas du correcteur post-coup : c’est appliqué à la frappe.',
 			rows: [
 				{ trig: 'chatgpt', out: 'ChatGPT', words: ['ChatGPT m’a aidé sur…'] },
 				{ trig: 'alexei', out: 'Alexeï', words: ['Alexeï Navalny'] },
@@ -291,7 +291,7 @@
 			tag: 'Un suffixe explicite pour les expansions longues',
 			lead: 'Pour vos snippets fréquents — formules de politesse, signatures, identifiants — la touche ★ déclenche l’expansion de manière non ambiguë. Aucun risque de collision avec la frappe normale.',
 			rows: [
-				{ trig: 'ct★', out: 'c’était', words: ['ct★ génial' , '→ c’était génial'] },
+				{ trig: 'ct★', out: 'c’était', words: ['ct★ génial', '→ c’était génial'] },
 				{ trig: 'pex★', out: 'par exemple', words: ['pex★ ce matin', '→ par exemple ce matin'] },
 				{ trig: 'np★', out: 'Adrien Moyaux', words: ['Cordialement,\nnp★', '→ …\nAdrien Moyaux'] },
 				{ trig: 'dt★', out: '07/05/2026', words: ['Le dt★ à 14h', '→ Le 07/05/2026 à 14h'] }
@@ -308,35 +308,35 @@
 			title: 'Roulements de bigrammes',
 			color: '#fb8c00',
 			tag: 'Des combinaisons inconfortables remplacées par des roulements',
-			lead: "Quelques bigrammes naturellement inconfortables sur Ergopti sont remappés vers des séquences fluides qui glissent sur des doigts adjacents. Vous tapez ce qui est confortable, le mot correct sort.",
+			lead: 'Quelques bigrammes naturellement inconfortables sur Ergopti sont remappés vers des séquences fluides qui glissent sur des doigts adjacents. Vous tapez ce qui est confortable, le mot correct sort.',
 			rows: [
-				{ trig: 'p\'', out: 'ct', words: ['acteur', 'docteur', 'docteurs'] },
-				{ trig: 'sx',  out: 'sk', words: ['ask', 'task', 'desk', 'risk'] },
-				{ trig: 'cx',  out: 'ck', words: ['back', 'check', 'dock'] },
-				{ trig: 'hc',  out: 'wh', words: ['what', 'when', 'where', 'while'] }
+				{ trig: "p'", out: 'ct', words: ['acteur', 'docteur', 'docteurs'] },
+				{ trig: 'sx', out: 'sk', words: ['ask', 'task', 'desk', 'risk'] },
+				{ trig: 'cx', out: 'ck', words: ['back', 'check', 'dock'] },
+				{ trig: 'hc', out: 'wh', words: ['what', 'when', 'where', 'while'] }
 			]
 		},
 		{
 			title: 'Réduction des SFBs',
 			color: '#e53935',
 			tag: 'Les Same-Finger Bigrams d’Ergopti, neutralisés',
-			lead: "La , devient une super touche morte qui supprime les derniers SFBs résiduels. Les touches É/È/Ê s’en chargent côté main gauche.",
+			lead: 'La , devient une super touche morte qui supprime les derniers SFBs résiduels. Les touches É/È/Ê s’en chargent côté main gauche.',
 			rows: [
-				{ trig: ',t',  out: 'pt', words: ['ap,tement → aptement'] },
-				{ trig: 'éà',  out: 'ié', words: ['c-éà-l → ciel'] },
-				{ trig: 'àé',  out: 'éi', words: ['ant-àé-r → antérieur'] },
-				{ trig: 'êe',  out: 'œ',  words: ['s-êe-ur → sœur'] }
+				{ trig: ',t', out: 'pt', words: ['ap,tement → aptement'] },
+				{ trig: 'éà', out: 'ié', words: ['c-éà-l → ciel'] },
+				{ trig: 'àé', out: 'éi', words: ['ant-àé-r → antérieur'] },
+				{ trig: 'êe', out: 'œ', words: ['s-êe-ur → sœur'] }
 			]
 		},
 		{
 			title: 'Hotstrings via touche magique ★',
 			color: '#8e44ad',
 			tag: 'Doublons et SFBs neutralisés via ★',
-			lead: "La touche ★ a deux comportements : répéter la dernière lettre, ou déclencher une expansion. Quelques expansions exclusivement Ergopti tirent profit de la position de ★ sous l’index gauche.",
+			lead: 'La touche ★ a deux comportements : répéter la dernière lettre, ou déclencher une expansion. Quelques expansions exclusivement Ergopti tirent profit de la position de ★ sous l’index gauche.',
 			rows: [
 				{ trig: 'à★', out: 'bu', words: ['dé-à★-t → début'] },
 				{ trig: 'àu', out: 'ub', words: ['t-àu-e → tube'] },
-				{ trig: '★ê', out: 'u',  words: ['con★ê → connu', 'bat★ê → battu'] }
+				{ trig: '★ê', out: 'u', words: ['con★ê → connu', 'bat★ê → battu'] }
 			]
 		}
 	];
@@ -384,7 +384,7 @@
 	];
 
 	// ─── AI predictions ──────────────────────────────────────────
-	const aiContext = "Bonjour Madame, je vous écris pour ";
+	const aiContext = 'Bonjour Madame, je vous écris pour ';
 	const aiSuggestions = [
 		'vous proposer un rendez-vous mardi prochain.',
 		'faire suite à notre échange de la semaine dernière.',
@@ -411,14 +411,14 @@
 			tap: { label: 'Entrée', icon: '↩' },
 			hold: { label: 'Cmd / Ctrl', icon: '⌘' },
 			color: '#e53935',
-			note: "La touche la plus à plat de la maison-row devient à la fois validation et modificateur d'OS."
+			note: 'La touche la plus à plat de la maison-row devient à la fois validation et modificateur d’OS.'
 		},
 		{
 			key: 'LShift',
 			tap: { label: 'Copier', icon: '⧉' },
 			hold: { label: 'Shift', icon: '⇧' },
 			color: '#1e88e5',
-			note: "Plus besoin d'aller chercher Ctrl/Cmd + C : un simple appui sur la touche que vous tenez déjà."
+			note: 'Plus besoin d’aller chercher Ctrl/Cmd + C : un simple appui sur la touche que vous tenez déjà.'
 		},
 		{
 			key: 'LCtrl',
@@ -480,7 +480,6 @@
 			pro: 'Inference accélérée par le Neural Engine. Sub-100 ms sur les petits modèles.'
 		}
 	];
-
 
 	// 4 built-in profiles defined in modules/llm/profiles.lua. The user can
 	// add their own profile via the prompt editor (custom prompts persisted
@@ -581,67 +580,67 @@
 		{ keys: ',o', out: 'jo' },
 		{ keys: ',u', out: 'ju' },
 		{ keys: ',é', out: 'jé' },
-		{ keys: ',\'', out: 'j’' }
+		{ keys: ",'", out: 'j’' }
 	];
 
 	const commaConsonants = [
-		{ keys: ',è', out: 'z',  note: 'Lettre Z' },
-		{ keys: ',y', out: 'k',  note: 'Lettre K' },
-		{ keys: ',s', out: 'q',  note: 'Lettre Q' },
-		{ keys: ',c', out: 'ç',  note: 'Cédille' },
+		{ keys: ',è', out: 'z', note: 'Lettre Z' },
+		{ keys: ',y', out: 'k', note: 'Lettre K' },
+		{ keys: ',s', out: 'q', note: 'Lettre Q' },
+		{ keys: ',c', out: 'ç', note: 'Cédille' },
 		{ keys: ',x', out: 'où', note: 'Mot complet' }
 	];
 
 	// ─── Suffixes en À ───────────────────────────────────────────
 	// The à key is followed by a suffix to expand frequent French endings.
 	const suffixesA = [
-		{ keys: 'às',  out: 'ement' },
-		{ keys: 'àt',  out: 'ation' },
-		{ keys: 'àn',  out: 'ment' },
-		{ keys: 'àr',  out: 'eur' },
-		{ keys: 'àl',  out: 'elle' },
-		{ keys: 'àp',  out: 'isme' }
+		{ keys: 'às', out: 'ement' },
+		{ keys: 'àt', out: 'ation' },
+		{ keys: 'àn', out: 'ment' },
+		{ keys: 'àr', out: 'eur' },
+		{ keys: 'àl', out: 'elle' },
+		{ keys: 'àp', out: 'isme' }
 	];
 
 	// ─── Personal hotstrings (TOML examples) ────────────────────
 	const personalExamples = [
-		{ trig: 'np★',  out: 'Adrien Moyaux',         desc: 'Nom complet' },
-		{ trig: 'em★',  out: 'adrien@example.com',    desc: 'E-mail principal' },
-		{ trig: 'tel★', out: '+33 6 12 34 56 78',     desc: 'Numéro de téléphone' },
+		{ trig: 'np★', out: 'Adrien Moyaux', desc: 'Nom complet' },
+		{ trig: 'em★', out: 'adrien@example.com', desc: 'E-mail principal' },
+		{ trig: 'tel★', out: '+33 6 12 34 56 78', desc: 'Numéro de téléphone' },
 		{ trig: 'sig★', out: 'Cordialement,\nAdrien', desc: 'Signature email' },
-		{ trig: 'ad★',  out: '15 rue Lafayette, Paris', desc: 'Adresse postale' },
+		{ trig: 'ad★', out: '15 rue Lafayette, Paris', desc: 'Adresse postale' },
 		{ trig: 'iban★', out: 'FR76 1234 5678 9012 3456 7890 123', desc: 'IBAN' }
 	];
 
 	// ─── Dynamic hotstrings (auto-computed at fire time) ───────
 	const dynamicExamples = [
-		{ prefix: '@dt',  desc: 'Date du jour (FR)',         out: '07/05/2026' },
-		{ prefix: '@dtL', desc: 'Date du jour en lettres',   out: '7 mai 2026' },
-		{ prefix: '@ph',  desc: 'Téléphone configuré',       out: '06 12 34 56 78' },
-		{ prefix: '@iban', desc: 'IBAN configuré',           out: 'FR76 1234 …' }
+		{ prefix: '@dt', desc: 'Date du jour (FR)', out: '07/05/2026' },
+		{ prefix: '@dtL', desc: 'Date du jour en lettres', out: '7 mai 2026' },
+		{ prefix: '@ph', desc: 'Téléphone configuré', out: '06 12 34 56 78' },
+		{ prefix: '@iban', desc: 'IBAN configuré', out: 'FR76 1234 …' }
 	];
 
 	// ─── Repeater (★ to double the previous letter) ─────────────
 	const repeaterExamples = [
-		{ trig: 'l★',  out: 'll', word: 'elle' },
-		{ trig: 'r★',  out: 'rr', word: 'erreur' },
-		{ trig: 't★',  out: 'tt', word: 'attendre' },
-		{ trig: 'p★',  out: 'pp', word: 'frappe' },
-		{ trig: 'n★',  out: 'nn', word: 'année' }
+		{ trig: 'l★', out: 'll', word: 'elle' },
+		{ trig: 'r★', out: 'rr', word: 'erreur' },
+		{ trig: 't★', out: 'tt', word: 'attendre' },
+		{ trig: 'p★', out: 'pp', word: 'frappe' },
+		{ trig: 'n★', out: 'nn', word: 'année' }
 	];
 
 	// ─── Symbol rolls (programming) ─────────────────────────────
 	const symbolRolls = [
-		{ trig: '#!',   out: ':=',  note: 'Affectation (Go, Pascal)' },
-		{ trig: '!#',   out: '!=',  note: 'Différent de' },
-		{ trig: '<@',   out: '</',  note: 'Fermeture HTML/JSX' },
-		{ trig: '<%',   out: '<=',  note: 'Inférieur ou égal' },
-		{ trig: '$=',   out: '=>',  note: 'Fat arrow (JS)' },
-		{ trig: '+?',   out: '->',  note: 'Flèche (Rust, types)' },
-		{ trig: '\\"',  out: '/*',  note: 'Début commentaire bloc' },
-		{ trig: '"\\',  out: '*/',  note: 'Fin commentaire bloc' },
-		{ trig: '(#',   out: '("',  note: 'Ouverture string en argument' },
-		{ trig: '[)',   out: '=""', note: 'Attribut HTML vide' }
+		{ trig: '#!', out: ':=', note: 'Affectation (Go, Pascal)' },
+		{ trig: '!#', out: '!=', note: 'Différent de' },
+		{ trig: '<@', out: '</', note: 'Fermeture HTML/JSX' },
+		{ trig: '<%', out: '<=', note: 'Inférieur ou égal' },
+		{ trig: '$=', out: '=>', note: 'Fat arrow (JS)' },
+		{ trig: '+?', out: '->', note: 'Flèche (Rust, types)' },
+		{ trig: '\\"', out: '/*', note: 'Début commentaire bloc' },
+		{ trig: '"\\', out: '*/', note: 'Fin commentaire bloc' },
+		{ trig: '(#', out: '("', note: 'Ouverture string en argument' },
+		{ trig: '[)', out: '=""', note: 'Attribut HTML vide' }
 	];
 
 	// ─── Personalization features ───────────────────────────────
@@ -684,16 +683,16 @@
 	// at parity (the AHK driver matches Hammerspoon for the core hotstring
 	// and tap-hold pipeline).
 	const compareFeatures = [
-		{ label: 'Hotstrings + autocorrection',     mac: true,  win: true  },
-		{ label: 'Touche magique ★',                mac: true,  win: true  },
-		{ label: 'Roulements personnalisés',        mac: true,  win: true  },
-		{ label: 'Hotstrings personnels (TOML)',    mac: true,  win: true  },
-		{ label: 'Tap-holds modificateurs',         mac: true,  win: true  },
-		{ label: 'Tooltip temps réel teinté',       mac: true,  win: true  },
-		{ label: 'Gestes trackpad',                 mac: true,  win: true  },
-		{ label: 'Menu de configuration intégré',   mac: true,  win: true  },
-		{ label: 'Prédictions IA (bridge LLM)',     mac: true,  win: false },
-		{ label: 'Métriques de frappe',             mac: true,  win: false }
+		{ label: 'Hotstrings + autocorrection', mac: true, win: true },
+		{ label: 'Touche magique ★', mac: true, win: true },
+		{ label: 'Roulements personnalisés', mac: true, win: true },
+		{ label: 'Hotstrings personnels (TOML)', mac: true, win: true },
+		{ label: 'Tap-holds modificateurs', mac: true, win: true },
+		{ label: 'Tooltip temps réel teinté', mac: true, win: true },
+		{ label: 'Gestes trackpad', mac: true, win: true },
+		{ label: 'Menu de configuration intégré', mac: true, win: true },
+		{ label: 'Prédictions IA (bridge LLM)', mac: true, win: false },
+		{ label: 'Métriques de frappe', mac: true, win: false }
 	];
 </script>
 
@@ -722,1319 +721,1428 @@
 		<div id="page-toc"></div>
 	</div>
 	<main class="ep-main">
+		<div class="ep-root">
+			<!-- ────────────────────────── Hero ────────────────────────── -->
+			<section class="hero">
+				<div class="hero-glow"></div>
 
-<div class="ep-root">
-	<!-- ────────────────────────── Hero ────────────────────────── -->
-	<section class="hero">
-		<div class="hero-glow"></div>
-
-		<div class="os-toggle">
-			<button
-				type="button"
-				class={osStyle === 'windows' ? 'os-btn active' : 'os-btn'}
-				onclick={() => setOS('windows')}
-				title="Afficher les fenêtres au style Windows (AutoHotkey)"
-				aria-pressed={osStyle === 'windows' ? 'true' : 'false'}
-				aria-label="Style Windows"
-			>
-				<i class="icon-windows"></i><span>Windows</span>
-			</button>
-			<button
-				type="button"
-				class={osStyle === 'macos' ? 'os-btn active' : 'os-btn'}
-				onclick={() => setOS('macos')}
-				title="Afficher les fenêtres au style macOS (Hammerspoon)"
-				aria-pressed={osStyle === 'macos' ? 'true' : 'false'}
-				aria-label="Style macOS"
-			>
-				<i class="icon-appleinc"></i><span>macOS</span>
-			</button>
-		</div>
-
-		<p class="eyebrow">Disposition clavier <span class="dot">•</span> macOS &amp; Windows</p>
-		<h1 class="hero-title">
-			Tapez moins.<br /><span class="grad">Écrivez plus.</span>
-		</h1>
-		<p class="hero-sub">
-			<ErgoptiPlus></ErgoptiPlus> ajoute à <strong>Ergopti</strong> une couche logicielle complète :
-			expansions de texte, autocorrection, roulements, tap-holds, gestes — pensés pour le français, l’anglais
-			et le code.
-		</p>
-
-		<div class="hero-cta">
-			<a class={osStyle === 'macos' ? 'btn btn-primary' : 'btn btn-secondary'} href="utilisation#macos">
-				<i class="icon-appleinc"></i>
-				<span>Installer sur macOS</span>
-			</a>
-			<a class={osStyle === 'windows' ? 'btn btn-primary' : 'btn btn-secondary'} href="utilisation#windows">
-				<i class="icon-windows"></i>
-				<span>Installer sur Windows</span>
-			</a>
-		</div>
-
-		<!-- Live typing demo — fake terminal-like surface that types a prefix,
-		     shows a coloured tooltip, then reveals the expansion. -->
-		<div class="demo-stage">
-			<div class="demo-window os-{osStyle}" aria-hidden="true">
-				<div class="chrome">
-					{#if osStyle === 'macos'}
-						<span class="mac-dots">
-							<span class="dot dot-r"></span>
-							<span class="dot dot-y"></span>
-							<span class="dot dot-g"></span>
-						</span>
-						<span class="chrome-title">~/notes/draft.md</span>
-						<span class="chrome-spacer"></span>
-					{:else}
-						<span class="chrome-title chrome-title--win">~/notes/draft.md</span>
-						<span class="win-buttons">
-							<span class="win-btn" aria-hidden="true">─</span>
-							<span class="win-btn" aria-hidden="true">▢</span>
-							<span class="win-btn close" aria-hidden="true">✕</span>
-						</span>
-					{/if}
-				</div>
-				<div class="demo-viewport">
-					{#key demoIndex}
-						<div
-							class="demo-body"
-							in:fly={{ x: 80, duration: 320, opacity: 0.2 }}
-							out:fly={{ x: -80, duration: 280, opacity: 0 }}
-						>
-							<span class="demo-typed">{typed}</span><span class="caret"></span>
-							{#if phase === 'tooltip'}
-								<div
-									class="demo-tooltip"
-									style="--tt: {demos[demoIndex].color};"
-									data-state="tooltip"
-								>
-									<span class="tt-text">{demos[demoIndex].output}</span>
-									<span class="tt-tag">{demos[demoIndex].group}</span>
-								</div>
-							{/if}
-						</div>
-					{/key}
-				</div>
-			</div>
-
-			<ul class="demo-pager" aria-label="Sélectionner une démo">
-				{#each demos as d, i}
-					<li>
-						<button
-							type="button"
-							class:active={i === demoIndex}
-							onclick={() => goToDemo(i)}
-							title="{d.input} → {d.output} ({d.group})"
-							aria-label="Démo {i + 1} sur {demos.length} : {d.input} devient {d.output}"
-						>
-							<span class="pager-input">{d.input}</span>
-							<span class="pager-arrow">→</span>
-							<span class="pager-output">{d.output}</span>
-						</button>
-					</li>
-				{/each}
-			</ul>
-		</div>
-	</section>
-
-	<!-- ────────────────────────── KPI strip ─────────────────────── -->
-	<section class="kpi-strip">
-		{#each kpis as kpi, i}
-			<div class="kpi">
-				<div class="kpi-num">{counters[i]}{kpi.suffix}</div>
-				<div class="kpi-label">{kpi.label}</div>
-			</div>
-		{/each}
-	</section>
-
-	<!-- ────────────────────────── Promises (defuse fear) ──────── -->
-	<section class="promises">
-		<header class="section-head">
-			<p class="kicker">Trois promesses</p>
-			<h2>Une suite riche, jamais imposante.</h2>
-			<p class="lead">
-				<ErgoptiPlus></ErgoptiPlus> embarque <strong>une trentaine de fonctionnalités</strong>. Pas
-				de panique : aucune n’est obligatoire, tout est désactivable, et le bénéfice arrive dès la
-				première session.
-			</p>
-		</header>
-
-		<div class="promise-grid">
-			{#each promises as p}
-				<article class="promise-card">
-					<div class="promise-icon" aria-hidden="true">{p.icon}</div>
-					<h3>{@html p.title}</h3>
-					<p>{@html p.body}</p>
-				</article>
-			{/each}
-		</div>
-	</section>
-
-	<!-- ────────────────────────── Real session ─────────────────── -->
-	<section class="session">
-		<header class="section-head">
-			<p class="kicker">Au fil de la frappe</p>
-			<h2>Une vraie phrase, plusieurs expansions.</h2>
-			<p class="lead">
-				Voici ce qui se passe à l’écran quand vous tapez naturellement. Les expansions s’enchaînent
-				sans rompre le flux.
-			</p>
-		</header>
-
-		<div class="session-window os-{osStyle}">
-			<div class="chrome">
-				{#if osStyle === 'macos'}
-					<span class="mac-dots">
-						<span class="dot dot-r"></span>
-						<span class="dot dot-y"></span>
-						<span class="dot dot-g"></span>
-					</span>
-					<span class="chrome-title">message.txt</span>
-					<span class="chrome-spacer"></span>
-				{:else}
-					<span class="chrome-title chrome-title--win">message.txt</span>
-					<span class="win-buttons">
-						<span class="win-btn" aria-hidden="true">─</span>
-						<span class="win-btn" aria-hidden="true">▢</span>
-						<span class="win-btn close" aria-hidden="true">✕</span>
-					</span>
-				{/if}
-			</div>
-			<div class="session-body">
-				<p class="session-line">{sessionText}<span class="caret"></span></p>
-				{#if sessionTooltip}
-					<div
-						class="session-tooltip"
-						style="--tt: {sessionTooltip.color};"
+				<div class="os-toggle">
+					<button
+						type="button"
+						class={osStyle === 'windows' ? 'os-btn active' : 'os-btn'}
+						onclick={() => setOS('windows')}
+						title="Afficher les fenêtres au style Windows (AutoHotkey)"
+						aria-pressed={osStyle === 'windows' ? 'true' : 'false'}
+						aria-label="Style Windows"
 					>
-						<span class="tt-text">{sessionTooltip.text}</span>
-						<span class="tt-tag">{sessionTooltip.group}</span>
-					</div>
-				{/if}
-			</div>
-		</div>
-	</section>
-
-	<!-- ────────────────────────── Features grid ─────────────────── -->
-	<section class="features">
-		<header class="section-head">
-			<p class="kicker">Tout dans un seul driver</p>
-			<h2>Une fonctionnalité, un raccourci, une couleur.</h2>
-			<p class="lead">
-				Chaque famille d’expansion a sa teinte dans le tooltip. Vous savez d’un coup d’œil ce qui va
-				se déclencher.
-			</p>
-		</header>
-
-		<div class="feat-grid">
-			{#each features as f}
-				<article class="feat-card" style="--accent: {f.color};">
-					<div class="feat-glyph" aria-hidden="true">{f.icon}</div>
-					<h3>{f.title}</h3>
-					<p>{@html f.body}</p>
-				</article>
-			{/each}
-		</div>
-	</section>
-
-	<!-- ────────────────────────── Tap-holds spotlight ───────────── -->
-	<section class="tapholds">
-		<header class="section-head">
-			<p class="kicker" style="color:#fb8c00">Confort × 2</p>
-			<h2>Une touche, deux comportements.</h2>
-			<p class="lead">
-				Les modificateurs de la rangée des pouces et de la maison récupèrent une seconde vie. Un
-				appui bref envoie une action, un maintien renvoie à leur rôle d’origine. Plus jamais besoin
-				d’aller chercher
-				<kbd>Ctrl</kbd>
-				+ <kbd>C</kbd> avec la main droite.
-			</p>
-		</header>
-
-		<div class="tap-grid">
-			{#each tapHolds as t}
-				<article class="tap-card" style="--accent: {t.color};">
-					<div class="tap-key">
-						<span class="tap-keycap">{t.key}</span>
-					</div>
-					<div class="tap-rows">
-						<div class="tap-row tap-row-tap">
-							<span class="tap-pill">Tap</span>
-							<span class="tap-glyph">{t.tap.icon}</span>
-							<span class="tap-action">{t.tap.label}</span>
-						</div>
-						<div class="tap-row tap-row-hold">
-							<span class="tap-pill tap-pill-hold">Hold</span>
-							<span class="tap-glyph">{t.hold.icon}</span>
-							<span class="tap-action">{t.hold.label}</span>
-						</div>
-					</div>
-					<p class="tap-note">{t.note}</p>
-				</article>
-			{/each}
-		</div>
-	</section>
-
-	<!-- ────────────────────────── Hotstrings deep dive ─────────── -->
-	<section class="hotdetail">
-		<header class="section-head">
-			<p class="kicker">Au cœur de la frappe</p>
-			<h2>Quatre familles, un même réflexe.</h2>
-			<p class="lead">
-				Voici à quoi ressemble chaque catégorie d’expansion <strong>en contexte réel</strong> — pas
-				des triggers isolés. Vous tapez un mot, le mot que vous vouliez sort.
-			</p>
-		</header>
-
-		<div class="hotdetail-grid">
-			{#each hotstringDetails as cat}
-				<article class="hotdetail-card" style="--accent: {cat.color};">
-					<header class="hotdetail-head">
-						<span class="hotdetail-dot"></span>
-						<div>
-							<h3>{cat.title}</h3>
-							<p class="hotdetail-tag">{cat.tag}</p>
-						</div>
-					</header>
-					<p class="hotdetail-lead">{cat.lead}</p>
-					<ul class="hotdetail-rows">
-						{#each cat.rows as r}
-							<li>
-								<div class="hot-trig">
-									<span class="hot-key">{r.trig}</span>
-									<span class="hot-arrow">→</span>
-									<span class="hot-out">{r.out}</span>
-								</div>
-								<div class="hot-context">
-									{#each r.words as w}
-										<span class="hot-word">{w}</span>
-									{/each}
-								</div>
-							</li>
-						{/each}
-					</ul>
-				</article>
-			{/each}
-		</div>
-	</section>
-
-	<!-- ────────────────────────── Hotstrings persos & dynamiques ─ -->
-	<section class="hsmore">
-		<header class="section-head">
-			<p class="kicker" style="color:#1e88e5">Vos propres hotstrings</p>
-			<h2>Et ceux que <em>vous</em> tapez tous les jours.</h2>
-			<p class="lead">
-				Les +3 000 hotstrings livrés sont une base. Au-dessus, ajoutez votre signature, votre IBAN,
-				vos formules récurrentes — sans toucher à un seul fichier de code.
-			</p>
-		</header>
-
-		<div class="hsmore-grid">
-			<article class="hsmore-card">
-				<header class="hsmore-head">
-					<h3>Hotstrings personnels</h3>
-					<p class="hsmore-sub">Édités depuis le menu, stockés en TOML, rechargés à la volée.</p>
-				</header>
-
-				<h4>Ajouter un raccourci en 5 secondes</h4>
-				<ol class="hsmore-steps">
-					<li>Sélectionnez le texte que vous voulez transformer en hotstring.</li>
-					<li>Ouvrez le menu → <strong>Hotstrings perso</strong>.</li>
-					<li>Donnez un trigger (ex&nbsp;: <code>sig★</code>).</li>
-					<li>C’est en place, sans relancer le driver.</li>
-				</ol>
-
-				<h4>Quelques exemples typiques</h4>
-				<ul class="hsmore-rows">
-					{#each personalExamples as p}
-						<li>
-							<span class="hs-key">{p.trig}</span>
-							<span class="hs-arrow">→</span>
-							<span class="hs-out">{p.out}</span>
-							<span class="hs-desc">{p.desc}</span>
-						</li>
-					{/each}
-				</ul>
-			</article>
-
-			<article class="hsmore-card">
-				<header class="hsmore-head">
-					<h3>Hotstrings dynamiques</h3>
-					<p class="hsmore-sub">Calculés au moment du déclenchement — date du jour, IBAN, infos perso.</p>
-				</header>
-
-				<h4>Préfixe <code>@</code> pour les données vivantes</h4>
-				<p class="hsmore-text">
-					Certaines valeurs changent chaque jour (la date) ou ne doivent pas être codées en dur (numéro
-					de téléphone, IBAN). Les hotstrings dynamiques lisent ces valeurs au moment de l’expansion.
-				</p>
-
-				<ul class="hsmore-rows">
-					{#each dynamicExamples as d}
-						<li>
-							<span class="hs-key">{d.prefix}</span>
-							<span class="hs-arrow">→</span>
-							<span class="hs-out">{d.out}</span>
-							<span class="hs-desc">{d.desc}</span>
-						</li>
-					{/each}
-				</ul>
-
-				<h4>Vos infos en un seul endroit</h4>
-				<p class="hsmore-text">
-					L’éditeur d’infos personnelles centralise nom, e-mail, téléphone, adresse, IBAN. Les
-					hotstrings dynamiques s’en servent automatiquement.
-				</p>
-			</article>
-		</div>
-	</section>
-
-	<!-- ────────────────────────── Magic key — full picture ────── -->
-	<section class="magic">
-		<header class="section-head">
-			<p class="kicker" style="color:#e53935">★ — la touche signature</p>
-			<h2>Une touche, deux comportements.</h2>
-			<p class="lead">
-				La touche <kbd class="glow">★</kbd> a deux modes : <strong>répéter la lettre précédente</strong>
-				ou <strong>déclencher une expansion (hotstring)</strong>. Les deux sont décidés au moment du
-				déclenchement selon le contexte — sans configuration.
-			</p>
-		</header>
-
-		<div class="magic-grid magic-grid-2">
-			<article class="magic-card">
-				<h3>1. Répéteur de lettre</h3>
-				<p>
-					Si aucune abréviation ne correspond, <kbd class="glow">★</kbd> double simplement la lettre
-					précédente. <strong>Plus de SFB sur les doublons.</strong>
-				</p>
-				<ul class="magic-rows">
-					{#each repeaterExamples as r}
-						<li>
-							<span class="hs-key">{r.trig}</span>
-							<span class="hs-arrow">→</span>
-							<span class="hs-out">{r.out}</span>
-							<span class="hs-desc">{r.word}</span>
-						</li>
-					{/each}
-				</ul>
-			</article>
-
-			<article class="magic-card">
-				<h3>2. Déclencheur d’abréviations</h3>
-				<p>
-					Si la lettre précédente forme un trigger connu, <kbd class="glow">★</kbd> expanse à la place.
-					Aucun risque de collision avec la frappe normale.
-				</p>
-				<ul class="magic-rows">
-					<li><span class="hs-key">a★</span><span class="hs-arrow">→</span><span class="hs-out">ainsi</span></li>
-					<li><span class="hs-key">c★</span><span class="hs-arrow">→</span><span class="hs-out">c’est</span></li>
-					<li><span class="hs-key">ct★</span><span class="hs-arrow">→</span><span class="hs-out">c’était</span></li>
-					<li><span class="hs-key">dé★</span><span class="hs-arrow">→</span><span class="hs-out">déjà</span></li>
-					<li><span class="hs-key">ê★</span><span class="hs-arrow">→</span><span class="hs-out">être</span></li>
-					<li><span class="hs-key">eef★</span><span class="hs-arrow">→</span><span class="hs-out">en effet</span></li>
-					<li><span class="hs-key">f★</span><span class="hs-arrow">→</span><span class="hs-out">faire</span></li>
-					<li><span class="hs-key">m★</span><span class="hs-arrow">→</span><span class="hs-out">mais</span></li>
-					<li><span class="hs-key">pcq★</span><span class="hs-arrow">→</span><span class="hs-out">parce que</span></li>
-					<li><span class="hs-key">pê★</span><span class="hs-arrow">→</span><span class="hs-out">peut-être</span></li>
-					<li><span class="hs-key">pex★</span><span class="hs-arrow">→</span><span class="hs-out">par exemple</span></li>
-					<li><span class="hs-key">r★</span><span class="hs-arrow">→</span><span class="hs-out">rien</span></li>
-				</ul>
-			</article>
-		</div>
-	</section>
-
-	<!-- ────────────────────────── Power moves ─────────────────── -->
-	<section class="power">
-		<header class="section-head">
-			<p class="kicker" style="color:#8e44ad">Petits réflexes, gros gain</p>
-			<h2>Les détails qui changent la frappe.</h2>
-			<p class="lead">
-				Quatre fonctions discrètes mais qu’on ne lâche plus une fois adoptées.
-			</p>
-		</header>
-
-		<div class="power-grid">
-			{#each powerMoves as p}
-				<div class="power-card">
-					<div class="power-icon">{p.icon}</div>
-					<h3>{p.title}</h3>
-					<p>{@html p.body}</p>
+						<i class="icon-windows"></i><span>Windows</span>
+					</button>
+					<button
+						type="button"
+						class={osStyle === 'macos' ? 'os-btn active' : 'os-btn'}
+						onclick={() => setOS('macos')}
+						title="Afficher les fenêtres au style macOS (Hammerspoon)"
+						aria-pressed={osStyle === 'macos' ? 'true' : 'false'}
+						aria-label="Style macOS"
+					>
+						<i class="icon-appleinc"></i><span>macOS</span>
+					</button>
 				</div>
-			{/each}
-		</div>
-	</section>
 
-	<!-- ────────────────────────── Navigation layer ─────────────── -->
-	<section class="navlayer">
-		<header class="section-head">
-			<p class="kicker" style="color:#fb8c00">Layer maintien</p>
-			<h2>Naviguer sans quitter la maison-row.</h2>
-			<p class="lead">
-				Maintenez <kbd>LAlt</kbd> et la moitié droite du clavier devient un cluster de navigation
-				complet. Plus de zigzag vers les flèches, le pavé numérique ou la souris.
-			</p>
-		</header>
+				<p class="eyebrow">Disposition clavier <span class="dot">•</span> macOS &amp; Windows</p>
+				<h1 class="hero-title">
+					Tapez moins.<br /><span class="grad">Écrivez plus.</span>
+				</h1>
+				<p class="hero-sub">
+					<ErgoptiPlus></ErgoptiPlus> ajoute à <strong>Ergopti</strong> une couche logicielle complète
+					: expansions de texte, autocorrection, roulements, tap-holds, gestes — pensés pour le français,
+					l’anglais et le code.
+				</p>
 
-		<div class="navlayer-window">
-			<div class="navlayer-hold">
-				<span class="navlayer-pill">Hold</span>
-				<span class="navlayer-key">LAlt</span>
-				<span class="navlayer-plus">+</span>
-			</div>
-			<div class="navlayer-grid">
-				{#each navLayer as n}
-					<div class="navlayer-cell">
-						<div class="navlayer-base">
-							{#each n.keys as k}<kbd>{k}</kbd>{/each}
-						</div>
-						<div class="navlayer-arrow">becomes</div>
-						<div class="navlayer-target">
-							<span class="navlayer-glyph">{n.label}</span>
-							<span class="navlayer-desc">{n.desc}</span>
-						</div>
-					</div>
-				{/each}
-			</div>
-		</div>
-	</section>
-
-	<!-- ────────────────────────── AI Predictions (mac only) ──── -->
-	<section class="ai">
-		<header class="section-head">
-			<p class="kicker" style="color:#ec407a">Pont LLM intégré · macOS</p>
-			<h2>Une IA locale qui prédit ce que vous voulez écrire.</h2>
-			<p class="lead">
-				Hammerspoon embarque un pont vers un modèle de langage qui tourne <strong>sur votre Mac</strong>,
-				pas dans le cloud. Aucune donnée n’est envoyée à l’extérieur, le modèle est rapide, et il
-				apprend votre style sans rien stocker.
-			</p>
-		</header>
-
-		<!-- Mock editor with live AI suggestion tooltip -->
-		<div class="ai-window os-{osStyle}">
-			<div class="chrome">
-				{#if osStyle === 'macos'}
-					<span class="mac-dots">
-						<span class="dot dot-r"></span>
-						<span class="dot dot-y"></span>
-						<span class="dot dot-g"></span>
-					</span>
-					<span class="chrome-title">~/inbox/draft.eml</span>
-					<span class="chrome-spacer"></span>
-				{:else}
-					<span class="chrome-title chrome-title--win">~/inbox/draft.eml</span>
-					<span class="win-buttons">
-						<span class="win-btn" aria-hidden="true">─</span>
-						<span class="win-btn" aria-hidden="true">▢</span>
-						<span class="win-btn close" aria-hidden="true">✕</span>
-					</span>
-				{/if}
-			</div>
-			<div class="ai-body">
-				<p class="ai-context">{aiContext}<span class="caret"></span></p>
-				<div class="ai-tooltip">
-					<div class="ai-tooltip-head">
-						<span class="ai-bolt">⚡</span>
-						<span>Suggestions IA</span>
-						<span class="ai-shortcut"><kbd>Tab</kbd> pour valider</span>
-					</div>
-					<ul class="ai-list">
-						{#each aiSuggestions as s, i}
-							<li class:active={i === 0}>
-								<span class="ai-num">{i + 1}</span>
-								<span>{s}</span>
-							</li>
-						{/each}
-					</ul>
+				<div class="hero-cta">
+					<a
+						class={osStyle === 'macos' ? 'btn btn-primary' : 'btn btn-secondary'}
+						href="utilisation#macos"
+					>
+						<i class="icon-appleinc"></i>
+						<span>Installer sur macOS</span>
+					</a>
+					<a
+						class={osStyle === 'windows' ? 'btn btn-primary' : 'btn btn-secondary'}
+						href="utilisation#windows"
+					>
+						<i class="icon-windows"></i>
+						<span>Installer sur Windows</span>
+					</a>
 				</div>
-			</div>
-		</div>
 
-		<!-- Backends — Ollama / MLX -->
-		<div class="ai-section">
-			<h3>1. Choisissez votre moteur d’inférence</h3>
-			<p class="ai-text">
-				Deux backends sont supportés en natif. Le driver détecte automatiquement le plus performant
-				pour votre matériel, mais vous pouvez toujours forcer votre choix depuis le menu.
-			</p>
-			<div class="ai-backends">
-				{#each aiBackends as b}
-					<article class="ai-backend">
-						<div class="ai-backend-icon">{b.icon}</div>
-						<div class="ai-backend-body">
-							<h4>{b.name} <span class="ai-port">port {b.port}</span></h4>
-							<p class="ai-backend-aud">{b.audience}</p>
-							<p class="ai-backend-pro">{b.pro}</p>
-						</div>
-					</article>
-				{/each}
-			</div>
-		</div>
-
-		<!-- Models — the full catalog, parsed from llm_models.json at build time -->
-		<div class="ai-section">
-			<h3>2. Choisissez votre modèle parmi <strong>{aiTotalModels}</strong></h3>
-			<p class="ai-text">
-				Le menu <em>Modèles</em> propose un catalogue curé qui regroupe à ce jour
-				<strong>{aiTotalModels} modèles open-weights</strong> issus de
-				<strong>{aiTotalProviders} fournisseurs</strong> ({aiTotalFamilies} familles). Du nano 350 M qui
-				répond en 50 ms au 70 B qui produit des phrases parfaitement contextuelles — vous choisissez
-				selon votre matériel et votre besoin. Le menu vous indique la RAM et l’espace disque requis
-				avant tout téléchargement.
-			</p>
-			<p class="ai-text-small">
-				Cette liste est <strong>générée automatiquement</strong> depuis le fichier de configuration
-				du driver — elle est toujours à jour avec ce que vous installerez réellement.
-			</p>
-			<div class="ai-providers">
-				{#each aiProviders as p}
-					<article class="ai-provider">
-						<div class="ai-provider-name">{p.name}</div>
-						<div class="ai-provider-family">{p.families}</div>
-						<div class="ai-provider-meta">
-							<span class="ai-provider-count">{p.modelCount} modèle{p.modelCount > 1 ? 's' : ''}</span>
-							{#if p.range}
-								<span class="ai-provider-range">{p.range}</span>
+				<!-- Live typing demo — fake terminal-like surface that types a prefix,
+		     shows a coloured tooltip, then reveals the expansion. -->
+				<div class="demo-stage">
+					<div class="demo-window os-{osStyle}" aria-hidden="true">
+						<div class="chrome">
+							{#if osStyle === 'macos'}
+								<span class="mac-dots">
+									<span class="dot dot-r"></span>
+									<span class="dot dot-y"></span>
+									<span class="dot dot-g"></span>
+								</span>
+								<span class="chrome-title">~/notes/draft.md</span>
+								<span class="chrome-spacer"></span>
+							{:else}
+								<span class="chrome-title chrome-title--win">~/notes/draft.md</span>
+								<span class="win-buttons">
+									<span class="win-btn" aria-hidden="true">─</span>
+									<span class="win-btn" aria-hidden="true">▢</span>
+									<span class="win-btn close" aria-hidden="true">✕</span>
+								</span>
 							{/if}
 						</div>
-					</article>
-				{/each}
-			</div>
+						<div class="demo-viewport">
+							{#key demoIndex}
+								<div
+									class="demo-body"
+									in:fly={{ x: 80, duration: 320, opacity: 0.2 }}
+									out:fly={{ x: -80, duration: 280, opacity: 0 }}
+								>
+									<span class="demo-typed">{typed}</span><span class="caret"></span>
+									{#if phase === 'tooltip'}
+										<div
+											class="demo-tooltip"
+											style="--tt: {demos[demoIndex].color};"
+											data-state="tooltip"
+										>
+											<span class="tt-text">{demos[demoIndex].output}</span>
+											<span class="tt-tag">{demos[demoIndex].group}</span>
+										</div>
+									{/if}
+								</div>
+							{/key}
+						</div>
+					</div>
 
-			<article class="ai-custom">
-				<div class="ai-custom-icon">＋</div>
-				<div class="ai-custom-body">
-					<h4>Ajoutez n’importe quel autre modèle</h4>
-					<p>
-						Une option <em>« Ajouter un modèle personnalisé »</em> accepte n’importe quel
-						<strong>identifiant HuggingFace</strong> (pour MLX) ou <strong>tag Ollama</strong>.
-						Exemple : <code>mlx-community/Qwen2.5-3B-Instruct-4bit</code> ou
-						<code>llama3.2:3b</code>. Le modèle apparaît immédiatement dans la liste, et reste
-						persisté entre les sessions.
-					</p>
-					<p class="ai-custom-foot">
-						Vous pouvez littéralement utiliser <strong>n’importe quel modèle</strong> publié sur
-						HuggingFace au format MLX, ou n’importe quel modèle disponible dans la bibliothèque
-						Ollama.
-					</p>
+					<ul class="demo-pager" aria-label="Sélectionner une démo">
+						{#each demos as d, i}
+							<li>
+								<button
+									type="button"
+									class:active={i === demoIndex}
+									onclick={() => goToDemo(i)}
+									title="{d.input} → {d.output} ({d.group})"
+									aria-label="Démo {i + 1} sur {demos.length} : {d.input} devient {d.output}"
+								>
+									<span class="pager-input">{d.input}</span>
+									<span class="pager-arrow">→</span>
+									<span class="pager-output">{d.output}</span>
+								</button>
+							</li>
+						{/each}
+					</ul>
 				</div>
-			</article>
-		</div>
+			</section>
 
-		<!-- Prompt profiles -->
-		<div class="ai-section">
-			<h3>3. Choisissez (ou écrivez) votre profil de prompt</h3>
-			<p class="ai-text">
-				Quatre profils intégrés couvrent les usages courants — chacun avec un prompt système précis,
-				rédigé pour fonctionner sur les petits modèles aussi bien que sur les gros.
-			</p>
-			<div class="ai-profiles">
-				{#each aiProfiles as p}
-					<article class="ai-profile">
-						<header>
-							<span class="ai-profile-name">{p.name}</span>
-							<span class="ai-profile-tag">{p.tag}</span>
+			<!-- ────────────────────────── KPI strip ─────────────────────── -->
+			<section class="kpi-strip">
+				{#each kpis as kpi, i}
+					<div class="kpi">
+						<div class="kpi-num">{counters[i]}{kpi.suffix}</div>
+						<div class="kpi-label">{kpi.label}</div>
+					</div>
+				{/each}
+			</section>
+
+			<!-- ────────────────────────── Promises (defuse fear) ──────── -->
+			<section class="promises">
+				<header class="section-head">
+					<p class="kicker">Trois promesses</p>
+					<h2>Une suite riche, jamais imposante.</h2>
+					<p class="lead">
+						<ErgoptiPlus></ErgoptiPlus> embarque <strong>une trentaine de fonctionnalités</strong>.
+						Pas de panique : aucune n’est obligatoire, tout est désactivable, et le bénéfice arrive
+						dès la première session.
+					</p>
+				</header>
+
+				<div class="promise-grid">
+					{#each promises as p}
+						<article class="promise-card">
+							<div class="promise-icon" aria-hidden="true">{p.icon}</div>
+							<h3>{@html p.title}</h3>
+							<p>{@html p.body}</p>
+						</article>
+					{/each}
+				</div>
+			</section>
+
+			<!-- ────────────────────────── Real session ─────────────────── -->
+			<section class="session">
+				<header class="section-head">
+					<p class="kicker">Au fil de la frappe</p>
+					<h2>Une vraie phrase, plusieurs expansions.</h2>
+					<p class="lead">
+						Voici ce qui se passe à l’écran quand vous tapez naturellement. Les expansions
+						s’enchaînent sans rompre le flux.
+					</p>
+				</header>
+
+				<div class="session-window os-{osStyle}">
+					<div class="chrome">
+						{#if osStyle === 'macos'}
+							<span class="mac-dots">
+								<span class="dot dot-r"></span>
+								<span class="dot dot-y"></span>
+								<span class="dot dot-g"></span>
+							</span>
+							<span class="chrome-title">message.txt</span>
+							<span class="chrome-spacer"></span>
+						{:else}
+							<span class="chrome-title chrome-title--win">message.txt</span>
+							<span class="win-buttons">
+								<span class="win-btn" aria-hidden="true">─</span>
+								<span class="win-btn" aria-hidden="true">▢</span>
+								<span class="win-btn close" aria-hidden="true">✕</span>
+							</span>
+						{/if}
+					</div>
+					<div class="session-body">
+						<p class="session-line">{sessionText}<span class="caret"></span></p>
+						{#if sessionTooltip}
+							<div class="session-tooltip" style="--tt: {sessionTooltip.color};">
+								<span class="tt-text">{sessionTooltip.text}</span>
+								<span class="tt-tag">{sessionTooltip.group}</span>
+							</div>
+						{/if}
+					</div>
+				</div>
+			</section>
+
+			<!-- ────────────────────────── Features grid ─────────────────── -->
+			<section class="features">
+				<header class="section-head">
+					<p class="kicker">Tout dans un seul driver</p>
+					<h2>Une fonctionnalité, un raccourci, une couleur.</h2>
+					<p class="lead">
+						Chaque famille d’expansion a sa teinte dans le tooltip. Vous savez d’un coup d’œil ce
+						qui va se déclencher.
+					</p>
+				</header>
+
+				<div class="feat-grid">
+					{#each features as f}
+						<article class="feat-card" style="--accent: {f.color};">
+							<div class="feat-glyph" aria-hidden="true">{f.icon}</div>
+							<h3>{f.title}</h3>
+							<p>{@html f.body}</p>
+						</article>
+					{/each}
+				</div>
+			</section>
+
+			<!-- ────────────────────────── Tap-holds spotlight ───────────── -->
+			<section class="tapholds">
+				<header class="section-head">
+					<p class="kicker" style="color:#fb8c00">Confort × 2</p>
+					<h2>Une touche, deux comportements.</h2>
+					<p class="lead">
+						Les modificateurs de la rangée des pouces et de la maison récupèrent une seconde vie. Un
+						appui bref envoie une action, un maintien renvoie à leur rôle d’origine. Plus jamais
+						besoin d’aller chercher
+						<kbd>Ctrl</kbd>
+						+ <kbd>C</kbd> avec la main droite.
+					</p>
+				</header>
+
+				<div class="tap-grid">
+					{#each tapHolds as t}
+						<article class="tap-card" style="--accent: {t.color};">
+							<div class="tap-key">
+								<span class="tap-keycap">{t.key}</span>
+							</div>
+							<div class="tap-rows">
+								<div class="tap-row tap-row-tap">
+									<span class="tap-pill">Tap</span>
+									<span class="tap-glyph">{t.tap.icon}</span>
+									<span class="tap-action">{t.tap.label}</span>
+								</div>
+								<div class="tap-row tap-row-hold">
+									<span class="tap-pill tap-pill-hold">Hold</span>
+									<span class="tap-glyph">{t.hold.icon}</span>
+									<span class="tap-action">{t.hold.label}</span>
+								</div>
+							</div>
+							<p class="tap-note">{t.note}</p>
+						</article>
+					{/each}
+				</div>
+			</section>
+
+			<!-- ────────────────────────── Hotstrings deep dive ─────────── -->
+			<section class="hotdetail">
+				<header class="section-head">
+					<p class="kicker">Au cœur de la frappe</p>
+					<h2>Quatre familles, un même réflexe.</h2>
+					<p class="lead">
+						Voici à quoi ressemble chaque catégorie d’expansion <strong>en contexte réel</strong> — pas
+						des triggers isolés. Vous tapez un mot, le mot que vous vouliez sort.
+					</p>
+				</header>
+
+				<div class="hotdetail-grid">
+					{#each hotstringDetails as cat}
+						<article class="hotdetail-card" style="--accent: {cat.color};">
+							<header class="hotdetail-head">
+								<span class="hotdetail-dot"></span>
+								<div>
+									<h3>{cat.title}</h3>
+									<p class="hotdetail-tag">{cat.tag}</p>
+								</div>
+							</header>
+							<p class="hotdetail-lead">{cat.lead}</p>
+							<ul class="hotdetail-rows">
+								{#each cat.rows as r}
+									<li>
+										<div class="hot-trig">
+											<span class="hot-key">{r.trig}</span>
+											<span class="hot-arrow">→</span>
+											<span class="hot-out">{r.out}</span>
+										</div>
+										<div class="hot-context">
+											{#each r.words as w}
+												<span class="hot-word">{w}</span>
+											{/each}
+										</div>
+									</li>
+								{/each}
+							</ul>
+						</article>
+					{/each}
+				</div>
+			</section>
+
+			<!-- ────────────────────────── Hotstrings persos & dynamiques ─ -->
+			<section class="hsmore">
+				<header class="section-head">
+					<p class="kicker" style="color:#1e88e5">Vos propres hotstrings</p>
+					<h2>Et ceux que <em>vous</em> tapez tous les jours.</h2>
+					<p class="lead">
+						Les +3 000 hotstrings livrés sont une base. Au-dessus, ajoutez votre signature, votre
+						IBAN, vos formules récurrentes — sans toucher à un seul fichier de code.
+					</p>
+				</header>
+
+				<div class="hsmore-grid">
+					<article class="hsmore-card">
+						<header class="hsmore-head">
+							<h3>Hotstrings personnels</h3>
+							<p class="hsmore-sub">
+								Édités depuis le menu, stockés en TOML, rechargés à la volée.
+							</p>
 						</header>
-						<p>{@html p.desc}</p>
+
+						<h4>Ajouter un raccourci en 5 secondes</h4>
+						<ol class="hsmore-steps">
+							<li>Sélectionnez le texte que vous voulez transformer en hotstring.</li>
+							<li>Ouvrez le menu → <strong>Hotstrings perso</strong>.</li>
+							<li>Donnez un trigger (ex&nbsp;: <code>sig★</code>).</li>
+							<li>C’est en place, sans relancer le driver.</li>
+						</ol>
+
+						<h4>Quelques exemples typiques</h4>
+						<ul class="hsmore-rows">
+							{#each personalExamples as p}
+								<li>
+									<span class="hs-key">{p.trig}</span>
+									<span class="hs-arrow">→</span>
+									<span class="hs-out">{p.out}</span>
+									<span class="hs-desc">{p.desc}</span>
+								</li>
+							{/each}
+						</ul>
 					</article>
-				{/each}
-			</div>
 
-			<article class="ai-custom">
-				<div class="ai-custom-icon">✎</div>
-				<div class="ai-custom-body">
-					<h4>Ou rédigez votre propre prompt</h4>
-					<p>
-						L’éditeur de prompts intégré (<em>Menu IA → Profils → Ajouter</em>) accepte n’importe
-						quel prompt système avec les variables <code>{'{context}'}</code>,
-						<code>{'{min_words}'}</code>, <code>{'{max_words}'}</code>. Imposez un ton, une langue,
-						une longueur, des contraintes métier. Vos profils sont persistés et réutilisables.
-					</p>
-					<p class="ai-custom-foot">
-						Exemples d’usages : <em>« Réponds toujours en québécois soutenu »</em>, <em>« Génère du
-						code TypeScript strict »</em>, <em>« Termine ma phrase comme Hemingway »</em>.
-					</p>
+					<article class="hsmore-card">
+						<header class="hsmore-head">
+							<h3>Hotstrings dynamiques</h3>
+							<p class="hsmore-sub">
+								Calculés au moment du déclenchement — date du jour, IBAN, infos perso.
+							</p>
+						</header>
+
+						<h4>Préfixe <code>@</code> pour les données vivantes</h4>
+						<p class="hsmore-text">
+							Certaines valeurs changent chaque jour (la date) ou ne doivent pas être codées en dur
+							(numéro de téléphone, IBAN). Les hotstrings dynamiques lisent ces valeurs au moment de
+							l’expansion.
+						</p>
+
+						<ul class="hsmore-rows">
+							{#each dynamicExamples as d}
+								<li>
+									<span class="hs-key">{d.prefix}</span>
+									<span class="hs-arrow">→</span>
+									<span class="hs-out">{d.out}</span>
+									<span class="hs-desc">{d.desc}</span>
+								</li>
+							{/each}
+						</ul>
+
+						<h4>Vos infos en un seul endroit</h4>
+						<p class="hsmore-text">
+							L’éditeur d’infos personnelles centralise nom, e-mail, téléphone, adresse, IBAN. Les
+							hotstrings dynamiques s’en servent automatiquement.
+						</p>
+					</article>
 				</div>
-			</article>
-		</div>
+			</section>
 
-		<!-- Three faithful AI tooltip mockups, mirroring tooltip_llm.lua -->
-		<div class="ai-section">
-			<h3>4. Trois modes d’usage, un seul tooltip</h3>
-			<p class="ai-text">
-				Le tooltip IA est <strong>une seule fenêtre sombre</strong> qui contient toute la phrase suggérée,
-				avec un code couleur précis : <span style="color:#7f7f7f">gris</span> pour le contexte
-				inchangé, <span style="color:#41e566;font-weight:700">vert</span> pour les corrections
-				orthographiques, <span style="color:#ff9d1c;font-weight:700">orange</span> pour la suite
-				prédite, <span style="color:#fae138;font-weight:700">jaune</span> pour le marqueur de ligne
-				active (✨).
-			</p>
-
-			<!-- Example A — prediction only -->
-			<article class="ai-example">
-				<header class="ai-example-head">
-					<span class="ai-example-num">A</span>
-					<div>
-						<h4>Prédiction simple</h4>
-						<p class="ai-example-tag">Aucune faute détectée. Seule la <em>continuation</em> apparaît, en orange.</p>
-					</div>
+			<!-- ────────────────────────── Magic key — full picture ────── -->
+			<section class="magic">
+				<header class="section-head">
+					<p class="kicker" style="color:#e53935">★ — la touche signature</p>
+					<h2>Une touche, deux comportements.</h2>
+					<p class="lead">
+						La touche <kbd class="glow">★</kbd> a deux modes :
+						<strong>répéter la lettre précédente</strong>
+						ou <strong>déclencher une expansion (hotstring)</strong>. Les deux sont décidés au
+						moment du déclenchement selon le contexte — sans configuration.
+					</p>
 				</header>
-				<div class="ai-example-context">
-					Bonjour Madame, je vous écris pour <span class="ai-caret"></span>
-				</div>
-				<div class="hs-tooltip">
-					<div class="hs-tt-line hs-tt-line--selected">
-						<span class="hs-tt-spark">✨</span>
-						<span class="hs-tt-eq">Bonjour Madame, je vous écris pour</span>
-						<span class="hs-tt-nw"> vous proposer un rendez-vous mardi prochain.</span>
-						<span class="hs-tt-shortcut">⌥1</span>
-					</div>
-					<div class="hs-tt-line">
-						<span class="hs-tt-eq hs-tt-eq--dim">Bonjour Madame, je vous écris pour</span>
-						<span class="hs-tt-nw hs-tt-nw--dim"> faire suite à notre échange de la semaine dernière.</span>
-						<span class="hs-tt-shortcut hs-tt-shortcut--dim">⌥2</span>
-					</div>
-					<div class="hs-tt-line">
-						<span class="hs-tt-eq hs-tt-eq--dim">Bonjour Madame, je vous écris pour</span>
-						<span class="hs-tt-nw hs-tt-nw--dim"> accuser réception de votre dossier complet.</span>
-						<span class="hs-tt-shortcut hs-tt-shortcut--dim">⌥3</span>
-					</div>
-					<div class="hs-tt-hint">⇧G + Tab&nbsp;&nbsp;&nbsp;&nbsp;◀&nbsp;&nbsp;&nbsp;&nbsp;Tab = accepter&nbsp;&nbsp;&nbsp;&nbsp;▶&nbsp;&nbsp;&nbsp;&nbsp;⇧D + Tab</div>
-					<div class="hs-tt-info">Llama 3.2 3B · Basic — ⏱ 0.18 s — 0.42 s</div>
-				</div>
-			</article>
 
-			<!-- Example B — correction only -->
-			<article class="ai-example">
-				<header class="ai-example-head">
-					<span class="ai-example-num ai-example-num-green">B</span>
-					<div>
-						<h4>Correction seule</h4>
-						<p class="ai-example-tag">Une faute détectée, pas de continuation. Seul le mot corrigé est en <strong style="color:#41e566">vert</strong>.</p>
-					</div>
+				<div class="magic-grid magic-grid-2">
+					<article class="magic-card">
+						<h3>1. Répéteur de lettre</h3>
+						<p>
+							Si aucune abréviation ne correspond, <kbd class="glow">★</kbd> double simplement la
+							lettre précédente. <strong>Plus de SFB sur les doublons.</strong>
+						</p>
+						<ul class="magic-rows">
+							{#each repeaterExamples as r}
+								<li>
+									<span class="hs-key">{r.trig}</span>
+									<span class="hs-arrow">→</span>
+									<span class="hs-out">{r.out}</span>
+									<span class="hs-desc">{r.word}</span>
+								</li>
+							{/each}
+						</ul>
+					</article>
+
+					<article class="magic-card">
+						<h3>2. Déclencheur d’abréviations</h3>
+						<p>
+							Si la lettre précédente forme un trigger connu, <kbd class="glow">★</kbd> expanse à la
+							place. Aucun risque de collision avec la frappe normale.
+						</p>
+						<ul class="magic-rows">
+							<li>
+								<span class="hs-key">a★</span><span class="hs-arrow">→</span><span class="hs-out"
+									>ainsi</span
+								>
+							</li>
+							<li>
+								<span class="hs-key">c★</span><span class="hs-arrow">→</span><span class="hs-out"
+									>c’est</span
+								>
+							</li>
+							<li>
+								<span class="hs-key">ct★</span><span class="hs-arrow">→</span><span class="hs-out"
+									>c’était</span
+								>
+							</li>
+							<li>
+								<span class="hs-key">dé★</span><span class="hs-arrow">→</span><span class="hs-out"
+									>déjà</span
+								>
+							</li>
+							<li>
+								<span class="hs-key">ê★</span><span class="hs-arrow">→</span><span class="hs-out"
+									>être</span
+								>
+							</li>
+							<li>
+								<span class="hs-key">eef★</span><span class="hs-arrow">→</span><span class="hs-out"
+									>en effet</span
+								>
+							</li>
+							<li>
+								<span class="hs-key">f★</span><span class="hs-arrow">→</span><span class="hs-out"
+									>faire</span
+								>
+							</li>
+							<li>
+								<span class="hs-key">m★</span><span class="hs-arrow">→</span><span class="hs-out"
+									>mais</span
+								>
+							</li>
+							<li>
+								<span class="hs-key">pcq★</span><span class="hs-arrow">→</span><span class="hs-out"
+									>parce que</span
+								>
+							</li>
+							<li>
+								<span class="hs-key">pê★</span><span class="hs-arrow">→</span><span class="hs-out"
+									>peut-être</span
+								>
+							</li>
+							<li>
+								<span class="hs-key">pex★</span><span class="hs-arrow">→</span><span class="hs-out"
+									>par exemple</span
+								>
+							</li>
+							<li>
+								<span class="hs-key">r★</span><span class="hs-arrow">→</span><span class="hs-out"
+									>rien</span
+								>
+							</li>
+						</ul>
+					</article>
+				</div>
+			</section>
+
+			<!-- ────────────────────────── Power moves ─────────────────── -->
+			<section class="power">
+				<header class="section-head">
+					<p class="kicker" style="color:#8e44ad">Petits réflexes, gros gain</p>
+					<h2>Les détails qui changent la frappe.</h2>
+					<p class="lead">Quatre fonctions discrètes mais qu’on ne lâche plus une fois adoptées.</p>
 				</header>
-				<div class="ai-example-context">
-					Je vous remercie de me <span class="ai-example-typo">recevoire</span> demain matin.<span class="ai-caret"></span>
-				</div>
-				<div class="hs-tooltip">
-					<div class="hs-tt-line hs-tt-line--selected">
-						<span class="hs-tt-spark">✨</span>
-						<span class="hs-tt-eq">Je vous remercie de me</span>
-						<span class="hs-tt-corr">recevoir</span>
-						<span class="hs-tt-eq">demain matin.</span>
-						<span class="hs-tt-shortcut">⌥1</span>
-					</div>
-					<div class="hs-tt-hint">Tab pour accepter</div>
-					<div class="hs-tt-info">Llama 3.2 3B · Advanced — ⏱ 0.21 s — 0.51 s</div>
-				</div>
-			</article>
 
-			<!-- Example C — correction + prediction (the killer mode) -->
-			<article class="ai-example">
-				<header class="ai-example-head">
-					<span class="ai-example-num ai-example-num-mixed">C</span>
-					<div>
-						<h4>Correction + prédiction</h4>
-						<p class="ai-example-tag">Le modèle <strong>corrige</strong> ce que vous avez tapé <em>et</em> <strong>continue</strong> la phrase. Tout en une seule ligne, en couleurs.</p>
-					</div>
+				<div class="power-grid">
+					{#each powerMoves as p}
+						<div class="power-card">
+							<div class="power-icon">{p.icon}</div>
+							<h3>{p.title}</h3>
+							<p>{@html p.body}</p>
+						</div>
+					{/each}
+				</div>
+			</section>
+
+			<!-- ────────────────────────── Navigation layer ─────────────── -->
+			<section class="navlayer">
+				<header class="section-head">
+					<p class="kicker" style="color:#fb8c00">Layer maintien</p>
+					<h2>Naviguer sans quitter la maison-row.</h2>
+					<p class="lead">
+						Maintenez <kbd>LAlt</kbd> et la moitié droite du clavier devient un cluster de navigation
+						complet. Plus de zigzag vers les flèches, le pavé numérique ou la souris.
+					</p>
 				</header>
-				<div class="ai-example-context">
-					Le projet est <span class="ai-example-typo">paralèle</span> à <span class="ai-caret"></span>
-				</div>
-				<div class="hs-tooltip">
-					<div class="hs-tt-line hs-tt-line--selected">
-						<span class="hs-tt-spark">✨</span>
-						<span class="hs-tt-eq">Le projet est</span>
-						<span class="hs-tt-corr">parallèle</span>
-						<span class="hs-tt-eq">à</span>
-						<span class="hs-tt-nw"> celui de l’an dernier, mais avec un budget revu à la hausse.</span>
-						<span class="hs-tt-shortcut">⌥1</span>
+
+				<div class="navlayer-window">
+					<div class="navlayer-hold">
+						<span class="navlayer-pill">Hold</span>
+						<span class="navlayer-key">LAlt</span>
+						<span class="navlayer-plus">+</span>
 					</div>
-					<div class="hs-tt-line">
-						<span class="hs-tt-eq hs-tt-eq--dim">Le projet est</span>
-						<span class="hs-tt-corr hs-tt-corr--dim">parallèle</span>
-						<span class="hs-tt-eq hs-tt-eq--dim">à</span>
-						<span class="hs-tt-nw hs-tt-nw--dim"> ceux que nous avons livrés en 2024.</span>
-						<span class="hs-tt-shortcut hs-tt-shortcut--dim">⌥2</span>
+					<div class="navlayer-grid">
+						{#each navLayer as n}
+							<div class="navlayer-cell">
+								<div class="navlayer-base">
+									{#each n.keys as k}<kbd>{k}</kbd>{/each}
+								</div>
+								<div class="navlayer-arrow">becomes</div>
+								<div class="navlayer-target">
+									<span class="navlayer-glyph">{n.label}</span>
+									<span class="navlayer-desc">{n.desc}</span>
+								</div>
+							</div>
+						{/each}
 					</div>
-					<div class="hs-tt-hint">⇧G + Tab&nbsp;&nbsp;&nbsp;&nbsp;◀&nbsp;&nbsp;&nbsp;&nbsp;Tab = accepter&nbsp;&nbsp;&nbsp;&nbsp;▶&nbsp;&nbsp;&nbsp;&nbsp;⇧D + Tab</div>
-					<div class="hs-tt-info">Mistral 7B · Advanced — ⏱ 0.34 s — 0.78 s</div>
 				</div>
-				<p class="ai-example-foot">
-					Un seul <kbd>Tab</kbd> insère la correction <strong>et</strong> la suite — vous écrivez 80
-					caractères en appuyant sur 1 touche.
-				</p>
-			</article>
+			</section>
 
-			<p class="ai-text-small">
-				Le code couleur des tooltips est entièrement personnalisable depuis le menu (ou désactivable
-				si vous préférez l’affichage neutre).
-			</p>
-		</div>
+			<!-- ────────────────────────── AI Predictions (mac only) ──── -->
+			<section class="ai">
+				<header class="section-head">
+					<p class="kicker" style="color:#ec407a">Pont LLM intégré · macOS</p>
+					<h2>Une IA locale qui prédit ce que vous voulez écrire.</h2>
+					<p class="lead">
+						Hammerspoon embarque un pont vers un modèle de langage qui tourne <strong
+							>sur votre Mac</strong
+						>, pas dans le cloud. Aucune donnée n’est envoyée à l’extérieur, le modèle est rapide,
+						et il apprend votre style sans rien stocker.
+					</p>
+				</header>
 
-		<!-- Validation shortcut -->
-		<div class="ai-section">
-			<h3>5. Validez en une touche</h3>
-			<p class="ai-text">
-				Une suggestion vous plaît ? Une seule pression sur <kbd>Tab</kbd> et elle est insérée. Plusieurs
-				suggestions ? Naviguez avec les flèches haut/bas, validez celle que vous voulez. Aucune
-				souris, aucun pop-up à fermer.
-			</p>
-			<ul class="ai-shortcuts-list">
-				<li><kbd>Tab</kbd> — Valider la suggestion en surbrillance</li>
-				<li><kbd>↑</kbd> / <kbd>↓</kbd> — Naviguer entre les suggestions</li>
-				<li><kbd>Échap</kbd> ou <strong>n’importe quelle frappe</strong> — Ignorer</li>
-			</ul>
-		</div>
-	</section>
-
-	<!-- ────────────────────────── Trackpad gestures (mac only) ── -->
-	<section class="trackpad">
-		<header class="section-head">
-			<p class="kicker" style="color:#00838f">Gestes trackpad · macOS</p>
-			<h2>Le clavier ne fait pas tout. Le trackpad non plus, seul.</h2>
-			<p class="lead">
-				Le driver intercepte les <strong>gestes bruts</strong> du trackpad (pas les événements de souris)
-				et les associe à n’importe quelle action. Plus de zigzag main droite/clavier — vos doigts
-				restent là où ils sont.
-			</p>
-		</header>
-
-		<div class="trackpad-grid">
-			{#each trackpadGestures as g}
-				<article class="trackpad-card" style="--accent:{g.color};">
-					<div class="trackpad-meta">
-						<span class="trackpad-fingers">{g.fingers}</span>
-						<span class="trackpad-type">{g.type}</span>
+				<!-- Mock editor with live AI suggestion tooltip -->
+				<div class="ai-window os-{osStyle}">
+					<div class="chrome">
+						{#if osStyle === 'macos'}
+							<span class="mac-dots">
+								<span class="dot dot-r"></span>
+								<span class="dot dot-y"></span>
+								<span class="dot dot-g"></span>
+							</span>
+							<span class="chrome-title">~/inbox/draft.eml</span>
+							<span class="chrome-spacer"></span>
+						{:else}
+							<span class="chrome-title chrome-title--win">~/inbox/draft.eml</span>
+							<span class="win-buttons">
+								<span class="win-btn" aria-hidden="true">─</span>
+								<span class="win-btn" aria-hidden="true">▢</span>
+								<span class="win-btn close" aria-hidden="true">✕</span>
+							</span>
+						{/if}
 					</div>
-					<div class="trackpad-action">{g.defaut}</div>
-					<p class="trackpad-note">{g.note}</p>
-				</article>
-			{/each}
-		</div>
-
-		<div class="trackpad-callout">
-			<h3>Tap 3 doigts = définition instantanée</h3>
-			<p>
-				Posez 3 doigts sur un mot dans n’importe quel texte (Safari, Mail, Pages, Slack, VS Code…) :
-				sa définition apparaît dans une popover. <strong>C’est le geste le plus utilisé d’<ErgoptiPlus></ErgoptiPlus></strong>
-				selon nos métriques internes — plus rapide qu’ouvrir un onglet vers un dictionnaire.
-			</p>
-		</div>
-
-		<div class="trackpad-extras">
-			<h3>Tout est réassignable</h3>
-			<p>
-				Le menu <em>Trackpad → Gestes</em> propose une liste déroulante par geste. Une trentaine
-				d’actions sont fournies : navigation entre fenêtres, contrôle du volume, mots/lignes/paragraphes,
-				copier/coller, captures d’écran, raccourcis applicatifs… Vous pouvez aussi pointer vers un
-				script Lua pour des actions sur-mesure.
-			</p>
-		</div>
-	</section>
-
-	<!-- ────────────────────────── Typing metrics ──────────────── -->
-	<section class="metrics">
-		<header class="section-head">
-			<p class="kicker" style="color:#00838f">Métriques de frappe</p>
-			<h2>Mesurer pour progresser.</h2>
-			<p class="lead">
-				Le keylogger interne (n’envoie rien dehors) compte les frappes, mots, déclenchements et
-				bigrammes inconfortables. De quoi voir d’une semaine sur l’autre où vous gagnez.
-			</p>
-		</header>
-
-		<div class="metrics-grid">
-			{#each metrics as m}
-				<div class="metric-card" style="--accent: {m.accent};">
-					<div class="metric-label">{m.label}</div>
-					<div class="metric-value">{m.value}</div>
-					<div class="metric-delta">{m.delta}</div>
-				</div>
-			{/each}
-		</div>
-	</section>
-
-	<!-- ────────────────────────── Mac window showcase ───────────── -->
-	<section class="showcase">
-		<header class="section-head">
-			<p class="kicker">Configuration unifiée</p>
-			<h2>Un panneau. Tous vos délais et couleurs.</h2>
-			<p class="lead">
-				Le menu intégré (macOS et Windows) lit et écrit le même fichier <code
-					>~/.config/ergopti_plus/hotstrings_config.toml</code
-				>. Réglez une fois, profitez partout.
-			</p>
-		</header>
-
-		<div class="mac-window os-{osStyle}">
-			<div class="chrome">
-				{#if osStyle === 'macos'}
-					<span class="mac-dots">
-						<span class="dot dot-r"></span>
-						<span class="dot dot-y"></span>
-						<span class="dot dot-g"></span>
-					</span>
-					<span class="chrome-title">Délais et couleurs des hotstrings</span>
-					<span class="chrome-spacer"></span>
-				{:else}
-					<span class="chrome-title chrome-title--win">Délais et couleurs des hotstrings</span>
-					<span class="win-buttons">
-						<span class="win-btn" aria-hidden="true">─</span>
-						<span class="win-btn" aria-hidden="true">▢</span>
-						<span class="win-btn close" aria-hidden="true">✕</span>
-					</span>
-				{/if}
-			</div>
-			<div class="mac-body">
-				<div class="mac-toolbar">
-					<button class="mac-btn">Tout en gris</button>
-					<button class="mac-btn ghost">Tout réinitialiser</button>
-					<span class="spacer"></span>
-					<span class="mac-hint">édité dans <code>hotstrings_config.toml</code></span>
+					<div class="ai-body">
+						<p class="ai-context">{aiContext}<span class="caret"></span></p>
+						<div class="ai-tooltip">
+							<div class="ai-tooltip-head">
+								<span class="ai-bolt">⚡</span>
+								<span>Suggestions IA</span>
+								<span class="ai-shortcut"><kbd>Tab</kbd> pour valider</span>
+							</div>
+							<ul class="ai-list">
+								{#each aiSuggestions as s, i}
+									<li class:active={i === 0}>
+										<span class="ai-num">{i + 1}</span>
+										<span>{s}</span>
+									</li>
+								{/each}
+							</ul>
+						</div>
+					</div>
 				</div>
 
-				{#each [{ name: 'Magic Key', delay: 2000, color: '#e53935', sections: 4 }, { name: 'Autocorrection', delay: 1000, color: '#43a047', sections: 6 }, { name: 'Roulements', delay: 500, color: '#fb8c00', sections: 5 }, { name: 'SFBs', delay: 500, color: '#fb8c00', sections: 3 }, { name: 'Distances', delay: 500, color: '#fb8c00', sections: 4 }, { name: 'Personal', delay: 2000, color: '#1e88e5', sections: 0 }] as row}
-					<div class="mac-row">
-						<span class="mac-swatch" style="background:{row.color}"></span>
-						<span class="mac-name">{row.name}</span>
-						<span class="mac-meta">{row.sections} section{row.sections > 1 ? 's' : ''}</span>
-						<span class="mac-delay">{row.delay} ms</span>
-						<span class="mac-arrow">›</span>
+				<!-- Backends — Ollama / MLX -->
+				<div class="ai-section">
+					<h3>1. Choisissez votre moteur d’inférence</h3>
+					<p class="ai-text">
+						Deux backends sont supportés en natif. Le driver détecte automatiquement le plus
+						performant pour votre matériel, mais vous pouvez toujours forcer votre choix depuis le
+						menu.
+					</p>
+					<div class="ai-backends">
+						{#each aiBackends as b}
+							<article class="ai-backend">
+								<div class="ai-backend-icon">{b.icon}</div>
+								<div class="ai-backend-body">
+									<h4>{b.name} <span class="ai-port">port {b.port}</span></h4>
+									<p class="ai-backend-aud">{b.audience}</p>
+									<p class="ai-backend-pro">{b.pro}</p>
+								</div>
+							</article>
+						{/each}
 					</div>
-				{/each}
-			</div>
-		</div>
-	</section>
+				</div>
 
-	<!-- ────────────────────────── Personnalisation ───────────── -->
-	<section class="custo">
-		<header class="section-head">
-			<p class="kicker">Tout sous votre contrôle</p>
-			<h2>Absolument tout est personnalisable. Et désactivable.</h2>
-			<p class="lead">
-				<strong>Aucune fonctionnalité n’est imposée.</strong> Chaque expansion, chaque tap-hold,
-				chaque geste, chaque tooltip, chaque délai, chaque couleur peut être modifié, désactivé,
-				réinitialisé. Vous décidez. Le menu est là pour vous mettre à l’aise — <strong>jamais pour vous
-				piéger</strong>.
-			</p>
-		</header>
+				<!-- Models — the full catalog, parsed from llm_models.json at build time -->
+				<div class="ai-section">
+					<h3>2. Choisissez votre modèle parmi <strong>{aiTotalModels}</strong></h3>
+					<p class="ai-text">
+						Le menu <em>Modèles</em> propose un catalogue curé qui regroupe à ce jour
+						<strong>{aiTotalModels} modèles open-weights</strong> issus de
+						<strong>{aiTotalProviders} fournisseurs</strong> ({aiTotalFamilies} familles). Du nano 350
+						M qui répond en 50 ms au 70 B qui produit des phrases parfaitement contextuelles — vous choisissez
+						selon votre matériel et votre besoin. Le menu vous indique la RAM et l’espace disque requis
+						avant tout téléchargement.
+					</p>
+					<p class="ai-text-small">
+						Cette liste est <strong>générée automatiquement</strong> depuis le fichier de configuration
+						du driver — elle est toujours à jour avec ce que vous installerez réellement.
+					</p>
+					<div class="ai-providers">
+						{#each aiProviders as p}
+							<article class="ai-provider">
+								<div class="ai-provider-name">{p.name}</div>
+								<div class="ai-provider-family">{p.families}</div>
+								<div class="ai-provider-meta">
+									<span class="ai-provider-count"
+										>{p.modelCount} modèle{p.modelCount > 1 ? 's' : ''}</span
+									>
+									{#if p.range}
+										<span class="ai-provider-range">{p.range}</span>
+									{/if}
+								</div>
+							</article>
+						{/each}
+					</div>
 
-		<div class="custo-pillars">
-			<div class="custo-pillar">
-				<span class="custo-pillar-num">1</span>
-				<div>
-					<h3>Activez fonction par fonction</h3>
-					<p>
-						Chaque catégorie de hotstrings, chaque tap-hold, chaque geste trackpad a sa case à
-						cocher. Démarrez avec 3 fonctions, ajoutez-en 2 le mois suivant, jamais d’obligation.
+					<article class="ai-custom">
+						<div class="ai-custom-icon">＋</div>
+						<div class="ai-custom-body">
+							<h4>Ajoutez n’importe quel autre modèle</h4>
+							<p>
+								Une option <em>« Ajouter un modèle personnalisé »</em> accepte n’importe quel
+								<strong>identifiant HuggingFace</strong> (pour MLX) ou <strong>tag Ollama</strong>.
+								Exemple : <code>mlx-community/Qwen2.5-3B-Instruct-4bit</code> ou
+								<code>llama3.2:3b</code>. Le modèle apparaît immédiatement dans la liste, et reste
+								persisté entre les sessions.
+							</p>
+							<p class="ai-custom-foot">
+								Vous pouvez littéralement utiliser <strong>n’importe quel modèle</strong> publié sur
+								HuggingFace au format MLX, ou n’importe quel modèle disponible dans la bibliothèque Ollama.
+							</p>
+						</div>
+					</article>
+				</div>
+
+				<!-- Prompt profiles -->
+				<div class="ai-section">
+					<h3>3. Choisissez (ou écrivez) votre profil de prompt</h3>
+					<p class="ai-text">
+						Quatre profils intégrés couvrent les usages courants — chacun avec un prompt système
+						précis, rédigé pour fonctionner sur les petits modèles aussi bien que sur les gros.
+					</p>
+					<div class="ai-profiles">
+						{#each aiProfiles as p}
+							<article class="ai-profile">
+								<header>
+									<span class="ai-profile-name">{p.name}</span>
+									<span class="ai-profile-tag">{p.tag}</span>
+								</header>
+								<p>{@html p.desc}</p>
+							</article>
+						{/each}
+					</div>
+
+					<article class="ai-custom">
+						<div class="ai-custom-icon">✎</div>
+						<div class="ai-custom-body">
+							<h4>Ou rédigez votre propre prompt</h4>
+							<p>
+								L’éditeur de prompts intégré (<em>Menu IA → Profils → Ajouter</em>) accepte
+								n’importe quel prompt système avec les variables <code>{'{context}'}</code>,
+								<code>{'{min_words}'}</code>, <code>{'{max_words}'}</code>. Imposez un ton, une
+								langue, une longueur, des contraintes métier. Vos profils sont persistés et
+								réutilisables.
+							</p>
+							<p class="ai-custom-foot">
+								Exemples d’usages : <em>« Réponds toujours en québécois soutenu »</em>,
+								<em>« Génère du code TypeScript strict »</em>,
+								<em>« Termine ma phrase comme Hemingway »</em>.
+							</p>
+						</div>
+					</article>
+				</div>
+
+				<!-- Three faithful AI tooltip mockups, mirroring tooltip_llm.lua -->
+				<div class="ai-section">
+					<h3>4. Trois modes d’usage, un seul tooltip</h3>
+					<p class="ai-text">
+						Le tooltip IA est <strong>une seule fenêtre sombre</strong> qui contient toute la phrase
+						suggérée, avec un code couleur précis : <span style="color:#7f7f7f">gris</span> pour le
+						contexte inchangé, <span style="color:#41e566;font-weight:700">vert</span> pour les
+						corrections orthographiques, <span style="color:#ff9d1c;font-weight:700">orange</span>
+						pour la suite prédite, <span style="color:#fae138;font-weight:700">jaune</span> pour le marqueur
+						de ligne active (✨).
+					</p>
+
+					<!-- Example A — prediction only -->
+					<article class="ai-example">
+						<header class="ai-example-head">
+							<span class="ai-example-num">A</span>
+							<div>
+								<h4>Prédiction simple</h4>
+								<p class="ai-example-tag">
+									Aucune faute détectée. Seule la <em>continuation</em> apparaît, en orange.
+								</p>
+							</div>
+						</header>
+						<div class="ai-example-context">
+							Bonjour Madame, je vous écris pour <span class="ai-caret"></span>
+						</div>
+						<div class="hs-tooltip">
+							<div class="hs-tt-line hs-tt-line--selected">
+								<span class="hs-tt-spark">✨</span>
+								<span class="hs-tt-eq">Bonjour Madame, je vous écris pour</span>
+								<span class="hs-tt-nw"> vous proposer un rendez-vous mardi prochain.</span>
+								<span class="hs-tt-shortcut">⌥1</span>
+							</div>
+							<div class="hs-tt-line">
+								<span class="hs-tt-eq hs-tt-eq--dim">Bonjour Madame, je vous écris pour</span>
+								<span class="hs-tt-nw hs-tt-nw--dim">
+									faire suite à notre échange de la semaine dernière.</span
+								>
+								<span class="hs-tt-shortcut hs-tt-shortcut--dim">⌥2</span>
+							</div>
+							<div class="hs-tt-line">
+								<span class="hs-tt-eq hs-tt-eq--dim">Bonjour Madame, je vous écris pour</span>
+								<span class="hs-tt-nw hs-tt-nw--dim">
+									accuser réception de votre dossier complet.</span
+								>
+								<span class="hs-tt-shortcut hs-tt-shortcut--dim">⌥3</span>
+							</div>
+							<div class="hs-tt-hint">
+								⇧G + Tab&nbsp;&nbsp;&nbsp;&nbsp;◀&nbsp;&nbsp;&nbsp;&nbsp;Tab =
+								accepter&nbsp;&nbsp;&nbsp;&nbsp;▶&nbsp;&nbsp;&nbsp;&nbsp;⇧D + Tab
+							</div>
+							<div class="hs-tt-info">Llama 3.2 3B · Basic — ⏱ 0.18 s — 0.42 s</div>
+						</div>
+					</article>
+
+					<!-- Example B — correction only -->
+					<article class="ai-example">
+						<header class="ai-example-head">
+							<span class="ai-example-num ai-example-num-green">B</span>
+							<div>
+								<h4>Correction seule</h4>
+								<p class="ai-example-tag">
+									Une faute détectée, pas de continuation. Seul le mot corrigé est en <strong
+										style="color:#41e566">vert</strong
+									>.
+								</p>
+							</div>
+						</header>
+						<div class="ai-example-context">
+							Je vous remercie de me <span class="ai-example-typo">recevoire</span> demain matin.<span
+								class="ai-caret"
+							></span>
+						</div>
+						<div class="hs-tooltip">
+							<div class="hs-tt-line hs-tt-line--selected">
+								<span class="hs-tt-spark">✨</span>
+								<span class="hs-tt-eq">Je vous remercie de me</span>
+								<span class="hs-tt-corr">recevoir</span>
+								<span class="hs-tt-eq">demain matin.</span>
+								<span class="hs-tt-shortcut">⌥1</span>
+							</div>
+							<div class="hs-tt-hint">Tab pour accepter</div>
+							<div class="hs-tt-info">Llama 3.2 3B · Advanced — ⏱ 0.21 s — 0.51 s</div>
+						</div>
+					</article>
+
+					<!-- Example C — correction + prediction (the killer mode) -->
+					<article class="ai-example">
+						<header class="ai-example-head">
+							<span class="ai-example-num ai-example-num-mixed">C</span>
+							<div>
+								<h4>Correction + prédiction</h4>
+								<p class="ai-example-tag">
+									Le modèle <strong>corrige</strong> ce que vous avez tapé <em>et</em>
+									<strong>continue</strong> la phrase. Tout en une seule ligne, en couleurs.
+								</p>
+							</div>
+						</header>
+						<div class="ai-example-context">
+							Le projet est <span class="ai-example-typo">paralèle</span> à
+							<span class="ai-caret"></span>
+						</div>
+						<div class="hs-tooltip">
+							<div class="hs-tt-line hs-tt-line--selected">
+								<span class="hs-tt-spark">✨</span>
+								<span class="hs-tt-eq">Le projet est</span>
+								<span class="hs-tt-corr">parallèle</span>
+								<span class="hs-tt-eq">à</span>
+								<span class="hs-tt-nw">
+									celui de l’an dernier, mais avec un budget revu à la hausse.</span
+								>
+								<span class="hs-tt-shortcut">⌥1</span>
+							</div>
+							<div class="hs-tt-line">
+								<span class="hs-tt-eq hs-tt-eq--dim">Le projet est</span>
+								<span class="hs-tt-corr hs-tt-corr--dim">parallèle</span>
+								<span class="hs-tt-eq hs-tt-eq--dim">à</span>
+								<span class="hs-tt-nw hs-tt-nw--dim"> ceux que nous avons livrés en 2024.</span>
+								<span class="hs-tt-shortcut hs-tt-shortcut--dim">⌥2</span>
+							</div>
+							<div class="hs-tt-hint">
+								⇧G + Tab&nbsp;&nbsp;&nbsp;&nbsp;◀&nbsp;&nbsp;&nbsp;&nbsp;Tab =
+								accepter&nbsp;&nbsp;&nbsp;&nbsp;▶&nbsp;&nbsp;&nbsp;&nbsp;⇧D + Tab
+							</div>
+							<div class="hs-tt-info">Mistral 7B · Advanced — ⏱ 0.34 s — 0.78 s</div>
+						</div>
+						<p class="ai-example-foot">
+							Un seul <kbd>Tab</kbd> insère la correction <strong>et</strong> la suite — vous écrivez
+							80 caractères en appuyant sur 1 touche.
+						</p>
+					</article>
+
+					<p class="ai-text-small">
+						Le code couleur des tooltips est entièrement personnalisable depuis le menu (ou
+						désactivable si vous préférez l’affichage neutre).
 					</p>
 				</div>
-			</div>
-			<div class="custo-pillar">
-				<span class="custo-pillar-num">2</span>
-				<div>
-					<h3>Réglez les valeurs</h3>
+
+				<!-- Validation shortcut -->
+				<div class="ai-section">
+					<h3>5. Validez en une touche</h3>
+					<p class="ai-text">
+						Une suggestion vous plaît ? Une seule pression sur <kbd>Tab</kbd> et elle est insérée. Plusieurs
+						suggestions ? Naviguez avec les flèches haut/bas, validez celle que vous voulez. Aucune souris,
+						aucun pop-up à fermer.
+					</p>
+					<ul class="ai-shortcuts-list">
+						<li><kbd>Tab</kbd> — Valider la suggestion en surbrillance</li>
+						<li><kbd>↑</kbd> / <kbd>↓</kbd> — Naviguer entre les suggestions</li>
+						<li><kbd>Échap</kbd> ou <strong>n’importe quelle frappe</strong> — Ignorer</li>
+					</ul>
+				</div>
+			</section>
+
+			<!-- ────────────────────────── Trackpad gestures (mac only) ── -->
+			<section class="trackpad">
+				<header class="section-head">
+					<p class="kicker" style="color:#00838f">Gestes trackpad · macOS</p>
+					<h2>Le clavier ne fait pas tout. Le trackpad non plus, seul.</h2>
+					<p class="lead">
+						Le driver intercepte les <strong>gestes bruts</strong> du trackpad (pas les événements de
+						souris) et les associe à n’importe quelle action. Plus de zigzag main droite/clavier — vos
+						doigts restent là où ils sont.
+					</p>
+				</header>
+
+				<div class="trackpad-grid">
+					{#each trackpadGestures as g}
+						<article class="trackpad-card" style="--accent:{g.color};">
+							<div class="trackpad-meta">
+								<span class="trackpad-fingers">{g.fingers}</span>
+								<span class="trackpad-type">{g.type}</span>
+							</div>
+							<div class="trackpad-action">{g.defaut}</div>
+							<p class="trackpad-note">{g.note}</p>
+						</article>
+					{/each}
+				</div>
+
+				<div class="trackpad-callout">
+					<h3>Tap 3 doigts = définition instantanée</h3>
 					<p>
-						Délais, couleurs, modèle d’IA, raccourcis, prompt, longueur de contexte, apps ignorées,
-						chemins de fichiers — chaque paramètre est exposé dans le menu, réversible d’un clic.
+						Posez 3 doigts sur un mot dans n’importe quel texte (Safari, Mail, Pages, Slack, VS
+						Code…) : sa définition apparaît dans une popover. <strong
+							>C’est le geste le plus utilisé d’<ErgoptiPlus></ErgoptiPlus></strong
+						>
+						selon nos métriques internes — plus rapide qu’ouvrir un onglet vers un dictionnaire.
 					</p>
 				</div>
-			</div>
-			<div class="custo-pillar">
-				<span class="custo-pillar-num">3</span>
-				<div>
-					<h3>Réécrivez les hotstrings</h3>
+
+				<div class="trackpad-extras">
+					<h3>Tout est réassignable</h3>
 					<p>
-						Un trigger livré ne vous convient pas ? Modifiez la valeur dans le TOML, le driver
-						recharge tout seul. Vous voulez en ajouter ? Le menu écrit le fichier pour vous.
+						Le menu <em>Trackpad → Gestes</em> propose une liste déroulante par geste. Une trentaine
+						d’actions sont fournies : navigation entre fenêtres, contrôle du volume, mots/lignes/paragraphes,
+						copier/coller, captures d’écran, raccourcis applicatifs… Vous pouvez aussi pointer vers un
+						script Lua pour des actions sur-mesure.
 					</p>
 				</div>
-			</div>
-		</div>
+			</section>
 
-		<h3 class="custo-h3">Quelques exemples de réglages disponibles</h3>
-		<div class="custo-grid">
-			{#each personalizationCards as c}
-				<article class="custo-card">
-					<div class="custo-icon">{c.icon}</div>
-					<h3>{c.title}</h3>
-					<p>{@html c.body}</p>
-				</article>
-			{/each}
-		</div>
-	</section>
+			<!-- ────────────────────────── Typing metrics ──────────────── -->
+			<section class="metrics">
+				<header class="section-head">
+					<p class="kicker" style="color:#00838f">Métriques de frappe</p>
+					<h2>Mesurer pour progresser.</h2>
+					<p class="lead">
+						Le keylogger interne (n’envoie rien dehors) compte les frappes, mots, déclenchements et
+						bigrammes inconfortables. De quoi voir d’une semaine sur l’autre où vous gagnez.
+					</p>
+				</header>
 
-	<!-- ────────────────────────── Privacy / open-source / free ── -->
-	<section class="trust">
-		<header class="section-head">
-			<p class="kicker">Confiance par construction</p>
-			<h2>100 % local. 100 % open-source. 100 % gratuit.</h2>
-			<p class="lead">
-				Pas d’abonnement, pas d’extension à acheter, pas de publicité, pas de compte à créer, pas de
-				télémétrie. Le code est lisible, auditable, modifiable.
-			</p>
-		</header>
+				<div class="metrics-grid">
+					{#each metrics as m}
+						<div class="metric-card" style="--accent: {m.accent};">
+							<div class="metric-label">{m.label}</div>
+							<div class="metric-value">{m.value}</div>
+							<div class="metric-delta">{m.delta}</div>
+						</div>
+					{/each}
+				</div>
+			</section>
 
-		<div class="trust-grid">
-			<article class="trust-card">
-				<div class="trust-icon" style="color:#43a047;">🔐</div>
-				<h3>Tout reste sur votre machine</h3>
-				<p>
-					Hotstrings, métriques de frappe, prédictions IA, gestes — chaque calcul est local. Aucun
-					serveur n’est sollicité. Même les modèles d’IA tournent <strong>chez vous</strong>, via
-					Ollama ou MLX. Une fois téléchargés, plus besoin d’internet.
-				</p>
-			</article>
+			<!-- ────────────────────────── Mac window showcase ───────────── -->
+			<section class="showcase">
+				<header class="section-head">
+					<p class="kicker">Configuration unifiée</p>
+					<h2>Un panneau. Tous vos délais et couleurs.</h2>
+					<p class="lead">
+						Le menu intégré (macOS et Windows) lit et écrit le même fichier <code
+							>~/.config/ergopti_plus/hotstrings_config.toml</code
+						>. Réglez une fois, profitez partout.
+					</p>
+				</header>
 
-			<article class="trust-card">
-				<div class="trust-icon" style="color:#1e88e5;">📂</div>
-				<h3>Code source ouvert</h3>
-				<p>
-					Le driver Hammerspoon (Lua), le driver AutoHotkey (AHK v2) et le site sont publiés sur
-					GitHub, sous licence libre. Vous pouvez auditer, modifier, forker, contribuer. Le projet
-					vit en public, par conception.
-				</p>
-			</article>
+				<div class="mac-window os-{osStyle}">
+					<div class="chrome">
+						{#if osStyle === 'macos'}
+							<span class="mac-dots">
+								<span class="dot dot-r"></span>
+								<span class="dot dot-y"></span>
+								<span class="dot dot-g"></span>
+							</span>
+							<span class="chrome-title">Délais et couleurs des hotstrings</span>
+							<span class="chrome-spacer"></span>
+						{:else}
+							<span class="chrome-title chrome-title--win">Délais et couleurs des hotstrings</span>
+							<span class="win-buttons">
+								<span class="win-btn" aria-hidden="true">─</span>
+								<span class="win-btn" aria-hidden="true">▢</span>
+								<span class="win-btn close" aria-hidden="true">✕</span>
+							</span>
+						{/if}
+					</div>
+					<div class="mac-body">
+						<div class="mac-toolbar">
+							<button class="mac-btn">Tout en gris</button>
+							<button class="mac-btn ghost">Tout réinitialiser</button>
+							<span class="spacer"></span>
+							<span class="mac-hint">édité dans <code>hotstrings_config.toml</code></span>
+						</div>
 
-			<article class="trust-card">
-				<div class="trust-icon" style="color:#fb8c00;">💸</div>
-				<h3>Gratuit. Pour de bon.</h3>
-				<p>
-					Pas de freemium qui devient payant après 30 jours. Pas d’extension premium à débloquer.
-					Pas de publicité dans le menu. Pas de don forcé. <ErgoptiPlus></ErgoptiPlus> est et
-					restera <strong>entièrement gratuit</strong>, sans limitation.
-				</p>
-			</article>
+						{#each [{ name: 'Magic Key', delay: 2000, color: '#e53935', sections: 4 }, { name: 'Autocorrection', delay: 1000, color: '#43a047', sections: 6 }, { name: 'Roulements', delay: 500, color: '#fb8c00', sections: 5 }, { name: 'SFBs', delay: 500, color: '#fb8c00', sections: 3 }, { name: 'Distances', delay: 500, color: '#fb8c00', sections: 4 }, { name: 'Personal', delay: 2000, color: '#1e88e5', sections: 0 }] as row}
+							<div class="mac-row">
+								<span class="mac-swatch" style="background:{row.color}"></span>
+								<span class="mac-name">{row.name}</span>
+								<span class="mac-meta">{row.sections} section{row.sections > 1 ? 's' : ''}</span>
+								<span class="mac-delay">{row.delay} ms</span>
+								<span class="mac-arrow">›</span>
+							</div>
+						{/each}
+					</div>
+				</div>
+			</section>
 
-			<article class="trust-card">
-				<div class="trust-icon" style="color:#8e44ad;">🚫</div>
-				<h3>Aucune télémétrie</h3>
-				<p>
-					Le driver ne fait <strong>aucun appel réseau</strong> en dehors du backend LLM local que
-					vous avez choisi. Pas de "anonymized usage data", pas de crash report envoyé en arrière-plan,
-					pas de pixel de tracking. Vous pouvez littéralement le faire tourner hors-ligne.
-				</p>
-			</article>
-		</div>
-	</section>
+			<!-- ────────────────────────── Personnalisation ───────────── -->
+			<section class="custo">
+				<header class="section-head">
+					<p class="kicker">Tout sous votre contrôle</p>
+					<h2>Absolument tout est personnalisable. Et désactivable.</h2>
+					<p class="lead">
+						<strong>Aucune fonctionnalité n’est imposée.</strong> Chaque expansion, chaque tap-hold,
+						chaque geste, chaque tooltip, chaque délai, chaque couleur peut être modifié, désactivé,
+						réinitialisé. Vous décidez. Le menu est là pour vous mettre à l’aise —
+						<strong>jamais pour vous piéger</strong>.
+					</p>
+				</header>
 
-	<!-- ════════════════════════════════════════════════════════════
+				<div class="custo-pillars">
+					<div class="custo-pillar">
+						<span class="custo-pillar-num">1</span>
+						<div>
+							<h3>Activez fonction par fonction</h3>
+							<p>
+								Chaque catégorie de hotstrings, chaque tap-hold, chaque geste trackpad a sa case à
+								cocher. Démarrez avec 3 fonctions, ajoutez-en 2 le mois suivant, jamais
+								d’obligation.
+							</p>
+						</div>
+					</div>
+					<div class="custo-pillar">
+						<span class="custo-pillar-num">2</span>
+						<div>
+							<h3>Réglez les valeurs</h3>
+							<p>
+								Délais, couleurs, modèle d’IA, raccourcis, prompt, longueur de contexte, apps
+								ignorées, chemins de fichiers — chaque paramètre est exposé dans le menu, réversible
+								d’un clic.
+							</p>
+						</div>
+					</div>
+					<div class="custo-pillar">
+						<span class="custo-pillar-num">3</span>
+						<div>
+							<h3>Réécrivez les hotstrings</h3>
+							<p>
+								Un trigger livré ne vous convient pas ? Modifiez la valeur dans le TOML, le driver
+								recharge tout seul. Vous voulez en ajouter ? Le menu écrit le fichier pour vous.
+							</p>
+						</div>
+					</div>
+				</div>
+
+				<h3 class="custo-h3">Quelques exemples de réglages disponibles</h3>
+				<div class="custo-grid">
+					{#each personalizationCards as c}
+						<article class="custo-card">
+							<div class="custo-icon">{c.icon}</div>
+							<h3>{c.title}</h3>
+							<p>{@html c.body}</p>
+						</article>
+					{/each}
+				</div>
+			</section>
+
+			<!-- ────────────────────────── Privacy / open-source / free ── -->
+			<section class="trust">
+				<header class="section-head">
+					<p class="kicker">Confiance par construction</p>
+					<h2>100 % local. 100 % open-source. 100 % gratuit.</h2>
+					<p class="lead">
+						Pas d’abonnement, pas d’extension à acheter, pas de publicité, pas de compte à créer,
+						pas de télémétrie. Le code est lisible, auditable, modifiable.
+					</p>
+				</header>
+
+				<div class="trust-grid">
+					<article class="trust-card">
+						<div class="trust-icon" style="color:#43a047;">🔐</div>
+						<h3>Tout reste sur votre machine</h3>
+						<p>
+							Hotstrings, métriques de frappe, prédictions IA, gestes — chaque calcul est local.
+							Aucun serveur n’est sollicité. Même les modèles d’IA tournent <strong
+								>chez vous</strong
+							>, via Ollama ou MLX. Une fois téléchargés, plus besoin d’internet.
+						</p>
+					</article>
+
+					<article class="trust-card">
+						<div class="trust-icon" style="color:#1e88e5;">📂</div>
+						<h3>Code source ouvert</h3>
+						<p>
+							Le driver Hammerspoon (Lua), le driver AutoHotkey (AHK v2) et le site sont publiés sur
+							GitHub, sous licence libre. Vous pouvez auditer, modifier, forker, contribuer. Le
+							projet vit en public, par conception.
+						</p>
+					</article>
+
+					<article class="trust-card">
+						<div class="trust-icon" style="color:#fb8c00;">💸</div>
+						<h3>Gratuit. Pour de bon.</h3>
+						<p>
+							Pas de freemium qui devient payant après 30 jours. Pas d’extension premium à
+							débloquer. Pas de publicité dans le menu. Pas de don forcé. <ErgoptiPlus
+							></ErgoptiPlus> est et restera <strong>entièrement gratuit</strong>, sans limitation.
+						</p>
+					</article>
+
+					<article class="trust-card">
+						<div class="trust-icon" style="color:#8e44ad;">🚫</div>
+						<h3>Aucune télémétrie</h3>
+						<p>
+							Le driver ne fait <strong>aucun appel réseau</strong> en dehors du backend LLM local que
+							vous avez choisi. Pas de "anonymized usage data", pas de crash report envoyé en arrière-plan,
+							pas de pixel de tracking. Vous pouvez littéralement le faire tourner hors-ligne.
+						</p>
+					</article>
+				</div>
+			</section>
+
+			<!-- ════════════════════════════════════════════════════════════
 	     EXCLUSIVITÉS ERGOPTI
 	     Tout ce qui suit ne fait sens QUE sur la disposition Ergopti :
 	     les positions de touches sont essentielles. Un avertissement
 	     visuel clair indique la rupture.
 	     ════════════════════════════════════════════════════════════ -->
-	<section class="ergopti-banner">
-		<header class="section-head ergopti-head">
-			<p class="kicker ergopti-kicker">⚠ Spécifique à la disposition Ergopti</p>
-			<h2>Exclusivités Ergopti.</h2>
-			<p class="lead">
-				Tout ce qui précède fonctionne sur <strong>n’importe quelle disposition</strong> (AZERTY,
-				QWERTY, Bépo…). Les fonctionnalités ci-dessous, en revanche, exploitent les <strong>positions
-				exactes des touches d’Ergopti</strong> — virgule sous l’index, ★ à la place du J, voyelles
-				accentuées dédiées. Sur un autre layout, elles n’auraient aucun sens.
-			</p>
-			<p class="lead lead-em">
-				C’est <em>l’autre moitié</em> du gain. Si vous adoptez Ergopti, vous récupérez tout cela
-				gratuitement.
-			</p>
-		</header>
+			<section class="ergopti-banner">
+				<header class="section-head ergopti-head">
+					<p class="kicker ergopti-kicker">⚠ Spécifique à la disposition Ergopti</p>
+					<h2>Exclusivités Ergopti.</h2>
+					<p class="lead">
+						Tout ce qui précède fonctionne sur <strong>n’importe quelle disposition</strong>
+						(AZERTY, QWERTY, Bépo…). Les fonctionnalités ci-dessous, en revanche, exploitent les
+						<strong>positions exactes des touches d’Ergopti</strong> — virgule sous l’index, ★ à la place
+						du J, voyelles accentuées dédiées. Sur un autre layout, elles n’auraient aucun sens.
+					</p>
+					<p class="lead lead-em">
+						C’est <em>l’autre moitié</em> du gain. Si vous adoptez Ergopti, vous récupérez tout cela
+						gratuitement.
+					</p>
+				</header>
 
-		<!-- Ergopti-only hotstrings (rolls + SFB reduction + magic Ergopti hs) -->
-		<div class="hotdetail-grid">
-			{#each ergoptiBigrams as cat}
-				<article class="hotdetail-card" style="--accent: {cat.color};">
-					<header class="hotdetail-head">
-						<span class="hotdetail-dot"></span>
-						<div>
-							<h3>{cat.title}</h3>
-							<p class="hotdetail-tag">{cat.tag}</p>
+				<!-- Ergopti-only hotstrings (rolls + SFB reduction + magic Ergopti hs) -->
+				<div class="hotdetail-grid">
+					{#each ergoptiBigrams as cat}
+						<article class="hotdetail-card" style="--accent: {cat.color};">
+							<header class="hotdetail-head">
+								<span class="hotdetail-dot"></span>
+								<div>
+									<h3>{cat.title}</h3>
+									<p class="hotdetail-tag">{cat.tag}</p>
+								</div>
+							</header>
+							<p class="hotdetail-lead">{cat.lead}</p>
+							<ul class="hotdetail-rows">
+								{#each cat.rows as r}
+									<li>
+										<div class="hot-trig">
+											<span class="hot-key">{r.trig}</span>
+											<span class="hot-arrow">→</span>
+											<span class="hot-out">{r.out}</span>
+										</div>
+										<div class="hot-context">
+											{#each r.words as w}
+												<span class="hot-word">{w}</span>
+											{/each}
+										</div>
+									</li>
+								{/each}
+							</ul>
+						</article>
+					{/each}
+				</div>
+
+				<!-- Super-keys (comma magic, Q→QU, ù→où, ê, apostrophe, BackSpace, nt') -->
+				<div class="ergopti-block">
+					<h3 class="ergopti-h3">Des touches qui font le travail de plusieurs</h3>
+					<p class="ergopti-text">
+						<ErgoptiPlus></ErgoptiPlus> tire profit de séquences statistiquement absentes du français
+						pour placer des raccourcis qui ne créent jamais de faux positifs.
+					</p>
+
+					<article class="super-card">
+						<h4>La touche <kbd>,</kbd> + voyelle remplace le <kbd>j</kbd></h4>
+						<p>
+							Le <kbd>j</kbd> minuscule devient la touche magique <kbd class="glow">★</kbd>. À sa
+							place, la virgule prend le relais : la séquence <code>,</code> + voyelle est
+							inexistante en français (<code>,</code> est toujours suivi d’un espace), donc on la
+							détourne pour produire un
+							<code>j</code>.
+						</p>
+						<div class="super-grid super-grid-tight">
+							{#each commaVowels as c}
+								<div class="suffix-row">
+									<span class="hs-key">{c.keys}</span>
+									<span class="hs-arrow">→</span>
+									<span class="hs-out">{c.out}</span>
+								</div>
+							{/each}
 						</div>
-					</header>
-					<p class="hotdetail-lead">{cat.lead}</p>
-					<ul class="hotdetail-rows">
-						{#each cat.rows as r}
-							<li>
-								<div class="hot-trig">
-									<span class="hot-key">{r.trig}</span>
-									<span class="hot-arrow">→</span>
-									<span class="hot-out">{r.out}</span>
+					</article>
+
+					<article class="super-card">
+						<h4>La touche <kbd>,</kbd> + consonne pour un layout 1DFH</h4>
+						<p>
+							Les lettres rares (<kbd>z</kbd>, <kbd>k</kbd>, <kbd>q</kbd>, <kbd>ç</kbd>) sont
+							accessibles via la virgule, donc plus à 1u du repos des doigts. Le mot <em>où</em> aussi
+							— bonus, en deux frappes au lieu de trois.
+						</p>
+						<div class="super-grid super-grid-tight">
+							{#each commaConsonants as c}
+								<div class="suffix-row suffix-row-3col">
+									<span class="hs-key">{c.keys}</span>
+									<span class="hs-arrow">→</span>
+									<span class="hs-out">{c.out}</span>
+									<span class="hs-desc">{c.note}</span>
 								</div>
-								<div class="hot-context">
-									{#each r.words as w}
-										<span class="hot-word">{w}</span>
-									{/each}
-								</div>
-							</li>
+							{/each}
+						</div>
+					</article>
+
+					<div class="super-grid super-grid-2col">
+						<article class="super-card">
+							<h4>Q + voyelle = QU automatique</h4>
+							<p>
+								En français, <kbd>q</kbd> + voyelle implique presque toujours un <kbd>u</kbd> caché.
+								Tapez
+								<code>qe</code>, <code>qi</code>, <code>qa</code> — le <code>u</code> s’insère seul.
+							</p>
+							<div class="super-mini">
+								<span class="hs-key">qe</span><span class="hs-arrow">→</span><span class="hs-out"
+									>que</span
+								>
+								<span class="hs-key">qoi</span><span class="hs-arrow">→</span><span class="hs-out"
+									>quoi</span
+								>
+							</div>
+						</article>
+
+						<article class="super-card">
+							<h4>Touche <kbd>ù</kbd> = mot <em>où</em></h4>
+							<p>
+								La touche <kbd>ù</kbd> n’est utilisée <strong>que</strong> pour le mot <em>où</em>.
+								Autant en faire le raccourci direct.
+							</p>
+							<div class="super-mini">
+								<span class="hs-key">AltGr+W</span><span class="hs-arrow">→</span><span
+									class="hs-out">où</span
+								>
+							</div>
+						</article>
+
+						<article class="super-card">
+							<h4>Touche <kbd>ê</kbd> = circonflexe en une frappe</h4>
+							<p>
+								Le bigramme le plus fréquent du circonflexe est <kbd class="deadkey">◌̂</kbd> +
+								<kbd>e</kbd>. Une touche dédiée évite l’aller-retour. Pour <em>â</em>, <em>î</em>,
+								<em>ô</em>,
+								<em>û</em> : <code>êa</code>, <code>êi</code>, <code>êo</code>, <code>êu</code>.
+							</p>
+							<div class="super-mini">
+								<span class="hs-key">ê</span><span class="hs-arrow">→</span><span class="hs-out"
+									>ê</span
+								>
+								<span class="hs-key">êa</span><span class="hs-arrow">→</span><span class="hs-out"
+									>â</span
+								>
+							</div>
+						</article>
+
+						<article class="super-card">
+							<h4>Apostrophe typographique automatique</h4>
+							<p>
+								Tapez <kbd>'</kbd> dans du texte, vous écrivez <kbd-output>’</kbd-output>. Tapez-la
+								dans du code, elle reste droite. <strong>Aucun réglage à faire.</strong>
+							</p>
+							<div class="super-mini">
+								<span class="hs-key">l'ami</span><span class="hs-arrow">→</span><span class="hs-out"
+									>l’ami</span
+								>
+							</div>
+						</article>
+
+						<article class="super-card">
+							<h4>BackSpace à portée de pouce</h4>
+							<p>
+								La touche la plus utilisée du clavier (BackSpace) est dupliquée sur <kbd>"LAlt"</kbd
+								>, juste sous la main. <kbd>Shift</kbd> + cette touche envoie <kbd>Delete</kbd>.
+								<kbd>AltGr</kbd> + cette touche envoie <kbd>Ctrl</kbd>+<kbd>BackSpace</kbd> (efface un
+								mot entier).
+							</p>
+						</article>
+
+						<article class="super-card">
+							<h4>Roulement <code>nt'</code> pour l’anglais</h4>
+							<p>
+								<code>nt'</code> devient <code>n’t</code> — la combinaison parfaite pour
+								<em>don’t</em>, <em>won’t</em>, <em>can’t</em>. Majeur → annulaire → auriculaire au
+								lieu de l’inverse, beaucoup plus confortable.
+							</p>
+						</article>
+					</div>
+				</div>
+
+				<!-- Suffixes en À -->
+				<div class="ergopti-block">
+					<h3 class="ergopti-h3">Suffixes en À — tapez 2, écrivez 5</h3>
+					<p class="ergopti-text">
+						La touche <kbd>à</kbd> n’est suivie que d’un espace ou d’une ponctuation en français
+						(seuls <em>à, là, déjà</em> contiennent <kbd>à</kbd>). On en a profité pour caler dessus
+						les suffixes les plus fréquents. Le suffixe <strong>-ement</strong> coûte normalement 5
+						frappes : il en coûte <strong>2</strong>.
+					</p>
+					<div class="suffixes-grid">
+						{#each suffixesA as s}
+							<div class="suffix-row">
+								<span class="hs-key">{s.keys}</span>
+								<span class="hs-arrow">→</span>
+								<span class="hs-out">{s.out}</span>
+							</div>
 						{/each}
-					</ul>
-				</article>
-			{/each}
-		</div>
-
-		<!-- Super-keys (comma magic, Q→QU, ù→où, ê, apostrophe, BackSpace, nt') -->
-		<div class="ergopti-block">
-			<h3 class="ergopti-h3">Des touches qui font le travail de plusieurs</h3>
-			<p class="ergopti-text">
-				<ErgoptiPlus></ErgoptiPlus> tire profit de séquences statistiquement absentes du français
-				pour placer des raccourcis qui ne créent jamais de faux positifs.
-			</p>
-
-			<article class="super-card">
-				<h4>La touche <kbd>,</kbd> + voyelle remplace le <kbd>j</kbd></h4>
-				<p>
-					Le <kbd>j</kbd> minuscule devient la touche magique <kbd class="glow">★</kbd>. À sa place, la
-					virgule prend le relais : la séquence <code>,</code> + voyelle est inexistante en français
-					(<code>,</code> est toujours suivi d’un espace), donc on la détourne pour produire un
-					<code>j</code>.
-				</p>
-				<div class="super-grid super-grid-tight">
-					{#each commaVowels as c}
-						<div class="suffix-row">
-							<span class="hs-key">{c.keys}</span>
-							<span class="hs-arrow">→</span>
-							<span class="hs-out">{c.out}</span>
-						</div>
-					{/each}
+					</div>
 				</div>
-			</article>
 
-			<article class="super-card">
-				<h4>La touche <kbd>,</kbd> + consonne pour un layout 1DFH</h4>
-				<p>
-					Les lettres rares (<kbd>z</kbd>, <kbd>k</kbd>, <kbd>q</kbd>, <kbd>ç</kbd>) sont accessibles
-					via la virgule, donc plus à 1u du repos des doigts. Le mot <em>où</em> aussi — bonus, en
-					deux frappes au lieu de trois.
-				</p>
-				<div class="super-grid super-grid-tight">
-					{#each commaConsonants as c}
-						<div class="suffix-row suffix-row-3col">
-							<span class="hs-key">{c.keys}</span>
-							<span class="hs-arrow">→</span>
-							<span class="hs-out">{c.out}</span>
-							<span class="hs-desc">{c.note}</span>
-						</div>
-					{/each}
+				<!-- Symbol rolls (programming) -->
+				<div class="ergopti-block">
+					<h3 class="ergopti-h3">Symboles de programmation, en roulements confortables</h3>
+					<p class="ergopti-text">
+						Les combinaisons inconfortables (<code>=&gt;</code>, <code>!=</code>, <code>:=</code>,
+						<code>&lt;/</code>, <code>=""</code>…) sont remappées en roulements vers l’intérieur,
+						sur la home-row d’Ergopti. Ces emplacements précis n’existent que sur cette disposition.
+					</p>
+					<div class="symbols-grid">
+						{#each symbolRolls as s}
+							<div class="symbol-row">
+								<span class="hs-key">{s.trig}</span>
+								<span class="hs-arrow">→</span>
+								<span class="hs-out">{s.out}</span>
+								<span class="hs-desc">{s.note}</span>
+							</div>
+						{/each}
+					</div>
 				</div>
-			</article>
+			</section>
 
-			<div class="super-grid super-grid-2col">
-				<article class="super-card">
-					<h4>Q + voyelle = QU automatique</h4>
-					<p>
-						En français, <kbd>q</kbd> + voyelle implique presque toujours un <kbd>u</kbd> caché. Tapez
-						<code>qe</code>, <code>qi</code>, <code>qa</code> — le <code>u</code> s’insère seul.
+			<!-- ────────────────────────── Layout-agnostic banner ───────── -->
+			<section class="agnostic">
+				<header class="section-head">
+					<p class="kicker">Compatibilité dispositions</p>
+					<h2>AZERTY, QWERTY, Bépo, Dvorak — tout fonctionne.</h2>
+					<p class="lead">
+						<ErgoptiPlus></ErgoptiPlus> est <em>pensé</em> pour la disposition Ergopti, mais le
+						driver agit sur le <strong>texte</strong> qui sort de votre clavier — pas sur la touche
+						que vous appuyez. <strong>Aucun changement de layout n’est nécessaire.</strong>
 					</p>
-					<div class="super-mini">
-						<span class="hs-key">qe</span><span class="hs-arrow">→</span><span class="hs-out">que</span>
-						<span class="hs-key">qoi</span><span class="hs-arrow">→</span><span class="hs-out">quoi</span>
+				</header>
+
+				<div class="agnostic-row">
+					<div class="agnostic-card">
+						<h3>Hotstrings et autocorrection</h3>
+						<p>
+							Tout fonctionne quel que soit votre layout, parce qu’ils opèrent sur le texte produit.
+							Vos expansions <code>ct★</code>, <code>pex★</code>, <code>chatgpt</code>…
+							déclencheront en AZERTY, QWERTY ou Bépo.
+						</p>
 					</div>
-				</article>
-
-				<article class="super-card">
-					<h4>Touche <kbd>ù</kbd> = mot <em>où</em></h4>
-					<p>
-						La touche <kbd>ù</kbd> n’est utilisée <strong>que</strong> pour le mot <em>où</em>. Autant
-						en faire le raccourci direct.
-					</p>
-					<div class="super-mini">
-						<span class="hs-key">AltGr+W</span><span class="hs-arrow">→</span><span class="hs-out">où</span>
+					<div class="agnostic-card">
+						<h3>Tap-holds, CapsWord, layer navigation</h3>
+						<p>
+							Ces fonctions agissent sur le <em>code physique</em> de la touche (scancode), donc indépendantes
+							du layout actif côté OS. Elles fonctionnent à l’identique sur tous les claviers.
+						</p>
 					</div>
-				</article>
-
-				<article class="super-card">
-					<h4>Touche <kbd>ê</kbd> = circonflexe en une frappe</h4>
-					<p>
-						Le bigramme le plus fréquent du circonflexe est <kbd class="deadkey">◌̂</kbd> + <kbd>e</kbd>.
-						Une touche dédiée évite l’aller-retour. Pour <em>â</em>, <em>î</em>, <em>ô</em>,
-						<em>û</em> : <code>êa</code>, <code>êi</code>, <code>êo</code>, <code>êu</code>.
-					</p>
-					<div class="super-mini">
-						<span class="hs-key">ê</span><span class="hs-arrow">→</span><span class="hs-out">ê</span>
-						<span class="hs-key">êa</span><span class="hs-arrow">→</span><span class="hs-out">â</span>
+					<div class="agnostic-card">
+						<h3>Gestes trackpad et IA</h3>
+						<p>
+							Les gestes trackpad sont des événements multi-touch bruts : aucune dépendance clavier.
+							L’IA prédit du texte, peu importe sur quelle touche vous l’avez tapé.
+						</p>
 					</div>
-				</article>
+				</div>
 
-				<article class="super-card">
-					<h4>Apostrophe typographique automatique</h4>
-					<p>
-						Tapez <kbd>'</kbd> dans du texte, vous écrivez <kbd-output>’</kbd-output>. Tapez-la dans du
-						code, elle reste droite. <strong>Aucun réglage à faire.</strong>
-					</p>
-					<div class="super-mini">
-						<span class="hs-key">l'ami</span><span class="hs-arrow">→</span><span class="hs-out">l’ami</span>
-					</div>
-				</article>
-
-				<article class="super-card">
-					<h4>BackSpace à portée de pouce</h4>
-					<p>
-						La touche la plus utilisée du clavier (BackSpace) est dupliquée sur <kbd>"LAlt"</kbd>,
-						juste sous la main. <kbd>Shift</kbd> + cette touche envoie <kbd>Delete</kbd>.
-						<kbd>AltGr</kbd> + cette touche envoie <kbd>Ctrl</kbd>+<kbd>BackSpace</kbd> (efface un mot
-						entier).
-					</p>
-				</article>
-
-				<article class="super-card">
-					<h4>Roulement <code>nt'</code> pour l’anglais</h4>
-					<p>
-						<code>nt'</code> devient <code>n’t</code> — la combinaison parfaite pour
-						<em>don’t</em>, <em>won’t</em>, <em>can’t</em>. Majeur → annulaire → auriculaire au lieu
-						de l’inverse, beaucoup plus confortable.
-					</p>
-				</article>
-			</div>
-		</div>
-
-		<!-- Suffixes en À -->
-		<div class="ergopti-block">
-			<h3 class="ergopti-h3">Suffixes en À — tapez 2, écrivez 5</h3>
-			<p class="ergopti-text">
-				La touche <kbd>à</kbd> n’est suivie que d’un espace ou d’une ponctuation en français
-				(seuls <em>à, là, déjà</em> contiennent <kbd>à</kbd>). On en a profité pour caler dessus les
-				suffixes les plus fréquents. Le suffixe <strong>-ement</strong> coûte normalement 5 frappes :
-				il en coûte <strong>2</strong>.
-			</p>
-			<div class="suffixes-grid">
-				{#each suffixesA as s}
-					<div class="suffix-row">
-						<span class="hs-key">{s.keys}</span>
-						<span class="hs-arrow">→</span>
-						<span class="hs-out">{s.out}</span>
-					</div>
-				{/each}
-			</div>
-		</div>
-
-		<!-- Symbol rolls (programming) -->
-		<div class="ergopti-block">
-			<h3 class="ergopti-h3">Symboles de programmation, en roulements confortables</h3>
-			<p class="ergopti-text">
-				Les combinaisons inconfortables (<code>=&gt;</code>, <code>!=</code>, <code>:=</code>,
-				<code>&lt;/</code>, <code>=""</code>…) sont remappées en roulements vers l’intérieur, sur la
-				home-row d’Ergopti. Ces emplacements précis n’existent que sur cette disposition.
-			</p>
-			<div class="symbols-grid">
-				{#each symbolRolls as s}
-					<div class="symbol-row">
-						<span class="hs-key">{s.trig}</span>
-						<span class="hs-arrow">→</span>
-						<span class="hs-out">{s.out}</span>
-						<span class="hs-desc">{s.note}</span>
-					</div>
-				{/each}
-			</div>
-		</div>
-	</section>
-
-	<!-- ────────────────────────── Layout-agnostic banner ───────── -->
-	<section class="agnostic">
-		<header class="section-head">
-			<p class="kicker">Compatibilité dispositions</p>
-			<h2>AZERTY, QWERTY, Bépo, Dvorak — tout fonctionne.</h2>
-			<p class="lead">
-				<ErgoptiPlus></ErgoptiPlus> est <em>pensé</em> pour la disposition Ergopti, mais le driver
-				agit sur le <strong>texte</strong> qui sort de votre clavier — pas sur la touche que vous
-				appuyez. <strong>Aucun changement de layout n’est nécessaire.</strong>
-			</p>
-		</header>
-
-		<div class="agnostic-row">
-			<div class="agnostic-card">
-				<h3>Hotstrings et autocorrection</h3>
-				<p>
-					Tout fonctionne quel que soit votre layout, parce qu’ils opèrent sur le texte produit. Vos
-					expansions <code>ct★</code>, <code>pex★</code>, <code>chatgpt</code>… déclencheront en
-					AZERTY, QWERTY ou Bépo.
+				<p class="agnostic-foot">
+					<strong>Notre recommandation :</strong> Ergopti + <ErgoptiPlus></ErgoptiPlus> est la meilleure
+					combinaison (la disposition tire profit des roulements et de la touche magique). Mais si vous
+					restez sur votre layout actuel, vous récupérez quand même 70 % du gain.
 				</p>
-			</div>
-			<div class="agnostic-card">
-				<h3>Tap-holds, CapsWord, layer navigation</h3>
-				<p>
-					Ces fonctions agissent sur le <em>code physique</em> de la touche (scancode), donc indépendantes
-					du layout actif côté OS. Elles fonctionnent à l’identique sur tous les claviers.
-				</p>
-			</div>
-			<div class="agnostic-card">
-				<h3>Gestes trackpad et IA</h3>
-				<p>
-					Les gestes trackpad sont des événements multi-touch bruts : aucune dépendance clavier. L’IA
-					prédit du texte, peu importe sur quelle touche vous l’avez tapé.
-				</p>
-			</div>
+			</section>
+
+			<!-- ────────────────────────── Cross-platform ─────────────────── -->
+			<section class="platforms">
+				<header class="section-head">
+					<p class="kicker">Identique partout</p>
+					<h2>macOS et Windows, même expérience.</h2>
+					<p class="lead">
+						Le même fichier de hotstrings, les mêmes raccourcis, le même tooltip. Vous changez de
+						machine, pas de réflexe.
+					</p>
+				</header>
+
+				<div class="compare-table-wrap">
+					<table class="compare-table">
+						<thead>
+							<tr>
+								<th class="compare-feature">Fonctionnalité</th>
+								<th class="compare-os">
+									<i class="icon-appleinc"></i>
+									<span class="compare-os-name">macOS</span>
+									<span class="compare-os-driver">Hammerspoon</span>
+								</th>
+								<th class="compare-os">
+									<i class="icon-windows"></i>
+									<span class="compare-os-name">Windows</span>
+									<span class="compare-os-driver">AutoHotkey&nbsp;v2</span>
+								</th>
+							</tr>
+						</thead>
+						<tbody>
+							{#each compareFeatures as row}
+								<tr>
+									<td class="compare-feature">{row.label}</td>
+									<td class="compare-cell" class:no={!row.mac}>
+										{row.mac ? '✅' : '❌'}
+									</td>
+									<td class="compare-cell" class:no={!row.win}>
+										{row.win ? '✅' : '❌'}
+									</td>
+								</tr>
+							{/each}
+						</tbody>
+					</table>
+				</div>
+			</section>
+
+			<!-- ────────────────────────── Final CTA ─────────────────────── -->
+			<section class="final-cta">
+				<div class="cta-card">
+					<h2>Passez à la vitesse supérieure.</h2>
+					<p>Téléchargez le driver et la disposition pour votre OS, et tapez <code>ct★</code>.</p>
+					<div class="hero-cta">
+						<a
+							class={osStyle === 'macos' ? 'btn btn-primary' : 'btn btn-secondary'}
+							href="utilisation#macos"
+						>
+							<i class="icon-appleinc"></i><span>macOS</span>
+						</a>
+						<a
+							class={osStyle === 'windows' ? 'btn btn-primary' : 'btn btn-secondary'}
+							href="utilisation#windows"
+						>
+							<i class="icon-windows"></i><span>Windows</span>
+						</a>
+					</div>
+				</div>
+			</section>
 		</div>
-
-		<p class="agnostic-foot">
-			<strong>Notre recommandation :</strong> Ergopti + <ErgoptiPlus></ErgoptiPlus> est la meilleure
-			combinaison (la disposition tire profit des roulements et de la touche magique). Mais si vous
-			restez sur votre layout actuel, vous récupérez quand même 70 % du gain.
-		</p>
-	</section>
-
-	<!-- ────────────────────────── Cross-platform ─────────────────── -->
-	<section class="platforms">
-		<header class="section-head">
-			<p class="kicker">Identique partout</p>
-			<h2>macOS et Windows, même expérience.</h2>
-			<p class="lead">
-				Le même fichier de hotstrings, les mêmes raccourcis, le même tooltip. Vous changez de
-				machine, pas de réflexe.
-			</p>
-		</header>
-
-		<div class="compare-table-wrap">
-			<table class="compare-table">
-				<thead>
-					<tr>
-						<th class="compare-feature">Fonctionnalité</th>
-						<th class="compare-os">
-							<i class="icon-appleinc"></i>
-							<span class="compare-os-name">macOS</span>
-							<span class="compare-os-driver">Hammerspoon</span>
-						</th>
-						<th class="compare-os">
-							<i class="icon-windows"></i>
-							<span class="compare-os-name">Windows</span>
-							<span class="compare-os-driver">AutoHotkey&nbsp;v2</span>
-						</th>
-					</tr>
-				</thead>
-				<tbody>
-					{#each compareFeatures as row}
-						<tr>
-							<td class="compare-feature">{row.label}</td>
-							<td class="compare-cell" class:no={!row.mac}>
-								{row.mac ? '✅' : '❌'}
-							</td>
-							<td class="compare-cell" class:no={!row.win}>
-								{row.win ? '✅' : '❌'}
-							</td>
-						</tr>
-					{/each}
-				</tbody>
-			</table>
-		</div>
-	</section>
-
-	<!-- ────────────────────────── Final CTA ─────────────────────── -->
-	<section class="final-cta">
-		<div class="cta-card">
-			<h2>Passez à la vitesse supérieure.</h2>
-			<p>Téléchargez le driver et la disposition pour votre OS, et tapez <code>ct★</code>.</p>
-			<div class="hero-cta">
-				<a class={osStyle === 'macos' ? 'btn btn-primary' : 'btn btn-secondary'} href="utilisation#macos">
-					<i class="icon-appleinc"></i><span>macOS</span>
-				</a>
-				<a class={osStyle === 'windows' ? 'btn btn-primary' : 'btn btn-secondary'} href="utilisation#windows">
-					<i class="icon-windows"></i><span>Windows</span>
-				</a>
-			</div>
-		</div>
-	</section>
-</div>
 	</main>
 </div>
 
@@ -2057,8 +2165,8 @@
 
 		color: var(--ink);
 		font-feature-settings: 'cv11', 'ss01';
-		max-width: 1200px;
 		margin: 0 auto;
+		max-width: 1200px;
 		padding: 0 24px 80px;
 	}
 
@@ -2572,8 +2680,7 @@
 	}
 
 	.session-body {
-		font-family:
-			'SF Mono', ui-monospace, Menlo, Consolas, monospace;
+		font-family: 'SF Mono', ui-monospace, Menlo, Consolas, monospace;
 		font-size: 17px;
 		line-height: 1.7;
 		min-height: 130px;
@@ -2713,7 +2820,11 @@
 
 	.tap-card {
 		background:
-			radial-gradient(ellipse at top right, color-mix(in srgb, var(--accent) 20%, transparent), transparent 60%),
+			radial-gradient(
+				ellipse at top right,
+				color-mix(in srgb, var(--accent) 20%, transparent),
+				transparent 60%
+			),
 			rgba(8, 12, 24, 0.8);
 		border: 1px solid var(--border-strong);
 		border-radius: var(--radius-lg);
@@ -3222,7 +3333,11 @@
 
 	.metric-card {
 		background:
-			radial-gradient(ellipse at top right, color-mix(in srgb, var(--accent) 22%, transparent), transparent 60%),
+			radial-gradient(
+				ellipse at top right,
+				color-mix(in srgb, var(--accent) 22%, transparent),
+				transparent 60%
+			),
 			rgba(8, 12, 24, 0.85);
 		border: 1px solid var(--border-strong);
 		border-radius: var(--radius-lg);
@@ -3232,11 +3347,11 @@
 	.metric-card::before {
 		background: var(--accent);
 		border-radius: 4px 0 0 4px;
+		bottom: 22px;
 		content: '';
 		left: 0;
 		position: absolute;
 		top: 22px;
-		bottom: 22px;
 		width: 3px;
 	}
 
@@ -3773,8 +3888,8 @@
 		grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
 	}
 	.super-grid-2col {
-		grid-template-columns: repeat(2, 1fr);
 		gap: 24px;
+		grid-template-columns: repeat(2, 1fr);
 	}
 	@media (max-width: 880px) {
 		.super-grid-2col {
@@ -3833,8 +3948,8 @@
 		padding: 20px;
 	}
 	.ai-backend-icon {
-		font-size: 32px;
 		flex-shrink: 0;
+		font-size: 32px;
 	}
 	.ai-backend h4 {
 		font-size: 16px;
@@ -3896,9 +4011,9 @@
 	}
 	.ai-provider-family {
 		color: var(--ink-soft);
+		flex: 1;
 		font-size: 12px;
 		line-height: 1.45;
-		flex: 1;
 	}
 	.ai-provider-meta {
 		align-items: center;
@@ -4371,6 +4486,7 @@
 		text-decoration: underline wavy #f44336;
 	}
 	.ai-caret {
+		animation: blink 1s step-end infinite;
 		background: var(--ink);
 		display: inline-block;
 		height: 14px;
@@ -4378,7 +4494,6 @@
 		opacity: 0.7;
 		vertical-align: middle;
 		width: 1.5px;
-		animation: blink 1s step-end infinite;
 	}
 	@keyframes blink {
 		50% {
@@ -4397,7 +4512,7 @@
 		background: rgba(25, 25, 25, 0.97);
 		border: 1px solid rgba(255, 255, 255, 0.06);
 		border-radius: 10px;
-		font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", sans-serif;
+		font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', sans-serif;
 		font-size: 14px;
 		padding: 10px 16px;
 	}

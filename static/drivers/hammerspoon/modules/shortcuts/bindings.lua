@@ -117,7 +117,7 @@ end
 -- =====================================
 
 -- Screenshots & Layer (appear first in the menu, before the Ctrl block)
-hotkey_labels.at_hash = "Capture d'écran instantanée"
+hotkey_labels.at_hash = "Capture d’écran instantanée"
 hotkey_defs.at_hash   = function()
 	return sys_acts.bind_instant_screenshot()
 end

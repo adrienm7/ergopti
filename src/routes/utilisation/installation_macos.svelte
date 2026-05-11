@@ -174,7 +174,6 @@
 	<enhanced:img src="$lib/images/macos_open_bundle.jpg" alt="Ouverture du bundle" />
 </ul>
 
-
 <h3>
 	<i class="icon-hammerspoon" style="font-size:0.8em; vertical-align:0; margin-right:0.25em"
 		><span class="icon-hammerspoon"><span class="path1"></span><span class="path2"></span></span></i
@@ -183,10 +182,10 @@
 
 <p>
 	<a href="https://www.hammerspoon.org/" target="_blank" class="link">Hammerspoon</a> est un outil
-	d'automatisation puissant et open source pour macOS, permettant d'interagir avec le système via
-	des scripts Lua. Le driver fourni couvre l’intégralité des fonctionnalités complémentaires
-	d’<ErgoptiPlus></ErgoptiPlus> sur macOS — il n’est plus nécessaire d’installer Karabiner-Elements
-	en parallèle. Voici ce que le driver Hammerspoon ajoute :
+	d’automatisation puissant et open source pour macOS, permettant d’interagir avec le système via
+	des scripts Lua. Le driver fourni couvre l’intégralité des fonctionnalités complémentaires d’<ErgoptiPlus
+	></ErgoptiPlus> sur macOS — il n’est plus nécessaire d’installer Karabiner-Elements en parallèle. Voici
+	ce que le driver Hammerspoon ajoute :
 </p>
 <ul>
 	<li>
@@ -205,9 +204,7 @@
 		<kbd-output>Copier</kbd-output> en tap, <kbd>LCtrl</kbd> avec <kbd-output>Coller</kbd-output> en
 		tap, <kbd>LOption</kbd> avec <kbd-output>BackSpace</kbd-output> en tap, etc. ;
 	</li>
-	<li>
-		Gestes personnalisés sur le trackpad (taps et swipes à 3 et 4 doigts) ;
-	</li>
+	<li>Gestes personnalisés sur le trackpad (taps et swipes à 3 et 4 doigts) ;</li>
 	<li>
 		Menu de configuration intégré pour ajuster les délais d’expansion par groupe et la couleur du
 		tooltip sans toucher au code.
@@ -304,11 +301,11 @@
 	Plusieurs workflows Alfred sont fournis pour reproduire les raccourcis Windows (<kbd>Win</kbd> +
 	touche) en utilisant <kbd>Ctrl</kbd> + touche sur macOS. Seul cas particulier : <kbd>Ctrl</kbd> +
 	<kbd>H</kbd>
-	pour la capture d'écran, car <kbd>Ctrl</kbd> + <kbd>C</kbd> est déjà utilisé pour stopper un processus
+	pour la capture d’écran, car <kbd>Ctrl</kbd> + <kbd>C</kbd> est déjà utilisé pour stopper un processus
 	dans le terminal.
 </p>
 <p>
 	Pour installer ces workflows, il suffit de double-cliquer sur les fichiers
 	<code>.alfredworkflow</code>, ce qui ouvrira Alfred et proposera de les importer. Ces workflows
-	nécessitent la licence Powerpack d'Alfred.
+	nécessitent la licence Powerpack d’Alfred.
 </p> -->

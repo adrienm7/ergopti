@@ -77,7 +77,7 @@ KLWV_IsAvailable() {
 ; ===================================
 ; ===================================
 
-; Resolve the absolute file:// URL of a dashboard's index.html.
+; Resolve the absolute file:// URL of a dashboard’s index.html.
 KLWV_AssetUrl(which) {
     base := A_ScriptDir . "\..\_shared\ui\metrics_" . which . "\index.html"
     loop files, base

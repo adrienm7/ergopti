@@ -76,15 +76,11 @@ def main(
                     toml_files.append((item, relative_path))
                 elif item.is_dir():
                     new_relative_path = (
-                        relative_path + "/" + item.name
-                        if relative_path
-                        else item.name
+                        relative_path + "/" + item.name if relative_path else item.name
                     )
                     find_toml_files_recursive(item, new_relative_path)
         except PermissionError:
-            logger.warning(
-                "Permission denied accessing directory: %s", directory
-            )
+            logger.warning("Permission denied accessing directory: %s", directory)
 
     find_toml_files_recursive(config_directory)
 
@@ -106,15 +102,11 @@ def main(
         try:
             # Create output directory with preserved structure
             output_subdir = (
-                output_directory / relative_path
-                if relative_path
-                else output_directory
+                output_directory / relative_path if relative_path else output_directory
             )
             output_subdir.mkdir(parents=True, exist_ok=True)
 
-            generate_alfred_snippets_from_toml(
-                toml_file, output_subdir, overwrite
-            )
+            generate_alfred_snippets_from_toml(toml_file, output_subdir, overwrite)
             processed += 1
             logger.success("Successfully processed: %s", display_name)
         except (OSError, ValueError, RuntimeError) as e:
@@ -126,7 +118,7 @@ def main(
 
 def generate_uuid() -> str:
     """
-    Generate a UUID in uppercase format matching Alfred's convention.
+    Generate a UUID in uppercase format matching Alfred’s convention.
 
     Returns:
         UUID string in uppercase format.
@@ -168,9 +160,7 @@ def parse_toml_simple(toml_content: str) -> Dict[str, Dict[str, any]]:
                     "auto_expand": auto_expand,
                 }
             else:
-                logger.warning(
-                    "Duplicate trigger found and ignored: '%s'", trigger
-                )
+                logger.warning("Duplicate trigger found and ignored: '%s'", trigger)
         else:
             # Fallback for old format: "trigger" = "replacement"
             old_match = re.match(r'^"([^"]+)"\s*=\s*"([^"]+)"', line)
@@ -185,9 +175,7 @@ def parse_toml_simple(toml_content: str) -> Dict[str, Dict[str, any]]:
                         "auto_expand": True,  # Default to true for backward compatibility
                     }
                 else:
-                    logger.warning(
-                        "Duplicate trigger found and ignored: '%s'", trigger
-                    )
+                    logger.warning("Duplicate trigger found and ignored: '%s'", trigger)
     return result
 
 
@@ -350,9 +338,7 @@ def create_alfredsnippets_file(
         # Create ZIP archive with .alfredsnippets extension
         archive_path = output_path / f"{collection_name}.alfredsnippets"
         try:
-            with zipfile.ZipFile(
-                archive_path, "w", zipfile.ZIP_DEFLATED
-            ) as zipf:
+            with zipfile.ZipFile(archive_path, "w", zipfile.ZIP_DEFLATED) as zipf:
                 # Add all files from temp directory
                 for file_path in temp_path.rglob("*"):
                     if file_path.is_file():
@@ -413,9 +399,7 @@ def generate_alfred_snippets_from_toml(
         auto_expand = metadata["auto_expand"]
 
         # Generate case variants
-        variants = generate_case_variants_for_trigger_replacement(
-            trigger, replacement
-        )
+        variants = generate_case_variants_for_trigger_replacement(trigger, replacement)
 
         for variant_trigger, variant_replacement in variants:
             # Check for duplicates across all snippets

@@ -13,7 +13,7 @@
 --- 1. CapsWord Priority: capsword.json is loaded first so CapsWord activation
 ---    always takes precedence over any tap/hold or combo rule that shares the
 ---    same key — without this ordering, RCmd+CapsLock combos could steal the
----    event before CapsWord's simultaneous matcher fires.
+---    event before CapsWord’s simultaneous matcher fires.
 --- 2. Physical State Tracking: every tap/hold rule sets ke_held_<key_code>=1
 ---    on key_down and clears it on key_up, letting combo and sentinel rules
 ---    distinguish real physical presses from emulated tap outputs.

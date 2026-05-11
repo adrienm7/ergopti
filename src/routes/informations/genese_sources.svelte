@@ -14,7 +14,7 @@
 		<a href="https://bepo.fr/" target="_blank" class="link">BÉPO</a>
 		depuis déjà de nombreuses années. Les améliorations d’Optimot par rapport au BÉPO sont significatives,
 		avec notamment une forte diminution des bigrammes à un doigt (<SFB />s) et un meilleur placement
-		des lettres pour l’anglais. Cependant, l'idée d'apprendre Optimot, pour peut-être découvrir par
+		des lettres pour l’anglais. Cependant, l'idée d’apprendre Optimot, pour peut-être découvrir par
 		la suite une disposition encore meilleure, était peu attrayante.
 	</p>
 	<p>
@@ -42,7 +42,7 @@
 	</p>
 	<p>
 		Rapidement, <Ergopti></Ergopti> s’éloigna d’Optimot sur plusieurs aspects fondamentaux. L'un des
-		points clés était ma volonté d'optimiser les <em>roulements</em>, entraînant de nombreux essais
+		points clés était ma volonté d’optimiser les <em>roulements</em>, entraînant de nombreux essais
 		d’arrangements des touches pour la <em>homerow</em>, notamment sur la partie droite avec les
 		consonnes. Un des choix majeurs fut de privilégier un agencement <kbd>SNTR</kbd> plutôt que le
 		<kbd>TSRN</kbd>
@@ -206,7 +206,7 @@
 	</p>
 	<p>
 		Le qualificatif d’exceptionnel n’est pas exagéré : <ErgoptiPlus></ErgoptiPlus> permet, une fois maîtrisée,
-		de supprimer presque totalement les <SFB></SFB>s, y compris ceux liés à la répétition d'une même
+		de supprimer presque totalement les <SFB></SFB>s, y compris ceux liés à la répétition d’une même
 		touche. Cela est rendu possible grâce à la touche spéciale <kbd class="glow">★</kbd>, permettant
 		de réitérer la frappe de la touche précédente avec une fluidité inédite, ainsi qu’à la touche
 		<kbd>,</kbd>
@@ -214,10 +214,10 @@
 	</p>
 	<p>
 		Il convient de préciser que l’idée de cette touche de répétition ne vient pas d’<Ergopti
-		></Ergopti>. Elle provient d'une (voire plus) disposition anglophone. D'autres concepts ont
-		également été empruntés, comme l'utilisation d'AHK (AutoHotkey) dans la disposition
+		></Ergopti>. Elle provient d’une (voire plus) disposition anglophone. d’autres concepts ont
+		également été empruntés, comme l'utilisation d’AHK (AutoHotkey) dans la disposition
 		<a href="https://ballerboo.github.io/boolayout/" target="_blank" class="link">Boo</a> afin de modifier
-		le comportement des combinaisons de touches. Ce système permet d'optimiser encore davantage les roulements
+		le comportement des combinaisons de touches. Ce système permet d’optimiser encore davantage les roulements
 		sur des touches adjacentes qui n'engendrent pas de bigrammes habituels.
 	</p>
 	<p>

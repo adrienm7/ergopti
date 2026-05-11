@@ -7,7 +7,7 @@
 <section>
 	<h2>Ponctuations avec espace insécable automatique</h2>
 	<p>
-		Les signes <kbd>;</kbd>, <kbd>:</kbd>, <kbd>?</kbd> et <kbd>!</kbd> bénéficient d'un traitement
+		Les signes <kbd>;</kbd>, <kbd>:</kbd>, <kbd>?</kbd> et <kbd>!</kbd> bénéficient d’un traitement
 		intelligent. Saisis sur la couche <kbd>Shift</kbd>, ils sont
 		<strong>automatiquement insérés précédés d’une espace insécable</strong>. Contrairement à une
 		espace classique, ce caractère spécial garantit que la ponctuation reste toujours solidaire du
@@ -24,7 +24,7 @@
 		faudra donc plutôt utiliser la couche
 		<kbd>AltGr</kbd>, car celle-ci envoie la
 		<strong>ponctuation brute</strong> (sans espace automatique). Cela permet de programmer
-		sereinement tout en conservant la possibilité d'écrire un français typographiquement impeccable
+		sereinement tout en conservant la possibilité d’écrire un français typographiquement impeccable
 		avec <kbd>Shift</kbd>.
 	</p>
 	<tiny-space></tiny-space>

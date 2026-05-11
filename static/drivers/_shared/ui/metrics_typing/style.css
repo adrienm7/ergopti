@@ -619,13 +619,13 @@ input[type='date']::-webkit-datetime-edit-year-field {
 
 /* SFB doubling toggle — pushed right via space-between flex on h2, brown when active */
 .sfb-toggle-btn {
-	font-size: 10px;
-	padding: 1px 6px;
-	border-radius: 4px;
-	margin-top: 1px;
 	background: transparent;
 	border-color: var(--kpi-sfb-color);
+	border-radius: 4px;
 	color: var(--kpi-sfb-color);
+	font-size: 10px;
+	margin-top: 1px;
+	padding: 1px 6px;
 }
 
 .sfb-toggle-btn.active {
@@ -715,8 +715,8 @@ input[type='date']::-webkit-datetime-edit-year-field {
 	   row width the two would overlap. Setting the flex-basis to the
 	   actual ideal width forces the wrap before any overlap. */
 	flex: 1 1 760px;
-	min-width: 0;
 	max-width: 100%;
+	min-width: 0;
 	overflow-x: auto;
 }
 
@@ -1006,7 +1006,7 @@ tr:hover td {
 	color: #ff9500 !important;
 }
 
-/* Brighter purple — aligns perceptual weight with cmd's vibrant green */
+/* Brighter purple — aligns perceptual weight with cmd’s vibrant green */
 .shortcut-mod-alt {
 	background: rgba(204, 85, 255, 0.1);
 	border-color: rgba(204, 85, 255, 0.45) !important;
@@ -1214,7 +1214,7 @@ th .tooltip .tooltiptext {
 	display: block;
 }
 
-/* KPI card tooltips inherit the card's accent color for immediate context */
+/* KPI card tooltips inherit the card’s accent color for immediate context */
 .card-hs .num-tooltip::after {
 	background: color-mix(in srgb, var(--tooltip-bg) 65%, var(--kpi-hs-color) 35%);
 }
