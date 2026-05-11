@@ -169,9 +169,9 @@ global GESTURE_ACTIONS := Map(
         Fn: (*) => 0,
     },
     ; --- Selection & navigation ---
-    "right_click_toggle", {
-        Label: "Toggle clic droit maintenu",
-        Fn: (*) => GestureToggleRightClick(),
+    "left_click_toggle", {
+        Label: "Toggle clic gauche maintenu",
+        Fn: (*) => GestureToggleLeftClick(),
     },
     "app_switcher", {
         Label: "Alt-Tab",
@@ -554,7 +554,7 @@ global GESTURE_ACTION_NAMES := [
     "none",
     "--",
     ; Selection & navigation
-    "right_click_toggle", "app_switcher",
+    "left_click_toggle", "app_switcher",
     "--",
     ; Editing
     "copy", "paste", "cut", "undo", "redo", "select_all", "find",
@@ -604,7 +604,7 @@ global GESTURE_ACTION_NAMES := [
 
 ; Current action assignments — read from INI or defaults
 global GestureAssignments := Map(
-    "tap_3", "right_click_toggle",
+    "tap_3", "left_click_toggle",
     "swipe_3_up", "tab_new",
     "swipe_3_down", "tab_close",
     "swipe_3_left", "tab_prev",
@@ -617,7 +617,7 @@ global GestureAssignments := Map(
 )
 
 ; Right-click hold mode state
-global GestureRightClickHeld := False
+global GestureLeftClickHeld := False
 global GestureKeyboardHook := 0
 
 ; ===========================================
@@ -974,44 +974,44 @@ GestureCycleAppWindows(Forward) {
     LoggerWarn("gestures", "CycleAppWindows: no candidate could be activated.")
 }
 
-; Activates or deactivates a right-button-held mode. Any subsequent keystroke
-; (or physical right-click) automatically releases the button — typically
-; firing the system's right-click action wherever the cursor is at that
-; moment. Useful as a generic "press right button until I do something"
-; toggle which covers context menus, drag-with-right-button workflows
-; (browser gestures, 3D viewport rotation, …) and whatever else right-
+; Activates or deactivates a left-button-held mode. Any subsequent keystroke
+; (or physical left-click) automatically releases the button — typically
+; firing the system's left-click action wherever the cursor is at that
+; moment. Useful as a generic "press left button until I do something"
+; toggle which covers context menus, drag-with-left-button workflows
+; (browser gestures, 3D viewport rotation, …) and whatever else left-
 ; click means in the focused app, hence the broader naming over the
 ; previous "selection" wording.
-GestureToggleRightClick() {
-    global GestureRightClickHeld
+GestureToggleLeftClick() {
+    global GestureLeftClickHeld
 
-    if (GestureRightClickHeld) {
-        GestureReleaseRightClick()
+    if (GestureLeftClickHeld) {
+        GestureReleaseLeftClick()
         return
     }
 
-    LoggerDebug("gestures", "Enabling right-click hold mode…")
-    Click("Right", "Down")
-    GestureRightClickHeld := True
+    LoggerDebug("gestures", "Enabling left-click hold mode…")
+    Click("Left", "Down")
+    GestureLeftClickHeld := True
 
     ; Install a keyboard hook that releases the button on any key press
     GestureStartKeyboardWatcher()
-    LoggerInfo("gestures", "Right-click hold mode enabled.")
+    LoggerInfo("gestures", "Left-click hold mode enabled.")
 }
 
-; Releases the right mouse button if it is currently held by the toggle.
-GestureReleaseRightClick() {
-    global GestureRightClickHeld
+; Releases the left mouse button if it is currently held by the toggle.
+GestureReleaseLeftClick() {
+    global GestureLeftClickHeld
 
-    if (!GestureRightClickHeld) {
+    if (!GestureLeftClickHeld) {
         return
     }
 
-    LoggerDebug("gestures", "Disabling right-click hold mode…")
+    LoggerDebug("gestures", "Disabling left-click hold mode…")
     GestureStopKeyboardWatcher()
-    Click("Right", "Up")
-    GestureRightClickHeld := False
-    LoggerInfo("gestures", "Right-click hold mode disabled.")
+    Click("Left", "Up")
+    GestureLeftClickHeld := False
+    LoggerInfo("gestures", "Left-click hold mode disabled.")
 }
 
 ; Installs a low-level keyboard hook to detect any key press.
@@ -1037,23 +1037,23 @@ GestureStopKeyboardWatcher() {
     }
 }
 
-; Callback fired on any key press while right-click hold is active.
+; Callback fired on any key press while left-click hold is active.
 GestureOnKeyDown(ih, vk, sc) {
-    ; Any keystroke releases the held right button
-    GestureReleaseRightClick()
+    ; Any keystroke releases the held left button
+    GestureReleaseLeftClick()
 }
 
 ; Wrapper required: #HotIf evaluates before globals are assigned at runtime
-IsGestureRightClickHeld() {
-    global GestureRightClickHeld
-    return IsSet(GestureRightClickHeld) ? GestureRightClickHeld : False
+IsGestureLeftClickHeld() {
+    global GestureLeftClickHeld
+    return IsSet(GestureLeftClickHeld) ? GestureLeftClickHeld : False
 }
 
-; Also release on a physical right click — user has clicked manually so the
+; Also release on a physical left click — user has clicked manually so the
 ; toggle should hand control back rather than trap the next event.
-#HotIf IsGestureRightClickHeld()
+#HotIf IsGestureLeftClickHeld()
 ~RButton:: {
-    GestureReleaseRightClick()
+    GestureReleaseLeftClick()
 }
 #HotIf
 

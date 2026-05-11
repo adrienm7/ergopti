@@ -16,7 +16,7 @@
 
 TestGestures_DefaultAssignments() {
     AssertTrue(GestureAssignments.Has("tap_3"), "tap_3 should exist")
-    AssertEqual("right_click_toggle", GestureAssignments["tap_3"], "tap_3 default")
+    AssertEqual("left_click_toggle", GestureAssignments["tap_3"], "tap_3 default")
     AssertEqual("tab_new", GestureAssignments["swipe_3_up"], "swipe_3_up default")
     AssertEqual("tab_close", GestureAssignments["swipe_3_down"], "swipe_3_down default")
     AssertEqual("tab_prev", GestureAssignments["swipe_3_left"], "swipe_3_left default")
@@ -83,17 +83,17 @@ Test("Gestures: action count matches GESTURE_ACTION_NAMES length", TestGestures_
 ; ===============================================
 
 TestGestures_RightClickStartsReleased() {
-    AssertFalse(GestureRightClickHeld, "right-click hold should start released")
+    AssertFalse(GestureLeftClickHeld, "right-click hold should start released")
 }
 Test("Gestures: right-click hold starts released", TestGestures_RightClickStartsReleased)
 
 TestGestures_ReleaseRightClickSafeWhenIdle() {
     ; Should not throw even when nothing is held
-    GestureRightClickHeld := False
-    GestureReleaseRightClick()
-    AssertFalse(GestureRightClickHeld, "still released after redundant release call")
+    GestureLeftClickHeld := False
+    GestureReleaseLeftClick()
+    AssertFalse(GestureLeftClickHeld, "still released after redundant release call")
 }
-Test("Gestures: GestureReleaseRightClick is safe when already released",
+Test("Gestures: GestureReleaseLeftClick is safe when already released",
     TestGestures_ReleaseRightClickSafeWhenIdle)
 
 ; ====================================
@@ -125,9 +125,6 @@ TestGestures_SlotCountMatchesExpected() {
 }
 Test("Gestures: slot count is 10", TestGestures_SlotCountMatchesExpected)
 
-
-
-
 ; =====================================================
 ; =====================================================
 ; ======= 5/ New actions (cycle / nav / screenshots) =======
@@ -136,11 +133,11 @@ Test("Gestures: slot count is 10", TestGestures_SlotCountMatchesExpected)
 
 TestGestures_NewActionsRegistered() {
     for Name in ["win_prev", "win_next", "win_app_prev", "win_app_next",
-                  "nav_back", "nav_forward",
-                  "screenshot_window_clipboard", "screenshot_window_save",
-                  "screenshot_region_clipboard", "screenshot_region_save",
-                  "screenshot_fullscreen_clipboard", "screenshot_fullscreen_save",
-                  "screen_record"] {
+        "nav_back", "nav_forward",
+        "screenshot_window_clipboard", "screenshot_window_save",
+        "screenshot_region_clipboard", "screenshot_region_save",
+        "screenshot_fullscreen_clipboard", "screenshot_fullscreen_save",
+        "screen_record"] {
         AssertTrue(GESTURE_ACTIONS.Has(Name), "missing action: " . Name)
     }
 }
@@ -172,7 +169,6 @@ TestGestures_NextIndexFromZero() {
 Test("Gestures: GestureNextIndex handles index=0 (active not in list)",
     TestGestures_NextIndexFromZero)
 
-
 ; ===========================================================
 ; ===========================================================
 ; ======= 6/ Registry encoding for auto-configure =======
@@ -202,9 +198,9 @@ Test("Gestures: KeyParams for swipe_4_right encodes Ctrl+Win+Shift+F10",
 TestGestures_KeyParamsAllSlotsCovered() {
     for Slot in GESTURE_SLOTS {
         AssertTrue(GESTURE_REG_KEY_PARAMS.Has(Slot),
-            "missing KeyParams encoding for slot: " . Slot)
+        "missing KeyParams encoding for slot: " . Slot)
         AssertTrue(GESTURE_REG_KEY_PARAMS_NAMES.Has(Slot),
-            "missing KeyParams name for slot: " . Slot)
+        "missing KeyParams name for slot: " . Slot)
     }
 }
 Test("Gestures: every slot has a KeyParams encoding and registry name",
@@ -215,7 +211,7 @@ TestGestures_TapSlotsHaveCustomTapName() {
     AssertTrue(GESTURE_REG_CUSTOM_TAP_NAMES.Has("tap_3"))
     AssertTrue(GESTURE_REG_CUSTOM_TAP_NAMES.Has("tap_4"))
     AssertFalse(GESTURE_REG_CUSTOM_TAP_NAMES.Has("swipe_3_up"),
-        "swipes should not have a CustomTap name")
+    "swipes should not have a CustomTap name")
 }
 Test("Gestures: tap slots map to CustomTap registry names",
     TestGestures_TapSlotsHaveCustomTapName)
@@ -225,7 +221,7 @@ TestGestures_SwipeSlotsHaveEnableName() {
     AssertTrue(GESTURE_REG_ENABLE_NAMES.Has("swipe_3_up"))
     AssertTrue(GESTURE_REG_ENABLE_NAMES.Has("swipe_4_right"))
     AssertFalse(GESTURE_REG_ENABLE_NAMES.Has("tap_3"),
-        "taps should not have a direction-enable name")
+    "taps should not have a direction-enable name")
 }
 Test("Gestures: swipe slots map to direction-enable registry names",
     TestGestures_SwipeSlotsHaveEnableName)
