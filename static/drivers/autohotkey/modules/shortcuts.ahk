@@ -533,8 +533,8 @@ SC01C::
 ~LButton::
 ~RButton::
 {
-    if (GestureRightClickHeld) {
-        GestureReleaseRightClick()
+    if (GestureLeftClickHeld) {
+        GestureReleaseLeftClick()
     }
     DisableCapsWord()
 }
