@@ -26,6 +26,16 @@ local LOG    = "gestures.conflicts"
 -- a built-in macOS gesture, plus the exact path to toggle it in System Settings
 local MACOS_GESTURE_GROUPS = {
 	{
+		key          = "swipe_2_conflict",
+		slots        = { 
+			"swipe_2_left", "swipe_2_right", "swipe_2_up", "swipe_2_down",
+			"swipe_2_left_up", "swipe_2_right_up", "swipe_2_left_down", "swipe_2_right_down"
+		},
+		description  = "Glisser 2 doigts — Défilement, Pages, Mission Control",
+		hint         = "Réglages Système › Trackpad\n→ Décocher les gestes à 2 doigts si vous souhaitez les utiliser dans Hammerspoon.",
+		settings_url = "x-apple.systempreferences:com.apple.Trackpad-Settings.extension",
+	},
+	{
 		key          = "tap_3_conflict",
 		slots        = { "tap_3" },
 		description  = "Tap 3 doigts — Recherche & détection de données",
@@ -34,7 +44,7 @@ local MACOS_GESTURE_GROUPS = {
 	},
 	{
 		key          = "swipe_3_horiz_conflict",
-		slots        = { "swipe_3_horiz" },
+		slots        = { "swipe_3_left", "swipe_3_right" },
 		description  = "Glisser 3 doigts gauche/droite — Pages / Passer d’un espace",
 		hint         = "Réglages Système › Trackpad › Plus de gestes\n→ Décocher « Faire défiler entre les pages » et « Passer d’un espace à l’autre »",
 		settings_url = "x-apple.systempreferences:com.apple.Trackpad-Settings.extension",
@@ -48,14 +58,18 @@ local MACOS_GESTURE_GROUPS = {
 	},
 	{
 		key          = "swipe_4_horiz_conflict",
-		slots        = { "swipe_4_horiz", "swipe_5_horiz" },
+		slots        = { "swipe_4_left", "swipe_4_right", "swipe_5_left", "swipe_5_right" },
 		description  = "Glisser 4/5 doigts gauche/droite — Passer d’un espace à l’autre",
 		hint         = "Réglages Système › Trackpad › Plus de gestes\n→ Décocher « Passer d’un espace à l’autre »",
 		settings_url = "x-apple.systempreferences:com.apple.Trackpad-Settings.extension",
 	},
 	{
 		key          = "swipe_4_vert_conflict",
-		slots        = { "swipe_4_up", "swipe_4_down", "swipe_5_up", "swipe_5_down" },
+		slots        = { 
+			"swipe_4_up", "swipe_4_down", "swipe_5_up", "swipe_5_down",
+			"swipe_4_left_up", "swipe_4_right_up", "swipe_4_left_down", "swipe_4_right_down",
+			"swipe_5_left_up", "swipe_5_right_up", "swipe_5_left_down", "swipe_5_right_down"
+		},
 		description  = "Glisser 4/5 doigts haut/bas — Mission Control & App Exposé",
 		hint         = "Réglages Système › Trackpad › Plus de gestes\n→ Décocher « Mission Control » et « Exposé de l’app »",
 		settings_url = "x-apple.systempreferences:com.apple.Trackpad-Settings.extension",

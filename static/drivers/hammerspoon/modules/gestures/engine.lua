@@ -49,7 +49,13 @@ local LIVE_REVERSE_FAST_MIN       = 1.5   -- Signed distance threshold to unlock
 local FINGER_CONFIRM_FRAMES = 4
 local FINGER_CONFIRM_MS     = 0.12
 
+-- Candidate confirmation for noisy multi-finger drops (flickering)
+-- We are more aggressive in keeping a higher finger count active.
+local FINGER_DROP_CONFIRM_FRAMES = 8
+local FINGER_DROP_CONFIRM_MS     = 0.20
+
 local scrollBlocker  = nil
+local isBlockingScroll = false
 local gs             = {}
 
 
@@ -64,27 +70,15 @@ local gs             = {}
 
 --- Engages a local eventtap to swallow default macOS scrolling events.
 local function startScrollBlock()
-	if scrollBlocker then return end
-	
-	Logger.debug(LOG, "Enabling system scrolling block…")
-	local evTypes = hs.eventtap.event.types
-	scrollBlocker = hs.eventtap.new(
-		{ evTypes.scrollWheel, evTypes.gesture },
-		function() return true end
-	)
-	if scrollBlocker then
-		pcall(function() scrollBlocker:start() end)
-		Logger.info(LOG, "System scrolling block enabled.")
+	if not isBlockingScroll then
+		isBlockingScroll = true
 	end
 end
 
 --- Disengages the scroll blocking interceptor.
 local function stopScrollBlock()
-	if scrollBlocker and type(scrollBlocker.stop) == "function" then
-		Logger.debug(LOG, "Disabling system scrolling block…")
-		pcall(function() scrollBlocker:stop() end)
-		scrollBlocker = nil
-		Logger.info(LOG, "System scrolling block disabled.")
+	if isBlockingScroll then
+		isBlockingScroll = false
 	end
 end
 
@@ -112,10 +106,15 @@ local function resetGS()
 		lifting        = false,
 		liveAxisSign   = nil,
 		lastLiveFire   = 0,
-		-- Candidate spike confirmation state
+		lastN          = nil,
+		-- Candidate spike confirmation state (joining)
 		candidateFingers = nil,
 		candidateSince   = nil,
 		candidateFrames  = 0,
+		-- Candidate drop confirmation state (leaving)
+		tentativeLifting       = false,
+		tentativeLiftingSince  = nil,
+		tentativeLiftingFrames = 0,
 	}
 end
 resetGS()
@@ -139,19 +138,21 @@ end
 --- Infers the action configuration slot ID given fingers count and direction.
 --- @param mf number Number of fingers.
 --- @param dir string Direction name (e.g., "horiz", "diag").
+--- @param dx number X delta.
+--- @param dy number Y delta.
 --- @return string|nil The slot string ID.
-local function slotForDir(mf, dir)
-	if mf == 2 then
-		if dir == "diag"  then return "swipe_2_diag"  end
-	elseif mf == 3 then
-		if     dir == "horiz" then return "swipe_3_horiz"
-		elseif dir == "diag"  then return "swipe_3_diag" end
-	elseif mf == 4 then
-		if     dir == "horiz" then return "swipe_4_horiz"
-		elseif dir == "diag"  then return "swipe_4_diag" end
-	elseif mf >= 5 then
-		if     dir == "horiz" then return "swipe_5_horiz"
-		elseif dir == "diag"  then return "swipe_5_diag" end
+local function slotForDir(mf, dir, dx, dy)
+	local prefix = "swipe_" .. tostring(mf) .. "_"
+	if dir == "horiz" then
+		return prefix .. (dx > 0 and "right" or "left")
+	elseif dir == "vert" then
+		return prefix .. (dy > 0 and "down" or "up")
+	elseif dir == "diag" then
+		if dx > 0 then
+			return prefix .. (dy > 0 and "right_down" or "right_up")
+		else
+			return prefix .. (dy > 0 and "left_down" or "left_up")
+		end
 	end
 	return nil
 end
@@ -169,50 +170,60 @@ local function computeDir(dx, dy, mf)
 	
 	if dist < min then return nil end
 
+	-- Stricter angles for primary axes to avoid accidental diagonal lock
+	-- Horizontal: 0-25 degrees (atan dy/dx)
+	-- Vertical: 65-90 degrees
+	-- Diagonal: 25-65 degrees
 	local angle = math.deg(math.atan(ady, adx))
 
-	if angle >= 35 then 
+	if angle >= 65 then 
 		return "vert"
-	elseif angle <= 20 then 
+	elseif angle <= 25 then 
 		return "horiz"
 	else
-		local diagMin = (mf == 2) and DIAG_MIN_2 or min
+		-- Diagnostic: only lock diagonal if user really meant it (both axes moved significantly)
+		local diagMin = (mf == 2) and DIAG_MIN_2 or (min * 1.5)
 		if adx >= diagMin and ady >= diagMin then return "diag" end
+		
+		-- Fallback to dominant axis if not enough "diagonal-ness"
 		return (adx >= ady) and "horiz" or "vert"
 	end
 end
 
---- Computes continuous signed distance respecting the native Natural Scroll setting.
+--- Computes continuous signed distance (absolute trackpad coordinates).
 --- @param pos table Current position coordinates.
 --- @return number Adjusted delta.
 local function signedDist(pos)
 	if not gs.startPos then return 0 end
-	local dx = pos.x - gs.startPos.x
-	return (_state.natural_scroll and -dx) or dx
+	return pos.x - gs.startPos.x
 end
 
---- Compute signed distance along a given axis ('horiz'|'vert').
+--- Compute signed distance along a given axis ('horiz'|'vert'|'diag').
 --- @param pos table Position table.
 --- @param axis string Axis name.
 local function signedDistAxis(pos, axis)
 	if not gs.startPos then return 0 end
 	if axis == "horiz" then
-		local dx = pos.x - gs.startPos.x
-		return (_state.natural_scroll and -dx) or dx
-	else
+		return pos.x - gs.startPos.x
+	elseif axis == "vert" then
 		return pos.y - gs.startPos.y
+	else
+		-- For diagonal, use Euclidean distance to represent true travel
+		local dx = pos.x - gs.startPos.x
+		local dy = pos.y - gs.startPos.y
+		local dist = math.sqrt(dx*dx + dy*dy)
+		local sign = (dx + dy > 0) and 1 or -1
+		return sign * dist
 	end
 end
 
---- Resolve vertical slots (up/down) for a given finger count.
---- @param mf number Number of fingers.
---- @param goDown boolean True when movement is downwards.
-local function slotForVertical(mf, goDown)
-	if mf == 2 then return nil end
-	if mf == 3 then return goDown and "swipe_3_down" or "swipe_3_up" end
-	if mf == 4 then return goDown and "swipe_4_down" or "swipe_4_up" end
-	if mf >= 5 then return goDown and "swipe_5_down" or "swipe_5_up" end
-	return nil
+--- Executes an action by trying both single and axis variants.
+--- @param action string The action ID.
+--- @param sign number The direction sign (1 for next, -1 for prev).
+local function triggerAction(action, sign)
+	if not action or action == "none" then return end
+	pcall(function() _actions.execute_single(action) end)
+	pcall(function() _actions.execute_axis(action, sign > 0) end)
 end
 
 --- Triggers non-scalable horizontal actions during the gesture to reduce latency.
@@ -222,8 +233,30 @@ end
 local function triggerLiveAxisIfNeeded(slot, pos, now, axis)
 	if not slot or not _state.ga[slot] or _state.ga[slot] == "none" then return end
 	local action = _state.ga[slot]
-	if _actions.is_scalable(action) then return end
 
+	local mode = _state.modes[slot] or "x1"
+	local sensitivity = _state.sensitivities[slot] or SCALE_DIV
+
+	if mode == "incremental" then
+		local sd = signedDistAxis(pos, axis)
+		local targetSteps = math.floor(math.abs(sd) / sensitivity)
+		local diff = targetSteps - gs.stepsCommitted
+
+		if diff > 0 then
+			for _ = 1, diff do
+				triggerAction(action, sd)
+			end
+			gs.stepsCommitted = targetSteps
+		elseif diff < 0 then
+			-- Reversal detection
+			gs.startPos = pos
+			gs.endPos = pos
+			gs.stepsCommitted = 0
+		end
+		return
+	end
+
+	-- x1 mode
 	local sd = signedDistAxis(pos, axis)
 	if math.abs(sd) < LIVE_AXIS_MIN then return end
 
@@ -236,13 +269,9 @@ local function triggerLiveAxisIfNeeded(slot, pos, now, axis)
 	end
 	if gs.lastLiveFire and (now - gs.lastLiveFire) < rearm_delay then return end
 
-	Logger.info(LOG, string.format("%s swipe live trigger on slot: %s (sign=%d).", (axis == "horiz") and "Horizontal" or "Vertical", slot, sign))
+	Logger.info(LOG, string.format("%s swipe live trigger on slot: %s (sign=%d).", axis, slot, sign))
 
-	-- Try executing both single and axis variants; one will be a no-op depending
-	-- on how the action is registered in the actions table. This keeps the
-	-- engine tolerant to user mappings (single vs axis actions).
-	pcall(function() _actions.execute_single(action) end)
-	pcall(function() _actions.execute_axis(action, sign > 0) end)
+	triggerAction(action, sign)
 
 	-- Rebase after each live trigger so a quick direction reversal can fire promptly.
 	gs.liveAxisSign = sign
@@ -262,16 +291,13 @@ local function commitGesture(now)
 	local elapsed = now - (gs.startTime or now)
 	local mf      = gs.maxFingers
 
-	-- Tap detection: if no direction was ever locked during the gesture, no swipe
-	-- motion was committed, so this is a tap (or an abandoned gesture).
-	-- Also treat as a tap when lockedDir was set by a brief frémissement (delta
-	-- below TAP_MAX_DELTA) — SWIPE_MIN is intentionally small for live tracking
-	-- responsiveness, but a real swipe always produces a larger final displacement.
+	-- Tap detection
 	local total_delta = math.abs(gs.endPos.x - gs.startPos.x) + math.abs(gs.endPos.y - gs.startPos.y)
 	if gs.lockedDir == nil or total_delta < TAP_MAX_DELTA then
 		if elapsed <= TAP_MAX_SEC then
 			local slot = nil
-			if     mf == 3 then slot = "tap_3"
+			if     mf == 2 then slot = "tap_2"
+			elseif mf == 3 then slot = "tap_3"
 			elseif mf == 4 then slot = "tap_4"
 			elseif mf >= 5 then slot = "tap_5" end
 
@@ -286,56 +312,32 @@ local function commitGesture(now)
 	local dir = computeDir(dx, dy, mf)
 	if not dir then return end
 
-	-- If diagonal mapping is unavailable, collapse to the dominant axis.
-	if dir == "diag" then
-		local diag_slot = slotForDir(mf, dir)
-		if not diag_slot or _state.ga[diag_slot] == "none" then
-			dir = (math.abs(dx) >= math.abs(dy)) and "horiz" or "vert"
-		end
-	end
-
-	local slot = nil
-	if dir == "vert" then
-		local goDown = dy < 0
-		slot = slotForVertical(mf, goDown)
-	else
-		slot = slotForDir(mf, dir)
-	end
-
+	local slot = slotForDir(mf, dir, dx, dy)
 	if not slot or _state.ga[slot] == "none" then return end
 
-	-- Unified commit behaviour: if the mapped action is scalable, compute the
-	-- requested number of axis steps based on distance; otherwise, perform a
-	-- single action repeated proportional to swipe length (keeps vertical and
-	-- horizontal consistent).
 	local action = _state.ga[slot]
 	if not action or action == "none" then return end
 
-	if _actions.is_scalable(action) then
+	local mode = _state.modes[slot] or "x1"
+	local sensitivity = _state.sensitivities[slot] or SCALE_DIV
+
+	if mode == "incremental" then
 		local sd = signedDistAxis(gs.endPos, dir)
-		local targetSteps = math.floor(sd / SCALE_DIV)
+		local targetSteps = math.floor(math.abs(sd) / sensitivity)
 		local diff = targetSteps - gs.stepsCommitted
 
 		if diff > 0 then
-			for _ = 1, diff do pcall(_actions.execute_axis, action, true) end
-		elseif diff < 0 then
-			for _ = 1, -diff do pcall(_actions.execute_axis, action, false) end
+			for _ = 1, diff do
+				triggerAction(action, sd)
+			end
 		end
 		gs.stepsCommitted = targetSteps
 	else
 		if gs.liveAxisSign ~= nil then return end
 		local sd = signedDistAxis(gs.endPos, dir)
 		if math.abs(sd) >= SWIPE_MIN then
-			Logger.info(LOG, string.format("%s swipe validated on slot: %s.", (dir == "horiz") and "Horizontal" or "Vertical", slot))
-			-- Try axis variant once (no-op if not registered as axis), then
-			-- execute single action repeatedly according to swipe length.
-			pcall(_actions.execute_axis, action, sd > 0)
-			local steps = math.floor(math.abs(sd) / SCALE_DIV)
-			if steps <= 0 then
-				pcall(_actions.execute_single, action)
-			else
-				for _ = 1, steps do pcall(_actions.execute_single, action) end
-			end
+			Logger.info(LOG, string.format("%s swipe validated on slot: %s.", dir, slot))
+			triggerAction(action, sd)
 		end
 	end
 end
@@ -354,6 +356,12 @@ end
 --- @param touches table The raw touch data objects.
 function M.process_frame(touches)
 	if type(touches) ~= "table" then return end
+	
+	-- Signal that we are receiving data
+	if not _G.ERGOPTI_GESTURES_RECEIVED_FIRST_FRAME and #touches > 0 then
+		_G.ERGOPTI_GESTURES_RECEIVED_FIRST_FRAME = true
+	end
+
 	local n   = #touches
 	local now = hs.timer.secondsSinceEpoch()
 	
@@ -391,18 +399,48 @@ function M.process_frame(touches)
 			gs.lifting        = false
 			gs.liveAxisSign   = nil
 			gs.lastLiveFire   = 0
-			gs.liveAxisSign   = nil
-			gs.lastLiveFire   = 0
+			
+			gs.tentativeLifting       = false
+			gs.tentativeLiftingSince  = nil
+			gs.tentativeLiftingFrames = 0
 		else
+			-- StartPos Compensation: if finger count changed, the centroid (pos) jumps.
+			-- We adjust startPos to maintain the same relative displacement,
+			-- effectively absorbing the jump and preserving momentum/fluidity.
+			if n ~= gs.lastN and gs.endPos then
+				local jumpX = pos.x - gs.endPos.x
+				local jumpY = pos.y - gs.endPos.y
+				gs.startPos.x = gs.startPos.x + jumpX
+				gs.startPos.y = gs.startPos.y + jumpY
+				Logger.debug(LOG, string.format("Centroid jump compensated: n %d -> %d (jump: %.1f, %.1f).", gs.lastN or 0, n, jumpX, jumpY))
+			end
+			gs.lastN = n
+
 			if n < gs.maxFingers then
-				gs.lifting = true
+				-- Flickering / Drop Debouncing: don't commit to "lifting" (end of gesture)
+				-- too quickly. Fingers often lose contact for 50-150ms during swipes.
+				if not gs.tentativeLifting then
+					gs.tentativeLifting = true
+					gs.tentativeLiftingSince = now
+					gs.tentativeLiftingFrames = 1
+				else
+					gs.tentativeLiftingFrames = gs.tentativeLiftingFrames + 1
+					local elapsed = now - gs.tentativeLiftingSince
+					if gs.tentativeLiftingFrames >= FINGER_DROP_CONFIRM_FRAMES or elapsed >= FINGER_DROP_CONFIRM_MS then
+						if not gs.lifting then
+							Logger.info(LOG, string.format("Confirmed finger drop: %d -> %d (frames=%d, %.3fs).", gs.maxFingers, n, gs.tentativeLiftingFrames, elapsed))
+						end
+						gs.lifting = true
+					end
+				end
 			elseif n > gs.maxFingers then
+				-- Reset tentative lifting if finger count is restored
+				gs.tentativeLifting = false
+
 				-- A new finger joined. Accept single-finger joins immediately,
 				-- but require confirmation for large spikes (e.g., 3→5) which are often transient.
 				if n <= gs.maxFingers + 1 then
 					gs.maxFingers = n
-					gs.startPos   = pos
-					gs.startTime  = now
 					gs.lifting    = false
 					gs.candidateFingers = nil
 					gs.candidateSince   = nil
@@ -414,8 +452,6 @@ function M.process_frame(touches)
 						if gs.candidateFrames >= FINGER_CONFIRM_FRAMES and elapsed >= FINGER_CONFIRM_MS then
 							Logger.info(LOG, string.format("Confirmed multi-finger join: %d → %d (frames=%d, %.3fs).", gs.maxFingers, n, gs.candidateFrames, elapsed))
 							gs.maxFingers = n
-							gs.startPos   = pos
-							gs.startTime  = now
 							gs.lifting    = false
 							gs.candidateFingers = nil
 							gs.candidateSince   = nil
@@ -430,70 +466,49 @@ function M.process_frame(touches)
 						Logger.warn(LOG, string.format("Observed spurious finger spike, awaiting confirmation: %d → %d.", gs.maxFingers, n))
 					end
 				end
-			elseif gs.lifting and n == gs.maxFingers then
-				-- Full finger count restored after a partial lift without a clean n=0
-				-- frame in between. This is a rapid successive tap: commit the current
-				-- gesture immediately and start fresh, keeping the scroll blocker alive
-				-- (fingers are still on the pad, tearing it down would add jitter).
-				Logger.debug(LOG, "Rapid re-tap detected (%d finger(s)) — committing and restarting.", n)
-				if gs.startPos then pcall(commitGesture, now) end
-				gs.startTime      = now
-				gs.startPos       = pos
-				gs.endPos         = pos
-				gs.lockedDir      = nil
-				gs.stepsCommitted = 0
-				gs.lifting        = false
-				return
-			end
-			-- Freeze endPos once lifting starts: the centroid of fewer fingers
-			-- drifts away from the full-contact centroid and would produce a false
-			-- delta in commitGesture, breaking both tap and swipe detection.
-			if not gs.lifting then
-				gs.endPos = pos
+			elseif n == gs.maxFingers then
+				-- If we were tentatively lifting but the finger came back, cancel it.
+				if gs.tentativeLifting then
+					Logger.debug(LOG, "Finger flickering recovered (count restored to " .. tostring(n) .. ").")
+					gs.tentativeLifting = false
+					gs.tentativeLiftingSince = nil
+					gs.tentativeLiftingFrames = 0
+				end
+
+				if gs.lifting then
+					-- Rapid re-tap detected: commit current and restart
+					Logger.debug(LOG, "Rapid re-tap detected (%d finger(s)) — committing and restarting.", n)
+					if gs.startPos then pcall(commitGesture, now) end
+					gs.startTime      = now
+					gs.startPos       = pos
+					gs.endPos         = pos
+					gs.lockedDir      = nil
+					gs.stepsCommitted = 0
+					gs.lifting        = false
+					return
+				end
 			end
 
-			if not gs.lifting then
+			-- Update endPos and process movement ONLY if we are not in a tentative
+			-- lift state (to avoid jitter from centroid shifts) and not confirmed lifting.
+			if not gs.lifting and not gs.tentativeLifting then
+				gs.endPos = pos
+
 				if gs.lockedDir == nil then
 					local dx = pos.x - gs.startPos.x
 					local dy = pos.y - gs.startPos.y
 					local tentative = computeDir(dx, dy, gs.maxFingers)
-					
-					if tentative == "diag" then
-						local diag_slot = slotForDir(gs.maxFingers, tentative)
-						if not diag_slot or _state.ga[diag_slot] == "none" then
-							tentative = (math.abs(dx) >= math.abs(dy)) and "horiz" or "vert"
-						end
-					end
-					-- lockedDir stays nil until SWIPE_MIN is exceeded; commitGesture
-					-- interprets lockedDir==nil as a tap candidate
 					gs.lockedDir = tentative
 				end
 
 				if gs.lockedDir then
 					local axis = gs.lockedDir
-					local slot = nil
-					if axis == "vert" then
-						local dy = pos.y - gs.startPos.y
-						local goDown = dy < 0
-						slot = slotForVertical(gs.maxFingers, goDown)
-					else
-						slot = slotForDir(gs.maxFingers, axis)
-					end
+					local dx = pos.x - gs.startPos.x
+					local dy = pos.y - gs.startPos.y
+					local slot = slotForDir(gs.maxFingers, axis, dx, dy)
+					
 					if slot and _state.ga[slot] and _state.ga[slot] ~= "none" then
-						local action = _state.ga[slot]
-						if _actions.is_scalable(action) then
-							local sd = signedDistAxis(pos, axis)
-							local targetSteps = math.floor(sd / SCALE_DIV)
-							local diff = targetSteps - gs.stepsCommitted
-							if diff > 0 then
-								for _ = 1, diff do pcall(_actions.execute_axis, action, true) end
-							elseif diff < 0 then
-								for _ = 1, -diff do pcall(_actions.execute_axis, action, false) end
-							end
-							gs.stepsCommitted = targetSteps
-						else
-							triggerLiveAxisIfNeeded(slot, pos, now, axis)
-						end
+						triggerLiveAxisIfNeeded(slot, pos, now, axis)
 					end
 				end
 			end
@@ -518,6 +533,20 @@ function M.init(core_state, actions_mod)
 	Logger.debug(LOG, "Initializing gestures engine dependencies…")
 	_state   = core_state
 	_actions = actions_mod
+	
+	-- Vital: Permanent event tap to block scroll events dynamically via flag.
+	-- Dynamically calling :start() and :stop() triggers a 10s macOS Accessibility block.
+	if not scrollBlocker then
+		local evTypes = hs.eventtap.event.types
+		scrollBlocker = hs.eventtap.new(
+			{ evTypes.scrollWheel, evTypes.gesture },
+			function() return isBlockingScroll end
+		)
+		if scrollBlocker then
+			pcall(function() scrollBlocker:start() end)
+		end
+	end
+	
 	Logger.info(LOG, "Gestures engine dependencies initialized.")
 end
 

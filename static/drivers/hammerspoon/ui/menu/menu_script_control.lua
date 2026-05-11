@@ -37,7 +37,7 @@ M.DEFAULT_STATE = {
 -- ====================================
 
 --- Builds the script control sub-menu.
---- @param ctx table Context.
+--- @param ctx table Context containing state, updateMenu, save_prefs, etc.
 --- @return table|nil
 function M.build(ctx)
 	local sc_module = ctx.script_control
@@ -46,29 +46,41 @@ function M.build(ctx)
 	local state      = ctx.state
 	local paused     = ctx.paused
 	local actions    = type(sc_module.ACTIONS) == "table" and sc_module.ACTIONS or {}
-	local act_labels = type(sc_module.ACTION_LABELS) == "table" and sc_module.ACTION_LABELS or {}
 	local enabled    = state.script_control_enabled
 
 	local function get_label(act)
-		local lbl = act_labels[act] or act
-		return lbl
+		if not act or act == "-" or act == "--" then return "-" end
+		if act:match("^#") then return act:sub(2) end -- Category headers
+
+		if ctx.gestures and type(ctx.gestures.get_action_label) == "function" then
+			return ctx.gestures.get_action_label(act)
+		end
+		return act
 	end
 
 	local function key_submenu(keyname)
 		local current = state.script_control_shortcuts[keyname] or "none"
 		local sub = {}
 		for _, act in ipairs(actions) do
-			table.insert(sub, {
-				title    = get_label(act),
-				checked  = ((current == act) and not paused) or nil,
-				disabled = not enabled or paused or nil,
-				fn       = (enabled and not paused) and (function(a) return function()
-					state.script_control_shortcuts[keyname] = a
-					if type(sc_module.set_shortcut_action) == "function" then pcall(sc_module.set_shortcut_action, keyname, a) end
-					ctx.save_prefs()
-					ctx.updateMenu()
-				end end)(act) or nil,
-			})
+			local label = get_label(act)
+			
+			if label == "-" then
+				table.insert(sub, { title = "-" })
+			elseif act:match("^#") then
+				table.insert(sub, { title = label, disabled = true })
+			else
+				table.insert(sub, {
+					title    = label,
+					checked  = ((current == act) and not paused) or nil,
+					disabled = not enabled or paused or nil,
+					fn       = (enabled and not paused) and (function(a) return function()
+						state.script_control_shortcuts[keyname] = a
+						if type(sc_module.set_shortcut_action) == "function" then pcall(sc_module.set_shortcut_action, keyname, a) end
+						ctx.save_prefs()
+						ctx.updateMenu()
+					end end)(act) or nil,
+				})
+			end
 		end
 		return sub
 	end
@@ -105,6 +117,7 @@ function M.build(ctx)
 			{ title = "Option droite + ⎋ : " .. get_label(cur_escape),
 			   disabled = not enabled or paused or nil, menu = key_submenu("escape") },
 		},
+
 	}
 end
 

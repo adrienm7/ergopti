@@ -437,7 +437,26 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 			end
 		end
 		if gestures then
-			if state.gestures then if type(gestures.enable_all) == "function" then pcall(gestures.enable_all) end else if type(gestures.disable_all) == "function" then pcall(gestures.disable_all) end end
+			if state.gestures then 
+				if type(gestures.enable_all) == "function" then pcall(gestures.enable_all) end 
+			else 
+				if type(gestures.disable_all) == "function" then pcall(gestures.disable_all) end 
+			end
+			
+			-- Sync granular settings
+			if type(state.gesture_modes) == "table" then
+				for slot, mode in pairs(state.gesture_modes) do
+					if type(gestures.set_mode) == "function" then pcall(gestures.set_mode, slot, mode) end
+				end
+			end
+			if type(state.gesture_sensitivities) == "table" then
+				for slot, sens in pairs(state.gesture_sensitivities) do
+					if type(gestures.set_sensitivity) == "function" then pcall(gestures.set_sensitivity, slot, sens) end
+				end
+			end
+			if state.gesture_space_wrap ~= nil then
+				if type(gestures.set_space_wrap) == "function" then pcall(gestures.set_space_wrap, state.gesture_space_wrap) end
+			end
 		end
 		if core_mods.shortcuts_mod then
 			if state.shortcuts then if type(core_mods.shortcuts_mod.start) == "function" then pcall(core_mods.shortcuts_mod.start) end else if type(core_mods.shortcuts_mod.stop) == "function" then pcall(core_mods.shortcuts_mod.stop) end end
