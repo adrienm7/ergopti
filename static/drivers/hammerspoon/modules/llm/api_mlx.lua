@@ -229,7 +229,7 @@ local _model_hf_path = nil
 
 -- Reads the runtime model identifier the bash launcher passed to mlx_lm via
 -- --model. mlx_lm.server routes every POST request through model_provider.load(),
--- keyed by the payload's "model" field; if the payload sends the HF repo id
+-- keyed by the payload’s "model" field; if the payload sends the HF repo id
 -- but the server was launched with a local snapshot path (or vice-versa),
 -- the server tries to snapshot_download that mismatched id and fails offline.
 -- The bash launcher writes the exact --model argument it used to this file so
@@ -434,7 +434,7 @@ local function discover_endpoints(on_done)
 				-- The right semantic: a 200 here means the server is reachable.
 				-- The model we passed to --model in bash is the one that actually
 				-- gets loaded; trust that and proceed straight to POST probes.
-				-- For the warmup payload's "model" field, prefer _model_hf_path
+				-- For the warmup payload’s "model" field, prefer _model_hf_path
 				-- (the canonical --model arg) over anything from /v1/models.
 				_server_model_id = nil
 				if type(body) == "string" and type(_expected_model_id) == "string"

@@ -39,6 +39,7 @@ de configuration.
 ```
 
 **Conséquences directes** :
+
 - Aucun script `.sh` / `.bat` à lancer pour rendre le format Git-friendly.
   Le format natif sur disque EST déjà du SQL texte.
 - `.gitignore` minimal (`today.log` seulement) — plus de question
@@ -68,13 +69,13 @@ exactement (intégrité vérifiable).
 
 ```json
 {
-  "device_id": "f3c1a8e0-9b3d-4d2c-8a4f-2b6e1d9c0e3a",
-  "name": "MBP-Adrien",
-  "os": "darwin",
-  "os_version": "14.5",
-  "host_signature": "<IOPlatformUUID|MachineGuid>",
-  "created_at": "2026-05-08 09:14:21.123",
-  "schema_version": 1
+	"device_id": "f3c1a8e0-9b3d-4d2c-8a4f-2b6e1d9c0e3a",
+	"name": "MBP-Adrien",
+	"os": "darwin",
+	"os_version": "14.5",
+	"host_signature": "<IOPlatformUUID|MachineGuid>",
+	"created_at": "2026-05-08 09:14:21.123",
+	"schema_version": 1
 }
 ```
 
@@ -83,8 +84,8 @@ Modifiable depuis l'UI (rename device). Mise à jour par le keylogger
 
 ### 1.5 `today.log`
 
-JSONL UTF-8 append-only. Une ligne = une entrée d'événement (cf. §3).
-Sa seule raison d'exister est d'**absorber les écritures du hot path
+JSONL UTF-8 append-only. Une ligne = une entrée d’événement (cf. §3).
+Sa seule raison d’exister est d’**absorber les écritures du hot path
 clavier sans toucher à SQLite ni au .sql canonique**. Il est ingéré par
 batch (cf. §15). Au day rollover, le fichier est draîné puis supprimé.
 
@@ -113,7 +114,7 @@ base unique avec une colonne `device_id` partout.
 
 ---
 
-## 2. Pipeline d'événement clavier
+## 2. Pipeline d’événement clavier
 
 ```
    keyDown / keyUp / flagsChanged / mouse event
@@ -165,7 +166,7 @@ space_change/system_load) · `hotstring` · `hotstring_suggested` ·
 `llm_dismissed` · `llm_accepted` · `session_start` · `session_end` ·
 `idle_start` · `idle_end`.
 
-Les schémas par `type` sont inchangés vs HS d'origine — voir le code
+Les schémas par `type` sont inchangés vs HS d’origine — voir le code
 HS et la première version du spec en historique Git si besoin.
 **Le `device_id` n'apparaît PAS dans le JSONL** : il est implicite au
 sous-dossier qui héberge `today.log`. Il est ajouté par l'ingest au
@@ -190,13 +191,13 @@ moment de générer les INSERT statements.
 
 Constantes ingest / cache :
 
-| Nom | Valeur | Sens |
-|---|---|---|
-| `INGEST_TICK_MS` | 5 000 | fréquence du tick d'ingest background. |
-| `INGEST_FLUSH_THRESHOLD` | 100 | nb lignes JSONL non-ingérées qui force un ingest immédiat. |
-| `INGEST_BATCH_LINES` | 5 000 | nb max de lignes par transaction (cap mémoire). |
-| `VIEW_CACHE_PREWARM_KEYS` | (cf. §18) | liste des vues que l'on précompute après chaque ingest. |
-| `VIEW_CACHE_MAX_BYTES` | 50 000 000 | budget total du cache en base ; LRU eviction si dépassé. |
+| Nom                       | Valeur     | Sens                                                       |
+| ------------------------- | ---------- | ---------------------------------------------------------- |
+| `INGEST_TICK_MS`          | 5 000      | fréquence du tick d’ingest background.                     |
+| `INGEST_FLUSH_THRESHOLD`  | 100        | nb lignes JSONL non-ingérées qui force un ingest immédiat. |
+| `INGEST_BATCH_LINES`      | 5 000      | nb max de lignes par transaction (cap mémoire).            |
+| `VIEW_CACHE_PREWARM_KEYS` | (cf. §18)  | liste des vues que l'on précompute après chaque ingest.    |
+| `VIEW_CACHE_MAX_BYTES`    | 50 000 000 | budget total du cache en base ; LRU eviction si dépassé.   |
 
 ---
 
@@ -260,7 +261,7 @@ joint sur device_id pour router vers le mapping macOS ou Windows.
 ## 10. Différences fonctionnelles connues (gaps)
 
 1. `space_change` : non émis côté Windows.
-2. `AXDocument path` : peu d'apps Windows l'exposent → `null` la plupart du temps.
+2. `AXDocument path` : peu d’apps Windows l'exposent → `null` la plupart du temps.
 3. `IsPasswordPattern` UIA : v1 best-effort, accepter des faux-négatifs.
 4. `bundleID` : remplacé par `process_name` côté Windows.
 5. `kc_hold` côté Windows : timestamp via `KBDLLHOOKSTRUCT.time`.
@@ -269,7 +270,7 @@ joint sur device_id pour router vers le mapping macOS ou Windows.
 
 ---
 
-## 11. Plan d'architecture AHK
+## 11. Plan d’architecture AHK
 
 ```
 static/drivers/autohotkey/lib/keylogger/
@@ -292,7 +293,7 @@ Lib SQLite côté AHK : `Class_SQLite.ahk` ou wrapper maison sur
 
 ---
 
-## 12. Plan d'architecture UI partagée
+## 12. Plan d’architecture UI partagée
 
 ```
 static/drivers/_shared/
@@ -307,7 +308,7 @@ static/drivers/_shared/
 
 Côté HS, `ui/metrics_apps/init.lua` charge le HTML depuis `_shared/`.
 Côté AHK (séance 4), launcher WebView2 charge la même page. Pas de
-réécriture d'UI, juste un launcher différent par OS.
+réécriture d’UI, juste un launcher différent par OS.
 
 ---
 
@@ -315,25 +316,25 @@ réécriture d'UI, juste un launcher différent par OS.
 
 ### 13.1 Décisions actées
 
-| # | Sujet | Décision |
-|---|---|---|
-| 1 | Lib SQLite côté AHK | `Class_SQLite.ahk` (mature, déjà éprouvée). Si bench montre un goulot, fallback wrapper maison sur `sqlite3.dll`. |
-| 2 | Ingest tick | 5 s par défaut, ajustable par constante `INGEST_TICK_MS`. |
-| 3 | Cap top-100 titres / 100 sessions durations | Validé. |
-| 4 | Schema version | Démarre à 1, incrément à chaque breaking change. |
-| 6 | Filtre password Windows | **Pas de best-effort** : séance dédiée pour faire le top — UIA `IsPasswordPattern` proprement combiné avec heuristiques control type / class names / app focused. |
-| 8 | Migration depuis l'historique HS | **Skip** — phase de tests, aucun utilisateur. On part vierge. |
-| 9 | Format Git diff-friendly | Le format natif sur disque EST déjà du SQL texte (`data.sql`). **Aucun script externe**, ni `.sh` ni `.bat`. Le `db.sqlite` vit dans tmpdir, jamais syncé. |
-| 10 | `device_info.name` éditable | Oui — modal « Renommer cet appareil » dans l'UI. |
-| 11 | `view_cache` budget | 50 MB par défaut, ajustable (`VIEW_CACHE_MAX_BYTES`). |
-| 12 | Pré-warm post-ingest | `dashboard:today:default`, `dashboard:last_7d:default`, `top10_apps:today`, `hourly_heatmap:today`. |
+| #   | Sujet                                       | Décision                                                                                                                                                          |
+| --- | ------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1   | Lib SQLite côté AHK                         | `Class_SQLite.ahk` (mature, déjà éprouvée). Si bench montre un goulot, fallback wrapper maison sur `sqlite3.dll`.                                                 |
+| 2   | Ingest tick                                 | 5 s par défaut, ajustable par constante `INGEST_TICK_MS`.                                                                                                         |
+| 3   | Cap top-100 titres / 100 sessions durations | Validé.                                                                                                                                                           |
+| 4   | Schema version                              | Démarre à 1, incrément à chaque breaking change.                                                                                                                  |
+| 6   | Filtre password Windows                     | **Pas de best-effort** : séance dédiée pour faire le top — UIA `IsPasswordPattern` proprement combiné avec heuristiques control type / class names / app focused. |
+| 8   | Migration depuis l'historique HS            | **Skip** — phase de tests, aucun utilisateur. On part vierge.                                                                                                     |
+| 9   | Format Git diff-friendly                    | Le format natif sur disque EST déjà du SQL texte (`data.sql`). **Aucun script externe**, ni `.sh` ni `.bat`. Le `db.sqlite` vit dans tmpdir, jamais syncé.        |
+| 10  | `device_info.name` éditable                 | Oui — modal « Renommer cet appareil » dans l'UI.                                                                                                                  |
+| 11  | `view_cache` budget                         | 50 MB par défaut, ajustable (`VIEW_CACHE_MAX_BYTES`).                                                                                                             |
+| 12  | Pré-warm post-ingest                        | `dashboard:today:default`, `dashboard:last_7d:default`, `top10_apps:today`, `hourly_heatmap:today`.                                                               |
 
 ### 13.2 À trancher au moment de l'implémentation correspondante
 
 5. **Filtre private mode Windows** : à arbitrer en séance 3 quand on
    touchera au context_tracker AHK. Probable : keywords titre +
    détection InPrivate via UIA pour les browsers Chromium.
-7. **Catégorisation app** : à arbitrer aussi en séance 3 — porter la
+6. **Catégorisation app** : à arbitrer aussi en séance 3 — porter la
    table HS avec process names Windows (`code.exe`, `chrome.exe`, …).
 
 ---
@@ -438,7 +439,7 @@ CREATE TABLE events_hotstring (
   device_id TEXT NOT NULL, id INTEGER NOT NULL,
   ts TEXT NOT NULL, date TEXT NOT NULL,
   app TEXT NOT NULL,
-  kind TEXT NOT NULL CHECK (kind IN ('fired','suggested','dismissed')),
+  kind TEXT NOT NULL CHECK (kind IN ('fired’,'suggested’,'dismissed’)),
   trigger TEXT NOT NULL,
   replacement TEXT NOT NULL,
   h_type TEXT,
@@ -451,7 +452,7 @@ CREATE TABLE events_llm (
   device_id TEXT NOT NULL, id INTEGER NOT NULL,
   ts TEXT NOT NULL, date TEXT NOT NULL,
   app TEXT NOT NULL,
-  kind TEXT NOT NULL CHECK (kind IN ('generation','suggested','dismissed','accepted')),
+  kind TEXT NOT NULL CHECK (kind IN ('generation','suggested’,'dismissed’,'accepted’)),
   context TEXT,
   predictions_json TEXT,
   prediction TEXT,
@@ -467,7 +468,7 @@ CREATE TABLE events_llm (
 CREATE TABLE events_session (
   device_id TEXT NOT NULL, id INTEGER NOT NULL,
   ts TEXT NOT NULL, date TEXT NOT NULL,
-  kind TEXT NOT NULL CHECK (kind IN ('session_start','session_end','idle_start','idle_end')),
+  kind TEXT NOT NULL CHECK (kind IN ('session_start','session_end’,'idle_start','idle_end’)),
   duration_ms INTEGER,
   PRIMARY KEY (device_id, id)
 );
@@ -705,7 +706,7 @@ CREATE INDEX idx_view_cache_size ON view_cache(size_bytes DESC);
 
 ---
 
-## 15. Pipeline d'ingest — protocole crash-safe
+## 15. Pipeline d’ingest — protocole crash-safe
 
 ### 15.1 Démarrage du keylogger
 
@@ -732,10 +733,10 @@ CREATE INDEX idx_view_cache_size ON view_cache(size_bytes DESC);
 5. Si today.log existe (LOCAL device uniquement) :
      stat size, compare à last_today_log_offset (variable mémoire = 0).
      Ingest le fichier en entier.
-     Si la première ligne date d'un autre jour (rollover loupé)
+     Si la première ligne date d’un autre jour (rollover loupé)
        → ingest puis DELETE.
 6. Démarrer le hot path (today.log peut grossir à nouveau).
-7. Programmer le tick d'ingest (INGEST_TICK_MS).
+7. Programmer le tick d’ingest (INGEST_TICK_MS).
 ```
 
 L'étape 4 est faite SYNC à l'init du keylogger pour que `db.sqlite` soit
@@ -743,7 +744,7 @@ complet avant l'ouverture de l'UI. Pour des fichiers énormes (plusieurs Go
 de data.sql), peut prendre ~minutes au PREMIER boot ou si tmpdir a été
 nettoyé ; les boots suivants sont incrémentaux et tiennent en <1 seconde.
 
-### 15.2 Tick d'ingest
+### 15.2 Tick d’ingest
 
 Pour chaque tick (5 s) OU dès que `INGEST_FLUSH_THRESHOLD` lignes
 non-ingérées s'accumulent dans today.log :
@@ -827,7 +828,8 @@ COMMIT;
 ```
 
 Règles de format strictes :
-- Une instruction SQL par ligne (pas de retour à la ligne au milieu d'un
+
+- Une instruction SQL par ligne (pas de retour à la ligne au milieu d’un
   INSERT). Permet à un grep / blame / diff Git de cibler une frappe.
 - Tous les strings sont single-quoted, échappement `'` → `''`.
 - Tous les JSON embeddés (events_json, esrc_json…) sont serialisés sans
@@ -844,25 +846,25 @@ Inchangé. UUID v4 + host_signature ; fork-on-mismatch au démarrage.
 
 ### 16.2 Que est syncé / pas syncé
 
-| Chemin | Syncé ? | Raison |
-|---|---|---|
-| `by_device/<id>/device.json` | OUI | tiny, JSON, git-friendly. |
-| `by_device/<id>/data.sql` | OUI | source de vérité, append-only texte. |
-| `by_device/<id>/today.log` | NON | hot path local-only. Listé dans `.gitignore`. |
-| `metrics/.gitignore` | OUI | shipped out-of-the-box. |
-| `metrics/README.md` | OUI | doc utilisateur. |
-| `<tmpdir>/ergopti_metrics/…` | NON | hors du dossier metrics, jamais syncé par construction. |
+| Chemin                       | Syncé ? | Raison                                                  |
+| ---------------------------- | ------- | ------------------------------------------------------- |
+| `by_device/<id>/device.json` | OUI     | tiny, JSON, git-friendly.                               |
+| `by_device/<id>/data.sql`    | OUI     | source de vérité, append-only texte.                    |
+| `by_device/<id>/today.log`   | NON     | hot path local-only. Listé dans `.gitignore`.           |
+| `metrics/.gitignore`         | OUI     | shipped out-of-the-box.                                 |
+| `metrics/README.md`          | OUI     | doc utilisateur.                                        |
+| `<tmpdir>/ergopti_metrics/…` | NON     | hors du dossier metrics, jamais syncé par construction. |
 
 ### 16.3 Comportements de sync
 
-| Situation | Conséquence |
-|---|---|
+| Situation                                                                          | Conséquence                                                                                                                                                           |
+| ---------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Device A appende un batch dans `data.sql`, sync engine copie le fichier mid-append | Le sync embarque jusqu'à où l'append est arrivé. Si le `COMMIT;` final manque, le batch incomplet est ignoré au replay (les lignes apparaîtront à la prochaine sync). |
-| Device A et B typent en même temps offline | Chacun écrit dans son propre `<device_id>/data.sql`. À la reconnection, sync transmet les deux fichiers, aucun conflit. |
-| Le user clone le dossier metrics d'un Mac vers un PC | Démarrage PC : host_signature mismatch → fork automatique. L'ancien `<id>/data.sql` reste comme « historique du Mac », le PC crée son propre `<new_id>/data.sql`. |
-| Le tmpdir du device est wipé (cleanup OS, reboot Windows en mode wipe-temp) | Au prochain démarrage du keylogger, le sqlite est reconstruit depuis tous les `data.sql`. Coût : ~secondes pour une année de données. |
+| Device A et B typent en même temps offline                                         | Chacun écrit dans son propre `<device_id>/data.sql`. À la reconnection, sync transmet les deux fichiers, aucun conflit.                                               |
+| Le user clone le dossier metrics d’un Mac vers un PC                               | Démarrage PC : host_signature mismatch → fork automatique. L'ancien `<id>/data.sql` reste comme « historique du Mac », le PC crée son propre `<new_id>/data.sql`.     |
+| Le tmpdir du device est wipé (cleanup OS, reboot Windows en mode wipe-temp)        | Au prochain démarrage du keylogger, le sqlite est reconstruit depuis tous les `data.sql`. Coût : ~secondes pour une année de données.                                 |
 
-### 16.4 Boot sur un device avec data.sql d'autres devices
+### 16.4 Boot sur un device avec data.sql d’autres devices
 
 ```
 foreach folder in by_device/*/:
@@ -902,6 +904,7 @@ typing-paths multi-devices, bursts records cross-period). Stocke le
 JSON déjà projeté → l'UI n'a qu'à le `JSON.parse` + render.
 
 Schéma rappel (cf. §14) :
+
 ```sql
 view_cache (cache_key, computed_at, data_json, depends_on_today,
             size_bytes, rev)
@@ -913,6 +916,7 @@ recommandé : `sha256(JSON.stringify(canonicalized_params))[0:16]`.
 Détection du `depends_on_today` = `period_end >= today's date`.
 
 Lookup logic (côté Lua / AHK) :
+
 ```
 function get_view(cache_key, compute_fn):
   row = SELECT * FROM view_cache WHERE cache_key = ?
@@ -926,14 +930,17 @@ function get_view(cache_key, compute_fn):
 ```
 
 Invalidation par ingest batch :
+
 ```sql
 DELETE FROM view_cache WHERE depends_on_today = 1;
 ```
+
 → Les vues historiques cachent à vie. Day rollover → DELETE all (le jour
-d'hier devient « today historique » mais on préfère recompute pour les
+d’hier devient « today historique » mais on préfère recompute pour les
 filtres « rolling 7 days » qui le touchent).
 
 LRU budget `VIEW_CACHE_MAX_BYTES` (50 MB par défaut) :
+
 ```sql
 WITH ordered AS (
   SELECT cache_key FROM view_cache
@@ -991,31 +998,34 @@ CREATE INDEX idx_agg_app_day_kc_hold_keycode   ON agg_app_day_kc_hold(keycode);
 
 ### 18.3 Estimation des temps de réponse
 
-| Action utilisateur | Path | Temps perçu |
-|---|---|---|
-| Ouvrir le dashboard pour la 1re fois aujourd'hui | view_cache hit (pré-warmé) | ~5 ms first paint |
-| Ouvrir le dashboard 30 min plus tard sans avoir tapé | view_cache hit (`rev` inchangé) | <1 ms |
-| Ouvrir 30 min plus tard après ~50 frappes | view_cache miss → recompute | ~20 ms |
-| Switch « aujourd'hui » → « cette semaine » | view_cache hit (vue persistante) | <1 ms |
-| Switch app filter | view_cache miss → recompute | ~20-50 ms |
-| Switch threshold de pause | agg_app_day_buckets direct SELECT | <5 ms |
-| Vue n-grams top-100 sur 90 jours | view_cache miss → SELECT + LIMIT | ~50-150 ms puis <1 ms |
-| Live update (nouveau keystroke) | dashboard reçoit push | <5 ms |
+| Action utilisateur                                   | Path                              | Temps perçu           |
+| ---------------------------------------------------- | --------------------------------- | --------------------- |
+| Ouvrir le dashboard pour la 1re fois aujourd’hui     | view_cache hit (pré-warmé)        | ~5 ms first paint     |
+| Ouvrir le dashboard 30 min plus tard sans avoir tapé | view_cache hit (`rev` inchangé)   | <1 ms                 |
+| Ouvrir 30 min plus tard après ~50 frappes            | view_cache miss → recompute       | ~20 ms                |
+| Switch « aujourd’hui » → « cette semaine »           | view_cache hit (vue persistante)  | <1 ms                 |
+| Switch app filter                                    | view_cache miss → recompute       | ~20-50 ms             |
+| Switch threshold de pause                            | agg_app_day_buckets direct SELECT | <5 ms                 |
+| Vue n-grams top-100 sur 90 jours                     | view_cache miss → SELECT + LIMIT  | ~50-150 ms puis <1 ms |
+| Live update (nouveau keystroke)                      | dashboard reçoit push             | <5 ms                 |
 
 ### 18.4 Live updates (push depuis le keylogger)
 
 Le keylogger maintient une liste des dashboards ouverts (via leur
 webview). Après chaque ingest batch + pré-warm :
+
 ```
 foreach open_webview:
   webview.executeScript("window.metrics_on_data_update(<rev>)")
 ```
+
 Le JS regarde son `last_seen_rev` :
+
 ```js
 window.metrics_on_data_update = (rev) => {
-  if (rev === window.last_seen_rev) return;
-  refresh_dashboard_view();  // appelle get_view(...)
-  window.last_seen_rev = rev;
+	if (rev === window.last_seen_rev) return;
+	refresh_dashboard_view(); // appelle get_view(...)
+	window.last_seen_rev = rev;
 };
 ```
 
@@ -1033,7 +1043,7 @@ l'utilisateur ne tape pas.
   par défaut — VACUUM nightly suffit).
 - `data.sql` : ~même volume que db.sqlite mais en texte (plus gros,
   ~2-3×). Compresse comme un texte (Git pack files efficaces, ratio
-  >5:1).
+  > 5:1).
 
 ---
 
@@ -1053,6 +1063,7 @@ avant le premier démarrage s'il veut une mise au propre absolue.
 ## Récapitulatif des fichiers à produire
 
 Séance 2 (extraction UI partagée + branchement HS) :
+
 - `static/drivers/_shared/schema/schema.sql` — DDL canonique.
 - `static/drivers/_shared/schema/migrations/0001_initial.sql`.
 - `static/drivers/_shared/ui/metrics_apps/{index.html,script.js,style.css,README.md}`.
@@ -1067,16 +1078,19 @@ Séance 2 (extraction UI partagée + branchement HS) :
   pour pointer vers `_shared/ui/`.
 
 Séance 3 (port AHK keylogger) :
+
 - Tout sous `static/drivers/autohotkey/lib/keylogger/` (cf. §11).
 - Tests unitaires AHK qui valident la parité byte-pour-byte de `data.sql`
   généré par AHK vs HS pour des inputs identiques (modulo timestamps et
   device_id).
 
 Séance dédiée (priorité haute, après séance 4) :
+
 - Filtre password Windows robuste : UIA `IsPasswordPattern` proprement
   combiné avec heuristiques control type / class names / app focused.
   Pas de best-effort — séance entière pour faire le top.
 
 Séance 4 (UI launcher AHK) :
+
 - `static/drivers/autohotkey/lib/metrics_ui/webview2_launcher.ahk`.
 - Branchement menu tray.

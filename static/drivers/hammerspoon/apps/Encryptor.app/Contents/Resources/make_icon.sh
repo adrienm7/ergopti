@@ -1,7 +1,7 @@
 #!/bin/zsh
 # apps/Encryptor.app/Contents/Resources/make_icon.sh
 #
-# Génère AppIcon.icns depuis AppIcon.svg et rafraîchit le cache d'icône macOS.
+# Génère AppIcon.icns depuis AppIcon.svg et rafraîchit le cache d’icône macOS.
 # À exécuter une fois après installation ou mise à jour du bundle.
 set -euo pipefail
 
@@ -41,7 +41,7 @@ cp "$PNG"         "$ICONSET/icon_512x512@2x.png"
 
 iconutil -c icns "$ICONSET" -o "$ICNS"
 
-# Rafraîchir le cache d'icône du Dock
+# Rafraîchir le cache d’icône du Dock
 BUNDLE_DIR="$(cd "$SCRIPT_DIR/../.." && pwd)"
 touch "$BUNDLE_DIR"
 /System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister \

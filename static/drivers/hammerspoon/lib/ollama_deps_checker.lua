@@ -36,7 +36,7 @@ local MARKER_READY      = "OLLAMA_READY"
 -- Step labels keyed by marker. The "READY" marker also doubles as a
 -- success-final-step we render before auto-hiding.
 local PROGRESS_LABELS = {
-	[MARKER_INSTALLING] = "Installation d'Ollama…",
+	[MARKER_INSTALLING] = "Installation d’Ollama…",
 	[MARKER_STARTING]   = "Démarrage du serveur Ollama…",
 	[MARKER_READY]      = "Serveur Ollama prêt.",
 }

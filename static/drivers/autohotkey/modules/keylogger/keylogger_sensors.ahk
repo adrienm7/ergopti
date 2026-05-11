@@ -32,7 +32,7 @@
 ; 6. Batching — the timer period is intentionally long
 ;    (SENSOR_TICK_MS = 60 000 ms). One snapshot per minute is sufficient
 ;    for trend graphs; more frequent polls add WMI overhead without
-;    improving UI accuracy at the dashboard's 5-minute granularity.
+;    improving UI accuracy at the dashboard’s 5-minute granularity.
 ;
 ; LIFECYCLE:
 ; - KL_Sensors_Start() is called after KL_Mouse_Start() in ErgoptiPlus.ahk.
@@ -40,9 +40,6 @@
 ; ==============================================================================
 
 #Requires Autohotkey v2.0+
-
-
-
 
 ; ===================================
 ; ===================================
@@ -53,15 +50,12 @@
 class KLSensorConst {
     ; One snapshot per minute — coarse enough to be cheap, fine enough
     ; for per-hour aggregation in the dashboard.
-    static SENSOR_TICK_MS     := 60000
+    static SENSOR_TICK_MS := 60000
 
     ; CPU load thresholds for the thermal_state heuristic (%).
-    static THERMAL_MODERATE   := 40
-    static THERMAL_HIGH       := 80
+    static THERMAL_MODERATE := 40
+    static THERMAL_HIGH := 80
 }
-
-
-
 
 ; ===================================
 ; ===================================
@@ -72,9 +66,6 @@ class KLSensorConst {
 class KLSensors {
     static tick_fn := unset
 }
-
-
-
 
 ; =========================================
 ; =========================================
@@ -120,12 +111,12 @@ KL_Sensors_Tick() {
             "SELECT FreePhysicalMemory, TotalVisibleMemorySize FROM Win32_OperatingSystem")
         for item in q {
             total := item.TotalVisibleMemorySize
-            free  := item.FreePhysicalMemory
+            free := item.FreePhysicalMemory
             if (total > 0)
                 meta["ram_used_pct"] := Round((total - free) / total * 100)
             ; Expose absolute values in MB for the dashboard
             meta["ram_total_mb"] := Round(total / 1024)
-            meta["ram_free_mb"]  := Round(free  / 1024)
+            meta["ram_free_mb"] := Round(free / 1024)
             break
         }
     }
@@ -136,7 +127,7 @@ KL_Sensors_Tick() {
             "SELECT EstimatedChargeRemaining, BatteryStatus"
             . " FROM Win32_Battery")
         for item in q {
-            meta["battery_pct"]    := item.EstimatedChargeRemaining
+            meta["battery_pct"] := item.EstimatedChargeRemaining
             ; BatteryStatus: 1=discharging, 2=AC, 3=fully-charged
             st := item.BatteryStatus
             if (st = 2 or st = 3)
@@ -149,9 +140,6 @@ KL_Sensors_Tick() {
 
     KL_LogSystemEvent("system_load", meta)
 }
-
-
-
 
 ; =====================================
 ; =====================================

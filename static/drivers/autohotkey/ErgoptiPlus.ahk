@@ -903,7 +903,7 @@ BuildMetricsMenu() {
     if MetricsFilters.secure_field
         MetricsMenu.Check(secure_label)
 
-    sysauth_label := "Ignorer les boîtes de dialogue d'authentification système"
+    sysauth_label := "Ignorer les boîtes de dialogue d’authentification système"
     MetricsMenu.Add(sysauth_label, ToggleFilterSystemAuth)
     if MetricsFilters.system_auth
         MetricsMenu.Check(sysauth_label)
@@ -1012,7 +1012,7 @@ ToggleMetricsEnabled() {
     ; has relocated their config.
     global _ConfigDir
     metrics_path := _ConfigDir . "metrics"
-    warn := "ATTENTION : Vous êtes sur le point d'activer le keylogger.`n`n"
+    warn := "ATTENTION : Vous êtes sur le point d’activer le keylogger.`n`n"
         . "Il enregistre vos frappes au clavier à la milliseconde près. "
         . "Ces logs sont stockés en local sous :`n"
         . "    " . metrics_path . "`n`n"
@@ -1047,7 +1047,7 @@ GestureAutoConfigureAction() {
     } else {
         MsgBox(
             "Erreur lors de l'écriture du registre.`n`n"
-            . "Essayez d'exécuter le script en tant qu'administrateur,`n"
+            . "Essayez d’exécuter le script en tant qu'administrateur,`n"
             . "ou configurez manuellement (voir Instructions).",
             "ErgoptiPlus — Erreur",
             "Icon!"
@@ -1227,10 +1227,10 @@ initMenu() {
         global _PrevDefaultLabel := CurDefaultLabel
         PersonalMenu.Add("Catégorie par défaut : " . CurDefaultLabel, DefaultSectionMenu)
         ; Close-on-add toggle — mirrors HS "Fermer l'UI après ajout"
-        PersonalMenu.Add("Fermer l'UI après ajout d'un hotstring par le raccourci",
+        PersonalMenu.Add("Fermer l'UI après ajout d’un hotstring par le raccourci",
             (*) => _TogglePersonalCloseOnAdd(PersonalMenu))
         if (_EditorPrefGet("CloseOnAdd", "1") == "1") {
-            PersonalMenu.Check("Fermer l'UI après ajout d'un hotstring par le raccourci")
+            PersonalMenu.Check("Fermer l'UI après ajout d’un hotstring par le raccourci")
         }
         if (Features["Personal"].Has("__Order") and Features["Personal"]["__Order"].Length > 0) {
             PersonalMenu.Add() ; Separating line
@@ -1722,7 +1722,7 @@ _MakeSetDefaultSectionFn(SecName, PersonalMenu, TomlData, DefaultSectionMenu) {
 
 ; Toggles the close-on-add pref and the corresponding checkmark.
 _TogglePersonalCloseOnAdd(PersonalMenu) {
-    Label := "Fermer l'UI après ajout d'un hotstring par le raccourci"
+    Label := "Fermer l'UI après ajout d’un hotstring par le raccourci"
     NewVal := (_EditorPrefGet("CloseOnAdd", "1") == "1") ? "0" : "1"
     _EditorPrefSet("CloseOnAdd", NewVal)
     if (NewVal == "1") {

@@ -410,7 +410,7 @@ if Features["Shortcuts"]["Search"].Enabled {
 
         SetTimer ChangeButtonNames, 50
         Result := MsgBox("Le chemin`n" A_Clipboard "`na été copié dans le presse-papier. `n`nVoulez-vous la version avec des \ à la place des / ?",
-            "Copie du chemin d'accès", "YesNo")
+            "Copie du chemin d’accès", "YesNo")
         if (Result == "No") {
             A_Clipboard := PathWithBackslash
             Sleep(200)
@@ -418,7 +418,7 @@ if Features["Shortcuts"]["Search"].Enabled {
         }
     }
     ChangeButtonNames() {
-        if not WinExist("Copie du chemin d'accès")
+        if not WinExist("Copie du chemin d’accès")
             return ; Keep waiting
         SetTimer ChangeButtonNames, 0
         WinActivate()

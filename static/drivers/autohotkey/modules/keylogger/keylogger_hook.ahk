@@ -49,9 +49,6 @@
 
 #Requires Autohotkey v2.0+
 
-
-
-
 ; ===================================
 ; ===================================
 ; ======= 1/ Constants =======
@@ -66,7 +63,7 @@ class KLHookConst {
 
     ; Window context (active app + title) is cheap to refresh but the
     ; per-keystroke cost adds up — cache for this many ms.
-    static CONTEXT_TTL_MS  := 500
+    static CONTEXT_TTL_MS := 500
 }
 
 ; Special-key VK → bracket marker. Mirrors the macOS hs.eventtap codepath
@@ -88,9 +85,6 @@ global KLHOOK_SPECIAL := Map(
     0x22, "[PGDN]"
 )
 
-
-
-
 ; ===================================
 ; ===================================
 ; ======= 2/ Module state =======
@@ -98,20 +92,20 @@ global KLHOOK_SPECIAL := Map(
 ; ===================================
 
 class KLHook {
-    static ih           := unset   ; the live InputHook object
-    static flush_timer  := unset   ; bound function reference for SetTimer
-    static last_tick    := 0       ; A_TickCount of the last captured event
+    static ih := unset   ; the live InputHook object
+    static flush_timer := unset   ; bound function reference for SetTimer
+    static last_tick := 0       ; A_TickCount of the last captured event
 
     ; Last (vk, sc) seen by OnKeyDown — paired with OnChar so each
     ; printable char carries both the virtual keycode AND the hardware
     ; scancode. The scancode is layout-independent and is what the
     ; Windows heatmap renders against.
-    static last_vk      := 0
-    static last_sc      := 0
+    static last_vk := 0
+    static last_sc := 0
 
     ; Active-window context cache. Avoids hammering Win32 on every
     ; keystroke; refreshed at most every CONTEXT_TTL_MS.
-    static context_at   := 0
+    static context_at := 0
 
     ; Previous (app, title) values + their entry tick — used to emit
     ; ``app_switch`` / ``window_switch`` events when the focused app or
@@ -119,14 +113,11 @@ class KLHook {
     ; ``"" / 0`` signals « no observation yet », so the first refresh
     ; only seeds the values without emitting a spurious switch from
     ; the static "Unknown" defaults.
-    static prev_app       := ""
-    static prev_title     := ""
+    static prev_app := ""
+    static prev_title := ""
     static app_entered_at := 0
     static title_entered_at := 0
 }
-
-
-
 
 ; ====================================
 ; ====================================
@@ -138,7 +129,7 @@ KL_Hook_RefreshContext() {
     if (A_TickCount - KLHook.context_at) < KLHookConst.CONTEXT_TTL_MS
         return
     NewTitle := ""
-    NewApp   := ""
+    NewApp := ""
     try {
         NewTitle := WinGetTitle("A")
     }
@@ -174,12 +165,9 @@ KL_Hook_RefreshContext() {
     }
 
     Keylogger.session_title := NewTitle
-    Keylogger.session_app   := NewApp
-    KLHook.context_at       := Now
+    Keylogger.session_app := NewApp
+    KLHook.context_at := Now
 }
-
-
-
 
 ; =========================================
 ; =========================================
@@ -293,13 +281,10 @@ KL_Hook_OnKeyDown(ih, vk, sc) {
             Keylogger.buffer_text .= "`n"
         case 0x09:
             Keylogger.buffer_text .= "`t"
-        ; Arrow keys, Esc, F-keys etc. do not insert any character so
-        ; we leave buffer_text untouched.
+            ; Arrow keys, Esc, F-keys etc. do not insert any character so
+            ; we leave buffer_text untouched.
     }
 }
-
-
-
 
 ; =====================================
 ; =====================================
@@ -309,20 +294,17 @@ KL_Hook_OnKeyDown(ih, vk, sc) {
 
 KL_Hook_Tick() {
     ; Fire only when the buffer has something to commit. We then flush
-    ; AND chain straight into KL_IngestOnce so the dashboard's live
+    ; AND chain straight into KL_IngestOnce so the dashboard’s live
     ; channel sees the new keystrokes within ~500 ms instead of waiting
     ; for the slower 5 s ingest cadence. The cached SQLite DB makes
     ; this near-free (only the new INSERTs are exec'd).
     if (Keylogger.buffer_events.Length = 0
-        && Keylogger.session_clicks  = 0
+        && Keylogger.session_clicks = 0
         && Keylogger.session_scrolls = 0)
         return
     try KL_FlushBuffer()
     try KL_IngestOnce()
 }
-
-
-
 
 ; =====================================
 ; =====================================
@@ -343,7 +325,7 @@ KL_Hook_Start() {
     ; still raise OnKeyDown — without this they would be silently
     ; absorbed by the ``Input`` wrapper.
     ih.NotifyNonText := true
-    ih.OnChar    := KL_Hook_OnChar
+    ih.OnChar := KL_Hook_OnChar
     ih.OnKeyDown := KL_Hook_OnKeyDown
     ih.Start()
     KLHook.ih := ih

@@ -333,7 +333,7 @@ function M.interactive_screenshot()
 		"/usr/sbin/screencapture",
 		function(exit_code, _, _)
 			if exit_code == 0 then
-				notifications.notify("Capture d'écran copiée dans le presse-papiers", nil, "success")
+				notifications.notify("Capture d’écran copiée dans le presse-papiers", nil, "success")
 				Logger.done(LOG, "Interactive screenshot completed.")
 			else
 				Logger.warn(LOG, "Interactive screenshot failed or was cancelled.")

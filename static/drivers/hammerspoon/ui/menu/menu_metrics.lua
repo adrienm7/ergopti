@@ -410,7 +410,7 @@ function M.build(ctx)
 	})
 
 	table.insert(menu, {
-		title    = "Ignorer les boîtes de dialogue d'authentification système",
+		title    = "Ignorer les boîtes de dialogue d’authentification système",
 		checked  = state.keylogger_system_auth_filter_enabled,
 		disabled = not state.keylogger_enabled,
 		fn       = function()

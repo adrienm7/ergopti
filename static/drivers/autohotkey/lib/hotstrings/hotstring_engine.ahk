@@ -84,7 +84,7 @@ global _SC_ALTGR := 0x38   ; SC138 lower byte once stripped of E0.
 ; every SC138 press through. The discriminator is therefore "SC138 maps to
 ; anything other than VK_RMENU" rather than a specific Kana check.
 ;
-; GetKeyboardLayout(0) returns the calling thread's HKL — for the AHK
+; GetKeyboardLayout(0) returns the calling thread’s HKL — for the AHK
 ; script's main thread, that may differ from the foreground app's HKL after
 ; a Win+Space switch. Resolve the foreground window's thread HKL instead so
 ; the probe reflects the layout the user is actually typing under.

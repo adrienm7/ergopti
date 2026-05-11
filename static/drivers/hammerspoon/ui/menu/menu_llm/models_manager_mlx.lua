@@ -729,7 +729,7 @@ PY
 				-- Persist the resolved snapshot path so api_mlx can use the SAME
 				-- value in the "model" field of every POST payload. mlx_lm.server
 				-- routes each request through model_provider.load() keyed by the
-				-- payload's "model" string; if we send the repo id instead of the
+				-- payload’s "model" string; if we send the repo id instead of the
 				-- local path, the server tries snapshot_download on the repo and
 				-- fails with the offline error. Identical strings → cache hit on
 				-- the model loaded at boot, no HF call.

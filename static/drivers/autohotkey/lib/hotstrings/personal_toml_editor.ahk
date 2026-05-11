@@ -743,7 +743,7 @@ _BuildEntry(TriggerEdit, OutputEdit, ChkIsWord, ChkAutoExp, ChkCaseSens, ChkFina
 _SaveData(W, LV, StatusText) {
     global _PersonalEditorData, _PersonalEditorSection
     if !WritePersonalToml(_PersonalEditorData) {
-        StatusText.Value := "⚠ Erreur d'écriture dans personal_hotstrings.toml."
+        StatusText.Value := "⚠ Erreur d’écriture dans personal_hotstrings.toml."
         return false
     }
     FeatureConfig := { TimeActivationSeconds: 0 }
@@ -765,7 +765,7 @@ _AddEntry(W, LV, TriggerEdit, OutputEdit, ChkIsWord, ChkAutoExp, ChkCaseSens, Ch
         return
     }
     if (_PersonalEditorSection == "") {
-        StatusText.Value := "⚠ Sélectionnez ou créez une section d'abord."
+        StatusText.Value := "⚠ Sélectionnez ou créez une section d’abord."
         return
     }
     ; Check for duplicate trigger in this section

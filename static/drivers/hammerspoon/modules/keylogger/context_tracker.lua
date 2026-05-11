@@ -98,7 +98,7 @@ local function update_secure_field_state(element)
 end
 
 --- Handles AXValueChanged events to detect macOS native autocorrect substitutions.
---- A sudden large delta in the field's text value (without matching keystrokes)
+--- A sudden large delta in the field’s text value (without matching keystrokes)
 --- signals a native substitution; we flush the buffer and log the event.
 --- @param element table The AX element whose value changed.
 local function handle_ax_value_changed(element)

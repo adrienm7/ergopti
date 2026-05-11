@@ -100,7 +100,7 @@ wait_for_server() {
 
 if ! command -v ollama >/dev/null 2>&1; then
 	emit_marker "OLLAMA_INSTALLING"
-	log_info "Installation automatique d'Ollama…"
+	log_info "Installation automatique d’Ollama…"
 
 	if command -v brew >/dev/null 2>&1; then
 		log_info "Homebrew détecté — installation via 'brew install ollama'."
@@ -109,13 +109,13 @@ if ! command -v ollama >/dev/null 2>&1; then
 			exit 1
 		fi
 	else
-		log_info "Pas d'Homebrew — utilisation de l'installeur officiel curl … | sh."
+		log_info "Pas d’Homebrew — utilisation de l'installeur officiel curl … | sh."
 		if ! command -v curl >/dev/null 2>&1; then
 			log_error "'curl' introuvable — impossible de télécharger Ollama. Vérifiez l'installation de macOS."
 			exit 1
 		fi
 		if ! curl -fsSL https://ollama.com/install.sh | sh >&2; then
-			log_error "Téléchargement / installation d'Ollama impossible. Vérifiez votre réseau (ou un éventuel pare-feu)."
+			log_error "Téléchargement / installation d’Ollama impossible. Vérifiez votre réseau (ou un éventuel pare-feu)."
 			exit 1
 		fi
 	fi

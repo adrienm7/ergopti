@@ -174,7 +174,7 @@ try_update_lib() {
         debian|ubuntu|pop|linuxmint)
             sudo apt update && sudo apt install -y git meson ninja-build bison flex libxml2-dev libwayland-dev libxkbcommon-dev wayland-protocols g++ libxcb-xkb-dev libxcb1-dev ;;
         *)
-            echo "Distro inconnue, tentative d'installation générique impossible." ;;
+            echo "Distro inconnue, tentative d’installation générique impossible." ;;
     esac
 
     printf "   ${BLUE}2. Compilation depuis les sources...${NO_COLOR}\n"

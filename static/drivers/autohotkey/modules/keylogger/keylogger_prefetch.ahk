@@ -64,7 +64,7 @@ KLPF_PrefetchPath(which) {
 ; an empty state).
 ; mode: "full" (default) — manifest + n-grams + range data.
 ;       "manifest" — skip n-grams. Used by the fast 500 ms flush tick
-;       so the dashboard's KPI counters update near-instantly without
+;       so the dashboard’s KPI counters update near-instantly without
 ;       paying the ~2-3 s n-gram projection + ~1 s JSON encode cost.
 KLPF_BuildAndWrite(which, metrics_dir, dbg := "", mode := "full") {
     if (dbg = "") {
@@ -297,7 +297,7 @@ KLPF_KeycodeLayout() {
     }
 
     ; Resolve the active layout for the foreground window. Falls back
-    ; to the script thread's layout if the lookup fails.
+    ; to the script thread’s layout if the lookup fails.
     hkl := 0
     try {
         hwnd := DllCall("GetForegroundWindow", "ptr")

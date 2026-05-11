@@ -69,13 +69,13 @@
 <tiny-space></tiny-space>
 
 <p>
-	Le processus d'installation utilise un script bash unique qui gère la sélection interactive
+	Le processus d’installation utilise un script bash unique qui gère la sélection interactive
 	(version, variante, options) puis lance automatiquement l'installateur approprié. Deux méthodes
-	d'installation sont disponibles :
+	d’installation sont disponibles :
 </p>
 <ul>
 	<li>
-		<strong>Méthode "Clean"</strong> (recommandée) : utilise un répertoire d'extensions utilisateur
+		<strong>Méthode "Clean"</strong> (recommandée) : utilise un répertoire d’extensions utilisateur
 		non invasif (<code>/usr/share/xkeyboard-config.d/</code>). Cette méthode n’existe que depuis fin
 		2025 et n’est disponible que sur les distributions les plus à jour comme Arch ou Fedora. En
 		effet, elle nécessite libxkbcommon ≥ 1.13.0.
@@ -93,7 +93,7 @@
 </p>
 <div class="download-buttons">
 	<a href={base + '/drivers/linux/xkb_installation/install.sh'} download>
-		<button class="alt-button"><i class="icon-linux"></i> Script complet d'installation</button>
+		<button class="alt-button"><i class="icon-linux"></i> Script complet d’installation</button>
 	</a>
 	<a href={base + '/drivers/linux/xkb_installation/detect_installation_method.sh'} download>
 		<button class="alt-button"><i class="icon-linux"></i> Script de détection de méthode</button>
@@ -114,7 +114,7 @@
 <p>Voici un résumé de ce que réalise l'installateur Clean :</p>
 <ul>
 	<li>
-		<strong>Installation non invasive</strong> : crée un répertoire d'extension dans
+		<strong>Installation non invasive</strong> : crée un répertoire d’extension dans
 		<code>/usr/share/xkeyboard-config.d/ergopti/</code>
 		contenant les fichiers de définition du layout (symbols, types, règles). Cette méthode ne modifie
 		aucun fichier système existant.
@@ -122,12 +122,12 @@
 	<li>
 		<strong>.XCompose</strong> : création (ou remplacement s'il existe déjà) du fichier
 		<code>.XCompose</code>
-		dans le home de l'utilisateur (<code>~/.XCompose</code>). Cela permet d'utiliser les touches
+		dans le home de l'utilisateur (<code>~/.XCompose</code>). Cela permet d’utiliser les touches
 		mortes ainsi que les sorties en plusieurs caractères, comme les ponctuations avec espaces
 		insécables automatiques.
 	</li>
 	<li>
-		<strong>Activation</strong> : le script tente d'appliquer la disposition via
+		<strong>Activation</strong> : le script tente d’appliquer la disposition via
 		<code>setxkbmap</code> et de purger le cache XKB pour une application immédiate des changements.
 	</li>
 </ul>
@@ -181,7 +181,7 @@
 </ul>
 
 <p>
-	En bref : la méthode Clean installe dans un répertoire d'extensions sans toucher aux fichiers
+	En bref : la méthode Clean installe dans un répertoire d’extensions sans toucher aux fichiers
 	système, tandis que la méthode Legacy modifie directement les fichiers système XKB.
 </p>
 

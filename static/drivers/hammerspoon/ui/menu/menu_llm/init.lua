@@ -1552,7 +1552,7 @@ function M.create(deps)
                         Logger.warn(LOG, "keymap.set_llm_enabled is unavailable.")
                     end
                     -- The first activation is when the user expects to see the
-                    -- backend's deps install — fire the deps bootstrap here.
+                    -- backend’s deps install — fire the deps bootstrap here.
                     -- It's idempotent and silent when the venv is already in
                     -- sync, so toggling LLM on/off in succession costs nothing.
                     if state.llm_enabled then

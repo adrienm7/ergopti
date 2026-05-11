@@ -453,7 +453,7 @@ local function build_sticky_delay_item(karabiner, update_menu)
 		fn    = function()
 			hs.focus()
 			local script = string.format(
-				"display dialog \"Délai d'annulation sticky (millisecondes)\\n"
+				"display dialog \"Délai d’annulation sticky (millisecondes)\\n"
 				.. "Après ce délai sans frappe, le modificateur one-shot est annulé.\" "
 				.. "default answer \"%d\" "
 				.. "with title \"Karabiner — Délai sticky\" "
@@ -485,16 +485,16 @@ local function build_simultaneous_threshold_item(karabiner, update_menu)
 	local threshold_ms = karabiner.get_simultaneous_threshold()
 
 	return {
-		title = string.format("Délai d'activation des combos : %s", fmt_delay(threshold_ms)),
+		title = string.format("Délai d’activation des combos : %s", fmt_delay(threshold_ms)),
 		fn    = function()
 			hs.focus()
 			local script = string.format(
 				"display dialog \"Délai maximal (en millisecondes) entre la 1re\\n"
-				.. "et la 2e touche d'un raccourci pour déclencher le slot \\\"Combo\\\"\\n"
+				.. "et la 2e touche d’un raccourci pour déclencher le slot \\\"Combo\\\"\\n"
 				.. "(activation de type accord : touches pressées quasi en même temps).\\n\\n"
 				.. "(défaut : %d ms)\" "
 				.. "default answer \"%d\" "
-				.. "with title \"Karabiner — Délai d'activation des combos\" "
+				.. "with title \"Karabiner — Délai d’activation des combos\" "
 				.. "buttons {\"Annuler\", \"OK\"} "
 				.. "default button \"OK\"",
 				karabiner.DEFAULT_SIMULTANEOUS_THRESHOLD_MS,
