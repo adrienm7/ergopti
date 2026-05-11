@@ -45,7 +45,7 @@ SortArray(arr) {
         i := A_Index
         loop n - i {
             j := A_Index
-            if (arr[j] > arr[j + 1]) {
+            if (StrCompare(arr[j], arr[j + 1]) > 0) {
                 tmp := arr[j]
                 arr[j] := arr[j + 1]
                 arr[j + 1] := tmp
