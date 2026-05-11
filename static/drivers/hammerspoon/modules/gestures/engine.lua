@@ -191,15 +191,40 @@ local function signedDist(pos)
 	return (_state.natural_scroll and -dx) or dx
 end
 
+--- Compute signed distance along a given axis ('horiz'|'vert').
+--- @param pos table Position table.
+--- @param axis string Axis name.
+local function signedDistAxis(pos, axis)
+	if not gs.startPos then return 0 end
+	if axis == "horiz" then
+		local dx = pos.x - gs.startPos.x
+		return (_state.natural_scroll and -dx) or dx
+	else
+		return pos.y - gs.startPos.y
+	end
+end
+
+--- Resolve vertical slots (up/down) for a given finger count.
+--- @param mf number Number of fingers.
+--- @param goDown boolean True when movement is downwards.
+local function slotForVertical(mf, goDown)
+	if mf == 2 then return nil end
+	if mf == 3 then return goDown and "swipe_3_down" or "swipe_3_up" end
+	if mf == 4 then return goDown and "swipe_4_down" or "swipe_4_up" end
+	if mf >= 5 then return goDown and "swipe_5_down" or "swipe_5_up" end
+	return nil
+end
+
 --- Triggers non-scalable horizontal actions during the gesture to reduce latency.
 --- @param slot string|nil The action slot resolved from direction and finger count.
 --- @param pos table Current centroid position.
 --- @param now number Current timestamp.
-local function triggerLiveAxisIfNeeded(slot, pos, now)
+local function triggerLiveAxisIfNeeded(slot, pos, now, axis)
 	if not slot or not _state.ga[slot] or _state.ga[slot] == "none" then return end
-	if _actions.is_scalable(_state.ga[slot]) then return end
+	local action = _state.ga[slot]
+	if _actions.is_scalable(action) then return end
 
-	local sd = signedDist(pos)
+	local sd = signedDistAxis(pos, axis)
 	if math.abs(sd) < LIVE_AXIS_MIN then return end
 
 	local sign = (sd > 0) and 1 or -1
@@ -211,8 +236,13 @@ local function triggerLiveAxisIfNeeded(slot, pos, now)
 	end
 	if gs.lastLiveFire and (now - gs.lastLiveFire) < rearm_delay then return end
 
-	Logger.info(LOG, string.format("Horizontal swipe live trigger on slot: %s (sign=%d).", slot, sign))
-	_actions.execute_axis(_state.ga[slot], sign > 0)
+	Logger.info(LOG, string.format("%s swipe live trigger on slot: %s (sign=%d).", (axis == "horiz") and "Horizontal" or "Vertical", slot, sign))
+
+	-- Try executing both single and axis variants; one will be a no-op depending
+	-- on how the action is registered in the actions table. This keeps the
+	-- engine tolerant to user mappings (single vs axis actions).
+	pcall(function() _actions.execute_single(action) end)
+	pcall(function() _actions.execute_axis(action, sign > 0) end)
 
 	-- Rebase after each live trigger so a quick direction reversal can fire promptly.
 	gs.liveAxisSign = sign
@@ -256,20 +286,7 @@ local function commitGesture(now)
 	local dir = computeDir(dx, dy, mf)
 	if not dir then return end
 
-	if dir == "vert" then
-		local goDown = dy < 0
-		local slot = nil
-		if     mf == 3 then slot = goDown and "swipe_3_down" or "swipe_3_up"
-		elseif mf == 4 then slot = goDown and "swipe_4_down" or "swipe_4_up"
-		elseif mf >= 5 then slot = goDown and "swipe_5_down" or "swipe_5_up" end
-		
-		if slot and _state.ga[slot] then
-			Logger.info(LOG, string.format("Vertical swipe validated on slot: %s.", slot))
-			_actions.execute_single(_state.ga[slot])
-		end
-		return
-	end
-
+	-- If diagonal mapping is unavailable, collapse to the dominant axis.
 	if dir == "diag" then
 		local diag_slot = slotForDir(mf, dir)
 		if not diag_slot or _state.ga[diag_slot] == "none" then
@@ -277,26 +294,48 @@ local function commitGesture(now)
 		end
 	end
 
+	local slot = nil
 	if dir == "vert" then
 		local goDown = dy < 0
-		local slot = nil
-		if     mf == 3 then slot = goDown and "swipe_3_down" or "swipe_3_up"
-		elseif mf == 4 then slot = goDown and "swipe_4_down" or "swipe_4_up"
-		elseif mf >= 5 then slot = goDown and "swipe_5_down" or "swipe_5_up" end
-		
-		if slot and _state.ga[slot] then _actions.execute_single(_state.ga[slot]) end
-		return
+		slot = slotForVertical(mf, goDown)
+	else
+		slot = slotForDir(mf, dir)
 	end
 
-	local slot = slotForDir(mf, dir)
 	if not slot or _state.ga[slot] == "none" then return end
-	
-	if not _actions.is_scalable(_state.ga[slot]) then
+
+	-- Unified commit behaviour: if the mapped action is scalable, compute the
+	-- requested number of axis steps based on distance; otherwise, perform a
+	-- single action repeated proportional to swipe length (keeps vertical and
+	-- horizontal consistent).
+	local action = _state.ga[slot]
+	if not action or action == "none" then return end
+
+	if _actions.is_scalable(action) then
+		local sd = signedDistAxis(gs.endPos, dir)
+		local targetSteps = math.floor(sd / SCALE_DIV)
+		local diff = targetSteps - gs.stepsCommitted
+
+		if diff > 0 then
+			for _ = 1, diff do pcall(_actions.execute_axis, action, true) end
+		elseif diff < 0 then
+			for _ = 1, -diff do pcall(_actions.execute_axis, action, false) end
+		end
+		gs.stepsCommitted = targetSteps
+	else
 		if gs.liveAxisSign ~= nil then return end
-		local sd = signedDist(gs.endPos)
+		local sd = signedDistAxis(gs.endPos, dir)
 		if math.abs(sd) >= SWIPE_MIN then
-			Logger.info(LOG, string.format("Horizontal swipe validated on slot: %s.", slot))
-			_actions.execute_axis(_state.ga[slot], sd > 0)
+			Logger.info(LOG, string.format("%s swipe validated on slot: %s.", (dir == "horiz") and "Horizontal" or "Vertical", slot))
+			-- Try axis variant once (no-op if not registered as axis), then
+			-- execute single action repeatedly according to swipe length.
+			pcall(_actions.execute_axis, action, sd > 0)
+			local steps = math.floor(math.abs(sd) / SCALE_DIV)
+			if steps <= 0 then
+				pcall(_actions.execute_single, action)
+			else
+				for _ = 1, steps do pcall(_actions.execute_single, action) end
+			end
 		end
 	end
 end
@@ -430,21 +469,31 @@ function M.process_frame(touches)
 					gs.lockedDir = tentative
 				end
 
-				if gs.lockedDir and gs.lockedDir ~= "vert" then
-					local slot = slotForDir(gs.maxFingers, gs.lockedDir)
-					if slot and _actions.is_scalable(_state.ga[slot]) then
-						local sd          = signedDist(pos)
-						local targetSteps = math.floor(sd / SCALE_DIV)
-						local diff        = targetSteps - gs.stepsCommitted
-						
-						if diff > 0 then
-							for _ = 1, diff  do _actions.execute_axis(_state.ga[slot], true)  end
-						elseif diff < 0 then
-							for _ = 1, -diff do _actions.execute_axis(_state.ga[slot], false) end
+				if gs.lockedDir then
+					local axis = gs.lockedDir
+					local slot = nil
+					if axis == "vert" then
+						local dy = pos.y - gs.startPos.y
+						local goDown = dy < 0
+						slot = slotForVertical(gs.maxFingers, goDown)
+					else
+						slot = slotForDir(gs.maxFingers, axis)
+					end
+					if slot and _state.ga[slot] and _state.ga[slot] ~= "none" then
+						local action = _state.ga[slot]
+						if _actions.is_scalable(action) then
+							local sd = signedDistAxis(pos, axis)
+							local targetSteps = math.floor(sd / SCALE_DIV)
+							local diff = targetSteps - gs.stepsCommitted
+							if diff > 0 then
+								for _ = 1, diff do pcall(_actions.execute_axis, action, true) end
+							elseif diff < 0 then
+								for _ = 1, -diff do pcall(_actions.execute_axis, action, false) end
+							end
+							gs.stepsCommitted = targetSteps
+						else
+							triggerLiveAxisIfNeeded(slot, pos, now, axis)
 						end
-						gs.stepsCommitted = targetSteps
-					elseif slot then
-						triggerLiveAxisIfNeeded(slot, pos, now)
 					end
 				end
 			end

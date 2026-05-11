@@ -549,7 +549,7 @@ local CMD_LETTERS = {
 -- Axis actions (prev / next) — scalable=true for continuous actions
 ax("tabs",       "Onglets",
 	function() pcall(hs.eventtap.keyStroke, {"ctrl", "shift"}, "tab") end,
-	function() pcall(hs.eventtap.keyStroke, {"ctrl"}, "tab") end)
+	function() pcall(hs.eventtap.keyStroke, {"ctrl"}, "tab") end, true)
 
 ax("windows",    "Fenêtres",
 	function() winNav(false) end, 
