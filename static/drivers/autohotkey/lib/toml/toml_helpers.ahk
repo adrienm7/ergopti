@@ -242,7 +242,13 @@ TOML_BatchWrite(Path, Updates) {
             Sections[Sec] := Map()
             order.Push(Sec)
         }
-        Sections[Sec][K] := V
+        ; Sentinel value "_DELETE_" removes the key rather than writing it
+        if (V == "_DELETE_") {
+            if Sections[Sec].Has(K)
+                Sections[Sec].Delete(K)
+        } else {
+            Sections[Sec][K] := V
+        }
     }
 
     body := ""
@@ -331,7 +337,7 @@ TOML_RunStrictCanonicalization(Path) {
         return
     if (Path != ConfigurationFile)
         return
-    if !IsSet(SaveFullConfig)
+    if !IsFunc("SaveFullConfig")
         return
 
     _TOML_STRICT_CANON_IN_PROGRESS := true
