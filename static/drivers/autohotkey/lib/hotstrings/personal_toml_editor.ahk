@@ -316,10 +316,10 @@ WritePersonalToml(Data) {
     ; Construct path: from A_ScriptDir (ErgoptiPlus.ahk location), walk up to repo root
     ; Pattern: C:\Users\...\ergopti\static\drivers\autohotkey\ErgoptiPlus.ahk
     ; Repo root: C:\Users\...\ergopti\
-    ScriptDir := SubStr(A_ScriptDir, 1, -31)  ; Remove "static\drivers\autohotkey"
+    ScriptDir := RegExReplace(A_ScriptDir, "\\?static\\drivers\\autohotkey$", "") . "\"
     FormatScript := ScriptDir . "tools\format_toml.py"
     if (FileExist(FormatScript)) {
-        RunWait(Format('python3 "{}" "{}"', FormatScript, FilePath), , 0)
+        RunWait(Format('python "{}" "{}"', FormatScript, FilePath), , 0)
     }
 
     return True
@@ -395,10 +395,10 @@ WritePersonalInfoToml(FilePath) {
     FileObj.Close()
 
     ; Reformat using centralized Python script for consistent styling
-    ScriptDir := SubStr(A_ScriptDir, 1, -31)  ; Remove "static\drivers\autohotkey"
+    ScriptDir := RegExReplace(A_ScriptDir, "\\?static\\drivers\\autohotkey$", "") . "\"
     FormatScript := ScriptDir . "tools\format_toml.py"
     if (FileExist(FormatScript)) {
-        RunWait(Format('python3 "{}" "{}"', FormatScript, FilePath), , 0)
+        RunWait(Format('python "{}" "{}"', FormatScript, FilePath), , 0)
     }
 
     return True
