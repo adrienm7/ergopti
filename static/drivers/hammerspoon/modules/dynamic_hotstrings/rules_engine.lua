@@ -294,7 +294,7 @@ function M.start(keymap_module)
 		{ name = "ssnprefixes",   description = "Saisir les premiers chiffres du numéro de sécurité sociale le complète automatiquement", count = 0 },
 		{ name = "ibanprefixes",  description = "Saisir les premiers caractères de l'IBAN le complète automatiquement", count = 0 },
 		{ name = "-" },
-		{ name = "textexpansionpersonalinformation", description = "Remplissage de formulaires avec le suffixe @ : @np★ = Nom ⇥ Prénom, etc.", count = 0, is_module_placeholder = true },
+		{ name = "textexpansionpersonalinformation", count = 0, is_module_placeholder = true },
 	}
 
 	if _km.register_lua_group then

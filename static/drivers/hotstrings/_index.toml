@@ -15,3 +15,4 @@ categories_order = ["distancesreduction", "sfbsreduction", "rolls", "autocorrect
 
 [modules.dynamichotstrings.textexpansionpersonalinformation]
 mod_id = "personal_info"
+description = "Remplissage de formulaires avec le préfixe @ : @np★ = Nom ⇥ Prénom, etc."
