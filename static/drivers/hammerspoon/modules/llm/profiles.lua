@@ -134,9 +134,23 @@ end
 --- @param active_id string The ID of the currently requested profile.
 --- @param user_profiles table Current user defined profiles.
 --- @return table The active profile object.
+-- Migration table for IDs that were renamed in previous versions.
+local LEGACY_IDS = {
+	parallel          = "basic",
+	batch             = "batch_advanced",
+	parallel_advanced = "advanced",
+	base_completion   = "raw",
+}
+
 function M.get_active_profile(active_id, user_profiles)
 	local id = tostring(active_id)
-	
+
+	-- Silently migrate stale IDs saved before the profile rename.
+	if LEGACY_IDS[id] then
+		Logger.debug(LOG, "Migrating legacy profile id '%s' → '%s'.", id, LEGACY_IDS[id])
+		id = LEGACY_IDS[id]
+	end
+
 	for _, p in ipairs(M.get_all_profiles(user_profiles)) do
 		if type(p) == "table" and p.id == id then return p end
 	end

@@ -264,7 +264,20 @@ end
 -- =============================
 -- =============================
 
-M.ACTIONS       = GestActions.SG_NAMES
+M.ACTIONS = GestActions.SG_NAMES
+
+-- Build a flat id→label lookup from SG_NAMES, skipping separators and headers.
+do
+	local labels = {}
+	if type(M.ACTIONS) == "table" then
+		for _, id in ipairs(M.ACTIONS) do
+			if type(id) == "string" and id ~= "-" and id ~= "--" and id:sub(1, 1) ~= "#" then
+				labels[id] = GestActions.get_label(id)
+			end
+		end
+	end
+	M.ACTION_LABELS = labels
+end
 
 --- Retrieves the localized label for a given action ID.
 --- @param name string The action ID.
