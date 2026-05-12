@@ -8,7 +8,7 @@
 color = "#e53935"
 delay = 2.0
 description = "Touche ★ et expansion de texte"
-sections_order = ["replace", "repeat", "-", "textexpansion", "textexpansionauto", "textexpansionemojis", "textexpansionsymbols", "textexpansionsymbolstypst", "-", "textexpansionpersonalinformation"]
+sections_order = ["replace", "repeat", "-", "textexpansion", "textexpansionauto", "textexpansionemojis", "textexpansionsymbols", "textexpansionsymbolstypst"]
 
 
 
