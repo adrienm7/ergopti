@@ -250,6 +250,35 @@ for _Slot in SCRIPT_SHORTCUT_SLOTS {
     ScriptShortcutAssignments[_Slot] := SCRIPT_SHORTCUT_DEFAULTS[_Slot]
 }
 
+; Configurable keyboard shortcuts — Ctrl/Win/Alt × a-z, 0-9 and special keys.
+; Each slot id matches a GESTURE_ACTIONS key (e.g. "win_a", "ctrl_b").
+; Defaults below mirror the legacy hard-coded shortcuts so a fresh install
+; behaves identically to before while giving the user full control via the menu.
+global KEYBOARD_SHORTCUT_DEFAULTS := Map(
+    "win_a", "select_line",
+    "win_d", "open_hotstrings_editor",
+    "win_g", "open_url",
+    "win_h", "screen_capture",
+    "win_m", "activity_simulation",
+    "win_n", "take_note",
+    "win_o", "surround_parens",
+    "win_s", "search_web",
+    "win_t", "teleport_mouse",
+    "win_u", "uppercase_selection",
+    "win_w", "titlecase_selection",
+    "win_x", "pick_color",
+    "win_sc029", "screen_capture_instant",
+    "ctrl_b", "microsoft_bold",
+    "ctrl_shift_v", "paste_plain",
+)
+; AHK send-key codes for each slot — must match GESTURE_ACTIONS Fn lambdas.
+; Slots not listed here are generated dynamically from their suffix.
+global KEYBOARD_SHORTCUT_SEND_CODES := Map(
+    "win_sc029", "#SC029",
+    "ctrl_shift_v", "^+v",
+)
+global KeyboardShortcutAssignments := Map()
+
 ; ParseTomlFile / IniCacheGet / ResolveConfigPath are defined in lib/ini_helpers.ahk
 ; (included above) so the test runner can exercise them in isolation.
 
@@ -1452,6 +1481,9 @@ initMenu() {
         A_TrayMenu.Check(GetCategoryTitle("Gestures"))
     }
 
+    ; ── Raccourcis clavier configurables — Ctrl/Win/Alt × toutes touches ──
+    A_TrayMenu.Add("⌨️ Raccourcis clavier", BuildKeyboardShortcutsMenu())
+
     A_TrayMenu.Add() ; Single separator between feature submenus and configuration items
 
     ; ── Actions globales — bulk-toggle / reset-defaults actions kept as a
@@ -1780,6 +1812,23 @@ if Features.Has("Personal") {
 ; Load script-shortcut overrides now that GESTURE_ACTIONS is defined — the
 ; reader validates each candidate action name against the registry.
 ReadScriptShortcutsConfig()
+
+; Seed keyboard shortcut assignments with defaults, then apply any user overrides.
+ReadKeyboardShortcutsConfig()
+
+; Register configurable hotkeys for each Ctrl/Win/Alt slot that has a non-"none"
+; assignment. All hotkeys call RunKeyboardShortcutAction with their slot id.
+; The Features["Shortcuts"] hard-coded behaviours (Win+A, Win+G, …) remain
+; active alongside these — the user disables individual Features items if they
+; prefer the configurable system exclusively.
+for _KbSlot, _KbAction in KeyboardShortcutAssignments {
+    if (_KbAction == "none")
+        continue
+    _KbSend := _KeyboardSlotSendCode(_KbSlot)
+    if (_KbSend == "")
+        continue
+    try Hotkey(_KbSend, ((_s) => (*) => RunKeyboardShortcutAction(_s))(_KbSlot))
+}
 
 ; Load every UI shortcut + privacy filter from the [shortcuts] section
 ; of ahk/config.toml. CS_Load() populates both MetricsShortcuts
@@ -2403,6 +2452,152 @@ BuildScriptShortcutsMenu() {
         SMenu.Add(SCRIPT_SHORTCUT_LABELS[Slot] . " : " . CurrentLabel, SlotMenu)
     }
     return SMenu
+}
+
+; ============================================================
+; ============================================================
+; ======= Keyboard Shortcuts — configurable Ctrl/Win/Alt =======
+; ============================================================
+; ============================================================
+
+; Derive the AHK send-code for a slot id from its suffix when not in the
+; explicit override table. "win_a" → "#a", "ctrl_0" → "^0", "alt_space" → "!{Space}".
+_KeyboardSlotSendCode(SlotId) {
+    global KEYBOARD_SHORTCUT_SEND_CODES
+    if KEYBOARD_SHORTCUT_SEND_CODES.Has(SlotId)
+        return KEYBOARD_SHORTCUT_SEND_CODES[SlotId]
+    ; Derive from slot id: "win_<key>", "ctrl_<key>", "ctrl_shift_<key>", "alt_<key>"
+    if SubStr(SlotId, 1, 10) = "ctrl_shift"
+        Mod := "^+"
+    else if SubStr(SlotId, 1, 4) = "ctrl"
+        Mod := "^"
+    else if SubStr(SlotId, 1, 3) = "win"
+        Mod := "#"
+    else if SubStr(SlotId, 1, 3) = "alt"
+        Mod := "!"
+    else
+        return ""
+    ; Extract suffix after last underscore group
+    if SubStr(SlotId, 1, 10) = "ctrl_shift"
+        Suffix := SubStr(SlotId, 12)
+    else
+        Suffix := SubStr(SlotId, InStr(SlotId, "_") + 1)
+    ; Map special suffix names to AHK key strings
+    static _SpecialMap := Map(
+        "space", "{Space}", "enter", "{Enter}",
+        "period", ".", "comma", ",", "sc029", "SC029"
+    )
+    if _SpecialMap.Has(Suffix)
+        return Mod . _SpecialMap[Suffix]
+    return Mod . Suffix
+}
+
+; Read per-slot action overrides from [Shortcuts.Keyboard] in the config TOML.
+ReadKeyboardShortcutsConfig() {
+    global KeyboardShortcutAssignments, KEYBOARD_SHORTCUT_DEFAULTS, _IniCache, GESTURE_ACTIONS
+    ; Seed with defaults first
+    for Slot, Action in KEYBOARD_SHORTCUT_DEFAULTS
+        KeyboardShortcutAssignments[Slot] := Action
+    ; Apply any user overrides persisted in the TOML
+    for Slot, _ in KEYBOARD_SHORTCUT_DEFAULTS {
+        Value := IniCacheGet(_IniCache, "Shortcuts.Keyboard", Slot)
+        if (Value != "_" and (Value == "none" or GESTURE_ACTIONS.Has(Value)))
+            KeyboardShortcutAssignments[Slot] := Value
+    }
+}
+
+; Execute the configured action for a keyboard shortcut slot.
+RunKeyboardShortcutAction(SlotId) {
+    global KeyboardShortcutAssignments, GESTURE_ACTIONS
+    Action := KeyboardShortcutAssignments.Has(SlotId) ? KeyboardShortcutAssignments[SlotId] : "none"
+    if (Action == "none" or !GESTURE_ACTIONS.Has(Action))
+        return
+    GESTURE_ACTIONS[Action].Fn.Call()
+}
+
+; Persist a slot assignment and reload.
+SetKeyboardShortcutAction(SlotId, ActionName) {
+    global KeyboardShortcutAssignments, ConfigurationFile
+    KeyboardShortcutAssignments[SlotId] := ActionName
+    TOML_Write(ActionName, ConfigurationFile, "Shortcuts.Keyboard", SlotId)
+    Reload
+}
+
+_MakeKeyboardShortcutHandler(SlotId, ActionName) {
+    return (*) => SetKeyboardShortcutAction(SlotId, ActionName)
+}
+
+; Build the "⌨️ Raccourcis clavier" submenu. Groups slots by modifier prefix
+; (Ctrl / Ctrl+Shift / Win / Alt), each slot opening a picker of all actions.
+BuildKeyboardShortcutsMenu() {
+    global KeyboardShortcutAssignments, GESTURE_ACTIONS, GESTURE_ACTION_NAMES
+    global KEYBOARD_SHORTCUT_DEFAULTS
+
+    KMenu := Menu()
+
+    ; Modifier groups: prefix → display label + subset of default slots
+    static _Groups := [
+        Map("prefix", "win_",         "label", "⊞ Win+"),
+        Map("prefix", "ctrl_",        "label", "^ Ctrl+"),
+        Map("prefix", "ctrl_shift_",  "label", "^⇧ Ctrl+Shift+"),
+        Map("prefix", "alt_",         "label", "⎇ Alt+"),
+    ]
+
+    for GroupInfo in _Groups {
+        Prefix := GroupInfo["prefix"]
+        GLabel := GroupInfo["label"]
+        GMenu  := Menu()
+
+        ; Collect all slots for this modifier from GESTURE_ACTIONS keys
+        for ActionKey, _ in GESTURE_ACTIONS {
+            if SubStr(ActionKey, 1, StrLen(Prefix)) != Prefix
+                continue
+            ; Only include modifier+key slots (single char suffix or digit or special)
+            ; i.e. slots whose id IS itself a key combo, not an action name that happens
+            ; to start with the same prefix (e.g. "win_app_prev" is fine — user can assign
+            ; it, but its own slot picker should not be in this menu).
+            Suffix := SubStr(ActionKey, StrLen(Prefix) + 1)
+            if (StrLen(Suffix) > 10)  ; skip action IDs with long suffixes
+                continue
+            Current := KeyboardShortcutAssignments.Has(ActionKey)
+                ? KeyboardShortcutAssignments[ActionKey] : "none"
+            CurrentLabel := GESTURE_ACTIONS.Has(Current)
+                ? GESTURE_ACTIONS[Current].Label : "Désactivé"
+            SlotMenu := _BuildActionPickerMenu(ActionKey)
+            GMenu.Add(ActionKey . " : " . CurrentLabel, SlotMenu)
+        }
+        KMenu.Add(GLabel, GMenu)
+    }
+
+    return KMenu
+}
+
+; Build a single-slot action picker menu (shared between keyboard and script shortcuts).
+_BuildActionPickerMenu(SlotId) {
+    global GESTURE_ACTION_NAMES, GESTURE_ACTIONS, KeyboardShortcutAssignments
+    SlotMenu := Menu()
+    Current := KeyboardShortcutAssignments.Has(SlotId)
+        ? KeyboardShortcutAssignments[SlotId] : "none"
+    last_was_separator := true
+    for ActionName in GESTURE_ACTION_NAMES {
+        if (ActionName == "--") {
+            if !last_was_separator {
+                SlotMenu.Add()
+                last_was_separator := true
+            }
+            continue
+        }
+        if SubStr(ActionName, 1, 1) = "#"
+            continue
+        if !GESTURE_ACTIONS.Has(ActionName)
+            continue
+        ActionLabel := GESTURE_ACTIONS[ActionName].Label
+        SlotMenu.Add(ActionLabel, _MakeKeyboardShortcutHandler(SlotId, ActionName))
+        if (ActionName == Current)
+            SlotMenu.Check(ActionLabel)
+        last_was_separator := false
+    }
+    return SlotMenu
 }
 
 FilePathsEditor(*) {
