@@ -363,8 +363,12 @@ TOML_RenderValue(v) {
         out .= "]"
         return out
     }
-    if IsNumber(v)
+    if IsNumber(v) {
+        ; Use %g format to strip floating-point noise (0.20000000000000001 → 0.2)
+        if v is Float
+            return Format("{:.10g}", v)
         return String(v)
+    }
     ; AHK boolean stored as 0/1 reaches us as a number above; everything
     ; else is a string.
     return TOML_RenderString(String(v))
