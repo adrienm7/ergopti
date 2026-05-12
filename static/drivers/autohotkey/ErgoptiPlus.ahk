@@ -341,11 +341,10 @@ ReadConfiguration(Cache) {
     for Category, FeaturesMap in Features {
         for Feature, Value in FeaturesMap {
             if (Type(Value) = "Map") {
-                ; Sub-map => iterate sub-features under [Category.Feature]
+                ; Sub-map => iterate sub-features under [Category.Feature.SubFeature]
                 for SubFeature, SubValue in Value {
                     for Prop in Props {
-                        Name := SubFeature . "." . Prop
-                        RawValue := IniCacheGet(Cache, Category "." Feature, Name)
+                        RawValue := IniCacheGet(Cache, Category "." Feature "." SubFeature, Prop)
                         if RawValue != "_" {
                             Features[Category][Feature][SubFeature].%Prop% := RawValue
                         }
@@ -353,9 +352,7 @@ ReadConfiguration(Cache) {
                 }
             } else {
                 for Prop in Props {
-                    ; Avoid "Foo.Foo" when the feature key and the property share the same name
-                    Name := (Feature = Prop) ? Prop : Feature . "." . Prop
-                    RawValue := IniCacheGet(Cache, Category, Name)
+                    RawValue := IniCacheGet(Cache, Category "." Feature, Prop)
                     if RawValue != "_" {
                         Features[Category][Feature].%Prop% := RawValue
                     }
@@ -619,8 +616,8 @@ SetFeatureLetter(FullPath, Letter) {
 
     Feature.Enabled := true
     Feature.Letter := Letter
-    TOML_Write(true, ConfigurationFile, FeatureCategoryPath, FeatureName . ".Enabled")
-    TOML_Write(Letter, ConfigurationFile, FeatureCategoryPath, FeatureName . ".Letter")
+    TOML_Write(true, ConfigurationFile, FeatureCategoryPath . "." . FeatureName, "Enabled")
+    TOML_Write(Letter, ConfigurationFile, FeatureCategoryPath . "." . FeatureName, "Letter")
     Reload
 }
 
@@ -633,7 +630,7 @@ SetFeatureLetterOff(FullPath) {
     FeatureName := SubStr(FullPath, pos + 1)
 
     Feature.Enabled := false
-    TOML_Write(false, ConfigurationFile, FeatureCategoryPath, FeatureName . ".Enabled")
+    TOML_Write(false, ConfigurationFile, FeatureCategoryPath . "." . FeatureName, "Enabled")
     Reload
 }
 
@@ -698,11 +695,11 @@ ToggleMenuVariableByPath(FullPath) {
         for ShortcutName in FeatureCategory {
             Shortcut := FeatureCategory.Get(ShortcutName)
             Shortcut.Enabled := False
-            TOML_Write(Shortcut.Enabled, ConfigurationFile, FeatureCategoryPath, ShortcutName . ".Enabled")
+            TOML_Write(Shortcut.Enabled, ConfigurationFile, FeatureCategoryPath . "." . ShortcutName, "Enabled")
         }
     }
     Feature.Enabled := !CurrentFeatureActivation
-    TOML_Write(Feature.Enabled, ConfigurationFile, FeatureCategoryPath, FeatureName . ".Enabled")
+    TOML_Write(Feature.Enabled, ConfigurationFile, FeatureCategoryPath . "." . FeatureName, "Enabled")
     Reload
 }
 
@@ -1813,7 +1810,7 @@ GPTLinkEditor(*) {
 }
 ModifyLink(gui, NewValue) {
     Features["Shortcuts"]["GPT"].Link := NewValue
-    TOML_Write(NewValue, ConfigurationFile, "Shortcuts", "GPT" . "." . "Link")
+    TOML_Write(NewValue, ConfigurationFile, "Shortcuts.GPT", "Link")
 
     gui.Destroy()
     Reload
@@ -1864,29 +1861,14 @@ ToggleAllFeatures(Value) {
             NewPath := (Path = "") ? Key : Path "." Key
             if Type(Val) == "Map" {
                 if Val.HasOwnProp("Enabled") {
-                    ; The Enabled flag of the map itself is written in the parent section
-                    parentSection := Path = "" ? Key : Path
                     Val.Enabled := Value
-                    Updates.Push({ Section: parentSection, Key: Key . ".Enabled", Value: Value })
+                    Updates.Push({ Section: NewPath, Key: "Enabled", Value: Value })
                 }
                 ; Recurse into nested entries to set their Enabled to Value
                 SetAllRecursive(NewPath, Val)
             } else if IsObject(Val) and Val.HasOwnProp("Enabled") {
-                ; For leaf features, write under the section corresponding to the parent path
-                pos := InStr(NewPath, ".", , -1)
-                if pos {
-                    section := SubStr(NewPath, 1, pos - 1)
-                    keyName := SubStr(NewPath, pos + 1)
-                } else {
-                    section := NewPath
-                    keyName := ""
-                }
                 Val.Enabled := Value
-                if keyName = "" {
-                    Updates.Push({ Section: section, Key: Key . ".Enabled", Value: Value })
-                } else {
-                    Updates.Push({ Section: section, Key: keyName . ".Enabled", Value: Value })
-                }
+                Updates.Push({ Section: NewPath, Key: "Enabled", Value: Value })
             }
         }
     }
@@ -1906,7 +1888,7 @@ ToggleAllFeatures(Value) {
                 }
                 if IsObject(Val) and Val.HasOwnProp("Enabled") {
                     Val.Enabled := Value
-                    Updates.Push({ Section: Category, Key: FeatureName . ".Enabled", Value: Value })
+                    Updates.Push({ Section: Category "." FeatureName, Key: "Enabled", Value: Value })
                 }
                 ; If Val is a Map without Enabled, we skip its children when enabling
             }
@@ -1935,7 +1917,7 @@ ToggleAllHotstrings(Value) {
             }
             if IsObject(Val) and Val.HasOwnProp("Enabled") {
                 Val.Enabled := Value
-                Updates.Push({ Section: Category, Key: FeatureName . ".Enabled", Value: Value })
+                Updates.Push({ Section: Category "." FeatureName, Key: "Enabled", Value: Value })
             }
         }
     }
@@ -1947,7 +1929,7 @@ ToggleAllHotstrings(Value) {
             }
             if IsObject(Val) and Val.HasOwnProp("Enabled") {
                 Val.Enabled := Value
-                Updates.Push({ Section: "DynamicHotstrings", Key: FeatureName . ".Enabled", Value: Value })
+                Updates.Push({ Section: "DynamicHotstrings." FeatureName, Key: "Enabled", Value: Value })
             }
         }
     }
@@ -1958,7 +1940,7 @@ ToggleAllHotstrings(Value) {
             }
             if IsObject(Val) and Val.HasOwnProp("Enabled") {
                 Val.Enabled := Value
-                Updates.Push({ Section: "Personal", Key: FeatureName . ".Enabled", Value: Value })
+                Updates.Push({ Section: "Personal." FeatureName, Key: "Enabled", Value: Value })
             }
         }
     }
@@ -2084,22 +2066,16 @@ _CollectFeatureUpdates(Updates, ParentPath, Node) {
                 Cfg := Value["__Configuration"]
                 for Prop in Props {
                     if Cfg.HasOwnProp(Prop) {
-                        ConfigKey := (Key == Prop) ? Prop : Key "." Prop
-                        Updates.Push({ Section: ParentPath == "" ? Key : ParentPath,
-                            Key: ConfigKey, Value: Cfg.%Prop% })
+                        Updates.Push({ Section: CurrentPath, Key: Prop, Value: Cfg.%Prop% })
                     }
                 }
             }
             _CollectFeatureUpdates(Updates, CurrentPath, Value)
         } else if IsObject(Value) {
-            ; Leaf feature object: persist all known properties
-            Section := (ParentPath == "") ? Key : ParentPath
+            ; Leaf feature object: persist all known properties under [Parent.Feature]
             for Prop in Props {
                 if Value.HasOwnProp(Prop) {
-                    ; Mirror ReadConfiguration: avoid "Foo.Foo" when the key
-                    ; and property share the same name
-                    ConfigKey := (Key == Prop) ? Prop : Key "." Prop
-                    Updates.Push({ Section: Section, Key: ConfigKey, Value: Value.%Prop% })
+                    Updates.Push({ Section: CurrentPath, Key: Prop, Value: Value.%Prop% })
                 }
             }
         }

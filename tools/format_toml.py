@@ -186,7 +186,8 @@ def rebuild_toml_from_structure(structure: dict) -> str:
                     ["", "", "", ""]
                 )  # 4 blanks before h2 (total 5 with the one after)
 
-        display_name = section_key.replace("_", " ").title()
+        last_part = section_key.split(".")[-1].replace("_", " ")
+        display_name = last_part[0].upper() + last_part[1:] if last_part else last_part
         header_lines = create_section_header(display_name, is_subsection)
         lines.extend(header_lines)
         lines.append("")  # blank line after header
@@ -265,7 +266,8 @@ def dict_to_toml(data: dict) -> str:
                     ["", "", "", ""]
                 )  # 4 blanks before h2 (total 5 with the one after)
 
-        display_name = section_key.replace("_", " ").title()
+        last_part = section_key.split(".")[-1].replace("_", " ")
+        display_name = last_part[0].upper() + last_part[1:] if last_part else last_part
         header_lines = create_section_header(display_name, is_subsection)
         lines.extend(header_lines)
         lines.append("")  # blank line after header
