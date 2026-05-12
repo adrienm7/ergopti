@@ -4,13 +4,17 @@
 --- MODULE: Menu Shortcuts
 --- DESCRIPTION:
 --- Builds the shortcuts sub-menu for the Hammerspoon tray menu.
+---
+--- FEATURES & RATIONALE:
+--- 1. Grouped Layout: Top-level items (screenshot, volume, wrap) appear first;
+---    Ctrl, Cmd, and script-control shortcuts are nested in labelled submenus,
+---    mirroring the AHK tray menu structure for consistency across platforms.
 --- ==============================================================================
 
 local M = {}
 local hs = hs
 local dialog        = require("lib.dialog_util")
 local shortcuts_mod = require("modules.shortcuts")
-
 
 
 
@@ -29,17 +33,74 @@ M.DEFAULT_STATE = {
 
 
 
-
 -- ====================================
 -- ====================================
 -- ======= 2/ Menu Construction =======
 -- ====================================
 -- ====================================
 
+--- Translates a shortcut identifier into a human-readable trigger label.
+--- @param id string The shortcut identifier (e.g. "ctrl_a", "layer_scroll").
+--- @param state table The current state table (used for trigger_char substitution).
+--- @return string Display label for the trigger key(s).
+local function pretty_key(id, state)
+	if id == "at_hash" then return "Touche @/#" end
+	if id == "layer_scroll" or id == "layer+scroll" then return "Layer + Scroll" end
+	if id == "wrap_text_if_selected" then return "AltGr + symbole" end
+
+	local parts = {}
+	for p in id:gmatch("[^_]+") do table.insert(parts, p) end
+	if #parts == 0 then return id end
+
+	local key = parts[#parts]
+	if key == "star" or key == "asterisk" then key = (state and state.trigger_char) or "★" end
+	if key == "period"   then key = "." end
+	if key == "quote"    then key = "'" end
+	if key == "capslock" then key = "CapsLock" end
+
+	local mods = {}
+	for i = 1, #parts - 1 do
+		local p   = parts[i]
+		local lbl = ({ ctrl = "Ctrl", cmd = "Cmd", alt = "Alt", option = "Alt", shift = "Shift" })[p]
+		table.insert(mods, lbl or (p:sub(1, 1):upper() .. p:sub(2)))
+	end
+	return (#mods > 0 and table.concat(mods, " + ") .. " + " or "") .. key:upper()
+end
+
+--- Builds a toggle menu item for a named shortcut.
+--- @param s table Shortcut descriptor {id, label, enabled}.
+--- @param shortcuts table The shortcuts module reference.
+--- @param ctx table The menu context.
+--- @return table hs.menubar-compatible item table.
+local function make_shortcut_item(s, shortcuts, ctx)
+	local state  = ctx.state
+	local paused = ctx.paused
+	local is_on  = type(shortcuts.is_enabled) == "function" and shortcuts.is_enabled(s.id) or s.enabled
+	local desc   = ctx.applyTriggerChar((s.label or ""):gsub("^%s*(.-)%s*$", "%1"))
+	local pk     = pretty_key(s.id, state)
+	return {
+		title    = pk .. (desc ~= "" and (" : " .. desc) or ""),
+		checked  = (is_on and not paused) or nil,
+		disabled = not state.shortcuts or paused or nil,
+		fn       = (state.shortcuts and not paused) and (function(id)
+			return function()
+				local on = type(shortcuts.is_enabled) == "function" and shortcuts.is_enabled(id) or false
+				if on then
+					if type(shortcuts.disable) == "function" then pcall(shortcuts.disable, id) end
+				else
+					if type(shortcuts.enable) == "function" then pcall(shortcuts.enable, id) end
+				end
+				ctx.save_prefs()
+				ctx.notify_feature(pretty_key(id, state), not on)
+				ctx.updateMenu()
+			end
+		end)(s.id) or nil,
+	}
+end
+
 --- Builds the shortcuts sub-menu.
 --- @param ctx table Context.
 --- @return table|nil
-
 function M.build(ctx)
 	local shortcuts = ctx.shortcuts
 	if not shortcuts then return nil end
@@ -52,10 +113,10 @@ function M.build(ctx)
 		checked = (state.shortcuts and not paused) or nil,
 		fn      = function()
 			state.shortcuts = not state.shortcuts
-			if state.shortcuts then 
-				if type(shortcuts.start) == "function" then pcall(shortcuts.start) end 
-			else 
-				if type(shortcuts.stop) == "function" then pcall(shortcuts.stop) end 
+			if state.shortcuts then
+				if type(shortcuts.start) == "function" then pcall(shortcuts.start) end
+			else
+				if type(shortcuts.stop) == "function" then pcall(shortcuts.stop) end
 			end
 			ctx.save_prefs()
 			ctx.notify_feature("Raccourcis", state.shortcuts)
@@ -63,138 +124,93 @@ function M.build(ctx)
 		end,
 	}
 
-	local function pretty_key(id)
-		if id == "at_hash" then return "Touche @/#" end
-		if id == "layer_scroll" or id == "layer+scroll" then return "Layer + Scroll" end
+	-- Buckets for each display group
+	local top_items  = {}   -- at_hash, layer_scroll, wrap_text_if_selected (in order)
+	local ctrl_items = {}
+	local cmd_items  = {}
 
-		local parts = {}
-		for p in id:gmatch("[^_]+") do table.insert(parts, p) end
-		if #parts == 0 then return id end
-        
-		local key = parts[#parts]
-		if key == "star" or key == "asterisk" then key = state.trigger_char end
-		if key == "period" then key = "." end
-		if key == "quote"  then key = "'" end
-        
-		local mods = {}
-		for i = 1, #parts - 1 do
-			local p   = parts[i]
-			local lbl = ({ ctrl="Ctrl", cmd="Cmd", alt="Alt", option="Alt", shift="Shift" })[p]
-			table.insert(mods, lbl or (p:sub(1,1):upper() .. p:sub(2)))
-		end
-		return (#mods > 0 and table.concat(mods, " + ") .. " + " or "") .. key:upper()
-	end
-
-	local s_menu = {}
-	local ctrl_shortcuts, cmd_shortcuts, other_shortcuts = {}, {}, {}
-	local layer_scroll_item, screenshot_item, after_screenshot = nil, nil, false
+	-- Preserve insertion order for top-level items
+	local TOP_ORDER = { "at_hash", "layer_scroll", "wrap_text_if_selected" }
+	local top_map   = {}
 
 	if type(shortcuts.list_shortcuts) == "function" then
 		local ok, list = pcall(shortcuts.list_shortcuts)
 		if ok and type(list) == "table" then
 			for _, s in ipairs(list) do
 				if type(s) == "table" and s.id then
-					local is_ctrl = s.id:sub(1, 5) == "ctrl_"
-					local is_cmd = s.id:sub(1, 4) == "cmd_"
-					local is_layer_scroll = (s.id == "layer_scroll" or s.id == "layer+scroll")
-					local is_screenshot = (s.id == "screenshot" or s.id == "capture_ecran" or s.label:lower():find("capture d’écran"))
+					local mi = make_shortcut_item(s, shortcuts, ctx)
 
-					local is_on = type(shortcuts.is_enabled) == "function" and shortcuts.is_enabled(s.id) or s.enabled
-					local desc  = ctx.applyTriggerChar((s.label or ""):gsub("^%s*(.-)%s*$", "%1"))
-					local shortcut_item = {
-						title    = pretty_key(s.id) .. (desc ~= "" and (" : " .. desc) or ""),
-						checked  = (is_on and not paused) or nil,
-						disabled = not state.shortcuts or paused or nil,
-						fn       = (state.shortcuts and not paused) and (function(id) 
-							return function()
-								local on = type(shortcuts.is_enabled) == "function" and shortcuts.is_enabled(id) or false
-								if on then 
-									if type(shortcuts.disable) == "function" then pcall(shortcuts.disable, id) end 
-								else 
-									if type(shortcuts.enable) == "function" then pcall(shortcuts.enable, id) end 
-								end
-								ctx.save_prefs()
-								ctx.notify_feature(pretty_key(id), not on)
-								ctx.updateMenu()
-							end 
-						end)(s.id) or nil,
-					}
+					if s.id == "at_hash" or s.id == "layer_scroll" or s.id == "wrap_text_if_selected" then
+						top_map[s.id] = mi
 
-					if is_layer_scroll then
-						layer_scroll_item = shortcut_item
-					elseif is_screenshot then
-						screenshot_item = shortcut_item
-					elseif is_ctrl then
-						table.insert(ctrl_shortcuts, shortcut_item)
-					elseif is_cmd then
-						table.insert(cmd_shortcuts, shortcut_item)
-					else
-						table.insert(other_shortcuts, shortcut_item)
-					end
+					elseif s.id:sub(1, 5) == "ctrl_" then
+						table.insert(ctrl_items, mi)
+						-- Inject ChatGPT URL editor inline below ctrl_g
+						if s.id == "ctrl_g" then
+							table.insert(ctrl_items, {
+								title    = "   ↳ Modifier l'URL ChatGPT…",
+								disabled = paused or nil,
+								fn       = not paused and function()
+									local ok_p, clicked, url = pcall(dialog.text_prompt, "URL ChatGPT",
+										"URL ouverte par Ctrl+G :",
+										state.chatgpt_url, "OK", "Annuler")
+									if ok_p and clicked == "OK" and type(url) == "string" and url ~= "" then
+										state.chatgpt_url = url
+										ctx.save_prefs()
+										ctx.updateMenu()
+									end
+								end or nil,
+							})
+						end
 
-					if s.id == "ctrl_g" then
-						table.insert(ctrl_shortcuts, {
-							title    = "   ↳ Modifier l’URL ChatGPT…",
-							disabled = paused or nil,
-							fn       = not paused and function()
-								local ok_p, clicked, url = pcall(dialog.text_prompt, "URL ChatGPT",
-									"URL ouverte par Ctrl+G :",
-									state.chatgpt_url, "OK", "Annuler")
-								if ok_p and clicked == "OK" and type(url) == "string" and url ~= "" then
-									state.chatgpt_url = url
-									ctx.save_prefs()
-									ctx.updateMenu()
-								end
-							end or nil,
-						})
+					elseif s.id:sub(1, 4) == "cmd_" then
+						table.insert(cmd_items, mi)
 					end
 				end
 			end
 		end
 	end
 
-	-- Ajout dans l’ordre demandé : autres, capture d’écran, layer+scroll, ctrl, --, cmd
-	for _, item in ipairs(other_shortcuts) do
-		table.insert(s_menu, item)
-		if screenshot_item and not after_screenshot and item == screenshot_item then
-			table.insert(s_menu, layer_scroll_item)
-			after_screenshot = true
-		end
-	end
-	if screenshot_item and not after_screenshot then
-		table.insert(s_menu, screenshot_item)
-		table.insert(s_menu, layer_scroll_item)
-		after_screenshot = true
+	-- Assemble top items in canonical order
+	for _, id in ipairs(TOP_ORDER) do
+		if top_map[id] then table.insert(top_items, top_map[id]) end
 	end
 
-	-- Bloc Ctrl
-	if #ctrl_shortcuts > 0 then
+	-- Build the final menu
+	local s_menu = {}
+
+	for _, mi in ipairs(top_items) do
+		table.insert(s_menu, mi)
+	end
+
+	-- Ctrl submenu
+	if #ctrl_items > 0 then
 		table.insert(s_menu, { title = "-" })
-		for _, item in ipairs(ctrl_shortcuts) do
-			table.insert(s_menu, item)
-		end
+		table.insert(s_menu, {
+			title    = "Ctrl",
+			disabled = not state.shortcuts or paused or nil,
+			menu     = ctrl_items,
+		})
 	end
 
-	-- Bloc Cmd
-	if #cmd_shortcuts > 0 then
-		table.insert(s_menu, { title = "-" })
-		for _, item in ipairs(cmd_shortcuts) do
-			table.insert(s_menu, item)
-		end
+	-- Cmd submenu
+	if #cmd_items > 0 then
+		table.insert(s_menu, {
+			title    = "Cmd",
+			disabled = not state.shortcuts or paused or nil,
+			menu     = cmd_items,
+		})
 	end
 
-	-- Ajout des 3 éléments du contrôle du script à la fin
+	-- Script control submenu
 	local script_control = ctx.script_control
 	if script_control then
-		local state = ctx.state
 		local enabled = state.script_control_enabled
-		local paused = ctx.paused
 		local actions = type(script_control.ACTIONS) == "table" and script_control.ACTIONS or {}
-		
+
 		local function get_label(act)
 			if not act or act == "-" or act == "--" then return "-" end
-			if act:match("^#") then return act:sub(2) end -- Category headers
-
+			if act:match("^#") then return act:sub(2) end
 			if ctx.gestures and type(ctx.gestures.get_action_label) == "function" then
 				return ctx.gestures.get_action_label(act)
 			end
@@ -206,7 +222,6 @@ function M.build(ctx)
 			local sub = {}
 			for _, act in ipairs(actions) do
 				local label = get_label(act)
-				
 				if label == "-" then
 					table.insert(sub, { title = "-" })
 				elseif act:match("^#") then
@@ -227,24 +242,34 @@ function M.build(ctx)
 			end
 			return sub
 		end
+
 		local cur_return = state.script_control_shortcuts.return_key or "none"
 		local cur_back   = state.script_control_shortcuts.backspace  or "none"
 		local cur_escape = state.script_control_shortcuts.escape     or "none"
+
+		local script_items = {
+			{
+				title    = "Option droite + ↩ : " .. get_label(cur_return),
+				disabled = not enabled or paused or nil,
+				menu     = key_submenu("return_key"),
+			},
+			{
+				title    = "Option droite + ⌫ : " .. get_label(cur_back),
+				disabled = not enabled or paused or nil,
+				menu     = key_submenu("backspace"),
+			},
+			{
+				title    = "Option droite + ⎋ : " .. get_label(cur_escape),
+				disabled = not enabled or paused or nil,
+				menu     = key_submenu("escape"),
+			},
+		}
+
 		table.insert(s_menu, { title = "-" })
 		table.insert(s_menu, {
-			title    = "Option droite + ↩ : " .. get_label(cur_return),
+			title    = "Raccourcis de gestion du script",
 			disabled = not enabled or paused or nil,
-			menu     = key_submenu("return_key")
-		})
-		table.insert(s_menu, {
-			title    = "Option droite + ⌫ : " .. get_label(cur_back),
-			disabled = not enabled or paused or nil,
-			menu     = key_submenu("backspace")
-		})
-		table.insert(s_menu, {
-			title    = "Option droite + ⎋ : " .. get_label(cur_escape),
-			disabled = not enabled or paused or nil,
-			menu     = key_submenu("escape")
+			menu     = script_items,
 		})
 	end
 
