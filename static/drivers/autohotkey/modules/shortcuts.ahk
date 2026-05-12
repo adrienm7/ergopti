@@ -428,8 +428,8 @@ if Features["Shortcuts"]["Search"].Enabled {
 }
 
 if Features["Shortcuts"]["TitleCase"].Enabled {
-    ; Win + T (TitleCase)
-    AddShortcut("#", "t", ConvertToTitleCase)
+    ; Win + W (TitleCase)
+    AddShortcut("#", "w", ConvertToTitleCase)
 
     ConvertToTitleCase(*) {
         Text := GetSelection()
@@ -471,21 +471,331 @@ if Features["Shortcuts"]["Uppercase"].Enabled {
     }
 }
 
-if Features["Shortcuts"]["SelectWord"].Enabled {
-    ; Win + W (Word)
-    AddShortcut("#", "w", SelectWord)
+if Features["Shortcuts"]["TeleportMouse"].Enabled {
+    ; Win + T (Téléport)
+    AddShortcut("#", "t", TeleportMouse)
 
-    SelectWord(*) {
-        SendFinalResult("^{Left}")
-        SendFinalResult("{LShift Down}^{Right}{LShift Up}")
-
-        SelectedWord := GetSelection()
-        if (SubStr(SelectedWord, -1, 1) == " ") {
-            ; If the selected word finishes with a space, we remove it from the selection
-            SendFinalResult("{LShift Down}{Left}{LShift Up}")
+    TeleportMouse(*) {
+        Monitors := []
+        Count := MonitorGetCount()
+        loop Count {
+            MonitorGet(A_Index, &Left, &Top, &Right, &Bottom)
+            Monitors.Push({Left: Left, Top: Top, Right: Right, Bottom: Bottom, Index: A_Index})
         }
+
+        if (Count < 2) {
+            MsgBox("Aucun autre moniteur détecté.")
+            return
+        }
+
+        MouseGetPos(&CurX, &CurY)
+
+        ; Find which monitor currently holds the cursor
+        CurrentIndex := 1
+        for Mon in Monitors {
+            if (CurX >= Mon.Left and CurX < Mon.Right and CurY >= Mon.Top and CurY < Mon.Bottom) {
+                CurrentIndex := A_Index
+                break
+            }
+        }
+
+        ; Pick the next monitor cyclically
+        NextIndex := (Mod(CurrentIndex, Count) + 1)
+        Target := Monitors[NextIndex]
+        TargetX := Target.Left + (Target.Right - Target.Left) // 2
+        TargetY := Target.Top + (Target.Bottom - Target.Top) // 2
+
+        DllCall("SetCursorPos", "int", TargetX, "int", TargetY)
+        SpotlightMouseAt(TargetX, TargetY, 3000)
     }
 }
+
+if Features["Shortcuts"]["SpotlightMouse"].Enabled {
+    ; Win + '
+    AddShortcut("#", "'", (*) => (MouseGetPos(&Mx, &My), SpotlightMouseAt(Mx, My, 5000)))
+}
+
+; Draws a filled yellow circle around (X, Y) and a red × on every other monitor,
+; matching the Hammerspoon spotlight visual exactly.
+; Dismissed after DurationMs ms or as soon as the mouse moves more than 5 px.
+SpotlightMouseAt(X, Y, DurationMs) {
+    static RING_RADIUS    := 60     ; Matches Hammerspoon SPOTLIGHT_RADIUS_PX
+    static RING_STROKE    := 6      ; Matches SPOTLIGHT_STROKE_PX
+    static FILL_ALPHA     := 102    ; 0.40 × 255 — matches SPOTLIGHT_FILL_ALPHA
+    static STROKE_ALPHA   := 230    ; 0.90 × 255 — matches OVERLAY_STROKE_ALPHA
+    static PAD            := 12     ; Matches SPOTLIGHT_PADDING_PX
+    static CROSS_HALF     := 60     ; Matches CROSS_ARM_HALF_PX
+    static CROSS_WIDTH    := 14     ; Matches CROSS_ARM_WIDTH_PX
+    static DISMISS_POLL   := 100
+
+    ; ARGB values (pre-multiplied alpha not needed for UpdateLayeredWindow with AC_SRC_ALPHA)
+    static YELLOW_FILL    := 0x66FFDA00   ; alpha=0x66(102), R=255, G=218, B=0
+    static YELLOW_STROKE  := 0xE6FFDA00   ; alpha=0xE6(230)
+    static RED_FILL       := 0x66E61A0D   ; alpha=0x66, R=230, G=26, B=13
+    static RED_STROKE     := 0xE6E61A0D   ; alpha=0xE6
+
+    ; GDI+ startup — shared token for all windows drawn this call
+    DllCall("LoadLibrary", "str", "gdiplus")
+    si := Buffer(24, 0)
+    NumPut("uint", 1, si)
+    DllCall("gdiplus\GdiplusStartup", "ptr*", &pToken := 0, "ptr", si, "ptr", 0)
+
+    ; --- Helper: create a layered window, paint via GDI+ callback, return hwnd ---
+    CreateOverlayWindow(WinX, WinY, WinW, WinH, DrawCallback) {
+        ; WS_EX_LAYERED | WS_EX_TRANSPARENT | WS_EX_TOPMOST | WS_EX_TOOLWINDOW
+        Hwnd := DllCall("CreateWindowEx",
+            "uint",  0x8009C,
+            "str",   "Static", "str", "",
+            "uint",  0x80000000,   ; WS_POPUP
+            "int",   WinX, "int", WinY, "int", WinW, "int", WinH,
+            "ptr",   0, "ptr", 0, "ptr", 0, "ptr", 0,
+            "ptr")
+        if not Hwnd
+            return 0
+
+        hScreenDC := DllCall("GetDC", "ptr", 0, "ptr")
+        hMemDC    := DllCall("CreateCompatibleDC", "ptr", hScreenDC, "ptr")
+
+        ; 32-bpp DIB section — required for per-pixel alpha in UpdateLayeredWindow
+        bi := Buffer(40, 0)
+        NumPut("int",   40,    bi,  0)   ; biSize
+        NumPut("int",   WinW,  bi,  4)   ; biWidth
+        NumPut("int",  -WinH,  bi,  8)   ; biHeight (negative = top-down)
+        NumPut("short", 1,     bi, 12)   ; biPlanes
+        NumPut("short", 32,    bi, 14)   ; biBitCount
+        hBitmap := DllCall("CreateDIBSection", "ptr", hMemDC, "ptr", bi, "uint", 0, "ptr*", 0, "ptr", 0, "uint", 0, "ptr")
+        DllCall("SelectObject", "ptr", hMemDC, "ptr", hBitmap)
+
+        ; GDI+ Graphics on the memory DC
+        DllCall("gdiplus\GdipCreateFromHDC", "ptr", hMemDC, "ptr*", &pGfx := 0)
+        DllCall("gdiplus\GdipSetSmoothingMode",    "ptr", pGfx, "int", 4)   ; AntiAlias
+        DllCall("gdiplus\GdipSetCompositingMode",  "ptr", pGfx, "int", 0)   ; SourceOver
+        DllCall("gdiplus\GdipSetCompositingQuality","ptr", pGfx, "int", 0)  ; Default
+
+        DrawCallback(pGfx, WinW, WinH)
+
+        DllCall("gdiplus\GdipDeleteGraphics", "ptr", pGfx)
+
+        ; Commit the bitmap to the layered window
+        ptDst  := Buffer(8, 0)
+        NumPut("int", WinX, ptDst, 0), NumPut("int", WinY, ptDst, 4)
+        szWin  := Buffer(8, 0)
+        NumPut("int", WinW, szWin, 0), NumPut("int", WinH, szWin, 4)
+        ptSrc  := Buffer(8, 0)
+        blend  := Buffer(4, 0)
+        NumPut("uchar", 0,   blend, 0)   ; BlendOp = AC_SRC_OVER
+        NumPut("uchar", 0,   blend, 1)   ; BlendFlags
+        NumPut("uchar", 255, blend, 2)   ; SourceConstantAlpha (per-pixel drives it)
+        NumPut("uchar", 1,   blend, 3)   ; AlphaFormat = AC_SRC_ALPHA
+
+        DllCall("UpdateLayeredWindow",
+            "ptr",  Hwnd,
+            "ptr",  hScreenDC,
+            "ptr",  ptDst,
+            "ptr",  szWin,
+            "ptr",  hMemDC,
+            "ptr",  ptSrc,
+            "uint", 0,
+            "ptr",  blend,
+            "uint", 2)          ; ULW_ALPHA
+
+        DllCall("ShowWindow", "ptr", Hwnd, "int", 4)   ; SW_SHOWNOACTIVATE
+
+        DllCall("DeleteObject", "ptr", hBitmap)
+        DllCall("DeleteDC",     "ptr", hMemDC)
+        DllCall("ReleaseDC",    "ptr", 0, "ptr", hScreenDC)
+
+        return Hwnd
+    }
+
+    ; --- Draw the yellow filled circle on the cursor's screen ---
+    Size   := (RING_RADIUS + PAD) * 2
+    WinX   := X - RING_RADIUS - PAD
+    WinY   := Y - RING_RADIUS - PAD
+
+    CircleDraw(pGfx, W, H) {
+        ; Filled ellipse
+        DllCall("gdiplus\GdipCreateSolidFill", "uint", YELLOW_FILL, "ptr*", &pBrush := 0)
+        DllCall("gdiplus\GdipFillEllipse",
+            "ptr", pGfx, "ptr", pBrush,
+            "float", PAD, "float", PAD,
+            "float", RING_RADIUS * 2, "float", RING_RADIUS * 2)
+        DllCall("gdiplus\GdipDeleteBrush", "ptr", pBrush)
+
+        ; Stroke ellipse
+        DllCall("gdiplus\GdipCreatePen1", "uint", YELLOW_STROKE, "float", RING_STROKE, "int", 2, "ptr*", &pPen := 0)
+        DllCall("gdiplus\GdipDrawEllipse",
+            "ptr", pGfx, "ptr", pPen,
+            "float", PAD + RING_STROKE / 2, "float", PAD + RING_STROKE / 2,
+            "float", RING_RADIUS * 2 - RING_STROKE, "float", RING_RADIUS * 2 - RING_STROKE)
+        DllCall("gdiplus\GdipDeletePen", "ptr", pPen)
+    }
+
+    CircleHwnd := CreateOverlayWindow(WinX, WinY, Size, Size, CircleDraw)
+
+    ; --- Draw a red × centered on every OTHER monitor ---
+    CrossSize := (CROSS_HALF + PAD) * 2
+    CrossHwnds := []
+
+    MonCount := MonitorGetCount()
+    loop MonCount {
+        MonitorGet(A_Index, &ML, &MT, &MR, &MB)
+        ; Skip the monitor that holds the cursor
+        if (X >= ML and X < MR and Y >= MT and Y < MB)
+            continue
+
+        CX := ML + (MR - ML) // 2
+        CY := MT + (MB - MT) // 2
+
+        CWinX := CX - CROSS_HALF - PAD
+        CWinY := CY - CROSS_HALF - PAD
+
+        CrossDraw(pGfx, W, H) {
+            HW := CROSS_WIDTH / 2
+
+            ; Horizontal bar
+            DllCall("gdiplus\GdipCreateSolidFill", "uint", RED_FILL, "ptr*", &pBrush := 0)
+            DllCall("gdiplus\GdipFillRectangle",
+                "ptr", pGfx, "ptr", pBrush,
+                "float", PAD, "float", PAD + CROSS_HALF - HW,
+                "float", CROSS_HALF * 2, "float", CROSS_WIDTH)
+            ; Vertical bar
+            DllCall("gdiplus\GdipFillRectangle",
+                "ptr", pGfx, "ptr", pBrush,
+                "float", PAD + CROSS_HALF - HW, "float", PAD,
+                "float", CROSS_WIDTH, "float", CROSS_HALF * 2)
+            DllCall("gdiplus\GdipDeleteBrush", "ptr", pBrush)
+
+            ; Strokes
+            DllCall("gdiplus\GdipCreatePen1", "uint", RED_STROKE, "float", RING_STROKE, "int", 2, "ptr*", &pPen := 0)
+            DllCall("gdiplus\GdipDrawRectangle",
+                "ptr", pGfx, "ptr", pPen,
+                "float", PAD + RING_STROKE / 2, "float", PAD + CROSS_HALF - HW + RING_STROKE / 2,
+                "float", CROSS_HALF * 2 - RING_STROKE, "float", CROSS_WIDTH - RING_STROKE)
+            DllCall("gdiplus\GdipDrawRectangle",
+                "ptr", pGfx, "ptr", pPen,
+                "float", PAD + CROSS_HALF - HW + RING_STROKE / 2, "float", PAD + RING_STROKE / 2,
+                "float", CROSS_WIDTH - RING_STROKE, "float", CROSS_HALF * 2 - RING_STROKE)
+            DllCall("gdiplus\GdipDeletePen", "ptr", pPen)
+        }
+
+        CrossHwnds.Push(CreateOverlayWindow(CWinX, CWinY, CrossSize, CrossSize, CrossDraw))
+    }
+
+    ; --- Poll for mouse move or timeout, then destroy all windows ---
+    StartX := X, StartY := Y
+    Elapsed := 0
+    loop {
+        Sleep(DISMISS_POLL)
+        Elapsed += DISMISS_POLL
+        MouseGetPos(&NowX, &NowY)
+        if (Elapsed >= DurationMs or Abs(NowX - StartX) > 5 or Abs(NowY - StartY) > 5)
+            break
+    }
+
+    if CircleHwnd
+        DllCall("DestroyWindow", "ptr", CircleHwnd)
+    for Hwnd in CrossHwnds
+        DllCall("DestroyWindow", "ptr", Hwnd)
+
+    DllCall("gdiplus\GdiplusShutdown", "ptr", pToken)
+}
+
+if Features["Shortcuts"]["OpenDownloads"].Enabled {
+    ; Win + D (Downloads)
+    AddShortcut("#", "d", OpenDownloads)
+
+    OpenDownloads(*) {
+        ; Resolve the real Downloads folder via SHGetKnownFolderPath —
+        ; locale-independent and respects user-relocated folders. Falls back
+        ; to %USERPROFILE%\Downloads if the API call fails.
+        DownloadsPath := GetKnownFolderDownloads()
+        if (DownloadsPath == "") {
+            DownloadsPath := EnvGet("USERPROFILE") "\Downloads"
+        }
+
+        ; Look for an existing Explorer window already showing Downloads.
+        ; Iterate every visible window of CabinetWClass / ExploreWClass and
+        ; compare its location bar URL — reliable across localisations
+        ; (avoids matching "Téléchargements" vs "Downloads" titles).
+        try {
+            for Win in ComObject("Shell.Application").Windows {
+                try {
+                    LocalPath := DOMPathToFilesystem(Win.LocationURL)
+                    if (LocalPath != "" and StrLower(LocalPath) == StrLower(DownloadsPath)) {
+                        Hwnd := Win.HWND
+                        if WinExist("ahk_id " Hwnd) {
+                            WinActivate("ahk_id " Hwnd)
+                            WinShow("ahk_id " Hwnd)
+                            return
+                        }
+                    }
+                }
+            }
+        }
+
+        ; No existing window — open a fresh one and force it to the foreground.
+        ; We split executable and argument explicitly to avoid Explorer
+        ; misparsing a path containing accents (e.g. "Téléchargements")
+        ; as a drive letter.
+        Run('explorer.exe "' DownloadsPath '"')
+        if WinWait("ahk_class CabinetWClass", , 2) {
+            WinActivate
+        }
+    }
+
+    ; Converts a file:// URL (as returned by IE/Explorer LocationURL) to a
+    ; standard Windows path. Returns "" if the URL is not a local file.
+    DOMPathToFilesystem(Url) {
+        if (SubStr(Url, 1, 8) != "file:///") {
+            return ""
+        }
+        Path := SubStr(Url, 9)
+        Path := StrReplace(Path, "/", "\")
+        ; Decode percent-encoded characters (spaces, accents, …)
+        Path := RegExReplace(Path, "%([0-9A-Fa-f]{2})", "$0")
+        Path := UriDecode(Path)
+        return Path
+    }
+
+    ; Returns the absolute path of the Downloads folder.
+    ; Tries several localised and English candidate names under %USERPROFILE%
+    ; and returns the first one that actually exists on disk.
+    GetKnownFolderDownloads() {
+        Profile := EnvGet("USERPROFILE")
+        Candidates := [
+            Profile "\Téléchargements",
+            Profile "\Downloads",
+            Profile "\Descargas",
+            Profile "\Transferências",
+            Profile "\Загрузки",
+        ]
+        for Path in Candidates {
+            if DirExist(Path) {
+                return Path
+            }
+        }
+        return ""
+    }
+
+    UriDecode(s) {
+        Pos := 1
+        Out := ""
+        while (Pos <= StrLen(s)) {
+            Ch := SubStr(s, Pos, 1)
+            if (Ch == "%" and Pos + 2 <= StrLen(s)) {
+                Hex := SubStr(s, Pos + 1, 2)
+                Out .= Chr("0x" Hex)
+                Pos += 3
+            } else {
+                Out .= Ch
+                Pos += 1
+            }
+        }
+        return Out
+    }
+}
+
 
 ; ==============================
 ; ==============================

@@ -257,7 +257,9 @@ global Features := Map(
             "Search",
             "TitleCase",
             "Uppercase",
-            "SelectWord",
+            "TeleportMouse",
+            "SpotlightMouse",
+            "OpenDownloads",
             "<",
             ">Combinaison de modificateurs",
             "AltGrLAlt",
@@ -474,15 +476,23 @@ global Features := Map(
         },
         "TitleCase", {
             Enabled: True,
-            Description: "Win + T(itleCase) = Conversion en casse de titre (majuscule à chaque première lettre de mot)",
+            Description: "Win + W = Conversion en casse de titre (majuscule à chaque première lettre de mot)",
         },
         "Uppercase", {
             Enabled: True,
             Description: "Win + U(ppercase) = Conversion en majuscules/minuscules la sélection",
         },
-        "SelectWord", {
+        "TeleportMouse", {
             Enabled: True,
-            Description: "Win + W(ord) = Sélection du mot là où se trouve le curseur",
+            Description: "Win + T(éléport) = Téléporte la souris au centre de l'autre moniteur (cyclique)",
+        },
+        "SpotlightMouse", {
+            Enabled: True,
+            Description: "Win + ' = Met la souris en surbrillance avec un anneau jaune",
+        },
+        "OpenDownloads", {
+            Enabled: True,
+            Description: "Win + D(ownloads) = Ouvre le dossier Téléchargements",
         },
     ),
     "TapHolds", Map(
