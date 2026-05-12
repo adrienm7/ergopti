@@ -22,7 +22,6 @@ replace = "Transformer la touche J en ★"
 textexpansion = "Expansion de texte : c★ = c’est, gt★ = j’étais, pex★ = par exemple, …"
 textexpansionauto = "Expansion de texte sans touche ★ : ju' = jusqu’, ya = y’a, …"
 textexpansionemojis = "Expansion de texte Emojis : voiture★ = 🚗, koala★ = 🐨, …"
-textexpansionpersonalinformation = "Remplissage de formulaires avec le suffixe @ : @np★ = Nom ⇥ Prénom, etc."
 textexpansionsymbols = "Expansion de texte Symboles : -->★ = ➜, (v)★ = ✓, …"
 textexpansionsymbolstypst = "Expansion de texte Symboles Typst : $eq.not$ = ≠, $PP$ = ℙ, $integral$ = ∫ …"
 
