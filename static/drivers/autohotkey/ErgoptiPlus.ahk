@@ -1211,11 +1211,13 @@ initMenu() {
             (*) => ToggleCategoryAllFeatures("Shortcuts", !ShortcutsAnyEnabled))
     }
 
-    ; Append the « Raccourcis de gestion du script » sub-submenu at the bottom
-    ; of the « Raccourcis » category.
+    ; Append the « Raccourcis de gestion du script » sub-submenu and the
+    ; configurable keyboard shortcut groups at the bottom of « Raccourcis ».
     if SubMenus.Has("Shortcuts") {
         SubMenus["Shortcuts"].Add()
         SubMenus["Shortcuts"].Add(MenuConfigurationShortcuts, BuildScriptShortcutsMenu())
+        SubMenus["Shortcuts"].Add()
+        AppendKeyboardShortcutGroups(SubMenus["Shortcuts"])
     }
 
     ; ── 🌐 Disposition clavier — mirrors the HS layout submenu naming ──
@@ -1480,9 +1482,6 @@ initMenu() {
     if Features["Gestures"]["Enabled"].Enabled {
         A_TrayMenu.Check(GetCategoryTitle("Gestures"))
     }
-
-    ; ── Raccourcis clavier configurables — Ctrl/Win/Alt × toutes touches ──
-    A_TrayMenu.Add("⌨️ Raccourcis clavier", BuildKeyboardShortcutsMenu())
 
     A_TrayMenu.Add() ; Single separator between feature submenus and configuration items
 
@@ -2549,20 +2548,19 @@ _MakeKeyboardShortcutHandler(SlotId, ActionName) {
 }
 
 ; Build the "⌨️ Raccourcis clavier" submenu.
-; Each group (Win/Ctrl/Ctrl+Shift/Alt) shows only assigned slots plus an "Ajouter…"
-; item. Clicking any item opens a lightweight GUI picker instead of building hundreds
-; of nested submenus up-front (which caused ~2 min load time on a 300+ slot map).
-BuildKeyboardShortcutsMenu() {
+; Appends the four keyboard shortcut groups (Win/Ctrl/Ctrl+Shift/Alt) to an
+; existing menu. Each group shows only assigned slots plus an "Ajouter…" item.
+; Clicking any item opens a lightweight GUI picker — no nested submenus built
+; up-front (which caused ~2 min load time on a 300+ slot map).
+AppendKeyboardShortcutGroups(TargetMenu) {
     global KeyboardShortcutAssignments, GESTURE_ACTIONS
-    LoggerStart("KeyboardShortcutsMenu", "Construction du menu raccourcis clavier…")
-
-    KMenu := Menu()
+    LoggerStart("KeyboardShortcutsMenu", "Ajout des groupes de raccourcis clavier…")
 
     static _Groups := [
-        Map("prefix", "win_",        "label", "⊞ Win+",        "add_label", "[+ Ajouter un raccourci Win+…]"),
-        Map("prefix", "ctrl_",       "label", "^ Ctrl+",        "add_label", "[+ Ajouter un raccourci Ctrl+…]"),
-        Map("prefix", "ctrl_shift_", "label", "^⇧ Ctrl+Shift+", "add_label", "[+ Ajouter un raccourci Ctrl+Shift+…]"),
-        Map("prefix", "alt_",        "label", "⎇ Alt+",         "add_label", "[+ Ajouter un raccourci Alt+…]"),
+        Map("prefix", "win_",        "label", "⊞ Win+",         "add_label", "[+ Ajouter un raccourci Win+…]"),
+        Map("prefix", "ctrl_",       "label", "^ Ctrl+",         "add_label", "[+ Ajouter un raccourci Ctrl+…]"),
+        Map("prefix", "ctrl_shift_", "label", "^⇧ Ctrl+Shift+",  "add_label", "[+ Ajouter un raccourci Ctrl+Shift+…]"),
+        Map("prefix", "alt_",        "label", "⎇ Alt+",          "add_label", "[+ Ajouter un raccourci Alt+…]"),
     ]
 
     AssignedCount := 0
@@ -2587,11 +2585,10 @@ BuildKeyboardShortcutsMenu() {
         ; "Add shortcut" item — opens picker with full slot list for this prefix
         GMenu.Add(AddLabel, ((_p) => (*) => ShowKeyboardSlotPicker(_p))(Prefix))
 
-        KMenu.Add(GLabel, GMenu)
+        TargetMenu.Add(GLabel, GMenu)
     }
 
-    LoggerSuccess("KeyboardShortcutsMenu", "Menu construit (%d raccourci(s) actif(s)).", AssignedCount)
-    return KMenu
+    LoggerSuccess("KeyboardShortcutsMenu", "Groupes ajoutés (%d raccourci(s) actif(s)).", AssignedCount)
 }
 
 ; Open a two-step GUI: first pick the key slot, then pick the action.
