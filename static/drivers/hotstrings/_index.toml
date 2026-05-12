@@ -14,5 +14,4 @@ categories_order = ["distancesreduction", "sfbsreduction", "rolls", "autocorrect
 # =============================================================
 
 [modules.magickey.textexpansionpersonalinformation]
-description = "Remplissage de formulaires avec le suffixe @ : @np★ = Nom ⇥ Prénom, etc."
 mod_id = "personal_info"

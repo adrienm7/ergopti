@@ -103,9 +103,39 @@ function M.generate(ctx, menu_mods, actions)
 			ctx.updateMenu()
 		end
 
+		-- Sum hotstring counts across all groups for the top-level title
+		local grand_total, grand_has_count = 0, false
+		if ctx and ctx.hotfiles and type(ctx.hotfiles) == "table"
+		and ctx.keymap and type(ctx.keymap.get_sections) == "function" then
+			for _, f in ipairs(ctx.hotfiles) do
+				local name = ctx.get_group_name and ctx.get_group_name(f) or f
+				local secs = ctx.keymap.get_sections(name)
+				if type(secs) == "table" then
+					for _, sec in ipairs(secs) do
+						if type(sec) == "table" and sec.name ~= "-" and not sec.is_module_placeholder
+						and sec.count ~= nil then
+							grand_has_count = true
+							grand_total = grand_total + tonumber(sec.count)
+						end
+					end
+				end
+			end
+		end
+		local function fmt_grand(n)
+			local s = tostring(math.floor(n + 0.5)); local r = ""
+			for i = 1, #s do
+				if i > 1 and (#s - i + 1) % 3 == 0 then r = r .. " " end
+				r = r .. s:sub(i, i)
+			end
+			return r
+		end
+		local hotstrings_title = grand_has_count
+			and ("⚡ Hotstrings (" .. fmt_grand(grand_total) .. ")")
+			or  "⚡ Hotstrings"
+
 		if #hotstrings_menu > 0 then
 			table.insert(items, {
-				title = "⚡ Hotstrings",
+				title = hotstrings_title,
 				menu = hotstrings_menu,
 				checked = all_enabled and not ctx.paused or nil,
 				fn = not ctx.paused and toggle_all_hotstrings or nil
