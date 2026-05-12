@@ -43,7 +43,8 @@ helpers.describe("ScriptControl ACTIONS / ACTION_LABELS", function()
 
 	helpers.it("ACTION_LABELS has a French label for every non-separator id", function()
 		for _, id in ipairs(SC.ACTIONS) do
-			if id ~= "--" then
+			-- Skip display-only entries: separators ("-", "--") and section headers ("#…")
+			if id ~= "-" and id ~= "--" and id:sub(1, 1) ~= "#" then
 				helpers.assert_true(type(SC.ACTION_LABELS[id]) == "string"
 					and SC.ACTION_LABELS[id] ~= "")
 			end
@@ -53,7 +54,8 @@ helpers.describe("ScriptControl ACTIONS / ACTION_LABELS", function()
 	helpers.it("does not contain duplicate ids (separators excluded)", function()
 		local seen = {}
 		for _, id in ipairs(SC.ACTIONS) do
-			if id ~= "--" then
+			-- Skip display-only entries: separators ("-", "--") and section headers ("#…")
+			if id ~= "-" and id ~= "--" and id:sub(1, 1) ~= "#" then
 				helpers.assert_eq(seen[id], nil, "duplicate id: " .. tostring(id))
 				seen[id] = true
 			end

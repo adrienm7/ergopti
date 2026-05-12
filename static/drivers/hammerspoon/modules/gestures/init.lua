@@ -42,6 +42,10 @@ M.DEFAULT_GESTURES = {
 	tap_4                = "app_window_previous",
 	tap_5                = "none",
 
+	swipe_3_horiz        = "none",
+	swipe_4_horiz        = "none",
+	swipe_5_horiz        = "none",
+
 	swipe_2_left         = "none",
 	swipe_2_right        = "none",
 	swipe_2_up           = "none",
@@ -115,7 +119,11 @@ M.SINGLE_SLOTS = {
 	"swipe_5_left_up", "swipe_5_right_up", "swipe_5_left_down", "swipe_5_right_down",
 }
 
-M.AXIS_SLOTS = {}
+M.AXIS_SLOTS = {
+	"swipe_3_horiz",
+	"swipe_4_horiz",
+	"swipe_5_horiz",
+}
 
 
 

@@ -1220,10 +1220,12 @@ initMenu() {
         HotstringsAllEnabled ? ToggleAllHotstringsOff : ToggleAllHotstringsOn)
     HotstringsMenu.Add() ; Separator after global toggle
 
-    ; 1. Paramètres — mirrors HS "⚙️ Paramètres hotstrings" at the top
-    HotstringsMenu.Add("Délais et couleurs des hotstrings…",
+    ; 1. Paramètres — mirrors HS "⚙️ Paramètres hotstrings" submenu
+    ParamsMenu := Menu()
+    ParamsMenu.Add("Délais et couleurs des hotstrings…",
         (*) => OpenHotstringsConfigWindow())
-    HotstringsMenu.Add("Touche magique : " . ScriptInformation["MagicKey"], MagicKeyEditor)
+    ParamsMenu.Add("Touche magique : " . ScriptInformation["MagicKey"], MagicKeyEditor)
+    HotstringsMenu.Add("⚙️ Paramètres hotstrings", ParamsMenu)
     HotstringsMenu.Add() ; Separator after paramètres block
 
     ; 2a. Standard hotstring groups + dynamic — "Hotstrings communs" header

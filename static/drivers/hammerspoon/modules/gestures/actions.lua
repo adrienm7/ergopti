@@ -657,7 +657,8 @@ end
 
 local function build_ax_names(shared)
 	if not shared then return nil end
-	local out = {}
+	-- "none" is the disabled-axis sentinel; always first, never in the TOML order list
+	local out = {"none"}
 	for _, item in ipairs(shared.ax_order) do
 		local meta = shared.ax_actions[item]
 		local platform = meta and meta.platform or "all"
@@ -721,7 +722,9 @@ M.SG_NAMES = build_sg_names(_shared) or {
 }
 
 function M.get_label(name)
-	if not name then return AX["none"].label end
+	if not name or name == "none" then
+		return SG["none"] and SG["none"].label or "Désactivé"
+	end
 	if AX[name] then return AX[name].label end
 	if SG[name] then return SG[name].label end
 	return name
