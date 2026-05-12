@@ -190,9 +190,9 @@ hotkey_defs.ctrl_u   = function()
 	return bind_log({"ctrl"}, "u", text_acts.toggle_uppercase)
 end
 
-hotkey_labels.ctrl_w = "Sélectionner le mot courant"
+hotkey_labels.ctrl_w = "Toggle Casse De Titre / minuscules"
 hotkey_defs.ctrl_w   = function()
-	return bind_log({"ctrl"}, "w", text_acts.select_word)
+	return bind_log({"ctrl"}, "w", text_acts.toggle_titlecase)
 end
 
 hotkey_labels.ctrl_x = "Copier la couleur hex du pixel sous le curseur"
@@ -200,10 +200,15 @@ hotkey_defs.ctrl_x   = function()
 	return bind_log({"ctrl"}, "x", sys_acts.copy_pixel_color)
 end
 
+hotkey_labels.ctrl_l = "Verrouiller l'écran"
+hotkey_defs.ctrl_l   = function()
+	return bind_log({"ctrl"}, "l", sys_acts.lock_screen)
+end
+
 -- Punctuation shortcuts — after all letter-based ctrl shortcuts
-hotkey_labels.ctrl_period = "Toggle Casse De Titre / minuscules"
+hotkey_labels.ctrl_period = "Ouvrir le sélecteur d'emojis"
 hotkey_defs.ctrl_period   = function()
-	return bind_log({"ctrl"}, ".", text_acts.toggle_titlecase)
+	return bind_log({"ctrl"}, ".", sys_acts.open_emoji_picker)
 end
 
 hotkey_labels.ctrl_quote = "Mettre la souris en surbrillance"

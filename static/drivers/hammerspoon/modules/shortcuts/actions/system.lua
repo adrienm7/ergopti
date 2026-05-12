@@ -562,6 +562,33 @@ function M.teleport_mouse()
 	end
 end
 
+--- Locks the screen immediately using the system screensaver engine.
+function M.lock_screen()
+	Logger.start(LOG, "Locking screen…")
+	local ok, err = pcall(hs.caffeinate.lockScreen)
+	if ok then
+		Logger.success(LOG, "Screen locked.")
+	else
+		Logger.error(LOG, "lock_screen: failed — %s.", tostring(err))
+	end
+end
+
+
+--- Opens the macOS Character Viewer (emoji picker) via the system shortcut.
+--- Mirrors Windows' native Win + . behaviour for cross-platform parity.
+function M.open_emoji_picker()
+	Logger.start(LOG, "Opening emoji picker…")
+	local ok, err = pcall(function()
+		eventtap.keyStroke({"ctrl", "cmd"}, "space", 0)
+	end)
+	if ok then
+		Logger.success(LOG, "Emoji picker triggered.")
+	else
+		Logger.error(LOG, "open_emoji_picker: failed — %s.", tostring(err))
+	end
+end
+
+
 --- Toggles display mirroring using CoreGraphics via an inline Python script.
 --- CGBeginDisplayConfiguration / CGConfigureDisplayMirrorOfDisplay are the
 --- official public APIs for this; the hs.eventtap Cmd+F1 approach is unreliable

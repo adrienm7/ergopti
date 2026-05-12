@@ -204,14 +204,50 @@ end
 -- =============================
 -- =============================
 
+--- Focuses an existing Finder window already showing the given folder path.
+--- Compares each Finder window's target via AppleScript (handles localised
+--- titles like "Téléchargements" vs "Downloads" reliably).
+--- @param folder_path string POSIX path of the folder to look for.
+--- @return boolean True if an existing window was found and focused.
+local function focus_existing_finder_window(folder_path)
+	local script = string.format([[
+		tell application "Finder"
+			set targetPath to POSIX file %q as alias
+			repeat with w in windows
+				try
+					if (target of w as alias) is targetPath then
+						set index of w to 1
+						activate
+						return "ok"
+					end if
+				end try
+			end repeat
+		end tell
+		return "none"
+	]], folder_path)
+
+	local ok, result = hs.osascript.applescript(script)
+	return ok and result == "ok"
+end
+
 --- Opens the Downloads folder via the best available file manager.
+--- Reuses an existing window if one is already showing Downloads.
 function M.open_downloads()
 	local home = os.getenv("HOME") or "~"
+	local downloads = home .. "/Downloads"
+
+	-- First, try to focus an existing Finder window already on Downloads
+	if focus_existing_finder_window(downloads) then
+		Logger.info(LOG, "Focused existing Finder window for Downloads.")
+		center_frontmost_after(CENTER_DELAY_SEC)
+		return
+	end
+
 	if not launch_first_available(FILE_MANAGERS) then
-		pcall(hs.execute, "open \"" .. home .. "/Downloads\"")
+		pcall(hs.execute, "open \"" .. downloads .. "\"")
 	else
 		timer.doAfter(FOLDER_OPEN_DELAY_SEC, function()
-			pcall(hs.execute, "open \"" .. home .. "/Downloads\"")
+			pcall(hs.execute, "open \"" .. downloads .. "\"")
 		end)
 	end
 	center_frontmost_after(CENTER_DELAY_SEC)
