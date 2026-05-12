@@ -335,26 +335,55 @@ global PersonalInformationLetters := Map(
 ; ======================================================================
 
 ReadConfiguration(Cache) {
-    Props := ["Enabled", "TimeActivationSeconds", "Letter", "PatternMaxLength", "Link", "DestinationFolder",
-        "DatedNotes", "SearchEngine", "SearchEngineURLQuery"]
+    ExtraProps := ["TimeActivationSeconds", "Letter", "PatternMaxLength",
+        "Link", "DestinationFolder", "DatedNotes", "SearchEngine", "SearchEngineURLQuery"]
 
     for Category, FeaturesMap in Features {
+        if !IsObject(FeaturesMap) or Type(FeaturesMap) != "Map"
+            continue
         for Feature, Value in FeaturesMap {
-            if (Type(Value) = "Map") {
-                ; Sub-map => iterate sub-features under [Category.Feature.SubFeature]
-                for SubFeature, SubValue in Value {
-                    for Prop in Props {
-                        RawValue := IniCacheGet(Cache, Category "." Feature "." SubFeature, Prop)
-                        if RawValue != "_" {
-                            Features[Category][Feature][SubFeature].%Prop% := RawValue
+            if Feature == "__Order"
+                continue
+            if Type(Value) == "Map" {
+                ; Sub-map: __Configuration props live directly in [Category.Feature]
+                if Value.Has("__Configuration") {
+                    Cfg := Value["__Configuration"]
+                    for Prop in ExtraProps {
+                        if Cfg.HasOwnProp(Prop) {
+                            Raw := IniCacheGet(Cache, Category "." Feature, Prop)
+                            if Raw != "_"
+                                Value["__Configuration"].%Prop% := Raw
                         }
                     }
                 }
-            } else {
-                for Prop in Props {
-                    RawValue := IniCacheGet(Cache, Category "." Feature, Prop)
-                    if RawValue != "_" {
-                        Features[Category][Feature].%Prop% := RawValue
+                ; Leaf sub-features are flattened in [Category.Feature]:
+                ;   Enabled → key = SubFeature, extra → key = SubFeature_Prop
+                for SubFeature, SubValue in Value {
+                    if SubFeature == "__Order" or SubFeature == "__Configuration"
+                        continue
+                    if !IsObject(SubValue)
+                        continue
+                    EnabledRaw := IniCacheGet(Cache, Category "." Feature, SubFeature)
+                    if EnabledRaw != "_"
+                        Features[Category][Feature][SubFeature].Enabled := EnabledRaw
+                    for Prop in ExtraProps {
+                        if SubValue.HasOwnProp(Prop) {
+                            Raw := IniCacheGet(Cache, Category "." Feature, SubFeature "_" Prop)
+                            if Raw != "_"
+                                Features[Category][Feature][SubFeature].%Prop% := Raw
+                        }
+                    }
+                }
+            } else if IsObject(Value) {
+                ; Leaf feature: Enabled lives as FeatureName key in [Category]
+                EnabledRaw := IniCacheGet(Cache, Category, Feature)
+                if EnabledRaw != "_"
+                    Features[Category][Feature].Enabled := EnabledRaw
+                for Prop in ExtraProps {
+                    if Value.HasOwnProp(Prop) {
+                        Raw := IniCacheGet(Cache, Category, Feature "_" Prop)
+                        if Raw != "_"
+                            Features[Category][Feature].%Prop% := Raw
                     }
                 }
             }
@@ -616,8 +645,8 @@ SetFeatureLetter(FullPath, Letter) {
 
     Feature.Enabled := true
     Feature.Letter := Letter
-    TOML_Write(true, ConfigurationFile, FeatureCategoryPath . "." . FeatureName, "Enabled")
-    TOML_Write(Letter, ConfigurationFile, FeatureCategoryPath . "." . FeatureName, "Letter")
+    TOML_Write(true, ConfigurationFile, FeatureCategoryPath, FeatureName)
+    TOML_Write(Letter, ConfigurationFile, FeatureCategoryPath, FeatureName "_Letter")
     Reload
 }
 
@@ -630,7 +659,7 @@ SetFeatureLetterOff(FullPath) {
     FeatureName := SubStr(FullPath, pos + 1)
 
     Feature.Enabled := false
-    TOML_Write(false, ConfigurationFile, FeatureCategoryPath . "." . FeatureName, "Enabled")
+    TOML_Write(false, ConfigurationFile, FeatureCategoryPath, FeatureName)
     Reload
 }
 
@@ -695,11 +724,11 @@ ToggleMenuVariableByPath(FullPath) {
         for ShortcutName in FeatureCategory {
             Shortcut := FeatureCategory.Get(ShortcutName)
             Shortcut.Enabled := False
-            TOML_Write(Shortcut.Enabled, ConfigurationFile, FeatureCategoryPath . "." . ShortcutName, "Enabled")
+            TOML_Write(Shortcut.Enabled, ConfigurationFile, FeatureCategoryPath, ShortcutName)
         }
     }
     Feature.Enabled := !CurrentFeatureActivation
-    TOML_Write(Feature.Enabled, ConfigurationFile, FeatureCategoryPath . "." . FeatureName, "Enabled")
+    TOML_Write(Feature.Enabled, ConfigurationFile, FeatureCategoryPath, FeatureName)
     Reload
 }
 
@@ -1810,7 +1839,7 @@ GPTLinkEditor(*) {
 }
 ModifyLink(gui, NewValue) {
     Features["Shortcuts"]["GPT"].Link := NewValue
-    TOML_Write(NewValue, ConfigurationFile, "Shortcuts.GPT", "Link")
+    TOML_Write(NewValue, ConfigurationFile, "Shortcuts", "GPT_Link")
 
     gui.Destroy()
     Reload
@@ -1852,23 +1881,23 @@ ToggleAllFeatures(Value) {
     global Features
     Updates := []
 
-    ; Recursive setter used when Value == 0
-    SetAllRecursive(Path, Items) {
+    ; Recursive setter used when Value == 0.
+    ; Section is the TOML section where this node's leaf children are flattened.
+    ; Pass an empty string for the root call; the function handles the top-level
+    ; category keys by using Key directly as the section name.
+    SetAllRecursive(Section, Items) {
         for Key, Val in Items {
-            if Key == "__Order" {
+            if Key == "__Order" or Key == "__Configuration" {
                 continue
             }
-            NewPath := (Path = "") ? Key : Path "." Key
+            ChildSection := (Section = "") ? Key : Section "." Key
             if Type(Val) == "Map" {
-                if Val.HasOwnProp("Enabled") {
-                    Val.Enabled := Value
-                    Updates.Push({ Section: NewPath, Key: "Enabled", Value: Value })
-                }
-                ; Recurse into nested entries to set their Enabled to Value
-                SetAllRecursive(NewPath, Val)
+                ; Sub-map: its leaf children are flattened in [ChildSection]
+                SetAllRecursive(ChildSection, Val)
             } else if IsObject(Val) and Val.HasOwnProp("Enabled") {
+                ; Leaf: flatten into parent Section with Key as the TOML key
                 Val.Enabled := Value
-                Updates.Push({ Section: NewPath, Key: "Enabled", Value: Value })
+                Updates.Push({ Section: Section, Key: Key, Value: Value })
             }
         }
     }
@@ -1888,7 +1917,7 @@ ToggleAllFeatures(Value) {
                 }
                 if IsObject(Val) and Val.HasOwnProp("Enabled") {
                     Val.Enabled := Value
-                    Updates.Push({ Section: Category "." FeatureName, Key: "Enabled", Value: Value })
+                    Updates.Push({ Section: Category, Key: FeatureName, Value: Value })
                 }
                 ; If Val is a Map without Enabled, we skip its children when enabling
             }
@@ -1917,7 +1946,7 @@ ToggleAllHotstrings(Value) {
             }
             if IsObject(Val) and Val.HasOwnProp("Enabled") {
                 Val.Enabled := Value
-                Updates.Push({ Section: Category "." FeatureName, Key: "Enabled", Value: Value })
+                Updates.Push({ Section: Category, Key: FeatureName, Value: Value })
             }
         }
     }
@@ -1929,7 +1958,7 @@ ToggleAllHotstrings(Value) {
             }
             if IsObject(Val) and Val.HasOwnProp("Enabled") {
                 Val.Enabled := Value
-                Updates.Push({ Section: "DynamicHotstrings." FeatureName, Key: "Enabled", Value: Value })
+                Updates.Push({ Section: "DynamicHotstrings", Key: FeatureName, Value: Value })
             }
         }
     }
@@ -1940,7 +1969,7 @@ ToggleAllHotstrings(Value) {
             }
             if IsObject(Val) and Val.HasOwnProp("Enabled") {
                 Val.Enabled := Value
-                Updates.Push({ Section: "Personal." FeatureName, Key: "Enabled", Value: Value })
+                Updates.Push({ Section: "Personal", Key: FeatureName, Value: Value })
             }
         }
     }
@@ -1982,7 +2011,7 @@ ToggleCategoryAllFeatures(Category, Value) {
         }
         if IsObject(Val) and Val.HasOwnProp("Enabled") {
             Val.Enabled := Value
-            Updates.Push({ Section: Category, Key: FeatureName . ".Enabled", Value: Value })
+            Updates.Push({ Section: Category, Key: FeatureName, Value: Value })
         }
     }
     TOML_BatchWrite(ConfigurationFile, Updates)
@@ -2048,10 +2077,14 @@ SaveFullConfig() {
 }
 
 ; Recursively walk the Features map to collect all persistable properties
-; into the Updates array. The key format mirrors ReadConfiguration so the
-; round-trip is lossless.
+; into the Updates array. Leaf features are flattened into their parent section:
+;   [Rolls]  CT = true
+;   [TapHolds.CapsLock]  EnterCtrl = true
+; Extra props use FeatureName_Prop keys:
+;   [TapHolds.LAlt]  BackSpaceLayer_TimeActivationSeconds = 0.2
+; This mirrors how Hammerspoon groups modules into compact sections.
 _CollectFeatureUpdates(Updates, ParentPath, Node) {
-    Props := ["Enabled", "TimeActivationSeconds", "Letter", "PatternMaxLength",
+    ExtraProps := ["TimeActivationSeconds", "Letter", "PatternMaxLength",
         "Link", "DestinationFolder", "DatedNotes", "SearchEngine", "SearchEngineURLQuery"]
 
     for Key, Value in Node {
@@ -2061,10 +2094,10 @@ _CollectFeatureUpdates(Updates, ParentPath, Node) {
         CurrentPath := (ParentPath == "") ? Key : ParentPath "." Key
 
         if Type(Value) == "Map" {
-            ; Nested sub-map: persist __Configuration if present, then recurse
+            ; Sub-map: __Configuration props go directly into [CurrentPath], then recurse
             if Value.Has("__Configuration") {
                 Cfg := Value["__Configuration"]
-                for Prop in Props {
+                for Prop in ExtraProps {
                     if Cfg.HasOwnProp(Prop) {
                         Updates.Push({ Section: CurrentPath, Key: Prop, Value: Cfg.%Prop% })
                     }
@@ -2072,10 +2105,14 @@ _CollectFeatureUpdates(Updates, ParentPath, Node) {
             }
             _CollectFeatureUpdates(Updates, CurrentPath, Value)
         } else if IsObject(Value) {
-            ; Leaf feature object: persist all known properties under [Parent.Feature]
-            for Prop in Props {
+            ; Leaf feature: flatten into ParentPath section.
+            ; Enabled maps to the feature name key; other props use FeatureName_Prop.
+            if Value.HasOwnProp("Enabled") {
+                Updates.Push({ Section: ParentPath, Key: Key, Value: Value.Enabled })
+            }
+            for Prop in ExtraProps {
                 if Value.HasOwnProp(Prop) {
-                    Updates.Push({ Section: CurrentPath, Key: Prop, Value: Value.%Prop% })
+                    Updates.Push({ Section: ParentPath, Key: Key "_" Prop, Value: Value.%Prop% })
                 }
             }
         }
