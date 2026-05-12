@@ -540,10 +540,9 @@ local function onKeyDownRaw(e)
 	end
 
 	-- 4. Handle Escape — dismiss predictions or optionally clear the buffer.
-	-- Either way the cursor's left-hand context is no longer known to the
-	-- buffer, so refuse to assume a word boundary on its left.
+	-- The cursor stays where it is; the next keystroke starts a fresh run.
 	if keyCode == Keycodes.ESCAPE then
-		CoreState.start_is_word_boundary = false
+		CoreState.start_is_word_boundary = true
 		return LLMBridge.check_escape_reset()
 	end
 
@@ -585,12 +584,11 @@ local function onKeyDownRaw(e)
 		return false
 	end
 
-	-- 7. Arrow / navigation keys break word context; delegate to nav-reset
-	-- handler and flip the boundary flag — the cursor moved to a position
-	-- whose left-hand context the buffer cannot describe.
+	-- 7. Arrow / navigation keys move the cursor; the next typed run starts
+	-- fresh, so treat the new position as a word boundary.
 	if keyCode == 117 or keyCode == 115 or keyCode == 116 or keyCode == 119 or keyCode == 121
 		or (keyCode >= 123 and keyCode <= 126) then
-		CoreState.start_is_word_boundary = false
+		CoreState.start_is_word_boundary = true
 		LLMBridge.check_nav_reset()
 		return false
 	end
@@ -803,13 +801,11 @@ mouse_tap = eventtap.new(
 	},
 	function()
 		local ok, result = pcall(function()
-			-- Mouse click moves the cursor to a position whose left-hand
-			-- context the buffer cannot describe. Flip the boundary flag
-			-- so word-boundary-required triggers refuse to fire flush
-			-- against the buffer's start until a real terminator is
-			-- observed. check_nav_reset may also wipe the buffer when
-			-- reset_buffer_on_navigation is enabled.
-			CoreState.start_is_word_boundary = false
+			-- Mouse click moves the cursor; the next typed run starts
+			-- fresh — treat as a word boundary. check_nav_reset may
+			-- also wipe the buffer when reset_buffer_on_navigation is
+			-- enabled.
+			CoreState.start_is_word_boundary = true
 			LLMBridge.check_nav_reset()
 			LLMBridge.reset_predictions()
 			return false
