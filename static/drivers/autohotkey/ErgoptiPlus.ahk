@@ -1821,25 +1821,25 @@ ReadKeyboardShortcutsConfig()
 ; The Features["Shortcuts"] hard-coded behaviours (Win+A, Win+G, …) remain
 ; active alongside these — the user disables individual Features items if they
 ; prefer the configurable system exclusively.
-Log("START", "KeyboardShortcuts", "Enregistrement des hotkeys configurables…")
+LoggerStart("KeyboardShortcuts", "Enregistrement des hotkeys configurables…")
 _KbBoundCount := 0
 for _KbSlot, _KbAction in KeyboardShortcutAssignments {
     if (_KbAction == "none")
         continue
     _KbSend := _KeyboardSlotSendCode(_KbSlot)
     if (_KbSend == "") {
-        Log("WARN", "KeyboardShortcuts", "Slot '%s' ignoré — code d'envoi introuvable.", _KbSlot)
+        LoggerWarn("KeyboardShortcuts", "Slot '%s' ignoré — code d'envoi introuvable.", _KbSlot)
         continue
     }
     try {
         Hotkey(_KbSend, ((_s) => (*) => RunKeyboardShortcutAction(_s))(_KbSlot))
-        Log("DEBUG", "KeyboardShortcuts", "Hotkey '%s' → '%s' enregistré.", _KbSlot, _KbAction)
+        LoggerDebug("KeyboardShortcuts", "Hotkey '%s' → '%s' enregistré.", _KbSlot, _KbAction)
         _KbBoundCount++
     } catch as _KbErr {
-        Log("WARN", "KeyboardShortcuts", "Échec enregistrement hotkey '%s' : %s.", _KbSlot, _KbErr.Message)
+        LoggerWarn("KeyboardShortcuts", "Échec enregistrement hotkey '%s' : %s.", _KbSlot, _KbErr.Message)
     }
 }
-Log("SUCCESS", "KeyboardShortcuts", "Hotkeys configurables enregistrés (%d actif(s)).", _KbBoundCount)
+LoggerSuccess("KeyboardShortcuts", "Hotkeys configurables enregistrés (%d actif(s)).", _KbBoundCount)
 
 ; Load every UI shortcut + privacy filter from the [shortcuts] section
 ; of ahk/config.toml. CS_Load() populates both MetricsShortcuts
@@ -2506,7 +2506,7 @@ _KeyboardSlotSendCode(SlotId) {
 ; Read per-slot action overrides from [Shortcuts.Keyboard] in the config TOML.
 ReadKeyboardShortcutsConfig() {
     global KeyboardShortcutAssignments, KEYBOARD_SHORTCUT_DEFAULTS, _IniCache, GESTURE_ACTIONS
-    Log("START", "KeyboardShortcuts", "Chargement des raccourcis clavier configurables…")
+    LoggerStart("KeyboardShortcuts", "Chargement des raccourcis clavier configurables…")
     ; Seed with defaults first
     for Slot, Action in KEYBOARD_SHORTCUT_DEFAULTS
         KeyboardShortcutAssignments[Slot] := Action
@@ -2517,10 +2517,10 @@ ReadKeyboardShortcutsConfig() {
         if (Value != "_" and (Value == "none" or GESTURE_ACTIONS.Has(Value))) {
             KeyboardShortcutAssignments[Slot] := Value
             OverrideCount++
-            Log("DEBUG", "KeyboardShortcuts", "Surcharge TOML : '%s' → '%s'.", Slot, Value)
+            LoggerDebug("KeyboardShortcuts", "Surcharge TOML : '%s' → '%s'.", Slot, Value)
         }
     }
-    Log("SUCCESS", "KeyboardShortcuts", "Raccourcis clavier chargés (%d défaut(s), %d surcharge(s)).",
+    LoggerSuccess("KeyboardShortcuts", "Raccourcis clavier chargés (%d défaut(s), %d surcharge(s)).",
         KEYBOARD_SHORTCUT_DEFAULTS.Count, OverrideCount)
 }
 
@@ -2529,10 +2529,10 @@ RunKeyboardShortcutAction(SlotId) {
     global KeyboardShortcutAssignments, GESTURE_ACTIONS
     Action := KeyboardShortcutAssignments.Has(SlotId) ? KeyboardShortcutAssignments[SlotId] : "none"
     if (Action == "none" or !GESTURE_ACTIONS.Has(Action)) {
-        Log("DEBUG", "KeyboardShortcuts", "Raccourci '%s' ignoré (action : '%s').", SlotId, Action)
+        LoggerDebug("KeyboardShortcuts", "Raccourci '%s' ignoré (action : '%s').", SlotId, Action)
         return
     }
-    Log("DEBUG", "KeyboardShortcuts", "Raccourci '%s' → '%s' déclenché.", SlotId, Action)
+    LoggerDebug("KeyboardShortcuts", "Raccourci '%s' → '%s' déclenché.", SlotId, Action)
     GESTURE_ACTIONS[Action].Fn.Call()
 }
 
@@ -2554,7 +2554,7 @@ _MakeKeyboardShortcutHandler(SlotId, ActionName) {
 ; of nested submenus up-front (which caused ~2 min load time on a 300+ slot map).
 BuildKeyboardShortcutsMenu() {
     global KeyboardShortcutAssignments, GESTURE_ACTIONS
-    Log("START", "KeyboardShortcutsMenu", "Construction du menu raccourcis clavier…")
+    LoggerStart("KeyboardShortcutsMenu", "Construction du menu raccourcis clavier…")
 
     KMenu := Menu()
 
@@ -2590,7 +2590,7 @@ BuildKeyboardShortcutsMenu() {
         KMenu.Add(GLabel, GMenu)
     }
 
-    Log("SUCCESS", "KeyboardShortcutsMenu", "Menu construit (%d raccourci(s) actif(s)).", AssignedCount)
+    LoggerSuccess("KeyboardShortcutsMenu", "Menu construit (%d raccourci(s) actif(s)).", AssignedCount)
     return KMenu
 }
 
@@ -2655,7 +2655,7 @@ ShowKeyboardSlotPicker(Prefix) {
 ; Used both from the "Ajouter…" flow and from clicking an existing slot.
 ShowKeyboardShortcutPicker(SlotId) {
     global GESTURE_ACTION_NAMES, GESTURE_ACTIONS, KeyboardShortcutAssignments
-    Log("START", "KeyboardShortcutsMenu", "Ouverture du sélecteur pour '%s'…", SlotId)
+    LoggerStart("KeyboardShortcutsMenu", "Ouverture du sélecteur pour '%s'…", SlotId)
 
     Current := KeyboardShortcutAssignments.Has(SlotId) ? KeyboardShortcutAssignments[SlotId] : "none"
 
@@ -2726,7 +2726,7 @@ ShowKeyboardShortcutPicker(SlotId) {
             return
         ChosenId := FilteredIds[Idx]
         W.Destroy()
-        Log("SUCCESS", "KeyboardShortcutsMenu", "Raccourci '%s' → '%s' confirmé.", SlotId, ChosenId)
+        LoggerSuccess("KeyboardShortcutsMenu", "Raccourci '%s' → '%s' confirmé.", SlotId, ChosenId)
         SetKeyboardShortcutAction(SlotId, ChosenId)
     }
 }
