@@ -1821,14 +1821,25 @@ ReadKeyboardShortcutsConfig()
 ; The Features["Shortcuts"] hard-coded behaviours (Win+A, Win+G, …) remain
 ; active alongside these — the user disables individual Features items if they
 ; prefer the configurable system exclusively.
+Log("START", "KeyboardShortcuts", "Enregistrement des hotkeys configurables…")
+_KbBoundCount := 0
 for _KbSlot, _KbAction in KeyboardShortcutAssignments {
     if (_KbAction == "none")
         continue
     _KbSend := _KeyboardSlotSendCode(_KbSlot)
-    if (_KbSend == "")
+    if (_KbSend == "") {
+        Log("WARN", "KeyboardShortcuts", "Slot '%s' ignoré — code d'envoi introuvable.", _KbSlot)
         continue
-    try Hotkey(_KbSend, ((_s) => (*) => RunKeyboardShortcutAction(_s))(_KbSlot))
+    }
+    try {
+        Hotkey(_KbSend, ((_s) => (*) => RunKeyboardShortcutAction(_s))(_KbSlot))
+        Log("DEBUG", "KeyboardShortcuts", "Hotkey '%s' → '%s' enregistré.", _KbSlot, _KbAction)
+        _KbBoundCount++
+    } catch as _KbErr {
+        Log("WARN", "KeyboardShortcuts", "Échec enregistrement hotkey '%s' : %s.", _KbSlot, _KbErr.Message)
+    }
 }
+Log("SUCCESS", "KeyboardShortcuts", "Hotkeys configurables enregistrés (%d actif(s)).", _KbBoundCount)
 
 ; Load every UI shortcut + privacy filter from the [shortcuts] section
 ; of ahk/config.toml. CS_Load() populates both MetricsShortcuts
@@ -2495,23 +2506,33 @@ _KeyboardSlotSendCode(SlotId) {
 ; Read per-slot action overrides from [Shortcuts.Keyboard] in the config TOML.
 ReadKeyboardShortcutsConfig() {
     global KeyboardShortcutAssignments, KEYBOARD_SHORTCUT_DEFAULTS, _IniCache, GESTURE_ACTIONS
+    Log("START", "KeyboardShortcuts", "Chargement des raccourcis clavier configurables…")
     ; Seed with defaults first
     for Slot, Action in KEYBOARD_SHORTCUT_DEFAULTS
         KeyboardShortcutAssignments[Slot] := Action
     ; Apply any user overrides persisted in the TOML
+    OverrideCount := 0
     for Slot, _ in KEYBOARD_SHORTCUT_DEFAULTS {
         Value := IniCacheGet(_IniCache, "Shortcuts.Keyboard", Slot)
-        if (Value != "_" and (Value == "none" or GESTURE_ACTIONS.Has(Value)))
+        if (Value != "_" and (Value == "none" or GESTURE_ACTIONS.Has(Value))) {
             KeyboardShortcutAssignments[Slot] := Value
+            OverrideCount++
+            Log("DEBUG", "KeyboardShortcuts", "Surcharge TOML : '%s' → '%s'.", Slot, Value)
+        }
     }
+    Log("SUCCESS", "KeyboardShortcuts", "Raccourcis clavier chargés (%d défaut(s), %d surcharge(s)).",
+        KEYBOARD_SHORTCUT_DEFAULTS.Count, OverrideCount)
 }
 
 ; Execute the configured action for a keyboard shortcut slot.
 RunKeyboardShortcutAction(SlotId) {
     global KeyboardShortcutAssignments, GESTURE_ACTIONS
     Action := KeyboardShortcutAssignments.Has(SlotId) ? KeyboardShortcutAssignments[SlotId] : "none"
-    if (Action == "none" or !GESTURE_ACTIONS.Has(Action))
+    if (Action == "none" or !GESTURE_ACTIONS.Has(Action)) {
+        Log("DEBUG", "KeyboardShortcuts", "Raccourci '%s' ignoré (action : '%s').", SlotId, Action)
         return
+    }
+    Log("DEBUG", "KeyboardShortcuts", "Raccourci '%s' → '%s' déclenché.", SlotId, Action)
     GESTURE_ACTIONS[Action].Fn.Call()
 }
 
@@ -2527,77 +2548,187 @@ _MakeKeyboardShortcutHandler(SlotId, ActionName) {
     return (*) => SetKeyboardShortcutAction(SlotId, ActionName)
 }
 
-; Build the "⌨️ Raccourcis clavier" submenu. Groups slots by modifier prefix
-; (Ctrl / Ctrl+Shift / Win / Alt), each slot opening a picker of all actions.
+; Build the "⌨️ Raccourcis clavier" submenu.
+; Each group (Win/Ctrl/Ctrl+Shift/Alt) shows only assigned slots plus an "Ajouter…"
+; item. Clicking any item opens a lightweight GUI picker instead of building hundreds
+; of nested submenus up-front (which caused ~2 min load time on a 300+ slot map).
 BuildKeyboardShortcutsMenu() {
-    global KeyboardShortcutAssignments, GESTURE_ACTIONS, GESTURE_ACTION_NAMES
-    global KEYBOARD_SHORTCUT_DEFAULTS
+    global KeyboardShortcutAssignments, GESTURE_ACTIONS
+    Log("START", "KeyboardShortcutsMenu", "Construction du menu raccourcis clavier…")
 
     KMenu := Menu()
 
-    ; Modifier groups: prefix → display label + subset of default slots
     static _Groups := [
-        Map("prefix", "win_",         "label", "⊞ Win+"),
-        Map("prefix", "ctrl_",        "label", "^ Ctrl+"),
-        Map("prefix", "ctrl_shift_",  "label", "^⇧ Ctrl+Shift+"),
-        Map("prefix", "alt_",         "label", "⎇ Alt+"),
+        Map("prefix", "win_",        "label", "⊞ Win+",        "add_label", "[+ Ajouter un raccourci Win+…]"),
+        Map("prefix", "ctrl_",       "label", "^ Ctrl+",        "add_label", "[+ Ajouter un raccourci Ctrl+…]"),
+        Map("prefix", "ctrl_shift_", "label", "^⇧ Ctrl+Shift+", "add_label", "[+ Ajouter un raccourci Ctrl+Shift+…]"),
+        Map("prefix", "alt_",        "label", "⎇ Alt+",         "add_label", "[+ Ajouter un raccourci Alt+…]"),
     ]
 
+    AssignedCount := 0
     for GroupInfo in _Groups {
-        Prefix := GroupInfo["prefix"]
-        GLabel := GroupInfo["label"]
-        GMenu  := Menu()
+        Prefix   := GroupInfo["prefix"]
+        GLabel   := GroupInfo["label"]
+        AddLabel := GroupInfo["add_label"]
+        GMenu    := Menu()
 
-        ; Collect all slots for this modifier from GESTURE_ACTIONS keys
-        for ActionKey, _ in GESTURE_ACTIONS {
-            if SubStr(ActionKey, 1, StrLen(Prefix)) != Prefix
+        ; Only show slots that have a non-none assignment
+        for Slot, Action in KeyboardShortcutAssignments {
+            if (SubStr(Slot, 1, StrLen(Prefix)) != Prefix)
                 continue
-            ; Only include modifier+key slots (single char suffix or digit or special)
-            ; i.e. slots whose id IS itself a key combo, not an action name that happens
-            ; to start with the same prefix (e.g. "win_app_prev" is fine — user can assign
-            ; it, but its own slot picker should not be in this menu).
-            Suffix := SubStr(ActionKey, StrLen(Prefix) + 1)
-            if (StrLen(Suffix) > 10)  ; skip action IDs with long suffixes
+            if (Action == "none")
                 continue
-            Current := KeyboardShortcutAssignments.Has(ActionKey)
-                ? KeyboardShortcutAssignments[ActionKey] : "none"
-            CurrentLabel := GESTURE_ACTIONS.Has(Current)
-                ? GESTURE_ACTIONS[Current].Label : "Désactivé"
-            SlotMenu := _BuildActionPickerMenu(ActionKey)
-            GMenu.Add(ActionKey . " : " . CurrentLabel, SlotMenu)
+            ActionLabel := GESTURE_ACTIONS.Has(Action) ? GESTURE_ACTIONS[Action].Label : Action
+            SlotDisplay := Slot . " : " . ActionLabel
+            GMenu.Add(SlotDisplay, ((_s) => (*) => ShowKeyboardShortcutPicker(_s))(Slot))
+            AssignedCount++
         }
+
+        ; "Add shortcut" item — opens picker with full slot list for this prefix
+        GMenu.Add(AddLabel, ((_p) => (*) => ShowKeyboardSlotPicker(_p))(Prefix))
+
         KMenu.Add(GLabel, GMenu)
     }
 
+    Log("SUCCESS", "KeyboardShortcutsMenu", "Menu construit (%d raccourci(s) actif(s)).", AssignedCount)
     return KMenu
 }
 
-; Build a single-slot action picker menu (shared between keyboard and script shortcuts).
-_BuildActionPickerMenu(SlotId) {
+; Open a two-step GUI: first pick the key slot, then pick the action.
+; Called when the user clicks "Ajouter…" for a modifier group.
+ShowKeyboardSlotPicker(Prefix) {
+    global GESTURE_ACTIONS
+
+    ; Collect all valid slots for this prefix from GESTURE_ACTIONS
+    Slots := []
+    static _SpecialOrder := ["space", "enter", "period", "comma", "sc029"]
+    ; Letters first (a-z)
+    Letters := "abcdefghijklmnopqrstuvwxyz"
+    loop StrLen(Letters) {
+        L := SubStr(Letters, A_Index, 1)
+        SlotId := Prefix . L
+        if GESTURE_ACTIONS.Has(SlotId)
+            Slots.Push(SlotId)
+    }
+    ; Digits 0-9
+    loop 10 {
+        D := SubStr("0123456789", A_Index, 1)
+        SlotId := Prefix . D
+        if GESTURE_ACTIONS.Has(SlotId)
+            Slots.Push(SlotId)
+    }
+    ; Special keys
+    for Sk in _SpecialOrder {
+        SlotId := Prefix . Sk
+        if GESTURE_ACTIONS.Has(SlotId)
+            Slots.Push(SlotId)
+    }
+
+    if (Slots.Length = 0)
+        return
+
+    ; Build display labels for the ListBox
+    SlotLabels := []
+    for SlotId in Slots
+        SlotLabels.Push(GESTURE_ACTIONS[SlotId].Label)
+
+    W := Gui("+AlwaysOnTop", "Choisir une touche — " . Prefix)
+    W.SetFont("s10", "Segoe UI")
+    W.MarginX := 12
+    W.MarginY := 12
+    W.Add("Text", "xm", "Sélectionner la combinaison de touches :")
+    LB := W.Add("ListBox", "xm w320 r16", SlotLabels)
+    W.Add("Button", "xm w80", "OK").OnEvent("Click", PickSlot)
+    W.Add("Button", "x+6 w80", "Annuler").OnEvent("Click", (*) => W.Destroy())
+    W.Show()
+
+    PickSlot(*) {
+        Idx := LB.Value
+        if (Idx = 0)
+            return
+        W.Destroy()
+        ShowKeyboardShortcutPicker(Slots[Idx])
+    }
+}
+
+; Open a GUI to pick an action for a given slot.
+; Used both from the "Ajouter…" flow and from clicking an existing slot.
+ShowKeyboardShortcutPicker(SlotId) {
     global GESTURE_ACTION_NAMES, GESTURE_ACTIONS, KeyboardShortcutAssignments
-    SlotMenu := Menu()
-    Current := KeyboardShortcutAssignments.Has(SlotId)
-        ? KeyboardShortcutAssignments[SlotId] : "none"
-    last_was_separator := true
+    Log("START", "KeyboardShortcutsMenu", "Ouverture du sélecteur pour '%s'…", SlotId)
+
+    Current := KeyboardShortcutAssignments.Has(SlotId) ? KeyboardShortcutAssignments[SlotId] : "none"
+
+    ; Build flat action list (labels + parallel id list), skipping headers/separators
+    ActionIds     := []
+    ActionLabels  := []
+    SelectedIdx   := 0
+
+    ; Add "Désactivé" as first entry
+    ActionIds.Push("none")
+    ActionLabels.Push("— Désactivé —")
+    if (Current == "none")
+        SelectedIdx := 1
+
     for ActionName in GESTURE_ACTION_NAMES {
-        if (ActionName == "--") {
-            if !last_was_separator {
-                SlotMenu.Add()
-                last_was_separator := true
-            }
-            continue
-        }
-        if SubStr(ActionName, 1, 1) = "#"
+        if (ActionName == "--" or SubStr(ActionName, 1, 1) = "#")
             continue
         if !GESTURE_ACTIONS.Has(ActionName)
             continue
-        ActionLabel := GESTURE_ACTIONS[ActionName].Label
-        SlotMenu.Add(ActionLabel, _MakeKeyboardShortcutHandler(SlotId, ActionName))
+        ActionIds.Push(ActionName)
+        ActionLabels.Push(GESTURE_ACTIONS[ActionName].Label)
         if (ActionName == Current)
-            SlotMenu.Check(ActionLabel)
-        last_was_separator := false
+            SelectedIdx := ActionIds.Length
     }
-    return SlotMenu
+
+    SlotDisplay := GESTURE_ACTIONS.Has(SlotId) ? GESTURE_ACTIONS[SlotId].Label : SlotId
+    W := Gui("+AlwaysOnTop", "Raccourci : " . SlotDisplay)
+    W.SetFont("s10", "Segoe UI")
+    W.MarginX := 12
+    W.MarginY := 12
+    W.Add("Text", "xm", "Action pour " . SlotDisplay . " :")
+
+    SearchEdit := W.Add("Edit", "xm w320")
+    LB := W.Add("ListBox", "xm w320 r18", ActionLabels)
+    if (SelectedIdx > 0)
+        LB.Choose(SelectedIdx)
+
+    W.Add("Button", "xm w80", "OK").OnEvent("Click", ConfirmPick)
+    W.Add("Button", "x+6 w80", "Annuler").OnEvent("Click", (*) => W.Destroy())
+    W.Show()
+
+    ; Filter the ListBox as the user types in the search box
+    AllLabels  := ActionLabels.Clone()
+    FilteredIds := ActionIds.Clone()
+    SearchEdit.OnEvent("Change", FilterList)
+
+    FilterList(*) {
+        Query := StrLower(SearchEdit.Value)
+        NewLabels  := []
+        NewIds     := []
+        for i, Lbl in AllLabels {
+            if (Query == "" or InStr(StrLower(Lbl), Query)) {
+                NewLabels.Push(Lbl)
+                NewIds.Push(ActionIds[i])
+            }
+        }
+        FilteredIds := NewIds
+        LB.Delete()
+        for Lbl in NewLabels
+            LB.Add(Lbl)
+        if (NewLabels.Length > 0)
+            LB.Choose(1)
+    }
+
+    ConfirmPick(*) {
+        Idx := LB.Value
+        if (Idx = 0)
+            return
+        ChosenId := FilteredIds[Idx]
+        W.Destroy()
+        Log("SUCCESS", "KeyboardShortcutsMenu", "Raccourci '%s' → '%s' confirmé.", SlotId, ChosenId)
+        SetKeyboardShortcutAction(SlotId, ChosenId)
+    }
 }
 
 FilePathsEditor(*) {
