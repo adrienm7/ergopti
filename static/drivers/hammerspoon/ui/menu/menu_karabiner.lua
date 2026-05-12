@@ -19,6 +19,7 @@ local M = {}
 local Logger      = require("lib.logger")
 local KeLifecycle = require("modules.karabiner.ke_lifecycle")
 local LOG         = "menu.karabiner"
+local i18n        = require("lib.i18n")
 
 -- Stop all KE launchd services for the current user, then kill any remaining
 -- processes. launchctl bootout must run first so launchd does not restart them.
@@ -248,7 +249,7 @@ local function build_tap_hold_items(karabiner, action_index, update_menu, enable
 	local items = {}
 
 	items[#items + 1] = { title = "===== Taps / Holds =====", disabled = true }
-	items[#items + 1] = { title = "— Main gauche —", disabled = true }
+	items[#items + 1] = { title = i18n.get("menu.karabiner.left_hand"),  disabled = true }
 	for _, key_def in ipairs(karabiner.TAP_HOLD_KEYS) do
 		if LEFT_HAND_IDS[key_def.id] then
 			items[#items + 1] = build_one_tap_hold_item(
@@ -256,7 +257,7 @@ local function build_tap_hold_items(karabiner, action_index, update_menu, enable
 		end
 	end
 
-	items[#items + 1] = { title = "— Main droite —", disabled = true }
+	items[#items + 1] = { title = i18n.get("menu.karabiner.right_hand"), disabled = true }
 	for _, key_def in ipairs(karabiner.TAP_HOLD_KEYS) do
 		if not LEFT_HAND_IDS[key_def.id] then
 			items[#items + 1] = build_one_tap_hold_item(
@@ -525,7 +526,7 @@ local function build_combo_symmetric_item(karabiner, update_menu)
 	local is_symmetric = karabiner.get_combo_symmetric()
 
 	return {
-		title   = "Raccourcis symétriques (ordre des touches indifférent)",
+		title   = i18n.get("menu.karabiner.symmetric"),
 		checked = is_symmetric,
 		fn      = function()
 			karabiner.set_combo_symmetric(not is_symmetric)

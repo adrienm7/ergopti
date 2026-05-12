@@ -15,6 +15,7 @@ local M = {}
 local hs     = hs
 local Logger = require("lib.logger")
 local LOG    = "builder"
+local i18n   = require("lib.i18n")
 
 
 
@@ -302,28 +303,33 @@ function M.generate(ctx, menu_mods, actions)
 	-- macOS side is driven by the big title button at the very top of the menu.
 	table.insert(items, { title = "-" })
 	table.insert(items, {
-		title = "Actions globales",
+		title = i18n.get("menu.global.title"),
 		menu = {
-			{ title = "☑ Activer toutes les fonctionnalités", fn = actions.enable_all },
-			{ title = "☐ Désactiver toutes les fonctionnalités", fn = actions.disable_all },
-			{ title = "↺ Valeurs par défaut", fn = actions.reset_defaults }
+			{ title = i18n.get("menu.global.enable_all"),    fn = actions.enable_all },
+			{ title = i18n.get("menu.global.disable_all"),   fn = actions.disable_all },
+			{ title = i18n.get("menu.global.reset_defaults"), fn = actions.reset_defaults },
+			{ title = "-" },
+			{
+				title = i18n.get("menu.global.language"),
+				menu  = i18n.build_language_menu_items(),
+			},
 		}
 	})
-	table.insert(items, { title = "📂 Dossier de configuration…", fn = actions.open_paths })
+	table.insert(items, { title = i18n.get("menu.global.config_folder"), fn = actions.open_paths })
 	table.insert(items, { title = "-" })
-	table.insert(items, { title = "✎ Éditer personal_shortcuts.lua", fn = actions.open_personal_shortcuts })
-	table.insert(items, { title = "↻ Recharger", fn = actions.reload })
-	table.insert(items, { title = "✕ Quitter", fn = actions.quit })
+	table.insert(items, { title = i18n.get("menu.global.edit_shortcuts"), fn = actions.open_personal_shortcuts })
+	table.insert(items, { title = i18n.get("menu.global.reload"),  fn = actions.reload })
+	table.insert(items, { title = i18n.get("menu.global.quit"),    fn = actions.quit })
 	-- Debug submenu — groups the developer-facing tools (Hammerspoon Console,
 	-- log-folder shortcut, today's log) so the top-level tray stays scannable.
 	-- Mirrors AutoHotkey's "⚠ Débogage" entry, which adds Window Spy / List Vars
 	-- / Key History on top of the same log shortcuts.
 	table.insert(items, {
-		title = "⚠ Débogage",
+		title = i18n.get("menu.debug.title"),
 		menu = {
-			{ title = "Console", fn = actions.open_console },
-			{ title = "Ouvrir le dossier de logs", fn = actions.open_logs },
-			{ title = "Ouvrir le fichier de log du jour", fn = actions.open_today_log },
+			{ title = i18n.get("menu.debug.console"),   fn = actions.open_console },
+			{ title = i18n.get("menu.debug.open_logs"),      fn = actions.open_logs },
+			{ title = i18n.get("menu.debug.open_today_log"), fn = actions.open_today_log },
 		}
 	})
 

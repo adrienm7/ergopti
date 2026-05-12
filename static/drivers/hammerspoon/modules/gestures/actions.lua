@@ -12,6 +12,7 @@ local M = {}
 local hs            = hs
 local notifications = require("lib.notifications")
 local Logger        = require("lib.logger")
+local i18n          = require("lib.i18n")
 local LOG           = "gestures.actions"
 
 local _state = nil
@@ -761,8 +762,17 @@ M.SG_NAMES = build_sg_names(_shared) or {
 
 function M.get_label(name)
 	if not name or name == "none" then
-		return SG["none"] and SG["none"].label or "Désactivé"
+		local t = i18n.get("sg_actions.none")
+		return (t ~= "sg_actions.none") and t or "Désactivé"
 	end
+	-- Prefer locale JSON so labels update when the user switches language
+	local key_sg = "sg_actions." .. name
+	local t_sg = i18n.get(key_sg)
+	if t_sg ~= key_sg then return t_sg end
+	local key_ax = "ax_actions." .. name
+	local t_ax = i18n.get(key_ax)
+	if t_ax ~= key_ax then return t_ax end
+	-- Fall back to the TOML-loaded label for backwards compatibility
 	if AX[name] then return AX[name].label end
 	if SG[name] then return SG[name].label end
 	return name

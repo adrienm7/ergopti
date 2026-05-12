@@ -15,6 +15,7 @@ local M = {}
 local hs = hs
 local dialog        = require("lib.dialog_util")
 local shortcuts_mod = require("modules.shortcuts")
+local i18n          = require("lib.i18n")
 
 
 
@@ -109,7 +110,7 @@ function M.build(ctx)
 	local paused = ctx.paused
 
 	local item = {
-		title   = "🎯 Raccourcis",
+		title   = i18n.get("menu.shortcuts.title"),
 		checked = (state.shortcuts and not paused) or nil,
 		fn      = function()
 			state.shortcuts = not state.shortcuts
@@ -119,7 +120,7 @@ function M.build(ctx)
 				if type(shortcuts.stop) == "function" then pcall(shortcuts.stop) end
 			end
 			ctx.save_prefs()
-			ctx.notify_feature("Raccourcis", state.shortcuts)
+			ctx.notify_feature(i18n.get("menu.shortcuts.title"), state.shortcuts)
 			ctx.updateMenu()
 		end,
 	}
@@ -267,7 +268,7 @@ function M.build(ctx)
 
 		table.insert(s_menu, { title = "-" })
 		table.insert(s_menu, {
-			title    = "Raccourcis de gestion du script",
+			title    = i18n.get("menu.shortcuts.script_shortcuts"),
 			disabled = not enabled or paused or nil,
 			menu     = script_items,
 		})

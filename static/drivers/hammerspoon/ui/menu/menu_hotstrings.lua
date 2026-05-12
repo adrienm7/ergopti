@@ -11,6 +11,7 @@ local hs            = hs
 local Logger        = require("lib.logger")
 local dialog        = require("lib.dialog_util")
 local notifications = require("lib.notifications")
+local i18n          = require("lib.i18n")
 local LOG           = "menu_hotstrings"
 
 local dh_mod = require("modules.dynamic_hotstrings")
@@ -164,7 +165,7 @@ local function buildPersonalInfoItems(ctx, description)
 			end,
 		},
 		{
-			title = "   ↳ Modifier les informations…",
+			title = i18n.get("menu.hotstrings.edit_personal_info"),
 			fn    = function() hs.timer.doAfter(0.1, function() pcall(ctx.personal_info.open_editor) end) end,
 		},
 	}
@@ -344,7 +345,7 @@ function M.build_management(ctx)
 		"set_preview_colored_tooltips",
 		"Bulles colorées"))
 
-	bubble_item = { title = "Bulles de prévisualisation", disabled = paused or nil, menu = bubble_sub }
+	bubble_item = { title = i18n.get("menu.hotstrings.preview_bubbles"), disabled = paused or nil, menu = bubble_sub }
 
 	local defs    = ctx.keymap and type(ctx.keymap.get_terminator_defs) == "function" and ctx.keymap.get_terminator_defs() or {}
 	local exp_sub = {}
@@ -396,7 +397,7 @@ function M.build_management(ctx)
 
 		local ct_sub = {
 			{
-				title    = "Supprimer cet expanseur…",
+				title    = i18n.get("menu.hotstrings.delete_expander"),
 				disabled = paused or nil,
 				fn       = not paused and (function(k) return function()
 					local res = dialog.block_alert(
@@ -430,7 +431,7 @@ function M.build_management(ctx)
 	end
 
 	exp_sub[#exp_sub + 1] = {
-		title    = "+ Ajouter un expanseur personnalisé…",
+		title    = i18n.get("menu.hotstrings.add_custom"),
 		disabled = paused or nil,
 		fn       = not paused and function()
 			-- 1. Ask for the trigger character (loop until exactly one character is entered)
@@ -569,7 +570,7 @@ function M.build_management(ctx)
 		table.insert(delay_menu, make_delay_item("Défaut (autres catégories)", nil, def_base, true))
 	end
 
-	delays_item = { title = "Délais d’expansion", disabled = paused or nil, menu = delay_menu }
+	delays_item = { title = i18n.get("menu.hotstrings.delays_colors"), disabled = paused or nil, menu = delay_menu }
 
 	magic_item = {
 		title    = "Touche magique : " .. state.trigger_char,
@@ -616,7 +617,7 @@ function M.build_management(ctx)
 	table.insert(menu, { title = "-" })
 	if bubble_item then table.insert(menu, bubble_item) end
 
-	return { title = "⚙️ Paramètres hotstrings", menu = menu }
+	return { title = i18n.get("menu.hotstrings.params"), menu = menu }
 end
 
 --- Returns the list of personal extension group names present in hotfiles,
@@ -684,7 +685,8 @@ function M.build_custom(ctx)
 	end
 	add_counts(custom_secs)
 
-	local base_title = "Hotstrings personnels"
+	-- Strip leading "— " section marker for use as a plain notification label
+	local base_title = (i18n.get("menu.hotstrings.personal_header"):gsub("^— ", ""))
 	local title_str  = has_count
 		and (base_title .. " (" .. fmt_count(total_count) .. ")")
 		or  base_title
@@ -864,7 +866,7 @@ function M.build_custom(ctx)
 
 	local menu_items = {
 		{
-			title    = "Ouvrir l’éditeur de hotstrings",
+			title    = i18n.get("menu.hotstrings.open_editor"),
 			disabled = paused or nil,
 			fn       = not paused and function()
 				hs.timer.doAfter(0, function() pcall(ctx.hotstring_editor.open) end)
@@ -881,7 +883,7 @@ function M.build_custom(ctx)
 			menu  = cat_menu,
 		},
 		{
-			title    = "Fermer l’UI après ajout d’un hotstring par le raccourci",
+			title    = i18n.get("menu.hotstrings.close_on_add"),
 			checked  = state.custom_close_on_add or nil,
 			fn       = not paused and function()
 				state.custom_close_on_add = not state.custom_close_on_add

@@ -72,6 +72,8 @@ SendMode("Event") ; Everything concerning hotstrings MUST use SendEvent and not 
 #Include lib/hotstrings/hotstring_engine.ahk
 #Include lib/hotstrings/hotstring_engine_v2.ahk
 #Include lib/toml/toml_loader.ahk
+; i18n module — must come after toml_loader.ahk (TOML_BatchWrite) and logger.ahk
+#Include lib/i18n.ahk
 #Include lib/hotstrings/hotstrings_config.ahk
 #Include lib/hotstrings/hotstrings_config_window.ahk
 #Include lib/tooltip.ahk
@@ -317,6 +319,7 @@ ReadScriptConfig(Cache) {
 
 global _IniCache := ParseTomlFile(ConfigurationFile)
 ReadScriptConfig(_IniCache)
+I18nInit(_IniCache)
 
 ; Auto-detect whether the active OS layout remaps AltGr to VK_KANA and cache
 ; the resolved bool in _ALTGR_KANA_FIXUP. Must run before the first hotstring
@@ -477,7 +480,7 @@ ApplyTomlMetadataToFeatures("MagicKey")
 ApplyTomlMetadataToFeatures("Rolls")
 ApplyTomlMetadataToFeatures("SFBsReduction")
 ApplyIndexTomlToDynamicHotstrings()
-ApplyLocaleDescriptions()
+ApplyLocaleDescriptions(I18nGetLocale())
 
 ; Append hotstring counts to section descriptions so the tray menu shows
 ; "(N)" next to each section item — mirrors Hammerspoon's per-section display.
@@ -802,25 +805,25 @@ ToggleMenuVariableByPath(FullPath) {
 GetCategoryTitle(Category) {
     switch Category {
         case "DistancesReduction":
-            return "Réduction des distances"
+            return t("category.distances_reduction")
         case "SFBsReduction":
-            return "Réduction des SFBs"
+            return t("category.sfbs_reduction")
         case "Rolls":
-            return "Roulements"
+            return t("category.rolls")
         case "Autocorrection":
-            return "Autocorrection"
+            return t("category.autocorrection")
         case "MagicKey":
-            return "Touche " . ScriptInformation["MagicKey"] . " et expansion de texte"
+            return t("category.magic_key")
         case "DynamicHotstrings":
-            return "Hotstrings dynamiques"
+            return t("category.dynamic_hotstrings")
         case "Personal":
-            return "Hotstrings personnels"
+            return t("category.personal")
         case "Shortcuts":
-            return "🎯 Raccourcis"
+            return t("category.shortcuts")
         case "TapHolds":
-            return "⌨️ Tap-Holds"
+            return t("category.tapholds")
         case "Gestures":
-            return "🖐️ Gestes"
+            return t("category.gestures")
         default:
             return ""
     }
@@ -838,14 +841,14 @@ BuildGesturesMenu() {
     ; Canonical category toggle — inserted at position 1 with separator at 2.
     GestEnabled := Features["Gestures"]["Enabled"].Enabled
     AddCategoryToggleItem(GMenu,
-        "✅ Gestes activés (cliquer pour désactiver)",
-        "❌ Gestes désactivés (cliquer pour activer)",
+        t("menu.gestures.on"),
+        t("menu.gestures.off"),
         GestEnabled,
         (*) => ToggleGesturesEnabled())
 
-    GMenu.Add("🔧 Configurer automatiquement (registre)", (*) => GestureAutoConfigureAction())
-    GMenu.Add("📋 Instructions de configuration", (*) => GestureShowSetupInstructions())
-    GMenu.Add("⚙ Ouvrir Pavé tactile (puis « Mouvements avancés »)", (*) => GestureOpenTouchpadSettings())
+    GMenu.Add(t("menu.gestures.auto_configure"),  (*) => GestureAutoConfigureAction())
+    GMenu.Add(t("menu.gestures.instructions"),    (*) => GestureShowSetupInstructions())
+    GMenu.Add(t("menu.gestures.open_touchpad"),   (*) => GestureOpenTouchpadSettings())
 
     GMenu.Add()
 
@@ -854,9 +857,9 @@ BuildGesturesMenu() {
     for Slot in GESTURE_SLOTS {
         if (Slot == "tap_4")
             GMenu.Add()
-        SlotLabel     := GESTURE_SLOT_LABELS[Slot]
+        SlotLabel     := t("gesture.slots." . Slot)
         CurrentAction := GestureAssignments.Has(Slot) ? GestureAssignments[Slot] : "none"
-        CurrentLabel  := GESTURE_ACTIONS.Has(CurrentAction) ? GESTURE_ACTIONS[CurrentAction].Label : "Désactivé"
+        CurrentLabel  := GESTURE_ACTIONS.Has(CurrentAction) ? t("sg_actions." . CurrentAction) : t("dialog.action_picker.disabled")
         EntryLabel    := SlotLabel . " : " . CurrentLabel
         GMenu.Add(EntryLabel, ((_s, _l) => (*) => ShowActionPicker(_l, GestureAssignments.Has(_s) ? GestureAssignments[_s] : "none", (Id) => SetGestureSlotAction(_s, Id)))(Slot, SlotLabel))
         if !GestEnabled
@@ -922,13 +925,13 @@ BuildMetricsMenu() {
     MetricsMenu := Menu()
 
     enabled := MetricsShortcuts.enabled
-    typing_label := "Afficher les métriques de frappe"
-    apps_label := "Afficher le temps sur les applications"
+    typing_label := t("menu.metrics.show_typing")
+    apps_label   := t("menu.metrics.show_apps")
     ; A trailing zero-width space differentiates the second « ↳ Raccourci :
-    ; Aucun » entry from the first — AHK's tray menu uses the label as a
+    ; Aucun » entry from the first — AHK’s tray menu uses the label as a
     ; unique key and would silently merge two identical strings into one.
-    typing_sc := "↳ Raccourci : " . MS_GetDisplayLabel("typing")
-    apps_sc := "↳ Raccourci : " . MS_GetDisplayLabel("apps") . Chr(0x200B)
+    typing_sc := t("menu.metrics.shortcut_prefix") . MS_GetDisplayLabel("typing")
+    apps_sc   := t("menu.metrics.shortcut_prefix") . MS_GetDisplayLabel("apps") . Chr(0x200B)
 
     MetricsMenu.Add(typing_label, (*) => KLUI_ToggleTyping())
     MetricsMenu.Add(typing_sc, (*) => MS_PromptShortcut("typing", KLUI_ToggleTyping))
@@ -936,27 +939,22 @@ BuildMetricsMenu() {
     MetricsMenu.Add(apps_label, (*) => KLUI_ToggleApps())
     MetricsMenu.Add(apps_sc, (*) => MS_PromptShortcut("apps", KLUI_ToggleApps))
 
-    ; ── Privacy filters — same section as HS menu_metrics.lua « FILTRES
-    ; DE CONFIDENTIALITÉ ». Each toggle persists immediately to
-    ; metrics_shortcuts.ini and takes effect on the next keystroke
-    ; flushed from the buffer (no Reload required because filters live
-    ; in RAM and the next MF_ShouldFilter call picks the new value).
     MetricsMenu.Add()
-    privacy_header := "— FILTRES DE CONFIDENTIALITÉ —"
+    privacy_header := t("menu.metrics.privacy_header")
     MetricsMenu.Add(privacy_header, (*) => "")
     MetricsMenu.Disable(privacy_header)
 
-    private_label := "Ignorer la navigation privée"
+    private_label := t("menu.metrics.filter_private")
     MetricsMenu.Add(private_label, ToggleFilterPrivate)
     if MetricsFilters.private_browsing
         MetricsMenu.Check(private_label)
 
-    secure_label := "Ignorer les champs mot de passe"
+    secure_label := t("menu.metrics.filter_secure")
     MetricsMenu.Add(secure_label, ToggleFilterSecureField)
     if MetricsFilters.secure_field
         MetricsMenu.Check(secure_label)
 
-    sysauth_label := "Ignorer les boîtes de dialogue d’authentification système"
+    sysauth_label := t("menu.metrics.filter_sysauth")
     MetricsMenu.Add(sysauth_label, ToggleFilterSystemAuth)
     if MetricsFilters.system_auth
         MetricsMenu.Check(sysauth_label)
@@ -965,8 +963,8 @@ BuildMetricsMenu() {
     ; reusable AppPicker Gui. Mirror of HS « Désactivé dans N application(s) ».
     n := MF_DisabledCount()
     excl_label := (n > 0)
-        ? "Désactivé dans " . n . " application" . (n > 1 ? "s" : "")
-        : "Exclure des applications du keylogger…"
+        ? t("menu.metrics.disabled_in_prefix") . n . (n > 1 ? t("menu.metrics.disabled_in_suffix_p") : t("menu.metrics.disabled_in_suffix_s"))
+        : t("menu.metrics.exclude_apps")
     MetricsMenu.Add(excl_label, OpenMetricsAppPicker)
 
     if !enabled {
@@ -980,14 +978,14 @@ BuildMetricsMenu() {
         MetricsMenu.Disable(excl_label)
     }
 
-    A_TrayMenu.Add("📊 Métriques", MetricsMenu)
+    A_TrayMenu.Add(t("menu.metrics.title"), MetricsMenu)
     ; Aligned with the canonical ✅/❌ pattern used by every other
     ; category submenu. The security-warning dialog still fires inside
     ; ToggleMetricsEnabled() before flipping ON, so the privacy
     ; safeguard stays in place — the icon change is purely cosmetic.
     AddCategoryToggleItem(MetricsMenu,
-        "✅ Métriques activées (cliquer pour désactiver)",
-        "❌ Métriques désactivées (cliquer pour activer)",
+        t("menu.metrics.on"),
+        t("menu.metrics.off"),
         MetricsShortcuts.enabled,
         (*) => ToggleMetricsEnabled())
 }
@@ -1017,12 +1015,11 @@ ToggleFilterSystemAuth(*) {
 
 OpenMetricsAppPicker(*) {
     AppPicker_Show(Map(
-        "title", "Exclure des applications — Métriques",
-        "prompt", "Sélectionnez les applications dont les frappes ne "
-        . "seront jamais enregistrées par le keylogger.",
-        "ok_label", "Enregistrer",
-        "initial", MF_DisabledList(),
-        "on_save", OnMetricsAppPickerSave
+        "title",    t("dialog.metrics.exclude_title"),
+        "prompt",   t("dialog.metrics.exclude_prompt"),
+        "ok_label", t("dialog.metrics.exclude_ok"),
+        "initial",  MF_DisabledList(),
+        "on_save",  OnMetricsAppPickerSave
     ))
 }
 
@@ -1045,10 +1042,8 @@ ToggleMetricsEnabled() {
     if MetricsShortcuts.enabled {
         ; Disabling — no warning needed, just confirm.
         res := MsgBox(
-            "Désactiver les métriques ?`n`n"
-            . "Le keylogger ne capturera plus aucune frappe. Les données déjà "
-            . "enregistrées sont conservées.",
-            "📊 Métriques",
+            t("dialog.metrics.disable_confirm"),
+            t("dialog.metrics.title"),
             "OKCancel Icon?"
         )
         if (res != "OK")
@@ -1065,18 +1060,11 @@ ToggleMetricsEnabled() {
     ; has relocated their config.
     global _ConfigDir
     metrics_path := _ConfigDir . "metrics"
-    warn := "ATTENTION : Vous êtes sur le point d’activer le keylogger.`n`n"
-        . "Il enregistre vos frappes au clavier à la milliseconde près. "
-        . "Ces logs sont stockés en local sous :`n"
-        . "    " . metrics_path . "`n`n"
-        . "Bien que les champs de mots de passe soient ignorés automatiquement "
-        . "(filtre UIA), il est recommandé de mettre le script en PAUSE lors "
-        . "de la saisie de données sensibles.`n`n"
-        . "Activer ?"
+    warn := Format(t("dialog.metrics.enable_warning"), metrics_path)
     ; Icon! = exclamation triangle (warning). Iconx is the red error stop
     ; sign and was the wrong choice for a "you are about to enable a
     ; logging feature" notice.
-    res := MsgBox(warn, "⚠ Avertissement de sécurité — Métriques", "OKCancel Icon!")
+    res := MsgBox(warn, t("dialog.metrics.security_warning_title"), "OKCancel Icon!")
     if (res != "OK")
         return
     MetricsShortcuts.enabled := true
@@ -1089,20 +1077,14 @@ GestureAutoConfigureAction() {
     Success := GestureAutoConfigureRegistry()
     if (Success) {
         MsgBox(
-            "Configuration des gestes appliquée avec succès.`n`n"
-            . "Les 10 gestes ont été configurés dans le registre Windows`n"
-            . "(Ctrl+Win+Shift+F1 à F10).`n`n"
-            . "Une déconnexion / reconnexion peut être nécessaire pour que`n"
-            . "Windows prenne les nouveaux raccourcis en compte.",
-            "ErgoptiPlus — Configuration des gestes",
+            t("dialog.gestures.auto_configure_success"),
+            t("dialog.gestures.auto_configure_title"),
             "Iconi"
         )
     } else {
         MsgBox(
-            "Erreur lors de l'écriture du registre.`n`n"
-            . "Essayez d’exécuter le script en tant qu'administrateur,`n"
-            . "ou configurez manuellement (voir Instructions).",
-            "ErgoptiPlus — Erreur",
+            t("dialog.gestures.auto_configure_error"),
+            t("dialog.gestures.auto_configure_error_title"),
             "Icon!"
         )
     }
@@ -1169,8 +1151,8 @@ initMenu() {
     if SubMenus.Has("Shortcuts") {
         ShortcutsAnyEnabled := HasAnyEnabled(Features["Shortcuts"])
         AddCategoryToggleItem(SubMenus["Shortcuts"],
-            "✅ Raccourcis activés (cliquer pour désactiver)",
-            "❌ Raccourcis désactivés (cliquer pour activer)",
+            t("menu.shortcuts.on"),
+            t("menu.shortcuts.off"),
             ShortcutsAnyEnabled,
             (*) => ToggleCategoryAllFeatures("Shortcuts", !ShortcutsAnyEnabled))
     }
@@ -1182,23 +1164,24 @@ initMenu() {
     if SubMenus.Has("Shortcuts") {
         InsertKeyboardShortcutGroups(SubMenus["Shortcuts"], "Combinaison de modificateurs")
         SubMenus["Shortcuts"].Add()
-        SubMenus["Shortcuts"].Add(MenuConfigurationShortcuts, BuildScriptShortcutsMenu())
+        SubMenus["Shortcuts"].Add(t("menu.shortcuts.script_shortcuts"), BuildScriptShortcutsMenu())
     }
 
     ; ── 🌐 Disposition clavier — mirrors the HS layout submenu naming ──
     LayoutMenu := Menu()
     LayoutAnyEnabled := HasAnyEnabled(Features["Layout"])
     AddCategoryToggleItem(LayoutMenu,
-        "✅ Disposition activée (cliquer pour désactiver)",
-        "❌ Disposition désactivée (cliquer pour activer)",
+        t("menu.layout.on"),
+        t("menu.layout.off"),
         LayoutAnyEnabled,
         (*) => ToggleCategoryAllFeatures("Layout", !LayoutAnyEnabled))
     for FeatureName in Features["Layout"]["__Order"] {
         MenuAddItem(LayoutMenu, "Layout", FeatureName)
     }
-    A_TrayMenu.Add("🌐 Disposition clavier", LayoutMenu)
+    LayoutMenuTitle := t("menu.layout.title")
+    A_TrayMenu.Add(LayoutMenuTitle, LayoutMenu)
     if LayoutAnyEnabled {
-        A_TrayMenu.Check("🌐 Disposition clavier")
+        A_TrayMenu.Check(LayoutMenuTitle)
     }
 
     ; ── Hotstrings ⚡ — single submenu grouping all hotstring categories ──
@@ -1210,18 +1193,18 @@ initMenu() {
     HotstringsMenu := Menu()
     HotstringsAllEnabled := IsCategoryAllEnabled(HotstringCategories)
     AddCategoryToggleItem(HotstringsMenu,
-        "✅ Hotstrings activés (cliquer pour désactiver)",
-        "❌ Hotstrings désactivés (cliquer pour activer)",
+        t("menu.hotstrings.on"),
+        t("menu.hotstrings.off"),
         HotstringsAllEnabled,
         HotstringsAllEnabled ? ToggleAllHotstringsOff : ToggleAllHotstringsOn)
     HotstringsMenu.Add() ; Separator after global toggle
 
     ; 1. Paramètres — mirrors HS "⚙️ Paramètres hotstrings" submenu
     ParamsMenu := Menu()
-    ParamsMenu.Add("Délais et couleurs des hotstrings…",
+    ParamsMenu.Add(t("menu.hotstrings.delays_colors"),
         (*) => OpenHotstringsConfigWindow())
-    ParamsMenu.Add("Touche magique : " . ScriptInformation["MagicKey"], MagicKeyEditor)
-    HotstringsMenu.Add("⚙️ Paramètres hotstrings", ParamsMenu)
+    ParamsMenu.Add(t("menu.hotstrings.magic_key_prefix") . ScriptInformation["MagicKey"], MagicKeyEditor)
+    HotstringsMenu.Add(t("menu.hotstrings.params"), ParamsMenu)
     HotstringsMenu.Add() ; Separator after paramètres block
 
     ; 2a. Standard hotstring groups + dynamic — "Hotstrings communs" header
@@ -1237,7 +1220,7 @@ initMenu() {
         }
     }
     StdTotal += DynTotalStd
-    StdHeader := "— Hotstrings communs" . (StdTotal > 0 ? " (" . FmtCount(StdTotal) . ")" : "") . " —"
+    StdHeader := t("menu.hotstrings.common_header") . (StdTotal > 0 ? " (" . FmtCount(StdTotal) . ")" : "") . " —"
     HotstringsMenu.Add(StdHeader, (*) => NoAction())
     HotstringsMenu.Disable(StdHeader)
     for Category in HotstringCategoriesStd {
@@ -1268,7 +1251,7 @@ initMenu() {
     for _ECat in HotstringCategoriesErgopti {
         ErgoptiTotal += CountTomlHotstrings(_ECat)
     }
-    ErgoptiHeader := "— Disposition Ergopti" . (ErgoptiTotal > 0 ? " (" . FmtCount(ErgoptiTotal) . ")" : "") . " —"
+    ErgoptiHeader := t("menu.hotstrings.ergopti_header") . (ErgoptiTotal > 0 ? " (" . FmtCount(ErgoptiTotal) . ")" : "") . " —"
     HotstringsMenu.Add(ErgoptiHeader, (*) => NoAction())
     HotstringsMenu.Disable(ErgoptiHeader)
     for Category in HotstringCategoriesErgopti {
@@ -1319,23 +1302,24 @@ initMenu() {
         }
     }
     HotstringsMenu.Add() ; Separator before personal group
-    PersonalHeader := "— Mes hotstrings" . (TotalPersonal > 0 ? " (" . FmtCount(TotalPersonal) . ")" : "") . " —"
+    PersonalHeader := t("menu.hotstrings.personal_header") . (TotalPersonal > 0 ? " (" . FmtCount(TotalPersonal) . ")" : "") . " —"
     HotstringsMenu.Add(PersonalHeader, (*) => NoAction())
     HotstringsMenu.Disable(PersonalHeader)
     if Features.Has("Personal") {
         ; Build the unified personal submenu for personal_hotstrings.toml
         PersonalMenu := Menu()
-        PersonalMenu.Add("Ouvrir l’éditeur de hotstrings", (*) => OpenPersonalEditor())
+        PersonalMenu.Add(t("menu.hotstrings.open_editor"), (*) => OpenPersonalEditor())
         ; Shortcut item — not yet customisable from AHK (HS handles it on macOS)
-        PersonalMenu.Add("Raccourci : Win + " . ScriptInformation["MagicKey"], (*) => NoAction())
-        PersonalMenu.Disable("Raccourci : Win + " . ScriptInformation["MagicKey"])
+        _ShortcutLabel := t("menu.hotstrings.shortcut_prefix") . ScriptInformation["MagicKey"]
+        PersonalMenu.Add(_ShortcutLabel, (*) => NoAction())
+        PersonalMenu.Disable(_ShortcutLabel)
         ; Default section — submenu with "Aucune" + one item per TOML section
         CurDefaultSec := _EditorPrefGet("DefaultSection", "")
         DefaultSectionMenu := Menu()
-        DefaultSectionMenu.Add("Aucune", (*) => _SetPersonalDefaultSection("", PersonalMenu, TomlData,
+        DefaultSectionMenu.Add(t("menu.hotstrings.default_none"), (*) => _SetPersonalDefaultSection("", PersonalMenu, TomlData,
             DefaultSectionMenu))
         if (CurDefaultSec == "") {
-            DefaultSectionMenu.Check("Aucune")
+            DefaultSectionMenu.Check(t("menu.hotstrings.default_none"))
         }
         DefaultSectionMenu.Add()
         for _, SecName in TomlData["sections_order"] {
@@ -1350,15 +1334,16 @@ initMenu() {
                 DefaultSectionMenu.Check(SecLabel)
             }
         }
-        CurDefaultLabel := (CurDefaultSec == "") ? "Aucune"
+        CurDefaultLabel := (CurDefaultSec == "") ? t("menu.hotstrings.default_none")
             : (TomlData["sections"].Has(CurDefaultSec) ? TomlData["sections"][CurDefaultSec]["description"] :
                 CurDefaultSec)
         global _PrevDefaultLabel := CurDefaultLabel
-        PersonalMenu.Add("Catégorie par défaut : " . CurDefaultLabel, DefaultSectionMenu)
-        PersonalMenu.Add("Fermer l’UI après ajout d’un hotstring par le raccourci",
-            (*) => _TogglePersonalCloseOnAdd(PersonalMenu))
+        _DefaultCatLabel := t("menu.hotstrings.default_category_prefix") . CurDefaultLabel
+        PersonalMenu.Add(_DefaultCatLabel, DefaultSectionMenu)
+        _CloseOnAddLabel := t("menu.hotstrings.close_on_add")
+        PersonalMenu.Add(_CloseOnAddLabel, (*) => _TogglePersonalCloseOnAdd(PersonalMenu))
         if (_EditorPrefGet("CloseOnAdd", "1") == "1") {
-            PersonalMenu.Check("Fermer l’UI après ajout d’un hotstring par le raccourci")
+            PersonalMenu.Check(_CloseOnAddLabel)
         }
         if (Features["Personal"].Has("__Order") and Features["Personal"]["__Order"].Length > 0) {
             PersonalMenu.Add()
@@ -1387,7 +1372,7 @@ initMenu() {
             ExtCount += _ES["count"]
         }
         ExtMenu := Menu()
-        ExtMenu.Add("Ouvrir le fichier…", _MakeOpenFileFn(ExtPath))
+        ExtMenu.Add(t("menu.hotstrings.open_file"), _MakeOpenFileFn(ExtPath))
         if (ExtSections.Length > 0) {
             ExtMenu.Add()
             for _, _ES in ExtSections {
@@ -1401,7 +1386,7 @@ initMenu() {
     }
     ; Compute grand total = common + personal
     GrandTotal := CommonTotal + TotalPersonal
-    HotstringsMenuTitle := MenuHotstrings . (GrandTotal > 0 ? " (" . FmtCount(GrandTotal) . ")" : "")
+    HotstringsMenuTitle := t("menu.hotstrings.title") . (GrandTotal > 0 ? " (" . FmtCount(GrandTotal) . ")" : "")
     A_TrayMenu.Add(HotstringsMenuTitle, HotstringsMenu)
     if HotstringsAllEnabled {
         A_TrayMenu.Check(HotstringsMenuTitle)
@@ -1416,7 +1401,7 @@ initMenu() {
     ; visible but greyed out so the menu shape stays familiar.
     BuildMetricsMenu()
     if MetricsShortcuts.enabled {
-        A_TrayMenu.Check("📊 Métriques")
+        A_TrayMenu.Check(t("menu.metrics.title"))
     }
 
     ; ── Raccourcis and Tap-Holds — standalone, like HS Raccourcis and Karabiner ──
@@ -1430,8 +1415,8 @@ initMenu() {
     if SubMenus.Has("TapHolds") {
         TapHoldsAllEnabled := IsCategoryAllEnabled(["TapHolds"])
         AddCategoryToggleItem(SubMenus["TapHolds"],
-            "✅ Tap-holds activés (cliquer pour désactiver)",
-            "❌ Tap-holds désactivés (cliquer pour activer)",
+            t("menu.tapholds.on"),
+            t("menu.tapholds.off"),
             TapHoldsAllEnabled,
             (*) => ToggleCategoryAllFeatures("TapHolds", !TapHoldsAllEnabled))
         A_TrayMenu.Add(GetCategoryTitle("TapHolds"), SubMenus["TapHolds"])
@@ -1453,33 +1438,38 @@ initMenu() {
     ; ── Actions globales — bulk-toggle / reset-defaults actions kept as a
     ; single submenu so the top-level tray stays scannable. ──
     GlobalActionsMenu := Menu()
-    GlobalActionsMenu.Add("☑ Activer toutes les fonctionnalités", ToggleAllFeaturesOn)
-    GlobalActionsMenu.Add("☐ Désactiver toutes les fonctionnalités", ToggleAllFeaturesOff)
-    GlobalActionsMenu.Add("↺ Valeurs par défaut", ReloadWithDefaultConfig)
+    GlobalActionsMenu.Add(t("menu.global.enable_all"),  ToggleAllFeaturesOn)
+    GlobalActionsMenu.Add(t("menu.global.disable_all"), ToggleAllFeaturesOff)
+    GlobalActionsMenu.Add(t("menu.global.reset_defaults"), ReloadWithDefaultConfig)
+    GlobalActionsMenu.Add()
+    ; Language selector — one entry per supported locale, check mark on active one
+    LangMenu := Menu()
+    I18nBuildLanguageMenu(LangMenu)
+    GlobalActionsMenu.Add(t("menu.global.language"), LangMenu)
 
     ; ── Script management — flattened into the top-level tray menu (used to
     ; live in a "Gestion du script" submenu). The lifecycle actions sit one
     ; click closer to the tray icon and stay grouped via separators. ──
     global MenuSuspend
-    MenuSuspend := "⏸︎ Suspendre"
-    A_TrayMenu.Add("Actions globales", GlobalActionsMenu)
-    A_TrayMenu.Add("📂 Dossier de configuration…", FilePathsEditor)
+    MenuSuspend := t("menu.global.suspend")
+    A_TrayMenu.Add(t("menu.global.title"), GlobalActionsMenu)
+    A_TrayMenu.Add(t("menu.global.config_folder"), FilePathsEditor)
     A_TrayMenu.Add() ; Separator before lifecycle actions
-    A_TrayMenu.Add("✎ Éditer personal_shortcuts.ahk", OpenPersonalShortcuts)
+    A_TrayMenu.Add(t("menu.global.edit_shortcuts"), OpenPersonalShortcuts)
     A_TrayMenu.Add(MenuSuspend, ToggleSuspend)
-    A_TrayMenu.Add("🔄 Recharger", ActivateReload)
-    A_TrayMenu.Add("⏹ Quitter", ActivateExitApp)
+    A_TrayMenu.Add(t("menu.global.reload"), ActivateReload)
+    A_TrayMenu.Add(t("menu.global.quit"), ActivateExitApp)
 
-    ; ── Débogage — tools grouped in a submenu to keep the top-level menu tidy.
-    ; Mirrors Hammerspoon's "⚠ Débogage" entry (Console + log shortcuts);
+    ; ── Debug tools — grouped in a submenu to keep the top-level menu tidy.
+    ; Mirrors Hammerspoon's "⚠ Debug" entry (Console + log shortcuts);
     ; Window Spy / List Vars / Key History are AutoHotkey-specific particulars. ──
     DebuggingMenu := Menu()
-    DebuggingMenu.Add("Window Spy", WindowSpy)
-    DebuggingMenu.Add("État des variables", ActivateListVars)
-    DebuggingMenu.Add("Historique des touches", ActivateKeyHistory)
-    DebuggingMenu.Add("Ouvrir le dossier de logs", OpenLogsFolder)
-    DebuggingMenu.Add("Ouvrir le fichier de log du jour", OpenTodayLog)
-    A_TrayMenu.Add(MenuDebugging, DebuggingMenu)
+    DebuggingMenu.Add(t("menu.debug.window_spy"),    WindowSpy)
+    DebuggingMenu.Add(t("menu.debug.list_vars"),     ActivateListVars)
+    DebuggingMenu.Add(t("menu.debug.key_history"),   ActivateKeyHistory)
+    DebuggingMenu.Add(t("menu.debug.open_logs"),     OpenLogsFolder)
+    DebuggingMenu.Add(t("menu.debug.open_today_log"), OpenTodayLog)
+    A_TrayMenu.Add(t("menu.debug.title"), DebuggingMenu)
 }
 
 ; Opens personal_shortcuts.ahk in Notepad. Same function the gesture binding
@@ -1868,7 +1858,7 @@ _SetPersonalDefaultSection(SecName, PersonalMenu, TomlData, DefaultSectionMenu) 
     global _PrevDefaultLabel
     _EditorPrefSet("DefaultSection", SecName)
     ; Refresh checkmarks inside the sub-menu
-    DefaultSectionMenu.Uncheck("Aucune")
+    DefaultSectionMenu.Uncheck(t("menu.hotstrings.default_none"))
     for _, SN in TomlData["sections_order"] {
         if (SN == "-") {
             continue
@@ -1877,14 +1867,15 @@ _SetPersonalDefaultSection(SecName, PersonalMenu, TomlData, DefaultSectionMenu) 
         try DefaultSectionMenu.Uncheck(SD["description"])
     }
     if (SecName == "") {
-        DefaultSectionMenu.Check("Aucune")
+        DefaultSectionMenu.Check(t("menu.hotstrings.default_none"))
     } else if (TomlData["sections"].Has(SecName)) {
         DefaultSectionMenu.Check(TomlData["sections"][SecName]["description"])
     }
     ; Rename the parent item to reflect the new selection
-    NewLabel := (SecName == "") ? "Aucune"
+    NewLabel := (SecName == "") ? t("menu.hotstrings.default_none")
         : (TomlData["sections"].Has(SecName) ? TomlData["sections"][SecName]["description"] : SecName)
-    try PersonalMenu.Rename("Catégorie par défaut : " . _PrevDefaultLabel, "Catégorie par défaut : " . NewLabel)
+    try PersonalMenu.Rename(t("menu.hotstrings.default_category_prefix") . _PrevDefaultLabel,
+        t("menu.hotstrings.default_category_prefix") . NewLabel)
     _PrevDefaultLabel := NewLabel
 }
 
@@ -1895,7 +1886,7 @@ _MakeSetDefaultSectionFn(SecName, PersonalMenu, TomlData, DefaultSectionMenu) {
 
 ; Toggles the close-on-add pref and the corresponding checkmark.
 _TogglePersonalCloseOnAdd(PersonalMenu) {
-    Label := "Fermer l'UI après ajout d’un hotstring par le raccourci"
+    Label  := t("menu.hotstrings.close_on_add")
     NewVal := (_EditorPrefGet("CloseOnAdd", "1") == "1") ? "0" : "1"
     _EditorPrefSet("CloseOnAdd", NewVal)
     if (NewVal == "1") {
@@ -2247,6 +2238,9 @@ SaveFullConfig() {
     ; Collect all feature flags recursively
     _CollectFeatureUpdates(Updates, "", Features)
 
+    ; [Script] section — locale and other script-level settings
+    Updates.Push({ Section: "Script", Key: "Locale", Value: I18nGetLocale() })
+
     ; [Hotstrings] root — MagicKey lives here, paths are never persisted
     Updates.Push({ Section: "Hotstrings", Key: "MagicKey", Value: ScriptInformation["MagicKey"] })
 
@@ -2395,7 +2389,7 @@ BuildScriptShortcutsMenu() {
     ; avoids pre-building a submenu with all actions for every slot.
     for Slot in SCRIPT_SHORTCUT_SLOTS {
         Current      := ScriptShortcutAssignments.Has(Slot) ? ScriptShortcutAssignments[Slot] : "none"
-        CurrentLabel := GESTURE_ACTIONS.Has(Current) ? GESTURE_ACTIONS[Current].Label : "Désactivé"
+        CurrentLabel := GESTURE_ACTIONS.Has(Current) ? t("sg_actions." . Current) : t("dialog.action_picker.disabled")
         SlotLabel    := SCRIPT_SHORTCUT_LABELS[Slot]
         SMenu.Add(SlotLabel . " : " . CurrentLabel,
             ((_s, _l) => (*) => ShowActionPicker(_l, ScriptShortcutAssignments.Has(_s) ? ScriptShortcutAssignments[_s] : "none", (Id) => SetScriptShortcutAction(_s, Id)))(Slot, SlotLabel))
@@ -2521,11 +2515,11 @@ InsertKeyboardShortcutGroups(TargetMenu, InsertBefore) {
     global KeyboardShortcutAssignments, GESTURE_ACTIONS
     LoggerStart("KeyboardShortcutsMenu", "Insertion des groupes de raccourcis clavier…")
 
-    static _Groups := [
-        Map("prefix", "alt_",        "label", "Raccourcis ⎇ Alt",          "add_label", "[+ Ajouter un raccourci Alt+…]"),
-        Map("prefix", "ctrl_",       "label", "Raccourcis ^ Ctrl",         "add_label", "[+ Ajouter un raccourci Ctrl+…]"),
-        Map("prefix", "ctrl_shift_", "label", "Raccourcis ^⇧ Ctrl+Shift",  "add_label", "[+ Ajouter un raccourci Ctrl+Shift+…]"),
-        Map("prefix", "win_",        "label", "Raccourcis ⊞ Win",         "add_label", "[+ Ajouter un raccourci Win+…]"),
+    _Groups := [
+        Map("prefix", "alt_",        "label", t("menu.shortcuts.alt_group"),        "add_label", t("menu.shortcuts.alt_add")),
+        Map("prefix", "ctrl_",       "label", t("menu.shortcuts.ctrl_group"),       "add_label", t("menu.shortcuts.ctrl_add")),
+        Map("prefix", "ctrl_shift_", "label", t("menu.shortcuts.ctrl_shift_group"), "add_label", t("menu.shortcuts.ctrl_shift_add")),
+        Map("prefix", "win_",        "label", t("menu.shortcuts.win_group"),        "add_label", t("menu.shortcuts.win_add")),
     ]
 
     ; Build all group menus first, then insert in reverse order so the final
@@ -2544,7 +2538,7 @@ InsertKeyboardShortcutGroups(TargetMenu, InsertBefore) {
                 continue
             if (Action == "none")
                 continue
-            ActionLabel := GESTURE_ACTIONS.Has(Action) ? GESTURE_ACTIONS[Action].Label : Action
+            ActionLabel := GESTURE_ACTIONS.Has(Action) ? t("sg_actions." . Action) : Action
             SlotDisplay := _FormatSlotLabel(Slot) . " : " . ActionLabel
             GMenu.Add(SlotDisplay, ((_s) => (*) => ShowKeyboardShortcutPicker(_s))(Slot))
             AssignedCount++
@@ -2603,16 +2597,16 @@ ShowKeyboardSlotPicker(Prefix) {
     ; Build display labels for the ListBox
     SlotLabels := []
     for SlotId in Slots
-        SlotLabels.Push(GESTURE_ACTIONS[SlotId].Label)
+        SlotLabels.Push(t("sg_actions." . SlotId))
 
-    W := Gui("+AlwaysOnTop", "Choisir une touche — " . Prefix)
+    W := Gui("+AlwaysOnTop", t("dialog.keyboard_shortcut.title_prefix") . Prefix)
     W.SetFont("s10", "Segoe UI")
     W.MarginX := 12
     W.MarginY := 12
-    W.Add("Text", "xm", "Sélectionner la combinaison de touches :")
+    W.Add("Text", "xm", t("dialog.keyboard_shortcut.prompt"))
     LB := W.Add("ListBox", "xm w320 r16", SlotLabels)
-    W.Add("Button", "xm w80", "OK").OnEvent("Click", PickSlot)
-    W.Add("Button", "x+6 w80", "Annuler").OnEvent("Click", (*) => W.Destroy())
+    W.Add("Button", "xm w80", t("button.ok")).OnEvent("Click", PickSlot)
+    W.Add("Button", "x+6 w80", t("button.cancel")).OnEvent("Click", (*) => W.Destroy())
     W.Show()
 
     PickSlot(*) {
@@ -2638,7 +2632,7 @@ ShowActionPicker(Title, Current, OnConfirm) {
     SelectedIdx  := 0
 
     ActionIds.Push("none")
-    ActionLabels.Push("— Désactivé —")
+    ActionLabels.Push(t("dialog.action_picker.disabled"))
     if (Current == "none")
         SelectedIdx := 1
 
@@ -2648,7 +2642,7 @@ ShowActionPicker(Title, Current, OnConfirm) {
         if !GESTURE_ACTIONS.Has(ActionName)
             continue
         ActionIds.Push(ActionName)
-        ActionLabels.Push(GESTURE_ACTIONS[ActionName].Label)
+        ActionLabels.Push(t("sg_actions." . ActionName))
         if (ActionName == Current)
             SelectedIdx := ActionIds.Length
     }
@@ -2657,15 +2651,15 @@ ShowActionPicker(Title, Current, OnConfirm) {
     W.SetFont("s10", "Segoe UI")
     W.MarginX := 12
     W.MarginY := 12
-    W.Add("Text", "xm", "Action :")
+    W.Add("Text", "xm", t("dialog.action_picker.label"))
 
     SearchEdit  := W.Add("Edit", "xm w320")
     LB          := W.Add("ListBox", "xm w320 r18", ActionLabels)
     if (SelectedIdx > 0)
         LB.Choose(SelectedIdx)
 
-    W.Add("Button", "xm w80", "OK").OnEvent("Click", ConfirmPick)
-    W.Add("Button", "x+6 w80", "Annuler").OnEvent("Click", (*) => W.Destroy())
+    W.Add("Button", "xm w80", t("button.ok")).OnEvent("Click", ConfirmPick)
+    W.Add("Button", "x+6 w80", t("button.cancel")).OnEvent("Click", (*) => W.Destroy())
     W.Show()
 
     AllLabels   := ActionLabels.Clone()
@@ -2706,8 +2700,8 @@ ShowActionPicker(Title, Current, OnConfirm) {
 ShowKeyboardShortcutPicker(SlotId) {
     global KeyboardShortcutAssignments, GESTURE_ACTIONS
     Current      := KeyboardShortcutAssignments.Has(SlotId) ? KeyboardShortcutAssignments[SlotId] : "none"
-    SlotDisplay  := GESTURE_ACTIONS.Has(SlotId) ? GESTURE_ACTIONS[SlotId].Label : SlotId
-    ShowActionPicker("Raccourci : " . SlotDisplay, Current, (Id) => SetKeyboardShortcutAction(SlotId, Id))
+    SlotDisplay  := t("sg_actions." . SlotId)
+    ShowActionPicker(t("dialog.keyboard_shortcut.title_prefix") . SlotDisplay, Current, (Id) => SetKeyboardShortcutAction(SlotId, Id))
 }
 
 FilePathsEditor(*) {
