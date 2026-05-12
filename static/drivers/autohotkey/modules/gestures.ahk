@@ -557,9 +557,240 @@ global GESTURE_ACTIONS := Map(
         Label: "Historique des touches",
         Fn: (*) => KeyHistory(),
     },
+    ; --- Actions système avancées ---
+    "select_line", {
+        Label: "☰ Sélectionner la ligne",
+        Fn: (*) => SendFinalResult("{Home}{Shift Down}{End}{Shift Up}"),
+    },
+    "screen_capture", {
+        Label: "📸 Capture sélective (Win+Shift+S)",
+        Fn: (*) => SendFinalResult("#+s"),
+    },
+    "screen_capture_instant", {
+        Label: "📸 Capture instantanée (fenêtre)",
+        Fn: (*) => GestureScreenshotInstant(),
+    },
+    "open_url", {
+        Label: "🌐 Ouvrir un lien (configurable)",
+        Fn: (*) => GestureOpenConfiguredURL(),
+    },
+    "pick_color", {
+        Label: "🎨 Couleur HEX sous le curseur",
+        Fn: (*) => GesturePickColor(),
+    },
+    "take_note", {
+        Label: "📝 Prendre une note",
+        Fn: (*) => GestureTakeNote(),
+    },
+    "activity_simulation", {
+        Label: "🖱 Simuler l'activité (anti-veille)",
+        Fn: (*) => GestureToggleActivitySimulation(),
+    },
+    "surround_parens", {
+        Label: "() Entourer de parenthèses",
+        Fn: (*) => SendFinalResult("{Home}({End}){Home}"),
+    },
+    "search_web", {
+        Label: "🔍 Recherche web (configurable)",
+        Fn: (*) => GestureSearchWeb(),
+    },
+    "teleport_mouse", {
+        Label: "🖱 Téléporter la souris",
+        Fn: (*) => GestureTeleportMouse(),
+    },
+    "uppercase_selection", {
+        Label: "AA Majuscules / minuscules",
+        Fn: (*) => GestureToggleUppercase(),
+    },
+    "titlecase_selection", {
+        Label: "Aa Casse de titre",
+        Fn: (*) => GestureToggleTitleCase(),
+    },
+    "spotlight_mouse", {
+        Label: "🔦 Surbrillance souris",
+        Fn: (*) => (MouseGetPos(&_Mx, &_My), SpotlightMouseAt(_Mx, _My, 5000)),
+    },
+    "toggle_capslock", {
+        Label: "⇪ Basculer CapsLock",
+        Fn: (*) => ToggleCapsLock(),
+    },
+    "microsoft_bold", {
+        Label: "𝐁 Ctrl+B Microsoft (→ Ctrl+G)",
+        Fn: (*) => (MicrosoftApps() ? SendFinalResult("^g") : SendFinalResult("^b")),
+    },
+    "paste_plain", {
+        Label: "⎘ Coller sans mise en forme",
+        Fn: (*) => GesturePastePlain(),
+    },
 )
 
-; Ctrl+lettre, Ctrl+Shift+lettre, Win+lettre, Alt+lettre — dynamiques (26 × 4).
+; --- Actions système avancées — implémentations ---
+
+GestureScreenshotInstant() {
+    WinGetPos(&WX, &WY, &WW, &WH, "A")
+    if (WW = 0 or WH = 0) {
+        MsgBox("Aucune fenêtre active.", "Capture d'écran", "OK T3")
+        return
+    }
+    PicsDir   := EnvGet("USERPROFILE") . "\Pictures\screenshots"
+    DirCreate(PicsDir)
+    Timestamp := FormatTime(, "yyyy_MM_dd_HH") . "h" . FormatTime(, "mm") . "min" . FormatTime(, "ss") . "sec"
+    FilePath  := PicsDir . "\screenshot_" . Timestamp . ".png"
+    TmpScript := A_Temp . "\hs_screenshot.ps1"
+    ScriptContent := "Add-Type -AssemblyName System.Drawing`n"
+        . "$bmp = New-Object System.Drawing.Bitmap(" . WW . ", " . WH . ")`n"
+        . "$g = [System.Drawing.Graphics]::FromImage($bmp)`n"
+        . "$g.CopyFromScreen(" . WX . ", " . WY . ", 0, 0, $bmp.Size)`n"
+        . "$bmp.Save('" . FilePath . "')`n"
+        . "$g.Dispose(); $bmp.Dispose()"
+    FileDelete(TmpScript)
+    FileAppend(ScriptContent, TmpScript, "UTF-8")
+    RunWait('powershell -NoProfile -NonInteractive -WindowStyle Hidden -ExecutionPolicy Bypass -File "' . TmpScript . '"',, "Hide")
+    TrayTip("Sauvegardé : " . FilePath, "Capture d'écran", "Icone=1")
+}
+
+GestureOpenConfiguredURL() {
+    global _IniCache
+    URL := IniCacheGet(_IniCache, "Shortcuts.Actions", "open_url")
+    if (URL = "_" or URL = "")
+        URL := "https://chatgpt.com/"
+    Run(URL)
+}
+
+GesturePickColor() {
+    MouseGetPos(&MouseX, &MouseY)
+    HexColor := PixelGetColor(MouseX, MouseY, "RGB")
+    HexColor := "#" . StrLower(SubStr(HexColor, 3))
+    A_Clipboard := HexColor
+    MsgBox("La couleur sous le curseur est " . HexColor . "`nElle a été sauvegardée dans le presse-papiers : " . A_Clipboard)
+}
+
+GestureTakeNote() {
+    global _IniCache
+    DatedRaw := IniCacheGet(_IniCache, "Shortcuts.Actions", "take_note_dated")
+    DatedNotes := (DatedRaw = "true")
+    FolderRaw := IniCacheGet(_IniCache, "Shortcuts.Actions", "take_note_folder")
+    DestFolder := (FolderRaw = "_" or FolderRaw = "") ? A_Desktop : FolderRaw
+    FileName := DatedNotes
+        ? "Notes_" . FormatTime(, "dd_MM_yyyy") . ".txt"
+        : "Notes.txt"
+    FilePath := DestFolder . "\" . FileName
+    if not FileExist(FilePath)
+        FileAppend("", FilePath)
+    PreviousTitleMatchMode := A_TitleMatchMode
+    try {
+        SetTitleMatchMode(2)
+        if WinExist(FileName) {
+            WinActivate(FileName)
+            WinWaitActive(FileName, , 3)
+        } else {
+            Run('notepad.exe "' . FilePath . '"')
+            WinWait(FileName, , 7)
+            WinActivate(FileName)
+            WinWaitActive(FileName, , 3)
+        }
+        WinMaximize()
+        Sleep(100)
+    } finally {
+        SetTitleMatchMode(PreviousTitleMatchMode)
+    }
+}
+
+GestureToggleActivitySimulation() {
+    global ActivitySimulation
+    ActivitySimulation := !ActivitySimulation
+    if ActivitySimulation
+        SetTimer(GestureSimulateActivity, Random(1000, 5000))
+}
+
+GestureSimulateActivity() {
+    global ActivitySimulation
+    if !ActivitySimulation
+        return
+    loop Random(3, 8) {
+        DllCall("SetCursorPos", "int", Random(0, A_ScreenWidth), "int", Random(0, A_ScreenHeight))
+        Sleep(Random(200, 800))
+    }
+    SendFinalResult("{VKFF}")
+}
+
+GestureSearchWeb() {
+    global _IniCache
+    EngineURL   := IniCacheGet(_IniCache, "Shortcuts.Actions", "search_web_engine")
+    EngineQuery := IniCacheGet(_IniCache, "Shortcuts.Actions", "search_web_query")
+    if (EngineURL = "_" or EngineURL = "")
+        EngineURL := "https://www.google.com"
+    if (EngineQuery = "_" or EngineQuery = "")
+        EngineQuery := "https://www.google.com/search?q="
+    SelectedText := Trim(GetSelection())
+    if (SelectedText = "") {
+        Run(EngineURL)
+    } else {
+        SelectedText := StrReplace(SelectedText, "`r`n", " ")
+        SelectedText := StrReplace(SelectedText, "#", "%23")
+        SelectedText := StrReplace(SelectedText, "&", "%26")
+        SelectedText := StrReplace(SelectedText, "+", "%2b")
+        SelectedText := StrReplace(SelectedText, "`"", "%22")
+        Run(EngineQuery . SelectedText)
+    }
+}
+
+GestureTeleportMouse() {
+    Monitors := []
+    Count := MonitorGetCount()
+    loop Count {
+        MonitorGet(A_Index, &Left, &Top, &Right, &Bottom)
+        Monitors.Push({Left: Left, Top: Top, Right: Right, Bottom: Bottom})
+    }
+    if (Count < 2) {
+        MsgBox("Aucun autre moniteur détecté.")
+        return
+    }
+    MouseGetPos(&CurX, &CurY)
+    CurrentIndex := 1
+    for I, Mon in Monitors {
+        if (CurX >= Mon.Left and CurX < Mon.Right and CurY >= Mon.Top and CurY < Mon.Bottom) {
+            CurrentIndex := I
+            break
+        }
+    }
+    NextIndex := (Mod(CurrentIndex, Count) + 1)
+    Target := Monitors[NextIndex]
+    TargetX := Target.Left + (Target.Right - Target.Left) // 2
+    TargetY := Target.Top + (Target.Bottom - Target.Top) // 2
+    DllCall("SetCursorPos", "int", TargetX, "int", TargetY)
+    SpotlightMouseAt(TargetX, TargetY, 3000)
+}
+
+GestureToggleUppercase() {
+    Text := GetSelection()
+    if RegExMatch(Text, "[a-zà-ÿ]")
+        SendInstant(Format("{:U}", Text))
+    else
+        SendInstant(Format("{:L}", Text))
+}
+
+GestureToggleTitleCase() {
+    Text := GetSelection()
+    TitleCasePattern :=
+        "^(?:[A-ZÉÈÀÙÂÊÎÔÛÇ][a-zéèàùâêîôûç0-9''\(\),.\-:;!?\-]*[ \t\r\n]+)*[A-ZÉÈÀÙÂÊÎÔÛÇ][a-zéèàùâêîôûç0-9''\(\),.\-:;!?\-]*$"
+    UpperCasePattern := "^[A-ZÉÈÀÙÂÊÎÔÛÇ0-9''\(\),.\-:;!?\s]+$"
+    if RegExMatch(Text, TitleCasePattern)
+        SendInstant(Format("{:L}", Text))
+    else
+        SendInstant(Format("{:T}", Text))
+}
+
+GesturePastePlain() {
+    if not WinActive("ahk_exe EXCEL.EXE") {
+        A_Clipboard := A_Clipboard
+        SendFinalResult("^v")
+    } else {
+        SendFinalResult("^+v")
+    }
+}
+
+; Ctrl+lettre, Ctrl+Shift+lettre, Win+lettre, Alt+lettre — dynamiques (26 × 4 = 104).
 _GestureLetters := "abcdefghijklmnopqrstuvwxyz"
 loop StrLen(_GestureLetters) {
     _L := SubStr(_GestureLetters, A_Index, 1)
@@ -579,6 +810,47 @@ loop StrLen(_GestureLetters) {
     GESTURE_ACTIONS["alt_" . _L] := {
         Label: "⎇ " . _U . " — Alt+" . _U,
         Fn: ((_k) => (*) => GestureSendShortcut("!" . _k))(_L),
+    }
+}
+
+; Ctrl+chiffre, Win+chiffre, Alt+chiffre — dynamiques (10 × 3 = 30).
+loop 10 {
+    _D := SubStr("0123456789", A_Index, 1)
+    GESTURE_ACTIONS["ctrl_" . _D] := {
+        Label: "^ " . _D . " — Ctrl+" . _D,
+        Fn: ((_k) => (*) => GestureSendShortcut("^" . _k))(_D),
+    }
+    GESTURE_ACTIONS["win_" . _D] := {
+        Label: "⊞ " . _D . " — Win+" . _D,
+        Fn: ((_k) => (*) => GestureSendShortcut("#" . _k))(_D),
+    }
+    GESTURE_ACTIONS["alt_" . _D] := {
+        Label: "⎇ " . _D . " — Alt+" . _D,
+        Fn: ((_k) => (*) => GestureSendShortcut("!" . _k))(_D),
+    }
+}
+
+; Touches spéciales — ctrl_space, win_space, alt_space, etc.
+_GestureSpecialKeys := Map(
+    "space",  "{Space}",
+    "enter",  "{Enter}",
+    "period", ".",
+    "comma",  ",",
+    "sc029",  "SC029",
+)
+for _SName, _SCode in _GestureSpecialKeys {
+    _DisplayName := StrUpper(SubStr(_SName, 1, 1)) . SubStr(_SName, 2)
+    GESTURE_ACTIONS["ctrl_" . _SName] := {
+        Label: "^ " . _DisplayName . " — Ctrl+" . _DisplayName,
+        Fn: ((_k) => (*) => GestureSendShortcut("^" . _k))(_SCode),
+    }
+    GESTURE_ACTIONS["win_" . _SName] := {
+        Label: "⊞ " . _DisplayName . " — Win+" . _DisplayName,
+        Fn: ((_k) => (*) => GestureSendShortcut("#" . _k))(_SCode),
+    }
+    GESTURE_ACTIONS["alt_" . _SName] := {
+        Label: "⎇ " . _DisplayName . " — Alt+" . _DisplayName,
+        Fn: ((_k) => (*) => GestureSendShortcut("!" . _k))(_SCode),
     }
 }
 
@@ -688,24 +960,36 @@ if _GestureTomlData.Has("sg_order") && _GestureTomlData["sg_order"].Has("items")
         if (SubStr(_Item, 1, 1) = "_") {
             if (_Item = "_ctrl_placeholder") {
                 GESTURE_ACTION_NAMES.Push("#Raccourcis ^ (Ctrl)")
-                _CtrlLetters := "abcdefghijklmnopqrstuvwxyz"
-                loop StrLen(_CtrlLetters)
-                    GESTURE_ACTION_NAMES.Push("ctrl_" . SubStr(_CtrlLetters, A_Index, 1))
+                _CtrlKeys := "abcdefghijklmnopqrstuvwxyz"
+                loop StrLen(_CtrlKeys)
+                    GESTURE_ACTION_NAMES.Push("ctrl_" . SubStr(_CtrlKeys, A_Index, 1))
+                loop 10
+                    GESTURE_ACTION_NAMES.Push("ctrl_" . SubStr("0123456789", A_Index, 1))
+                for _Sk, _ in _GestureSpecialKeys
+                    GESTURE_ACTION_NAMES.Push("ctrl_" . _Sk)
             } else if (_Item = "_ctrl_shift_placeholder") {
                 GESTURE_ACTION_NAMES.Push("#Raccourcis ^⇧ (Ctrl+Shift)")
-                _CtrlLetters := "abcdefghijklmnopqrstuvwxyz"
-                loop StrLen(_CtrlLetters)
-                    GESTURE_ACTION_NAMES.Push("ctrl_shift_" . SubStr(_CtrlLetters, A_Index, 1))
+                _CtrlShiftKeys := "abcdefghijklmnopqrstuvwxyz"
+                loop StrLen(_CtrlShiftKeys)
+                    GESTURE_ACTION_NAMES.Push("ctrl_shift_" . SubStr(_CtrlShiftKeys, A_Index, 1))
             } else if (_Item = "_win_placeholder") {
                 GESTURE_ACTION_NAMES.Push("#Raccourcis ⊞ (Win)")
-                _WinLetters := "abcdefghijklmnopqrstuvwxyz"
-                loop StrLen(_WinLetters)
-                    GESTURE_ACTION_NAMES.Push("win_" . SubStr(_WinLetters, A_Index, 1))
+                _WinKeys := "abcdefghijklmnopqrstuvwxyz"
+                loop StrLen(_WinKeys)
+                    GESTURE_ACTION_NAMES.Push("win_" . SubStr(_WinKeys, A_Index, 1))
+                loop 10
+                    GESTURE_ACTION_NAMES.Push("win_" . SubStr("0123456789", A_Index, 1))
+                for _Sk, _ in _GestureSpecialKeys
+                    GESTURE_ACTION_NAMES.Push("win_" . _Sk)
             } else if (_Item = "_alt_placeholder") {
                 GESTURE_ACTION_NAMES.Push("#Raccourcis ⎇ (Alt)")
-                _AltLetters := "abcdefghijklmnopqrstuvwxyz"
-                loop StrLen(_AltLetters)
-                    GESTURE_ACTION_NAMES.Push("alt_" . SubStr(_AltLetters, A_Index, 1))
+                _AltKeys := "abcdefghijklmnopqrstuvwxyz"
+                loop StrLen(_AltKeys)
+                    GESTURE_ACTION_NAMES.Push("alt_" . SubStr(_AltKeys, A_Index, 1))
+                loop 10
+                    GESTURE_ACTION_NAMES.Push("alt_" . SubStr("0123456789", A_Index, 1))
+                for _Sk, _ in _GestureSpecialKeys
+                    GESTURE_ACTION_NAMES.Push("alt_" . _Sk)
             }
             ; hs-only placeholders (_cmd_placeholder, _hs_ctrl_placeholder…) are silently dropped
             continue

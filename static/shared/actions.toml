@@ -558,6 +558,72 @@ platform = "all"
 label    = "✕ Quitter"
 platform = "all"
 
+# --- Actions système avancées ---
+
+[sg_actions.select_line]
+label    = "☰ Sélectionner la ligne"
+platform = "ahk"
+
+[sg_actions.screen_capture]
+label    = "📸 Capture sélective (Win+Shift+S)"
+platform = "ahk"
+
+[sg_actions.screen_capture_instant]
+label    = "📸 Capture instantanée (fenêtre)"
+platform = "ahk"
+
+[sg_actions.open_url]
+label    = "🌐 Ouvrir un lien (configurable)"
+platform = "ahk"
+
+[sg_actions.pick_color]
+label    = "🎨 Couleur HEX sous le curseur"
+platform = "ahk"
+
+[sg_actions.take_note]
+label    = "📝 Prendre une note"
+platform = "ahk"
+
+[sg_actions.activity_simulation]
+label    = "🖱 Simuler l'activité (anti-veille)"
+platform = "ahk"
+
+[sg_actions.surround_parens]
+label    = "() Entourer de parenthèses"
+platform = "ahk"
+
+[sg_actions.search_web]
+label    = "🔍 Recherche web (configurable)"
+platform = "ahk"
+
+[sg_actions.teleport_mouse]
+label    = "🖱 Téléporter la souris"
+platform = "ahk"
+
+[sg_actions.uppercase_selection]
+label    = "AA Majuscules / minuscules"
+platform = "ahk"
+
+[sg_actions.titlecase_selection]
+label    = "Aa Casse de titre"
+platform = "ahk"
+
+[sg_actions.spotlight_mouse]
+label    = "🔦 Surbrillance souris"
+platform = "ahk"
+
+[sg_actions.toggle_capslock]
+label    = "⇪ Basculer CapsLock"
+platform = "ahk"
+
+[sg_actions.microsoft_bold]
+label    = "𝐁 Ctrl+B Microsoft (→ Ctrl+G)"
+platform = "ahk"
+
+[sg_actions.paste_plain]
+label    = "⎘ Coller sans mise en forme"
+platform = "ahk"
+
 # --- Debug ---
 
 [sg_actions.open_console]
@@ -599,6 +665,11 @@ is_header = true
 
 [sg_actions._hs_ctrl_shift_placeholder]
 label    = "#Raccourcis ^⇧ (Ctrl+Shift) — macOS"
+platform = "hs"
+is_header = true
+
+[sg_actions._hs_option_placeholder]
+label    = "#Raccourcis ⌥ (Option) — macOS"
 platform = "hs"
 is_header = true
 
@@ -723,6 +794,8 @@ items = [
     "--",
     "_hs_ctrl_shift_placeholder",
     "--",
+    "_hs_option_placeholder",
+    "--",
     "_ctrl_placeholder",
     "--",
     "_ctrl_shift_placeholder",
@@ -753,6 +826,24 @@ items = [
     "#Système",
     "lock_screen",
     "notification_center",
+    "--",
+    "#Actions système",
+    "select_line",
+    "screen_capture",
+    "screen_capture_instant",
+    "open_url",
+    "pick_color",
+    "take_note",
+    "activity_simulation",
+    "surround_parens",
+    "search_web",
+    "teleport_mouse",
+    "uppercase_selection",
+    "titlecase_selection",
+    "spotlight_mouse",
+    "toggle_capslock",
+    "microsoft_bold",
+    "paste_plain",
     "--",
     "#Interface",
     "open_metrics_typing",

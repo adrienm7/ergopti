@@ -514,6 +514,35 @@ for _, letter in ipairs(CMD_LETTERS) do
 		function() pcall(hs.eventtap.keyStroke, {"ctrl", "shift"}, letter) end)
 end
 
+-- Option (alt) letter shortcuts (macOS)
+for _, letter in ipairs(CMD_LETTERS) do
+	local upper = string.upper(letter)
+	sg("hs_option_" .. letter,
+		"⌥ " .. upper .. " — Option+" .. upper,
+		function() pcall(hs.eventtap.keyStroke, {"alt"}, letter) end)
+end
+
+-- Digit shortcuts: cmd_0..9, hs_ctrl_0..9, hs_option_0..9
+local DIGITS = {"0","1","2","3","4","5","6","7","8","9"}
+for _, d in ipairs(DIGITS) do
+	sg("cmd_"        .. d, "⌘ " .. d .. " — Cmd+"    .. d, function() pcall(hs.eventtap.keyStroke, {"cmd"},          d) end)
+	sg("hs_ctrl_"    .. d, "^ " .. d .. " — Ctrl+"   .. d, function() pcall(hs.eventtap.keyStroke, {"ctrl"},         d) end)
+	sg("hs_option_"  .. d, "⌥ " .. d .. " — Option+" .. d, function() pcall(hs.eventtap.keyStroke, {"alt"},          d) end)
+end
+
+-- Special key shortcuts: space, enter, period, comma
+local HS_SPECIAL_KEYS = {
+	{id = "space",  key = "space",  label = "Espace"},
+	{id = "enter",  key = "return", label = "Entrée"},
+	{id = "period", key = ".",      label = "Point"},
+	{id = "comma",  key = ",",      label = "Virgule"},
+}
+for _, sk in ipairs(HS_SPECIAL_KEYS) do
+	sg("cmd_"       .. sk.id, "⌘ "  .. sk.label .. " — Cmd+"    .. sk.label, function() pcall(hs.eventtap.keyStroke, {"cmd"},  sk.key) end)
+	sg("hs_ctrl_"   .. sk.id, "^ "  .. sk.label .. " — Ctrl+"   .. sk.label, function() pcall(hs.eventtap.keyStroke, {"ctrl"}, sk.key) end)
+	sg("hs_option_" .. sk.id, "⌥ "  .. sk.label .. " — Option+" .. sk.label, function() pcall(hs.eventtap.keyStroke, {"alt"},  sk.key) end)
+end
+
 
 
 
@@ -633,15 +662,24 @@ local function build_sg_names(shared)
 		elseif item == "_cmd_placeholder" then
 			out[#out + 1] = "#Raccourcis ⌘ (Cmd)"
 			for _, l in ipairs(CMD_LETTERS) do out[#out + 1] = "cmd_" .. l end
+			for d = 0, 9 do out[#out + 1] = "cmd_" .. d end
+			for _, sk in ipairs({"space","enter","period","comma"}) do out[#out + 1] = "cmd_" .. sk end
 		elseif item == "_cmd_shift_placeholder" then
 			out[#out + 1] = "#Raccourcis ⌘⇧ (Cmd+Shift)"
 			for _, l in ipairs(CMD_LETTERS) do out[#out + 1] = "cmd_shift_" .. l end
 		elseif item == "_hs_ctrl_placeholder" then
 			out[#out + 1] = "#Raccourcis ^ (Ctrl) — macOS"
 			for _, l in ipairs(CMD_LETTERS) do out[#out + 1] = "hs_ctrl_" .. l end
+			for d = 0, 9 do out[#out + 1] = "hs_ctrl_" .. d end
+			for _, sk in ipairs({"space","enter","period","comma"}) do out[#out + 1] = "hs_ctrl_" .. sk end
 		elseif item == "_hs_ctrl_shift_placeholder" then
 			out[#out + 1] = "#Raccourcis ^⇧ (Ctrl+Shift) — macOS"
 			for _, l in ipairs(CMD_LETTERS) do out[#out + 1] = "hs_ctrl_shift_" .. l end
+		elseif item == "_hs_option_placeholder" then
+			out[#out + 1] = "#Raccourcis ⌥ (Option) — macOS"
+			for _, l in ipairs(CMD_LETTERS) do out[#out + 1] = "hs_option_" .. l end
+			for d = 0, 9 do out[#out + 1] = "hs_option_" .. d end
+			for _, sk in ipairs({"space","enter","period","comma"}) do out[#out + 1] = "hs_option_" .. sk end
 		elseif item:sub(1, 1) == "_" then
 			-- ahk-only placeholders (_ctrl_placeholder, _win_placeholder…): skip silently
 		else
