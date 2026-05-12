@@ -308,8 +308,8 @@ CS_Load() {
 ; Serialise the in-memory state back to disk. Only the [Metrics]
 ; section is rewritten; every other section in config.toml stays put.
 CS_Save() {
-    global SaveFullConfig
-    if IsSet(SaveFullConfig) {
+    global _SaveFullConfigReady
+    if IsSet(_SaveFullConfigReady) {
         SaveFullConfig()
         return
     }

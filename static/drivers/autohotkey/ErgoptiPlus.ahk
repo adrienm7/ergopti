@@ -1710,10 +1710,10 @@ ReadScriptShortcutsConfig()
 ; and MetricsFilters in one pass.
 CS_Load()
 
-; Expose SaveFullConfig as a global variable so that lib modules loaded
-; before this point (config_shortcuts, toml_helpers) can detect its
-; presence via IsSet() and delegate persistence to the full writer.
-global SaveFullConfig := Func("SaveFullConfig")
+; Expose a global flag so lib modules loaded before this point
+; (config_shortcuts, toml_helpers) can detect that SaveFullConfig() is
+; available and delegate persistence to the full writer.
+global _SaveFullConfigReady := true
 
 ; Now that all modules are loaded and config is hydrated, persist the
 ; complete state to ensure the on-disk TOML contains every key — not
