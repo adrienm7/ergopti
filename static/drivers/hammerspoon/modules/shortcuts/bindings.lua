@@ -200,6 +200,11 @@ hotkey_defs.ctrl_x   = function()
 	return bind_log({"ctrl"}, "x", sys_acts.copy_pixel_color)
 end
 
+hotkey_labels.ctrl_capslock = "Basculer CapsLock"
+hotkey_defs.ctrl_capslock   = function()
+	return bind_log({"ctrl"}, "capslock", sys_acts.toggle_capslock)
+end
+
 hotkey_labels.ctrl_l = "Verrouiller l'écran"
 hotkey_defs.ctrl_l   = function()
 	return bind_log({"ctrl"}, "l", sys_acts.lock_screen)
