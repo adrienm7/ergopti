@@ -21,6 +21,7 @@ local toml_writer   = require("lib.toml_writer")
 local ui_builder    = require("ui.ui_builder")
 local Logger        = require("lib.logger")
 local notifications = require("lib.notifications")
+local i18n          = require("lib.i18n")
 local LOG           = "hotstring_editor"
 
 
@@ -81,10 +82,10 @@ local _prefs = {
 --- Returns an empty TOML configuration structure for hotstrings.
 --- @return table The default empty configuration.
 local function empty_toml_data()
-	return { 
-		meta = { description = "Hotstrings personnels" },
-		sections_order = {}, 
-		sections = {} 
+	return {
+		meta = { description = i18n.get("editor.hotstrings.meta_desc") },
+		sections_order = {},
+		sections = {}
 	}
 end
 
@@ -188,10 +189,10 @@ end
 --- @param save_data table The data received from the JS frontend.
 --- @return table The TOML-compatible structure.
 local function js_to_toml(save_data)
-	local data = { 
-		meta = { description = "Hotstrings personnels" },
+	local data = {
+		meta = { description = i18n.get("editor.hotstrings.meta_desc") },
 		sections_order = (type(save_data.sections_order) == "table") and save_data.sections_order or {},
-		sections = {} 
+		sections = {}
 	}
 	
 	for _, name in ipairs(data.sections_order) do
@@ -276,7 +277,7 @@ local function handle_message(msg)
 			end
 			if type(_update_menu) == "function" then hs.timer.doAfter(0, function() pcall(_update_menu) end) end
 		else
-			pcall(notifications.notify, "Erreur de sauvegarde", tostring(err), "error")
+			pcall(notifications.notify, i18n.get("editor.hotstrings.save_error"), tostring(err), "error")
 		end
 		return
 	end
@@ -347,7 +348,7 @@ function M.open(open_mode)
 	-- Request the webview creation/focus from the centralized UI builder
 	_webview = ui_builder.show_webview({
 		frame       = ui_builder.get_centered_frame(760, 640),
-		title       = "Hotstrings personnels",
+		title       = i18n.get("editor.hotstrings.window_title"),
 		style_masks = window_style,
 		usercontent = _usercontent,
 		assets_dir  = ASSETS_DIR,

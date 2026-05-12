@@ -1,19 +1,16 @@
-﻿{
+{
 	"_meta.locale": "zh",
 	"_meta.flag": "🇨🇳",
 	"_meta.name": "中文",
-
 	"layout.ergoptibase": "模拟 Ergopti 布局的基础层",
 	"layout.directaccessdigits": "顶行数字直接访问",
 	"layout.ergoptialtgr": "模拟 Ergopti 布局的 AltGr 层",
 	"layout.ergoptiplus": "应用 Ergopti➕ 的 AltGr 小幅调整",
-
 	"dynamichotstrings.datefr": "dt★ 插入当前日期（日/月/年）",
 	"dynamichotstrings.date": "td★ 插入当前日期（年_月_日）",
 	"dynamichotstrings.phoneprefixes": "输入手机号前几位即可自动补全",
 	"dynamichotstrings.ssnprefixes": "输入社保号前几位即可自动补全",
 	"dynamichotstrings.ibanprefixes": "输入 IBAN 前几个字符即可自动补全",
-
 	"shortcuts.egrave": "È 键上的所有快捷键对应 ",
 	"shortcuts.ecirc": "Ê 键上的所有快捷键对应 ",
 	"shortcuts.eacute": "É 键上的所有快捷键对应 ",
@@ -69,11 +66,9 @@
 	"shortcuts.laltcapslock.oneshotshift": "\"LAlt\" + \"CapsLock\" = OneShotShift",
 	"shortcuts.laltcapslock.tab": "\"LAlt\" + \"CapsLock\" = Tab",
 	"gestures.enabled": "触控板手势（需要 Windows 配置）",
-
 	"menu.layout.title": "🌐 键盘布局",
 	"menu.layout.on": "✅ 布局已启用（点击禁用）",
 	"menu.layout.off": "❌ 布局已禁用（点击启用）",
-
 	"menu.hotstrings.title": "⚡ 热字符串",
 	"menu.hotstrings.on": "✅ 热字符串已启用（点击禁用）",
 	"menu.hotstrings.off": "❌ 热字符串已禁用（点击启用）",
@@ -95,7 +90,6 @@
 	"menu.hotstrings.reset_magic_key": "   ↳ 重置（默认：★）",
 	"menu.hotstrings.edit_personal_info": "   ↳ 编辑个人信息…",
 	"menu.hotstrings.default_marker": "（默认）",
-
 	"menu.shortcuts.title": "🎯 快捷键",
 	"menu.shortcuts.on": "✅ 快捷键已启用（点击禁用）",
 	"menu.shortcuts.off": "❌ 快捷键已禁用（点击启用）",
@@ -108,11 +102,9 @@
 	"menu.shortcuts.ctrl_shift_add": "[+ 添加 Ctrl+Shift+… 快捷键]",
 	"menu.shortcuts.win_group": "⊞ Win 快捷键",
 	"menu.shortcuts.win_add": "[+ 添加 Win+… 快捷键]",
-
 	"menu.tapholds.title": "⌨️ 点按/长按",
 	"menu.tapholds.on": "✅ 点按/长按已启用（点击禁用）",
 	"menu.tapholds.off": "❌ 点按/长按已禁用（点击启用）",
-
 	"menu.gestures.title": "🖐️ 手势",
 	"menu.gestures.on": "✅ 手势已启用（点击禁用）",
 	"menu.gestures.off": "❌ 手势已禁用（点击启用）",
@@ -130,7 +122,6 @@
 	"menu.gestures.action_prefix": "动作：",
 	"menu.gestures.mode_prefix": "模式：",
 	"menu.gestures.sensitivity_prefix": "灵敏度：",
-
 	"menu.metrics.title": "📊 统计数据",
 	"menu.metrics.on": "✅ 统计数据已启用（点击禁用）",
 	"menu.metrics.off": "❌ 统计数据已禁用（点击启用）",
@@ -146,7 +137,6 @@
 	"menu.metrics.disabled_in_suffix_p": " 个应用中禁用",
 	"menu.metrics.exclude_apps": "将应用排除在键盘记录之外…",
 	"menu.metrics.open_encryptor": "↳ 打开独立加密器…",
-
 	"menu.global.title": "全局操作",
 	"menu.global.enable_all": "☑ 启用所有功能",
 	"menu.global.disable_all": "☐ 禁用所有功能",
@@ -157,7 +147,6 @@
 	"menu.global.suspend": "⏸︎ 暂停",
 	"menu.global.reload": "🔄 重新加载",
 	"menu.global.quit": "⏹ 退出",
-
 	"menu.debug.title": "⚠ 调试",
 	"menu.debug.console": "控制台",
 	"menu.debug.window_spy": "窗口侦察",
@@ -165,15 +154,12 @@
 	"menu.debug.key_history": "按键历史",
 	"menu.debug.open_logs": "打开日志文件夹",
 	"menu.debug.open_today_log": "打开今日日志文件",
-
 	"menu.keyboard_layout.add_ergopti": "➕ 将 Ergopti v%s 添加到布局列表",
 	"menu.keyboard_layout.active_header": "已激活的布局",
 	"menu.keyboard_layout.open_system_prefs": "打开系统偏好设置 → 键盘",
-
 	"menu.karabiner.left_hand": "— 左手 —",
 	"menu.karabiner.right_hand": "— 右手 —",
 	"menu.karabiner.symmetric": "对称快捷键（键位顺序无关）",
-
 	"menu.llm.no_model": "无模型（已禁用）",
 	"menu.llm.add_model": "➕ 添加自定义模型…",
 	"menu.llm.delete_model": "🗑️ 从缓存中移除此模型",
@@ -182,7 +168,6 @@
 	"menu.llm.params_active": "参数（活跃）：",
 	"menu.llm.generation_settings": "生成设置",
 	"menu.llm.disabled_in_prefix": "已在以下应用中禁用",
-
 	"category.distances_reduction": "减少移动距离",
 	"category.sfbs_reduction": "减少同指二连键",
 	"category.rolls": "滚动",
@@ -194,12 +179,10 @@
 	"category.tapholds": "⌨️ 点按/长按",
 	"category.gestures": "🖐️ 手势",
 	"category.layout": "🌐 键盘布局",
-
 	"dialog.action_picker.label": "动作：",
 	"dialog.action_picker.disabled": "— 已禁用 —",
 	"dialog.keyboard_shortcut.title_prefix": "选择按键 — ",
 	"dialog.keyboard_shortcut.prompt": "选择按键组合：",
-
 	"dialog.metrics.title": "📊 统计数据",
 	"dialog.metrics.disable_confirm": "禁用统计数据？\n\n键盘记录器将不再捕获任何按键。已记录的数据将被保留。",
 	"dialog.metrics.enable_warning": "警告：您即将启用键盘记录器。\n\n它会精确到毫秒记录您的按键。日志存储在本地：\n    %s\n\n虽然密码字段会被自动忽略（UIA 过滤器），但建议在输入敏感数据时暂停脚本。\n\n是否启用？",
@@ -207,18 +190,14 @@
 	"dialog.metrics.exclude_title": "排除应用 — 统计数据",
 	"dialog.metrics.exclude_prompt": "选择不希望被键盘记录器记录按键的应用。",
 	"dialog.metrics.exclude_ok": "保存",
-
 	"dialog.gestures.auto_configure_title": "ErgoptiPlus — 手势配置",
 	"dialog.gestures.auto_configure_success": "手势配置已成功应用。\n\n10 个手势已写入 Windows 注册表\n（Ctrl+Win+Shift+F1 到 F10）。\n\n可能需要注销并重新登录\n才能使 Windows 识别新快捷键。",
 	"dialog.gestures.auto_configure_error_title": "ErgoptiPlus — 错误",
 	"dialog.gestures.auto_configure_error": "写入注册表时出错。\n\n请尝试以管理员身份运行脚本，\n或手动配置（参见说明）。",
 	"dialog.gestures.warning_title": "手势警告",
-
 	"dialog.hotstrings.delete_title": "删除扩展",
-
 	"dialog.llm.delete_title": "删除模型？",
 	"dialog.llm.delete_profile_prefix": "删除「",
-
 	"button.ok": "确定",
 	"button.cancel": "取消",
 	"button.save": "保存",
@@ -226,7 +205,6 @@
 	"button.add": "添加",
 	"button.activate": "启用",
 	"button.open_settings": "打开设置",
-
 	"gesture.slots.tap_3": "三指轻点",
 	"gesture.slots.swipe_3_up": "三指上滑 ↑",
 	"gesture.slots.swipe_3_down": "三指下滑 ↓",
@@ -237,7 +215,6 @@
 	"gesture.slots.swipe_4_down": "四指下滑 ↓",
 	"gesture.slots.swipe_4_left": "四指左滑 ←",
 	"gesture.slots.swipe_4_right": "四指右滑 →",
-
 	"sg_actions.sg_order.header.mouse_nav": "#鼠标与导航",
 	"sg_actions.sg_order.header.edition": "#编辑",
 	"sg_actions.sg_order.header.keys": "#按键",
@@ -264,7 +241,6 @@
 	"sg_actions.sg_order.header.files": "#文件",
 	"sg_actions.sg_order.header.script": "#脚本管理",
 	"sg_actions.sg_order.header.debug": "#调试",
-
 	"sg_actions.none": "∅ 已禁用",
 	"sg_actions.left_click_toggle": "🖱 L 鼠标左键（长按）",
 	"sg_actions.right_click_toggle": "🖱 R 鼠标右键（长按）",
@@ -381,7 +357,6 @@
 	"sg_actions.open_window_spy": "窗口侦察",
 	"sg_actions.open_list_vars": "变量状态",
 	"sg_actions.open_key_history": "按键历史",
-
 	"ax_actions.tabs": "⧉ 标签页",
 	"ax_actions.char": "A 字符",
 	"ax_actions.char_sel": "✎ A 选择字符",
@@ -418,11 +393,9 @@
 	"notify.script_control": "脚本控制",
 	"notify.hotstrings": "Hotstrings",
 	"dialog.gestures.warning_msg": "⚠️ 注意：启用触控板手势可能与系统手势产生冲突。\n\n为避免冲突，请禁用以下 macOS 选项：\n\n• 2指触控板手势：如需在 Hammerspoon 中使用，请禁用滚动和滑动。\n• 3指触控板手势用于移动窗口和选择文本\n• 3指轻点查词\n• 3指水平/垂直滑动切换 Space、启用 App Exposé 或 Mission Control\n• 4指水平/垂直滑动切换 Space、启用 App Exposé 或 Mission Control\n\n必须禁用4指系统手势才能定义5指手势。否则 macOS 将无法区分两者，导致5指手势无法工作。",
-
 	"button.retry": "重试",
 	"button.encrypt": "加密",
 	"button.decrypt": "解密",
-
 	"dialog.hotstrings.delete_body": "确定要删除此自定义扩展器吗？",
 	"dialog.hotstrings.new_title": "新建词语扩展器",
 	"dialog.hotstrings.new_prompt": "输入触发字符（仅一个字符）：",
@@ -432,11 +405,9 @@
 	"dialog.hotstrings.consume_body": "扩展时是否消耗触发字符（不输出）？",
 	"dialog.hotstrings.consume_no": "否 — 输出字符",
 	"dialog.hotstrings.consume_yes": "是 — 消耗字符",
-
 	"menu.shortcuts.chatgpt_url_item": "   ↳ 编辑 ChatGPT URL…",
 	"dialog.shortcuts.chatgpt_title": "ChatGPT URL",
 	"dialog.shortcuts.chatgpt_prompt": "Ctrl+G 打开的 URL：",
-
 	"menu.karabiner.status_active": "🟢 Karabiner 已激活",
 	"menu.karabiner.status_priming": "🔵 Karabiner — 初始化中…",
 	"menu.karabiner.status_not_primed": "🟡 Karabiner 已启用 — 规则未应用（点击初始化）",
@@ -460,7 +431,6 @@
 	"menu.karabiner.sticky_dialog_prompt": "Sticky 取消延迟（毫秒）\n超过此时间无按键，单次修饰键将被取消。",
 	"menu.karabiner.simultaneous_dialog_title": "Karabiner — 组合键激活延迟",
 	"menu.karabiner.simultaneous_dialog_prompt": "触发\"组合\"槽的两个按键之间的最大延迟（毫秒）。\n\n（默认：%d ms）",
-
 	"menu.metrics.encrypt_toggle": "加密磁盘日志（安全）",
 	"dialog.metrics.progress_label": "处理中：%d / %d",
 	"dialog.metrics.complete_label": "操作完成。\n\n成功处理文件：%d\n遇到错误：%d",
@@ -477,7 +447,6 @@
 	"dialog.metrics.security_warning_body": "⚠️  警告：即将启用指标和键盘记录器。\n\n该系统将记录您的键盘输入和触控板手势激活。\n\n• 日志存储在 Hammerspoon 文件夹中\n• 密码字段会自动忽略\n• 建议在输入敏感数据时暂停脚本\n\n为避免与自定义手势冲突：\n• 如有使用，请移除 macOS 3/4 指滑动手势\n• 通过手势禁用 Mission Control 和 App Exposé",
 	"menu.hotstrings.custom_label": "自定义",
 	"menu.hotstrings.consumed": "已消耗",
-
 	"ui_typing.title": "输入指标",
 	"ui_typing.label_from": "从：",
 	"ui_typing.label_to": "至：",
@@ -526,7 +495,6 @@
 	"ui_typing.search_close": "关闭（Esc）",
 	"ui_typing.page_loading": "正在加载界面...",
 	"ui_typing.pinch_hint": "双指捏合（触控板）缩放。",
-
 	"ui_apps.title": "应用使用时间",
 	"ui_apps.label_period": "时段：",
 	"ui_apps.label_date": "日期：",
@@ -620,5 +588,80 @@
 	"ui_apps.modal_layouts": "已用布局",
 	"ui_apps.modal_records": "记录",
 	"ui_apps.modal_hs_ai": "热字符串 & AI",
-	"ui_apps.loading_data": "正在加载数据..."
+	"ui_apps.loading_data": "正在加载数据...",
+	"menu.paths.menu_item": "配置文件夹…",
+	"menu.paths.window_title": "配置文件夹 — Ergopti",
+	"menu.paths.pick_prompt": "选择配置文件夹",
+	"editor.hotstrings.meta_desc": "个人热字符串",
+	"editor.hotstrings.window_title": "个人热字符串编辑器",
+	"editor.hotstrings.save_error": "保存错误",
+	"hs_config.window_title": "热字符串延迟与颜色",
+	"hs_config.cat_magickey": "★ 键与扩展",
+	"hs_config.cat_autocorrection": "自动纠错",
+	"hs_config.cat_rolls": "连击",
+	"hs_config.cat_sfbs": "SFB 减少",
+	"hs_config.cat_distances": "距离减少",
+	"hs_config.cat_personal": "个人热字符串",
+	"hs_config.color_inherit": "— 继承默认 —",
+	"hs_config.color_red": "红色 (★)",
+	"hs_config.color_green": "绿色（自动）",
+	"hs_config.color_orange": "橙色（连击）",
+	"hs_config.color_blue": "蓝色（个人）",
+	"hs_config.color_purple": "紫色",
+	"hs_config.color_cyan": "青色",
+	"hs_config.color_yellow": "黄色",
+	"hs_config.color_gray": "灰色",
+
+	"editor.hotstrings.label_section": "章节：",
+	"editor.hotstrings.btn_new": "新建…",
+	"editor.hotstrings.btn_rename": "重命名…",
+	"editor.hotstrings.btn_delete": "删除",
+	"editor.hotstrings.col_trigger": "触发词",
+	"editor.hotstrings.col_result": "结果",
+	"editor.hotstrings.col_word": "整词",
+	"editor.hotstrings.col_auto": "自动",
+	"editor.hotstrings.col_case": "大小写",
+	"editor.hotstrings.col_final": "最终",
+	"editor.hotstrings.label_trigger": "触发词：",
+	"editor.hotstrings.label_result": "结果：",
+	"editor.hotstrings.chk_word": "完整词",
+	"editor.hotstrings.chk_case": "区分大小写",
+	"editor.hotstrings.chk_final": "最终结果",
+	"editor.hotstrings.btn_add": "➕ 添加",
+	"editor.hotstrings.chk_close_after": "添加后关闭",
+	"editor.hotstrings.group_selected": "已选热字符串",
+	"editor.hotstrings.btn_edit": "💾 编辑",
+	"editor.hotstrings.btn_delete_entry": "🗑 删除",
+	"editor.hotstrings.no_section": "（无章节）",
+	"editor.hotstrings.err_write": "⚠ 写入 personal_hotstrings.toml 时出错。",
+	"editor.hotstrings.saved_prefix": "✓ 已保存 — ",
+	"editor.hotstrings.err_trigger_required": "⚠ 触发词和结果不能为空。",
+	"editor.hotstrings.err_no_section": "⚠ 请先选择或创建一个章节。",
+	"editor.hotstrings.err_duplicate": "⚠ 该触发词在此章节中已存在。",
+	"editor.hotstrings.err_select_to_edit": "⚠ 请选择要编辑的热字符串。",
+	"editor.hotstrings.err_select_to_delete": "⚠ 请选择要删除的热字符串。",
+	"editor.hotstrings.title_confirm": "确认",
+	"editor.hotstrings.title_error": "错误",
+	"editor.hotstrings.new_section_title": "新建章节",
+	"editor.hotstrings.new_section_prompt": "新章节名称（标识符，不含空格）：",
+	"editor.hotstrings.err_section_exists": "该章节已存在。",
+	"editor.hotstrings.desc_title": "描述",
+	"editor.hotstrings.desc_prompt": "该章节在菜单中显示的描述：",
+	"editor.hotstrings.err_no_section_selected": "未选择章节。",
+	"editor.hotstrings.rename_title": "重命名",
+
+	"hs_config.file_level": "── 文件级别 ──",
+	"hs_config.btn_all_gray": "全部置灰",
+	"hs_config.btn_reset_all": "全部重置",
+	"hs_config.btn_close": "关闭",
+	"hs_config.label_category": "类别：",
+	"hs_config.label_section": "章节：",
+	"hs_config.label_delay": "延迟（毫秒）：",
+	"hs_config.label_color": "颜色：",
+	"hs_config.default_prefix": "默认：",
+	"hs_config.override_active": "覆盖已激活",
+	"hs_config.none": "（无）",
+	"hs_config.category_prefix": "类别：",
+	"hs_config.section_prefix": "章节：",
+	"hs_config.file_level_short": "（文件级别）"
 }

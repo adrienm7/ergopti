@@ -11,6 +11,7 @@
 
 local M = {}
 local Logger = require("lib.logger")
+local i18n   = require("lib.i18n")
 local LOG    = "toml_writer"
 
 
@@ -131,8 +132,16 @@ function M.write(path, data)
 	
 	local order     = type(data.sections_order) == "table" and data.sections_order or {}
 	local sections  = type(data.sections) == "table" and data.sections or {}
-	local meta_desc = (type(data.meta) == "table" and type(data.meta.description) == "string") 
-					  and data.meta.description or "Hotstrings personnels"
+	local raw_desc  = type(data.meta) == "table" and data.meta.description or nil
+	local meta_desc
+	if type(raw_desc) == "table" then
+		local code = i18n.get_locale()
+		meta_desc = raw_desc[code] or raw_desc["fr"] or "Hotstrings personnels"
+	elseif type(raw_desc) == "string" then
+		meta_desc = raw_desc
+	else
+		meta_desc = "Hotstrings personnels"
+	end
 
 	local L = {}
 	local function w(line) table.insert(L, line) end

@@ -387,6 +387,17 @@ do
 				goto continue
 			end
 
+			-- key = { lang = "val", … } — multilingual inline table
+			local tbl_key, tbl_body = stripped:match('^([%w_]+)%s*=%s*%{(.-)%}$')
+			if tbl_key then
+				local tbl = {}
+				for lang, val in tbl_body:gmatch('"?([%w_%-]+)"?%s*=%s*"([^"]*)"') do
+					tbl[lang] = val
+				end
+				set_nested(result, current_path, tbl_key, tbl)
+				goto continue
+			end
+
 			::continue::
 		end
 		return result

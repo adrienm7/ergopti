@@ -1,19 +1,16 @@
-﻿{
+{
 	"_meta.locale": "es",
 	"_meta.flag": "🇪🇸",
 	"_meta.name": "Español",
-
 	"layout.ergoptibase": "Emular la capa base de la disposición Ergopti",
 	"layout.directaccessdigits": "Dígitos de acceso directo en la fila superior",
 	"layout.ergoptialtgr": "Emular la capa AltGr de la disposición Ergopti",
 	"layout.ergoptiplus": "Aplicar los pequeños cambios en AltGr de Ergopti➕",
-
 	"dynamichotstrings.datefr": "dt★ inserta la fecha actual (dd/mm/aaaa)",
 	"dynamichotstrings.date": "td★ inserta la fecha actual (aaaa_mm_dd)",
 	"dynamichotstrings.phoneprefixes": "Escribir los primeros dígitos del número de teléfono lo completa automáticamente",
 	"dynamichotstrings.ssnprefixes": "Escribir los primeros dígitos del número de seguridad social lo completa automáticamente",
 	"dynamichotstrings.ibanprefixes": "Escribir los primeros caracteres del IBAN lo completa automáticamente",
-
 	"shortcuts.egrave": "Todos los atajos de la tecla È corresponden a los de ",
 	"shortcuts.ecirc": "Todos los atajos de la tecla Ê corresponden a los de ",
 	"shortcuts.eacute": "Todos los atajos de la tecla É corresponden a los de ",
@@ -69,11 +66,9 @@
 	"shortcuts.laltcapslock.oneshotshift": "\"LAlt\" + \"CapsLock\" = OneShotShift",
 	"shortcuts.laltcapslock.tab": "\"LAlt\" + \"CapsLock\" = Tab",
 	"gestures.enabled": "Gestos del touchpad (requiere configuración de Windows)",
-
 	"menu.layout.title": "🌐 Disposición del teclado",
 	"menu.layout.on": "✅ Disposición activa (clic para desactivar)",
 	"menu.layout.off": "❌ Disposición inactiva (clic para activar)",
-
 	"menu.hotstrings.title": "⚡ Hotstrings",
 	"menu.hotstrings.on": "✅ Hotstrings activos (clic para desactivar)",
 	"menu.hotstrings.off": "❌ Hotstrings inactivos (clic para activar)",
@@ -95,7 +90,6 @@
 	"menu.hotstrings.reset_magic_key": "   ↳ Restablecer (defecto: ★)",
 	"menu.hotstrings.edit_personal_info": "   ↳ Editar información personal…",
 	"menu.hotstrings.default_marker": "(defecto)",
-
 	"menu.shortcuts.title": "🎯 Atajos",
 	"menu.shortcuts.on": "✅ Atajos activos (clic para desactivar)",
 	"menu.shortcuts.off": "❌ Atajos inactivos (clic para activar)",
@@ -108,11 +102,9 @@
 	"menu.shortcuts.ctrl_shift_add": "[+ Añadir atajo Ctrl+Shift+…]",
 	"menu.shortcuts.win_group": "⊞ Atajos Win",
 	"menu.shortcuts.win_add": "[+ Añadir atajo Win+…]",
-
 	"menu.tapholds.title": "⌨️ Tap-Holds",
 	"menu.tapholds.on": "✅ Tap-holds activos (clic para desactivar)",
 	"menu.tapholds.off": "❌ Tap-holds inactivos (clic para activar)",
-
 	"menu.gestures.title": "🖐️ Gestos",
 	"menu.gestures.on": "✅ Gestos activos (clic para desactivar)",
 	"menu.gestures.off": "❌ Gestos inactivos (clic para activar)",
@@ -130,7 +122,6 @@
 	"menu.gestures.action_prefix": "Acción: ",
 	"menu.gestures.mode_prefix": "Modo: ",
 	"menu.gestures.sensitivity_prefix": "Sensibilidad: ",
-
 	"menu.metrics.title": "📊 Métricas",
 	"menu.metrics.on": "✅ Métricas activas (clic para desactivar)",
 	"menu.metrics.off": "❌ Métricas inactivas (clic para activar)",
@@ -146,7 +137,6 @@
 	"menu.metrics.disabled_in_suffix_p": " aplicaciones",
 	"menu.metrics.exclude_apps": "Excluir aplicaciones del keylogger…",
 	"menu.metrics.open_encryptor": "↳ Abrir Encryptor independiente…",
-
 	"menu.global.title": "Acciones globales",
 	"menu.global.enable_all": "☑ Activar todas las funciones",
 	"menu.global.disable_all": "☐ Desactivar todas las funciones",
@@ -157,7 +147,6 @@
 	"menu.global.suspend": "⏸︎ Suspender",
 	"menu.global.reload": "🔄 Recargar",
 	"menu.global.quit": "⏹ Salir",
-
 	"menu.debug.title": "⚠ Depuración",
 	"menu.debug.console": "Consola",
 	"menu.debug.window_spy": "Window Spy",
@@ -165,15 +154,12 @@
 	"menu.debug.key_history": "Historial de teclas",
 	"menu.debug.open_logs": "Abrir carpeta de registros",
 	"menu.debug.open_today_log": "Abrir registro de hoy",
-
 	"menu.keyboard_layout.add_ergopti": "➕ Añadir Ergopti v%s a la lista de disposiciones",
 	"menu.keyboard_layout.active_header": "Disposiciones activas",
 	"menu.keyboard_layout.open_system_prefs": "Abrir Preferencias del Sistema → Teclado",
-
 	"menu.karabiner.left_hand": "— Mano izquierda —",
 	"menu.karabiner.right_hand": "— Mano derecha —",
 	"menu.karabiner.symmetric": "Atajos simétricos (orden de teclas indiferente)",
-
 	"menu.llm.no_model": "Sin modelo (Desactivado)",
 	"menu.llm.add_model": "➕ Añadir modelo personalizado…",
 	"menu.llm.delete_model": "🗑️ Eliminar este modelo del caché",
@@ -182,7 +168,6 @@
 	"menu.llm.params_active": "Parámetros (Activos): ",
 	"menu.llm.generation_settings": "Configuración de generación",
 	"menu.llm.disabled_in_prefix": "Desactivado en",
-
 	"category.distances_reduction": "Reducción de distancias",
 	"category.sfbs_reduction": "Reducción de SFBs",
 	"category.rolls": "Rodamientos",
@@ -194,12 +179,10 @@
 	"category.tapholds": "⌨️ Tap-Holds",
 	"category.gestures": "🖐️ Gestos",
 	"category.layout": "🌐 Disposición del teclado",
-
 	"dialog.action_picker.label": "Acción:",
 	"dialog.action_picker.disabled": "— Desactivado —",
 	"dialog.keyboard_shortcut.title_prefix": "Elegir una tecla — ",
 	"dialog.keyboard_shortcut.prompt": "Seleccionar la combinación de teclas:",
-
 	"dialog.metrics.title": "📊 Métricas",
 	"dialog.metrics.disable_confirm": "¿Desactivar métricas?\n\nEl keylogger dejará de capturar pulsaciones. Los datos ya registrados se conservan.",
 	"dialog.metrics.enable_warning": "ATENCIÓN: Está a punto de activar el keylogger.\n\nRegistra sus pulsaciones con precisión de milisegundos. Los registros se almacenan localmente en:\n    %s\n\nAunque los campos de contraseña se ignoran automáticamente (filtro UIA), se recomienda PAUSAR el script al introducir datos sensibles.\n\n¿Activar?",
@@ -207,18 +190,14 @@
 	"dialog.metrics.exclude_title": "Excluir aplicaciones — Métricas",
 	"dialog.metrics.exclude_prompt": "Seleccione las aplicaciones cuyas pulsaciones nunca serán registradas por el keylogger.",
 	"dialog.metrics.exclude_ok": "Guardar",
-
 	"dialog.gestures.auto_configure_title": "ErgoptiPlus — Configuración de gestos",
 	"dialog.gestures.auto_configure_success": "Configuración de gestos aplicada correctamente.\n\nLos 10 gestos han sido configurados en el registro de Windows\n(Ctrl+Win+Shift+F1 a F10).\n\nPuede ser necesario cerrar y volver a iniciar sesión para que\nWindows aplique los nuevos atajos.",
 	"dialog.gestures.auto_configure_error_title": "ErgoptiPlus — Error",
 	"dialog.gestures.auto_configure_error": "Error al escribir en el registro.\n\nIntente ejecutar el script como administrador,\no configúrelo manualmente (ver Instrucciones).",
 	"dialog.gestures.warning_title": "Advertencia de gestos",
-
 	"dialog.hotstrings.delete_title": "Eliminar expansor",
-
 	"dialog.llm.delete_title": "¿Eliminar modelo?",
 	"dialog.llm.delete_profile_prefix": "Eliminar \"",
-
 	"button.ok": "OK",
 	"button.cancel": "Cancelar",
 	"button.save": "Guardar",
@@ -226,7 +205,6 @@
 	"button.add": "Añadir",
 	"button.activate": "Activar",
 	"button.open_settings": "Abrir ajustes",
-
 	"gesture.slots.tap_3": "Toque 3 dedos",
 	"gesture.slots.swipe_3_up": "Deslizar 3 dedos ↑",
 	"gesture.slots.swipe_3_down": "Deslizar 3 dedos ↓",
@@ -237,7 +215,6 @@
 	"gesture.slots.swipe_4_down": "Deslizar 4 dedos ↓",
 	"gesture.slots.swipe_4_left": "Deslizar 4 dedos ←",
 	"gesture.slots.swipe_4_right": "Deslizar 4 dedos →",
-
 	"sg_actions.sg_order.header.mouse_nav": "#Ratón y Navegación",
 	"sg_actions.sg_order.header.edition": "#Edición",
 	"sg_actions.sg_order.header.keys": "#Teclas",
@@ -264,7 +241,6 @@
 	"sg_actions.sg_order.header.files": "#Archivos",
 	"sg_actions.sg_order.header.script": "#Gestión del Script",
 	"sg_actions.sg_order.header.debug": "#Depuración",
-
 	"sg_actions.none": "∅ Desactivado",
 	"sg_actions.left_click_toggle": "🖱 L Clic izquierdo (mant.)",
 	"sg_actions.right_click_toggle": "🖱 R Clic derecho (mant.)",
@@ -381,7 +357,6 @@
 	"sg_actions.open_window_spy": "Window Spy",
 	"sg_actions.open_list_vars": "Estado de variables",
 	"sg_actions.open_key_history": "Historial de teclas",
-
 	"ax_actions.tabs": "⧉ Pestañas",
 	"ax_actions.char": "A Letras",
 	"ax_actions.char_sel": "✎ A Sel. Letras",
@@ -418,11 +393,9 @@
 	"notify.script_control": "Control del script",
 	"notify.hotstrings": "Hotstrings",
 	"dialog.gestures.warning_msg": "⚠️ Atención: Activar los gestos del trackpad puede interferir con los gestos del sistema.\n\nPara evitar conflictos, desactive las siguientes opciones de macOS:\n\n• Gestos de trackpad con 2 dedos: desactivar desplazamiento y deslizamientos si desea usarlos en Hammerspoon.\n• Gestos de trackpad con 3 dedos para mover ventanas y seleccionar texto\n• Toque con 3 dedos para buscar palabras en el diccionario\n• Deslizamiento horizontal/vertical con 3 dedos para cambiar de espacio, activar App Exposé o Mission Control\n• Deslizamiento horizontal/vertical con 4 dedos para cambiar de espacio, activar App Exposé o Mission Control\n\nEs importante desactivar los gestos del sistema de 4 dedos para poder definir gestos de 5 dedos. De lo contrario, macOS no distinguiría entre ellos e impediría que los gestos de 5 dedos funcionen.",
-
 	"button.retry": "Reintentar",
 	"button.encrypt": "Cifrar",
 	"button.decrypt": "Descifrar",
-
 	"dialog.hotstrings.delete_body": "¿Está seguro de que desea eliminar este expansor personalizado?",
 	"dialog.hotstrings.new_title": "Nuevo expansor de palabras",
 	"dialog.hotstrings.new_prompt": "Introduzca el carácter desencadenador (exactamente un carácter):",
@@ -432,11 +405,9 @@
 	"dialog.hotstrings.consume_body": "¿Debe consumirse el carácter desencadenador (no escribirse) durante la expansión?",
 	"dialog.hotstrings.consume_no": "No — escribir el carácter",
 	"dialog.hotstrings.consume_yes": "Sí — consumirlo",
-
 	"menu.shortcuts.chatgpt_url_item": "   ↳ Editar URL de ChatGPT…",
 	"dialog.shortcuts.chatgpt_title": "URL de ChatGPT",
 	"dialog.shortcuts.chatgpt_prompt": "URL abierta por Ctrl+G:",
-
 	"menu.karabiner.status_active": "🟢 Karabiner activo",
 	"menu.karabiner.status_priming": "🔵 Karabiner — iniciando…",
 	"menu.karabiner.status_not_primed": "🟡 Karabiner habilitado — reglas no aplicadas (clic para iniciar)",
@@ -460,7 +431,6 @@
 	"menu.karabiner.sticky_dialog_prompt": "Retardo de cancelación sticky (milisegundos)\nTras este tiempo sin pulsación, el modificador one-shot se cancela.",
 	"menu.karabiner.simultaneous_dialog_title": "Karabiner — Retardo de activación de combo",
 	"menu.karabiner.simultaneous_dialog_prompt": "Retardo máximo (milisegundos) entre la 1ª\ny 2ª tecla de un acceso directo para activar el slot \"Combo\".\n\n(predeterminado: %d ms)",
-
 	"menu.metrics.encrypt_toggle": "Cifrar registros en disco (Seguridad)",
 	"dialog.metrics.progress_label": "Procesando: %d / %d",
 	"dialog.metrics.complete_label": "Operación completada.\n\nArchivos procesados correctamente: %d\nErrores: %d",
@@ -477,7 +447,6 @@
 	"dialog.metrics.security_warning_body": "⚠️  ATENCIÓN: Las métricas y el keylogger están a punto de activarse.\n\nEste sistema registra sus pulsaciones y activaciones de gestos del trackpad.\n\n• Los registros se almacenan en la carpeta Hammerspoon\n• Los campos de contraseña se ignoran automáticamente\n• Se recomienda PAUSAR el script al introducir datos sensibles\n\nPara evitar interferencias con sus gestos personalizados:\n• Elimine los gestos de deslizamiento macOS de 3/4 dedos si se usan\n• Desactive Mission Control y App Exposé mediante gestos",
 	"menu.hotstrings.custom_label": "Personalizado",
 	"menu.hotstrings.consumed": "consumido",
-
 	"ui_typing.title": "Métricas de escritura",
 	"ui_typing.label_from": "Desde:",
 	"ui_typing.label_to": "Hasta:",
@@ -526,7 +495,6 @@
 	"ui_typing.search_close": "Cerrar (Esc)",
 	"ui_typing.page_loading": "Cargando interfaz...",
 	"ui_typing.pinch_hint": "Pellizcar (trackpad) para zoom.",
-
 	"ui_apps.title": "Tiempo en aplicaciones",
 	"ui_apps.label_period": "Período:",
 	"ui_apps.label_date": "El:",
@@ -620,5 +588,80 @@
 	"ui_apps.modal_layouts": "Layouts usados",
 	"ui_apps.modal_records": "Récords",
 	"ui_apps.modal_hs_ai": "Hotstrings & IA",
-	"ui_apps.loading_data": "Cargando datos..."
+	"ui_apps.loading_data": "Cargando datos...",
+	"menu.paths.menu_item": "Carpeta de configuración…",
+	"menu.paths.window_title": "Carpeta de configuración — Ergopti",
+	"menu.paths.pick_prompt": "Seleccionar la carpeta de configuración",
+	"editor.hotstrings.meta_desc": "Hotstrings personales",
+	"editor.hotstrings.window_title": "Editor de hotstrings personales",
+	"editor.hotstrings.save_error": "Error al guardar",
+	"hs_config.window_title": "Retrasos y colores de los hotstrings",
+	"hs_config.cat_magickey": "Tecla ★ y expansión",
+	"hs_config.cat_autocorrection": "Autocorrección",
+	"hs_config.cat_rolls": "Rodamientos",
+	"hs_config.cat_sfbs": "Reducción de SFBs",
+	"hs_config.cat_distances": "Reducción de distancias",
+	"hs_config.cat_personal": "Hotstrings personales",
+	"hs_config.color_inherit": "— hereda el predeterminado —",
+	"hs_config.color_red": "Rojo (★)",
+	"hs_config.color_green": "Verde (auto)",
+	"hs_config.color_orange": "Naranja (rodamientos)",
+	"hs_config.color_blue": "Azul (personal)",
+	"hs_config.color_purple": "Violeta",
+	"hs_config.color_cyan": "Cian",
+	"hs_config.color_yellow": "Amarillo",
+	"hs_config.color_gray": "Gris",
+
+	"editor.hotstrings.label_section": "Sección:",
+	"editor.hotstrings.btn_new": "Nueva…",
+	"editor.hotstrings.btn_rename": "Renombrar…",
+	"editor.hotstrings.btn_delete": "Eliminar",
+	"editor.hotstrings.col_trigger": "Disparador",
+	"editor.hotstrings.col_result": "Resultado",
+	"editor.hotstrings.col_word": "Palabra",
+	"editor.hotstrings.col_auto": "Auto",
+	"editor.hotstrings.col_case": "Mayús.",
+	"editor.hotstrings.col_final": "Final",
+	"editor.hotstrings.label_trigger": "Disparador:",
+	"editor.hotstrings.label_result": "Resultado:",
+	"editor.hotstrings.chk_word": "Palabra completa",
+	"editor.hotstrings.chk_case": "Distinguir mayúsculas",
+	"editor.hotstrings.chk_final": "Resultado final",
+	"editor.hotstrings.btn_add": "➕ Añadir",
+	"editor.hotstrings.chk_close_after": "Cerrar después",
+	"editor.hotstrings.group_selected": "Hotstring seleccionado",
+	"editor.hotstrings.btn_edit": "💾 Editar",
+	"editor.hotstrings.btn_delete_entry": "🗑 Eliminar",
+	"editor.hotstrings.no_section": "(ninguna sección)",
+	"editor.hotstrings.err_write": "⚠ Error de escritura en personal_hotstrings.toml.",
+	"editor.hotstrings.saved_prefix": "✓ Guardado — ",
+	"editor.hotstrings.err_trigger_required": "⚠ El disparador y el resultado son obligatorios.",
+	"editor.hotstrings.err_no_section": "⚠ Seleccione o cree una sección primero.",
+	"editor.hotstrings.err_duplicate": "⚠ Este disparador ya existe en esta sección.",
+	"editor.hotstrings.err_select_to_edit": "⚠ Seleccione un hotstring para editar.",
+	"editor.hotstrings.err_select_to_delete": "⚠ Seleccione un hotstring para eliminar.",
+	"editor.hotstrings.title_confirm": "Confirmación",
+	"editor.hotstrings.title_error": "Error",
+	"editor.hotstrings.new_section_title": "Nueva sección",
+	"editor.hotstrings.new_section_prompt": "Nombre de la nueva sección (identificador, sin espacios):",
+	"editor.hotstrings.err_section_exists": "Esta sección ya existe.",
+	"editor.hotstrings.desc_title": "Descripción",
+	"editor.hotstrings.desc_prompt": "Descripción mostrada en el menú para esta sección:",
+	"editor.hotstrings.err_no_section_selected": "Ninguna sección seleccionada.",
+	"editor.hotstrings.rename_title": "Renombrar",
+
+	"hs_config.file_level": "── Nivel archivo ──",
+	"hs_config.btn_all_gray": "Todo en gris",
+	"hs_config.btn_reset_all": "Restablecer todo",
+	"hs_config.btn_close": "Cerrar",
+	"hs_config.label_category": "Categoría:",
+	"hs_config.label_section": "Sección:",
+	"hs_config.label_delay": "Retraso (ms):",
+	"hs_config.label_color": "Color:",
+	"hs_config.default_prefix": "Predeterminado: ",
+	"hs_config.override_active": "override activo",
+	"hs_config.none": "(ninguno)",
+	"hs_config.category_prefix": "Categoría: ",
+	"hs_config.section_prefix": "Sección: ",
+	"hs_config.file_level_short": "(nivel archivo)"
 }

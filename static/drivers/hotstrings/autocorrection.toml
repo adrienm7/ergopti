@@ -7,7 +7,7 @@
 [_meta]
 color = "#43a047"
 delay = 1.0
-description = "Autocorrection"
+description = { fr = "Autocorrection", en = "Autocorrection", de = "Autokorrektur", es = "Autocorrección", zh = "自动纠错" }
 sections_order = ["accents", "names", "caps", "-", "typographicapostrophe", "-", "errors", "ou", "multiplepunctuationmarks", "suffixesachaining", "-", "minus", "minusapostrophe"]
 
 
@@ -17,16 +17,16 @@ sections_order = ["accents", "names", "caps", "-", "typographicapostrophe", "-",
 # =========================
 
 [_meta.sections]
-accents = "Autocorrection des accents de très nombreux mots"
-caps = "Majuscules automatiques : chatgpt = ChatGPT, powerpoint = PowerPoint, …"
-errors = "Correction de certaines fautes de frappe : OUi = Oui, aeu = eau, …"
-minus = "Évite de devoir taper des tirets : aije = ai-je, atil = a-t-il, … "
-minusapostrophe = "L’apostrophe agit comme un tiret : ai'je = ai-je, a't'il = a-t-il, … "
-multiplepunctuationmarks = "Taper \"!\" ou \"?\" plusieurs fois d’affilée n’ajoute pas d’espace insécable entre chaque caractère"
-names = "Autocorrection des accents sur les prénoms et les noms de pays : alexei = Alexeï, taiwan = Taïwan, …"
-ou = "Taper [où ] puis un point ou une virgule supprime automatiquement l’espace ajouté avant"
-suffixesachaining = "Enchaîner plusieurs fois des suffixes, comme aim|able|ement = aimablement"
-typographicapostrophe = "L’apostrophe devient typographique lors de l’écriture de texte : m'a = m’a, it's = it’s, …"
+accents = { fr = "Autocorrection des accents de très nombreux mots", en = "Accent autocorrection for a large number of words", de = "Akzent-Autokorrektur für sehr viele Wörter", es = "Autocorrección de acentos de muchísimas palabras", zh = "对大量单词进行重音自动更正" }
+caps = { fr = "Majuscules automatiques : chatgpt = ChatGPT, powerpoint = PowerPoint, …", en = "Auto capitalisation: chatgpt = ChatGPT, powerpoint = PowerPoint, …", de = "Automatische Großschreibung: chatgpt = ChatGPT, powerpoint = PowerPoint, …", es = "Mayúsculas automáticas: chatgpt = ChatGPT, powerpoint = PowerPoint, …", zh = "自动大写：chatgpt = ChatGPT，powerpoint = PowerPoint，…" }
+errors = { fr = "Correction de certaines fautes de frappe : OUi = Oui, aeu = eau, …", en = "Correction of certain typos: OUi = Oui, aeu = eau, …", de = "Korrektur bestimmter Tippfehler: OUi = Oui, aeu = eau, …", es = "Corrección de ciertos errores tipográficos: OUi = Oui, aeu = eau, …", zh = "纠正某些打字错误：OUi = Oui，aeu = eau，…" }
+minus = { fr = "Évite de devoir taper des tirets : aije = ai-je, atil = a-t-il, …", en = "Avoids typing hyphens: aije = ai-je, atil = a-t-il, …", de = "Vermeidet das Tippen von Bindestrichen: aije = ai-je, atil = a-t-il, …", es = "Evita escribir guiones: aije = ai-je, atil = a-t-il, …", zh = "避免输入连字符：aije = ai-je，atil = a-t-il，…" }
+minusapostrophe = { fr = "L’apostrophe agit comme un tiret : ai’je = ai-je, a’t’il = a-t-il, …", en = "Apostrophe acts as a hyphen: ai’je = ai-je, a’t’il = a-t-il, …", de = "Apostroph wirkt als Bindestrich: ai’je = ai-je, a’t’il = a-t-il, …", es = "El apóstrofo actúa como guion: ai’je = ai-je, a’t’il = a-t-il, …", zh = "撇号充当连字符：ai’je = ai-je，a’t’il = a-t-il，…" }
+multiplepunctuationmarks = { fr = "Taper \"!\" ou \"?\" plusieurs fois d’affilée n’ajoute pas d’espace insécable entre chaque caractère", en = "Typing \"!\" or \"?\" multiple times in a row does not insert a non-breaking space between each character", de = "Mehrfaches Tippen von \"!\" oder \"?\" fügt kein geschütztes Leerzeichen zwischen die Zeichen ein", es = "Escribir \"!\" o \"?\" varias veces seguidas no añade espacio de no separación entre cada carácter", zh = "连续输入 \"!\" 或 \"?\" 不会在每个字符间插入不间断空格" }
+names = { fr = "Autocorrection des accents sur les prénoms et les noms de pays : alexei = Alexeï, taiwan = Taïwan, …", en = "Accent autocorrection for first names and country names: alexei = Alexeï, taiwan = Taïwan, …", de = "Akzent-Autokorrektur für Vornamen und Ländernamen: alexei = Alexeï, taiwan = Taïwan, …", es = "Autocorrección de acentos en nombres de pila y de países: alexei = Alexeï, taiwan = Taïwan, …", zh = "人名和国名的重音自动更正：alexei = Alexeï，taiwan = Taïwan，…" }
+ou = { fr = "Taper [où ] puis un point ou une virgule supprime automatiquement l’espace ajouté avant", en = "Typing [où ] then a period or comma automatically removes the previously added space", de = "Tippen von [où ] gefolgt von Punkt oder Komma entfernt automatisch das zuvor eingefügte Leerzeichen", es = "Escribir [où ] y luego un punto o coma elimina automáticamente el espacio añadido", zh = "输入 [où ] 后接句号或逗号，自动删除前面添加的空格" }
+suffixesachaining = { fr = "Enchaîner plusieurs fois des suffixes, comme aim|able|ement = aimablement", en = "Chain multiple suffixes, e.g. aim|able|ement = aimablement", de = "Mehrere Suffixe verketten, z.B. aim|able|ement = aimablement", es = "Encadenar varios sufijos, como aim|able|ement = aimablement", zh = "连接多个后缀，如 aim|able|ement = aimablement" }
+typographicapostrophe = { fr = "L’apostrophe devient typographique lors de l’écriture de texte : m’a = m’a, it’s = it’s, …", en = "Apostrophe becomes typographic while typing text: m’a = m’a, it’s = it’s, …", de = "Apostroph wird beim Schreiben typografisch: m’a = m’a, it’s = it’s, …", es = "El apóstrofo se vuelve tipográfico al escribir texto: m’a = m’a, it’s = it’s, …", zh = "书写时撇号变为印刷体：m’a = m’a，it’s = it’s，…" }
 
 
 

@@ -135,7 +135,7 @@ ReadPersonalToml() {
     Result := Map(
         "sections_order", [],
         "sections", Map(),
-        "meta_description", "Hotstrings personnels",
+        "meta_description", t("editor.hotstrings.meta_desc"),
     )
     if !FileExist(FilePath) {
         return Result
@@ -256,7 +256,7 @@ WritePersonalToml(Data) {
     Q := Chr(34)
     Lines := []
 
-    MetaDesc := Data.Has("meta_description") ? Data["meta_description"] : "Hotstrings personnels"
+    MetaDesc := Data.Has("meta_description") ? Data["meta_description"] : t("editor.hotstrings.meta_desc")
     Lines.Push("[_meta]")
     Lines.Push("description = " . Q . EscapeTomlValue(MetaDesc) . Q)
 
@@ -527,17 +527,17 @@ OpenPersonalEditor(DefaultSection := "") {
     }
     _PersonalEditorSection := TargetSection
 
-    W := Gui("+Resize +MinSize700x560", "Éditeur de hotstrings personnels")
+    W := Gui("+Resize +MinSize700x560", t("editor.hotstrings.window_title"))
     W.SetFont("s10", "Segoe UI")
     W.MarginX := 12
     W.MarginY := 10
 
     ; ── Top bar: section selector + section management buttons ──
-    W.Add("Text", "xm y12 w70 h24 +0x200", "Section :")
+    W.Add("Text", "xm y12 w70 h24 +0x200", t("editor.hotstrings.label_section"))
     SectionDrop := W.Add("DropDownList", "x+6 yp w420", _BuildSectionList(_PersonalEditorData))
-    W.Add("Button", "x+8 yp w90 h24", "Nouvelle…").OnEvent("Click", (*) => _NewSection(W, SectionDrop))
-    W.Add("Button", "x+4 yp w90 h24", "Renommer…").OnEvent("Click", (*) => _RenameSection(W, SectionDrop))
-    BtnDelSec := W.Add("Button", "x+4 yp w90 h24", "Supprimer")
+    W.Add("Button", "x+8 yp w90 h24", t("editor.hotstrings.btn_new")).OnEvent("Click", (*) => _NewSection(W, SectionDrop))
+    W.Add("Button", "x+4 yp w90 h24", t("editor.hotstrings.btn_rename")).OnEvent("Click", (*) => _RenameSection(W, SectionDrop))
+    BtnDelSec := W.Add("Button", "x+4 yp w90 h24", t("editor.hotstrings.btn_delete"))
     BtnDelSec.OnEvent("Click", (*) => _DeleteSection(W, SectionDrop))
 
     _SelectDropDown(SectionDrop, _PersonalEditorSection)
@@ -545,7 +545,7 @@ OpenPersonalEditor(DefaultSection := "") {
     ; ── Entry list ──
     LV := W.Add("ListView",
         "xm y+10 w860 r12 -Multi +LV0x10000",
-        ["Déclencheur", "Résultat", "Mot", "Auto", "Casse", "Final"])
+        [t("editor.hotstrings.col_trigger"), t("editor.hotstrings.col_result"), t("editor.hotstrings.col_word"), t("editor.hotstrings.col_auto"), t("editor.hotstrings.col_case"), t("editor.hotstrings.col_final")])
     LV.ModifyCol(1, 160)
     LV.ModifyCol(2, 490)
     LV.ModifyCol(3, 45)
@@ -565,23 +565,23 @@ OpenPersonalEditor(DefaultSection := "") {
     ; OutputEdit h=62, flags block h=92 → flags start at TriggerEdit top = OutputEdit top - 28.
     ; In AHK v2 yp after OutputEdit = OutputEdit top, so flags at yp-28 = TriggerEdit top.
 
-    W.Add("Text", "xm y+10 w90 h22 +0x200", "Déclencheur :")
+    W.Add("Text", "xm y+10 w90 h22 +0x200", t("editor.hotstrings.label_trigger"))
     TriggerEdit := W.Add("Edit", "x108 yp w520 h22")
-    W.Add("Text", "xm y+6  w90 h22 +0x200", "Résultat :")
+    W.Add("Text", "xm y+6  w90 h22 +0x200", t("editor.hotstrings.label_result"))
     OutputEdit := W.Add("Edit", "x108 yp w520 h62 +Multi +WantReturn")
 
     ; Flags — placed to the right of TriggerEdit, anchored at TriggerEdit top via yp
     TriggerEdit.GetPos(, &TrigY)
-    ChkIsWord := W.Add("CheckBox", "x644 y" . TrigY . " w180", "Mot complet")
+    ChkIsWord := W.Add("CheckBox", "x644 y" . TrigY . " w180", t("editor.hotstrings.chk_word"))
     ChkAutoExp := W.Add("CheckBox", "x644 y+11 w180", "Auto-expand")
-    ChkCaseSens := W.Add("CheckBox", "x644 y+11 w180", "Sensible à la casse")
-    ChkFinal := W.Add("CheckBox", "x644 y+11 w180", "Résultat final")
+    ChkCaseSens := W.Add("CheckBox", "x644 y+11 w180", t("editor.hotstrings.chk_case"))
+    ChkFinal := W.Add("CheckBox", "x644 y+11 w180", t("editor.hotstrings.chk_final"))
     ChkAutoExp.Value := 1
 
     ; ── Créer — bouton + checkbox alignés, avant le séparateur ──
     OutputEdit.GetPos(, &OutY, , &OutH)
-    BtnAdd := W.Add("Button", "xm y" . (OutY + OutH + 10) . " w110 h26", "➕ Ajouter")
-    CloseOnAddChk := W.Add("CheckBox", "x+10 yp+5 w120", "Fermer après")
+    BtnAdd := W.Add("Button", "xm y" . (OutY + OutH + 10) . " w110 h26", t("editor.hotstrings.btn_add"))
+    CloseOnAddChk := W.Add("CheckBox", "x+10 yp+5 w120", t("editor.hotstrings.chk_close_after"))
     CloseOnAddChk.Value := (_EditorPrefGet("CloseOnAdd", "0") == "1") ? 1 : 0
 
     ; Token help — à droite du bouton Ajouter, aligné verticalement au centre
@@ -595,10 +595,10 @@ OpenPersonalEditor(DefaultSection := "") {
     SepCtrl.GetPos(, &SepY, , &SepH)
     RowY := SepY + SepH + 8
 
-    GB2 := W.Add("GroupBox", "xm y" . RowY . " w240 h54", "Hotstring sélectionné")
+    GB2 := W.Add("GroupBox", "xm y" . RowY . " w240 h54", t("editor.hotstrings.group_selected"))
     GB2.GetPos(&GB2X, &GB2Y)
-    BtnSave := W.Add("Button", "x" . (GB2X + 10) . " y" . (GB2Y + 22) . " w106 h26", "💾 Modifier")
-    BtnDel := W.Add("Button", "x" . (GB2X + 122) . " y" . (GB2Y + 22) . " w106 h26", "🗑 Supprimer")
+    BtnSave := W.Add("Button", "x" . (GB2X + 10) . " y" . (GB2Y + 22) . " w106 h26", t("editor.hotstrings.btn_edit"))
+    BtnDel := W.Add("Button", "x" . (GB2X + 122) . " y" . (GB2Y + 22) . " w106 h26", t("editor.hotstrings.btn_delete_entry"))
 
     ; ── Status bar ──
     StatusText := W.Add("Text", "xm y+10 w860 h20 cGray", "")
@@ -639,7 +639,7 @@ _BuildSectionList(Data) {
         List.Push(Desc)
     }
     if List.Length == 0 {
-        List.Push("(aucune section)")
+        List.Push(t("editor.hotstrings.no_section"))
     }
     return List
 }
@@ -743,7 +743,7 @@ _BuildEntry(TriggerEdit, OutputEdit, ChkIsWord, ChkAutoExp, ChkCaseSens, ChkFina
 _SaveData(W, LV, StatusText) {
     global _PersonalEditorData, _PersonalEditorSection
     if !WritePersonalToml(_PersonalEditorData) {
-        StatusText.Value := "⚠ Erreur d’écriture dans personal_hotstrings.toml."
+        StatusText.Value := t("editor.hotstrings.err_write")
         return false
     }
     FeatureConfig := { TimeActivationSeconds: 0 }
@@ -752,7 +752,7 @@ _SaveData(W, LV, StatusText) {
     }
     ReloadPersonalSection(_PersonalEditorData, _PersonalEditorSection, FeatureConfig)
     _PopulateList(LV, _PersonalEditorData, _PersonalEditorSection)
-    StatusText.Value := "✓ Sauvegardé — " . A_Now
+    StatusText.Value := t("editor.hotstrings.saved_prefix") . A_Now
     return true
 }
 
@@ -761,17 +761,17 @@ _AddEntry(W, LV, TriggerEdit, OutputEdit, ChkIsWord, ChkAutoExp, ChkCaseSens, Ch
     T := Trim(TriggerEdit.Value)
     O := Trim(OutputEdit.Value)
     if (T == "" or O == "") {
-        StatusText.Value := "⚠ Le déclencheur et le résultat sont obligatoires."
+        StatusText.Value := t("editor.hotstrings.err_trigger_required")
         return
     }
     if (_PersonalEditorSection == "") {
-        StatusText.Value := "⚠ Sélectionnez ou créez une section d’abord."
+        StatusText.Value := t("editor.hotstrings.err_no_section")
         return
     }
     ; Check for duplicate trigger in this section
     for _, E in _PersonalEditorData["sections"][_PersonalEditorSection]["entries"] {
         if (E["trigger"] == T) {
-            StatusText.Value := "⚠ Ce déclencheur existe déjà dans cette section."
+            StatusText.Value := t("editor.hotstrings.err_duplicate")
             return
         }
     }
@@ -789,13 +789,13 @@ _SaveEntry(W, LV, TriggerEdit, OutputEdit, ChkIsWord, ChkAutoExp, ChkCaseSens, C
     global _PersonalEditorData, _PersonalEditorSection
     Row := LV.GetNext(0)
     if !Row {
-        StatusText.Value := "⚠ Sélectionnez un hotstring à modifier."
+        StatusText.Value := t("editor.hotstrings.err_select_to_edit")
         return
     }
     T := Trim(TriggerEdit.Value)
     O := Trim(OutputEdit.Value)
     if (T == "" or O == "") {
-        StatusText.Value := "⚠ Le déclencheur et le résultat sont obligatoires."
+        StatusText.Value := t("editor.hotstrings.err_trigger_required")
         return
     }
     Entries := _PersonalEditorData["sections"][_PersonalEditorSection]["entries"]
@@ -812,7 +812,7 @@ _DeleteEntry(W, LV, StatusText) {
     global _PersonalEditorData, _PersonalEditorSection
     Row := LV.GetNext(0)
     if !Row {
-        StatusText.Value := "⚠ Sélectionnez un hotstring à supprimer."
+        StatusText.Value := t("editor.hotstrings.err_select_to_delete")
         return
     }
     Entries := _PersonalEditorData["sections"][_PersonalEditorSection]["entries"]
@@ -821,8 +821,8 @@ _DeleteEntry(W, LV, StatusText) {
     }
     E := Entries[Row]
     Confirm := MsgBox(
-        "Supprimer `"" . E["trigger"] . "`" → `"" . E["output"] . "`" ?",
-        "Confirmation", "YesNo Icon?"
+        t("editor.hotstrings.btn_delete") . " `"" . E["trigger"] . "`" → `"" . E["output"] . "`" ?",
+        t("editor.hotstrings.title_confirm"), "YesNo Icon?"
     )
     if Confirm != "Yes" {
         return
@@ -843,17 +843,17 @@ _OnSectionChange(SectionDrop, LV, TriggerEdit, OutputEdit, ChkIsWord, ChkAutoExp
 
 _NewSection(W, SectionDrop) {
     global _PersonalEditorData, _PersonalEditorSection
-    Res := InputBox("Nom de la nouvelle section (identifiant, sans espaces) :", "Nouvelle section", "w300 h120")
+    Res := InputBox(t("editor.hotstrings.new_section_prompt"), t("editor.hotstrings.new_section_title"), "w300 h120")
     if Res.Result != "OK" or Trim(Res.Value) == "" {
         return
     }
     SecName := StrLower(Trim(Res.Value))
     SecName := RegExReplace(SecName, "[^a-z0-9_]", "_")
     if _PersonalEditorData["sections"].Has(SecName) {
-        MsgBox("Cette section existe déjà.", "Erreur", "Icon!")
+        MsgBox(t("editor.hotstrings.err_section_exists"), t("editor.hotstrings.title_error"), "Icon!")
         return
     }
-    Res2 := InputBox("Description affichée dans le menu pour cette section :", "Description", "w300 h120", SecName)
+    Res2 := InputBox(t("editor.hotstrings.desc_prompt"), t("editor.hotstrings.desc_title"), "w300 h120", SecName)
     if Res2.Result != "OK" {
         return
     }
@@ -878,13 +878,13 @@ _NewSection(W, SectionDrop) {
 _RenameSection(W, SectionDrop) {
     global _PersonalEditorData, _PersonalEditorSection
     if (_PersonalEditorSection == "") {
-        MsgBox("Aucune section sélectionnée.", "Erreur", "Icon!")
+        MsgBox(t("editor.hotstrings.err_no_section_selected"), t("editor.hotstrings.title_error"), "Icon!")
         return
     }
     OldDesc := _PersonalEditorData["sections"].Has(_PersonalEditorSection)
         ? _PersonalEditorData["sections"][_PersonalEditorSection]["description"]
         : _PersonalEditorSection
-    Res := InputBox("Nouvelle description pour la section `"" . _PersonalEditorSection . "`" :", "Renommer",
+    Res := InputBox("Nouvelle description pour la section `"" . _PersonalEditorSection . "`" :", t("editor.hotstrings.rename_title"),
         "w300 h120", OldDesc)
     if Res.Result != "OK" or Trim(Res.Value) == "" {
         return
@@ -898,15 +898,15 @@ _RenameSection(W, SectionDrop) {
 _DeleteSection(W, SectionDrop) {
     global _PersonalEditorData, _PersonalEditorSection
     if (_PersonalEditorSection == "") {
-        MsgBox("Aucune section sélectionnée.", "Erreur", "Icon!")
+        MsgBox(t("editor.hotstrings.err_no_section_selected"), t("editor.hotstrings.title_error"), "Icon!")
         return
     }
     EntryCount := _PersonalEditorData["sections"].Has(_PersonalEditorSection)
         ? _PersonalEditorData["sections"][_PersonalEditorSection]["entries"].Length
         : 0
     Confirm := MsgBox(
-        "Supprimer la section `"" . _PersonalEditorSection . "`" et ses " . EntryCount . " entrée(s) ?",
-        "Confirmation", "YesNo Icon?"
+        t("editor.hotstrings.btn_delete") . " `"" . _PersonalEditorSection . "`" (" . EntryCount . ") ?",
+        t("editor.hotstrings.title_confirm"), "YesNo Icon?"
     )
     if Confirm != "Yes" {
         return

@@ -180,9 +180,42 @@ local function parse_entry(line)
 	}
 end
 
---- Parses a plain key equals value line where the value is a quoted string.
+--- Parses a TOML inline table whose values are all double-quoted strings.
+--- Expected format: { key = "val", key2 = "val2", … }
+--- @param s string The input string.
+--- @param i number The starting index (must point at '{').
+--- @return table|nil, number Returns parsed table and next index, or nil on failure.
+local function parse_inline_string_table(s, i)
+	if type(s) ~= "string" or s:sub(i, i) ~= "{" then return nil, i end
+	local result = {}
+	i = skip_ws(s, i + 1)
+	while i <= #s do
+		if s:sub(i, i) == "}" then
+			return result, i + 1
+		end
+		if s:sub(i, i) == "," then
+			i = skip_ws(s, i + 1)
+		end
+		-- Parse the key (unquoted identifier)
+		local ks = i
+		while i <= #s and s:sub(i, i):match("[%w_%-]") do i = i + 1 end
+		local key = s:sub(ks, i - 1)
+		if key == "" then return nil, ks end
+		i = skip_ws(s, i)
+		if s:sub(i, i) ~= "=" then return nil, ks end
+		i = skip_ws(s, i + 1)
+		if s:sub(i, i) ~= "\"" then return nil, ks end
+		local val, ni = parse_dq_string(s, i)
+		if not val then return nil, ks end
+		result[key] = val
+		i = skip_ws(s, ni)
+	end
+	return nil, i
+end
+
+--- Parses a plain key equals value line where the value is a quoted string or inline table.
 --- @param line string The line to parse.
---- @return string|nil, string|nil Returns key and value.
+--- @return string|nil, string|table|nil Returns key and value.
 local function parse_kv_string(line)
 	if type(line) ~= "string" then return nil, nil end
 
@@ -203,6 +236,10 @@ local function parse_kv_string(line)
 	if line:sub(i, i) ~= "=" then return nil, nil end
 
 	i = skip_ws(line, i + 1)
+	if line:sub(i, i) == "{" then
+		local tbl = select(1, parse_inline_string_table(line, i))
+		return key, tbl
+	end
 	if line:sub(i, i) ~= "\"" then return nil, nil end
 
 	local val = select(1, parse_dq_string(line, i))
@@ -234,7 +271,10 @@ local function parse_kv_value(line)
 	i = skip_ws(line, i + 1)
 
 	local c = line:sub(i, i)
-	if c == "\"" then
+	if c == "{" then
+		local tbl = select(1, parse_inline_string_table(line, i))
+		return key, tbl
+	elseif c == "\"" then
 		local val = select(1, parse_dq_string(line, i))
 		return key, val
 	elseif line:sub(i, i + 3) == "true" then
@@ -373,7 +413,7 @@ function M.parse(path)
 					result.meta.sections_order = parse_string_array(arr_val)
 				else
 					local key, val = parse_kv_value(line)
-					if key == "description" and type(val) == "string" then
+					if key == "description" and (type(val) == "string" or type(val) == "table") then
 						result.meta.description = val
 					elseif key == "delay" and type(val) == "number" then
 						result.meta.delay = val
@@ -397,7 +437,7 @@ function M.parse(path)
 				local key, val = parse_kv_value(line)
 				if key then
 					local entry = ensure_meta_section(current_meta_sec)
-					if key == "description" and type(val) == "string" then
+					if key == "description" and (type(val) == "string" or type(val) == "table") then
 						entry.description = val
 						if result.sections[current_meta_sec] then
 							result.sections[current_meta_sec].description = val
