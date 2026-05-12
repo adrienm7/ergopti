@@ -204,7 +204,8 @@ global ScriptInformation := Map(
     ; sync. Shared neutral files (hotstrings TOML, personal info) stay
     ; at the root of _ConfigDir.
     "PersonalAhkPath", _ConfigDir . "ahk\personal_shortcuts.ahk",
-    "PersonalTomlPath", _ConfigDir . "personal_hotstrings.toml",
+    "PersonalTomlPath", _ConfigDir . "hotstrings\personal_hotstrings.toml",
+    "PersonalHotstringsDir", _ConfigDir . "hotstrings\",
     "PersonalInfoTomlPath", _ConfigDir . "personal_info.toml",
 )
 
@@ -1193,6 +1194,11 @@ initMenu() {
     }
 
     ; ── Hotstrings ⚡ — single submenu grouping all hotstring categories ──
+    ; Layout mirrors Hammerspoon builder.lua:
+    ;   1. Global toggle + separator
+    ;   2. Paramètres (config items) + separator
+    ;   3. "— Hotstrings communs —" header + common TOML groups + dynamic
+    ;   4. Separator + "— Hotstrings personnels —" header + personal TOML(s) + extensions
     HotstringsMenu := Menu()
     HotstringsAllEnabled := IsCategoryAllEnabled(HotstringCategories)
     AddCategoryToggleItem(HotstringsMenu,
@@ -1200,6 +1206,29 @@ initMenu() {
         "❌ Hotstrings désactivés (cliquer pour activer)",
         HotstringsAllEnabled,
         HotstringsAllEnabled ? ToggleAllHotstringsOff : ToggleAllHotstringsOn)
+    HotstringsMenu.Add() ; Separator after global toggle
+
+    ; 1. Paramètres — mirrors HS "⚙️ Paramètres hotstrings" at the top
+    HotstringsMenu.Add("Délais et couleurs des hotstrings…",
+        (*) => OpenHotstringsConfigWindow())
+    HotstringsMenu.Add("Touche magique : " . ScriptInformation["MagicKey"], MagicKeyEditor)
+    HotstringsMenu.Add("Modifier le lien ouvert par Win + G", GPTLinkEditor)
+    HotstringsMenu.Add() ; Separator after paramètres block
+
+    ; 2. Common hotstring groups with a disabled header
+    CommonTotal := 0
+    for _CCat in HotstringCategories {
+        CommonTotal += CountTomlHotstrings(_CCat)
+    }
+    for _DSec in Features["DynamicHotstrings"]["__Order"] {
+        if (_DSec != "-" and Features["DynamicHotstrings"].Has(_DSec)
+        and Features["DynamicHotstrings"][_DSec].Enabled) {
+            CommonTotal += CountDynamicSection(_DSec)
+        }
+    }
+    CommonHeader := "— Hotstrings communs" . (CommonTotal > 0 ? " (" . FmtCount(CommonTotal) . ")" : "") . " —"
+    HotstringsMenu.Add(CommonHeader, (*) => NoAction())
+    HotstringsMenu.Disable(CommonHeader)
     for Category in HotstringCategories {
         if SubMenus.Has(Category) {
             Total := CountTomlHotstrings(Category)
@@ -1208,8 +1237,6 @@ initMenu() {
         }
     }
     ; Dynamic hotstrings — date insertion and future rule-based expansions.
-    ; Mirrors HS build_custom's dynamichotstrings group: one item per section
-    ; (currently only "date") with an enable/disable checkbox.
     if Features.Has("DynamicHotstrings") and SubMenus.Has("DynamicHotstrings") {
         DynMenu := SubMenus["DynamicHotstrings"]
         DynTotal := 0
@@ -1224,28 +1251,50 @@ initMenu() {
         HotstringsMenu.Add(DynTitle, DynMenu)
     }
 
-    ; Personal hotstrings — unified submenu that mirrors HS build_custom layout:
-    ; editor button + shortcut hint up top, then per-section toggle checkboxes
-    ; with hotstring counts, replacing the old separate editor-only submenu.
+    ; 3. Personal/custom hotstrings — separator + disabled header + entries
+    ; personal_hotstrings.toml first, then extra TOMLs from hotstrings\ folder alphabetically.
+    TotalPersonal := 0
     if Features.Has("Personal") {
         ; Read personal_hotstrings.toml once to get section order, descriptions, and counts
         TomlData := ReadPersonalToml()
-        ; Enrich Features["Personal"] descriptions with entry counts so that
-        ; MenuAddItem / GetMenuTitleByPath display them alongside the checkbox
+        ; Enrich Features["Personal"] descriptions with entry counts
         for _, SecName in TomlData["sections_order"] {
             SecData := TomlData["sections"][SecName]
             Count := SecData["entries"].Length
             BaseDesc := SecData["description"]
-            ; Match lowercase TOML key to the PascalCase Features key
             for FeatKey in Features["Personal"] {
                 if (FeatKey != "__Order" and StrLower(FeatKey) == SecName) {
                     Features["Personal"][FeatKey].Description := BaseDesc . " (" . FmtCount(Count) . ")"
                 }
             }
         }
-        ; Build the unified personal submenu
+        for _, SecData in TomlData["sections"] {
+            TotalPersonal += SecData["entries"].Length
+        }
+    }
+    ; Count extra extension TOMLs
+    ExtTomlFiles := []
+    if IsSet(ScriptInformation) and ScriptInformation.Has("PersonalHotstringsDir") {
+        HsDir := ScriptInformation["PersonalHotstringsDir"]
+        if DirExist(HsDir) {
+            Loop Files HsDir . "*.toml" {
+                if (A_LoopFileName != "personal_hotstrings.toml") {
+                    ExtTomlFiles.Push(A_LoopFileFullPath)
+                    for _, _ESec in _ParseExtTomlSections(A_LoopFileFullPath) {
+                        TotalPersonal += _ESec["count"]
+                    }
+                }
+            }
+        }
+    }
+    HotstringsMenu.Add() ; Separator before personal group
+    PersonalHeader := "— Hotstrings personnels" . (TotalPersonal > 0 ? " (" . FmtCount(TotalPersonal) . ")" : "") . " —"
+    HotstringsMenu.Add(PersonalHeader, (*) => NoAction())
+    HotstringsMenu.Disable(PersonalHeader)
+    if Features.Has("Personal") {
+        ; Build the unified personal submenu for personal_hotstrings.toml
         PersonalMenu := Menu()
-        PersonalMenu.Add("Ouvrir l'éditeur de hotstrings", (*) => OpenPersonalEditor())
+        PersonalMenu.Add("Ouvrir l’éditeur de hotstrings", (*) => OpenPersonalEditor())
         ; Shortcut item — not yet customisable from AHK (HS handles it on macOS)
         PersonalMenu.Add("Raccourci : Win + " . ScriptInformation["MagicKey"], (*) => NoAction())
         PersonalMenu.Disable("Raccourci : Win + " . ScriptInformation["MagicKey"])
@@ -1270,20 +1319,18 @@ initMenu() {
                 DefaultSectionMenu.Check(SecLabel)
             }
         }
-        ; Title reflects the currently selected section
         CurDefaultLabel := (CurDefaultSec == "") ? "Aucune"
             : (TomlData["sections"].Has(CurDefaultSec) ? TomlData["sections"][CurDefaultSec]["description"] :
                 CurDefaultSec)
         global _PrevDefaultLabel := CurDefaultLabel
         PersonalMenu.Add("Catégorie par défaut : " . CurDefaultLabel, DefaultSectionMenu)
-        ; Close-on-add toggle — mirrors HS "Fermer l'UI après ajout"
-        PersonalMenu.Add("Fermer l'UI après ajout d’un hotstring par le raccourci",
+        PersonalMenu.Add("Fermer l’UI après ajout d’un hotstring par le raccourci",
             (*) => _TogglePersonalCloseOnAdd(PersonalMenu))
         if (_EditorPrefGet("CloseOnAdd", "1") == "1") {
-            PersonalMenu.Check("Fermer l'UI après ajout d’un hotstring par le raccourci")
+            PersonalMenu.Check("Fermer l’UI après ajout d’un hotstring par le raccourci")
         }
         if (Features["Personal"].Has("__Order") and Features["Personal"]["__Order"].Length > 0) {
-            PersonalMenu.Add() ; Separating line
+            PersonalMenu.Add()
             for FeatName in Features["Personal"]["__Order"] {
                 if FeatName == "-" {
                     PersonalMenu.Add()
@@ -1292,45 +1339,39 @@ initMenu() {
                 }
             }
         }
-        ; Compute total count for the top-level category title
-        TotalPersonal := 0
+        PersonalCount := 0
         for _, SecData in TomlData["sections"] {
-            TotalPersonal += SecData["entries"].Length
+            PersonalCount += SecData["entries"].Length
         }
         PersonalTitle := GetCategoryTitle("Personal")
-        . (TotalPersonal > 0 ? " (" . FmtCount(TotalPersonal) . ")" : "")
+            . (PersonalCount > 0 ? " (" . FmtCount(PersonalCount) . ")" : "")
         HotstringsMenu.Add(PersonalTitle, PersonalMenu)
     }
-    HotstringsMenu.Add() ; Separating line
-    ; Hotstrings configuration window — per-group delay and tooltip color.
-    ; Edits the same shared override file consumed by Hammerspoon, so any
-    ; change here applies to both drivers at next reload.
-    HotstringsMenu.Add("Délais et couleurs des hotstrings…",
-        (*) => OpenHotstringsConfigWindow())
-    HotstringsMenu.Add() ; Separating line
-    ; Magic key editor — mirrors HS menu_hotstrings build_management placement
-    HotstringsMenu.Add("Touche magique : " . ScriptInformation["MagicKey"], MagicKeyEditor)
-    HotstringsMenu.Add("Modifier le lien ouvert par Win + G", GPTLinkEditor)
-    ; Compute grand total across all hotstring categories for the top-level menu title
-    GrandTotal := 0
-    for _GCat in HotstringCategories {
-        GrandTotal += CountTomlHotstrings(_GCat)
-    }
-    for _DSec in Features["DynamicHotstrings"]["__Order"] {
-        if (_DSec != "-" and Features["DynamicHotstrings"].Has(_DSec)
-        and Features["DynamicHotstrings"][_DSec].Enabled) {
-            GrandTotal += CountDynamicSection(_DSec)
+    ; Extension TOML files — one submenu entry per file, alphabetically sorted
+    for _, ExtPath in ExtTomlFiles {
+        SplitPath ExtPath, &ExtFileName, , , &ExtStem
+        ExtSections := _ParseExtTomlSections(ExtPath)
+        ExtCount := 0
+        for _, _ES in ExtSections {
+            ExtCount += _ES["count"]
         }
-    }
-    if Features.Has("Personal") {
-        GrandTomlPersonal := ReadPersonalToml()
-        for _, _GSecData in GrandTomlPersonal["sections"] {
-            GrandTotal += _GSecData["entries"].Length
+        ExtMenu := Menu()
+        ExtMenu.Add("Ouvrir le fichier…", _MakeOpenFileFn(ExtPath))
+        if (ExtSections.Length > 0) {
+            ExtMenu.Add()
+            for _, _ES in ExtSections {
+                SecLabel := _ES["description"] . " (" . FmtCount(_ES["count"]) . ")"
+                ExtMenu.Add(SecLabel, (*) => NoAction())
+                ExtMenu.Disable(SecLabel)
+            }
         }
+        ExtTitle := ExtStem . (ExtCount > 0 ? " (" . FmtCount(ExtCount) . ")" : "")
+        HotstringsMenu.Add(ExtTitle, ExtMenu)
     }
+    ; Compute grand total = common + personal
+    GrandTotal := CommonTotal + TotalPersonal
     HotstringsMenuTitle := MenuHotstrings . (GrandTotal > 0 ? " (" . FmtCount(GrandTotal) . ")" : "")
     A_TrayMenu.Add(HotstringsMenuTitle, HotstringsMenu)
-    ; Check the parent title when all hotstrings are enabled — mirrors HS checked submenu.
     if HotstringsAllEnabled {
         A_TrayMenu.Check(HotstringsMenuTitle)
     }
@@ -1803,6 +1844,81 @@ _TogglePersonalCloseOnAdd(PersonalMenu) {
     } else {
         PersonalMenu.Uncheck(Label)
     }
+}
+
+; Returns a closure that opens a file with the default OS application.
+_MakeOpenFileFn(FilePath) {
+    return (*) => Run(FilePath)
+}
+
+; Parses an extension TOML file and returns a list of section summaries:
+; [{description, count}, ...] in the order declared in [_meta.sections].
+; Descriptions come from [_meta.sections], counts from [[section]] entries.
+_ParseExtTomlSections(FilePath) {
+    Result := []
+    if !FileExist(FilePath) {
+        return Result
+    }
+    Content := FileRead(FilePath)
+    Q := Chr(34)
+    ; First pass: collect descriptions from [_meta.sections] and section order
+    SectionDescs := Map()
+    SectionOrder := []
+    InMetaSections := false
+    for _, Line in StrSplit(Content, "`n", "`r") {
+        Trimmed := Trim(Line, " `t")
+        if RegExMatch(Trimmed, "^\[([^\[\]]+)\]$", &HM) {
+            InMetaSections := (Trim(HM[1]) == "_meta.sections")
+            continue
+        }
+        if (SubStr(Trimmed, 1, 2) == "[[") {
+            InMetaSections := false
+            continue
+        }
+        if !InMetaSections {
+            continue
+        }
+        if RegExMatch(Trimmed, "^([A-Za-z0-9_]+)\s*=\s*" . Q . "((?:[^" . Q . "\\]|\\.)*)" . Q, &KM) {
+            SectionKey := StrLower(KM[1])
+            SectionDescs[SectionKey] := KM[2]
+            SectionOrder.Push(SectionKey)
+        }
+    }
+    ; Second pass: count entries per [[section]]
+    SectionCounts := Map()
+    CurSec := ""
+    for _, Line in StrSplit(Content, "`n", "`r") {
+        Trimmed := Trim(Line, " `t")
+        if RegExMatch(Trimmed, "^\[\[([^\[\]]+)\]\]$", &SecM) {
+            CurSec := StrLower(Trim(SecM[1]))
+            if !SectionCounts.Has(CurSec) {
+                SectionCounts[CurSec] := 0
+            }
+            continue
+        }
+        if (SubStr(Trimmed, 1, 1) == "[") {
+            CurSec := ""
+            continue
+        }
+        if (CurSec != "" and SubStr(Trimmed, 1, 1) == Q and InStr(Trimmed, "output")) {
+            SectionCounts[CurSec] := SectionCounts.Get(CurSec, 0) + 1
+        }
+    }
+    ; Build result in [_meta.sections] order (or any section not in meta, alphabetically)
+    Seen := Map()
+    for _, SecKey in SectionOrder {
+        Seen[SecKey] := true
+        Result.Push(Map(
+            "description", SectionDescs.Get(SecKey, SecKey),
+            "count",       SectionCounts.Get(SecKey, 0)
+        ))
+    }
+    for SecKey, Cnt in SectionCounts {
+        if !Seen.Has(SecKey) {
+            Result.Push(Map("description", SecKey, "count", Cnt))
+        }
+    }
+    return Result
 }
 
 MagicKeyEditor(*) {

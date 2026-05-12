@@ -805,3 +805,18 @@ if Features.Has("Personal") {
         LoadHotstringsSection("personal", TomlSection, FeatObj)
     }
 }
+
+; Extension personal TOML files — any *.toml in the hotstrings\ folder other than
+; personal_hotstrings.toml is loaded as an extension pack (all sections enabled,
+; no per-section toggle). Files are sorted alphabetically by the OS loop order.
+if IsSet(ScriptInformation) and ScriptInformation.Has("PersonalHotstringsDir") {
+    HsExtDir := ScriptInformation["PersonalHotstringsDir"]
+    if DirExist(HsExtDir) {
+        Loop Files HsExtDir . "*.toml" {
+            if (A_LoopFileName != "personal_hotstrings.toml") {
+                SplitPath A_LoopFileFullPath, , , , &_ExtStem
+                LoadExtTomlFile(A_LoopFileFullPath, _ExtStem)
+            }
+        }
+    }
+}

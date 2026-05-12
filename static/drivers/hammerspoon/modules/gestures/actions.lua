@@ -446,7 +446,12 @@ sg("open_hotstrings_editor", "⌨ Éditeur Hotstrings",   function() pcall(funct
 sg("open_paths_editor",      "📂 Éditeur Chemins",      function() pcall(function() require("ui.paths_editor").show() end) end)
 sg("open_script_source",     "🛠 Code Source",          function() pcall(hs.execute, string.format("open %q", hs.configdir)) end)
 sg("open_personal_shortcuts","👤 Raccourcis perso",     function() pcall(hs.execute, string.format("open %q/personal_shortcuts.toml", hs.configdir)) end)
-sg("open_personal_hotstrings","👤 Hotstrings perso",    function() pcall(hs.execute, string.format("open %q/personal_hotstrings.toml", hs.configdir)) end)
+sg("open_personal_hotstrings","👤 Hotstrings perso",    function()
+	local ok_mp, mp = pcall(require, "ui.menu.menu_paths")
+	local p = ok_mp and type(mp.get) == "function" and mp.get("PersonalTomlPath")
+	if p and p ~= "" then pcall(hs.execute, string.format("open %q", p))
+	else pcall(hs.execute, string.format("open %q/hotstrings/personal_hotstrings.toml", hs.configdir)) end
+end)
 sg("open_personal_info",     "👤 Infos perso",          function() pcall(hs.execute, string.format("open %q/personal_info.toml", hs.configdir)) end)
 sg("open_config",            "⚙ Configuration",        function() pcall(hs.execute, string.format("open %q/config.toml", hs.configdir)) end)
 sg("open_logs_folder",       "📁 Dossier Logs",         function() pcall(hs.execute, string.format("open %q/logs", hs.configdir)) end)

@@ -182,7 +182,7 @@ function M.build_groups(ctx)
 
 	local items = {}
 	for _, name in ipairs(top_names) do
-		if name == "custom" or name == "personal" then goto continue_group end
+		if name == "custom" or name == "personal" or name:sub(1, 13) == "personal_ext_" then goto continue_group end
 
 		local enabled  = groupEnabled(ctx, name)
 		local sections = ctx.keymap and type(ctx.keymap.get_sections) == "function" and ctx.keymap.get_sections(name) or nil
@@ -617,28 +617,55 @@ function M.build_management(ctx)
 	return { title = "⚙️ Paramètres hotstrings", menu = menu }
 end
 
+--- Returns the list of personal extension group names present in hotfiles,
+--- sorted alphabetically (excludes "personal" itself and "custom").
+--- @param ctx table Context.
+--- @return table List of group name strings.
+local function get_personal_ext_groups(ctx)
+	local ext = {}
+	for _, f in ipairs(type(ctx.hotfiles) == "table" and ctx.hotfiles or {}) do
+		local name = ctx.get_group_name(f)
+		if name:sub(1, 13) == "personal_ext_" then
+			table.insert(ext, name)
+		end
+	end
+	table.sort(ext)
+	return ext
+end
+
 --- Builds the unified personal hotstrings menu (personal_hotstrings.toml sections +
---- custom/dynamic hotstrings), with editor button, shortcut, and per-section
---- toggles and counts for both groups.
+--- extension TOMLs from the hotstrings/ folder + custom/dynamic hotstrings),
+--- with editor button, shortcut, and per-section toggles and counts for all groups.
 --- @param ctx table Context.
 --- @return table|nil
 function M.build_custom(ctx)
 	local state  = ctx.state
 	local paused = ctx.paused
 
-	-- Both groups contribute sections to this single menu entry
-	local personal_enabled = groupEnabled(ctx, "personal")
 	local custom_enabled   = groupEnabled(ctx, "custom")
-	local personal_secs    = ctx.keymap and type(ctx.keymap.get_sections) == "function" and ctx.keymap.get_sections("personal") or nil
-	local custom_secs      = ctx.keymap and type(ctx.keymap.get_sections) == "function" and ctx.keymap.get_sections("custom")   or nil
+	local custom_secs      = ctx.keymap and type(ctx.keymap.get_sections) == "function" and ctx.keymap.get_sections("custom") or nil
 
-	-- personal_hotstrings.toml group present in hotfiles?
+	-- Collect all personal groups: "personal" first, then extension groups alphabetically
+	local personal_group_names = {}
 	local has_personal = false
 	for _, f in ipairs(type(ctx.hotfiles) == "table" and ctx.hotfiles or {}) do
 		if ctx.get_group_name(f) == "personal" then has_personal = true; break end
 	end
+	if has_personal then table.insert(personal_group_names, "personal") end
+	for _, ext_name in ipairs(get_personal_ext_groups(ctx)) do
+		table.insert(personal_group_names, ext_name)
+	end
 
-	-- Total count across both groups (all sections, enabled or not, for display)
+	-- Gather all sections across all personal groups
+	local all_personal_secs_by_group = {}
+	for _, gname in ipairs(personal_group_names) do
+		local secs = ctx.keymap and type(ctx.keymap.get_sections) == "function" and ctx.keymap.get_sections(gname) or nil
+		all_personal_secs_by_group[gname] = secs
+	end
+	-- Keep the personal group's sections for the default-section picker (personal only)
+	local personal_secs = all_personal_secs_by_group["personal"]
+
+	-- Total count across all personal groups + custom (for the top-level title)
 	local total_count, has_count = 0, false
 	local function add_counts(secs)
 		if type(secs) ~= "table" then return end
@@ -650,7 +677,9 @@ function M.build_custom(ctx)
 			end
 		end
 	end
-	add_counts(personal_secs)
+	for _, gname in ipairs(personal_group_names) do
+		add_counts(all_personal_secs_by_group[gname])
+	end
 	add_counts(custom_secs)
 
 	local base_title = "Hotstrings personnels"
@@ -863,13 +892,15 @@ function M.build_custom(ctx)
 		},
 	}
 
-	-- personal_hotstrings.toml sections (group "personal")
-	if has_personal then
-		local personal_rows = {}
-		append_section_rows(personal_rows, "personal", personal_secs, personal_enabled)
-		if #personal_rows > 0 then
+	-- All personal groups in order: personal first, then extensions alphabetically
+	for _, gname in ipairs(personal_group_names) do
+		local g_enabled = groupEnabled(ctx, gname)
+		local g_secs    = all_personal_secs_by_group[gname]
+		local g_rows    = {}
+		append_section_rows(g_rows, gname, g_secs, g_enabled)
+		if #g_rows > 0 then
 			table.insert(menu_items, { title = "-" })
-			for _, row in ipairs(personal_rows) do table.insert(menu_items, row) end
+			for _, row in ipairs(g_rows) do table.insert(menu_items, row) end
 		end
 	end
 
@@ -881,20 +912,24 @@ function M.build_custom(ctx)
 		for _, row in ipairs(custom_rows) do table.insert(menu_items, row) end
 	end
 
-	-- Both groups toggle together when the user clicks the top-level item
-	local both_enabled = personal_enabled and custom_enabled
+	-- All groups toggle together when the user clicks the top-level item
+	local all_personal_enabled = true
+	for _, gname in ipairs(personal_group_names) do
+		if not groupEnabled(ctx, gname) then all_personal_enabled = false; break end
+	end
+	local both_enabled = all_personal_enabled and custom_enabled
 	return {
 		title   = title_str,
 		checked = (both_enabled and not paused) or nil,
 		fn      = function()
 			local will_enable = not both_enabled
-			-- Toggle personal group
-			if has_personal then
-				state.hotstrings["personal"] = will_enable
+			-- Toggle all personal groups
+			for _, gname in ipairs(personal_group_names) do
+				state.hotstrings[gname] = will_enable
 				if will_enable then
-					if ctx.keymap and type(ctx.keymap.enable_group) == "function" then pcall(ctx.keymap.enable_group, "personal") end
+					if ctx.keymap and type(ctx.keymap.enable_group) == "function" then pcall(ctx.keymap.enable_group, gname) end
 				else
-					if ctx.keymap and type(ctx.keymap.disable_group) == "function" then pcall(ctx.keymap.disable_group, "personal") end
+					if ctx.keymap and type(ctx.keymap.disable_group) == "function" then pcall(ctx.keymap.disable_group, gname) end
 				end
 			end
 			-- Toggle custom group

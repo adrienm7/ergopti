@@ -236,6 +236,68 @@ LoadHotstringsSection(CategoryName, SectionName, FeatureConfig, ExtraOptions := 
         CategoryName, SectionName, Loaded)
 }
 
+; Load all hotstring entries from every [[section]] in an arbitrary TOML file.
+; Used for personal extension packs dropped in the hotstrings\ folder.
+; All sections are loaded unconditionally (no per-section enable/disable toggle).
+LoadExtTomlFile(FilePath, CategoryLabel) {
+    global ScriptInformation, _HOTSTRING_ENTRY_PATTERN
+    if !FileExist(FilePath) {
+        try LoggerWarn("TomlLoader", "Extension TOML '{1}' not found — skipped.", FilePath)
+        return
+    }
+    try LoggerStart("TomlLoader", "Loading extension TOML '{1}'…", FilePath)
+    TotalLoaded := 0
+    CurrentSection := ""
+    FeatConf := { Enabled: true, TimeActivationSeconds: 0 }
+    FileContent := ReadTomlFile(FilePath)
+    loop parse, FileContent, "`n", "`r" {
+        Line := Trim(A_LoopField, " `t")
+        if (Line == "" or SubStr(Line, 1, 1) == "#") {
+            continue
+        }
+        if RegExMatch(Line, "^\[\[(.+)\]\]$", &SecM) {
+            CurrentSection := StrLower(SecM[1])
+            continue
+        }
+        if (SubStr(Line, 1, 1) == "[") {
+            CurrentSection := ""
+            continue
+        }
+        if (CurrentSection == "") {
+            continue
+        }
+        if !RegExMatch(Line, _HOTSTRING_ENTRY_PATTERN, &Match) {
+            continue
+        }
+        Trigger    := UnescapeTomlString(Match[1])
+        Output     := UnescapeTomlString(Match[2])
+        Trigger    := StrReplace(Trigger, "★", ScriptInformation["MagicKey"])
+        IsWord     := (Match[3] == "true")
+        AutoExpand := (Match[4] == "true")
+        IsCaseSens := (Match[5] == "true")
+        FinalResult := (Match[6] == "true")
+        StrictCase := (Match[7] == "true")
+        Flags := ""
+        if AutoExpand {
+            Flags .= "*"
+        }
+        if !IsWord {
+            Flags .= "?"
+        }
+        if StrictCase {
+            Flags .= "C"
+        }
+        Options := Map("TimeActivationSeconds", 0, "FinalResult", FinalResult)
+        if IsCaseSens {
+            CreateHotstring(Flags, Trigger, Output, Options)
+        } else {
+            CreateCaseSensitiveHotstrings(Flags, Trigger, Output, Options)
+        }
+        TotalLoaded += 1
+    }
+    try LoggerSuccess("TomlLoader", "Extension TOML '{1}': {2} entry(ies) loaded.", CategoryLabel, TotalLoaded)
+}
+
 ; Fold common French accented characters to their ASCII equivalent, then
 ; lowercase. Used to match the lowercase-only TOML metadata keys (e.g.
 ; ``ie``) against the PascalCase Features Map keys that may contain

@@ -245,15 +245,27 @@ function M.is_initialized()
 end
 
 --- Returns the resolved path for a well-known personal file.
+--- Returns the absolute path to the user's personal hotstrings folder.
+--- The folder is auto-created on first access so callers need not guard ENOENT.
+--- @return string Absolute path with trailing slash.
+local function personal_hotstrings_dir()
+	local d = config_dir()
+	if not d:match("[/\\]$") then d = d .. "/" end
+	local p = d .. "hotstrings/"
+	ensure_dir(p)
+	return p
+end
+
 --- Callers use named constants rather than bare filenames.
 --- @param key string One of: "PersonalTomlPath", "PersonalInfoTomlPath",
----   "HotstringsDirPath", "ConfigTomlPath", "KarabinerConfigPath".
+---   "HotstringsDirPath", "PersonalHotstringsDir", "ConfigTomlPath", "KarabinerConfigPath".
 --- @return string The resolved absolute path.
 function M.get(key)
 	-- Shared at the root of config_dir (both drivers may read these):
-	if key == "PersonalTomlPath"     then return file_in_config("personal_hotstrings.toml") end
-	if key == "PersonalInfoTomlPath" then return file_in_config("personal_info.toml")       end
-	if key == "HotstringsDirPath"    then return config_dir()                               end
+	if key == "PersonalTomlPath"     then return personal_hotstrings_dir() .. "personal_hotstrings.toml" end
+	if key == "PersonalInfoTomlPath" then return file_in_config("personal_info.toml")                   end
+	if key == "HotstringsDirPath"    then return config_dir()                                           end
+	if key == "PersonalHotstringsDir" then return personal_hotstrings_dir()                             end
 	-- Hammerspoon-specific (under <config_dir>/hammerspoon/):
 	if key == "ConfigTomlPath"           then return file_in_driver_subdir("config.toml")              end
 	if key == "KarabinerConfigPath"      then return file_in_driver_subdir("config_karabiner.toml")      end
