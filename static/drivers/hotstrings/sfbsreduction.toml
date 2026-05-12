@@ -7,7 +7,7 @@
 [_meta]
 color = "#fb8c00"
 delay = 0.5
-description = "Réduction des SFBs"
+description = { fr = "Réduction des SFBs", en = "SFB reduction", de = "SFB-Reduktion", es = "Reducción de SFBs", zh = "SFB 减少" }
 sections_order = ["comma", "-", "ecirc", "egrave", "-", "bu", "ie"]
 
 
@@ -17,11 +17,11 @@ sections_order = ["comma", "-", "ecirc", "egrave", "-", "bu", "ie"]
 # =========================
 
 [_meta.sections]
-bu = "À + ★/U corrige 2 SFBs : à★ = bu et àu = ub"
-comma = "Virgule + Consonne corrige de très nombreux SFBs : ,t = pt, ,d= ds, ,p = xp, …"
-ecirc = "Ê + touche sur la main gauche corrige 4 SFBs : êé = oe, éê = eo, ê, = u, et ê. = u."
-egrave = "È + touche Y corrige 2 SFBs : èy = aî et yè = â"
-ie = "À + É corrige 2 SFBs : éà = ié et àé = éi"
+bu = { fr = "À + ★/U corrige 2 SFBs : à★ = bu et àu = ub", en = "À + ★/U fixes 2 SFBs: à★ = bu and àu = ub", de = "À + ★/U korrigiert 2 SFBs: à★ = bu und àu = ub", es = "À + ★/U corrige 2 SFBs: à★ = bu y àu = ub", zh = "À + ★/U 修正 2 个 SFB：à★ = bu 和 àu = ub" }
+comma = { fr = "Virgule + Consonne corrige de très nombreux SFBs : ,t = pt, ,d= ds, ,p = xp, …", en = "Comma + Consonant fixes many SFBs: ,t = pt, ,d = ds, ,p = xp, …", de = "Komma + Konsonant korrigiert viele SFBs: ,t = pt, ,d = ds, ,p = xp, …", es = "Coma + Consonante corrige muchos SFBs: ,t = pt, ,d = ds, ,p = xp, …", zh = "逗号 + 辅音修正大量 SFB：,t = pt，,d = ds，,p = xp，…" }
+ecirc = { fr = "Ê + touche sur la main gauche corrige 4 SFBs : êé = oe, éê = eo, ê, = u, et ê. = u.", en = "Ê + left-hand key fixes 4 SFBs: êé = oe, éê = eo, ê, = u, and ê. = u.", de = "Ê + Linke-Hand-Taste korrigiert 4 SFBs: êé = oe, éê = eo, ê, = u, und ê. = u.", es = "Ê + tecla de la mano izquierda corrige 4 SFBs: êé = oe, éê = eo, ê, = u, y ê. = u.", zh = "Ê + 左手键修正 4 个 SFB：êé = oe，éê = eo，ê, = u，ê. = u" }
+egrave = { fr = "È + touche Y corrige 2 SFBs : èy = aî et yè = â", en = "È + Y key fixes 2 SFBs: èy = aî and yè = â", de = "È + Y-Taste korrigiert 2 SFBs: èy = aî und yè = â", es = "È + tecla Y corrige 2 SFBs: èy = aî y yè = â", zh = "È + Y 键修正 2 个 SFB：èy = aî 和 yè = â" }
+ie = { fr = "À + É corrige 2 SFBs : éà = ié et àé = éi", en = "À + É fixes 2 SFBs: éà = ié and àé = éi", de = "À + É korrigiert 2 SFBs: éà = ié und àé = éi", es = "À + É corrige 2 SFBs: éà = ié y àé = éi", zh = "À + É 修正 2 个 SFB：éà = ié 和 àé = éi" }
 
 
 

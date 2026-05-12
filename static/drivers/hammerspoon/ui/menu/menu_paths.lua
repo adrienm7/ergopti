@@ -22,6 +22,7 @@
 local M = {}
 local hs     = hs
 local Logger = require("lib.logger")
+local i18n   = require("lib.i18n")
 local LOG    = "menu_paths"
 
 -- Bootstrap file lives next to init.lua (gitignored).
@@ -320,12 +321,12 @@ local function pick_dir(current)
 	local escaped = default_dir:gsub('"', '\\"')
 	local script  = string.format([[
 		try
-			set r to choose folder with prompt "Sélectionner le dossier de configuration" default location ((POSIX file "%s") as alias)
+			set r to choose folder with prompt "%s" default location ((POSIX file "%s") as alias)
 			return POSIX path of r
 		on error
 			return ""
 		end try
-	]], escaped)
+	]], i18n.get("menu.paths.pick_prompt"), escaped)
 
 	local ok, r2, raw = hs.osascript.applescript(script)
 	Logger.debug(LOG, "pick_dir: ok={1} r2={2}.", tostring(ok), tostring(r2))
@@ -499,7 +500,7 @@ function M.open_editor()
 
 	_webview = ui_builder.show_webview({
 		frame       = ui_builder.get_centered_frame(win_w, win_h),
-		title       = "Dossier de configuration — Ergopti",
+		title       = i18n.get("menu.paths.window_title"),
 		style_masks = style_masks,
 		usercontent = _usercontent,
 		assets_dir  = ASSETS_DIR,
@@ -530,7 +531,7 @@ end
 --- @return table Menu item table.
 function M.build_menu_item()
 	return {
-		title = "Dossier de configuration…",
+		title = i18n.get("menu.paths.menu_item"),
 		fn    = function()
 			hs.timer.doAfter(0.05, function() pcall(M.open_editor) end)
 		end,

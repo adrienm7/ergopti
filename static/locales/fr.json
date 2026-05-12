@@ -1,19 +1,16 @@
-﻿{
+{
 	"_meta.locale": "fr",
 	"_meta.flag": "🇫🇷",
 	"_meta.name": "Français",
-
 	"layout.ergoptibase": "Émuler la couche de base de la disposition Ergopti",
 	"layout.directaccessdigits": "Chiffres en accès direct sur la rangée du haut",
 	"layout.ergoptialtgr": "Émuler la couche AltGr de la disposition Ergopti",
 	"layout.ergoptiplus": "Appliquer les légers changements en AltGr d'Ergopti➕",
-
 	"dynamichotstrings.datefr": "dt★ insère la date courante (jj/mm/aaaa)",
 	"dynamichotstrings.date": "td★ insère la date courante (aaaa_mm_jj)",
 	"dynamichotstrings.phoneprefixes": "Saisir les premiers chiffres du numéro de téléphone le complète automatiquement",
 	"dynamichotstrings.ssnprefixes": "Saisir les premiers chiffres du numéro de sécurité sociale le complète automatiquement",
 	"dynamichotstrings.ibanprefixes": "Saisir les premiers caractères de l'IBAN le complète automatiquement",
-
 	"shortcuts.egrave": "Tous les raccourcis sur la touche È correspondent à ceux de ",
 	"shortcuts.ecirc": "Tous les raccourcis sur la touche Ê correspondent à ceux de ",
 	"shortcuts.eacute": "Tous les raccourcis sur la touche É correspondent à ceux de ",
@@ -69,11 +66,9 @@
 	"shortcuts.laltcapslock.oneshotshift": "\"LAlt\" + \"CapsLock\" = OneShotShift",
 	"shortcuts.laltcapslock.tab": "\"LAlt\" + \"CapsLock\" = Tab",
 	"gestures.enabled": "Gestes du touchpad (nécessite configuration Windows)",
-
 	"menu.layout.title": "🌐 Disposition clavier",
 	"menu.layout.on": "✅ Disposition activée (cliquer pour désactiver)",
 	"menu.layout.off": "❌ Disposition désactivée (cliquer pour activer)",
-
 	"menu.hotstrings.title": "⚡ Hotstrings",
 	"menu.hotstrings.on": "✅ Hotstrings activés (cliquer pour désactiver)",
 	"menu.hotstrings.off": "❌ Hotstrings désactivés (cliquer pour activer)",
@@ -95,7 +90,6 @@
 	"menu.hotstrings.reset_magic_key": "   ↳ Réinitialiser (défaut : ★)",
 	"menu.hotstrings.edit_personal_info": "   ↳ Modifier les informations…",
 	"menu.hotstrings.default_marker": "(défaut)",
-
 	"menu.shortcuts.title": "🎯 Raccourcis",
 	"menu.shortcuts.on": "✅ Raccourcis activés (cliquer pour désactiver)",
 	"menu.shortcuts.off": "❌ Raccourcis désactivés (cliquer pour activer)",
@@ -108,11 +102,9 @@
 	"menu.shortcuts.ctrl_shift_add": "[+ Ajouter un raccourci Ctrl+Shift+…]",
 	"menu.shortcuts.win_group": "Raccourcis ⊞ Win",
 	"menu.shortcuts.win_add": "[+ Ajouter un raccourci Win+…]",
-
 	"menu.tapholds.title": "⌨️ Tap-Holds",
 	"menu.tapholds.on": "✅ Tap-holds activés (cliquer pour désactiver)",
 	"menu.tapholds.off": "❌ Tap-holds désactivés (cliquer pour activer)",
-
 	"menu.gestures.title": "🖐️ Gestes",
 	"menu.gestures.on": "✅ Gestes activés (cliquer pour désactiver)",
 	"menu.gestures.off": "❌ Gestes désactivés (cliquer pour activer)",
@@ -130,7 +122,6 @@
 	"menu.gestures.action_prefix": "Action : ",
 	"menu.gestures.mode_prefix": "Mode : ",
 	"menu.gestures.sensitivity_prefix": "Sensibilité : ",
-
 	"menu.metrics.title": "📊 Métriques",
 	"menu.metrics.on": "✅ Métriques activées (cliquer pour désactiver)",
 	"menu.metrics.off": "❌ Métriques désactivées (cliquer pour activer)",
@@ -146,7 +137,6 @@
 	"menu.metrics.disabled_in_suffix_p": " applications",
 	"menu.metrics.exclude_apps": "Exclure des applications du keylogger…",
 	"menu.metrics.open_encryptor": "↳ Ouvrir l'Encryptor autonome…",
-
 	"menu.global.title": "Actions globales",
 	"menu.global.enable_all": "☑ Activer toutes les fonctionnalités",
 	"menu.global.disable_all": "☐ Désactiver toutes les fonctionnalités",
@@ -157,7 +147,6 @@
 	"menu.global.suspend": "⏸︎ Suspendre",
 	"menu.global.reload": "🔄 Recharger",
 	"menu.global.quit": "⏹ Quitter",
-
 	"menu.debug.title": "⚠ Débogage",
 	"menu.debug.console": "Console",
 	"menu.debug.window_spy": "Window Spy",
@@ -165,15 +154,12 @@
 	"menu.debug.key_history": "Historique des touches",
 	"menu.debug.open_logs": "Ouvrir le dossier de logs",
 	"menu.debug.open_today_log": "Ouvrir le fichier de log du jour",
-
 	"menu.keyboard_layout.add_ergopti": "➕ Ajouter Ergopti v%s à la liste des dispositions",
 	"menu.keyboard_layout.active_header": "Dispositions actives",
 	"menu.keyboard_layout.open_system_prefs": "Ouvrir Préférences Système → Clavier",
-
 	"menu.karabiner.left_hand": "— Main gauche —",
 	"menu.karabiner.right_hand": "— Main droite —",
 	"menu.karabiner.symmetric": "Raccourcis symétriques (ordre des touches indifférent)",
-
 	"menu.llm.no_model": "Aucun modèle (Désactivé)",
 	"menu.llm.add_model": "➕ Ajouter un modèle personnalisé…",
 	"menu.llm.delete_model": "🗑️ Supprimer ce modèle du cache",
@@ -182,7 +168,6 @@
 	"menu.llm.params_active": "Paramètres (Actifs) : ",
 	"menu.llm.generation_settings": "Paramètres de génération",
 	"menu.llm.disabled_in_prefix": "Désactivé dans",
-
 	"category.distances_reduction": "Réduction des distances",
 	"category.sfbs_reduction": "Réduction des SFBs",
 	"category.rolls": "Roulements",
@@ -194,12 +179,10 @@
 	"category.tapholds": "⌨️ Tap-Holds",
 	"category.gestures": "🖐️ Gestes",
 	"category.layout": "🌐 Disposition clavier",
-
 	"dialog.action_picker.label": "Action :",
 	"dialog.action_picker.disabled": "— Désactivé —",
 	"dialog.keyboard_shortcut.title_prefix": "Choisir une touche — ",
 	"dialog.keyboard_shortcut.prompt": "Sélectionner la combinaison de touches :",
-
 	"dialog.metrics.title": "📊 Métriques",
 	"dialog.metrics.disable_confirm": "Désactiver les métriques ?\n\nLe keylogger ne capturera plus aucune frappe. Les données déjà enregistrées sont conservées.",
 	"dialog.metrics.enable_warning": "ATTENTION : Vous êtes sur le point d'activer le keylogger.\n\nIl enregistre vos frappes au clavier à la milliseconde près. Ces logs sont stockés en local sous :\n    %s\n\nBien que les champs de mots de passe soient ignorés automatiquement (filtre UIA), il est recommandé de mettre le script en PAUSE lors de la saisie de données sensibles.\n\nActiver ?",
@@ -207,18 +190,14 @@
 	"dialog.metrics.exclude_title": "Exclure des applications — Métriques",
 	"dialog.metrics.exclude_prompt": "Sélectionnez les applications dont les frappes ne seront jamais enregistrées par le keylogger.",
 	"dialog.metrics.exclude_ok": "Enregistrer",
-
 	"dialog.gestures.auto_configure_title": "ErgoptiPlus — Configuration des gestes",
 	"dialog.gestures.auto_configure_success": "Configuration des gestes appliquée avec succès.\n\nLes 10 gestes ont été configurés dans le registre Windows\n(Ctrl+Win+Shift+F1 à F10).\n\nUne déconnexion / reconnexion peut être nécessaire pour que\nWindows prenne les nouveaux raccourcis en compte.",
 	"dialog.gestures.auto_configure_error_title": "ErgoptiPlus — Erreur",
 	"dialog.gestures.auto_configure_error": "Erreur lors de l'écriture du registre.\n\nEssayez d'exécuter le script en tant qu'administrateur,\nou configurez manuellement (voir Instructions).",
 	"dialog.gestures.warning_title": "Avertissement Gestes",
-
 	"dialog.hotstrings.delete_title": "Supprimer l'expanseur",
-
 	"dialog.llm.delete_title": "Supprimer le modèle ?",
 	"dialog.llm.delete_profile_prefix": "Supprimer « ",
-
 	"button.ok": "OK",
 	"button.cancel": "Annuler",
 	"button.save": "Enregistrer",
@@ -226,7 +205,6 @@
 	"button.add": "Ajouter",
 	"button.activate": "Activer",
 	"button.open_settings": "Ouvrir Réglages",
-
 	"gesture.slots.tap_3": "Tap 3 doigts",
 	"gesture.slots.swipe_3_up": "Swipe 3 doigts ↑",
 	"gesture.slots.swipe_3_down": "Swipe 3 doigts ↓",
@@ -237,7 +215,6 @@
 	"gesture.slots.swipe_4_down": "Swipe 4 doigts ↓",
 	"gesture.slots.swipe_4_left": "Swipe 4 doigts ←",
 	"gesture.slots.swipe_4_right": "Swipe 4 doigts →",
-
 	"sg_actions.sg_order.header.mouse_nav": "#Souris et Navigation",
 	"sg_actions.sg_order.header.edition": "#Édition",
 	"sg_actions.sg_order.header.keys": "#Touches",
@@ -264,7 +241,6 @@
 	"sg_actions.sg_order.header.files": "#Fichiers",
 	"sg_actions.sg_order.header.script": "#Gestion du Script",
 	"sg_actions.sg_order.header.debug": "#Debug",
-
 	"sg_actions.none": "∅ Désactivé",
 	"sg_actions.left_click_toggle": "🖱 L Clic gauche (maint.)",
 	"sg_actions.right_click_toggle": "🖱 R Clic droit (maint.)",
@@ -381,7 +357,6 @@
 	"sg_actions.open_window_spy": "Window Spy",
 	"sg_actions.open_list_vars": "État des variables",
 	"sg_actions.open_key_history": "Historique des touches",
-
 	"ax_actions.tabs": "⧉ Onglets",
 	"ax_actions.char": "A Lettres",
 	"ax_actions.char_sel": "✎ A Sél. Lettres",
@@ -418,11 +393,9 @@
 	"notify.script_control": "Contrôle du script",
 	"notify.hotstrings": "Hotstrings",
 	"dialog.gestures.warning_msg": "⚠️ Attention : L'activation des gestes trackpad peut interférer avec les gestes système.\n\nPour éviter les conflits, désactiver les options macOS suivantes :\n\n• Gestes trackpad 2 doigts : désactiver le défilement et les balayages si vous voulez les utiliser dans Hammerspoon.\n• Gestes trackpad 3 doigts pour bouger les fenêtres et la sélection\n• Tap 3 doigts pour chercher le mot dans le dictionnaire\n• Swipe 3 doigts horizontal/vertical pour changer de spaces, activer App Exposé ou Mission Control\n• Swipe 4 doigts horizontal/vertical pour changer de spaces, activer App Exposé ou Mission Control\n\nIl est important de désactiver les gestes système utilisant 4 doigts afin de pouvoir définir des gestes à 5 doigts. Autrement, macOS ne ferait pas de distinction entre les deux et empêcherait les gestes à 5 doigts de fonctionner. C'est pourquoi les gestes à 4 doigts par défaut son redéfinis dans le module Gestes pour retrouver les fonctions système sans conflit avec les gestes à 5 doigts.",
-
 	"button.retry": "Réessayer",
 	"button.encrypt": "Chiffrer",
 	"button.decrypt": "Déchiffrer",
-
 	"dialog.hotstrings.delete_body": "Êtes-vous sûr de vouloir supprimer cet expanseur personnalisé ?",
 	"dialog.hotstrings.new_title": "Nouvel expanseur de mots",
 	"dialog.hotstrings.new_prompt": "Saisissez le caractère déclencheur (un seul caractère) :",
@@ -432,11 +405,9 @@
 	"dialog.hotstrings.consume_body": "Voulez-vous que le caractère soit consommé (non tapé) lors de l'expansion ?",
 	"dialog.hotstrings.consume_no": "Non — taper le caractère",
 	"dialog.hotstrings.consume_yes": "Oui — consommer",
-
 	"menu.shortcuts.chatgpt_url_item": "   ↳ Modifier l'URL ChatGPT…",
 	"dialog.shortcuts.chatgpt_title": "URL ChatGPT",
 	"dialog.shortcuts.chatgpt_prompt": "URL ouverte par Ctrl+G :",
-
 	"menu.karabiner.status_active": "🟢 Karabiner actif",
 	"menu.karabiner.status_priming": "🔵 Karabiner — amorçage en cours…",
 	"menu.karabiner.status_not_primed": "🟡 Karabiner activé — règles non appliquées (cliquer pour amorcer)",
@@ -460,7 +431,6 @@
 	"menu.karabiner.sticky_dialog_prompt": "Délai d'annulation sticky (millisecondes)\nAprès ce délai sans frappe, le modificateur one-shot est annulé.",
 	"menu.karabiner.simultaneous_dialog_title": "Karabiner — Délai d'activation des combos",
 	"menu.karabiner.simultaneous_dialog_prompt": "Délai maximal (en millisecondes) entre la 1re\net la 2e touche d'un raccourci pour déclencher le slot \"Combo\"\n(activation de type accord : touches pressées quasi en même temps).\n\n(défaut : %d ms)",
-
 	"menu.metrics.encrypt_toggle": "Chiffrer les logs sur le disque (Sécurité)",
 	"dialog.metrics.progress_label": "Traitement en cours : %d / %d",
 	"dialog.metrics.complete_label": "Opération terminée.\n\nFichiers traités avec succès : %d\nErreurs rencontrées : %d",
@@ -477,7 +447,6 @@
 	"dialog.metrics.security_warning_body": "⚠️  ATTENTION : Métriques et keylogger vont être activés.\n\nCe système enregistre vos frappes au clavier et l'activation des gestes trackpad.\n\n• Les logs sont stockés dans le dossier Hammerspoon\n• Les champs de mots de passe sont ignorés automatiquement\n• Il est recommandé de mettre le script en PAUSE lors de la saisie de données sensibles\n\nPour éviter les interférences avec vos gestes personnalisés :\n• Supprimez les gestes macOS pour swipe 3/4 doigts si utilisés\n• Désactivez mission control et app exposé via gestes",
 	"menu.hotstrings.custom_label": "Personnalisé",
 	"menu.hotstrings.consumed": "consommé",
-
 	"ui_typing.title": "Métriques de frappe",
 	"ui_typing.label_from": "Du :",
 	"ui_typing.label_to": "Au :",
@@ -526,7 +495,6 @@
 	"ui_typing.search_close": "Fermer (Échap)",
 	"ui_typing.page_loading": "Chargement de l'interface...",
 	"ui_typing.pinch_hint": "Pincer (trackpad) pour zoomer.",
-
 	"ui_apps.title": "Temps sur les applications",
 	"ui_apps.label_period": "Période :",
 	"ui_apps.label_date": "Le :",
@@ -620,5 +588,80 @@
 	"ui_apps.modal_layouts": "Layouts utilisés",
 	"ui_apps.modal_records": "Records",
 	"ui_apps.modal_hs_ai": "Hotstrings & IA",
-	"ui_apps.loading_data": "Chargement des données..."
+	"ui_apps.loading_data": "Chargement des données...",
+	"menu.paths.menu_item": "Dossier de configuration…",
+	"menu.paths.window_title": "Dossier de configuration — Ergopti",
+	"menu.paths.pick_prompt": "Sélectionner le dossier de configuration",
+	"editor.hotstrings.meta_desc": "Hotstrings personnels",
+	"editor.hotstrings.window_title": "Éditeur de hotstrings personnels",
+	"editor.hotstrings.save_error": "Erreur de sauvegarde",
+	"hs_config.window_title": "Délais et couleurs des hotstrings",
+	"hs_config.cat_magickey": "Touche ★ et expansion",
+	"hs_config.cat_autocorrection": "Autocorrection",
+	"hs_config.cat_rolls": "Roulements",
+	"hs_config.cat_sfbs": "Réduction des SFBs",
+	"hs_config.cat_distances": "Réduction des distances",
+	"hs_config.cat_personal": "Hotstrings personnels",
+	"hs_config.color_inherit": "— hérite du défaut —",
+	"hs_config.color_red": "Rouge (★)",
+	"hs_config.color_green": "Vert (auto)",
+	"hs_config.color_orange": "Orange (rolls)",
+	"hs_config.color_blue": "Bleu (perso)",
+	"hs_config.color_purple": "Violet",
+	"hs_config.color_cyan": "Cyan",
+	"hs_config.color_yellow": "Jaune",
+	"hs_config.color_gray": "Gris",
+
+	"editor.hotstrings.label_section": "Section :",
+	"editor.hotstrings.btn_new": "Nouvelle…",
+	"editor.hotstrings.btn_rename": "Renommer…",
+	"editor.hotstrings.btn_delete": "Supprimer",
+	"editor.hotstrings.col_trigger": "Déclencheur",
+	"editor.hotstrings.col_result": "Résultat",
+	"editor.hotstrings.col_word": "Mot",
+	"editor.hotstrings.col_auto": "Auto",
+	"editor.hotstrings.col_case": "Casse",
+	"editor.hotstrings.col_final": "Final",
+	"editor.hotstrings.label_trigger": "Déclencheur :",
+	"editor.hotstrings.label_result": "Résultat :",
+	"editor.hotstrings.chk_word": "Mot complet",
+	"editor.hotstrings.chk_case": "Sensible à la casse",
+	"editor.hotstrings.chk_final": "Résultat final",
+	"editor.hotstrings.btn_add": "➕ Ajouter",
+	"editor.hotstrings.chk_close_after": "Fermer après",
+	"editor.hotstrings.group_selected": "Hotstring sélectionné",
+	"editor.hotstrings.btn_edit": "💾 Modifier",
+	"editor.hotstrings.btn_delete_entry": "🗑 Supprimer",
+	"editor.hotstrings.no_section": "(aucune section)",
+	"editor.hotstrings.err_write": "⚠ Erreur d'écriture dans personal_hotstrings.toml.",
+	"editor.hotstrings.saved_prefix": "✓ Sauvegardé — ",
+	"editor.hotstrings.err_trigger_required": "⚠ Le déclencheur et le résultat sont obligatoires.",
+	"editor.hotstrings.err_no_section": "⚠ Sélectionnez ou créez une section d'abord.",
+	"editor.hotstrings.err_duplicate": "⚠ Ce déclencheur existe déjà dans cette section.",
+	"editor.hotstrings.err_select_to_edit": "⚠ Sélectionnez un hotstring à modifier.",
+	"editor.hotstrings.err_select_to_delete": "⚠ Sélectionnez un hotstring à supprimer.",
+	"editor.hotstrings.title_confirm": "Confirmation",
+	"editor.hotstrings.title_error": "Erreur",
+	"editor.hotstrings.new_section_title": "Nouvelle section",
+	"editor.hotstrings.new_section_prompt": "Nom de la nouvelle section (identifiant, sans espaces) :",
+	"editor.hotstrings.err_section_exists": "Cette section existe déjà.",
+	"editor.hotstrings.desc_title": "Description",
+	"editor.hotstrings.desc_prompt": "Description affichée dans le menu pour cette section :",
+	"editor.hotstrings.err_no_section_selected": "Aucune section sélectionnée.",
+	"editor.hotstrings.rename_title": "Renommer",
+
+	"hs_config.file_level": "── Niveau fichier ──",
+	"hs_config.btn_all_gray": "Tout en gris",
+	"hs_config.btn_reset_all": "Tout réinitialiser",
+	"hs_config.btn_close": "Fermer",
+	"hs_config.label_category": "Catégorie :",
+	"hs_config.label_section": "Section :",
+	"hs_config.label_delay": "Délai (ms) :",
+	"hs_config.label_color": "Couleur :",
+	"hs_config.default_prefix": "Défaut : ",
+	"hs_config.override_active": "override actif",
+	"hs_config.none": "(aucune)",
+	"hs_config.category_prefix": "Catégorie : ",
+	"hs_config.section_prefix": "Section : ",
+	"hs_config.file_level_short": "(niveau fichier)"
 }

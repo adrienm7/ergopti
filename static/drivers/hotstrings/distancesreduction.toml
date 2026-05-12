@@ -7,7 +7,7 @@
 [_meta]
 color = "#fb8c00"
 delay = 0.5
-description = "Réduction des distances"
+description = { fr = "Réduction des distances", en = "Distance reduction", de = "Distanzreduktion", es = "Reducción de distancias", zh = "距离减少" }
 sections_order = ["qu", "suffixesa", "-", "commaj", "commafarletters", "-", "deadkeyecircumflex", "ecircumflexe", "-", "spacearoundsymbols"]
 
 
@@ -17,13 +17,13 @@ sections_order = ["qu", "suffixesa", "-", "commaj", "commafarletters", "-", "dea
 # =========================
 
 [_meta.sections]
-commafarletters = "Virgule permet de taper des lettres excentrées : ,è=z et ,y=k et ,c=ç et ,x=où et ,s=q"
-commaj = "Virgule + Voyelle donne J : ,a = ja, ,o = jo, ,' = j’, …"
-deadkeyecircumflex = "Ê suivi d’une lettre agit comme une touche morte : êo = ô, êu = û, ês = ß…"
-ecircumflexe = "Ê suivi de E donne Œ"
-qu = "Q devient QU quand elle est suivie d’une voyelle : qa = qua, qo = quo, …"
-spacearoundsymbols = "Ajouter un espace avant et après les symboles obtenus par rolls ainsi qu’après la touche [où]"
-suffixesa = "À + lettre donne un suffixe : às = ement, àn = ation, àh = ight, …"
+commafarletters = { fr = "Virgule permet de taper des lettres excentrées : ,è=z et ,y=k et ,c=ç et ,x=où et ,s=q", en = "Comma types eccentric letters: ,è=z and ,y=k and ,c=ç and ,x=où and ,s=q", de = "Komma tippt außermittige Buchstaben: ,è=z und ,y=k und ,c=ç und ,x=où und ,s=q", es = "La coma escribe letras excéntricas: ,è=z y ,y=k y ,c=ç y ,x=où y ,s=q", zh = "逗号输入偏远字母：,è=z 和 ,y=k 和 ,c=ç 和 ,x=où 和 ,s=q" }
+commaj = { fr = "Virgule + Voyelle donne J : ,a = ja, ,o = jo, ,’ = j’, …", en = "Comma + Vowel gives J: ,a = ja, ,o = jo, ,’ = j’, …", de = "Komma + Vokal ergibt J: ,a = ja, ,o = jo, ,’ = j’, …", es = "Coma + Vocal da J: ,a = ja, ,o = jo, ,’ = j’, …", zh = "逗号 + 元音 = J：,a = ja，,o = jo，,’ = j’，…" }
+deadkeyecircumflex = { fr = "Ê suivi d’une lettre agit comme une touche morte : êo = ô, êu = û, ês = ß…", en = "Ê followed by a letter acts as a dead key: êo = ô, êu = û, ês = ß…", de = "Ê gefolgt von einem Buchstaben wirkt als Tottaste: êo = ô, êu = û, ês = ß…", es = "Ê seguido de una letra actúa como tecla muerta: êo = ô, êu = û, ês = ß…", zh = "Ê 后接字母作为死键：êo = ô，êu = û，ês = ß…" }
+ecircumflexe = { fr = "Ê suivi de E donne Œ", en = "Ê followed by E gives Œ", de = "Ê gefolgt von E ergibt Œ", es = "Ê seguido de E da Œ", zh = "Ê 后接 E 得 Œ" }
+qu = { fr = "Q devient QU quand elle est suivie d’une voyelle : qa = qua, qo = quo, …", en = "Q becomes QU when followed by a vowel: qa = qua, qo = quo, …", de = "Q wird zu QU, wenn ein Vokal folgt: qa = qua, qo = quo, …", es = "Q se convierte en QU ante vocal: qa = qua, qo = quo, …", zh = "Q 后接元音变为 QU：qa = qua，qo = quo，…" }
+spacearoundsymbols = { fr = "Ajouter un espace avant et après les symboles obtenus par rolls ainsi qu’après la touche [où]", en = "Add a space before and after symbols produced by rolls, and after the [où] key", de = "Leerzeichen vor und nach durch Läufe erzeugten Symbolen sowie nach der [où]-Taste", es = "Añade espacio antes y después de los símbolos generados por rodamientos y tras la tecla [où]", zh = "在连击产生的符号前后添加空格，以及在 [où] 键后添加空格" }
+suffixesa = { fr = "À + lettre donne un suffixe : às = ement, àn = ation, àh = ight, …", en = "À + letter gives a suffix: às = ement, àn = ation, àh = ight, …", de = "À + Buchstabe ergibt ein Suffix: às = ement, àn = ation, àh = ight, …", es = "À + letra da un sufijo: às = ement, àn = ation, àh = ight, …", zh = "À + 字母 = 后缀：às = ement，àn = ation，àh = ight，…" }
 
 
 

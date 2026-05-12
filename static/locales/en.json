@@ -1,19 +1,16 @@
-﻿{
+{
 	"_meta.locale": "en",
 	"_meta.flag": "🇬🇧",
 	"_meta.name": "English",
-
 	"layout.ergoptibase": "Emulate the base layer of the Ergopti layout",
 	"layout.directaccessdigits": "Direct digit access on the top row",
 	"layout.ergoptialtgr": "Emulate the AltGr layer of the Ergopti layout",
 	"layout.ergoptiplus": "Apply the minor AltGr changes of Ergopti➕",
-
 	"dynamichotstrings.datefr": "dt★ inserts the current date (dd/mm/yyyy)",
 	"dynamichotstrings.date": "td★ inserts the current date (yyyy_mm_dd)",
 	"dynamichotstrings.phoneprefixes": "Typing the first digits of your phone number auto-completes it",
 	"dynamichotstrings.ssnprefixes": "Typing the first digits of your social security number auto-completes it",
 	"dynamichotstrings.ibanprefixes": "Typing the first characters of your IBAN auto-completes it",
-
 	"shortcuts.egrave": "All shortcuts on the È key map to those of ",
 	"shortcuts.ecirc": "All shortcuts on the Ê key map to those of ",
 	"shortcuts.eacute": "All shortcuts on the É key map to those of ",
@@ -69,11 +66,9 @@
 	"shortcuts.laltcapslock.oneshotshift": "\"LAlt\" + \"CapsLock\" = OneShotShift",
 	"shortcuts.laltcapslock.tab": "\"LAlt\" + \"CapsLock\" = Tab",
 	"gestures.enabled": "Touchpad gestures (requires Windows configuration)",
-
 	"menu.layout.title": "🌐 Keyboard layout",
 	"menu.layout.on": "✅ Layout enabled (click to disable)",
 	"menu.layout.off": "❌ Layout disabled (click to enable)",
-
 	"menu.hotstrings.title": "⚡ Hotstrings",
 	"menu.hotstrings.on": "✅ Hotstrings enabled (click to disable)",
 	"menu.hotstrings.off": "❌ Hotstrings disabled (click to enable)",
@@ -95,7 +90,6 @@
 	"menu.hotstrings.reset_magic_key": "   ↳ Reset (default: ★)",
 	"menu.hotstrings.edit_personal_info": "   ↳ Edit personal information…",
 	"menu.hotstrings.default_marker": "(default)",
-
 	"menu.shortcuts.title": "🎯 Shortcuts",
 	"menu.shortcuts.on": "✅ Shortcuts enabled (click to disable)",
 	"menu.shortcuts.off": "❌ Shortcuts disabled (click to enable)",
@@ -108,11 +102,9 @@
 	"menu.shortcuts.ctrl_shift_add": "[+ Add a Ctrl+Shift+… shortcut]",
 	"menu.shortcuts.win_group": "⊞ Win shortcuts",
 	"menu.shortcuts.win_add": "[+ Add a Win+… shortcut]",
-
 	"menu.tapholds.title": "⌨️ Tap-Holds",
 	"menu.tapholds.on": "✅ Tap-holds enabled (click to disable)",
 	"menu.tapholds.off": "❌ Tap-holds disabled (click to enable)",
-
 	"menu.gestures.title": "🖐️ Gestures",
 	"menu.gestures.on": "✅ Gestures enabled (click to disable)",
 	"menu.gestures.off": "❌ Gestures disabled (click to enable)",
@@ -130,7 +122,6 @@
 	"menu.gestures.action_prefix": "Action: ",
 	"menu.gestures.mode_prefix": "Mode: ",
 	"menu.gestures.sensitivity_prefix": "Sensitivity: ",
-
 	"menu.metrics.title": "📊 Metrics",
 	"menu.metrics.on": "✅ Metrics enabled (click to disable)",
 	"menu.metrics.off": "❌ Metrics disabled (click to enable)",
@@ -146,7 +137,6 @@
 	"menu.metrics.disabled_in_suffix_p": " applications",
 	"menu.metrics.exclude_apps": "Exclude applications from keylogger…",
 	"menu.metrics.open_encryptor": "↳ Open standalone Encryptor…",
-
 	"menu.global.title": "Global actions",
 	"menu.global.enable_all": "☑ Enable all features",
 	"menu.global.disable_all": "☐ Disable all features",
@@ -157,7 +147,6 @@
 	"menu.global.suspend": "⏸︎ Suspend",
 	"menu.global.reload": "🔄 Reload",
 	"menu.global.quit": "⏹ Quit",
-
 	"menu.debug.title": "⚠ Debug",
 	"menu.debug.console": "Console",
 	"menu.debug.window_spy": "Window Spy",
@@ -165,15 +154,12 @@
 	"menu.debug.key_history": "Key history",
 	"menu.debug.open_logs": "Open logs folder",
 	"menu.debug.open_today_log": "Open today's log file",
-
 	"menu.keyboard_layout.add_ergopti": "➕ Add Ergopti v%s to layout list",
 	"menu.keyboard_layout.active_header": "Active layouts",
 	"menu.keyboard_layout.open_system_prefs": "Open System Preferences → Keyboard",
-
 	"menu.karabiner.left_hand": "— Left hand —",
 	"menu.karabiner.right_hand": "— Right hand —",
 	"menu.karabiner.symmetric": "Symmetric shortcuts (key order independent)",
-
 	"menu.llm.no_model": "No model (Disabled)",
 	"menu.llm.add_model": "➕ Add a custom model…",
 	"menu.llm.delete_model": "🗑️ Remove this model from cache",
@@ -182,7 +168,6 @@
 	"menu.llm.params_active": "Parameters (Active): ",
 	"menu.llm.generation_settings": "Generation settings",
 	"menu.llm.disabled_in_prefix": "Disabled in",
-
 	"category.distances_reduction": "Distance reduction",
 	"category.sfbs_reduction": "SFB reduction",
 	"category.rolls": "Rolls",
@@ -194,12 +179,10 @@
 	"category.tapholds": "⌨️ Tap-Holds",
 	"category.gestures": "🖐️ Gestures",
 	"category.layout": "🌐 Keyboard layout",
-
 	"dialog.action_picker.label": "Action:",
 	"dialog.action_picker.disabled": "— Disabled —",
 	"dialog.keyboard_shortcut.title_prefix": "Choose a key — ",
 	"dialog.keyboard_shortcut.prompt": "Select the key combination:",
-
 	"dialog.metrics.title": "📊 Metrics",
 	"dialog.metrics.disable_confirm": "Disable metrics?\n\nThe keylogger will no longer capture any keystrokes. Already recorded data is preserved.",
 	"dialog.metrics.enable_warning": "WARNING: You are about to enable the keylogger.\n\nIt records your keystrokes to the millisecond. Logs are stored locally under:\n    %s\n\nAlthough password fields are automatically ignored (UIA filter), it is recommended to PAUSE the script when entering sensitive data.\n\nEnable?",
@@ -207,18 +190,14 @@
 	"dialog.metrics.exclude_title": "Exclude applications — Metrics",
 	"dialog.metrics.exclude_prompt": "Select the applications whose keystrokes will never be recorded by the keylogger.",
 	"dialog.metrics.exclude_ok": "Save",
-
 	"dialog.gestures.auto_configure_title": "ErgoptiPlus — Gesture configuration",
 	"dialog.gestures.auto_configure_success": "Gesture configuration applied successfully.\n\nThe 10 gestures have been configured in the Windows registry\n(Ctrl+Win+Shift+F1 to F10).\n\nA sign-out / sign-in may be required for\nWindows to pick up the new shortcuts.",
 	"dialog.gestures.auto_configure_error_title": "ErgoptiPlus — Error",
 	"dialog.gestures.auto_configure_error": "Error writing to the registry.\n\nTry running the script as administrator,\nor configure manually (see Instructions).",
 	"dialog.gestures.warning_title": "Gesture warning",
-
 	"dialog.hotstrings.delete_title": "Delete expander",
-
 	"dialog.llm.delete_title": "Delete model?",
 	"dialog.llm.delete_profile_prefix": "Delete \"",
-
 	"button.ok": "OK",
 	"button.cancel": "Cancel",
 	"button.save": "Save",
@@ -226,7 +205,6 @@
 	"button.add": "Add",
 	"button.activate": "Enable",
 	"button.open_settings": "Open Settings",
-
 	"gesture.slots.tap_3": "3-finger tap",
 	"gesture.slots.swipe_3_up": "3-finger swipe ↑",
 	"gesture.slots.swipe_3_down": "3-finger swipe ↓",
@@ -237,7 +215,6 @@
 	"gesture.slots.swipe_4_down": "4-finger swipe ↓",
 	"gesture.slots.swipe_4_left": "4-finger swipe ←",
 	"gesture.slots.swipe_4_right": "4-finger swipe →",
-
 	"sg_actions.sg_order.header.mouse_nav": "#Mouse & Navigation",
 	"sg_actions.sg_order.header.edition": "#Editing",
 	"sg_actions.sg_order.header.keys": "#Keys",
@@ -264,7 +241,6 @@
 	"sg_actions.sg_order.header.files": "#Files",
 	"sg_actions.sg_order.header.script": "#Script management",
 	"sg_actions.sg_order.header.debug": "#Debug",
-
 	"sg_actions.none": "∅ Disabled",
 	"sg_actions.left_click_toggle": "🖱 L Left click (hold)",
 	"sg_actions.right_click_toggle": "🖱 R Right click (hold)",
@@ -381,7 +357,6 @@
 	"sg_actions.open_window_spy": "Window Spy",
 	"sg_actions.open_list_vars": "Variable state",
 	"sg_actions.open_key_history": "Key history",
-
 	"ax_actions.tabs": "⧉ Tabs",
 	"ax_actions.char": "A Characters",
 	"ax_actions.char_sel": "✎ A Sel. Characters",
@@ -418,11 +393,9 @@
 	"notify.script_control": "Script control",
 	"notify.hotstrings": "Hotstrings",
 	"dialog.gestures.warning_msg": "⚠️ Warning: Enabling trackpad gestures may interfere with system gestures.\n\nTo avoid conflicts, disable the following macOS options:\n\n• 2-finger trackpad gestures: disable scroll and swipe if you want to use them in Hammerspoon.\n• 3-finger trackpad gestures to move windows and select text\n• 3-finger tap to look up words in the dictionary\n• 3-finger horizontal/vertical swipe to switch spaces, activate App Exposé or Mission Control\n• 4-finger horizontal/vertical swipe to switch spaces, activate App Exposé or Mission Control\n\nIt is important to disable 4-finger system gestures in order to define 5-finger gestures. Otherwise, macOS would not distinguish between them and would prevent 5-finger gestures from working. That is why the default 4-finger gestures are redefined in the Gestures module to restore system functions without conflict with 5-finger gestures.",
-
 	"button.retry": "Retry",
 	"button.encrypt": "Encrypt",
 	"button.decrypt": "Decrypt",
-
 	"dialog.hotstrings.delete_body": "Are you sure you want to delete this custom expander?",
 	"dialog.hotstrings.new_title": "New word expander",
 	"dialog.hotstrings.new_prompt": "Enter the trigger character (exactly one character):",
@@ -432,11 +405,9 @@
 	"dialog.hotstrings.consume_body": "Should the trigger character be consumed (not typed) during expansion?",
 	"dialog.hotstrings.consume_no": "No — type the character",
 	"dialog.hotstrings.consume_yes": "Yes — consume it",
-
 	"menu.shortcuts.chatgpt_url_item": "   ↳ Edit ChatGPT URL…",
 	"dialog.shortcuts.chatgpt_title": "ChatGPT URL",
 	"dialog.shortcuts.chatgpt_prompt": "URL opened by Ctrl+G:",
-
 	"menu.karabiner.status_active": "🟢 Karabiner active",
 	"menu.karabiner.status_priming": "🔵 Karabiner — priming in progress…",
 	"menu.karabiner.status_not_primed": "🟡 Karabiner enabled — rules not applied (click to prime)",
@@ -460,7 +431,6 @@
 	"menu.karabiner.sticky_dialog_prompt": "Sticky cancellation delay (milliseconds)\nAfter this duration without a keypress, the one-shot modifier is cancelled.",
 	"menu.karabiner.simultaneous_dialog_title": "Karabiner — Combo activation delay",
 	"menu.karabiner.simultaneous_dialog_prompt": "Maximum delay (milliseconds) between the 1st\nand 2nd key of a shortcut to trigger the \"Combo\" slot\n(chord-style: keys pressed almost simultaneously).\n\n(default: %d ms)",
-
 	"menu.metrics.encrypt_toggle": "Encrypt logs on disk (Security)",
 	"dialog.metrics.progress_label": "Processing: %d / %d",
 	"dialog.metrics.complete_label": "Operation complete.\n\nFiles processed successfully: %d\nErrors encountered: %d",
@@ -477,7 +447,6 @@
 	"dialog.metrics.security_warning_body": "⚠️  WARNING: Metrics and keylogger are about to be enabled.\n\nThis system records your keystrokes and trackpad gesture activations.\n\n• Logs are stored in the Hammerspoon folder\n• Password fields are automatically ignored\n• It is recommended to PAUSE the script when entering sensitive data\n\nTo avoid interference with your custom gestures:\n• Remove macOS swipe 3/4-finger gestures if used\n• Disable Mission Control and App Exposé via gestures",
 	"menu.hotstrings.custom_label": "Custom",
 	"menu.hotstrings.consumed": "consumed",
-
 	"ui_typing.title": "Typing Metrics",
 	"ui_typing.label_from": "From:",
 	"ui_typing.label_to": "To:",
@@ -526,7 +495,6 @@
 	"ui_typing.search_close": "Close (Esc)",
 	"ui_typing.page_loading": "Loading interface...",
 	"ui_typing.pinch_hint": "Pinch (trackpad) to zoom.",
-
 	"ui_apps.title": "App Time Tracker",
 	"ui_apps.label_period": "Period:",
 	"ui_apps.label_date": "On:",
@@ -620,5 +588,80 @@
 	"ui_apps.modal_layouts": "Layouts used",
 	"ui_apps.modal_records": "Records",
 	"ui_apps.modal_hs_ai": "Hotstrings & AI",
-	"ui_apps.loading_data": "Loading data..."
+	"ui_apps.loading_data": "Loading data...",
+	"menu.paths.menu_item": "Configuration folder…",
+	"menu.paths.window_title": "Configuration folder — Ergopti",
+	"menu.paths.pick_prompt": "Select the configuration folder",
+	"editor.hotstrings.meta_desc": "Personal hotstrings",
+	"editor.hotstrings.window_title": "Personal hotstrings editor",
+	"editor.hotstrings.save_error": "Save error",
+	"hs_config.window_title": "Hotstring delays and colors",
+	"hs_config.cat_magickey": "★ key and expansion",
+	"hs_config.cat_autocorrection": "Autocorrection",
+	"hs_config.cat_rolls": "Rolls",
+	"hs_config.cat_sfbs": "SFB reduction",
+	"hs_config.cat_distances": "Distance reduction",
+	"hs_config.cat_personal": "Personal hotstrings",
+	"hs_config.color_inherit": "— inherits default —",
+	"hs_config.color_red": "Red (★)",
+	"hs_config.color_green": "Green (auto)",
+	"hs_config.color_orange": "Orange (rolls)",
+	"hs_config.color_blue": "Blue (personal)",
+	"hs_config.color_purple": "Purple",
+	"hs_config.color_cyan": "Cyan",
+	"hs_config.color_yellow": "Yellow",
+	"hs_config.color_gray": "Gray",
+
+	"editor.hotstrings.label_section": "Section:",
+	"editor.hotstrings.btn_new": "New…",
+	"editor.hotstrings.btn_rename": "Rename…",
+	"editor.hotstrings.btn_delete": "Delete",
+	"editor.hotstrings.col_trigger": "Trigger",
+	"editor.hotstrings.col_result": "Result",
+	"editor.hotstrings.col_word": "Word",
+	"editor.hotstrings.col_auto": "Auto",
+	"editor.hotstrings.col_case": "Case",
+	"editor.hotstrings.col_final": "Final",
+	"editor.hotstrings.label_trigger": "Trigger:",
+	"editor.hotstrings.label_result": "Result:",
+	"editor.hotstrings.chk_word": "Whole word",
+	"editor.hotstrings.chk_case": "Case sensitive",
+	"editor.hotstrings.chk_final": "Final result",
+	"editor.hotstrings.btn_add": "➕ Add",
+	"editor.hotstrings.chk_close_after": "Close after",
+	"editor.hotstrings.group_selected": "Selected hotstring",
+	"editor.hotstrings.btn_edit": "💾 Edit",
+	"editor.hotstrings.btn_delete_entry": "🗑 Delete",
+	"editor.hotstrings.no_section": "(no section)",
+	"editor.hotstrings.err_write": "⚠ Write error in personal_hotstrings.toml.",
+	"editor.hotstrings.saved_prefix": "✓ Saved — ",
+	"editor.hotstrings.err_trigger_required": "⚠ Trigger and result are required.",
+	"editor.hotstrings.err_no_section": "⚠ Select or create a section first.",
+	"editor.hotstrings.err_duplicate": "⚠ This trigger already exists in this section.",
+	"editor.hotstrings.err_select_to_edit": "⚠ Select a hotstring to edit.",
+	"editor.hotstrings.err_select_to_delete": "⚠ Select a hotstring to delete.",
+	"editor.hotstrings.title_confirm": "Confirmation",
+	"editor.hotstrings.title_error": "Error",
+	"editor.hotstrings.new_section_title": "New section",
+	"editor.hotstrings.new_section_prompt": "New section name (identifier, no spaces):",
+	"editor.hotstrings.err_section_exists": "This section already exists.",
+	"editor.hotstrings.desc_title": "Description",
+	"editor.hotstrings.desc_prompt": "Description shown in the menu for this section:",
+	"editor.hotstrings.err_no_section_selected": "No section selected.",
+	"editor.hotstrings.rename_title": "Rename",
+
+	"hs_config.file_level": "── File level ──",
+	"hs_config.btn_all_gray": "All gray",
+	"hs_config.btn_reset_all": "Reset all",
+	"hs_config.btn_close": "Close",
+	"hs_config.label_category": "Category:",
+	"hs_config.label_section": "Section:",
+	"hs_config.label_delay": "Delay (ms):",
+	"hs_config.label_color": "Color:",
+	"hs_config.default_prefix": "Default: ",
+	"hs_config.override_active": "override active",
+	"hs_config.none": "(none)",
+	"hs_config.category_prefix": "Category: ",
+	"hs_config.section_prefix": "Section: ",
+	"hs_config.file_level_short": "(file level)"
 }

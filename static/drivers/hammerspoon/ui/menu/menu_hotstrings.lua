@@ -14,6 +14,18 @@ local notifications = require("lib.notifications")
 local i18n          = require("lib.i18n")
 local LOG           = "menu_hotstrings"
 
+--- Resolves a description value that may be a plain string or a multilingual table.
+--- Falls back to the "fr" locale, then to an empty string.
+--- @param desc string|table|nil The raw description field.
+--- @return string The resolved description.
+local function resolve_desc(desc)
+	if type(desc) == "table" then
+		local code = i18n.get_locale()
+		return desc[code] or desc["fr"] or ""
+	end
+	return type(desc) == "string" and desc or ""
+end
+
 local dh_mod = require("modules.dynamic_hotstrings")
 -- Keymap is already loaded by init.lua before this module is required;
 -- require() returns the cached module with no side-effects.
@@ -241,8 +253,7 @@ function M.build_groups(ctx, only)
 						local ms_entry = type(ms) == "table" and ms[sec.name]
 						local mod_id   = type(ms_entry) == "table" and ms_entry.mod_id or ms_entry
 						if mod_id == "personal_info" then
-							local desc = (type(ms_entry) == "table" and type(ms_entry.description) == "string")
-										 and ms_entry.description or sec.description or "Remplissage de formulaires"
+							local desc = resolve_desc((type(ms_entry) == "table" and ms_entry.description) or sec.description)
 							local pi_items = buildPersonalInfoItems(ctx, desc)
 							if pi_items then
 								for _, pi in ipairs(pi_items) do
@@ -252,8 +263,8 @@ function M.build_groups(ctx, only)
 						end
 					else
 						local sec_on = ctx.keymap and type(ctx.keymap.is_section_enabled) == "function" and ctx.keymap.is_section_enabled(name, sec.name) or false
-						local lbl    = (type(sec.description) == "string" and sec.description ~= "")
-									   and sec.description or tostring(sec.name):gsub("_", " ")
+						local lbl    = resolve_desc(sec.description) ~= "" and resolve_desc(sec.description)
+									   or tostring(sec.name):gsub("_", " ")
 						lbl = ctx.applyTriggerChar(lbl)
 						sec_menu[#sec_menu + 1] = {
 							title    = sec.count ~= nil and (lbl .. " (" .. fmt_count(sec.count) .. ")") or lbl,
@@ -766,8 +777,8 @@ function M.build_custom(ctx)
 		if type(personal_secs) == "table" then
 			for _, sec in ipairs(personal_secs) do
 				if type(sec) == "table" and sec.name == state.custom_default_section then
-					local lbl = (type(sec.description) == "string" and sec.description ~= "")
-						and sec.description or tostring(sec.name):gsub("_", " ")
+					local lbl = resolve_desc(sec.description) ~= "" and resolve_desc(sec.description)
+						or tostring(sec.name):gsub("_", " ")
 					return ctx.applyTriggerChar(lbl)
 				end
 			end
