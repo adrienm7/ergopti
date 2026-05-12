@@ -827,14 +827,11 @@ GetCategoryTitle(Category) {
 ; ===================================
 
 BuildGesturesMenu() {
-    global Features, GestureAssignments, GESTURE_SLOTS, GESTURE_ACTIONS
-    global GESTURE_ACTION_NAMES, GESTURE_SLOT_LABELS
+    global Features, GestureAssignments, GESTURE_SLOTS, GESTURE_ACTIONS, GESTURE_SLOT_LABELS
 
     GMenu := Menu()
 
-    ; Canonical category toggle. AddCategoryToggleItem inserts at position
-    ; 1 (and a separator at 2), so the rest of the submenu is appended
-    ; AFTER and ends up at positions 3+.
+    ; Canonical category toggle — inserted at position 1 with separator at 2.
     GestEnabled := Features["Gestures"]["Enabled"].Enabled
     AddCategoryToggleItem(GMenu,
         "✅ Gestes activés (cliquer pour désactiver)",
@@ -842,64 +839,27 @@ BuildGesturesMenu() {
         GestEnabled,
         (*) => ToggleGesturesEnabled())
 
-    ; Setup items
     GMenu.Add("🔧 Configurer automatiquement (registre)", (*) => GestureAutoConfigureAction())
     GMenu.Add("📋 Instructions de configuration", (*) => GestureShowSetupInstructions())
     GMenu.Add("⚙ Ouvrir Pavé tactile (puis « Mouvements avancés »)", (*) => GestureOpenTouchpadSettings())
 
-    GMenu.Add() ; Separator
+    GMenu.Add()
 
-    ; Per-slot submenus — each slot shows all available actions as radio
-    ; items. Group separators are driven by the "--" sentinels embedded in
-    ; GESTURE_ACTION_NAMES (see modules/gestures.ahk), so this loop only
-    ; needs to translate sentinel → menu separator and skip duplicates.
-
+    ; Each slot becomes a single clickable item that opens a lazy GUI picker —
+    ; avoids pre-building hundreds of submenus (N slots × M actions).
     for Slot in GESTURE_SLOTS {
-        ; Separator between 3-finger and 4-finger groups
-        if (Slot == "tap_4") {
+        if (Slot == "tap_4")
             GMenu.Add()
-        }
-        SlotLabel := GESTURE_SLOT_LABELS[Slot]
+        SlotLabel     := GESTURE_SLOT_LABELS[Slot]
         CurrentAction := GestureAssignments.Has(Slot) ? GestureAssignments[Slot] : "none"
-        CurrentActionLabel := GESTURE_ACTIONS.Has(CurrentAction) ? GESTURE_ACTIONS[CurrentAction].Label : "Désactivé"
-
-        SlotMenu := Menu()
-        last_was_separator := true   ; suppress leading separators
-        for ActionName in GESTURE_ACTION_NAMES {
-            ; "--" sentinels mark category boundaries — render as a
-            ; menu separator (collapsing consecutive ones).
-            if (ActionName == "--") {
-                if !last_was_separator {
-                    SlotMenu.Add()
-                    last_was_separator := true
-                }
-                continue
-            }
-            if !GESTURE_ACTIONS.Has(ActionName)
-                continue
-            ActionLabel := GESTURE_ACTIONS[ActionName].Label
-            SlotMenu.Add(ActionLabel, MakeGestureSlotHandler(Slot, ActionName))
-            if (ActionName == CurrentAction) {
-                SlotMenu.Check(ActionLabel)
-            }
-            if !Features["Gestures"]["Enabled"].Enabled {
-                SlotMenu.Disable(ActionLabel)
-            }
-            last_was_separator := false
-        }
-        EntryLabel := SlotLabel . " : " . CurrentActionLabel
-        GMenu.Add(EntryLabel, SlotMenu)
-        if !Features["Gestures"]["Enabled"].Enabled {
+        CurrentLabel  := GESTURE_ACTIONS.Has(CurrentAction) ? GESTURE_ACTIONS[CurrentAction].Label : "Désactivé"
+        EntryLabel    := SlotLabel . " : " . CurrentLabel
+        GMenu.Add(EntryLabel, ((_s, _l) => (*) => ShowActionPicker(_l, GestureAssignments.Has(_s) ? GestureAssignments[_s] : "none", (Id) => SetGestureSlotAction(_s, Id)))(Slot, SlotLabel))
+        if !GestEnabled
             GMenu.Disable(EntryLabel)
-        }
     }
 
     return GMenu
-}
-
-; Creates a closure for a gesture slot action handler.
-MakeGestureSlotHandler(Slot, ActionName) {
-    return (*) => SetGestureSlotAction(Slot, ActionName)
 }
 
 ; Applies a new action to a gesture slot and reloads.
@@ -2421,46 +2381,20 @@ SetScriptShortcutAction(Slot, ActionName) {
     Reload
 }
 
-_MakeScriptShortcutHandler(Slot, ActionName) {
-    return (*) => SetScriptShortcutAction(Slot, ActionName)
-}
-
 ; Build the « Raccourcis de gestion du script » submenu — one entry per slot,
-; each opening a sub-submenu listing every gesture action so the user can
-; rebind the AltGr+ combos to any of them.
+; each opening a lazy GUI picker so the user can rebind the AltGr+ combos.
 BuildScriptShortcutsMenu() {
-    global SCRIPT_SHORTCUT_SLOTS, SCRIPT_SHORTCUT_LABELS, SCRIPT_SHORTCUT_DEFAULTS
-    global ScriptShortcutAssignments, GESTURE_ACTIONS, GESTURE_ACTION_NAMES
+    global SCRIPT_SHORTCUT_SLOTS, SCRIPT_SHORTCUT_LABELS, ScriptShortcutAssignments, GESTURE_ACTIONS
 
     SMenu := Menu()
+    ; Each slot becomes a single clickable item that opens a lazy GUI picker —
+    ; avoids pre-building a submenu with all actions for every slot.
     for Slot in SCRIPT_SHORTCUT_SLOTS {
-        Current := ScriptShortcutAssignments.Has(Slot) ? ScriptShortcutAssignments[Slot] : "none"
-        CurrentLabel := GESTURE_ACTIONS.Has(Current)
-            ? GESTURE_ACTIONS[Current].Label
-            : "Désactivé"
-        SlotMenu := Menu()
-        ; "--" sentinels in GESTURE_ACTION_NAMES become visual separators
-        ; in the slot picker so the user can see category boundaries
-        ; (Selection / Editing / Keys / Tabs / Windows / …).
-        last_was_separator := true   ; suppress leading separators
-        for ActionName in GESTURE_ACTION_NAMES {
-            if (ActionName == "--") {
-                if !last_was_separator {
-                    SlotMenu.Add()
-                    last_was_separator := true
-                }
-                continue
-            }
-            if !GESTURE_ACTIONS.Has(ActionName)
-                continue
-            ActionLabel := GESTURE_ACTIONS[ActionName].Label
-            SlotMenu.Add(ActionLabel, _MakeScriptShortcutHandler(Slot, ActionName))
-            if (ActionName == Current) {
-                SlotMenu.Check(ActionLabel)
-            }
-            last_was_separator := false
-        }
-        SMenu.Add(SCRIPT_SHORTCUT_LABELS[Slot] . " : " . CurrentLabel, SlotMenu)
+        Current      := ScriptShortcutAssignments.Has(Slot) ? ScriptShortcutAssignments[Slot] : "none"
+        CurrentLabel := GESTURE_ACTIONS.Has(Current) ? GESTURE_ACTIONS[Current].Label : "Désactivé"
+        SlotLabel    := SCRIPT_SHORTCUT_LABELS[Slot]
+        SMenu.Add(SlotLabel . " : " . CurrentLabel,
+            ((_s, _l) => (*) => ShowActionPicker(_l, ScriptShortcutAssignments.Has(_s) ? ScriptShortcutAssignments[_s] : "none", (Id) => SetScriptShortcutAction(_s, Id)))(Slot, SlotLabel))
     }
     return SMenu
 }
@@ -2661,20 +2595,19 @@ ShowKeyboardSlotPicker(Prefix) {
     }
 }
 
-; Open a GUI to pick an action for a given slot.
-; Used both from the "Ajouter…" flow and from clicking an existing slot.
-ShowKeyboardShortcutPicker(SlotId) {
-    global GESTURE_ACTION_NAMES, GESTURE_ACTIONS, KeyboardShortcutAssignments
-    LoggerStart("KeyboardShortcutsMenu", "Ouverture du sélecteur pour '%s'…", SlotId)
+; Generic action picker GUI — shows a searchable list of all available actions.
+; Title     : window title string
+; Current   : currently assigned action id (or "none")
+; OnConfirm : callback(ActionId) called when the user validates their pick
+ShowActionPicker(Title, Current, OnConfirm) {
+    global GESTURE_ACTION_NAMES, GESTURE_ACTIONS
+    LoggerStart("ActionPicker", "Ouverture du sélecteur '%s'…", Title)
 
-    Current := KeyboardShortcutAssignments.Has(SlotId) ? KeyboardShortcutAssignments[SlotId] : "none"
+    ; Build flat action list (ids + labels), skipping category sentinels
+    ActionIds    := []
+    ActionLabels := []
+    SelectedIdx  := 0
 
-    ; Build flat action list (labels + parallel id list), skipping headers/separators
-    ActionIds     := []
-    ActionLabels  := []
-    SelectedIdx   := 0
-
-    ; Add "Désactivé" as first entry
     ActionIds.Push("none")
     ActionLabels.Push("— Désactivé —")
     if (Current == "none")
@@ -2691,15 +2624,14 @@ ShowKeyboardShortcutPicker(SlotId) {
             SelectedIdx := ActionIds.Length
     }
 
-    SlotDisplay := GESTURE_ACTIONS.Has(SlotId) ? GESTURE_ACTIONS[SlotId].Label : SlotId
-    W := Gui("+AlwaysOnTop", "Raccourci : " . SlotDisplay)
+    W := Gui("+AlwaysOnTop", Title)
     W.SetFont("s10", "Segoe UI")
     W.MarginX := 12
     W.MarginY := 12
-    W.Add("Text", "xm", "Action pour " . SlotDisplay . " :")
+    W.Add("Text", "xm", "Action :")
 
-    SearchEdit := W.Add("Edit", "xm w320")
-    LB := W.Add("ListBox", "xm w320 r18", ActionLabels)
+    SearchEdit  := W.Add("Edit", "xm w320")
+    LB          := W.Add("ListBox", "xm w320 r18", ActionLabels)
     if (SelectedIdx > 0)
         LB.Choose(SelectedIdx)
 
@@ -2707,15 +2639,14 @@ ShowKeyboardShortcutPicker(SlotId) {
     W.Add("Button", "x+6 w80", "Annuler").OnEvent("Click", (*) => W.Destroy())
     W.Show()
 
-    ; Filter the ListBox as the user types in the search box
-    AllLabels  := ActionLabels.Clone()
+    AllLabels   := ActionLabels.Clone()
     FilteredIds := ActionIds.Clone()
     SearchEdit.OnEvent("Change", FilterList)
 
     FilterList(*) {
-        Query := StrLower(SearchEdit.Value)
-        NewLabels  := []
-        NewIds     := []
+        Query     := StrLower(SearchEdit.Value)
+        NewLabels := []
+        NewIds    := []
         for i, Lbl in AllLabels {
             if (Query == "" or InStr(StrLower(Lbl), Query)) {
                 NewLabels.Push(Lbl)
@@ -2736,9 +2667,18 @@ ShowKeyboardShortcutPicker(SlotId) {
             return
         ChosenId := FilteredIds[Idx]
         W.Destroy()
-        LoggerSuccess("KeyboardShortcutsMenu", "Raccourci '%s' → '%s' confirmé.", SlotId, ChosenId)
-        SetKeyboardShortcutAction(SlotId, ChosenId)
+        LoggerSuccess("ActionPicker", "Sélection confirmée → '%s'.", ChosenId)
+        OnConfirm(ChosenId)
     }
+}
+
+; Open a GUI to pick an action for a keyboard shortcut slot.
+; Used both from the "Ajouter…" flow and from clicking an existing slot.
+ShowKeyboardShortcutPicker(SlotId) {
+    global KeyboardShortcutAssignments, GESTURE_ACTIONS
+    Current      := KeyboardShortcutAssignments.Has(SlotId) ? KeyboardShortcutAssignments[SlotId] : "none"
+    SlotDisplay  := GESTURE_ACTIONS.Has(SlotId) ? GESTURE_ACTIONS[SlotId].Label : SlotId
+    ShowActionPicker("Raccourci : " . SlotDisplay, Current, (Id) => SetKeyboardShortcutAction(SlotId, Id))
 }
 
 FilePathsEditor(*) {
