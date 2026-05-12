@@ -100,31 +100,68 @@ function M.trigger_lookup()
 end
 
 --- Toggles a synthetic right-click hold state.
-local rightClickHeld = false
+local rightClickHeld  = false
+local leftClickHeld   = false
+local click_key_watcher = nil
+
+--- Starts the key watcher that releases any held synthetic click on the next keydown.
+local function start_click_key_watcher()
+	if click_key_watcher then return end
+	click_key_watcher = hs.eventtap.new({ hs.eventtap.event.types.keyDown }, function(_)
+		local pos = hs.mouse.absolutePosition()
+		if leftClickHeld then
+			pcall(function() hs.eventtap.event.newMouseEvent(hs.eventtap.event.types.leftMouseUp, pos):post() end)
+			leftClickHeld = false
+			Logger.info(LOG, "Synthetic Left-Click RELEASED by keydown.")
+		end
+		if rightClickHeld then
+			pcall(function() hs.eventtap.event.newMouseEvent(hs.eventtap.event.types.rightMouseUp, pos):post() end)
+			rightClickHeld = false
+			Logger.info(LOG, "Synthetic Right-Click RELEASED by keydown.")
+		end
+		-- Stop watcher once no click is held
+		pcall(function() click_key_watcher:stop() end)
+		click_key_watcher = nil
+		-- Pass the key event through unmodified
+		return false
+	end)
+	pcall(function() click_key_watcher:start() end)
+end
+
+--- Stops the key watcher if running.
+local function stop_click_key_watcher()
+	if not click_key_watcher then return end
+	pcall(function() click_key_watcher:stop() end)
+	click_key_watcher = nil
+end
+
 function M.toggle_right_click()
 	local pos = hs.mouse.absolutePosition()
 	if rightClickHeld then
 		pcall(function() hs.eventtap.event.newMouseEvent(hs.eventtap.event.types.rightMouseUp, pos):post() end)
 		rightClickHeld = false
 		Logger.info(LOG, "Synthetic Right-Click RELEASED.")
+		if not leftClickHeld then stop_click_key_watcher() end
 	else
 		pcall(function() hs.eventtap.event.newMouseEvent(hs.eventtap.event.types.rightMouseDown, pos):post() end)
 		rightClickHeld = true
 		Logger.info(LOG, "Synthetic Right-Click HELD.")
+		start_click_key_watcher()
 	end
 end
 
-local leftClickHeld = false
 function M.toggle_left_click()
 	local pos = hs.mouse.absolutePosition()
 	if leftClickHeld then
 		pcall(function() hs.eventtap.event.newMouseEvent(hs.eventtap.event.types.leftMouseUp, pos):post() end)
 		leftClickHeld = false
 		Logger.info(LOG, "Synthetic Left-Click RELEASED.")
+		if not rightClickHeld then stop_click_key_watcher() end
 	else
 		pcall(function() hs.eventtap.event.newMouseEvent(hs.eventtap.event.types.leftMouseDown, pos):post() end)
 		leftClickHeld = true
 		Logger.info(LOG, "Synthetic Left-Click HELD.")
+		start_click_key_watcher()
 	end
 end
 
@@ -339,18 +376,18 @@ sg("script_pause_toggle",    "⏸/▶ Suspendre / Reprendre", function()
 	local ok, sc = pcall(require, "modules.shortcuts.script_control")
 	if ok and type(sc.toggle) == "function" then pcall(sc.toggle) end
 end)
-sg("script_reload",          "↻ Recharger Hammerspoon", function() pcall(hs.reload) end)
+sg("script_reload",          "↻ Recharger",             function() pcall(hs.reload) end)
 sg("script_save_reload",     "↻ Sauver et recharger", function()
 	pcall(hs.eventtap.keyStroke, {"cmd"}, "s")
 	hs.timer.doAfter(0.3, function() pcall(hs.reload) end)
 end)
-sg("script_quit",            "✕ Quitter Hammerspoon", function()
+sg("script_quit",            "✕ Quitter",             function()
 	pcall(function() hs.closeConsole() end)
 	pcall(function() hs.timer.doAfter(0.1, function() os.exit(0) end) end)
 end)
 
 -- Debug
-sg("open_console",           "▤ Console Hammerspoon", function() pcall(hs.openConsole) end)
+sg("open_console",           "▤ Console",             function() pcall(hs.openConsole) end)
 
 -- Cmd letter shortcuts
 for _, letter in ipairs(CMD_LETTERS) do
@@ -367,6 +404,21 @@ for _, letter in ipairs(CMD_LETTERS) do
 		function() pcall(hs.eventtap.keyStroke, {"cmd", "shift"}, letter) end)
 end
 
+-- Ctrl letter shortcuts (macOS)
+for _, letter in ipairs(CMD_LETTERS) do
+	local upper = string.upper(letter)
+	sg("hs_ctrl_" .. letter,
+		"^ " .. upper .. " — Ctrl+" .. upper,
+		function() pcall(hs.eventtap.keyStroke, {"ctrl"}, letter) end)
+end
+
+for _, letter in ipairs(CMD_LETTERS) do
+	local upper = string.upper(letter)
+	sg("hs_ctrl_shift_" .. letter,
+		"^⇧ " .. upper .. " — Ctrl+Shift+" .. upper,
+		function() pcall(hs.eventtap.keyStroke, {"ctrl", "shift"}, letter) end)
+end
+
 
 
 
@@ -377,95 +429,201 @@ end
 -- =============================
 -- =============================
 
-M.AX_NAMES = {
+-- Path to the shared gesture_actions.toml, resolved relative to this file.
+-- actions.lua lives at static/drivers/hammerspoon/modules/gestures/actions.lua
+-- so we climb 4 levels to reach static/, then enter shared/.
+local _self_path = (debug.getinfo(1, "S").source:sub(2):match("^(.*[/\\])") or "./")
+local _shared_toml = _self_path .. "../../../../shared/actions.toml"
+
+--- Parses the shared actions.toml using a lightweight line-by-line reader.
+--- Returns { sg_order = [...], ax_order = [...], sg_actions = {name={platform=...}}, ax_actions = {name={platform=...}} }
+local function load_shared_actions(path)
+	local result = { sg_order = {}, ax_order = {}, sg_actions = {}, ax_actions = {} }
+	local ok, f = pcall(io.open, path, "r")
+	if not ok or not f then
+		Logger.warn("gestures.actions", "Shared actions TOML not found: %s — using fallback.", tostring(path))
+		return nil
+	end
+
+	local current_section = nil
+	local current_key     = nil
+	local in_array        = false
+	local array_buf       = {}
+	local current_action  = nil  -- e.g. "sg_actions.left_click_toggle"
+
+	for line in f:lines() do
+		local trimmed = line:match("^%s*(.-)%s*$")
+
+		-- Skip blank lines and comments
+		if trimmed == "" or trimmed:sub(1, 1) == "#" then goto continue end
+
+		-- Multi-line array continuation
+		if in_array then
+			if trimmed:sub(1, 1) == "]" then
+				-- End of array
+				if current_section == "sg_order" then
+					result.sg_order = array_buf
+				elseif current_section == "ax_order" then
+					result.ax_order = array_buf
+				end
+				in_array  = false
+				array_buf = {}
+			else
+				-- Collect array items: strip trailing comma and quotes
+				local item = trimmed:match('^"(.-)"')
+				if item then array_buf[#array_buf + 1] = item end
+			end
+			goto continue
+		end
+
+		-- Section header [name] or [name.subkey]
+		local section = trimmed:match("^%[([^%[%]]+)%]$")
+		if section then
+			current_section = section
+			current_action  = nil
+			-- Pre-create entry for known action sections
+			local kind, name = section:match("^(sg_actions)%.(.+)$")
+			if not kind then kind, name = section:match("^(ax_actions)%.(.+)$") end
+			if kind and name then
+				current_action = section
+				result[kind][name] = result[kind][name] or {}
+			end
+			goto continue
+		end
+
+		-- Key = value
+		local key, val = trimmed:match("^([%w_]+)%s*=%s*(.+)$")
+		if key and val then
+			-- Unquote string values
+			local str_val = val:match('^"(.-)"$') or val
+			-- Array opening without closing on same line
+			if val:sub(1, 1) == "[" and not val:find("]", 2, true) then
+				current_key = key
+				in_array    = true
+				array_buf   = {}
+			elseif current_action then
+				-- Store attribute of current [sg_actions.X] or [ax_actions.X]
+				local kind, name = current_action:match("^(sg_actions)%.(.+)$")
+				if not kind then kind, name = current_action:match("^(ax_actions)%.(.+)$") end
+				if kind and name then
+					result[kind][name][key] = str_val
+				end
+			end
+		end
+
+		::continue::
+	end
+	f:close()
+	return result
+end
+
+local _shared = load_shared_actions(_shared_toml)
+
+--- Builds a picker-order list from the shared TOML, keeping only entries
+--- matching the given platform ("hs") plus sentinels ("--", "#…").
+--- Placeholder keys (_cmd_placeholder, _cmd_shift_placeholder) are replaced
+--- inline with the dynamically-registered cmd_* / cmd_shift_* names.
+local function build_sg_names(shared)
+	if not shared then
+		-- Fallback: keep previous hard-coded list intact via inline table
+		return nil
+	end
+	local out = {}
+	for _, item in ipairs(shared.sg_order) do
+		-- Sentinels and headers always pass through (TOML uses "--" and "#…")
+		if item == "--" then
+			out[#out + 1] = "-"
+		elseif item:sub(1, 1) == "#" then
+			out[#out + 1] = item
+		elseif item == "_cmd_placeholder" then
+			out[#out + 1] = "#Raccourcis ⌘ (Cmd)"
+			for _, l in ipairs(CMD_LETTERS) do out[#out + 1] = "cmd_" .. l end
+		elseif item == "_cmd_shift_placeholder" then
+			out[#out + 1] = "#Raccourcis ⌘⇧ (Cmd+Shift)"
+			for _, l in ipairs(CMD_LETTERS) do out[#out + 1] = "cmd_shift_" .. l end
+		elseif item == "_hs_ctrl_placeholder" then
+			out[#out + 1] = "#Raccourcis ^ (Ctrl) — macOS"
+			for _, l in ipairs(CMD_LETTERS) do out[#out + 1] = "hs_ctrl_" .. l end
+		elseif item == "_hs_ctrl_shift_placeholder" then
+			out[#out + 1] = "#Raccourcis ^⇧ (Ctrl+Shift) — macOS"
+			for _, l in ipairs(CMD_LETTERS) do out[#out + 1] = "hs_ctrl_shift_" .. l end
+		elseif item:sub(1, 1) == "_" then
+			-- ahk-only placeholders (_ctrl_placeholder, _win_placeholder…): skip silently
+		else
+			local meta = shared.sg_actions[item]
+			local platform = meta and meta.platform or "all"
+			if platform == "all" or platform == "hs" then
+				out[#out + 1] = item
+			end
+		end
+	end
+	return out
+end
+
+local function build_ax_names(shared)
+	if not shared then return nil end
+	local out = {}
+	for _, item in ipairs(shared.ax_order) do
+		local meta = shared.ax_actions[item]
+		local platform = meta and meta.platform or "all"
+		if platform == "all" or platform == "hs" then
+			out[#out + 1] = item
+		end
+	end
+	return out
+end
+
+M.AX_NAMES = build_ax_names(_shared) or {
 	"none", "char", "char_sel", "words", "words_sel",
 	"line_arrow", "line_sel", "lines", "paragraphs", "line_bounds", "document",
 	"tabs", "windows", "spaces", "volume", "brightness", "tracks",
 }
 
-M.SG_NAMES = {
-	"none",
-	"-",
-	"#Curseur et Texte",
+M.SG_NAMES = build_sg_names(_shared) or {
+	"none", "-",
+	"#Souris et Navigation",
+	"left_click_toggle", "right_click_toggle", "lookup",
+	"app_switcher", "app_previous", "app_window_previous",
+	"-", "#Touches",
+	"enter", "tab", "escape", "backspace", "delete",
+	"-", "#Onglets",
+	"tab_new", "tab_close", "tab_prev", "tab_next",
+	"-", "#Fenêtres",
+	"win_prev", "win_next", "close_window", "fullscreen",
+	"snap_left", "snap_right", "maximize",
+	"-", "#Espaces / Bureaux",
+	"space_prev", "space_next", "mission_control", "app_expose",
+	"-", "#Curseur et Texte",
 	"arrow_up", "arrow_down", "arrow_left", "arrow_right",
 	"word_prev", "word_next",
 	"line_up", "line_down", "line_start", "line_end",
 	"para_prev", "para_next", "doc_start", "doc_end",
-	"-",
-	"#Sélection de Texte",
+	"-", "#Sélection de Texte",
 	"sel_up", "sel_down", "sel_left", "sel_right",
 	"sel_word_prev", "sel_word_next",
-	"-",
-	"#Onglets et Fenêtres",
-	"tab_prev", "tab_next", "tab_new", "tab_close",
-	"win_prev", "win_next", "close_window", "fullscreen",
-	"snap_left", "snap_right", "maximize",
-	"-",
-	"#Système et Espaces",
-	"space_prev", "space_next", "mission_control", "app_expose",
-	"app_switcher", "app_previous", "app_window_previous",
-	"lock_screen", "notification_center",
-	"-",
-	"#Sélection et Souris",
-	"left_click_toggle", "right_click_toggle", "lookup",
-	"-",
-	"#Édition et Touches",
-	"enter", "tab", "escape", "backspace", "delete",
-	"-",
-	"#Raccourcis ⌘ (Cmd)",
-	"-",
-	"#Raccourcis ⌘⇧ (Cmd+Shift)",
-	"-",
-	"#Multimédia",
-	"vol_up", "vol_down", "mute",
-	"brightness_up", "brightness_down",
+	"-", "#Médias",
+	"vol_up", "vol_down", "mute", "brightness_up", "brightness_down",
 	"track_play", "track_next", "track_prev",
-	"-",
-	"#Captures d'écran",
+	"-", "#Captures d'écran",
 	"screenshot_window_clipboard", "screenshot_window_save",
 	"screenshot_region_clipboard", "screenshot_region_save",
 	"screenshot_fullscreen_clipboard", "screenshot_fullscreen_save",
-	"-",
-	"#Applications et Statistiques",
+	"-", "#Système",
+	"lock_screen", "notification_center",
+	"-", "#Interface",
 	"open_metrics_typing", "open_metrics_apps",
 	"open_hotstrings_editor", "open_paths_editor",
+	"-", "#Fichiers",
 	"open_script_source", "open_personal_shortcuts",
 	"open_personal_hotstrings", "open_personal_info",
 	"open_config", "open_logs_folder", "open_today_log",
-	"-",
-	"#Gestion du Script",
+	"-", "#Gestion du Script",
 	"script_pause_toggle", "script_reload", "script_save_reload", "script_quit",
+	"-", "#Debug",
 	"open_console",
+	"-", "#Raccourcis ⌘ (Cmd)",
+	"-", "#Raccourcis ⌘⇧ (Cmd+Shift)",
 }
-
-local function insert_cmd_shortcuts_in_picker_order()
-	local function find_index(title)
-		for i, name in ipairs(M.SG_NAMES) do
-			if name == title then return i end
-		end
-		return nil
-	end
-
-	local cmd_header_idx = find_index("#Raccourcis ⌘ (Cmd)")
-	if cmd_header_idx then
-		local insert_at = cmd_header_idx + 1
-		for _, letter in ipairs(CMD_LETTERS) do
-			table.insert(M.SG_NAMES, insert_at, "cmd_" .. letter)
-			insert_at = insert_at + 1
-		end
-	end
-
-	local cmd_shift_header_idx = find_index("#Raccourcis ⌘⇧ (Cmd+Shift)")
-	if cmd_shift_header_idx then
-		local insert_at = cmd_shift_header_idx + 1
-		for _, letter in ipairs(CMD_LETTERS) do
-			table.insert(M.SG_NAMES, insert_at, "cmd_shift_" .. letter)
-			insert_at = insert_at + 1
-		end
-	end
-end
-
-insert_cmd_shortcuts_in_picker_order()
 
 function M.get_label(name)
 	if not name then return AX["none"].label end

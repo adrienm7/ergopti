@@ -168,16 +168,20 @@ global GESTURE_ACTIONS := Map(
         Label: "Désactivé",
         Fn: (*) => 0,
     },
-    ; --- Selection & navigation ---
+    ; --- Souris ---
     "left_click_toggle", {
-        Label: "Toggle clic gauche maintenu",
+        Label: "🖱 L Clic gauche (maint.)",
         Fn: (*) => GestureToggleLeftClick(),
     },
+    "right_click_toggle", {
+        Label: "🖱 R Clic droit (maint.)",
+        Fn: (*) => GestureToggleRightClick(),
+    },
     "app_switcher", {
-        Label: "Alt-Tab",
+        Label: "⇥ Alt+Tab — App. précédente",
         Fn: (*) => SendInput("!{Tab}"),
     },
-    ; --- Editing ---
+    ; --- Édition ---
     "copy", {
         Label: "Copier",
         Fn: (*) => SendInput("^c"),
@@ -206,137 +210,228 @@ global GESTURE_ACTIONS := Map(
         Label: "Rechercher",
         Fn: (*) => SendInput("^f"),
     },
-    ; --- Keys ---
+    ; --- Touches ---
     "enter", {
-        Label: "Entrée",
+        Label: "↵ Entrée",
         Fn: (*) => SendInput("{Enter}"),
     },
     "tab", {
-        Label: "Tab",
+        Label: "⇥ Tab",
         Fn: (*) => SendInput("{Tab}"),
     },
     "escape", {
-        Label: "Échap",
+        Label: "⎋ Échap",
         Fn: (*) => SendInput("{Escape}"),
     },
     "backspace", {
-        Label: "Suppr. arrière",
+        Label: "⌫ Suppr. arrière",
         Fn: (*) => SendInput("{BackSpace}"),
     },
     "delete", {
-        Label: "Supprimer",
+        Label: "⌦ Suppr. avant",
         Fn: (*) => SendInput("{Delete}"),
     },
-    ; --- Tabs ---
+    ; --- Onglets ---
     "tab_new", {
-        Label: "Nouvel onglet",
+        Label: "⧉ + Nouvel onglet",
         Fn: (*) => SendInput("^t"),
     },
     "tab_close", {
-        Label: "Fermer onglet",
+        Label: "⧉ × Fermer onglet",
         Fn: (*) => SendInput("^w"),
     },
     "tab_prev", {
-        Label: "Onglet précédent",
+        Label: "⧉ ← Onglet précédent",
         Fn: (*) => GestureSendShortcut("^+{Tab}"),
     },
     "tab_next", {
-        Label: "Onglet suivant",
+        Label: "⧉ → Onglet suivant",
         Fn: (*) => GestureSendShortcut("^{Tab}"),
     },
-    ; --- Browser / history navigation ---
+    ; --- Navigation navigateur ---
     "nav_back", {
-        Label: "Précédent (navigation)",
+        Label: "← Précédent (navigation)",
         Fn: (*) => GestureSendShortcut("!{Left}"),
     },
     "nav_forward", {
-        Label: "Suivant (navigation)",
+        Label: "→ Suivant (navigation)",
         Fn: (*) => GestureSendShortcut("!{Right}"),
     },
-    ; --- Windows & Desktops ---
+    ; --- Fenêtres & Bureaux ---
     "win_prev", {
-        Label: "Fenêtre précédente (cycle)",
+        Label: "◱ ← Fenêtre précédente",
         Fn: (*) => GestureCycleWindows(False),
     },
     "win_next", {
-        Label: "Fenêtre suivante (cycle)",
+        Label: "◱ → Fenêtre suivante",
         Fn: (*) => GestureCycleWindows(True),
     },
     "win_app_prev", {
-        Label: "Fenêtre précédente de l'app",
+        Label: "◱ ← Fenêtre préc. (même app)",
         Fn: (*) => GestureCycleAppWindows(False),
     },
     "win_app_next", {
-        Label: "Fenêtre suivante de l'app",
+        Label: "◱ → Fenêtre suiv. (même app)",
         Fn: (*) => GestureCycleAppWindows(True),
     },
     "close_window", {
-        Label: "Fermer la fenêtre",
+        Label: "◱ × Fermer la fenêtre",
         Fn: (*) => SendInput("!{F4}"),
     },
     "fullscreen", {
-        Label: "Plein écran",
+        Label: "📺 Plein écran",
         Fn: (*) => SendInput("{F11}"),
     },
     "snap_left", {
-        Label: "Ancrer à gauche",
+        Label: "◧ ← Ancrer à gauche",
         Fn: (*) => SendInput("#{Left}"),
     },
     "snap_right", {
-        Label: "Ancrer à droite",
+        Label: "◨ → Ancrer à droite",
         Fn: (*) => SendInput("#{Right}"),
     },
     "maximize", {
-        Label: "Maximiser",
+        Label: "🔲 Maximiser",
         Fn: (*) => SendInput("#{Up}"),
     },
     "desktop_prev", {
-        Label: "Bureau précédent",
+        Label: "▢ ← Bureau précédent",
         Fn: (*) => SendInput("^#{Left}"),
     },
     "desktop_next", {
-        Label: "Bureau suivant",
+        Label: "▢ → Bureau suivant",
         Fn: (*) => SendInput("^#{Right}"),
     },
     "desktop_new", {
-        Label: "Nouveau bureau",
+        Label: "▢ + Nouveau bureau",
         Fn: (*) => SendInput("^#d"),
     },
     "desktop_close", {
-        Label: "Fermer le bureau",
+        Label: "▢ × Fermer le bureau",
         Fn: (*) => SendInput("^#{F4}"),
     },
     "task_view", {
-        Label: "Vue des tâches",
+        Label: "▢ Vue des tâches",
         Fn: (*) => SendInput("#{Tab}"),
     },
     "minimize_all", {
-        Label: "Tout minimiser",
+        Label: "◱ Tout minimiser",
         Fn: (*) => SendInput("#d"),
     },
-    ; --- Media ---
+    ; --- Déplacement curseur ---
+    "word_prev", {
+        Label: "W ← Mot précédent",
+        Fn: (*) => SendInput("^{Left}"),
+    },
+    "word_next", {
+        Label: "W → Mot suivant",
+        Fn: (*) => SendInput("^{Right}"),
+    },
+    "line_up", {
+        Label: "↕ ↑ Ligne précédente",
+        Fn: (*) => SendInput("{Up}"),
+    },
+    "line_down", {
+        Label: "↕ ↓ Ligne suivante",
+        Fn: (*) => SendInput("{Down}"),
+    },
+    "line_start", {
+        Label: "⇤ Début de ligne",
+        Fn: (*) => SendInput("{Home}"),
+    },
+    "line_end", {
+        Label: "⇥ Fin de ligne",
+        Fn: (*) => SendInput("{End}"),
+    },
+    "para_prev", {
+        Label: "¶ ↑ Paragraphe précédent",
+        Fn: (*) => SendInput("^{Up}"),
+    },
+    "para_next", {
+        Label: "¶ ↓ Paragraphe suivant",
+        Fn: (*) => SendInput("^{Down}"),
+    },
+    "doc_start", {
+        Label: "⤒ Début du document",
+        Fn: (*) => SendInput("^{Home}"),
+    },
+    "doc_end", {
+        Label: "⤓ Fin du document",
+        Fn: (*) => SendInput("^{End}"),
+    },
+    ; --- Flèches ---
+    "arrow_up", {
+        Label: "↑ Flèche Haut",
+        Fn: (*) => SendInput("{Up}"),
+    },
+    "arrow_down", {
+        Label: "↓ Flèche Bas",
+        Fn: (*) => SendInput("{Down}"),
+    },
+    "arrow_left", {
+        Label: "← Flèche Gauche",
+        Fn: (*) => SendInput("{Left}"),
+    },
+    "arrow_right", {
+        Label: "→ Flèche Droite",
+        Fn: (*) => SendInput("{Right}"),
+    },
+    ; --- Sélection ---
+    "sel_up", {
+        Label: "✎ ↑ Sélection Haut",
+        Fn: (*) => SendInput("+{Up}"),
+    },
+    "sel_down", {
+        Label: "✎ ↓ Sélection Bas",
+        Fn: (*) => SendInput("+{Down}"),
+    },
+    "sel_left", {
+        Label: "✎ ← Sélection Gauche",
+        Fn: (*) => SendInput("+{Left}"),
+    },
+    "sel_right", {
+        Label: "✎ → Sélection Droite",
+        Fn: (*) => SendInput("+{Right}"),
+    },
+    "sel_word_prev", {
+        Label: "✎ W ← Sél. Mot préc.",
+        Fn: (*) => SendInput("^+{Left}"),
+    },
+    "sel_word_next", {
+        Label: "✎ W → Sél. Mot suiv.",
+        Fn: (*) => SendInput("^+{Right}"),
+    },
+    ; --- Médias ---
     "vol_up", {
-        Label: "Volume +",
+        Label: "🔊 + Volume +",
         Fn: (*) => SendInput("{Volume_Up}"),
     },
     "vol_down", {
-        Label: "Volume -",
+        Label: "🔊 - Volume -",
         Fn: (*) => SendInput("{Volume_Down}"),
     },
     "mute", {
-        Label: "Muet/Unmute",
+        Label: "🔇 Muet/Unmute",
         Fn: (*) => SendInput("{Volume_Mute}"),
     },
+    "brightness_up", {
+        Label: "☀ + Luminosité +",
+        Fn: (*) => SendInput("{Brightness_Up}"),
+    },
+    "brightness_down", {
+        Label: "☀ - Luminosité -",
+        Fn: (*) => SendInput("{Brightness_Down}"),
+    },
     "track_play", {
-        Label: "Lecture/Pause",
+        Label: "⏯ Lecture/Pause",
         Fn: (*) => SendInput("{Media_Play_Pause}"),
     },
     "track_next", {
-        Label: "Piste suivante",
+        Label: "⏭ Piste suivante",
         Fn: (*) => SendInput("{Media_Next}"),
     },
     "track_prev", {
-        Label: "Piste précédente",
+        Label: "⏮ Piste précédente",
         Fn: (*) => SendInput("{Media_Prev}"),
     },
     ; --- System ---
@@ -348,39 +443,39 @@ global GESTURE_ACTIONS := Map(
     ; their current workflow without producing files they then have to
     ; clean up.
     "screenshot_window_clipboard", {
-        Label: "Capture d’écran de la fenêtre active (presse-papiers)",
+        Label: "📸 ⊞ Copier fenêtre",
         Fn: (*) => GestureScreenshotWindow("clipboard"),
     },
     "screenshot_window_save", {
-        Label: "Capture d’écran de la fenêtre active (sauver sur disque)",
+        Label: "📸 ⊞ Sauver fenêtre",
         Fn: (*) => GestureScreenshotWindow("save"),
     },
     "screenshot_region_clipboard", {
-        Label: "Capture d’écran d’une zone à sélectionner (presse-papiers)",
+        Label: "📸 ⬚ Copier région",
         Fn: (*) => GestureScreenshotRegion("clipboard"),
     },
     "screenshot_region_save", {
-        Label: "Capture d’écran d’une zone à sélectionner (sauver sur disque)",
+        Label: "📸 ⬚ Sauver région",
         Fn: (*) => GestureScreenshotRegion("save"),
     },
     "screenshot_fullscreen_clipboard", {
-        Label: "Capture d’écran entier (presse-papiers)",
+        Label: "📸 🖥 Copier écran",
         Fn: (*) => GestureScreenshotFullscreen("clipboard"),
     },
     "screenshot_fullscreen_save", {
-        Label: "Capture d’écran entier (sauver sur disque)",
+        Label: "📸 🖥 Sauver écran",
         Fn: (*) => GestureScreenshotFullscreen("save"),
     },
     "screen_record", {
-        Label: "Capture vidéo (Xbox Game Bar)",
+        Label: "⏺ Capture vidéo",
         Fn: (*) => SendInput("#!r"),
     },
     "lock_screen", {
-        Label: "Verrouiller",
+        Label: "🔒 Verrouiller",
         Fn: (*) => DllCall("LockWorkStation"),
     },
     "notification_center", {
-        Label: "Notifications",
+        Label: "🔔 Notifications",
         Fn: (*) => SendInput("#n"),
     },
     ; --- UI windows ---
@@ -388,68 +483,68 @@ global GESTURE_ACTIONS := Map(
     ; closed, open it; if open and focused, close it; if open but in the
     ; background, raise it to the foreground.
     "open_metrics_typing", {
-        Label: "📊 Métriques de frappe",
+        Label: "📊 Stats Frappe",
         Fn: (*) => GestureToggleOrFocusUI("metrics_typing"),
     },
     "open_metrics_apps", {
-        Label: "📊 Temps sur les applications",
+        Label: "📊 Stats Applications",
         Fn: (*) => GestureToggleOrFocusUI("metrics_apps"),
     },
     "open_hotstrings_editor", {
-        Label: "✏️ Éditeur de hotstrings personnels",
+        Label: "⌨ Éditeur Hotstrings",
         Fn: (*) => GestureToggleOrFocusUI("hotstrings_editor"),
     },
     "open_paths_editor", {
-        Label: "📂 Dossier de configuration (éditeur)",
+        Label: "📂 Éditeur Chemins",
         Fn: (*) => GestureToggleOrFocusUI("paths_editor"),
     },
-    ; --- Open user files / folders ---
+    ; --- Fichiers utilisateur ---
     "open_script_source", {
-        Label: "✎ Ouvrir ErgoptiPlus.ahk",
+        Label: "🛠 Code Source",
         Fn: (*) => Run('notepad.exe "' . A_ScriptFullPath . '"'),
     },
     "open_personal_shortcuts", {
-        Label: "✎ Éditer personal_shortcuts.ahk",
+        Label: "👤 Raccourcis perso",
         Fn: (*) => GestureEditPersonalShortcuts(),
     },
     "open_personal_hotstrings", {
-        Label: "Ouvrir personal_hotstrings.toml",
+        Label: "👤 Hotstrings perso",
         Fn: (*) => GestureOpenIfExists(ScriptInformation["PersonalTomlPath"]),
     },
     "open_personal_info", {
-        Label: "Ouvrir personal_info.toml",
+        Label: "👤 Infos perso",
         Fn: (*) => GestureOpenIfExists(ScriptInformation["PersonalInfoTomlPath"]),
     },
     "open_config", {
-        Label: "Ouvrir config.toml",
+        Label: "⚙ Configuration",
         Fn: (*) => GestureOpenIfExists(IsSet(ConfigurationFile) ? ConfigurationFile : ""),
     },
     "open_logs_folder", {
-        Label: "Ouvrir le dossier de logs",
+        Label: "📁 Dossier Logs",
         Fn: (*) => OpenLogsFolder(),
     },
     "open_today_log", {
-        Label: "Ouvrir le fichier de log du jour",
+        Label: "📄 Log du jour",
         Fn: (*) => OpenTodayLog(),
     },
-    ; --- Script management ---
+    ; --- Gestion du script ---
     "script_pause_toggle", {
-        Label: "Suspendre / Reprendre ErgoptiPlus",
+        Label: "⏸/▶ Suspendre / Reprendre",
         Fn: (*) => ToggleSuspend(),
     },
     "script_reload", {
-        Label: "↻ Recharger ErgoptiPlus",
+        Label: "↻ Recharger",
         Fn: (*) => Reload(),
     },
     "script_save_reload", {
-        Label: "↻ Sauver (Ctrl+S) et recharger",
+        Label: "↻ Sauver et recharger",
         Fn: (*) => GestureSaveAndReload(),
     },
     "script_quit", {
-        Label: "✕ Quitter ErgoptiPlus",
+        Label: "✕ Quitter",
         Fn: (*) => ExitApp(),
     },
-    ; --- Debug (AutoHotkey-only — Hammerspoon's Console covers all three) ---
+    ; --- Debug (AHK uniquement — la Console Hammerspoon couvre les trois) ---
     "open_window_spy", {
         Label: "Window Spy",
         Fn: (*) => WindowSpy(),
@@ -463,6 +558,29 @@ global GESTURE_ACTIONS := Map(
         Fn: (*) => KeyHistory(),
     },
 )
+
+; Ctrl+lettre, Ctrl+Shift+lettre, Win+lettre, Alt+lettre — dynamiques (26 × 4).
+_GestureLetters := "abcdefghijklmnopqrstuvwxyz"
+loop StrLen(_GestureLetters) {
+    _L := SubStr(_GestureLetters, A_Index, 1)
+    _U := StrUpper(_L)
+    GESTURE_ACTIONS["ctrl_" . _L] := {
+        Label: "^ " . _U . " — Ctrl+" . _U,
+        Fn: ((_k) => (*) => GestureSendShortcut("^" . _k))(_L),
+    }
+    GESTURE_ACTIONS["ctrl_shift_" . _L] := {
+        Label: "^⇧ " . _U . " — Ctrl+Shift+" . _U,
+        Fn: ((_k) => (*) => GestureSendShortcut("^+" . _k))(_L),
+    }
+    GESTURE_ACTIONS["win_" . _L] := {
+        Label: "⊞ " . _U . " — Win+" . _U,
+        Fn: ((_k) => (*) => GestureSendShortcut("#" . _k))(_L),
+    }
+    GESTURE_ACTIONS["alt_" . _L] := {
+        Label: "⎇ " . _U . " — Alt+" . _U,
+        Fn: ((_k) => (*) => GestureSendShortcut("!" . _k))(_L),
+    }
+}
 
 ; Opens an arbitrary path in Notepad if it exists. Used by every "open user
 ; file" gesture so a fresh install with no personal_info.toml yet quietly
@@ -542,65 +660,81 @@ GestureEditPersonalShortcuts() {
     Run('notepad.exe "' . Path . '"')
 }
 
-; Ordered list of action names for the menu, with "--" sentinels marking
-; category boundaries. The menu builder turns each "--" into a visual
-; separator so the picker stays scannable at a glance instead of being
-; one long flat scroll. Mirrors modules/gestures/actions.SG_NAMES on the
-; macOS side — same ids, same order, same separators — so a user moving
-; between platforms sees the exact same picker, with platform-specific
-; particularities (Hammerspoon Console vs AHK's Window Spy / List Vars /
-; Key History triplet, macOS-only spaces / cursor moves) where they belong.
-global GESTURE_ACTION_NAMES := [
-    "none",
-    "--",
-    ; Selection & navigation
-    "left_click_toggle", "app_switcher",
-    "--",
-    ; Editing
-    "copy", "paste", "cut", "undo", "redo", "select_all", "find",
-    "--",
-    ; Keys
-    "enter", "tab", "escape", "backspace", "delete",
-    "--",
-    ; Tabs
-    "tab_new", "tab_close", "tab_prev", "tab_next",
-    "--",
-    ; Browser / history navigation
-    "nav_back", "nav_forward",
-    "--",
-    ; Windows & Desktops
-    "win_prev", "win_next", "win_app_prev", "win_app_next", "close_window", "fullscreen",
-    "snap_left", "snap_right", "maximize",
-    "desktop_prev", "desktop_next", "desktop_new", "desktop_close",
-    "task_view", "minimize_all",
-    "--",
-    ; Media
-    "vol_up", "vol_down", "mute",
-    "track_play", "track_next", "track_prev",
-    "--",
-    ; System
-    "screenshot_window_clipboard", "screenshot_window_save",
-    "screenshot_region_clipboard", "screenshot_region_save",
-    "screenshot_fullscreen_clipboard", "screenshot_fullscreen_save",
-    "screen_record",
-    "lock_screen", "notification_center",
-    "--",
-    ; UI windows
-    "open_metrics_typing", "open_metrics_apps",
-    "open_hotstrings_editor", "open_paths_editor",
-    "--",
-    ; Open user files / folders
-    "open_script_source", "open_personal_shortcuts",
-    "open_personal_hotstrings", "open_personal_info",
-    "open_config",
-    "open_logs_folder", "open_today_log",
-    "--",
-    ; Script management
-    "script_pause_toggle", "script_reload", "script_save_reload", "script_quit",
-    "--",
-    ; Debug (AutoHotkey-only — Hammerspoon's Console covers all three)
-    "open_window_spy", "open_list_vars", "open_key_history",
-]
+; Ordered list of action names for the menu — built from the shared TOML so
+; Hammerspoon and AHK always show the same picker order, filtering each side
+; to its own platform entries. "--" entries become visual separators;
+; "#Titre" entries become non-selectable section headers.
+global GESTURE_ACTION_NAMES := []
+global GESTURE_AX_NAMES := []
+
+; Path to the shared cross-platform action registry.
+; Resolved from _StaticDir which is already set in ErgoptiPlus.ahk.
+_GestureSharedToml := _StaticDir . "\shared\actions.toml"
+
+_GestureTomlData := ParseTomlFile(_GestureSharedToml)
+
+; Build GESTURE_ACTION_NAMES from [sg_order].items, keeping only entries that
+; are either a sentinel ("--", "#…") or an action whose platform is "all" / "ahk".
+if _GestureTomlData.Has("sg_order") && _GestureTomlData["sg_order"].Has("items") {
+    _SgItems := _GestureTomlData["sg_order"]["items"]
+    for _Item in _SgItems {
+        ; Sentinels and headers pass through unconditionally
+        if (_Item = "--" || SubStr(_Item, 1, 1) = "#") {
+            GESTURE_ACTION_NAMES.Push(_Item)
+            continue
+        }
+        ; Placeholder keys (_cmd_placeholder, _ctrl_placeholder…) are replaced
+        ; by the dynamic ctrl_* block inserted below — skip them here
+        if (SubStr(_Item, 1, 1) = "_") {
+            if (_Item = "_ctrl_placeholder") {
+                GESTURE_ACTION_NAMES.Push("#Raccourcis ^ (Ctrl)")
+                _CtrlLetters := "abcdefghijklmnopqrstuvwxyz"
+                loop StrLen(_CtrlLetters)
+                    GESTURE_ACTION_NAMES.Push("ctrl_" . SubStr(_CtrlLetters, A_Index, 1))
+            } else if (_Item = "_ctrl_shift_placeholder") {
+                GESTURE_ACTION_NAMES.Push("#Raccourcis ^⇧ (Ctrl+Shift)")
+                _CtrlLetters := "abcdefghijklmnopqrstuvwxyz"
+                loop StrLen(_CtrlLetters)
+                    GESTURE_ACTION_NAMES.Push("ctrl_shift_" . SubStr(_CtrlLetters, A_Index, 1))
+            } else if (_Item = "_win_placeholder") {
+                GESTURE_ACTION_NAMES.Push("#Raccourcis ⊞ (Win)")
+                _WinLetters := "abcdefghijklmnopqrstuvwxyz"
+                loop StrLen(_WinLetters)
+                    GESTURE_ACTION_NAMES.Push("win_" . SubStr(_WinLetters, A_Index, 1))
+            } else if (_Item = "_alt_placeholder") {
+                GESTURE_ACTION_NAMES.Push("#Raccourcis ⎇ (Alt)")
+                _AltLetters := "abcdefghijklmnopqrstuvwxyz"
+                loop StrLen(_AltLetters)
+                    GESTURE_ACTION_NAMES.Push("alt_" . SubStr(_AltLetters, A_Index, 1))
+            }
+            ; hs-only placeholders (_cmd_placeholder, _hs_ctrl_placeholder…) are silently dropped
+            continue
+        }
+        ; Regular action — keep if platform is "all" or "ahk"
+        _SecKey := "sg_actions." . _Item
+        if _GestureTomlData.Has(_SecKey) {
+            _Plat := _GestureTomlData[_SecKey].Has("platform") ? _GestureTomlData[_SecKey]["platform"] : "all"
+            if (_Plat = "all" || _Plat = "ahk")
+                GESTURE_ACTION_NAMES.Push(_Item)
+        } else if GESTURE_ACTIONS.Has(_Item) {
+            ; Action exists in registry but not in shared TOML (e.g. dynamically added) — include it
+            GESTURE_ACTION_NAMES.Push(_Item)
+        }
+    }
+}
+
+; Build GESTURE_AX_NAMES from [ax_order].items, same filtering logic.
+if _GestureTomlData.Has("ax_order") && _GestureTomlData["ax_order"].Has("items") {
+    _AxItems := _GestureTomlData["ax_order"]["items"]
+    for _Item in _AxItems {
+        _SecKey := "ax_actions." . _Item
+        if _GestureTomlData.Has(_SecKey) {
+            _Plat := _GestureTomlData[_SecKey].Has("platform") ? _GestureTomlData[_SecKey]["platform"] : "all"
+            if (_Plat = "all" || _Plat = "ahk")
+                GESTURE_AX_NAMES.Push(_Item)
+        }
+    }
+}
 
 ; Current action assignments — read from INI or defaults
 global GestureAssignments := Map(
@@ -616,9 +750,10 @@ global GestureAssignments := Map(
     "swipe_4_right", "desktop_next",
 )
 
-; Right-click hold mode state
-global GestureLeftClickHeld := False
-global GestureKeyboardHook := 0
+; Click hold mode state
+global GestureLeftClickHeld  := False
+global GestureRightClickHeld := False
+global GestureKeyboardHook   := 0
 
 ; ===========================================
 ; ===========================================
@@ -1001,16 +1136,18 @@ GestureToggleLeftClick() {
 
 ; Releases the left mouse button if it is currently held by the toggle.
 GestureReleaseLeftClick() {
-    global GestureLeftClickHeld
+    global GestureLeftClickHeld, GestureRightClickHeld
 
     if (!GestureLeftClickHeld) {
         return
     }
 
     LoggerDebug("gestures", "Disabling left-click hold mode…")
-    GestureStopKeyboardWatcher()
     Click("Left", "Up")
     GestureLeftClickHeld := False
+    ; Stop the shared watcher only if the right click is also released
+    if (!GestureRightClickHeld)
+        GestureStopKeyboardWatcher()
     LoggerInfo("gestures", "Left-click hold mode disabled.")
 }
 
@@ -1037,10 +1174,11 @@ GestureStopKeyboardWatcher() {
     }
 }
 
-; Callback fired on any key press while left-click hold is active.
+; Callback fired on any key press while a click hold is active.
 GestureOnKeyDown(ih, vk, sc) {
-    ; Any keystroke releases the held left button
+    ; Any keystroke releases whichever button(s) are currently held
     GestureReleaseLeftClick()
+    GestureReleaseRightClick()
 }
 
 ; Wrapper required: #HotIf evaluates before globals are assigned at runtime
@@ -1049,13 +1187,58 @@ IsGestureLeftClickHeld() {
     return IsSet(GestureLeftClickHeld) ? GestureLeftClickHeld : False
 }
 
-; Also release on a physical left click — user has clicked manually so the
-; toggle should hand control back rather than trap the next event.
+IsGestureRightClickHeld() {
+    global GestureRightClickHeld
+    return IsSet(GestureRightClickHeld) ? GestureRightClickHeld : False
+}
+
+; Also release on a physical click so the toggle hands control back.
 #HotIf IsGestureLeftClickHeld()
 ~RButton:: {
     GestureReleaseLeftClick()
 }
 #HotIf
+
+#HotIf IsGestureRightClickHeld()
+~LButton:: {
+    GestureReleaseRightClick()
+}
+#HotIf
+
+; Activates or deactivates a right-button-held mode. Mirrors GestureToggleLeftClick.
+GestureToggleRightClick() {
+    global GestureRightClickHeld
+
+    if (GestureRightClickHeld) {
+        GestureReleaseRightClick()
+        return
+    }
+
+    LoggerDebug("gestures", "Enabling right-click hold mode…")
+    Click("Right", "Down")
+    GestureRightClickHeld := True
+
+    ; Install a keyboard hook that releases the button on any key press
+    GestureStartKeyboardWatcher()
+    LoggerInfo("gestures", "Right-click hold mode enabled.")
+}
+
+; Releases the right mouse button if it is currently held by the toggle.
+GestureReleaseRightClick() {
+    global GestureRightClickHeld, GestureLeftClickHeld
+
+    if (!GestureRightClickHeld) {
+        return
+    }
+
+    LoggerDebug("gestures", "Disabling right-click hold mode…")
+    Click("Right", "Up")
+    GestureRightClickHeld := False
+    ; Stop the shared watcher only if the left click is also released
+    if (!GestureLeftClickHeld)
+        GestureStopKeyboardWatcher()
+    LoggerInfo("gestures", "Right-click hold mode disabled.")
+}
 
 ; =====================================
 ; =====================================

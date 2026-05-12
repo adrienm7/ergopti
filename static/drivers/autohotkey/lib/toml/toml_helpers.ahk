@@ -66,6 +66,7 @@ SortArray(arr) {
 ; exotic falls through as a raw string. Returns an empty Map when the file
 ; is missing so callers can rely on ``.Has`` checks without a prior
 ; ``FileExist``.
+; Multi-line arrays ( key = [\n  "a",\n  "b"\n] ) are fully supported.
 ParseTomlFile(Path) {
     Sections := Map()
     if !FileExist(Path)
@@ -75,18 +76,41 @@ ParseTomlFile(Path) {
     if (Content = "")
         return Sections
 
-    Section := ""
+    Section     := ""
+    PendingKey  := ""   ; key whose value spans multiple lines
+    PendingVal  := ""   ; accumulated raw characters of the multi-line value
+
     loop parse, Content, "`n", "`r" {
         Line := Trim(A_LoopField)
+
+        ; --- Continuation of a multi-line array ---
+        if (PendingKey != "") {
+            PendingVal .= " " . Line
+            ; Once the closing ] is on a line by itself (or at end of val),
+            ; the accumulation is done
+            if InStr(Line, "]") {
+                if !Sections.Has(Section)
+                    Sections[Section] := Map()
+                Sections[Section][PendingKey] := TOML_CoerceValue(Trim(PendingVal))
+                PendingKey := ""
+                PendingVal := ""
+            }
+            continue
+        }
+
         if (Line = "" || SubStr(Line, 1, 1) = "#")
             continue
-        ; Section header: [name]
-        if (SubStr(Line, 1, 1) = "[" && SubStr(Line, -1) = "]") {
-            Section := Trim(SubStr(Line, 2, StrLen(Line) - 2))
+
+        ; Section header [name] — skip [[table-array]] headers (hotstrings TOML)
+        if (SubStr(Line, 1, 1) = "[") {
+            ; Strip leading/trailing brackets, ignoring double-bracket variant
+            inner := RegExReplace(Line, "^\[+|\]+$", "")
+            Section := Trim(inner)
             if !Sections.Has(Section)
                 Sections[Section] := Map()
             continue
         }
+
         eq := InStr(Line, "=")
         if !eq
             continue
@@ -97,6 +121,14 @@ ParseTomlFile(Path) {
             key := SubStr(key, 2, StrLen(key) - 2)
         if (Section = "")
             continue
+
+        ; Detect opening of a multi-line array: value starts with [ but has no ]
+        if (SubStr(val, 1, 1) = "[" && !InStr(val, "]")) {
+            PendingKey := key
+            PendingVal := val
+            continue
+        }
+
         Sections[Section][key] := TOML_CoerceValue(val)
     }
     return Sections
