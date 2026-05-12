@@ -1211,13 +1211,14 @@ initMenu() {
             (*) => ToggleCategoryAllFeatures("Shortcuts", !ShortcutsAnyEnabled))
     }
 
-    ; Append the « Raccourcis de gestion du script » sub-submenu and the
-    ; configurable keyboard shortcut groups at the bottom of « Raccourcis ».
+    ; Insert the configurable keyboard shortcut groups just before the
+    ; « Combinaison de modificateurs » group that CreateSubMenusRecursive already
+    ; added — keeping the modifier combos visually grouped together.
+    ; Then append « Raccourcis de gestion du script » at the bottom.
     if SubMenus.Has("Shortcuts") {
+        InsertKeyboardShortcutGroups(SubMenus["Shortcuts"], "Combinaison de modificateurs")
         SubMenus["Shortcuts"].Add()
         SubMenus["Shortcuts"].Add(MenuConfigurationShortcuts, BuildScriptShortcutsMenu())
-        SubMenus["Shortcuts"].Add()
-        AppendKeyboardShortcutGroups(SubMenus["Shortcuts"])
     }
 
     ; ── 🌐 Disposition clavier — mirrors the HS layout submenu naming ──
@@ -2548,13 +2549,14 @@ _MakeKeyboardShortcutHandler(SlotId, ActionName) {
 }
 
 ; Build the "⌨️ Raccourcis clavier" submenu.
-; Appends the four keyboard shortcut groups (Win/Ctrl/Ctrl+Shift/Alt) to an
-; existing menu. Each group shows only assigned slots plus an "Ajouter…" item.
+; Inserts the four keyboard shortcut groups (Win/Ctrl/Ctrl+Shift/Alt) into
+; TargetMenu just before the item named InsertBefore.
+; Each group shows only assigned slots plus an "Ajouter…" item.
 ; Clicking any item opens a lightweight GUI picker — no nested submenus built
 ; up-front (which caused ~2 min load time on a 300+ slot map).
-AppendKeyboardShortcutGroups(TargetMenu) {
+InsertKeyboardShortcutGroups(TargetMenu, InsertBefore) {
     global KeyboardShortcutAssignments, GESTURE_ACTIONS
-    LoggerStart("KeyboardShortcutsMenu", "Ajout des groupes de raccourcis clavier…")
+    LoggerStart("KeyboardShortcutsMenu", "Insertion des groupes de raccourcis clavier…")
 
     static _Groups := [
         Map("prefix", "win_",        "label", "⊞ Win+",         "add_label", "[+ Ajouter un raccourci Win+…]"),
@@ -2563,7 +2565,10 @@ AppendKeyboardShortcutGroups(TargetMenu) {
         Map("prefix", "alt_",        "label", "⎇ Alt+",          "add_label", "[+ Ajouter un raccourci Alt+…]"),
     ]
 
+    ; Build all group menus first, then insert in reverse order so the final
+    ; menu order matches _Groups (Insert always places before InsertBefore).
     AssignedCount := 0
+    GroupMenus := []
     for GroupInfo in _Groups {
         Prefix   := GroupInfo["prefix"]
         GLabel   := GroupInfo["label"]
@@ -2585,10 +2590,18 @@ AppendKeyboardShortcutGroups(TargetMenu) {
         ; "Add shortcut" item — opens picker with full slot list for this prefix
         GMenu.Add(AddLabel, ((_p) => (*) => ShowKeyboardSlotPicker(_p))(Prefix))
 
-        TargetMenu.Add(GLabel, GMenu)
+        GroupMenus.Push(Map("label", GLabel, "menu", GMenu))
     }
 
-    LoggerSuccess("KeyboardShortcutsMenu", "Groupes ajoutés (%d raccourci(s) actif(s)).", AssignedCount)
+    ; Insert separator first (it ends up just before the block after reversal)
+    TargetMenu.Insert(InsertBefore)
+    ; Insert groups in reverse so final order is Win / Ctrl / Ctrl+Shift / Alt
+    loop GroupMenus.Length {
+        Idx := GroupMenus.Length - A_Index + 1
+        TargetMenu.Insert(InsertBefore, GroupMenus[Idx]["label"], GroupMenus[Idx]["menu"])
+    }
+
+    LoggerSuccess("KeyboardShortcutsMenu", "Groupes insérés (%d raccourci(s) actif(s)).", AssignedCount)
 }
 
 ; Open a two-step GUI: first pick the key slot, then pick the action.
