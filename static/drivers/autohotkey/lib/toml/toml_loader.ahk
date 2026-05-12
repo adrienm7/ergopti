@@ -558,7 +558,8 @@ ApplyIndexTomlToDynamicHotstrings() {
 ; Locale defaults to ``"fr"`` and maps to ``static/locales/fr.json``.
 ApplyLocaleDescriptions(Locale := "fr") {
     global ScriptInformation
-    FilePath := A_ScriptDir . "\..\..\..\..\locales\" . Locale . ".json"
+    global _StaticDir
+    FilePath := _StaticDir . "\locales\" . Locale . ".json"
     if !FileExist(FilePath) {
         try LoggerWarn("TomlLoader", "Locale file not found: '{1}' — descriptions not injected.", FilePath)
         return

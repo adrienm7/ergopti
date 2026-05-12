@@ -149,13 +149,13 @@ function M.build(ctx)
 						-- Inject ChatGPT URL editor inline below ctrl_g
 						if s.id == "ctrl_g" then
 							table.insert(ctrl_items, {
-								title    = "   ↳ Modifier l'URL ChatGPT…",
+								title    = i18n.get("menu.shortcuts.chatgpt_url_item"),
 								disabled = paused or nil,
 								fn       = not paused and function()
-									local ok_p, clicked, url = pcall(dialog.text_prompt, "URL ChatGPT",
-										"URL ouverte par Ctrl+G :",
-										state.chatgpt_url, "OK", "Annuler")
-									if ok_p and clicked == "OK" and type(url) == "string" and url ~= "" then
+									local ok_p, clicked, url = pcall(dialog.text_prompt, i18n.get("dialog.shortcuts.chatgpt_title"),
+										i18n.get("dialog.shortcuts.chatgpt_prompt"),
+										state.chatgpt_url, i18n.get("button.ok"), i18n.get("button.cancel"))
+									if ok_p and clicked == i18n.get("button.ok") and type(url) == "string" and url ~= "" then
 										state.chatgpt_url = url
 										ctx.save_prefs()
 										ctx.updateMenu()

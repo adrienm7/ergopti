@@ -64,9 +64,9 @@ function M.build(ctx)
 			local new_state = not state.gestures
 			if new_state then
 				-- Show warning when activating gestures
-				local warnMsg = "⚠️ Attention : L'activation des gestes trackpad peut interférer avec les gestes système.\n\nPour éviter les conflits, désactiver les options macOS suivantes :\n\n• Gestes trackpad 2 doigts : désactiver le défilement et les balayages si vous voulez les utiliser dans Hammerspoon.\n• Gestes trackpad 3 doigts pour bouger les fenêtres et la sélection\n• Tap 3 doigts pour chercher le mot dans le dictionnaire\n• Swipe 3 doigts horizontal/vertical pour changer de spaces, activer App Exposé ou Mission Control\n• Swipe 4 doigts horizontal/vertical pour changer de spaces, activer App Exposé ou Mission Control\n\nIl est important de désactiver les gestes système utilisant 4 doigts afin de pouvoir définir des gestes à 5 doigts. Autrement, macOS ne ferait pas de distinction entre les deux et empêcherait les gestes à 5 doigts de fonctionner. C’est pourquoi les gestes à 4 doigts par défaut son redéfinis dans le module Gestes pour retrouver les fonctions système sans conflit avec les gestes à 5 doigts."
-				local res = dialog.block_alert("Avertissement Gestes", warnMsg, "Activer", "Annuler", "warning")
-				if res ~= "Activer" then return end
+				local warnMsg = i18n.get("dialog.gestures.warning_msg")
+				local res = dialog.block_alert(i18n.get("dialog.gestures.warning_title"), warnMsg, i18n.get("button.activate"), i18n.get("button.cancel"), "warning")
+				if res ~= i18n.get("button.activate") then return end
 			end
 			state.gestures = new_state
 			if gestures then
@@ -77,7 +77,7 @@ function M.build(ctx)
 				end
 			end
 			ctx.save_prefs()
-			ctx.notify_feature("Gestes", state.gestures)
+			ctx.notify_feature(i18n.get("menu.gestures.notify_title"), state.gestures)
 			ctx.updateMenu()
 		end,
 	}
