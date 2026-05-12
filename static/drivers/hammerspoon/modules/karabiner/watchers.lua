@@ -29,9 +29,6 @@ local hs          = hs
 local Logger      = require("lib.logger")
 local Keycodes    = require("lib.keycodes")
 
--- Optional: undocumented MultitouchSupport wrapper — nil when unavailable.
-local ok_td, touchdevice = pcall(require, "hs._asm.undocumented.touchdevice")
-if not ok_td then touchdevice = nil end
 
 local LOG = "karabiner"
 
@@ -70,10 +67,6 @@ local _capsword_last_check_s = 0
 
 -- Guard against spawning concurrent async checks while one is already in flight.
 local _capsword_check_pending = false
-
--- touchdevice frameCallback watchers keyed by device ID — kept alive to prevent GC.
-local _td_devices  = {}
-local _td_watchers = {}
 
 -- App history cache for direct app-previous focus.
 local _current_bundle_id = nil
@@ -128,51 +121,14 @@ local function deactivate_capsword()
 	end, {"--get-variable", "capsword"}):start()
 end
 
---- Attaches a frameCallback watcher on every available touchdevice so that
---- any bare finger contact (no click required) triggers CapsWord deactivation.
---- The MultitouchSupport API fires at ~60 Hz; the existing throttle inside
---- deactivate_capsword() prevents CPU spikes.
-local function start_touchdevice_watchers()
-	if not touchdevice then
-		Logger.warn(LOG, "touchdevice unavailable — bare-touch CapsWord detection disabled.")
-		return
-	end
-
-	local ok_list, devices = pcall(touchdevice.devices)
-	if not ok_list or type(devices) ~= "table" then
-		Logger.warn(LOG, "touchdevice.devices() failed — bare-touch detection disabled.")
-		return
-	end
-
-	for _, id in ipairs(devices) do
-		local ok_dev, dev = pcall(touchdevice.forDeviceID, id)
-		if not ok_dev or not dev then
-			Logger.warn(LOG, "touchdevice.forDeviceID(%s) failed.", tostring(id))
-		else
-			-- Hold a strong reference to prevent GC from collecting the device.
-			_td_devices[id] = dev
-			local w = dev:frameCallback(function(_, touches, _, _)
-				if type(touches) == "table" and #touches > 0 then
-					deactivate_capsword()
-				end
-			end)
-			if w then
-				pcall(function() w:start() end)
-				_td_watchers[id] = w
-				Logger.success(LOG, "Touchdevice bare-touch watcher started (device=%s).", tostring(id))
-			else
-				Logger.warn(LOG, "frameCallback returned nil for device=%s.", tostring(id))
-			end
-		end
-	end
-end
-
 --- Starts the eventtap watching for any pointer event that signals the user
 --- has left the keyboard: movement, scroll, gestures, and all click types.
---- A separate touchdevice frameCallback layer catches bare finger touches
---- that eventtap cannot see (no click, no movement).
+--- Bare finger contact is handled via gestures_engine.set_any_touch_hook(),
+--- which piggybacks on the existing touchdevice frameCallback in the gestures
+--- module rather than registering a competing second frameCallback.
+--- @param gestures_engine table The gestures engine module (may be nil).
 --- @return hs.eventtap The running eventtap watcher instance.
-function M.start_gesture_watcher()
+function M.start_gesture_watcher(gestures_engine)
 	local ev = hs.eventtap.event.types
 	local watcher = hs.eventtap.new(
 		{
@@ -191,8 +147,14 @@ function M.start_gesture_watcher()
 	watcher:start()
 	Logger.success(LOG, "Trackpad CapsWord watcher started.")
 
-	-- Layer 2: MultitouchSupport frameCallback for bare finger detection.
-	start_touchdevice_watchers()
+	-- Layer 2: hook into the gestures engine's existing frameCallback so bare
+	-- finger touch (no click, no movement) also deactivates CapsWord.
+	if gestures_engine and type(gestures_engine.set_any_touch_hook) == "function" then
+		gestures_engine.set_any_touch_hook(deactivate_capsword)
+		Logger.success(LOG, "Bare-touch CapsWord hook registered on gestures engine.")
+	else
+		Logger.warn(LOG, "gestures_engine unavailable — bare-touch CapsWord detection disabled.")
+	end
 
 	return watcher
 end

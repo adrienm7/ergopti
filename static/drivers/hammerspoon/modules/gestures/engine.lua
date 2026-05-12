@@ -17,8 +17,13 @@ local hs     = hs
 local Logger = require("lib.logger")
 local LOG    = "gestures.engine"
 
-local _state   = nil
-local _actions = nil
+local _state      = nil
+local _actions    = nil
+
+-- Optional callback fired on every frame where at least one finger is touching
+-- the trackpad. Registered by external modules (e.g. karabiner watcher) via
+-- M.set_any_touch_hook(). Only one hook is supported at a time.
+local _any_touch_hook = nil
 
 
 
@@ -592,6 +597,10 @@ function M.process_frame(touches)
 		_G.ERGOPTI_GESTURES_RECEIVED_FIRST_FRAME = true
 	end
 
+	if #touches > 0 and _any_touch_hook then
+		pcall(_any_touch_hook)
+	end
+
 	local n   = #touches
 	local now = hs.timer.secondsSinceEpoch()
 
@@ -827,6 +836,13 @@ function M.init(core_state, actions_mod)
 	end
 	
 	Logger.info(LOG, "Gestures engine dependencies initialized.")
+end
+
+--- Registers a callback fired on every frame where at least one finger touches
+--- the trackpad. Pass nil to unregister.
+--- @param hook fun()|nil
+function M.set_any_touch_hook(hook)
+	_any_touch_hook = hook
 end
 
 return M
