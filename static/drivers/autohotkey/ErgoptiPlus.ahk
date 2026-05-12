@@ -608,6 +608,10 @@ CreateSubMenusRecursiveCommonCode(MenuParent, Key, Val, CategoryPath) {
         if (StrLower(Key) == "textexpansionpersonalinformation") {
             MenuParent.Add("   ↳ Modifier les informations…", PersonalInformationEditor)
         }
+        ; Mirror HS ctrl_g pattern: inject the URL editor right below the GPT toggle
+        if (StrLower(Key) == "gpt") {
+            MenuParent.Add("   ↳ Modifier le lien Win + G…", GPTLinkEditor)
+        }
     }
 }
 
@@ -1178,11 +1182,10 @@ initMenu() {
             (*) => ToggleCategoryAllFeatures("Shortcuts", !ShortcutsAnyEnabled))
     }
 
-    ; Append the « Raccourcis de gestion du script » sub-submenu and the GPT link
-    ; editor at the bottom of the « Raccourcis » category.
+    ; Append the « Raccourcis de gestion du script » sub-submenu at the bottom
+    ; of the « Raccourcis » category.
     if SubMenus.Has("Shortcuts") {
         SubMenus["Shortcuts"].Add()
-        SubMenus["Shortcuts"].Add("Modifier le lien ouvert par Win + G", GPTLinkEditor)
         SubMenus["Shortcuts"].Add(MenuConfigurationShortcuts, BuildScriptShortcutsMenu())
     }
 
