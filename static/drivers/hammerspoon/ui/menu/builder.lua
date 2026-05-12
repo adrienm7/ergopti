@@ -73,26 +73,38 @@ function M.generate(ctx, menu_mods, actions)
 			return r
 		end
 
-		-- Count hotstrings for common groups (excludes personal/custom)
-		local common_total, common_has_count = 0, false
+		-- Groups that are specific to the Ergopti keyboard layout
+		local ERGOPTI_GROUPS = { sfbsreduction = true, rolls = true }
+
+		-- Count hotstrings for common groups split into "communs" and "ergopti"
+		local common_total, ergopti_total = 0, 0
+		local common_has_count, ergopti_has_count = false, false
 		if ctx and ctx.hotfiles and type(ctx.hotfiles) == "table"
 		and ctx.keymap and type(ctx.keymap.get_sections) == "function" then
 			for _, f in ipairs(ctx.hotfiles) do
 				local name = ctx.get_group_name and ctx.get_group_name(f) or f
-				if name ~= "custom" and name ~= "personal" then
+				if name ~= "custom" and name ~= "personal" and name:sub(1, 13) ~= "personal_ext_" then
 					local secs = ctx.keymap.get_sections(name)
 					if type(secs) == "table" then
 						for _, sec in ipairs(secs) do
 							if type(sec) == "table" and sec.name ~= "-" and not sec.is_module_placeholder
 							and sec.count ~= nil then
-								common_has_count = true
-								common_total = common_total + tonumber(sec.count)
+								local cnt = tonumber(sec.count)
+								if ERGOPTI_GROUPS[name] then
+									ergopti_has_count = true
+									ergopti_total = ergopti_total + cnt
+								else
+									common_has_count = true
+									common_total = common_total + cnt
+								end
 							end
 						end
 					end
 				end
 			end
 		end
+		local all_common_total    = common_total + ergopti_total
+		local all_common_has_count = common_has_count or ergopti_has_count
 
 		-- Count hotstrings for personal/custom groups (includes personal_ext_* extensions)
 		local personal_total, personal_has_count = 0, false
@@ -120,8 +132,8 @@ function M.generate(ctx, menu_mods, actions)
 			end
 		end
 
-		local grand_total     = common_total + personal_total
-		local grand_has_count = common_has_count or personal_has_count
+		local grand_total     = all_common_total + personal_total
+		local grand_has_count = all_common_has_count or personal_has_count
 
 		-- Détection de l’état global : tous les hotstrings activés ?
 		local all_enabled = true
@@ -173,23 +185,50 @@ function M.generate(ctx, menu_mods, actions)
 			table.insert(hotstrings_menu, { title = "-" })
 		end
 
-		-- 2. Common hotstring groups with a disabled header
-		local common_groups = {}
-		local groups_result = type(menu_mods.hotstrings.build_groups) == "function"
-			and Logger.build(LOG, "hotstrings.build_groups", menu_mods.hotstrings.build_groups, ctx)
-		if type(groups_result) == "table" then
-			if groups_result[1] ~= nil then
-				for _, it in ipairs(groups_result) do table.insert(common_groups, it) end
-			else
-				table.insert(common_groups, groups_result)
+		-- 2a. Common hotstring groups (non-Ergopti) with a disabled header
+		local function collect_groups(only_filter)
+			local result = {}
+			if type(menu_mods.hotstrings.build_groups) ~= "function" then return result end
+			local built = Logger.build(LOG, "hotstrings.build_groups",
+				function(c) return menu_mods.hotstrings.build_groups(c, only_filter) end, ctx)
+			if type(built) == "table" then
+				if built[1] ~= nil then
+					for _, it in ipairs(built) do table.insert(result, it) end
+				else
+					table.insert(result, built)
+				end
+			end
+			return result
+		end
+
+		local non_ergopti_filter = {}
+		if ctx and ctx.hotfiles and type(ctx.hotfiles) == "table" then
+			for _, f in ipairs(ctx.hotfiles) do
+				local name = ctx.get_group_name and ctx.get_group_name(f) or f
+				if name ~= "custom" and name ~= "personal" and name:sub(1, 13) ~= "personal_ext_"
+				and not ERGOPTI_GROUPS[name] then
+					non_ergopti_filter[name] = true
+				end
 			end
 		end
-		if #common_groups > 0 then
+
+		local std_groups = collect_groups(non_ergopti_filter)
+		if #std_groups > 0 then
 			local common_header = common_has_count
 				and ("— Hotstrings communs (" .. fmt_grand(common_total) .. ") —")
 				or  "— Hotstrings communs —"
 			table.insert(hotstrings_menu, { title = common_header, disabled = true })
-			for _, it in ipairs(common_groups) do table.insert(hotstrings_menu, it) end
+			for _, it in ipairs(std_groups) do table.insert(hotstrings_menu, it) end
+		end
+
+		-- 2b. Ergopti-layout-specific groups with their own disabled header
+		local ergopti_groups = collect_groups(ERGOPTI_GROUPS)
+		if #ergopti_groups > 0 then
+			local ergopti_header = ergopti_has_count
+				and ("— Disposition Ergopti (" .. fmt_grand(ergopti_total) .. ") —")
+				or  "— Disposition Ergopti —"
+			table.insert(hotstrings_menu, { title = ergopti_header, disabled = true })
+			for _, it in ipairs(ergopti_groups) do table.insert(hotstrings_menu, it) end
 		end
 
 		-- 3. Personal/custom hotstrings with a separator and a disabled header

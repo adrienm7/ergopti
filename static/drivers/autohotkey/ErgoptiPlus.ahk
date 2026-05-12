@@ -1119,7 +1119,11 @@ global MenuSuspend := "⏸︎ Suspendre"
 global MenuDebugging := "⚠ Débogage"
 
 ; Categories that live inside the Hotstrings submenu (ordered to match HS menu)
-global HotstringCategories := ["DistancesReduction", "SFBsReduction", "Rolls", "Autocorrection", "MagicKey", "Personal"]
+global HotstringCategories := ["DistancesReduction", "SFBsReduction", "Rolls", "Autocorrection", "MagicKey"]
+; Standard (layout-agnostic) hotstring categories
+global HotstringCategoriesStd := ["DistancesReduction", "Autocorrection", "MagicKey"]
+; Layout-specific categories for the Ergopti keyboard disposition
+global HotstringCategoriesErgopti := ["SFBsReduction", "Rolls"]
 
 InitSubMenus() {
     global Features, SubMenus
@@ -1215,21 +1219,23 @@ initMenu() {
     HotstringsMenu.Add("Modifier le lien ouvert par Win + G", GPTLinkEditor)
     HotstringsMenu.Add() ; Separator after paramètres block
 
-    ; 2. Common hotstring groups with a disabled header
-    CommonTotal := 0
-    for _CCat in HotstringCategories {
-        CommonTotal += CountTomlHotstrings(_CCat)
+    ; 2a. Standard hotstring groups + dynamic — "Hotstrings communs" header
+    StdTotal := 0
+    for _CCat in HotstringCategoriesStd {
+        StdTotal += CountTomlHotstrings(_CCat)
     }
+    DynTotalStd := 0
     for _DSec in Features["DynamicHotstrings"]["__Order"] {
         if (_DSec != "-" and Features["DynamicHotstrings"].Has(_DSec)
         and Features["DynamicHotstrings"][_DSec].Enabled) {
-            CommonTotal += CountDynamicSection(_DSec)
+            DynTotalStd += CountDynamicSection(_DSec)
         }
     }
-    CommonHeader := "— Hotstrings communs" . (CommonTotal > 0 ? " (" . FmtCount(CommonTotal) . ")" : "") . " —"
-    HotstringsMenu.Add(CommonHeader, (*) => NoAction())
-    HotstringsMenu.Disable(CommonHeader)
-    for Category in HotstringCategories {
+    StdTotal += DynTotalStd
+    StdHeader := "— Hotstrings communs" . (StdTotal > 0 ? " (" . FmtCount(StdTotal) . ")" : "") . " —"
+    HotstringsMenu.Add(StdHeader, (*) => NoAction())
+    HotstringsMenu.Disable(StdHeader)
+    for Category in HotstringCategoriesStd {
         if SubMenus.Has(Category) {
             Total := CountTomlHotstrings(Category)
             Title := GetCategoryTitle(Category) . (Total > 0 ? " (" . FmtCount(Total) . ")" : "")
@@ -1250,6 +1256,25 @@ initMenu() {
         . (DynTotal > 0 ? " (" . FmtCount(DynTotal) . ")" : "")
         HotstringsMenu.Add(DynTitle, DynMenu)
     }
+
+    ; 2b. Ergopti-layout-specific groups — "Disposition Ergopti" header
+    ErgoptiTotal := 0
+    for _ECat in HotstringCategoriesErgopti {
+        ErgoptiTotal += CountTomlHotstrings(_ECat)
+    }
+    ErgoptiHeader := "— Disposition Ergopti" . (ErgoptiTotal > 0 ? " (" . FmtCount(ErgoptiTotal) . ")" : "") . " —"
+    HotstringsMenu.Add(ErgoptiHeader, (*) => NoAction())
+    HotstringsMenu.Disable(ErgoptiHeader)
+    for Category in HotstringCategoriesErgopti {
+        if SubMenus.Has(Category) {
+            Total := CountTomlHotstrings(Category)
+            Title := GetCategoryTitle(Category) . (Total > 0 ? " (" . FmtCount(Total) . ")" : "")
+            HotstringsMenu.Add(Title, SubMenus[Category])
+        }
+    }
+
+    ; CommonTotal = all groups (std + ergopti) used for GrandTotal
+    CommonTotal := StdTotal + ErgoptiTotal
 
     ; 3. Personal/custom hotstrings — separator + disabled header + entries
     ; personal_hotstrings.toml first, then extra TOMLs from hotstrings\ folder alphabetically.
