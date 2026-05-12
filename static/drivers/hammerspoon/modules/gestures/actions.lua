@@ -99,70 +99,160 @@ function M.trigger_lookup()
 	end)
 end
 
---- Toggles a synthetic right-click hold state.
-local rightClickHeld  = false
-local leftClickHeld   = false
+-- Delay to ignore the spurious mouseUp from the gesture's own finger-lift.
+local CLICK_COOLDOWN_SEC = 0.15
+
+local rightClickHeld    = false
+local leftClickHeld     = false
+local rightMouseTap     = nil
+local leftMouseTap      = nil
 local click_key_watcher = nil
 
---- Starts the key watcher that releases any held synthetic click on the next keydown.
-local function start_click_key_watcher()
-	if click_key_watcher then return end
-	click_key_watcher = hs.eventtap.new({ hs.eventtap.event.types.keyDown }, function(_)
-		local pos = hs.mouse.absolutePosition()
-		if leftClickHeld then
-			pcall(function() hs.eventtap.event.newMouseEvent(hs.eventtap.event.types.leftMouseUp, pos):post() end)
-			leftClickHeld = false
-			Logger.info(LOG, "Synthetic Left-Click RELEASED by keydown.")
-		end
-		if rightClickHeld then
-			pcall(function() hs.eventtap.event.newMouseEvent(hs.eventtap.event.types.rightMouseUp, pos):post() end)
-			rightClickHeld = false
-			Logger.info(LOG, "Synthetic Right-Click RELEASED by keydown.")
-		end
-		-- Stop watcher once no click is held
-		pcall(function() click_key_watcher:stop() end)
-		click_key_watcher = nil
-		-- Pass the key event through unmodified
-		return false
-	end)
-	pcall(function() click_key_watcher:start() end)
-end
-
---- Stops the key watcher if running.
+--- Stops the keyboard watcher that auto-releases held clicks on any keypress.
 local function stop_click_key_watcher()
 	if not click_key_watcher then return end
 	pcall(function() click_key_watcher:stop() end)
 	click_key_watcher = nil
 end
 
-function M.toggle_right_click()
+--- Starts a keyboard watcher that releases all held synthetic clicks on the next keydown.
+local function start_click_key_watcher()
+	if click_key_watcher then return end
+	click_key_watcher = hs.eventtap.new({ hs.eventtap.event.types.keyDown }, function(_)
+		local pos = hs.mouse.absolutePosition()
+		if leftClickHeld then
+			if leftMouseTap then pcall(function() leftMouseTap:stop() end); leftMouseTap = nil end
+			pcall(function() hs.eventtap.event.newMouseEvent(hs.eventtap.event.types.leftMouseUp, pos):post() end)
+			leftClickHeld = false
+			Logger.info(LOG, "Synthetic Left-Click RELEASED by keydown.")
+		end
+		if rightClickHeld then
+			if rightMouseTap then pcall(function() rightMouseTap:stop() end); rightMouseTap = nil end
+			pcall(function() hs.eventtap.event.newMouseEvent(hs.eventtap.event.types.rightMouseUp, pos):post() end)
+			rightClickHeld = false
+			Logger.info(LOG, "Synthetic Right-Click RELEASED by keydown.")
+		end
+		pcall(function() click_key_watcher:stop() end)
+		click_key_watcher = nil
+		return false
+	end)
+	pcall(function() click_key_watcher:start() end)
+end
+
+function M.force_cleanup()
+	Logger.debug(LOG, "Forcefully releasing all held clicks…")
+	stop_click_key_watcher()
 	local pos = hs.mouse.absolutePosition()
+	if leftMouseTap  then pcall(function() leftMouseTap:stop()  end); leftMouseTap  = nil end
+	if rightMouseTap then pcall(function() rightMouseTap:stop() end); rightMouseTap = nil end
+	if leftClickHeld then
+		pcall(function() hs.eventtap.event.newMouseEvent(hs.eventtap.event.types.leftMouseUp,  pos):post() end)
+		leftClickHeld = false
+		Logger.info(LOG, "Synthetic Left-Click forcefully released.")
+	end
 	if rightClickHeld then
 		pcall(function() hs.eventtap.event.newMouseEvent(hs.eventtap.event.types.rightMouseUp, pos):post() end)
 		rightClickHeld = false
-		Logger.info(LOG, "Synthetic Right-Click RELEASED.")
-		if not leftClickHeld then stop_click_key_watcher() end
-	else
-		pcall(function() hs.eventtap.event.newMouseEvent(hs.eventtap.event.types.rightMouseDown, pos):post() end)
-		rightClickHeld = true
-		Logger.info(LOG, "Synthetic Right-Click HELD.")
-		start_click_key_watcher()
+		Logger.info(LOG, "Synthetic Right-Click forcefully released.")
 	end
 end
 
+function M.toggle_right_click()
+	if rightClickHeld then
+		if rightMouseTap then pcall(function() rightMouseTap:stop() end); rightMouseTap = nil end
+		pcall(function()
+			hs.eventtap.event.newMouseEvent(
+				hs.eventtap.event.types.rightMouseUp, hs.mouse.absolutePosition()
+			):post()
+		end)
+		rightClickHeld = false
+		Logger.info(LOG, "Synthetic Right-Click RELEASED.")
+		if not leftClickHeld then stop_click_key_watcher() end
+		return
+	end
+
+	Logger.debug(LOG, "Enabling right-click hold mode…")
+	pcall(function()
+		local ev = hs.eventtap.event.newMouseEvent(
+			hs.eventtap.event.types.rightMouseDown, hs.mouse.absolutePosition()
+		)
+		-- HID-sourced so the event reaches title bars and WindowServer-managed areas.
+		pcall(function() ev:setProperty(hs.eventtap.event.properties.eventSourceStateID, 1) end)
+		ev:post()
+	end)
+	rightClickHeld = true
+	start_click_key_watcher()
+
+	local t0       = hs.timer.secondsSinceEpoch()
+	local evTypes  = hs.eventtap.event.types
+	rightMouseTap  = hs.eventtap.new({ evTypes.mouseMoved, evTypes.rightMouseUp }, function(e)
+		local t = e:getType()
+		if t == evTypes.rightMouseUp then
+			-- Swallow the spurious finger-lift mouseUp within the cooldown window.
+			if hs.timer.secondsSinceEpoch() - t0 < CLICK_COOLDOWN_SEC then return true end
+			hs.timer.doAfter(0, M.toggle_right_click)
+			return true
+		end
+		-- Convert idle mouseMoved to rightMouseDragged for apps that need it.
+		if t == evTypes.mouseMoved then
+			pcall(function()
+				hs.eventtap.event.newMouseEvent(evTypes.rightMouseDragged, e:location()):post()
+			end)
+			return false
+		end
+		return false
+	end)
+	if rightMouseTap then pcall(function() rightMouseTap:start() end) end
+	Logger.info(LOG, "Synthetic Right-Click HELD.")
+end
+
 function M.toggle_left_click()
-	local pos = hs.mouse.absolutePosition()
 	if leftClickHeld then
-		pcall(function() hs.eventtap.event.newMouseEvent(hs.eventtap.event.types.leftMouseUp, pos):post() end)
+		if leftMouseTap then pcall(function() leftMouseTap:stop() end); leftMouseTap = nil end
+		pcall(function()
+			hs.eventtap.event.newMouseEvent(
+				hs.eventtap.event.types.leftMouseUp, hs.mouse.absolutePosition()
+			):post()
+		end)
 		leftClickHeld = false
 		Logger.info(LOG, "Synthetic Left-Click RELEASED.")
 		if not rightClickHeld then stop_click_key_watcher() end
-	else
-		pcall(function() hs.eventtap.event.newMouseEvent(hs.eventtap.event.types.leftMouseDown, pos):post() end)
-		leftClickHeld = true
-		Logger.info(LOG, "Synthetic Left-Click HELD.")
-		start_click_key_watcher()
+		return
 	end
+
+	Logger.debug(LOG, "Enabling left-click hold mode…")
+	pcall(function()
+		local ev = hs.eventtap.event.newMouseEvent(
+			hs.eventtap.event.types.leftMouseDown, hs.mouse.absolutePosition()
+		)
+		-- HID-sourced so the event reaches title bars and WindowServer-managed areas.
+		pcall(function() ev:setProperty(hs.eventtap.event.properties.eventSourceStateID, 1) end)
+		ev:post()
+	end)
+	leftClickHeld = true
+	start_click_key_watcher()
+
+	local t0      = hs.timer.secondsSinceEpoch()
+	local evTypes = hs.eventtap.event.types
+	leftMouseTap  = hs.eventtap.new({ evTypes.mouseMoved, evTypes.leftMouseUp }, function(e)
+		local t = e:getType()
+		if t == evTypes.leftMouseUp then
+			-- Swallow the spurious finger-lift mouseUp within the cooldown window.
+			if hs.timer.secondsSinceEpoch() - t0 < CLICK_COOLDOWN_SEC then return true end
+			hs.timer.doAfter(0, M.toggle_left_click)
+			return true
+		end
+		-- Convert mouseMoved to leftMouseDragged so apps see a proper drag event.
+		if t == evTypes.mouseMoved then
+			pcall(function()
+				hs.eventtap.event.newMouseEvent(evTypes.leftMouseDragged, e:location()):post()
+			end)
+			return false
+		end
+		return false
+	end)
+	if leftMouseTap then pcall(function() leftMouseTap:start() end) end
+	Logger.info(LOG, "Synthetic Left-Click HELD.")
 end
 
 local function show_application_switcher_overlay()
