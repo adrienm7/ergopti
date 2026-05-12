@@ -63,10 +63,65 @@ function M.generate(ctx, menu_mods, actions)
 	-- Hotstrings zone avec activation globale
 	if type(menu_mods.hotstrings) == "table" then
 		Logger.debug(LOG, "Building hotstrings submenu…")
-		local hotstrings_menu = {}
-		push_into(hotstrings_menu, "hotstrings.build_groups", menu_mods.hotstrings.build_groups, ctx)
-		push_into(hotstrings_menu, "hotstrings.build_custom", menu_mods.hotstrings.build_custom, ctx)
-		push_into(hotstrings_menu, "hotstrings.build_management", menu_mods.hotstrings.build_management, ctx)
+
+		local function fmt_grand(n)
+			local s = tostring(math.floor(n + 0.5)); local r = ""
+			for i = 1, #s do
+				if i > 1 and (#s - i + 1) % 3 == 0 then r = r .. " " end
+				r = r .. s:sub(i, i)
+			end
+			return r
+		end
+
+		-- Count hotstrings for common groups (excludes personal/custom)
+		local common_total, common_has_count = 0, false
+		if ctx and ctx.hotfiles and type(ctx.hotfiles) == "table"
+		and ctx.keymap and type(ctx.keymap.get_sections) == "function" then
+			for _, f in ipairs(ctx.hotfiles) do
+				local name = ctx.get_group_name and ctx.get_group_name(f) or f
+				if name ~= "custom" and name ~= "personal" then
+					local secs = ctx.keymap.get_sections(name)
+					if type(secs) == "table" then
+						for _, sec in ipairs(secs) do
+							if type(sec) == "table" and sec.name ~= "-" and not sec.is_module_placeholder
+							and sec.count ~= nil then
+								common_has_count = true
+								common_total = common_total + tonumber(sec.count)
+							end
+						end
+					end
+				end
+			end
+		end
+
+		-- Count hotstrings for personal/custom groups (includes personal_ext_* extensions)
+		local personal_total, personal_has_count = 0, false
+		if ctx and ctx.keymap and type(ctx.keymap.get_sections) == "function" then
+			local personal_group_names = {"personal", "custom"}
+			if ctx.hotfiles then
+				for _, f in ipairs(ctx.hotfiles) do
+					local n = ctx.get_group_name and ctx.get_group_name(f) or f
+					if n:sub(1, 13) == "personal_ext_" then
+						table.insert(personal_group_names, n)
+					end
+				end
+			end
+			for _, gname in ipairs(personal_group_names) do
+				local secs = ctx.keymap.get_sections(gname)
+				if type(secs) == "table" then
+					for _, sec in ipairs(secs) do
+						if type(sec) == "table" and sec.name ~= "-" and not sec.is_module_placeholder
+						and sec.count ~= nil then
+							personal_has_count = true
+							personal_total = personal_total + tonumber(sec.count)
+						end
+					end
+				end
+			end
+		end
+
+		local grand_total     = common_total + personal_total
+		local grand_has_count = common_has_count or personal_has_count
 
 		-- Détection de l’état global : tous les hotstrings activés ?
 		local all_enabled = true
@@ -103,35 +158,51 @@ function M.generate(ctx, menu_mods, actions)
 			ctx.updateMenu()
 		end
 
-		-- Sum hotstring counts across all groups for the top-level title
-		local grand_total, grand_has_count = 0, false
-		if ctx and ctx.hotfiles and type(ctx.hotfiles) == "table"
-		and ctx.keymap and type(ctx.keymap.get_sections) == "function" then
-			for _, f in ipairs(ctx.hotfiles) do
-				local name = ctx.get_group_name and ctx.get_group_name(f) or f
-				local secs = ctx.keymap.get_sections(name)
-				if type(secs) == "table" then
-					for _, sec in ipairs(secs) do
-						if type(sec) == "table" and sec.name ~= "-" and not sec.is_module_placeholder
-						and sec.count ~= nil then
-							grand_has_count = true
-							grand_total = grand_total + tonumber(sec.count)
-						end
-					end
-				end
-			end
-		end
-		local function fmt_grand(n)
-			local s = tostring(math.floor(n + 0.5)); local r = ""
-			for i = 1, #s do
-				if i > 1 and (#s - i + 1) % 3 == 0 then r = r .. " " end
-				r = r .. s:sub(i, i)
-			end
-			return r
-		end
 		local hotstrings_title = grand_has_count
 			and ("⚡ Hotstrings (" .. fmt_grand(grand_total) .. ")")
 			or  "⚡ Hotstrings"
+
+		-- Build the three groups in order: paramètres, communs, personnels
+		local hotstrings_menu = {}
+
+		-- 1. Paramètres at top, followed by a separator
+		local mgmt_item = type(menu_mods.hotstrings.build_management) == "function"
+			and Logger.build(LOG, "hotstrings.build_management", menu_mods.hotstrings.build_management, ctx)
+		if mgmt_item then
+			table.insert(hotstrings_menu, mgmt_item)
+			table.insert(hotstrings_menu, { title = "-" })
+		end
+
+		-- 2. Common hotstring groups with a disabled header
+		local common_groups = {}
+		local groups_result = type(menu_mods.hotstrings.build_groups) == "function"
+			and Logger.build(LOG, "hotstrings.build_groups", menu_mods.hotstrings.build_groups, ctx)
+		if type(groups_result) == "table" then
+			if groups_result[1] ~= nil then
+				for _, it in ipairs(groups_result) do table.insert(common_groups, it) end
+			else
+				table.insert(common_groups, groups_result)
+			end
+		end
+		if #common_groups > 0 then
+			local common_header = common_has_count
+				and ("— Hotstrings communs (" .. fmt_grand(common_total) .. ") —")
+				or  "— Hotstrings communs —"
+			table.insert(hotstrings_menu, { title = common_header, disabled = true })
+			for _, it in ipairs(common_groups) do table.insert(hotstrings_menu, it) end
+		end
+
+		-- 3. Personal/custom hotstrings with a separator and a disabled header
+		local custom_item = type(menu_mods.hotstrings.build_custom) == "function"
+			and Logger.build(LOG, "hotstrings.build_custom", menu_mods.hotstrings.build_custom, ctx)
+		if custom_item then
+			table.insert(hotstrings_menu, { title = "-" })
+			local personal_header = personal_has_count
+				and ("— Hotstrings personnels (" .. fmt_grand(personal_total) .. ") —")
+				or  "— Hotstrings personnels —"
+			table.insert(hotstrings_menu, { title = personal_header, disabled = true })
+			table.insert(hotstrings_menu, custom_item)
+		end
 
 		if #hotstrings_menu > 0 then
 			table.insert(items, {
