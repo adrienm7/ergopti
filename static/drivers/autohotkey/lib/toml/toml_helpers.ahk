@@ -329,7 +329,7 @@ TOML_FormatViaScript(Path) {
 ; TOML write targeting ConfigurationFile, rebuild the file from the in-memory
 ; state via SaveFullConfig so stale sections/keys are dropped.
 TOML_RunStrictCanonicalization(Path) {
-    global _TOML_STRICT_CANON_IN_PROGRESS, ConfigurationFile, SaveFullConfig
+    global _TOML_STRICT_CANON_IN_PROGRESS, ConfigurationFile, _SaveFullConfigReady
 
     if (_TOML_STRICT_CANON_IN_PROGRESS = true)
         return
@@ -337,7 +337,7 @@ TOML_RunStrictCanonicalization(Path) {
         return
     if (Path != ConfigurationFile)
         return
-    if !IsSet(SaveFullConfig)
+    if !IsSet(_SaveFullConfigReady)
         return
 
     _TOML_STRICT_CANON_IN_PROGRESS := true
