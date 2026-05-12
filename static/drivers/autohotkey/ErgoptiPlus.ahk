@@ -2493,10 +2493,10 @@ InsertKeyboardShortcutGroups(TargetMenu, InsertBefore) {
     LoggerStart("KeyboardShortcutsMenu", "Insertion des groupes de raccourcis clavier…")
 
     static _Groups := [
-        Map("prefix", "win_",        "label", "⊞ Win+",         "add_label", "[+ Ajouter un raccourci Win+…]"),
-        Map("prefix", "ctrl_",       "label", "^ Ctrl+",         "add_label", "[+ Ajouter un raccourci Ctrl+…]"),
-        Map("prefix", "ctrl_shift_", "label", "^⇧ Ctrl+Shift+",  "add_label", "[+ Ajouter un raccourci Ctrl+Shift+…]"),
-        Map("prefix", "alt_",        "label", "⎇ Alt+",          "add_label", "[+ Ajouter un raccourci Alt+…]"),
+        Map("prefix", "win_",        "label", "Raccourcis ⊞ Win",         "add_label", "[+ Ajouter un raccourci Win+…]"),
+        Map("prefix", "ctrl_",       "label", "Raccourcis ^ Ctrl",         "add_label", "[+ Ajouter un raccourci Ctrl+…]"),
+        Map("prefix", "ctrl_shift_", "label", "Raccourcis ^⇧ Ctrl+Shift",  "add_label", "[+ Ajouter un raccourci Ctrl+Shift+…]"),
+        Map("prefix", "alt_",        "label", "Raccourcis ⎇ Alt",          "add_label", "[+ Ajouter un raccourci Alt+…]"),
     ]
 
     ; Build all group menus first, then insert in reverse order so the final
