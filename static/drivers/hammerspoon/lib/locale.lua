@@ -110,6 +110,15 @@ function M.set_trigger_provider(fn)
 	end
 end
 
+--- Switches the active locale and clears the string cache so the next
+--- ``get()`` call reloads the correct JSON file.
+--- @param code string A locale code, e.g. ``"en"``.
+function M.set_locale(code)
+	if type(code) ~= "string" or code == "" then return end
+	_locale  = code
+	_strings = nil
+end
+
 --- Returns all loaded strings as a flat table (for inspection/testing).
 --- @return table
 function M.all()

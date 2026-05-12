@@ -135,18 +135,11 @@ global GESTURE_SLOTS := [
 ]
 
 ; Human-readable labels for each slot
-global GESTURE_SLOT_LABELS := Map(
-    "tap_3", "Tap 3 doigts",
-    "swipe_3_up", "Swipe 3 doigts ↑",
-    "swipe_3_down", "Swipe 3 doigts ↓",
-    "swipe_3_left", "Swipe 3 doigts ←",
-    "swipe_3_right", "Swipe 3 doigts →",
-    "tap_4", "Tap 4 doigts",
-    "swipe_4_up", "Swipe 4 doigts ↑",
-    "swipe_4_down", "Swipe 4 doigts ↓",
-    "swipe_4_left", "Swipe 4 doigts ←",
-    "swipe_4_right", "Swipe 4 doigts →",
-)
+global GESTURE_SLOT_LABELS := Map()
+for _Slot in ["tap_3", "swipe_3_up", "swipe_3_down", "swipe_3_left", "swipe_3_right",
+              "tap_4", "swipe_4_up", "swipe_4_down", "swipe_4_left", "swipe_4_right"] {
+    GESTURE_SLOT_LABELS[_Slot] := t("gesture.slots." . _Slot)
+}
 
 ; Shortcut labels for setup instructions
 global GESTURE_SHORTCUT_LABELS := Map(
@@ -1717,7 +1710,7 @@ GestureShowSetupInstructions() {
         . "puis taper le raccourci indiqué :`n`n"
 
     for Slot in GESTURE_SLOTS {
-        Instructions .= "  " . GESTURE_SLOT_LABELS[Slot] . " :  "
+        Instructions .= "  " . t("gesture.slots." . Slot) . " :  "
             . GESTURE_SHORTCUT_LABELS[Slot] . "`n"
     }
 

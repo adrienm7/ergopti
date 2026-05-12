@@ -1,0 +1,166 @@
+--- lib/i18n.lua
+
+--- ==============================================================================
+--- MODULE: i18n (Internationalisation)
+--- DESCRIPTION:
+--- Manages the active UI locale for the Hammerspoon driver. Wraps lib/locale
+--- to add locale switching, persistence via hs.settings, and a language
+--- selector menu builder.
+---
+--- FEATURES & RATIONALE:
+--- 1. Lazy Load: delegates file I/O to lib/locale; a locale switch clears
+---    the locale cache so the next get() re-reads the new file.
+--- 2. Persistence: the active locale code is written to hs.settings under
+---    ``i18n_locale`` so it survives script reloads without touching any
+---    TOML file.
+--- 3. Language selector: M.build_language_menu() returns a table of
+---    hs.menubar or hs.menu items — one per supported locale — usable
+---    directly inside builder.lua's global-actions section.
+--- 4. Shared locale files: JSON files in static/locales/ are the single
+---    source of truth shared with the AHK driver.
+--- ==============================================================================
+
+local M = {}
+
+local hs     = hs
+local Logger = require("lib.logger")
+local LOG    = "i18n"
+
+local locale_mod = require("lib.locale")
+
+
+
+
+-- ==========================================
+-- ==========================================
+-- ======= 1/ Constants and module state =======
+-- ==========================================
+-- ==========================================
+
+--- Ordered list of supported locales.
+local LOCALES = {
+	{ code = "fr", flag = "🇫🇷", name = "Français" },
+	{ code = "en", flag = "🇬🇧", name = "English"  },
+	{ code = "de", flag = "🇩🇪", name = "Deutsch"  },
+	{ code = "es", flag = "🇪🇸", name = "Español"  },
+	{ code = "zh", flag = "🇨🇳", name = "中文"      },
+}
+
+--- hs.settings key used to persist the locale between reloads.
+local SETTINGS_KEY = "i18n_locale"
+
+--- Currently active locale code.
+local _locale = "fr"
+
+
+
+
+-- =====================================
+-- =====================================
+-- ======= 2/ Internal helpers =======
+-- =====================================
+-- =====================================
+
+--- Returns true when code is a supported locale code.
+local function is_known(code)
+	for _, loc in ipairs(LOCALES) do
+		if loc.code == code then return true end
+	end
+	return false
+end
+
+--- Pushes the active locale into lib/locale so get() resolves the right file.
+--- lib/locale exposes no public setter for the locale code, so we access its
+--- internals via a module-level upvalue injection pattern using an internal
+--- function injected at require time.
+local _locale_set_fn = nil  -- injected by init() below
+
+
+
+
+-- =========================================
+-- =========================================
+-- ======= 3/ Public API =======
+-- =========================================
+-- =========================================
+
+--- Initialises the i18n module. Reads the persisted locale from hs.settings
+--- (or falls back to "fr"). Must be called once at boot before any menu is built.
+function M.init()
+	Logger.trace(LOG, "Initialising i18n…")
+	local saved = hs.settings.get(SETTINGS_KEY)
+	if type(saved) == "string" and is_known(saved) then
+		_locale = saved
+	else
+		_locale = "fr"
+	end
+	-- Patch lib/locale so it loads the right file
+	if _locale_set_fn then _locale_set_fn(_locale) end
+	Logger.done(LOG, "i18n initialised (locale: '%s').", _locale)
+end
+
+--- Returns the translated string for the given dot-notation key.
+--- Delegates to lib/locale.get() which handles ★ substitution and caching.
+--- Falls back to the raw key name when the string is absent.
+--- @param key string Dot-notation key, e.g. ``"menu.global.reload"``.
+--- @return string
+function M.get(key)
+	local s = locale_mod.get(key)
+	if s == nil or s == "" then return key end
+	return s
+end
+
+--- Returns the active locale code (e.g. ``"fr"``).
+--- @return string
+function M.get_locale()
+	return _locale
+end
+
+--- Changes the active locale, persists it, and triggers a Hammerspoon reload
+--- so all menus are rebuilt in the new language.
+--- @param code string A known locale code.
+function M.set_locale(code)
+	if not is_known(code) then
+		Logger.warn(LOG, "Unknown locale '%s' — ignoring.", code)
+		return
+	end
+	if code == _locale then return end
+	Logger.start(LOG, "Switching locale to '%s'…", code)
+	_locale = code
+	hs.settings.set(SETTINGS_KEY, code)
+	Logger.success(LOG, "Locale set to '%s' — reloading.", code)
+	hs.reload()
+end
+
+--- Returns a list of hs.menu-compatible item tables for a language selector.
+--- Each item has a title and an fn; the currently active locale gets a
+--- checked = true flag. Pass this list directly into an hs.menubar submenu.
+--- @return table[] List of menu item tables.
+function M.build_language_menu_items()
+	local items = {}
+	for _, loc in ipairs(LOCALES) do
+		local code = loc.code
+		items[#items + 1] = {
+			title   = loc.flag .. " " .. loc.name,
+			checked = (code == _locale),
+			fn      = function() M.set_locale(code) end,
+		}
+	end
+	return items
+end
+
+--- Injects a locale setter into lib/locale so the active locale is applied
+--- at module level. Called internally during init; exposed so init.lua can
+--- wire the locale into lib/locale before any module calls locale.get().
+--- @param fn function A function accepting a locale code string.
+function M.set_locale_injector(fn)
+	_locale_set_fn = fn
+end
+
+--- Returns the ordered list of supported locales (read-only view).
+--- @return table[]
+function M.locales()
+	return LOCALES
+end
+
+return M

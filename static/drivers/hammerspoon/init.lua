@@ -69,6 +69,14 @@ do
 	end
 end
 
+local i18n               = require("lib.i18n")
+local locale_mod         = require("lib.locale")
+
+-- Wire i18n → locale so set_locale() updates the JSON loader's active locale.
+-- Must run before any menu builder calls i18n.get() or locale_mod.get().
+i18n.set_locale_injector(function(code) locale_mod.set_locale(code) end)
+i18n.init()
+
 local menu_paths         = require("ui.menu.menu_paths")
 local gestures           = require("modules.gestures")
 local keymap             = require("modules.keymap")

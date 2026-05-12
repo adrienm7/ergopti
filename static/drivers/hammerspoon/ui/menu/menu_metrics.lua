@@ -23,6 +23,7 @@ local fs = require("hs.fs")
 local AppPickerLib = require("lib.app_picker")
 local dialog       = require("lib.dialog_util")
 local kl_mod       = require("modules.keylogger")
+local i18n         = require("lib.i18n")
 
 local _prog_canvas = nil
 local _is_initialized = false
@@ -187,7 +188,7 @@ function M.build(ctx)
 	local menu = {}
 	
 	table.insert(menu, {
-		title    = "Afficher les métriques de frappe",
+		title    = i18n.get("menu.metrics.show_typing"),
 		disabled = not state.keylogger_enabled,
 		fn       = function() 
 			local Keylogger = require("modules.keylogger")
@@ -240,7 +241,7 @@ function M.build(ctx)
 	})
 
 	table.insert(menu, {
-		title    = "Afficher le temps sur les applications",
+		title    = i18n.get("menu.metrics.show_apps"),
 		disabled = not state.keylogger_enabled,
 		fn       = function() 
 			local ok, at = pcall(require, "ui.metrics_apps")
@@ -379,10 +380,10 @@ function M.build(ctx)
 
 	table.insert(menu, { title = "-" })
 	table.insert(menu, { title = "-" })
-	table.insert(menu, { title = "— FILTRES DE CONFIDENTIALITÉ —", disabled = true })
+	table.insert(menu, { title = i18n.get("menu.metrics.privacy_header"), disabled = true })
 
 	table.insert(menu, {
-		title    = "Ignorer la navigation privée",
+		title    = i18n.get("menu.metrics.filter_private"),
 		checked  = state.keylogger_private_filter_enabled,
 		disabled = not state.keylogger_enabled,
 		fn       = function()
@@ -396,7 +397,7 @@ function M.build(ctx)
 	})
 
 	table.insert(menu, {
-		title    = "Ignorer les champs mot de passe",
+		title    = i18n.get("menu.metrics.filter_secure"),
 		checked  = state.keylogger_secure_filter_enabled,
 		disabled = not state.keylogger_enabled,
 		fn       = function()
@@ -410,7 +411,7 @@ function M.build(ctx)
 	})
 
 	table.insert(menu, {
-		title    = "Ignorer les boîtes de dialogue d’authentification système",
+		title    = i18n.get("menu.metrics.filter_sysauth"),
 		checked  = state.keylogger_system_auth_filter_enabled,
 		disabled = not state.keylogger_enabled,
 		fn       = function()
@@ -424,7 +425,10 @@ function M.build(ctx)
 	})
 
 	local disabled_count = #(type(state.keylogger_disabled_apps) == "table" and state.keylogger_disabled_apps or {})
-	local label = "Désactivé dans" .. (disabled_count > 0 and (" " .. disabled_count .. " application" .. (disabled_count > 1 and "s" or "")) or " ces applications")
+	local label = i18n.get("menu.metrics.disabled_in_prefix")
+		.. (disabled_count > 0
+			and (disabled_count .. i18n.get("menu.metrics.disabled_in_suffix_s") .. (disabled_count > 1 and "s" or ""))
+			or i18n.get("menu.metrics.disabled_in_suffix_p"))
 
 	local exclusion_menu = AppPickerLib.build_menu(
 		state.keylogger_disabled_apps,
@@ -437,7 +441,7 @@ function M.build(ctx)
 			pcall(save_prefs)
 			pcall(updateMenu)
 		end,
-		"Exclure des métriques de frappe…"
+		i18n.get("menu.metrics.exclude_apps")
 	)
 
 	table.insert(menu, {
@@ -528,7 +532,7 @@ function M.build(ctx)
 	})
 
 	table.insert(menu, {
-		title = "↳ Ouvrir l’Encryptor autonome...",
+		title = i18n.get("menu.metrics.open_encryptor"),
 		fn = function()
 			local app_path = hs.configdir .. "/utils/encryptor/Encryptor.app"
 			if fs.attributes(app_path) then
@@ -540,7 +544,7 @@ function M.build(ctx)
 	})
 
 	return {
-		title   = "📊 Métriques",
+		title   = i18n.get("menu.metrics.title"),
 		checked = state.keylogger_enabled,
 		fn      = function()
 			if not state.keylogger_enabled then
