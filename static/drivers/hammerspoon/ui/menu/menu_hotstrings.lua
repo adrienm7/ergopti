@@ -160,7 +160,7 @@ local function buildPersonalInfoItems(ctx, description)
 					if type(ctx.personal_info.disable) == "function" then pcall(ctx.personal_info.disable) end 
 				end
 				ctx.save_prefs()
-				ctx.notify_feature(description or "Informations personnelles", ctx.state.personal_info)
+				ctx.notify_feature(description or i18n.get("notify.personal_info"), ctx.state.personal_info)
 				ctx.updateMenu()
 			end,
 		},
@@ -378,7 +378,7 @@ function M.build_management(ctx)
 						end
 						state.terminator_states[k] = nv
 						ctx.save_prefs()
-						ctx.notify_feature("Expanseur de mots : " .. ctx.applyTriggerChar(l), nv)
+						ctx.notify_feature(string.format(i18n.get("notify.word_expander_prefix"), ctx.applyTriggerChar(l)), nv)
 						ctx.updateMenu()
 					end end)(def.key, lbl) or nil,
 				}

@@ -2,7 +2,7 @@
 <html lang="fr">
 	<head>
 		<meta charset="utf-8" />
-		<title>Métriques de frappe</title>
+		<title data-i18n="ui_typing.title">Métriques de frappe</title>
 		<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 		<script src="https://cdn.jsdelivr.net/npm/date-fns"></script>
 		<script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns"></script>
@@ -13,13 +13,13 @@
 	<body>
 		<div class="top-fixed-bar">
 			<div class="header">
-				<h1>Métriques de frappe</h1>
+				<h1 data-i18n="ui_typing.title">Métriques de frappe</h1>
 			</div>
 
 			<div class="filters-bar">
 				<div class="filter-group-dates">
 					<div>
-						<label>Du&nbsp;:</label
+						<label data-i18n="ui_typing.label_from">Du&nbsp;:</label
 						><input
 							type="date"
 							id="date_start"
@@ -27,7 +27,7 @@
 						/>
 					</div>
 					<div>
-						<label>Au&nbsp;:</label
+						<label data-i18n="ui_typing.label_to">Au&nbsp;:</label
 						><input
 							type="date"
 							id="date_end"
@@ -39,6 +39,8 @@
 						class="filter-btn"
 						onchange="apply_quick_date_range()"
 						title="Raccourci période"
+						data-i18n-option-prefix="ui_typing.opt_quick_range"
+						data-i18n-title="ui_typing.title_quick_range"
 					>
 						<option value="">Période…</option>
 						<option value="last_hour">Dernière heure</option>
@@ -53,7 +55,7 @@
 				</div>
 
 				<div class="filter-group-buttons">
-					<button class="filter-btn active" id="app_filter_btn" onclick="open_app_modal()">
+					<button class="filter-btn active" id="app_filter_btn" onclick="open_app_modal()" data-i18n="ui_typing.btn_apps_all">
 						Apps (Toutes)
 					</button>
 
@@ -81,28 +83,29 @@
 						class="filter-btn"
 						id="btn_case_sensitive"
 						onclick="toggle_filter('btn_case_sensitive')"
+						data-i18n="ui_typing.btn_case_sensitive"
 					>
 						Sensible à la casse
 					</button>				</div>
 
-				<button class="filter-btn filter-reset" onclick="reset_filters()">Réinitialiser</button>
+				<button class="filter-btn filter-reset" onclick="reset_filters()" data-i18n="ui_typing.btn_reset">Réinitialiser</button>
 			</div>
 		</div>
 
 		<div class="main-content">
 			<div class="stats-grid" id="main_stats_grid">
 				<div class="stat-card card-llm" id="llm_card">
-					<h2>Intelligence artificielle <span id="llm_trend"></span></h2>
-					<div class="stat-value" id="llm_val">0 <span class="stat-unit">activations</span></div>
+					<h2><span data-i18n="ui_typing.h2_ai">Intelligence artificielle</span> <span id="llm_trend"></span></h2>
+					<div class="stat-value" id="llm_val">0 <span class="stat-unit" data-i18n="ui_typing.unit_activations">activations</span></div>
 
-					<div class="stat-details" id="llm_loading">Calcul en cours...</div>
+					<div class="stat-details" id="llm_loading" data-i18n="ui_typing.loading">Calcul en cours...</div>
 					<div class="stat-details-split" id="llm_details" style="display: none">
 						<div class="split-col" title="Différence nette entre caractères effacés et générés">
-							<div class="split-label">Économisées</div>
-							<div class="split-val"><strong id="llm_net_val">0</strong> frappes</div>
+							<div class="split-label" data-i18n="ui_typing.lbl_saved">Économisées</div>
+							<div class="split-val"><strong id="llm_net_val">0</strong> <span data-i18n="ui_typing.unit_keystrokes">frappes</span></div>
 						</div>
 						<div class="split-col">
-							<div class="split-label">Acceptées</div>
+							<div class="split-label" data-i18n="ui_typing.lbl_accepted">Acceptées</div>
 							<div class="split-val">
 								<strong id="llm_acc_pct">0%</strong>
 								<span class="split-sub" id="llm_acc_raw">(0/0)</span>
@@ -114,17 +117,17 @@
 				</div>
 
 				<div class="stat-card card-hs" id="hs_card">
-					<h2>Hotstrings <span id="hs_trend"></span></h2>
-					<div class="stat-value" id="hs_val">0 <span class="stat-unit">activations</span></div>
+					<h2><span data-i18n="ui_typing.h2_hs">Hotstrings</span> <span id="hs_trend"></span></h2>
+					<div class="stat-value" id="hs_val">0 <span class="stat-unit" data-i18n="ui_typing.unit_activations">activations</span></div>
 
-					<div class="stat-details" id="hs_loading">Calcul en cours...</div>
+					<div class="stat-details" id="hs_loading" data-i18n="ui_typing.loading">Calcul en cours...</div>
 					<div class="stat-details-split" id="hs_details" style="display: none">
 						<div class="split-col" title="Différence nette entre caractères tapés et générés">
-							<div class="split-label">Économisées</div>
-							<div class="split-val"><strong id="hs_net_val">0</strong> frappes</div>
+							<div class="split-label" data-i18n="ui_typing.lbl_saved">Économisées</div>
+							<div class="split-val"><strong id="hs_net_val">0</strong> <span data-i18n="ui_typing.unit_keystrokes">frappes</span></div>
 						</div>
 						<div class="split-col">
-							<div class="split-label">Acceptées</div>
+							<div class="split-label" data-i18n="ui_typing.lbl_accepted">Acceptées</div>
 							<div class="split-val">
 								<strong id="hs_acc_pct">0%</strong>
 								<span class="split-sub" id="hs_acc_raw">(0/0)</span>
@@ -136,12 +139,12 @@
 				</div>
 
 				<div class="stat-card card-global" id="global_card">
-					<h2>Vitesse moyenne <span id="wpm_trend"></span></h2>
+					<h2><span data-i18n="ui_typing.h2_speed">Vitesse moyenne</span> <span id="wpm_trend"></span></h2>
 					<div class="stat-value" id="wpm_val" style="margin: 5px 0">0</div>
 					<div class="stat-details" id="global_details">
 						<div>
 							<strong>0</strong>
-							<span class="stat-unit" style="font-size: 0.9em">touches tapées</span>
+							<span class="stat-unit" style="font-size: 0.9em" data-i18n="ui_typing.unit_keyspressed">touches tapées</span>
 						</div>
 					</div>
 					<div id="wpm_words_sub"></div>
@@ -152,6 +155,7 @@
 							onchange="apply_local_filters()"
 							title="Seuil de pause : pauses supérieures à ce seuil sont exclues du temps actif pour le calcul MPM."
 							style="font-size:11px;padding:3px 6px;height:auto;"
+							data-i18n-option-prefix="ui_typing.opt_pause"
 						>
 							<option value="1000">Pauses &gt; 1 s</option>
 							<option value="2000">Pauses &gt; 2 s</option>
@@ -176,6 +180,7 @@
 							<h3
 								id="precision_chart_title"
 								style="margin: 0; font-size: 14px; color: var(--kpi-precision-color)"
+								data-i18n="ui_typing.h3_precision"
 							>
 								Précision (%)
 							</h3>
@@ -184,12 +189,13 @@
 								class="tooltip stat-inline-tooltip"
 								style="color: var(--kpi-precision-color)"
 							></span>
-							<div class="chart-help" style="margin: 0">Pincer (trackpad) pour zoomer.</div>
+							<div class="chart-help" style="margin: 0" data-i18n="ui_typing.pinch_hint">Pincer (trackpad) pour zoomer.</div>
 						</div>
 						<button
 							class="tab-btn"
 							style="padding: 2px 8px; font-size: 11px; border-color: var(--precision-border)"
 							onclick="reset_chart_zoom('precision')"
+							data-i18n="ui_typing.btn_restore_zoom"
 						>
 							Restaurer le zoom
 						</button>
@@ -208,12 +214,13 @@
 							>
 								Vitesse (MPM)
 							</h3>
-							<div class="chart-help" style="margin: 0">Pincer (trackpad) pour zoomer.</div>
+							<div class="chart-help" style="margin: 0" data-i18n="ui_typing.pinch_hint">Pincer (trackpad) pour zoomer.</div>
 						</div>
 						<button
 							class="tab-btn"
 							style="padding: 2px 8px; font-size: 11px; border-color: var(--global-border)"
 							onclick="reset_chart_zoom('wpm')"
+							data-i18n="ui_typing.btn_restore_zoom"
 						>
 							Restaurer le zoom
 						</button>
@@ -245,12 +252,13 @@
 						<h3 style="margin: 0; font-size: 14px; color: var(--text-color)">
 							Origine des frappes
 						</h3>
-					<div class="chart-help" style="margin: 0">Pincer (trackpad) pour zoomer.</div>
+					<div class="chart-help" style="margin: 0" data-i18n="ui_typing.pinch_hint">Pincer (trackpad) pour zoomer.</div>
 					</div>
 					<button
 						class="tab-btn"
 					style="padding: 2px 8px; font-size: 11px; border-color: var(--delegation-border)"
 						onclick="reset_chart_zoom('delegation')"
+						data-i18n="ui_typing.btn_restore_zoom"
 					>
 						Restaurer le zoom
 					</button>
@@ -818,7 +826,7 @@
 					</thead>
 					<tbody id="metrics_table_body">
 						<tr>
-							<td colspan="8" style="text-align: center; color: var(--text-muted); padding: 30px">
+							<td colspan="8" style="text-align: center; color: var(--text-muted); padding: 30px" data-i18n="ui_typing.page_loading">
 								Chargement de l'interface...
 							</td>
 						</tr>
@@ -829,15 +837,16 @@
 
 		<div id="app_modal" class="modal" style="display: none">
 			<div class="modal-content">
-				<h2>Sélectionner les applications</h2>
+				<h2 data-i18n="ui_typing.modal_select_apps">Sélectionner les applications</h2>
 				<div class="app-modal-controls">
-					<button class="tab-btn" onclick="select_all_apps()">Tout cocher</button>
-					<button class="tab-btn" onclick="deselect_all_apps()">Tout décocher</button>
+					<button class="tab-btn" onclick="select_all_apps()" data-i18n="ui_typing.modal_check_all">Tout cocher</button>
+					<button class="tab-btn" onclick="deselect_all_apps()" data-i18n="ui_typing.modal_uncheck_all">Tout décocher</button>
 				</div>
 				<input
 					type="text"
 					id="app_search"
 					placeholder="Rechercher une application..."
+					data-i18n-placeholder="ui_typing.modal_search_app"
 					onkeyup="render_app_list()"
 				/>
 				<div id="app_list" class="app-list"></div>
@@ -845,6 +854,7 @@
 					class="tab-btn"
 					style="width: 100%; margin-top: 15px; font-weight: bold"
 					onclick="close_app_modal()"
+					data-i18n="ui_typing.modal_apply"
 				>
 					Fermer et Appliquer
 				</button>
@@ -853,16 +863,16 @@
 
 		<!-- Find-in-page bar (hidden by default, revealed via Cmd+F) -->
 		<div id="find_bar">
-			<span class="find-label">Rechercher dans la page</span>
-			<input type="text" id="find_input" placeholder="Rechercher…" autocomplete="off" />
+			<span class="find-label" data-i18n="ui_typing.search_label">Rechercher dans la page</span>
+			<input type="text" id="find_input" placeholder="Rechercher…" autocomplete="off" data-i18n-placeholder="ui_typing.search_placeholder" />
 			<span id="find_status" class="find-status"></span>
-			<button class="find-nav-btn" onclick="find_in_page(false)" title="Précédent (Maj+Entrée)">
+			<button class="find-nav-btn" onclick="find_in_page(false)" title="Précédent (Maj+Entrée)" data-i18n-title="ui_typing.search_prev">
 				&#8249;
 			</button>
-			<button class="find-nav-btn" onclick="find_in_page(true)" title="Suivant (Entrée)">
+			<button class="find-nav-btn" onclick="find_in_page(true)" title="Suivant (Entrée)" data-i18n-title="ui_typing.search_next">
 				&#8250;
 			</button>
-			<button class="find-close-btn" onclick="close_find_bar()" title="Fermer (Échap)">
+			<button class="find-close-btn" onclick="close_find_bar()" title="Fermer (Échap)" data-i18n-title="ui_typing.search_close">
 				&#x2715;
 			</button>
 		</div>

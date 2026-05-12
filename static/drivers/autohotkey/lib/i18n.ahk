@@ -203,7 +203,7 @@ I18nBuildLanguageMenu(LangMenu) {
 	for Loc in I18N_LOCALES {
 		; _MakeLocaleSetter wraps the code in a named function so AHK captures
 		; the value at call time rather than sharing the loop variable reference.
-		Label    := Loc.Flag . " " . Loc.Name
+		Label    := Loc.Name
 		LangMenu.Add(Label, _MakeLocaleSetter(Loc.Code))
 		FlagPath := FlagsDir . Loc.Code . ".png"
 		if FileExist(FlagPath)

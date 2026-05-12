@@ -167,7 +167,7 @@ function M.generate(ctx, menu_mods, actions)
 				end
 			end
 			ctx.save_prefs()
-			ctx.notify_feature("Hotstrings", enable)
+			ctx.notify_feature(i18n.get("notify.hotstrings"), enable)
 			ctx.updateMenu()
 		end
 
@@ -318,8 +318,10 @@ function M.generate(ctx, menu_mods, actions)
 	table.insert(items, { title = i18n.get("menu.global.config_folder"), fn = actions.open_paths })
 	table.insert(items, { title = "-" })
 	table.insert(items, { title = i18n.get("menu.global.edit_shortcuts"), fn = actions.open_personal_shortcuts })
-	table.insert(items, { title = i18n.get("menu.global.reload"),  fn = actions.reload })
-	table.insert(items, { title = i18n.get("menu.global.quit"),    fn = actions.quit })
+	-- Strip the leading emoji token from the shared i18n string and replace with
+	-- plain Unicode symbols — emoji render poorly in native macOS menu bars
+	table.insert(items, { title = "↺ " .. i18n.get("menu.global.reload"):gsub("^%S+ ", ""),  fn = actions.reload })
+	table.insert(items, { title = "✕ " .. i18n.get("menu.global.quit"):gsub("^%S+ ", ""),    fn = actions.quit })
 	-- Debug submenu — groups the developer-facing tools (Hammerspoon Console,
 	-- log-folder shortcut, today's log) so the top-level tray stays scannable.
 	-- Mirrors AutoHotkey's "⚠ Débogage" entry, which adds Window Spy / List Vars
