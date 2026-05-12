@@ -416,6 +416,13 @@ ReadConfiguration(Cache) {
 }
 
 ReadConfiguration(_IniCache)
+; Migrate TextExpansionPersonalInformation from MagicKey to DynamicHotstrings:
+; remove the stale keys from [Hotstrings.MagicKey] so they stop reappearing
+; in the config file on every write.
+TOML_BatchWrite(ConfigurationFile, [
+    { Section: "Hotstrings.MagicKey", Key: "TextExpansionPersonalInformation",              Value: "_DELETE_" },
+    { Section: "Hotstrings.MagicKey", Key: "TextExpansionPersonalInformation_PatternMaxLength", Value: "_DELETE_" },
+])
 ; Materialise personal_info.toml from defaults if missing, so renaming or
 ; deleting the file simply triggers a fresh re-creation on the next launch
 ; (same guarantee EnsurePersonalShortcutsFile gives for personal_shortcuts.ahk).
@@ -1304,10 +1311,28 @@ initMenu() {
     ; Magic key editor — mirrors HS menu_hotstrings build_management placement
     HotstringsMenu.Add("Touche magique : " . ScriptInformation["MagicKey"], MagicKeyEditor)
     HotstringsMenu.Add("Modifier le lien ouvert par Win + G", GPTLinkEditor)
-    A_TrayMenu.Add(MenuHotstrings, HotstringsMenu)
+    ; Compute grand total across all hotstring categories for the top-level menu title
+    GrandTotal := 0
+    for _GCat in HotstringCategories {
+        GrandTotal += CountTomlHotstrings(_GCat)
+    }
+    for _DSec in Features["DynamicHotstrings"]["__Order"] {
+        if (_DSec != "-" and Features["DynamicHotstrings"].Has(_DSec)
+        and Features["DynamicHotstrings"][_DSec].Enabled) {
+            GrandTotal += CountDynamicSection(_DSec)
+        }
+    }
+    if Features.Has("Personal") {
+        GrandTomlPersonal := ReadPersonalToml()
+        for _, _GSecData in GrandTomlPersonal["sections"] {
+            GrandTotal += _GSecData["entries"].Length
+        }
+    }
+    HotstringsMenuTitle := MenuHotstrings . (GrandTotal > 0 ? " (" . FmtCount(GrandTotal) . ")" : "")
+    A_TrayMenu.Add(HotstringsMenuTitle, HotstringsMenu)
     ; Check the parent title when all hotstrings are enabled — mirrors HS checked submenu.
     if HotstringsAllEnabled {
-        A_TrayMenu.Check(MenuHotstrings)
+        A_TrayMenu.Check(HotstringsMenuTitle)
     }
 
     ; ── 📊 Métriques — mirrors the HS Métriques submenu position exactly:
@@ -1684,6 +1709,11 @@ ReadScriptShortcutsConfig()
 ; of ahk/config.toml. CS_Load() populates both MetricsShortcuts
 ; and MetricsFilters in one pass.
 CS_Load()
+
+; Expose SaveFullConfig as a global variable so that lib modules loaded
+; before this point (config_shortcuts, toml_helpers) can detect its
+; presence via IsSet() and delegate persistence to the full writer.
+global SaveFullConfig := Func("SaveFullConfig")
 
 ; Now that all modules are loaded and config is hydrated, persist the
 ; complete state to ensure the on-disk TOML contains every key — not
