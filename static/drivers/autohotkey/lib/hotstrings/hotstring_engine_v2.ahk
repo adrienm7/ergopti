@@ -235,12 +235,12 @@ HSE_FeedBackspace() {
 
 ; Generic reset. KnownTerminatorBefore declares whether the caller can
 ; vouch for the new cursor position abutting a word boundary:
-;   - true for keystrokes that themselves emit a terminator at the cursor
-;     position (Tab, Enter), or that explicitly start a fresh context
-;     (Ctrl+A replaces the entire selection — the next typed char lands at
-;     a fresh word-start).
-;   - false for everything else (arrows, Home, End, PgUp/PgDn, Insert,
-;     Delete, Escape, mouse click, Ctrl+X / V / Z / Y …).
+;   - true for keystrokes that land at a known fresh context: Tab, Enter
+;     (terminator emitted), Ctrl+A (selection replaced), arrows, Escape,
+;     mouse click (cursor moved — next run starts fresh).
+;   - false for destructive or content-replacing operations where the
+;     buffer content to the left is completely unknown: Ctrl+X (cut),
+;     Ctrl+V (paste), Ctrl+Z/Y (undo/redo), backspace on empty buffer.
 HSE_FeedReset(KnownTerminatorBefore := false) {
     global HSE_Buffer, HSE_StartIsWordBoundary, HSE_Suppressed
     if HSE_Suppressed {

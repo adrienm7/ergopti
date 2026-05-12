@@ -118,7 +118,10 @@ _InstallMouseClickResetHooks() {
 
 _OnMouseClickReset(*) {
     try {
-        HSE_FeedReset(false)
+        ; A click places the cursor at an unknown position, but the next
+        ; keystroke will start a fresh run — treat it as a word boundary so
+        ; is_word triggers (e.g. "c★ → c'est") fire immediately.
+        HSE_FeedReset(true)
         _ResetPrefixBuffer()
     } catch as Err {
         LoggerError("PrefixWatcher", "Mouse-click reset failed: {1}.", Err.Message)
@@ -518,11 +521,12 @@ _OnPrefixKeyDown(IH, VK, SC) {
 
         ; Feed HSEv2 with the appropriate buffer mutation. Backspace
         ; decrements its buffer (preserving word context, the whole point
-        ; of the rewrite); Tab/Enter declare a new word boundary; arrows /
-        ; Escape / Space wipe to an unknown left-hand context. Space is
-        ; already handled by HSE_FeedChar via OnChar's terminator path,
-        ; but we also reset here so a Space whose char event was swallowed
-        ; (e.g. layered on tap-hold) still flips the boundary flag.
+        ; of the rewrite); Tab/Enter/arrows/Escape/mouse-click all declare
+        ; a word boundary — the cursor lands somewhere unknown but the next
+        ; typed run always starts fresh. Space is already handled by
+        ; HSE_FeedChar via OnChar's terminator path, but we also reset here
+        ; so a Space whose char event was swallowed (e.g. layered on
+        ; tap-hold) still flips the boundary flag.
         if (VK == 0x08) {
             HSE_FeedBackspace()
         } else if (VK == 0x09 or VK == 0x0D) {
@@ -530,7 +534,9 @@ _OnPrefixKeyDown(IH, VK, SC) {
         } else if (VK == 0x1B
                 or VK == 0x25 or VK == 0x26
                 or VK == 0x27 or VK == 0x28) {
-            HSE_FeedReset(false)
+            ; Arrow keys and Escape move the cursor to an unknown position,
+            ; but the next typed run starts fresh — treat as word boundary.
+            HSE_FeedReset(true)
         }
         if ResetVKs.Has(VK) {
             _ResetPrefixBuffer()

@@ -265,17 +265,29 @@ TestHSEv2_WordBoundaryFailsAfterBackspaceFromEmpty() {
 Test("HSEv2 word-boundary check fails after backspace through empty buffer",
     TestHSEv2_WordBoundaryFailsAfterBackspaceFromEmpty)
 
-TestHSEv2_WordBoundaryFailsAfterArrowReset() {
+TestHSEv2_WordBoundaryPassesAfterArrowReset() {
     HSEv2_TestReset()
     HSE_Register("*", "ui", () => 0)
-    HSE_FeedReset(false) ; arrow / Home / mouse click semantics
+    HSE_FeedReset(true) ; arrow / mouse click — next run starts fresh
+    HSE_FeedChar("u")
+    Match := HSE_FeedChar("i")
+    AssertEqual("ui", Match,
+        "navigation reset sets word boundary — trigger fires immediately after")
+}
+Test("HSEv2 word-boundary passes after navigation reset",
+    TestHSEv2_WordBoundaryPassesAfterArrowReset)
+
+TestHSEv2_WordBoundaryFailsAfterCtrlX() {
+    HSEv2_TestReset()
+    HSE_Register("*", "ui", () => 0)
+    HSE_FeedReset(false) ; Ctrl+X / Ctrl+V / Ctrl+Z — unknown buffer content
     HSE_FeedChar("u")
     Match := HSE_FeedChar("i")
     AssertEqual("", Match,
-        "navigation reset clears the boundary flag — trigger stays silent")
+        "cut/paste/undo reset clears the boundary flag — trigger stays silent")
 }
-Test("HSEv2 word-boundary check fails after navigation reset",
-    TestHSEv2_WordBoundaryFailsAfterArrowReset)
+Test("HSEv2 word-boundary check fails after cut/paste/undo reset",
+    TestHSEv2_WordBoundaryFailsAfterCtrlX)
 
 TestHSEv2_WordBoundaryHonouredMidBuffer() {
     HSEv2_TestReset()
