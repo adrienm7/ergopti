@@ -246,6 +246,20 @@ function M.stop_awake()
 	end
 end
 
+--- Toggles the hardware CapsLock state by synthesising a raw CapsLock keystroke.
+--- Useful for debugging CapsWord state or recovering a stuck CapsLock LED.
+function M.toggle_capslock()
+	local ok, cur = pcall(hs.eventtap.checkKeyboardModifiers)
+	if not ok then
+		Logger.warn(LOG, "toggle_capslock: could not read modifier state.")
+		return
+	end
+	-- Synthesise a CapsLock key-down + key-up pair; macOS toggles the LED on the down event.
+	pcall(hs.eventtap.keyStroke, {}, "capslock", 0)
+	local new_state = not (cur and cur.capslock)
+	Logger.debug(LOG, "CapsLock toggled — now %s.", new_state and "ON" or "OFF")
+end
+
 
 
 
