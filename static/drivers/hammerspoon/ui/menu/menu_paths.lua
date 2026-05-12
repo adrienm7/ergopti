@@ -253,6 +253,16 @@ local function personal_hotstrings_dir()
 	if not d:match("[/\\]$") then d = d .. "/" end
 	local p = d .. "hotstrings/"
 	ensure_dir(p)
+	-- Bootstrap an empty personal_hotstrings.toml on first use so the user
+	-- always has a file to open rather than a confusing ENOENT.
+	local toml_path = p .. "personal_hotstrings.toml"
+	local existing  = io.open(toml_path, "r")
+	if not existing then
+		local fh = io.open(toml_path, "w")
+		if fh then fh:write("") fh:close() end
+	else
+		existing:close()
+	end
 	return p
 end
 

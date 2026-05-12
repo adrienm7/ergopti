@@ -190,11 +190,16 @@ global _LogoDir := _StaticDir . "\img\logo"
 global IconPath := _LogoDir . "\logo_simple.ico"
 global IconPathDisabled := _LogoDir . "\logo_simple_disabled.ico"
 
-; Auto-create the AHK driver subfolder under _ConfigDir on first launch.
-; Driver-specific files (personal_shortcuts.ahk, config.toml, …) live
-; here so a Mac+PC setup can keep ahk/ and hammerspoon/ side by side
-; without any name collision.
+; Auto-create driver and shared subfolders under _ConfigDir on first launch.
+; ahk/ holds driver-specific files; hotstrings/ holds the shared TOML files
+; so a Mac+PC setup can keep both side by side without name collision.
 DirCreate(_ConfigDir . "ahk")
+DirCreate(_ConfigDir . "hotstrings")
+; Bootstrap an empty personal_hotstrings.toml if it does not exist yet so the
+; user always has a file to open rather than a confusing error.
+_PersonalTomlBootstrap := _ConfigDir . "hotstrings\personal_hotstrings.toml"
+if !FileExist(_PersonalTomlBootstrap)
+    FileAppend("", _PersonalTomlBootstrap)
 
 global ScriptInformation := Map(
     "MagicKey", "★",
@@ -1173,11 +1178,11 @@ initMenu() {
             (*) => ToggleCategoryAllFeatures("Shortcuts", !ShortcutsAnyEnabled))
     }
 
-    ; Append the « Raccourcis de gestion du script » sub-submenu at the bottom
-    ; of the « Raccourcis » category so the per-slot action assignments live
-    ; alongside the other shortcut configuration rather than at the tray root.
+    ; Append the « Raccourcis de gestion du script » sub-submenu and the GPT link
+    ; editor at the bottom of the « Raccourcis » category.
     if SubMenus.Has("Shortcuts") {
         SubMenus["Shortcuts"].Add()
+        SubMenus["Shortcuts"].Add("Modifier le lien ouvert par Win + G", GPTLinkEditor)
         SubMenus["Shortcuts"].Add(MenuConfigurationShortcuts, BuildScriptShortcutsMenu())
     }
 
@@ -1216,7 +1221,6 @@ initMenu() {
     HotstringsMenu.Add("Délais et couleurs des hotstrings…",
         (*) => OpenHotstringsConfigWindow())
     HotstringsMenu.Add("Touche magique : " . ScriptInformation["MagicKey"], MagicKeyEditor)
-    HotstringsMenu.Add("Modifier le lien ouvert par Win + G", GPTLinkEditor)
     HotstringsMenu.Add() ; Separator after paramètres block
 
     ; 2a. Standard hotstring groups + dynamic — "Hotstrings communs" header
@@ -1257,7 +1261,8 @@ initMenu() {
         HotstringsMenu.Add(DynTitle, DynMenu)
     }
 
-    ; 2b. Ergopti-layout-specific groups — "Disposition Ergopti" header
+    ; 2b. Ergopti-layout-specific groups — separated from the standard block
+    HotstringsMenu.Add() ; Separator between communs and Ergopti blocks
     ErgoptiTotal := 0
     for _ECat in HotstringCategoriesErgopti {
         ErgoptiTotal += CountTomlHotstrings(_ECat)
@@ -1313,7 +1318,7 @@ initMenu() {
         }
     }
     HotstringsMenu.Add() ; Separator before personal group
-    PersonalHeader := "— Hotstrings personnels" . (TotalPersonal > 0 ? " (" . FmtCount(TotalPersonal) . ")" : "") . " —"
+    PersonalHeader := "— Mes hotstrings" . (TotalPersonal > 0 ? " (" . FmtCount(TotalPersonal) . ")" : "") . " —"
     HotstringsMenu.Add(PersonalHeader, (*) => NoAction())
     HotstringsMenu.Disable(PersonalHeader)
     if Features.Has("Personal") {
