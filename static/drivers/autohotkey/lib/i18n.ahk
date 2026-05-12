@@ -182,6 +182,13 @@ I18nGetLocale() {
 	return _I18nLocale
 }
 
+; Returns a menu callback bound to a specific locale code. Calling this helper
+; inside the loop captures Code by value, preventing all callbacks from sharing
+; the same loop variable reference (AHK fat-arrow closures capture by reference).
+_MakeLocaleSetter(Code) {
+	return (*) => I18nSetLocale(Code)
+}
+
 ; Populate a Menu object with one language entry per supported locale.
 ; Each item calls I18nSetLocale when clicked. A check mark is placed on the
 ; currently active locale. The menu is cleared first so this function is safe
@@ -194,11 +201,10 @@ I18nBuildLanguageMenu(LangMenu) {
 	try LangMenu.Delete()
 	FlagsDir := _StaticDir . "\img\flags\"
 	for Loc in I18N_LOCALES {
-		; Capture loop variable for the closure
-		LocCode  := Loc.Code
-		; Windows does not render country flag emoji in menus — use flag PNG icon instead
+		; _MakeLocaleSetter wraps the code in a named function so AHK captures
+		; the value at call time rather than sharing the loop variable reference.
 		Label    := Loc.Flag . " " . Loc.Name
-		LangMenu.Add(Label, (*) => I18nSetLocale(LocCode))
+		LangMenu.Add(Label, _MakeLocaleSetter(Loc.Code))
 		FlagPath := FlagsDir . Loc.Code . ".png"
 		if FileExist(FlagPath)
 			try LangMenu.SetIcon(Label, FlagPath)
