@@ -53,7 +53,6 @@ global Features := Map(
         "TextExpansionPersonalInformation", {
             Enabled: True,
             PatternMaxLength: 1,
-            Description: "Remplissage de formulaires avec le préfixe @ : @np★ = Nom ⇥ Prénom, etc.",
         },
     ),
     "Layout", Map(
