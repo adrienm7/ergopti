@@ -102,30 +102,54 @@ local function deactivate_capsword()
 
 		-- Clear the KE variable first so the engine does not re-activate CapsWord
 		-- when it sees the subsequent LED state change.
-		hs.task.new(KARABINER_CLI, function(_, _, _) end, {"--set-variable", "capsword", "0"}):start()
+		hs.task.new(KARABINER_CLI, function(_, _, _)
+			-- macOS sometimes re-displays the CapsLock indicator after a single
+			-- LED reset (race with the Karabiner virtual CapsLock state machine).
+			-- A second unconditional set 150 ms later ensures the indicator stays off.
+			pcall(hs.hid.capslock.set, false)
+			hs.timer.doAfter(0.15, function() pcall(hs.hid.capslock.set, false) end)
+			Logger.done(LOG, "CapsWord deactivated via pointer event.")
+		end, {"--set-variable", "capsword", "0"}):start()
 
 		-- hs.eventtap.keyStroke does not work for CapsLock on macOS — CapsLock is
 		-- a flagsChanged event, not a regular keyDown/keyUp, so keyStroke fails
 		-- silently. hs.hid.capslock.set is the only reliable way to toggle the LED.
 		pcall(hs.hid.capslock.set, false)
-
-		Logger.done(LOG, "CapsWord deactivated via pointer event.")
 	end, {"--get-variable", "capsword"}):start()
 end
 
+--- Builds the list of event types to watch for CapsWord deactivation.
+--- directTouch and beginGesture are added only when the Hammerspoon runtime
+--- exposes them — older builds may not have them in hs.eventtap.event.types.
+local function build_capsword_event_types()
+	local ev = hs.eventtap.event.types
+	local types = {
+		ev.mouseMoved,
+		ev.scrollWheel,
+		ev.gesture,
+		ev.leftMouseDown,
+		ev.rightMouseDown,
+		ev.otherMouseDown,
+	}
+	-- directTouch fires on any bare finger contact with the trackpad (no click
+	-- required) — catches the case where the user rests a finger without moving.
+	-- beginGesture is the leading edge of every multi-touch gesture sequence.
+	local optional = { "directTouch", "beginGesture" }
+	for _, name in ipairs(optional) do
+		if ev[name] then
+			types[#types + 1] = ev[name]
+		end
+	end
+	return types
+end
+
 --- Starts the eventtap watching for any pointer event that signals the user
---- has left the keyboard: movement, scroll, gestures, and all click types.
+--- has left the keyboard: movement, scroll, gestures, all click types, and
+--- bare trackpad touches (directTouch / beginGesture).
 --- @return hs.eventtap The running watcher instance.
 function M.start_gesture_watcher()
 	local watcher = hs.eventtap.new(
-		{
-			hs.eventtap.event.types.mouseMoved,
-			hs.eventtap.event.types.scrollWheel,
-			hs.eventtap.event.types.gesture,
-			hs.eventtap.event.types.leftMouseDown,
-			hs.eventtap.event.types.rightMouseDown,
-			hs.eventtap.event.types.otherMouseDown,
-		},
+		build_capsword_event_types(),
 		function(_event)
 			deactivate_capsword()
 			return false
