@@ -18,6 +18,7 @@ local shortcut_ui   = require("ui.menu.shortcut_utils")
 local Logger        = require("lib.logger")
 local dialog        = require("lib.dialog_util")
 local notifications = require("lib.notifications")
+local i18n          = require("lib.i18n")
 local Models        = require("ui.menu.menu_llm.models_manager")
 local Profiles      = require("ui.menu.menu_llm.profiles_manager")
 local Settings      = require("ui.menu.menu_llm.settings_manager")
@@ -1559,7 +1560,7 @@ function M.create(deps)
                         check_backend_deps(state.llm_backend)
                     end
                     save_prefs(); update_menu()
-                    pcall(function() hs.notify.new({title = state.llm_enabled and "🟢 ACTIVÉ" or "🔴 DÉSACTIVÉ", informativeText = "Suggestions IA"}):send() end)
+                    pcall(function() notifications.notify(state.llm_enabled and i18n.get("notify.llm_enabled") or i18n.get("notify.llm_disabled"), i18n.get("notify.llm_suggestions")) end)
                 end
 
                 if not state.llm_enabled then

@@ -10,6 +10,7 @@ local M = {}
 local hs = hs
 local dialog        = require("lib.dialog_util")
 local shortcuts_mod = require("modules.shortcuts")
+local i18n          = require("lib.i18n")
 
 
 
@@ -106,7 +107,7 @@ function M.build(ctx)
 				end
 			end
 			ctx.save_prefs()
-			ctx.notify_feature("Contrôle du script", state.script_control_enabled)
+			ctx.notify_feature(i18n.get("notify.script_control"), state.script_control_enabled)
 			ctx.updateMenu()
 		end,
 		menu = {

@@ -639,7 +639,7 @@ GestureScreenshotInstant() {
     FileDelete(TmpScript)
     FileAppend(ScriptContent, TmpScript, "UTF-8")
     RunWait('powershell -NoProfile -NonInteractive -WindowStyle Hidden -ExecutionPolicy Bypass -File "' . TmpScript . '"',, "Hide")
-    TrayTip("Sauvegardé : " . FilePath, "Capture d'écran", "Icone=1")
+    TrayTip(Format(t("notify.screenshot_saved_path"), FilePath), t("notify.screenshot_title"), "Icone=1")
 }
 
 GestureOpenConfiguredURL() {
@@ -1190,13 +1190,13 @@ GestureScreenshotWindow(Mode) {
         LoggerStart("gestures", "Capturing window to '{1}'…", Path)
         if GestureCaptureRegion(X, Y, W, H, "save", Path) {
             LoggerSuccess("gestures", "Window screenshot saved: '{1}'.", Path)
-            TrayTip("Capture sauvegardée", Path, "Iconi Mute")
+            TrayTip(t("notify.screenshot_saved"), Path, "Iconi Mute")
         }
     } else {
         LoggerStart("gestures", "Capturing window to clipboard…")
         if GestureCaptureRegion(X, Y, W, H, "clipboard") {
             LoggerSuccess("gestures", "Window screenshot copied to clipboard.")
-            TrayTip("Capture copiée", "Presse-papiers", "Iconi Mute")
+            TrayTip(t("notify.screenshot_copied"), t("notify.clipboard"), "Iconi Mute")
         }
     }
 }
@@ -1212,13 +1212,13 @@ GestureScreenshotFullscreen(Mode) {
         LoggerStart("gestures", "Capturing fullscreen to '{1}'…", Path)
         if GestureCaptureRegion(X, Y, W, H, "save", Path) {
             LoggerSuccess("gestures", "Fullscreen screenshot saved: '{1}'.", Path)
-            TrayTip("Capture sauvegardée", Path, "Iconi Mute")
+            TrayTip(t("notify.screenshot_saved"), Path, "Iconi Mute")
         }
     } else {
         LoggerStart("gestures", "Capturing fullscreen to clipboard…")
         if GestureCaptureRegion(X, Y, W, H, "clipboard") {
             LoggerSuccess("gestures", "Fullscreen screenshot copied to clipboard.")
-            TrayTip("Capture copiée", "Presse-papiers", "Iconi Mute")
+            TrayTip(t("notify.screenshot_copied"), t("notify.clipboard"), "Iconi Mute")
         }
     }
 }
@@ -1256,7 +1256,7 @@ GestureScreenshotRegion(Mode) {
         RunWait('powershell.exe -NoProfile -Sta -WindowStyle Hidden -Command "' . PSScript . '"', , "Hide")
         if FileExist(Path) {
             LoggerSuccess("gestures", "Region screenshot saved: '{1}'.", Path)
-            TrayTip("Capture sauvegardée", Path, "Iconi Mute")
+            TrayTip(t("notify.screenshot_saved"), Path, "Iconi Mute")
         } else {
             LoggerWarn("gestures", "Region screenshot: clipboard image was not saved.")
         }
