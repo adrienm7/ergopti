@@ -16,7 +16,11 @@
 ; 3. ApplyTomlMetadataToFeatures: maps ``[_meta]`` / ``[_meta.sections]`` onto
 ;    the runtime ``Features`` Map so menu titles and submenu ordering are driven
 ;    by TOML files, with ``★`` substituted for the user's configured MagicKey.
-; 4. FoldAsciiLower: accent-folding helper that reconciles PascalCase Features
+; 4. ApplyIndexTomlToDynamicHotstrings: reads ``[modules.dynamichotstrings.*]``
+;    from ``_index.toml`` and injects ``description`` fields into
+;    ``Features["DynamicHotstrings"]`` — the single source of truth for those
+;    descriptions, shared between AHK and Hammerspoon.
+; 5. FoldAsciiLower: accent-folding helper that reconciles PascalCase Features
 ;    keys containing French letters (e.g. ``IÉ``) with the lowercase TOML keys
 ;    (e.g. ``ie``) used in ``sections_order`` and ``[_meta.sections]``.
 ; ==============================================================================
@@ -484,6 +488,57 @@ ApplyTomlMetadataToFeatures(CategoryName) {
         }
         if NewOrder.Length > 0 {
             Features[CategoryName]["__Order"] := NewOrder
+        }
+    }
+}
+
+; Read ``[modules.dynamichotstrings.<key>]`` blocks from ``_index.toml`` and
+; inject the ``description`` field of each into ``Features["DynamicHotstrings"]``.
+; This makes ``_index.toml`` the single source of truth for those descriptions,
+; shared with Hammerspoon (which reads the same file at startup).
+ApplyIndexTomlToDynamicHotstrings() {
+    global ScriptInformation
+    FilePath := A_ScriptDir . "\..\hotstrings\_index.toml"
+    if !FileExist(FilePath) {
+        return
+    }
+    if !Features.Has("DynamicHotstrings") {
+        return
+    }
+
+    ; Build reverse lookup folded-lowercase → PascalCase key
+    KeyByFolded := Map()
+    for Key, _ in Features["DynamicHotstrings"] {
+        if Key != "__Order"
+            KeyByFolded[FoldAsciiLower(Key)] := Key
+    }
+
+    ; Scan for [modules.dynamichotstrings.<key>] sections and read description
+    CurrentKey := ""
+    FileContent := ReadTomlFile(FilePath)
+    loop parse, FileContent, "`n", "`r" {
+        Line := Trim(A_LoopField, " `t")
+        if (Line == "" or SubStr(Line, 1, 1) == "#")
+            continue
+
+        if RegExMatch(Line, "^\[modules\.dynamichotstrings\.([A-Za-z0-9_]+)\]$", &M) {
+            CurrentKey := StrLower(M[1])
+            continue
+        }
+
+        ; Any other [header] resets the current section
+        if RegExMatch(Line, "^\[", &_)
+            CurrentKey := ""
+
+        if (CurrentKey != "" and RegExMatch(Line, "^description\s*=\s*`"((?:[^`"\\]|\\.)*)`"\s*$", &DM)) {
+            Desc := UnescapeTomlString(DM[1])
+            Desc := StrReplace(Desc, "★", ScriptInformation["MagicKey"])
+            if KeyByFolded.Has(CurrentKey) {
+                ActualKey := KeyByFolded[CurrentKey]
+                FeatureObj := Features["DynamicHotstrings"][ActualKey]
+                if IsObject(FeatureObj) and !(Type(FeatureObj) == "Map")
+                    FeatureObj.Description := Desc
+            }
         }
     }
 }

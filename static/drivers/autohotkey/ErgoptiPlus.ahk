@@ -474,6 +474,7 @@ ApplyTomlMetadataToFeatures("DistancesReduction")
 ApplyTomlMetadataToFeatures("MagicKey")
 ApplyTomlMetadataToFeatures("Rolls")
 ApplyTomlMetadataToFeatures("SFBsReduction")
+ApplyIndexTomlToDynamicHotstrings()
 
 ; Append hotstring counts to section descriptions so the tray menu shows
 ; "(N)" next to each section item — mirrors Hammerspoon's per-section display.
