@@ -34,6 +34,8 @@ local LOG = "shortcuts.actions.system"
 local ok_gestures, gestures = pcall(require, "modules.gestures")
 if not ok_gestures then gestures = nil end
 
+local text_acts = require("modules.shortcuts.actions.text")
+
 
 
 
@@ -523,6 +525,58 @@ function M.bind_cmd_star(on_trigger)
 end
 
 
+
+
+
+
+--- Starts a keyDown eventtap that wraps the current text selection with the typed symbol.
+--- When no text is selected the key event is passed through unchanged.
+--- Wrapping pairs (e.g. ( → ), [ → ]) come from text_acts.WRAP_PAIRS.
+--- @return table Fake-hotkey object with :delete().
+function M.bind_wrap_text_if_selected()
+	local ok_ax, ax = pcall(require, "hs.axuielement")
+
+	local tap = hs.eventtap.new({hs.eventtap.event.types.keyDown}, function(e)
+		-- Ignore events that carry a modifier (cmd/ctrl/alt) — those are shortcuts, not symbols
+		local flags = e:getFlags()
+		if flags.cmd or flags.ctrl or flags.alt then return false end
+
+		local ok_ch, ch = pcall(function() return e:getCharacters() end)
+		if not ok_ch or type(ch) ~= "string" or ch == "" then return false end
+
+		-- Check if this character is in the wrap-pairs table
+		local pair = text_acts.WRAP_PAIRS[ch]
+		if not pair then return false end
+
+		-- Read AXSelectedText without touching the clipboard
+		if not ok_ax or not ax then return false end
+
+		local sel = nil
+		pcall(function()
+			local el = ax.systemWideElement():attributeValue("AXFocusedUIElement")
+			if el then sel = el:attributeValue("AXSelectedText") end
+		end)
+
+		if type(sel) ~= "string" or sel == "" then return false end
+
+		-- Non-empty selection: suppress the raw keystroke and wrap instead
+		Logger.debug(LOG, "WrapTextIfSelected: wrapping %d chars with '%s'/'%s'.", #sel, pair.left, pair.right)
+		local prior = hs.pasteboard.getContents()
+		pcall(hs.pasteboard.setContents, pair.left .. sel .. pair.right)
+		hs.timer.doAfter(0, function()
+			hs.eventtap.keyStroke({"cmd"}, "v", 0.02)
+			hs.timer.doAfter(0.25, function()
+				pcall(function()
+					if prior and prior ~= "" then hs.pasteboard.setContents(prior)
+					else hs.pasteboard.clearContents() end
+				end)
+			end)
+		end)
+		return true
+	end)
+	tap:start()
+	return wrap_tap(tap)
+end
 
 
 
