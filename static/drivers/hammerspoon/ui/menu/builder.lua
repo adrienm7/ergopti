@@ -221,9 +221,10 @@ function M.generate(ctx, menu_mods, actions)
 			for _, it in ipairs(std_groups) do table.insert(hotstrings_menu, it) end
 		end
 
-		-- 2b. Ergopti-layout-specific groups with their own disabled header
+		-- 2b. Ergopti-layout-specific groups — separated from the standard block
 		local ergopti_groups = collect_groups(ERGOPTI_GROUPS)
 		if #ergopti_groups > 0 then
+			if #std_groups > 0 then table.insert(hotstrings_menu, { title = "-" }) end
 			local ergopti_header = ergopti_has_count
 				and ("— Disposition Ergopti (" .. fmt_grand(ergopti_total) .. ") —")
 				or  "— Disposition Ergopti —"
@@ -231,14 +232,15 @@ function M.generate(ctx, menu_mods, actions)
 			for _, it in ipairs(ergopti_groups) do table.insert(hotstrings_menu, it) end
 		end
 
-		-- 3. Personal/custom hotstrings with a separator and a disabled header
+		-- 3. Personal/custom hotstrings — "Mes hotstrings" header avoids duplication with
+		-- the sub-menu item title "Hotstrings personnels" just below it.
 		local custom_item = type(menu_mods.hotstrings.build_custom) == "function"
 			and Logger.build(LOG, "hotstrings.build_custom", menu_mods.hotstrings.build_custom, ctx)
 		if custom_item then
 			table.insert(hotstrings_menu, { title = "-" })
 			local personal_header = personal_has_count
-				and ("— Hotstrings personnels (" .. fmt_grand(personal_total) .. ") —")
-				or  "— Hotstrings personnels —"
+				and ("— Mes hotstrings (" .. fmt_grand(personal_total) .. ") —")
+				or  "— Mes hotstrings —"
 			table.insert(hotstrings_menu, { title = personal_header, disabled = true })
 			table.insert(hotstrings_menu, custom_item)
 		end
