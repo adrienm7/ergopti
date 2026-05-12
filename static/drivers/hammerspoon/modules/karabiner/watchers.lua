@@ -11,8 +11,10 @@
 ---
 --- FEATURES & RATIONALE:
 --- 1. CapsWord Safety: Any pointer event signals the user has left the keyboard,
----    so CapsWord is cancelled automatically. A 100 ms subprocess throttle
----    prevents CPU spikes from high-frequency events such as mouseMoved.
+---    so CapsWord is cancelled automatically. Two complementary layers are used:
+---    hs.eventtap catches clicks, scrolls, and cursor movement; the undocumented
+---    MultitouchSupport frameCallback catches bare finger touches that eventtap
+---    cannot see. A 100 ms subprocess throttle prevents CPU spikes.
 --- 2. Layout Awareness: macOS can emit two input-source notifications in rapid
 ---    succession during a layout switch. Debouncing coalesces them into a
 ---    single callback so the caller does not rebuild the KE config twice.
@@ -23,9 +25,13 @@
 
 local M = {}
 
-local hs       = hs
-local Logger   = require("lib.logger")
-local Keycodes = require("lib.keycodes")
+local hs          = hs
+local Logger      = require("lib.logger")
+local Keycodes    = require("lib.keycodes")
+
+-- Optional: undocumented MultitouchSupport wrapper — nil when unavailable.
+local ok_td, touchdevice = pcall(require, "hs._asm.undocumented.touchdevice")
+if not ok_td then touchdevice = nil end
 
 local LOG = "karabiner"
 
@@ -64,6 +70,10 @@ local _capsword_last_check_s = 0
 
 -- Guard against spawning concurrent async checks while one is already in flight.
 local _capsword_check_pending = false
+
+-- touchdevice frameCallback watchers keyed by device ID — kept alive to prevent GC.
+local _td_devices  = {}
+local _td_watchers = {}
 
 -- App history cache for direct app-previous focus.
 local _current_bundle_id = nil
@@ -118,38 +128,61 @@ local function deactivate_capsword()
 	end, {"--get-variable", "capsword"}):start()
 end
 
---- Builds the list of event types to watch for CapsWord deactivation.
---- directTouch and beginGesture are added only when the Hammerspoon runtime
---- exposes them — older builds may not have them in hs.eventtap.event.types.
-local function build_capsword_event_types()
-	local ev = hs.eventtap.event.types
-	local types = {
-		ev.mouseMoved,
-		ev.scrollWheel,
-		ev.gesture,
-		ev.leftMouseDown,
-		ev.rightMouseDown,
-		ev.otherMouseDown,
-	}
-	-- directTouch fires on any bare finger contact with the trackpad (no click
-	-- required) — catches the case where the user rests a finger without moving.
-	-- beginGesture is the leading edge of every multi-touch gesture sequence.
-	local optional = { "directTouch", "beginGesture" }
-	for _, name in ipairs(optional) do
-		if ev[name] then
-			types[#types + 1] = ev[name]
+--- Attaches a frameCallback watcher on every available touchdevice so that
+--- any bare finger contact (no click required) triggers CapsWord deactivation.
+--- The MultitouchSupport API fires at ~60 Hz; the existing throttle inside
+--- deactivate_capsword() prevents CPU spikes.
+local function start_touchdevice_watchers()
+	if not touchdevice then
+		Logger.warn(LOG, "touchdevice unavailable — bare-touch CapsWord detection disabled.")
+		return
+	end
+
+	local ok_list, devices = pcall(touchdevice.devices)
+	if not ok_list or type(devices) ~= "table" then
+		Logger.warn(LOG, "touchdevice.devices() failed — bare-touch detection disabled.")
+		return
+	end
+
+	for _, id in ipairs(devices) do
+		local ok_dev, dev = pcall(touchdevice.forDeviceID, id)
+		if not ok_dev or not dev then
+			Logger.warn(LOG, "touchdevice.forDeviceID(%s) failed.", tostring(id))
+		else
+			-- Hold a strong reference to prevent GC from collecting the device.
+			_td_devices[id] = dev
+			local w = dev:frameCallback(function(_, touches, _, _)
+				if type(touches) == "table" and #touches > 0 then
+					deactivate_capsword()
+				end
+			end)
+			if w then
+				pcall(function() w:start() end)
+				_td_watchers[id] = w
+				Logger.success(LOG, "Touchdevice bare-touch watcher started (device=%s).", tostring(id))
+			else
+				Logger.warn(LOG, "frameCallback returned nil for device=%s.", tostring(id))
+			end
 		end
 	end
-	return types
 end
 
 --- Starts the eventtap watching for any pointer event that signals the user
---- has left the keyboard: movement, scroll, gestures, all click types, and
---- bare trackpad touches (directTouch / beginGesture).
---- @return hs.eventtap The running watcher instance.
+--- has left the keyboard: movement, scroll, gestures, and all click types.
+--- A separate touchdevice frameCallback layer catches bare finger touches
+--- that eventtap cannot see (no click, no movement).
+--- @return hs.eventtap The running eventtap watcher instance.
 function M.start_gesture_watcher()
+	local ev = hs.eventtap.event.types
 	local watcher = hs.eventtap.new(
-		build_capsword_event_types(),
+		{
+			ev.mouseMoved,
+			ev.scrollWheel,
+			ev.gesture,
+			ev.leftMouseDown,
+			ev.rightMouseDown,
+			ev.otherMouseDown,
+		},
 		function(_event)
 			deactivate_capsword()
 			return false
@@ -157,6 +190,10 @@ function M.start_gesture_watcher()
 	)
 	watcher:start()
 	Logger.success(LOG, "Trackpad CapsWord watcher started.")
+
+	-- Layer 2: MultitouchSupport frameCallback for bare finger detection.
+	start_touchdevice_watchers()
+
 	return watcher
 end
 
