@@ -455,7 +455,7 @@ if Features["DistancesReduction"]["SuffixesA"].Enabled {
 ; ===== 4.2) Personal information shortcuts with @ =====
 ; ==============================================================
 
-if Features["MagicKey"]["TextExpansionPersonalInformation"].Enabled {
+if Features["DynamicHotstrings"]["TextExpansionPersonalInformation"].Enabled {
 	CreateHotstring("*", "@bic" . ScriptInformation["MagicKey"], PersonalInformation["BIC"], Map("FinalResult",
 		True))
 	CreateHotstring("*", "@cb" . ScriptInformation["MagicKey"], PersonalInformation["CreditCard"], Map(
@@ -486,7 +486,7 @@ if Features["MagicKey"]["TextExpansionPersonalInformation"].Enabled {
 	; Generate all possible combinations of letters between 1 and PatternMaxLength characters
 	GeneratePersonalInformationHotstrings(
 		PersonalInformationHotstrings,
-		Features["MagicKey"]["TextExpansionPersonalInformation"].PatternMaxLength
+		Features["DynamicHotstrings"]["TextExpansionPersonalInformation"].PatternMaxLength
 	)
 
 	GeneratePersonalInformationHotstrings(hotstrings, maxLen) {

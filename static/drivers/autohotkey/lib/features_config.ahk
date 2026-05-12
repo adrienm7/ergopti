@@ -29,7 +29,7 @@ global Features := Map(
     "__Order", ["Layout", "DistancesReduction", "SFBsReduction", "Rolls", "Autocorrection", "MagicKey",
         "DynamicHotstrings", "Shortcuts", "TapHolds", "Gestures"],
     "DynamicHotstrings", Map(
-        "__Order", ["DateFr", "Date", "PhonePrefixes", "SsnPrefixes", "IbanPrefixes"],
+        "__Order", ["DateFr", "Date", "PhonePrefixes", "SsnPrefixes", "IbanPrefixes", "-", "TextExpansionPersonalInformation"],
         "DateFr", {
             Enabled: True,
             Description: "dt★ insère la date courante (jj/mm/aaaa)",
@@ -49,6 +49,11 @@ global Features := Map(
         "IbanPrefixes", {
             Enabled: True,
             Description: "Saisir les premiers caractères de l'IBAN le complète automatiquement",
+        },
+        "TextExpansionPersonalInformation", {
+            Enabled: True,
+            PatternMaxLength: 1,
+            Description: "Remplissage de formulaires avec le suffixe @ : @np★ = Nom ⇥ Prénom, etc.",
         },
     ),
     "Layout", Map(
@@ -225,10 +230,6 @@ global Features := Map(
         },
         "TextExpansionSymbolsTypst", {
             Enabled: True,
-        },
-        "TextExpansionPersonalInformation", {
-            Enabled: True,
-            PatternMaxLength: 1,
         },
     ),
     "Shortcuts", Map(
