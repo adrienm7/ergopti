@@ -238,7 +238,14 @@ function M.build_groups(ctx)
 						local ms_entry = type(ms) == "table" and ms[sec.name]
 						local mod_id   = type(ms_entry) == "table" and ms_entry.mod_id or ms_entry
 						if mod_id == "personal_info" then
-							-- personal_info is managed by dynamic hotstrings, not in static groups menu
+							local desc = (type(ms_entry) == "table" and type(ms_entry.description) == "string")
+										 and ms_entry.description or sec.description or "Remplissage de formulaires"
+							local pi_items = buildPersonalInfoItems(ctx, desc)
+							if pi_items then
+								for _, pi in ipairs(pi_items) do
+									sec_menu[#sec_menu + 1] = pi
+								end
+							end
 						end
 					else
 						local sec_on = ctx.keymap and type(ctx.keymap.is_section_enabled) == "function" and ctx.keymap.is_section_enabled(name, sec.name) or false
