@@ -190,13 +190,18 @@ I18nGetLocale() {
 ; @param LangMenu  Menu   The AHK Menu object to populate.
 I18nBuildLanguageMenu(LangMenu) {
 	global _I18nLocale
+	global _StaticDir
 	try LangMenu.Delete()
+	FlagsDir := _StaticDir . "\img\flags\"
 	for Loc in I18N_LOCALES {
 		; Capture loop variable for the closure
-		LocCode := Loc.Code
-		; Windows does not render country flag emoji in menus — use uppercase code as prefix
-		Label   := "[" . StrUpper(Loc.Code) . "] " . Loc.Name
+		LocCode  := Loc.Code
+		; Windows does not render country flag emoji in menus — use flag PNG icon instead
+		Label    := Loc.Flag . " " . Loc.Name
 		LangMenu.Add(Label, (*) => I18nSetLocale(LocCode))
+		FlagPath := FlagsDir . Loc.Code . ".png"
+		if FileExist(FlagPath)
+			try LangMenu.SetIcon(Label, FlagPath)
 		if Loc.Code == _I18nLocale
 			LangMenu.Check(Label)
 	}
