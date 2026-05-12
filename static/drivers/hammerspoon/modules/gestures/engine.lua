@@ -45,14 +45,32 @@ local LIVE_REARM_SEC              = 0.08  -- Minimum delay between consecutive l
 local LIVE_REARM_REVERSE_FAST_SEC = 0.03  -- Faster rearm when user reverses direction strongly
 local LIVE_REVERSE_FAST_MIN       = 1.5   -- Signed distance threshold to unlock fast reversal rearm
 
--- Candidate confirmation for noisy multi-finger spikes (e.g., 3→5 transient)
+-- Candidate confirmation for noisy multi-finger spikes (e.g., 3→5 transient).
+-- The MS threshold used to be 0.12 s but logs showed real 4-finger swipes
+-- being misclassified: the user held 4 fingers for ~100 ms then lifted one
+-- to end the gesture, so the candidate=4 never confirmed and we fell back
+-- to maxFingers=3 — producing 9 word_prev fires instead of 1 space_prev.
+-- 50 ms is still long enough to filter out genuine palm-spike noise (which
+-- typically lasts <30 ms / 1-2 frames at 60 Hz).
 local FINGER_CONFIRM_FRAMES = 4
-local FINGER_CONFIRM_MS     = 0.12
+local FINGER_CONFIRM_MS     = 0.05
 
 -- Candidate confirmation for noisy multi-finger drops (flickering)
 -- We are more aggressive in keeping a higher finger count active.
 local FINGER_DROP_CONFIRM_FRAMES = 8
 local FINGER_DROP_CONFIRM_MS     = 0.20
+
+-- Finger count stability gate before allowing ANY live trigger.
+-- Without this, a 4-finger swipe whose first frames register only 2-3 contacts
+-- fires the WRONG action (e.g., swipe_2_left=arrow_up) before the engine
+-- upgrades maxFingers to 4. Holding live fires for a short grace period gives
+-- the rest of the fingers time to land and the centroid time to stabilise.
+local FINGER_COUNT_STABLE_MS = 0.06   -- 60 ms — fast enough to feel instant, slow enough to absorb staggered contact
+
+-- Minimum time a peak finger count must have been seen before we treat it as
+-- the user's true intent (used to override a lower maxFingers at commit time
+-- when fingers staggered down before the candidate could confirm).
+local PEAK_FINGERS_CONFIRM_MS = 0.05
 
 local scrollBlocker  = nil
 local isBlockingScroll = false
@@ -82,6 +100,52 @@ local function stopScrollBlock()
 	end
 end
 
+-- All directional slot suffixes a finger count can resolve to.
+local SLOT_DIRS_ALL   = { "left", "right", "up", "down", "left_up", "right_up", "left_down", "right_down" }
+local SLOT_DIRS_HORIZ = { "left", "right" }
+local SLOT_DIRS_VERT  = { "up", "down" }
+local SLOT_DIRS_DIAG  = { "left_up", "right_up", "left_down", "right_down" }
+
+--- Returns true when every relevant swipe slot for the given finger count is
+--- bound to "none" on the supplied axis. When axis is nil (gesture has not
+--- locked a direction yet), the tap slot is also required to be "none" — we
+--- don't yet know whether the user is tapping or swiping.
+---
+--- When this returns true, no live or commit fire can ever target this finger
+--- count on this axis, so the engine is free to shortcut the spike-confirmation
+--- period: there is literally nothing it could fire wrong, so being tolerant
+--- about an N→M finger upgrade is risk-free.
+---
+--- The axis-aware variant matters because, in practice, users disable 2-finger
+--- HORIZONTAL events (which collide with macOS native swipes) but keep
+--- 2-finger vertical or diagonal events bound. With this helper, a horizontal
+--- 4-finger swipe whose first contacts land staggered can promote to 4 fingers
+--- the moment lockedDir resolves to "horiz", without waiting 120 ms for the
+--- candidate confirmation that would otherwise be needed.
+--- @param mf number Finger count to test.
+--- @param axis string|nil "horiz", "vert", "diag", or nil (check all).
+--- @return boolean
+local function finger_count_is_inert(mf, axis)
+	if not _state or not _state.ga then return false end
+	local fc = tostring(mf)
+	local dirs
+	if     axis == "horiz" then dirs = SLOT_DIRS_HORIZ
+	elseif axis == "vert"  then dirs = SLOT_DIRS_VERT
+	elseif axis == "diag"  then dirs = SLOT_DIRS_DIAG
+	else                        dirs = SLOT_DIRS_ALL end
+	for _, dir in ipairs(dirs) do
+		local action = _state.ga["swipe_" .. fc .. "_" .. dir]
+		if action and action ~= "none" then return false end
+	end
+	-- Tap only matters when direction is not yet known — a moving gesture
+	-- past lockedDir cannot become a tap.
+	if axis == nil then
+		local tap_action = _state.ga["tap_" .. fc]
+		if tap_action and tap_action ~= "none" then return false end
+	end
+	return true
+end
+
 
 
 
@@ -96,17 +160,27 @@ end
 local function resetGS()
 	stopScrollBlock()
 	gs = {
-		active         = false, 
-		startTime      = nil, 
-		startPos       = nil, 
-		endPos         = nil, 
+		active         = false,
+		startTime      = nil,
+		startPos       = nil,
+		endPos         = nil,
 		maxFingers     = 0,
-		lockedDir      = nil, 
-		stepsCommitted = 0, 
+		lockedDir      = nil,
+		stepsCommitted = 0,
 		lifting        = false,
 		liveAxisSign   = nil,
+		liveAxisSlot   = nil,  -- Slot of the most recent live fire (separate from sign — different slots are unrelated)
 		lastLiveFire   = 0,
+		lastFirePos    = nil,  -- Position of the most recent incremental fire (for reversal detection)
 		lastN          = nil,
+		fingerCountChangedAt = 0,  -- Timestamp of the last finger count change (for stability gate)
+		-- Peak finger count: highest n observed during the gesture (regardless
+		-- of whether the candidate-confirmation path ever promoted maxFingers).
+		-- Used at commit time to recover the user's true intent when a real
+		-- 4-finger swipe ends with one finger lifting before the others.
+		peakN          = 0,
+		peakNFirstSeen = nil,
+		peakNFrames    = 0,  -- Number of frames observed at >= peakN (for sustained-peak detection)
 		-- Candidate spike confirmation state (joining)
 		candidateFingers = nil,
 		candidateSince   = nil,
@@ -234,24 +308,78 @@ local function triggerLiveAxisIfNeeded(slot, pos, now, axis)
 	if not slot or not _state.ga[slot] or _state.ga[slot] == "none" then return end
 	local action = _state.ga[slot]
 
+	-- Pending finger-spike confirmation gate. While the engine is still
+	-- confirming whether the finger count just jumped (e.g., 2→4 takes up to
+	-- FINGER_CONFIRM_MS to confirm), maxFingers reflects the OLD count. Firing
+	-- a live trigger here would target the wrong slot — typically swipe_2_<dir>
+	-- instead of swipe_4_<dir> for a 4-finger swipe whose first contacts land
+	-- staggered. Hold all live fires until the candidate resolves.
+	if gs.candidateFingers ~= nil then
+		Logger.debug(LOG, "live blocked: finger spike confirmation pending (candidate=%d, current=%d) slot=%s",
+			gs.candidateFingers, gs.maxFingers, slot)
+		return
+	end
+
+	-- Finger-count stability gate. After a confirmed count change, give the
+	-- centroid a brief moment to stabilise before firing — quick single-finger
+	-- joins (2→3, 3→4) skip the candidate path above so this catches them too.
+	local stable_elapsed = now - (gs.fingerCountChangedAt or 0)
+	if stable_elapsed < FINGER_COUNT_STABLE_MS then
+		Logger.debug(LOG, "live blocked: finger count unstable (%.0fms since change, need %.0fms) slot=%s",
+			stable_elapsed * 1000, FINGER_COUNT_STABLE_MS * 1000, slot)
+		return
+	end
+
 	local mode = _state.modes[slot] or "x1"
 	local sensitivity = _state.sensitivities[slot] or SCALE_DIV
 
 	if mode == "incremental" then
+		-- Early reversal detection: if the user has fired in one direction and now
+		-- moves at least LIVE_AXIS_MIN units back FROM THE LAST FIRE POSITION in
+		-- the opposite direction, rebase immediately instead of waiting for them
+		-- to come all the way back through the original origin. This makes reverse
+		-- swipes feel as responsive as fresh ones.
+		if gs.liveAxisSign and gs.lastFirePos then
+			local local_delta = (axis == "horiz")
+				and (pos.x - gs.lastFirePos.x)
+				or  (pos.y - gs.lastFirePos.y)
+			local local_sign = (local_delta > 0) and 1 or (local_delta < 0 and -1 or 0)
+			if local_sign ~= 0 and local_sign ~= gs.liveAxisSign and math.abs(local_delta) >= LIVE_AXIS_MIN then
+				Logger.info(LOG, string.format("INCREMENTAL REVERSAL DETECTED slot=%s axis=%s local_delta=%.2f prevSign=%d newSign=%d — rebasing startPos to (%.1f,%.1f)",
+					slot, axis, local_delta, gs.liveAxisSign, local_sign, pos.x, pos.y))
+				gs.startPos       = pos
+				gs.endPos         = pos
+				gs.stepsCommitted = 0
+				gs.liveAxisSign   = nil
+				gs.lastFirePos    = nil
+				return
+			end
+		end
+
 		local sd = signedDistAxis(pos, axis)
 		local targetSteps = math.floor(math.abs(sd) / sensitivity)
 		local diff = targetSteps - gs.stepsCommitted
 
 		if diff > 0 then
+			Logger.info(LOG, string.format("INCREMENTAL FIRE slot=%s axis=%s sd=%.2f sensitivity=%.2f targetSteps=%d prevSteps=%d diff=%d action=%s",
+				slot, axis, sd, sensitivity, targetSteps, gs.stepsCommitted, diff, tostring(action)))
 			for _ = 1, diff do
 				triggerAction(action, sd)
 			end
 			gs.stepsCommitted = targetSteps
+			gs.liveAxisSign   = (sd > 0) and 1 or -1
+			gs.lastFirePos    = pos
+			gs.lastLiveFire   = now
 		elseif diff < 0 then
-			-- Reversal detection
-			gs.startPos = pos
-			gs.endPos = pos
+			-- Fallback rebase: still kept as a safety net if reversal slipped past
+			-- the early detector above (e.g., sudden centroid jump from finger count change).
+			Logger.info(LOG, string.format("INCREMENTAL FALLBACK REBASE slot=%s axis=%s sd=%.2f targetSteps=%d prevSteps=%d diff=%d",
+				slot, axis, sd, targetSteps, gs.stepsCommitted, diff))
+			gs.startPos       = pos
+			gs.endPos         = pos
 			gs.stepsCommitted = 0
+			gs.liveAxisSign   = nil
+			gs.lastFirePos    = nil
 		end
 		return
 	end
@@ -261,20 +389,33 @@ local function triggerLiveAxisIfNeeded(slot, pos, now, axis)
 	if math.abs(sd) < LIVE_AXIS_MIN then return end
 
 	local sign = (sd > 0) and 1 or -1
-	if gs.liveAxisSign == sign then return end
+	-- Block only if the EXACT same slot+sign already fired live. When the slot
+	-- changes mid-gesture (e.g., user goes from 2 fingers to 4, swipe_2_left →
+	-- swipe_4_left), the new slot is a fresh action and must be allowed to fire.
+	if gs.liveAxisSign == sign and gs.liveAxisSlot == slot then
+		Logger.debug(LOG, "x1 live blocked: same slot+sign as previous (slot=%s sign=%d sd=%.2f)", slot, sign, sd)
+		return
+	end
 
 	local rearm_delay = LIVE_REARM_SEC
-	if gs.liveAxisSign and sign ~= gs.liveAxisSign and math.abs(sd) >= LIVE_REVERSE_FAST_MIN then
+	local is_reversal = (gs.liveAxisSign and sign ~= gs.liveAxisSign)
+	if is_reversal and math.abs(sd) >= LIVE_REVERSE_FAST_MIN then
 		rearm_delay = LIVE_REARM_REVERSE_FAST_SEC
 	end
-	if gs.lastLiveFire and (now - gs.lastLiveFire) < rearm_delay then return end
+	if gs.lastLiveFire and (now - gs.lastLiveFire) < rearm_delay then
+		Logger.debug(LOG, "x1 live blocked: rearm delay (slot=%s elapsed=%.3fs need=%.3fs reversal=%s)",
+			slot, now - gs.lastLiveFire, rearm_delay, tostring(is_reversal))
+		return
+	end
 
-	Logger.info(LOG, string.format("%s swipe live trigger on slot: %s (sign=%d).", axis, slot, sign))
+	Logger.info(LOG, "x1 LIVE FIRE slot=%s axis=%s sign=%d sd=%.2f reversal=%s prevSlot=%s action=%s",
+		slot, axis, sign, sd, tostring(is_reversal), tostring(gs.liveAxisSlot), tostring(action))
 
 	triggerAction(action, sign)
 
 	-- Rebase after each live trigger so a quick direction reversal can fire promptly.
 	gs.liveAxisSign = sign
+	gs.liveAxisSlot = slot
 	gs.lastLiveFire = now
 	gs.startPos     = pos
 	gs.endPos       = pos
@@ -284,16 +425,49 @@ end
 --- Evaluates the gesture state upon release and issues the appropriate trigger.
 --- @param now number Timestamp of the evaluation.
 local function commitGesture(now)
-	if not _state.enabled or not gs.startPos or not gs.endPos then return end
+	-- ENTRY DIAGNOSTIC — full state dump every commit
+	local sp = gs.startPos and string.format("(%.1f,%.1f)", gs.startPos.x, gs.startPos.y) or "nil"
+	local ep = gs.endPos   and string.format("(%.1f,%.1f)", gs.endPos.x,   gs.endPos.y)   or "nil"
+	Logger.info(LOG, "commitGesture ENTRY: enabled=%s maxFingers=%d startPos=%s endPos=%s lockedDir=%s liveAxisSign=%s stepsCommitted=%d elapsed=%.3fs",
+		tostring(_state.enabled), gs.maxFingers, sp, ep, tostring(gs.lockedDir),
+		tostring(gs.liveAxisSign), gs.stepsCommitted, now - (gs.startTime or now))
+
+	if not _state.enabled or not gs.startPos or not gs.endPos then
+		Logger.warn(LOG, "commitGesture: SKIP (enabled=%s startPos=%s endPos=%s)",
+			tostring(_state.enabled), sp, ep)
+		return
+	end
 
 	local dx      = gs.endPos.x - gs.startPos.x
 	local dy      = gs.endPos.y - gs.startPos.y
 	local elapsed = now - (gs.startTime or now)
-	local mf      = gs.maxFingers
+	-- Prefer the peak finger count over maxFingers when the peak was sustained
+	-- long enough. This recovers user intent when a 4-finger swipe ends with
+	-- one finger lifting early (n drops from 4 to 3 before the candidate path
+	-- can confirm 4 as the new maxFingers). Without this, the commit would
+	-- fire the 3-finger action instead of the 4-finger one.
+	local mf = gs.maxFingers
+	if gs.peakN and gs.peakN > mf and (gs.peakNFrames or 0) >= FINGER_CONFIRM_FRAMES then
+		Logger.info(LOG, "commitGesture: PEAK OVERRIDE — using peakN=%d (held %d frames) over maxFingers=%d",
+			gs.peakN, gs.peakNFrames, mf)
+		mf = gs.peakN
+	end
 
 	-- Tap detection
-	local total_delta = math.abs(gs.endPos.x - gs.startPos.x) + math.abs(gs.endPos.y - gs.startPos.y)
-	if gs.lockedDir == nil or total_delta < TAP_MAX_DELTA then
+	-- Critical guard: a gesture that already fired a live action is by
+	-- definition NOT a tap. After a live fire we rebase startPos to the
+	-- centroid at fire time, so the residual dx/dy at lift-off is naturally
+	-- small (< TAP_MAX_DELTA). Without this guard the engine would classify
+	-- the lift residue as a tap and fire the tap action ON TOP OF the
+	-- legitimate swipe action — e.g., a 4-finger down swipe firing
+	-- app_expose during the swipe, then app_window_previous on lift.
+	local had_live_fire = (gs.liveAxisSign ~= nil)
+	local total_delta = math.abs(dx) + math.abs(dy)
+	Logger.debug(LOG, "commitGesture: dx=%.2f dy=%.2f total_delta=%.2f TAP_MAX_DELTA=%.2f TAP_MAX_SEC=%.2f had_live_fire=%s",
+		dx, dy, total_delta, TAP_MAX_DELTA, TAP_MAX_SEC, tostring(had_live_fire))
+	if not had_live_fire and (gs.lockedDir == nil or total_delta < TAP_MAX_DELTA) then
+		Logger.debug(LOG, "commitGesture: classified as TAP candidate (lockedDir=%s, total_delta=%.2f < %.2f)",
+			tostring(gs.lockedDir), total_delta, TAP_MAX_DELTA)
 		if elapsed <= TAP_MAX_SEC then
 			local slot = nil
 			if     mf == 2 then slot = "tap_2"
@@ -302,42 +476,98 @@ local function commitGesture(now)
 			elseif mf >= 5 then slot = "tap_5" end
 
 			if slot and _state.ga[slot] then
-				Logger.info(LOG, string.format("Tap validated on slot: %s (%.3fs, %d finger(s)).", slot, elapsed, mf))
+				Logger.info(LOG, "TAP FIRE slot=%s action=%s elapsed=%.3fs fingers=%d",
+					slot, tostring(_state.ga[slot]), elapsed, mf)
 				_actions.execute_single(_state.ga[slot])
+			else
+				Logger.debug(LOG, "commitGesture: tap not fired (slot=%s, action=%s)",
+					tostring(slot), tostring(slot and _state.ga[slot]))
 			end
+		else
+			Logger.debug(LOG, "commitGesture: tap too slow (elapsed=%.3fs > TAP_MAX_SEC=%.2fs)", elapsed, TAP_MAX_SEC)
 		end
+		return
+	end
+	if had_live_fire and total_delta < TAP_MAX_DELTA then
+		Logger.debug(LOG, "commitGesture: tap-zone hit AFTER a live fire — refusing to fire spurious tap (residual=lift-off drift)")
 		return
 	end
 
 	local dir = computeDir(dx, dy, mf)
-	if not dir then return end
+	Logger.debug(LOG, "commitGesture: computeDir → %s (lockedDir=%s)", tostring(dir), tostring(gs.lockedDir))
+	if not dir then
+		Logger.debug(LOG, "commitGesture: no direction computed — return")
+		return
+	end
+
+	-- Enforce gesture axis lock at commit time. The post-last-live-fire centroid
+	-- drift during finger lift-off can produce a dx/dy that points to a DIFFERENT
+	-- axis than the gesture was locked on (e.g., a vertical swipe with a tail
+	-- of horizontal drift). Without this guard, we would fire a spurious third
+	-- action on the wrong axis on top of the legitimate live fires.
+	if gs.lockedDir and gs.lockedDir ~= dir then
+		Logger.warn(LOG, "commitGesture: dir=%s does not match gesture lockedDir=%s — skipping commit",
+			dir, gs.lockedDir)
+		return
+	end
 
 	local slot = slotForDir(mf, dir, dx, dy)
-	if not slot or _state.ga[slot] == "none" then return end
+	Logger.debug(LOG, "commitGesture: slotForDir(%d, %s, %.2f, %.2f) → %s", mf, dir, dx, dy, tostring(slot))
+	if not slot or _state.ga[slot] == "none" then
+		Logger.debug(LOG, "commitGesture: slot=%s action=%s — skip",
+			tostring(slot), tostring(slot and _state.ga[slot]))
+		return
+	end
 
 	local action = _state.ga[slot]
-	if not action or action == "none" then return end
+	if not action or action == "none" then
+		Logger.debug(LOG, "commitGesture: action missing for slot %s — skip", slot)
+		return
+	end
 
 	local mode = _state.modes[slot] or "x1"
 	local sensitivity = _state.sensitivities[slot] or SCALE_DIV
+	Logger.debug(LOG, "commitGesture: slot=%s action=%s mode=%s sensitivity=%.2f", slot, action, mode, sensitivity)
 
 	if mode == "incremental" then
 		local sd = signedDistAxis(gs.endPos, dir)
 		local targetSteps = math.floor(math.abs(sd) / sensitivity)
 		local diff = targetSteps - gs.stepsCommitted
+		Logger.info(LOG, "commitGesture INCREMENTAL: sd=%.2f targetSteps=%d prevSteps=%d diff=%d",
+			sd, targetSteps, gs.stepsCommitted, diff)
 
 		if diff > 0 then
+			Logger.info(LOG, "COMMIT INCREMENTAL FIRE slot=%s action=%s diff=%d", slot, action, diff)
 			for _ = 1, diff do
 				triggerAction(action, sd)
 			end
 		end
 		gs.stepsCommitted = targetSteps
 	else
-		if gs.liveAxisSign ~= nil then return end
+		-- x1 mode
 		local sd = signedDistAxis(gs.endPos, dir)
+		local sign = (sd > 0) and 1 or (sd < 0 and -1 or 0)
+		Logger.info(LOG, "commitGesture x1: dir=%s slot=%s sd=%.2f sign=%d prevLiveSlot=%s prevLiveSign=%s SWIPE_MIN=%.2f",
+			dir, slot, sd, sign, tostring(gs.liveAxisSlot), tostring(gs.liveAxisSign), SWIPE_MIN)
+		-- Block double-fire only when commit and the previous live fire targeted the
+		-- EXACT same slot+sign. Two cases that must still fire at commit:
+		--   1. Reversal: user swiped left (live fired swipe_X_left), then reversed to
+		--      right and lifted before live re-armed — sign differs, must fire right.
+		--   2. Finger transition: live fired swipe_2_left during a staggered 4-finger
+		--      landing, then user actually swiped 4 fingers — slot differs (swipe_4_left
+		--      vs swipe_2_left), so the 4-finger action must fire at commit.
+		if gs.liveAxisSign == sign and gs.liveAxisSlot == slot then
+			Logger.warn(LOG, "commitGesture x1: BLOCKED — same slot+sign as previous live fire (slot=%s sign=%d)",
+				slot, sign)
+			return
+		end
 		if math.abs(sd) >= SWIPE_MIN then
-			Logger.info(LOG, string.format("%s swipe validated on slot: %s.", dir, slot))
+			Logger.info(LOG, "COMMIT X1 FIRE slot=%s action=%s sign=%d sd=%.2f (prevLiveSlot=%s prevLiveSign=%s)",
+				slot, action, sign, sd, tostring(gs.liveAxisSlot), tostring(gs.liveAxisSign))
 			triggerAction(action, sd)
+		else
+			Logger.warn(LOG, "commitGesture x1: BELOW THRESHOLD (|sd|=%.2f < SWIPE_MIN=%.2f) — not firing slot %s",
+				math.abs(sd), SWIPE_MIN, slot)
 		end
 	end
 end
@@ -356,7 +586,7 @@ end
 --- @param touches table The raw touch data objects.
 function M.process_frame(touches)
 	if type(touches) ~= "table" then return end
-	
+
 	-- Signal that we are receiving data
 	if not _G.ERGOPTI_GESTURES_RECEIVED_FIRST_FRAME and #touches > 0 then
 		_G.ERGOPTI_GESTURES_RECEIVED_FIRST_FRAME = true
@@ -364,11 +594,15 @@ function M.process_frame(touches)
 
 	local n   = #touches
 	local now = hs.timer.secondsSinceEpoch()
-	
+
 	if n == 0 then
 		stopScrollBlock()
 		if gs.active and gs.startPos and gs.endPos then
+			Logger.info(LOG, "process_frame: n=0 → fingers lifted, calling commitGesture (was active)")
 			pcall(commitGesture, now)
+		elseif gs.active then
+			Logger.debug(LOG, "process_frame: n=0 but startPos/endPos missing (startPos=%s, endPos=%s)",
+				tostring(gs.startPos), tostring(gs.endPos))
 		end
 		-- Signal the actions module that the gesture is over before resetting,
 		-- so leftMouseUp events generated after the finger lift are not silenced
@@ -385,6 +619,7 @@ function M.process_frame(touches)
 	if n >= 2 then
 		local pos = avgPos(touches)
 		if not gs.active then
+			Logger.info(LOG, "GESTURE START: fingers=%d pos=(%.1f,%.1f) ts=%.3f", n, pos.x, pos.y, now)
 			-- Signal the actions module that a new gesture has begun, so any
 			-- leftMouseUp from trackpad contact does not cancel drag selection.
 			if _actions and type(_actions.set_gesture_in_progress) == "function" then
@@ -398,12 +633,30 @@ function M.process_frame(touches)
 			gs.stepsCommitted = 0
 			gs.lifting        = false
 			gs.liveAxisSign   = nil
+			gs.liveAxisSlot   = nil
 			gs.lastLiveFire   = 0
-			
+			gs.lastFirePos    = nil
+			gs.fingerCountChangedAt = now
+			gs.peakN          = n
+			gs.peakNFirstSeen = now
+			gs.peakNFrames    = 1
+
 			gs.tentativeLifting       = false
 			gs.tentativeLiftingSince  = nil
 			gs.tentativeLiftingFrames = 0
 		else
+			-- Track the peak finger count seen so far. This recovers user
+			-- intent at commit time when a real 4-finger swipe ends with one
+			-- finger lifting before the others, draining maxFingers below the
+			-- gesture's actual peak before the candidate path can confirm.
+			if n > (gs.peakN or 0) then
+				gs.peakN = n
+				gs.peakNFirstSeen = now
+				gs.peakNFrames = 1
+			elseif n == gs.peakN then
+				gs.peakNFrames = (gs.peakNFrames or 0) + 1
+			end
+
 			-- StartPos Compensation: if finger count changed, the centroid (pos) jumps.
 			-- We adjust startPos to maintain the same relative displacement,
 			-- effectively absorbing the jump and preserving momentum/fluidity.
@@ -439,9 +692,22 @@ function M.process_frame(touches)
 
 				-- A new finger joined. Accept single-finger joins immediately,
 				-- but require confirmation for large spikes (e.g., 3→5) which are often transient.
-				if n <= gs.maxFingers + 1 then
+				-- Fast-path: accept the new count immediately when either it is
+				-- only one above the current count (normal sequential landing) OR
+				-- the CURRENT finger count is inert on the locked axis (no
+				-- configured actions can fire). If nothing was going to fire at
+				-- maxFingers anyway, there is no false-positive to protect against
+				-- — being tolerant is free. Using the locked axis (rather than
+				-- "all directions") means a horizontal swipe benefits from
+				-- 2-finger HORIZONTAL being "none" even if 2-finger vertical or
+				-- diagonal is bound.
+				local inert = finger_count_is_inert(gs.maxFingers, gs.lockedDir)
+				if n <= gs.maxFingers + 1 or inert then
+					Logger.info(LOG, string.format("Finger join (fast-path): %d → %d (inert_at_%d_on_%s=%s)",
+						gs.maxFingers, n, gs.maxFingers, tostring(gs.lockedDir), tostring(inert)))
 					gs.maxFingers = n
 					gs.lifting    = false
+					gs.fingerCountChangedAt = now
 					gs.candidateFingers = nil
 					gs.candidateSince   = nil
 					gs.candidateFrames  = 0
@@ -453,6 +719,11 @@ function M.process_frame(touches)
 							Logger.info(LOG, string.format("Confirmed multi-finger join: %d → %d (frames=%d, %.3fs).", gs.maxFingers, n, gs.candidateFrames, elapsed))
 							gs.maxFingers = n
 							gs.lifting    = false
+							-- The candidate-confirmation period already enforced stability:
+							-- the user has held this finger count for >= FINGER_CONFIRM_MS.
+							-- Zero out fingerCountChangedAt so the live-fire stability gate
+							-- does not impose an ADDITIONAL 60 ms wait on top of that.
+							gs.fingerCountChangedAt = 0
 							gs.candidateFingers = nil
 							gs.candidateSince   = nil
 							gs.candidateFrames  = 0
@@ -485,6 +756,10 @@ function M.process_frame(touches)
 					gs.lockedDir      = nil
 					gs.stepsCommitted = 0
 					gs.lifting        = false
+					gs.liveAxisSign   = nil
+					gs.liveAxisSlot   = nil
+					gs.lastFirePos    = nil
+					gs.fingerCountChangedAt = now
 					return
 				end
 			end
@@ -498,6 +773,10 @@ function M.process_frame(touches)
 					local dx = pos.x - gs.startPos.x
 					local dy = pos.y - gs.startPos.y
 					local tentative = computeDir(dx, dy, gs.maxFingers)
+					if tentative ~= nil then
+						Logger.info(LOG, "LOCKED DIR=%s (dx=%.2f dy=%.2f maxFingers=%d)",
+							tentative, dx, dy, gs.maxFingers)
+					end
 					gs.lockedDir = tentative
 				end
 
@@ -506,7 +785,7 @@ function M.process_frame(touches)
 					local dx = pos.x - gs.startPos.x
 					local dy = pos.y - gs.startPos.y
 					local slot = slotForDir(gs.maxFingers, axis, dx, dy)
-					
+
 					if slot and _state.ga[slot] and _state.ga[slot] ~= "none" then
 						triggerLiveAxisIfNeeded(slot, pos, now, axis)
 					end

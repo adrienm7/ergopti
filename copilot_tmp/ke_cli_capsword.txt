@@ -1,1 +1,0 @@
-error parsing options: Option 'get-variable' does not exist
