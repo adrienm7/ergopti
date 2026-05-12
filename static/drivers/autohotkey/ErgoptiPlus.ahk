@@ -467,14 +467,17 @@ ReadPersonalInfoToml(ScriptInformation["PersonalInfoTomlPath"])
 ; Pull menu titles and submenu ordering from the per-category TOML files so
 ; that those hotstring files are the single source of truth for both the
 ; hotstring payload and the feature descriptions shown in the tray menu.
-; Categories without a TOML (``Layout``, ``Shortcuts``, ``TapHolds``) keep
-; their hardcoded Descriptions and ``__Order`` arrays in the Features Map.
+; Categories without a dedicated TOML (``Layout``, ``Shortcuts``, ``Gestures``,
+; and the flat DynamicHotstrings entries) get their descriptions from the locale
+; file via ``ApplyLocaleDescriptions``. ``TapHolds`` descriptions come from
+; ``tap_hold_config.ahk``.
 ApplyTomlMetadataToFeatures("Autocorrection")
 ApplyTomlMetadataToFeatures("DistancesReduction")
 ApplyTomlMetadataToFeatures("MagicKey")
 ApplyTomlMetadataToFeatures("Rolls")
 ApplyTomlMetadataToFeatures("SFBsReduction")
 ApplyIndexTomlToDynamicHotstrings()
+ApplyLocaleDescriptions()
 
 ; Append hotstring counts to section descriptions so the tray menu shows
 ; "(N)" next to each section item — mirrors Hammerspoon's per-section display.

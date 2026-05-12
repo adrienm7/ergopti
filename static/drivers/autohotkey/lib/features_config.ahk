@@ -32,23 +32,18 @@ global Features := Map(
         "__Order", ["DateFr", "Date", "PhonePrefixes", "SsnPrefixes", "IbanPrefixes", "-", "TextExpansionPersonalInformation"],
         "DateFr", {
             Enabled: True,
-            Description: "dt★ insère la date courante (jj/mm/aaaa)",
         },
         "Date", {
             Enabled: True,
-            Description: "td★ insère la date courante (aaaa_mm_jj)",
         },
         "PhonePrefixes", {
             Enabled: True,
-            Description: "Saisir les premiers chiffres du numéro de téléphone le complète automatiquement",
         },
         "SsnPrefixes", {
             Enabled: True,
-            Description: "Saisir les premiers chiffres du numéro de sécurité sociale le complète automatiquement",
         },
         "IbanPrefixes", {
             Enabled: True,
-            Description: "Saisir les premiers caractères de l'IBAN le complète automatiquement",
         },
         "TextExpansionPersonalInformation", {
             Enabled: True,
@@ -59,19 +54,15 @@ global Features := Map(
         "__Order", ["ErgoptiBase", "DirectAccessDigits", "ErgoptiAltGr", "ErgoptiPlus"],
         "ErgoptiBase", {
             Enabled: True,
-            Description: "Émuler la couche de base de la disposition Ergopti",
         },
         "DirectAccessDigits", {
             Enabled: True,
-            Description: "Chiffres en accès direct sur la rangée du haut",
         },
         "ErgoptiAltGr", {
             Enabled: True,
-            Description: "Émuler la couche AltGr de la disposition Ergopti",
         },
         "ErgoptiPlus", {
             Enabled: True,
-            Description: "Appliquer les légers changements en AltGr d’Ergopti➕",
         }
     ),
     "DistancesReduction", Map(
@@ -249,241 +240,126 @@ global Features := Map(
         ],
         "EGrave", {
             Enabled: True,
-            Description: "Tous les raccourcis sur la touche È correspondent à ceux de ",
             Letter: "z",
         },
         "ECirc", {
             Enabled: True,
-            Description: "Tous les raccourcis sur la touche Ê correspondent à ceux de ",
             Letter: "x",
         },
         "EAcute", {
             Enabled: True,
-            Description: "Tous les raccourcis sur la touche É correspondent à ceux de ",
             Letter: "c",
         },
         "AGrave", {
             Enabled: True,
-            Description: "Tous les raccourcis sur la touche À correspondent à ceux de ",
             Letter: "v",
         },
         "WrapTextIfSelected", {
             Enabled: True,
-            Description: "Taper un symbole lors d’une sélection de texte va encadrer celle-ci par le symbole. Fonctionne si émulation.",
         },
         "MicrosoftBold", {
             Enabled: True,
-            Description: "Ctrl + B met en gras dans les applications Microsoft (comme Ctrl + G)",
         },
         "Save", {
             Enabled: False,
-            Description: "Ctrl + J/" . ScriptInformation["MagicKey"] . " = Ctrl + S. Attention, Ctrl + J est perdu",
         },
         "CtrlJ", {
             Enabled: False,
-            Description: "Ctrl + S = Ctrl + J",
         },
         "PasteWithoutFormatting", {
             Enabled: False,
-            Description: "Ctrl + Shift + V : coller sans la mise en forme. Excel garde son comportement natif",
         },
         "AltGrLAlt", Map(
-            "BackSpace", {
-                Enabled: False,
-                Description: "`"AltGr`" + `"LAlt`" = BackSpace",
-            },
-            "CapsLock", {
-                Enabled: False,
-                Description: "`"AltGr`" + `"LAlt`" = CapsLock",
-            },
-            "CapsWord", {
-                Enabled: False,
-                Description: "`"AltGr`" + `"LAlt`" = CapsWord",
-            },
-            "CtrlBackSpace", {
-                Enabled: True,
-                Description: "`"AltGr`" + `"LAlt`" = Ctrl + BackSpace",
-            },
-            "CtrlDelete", {
-                Enabled: False,
-                Description: "`"AltGr`" + `"LAlt`" = Ctrl + Delete",
-            },
-            "Delete", {
-                Enabled: False,
-                Description: "`"AltGr`" + `"LAlt`" = Delete",
-            },
-            "Enter", {
-                Enabled: False,
-                Description: "`"AltGr`" + `"LAlt`" = Entrée",
-            },
-            "Escape", {
-                Enabled: False,
-                Description: "`"AltGr`" + `"LAlt`" = Échap",
-            },
-            "OneShotShift", {
-                Enabled: False,
-                Description: "`"AltGr`" + `"LAlt`" = OneShotShift",
-            },
-            "Tab", {
-                Enabled: False,
-                Description: "`"AltGr`" + `"LAlt`" = Tab",
-            },
+            "BackSpace",     { Enabled: False },
+            "CapsLock",      { Enabled: False },
+            "CapsWord",      { Enabled: False },
+            "CtrlBackSpace", { Enabled: True  },
+            "CtrlDelete",    { Enabled: False },
+            "Delete",        { Enabled: False },
+            "Enter",         { Enabled: False },
+            "Escape",        { Enabled: False },
+            "OneShotShift",  { Enabled: False },
+            "Tab",           { Enabled: False },
         ),
         "AltGrCapsLock", Map(
-            "BackSpace", {
-                Enabled: False,
-                Description: "`"AltGr`" + `"CapsLock`" = BackSpace",
-            },
-            "CapsLock", {
-                Enabled: False,
-                Description: "`"AltGr`" + `"CapsLock`" = CapsLock",
-            },
-            "CapsWord", {
-                Enabled: False,
-                Description: "`"AltGr`" + `"CapsLock`" = CapsWord",
-            },
-            "CtrlDelete", {
-                Enabled: True,
-                Description: "`"AltGr`" + `"CapsLock`" = Ctrl + Delete",
-            },
-            "CtrlBackSpace", {
-                Enabled: False,
-                Description: "`"AltGr`" + `"CapsLock`" = Ctrl + BackSpace",
-            },
-            "Delete", {
-                Enabled: False,
-                Description: "`"AltGr`" + `"CapsLock`" = Delete",
-            },
-            "Enter", {
-                Enabled: False,
-                Description: "`"AltGr`" + `"CapsLock`" = Entrée",
-            },
-            "Escape", {
-                Enabled: False,
-                Description: "`"AltGr`" + `"CapsLock`" = Échap",
-            },
-            "OneShotShift", {
-                Enabled: False,
-                Description: "`"AltGr`" + `"CapsLock`" = OneShotShift",
-            },
-            "Tab", {
-                Enabled: False,
-                Description: "`"AltGr`" + `"CapsLock`" = Tab",
-            },
+            "BackSpace",     { Enabled: False },
+            "CapsLock",      { Enabled: False },
+            "CapsWord",      { Enabled: False },
+            "CtrlBackSpace", { Enabled: False },
+            "CtrlDelete",    { Enabled: True  },
+            "Delete",        { Enabled: False },
+            "Enter",         { Enabled: False },
+            "Escape",        { Enabled: False },
+            "OneShotShift",  { Enabled: False },
+            "Tab",           { Enabled: False },
         ),
         "LAltCapsLock", Map(
-            "BackSpace", {
-                Enabled: False,
-                Description: "`"LAlt`" + `"CapsLock`" = BackSpace",
-            },
-            "CapsLock", {
-                Enabled: False,
-                Description: "`"LAlt`" + `"CapsLock`" = CapsLock",
-            },
-            "CapsWord", {
-                Enabled: True,
-                Description: "`"LAlt`" + `"CapsLock`" = CapsWord",
-            },
-            "CtrlDelete", {
-                Enabled: False,
-                Description: "`"LAlt`" + `"CapsLock`" = Ctrl + Delete",
-            },
-            "CtrlBackSpace", {
-                Enabled: False,
-                Description: "`"LAlt`" + `"CapsLock`" = Ctrl + BackSpace",
-            },
-            "Delete", {
-                Enabled: False,
-                Description: "`"LAlt`" + `"CapsLock`" = Delete",
-            },
-            "Enter", {
-                Enabled: False,
-                Description: "`"LAlt`" + `"CapsLock`" = Entrée",
-            },
-            "Escape", {
-                Enabled: False,
-                Description: "`"LAlt`" + `"CapsLock`" = Échap",
-            },
-            "OneShotShift", {
-                Enabled: False,
-                Description: "`"LAlt`" + `"CapsLock`" = OneShotShift",
-            },
-            "Tab", {
-                Enabled: False,
-                Description: "`"LAlt`" + `"CapsLock`" = Tab",
-            },
+            "BackSpace",     { Enabled: False },
+            "CapsLock",      { Enabled: False },
+            "CapsWord",      { Enabled: True  },
+            "CtrlBackSpace", { Enabled: False },
+            "CtrlDelete",    { Enabled: False },
+            "Delete",        { Enabled: False },
+            "Enter",         { Enabled: False },
+            "Escape",        { Enabled: False },
+            "OneShotShift",  { Enabled: False },
+            "Tab",           { Enabled: False },
         ),
         "WinCapsLock", {
             Enabled: True,
-            Description: "Win + `"CapsLock`" = CapsLock",
         },
         "SelectLine", {
             Enabled: True,
-            Description: "Win + A(ll) = Sélection de toute la ligne",
         },
         "Screen", {
             Enabled: True,
-            Description: "Win + H (screensHot) = Capture de l'écran (réalise le raccourci Win + Shift + S)",
         },
         "GPT", {
             Enabled: True,
-            Description: "Win + G(PT) = Ouverture de ChatGPT (site configurable)",
             Link: "https://chatgpt.com/",
         },
         "GetHexValue", {
             Enabled: True,
-            Description: "Win + X (heX) = Copie dans le presse-papiers de la couleur HEX du pixel situé sous le curseur",
         },
         "TakeNote", {
             Enabled: True,
-            Description: "Win + N(ote) = Ouverture d’un fichier pour prendre des notes",
             DatedNotes: False,
             DestinationFolder: A_Desktop,
         },
         "SurroundWithParentheses", {
             Enabled: True,
-            Description: "Win + O = Entoure de parenthèses la ligne",
         },
         "Move", {
             Enabled: True,
-            Description: "Win + M(ove) = Simulation d’une activité en bougeant la souris aléatoirement. Pour désactiver, réitérer le raccourci ou recharger le script",
         },
         "Search", {
             Enabled: True,
-            Description: "Win + S(earch) = Recherche de la sélection sur Internet. Dans l'explorateur, récupération du chemin du fichier sélectionné",
             SearchEngine: "https://www.google.com",
             SearchEngineURLQuery: "https://www.google.com/search?q=",
         },
         "TitleCase", {
             Enabled: True,
-            Description: "Win + W = Conversion en casse de titre (majuscule à chaque première lettre de mot)",
         },
         "Uppercase", {
             Enabled: True,
-            Description: "Win + U(ppercase) = Conversion en majuscules/minuscules la sélection",
         },
         "TeleportMouse", {
             Enabled: True,
-            Description: "Win + T(éléport) = Téléporte la souris au centre de l'autre moniteur (cyclique)",
         },
         "SpotlightMouse", {
             Enabled: True,
-            Description: "Win + ' = Met la souris en surbrillance avec un anneau jaune",
         },
         "OpenDownloads", {
             Enabled: True,
-            Description: "Win + D(ownloads) = Ouvre le dossier Téléchargements",
         },
         "ScreenInstant", {
             Enabled: True,
-            Description: "Touche ² (SC029, à gauche de 1) = Capture instantanée de la fenêtre active, sauvegardée dans Images avec horodatage",
         },
     ),
     "TapHolds", _TapHoldsConfig,
     "Gestures", Map(
         "Enabled", {
             Enabled: False,
-            Description: "Gestes du touchpad (nécessite configuration Windows)",
         },
     ),
 )
