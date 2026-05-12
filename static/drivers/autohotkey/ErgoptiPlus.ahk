@@ -2482,6 +2482,31 @@ _MakeKeyboardShortcutHandler(SlotId, ActionName) {
     return (*) => SetKeyboardShortcutAction(SlotId, ActionName)
 }
 
+; Convert a slot id to a human-readable label: "ctrl_shift_a" → "Ctrl + Shift + A".
+_FormatSlotLabel(SlotId) {
+    static _ModLabels := Map(
+        "ctrl_shift_", "Ctrl + Shift + ",
+        "ctrl_",       "Ctrl + ",
+        "win_",        "Win + ",
+        "alt_",        "Alt + ",
+    )
+    static _KeyNames := Map(
+        "space",  "Espace",
+        "enter",  "Entrée",
+        "period", ".",
+        "comma",  ",",
+        "sc029",  "²",
+    )
+    for Prefix, ModLabel in _ModLabels {
+        if (SubStr(SlotId, 1, StrLen(Prefix)) = Prefix) {
+            Suffix := SubStr(SlotId, StrLen(Prefix) + 1)
+            Key := _KeyNames.Has(Suffix) ? _KeyNames[Suffix] : StrUpper(Suffix)
+            return ModLabel . Key
+        }
+    }
+    return SlotId
+}
+
 ; Build the "⌨️ Raccourcis clavier" submenu.
 ; Inserts the four keyboard shortcut groups (Win/Ctrl/Ctrl+Shift/Alt) into
 ; TargetMenu just before the item named InsertBefore.
@@ -2493,10 +2518,10 @@ InsertKeyboardShortcutGroups(TargetMenu, InsertBefore) {
     LoggerStart("KeyboardShortcutsMenu", "Insertion des groupes de raccourcis clavier…")
 
     static _Groups := [
-        Map("prefix", "win_",        "label", "Raccourcis ⊞ Win",         "add_label", "[+ Ajouter un raccourci Win+…]"),
+        Map("prefix", "alt_",        "label", "Raccourcis ⎇ Alt",          "add_label", "[+ Ajouter un raccourci Alt+…]"),
         Map("prefix", "ctrl_",       "label", "Raccourcis ^ Ctrl",         "add_label", "[+ Ajouter un raccourci Ctrl+…]"),
         Map("prefix", "ctrl_shift_", "label", "Raccourcis ^⇧ Ctrl+Shift",  "add_label", "[+ Ajouter un raccourci Ctrl+Shift+…]"),
-        Map("prefix", "alt_",        "label", "Raccourcis ⎇ Alt",          "add_label", "[+ Ajouter un raccourci Alt+…]"),
+        Map("prefix", "win_",        "label", "Raccourcis ⊞ Win",         "add_label", "[+ Ajouter un raccourci Win+…]"),
     ]
 
     ; Build all group menus first, then insert in reverse order so the final
@@ -2516,7 +2541,7 @@ InsertKeyboardShortcutGroups(TargetMenu, InsertBefore) {
             if (Action == "none")
                 continue
             ActionLabel := GESTURE_ACTIONS.Has(Action) ? GESTURE_ACTIONS[Action].Label : Action
-            SlotDisplay := Slot . " : " . ActionLabel
+            SlotDisplay := _FormatSlotLabel(Slot) . " : " . ActionLabel
             GMenu.Add(SlotDisplay, ((_s) => (*) => ShowKeyboardShortcutPicker(_s))(Slot))
             AssignedCount++
         }
@@ -2529,7 +2554,7 @@ InsertKeyboardShortcutGroups(TargetMenu, InsertBefore) {
 
     ; Insert separator first (it ends up just before the block after reversal)
     TargetMenu.Insert(InsertBefore)
-    ; Insert groups in reverse so final order is Win / Ctrl / Ctrl+Shift / Alt
+    ; Insert groups in reverse so final order is Alt / Ctrl / Ctrl+Shift / Win
     loop GroupMenus.Length {
         Idx := GroupMenus.Length - A_Index + 1
         TargetMenu.Insert(InsertBefore, GroupMenus[Idx]["label"], GroupMenus[Idx]["menu"])
