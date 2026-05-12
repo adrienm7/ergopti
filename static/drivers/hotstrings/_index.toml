@@ -9,9 +9,9 @@ categories_order = ["distancesreduction", "sfbsreduction", "rolls", "autocorrect
 
 
 
-# =============================================================
-# ===== Modules.Magickey.Textexpansionpersonalinformation =====
-# =============================================================
+# ======================================================================
+# ===== Modules.Dynamichotstrings.Textexpansionpersonalinformation =====
+# ======================================================================
 
-[modules.magickey.textexpansionpersonalinformation]
+[modules.dynamichotstrings.textexpansionpersonalinformation]
 mod_id = "personal_info"

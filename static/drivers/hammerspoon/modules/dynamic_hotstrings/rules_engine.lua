@@ -285,7 +285,9 @@ function M.start(keymap_module)
 	-- Sections ordered identically to the AHK DynamicHotstrings feature map.
 	-- Prefix section counts start at 0; register_prefix_entries updates them with
 	-- the real values once personal data is injected.
+	-- textexpansionpersonalinformation is a module placeholder — resolved by the menu via _index.toml.
 	_sections = {
+		{ name = "textexpansionpersonalinformation", description = "Remplissage de formulaires avec le suffixe @ : @np★ = Nom ⇥ Prénom, etc.", count = 0, is_module_placeholder = true },
 		{ name = "datefr",        description = "dt" .. _trigger .. " insère la date courante (" .. date_fr  .. ")", count = 1 },
 		{ name = "date",          description = "td" .. _trigger .. " insère la date courante (" .. date_iso .. ")", count = 1 },
 		{ name = "phoneprefixes", description = "Saisir les premiers chiffres du numéro de téléphone le complète automatiquement", count = 0 },

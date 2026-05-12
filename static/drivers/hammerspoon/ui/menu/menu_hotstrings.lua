@@ -172,8 +172,9 @@ end
 
 --- Builds the main hotstring groups menu.
 --- @param ctx table Context.
+--- @param only table|nil Optional set of group names to include (nil = all common groups).
 --- @return table
-function M.build_groups(ctx)
+function M.build_groups(ctx, only)
 	local top_names = {}
 	for _, f in ipairs(type(ctx.hotfiles) == "table" and ctx.hotfiles or {}) do
 		top_names[#top_names + 1] = ctx.get_group_name(f)
@@ -183,6 +184,7 @@ function M.build_groups(ctx)
 	local items = {}
 	for _, name in ipairs(top_names) do
 		if name == "custom" or name == "personal" or name:sub(1, 13) == "personal_ext_" then goto continue_group end
+		if type(only) == "table" and not only[name] then goto continue_group end
 
 		local enabled  = groupEnabled(ctx, name)
 		local sections = ctx.keymap and type(ctx.keymap.get_sections) == "function" and ctx.keymap.get_sections(name) or nil
