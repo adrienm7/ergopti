@@ -247,13 +247,37 @@ for _Slot in SCRIPT_SHORTCUT_SLOTS {
 ; ParseTomlFile / IniCacheGet / ResolveConfigPath are defined in lib/ini_helpers.ahk
 ; (included above) so the test runner can exercise them in isolation.
 
+; Hotstring categories are grouped under a [Hotstrings] umbrella in the TOML,
+; matching the Hammerspoon config layout. Internal AHK category names stay
+; unchanged so no menu or hotstring code needs updating.
+_HOTSTRING_TOML_CATEGORIES := Map(
+    "Autocorrection",      "Hotstrings.Autocorrection",
+    "DistancesReduction",  "Hotstrings.DistancesReduction",
+    "DynamicHotstrings",   "Hotstrings.DynamicHotstrings",
+    "MagicKey",            "Hotstrings.MagicKey",
+    "Personal",            "Hotstrings.Personal",
+    "Rolls",               "Hotstrings.Rolls",
+    "SFBsReduction",       "Hotstrings.SFBsReduction",
+)
+
+; Map an internal AHK category name to its TOML section name.
+_TomlSection(Category) {
+    global _HOTSTRING_TOML_CATEGORIES
+    if _HOTSTRING_TOML_CATEGORIES.Has(Category)
+        return _HOTSTRING_TOML_CATEGORIES[Category]
+    return Category
+}
+
 ReadScriptConfig(Cache) {
-    for Information in ScriptInformation {
-        Value := IniCacheGet(Cache, "Script", Information)
-        if Value != "_" {
-            ScriptInformation[Information] := Value
-        }
-    }
+    ; MagicKey lives in [Hotstrings] in the TOML (alongside the hotstring modules)
+    Raw := IniCacheGet(Cache, "Hotstrings", "MagicKey")
+    if Raw != "_"
+        ScriptInformation["MagicKey"] := Raw
+    ; Backward-compat: also check the old [Script] location so existing configs still load
+    Raw := IniCacheGet(Cache, "Script", "MagicKey")
+    if Raw != "_"
+        ScriptInformation["MagicKey"] := Raw
+    ; Paths are always derived from _ConfigDir at startup and are never persisted
 }
 
 global _IniCache := ParseTomlFile(ConfigurationFile)
@@ -341,59 +365,52 @@ ReadConfiguration(Cache) {
     for Category, FeaturesMap in Features {
         if !IsObject(FeaturesMap) or Type(FeaturesMap) != "Map"
             continue
+        TomlCat := _TomlSection(Category)
         for Feature, Value in FeaturesMap {
             if Feature == "__Order"
                 continue
             if Type(Value) == "Map" {
-                ; Sub-map: __Configuration props live directly in [Category.Feature]
+                ; Sub-map: __Configuration props live directly in [TomlCat.Feature]
                 if Value.Has("__Configuration") {
                     Cfg := Value["__Configuration"]
                     for Prop in ExtraProps {
                         if Cfg.HasOwnProp(Prop) {
-                            Raw := IniCacheGet(Cache, Category "." Feature, Prop)
+                            Raw := IniCacheGet(Cache, TomlCat "." Feature, Prop)
                             if Raw != "_"
                                 Value["__Configuration"].%Prop% := Raw
                         }
                     }
                 }
-                ; Leaf sub-features are flattened in [Category.Feature]:
-                ;   Enabled → key = SubFeature, extra → key = SubFeature_Prop
+                ; Leaf sub-features are flattened in [TomlCat.Feature]
                 for SubFeature, SubValue in Value {
                     if SubFeature == "__Order" or SubFeature == "__Configuration"
                         continue
                     if !IsObject(SubValue)
                         continue
-                    EnabledRaw := IniCacheGet(Cache, Category "." Feature, SubFeature)
+                    EnabledRaw := IniCacheGet(Cache, TomlCat "." Feature, SubFeature)
                     if EnabledRaw != "_"
                         Features[Category][Feature][SubFeature].Enabled := EnabledRaw
                     for Prop in ExtraProps {
                         if SubValue.HasOwnProp(Prop) {
-                            Raw := IniCacheGet(Cache, Category "." Feature, SubFeature "_" Prop)
+                            Raw := IniCacheGet(Cache, TomlCat "." Feature, SubFeature "_" Prop)
                             if Raw != "_"
                                 Features[Category][Feature][SubFeature].%Prop% := Raw
                         }
                     }
                 }
             } else if IsObject(Value) {
-                ; Leaf feature: Enabled lives as FeatureName key in [Category]
-                EnabledRaw := IniCacheGet(Cache, Category, Feature)
+                ; Leaf feature: Enabled lives as FeatureName key in [TomlCat]
+                EnabledRaw := IniCacheGet(Cache, TomlCat, Feature)
                 if EnabledRaw != "_"
                     Features[Category][Feature].Enabled := EnabledRaw
                 for Prop in ExtraProps {
                     if Value.HasOwnProp(Prop) {
-                        Raw := IniCacheGet(Cache, Category, Feature "_" Prop)
+                        Raw := IniCacheGet(Cache, TomlCat, Feature "_" Prop)
                         if Raw != "_"
                             Features[Category][Feature].%Prop% := Raw
                     }
                 }
             }
-        }
-    }
-
-    for Information in ScriptInformation {
-        Value := IniCacheGet(Cache, "Script", Information)
-        if Value != "_" {
-            ScriptInformation[Information] := Value
         }
     }
 }
@@ -1769,7 +1786,7 @@ MagicKeyEditor(*) {
 ModifyMagicKey(gui, NewValue) {
     global ScriptInformation, ConfigurationFile
     ScriptInformation["MagicKey"] := NewValue
-    TOML_Write(NewValue, ConfigurationFile, "Script", "MagicKey")
+    TOML_Write(NewValue, ConfigurationFile, "Hotstrings", "MagicKey")
 
     gui.Destroy()
     Reload
@@ -1890,7 +1907,9 @@ ToggleAllFeatures(Value) {
             if Key == "__Order" or Key == "__Configuration" {
                 continue
             }
-            ChildSection := (Section = "") ? Key : Section "." Key
+            ; Translate category names to TOML sections at the top level
+            TomlKey := (Section = "") ? _TomlSection(Key) : Key
+            ChildSection := (Section = "") ? TomlKey : Section "." Key
             if Type(Val) == "Map" {
                 ; Sub-map: its leaf children are flattened in [ChildSection]
                 SetAllRecursive(ChildSection, Val)
@@ -1917,7 +1936,7 @@ ToggleAllFeatures(Value) {
                 }
                 if IsObject(Val) and Val.HasOwnProp("Enabled") {
                     Val.Enabled := Value
-                    Updates.Push({ Section: Category, Key: FeatureName, Value: Value })
+                    Updates.Push({ Section: _TomlSection(Category), Key: FeatureName, Value: Value })
                 }
                 ; If Val is a Map without Enabled, we skip its children when enabling
             }
@@ -1936,40 +1955,31 @@ ToggleAllHotstringsOff(*) {
 ToggleAllHotstrings(Value) {
     global Features, HotstringCategories
     Updates := []
-    for Category in HotstringCategories {
+    ; Toggle all hotstring categories including DynamicHotstrings and Personal
+    AllHotsCats := HotstringCategories.Clone()
+    for ExtraCat in ["DynamicHotstrings", "Personal"] {
+        Found := false
+        for C in AllHotsCats {
+            if C == ExtraCat {
+                Found := true
+                break
+            }
+        }
+        if !Found
+            AllHotsCats.Push(ExtraCat)
+    }
+    for Category in AllHotsCats {
         if !Features.Has(Category) {
             continue
         }
+        TomlCat := _TomlSection(Category)
         for FeatureName, Val in Features[Category] {
             if FeatureName == "__Order" {
                 continue
             }
             if IsObject(Val) and Val.HasOwnProp("Enabled") {
                 Val.Enabled := Value
-                Updates.Push({ Section: Category, Key: FeatureName, Value: Value })
-            }
-        }
-    }
-    ; Also toggle DynamicHotstrings and Personal categories
-    if Features.Has("DynamicHotstrings") {
-        for FeatureName, Val in Features["DynamicHotstrings"] {
-            if FeatureName == "__Order" {
-                continue
-            }
-            if IsObject(Val) and Val.HasOwnProp("Enabled") {
-                Val.Enabled := Value
-                Updates.Push({ Section: "DynamicHotstrings", Key: FeatureName, Value: Value })
-            }
-        }
-    }
-    if Features.Has("Personal") {
-        for FeatureName, Val in Features["Personal"] {
-            if FeatureName == "__Order" {
-                continue
-            }
-            if IsObject(Val) and Val.HasOwnProp("Enabled") {
-                Val.Enabled := Value
-                Updates.Push({ Section: "Personal", Key: FeatureName, Value: Value })
+                Updates.Push({ Section: TomlCat, Key: FeatureName, Value: Value })
             }
         }
     }
@@ -2011,7 +2021,7 @@ ToggleCategoryAllFeatures(Category, Value) {
         }
         if IsObject(Val) and Val.HasOwnProp("Enabled") {
             Val.Enabled := Value
-            Updates.Push({ Section: Category, Key: FeatureName, Value: Value })
+            Updates.Push({ Section: _TomlSection(Category), Key: FeatureName, Value: Value })
         }
     }
     TOML_BatchWrite(ConfigurationFile, Updates)
@@ -2032,10 +2042,8 @@ SaveFullConfig() {
     ; Collect all feature flags recursively
     _CollectFeatureUpdates(Updates, "", Features)
 
-    ; [Script] section — all entries from ScriptInformation
-    for Key, Value in ScriptInformation {
-        Updates.Push({ Section: "Script", Key: Key, Value: Value })
-    }
+    ; [Hotstrings] root — MagicKey lives here, paths are never persisted
+    Updates.Push({ Section: "Hotstrings", Key: "MagicKey", Value: ScriptInformation["MagicKey"] })
 
     ; [Shortcuts.ScriptControl] section
     if IsSet(ScriptShortcutAssignments) {
@@ -2091,7 +2099,10 @@ _CollectFeatureUpdates(Updates, ParentPath, Node) {
         if Key == "__Order" or Key == "__Configuration" {
             continue
         }
-        CurrentPath := (ParentPath == "") ? Key : ParentPath "." Key
+        ; Translate top-level category names to their TOML section (e.g. Autocorrection →
+        ; Hotstrings.Autocorrection). Sub-levels already carry the translated prefix.
+        TomlKey := (ParentPath == "") ? _TomlSection(Key) : Key
+        CurrentPath := (ParentPath == "") ? TomlKey : ParentPath "." Key
 
         if Type(Value) == "Map" {
             ; Sub-map: __Configuration props go directly into [CurrentPath], then recurse
