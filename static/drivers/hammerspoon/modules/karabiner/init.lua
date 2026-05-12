@@ -580,7 +580,11 @@ function M.init()
 		Logger.info(LOG, "Default config written to '%s'.", resolve_user_config())
 	end
 
-	_state.watcher              = Watchers.start_gesture_watcher()
+	-- Gestures engine is an optional dependency: it provides the any-touch hook
+	-- so bare finger contact on the trackpad also deactivates CapsWord.
+	local ok_ge, gestures_engine = pcall(require, "modules.gestures.engine")
+	if not ok_ge then gestures_engine = nil end
+	_state.watcher              = Watchers.start_gesture_watcher(gestures_engine)
 	_state.hotkey_cycle_windows = Watchers.start_cycle_windows_hotkey()
 	_state.hotkey_alt_tab_windows = Watchers.start_alt_tab_windows_hotkey()
 	_state.hotkey_alt_tab_apps = Watchers.start_alt_tab_apps_hotkey()
