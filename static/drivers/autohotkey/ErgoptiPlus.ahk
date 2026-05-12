@@ -2062,6 +2062,7 @@ SaveFullConfig() {
     _TOML_STRICT_CANON_IN_PROGRESS := true
     try TOML_BatchWrite(ConfigurationFile, Updates)
     finally _TOML_STRICT_CANON_IN_PROGRESS := PrevCanonState
+    TOML_FormatViaScript(ConfigurationFile)
 }
 
 ; Recursively walk the Features map to collect all persistable properties

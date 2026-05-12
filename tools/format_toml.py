@@ -62,6 +62,8 @@ def create_section_header(section_name: str, is_subsection: bool = False) -> lis
 
 def parse_toml_structure(content: str) -> dict:
     """Parse TOML content into a structured format."""
+    # Strip UTF-8 BOM if present (written by Windows tools like AHK)
+    content = content.lstrip("﻿")
     lines = content.split("\n")
     structure = OrderedDict()
     current_section = None

@@ -309,6 +309,16 @@ TOML_BatchWrite(Path, Updates) {
     return true
 }
 
+; Reformat a TOML file using the centralized Python formatter (format_toml.py).
+; Ensures consistent === headers ===, sorted sections and keys across all config files.
+; Mirrors the pattern used by toml_writer.lua on the Hammerspoon side.
+TOML_FormatViaScript(Path) {
+    RepoRoot := RegExReplace(A_ScriptDir, "\\?static\\drivers\\autohotkey$", "") . "\"
+    FormatScript := RepoRoot . "tools\format_toml.py"
+    if FileExist(FormatScript)
+        RunWait(Format('python "{}" "{}"', FormatScript, Path), , "Hide")
+}
+
 ; Enforce a strict schema on the unified driver config: after any successful
 ; TOML write targeting ConfigurationFile, rebuild the file from the in-memory
 ; state via SaveFullConfig so stale sections/keys are dropped.
