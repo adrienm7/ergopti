@@ -25,6 +25,21 @@ from collections import OrderedDict
 from pathlib import Path
 
 
+def section_display_name(section_key: str) -> str:
+    """Build the header display name from a full dotted section key.
+
+    Each segment has its first letter capitalised and underscores replaced with
+    spaces; segments are re-joined with dots — matching the Hammerspoon style:
+      hotstrings.editor.shortcut → Hotstrings.Editor.Shortcut
+    """
+    parts = section_key.split(".")
+    formatted = []
+    for p in parts:
+        p = p.replace("_", " ")
+        formatted.append(p[0].upper() + p[1:] if p else p)
+    return ".".join(formatted)
+
+
 def count_equals_needed(text: str, is_subsection: bool = False) -> int:
     """Calculate the number of = needed for a header to match the total title length."""
     side_equals = 5 if is_subsection else 7
@@ -186,8 +201,7 @@ def rebuild_toml_from_structure(structure: dict) -> str:
                     ["", "", "", ""]
                 )  # 4 blanks before h2 (total 5 with the one after)
 
-        last_part = section_key.split(".")[-1].replace("_", " ")
-        display_name = last_part[0].upper() + last_part[1:] if last_part else last_part
+        display_name = section_display_name(section_key)
         header_lines = create_section_header(display_name, is_subsection)
         lines.extend(header_lines)
         lines.append("")  # blank line after header
@@ -266,8 +280,7 @@ def dict_to_toml(data: dict) -> str:
                     ["", "", "", ""]
                 )  # 4 blanks before h2 (total 5 with the one after)
 
-        last_part = section_key.split(".")[-1].replace("_", " ")
-        display_name = last_part[0].upper() + last_part[1:] if last_part else last_part
+        display_name = section_display_name(section_key)
         header_lines = create_section_header(display_name, is_subsection)
         lines.extend(header_lines)
         lines.append("")  # blank line after header
