@@ -392,8 +392,8 @@ function M.build_management(ctx)
 	for _, ct in ipairs(type(state.custom_terminators) == "table" and state.custom_terminators or {}) do
 		if type(ct) ~= "table" or type(ct.char) ~= "string" or ct.char == "" then goto continue_ct end
 		local enabled_t = ctx.keymap and type(ctx.keymap.is_terminator_enabled) == "function" and ctx.keymap.is_terminator_enabled(ct.key) or false
-		local consume_sfx = ct.consume and " (consommé)" or ""
-		local ct_lbl = ct.char .. " : Personnalisé" .. consume_sfx
+		local consume_sfx = ct.consume and (" (" .. i18n.get("menu.hotstrings.consumed") .. ")") or ""
+		local ct_lbl = ct.char .. " : " .. i18n.get("menu.hotstrings.custom_label") .. consume_sfx
 
 		local ct_sub = {
 			{
@@ -401,11 +401,11 @@ function M.build_management(ctx)
 				disabled = paused or nil,
 				fn       = not paused and (function(k) return function()
 					local res = dialog.block_alert(
-						"Supprimer l’expanseur",
-						"Êtes-vous sûr de vouloir supprimer cet expanseur personnalisé ?",
-						"Supprimer", "Annuler"
+						i18n.get("dialog.hotstrings.delete_title"),
+						i18n.get("dialog.hotstrings.delete_body"),
+						i18n.get("button.delete"), i18n.get("button.cancel")
 					)
-					if res ~= "Supprimer" then return end
+					if res ~= i18n.get("button.delete") then return end
 					if ctx.keymap and type(ctx.keymap.remove_custom_terminator) == "function" then
 						pcall(ctx.keymap.remove_custom_terminator, k)
 					end
@@ -438,9 +438,9 @@ function M.build_management(ctx)
 			local char
 			while true do
 				local ok_p, btn, char_raw = pcall(dialog.text_prompt,
-					"Nouvel expanseur de mots",
-					"Saisissez le caractère déclencheur (un seul caractère) :",
-					"", "OK", "Annuler"
+					i18n.get("dialog.hotstrings.new_title"),
+					i18n.get("dialog.hotstrings.new_prompt"),
+					"", i18n.get("button.ok"), i18n.get("button.cancel")
 				)
 				if not ok_p or btn ~= "OK" or type(char_raw) ~= "string" then return end
 				-- Extract first UTF-8 character and check nothing follows
@@ -449,17 +449,17 @@ function M.build_management(ctx)
 					char = first
 					break
 				end
-				dialog.block_alert("Saisie invalide", "Veuillez saisir exactement un seul caractère.", "Réessayer")
+				dialog.block_alert(i18n.get("dialog.hotstrings.invalid_title"), i18n.get("dialog.hotstrings.invalid_body"), i18n.get("button.retry"))
 			end
 
 			-- 2. Ask consume behaviour (default: non consommé)
 			local consume_res = dialog.block_alert(
-				"Comportement du déclencheur",
-				"Voulez-vous que le caractère soit consommé (non tapé) lors de l’expansion ?",
-				"Non — taper le caractère", "Oui — consommer", "Annuler"
+				i18n.get("dialog.hotstrings.consume_title"),
+				i18n.get("dialog.hotstrings.consume_body"),
+				i18n.get("dialog.hotstrings.consume_no"), i18n.get("dialog.hotstrings.consume_yes"), i18n.get("button.cancel")
 			)
-			if consume_res == "Annuler" then return end
-			local consume = (consume_res == "Oui — consommer")
+			if consume_res == i18n.get("button.cancel") then return end
+			local consume = (consume_res == i18n.get("dialog.hotstrings.consume_yes"))
 
 			-- 3. Generate a unique key
 			local existing_keys = {}

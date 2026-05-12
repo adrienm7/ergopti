@@ -84,7 +84,7 @@ local function update_progress(current_index, total_files)
 	}
 
 	local percentage = total_files > 0 and (current_index / total_files) or 0
-	local ui_label = string.format("Traitement en cours : %d / %d", current_index, total_files)
+	local ui_label = string.format(i18n.get("dialog.metrics.progress_label"), current_index, total_files)
 
 	_prog_canvas:replaceElements({
 		{ type = "rectangle", action = "fill", fillColor = palette.bg_color, roundedRectRadii = { xRadius = 10, yRadius = 10 } },
@@ -113,12 +113,12 @@ local function process_files_with_ui(files_to_process, is_encrypt, password)
 			_prog_canvas = nil
 		end
 
-		local alert_msg = string.format("Opération terminée.\n\nFichiers traités avec succès : %d\nErreurs rencontrées : %d", success_count, error_count)
+		local alert_msg = string.format(i18n.get("dialog.metrics.complete_label"), success_count, error_count)
 		if has_bad_password then
-			alert_msg = alert_msg .. "\n\n⚠️ Attention : Échec de déchiffrement détecté. Le mot de passe est potentiellement incorrect."
+			alert_msg = alert_msg .. "\n\n" .. i18n.get("dialog.metrics.bad_password_warning")
 		end
 
-		dialog.block_alert("Encryptor", alert_msg, "OK")
+		dialog.block_alert("Encryptor", alert_msg, i18n.get("button.ok"))
 	end
 
 	local log_manager = require("modules.keylogger.log_manager")
@@ -460,7 +460,7 @@ function M.build(ctx)
 	-- =================================
 
 	table.insert(menu, {
-		title    = "Chiffrer les logs sur le disque (Sécurité)",
+		title    = i18n.get("menu.metrics.encrypt_toggle"),
 		checked  = state.keylogger_encrypt,
 		disabled = not state.keylogger_enabled,
 		fn = function()
@@ -470,11 +470,11 @@ function M.build(ctx)
 			if type(log_manager.get_mac_serial) == "function" then default_pwd = log_manager.get_mac_serial() end
 
 			if not state.keylogger_encrypt then
-				local alert_msg = "L’activation va chiffrer tous vos anciens logs pour qu’ils soient illisibles sur le disque.\n\nConfirmer ?"
-				local res = dialog.block_alert("Protection des données", alert_msg, "Chiffrer", "Annuler")
-				if res ~= "Chiffrer" then return end
+				local alert_msg = i18n.get("dialog.metrics.encrypt_confirm_body")
+				local res = dialog.block_alert(i18n.get("dialog.metrics.encrypt_confirm_title"), alert_msg, i18n.get("button.encrypt"), i18n.get("button.cancel"))
+				if res ~= i18n.get("button.encrypt") then return end
 
-				local ok_prompt, btn, pwd = pcall(dialog.text_prompt, "Clé de sécurité", "Veuillez définir la clé de chiffrement (par défaut: numéro de série du Mac) :", default_pwd, "OK", "Annuler")
+				local ok_prompt, btn, pwd = pcall(dialog.text_prompt, i18n.get("dialog.metrics.encrypt_key_title"), i18n.get("dialog.metrics.encrypt_key_prompt"), default_pwd, i18n.get("button.ok"), i18n.get("button.cancel"))
 				if not ok_prompt or btn ~= "OK" or type(pwd) ~= "string" or pwd == "" then return end
 
 				if type(log_manager.register_encryptor_app) == "function" then
@@ -501,11 +501,11 @@ function M.build(ctx)
 					process_files_with_ui(files_to_process, true, pwd)
 				end
 			else
-				local alert_msg = "Tous vos logs chiffrés vont être restaurés en clair sur le disque.\n\nConfirmer ?"
-				local res = dialog.block_alert("Désactivation", alert_msg, "Déchiffrer", "Annuler")
-				if res ~= "Déchiffrer" then return end
+				local alert_msg = i18n.get("dialog.metrics.decrypt_confirm_body")
+				local res = dialog.block_alert(i18n.get("dialog.metrics.decrypt_confirm_title"), alert_msg, i18n.get("button.decrypt"), i18n.get("button.cancel"))
+				if res ~= i18n.get("button.decrypt") then return end
 
-				local ok_prompt, btn, pwd = pcall(dialog.text_prompt, "Clé de sécurité", "Entrez la clé de sécurité nécessaire au déchiffrement :", default_pwd, "OK", "Annuler")
+				local ok_prompt, btn, pwd = pcall(dialog.text_prompt, i18n.get("dialog.metrics.encrypt_key_title"), i18n.get("dialog.metrics.decrypt_key_prompt"), default_pwd, i18n.get("button.ok"), i18n.get("button.cancel"))
 				if not ok_prompt or btn ~= "OK" or type(pwd) ~= "string" or pwd == "" then return end
 
 				local files_to_process = {}
@@ -538,7 +538,7 @@ function M.build(ctx)
 			if fs.attributes(app_path) then
 				hs.execute(string.format("open %q", app_path))
 			else
-				dialog.block_alert("Erreur", "L’application est introuvable. Veuillez d’abord générer l’application avec le script Python.", "OK")
+				dialog.block_alert(i18n.get("dialog.metrics.encryptor_error_title"), i18n.get("dialog.metrics.encryptor_error_body"), i18n.get("button.ok"))
 			end
 		end
 	})
@@ -548,9 +548,9 @@ function M.build(ctx)
 		checked = state.keylogger_enabled,
 		fn      = function()
 			if not state.keylogger_enabled then
-			local warnMsg = "⚠️  ATTENTION : Métriques et keylogger vont être activés.\n\nCe système enregistre vos frappes au clavier et l'activation des gestes trackpad.\n\n• Les logs sont stockés dans le dossier Hammerspoon\n• Les champs de mots de passe sont ignorés automatiquement\n• Il est recommandé de mettre le script en PAUSE lors de la saisie de données sensibles\n\nPour éviter les interférences avec vos gestes personnalisés :\n• Supprimez les gestes macOS pour swipe 3/4 doigts si utilisés\n• Désactivez mission control et app exposé via gestes"
-			local res = dialog.block_alert("Avertissement Sécurité & Gestes", warnMsg, "Activer", "Annuler", "warning")
-				if res ~= "Activer" then return end
+			local warnMsg = i18n.get("dialog.metrics.security_warning_body")
+			local res = dialog.block_alert(i18n.get("dialog.metrics.security_warning_title"), warnMsg, i18n.get("button.activate"), i18n.get("button.cancel"), "warning")
+				if res ~= i18n.get("button.activate") then return end
 			end
 
 			state.keylogger_enabled = not state.keylogger_enabled

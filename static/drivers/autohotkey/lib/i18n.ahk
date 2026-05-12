@@ -55,13 +55,10 @@ global _I18nCacheLoaded := false
 ; =============================================
 
 ; Resolve the absolute path to a locale JSON file given a locale code.
-; Walks up from A_ScriptDir (static/drivers/autohotkey) to static/, then
-; descends into locales/.
+; Uses _StaticDir (computed in ErgoptiPlus.ahk) to reach static/locales/.
 _I18nLocalePath(Code) {
-	; A_ScriptDir = .../static/drivers/autohotkey
-	SplitPath(A_ScriptDir, , &DriversDir)   ; .../static/drivers
-	SplitPath(DriversDir, , &StaticDir)     ; .../static
-	return StaticDir . "\locales\" . Code . ".json"
+	global _StaticDir
+	return _StaticDir . "\locales\" . Code . ".json"
 }
 
 ; Parse the JSON file at FilePath and populate _I18nCache. Substitutes ★ with
@@ -197,8 +194,9 @@ I18nBuildLanguageMenu(LangMenu) {
 	for Loc in I18N_LOCALES {
 		; Capture loop variable for the closure
 		LocCode := Loc.Code
-		Label   := Loc.Flag . " " . Loc.Name
-		LangMenu.Add(Label, (_) => I18nSetLocale(LocCode))
+		; Windows does not render country flag emoji in menus — use uppercase code as prefix
+		Label   := "[" . StrUpper(Loc.Code) . "] " . Loc.Name
+		LangMenu.Add(Label, (*) => I18nSetLocale(LocCode))
 		if Loc.Code == _I18nLocale
 			LangMenu.Check(Label)
 	}

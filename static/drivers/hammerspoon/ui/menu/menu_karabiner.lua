@@ -413,19 +413,18 @@ local function build_delay_item(karabiner, update_menu)
 	local timeout_ms = karabiner.get_tap_hold_timeout()
 
 	return {
-		title = string.format("Délai tap / hold : %s", fmt_delay(timeout_ms)),
+		title = string.format(i18n.get("menu.karabiner.tap_hold_title"), fmt_delay(timeout_ms)),
 		fn    = function()
 			-- Bring Hammerspoon to front so the dialog appears above other windows
 			hs.focus()
+			local prompt = string.format(i18n.get("menu.karabiner.tap_hold_dialog_prompt"), karabiner.DEFAULT_TAP_HOLD_TIMEOUT_MS)
+			local title_d = i18n.get("menu.karabiner.tap_hold_dialog_title")
+			local btn_ok = i18n.get("button.ok")
+			local btn_cancel = i18n.get("button.cancel")
 			local script = string.format(
-				"display dialog \"Délai tap / hold en millisecondes\\n"
-				.. "(défaut Karabiner : %d ms)\" "
-				.. "default answer \"%d\" "
-				.. "with title \"Karabiner — Délai tap / hold\" "
-				.. "buttons {\"Annuler\", \"OK\"} "
-				.. "default button \"OK\"",
-				karabiner.DEFAULT_TAP_HOLD_TIMEOUT_MS,
-				timeout_ms or karabiner.DEFAULT_TAP_HOLD_TIMEOUT_MS
+				"display dialog %q default answer \"%d\" with title %q buttons {%q, %q} default button %q",
+				prompt, timeout_ms or karabiner.DEFAULT_TAP_HOLD_TIMEOUT_MS,
+				title_d, btn_cancel, btn_ok, btn_ok
 			)
 			local ok, result = hs.osascript.applescript(script)
 			Logger.debug(LOG, "Delay input dialog: ok=%s result=%s.", tostring(ok), hs.inspect(result))
@@ -450,17 +449,17 @@ local function build_sticky_delay_item(karabiner, update_menu)
 	local timeout_ms = karabiner.get_sticky_timeout()
 
 	return {
-		title = string.format("Délai modificateur sticky : %s", fmt_delay(timeout_ms)),
+		title = string.format(i18n.get("menu.karabiner.sticky_title"), fmt_delay(timeout_ms)),
 		fn    = function()
 			hs.focus()
+			local prompt = i18n.get("menu.karabiner.sticky_dialog_prompt")
+			local title_d = i18n.get("menu.karabiner.sticky_dialog_title")
+			local btn_ok = i18n.get("button.ok")
+			local btn_cancel = i18n.get("button.cancel")
 			local script = string.format(
-				"display dialog \"Délai d’annulation sticky (millisecondes)\\n"
-				.. "Après ce délai sans frappe, le modificateur one-shot est annulé.\" "
-				.. "default answer \"%d\" "
-				.. "with title \"Karabiner — Délai sticky\" "
-				.. "buttons {\"Annuler\", \"OK\"} "
-				.. "default button \"OK\"",
-				timeout_ms or karabiner.DEFAULT_STICKY_TIMEOUT_MS
+				"display dialog %q default answer \"%d\" with title %q buttons {%q, %q} default button %q",
+				prompt, timeout_ms or karabiner.DEFAULT_STICKY_TIMEOUT_MS,
+				title_d, btn_cancel, btn_ok, btn_ok
 			)
 			local ok, result = hs.osascript.applescript(script)
 			Logger.debug(LOG, "Sticky delay input: ok=%s result=%s.", tostring(ok), hs.inspect(result))
@@ -486,20 +485,17 @@ local function build_simultaneous_threshold_item(karabiner, update_menu)
 	local threshold_ms = karabiner.get_simultaneous_threshold()
 
 	return {
-		title = string.format("Délai d’activation des combos : %s", fmt_delay(threshold_ms)),
+		title = string.format(i18n.get("menu.karabiner.simultaneous_title"), fmt_delay(threshold_ms)),
 		fn    = function()
 			hs.focus()
+			local prompt = string.format(i18n.get("menu.karabiner.simultaneous_dialog_prompt"), karabiner.DEFAULT_SIMULTANEOUS_THRESHOLD_MS)
+			local title_d = i18n.get("menu.karabiner.simultaneous_dialog_title")
+			local btn_ok = i18n.get("button.ok")
+			local btn_cancel = i18n.get("button.cancel")
 			local script = string.format(
-				"display dialog \"Délai maximal (en millisecondes) entre la 1re\\n"
-				.. "et la 2e touche d’un raccourci pour déclencher le slot \\\"Combo\\\"\\n"
-				.. "(activation de type accord : touches pressées quasi en même temps).\\n\\n"
-				.. "(défaut : %d ms)\" "
-				.. "default answer \"%d\" "
-				.. "with title \"Karabiner — Délai d’activation des combos\" "
-				.. "buttons {\"Annuler\", \"OK\"} "
-				.. "default button \"OK\"",
-				karabiner.DEFAULT_SIMULTANEOUS_THRESHOLD_MS,
-				threshold_ms or karabiner.DEFAULT_SIMULTANEOUS_THRESHOLD_MS
+				"display dialog %q default answer \"%d\" with title %q buttons {%q, %q} default button %q",
+				prompt, threshold_ms or karabiner.DEFAULT_SIMULTANEOUS_THRESHOLD_MS,
+				title_d, btn_cancel, btn_ok, btn_ok
 			)
 			local ok, result = hs.osascript.applescript(script)
 			Logger.debug(LOG, "Simultaneous threshold input: ok=%s result=%s.", tostring(ok), hs.inspect(result))
@@ -582,15 +578,15 @@ function M.build(ctx)
 	-- 🔴 integration disabled in our config (independent of KE state).
 	local status_title
 	if active then
-		status_title = "🟢 Karabiner actif"
+		status_title = i18n.get("menu.karabiner.status_active")
 	elseif priming then
-		status_title = "🔵 Karabiner — amorçage en cours…"
+		status_title = i18n.get("menu.karabiner.status_priming")
 	elseif enabled and grabber_only then
-		status_title = "🟡 Karabiner activé — règles non appliquées (cliquer pour amorcer)"
+		status_title = i18n.get("menu.karabiner.status_not_primed")
 	elseif enabled then
-		status_title = "🟡 Karabiner activé — daemon non détecté (KE installé ?)"
+		status_title = i18n.get("menu.karabiner.status_no_daemon")
 	else
-		status_title = "🔴 Karabiner inactif — cliquer pour relancer"
+		status_title = i18n.get("menu.karabiner.status_inactive")
 	end
 
 	local submenu = {}
@@ -628,11 +624,11 @@ function M.build(ctx)
 		fn    = status_fn,
 	}
 	submenu[#submenu + 1] = {
-		title = "Ouvrir Karabiner-Elements",
+		title = i18n.get("menu.karabiner.open_gui"),
 		fn    = function() karabiner.open_gui() end,
 	}
 	submenu[#submenu + 1] = {
-		title    = "▶ Démarrer Karabiner",
+		title    = i18n.get("menu.karabiner.start"),
 		-- Force a fresh prime even if the session marker already exists.
 		-- Useful when the daemon was killed manually or by macOS.
 		disabled = bridge_live,
@@ -645,7 +641,7 @@ function M.build(ctx)
 		end,
 	}
 	submenu[#submenu + 1] = {
-		title    = "✕ Quitter Karabiner",
+		title    = i18n.get("menu.karabiner.stop"),
 		-- Grayed when bridge is not running — nothing to stop.
 		disabled = not bridge_live,
 		fn       = function()
@@ -666,19 +662,19 @@ function M.build(ctx)
 	-- stop its remappings — our toggle alone does not kill the process.
 	if not enabled and grabber_only then
 		submenu[#submenu + 1] = {
-			title    = "⚠️  Menu désactivé mais Karabiner tourne encore.",
+			title    = i18n.get("menu.karabiner.disabled_warning_1"),
 			disabled = true,
 		}
 		submenu[#submenu + 1] = {
-			title    = "      Les remappages sont donc toujours actifs.",
+			title    = i18n.get("menu.karabiner.disabled_warning_2"),
 			disabled = true,
 		}
 		submenu[#submenu + 1] = {
-			title    = "      Pour tout stopper : cliquer sur 🟢 ci-dessus,",
+			title    = i18n.get("menu.karabiner.disabled_warning_3"),
 			disabled = true,
 		}
 		submenu[#submenu + 1] = {
-			title    = "      et retirer Karabiner des apps au démarrage.",
+			title    = i18n.get("menu.karabiner.disabled_warning_4"),
 			disabled = true,
 		}
 	end
@@ -689,7 +685,7 @@ function M.build(ctx)
 	-- Management actions: clear-all first (destructive reset), then restore defaults,
 	-- then the tap→combo propagation helper.
 	submenu[#submenu + 1] = {
-		title = "🧹 Tout vider (tap/hold et raccourcis)",
+		title = i18n.get("menu.karabiner.clear_all"),
 		fn    = function()
 			Logger.start(LOG, "Clearing every tap/hold and combo slot…")
 			local cleared = 0
@@ -710,7 +706,7 @@ function M.build(ctx)
 		end,
 	}
 	submenu[#submenu + 1] = {
-		title = "↩ Restaurer les valeurs par défaut",
+		title = i18n.get("menu.karabiner.restore_defaults"),
 		fn    = function()
 			pcall(karabiner.reset_to_defaults)
 			pcall(karabiner.regenerate)

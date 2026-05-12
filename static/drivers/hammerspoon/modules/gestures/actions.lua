@@ -1,4 +1,4 @@
---- modules/gestures/actions.lua
+﻿--- modules/gestures/actions.lua
 
 --- ==============================================================================
 --- MODULE: Gestures Actions Registry
@@ -61,13 +61,13 @@ local AX = {} -- Axis actions (continuous/scalable)
 local SG = {} -- Single actions (discrete)
 
 --- Registers an axis-based action (scalable).
-local function ax(name, label, prev_fn, next_fn, scalable)
-	AX[name] = { label = label, prev = prev_fn, next = next_fn, scalable = scalable }
+local function ax(name, prev_fn, next_fn, scalable)
+	AX[name] = { prev = prev_fn, next = next_fn, scalable = scalable }
 end
 
 --- Registers a discrete single-fire action.
-local function sg(name, label, fn)
-	SG[name] = { label = label, fn = fn }
+local function sg(name, fn)
+	SG[name] = { fn = fn }
 end
 
 --- Switch to the previous application in the MRU list.
@@ -281,182 +281,182 @@ local CMD_LETTERS = {
 }
 
 -- Axis actions (prev / next)
-ax("tabs",       "⧉ Onglets",
+ax("tabs",       
 	function() pcall(hs.eventtap.keyStroke, {"ctrl", "shift"}, "tab") end,
 	function() pcall(hs.eventtap.keyStroke, {"ctrl"}, "tab") end, true)
 
-ax("char",       "A Lettres",
+ax("char",       
 	function() postKeyStroke({}, "left") end,
 	function() postKeyStroke({}, "right") end, true)
 
-ax("char_sel",   "✎ A Sél. Lettres",
+ax("char_sel",   
 	function() postKeyStroke({"shift"}, "left") end,
 	function() postKeyStroke({"shift"}, "right") end, true)
 
-ax("line_arrow", "↕ Lignes (Flèches)",
+ax("line_arrow", 
 	function() postKeyStroke({}, "up") end,
 	function() postKeyStroke({}, "down") end, true)
 
-ax("line_sel",   "✎ ↕ Sél. Lignes",
+ax("line_sel",   
 	function() postKeyStroke({"shift"}, "up") end,
 	function() postKeyStroke({"shift"}, "down") end, true)
 
-ax("words",      "W Mots",
+ax("words",      
 	function() postKeyStroke({"alt"}, "left") end,
 	function() postKeyStroke({"alt"}, "right") end, true)
 
-ax("words_sel",  "✎ W Sél. Mots",
+ax("words_sel",  
 	function() postKeyStroke({"shift", "alt"}, "left") end,
 	function() postKeyStroke({"shift", "alt"}, "right") end, true)
 
-ax("windows",    "◱ Fenêtres",
+ax("windows",    
 	function() winNav(false) end, 
 	function() winNav(true) end)
 
-ax("spaces",     "▢ Spaces",
+ax("spaces",     
 	function() spaceNav(false) end, 
 	function() spaceNav(true) end)
 
-ax("volume",     "🔊 Volume",
+ax("volume",     
 	function() sysKey("SOUND_DOWN") end, 
 	function() sysKey("SOUND_UP") end, true)
 
-ax("brightness", "☀ Luminosité",
+ax("brightness", 
 	function() sysKey("BRIGHTNESS_DOWN") end, 
 	function() sysKey("BRIGHTNESS_UP") end, true)
 
-ax("tracks",     "♫ Pistes",
+ax("tracks",     
 	function() sysKey("PREVIOUS") end, 
 	function() sysKey("NEXT") end)
 
-ax("lines",      "↕ Lignes (Alt)",
+ax("lines",      
 	function() hs.timer.doAfter(0, function() pcall(hs.eventtap.keyStroke, {"alt"}, "up") end) end,
 	function() hs.timer.doAfter(0, function() pcall(hs.eventtap.keyStroke, {"alt"}, "down") end) end, true)
 
-ax("line_bounds","↔ Ligne (début/fin)",
+ax("line_bounds",
 	function() hs.timer.doAfter(0, function() pcall(hs.eventtap.keyStroke, {"cmd"}, "left") end) end,
 	function() hs.timer.doAfter(0, function() pcall(hs.eventtap.keyStroke, {"cmd"}, "right") end) end)
 
-ax("paragraphs", "¶ Paragraphes",
+ax("paragraphs", 
 	function() pcall(hs.eventtap.keyStroke, {"alt"}, "up") end,
 	function() pcall(hs.eventtap.keyStroke, {"alt"}, "down") end, true)
 
-ax("document",   "📄 Document (début/fin)",
+ax("document",   
 	function() pcall(hs.eventtap.keyStroke, {"cmd"}, "up") end,
 	function() pcall(hs.eventtap.keyStroke, {"cmd"}, "down") end)
 
 -- Single actions
-sg("none",             "∅ Désactivé",            function() end)
+sg("none",                         function() end)
 
 -- Selection & navigation cursor
-sg("left_click_toggle",  "🖱 L Clic gauche (maint.)", M.toggle_left_click)
-sg("right_click_toggle", "🖱 R Clic droit (maint.)",  M.toggle_right_click)
-sg("lookup",           "🔍 Définition du mot",    M.trigger_lookup)
-sg("app_switcher",     "⇥ Alt+Tab — Liste apps", show_application_switcher_overlay)
-sg("app_previous",     "⇥ ← Alt+Tab — App préc.", switch_to_previous_application)
-sg("app_window_previous", "⇥ ◱ ← Alt+Tab — Fenêtre préc.", switch_to_previous_window_precise)
+sg("left_click_toggle",   M.toggle_left_click)
+sg("right_click_toggle",   M.toggle_right_click)
+sg("lookup",               M.trigger_lookup)
+sg("app_switcher",      show_application_switcher_overlay)
+sg("app_previous",      switch_to_previous_application)
+sg("app_window_previous",  switch_to_previous_window_precise)
 
 -- Keys
-sg("enter",            "↵ Entrée",               function() pcall(hs.eventtap.keyStroke, {}, "return") end)
-sg("tab",              "⇥ Tab",                  function() pcall(hs.eventtap.keyStroke, {}, "tab") end)
-sg("escape",           "⎋ Échap",                function() pcall(hs.eventtap.keyStroke, {}, "escape") end)
-sg("backspace",        "⌫ Suppr. arrière",       function() pcall(hs.eventtap.keyStroke, {}, "delete") end)
-sg("delete",           "⌦ Suppr. avant",         function() pcall(hs.eventtap.keyStroke, {}, "forwarddelete") end)
+sg("enter",                           function() pcall(hs.eventtap.keyStroke, {}, "return") end)
+sg("tab",                                function() pcall(hs.eventtap.keyStroke, {}, "tab") end)
+sg("escape",                           function() pcall(hs.eventtap.keyStroke, {}, "escape") end)
+sg("backspace",               function() pcall(hs.eventtap.keyStroke, {}, "delete") end)
+sg("delete",                    function() pcall(hs.eventtap.keyStroke, {}, "forwarddelete") end)
 
 -- Tabs
-sg("tab_new",          "⧉ + Nouvel onglet",        function() pcall(hs.eventtap.keyStroke, {"cmd"}, "t") end)
-sg("tab_close",        "⧉ × Fermer onglet",        function() pcall(hs.eventtap.keyStroke, {"cmd"}, "w") end)
-sg("tab_prev",         "⧉ ← Onglet précédent",     function() pcall(hs.eventtap.keyStroke, {"ctrl", "shift"}, "tab") end)
-sg("tab_next",         "⧉ → Onglet suivant",       function() pcall(hs.eventtap.keyStroke, {"ctrl"}, "tab") end)
+sg("tab_new",                  function() pcall(hs.eventtap.keyStroke, {"cmd"}, "t") end)
+sg("tab_close",                function() pcall(hs.eventtap.keyStroke, {"cmd"}, "w") end)
+sg("tab_prev",              function() pcall(hs.eventtap.keyStroke, {"ctrl", "shift"}, "tab") end)
+sg("tab_next",                function() pcall(hs.eventtap.keyStroke, {"ctrl"}, "tab") end)
 
 -- Windows & Spaces
-sg("win_prev",         "◱ ← Fenêtre précédente",   function() winNav(false) end)
-sg("win_next",         "◱ → Fenêtre suivante",     function() winNav(true) end)
-sg("close_window",     "◱ × Fermer la fenêtre",    function() pcall(hs.eventtap.keyStroke, {"cmd"}, "w") end)
-sg("fullscreen",       "📺 Plein écran",          function() pcall(hs.eventtap.keyStroke, {"cmd", "ctrl"}, "f") end)
-sg("snap_left",        "◧ ← Ancrer à gauche",      function()
+sg("win_prev",            function() winNav(false) end)
+sg("win_next",              function() winNav(true) end)
+sg("close_window",         function() pcall(hs.eventtap.keyStroke, {"cmd"}, "w") end)
+sg("fullscreen",                 function() pcall(hs.eventtap.keyStroke, {"cmd", "ctrl"}, "f") end)
+sg("snap_left",              function()
 	local win = hs.window.focusedWindow()
 	if win then pcall(function() win:moveToUnit(hs.layout.left50) end) end
 end)
-sg("snap_right",       "◨ → Ancrer à droite",      function()
+sg("snap_right",             function()
 	local win = hs.window.focusedWindow()
 	if win then pcall(function() win:maximize() end) end
 end)
-sg("maximize",         "🔲 Maximiser",            function()
+sg("maximize",                     function()
 	local win = hs.window.focusedWindow()
 	if win then pcall(function() win:maximize() end) end
 end)
-sg("space_prev",       "▢ ← Space précédent",      function() spaceNav(false) end)
-sg("space_next",       "▢ → Space suivant",        function() spaceNav(true) end)
-sg("mission_control",  "▢ Mission Control",      function() pcall(hs.osascript.applescript, "tell application \"System Events\" to key code 160") end)
-sg("app_expose",       "◱ App Exposé",           function() pcall(hs.osascript.applescript, "tell application \"System Events\" to key code 125 using {control down}") end)
+sg("space_prev",             function() spaceNav(false) end)
+sg("space_next",               function() spaceNav(true) end)
+sg("mission_control",        function() pcall(hs.osascript.applescript, "tell application \"System Events\" to key code 160") end)
+sg("app_expose",                  function() pcall(hs.osascript.applescript, "tell application \"System Events\" to key code 125 using {control down}") end)
 
 -- Cursor movement
-sg("word_prev",        "W ← Mot précédent",        function() postKeyStroke({"alt"}, "left") end)
-sg("word_next",        "W → Mot suivant",          function() postKeyStroke({"alt"}, "right") end)
-sg("line_up",          "↕ ↑ Ligne précédente",     function() hs.timer.doAfter(0, function() pcall(hs.eventtap.keyStroke, {"alt"}, "up") end) end)
-sg("line_down",        "↕ ↓ Ligne suivante",       function() hs.timer.doAfter(0, function() pcall(hs.eventtap.keyStroke, {"alt"}, "down") end) end)
-sg("line_start",       "⇤ Début de ligne",       function() hs.timer.doAfter(0, function() pcall(hs.eventtap.keyStroke, {"cmd"}, "left") end) end)
-sg("line_end",         "⇥ Fin de ligne",         function() hs.timer.doAfter(0, function() pcall(hs.eventtap.keyStroke, {"cmd"}, "right") end) end)
-sg("para_prev",        "¶ ↑ Paragraphe précédent", function() pcall(hs.eventtap.keyStroke, {"alt"}, "up") end)
-sg("para_next",        "¶ ↓ Paragraphe suivant",   function() pcall(hs.eventtap.keyStroke, {"alt"}, "down") end)
-sg("doc_start",        "⤒ Début du document",    function() pcall(hs.eventtap.keyStroke, {"cmd"}, "up") end)
-sg("doc_end",          "⤓ Fin du document",      function() pcall(hs.eventtap.keyStroke, {"cmd"}, "down") end)
+sg("word_prev",                function() postKeyStroke({"alt"}, "left") end)
+sg("word_next",                  function() postKeyStroke({"alt"}, "right") end)
+sg("line_up",               function() hs.timer.doAfter(0, function() pcall(hs.eventtap.keyStroke, {"alt"}, "up") end) end)
+sg("line_down",               function() hs.timer.doAfter(0, function() pcall(hs.eventtap.keyStroke, {"alt"}, "down") end) end)
+sg("line_start",              function() hs.timer.doAfter(0, function() pcall(hs.eventtap.keyStroke, {"cmd"}, "left") end) end)
+sg("line_end",                  function() hs.timer.doAfter(0, function() pcall(hs.eventtap.keyStroke, {"cmd"}, "right") end) end)
+sg("para_prev",         function() pcall(hs.eventtap.keyStroke, {"alt"}, "up") end)
+sg("para_next",           function() pcall(hs.eventtap.keyStroke, {"alt"}, "down") end)
+sg("doc_start",            function() pcall(hs.eventtap.keyStroke, {"cmd"}, "up") end)
+sg("doc_end",                function() pcall(hs.eventtap.keyStroke, {"cmd"}, "down") end)
 
 -- Media
-sg("vol_up",           "🔊 + Volume +",             function() sysKey("SOUND_UP") end)
-sg("vol_down",         "🔊 - Volume -",             function() sysKey("SOUND_DOWN") end)
-sg("mute",             "🔇 Muet/Unmute",          function() sysKey("MUTE") end)
-sg("brightness_up",    "☀ + Luminosité +",         function() sysKey("BRIGHTNESS_UP") end)
-sg("brightness_down",  "☀ - Luminosité -",         function() sysKey("BRIGHTNESS_DOWN") end)
-sg("track_play",       "⏯ Lecture/Pause",        function() sysKey("PLAY") end)
-sg("track_next",       "⏭ Piste suivante",       function() sysKey("NEXT") end)
-sg("track_prev",       "⏮ Piste précédente",     function() sysKey("PREVIOUS") end)
+sg("vol_up",                        function() sysKey("SOUND_UP") end)
+sg("vol_down",                      function() sysKey("SOUND_DOWN") end)
+sg("mute",                       function() sysKey("MUTE") end)
+sg("brightness_up",             function() sysKey("BRIGHTNESS_UP") end)
+sg("brightness_down",           function() sysKey("BRIGHTNESS_DOWN") end)
+sg("track_play",               function() sysKey("PLAY") end)
+sg("track_next",              function() sysKey("NEXT") end)
+sg("track_prev",            function() sysKey("PREVIOUS") end)
 
 -- Single arrows
-sg("arrow_up",         "↑ Flèche Haut",          function() postKeyStroke({}, "up") end)
-sg("arrow_down",       "↓ Flèche Bas",           function() postKeyStroke({}, "down") end)
-sg("arrow_left",       "← Flèche Gauche",        function() postKeyStroke({}, "left") end)
-sg("arrow_right",      "→ Flèche Droite",        function() postKeyStroke({}, "right") end)
+sg("arrow_up",                   function() postKeyStroke({}, "up") end)
+sg("arrow_down",                  function() postKeyStroke({}, "down") end)
+sg("arrow_left",               function() postKeyStroke({}, "left") end)
+sg("arrow_right",              function() postKeyStroke({}, "right") end)
 
 -- Shift + Arrows
-sg("sel_up",           "✎ ↑ Sélection Haut",       function() postKeyStroke({"shift"}, "up") end)
-sg("sel_down",         "✎ ↓ Sélection Bas",        function() postKeyStroke({"shift"}, "down") end)
-sg("sel_left",         "✎ ← Sélection Gauche",     function() postKeyStroke({"shift"}, "left") end)
-sg("sel_right",        "✎ → Sélection Droite",     function() postKeyStroke({"shift"}, "right") end)
+sg("sel_up",                  function() postKeyStroke({"shift"}, "up") end)
+sg("sel_down",                 function() postKeyStroke({"shift"}, "down") end)
+sg("sel_left",              function() postKeyStroke({"shift"}, "left") end)
+sg("sel_right",             function() postKeyStroke({"shift"}, "right") end)
 
 -- Shift + Alt + Arrows (Word selection)
-sg("sel_word_prev",    "✎ W ← Sél. Mot préc.", function() postKeyStroke({"shift", "alt"}, "left") end)
-sg("sel_word_next",    "✎ W → Sél. Mot suiv.",   function() postKeyStroke({"shift", "alt"}, "right") end)
+sg("sel_word_prev",     function() postKeyStroke({"shift", "alt"}, "left") end)
+sg("sel_word_next",       function() postKeyStroke({"shift", "alt"}, "right") end)
 
 -- System
-sg("screenshot_window_clipboard",    "📸 ⊞ Copier fenêtre", function() pcall(hs.execute, "screencapture -cw") end)
-sg("screenshot_window_save",         "📸 ⊞ Sauver fenêtre", function() pcall(hs.execute, "screencapture -w ~/Pictures/screenshots/win_$(date +%Y%m%d%H%M%S).png") end)
-sg("screenshot_region_clipboard",    "📸 ⬚ Copier région",  function() pcall(hs.execute, "screencapture -ci") end)
-sg("screenshot_region_save",         "📸 ⬚ Sauver région",  function() pcall(hs.execute, "screencapture -i ~/Pictures/screenshots/reg_$(date +%Y%m%d%H%M%S).png") end)
-sg("screenshot_fullscreen_clipboard","📸 🖥 Copier écran",   function() pcall(hs.execute, "screencapture -c") end)
-sg("screenshot_fullscreen_save",     "📸 🖥 Sauver écran",   function() pcall(hs.execute, "screencapture ~/Pictures/screenshots/full_$(date +%Y%m%d%H%M%S).png") end)
+sg("screenshot_window_clipboard",     function() pcall(hs.execute, "screencapture -cw") end)
+sg("screenshot_window_save",          function() pcall(hs.execute, "screencapture -w ~/Pictures/screenshots/win_$(date +%Y%m%d%H%M%S).png") end)
+sg("screenshot_region_clipboard",      function() pcall(hs.execute, "screencapture -ci") end)
+sg("screenshot_region_save",           function() pcall(hs.execute, "screencapture -i ~/Pictures/screenshots/reg_$(date +%Y%m%d%H%M%S).png") end)
+sg("screenshot_fullscreen_clipboard",   function() pcall(hs.execute, "screencapture -c") end)
+sg("screenshot_fullscreen_save",        function() pcall(hs.execute, "screencapture ~/Pictures/screenshots/full_$(date +%Y%m%d%H%M%S).png") end)
 
-sg("lock_screen",           "🔒 Verrouiller",         function() pcall(hs.caffeinate.lockScreen) end)
-sg("notification_center",   "🔔 Notifications",       function() pcall(hs.osascript.applescript, "tell application \"System Events\" to click menu bar item \"Notification Center\" of menu bar 1 of application process \"ControlCenter\"") end)
+sg("lock_screen",                    function() pcall(hs.caffeinate.lockScreen) end)
+sg("notification_center",          function() pcall(hs.osascript.applescript, "tell application \"System Events\" to click menu bar item \"Notification Center\" of menu bar 1 of application process \"ControlCenter\"") end)
 
 -- Applications and Stats
-sg("open_metrics_typing",    "📊 Stats Frappe",        function() pcall(function() require("ui.metrics_overlay").toggle("typing") end) end)
-sg("open_metrics_apps",      "📊 Stats Applications",  function() pcall(function() require("ui.metrics_overlay").toggle("apps") end) end)
-sg("open_hotstrings_editor", "⌨ Éditeur Hotstrings",   function() pcall(function() require("ui.hotstrings_editor").show() end) end)
-sg("open_paths_editor",      "📂 Éditeur Chemins",      function() pcall(function() require("ui.paths_editor").show() end) end)
-sg("open_script_source",     "🛠 Code Source",          function() pcall(hs.execute, string.format("open %q", hs.configdir)) end)
-sg("open_personal_shortcuts","👤 Raccourcis perso",     function() pcall(hs.execute, string.format("open %q/personal_shortcuts.toml", hs.configdir)) end)
-sg("open_personal_hotstrings","👤 Hotstrings perso",    function()
+sg("open_metrics_typing",            function() pcall(function() require("ui.metrics_overlay").toggle("typing") end) end)
+sg("open_metrics_apps",        function() pcall(function() require("ui.metrics_overlay").toggle("apps") end) end)
+sg("open_hotstrings_editor",    function() pcall(function() require("ui.hotstrings_editor").show() end) end)
+sg("open_paths_editor",            function() pcall(function() require("ui.paths_editor").show() end) end)
+sg("open_script_source",               function() pcall(hs.execute, string.format("open %q", hs.configdir)) end)
+sg("open_personal_shortcuts",     function() pcall(hs.execute, string.format("open %q/personal_shortcuts.toml", hs.configdir)) end)
+sg("open_personal_hotstrings",    function()
 	local ok_mp, mp = pcall(require, "ui.menu.menu_paths")
 	local p = ok_mp and type(mp.get) == "function" and mp.get("PersonalTomlPath")
 	if p and p ~= "" then pcall(hs.execute, string.format("open %q", p))
 	else pcall(hs.execute, string.format("open %q/hotstrings/personal_hotstrings.toml", hs.configdir)) end
 end)
-sg("open_personal_info",     "👤 Infos perso",          function() pcall(hs.execute, string.format("open %q/personal_info.toml", hs.configdir)) end)
-sg("open_config",            "⚙ Configuration",        function() pcall(hs.execute, string.format("open %q/config.toml", hs.configdir)) end)
-sg("open_logs_folder",       "📁 Dossier Logs",         function() pcall(hs.execute, string.format("open %q/logs", hs.configdir)) end)
-sg("open_today_log",         "📄 Log du jour",          function()
+sg("open_personal_info",               function() pcall(hs.execute, string.format("open %q/personal_info.toml", hs.configdir)) end)
+sg("open_config",                    function() pcall(hs.execute, string.format("open %q/config.toml", hs.configdir)) end)
+sg("open_logs_folder",                function() pcall(hs.execute, string.format("open %q/logs", hs.configdir)) end)
+sg("open_today_log",                   function()
 	local ok_p, path = pcall(function()
 		local ok_u, utils = pcall(require, "lib.utils")
 		if ok_u and type(utils.get_logs_dir) == "function" then
@@ -468,22 +468,22 @@ sg("open_today_log",         "📄 Log du jour",          function()
 end)
 
 -- Script management
-sg("script_pause_toggle",    "⏸/▶ Suspendre / Reprendre", function()
+sg("script_pause_toggle",     function()
 	local ok, sc = pcall(require, "modules.shortcuts.script_control")
 	if ok and type(sc.toggle) == "function" then pcall(sc.toggle) end
 end)
-sg("script_reload",          "↻ Recharger",             function() pcall(hs.reload) end)
-sg("script_save_reload",     "↻ Sauver et recharger", function()
+sg("script_reload",                       function() pcall(hs.reload) end)
+sg("script_save_reload",      function()
 	pcall(hs.eventtap.keyStroke, {"cmd"}, "s")
 	hs.timer.doAfter(0.3, function() pcall(hs.reload) end)
 end)
-sg("script_quit",            "✕ Quitter",             function()
+sg("script_quit",                         function()
 	pcall(function() hs.closeConsole() end)
 	pcall(function() hs.timer.doAfter(0.1, function() os.exit(0) end) end)
 end)
 
 -- Debug
-sg("open_console",           "▤ Console",             function() pcall(hs.openConsole) end)
+sg("open_console",                        function() pcall(hs.openConsole) end)
 
 -- Cmd letter shortcuts
 for _, letter in ipairs(CMD_LETTERS) do
@@ -539,9 +539,9 @@ local HS_SPECIAL_KEYS = {
 	{id = "comma",  key = ",",      label = "Virgule"},
 }
 for _, sk in ipairs(HS_SPECIAL_KEYS) do
-	sg("cmd_"       .. sk.id, "⌘ "  .. sk.label .. " — Cmd+"    .. sk.label, function() pcall(hs.eventtap.keyStroke, {"cmd"},  sk.key) end)
-	sg("hs_ctrl_"   .. sk.id, "^ "  .. sk.label .. " — Ctrl+"   .. sk.label, function() pcall(hs.eventtap.keyStroke, {"ctrl"}, sk.key) end)
-	sg("hs_option_" .. sk.id, "⌥ "  .. sk.label .. " — Option+" .. sk.label, function() pcall(hs.eventtap.keyStroke, {"alt"},  sk.key) end)
+	sg("cmd_"       .. sk.id, function() pcall(hs.eventtap.keyStroke, {"cmd"},  sk.key) end)
+	sg("hs_ctrl_"   .. sk.id, function() pcall(hs.eventtap.keyStroke, {"ctrl"}, sk.key) end)
+	sg("hs_option_" .. sk.id, function() pcall(hs.eventtap.keyStroke, {"alt"},  sk.key) end)
 end
 
 
@@ -772,9 +772,7 @@ function M.get_label(name)
 	local key_ax = "ax_actions." .. name
 	local t_ax = i18n.get(key_ax)
 	if t_ax ~= key_ax then return t_ax end
-	-- Fall back to the TOML-loaded label for backwards compatibility
-	if AX[name] then return AX[name].label end
-	if SG[name] then return SG[name].label end
+	-- Fall back to the action name if no translation found
 	return name
 end
 
