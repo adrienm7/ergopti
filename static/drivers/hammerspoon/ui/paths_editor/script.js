@@ -9,6 +9,31 @@
 // Full payload received from Lua on init
 let _data = null;
 
+// Locale strings — populated by initData; used by _t() and applyDomStrings()
+let _strings = {};
+
+/**
+ * Returns the translated string for key, or key itself as fallback.
+ * @param {string} key
+ * @returns {string}
+ */
+function _t(key) {
+	return _strings[key] || key;
+}
+
+/**
+ * Applies translations from _strings to every DOM element carrying data-i18n.
+ * Handles the <title> element via document.title as a special case.
+ */
+function applyDomStrings() {
+	document.querySelectorAll("[data-i18n]").forEach(function (el) {
+		var key = el.getAttribute("data-i18n");
+		if (_strings[key] === undefined) return;
+		if (el.tagName === "TITLE") document.title = _strings[key];
+		else el.textContent = _strings[key];
+	});
+}
+
 // Current working value for the config directory
 let _currentDir = "";
 
@@ -45,7 +70,7 @@ function refreshTag() {
 	if (!inp || !tag) return;
 	const isDefault = _currentDir === _data.defaultConfigDir;
 	inp.classList.toggle("is-default", isDefault);
-	tag.textContent = isDefault ? "par défaut" : "modifié";
+	tag.textContent = isDefault ? _t("paths_editor.tag_default") : _t("paths_editor.tag_modified");
 	tag.className   = isDefault ? "tag-default" : "tag-modified";
 }
 
@@ -62,6 +87,10 @@ function refreshTag() {
  */
 window.initData = function (data) {
 	_data = data;
+	if (data.strings) {
+		_strings = data.strings;
+		applyDomStrings();
+	}
 	_currentDir = data.configDir || data.defaultConfigDir || "";
 	const inp = dirInput();
 	if (inp) inp.value = _currentDir;

@@ -4,18 +4,18 @@
 --- MODULE: Onboarding Wizard
 --- DESCRIPTION:
 --- First-launch setup wizard guiding the user through the initial configuration
---- of Ergopti via a sequence of native Hammerspoon dialogs.
+--- of Ergopti via a webview-based multi-step form.
 ---
 --- FEATURES & RATIONALE:
---- 1. Zero-dependency UI: Uses only hs.alert, hs.dialog, and hs.chooser — no
----    WebView, no external renderer. This keeps the wizard functional even
----    before the main UI stack is initialised.
---- 2. Sequential callbacks: Each step calls the next in its own callback, so
----    the main thread is never blocked.
---- 3. Locale-aware: The user picks their language in step 1 and all subsequent
----    steps immediately reflect that choice via i18n.set_locale().
---- 4. Atomic write: All collected answers are flushed to config.toml in a
----    single toml_writer.batch_write() call at the end, then hs.reload().
+--- 1. Consistent UI: Uses the same webview + usercontent bridge pattern as all
+---    other Ergopti panels — one coherent design language throughout the app.
+--- 2. Live Locale Switch: Selecting a language in step 1 triggers a "previewLocale"
+---    message; Lua loads the strings and injects them back via applyStrings() so
+---    subsequent steps render in the chosen language without a reload.
+--- 3. Atomic Write: All collected answers are flushed to config.toml in a single
+---    toml_writer.batch_write() call at the end, then hs.reload().
+--- 4. Single-message Finish: The JS sends one "finish" message containing all
+---    answers at once, so Lua never has to maintain per-step state.
 --- ==============================================================================
 
 local M = {}
@@ -23,191 +23,171 @@ local M = {}
 local i18n         = require("lib.i18n")
 local toml_writer  = require("lib.toml_writer")
 local notifications = require("lib.notifications")
+local Logger       = require("lib.logger")
+local LOG          = "onboarding"
 
-local LOG = "onboarding"
-
-
-
-
--- ============================================================
--- ============================================================
--- ======= 1/ Constants and locale definitions =======
--- ============================================================
--- ============================================================
-
--- Ordered alphabetically by language code, shown in the chooser
-local LOCALES_ORDERED = {
-	{ code = "de", label = "🇩🇪  Deutsch"  },
-	{ code = "en", label = "🇬🇧  English"  },
-	{ code = "es", label = "🇪🇸  Español"  },
-	{ code = "fr", label = "🇫🇷  Français" },
-	{ code = "zh", label = "🇨🇳  中文"     },
-}
-
-local DEFAULT_LOCALE    = "en"
-local DEFAULT_MAGIC_KEY = "★"
-
--- hs.settings key used to remember that the wizard has already run once
 local SETTINGS_COMPLETED_KEY = "ergopti.onboarding.completed"
 
+-- Path to config.toml — set by M.run() before the wizard opens
+local _config_path  = nil
 
+-- WebView + usercontent bridge state (singleton)
+local _webview      = nil
+local _usercontent  = nil
 
-
--- ============================================================
--- ============================================================
--- ======= 2/ Internal wizard state =======
--- ============================================================
--- ============================================================
-
--- Accumulated answers collected across wizard steps; written to disk at the end
-local _answers = {
-	locale      = DEFAULT_LOCALE,
-	use_ergopti = true,
-	magic_key   = DEFAULT_MAGIC_KEY,
-	use_metrics = true,
-	use_gestures = true,
-}
-
--- Path to config.toml, set when M.run() or M.run_from_menu() is called
-local _config_path = nil
+-- Absolute path to the assets folder (same directory as this file)
+local _src       = debug.getinfo(1, "S").source:sub(2)
+local ASSETS_DIR = _src:match("^(.*[/\\])") or "./"
 
 
 
 
--- ============================================================
--- ============================================================
--- ======= 3/ Helper utilities =======
--- ============================================================
--- ============================================================
+-- ============================================
+-- ============================================
+-- ======= 1/ Locale string injection =======
+-- ============================================
+-- ============================================
 
+--- Loads the strings for a given locale code and injects them into the webview
+--- via window.applyStrings().  Used both for the initial render and for the
+--- live-preview when the user hovers over a language row.
+--- @param code string Locale code, e.g. "fr".
+local function inject_strings(code)
+	if not _webview then return end
+	local strings = {}
 
---- Converts a boolean to the TOML-compatible string "true"/"false".
---- @param value boolean The boolean to convert.
---- @return string The lowercase string representation.
-local function bool_to_str(value)
-	return value and "true" or "false"
-end
+	-- Pull every translated string out of i18n by temporarily pointing it at
+	-- the requested locale, then restoring the previous locale.
+	local prev_code = i18n.get_locale()
+	i18n.set_locale_no_reload(code)
 
-
---- Builds the list of update records consumed by toml_writer.batch_write().
---- @return table[] Ordered list of {section, key, value} records.
-local function build_updates()
-	return {
-		{ section = "Script",    key = "Locale",          value = _answers.locale                          },
-		{ section = "Layout",    key = "ErgoptiBase",     value = bool_to_str(_answers.use_ergopti)        },
-		{ section = "Layout",    key = "ErgoptiAltGr",    value = bool_to_str(_answers.use_ergopti)        },
-		{ section = "Layout",    key = "ErgoptiPlus",     value = bool_to_str(_answers.use_ergopti)        },
-		{ section = "Hotstrings", key = "MagicKey",       value = _answers.magic_key                       },
-		{ section = "Metrics",   key = "metrics_enabled", value = bool_to_str(_answers.use_metrics)        },
-		{ section = "Gestures",  key = "Enabled",         value = bool_to_str(_answers.use_gestures)       },
+	-- Collect all onboarding keys the JS wizard needs
+	local keys = {
+		"onboarding.language.placeholder",
+		"onboarding.layout.title", "onboarding.layout.desc",
+		"onboarding.layout.yes",  "onboarding.layout.no",
+		"onboarding.magic_key.title", "onboarding.magic_key.desc",
+		"onboarding.magic_key.hint",
+		"onboarding.metrics.title", "onboarding.metrics.desc",
+		"onboarding.gestures.title", "onboarding.gestures.desc",
+		"onboarding.yes", "onboarding.no",
+		"onboarding.back", "onboarding.next", "onboarding.finish",
 	}
-end
-
-
-
-
--- ============================================================
--- ============================================================
--- ======= 4/ Wizard steps =======
--- ============================================================
--- ============================================================
-
-
---- Forward declaration so steps can reference each other via closures
-local step1_language, step2_layout, step3_magic_key, step4_metrics, step5_gestures, step_finish
-
-
---- Step 5 — Gestures: asks the user whether to enable gesture support.
-step5_gestures = function()
-	local title = i18n.get("onboarding.gestures.title")
-	local msg   = i18n.get("onboarding.gestures.desc")
-	local yes   = i18n.get("onboarding.btn.yes")
-	local no    = i18n.get("onboarding.btn.no")
-
-	local answer = hs.dialog.blockAlert(title, msg, yes, no)
-	_answers.use_gestures = (answer == yes)
-	step_finish()
-end
-
-
---- Step 4 — Metrics: asks the user whether to enable typing-metrics collection.
-step4_metrics = function()
-	local title = i18n.get("onboarding.metrics.title")
-	local msg   = i18n.get("onboarding.metrics.desc")
-	local yes   = i18n.get("onboarding.btn.yes")
-	local no    = i18n.get("onboarding.btn.no")
-
-	local answer = hs.dialog.blockAlert(title, msg, yes, no)
-	_answers.use_metrics = (answer == yes)
-	step5_gestures()
-end
-
-
---- Step 3 — Magic key: lets the user pick the hotstring trigger character.
-step3_magic_key = function()
-	local title  = i18n.get("onboarding.magic_key.title")
-	local msg    = i18n.get("onboarding.magic_key.desc")
-	local ok_lbl = i18n.get("onboarding.btn.ok")
-	local cancel = i18n.get("onboarding.btn.cancel")
-
-	local result, text = hs.dialog.textPrompt(title, msg, DEFAULT_MAGIC_KEY, ok_lbl, cancel)
-	if result == ok_lbl and text and text ~= "" then
-		_answers.magic_key = text
-	end
-	-- Proceed even on cancel — keep the default value
-	step4_metrics()
-end
-
-
---- Step 2 — Layout: asks whether the user wants the Ergopti keyboard layout.
-step2_layout = function()
-	local title = i18n.get("onboarding.layout.title")
-	local msg   = i18n.get("onboarding.layout.desc")
-	local yes   = i18n.get("onboarding.btn.yes")
-	local no    = i18n.get("onboarding.btn.no")
-
-	local answer = hs.dialog.blockAlert(title, msg, yes, no)
-	_answers.use_ergopti = (answer == yes)
-	step3_magic_key()
-end
-
-
---- Step 1 — Language: presents a chooser with the five supported locales.
---- Calls i18n.set_locale() immediately on selection so the rest of the wizard
---- uses the chosen language without requiring a reload.
-step1_language = function()
-	local chooser_items = {}
-	for _, locale in ipairs(LOCALES_ORDERED) do
-		table.insert(chooser_items, {
-			text    = locale.label,
-			subText = locale.code,
-			code    = locale.code,
-		})
+	for _, k in ipairs(keys) do
+		strings[k] = i18n.get(k)
 	end
 
-	local chooser = hs.chooser.new(function(selection)
-		local code = (selection and selection.code) or DEFAULT_LOCALE
-		_answers.locale = code
-		-- Apply locale in-memory only — avoid reloading mid-wizard
-		i18n.set_locale_no_reload(code)
-		step2_layout()
+	i18n.set_locale_no_reload(prev_code)
+
+	local ok_enc, json = pcall(hs.json.encode, strings)
+	if not ok_enc or not json then
+		Logger.error(LOG, "inject_strings: failed to encode strings for '%s'.", code)
+		return
+	end
+
+	Logger.debug(LOG, "Injecting strings for locale '%s'…", code)
+	pcall(function()
+		_webview:evaluateJavaScript("if(window.applyStrings) window.applyStrings(" .. json .. ")")
 	end)
-
-	chooser:placeholderText(i18n.get("onboarding.language.placeholder"))
-	chooser:choices(chooser_items)
-	chooser:searchSubText(false)
-	chooser:show()
 end
 
+--- Sends the full initData payload (locale + strings + default answers) to the
+--- webview so the first step renders correctly on open.
+local function inject_init_data()
+	if not _webview then return end
+
+	local current_locale = i18n.get_locale()
+	local strings = {}
+	local keys = {
+		"onboarding.language.placeholder",
+		"onboarding.layout.title", "onboarding.layout.desc",
+		"onboarding.layout.yes",  "onboarding.layout.no",
+		"onboarding.magic_key.title", "onboarding.magic_key.desc",
+		"onboarding.magic_key.hint",
+		"onboarding.metrics.title", "onboarding.metrics.desc",
+		"onboarding.gestures.title", "onboarding.gestures.desc",
+		"onboarding.yes", "onboarding.no",
+		"onboarding.back", "onboarding.next", "onboarding.finish",
+	}
+	for _, k in ipairs(keys) do
+		strings[k] = i18n.get(k)
+	end
+
+	local payload = {
+		locale  = current_locale,
+		strings = strings,
+		answers = {
+			locale       = current_locale,
+			use_ergopti  = true,
+			magic_key    = "★",
+			use_metrics  = false,
+			use_gestures = false,
+		},
+	}
+
+	local ok_enc, json = pcall(hs.json.encode, payload)
+	if not ok_enc or not json then
+		Logger.error(LOG, "inject_init_data: failed to encode payload.")
+		return
+	end
+
+	Logger.debug(LOG, "Injecting initData into onboarding webview…")
+	pcall(function()
+		_webview:evaluateJavaScript("if(window.initData) window.initData(" .. json .. ")")
+	end)
+end
+
+
+
+
+-- ============================================
+-- ============================================
+-- ======= 2/ Finish and commit =============
+-- ============================================
+-- ============================================
+
+--- Converts a JS truthy value to a TOML boolean string.
+--- @param value any
+--- @return string
+local function to_bool(value)
+	return (value == true or value == "true") and "true" or "false"
+end
+
+--- Closes the webview cleanly.
+local function close_webview()
+	if _webview then
+		pcall(function() _webview:delete() end)
+		_webview     = nil
+		_usercontent = nil
+	end
+end
 
 --- Writes all collected answers to config.toml and reloads Hammerspoon.
-step_finish = function()
+--- @param answers table The answers object from the JS "finish" message.
+local function commit(answers)
+	Logger.start(LOG, "Writing onboarding answers to config.toml…")
+
+	local locale = type(answers.locale) == "string" and answers.locale ~= "" and answers.locale or "en"
+	local updates = {
+		{ section = "Script",    key = "Locale",          value = locale                            },
+		{ section = "Layout",    key = "ErgoptiBase",     value = to_bool(answers.use_ergopti)      },
+		{ section = "Layout",    key = "ErgoptiAltGr",    value = to_bool(answers.use_ergopti)      },
+		{ section = "Layout",    key = "ErgoptiPlus",     value = to_bool(answers.use_ergopti)      },
+		{ section = "Hotstrings", key = "MagicKey",       value = answers.magic_key or "★"          },
+		{ section = "Metrics",   key = "metrics_enabled", value = to_bool(answers.use_metrics)      },
+		{ section = "Gestures",  key = "Enabled",         value = to_bool(answers.use_gestures)     },
+	}
+
+	-- Switch to the chosen locale before writing so success messages are translated
+	i18n.set_locale_no_reload(locale)
+
 	local ok, err = pcall(function()
-		toml_writer.batch_write(_config_path, build_updates())
+		toml_writer.batch_write(_config_path, updates)
 	end)
 
 	if not ok then
-		-- Surface the failure loudly — the wizard cannot complete silently
+		Logger.error(LOG, "commit: toml_writer failed — %s.", tostring(err))
+		close_webview()
 		hs.dialog.blockAlert(
 			i18n.get("onboarding.error.title"),
 			i18n.get("onboarding.error.write_failed") .. "\n\n" .. tostring(err),
@@ -216,10 +196,11 @@ step_finish = function()
 		return
 	end
 
+	Logger.success(LOG, "Onboarding answers written successfully.")
 	hs.settings.set(SETTINGS_COMPLETED_KEY, true)
-	notifications.notify(i18n.get("onboarding.done.title"), i18n.get("onboarding.done.body"))
+	close_webview()
 
-	-- Small delay so the notification is visible before the reload wipes the screen
+	notifications.notify(i18n.get("onboarding.done.title"), i18n.get("onboarding.done.body"))
 	hs.timer.doAfter(1.5, function()
 		hs.reload()
 	end)
@@ -228,15 +209,54 @@ end
 
 
 
--- ============================================================
--- ============================================================
--- ======= 5/ Public API =======
--- ============================================================
--- ============================================================
+-- ============================================
+-- ============================================
+-- ======= 3/ Message handler ===============
+-- ============================================
+-- ============================================
 
+--- Dispatches incoming usercontent messages from the JS wizard.
+--- @param body table The decoded message body.
+local function handle_message(body)
+	if type(body) ~= "table" then return end
+	local action = body.action
+	Logger.debug(LOG, "usercontent message: action='%s'.", tostring(action))
+
+	if action == "ready" then
+		-- JS page finished loading — inject initial data
+		hs.timer.doAfter(0.05, inject_init_data)
+
+	elseif action == "previewLocale" then
+		-- User hovered/clicked a language row — inject its strings live
+		local code = type(body.locale) == "string" and body.locale or "en"
+		inject_strings(code)
+
+	elseif action == "localeSelected" then
+		-- User confirmed language and moved to step 2 — switch locale in memory
+		local code = type(body.locale) == "string" and body.locale or "en"
+		i18n.set_locale_no_reload(code)
+		Logger.info(LOG, "Onboarding locale set to '%s'.", code)
+
+	elseif action == "finish" then
+		-- User reached the last step and clicked Finish — write config and reload
+		if type(body.answers) == "table" then
+			commit(body.answers)
+		else
+			Logger.error(LOG, "finish message missing answers table.")
+		end
+	end
+end
+
+
+
+
+-- ============================================
+-- ============================================
+-- ======= 4/ Public API ====================
+-- ============================================
+-- ============================================
 
 --- Returns true when the onboarding wizard should run.
---- The wizard must run whenever config.toml does not yet exist on disk.
 --- @param config_path string Absolute path to the user's config.toml.
 --- @return boolean True if the wizard should be displayed.
 function M.should_run(config_path)
@@ -246,40 +266,79 @@ function M.should_run(config_path)
 	return not hs.fs.attributes(config_path)
 end
 
-
---- Starts the onboarding wizard on first launch.
---- Resets all collected answers to their defaults before beginning so that
---- repeated calls from the same session always start from a clean slate.
+--- Opens the onboarding wizard webview.
+--- Resets all collected answers to their defaults before beginning.
 --- @param config_path string Absolute path where config.toml should be written.
 function M.run(config_path)
 	if type(config_path) ~= "string" or config_path == "" then
-		hs.dialog.blockAlert("Ergopti — Onboarding", "config_path is missing.", "OK")
+		Logger.error(LOG, "M.run() called with missing config_path.")
+		return
+	end
+	_config_path = config_path
+
+	-- Bring the existing window to front if the wizard is already open
+	if _webview then
+		local ok_ui, ui_builder = pcall(require, "ui.ui_builder")
+		if ok_ui then ui_builder.force_focus(_webview)
+		else pcall(function() _webview:bringToFront() end) end
 		return
 	end
 
-	_config_path = config_path
+	Logger.start(LOG, "Opening onboarding wizard…")
 
-	-- Reset answers so a re-run in the same session starts fresh
-	_answers = {
-		locale       = DEFAULT_LOCALE,
-		use_ergopti  = true,
-		magic_key    = DEFAULT_MAGIC_KEY,
-		use_metrics  = true,
-		use_gestures = true,
-	}
+	local ok_uc, uc = pcall(hs.webview.usercontent.new, "hsOnboarding")
+	if not ok_uc or not uc then
+		Logger.error(LOG, "Failed to create usercontent bridge.")
+		return
+	end
+	_usercontent = uc
+	_usercontent:setCallback(function(message)
+		if message and type(message.body) == "table" then
+			handle_message(message.body)
+		end
+	end)
 
-	step1_language()
+	local ok_ui, ui_builder = pcall(require, "ui.ui_builder")
+	if not ok_ui or not ui_builder then
+		Logger.error(LOG, "Failed to load ui_builder module.")
+		return
+	end
+
+	local screen  = hs.screen.mainScreen()
+	local sf      = screen and type(screen.frame) == "function" and screen:frame() or { w = 1440, h = 900 }
+	local win_h   = math.min(520, math.floor(sf.h * 0.60))
+	local win_w   = math.min(460, math.floor(sf.w * 0.35))
+
+	local masks       = hs.webview.windowMasks
+	local style_masks = (masks["titled"] or 1) + (masks["closable"] or 2)
+
+	_webview = ui_builder.show_webview({
+		frame       = ui_builder.get_centered_frame(win_w, win_h),
+		title       = "Ergopti — Setup",
+		style_masks = style_masks,
+		usercontent = _usercontent,
+		assets_dir  = ASSETS_DIR,
+		on_close    = function()
+			_webview     = nil
+			_usercontent = nil
+		end,
+		on_navigation = function(action)
+			if action == "didFinishNavigation" then
+				Logger.debug(LOG, "Navigation finished — injecting initData.")
+				hs.timer.doAfter(0.05, inject_init_data)
+			end
+			return true
+		end,
+	})
+
+	Logger.success(LOG, "Onboarding wizard opened.")
 end
-
 
 --- Starts the onboarding wizard regardless of whether config.toml exists.
 --- Useful when the user triggers the wizard manually from a menu item.
 --- @param config_path string Absolute path to the user's config.toml.
 function M.run_from_menu(config_path)
-	-- Identical behaviour to M.run() — the distinction exists at the call site
-	-- (the caller decides when to invoke this rather than M.run())
 	M.run(config_path)
 end
-
 
 return M

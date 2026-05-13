@@ -1,0 +1,295 @@
+/* ui/onboarding/style.css */
+
+/* =========================================================================== */
+/* Onboarding Wizard Styles.                                                   */
+/*                                                                             */
+/* Multi-step first-run wizard, matching the macOS system design language      */
+/* used across all Ergopti webview windows.                                    */
+/* =========================================================================== */
+
+/* =============================== */
+/* =============================== */
+/* ======= 1/ Reset & Base ======= */
+/* =============================== */
+/* =============================== */
+
+* {
+	box-sizing: border-box;
+}
+
+html, body {
+	height: 100%;
+	margin: 0;
+}
+
+body {
+	background: #f5f5f7;
+	color: #333;
+	font-family: -apple-system, BlinkMacSystemFont, 'Helvetica Neue', sans-serif;
+	font-size: 14px;
+}
+
+/* ====================================== */
+/* ====================================== */
+/* ======= 2/ Layout & Structure ======= */
+/* ====================================== */
+/* ====================================== */
+
+#wizard {
+	display: flex;
+	flex-direction: column;
+	height: 100%;
+	padding: 20px 24px 18px;
+}
+
+.step {
+	display: flex;
+	flex-direction: column;
+	flex-grow: 1;
+}
+
+.step.hidden {
+	display: none;
+}
+
+/* =============================== */
+/* =============================== */
+/* ======= 3/ Step Indicator ===== */
+/* =============================== */
+/* =============================== */
+
+.step-bar {
+	align-items: center;
+	display: flex;
+	gap: 6px;
+	justify-content: center;
+	margin-bottom: 18px;
+}
+
+.step-dot {
+	background: #d0d0d5;
+	border-radius: 50%;
+	height: 7px;
+	transition: background 0.2s, transform 0.2s;
+	width: 7px;
+}
+
+.step-dot.active {
+	background: #007aff;
+	transform: scale(1.25);
+}
+
+.step-dot.done {
+	background: #34c759;
+}
+
+/* =============================== */
+/* =============================== */
+/* ======= 4/ Typography ========= */
+/* =============================== */
+/* =============================== */
+
+h1 {
+	color: #1d1d1f;
+	font-size: 17px;
+	font-weight: 600;
+	margin: 0 0 6px;
+}
+
+.subtitle {
+	color: #888;
+	font-size: 12px;
+	margin: 0 0 14px;
+}
+
+.desc {
+	color: #555;
+	font-size: 12.5px;
+	line-height: 1.55;
+	margin: 0 0 16px;
+	white-space: pre-line;
+}
+
+.hint {
+	color: #888;
+	font-size: 11px;
+	font-style: italic;
+	line-height: 1.5;
+	margin: 8px 0 0;
+}
+
+/* ====================================== */
+/* ====================================== */
+/* ======= 5/ Language List ============= */
+/* ====================================== */
+/* ====================================== */
+
+.lang-list {
+	border: 1px solid #e0e0e0;
+	border-radius: 8px;
+	flex-grow: 1;
+	min-height: 0;
+	overflow-y: auto;
+}
+
+.lang-item {
+	align-items: center;
+	border-bottom: 1px solid #f0f0f0;
+	cursor: pointer;
+	display: flex;
+	gap: 10px;
+	padding: 9px 12px;
+	transition: background 0.1s;
+	user-select: none;
+}
+
+.lang-item:last-child {
+	border-bottom: none;
+}
+
+.lang-item:hover {
+	background: #f0f4ff;
+}
+
+.lang-item.selected {
+	background: #e8f0ff;
+}
+
+.lang-item.selected .lang-name {
+	color: #007aff;
+	font-weight: 600;
+}
+
+.lang-flag {
+	font-size: 18px;
+	flex-shrink: 0;
+	line-height: 1;
+	width: 24px;
+}
+
+.lang-name {
+	color: #1d1d1f;
+	font-size: 13px;
+}
+
+/* ====================================== */
+/* ====================================== */
+/* ======= 6/ Radio Cards ============== */
+/* ====================================== */
+/* ====================================== */
+
+.radio-group {
+	display: flex;
+	flex-direction: column;
+	flex-grow: 1;
+	gap: 8px;
+}
+
+.radio-card {
+	align-items: center;
+	background: #fff;
+	border: 1.5px solid #e0e0e0;
+	border-radius: 8px;
+	cursor: pointer;
+	display: flex;
+	gap: 10px;
+	padding: 12px 14px;
+	transition:
+		border-color 0.15s,
+		background 0.1s;
+}
+
+.radio-card:hover {
+	background: #f5f8ff;
+	border-color: #a0bfff;
+}
+
+.radio-card input[type="radio"] {
+	accent-color: #007aff;
+	flex-shrink: 0;
+	height: 16px;
+	margin: 0;
+	width: 16px;
+}
+
+.radio-card input[type="radio"]:checked + .radio-label {
+	color: #007aff;
+	font-weight: 500;
+}
+
+.radio-label {
+	color: #333;
+	font-size: 13px;
+	line-height: 1.4;
+}
+
+/* ====================================== */
+/* ====================================== */
+/* ======= 7/ Magic Key Input ========== */
+/* ====================================== */
+/* ====================================== */
+
+.field-group {
+	display: flex;
+	margin-bottom: 4px;
+}
+
+#s3-input {
+	background: #fff;
+	border: 1.5px solid #d0d0d0;
+	border-radius: 7px;
+	color: #1d1d1f;
+	font-family: 'SF Mono', 'Monaco', monospace;
+	font-size: 22px;
+	outline: none;
+	padding: 8px 14px;
+	text-align: center;
+	transition:
+		border-color 0.15s,
+		box-shadow 0.15s;
+	width: 80px;
+}
+
+#s3-input:focus {
+	border-color: #007aff;
+	box-shadow: 0 0 0 3px rgba(0, 122, 255, 0.15);
+}
+
+/* ===================================== */
+/* ===================================== */
+/* ======= 8/ Buttons ================= */
+/* ===================================== */
+/* ===================================== */
+
+.btns {
+	align-items: center;
+	display: flex;
+	flex-shrink: 0;
+	gap: 8px;
+	justify-content: flex-end;
+	margin-top: 16px;
+}
+
+button {
+	border: none;
+	border-radius: 7px;
+	cursor: pointer;
+	font-size: 12.5px;
+	font-weight: 500;
+	padding: 7px 18px;
+	transition: filter 0.1s;
+}
+
+button:hover {
+	filter: brightness(0.92);
+}
+
+.primary {
+	background: #007aff;
+	color: #fff;
+}
+
+.secondary {
+	background: #e0e0e0;
+	color: #333;
+}

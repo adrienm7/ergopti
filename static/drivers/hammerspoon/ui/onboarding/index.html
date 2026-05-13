@@ -1,0 +1,107 @@
+<!-- ui/onboarding/index.html -->
+<!doctype html>
+<html lang="en">
+	<head>
+		<meta charset="utf-8" />
+		<title>Ergopti — Setup</title>
+		<link rel="stylesheet" href="style.css" />
+	</head>
+	<body>
+		<div id="wizard">
+			<!-- Step indicator -->
+			<div class="step-bar">
+				<div class="step-dot active" id="dot-1"></div>
+				<div class="step-dot" id="dot-2"></div>
+				<div class="step-dot" id="dot-3"></div>
+				<div class="step-dot" id="dot-4"></div>
+				<div class="step-dot" id="dot-5"></div>
+			</div>
+
+			<!-- Step 1 — Language -->
+			<div class="step" id="step-1">
+				<h1>Welcome / Bienvenue / Willkommen</h1>
+				<p class="subtitle" id="s1-subtitle">Choose your language / Choisissez votre langue</p>
+				<div class="lang-list" id="lang-list"></div>
+				<div class="btns">
+					<button type="button" class="btn-next primary" id="s1-next">Next →</button>
+				</div>
+			</div>
+
+			<!-- Step 2 — Layout -->
+			<div class="step hidden" id="step-2">
+				<h1 id="s2-title"></h1>
+				<p class="desc" id="s2-desc"></p>
+				<div class="radio-group">
+					<label class="radio-card" id="s2-yes-card">
+						<input type="radio" name="layout" value="yes" checked />
+						<span class="radio-label" id="s2-yes-label"></span>
+					</label>
+					<label class="radio-card" id="s2-no-card">
+						<input type="radio" name="layout" value="no" />
+						<span class="radio-label" id="s2-no-label"></span>
+					</label>
+				</div>
+				<div class="btns">
+					<button type="button" class="btn-back secondary" id="s2-back"></button>
+					<button type="button" class="btn-next primary" id="s2-next"></button>
+				</div>
+			</div>
+
+			<!-- Step 3 — Magic key -->
+			<div class="step hidden" id="step-3">
+				<h1 id="s3-title"></h1>
+				<p class="desc" id="s3-desc"></p>
+				<div class="field-group">
+					<input type="text" id="s3-input" maxlength="3" />
+				</div>
+				<p class="hint" id="s3-hint"></p>
+				<div class="btns">
+					<button type="button" class="btn-back secondary" id="s3-back"></button>
+					<button type="button" class="btn-next primary" id="s3-next"></button>
+				</div>
+			</div>
+
+			<!-- Step 4 — Metrics -->
+			<div class="step hidden" id="step-4">
+				<h1 id="s4-title"></h1>
+				<p class="desc" id="s4-desc"></p>
+				<div class="radio-group">
+					<label class="radio-card" id="s4-yes-card">
+						<input type="radio" name="metrics" value="yes" />
+						<span class="radio-label" id="s4-yes-label"></span>
+					</label>
+					<label class="radio-card" id="s4-no-card">
+						<input type="radio" name="metrics" value="no" checked />
+						<span class="radio-label" id="s4-no-label"></span>
+					</label>
+				</div>
+				<div class="btns">
+					<button type="button" class="btn-back secondary" id="s4-back"></button>
+					<button type="button" class="btn-next primary" id="s4-next"></button>
+				</div>
+			</div>
+
+			<!-- Step 5 — Gestures -->
+			<div class="step hidden" id="step-5">
+				<h1 id="s5-title"></h1>
+				<p class="desc" id="s5-desc"></p>
+				<div class="radio-group">
+					<label class="radio-card" id="s5-yes-card">
+						<input type="radio" name="gestures" value="yes" />
+						<span class="radio-label" id="s5-yes-label"></span>
+					</label>
+					<label class="radio-card" id="s5-no-card">
+						<input type="radio" name="gestures" value="no" checked />
+						<span class="radio-label" id="s5-no-label"></span>
+					</label>
+				</div>
+				<div class="btns">
+					<button type="button" class="btn-back secondary" id="s5-back"></button>
+					<button type="button" class="btn-finish primary" id="s5-finish"></button>
+				</div>
+			</div>
+		</div>
+
+		<script src="script.js"></script>
+	</body>
+</html>
