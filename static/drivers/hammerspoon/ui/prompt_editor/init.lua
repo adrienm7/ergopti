@@ -1,4 +1,4 @@
---- ui/prompt_editor/init.lua
+﻿--- ui/prompt_editor/init.lua
 
 --- ==============================================================================
 --- MODULE: Prompt Editor UI
@@ -18,6 +18,7 @@ local M = {}
 local hs         = hs
 local ui_builder = require("ui.ui_builder")
 local Logger     = require("lib.logger")
+local i18n       = require("lib.i18n")
 
 local LOG = "prompt_editor"
 
@@ -64,8 +65,8 @@ function M.open(existing, on_save)
 
 	local default_name   = type(existing) == "table" and type(existing.label) == "string" and existing.label or ""
 	local default_batch  = type(existing) == "table" and existing.batch == true
-	local default_prompt = type(existing) == "table" and type(existing.raw_prompt) == "string" and existing.raw_prompt or "Voici un texte, continue-le : {context}"
-	local title_str      = existing and "Modifier le profil" or "Nouveau profil"
+	local default_prompt = type(existing) == "table" and type(existing.raw_prompt) == "string" and existing.raw_prompt or i18n.get("prompt_editor.placeholder_prompt")
+	local title_str      = existing and i18n.get("prompt_editor.title_edit") or i18n.get("prompt_editor.title_new")
 
 	-- Setup the usercontent bridge
 	local ok_uc, uc = pcall(hs.webview.usercontent.new, "prompt_bridge")
@@ -90,7 +91,7 @@ function M.open(existing, on_save)
 				if type(on_save) == "function" then
 					pcall(on_save, {
 						id          = id,
-						label       = type(body.name) == "string" and body.name or "Profil personnalisé",
+						label       = type(body.name) == "string" and body.name or i18n.get("prompt_editor.default_label"),
 						batch       = (body.batch == true),
 						raw_prompt  = type(body.prompt) == "string" and body.prompt or "",
 					})

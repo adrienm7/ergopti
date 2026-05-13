@@ -29,6 +29,7 @@ local M = {}
 
 local Logger     = require("lib.logger")
 local ui_builder = require("ui.ui_builder")
+local i18n       = require("lib.i18n")
 
 local LOG = "download_window"
 
@@ -621,7 +622,7 @@ function M.set_error(msg)
         Logger.error(LOG, "set_error called with no active UI: %s", tostring(msg))
         return
     end
-    local text = type(msg) == "string" and msg or "Erreur inconnue."
+    local text = type(msg) == "string" and msg or i18n.get("download_window.error_unknown")
     Logger.warn(LOG, "Progress UI flipped to error state: %s", text)
     eval(string.format("setError(%s)", js_str(text)))
     hs.timer.doAfter(ERROR_AUTO_DISMISS_SEC, function()

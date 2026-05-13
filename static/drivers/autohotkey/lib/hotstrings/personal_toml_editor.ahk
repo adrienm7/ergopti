@@ -534,10 +534,10 @@ OpenPersonalEditor(DefaultSection := "") {
 
     ; ── Top bar: section selector + section management buttons ──
     W.Add("Text", "xm y12 w70 h24 +0x200", t("editor.hotstrings.label_section"))
-    SectionDrop := W.Add("DropDownList", "x+6 yp w420", _BuildSectionList(_PersonalEditorData))
-    W.Add("Button", "x+8 yp w90 h24", t("editor.hotstrings.btn_new")).OnEvent("Click", (*) => _NewSection(W, SectionDrop))
-    W.Add("Button", "x+4 yp w90 h24", t("editor.hotstrings.btn_rename")).OnEvent("Click", (*) => _RenameSection(W, SectionDrop))
-    BtnDelSec := W.Add("Button", "x+4 yp w90 h24", t("editor.hotstrings.btn_delete"))
+    SectionDrop := W.Add("DropDownList", "x+6 yp w360", _BuildSectionList(_PersonalEditorData))
+    W.Add("Button", "x+8 yp w110 h24", t("editor.hotstrings.btn_new")).OnEvent("Click", (*) => _NewSection(W, SectionDrop))
+    W.Add("Button", "x+4 yp w110 h24", t("editor.hotstrings.btn_rename")).OnEvent("Click", (*) => _RenameSection(W, SectionDrop))
+    BtnDelSec := W.Add("Button", "x+4 yp w110 h24", t("editor.hotstrings.btn_delete"))
     BtnDelSec.OnEvent("Click", (*) => _DeleteSection(W, SectionDrop))
 
     _SelectDropDown(SectionDrop, _PersonalEditorSection)
@@ -578,13 +578,13 @@ OpenPersonalEditor(DefaultSection := "") {
     ChkFinal := W.Add("CheckBox", "x644 y+11 w180", t("editor.hotstrings.chk_final"))
     ChkAutoExp.Value := 1
 
-    ; ── Créer — bouton + checkbox alignés, avant le séparateur ──
+    ; ── Add button + checkbox aligned, before the separator ──
     OutputEdit.GetPos(, &OutY, , &OutH)
     BtnAdd := W.Add("Button", "xm y" . (OutY + OutH + 10) . " w110 h26", t("editor.hotstrings.btn_add"))
     CloseOnAddChk := W.Add("CheckBox", "x+10 yp+5 w120", t("editor.hotstrings.chk_close_after"))
     CloseOnAddChk.Value := (_EditorPrefGet("CloseOnAdd", "0") == "1") ? 1 : 0
 
-    ; Token help — à droite du bouton Ajouter, aligné verticalement au centre
+    ; Token help — to the right of the Add button, vertically centered
     BtnAdd.GetPos(, &BtnAddY, , &BtnAddH)
     TokenHelp := W.Add("Text", "x" . (W.MarginX + 260) . " y" . (BtnAddY + 6) . " w590 h26 cGray",
     "{Enter}  {Tab}  {Left}  {Right}  {Up}  {Down}  {BackSpace}  {Delete}  {Escape}  {Home}  {End}")
@@ -884,7 +884,7 @@ _RenameSection(W, SectionDrop) {
     OldDesc := _PersonalEditorData["sections"].Has(_PersonalEditorSection)
         ? _PersonalEditorData["sections"][_PersonalEditorSection]["description"]
         : _PersonalEditorSection
-    Res := InputBox("Nouvelle description pour la section `"" . _PersonalEditorSection . "`" :", t("editor.hotstrings.rename_title"),
+    Res := InputBox(Format(t("editor.hotstrings.rename_desc_prompt"), _PersonalEditorSection), t("editor.hotstrings.rename_title"),
         "w300 h120", OldDesc)
     if Res.Result != "OK" or Trim(Res.Value) == "" {
         return

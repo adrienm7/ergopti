@@ -1,4 +1,4 @@
---- ui/menu/menu_llm/models_manager.lua
+﻿--- ui/menu/menu_llm/models_manager.lua
 
 --- ==============================================================================
 --- MODULE: LLM Models Manager (Router)
@@ -20,6 +20,7 @@ local MlxMgr    = require("ui.menu.menu_llm.models_manager_mlx")
 local Logger    = require("lib.logger")
 local dialog    = require("lib.dialog_util")
 local llm_mod   = require("modules.llm")
+local i18n      = require("lib.i18n")
 
 local LOG = "menu_llm.models"
 
@@ -298,7 +299,7 @@ function M.new(deps)
 		end
 
 
-		local msg = "Modèle : " .. target_model .. "\n\n" .. table.concat(warnings, "\n")
+		local msg = string.format(i18n.get("menu.llm.model_label"), target_model) .. "\n\n" .. table.concat(warnings, "\n")
 		
 		hs.timer.doAfter(0.1, function()
 			local hs_app = hs.application and hs.application.get and hs.application.get("Hammerspoon") or nil
@@ -311,22 +312,22 @@ function M.new(deps)
 				pcall(hs.focus)
 			end
 			if is_critical then
-				pcall(dialog.block_alert, "Téléchargement impossible", msg, "Fermer", nil, "critical")
+				pcall(dialog.block_alert, i18n.get("menu.llm.download_failed"), msg, i18n.get("common.close"), nil, "critical")
 				if type(on_cancel) == "function" then pcall(on_cancel) end return
 			end
 			
 			local sep  = string.rep("─", 25)
-			local body = sep .. "\n" .. msg .. "\n" .. sep .. "\n\nCe modèle n’est pas encore installé."
+			local body = sep .. "\n" .. msg .. "\n" .. sep .. "\n\n" .. i18n.get("menu.llm.not_installed_body")
 			if repo_info and repo_info ~= "" then
 				body = body .. "\n ➜ " .. repo_info
 			end
-			body = body .. "\n\nVoulez-vous lancer le téléchargement ?"
+			body = body .. "\n\n" .. i18n.get("menu.llm.launch_download_prompt")
 
 			local ok_c, choice = pcall(dialog.block_alert,
-				"Configuration requise (" .. engine_name .. ")",
-				body, "Télécharger", "Annuler", msg:find("⚠️") and "warning" or "informational")
+				string.format(i18n.get("menu.llm.install_required_title"), engine_name),
+				body, i18n.get("menu.llm.btn_download"), i18n.get("common.cancel"), msg:find("⚠️") and "warning" or "informational")
 				
-			if ok_c and choice == "Télécharger" then
+			if ok_c and choice == i18n.get("menu.llm.btn_download") then
 				do_download()
 			else
 				if type(on_cancel) == "function" then pcall(on_cancel) end

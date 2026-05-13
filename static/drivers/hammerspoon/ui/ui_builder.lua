@@ -85,7 +85,7 @@ function M.build_injected_html(assets_dir, html_name)
 	local ok, fh = pcall(io.open, html_path, "r")
 	if not ok or not fh then
 		Logger.error(LOG, "Failed to find HTML template: %s.", html_name)
-		return "<html><body><h1>Erreur de construction : " .. html_name .. " introuvable</h1></body></html>"
+		return "<html><body><h1>Build error: " .. html_name .. " not found</h1></body></html>"
 	end
 	local html = fh:read("*a")
 	fh:close()

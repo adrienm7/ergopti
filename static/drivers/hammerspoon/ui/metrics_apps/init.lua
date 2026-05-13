@@ -1,4 +1,4 @@
---- ui/metrics_apps/init.lua
+﻿--- ui/metrics_apps/init.lua
 
 --- ==============================================================================
 --- MODULE: Apps Time Dashboard UI
@@ -28,6 +28,7 @@ local json       = require("hs.json")
 local ui_builder = require("ui.ui_builder")
 local Logger     = require("lib.logger")
 local dialog     = require("lib.dialog_util")
+local i18n       = require("lib.i18n")
 
 local LOG = "metrics_apps"
 
@@ -121,13 +122,13 @@ end
 
 local function prompt_score_then_save(app_name, chosen_cat, default_score)
 	local btn, score_str = dialog.text_prompt(
-		"Score",
-		"Score de productivité pour " .. app_name .. "\n(-2 très distrayant à 2 très productif) :",
-		tostring(default_score or 0), "OK", "Annuler")
-	if btn ~= "OK" then return end
+		i18n.get("metrics_apps.score_title"),
+		string.format(i18n.get("metrics_apps.score_prompt"), app_name),
+		tostring(default_score or 0), i18n.get("button.ok"), i18n.get("common.cancel"))
+	if btn ~= i18n.get("button.ok") then return end
 	local score = tonumber(score_str)
 	if not score or score < -2 or score > 2 then
-		dialog.alert("Erreur", "Le score doit être compris entre -2 et 2.", "OK")
+		dialog.alert(i18n.get("common.warning"), i18n.get("metrics_apps.score_error"), i18n.get("button.ok"))
 		return
 	end
 	local cats = load_categories()
@@ -140,11 +141,11 @@ function M.prompt_category(app_name, default_cat, default_score)
 	local existing = list_existing_categories()
 	local choices  = {}
 
-	table.insert(choices, { text = "+ Nouvelle catégorie…", subText = "Créer une catégorie inédite", _kind = "new" })
-	table.insert(choices, { text = "✎ Renommer une catégorie existante…", subText = "Toutes les apps de cette catégorie seront renommées", _kind = "rename" })
+	table.insert(choices, { text = i18n.get("metrics_apps.new_category_item"), subText = i18n.get("metrics_apps.new_category_create_subtext"), _kind = "new" })
+	table.insert(choices, { text = i18n.get("metrics_apps.rename_item"), subText = i18n.get("metrics_apps.rename_subtext"), _kind = "rename" })
 	for _, cat in ipairs(existing) do
 		local marker = (cat == default_cat) and "  ✓" or ""
-		table.insert(choices, { text = cat .. marker, subText = "Utiliser cette catégorie", _kind = "pick", _value = cat })
+		table.insert(choices, { text = cat .. marker, subText = i18n.get("metrics_apps.use_category_subtext"), _kind = "pick", _value = cat })
 	end
 
 	local chooser
@@ -153,24 +154,24 @@ function M.prompt_category(app_name, default_cat, default_score)
 		if choice._kind == "pick" then
 			prompt_score_then_save(app_name, choice._value, default_score)
 		elseif choice._kind == "new" then
-			local btn, new_cat = dialog.text_prompt("Nouvelle catégorie",
-				"Nom de la nouvelle catégorie pour " .. app_name .. " :",
-				"", "OK", "Annuler")
-			if btn == "OK" and new_cat and new_cat ~= "" then
+			local btn, new_cat = dialog.text_prompt(i18n.get("metrics_apps.new_category_title"),
+				string.format(i18n.get("metrics_apps.new_category_prompt"), app_name),
+				"", i18n.get("button.ok"), i18n.get("common.cancel"))
+			if btn == i18n.get("button.ok") and new_cat and new_cat ~= "" then
 				prompt_score_then_save(app_name, new_cat, default_score)
 			end
 		elseif choice._kind == "rename" then
 			local rename_choices = {}
 			for _, cat in ipairs(existing) do
-				table.insert(rename_choices, { text = cat, subText = "Renommer cette catégorie" })
+				table.insert(rename_choices, { text = cat, subText = i18n.get("metrics_apps.rename_title") })
 			end
 			local sub
 			sub = hs.chooser.new(function(c2)
 				if not c2 then return end
-				local btn, new_name = dialog.text_prompt("Renommer",
-					"Nouveau nom pour la catégorie « " .. c2.text .. " » :",
-					c2.text, "OK", "Annuler")
-				if btn == "OK" and new_name and new_name ~= "" and new_name ~= c2.text then
+				local btn, new_name = dialog.text_prompt(i18n.get("metrics_apps.rename_title"),
+					string.format(i18n.get("metrics_apps.rename_prompt"), c2.text),
+					c2.text, i18n.get("button.ok"), i18n.get("common.cancel"))
+				if btn == i18n.get("button.ok") and new_name and new_name ~= "" and new_name ~= c2.text then
 					local cats = load_categories()
 					for _, entry in pairs(cats) do
 						if type(entry) == "table" and entry.type == c2.text then
@@ -181,12 +182,12 @@ function M.prompt_category(app_name, default_cat, default_score)
 					push_categories_to_ui()
 				end
 			end)
-			sub:placeholderText("Catégorie à renommer")
+			sub:placeholderText(i18n.get("metrics_apps.rename_chooser_placeholder"))
 			sub:choices(rename_choices)
 			sub:show()
 		end
 	end)
-	chooser:placeholderText("Catégorie pour " .. app_name)
+	chooser:placeholderText(string.format(i18n.get("metrics_apps.chooser_placeholder"), app_name))
 	chooser:choices(choices)
 	chooser:show()
 end
@@ -199,7 +200,7 @@ local function prompt_pick_app()
 	end
 	local choices = app_picker.discover_apps()
 	if type(choices) ~= "table" or #choices == 0 then
-		dialog.alert("Erreur", "Aucune application n'a pu être détectée.", "OK")
+		dialog.alert(i18n.get("common.warning"), i18n.get("metrics_apps.no_app_detected"), i18n.get("button.ok"))
 		return
 	end
 	local chooser

@@ -1,4 +1,4 @@
---- ui/menu/menu_llm/settings_manager.lua
+﻿--- ui/menu/menu_llm/settings_manager.lua
 
 --- ==============================================================================
 --- MODULE: LLM Settings Manager
@@ -49,14 +49,14 @@ local function generic_numeric_prompt(deps, title, msg, key, factor, hs_fn, defa
 	local full_msg = tostring(msg) .. string.format(i18n.get("menu.settings.reset_instruction"), tostring(display_def))
 
 	Logger.debug(LOG, string.format("Opening numeric prompt for %s…", key))
-	local ok_p, btn, raw = pcall(dialog.text_prompt, 
-		tostring(title), 
-		full_msg, 
-		tostring(display_val), 
-		"OK", "Annuler"
+	local ok_p, btn, raw = pcall(dialog.text_prompt,
+		tostring(title),
+		full_msg,
+		tostring(display_val),
+		i18n.get("button.ok"), i18n.get("common.cancel")
 	)
 
-	if ok_p and btn == "OK" then
+	if ok_p and btn == i18n.get("button.ok") then
 		local new_val
 		if raw:match("^%s*$") then
 			new_val = tonumber(default_val) or 0
@@ -131,13 +131,13 @@ function M.new(deps)
 
 		local full_msg = string.format(i18n.get("menu.settings.delay_prompt"), display_def)
 
-		local ok_p, btn, raw = pcall(dialog.text_prompt, "i18n.get("menu.settings.delay_title")", full_msg, tostring(display_val), "OK", "Annuler")
+		local ok_p, btn, raw = pcall(dialog.text_prompt, i18n.get("menu.settings.delay_title"), full_msg, tostring(display_val), i18n.get("button.ok"), i18n.get("common.cancel"))
 
-		if ok_p and btn == "OK" then
+		if ok_p and btn == i18n.get("button.ok") then
 			local new_val
 			if raw:match("^%s*$") then
 				new_val = llm_mod.DEFAULT_STATE.llm_debounce
-			elseif raw:lower():match("jamais") then
+			elseif raw:lower() == string.lower(i18n.get("menu.settings.never")) then
 				new_val = -1
 			else
 				new_val = tonumber(raw)
@@ -170,9 +170,9 @@ function M.new(deps)
 
 		local full_msg = i18n.get("menu.settings.max_words_prompt")
 
-		local ok_p, btn, raw = pcall(dialog.text_prompt, i18n.get("menu.settings.max_words_title"), full_msg, display_val, "OK", "Annuler")
+		local ok_p, btn, raw = pcall(dialog.text_prompt, i18n.get("menu.settings.max_words_title"), full_msg, display_val, i18n.get("button.ok"), i18n.get("common.cancel"))
 
-		if ok_p and btn == "OK" then
+		if ok_p and btn == i18n.get("button.ok") then
 			local digits = raw:match("^%s*(%d+)%s*$")
 			if not digits then return end
 			local new_val = tonumber(digits) or 0
@@ -201,9 +201,9 @@ function M.new(deps)
 
 		local full_msg = i18n.get("menu.settings.min_words_prompt")
 
-		local ok_p, btn, raw = pcall(dialog.text_prompt, i18n.get("menu.settings.min_words_title"), full_msg, display_val, "OK", "Annuler")
+		local ok_p, btn, raw = pcall(dialog.text_prompt, i18n.get("menu.settings.min_words_title"), full_msg, display_val, i18n.get("button.ok"), i18n.get("common.cancel"))
 
-		if ok_p and btn == "OK" then
+		if ok_p and btn == i18n.get("button.ok") then
 			local digits = raw:match("^%s*(%d+)%s*$")
 			if not digits then return end
 			local new_val = tonumber(digits) or 1

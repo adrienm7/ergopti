@@ -16,11 +16,14 @@
 let globalLogLines = [];
 let globalDoneState = false;
 
-const KIND_TITLES = {
-	mlx_install: '⚙️ Installation du moteur IA (MLX)',
-	ollama_install: '⚙️ Installation du moteur IA (Ollama)',
-	mlx_model: '📥 Téléchargement du modèle MLX',
-	ollama_model: '📥 Téléchargement du modèle Ollama',
+function _t(key) { return (window._i18n_strings && window._i18n_strings[key]) || null; }
+
+// KIND_TITLES is populated lazily in getKindTitle() after i18n is loaded
+const KIND_TITLE_KEYS = {
+	mlx_install: 'download_window.kind_mlx_install',
+	ollama_install: 'download_window.kind_ollama_install',
+	mlx_model: 'download_window.kind_mlx_model',
+	ollama_model: 'download_window.kind_ollama_model',
 };
 
 const KIND_MODES = {
@@ -54,7 +57,8 @@ function setKind(kind, title, subtitle) {
 	document.body.classList.add('mode-' + mode, 'kind-' + kind);
 
 	const titleEl = document.getElementById('title');
-	if (titleEl) titleEl.textContent = title || KIND_TITLES[kind] || 'Progression';
+	const kindTitle = KIND_TITLE_KEYS[kind] ? (_t(KIND_TITLE_KEYS[kind]) || kind) : kind;
+	if (titleEl) titleEl.textContent = title || kindTitle || _t('download_window.title') || 'Progression';
 
 	const subtitleEl = document.getElementById('subtitle');
 	if (subtitleEl) subtitleEl.textContent = subtitle || '';
@@ -184,7 +188,7 @@ function resetUI() {
 	if (cancelBtn) {
 		cancelBtn.style.display = 'inline-block';
 		cancelBtn.disabled = false;
-		cancelBtn.textContent = '🛑 Annuler';
+		cancelBtn.textContent = _t('download_window.btn_cancel') || '🛑 Annuler';
 	}
 
 	const retryBtn = document.getElementById('btn-retry');
