@@ -611,7 +611,6 @@
 	"hs_config.color_cyan": "Cian",
 	"hs_config.color_yellow": "Amarillo",
 	"hs_config.color_gray": "Gris",
-
 	"editor.hotstrings.label_section": "Sección:",
 	"editor.hotstrings.btn_new": "Nueva…",
 	"editor.hotstrings.btn_rename": "Renombrar…",
@@ -649,24 +648,21 @@
 	"editor.hotstrings.desc_prompt": "Descripción mostrada en el menú para esta sección:",
 	"editor.hotstrings.err_no_section_selected": "Ninguna sección seleccionada.",
 	"editor.hotstrings.rename_title": "Renombrar",
-
 	"hs_config.file_level": "── Nivel archivo ──",
 	"hs_config.btn_all_gray": "Todo en gris",
 	"hs_config.btn_reset_all": "Restablecer todo",
 	"hs_config.btn_close": "Cerrar",
 	"hs_config.label_category": "Categoría:",
 	"hs_config.label_section": "Sección:",
-	"hs_config.label_delay": "Retraso (ms):",
-	"hs_config.label_color": "Color:",
+	"hs_config.label_delay": "Retardo (ms)",
+	"hs_config.label_color": "Color",
 	"hs_config.default_prefix": "Predeterminado: ",
 	"hs_config.override_active": "override activo",
 	"hs_config.none": "(ninguno)",
 	"hs_config.category_prefix": "Categoría: ",
 	"hs_config.section_prefix": "Sección: ",
 	"hs_config.file_level_short": "(nivel archivo)",
-
 	"ui_typing.h3_speed": "Velocidad (PPM)",
-	"ui_typing.h3_precision": "Precisión (%)",
 	"ui_typing.h3_activity_hourly": "Actividad (pulsaciones/h)",
 	"ui_typing.h3_precision_hourly": "Precisión (%) — vista horaria",
 	"ui_typing.h3_keystroke_origin": "Origen de las pulsaciones",
@@ -796,7 +792,6 @@
 	"ui_typing.dataset_precision": "Precisión (%)",
 	"ui_typing.dataset_touches_h": "Pulsaciones/h",
 	"ui_typing.dataset_touches_5min": "Pulsaciones / 5 min",
-
 	"ui_apps.detail_global_activity": "Actividad global registrada",
 	"ui_apps.detail_productivity_score": "Puntuación calculada según sus categorías",
 	"ui_apps.lbl_switches": "Cambios:",
@@ -931,7 +926,6 @@
 	"menu.llm.add_custom_model": "Añadir un modelo personalizado",
 	"menu.llm.val_label": "Seleccionar sugerencia n.º (%s)",
 	"menu.profiles.use_profile": "Usar este perfil",
-
 	"common.save": "Guardar",
 	"common.cancel": "Cancelar",
 	"common.ok": "OK",
@@ -939,9 +933,7 @@
 	"common.delete": "Eliminar",
 	"common.loading": "Cargando…",
 	"common.saved": "Guardado ✓",
-
 	"editor.personal_info.window_title": "Información personal",
-
 	"token_prompt.window_title": "Inicio de sesión HuggingFace",
 	"token_prompt.title": "🔐 Inicio de sesión HuggingFace",
 	"token_prompt.instruction": "Pegue su token de HuggingFace (hf_...) para acelerar las descargas.",
@@ -950,7 +942,6 @@
 	"token_prompt.label": "Token HuggingFace:",
 	"token_prompt.placeholder": "hf_xxxxxxxxxxxxxxxxxxxxxxxxxxxx...",
 	"token_prompt.validate": "Validar",
-
 	"download_window.window_title": "Progreso",
 	"download_window.title": "📥 Descarga en curso",
 	"download_window.eta_label": "⏳ Tiempo restante:",
@@ -959,7 +950,6 @@
 	"download_window.btn_cancel": "🛑 Cancelar",
 	"download_window.btn_terminal": "🖥 Terminal",
 	"download_window.btn_retry": "🔄 Reiniciar descarga",
-
 	"prompt_editor.title_new": "Nuevo perfil",
 	"prompt_editor.label_name": "Nombre del perfil",
 	"prompt_editor.label_mode": "Modo de solicitud",
@@ -972,7 +962,6 @@
 	"prompt_editor.insert_max_words": "Insertar bloque {max_words}",
 	"prompt_editor.placeholder_prompt": "Aquí hay un texto, continúalo: {context}",
 	"prompt_editor.help_text": "El bloque {context} será reemplazado por el texto seleccionado. El bloque {n} será reemplazado por el número de predicciones. Formato (Batch): Pida al modelo que separe cada sugerencia con ---.",
-
 	"editor.hotstrings.page_title": "✏︎ Hotstrings personales",
 	"editor.hotstrings.btn_add_section": "＋ Sección",
 	"editor.hotstrings.empty_hint": "No hay hotstrings definidos. Haga clic en + Sección para comenzar. ☰ arrastrar para reordenar — hacer clic en el título para renombrar",
@@ -995,14 +984,12 @@
 	"editor.hotstrings.cb_case": "Distinguir mayúsculas",
 	"editor.hotstrings.cb_final": "Resultado final",
 	"editor.hotstrings.kbd_help": "↩ = nueva línea\n⌘ + ↩ = guardar\n⇧ + ⌘ + ↩ = guardar + nuevo hotstring",
-
 	"hs_config.hint": "Ajuste por categoría o sección. Todos los cambios se guardan inmediatamente.",
 	"hs_config.btn_all_grey": "Todo en gris",
-	"hs_config.btn_reset_all": "Restablecer todo",
-	"hs_config.label_delay": "Retardo (ms)",
-	"hs_config.label_color": "Color",
 	"hs_config.btn_reset_default": "Restaurar predeterminado",
 	"menu.metrics.show_wpm_menubar": "Mostrar PPM en el tooltip del menú",
 	"menu.metrics.show_wpm_widget": "📊 Widget PPM flotante",
-	"menu.metrics.wpm_unit": "PPM"
+	"menu.metrics.wpm_unit": "PPM",
+	"menu.metrics.colors_by_source": "Color por origen de tecla",
+	"menu.metrics.include_realtime": "Gráfico en tiempo real"
 }
