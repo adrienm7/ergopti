@@ -9,42 +9,38 @@
 	<body>
 		<div class="top-fixed-bar">
 			<div class="header">
-				<h1 data-i18n="ui_apps.title">Temps sur les applications</h1>
+				<h1 data-i18n="ui_apps.title"></h1>
 			</div>
 			<div class="filters-bar" style="display: flex; gap: 15px; align-items: center">
 				<div>
-					<label for="period-select" data-i18n="ui_apps.label_period">Période :</label>
+					<label for="period-select" data-i18n="ui_apps.label_period"></label>
 					<select id="period-select" data-i18n-option-prefix="ui_apps.opt_period">
-						<option value="day" selected data-i18n="ui_apps.opt_period.day">Jour</option>
-						<option value="week" data-i18n="ui_apps.opt_period.week">7 derniers jours</option>
-						<option value="month" data-i18n="ui_apps.opt_period.month">30 derniers jours</option>
-						<option value="year" data-i18n="ui_apps.opt_period.year">Année</option>
-						<option value="all" data-i18n="ui_apps.opt_period.all">Tout</option>
+						<option value="day" selected data-i18n="ui_apps.opt_period.day"></option>
+						<option value="week" data-i18n="ui_apps.opt_period.week"></option>
+						<option value="month" data-i18n="ui_apps.opt_period.month"></option>
+						<option value="year" data-i18n="ui_apps.opt_period.year"></option>
+						<option value="all" data-i18n="ui_apps.opt_period.all"></option>
 					</select>
 				</div>
 				<div id="date-select-container">
-					<label for="date-select" data-i18n="ui_apps.label_date">Le :</label>
+					<label for="date-select" data-i18n="ui_apps.label_date"></label>
 					<select id="date-select"></select>
 				</div>
 				<div style="flex-grow: 1"></div>
-				<button class="filter-btn active" id="btn-refresh" data-i18n="ui_apps.btn_refresh">Rafraîchir</button>
-				<button class="filter-btn" id="btn-add-app" data-i18n="ui_apps.btn_add_app">Classer une application…</button>
+				<button class="filter-btn active" id="btn-refresh" data-i18n="ui_apps.btn_refresh"></button>
+				<button class="filter-btn" id="btn-add-app" data-i18n="ui_apps.btn_add_app"></button>
 				<button
 					class="filter-btn"
 					id="btn-compare-prev"
 					data-i18n="ui_apps.btn_compare"
 					title="Comparer la période avec la précédente équivalente."
-				>
-					Comparer ↔
-				</button>
+				></button>
 				<button
 					class="filter-btn"
 					id="btn-count-awake"
 					data-i18n="ui_apps.btn_count_awake"
 					title="Activer pour inclure le temps en keep-awake (Ctrl+M) dans les stats. Désactivé par défaut."
-				>
-					Compter keep-awake
-				</button>
+				></button>
 			</div>
 			<!-- Filtres catégorie (#53) et jour de semaine (#54) — toggle pour exclure des apps ou des jours du calcul. -->
 			<div
@@ -52,11 +48,11 @@
 				style="display: flex; gap: 18px; align-items: center; flex-wrap: wrap; margin-top: 8px"
 			>
 				<div style="display: flex; align-items: center; gap: 6px">
-					<span style="font-size: 12px; color: var(--text-muted)" data-i18n="ui_apps.label_categories">Catégories :</span>
+					<span style="font-size: 12px; color: var(--text-muted)" data-i18n="ui_apps.label_categories"></span>
 					<div id="category-filter-buttons" style="display: flex; gap: 4px; flex-wrap: wrap"></div>
 				</div>
 				<div style="display: flex; align-items: center; gap: 6px">
-					<span style="font-size: 12px; color: var(--text-muted)" data-i18n="ui_apps.label_days">Jours :</span>
+					<span style="font-size: 12px; color: var(--text-muted)" data-i18n="ui_apps.label_days"></span>
 					<div id="weekday-filter-buttons" style="display: flex; gap: 4px"></div>
 				</div>
 			</div>
@@ -85,7 +81,7 @@
 						margin-bottom: 8px;
 					"
 				>
-					<strong style="color: #fff; font-size: 13px" data-i18n="ui_apps.compare_title">Comparaison vs période précédente</strong>
+					<strong style="color: #fff; font-size: 13px" data-i18n="ui_apps.compare_title"></strong>
 					<span id="compare-window">--</span>
 				</div>
 				<div
@@ -103,27 +99,25 @@
 				class="filters-bar"
 				style="display: flex; gap: 6px; margin-bottom: 14px; flex-wrap: wrap"
 			>
-				<button class="filter-btn tab-btn active" data-tab-target="overview" data-i18n="ui_apps.tab_overview">Aperçu</button>
-				<button class="filter-btn tab-btn" data-tab-target="time" data-i18n="ui_apps.tab_time">Temps &amp; rythmes</button>
-				<button class="filter-btn tab-btn" data-tab-target="apps" data-i18n="ui_apps.tab_apps">Apps &amp; multitâche</button>
-				<button class="filter-btn tab-btn" data-tab-target="typing" data-i18n="ui_apps.tab_typing">
-					Frappe &amp; productivité
-				</button>
-				<button class="filter-btn tab-btn" data-tab-target="system" data-i18n="ui_apps.tab_system">Système &amp; records</button>
+				<button class="filter-btn tab-btn active" data-tab-target="overview" data-i18n="ui_apps.tab_overview"></button>
+				<button class="filter-btn tab-btn" data-tab-target="time" data-i18n="ui_apps.tab_time"></button>
+				<button class="filter-btn tab-btn" data-tab-target="apps" data-i18n="ui_apps.tab_apps"></button>
+				<button class="filter-btn tab-btn" data-tab-target="typing" data-i18n="ui_apps.tab_typing"></button>
+				<button class="filter-btn tab-btn" data-tab-target="system" data-i18n="ui_apps.tab_system"></button>
 			</div>
 
 			<!-- Primary KPI row: global time + productivity + context signals -->
 			<div class="stats-grid" data-tab="overview">
 				<div class="stat-card card-global">
-					<h2 data-i18n="ui_apps.h2_screen_time">Temps d’écran</h2>
+					<h2 data-i18n="ui_apps.h2_screen_time"></h2>
 					<div class="stat-value" id="kpi-total-time">--</div>
-					<div class="stat-details">Activité globale enregistrée</div>
+					<div class="stat-details" data-i18n="ui_apps.detail_global_activity"></div>
 				</div>
 				<div class="stat-card card-hs">
-					<h2 data-i18n="ui_apps.h2_productivity">Indice de productivité</h2>
+					<h2 data-i18n="ui_apps.h2_productivity"></h2>
 					<div class="stat-value" id="kpi-productivity">--</div>
 					<div class="stat-details" id="kpi-productivity-desc">
-						Score calculé selon vos catégories
+						<span data-i18n="ui_apps.detail_productivity_score"></span>
 					</div>
 				</div>
 				<div
@@ -131,15 +125,15 @@
 					style="display: flex; flex-direction: column; justify-content: center"
 				>
 					<div style="display: flex; justify-content: space-between; margin-bottom: 8px">
-						<span style="font-size: 0.85em; color: var(--text-muted)">Bascules :</span>
+						<span style="font-size: 0.85em; color: var(--text-muted)" data-i18n="ui_apps.lbl_switches"></span>
 						<strong id="kpi-switches" style="color: #fff">--</strong>
 					</div>
 					<div style="display: flex; justify-content: space-between; margin-bottom: 8px">
-						<span style="font-size: 0.85em; color: var(--text-muted)">Déverrouillages :</span>
+						<span style="font-size: 0.85em; color: var(--text-muted)" data-i18n="ui_apps.lbl_unlocks"></span>
 						<strong id="kpi-unlocks" style="color: #fff">--</strong>
 					</div>
 					<div style="display: flex; justify-content: space-between">
-						<span style="font-size: 0.85em; color: var(--text-muted)">Top WiFi :</span>
+						<span style="font-size: 0.85em; color: var(--text-muted)" data-i18n="ui_apps.lbl_top_wifi"></span>
 						<strong id="kpi-wifi" style="color: #fff">--</strong>
 					</div>
 				</div>
@@ -151,12 +145,12 @@
 					class="stat-card"
 					title="Bascules d’app par minute de temps focus. Au-delà d’un seuil le workflow est fragmenté."
 				>
-					<h2>App-hopping</h2>
+					<h2 data-i18n="ui_apps.h2_app_hopping"></h2>
 					<div class="stat-value" id="kpi-hopping-rate">--</div>
 					<div class="stat-details" id="kpi-hopping-detail">--</div>
 				</div>
 				<div class="stat-card" title="Temps moyen passé dans une app avant de basculer ailleurs.">
-					<h2 data-i18n="ui_apps.h2_depth">Profondeur moy.</h2>
+					<h2 data-i18n="ui_apps.h2_depth"></h2>
 					<div class="stat-value" id="kpi-depth-mean">--</div>
 					<div class="stat-details" id="kpi-depth-detail">--</div>
 				</div>
@@ -164,7 +158,7 @@
 					class="stat-card"
 					title="Trois apps qui concentrent la majorité du temps focus, avec leur part cumulée."
 				>
-					<h2>Top trio</h2>
+					<h2 data-i18n="ui_apps.h2_top_trio"></h2>
 					<div class="stat-value" id="kpi-top-trio-share">--</div>
 					<div class="stat-details" id="kpi-top-trio-list">--</div>
 				</div>
@@ -172,7 +166,7 @@
 					class="stat-card"
 					title="App qui sert de point central — celle qui a le plus de destinations différentes vers lesquelles vous basculez."
 				>
-					<h2 data-i18n="ui_apps.h2_pivot_app">App pivot</h2>
+					<h2 data-i18n="ui_apps.h2_pivot_app"></h2>
 					<div class="stat-value" id="kpi-pivot-app">--</div>
 					<div class="stat-details" id="kpi-pivot-detail">--</div>
 				</div>
@@ -180,7 +174,7 @@
 					class="stat-card"
 					title="Part du temps focus passée dans l'app la plus utilisée. Plus c'est élevé, plus vous êtes concentré sur un outil."
 				>
-					<h2 data-i18n="ui_apps.h2_focus_index">Index focus</h2>
+					<h2 data-i18n="ui_apps.h2_focus_index"></h2>
 					<div class="stat-value" id="kpi-focus-index">--</div>
 					<div class="stat-details" id="kpi-focus-index-detail">--</div>
 				</div>
@@ -188,7 +182,7 @@
 					class="stat-card"
 					title="Total des bascules / déverrouillages / changements de Wi-Fi sur la période. Reflet rapide de la mobilité du contexte."
 				>
-					<h2 data-i18n="ui_apps.h2_context_volume">Volume contexte</h2>
+					<h2 data-i18n="ui_apps.h2_context_volume"></h2>
 					<div class="stat-value" id="kpi-context-volume">--</div>
 					<div class="stat-details" id="kpi-context-detail">--</div>
 				</div>
@@ -200,7 +194,7 @@
 					class="stat-card"
 					title="Temps réellement passé à frapper (somme des intervalles inter-touches), hors temps de réflexion. Numérateur du ratio actif."
 				>
-					<h2 data-i18n="ui_apps.h2_active_time">Temps actif</h2>
+					<h2 data-i18n="ui_apps.h2_active_time"></h2>
 					<div class="stat-value" id="kpi-active-time">--</div>
 					<div class="stat-details" id="kpi-active-ratio">--</div>
 				</div>
@@ -208,7 +202,7 @@
 					class="stat-card"
 					title="Temps cumulé pendant lequel l'écran était verrouillé ou la machine en veille. Soustrait du temps focus pour le ratio actif."
 				>
-					<h2 data-i18n="ui_apps.h2_passive_system">Passif système</h2>
+					<h2 data-i18n="ui_apps.h2_passive_system"></h2>
 					<div class="stat-value" id="kpi-passive-time">--</div>
 					<div class="stat-details" id="kpi-passive-detail">--</div>
 				</div>
@@ -216,7 +210,7 @@
 					class="stat-card"
 					title="Heure de la première et de la dernière frappe sur la période. Reflète vos horaires effectifs derrière le clavier."
 				>
-					<h2 data-i18n="ui_apps.h2_first_last">Premier / dernier</h2>
+					<h2 data-i18n="ui_apps.h2_first_last"></h2>
 					<div class="stat-value" id="kpi-day-bounds">--</div>
 					<div class="stat-details" id="kpi-day-amplitude">--</div>
 				</div>
@@ -224,7 +218,7 @@
 					class="stat-card"
 					title="Plus longue séance ininterrompue de la période et l'app où elle s'est passée. Une séance se termine après 5 min sans frappe."
 				>
-					<h2 data-i18n="ui_apps.h2_longest_session">Plus longue séance</h2>
+					<h2 data-i18n="ui_apps.h2_longest_session"></h2>
 					<div class="stat-value" id="kpi-longest-session">--</div>
 					<div class="stat-details" id="kpi-longest-session-app">--</div>
 				</div>
@@ -232,7 +226,7 @@
 					class="stat-card"
 					title="Total de séances détectées (≥ 1 frappe, gap &lt; 5 min) et durée moyenne de chacune."
 				>
-					<h2 data-i18n="ui_apps.h2_sessions">Séances</h2>
+					<h2 data-i18n="ui_apps.h2_sessions"></h2>
 					<div class="stat-value" id="kpi-sessions-count">--</div>
 					<div class="stat-details" id="kpi-sessions-mean">--</div>
 				</div>
@@ -240,7 +234,7 @@
 					class="stat-card"
 					title="Densité de frappe sur le temps focus : combien de caractères vous tapez par minute passée dans une app au foreground."
 				>
-					<h2 data-i18n="ui_apps.h2_density">Densité</h2>
+					<h2 data-i18n="ui_apps.h2_density"></h2>
 					<div class="stat-value" id="kpi-density">--</div>
 					<div class="stat-details" id="kpi-density-detail">--</div>
 				</div>
@@ -258,9 +252,7 @@
 						padding: 15px;
 					"
 				>
-					<h3 style="margin: 0 0 10px 0; font-size: 14px; color: #fff" data-i18n="ui_apps.chart_top7">
-						Top 7 Applications (Temps)
-					</h3>
+					<h3 style="margin: 0 0 10px 0; font-size: 14px; color: #fff" data-i18n="ui_apps.chart_top7"></h3>
 					<div style="position: relative; height: 210px">
 						<canvas id="apps_bar_chart"></canvas>
 					</div>
@@ -276,7 +268,7 @@
 						padding: 15px;
 					"
 				>
-					<h3 style="margin: 0 0 10px 0; font-size: 14px; color: #fff" data-i18n="ui_apps.chart_time_by_cat">Temps par Catégorie</h3>
+					<h3 style="margin: 0 0 10px 0; font-size: 14px; color: #fff" data-i18n="ui_apps.chart_time_by_cat"></h3>
 					<div style="position: relative; height: 210px">
 						<canvas id="category_pie_chart"></canvas>
 					</div>
@@ -295,9 +287,7 @@
 					margin-bottom: 20px;
 				"
 			>
-				<h3 id="timeline_chart_title" style="margin: 0 0 10px 0; font-size: 14px; color: #fff" data-i18n="ui_apps.chart_timeline">
-					Évolution Chronologique
-				</h3>
+				<h3 id="timeline_chart_title" style="margin: 0 0 10px 0; font-size: 14px; color: #fff" data-i18n="ui_apps.chart_timeline"></h3>
 				<div style="position: relative; height: 210px">
 					<canvas id="timeline_stacked_chart"></canvas>
 				</div>
@@ -309,7 +299,7 @@
 					class="stat-card"
 					title="Latence moyenne entre l'activation d’une app et la 1ʳᵉ frappe — temps d’orientation."
 				>
-					<h2 data-i18n="ui_apps.h2_focus_latency">Latence focus</h2>
+					<h2 data-i18n="ui_apps.h2_focus_latency"></h2>
 					<div class="stat-value" id="kpi-tx-focus-lat">--</div>
 					<div class="stat-details" id="kpi-tx-focus-lat-detail">--</div>
 				</div>
@@ -317,7 +307,7 @@
 					class="stat-card"
 					title="Nombre de dispositions de clavier différentes vues sur la période."
 				>
-					<h2 data-i18n="ui_apps.h2_layouts">Layouts vus</h2>
+					<h2 data-i18n="ui_apps.h2_layouts"></h2>
 					<div class="stat-value" id="kpi-tx-layouts">--</div>
 					<div class="stat-details" id="kpi-tx-layouts-detail">--</div>
 				</div>
@@ -325,7 +315,7 @@
 					class="stat-card"
 					title="Nombre d’app-jours dont la séance la plus longue dépasse 90 minutes."
 				>
-					<h2 data-i18n="ui_apps.h2_long_sessions">Longues séances</h2>
+					<h2 data-i18n="ui_apps.h2_long_sessions"></h2>
 					<div class="stat-value" id="kpi-tx-long-sessions">--</div>
 					<div class="stat-details" id="kpi-tx-long-sessions-detail">--</div>
 				</div>
@@ -333,7 +323,7 @@
 					class="stat-card"
 					title="Part des frappes détectées comme auto-repeat (touche maintenue, pas une décision motrice)."
 				>
-					<h2>Auto-repeat</h2>
+					<h2 data-i18n="ui_apps.h2_autorepeat"></h2>
 					<div class="stat-value" id="kpi-tx-autorepeat">--</div>
 					<div class="stat-details" id="kpi-tx-autorepeat-detail">--</div>
 				</div>
@@ -341,7 +331,7 @@
 					class="stat-card"
 					title="App avec le plus haut taux de backspaces sur la période — où vous vous trompez le plus."
 				>
-					<h2 data-i18n="ui_apps.h2_most_errors">App la + erronée</h2>
+					<h2 data-i18n="ui_apps.h2_most_errors"></h2>
 					<div class="stat-value" id="kpi-tx-error-app" style="font-size: 1.3em">--</div>
 					<div class="stat-details" id="kpi-tx-error-app-detail">--</div>
 				</div>
@@ -349,7 +339,7 @@
 					class="stat-card"
 					title="App avec le temps de récupération moyen le plus long après une erreur."
 				>
-					<h2 data-i18n="ui_apps.h2_slowest_recovery">Récup la + lente</h2>
+					<h2 data-i18n="ui_apps.h2_slowest_recovery"></h2>
 					<div class="stat-value" id="kpi-tx-recovery-app" style="font-size: 1.3em">--</div>
 					<div class="stat-details" id="kpi-tx-recovery-app-detail">--</div>
 				</div>
@@ -368,9 +358,7 @@
 					margin-bottom: 20px;
 				"
 			>
-				<h3 style="margin: 0 0 10px 0; font-size: 14px; color: #fff" data-i18n="ui_apps.chart_speed_by_cat">
-					Vitesse de frappe par catégorie (CPM)
-					<span
+				<h3 style="margin: 0 0 10px 0; font-size: 14px; color: #fff" data-i18n="ui_apps.chart_speed_by_cat"><span
 						style="font-size: 11px; font-weight: 400; color: var(--text-muted); margin-left: 8px"
 						>caractères par minute focus, regroupés par catégorie d’app</span
 					>
@@ -387,7 +375,7 @@
 					style="grid-column: span 2"
 					title="Décomposition du temps focus selon le score de productivité de chaque app."
 				>
-					<h2 data-i18n="ui_apps.chart_prod_vs_dist">Productif vs distraction</h2>
+					<h2 data-i18n="ui_apps.chart_prod_vs_dist"></h2>
 					<div
 						id="kpi-prod-bar"
 						style="
@@ -405,7 +393,7 @@
 					class="stat-card"
 					title="Heure de la journée où votre productivité moyenne est la plus haute (score pondéré par le temps)."
 				>
-					<h2 data-i18n="ui_apps.h2_best_hour">Meilleure heure</h2>
+					<h2 data-i18n="ui_apps.h2_best_hour"></h2>
 					<div class="stat-value" id="kpi-best-hour">--</div>
 					<div class="stat-details" id="kpi-best-hour-detail">--</div>
 				</div>
@@ -413,7 +401,7 @@
 					class="stat-card"
 					title="Catégorie d’app dominante par jour de semaine sur la période."
 				>
-					<h2 data-i18n="ui_apps.h2_dominant_cat">Catégorie dominante</h2>
+					<h2 data-i18n="ui_apps.h2_dominant_cat"></h2>
 					<div class="stat-value" id="kpi-dom-cat" style="font-size: 1.3em">--</div>
 					<div class="stat-details" id="kpi-dom-cat-detail">--</div>
 				</div>
@@ -425,12 +413,12 @@
 					class="stat-card"
 					title="Nombre de verrouillages d’écran et mises en veille sur la période."
 				>
-					<h2 data-i18n="ui_apps.h2_locks">Verrouillages</h2>
+					<h2 data-i18n="ui_apps.h2_locks"></h2>
 					<div class="stat-value" id="kpi-sys-passive">--</div>
 					<div class="stat-details" id="kpi-sys-passive-detail">--</div>
 				</div>
 				<div class="stat-card" title="Temps écran verrouillé vs en veille système, séparés.">
-					<h2 data-i18n="ui_apps.h2_lock_vs_sleep">Verrou vs veille</h2>
+					<h2 data-i18n="ui_apps.h2_lock_vs_sleep"></h2>
 					<div class="stat-value" id="kpi-sys-lock-vs-sleep">--</div>
 					<div class="stat-details" id="kpi-sys-lock-vs-sleep-detail">--</div>
 				</div>
@@ -438,7 +426,7 @@
 					class="stat-card"
 					title="Nombre de changements de réseau Wi-Fi détectés (mobilité : café, train, bureau)."
 				>
-					<h2 data-i18n="ui_apps.h2_wifi_changes">Changements Wi-Fi</h2>
+					<h2 data-i18n="ui_apps.h2_wifi_changes"></h2>
 					<div class="stat-value" id="kpi-sys-wifi">--</div>
 					<div class="stat-details" id="kpi-sys-wifi-detail">--</div>
 				</div>
@@ -446,7 +434,7 @@
 					class="stat-card"
 					title="Niveau batterie : moyenne des observations sur la période, plus le minimum atteint."
 				>
-					<h2 data-i18n="ui_apps.h2_battery">Batterie</h2>
+					<h2 data-i18n="ui_apps.h2_battery"></h2>
 					<div class="stat-value" id="kpi-sys-battery">--</div>
 					<div class="stat-details" id="kpi-sys-battery-detail">--</div>
 				</div>
@@ -454,7 +442,7 @@
 					class="stat-card"
 					title="Temps cumulé en mode muet (proxy de réunion ou focus profond)."
 				>
-					<h2 data-i18n="ui_apps.h2_muted">Audio muet</h2>
+					<h2 data-i18n="ui_apps.h2_muted"></h2>
 					<div class="stat-value" id="kpi-sys-mute">--</div>
 					<div class="stat-details" id="kpi-sys-mute-detail">--</div>
 				</div>
@@ -462,12 +450,12 @@
 					class="stat-card"
 					title="Changements de Space (Mission Control) : proxy d’organisation visuelle / multitâche."
 				>
-					<h2>Spaces</h2>
+					<h2 data-i18n="ui_apps.h2_spaces"></h2>
 					<div class="stat-value" id="kpi-sys-spaces">--</div>
 					<div class="stat-details" id="kpi-sys-spaces-detail">--</div>
 				</div>
 				<div class="stat-card" title="Réveils nocturnes : sessions reprises entre 0 h et 6 h.">
-					<h2 data-i18n="ui_apps.h2_night_wakeups">Réveils nuit</h2>
+					<h2 data-i18n="ui_apps.h2_night_wakeups"></h2>
 					<div class="stat-value" id="kpi-sys-night">--</div>
 					<div class="stat-details" id="kpi-sys-night-detail">--</div>
 				</div>
@@ -475,7 +463,7 @@
 					class="stat-card"
 					title="Temps cumulé en keep-awake (Ctrl+M). Soustrait des stats par défaut ; activez le bouton « Compter keep-awake » pour l'inclure."
 				>
-					<h2>Keep-awake</h2>
+					<h2 data-i18n="ui_apps.h2_keep_awake"></h2>
 					<div class="stat-value" id="kpi-sys-awake">--</div>
 					<div class="stat-details" id="kpi-sys-awake-detail">--</div>
 				</div>
@@ -487,7 +475,7 @@
 					class="stat-card"
 					title="Plus longue série de jours consécutifs avec au moins 1000 caractères tapés."
 				>
-					<h2 data-i18n="ui_apps.h2_streak_chars">Streak chars ≥ 1k</h2>
+					<h2 data-i18n="ui_apps.h2_streak_chars"></h2>
 					<div class="stat-value" id="kpi-streak-chars">--</div>
 					<div class="stat-details" id="kpi-streak-chars-detail">--</div>
 				</div>
@@ -495,7 +483,7 @@
 					class="stat-card"
 					title="Plus longue série de jours consécutifs avec au moins 30 minutes de focus actif."
 				>
-					<h2 data-i18n="ui_apps.h2_streak_focus">Streak focus ≥ 30 min</h2>
+					<h2 data-i18n="ui_apps.h2_streak_focus"></h2>
 					<div class="stat-value" id="kpi-streak-focus">--</div>
 					<div class="stat-details" id="kpi-streak-focus-detail">--</div>
 				</div>
@@ -504,7 +492,7 @@
 					style="grid-column: span 2"
 					title="Progression vers votre objectif quotidien (modifiable par clic sur la valeur)."
 				>
-					<h2 data-i18n="ui_apps.h2_daily_goal">Objectif du jour</h2>
+					<h2 data-i18n="ui_apps.h2_daily_goal"></h2>
 					<div style="display: flex; align-items: center; gap: 8px; margin: 6px 0">
 						<span
 							class="stat-value"
@@ -543,7 +531,7 @@
 					class="stat-card"
 					title="Meilleure cadence sur un burst (≥ 10 caractères, gap entre touches &lt; 1s)."
 				>
-					<h2 data-i18n="ui_apps.h2_burst_record">Burst record</h2>
+					<h2 data-i18n="ui_apps.h2_burst_record"></h2>
 					<div class="stat-value" id="kpi-rec-burst">--</div>
 					<div class="stat-details" id="kpi-rec-burst-detail">--</div>
 				</div>
@@ -551,12 +539,12 @@
 					class="stat-card"
 					title="Plus long burst en caractères : la salve la plus longue sans pause de plus d’une seconde."
 				>
-					<h2 data-i18n="ui_apps.h2_longest_burst">Burst le + long</h2>
+					<h2 data-i18n="ui_apps.h2_longest_burst"></h2>
 					<div class="stat-value" id="kpi-rec-burst-chars">--</div>
 					<div class="stat-details" id="kpi-rec-burst-chars-detail">--</div>
 				</div>
 				<div class="stat-card" title="Plus longue séance détectée et l'app où elle s'est passée.">
-					<h2 data-i18n="ui_apps.h2_session_record">Séance record</h2>
+					<h2 data-i18n="ui_apps.h2_session_record"></h2>
 					<div class="stat-value" id="kpi-rec-session">--</div>
 					<div class="stat-details" id="kpi-rec-session-detail">--</div>
 				</div>
@@ -564,7 +552,7 @@
 					class="stat-card"
 					title="Streak max sur le même doigt observé sur la période. Au-delà de 6, vraiment beaucoup d’anti-alternance."
 				>
-					<h2 data-i18n="ui_apps.h2_finger_streak">Streak doigt</h2>
+					<h2 data-i18n="ui_apps.h2_finger_streak"></h2>
 					<div class="stat-value" id="kpi-rec-finger-streak">--</div>
 					<div class="stat-details" id="kpi-rec-finger-streak-detail">--</div>
 				</div>
@@ -572,12 +560,12 @@
 					class="stat-card"
 					title="Plus longue cascade de backspaces : combien de caractères vous avez effacés d’un coup pour réécrire."
 				>
-					<h2 data-i18n="ui_apps.h2_max_cascade">Cascade max</h2>
+					<h2 data-i18n="ui_apps.h2_max_cascade"></h2>
 					<div class="stat-value" id="kpi-rec-cascade">--</div>
 					<div class="stat-details" id="kpi-rec-cascade-detail">--</div>
 				</div>
 				<div class="stat-card" title="Jour avec le plus de caractères tapés sur la période.">
-					<h2 data-i18n="ui_apps.h2_record_day">Jour record</h2>
+					<h2 data-i18n="ui_apps.h2_record_day"></h2>
 					<div class="stat-value" id="kpi-rec-day-chars">--</div>
 					<div class="stat-details" id="kpi-rec-day-chars-detail">--</div>
 				</div>
@@ -596,11 +584,9 @@
 					margin-bottom: 20px;
 				"
 			>
-				<h3 style="margin: 0 0 10px 0; font-size: 14px; color: #fff">
-					Vitesse de frappe par heure (CPM)
-					<span
+				<h3 style="margin: 0 0 10px 0; font-size: 14px; color: #fff" data-i18n="ui_apps.chart_speed_by_hour"><span
 						style="font-size: 11px; font-weight: 400; color: var(--text-muted); margin-left: 8px"
-						>car. par minute focus, sur la période active</span
+						data-i18n="ui_apps.sub_speed_by_hour"></span
 					>
 				</h3>
 				<div style="position: relative; height: 190px">
@@ -628,20 +614,15 @@
 						margin-bottom: 10px;
 					"
 				>
-					<h3 style="margin: 0; font-size: 14px; color: #fff" data-i18n="ui_apps.chart_activity_cal">
-						Calendrier d’activité (12 mois glissants)
-					</h3>
+					<h3 style="margin: 0; font-size: 14px; color: #fff" data-i18n="ui_apps.chart_activity_cal"></h3>
 					<div style="display: flex; gap: 6px">
-						<button class="filter-btn" id="cal-mode-time" onclick="setCalendarMode('time')">
-							Temps
-						</button>
+						<button class="filter-btn" id="cal-mode-time" onclick="setCalendarMode('time')" data-i18n="ui_apps.btn_mode_time"></button>
 						<button
 							class="filter-btn active"
 							id="cal-mode-chars"
 							onclick="setCalendarMode('chars')"
-						>
-							Caractères
-						</button>
+							data-i18n="ui_apps.btn_mode_chars"
+						></button>
 					</div>
 				</div>
 				<div id="activity_calendar_container" style="overflow-x: auto"></div>
@@ -667,18 +648,15 @@
 						margin-bottom: 10px;
 					"
 				>
-					<h3 style="margin: 0; font-size: 14px; color: #fff" data-i18n="ui_apps.chart_hour_weekday">Heure × jour de semaine</h3>
+					<h3 style="margin: 0; font-size: 14px; color: #fff" data-i18n="ui_apps.chart_hour_weekday"></h3>
 					<div style="display: flex; gap: 6px">
-						<button class="filter-btn" id="hwk-mode-time" onclick="setHourWeekdayMode('time')">
-							Temps
-						</button>
+						<button class="filter-btn" id="hwk-mode-time" onclick="setHourWeekdayMode('time')" data-i18n="ui_apps.btn_mode_time"></button>
 						<button
 							class="filter-btn active"
 							id="hwk-mode-chars"
 							onclick="setHourWeekdayMode('chars')"
-						>
-							Caractères
-						</button>
+							data-i18n="ui_apps.btn_mode_chars"
+						></button>
 					</div>
 				</div>
 				<div id="hour_weekday_heatmap_container" style="overflow-x: auto"></div>
@@ -696,9 +674,7 @@
 					margin-bottom: 20px;
 				"
 			>
-				<h3 style="margin: 0 0 12px 0; font-size: 14px; color: #fff" data-i18n="ui_apps.chart_annotated_strip">
-					Frise annotée
-					<span
+				<h3 style="margin: 0 0 12px 0; font-size: 14px; color: #fff" data-i18n="ui_apps.chart_annotated_strip"><span
 						style="font-size: 11px; font-weight: 400; color: var(--text-muted); margin-left: 8px"
 						>temps par app + marqueurs système (verrou, Wi-Fi, audio, Space)</span
 					>
@@ -718,9 +694,7 @@
 					margin-bottom: 20px;
 				"
 			>
-				<h3 style="margin: 0 0 12px 0; font-size: 14px; color: #fff" data-i18n="ui_apps.chart_session_durations">
-					Durées de séance par app
-					<span
+				<h3 style="margin: 0 0 12px 0; font-size: 14px; color: #fff" data-i18n="ui_apps.chart_session_durations"><span
 						style="font-size: 11px; font-weight: 400; color: var(--text-muted); margin-left: 8px"
 						>moustache : min / Q1 / médiane / Q3 / max</span
 					>
@@ -730,9 +704,7 @@
 
 			<!-- Top fenêtres (#39) — titres de fenêtre les plus tapés. -->
 			<div class="table-container" data-tab="system" style="margin-bottom: 20px">
-				<h3 style="margin: 0 0 12px 0; font-size: 14px; color: #fff; padding: 0 10px" data-i18n="ui_apps.chart_top_windows">
-					Top fenêtres
-					<span
+				<h3 style="margin: 0 0 12px 0; font-size: 14px; color: #fff; padding: 0 10px" data-i18n="ui_apps.chart_top_windows"><span
 						style="font-size: 11px; font-weight: 400; color: var(--text-muted); margin-left: 8px"
 						>titres de fenêtre par caractères tapés</span
 					>
@@ -740,10 +712,10 @@
 				<table id="top_windows_table">
 					<thead>
 						<tr>
-							<th data-i18n="ui_apps.col_window">Fenêtre</th>
-							<th data-i18n="ui_apps.col_app">App</th>
-							<th style="text-align: right" data-i18n="ui_apps.col_chars">Caractères</th>
-							<th style="text-align: right" data-i18n="ui_apps.col_duration">Durée</th>
+							<th data-i18n="ui_apps.col_window"></th>
+							<th data-i18n="ui_apps.col_app"></th>
+							<th style="text-align: right" data-i18n="ui_apps.col_chars"></th>
+							<th style="text-align: right" data-i18n="ui_apps.col_duration"></th>
 						</tr>
 					</thead>
 					<tbody id="top_windows_tbody"></tbody>
@@ -752,9 +724,7 @@
 
 			<!-- Top sessions (#37) — les plus longues sessions observées par app-jour. -->
 			<div class="table-container" data-tab="system" style="margin-bottom: 20px">
-				<h3 style="margin: 0 0 12px 0; font-size: 14px; color: #fff; padding: 0 10px" data-i18n="ui_apps.chart_top_sessions">
-					Top sessions
-					<span
+				<h3 style="margin: 0 0 12px 0; font-size: 14px; color: #fff; padding: 0 10px" data-i18n="ui_apps.chart_top_sessions"><span
 						style="font-size: 11px; font-weight: 400; color: var(--text-muted); margin-left: 8px"
 						>les plus longues séances observées (par app-jour)</span
 					>
@@ -762,10 +732,10 @@
 				<table id="top_sessions_table">
 					<thead>
 						<tr>
-							<th data-i18n="ui_apps.col_day">Jour</th>
-							<th data-i18n="ui_apps.col_app">App</th>
-							<th style="text-align: right" data-i18n="ui_apps.col_duration">Durée</th>
-							<th style="text-align: right" data-i18n="ui_apps.col_chars">Caractères</th>
+							<th data-i18n="ui_apps.col_day"></th>
+							<th data-i18n="ui_apps.col_app"></th>
+							<th style="text-align: right" data-i18n="ui_apps.col_duration"></th>
+							<th style="text-align: right" data-i18n="ui_apps.col_chars"></th>
 						</tr>
 					</thead>
 					<tbody id="top_sessions_tbody"></tbody>
@@ -774,9 +744,7 @@
 
 			<!-- Top journées (#38) — meilleures journées par caractères, temps focus, bascules. -->
 			<div class="table-container" data-tab="system" style="margin-bottom: 20px">
-				<h3 style="margin: 0 0 12px 0; font-size: 14px; color: #fff; padding: 0 10px" data-i18n="ui_apps.chart_top_days">
-					Top journées
-					<span
+				<h3 style="margin: 0 0 12px 0; font-size: 14px; color: #fff; padding: 0 10px" data-i18n="ui_apps.chart_top_days"><span
 						style="font-size: 11px; font-weight: 400; color: var(--text-muted); margin-left: 8px"
 						>classement par caractères tapés, temps focus, et bascules</span
 					>
@@ -784,11 +752,11 @@
 				<table id="top_days_table">
 					<thead>
 						<tr>
-							<th data-i18n="ui_apps.col_day">Jour</th>
-							<th style="text-align: right" data-i18n="ui_apps.col_chars">Caractères</th>
-							<th style="text-align: right" data-i18n="ui_apps.col_focus_time">Temps focus</th>
-							<th style="text-align: right" data-i18n="ui_apps.col_switches">Bascules</th>
-							<th style="text-align: right" data-i18n="ui_apps.col_sessions">Séances</th>
+							<th data-i18n="ui_apps.col_day"></th>
+							<th style="text-align: right" data-i18n="ui_apps.col_chars"></th>
+							<th style="text-align: right" data-i18n="ui_apps.col_focus_time"></th>
+							<th style="text-align: right" data-i18n="ui_apps.col_switches"></th>
+							<th style="text-align: right" data-i18n="ui_apps.col_sessions"></th>
 						</tr>
 					</thead>
 					<tbody id="top_days_tbody"></tbody>
@@ -797,9 +765,7 @@
 
 			<!-- Table des paires d’app (#36) — bascules A→B les plus fréquentes. -->
 			<div class="table-container" data-tab="apps" style="margin-bottom: 20px">
-				<h3 style="margin: 0 0 12px 0; font-size: 14px; color: #fff; padding: 0 10px" data-i18n="ui_apps.chart_top_switch_pairs">
-					Top paires de bascules
-					<span
+				<h3 style="margin: 0 0 12px 0; font-size: 14px; color: #fff; padding: 0 10px" data-i18n="ui_apps.chart_top_switch_pairs"><span
 						style="font-size: 11px; font-weight: 400; color: var(--text-muted); margin-left: 8px"
 						>de quelle app vers quelle app et combien de fois</span
 					>
@@ -807,10 +773,10 @@
 				<table id="app_pairs_table">
 					<thead>
 						<tr>
-							<th data-i18n="ui_apps.col_from">De</th>
-							<th data-i18n="ui_apps.col_to">Vers</th>
-							<th style="text-align: right" data-i18n="ui_apps.col_switches">Bascules</th>
-							<th style="text-align: right" data-i18n="ui_apps.col_share">Part du total</th>
+							<th data-i18n="ui_apps.col_from"></th>
+							<th data-i18n="ui_apps.col_to"></th>
+							<th style="text-align: right" data-i18n="ui_apps.col_switches"></th>
+							<th style="text-align: right" data-i18n="ui_apps.col_share"></th>
 						</tr>
 					</thead>
 					<tbody id="app_pairs_tbody"></tbody>
@@ -829,9 +795,7 @@
 					margin-bottom: 20px;
 				"
 			>
-				<h3 style="margin: 0 0 12px 0; font-size: 14px; color: #fff" data-i18n="ui_apps.chart_daily_evolution">
-					Évolution journalière
-					<span
+				<h3 style="margin: 0 0 12px 0; font-size: 14px; color: #fff" data-i18n="ui_apps.chart_daily_evolution"><span
 						style="font-size: 11px; font-weight: 400; color: var(--text-muted); margin-left: 8px"
 						>temps focus, caractères, bascules par jour</span
 					>
@@ -850,9 +814,7 @@
 					margin-bottom: 20px;
 				"
 			>
-				<h3 style="margin: 0 0 12px 0; font-size: 14px; color: #fff" data-i18n="ui_apps.chart_active_ratio">
-					Ratio actif au fil des jours
-					<span
+				<h3 style="margin: 0 0 12px 0; font-size: 14px; color: #fff" data-i18n="ui_apps.chart_active_ratio"><span
 						style="font-size: 11px; font-weight: 400; color: var(--text-muted); margin-left: 8px"
 						>temps actif / focus net par jour</span
 					>
@@ -873,9 +835,7 @@
 					margin-bottom: 20px;
 				"
 			>
-				<h3 style="margin: 0 0 12px 0; font-size: 14px; color: #fff" data-i18n="ui_apps.chart_cat_evolution">
-					Évolution des catégories
-					<span
+				<h3 style="margin: 0 0 12px 0; font-size: 14px; color: #fff" data-i18n="ui_apps.chart_cat_evolution"><span
 						style="font-size: 11px; font-weight: 400; color: var(--text-muted); margin-left: 8px"
 						>aire empilée du temps focus par catégorie</span
 					>
@@ -896,9 +856,7 @@
 					margin-bottom: 20px;
 				"
 			>
-				<h3 style="margin: 0 0 12px 0; font-size: 14px; color: #fff" data-i18n="ui_apps.chart_wake_sleep">
-					Heures de réveil et de coucher (clavier)
-					<span
+				<h3 style="margin: 0 0 12px 0; font-size: 14px; color: #fff" data-i18n="ui_apps.chart_wake_sleep"><span
 						style="font-size: 11px; font-weight: 400; color: var(--text-muted); margin-left: 8px"
 						>première et dernière frappe par jour</span
 					>
@@ -921,9 +879,7 @@
 					margin-bottom: 20px;
 				"
 			>
-				<h3 style="margin: 0 0 10px 0; font-size: 14px; color: #fff" data-i18n="ui_apps.chart_top8">
-					Top 8 apps : temps vs caractères
-					<span
+				<h3 style="margin: 0 0 10px 0; font-size: 14px; color: #fff" data-i18n="ui_apps.chart_top8"><span
 						style="font-size: 11px; font-weight: 400; color: var(--text-muted); margin-left: 8px"
 						>deux séries normalisées sur le top focus</span
 					>
@@ -945,9 +901,7 @@
 					margin-bottom: 20px;
 				"
 			>
-				<h3 style="margin: 0 0 12px 0; font-size: 14px; color: #fff" data-i18n="ui_apps.chart_burst_hist">
-					Histogramme des bursts
-					<span
+				<h3 style="margin: 0 0 12px 0; font-size: 14px; color: #fff" data-i18n="ui_apps.chart_burst_hist"><span
 						style="font-size: 11px; font-weight: 400; color: var(--text-muted); margin-left: 8px"
 						>combien de salves selon leur longueur en caractères</span
 					>
@@ -969,9 +923,7 @@
 					margin-bottom: 20px;
 				"
 			>
-				<h3 style="margin: 0 0 12px 0; font-size: 14px; color: #fff" data-i18n="ui_apps.chart_app_switches">
-					Bascules entre apps
-					<span
+				<h3 style="margin: 0 0 12px 0; font-size: 14px; color: #fff" data-i18n="ui_apps.chart_app_switches"><span
 						style="font-size: 11px; font-weight: 400; color: var(--text-muted); margin-left: 8px"
 						>épaisseur du flux = nombre de bascules</span
 					>
@@ -991,9 +943,7 @@
 					margin-bottom: 20px;
 				"
 			>
-				<h3 style="margin: 0 0 12px 0; font-size: 14px; color: #fff" data-i18n="ui_apps.chart_day_strip">
-					Frise par jour
-					<span
+				<h3 style="margin: 0 0 12px 0; font-size: 14px; color: #fff" data-i18n="ui_apps.chart_day_strip"><span
 						style="font-size: 11px; font-weight: 400; color: var(--text-muted); margin-left: 8px"
 						>une bande par jour, couleur = catégorie dominante à chaque heure</span
 					>
@@ -1016,30 +966,23 @@
 				<table id="apps-table">
 					<thead>
 						<tr>
-							<th>Application</th>
-							<th>Catégorie</th>
-							<th title="Temps avec l'app au foreground (somme des durées de focus).">Focus</th>
-							<th title="Part du temps focus passée à frapper activement (inter-touches sommés).">
-								Frappe %
-							</th>
-							<th title="Caractères tapés ÷ minutes de focus. Densité de production texte par app.">
-								Densité
-							</th>
+							<th data-i18n="ui_apps.col_app_name"></th>
+							<th data-i18n="ui_apps.col_category"></th>
+							<th title="Temps avec l’app au foreground (somme des durées de focus)." data-i18n="ui_apps.col_focus"></th>
+							<th title="Part du temps focus passée à frapper activement (inter-touches sommés)." data-i18n="ui_apps.col_typing_pct"></th>
+							<th title="Caractères tapés ÷ minutes de focus. Densité de production texte par app." data-i18n="ui_apps.col_density"></th>
 							<th
 								title="Nombre de séances détectées dans cette app sur la période (gap inactif &lt; 5 min)."
-							>
-								Séances
-							</th>
+								data-i18n="ui_apps.col_sessions"
+							></th>
 							<th
-								title="Latence moyenne entre l'activation de l'app et votre première frappe — temps d’orientation."
-							>
-								Latence
-							</th>
+								title="Latence moyenne entre l’activation de l’app et votre première frappe — temps d’orientation."
+								data-i18n="ui_apps.col_latency"
+							></th>
 							<th
-								title="Caractères produits via hotstrings ÷ caractères totaux. Indique l'apport des raccourcis dans cette app."
-							>
-								% HS
-							</th>
+								title="Caractères produits via hotstrings ÷ caractères totaux. Indique l’apport des raccourcis dans cette app."
+								data-i18n="ui_apps.col_hs_pct"
+							></th>
 							<th
 								title="Plus long enchaînement same-finger observé dans cette app — signal d’anti-alternance ergonomique."
 							>
@@ -1047,17 +990,14 @@
 							</th>
 							<th
 								title="Durée moyenne d’appui sur les modifiers (Cmd / Shift / Option) dans cette app."
-							>
-								Hold
-							</th>
-							<th>Principales destinations</th>
+								data-i18n="ui_apps.col_hold"
+							></th>
+							<th data-i18n="ui_apps.col_top_dests"></th>
 						</tr>
 					</thead>
 					<tbody id="apps-tbody">
 						<tr>
-							<td class="app-name-cell" colspan="9" style="text-align: center" data-i18n="ui_apps.loading_data">
-								Chargement des données...
-							</td>
+							<td class="app-name-cell" colspan="9" style="text-align: center" data-i18n="ui_apps.loading_data"></td>
 						</tr>
 					</tbody>
 				</table>
@@ -1073,33 +1013,33 @@
 		>
 			<div class="app-modal-card">
 				<div class="app-modal-header">
-					<h2 id="app_modal_title" data-i18n="ui_apps.modal_app_title">Application</h2>
-					<button class="app-modal-close" onclick="closeAppDrilldown()" title="Fermer" data-i18n="ui_apps.btn_close">×</button>
+					<h2 id="app_modal_title" data-i18n="ui_apps.modal_app_title"></h2>
+					<button class="app-modal-close" onclick="closeAppDrilldown()" title="Fermer" data-i18n="ui_apps.btn_close"></button>
 				</div>
 				<div class="app-modal-tiles" id="app_modal_tiles"></div>
 				<div class="app-modal-section">
-					<h3 data-i18n="ui_apps.modal_activity_hour">Activité par heure</h3>
+					<h3 data-i18n="ui_apps.modal_activity_hour"></h3>
 					<div style="position: relative; height: 160px">
 						<canvas id="app_modal_hourly"></canvas>
 					</div>
 				</div>
 				<div class="app-modal-section app-modal-grid-2">
 					<div>
-						<h3 data-i18n="ui_apps.modal_destinations">Destinations</h3>
+						<h3 data-i18n="ui_apps.modal_destinations"></h3>
 						<div id="app_modal_dests"></div>
 					</div>
 					<div>
-						<h3 data-i18n="ui_apps.modal_layouts">Layouts utilisés</h3>
+						<h3 data-i18n="ui_apps.modal_layouts"></h3>
 						<div id="app_modal_layouts"></div>
 					</div>
 				</div>
 				<div class="app-modal-section app-modal-grid-2">
 					<div>
-						<h3 data-i18n="ui_apps.modal_records">Records</h3>
+						<h3 data-i18n="ui_apps.modal_records"></h3>
 						<div id="app_modal_records"></div>
 					</div>
 					<div>
-						<h3 data-i18n="ui_apps.modal_hs_ai">Hotstrings & IA</h3>
+						<h3 data-i18n="ui_apps.modal_hs_ai"></h3>
 						<div id="app_modal_assist"></div>
 					</div>
 				</div>

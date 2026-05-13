@@ -13,6 +13,7 @@ local M = {}
 local hs      = hs
 local llm_mod = require("modules.llm")
 local Logger  = require("lib.logger")
+local i18n    = require("lib.i18n")
 local dialog  = require("lib.dialog_util")
 
 local LOG = "menu_llm.settings"
@@ -45,7 +46,7 @@ local function generic_numeric_prompt(deps, title, msg, key, factor, hs_fn, defa
 	local display_val = factor and math.floor(current_val * factor) or current_val
 	local display_def = (factor and tonumber(default_val)) and math.floor(tonumber(default_val) * factor) or default_val
 
-	local full_msg = tostring(msg) .. "\n\n(Laissez vide pour réinitialiser : " .. tostring(display_def) .. ")"
+	local full_msg = tostring(msg) .. string.format(i18n.get("menu.settings.reset_instruction"), tostring(display_def))
 
 	Logger.debug(LOG, string.format("Opening numeric prompt for %s…", key))
 	local ok_p, btn, raw = pcall(dialog.text_prompt, 
@@ -125,12 +126,12 @@ function M.new(deps)
 
 		local current_val = tonumber(state.llm_debounce)
 		if current_val == nil then current_val = llm_mod.DEFAULT_STATE.llm_debounce end
-		local display_val = current_val < 0 and "Jamais" or math.floor(current_val * 1000)
+		local display_val = current_val < 0 and i18n.get("menu.settings.never") or math.floor(current_val * 1000)
 		local display_def = math.floor(llm_mod.DEFAULT_STATE.llm_debounce * 1000)
 
-		local full_msg = "Délai de pause requis lors de la frappe (en ms) avant de solliciter l’IA :\n\n(Laissez vide pour réinitialiser : " .. display_def .. " ms)\n(Tapez \"Jamais\" ou -1 pour désactiver l’auto-génération)"
+		local full_msg = string.format(i18n.get("menu.settings.delay_prompt"), display_def)
 
-		local ok_p, btn, raw = pcall(dialog.text_prompt, "Temps d’attente", full_msg, tostring(display_val), "OK", "Annuler")
+		local ok_p, btn, raw = pcall(dialog.text_prompt, "i18n.get("menu.settings.delay_title")", full_msg, tostring(display_val), "OK", "Annuler")
 
 		if ok_p and btn == "OK" then
 			local new_val
@@ -167,9 +168,9 @@ function M.new(deps)
 		local current_val = tonumber(state.llm_max_words)
 		local display_val = (current_val and current_val > 0) and tostring(current_val) or "0"
 
-		local full_msg = "Nombre maximum de mots à conserver par suggestion (0 = illimité) :"
+		local full_msg = i18n.get("menu.settings.max_words_prompt")
 
-		local ok_p, btn, raw = pcall(dialog.text_prompt, "Mots max par suggestion", full_msg, display_val, "OK", "Annuler")
+		local ok_p, btn, raw = pcall(dialog.text_prompt, i18n.get("menu.settings.max_words_title"), full_msg, display_val, "OK", "Annuler")
 
 		if ok_p and btn == "OK" then
 			local digits = raw:match("^%s*(%d+)%s*$")
@@ -198,9 +199,9 @@ function M.new(deps)
 		local current_val = tonumber(state.llm_min_words)
 		local display_val = (current_val and current_val > 0) and tostring(current_val) or "1"
 
-		local full_msg = "Nombre minimum de mots à générer par suggestion :"
+		local full_msg = i18n.get("menu.settings.min_words_prompt")
 
-		local ok_p, btn, raw = pcall(dialog.text_prompt, "Mots min par suggestion", full_msg, display_val, "OK", "Annuler")
+		local ok_p, btn, raw = pcall(dialog.text_prompt, i18n.get("menu.settings.min_words_title"), full_msg, display_val, "OK", "Annuler")
 
 		if ok_p and btn == "OK" then
 			local digits = raw:match("^%s*(%d+)%s*$")
@@ -225,8 +226,8 @@ function M.new(deps)
 	--- Sets the AI temperature (creativity vs stability).
 	function obj.set_temperature()
 		generic_numeric_prompt(deps, 
-			"Température", 
-			"Niveau de créativité (de 0.0 à 1.0) :", 
+			i18n.get("menu.settings.temperature_title"), 
+			i18n.get("menu.settings.temperature_prompt"), 
 			"llm_temperature", nil, "set_llm_temperature", llm_mod.DEFAULT_STATE.llm_temperature, 0.0, 1.0
 		)
 	end
@@ -238,8 +239,8 @@ function M.new(deps)
 	--- Sets the size of the text buffer sent as context to the AI.
 	function obj.set_context_length()
 		generic_numeric_prompt(deps, 
-			"Taille du contexte", 
-			"Nombre de caractères précédents à analyser :", 
+			i18n.get("menu.settings.context_length_title"), 
+			i18n.get("menu.settings.context_length_prompt"), 
 			"llm_context_length", nil, "set_llm_context_length", llm_mod.DEFAULT_STATE.llm_context_length
 		)
 	end
@@ -257,8 +258,8 @@ function M.new(deps)
 		local paused  = deps.script_control and type(deps.script_control.is_paused) == "function" and deps.script_control.is_paused() or false
 
 		for i = -7, 7 do
-			local title_str = ((i == -1 or i == 0 or i == 1) and i .. " espace") or (i .. " espaces")
-			if i == default_val then title_str = title_str .. " (défaut)" end
+			local title_str = ((i == -1 or i == 0 or i == 1) and i18n.get("menu.settings.indent_space")) or (i .. i18n.get("menu.settings.indent_spaces"))
+			if i == default_val then title_str = title_str .. " " .. i18n.get("menu.settings.default_indicator")" end
 			
 			table.insert(menu, {
 				title   = title_str,
@@ -285,8 +286,8 @@ function M.new(deps)
 		local paused = deps.script_control and type(deps.script_control.is_paused) == "function" and deps.script_control.is_paused() or false
 
         local opts = {
-            {title = "Désactivé", mods = {"none"}}, 
-            {title = "Aucun modificateur", mods = {}},
+            {title = "i18n.get("menu.settings.disabled")", mods = {"none"}}, 
+            {title = "i18n.get("menu.settings.no_modifier")", mods = {}},
             {title = "⇧ Shift", mods = {"shift"}}, 
             {title = "⌘ Cmd", mods = {"cmd"}},
             {title = "⌥ Option", mods = {"alt"}}, 

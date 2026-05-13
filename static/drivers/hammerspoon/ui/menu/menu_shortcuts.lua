@@ -45,9 +45,9 @@ M.DEFAULT_STATE = {
 --- @param state table The current state table (used for trigger_char substitution).
 --- @return string Display label for the trigger key(s).
 local function pretty_key(id, state)
-	if id == "at_hash" then return "Touche @/#" end
+	if id == "at_hash" then return i18n.get("menu.shortcuts.key_at_hash") end
 	if id == "layer_scroll" or id == "layer+scroll" then return "Layer + Scroll" end
-	if id == "wrap_text_if_selected" then return "AltGr + symbole" end
+	if id == "wrap_text_if_selected" then return i18n.get("menu.shortcuts.altgr_symbol") end
 
 	local parts = {}
 	for p in id:gmatch("[^_]+") do table.insert(parts, p) end
@@ -188,7 +188,7 @@ function M.build(ctx)
 	if #ctrl_items > 0 then
 		table.insert(s_menu, { title = "-" })
 		table.insert(s_menu, {
-			title    = "Ctrl",
+			title    = i18n.get("menu.shortcuts.submenu_ctrl"),
 			disabled = not state.shortcuts or paused or nil,
 			menu     = ctrl_items,
 		})
@@ -197,7 +197,7 @@ function M.build(ctx)
 	-- Cmd submenu
 	if #cmd_items > 0 then
 		table.insert(s_menu, {
-			title    = "Cmd",
+			title    = i18n.get("menu.shortcuts.submenu_cmd"),
 			disabled = not state.shortcuts or paused or nil,
 			menu     = cmd_items,
 		})
@@ -250,17 +250,17 @@ function M.build(ctx)
 
 		local script_items = {
 			{
-				title    = "Option droite + ↩ : " .. get_label(cur_return),
+				title    = "string.format(i18n.get("menu.shortcuts.right_opt_return"), get_label(cur_return)),
 				disabled = not enabled or paused or nil,
 				menu     = key_submenu("return_key"),
 			},
 			{
-				title    = "Option droite + ⌫ : " .. get_label(cur_back),
+				title    = "string.format(i18n.get("menu.shortcuts.right_opt_back"), get_label(cur_back)),
 				disabled = not enabled or paused or nil,
 				menu     = key_submenu("backspace"),
 			},
 			{
-				title    = "Option droite + ⎋ : " .. get_label(cur_escape),
+				title    = "string.format(i18n.get("menu.shortcuts.right_opt_escape"), get_label(cur_escape)),
 				disabled = not enabled or paused or nil,
 				menu     = key_submenu("escape"),
 			},

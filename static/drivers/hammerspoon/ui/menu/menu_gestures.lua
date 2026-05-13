@@ -122,8 +122,8 @@ function M.build(ctx)
 							if type(conflict) == "table" then
 								hs.timer.doAfter(0.3, function()
 									local ok_c, clicked = pcall(dialog.block_alert,
-										"⚠️ Conflit potentiel", conflict.msg or "",
-										"Ouvrir Réglages", "OK", "warning")
+										i18n.get("menu.gestures.conflict_title"), conflict.msg or "",
+										i18n.get("menu.gestures.open_settings"), "OK", "warning")
 									if ok_c and clicked == "Ouvrir Réglages" then
 										pcall(hs.execute, string.format("open \"%s\"", conflict.url or ""))
 									end

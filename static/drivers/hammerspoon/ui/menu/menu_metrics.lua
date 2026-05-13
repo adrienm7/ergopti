@@ -196,7 +196,7 @@ function M.build(ctx)
 		end
 	})
 
-	local sc_label_metrics = "Aucun"
+	local sc_label_metrics = i18n.get("menu.metrics.shortcut_none")
 	if type(state.metrics_shortcut) == "table" then
 		local mods_cap = {}
 		for _, m in ipairs(state.metrics_shortcut.mods or {}) do
@@ -207,7 +207,7 @@ function M.build(ctx)
 	end
 
 	table.insert(menu, {
-		title = "↳ Raccourci : " .. sc_label_metrics,
+		title = string.format(i18n.get("menu.metrics.shortcut_item"), sc_label_metrics),
 		disabled = not state.keylogger_enabled,
 		fn = function()
 			local current_str = ""
@@ -215,8 +215,8 @@ function M.build(ctx)
 				current_str = table.concat(state.metrics_shortcut.mods or {}, "+") .. "+" .. (state.metrics_shortcut.key or "")
 			end
 			local ok_p, btn, raw = pcall(dialog.text_prompt,
-				"Raccourci métriques de frappe",
-				"Format : mods+touche  (ex : cmd+alt+m)\nMods disponibles : cmd, alt, ctrl, shift\nLaisser vide pour désactiver",
+				i18n.get("menu.metrics.shortcut_typing_title"),
+				i18n.get("menu.metrics.shortcut_prompt"),
 				current_str, "OK", "Annuler"
 			)
 			if not ok_p or btn ~= "OK" or type(raw) ~= "string" then return end
@@ -251,7 +251,7 @@ function M.build(ctx)
 		end
 	})
 
-	local sc_label_apps = "Aucun"
+	local sc_label_apps = i18n.get("menu.metrics.shortcut_none")
 	if type(state.apps_time_shortcut) == "table" then
 		local mods_cap = {}
 		for _, m in ipairs(state.apps_time_shortcut.mods or {}) do
@@ -262,7 +262,7 @@ function M.build(ctx)
 	end
 
 	table.insert(menu, {
-		title = "↳ Raccourci : " .. sc_label_apps,
+		title = string.format(i18n.get("menu.metrics.shortcut_item"), sc_label_apps),
 		disabled = not state.keylogger_enabled,
 		fn = function()
 			local current_str = ""
@@ -270,8 +270,8 @@ function M.build(ctx)
 				current_str = table.concat(state.apps_time_shortcut.mods or {}, "+") .. "+" .. (state.apps_time_shortcut.key or "")
 			end
 			local ok_p, btn, raw = pcall(dialog.text_prompt,
-				"Raccourci temps apps",
-				"Format : mods+touche  (ex : cmd+alt+t)\nMods disponibles : cmd, alt, ctrl, shift\nLaisser vide pour désactiver",
+				i18n.get("menu.metrics.shortcut_apps_title"),
+				i18n.get("menu.metrics.shortcut_prompt"),
 				current_str, "OK", "Annuler"
 			)
 			if not ok_p or btn ~= "OK" or type(raw) ~= "string" then return end
@@ -299,7 +299,7 @@ function M.build(ctx)
 	table.insert(menu, { title = "-" })
 
 	table.insert(menu, {
-		title = "Afficher le MPM dans la barre des menus",
+		title = i18n.get("menu.metrics.show_wpm_menubar"),
 		checked = state.keylogger_menubar_wpm,
 		disabled = not state.keylogger_enabled,
 		fn = function()
@@ -315,7 +315,7 @@ function M.build(ctx)
 	})
 
 	table.insert(menu, {
-		title = "↳ Couleurs selon la source",
+		title = i18n.get("menu.metrics.colors_by_source"),
 		checked = state.keylogger_menubar_colors,
 		disabled = not state.keylogger_enabled or not state.keylogger_menubar_wpm,
 		fn = function()
@@ -331,7 +331,7 @@ function M.build(ctx)
 	})
 
 	table.insert(menu, {
-		title = "Afficher le MPM dans un widget flottant",
+		title = i18n.get("menu.metrics.show_wpm_widget"),
 		checked = state.keylogger_float_wpm,
 		disabled = not state.keylogger_enabled,
 		fn = function()
@@ -347,7 +347,7 @@ function M.build(ctx)
 	})
 
 	table.insert(menu, {
-		title = "↳ Couleurs selon la source",
+		title = i18n.get("menu.metrics.colors_by_source"),
 		checked = state.keylogger_float_colors,
 		disabled = not state.keylogger_enabled or not state.keylogger_float_wpm,
 		fn = function()
@@ -363,7 +363,7 @@ function M.build(ctx)
 	})
 
 	table.insert(menu, {
-		title = "↳ Inclure le graphique en temps réel",
+		title = i18n.get("menu.metrics.include_realtime"),
 		checked = state.keylogger_float_graph,
 		disabled = not state.keylogger_enabled or not state.keylogger_float_wpm,
 		fn = function()

@@ -21,14 +21,15 @@
 local M = {}
 local hs     = hs
 local Logger = require("lib.logger")
+local i18n   = require("lib.i18n")
 
 local LOG = "menu_apps"
 
 
 -- Short descriptions shown next to each app name in the submenu
 local APP_DESCRIPTIONS = {
-	["App Cloner"] = "Cloner une app avec icône et identité propres",
-	["Encryptor"]  = "Chiffrer des fichiers journaux",
+	["App Cloner"] = i18n.get("menu.apps.clone_desc"),
+	["Encryptor"]  = i18n.get("menu.apps.encrypt_desc"),
 }
 
 
@@ -203,7 +204,7 @@ function M.build(ctx)
 	end
 
 	if #rows == 0 then
-		table.insert(rows, { title = "Aucune application disponible", disabled = true })
+		table.insert(rows, { title = i18n.get("menu.apps.no_apps"), disabled = true })
 	end
 
 	Logger.done(LOG, "Applications submenu built (%d item(s)).", #rows)

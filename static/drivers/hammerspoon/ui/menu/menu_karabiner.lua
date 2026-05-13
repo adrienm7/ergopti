@@ -197,7 +197,7 @@ local function build_one_tap_hold_item(karabiner, action_index, update_menu, ena
 
 	local key_submenu = {
 		{
-			title    = "— Rien (effacer tap et hold) —",
+			title    = i18n.get("menu.karabiner.nothing_tap_hold"),
 			disabled = (current_tap == "none" and current_hold == "none"),
 			fn       = function()
 				pcall(karabiner.set_tap_action,  kid, "none")
@@ -208,7 +208,7 @@ local function build_one_tap_hold_item(karabiner, action_index, update_menu, ena
 		},
 		{ title = "-" },
 		{
-			title = string.format("Tap  ➜  %s", tap_slbl),
+			title = string.format(i18n.get("menu.karabiner.tap_arrow"), tap_slbl),
 			menu  = build_action_picker(
 				karabiner,
 				function(action_id) karabiner.set_tap_action(kid, action_id) end,
@@ -218,7 +218,7 @@ local function build_one_tap_hold_item(karabiner, action_index, update_menu, ena
 			),
 		},
 		{
-			title = string.format("Hold ➜  %s", hold_slbl),
+			title = string.format(i18n.get("menu.karabiner.hold_arrow"), hold_slbl),
 			menu  = build_action_picker(
 				karabiner,
 				function(action_id) karabiner.set_hold_action(kid, action_id) end,
@@ -248,7 +248,7 @@ end
 local function build_tap_hold_items(karabiner, action_index, update_menu, enabled)
 	local items = {}
 
-	items[#items + 1] = { title = "===== Taps / Holds =====", disabled = true }
+	items[#items + 1] = { title = i18n.get("menu.karabiner.header_taps_holds"), disabled = true }
 	items[#items + 1] = { title = i18n.get("menu.karabiner.left_hand"),  disabled = true }
 	for _, key_def in ipairs(karabiner.TAP_HOLD_KEYS) do
 		if LEFT_HAND_IDS[key_def.id] then
@@ -306,7 +306,7 @@ local function build_one_combo_item(karabiner, action_index, update_menu, enable
 
 	local combo_submenu = {
 		{
-			title    = "— Rien (effacer combo, tap et hold) —",
+			title    = i18n.get("menu.karabiner.nothing_combo"),
 			disabled = is_empty,
 			fn       = function()
 				pcall(karabiner.set_combo_combo_action, cid, "none")
@@ -318,7 +318,7 @@ local function build_one_combo_item(karabiner, action_index, update_menu, enable
 		},
 		{ title = "-" },
 		{
-			title = string.format("Combo  :  %s", combo_slbl),
+			title = string.format(i18n.get("menu.karabiner.combo_arrow"), combo_slbl),
 			menu  = build_action_picker(
 				karabiner,
 				function(action_id) karabiner.set_combo_combo_action(cid, action_id) end,
@@ -328,7 +328,7 @@ local function build_one_combo_item(karabiner, action_index, update_menu, enable
 			),
 		},
 		{
-			title = string.format("Tap  :  %s", tap_slbl),
+			title = string.format(i18n.get("menu.karabiner.tap_colon"), tap_slbl),
 			menu  = build_action_picker(
 				karabiner,
 				function(action_id) karabiner.set_combo_tap_action(cid, action_id) end,
@@ -338,7 +338,7 @@ local function build_one_combo_item(karabiner, action_index, update_menu, enable
 			),
 		},
 		{
-			title = string.format("Hold  :  %s", hold_slbl),
+			title = string.format(i18n.get("menu.karabiner.hold_colon"), hold_slbl),
 			menu  = build_action_picker(
 				karabiner,
 				function(action_id) karabiner.set_combo_hold_action(cid, action_id) end,
@@ -714,7 +714,7 @@ function M.build(ctx)
 		end,
 	}
 	submenu[#submenu + 1] = {
-		title = "⇢  Copier Tap → Combo (tous les raccourcis)",
+		title = i18n.get("menu.karabiner.copy_tap_to_combo"),
 		fn    = function()
 			Logger.start(LOG, "Propagating tap → combo for all modifier combos…")
 			local changed = 0
@@ -752,7 +752,7 @@ function M.build(ctx)
 	submenu[#submenu + 1] = { title = "-" }
 
 	-- Section 2: modifier combo action pickers (grayed when disabled)
-	submenu[#submenu + 1] = { title = "===== Raccourcis =====", disabled = true }
+	submenu[#submenu + 1] = { title = i18n.get("menu.karabiner.header_shortcuts"), disabled = true }
 	for _, item in ipairs(raccourcis) do
 		submenu[#submenu + 1] = item
 	end
