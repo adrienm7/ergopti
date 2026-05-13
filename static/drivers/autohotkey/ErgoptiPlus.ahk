@@ -3,6 +3,13 @@
 #SingleInstance Force ; Ensure that only one instance of the script can run at once
 SetWorkingDir(A_ScriptDir) ; Set the working directory where the script is located
 
+; Compute _StaticDir early so i18n.ahk and any module-level t() calls that run
+; during #Include processing can resolve locale file paths. _StaticDir is later
+; re-confirmed at line ~184 via SplitPath — the two computations are identical.
+SplitPath(A_ScriptDir, , &_DriversDir_early)    ; static/drivers
+SplitPath(_DriversDir_early, , &_StaticDir)     ; static
+global _StaticDir
+
 ; #Warn directives apply to the whole compilation unit in AHK v2 — they
 ; cannot be scoped to a single #Include. VarUnset and LocalSameAsGlobal are
 ; disabled globally because UIA.ahk (third-party) triggers both intentionally.
@@ -91,6 +98,7 @@ SendMode("Event") ; Everything concerning hotstrings MUST use SendEvent and not 
 #Include lib/config_shortcuts.ahk
 #Include lib/metrics/metrics_shortcuts.ahk
 #Include lib/metrics/metrics_filters.ahk
+#Include lib/metrics/wpm_widget.ahk
 #Include lib/sqlite3.ahk
 #Include vendor/ComVar.ahk
 #Include vendor/Promise.ahk
@@ -967,6 +975,17 @@ BuildMetricsMenu() {
         : t("menu.metrics.exclude_apps")
     MetricsMenu.Add(excl_label, OpenMetricsAppPicker)
 
+    ; ── Real-time WPM display ──────────────────────────────────────────────
+    MetricsMenu.Add()
+    wpm_menubar_label  := t("menu.metrics.show_wpm_menubar")
+    wpm_widget_label   := t("menu.metrics.show_wpm_widget")
+    MetricsMenu.Add(wpm_menubar_label,  (*) => ToggleWpmMenubar())
+    MetricsMenu.Add(wpm_widget_label,   (*) => WPMWidget_Toggle())
+    if MetricsShortcuts.show_wpm_menubar
+        MetricsMenu.Check(wpm_menubar_label)
+    if WPMWidget.visible
+        MetricsMenu.Check(wpm_widget_label)
+
     if !enabled {
         MetricsMenu.Disable(typing_label)
         MetricsMenu.Disable(typing_sc)
@@ -976,6 +995,8 @@ BuildMetricsMenu() {
         MetricsMenu.Disable(secure_label)
         MetricsMenu.Disable(sysauth_label)
         MetricsMenu.Disable(excl_label)
+        MetricsMenu.Disable(wpm_menubar_label)
+        MetricsMenu.Disable(wpm_widget_label)
     }
 
     A_TrayMenu.Add(t("menu.metrics.title"), MetricsMenu)
@@ -1011,6 +1032,33 @@ ToggleFilterSystemAuth(*) {
     MetricsFilters.system_auth := !MetricsFilters.system_auth
     MF_SaveToIni()
     Reload
+}
+
+; WPM toggles — no Reload needed since these control runtime-only state.
+ToggleWpmMenubar(*) {
+    MetricsShortcuts.show_wpm_menubar := !MetricsShortcuts.show_wpm_menubar
+    CS_Save()
+    if MetricsShortcuts.show_wpm_menubar {
+        ; Start the tray-tip WPM update timer.
+        SetTimer(WpmMenubar_Tick, 1000)
+    } else {
+        SetTimer(WpmMenubar_Tick, 0)
+        ; Restore the default tooltip.
+        A_IconTip := "ErgoptiPlus"
+    }
+    ; Rebuild the menu so the checkmark reflects the new state.
+    Reload
+}
+
+; Updates A_IconTip with the current live WPM every second.
+WpmMenubar_Tick() {
+    result := WPMWidget_Calc()
+    wpm    := result["wpm"]
+    if (wpm > 0) {
+        A_IconTip := "ErgoptiPlus  |  " . wpm . " " . t("menu.metrics.wpm_unit")
+    } else {
+        A_IconTip := "ErgoptiPlus"
+    }
 }
 
 OpenMetricsAppPicker(*) {
@@ -1819,6 +1867,13 @@ UpdateTrayIcon()
 ; the user has explicitly opted in. A fresh install starts OFF — this is
 ; a keylogger; the privacy default must be the safe one.
 if MetricsShortcuts.enabled {
+    ; Restore real-time WPM widget state from config.
+    WPMWidget_LoadConfig(_IniCache)
+    if WPMWidget.visible
+        WPMWidget_Show()
+    if MetricsShortcuts.show_wpm_menubar
+        SetTimer(WpmMenubar_Tick, 1000)
+
     ; Use the resolved config dir (paths.toml override honoured) so the
     ; metrics folder follows the user's relocated config when applicable.
     KL_Init(_ConfigDir . "metrics")

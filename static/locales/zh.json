@@ -1,4 +1,4 @@
-{
+﻿{
 	"_meta.locale": "zh",
 	"_meta.flag": "🇨🇳",
 	"_meta.name": "中文",
@@ -1001,5 +1001,8 @@
 	"hs_config.btn_reset_all": "全部重置",
 	"hs_config.label_delay": "延迟 (ms)",
 	"hs_config.label_color": "颜色",
-	"hs_config.btn_reset_default": "恢复默认"
+	"hs_config.btn_reset_default": "恢复默认",
+	"menu.metrics.show_wpm_menubar": "在托盘提示中显示每分钟字数",
+	"menu.metrics.show_wpm_widget": "📊 浮动WPM小部件",
+	"menu.metrics.wpm_unit": "WPM"
 }
