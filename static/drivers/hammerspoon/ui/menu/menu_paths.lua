@@ -401,9 +401,22 @@ local function inject_init_data()
 	local current_dir = config_dir()
 	local default_dir = _default_config_dir or _base_dir or ""
 
+	local i18n_keys = {
+		"menu.paths.window_title",
+		"paths_editor.heading", "paths_editor.subtitle", "paths_editor.label_config_dir",
+		"paths_editor.tag_default", "paths_editor.tag_modified",
+		"paths_editor.btn_browse", "paths_editor.btn_reset",
+		"paths_editor.btn_cancel", "paths_editor.btn_save",
+	}
+	local strings = {}
+	for _, k in ipairs(i18n_keys) do
+		strings[k] = i18n.get(k)
+	end
+
 	local payload = {
 		configDir        = current_dir,
 		defaultConfigDir = default_dir,
+		strings          = strings,
 	}
 
 	local ok_enc, json = pcall(hs.json.encode, payload)
