@@ -402,6 +402,7 @@ end
 
 M.AX_NAMES           = Actions.AX_NAMES
 M.SG_NAMES           = Actions.SG_NAMES
+M.get_sg_names       = Actions.get_sg_names
 M.get_action_label   = Actions.get_label
 M.forceCleanup       = Actions.force_cleanup
 M.toggleRightClick   = Actions.toggle_right_click
