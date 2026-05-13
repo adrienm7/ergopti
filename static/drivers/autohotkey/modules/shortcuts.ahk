@@ -274,21 +274,104 @@ if Features["Shortcuts"]["TakeNote"].Enabled {
 
 if Features["Shortcuts"]["Move"].Enabled {
     ; Win + M (Move)
-    AddShortcut("#", "m", (*) => (ToggleActivitySimulation(), SetTimer(SimulateActivity, Random(1000, 5000))))
+    AddShortcut("#", "m", ToggleActivitySimulation)
+
+    ; Jitter parameters — mirrored from Hammerspoon's AWAKE_JITTER_* constants
+    global AWAKE_TICK_MIN_MS   := 1000  ; Minimum interval between ticks
+    global AWAKE_TICK_MAX_MS   := 5000  ; Maximum interval between ticks
+    global AWAKE_JITTER_PX     := 80    ; Max pixel offset around origin per tick
+    global AWAKE_RETURN_MS     := 200   ; Delay before returning cursor to origin
+
+    ; Origin captured at toggle-on; shared between Start and SimulateActivity
+    global AwakeOriginX := 0, AwakeOriginY := 0
+
+    StartActivitySimulation(*) {
+        global ActivitySimulation, AwakeOriginX, AwakeOriginY
+        ActivitySimulation := True
+        ; Capture the current cursor position as the jitter origin
+        MouseGetPos(&AwakeOriginX, &AwakeOriginY)
+        ; Reset the user-move baseline so the first tick never self-cancels
+        SimulateActivity(True)
+        SetTimer(SimulateActivity, Random(AWAKE_TICK_MIN_MS, AWAKE_TICK_MAX_MS))
+        TrayTip(t("keepawake.started"), t("keepawake.title"), "Icon=1")
+    }
 
     ToggleActivitySimulation(*) {
-        global ActivitySimulation := not ActivitySimulation
-    }
-    SimulateActivity() {
+        global ActivitySimulation
         if ActivitySimulation {
-            MouseMoveCount := Random(3, 8) ; Randomly select the number of mouse moves
-            loop MouseMoveCount {
-                MouseX := Random(0, A_ScreenWidth)
-                MouseY := Random(0, A_ScreenHeight)
-                DllCall("SetCursorPos", "int", MouseX, "int", MouseY)
-                Sleep(Random(200, 800)) ; Wait for a short duration
-            }
-            SendFinalResult("{VKFF}") ; Send the void keypress. Otherwise, despite the mouse moving, it can be seen as inactivity
+            StopActivitySimulation()
+        } else {
+            StartActivitySimulation()
+        }
+    }
+
+    StopActivitySimulation() {
+        global ActivitySimulation
+        ActivitySimulation := False
+        SetTimer(SimulateActivity, 0)
+        TrayTip(t("keepawake.stopped"), t("keepawake.title"), "Icon=1")
+    }
+
+    SimulateActivity(ResetOnly := False) {
+        global ActivitySimulation, AwakeOriginX, AwakeOriginY
+        ; LastX/LastY track where the cursor was after the previous synthetic move,
+        ; so we can distinguish a real user move from our own jitter.
+        static LastX := -1, LastY := -1
+
+        if ResetOnly {
+            LastX := -1
+            LastY := -1
+            return
+        }
+
+        if not ActivitySimulation {
+            return
+        }
+
+        ; If the cursor moved more than AWAKE_JITTER_PX from where we left it,
+        ; the user touched the mouse or touchpad — stop without moving again.
+        MouseGetPos(&CurX, &CurY)
+        if (LastX != -1 and (Abs(CurX - LastX) > AWAKE_JITTER_PX or Abs(CurY - LastY) > AWAKE_JITTER_PX)) {
+            StopActivitySimulation()
+            return
+        }
+
+        ; Move to a random offset around the captured origin (±AWAKE_JITTER_PX)
+        OffX := Random(-AWAKE_JITTER_PX, AWAKE_JITTER_PX)
+        OffY := Random(-AWAKE_JITTER_PX, AWAKE_JITTER_PX)
+        DllCall("SetCursorPos", "int", AwakeOriginX + OffX, "int", AwakeOriginY + OffY)
+
+        ; Signal OS activity without a visible keystroke
+        SendFinalResult("{VKFF}")
+
+        ; Return to origin after a short delay, mirroring Hammerspoon's AWAKE_RETURN_DELAY_SEC
+        Sleep(AWAKE_RETURN_MS)
+        DllCall("SetCursorPos", "int", AwakeOriginX, "int", AwakeOriginY)
+
+        ; Record the resting position so the next tick's user-move check is accurate
+        LastX := AwakeOriginX
+        LastY := AwakeOriginY
+
+        ; Re-schedule the next tick at a new random interval
+        SetTimer(SimulateActivity, Random(AWAKE_TICK_MIN_MS, AWAKE_TICK_MAX_MS))
+    }
+
+    ; Any real physical key press while simulation is active cancels it.
+    ; The ~ prefix passes the key through; $ excludes synthetic keystrokes
+    ; (like the {VKFF} sent by SimulateActivity itself) from triggering this.
+    ~*$*:: {
+        if ActivitySimulation {
+            StopActivitySimulation()
+        }
+    }
+
+    ; Touchpad taps and clicks (left, right, middle) also cancel the simulation.
+    ; These are separate because mouse buttons are not matched by the $* wildcard.
+    ~*$LButton::
+    ~*$RButton::
+    ~*$MButton:: {
+        if ActivitySimulation {
+            StopActivitySimulation()
         }
     }
 }
@@ -539,7 +622,7 @@ SC029:: {
     FileDelete(TmpScript)
     FileAppend(ScriptContent, TmpScript, "UTF-8")
     RunWait('powershell -NoProfile -NonInteractive -WindowStyle Hidden -ExecutionPolicy Bypass -File "' . TmpScript . '"',, "Hide")
-    TrayTip(Format(t("notify.screenshot_saved_path"), FilePath), t("notify.screenshot_title"), "Icone=1")
+    TrayTip(Format(t("notify.screenshot_saved_path"), FilePath), t("notify.screenshot_title"), "Icon=1")
 }
 #HotIf
 

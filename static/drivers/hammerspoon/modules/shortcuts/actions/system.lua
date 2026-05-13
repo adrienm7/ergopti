@@ -58,8 +58,8 @@ local KEYCODE_F18            = Keycodes.to_name(Keycodes.F18_WAKE_OS)
 -- Keep-awake jitter parameters
 local AWAKE_TICK_MIN_SEC     = 1    -- Minimum interval between mouse-jitter ticks
 local AWAKE_TICK_MAX_SEC     = 5    -- Maximum interval between mouse-jitter ticks
-local AWAKE_JITTER_X         = 2    -- Max horizontal pixel offset per tick (imperceptible)
-local AWAKE_JITTER_Y         = 1    -- Max vertical pixel offset per tick (imperceptible)
+local AWAKE_JITTER_X         = 80   -- Max horizontal pixel offset per tick (visible but stays near origin)
+local AWAKE_JITTER_Y         = 80   -- Max vertical pixel offset per tick (visible but stays near origin)
 local AWAKE_RETURN_DELAY_SEC = 0.2  -- Seconds to hold offset before returning to origin
 
 -- Spotlight ring color (circle on the screen that holds the cursor)
@@ -102,6 +102,9 @@ local awake_started_at = nil
 -- jiggler keeps this app at the foreground for the duration, so the
 -- dashboard can credit the awake_ms back to that app on toggle OFF.
 local awake_focused_app = nil
+-- Eventtap that watches for any real user input while keep-awake is active;
+-- stops the jiggler immediately so the cursor doesn't fight the user.
+local awake_input_watcher = nil
 
 -- Spotlight state
 local _spotlight_dismiss = nil  -- Dismiss fn for the active spotlight; nil when none active
@@ -166,11 +169,21 @@ schedule_awake_tick = function()
 	end)
 end
 
+--- Stops the input-activity watcher without touching keep-awake state.
+local function stop_awake_input_watcher()
+	if awake_input_watcher then
+		pcall(function() awake_input_watcher:stop() end)
+		awake_input_watcher = nil
+	end
+end
+
 --- Toggles keep-awake mode on or off.
 --- When active, jiggles the mouse periodically to prevent the display from sleeping.
 function M.toggle_awake()
 	if awake_active then
 		awake_active = false
+
+		stop_awake_input_watcher()
 
 		if awake_timer and type(awake_timer.stop) == "function" then
 			pcall(function() awake_timer:stop() end)
@@ -228,6 +241,61 @@ function M.toggle_awake()
 			pcall(hs.mouse.absolutePosition, {x = pos.x + dx, y = pos.y})
 		end
 
+		-- Watch for any real keyboard or touchpad activity (key press, scroll,
+		-- swipe, tap, pinch, rotate…). We cut silently (no alert) since the user
+		-- is clearly back — the visual noise would be worse than the keep-awake itself.
+		local ev = eventtap.event.types
+		local watch_types = { ev.keyDown, ev.scrollWheel }
+		-- Touchpad gesture event types — some may be absent on older macOS builds
+		for _, name in ipairs({ "gesture", "beginGesture", "endGesture", "swipe", "magnify", "rotate", "directTouch", "smartMagnify" }) do
+			if ev[name] then
+				table.insert(watch_types, ev[name])
+			end
+		end
+		awake_input_watcher = eventtap.new(watch_types, function(_ev)
+			if not awake_active then return false end
+
+			awake_active = false
+			stop_awake_input_watcher()
+
+			if awake_timer and type(awake_timer.stop) == "function" then
+				pcall(function() awake_timer:stop() end)
+				awake_timer = nil
+			end
+			if awake_alert_id then
+				pcall(hs.alert.closeSpecific, awake_alert_id)
+				awake_alert_id = nil
+			end
+
+			-- Log duration so the dashboard accounts for the keep-awake period
+			if awake_started_at then
+				local dur_ms = math.floor((hs.timer.secondsSinceEpoch() - awake_started_at) * 1000)
+				if dur_ms > 0 then
+					local ok_lm, log_manager = pcall(require, "modules.keylogger.log_manager")
+					if ok_lm and log_manager then
+						if type(log_manager.log_passive_period) == "function" then
+							pcall(log_manager.log_passive_period, "awake", dur_ms)
+						end
+						if awake_focused_app and type(log_manager.tag_awake_focus) == "function" then
+							pcall(log_manager.tag_awake_focus, awake_focused_app, dur_ms)
+						end
+					end
+				end
+				awake_started_at  = nil
+				awake_focused_app = nil
+			end
+
+			Logger.info(LOG, "Keep-awake auto-disabled — user activity detected.")
+			return false
+		end)
+		-- Defer the watcher start by one event-loop tick so the keyDown that
+		-- triggered toggle_awake() itself does not immediately cancel keep-awake.
+		timer.doAfter(0, function()
+			if awake_active and awake_input_watcher then
+				pcall(function() awake_input_watcher:start() end)
+			end
+		end)
+
 		schedule_awake_tick()
 		Logger.info(LOG, "Keep-awake enabled.")
 	end
@@ -236,6 +304,8 @@ end
 --- Stops keep-awake cleanly; called when the bindings module shuts down.
 function M.stop_awake()
 	awake_active = false
+
+	stop_awake_input_watcher()
 
 	if awake_timer and type(awake_timer.stop) == "function" then
 		pcall(function() awake_timer:stop() end)
