@@ -293,7 +293,7 @@ if Features["Shortcuts"]["Move"].Enabled {
         ; Reset the user-move baseline so the first tick never self-cancels
         SimulateActivity(True)
         SetTimer(SimulateActivity, Random(AWAKE_TICK_MIN_MS, AWAKE_TICK_MAX_MS))
-        TrayTip(t("keepawake.started"), t("keepawake.title"), "Icon=1")
+        TrayTip(t("keepawake.started"), t("keepawake.title"), "Iconi Mute")
     }
 
     ToggleActivitySimulation(*) {
@@ -309,7 +309,7 @@ if Features["Shortcuts"]["Move"].Enabled {
         global ActivitySimulation
         ActivitySimulation := False
         SetTimer(SimulateActivity, 0)
-        TrayTip(t("keepawake.stopped"), t("keepawake.title"), "Icon=1")
+        TrayTip(t("keepawake.stopped"), t("keepawake.title"), "Iconi Mute")
     }
 
     SimulateActivity(ResetOnly := False) {
@@ -622,7 +622,7 @@ SC029:: {
     FileDelete(TmpScript)
     FileAppend(ScriptContent, TmpScript, "UTF-8")
     RunWait('powershell -NoProfile -NonInteractive -WindowStyle Hidden -ExecutionPolicy Bypass -File "' . TmpScript . '"',, "Hide")
-    TrayTip(Format(t("notify.screenshot_saved_path"), FilePath), t("notify.screenshot_title"), "Icon=1")
+    TrayTip(Format(t("notify.screenshot_saved_path"), FilePath), t("notify.screenshot_title"), "Iconi Mute")
 }
 #HotIf
 
