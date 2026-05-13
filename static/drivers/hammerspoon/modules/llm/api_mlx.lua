@@ -11,6 +11,7 @@ local M = {}
 local hs       = hs
 local Logger   = require("lib.logger")
 local Notifications = require("lib.notifications")
+local i18n     = require("lib.i18n")
 local Parser   = require("modules.llm.parser")
 local Profiles = require("modules.llm.profiles")
 local ApiCommon = require("modules.llm.api_common")
@@ -676,7 +677,7 @@ function M.warmup(model_name, profile)
 				Logger.warn(LOG, "MLX KV cache primed (profile: %s) — backend ready.",
 					(type(profile) == "table" and profile.id) or "default")
 				if became_ready then
-					Notifications.notify("LLM actif", "Le serveur MLX est prêt.", "success")
+					Notifications.notify(i18n.get("llm.server_ready_title"), i18n.get("llm.server_mlx_ready_body"), "success")
 				end
 			else
 				_is_ready = false

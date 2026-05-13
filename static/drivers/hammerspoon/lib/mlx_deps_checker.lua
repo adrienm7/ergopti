@@ -41,6 +41,7 @@
 local M = {}
 local hs           = hs
 local Logger       = require("lib.logger")
+local i18n         = require("lib.i18n")
 local llm_progress = require("ui.download_window")
 
 local LOG = "mlx_deps"
@@ -142,10 +143,10 @@ local KNOWN_MARKERS = {
 -- a fresh step label — the matching *_INSTALLED / *_DONE markers are
 -- absorbed silently because the next step's label supersedes them anyway.
 local PROGRESS_LABELS = {
-	[MARKER_UV_INSTALL]     = "Installation de uv…",
-	[MARKER_PYTHON_INSTALL] = "Installation de Python…",
-	[MARKER_VENV_CREATE]    = "Création du virtualenv local…",
-	[MARKER_DEPS_SYNC]      = "Synchronisation des dépendances IA…",
+	[MARKER_UV_INSTALL]     = i18n.get("mlx.deps_step_uv"),
+	[MARKER_PYTHON_INSTALL] = i18n.get("mlx.deps_step_python"),
+	[MARKER_VENV_CREATE]    = i18n.get("mlx.deps_step_venv"),
+	[MARKER_DEPS_SYNC]      = i18n.get("mlx.deps_step_sync"),
 }
 
 --- Detects whether a stdout chunk contains a specific marker line.
@@ -266,8 +267,8 @@ local function make_streaming_handler()
 			if not ui_already_visible() then
 				pcall(llm_progress.show, {
 					kind     = "mlx_install",
-					title    = "Initialisation du moteur IA (MLX)",
-					subtitle = "Préparation en cours…",
+					title    = i18n.get("mlx.install_title"),
+					subtitle = i18n.get("mlx.deps_preparing"),
 				})
 			end
 		end
@@ -279,7 +280,7 @@ local function make_streaming_handler()
 				if not ui_already_visible() then
 					pcall(llm_progress.show, {
 						kind     = "mlx_install",
-						title    = "Initialisation du moteur IA (MLX)",
+						title    = i18n.get("mlx.install_title"),
 						subtitle = label,
 					})
 				else
@@ -491,8 +492,8 @@ function M.check_and_install_deps(on_complete)
 			if not llm_progress.is_active() then
 				pcall(llm_progress.show, {
 					kind     = "mlx_install",
-					title    = "Initialisation du moteur IA (MLX)",
-					subtitle    = "Échec…",
+					title    = i18n.get("mlx.install_title"),
+					subtitle    = i18n.get("mlx.deps_failed"),
 				})
 			end
 			pcall(llm_progress.set_error, tail)
@@ -503,7 +504,7 @@ function M.check_and_install_deps(on_complete)
 	if not task then
 		Logger.error(LOG, "Failed to create hs.task for MLX bootstrap script.")
 		_bootstrap_state = "failed"
-		_last_failure_message = "Impossible de créer la tâche hs.task."
+		_last_failure_message = i18n.get("mlx.deps_task_create_failed")
 		os.execute("rm -f " .. pty_wrapper_path)
 		return
 	end
@@ -513,7 +514,7 @@ function M.check_and_install_deps(on_complete)
 	if not pcall(function() task:start() end) then
 		Logger.error(LOG, "Failed to start hs.task for MLX bootstrap script.")
 		_bootstrap_state = "failed"
-		_last_failure_message = "Impossible de démarrer la tâche hs.task."
+		_last_failure_message = i18n.get("mlx.deps_task_start_failed")
 		os.execute("rm -f " .. pty_wrapper_path)
 		fire_pending_callbacks(false)
 	else

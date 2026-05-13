@@ -20,6 +20,7 @@ local text_acts   = require("modules.shortcuts.actions.text")
 local sys_acts    = require("modules.shortcuts.actions.system")
 local app_acts    = require("modules.shortcuts.actions.apps")
 local Logger      = require("lib.logger")
+local i18n        = require("lib.i18n")
 
 local LOG = "shortcuts.bindings"
 
@@ -117,122 +118,122 @@ end
 -- =====================================
 
 -- Screenshots & Layer (appear first in the menu, before the Ctrl block)
-hotkey_labels.at_hash = "Capture d’écran instantanée"
+hotkey_labels.at_hash = i18n.get("shortcuts.label_at_hash")
 hotkey_defs.at_hash   = function()
 	return sys_acts.bind_instant_screenshot()
 end
 
-hotkey_labels.layer_scroll = "Volume"
+hotkey_labels.layer_scroll = i18n.get("shortcuts.label_layer_scroll")
 hotkey_defs.layer_scroll   = function()
 	return sys_acts.bind_layer_scroll()
 end
 
-hotkey_labels.wrap_text_if_selected = "Taper un symbole encadre la sélection (AltGr)"
+hotkey_labels.wrap_text_if_selected = i18n.get("shortcuts.label_wrap_text")
 hotkey_defs.wrap_text_if_selected   = function()
 	return sys_acts.bind_wrap_text_if_selected()
 end
 
 -- Ctrl shortcuts — alphabetical by id (mirrors list_shortcuts() sort order)
-hotkey_labels.ctrl_a = "Sélectionner la ligne"
+hotkey_labels.ctrl_a = i18n.get("shortcuts.label_ctrl_a")
 hotkey_defs.ctrl_a   = function()
 	return bind_log({"ctrl"}, "a", text_acts.select_line)
 end
 
-hotkey_labels.ctrl_d = "Ouvrir Téléchargements"
+hotkey_labels.ctrl_d = i18n.get("shortcuts.label_ctrl_d")
 hotkey_defs.ctrl_d   = function()
 	return bind_log({"ctrl"}, "d", app_acts.open_downloads)
 end
 
-hotkey_labels.ctrl_e = "Ouvrir Finder"
+hotkey_labels.ctrl_e = i18n.get("shortcuts.label_ctrl_e")
 hotkey_defs.ctrl_e   = function()
 	return bind_log({"ctrl"}, "e", app_acts.open_finder)
 end
 
-hotkey_labels.ctrl_g = "Ouvrir ChatGPT (URL définie dans le menu)"
+hotkey_labels.ctrl_g = i18n.get("shortcuts.label_ctrl_g")
 hotkey_defs.ctrl_g   = function()
 	return bind_log({"ctrl"}, "g", function()
 		app_acts.open_chatgpt(M.DEFAULT_CHATGPT_URL)
 	end)
 end
 
-hotkey_labels.ctrl_h = "Capture interactive vers le presse-papiers"
+hotkey_labels.ctrl_h = i18n.get("shortcuts.label_ctrl_h")
 hotkey_defs.ctrl_h   = function()
 	return bind_log({"ctrl"}, "h", sys_acts.interactive_screenshot)
 end
 
-hotkey_labels.ctrl_i = "Ouvrir Réglages"
+hotkey_labels.ctrl_i = i18n.get("shortcuts.label_ctrl_i")
 hotkey_defs.ctrl_i   = function()
 	return bind_log({"ctrl"}, "i", app_acts.open_settings)
 end
 
-hotkey_labels.ctrl_m = "Anti-veille"
+hotkey_labels.ctrl_m = i18n.get("shortcuts.label_ctrl_m")
 hotkey_defs.ctrl_m   = function()
 	return bind_log({"ctrl"}, "m", sys_acts.toggle_awake)
 end
 
-hotkey_labels.ctrl_o = "Entourer la ligne de parenthèses"
+hotkey_labels.ctrl_o = i18n.get("shortcuts.label_ctrl_o")
 hotkey_defs.ctrl_o   = function()
 	return bind_log({"ctrl"}, "o", text_acts.surround_with_parens)
 end
 
-hotkey_labels.ctrl_p = "Basculer recopie / bureau étendu"
+hotkey_labels.ctrl_p = i18n.get("shortcuts.label_ctrl_p")
 hotkey_defs.ctrl_p   = function()
 	return bind_log({"ctrl"}, "p", sys_acts.toggle_display_mirror)
 end
 
-hotkey_labels.ctrl_s = "Ouvrir / Copier chemin"
+hotkey_labels.ctrl_s = i18n.get("shortcuts.label_ctrl_s")
 hotkey_defs.ctrl_s   = function()
 	return bind_log({"ctrl"}, "s", app_acts.copy_or_open_path)
 end
 
-hotkey_labels.ctrl_t = "Téléporter la souris sur l'autre moniteur"
+hotkey_labels.ctrl_t = i18n.get("shortcuts.label_ctrl_t")
 hotkey_defs.ctrl_t   = function()
 	return bind_log({"ctrl"}, "t", sys_acts.teleport_mouse)
 end
 
-hotkey_labels.ctrl_u = "Toggle MAJUSCULES / minuscules"
+hotkey_labels.ctrl_u = i18n.get("shortcuts.label_ctrl_u")
 hotkey_defs.ctrl_u   = function()
 	return bind_log({"ctrl"}, "u", text_acts.toggle_uppercase)
 end
 
-hotkey_labels.ctrl_w = "Toggle Casse De Titre / minuscules"
+hotkey_labels.ctrl_w = i18n.get("shortcuts.label_ctrl_w")
 hotkey_defs.ctrl_w   = function()
 	return bind_log({"ctrl"}, "w", text_acts.toggle_titlecase)
 end
 
-hotkey_labels.ctrl_x = "Copier la couleur hex du pixel sous le curseur"
+hotkey_labels.ctrl_x = i18n.get("shortcuts.label_ctrl_x")
 hotkey_defs.ctrl_x   = function()
 	return bind_log({"ctrl"}, "x", sys_acts.copy_pixel_color)
 end
 
-hotkey_labels.ctrl_capslock = "Basculer CapsLock"
+hotkey_labels.ctrl_capslock = i18n.get("shortcuts.label_ctrl_capslock")
 hotkey_defs.ctrl_capslock   = function()
 	return bind_log({"ctrl"}, "capslock", sys_acts.toggle_capslock)
 end
 
-hotkey_labels.ctrl_l = "Verrouiller l'écran"
+hotkey_labels.ctrl_l = i18n.get("shortcuts.label_ctrl_l")
 hotkey_defs.ctrl_l   = function()
 	return bind_log({"ctrl"}, "l", sys_acts.lock_screen)
 end
 
 -- Punctuation shortcuts — after all letter-based ctrl shortcuts
-hotkey_labels.ctrl_period = "Ouvrir le sélecteur d'emojis"
+hotkey_labels.ctrl_period = i18n.get("shortcuts.label_ctrl_period")
 hotkey_defs.ctrl_period   = function()
 	return bind_log({"ctrl"}, ".", sys_acts.open_emoji_picker)
 end
 
-hotkey_labels.ctrl_quote = "Mettre la souris en surbrillance"
+hotkey_labels.ctrl_quote = i18n.get("shortcuts.label_ctrl_quote")
 hotkey_defs.ctrl_quote   = function()
 	return bind_log({"ctrl"}, "'", sys_acts.spotlight_mouse)
 end
 
 -- Cmd shortcuts — alphabetical by id
-hotkey_labels.cmd_shift_v = "Coller sans mise en forme"
+hotkey_labels.cmd_shift_v = i18n.get("shortcuts.label_cmd_shift_v")
 hotkey_defs.cmd_shift_v   = function()
 	return bind_log({"cmd", "shift"}, "v", text_acts.paste_as_plain_text)
 end
 
-hotkey_labels.cmd_star = "Cmd + S (préserve mod.)"
+hotkey_labels.cmd_star = i18n.get("shortcuts.label_cmd_star")
 hotkey_defs.cmd_star   = function()
 	-- Pass the log callback so bind_cmd_star can log the re-fired Cmd+S
 	return sys_acts.bind_cmd_star(log_shortcut)

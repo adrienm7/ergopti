@@ -26,6 +26,7 @@ local urlevent      = hs.urlevent
 local http          = hs.http
 local notifications = require("lib.notifications")
 local Logger        = require("lib.logger")
+local i18n          = require("lib.i18n")
 
 local LOG = "shortcuts.actions.apps"
 
@@ -296,7 +297,7 @@ function M.copy_or_open_path()
 		timer.doAfter(FINDER_PATH_SETTLE_SEC, function()
 			local ok_p, p = pcall(pasteboard.getContents)
 			if ok_p and p and p ~= "" then
-				notifications.notify("Chemin copié : " .. p, nil, "success")
+				notifications.notify(string.format(i18n.get("shortcuts.copy_path_notif"), p), nil, "success")
 				return
 			end
 
