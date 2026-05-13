@@ -13,10 +13,12 @@
 // FEATURES & RATIONALE:
 // 1. Zero dependencies — plain fetch + DOM traversal, no library needed.
 // 2. Self-contained — the backend does not need to push strings; the page
-//    fetches the JSON itself using a relative path resolved at runtime.
-// 3. Graceful fallback — if the fetch fails or a key is missing, the existing
-//    hardcoded French text is left in place so the UI is never broken.
-// 4. Attribute variants:
+//    fetches the JSON itself using a path resolved relative to this script.
+// 3. Graceful fallback — if the fetch fails or a key is missing, elements
+//    remain empty (textContent was cleared when data-i18n was added).
+// 4. Global store — strings are saved in window._i18n_strings so page scripts
+//    can call _t(key) for dynamic content not reachable via DOM attributes.
+// 5. Attribute variants:
 //    - data-i18n="key"             → element.textContent
 //    - data-i18n-title="key"       → element.title
 //    - data-i18n-placeholder="key" → element.placeholder (inputs)
@@ -27,54 +29,57 @@
 (function () {
 	"use strict";
 
-	// Resolve the path to static/locales/ relative to this script's own URL.
-	// Works whether the page is served from metrics_typing/ or metrics_apps/.
+	// Resolve the path to static/locales/<code>.json relative to this script's
+	// own URL. Works regardless of how many levels deep the calling page sits.
 	function resolve_locale_url(code) {
-		// __i18n_base is optionally set by the backend before this script loads.
 		if (window.__i18n_base) return window.__i18n_base + code + ".json";
-		// Walk up from the current page URL to find the shared locales directory.
-		// Both metrics pages are two levels deep: ui/<page>/index.html
-		const base = new URL("../../locales/", document.currentScript
-			? document.currentScript.src.replace(/[^/]+$/, "../../")
-			: location.href);
-		return new URL(code + ".json", base).href;
+		// currentScript is set while the <script> tag is being parsed.
+		// Walk up from i18n.js location to find static/locales/.
+		var src = document.currentScript ? document.currentScript.src : null;
+		if (src) {
+			// i18n.js lives at static/drivers/_shared/ui/i18n.js
+			// static/locales/ is two dirs above _shared/ui/
+			var base = src.replace(/[^/]+$/, "../../locales/");
+			return base + code + ".json";
+		}
+		// Fallback: walk up two levels from the page URL (legacy path)
+		var parts = location.href.split("/");
+		var base_parts = parts.slice(0, parts.length - 2);
+		return base_parts.join("/") + "/locales/" + code + ".json";
 	}
 
 	function apply(strings) {
+		// Store globally so page scripts can call _t(key) for dynamic content
+		window._i18n_strings = strings;
+
 		// data-i18n → textContent
 		document.querySelectorAll("[data-i18n]").forEach(function (el) {
-			const key = el.getAttribute("data-i18n");
+			var key = el.getAttribute("data-i18n");
 			if (strings[key] !== undefined) el.textContent = strings[key];
 		});
 		// data-i18n-title → title attribute
 		document.querySelectorAll("[data-i18n-title]").forEach(function (el) {
-			const key = el.getAttribute("data-i18n-title");
+			var key = el.getAttribute("data-i18n-title");
 			if (strings[key] !== undefined) el.title = strings[key];
 		});
 		// data-i18n-placeholder → placeholder attribute
 		document.querySelectorAll("[data-i18n-placeholder]").forEach(function (el) {
-			const key = el.getAttribute("data-i18n-placeholder");
+			var key = el.getAttribute("data-i18n-placeholder");
 			if (strings[key] !== undefined) el.placeholder = strings[key];
 		});
 		// data-i18n-option-prefix → each <option> value mapped to key_prefix.value
 		document.querySelectorAll("select[data-i18n-option-prefix]").forEach(function (sel) {
-			const prefix = sel.getAttribute("data-i18n-option-prefix");
+			var prefix = sel.getAttribute("data-i18n-option-prefix");
 			sel.querySelectorAll("option").forEach(function (opt) {
-				const key = prefix + "." + opt.value;
+				var key = prefix + "." + opt.value;
 				if (strings[key] !== undefined) opt.textContent = strings[key];
 			});
 		});
 	}
 
 	function load() {
-		const code = window._i18n_locale || "fr";
-
-		// Resolve URL two levels up (ui/<subdir>/index.html → ui/locales/)
-		const here = location.href;
-		const parts = here.split("/");
-		// Remove filename and subdir, append locales/<code>.json
-		const base_parts = parts.slice(0, parts.length - 2);
-		const url = base_parts.join("/") + "/locales/" + code + ".json";
+		var code = window._i18n_locale || "fr";
+		var url = resolve_locale_url(code);
 
 		fetch(url)
 			.then(function (r) { return r.ok ? r.json() : null; })

@@ -13,6 +13,23 @@
 
 let state = { categories: [], presets: [] };
 
+// Resolve a translation key via the loaded locale strings (set by i18n.js).
+function _t(key) {
+	return (window._i18n_strings && window._i18n_strings[key]) || key;
+}
+
+// Apply data-i18n-key / data-i18n-title-key inside a freshly cloned template
+// fragment (i18n.js cannot reach inside <template> nodes before cloning).
+function applyTemplateI18n(node) {
+	node.querySelectorAll("[data-i18n-key]").forEach(function (el) {
+		el.textContent = _t(el.getAttribute("data-i18n-key"));
+	});
+	node.querySelectorAll("[data-i18n-title-key]").forEach(function (el) {
+		el.title = _t(el.getAttribute("data-i18n-title-key"));
+	});
+}
+
+
 // ============================================================
 // 1/ Bridge primitives
 // ============================================================
@@ -58,6 +75,7 @@ function render() {
 
 	for (const cat of state.categories) {
 		const node = document.importNode(tplCat, true);
+		applyTemplateI18n(node);
 		const card = node.querySelector(".cat");
 
 		card.querySelector(".cat-title").textContent = cat.title;
@@ -82,6 +100,7 @@ function render() {
 		// Sections
 		for (const sec of cat.sections) {
 			const secNode = document.importNode(tplSec, true);
+			applyTemplateI18n(secNode);
 			secNode.querySelector(".sec-title").textContent =
 				sec.title || sec.name;
 			bindDelay(secNode.querySelector(".field-delay"), cat, sec);

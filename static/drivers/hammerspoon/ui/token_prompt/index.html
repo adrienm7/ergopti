@@ -2,35 +2,34 @@
 <html lang="fr">
 	<head>
 		<meta charset="utf-8" />
-		<title>Connexion HuggingFace</title>
+		<title data-i18n="token_prompt.window_title"></title>
 		<link rel="stylesheet" href="style.css" />
+		<script src="../../../_shared/ui/i18n.js"></script>
 	</head>
 	<body>
 		<div id="container">
-			<h2>🔐 Connexion HuggingFace</h2>
+			<h2 data-i18n="token_prompt.title"></h2>
 
-			<div id="instruction">
-				Collez votre token HuggingFace (hf_...) pour accélérer les téléchargements.
-			</div>
+			<div id="instruction" data-i18n="token_prompt.instruction"></div>
 
 			<div id="link-section">
-				Vous n'avez pas de token ?
-				<a href="javascript:void(0)" onclick="doOpenLink()">👉 Cliquez ici pour en créer un</a>
+				<span data-i18n="token_prompt.no_token"></span>
+				<a href="javascript:void(0)" onclick="doOpenLink()" data-i18n="token_prompt.create_link"></a>
 			</div>
 
 			<div id="token-input-wrapper">
-				<label for="token-input">Token HuggingFace :</label>
+				<label for="token-input" data-i18n="token_prompt.label"></label>
 				<input
 					type="text"
 					id="token-input"
-					placeholder="hf_xxxxxxxxxxxxxxxxxxxxxxxxxxxx..."
+					data-i18n-placeholder="token_prompt.placeholder"
 					autofocus
 				/>
 			</div>
 
 			<div id="button-group">
-				<button id="btn-cancel" onclick="doCancel()">Annuler</button>
-				<button id="btn-validate" onclick="doValidate()">Valider</button>
+				<button id="btn-cancel" onclick="doCancel()" data-i18n="common.cancel"></button>
+				<button id="btn-validate" onclick="doValidate()" data-i18n="token_prompt.validate"></button>
 			</div>
 		</div>
 
