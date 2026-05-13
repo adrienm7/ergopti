@@ -1941,6 +1941,11 @@ global _SaveFullConfigReady := true
 ; human-readable, complete reference of the current configuration.
 SaveFullConfig()
 
+; Restore WPM widget state before building menus so that BuildMetricsMenu()
+; reads the correct WPMWidget.visible value when setting checkmarks.
+if MetricsShortcuts.enabled
+    WPMWidget_LoadConfig(_IniCache)
+
 InitSubMenus()
 initMenu()
 UpdateTrayIcon()
@@ -1949,8 +1954,6 @@ UpdateTrayIcon()
 ; the user has explicitly opted in. A fresh install starts OFF — this is
 ; a keylogger; the privacy default must be the safe one.
 if MetricsShortcuts.enabled {
-    ; Restore real-time WPM widget state from config.
-    WPMWidget_LoadConfig(_IniCache)
     if WPMWidget.visible
         WPMWidget_Show()
     if MetricsShortcuts.show_wpm_menubar
