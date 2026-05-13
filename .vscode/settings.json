@@ -2,5 +2,6 @@
 	"cSpell.words": ["ergopti", "kbdedit", "keylayout", "keylayouts", "keymap", "keymaps"],
 	"search.exclude": {
 		"**/static/corpus/**": true
-	}
+	},
+	"folder-color.pathColors": []
 }
