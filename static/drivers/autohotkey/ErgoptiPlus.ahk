@@ -1325,7 +1325,6 @@ initMenu() {
         t("menu.hotstrings.off"),
         HotstringsAllEnabled,
         HotstringsAllEnabled ? ToggleAllHotstringsOff : ToggleAllHotstringsOn)
-    HotstringsMenu.Add() ; Separator after global toggle
 
     ; 1. Paramètres — mirrors HS "⚙️ Paramètres hotstrings" submenu
     ParamsMenu := Menu()

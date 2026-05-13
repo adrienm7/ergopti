@@ -1,4 +1,4 @@
-﻿{
+{
 	"_meta.locale": "de",
 	"_meta.flag": "🇩🇪",
 	"_meta.name": "Deutsch",
@@ -611,6 +611,7 @@
 	"hs_config.color_cyan": "Cyan",
 	"hs_config.color_yellow": "Gelb",
 	"hs_config.color_gray": "Grau",
+
 	"editor.hotstrings.label_section": "Abschnitt:",
 	"editor.hotstrings.btn_new": "Neu…",
 	"editor.hotstrings.btn_rename": "Umbenennen…",
@@ -648,6 +649,7 @@
 	"editor.hotstrings.desc_prompt": "Im Menü angezeigte Beschreibung für diesen Abschnitt:",
 	"editor.hotstrings.err_no_section_selected": "Kein Abschnitt ausgewählt.",
 	"editor.hotstrings.rename_title": "Umbenennen",
+
 	"hs_config.file_level": "── Dateiebene ──",
 	"hs_config.btn_all_gray": "Alles grau",
 	"hs_config.btn_reset_all": "Alles zurücksetzen",
@@ -662,7 +664,9 @@
 	"hs_config.category_prefix": "Kategorie: ",
 	"hs_config.section_prefix": "Abschnitt: ",
 	"hs_config.file_level_short": "(Dateiebene)",
+
 	"ui_typing.h3_speed": "Geschwindigkeit (WPM)",
+	"ui_typing.h3_precision": "Genauigkeit (%)",
 	"ui_typing.h3_activity_hourly": "Aktivität (Tasten/h)",
 	"ui_typing.h3_precision_hourly": "Genauigkeit (%) — Stundenansicht",
 	"ui_typing.h3_keystroke_origin": "Tastenherkunft",
@@ -792,6 +796,7 @@
 	"ui_typing.dataset_precision": "Genauigkeit (%)",
 	"ui_typing.dataset_touches_h": "Tasten/h",
 	"ui_typing.dataset_touches_5min": "Tasten / 5 Min.",
+
 	"ui_apps.detail_global_activity": "Gesamte aufgezeichnete Aktivität",
 	"ui_apps.detail_productivity_score": "Score nach Ihren Kategorien berechnet",
 	"ui_apps.lbl_switches": "Wechsel:",
@@ -926,6 +931,7 @@
 	"menu.llm.add_custom_model": "Benutzerdefiniertes Modell hinzufügen",
 	"menu.llm.val_label": "Vorschlag Nr. auswählen (%s)",
 	"menu.profiles.use_profile": "Dieses Profil verwenden",
+
 	"common.save": "Speichern",
 	"common.cancel": "Abbrechen",
 	"common.ok": "OK",
@@ -933,7 +939,9 @@
 	"common.delete": "Löschen",
 	"common.loading": "Laden…",
 	"common.saved": "Gespeichert ✓",
+
 	"editor.personal_info.window_title": "Persönliche Informationen",
+
 	"token_prompt.window_title": "HuggingFace-Anmeldung",
 	"token_prompt.title": "🔐 HuggingFace-Anmeldung",
 	"token_prompt.instruction": "Fügen Sie Ihren HuggingFace-Token (hf_...) ein, um Downloads zu beschleunigen.",
@@ -942,6 +950,7 @@
 	"token_prompt.label": "HuggingFace-Token:",
 	"token_prompt.placeholder": "hf_xxxxxxxxxxxxxxxxxxxxxxxxxxxx...",
 	"token_prompt.validate": "Bestätigen",
+
 	"download_window.window_title": "Fortschritt",
 	"download_window.title": "📥 Download läuft",
 	"download_window.eta_label": "⏳ Verbleibende Zeit:",
@@ -950,6 +959,7 @@
 	"download_window.btn_cancel": "🛑 Abbrechen",
 	"download_window.btn_terminal": "🖥 Terminal",
 	"download_window.btn_retry": "🔄 Download neu starten",
+
 	"prompt_editor.title_new": "Neues Profil",
 	"prompt_editor.label_name": "Profilname",
 	"prompt_editor.label_mode": "Anfragemodus",
@@ -962,6 +972,7 @@
 	"prompt_editor.insert_max_words": "{max_words}-Block einfügen",
 	"prompt_editor.placeholder_prompt": "Hier ist ein Text, setzen Sie ihn fort: {context}",
 	"prompt_editor.help_text": "Der {context}-Block wird durch den ausgewählten Text ersetzt. Der {n}-Block wird durch die Anzahl der Vorhersagen ersetzt. Formatierung (Batch): Bitten Sie das Modell, jeden Vorschlag durch --- zu trennen.",
+
 	"editor.hotstrings.page_title": "✏︎ Persönliche Hotstrings",
 	"editor.hotstrings.btn_add_section": "＋ Abschnitt",
 	"editor.hotstrings.empty_hint": "Keine Hotstrings definiert. Klicken Sie auf + Abschnitt, um zu beginnen. ☰ ziehen zum Neuanordnen — auf den Titel klicken zum Umbenennen",
@@ -984,12 +995,11 @@
 	"editor.hotstrings.cb_case": "Groß-/Kleinschreibung",
 	"editor.hotstrings.cb_final": "Endergebnis",
 	"editor.hotstrings.kbd_help": "↩ = neue Zeile\n⌘ + ↩ = speichern\n⇧ + ⌘ + ↩ = speichern + neuer Hotstring",
+
 	"hs_config.hint": "Nach Kategorie oder Abschnitt anpassen. Alle Änderungen werden sofort gespeichert.",
 	"hs_config.btn_all_grey": "Alles grau",
-	"hs_config.btn_reset_default": "Standard wiederherstellen",
-	"menu.metrics.show_wpm_menubar": "WPM im Tray-Tooltip anzeigen",
-	"menu.metrics.show_wpm_widget": "📊 Schwebendes WPM-Widget",
-	"menu.metrics.wpm_unit": "WPM",
-	"menu.metrics.colors_by_source": "Farbe nach Tippquelle",
-	"menu.metrics.include_realtime": "Echtzeit-Diagramm"
+	"hs_config.btn_reset_all": "Alles zurücksetzen",
+	"hs_config.label_delay": "Verzögerung (ms)",
+	"hs_config.label_color": "Farbe",
+	"hs_config.btn_reset_default": "Standard wiederherstellen"
 }
