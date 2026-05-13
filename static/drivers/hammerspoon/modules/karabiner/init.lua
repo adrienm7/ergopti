@@ -604,6 +604,15 @@ function M.init()
 			else
 				Logger.success(LOG, "Layout change processed — bridge disabled, no rebuild.")
 			end
+			-- Rebuild Hammerspoon hotkeys so they track the new physical key positions.
+			-- hs.hotkey.bind resolves key names at bind time, so existing bindings point
+			-- at the old layout's scancodes until stop()/start() is called.
+			local ok_sc, shortcuts = pcall(require, "modules.shortcuts")
+			if ok_sc and shortcuts and type(shortcuts.stop) == "function" and type(shortcuts.start) == "function" then
+				pcall(shortcuts.stop)
+				pcall(shortcuts.start)
+				Logger.info(LOG, "Shortcuts rebound for layout '%s'.", layout_name)
+			end
 		end)
 	end)
 
