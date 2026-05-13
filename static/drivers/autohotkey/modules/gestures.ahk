@@ -617,7 +617,20 @@ global GESTURE_ACTIONS := Map(
     },
 )
 
-; --- Actions système avancées — implémentations ---
+; Returns the translated label for a gesture action.
+; Prefers t("sg_actions.X") from the active locale JSON; falls back to the
+; hardcoded English label in GESTURE_ACTIONS so new locales never show raw keys.
+_GestureActionLabel(Name) {
+	global GESTURE_ACTIONS
+	Key := "sg_actions." . Name
+	Translated := t(Key)
+	if (Translated != Key)
+		return Translated
+	return GESTURE_ACTIONS.Has(Name) ? GESTURE_ACTIONS[Name].Label : Name
+}
+
+
+; --- Advanced system action implementations ---
 
 GestureScreenshotInstant() {
     WinGetPos(&WX, &WY, &WW, &WH, "A")
