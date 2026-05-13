@@ -589,12 +589,12 @@ WPMWidget_LoadConfig(Cache) {
         WPMWidget.pos_x := Integer(raw_x)
     if (raw_y != "_" && raw_y != "" && IsInteger(raw_y))
         WPMWidget.pos_y := Integer(raw_y)
-    if (raw_colors = "1")
+    if (raw_colors = "1" || raw_colors = true)
         WPMWidget.use_colors := true
-    if (raw_graph = "1")
+    if (raw_graph = "1" || raw_graph = true)
         WPMWidget.show_graph := true
 
-    if (raw_vis = "1")
+    if (raw_vis = "1" || raw_vis = true)
         WPMWidget.visible := true
     try LoggerDone("WPMWidget", "Config loaded (visible=%s, x=%d, y=%d, colors=%s, graph=%s).",
         WPMWidget.visible, WPMWidget.pos_x, WPMWidget.pos_y,
