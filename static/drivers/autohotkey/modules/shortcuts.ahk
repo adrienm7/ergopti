@@ -324,8 +324,11 @@ if Features["Shortcuts"]["Move"].Enabled {
     }
 
     AwakeCancelOnKey(*) {
+        global ActivitySimulation
         if ActivitySimulation {
-            StopActivitySimulation()
+            ; Defer the stop to the next event loop tick so this callback
+            ; returns cleanly before Hotkey("Off") is called on itself
+            SetTimer(StopActivitySimulation, -1)
         }
     }
 
