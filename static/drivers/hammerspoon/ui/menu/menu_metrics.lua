@@ -26,7 +26,6 @@ local kl_mod       = require("modules.keylogger")
 local i18n         = require("lib.i18n")
 
 local _prog_canvas = nil
-local _is_initialized = false
 
 
 
@@ -146,42 +145,23 @@ function M.build(ctx)
 	local updateMenu     = ctx.updateMenu
 	local script_control = ctx.script_control
 
-	if not _is_initialized then
-		_is_initialized = true
-		if state.keylogger_enabled then
-			local Keylogger = require("modules.keylogger")
-			if type(Keylogger.set_options) == "function" then
-				Keylogger.set_options({ encrypt = state.keylogger_encrypt })
-			end
-			if type(Keylogger.set_disabled_apps) == "function" then
-				Keylogger.set_disabled_apps(state.keylogger_disabled_apps or {})
-			end
-			if type(Keylogger.set_private_filter_enabled) == "function" then
-				Keylogger.set_private_filter_enabled(state.keylogger_private_filter_enabled ~= false)
-			end
-			if type(Keylogger.set_secure_field_filter_enabled) == "function" then
-				Keylogger.set_secure_field_filter_enabled(state.keylogger_secure_filter_enabled ~= false)
-			end
-			if type(Keylogger.set_system_auth_filter_enabled) == "function" then
-				Keylogger.set_system_auth_filter_enabled(state.keylogger_system_auth_filter_enabled ~= false)
-			end
+	-- Sync widget visibility on every build so a reload restores the saved state.
+	-- Keylogger start/stop is handled by sync_state_to_modules in init.lua.
+	if state.keylogger_enabled then
+		local WpmMenubar = require("ui.wpm.wpm_menubar")
+		if type(WpmMenubar.set_use_source_colors) == "function" then
+			WpmMenubar.set_use_source_colors(state.keylogger_menubar_colors)
+		end
+		if state.keylogger_menubar_wpm then WpmMenubar.start() else WpmMenubar.stop() end
 
-			Keylogger.start(script_control)
-			
-			if state.keylogger_menubar_wpm then 
-				local WpmMenubar = require("ui.wpm.wpm_menubar")
-				if type(WpmMenubar.set_use_source_colors) == "function" then
-					WpmMenubar.set_use_source_colors(state.keylogger_menubar_colors)
-				end
-				WpmMenubar.start()
-			end
-			if state.keylogger_float_wpm then 
-				local WpmWidget = require("ui.wpm.wpm_widget")
-				if type(WpmWidget.set_use_source_colors) == "function" then
-					WpmWidget.set_use_source_colors(state.keylogger_float_colors)
-				end
-				WpmWidget.start(state.keylogger_float_graph)
-			end
+		local WpmWidget = require("ui.wpm.wpm_widget")
+		if type(WpmWidget.set_use_source_colors) == "function" then
+			WpmWidget.set_use_source_colors(state.keylogger_float_colors)
+		end
+		if state.keylogger_float_wpm then
+			WpmWidget.start(state.keylogger_float_graph)
+		else
+			WpmWidget.stop()
 		end
 	end
 
