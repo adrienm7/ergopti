@@ -66,6 +66,8 @@ class WPMWidgetConst {
     static CFG_VISIBLE      := "WpmWidgetVisible"
     static CFG_X            := "WpmWidgetX"
     static CFG_Y            := "WpmWidgetY"
+    static CFG_COLORS       := "WpmWidgetColors"
+    static CFG_GRAPH        := "WpmWidgetGraph"
     ; Ring buffer capacity for recent keystrokes.
     static RING_CAP         := 2000
 }
@@ -99,6 +101,10 @@ class WPMWidget {
     static _last_tick   := 0      ; A_TickCount of last keystroke seen
     static _last_hs     := false  ; most recent keystroke was a HS expansion
     static _last_ai     := false  ; most recent keystroke was an AI suggestion
+
+    ; Display options — toggled from the menu.
+    static use_colors    := false   ; color-code by keystroke origin
+    static show_graph    := false   ; show mini sparkline graph (future)
 
     ; Drag state.
     static _drag_start_x := 0
@@ -293,18 +299,18 @@ WPMWidget_Tick() {
     has_hs  := result["has_hs"]
     has_ai  := result["has_ai"]
 
-    ; Select color scheme.
+    ; Select color scheme — color coding only when the option is enabled.
     if idle || wpm = 0 {
         bg_color  := WPMWidgetConst.COLOR_BG_IDLE
         txt_color := WPMWidgetConst.COLOR_TXT_IDLE
         alpha     := WPMWidgetConst.ALPHA_IDLE
         wpm_str   := "—"
-    } else if has_ai {
+    } else if WPMWidget.use_colors && has_ai {
         bg_color  := WPMWidgetConst.COLOR_BG_AI
         txt_color := WPMWidgetConst.COLOR_TXT_AI
         alpha     := WPMWidgetConst.ALPHA_ACTIVE
         wpm_str   := String(wpm)
-    } else if has_hs {
+    } else if WPMWidget.use_colors && has_hs {
         bg_color  := WPMWidgetConst.COLOR_BG_HS
         txt_color := WPMWidgetConst.COLOR_TXT_HS
         alpha     := WPMWidgetConst.ALPHA_ACTIVE
@@ -338,20 +344,27 @@ WPMWidget_Tick() {
 
 ; Called once at startup to restore position and visibility from config.
 WPMWidget_LoadConfig(Cache) {
-    raw_vis := IniCacheGet(Cache, "Script", WPMWidgetConst.CFG_VISIBLE)
-    raw_x   := IniCacheGet(Cache, "Script", WPMWidgetConst.CFG_X)
-    raw_y   := IniCacheGet(Cache, "Script", WPMWidgetConst.CFG_Y)
+    raw_vis    := IniCacheGet(Cache, "Script", WPMWidgetConst.CFG_VISIBLE)
+    raw_x      := IniCacheGet(Cache, "Script", WPMWidgetConst.CFG_X)
+    raw_y      := IniCacheGet(Cache, "Script", WPMWidgetConst.CFG_Y)
+    raw_colors := IniCacheGet(Cache, "Script", WPMWidgetConst.CFG_COLORS)
+    raw_graph  := IniCacheGet(Cache, "Script", WPMWidgetConst.CFG_GRAPH)
 
     if (raw_x != "_" && raw_x != "" && IsInteger(raw_x))
         WPMWidget.pos_x := Integer(raw_x)
     if (raw_y != "_" && raw_y != "" && IsInteger(raw_y))
         WPMWidget.pos_y := Integer(raw_y)
+    if (raw_colors = "1")
+        WPMWidget.use_colors := true
+    if (raw_graph = "1")
+        WPMWidget.show_graph := true
 
     ; Auto-show if it was visible on last quit — only when metrics are on.
     if (raw_vis = "1")
         WPMWidget.visible := true
-    try LoggerDone("WPMWidget", "Config loaded (visible=%s, x=%d, y=%d).",
-        WPMWidget.visible, WPMWidget.pos_x, WPMWidget.pos_y)
+    try LoggerDone("WPMWidget", "Config loaded (visible=%s, x=%d, y=%d, colors=%s, graph=%s).",
+        WPMWidget.visible, WPMWidget.pos_x, WPMWidget.pos_y,
+        WPMWidget.use_colors, WPMWidget.show_graph)
 }
 
 WPMWidget_SaveVisible() {
@@ -366,5 +379,13 @@ WPMWidget_SavePosition() {
     try TOML_BatchWrite(ConfigurationFile, [
         { Section: "Script", Key: WPMWidgetConst.CFG_X, Value: String(WPMWidget.pos_x) },
         { Section: "Script", Key: WPMWidgetConst.CFG_Y, Value: String(WPMWidget.pos_y) },
+    ])
+}
+
+WPMWidget_SaveConfig() {
+    global ConfigurationFile
+    try TOML_BatchWrite(ConfigurationFile, [
+        { Section: "Script", Key: WPMWidgetConst.CFG_COLORS, Value: WPMWidget.use_colors ? "1" : "0" },
+        { Section: "Script", Key: WPMWidgetConst.CFG_GRAPH,  Value: WPMWidget.show_graph  ? "1" : "0" },
     ])
 }

@@ -928,9 +928,20 @@ AddCategoryToggleItem(menu, on_label, off_label, is_enabled, on_click) {
 ; When the feature is OFF, the sub-items remain visible (so the user can
 ; still see what the menu looks like) but are disabled — no dashboard can
 ; open, no shortcut binding takes effect.
+; Global reference kept so toggle callbacks can call .ToggleCheck without Reload.
+global _MetricsMenu := unset
+global _WpmMenubarLabel := ""
+global _WpmWidgetLabel  := ""
+global _WpmMenubarColorsLabel := ""
+global _WpmWidgetColorsLabel  := ""
+global _WpmWidgetGraphLabel   := ""
+
 BuildMetricsMenu() {
-    global A_TrayMenu
+    global A_TrayMenu, _MetricsMenu
+    global _WpmMenubarLabel, _WpmWidgetLabel
+    global _WpmMenubarColorsLabel, _WpmWidgetColorsLabel, _WpmWidgetGraphLabel
     MetricsMenu := Menu()
+    _MetricsMenu := MetricsMenu
 
     enabled := MetricsShortcuts.enabled
     typing_label := t("menu.metrics.show_typing")
@@ -977,14 +988,37 @@ BuildMetricsMenu() {
 
     ; ── Real-time WPM display ──────────────────────────────────────────────
     MetricsMenu.Add()
-    wpm_menubar_label  := t("menu.metrics.show_wpm_menubar")
-    wpm_widget_label   := t("menu.metrics.show_wpm_widget")
-    MetricsMenu.Add(wpm_menubar_label,  (*) => ToggleWpmMenubar())
-    MetricsMenu.Add(wpm_widget_label,   (*) => WPMWidget_Toggle())
+    _WpmMenubarLabel        := t("menu.metrics.show_wpm_menubar")
+    _WpmMenubarColorsLabel  := t("menu.metrics.colors_by_source") . Chr(0x200B)
+    _WpmWidgetLabel         := t("menu.metrics.show_wpm_widget")
+    _WpmWidgetColorsLabel   := t("menu.metrics.colors_by_source")
+    _WpmWidgetGraphLabel    := t("menu.metrics.include_realtime")
+
+    MetricsMenu.Add(_WpmMenubarLabel,       (*) => ToggleWpmMenubar())
+    MetricsMenu.Add(_WpmMenubarColorsLabel, (*) => ToggleWpmMenubarColors())
+    MetricsMenu.Add()
+    MetricsMenu.Add(_WpmWidgetLabel,        (*) => ToggleWpmWidget())
+    MetricsMenu.Add(_WpmWidgetColorsLabel,  (*) => ToggleWpmWidgetColors())
+    MetricsMenu.Add(_WpmWidgetGraphLabel,   (*) => ToggleWpmWidgetGraph())
+
     if MetricsShortcuts.show_wpm_menubar
-        MetricsMenu.Check(wpm_menubar_label)
+        MetricsMenu.Check(_WpmMenubarLabel)
+    if MetricsShortcuts.show_wpm_menubar && MetricsShortcuts.wpm_menubar_colors
+        MetricsMenu.Check(_WpmMenubarColorsLabel)
     if WPMWidget.visible
-        MetricsMenu.Check(wpm_widget_label)
+        MetricsMenu.Check(_WpmWidgetLabel)
+    if WPMWidget.visible && WPMWidget.use_colors
+        MetricsMenu.Check(_WpmWidgetColorsLabel)
+    if WPMWidget.visible && WPMWidget.show_graph
+        MetricsMenu.Check(_WpmWidgetGraphLabel)
+
+    ; Sub-options are disabled when their parent toggle is off.
+    if !MetricsShortcuts.show_wpm_menubar
+        MetricsMenu.Disable(_WpmMenubarColorsLabel)
+    if !WPMWidget.visible {
+        MetricsMenu.Disable(_WpmWidgetColorsLabel)
+        MetricsMenu.Disable(_WpmWidgetGraphLabel)
+    }
 
     if !enabled {
         MetricsMenu.Disable(typing_label)
@@ -995,8 +1029,11 @@ BuildMetricsMenu() {
         MetricsMenu.Disable(secure_label)
         MetricsMenu.Disable(sysauth_label)
         MetricsMenu.Disable(excl_label)
-        MetricsMenu.Disable(wpm_menubar_label)
-        MetricsMenu.Disable(wpm_widget_label)
+        MetricsMenu.Disable(_WpmMenubarLabel)
+        MetricsMenu.Disable(_WpmMenubarColorsLabel)
+        MetricsMenu.Disable(_WpmWidgetLabel)
+        MetricsMenu.Disable(_WpmWidgetColorsLabel)
+        MetricsMenu.Disable(_WpmWidgetGraphLabel)
     }
 
     A_TrayMenu.Add(t("menu.metrics.title"), MetricsMenu)
@@ -1034,28 +1071,71 @@ ToggleFilterSystemAuth(*) {
     Reload
 }
 
-; WPM toggles — no Reload needed since these control runtime-only state.
+; ── WPM toggle callbacks — no Reload; ToggleCheck updates the menu live. ──────
+
 ToggleWpmMenubar(*) {
+    global _MetricsMenu, _WpmMenubarLabel, _WpmMenubarColorsLabel
     MetricsShortcuts.show_wpm_menubar := !MetricsShortcuts.show_wpm_menubar
     CS_Save()
+    try _MetricsMenu.ToggleCheck(_WpmMenubarLabel)
     if MetricsShortcuts.show_wpm_menubar {
-        ; Start the tray-tip WPM update timer.
         SetTimer(WpmMenubar_Tick, 1000)
+        try _MetricsMenu.Enable(_WpmMenubarColorsLabel)
     } else {
         SetTimer(WpmMenubar_Tick, 0)
-        ; Restore the default tooltip.
         A_IconTip := "ErgoptiPlus"
+        try _MetricsMenu.Disable(_WpmMenubarColorsLabel)
     }
-    ; Rebuild the menu so the checkmark reflects the new state.
-    Reload
+}
+
+ToggleWpmMenubarColors(*) {
+    global _MetricsMenu, _WpmMenubarColorsLabel
+    MetricsShortcuts.wpm_menubar_colors := !MetricsShortcuts.wpm_menubar_colors
+    CS_Save()
+    try _MetricsMenu.ToggleCheck(_WpmMenubarColorsLabel)
+}
+
+ToggleWpmWidget(*) {
+    global _MetricsMenu, _WpmWidgetLabel, _WpmWidgetColorsLabel, _WpmWidgetGraphLabel
+    WPMWidget_Toggle()
+    try _MetricsMenu.ToggleCheck(_WpmWidgetLabel)
+    if WPMWidget.visible {
+        try _MetricsMenu.Enable(_WpmWidgetColorsLabel)
+        try _MetricsMenu.Enable(_WpmWidgetGraphLabel)
+    } else {
+        try _MetricsMenu.Disable(_WpmWidgetColorsLabel)
+        try _MetricsMenu.Disable(_WpmWidgetGraphLabel)
+    }
+}
+
+ToggleWpmWidgetColors(*) {
+    global _MetricsMenu, _WpmWidgetColorsLabel
+    WPMWidget.use_colors := !WPMWidget.use_colors
+    WPMWidget_SaveConfig()
+    try _MetricsMenu.ToggleCheck(_WpmWidgetColorsLabel)
+}
+
+ToggleWpmWidgetGraph(*) {
+    global _MetricsMenu, _WpmWidgetGraphLabel
+    WPMWidget.show_graph := !WPMWidget.show_graph
+    WPMWidget_SaveConfig()
+    try _MetricsMenu.ToggleCheck(_WpmWidgetGraphLabel)
 }
 
 ; Updates A_IconTip with the current live WPM every second.
+; When colors are enabled, appends the keystroke-origin tag [HS] or [IA].
 WpmMenubar_Tick() {
     result := WPMWidget_Calc()
     wpm    := result["wpm"]
     if (wpm > 0) {
-        A_IconTip := "ErgoptiPlus  |  " . wpm . " " . t("menu.metrics.wpm_unit")
+        suffix := ""
+        if MetricsShortcuts.wpm_menubar_colors {
+            if result["has_ai"]
+                suffix := " [IA]"
+            else if result["has_hs"]
+                suffix := " [HS]"
+        }
+        A_IconTip := "ErgoptiPlus  |  " . wpm . " " . t("menu.metrics.wpm_unit") . suffix
     } else {
         A_IconTip := "ErgoptiPlus"
     }

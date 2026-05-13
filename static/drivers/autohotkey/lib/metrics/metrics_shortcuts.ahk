@@ -62,7 +62,8 @@ class MetricsShortcuts {
     static typing_ahk        := ""    ; e.g. "^!m"  (active hotkey string)
     static apps_ahk          := ""
     ; Real-time WPM display prefs.
-    static show_wpm_menubar  := false  ; Show live WPM in the tray tooltip
+    static show_wpm_menubar       := false  ; Show live WPM in the tray tooltip
+    static wpm_menubar_colors     := false  ; Color-code menubar WPM by keystroke origin
 }
 
 
