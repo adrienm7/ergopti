@@ -333,12 +333,12 @@ _HCW_SelectedSection() {
 
 ; Extract the locale-appropriate string from a TOML inline table body like:
 ;   fr = "texte", en = "text", de = "Text", es = "Texto", zh = "文本"
-; Falls back to "fr" when the current locale has no entry, then to the raw body.
+; Falls back to "en" then "fr" when the current locale has no entry.
 _HCW_LocaleFromInlineTable(body) {
     global _I18nLocale
-    lang := (IsSet(_I18nLocale) && _I18nLocale != "") ? StrLower(_I18nLocale) : "fr"
-    ; Try current locale first, then "fr" as fallback.
-    for try_lang in [lang, "fr"] {
+    lang := (IsSet(_I18nLocale) && _I18nLocale != "") ? StrLower(_I18nLocale) : "en"
+    ; Try current locale, then English, then French as fallbacks.
+    for try_lang in [lang, "en", "fr"] {
         if RegExMatch(body, try_lang . '\s*=\s*"((?:[^"\\]|\\.)*)"', &M)
             return UnescapeTomlString(M[1])
     }
@@ -359,7 +359,7 @@ _HCW_GetSections(Category) {
             and ScriptInformation.Has("PersonalTomlPath")) {
         Path := ScriptInformation["PersonalTomlPath"]
     } else {
-        Path := A_ScriptDir . "\..\hotstrings\" . StrLower(Category) . ".toml"
+        Path := A_ScriptDir . "\..\..\hotstrings\" . StrLower(Category) . ".toml"
     }
     Sections := []
     Seen := Map()
