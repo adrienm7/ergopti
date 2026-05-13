@@ -25,6 +25,24 @@ local LOG = "ui_builder"
 -- HS session is enough.
 local _html_cache = {}
 
+-- Absolute file:// URL to the shared static/locales/ directory.
+-- Computed once at module-load time from this file's own path.
+-- Injected into every webview as window.__i18n_base so that the browser-side
+-- i18n.js fetch() resolves locale JSON files correctly even when the HTML is
+-- loaded inline (via wv:html()) with no base URL.
+local _locales_base_url = (function()
+	local src = debug.getinfo(1, "S").source:sub(2)  -- strip leading '@'
+	-- ui_builder.lua lives at  .../hammerspoon/ui/ui_builder.lua
+	-- static/locales/          .../../../locales/
+	local dir = src:match("^(.*[/\\])") or "./"
+	-- Walk up: ui/ → hammerspoon/ → drivers/ → static/ then into locales/
+	local locales = dir .. "../../../locales/"
+	-- Normalise to forward slashes and prepend file:// so fetch() accepts it
+	locales = locales:gsub("\\", "/")
+	if not locales:match("^/") then locales = "/" .. locales end
+	return "file://" .. locales
+end)()
+
 
 
 
@@ -71,6 +89,19 @@ function M.build_injected_html(assets_dir, html_name)
 	end
 	local html = fh:read("*a")
 	fh:close()
+
+	-- Inject window.__i18n_base and window._i18n_locale right after <head> so
+	-- that i18n.js fetch() resolves locale JSON files correctly even when HTML
+	-- is loaded inline (no file:// base URL).  The locale is read at build time
+	-- from lib.i18n so the page renders in the user's active language.
+	local ok_i18n, i18n_mod = pcall(require, "lib.i18n")
+	local active_locale = (ok_i18n and i18n_mod and i18n_mod.get_locale()) or "fr"
+	local i18n_boot = string.format(
+		'<script>window.__i18n_base="%s";window._i18n_locale="%s";</script>',
+		_locales_base_url, active_locale
+	)
+	-- Use a function replacement to avoid gsub interpreting % in the boot script
+	html = html:gsub("(<head[^>]*>)", function(tag) return tag .. i18n_boot end, 1)
 
 	-- Inline local <link rel="stylesheet" href="..."> tags; leave CDN URLs intact
 	html = html:gsub('<link%s+rel="stylesheet"%s+href="([^"]+)"%s*/>', function(href)
@@ -251,10 +282,38 @@ function M.show_webview(opts)
 		end)
 	end
 
-	-- Bind navigation callback
-	if type(opts.on_navigation) == "function" then
-		pcall(function() wv:navigationCallback(opts.on_navigation) end)
-	end
+	-- Bind navigation callback; also inject i18n strings after every navigation
+	-- as a fallback for webviews where i18n.js fetch() cannot reach file:// URLs.
+	local caller_nav = opts.on_navigation
+	pcall(function()
+		wv:navigationCallback(function(action, wv2, nav)
+			-- Forward to the caller's own handler first
+			local result = true
+			if type(caller_nav) == "function" then
+				result = caller_nav(action, wv2, nav)
+			end
+			-- After the page finishes loading, inject locale strings so that
+			-- data-i18n elements are populated even when fetch() fails (inline HTML,
+			-- about:blank origin, no file:// CORS access).
+			if action == "didFinishNavigation" and opts.inject_i18n ~= false then
+				hs.timer.doAfter(0.08, function()
+					if not wv or not wv2 then return end
+					local ok_mod, locale_mod = pcall(require, "lib.locale")
+					if not ok_mod or not locale_mod then return end
+					local all_strings = locale_mod.all()
+					if type(all_strings) ~= "table" then return end
+					local ok_enc, json = pcall(hs.json.encode, all_strings)
+					if not ok_enc or not json then return end
+					pcall(function()
+						wv:evaluateJavaScript(
+							"if(window.i18n_apply){window.i18n_apply(" .. json .. ");}"
+						)
+					end)
+				end)
+			end
+			return result
+		end)
+	end)
 
 	-- Inject HTML assets
 	if type(opts.assets_dir) == "string" then
