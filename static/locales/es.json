@@ -1,4 +1,4 @@
-{
+﻿{
 	"_meta.locale": "es",
 	"_meta.flag": "🇪🇸",
 	"_meta.name": "Español",
@@ -483,6 +483,9 @@
 	"notify.clipboard": "Portapapeles",
 	"notify.screenshot_saved_path": "Guardado: %s",
 	"notify.screenshot_title": "Captura de pantalla",
+	"keepawake.title": "Actividad del teclado",
+	"keepawake.started": "☕ Anti-suspensión activo",
+	"keepawake.stopped": "☕ Anti-suspensión desactivado",
 	"notify.llm_enabled": "🟢 ACTIVADO",
 	"notify.llm_disabled": "🔴 DESACTIVADO",
 	"notify.llm_suggestions": "Sugerencias IA",

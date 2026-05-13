@@ -1,4 +1,4 @@
-{
+﻿{
 	"_meta.locale": "ko",
 	"_meta.flag": "🇰🇷",
 	"_meta.name": "한국어",
@@ -483,6 +483,9 @@
 	"notify.clipboard": "클립보드",
 	"notify.screenshot_saved_path": "저장됨: %s",
 	"notify.screenshot_title": "스크린샷",
+	"keepawake.title": "키보드 활동",
+	"keepawake.started": "☕ 절전 방지 활성화",
+	"keepawake.stopped": "☕ 절전 방지 비활성화",
 	"notify.llm_enabled": "🟢 활성화됨",
 	"notify.llm_disabled": "🔴 비활성화됨",
 	"notify.llm_suggestions": "AI 제안",

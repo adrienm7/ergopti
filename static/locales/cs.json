@@ -1,4 +1,4 @@
-{
+﻿{
 	"_meta.locale": "cs",
 	"_meta.flag": "🇨🇿",
 	"_meta.name": "Čeština",
@@ -483,6 +483,9 @@
 	"notify.clipboard": "Schránka",
 	"notify.screenshot_saved_path": "Uloženo: %s",
 	"notify.screenshot_title": "Snímek obrazovky",
+	"keepawake.title": "Aktivita klávesnice",
+	"keepawake.started": "☕ Proti spánku aktivní",
+	"keepawake.stopped": "☕ Proti spánku deaktivováno",
 	"notify.llm_enabled": "🟢 POVOLENO",
 	"notify.llm_disabled": "🔴 ZAKÁZÁNO",
 	"notify.llm_suggestions": "Návrhy AI",

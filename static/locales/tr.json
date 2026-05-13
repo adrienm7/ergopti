@@ -1,4 +1,4 @@
-{
+﻿{
 	"_meta.locale": "tr",
 	"_meta.flag": "🇹🇷",
 	"_meta.name": "Türkçe",
@@ -473,6 +473,9 @@
 	"notify.clipboard": "Pano",
 	"notify.screenshot_saved_path": "Kaydedildi: %s",
 	"notify.screenshot_title": "Ekran görüntüsü",
+	"keepawake.title": "Klavye etkinliği",
+	"keepawake.started": "☕ Uyku önleme aktif",
+	"keepawake.stopped": "☕ Uyku önleme devre dışı",
 	"notify.llm_enabled": "🟢 ETKİN",
 	"notify.llm_disabled": "🔴 DEVRE DIŞI",
 	"notify.llm_suggestions": "YZ Önerileri",

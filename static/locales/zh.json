@@ -1,4 +1,4 @@
-{
+﻿{
 	"_meta.locale": "zh",
 	"_meta.flag": "🇨🇳",
 	"_meta.name": "中文",
@@ -483,6 +483,9 @@
 	"notify.clipboard": "剪贴板",
 	"notify.screenshot_saved_path": "已保存：%s",
 	"notify.screenshot_title": "截图",
+	"keepawake.title": "键盘活动",
+	"keepawake.started": "☕ 防休眠已启用",
+	"keepawake.stopped": "☕ 防休眠已禁用",
 	"notify.llm_enabled": "🟢 已启用",
 	"notify.llm_disabled": "🔴 已禁用",
 	"notify.llm_suggestions": "AI 建议",
