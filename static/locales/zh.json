@@ -1092,6 +1092,8 @@
 	"keylogger.category_general": "常规",
 	"keylogger.category_private": "隐私浏览",
 	"metrics_apps.title": "打字指标",
+	"menu.builder.title": "Ergopti+",
+	"menu.builder.title_paused": "Ergopti+ ⏸",
 	"menu.global.setup_wizard": "设置向导…",
 	"onboarding.language.placeholder": "选择您的语言…",
 	"onboarding.layout.title": "键盘布局",

@@ -1092,6 +1092,8 @@
 	"keylogger.category_general": "General",
 	"keylogger.category_private": "Navegación privada",
 	"metrics_apps.title": "Métricas de escritura",
+	"menu.builder.title": "Ergopti+",
+	"menu.builder.title_paused": "Ergopti+ ⏸",
 	"menu.global.setup_wizard": "Asistente de configuración…",
 	"onboarding.language.placeholder": "Elija su idioma…",
 	"onboarding.layout.title": "Disposición del teclado",

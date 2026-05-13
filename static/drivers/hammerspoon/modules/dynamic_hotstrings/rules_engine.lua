@@ -295,10 +295,10 @@ function M.start(keymap_module)
 	local function loc(key) return locale and locale.get(key) or "" end
 	-- Date descriptions embed today's date so the user sees the expected output.
 	local desc_datefr = loc("dynamichotstrings.datefr")
-	if desc_datefr == "" then desc_datefr = "dt" .. _trigger .. " insère la date courante" end
+	if desc_datefr == "" then desc_datefr = "dt" .. _trigger .. " inserts current date" end
 	desc_datefr = desc_datefr .. " (" .. date_fr  .. ")"
 	local desc_date   = loc("dynamichotstrings.date")
-	if desc_date == "" then desc_date = "td" .. _trigger .. " insère la date courante" end
+	if desc_date == "" then desc_date = "td" .. _trigger .. " inserts current date" end
 	desc_date   = desc_date   .. " (" .. date_iso .. ")"
 	_sections = {
 		{ name = "datefr",        description = desc_datefr,                                count = 1 },

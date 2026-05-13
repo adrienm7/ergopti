@@ -1092,6 +1092,8 @@
 	"keylogger.category_general": "Allgemein",
 	"keylogger.category_private": "Privates Surfen",
 	"metrics_apps.title": "Tippmetriken",
+	"menu.builder.title": "Ergopti+",
+	"menu.builder.title_paused": "Ergopti+ ⏸",
 	"menu.global.setup_wizard": "Einrichtungsassistent…",
 	"onboarding.language.placeholder": "Sprache wählen…",
 	"onboarding.layout.title": "Tastaturbelegung",
