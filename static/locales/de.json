@@ -1,4 +1,4 @@
-{
+﻿{
 	"_meta.locale": "de",
 	"_meta.flag": "🇩🇪",
 	"_meta.name": "Deutsch",
@@ -1001,5 +1001,8 @@
 	"hs_config.btn_reset_all": "Alles zurücksetzen",
 	"hs_config.label_delay": "Verzögerung (ms)",
 	"hs_config.label_color": "Farbe",
-	"hs_config.btn_reset_default": "Standard wiederherstellen"
+	"hs_config.btn_reset_default": "Standard wiederherstellen",
+	"menu.metrics.show_wpm_menubar": "WPM im Tray-Tooltip anzeigen",
+	"menu.metrics.show_wpm_widget": "📊 Schwebendes WPM-Widget",
+	"menu.metrics.wpm_unit": "WPM"
 }

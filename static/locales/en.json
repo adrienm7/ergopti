@@ -1,4 +1,4 @@
-{
+﻿{
 	"_meta.locale": "en",
 	"_meta.flag": "🇬🇧",
 	"_meta.name": "English",
@@ -1001,5 +1001,8 @@
 	"hs_config.btn_reset_all": "Reset all",
 	"hs_config.label_delay": "Delay (ms)",
 	"hs_config.label_color": "Color",
-	"hs_config.btn_reset_default": "Restore default"
+	"hs_config.btn_reset_default": "Restore default",
+	"menu.metrics.show_wpm_menubar": "Show WPM in tray tooltip",
+	"menu.metrics.show_wpm_widget": "📊 Floating WPM widget",
+	"menu.metrics.wpm_unit": "WPM"
 }

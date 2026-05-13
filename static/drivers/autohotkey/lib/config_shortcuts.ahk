@@ -288,6 +288,8 @@ CS_Load() {
     if s.Has("metrics_shortcut_apps")
         MetricsShortcuts.apps_str := String(s["metrics_shortcut_apps"])
 
+    if s.Has("metrics_show_wpm_menubar")
+        MetricsShortcuts.show_wpm_menubar := s["metrics_show_wpm_menubar"] ? true : false
     if s.Has("metrics_filter_private_browsing")
         MetricsFilters.private_browsing := s["metrics_filter_private_browsing"] ? true : false
     if s.Has("metrics_filter_secure_field")
@@ -322,6 +324,7 @@ CS_Save() {
         "metrics_enabled", MetricsShortcuts.enabled,
         "metrics_shortcut_typing", MetricsShortcuts.typing_str,
         "metrics_shortcut_apps", MetricsShortcuts.apps_str,
+        "metrics_show_wpm_menubar", MetricsShortcuts.show_wpm_menubar,
         "metrics_filter_private_browsing", MetricsFilters.private_browsing,
         "metrics_filter_secure_field", MetricsFilters.secure_field,
         "metrics_filter_system_auth", MetricsFilters.system_auth,

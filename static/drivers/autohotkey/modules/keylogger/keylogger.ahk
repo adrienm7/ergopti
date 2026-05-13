@@ -753,6 +753,10 @@ KL_LogHotstring(trigger, replacement, h_type := "unknown", app_name := "") {
     ))
     Keylogger.last_flush_time := A_TickCount
     try KL_Roi_OnHotstring(trigger, net_saved)
+    ; Feed the real-time WPM widget — the expansion counts as HS-typed chars.
+    repl_len := StrLen(replacement)
+    Loop repl_len
+        try WPMWidget_Push(true, false)
 }
 
 ; Logs that a hotstring tooltip was shown to the user. Mirrors HS init.lua:1196.

@@ -1,4 +1,4 @@
-{
+﻿{
 	"_meta.locale": "es",
 	"_meta.flag": "🇪🇸",
 	"_meta.name": "Español",
@@ -1001,5 +1001,8 @@
 	"hs_config.btn_reset_all": "Restablecer todo",
 	"hs_config.label_delay": "Retardo (ms)",
 	"hs_config.label_color": "Color",
-	"hs_config.btn_reset_default": "Restaurar predeterminado"
+	"hs_config.btn_reset_default": "Restaurar predeterminado",
+	"menu.metrics.show_wpm_menubar": "Mostrar PPM en el tooltip del menú",
+	"menu.metrics.show_wpm_widget": "📊 Widget PPM flotante",
+	"menu.metrics.wpm_unit": "PPM"
 }
