@@ -50,9 +50,9 @@ AppPicker_Show(opts) {
         ; Defensive — mis-call must not crash the caller.
         return
     }
-    title := opts.Has("title") ? opts["title"] : "Sélection d’applications"
-    prompt := opts.Has("prompt") ? opts["prompt"] : "Sélectionnez les applications :"
-    ok_label := opts.Has("ok_label") ? opts["ok_label"] : "Valider"
+    title := opts.Has("title") ? opts["title"] : t("dialog.app_picker.title")
+    prompt := opts.Has("prompt") ? opts["prompt"] : t("dialog.app_picker.prompt")
+    ok_label := opts.Has("ok_label") ? opts["ok_label"] : t("common.ok")
     on_save := opts.Has("on_save") ? opts["on_save"] : ""
 
     initial := Map()
@@ -80,9 +80,9 @@ AppPicker_Show(opts) {
 
     ; Footer: count + buttons.
     g.AddText("xs y+10 w300 vAppPickerStatus",
-        rows.Length . " application(s) en cours.")
+        StrReplace(t("dialog.app_picker.running_count"), "{n}", rows.Length))
     btn_ok := g.AddButton("x+10 yp-4 w100 Default", ok_label)
-    btn_cancel := g.AddButton("x+5 yp w100", "Annuler")
+    btn_cancel := g.AddButton("x+5 yp w100", t("common.cancel"))
 
     btn_ok.OnEvent("Click", (*) => AppPicker_OnOK(g, lv, rows, on_save))
     btn_cancel.OnEvent("Click", (*) => g.Destroy())
@@ -135,7 +135,7 @@ AppPicker_BuildRows(initial) {
     if (focused_proc != "") {
         rows.Push({
             process: focused_proc,
-            display: focused_disp . " (en cours)",
+            display: focused_disp . t("dialog.app_picker.active_suffix"),
             checked: initial.Has(focused_proc)
         })
         seen[focused_proc] := true
@@ -195,7 +195,7 @@ AppPicker_BuildRows(initial) {
             continue
         rows.Push({
             process: proc,
-            display: proc . " (arrêté)",
+            display: proc . t("dialog.app_picker.stopped_suffix"),
             checked: true
         })
         seen[proc] := true

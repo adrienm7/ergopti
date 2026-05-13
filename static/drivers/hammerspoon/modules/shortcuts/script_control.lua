@@ -23,6 +23,7 @@ local hs            = hs
 local notifications = require("lib.notifications")
 local Logger        = require("lib.logger")
 local Keycodes      = require("lib.keycodes")
+local i18n          = require("lib.i18n")
 
 local Engine    = require("modules.gestures.engine")
 local GestActions = require("modules.gestures.actions")
@@ -177,11 +178,11 @@ local function dispatch_action(action)
 		if _is_paused then
 			Logger.info(LOG, "Pausing all script operations.")
 			pause_all()
-			notifications.notify("Script mis en pause", nil, "warning")
+			notifications.notify(i18n.get("script_control.paused"), nil, "warning")
 		else
 			Logger.info(LOG, "Resuming all script operations.")
 			resume_all()
-			notifications.notify("Script réactivé", nil, "success")
+			notifications.notify(i18n.get("script_control.resumed"), nil, "success")
 		end
 		return true
 	end

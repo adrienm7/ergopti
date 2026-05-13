@@ -202,8 +202,8 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 
 	local function do_reload(source)
 		local msg = source == "watcher"
-			and "Fichiers modifiés — Rechargement…"
-			or  "Rechargement du script…"
+			and i18n.get("menu.reloading_files")
+			or  i18n.get("menu.reloading")
 		pcall(notifications.notify, msg, nil, "info")
 		hs.timer.doAfter(0.25, function() pcall(hs.reload) end)
 	end
@@ -799,6 +799,12 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 				end
 				pcall(hs.execute, string.format("open %q", path))
 			end,
+			show_setup_wizard         = function()
+				local ok, ob = pcall(require, "ui.onboarding")
+				if ok and type(ob.run_from_menu) == "function" then
+					pcall(ob.run_from_menu, MenuPaths.get("ConfigTomlPath"))
+				end
+			end,
 		}
 
 		-- Wire those callbacks into script_control so the right-Alt key slots
@@ -859,7 +865,7 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 	end, "AppleInterfaceThemeChangedNotification")
 	M._theme_watcher:start()
 
-	pcall(notifications.notify, "Script prêt !", nil, "success")
+	pcall(notifications.notify, i18n.get("menu.script_ready"), nil, "success")
 	return myMenu, configWatcher
 end
 

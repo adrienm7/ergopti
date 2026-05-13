@@ -10,6 +10,7 @@
 local M = {}
 local hs     = hs
 local dialog = require("lib.dialog_util")
+local i18n   = require("lib.i18n")
 
 
 
@@ -161,13 +162,13 @@ end
 function M.prompt_shortcut(opts)
 	if type(opts) ~= "table" or type(opts.on_apply) ~= "function" then return false end
 
-	local title = type(opts.title) == "string" and opts.title or "Raccourci"
+	local title = type(opts.title) == "string" and opts.title or i18n.get("shortcuts.shortcut_label")
 	local message = type(opts.message) == "string"
 		and opts.message
-		or "Format : mods+touche (ex : cmd+alt+p)\nMods disponibles : cmd, alt, ctrl, shift\nLaisser vide pour désactiver"
+		or i18n.get("shortcuts.shortcut_format_hint")
 
 	local current = M.shortcut_to_config_string(opts.current_shortcut)
-	local ok_prompt, button, raw = pcall(dialog.text_prompt, title, message, current, "OK", "Annuler")
+	local ok_prompt, button, raw = pcall(dialog.text_prompt, title, message, current, "OK", i18n.get("common.cancel"))
 	if not ok_prompt or button ~= "OK" or type(raw) ~= "string" then return false end
 
 	local cleaned = raw:match("^%s*(.-)%s*$")

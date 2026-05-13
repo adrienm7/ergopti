@@ -21,6 +21,7 @@
 
 local hs     = hs
 local Logger = require("lib.logger")
+local i18n   = require("lib.i18n")
 local LOG    = "keylogger.context_tracker"
 local M      = {}
 
@@ -37,9 +38,16 @@ local _last_win_time        = 0
 
 -- Incognito / private browsing window title keywords across all major browsers
 local PRIVATE_KEYWORDS = {
-	"Navigation privée", "Private Browsing", "Incognito",
-	"InPrivate", "Anonymous",
+	-- Populated at first use via i18n to pick the locale-correct term
+	"Private Browsing", "Incognito", "InPrivate", "Anonymous",
 }
+local function get_private_keywords()
+	local localized = i18n.get("keylogger.category_private")
+	if localized ~= "keylogger.category_private" then
+		PRIVATE_KEYWORDS[#PRIVATE_KEYWORDS + 1] = localized
+	end
+	return PRIVATE_KEYWORDS
+end
 
 
 
@@ -241,7 +249,7 @@ function M.update_private_status()
 	_last_win_time  = now
 
 	-- Check for private/incognito mode keywords in the window title
-	for _, keyword in ipairs(PRIVATE_KEYWORDS) do
+	for _, keyword in ipairs(get_private_keywords()) do
 		if title:find(keyword, 1, true) then
 			_state.is_private_window = true
 			Logger.debug(LOG, "Private browsing window detected in '%s'.", _state.active_app_name or "?")
