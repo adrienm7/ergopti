@@ -1957,16 +1957,18 @@ CS_Load()
 ; available and delegate persistence to the full writer.
 global _SaveFullConfigReady := true
 
+; Restore WPM widget state before SaveFullConfig() so that the canonical
+; write captures the correct visible/graph/colors values rather than the
+; class defaults (which are all false). Without this ordering, SaveFullConfig
+; would overwrite WpmWidgetVisible = 0 and the next reload would see that 0.
+if MetricsShortcuts.enabled
+    WPMWidget_LoadConfig(_IniCache)
+
 ; Now that all modules are loaded and config is hydrated, persist the
 ; complete state to ensure the on-disk TOML contains every key — not
 ; just the ones the user has ever toggled. This makes the file a
 ; human-readable, complete reference of the current configuration.
 SaveFullConfig()
-
-; Restore WPM widget state before building menus so that BuildMetricsMenu()
-; reads the correct WPMWidget.visible value when setting checkmarks.
-if MetricsShortcuts.enabled
-    WPMWidget_LoadConfig(_IniCache)
 
 InitSubMenus()
 initMenu()
@@ -2135,10 +2137,10 @@ _ParseExtTomlSections(FilePath) {
 
 MagicKeyEditor(*) {
     GuiToShow := Gui(, t("dialog.magic_key.title"))
-    GuiToShow.Add("Text", , "Nouvelle valeur (★ par défaut) :")
+    GuiToShow.Add("Text", , t("dialog.magic_key.prompt"))
     NewValue := GuiToShow.Add("Edit", "w50 x+10", ScriptInformation["MagicKey"])
 
-    GuiToShow.Add("Button", "w100 x+10", "OK").OnEvent("Click", (*) => ModifyMagicKey(GuiToShow, NewValue.Text))
+    GuiToShow.Add("Button", "w100 x+10", t("button.ok")).OnEvent("Click", (*) => ModifyMagicKey(GuiToShow, NewValue.Text))
     GuiToShow.Show("Center")
 }
 ModifyMagicKey(gui, NewValue) {
@@ -2174,7 +2176,7 @@ PersonalInformationEditor(*) {
     }
 
     ; OK button
-    GuiToShow.Add("Button", "w100 Center", "OK").OnEvent("Click", (*) => ProcessUserInput(GuiToShow,
+    GuiToShow.Add("Button", "w100 Center", t("button.ok")).OnEvent("Click", (*) => ProcessUserInput(GuiToShow,
         UpdatedPersonalInformation))
 
     GuiToShow.Show("Center")
@@ -2209,7 +2211,7 @@ GPTLinkEditor(*) {
     GuiToShow := Gui(, t("dialog.gpt_link.title"))
     NewValue := GuiToShow.Add("Edit", "w300", Features["Shortcuts"]["GPT"].Link)
 
-    GuiToShow.Add("Button", "w100 Center", "OK").OnEvent("Click", (*) => ModifyLink(GuiToShow, NewValue.Text))
+    GuiToShow.Add("Button", "w100 Center", t("button.ok")).OnEvent("Click", (*) => ModifyLink(GuiToShow, NewValue.Text))
     GuiToShow.Show("Center")
 }
 ModifyLink(gui, NewValue) {
@@ -2941,7 +2943,7 @@ FilePathsEditor(*) {
 
     W.Add("Text", "xm y+14 cGray", t("dialog.config_folder.hint"))
 
-    W.Add("Button", "xm y+10 w80", "OK").OnEvent("Click", SaveConfigDir)
+    W.Add("Button", "xm y+10 w80", t("button.ok")).OnEvent("Click", SaveConfigDir)
     W.Add("Button", "x+6 w80", t("common.cancel")).OnEvent("Click", (*) => W.Destroy())
 
     BrowseDir(*) {
