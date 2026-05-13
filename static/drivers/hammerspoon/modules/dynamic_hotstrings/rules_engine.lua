@@ -311,7 +311,7 @@ function M.start(keymap_module)
 	}
 
 	if _km.register_lua_group then
-		_km.register_lua_group(GROUP_NAME, "Hotstrings dynamiques", _sections)
+		_km.register_lua_group(GROUP_NAME, loc("dynamichotstrings.group_label"), _sections)
 	end
 
 	if _km.set_post_load_hook then

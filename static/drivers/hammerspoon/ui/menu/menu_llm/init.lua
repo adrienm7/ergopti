@@ -899,7 +899,7 @@ function M.create(deps)
                     if m.capabilities then
                         table.insert(model_submenu, { title = "-" })
                         table.insert(model_submenu, { title = i18n.section("menu.llm.caps_header"), disabled = true })
-                        if m.capabilities.speed_tok_s then table.insert(model_submenu, { title = string.format(i18n.get("menu.llm.model_speed"), m.capabilities.speed_tok_s)", fn = function() end }) end
+                        if m.capabilities.speed_tok_s then table.insert(model_submenu, { title = string.format(i18n.get("menu.llm.model_speed"), m.capabilities.speed_tok_s), fn = function() end }) end
                         local tags = m.capabilities.tags
                         if tags and type(tags) == "table" and #tags > 0 then
                             table.insert(model_submenu, { title = string.format(i18n.get("menu.llm.model_tags"), table.concat(tags, ", ")), fn = function() end })
