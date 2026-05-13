@@ -1295,7 +1295,7 @@ initMenu() {
     ; added — keeping the modifier combos visually grouped together.
     ; Then append « Raccourcis de gestion du script » at the bottom.
     if SubMenus.Has("Shortcuts") {
-        InsertKeyboardShortcutGroups(SubMenus["Shortcuts"], "Combinaison de modificateurs")
+        InsertKeyboardShortcutGroups(SubMenus["Shortcuts"], t("menu.shortcuts.group_modifiers"))
         SubMenus["Shortcuts"].Add()
         SubMenus["Shortcuts"].Add(t("menu.shortcuts.script_shortcuts"), BuildScriptShortcutsMenu())
     }
@@ -2705,7 +2705,7 @@ InsertKeyboardShortcutGroups(TargetMenu, InsertBefore) {
         TargetMenu.Insert(InsertBefore, GroupMenus[Idx]["label"], GroupMenus[Idx]["menu"])
     }
 
-    LoggerSuccess("KeyboardShortcutsMenu", "Groupes insérés (%d raccourci(s) actif(s)).", AssignedCount)
+    LoggerSuccess("KeyboardShortcutsMenu", "Groups inserted (%d active shortcut(s)).", AssignedCount)
 }
 
 ; Open a two-step GUI: first pick the key slot, then pick the action.
