@@ -423,6 +423,8 @@ WPMWidget_DragPoll() {
 ; ============================================
 
 WPMWidget_Show() {
+    LoggerStart("WPMWidget", "Showing widget (graph=%s, pos_x=%d, pos_y=%d)…",
+        WPMWidget.show_graph, WPMWidget.pos_x, WPMWidget.pos_y)
     if WPMWidget.show_graph {
         if !WPMWidget._graph_gui
             WPMWidget_BuildGraph()
@@ -445,15 +447,16 @@ WPMWidget_Show() {
 
     gui_ref.Show("x" . WPMWidget.pos_x . " y" . WPMWidget.pos_y
         . " w" . w . " h" . h . " NoActivate")
-    if WPMWidget.show_graph
-        ; Color-key "000001" punches out the Gui background so only the WebView2
-        ; canvas drawing is visible. No alpha layer needed — the canvas handles opacity.
+    ; Apply color-key transparency only when WebView2 is available — without it
+    ; the "000001" near-black background would make the whole window invisible.
+    if (WPMWidget.show_graph && WPMWidget._graph_wv)
         WinSetTransparent("000001", gui_ref)
     else
         WinSetTransparent(WPMWidgetConst.ALPHA_IDLE, gui_ref)
     SetTimer(WPMWidget_Tick, WPMWidgetConst.TICK_MS)
-    try LoggerDone("WPMWidget", "Widget shown at (%d, %d) mode=%s.",
-        WPMWidget.pos_x, WPMWidget.pos_y, WPMWidget.show_graph ? "graph" : "compact")
+    LoggerSuccess("WPMWidget", "Widget shown at (%d, %d) mode=%s, wv_ready=%s.",
+        WPMWidget.pos_x, WPMWidget.pos_y, WPMWidget.show_graph ? "graph" : "compact",
+        WPMWidget._graph_wv_ready)
 }
 
 WPMWidget_Hide() {
@@ -596,8 +599,8 @@ WPMWidget_LoadConfig(Cache) {
 
     if (raw_vis = "1" || raw_vis = true)
         WPMWidget.visible := true
-    try LoggerDone("WPMWidget", "Config loaded (visible=%s, x=%d, y=%d, colors=%s, graph=%s).",
-        WPMWidget.visible, WPMWidget.pos_x, WPMWidget.pos_y,
+    LoggerDone("WPMWidget", "Config loaded — raw_vis=[%s] visible=%s, x=%d, y=%d, colors=%s, graph=%s.",
+        raw_vis, WPMWidget.visible, WPMWidget.pos_x, WPMWidget.pos_y,
         WPMWidget.use_colors, WPMWidget.show_graph)
 }
 

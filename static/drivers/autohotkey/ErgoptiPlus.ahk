@@ -1978,6 +1978,8 @@ UpdateTrayIcon()
 ; the user has explicitly opted in. A fresh install starts OFF — this is
 ; a keylogger; the privacy default must be the safe one.
 if MetricsShortcuts.enabled {
+    LoggerDebug("Startup", "Metrics enabled — WPMWidget.visible=%s, show_graph=%s.",
+        WPMWidget.visible, WPMWidget.show_graph)
     if WPMWidget.visible
         WPMWidget_Show()
     if MetricsShortcuts.show_wpm_menubar
