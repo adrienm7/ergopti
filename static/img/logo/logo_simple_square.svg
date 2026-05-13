@@ -63,10 +63,10 @@
 
 
 <!-- Star overlay for simulated border -->
-<g transform="rotate(36) translate(0 0)">
+<g transform="rotate(36) translate(3 3)">
 	<!-- White star for border -->
 	<path
-		transform="scale(19) rotate(180) translate(-0.025 -0.3)"
+		transform="scale(17.5) rotate(180) translate(-0.025 -0.3)"
 		style="
 			fill: #fff;
 		"
@@ -75,7 +75,7 @@
     />
 	<!-- Main star (no stroke) -->
     <path
-		transform="scale(15) rotate(180) translate(-0.025 -0.3)"
+		transform="scale(13) rotate(180) translate(-0.025 -0.3)"
 		style="
 			fill: #343048;
 		"
