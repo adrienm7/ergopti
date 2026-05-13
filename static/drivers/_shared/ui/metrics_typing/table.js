@@ -684,9 +684,9 @@ function render_current_tab() {
 		if (app_state.current_tab === "c") {
 			const { show_hs, show_llm } = get_source_mode_flags();
 			// show_hs/show_llm=true means HS/LLM expansions are included (output view)
-			const mode_label = (show_hs && show_llm) ? "sortie écran"
-				: (show_hs || show_llm) ? "mixte"
-				: "frappes brutes";
+			const mode_label = (show_hs && show_llm) ? _t('ui_typing.table_mode_output')
+				: (show_hs || show_llm) ? _t('ui_typing.table_mode_mixed')
+				: _t('ui_typing.table_mode_raw');
 			mode_badge = ` <span style="font-size:0.8em;opacity:0.7;">(${mode_label})</span>`;
 		}
 		occ_elem.innerHTML = format_number(total_occ) + mode_badge;
@@ -1790,6 +1790,6 @@ function render_table() {
 		}).join("");
 
 		tbody.innerHTML = html ||
-			"<tr><td colspan=\"8\" style=\"text-align:center;\">Aucune donn\u00E9e</td></tr>";
+			`<tr><td colspan="8" style="text-align:center;">${_t('ui_typing.no_data')}</td></tr>`;
 	});
 }

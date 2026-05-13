@@ -387,7 +387,7 @@ function _render_precision_chart(sorted_keys, rgb_prc, x_min = null, x_max = nul
 			parseInt(document.getElementById('pause_threshold')?.value ?? '5000', 10) || 5000;
 		const thresh_label =
 			ui_thresh_ms >= 99999000
-				? 'sans filtre'
+				? _t('ui_typing.precision_no_filter')
 				: ui_thresh_ms >= 60000
 					? `${ui_thresh_ms / 60000}${NBSP}min`
 					: `${ui_thresh_ms / 1000}${NBSP}s`;
@@ -1077,24 +1077,24 @@ function _render_activity_calendar() {
 		const date_str = iso_date(cursor);
 		const n = date_chars[date_str] || 0;
 		const fill = heat_color(n);
-		const tip = `${fr_date(cursor)} — ${n === 0 ? 'aucune frappe' : format_number(n) + ' caractères'}`;
+		const tip = `${fr_date(cursor)} — ${n === 0 ? _t('ui_typing.calendar_no_keystrokes') : format_number(n) + ' ' + _t('ui_typing.calendar_chars')}`;
 		cells += `<rect x="${x}" y="${y}" width="${CELL}" height="${CELL}" rx="2" fill="${fill}"><title>${tip}</title></rect>`;
 
 		// Month label appears once at the start of each new month
 		if (cursor.getMonth() !== last_month && dow === 0) {
 			const month_short = [
-				'jan',
-				'fév',
-				'mar',
-				'avr',
-				'mai',
-				'juin',
-				'juil',
-				'août',
-				'sep',
-				'oct',
-				'nov',
-				'déc'
+				_t('ui_typing.calendar_month_0'),
+				_t('ui_typing.calendar_month_1'),
+				_t('ui_typing.calendar_month_2'),
+				_t('ui_typing.calendar_month_3'),
+				_t('ui_typing.calendar_month_4'),
+				_t('ui_typing.calendar_month_5'),
+				_t('ui_typing.calendar_month_6'),
+				_t('ui_typing.calendar_month_7'),
+				_t('ui_typing.calendar_month_8'),
+				_t('ui_typing.calendar_month_9'),
+				_t('ui_typing.calendar_month_10'),
+				_t('ui_typing.calendar_month_11')
 			][cursor.getMonth()];
 			month_labels += `<text x="${x}" y="${PAD_TOP - 6}" font-size="10" fill="var(--text-muted, #888)">${month_short}</text>`;
 			last_month = cursor.getMonth();
@@ -1104,7 +1104,7 @@ function _render_activity_calendar() {
 		if ((cursor.getDay() + 6) % 7 === 0) col++;
 	}
 
-	const weekday_labels = ['Lun', 'Mer', 'Ven']
+	const weekday_labels = [_t('ui_typing.calendar_day_mon'), _t('ui_typing.calendar_day_wed'), _t('ui_typing.calendar_day_fri')]
 		.map(
 			(lbl, i) =>
 				`<text x="0" y="${PAD_TOP + i * 2 * (CELL + GAP) + CELL - 2}" font-size="9" fill="var(--text-muted, #888)">${lbl}</text>`
@@ -1127,8 +1127,8 @@ function _render_activity_calendar() {
 	container.innerHTML =
 		`<div style="background:var(--panel-bg);border:1px solid var(--border);border-radius:10px;padding:12px 14px;">` +
 		`<div style="display:flex;align-items:baseline;justify-content:space-between;margin-bottom:8px;">` +
-		`<h3 style="margin:0;font-size:14px;color:var(--text-color);">Calendrier d’activité <span style="color:var(--text-muted);font-weight:normal;font-size:12px;">— 12 derniers mois</span></h3>` +
-		`<span style="font-size:11px;color:var(--text-muted);">${active_days} jours actifs · ${format_number(total_chars)} caractères</span>` +
+		`<h3 style="margin:0;font-size:14px;color:var(--text-color);">${_t(‘ui_typing.calendar_title’)} <span style="color:var(--text-muted);font-weight:normal;font-size:12px;">— ${_t(‘ui_typing.calendar_subtitle’)}</span></h3>` +
+		`<span style="font-size:11px;color:var(--text-muted);">${active_days} ${_t(‘ui_typing.calendar_active_days’)} · ${format_number(total_chars)} ${_t(‘ui_typing.calendar_chars’)}</span>` +
 		`</div>` +
 		`<svg width="${svg_w}" height="${svg_h}" xmlns="http://www.w3.org/2000/svg" style="display:block;max-width:100%;">` +
 		weekday_labels +
@@ -1208,7 +1208,15 @@ function _render_hour_weekday_heatmap() {
 		return `rgb(${r}, ${g}, ${b})`;
 	};
 
-	const days_fr = ['Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam', 'Dim'];
+	const days_fr = [
+		_t('ui_typing.heatmap_day_mon'),
+		_t('ui_typing.heatmap_day_tue'),
+		_t('ui_typing.heatmap_day_wed'),
+		_t('ui_typing.heatmap_day_thu'),
+		_t('ui_typing.heatmap_day_fri'),
+		_t('ui_typing.heatmap_day_sat'),
+		_t('ui_typing.heatmap_day_sun')
+	];
 
 	let cells = '';
 	for (let dow = 0; dow < 7; dow++) {
@@ -1216,7 +1224,7 @@ function _render_hour_weekday_heatmap() {
 			const x = PAD_LEFT + h * (CELL_W + GAP);
 			const y = PAD_TOP + dow * (CELL_H + GAP);
 			const n = matrix[dow][h];
-			const tip = `${days_fr[dow]} ${String(h).padStart(2, '0')}h — ${n === 0 ? 'aucune frappe' : format_number(n) + ' car.'}`;
+			const tip = `${days_fr[dow]} ${String(h).padStart(2, '0')}h — ${n === 0 ? _t('ui_typing.heatmap_hour_no_keystrokes') : format_number(n) + ' ' + _t('ui_typing.heatmap_hour_chars_abbrev')}`;
 			cells += `<rect x="${x}" y="${y}" width="${CELL_W}" height="${CELL_H}" rx="2" fill="${heat_color(n)}"><title>${tip}</title></rect>`;
 		}
 	}
@@ -1240,8 +1248,8 @@ function _render_hour_weekday_heatmap() {
 	container.innerHTML =
 		`<div style="background:var(--panel-bg);border:1px solid var(--border);border-radius:10px;padding:12px 14px;">` +
 		`<div style="display:flex;align-items:baseline;justify-content:space-between;margin-bottom:8px;">` +
-		`<h3 style="margin:0;font-size:14px;color:var(--text-color);">Activité par heure et jour de la semaine <span style="color:var(--text-muted);font-weight:normal;font-size:12px;">— sur la période sélectionnée</span></h3>` +
-		`<span style="font-size:11px;color:var(--text-muted);">${format_number(total_chars)} caractères au total</span>` +
+		`<h3 style="margin:0;font-size:14px;color:var(--text-color);">${_t('ui_typing.heatmap_hour_title')} <span style="color:var(--text-muted);font-weight:normal;font-size:12px;">— ${_t('ui_typing.heatmap_hour_subtitle')}</span></h3>` +
+		`<span style="font-size:11px;color:var(--text-muted);">${format_number(total_chars)} ${_t('ui_typing.heatmap_hour_total')}</span>` +
 		`</div>` +
 		`<svg width="${SVG_W}" height="${SVG_H}" xmlns="http://www.w3.org/2000/svg" style="display:block;max-width:100%;">` +
 		day_labels +
