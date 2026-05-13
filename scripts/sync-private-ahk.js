@@ -2,11 +2,11 @@ import fs from 'fs';
 import path from 'path';
 
 // Sync the private AHK file to the public repo location.
-// Reads the path from "static/drivers/hotstrings/.local_ahk_path" (gitignored).
+// Reads the path from "static/hotstrings/.local_ahk_path" (gitignored).
 // If the file does not exist, this script is a no-op.
 // The subsequent clean-ahk step will strip the personal section before commit.
 
-const overrideFile = path.join('static', 'drivers', 'hotstrings', '.local_ahk_path');
+const overrideFile = path.join('static', 'hotstrings', '.local_ahk_path');
 
 if (!fs.existsSync(overrideFile)) {
 	console.log('ℹ️  No .local_ahk_path found — skipping private AHK sync.');

@@ -60,7 +60,7 @@ function runPipeline() {
 		execFileSync(NODE, [script], { cwd: PROJECT_DIR, stdio: 'inherit' });
 	}
 	// Generate TOML hotstrings via uv.
-	execFileSync(uvPath, ['run', 'python', 'static/drivers/hotstrings/0_generate_hotstrings.py'], {
+	execFileSync(uvPath, ['run', 'python', 'static/hotstrings/0_generate_hotstrings.py'], {
 		cwd: PROJECT_DIR,
 		stdio: 'inherit'
 	});

@@ -5,7 +5,7 @@
 ; DESCRIPTION:
 ; AUTO-GENERATED FILE — DO NOT EDIT BY HAND.
 ; Regenerate with ``python tools/compile_hotstrings.py`` from the repo root
-; whenever the bundled TOML files under ``static/drivers/hotstrings/`` change.
+; whenever the bundled TOML files under ``static/hotstrings/`` change.
 ;
 ; The generator reads the same TOML payload that the runtime parser used to
 ; consume on every startup and emits direct ``CreateHotstring`` /

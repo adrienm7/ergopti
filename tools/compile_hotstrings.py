@@ -3,7 +3,7 @@
 ==============================================================================
 MODULE: TOML Hotstrings Compiler
 DESCRIPTION:
-Reads the TOML hotstring files under ``static/drivers/hotstrings/`` and emits
+Reads the TOML hotstring files under ``static/hotstrings/`` and emits
 a single ``static/drivers/autohotkey/lib/hotstrings_generated.ahk`` file that
 registers every hotstring with literal ``CreateHotstring`` /
 ``CreateCaseSensitiveHotstrings`` calls. This replaces the runtime regex-based
@@ -64,7 +64,7 @@ HEADER: str = """\
 ; DESCRIPTION:
 ; AUTO-GENERATED FILE — DO NOT EDIT BY HAND.
 ; Regenerate with ``python tools/compile_hotstrings.py`` from the repo root
-; whenever the bundled TOML files under ``static/drivers/hotstrings/`` change.
+; whenever the bundled TOML files under ``static/hotstrings/`` change.
 ;
 ; The generator reads the same TOML payload that the runtime parser used to
 ; consume on every startup and emits direct ``CreateHotstring`` /
@@ -218,7 +218,7 @@ def compile_category(
     root: Path, out: list[str], category: str
 ) -> list[tuple[str, str]]:
     """Compile every ``[[section]]`` block of one category; returns registry tuples."""
-    toml_path = root / "static" / "drivers" / "hotstrings" / f"{category}.toml"
+    toml_path = root / "static" / "hotstrings" / f"{category}.toml"
     if not toml_path.exists():
         print(f"[compile_hotstrings] skip (missing): {toml_path}", file=sys.stderr)
         return []

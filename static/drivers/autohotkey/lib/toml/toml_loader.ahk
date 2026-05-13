@@ -72,7 +72,7 @@ ReadTomlFile(FilePath) {
 }
 
 ; Unescape a TOML double-quoted string literal (\\, \", \n, \t, \r).
-; The generator at static/drivers/hotstrings/0_generate_hotstrings.py writes
+; The generator at static/hotstrings/0_generate_hotstrings.py writes
 ; trigger/output with these escapes, so we mirror the inverse transform here.
 UnescapeTomlString(s) {
     Result := ""
@@ -150,7 +150,7 @@ LoadHotstringsSection(CategoryName, SectionName, FeatureConfig, ExtraOptions := 
     and ScriptInformation.Has("PersonalTomlPath")) {
         FilePath := ScriptInformation["PersonalTomlPath"]
     } else {
-        FilePath := A_ScriptDir . "\..\hotstrings\" . CategoryName . ".toml"
+        FilePath := A_ScriptDir . "\..\..\hotstrings\" . CategoryName . ".toml"
     }
     if !FileExist(FilePath) {
         try LoggerWarn("TomlLoader", "Section [{1}.{2}]: file {3} not found.",
@@ -504,7 +504,7 @@ ApplyTomlMetadataToFeatures(CategoryName) {
 ; shared with Hammerspoon (which reads the same file at startup).
 ApplyIndexTomlToDynamicHotstrings() {
     global ScriptInformation
-    FilePath := A_ScriptDir . "\..\hotstrings\_index.toml"
+    FilePath := A_ScriptDir . "\..\..\hotstrings\_index.toml"
     if !FileExist(FilePath) {
         return
     }
