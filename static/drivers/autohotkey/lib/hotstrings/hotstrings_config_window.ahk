@@ -331,6 +331,24 @@ _HCW_SelectedSection() {
     return Sections[Idx - 1].Name
 }
 
+; Extract the locale-appropriate string from a TOML inline table body like:
+;   fr = "texte", en = "text", de = "Text", es = "Texto", zh = "文本"
+; Falls back to "fr" when the current locale has no entry, then to the raw body.
+_HCW_LocaleFromInlineTable(body) {
+    global _I18nLocale
+    lang := (IsSet(_I18nLocale) && _I18nLocale != "") ? StrLower(_I18nLocale) : "fr"
+    ; Try current locale first, then "fr" as fallback.
+    for try_lang in [lang, "fr"] {
+        if RegExMatch(body, try_lang . '\s*=\s*"((?:[^"\\]|\\.)*)"', &M)
+            return UnescapeTomlString(M[1])
+    }
+    ; Last resort: return first quoted value found.
+    if RegExMatch(body, '"((?:[^"\\]|\\.)*)"', &M)
+        return UnescapeTomlString(M[1])
+    return Trim(body)
+}
+
+
 ; Lightweight TOML scan — re-parses the [_meta] / [[section]] headers to list
 ; the sections and their descriptions. We could share with toml_loader but
 ; the scope here is small enough that duplicating is cheaper than coupling.
@@ -403,7 +421,12 @@ _HCW_GetSections(Category) {
                 SectionsOrderRaw := OrderMatch[1]
             }
         } else if InMetaSections {
-            if RegExMatch(Line, "^([A-Za-z0-9_\-]+)\s*=\s*`"((?:[^`"\\]|\\.)*)`"\s*$", &DM) {
+            ; Support both plain string and locale inline-table:
+            ;   key = "text"
+            ;   key = { fr = "texte", en = "text", de = "Text", … }
+            if RegExMatch(Line, "^([A-Za-z0-9_\-]+)\s*=\s*\{([^}]+)\}\s*$", &DM) {
+                Descs[StrLower(DM[1])] := _HCW_LocaleFromInlineTable(DM[2])
+            } else if RegExMatch(Line, "^([A-Za-z0-9_\-]+)\s*=\s*`"((?:[^`"\\]|\\.)*)`"\s*$", &DM) {
                 Descs[StrLower(DM[1])] := UnescapeTomlString(DM[2])
             }
         } else if (InMetaSecBlock != "") {
