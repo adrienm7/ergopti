@@ -508,20 +508,25 @@ const FINGER_HOME = (() => {
 	return map;
 })();
 
-// French display labels for each finger identifier.
+// Localised display labels for each finger identifier, resolved at render time
+// from the active locale via window._i18n_strings.
 // In "variante-en-A" the right hand types the physical left columns and vice-versa,
 // so the display label swaps G/D vs. the logical finger name to match physical key position.
+function _finger_label(key) {
+	return (window._i18n_strings && window._i18n_strings['ui_typing.finger.' + key]) || key;
+}
+
 const FINGER_LABELS_FR = {
-	l_pinky: 'Auriculaire D',
-	l_ring: 'Annulaire D',
-	l_mid: 'Majeur D',
-	l_idx: 'Index D',
-	l_thumb: 'Pouce D',
-	r_idx: 'Index G',
-	r_mid: 'Majeur G',
-	r_ring: 'Annulaire G',
-	r_pinky: 'Auriculaire G',
-	r_thumb: 'Pouce G'
+	get l_pinky() { return _finger_label('l_pinky'); },
+	get l_ring()  { return _finger_label('l_ring'); },
+	get l_mid()   { return _finger_label('l_mid'); },
+	get l_idx()   { return _finger_label('l_idx'); },
+	get l_thumb() { return _finger_label('l_thumb'); },
+	get r_idx()   { return _finger_label('r_idx'); },
+	get r_mid()   { return _finger_label('r_mid'); },
+	get r_ring()  { return _finger_label('r_ring'); },
+	get r_pinky() { return _finger_label('r_pinky'); },
+	get r_thumb() { return _finger_label('r_thumb'); }
 };
 
 // Pause-threshold buckets emitted by the keylogger as cumulative cache fields.

@@ -31,6 +31,17 @@
  * ==============================================================================
  */
 
+/**
+ * Returns the translated string for a given i18n key, or the key itself as fallback.
+ * Reads from window._i18n_strings populated by the shared i18n loader.
+ * @param {string} key - The dotted i18n key.
+ * @returns {string}
+ */
+function _t(key) {
+	return (window._i18n_strings && window._i18n_strings[key]) || key;
+}
+
+
 // ===================================
 // ===================================
 // ======= 1/ N-Gram Merging =======
@@ -454,11 +465,11 @@ function compute_manifest_metrics() {
 		global_details.innerHTML =
 			`<div style="margin-top:5px;">` +
 			`<strong style="color:var(--kpi-wpm-color);font-size:1.1em;">${format_number(global_raw_chars)}</strong>` +
-			` <span class="stat-unit" style="font-size:0.9em;">caractères bruts tapés</span>` +
+			` <span class="stat-unit" style="font-size:0.9em;">${_t('ui_typing.cpm_unit_raw_chars')}</span>` +
 			`</div>` +
 			`<div style="margin-top:3px;">` +
 			`<strong style="color:var(--kpi-wpm-color);font-size:1.1em;">${format_number(global_output_chars)}</strong>` +
-			` <span class="stat-unit" style="font-size:0.9em;">caractères apparus à l'écran</span>` +
+			` <span class="stat-unit" style="font-size:0.9em;">${_t('ui_typing.cpm_unit_output_chars')}</span>` +
 			`</div>`;
 	}
 
@@ -597,18 +608,18 @@ function recompute_speed_kpi() {
 
 	const thresh_label =
 		pause_thresh >= 99999000
-			? 'sans filtre'
+			? _t('ui_typing.precision_no_filter')
 			: pause_thresh >= 60000
 				? `> ${pause_thresh / 60000} min`
 				: `> ${pause_thresh / 1000} s`;
 	const mode_label =
 		show_hs && show_llm
-			? 'avec HS + IA'
+			? _t('ui_typing.cpm_mode_hs_ai')
 			: show_hs
-				? 'avec HS'
+				? _t('ui_typing.cpm_mode_hs')
 				: show_llm
-					? 'avec IA'
-					: 'frappes manuelles uniquement';
+					? _t('ui_typing.cpm_mode_ai')
+					: _t('ui_typing.cpm_mode_manual');
 	const NBSP = String.fromCharCode(160);
 
 	// Tooltip explaining the exact formula in plain French
@@ -647,11 +658,11 @@ function recompute_speed_kpi() {
 		global_details.innerHTML =
 			`<div style="margin-top:5px;">` +
 			`<strong style="color:var(--kpi-wpm-color);font-size:1.1em;">${format_number(totals.manual_chars)}</strong>` +
-			` <span class="stat-unit" style="font-size:0.9em;">caractères bruts tapés</span>` +
+			` <span class="stat-unit" style="font-size:0.9em;">${_t('ui_typing.cpm_unit_raw_chars')}</span>` +
 			`</div>` +
 			`<div style="margin-top:3px;">` +
 			`<strong style="color:var(--kpi-wpm-color);font-size:1.1em;">${format_number(output_chars)}</strong>` +
-			` <span class="stat-unit" style="font-size:0.9em;">caractères apparus à l'écran</span>` +
+			` <span class="stat-unit" style="font-size:0.9em;">${_t('ui_typing.cpm_unit_output_chars')}</span>` +
 			`</div>`;
 	}
 }
@@ -830,7 +841,7 @@ function render_repetitions_kpi() {
 
 	// Raw count as secondary detail
 	const pct_el = document.getElementById('rep_pct');
-	if (pct_el) pct_el.innerHTML = `${format_number(rep_count)} redoublements`;
+	if (pct_el) pct_el.innerHTML = `${format_number(rep_count)} ${_t('ui_typing.rep_doublings')}`;
 
 	const hs_pct_el = document.getElementById('rep_hs_pct');
 	if (hs_pct_el) hs_pct_el.innerHTML = `${format_number(rep_hs_pct.toFixed(1))}%`;
@@ -873,14 +884,14 @@ function render_rep_table() {
 		return _rep_sort_asc ? va - vb : vb - va;
 	});
 
-	const h_key = `Bigramme${_sort_arrow('key', _rep_sort_col, _rep_sort_asc)}`;
-	const h_total = `Total${_sort_arrow('total', _rep_sort_col, _rep_sort_asc)}`;
-	const h_manual = `Manuel${_sort_arrow('manual', _rep_sort_col, _rep_sort_asc)}`;
-	const h_star = `Via\u00A0\u2605${_sort_arrow('star', _rep_sort_col, _rep_sort_asc)}`;
+	const h_key = `${_t('ui_typing.rep_table_bigram')}${_sort_arrow('key', _rep_sort_col, _rep_sort_asc)}`;
+	const h_total = `${_t('ui_typing.rep_table_total')}${_sort_arrow('total', _rep_sort_col, _rep_sort_asc)}`;
+	const h_manual = `${_t('ui_typing.rep_table_manual')}${_sort_arrow('manual', _rep_sort_col, _rep_sort_asc)}`;
+	const h_star = `${_t('ui_typing.rep_table_via_star')}${_sort_arrow('star', _rep_sort_col, _rep_sort_asc)}`;
 
 	let rows_html;
 	if (sorted.length === 0) {
-		rows_html = `<tr><td colspan="4" style="text-align:center;padding:12px;color:var(--text-muted);">Aucun redoublement</td></tr>`;
+		rows_html = `<tr><td colspan="4" style="text-align:center;padding:12px;color:var(--text-muted);">${_t('ui_typing.rep_no_data')}</td></tr>`;
 	} else {
 		rows_html = sorted
 			.map((d) => {
@@ -1122,15 +1133,15 @@ function render_sfb_kpi() {
 
 	// Raw count + avoided count as secondary detail
 	const pct_el = document.getElementById('sfb_pct');
-	if (pct_el) pct_el.innerHTML = `${format_number(sfb_total)} SFBs bruts`;
+	if (pct_el) pct_el.innerHTML = `${format_number(sfb_total)} ${_t('ui_typing.sfb_raw_count')}`;
 
 	const avoided_el = document.getElementById('sfb_avoided');
 	if (avoided_el) {
 		const avoided_pct = bigram_total > 0 ? (sfb_avoided_hs / bigram_total) * 100 : 0;
 		avoided_el.innerHTML =
 			sfb_avoided_hs > 0
-				? `${format_number(sfb_avoided_hs)} évités via HS (${format_number(avoided_pct.toFixed(1))}%)`
-				: `0 évités via HS`;
+				? `${format_number(sfb_avoided_hs)} ${_t('ui_typing.sfb_avoided')} (${format_number(avoided_pct.toFixed(1))}%)`
+				: _t('ui_typing.sfb_avoided_none');
 	}
 
 	// Render the SFB heatmap with its own toggle state (independent of the
@@ -1179,7 +1190,7 @@ function toggle_sfb_heatmap_same_key() {
 	const btn = document.getElementById('sfb_heatmap_same_key_btn');
 	if (btn) {
 		btn.classList.toggle('active', _sfb_heatmap_include_same_key);
-		btn.textContent = _sfb_heatmap_include_same_key ? 'Doublons inclus' : 'Doublons exclus';
+		btn.textContent = _sfb_heatmap_include_same_key ? _t('ui_typing.btn_doublings_included') : _t('ui_typing.btn_doublings_excluded');
 	}
 	_render_sfb_heatmap_with_toggle();
 }
@@ -1203,14 +1214,14 @@ function render_sfb_table() {
 		return _sfb_sort_asc ? va - vb : vb - va;
 	});
 
-	const h_pair = `Paire${_sort_arrow('pair', _sfb_sort_col, _sfb_sort_asc)}`;
-	const h_count = `Total${_sort_arrow('count', _sfb_sort_col, _sfb_sort_asc)}`;
-	const h_finger = `Doigt${_sort_arrow('finger', _sfb_sort_col, _sfb_sort_asc)}`;
-	const h_hand = `Main${_sort_arrow('hand', _sfb_sort_col, _sfb_sort_asc)}`;
+	const h_pair = `${_t('ui_typing.sfb_table_pair')}${_sort_arrow('pair', _sfb_sort_col, _sfb_sort_asc)}`;
+	const h_count = `${_t('ui_typing.rep_table_total')}${_sort_arrow('count', _sfb_sort_col, _sfb_sort_asc)}`;
+	const h_finger = `${_t('ui_typing.sfb_table_finger')}${_sort_arrow('finger', _sfb_sort_col, _sfb_sort_asc)}`;
+	const h_hand = `${_t('ui_typing.sfb_table_hand')}${_sort_arrow('hand', _sfb_sort_col, _sfb_sort_asc)}`;
 
 	let rows_html;
 	if (sorted.length === 0) {
-		rows_html = `<tr><td colspan="4" style="text-align:center;padding:12px;color:var(--text-muted);">Aucun SFB</td></tr>`;
+		rows_html = `<tr><td colspan="4" style="text-align:center;padding:12px;color:var(--text-muted);">${_t('ui_typing.sfb_no_data')}</td></tr>`;
 	} else {
 		rows_html = sorted
 			.slice(0, 200)
@@ -2134,7 +2145,7 @@ function render_errors_table() {
 	const container = document.getElementById('errors_bigrams_container');
 	if (!container) return;
 	if (_err_data.length === 0) {
-		container.innerHTML = `<div style="text-align:center;color:var(--text-muted);padding:12px;">Aucune correction enregistrée sur la période.</div>`;
+		container.innerHTML = `<div style="text-align:center;color:var(--text-muted);padding:12px;">${_t('ui_typing.errors_no_data')}</div>`;
 		return;
 	}
 
@@ -2162,10 +2173,10 @@ function render_errors_table() {
 
 	container.innerHTML =
 		`<table class="ekpi-table"><thead><tr>` +
-		`<th onclick="sort_errors_table('pair')" style="cursor:pointer;">Bigramme${arrow('pair')}</th>` +
-		`<th onclick="sort_errors_table('count')" style="cursor:pointer;text-align:right;">Occurrences${arrow('count')}</th>` +
-		`<th onclick="sort_errors_table('errors')" style="cursor:pointer;text-align:right;">Erreurs${arrow('errors')}</th>` +
-		`<th onclick="sort_errors_table('rate')" style="cursor:pointer;text-align:right;">Taux${arrow('rate')}</th>` +
+		`<th onclick="sort_errors_table('pair')" style="cursor:pointer;">${_t('ui_typing.errors_table_bigram')}${arrow('pair')}</th>` +
+		`<th onclick="sort_errors_table('count')" style="cursor:pointer;text-align:right;">${_t('ui_typing.errors_table_occ')}${arrow('count')}</th>` +
+		`<th onclick="sort_errors_table('errors')" style="cursor:pointer;text-align:right;">${_t('ui_typing.errors_table_errors')}${arrow('errors')}</th>` +
+		`<th onclick="sort_errors_table('rate')" style="cursor:pointer;text-align:right;">${_t('ui_typing.errors_table_rate')}${arrow('rate')}</th>` +
 		`</tr></thead><tbody>${rows}</tbody></table>`;
 }
 

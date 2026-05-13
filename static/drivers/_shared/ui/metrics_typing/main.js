@@ -210,7 +210,7 @@ function _activate_match(idx) {
 
 /**
  * Updates the status text shown next to the navigation buttons.
- * @param {string}  text       - The string to display (e.g. "3 / 42" or "Introuvable").
+ * @param {string}  text       - The string to display (e.g. "3 / 42" or _t('ui_typing.not_found')).
  * @param {boolean} not_found  - Whether to apply the red "not found" color class.
  */
 function _set_find_status(text, not_found) {
@@ -250,14 +250,14 @@ function find_in_page(forward) {
 
 		if (_find_matches.length === 0) {
 			_find_index = -1;
-			_set_find_status("Introuvable", true);
+			_set_find_status(_t('ui_typing.not_found'), true);
 			return;
 		}
 		_find_index = forward ? 0 : _find_matches.length - 1;
 	} else {
 		// Same query: just advance the cursor
 		if (_find_matches.length === 0) {
-			_set_find_status("Introuvable", true);
+			_set_find_status(_t('ui_typing.not_found'), true);
 			return;
 		}
 		// Detect stale spans (table re-rendered) and re-scan transparently
@@ -267,7 +267,7 @@ function find_in_page(forward) {
 			_scan_and_highlight(lower_query);
 			if (_find_matches.length === 0) {
 				_find_index = -1;
-				_set_find_status("Introuvable", true);
+				_set_find_status(_t('ui_typing.not_found'), true);
 				return;
 			}
 			_find_index = forward ? 0 : _find_matches.length - 1;

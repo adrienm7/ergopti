@@ -150,7 +150,15 @@ function format_number(num) {
  * @returns {string} The French-formatted date string.
  */
 const tooltipTitleCallback = (context) => {
-	const days    = ["dimanche", "lundi", "mardi", "mercredi", "jeudi", "vendredi", "samedi"];
+	const days = [
+		_t('ui_typing.day_0'),
+		_t('ui_typing.day_1'),
+		_t('ui_typing.day_2'),
+		_t('ui_typing.day_3'),
+		_t('ui_typing.day_4'),
+		_t('ui_typing.day_5'),
+		_t('ui_typing.day_6')
+	];
 	const d       = new Date(context[0].parsed.x);
 	const dayName = days[d.getDay()];
 	const dd      = String(d.getDate()).padStart(2, "0");
