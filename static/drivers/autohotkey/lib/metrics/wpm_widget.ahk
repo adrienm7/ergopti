@@ -404,8 +404,11 @@ WPMWidget_Show() {
 
     WPMWidget.visible := true
 
-    if (WPMWidget.pos_x = -1 || WPMWidget.pos_y = -1)
-        WPMWidget_DefaultPos(&WPMWidget.pos_x, &WPMWidget.pos_y)
+    if (WPMWidget.pos_x = -1 || WPMWidget.pos_y = -1) {
+        WPMWidget_DefaultPos(&def_x, &def_y)
+        WPMWidget.pos_x := def_x
+        WPMWidget.pos_y := def_y
+    }
 
     w      := WPMWidget.show_graph ? WPMWidgetConst.GRAPH_W : WPMWidgetConst.W
     h      := WPMWidget.show_graph ? WPMWidgetConst.GRAPH_H : WPMWidgetConst.H
