@@ -67,7 +67,7 @@ Onboarding_Run() {
 
 ; Allow the user to re-run the wizard from the tray menu even when a
 ; config already exists — useful after a reset or for re-configuration.
-Onboarding_ShowFromMenu() {
+Onboarding_ShowFromMenu(*) {
 	_Onboarding_Step1()
 }
 
