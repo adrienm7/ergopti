@@ -315,12 +315,20 @@ if Features["Shortcuts"]["Move"].Enabled {
         global ActivitySimulation
         ActivitySimulation := False
         SetTimer(SimulateActivity, 0)
+        SetTimer(AwakeReturnToOrigin, 0)
         ; Disarm input-cancel hooks
         try Hotkey("~*$*",       AwakeCancelOnKey, "Off")
         try Hotkey("~*$LButton", AwakeCancelOnKey, "Off")
         try Hotkey("~*$RButton", AwakeCancelOnKey, "Off")
         try Hotkey("~*$MButton", AwakeCancelOnKey, "Off")
         TrayTip(t("keepawake.stopped"), t("keepawake.title"), "Iconi Mute")
+    }
+
+    AwakeReturnToOrigin() {
+        global ActivitySimulation, AwakeOriginX, AwakeOriginY
+        if ActivitySimulation {
+            DllCall("SetCursorPos", "int", AwakeOriginX, "int", AwakeOriginY)
+        }
     }
 
     AwakeCancelOnKey(*) {
@@ -364,13 +372,13 @@ if Features["Shortcuts"]["Move"].Enabled {
         ; Signal OS activity without a visible keystroke
         SendFinalResult("{VKFF}")
 
-        ; Return to origin after a short delay, mirroring Hammerspoon's AWAKE_RETURN_DELAY_SEC
-        Sleep(AWAKE_RETURN_MS)
-        DllCall("SetCursorPos", "int", AwakeOriginX, "int", AwakeOriginY)
+        ; Record the jitter position so the next tick's user-move check is accurate
+        LastX := AwakeOriginX + OffX
+        LastY := AwakeOriginY + OffY
 
-        ; Record the resting position so the next tick's user-move check is accurate
-        LastX := AwakeOriginX
-        LastY := AwakeOriginY
+        ; Return to origin via a separate one-shot timer — avoids blocking the thread
+        ; with Sleep(), which would delay input-cancel detection by up to AWAKE_RETURN_MS
+        SetTimer(AwakeReturnToOrigin, -AWAKE_RETURN_MS)
 
         ; Re-schedule the next tick at a new random interval
         SetTimer(SimulateActivity, Random(AWAKE_TICK_MIN_MS, AWAKE_TICK_MAX_MS))
