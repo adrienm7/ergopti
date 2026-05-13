@@ -29,23 +29,38 @@
 ; ============================================
 
 ; Ordered list of supported locales: { Code, Flag, Name }
+; Tag = short code shown in radio buttons (flag emojis don't render on Windows)
 global I18N_LOCALES := [
-	{ Code: "de", Flag: "🇩🇪", Name: "Deutsch"   },
-	{ Code: "en", Flag: "🇬🇧", Name: "English"   },
-	{ Code: "es", Flag: "🇪🇸", Name: "Español"   },
-	{ Code: "fr", Flag: "🇫🇷", Name: "Français"  },
-	{ Code: "zh", Flag: "🇨🇳", Name: "中文"       },
+	{ Code: "ar", Tag: "[AR]", Name: "العربية"    },
+	{ Code: "cs", Tag: "[CS]", Name: "Čeština"    },
+	{ Code: "de", Tag: "[DE]", Name: "Deutsch"    },
+	{ Code: "en", Tag: "[EN]", Name: "English"    },
+	{ Code: "es", Tag: "[ES]", Name: "Español"    },
+	{ Code: "fr", Tag: "[FR]", Name: "Français"   },
+	{ Code: "it", Tag: "[IT]", Name: "Italiano"   },
+	{ Code: "ja", Tag: "[JA]", Name: "日本語"      },
+	{ Code: "ko", Tag: "[KO]", Name: "한국어"      },
+	{ Code: "nl", Tag: "[NL]", Name: "Nederlands"  },
+	{ Code: "pl", Tag: "[PL]", Name: "Polski"     },
+	{ Code: "pt", Tag: "[PT]", Name: "Português"  },
+	{ Code: "ru", Tag: "[RU]", Name: "Русский"    },
+	{ Code: "tr", Tag: "[TR]", Name: "Türkçe"     },
+	{ Code: "uk", Tag: "[UK]", Name: "Українська"  },
+	{ Code: "zh", Tag: "[ZH]", Name: "中文"        },
 ]
 
 ; Active locale code — read from config.toml at boot, then kept in memory.
 global _I18nLocale := "fr"
 
-; Flat map of key → translated string for the active locale. Populated lazily
-; on first call to t() after each locale switch.
+; Flat map of key → translated string for the active locale. Populated lazily.
 global _I18nCache := Map()
-
-; Set to true once _I18nCache has been populated for _I18nLocale.
 global _I18nCacheLoaded := false
+
+; Fallback caches: English first, French second.
+global _I18nCacheEn := Map()
+global _I18nCacheEnLoaded := false
+global _I18nCacheFr := Map()
+global _I18nCacheFrLoaded := false
 
 
 ; =============================================
@@ -111,11 +126,60 @@ _I18nLoadFile(FilePath) {
 	try LoggerDone("i18n", "Locale '{1}' loaded (%d key(s)).", _I18nLocale, _I18nCache.Count)
 }
 
-; Ensure the cache is loaded for the active locale.
+; Load a locale into a provided Map reference. Returns true on success.
+_I18nLoadInto(Code, &Cache, &Loaded) {
+	if Loaded
+		return
+	FilePath := _I18nLocalePath(Code)
+	TempCache := Map()
+	TempLoaded := false
+	; Reuse _I18nLoadFile logic inline with a local cache target
+	global ScriptInformation
+	if !FileExist(FilePath) {
+		try LoggerWarn("i18n", "Fallback locale file not found: '{1}'.", FilePath)
+		Loaded := false
+		return
+	}
+	try {
+		FileContent := FileRead(FilePath, "UTF-8")
+	} catch {
+		try LoggerWarn("i18n", "Failed to read fallback locale '{1}'.", Code)
+		Loaded := false
+		return
+	}
+	MagicKey := IsSet(ScriptInformation) and ScriptInformation.Has("MagicKey")
+		? ScriptInformation["MagicKey"] : "★"
+	Pos := 1
+	FileLen := StrLen(FileContent)
+	while Pos <= FileLen {
+		if !RegExMatch(FileContent, '`"([^`"]+)`"\s*:\s*`"((?:[^`"\\]|\\.)*)`"', &KVMatch, Pos)
+			break
+		Val := StrReplace(KVMatch[2], "\\", Chr(1))
+		Val := StrReplace(Val, '\"', "`"")
+		Val := StrReplace(Val, "\n", "`n")
+		Val := StrReplace(Val, "\t", "`t")
+		Val := StrReplace(Val, "\r", "`r")
+		Val := StrReplace(Val, "\/", "/")
+		Val := StrReplace(Val, Chr(1), "\")
+		Val := StrReplace(Val, "★", MagicKey)
+		TempCache[KVMatch[1]] := Val
+		Pos := KVMatch.Pos + KVMatch.Len
+	}
+	Cache  := TempCache
+	Loaded := true
+}
+
+; Ensure the active locale and both fallback locales are loaded.
 _I18nEnsureLoaded() {
 	global _I18nCacheLoaded, _I18nLocale
+	global _I18nCacheEn, _I18nCacheEnLoaded
+	global _I18nCacheFr, _I18nCacheFrLoaded
 	if !_I18nCacheLoaded
 		_I18nLoadFile(_I18nLocalePath(_I18nLocale))
+	if _I18nLocale != "en" and !_I18nCacheEnLoaded
+		_I18nLoadInto("en", &_I18nCacheEn, &_I18nCacheEnLoaded)
+	if _I18nLocale != "fr" and !_I18nCacheFrLoaded
+		_I18nLoadInto("fr", &_I18nCacheFr, &_I18nCacheFrLoaded)
 }
 
 
@@ -128,9 +192,15 @@ _I18nEnsureLoaded() {
 ; Return the localised string for the given dot-notation key.
 ; Falls back to the raw key name if the locale file is missing or the key is absent.
 t(Key) {
-	global _I18nCache
+	global _I18nCache, _I18nCacheEn, _I18nCacheEnLoaded, _I18nCacheFr, _I18nCacheFrLoaded
 	_I18nEnsureLoaded()
-	return _I18nCache.Has(Key) ? _I18nCache[Key] : Key
+	if _I18nCache.Has(Key)
+		return _I18nCache[Key]
+	if _I18nCacheEnLoaded and _I18nCacheEn.Has(Key)
+		return _I18nCacheEn[Key]
+	if _I18nCacheFrLoaded and _I18nCacheFr.Has(Key)
+		return _I18nCacheFr[Key]
+	return Key
 }
 
 ; Initialise the i18n module from the script configuration cache.

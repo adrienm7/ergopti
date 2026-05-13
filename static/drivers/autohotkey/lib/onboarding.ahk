@@ -29,12 +29,14 @@
 ; ================================================
 ; ================================================
 
-; Default locale index within I18N_LOCALES (1-based; English is index 2)
-global ONBOARDING_DEFAULT_LOCALE_INDEX := 2
+; Default locale index within I18N_LOCALES (1-based; English is index 4)
+global ONBOARDING_DEFAULT_LOCALE_INDEX := 4
 
-; Wizard window dimensions
-global ONBOARDING_WIN_W := 480
-global ONBOARDING_WIN_H := 340
+; Wizard window width (height is computed automatically from controls)
+global ONBOARDING_WIN_W := 400
+
+; Height of the language ListView — fits ~8 rows, scrollable beyond that
+global ONBOARDING_LV_H := 220
 
 ; Collected answers — populated as the user advances through each step
 global _ob_locale       := "en"
@@ -86,45 +88,55 @@ Onboarding_ShowFromMenu(*) {
 
 _Onboarding_Step1() {
 	_Onboarding_DestroyActive()
+	global _StaticDir
 
 	g := Gui("+AlwaysOnTop", "Welcome / Bienvenue / Willkommen")
 	g.SetFont("s10", "Segoe UI")
 	g.MarginX := 20
 	g.MarginY := 16
 
-	g.AddText("w" ONBOARDING_WIN_W - 40, "Choose your language:")
+	g.AddText("w" ONBOARDING_WIN_W - 40, "Choose your language / Choisissez votre langue:")
 
-	; One radio button per locale — English ticked by default
-	radios := []
+	; Build a 32×24 image list from flag PNGs in static/img/flags/
+	FlagsDir := _StaticDir . "\img\flags\"
+	IL := IL_Create(I18N_LOCALES.Length, 1, false)
+	FlagIndexMap := Map()  ; Code -> 1-based IL index
 	loop I18N_LOCALES.Length {
-		locale := I18N_LOCALES[A_Index]
-		label  := locale.Flag " " locale.Name
-		opt    := (A_Index = 1) ? "Radio Group vLocaleRadio" : "Radio"
-		r      := g.AddRadio(opt, label)
-		if (A_Index = ONBOARDING_DEFAULT_LOCALE_INDEX) {
-			r.Value := 1
-		}
-		radios.Push(r)
+		loc      := I18N_LOCALES[A_Index]
+		FlagFile := FlagsDir . loc.Code . ".png"
+		idx      := IL_Add(IL, FlagFile)
+		FlagIndexMap[loc.Code] := (idx > 0) ? idx : 0
 	}
 
-	g.AddText("w" ONBOARDING_WIN_W - 40 " y+16", "")
+	; Single-select ListView — one row per locale, flag icon + name
+	ContentW := ONBOARDING_WIN_W - 40
+	lv := g.AddListView("w" ContentW " h" ONBOARDING_LV_H " -Hdr -Multi -HScroll LV0x10 NoSortHdr", ["Language"])
+	lv.SetImageList(IL)
+	loop I18N_LOCALES.Length {
+		loc   := I18N_LOCALES[A_Index]
+		iIcon := FlagIndexMap.Has(loc.Code) ? FlagIndexMap[loc.Code] : 0
+		lv.Add("Icon" iIcon, loc.Name)
+	}
+	; Subtract scrollbar width (~17px) so the column never triggers horizontal overflow
+	lv.ModifyCol(1, ContentW - 20)
+	; Pre-select the default locale row
+	lv.Modify(ONBOARDING_DEFAULT_LOCALE_INDEX, "Select Focus Vis")
+
+	g.AddText("w" ONBOARDING_WIN_W - 40 " y+10", "")
 
 	btnNext := g.AddButton("Default w100 x" ONBOARDING_WIN_W - 120, "Next →")
-	btnNext.OnEvent("Click", _Step1_Next.Bind(g, radios))
+	btnNext.OnEvent("Click", _Step1_Next.Bind(g, lv))
 
 	_Onboarding_Show(g)
 	global _ob_gui := g
 }
 
-_Step1_Next(g, radios, *) {
-	; Identify which radio is selected by iterating the controls
+_Step1_Next(g, lv, *) {
+	; Get the selected row index (1-based); fall back to default if none selected
 	selectedIndex := ONBOARDING_DEFAULT_LOCALE_INDEX
-	loop radios.Length {
-		if radios[A_Index].Value {
-			selectedIndex := A_Index
-			break
-		}
-	}
+	row := lv.GetNext(0, "Focused")
+	if row > 0
+		selectedIndex := row
 
 	locale := I18N_LOCALES[selectedIndex]
 	global _ob_locale := locale.Code
@@ -155,7 +167,7 @@ _Onboarding_Step2() {
 	g.SetFont("s10")
 
 	g.AddText("w" ONBOARDING_WIN_W - 40 " y+12", "")
-	rYes := g.AddRadio("Radio Group vLayoutChoice", t("onboarding.layout.yes"))
+	rYes := g.AddRadio("vLayoutChoice", t("onboarding.layout.yes"))
 	rNo  := g.AddRadio("Radio Checked", t("onboarding.layout.no"))
 
 	g.AddText("w" ONBOARDING_WIN_W - 40 " y+16", "")
@@ -246,7 +258,7 @@ _Onboarding_Step4() {
 	g.SetFont("s10")
 
 	g.AddText("w" ONBOARDING_WIN_W - 40 " y+12", "")
-	rYes := g.AddRadio("Radio Group vMetricsChoice", t("onboarding.yes"))
+	rYes := g.AddRadio("vMetricsChoice", t("onboarding.yes"))
 	rNo  := g.AddRadio("Radio Checked", t("onboarding.no"))
 
 	g.AddText("w" ONBOARDING_WIN_W - 40 " y+16", "")
@@ -289,7 +301,7 @@ _Onboarding_Step5() {
 	g.SetFont("s10")
 
 	g.AddText("w" ONBOARDING_WIN_W - 40 " y+12", "")
-	rYes := g.AddRadio("Radio Group vGesturesChoice", t("onboarding.yes"))
+	rYes := g.AddRadio("vGesturesChoice", t("onboarding.yes"))
 	rNo  := g.AddRadio("Radio Checked", t("onboarding.no"))
 
 	g.AddText("w" ONBOARDING_WIN_W - 40 " y+16", "")
@@ -358,8 +370,9 @@ _Onboarding_Commit() {
 ; ========================================
 
 ; Center the wizard window on the primary monitor and show it.
+; Width is fixed; height is computed automatically from the controls.
 _Onboarding_Show(g) {
-	g.Show("w" ONBOARDING_WIN_W " h" ONBOARDING_WIN_H " Center")
+	g.Show("w" ONBOARDING_WIN_W " AutoSize Center")
 }
 
 

@@ -158,54 +158,54 @@ global GESTURE_SHORTCUT_LABELS := Map(
 ; Action registry — each action has a label and an execution function
 global GESTURE_ACTIONS := Map(
     "none", {
-        Label: "Désactivé",
+        Label: "∅ Disabled",
         Fn: (*) => 0,
     },
-    ; --- Souris ---
+    ; --- Mouse ---
     "left_click_toggle", {
-        Label: "🖱 L Clic gauche (maint.)",
+        Label: "🖱 L Left click (hold)",
         Fn: (*) => GestureToggleLeftClick(),
     },
     "right_click_toggle", {
-        Label: "🖱 R Clic droit (maint.)",
+        Label: "🖱 R Right click (hold)",
         Fn: (*) => GestureToggleRightClick(),
     },
     "app_switcher", {
-        Label: "⇥ Alt+Tab — App. précédente",
+        Label: "⇥ Alt+Tab — Previous app",
         Fn: (*) => SendInput("!{Tab}"),
     },
-    ; --- Édition ---
+    ; --- Editing ---
     "copy", {
-        Label: "Copier",
+        Label: "⎘ Copy",
         Fn: (*) => SendInput("^c"),
     },
     "paste", {
-        Label: "Coller",
+        Label: "⎘ Paste",
         Fn: (*) => SendInput("^v"),
     },
     "cut", {
-        Label: "Couper",
+        Label: "⎘ Cut",
         Fn: (*) => SendInput("^x"),
     },
     "undo", {
-        Label: "Annuler",
+        Label: "↩ Undo",
         Fn: (*) => SendInput("^z"),
     },
     "redo", {
-        Label: "Rétablir",
+        Label: "↪ Redo",
         Fn: (*) => SendInput("^y"),
     },
     "select_all", {
-        Label: "Tout sélectionner",
+        Label: "⬚ Select all",
         Fn: (*) => SendInput("^a"),
     },
     "find", {
-        Label: "Rechercher",
+        Label: "🔍 Find",
         Fn: (*) => SendInput("^f"),
     },
-    ; --- Touches ---
+    ; --- Keys ---
     "enter", {
-        Label: "↵ Entrée",
+        Label: "↵ Enter",
         Fn: (*) => SendInput("{Enter}"),
     },
     "tab", {
@@ -213,188 +213,188 @@ global GESTURE_ACTIONS := Map(
         Fn: (*) => SendInput("{Tab}"),
     },
     "escape", {
-        Label: "⎋ Échap",
+        Label: "⎋ Escape",
         Fn: (*) => SendInput("{Escape}"),
     },
     "backspace", {
-        Label: "⌫ Suppr. arrière",
+        Label: "⌫ Backspace",
         Fn: (*) => SendInput("{BackSpace}"),
     },
     "delete", {
-        Label: "⌦ Suppr. avant",
+        Label: "⌦ Delete",
         Fn: (*) => SendInput("{Delete}"),
     },
-    ; --- Onglets ---
+    ; --- Tabs ---
     "tab_new", {
-        Label: "⧉ + Nouvel onglet",
+        Label: "⧉ + New tab",
         Fn: (*) => SendInput("^t"),
     },
     "tab_close", {
-        Label: "⧉ × Fermer onglet",
+        Label: "⧉ × Close tab",
         Fn: (*) => SendInput("^w"),
     },
     "tab_prev", {
-        Label: "⧉ ← Onglet précédent",
+        Label: "⧉ ← Previous tab",
         Fn: (*) => GestureSendShortcut("^+{Tab}"),
     },
     "tab_next", {
-        Label: "⧉ → Onglet suivant",
+        Label: "⧉ → Next tab",
         Fn: (*) => GestureSendShortcut("^{Tab}"),
     },
-    ; --- Navigation navigateur ---
+    ; --- Browser navigation ---
     "nav_back", {
-        Label: "← Précédent (navigation)",
+        Label: "← Back (navigation)",
         Fn: (*) => GestureSendShortcut("!{Left}"),
     },
     "nav_forward", {
-        Label: "→ Suivant (navigation)",
+        Label: "→ Forward (navigation)",
         Fn: (*) => GestureSendShortcut("!{Right}"),
     },
-    ; --- Fenêtres & Bureaux ---
+    ; --- Windows & Desktops ---
     "win_prev", {
-        Label: "◱ ← Fenêtre précédente",
+        Label: "◱ ← Previous window",
         Fn: (*) => GestureCycleWindows(False),
     },
     "win_next", {
-        Label: "◱ → Fenêtre suivante",
+        Label: "◱ → Next window",
         Fn: (*) => GestureCycleWindows(True),
     },
     "win_app_prev", {
-        Label: "◱ ← Fenêtre préc. (même app)",
+        Label: "◱ ← Prev. window (same app)",
         Fn: (*) => GestureCycleAppWindows(False),
     },
     "win_app_next", {
-        Label: "◱ → Fenêtre suiv. (même app)",
+        Label: "◱ → Next window (same app)",
         Fn: (*) => GestureCycleAppWindows(True),
     },
     "close_window", {
-        Label: "◱ × Fermer la fenêtre",
+        Label: "◱ × Close window",
         Fn: (*) => SendInput("!{F4}"),
     },
     "fullscreen", {
-        Label: "📺 Plein écran",
+        Label: "📺 Fullscreen",
         Fn: (*) => SendInput("{F11}"),
     },
     "snap_left", {
-        Label: "◧ ← Ancrer à gauche",
+        Label: "◧ ← Snap left",
         Fn: (*) => SendInput("#{Left}"),
     },
     "snap_right", {
-        Label: "◨ → Ancrer à droite",
+        Label: "◨ → Snap right",
         Fn: (*) => SendInput("#{Right}"),
     },
     "maximize", {
-        Label: "🔲 Maximiser",
+        Label: "🔲 Maximize",
         Fn: (*) => SendInput("#{Up}"),
     },
     "desktop_prev", {
-        Label: "▢ ← Bureau précédent",
+        Label: "▢ ← Previous desktop",
         Fn: (*) => SendInput("^#{Left}"),
     },
     "desktop_next", {
-        Label: "▢ → Bureau suivant",
+        Label: "▢ → Next desktop",
         Fn: (*) => SendInput("^#{Right}"),
     },
     "desktop_new", {
-        Label: "▢ + Nouveau bureau",
+        Label: "▢ + New desktop",
         Fn: (*) => SendInput("^#d"),
     },
     "desktop_close", {
-        Label: "▢ × Fermer le bureau",
+        Label: "▢ × Close desktop",
         Fn: (*) => SendInput("^#{F4}"),
     },
     "task_view", {
-        Label: "▢ Vue des tâches",
+        Label: "▢ Task View",
         Fn: (*) => SendInput("#{Tab}"),
     },
     "minimize_all", {
-        Label: "◱ Tout minimiser",
+        Label: "◱ Minimize all",
         Fn: (*) => SendInput("#d"),
     },
-    ; --- Déplacement curseur ---
+    ; --- Cursor movement ---
     "word_prev", {
-        Label: "W ← Mot précédent",
+        Label: "W ← Previous word",
         Fn: (*) => SendInput("^{Left}"),
     },
     "word_next", {
-        Label: "W → Mot suivant",
+        Label: "W → Next word",
         Fn: (*) => SendInput("^{Right}"),
     },
     "line_up", {
-        Label: "↕ ↑ Ligne précédente",
+        Label: "↕ ↑ Previous line",
         Fn: (*) => SendInput("{Up}"),
     },
     "line_down", {
-        Label: "↕ ↓ Ligne suivante",
+        Label: "↕ ↓ Next line",
         Fn: (*) => SendInput("{Down}"),
     },
     "line_start", {
-        Label: "⇤ Début de ligne",
+        Label: "⇤ Line start",
         Fn: (*) => SendInput("{Home}"),
     },
     "line_end", {
-        Label: "⇥ Fin de ligne",
+        Label: "⇥ Line end",
         Fn: (*) => SendInput("{End}"),
     },
     "para_prev", {
-        Label: "¶ ↑ Paragraphe précédent",
+        Label: "¶ ↑ Previous paragraph",
         Fn: (*) => SendInput("^{Up}"),
     },
     "para_next", {
-        Label: "¶ ↓ Paragraphe suivant",
+        Label: "¶ ↓ Next paragraph",
         Fn: (*) => SendInput("^{Down}"),
     },
     "doc_start", {
-        Label: "⤒ Début du document",
+        Label: "⤒ Document start",
         Fn: (*) => SendInput("^{Home}"),
     },
     "doc_end", {
-        Label: "⤓ Fin du document",
+        Label: "⤓ Document end",
         Fn: (*) => SendInput("^{End}"),
     },
-    ; --- Flèches ---
+    ; --- Arrows ---
     "arrow_up", {
-        Label: "↑ Flèche Haut",
+        Label: "↑ Arrow Up",
         Fn: (*) => SendInput("{Up}"),
     },
     "arrow_down", {
-        Label: "↓ Flèche Bas",
+        Label: "↓ Arrow Down",
         Fn: (*) => SendInput("{Down}"),
     },
     "arrow_left", {
-        Label: "← Flèche Gauche",
+        Label: "← Arrow Left",
         Fn: (*) => SendInput("{Left}"),
     },
     "arrow_right", {
-        Label: "→ Flèche Droite",
+        Label: "→ Arrow Right",
         Fn: (*) => SendInput("{Right}"),
     },
-    ; --- Sélection ---
+    ; --- Selection ---
     "sel_up", {
-        Label: "✎ ↑ Sélection Haut",
+        Label: "✎ ↑ Select Up",
         Fn: (*) => SendInput("+{Up}"),
     },
     "sel_down", {
-        Label: "✎ ↓ Sélection Bas",
+        Label: "✎ ↓ Select Down",
         Fn: (*) => SendInput("+{Down}"),
     },
     "sel_left", {
-        Label: "✎ ← Sélection Gauche",
+        Label: "✎ ← Select Left",
         Fn: (*) => SendInput("+{Left}"),
     },
     "sel_right", {
-        Label: "✎ → Sélection Droite",
+        Label: "✎ → Select Right",
         Fn: (*) => SendInput("+{Right}"),
     },
     "sel_word_prev", {
-        Label: "✎ W ← Sél. Mot préc.",
+        Label: "✎ W ← Sel. prev. word",
         Fn: (*) => SendInput("^+{Left}"),
     },
     "sel_word_next", {
-        Label: "✎ W → Sél. Mot suiv.",
+        Label: "✎ W → Sel. next word",
         Fn: (*) => SendInput("^+{Right}"),
     },
-    ; --- Médias ---
+    ; --- Media ---
     "vol_up", {
         Label: "🔊 + Volume +",
         Fn: (*) => SendInput("{Volume_Up}"),
@@ -404,27 +404,27 @@ global GESTURE_ACTIONS := Map(
         Fn: (*) => SendInput("{Volume_Down}"),
     },
     "mute", {
-        Label: "🔇 Muet/Unmute",
+        Label: "🔇 Mute/Unmute",
         Fn: (*) => SendInput("{Volume_Mute}"),
     },
     "brightness_up", {
-        Label: "☀ + Luminosité +",
+        Label: "☀ + Brightness +",
         Fn: (*) => SendInput("{Brightness_Up}"),
     },
     "brightness_down", {
-        Label: "☀ - Luminosité -",
+        Label: "☀ - Brightness -",
         Fn: (*) => SendInput("{Brightness_Down}"),
     },
     "track_play", {
-        Label: "⏯ Lecture/Pause",
+        Label: "⏯ Play/Pause",
         Fn: (*) => SendInput("{Media_Play_Pause}"),
     },
     "track_next", {
-        Label: "⏭ Piste suivante",
+        Label: "⏭ Next track",
         Fn: (*) => SendInput("{Media_Next}"),
     },
     "track_prev", {
-        Label: "⏮ Piste précédente",
+        Label: "⏮ Previous track",
         Fn: (*) => SendInput("{Media_Prev}"),
     },
     ; --- System ---
@@ -436,35 +436,35 @@ global GESTURE_ACTIONS := Map(
     ; their current workflow without producing files they then have to
     ; clean up.
     "screenshot_window_clipboard", {
-        Label: "📸 ⊞ Copier fenêtre",
+        Label: "📸 ⊞ Copy window",
         Fn: (*) => GestureScreenshotWindow("clipboard"),
     },
     "screenshot_window_save", {
-        Label: "📸 ⊞ Sauver fenêtre",
+        Label: "📸 ⊞ Save window",
         Fn: (*) => GestureScreenshotWindow("save"),
     },
     "screenshot_region_clipboard", {
-        Label: "📸 ⬚ Copier région",
+        Label: "📸 ⬚ Copy region",
         Fn: (*) => GestureScreenshotRegion("clipboard"),
     },
     "screenshot_region_save", {
-        Label: "📸 ⬚ Sauver région",
+        Label: "📸 ⬚ Save region",
         Fn: (*) => GestureScreenshotRegion("save"),
     },
     "screenshot_fullscreen_clipboard", {
-        Label: "📸 🖥 Copier écran",
+        Label: "📸 🖥 Copy screen",
         Fn: (*) => GestureScreenshotFullscreen("clipboard"),
     },
     "screenshot_fullscreen_save", {
-        Label: "📸 🖥 Sauver écran",
+        Label: "📸 🖥 Save screen",
         Fn: (*) => GestureScreenshotFullscreen("save"),
     },
     "screen_record", {
-        Label: "⏺ Capture vidéo",
+        Label: "⏺ Screen recording",
         Fn: (*) => SendInput("#!r"),
     },
     "lock_screen", {
-        Label: "🔒 Verrouiller",
+        Label: "🔒 Lock screen",
         Fn: (*) => DllCall("LockWorkStation"),
     },
     "notification_center", {
@@ -476,36 +476,36 @@ global GESTURE_ACTIONS := Map(
     ; closed, open it; if open and focused, close it; if open but in the
     ; background, raise it to the foreground.
     "open_metrics_typing", {
-        Label: "📊 Stats Frappe",
+        Label: "📊 Typing stats",
         Fn: (*) => GestureToggleOrFocusUI("metrics_typing"),
     },
     "open_metrics_apps", {
-        Label: "📊 Stats Applications",
+        Label: "📊 App stats",
         Fn: (*) => GestureToggleOrFocusUI("metrics_apps"),
     },
     "open_hotstrings_editor", {
-        Label: "⌨ Éditeur Hotstrings",
+        Label: "⌨ Hotstrings editor",
         Fn: (*) => GestureToggleOrFocusUI("hotstrings_editor"),
     },
     "open_paths_editor", {
-        Label: "📂 Éditeur Chemins",
+        Label: "📂 Paths editor",
         Fn: (*) => GestureToggleOrFocusUI("paths_editor"),
     },
-    ; --- Fichiers utilisateur ---
+    ; --- User files ---
     "open_script_source", {
-        Label: "🛠 Code Source",
+        Label: "🛠 Source code",
         Fn: (*) => Run('notepad.exe "' . A_ScriptFullPath . '"'),
     },
     "open_personal_shortcuts", {
-        Label: "👤 Raccourcis perso",
+        Label: "👤 Personal shortcuts",
         Fn: (*) => GestureEditPersonalShortcuts(),
     },
     "open_personal_hotstrings", {
-        Label: "👤 Hotstrings perso",
+        Label: "👤 Personal hotstrings",
         Fn: (*) => GestureOpenIfExists(ScriptInformation["PersonalTomlPath"]),
     },
     "open_personal_info", {
-        Label: "👤 Infos perso",
+        Label: "👤 Personal info",
         Fn: (*) => GestureOpenIfExists(ScriptInformation["PersonalInfoTomlPath"]),
     },
     "open_config", {
@@ -513,98 +513,98 @@ global GESTURE_ACTIONS := Map(
         Fn: (*) => GestureOpenIfExists(IsSet(ConfigurationFile) ? ConfigurationFile : ""),
     },
     "open_logs_folder", {
-        Label: "📁 Dossier Logs",
+        Label: "📁 Logs folder",
         Fn: (*) => OpenLogsFolder(),
     },
     "open_today_log", {
-        Label: "📄 Log du jour",
+        Label: "📄 Today's log",
         Fn: (*) => OpenTodayLog(),
     },
-    ; --- Gestion du script ---
+    ; --- Script management ---
     "script_pause_toggle", {
-        Label: "⏸/▶ Suspendre / Reprendre",
+        Label: "⏸/▶ Suspend / Resume",
         Fn: (*) => ToggleSuspend(),
     },
     "script_reload", {
-        Label: "↻ Recharger",
+        Label: "↻ Reload",
         Fn: (*) => Reload(),
     },
     "script_save_reload", {
-        Label: "↻ Sauver et recharger",
+        Label: "↻ Save and reload",
         Fn: (*) => GestureSaveAndReload(),
     },
     "script_quit", {
-        Label: "✕ Quitter",
+        Label: "✕ Quit",
         Fn: (*) => ExitApp(),
     },
-    ; --- Debug (AHK uniquement — la Console Hammerspoon couvre les trois) ---
+    ; --- Debug (AHK only — Hammerspoon Console covers the three) ---
     "open_window_spy", {
         Label: "Window Spy",
         Fn: (*) => WindowSpy(),
     },
     "open_list_vars", {
-        Label: "État des variables",
+        Label: "Variable state",
         Fn: (*) => ListVars(),
     },
     "open_key_history", {
-        Label: "Historique des touches",
+        Label: "Key history",
         Fn: (*) => KeyHistory(),
     },
-    ; --- Actions système avancées ---
+    ; --- Advanced system actions ---
     "select_line", {
-        Label: "☰ Sélectionner la ligne",
+        Label: "☰ Select line",
         Fn: (*) => SendFinalResult("{Home}{Shift Down}{End}{Shift Up}"),
     },
     "screen_capture", {
-        Label: "📸 Capture sélective (Win+Shift+S)",
+        Label: "📸 Selective capture (Win+Shift+S)",
         Fn: (*) => SendFinalResult("#+s"),
     },
     "screen_capture_instant", {
-        Label: "📸 Capture instantanée (fenêtre)",
+        Label: "📸 Instant capture (window)",
         Fn: (*) => GestureScreenshotInstant(),
     },
     "open_url", {
-        Label: "🌐 Ouvrir un lien (configurable)",
+        Label: "🌐 Open a link (configurable)",
         Fn: (*) => GestureOpenConfiguredURL(),
     },
     "pick_color", {
-        Label: "🎨 Couleur HEX sous le curseur",
+        Label: "🎨 HEX colour under cursor",
         Fn: (*) => GesturePickColor(),
     },
     "take_note", {
-        Label: "📝 Prendre une note",
+        Label: "📝 Take a note",
         Fn: (*) => GestureTakeNote(),
     },
     "activity_simulation", {
-        Label: "🖱 Simuler l'activité (anti-veille)",
+        Label: "🖱 Simulate activity (anti-sleep)",
         Fn: (*) => GestureToggleActivitySimulation(),
     },
     "surround_parens", {
-        Label: "() Entourer de parenthèses",
+        Label: "() Surround with parentheses",
         Fn: (*) => SendFinalResult("{Home}({End}){Home}"),
     },
     "search_web", {
-        Label: "🔍 Recherche web (configurable)",
+        Label: "🔍 Web search (configurable)",
         Fn: (*) => GestureSearchWeb(),
     },
     "teleport_mouse", {
-        Label: "🖱 Téléporter la souris",
+        Label: "🖱 Teleport mouse",
         Fn: (*) => GestureTeleportMouse(),
     },
     "uppercase_selection", {
-        Label: "AA Majuscules / minuscules",
+        Label: "AA Uppercase / lowercase",
         Fn: (*) => GestureToggleUppercase(),
     },
     "titlecase_selection", {
-        Label: "Aa Casse de titre",
+        Label: "Aa Title case",
         Fn: (*) => GestureToggleTitleCase(),
     },
     "spotlight_mouse", {
-        Label: "🔦 Surbrillance souris",
+        Label: "🔦 Mouse spotlight",
         Fn: (*) => (MouseGetPos(&_Mx, &_My), SpotlightMouseAt(_Mx, _My, 5000)),
     },
     "toggle_capslock", {
-        Label: "⇪ Basculer CapsLock",
+        Label: "⇪ Toggle CapsLock",
         Fn: (*) => ToggleCapsLock(),
     },
     "microsoft_bold", {
@@ -612,7 +612,7 @@ global GESTURE_ACTIONS := Map(
         Fn: (*) => (MicrosoftApps() ? SendFinalResult("^g") : SendFinalResult("^b")),
     },
     "paste_plain", {
-        Label: "⎘ Coller sans mise en forme",
+        Label: "⎘ Paste without formatting",
         Fn: (*) => GesturePastePlain(),
     },
 )

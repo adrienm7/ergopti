@@ -98,9 +98,9 @@ function M.build(ctx)
 		
 		local slotLbl   = slot_label(slot)
 		local actionLbl = type(gestures.get_action_label) == "function" and gestures.get_action_label(current)
-			or i18n.get("sg_actions." .. (current or "none"))
+			or (current or "none")
 		
-		local names     = gestures.SG_NAMES
+		local names     = type(gestures.get_sg_names) == "function" and gestures.get_sg_names() or gestures.SG_NAMES
 		local actionsSubmenu   = {}
 
 		if type(names) == "table" then

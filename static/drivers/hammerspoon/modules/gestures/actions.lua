@@ -554,6 +554,145 @@ end
 -- =============================
 -- =============================
 
+-- Hard-coded action labels — same in every locale (symbols + universal terms).
+-- app_expose and mission_control are intentionally absent: they vary by language
+-- and are served from the locale JSON.
+local LABELS = {
+	-- SG actions
+	none                             = "∅ Disabled",
+	left_click_toggle                = "🖱 L Left click (hold)",
+	right_click_toggle               = "🖱 R Right click (hold)",
+	lookup                           = "🔍 Word definition",
+	app_switcher                     = "⇥ Alt+Tab — Previous app",
+	app_previous                     = "⇥ ← Alt+Tab — Prev. app",
+	app_window_previous              = "⇥ ◱ ← Alt+Tab — Prev. window",
+	copy                             = "⎘ Copy",
+	paste                            = "⎘ Paste",
+	cut                              = "⎘ Cut",
+	undo                             = "↩ Undo",
+	redo                             = "↪ Redo",
+	select_all                       = "⬚ Select all",
+	find                             = "🔍 Find",
+	enter                            = "↵ Enter",
+	tab                              = "⇥ Tab",
+	escape                           = "⎋ Escape",
+	backspace                        = "⌫ Backspace",
+	delete                           = "⌦ Delete",
+	tab_new                          = "⧉ + New tab",
+	tab_close                        = "⧉ × Close tab",
+	tab_prev                         = "⧉ ← Previous tab",
+	tab_next                         = "⧉ → Next tab",
+	nav_back                         = "← Back (navigation)",
+	nav_forward                      = "→ Forward (navigation)",
+	win_prev                         = "◱ ← Previous window",
+	win_next                         = "◱ → Next window",
+	win_app_prev                     = "◱ ← Prev. window (same app)",
+	win_app_next                     = "◱ → Next window (same app)",
+	close_window                     = "◱ × Close window",
+	fullscreen                       = "📺 Fullscreen",
+	snap_left                        = "◧ ← Snap left",
+	snap_right                       = "◨ → Snap right",
+	maximize                         = "🔲 Maximize",
+	space_prev                       = "▢ ← Previous Space",
+	space_next                       = "▢ → Next Space",
+	desktop_prev                     = "▢ ← Previous desktop",
+	desktop_next                     = "▢ → Next desktop",
+	desktop_new                      = "▢ + New desktop",
+	desktop_close                    = "▢ × Close desktop",
+	task_view                        = "▢ Task View",
+	minimize_all                     = "◱ Minimize all",
+	word_prev                        = "W ← Previous word",
+	word_next                        = "W → Next word",
+	line_up                          = "↕ ↑ Previous line",
+	line_down                        = "↕ ↓ Next line",
+	line_start                       = "⇤ Line start",
+	line_end                         = "⇥ Line end",
+	para_prev                        = "¶ ↑ Previous paragraph",
+	para_next                        = "¶ ↓ Next paragraph",
+	doc_start                        = "⤒ Document start",
+	doc_end                          = "⤓ Document end",
+	arrow_up                         = "↑ Arrow Up",
+	arrow_down                       = "↓ Arrow Down",
+	arrow_left                       = "← Arrow Left",
+	arrow_right                      = "→ Arrow Right",
+	sel_up                           = "✎ ↑ Select Up",
+	sel_down                         = "✎ ↓ Select Down",
+	sel_left                         = "✎ ← Select Left",
+	sel_right                        = "✎ → Select Right",
+	sel_word_prev                    = "✎ W ← Sel. prev. word",
+	sel_word_next                    = "✎ W → Sel. next word",
+	vol_up                           = "🔊 + Volume +",
+	vol_down                         = "🔊 - Volume -",
+	mute                             = "🔇 Mute/Unmute",
+	brightness_up                    = "☀ + Brightness +",
+	brightness_down                  = "☀ - Brightness -",
+	track_play                       = "⏯ Play/Pause",
+	track_next                       = "⏭ Next track",
+	track_prev                       = "⏮ Previous track",
+	screenshot_window_clipboard      = "📸 ⊞ Copy window",
+	screenshot_window_save           = "📸 ⊞ Save window",
+	screenshot_region_clipboard      = "📸 ⬚ Copy region",
+	screenshot_region_save           = "📸 ⬚ Save region",
+	screenshot_fullscreen_clipboard  = "📸 🖥 Copy screen",
+	screenshot_fullscreen_save       = "📸 🖥 Save screen",
+	screen_record                    = "⏺ Screen recording",
+	lock_screen                      = "🔒 Lock screen",
+	notification_center              = "🔔 Notifications",
+	open_metrics_typing              = "📊 Typing stats",
+	open_metrics_apps                = "📊 App stats",
+	open_hotstrings_editor           = "⌨ Hotstrings editor",
+	open_paths_editor                = "📂 Paths editor",
+	open_script_source               = "🛠 Source code",
+	open_personal_shortcuts          = "👤 Personal shortcuts",
+	open_personal_hotstrings         = "👤 Personal hotstrings",
+	open_personal_info               = "👤 Personal info",
+	open_config                      = "⚙ Configuration",
+	open_logs_folder                 = "📁 Logs folder",
+	open_today_log                   = "📄 Today's log",
+	script_pause_toggle              = "⏸/▶ Suspend / Resume",
+	script_reload                    = "↻ Reload",
+	script_save_reload               = "↻ Save and reload",
+	script_quit                      = "✕ Quit",
+	select_line                      = "☰ Select line",
+	screen_capture                   = "📸 Selective capture (Win+Shift+S)",
+	screen_capture_instant           = "📸 Instant capture (window)",
+	open_url                         = "🌐 Open a link (configurable)",
+	pick_color                       = "🎨 HEX colour under cursor",
+	take_note                        = "📝 Take a note",
+	activity_simulation              = "🖱 Simulate activity (anti-sleep)",
+	surround_parens                  = "() Surround with parentheses",
+	search_web                       = "🔍 Web search (configurable)",
+	teleport_mouse                   = "🖱 Teleport mouse",
+	uppercase_selection              = "AA Uppercase / lowercase",
+	titlecase_selection              = "Aa Title case",
+	spotlight_mouse                  = "🔦 Mouse spotlight",
+	toggle_capslock                  = "⇪ Toggle CapsLock",
+	microsoft_bold                   = "𝐁 Ctrl+B Microsoft (→ Ctrl+G)",
+	paste_plain                      = "⎘ Paste without formatting",
+	open_console                     = "▤ Console",
+	open_window_spy                  = "Window Spy",
+	open_list_vars                   = "Variable state",
+	open_key_history                 = "Key history",
+	-- AX actions
+	["ax.tabs"]                      = "⧉ Tabs",
+	["ax.char"]                      = "A Characters",
+	["ax.char_sel"]                  = "✎ A Sel. Characters",
+	["ax.line_arrow"]                = "↕ Lines (Arrows)",
+	["ax.line_sel"]                  = "✎ ↕ Sel. Lines",
+	["ax.words"]                     = "W Words",
+	["ax.words_sel"]                 = "✎ W Sel. Words",
+	["ax.windows"]                   = "◱ Windows",
+	["ax.spaces"]                    = "▢ Spaces",
+	["ax.desktops"]                  = "▢ Desktops",
+	["ax.volume"]                    = "🔊 Volume",
+	["ax.brightness"]                = "☀ Brightness",
+	["ax.tracks"]                    = "♫ Tracks",
+	["ax.lines"]                     = "↕ Lines (Alt)",
+	["ax.line_bounds"]               = "↔ Line (start/end)",
+	["ax.paragraphs"]                = "¶ Paragraphs",
+	["ax.document"]                  = "📄 Document (start/end)",
+}
+
 -- Path to the shared gesture_actions.toml, resolved relative to this file.
 -- actions.lua lives at static/drivers/hammerspoon/modules/gestures/actions.lua
 -- so we climb 4 levels to reach static/, then enter shared/.
@@ -659,25 +798,30 @@ local function build_sg_names(shared)
 		if item == "--" then
 			out[#out + 1] = "-"
 		elseif item:sub(1, 1) == "#" then
-			out[#out + 1] = item
+			-- Header key from TOML: "#mouse_nav" -> translated section title
+			local key_suffix = item:sub(2)
+			local i18n_key   = "sg_actions.sg_order.header." .. key_suffix
+			local translated = i18n.get(i18n_key)
+			-- Keep the # prefix so menu_gestures.lua can detect it as a disabled header
+			out[#out + 1] = "#" .. ((translated ~= i18n_key) and translated or key_suffix)
 		elseif item == "_cmd_placeholder" then
-			out[#out + 1] = "#Raccourcis ⌘ (Cmd)"
+			out[#out + 1] = "#" .. i18n.get("sg_actions.sg_order.header.cmd")
 			for _, l in ipairs(CMD_LETTERS) do out[#out + 1] = "cmd_" .. l end
 			for d = 0, 9 do out[#out + 1] = "cmd_" .. d end
 			for _, sk in ipairs({"space","enter","period","comma"}) do out[#out + 1] = "cmd_" .. sk end
 		elseif item == "_cmd_shift_placeholder" then
-			out[#out + 1] = "#Raccourcis ⌘⇧ (Cmd+Shift)"
+			out[#out + 1] = "#" .. i18n.get("sg_actions.sg_order.header.cmd_shift")
 			for _, l in ipairs(CMD_LETTERS) do out[#out + 1] = "cmd_shift_" .. l end
 		elseif item == "_hs_ctrl_placeholder" then
-			out[#out + 1] = "#Raccourcis ^ (Ctrl) — macOS"
+			out[#out + 1] = "#" .. i18n.get("sg_actions.sg_order.header.hs_ctrl")
 			for _, l in ipairs(CMD_LETTERS) do out[#out + 1] = "hs_ctrl_" .. l end
 			for d = 0, 9 do out[#out + 1] = "hs_ctrl_" .. d end
 			for _, sk in ipairs({"space","enter","period","comma"}) do out[#out + 1] = "hs_ctrl_" .. sk end
 		elseif item == "_hs_ctrl_shift_placeholder" then
-			out[#out + 1] = "#Raccourcis ^⇧ (Ctrl+Shift) — macOS"
+			out[#out + 1] = "#" .. i18n.get("sg_actions.sg_order.header.hs_ctrl_shift")
 			for _, l in ipairs(CMD_LETTERS) do out[#out + 1] = "hs_ctrl_shift_" .. l end
 		elseif item == "_hs_option_placeholder" then
-			out[#out + 1] = "#Raccourcis ⌥ (Option) — macOS"
+			out[#out + 1] = "#" .. i18n.get("sg_actions.sg_order.header.hs_option")
 			for _, l in ipairs(CMD_LETTERS) do out[#out + 1] = "hs_option_" .. l end
 			for d = 0, 9 do out[#out + 1] = "hs_option_" .. d end
 			for _, sk in ipairs({"space","enter","period","comma"}) do out[#out + 1] = "hs_option_" .. sk end
@@ -714,65 +858,73 @@ M.AX_NAMES = build_ax_names(_shared) or {
 	"tabs", "windows", "spaces", "volume", "brightness", "tracks",
 }
 
-M.SG_NAMES = build_sg_names(_shared) or {
-	"none", "-",
-	"#Souris et Navigation",
-	"left_click_toggle", "right_click_toggle", "lookup",
-	"app_switcher", "app_previous", "app_window_previous",
-	"-", "#Touches",
-	"enter", "tab", "escape", "backspace", "delete",
-	"-", "#Onglets",
-	"tab_new", "tab_close", "tab_prev", "tab_next",
-	"-", "#Fenêtres",
-	"win_prev", "win_next", "close_window", "fullscreen",
-	"snap_left", "snap_right", "maximize",
-	"-", "#Espaces / Bureaux",
-	"space_prev", "space_next", "mission_control", "app_expose",
-	"-", "#Curseur et Texte",
-	"arrow_up", "arrow_down", "arrow_left", "arrow_right",
-	"word_prev", "word_next",
-	"line_up", "line_down", "line_start", "line_end",
-	"para_prev", "para_next", "doc_start", "doc_end",
-	"-", "#Sélection de Texte",
-	"sel_up", "sel_down", "sel_left", "sel_right",
-	"sel_word_prev", "sel_word_next",
-	"-", "#Médias",
-	"vol_up", "vol_down", "mute", "brightness_up", "brightness_down",
-	"track_play", "track_next", "track_prev",
-	"-", "#Captures d'écran",
-	"screenshot_window_clipboard", "screenshot_window_save",
-	"screenshot_region_clipboard", "screenshot_region_save",
-	"screenshot_fullscreen_clipboard", "screenshot_fullscreen_save",
-	"-", "#Système",
-	"lock_screen", "notification_center",
-	"-", "#Interface",
-	"open_metrics_typing", "open_metrics_apps",
-	"open_hotstrings_editor", "open_paths_editor",
-	"-", "#Fichiers",
-	"open_script_source", "open_personal_shortcuts",
-	"open_personal_hotstrings", "open_personal_info",
-	"open_config", "open_logs_folder", "open_today_log",
-	"-", "#Gestion du Script",
-	"script_pause_toggle", "script_reload", "script_save_reload", "script_quit",
-	"-", "#Debug",
-	"open_console",
-	"-", "#Raccourcis ⌘ (Cmd)",
-	"-", "#Raccourcis ⌘⇧ (Cmd+Shift)",
-}
+--- Returns the ordered list of SG action names with translated section headers.
+--- Called at menu-build time so headers always reflect the active locale.
+function M.get_sg_names()
+	local names = build_sg_names(_shared)
+	if names then return names end
+	-- Fallback when the shared TOML could not be loaded
+	local h = function(key) return "#" .. i18n.get(key) end
+	return {
+		"none", "-",
+		h("sg_actions.sg_order.header.mouse_nav"),
+		"left_click_toggle", "right_click_toggle", "lookup",
+		"app_switcher", "app_previous", "app_window_previous",
+		"-", h("sg_actions.sg_order.header.keys"),
+		"enter", "tab", "escape", "backspace", "delete",
+		"-", h("sg_actions.sg_order.header.tabs"),
+		"tab_new", "tab_close", "tab_prev", "tab_next",
+		"-", h("sg_actions.sg_order.header.windows"),
+		"win_prev", "win_next", "close_window", "fullscreen",
+		"snap_left", "snap_right", "maximize",
+		"-", h("sg_actions.sg_order.header.spaces"),
+		"space_prev", "space_next", "mission_control", "app_expose",
+		"-", h("sg_actions.sg_order.header.cursor"),
+		"arrow_up", "arrow_down", "arrow_left", "arrow_right",
+		"word_prev", "word_next",
+		"line_up", "line_down", "line_start", "line_end",
+		"para_prev", "para_next", "doc_start", "doc_end",
+		"-", h("sg_actions.sg_order.header.selection"),
+		"sel_up", "sel_down", "sel_left", "sel_right",
+		"sel_word_prev", "sel_word_next",
+		"-", h("sg_actions.sg_order.header.media"),
+		"vol_up", "vol_down", "mute", "brightness_up", "brightness_down",
+		"track_play", "track_next", "track_prev",
+		"-", h("sg_actions.sg_order.header.screenshot"),
+		"screenshot_window_clipboard", "screenshot_window_save",
+		"screenshot_region_clipboard", "screenshot_region_save",
+		"screenshot_fullscreen_clipboard", "screenshot_fullscreen_save",
+		"-", h("sg_actions.sg_order.header.system"),
+		"lock_screen", "notification_center",
+		"-", h("sg_actions.sg_order.header.ui"),
+		"open_metrics_typing", "open_metrics_apps",
+		"open_hotstrings_editor", "open_paths_editor",
+		"-", h("sg_actions.sg_order.header.files"),
+		"open_script_source", "open_personal_shortcuts",
+		"open_personal_hotstrings", "open_personal_info",
+		"open_config", "open_logs_folder", "open_today_log",
+		"-", h("sg_actions.sg_order.header.script"),
+		"script_pause_toggle", "script_reload", "script_save_reload", "script_quit",
+		"-", h("sg_actions.sg_order.header.debug"),
+		"open_console",
+		"-", h("sg_actions.sg_order.header.cmd"),
+		"-", h("sg_actions.sg_order.header.cmd_shift"),
+	}
+end
 
 function M.get_label(name)
-	if not name or name == "none" then
-		local t = i18n.get("sg_actions.none")
-		return (t ~= "sg_actions.none") and t or "Désactivé"
-	end
-	-- Prefer locale JSON so labels update when the user switches language
-	local key_sg = "sg_actions." .. name
-	local t_sg = i18n.get(key_sg)
-	if t_sg ~= key_sg then return t_sg end
+	if not name or name == "none" then return LABELS.none end
+	-- Hard-coded label first (covers 95% of actions identically in all locales)
+	if LABELS[name] then return LABELS[name] end
+	-- AX prefix variant
+	if LABELS["ax." .. name] then return LABELS["ax." .. name] end
+	-- Locale JSON only for the few truly language-specific labels (app_expose, mission_control…)
+	local key = "sg_actions." .. name
+	local t = i18n.get(key)
+	if t ~= key then return t end
 	local key_ax = "ax_actions." .. name
 	local t_ax = i18n.get(key_ax)
 	if t_ax ~= key_ax then return t_ax end
-	-- Fall back to the action name if no translation found
 	return name
 end
 
