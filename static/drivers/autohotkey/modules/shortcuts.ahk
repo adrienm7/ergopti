@@ -285,20 +285,26 @@ if Features["Shortcuts"]["Move"].Enabled {
     ; Origin captured at toggle-on; shared between Start and SimulateActivity
     global AwakeOriginX := 0, AwakeOriginY := 0
 
+    ; InputHook used to detect any real keypress while keep-awake is active
+    global AwakeInputHook := ""
+
     StartActivitySimulation(*) {
-        global ActivitySimulation, AwakeOriginX, AwakeOriginY
+        global ActivitySimulation, AwakeOriginX, AwakeOriginY, AwakeInputHook
         ActivitySimulation := True
         ; Capture the current cursor position as the jitter origin
         MouseGetPos(&AwakeOriginX, &AwakeOriginY)
         ; Reset the user-move baseline so the first tick never self-cancels
         SimulateActivity(True)
         SetTimer(SimulateActivity, Random(AWAKE_TICK_MIN_MS, AWAKE_TICK_MAX_MS))
-        ; Arm input-cancel hooks: any real key or mouse button stops the simulation.
-        ; Hotkey() with "On" registers dynamically; $ excludes synthetic events.
-        Hotkey("~*$*",      AwakeCancelOnKey, "On")
-        Hotkey("~*$LButton", AwakeCancelOnKey, "On")
-        Hotkey("~*$RButton", AwakeCancelOnKey, "On")
-        Hotkey("~*$MButton", AwakeCancelOnKey, "On")
+        ; Arm mouse-button cancel hooks
+        Hotkey("~*$LButton", AwakeCancelOnMouse, "On")
+        Hotkey("~*$RButton", AwakeCancelOnMouse, "On")
+        Hotkey("~*$MButton", AwakeCancelOnMouse, "On")
+        ; Use InputHook to detect any keypress — does not conflict with other hotkeys
+        AwakeInputHook := InputHook("L0 I")
+        AwakeInputHook.OnChar := AwakeCancelOnKeypress
+        AwakeInputHook.OnKeyDown := AwakeCancelOnKeypress
+        AwakeInputHook.Start()
         TrayTip(t("keepawake.started"), t("keepawake.title"), "Iconi Mute")
     }
 
@@ -312,15 +318,19 @@ if Features["Shortcuts"]["Move"].Enabled {
     }
 
     StopActivitySimulation() {
-        global ActivitySimulation
+        global ActivitySimulation, AwakeInputHook
         ActivitySimulation := False
         SetTimer(SimulateActivity, 0)
         SetTimer(AwakeReturnToOrigin, 0)
-        ; Disarm input-cancel hooks
-        try Hotkey("~*$*",       AwakeCancelOnKey, "Off")
-        try Hotkey("~*$LButton", AwakeCancelOnKey, "Off")
-        try Hotkey("~*$RButton", AwakeCancelOnKey, "Off")
-        try Hotkey("~*$MButton", AwakeCancelOnKey, "Off")
+        ; Disarm mouse-button cancel hooks
+        try Hotkey("~*$LButton", AwakeCancelOnMouse, "Off")
+        try Hotkey("~*$RButton", AwakeCancelOnMouse, "Off")
+        try Hotkey("~*$MButton", AwakeCancelOnMouse, "Off")
+        ; Stop the keypress detector
+        if IsObject(AwakeInputHook) {
+            try AwakeInputHook.Stop()
+            AwakeInputHook := ""
+        }
         TrayTip(t("keepawake.stopped"), t("keepawake.title"), "Iconi Mute")
     }
 
@@ -331,11 +341,16 @@ if Features["Shortcuts"]["Move"].Enabled {
         }
     }
 
-    AwakeCancelOnKey(*) {
+    AwakeCancelOnMouse(*) {
         global ActivitySimulation
         if ActivitySimulation {
-            ; Defer the stop to the next event loop tick so this callback
-            ; returns cleanly before Hotkey("Off") is called on itself
+            SetTimer(StopActivitySimulation, -1)
+        }
+    }
+
+    AwakeCancelOnKeypress(ih, *) {
+        global ActivitySimulation
+        if ActivitySimulation {
             SetTimer(StopActivitySimulation, -1)
         }
     }
