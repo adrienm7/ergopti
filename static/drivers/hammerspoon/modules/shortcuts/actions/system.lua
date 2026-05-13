@@ -245,7 +245,11 @@ function M.toggle_awake()
 		-- swipe, tap, pinch, rotate…). We cut silently (no alert) since the user
 		-- is clearly back — the visual noise would be worse than the keep-awake itself.
 		local ev = eventtap.event.types
-		local watch_types = { ev.keyDown, ev.scrollWheel }
+		-- keyDown is intentionally excluded: it is the event type that triggered
+		-- toggle_awake() itself, and even a deferred watcher start risks catching
+		-- it or its keyUp twin. Scroll and gesture events are sufficient to detect
+		-- real user activity on the trackpad; mouse buttons cover click activity.
+		local watch_types = { ev.scrollWheel, ev.leftMouseDown, ev.rightMouseDown, ev.otherMouseDown }
 		-- Touchpad gesture event types — some may be absent on older macOS builds
 		for _, name in ipairs({ "gesture", "beginGesture", "endGesture", "swipe", "magnify", "rotate", "directTouch", "smartMagnify" }) do
 			if ev[name] then
@@ -288,15 +292,11 @@ function M.toggle_awake()
 			Logger.info(LOG, "Keep-awake auto-disabled — user activity detected.")
 			return false
 		end)
-		-- Defer past the full Ctrl+M key-press cycle (keyDown + keyUp for both
-		-- Ctrl and M). doAfter(0) only skips one run-loop iteration and is not
-		-- enough; 0.3s guarantees the triggering key events are fully delivered
-		-- before we arm the watcher.
-		timer.doAfter(0.3, function()
-			if awake_active and awake_input_watcher then
-				pcall(function() awake_input_watcher:start() end)
-			end
-		end)
+		-- keyDown is excluded from watch_types so no deferred start is needed;
+		-- start immediately so scroll/gesture/click detection is live at once.
+		if awake_active and awake_input_watcher then
+			pcall(function() awake_input_watcher:start() end)
+		end
 
 		schedule_awake_tick()
 		Logger.info(LOG, "Keep-awake enabled.")
