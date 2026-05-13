@@ -127,8 +127,25 @@ _Onboarding_Step1() {
 	btnNext := g.AddButton("Default w100 x" ONBOARDING_WIN_W - 120, "Next →")
 	btnNext.OnEvent("Click", _Step1_Next.Bind(g, lv))
 
+	; Update button text to "Next →" in the selected language when the selection changes
+	lv.OnEvent("ItemSelect", _Step1_UpdateNextBtn.Bind(btnNext))
+
 	_Onboarding_Show(g)
 	global _ob_gui := g
+}
+
+_Step1_UpdateNextBtn(btn, lv, row, selected, *) {
+	if !selected or row <= 0
+		return
+	global _I18nLocale, _I18nCacheLoaded
+	PrevLocale  := _I18nLocale
+	PrevLoaded  := _I18nCacheLoaded
+	_I18nLocale      := I18N_LOCALES[row].Code
+	_I18nCacheLoaded := false
+	NextLabel        := t("onboarding.next")
+	_I18nLocale      := PrevLocale
+	_I18nCacheLoaded := PrevLoaded
+	btn.Text := NextLabel
 }
 
 _Step1_Next(g, lv, *) {
@@ -168,7 +185,7 @@ _Onboarding_Step2() {
 
 	g.AddText("w" ONBOARDING_WIN_W - 40 " y+12", "")
 	rYes := g.AddRadio("vLayoutChoice", t("onboarding.layout.yes"))
-	rNo  := g.AddRadio("Radio Checked", t("onboarding.layout.no"))
+	rNo  := g.AddRadio("Checked", t("onboarding.layout.no"))
 
 	g.AddText("w" ONBOARDING_WIN_W - 40 " y+16", "")
 
@@ -259,7 +276,7 @@ _Onboarding_Step4() {
 
 	g.AddText("w" ONBOARDING_WIN_W - 40 " y+12", "")
 	rYes := g.AddRadio("vMetricsChoice", t("onboarding.yes"))
-	rNo  := g.AddRadio("Radio Checked", t("onboarding.no"))
+	rNo  := g.AddRadio("Checked", t("onboarding.no"))
 
 	g.AddText("w" ONBOARDING_WIN_W - 40 " y+16", "")
 
@@ -302,7 +319,7 @@ _Onboarding_Step5() {
 
 	g.AddText("w" ONBOARDING_WIN_W - 40 " y+12", "")
 	rYes := g.AddRadio("vGesturesChoice", t("onboarding.yes"))
-	rNo  := g.AddRadio("Radio Checked", t("onboarding.no"))
+	rNo  := g.AddRadio("Checked", t("onboarding.no"))
 
 	g.AddText("w" ONBOARDING_WIN_W - 40 " y+16", "")
 
