@@ -28,32 +28,39 @@ global _HCW_CATEGORY_ORDER := [
     "sfbsreduction", "distancesreduction", "personal"
 ]
 
-global _HCW_CATEGORY_LABELS := Map(
-    "magickey",           t("hs_config.cat_magickey"),
-    "autocorrection",     t("hs_config.cat_autocorrection"),
-    "rolls",              t("hs_config.cat_rolls"),
-    "sfbsreduction",      t("hs_config.cat_sfbs"),
-    "distancesreduction", t("hs_config.cat_distances"),
-    "personal",           t("hs_config.cat_personal"),
-)
+; Populated lazily in _HCW_InitLocaleStrings() — not at include time,
+; because i18n is not yet loaded when this file is included.
+global _HCW_CATEGORY_LABELS := Map()
+global _HCW_COLOR_PRESETS   := []
+global _HCW_FILE_LEVEL_LABEL := ""
 
-; First six entries mirror the bootstrap defaults shipped in the category
-; TOMLs; the four following ones are fillers offered for variety. Hex and
-; label are kept side by side so the dropdown can render labels while we
-; persist the underlying hex value.
-global _HCW_COLOR_PRESETS := [
-    Map("Label", t("hs_config.color_inherit"), "Hex", ""),
-    Map("Label", t("hs_config.color_red"),     "Hex", "#e53935"),
-    Map("Label", t("hs_config.color_green"),   "Hex", "#43a047"),
-    Map("Label", t("hs_config.color_orange"),  "Hex", "#fb8c00"),
-    Map("Label", t("hs_config.color_blue"),    "Hex", "#1e88e5"),
-    Map("Label", t("hs_config.color_purple"),  "Hex", "#8e44ad"),
-    Map("Label", t("hs_config.color_cyan"),    "Hex", "#00838f"),
-    Map("Label", t("hs_config.color_yellow"),  "Hex", "#fdd835"),
-    Map("Label", t("hs_config.color_gray"),    "Hex", "#6e6e73"),
-]
-
-global _HCW_FILE_LEVEL_LABEL := t("hs_config.file_level")
+; Populate all locale-dependent labels. Called at window-open time so that
+; i18n is fully initialised and the correct locale is active.
+_HCW_InitLocaleStrings() {
+    global _HCW_CATEGORY_LABELS, _HCW_COLOR_PRESETS, _HCW_FILE_LEVEL_LABEL
+    _HCW_CATEGORY_LABELS := Map(
+        "magickey",           t("hs_config.cat_magickey"),
+        "autocorrection",     t("hs_config.cat_autocorrection"),
+        "rolls",              t("hs_config.cat_rolls"),
+        "sfbsreduction",      t("hs_config.cat_sfbs"),
+        "distancesreduction", t("hs_config.cat_distances"),
+        "personal",           t("hs_config.cat_personal"),
+    )
+    ; First six entries mirror the bootstrap defaults shipped in the category
+    ; TOMLs; the four following ones are fillers offered for variety.
+    _HCW_COLOR_PRESETS := [
+        Map("Label", t("hs_config.color_inherit"), "Hex", ""),
+        Map("Label", t("hs_config.color_red"),     "Hex", "#e53935"),
+        Map("Label", t("hs_config.color_green"),   "Hex", "#43a047"),
+        Map("Label", t("hs_config.color_orange"),  "Hex", "#fb8c00"),
+        Map("Label", t("hs_config.color_blue"),    "Hex", "#1e88e5"),
+        Map("Label", t("hs_config.color_purple"),  "Hex", "#8e44ad"),
+        Map("Label", t("hs_config.color_cyan"),    "Hex", "#00838f"),
+        Map("Label", t("hs_config.color_yellow"),  "Hex", "#fdd835"),
+        Map("Label", t("hs_config.color_gray"),    "Hex", "#6e6e73"),
+    ]
+    _HCW_FILE_LEVEL_LABEL := t("hs_config.file_level")
+}
 
 
 ; ============================================================
@@ -64,6 +71,7 @@ global _HCW_FILE_LEVEL_LABEL := t("hs_config.file_level")
 
 OpenHotstringsConfigWindow() {
     global _HCWGui, _HCWWidgets
+    _HCW_InitLocaleStrings()
     if _HCWGui {
         try _HCWGui.Show()
         return
