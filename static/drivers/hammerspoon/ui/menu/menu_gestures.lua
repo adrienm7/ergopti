@@ -11,6 +11,7 @@ local hs = hs
 
 local gestures_mod = require("modules.gestures")
 local dialog       = require("lib.dialog_util")
+local i18n         = require("lib.i18n")
 
 
 
@@ -36,48 +37,13 @@ M.DEFAULT_STATE = {
 -- ====================================
 -- ====================================
 
-local SLOT_LABELS = {
-	tap_2                = "Tap 2 doigts",
-	tap_3                = "Tap 3 doigts",
-	tap_4                = "Tap 4 doigts",
-	tap_5                = "Tap 5 doigts",
-
-	swipe_2_left         = "Swipe 2 doigts ←",
-	swipe_2_right        = "Swipe 2 doigts →",
-	swipe_2_up           = "Swipe 2 doigts ↑",
-	swipe_2_down         = "Swipe 2 doigts ↓",
-	swipe_2_left_up      = "Swipe 2 doigts ↖",
-	swipe_2_right_up     = "Swipe 2 doigts ↗",
-	swipe_2_left_down    = "Swipe 2 doigts ↙",
-	swipe_2_right_down   = "Swipe 2 doigts ↘",
-
-	swipe_3_left         = "Swipe 3 doigts ←",
-	swipe_3_right        = "Swipe 3 doigts →",
-	swipe_3_up           = "Swipe 3 doigts ↑",
-	swipe_3_down         = "Swipe 3 doigts ↓",
-	swipe_3_left_up      = "Swipe 3 doigts ↖",
-	swipe_3_right_up     = "Swipe 3 doigts ↗",
-	swipe_3_left_down    = "Swipe 3 doigts ↙",
-	swipe_3_right_down   = "Swipe 3 doigts ↘",
-
-	swipe_4_left         = "Swipe 4 doigts ←",
-	swipe_4_right        = "Swipe 4 doigts →",
-	swipe_4_up           = "Swipe 4 doigts ↑",
-	swipe_4_down         = "Swipe 4 doigts ↓",
-	swipe_4_left_up      = "Swipe 4 doigts ↖",
-	swipe_4_right_up     = "Swipe 4 doigts ↗",
-	swipe_4_left_down    = "Swipe 4 doigts ↙",
-	swipe_4_right_down   = "Swipe 4 doigts ↘",
-
-	swipe_5_left         = "Swipe 5 doigts ←",
-	swipe_5_right        = "Swipe 5 doigts →",
-	swipe_5_up           = "Swipe 5 doigts ↑",
-	swipe_5_down         = "Swipe 5 doigts ↓",
-	swipe_5_left_up      = "Swipe 5 doigts ↖",
-	swipe_5_right_up     = "Swipe 5 doigts ↗",
-	swipe_5_left_down    = "Swipe 5 doigts ↙",
-	swipe_5_right_down   = "Swipe 5 doigts ↘",
-}
+--- Returns the translated label for a gesture slot identifier.
+--- Falls back to the raw slot id when the key is missing from the locale file.
+--- @param slot string Internal slot id, e.g. ``"tap_3"`` or ``"swipe_2_left"``.
+--- @return string
+local function slot_label(slot)
+	return i18n.get("gesture.slots." .. slot)
+end
 
 local DISABLED_GESTURE_ACTION = "none"
 
@@ -92,15 +58,15 @@ function M.build(ctx)
 	local paused = ctx.paused
 
 	local item = {
-		title   = "🖐️ Gestes",
+		title   = i18n.get("menu.gestures.title"),
 		checked = (state.gestures and not paused) or nil,
 		fn      = function()
 			local new_state = not state.gestures
 			if new_state then
 				-- Show warning when activating gestures
-				local warnMsg = "⚠️ Attention : L'activation des gestes trackpad peut interférer avec les gestes système.\n\nPour éviter les conflits, désactiver les options macOS suivantes :\n\n• Gestes trackpad 2 doigts : désactiver le défilement et les balayages si vous voulez les utiliser dans Hammerspoon.\n• Gestes trackpad 3 doigts pour bouger les fenêtres et la sélection\n• Tap 3 doigts pour chercher le mot dans le dictionnaire\n• Swipe 3 doigts horizontal/vertical pour changer de spaces, activer App Exposé ou Mission Control\n• Swipe 4 doigts horizontal/vertical pour changer de spaces, activer App Exposé ou Mission Control\n\nIl est important de désactiver les gestes système utilisant 4 doigts afin de pouvoir définir des gestes à 5 doigts. Autrement, macOS ne ferait pas de distinction entre les deux et empêcherait les gestes à 5 doigts de fonctionner. C’est pourquoi les gestes à 4 doigts par défaut son redéfinis dans le module Gestes pour retrouver les fonctions système sans conflit avec les gestes à 5 doigts."
-				local res = dialog.block_alert("Avertissement Gestes", warnMsg, "Activer", "Annuler", "warning")
-				if res ~= "Activer" then return end
+				local warnMsg = i18n.get("dialog.gestures.warning_msg")
+				local res = dialog.block_alert(i18n.get("dialog.gestures.warning_title"), warnMsg, i18n.get("button.activate"), i18n.get("button.cancel"), "warning")
+				if res ~= i18n.get("button.activate") then return end
 			end
 			state.gestures = new_state
 			if gestures then
@@ -111,7 +77,7 @@ function M.build(ctx)
 				end
 			end
 			ctx.save_prefs()
-			ctx.notify_feature("Gestes", state.gestures)
+			ctx.notify_feature(i18n.get("menu.gestures.notify_title"), state.gestures)
 			ctx.updateMenu()
 		end,
 	}
@@ -130,8 +96,9 @@ function M.build(ctx)
 		local currentMode = type(gestures.get_mode) == "function" and gestures.get_mode(slot) or "x1"
 		local currentSens = type(gestures.get_sensitivity) == "function" and gestures.get_sensitivity(slot) or 3.5
 		
-		local slotLbl   = SLOT_LABELS[slot] or slot
-		local actionLbl = type(gestures.get_action_label) == "function" and gestures.get_action_label(current) or "Inconnu"
+		local slotLbl   = slot_label(slot)
+		local actionLbl = type(gestures.get_action_label) == "function" and gestures.get_action_label(current)
+			or i18n.get("sg_actions." .. (current or "none"))
 		
 		local names     = gestures.SG_NAMES
 		local actionsSubmenu   = {}
@@ -155,8 +122,8 @@ function M.build(ctx)
 							if type(conflict) == "table" then
 								hs.timer.doAfter(0.3, function()
 									local ok_c, clicked = pcall(dialog.block_alert,
-										"⚠️ Conflit potentiel", conflict.msg or "",
-										"Ouvrir Réglages", "OK", "warning")
+										i18n.get("menu.gestures.conflict_title"), conflict.msg or "",
+										i18n.get("menu.gestures.open_settings"), "OK", "warning")
 									if ok_c and clicked == "Ouvrir Réglages" then
 										pcall(hs.execute, string.format("open \"%s\"", conflict.url or ""))
 									end
@@ -170,7 +137,7 @@ function M.build(ctx)
 
 		local modeSubmenu = {
 			{
-				title = "Action unique (x1)",
+				title = i18n.get("menu.gestures.mode_single"),
 				checked = (currentMode == "x1") or nil,
 				fn = function()
 					if type(gestures.set_mode) == "function" then pcall(gestures.set_mode, slot, "x1") end
@@ -179,7 +146,7 @@ function M.build(ctx)
 				end
 			},
 			{
-				title = "Envoi incrémental (distance)",
+				title = i18n.get("menu.gestures.mode_incremental"),
 				checked = (currentMode == "incremental") or nil,
 				fn = function()
 					if type(gestures.set_mode) == "function" then pcall(gestures.set_mode, slot, "incremental") end
@@ -190,14 +157,14 @@ function M.build(ctx)
 		}
 
 		local sensSubmenu = {
-			{ title = "Distance par action (Sensibilité) :", disabled = true },
-			{ title = "(Plus petit = Plus sensible/réactif)", disabled = true },
+			{ title = i18n.get("menu.gestures.sensitivity_label"), disabled = true },
+			{ title = i18n.get("menu.gestures.sensitivity_hint"),  disabled = true },
 			{ title = "-" },
 		}
 		local sensitivities = { 1.0, 1.5, 2.0, 2.5, 3.0, 3.5, 4.0, 4.5, 5.0, 6.0, 7.0, 8.0, 10.0, 12.0, 15.0, 20.0, 25.0, 30.0 }
 		for _, s in ipairs(sensitivities) do
 			local label = string.format("%.1f", s)
-			if s == 3.5 then label = label .. " (Défaut général)" end
+			if s == 3.5 then label = label .. " " .. i18n.get("menu.gestures.default_sensitivity") end
 
 			table.insert(sensSubmenu, {
 				title = label,
@@ -209,13 +176,16 @@ function M.build(ctx)
 			})
 		end
 
+		local mode_display = currentMode == "incremental"
+			and i18n.get("menu.gestures.mode_incremental")
+			or  i18n.get("menu.gestures.mode_single")
 		local finalSubmenu = {
-			{ title = "Action : " .. actionLbl, menu = actionsSubmenu },
+			{ title = i18n.get("menu.gestures.action_prefix") .. actionLbl, menu = actionsSubmenu },
 		}
-		
+
 		if slot:match("swipe") then
-			table.insert(finalSubmenu, { title = "Mode : " .. (currentMode == "incremental" and "Incrémental" or "Unique"), menu = modeSubmenu })
-			table.insert(finalSubmenu, { title = "Sensibilité : " .. string.format("%.1f", currentSens), menu = sensSubmenu, disabled = (currentMode ~= "incremental") or nil })
+			table.insert(finalSubmenu, { title = i18n.get("menu.gestures.mode_prefix") .. mode_display, menu = modeSubmenu })
+			table.insert(finalSubmenu, { title = i18n.get("menu.gestures.sensitivity_prefix") .. string.format("%.1f", currentSens), menu = sensSubmenu, disabled = (currentMode ~= "incremental") or nil })
 		end
 
 		return {
@@ -238,7 +208,7 @@ function M.build(ctx)
 
 	-- Quick-action buttons at the top, mirroring the karabiner menu pattern
 	table.insert(gm, {
-		title = "✕ Désactiver tous les gestes",
+		title = i18n.get("menu.gestures.disable_all"),
 		fn    = function()
 			local gestures_enabled = state.gestures == true
 			local all_slots = gestures_mod.SINGLE_SLOTS or {}
@@ -256,7 +226,7 @@ function M.build(ctx)
 		end,
 	})
 	table.insert(gm, {
-		title = "↩ Restaurer les valeurs par défaut",
+		title = i18n.get("menu.gestures.restore_defaults"),
 		fn    = function()
 			local defaults = gestures_mod.DEFAULT_GESTURES or {}
 			for slot, action in pairs(defaults) do
@@ -270,7 +240,7 @@ function M.build(ctx)
 
 	-- Global Settings
 	table.insert(gm, {
-		title = "Navigation circulaire des Spaces (1 ↔ N)",
+		title = i18n.get("menu.gestures.circular_spaces"),
 		checked = (type(gestures.get_space_wrap) == "function" and gestures.get_space_wrap()) or nil,
 		disabled = not state.gestures or paused or nil,
 		fn = function()

@@ -11,7 +11,20 @@ local hs            = hs
 local Logger        = require("lib.logger")
 local dialog        = require("lib.dialog_util")
 local notifications = require("lib.notifications")
+local i18n          = require("lib.i18n")
 local LOG           = "menu_hotstrings"
+
+--- Resolves a description value that may be a plain string or a multilingual table.
+--- Falls back to the "fr" locale, then to an empty string.
+--- @param desc string|table|nil The raw description field.
+--- @return string The resolved description.
+local function resolve_desc(desc)
+	if type(desc) == "table" then
+		local code = i18n.get_locale()
+		return desc[code] or desc["fr"] or ""
+	end
+	return type(desc) == "string" and desc or ""
+end
 
 local dh_mod = require("modules.dynamic_hotstrings")
 -- Keymap is already loaded by init.lua before this module is required;
@@ -159,12 +172,12 @@ local function buildPersonalInfoItems(ctx, description)
 					if type(ctx.personal_info.disable) == "function" then pcall(ctx.personal_info.disable) end 
 				end
 				ctx.save_prefs()
-				ctx.notify_feature(description or "Informations personnelles", ctx.state.personal_info)
+				ctx.notify_feature(description or i18n.get("notify.personal_info"), ctx.state.personal_info)
 				ctx.updateMenu()
 			end,
 		},
 		{
-			title = "   ↳ Modifier les informations…",
+			title = i18n.get("menu.hotstrings.edit_personal_info"),
 			fn    = function() hs.timer.doAfter(0.1, function() pcall(ctx.personal_info.open_editor) end) end,
 		},
 	}
@@ -172,8 +185,9 @@ end
 
 --- Builds the main hotstring groups menu.
 --- @param ctx table Context.
+--- @param only table|nil Optional set of group names to include (nil = all common groups).
 --- @return table
-function M.build_groups(ctx)
+function M.build_groups(ctx, only)
 	local top_names = {}
 	for _, f in ipairs(type(ctx.hotfiles) == "table" and ctx.hotfiles or {}) do
 		top_names[#top_names + 1] = ctx.get_group_name(f)
@@ -182,7 +196,8 @@ function M.build_groups(ctx)
 
 	local items = {}
 	for _, name in ipairs(top_names) do
-		if name == "custom" or name == "personal" then goto continue_group end
+		if name == "custom" or name == "personal" or name:sub(1, 13) == "personal_ext_" then goto continue_group end
+		if type(only) == "table" and not only[name] then goto continue_group end
 
 		local enabled  = groupEnabled(ctx, name)
 		local sections = ctx.keymap and type(ctx.keymap.get_sections) == "function" and ctx.keymap.get_sections(name) or nil
@@ -238,8 +253,7 @@ function M.build_groups(ctx)
 						local ms_entry = type(ms) == "table" and ms[sec.name]
 						local mod_id   = type(ms_entry) == "table" and ms_entry.mod_id or ms_entry
 						if mod_id == "personal_info" then
-							local desc = (type(ms_entry) == "table" and type(ms_entry.description) == "string")
-										 and ms_entry.description or sec.description or "Remplissage de formulaires"
+							local desc = resolve_desc((type(ms_entry) == "table" and ms_entry.description) or sec.description)
 							local pi_items = buildPersonalInfoItems(ctx, desc)
 							if pi_items then
 								for _, pi in ipairs(pi_items) do
@@ -249,8 +263,8 @@ function M.build_groups(ctx)
 						end
 					else
 						local sec_on = ctx.keymap and type(ctx.keymap.is_section_enabled) == "function" and ctx.keymap.is_section_enabled(name, sec.name) or false
-						local lbl    = (type(sec.description) == "string" and sec.description ~= "")
-									   and sec.description or tostring(sec.name):gsub("_", " ")
+						local lbl    = resolve_desc(sec.description) ~= "" and resolve_desc(sec.description)
+									   or tostring(sec.name):gsub("_", " ")
 						lbl = ctx.applyTriggerChar(lbl)
 						sec_menu[#sec_menu + 1] = {
 							title    = sec.count ~= nil and (lbl .. " (" .. fmt_count(sec.count) .. ")") or lbl,
@@ -317,19 +331,19 @@ function M.build_management(ctx)
 	local bubble_sub = {}
 
 	table.insert(bubble_sub, buildBubbleItem(ctx,
-		"Bulle ★ (touche magique)",
+		i18n.get("menu.hotstrings.tooltip_magic"),
 		"preview_star_enabled",
 		"set_preview_star_enabled",
 		"Bulle ★"))
 
 	table.insert(bubble_sub, buildBubbleItem(ctx,
-		"Bulle Autocorrection (espace)",
+		i18n.get("menu.hotstrings.tooltip_autocorrect"),
 		"preview_autocorrect_enabled",
 		"set_preview_autocorrect_enabled",
 		"Bulle Autocorrection"))
 
 	table.insert(bubble_sub, buildBubbleItem(ctx,
-		"Bulle Intelligence Artificielle",
+		i18n.get("menu.hotstrings.tooltip_ai"),
 		"preview_ai_enabled",
 		"set_preview_ai_enabled",
 		"Bulle IA"))
@@ -337,12 +351,12 @@ function M.build_management(ctx)
 	table.insert(bubble_sub, { title = "-" })
 
 	table.insert(bubble_sub, buildBubbleItem(ctx,
-		"Bulles colorées par catégorie",
+		i18n.get("menu.hotstrings.tooltip_colored"),
 		"preview_colored_tooltips",
 		"set_preview_colored_tooltips",
 		"Bulles colorées"))
 
-	bubble_item = { title = "Bulles de prévisualisation", disabled = paused or nil, menu = bubble_sub }
+	bubble_item = { title = i18n.get("menu.hotstrings.preview_bubbles"), disabled = paused or nil, menu = bubble_sub }
 
 	local defs    = ctx.keymap and type(ctx.keymap.get_terminator_defs) == "function" and ctx.keymap.get_terminator_defs() or {}
 	local exp_sub = {}
@@ -359,7 +373,7 @@ function M.build_management(ctx)
 				lbl = lbl:gsub("Guillemets fermants", "Guillemet fermant")
 				lbl = lbl:gsub("tiret bas", "underscore")
 				lbl = lbl:gsub("Tiret bas", "Underscore")
-				if def.consume then lbl = lbl .. " (consommé)" end
+				if def.consume then lbl = lbl .. " " .. i18n.get("menu.hotstrings.consumed_suffix") end
 
 				exp_sub[#exp_sub + 1] = {
 					title    = ctx.applyTriggerChar(lbl),
@@ -375,7 +389,7 @@ function M.build_management(ctx)
 						end
 						state.terminator_states[k] = nv
 						ctx.save_prefs()
-						ctx.notify_feature("Expanseur de mots : " .. ctx.applyTriggerChar(l), nv)
+						ctx.notify_feature(string.format(i18n.get("notify.word_expander_prefix"), ctx.applyTriggerChar(l)), nv)
 						ctx.updateMenu()
 					end end)(def.key, lbl) or nil,
 				}
@@ -389,20 +403,20 @@ function M.build_management(ctx)
 	for _, ct in ipairs(type(state.custom_terminators) == "table" and state.custom_terminators or {}) do
 		if type(ct) ~= "table" or type(ct.char) ~= "string" or ct.char == "" then goto continue_ct end
 		local enabled_t = ctx.keymap and type(ctx.keymap.is_terminator_enabled) == "function" and ctx.keymap.is_terminator_enabled(ct.key) or false
-		local consume_sfx = ct.consume and " (consommé)" or ""
-		local ct_lbl = ct.char .. " : Personnalisé" .. consume_sfx
+		local consume_sfx = ct.consume and (" (" .. i18n.get("menu.hotstrings.consumed") .. ")") or ""
+		local ct_lbl = ct.char .. " : " .. i18n.get("menu.hotstrings.custom_label") .. consume_sfx
 
 		local ct_sub = {
 			{
-				title    = "Supprimer cet expanseur…",
+				title    = i18n.get("menu.hotstrings.delete_expander"),
 				disabled = paused or nil,
 				fn       = not paused and (function(k) return function()
 					local res = dialog.block_alert(
-						"Supprimer l’expanseur",
-						"Êtes-vous sûr de vouloir supprimer cet expanseur personnalisé ?",
-						"Supprimer", "Annuler"
+						i18n.get("dialog.hotstrings.delete_title"),
+						i18n.get("dialog.hotstrings.delete_body"),
+						i18n.get("button.delete"), i18n.get("button.cancel")
 					)
-					if res ~= "Supprimer" then return end
+					if res ~= i18n.get("button.delete") then return end
 					if ctx.keymap and type(ctx.keymap.remove_custom_terminator) == "function" then
 						pcall(ctx.keymap.remove_custom_terminator, k)
 					end
@@ -428,16 +442,16 @@ function M.build_management(ctx)
 	end
 
 	exp_sub[#exp_sub + 1] = {
-		title    = "+ Ajouter un expanseur personnalisé…",
+		title    = i18n.get("menu.hotstrings.add_custom"),
 		disabled = paused or nil,
 		fn       = not paused and function()
 			-- 1. Ask for the trigger character (loop until exactly one character is entered)
 			local char
 			while true do
 				local ok_p, btn, char_raw = pcall(dialog.text_prompt,
-					"Nouvel expanseur de mots",
-					"Saisissez le caractère déclencheur (un seul caractère) :",
-					"", "OK", "Annuler"
+					i18n.get("dialog.hotstrings.new_title"),
+					i18n.get("dialog.hotstrings.new_prompt"),
+					"", i18n.get("button.ok"), i18n.get("button.cancel")
 				)
 				if not ok_p or btn ~= "OK" or type(char_raw) ~= "string" then return end
 				-- Extract first UTF-8 character and check nothing follows
@@ -446,17 +460,17 @@ function M.build_management(ctx)
 					char = first
 					break
 				end
-				dialog.block_alert("Saisie invalide", "Veuillez saisir exactement un seul caractère.", "Réessayer")
+				dialog.block_alert(i18n.get("dialog.hotstrings.invalid_title"), i18n.get("dialog.hotstrings.invalid_body"), i18n.get("button.retry"))
 			end
 
 			-- 2. Ask consume behaviour (default: non consommé)
 			local consume_res = dialog.block_alert(
-				"Comportement du déclencheur",
-				"Voulez-vous que le caractère soit consommé (non tapé) lors de l’expansion ?",
-				"Non — taper le caractère", "Oui — consommer", "Annuler"
+				i18n.get("dialog.hotstrings.consume_title"),
+				i18n.get("dialog.hotstrings.consume_body"),
+				i18n.get("dialog.hotstrings.consume_no"), i18n.get("dialog.hotstrings.consume_yes"), i18n.get("button.cancel")
 			)
-			if consume_res == "Annuler" then return end
-			local consume = (consume_res == "Oui — consommer")
+			if consume_res == i18n.get("button.cancel") then return end
+			local consume = (consume_res == i18n.get("dialog.hotstrings.consume_yes"))
 
 			-- 3. Generate a unique key
 			local existing_keys = {}
@@ -488,33 +502,33 @@ function M.build_management(ctx)
 		end or nil,
 	}
 
-	exp_item = { title = "Expanseurs de mots", disabled = paused or nil, menu = exp_sub }
+	exp_item = { title = i18n.get("menu.hotstrings.word_expanders"), disabled = paused or nil, menu = exp_sub }
 
 	local delay_menu = {}
 	local function make_delay_item(title, key, default_val, is_base)
 		if type(default_val) ~= "number" then
 			Logger.error(LOG, "make_delay_item(): default_val nil for '%s' — keymap.DELAYS_DEFAULT may be outdated.", title)
-			return { title = title .. " : (valeur manquante)", disabled = true }
+			return { title = title .. " : " .. i18n.get("menu.hotstrings.missing_value"), disabled = true }
 		end
 		local cur_val = is_base and state.expansion_delay or (state.delays[key] or default_val)
 		local cur_ms = math.floor(cur_val * 1000 + 0.5)
 		local def_ms = math.floor(default_val * 1000 + 0.5)
-		local display_ms = (cur_ms == 0) and "Infini (0)" or (cur_ms .. " ms")
+		local display_ms = (cur_ms == 0) and i18n.get("menu.hotstrings.infinite") or (cur_ms .. " ms")
 		
 		return {
-			title    = title .. " : " .. display_ms .. (cur_ms == def_ms and " (défaut)" or ""),
+			title    = title .. " : " .. display_ms .. (cur_ms == def_ms and (" " .. i18n.get("menu.hotstrings.default_indicator")) or ""),
 			disabled = paused or nil,
 			fn       = not paused and function()
 				local ok_p, btn, raw = pcall(dialog.text_prompt,
 					title,
-					"Entrez le délai en millisecondes (entier ≥ 0).\nMettez 0 pour un délai infini (aucune limite de temps) :",
+					i18n.get("menu.hotstrings.delay_prompt"),
 					tostring(cur_ms), "OK", "Annuler"
 				)
 				if not ok_p or btn ~= "OK" then return end
-				
+
 				local val = tonumber(raw)
 				if not val or val < 0 or val ~= math.floor(val) then
-					pcall(notifications.notify, "Délai invalide", "Veuillez saisir un entier ≥ 0.", "error")
+					pcall(notifications.notify, i18n.get("menu.hotstrings.delay_invalid_title"), i18n.get("menu.hotstrings.delay_invalid_body"), "error")
 					return
 				end
 				
@@ -551,7 +565,7 @@ function M.build_management(ctx)
 	-- that do not have a TOML counterpart (llm_prediction, dynamichotstrings)
 	-- and the global baseline keep their per-prompt menu items as quick access.
 	table.insert(delay_menu, {
-		title    = "Délais et couleurs des hotstrings…",
+		title    = i18n.get("menu.hotstrings.config_item"),
 		disabled = paused or nil,
 		fn       = not paused and function()
 			local ok, win = pcall(require, "ui.hotstrings_config_window")
@@ -560,22 +574,22 @@ function M.build_management(ctx)
 	})
 	table.insert(delay_menu, { title = "-" })
 	if def_delays then
-		table.insert(delay_menu, make_delay_item("Intelligence Artificielle (Acceptation)", "llm_prediction", def_delays.llm_prediction, false))
-		table.insert(delay_menu, make_delay_item("Auto-complétions (ex: numéros)", "dynamichotstrings", def_delays.dynamichotstrings, false))
+		table.insert(delay_menu, make_delay_item(i18n.get("menu.hotstrings.tooltip_ai_acceptance"), "llm_prediction", def_delays.llm_prediction, false))
+		table.insert(delay_menu, make_delay_item(i18n.get("menu.hotstrings.tooltip_autocompletion"), "dynamichotstrings", def_delays.dynamichotstrings, false))
 	end
 	if def_base then
-		table.insert(delay_menu, make_delay_item("Défaut (autres catégories)", nil, def_base, true))
+		table.insert(delay_menu, make_delay_item(i18n.get("menu.hotstrings.tooltip_default"), nil, def_base, true))
 	end
 
-	delays_item = { title = "Délais d’expansion", disabled = paused or nil, menu = delay_menu }
+	delays_item = { title = i18n.get("menu.hotstrings.delays_colors"), disabled = paused or nil, menu = delay_menu }
 
 	magic_item = {
-		title    = "Touche magique : " .. state.trigger_char,
+		title    = i18n.get("menu.hotstrings.magic_key_item_prefix") .. state.trigger_char,
 		disabled = paused or nil,
 		fn       = not paused and function()
 			local ok_p, btn, raw = pcall(dialog.text_prompt,
-				"Touche magique",
-				"Entrez le caractère à utiliser pour remplacer le ★ :",
+				i18n.get("menu.hotstrings.magic_key_title"),
+				i18n.get("menu.hotstrings.magic_key_prompt"),
 				state.trigger_char, "OK", "Annuler"
 			)
 			if ok_p and btn == "OK" and type(raw) == "string" and raw ~= "" then
@@ -597,7 +611,7 @@ function M.build_management(ctx)
 	
 	if state.trigger_char ~= "★" then
 		magic_reset_item = {
-			title    = "   ↳ Réinitialiser (défaut : ★)",
+			title    = i18n.get("menu.hotstrings.reset_magic_key"),
 			disabled = paused or nil,
 			fn       = not paused and function()
 				state.trigger_char = "★"
@@ -614,31 +628,58 @@ function M.build_management(ctx)
 	table.insert(menu, { title = "-" })
 	if bubble_item then table.insert(menu, bubble_item) end
 
-	return { title = "⚙️ Paramètres hotstrings", menu = menu }
+	return { title = i18n.get("menu.hotstrings.params"), menu = menu }
+end
+
+--- Returns the list of personal extension group names present in hotfiles,
+--- sorted alphabetically (excludes "personal" itself and "custom").
+--- @param ctx table Context.
+--- @return table List of group name strings.
+local function get_personal_ext_groups(ctx)
+	local ext = {}
+	for _, f in ipairs(type(ctx.hotfiles) == "table" and ctx.hotfiles or {}) do
+		local name = ctx.get_group_name(f)
+		if name:sub(1, 13) == "personal_ext_" then
+			table.insert(ext, name)
+		end
+	end
+	table.sort(ext)
+	return ext
 end
 
 --- Builds the unified personal hotstrings menu (personal_hotstrings.toml sections +
---- custom/dynamic hotstrings), with editor button, shortcut, and per-section
---- toggles and counts for both groups.
+--- extension TOMLs from the hotstrings/ folder + custom/dynamic hotstrings),
+--- with editor button, shortcut, and per-section toggles and counts for all groups.
 --- @param ctx table Context.
 --- @return table|nil
 function M.build_custom(ctx)
 	local state  = ctx.state
 	local paused = ctx.paused
 
-	-- Both groups contribute sections to this single menu entry
-	local personal_enabled = groupEnabled(ctx, "personal")
 	local custom_enabled   = groupEnabled(ctx, "custom")
-	local personal_secs    = ctx.keymap and type(ctx.keymap.get_sections) == "function" and ctx.keymap.get_sections("personal") or nil
-	local custom_secs      = ctx.keymap and type(ctx.keymap.get_sections) == "function" and ctx.keymap.get_sections("custom")   or nil
+	local custom_secs      = ctx.keymap and type(ctx.keymap.get_sections) == "function" and ctx.keymap.get_sections("custom") or nil
 
-	-- personal_hotstrings.toml group present in hotfiles?
+	-- Collect all personal groups: "personal" first, then extension groups alphabetically
+	local personal_group_names = {}
 	local has_personal = false
 	for _, f in ipairs(type(ctx.hotfiles) == "table" and ctx.hotfiles or {}) do
 		if ctx.get_group_name(f) == "personal" then has_personal = true; break end
 	end
+	if has_personal then table.insert(personal_group_names, "personal") end
+	for _, ext_name in ipairs(get_personal_ext_groups(ctx)) do
+		table.insert(personal_group_names, ext_name)
+	end
 
-	-- Total count across both groups (all sections, enabled or not, for display)
+	-- Gather all sections across all personal groups
+	local all_personal_secs_by_group = {}
+	for _, gname in ipairs(personal_group_names) do
+		local secs = ctx.keymap and type(ctx.keymap.get_sections) == "function" and ctx.keymap.get_sections(gname) or nil
+		all_personal_secs_by_group[gname] = secs
+	end
+	-- Keep the personal group's sections for the default-section picker (personal only)
+	local personal_secs = all_personal_secs_by_group["personal"]
+
+	-- Total count across all personal groups + custom (for the top-level title)
 	local total_count, has_count = 0, false
 	local function add_counts(secs)
 		if type(secs) ~= "table" then return end
@@ -650,10 +691,13 @@ function M.build_custom(ctx)
 			end
 		end
 	end
-	add_counts(personal_secs)
+	for _, gname in ipairs(personal_group_names) do
+		add_counts(all_personal_secs_by_group[gname])
+	end
 	add_counts(custom_secs)
 
-	local base_title = "Hotstrings personnels"
+	-- Strip leading "— " section marker for use as a plain notification label
+	local base_title = (i18n.get("menu.hotstrings.personal_header"):gsub("^— ", ""))
 	local title_str  = has_count
 		and (base_title .. " (" .. fmt_count(total_count) .. ")")
 		or  base_title
@@ -677,9 +721,9 @@ function M.build_custom(ctx)
 
 	local function sc_label()
 		local sc = state.custom_editor_shortcut
-		if not sc or sc == false then return "Aucun" end
+		if not sc or sc == false then return i18n.get("menu.hotstrings.shortcut_none") end
 		if sc_is_default(sc) then
-			return "Ctrl + " .. state.trigger_char .. " (défaut)"
+			return string.format(i18n.get("menu.hotstrings.shortcut_default_ctrl"), state.trigger_char)
 		end
 		local mods_str = table.concat(sc.mods or {}, "+")
 		return mods_str ~= "" and (mods_str .. " + " .. (sc.key or "?"):upper())
@@ -706,8 +750,7 @@ function M.build_custom(ctx)
 		end
 		local ok_p, btn, raw = pcall(dialog.text_prompt,
 			"Raccourci personnalisé",
-			"Format : mods+touche  (ex : cmd+alt+p  ou  ctrl+shift+e)\n"
-				.. "Mods disponibles : cmd, alt, ctrl, shift\nLaisser vide pour désactiver",
+			i18n.get("menu.hotstrings.shortcut_prompt"),
 			current_str, "OK", "Annuler"
 		)
 		if not ok_p or btn ~= "OK" or type(raw) ~= "string" then return end
@@ -729,12 +772,12 @@ function M.build_custom(ctx)
 
 	-- Build the default-section sub-menu: "Aucune" first, then one item per personal section
 	local function default_section_label()
-		if not state.custom_default_section then return "Aucune" end
+		if not state.custom_default_section then return i18n.get("menu.hotstrings.no_default_section") end
 		if type(personal_secs) == "table" then
 			for _, sec in ipairs(personal_secs) do
 				if type(sec) == "table" and sec.name == state.custom_default_section then
-					local lbl = (type(sec.description) == "string" and sec.description ~= "")
-						and sec.description or tostring(sec.name):gsub("_", " ")
+					local lbl = resolve_desc(sec.description) ~= "" and resolve_desc(sec.description)
+						or tostring(sec.name):gsub("_", " ")
 					return ctx.applyTriggerChar(lbl)
 				end
 			end
@@ -743,7 +786,7 @@ function M.build_custom(ctx)
 	end
 
 	local cat_menu = { {
-		title   = "Aucune",
+		title   = i18n.get("menu.hotstrings.no_default_section"),
 		checked = (not state.custom_default_section) or nil,
 		fn      = function()
 			state.custom_default_section = nil
@@ -833,7 +876,7 @@ function M.build_custom(ctx)
 
 	local menu_items = {
 		{
-			title    = "Ouvrir l’éditeur de hotstrings",
+			title    = i18n.get("menu.hotstrings.open_editor"),
 			disabled = paused or nil,
 			fn       = not paused and function()
 				hs.timer.doAfter(0, function() pcall(ctx.hotstring_editor.open) end)
@@ -841,16 +884,16 @@ function M.build_custom(ctx)
 		},
 		{
 			-- Clicking this item directly opens the shortcut customisation dialog
-			title    = "Raccourci : " .. sc_label(),
+			title    = i18n.get("menu.hotstrings.shortcut_prefix") .. sc_label(),
 			disabled = paused or nil,
 			fn       = not paused and sc_fn or nil,
 		},
 		{
-			title = "Catégorie par défaut : " .. default_section_label(),
+			title = i18n.get("menu.hotstrings.default_category_prefix") .. default_section_label(),
 			menu  = cat_menu,
 		},
 		{
-			title    = "Fermer l’UI après ajout d’un hotstring par le raccourci",
+			title    = i18n.get("menu.hotstrings.close_on_add"),
 			checked  = state.custom_close_on_add or nil,
 			fn       = not paused and function()
 				state.custom_close_on_add = not state.custom_close_on_add
@@ -863,13 +906,15 @@ function M.build_custom(ctx)
 		},
 	}
 
-	-- personal_hotstrings.toml sections (group "personal")
-	if has_personal then
-		local personal_rows = {}
-		append_section_rows(personal_rows, "personal", personal_secs, personal_enabled)
-		if #personal_rows > 0 then
+	-- All personal groups in order: personal first, then extensions alphabetically
+	for _, gname in ipairs(personal_group_names) do
+		local g_enabled = groupEnabled(ctx, gname)
+		local g_secs    = all_personal_secs_by_group[gname]
+		local g_rows    = {}
+		append_section_rows(g_rows, gname, g_secs, g_enabled)
+		if #g_rows > 0 then
 			table.insert(menu_items, { title = "-" })
-			for _, row in ipairs(personal_rows) do table.insert(menu_items, row) end
+			for _, row in ipairs(g_rows) do table.insert(menu_items, row) end
 		end
 	end
 
@@ -881,20 +926,24 @@ function M.build_custom(ctx)
 		for _, row in ipairs(custom_rows) do table.insert(menu_items, row) end
 	end
 
-	-- Both groups toggle together when the user clicks the top-level item
-	local both_enabled = personal_enabled and custom_enabled
+	-- All groups toggle together when the user clicks the top-level item
+	local all_personal_enabled = true
+	for _, gname in ipairs(personal_group_names) do
+		if not groupEnabled(ctx, gname) then all_personal_enabled = false; break end
+	end
+	local both_enabled = all_personal_enabled and custom_enabled
 	return {
 		title   = title_str,
 		checked = (both_enabled and not paused) or nil,
 		fn      = function()
 			local will_enable = not both_enabled
-			-- Toggle personal group
-			if has_personal then
-				state.hotstrings["personal"] = will_enable
+			-- Toggle all personal groups
+			for _, gname in ipairs(personal_group_names) do
+				state.hotstrings[gname] = will_enable
 				if will_enable then
-					if ctx.keymap and type(ctx.keymap.enable_group) == "function" then pcall(ctx.keymap.enable_group, "personal") end
+					if ctx.keymap and type(ctx.keymap.enable_group) == "function" then pcall(ctx.keymap.enable_group, gname) end
 				else
-					if ctx.keymap and type(ctx.keymap.disable_group) == "function" then pcall(ctx.keymap.disable_group, "personal") end
+					if ctx.keymap and type(ctx.keymap.disable_group) == "function" then pcall(ctx.keymap.disable_group, gname) end
 				end
 			end
 			-- Toggle custom group

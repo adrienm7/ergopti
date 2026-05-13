@@ -25,6 +25,7 @@ local hs               = hs
 local ui_builder       = require("ui.ui_builder")
 local Logger           = require("lib.logger")
 local hotstrings_config = require("modules.hotstrings_config")
+local i18n             = require("lib.i18n")
 
 local LOG = "hotstrings_config_window"
 
@@ -54,26 +55,26 @@ local CATEGORY_ORDER = {
 -- Friendly labels for each category. Falls back to the TOML's [_meta]
 -- description when this table has no entry for a given key.
 local CATEGORY_LABELS = {
-	magickey           = "Touche ★ et expansion",
-	autocorrection     = "Autocorrection",
-	rolls              = "Roulements",
-	sfbsreduction      = "Réduction des SFBs",
-	distancesreduction = "Réduction des distances",
-	personal           = "Hotstrings personnels",
+	magickey           = i18n.get("hs_config.cat_magickey"),
+	autocorrection     = i18n.get("hs_config.cat_autocorrection"),
+	rolls              = i18n.get("hs_config.cat_rolls"),
+	sfbsreduction      = i18n.get("hs_config.cat_sfbs"),
+	distancesreduction = i18n.get("hs_config.cat_distances"),
+	personal           = i18n.get("hs_config.cat_personal"),
 }
 
 -- Color palette offered in the "couleur" dropdown. The first six values
 -- mirror the bootstrap defaults shipped in the category TOMLs so a user
 -- who wandered too far can recover the original look in one click.
 local COLOR_PRESETS = {
-	{ label = "Rouge (★)",      hex = "#e53935" },
-	{ label = "Vert (auto)",    hex = "#43a047" },
-	{ label = "Orange (rolls)", hex = "#fb8c00" },
-	{ label = "Bleu (perso)",   hex = "#1e88e5" },
-	{ label = "Violet",         hex = "#8e44ad" },
-	{ label = "Cyan",           hex = "#00838f" },
-	{ label = "Jaune",          hex = "#fdd835" },
-	{ label = "Gris",           hex = "#6e6e73" },
+	{ label = i18n.get("hs_config.color_red"),    hex = "#e53935" },
+	{ label = i18n.get("hs_config.color_green"),  hex = "#43a047" },
+	{ label = i18n.get("hs_config.color_orange"), hex = "#fb8c00" },
+	{ label = i18n.get("hs_config.color_blue"),   hex = "#1e88e5" },
+	{ label = i18n.get("hs_config.color_purple"), hex = "#8e44ad" },
+	{ label = i18n.get("hs_config.color_cyan"),   hex = "#00838f" },
+	{ label = i18n.get("hs_config.color_yellow"), hex = "#fdd835" },
+	{ label = i18n.get("hs_config.color_gray"),   hex = "#6e6e73" },
 }
 
 
@@ -215,7 +216,7 @@ function M.open()
 
 	_webview = ui_builder.show_webview({
 		frame        = ui_builder.get_centered_frame(WINDOW_WIDTH, WINDOW_HEIGHT),
-		title        = "Délais et couleurs des hotstrings",
+		title        = i18n.get("hs_config.window_title"),
 		style_masks  = { "titled", "closable", "resizable", "utility" },
 		usercontent  = _usercontent,
 		assets_dir   = ASSETS_DIR,

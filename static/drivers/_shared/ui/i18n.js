@@ -1,0 +1,100 @@
+// drivers/_shared/ui/i18n.js
+
+// ==============================================================================
+// MODULE: HTML i18n loader
+// DESCRIPTION:
+// Minimal browser-side i18n system for the metrics webviews. Reads the active
+// locale from window._i18n_locale (injected by the backend before this script
+// runs, or "fr" as fallback), fetches the matching JSON file from the shared
+// static/locales/ directory, then applies translations to every DOM element
+// that carries a data-i18n="key" attribute. Also handles data-i18n-title and
+// data-i18n-placeholder for non-text-content attributes.
+//
+// FEATURES & RATIONALE:
+// 1. Zero dependencies — plain fetch + DOM traversal, no library needed.
+// 2. Self-contained — the backend does not need to push strings; the page
+//    fetches the JSON itself using a path resolved relative to this script.
+// 3. Graceful fallback — if the fetch fails or a key is missing, elements
+//    remain empty (textContent was cleared when data-i18n was added).
+// 4. Global store — strings are saved in window._i18n_strings so page scripts
+//    can call _t(key) for dynamic content not reachable via DOM attributes.
+// 5. Attribute variants:
+//    - data-i18n="key"             → element.textContent
+//    - data-i18n-title="key"       → element.title
+//    - data-i18n-placeholder="key" → element.placeholder (inputs)
+//    - data-i18n-option-prefix     → marks a <select> whose <option> values
+//                                    follow the pattern "key_prefix.<value>"
+// ==============================================================================
+
+(function () {
+	"use strict";
+
+	// Resolve the path to static/locales/<code>.json relative to this script's
+	// own URL. Works regardless of how many levels deep the calling page sits.
+	function resolve_locale_url(code) {
+		if (window.__i18n_base) return window.__i18n_base + code + ".json";
+		// currentScript is set while the <script> tag is being parsed.
+		// Walk up from i18n.js location to find static/locales/.
+		var src = document.currentScript ? document.currentScript.src : null;
+		if (src) {
+			// i18n.js lives at static/drivers/_shared/ui/i18n.js
+			// static/locales/ is two dirs above _shared/ui/
+			var base = src.replace(/[^/]+$/, "../../locales/");
+			return base + code + ".json";
+		}
+		// Fallback: walk up two levels from the page URL (legacy path)
+		var parts = location.href.split("/");
+		var base_parts = parts.slice(0, parts.length - 2);
+		return base_parts.join("/") + "/locales/" + code + ".json";
+	}
+
+	function apply(strings) {
+		// Store globally so page scripts can call _t(key) for dynamic content
+		window._i18n_strings = strings;
+
+		// data-i18n → textContent
+		document.querySelectorAll("[data-i18n]").forEach(function (el) {
+			var key = el.getAttribute("data-i18n");
+			if (strings[key] !== undefined) el.textContent = strings[key];
+		});
+		// data-i18n-title → title attribute
+		document.querySelectorAll("[data-i18n-title]").forEach(function (el) {
+			var key = el.getAttribute("data-i18n-title");
+			if (strings[key] !== undefined) el.title = strings[key];
+		});
+		// data-i18n-placeholder → placeholder attribute
+		document.querySelectorAll("[data-i18n-placeholder]").forEach(function (el) {
+			var key = el.getAttribute("data-i18n-placeholder");
+			if (strings[key] !== undefined) el.placeholder = strings[key];
+		});
+		// data-i18n-option-prefix → each <option> value mapped to key_prefix.value
+		document.querySelectorAll("select[data-i18n-option-prefix]").forEach(function (sel) {
+			var prefix = sel.getAttribute("data-i18n-option-prefix");
+			sel.querySelectorAll("option").forEach(function (opt) {
+				var key = prefix + "." + opt.value;
+				if (strings[key] !== undefined) opt.textContent = strings[key];
+			});
+		});
+	}
+
+	function load() {
+		var code = window._i18n_locale || "fr";
+		var url = resolve_locale_url(code);
+
+		fetch(url)
+			.then(function (r) { return r.ok ? r.json() : null; })
+			.then(function (strings) {
+				if (strings) apply(strings);
+			})
+			.catch(function (err) {
+				console.warn("[i18n] Could not load locale '" + code + "':", err);
+			});
+	}
+
+	// Run after DOM is ready
+	if (document.readyState === "loading") {
+		document.addEventListener("DOMContentLoaded", load);
+	} else {
+		load();
+	}
+})();

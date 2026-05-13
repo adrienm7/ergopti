@@ -24,6 +24,7 @@ local M = {}
 local hs            = hs
 local Logger        = require("lib.logger")
 local notifications = require("lib.notifications")
+local i18n          = require("lib.i18n")
 local LOG           = "menu.keyboard_layout"
 
 
@@ -277,7 +278,7 @@ local function install_user(bundles_dir, bundle_name)
 	local out, ok = hs.execute(cmd)
 	if ok then
 		Logger.success(LOG, "User install done — %s.", bundle_name)
-		pcall(notifications.notify, "Ergopti installé pour l'utilisateur.", nil, "success")
+		pcall(notifications.notify, i18n.get("menu.layout.installed_user"), nil, "success")
 		return true
 	end
 	Logger.error(LOG, "User install failed: %s.", tostring(out))
@@ -310,7 +311,7 @@ local function install_system(bundles_dir, bundle_name)
 	end
 	if ok then
 		Logger.success(LOG, "System install done — %s.", bundle_name)
-		pcall(notifications.notify, "Ergopti installé pour le système.", nil, "success")
+		pcall(notifications.notify, i18n.get("menu.layout.installed_system"), nil, "success")
 		return true
 	end
 	Logger.error(LOG, "System install failed (sudo cancelled or copy error).")
@@ -929,7 +930,7 @@ local function build_install_item(scope_label, emoji_install, installed, latest_
 	if installed and not version_gt(latest_ver, installed.version) then
 		-- Latest already installed — nothing to do
 		return {
-			title    = string.format("Ergopti (%s) v%s installé ✅", scope_label, latest_str),
+			title    = string.format(i18n.get("menu.layout.installed_version"), scope_label, latest_str),
 			disabled = true,
 		}
 	end
@@ -937,12 +938,12 @@ local function build_install_item(scope_label, emoji_install, installed, latest_
 		-- An older version is on disk; offer an in-place upgrade
 		local old_str = version_str(installed.version)
 		return {
-			title = string.format("📥 Mettre à jour Ergopti (%s) — v%s → v%s", scope_label, old_str, latest_str),
+			title = string.format(i18n.get("menu.layout.update_version"), scope_label, old_str, latest_str),
 			fn    = do_install,
 		}
 	end
 	return {
-		title = string.format("%s Installer Ergopti (%s) — v%s", emoji_install, scope_label, latest_str),
+		title = string.format(i18n.get("menu.layout.install_version"), emoji_install, scope_label, latest_str),
 		fn    = do_install,
 	}
 end
@@ -961,7 +962,7 @@ function M.build(ctx)
 	-- internal services (PressAndHold, CharacterPalette, …).
 	local records    = list_active_keyboard_layouts()
 	-- Build the active-Ergopti set directly from records — the same source used
-	-- to display the "Dispositions actives" list below. If an entry appears there
+	-- to display the i18n.get("menu.layout.active_layouts") list below. If an entry appears there
 	-- it is truly active; no need to read HIToolbox separately.
 	--
 	-- records[i].id is the KeyboardLayout Name from HIToolbox (e.g. "Ergopti_v2_2_2_plus"),
@@ -1055,7 +1056,7 @@ function M.build(ctx)
 	if all_variants_active and installed_ver then
 		-- 1. All variants already in list and up to date
 		submenu[#submenu + 1] = {
-			title    = string.format("Ergopti v%s dans la liste des dispositions ✅", version_str(installed_ver)),
+			title    = string.format(i18n.get("menu.layout.in_list"), version_str(installed_ver)),
 			disabled = true,
 		}
 	elseif #legacy_active > 0 and latest ~= nil and not latest_installed_anywhere then
@@ -1064,7 +1065,7 @@ function M.build(ctx)
 		local _m = (legacy_active[1] or ""):match("_v(%d+_%d+_%d+)")
 		local old_str = _m and _m:gsub("_", ".") or "?"
 		submenu[#submenu + 1] = {
-			title    = string.format("Mettre à jour la liste — installer Ergopti v%s d’abord (v%s actif)",
+			title    = string.format(i18n.get("menu.layout.update_list_install_first"),
 				latest_str, old_str),
 			disabled = true,
 		}
@@ -1073,7 +1074,7 @@ function M.build(ctx)
 		local _m = (legacy_active[1] or ""):match("_v(%d+_%d+_%d+)")
 		local old_str = _m and _m:gsub("_", ".") or "?"
 		submenu[#submenu + 1] = {
-			title = string.format("📥 Mettre à jour Ergopti dans la liste — v%s → v%s", old_str, latest_str),
+			title = string.format(i18n.get("menu.layout.update_list"), old_str, latest_str),
 			fn    = function()
 				defer_tis_call(function()
 					local ok = upgrade_active_list(legacy_active)
@@ -1129,13 +1130,13 @@ function M.build(ctx)
 			end
 		end
 		submenu[#submenu + 1] = {
-			title = string.format("➕ Ajouter Ergopti v%s à la liste des dispositions", latest_str),
+			title = string.format(i18n.get("menu.layout.add_to_list"), latest_str),
 			menu  = add_sub,
 		}
 	else
 		-- 5. Absent and bundle missing — greyed
 		submenu[#submenu + 1] = {
-			title    = "Installation préalable d’Ergopti nécessaire avant de pouvoir l’ajouter à la liste",
+			title    = i18n.get("menu.layout.install_first"),
 			disabled = true,
 		}
 	end
@@ -1158,12 +1159,12 @@ function M.build(ctx)
 		if type(update_menu) == "function" then pcall(update_menu) end
 	end
 	submenu[#submenu + 1] = {
-		title   = "🌟 Logo par défaut",
+		title   = i18n.get("menu.layout.logo_default"),
 		checked = current_variant == "simple",
 		fn      = function() set_variant("simple") end,
 	}
 	submenu[#submenu + 1] = {
-		title   = "🎨 Logo distinct de l’icône de la disposition",
+		title   = i18n.get("menu.layout.logo_custom"),
 		checked = current_variant == "complex",
 		fn      = function() set_variant("complex") end,
 	}
@@ -1198,7 +1199,7 @@ function M.build(ctx)
 	submenu[#submenu + 1] = { title = "Dispositions actives", disabled = true }
 	if #records == 0 then
 		submenu[#submenu + 1] = {
-			title = "Ouvrir Préférences Système → Clavier",
+			title = i18n.get("menu.layout.open_prefs"),
 			fn    = function() pcall(hs.execute, "open '" .. KEYBOARD_PREFS_URL .. "'") end,
 		}
 	else

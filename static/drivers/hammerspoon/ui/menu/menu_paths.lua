@@ -22,6 +22,7 @@
 local M = {}
 local hs     = hs
 local Logger = require("lib.logger")
+local i18n   = require("lib.i18n")
 local LOG    = "menu_paths"
 
 -- Bootstrap file lives next to init.lua (gitignored).
@@ -245,15 +246,37 @@ function M.is_initialized()
 end
 
 --- Returns the resolved path for a well-known personal file.
+--- Returns the absolute path to the user's personal hotstrings folder.
+--- The folder is auto-created on first access so callers need not guard ENOENT.
+--- @return string Absolute path with trailing slash.
+local function personal_hotstrings_dir()
+	local d = config_dir()
+	if not d:match("[/\\]$") then d = d .. "/" end
+	local p = d .. "hotstrings/"
+	ensure_dir(p)
+	-- Bootstrap an empty personal_hotstrings.toml on first use so the user
+	-- always has a file to open rather than a confusing ENOENT.
+	local toml_path = p .. "personal_hotstrings.toml"
+	local existing  = io.open(toml_path, "r")
+	if not existing then
+		local fh = io.open(toml_path, "w")
+		if fh then fh:write("") fh:close() end
+	else
+		existing:close()
+	end
+	return p
+end
+
 --- Callers use named constants rather than bare filenames.
 --- @param key string One of: "PersonalTomlPath", "PersonalInfoTomlPath",
----   "HotstringsDirPath", "ConfigTomlPath", "KarabinerConfigPath".
+---   "HotstringsDirPath", "PersonalHotstringsDir", "ConfigTomlPath", "KarabinerConfigPath".
 --- @return string The resolved absolute path.
 function M.get(key)
 	-- Shared at the root of config_dir (both drivers may read these):
-	if key == "PersonalTomlPath"     then return file_in_config("personal_hotstrings.toml") end
-	if key == "PersonalInfoTomlPath" then return file_in_config("personal_info.toml")       end
-	if key == "HotstringsDirPath"    then return config_dir()                               end
+	if key == "PersonalTomlPath"     then return personal_hotstrings_dir() .. "personal_hotstrings.toml" end
+	if key == "PersonalInfoTomlPath" then return file_in_config("personal_info.toml")                   end
+	if key == "HotstringsDirPath"    then return config_dir()                                           end
+	if key == "PersonalHotstringsDir" then return personal_hotstrings_dir()                             end
 	-- Hammerspoon-specific (under <config_dir>/hammerspoon/):
 	if key == "ConfigTomlPath"           then return file_in_driver_subdir("config.toml")              end
 	if key == "KarabinerConfigPath"      then return file_in_driver_subdir("config_karabiner.toml")      end
@@ -298,12 +321,12 @@ local function pick_dir(current)
 	local escaped = default_dir:gsub('"', '\\"')
 	local script  = string.format([[
 		try
-			set r to choose folder with prompt "Sélectionner le dossier de configuration" default location ((POSIX file "%s") as alias)
+			set r to choose folder with prompt "%s" default location ((POSIX file "%s") as alias)
 			return POSIX path of r
 		on error
 			return ""
 		end try
-	]], escaped)
+	]], i18n.get("menu.paths.pick_prompt"), escaped)
 
 	local ok, r2, raw = hs.osascript.applescript(script)
 	Logger.debug(LOG, "pick_dir: ok={1} r2={2}.", tostring(ok), tostring(r2))
@@ -477,7 +500,7 @@ function M.open_editor()
 
 	_webview = ui_builder.show_webview({
 		frame       = ui_builder.get_centered_frame(win_w, win_h),
-		title       = "Dossier de configuration — Ergopti",
+		title       = i18n.get("menu.paths.window_title"),
 		style_masks = style_masks,
 		usercontent = _usercontent,
 		assets_dir  = ASSETS_DIR,
@@ -508,7 +531,7 @@ end
 --- @return table Menu item table.
 function M.build_menu_item()
 	return {
-		title = "Dossier de configuration…",
+		title = i18n.get("menu.paths.menu_item"),
 		fn    = function()
 			hs.timer.doAfter(0.05, function() pcall(M.open_editor) end)
 		end,

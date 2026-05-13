@@ -17,6 +17,7 @@ local hs               = hs
 local notifications    = require("lib.notifications")
 local hotstring_editor = require("ui.hotstring_editor")
 local Logger           = require("lib.logger")
+local i18n             = require("lib.i18n")
 local ui_restore       = require("lib.ui_restore")
 
 local Preferences = require("ui.menu.preferences")
@@ -558,14 +559,14 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 		sync_state_to_modules(state, false)
 		save_prefs()
 		
-		notify_feature(enabled and "Toutes les fonctionnalités ont été activées" or "Toutes les fonctionnalités ont été désactivées", enabled)
+		notify_feature(enabled and i18n.get("notify.all_features_enabled") or i18n.get("notify.all_features_disabled"), enabled)
 		if type(updateMenu) == "function" then updateMenu() end
 	end
 
 	local function reset_all_defaults()
 		-- Delete config.json so that the next startup uses the default module settings
 		pcall(os.remove, MenuPaths.get("ConfigTomlPath"))
-		pcall(notifications.notify, "Valeurs par défaut réinitialisées — Rechargement…", nil, "info")
+		pcall(notifications.notify, i18n.get("notify.defaults_reset"), nil, "info")
 		hs.timer.doAfter(0.25, function() pcall(hs.reload) end)
 	end
 

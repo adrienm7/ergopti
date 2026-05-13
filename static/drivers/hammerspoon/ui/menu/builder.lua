@@ -15,6 +15,7 @@ local M = {}
 local hs     = hs
 local Logger = require("lib.logger")
 local LOG    = "builder"
+local i18n   = require("lib.i18n")
 
 
 
@@ -63,10 +64,77 @@ function M.generate(ctx, menu_mods, actions)
 	-- Hotstrings zone avec activation globale
 	if type(menu_mods.hotstrings) == "table" then
 		Logger.debug(LOG, "Building hotstrings submenu…")
-		local hotstrings_menu = {}
-		push_into(hotstrings_menu, "hotstrings.build_groups", menu_mods.hotstrings.build_groups, ctx)
-		push_into(hotstrings_menu, "hotstrings.build_custom", menu_mods.hotstrings.build_custom, ctx)
-		push_into(hotstrings_menu, "hotstrings.build_management", menu_mods.hotstrings.build_management, ctx)
+
+		local function fmt_grand(n)
+			local s = tostring(math.floor(n + 0.5)); local r = ""
+			for i = 1, #s do
+				if i > 1 and (#s - i + 1) % 3 == 0 then r = r .. " " end
+				r = r .. s:sub(i, i)
+			end
+			return r
+		end
+
+		-- Groups that are specific to the Ergopti keyboard layout
+		local ERGOPTI_GROUPS = { sfbsreduction = true, rolls = true }
+
+		-- Count hotstrings for common groups split into "communs" and "ergopti"
+		local common_total, ergopti_total = 0, 0
+		local common_has_count, ergopti_has_count = false, false
+		if ctx and ctx.hotfiles and type(ctx.hotfiles) == "table"
+		and ctx.keymap and type(ctx.keymap.get_sections) == "function" then
+			for _, f in ipairs(ctx.hotfiles) do
+				local name = ctx.get_group_name and ctx.get_group_name(f) or f
+				if name ~= "custom" and name ~= "personal" and name:sub(1, 13) ~= "personal_ext_" then
+					local secs = ctx.keymap.get_sections(name)
+					if type(secs) == "table" then
+						for _, sec in ipairs(secs) do
+							if type(sec) == "table" and sec.name ~= "-" and not sec.is_module_placeholder
+							and sec.count ~= nil then
+								local cnt = tonumber(sec.count)
+								if ERGOPTI_GROUPS[name] then
+									ergopti_has_count = true
+									ergopti_total = ergopti_total + cnt
+								else
+									common_has_count = true
+									common_total = common_total + cnt
+								end
+							end
+						end
+					end
+				end
+			end
+		end
+		local all_common_total    = common_total + ergopti_total
+		local all_common_has_count = common_has_count or ergopti_has_count
+
+		-- Count hotstrings for personal/custom groups (includes personal_ext_* extensions)
+		local personal_total, personal_has_count = 0, false
+		if ctx and ctx.keymap and type(ctx.keymap.get_sections) == "function" then
+			local personal_group_names = {"personal", "custom"}
+			if ctx.hotfiles then
+				for _, f in ipairs(ctx.hotfiles) do
+					local n = ctx.get_group_name and ctx.get_group_name(f) or f
+					if n:sub(1, 13) == "personal_ext_" then
+						table.insert(personal_group_names, n)
+					end
+				end
+			end
+			for _, gname in ipairs(personal_group_names) do
+				local secs = ctx.keymap.get_sections(gname)
+				if type(secs) == "table" then
+					for _, sec in ipairs(secs) do
+						if type(sec) == "table" and sec.name ~= "-" and not sec.is_module_placeholder
+						and sec.count ~= nil then
+							personal_has_count = true
+							personal_total = personal_total + tonumber(sec.count)
+						end
+					end
+				end
+			end
+		end
+
+		local grand_total     = all_common_total + personal_total
+		local grand_has_count = all_common_has_count or personal_has_count
 
 		-- Détection de l’état global : tous les hotstrings activés ?
 		local all_enabled = true
@@ -99,39 +167,84 @@ function M.generate(ctx, menu_mods, actions)
 				end
 			end
 			ctx.save_prefs()
-			ctx.notify_feature("Hotstrings", enable)
+			ctx.notify_feature(i18n.get("notify.hotstrings"), enable)
 			ctx.updateMenu()
 		end
 
-		-- Sum hotstring counts across all groups for the top-level title
-		local grand_total, grand_has_count = 0, false
-		if ctx and ctx.hotfiles and type(ctx.hotfiles) == "table"
-		and ctx.keymap and type(ctx.keymap.get_sections) == "function" then
-			for _, f in ipairs(ctx.hotfiles) do
-				local name = ctx.get_group_name and ctx.get_group_name(f) or f
-				local secs = ctx.keymap.get_sections(name)
-				if type(secs) == "table" then
-					for _, sec in ipairs(secs) do
-						if type(sec) == "table" and sec.name ~= "-" and not sec.is_module_placeholder
-						and sec.count ~= nil then
-							grand_has_count = true
-							grand_total = grand_total + tonumber(sec.count)
-						end
-					end
-				end
-			end
-		end
-		local function fmt_grand(n)
-			local s = tostring(math.floor(n + 0.5)); local r = ""
-			for i = 1, #s do
-				if i > 1 and (#s - i + 1) % 3 == 0 then r = r .. " " end
-				r = r .. s:sub(i, i)
-			end
-			return r
-		end
 		local hotstrings_title = grand_has_count
 			and ("⚡ Hotstrings (" .. fmt_grand(grand_total) .. ")")
 			or  "⚡ Hotstrings"
+
+		-- Build the three groups in order: paramètres, communs, personnels
+		local hotstrings_menu = {}
+
+		-- 1. Paramètres at top, followed by a separator
+		local mgmt_item = type(menu_mods.hotstrings.build_management) == "function"
+			and Logger.build(LOG, "hotstrings.build_management", menu_mods.hotstrings.build_management, ctx)
+		if mgmt_item then
+			table.insert(hotstrings_menu, mgmt_item)
+			table.insert(hotstrings_menu, { title = "-" })
+		end
+
+		-- 2a. Common hotstring groups (non-Ergopti) with a disabled header
+		local function collect_groups(only_filter)
+			local result = {}
+			if type(menu_mods.hotstrings.build_groups) ~= "function" then return result end
+			local built = Logger.build(LOG, "hotstrings.build_groups",
+				function(c) return menu_mods.hotstrings.build_groups(c, only_filter) end, ctx)
+			if type(built) == "table" then
+				if built[1] ~= nil then
+					for _, it in ipairs(built) do table.insert(result, it) end
+				else
+					table.insert(result, built)
+				end
+			end
+			return result
+		end
+
+		local non_ergopti_filter = {}
+		if ctx and ctx.hotfiles and type(ctx.hotfiles) == "table" then
+			for _, f in ipairs(ctx.hotfiles) do
+				local name = ctx.get_group_name and ctx.get_group_name(f) or f
+				if name ~= "custom" and name ~= "personal" and name:sub(1, 13) ~= "personal_ext_"
+				and not ERGOPTI_GROUPS[name] then
+					non_ergopti_filter[name] = true
+				end
+			end
+		end
+
+		local std_groups = collect_groups(non_ergopti_filter)
+		if #std_groups > 0 then
+			local common_header = common_has_count
+				and string.format(i18n.get("menu.hotstrings.header_common_count"), fmt_grand(common_total))
+				or  i18n.get("menu.hotstrings.header_common")
+			table.insert(hotstrings_menu, { title = common_header, disabled = true })
+			for _, it in ipairs(std_groups) do table.insert(hotstrings_menu, it) end
+		end
+
+		-- 2b. Ergopti-layout-specific groups — separated from the standard block
+		local ergopti_groups = collect_groups(ERGOPTI_GROUPS)
+		if #ergopti_groups > 0 then
+			if #std_groups > 0 then table.insert(hotstrings_menu, { title = "-" }) end
+			local ergopti_header = ergopti_has_count
+				and string.format(i18n.get("menu.hotstrings.header_ergopti_count"), fmt_grand(ergopti_total))
+				or  i18n.get("menu.hotstrings.header_ergopti")
+			table.insert(hotstrings_menu, { title = ergopti_header, disabled = true })
+			for _, it in ipairs(ergopti_groups) do table.insert(hotstrings_menu, it) end
+		end
+
+		-- 3. Personal/custom hotstrings — "Mes hotstrings" header avoids duplication with
+		-- the sub-menu item title "Hotstrings personnels" just below it.
+		local custom_item = type(menu_mods.hotstrings.build_custom) == "function"
+			and Logger.build(LOG, "hotstrings.build_custom", menu_mods.hotstrings.build_custom, ctx)
+		if custom_item then
+			table.insert(hotstrings_menu, { title = "-" })
+			local personal_header = personal_has_count
+				and string.format(i18n.get("menu.hotstrings.header_personal_count"), fmt_grand(personal_total))
+				or  i18n.get("menu.hotstrings.header_personal")
+			table.insert(hotstrings_menu, { title = personal_header, disabled = true })
+			table.insert(hotstrings_menu, custom_item)
+		end
 
 		if #hotstrings_menu > 0 then
 			table.insert(items, {
@@ -190,28 +303,35 @@ function M.generate(ctx, menu_mods, actions)
 	-- macOS side is driven by the big title button at the very top of the menu.
 	table.insert(items, { title = "-" })
 	table.insert(items, {
-		title = "Actions globales",
+		title = i18n.get("menu.global.title"),
 		menu = {
-			{ title = "☑ Activer toutes les fonctionnalités", fn = actions.enable_all },
-			{ title = "☐ Désactiver toutes les fonctionnalités", fn = actions.disable_all },
-			{ title = "↺ Valeurs par défaut", fn = actions.reset_defaults }
+			{ title = i18n.get("menu.global.enable_all"),    fn = actions.enable_all },
+			{ title = i18n.get("menu.global.disable_all"),   fn = actions.disable_all },
+			{ title = i18n.get("menu.global.reset_defaults"), fn = actions.reset_defaults },
+			{ title = "-" },
+			{
+				title = i18n.get("menu.global.language"),
+				menu  = i18n.build_language_menu_items(),
+			},
 		}
 	})
-	table.insert(items, { title = "📂 Dossier de configuration…", fn = actions.open_paths })
+	table.insert(items, { title = i18n.get("menu.global.config_folder"), fn = actions.open_paths })
 	table.insert(items, { title = "-" })
-	table.insert(items, { title = "✎ Éditer personal_shortcuts.lua", fn = actions.open_personal_shortcuts })
-	table.insert(items, { title = "↻ Recharger", fn = actions.reload })
-	table.insert(items, { title = "✕ Quitter", fn = actions.quit })
+	table.insert(items, { title = i18n.get("menu.global.edit_shortcuts"), fn = actions.open_personal_shortcuts })
+	-- Strip the leading emoji token from the shared i18n string and replace with
+	-- plain Unicode symbols — emoji render poorly in native macOS menu bars
+	table.insert(items, { title = "↺ " .. i18n.get("menu.global.reload"):gsub("^%S+ ", ""),  fn = actions.reload })
+	table.insert(items, { title = "✕ " .. i18n.get("menu.global.quit"):gsub("^%S+ ", ""),    fn = actions.quit })
 	-- Debug submenu — groups the developer-facing tools (Hammerspoon Console,
 	-- log-folder shortcut, today's log) so the top-level tray stays scannable.
 	-- Mirrors AutoHotkey's "⚠ Débogage" entry, which adds Window Spy / List Vars
 	-- / Key History on top of the same log shortcuts.
 	table.insert(items, {
-		title = "⚠ Débogage",
+		title = i18n.get("menu.debug.title"),
 		menu = {
-			{ title = "Console", fn = actions.open_console },
-			{ title = "Ouvrir le dossier de logs", fn = actions.open_logs },
-			{ title = "Ouvrir le fichier de log du jour", fn = actions.open_today_log },
+			{ title = i18n.get("menu.debug.console"),   fn = actions.open_console },
+			{ title = i18n.get("menu.debug.open_logs"),      fn = actions.open_logs },
+			{ title = i18n.get("menu.debug.open_today_log"), fn = actions.open_today_log },
 		}
 	})
 
@@ -243,7 +363,7 @@ function M.generate(ctx, menu_mods, actions)
 	local canvas_w = math.ceil(max_text_width)
 	
 	local paused = ctx and ctx.paused
-	local display_text = paused and "Ergopti + (en pause)" or "Ergopti +"
+	local display_text = paused and i18n.get("menu.builder.title_paused") or i18n.get("menu.builder.title")
 	local ok, size = pcall(hs.drawing.getTextDrawingSize, display_text, { font = "Helvetica-Bold", size = 14 })
 	local text_w = size.w
 	

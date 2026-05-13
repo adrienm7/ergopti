@@ -44,7 +44,7 @@ local MACOS_GESTURE_GROUPS = {
 	},
 	{
 		key          = "swipe_3_horiz_conflict",
-		slots        = { "swipe_3_left", "swipe_3_right" },
+		slots        = { "swipe_3_horiz", "swipe_3_left", "swipe_3_right" },
 		description  = "Glisser 3 doigts gauche/droite — Pages / Passer d’un espace",
 		hint         = "Réglages Système › Trackpad › Plus de gestes\n→ Décocher « Faire défiler entre les pages » et « Passer d’un espace à l’autre »",
 		settings_url = "x-apple.systempreferences:com.apple.Trackpad-Settings.extension",
@@ -58,7 +58,7 @@ local MACOS_GESTURE_GROUPS = {
 	},
 	{
 		key          = "swipe_4_horiz_conflict",
-		slots        = { "swipe_4_left", "swipe_4_right", "swipe_5_left", "swipe_5_right" },
+		slots        = { "swipe_4_horiz", "swipe_5_horiz", "swipe_4_left", "swipe_4_right", "swipe_5_left", "swipe_5_right" },
 		description  = "Glisser 4/5 doigts gauche/droite — Passer d’un espace à l’autre",
 		hint         = "Réglages Système › Trackpad › Plus de gestes\n→ Décocher « Passer d’un espace à l’autre »",
 		settings_url = "x-apple.systempreferences:com.apple.Trackpad-Settings.extension",

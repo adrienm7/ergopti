@@ -16,9 +16,19 @@
 ; 3. ApplyTomlMetadataToFeatures: maps ``[_meta]`` / ``[_meta.sections]`` onto
 ;    the runtime ``Features`` Map so menu titles and submenu ordering are driven
 ;    by TOML files, with ``★`` substituted for the user's configured MagicKey.
-; 4. FoldAsciiLower: accent-folding helper that reconciles PascalCase Features
+; 4. ApplyIndexTomlToDynamicHotstrings: reads ``[modules.dynamichotstrings.*]``
+;    from ``_index.toml`` and injects ``description`` fields into
+;    ``Features["DynamicHotstrings"]`` — single source of truth shared with HS.
+; 5. FoldAsciiLower: accent-folding helper that reconciles PascalCase Features
 ;    keys containing French letters (e.g. ``IÉ``) with the lowercase TOML keys
 ;    (e.g. ``ie``) used in ``sections_order`` and ``[_meta.sections]``.
+; 6. ApplyLocaleDescriptions: reads ``static/locales/fr.json`` (or the active
+;    locale file) and injects descriptions into the Features Map for all
+;    categories that have no dedicated TOML (Layout, Shortcuts, Gestures,
+;    DynamicHotstrings flat entries). Flat JSON keys use dot notation:
+;    ``"category.featurekey"`` for top-level entries and
+;    ``"category.submap.featurekey"`` for nested sub-maps. The ``★``
+;    placeholder is substituted for the user's configured MagicKey.
 ; ==============================================================================
 
 ; Holds the raw UTF-8 content of every TOML file that has been read this
@@ -236,6 +246,68 @@ LoadHotstringsSection(CategoryName, SectionName, FeatureConfig, ExtraOptions := 
         CategoryName, SectionName, Loaded)
 }
 
+; Load all hotstring entries from every [[section]] in an arbitrary TOML file.
+; Used for personal extension packs dropped in the hotstrings\ folder.
+; All sections are loaded unconditionally (no per-section enable/disable toggle).
+LoadExtTomlFile(FilePath, CategoryLabel) {
+    global ScriptInformation, _HOTSTRING_ENTRY_PATTERN
+    if !FileExist(FilePath) {
+        try LoggerWarn("TomlLoader", "Extension TOML '{1}' not found — skipped.", FilePath)
+        return
+    }
+    try LoggerStart("TomlLoader", "Loading extension TOML '{1}'…", FilePath)
+    TotalLoaded := 0
+    CurrentSection := ""
+    FeatConf := { Enabled: true, TimeActivationSeconds: 0 }
+    FileContent := ReadTomlFile(FilePath)
+    loop parse, FileContent, "`n", "`r" {
+        Line := Trim(A_LoopField, " `t")
+        if (Line == "" or SubStr(Line, 1, 1) == "#") {
+            continue
+        }
+        if RegExMatch(Line, "^\[\[(.+)\]\]$", &SecM) {
+            CurrentSection := StrLower(SecM[1])
+            continue
+        }
+        if (SubStr(Line, 1, 1) == "[") {
+            CurrentSection := ""
+            continue
+        }
+        if (CurrentSection == "") {
+            continue
+        }
+        if !RegExMatch(Line, _HOTSTRING_ENTRY_PATTERN, &Match) {
+            continue
+        }
+        Trigger    := UnescapeTomlString(Match[1])
+        Output     := UnescapeTomlString(Match[2])
+        Trigger    := StrReplace(Trigger, "★", ScriptInformation["MagicKey"])
+        IsWord     := (Match[3] == "true")
+        AutoExpand := (Match[4] == "true")
+        IsCaseSens := (Match[5] == "true")
+        FinalResult := (Match[6] == "true")
+        StrictCase := (Match[7] == "true")
+        Flags := ""
+        if AutoExpand {
+            Flags .= "*"
+        }
+        if !IsWord {
+            Flags .= "?"
+        }
+        if StrictCase {
+            Flags .= "C"
+        }
+        Options := Map("TimeActivationSeconds", 0, "FinalResult", FinalResult)
+        if IsCaseSens {
+            CreateHotstring(Flags, Trigger, Output, Options)
+        } else {
+            CreateCaseSensitiveHotstrings(Flags, Trigger, Output, Options)
+        }
+        TotalLoaded += 1
+    }
+    try LoggerSuccess("TomlLoader", "Extension TOML '{1}': {2} entry(ies) loaded.", CategoryLabel, TotalLoaded)
+}
+
 ; Fold common French accented characters to their ASCII equivalent, then
 ; lowercase. Used to match the lowercase-only TOML metadata keys (e.g.
 ; ``ie``) against the PascalCase Features Map keys that may contain
@@ -425,6 +497,163 @@ ApplyTomlMetadataToFeatures(CategoryName) {
         }
     }
 }
+
+; Read ``[modules.dynamichotstrings.<key>]`` blocks from ``_index.toml`` and
+; inject the ``description`` field of each into ``Features["DynamicHotstrings"]``.
+; This makes ``_index.toml`` the single source of truth for those descriptions,
+; shared with Hammerspoon (which reads the same file at startup).
+ApplyIndexTomlToDynamicHotstrings() {
+    global ScriptInformation
+    FilePath := A_ScriptDir . "\..\hotstrings\_index.toml"
+    if !FileExist(FilePath) {
+        return
+    }
+    if !Features.Has("DynamicHotstrings") {
+        return
+    }
+
+    ; Build reverse lookup folded-lowercase → PascalCase key
+    KeyByFolded := Map()
+    for Key, _ in Features["DynamicHotstrings"] {
+        if Key != "__Order"
+            KeyByFolded[FoldAsciiLower(Key)] := Key
+    }
+
+    ; Scan for [modules.dynamichotstrings.<key>] sections and read description
+    CurrentKey := ""
+    FileContent := ReadTomlFile(FilePath)
+    loop parse, FileContent, "`n", "`r" {
+        Line := Trim(A_LoopField, " `t")
+        if (Line == "" or SubStr(Line, 1, 1) == "#")
+            continue
+
+        if RegExMatch(Line, "^\[modules\.dynamichotstrings\.([A-Za-z0-9_]+)\]$", &M) {
+            CurrentKey := StrLower(M[1])
+            continue
+        }
+
+        ; Any other [header] resets the current section
+        if RegExMatch(Line, "^\[", &_)
+            CurrentKey := ""
+
+        if (CurrentKey != "" and RegExMatch(Line, "^description\s*=\s*`"((?:[^`"\\]|\\.)*)`"\s*$", &DM)) {
+            Desc := UnescapeTomlString(DM[1])
+            Desc := StrReplace(Desc, "★", ScriptInformation["MagicKey"])
+            if KeyByFolded.Has(CurrentKey) {
+                ActualKey := KeyByFolded[CurrentKey]
+                FeatureObj := Features["DynamicHotstrings"][ActualKey]
+                if IsObject(FeatureObj) and !(Type(FeatureObj) == "Map")
+                    FeatureObj.Description := Desc
+            }
+        }
+    }
+}
+
+; Load ``static/locales/<Locale>.json`` and inject ``description`` fields into
+; the Features Map for categories that have no dedicated TOML file (Layout,
+; Shortcuts, Gestures, and the flat DynamicHotstrings entries). Keys follow dot
+; notation: ``"category.feature"`` for top-level entries and
+; ``"category.submap.feature"`` for sub-map entries (e.g. AltGrLAlt.*).
+; The ``★`` placeholder is substituted for the user's configured MagicKey.
+; Locale defaults to ``"fr"`` and maps to ``static/locales/fr.json``.
+ApplyLocaleDescriptions(Locale := "fr") {
+    global ScriptInformation
+    global _StaticDir
+    FilePath := _StaticDir . "\locales\" . Locale . ".json"
+    if !FileExist(FilePath) {
+        try LoggerWarn("TomlLoader", "Locale file not found: '{1}' — descriptions not injected.", FilePath)
+        return
+    }
+    try LoggerTrace("TomlLoader", "Applying locale descriptions from '{1}'…", FilePath)
+
+    FileContent := FileRead(FilePath, "UTF-8")
+
+    ; Minimal flat-JSON parser: extract every "key": "value" pair.
+    ; The JSON has no nesting — keys use dot notation to encode hierarchy.
+    LocaleMap := Map()
+    Pos := 1
+    FileLen := StrLen(FileContent)
+    while Pos <= FileLen {
+        ; Find next quoted key
+        if !RegExMatch(FileContent, '`"([^`"]+)`"\s*:\s*`"((?:[^`"\\]|\\.)*)`"', &KVMatch, Pos)
+            break
+        RawKey := KVMatch[1]
+        RawVal := KVMatch[2]
+        ; Unescape JSON string (\\, \", \n, \t, \r, \/)
+        Val := StrReplace(RawVal, "\\", Chr(1))
+        Val := StrReplace(Val, '\"', "`"")
+        Val := StrReplace(Val, "\n", "`n")
+        Val := StrReplace(Val, "\t", "`t")
+        Val := StrReplace(Val, "\r", "`r")
+        Val := StrReplace(Val, "\/", "/")
+        Val := StrReplace(Val, Chr(1), "\")
+        Val := StrReplace(Val, "★", ScriptInformation["MagicKey"])
+        LocaleMap[RawKey] := Val
+        Pos := KVMatch.Pos + KVMatch.Len
+    }
+
+    ; Inject each locale entry into the corresponding Features object.
+    ; Key format:
+    ;   "category.feature"            → Features[Category][Feature].Description
+    ;   "category.submap.feature"     → Features[Category][SubMap][Feature].Description
+    ; All segments are matched case-insensitively via FoldAsciiLower.
+    for RawKey, Desc in LocaleMap {
+        Parts := StrSplit(RawKey, ".")
+        if Parts.Length < 2
+            continue
+
+        ; Locate the category (case-insensitive)
+        CatLower := Parts[1]
+        CategoryKey := ""
+        for K, _ in Features {
+            if FoldAsciiLower(K) == CatLower {
+                CategoryKey := K
+                break
+            }
+        }
+        if CategoryKey == ""
+            continue
+
+        CategoryMap := Features[CategoryKey]
+        if !(Type(CategoryMap) == "Map")
+            continue
+
+        if Parts.Length == 2 {
+            ; Top-level feature: "category.feature"
+            FeatLower := Parts[2]
+            for K, V in CategoryMap {
+                if FoldAsciiLower(K) == FeatLower {
+                    if IsObject(V) and !(Type(V) == "Map")
+                        V.Description := Desc
+                    break
+                }
+            }
+        } else if Parts.Length == 3 {
+            ; Sub-map feature: "category.submap.feature"
+            SubLower  := Parts[2]
+            FeatLower := Parts[3]
+            SubMapKey := ""
+            for K, V in CategoryMap {
+                if FoldAsciiLower(K) == SubLower and Type(V) == "Map" {
+                    SubMapKey := K
+                    break
+                }
+            }
+            if SubMapKey == ""
+                continue
+            SubMap := CategoryMap[SubMapKey]
+            for K, V in SubMap {
+                if FoldAsciiLower(K) == FeatLower {
+                    if IsObject(V) and !(Type(V) == "Map")
+                        V.Description := Desc
+                    break
+                }
+            }
+        }
+    }
+    try LoggerDone("TomlLoader", "Locale descriptions applied (%d key(s)).", LocaleMap.Count)
+}
+
 
 ; Parse the ``[_meta]`` and ``[_meta.sections.<name>]`` blocks of a category
 ; TOML to extract the file-level and per-section default delay (seconds) and

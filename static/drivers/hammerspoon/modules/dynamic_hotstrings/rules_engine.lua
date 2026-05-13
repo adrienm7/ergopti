@@ -23,6 +23,9 @@ if not ok_kl then keylogger = nil end
 local Logger = require("lib.logger")
 local LOG    = "dynamic_hotstrings.rules"
 
+local ok_locale, locale = pcall(require, "lib.locale")
+if not ok_locale then locale = nil end
+
 
 
 
@@ -285,12 +288,26 @@ function M.start(keymap_module)
 	-- Sections ordered identically to the AHK DynamicHotstrings feature map.
 	-- Prefix section counts start at 0; register_prefix_entries updates them with
 	-- the real values once personal data is injected.
+	-- textexpansionpersonalinformation is a module placeholder — resolved by the menu via _index.toml.
+	-- textexpansionpersonalinformation is last, separated — mirrors AHK DynamicHotstrings layout.
+	-- Descriptions come from lib.locale (static/locales/fr.json) so the JSON
+	-- is the single source of truth shared with the AHK driver.
+	local function loc(key) return locale and locale.get(key) or "" end
+	-- Date descriptions embed today's date so the user sees the expected output.
+	local desc_datefr = loc("dynamichotstrings.datefr")
+	if desc_datefr == "" then desc_datefr = "dt" .. _trigger .. " insère la date courante" end
+	desc_datefr = desc_datefr .. " (" .. date_fr  .. ")"
+	local desc_date   = loc("dynamichotstrings.date")
+	if desc_date == "" then desc_date = "td" .. _trigger .. " insère la date courante" end
+	desc_date   = desc_date   .. " (" .. date_iso .. ")"
 	_sections = {
-		{ name = "datefr",        description = "dt" .. _trigger .. " insère la date courante (" .. date_fr  .. ")", count = 1 },
-		{ name = "date",          description = "td" .. _trigger .. " insère la date courante (" .. date_iso .. ")", count = 1 },
-		{ name = "phoneprefixes", description = "Saisir les premiers chiffres du numéro de téléphone le complète automatiquement", count = 0 },
-		{ name = "ssnprefixes",   description = "Saisir les premiers chiffres du numéro de sécurité sociale le complète automatiquement", count = 0 },
-		{ name = "ibanprefixes",  description = "Saisir les premiers caractères de l'IBAN le complète automatiquement", count = 0 },
+		{ name = "datefr",        description = desc_datefr,                                count = 1 },
+		{ name = "date",          description = desc_date,                                  count = 1 },
+		{ name = "phoneprefixes", description = loc("dynamichotstrings.phoneprefixes"),     count = 0 },
+		{ name = "ssnprefixes",   description = loc("dynamichotstrings.ssnprefixes"),       count = 0 },
+		{ name = "ibanprefixes",  description = loc("dynamichotstrings.ibanprefixes"),      count = 0 },
+		{ name = "-" },
+		{ name = "textexpansionpersonalinformation", count = 0, is_module_placeholder = true },
 	}
 
 	if _km.register_lua_group then

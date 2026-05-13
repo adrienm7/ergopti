@@ -13,8 +13,9 @@
 
 local hs = hs
 
-local Bindings      = require("modules.shortcuts.bindings")
-local ScriptControl = require("modules.shortcuts.script_control")
+local Bindings          = require("modules.shortcuts.bindings")
+local ScriptControl     = require("modules.shortcuts.script_control")
+local KeyboardShortcuts = require("modules.shortcuts.keyboard_shortcuts")
 
 local M = {}
 
@@ -64,5 +65,13 @@ M.set_shortcut_action   = ScriptControl.set_shortcut_action
 M.set_on_pause_change   = ScriptControl.set_on_pause_change
 M.set_extras            = ScriptControl.set_extras
 M.toggle_script_control = ScriptControl.toggle
+
+-- Proxy Keyboard Shortcuts Methods
+M.start_keyboard_shortcuts = KeyboardShortcuts.start
+M.stop_keyboard_shortcuts  = KeyboardShortcuts.stop
+M.set_keyboard_action      = KeyboardShortcuts.set_action
+M.get_keyboard_action      = KeyboardShortcuts.get_action
+M.get_keyboard_slot_label  = KeyboardShortcuts.get_slot_label
+M.get_keyboard_assignments = KeyboardShortcuts.get_assignments
 
 return M

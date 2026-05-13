@@ -7,7 +7,7 @@
 [_meta]
 color = "#e53935"
 delay = 2.0
-description = "Touche ★ et expansion de texte"
+description = { fr = "Touche ★ et expansion de texte", en = "★ key and text expansion", de = "★-Taste und Texterweiterung", es = "Tecla ★ y expansión de texto", zh = "★ 键与文本扩展" }
 sections_order = ["replace", "repeat", "-", "textexpansion", "textexpansionauto", "textexpansionemojis", "textexpansionsymbols", "textexpansionsymbolstypst"]
 
 
@@ -17,14 +17,13 @@ sections_order = ["replace", "repeat", "-", "textexpansion", "textexpansionauto"
 # =========================
 
 [_meta.sections]
-repeat = "La touche ★ permet la répétition"
-replace = "Transformer la touche J en ★"
-textexpansion = "Expansion de texte : c★ = c’est, gt★ = j’étais, pex★ = par exemple, …"
-textexpansionauto = "Expansion de texte sans touche ★ : ju' = jusqu’, ya = y’a, …"
-textexpansionemojis = "Expansion de texte Emojis : voiture★ = 🚗, koala★ = 🐨, …"
-textexpansionpersonalinformation = "Remplissage de formulaires avec le suffixe @ : @np★ = Nom ⇥ Prénom, etc."
-textexpansionsymbols = "Expansion de texte Symboles : -->★ = ➜, (v)★ = ✓, …"
-textexpansionsymbolstypst = "Expansion de texte Symboles Typst : $eq.not$ = ≠, $PP$ = ℙ, $integral$ = ∫ …"
+repeat = { fr = "La touche ★ permet la répétition", en = "The ★ key enables repetition", de = "Die ★-Taste ermöglicht Wiederholung", es = "La tecla ★ permite la repetición", zh = "★ 键启用重复" }
+replace = { fr = "Transformer la touche J en ★", en = "Transform the J key into ★", de = "Die J-Taste in ★ umwandeln", es = "Transformar la tecla J en ★", zh = "将 J 键转换为 ★" }
+textexpansion = { fr = "Expansion de texte : c★ = c’est, gt★ = j’étais, pex★ = par exemple, …", en = "Text expansion: c★ = c’est, gt★ = j’étais, pex★ = par exemple, …", de = "Texterweiterung: c★ = c’est, gt★ = j’étais, pex★ = par exemple, …", es = "Expansión de texto: c★ = c’est, gt★ = j’étais, pex★ = par exemple, …", zh = "文本扩展：c★ = c’est，gt★ = j’étais，pex★ = par exemple，…" }
+textexpansionauto = { fr = "Expansion de texte sans touche ★ : ju’ = jusqu’, ya = y’a, …", en = "Text expansion without ★ key: ju’ = jusqu’, ya = y’a, …", de = "Texterweiterung ohne ★-Taste: ju’ = jusqu’, ya = y’a, …", es = "Expansión de texto sin tecla ★: ju’ = jusqu’, ya = y’a, …", zh = "无需 ★ 键的文本扩展：ju’ = jusqu’，ya = y’a，…" }
+textexpansionemojis = { fr = "Expansion de texte Emojis : voiture★ = 🚗, koala★ = 🐨, …", en = "Emoji text expansion: voiture★ = 🚗, koala★ = 🐨, …", de = "Emoji-Texterweiterung: voiture★ = 🚗, koala★ = 🐨, …", es = "Expansión de texto con emojis: voiture★ = 🚗, koala★ = 🐨, …", zh = "表情文本扩展：voiture★ = 🚗，koala★ = 🐨，…" }
+textexpansionsymbols = { fr = "Expansion de texte Symboles : -->★ = ➜, (v)★ = ✓, …", en = "Symbol text expansion: -->★ = ➜, (v)★ = ✓, …", de = "Symbol-Texterweiterung: -->★ = ➜, (v)★ = ✓, …", es = "Expansión de texto con símbolos: -->★ = ➜, (v)★ = ✓, …", zh = "符号文本扩展：-->★ = ➜，(v)★ = ✓，…" }
+textexpansionsymbolstypst = { fr = "Expansion de texte Symboles Typst : $eq.not$ = ≠, $PP$ = ℙ, $integral$ = ∫ …", en = "Typst symbol text expansion: $eq.not$ = ≠, $PP$ = ℙ, $integral$ = ∫ …", de = "Typst-Symbol-Texterweiterung: $eq.not$ = ≠, $PP$ = ℙ, $integral$ = ∫ …", es = "Expansión de texto con símbolos Typst: $eq.not$ = ≠, $PP$ = ℙ, $integral$ = ∫ …", zh = "Typst 符号文本扩展：$eq.not$ = ≠，$PP$ = ℙ，$integral$ = ∫ …" }
 
 
 
