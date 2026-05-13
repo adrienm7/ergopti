@@ -288,11 +288,8 @@ WPMWidget_BuildGraph() {
     w := WPMWidgetConst.GRAPH_W
     h := WPMWidgetConst.GRAPH_H
 
-    ; Use a black key color made transparent via WinSetTransparent so the
-    ; WebView2 canvas (which draws its own semi-transparent background) floats
-    ; over the desktop without a solid Gui backdrop.
     g := Gui("+AlwaysOnTop -Caption +ToolWindow +E0x80000 -DPIScale", "ErgoptiPlus WPM Graph")
-    g.BackColor := "000001"   ; near-black used as color key for transparency
+    g.BackColor := WPMWidgetConst.COLOR_BG_IDLE
     g.MarginX   := 0
     g.MarginY   := 0
 
@@ -310,9 +307,8 @@ WPMWidget_BuildGraph() {
         wvc := WebView2.CreateControllerAsync(g.Hwnd).Await()
         wv  := wvc.CoreWebView2
 
-        ; Make the WebView2 background fully transparent so only the canvas
-        ; drawing is visible over the Gui color-key layer.
-        try wvc.DefaultBackgroundColor := 0x00000000
+        ; Opaque dark background matching the Gui — avoids white flash on load.
+        try wvc.DefaultBackgroundColor := 0xFF1a1a2e
 
         wvc.Bounds := { X: 0, Y: 0, Width: w, Height: h }
 
@@ -455,12 +451,7 @@ WPMWidget_Show() {
 
     gui_ref.Show("x" . WPMWidget.pos_x . " y" . WPMWidget.pos_y
         . " w" . w . " h" . h . " NoActivate")
-    ; Apply color-key transparency only when WebView2 is available — without it
-    ; the "000001" near-black background would make the whole window invisible.
-    if (WPMWidget.show_graph && WPMWidget._graph_wv)
-        WinSetTransparent("000001", gui_ref)
-    else
-        WinSetTransparent(WPMWidgetConst.ALPHA_IDLE, gui_ref)
+    WinSetTransparent(WPMWidgetConst.ALPHA_ACTIVE, gui_ref)
     SetTimer(WPMWidget_Tick, WPMWidgetConst.TICK_MS)
     LoggerSuccess("WPMWidget", "Widget shown at (%d, %d) mode=%s, wv_ready=%s.",
         WPMWidget.pos_x, WPMWidget.pos_y, WPMWidget.show_graph ? "graph" : "compact",
@@ -519,8 +510,6 @@ WPMWidget_Tick() {
 
     if WPMWidget.show_graph {
         if WPMWidget._graph_gui {
-            ; In graph mode the Gui color-key ("000001") must stay intact so the
-            ; background stays transparent; only the WebView2 canvas is visible.
             WPMWidget_PushGraphUpdate(wpm_str, txt_col, has_hs, has_ai, has_ac, is_idle)
         }
     } else {
