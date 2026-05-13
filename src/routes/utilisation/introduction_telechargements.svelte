@@ -40,7 +40,7 @@
 	remplacementsSample = parseTomlSimple(magicSampleToml);
 
 	if (typeof window !== 'undefined') {
-		fetch(base + '/drivers/hotstrings/magic.toml')
+		fetch(base + '/hotstrings/magic.toml')
 			.then((response) => response.text())
 			.then((text) => {
 				remplacements = parseTomlSimple(text);
@@ -108,7 +108,7 @@
 
 	onMount(async () => {
 		try {
-			const res = await fetch(base + '/drivers/hotstrings/magickey.toml');
+			const res = await fetch(base + '/hotstrings/magickey.toml');
 			const text = await res.text();
 			const parsed = parseTomlSections(text);
 			tomlSections = parsed.sections;

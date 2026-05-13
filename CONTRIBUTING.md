@@ -26,7 +26,7 @@ This repo contains:
 
 - The **Ergopti website** (SvelteKit, `src/`)
 - The **driver files** distributed to users (AutoHotkey, Hammerspoon, Karabiner…), under `static/drivers/`
-- A Python **hotstrings generator** (`static/drivers/hotstrings/0_generate_hotstrings.py`) that reads `ErgoptiPlus.ahk` and outputs TOML files consumed by Hammerspoon
+- A Python **hotstrings generator** (`static/hotstrings/0_generate_hotstrings.py`) that reads `ErgoptiPlus.ahk` and outputs TOML files consumed by Hammerspoon
 
 ---
 
@@ -60,7 +60,7 @@ On the author's machine, the real file lives in a **private repo** at a differen
 A **gitignored override file** tells the tooling where your private AHK file is:
 
 ```text
-static/drivers/hotstrings/.local_ahk_path   ← gitignored, never committed
+static/hotstrings/.local_ahk_path   ← gitignored, never committed
 ```
 
 This plain-text file contains a single line: the absolute path to your private `ErgoptiPlus.ahk`, for example:
@@ -75,7 +75,7 @@ This plain-text file contains a single line: the absolute path to your private `
 Create the `.local_ahk_path` file and paste the absolute path to your private `ErgoptiPlus.ahk` inside it.
 
 ```bash
-echo "/absolute/path/to/your/private/ErgoptiPlus.ahk" > static/drivers/hotstrings/.local_ahk_path
+echo "/absolute/path/to/your/private/ErgoptiPlus.ahk" > static/hotstrings/.local_ahk_path
 ```
 
 #### 2. Start the watcher
@@ -131,7 +131,7 @@ static/drivers/autohotkey/ErgoptiPlus.ahk  (public version, no section 2)
         │
         │  0_generate_hotstrings.py  (regenerate TOML files)
         ▼
-static/drivers/hotstrings/*.toml
+static/hotstrings/*.toml
         │
         │  git add + commit
         ▼
@@ -144,12 +144,12 @@ GitHub
 
 ## ⚙️ Hotstrings generator
 
-`static/drivers/hotstrings/0_generate_hotstrings.py` parses `ErgoptiPlus.ahk` and writes TOML files consumed by the Hammerspoon driver.
+`static/hotstrings/0_generate_hotstrings.py` parses `ErgoptiPlus.ahk` and writes TOML files consumed by the Hammerspoon driver.
 
 Run it manually:
 
 ```bash
-python static/drivers/hotstrings/0_generate_hotstrings.py
+python static/hotstrings/0_generate_hotstrings.py
 ```
 
 When `.local_ahk_path` is present, the script reads from your private file directly. Otherwise, it falls back to the public `ErgoptiPlus.ahk`.
@@ -168,7 +168,7 @@ Managed by [Husky](https://typicode.github.io/husky/). The hook runs in order:
 | 4    | `git add static/drivers/autohotkey/*.ahk`  | Stage the cleaned file                                |
 | 5    | Windows only: local Ahk2Exe compile        | If AHK is staged, compile and stage `ErgoptiPlus.exe` |
 | 6    | `uv run python … 0_generate_hotstrings.py` | Regenerate TOML hotstrings from the cleaned AHK       |
-| 7    | `git add static/drivers/hotstrings/*.toml` | Stage the regenerated TOML files                      |
+| 7    | `git add static/hotstrings/*.toml` | Stage the regenerated TOML files                      |
 
 ```
 

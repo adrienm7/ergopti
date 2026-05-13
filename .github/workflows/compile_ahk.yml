@@ -5,7 +5,7 @@ on:
         branches: ["main"]
         paths:
             - "static/drivers/autohotkey/**/*.ahk"
-            - "static/drivers/hotstrings/*.toml"
+            - "static/hotstrings/*.toml"
             - "tools/compile_hotstrings.py"
 
     # Permet de lancer manuellement depuis l'onglet Actions

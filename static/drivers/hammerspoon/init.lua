@@ -216,7 +216,7 @@ local config_overrides = require("lib.config_overrides")
 config_overrides.apply(menu_paths.get("ConfigTomlPath"))
 
 local configured_hotstrings_dir = menu_paths.get("HotstringsDirPath")
-local bundled_hotstrings_dir    = base_dir .. "../hotstrings/"
+local bundled_hotstrings_dir    = base_dir .. "../../hotstrings/"
 local hotstrings_dir            = configured_hotstrings_dir
 local config_file               = menu_paths.get("ConfigTomlPath")
 
