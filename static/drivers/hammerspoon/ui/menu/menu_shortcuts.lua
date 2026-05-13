@@ -250,17 +250,17 @@ function M.build(ctx)
 
 		local script_items = {
 			{
-				title    = "string.format(i18n.get("menu.shortcuts.right_opt_return"), get_label(cur_return)),
+				title    = string.format(i18n.get("menu.shortcuts.right_opt_return"), get_label(cur_return)),
 				disabled = not enabled or paused or nil,
 				menu     = key_submenu("return_key"),
 			},
 			{
-				title    = "string.format(i18n.get("menu.shortcuts.right_opt_back"), get_label(cur_back)),
+				title    = string.format(i18n.get("menu.shortcuts.right_opt_back"), get_label(cur_back)),
 				disabled = not enabled or paused or nil,
 				menu     = key_submenu("backspace"),
 			},
 			{
-				title    = "string.format(i18n.get("menu.shortcuts.right_opt_escape"), get_label(cur_escape)),
+				title    = string.format(i18n.get("menu.shortcuts.right_opt_escape"), get_label(cur_escape)),
 				disabled = not enabled or paused or nil,
 				menu     = key_submenu("escape"),
 			},

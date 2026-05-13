@@ -334,19 +334,19 @@ function M.build_management(ctx)
 		i18n.get("menu.hotstrings.tooltip_magic"),
 		"preview_star_enabled",
 		"set_preview_star_enabled",
-		"Bulle ★"))
+		i18n.get("menu.hotstrings.notify_bubble_star")))
 
 	table.insert(bubble_sub, buildBubbleItem(ctx,
 		i18n.get("menu.hotstrings.tooltip_autocorrect"),
 		"preview_autocorrect_enabled",
 		"set_preview_autocorrect_enabled",
-		"Bulle Autocorrection"))
+		i18n.get("menu.hotstrings.notify_bubble_autocorrect")))
 
 	table.insert(bubble_sub, buildBubbleItem(ctx,
 		i18n.get("menu.hotstrings.tooltip_ai"),
 		"preview_ai_enabled",
 		"set_preview_ai_enabled",
-		"Bulle IA"))
+		i18n.get("menu.hotstrings.notify_bubble_ai")))
 
 	table.insert(bubble_sub, { title = "-" })
 
@@ -354,7 +354,7 @@ function M.build_management(ctx)
 		i18n.get("menu.hotstrings.tooltip_colored"),
 		"preview_colored_tooltips",
 		"set_preview_colored_tooltips",
-		"Bulles colorées"))
+		i18n.get("menu.hotstrings.notify_bubble_colored")))
 
 	bubble_item = { title = i18n.get("menu.hotstrings.preview_bubbles"), disabled = paused or nil, menu = bubble_sub }
 
