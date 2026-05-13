@@ -28,6 +28,7 @@ local eventtap      = hs.eventtap
 local pasteboard    = hs.pasteboard
 local notifications = require("lib.notifications")
 local Logger        = require("lib.logger")
+local i18n          = require("lib.i18n")
 
 local LOG = "shortcuts.actions.system"
 
@@ -411,7 +412,7 @@ function M.copy_pixel_color()
 	end
 
 	pcall(pasteboard.setContents, hex)
-	notifications.notify("Couleur copiée : " .. hex, nil, "success")
+	notifications.notify(string.format(i18n.get("shortcuts.color_copied"), hex), nil, "success")
 end
 
 --- Launches the native macOS interactive screenshot tool and copies the result to the clipboard.
@@ -421,7 +422,7 @@ function M.interactive_screenshot()
 		"/usr/sbin/screencapture",
 		function(exit_code, _, _)
 			if exit_code == 0 then
-				notifications.notify("Capture d’écran copiée dans le presse-papiers", nil, "success")
+				notifications.notify(i18n.get("shortcuts.screenshot_copied"), nil, "success")
 				Logger.done(LOG, "Interactive screenshot completed.")
 			else
 				Logger.warn(LOG, "Interactive screenshot failed or was cancelled.")
@@ -471,7 +472,7 @@ function M.bind_instant_screenshot()
 
 		local ok, w = pcall(hs.window.frontmostWindow)
 		if not ok or not w then
-			notifications.notify("Aucune fenêtre active", nil, "warning")
+			notifications.notify(i18n.get("shortcuts.no_active_window"), nil, "warning")
 			return true
 		end
 
@@ -482,7 +483,7 @@ function M.bind_instant_screenshot()
 
 		local filename = string.format("%s/screenshot_%s.png", dir, os.date("%Y_%m_%d_%Hh_%Mmin_%Ss"))
 		pcall(hs.execute, "screencapture -l " .. id .. " \"" .. filename .. "\"")
-		notifications.notify("Sauvegardé : " .. filename, nil, "success")
+		notifications.notify(string.format(i18n.get("shortcuts.saved"), filename), nil, "success")
 		return true
 	end)
 	tap:start()
@@ -671,7 +672,7 @@ function M.teleport_mouse()
 
 	local all = hs.screen.allScreens()
 	if #all < 2 then
-		notifications.notify("Aucun autre moniteur détecté", nil, "warning")
+		notifications.notify(i18n.get("shortcuts.no_other_monitor"), nil, "warning")
 		Logger.info(LOG, "teleport_mouse: single screen — nothing to do.")
 		return
 	end

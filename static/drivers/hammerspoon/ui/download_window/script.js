@@ -109,7 +109,7 @@ function setProgress(pct) {
 function setError(text) {
 	document.body.classList.add('is-error');
 	const el = document.getElementById('step-line');
-	if (el) el.textContent = text || 'Erreur inconnue.';
+	if (el) el.textContent = text || _t('download_window.error_unknown') || 'Unknown error.';
 }
 
 // ========================================
@@ -125,7 +125,7 @@ function doCancel() {
 	const cancelButton = document.getElementById('btn-cancel');
 	if (cancelButton) {
 		cancelButton.disabled = true;
-		cancelButton.textContent = 'Annulation…';
+		cancelButton.textContent = _t('download_window.cancelling') || 'Cancelling…';
 	}
 
 	if (window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.dl_bridge) {
@@ -220,7 +220,7 @@ function update(percentage, downloadedSize, speed, eta, fileCount) {
 
 	const fileCountEl = document.getElementById('file-count');
 	if (fileCount) {
-		fileCountEl.textContent = `📁 Fichiers : ${fileCount}`;
+		fileCountEl.textContent = (_t('download_window.file_count') || '📁 Files: %s').replace('%s', fileCount);
 		fileCountEl.style.display = 'block';
 	} else {
 		fileCountEl.style.display = 'none';
@@ -229,8 +229,8 @@ function update(percentage, downloadedSize, speed, eta, fileCount) {
 	const statsDetails = document.getElementById('stats-details');
 	let detailsParts = [];
 
-	if (downloadedSize) detailsParts.push(`📦 Taille : <b>${downloadedSize}</b>`);
-	if (speed) detailsParts.push(`⚡ Vitesse : <b>${speed}</b>`);
+	if (downloadedSize) detailsParts.push((_t('download_window.size_label') || '📦 Size: ') + `<b>${downloadedSize}</b>`);
+	if (speed) detailsParts.push((_t('download_window.speed_label') || '⚡ Speed: ') + `<b>${speed}</b>`);
 
 	if (detailsParts.length > 0) {
 		statsDetails.innerHTML = detailsParts.join(
@@ -316,7 +316,7 @@ function done(isSuccess, message, errorKind) {
 
 	const doneMessageElement = document.getElementById('done-msg');
 	doneMessageElement.textContent =
-		message || (isSuccess ? '✅ Terminé' : 'Échec du téléchargement');
+		message || (isSuccess ? (_t('download_window.done_success') || '✅ Done') : (_t('download_window.done_failed') || 'Download failed'));
 	doneMessageElement.className = isSuccess ? 'ok' : 'error'; // Show it inline inside the status-line
 
 	doneMessageElement.style.display = 'block';

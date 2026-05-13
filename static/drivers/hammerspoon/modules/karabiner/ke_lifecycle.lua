@@ -31,6 +31,7 @@ local M = {}
 local hs     = hs
 local Logger = require("lib.logger")
 local Notifications = require("lib.notifications")
+local i18n   = require("lib.i18n")
 
 local LOG = "karabiner"
 
@@ -346,7 +347,7 @@ local function notify_karabiner_ready()
 			end
 			_last_karabiner_ready_notify_at = now
 			Logger.info(LOG, "Karabiner ready notification sent.")
-			Notifications.notify("Karabiner prêt", "Le moteur Karabiner est prêt.", "success")
+			Notifications.notify(i18n.get("karabiner.ready_title"), i18n.get("karabiner.ready_body"), "success")
 		end)
 		if not ok then
 			_pending_karabiner_ready_notify = true

@@ -643,7 +643,7 @@ do
 				-- snapshot() is a safety net for any UI still open at reload time;
 				-- under normal deferral they are already closed so it saves nothing
 				ui_restore.snapshot()
-				pcall(notifications.notify, "Rechargement", msg or "Fichiers modifiés — rechargement…", "info")
+				pcall(notifications.notify, i18n.get("init.reload_title"), msg or i18n.get("init.reload_files"), "info")
 				hs.reload()
 			end)
 		end)
@@ -659,7 +659,7 @@ do
 	local dir_watcher = hs.pathwatcher.new(hotstrings_dir, function(paths)
 		for _, p in ipairs(paths) do
 			if p:match("%.toml$") or p:match("_index%.json$") or p:match("%.local_ahk_path$") then
-				schedule_reload("Hotstrings modifiés — rechargement…")
+				schedule_reload(i18n.get("init.reload_hotstrings"))
 				return
 			end
 		end
@@ -678,7 +678,7 @@ do
 			end
 			if p:match("%.lua$") then
 				Logger.debug(LOG, "Lua file change detected: %s", p)
-				schedule_reload("Script modifié — rechargement…")
+				schedule_reload(i18n.get("init.reload_script"))
 				return
 			end
 		end
@@ -696,7 +696,7 @@ do
 	for fname in hs.fs.dir(hotstrings_dir) do
 		if fname:match("%.toml$") or fname:match("_index%.json$") then
 			local w = hs.pathwatcher.new(hotstrings_dir .. fname, function()
-				schedule_reload("Hotstrings modifiés — rechargement…")
+				schedule_reload(i18n.get("init.reload_hotstrings"))
 			end)
 			w:start()
 			table.insert(_G.script_watchers, w)
@@ -716,11 +716,11 @@ end
 
 hs.shutdownCallback = function()
 	pcall(function() hs.settings.set(HS_BOOT_READY_SETTING_KEY, false) end)
-	Logger.info(LOG, "Arrêt système — restauration des overrides")
+	Logger.info(LOG, "Shutdown — restoring overrides.")
 	if type(gestures) == "table" and type(gestures.restore_all_overrides) == "function" then
 		pcall(gestures.restore_all_overrides)
 	else
-		Logger.warn(LOG, "restore_all_overrides indisponible — arrêt sans restauration")
+		Logger.warn(LOG, "restore_all_overrides unavailable — shutdown without restore.")
 	end
 	-- Stop Karabiner-Elements user-level helpers we spawned during priming.
 	-- IMPORTANT: use KILL_FAST_CMD (synchronous plain pkill, ~50 ms) — NOT the

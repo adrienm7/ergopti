@@ -24,6 +24,7 @@ local M = {}
 local hs     = hs
 local utf8   = utf8
 local Logger = require("lib.logger")
+local i18n   = require("lib.i18n")
 local dialog = require("lib.dialog_util")
 
 local LogManager     = require("modules.keylogger.log_manager")
@@ -1284,9 +1285,9 @@ function M.show_metrics()
 		Logger.info(LOG, "Metrics UI opened.")
 	else
 		Logger.error(LOG, "Failed to load metrics UI — ui.metrics_typing.init not found.")
-		dialog.alert("Erreur Keylogger",
-			"Impossible de charger l'interface des métriques.\n\nVérifiez ui/metrics_typing/init.lua.",
-			"OK")
+		dialog.alert(i18n.get("keylogger.error_title"),
+			i18n.get("keylogger.error_body"),
+			i18n.get("button.ok"))
 	end
 end
 

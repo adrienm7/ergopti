@@ -25,6 +25,7 @@
 local M = {}
 local hs           = hs
 local Logger       = require("lib.logger")
+local i18n         = require("lib.i18n")
 local llm_progress = require("ui.download_window")
 
 local LOG = "ollama_deps"
@@ -36,9 +37,9 @@ local MARKER_READY      = "OLLAMA_READY"
 -- Step labels keyed by marker. The "READY" marker also doubles as a
 -- success-final-step we render before auto-hiding.
 local PROGRESS_LABELS = {
-	[MARKER_INSTALLING] = "Installation d’Ollama…",
-	[MARKER_STARTING]   = "Démarrage du serveur Ollama…",
-	[MARKER_READY]      = "Serveur Ollama prêt.",
+	[MARKER_INSTALLING] = i18n.get("ollama.deps_step_installing"),
+	[MARKER_STARTING]   = i18n.get("ollama.deps_step_starting"),
+	[MARKER_READY]      = i18n.get("ollama.deps_step_ready"),
 }
 
 local KNOWN_MARKERS = {
@@ -145,7 +146,7 @@ local function make_streaming_handler()
 				if not ui_shown then
 					pcall(llm_progress.show, {
 						kind     = "ollama_install",
-						title    = "Initialisation du moteur IA (Ollama)",
+						title    = i18n.get("ollama.install_title"),
 						subtitle = label,
 					})
 					ui_shown = true
@@ -200,7 +201,7 @@ function M.check_and_install_deps()
 			Logger.success(LOG, "Ollama backend ready.")
 			-- Only auto-hide if the UI was actually shown (slow path).
 			if llm_progress.is_active() then
-				pcall(llm_progress.set_step, "Serveur Ollama prêt.")
+				pcall(llm_progress.set_step, i18n.get("ollama.deps_step_ready"))
 				pcall(llm_progress.set_progress, 100)
 				hs.timer.doAfter(SUCCESS_AUTO_HIDE_SEC, function()
 					pcall(llm_progress.hide)
@@ -216,8 +217,8 @@ function M.check_and_install_deps()
 			if not llm_progress.is_active() then
 				pcall(llm_progress.show, {
 					kind     = "ollama_install",
-					title    = "Initialisation du moteur IA (Ollama)",
-					subtitle = "Échec…",
+					title    = i18n.get("ollama.install_title"),
+					subtitle = i18n.get("ollama.deps_failed"),
 				})
 			end
 			pcall(llm_progress.set_error, tail)
@@ -227,7 +228,7 @@ function M.check_and_install_deps()
 	if not task then
 		Logger.error(LOG, "Failed to create hs.task for Ollama bootstrap script.")
 		_bootstrap_state = "failed"
-		_last_failure_message = "Impossible de créer la tâche hs.task."
+		_last_failure_message = i18n.get("ollama.deps_task_create_failed")
 		return
 	end
 
@@ -236,7 +237,7 @@ function M.check_and_install_deps()
 	if not pcall(function() task:start() end) then
 		Logger.error(LOG, "Failed to start hs.task for Ollama bootstrap script.")
 		_bootstrap_state = "failed"
-		_last_failure_message = "Impossible de démarrer la tâche hs.task."
+		_last_failure_message = i18n.get("ollama.deps_task_start_failed")
 	end
 end
 

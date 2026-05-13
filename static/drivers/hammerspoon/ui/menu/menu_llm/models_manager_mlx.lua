@@ -15,6 +15,7 @@ local hs            = hs
 local notifications = require("lib.notifications")
 local ui_builder = require("ui.ui_builder")
 local Logger = require("lib.logger")
+local i18n = require("lib.i18n")
 
 -- Optional dependency: the auto-bootstrap status lives in this module so we
 -- can differentiate "still installing" from "definitively failed" when the
@@ -174,18 +175,18 @@ function M.new(deps, presets)
 	function obj.open_model_source_page(model_name)
 		local repo = obj.get_mlx_repo(model_name)
 		if type(repo) ~= "string" or repo == "" then
-			pcall(notifications.notify, "Source introuvable", "Aucun dépôt MLX trouvé pour ce modèle", "error")
+			pcall(notifications.notify, i18n.get("mlx.source_not_found"), i18n.get("mlx.source_not_found_body"), "error")
 			return false
 		end
 
 		local url = "https://huggingface.co/" .. repo
 		local ok_open = pcall(hs.urlevent.openURL, url)
 		if not ok_open then
-			pcall(notifications.notify, "Ouverture impossible", "Impossible d’ouvrir la page HuggingFace", "error")
+			pcall(notifications.notify, i18n.get("mlx.source_not_found"), i18n.get("mlx.open_source_failed"), "error")
 			return false
 		end
 
-		pcall(notifications.notify, "HuggingFace", "Page du modèle ouverte dans votre navigateur", "info")
+		pcall(notifications.notify, i18n.get("mlx.hf_login_title"), i18n.get("mlx.hf_page_opened"), "info")
 		return true
 	end
 
@@ -232,14 +233,14 @@ function M.new(deps, presets)
 					
 					if token == "" and token_seed ~= "" then
 						token = token_seed
-						pcall(notifications.notify, "Token détecté", "Token récupéré depuis le presse-papiers", "success")
+						pcall(notifications.notify, i18n.get("mlx.token_detected"), i18n.get("mlx.token_detected_body"), "success")
 					elseif token ~= "" and token_seed ~= "" and #token_seed > #token and token_seed:sub(-#token) == token then
 						token = token_seed
-						pcall(notifications.notify, "Token corrigé", "Le token du presse-papiers complet a été utilisé", "success")
+						pcall(notifications.notify, i18n.get("mlx.token_corrected"), i18n.get("mlx.token_corrected_body"), "success")
 					end
 					
 					if token == "" then
-						pcall(notifications.notify, "Token manquant", "Aucun token fourni", "error")
+						pcall(notifications.notify, i18n.get("mlx.token_missing"), i18n.get("mlx.token_missing_body"), "error")
 						if type(on_done) == "function" then pcall(on_done, false) end
 						return
 					end
@@ -261,7 +262,7 @@ function M.new(deps, presets)
 
 			_token_wv = ui_builder.show_webview({
 				frame             = frame,
-				title             = "Connexion HuggingFace",
+				title             = i18n.get("mlx.hf_login_title"),
 				style_masks       = {"titled", "closable", "nonactivating"},
 				level             = hs.drawing.windowLevels.floating,
 				allow_text_entry  = true,
@@ -358,10 +359,10 @@ PY
 			if deps.active_tasks then deps.active_tasks["hf_login"] = nil end
 
 			if code == 0 then
-				pcall(notifications.notify, "HuggingFace connecté", "Token sauvegardé. Vous pouvez maintenant télécharger les modèles beaucoup plus rapidement !", "success")
+				pcall(notifications.notify, i18n.get("mlx.hf_connected"), i18n.get("mlx.hf_connected_body"), "success")
 				if type(on_done) == "function" then pcall(on_done, true) end
 			else
-				pcall(notifications.notify, "Connexion HuggingFace", "Échec de connexion. Vérifiez votre token.", "error")
+				pcall(notifications.notify, i18n.get("mlx.hf_login_title"), i18n.get("mlx.hf_connection_failed_body"), "error")
 				if type(on_done) == "function" then pcall(on_done, false) end
 			end
 		end, function(_, stdout, stderr)
@@ -995,7 +996,7 @@ PY
 				pcall(deps.update_icon)
 				os.execute("rm -f /tmp/hs_mlx_active_download.json 2>/dev/null")
 				if not silent then
-					pcall(notifications.notify, "Annulé", "Téléchargement de " .. target_model .. " interrompu.", "warning")
+					pcall(notifications.notify, i18n.get("mlx.download_cancelled"), string.format(i18n.get("mlx.download_cancelled_body"), target_model), "warning")
 					if download_window then pcall(download_window.complete, false, target_model) end
 				end
 			end
@@ -1059,7 +1060,7 @@ PY
 			-- heredoc — a detached process cannot read from stdin after the shell exits anyway
 			local py = io.open(py_path, "w")
 			if not py then
-				pcall(notifications.notify, "Écriture du script Python impossible dans /tmp", nil, "error")
+				pcall(notifications.notify, i18n.get("mlx.write_py_failed"), nil, "error")
 				return
 			end
 			py:write("import sys, os, threading, atexit\n")
@@ -1150,7 +1151,7 @@ PY
 			-- then starts Python detached via nohup (shields SIGHUP) and reports its PID
 			local f = io.open(script_path, "w")
 			if not f then
-				pcall(notifications.notify, "Écriture du script Bash impossible dans /tmp", nil, "error")
+				pcall(notifications.notify, i18n.get("mlx.write_sh_failed"), nil, "error")
 				return
 			end
 			f:write("#!/bin/bash\n")
@@ -1240,7 +1241,7 @@ PY
 						local reason = (_current_pct >= 99)
 							and "Aucun progrès détecté depuis 2 minutes à 99 %. Blocage probable."
 							or "Aucun progrès détecté depuis 5 minutes. Abandon."
-						pcall(notifications.notify, "Téléchargement MLX bloqué", reason, "warning")
+						pcall(notifications.notify, i18n.get("mlx.download_stalled"), reason, "warning")
 						if download_window then pcall(download_window.complete, false, target_model) end
 						-- Pass silent=true: notifications and window state already handled above
 						do_cancel(true)
@@ -1347,7 +1348,7 @@ PY
 				end
 
 				if exit_code == 0 then
-					pcall(notifications.notify, "Modèle MLX installé", target_model .. " est prêt !", "success")
+					pcall(notifications.notify, i18n.get("mlx.model_installed"), string.format(i18n.get("mlx.model_ready"), target_model), "success")
 					if download_window then pcall(download_window.complete, true, target_model) end
 					deps.state.llm_model = target_model
 					if deps.keymap and type(deps.keymap.set_llm_model) == "function" then pcall(deps.keymap.set_llm_model, target_model) end
@@ -1357,7 +1358,7 @@ PY
 					end)
 				else
 					if download_window then pcall(download_window.complete, false, target_model, _saw_gated_error and "gated" or nil) end
-					pcall(notifications.notify, "Échec MLX", "Vérifiez les logs dans la fenêtre.", "error")
+					pcall(notifications.notify, i18n.get("mlx.download_failed"), i18n.get("mlx.download_failed_body"), "error")
 				end
 			end
 
@@ -1401,7 +1402,7 @@ PY
 					-- Reset icon here: handle_download_done will not run after a launcher failure
 					pcall(deps.update_icon)
 					if download_window then pcall(download_window.complete, false, target_model) end
-					pcall(notifications.notify, "Échec lancement MLX", "Le lanceur a échoué (code " .. tostring(code) .. ").", "error")
+					pcall(notifications.notify, i18n.get("mlx.launcher_failed"), string.format(i18n.get("mlx.launcher_failed_body"), code), "error")
 					return
 				end
 				start_tail_monitor()
@@ -1464,9 +1465,9 @@ PY
 			os.execute("rm -f " .. exit_path .. " 2>/dev/null")
 			os.execute("rm -f /tmp/hs_mlx_active_download.json 2>/dev/null")
 			if code == 0 then
-				pcall(notifications.notify, "Modèle MLX installé", model .. " est prêt !", "success")
+				pcall(notifications.notify, i18n.get("mlx.model_installed"), string.format(i18n.get("mlx.model_ready"), model), "success")
 			else
-				pcall(notifications.notify, "Échec MLX", "Le téléchargement de " .. model .. " a échoué pendant le rechargement.", "error")
+				pcall(notifications.notify, i18n.get("mlx.download_failed"), string.format(i18n.get("mlx.download_interrupted_body"), model), "error")
 			end
 			Logger.info(LOG, "Reattach: download already finished (exit=%d) — no tail needed.", code)
 			return
@@ -1477,7 +1478,7 @@ PY
 			local alive = os.execute("kill -0 " .. tostring(pid) .. " 2>/dev/null")
 			if not alive then
 				os.execute("rm -f /tmp/hs_mlx_active_download.json 2>/dev/null")
-				pcall(notifications.notify, "Téléchargement interrompu", "Le processus de téléchargement de " .. model .. " s'est arrêté pendant le rechargement.", "error")
+				pcall(notifications.notify, i18n.get("mlx.download_interrupted"), string.format(i18n.get("mlx.download_interrupted_body"), model), "error")
 				Logger.warn(LOG, "Reattach: PID %d no longer alive — aborting reattach.", pid)
 				return
 			end
@@ -1499,7 +1500,7 @@ PY
 			pcall(deps.update_icon)
 			os.execute("rm -f /tmp/hs_mlx_active_download.json 2>/dev/null")
 			if not silent then
-				pcall(notifications.notify, "Annulé", "Téléchargement de " .. model .. " interrompu.", "warning")
+				pcall(notifications.notify, i18n.get("mlx.download_cancelled"), string.format(i18n.get("mlx.download_cancelled_body"), model), "warning")
 				if download_window then pcall(download_window.complete, false, model) end
 			end
 		end
@@ -1519,12 +1520,12 @@ PY
 				os.execute("rm -f " .. exit_path .. " 2>/dev/null")
 			end
 			if exit_code == 0 then
-				pcall(notifications.notify, "Modèle MLX installé", model .. " est prêt !", "success")
+				pcall(notifications.notify, i18n.get("mlx.model_installed"), string.format(i18n.get("mlx.model_ready"), model), "success")
 				if download_window then pcall(download_window.complete, true, model) end
 				pcall(deps.save_prefs)
 			else
 				if download_window then pcall(download_window.complete, false, model) end
-				pcall(notifications.notify, "Échec MLX", "Vérifiez les logs dans la fenêtre.", "error")
+				pcall(notifications.notify, i18n.get("mlx.download_failed"), i18n.get("mlx.download_failed_body"), "error")
 			end
 		end
 
@@ -1611,7 +1612,7 @@ PY
 				Logger.warn(LOG, "MLX model %s not detected as installed. Starting download flow…", tostring(target_model))
 				local repo = obj.get_mlx_repo(target_model)
 				if not repo then 
-					pcall(notifications.notify, "Modèle MLX non disponible", "Le modèle " .. target_model .. " n’est pas compatible MLX ou n’a pas de dépôt MLX configuré", "error")
+					pcall(notifications.notify, i18n.get("mlx.model_unavailable"), string.format(i18n.get("mlx.model_unavailable_body"), target_model), "error")
 					if on_cancel then on_cancel() end 
 					return 
 				end

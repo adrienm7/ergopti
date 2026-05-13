@@ -1781,7 +1781,7 @@ function M.create(deps)
                     pcall(_dw.focus)
                 elseif _dw and type(_dw.is_active) == "function" and not _dw.is_active() then
                     -- Window was closed without cancelling — download still runs in background
-                    pcall(notifications.notify, "Fenêtre de téléchargement introuvable", "Le téléchargement est toujours en cours en arrière-plan.", "info")
+                    pcall(notifications.notify, i18n.get("menu.llm.download_window_lost"), i18n.get("menu.llm.download_window_lost_body"), "info")
                 end
             end
         }

@@ -107,8 +107,9 @@ end
 
 local function list_existing_categories()
 	local cats = load_categories()
-	local seen = { ["Général"] = true }
-	local result = { "Général" }
+	local general = i18n.get("metrics_apps.general_category")
+	local seen = { [general] = true }
+	local result = { general }
 	for _, entry in pairs(cats) do
 		local t = type(entry) == "table" and entry.type or nil
 		if type(t) == "string" and t ~= "" and not seen[t] then

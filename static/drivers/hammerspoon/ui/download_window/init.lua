@@ -55,26 +55,26 @@ local ASSETS_DIR = _src:match("^(.*[/\\])") or "./"
 local PRESETS = {
 	mlx_install = {
 		mode             = "bootstrap",
-		default_title    = "Installation du moteur IA (MLX)",
-		default_subtitle = "Préparation des dépendances Python locales…",
+		default_title    = i18n.get("mlx.install_title"),
+		default_subtitle = i18n.get("mlx.install_subtitle"),
 		accent           = "#4da6ff",
 	},
 	ollama_install = {
 		mode             = "bootstrap",
-		default_title    = "Installation du moteur IA (Ollama)",
-		default_subtitle = "Préparation du serveur Ollama local…",
+		default_title    = i18n.get("ollama.install_title"),
+		default_subtitle = i18n.get("ollama.install_subtitle"),
 		accent           = "#73d98c",
 	},
 	mlx_model = {
 		mode             = "download",
-		default_title    = "Téléchargement du modèle MLX",
-		default_subtitle = "Récupération des poids depuis Hugging Face…",
+		default_title    = i18n.get("mlx.download_title"),
+		default_subtitle = i18n.get("mlx.download_subtitle"),
 		accent           = "#9973f2",
 	},
 	ollama_model = {
 		mode             = "download",
-		default_title    = "Téléchargement du modèle Ollama",
-		default_subtitle = "Récupération des poids depuis Ollama Hub…",
+		default_title    = i18n.get("ollama.download_title"),
+		default_subtitle = i18n.get("ollama.download_subtitle"),
 		accent           = "#f2bf4d",
 	},
 }
@@ -244,7 +244,7 @@ local function ensure_webview(title)
 
     _wv = ui_builder.show_webview({
         frame             = compute_frame(_mode),
-        title             = title or "Téléchargement",
+        title             = title or i18n.get("download_window.title"),
         style_masks       = {"titled", "closable", "miniaturizable", "resizable", "nonactivating"},
         level             = hs.drawing.windowLevels.floating,
         allow_text_entry  = false,
@@ -410,7 +410,7 @@ function M.show(opts)
     M._total_files = nil
     M._last_file_count = nil
 
-    ensure_webview("Téléchargement du modèle")
+    ensure_webview(i18n.get("mlx.download_title"))
 
     eval(string.format("setKind(%s,null,null)", js_str(_kind)))
     local safe = M._current_model:gsub("'", "\\'"):gsub("\"", "\\\"")
@@ -560,7 +560,7 @@ function M.complete(success, _model_name, error_kind)
     if not _wv then return end
 
     local is_ok = success == true
-    local msg   = is_ok and "✅ Installation terminée !" or "Échec du téléchargement"
+    local msg   = is_ok and i18n.get("download_window.done_success") or i18n.get("download_window.done_failed")
     local js    = string.format("done(%s,%s,%s); showLog()", is_ok and "true" or "false", js_str(msg), js_str(error_kind))
 
     eval(js)

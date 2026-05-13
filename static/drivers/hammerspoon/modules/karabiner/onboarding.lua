@@ -35,6 +35,7 @@ local M = {}
 
 local hs     = hs
 local Logger = require("lib.logger")
+local i18n   = require("lib.i18n")
 
 -- Optional dependency: only used to surface user-friendly notifications.
 -- Falls back to silent operation if the notifications lib is not present.
@@ -352,11 +353,11 @@ end
 function M.ensure_dmg_cached(manifest, cache_path, callback)
 	local function fresh_download()
 		Logger.start(LOG, "Downloading KE DMG (~46 MB) from %s…", manifest.source_url)
-		notify("Téléchargement de Karabiner-Elements (~46 Mo)…", "info")
+		notify(i18n.get("karabiner.downloading"), "info")
 		download_async(manifest.source_url, cache_path, function(ok_dl, err_dl)
 			if not ok_dl then
 				Logger.error(LOG, "Download failed: %s.", err_dl)
-				callback(false, "Téléchargement échoué : " .. tostring(err_dl))
+				callback(false, string.format(i18n.get("karabiner.download_failed"), tostring(err_dl)))
 				return
 			end
 			Logger.success(LOG, "Download complete.")
@@ -365,7 +366,7 @@ function M.ensure_dmg_cached(manifest, cache_path, callback)
 				if not ok_sha then
 					Logger.error(LOG, "Hash verification failed: %s.", err_sha)
 					os.remove(cache_path)
-					callback(false, "Vérification SHA-256 échouée : " .. tostring(err_sha))
+					callback(false, string.format(i18n.get("karabiner.sha_failed"), tostring(err_sha)))
 					return
 				end
 				Logger.success(LOG, "SHA-256 verified.")
@@ -436,17 +437,17 @@ function M.install_karabiner_elements(callback)
 			if not pkg_path then
 				unmount_dmg(mount_point)
 				Logger.error(LOG, "No .pkg found in mounted volume.")
-				callback(false, "Aucun .pkg trouvé dans le DMG.")
+				callback(false, i18n.get("karabiner.pkg_not_found"))
 				return
 			end
 
 			Logger.start(LOG, "Running pkg installer (admin prompt expected)…")
-			notify("Installation de Karabiner-Elements (mot de passe admin requis)…", "info")
+			notify(i18n.get("karabiner.installing"), "info")
 			run_pkg_with_sudo_async(pkg_path, function(ok_install, err_install)
 				unmount_dmg(mount_point)
 				if not ok_install then
 					Logger.error(LOG, "Installer failed: %s.", err_install)
-					callback(false, "Installation échouée : " .. tostring(err_install))
+					callback(false, string.format(i18n.get("karabiner.install_failed"), tostring(err_install)))
 					return
 				end
 				Logger.success(LOG, "Karabiner-Elements installed.")
@@ -570,11 +571,9 @@ function M.run_first_run_wizard()
 		M.install_karabiner_elements(function(ok_install, err_install)
 			if not ok_install then
 				hs.dialog.blockAlert(
-					"Installation échouée",
-					"L'installation automatique a échoué : " .. tostring(err_install)
-						.. "\n\nVous pouvez télécharger manuellement Karabiner-Elements "
-						.. "depuis https://karabiner-elements.pqrs.org puis relancer Hammerspoon.",
-					"OK", nil, "critical")
+					i18n.get("karabiner.install_error_title"),
+					string.format(i18n.get("karabiner.install_error_body"), tostring(err_install)),
+					i18n.get("button.ok"), nil, "critical")
 				return
 			end
 			-- Wait briefly for the new binary to register, then re-poll to
