@@ -27,6 +27,7 @@ local fs         = require("hs.fs")
 local json       = require("hs.json")
 local ui_builder = require("ui.ui_builder")
 local Logger     = require("lib.logger")
+local i18n       = require("lib.i18n")
 
 local LOG = "metrics_typing"
 
@@ -341,7 +342,7 @@ function M.show()
 
 	M._wv = ui_builder.show_webview({
 		frame       = frame,
-		title       = "Métriques de frappe",
+		title       = i18n.get("metrics_apps.title"),
 		style_masks = 15,
 		assets_dir  = hs.configdir .. "/../_shared/ui/metrics_typing/",
 		on_close    = function()

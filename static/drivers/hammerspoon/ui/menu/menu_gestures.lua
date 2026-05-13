@@ -124,7 +124,7 @@ function M.build(ctx)
 									local ok_c, clicked = pcall(dialog.block_alert,
 										i18n.get("menu.gestures.conflict_title"), conflict.msg or "",
 										i18n.get("menu.gestures.open_settings"), "OK", "warning")
-									if ok_c and clicked == "Ouvrir Réglages" then
+									if ok_c and clicked == i18n.get("menu.gestures.open_settings") then
 										pcall(hs.execute, string.format("open \"%s\"", conflict.url or ""))
 									end
 								end)

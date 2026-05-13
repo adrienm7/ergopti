@@ -483,7 +483,7 @@ function M.build_management(ctx)
 			local key = "custom_" .. idx
 			while existing_keys[key] do idx = idx + 1; key = "custom_" .. idx end
 
-			local label = char .. " : Personnalisé" .. (consume and " (consommé)" or "")
+			local label = char .. " : " .. (consume and i18n.get("hotstrings.custom_terminator_consumed") or i18n.get("hotstrings.custom_terminator"))
 
 			-- 4. Register in the live engine
 			if ctx.keymap and type(ctx.keymap.add_custom_terminator) == "function" then
@@ -749,9 +749,9 @@ function M.build_custom(ctx)
 				.. "+" .. (state.custom_editor_shortcut.key or "")
 		end
 		local ok_p, btn, raw = pcall(dialog.text_prompt,
-			"Raccourci personnalisé",
+			i18n.get("hotstrings.shortcut_custom"),
 			i18n.get("menu.hotstrings.shortcut_prompt"),
-			current_str, "OK", "Annuler"
+			current_str, "OK", i18n.get("common.cancel")
 		)
 		if not ok_p or btn ~= "OK" or type(raw) ~= "string" then return end
 		raw = raw:match("^%s*(.-)%s*$"):lower()

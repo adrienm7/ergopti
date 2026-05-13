@@ -224,7 +224,7 @@ global Features := Map(
     ),
     "Shortcuts", Map(
         "__Order", [
-            ">Lettres accentuées",
+            ">menu.shortcuts.group_accented",
             "EGrave",
             "ECirc",
             "EAcute",
@@ -232,7 +232,7 @@ global Features := Map(
             "<",
             "WrapTextIfSelected",
             "-",
-            ">Combinaison de modificateurs",
+            ">menu.shortcuts.group_modifiers",
             "AltGrLAlt",
             "AltGrCapsLock",
             "LAltCapsLock",

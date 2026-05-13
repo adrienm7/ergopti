@@ -316,6 +316,7 @@ function M.generate(ctx, menu_mods, actions)
 		}
 	})
 	table.insert(items, { title = i18n.get("menu.global.config_folder"), fn = actions.open_paths })
+	table.insert(items, { title = i18n.get("menu.global.setup_wizard"),  fn = actions.show_setup_wizard })
 	table.insert(items, { title = "-" })
 	table.insert(items, { title = i18n.get("menu.global.edit_shortcuts"), fn = actions.open_personal_shortcuts })
 	-- Strip the leading emoji token from the shared i18n string and replace with

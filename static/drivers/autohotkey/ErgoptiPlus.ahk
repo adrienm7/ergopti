@@ -81,6 +81,7 @@ SendMode("Event") ; Everything concerning hotstrings MUST use SendEvent and not 
 #Include lib/toml/toml_loader.ahk
 ; i18n module — must come after toml_loader.ahk (TOML_BatchWrite) and logger.ahk
 #Include lib/i18n.ahk
+#Include lib/onboarding.ahk
 #Include lib/hotstrings/hotstrings_config.ahk
 #Include lib/hotstrings/hotstrings_config_window.ahk
 #Include lib/tooltip.ahk
@@ -238,10 +239,10 @@ global SCRIPT_SHORTCUT_SLOTS := [
     "script_altgr_escape",
 ]
 global SCRIPT_SHORTCUT_LABELS := Map(
-    "script_altgr_enter", "AltGr + Entrée",
-    "script_altgr_backspace", "AltGr + ⌫",
-    "script_altgr_delete", "AltGr + ⌦",
-    "script_altgr_escape", "AltGr + Échap",
+    "script_altgr_enter",    t("sg_labels.script_altgr_enter"),
+    "script_altgr_backspace", t("sg_labels.script_altgr_backspace"),
+    "script_altgr_delete",   t("sg_labels.script_altgr_delete"),
+    "script_altgr_escape",   t("sg_labels.script_altgr_escape"),
 )
 global SCRIPT_SHORTCUT_DEFAULTS := Map(
     "script_altgr_enter", "script_pause_toggle",
@@ -324,6 +325,8 @@ ReadScriptConfig(Cache) {
         ScriptInformation["MagicKey"] := Raw
     ; Paths are always derived from _ConfigDir at startup and are never persisted
 }
+
+Onboarding_Run()
 
 global _IniCache := ParseTomlFile(ConfigurationFile)
 ReadScriptConfig(_IniCache)
@@ -598,7 +601,9 @@ CreateSubMenusRecursive(MenuParent, Items, CategoryPath) {
                 continue
             }
             if (SubStr(Feature, 1, 1) == ">") {
-                GroupLabel := Trim(SubStr(Feature, 2))
+                GroupKey := Trim(SubStr(Feature, 2))
+                ; If the key contains a dot it's an i18n key, otherwise literal label
+                GroupLabel := InStr(GroupKey, ".") ? t(GroupKey) : GroupKey
                 GroupMenu := Menu()
                 CurrentMenu.Add(GroupLabel, GroupMenu)
                 MenuStack.Push(GroupMenu)
@@ -650,11 +655,11 @@ CreateSubMenusRecursiveCommonCode(MenuParent, Key, Val, CategoryPath) {
         ; Mirror HS personal_info module_placeholder: add an editor shortcut
         ; below the "Remplissage de formulaires" toggle
         if (StrLower(Key) == "textexpansionpersonalinformation") {
-            MenuParent.Add("   ↳ Modifier les informations…", PersonalInformationEditor)
+            MenuParent.Add(t("menu.shortcuts.edit_personal_info"), PersonalInformationEditor)
         }
         ; Mirror HS ctrl_g pattern: inject the URL editor right below the GPT toggle
         if (StrLower(Key) == "gpt") {
-            MenuParent.Add("   ↳ Modifier le lien Win + G…", GPTLinkEditor)
+            MenuParent.Add(t("menu.shortcuts.edit_gpt_link"), GPTLinkEditor)
         }
     }
 }
@@ -686,8 +691,8 @@ MenuAddLetterPicker(MenuParent, FeatureCategoryPath, FeatureName) {
 
     LetterMenu := Menu()
 
-    ; "Désactivé" entry — disables the remap without touching Letter
-    DisabledLabel := "Désactivé"
+    ; Entry that disables the remap without touching Letter
+    DisabledLabel := t("common.disabled")
     LetterMenu.Add(DisabledLabel, ((p) => (*) => SetFeatureLetterOff(p))(FullPath))
     if !Feature.Enabled {
         LetterMenu.Check(DisabledLabel)
@@ -750,7 +755,7 @@ SetFeatureLetterOff(FullPath) {
 GetSubMenuLabel(FullPath, FallbackKey) {
     switch FullPath {
         case "Shortcuts.Personal":
-            return "Raccourcis personnels"
+            return t("menu.shortcuts.personal")
     }
     return FallbackKey
 }
@@ -1223,12 +1228,12 @@ GestureAutoConfigureAction() {
 ; =========================
 
 global MenuHotstrings := "⚡ Hotstrings"
-global MenuConfigurationShortcuts := "Raccourcis de gestion du script"
+global MenuConfigurationShortcuts := t("menu.script_control.title")
 ; Holds the « Suspendre » label so UpdateTrayIcon can check/uncheck the
 ; entry by its exact text on A_TrayMenu. Re-assigned in initMenu so future
 ; label tweaks (icons, hints) only need to change the menu builder.
-global MenuSuspend := "⏸︎ Suspendre"
-global MenuDebugging := "⚠ Débogage"
+global MenuSuspend := t("menu.global.suspend")
+global MenuDebugging := t("menu.debug.title")
 
 ; Categories that live inside the Hotstrings submenu (ordered to match HS menu)
 global HotstringCategories := ["DistancesReduction", "SFBsReduction", "Rolls", "Autocorrection", "MagicKey"]
@@ -1581,6 +1586,7 @@ initMenu() {
     MenuSuspend := t("menu.global.suspend")
     A_TrayMenu.Add(t("menu.global.title"), GlobalActionsMenu)
     A_TrayMenu.Add(t("menu.global.config_folder"), FilePathsEditor)
+    A_TrayMenu.Add(t("menu.global.setup_wizard"), Onboarding_ShowFromMenu)
     A_TrayMenu.Add() ; Separator before lifecycle actions
     A_TrayMenu.Add(t("menu.global.edit_shortcuts"), OpenPersonalShortcuts)
     A_TrayMenu.Add(MenuSuspend, ToggleSuspend)
@@ -2106,7 +2112,7 @@ _ParseExtTomlSections(FilePath) {
 }
 
 MagicKeyEditor(*) {
-    GuiToShow := Gui(, "Modifier la touche magique")
+    GuiToShow := Gui(, t("dialog.magic_key.title"))
     GuiToShow.Add("Text", , "Nouvelle valeur (★ par défaut) :")
     NewValue := GuiToShow.Add("Edit", "w50 x+10", ScriptInformation["MagicKey"])
 
@@ -2123,7 +2129,7 @@ ModifyMagicKey(gui, NewValue) {
 }
 
 PersonalInformationEditor(*) {
-    GuiToShow := Gui(, "Modifier les coordonnées personnelles")
+    GuiToShow := Gui(, t("dialog.personal_info.title"))
     UpdatedPersonalInformation := Map()
 
     ReverseLetters := Map()
@@ -2173,12 +2179,12 @@ ProcessUserInput(gui, edits) {
         }
     }
 
-    MsgBox("Nouvelles coordonnées :`n`n" PersonalInformationSummary)
+    MsgBox(t("dialog.personal_info.saved") "`n`n" PersonalInformationSummary)
     Reload
 }
 
 GPTLinkEditor(*) {
-    GuiToShow := Gui(, "Modifier le lien ouvert par Win + G")
+    GuiToShow := Gui(, t("dialog.gpt_link.title"))
     NewValue := GuiToShow.Add("Edit", "w300", Features["Shortcuts"]["GPT"].Link)
 
     GuiToShow.Add("Button", "w100 Center", "OK").OnEvent("Click", (*) => ModifyLink(GuiToShow, NewValue.Text))
@@ -2210,9 +2216,7 @@ NoAction(*) {
 }
 
 ToggleAllFeaturesOn(*) {
-    MsgBox(
-        "⚠ ATTENTION : Toutes les fonctionnalités ont été activées, même quelques unes désactivées par défaut."
-    )
+    MsgBox(t("dialog.enable_all.warning"))
     ToggleAllFeatures(1)
 }
 ToggleAllFeaturesOff(*) {
@@ -2850,21 +2854,19 @@ ShowKeyboardShortcutPicker(SlotId) {
 FilePathsEditor(*) {
     global _ConfigDir, _PathsFile
 
-    W := Gui(, "Dossier de configuration")
+    W := Gui(, t("dialog.config_folder.title"))
     W.SetFont("s10", "Segoe UI")
     W.MarginX := 12
     W.MarginY := 12
 
-    W.Add("Text", "xm", "Dossier de configuration personnel :")
+    W.Add("Text", "xm", t("dialog.config_folder.label"))
     DirEdit := W.Add("Edit", "xm w480", _ConfigDir)
-    W.Add("Button", "x+6 w80", "Parcourir…").OnEvent("Click", BrowseDir)
+    W.Add("Button", "x+6 w80", t("common.browse")).OnEvent("Click", BrowseDir)
 
-    W.Add("Text", "xm y+14 cGray",
-        "Tous les fichiers personnels (personal_shortcuts.ahk, personal_hotstrings.toml…)`n"
-        . "seront cherchés dans ce dossier. Laisser vide pour utiliser le dossier par défaut.")
+    W.Add("Text", "xm y+14 cGray", t("dialog.config_folder.hint"))
 
     W.Add("Button", "xm y+10 w80", "OK").OnEvent("Click", SaveConfigDir)
-    W.Add("Button", "x+6 w80", "Annuler").OnEvent("Click", (*) => W.Destroy())
+    W.Add("Button", "x+6 w80", t("common.cancel")).OnEvent("Click", (*) => W.Destroy())
 
     BrowseDir(*) {
         ; Start from the current field value if it exists, otherwise fall back to
@@ -2873,7 +2875,7 @@ FilePathsEditor(*) {
         if (StartDir == "" or !DirExist(StartDir)) {
             StartDir := A_MyDocuments
         }
-        Selected := DirSelect("*" . StartDir, 1, "Sélectionner le dossier de configuration")
+        Selected := DirSelect("*" . StartDir, 1, t("dialog.config_folder.select_title"))
         if (Selected != "") {
             if !RegExMatch(Selected, "\\$")
                 Selected .= "\"

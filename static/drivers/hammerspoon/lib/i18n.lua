@@ -39,10 +39,10 @@ local locale_mod = require("lib.locale")
 
 --- Ordered list of supported locales.
 local LOCALES = {
-	{ code = "fr", flag = "🇫🇷", name = "Français" },
-	{ code = "en", flag = "🇬🇧", name = "English"  },
 	{ code = "de", flag = "🇩🇪", name = "Deutsch"  },
+	{ code = "en", flag = "🇬🇧", name = "English"  },
 	{ code = "es", flag = "🇪🇸", name = "Español"  },
+	{ code = "fr", flag = "🇫🇷", name = "Français" },
 	{ code = "zh", flag = "🇨🇳", name = "中文"      },
 }
 
@@ -131,6 +131,20 @@ function M.set_locale(code)
 	Logger.success(LOG, "Locale set to '%s' — reloading.", code)
 	hs.reload()
 end
+
+--- Changes the active locale in memory only, without triggering a reload.
+--- Used by the onboarding wizard so subsequent steps render in the new locale
+--- without restarting the script mid-wizard.
+--- @param code string A known locale code.
+function M.set_locale_no_reload(code)
+	if not is_known(code) then
+		Logger.warn(LOG, "Unknown locale '%s' — ignoring.", code)
+		return
+	end
+	_locale = code
+	if _locale_set_fn then _locale_set_fn(code) end
+end
+
 
 --- Returns a list of hs.menu-compatible item tables for a language selector.
 --- Each item has a title and an fn; the currently active locale gets a

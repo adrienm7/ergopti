@@ -194,6 +194,19 @@ end
 -- =======================================
 -- =======================================
 
+-- Show the onboarding wizard on first launch (config.toml absent) and bail early —
+-- the wizard writes the file and calls hs.reload(), so normal init must not proceed
+do
+	local ok_ob, onboarding_mod = pcall(require, "ui.onboarding")
+	if ok_ob and type(onboarding_mod) == "table" then
+		local cfg_path = menu_paths.get("ConfigTomlPath")
+		if onboarding_mod.should_run(cfg_path) then
+			onboarding_mod.run(cfg_path)
+			return
+		end
+	end
+end
+
 -- Apply optional user overrides from hammerspoon/config.toml on top of
 -- hs.settings. The [script] and [features] sections are an optional "expert"
 -- layer the user can edit by hand to override anything the menu exposes

@@ -30,10 +30,10 @@
 
 ; Ordered list of supported locales: { Code, Flag, Name }
 global I18N_LOCALES := [
-	{ Code: "fr", Flag: "🇫🇷", Name: "Français"  },
-	{ Code: "en", Flag: "🇬🇧", Name: "English"   },
 	{ Code: "de", Flag: "🇩🇪", Name: "Deutsch"   },
+	{ Code: "en", Flag: "🇬🇧", Name: "English"   },
 	{ Code: "es", Flag: "🇪🇸", Name: "Español"   },
+	{ Code: "fr", Flag: "🇫🇷", Name: "Français"  },
 	{ Code: "zh", Flag: "🇨🇳", Name: "中文"       },
 ]
 
