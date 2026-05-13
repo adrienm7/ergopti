@@ -318,13 +318,21 @@ WPMWidget_BuildGraph() {
 
         ; Set _graph_wv_ready only after the page has fully loaded so that
         ; ExecuteScriptAsync calls don't race against page initialization.
-        wv.add_NavigationCompleted((_wv, _args) => WPMWidget._graph_wv_ready := true)
+        ; Force a first render immediately so the canvas is not blank while
+        ; waiting for the next tick interval.
+        wv.add_NavigationCompleted(WPMWidget_OnNavCompleted)
         wv.NavigateToString(WPMWidget_GraphHtml(w, h))
 
         WPMWidget._graph_wv := wvc
     }
 
     WPMWidget._gui := g
+}
+
+
+WPMWidget_OnNavCompleted(_wv, _args) {
+    WPMWidget._graph_wv_ready := true
+    WPMWidget_PushGraphUpdate("0", WPMWidgetConst.COLOR_TXT_IDLE, false, false, false, true)
 }
 
 
