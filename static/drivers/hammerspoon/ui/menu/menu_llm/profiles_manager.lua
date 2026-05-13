@@ -222,14 +222,14 @@ local function build_profile_menu(deps, models_mgr)
 					end,
 				},
 				{
-					title = "i18n.get("menu.profiles.delete_profile")",
+					title = i18n.get("menu.profiles.delete_profile"),
 					fn    = function()
 						local ok_c, choice = pcall(dialog.block_alert,
-							"string.format(i18n.get("menu.profiles.delete_confirm_title"), display_label)", 
-							"i18n.get("menu.profiles.delete_confirm_body")", 
-							"Supprimer", "Annuler", "critical")
-							
-						if ok_c and choice == "Supprimer" then
+							string.format(i18n.get("menu.profiles.delete_confirm_title"), display_label),
+							i18n.get("menu.profiles.delete_confirm_body"),
+							i18n.get("button.delete"), i18n.get("common.cancel"), "critical")
+
+						if ok_c and choice == i18n.get("button.delete") then
 							if type(deps.apply_llm_profile_shortcut) == "function" then
 								deps.apply_llm_profile_shortcut(pid, nil, nil, { silent = true })
 							end

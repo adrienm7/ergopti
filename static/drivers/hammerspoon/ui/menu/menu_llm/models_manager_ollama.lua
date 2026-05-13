@@ -15,6 +15,7 @@ local M = {}
 local hs            = hs
 local notifications = require("lib.notifications")
 local Logger        = require("lib.logger")
+local i18n          = require("lib.i18n")
 
 local LOG = "menu_llm.ollama"
 
@@ -164,7 +165,7 @@ function M.new(deps, presets, ram_getter)
 			return
 		end
 
-		pcall(notifications.notify, "Démarrage Ollama", "Le service Ollama est arrêté. Démarrage en cours…", "info")
+		pcall(notifications.notify, i18n.get("ollama.starting_title"), i18n.get("ollama.service_stopped"), "info")
 		if restart_ollama_daemon() then
 			local retries = 0
 			local function check_ready()
@@ -175,13 +176,13 @@ function M.new(deps, presets, ram_getter)
 				elseif retries < 30 then
 					hs.timer.doAfter(0.5, check_ready)
 				else
-					pcall(notifications.notify, "Échec Ollama", "Impossible de démarrer le service.", "error")
+					pcall(notifications.notify, i18n.get("ollama.fail_title"), i18n.get("ollama.start_fail"), "error")
 					if type(on_fail) == "function" then on_fail() end
 				end
 			end
 			hs.timer.doAfter(0.5, check_ready)
 		else
-			pcall(notifications.notify, "Échec Ollama", "Impossible de lancer le démon Ollama.", "error")
+			pcall(notifications.notify, i18n.get("ollama.fail_title"), i18n.get("ollama.daemon_fail"), "error")
 			if type(on_fail) == "function" then on_fail() end
 		end
 	end
@@ -193,7 +194,7 @@ function M.new(deps, presets, ram_getter)
 
 		for i = 1, retries do
 			local pct = math.floor((i / retries) * 100)
-			update_progress_ui(pct, "Démarrage du service Ollama (" .. i .. "/" .. retries .. ")…")
+			update_progress_ui(pct, string.format(i18n.get("ollama.starting_service"), i, retries))
 			
 			local ok, result = pcall(hs.execute, "curl -s http://localhost:11434/api/version 2>/dev/null")
 			if ok and result and result:find('"version"') then
@@ -208,7 +209,7 @@ function M.new(deps, presets, ram_getter)
 		end
 
 		if success then
-			update_progress_ui(100, "Service Ollama prêt ✅")
+			update_progress_ui(100, i18n.get("ollama.service_ready"))
 		end
 
 		return success
@@ -329,12 +330,12 @@ function M.new(deps, presets, ram_getter)
 			end)
 		end
 		
-		show_progress_ui(target_model, "ollama pull " .. repo, "Téléchargement Ollama en cours...", cancel_pull_and_upgrade, do_retry)
+		show_progress_ui(target_model, "ollama pull " .. repo, i18n.get("ollama.downloading"), cancel_pull_and_upgrade, do_retry)
 		
 		local task = hs.task.new(bin, function(code)
 			if deps.active_tasks then deps.active_tasks["ollama_pull"] = nil end
 			if code == 0 then
-				pcall(notifications.notify, "Modèle Ollama installé", target_model .. " est prêt !", "success")
+				pcall(notifications.notify, i18n.get("ollama.model_installed_title"), string.format(i18n.get("ollama.model_ready"), target_model), "success")
 				complete_progress_ui(true, target_model)
 				-- Resolve the display name from the actual model name (e.g. "gemma3:4b" → "Gemma 3 4B")
 				local display_model = target_model
@@ -372,7 +373,7 @@ function M.new(deps, presets, ram_getter)
 					if on_success then pcall(on_success) end
 				end)
 			elseif code == 15 then
-				pcall(notifications.notify, "Annulé", "Téléchargement Ollama interrompu", "warning")
+				pcall(notifications.notify, i18n.get("ollama.cancelled_title"), i18n.get("ollama.download_cancelled"), "warning")
 				complete_progress_ui(false, target_model)
 			else
 				local requires_upgrade = needs_ollama_upgrade(pull_output)
@@ -380,13 +381,13 @@ function M.new(deps, presets, ram_getter)
 				
 				if requires_upgrade then
 					pcall(notifications.notify, "Mise à jour Ollama requise",
-						"La version d’Ollama installée est trop ancienne pour ce modèle. Mettez à jour Ollama manuellement.", "warning")
-					complete_progress_ui(false, target_model)
+					pcall(notifications.notify, i18n.get("ollama.upgrade_required_title"),
+						i18n.get("ollama.upgrade_required_body"), "warning")
 				elseif connection_error then
-					pcall(notifications.notify, "Échec Ollama", "Le service Ollama a cessé de répondre.", "error")
+					pcall(notifications.notify, i18n.get("ollama.fail_title"), i18n.get("ollama.service_disconnected"), "error")
 					complete_progress_ui(false, target_model)
 				else
-					pcall(notifications.notify, "Échec Ollama", "Erreur lors du téléchargement de " .. target_model, "error")
+					pcall(notifications.notify, i18n.get("ollama.fail_title"), string.format(i18n.get("ollama.download_error"), target_model), "error")
 					complete_progress_ui(false, target_model)
 				end
 			end
@@ -414,7 +415,7 @@ function M.new(deps, presets, ram_getter)
 
 	function obj.install_ollama_then_pull(target_model, repo, on_success)
 		pcall(hs.urlevent.openURL, "https://ollama.com/download")
-		pcall(notifications.notify, "Ollama non détecté", "Veuillez installer Ollama puis réessayer.", "warning")
+		pcall(notifications.notify, i18n.get("ollama.not_detected_title"), i18n.get("ollama.not_detected_body"), "warning")
 	end
 
 	--- Verifies if the target model is installed, triggering the download prompt otherwise.
@@ -446,7 +447,7 @@ function M.new(deps, presets, ram_getter)
 					if type(on_success) == "function" then on_success() end
 				end, function(_, is_load_error)
 					if is_load_error and get_ollama_path() then
-						pcall(notifications.notify, "Réparation du modèle Ollama", "Le modèle semble corrompu. Tentative de re-téléchargement: " .. target_model, "info")
+						pcall(notifications.notify, i18n.get("ollama.model_repair_title"), string.format(i18n.get("ollama.model_repair"), target_model), "info")
 						obj.pull_model(target_model, repo, on_success)
 						return
 					end
@@ -475,11 +476,11 @@ function M.new(deps, presets, ram_getter)
 			local ok, output = pcall(hs.execute, bin .. " rm " .. model_name .. " 2>&1")
 			
 			if ok then
-				pcall(notifications.notify, "Supprimé (Ollama)", "Modèle supprimé: " .. model_name, "success")
+				pcall(notifications.notify, i18n.get("ollama.deleted_title"), string.format(i18n.get("ollama.model_deleted"), model_name), "success")
 				if deps.update_menu then pcall(deps.update_menu) end
 				Logger.info(LOG, string.format("Ollama model %s deleted successfully.", model_name))
 			else
-				pcall(notifications.notify, "Échec de la suppression Ollama", "Modèle: " .. model_name .. "\n" .. tostring(output), "error")
+				pcall(notifications.notify, i18n.get("ollama.delete_fail_title"), string.format(i18n.get("ollama.delete_error"), model_name, tostring(output)), "error")
 			end
 		end)
 	end

@@ -12,6 +12,8 @@
 // ====================================
 // ====================================
 
+function _t(key) { return (window._i18n_strings && window._i18n_strings[key]) || null; }
+
 let D = null;
 let TRIGGER_CHAR = '★';
 let STAR = '★';
@@ -201,7 +203,7 @@ function showConfirm(msg, fn, opts = {}) {
 	let titleHtml = '';
 	if (opts.isWarning) {
 		titleHtml =
-			'<div style="display:flex;align-items:center;gap:8px;color:var(--warning);font-weight:600;font-size:15px;margin-bottom:10px;"><span style="font-size:20px;">⚠️</span> Attention</div>';
+			'<div style="display:flex;align-items:center;gap:8px;color:var(--warning);font-weight:600;font-size:15px;margin-bottom:10px;"><span style="font-size:20px;">⚠️</span> ' + (_t('common.warning') || 'Attention') + '</div>';
 	}
 	document.getElementById('confirm-text').innerHTML =
 		titleHtml +
@@ -210,7 +212,7 @@ function showConfirm(msg, fn, opts = {}) {
 		'</div>';
 
 	const okBtn = document.getElementById('confirm-ok');
-	okBtn.textContent = opts.okLabel || 'Supprimer';
+	okBtn.textContent = opts.okLabel || _t('common.delete') || 'Delete';
 	okBtn.style.background = opts.okColor || 'var(--danger)';
 
 	_confirmCb = fn;
@@ -994,7 +996,7 @@ function saveSec() {
 function delSec(si) {
 	const s = D.sections[si];
 	showConfirm(
-		'Supprimer « ' + (s.description || s.name) + ' » et tous ses hotstrings ?',
+		(_t('editor.hotstrings.confirm_del_section') || 'Delete « %s » and all its hotstrings?').replace('%s', s.description || s.name),
 		function () {
 			D.sections.splice(si, 1);
 			persist();
@@ -1024,8 +1026,8 @@ function resetEntryForm() {
 function showAddEntry(si) {
 	edEntry = { si: si, ei: null };
 	const secName = D.sections[si].description || D.sections[si].name;
-	document.getElementById('entry-modal-title').textContent =
-		'Création d’un hotstring — Section «\xA0' + secName + '\xA0»';
+	document.getElementById(‘entry-modal-title’).textContent =
+		(_t(‘editor.hotstrings.add_entry_title’) || ‘New hotstring — Section « %s »’).replace(‘%s’, secName);
 	resetEntryForm();
 	openModal('entry-modal');
 	setTimeout(() => document.getElementById('e-trig').focus(), 80);
@@ -1035,8 +1037,8 @@ function showEditEntry(si, ei, focusField) {
 	edEntry = { si: si, ei: ei };
 	const e = D.sections[si].entries[ei];
 	const secName = D.sections[si].description || D.sections[si].name;
-	document.getElementById('entry-modal-title').textContent =
-		'Modification d’un hotstring — Section «\xA0' + secName + '\xA0»';
+	document.getElementById(‘entry-modal-title’).textContent =
+		(_t(‘editor.hotstrings.edit_entry_title’) || ‘Edit hotstring — Section « %s »’).replace(‘%s’, secName);
 
 	setTrigContent(document.getElementById('e-trig'), e.trigger || '');
 	setEditorContent(document.getElementById('e-out'), e.output || '');
@@ -1161,7 +1163,7 @@ function delEntryStop(e, si, ei) {
 
 function delEntry(si, ei) {
 	const trig = toDisplay(D.sections[si].entries[ei].trigger);
-	showConfirm('Supprimer « ' + esc(trig) + ' » ?', function () {
+	showConfirm((_t('editor.hotstrings.confirm_del_entry') || 'Delete « %s »?').replace('%s', esc(trig)), function () {
 		D.sections[si].entries.splice(ei, 1);
 		persist();
 	});
@@ -1198,13 +1200,7 @@ window.clearBulk = function () {
 window.bulkDel = function () {
 	const cnt = document.querySelectorAll('.entry-cb:checked').length;
 	showConfirm(
-		'Supprimer les ' +
-			cnt +
-			' élément' +
-			(cnt > 1 ? 's' : '') +
-			' sélectionné' +
-			(cnt > 1 ? 's' : '') +
-			' ?',
+		(_t('editor.hotstrings.confirm_del_bulk') || 'Delete %d selected item(s)?').replace('%d', cnt),
 		function () {
 			const cbs = Array.from(document.querySelectorAll('.entry-cb:checked'));
 			const toDel = cbs.map((cb) => ({ si: parseInt(cb.dataset.si), ei: parseInt(cb.dataset.ei) }));
