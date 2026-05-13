@@ -55,6 +55,7 @@ typographicapostrophe = { fr = "L’apostrophe devient typographique lors de l�
 "ambigui" = { output = "ambiguï", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
 "ame" = { output = "âme", is_word = true, auto_expand = false, is_case_sensitive = false, final_result = false }
 "ames" = { output = "âmes", is_word = true, auto_expand = false, is_case_sensitive = false, final_result = false }
+"amphithéatre" = { output = "amphithéâtre", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
 "ane" = { output = "âne", is_word = true, auto_expand = false, is_case_sensitive = false, final_result = false }
 "anerie" = { output = "ânerie", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
 "anes" = { output = "ânes", is_word = true, auto_expand = false, is_case_sensitive = false, final_result = false }
@@ -156,6 +157,8 @@ typographicapostrophe = { fr = "L’apostrophe devient typographique lors de l�
 "crument" = { output = "crûment", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
 "diplome" = { output = "diplôme", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
 "diplomé" = { output = "diplômé", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
+# "dome" = { output = "dôme", is_word = true, auto_expand = false, is_case_sensitive = false, final_result = false }
+# "domes" = { output = "dômes", is_word = true, auto_expand = false, is_case_sensitive = false, final_result = false }
 "drole" = { output = "drôle", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
 "dument" = { output = "dûment", is_word = true, auto_expand = false, is_case_sensitive = false, final_result = false }
 "débacle" = { output = "débâcle", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
@@ -383,6 +386,8 @@ typographicapostrophe = { fr = "L’apostrophe devient typographique lors de l�
 "reves" = { output = "rêves", is_word = true, auto_expand = false, is_case_sensitive = false, final_result = false }
 "rodeur" = { output = "rôdeur", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
 "rodeuse" = { output = "rôdeuse", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
+# "role" = { output = "rôle", is_word = true, auto_expand = false, is_case_sensitive = false, final_result = false }
+# "roles" = { output = "rôles", is_word = true, auto_expand = false, is_case_sensitive = false, final_result = false }
 "roti" = { output = "rôti", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
 "salpetre" = { output = "salpêtre", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
 "samourai" = { output = "samouraï", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
@@ -420,8 +425,11 @@ typographicapostrophe = { fr = "L’apostrophe devient typographique lors de l�
 "trinome" = { output = "trinôme", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
 "trona" = { output = "trôna", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
 "trone" = { output = "trône", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
+"ushuaia" = { output = "Ushuaïa", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
 "vetement" = { output = "vêtement", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
 "voeu" = { output = "vœu", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
+"voute" = { output = "voûte", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
+"vouté" = { output = "voûté", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
 "écoeure" = { output = "écœure", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
 "écoeuré" = { output = "écœuré", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
 "égoisme" = { output = "égoïsme", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
@@ -454,6 +462,7 @@ typographicapostrophe = { fr = "L’apostrophe devient typographique lors de l�
 "bpce" = { output = "BPCE", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
 "bspce" = { output = "BSPCE", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
 "caas" = { output = "CaaS", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
+"captcha" = { output = "CAPTCHA", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
 "catboost" = { output = "CatBoost", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
 "cdd" = { output = "CDD", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
 "cdi" = { output = "CDI", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
@@ -477,7 +486,9 @@ typographicapostrophe = { fr = "L’apostrophe devient typographique lors de l�
 "faas" = { output = "FaaS", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
 "facebook" = { output = "Facebook", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
 "firefox" = { output = "Firefox", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
+"fmi" = { output = "FMI", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
 "gcp" = { output = "GCP", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
+"gdpr" = { output = "GDPR", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
 "github" = { output = "GitHub", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
 "google" = { output = "Google", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
 "gps" = { output = "GPS", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
@@ -488,7 +499,8 @@ typographicapostrophe = { fr = "L’apostrophe devient typographique lors de l�
 "ia" = { output = "IA", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
 "iaas" = { output = "IaaS", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
 "iban" = { output = "IBAN", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
-"insee" = { output = "INSEE", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
+"imf" = { output = "IMF", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
+"insee" = { output = "Insee", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
 "instagram" = { output = "Instagram", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
 "intellij" = { output = "IntelliJ", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
 "ip" = { output = "IP", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
@@ -514,6 +526,7 @@ typographicapostrophe = { fr = "L’apostrophe devient typographique lors de l�
 "mlflow" = { output = "MLflow", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
 "mlops" = { output = "MLOps", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
 "nasa" = { output = "NASA", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
+"nato" = { output = "NATO", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
 "nfc" = { output = "NFC", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
 "nft" = { output = "NFT", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
 "nlp" = { output = "NLP", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
@@ -525,7 +538,10 @@ typographicapostrophe = { fr = "L’apostrophe devient typographique lors de l�
 "openshift" = { output = "OpenShift", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
 "opentelemetry" = { output = "OpenTelemetry", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
 "optimot" = { output = "Optimot", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
+"otan" = { output = "OTAN", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
 "outlook" = { output = "Outlook", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
+"ovni" = { output = "OVNI", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
+"ovnis" = { output = "OVNIS", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
 "paas" = { output = "PaaS", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
 "pnl" = { output = "PNL", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
 "poc" = { output = "POC", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
@@ -537,11 +553,13 @@ typographicapostrophe = { fr = "L’apostrophe devient typographique lors de l�
 "raid" = { output = "RAID", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
 "ram" = { output = "RAM", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
 "rdc" = { output = "RDC", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
+"rgpd" = { output = "RGPD", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
 "rh" = { output = "RH", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
 "rib" = { output = "RIB", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
 "saas" = { output = "SaaS", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
 "sas" = { output = "SAS", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
 "sharepoint" = { output = "SharePoint", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
+"siret" = { output = "SIRET", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
 "slm" = { output = "SLM", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
 "sncf" = { output = "SNCF", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
 "sql" = { output = "SQL", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
@@ -557,7 +575,9 @@ typographicapostrophe = { fr = "L’apostrophe devient typographique lors de l�
 "ui" = { output = "UI", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
 "uno" = { output = "UNO", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
 "url" = { output = "URL", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
+"urss" = { output = "URSS", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
 "ux" = { output = "UX", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
+"vendome" = { output = "Vendôme", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
 "vpn" = { output = "VPN", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
 "vps" = { output = "VPS", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
 "vscode" = { output = "VSCode", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
@@ -591,6 +611,7 @@ typographicapostrophe = { fr = "L’apostrophe devient typographique lors de l�
 "acceuil" = { output = "accueil", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
 "accuei" = { output = "accuei", is_word = false, auto_expand = true, is_case_sensitive = false, final_result = false }
 "aeu" = { output = "eau", is_word = false, auto_expand = true, is_case_sensitive = false, final_result = false }
+"avce" = { output = "avec", is_word = true, auto_expand = false, is_case_sensitive = false, final_result = false }
 "eiu" = { output = "ieu", is_word = false, auto_expand = true, is_case_sensitive = false, final_result = false }
 "eua" = { output = "eau", is_word = false, auto_expand = true, is_case_sensitive = false, final_result = false }
 "fenètre" = { output = "fenêtre", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
@@ -696,16 +717,14 @@ typographicapostrophe = { fr = "L’apostrophe devient typographique lors de l�
 # ========================================
 
 [[multiplepunctuationmarks]]
-"! !" = { output = "!!", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false }
-"! ?" = { output = "!?", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = true }
-"? !" = { output = "?!", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = true }
-"? ?" = { output = "??", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false }
-" ! !" = { output = " !!", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false }
-" ! ?" = { output = " !?", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = true }
-" ? !" = { output = " ?!", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = true }
-" ? ?" = { output = " ??", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false }
-
-
+"! !" = { output = "!!", is_word = false, auto_expand = true, is_case_sensitive = true, final_result = false }
+"! ?" = { output = "!?", is_word = false, auto_expand = true, is_case_sensitive = true, final_result = false }
+"? !" = { output = "?!", is_word = false, auto_expand = true, is_case_sensitive = true, final_result = false }
+"? ?" = { output = "??", is_word = false, auto_expand = true, is_case_sensitive = true, final_result = false }
+" ! !" = { output = " !!", is_word = false, auto_expand = true, is_case_sensitive = true, final_result = false }
+" ! ?" = { output = " !?", is_word = false, auto_expand = true, is_case_sensitive = true, final_result = false }
+" ? !" = { output = " ?!", is_word = false, auto_expand = true, is_case_sensitive = true, final_result = false }
+" ? ?" = { output = " ??", is_word = false, auto_expand = true, is_case_sensitive = true, final_result = false }
 
 
 
@@ -744,6 +763,7 @@ typographicapostrophe = { fr = "L’apostrophe devient typographique lors de l�
 "joelle" = { output = "Joëlle", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = true }
 "jérome" = { output = "Jérôme", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = true }
 "koweit" = { output = "Koweït", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = true }
+"mendeleiev" = { output = "Mendeleïev", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = true }
 "mickael" = { output = "Mickaël", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = true }
 "nimes" = { output = "Nîmes", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = true }
 "noel" = { output = "Noël", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = true }
@@ -810,6 +830,7 @@ typographicapostrophe = { fr = "L’apostrophe devient typographique lors de l�
 [[typographicapostrophe]]
 "c'" = { output = "c’", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
 "d'" = { output = "d’", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
+"ch'ti" = { output = "ch’ti", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
 "j'" = { output = "j’", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
 "l'" = { output = "l’", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
 "m'" = { output = "m’", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
