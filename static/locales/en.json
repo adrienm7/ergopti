@@ -611,7 +611,6 @@
 	"hs_config.color_cyan": "Cyan",
 	"hs_config.color_yellow": "Yellow",
 	"hs_config.color_gray": "Gray",
-
 	"editor.hotstrings.label_section": "Section:",
 	"editor.hotstrings.btn_new": "New…",
 	"editor.hotstrings.btn_rename": "Rename…",
@@ -649,24 +648,21 @@
 	"editor.hotstrings.desc_prompt": "Description shown in the menu for this section:",
 	"editor.hotstrings.err_no_section_selected": "No section selected.",
 	"editor.hotstrings.rename_title": "Rename",
-
 	"hs_config.file_level": "── File level ──",
 	"hs_config.btn_all_gray": "All gray",
 	"hs_config.btn_reset_all": "Reset all",
 	"hs_config.btn_close": "Close",
 	"hs_config.label_category": "Category:",
 	"hs_config.label_section": "Section:",
-	"hs_config.label_delay": "Delay (ms):",
-	"hs_config.label_color": "Color:",
+	"hs_config.label_delay": "Delay (ms)",
+	"hs_config.label_color": "Color",
 	"hs_config.default_prefix": "Default: ",
 	"hs_config.override_active": "override active",
 	"hs_config.none": "(none)",
 	"hs_config.category_prefix": "Category: ",
 	"hs_config.section_prefix": "Section: ",
 	"hs_config.file_level_short": "(file level)",
-
 	"ui_typing.h3_speed": "Speed (WPM)",
-	"ui_typing.h3_precision": "Accuracy (%)",
 	"ui_typing.h3_activity_hourly": "Activity (keystrokes/h)",
 	"ui_typing.h3_precision_hourly": "Accuracy (%) — hourly view",
 	"ui_typing.h3_keystroke_origin": "Keystroke origin",
@@ -796,7 +792,6 @@
 	"ui_typing.dataset_precision": "Accuracy (%)",
 	"ui_typing.dataset_touches_h": "Keystrokes/h",
 	"ui_typing.dataset_touches_5min": "Keystrokes / 5 min",
-
 	"ui_apps.detail_global_activity": "Total recorded activity",
 	"ui_apps.detail_productivity_score": "Score calculated from your categories",
 	"ui_apps.lbl_switches": "Switches:",
@@ -931,7 +926,6 @@
 	"menu.llm.add_custom_model": "Add a custom model",
 	"menu.llm.val_label": "Select suggestion no. (%s)",
 	"menu.profiles.use_profile": "Use this profile",
-
 	"common.save": "Save",
 	"common.cancel": "Cancel",
 	"common.ok": "OK",
@@ -939,9 +933,7 @@
 	"common.delete": "Delete",
 	"common.loading": "Loading…",
 	"common.saved": "Saved ✓",
-
 	"editor.personal_info.window_title": "Personal information",
-
 	"token_prompt.window_title": "HuggingFace Login",
 	"token_prompt.title": "🔐 HuggingFace Login",
 	"token_prompt.instruction": "Paste your HuggingFace token (hf_...) to speed up downloads.",
@@ -950,7 +942,6 @@
 	"token_prompt.label": "HuggingFace Token:",
 	"token_prompt.placeholder": "hf_xxxxxxxxxxxxxxxxxxxxxxxxxxxx...",
 	"token_prompt.validate": "Validate",
-
 	"download_window.window_title": "Progress",
 	"download_window.title": "📥 Download in progress",
 	"download_window.eta_label": "⏳ Time remaining:",
@@ -959,7 +950,6 @@
 	"download_window.btn_cancel": "🛑 Cancel",
 	"download_window.btn_terminal": "🖥 Terminal",
 	"download_window.btn_retry": "🔄 Retry download",
-
 	"prompt_editor.title_new": "New profile",
 	"prompt_editor.label_name": "Profile name",
 	"prompt_editor.label_mode": "Request mode",
@@ -972,7 +962,6 @@
 	"prompt_editor.insert_max_words": "Insert {max_words} block",
 	"prompt_editor.placeholder_prompt": "Here is a text, continue it: {context}",
 	"prompt_editor.help_text": "The {context} block will be replaced by the selected text. The {n} block will be replaced by the number of predictions. Formatting (Batch): Ask the model to separate each suggestion with ---.",
-
 	"editor.hotstrings.page_title": "✏︎ Personal Hotstrings",
 	"editor.hotstrings.btn_add_section": "＋ Section",
 	"editor.hotstrings.empty_hint": "No hotstrings defined. Click + Section to get started. ☰ drag to reorder — click the title to rename",
@@ -995,14 +984,12 @@
 	"editor.hotstrings.cb_case": "Case sensitive",
 	"editor.hotstrings.cb_final": "Final result",
 	"editor.hotstrings.kbd_help": "↩ = new line\n⌘ + ↩ = save\n⇧ + ⌘ + ↩ = save + new hotstring",
-
 	"hs_config.hint": "Adjust by category or section. All changes are saved immediately.",
 	"hs_config.btn_all_grey": "All grey",
-	"hs_config.btn_reset_all": "Reset all",
-	"hs_config.label_delay": "Delay (ms)",
-	"hs_config.label_color": "Color",
 	"hs_config.btn_reset_default": "Restore default",
 	"menu.metrics.show_wpm_menubar": "Show WPM in tray tooltip",
 	"menu.metrics.show_wpm_widget": "📊 Floating WPM widget",
-	"menu.metrics.wpm_unit": "WPM"
+	"menu.metrics.wpm_unit": "WPM",
+	"menu.metrics.colors_by_source": "Color by keystroke source",
+	"menu.metrics.include_realtime": "Real-time graph"
 }

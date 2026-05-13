@@ -611,7 +611,6 @@
 	"hs_config.color_cyan": "Cyan",
 	"hs_config.color_yellow": "Jaune",
 	"hs_config.color_gray": "Gris",
-
 	"editor.hotstrings.label_section": "Section :",
 	"editor.hotstrings.btn_new": "Nouvelleâ€¦",
 	"editor.hotstrings.btn_rename": "Renommerâ€¦",
@@ -649,24 +648,21 @@
 	"editor.hotstrings.desc_prompt": "Description affichÃ©e dans le menu pour cette section :",
 	"editor.hotstrings.err_no_section_selected": "Aucune section sÃ©lectionnÃ©e.",
 	"editor.hotstrings.rename_title": "Renommer",
-
 	"hs_config.file_level": "â”€â”€ Niveau fichier â”€â”€",
 	"hs_config.btn_all_gray": "Tout en gris",
 	"hs_config.btn_reset_all": "Tout rÃ©initialiser",
 	"hs_config.btn_close": "Fermer",
 	"hs_config.label_category": "CatÃ©gorie :",
 	"hs_config.label_section": "Section :",
-	"hs_config.label_delay": "DÃ©lai (ms) :",
-	"hs_config.label_color": "Couleur :",
+	"hs_config.label_delay": "DÃ©lai (ms)",
+	"hs_config.label_color": "Couleur",
 	"hs_config.default_prefix": "DÃ©faut : ",
 	"hs_config.override_active": "override actif",
 	"hs_config.none": "(aucune)",
 	"hs_config.category_prefix": "CatÃ©gorie : ",
 	"hs_config.section_prefix": "Section : ",
 	"hs_config.file_level_short": "(niveau fichier)",
-
 	"ui_typing.h3_speed": "Vitesse (MPM)",
-	"ui_typing.h3_precision": "PrÃ©cision (%)",
 	"ui_typing.h3_activity_hourly": "ActivitÃ© (touches/h)",
 	"ui_typing.h3_precision_hourly": "PrÃ©cision (%) â€” vue horaire",
 	"ui_typing.h3_keystroke_origin": "Origine des frappes",
@@ -796,7 +792,6 @@
 	"ui_typing.dataset_precision": "PrÃ©cision (%)",
 	"ui_typing.dataset_touches_h": "Touches/h",
 	"ui_typing.dataset_touches_5min": "Touches / 5 min",
-
 	"ui_apps.detail_global_activity": "ActivitÃ© globale enregistrÃ©e",
 	"ui_apps.detail_productivity_score": "Score calculÃ© selon vos catÃ©gories",
 	"ui_apps.lbl_switches": "Bascules :",
@@ -931,7 +926,6 @@
 	"menu.llm.add_custom_model": "Ajouter un modÃ¨le personnalisÃ©",
 	"menu.llm.val_label": "SÃ©lectionner la suggestion nÂ° (%s)",
 	"menu.profiles.use_profile": "Utiliser ce profil",
-
 	"common.save": "Enregistrer",
 	"common.cancel": "Annuler",
 	"common.ok": "OK",
@@ -939,9 +933,7 @@
 	"common.delete": "Supprimer",
 	"common.loading": "Chargementâ€¦",
 	"common.saved": "EnregistrÃ© âœ“",
-
 	"editor.personal_info.window_title": "Informations personnelles",
-
 	"token_prompt.window_title": "Connexion HuggingFace",
 	"token_prompt.title": "ðŸ” Connexion HuggingFace",
 	"token_prompt.instruction": "Collez votre token HuggingFace (hf_...) pour accÃ©lÃ©rer les tÃ©lÃ©chargements.",
@@ -950,7 +942,6 @@
 	"token_prompt.label": "Token HuggingFace :",
 	"token_prompt.placeholder": "hf_xxxxxxxxxxxxxxxxxxxxxxxxxxxx...",
 	"token_prompt.validate": "Valider",
-
 	"download_window.window_title": "Progression",
 	"download_window.title": "ðŸ“¥ TÃ©lÃ©chargement en cours",
 	"download_window.eta_label": "â³ Temps restant :",
@@ -959,7 +950,6 @@
 	"download_window.btn_cancel": "ðŸ›‘ Annuler",
 	"download_window.btn_terminal": "ðŸ–¥ Terminal",
 	"download_window.btn_retry": "ðŸ”„ Relancer le tÃ©lÃ©chargement",
-
 	"prompt_editor.title_new": "Nouveau profil",
 	"prompt_editor.label_name": "Nom du profil",
 	"prompt_editor.label_mode": "Mode de requÃªte",
@@ -972,7 +962,6 @@
 	"prompt_editor.insert_max_words": "InsÃ©rer le bloc {max_words}",
 	"prompt_editor.placeholder_prompt": "Voici un texte, continue-le : {context}",
 	"prompt_editor.help_text": "Le bloc {context} sera remplacÃ© par le texte sÃ©lectionnÃ©. Le bloc {n} sera remplacÃ© par le nombre de prÃ©dictions. Formatage (Batch) : Demandez au modÃ¨le de sÃ©parer chaque suggestion par ---.",
-
 	"editor.hotstrings.page_title": "âœï¸Ž Hotstrings personnels",
 	"editor.hotstrings.btn_add_section": "ï¼‹ Section",
 	"editor.hotstrings.empty_hint": "Aucun hotstring dÃ©fini. Cliquez sur + Section pour commencer. â˜° glisser pour rÃ©ordonner â€” cliquer sur le titre pour renommer",
@@ -995,14 +984,12 @@
 	"editor.hotstrings.cb_case": "Sensible Ã  la casse",
 	"editor.hotstrings.cb_final": "RÃ©sultat final",
 	"editor.hotstrings.kbd_help": "â†© = saut de ligne\nâŒ˜ + â†© = enregistrer\nâ‡§ + âŒ˜ + â†© = enregistrer + nouveau hotstring",
-
 	"hs_config.hint": "Ajustez par catÃ©gorie ou par section. Toute modification est enregistrÃ©e immÃ©diatement.",
 	"hs_config.btn_all_grey": "Tout en gris",
-	"hs_config.btn_reset_all": "Tout rÃ©initialiser",
-	"hs_config.label_delay": "DÃ©lai (ms)",
-	"hs_config.label_color": "Couleur",
 	"hs_config.btn_reset_default": "Revenir au dÃ©faut",
 	"menu.metrics.show_wpm_menubar": "Afficher les MPM dans l’infobulle du menu",
 	"menu.metrics.show_wpm_widget": "📊 Widget MPM flottant",
-	"menu.metrics.wpm_unit": "MPM"
+	"menu.metrics.wpm_unit": "MPM",
+	"menu.metrics.colors_by_source": "Couleurs par source de frappe",
+	"menu.metrics.include_realtime": "Graphique en temps réel"
 }
