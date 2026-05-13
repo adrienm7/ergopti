@@ -962,7 +962,7 @@ BuildMetricsMenu() {
     MetricsMenu.Add(apps_sc, (*) => MS_PromptShortcut("apps", KLUI_ToggleApps))
 
     MetricsMenu.Add()
-    privacy_header := "— " . t("menu.metrics.privacy_header") . " —"
+    privacy_header := MenuSectionTitle(t("menu.metrics.privacy_header"))
     MetricsMenu.Add(privacy_header, (*) => "")
     MetricsMenu.Disable(privacy_header)
 
@@ -1349,7 +1349,7 @@ initMenu() {
         }
     }
     StdTotal += DynTotalStd
-    StdHeader := "— " . t("menu.hotstrings.common_header") . (StdTotal > 0 ? " (" . FmtCount(StdTotal) . ")" : "") . " —"
+    StdHeader := MenuSectionTitle(t("menu.hotstrings.common_header") . (StdTotal > 0 ? " (" . FmtCount(StdTotal) . ")" : ""))
     HotstringsMenu.Add(StdHeader, (*) => NoAction())
     HotstringsMenu.Disable(StdHeader)
     for Category in HotstringCategoriesStd {
@@ -1380,7 +1380,7 @@ initMenu() {
     for _ECat in HotstringCategoriesErgopti {
         ErgoptiTotal += CountTomlHotstrings(_ECat)
     }
-    ErgoptiHeader := "— " . t("menu.hotstrings.ergopti_header") . (ErgoptiTotal > 0 ? " (" . FmtCount(ErgoptiTotal) . ")" : "") . " —"
+    ErgoptiHeader := MenuSectionTitle(t("menu.hotstrings.ergopti_header") . (ErgoptiTotal > 0 ? " (" . FmtCount(ErgoptiTotal) . ")" : ""))
     HotstringsMenu.Add(ErgoptiHeader, (*) => NoAction())
     HotstringsMenu.Disable(ErgoptiHeader)
     for Category in HotstringCategoriesErgopti {
@@ -1431,7 +1431,7 @@ initMenu() {
         }
     }
     HotstringsMenu.Add() ; Separator before personal group
-    PersonalHeader := "— " . t("menu.hotstrings.personal_header") . (TotalPersonal > 0 ? " (" . FmtCount(TotalPersonal) . ")" : "") . " —"
+    PersonalHeader := MenuSectionTitle(t("menu.hotstrings.personal_header") . (TotalPersonal > 0 ? " (" . FmtCount(TotalPersonal) . ")" : ""))
     HotstringsMenu.Add(PersonalHeader, (*) => NoAction())
     HotstringsMenu.Disable(PersonalHeader)
     if Features.Has("Personal") {
@@ -2212,6 +2212,12 @@ FmtCount(N) {
 NoAction(*) {
 }
 
+; Wraps a string in section-title dashes for disabled menu headers.
+; Use instead of embedding — directly in locale values.
+MenuSectionTitle(Text) {
+    return "— " . Text . " —"
+}
+
 ToggleAllFeaturesOn(*) {
     MsgBox(t("dialog.enable_all.warning"))
     ToggleAllFeatures(1)
@@ -2770,25 +2776,60 @@ ShowActionPicker(Title, Current, OnConfirm) {
     global GESTURE_ACTION_NAMES, GESTURE_ACTIONS
     LoggerStart("ActionPicker", "Ouverture du sélecteur '%s'…", Title)
 
-    ; Build flat action list (ids + labels), skipping category sentinels
-    ActionIds    := []
-    ActionLabels := []
-    SelectedIdx  := 0
+    ; Build the source data: parallel arrays of ids and display labels.
+    ; Category headers are stored with id="" so ConfirmPick can ignore them.
+    ; AllItems holds {Id, Label, Cat} for re-filtering with category re-injection.
+    AllItems    := []  ; [{Id, Label, Cat}] — action rows only (no header rows)
 
-    ActionIds.Push("none")
-    ActionLabels.Push(t("dialog.action_picker.disabled"))
-    if (Current == "none")
-        SelectedIdx := 1
+    _PushItem(Id, Label, Cat) {
+        AllItems.Push({ Id: Id, Label: Label, Cat: Cat })
+    }
 
+    ; "Désactivé" entry (no category)
+    _PushItem("none", t("dialog.action_picker.disabled"), "")
+
+    CurrentCat := ""
     for ActionName in GESTURE_ACTION_NAMES {
-        if (ActionName == "--" or SubStr(ActionName, 1, 1) = "#")
+        if (ActionName == "--")
             continue
+        if (SubStr(ActionName, 1, 1) = "#") {
+            CurrentCat := SubStr(ActionName, 2)
+            continue
+        }
         if !GESTURE_ACTIONS.Has(ActionName)
             continue
-        ActionIds.Push(ActionName)
-        ActionLabels.Push(_GestureActionLabel(ActionName))
-        if (ActionName == Current)
-            SelectedIdx := ActionIds.Length
+        _PushItem(ActionName, _GestureActionLabel(ActionName), CurrentCat)
+    }
+
+    ; Rebuilds the ListBox from a filtered subset of AllItems, injecting
+    ; category headers before the first item of each group.
+    ; Returns the parallel FilteredIds array for ConfirmPick lookups.
+    BuildListRows(Items) {
+        Ids    := []
+        Labels := []
+        LastCat := Chr(0)  ; sentinel that can't match any real category
+        for Item in Items {
+            if (Item.Cat != "" and Item.Cat != LastCat) {
+                Ids.Push("")              ; header is not selectable
+                Labels.Push("▸ " . Item.Cat)
+                LastCat := Item.Cat
+            }
+            Ids.Push(Item.Id)
+            Labels.Push("    " . Item.Label)
+        }
+        return { Ids: Ids, Labels: Labels }
+    }
+
+    Rows        := BuildListRows(AllItems)
+    FilteredIds := Rows.Ids
+
+    ; Pre-select current action
+    SelectedIdx := 0
+    for i, Id in FilteredIds {
+        if (Id == Current) {
+            SelectedIdx := i
+            break
+        }
     }
 
     W := Gui("+AlwaysOnTop", Title)
@@ -2797,8 +2838,8 @@ ShowActionPicker(Title, Current, OnConfirm) {
     W.MarginY := 12
     W.Add("Text", "xm", t("dialog.action_picker.label"))
 
-    SearchEdit  := W.Add("Edit", "xm w320")
-    LB          := W.Add("ListBox", "xm w320 r18", ActionLabels)
+    SearchEdit  := W.Add("Edit", "xm w340")
+    LB          := W.Add("ListBox", "xm w340 r20", Rows.Labels)
     if (SelectedIdx > 0)
         LB.Choose(SelectedIdx)
 
@@ -2806,26 +2847,36 @@ ShowActionPicker(Title, Current, OnConfirm) {
     W.Add("Button", "x+6 w80", t("button.cancel")).OnEvent("Click", (*) => W.Destroy())
     W.Show()
 
-    AllLabels   := ActionLabels.Clone()
-    FilteredIds := ActionIds.Clone()
     SearchEdit.OnEvent("Change", FilterList)
 
     FilterList(*) {
-        Query     := StrLower(SearchEdit.Value)
-        NewLabels := []
-        NewIds    := []
-        for i, Lbl in AllLabels {
-            if (Query == "" or InStr(StrLower(Lbl), Query)) {
-                NewLabels.Push(Lbl)
-                NewIds.Push(ActionIds[i])
+        Query       := StrLower(SearchEdit.Value)
+        Matched     := []
+        if (Query == "") {
+            Matched := AllItems
+        } else {
+            for Item in AllItems {
+                ; id="" is the "none" entry — keep it if it matches
+                if (Item.Id == "none") {
+                    if InStr(StrLower(Item.Label), Query)
+                        Matched.Push(Item)
+                } else if InStr(StrLower(Item.Label), Query) {
+                    Matched.Push(Item)
+                }
             }
         }
-        FilteredIds := NewIds
+        NewRows     := BuildListRows(Matched)
+        FilteredIds := NewRows.Ids
         LB.Delete()
-        for Lbl in NewLabels
+        for Lbl in NewRows.Labels
             LB.Add(Lbl)
-        if (NewLabels.Length > 0)
-            LB.Choose(1)
+        ; Skip headers when pre-selecting first result
+        for i, Id in FilteredIds {
+            if (Id != "") {
+                LB.Choose(i)
+                break
+            }
+        }
     }
 
     ConfirmPick(*) {
@@ -2833,6 +2884,9 @@ ShowActionPicker(Title, Current, OnConfirm) {
         if (Idx = 0)
             return
         ChosenId := FilteredIds[Idx]
+        ; Ignore clicks on category headers
+        if (ChosenId == "")
+            return
         W.Destroy()
         LoggerSuccess("ActionPicker", "Sélection confirmée → '%s'.", ChosenId)
         OnConfirm(ChosenId)
