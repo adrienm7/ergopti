@@ -288,9 +288,11 @@ function M.toggle_awake()
 			Logger.info(LOG, "Keep-awake auto-disabled — user activity detected.")
 			return false
 		end)
-		-- Defer the watcher start by one event-loop tick so the keyDown that
-		-- triggered toggle_awake() itself does not immediately cancel keep-awake.
-		timer.doAfter(0, function()
+		-- Defer past the full Ctrl+M key-press cycle (keyDown + keyUp for both
+		-- Ctrl and M). doAfter(0) only skips one run-loop iteration and is not
+		-- enough; 0.3s guarantees the triggering key events are fully delivered
+		-- before we arm the watcher.
+		timer.doAfter(0.3, function()
 			if awake_active and awake_input_watcher then
 				pcall(function() awake_input_watcher:start() end)
 			end
