@@ -1,4 +1,4 @@
-{
+﻿{
 	"_meta.locale": "de",
 	"_meta.flag": "🇩🇪",
 	"_meta.name": "Deutsch",
@@ -483,6 +483,9 @@
 	"notify.clipboard": "Zwischenablage",
 	"notify.screenshot_saved_path": "Gespeichert: %s",
 	"notify.screenshot_title": "Screenshot",
+	"keepawake.title": "Tastaturaktivität",
+	"keepawake.started": "☕ Anti-Ruhemodus aktiv",
+	"keepawake.stopped": "☕ Anti-Ruhemodus deaktiviert",
 	"notify.llm_enabled": "🟢 AKTIVIERT",
 	"notify.llm_disabled": "🔴 DEAKTIVIERT",
 	"notify.llm_suggestions": "KI-Vorschläge",

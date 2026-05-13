@@ -1,4 +1,4 @@
-{
+﻿{
 	"_meta.locale": "nl",
 	"_meta.flag": "🇳🇱",
 	"_meta.name": "Nederlands",
@@ -473,6 +473,9 @@
 	"notify.clipboard": "Klembord",
 	"notify.screenshot_saved_path": "Opgeslagen: %s",
 	"notify.screenshot_title": "Schermafbeelding",
+	"keepawake.title": "Toetsenbordactiviteit",
+	"keepawake.started": "☕ Slaapstand-preventie actief",
+	"keepawake.stopped": "☕ Slaapstand-preventie uitgeschakeld",
 	"notify.llm_enabled": "🟢 INGESCHAKELD",
 	"notify.llm_disabled": "🔴 UITGESCHAKELD",
 	"notify.llm_suggestions": "KI-suggesties",

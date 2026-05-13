@@ -1,4 +1,4 @@
-{
+﻿{
   "_meta.locale": "uk",
   "_meta.flag": "🇺🇦",
   "_meta.name": "Українська",
@@ -483,6 +483,9 @@
   "notify.clipboard": "Буфер обміну",
   "notify.screenshot_saved_path": "Збережено: %s",
   "notify.screenshot_title": "Знімок екрана",
+	"keepawake.title": "Активність клавіатури",
+	"keepawake.started": "☕ Режим неспання активний",
+	"keepawake.stopped": "☕ Режим неспання вимкнено",
   "notify.llm_enabled": "🟢 УВІМКНЕНО",
   "notify.llm_disabled": "🔴 ВИМКНЕНО",
   "notify.llm_suggestions": "Пропозиції ШІ",

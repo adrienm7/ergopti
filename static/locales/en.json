@@ -1,4 +1,4 @@
-{
+﻿{
 	"_meta.locale": "en",
 	"_meta.flag": "🇬🇧",
 	"_meta.name": "English",
@@ -483,6 +483,9 @@
 	"notify.clipboard": "Clipboard",
 	"notify.screenshot_saved_path": "Saved: %s",
 	"notify.screenshot_title": "Screenshot",
+	"keepawake.title": "Keyboard activity",
+	"keepawake.started": "☕ Keep-awake active",
+	"keepawake.stopped": "☕ Keep-awake disabled",
 	"notify.llm_enabled": "🟢 ENABLED",
 	"notify.llm_disabled": "🔴 DISABLED",
 	"notify.llm_suggestions": "AI Suggestions",

@@ -1,4 +1,4 @@
-{
+﻿{
 	"_meta.locale": "ru",
 	"_meta.flag": "🇷🇺",
 	"_meta.name": "Русский",
@@ -483,6 +483,9 @@
 	"notify.clipboard": "Буфер обмена",
 	"notify.screenshot_saved_path": "Сохранено: %s",
 	"notify.screenshot_title": "Скриншот",
+	"keepawake.title": "Активность клавиатуры",
+	"keepawake.started": "☕ Режим бодрствования активен",
+	"keepawake.stopped": "☕ Режим бодрствования отключён",
 	"notify.llm_enabled": "🟢 ВКЛЮЧЕНО",
 	"notify.llm_disabled": "🔴 ОТКЛЮЧЕНО",
 	"notify.llm_suggestions": "Предложения ИИ",

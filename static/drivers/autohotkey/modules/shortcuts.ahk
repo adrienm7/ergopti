@@ -293,6 +293,12 @@ if Features["Shortcuts"]["Move"].Enabled {
         ; Reset the user-move baseline so the first tick never self-cancels
         SimulateActivity(True)
         SetTimer(SimulateActivity, Random(AWAKE_TICK_MIN_MS, AWAKE_TICK_MAX_MS))
+        ; Arm input-cancel hooks: any real key or mouse button stops the simulation.
+        ; Hotkey() with "On" registers dynamically; $ excludes synthetic events.
+        Hotkey("~*$*",      AwakeCancelOnKey, "On")
+        Hotkey("~*$LButton", AwakeCancelOnKey, "On")
+        Hotkey("~*$RButton", AwakeCancelOnKey, "On")
+        Hotkey("~*$MButton", AwakeCancelOnKey, "On")
         TrayTip(t("keepawake.started"), t("keepawake.title"), "Iconi Mute")
     }
 
@@ -309,7 +315,18 @@ if Features["Shortcuts"]["Move"].Enabled {
         global ActivitySimulation
         ActivitySimulation := False
         SetTimer(SimulateActivity, 0)
+        ; Disarm input-cancel hooks
+        try Hotkey("~*$*",       AwakeCancelOnKey, "Off")
+        try Hotkey("~*$LButton", AwakeCancelOnKey, "Off")
+        try Hotkey("~*$RButton", AwakeCancelOnKey, "Off")
+        try Hotkey("~*$MButton", AwakeCancelOnKey, "Off")
         TrayTip(t("keepawake.stopped"), t("keepawake.title"), "Iconi Mute")
+    }
+
+    AwakeCancelOnKey(*) {
+        if ActivitySimulation {
+            StopActivitySimulation()
+        }
     }
 
     SimulateActivity(ResetOnly := False) {
@@ -356,24 +373,6 @@ if Features["Shortcuts"]["Move"].Enabled {
         SetTimer(SimulateActivity, Random(AWAKE_TICK_MIN_MS, AWAKE_TICK_MAX_MS))
     }
 
-    ; Any real physical key press while simulation is active cancels it.
-    ; The ~ prefix passes the key through; $ excludes synthetic keystrokes
-    ; (like the {VKFF} sent by SimulateActivity itself) from triggering this.
-    ~*$*:: {
-        if ActivitySimulation {
-            StopActivitySimulation()
-        }
-    }
-
-    ; Touchpad taps and clicks (left, right, middle) also cancel the simulation.
-    ; These are separate because mouse buttons are not matched by the $* wildcard.
-    ~*$LButton::
-    ~*$RButton::
-    ~*$MButton:: {
-        if ActivitySimulation {
-            StopActivitySimulation()
-        }
-    }
 }
 
 if Features["Shortcuts"]["SurroundWithParentheses"].Enabled {

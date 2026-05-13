@@ -1,4 +1,4 @@
-{
+﻿{
 	"_meta.locale": "pl",
 	"_meta.flag": "🇵🇱",
 	"_meta.name": "Polski",
@@ -473,6 +473,9 @@
 	"notify.clipboard": "Schowek",
 	"notify.screenshot_saved_path": "Zapisano: %s",
 	"notify.screenshot_title": "Zrzut ekranu",
+	"keepawake.title": "Aktywność klawiatury",
+	"keepawake.started": "☕ Zapobieganie uśpieniu aktywne",
+	"keepawake.stopped": "☕ Zapobieganie uśpieniu wyłączone",
 	"notify.llm_enabled": "🟢 WŁĄCZONY",
 	"notify.llm_disabled": "🔴 WYŁĄCZONY",
 	"notify.llm_suggestions": "Sugestie SI",

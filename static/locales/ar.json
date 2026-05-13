@@ -1,4 +1,4 @@
-{
+﻿{
   "_meta.locale": "ar",
   "_meta.flag": "🇸🇦",
   "_meta.name": "العربية",
@@ -483,6 +483,9 @@
   "notify.clipboard": "الحافظة",
   "notify.screenshot_saved_path": "محفوظ: %s",
   "notify.screenshot_title": "لقطة شاشة",
+	"keepawake.title": "نشاط لوحة المفاتيح",
+	"keepawake.started": "☕ مضاد للسكون نشط",
+	"keepawake.stopped": "☕ مضاد للسكون معطّل",
   "notify.llm_enabled": "🟢 مُفعَّل",
   "notify.llm_disabled": "🔴 مُعطَّل",
   "notify.llm_suggestions": "اقتراحات الذكاء الاصطناعي",

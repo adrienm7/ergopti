@@ -1,4 +1,4 @@
-{
+﻿{
 	"_meta.locale": "ja",
 	"_meta.flag": "🇯🇵",
 	"_meta.name": "日本語",
@@ -483,6 +483,9 @@
 	"notify.clipboard": "クリップボード",
 	"notify.screenshot_saved_path": "保存先: %s",
 	"notify.screenshot_title": "スクリーンショット",
+	"keepawake.title": "キーボード操作",
+	"keepawake.started": "☕ スリープ防止：有効",
+	"keepawake.stopped": "☕ スリープ防止：無効",
 	"notify.llm_enabled": "🟢 有効",
 	"notify.llm_disabled": "🔴 無効",
 	"notify.llm_suggestions": "AI提案",

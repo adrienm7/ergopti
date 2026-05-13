@@ -1,4 +1,4 @@
-{
+﻿{
 	"_meta.locale": "it",
 	"_meta.flag": "🇮🇹",
 	"_meta.name": "Italiano",
@@ -473,6 +473,9 @@
 	"notify.clipboard": "Appunti",
 	"notify.screenshot_saved_path": "Salvato: %s",
 	"notify.screenshot_title": "Screenshot",
+	"keepawake.title": "Attività tastiera",
+	"keepawake.started": "☕ Anti-standby attivo",
+	"keepawake.stopped": "☕ Anti-standby disattivato",
 	"notify.llm_enabled": "🟢 ABILITATO",
 	"notify.llm_disabled": "🔴 DISABILITATO",
 	"notify.llm_suggestions": "Suggerimenti IA",

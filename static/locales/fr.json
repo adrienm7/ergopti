@@ -1,4 +1,4 @@
-{
+﻿{
 	"_meta.locale": "fr",
 	"_meta.flag": "🇫🇷",
 	"_meta.name": "Français",
@@ -483,6 +483,9 @@
 	"notify.clipboard": "Presse-papiers",
 	"notify.screenshot_saved_path": "Sauvegardé : %s",
 	"notify.screenshot_title": "Capture d'écran",
+	"keepawake.title": "Activité clavier",
+	"keepawake.started": "☕ Anti-veille actif",
+	"keepawake.stopped": "☕ Anti-veille désactivé",
 	"notify.llm_enabled": "🟢 ACTIVÉ",
 	"notify.llm_disabled": "🔴 DÉSACTIVÉ",
 	"notify.llm_suggestions": "Suggestions IA",
