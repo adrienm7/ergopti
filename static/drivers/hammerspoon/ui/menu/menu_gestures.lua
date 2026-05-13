@@ -88,6 +88,71 @@ function M.build(ctx)
 	-- ===== 2.1) Helper Functions =====
 	-- =================================
 
+	--- Builds hs.chooser choices from the SG names list, grouping by category.
+	--- Each choice carries text (action label), subText (category name), and id (action name).
+	--- @param names table Ordered list of action names and sentinels from get_sg_names().
+	--- @param current string|nil Currently assigned action name.
+	--- @return table choices, number selectedIdx
+	local function build_chooser_choices(names, current)
+		local choices     = {}
+		local selected    = 1
+		local current_cat = ""
+
+		-- "Désactivé" entry first
+		local disabled_lbl = i18n.get("menu.gestures.action_disabled") ~= "menu.gestures.action_disabled"
+			and i18n.get("menu.gestures.action_disabled")
+			or i18n.get("dialog.action_picker.disabled")
+		table.insert(choices, { text = disabled_lbl, subText = "", id = "none" })
+		if current == "none" or current == nil then selected = 1 end
+
+		if type(names) == "table" then
+			for _, aname in ipairs(names) do
+				if aname == "-" or aname == "--" then
+					-- skip separators — categories provide visual grouping
+				elseif aname:sub(1, 1) == "#" then
+					current_cat = aname:sub(2)
+				else
+					local lbl = type(gestures.get_action_label) == "function"
+						and gestures.get_action_label(aname) or aname
+					table.insert(choices, { text = lbl, subText = current_cat, id = aname })
+					if aname == current then selected = #choices end
+				end
+			end
+		end
+		return choices, selected
+	end
+
+	--- Opens a hs.chooser to pick an action for a gesture slot.
+	--- Applies the chosen action, saves prefs, and handles conflict dialogs.
+	--- @param slot string The internal slot identifier.
+	--- @param names table Ordered names list from get_sg_names().
+	--- @param current string|nil Currently assigned action name.
+	local function open_action_chooser(slot, names, current)
+		local choices, selected = build_chooser_choices(names, current)
+		local picker = hs.chooser.new(function(choice)
+			if not choice then return end
+			local a = choice.id
+			if type(gestures.set_action) == "function" then pcall(gestures.set_action, slot, a) end
+			local conflict = type(gestures.on_action_changed) == "function" and gestures.on_action_changed(slot, a) or nil
+			ctx.save_prefs()
+			ctx.updateMenu()
+			if type(conflict) == "table" then
+				hs.timer.doAfter(0.3, function()
+					local ok_c, clicked = pcall(dialog.block_alert,
+						i18n.get("menu.gestures.conflict_title"), conflict.msg or "",
+						i18n.get("menu.gestures.open_settings"), "OK", "warning")
+					if ok_c and clicked == i18n.get("menu.gestures.open_settings") then
+						pcall(hs.execute, string.format("open \"%s\"", conflict.url or ""))
+					end
+				end)
+			end
+		end)
+		picker:choices(choices)
+		picker:searchSubText(true)
+		picker:select(selected)
+		picker:show()
+	end
+
 	--- Generates a menu item for a specific gesture slot.
 	--- @param slot string The internal slot identifier.
 	--- @return table The slot menu definition.
@@ -95,45 +160,12 @@ function M.build(ctx)
 		local current     = type(gestures.get_action) == "function" and gestures.get_action(slot) or nil
 		local currentMode = type(gestures.get_mode) == "function" and gestures.get_mode(slot) or "x1"
 		local currentSens = type(gestures.get_sensitivity) == "function" and gestures.get_sensitivity(slot) or 3.5
-		
+
 		local slotLbl   = slot_label(slot)
 		local actionLbl = type(gestures.get_action_label) == "function" and gestures.get_action_label(current)
 			or (current or "none")
-		
-		local names     = type(gestures.get_sg_names) == "function" and gestures.get_sg_names() or gestures.SG_NAMES
-		local actionsSubmenu   = {}
 
-		if type(names) == "table" then
-			for _, aname in ipairs(names) do
-				if aname == "-" or aname == "--" then
-					table.insert(actionsSubmenu, { title = "-" })
-				elseif aname:sub(1, 1) == "#" then
-					table.insert(actionsSubmenu, { title = "— " .. aname:sub(2) .. " —", disabled = true })
-				else
-					table.insert(actionsSubmenu, {
-						title    = type(gestures.get_action_label) == "function" and gestures.get_action_label(aname) or aname,
-						checked  = ((current == aname) and not paused) or nil,
-						disabled = not state.gestures or paused or nil,
-						fn       = (state.gestures and not paused) and (function(a) return function()
-							if type(gestures.set_action) == "function" then pcall(gestures.set_action, slot, a) end
-							local conflict = type(gestures.on_action_changed) == "function" and gestures.on_action_changed(slot, a) or nil
-							ctx.save_prefs()
-							ctx.updateMenu()
-							if type(conflict) == "table" then
-								hs.timer.doAfter(0.3, function()
-									local ok_c, clicked = pcall(dialog.block_alert,
-										i18n.get("menu.gestures.conflict_title"), conflict.msg or "",
-										i18n.get("menu.gestures.open_settings"), "OK", "warning")
-									if ok_c and clicked == i18n.get("menu.gestures.open_settings") then
-										pcall(hs.execute, string.format("open \"%s\"", conflict.url or ""))
-									end
-								end)
-							end
-						end end)(aname) or nil,
-					})
-				end
-			end
-		end
+		local names = type(gestures.get_sg_names) == "function" and gestures.get_sg_names() or gestures.SG_NAMES
 
 		local modeSubmenu = {
 			{
@@ -157,7 +189,7 @@ function M.build(ctx)
 		}
 
 		local sensSubmenu = {
-			{ title = "— " .. i18n.get("menu.gestures.sensitivity_label") .. " —", disabled = true },
+			{ title = i18n.section("menu.gestures.sensitivity_label"), disabled = true },
 			{ title = i18n.get("menu.gestures.sensitivity_hint"),  disabled = true },
 			{ title = "-" },
 		}
@@ -179,19 +211,35 @@ function M.build(ctx)
 		local mode_display = currentMode == "incremental"
 			and i18n.get("menu.gestures.mode_incremental")
 			or  i18n.get("menu.gestures.mode_single")
-		local finalSubmenu = {
-			{ title = i18n.get("menu.gestures.action_prefix") .. actionLbl, menu = actionsSubmenu },
+
+		local change_action_item = {
+			title = i18n.get("menu.gestures.change_action"),
+			fn    = (state.gestures and not paused) and function()
+				hs.timer.doAfter(0.05, function() open_action_chooser(slot, names, current) end)
+			end or nil,
+			disabled = not state.gestures or paused or nil,
 		}
 
+		-- Swipe slots expose an action-picker entry + mode + sensitivity in a sub-menu.
 		if slot:match("swipe") then
-			table.insert(finalSubmenu, { title = i18n.get("menu.gestures.mode_prefix") .. mode_display, menu = modeSubmenu })
-			table.insert(finalSubmenu, { title = i18n.get("menu.gestures.sensitivity_prefix") .. string.format("%.1f", currentSens), menu = sensSubmenu, disabled = (currentMode ~= "incremental") or nil })
+			local swipeSubmenu = {
+				change_action_item,
+				{ title = "-" },
+				{ title = i18n.get("menu.gestures.mode_prefix") .. mode_display, menu = modeSubmenu },
+				{ title = i18n.get("menu.gestures.sensitivity_prefix") .. string.format("%.1f", currentSens), menu = sensSubmenu, disabled = (currentMode ~= "incremental") or nil },
+			}
+			return {
+				title    = slotLbl .. " : " .. actionLbl,
+				disabled = not state.gestures or paused or nil,
+				menu     = swipeSubmenu,
+			}
 		end
 
+		-- Tap slots: only the action matters, open the chooser directly.
 		return {
 			title    = slotLbl .. " : " .. actionLbl,
 			disabled = not state.gestures or paused or nil,
-			menu     = finalSubmenu,
+			menu     = { change_action_item },
 		}
 	end
 

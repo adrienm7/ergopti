@@ -188,4 +188,12 @@ function M.locales()
 	return LOCALES
 end
 
+--- Wraps a translated string in section-title dashes for disabled menu headers.
+--- Use instead of embedding — directly in locale values.
+--- @param key string i18n key to translate.
+--- @return string Formatted as "— Value —".
+function M.section(key)
+	return "— " .. M.get(key) .. " —"
+end
+
 return M

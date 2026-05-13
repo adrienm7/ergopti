@@ -215,9 +215,9 @@ function M.generate(ctx, menu_mods, actions)
 
 		local std_groups = collect_groups(non_ergopti_filter)
 		if #std_groups > 0 then
-			local common_header = "— " .. (common_has_count
-				and string.format(i18n.get("menu.hotstrings.header_common_count"), fmt_grand(common_total))
-				or  i18n.get("menu.hotstrings.header_common")) .. " —"
+			local common_header = common_has_count
+				and "— " .. string.format(i18n.get("menu.hotstrings.header_common_count"), fmt_grand(common_total)) .. " —"
+				or  i18n.section("menu.hotstrings.header_common")
 			table.insert(hotstrings_menu, { title = common_header, disabled = true })
 			for _, it in ipairs(std_groups) do table.insert(hotstrings_menu, it) end
 		end
@@ -226,9 +226,9 @@ function M.generate(ctx, menu_mods, actions)
 		local ergopti_groups = collect_groups(ERGOPTI_GROUPS)
 		if #ergopti_groups > 0 then
 			if #std_groups > 0 then table.insert(hotstrings_menu, { title = "-" }) end
-			local ergopti_header = "— " .. (ergopti_has_count
-				and string.format(i18n.get("menu.hotstrings.header_ergopti_count"), fmt_grand(ergopti_total))
-				or  i18n.get("menu.hotstrings.header_ergopti")) .. " —"
+			local ergopti_header = ergopti_has_count
+				and "— " .. string.format(i18n.get("menu.hotstrings.header_ergopti_count"), fmt_grand(ergopti_total)) .. " —"
+				or  i18n.section("menu.hotstrings.header_ergopti")
 			table.insert(hotstrings_menu, { title = ergopti_header, disabled = true })
 			for _, it in ipairs(ergopti_groups) do table.insert(hotstrings_menu, it) end
 		end
@@ -239,9 +239,9 @@ function M.generate(ctx, menu_mods, actions)
 			and Logger.build(LOG, "hotstrings.build_custom", menu_mods.hotstrings.build_custom, ctx)
 		if custom_item then
 			table.insert(hotstrings_menu, { title = "-" })
-			local personal_header = "— " .. (personal_has_count
-				and string.format(i18n.get("menu.hotstrings.header_personal_count"), fmt_grand(personal_total))
-				or  i18n.get("menu.hotstrings.header_personal")) .. " —"
+			local personal_header = personal_has_count
+				and "— " .. string.format(i18n.get("menu.hotstrings.header_personal_count"), fmt_grand(personal_total)) .. " —"
+				or  i18n.section("menu.hotstrings.header_personal")
 			table.insert(hotstrings_menu, { title = personal_header, disabled = true })
 			table.insert(hotstrings_menu, custom_item)
 		end

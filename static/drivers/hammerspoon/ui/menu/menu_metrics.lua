@@ -380,7 +380,7 @@ function M.build(ctx)
 
 	table.insert(menu, { title = "-" })
 	table.insert(menu, { title = "-" })
-	table.insert(menu, { title = "— " .. i18n.get("menu.metrics.privacy_header") .. " —", disabled = true })
+	table.insert(menu, { title = i18n.section("menu.metrics.privacy_header"), disabled = true })
 
 	table.insert(menu, {
 		title    = i18n.get("menu.metrics.filter_private"),

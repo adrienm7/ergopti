@@ -879,7 +879,7 @@ function M.create(deps)
                     })
 
                     table.insert(model_submenu, { title = "-" })
-                    table.insert(model_submenu, { title = "— " .. i18n.get("menu.llm.specs_header") .. " —", disabled = true })
+                    table.insert(model_submenu, { title = i18n.section("menu.llm.specs_header"), disabled = true })
                     
                     local m_type = m.type or info.type or "Inconnu"
                     local type_label = (m_type == "completion") and "📝 Complétion" or "💬 Chat"
@@ -898,7 +898,7 @@ function M.create(deps)
 
                     if m.capabilities then
                         table.insert(model_submenu, { title = "-" })
-                        table.insert(model_submenu, { title = "— " .. i18n.get("menu.llm.caps_header") .. " —", disabled = true })
+                        table.insert(model_submenu, { title = i18n.section("menu.llm.caps_header"), disabled = true })
                         if m.capabilities.speed_tok_s then table.insert(model_submenu, { title = string.format(i18n.get("menu.llm.model_speed"), m.capabilities.speed_tok_s)", fn = function() end }) end
                         local tags = m.capabilities.tags
                         if tags and type(tags) == "table" and #tags > 0 then
