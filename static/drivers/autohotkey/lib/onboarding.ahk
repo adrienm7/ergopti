@@ -137,13 +137,15 @@ _Onboarding_Step1() {
 _Step1_UpdateNextBtn(btn, lv, row, selected, *) {
 	if !selected or row <= 0
 		return
-	global _I18nLocale, _I18nCacheLoaded
+	global _I18nLocale, _I18nCache, _I18nCacheLoaded
 	PrevLocale  := _I18nLocale
+	PrevCache   := _I18nCache
 	PrevLoaded  := _I18nCacheLoaded
 	_I18nLocale      := I18N_LOCALES[row].Code
 	_I18nCacheLoaded := false
 	NextLabel        := t("onboarding.next")
 	_I18nLocale      := PrevLocale
+	_I18nCache       := PrevCache
 	_I18nCacheLoaded := PrevLoaded
 	btn.Text := NextLabel
 }
