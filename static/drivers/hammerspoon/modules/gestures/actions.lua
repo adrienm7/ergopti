@@ -932,9 +932,26 @@ end
 
 function M.execute_single(name)
 	local s = SG[name]
-	if s and type(s.fn) == "function" then
-		pcall(s.fn)
+	if not s or type(s.fn) ~= "function" then return end
+	-- Any tap action (other than the click-toggle itself) must deactivate a held click
+	-- so that a selection started with left_click_toggle is properly released first.
+	if name ~= "left_click_toggle" and name ~= "right_click_toggle" then
+		local pos = hs.mouse.absolutePosition()
+		if leftClickHeld then
+			if leftMouseTap then pcall(function() leftMouseTap:stop() end); leftMouseTap = nil end
+			pcall(function() hs.eventtap.event.newMouseEvent(hs.eventtap.event.types.leftMouseUp, pos):post() end)
+			leftClickHeld = false
+			Logger.info(LOG, "Synthetic Left-Click RELEASED by tap action '%s'.", name)
+		end
+		if rightClickHeld then
+			if rightMouseTap then pcall(function() rightMouseTap:stop() end); rightMouseTap = nil end
+			pcall(function() hs.eventtap.event.newMouseEvent(hs.eventtap.event.types.rightMouseUp, pos):post() end)
+			rightClickHeld = false
+			Logger.info(LOG, "Synthetic Right-Click RELEASED by tap action '%s'.", name)
+		end
+		if not leftClickHeld and not rightClickHeld then stop_click_key_watcher() end
 	end
+	pcall(s.fn)
 end
 
 function M.execute_axis(name, goNext)
