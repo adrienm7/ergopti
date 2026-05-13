@@ -1120,9 +1120,31 @@ ToggleWpmWidgetColors(*) {
 
 ToggleWpmWidgetGraph(*) {
     global _MetricsMenu, _WpmWidgetGraphLabel
+    was_visible := WPMWidget.visible
+    ; Rebuild the widget in the new mode — compact and graph use different Gui layouts.
+    if was_visible
+        WPMWidget_Hide()
     WPMWidget.show_graph := !WPMWidget.show_graph
+    ; Destroy existing GUI so it is rebuilt in the correct layout on next show.
+    if WPMWidget._gui {
+        try WPMWidget._gui.Destroy()
+        WPMWidget._gui      := false
+        WPMWidget._lbl_wpm  := false
+        WPMWidget._lbl_unit := false
+    }
+    if WPMWidget._graph_gui {
+        try WPMWidget._graph_gui.Destroy()
+        WPMWidget._graph_gui      := false
+        WPMWidget._graph_wv       := false
+        WPMWidget._graph_wv_ready := false
+    }
+    ; Reset saved position so default bottom-right is recalculated for new size.
+    WPMWidget.pos_x := -1
+    WPMWidget.pos_y := -1
     WPMWidget_SaveConfig()
     try _MetricsMenu.ToggleCheck(_WpmWidgetGraphLabel)
+    if was_visible
+        WPMWidget_Show()
 }
 
 ; Updates A_IconTip with the current live WPM every second.

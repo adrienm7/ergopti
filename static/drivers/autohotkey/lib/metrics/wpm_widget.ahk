@@ -13,16 +13,19 @@
 ;    (default 30 s) of recent keystrokes so the value reacts quickly to
 ;    speed changes without wild swings from isolated bursts.
 ; 2. Color coding: the background color encodes keystroke origin —
-;      - manual keystrokes  → neutral (dark grey text on semi-transparent bg)
-;      - hotstring expanded → orange tint (immediate visual feedback)
-;      - IA suggestion (future) → purple tint
-;    Colors match the HS bubble color scheme for consistency.
-; 3. Draggable: click-drag moves the widget anywhere on screen; position
+;      - manual keystrokes  → blue
+;      - hotstring expanded → red
+;      - autocorrection     → green
+;      - IA suggestion      → purple
+;    Colors match the Hammerspoon widget color scheme for consistency.
+; 3. Two display modes:
+;      - Compact: colored pill with large WPM number + small unit label.
+;      - Graph: sparkline of recent history rendered as a WebView2 canvas.
+; 4. Draggable: click-drag moves the widget anywhere on screen; position
 ;    is saved to config and restored on next launch.
-; 4. Zero-impact when hidden: the SetTimer tick is cancelled when the widget
+; 5. Default position: bottom-right corner, above the Windows taskbar.
+; 6. Zero-impact when hidden: the SetTimer tick is cancelled when the widget
 ;    is off — no overhead on the keystroke hot path.
-; 5. Menu bar integration: a checkmark toggle in the metrics submenu controls
-;    the widget; the state is persisted in config.toml alongside other prefs.
 ; ==============================================================================
 
 #Requires Autohotkey v2.0+
@@ -38,38 +41,48 @@
 
 class WPMWidgetConst {
     ; Rolling window over which WPM is averaged.
-    static WINDOW_MS        := 30000
+    static WINDOW_MS          := 30000
     ; Timer tick — how often the display refreshes (ms).
-    static TICK_MS          := 500
-    ; Visual — widget dimensions (px).
-    static W                := 110
-    static H                := 44
-    ; How long (ms) after the last keystroke to show the fade-to-idle state.
-    static IDLE_AFTER_MS    := 4000
-    ; Default screen-corner position when no saved position exists.
-    static DEFAULT_X        := 20
-    static DEFAULT_Y        := 60
-    ; Background colors (RRGGBB, AHK control format 0xRRGGBB).
-    static COLOR_BG_NORMAL  := "1e1e2e"   ; Dark neutral
-    static COLOR_BG_HS      := "7c3e00"   ; Orange-brown (hotstring)
-    static COLOR_BG_AI      := "3a005e"   ; Purple (IA — future)
-    static COLOR_BG_IDLE    := "111118"   ; Almost black when idle
+    static TICK_MS            := 500
+    ; Compact mode pill dimensions (px).
+    static W                  := 80
+    static H                  := 56
+    ; Graph mode dimensions (wider to show history).
+    static GRAPH_W            := 220
+    static GRAPH_H            := 80
+    ; Margin from screen edges (px).
+    static EDGE_MARGIN        := 12
+    ; How long (ms) after the last keystroke to show the idle state.
+    static IDLE_AFTER_MS      := 4000
+    ; Source background colors (RRGGBB for AHK BackColor / canvas).
+    static COLOR_BG_MANUAL    := "0055cc"   ; Blue
+    static COLOR_BG_HS        := "cc2200"   ; Red (hotstring)
+    static COLOR_BG_AC        := "1a8a3a"   ; Green (autocorrection)
+    static COLOR_BG_AI        := "7a30b0"   ; Purple (IA)
+    static COLOR_BG_IDLE      := "1a1a2e"   ; Near-black when idle
     ; Text colors.
-    static COLOR_TXT_NORMAL := "e0e0f0"
-    static COLOR_TXT_HS     := "ffbb66"
-    static COLOR_TXT_AI     := "cc88ff"
-    static COLOR_TXT_IDLE   := "444455"
+    static COLOR_TXT_ACTIVE   := "ffffff"
+    static COLOR_TXT_IDLE     := "555577"
+    ; Graph accent colors (same palette, slightly brighter for lines).
+    static COLOR_GRAPH_MANUAL := "4499ff"
+    static COLOR_GRAPH_HS     := "ff6644"
+    static COLOR_GRAPH_AC     := "44dd77"
+    static COLOR_GRAPH_AI     := "cc88ff"
     ; Transparency (0-255, 255=opaque).
-    static ALPHA_ACTIVE     := 210
-    static ALPHA_IDLE       := 130
+    static ALPHA_ACTIVE       := 220
+    static ALPHA_IDLE         := 140
     ; Config key names written to config.toml under [Script].
-    static CFG_VISIBLE      := "WpmWidgetVisible"
-    static CFG_X            := "WpmWidgetX"
-    static CFG_Y            := "WpmWidgetY"
-    static CFG_COLORS       := "WpmWidgetColors"
-    static CFG_GRAPH        := "WpmWidgetGraph"
+    static CFG_VISIBLE        := "WpmWidgetVisible"
+    static CFG_X              := "WpmWidgetX"
+    static CFG_Y              := "WpmWidgetY"
+    static CFG_COLORS         := "WpmWidgetColors"
+    static CFG_GRAPH          := "WpmWidgetGraph"
     ; Ring buffer capacity for recent keystrokes.
-    static RING_CAP         := 2000
+    static RING_CAP           := 2000
+    ; Number of history ticks kept for the graph.
+    static GRAPH_HISTORY      := 40
+    ; Maximum WPM assumed for graph scale.
+    static GRAPH_SCALE_MAX    := 120
 }
 
 
@@ -82,35 +95,44 @@ class WPMWidgetConst {
 ; ===================================
 
 class WPMWidget {
-    ; Gui handle — false means not yet built.
-    static _gui         := false
-    static _lbl_wpm     := false   ; main WPM number
-    static _lbl_unit    := false   ; "MPM" label
+    ; Compact mode GUI handles.
+    static _gui           := false
+    static _lbl_wpm       := false
+    static _lbl_unit      := false
+
+    ; Graph mode GUI + WebView2 handles.
+    static _graph_gui        := false
+    static _graph_wv         := false   ; WebView2 controller
+    static _graph_wv_ready   := false   ; true once NavigateToString completed
 
     ; Visibility + position.
-    static visible      := false
-    static pos_x        := WPMWidgetConst.DEFAULT_X
-    static pos_y        := WPMWidgetConst.DEFAULT_Y
+    static visible        := false
+    static pos_x          := -1         ; -1 = auto-position on first show
+    static pos_y          := -1
 
-    ; Ring buffer of recent keystrokes: [{t: tick_ms, hs: bool, ai: bool}, …]
-    static _ring        := []
-    static _ring_head   := 0      ; next write index (mod RING_CAP)
+    ; Ring buffer of recent keystrokes.
+    static _ring          := []
+    static _ring_head     := 0
+
+    ; WPM history array for graph (newest last).
+    static _graph_hist    := []
 
     ; Derived state refreshed by the tick.
-    static _last_wpm    := 0
-    static _last_tick   := 0      ; A_TickCount of last keystroke seen
-    static _last_hs     := false  ; most recent keystroke was a HS expansion
-    static _last_ai     := false  ; most recent keystroke was an AI suggestion
+    static _last_wpm      := 0
+    static _last_tick     := 0
+    static _last_hs       := false
+    static _last_ai       := false
+    static _last_ac       := false
 
-    ; Display options — toggled from the menu.
-    static use_colors    := false   ; color-code by keystroke origin
-    static show_graph    := false   ; show mini sparkline graph (future)
+    ; Display options.
+    static use_colors     := false
+    static show_graph     := false
 
     ; Drag state.
-    static _drag_start_x := 0
-    static _drag_start_y := 0
-    static _drag_win_x   := 0
-    static _drag_win_y   := 0
+    static _drag_start_x  := 0
+    static _drag_start_y  := 0
+    static _drag_win_x    := 0
+    static _drag_win_y    := 0
 }
 
 
@@ -123,35 +145,32 @@ class WPMWidget {
 ; ============================================
 
 ; Called by the keylogger hook after each accepted keystroke.
-; is_hs: true when the character is a hotstring synthetic output.
-; is_ai: true when from an AI suggestion (future).
-WPMWidget_Push(is_hs := false, is_ai := false) {
+WPMWidget_Push(is_hs := false, is_ai := false, is_ac := false) {
     if !WPMWidget.visible
         return
-    ; Grow ring array up to capacity, then overwrite oldest slot.
-    cap := WPMWidgetConst.RING_CAP
+    cap  := WPMWidgetConst.RING_CAP
     head := WPMWidget._ring_head
-    entry := Map("t", A_TickCount, "hs", is_hs, "ai", is_ai)
-    if (WPMWidget._ring.Length < cap) {
+    entry := Map("t", A_TickCount, "hs", is_hs, "ai", is_ai, "ac", is_ac)
+    if (WPMWidget._ring.Length < cap)
         WPMWidget._ring.Push(entry)
-    } else {
-        WPMWidget._ring[head + 1] := entry   ; 1-based
-    }
+    else
+        WPMWidget._ring[head + 1] := entry
     WPMWidget._ring_head := Mod(head + 1, cap)
     WPMWidget._last_tick := A_TickCount
     WPMWidget._last_hs   := is_hs
     WPMWidget._last_ai   := is_ai
+    WPMWidget._last_ac   := is_ac
 }
 
 
-; Compute current WPM from the ring buffer using a trailing WINDOW_MS window.
-; Returns {wpm, has_hs, has_ai} reflecting events inside the window.
+; Compute current WPM from the ring buffer.
 WPMWidget_Calc() {
-    now      := A_TickCount
-    cutoff   := now - WPMWidgetConst.WINDOW_MS
-    count    := 0
-    has_hs   := false
-    has_ai   := false
+    now    := A_TickCount
+    cutoff := now - WPMWidgetConst.WINDOW_MS
+    count  := 0
+    has_hs := false
+    has_ai := false
+    has_ac := false
     earliest := now
     latest   := 0
     for ev in WPMWidget._ring {
@@ -163,20 +182,69 @@ WPMWidget_Calc() {
             has_hs := true
         if ev["ai"]
             has_ai := true
+        if ev["ac"]
+            has_ac := true
         if (t < earliest)
             earliest := t
         if (t > latest)
             latest := t
     }
-    if (count < 2) {
-        return Map("wpm", 0, "has_hs", has_hs, "has_ai", has_ai)
-    }
+    if (count < 2)
+        return Map("wpm", 0, "has_hs", has_hs, "has_ai", has_ai, "has_ac", has_ac)
     elapsed_ms := latest - earliest
     if (elapsed_ms < 50)
-        return Map("wpm", 0, "has_hs", has_hs, "has_ai", has_ai)
-    ; Standard WPM formula: characters ÷ 5 ÷ minutes.
+        return Map("wpm", 0, "has_hs", has_hs, "has_ai", has_ai, "has_ac", has_ac)
     wpm := (count / 5) / (elapsed_ms / 60000)
-    return Map("wpm", Round(wpm), "has_hs", has_hs, "has_ai", has_ai)
+    return Map("wpm", Round(wpm), "has_hs", has_hs, "has_ai", has_ai, "has_ac", has_ac)
+}
+
+
+; Resolve the background color for the current source state.
+WPMWidget_ResolveBgColor(idle, has_hs, has_ai, has_ac, use_colors) {
+    if idle
+        return WPMWidgetConst.COLOR_BG_IDLE
+    if use_colors {
+        if has_ai
+            return WPMWidgetConst.COLOR_BG_AI
+        if has_hs
+            return WPMWidgetConst.COLOR_BG_HS
+        if has_ac
+            return WPMWidgetConst.COLOR_BG_AC
+    }
+    return WPMWidgetConst.COLOR_BG_MANUAL
+}
+
+
+; Resolve the graph accent color hex string.
+WPMWidget_ResolveGraphColor(has_hs, has_ai, has_ac, use_colors) {
+    if use_colors {
+        if has_ai
+            return WPMWidgetConst.COLOR_GRAPH_AI
+        if has_hs
+            return WPMWidgetConst.COLOR_GRAPH_HS
+        if has_ac
+            return WPMWidgetConst.COLOR_GRAPH_AC
+    }
+    return WPMWidgetConst.COLOR_GRAPH_MANUAL
+}
+
+
+
+
+; ==================================================
+; ==================================================
+; ======= 4/ Default position (bottom-right) =======
+; ==================================================
+; ==================================================
+
+; Returns the default bottom-right position, above the Windows taskbar.
+WPMWidget_DefaultPos(&out_x, &out_y) {
+    ; MonitorGetWorkArea excludes the taskbar from the usable area.
+    MonitorGetWorkArea(, &wl, &wt, &wr, &wb)
+    w := WPMWidget.show_graph ? WPMWidgetConst.GRAPH_W : WPMWidgetConst.W
+    h := WPMWidget.show_graph ? WPMWidgetConst.GRAPH_H : WPMWidgetConst.H
+    out_x := wr - w - WPMWidgetConst.EDGE_MARGIN
+    out_y := wb - h - WPMWidgetConst.EDGE_MARGIN
 }
 
 
@@ -184,29 +252,31 @@ WPMWidget_Calc() {
 
 ; ============================================
 ; ============================================
-; ======= 4/ GUI construction =======
+; ======= 5/ GUI construction =======
 ; ============================================
 ; ============================================
 
-WPMWidget_Build() {
-    g := Gui("+AlwaysOnTop -Caption +ToolWindow +E0x80000 -DPIScale",
-        "ErgoptiPlus WPM")
+WPMWidget_BuildCompact() {
+    w := WPMWidgetConst.W
+    h := WPMWidgetConst.H
+
+    g := Gui("+AlwaysOnTop -Caption +ToolWindow +E0x80000 -DPIScale", "ErgoptiPlus WPM")
     g.BackColor := WPMWidgetConst.COLOR_BG_IDLE
+    g.MarginX   := 0
+    g.MarginY   := 0
 
-    ; Main WPM number — large and centered.
-    g.SetFont("s18 w700 c" . WPMWidgetConst.COLOR_TXT_IDLE, "Segoe UI")
-    lbl_wpm := g.AddText("x0 y4 w" . WPMWidgetConst.W . " h28 Center", "—")
+    ; Large WPM number.
+    g.SetFont("s20 w700 c" . WPMWidgetConst.COLOR_TXT_IDLE, "Segoe UI")
+    lbl_wpm := g.AddText("x0 y6 w" . w . " h30 Center BackgroundTrans", "—")
 
-    ; "MPM" unit label below.
+    ; Small unit label ("mpm" / "wpm") below.
     g.SetFont("s8 w400 c" . WPMWidgetConst.COLOR_TXT_IDLE, "Segoe UI")
-    lbl_unit := g.AddText("x0 y30 w" . WPMWidgetConst.W . " h12 Center",
+    lbl_unit := g.AddText("x0 y36 w" . w . " h14 Center BackgroundTrans",
         t("menu.metrics.wpm_unit"))
 
-    ; Make the window draggable by clicking anywhere.
-    g.OnEvent("Close",   (*) => WPMWidget_Hide())
-    lbl_wpm.OnEvent("Click", WPMWidget_DragStart)
+    lbl_wpm.OnEvent("Click",  WPMWidget_DragStart)
     lbl_unit.OnEvent("Click", WPMWidget_DragStart)
-    g.OnEvent("Size", (*) => "")   ; prevent resize
+    g.OnEvent("Close", (*) => WPMWidget_Hide())
 
     WPMWidget._gui      := g
     WPMWidget._lbl_wpm  := lbl_wpm
@@ -214,32 +284,104 @@ WPMWidget_Build() {
 }
 
 
+WPMWidget_BuildGraph() {
+    w := WPMWidgetConst.GRAPH_W
+    h := WPMWidgetConst.GRAPH_H
+
+    g := Gui("+AlwaysOnTop -Caption +ToolWindow +E0x80000 -DPIScale", "ErgoptiPlus WPM Graph")
+    g.BackColor := WPMWidgetConst.COLOR_BG_IDLE
+    g.MarginX   := 0
+    g.MarginY   := 0
+
+    ; The WebView2 control will fill the whole window.
+    ; A transparent placeholder text receives drag clicks until WV is ready.
+    lbl := g.AddText("x0 y0 w" . w . " h" . h . " BackgroundTrans", "")
+    lbl.OnEvent("Click", WPMWidget_DragStart)
+
+    g.OnEvent("Close", (*) => WPMWidget_Hide())
+
+    WPMWidget._graph_gui      := g
+    WPMWidget._graph_wv       := false
+    WPMWidget._graph_wv_ready := false
+
+    ; Attempt to embed WebView2 for canvas rendering.
+    ; Falls back gracefully if WebView2 Runtime is not installed.
+    try {
+        wvc := WebView2.CreateControllerAsync(g.Hwnd).Await()
+        wv  := wvc.CoreWebView2
+        wvc.Bounds := { X: 0, Y: 0, Width: w, Height: h }
+        wv.NavigateToString(WPMWidget_GraphHtml(w, h))
+        WPMWidget._graph_wv       := wvc
+        WPMWidget._graph_wv_ready := true
+    }
+
+    WPMWidget._gui := g
+}
+
+
+; Returns the self-contained HTML for the graph canvas.
+WPMWidget_GraphHtml(w, h) {
+    return "<!DOCTYPE html><html><head><meta charset='utf-8'><style>"
+        . "html,body{margin:0;padding:0;background:transparent;overflow:hidden}"
+        . "canvas{display:block}</style></head><body>"
+        . "<canvas id='c' width='" . w . "' height='" . h . "'></canvas>"
+        . "<script>"
+        . "const c=document.getElementById('c'),ctx=c.getContext('2d');"
+        . "window.updateGraph=function(data){"
+        . "  const d=JSON.parse(data);"
+        . "  ctx.clearRect(0,0,c.width,c.height);"
+        . "  const pad=6,lh=18,gh=c.height-lh-pad*2,gw=c.width-pad*2;"
+        . "  const n=d.hist.length; if(n<2)return;"
+        . "  const mx=d.scale||120;"
+        . "  const step=gw/(n-1);"
+        . "  const col='#'+d.color;"
+        . "  ctx.beginPath();"
+        . "  ctx.moveTo(pad,lh+pad+gh);"
+        . "  for(let i=0;i<n;i++){ctx.lineTo(pad+i*step,lh+pad+gh-(d.hist[i]/mx)*gh);}"
+        . "  ctx.lineTo(pad+(n-1)*step,lh+pad+gh);"
+        . "  ctx.closePath();"
+        . "  ctx.fillStyle=col+'33';ctx.fill();"
+        . "  ctx.beginPath();"
+        . "  for(let i=0;i<n;i++){i===0?ctx.moveTo(pad,lh+pad+gh-(d.hist[0]/mx)*gh):ctx.lineTo(pad+i*step,lh+pad+gh-(d.hist[i]/mx)*gh);}"
+        . "  ctx.strokeStyle=col;ctx.lineWidth=2;ctx.stroke();"
+        . "  ctx.fillStyle='#'+d.txt;ctx.font='bold 12px Segoe UI';"
+        . "  ctx.textAlign='center';ctx.fillText(d.label,c.width/2,lh);"
+        . "}"
+        . "</script></body></html>"
+}
+
+
+
+
 ; ── Drag support ──────────────────────────────────────────────────────────────
 
 WPMWidget_DragStart(ctrl, info, *) {
-    ; Record initial mouse + window position for drag computation.
+    gui_ref := WPMWidget.show_graph ? WPMWidget._graph_gui : WPMWidget._gui
+    if !gui_ref
+        return
     MouseGetPos(&mx, &my)
-    WPMWidget._gui.GetPos(&wx, &wy)
+    gui_ref.GetPos(&wx, &wy)
     WPMWidget._drag_start_x := mx
     WPMWidget._drag_start_y := my
     WPMWidget._drag_win_x   := wx
     WPMWidget._drag_win_y   := wy
-    ; Poll mouse movement until button released.
     SetTimer(WPMWidget_DragPoll, 16)
     KeyWait("LButton", "U")
     SetTimer(WPMWidget_DragPoll, 0)
-    ; Persist final position.
-    WPMWidget._gui.GetPos(&fx, &fy)
+    gui_ref.GetPos(&fx, &fy)
     WPMWidget.pos_x := fx
     WPMWidget.pos_y := fy
     WPMWidget_SavePosition()
 }
 
 WPMWidget_DragPoll() {
+    gui_ref := WPMWidget.show_graph ? WPMWidget._graph_gui : WPMWidget._gui
+    if !gui_ref
+        return
     MouseGetPos(&mx, &my)
     dx := mx - WPMWidget._drag_start_x
     dy := my - WPMWidget._drag_start_y
-    WPMWidget._gui.Move(WPMWidget._drag_win_x + dx, WPMWidget._drag_win_y + dy)
+    gui_ref.Move(WPMWidget._drag_win_x + dx, WPMWidget._drag_win_y + dy)
 }
 
 
@@ -247,28 +389,43 @@ WPMWidget_DragPoll() {
 
 ; ============================================
 ; ============================================
-; ======= 5/ Show / Hide =======
+; ======= 6/ Show / Hide =======
 ; ============================================
 ; ============================================
 
 WPMWidget_Show() {
-    if !WPMWidget._gui
-        WPMWidget_Build()
+    if WPMWidget.show_graph {
+        if !WPMWidget._graph_gui
+            WPMWidget_BuildGraph()
+    } else {
+        if !WPMWidget._gui
+            WPMWidget_BuildCompact()
+    }
+
     WPMWidget.visible := true
-    WPMWidget._gui.Show("x" . WPMWidget.pos_x . " y" . WPMWidget.pos_y
-        . " w" . WPMWidgetConst.W . " h" . WPMWidgetConst.H . " NoActivate")
-    WinSetTransparent(WPMWidgetConst.ALPHA_IDLE, WPMWidget._gui)
-    ; Start the refresh tick.
+
+    if (WPMWidget.pos_x = -1 || WPMWidget.pos_y = -1)
+        WPMWidget_DefaultPos(&WPMWidget.pos_x, &WPMWidget.pos_y)
+
+    w      := WPMWidget.show_graph ? WPMWidgetConst.GRAPH_W : WPMWidgetConst.W
+    h      := WPMWidget.show_graph ? WPMWidgetConst.GRAPH_H : WPMWidgetConst.H
+    gui_ref := WPMWidget.show_graph ? WPMWidget._graph_gui : WPMWidget._gui
+
+    gui_ref.Show("x" . WPMWidget.pos_x . " y" . WPMWidget.pos_y
+        . " w" . w . " h" . h . " NoActivate")
+    WinSetTransparent(WPMWidgetConst.ALPHA_IDLE, gui_ref)
     SetTimer(WPMWidget_Tick, WPMWidgetConst.TICK_MS)
-    try LoggerDone("WPMWidget", "Widget shown at (%d, %d).", WPMWidget.pos_x, WPMWidget.pos_y)
+    try LoggerDone("WPMWidget", "Widget shown at (%d, %d) mode=%s.",
+        WPMWidget.pos_x, WPMWidget.pos_y, WPMWidget.show_graph ? "graph" : "compact")
 }
 
 WPMWidget_Hide() {
     WPMWidget.visible := false
     SetTimer(WPMWidget_Tick, 0)
-    if WPMWidget._gui {
+    if WPMWidget._gui
         try WPMWidget._gui.Hide()
-    }
+    if WPMWidget._graph_gui
+        try WPMWidget._graph_gui.Hide()
     try LoggerDone("WPMWidget", "Widget hidden.")
 }
 
@@ -285,52 +442,93 @@ WPMWidget_Toggle() {
 
 ; ============================================
 ; ============================================
-; ======= 6/ Tick — refresh display =======
+; ======= 7/ Tick — refresh display =======
 ; ============================================
 ; ============================================
 
 WPMWidget_Tick() {
     if !WPMWidget.visible
         return
-    now     := A_TickCount
-    idle    := (now - WPMWidget._last_tick) > WPMWidgetConst.IDLE_AFTER_MS
-    result  := WPMWidget_Calc()
-    wpm     := result["wpm"]
-    has_hs  := result["has_hs"]
-    has_ai  := result["has_ai"]
 
-    ; Select color scheme — color coding only when the option is enabled.
-    if idle || wpm = 0 {
-        bg_color  := WPMWidgetConst.COLOR_BG_IDLE
-        txt_color := WPMWidgetConst.COLOR_TXT_IDLE
-        alpha     := WPMWidgetConst.ALPHA_IDLE
-        wpm_str   := "—"
-    } else if WPMWidget.use_colors && has_ai {
-        bg_color  := WPMWidgetConst.COLOR_BG_AI
-        txt_color := WPMWidgetConst.COLOR_TXT_AI
-        alpha     := WPMWidgetConst.ALPHA_ACTIVE
-        wpm_str   := String(wpm)
-    } else if WPMWidget.use_colors && has_hs {
-        bg_color  := WPMWidgetConst.COLOR_BG_HS
-        txt_color := WPMWidgetConst.COLOR_TXT_HS
-        alpha     := WPMWidgetConst.ALPHA_ACTIVE
-        wpm_str   := String(wpm)
+    now    := A_TickCount
+    idle   := (now - WPMWidget._last_tick) > WPMWidgetConst.IDLE_AFTER_MS
+    result := WPMWidget_Calc()
+    wpm    := result["wpm"]
+    has_hs := result["has_hs"]
+    has_ai := result["has_ai"]
+    has_ac := result["has_ac"]
+
+    ; Update graph history.
+    WPMWidget._graph_hist.Push(wpm)
+    while (WPMWidget._graph_hist.Length > WPMWidgetConst.GRAPH_HISTORY)
+        WPMWidget._graph_hist.RemoveAt(1)
+
+    is_idle  := idle || wpm = 0
+    bg_color := WPMWidget_ResolveBgColor(is_idle, has_hs, has_ai, has_ac, WPMWidget.use_colors)
+    alpha    := is_idle ? WPMWidgetConst.ALPHA_IDLE : WPMWidgetConst.ALPHA_ACTIVE
+    wpm_str  := is_idle ? "—" : String(wpm)
+    txt_col  := is_idle ? WPMWidgetConst.COLOR_TXT_IDLE : WPMWidgetConst.COLOR_TXT_ACTIVE
+
+    if WPMWidget.show_graph {
+        if WPMWidget._graph_gui {
+            WPMWidget._graph_gui.BackColor := bg_color
+            WinSetTransparent(alpha, WPMWidget._graph_gui)
+            WPMWidget_PushGraphUpdate(wpm_str, txt_col, has_hs, has_ai, has_ac, is_idle)
+        }
     } else {
-        bg_color  := WPMWidgetConst.COLOR_BG_NORMAL
-        txt_color := WPMWidgetConst.COLOR_TXT_NORMAL
-        alpha     := WPMWidgetConst.ALPHA_ACTIVE
-        wpm_str   := String(wpm)
+        if WPMWidget._gui {
+            WPMWidget._gui.BackColor := bg_color
+            WinSetTransparent(alpha, WPMWidget._gui)
+            if WPMWidget._lbl_wpm && (wpm_str != WPMWidget._lbl_wpm.Value)
+                WPMWidget._lbl_wpm.Value := wpm_str
+            if WPMWidget._lbl_wpm
+                WPMWidget._lbl_wpm.SetFont("c" . txt_col)
+            if WPMWidget._lbl_unit
+                WPMWidget._lbl_unit.SetFont("c" . txt_col)
+        }
     }
-
-    ; Apply — only redraw when values changed to avoid flicker.
-    if (wpm_str != WPMWidget._lbl_wpm.Value) {
-        WPMWidget._lbl_wpm.Value := wpm_str
-    }
-    WPMWidget._gui.BackColor := bg_color
-    WPMWidget._lbl_wpm.SetFont("c" . txt_color)
-    WPMWidget._lbl_unit.SetFont("c" . txt_color)
-    WinSetTransparent(alpha, WPMWidget._gui)
     WPMWidget._last_wpm := wpm
+}
+
+
+; Sends updated graph data to the WebView2 canvas via postMessage.
+WPMWidget_PushGraphUpdate(wpm_str, txt_col, has_hs, has_ai, has_ac, is_idle) {
+    if !WPMWidget._graph_wv_ready
+        return
+
+    accent := WPMWidget_ResolveGraphColor(has_hs, has_ai, has_ac, WPMWidget.use_colors)
+    ; Build compact JSON array of history values.
+    hist_parts := []
+    for v in WPMWidget._graph_hist
+        hist_parts.Push(String(v))
+    hist_json := "[" . StrJoin(hist_parts, ",") . "]"
+
+    label := wpm_str . " " . t("menu.metrics.wpm_unit")
+    json  := '{"hist":' . hist_json
+        . ',"color":"' . accent . '"'
+        . ',"txt":"'   . txt_col . '"'
+        . ',"label":"' . label . '"'
+        . ',"scale":' . WPMWidgetConst.GRAPH_SCALE_MAX . '}'
+
+    try WPMWidget._graph_wv.CoreWebView2.ExecuteScriptAsync(
+        "if(window.updateGraph)window.updateGraph(" . JSON_Escape(json) . ")")
+}
+
+
+; Escapes a string for safe embedding in a JS string literal.
+JSON_Escape(s) {
+    s := StrReplace(s, "\", "\\")
+    s := StrReplace(s, '"', '\"')
+    return '"' . s . '"'
+}
+
+
+; Joins array elements with a separator.
+StrJoin(arr, sep) {
+    out := ""
+    for i, v in arr
+        out .= (i > 1 ? sep : "") . v
+    return out
 }
 
 
@@ -338,7 +536,7 @@ WPMWidget_Tick() {
 
 ; ============================================
 ; ============================================
-; ======= 7/ Config persistence =======
+; ======= 8/ Config persistence =======
 ; ============================================
 ; ============================================
 
@@ -359,7 +557,6 @@ WPMWidget_LoadConfig(Cache) {
     if (raw_graph = "1")
         WPMWidget.show_graph := true
 
-    ; Auto-show if it was visible on last quit — only when metrics are on.
     if (raw_vis = "1")
         WPMWidget.visible := true
     try LoggerDone("WPMWidget", "Config loaded (visible=%s, x=%d, y=%d, colors=%s, graph=%s).",
