@@ -22,8 +22,10 @@ local M = {}
 local Logger = require("lib.logger")
 local LOG    = "locale"
 
-local _strings  = nil
-local _locale   = "fr"
+local _strings     = nil   -- active locale strings
+local _strings_en  = nil   -- English fallback strings
+local _strings_fr  = nil   -- French second-fallback strings
+local _locale      = "fr"
 local _get_trigger = nil   -- injected by init.lua after keymap is ready
 
 
@@ -35,24 +37,21 @@ local _get_trigger = nil   -- injected by init.lua after keymap is ready
 -- =====================================
 -- =====================================
 
---- Resolves the absolute path to the locale JSON file.
---- @return string Absolute path to e.g. ``…/static/locales/fr.json``.
-local function locale_path()
-	-- hs.configdir points to ~/.hammerspoon; the repo root is two levels up
-	-- (hammerspoon/ → static/ → repo root) then down to static/locales/.
-	-- We walk up from hs.configdir until we find the locales/ directory.
+--- Resolves the absolute path to a locale JSON file.
+--- @param code string Locale code, e.g. ``"fr"``.
+--- @return string Absolute path to the JSON file.
+local function locale_path(code)
 	local cfg = hs.configdir or ""
-	-- Expected layout: <repo>/static/drivers/hammerspoon/ → hs.configdir
-	-- Walk up 3 levels: hammerspoon → drivers → static → repo root
 	local repo_root = cfg:gsub("/static/drivers/hammerspoon$", "")
 	                      :gsub("\\static\\drivers\\hammerspoon$", "")
-	return repo_root .. "/static/locales/" .. _locale .. ".json"
+	return repo_root .. "/static/locales/" .. code .. ".json"
 end
 
---- Loads and caches the locale strings map.
-local function ensure_loaded()
-	if _strings then return end
-	local path = locale_path()
+--- Loads a JSON locale file and returns a flat key→string table, or {}.
+--- @param code string Locale code to load.
+--- @return table
+local function load_locale(code)
+	local path = locale_path(code)
 	local ok, data = pcall(function()
 		local f = io.open(path, "r")
 		if not f then
@@ -64,13 +63,29 @@ local function ensure_loaded()
 		return hs.json.decode(raw) or {}
 	end)
 	if ok and type(data) == "table" then
-		_strings = data
-		Logger.debug(LOG, "Locale '%s' loaded (%d key(s)).", _locale, (function()
+		Logger.debug(LOG, "Locale '%s' loaded (%d key(s)).", code, (function()
 			local n = 0; for _ in pairs(data) do n = n + 1 end; return n
 		end)())
+		return data
+	end
+	Logger.warn(LOG, "Failed to load locale '%s': %s.", code, tostring(data))
+	return {}
+end
+
+--- Ensures the active locale and both fallback locales are loaded.
+local function ensure_loaded()
+	if _strings then return end
+	_strings = load_locale(_locale)
+	-- Pre-load fallbacks so missing keys degrade gracefully
+	if _locale ~= "en" then
+		_strings_en = _strings_en or load_locale("en")
 	else
-		Logger.warn(LOG, "Failed to load locale '%s': %s.", _locale, tostring(data))
-		_strings = {}
+		_strings_en = _strings
+	end
+	if _locale ~= "fr" then
+		_strings_fr = _strings_fr or load_locale("fr")
+	else
+		_strings_fr = _strings
 	end
 end
 
@@ -90,7 +105,14 @@ end
 --- @return string
 function M.get(key)
 	ensure_loaded()
+	-- Resolve with fallback chain: active locale → English → French
 	local s = _strings[key]
+	if type(s) ~= "string" or s == "" then
+		s = _strings_en and _strings_en[key]
+	end
+	if type(s) ~= "string" or s == "" then
+		s = _strings_fr and _strings_fr[key]
+	end
 	if type(s) ~= "string" then return "" end
 	if _get_trigger then
 		local ok, trigger = pcall(_get_trigger)
@@ -115,8 +137,12 @@ end
 --- @param code string A locale code, e.g. ``"en"``.
 function M.set_locale(code)
 	if type(code) ~= "string" or code == "" then return end
-	_locale  = code
-	_strings = nil
+	_locale     = code
+	_strings    = nil
+	-- Reset en/fr caches only if they were the previously active locale
+	-- (they stay loaded across locale switches to avoid redundant re-reads)
+	if code == "en" then _strings_en = nil end
+	if code == "fr" then _strings_fr = nil end
 end
 
 --- Returns all loaded strings as a flat table (for inspection/testing).

@@ -872,7 +872,7 @@ BuildGesturesMenu() {
             GMenu.Add()
         SlotLabel     := t("gesture.slots." . Slot)
         CurrentAction := GestureAssignments.Has(Slot) ? GestureAssignments[Slot] : "none"
-        CurrentLabel  := GESTURE_ACTIONS.Has(CurrentAction) ? t("sg_actions." . CurrentAction) : t("dialog.action_picker.disabled")
+        CurrentLabel  := GESTURE_ACTIONS.Has(CurrentAction) ? GESTURE_ACTIONS[CurrentAction].Label : t("dialog.action_picker.disabled")
         EntryLabel    := SlotLabel . " : " . CurrentLabel
         GMenu.Add(EntryLabel, ((_s, _l) => (*) => ShowActionPicker(_l, GestureAssignments.Has(_s) ? GestureAssignments[_s] : "none", (Id) => SetGestureSlotAction(_s, Id)))(Slot, SlotLabel))
         if !GestEnabled
@@ -1296,7 +1296,6 @@ initMenu() {
     ; Then append « Raccourcis de gestion du script » at the bottom.
     if SubMenus.Has("Shortcuts") {
         InsertKeyboardShortcutGroups(SubMenus["Shortcuts"], t("menu.shortcuts.group_modifiers"))
-        SubMenus["Shortcuts"].Add()
         SubMenus["Shortcuts"].Add(t("menu.shortcuts.script_shortcuts"), BuildScriptShortcutsMenu())
     }
 
@@ -2536,7 +2535,7 @@ BuildScriptShortcutsMenu() {
     ; avoids pre-building a submenu with all actions for every slot.
     for Slot in SCRIPT_SHORTCUT_SLOTS {
         Current      := ScriptShortcutAssignments.Has(Slot) ? ScriptShortcutAssignments[Slot] : "none"
-        CurrentLabel := GESTURE_ACTIONS.Has(Current) ? t("sg_actions." . Current) : t("dialog.action_picker.disabled")
+        CurrentLabel := GESTURE_ACTIONS.Has(Current) ? GESTURE_ACTIONS[Current].Label : t("dialog.action_picker.disabled")
         SlotLabel    := SCRIPT_SHORTCUT_LABELS[Slot]
         SMenu.Add(SlotLabel . " : " . CurrentLabel,
             ((_s, _l) => (*) => ShowActionPicker(_l, ScriptShortcutAssignments.Has(_s) ? ScriptShortcutAssignments[_s] : "none", (Id) => SetScriptShortcutAction(_s, Id)))(Slot, SlotLabel))
@@ -2685,7 +2684,7 @@ InsertKeyboardShortcutGroups(TargetMenu, InsertBefore) {
                 continue
             if (Action == "none")
                 continue
-            ActionLabel := GESTURE_ACTIONS.Has(Action) ? t("sg_actions." . Action) : Action
+            ActionLabel := GESTURE_ACTIONS.Has(Action) ? GESTURE_ACTIONS[Action].Label : Action
             SlotDisplay := _FormatSlotLabel(Slot) . " : " . ActionLabel
             GMenu.Add(SlotDisplay, ((_s) => (*) => ShowKeyboardShortcutPicker(_s))(Slot))
             AssignedCount++
@@ -2744,7 +2743,7 @@ ShowKeyboardSlotPicker(Prefix) {
     ; Build display labels for the ListBox
     SlotLabels := []
     for SlotId in Slots
-        SlotLabels.Push(t("sg_actions." . SlotId))
+        SlotLabels.Push(GESTURE_ACTIONS.Has(SlotId) ? GESTURE_ACTIONS[SlotId].Label : SlotId)
 
     W := Gui("+AlwaysOnTop", t("dialog.keyboard_shortcut.title_prefix") . Prefix)
     W.SetFont("s10", "Segoe UI")
@@ -2789,7 +2788,7 @@ ShowActionPicker(Title, Current, OnConfirm) {
         if !GESTURE_ACTIONS.Has(ActionName)
             continue
         ActionIds.Push(ActionName)
-        ActionLabels.Push(t("sg_actions." . ActionName))
+        ActionLabels.Push(GESTURE_ACTIONS[ActionName].Label)
         if (ActionName == Current)
             SelectedIdx := ActionIds.Length
     }
@@ -2847,7 +2846,7 @@ ShowActionPicker(Title, Current, OnConfirm) {
 ShowKeyboardShortcutPicker(SlotId) {
     global KeyboardShortcutAssignments, GESTURE_ACTIONS
     Current      := KeyboardShortcutAssignments.Has(SlotId) ? KeyboardShortcutAssignments[SlotId] : "none"
-    SlotDisplay  := t("sg_actions." . SlotId)
+    SlotDisplay  := GESTURE_ACTIONS.Has(SlotId) ? GESTURE_ACTIONS[SlotId].Label : SlotId
     ShowActionPicker(t("dialog.keyboard_shortcut.title_prefix") . SlotDisplay, Current, (Id) => SetKeyboardShortcutAction(SlotId, Id))
 }
 

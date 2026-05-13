@@ -39,11 +39,22 @@ local locale_mod = require("lib.locale")
 
 --- Ordered list of supported locales.
 local LOCALES = {
-	{ code = "de", flag = "🇩🇪", name = "Deutsch"  },
-	{ code = "en", flag = "🇬🇧", name = "English"  },
-	{ code = "es", flag = "🇪🇸", name = "Español"  },
-	{ code = "fr", flag = "🇫🇷", name = "Français" },
-	{ code = "zh", flag = "🇨🇳", name = "中文"      },
+	{ code = "ar", flag = "🇸🇦", name = "العربية"   },
+	{ code = "cs", flag = "🇨🇿", name = "Čeština"   },
+	{ code = "de", flag = "🇩🇪", name = "Deutsch"   },
+	{ code = "en", flag = "🇬🇧", name = "English"   },
+	{ code = "es", flag = "🇪🇸", name = "Español"   },
+	{ code = "fr", flag = "🇫🇷", name = "Français"  },
+	{ code = "it", flag = "🇮🇹", name = "Italiano"  },
+	{ code = "ja", flag = "🇯🇵", name = "日本語"     },
+	{ code = "ko", flag = "🇰🇷", name = "한국어"     },
+	{ code = "nl", flag = "🇳🇱", name = "Nederlands" },
+	{ code = "pl", flag = "🇵🇱", name = "Polski"    },
+	{ code = "pt", flag = "🇧🇷", name = "Português" },
+	{ code = "ru", flag = "🇷🇺", name = "Русский"   },
+	{ code = "tr", flag = "🇹🇷", name = "Türkçe"    },
+	{ code = "uk", flag = "🇺🇦", name = "Українська" },
+	{ code = "zh", flag = "🇨🇳", name = "中文"       },
 }
 
 --- hs.settings key used to persist the locale between reloads.
