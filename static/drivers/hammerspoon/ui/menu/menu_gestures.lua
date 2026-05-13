@@ -108,7 +108,7 @@ function M.build(ctx)
 				if aname == "-" or aname == "--" then
 					table.insert(actionsSubmenu, { title = "-" })
 				elseif aname:sub(1, 1) == "#" then
-					table.insert(actionsSubmenu, { title = aname:sub(2), disabled = true })
+					table.insert(actionsSubmenu, { title = "— " .. aname:sub(2) .. " —", disabled = true })
 				else
 					table.insert(actionsSubmenu, {
 						title    = type(gestures.get_action_label) == "function" and gestures.get_action_label(aname) or aname,
@@ -157,7 +157,7 @@ function M.build(ctx)
 		}
 
 		local sensSubmenu = {
-			{ title = i18n.get("menu.gestures.sensitivity_label"), disabled = true },
+			{ title = "— " .. i18n.get("menu.gestures.sensitivity_label") .. " —", disabled = true },
 			{ title = i18n.get("menu.gestures.sensitivity_hint"),  disabled = true },
 			{ title = "-" },
 		}

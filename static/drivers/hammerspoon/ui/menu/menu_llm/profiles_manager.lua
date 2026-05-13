@@ -115,7 +115,7 @@ local function build_profile_menu(deps, models_mgr)
 	table.insert(menu, { title = "-" })
 
 	-- Native profiles section
-	table.insert(menu, { title = "i18n.get("menu.profiles.header_default_profiles")", disabled = true })
+	table.insert(menu, { title = "— " .. i18n.get("menu.profiles.header_default_profiles") .. " —", disabled = true })
 	for _, profile in ipairs(llm_mod.BUILTIN_PROFILES or {}) do
 		local pid = profile.id
 		
@@ -151,7 +151,7 @@ local function build_profile_menu(deps, models_mgr)
 	local user_profiles = state.llm_user_profiles or {}
 	if type(user_profiles) == "table" and #user_profiles > 0 then
 		table.insert(menu, { title = "-" })
-		table.insert(menu, { title = "i18n.get("menu.profiles.header_custom_profiles")", disabled = true })
+		table.insert(menu, { title = "— " .. i18n.get("menu.profiles.header_custom_profiles") .. " —", disabled = true })
 		for i, profile in ipairs(user_profiles) do
 			local pid = profile.id
 			local display_label = format_dynamic_label(profile.label or ("i18n.get("menu.profiles.custom_profile_label") .. " "" .. i), state.llm_num_predictions)

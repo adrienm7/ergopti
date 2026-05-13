@@ -124,7 +124,7 @@ local function build_action_picker(karabiner, set_fn, current_id, update_menu, s
 			end
 			-- "Spécial" items (none, CapsWord) are shown ungrouped at the top
 			if action.category ~= "Spécial" then
-				items[#items + 1] = { title = action.category, disabled = true }
+				items[#items + 1] = { title = "— " .. action.category .. " —", disabled = true }
 			end
 			current_category = action.category
 		end
@@ -248,8 +248,8 @@ end
 local function build_tap_hold_items(karabiner, action_index, update_menu, enabled)
 	local items = {}
 
-	items[#items + 1] = { title = i18n.get("menu.karabiner.header_taps_holds"), disabled = true }
-	items[#items + 1] = { title = i18n.get("menu.karabiner.left_hand"),  disabled = true }
+	items[#items + 1] = { title = "— " .. i18n.get("menu.karabiner.header_taps_holds") .. " —", disabled = true }
+	items[#items + 1] = { title = "— " .. i18n.get("menu.karabiner.left_hand") .. " —",  disabled = true }
 	for _, key_def in ipairs(karabiner.TAP_HOLD_KEYS) do
 		if LEFT_HAND_IDS[key_def.id] then
 			items[#items + 1] = build_one_tap_hold_item(
@@ -257,7 +257,7 @@ local function build_tap_hold_items(karabiner, action_index, update_menu, enable
 		end
 	end
 
-	items[#items + 1] = { title = i18n.get("menu.karabiner.right_hand"), disabled = true }
+	items[#items + 1] = { title = "— " .. i18n.get("menu.karabiner.right_hand") .. " —", disabled = true }
 	for _, key_def in ipairs(karabiner.TAP_HOLD_KEYS) do
 		if not LEFT_HAND_IDS[key_def.id] then
 			items[#items + 1] = build_one_tap_hold_item(
@@ -752,7 +752,7 @@ function M.build(ctx)
 	submenu[#submenu + 1] = { title = "-" }
 
 	-- Section 2: modifier combo action pickers (grayed when disabled)
-	submenu[#submenu + 1] = { title = i18n.get("menu.karabiner.header_shortcuts"), disabled = true }
+	submenu[#submenu + 1] = { title = "— " .. i18n.get("menu.karabiner.header_shortcuts") .. " —", disabled = true }
 	for _, item in ipairs(raccourcis) do
 		submenu[#submenu + 1] = item
 	end

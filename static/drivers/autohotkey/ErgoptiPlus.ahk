@@ -962,7 +962,7 @@ BuildMetricsMenu() {
     MetricsMenu.Add(apps_sc, (*) => MS_PromptShortcut("apps", KLUI_ToggleApps))
 
     MetricsMenu.Add()
-    privacy_header := t("menu.metrics.privacy_header")
+    privacy_header := "— " . t("menu.metrics.privacy_header") . " —"
     MetricsMenu.Add(privacy_header, (*) => "")
     MetricsMenu.Disable(privacy_header)
 
@@ -1349,7 +1349,7 @@ initMenu() {
         }
     }
     StdTotal += DynTotalStd
-    StdHeader := t("menu.hotstrings.common_header") . (StdTotal > 0 ? " (" . FmtCount(StdTotal) . ")" : "") . " —"
+    StdHeader := "— " . t("menu.hotstrings.common_header") . (StdTotal > 0 ? " (" . FmtCount(StdTotal) . ")" : "") . " —"
     HotstringsMenu.Add(StdHeader, (*) => NoAction())
     HotstringsMenu.Disable(StdHeader)
     for Category in HotstringCategoriesStd {
@@ -1380,7 +1380,7 @@ initMenu() {
     for _ECat in HotstringCategoriesErgopti {
         ErgoptiTotal += CountTomlHotstrings(_ECat)
     }
-    ErgoptiHeader := t("menu.hotstrings.ergopti_header") . (ErgoptiTotal > 0 ? " (" . FmtCount(ErgoptiTotal) . ")" : "") . " —"
+    ErgoptiHeader := "— " . t("menu.hotstrings.ergopti_header") . (ErgoptiTotal > 0 ? " (" . FmtCount(ErgoptiTotal) . ")" : "") . " —"
     HotstringsMenu.Add(ErgoptiHeader, (*) => NoAction())
     HotstringsMenu.Disable(ErgoptiHeader)
     for Category in HotstringCategoriesErgopti {
@@ -1431,7 +1431,7 @@ initMenu() {
         }
     }
     HotstringsMenu.Add() ; Separator before personal group
-    PersonalHeader := t("menu.hotstrings.personal_header") . (TotalPersonal > 0 ? " (" . FmtCount(TotalPersonal) . ")" : "") . " —"
+    PersonalHeader := "— " . t("menu.hotstrings.personal_header") . (TotalPersonal > 0 ? " (" . FmtCount(TotalPersonal) . ")" : "") . " —"
     HotstringsMenu.Add(PersonalHeader, (*) => NoAction())
     HotstringsMenu.Disable(PersonalHeader)
     if Features.Has("Personal") {
