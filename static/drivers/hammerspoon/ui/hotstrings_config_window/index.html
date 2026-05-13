@@ -9,15 +9,12 @@
 		<header class="topbar">
 			<div class="title">
 				<h1 data-i18n="hs_config.window_title"></h1>
-				<p class="hint">
-					Ajustez par cat&eacute;gorie ou par section. Toute modification est enregistr&eacute;e
-					imm&eacute;diatement dans <code>~/.config/ergopti_plus/hotstrings_config.toml</code>.
-				</p>
+				<p class="hint" data-i18n="hs_config.hint"></p>
 			</div>
 			<div class="actions">
-				<button class="btn" onclick="setAllGrey()">Tout en gris</button>
-				<button class="btn btn-danger" onclick="resetAll()">Tout r&eacute;initialiser</button>
-				<button class="btn" onclick="closeWindow()">Fermer</button>
+				<button class="btn" onclick="setAllGrey()" data-i18n="hs_config.btn_all_grey"></button>
+				<button class="btn btn-danger" onclick="resetAll()" data-i18n="hs_config.btn_reset_all"></button>
+				<button class="btn" onclick="closeWindow()" data-i18n="common.close"></button>
 			</div>
 		</header>
 
@@ -30,18 +27,18 @@
 					<h2 class="cat-title"></h2>
 					<div class="row">
 						<div class="field field-delay" data-level="file" data-field="delay">
-							<label>D&eacute;lai (ms)</label>
+							<label data-i18n-key="hs_config.label_delay"></label>
 							<div class="ctrl">
 								<input type="number" min="0" step="50" />
-								<button class="reset" title="Revenir au d&eacute;faut">↺</button>
+								<button class="reset" data-i18n-title-key="hs_config.btn_reset_default">↺</button>
 							</div>
 						</div>
 						<div class="field field-color" data-level="file" data-field="color">
-							<label>Couleur</label>
+							<label data-i18n-key="hs_config.label_color"></label>
 							<div class="ctrl">
 								<span class="swatch"></span>
 								<select></select>
-								<button class="reset" title="Revenir au d&eacute;faut">↺</button>
+								<button class="reset" data-i18n-title-key="hs_config.btn_reset_default">↺</button>
 							</div>
 						</div>
 					</div>
@@ -55,18 +52,18 @@
 				<div class="sec-title"></div>
 				<div class="row">
 					<div class="field field-delay" data-level="section" data-field="delay">
-						<label>D&eacute;lai (ms)</label>
+						<label data-i18n-key="hs_config.label_delay"></label>
 						<div class="ctrl">
 							<input type="number" min="0" step="50" />
-							<button class="reset" title="Revenir au d&eacute;faut">↺</button>
+							<button class="reset" data-i18n-title-key="hs_config.btn_reset_default">↺</button>
 						</div>
 					</div>
 					<div class="field field-color" data-level="section" data-field="color">
-						<label>Couleur</label>
+						<label data-i18n-key="hs_config.label_color"></label>
 						<div class="ctrl">
 							<span class="swatch"></span>
 							<select></select>
-							<button class="reset" title="Revenir au d&eacute;faut">↺</button>
+							<button class="reset" data-i18n-title-key="hs_config.btn_reset_default">↺</button>
 						</div>
 					</div>
 				</div>
