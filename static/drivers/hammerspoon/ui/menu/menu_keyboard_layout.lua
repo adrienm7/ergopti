@@ -1196,7 +1196,7 @@ function M.build(ctx)
 		return clean_layout_name(id)
 	end
 
-	submenu[#submenu + 1] = { title = i18n.get("menu.layout.active_layouts"), disabled = true }
+	submenu[#submenu + 1] = { title = "— " .. i18n.get("menu.layout.active_layouts") .. " —", disabled = true }
 	if #records == 0 then
 		submenu[#submenu + 1] = {
 			title = i18n.get("menu.layout.open_prefs"),

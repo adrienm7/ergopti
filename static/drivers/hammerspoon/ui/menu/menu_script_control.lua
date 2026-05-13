@@ -68,7 +68,7 @@ function M.build(ctx)
 			if label == "-" then
 				table.insert(sub, { title = "-" })
 			elseif act:match("^#") then
-				table.insert(sub, { title = label, disabled = true })
+				table.insert(sub, { title = "— " .. label .. " —", disabled = true })
 			else
 				table.insert(sub, {
 					title    = label,
