@@ -15,6 +15,7 @@ local notifications = require("lib.notifications")
 local llm_mod       = require("modules.llm")
 local shortcut_ui   = require("ui.menu.shortcut_utils")
 local Logger        = require("lib.logger")
+local i18n          = require("lib.i18n")
 local dialog        = require("lib.dialog_util")
 
 local LOG = "menu_llm.profiles"
@@ -97,24 +98,24 @@ local function build_profile_menu(deps, models_mgr)
 
 	-- Auto-detect recommendation logic
 	table.insert(menu, {
-		title    = "✨ Détection automatique du meilleur profil",
+		title    = "i18n.get("menu.profiles.auto_detect")",
 		disabled = paused or nil,
 		fn       = not paused and function()
 			if type(deps.apply_recommended_prompt_profile) == "function" then
-				deps.apply_recommended_prompt_profile({ dialog_title = "Profil recommandé", force_dialog = true })
+				deps.apply_recommended_prompt_profile({ dialog_title = "i18n.get("menu.profiles.recommended_profile")", force_dialog = true })
 				return
 			end
 
 			local model_name = state.llm_model
 			if type(model_name) ~= "string" or model_name == "" or not models_mgr then return end
 
-			pcall(notifications.notify, "Profil recommandé indisponible", "Impossible d’appliquer la détection automatique dans ce contexte", "warning")
+			pcall(notifications.notify, "i18n.get("menu.profiles.recommended_unavailable_title")", "i18n.get("menu.profiles.recommended_unavailable_body")", "warning")
 		end or nil,
 	})
 	table.insert(menu, { title = "-" })
 
 	-- Native profiles section
-	table.insert(menu, { title = "— PROFILS PAR DÉFAUT —", disabled = true })
+	table.insert(menu, { title = "i18n.get("menu.profiles.header_default_profiles")", disabled = true })
 	for _, profile in ipairs(llm_mod.BUILTIN_PROFILES or {}) do
 		local pid = profile.id
 		
@@ -123,7 +124,7 @@ local function build_profile_menu(deps, models_mgr)
 		
 		local extra = ""
 		if (pid == "basic" or pid == "advanced") and is_thinking then
-			extra = "  ⚠️ Non recommandé (Thinking)"
+			extra = "i18n.get("menu.profiles.not_recommended")"
 		end
 
 		local display_label = format_dynamic_label(profile.label, state.llm_num_predictions)
@@ -150,10 +151,10 @@ local function build_profile_menu(deps, models_mgr)
 	local user_profiles = state.llm_user_profiles or {}
 	if type(user_profiles) == "table" and #user_profiles > 0 then
 		table.insert(menu, { title = "-" })
-		table.insert(menu, { title = "— PROFILS PERSONNALISÉS —", disabled = true })
+		table.insert(menu, { title = "i18n.get("menu.profiles.header_custom_profiles")", disabled = true })
 		for i, profile in ipairs(user_profiles) do
 			local pid = profile.id
-			local display_label = format_dynamic_label(profile.label or ("Profil personnalisé " .. i), state.llm_num_predictions)
+			local display_label = format_dynamic_label(profile.label or ("i18n.get("menu.profiles.custom_profile_label") .. " "" .. i), state.llm_num_predictions)
 			local profile_shortcut = type(state.llm_profile_shortcuts) == "table" and state.llm_profile_shortcuts[pid] or nil
 			local item = {
 				title    = display_label,
@@ -164,7 +165,7 @@ local function build_profile_menu(deps, models_mgr)
 			-- User profiles get a sub-menu for Editing/Deleting
 			item.menu = {
 				{
-					title    = "Utiliser ce profil",
+					title    = "i18n.get("menu.profiles.use_profile")",
 					checked  = (state.llm_active_profile == pid) or nil,
 					disabled = paused or nil,
 					fn       = not paused and function()
@@ -180,12 +181,12 @@ local function build_profile_menu(deps, models_mgr)
 					end or nil,
 				},
 				{
-					title    = "Raccourci : " .. shortcut_ui.shortcut_to_label(profile_shortcut, "Aucun"),
+					title    = "i18n.get("menu.profiles.shortcut_prefix"),
 					disabled = paused or nil,
 					fn       = not paused and function()
 						shortcut_ui.prompt_shortcut({
-							title = "Raccourci du profil",
-							message = "Format : mods+touche  (ex : cmd+shift+b)\nMods disponibles : cmd, alt, ctrl, shift\nLaisser vide pour désactiver",
+							title = "i18n.get("menu.profiles.shortcut_title")",
+							message = i18n.get("menu.profiles.shortcut_prompt"),
 							current_shortcut = type(state.llm_profile_shortcuts) == "table" and state.llm_profile_shortcuts[pid] or nil,
 							default_mods = {"ctrl"},
 							on_apply = function(mods, key)
@@ -198,7 +199,7 @@ local function build_profile_menu(deps, models_mgr)
 				},
 				{ title = "-" },
 				{
-					title = "✏️ Modifier…",
+					title = "i18n.get("menu.profiles.edit_profile")",
 					fn    = function()
 						if prompt_editor and type(prompt_editor.open) == "function" then
 							hs.timer.doAfter(0.1, function()
@@ -221,11 +222,11 @@ local function build_profile_menu(deps, models_mgr)
 					end,
 				},
 				{
-					title = "🗑️ Supprimer…",
+					title = "i18n.get("menu.profiles.delete_profile")",
 					fn    = function()
 						local ok_c, choice = pcall(dialog.block_alert,
-							"Supprimer « " .. display_label .. " » ?", 
-							"Ce profil personnalisé sera supprimé définitivement.", 
+							"string.format(i18n.get("menu.profiles.delete_confirm_title"), display_label)", 
+							"i18n.get("menu.profiles.delete_confirm_body")", 
 							"Supprimer", "Annuler", "critical")
 							
 						if ok_c and choice == "Supprimer" then
@@ -254,7 +255,7 @@ local function build_profile_menu(deps, models_mgr)
 
 	table.insert(menu, { title = "-" })
 	table.insert(menu, {
-		title = "Créer un profil personnalisé…",
+		title = "i18n.get("menu.profiles.create_profile")",
 		fn    = not paused and function()
 			if prompt_editor and type(prompt_editor.open) == "function" then
 				hs.timer.doAfter(0.1, function()
@@ -306,7 +307,7 @@ function M.new(deps, models_mgr)
 		local warning = (is_thinking and (deps.state.llm_active_profile == "basic" or deps.state.llm_active_profile == "advanced")) and "  ⚠️" or ""
 
 		return {
-			title = "Profil : " .. label .. warning,
+			title = "string.format(i18n.get("menu.profiles.profile_label_prefix"), label) .. warning,
 			menu  = build_profile_menu(deps, models_mgr)
 		}
 	end

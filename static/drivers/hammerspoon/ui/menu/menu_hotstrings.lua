@@ -331,19 +331,19 @@ function M.build_management(ctx)
 	local bubble_sub = {}
 
 	table.insert(bubble_sub, buildBubbleItem(ctx,
-		"Bulle ★ (touche magique)",
+		i18n.get("menu.hotstrings.tooltip_magic"),
 		"preview_star_enabled",
 		"set_preview_star_enabled",
 		"Bulle ★"))
 
 	table.insert(bubble_sub, buildBubbleItem(ctx,
-		"Bulle Autocorrection (espace)",
+		i18n.get("menu.hotstrings.tooltip_autocorrect"),
 		"preview_autocorrect_enabled",
 		"set_preview_autocorrect_enabled",
 		"Bulle Autocorrection"))
 
 	table.insert(bubble_sub, buildBubbleItem(ctx,
-		"Bulle Intelligence Artificielle",
+		i18n.get("menu.hotstrings.tooltip_ai"),
 		"preview_ai_enabled",
 		"set_preview_ai_enabled",
 		"Bulle IA"))
@@ -351,7 +351,7 @@ function M.build_management(ctx)
 	table.insert(bubble_sub, { title = "-" })
 
 	table.insert(bubble_sub, buildBubbleItem(ctx,
-		"Bulles colorées par catégorie",
+		i18n.get("menu.hotstrings.tooltip_colored"),
 		"preview_colored_tooltips",
 		"set_preview_colored_tooltips",
 		"Bulles colorées"))
@@ -373,7 +373,7 @@ function M.build_management(ctx)
 				lbl = lbl:gsub("Guillemets fermants", "Guillemet fermant")
 				lbl = lbl:gsub("tiret bas", "underscore")
 				lbl = lbl:gsub("Tiret bas", "Underscore")
-				if def.consume then lbl = lbl .. " (consommé)" end
+				if def.consume then lbl = lbl .. " " .. i18n.get("menu.hotstrings.consumed_suffix") end
 
 				exp_sub[#exp_sub + 1] = {
 					title    = ctx.applyTriggerChar(lbl),
@@ -502,33 +502,33 @@ function M.build_management(ctx)
 		end or nil,
 	}
 
-	exp_item = { title = "Expanseurs de mots", disabled = paused or nil, menu = exp_sub }
+	exp_item = { title = i18n.get("menu.hotstrings.word_expanders"), disabled = paused or nil, menu = exp_sub }
 
 	local delay_menu = {}
 	local function make_delay_item(title, key, default_val, is_base)
 		if type(default_val) ~= "number" then
 			Logger.error(LOG, "make_delay_item(): default_val nil for '%s' — keymap.DELAYS_DEFAULT may be outdated.", title)
-			return { title = title .. " : (valeur manquante)", disabled = true }
+			return { title = title .. " : " .. i18n.get("menu.hotstrings.missing_value"), disabled = true }
 		end
 		local cur_val = is_base and state.expansion_delay or (state.delays[key] or default_val)
 		local cur_ms = math.floor(cur_val * 1000 + 0.5)
 		local def_ms = math.floor(default_val * 1000 + 0.5)
-		local display_ms = (cur_ms == 0) and "Infini (0)" or (cur_ms .. " ms")
+		local display_ms = (cur_ms == 0) and i18n.get("menu.hotstrings.infinite") or (cur_ms .. " ms")
 		
 		return {
-			title    = title .. " : " .. display_ms .. (cur_ms == def_ms and " (défaut)" or ""),
+			title    = title .. " : " .. display_ms .. (cur_ms == def_ms and (" " .. i18n.get("menu.hotstrings.default_indicator")) or ""),
 			disabled = paused or nil,
 			fn       = not paused and function()
 				local ok_p, btn, raw = pcall(dialog.text_prompt,
 					title,
-					"Entrez le délai en millisecondes (entier ≥ 0).\nMettez 0 pour un délai infini (aucune limite de temps) :",
+					i18n.get("menu.hotstrings.delay_prompt"),
 					tostring(cur_ms), "OK", "Annuler"
 				)
 				if not ok_p or btn ~= "OK" then return end
-				
+
 				local val = tonumber(raw)
 				if not val or val < 0 or val ~= math.floor(val) then
-					pcall(notifications.notify, "Délai invalide", "Veuillez saisir un entier ≥ 0.", "error")
+					pcall(notifications.notify, i18n.get("menu.hotstrings.delay_invalid_title"), i18n.get("menu.hotstrings.delay_invalid_body"), "error")
 					return
 				end
 				
@@ -565,7 +565,7 @@ function M.build_management(ctx)
 	-- that do not have a TOML counterpart (llm_prediction, dynamichotstrings)
 	-- and the global baseline keep their per-prompt menu items as quick access.
 	table.insert(delay_menu, {
-		title    = "Délais et couleurs des hotstrings…",
+		title    = i18n.get("menu.hotstrings.config_item"),
 		disabled = paused or nil,
 		fn       = not paused and function()
 			local ok, win = pcall(require, "ui.hotstrings_config_window")
@@ -574,22 +574,22 @@ function M.build_management(ctx)
 	})
 	table.insert(delay_menu, { title = "-" })
 	if def_delays then
-		table.insert(delay_menu, make_delay_item("Intelligence Artificielle (Acceptation)", "llm_prediction", def_delays.llm_prediction, false))
-		table.insert(delay_menu, make_delay_item("Auto-complétions (ex: numéros)", "dynamichotstrings", def_delays.dynamichotstrings, false))
+		table.insert(delay_menu, make_delay_item(i18n.get("menu.hotstrings.tooltip_ai_acceptance"), "llm_prediction", def_delays.llm_prediction, false))
+		table.insert(delay_menu, make_delay_item(i18n.get("menu.hotstrings.tooltip_autocompletion"), "dynamichotstrings", def_delays.dynamichotstrings, false))
 	end
 	if def_base then
-		table.insert(delay_menu, make_delay_item("Défaut (autres catégories)", nil, def_base, true))
+		table.insert(delay_menu, make_delay_item(i18n.get("menu.hotstrings.tooltip_default"), nil, def_base, true))
 	end
 
 	delays_item = { title = i18n.get("menu.hotstrings.delays_colors"), disabled = paused or nil, menu = delay_menu }
 
 	magic_item = {
-		title    = "Touche magique : " .. state.trigger_char,
+		title    = i18n.get("menu.hotstrings.magic_key_item_prefix") .. state.trigger_char,
 		disabled = paused or nil,
 		fn       = not paused and function()
 			local ok_p, btn, raw = pcall(dialog.text_prompt,
-				"Touche magique",
-				"Entrez le caractère à utiliser pour remplacer le ★ :",
+				i18n.get("menu.hotstrings.magic_key_title"),
+				i18n.get("menu.hotstrings.magic_key_prompt"),
 				state.trigger_char, "OK", "Annuler"
 			)
 			if ok_p and btn == "OK" and type(raw) == "string" and raw ~= "" then
@@ -611,7 +611,7 @@ function M.build_management(ctx)
 	
 	if state.trigger_char ~= "★" then
 		magic_reset_item = {
-			title    = "   ↳ Réinitialiser (défaut : ★)",
+			title    = i18n.get("menu.hotstrings.reset_magic_key"),
 			disabled = paused or nil,
 			fn       = not paused and function()
 				state.trigger_char = "★"
@@ -721,9 +721,9 @@ function M.build_custom(ctx)
 
 	local function sc_label()
 		local sc = state.custom_editor_shortcut
-		if not sc or sc == false then return "Aucun" end
+		if not sc or sc == false then return i18n.get("menu.hotstrings.shortcut_none") end
 		if sc_is_default(sc) then
-			return "Ctrl + " .. state.trigger_char .. " (défaut)"
+			return string.format(i18n.get("menu.hotstrings.shortcut_default_ctrl"), state.trigger_char)
 		end
 		local mods_str = table.concat(sc.mods or {}, "+")
 		return mods_str ~= "" and (mods_str .. " + " .. (sc.key or "?"):upper())
@@ -750,8 +750,7 @@ function M.build_custom(ctx)
 		end
 		local ok_p, btn, raw = pcall(dialog.text_prompt,
 			"Raccourci personnalisé",
-			"Format : mods+touche  (ex : cmd+alt+p  ou  ctrl+shift+e)\n"
-				.. "Mods disponibles : cmd, alt, ctrl, shift\nLaisser vide pour désactiver",
+			i18n.get("menu.hotstrings.shortcut_prompt"),
 			current_str, "OK", "Annuler"
 		)
 		if not ok_p or btn ~= "OK" or type(raw) ~= "string" then return end
@@ -773,7 +772,7 @@ function M.build_custom(ctx)
 
 	-- Build the default-section sub-menu: "Aucune" first, then one item per personal section
 	local function default_section_label()
-		if not state.custom_default_section then return "Aucune" end
+		if not state.custom_default_section then return i18n.get("menu.hotstrings.no_default_section") end
 		if type(personal_secs) == "table" then
 			for _, sec in ipairs(personal_secs) do
 				if type(sec) == "table" and sec.name == state.custom_default_section then
@@ -787,7 +786,7 @@ function M.build_custom(ctx)
 	end
 
 	local cat_menu = { {
-		title   = "Aucune",
+		title   = i18n.get("menu.hotstrings.no_default_section"),
 		checked = (not state.custom_default_section) or nil,
 		fn      = function()
 			state.custom_default_section = nil
@@ -885,12 +884,12 @@ function M.build_custom(ctx)
 		},
 		{
 			-- Clicking this item directly opens the shortcut customisation dialog
-			title    = "Raccourci : " .. sc_label(),
+			title    = i18n.get("menu.hotstrings.shortcut_prefix") .. sc_label(),
 			disabled = paused or nil,
 			fn       = not paused and sc_fn or nil,
 		},
 		{
-			title = "Catégorie par défaut : " .. default_section_label(),
+			title = i18n.get("menu.hotstrings.default_category_prefix") .. default_section_label(),
 			menu  = cat_menu,
 		},
 		{

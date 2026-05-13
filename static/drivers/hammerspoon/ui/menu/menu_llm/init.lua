@@ -529,15 +529,15 @@ function M.create(deps)
                 llm_mod.set_active_profile(rec_profile)
                 save_prefs(); update_menu()
             else
-                local title = type(opts.dialog_title) == "string" and opts.dialog_title or "Changement de modèle"
+                local title = type(opts.dialog_title) == "string" and opts.dialog_title or i18n.get("menu.llm.model_change_title")
                 Logger.debug(LOG, "Displaying profile suggestion dialog…")
                 local msg = string.format(
-                    "Modèle : %s\n%s\n\nPrompt actuel :\n%s\n\nPrompt conseillé :\n%s\n\nValider pour appliquer le prompt conseillé.",
+                    i18n.get("menu.llm.profile_change_msg"),
                     display_model_name, power_desc, cur_label, rec_label
                 )
-                local ok, choice = pcall(dialog.block_alert, title, msg, "Valider", "Annuler", "informational")
+                local ok, choice = pcall(dialog.block_alert, title, msg, i18n.get("button.confirm"), i18n.get("button.cancel"), "informational")
                 Logger.debug(LOG, string.format("Dialog response: %s, choice=%s", tostring(ok), tostring(choice)))
-                if ok and choice == "Valider" then
+                if ok and choice == i18n.get("button.confirm") then
                     Logger.info(LOG, string.format("Profile changed to %s (dialog accepted).", rec_profile))
                     state.llm_active_profile = rec_profile
                     llm_mod.set_active_profile(rec_profile)
@@ -551,10 +551,10 @@ function M.create(deps)
         elseif force_dialog then
             local title = type(opts.dialog_title) == "string" and opts.dialog_title or "Profil recommandé"
             local msg = string.format(
-                "Modèle : %s\n%s\n\nPrompt actuel :\n%s\n\nPrompt conseillé :\n%s\n\nCe profil est déjà adapté à ce modèle.",
+                i18n.get("menu.llm.profile_already_ok_msg"),
                 display_model_name, power_desc, cur_label, rec_label
             )
-            pcall(dialog.block_alert, title, msg, "Valider", "Annuler", "informational")
+            pcall(dialog.block_alert, title, msg, i18n.get("button.confirm"), i18n.get("button.cancel"), "informational")
         else
             Logger.debug(LOG, "Recommended profile is already the current profile.")
         end
@@ -619,7 +619,7 @@ function M.create(deps)
             -- Always persist and refresh the menu so the active model is visible immediately
             save_prefs(); update_menu()
             unlock_predictions()
-            apply_recommended_prompt_profile(new_model, { dialog_title = "Changement de modèle" })
+            apply_recommended_prompt_profile(new_model, { dialog_title = i18n.get("menu.llm.model_change_title") })
         end, function()
             -- Requirements check failed (model not installed, cancelled, etc.) — restore
             -- predictions with the previously running model so the user is not left stranded
@@ -688,14 +688,14 @@ function M.create(deps)
         local active_backend = state.llm_backend
         local hint
         if active_backend == "mlx" then
-            hint = "Identifiant HuggingFace du modèle MLX, par exemple : mlx-community/Qwen2.5-3B-Instruct-4bit"
+            hint = i18n.get("menu.llm.mlx_model_hint")
         else
-            hint = "Identifiant Ollama du modèle, par exemple : qwen2.5:1.5b ou llama3.2:3b"
+            hint = i18n.get("menu.llm.ollama_model_hint")
         end
         local ok, ret_a, ret_b = pcall(dialog.text_prompt,
-            "Ajouter un modèle personnalisé",
+            i18n.get("menu.llm.add_custom_model"),
             hint,
-            "", "Ajouter", "Annuler")
+            "", i18n.get("button.add"), i18n.get("button.cancel"))
         if not ok then
             Logger.warn(LOG, "Custom model dialog raised — aborting add.")
             return
@@ -703,15 +703,15 @@ function M.create(deps)
         -- hs.dialog.textPrompt return order has varied across macOS builds —
         -- accept both (button, text) and (text, button) without surprises.
         local picked_btn, picked_text
-        if ret_a == "Ajouter" or ret_a == "Annuler" then
+        if ret_a == i18n.get("button.add") or ret_a == i18n.get("button.cancel") then
             picked_btn, picked_text = ret_a, ret_b
         else
             picked_text, picked_btn = ret_a, ret_b
         end
-        if picked_btn ~= "Ajouter" then return end
+        if picked_btn ~= i18n.get("button.add") then return end
         local name = (type(picked_text) == "string" and picked_text or ""):gsub("^%s+", ""):gsub("%s+$", "")
         if name == "" then
-            pcall(dialog.alert, "Modèle personnalisé", "Identifiant vide — aucune action.", "OK")
+            pcall(dialog.alert, i18n.get("menu.llm.custom_model_title"), i18n.get("menu.llm.empty_model_id"), "OK")
             return
         end
         add_user_model(active_backend, name)
@@ -737,7 +737,7 @@ function M.create(deps)
         end
 
         table.insert(menu, {
-            title   = "Aucun modèle (Désactivé)",
+            title   = i18n.get("menu.llm.no_model"),
             checked = (not state.llm_model or state.llm_model == ""),
             fn      = function() 
                 Logger.info(LOG, "Switching model to None (disabled).")
@@ -755,7 +755,7 @@ function M.create(deps)
         local backend_default = get_display_model_name(backend_default_raw, presets)
         if backend_default and backend_default ~= "" then
             table.insert(menu, {
-                title   = "↺ Modèle par défaut du backend (" .. backend_default .. ")",
+                title   = string.format(i18n.get("menu.llm.backend_default_model"), backend_default),
                 checked = (active_display_model == backend_default),
                 fn      = function()
                     Logger.info(LOG, string.format("Restoring backend default model -> %s", backend_default))
@@ -766,9 +766,9 @@ function M.create(deps)
 
         -- Only show HuggingFace token when using a backend that downloads from HuggingFace
         if active_backend == "mlx" then
-            local token_status = has_hf_token and "✅ Configuré" or "❌ Non configuré"
+            local token_status = has_hf_token and i18n.get("menu.llm.hf_token_set") or i18n.get("menu.llm.hf_token_unset")
             table.insert(menu, {
-                title = "🔑 Token HuggingFace : " .. token_status,
+                title = string.format(i18n.get("menu.llm.hf_token_label"), token_status),
                 fn = function()
                     if models_mgr and type(models_mgr.prompt_hf_login) == "function" then
                         models_mgr.prompt_hf_login(function()
@@ -792,18 +792,18 @@ function M.create(deps)
                 local prefix = (state.llm_model == m_name) and "✓ " or "  "
                 local model_submenu = {}
                 table.insert(model_submenu, {
-                    title   = "👉 Sélectionner ce modèle",
+                    title   = i18n.get("menu.llm.select_model"),
                     checked = (state.llm_model == m_name),
                     fn      = function() switch_model(m_name) end
                 })
                 table.insert(model_submenu, {
-                    title = "🗑️ Retirer de mes modèles",
+                    title = i18n.get("menu.llm.remove_user_model"),
                     fn = function()
                         local ok, choice = pcall(dialog.block_alert,
-                            "Retirer ce modèle ?",
-                            "Voulez-vous retirer le modèle personnalisé \"" .. m_name .. "\" de votre liste ? Le modèle ne sera pas désinstallé du système.",
-                            "Retirer", "Annuler", "warning")
-                        if ok and choice == "Retirer" then
+                            i18n.get("menu.llm.remove_model_title"),
+                            string.format(i18n.get("menu.llm.remove_model_body"), m_name),
+                            i18n.get("button.remove"), i18n.get("button.cancel"), "warning")
+                        if ok and choice == i18n.get("button.remove") then
                             remove_user_model(active_backend, m_name)
                             if state.llm_model == m_name then state.llm_model = "" end
                             save_prefs(); update_menu()
@@ -816,7 +816,7 @@ function M.create(deps)
                     fn      = function() pcall(function() switch_model(m_name) end) end
                 })
             end
-            table.insert(menu, { title = "🛠️ Mes modèles", menu = user_sub })
+            table.insert(menu, { title = i18n.get("menu.llm.my_models"), menu = user_sub })
         end
 
         for _, provider in ipairs(presets) do
@@ -850,17 +850,17 @@ function M.create(deps)
                     local model_submenu = {}
 
                     table.insert(model_submenu, {
-                        title   = "👉 Sélectionner ce modèle",
+                        title   = i18n.get("menu.llm.select_model"),
                         checked = (active_display_model == m_name),
                         fn      = function() switch_model(m_name) end
                     })
 
                     if is_inst then
                         table.insert(model_submenu, {
-                            title = "🗑️ Supprimer ce modèle du cache",
+                            title = i18n.get("menu.llm.delete_model_cache"),
                             fn = function()
-                                local ok, choice = pcall(dialog.block_alert, "Supprimer le modèle ?", "Voulez-vous vraiment supprimer le modèle \"" .. m_name .. "\" du cache local ?", "Supprimer", "Annuler", "warning")
-                                if ok and choice == "Supprimer" then
+                                local ok, choice = pcall(dialog.block_alert, i18n.get("menu.llm.delete_model_title"), string.format(i18n.get("menu.llm.delete_model_body"), m_name), i18n.get("button.delete"), i18n.get("button.cancel"), "warning")
+                                if ok and choice == i18n.get("button.delete") then
                                     models_mgr.delete_model(m_name)
                                 end
                             end
@@ -869,49 +869,49 @@ function M.create(deps)
 
                     table.insert(model_submenu, { title = "-" })
 
-                    table.insert(model_submenu, { title = "Backend : " .. display_backend, fn = function() end })
+                    table.insert(model_submenu, { title = string.format(i18n.get("menu.llm.model_backend"), display_backend), fn = function() end })
 
                     table.insert(model_submenu, {
-                        title = "Source : " .. active_source,
+                        title = string.format(i18n.get("menu.llm.model_source"), active_source),
                         fn = function()
                             pcall(hs.urlevent.openURL, active_source)
                         end
                     })
 
                     table.insert(model_submenu, { title = "-" })
-                    table.insert(model_submenu, { title = "— SPÉCIFICATIONS —", disabled = true })
+                    table.insert(model_submenu, { title = i18n.get("menu.llm.specs_header"), disabled = true })
                     
                     local m_type = m.type or info.type or "Inconnu"
                     local type_label = (m_type == "completion") and "📝 Complétion" or "💬 Chat"
-                    table.insert(model_submenu, { title = "Type : " .. type_label, fn = function() end })
+                    table.insert(model_submenu, { title = string.format(i18n.get("menu.llm.model_type"), type_label), fn = function() end })
                     
                     if m.last_updated and m.last_updated ~= "Unknown" then
                         local y, mo, d = m.last_updated:match("^(%d+)%-(%d+)%-(%d+)$")
                         local formatted_date = (y and mo and d) and (d .. "/" .. mo .. "/" .. y) or m.last_updated
-                        table.insert(model_submenu, { title = "Date de mise à jour : " .. formatted_date, fn = function() end })
+                        table.insert(model_submenu, { title = string.format(i18n.get("menu.llm.model_date"), formatted_date), fn = function() end })
                     end
 
                     if m.parameters then
-                        if m.parameters.total and m.parameters.total ~= "N/A" then table.insert(model_submenu, { title = "Paramètres (Total) : " .. m.parameters.total, fn = function() end }) end
-                        if m.parameters.active and m.parameters.active ~= "N/A" then table.insert(model_submenu, { title = "Paramètres (Actifs) : " .. m.parameters.active, fn = function() end }) end
+                        if m.parameters.total and m.parameters.total ~= "N/A" then table.insert(model_submenu, { title = string.format(i18n.get("menu.llm.model_params_total"), m.parameters.total), fn = function() end }) end
+                        if m.parameters.active and m.parameters.active ~= "N/A" then table.insert(model_submenu, { title = string.format(i18n.get("menu.llm.model_params_active"), m.parameters.active), fn = function() end }) end
                     end
 
                     if m.capabilities then
                         table.insert(model_submenu, { title = "-" })
-                        table.insert(model_submenu, { title = "— CAPACITÉS —", disabled = true })
-                        if m.capabilities.speed_tok_s then table.insert(model_submenu, { title = "Vitesse estimée : " .. m.capabilities.speed_tok_s .. " tok/s", fn = function() end }) end
+                        table.insert(model_submenu, { title = i18n.get("menu.llm.caps_header"), disabled = true })
+                        if m.capabilities.speed_tok_s then table.insert(model_submenu, { title = string.format(i18n.get("menu.llm.model_speed"), m.capabilities.speed_tok_s)", fn = function() end }) end
                         local tags = m.capabilities.tags
                         if tags and type(tags) == "table" and #tags > 0 then
-                            table.insert(model_submenu, { title = "Tags : " .. table.concat(tags, ", "), fn = function() end })
+                            table.insert(model_submenu, { title = string.format(i18n.get("menu.llm.model_tags"), table.concat(tags, ", ")), fn = function() end })
                         end
                     end
 
                     if hw_active.download_gb or hw_active.disk_gb or hw_active.ram_gb then
                         table.insert(model_submenu, { title = "-" })
-                        table.insert(model_submenu, { title = "— CONFIGURATION REQUISE (" .. display_backend .. ") —", disabled = true })
-                        if hw_active.download_gb then table.insert(model_submenu, { title = "Téléchargement : " .. hw_active.download_gb .. " Go", fn = function() end }) end
-                        if hw_active.disk_gb then table.insert(model_submenu, { title = "Espace disque : " .. hw_active.disk_gb .. " Go", fn = function() end }) end
-                        if hw_active.ram_gb then table.insert(model_submenu, { title = "Mémoire (RAM) : " .. hw_active.ram_gb .. " Go", fn = function() end }) end
+                        table.insert(model_submenu, { title = string.format(i18n.get("menu.llm.hw_header"), display_backend)", disabled = true })
+                        if hw_active.download_gb then table.insert(model_submenu, { title = string.format(i18n.get("menu.llm.hw_download"), hw_active.download_gb)", fn = function() end }) end
+                        if hw_active.disk_gb then table.insert(model_submenu, { title = string.format(i18n.get("menu.llm.hw_disk"), hw_active.disk_gb)", fn = function() end }) end
+                        if hw_active.ram_gb then table.insert(model_submenu, { title = string.format(i18n.get("menu.llm.hw_ram"), hw_active.ram_gb)", fn = function() end }) end
                     end
 
                     table.insert(family_sub, {
@@ -943,7 +943,7 @@ function M.create(deps)
         -- discoverable default — the custom entry is for power users.
         table.insert(menu, { title = "-" })
         table.insert(menu, {
-            title = "➕ Ajouter un modèle personnalisé…",
+            title = i18n.get("menu.llm.add_model_entry")…",
             fn    = function() prompt_add_user_model() end,
         })
 
@@ -955,7 +955,7 @@ function M.create(deps)
         local m = {}
         for i = 1, 10 do
             table.insert(m, {
-                title   = i .. " suggestion" .. (i > 1 and "s" or ""),
+                title   = string.format(i18n.get("menu.llm.prediction_count_label"), i),
                 checked = (state.llm_num_predictions == i),
                 fn      = function()
                     Logger.info(LOG, string.format("Changing number of predictions -> %d", i))
@@ -1264,9 +1264,9 @@ function M.create(deps)
             end
         end
 
-        local rich_model_title = health_dot .. "Modèle actif : "
+        local rich_model_title = health_dot .. i18n.get("menu.llm.active_model_label")
         if not state.llm_model or state.llm_model == "" then
-            rich_model_title = rich_model_title .. "Aucun"
+            rich_model_title = rich_model_title .. i18n.get("menu.llm.no_model_none")
         else
             rich_model_title = rich_model_title .. string.format("%s%s%s", active_display_model, type_str, params_ram_str)
         end
@@ -1278,7 +1278,7 @@ function M.create(deps)
         })
 
         if info and info.emojis and info.emojis:find("🧠💭") then
-            table.insert(main_menu, { title = "  ↳ Info : Modèle thinking (réflexion masquée)", disabled = true })
+            table.insert(main_menu, { title = i18n.get("menu.llm.thinking_model_info"), disabled = true })
         end
 
         table.insert(main_menu, { title = "-" })
@@ -1287,10 +1287,10 @@ function M.create(deps)
         profiles_item.disabled = is_disabled or nil
         table.insert(main_menu, profiles_item)
 
-        table.insert(main_menu, { title = "Nombre de suggestions : " .. tostring(state.llm_num_predictions or llm_mod.DEFAULT_STATE.llm_num_predictions), disabled = is_disabled or nil, menu = build_num_pred_menu() })
+        table.insert(main_menu, { title = string.format(i18n.get("menu.llm.num_predictions_label"), tostring(state.llm_num_predictions or llm_mod.DEFAULT_STATE.llm_num_predictions)), disabled = is_disabled or nil, menu = build_num_pred_menu() })
         if state.llm_num_predictions ~= llm_mod.DEFAULT_STATE.llm_num_predictions then
             table.insert(main_menu, {
-                title    = "  ↳ Réinitialiser (défaut : " .. tostring(llm_mod.DEFAULT_STATE.llm_num_predictions) .. ")",
+                title    = string.format(i18n.get("menu.llm.reset_label"), .. tostring(llm_mod.DEFAULT_STATE.llm_num_predictions)),
                 disabled = is_disabled or nil,
                 fn       = function()
                     state.llm_num_predictions = llm_mod.DEFAULT_STATE.llm_num_predictions
@@ -1309,12 +1309,12 @@ function M.create(deps)
 
         local sc_label = shortcut_ui.shortcut_to_label(state.llm_trigger_shortcut, "Aucun")
         table.insert(trigger_menu, {
-            title    = "Raccourci pour générer manuellement : " .. sc_label,
+            title    = string.format(i18n.get("menu.llm.trigger_shortcut_label"), sc_label),
             disabled = is_disabled or nil,
             fn       = function()
                 shortcut_ui.prompt_shortcut({
-                    title = "Raccourci génération IA",
-                    message = "Format : mods+touche  (ex : cmd+alt+p)\nMods disponibles : cmd, alt, ctrl, shift\nLaisser vide pour désactiver",
+                    title = i18n.get("menu.llm.trigger_shortcut_title"),
+                    message = i18n.get("menu.llm.shortcut_prompt"),
                     current_shortcut = state.llm_trigger_shortcut,
                     default_mods = {"ctrl"},
                     on_apply = apply_llm_shortcut,
@@ -1323,15 +1323,15 @@ function M.create(deps)
         })
 
         local debounce_val = tonumber(state.llm_debounce) or llm_mod.DEFAULT_STATE.llm_debounce
-        local debounce_display = (debounce_val <= 0) and "Jamais" or (math.floor(debounce_val * 1000) .. " ms…")
+        local debounce_display = (debounce_val <= 0) and i18n.get("menu.settings.never") or (math.floor(debounce_val * 1000) .. " ms…")
 
-        table.insert(trigger_menu, { title = "Temps d’inactivité avant suggestion : " .. debounce_display, disabled = is_disabled or nil, fn = settings_mgr.set_debounce })
+        table.insert(trigger_menu, { title = string.format(i18n.get("menu.llm.debounce_label"), debounce_display), disabled = is_disabled or nil, fn = settings_mgr.set_debounce })
         if state.llm_debounce ~= llm_mod.DEFAULT_STATE.llm_debounce then
-            table.insert(trigger_menu, { title = "  ↳ Réinitialiser (défaut : " .. math.floor(llm_mod.DEFAULT_STATE.llm_debounce * 1000) .. " ms)", disabled = is_disabled or nil, fn = settings_mgr.reset_debounce })
+            table.insert(trigger_menu, { title = string.format(i18n.get("menu.llm.reset_label"), math.floor(llm_mod.DEFAULT_STATE.llm_debounce * 1000) .. " ms")", disabled = is_disabled or nil, fn = settings_mgr.reset_debounce })
         end
 
         table.insert(trigger_menu, {
-            title    = "Suggestion instantanée en fin de mot",
+            title    = i18n.get("menu.llm.instant_on_word_end"),
             checked  = state.llm_instant_on_word_end,
             disabled = is_disabled or nil,
             fn       = not is_disabled and function()
@@ -1344,7 +1344,7 @@ function M.create(deps)
         })
 
         table.insert(trigger_menu, {
-            title    = "Suggestion après expiration d’une bulle hotstring",
+            title    = i18n.get("menu.llm.after_hotstring"),
             checked  = state.llm_after_hotstring,
             disabled = is_disabled or nil,
             fn       = not is_disabled and function()
@@ -1359,7 +1359,7 @@ function M.create(deps)
         table.insert(trigger_menu, { title = "-" })
 
         local disabled_count = #(type(state.llm_disabled_apps) == "table" and state.llm_disabled_apps or {})
-        local disabled_label = "Désactivé dans" .. (disabled_count > 0 and (" " .. disabled_count .. " application" .. (disabled_count > 1 and "s" or "")) or " ces applications")
+        local disabled_label = string.format(i18n.get("menu.llm.disabled_in_label"), disabled_count, disabled_count > 1 and "s" or "")
 
         local exclusion_menu = AppPickerLib.build_menu(
             state.llm_disabled_apps,
@@ -1368,11 +1368,11 @@ function M.create(deps)
                 if keymap and type(keymap.set_llm_disabled_apps) == "function" then pcall(keymap.set_llm_disabled_apps, new_list) end
                 pcall(save_prefs); pcall(update_menu)
             end,
-            "Exclure de la génération IA automatique…"
+            i18n.get("menu.llm.exclude_from_ai")
         )
 
         table.insert(trigger_menu, {
-            title    = "Désactiver dans les barres d’adresse des navigateurs",
+            title    = i18n.get("menu.llm.disable_url_bars"),
             checked  = state.llm_url_bar_filter_enabled,
             disabled = is_disabled or nil,
             fn       = not is_disabled and function()
@@ -1385,7 +1385,7 @@ function M.create(deps)
         })
 
         table.insert(trigger_menu, {
-            title    = "Désactiver dans les champs mot de passe",
+            title    = i18n.get("menu.llm.disable_password_fields"),
             checked  = state.llm_secure_field_filter_enabled,
             disabled = is_disabled or nil,
             fn       = not is_disabled and function()
@@ -1399,20 +1399,20 @@ function M.create(deps)
 
         table.insert(trigger_menu, { title = disabled_label, disabled = is_disabled or nil, menu = exclusion_menu })
 
-        table.insert(main_menu, { title = "Déclenchement de l’IA", disabled = is_disabled or nil, menu = trigger_menu })
+        table.insert(main_menu, { title = i18n.get("menu.llm.trigger_menu_title"), disabled = is_disabled or nil, menu = trigger_menu })
 
 
         -- ===== Generation settings submenu =====
 
         local generation_menu = {}
 
-        table.insert(generation_menu, { title = "Taille du contexte : " .. tostring(state.llm_context_length) .. " derniers caractères", disabled = is_disabled or nil, fn = settings_mgr.set_context_length })
+        table.insert(generation_menu, { title = string.format(i18n.get("menu.llm.context_length_label"), tostring(state.llm_context_length)), disabled = is_disabled or nil, fn = settings_mgr.set_context_length })
         if state.llm_context_length ~= llm_mod.DEFAULT_STATE.llm_context_length then
-            table.insert(generation_menu, { title = "  ↳ Réinitialiser (défaut : " .. tostring(llm_mod.DEFAULT_STATE.llm_context_length) .. ")", disabled = is_disabled or nil, fn = settings_mgr.reset_context_length })
+            table.insert(generation_menu, { title = string.format(i18n.get("menu.llm.reset_label"), .. tostring(llm_mod.DEFAULT_STATE.llm_context_length)), disabled = is_disabled or nil, fn = settings_mgr.reset_context_length })
         end
 
         table.insert(generation_menu, {
-            title    = "Vider le contexte sur clic/navigation",
+            title    = i18n.get("menu.llm.reset_on_nav"),
             checked  = state.llm_reset_on_nav,
             disabled = is_disabled or nil,
             fn       = function()
@@ -1423,24 +1423,24 @@ function M.create(deps)
         })
 
         local min_words_display = (state.llm_min_words and state.llm_min_words > 0) and tostring(state.llm_min_words) or "1"
-        table.insert(generation_menu, { title = "Mots min par suggestion : " .. min_words_display, disabled = is_disabled or nil, fn = settings_mgr.set_min_words })
+        table.insert(generation_menu, { title = string.format(i18n.get("menu.llm.min_words_label"), min_words_display), disabled = is_disabled or nil, fn = settings_mgr.set_min_words })
         if state.llm_min_words ~= llm_mod.DEFAULT_STATE.llm_min_words then
-            table.insert(generation_menu, { title = "  ↳ Réinitialiser (défaut : " .. tostring(llm_mod.DEFAULT_STATE.llm_min_words) .. ")", disabled = is_disabled or nil, fn = settings_mgr.reset_min_words })
+            table.insert(generation_menu, { title = string.format(i18n.get("menu.llm.reset_label"), .. tostring(llm_mod.DEFAULT_STATE.llm_min_words)), disabled = is_disabled or nil, fn = settings_mgr.reset_min_words })
         end
 
-        local max_words_display = (state.llm_max_words and state.llm_max_words > 0) and tostring(state.llm_max_words) or "Illimité"
-        table.insert(generation_menu, { title = "Mots max par suggestion : " .. max_words_display, disabled = is_disabled or nil, fn = settings_mgr.set_max_words })
+        local max_words_display = (state.llm_max_words and state.llm_max_words > 0) and tostring(state.llm_max_words) or i18n.get("menu.llm.unlimited")
+        table.insert(generation_menu, { title = string.format(i18n.get("menu.llm.max_words_label"), max_words_display), disabled = is_disabled or nil, fn = settings_mgr.set_max_words })
         if state.llm_max_words ~= llm_mod.DEFAULT_STATE.llm_max_words then
-            local def_w_disp = (llm_mod.DEFAULT_STATE.llm_max_words and llm_mod.DEFAULT_STATE.llm_max_words > 0) and tostring(llm_mod.DEFAULT_STATE.llm_max_words) or "Illimité"
-            table.insert(generation_menu, { title = "  ↳ Réinitialiser (défaut : " .. def_w_disp .. ")", disabled = is_disabled or nil, fn = settings_mgr.reset_max_words })
+            local def_w_disp = (llm_mod.DEFAULT_STATE.llm_max_words and llm_mod.DEFAULT_STATE.llm_max_words > 0) and tostring(llm_mod.DEFAULT_STATE.llm_max_words) or i18n.get("menu.llm.unlimited")
+            table.insert(generation_menu, { title = string.format(i18n.get("menu.llm.reset_label"), .. def_w_disp), disabled = is_disabled or nil, fn = settings_mgr.reset_max_words })
         end
 
-        table.insert(generation_menu, { title = "Température (Créativité) : " .. tostring(state.llm_temperature), disabled = is_disabled or nil, fn = settings_mgr.set_temperature })
+        table.insert(generation_menu, { title = string.format(i18n.get("menu.llm.temperature_label"), tostring(state.llm_temperature)), disabled = is_disabled or nil, fn = settings_mgr.set_temperature })
         if state.llm_temperature ~= llm_mod.DEFAULT_STATE.llm_temperature then
-            table.insert(generation_menu, { title = "  ↳ Réinitialiser (défaut : " .. tostring(llm_mod.DEFAULT_STATE.llm_temperature) .. ")", disabled = is_disabled or nil, fn = settings_mgr.reset_temperature })
+            table.insert(generation_menu, { title = "string.format(i18n.get("menu.llm.reset_label"), tostring(llm_mod.DEFAULT_STATE.llm_temperature))), disabled = is_disabled or nil, fn = settings_mgr.reset_temperature })
         end
         table.insert(generation_menu, {
-            title    = "  ↳ Hausser la temp. automatiquement (+0.1 par suggestion)",
+            title    = i18n.get("menu.llm.auto_raise_temp"),
             checked  = state.llm_auto_raise_temp,
             disabled = (is_disabled or (tonumber(state.llm_num_predictions) or llm_mod.DEFAULT_STATE.llm_num_predictions) < 2) or nil,
             fn       = function()
@@ -1452,7 +1452,7 @@ function M.create(deps)
             end
         })
 
-        table.insert(main_menu, { title = "Paramètres de génération", disabled = is_disabled or nil, menu = generation_menu })
+        table.insert(main_menu, { title = i18n.get("menu.llm.generation_menu_title"), disabled = is_disabled or nil, menu = generation_menu })
 
 
         -- ===== Display submenu =====
@@ -1461,13 +1461,13 @@ function M.create(deps)
 
         local num_preds_safe = tonumber(state.llm_num_predictions) or llm_mod.DEFAULT_STATE.llm_num_predictions
         table.insert(display_menu, {
-            title    = "Indentation de la suggestion sélectionnée",
+            title    = i18n.get("menu.llm.indent_label"),
             disabled = (is_disabled or num_preds_safe < 2) or nil,
             menu     = settings_mgr.build_indent_menu()
         })
 
         table.insert(display_menu, {
-            title    = "Afficher la barre d’info (modèle et latence)",
+            title    = i18n.get("menu.llm.show_info_bar"),
             checked  = state.llm_show_info_bar,
             disabled = is_disabled or nil,
             fn       = function()
@@ -1482,7 +1482,7 @@ function M.create(deps)
         local streaming_multi_on = (state.llm_streaming_multi == true)  -- true = show predictions as they arrive (progressive/parallel)
         local num_preds_multi    = tonumber(state.llm_num_predictions) or llm_mod.DEFAULT_STATE.llm_num_predictions
         table.insert(display_menu, {
-            title    = "Afficher chaque suggestion en streaming (token par token)",
+            title    = i18n.get("menu.llm.show_streaming"),
             checked  = streaming_on,
             disabled = (is_disabled or not streaming_multi_on) or nil,
             fn       = not is_disabled and function()
@@ -1495,7 +1495,7 @@ function M.create(deps)
         })
         table.insert(display_menu, {
             -- Independent of token streaming; only irrelevant when num_predictions < 2
-            title    = "Afficher toutes les suggestions d’un coup (multi-prédictions)",
+            title    = i18n.get("menu.llm.show_all_at_once"),
             checked  = not streaming_multi_on,
             disabled = (is_disabled or num_preds_multi < 2) or nil,
             fn       = (not is_disabled and num_preds_multi >= 2) and function()
@@ -1507,7 +1507,7 @@ function M.create(deps)
             end or nil,
         })
 
-        table.insert(main_menu, { title = "Affichage", disabled = is_disabled or nil, menu = display_menu })
+        table.insert(main_menu, { title = i18n.get("menu.llm.display_menu_title"), disabled = is_disabled or nil, menu = display_menu })
 
 
         -- ===== Navigation submenu =====
@@ -1523,24 +1523,24 @@ function M.create(deps)
         if keymap and type(keymap.set_llm_val_modifiers) == "function" then pcall(keymap.set_llm_val_modifiers, val_mods) end
 
         local num_preds_safe = tonumber(state.llm_num_predictions) or llm_mod.DEFAULT_STATE.llm_num_predictions
-        local nav_title = format_shortcut_title("Naviguer dans les suggestions (↑/← et ↓/→)", nav_mods, "Flèches seules", "Flèches")
+        local nav_title = format_shortcut_title(i18n.get("menu.llm.nav_label"), nav_mods, i18n.get("menu.llm.arrows_only"), i18n.get("menu.llm.arrows"))
         table.insert(nav_menu_items, {
             title    = nav_title,
             disabled = (is_disabled or num_preds_safe < 2) or nil,
             menu     = settings_mgr.build_nav_modifier_menu()
         })
 
-        local val_title = format_shortcut_title("Sélectionner la suggestion n° (" .. ((num_preds_safe == 10) and "1-0" or ("1-" .. num_preds_safe)) .. ")", val_mods, "Chiffres seuls", "Chiffres")
+        local val_title = format_shortcut_title(string.format(i18n.get("menu.llm.val_label"), (num_preds_safe == 10) and "1-0" or ("1-" .. num_preds_safe)), val_mods, i18n.get("menu.llm.digits_only"), i18n.get("menu.llm.digits"))
         table.insert(nav_menu_items, {
             title    = val_title,
             disabled = (is_disabled or num_preds_safe < 2) or nil,
             menu     = settings_mgr.build_val_modifier_menu()
         })
 
-        table.insert(main_menu, { title = "Navigation", disabled = is_disabled or nil, menu = nav_menu_items })
+        table.insert(main_menu, { title = i18n.get("menu.llm.nav_menu_title"), disabled = is_disabled or nil, menu = nav_menu_items })
 
         return {
-            title   = "✨ Intelligence Artificielle",
+            title   = i18n.get("menu.llm.title"),
             checked = (state.llm_enabled and not paused) or nil,
             fn      = not paused and function()
                 local function toggle_state()

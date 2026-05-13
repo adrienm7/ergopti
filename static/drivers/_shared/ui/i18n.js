@@ -68,7 +68,6 @@
 
 	function load() {
 		const code = window._i18n_locale || "fr";
-		if (code === "fr") return; // HTML already in French — nothing to do
 
 		// Resolve URL two levels up (ui/<subdir>/index.html → ui/locales/)
 		const here = location.href;

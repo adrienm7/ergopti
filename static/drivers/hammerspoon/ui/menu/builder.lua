@@ -216,8 +216,8 @@ function M.generate(ctx, menu_mods, actions)
 		local std_groups = collect_groups(non_ergopti_filter)
 		if #std_groups > 0 then
 			local common_header = common_has_count
-				and ("— Hotstrings communs (" .. fmt_grand(common_total) .. ") —")
-				or  "— Hotstrings communs —"
+				and string.format(i18n.get("menu.hotstrings.header_common_count"), fmt_grand(common_total))
+				or  i18n.get("menu.hotstrings.header_common")
 			table.insert(hotstrings_menu, { title = common_header, disabled = true })
 			for _, it in ipairs(std_groups) do table.insert(hotstrings_menu, it) end
 		end
@@ -227,8 +227,8 @@ function M.generate(ctx, menu_mods, actions)
 		if #ergopti_groups > 0 then
 			if #std_groups > 0 then table.insert(hotstrings_menu, { title = "-" }) end
 			local ergopti_header = ergopti_has_count
-				and ("— Disposition Ergopti (" .. fmt_grand(ergopti_total) .. ") —")
-				or  "— Disposition Ergopti —"
+				and string.format(i18n.get("menu.hotstrings.header_ergopti_count"), fmt_grand(ergopti_total))
+				or  i18n.get("menu.hotstrings.header_ergopti")
 			table.insert(hotstrings_menu, { title = ergopti_header, disabled = true })
 			for _, it in ipairs(ergopti_groups) do table.insert(hotstrings_menu, it) end
 		end
@@ -240,8 +240,8 @@ function M.generate(ctx, menu_mods, actions)
 		if custom_item then
 			table.insert(hotstrings_menu, { title = "-" })
 			local personal_header = personal_has_count
-				and ("— Mes hotstrings (" .. fmt_grand(personal_total) .. ") —")
-				or  "— Mes hotstrings —"
+				and string.format(i18n.get("menu.hotstrings.header_personal_count"), fmt_grand(personal_total))
+				or  i18n.get("menu.hotstrings.header_personal")
 			table.insert(hotstrings_menu, { title = personal_header, disabled = true })
 			table.insert(hotstrings_menu, custom_item)
 		end
@@ -363,7 +363,7 @@ function M.generate(ctx, menu_mods, actions)
 	local canvas_w = math.ceil(max_text_width)
 	
 	local paused = ctx and ctx.paused
-	local display_text = paused and "Ergopti + (en pause)" or "Ergopti +"
+	local display_text = paused and i18n.get("menu.builder.title_paused") or i18n.get("menu.builder.title")
 	local ok, size = pcall(hs.drawing.getTextDrawingSize, display_text, { font = "Helvetica-Bold", size = 14 })
 	local text_w = size.w
 	
