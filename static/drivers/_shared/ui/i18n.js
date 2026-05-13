@@ -3,8 +3,8 @@
 // ==============================================================================
 // MODULE: HTML i18n loader
 // DESCRIPTION:
-// Minimal browser-side i18n system for the metrics webviews. Reads the active
-// locale from window._i18n_locale (injected by the backend before this script
+// Minimal browser-side i18n system for all Ergopti webviews. Reads the active
+// locale from window._i18n_locale (injected by ui_builder before this script
 // runs, or "fr" as fallback), fetches the matching JSON file from the shared
 // static/locales/ directory, then applies translations to every DOM element
 // that carries a data-i18n="key" attribute. Also handles data-i18n-title and
@@ -12,13 +12,17 @@
 //
 // FEATURES & RATIONALE:
 // 1. Zero dependencies — plain fetch + DOM traversal, no library needed.
-// 2. Self-contained — the backend does not need to push strings; the page
-//    fetches the JSON itself using a path resolved relative to this script.
+// 2. Dual path — ui_builder injects window.__i18n_base (file:// URL to
+//    static/locales/) and window._i18n_locale into every webview as a
+//    <script> prefix, so fetch() resolves correctly even when the HTML is
+//    loaded inline with no base URL.
 // 3. Graceful fallback — if the fetch fails or a key is missing, elements
 //    remain empty (textContent was cleared when data-i18n was added).
 // 4. Global store — strings are saved in window._i18n_strings so page scripts
 //    can call _t(key) for dynamic content not reachable via DOM attributes.
-// 5. Attribute variants:
+// 5. Direct injection — Lua backends can skip the fetch entirely by calling
+//    window.i18n_apply(strings) with a pre-loaded flat key→value map.
+// 6. Attribute variants:
 //    - data-i18n="key"             → element.textContent
 //    - data-i18n-title="key"       → element.title
 //    - data-i18n-placeholder="key" → element.placeholder (inputs)
@@ -55,7 +59,10 @@
 		// data-i18n → textContent
 		document.querySelectorAll("[data-i18n]").forEach(function (el) {
 			var key = el.getAttribute("data-i18n");
-			if (strings[key] !== undefined) el.textContent = strings[key];
+			if (strings[key] !== undefined) {
+				if (el.tagName === "TITLE") document.title = strings[key];
+				else el.textContent = strings[key];
+			}
 		});
 		// data-i18n-title → title attribute
 		document.querySelectorAll("[data-i18n-title]").forEach(function (el) {
@@ -76,6 +83,10 @@
 			});
 		});
 	}
+
+	// Expose apply() globally so Lua backends can inject strings directly via
+	// evaluateJavaScript without relying on the fetch() path.
+	window.i18n_apply = apply;
 
 	function load() {
 		var code = window._i18n_locale || "fr";
