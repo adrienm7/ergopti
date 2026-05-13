@@ -288,13 +288,14 @@ WPMWidget_BuildGraph() {
     w := WPMWidgetConst.GRAPH_W
     h := WPMWidgetConst.GRAPH_H
 
+    ; Use a black key color made transparent via WinSetTransparent so the
+    ; WebView2 canvas (which draws its own semi-transparent background) floats
+    ; over the desktop without a solid Gui backdrop.
     g := Gui("+AlwaysOnTop -Caption +ToolWindow +E0x80000 -DPIScale", "ErgoptiPlus WPM Graph")
-    g.BackColor := WPMWidgetConst.COLOR_BG_IDLE
+    g.BackColor := "000001"   ; near-black used as color key for transparency
     g.MarginX   := 0
     g.MarginY   := 0
 
-    ; The WebView2 control will fill the whole window.
-    ; A transparent placeholder text receives drag clicks until WV is ready.
     lbl := g.AddText("x0 y0 w" . w . " h" . h . " BackgroundTrans", "")
     lbl.OnEvent("Click", WPMWidget_DragStart)
 
@@ -305,14 +306,22 @@ WPMWidget_BuildGraph() {
     WPMWidget._graph_wv_ready := false
 
     ; Attempt to embed WebView2 for canvas rendering.
-    ; Falls back gracefully if WebView2 Runtime is not installed.
     try {
         wvc := WebView2.CreateControllerAsync(g.Hwnd).Await()
         wv  := wvc.CoreWebView2
+
+        ; Make the WebView2 background fully transparent so only the canvas
+        ; drawing is visible over the Gui color-key layer.
+        try wvc.DefaultBackgroundColor := 0x00000000
+
         wvc.Bounds := { X: 0, Y: 0, Width: w, Height: h }
+
+        ; Set _graph_wv_ready only after the page has fully loaded so that
+        ; ExecuteScriptAsync calls don't race against page initialization.
+        wv.add_NavigationCompleted((_wv, _args) => WPMWidget._graph_wv_ready := true)
         wv.NavigateToString(WPMWidget_GraphHtml(w, h))
-        WPMWidget._graph_wv       := wvc
-        WPMWidget._graph_wv_ready := true
+
+        WPMWidget._graph_wv := wvc
     }
 
     WPMWidget._gui := g
@@ -320,32 +329,52 @@ WPMWidget_BuildGraph() {
 
 
 ; Returns the self-contained HTML for the graph canvas.
+; Mirrors the Hammerspoon graph style: dark semi-transparent rounded pill,
+; colored fill + stroke line, WPM label at the top.
 WPMWidget_GraphHtml(w, h) {
     return "<!DOCTYPE html><html><head><meta charset='utf-8'><style>"
         . "html,body{margin:0;padding:0;background:transparent;overflow:hidden}"
-        . "canvas{display:block}</style></head><body>"
+        . "canvas{display:block;position:absolute;top:0;left:0}"
+        . "</style></head><body>"
         . "<canvas id='c' width='" . w . "' height='" . h . "'></canvas>"
         . "<script>"
         . "const c=document.getElementById('c'),ctx=c.getContext('2d');"
+        . "const W=c.width,H=c.height,R=10;"
+        . "function roundRect(x,y,w,h,r){"
+        . "  ctx.beginPath();"
+        . "  ctx.moveTo(x+r,y);"
+        . "  ctx.lineTo(x+w-r,y);ctx.arcTo(x+w,y,x+w,y+r,r);"
+        . "  ctx.lineTo(x+w,y+h-r);ctx.arcTo(x+w,y+h,x+w-r,y+h,r);"
+        . "  ctx.lineTo(x+r,y+h);ctx.arcTo(x,y+h,x,y+h-r,r);"
+        . "  ctx.lineTo(x,y+r);ctx.arcTo(x,y,x+r,y,r);"
+        . "  ctx.closePath();"
+        . "}"
         . "window.updateGraph=function(data){"
         . "  const d=JSON.parse(data);"
-        . "  ctx.clearRect(0,0,c.width,c.height);"
-        . "  const pad=6,lh=18,gh=c.height-lh-pad*2,gw=c.width-pad*2;"
-        . "  const n=d.hist.length; if(n<2)return;"
+        . "  ctx.clearRect(0,0,W,H);"
+        . "  roundRect(0,0,W,H,R);"
+        . "  ctx.fillStyle='rgba(0,0,0,0.82)';ctx.fill();"
+        . "  roundRect(0,0,W,H,R);"
+        . "  ctx.strokeStyle='rgba(255,255,255,0.18)';ctx.lineWidth=1;ctx.stroke();"
+        . "  const pad=6,lh=20,gh=H-lh-pad*2,gw=W-pad*2;"
+        . "  const n=d.hist.length;if(n<2){"
+        . "    ctx.fillStyle='#'+d.txt;ctx.font='bold 13px Segoe UI';"
+        . "    ctx.textAlign='center';ctx.fillText(d.label,W/2,lh);return;}"
         . "  const mx=d.scale||120;"
         . "  const step=gw/(n-1);"
         . "  const col='#'+d.color;"
+        . "  ctx.save();roundRect(0,0,W,H,R);ctx.clip();"
         . "  ctx.beginPath();"
         . "  ctx.moveTo(pad,lh+pad+gh);"
-        . "  for(let i=0;i<n;i++){ctx.lineTo(pad+i*step,lh+pad+gh-(d.hist[i]/mx)*gh);}"
-        . "  ctx.lineTo(pad+(n-1)*step,lh+pad+gh);"
-        . "  ctx.closePath();"
+        . "  for(let i=0;i<n;i++)ctx.lineTo(pad+i*step,lh+pad+gh-(d.hist[i]/mx)*gh);"
+        . "  ctx.lineTo(pad+(n-1)*step,lh+pad+gh);ctx.closePath();"
         . "  ctx.fillStyle=col+'33';ctx.fill();"
         . "  ctx.beginPath();"
-        . "  for(let i=0;i<n;i++){i===0?ctx.moveTo(pad,lh+pad+gh-(d.hist[0]/mx)*gh):ctx.lineTo(pad+i*step,lh+pad+gh-(d.hist[i]/mx)*gh);}"
+        . "  for(let i=0;i<n;i++)i===0?ctx.moveTo(pad,lh+pad+gh-(d.hist[0]/mx)*gh):ctx.lineTo(pad+i*step,lh+pad+gh-(d.hist[i]/mx)*gh);"
         . "  ctx.strokeStyle=col;ctx.lineWidth=2;ctx.stroke();"
-        . "  ctx.fillStyle='#'+d.txt;ctx.font='bold 12px Segoe UI';"
-        . "  ctx.textAlign='center';ctx.fillText(d.label,c.width/2,lh);"
+        . "  ctx.restore();"
+        . "  ctx.fillStyle='#'+d.txt;ctx.font='bold 13px Segoe UI';"
+        . "  ctx.textAlign='center';ctx.fillText(d.label,W/2,lh);"
         . "}"
         . "</script></body></html>"
 }
@@ -416,7 +445,12 @@ WPMWidget_Show() {
 
     gui_ref.Show("x" . WPMWidget.pos_x . " y" . WPMWidget.pos_y
         . " w" . w . " h" . h . " NoActivate")
-    WinSetTransparent(WPMWidgetConst.ALPHA_IDLE, gui_ref)
+    if WPMWidget.show_graph
+        ; Color-key "000001" punches out the Gui background so only the WebView2
+        ; canvas drawing is visible. No alpha layer needed — the canvas handles opacity.
+        WinSetTransparent("000001", gui_ref)
+    else
+        WinSetTransparent(WPMWidgetConst.ALPHA_IDLE, gui_ref)
     SetTimer(WPMWidget_Tick, WPMWidgetConst.TICK_MS)
     try LoggerDone("WPMWidget", "Widget shown at (%d, %d) mode=%s.",
         WPMWidget.pos_x, WPMWidget.pos_y, WPMWidget.show_graph ? "graph" : "compact")
@@ -474,8 +508,8 @@ WPMWidget_Tick() {
 
     if WPMWidget.show_graph {
         if WPMWidget._graph_gui {
-            WPMWidget._graph_gui.BackColor := bg_color
-            WinSetTransparent(alpha, WPMWidget._graph_gui)
+            ; In graph mode the Gui color-key ("000001") must stay intact so the
+            ; background stays transparent; only the WebView2 canvas is visible.
             WPMWidget_PushGraphUpdate(wpm_str, txt_col, has_hs, has_ai, has_ac, is_idle)
         }
     } else {
