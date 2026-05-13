@@ -471,6 +471,7 @@ textexpansionsymbolstypst = { fr = "Expansion de texte Symboles Typst : $eq.not$
 "outv★" = { output = "Où êtes-vous ?", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false }
 "out★" = { output = "Où es-tu ?", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false }
 "ouv★" = { output = "ouverture", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
+"p★" = { output = "prendre", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
 "p//★" = { output = "par rapport", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
 "params★" = { output = "paramètres", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
 "param★" = { output = "paramètre", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
@@ -490,6 +491,10 @@ textexpansionsymbolstypst = { fr = "Expansion de texte Symboles Typst : $eq.not$
 "perso★" = { output = "personne", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
 "peut-ê★" = { output = "peut-être", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
 "pex★" = { output = "par exemple", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
+"pè★" = { output = "problème", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
+"périm★" = { output = "périmètre", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
+"péri★" = { output = "périmètre", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
+"pê★" = { output = "peut-être", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
 "pf★" = { output = "portefeuille", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
 "pgm★" = { output = "programme", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
 "pg★" = { output = "pas grave", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
@@ -530,16 +535,12 @@ textexpansionsymbolstypst = { fr = "Expansion de texte Symboles Typst : $eq.not$
 "psycho★" = { output = "psychologie", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
 "psy★" = { output = "psychologie", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
 "ptf★" = { output = "portefeuille", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
+"ptn★" = { output = "putain", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
 "pts★" = { output = "points", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
 "pt★" = { output = "point", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
 "pub★" = { output = "publicité", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
 "pvv★" = { output = "pouvez-vous", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
 "py★" = { output = "python", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
-"pè★" = { output = "problème", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
-"périm★" = { output = "périmètre", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
-"péri★" = { output = "périmètre", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
-"pê★" = { output = "peut-être", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
-"p★" = { output = "prendre", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
 "qcq'★" = { output = "qu’est-ce qu’", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
 "qcq★" = { output = "qu’est-ce que", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
 "qc★" = { output = "qu’est-ce", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
