@@ -285,6 +285,11 @@
 	"button.add": "Toevoegen",
 	"button.activate": "Inschakelen",
 	"button.open_settings": "Instellingen openen",
+	"gesture.setup.auto_configure": "\nOf klik op «Automatisch configureren» in het menu\nom deze sneltoetsen direct naar het register te schrijven.\n(Een herstart kan nodig zijn.)",
+	"gesture.setup.for_each": "Selecteer voor elk gebaar «Aangepaste sneltoets»\nen typ de aangegeven sneltoets:\n\n",
+	"gesture.setup.header": "Touchpad-gebaren configureren\n══════════════════════════════════\n\n",
+	"gesture.setup.open_path": "Openen: Instellingen > Bluetooth en apparaten > Touchpad\n         > Geavanceerde gebaren\n\n",
+	"gesture.setup.title": "ErgoptiPlus — Touchpad-gebaren",
 	"gesture.slots.tap_3": "3-vinger tik",
 	"gesture.slots.swipe_3_up": "3-vinger veeg ↑",
 	"gesture.slots.swipe_3_down": "3-vinger veeg ↓",
@@ -1202,4 +1207,5 @@
 	"gesture.slots.swipe_2_right_up": "2-finger swipe ↗",
 	"gesture.slots.swipe_2_left_down": "2-finger swipe ↙",
 	"gesture.slots.swipe_2_right_down": "2-finger swipe ↘"
+	"gesture.touchpad_open.body": "De touchpadpagina is geopend.\n\nScroll naar beneden en klik op\n«Geavanceerde gebaren» om de sneltoetsen te openen.",
 }

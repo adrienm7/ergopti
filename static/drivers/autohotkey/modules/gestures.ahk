@@ -1715,36 +1715,25 @@ GestureRestartTouchpadDevice() {
 
 ; Shows setup instructions to the user.
 GestureShowSetupInstructions() {
-    Instructions := "Configuration des gestes du touchpad`n"
-        . "══════════════════════════════════`n`n"
-        . "Ouvrir : Paramètres > Bluetooth et appareils > Pavé tactile`n"
-        . "         > Mouvements avancés`n`n"
-        . "Pour chaque geste, sélectionner « Raccourci personnalisé »`n"
-        . "puis taper le raccourci indiqué :`n`n"
+    Instructions := t("gesture.setup.header")
+        . t("gesture.setup.open_path")
+        . t("gesture.setup.for_each")
 
     for Slot in GESTURE_SLOTS {
         Instructions .= "  " . t("gesture.slots." . Slot) . " :  "
             . GESTURE_SHORTCUT_LABELS[Slot] . "`n"
     }
 
-    Instructions .= "`nOu cliquer « Configurer automatiquement » dans le menu`n"
-        . "pour écrire ces raccourcis directement dans le registre.`n"
-        . "(Un redémarrage peut être nécessaire.)"
+    Instructions .= t("gesture.setup.auto_configure")
 
-    MsgBox(Instructions, "ErgoptiPlus — Gestes du touchpad", "Iconi")
+    MsgBox(Instructions, t("gesture.setup.title"), "Iconi")
 }
 
 ; Opens Windows Settings to the touchpad page and reminds the user to drill
 ; down into the "Mouvements avancés" sub-page (no deep-link URI exists for it).
 GestureOpenTouchpadSettings() {
     try Run("ms-settings:devices-touchpad")
-    MsgBox(
-        "La page « Pavé tactile » est ouverte.`n`n"
-        . "Faire défiler jusqu'en bas, puis cliquer sur`n"
-        . "« Mouvements avancés » pour accéder aux raccourcis.",
-        "ErgoptiPlus — Gestes du touchpad",
-        "Iconi"
-    )
+    MsgBox(t("gesture.touchpad_open.body"), t("gesture.setup.title"), "Iconi")
 }
 
 ; Read configuration on load
