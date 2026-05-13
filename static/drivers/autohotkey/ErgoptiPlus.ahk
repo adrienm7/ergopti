@@ -565,11 +565,9 @@ if Features.Has("DynamicHotstrings") {
         CountSuffix := N > 0 ? " (" . N . ")" : ""
         switch _DynKey {
             case "DateFr":
-                _DynVal.Description := "dt" . MK . " insère la date courante (" . FormatTime(, "dd/MM/yyyy") . ")" .
-                CountSuffix
+                _DynVal.Description := StrReplace(StrReplace(t("dynamichotstrings.datefr"), "★", MK), "{date}", FormatTime(, "dd/MM/yyyy")) . CountSuffix
             case "Date":
-                _DynVal.Description := "td" . MK . " insère la date courante (" . FormatTime(, "yyyy_MM_dd") . ")" .
-                CountSuffix
+                _DynVal.Description := StrReplace(StrReplace(t("dynamichotstrings.date"), "★", MK), "{date}", FormatTime(, "yyyy_MM_dd")) . CountSuffix
             default:
                 if (_DynVal.HasOwnProp("Description") and _DynVal.Description != "" and N > 0) {
                     _DynVal.Description := _DynVal.Description . CountSuffix
