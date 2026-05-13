@@ -285,6 +285,11 @@
 	"button.add": "Dodaj",
 	"button.activate": "Włącz",
 	"button.open_settings": "Otwórz Ustawienia",
+	"gesture.setup.auto_configure": "\nLub kliknij «Skonfiguruj automatycznie» w menu,\naby zapisać te skróty bezpośrednio w rejestrze.\n(Może być wymagane ponowne uruchomienie.)",
+	"gesture.setup.for_each": "Dla każdego gestu wybierz «Niestandardowy skrót»\ni wpisz wskazany skrót:\n\n",
+	"gesture.setup.header": "Konfiguracja gestów touchpada\n══════════════════════════════════\n\n",
+	"gesture.setup.open_path": "Otwórz: Ustawienia > Bluetooth i urządzenia > Touchpad\n         > Gesty zaawansowane\n\n",
+	"gesture.setup.title": "ErgoptiPlus — Gesty touchpada",
 	"gesture.slots.tap_3": "Stuknięcie 3 palcami",
 	"gesture.slots.swipe_3_up": "Przesunięcie 3 palcami ↑",
 	"gesture.slots.swipe_3_down": "Przesunięcie 3 palcami ↓",
@@ -1202,4 +1207,5 @@
 	"gesture.slots.swipe_2_right_up": "2-finger swipe ↗",
 	"gesture.slots.swipe_2_left_down": "2-finger swipe ↙",
 	"gesture.slots.swipe_2_right_down": "2-finger swipe ↘"
+	"gesture.touchpad_open.body": "Strona Touchpad jest otwarta.\n\nPrzewiń w dół, a następnie kliknij\n«Gesty zaawansowane», aby uzyskać dostęp do skrótów.",
 }

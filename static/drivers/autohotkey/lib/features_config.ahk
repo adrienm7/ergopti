@@ -231,7 +231,6 @@ global Features := Map(
             "AGrave",
             "<",
             "WrapTextIfSelected",
-            "-",
             ">menu.shortcuts.group_modifiers",
             "AltGrLAlt",
             "AltGrCapsLock",

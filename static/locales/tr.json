@@ -285,6 +285,11 @@
 	"button.add": "Ekle",
 	"button.activate": "Etkinleştir",
 	"button.open_settings": "Ayarları aç",
+	"gesture.setup.auto_configure": "\nYa da menüdeki «Otomatik yapılandır» seçeneğine tıklayarak\nbu kısayolları doğrudan kayıt defterine yazın.\n(Yeniden başlatma gerekebilir.)",
+	"gesture.setup.for_each": "Her jest için «Özel kısayol» seçin\nve gösterilen kısayolu yazın:\n\n",
+	"gesture.setup.header": "Dokunmatik yüzey jest yapılandırması\n══════════════════════════════════\n\n",
+	"gesture.setup.open_path": "Aç: Ayarlar > Bluetooth ve aygıtlar > Dokunmatik Yüzey\n         > Gelişmiş hareketler\n\n",
+	"gesture.setup.title": "ErgoptiPlus — Dokunmatik yüzey jestleri",
 	"gesture.slots.tap_3": "3 parmak dokunma",
 	"gesture.slots.swipe_3_up": "3 parmak kaydırma ↑",
 	"gesture.slots.swipe_3_down": "3 parmak kaydırma ↓",
@@ -1202,4 +1207,5 @@
 	"gesture.slots.swipe_2_right_up": "2-finger swipe ↗",
 	"gesture.slots.swipe_2_left_down": "2-finger swipe ↙",
 	"gesture.slots.swipe_2_right_down": "2-finger swipe ↘"
+	"gesture.touchpad_open.body": "Dokunmatik Yüzey sayfası açıldı.\n\nAşağı kaydırın, ardından kısayollara erişmek için\n«Gelişmiş hareketler» seçeneğine tıklayın.",
 }

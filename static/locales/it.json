@@ -285,6 +285,11 @@
 	"button.add": "Aggiungi",
 	"button.activate": "Abilita",
 	"button.open_settings": "Apri Impostazioni",
+	"gesture.setup.auto_configure": "\nOppure fare clic su «Configura automaticamente» nel menu\nper scrivere questi tasti di scelta rapida direttamente nel registro.\n(Potrebbe essere necessario un riavvio.)",
+	"gesture.setup.for_each": "Per ogni gesto, selezionare «Scorciatoia personalizzata»\nquindi digitare la scorciatoia indicata:\n\n",
+	"gesture.setup.header": "Configurazione dei gesti del touchpad\n══════════════════════════════════\n\n",
+	"gesture.setup.open_path": "Aprire: Impostazioni > Bluetooth e dispositivi > Touchpad\n         > Gesti avanzati\n\n",
+	"gesture.setup.title": "ErgoptiPlus — Gesti del touchpad",
 	"gesture.slots.tap_3": "Tap 3 dita",
 	"gesture.slots.swipe_3_up": "Scorrimento 3 dita ↑",
 	"gesture.slots.swipe_3_down": "Scorrimento 3 dita ↓",
@@ -1202,4 +1207,5 @@
 	"gesture.slots.swipe_2_right_up": "2-finger swipe ↗",
 	"gesture.slots.swipe_2_left_down": "2-finger swipe ↙",
 	"gesture.slots.swipe_2_right_down": "2-finger swipe ↘"
+	"gesture.touchpad_open.body": "La pagina Touchpad è aperta.\n\nScorrere verso il basso, poi fare clic su\n«Gesti avanzati» per accedere alle scorciatoie.",
 }
