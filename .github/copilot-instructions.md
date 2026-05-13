@@ -67,12 +67,12 @@ Use the central logger system (`lib.logger` in Lua, equivalent elsewhere). **Log
 
 The logger has **8 variants** organized on two axes: _importance_ and _lifecycle role_.
 
-| | Misc | Lifecycle Start | Lifecycle End |
-|---|---|---|---|
-| **DEBUG** | `DEBUG` (gray) | `TRACE` (dim cyan) | `DONE` (dim green) |
-| **INFO** | `INFO` (black) | `START` (bright cyan) | `SUCCESS` (bright green) |
-| **WARNING** | `WARNING` (orange) | — | — |
-| **ERROR** | `ERROR` (red) | — | — |
+|             | Misc               | Lifecycle Start       | Lifecycle End            |
+| ----------- | ------------------ | --------------------- | ------------------------ |
+| **DEBUG**   | `DEBUG` (gray)     | `TRACE` (dim cyan)    | `DONE` (dim green)       |
+| **INFO**    | `INFO` (black)     | `START` (bright cyan) | `SUCCESS` (bright green) |
+| **WARNING** | `WARNING` (orange) | —                     | —                        |
+| **ERROR**   | `ERROR` (red)      | —                     | —                        |
 
 **When to use each:**
 
@@ -271,6 +271,7 @@ end
 - **Format:** All commits MUST follow the [Conventional Commits](https://www.conventionalcommits.org/) specification.
 - **Language:** Commit messages are always written in **English** (developer-facing, like logs).
 - **No co-author credits:** Never add `Co-Authored-By` trailers. Do not credit any LLM or tool in commit messages.
+- **Never add 'Co-authored-by: Copilot <copilot@github.com>' in commits or code. Remove if present.** Same for Claude or any other tool. The code is ours, the credit is ours, the responsibility is ours. Do not dilute that by giving a byline to an AI.
 - **Linear history:** The `main` and `dev` branches must always have a perfectly linear history. This means:
   - **Never use merge commits** (`git merge`) when integrating a feature or fix branch. Always use `git merge --squash` followed by a single conventional commit, or rebase the branch before merging.
   - **Squash on merge:** When a feature/fix branch is ready to land, squash all its commits into one clean conventional commit. The commit message must summarise the entire change set, not enumerate the squashed commits.
@@ -278,16 +279,16 @@ end
 
 ### 6.1) Commit Types
 
-| Type | When to use |
-|---|---|
-| `feat` | New feature or user-visible behaviour |
-| `fix` | Bug fix |
-| `perf` | Performance improvement with no behaviour change |
-| `refactor` | Code restructuring with no behaviour change |
-| `style` | Formatting, whitespace, naming — no logic change |
-| `docs` | Documentation only |
-| `test` | Adding or updating tests |
-| `chore` | Build scripts, tooling, CI, dependency updates |
+| Type       | When to use                                      |
+| ---------- | ------------------------------------------------ |
+| `feat`     | New feature or user-visible behaviour            |
+| `fix`      | Bug fix                                          |
+| `perf`     | Performance improvement with no behaviour change |
+| `refactor` | Code restructuring with no behaviour change      |
+| `style`    | Formatting, whitespace, naming — no logic change |
+| `docs`     | Documentation only                               |
+| `test`     | Adding or updating tests                         |
+| `chore`    | Build scripts, tooling, CI, dependency updates   |
 
 ### 6.2) Format Rules
 
@@ -312,7 +313,6 @@ fix(llm): prevent stale callbacks from updating the tooltip after reset
 
 refactor(keylogger): extract flush logic into dedicated log_manager module
 ```
-
 
 ## 7. Language-Specific Guidelines
 
@@ -389,7 +389,6 @@ if not ok_mod then optional_mod = nil end
 local ok, offset = pcall(utf8.offset, s, -1)
 if not ok or not offset then ... end
 ```
-
 
 **Example:**
 
