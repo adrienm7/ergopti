@@ -2400,10 +2400,19 @@ SaveFullConfig() {
     Updates.Push({ Section: "Metrics", Key: "metrics_enabled", Value: MetricsShortcuts.enabled })
     Updates.Push({ Section: "Metrics", Key: "metrics_shortcut_typing", Value: MetricsShortcuts.typing_str })
     Updates.Push({ Section: "Metrics", Key: "metrics_shortcut_apps", Value: MetricsShortcuts.apps_str })
+    Updates.Push({ Section: "Metrics", Key: "metrics_show_wpm_menubar", Value: MetricsShortcuts.show_wpm_menubar })
+    Updates.Push({ Section: "Metrics", Key: "metrics_wpm_menubar_colors", Value: MetricsShortcuts.wpm_menubar_colors })
     Updates.Push({ Section: "Metrics", Key: "metrics_filter_private_browsing", Value: MetricsFilters.private_browsing })
     Updates.Push({ Section: "Metrics", Key: "metrics_filter_secure_field", Value: MetricsFilters.secure_field })
     Updates.Push({ Section: "Metrics", Key: "metrics_filter_system_auth", Value: MetricsFilters.system_auth })
     Updates.Push({ Section: "Metrics", Key: "metrics_disabled_apps", Value: apps })
+
+    ; [Script] section — WPM widget position and display options
+    Updates.Push({ Section: "Script", Key: WPMWidgetConst.CFG_VISIBLE, Value: WPMWidget.visible ? "1" : "0" })
+    Updates.Push({ Section: "Script", Key: WPMWidgetConst.CFG_X,       Value: String(WPMWidget.pos_x) })
+    Updates.Push({ Section: "Script", Key: WPMWidgetConst.CFG_Y,       Value: String(WPMWidget.pos_y) })
+    Updates.Push({ Section: "Script", Key: WPMWidgetConst.CFG_COLORS,  Value: WPMWidget.use_colors ? "1" : "0" })
+    Updates.Push({ Section: "Script", Key: WPMWidgetConst.CFG_GRAPH,   Value: WPMWidget.show_graph  ? "1" : "0" })
 
     ; Strict schema: rewrite from scratch so stale/unknown sections and keys
     ; are removed on each full save
