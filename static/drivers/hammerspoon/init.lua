@@ -69,6 +69,14 @@ do
 	end
 end
 
+local i18n               = require("lib.i18n")
+local locale_mod         = require("lib.locale")
+
+-- Wire i18n → locale so set_locale() updates the JSON loader's active locale.
+-- Must run before any menu builder calls i18n.get() or locale_mod.get().
+i18n.set_locale_injector(function(code) locale_mod.set_locale(code) end)
+i18n.init()
+
 local menu_paths         = require("ui.menu.menu_paths")
 local gestures           = require("modules.gestures")
 local keymap             = require("modules.keymap")
@@ -245,6 +253,11 @@ do
 			if category == "personal" then
 				return menu_paths.get("PersonalTomlPath")
 			end
+			-- Extension personal TOML groups: personal_ext_<stem> → hotstrings/<stem>.toml
+			local ext_stem = category:match("^personal_ext_(.+)$")
+			if ext_stem then
+				return menu_paths.get("PersonalHotstringsDir") .. ext_stem .. ".toml"
+			end
 			return hotstrings_dir .. category .. ".toml"
 		end,
 	})
@@ -374,6 +387,17 @@ do
 				goto continue
 			end
 
+			-- key = { lang = "val", … } — multilingual inline table
+			local tbl_key, tbl_body = stripped:match('^([%w_]+)%s*=%s*%{(.-)%}$')
+			if tbl_key then
+				local tbl = {}
+				for lang, val in tbl_body:gmatch('"?([%w_%-]+)"?%s*=%s*"([^"]*)"') do
+					tbl[lang] = val
+				end
+				set_nested(result, current_path, tbl_key, tbl)
+				goto continue
+			end
+
 			::continue::
 		end
 		return result
@@ -493,13 +517,38 @@ Logger.debug(LOG, "Initializing custom hotstrings…")
 -- ===== 5.1) Custom Hotstrings =====
 -- ==================================
 
--- Personal hotstrings are stored in personal_hotstrings.toml (path configurable
--- via the paths editor — defaults to hotstrings/personal_hotstrings.toml).
+-- personal_hotstrings.toml lives in <config_dir>/hotstrings/ (configurable via
+-- the paths editor). Additional *.toml files placed in the same folder are loaded
+-- automatically as extra personal extension groups, displayed after the main
+-- personal group in alphabetical order by filename stem.
 do
 	local personal_path = menu_paths.get("PersonalTomlPath")
 	hotstring_editor.init(personal_path, keymap)
 	keymap.load_toml("personal", personal_path)
 	table.insert(hotfiles, "personal")
+
+	-- Scan for extra TOML files in the hotstrings folder
+	local hs_dir = menu_paths.get("PersonalHotstringsDir")
+	local ok_attr, attr = pcall(hs.fs.attributes, hs_dir)
+	if ok_attr and type(attr) == "table" and attr.mode == "directory" then
+		local extra_stems = {}
+		for fname in hs.fs.dir(hs_dir) do
+			if fname:match("%.toml$") and fname ~= "personal_hotstrings.toml" and not fname:match("^_") then
+				local stem = fname:match("^(.-)%.toml$")
+				if stem and stem ~= "" then
+					table.insert(extra_stems, stem)
+				end
+			end
+		end
+		table.sort(extra_stems)
+		for _, stem in ipairs(extra_stems) do
+			local ext_path  = hs_dir .. stem .. ".toml"
+			local group_name = "personal_ext_" .. stem
+			keymap.load_toml(group_name, ext_path)
+			table.insert(hotfiles, group_name)
+			Logger.info(LOG, "Loaded extra personal hotstrings group '%s' from '%s'.", group_name, ext_path)
+		end
+	end
 end
 
 -- Single final sort covering TOML + dynamic + custom groups.

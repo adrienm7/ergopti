@@ -1,4 +1,4 @@
-# static/shared/actions.toml
+﻿# static/shared/actions.toml
 #
 # Source de vérité unique pour les actions de gestes.
 # Lue par Hammerspoon (modules/gestures/actions.lua) et AutoHotkey
@@ -23,87 +23,70 @@
 [ax_actions]
 
 [ax_actions.tabs]
-label    = "⧉ Onglets"
 platform = "all"
 scalable = true
 
 [ax_actions.char]
-label    = "A Lettres"
 platform = "all"
 scalable = true
 
 [ax_actions.char_sel]
-label    = "✎ A Sél. Lettres"
 platform = "all"
 scalable = true
 
 [ax_actions.line_arrow]
-label    = "↕ Lignes (Flèches)"
 platform = "all"
 scalable = true
 
 [ax_actions.line_sel]
-label    = "✎ ↕ Sél. Lignes"
 platform = "all"
 scalable = true
 
 [ax_actions.words]
-label    = "W Mots"
 platform = "all"
 scalable = true
 
 [ax_actions.words_sel]
-label    = "✎ W Sél. Mots"
 platform = "all"
 scalable = true
 
 [ax_actions.windows]
-label    = "◱ Fenêtres"
 platform = "all"
 scalable = false
 
 [ax_actions.spaces]
-label    = "▢ Spaces"
 platform = "hs"
 scalable = false
 
 [ax_actions.desktops]
-label    = "▢ Bureaux"
 platform = "ahk"
 scalable = false
 
 [ax_actions.volume]
-label    = "🔊 Volume"
 platform = "all"
 scalable = true
 
 [ax_actions.brightness]
-label    = "☀ Luminosité"
 platform = "all"
 scalable = true
 
 [ax_actions.tracks]
-label    = "♫ Pistes"
 platform = "all"
 scalable = false
 
 [ax_actions.lines]
-label    = "↕ Lignes (Alt)"
 platform = "all"
 scalable = true
 
 [ax_actions.line_bounds]
-label    = "↔ Ligne (début/fin)"
 platform = "all"
 scalable = false
 
 [ax_actions.paragraphs]
-label    = "¶ Paragraphes"
 platform = "all"
 scalable = true
 
 [ax_actions.document]
-label    = "📄 Document (début/fin)"
 platform = "all"
 scalable = false
 
@@ -141,439 +124,389 @@ items = [
 [sg_actions]
 
 [sg_actions.none]
-label    = "∅ Désactivé"
 platform = "all"
 
 # --- Souris ---
 
 [sg_actions.left_click_toggle]
-label    = "🖱 L Clic gauche (maint.)"
 platform = "all"
 
 [sg_actions.right_click_toggle]
-label    = "🖱 R Clic droit (maint.)"
 platform = "all"
 
 [sg_actions.lookup]
-label    = "🔍 Définition du mot"
 platform = "hs"
 
 # --- Navigation applications ---
 
 [sg_actions.app_switcher]
-label    = "⇥ Alt+Tab — App. précédente"
 platform = "all"
 
 [sg_actions.app_previous]
-label    = "⇥ ← Alt+Tab — App préc."
 platform = "hs"
 
 [sg_actions.app_window_previous]
-label    = "⇥ ◱ ← Alt+Tab — Fenêtre préc."
 platform = "hs"
 
 # --- Édition (Windows uniquement — macOS utilise Cmd+C/V/X dans cmd_*) ---
 
 [sg_actions.copy]
-label    = "⎘ Copier"
 platform = "ahk"
 
 [sg_actions.paste]
-label    = "⎘ Coller"
 platform = "ahk"
 
 [sg_actions.cut]
-label    = "⎘ Couper"
 platform = "ahk"
 
 [sg_actions.undo]
-label    = "↩ Annuler"
 platform = "ahk"
 
 [sg_actions.redo]
-label    = "↪ Rétablir"
 platform = "ahk"
 
 [sg_actions.select_all]
-label    = "⬚ Tout sélectionner"
 platform = "ahk"
 
 [sg_actions.find]
-label    = "🔍 Rechercher"
 platform = "ahk"
 
 # --- Touches ---
 
 [sg_actions.enter]
-label    = "↵ Entrée"
 platform = "all"
 
 [sg_actions.tab]
-label    = "⇥ Tab"
 platform = "all"
 
 [sg_actions.escape]
-label    = "⎋ Échap"
 platform = "all"
 
 [sg_actions.backspace]
-label    = "⌫ Suppr. arrière"
 platform = "all"
 
 [sg_actions.delete]
-label    = "⌦ Suppr. avant"
 platform = "all"
 
 # --- Onglets ---
 
 [sg_actions.tab_new]
-label    = "⧉ + Nouvel onglet"
 platform = "all"
 
 [sg_actions.tab_close]
-label    = "⧉ × Fermer onglet"
 platform = "all"
 
 [sg_actions.tab_prev]
-label    = "⧉ ← Onglet précédent"
 platform = "all"
 
 [sg_actions.tab_next]
-label    = "⧉ → Onglet suivant"
 platform = "all"
 
 # --- Navigation navigateur ---
 
 [sg_actions.nav_back]
-label    = "← Précédent (navigation)"
 platform = "ahk"
 
 [sg_actions.nav_forward]
-label    = "→ Suivant (navigation)"
 platform = "ahk"
 
 # --- Fenêtres ---
 
 [sg_actions.win_prev]
-label    = "◱ ← Fenêtre précédente"
 platform = "all"
 
 [sg_actions.win_next]
-label    = "◱ → Fenêtre suivante"
 platform = "all"
 
 [sg_actions.win_app_prev]
-label    = "◱ ← Fenêtre préc. (même app)"
 platform = "ahk"
 
 [sg_actions.win_app_next]
-label    = "◱ → Fenêtre suiv. (même app)"
 platform = "ahk"
 
 [sg_actions.close_window]
-label    = "◱ × Fermer la fenêtre"
 platform = "all"
 
 [sg_actions.fullscreen]
-label    = "📺 Plein écran"
 platform = "all"
 
 [sg_actions.snap_left]
-label    = "◧ ← Ancrer à gauche"
 platform = "all"
 
 [sg_actions.snap_right]
-label    = "◨ → Ancrer à droite"
 platform = "all"
 
 [sg_actions.maximize]
-label    = "🔲 Maximiser"
 platform = "all"
 
 # --- Espaces / bureaux virtuels ---
 
 [sg_actions.space_prev]
-label    = "▢ ← Space précédent"
 platform = "hs"
 
 [sg_actions.space_next]
-label    = "▢ → Space suivant"
 platform = "hs"
 
 [sg_actions.mission_control]
-label    = "▢ Mission Control"
 platform = "hs"
 
 [sg_actions.app_expose]
-label    = "◱ App Exposé"
 platform = "hs"
 
 [sg_actions.desktop_prev]
-label    = "▢ ← Bureau précédent"
 platform = "ahk"
 
 [sg_actions.desktop_next]
-label    = "▢ → Bureau suivant"
 platform = "ahk"
 
 [sg_actions.desktop_new]
-label    = "▢ + Nouveau bureau"
 platform = "ahk"
 
 [sg_actions.desktop_close]
-label    = "▢ × Fermer le bureau"
 platform = "ahk"
 
 [sg_actions.task_view]
-label    = "▢ Vue des tâches"
 platform = "ahk"
 
 [sg_actions.minimize_all]
-label    = "◱ Tout minimiser"
 platform = "ahk"
 
 # --- Déplacement curseur ---
 
 [sg_actions.word_prev]
-label    = "W ← Mot précédent"
 platform = "all"
 
 [sg_actions.word_next]
-label    = "W → Mot suivant"
 platform = "all"
 
 [sg_actions.line_up]
-label    = "↕ ↑ Ligne précédente"
 platform = "all"
 
 [sg_actions.line_down]
-label    = "↕ ↓ Ligne suivante"
 platform = "all"
 
 [sg_actions.line_start]
-label    = "⇤ Début de ligne"
 platform = "all"
 
 [sg_actions.line_end]
-label    = "⇥ Fin de ligne"
 platform = "all"
 
 [sg_actions.para_prev]
-label    = "¶ ↑ Paragraphe précédent"
 platform = "all"
 
 [sg_actions.para_next]
-label    = "¶ ↓ Paragraphe suivant"
 platform = "all"
 
 [sg_actions.doc_start]
-label    = "⤒ Début du document"
 platform = "all"
 
 [sg_actions.doc_end]
-label    = "⤓ Fin du document"
 platform = "all"
 
 # --- Flèches ---
 
 [sg_actions.arrow_up]
-label    = "↑ Flèche Haut"
 platform = "all"
 
 [sg_actions.arrow_down]
-label    = "↓ Flèche Bas"
 platform = "all"
 
 [sg_actions.arrow_left]
-label    = "← Flèche Gauche"
 platform = "all"
 
 [sg_actions.arrow_right]
-label    = "→ Flèche Droite"
 platform = "all"
 
 # --- Sélection ---
 
 [sg_actions.sel_up]
-label    = "✎ ↑ Sélection Haut"
 platform = "all"
 
 [sg_actions.sel_down]
-label    = "✎ ↓ Sélection Bas"
 platform = "all"
 
 [sg_actions.sel_left]
-label    = "✎ ← Sélection Gauche"
 platform = "all"
 
 [sg_actions.sel_right]
-label    = "✎ → Sélection Droite"
 platform = "all"
 
 [sg_actions.sel_word_prev]
-label    = "✎ W ← Sél. Mot préc."
 platform = "all"
 
 [sg_actions.sel_word_next]
-label    = "✎ W → Sél. Mot suiv."
 platform = "all"
 
 # --- Médias ---
 
 [sg_actions.vol_up]
-label    = "🔊 + Volume +"
 platform = "all"
 
 [sg_actions.vol_down]
-label    = "🔊 - Volume -"
 platform = "all"
 
 [sg_actions.mute]
-label    = "🔇 Muet/Unmute"
 platform = "all"
 
 [sg_actions.brightness_up]
-label    = "☀ + Luminosité +"
 platform = "all"
 
 [sg_actions.brightness_down]
-label    = "☀ - Luminosité -"
 platform = "all"
 
 [sg_actions.track_play]
-label    = "⏯ Lecture/Pause"
 platform = "all"
 
 [sg_actions.track_next]
-label    = "⏭ Piste suivante"
 platform = "all"
 
 [sg_actions.track_prev]
-label    = "⏮ Piste précédente"
 platform = "all"
 
 # --- Captures d'écran ---
 
 [sg_actions.screenshot_window_clipboard]
-label    = "📸 ⊞ Copier fenêtre"
 platform = "all"
 
 [sg_actions.screenshot_window_save]
-label    = "📸 ⊞ Sauver fenêtre"
 platform = "all"
 
 [sg_actions.screenshot_region_clipboard]
-label    = "📸 ⬚ Copier région"
 platform = "all"
 
 [sg_actions.screenshot_region_save]
-label    = "📸 ⬚ Sauver région"
 platform = "all"
 
 [sg_actions.screenshot_fullscreen_clipboard]
-label    = "📸 🖥 Copier écran"
 platform = "all"
 
 [sg_actions.screenshot_fullscreen_save]
-label    = "📸 🖥 Sauver écran"
 platform = "all"
 
 [sg_actions.screen_record]
-label    = "⏺ Capture vidéo"
 platform = "ahk"
 
 # --- Système ---
 
 [sg_actions.lock_screen]
-label    = "🔒 Verrouiller"
 platform = "all"
 
 [sg_actions.notification_center]
-label    = "🔔 Notifications"
 platform = "all"
 
 # --- UI / Fenêtres de l'app ---
 
 [sg_actions.open_metrics_typing]
-label    = "📊 Stats Frappe"
 platform = "all"
 
 [sg_actions.open_metrics_apps]
-label    = "📊 Stats Applications"
 platform = "all"
 
 [sg_actions.open_hotstrings_editor]
-label    = "⌨ Éditeur Hotstrings"
 platform = "all"
 
 [sg_actions.open_paths_editor]
-label    = "📂 Éditeur Chemins"
 platform = "all"
 
 # --- Fichiers utilisateur ---
 
 [sg_actions.open_script_source]
-label    = "🛠 Code Source"
 platform = "all"
 
 [sg_actions.open_personal_shortcuts]
-label    = "👤 Raccourcis perso"
 platform = "all"
 
 [sg_actions.open_personal_hotstrings]
-label    = "👤 Hotstrings perso"
 platform = "all"
 
 [sg_actions.open_personal_info]
-label    = "👤 Infos perso"
 platform = "all"
 
 [sg_actions.open_config]
-label    = "⚙ Configuration"
 platform = "all"
 
 [sg_actions.open_logs_folder]
-label    = "📁 Dossier Logs"
 platform = "all"
 
 [sg_actions.open_today_log]
-label    = "📄 Log du jour"
 platform = "all"
 
 # --- Gestion du script ---
 
 [sg_actions.script_pause_toggle]
-label    = "⏸/▶ Suspendre / Reprendre"
 platform = "all"
 
 [sg_actions.script_reload]
-label    = "↻ Recharger"
 platform = "all"
 
 [sg_actions.script_save_reload]
-label    = "↻ Sauver et recharger"
 platform = "all"
 
 [sg_actions.script_quit]
-label    = "✕ Quitter"
 platform = "all"
+
+# --- Actions système avancées ---
+
+[sg_actions.select_line]
+platform = "ahk"
+
+[sg_actions.screen_capture]
+platform = "ahk"
+
+[sg_actions.screen_capture_instant]
+platform = "ahk"
+
+[sg_actions.open_url]
+platform = "ahk"
+
+[sg_actions.pick_color]
+platform = "ahk"
+
+[sg_actions.take_note]
+platform = "ahk"
+
+[sg_actions.activity_simulation]
+platform = "ahk"
+
+[sg_actions.surround_parens]
+platform = "ahk"
+
+[sg_actions.search_web]
+platform = "ahk"
+
+[sg_actions.teleport_mouse]
+platform = "ahk"
+
+[sg_actions.uppercase_selection]
+platform = "ahk"
+
+[sg_actions.titlecase_selection]
+platform = "ahk"
+
+[sg_actions.spotlight_mouse]
+platform = "ahk"
+
+[sg_actions.toggle_capslock]
+platform = "ahk"
+
+[sg_actions.microsoft_bold]
+platform = "ahk"
+
+[sg_actions.paste_plain]
+platform = "ahk"
 
 # --- Debug ---
 
 [sg_actions.open_console]
-label    = "▤ Console"
 platform = "hs"
 
 [sg_actions.open_window_spy]
-label    = "Window Spy"
 platform = "ahk"
 
 [sg_actions.open_list_vars]
-label    = "État des variables"
 platform = "ahk"
 
 [sg_actions.open_key_history]
-label    = "Historique des touches"
 platform = "ahk"
 
 # --- Raccourcis Cmd (macOS) / Ctrl (Windows) ---
@@ -583,42 +516,38 @@ platform = "ahk"
 # les deux drivers les insèrent dans le picker après chargement du TOML.
 
 [sg_actions._cmd_placeholder]
-label    = "#Raccourcis ⌘ (Cmd)"
 platform = "hs"
 is_header = true
 
 [sg_actions._cmd_shift_placeholder]
-label    = "#Raccourcis ⌘⇧ (Cmd+Shift)"
 platform = "hs"
 is_header = true
 
 [sg_actions._hs_ctrl_placeholder]
-label    = "#Raccourcis ^ (Ctrl) — macOS"
 platform = "hs"
 is_header = true
 
 [sg_actions._hs_ctrl_shift_placeholder]
-label    = "#Raccourcis ^⇧ (Ctrl+Shift) — macOS"
+platform = "hs"
+is_header = true
+
+[sg_actions._hs_option_placeholder]
 platform = "hs"
 is_header = true
 
 [sg_actions._ctrl_placeholder]
-label    = "#Raccourcis ^ (Ctrl)"
 platform = "ahk"
 is_header = true
 
 [sg_actions._ctrl_shift_placeholder]
-label    = "#Raccourcis ^⇧ (Ctrl+Shift)"
 platform = "ahk"
 is_header = true
 
 [sg_actions._win_placeholder]
-label    = "#Raccourcis ⊞ (Win)"
 platform = "ahk"
 is_header = true
 
 [sg_actions._alt_placeholder]
-label    = "#Raccourcis ⎇ (Alt)"
 platform = "ahk"
 is_header = true
 
@@ -723,6 +652,8 @@ items = [
     "--",
     "_hs_ctrl_shift_placeholder",
     "--",
+    "_hs_option_placeholder",
+    "--",
     "_ctrl_placeholder",
     "--",
     "_ctrl_shift_placeholder",
@@ -753,6 +684,24 @@ items = [
     "#Système",
     "lock_screen",
     "notification_center",
+    "--",
+    "#Actions système",
+    "select_line",
+    "screen_capture",
+    "screen_capture_instant",
+    "open_url",
+    "pick_color",
+    "take_note",
+    "activity_simulation",
+    "surround_parens",
+    "search_web",
+    "teleport_mouse",
+    "uppercase_selection",
+    "titlecase_selection",
+    "spotlight_mouse",
+    "toggle_capslock",
+    "microsoft_bold",
+    "paste_plain",
     "--",
     "#Interface",
     "open_metrics_typing",

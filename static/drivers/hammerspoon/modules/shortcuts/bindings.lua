@@ -127,6 +127,11 @@ hotkey_defs.layer_scroll   = function()
 	return sys_acts.bind_layer_scroll()
 end
 
+hotkey_labels.wrap_text_if_selected = "Taper un symbole encadre la sélection (AltGr)"
+hotkey_defs.wrap_text_if_selected   = function()
+	return sys_acts.bind_wrap_text_if_selected()
+end
+
 -- Ctrl shortcuts — alphabetical by id (mirrors list_shortcuts() sort order)
 hotkey_labels.ctrl_a = "Sélectionner la ligne"
 hotkey_defs.ctrl_a   = function()
@@ -198,6 +203,11 @@ end
 hotkey_labels.ctrl_x = "Copier la couleur hex du pixel sous le curseur"
 hotkey_defs.ctrl_x   = function()
 	return bind_log({"ctrl"}, "x", sys_acts.copy_pixel_color)
+end
+
+hotkey_labels.ctrl_capslock = "Basculer CapsLock"
+hotkey_defs.ctrl_capslock   = function()
+	return bind_log({"ctrl"}, "capslock", sys_acts.toggle_capslock)
 end
 
 hotkey_labels.ctrl_l = "Verrouiller l'écran"

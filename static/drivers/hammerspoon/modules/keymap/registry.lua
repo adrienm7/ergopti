@@ -646,10 +646,16 @@ function M.get_sections(name)
 end
 
 --- Returns the prose description from the TOML [_meta] block, or nil.
+--- Resolves the active locale when the stored value is a multilingual table.
 --- @param name string Group identifier.
 --- @return string|nil
 function M.get_meta_description(name)
-	return _state and _state.groups[name] and _state.groups[name].meta_description or nil
+	local raw = _state and _state.groups[name] and _state.groups[name].meta_description or nil
+	if type(raw) == "table" then
+		local code = require("lib.i18n").get_locale()
+		return raw[code] or raw["fr"] or nil
+	end
+	return raw
 end
 
 --- Manually sets the current group context used by M.add() to tag new entries.

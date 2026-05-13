@@ -29,12 +29,12 @@ global _HCW_CATEGORY_ORDER := [
 ]
 
 global _HCW_CATEGORY_LABELS := Map(
-    "magickey",           "Touche ★ et expansion",
-    "autocorrection",     "Autocorrection",
-    "rolls",              "Roulements",
-    "sfbsreduction",      "Réduction des SFBs",
-    "distancesreduction", "Réduction des distances",
-    "personal",           "Hotstrings personnels",
+    "magickey",           t("hs_config.cat_magickey"),
+    "autocorrection",     t("hs_config.cat_autocorrection"),
+    "rolls",              t("hs_config.cat_rolls"),
+    "sfbsreduction",      t("hs_config.cat_sfbs"),
+    "distancesreduction", t("hs_config.cat_distances"),
+    "personal",           t("hs_config.cat_personal"),
 )
 
 ; First six entries mirror the bootstrap defaults shipped in the category
@@ -42,18 +42,18 @@ global _HCW_CATEGORY_LABELS := Map(
 ; label are kept side by side so the dropdown can render labels while we
 ; persist the underlying hex value.
 global _HCW_COLOR_PRESETS := [
-    Map("Label", "— hérite du défaut —", "Hex", ""),
-    Map("Label", "Rouge (★)",           "Hex", "#e53935"),
-    Map("Label", "Vert (auto)",         "Hex", "#43a047"),
-    Map("Label", "Orange (rolls)",      "Hex", "#fb8c00"),
-    Map("Label", "Bleu (perso)",        "Hex", "#1e88e5"),
-    Map("Label", "Violet",              "Hex", "#8e44ad"),
-    Map("Label", "Cyan",                "Hex", "#00838f"),
-    Map("Label", "Jaune",               "Hex", "#fdd835"),
-    Map("Label", "Gris",                "Hex", "#6e6e73"),
+    Map("Label", t("hs_config.color_inherit"), "Hex", ""),
+    Map("Label", t("hs_config.color_red"),     "Hex", "#e53935"),
+    Map("Label", t("hs_config.color_green"),   "Hex", "#43a047"),
+    Map("Label", t("hs_config.color_orange"),  "Hex", "#fb8c00"),
+    Map("Label", t("hs_config.color_blue"),    "Hex", "#1e88e5"),
+    Map("Label", t("hs_config.color_purple"),  "Hex", "#8e44ad"),
+    Map("Label", t("hs_config.color_cyan"),    "Hex", "#00838f"),
+    Map("Label", t("hs_config.color_yellow"),  "Hex", "#fdd835"),
+    Map("Label", t("hs_config.color_gray"),    "Hex", "#6e6e73"),
 ]
 
-global _HCW_FILE_LEVEL_LABEL := "── Niveau fichier ──"
+global _HCW_FILE_LEVEL_LABEL := t("hs_config.file_level")
 
 
 ; ============================================================
@@ -69,34 +69,34 @@ OpenHotstringsConfigWindow() {
         return
     }
 
-    G := Gui("+Resize +MinSize560x260", "Délais et couleurs des hotstrings")
+    G := Gui("+Resize +MinSize560x260", t("hs_config.window_title"))
     G.SetFont("s10", "Segoe UI")
     G.MarginX := 14
     G.MarginY := 12
 
     ; ----- Top action row --------------------------------------------------
-    BtnGrey := G.Add("Button", "w120 h28",  "Tout en gris")
-    BtnReset := G.Add("Button", "x+6 yp w160 h28", "Tout réinitialiser")
-    BtnClose := G.Add("Button", "x+6 yp w90 h28",  "Fermer")
+    BtnGrey := G.Add("Button", "w120 h28",  t("hs_config.btn_all_gray"))
+    BtnReset := G.Add("Button", "x+6 yp w160 h28", t("hs_config.btn_reset_all"))
+    BtnClose := G.Add("Button", "x+6 yp w90 h28",  t("hs_config.btn_close"))
     BtnGrey.OnEvent("Click",  (*) => _HCW_SetAllGrey())
     BtnReset.OnEvent("Click", (*) => _HCW_ResetAll())
     BtnClose.OnEvent("Click", (*) => _HCWGui.Hide())
 
     ; ----- Selectors -------------------------------------------------------
-    G.Add("Text", "xm y+18 w80", "Catégorie :")
+    G.Add("Text", "xm y+18 w80", t("hs_config.label_category"))
     CatDD := G.Add("DropDownList", "x+6 yp-3 w200", _HCW_CategoryItems())
-    G.Add("Text", "x+12 yp+3 w70", "Section :")
+    G.Add("Text", "x+12 yp+3 w70", t("hs_config.label_section"))
     SecDD := G.Add("DropDownList", "x+6 yp-3 w260 r14", [])
 
     ; ----- Delay row -------------------------------------------------------
-    G.Add("Text", "xm y+18 w80", "Délai (ms) :")
+    G.Add("Text", "xm y+18 w80", t("hs_config.label_delay"))
     DelayEdit := G.Add("Edit", "x+6 yp-3 w90 Number")
     DelayUpDown := G.Add("UpDown", "Range0-10000", 0)
     DelayReset := G.Add("Button", "x+6 yp w28 h24", "↺")
     DelayDefault := G.Add("Text", "x+8 yp+3 w260", "")
 
     ; ----- Color row -------------------------------------------------------
-    G.Add("Text", "xm y+10 w80", "Couleur :")
+    G.Add("Text", "xm y+10 w80", t("hs_config.label_color"))
     ColorDD := G.Add("DropDownList", "x+6 yp-3 w200", _HCW_ColorLabels())
     ColorSwatch := G.Add("Progress", "x+8 yp+1 w22 h22 BackgroundCCCCCC", 100)
     ColorReset := G.Add("Button", "x+8 yp-1 w28 h24", "↺")
@@ -179,9 +179,9 @@ _HCW_LoadCurrent() {
     ; is silent.
     _HCWWidgets.DelayEdit.Value := DelayMs
 
-    DefHint := "Défaut : " . DelayDefMs . " ms"
+    DefHint := t("hs_config.default_prefix") . DelayDefMs . " ms"
     if DelayOverridden {
-        DefHint .= "    •  override actif"
+        DefHint .= "    •  " . t("hs_config.override_active")
         _HCWWidgets.DelayReset.Enabled := true
     } else {
         _HCWWidgets.DelayReset.Enabled := false
@@ -205,16 +205,16 @@ _HCW_LoadCurrent() {
     _HCWWidgets.ColorSwatch.Opt("Background" . _HCW_HexNoHash(ColorHex))
 
     ColorOverridden := (Override.HasOwnProp("Color") and Override.Color != "")
-    DefColor := (Defaults.Color != "") ? Defaults.Color : "(aucune)"
-    Hint := "Défaut : " . DefColor
+    DefColor := (Defaults.Color != "") ? Defaults.Color : t("hs_config.none")
+    Hint := t("hs_config.default_prefix") . DefColor
     if ColorOverridden {
-        Hint .= "    •  override actif"
+        Hint .= "    •  " . t("hs_config.override_active")
         _HCWWidgets.ColorReset.Enabled := true
     } else {
         _HCWWidgets.ColorReset.Enabled := false
     }
     _HCWWidgets.ColorDefault.Value := Hint
-    _HCWWidgets.Status.Value := "Catégorie : " . Cat . "    Section : " . (Sec ? Sec : "(niveau fichier)")
+    _HCWWidgets.Status.Value := t("hs_config.category_prefix") . Cat . "    " . t("hs_config.section_prefix") . (Sec ? Sec : t("hs_config.file_level_short"))
 }
 
 

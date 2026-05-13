@@ -17,9 +17,26 @@
  * ==============================================================================
  */
 
+// ============================================================
+// ============================================================
+// ======= 1/ i18n Helper & Main Chart Render Helpers  =======
+// ============================================================
+// ============================================================
+
+/**
+ * Returns the translated string for a given i18n key, or the key itself as fallback.
+ * Reads from window._i18n_strings populated by the shared i18n loader.
+ * @param {string} key - The dotted i18n key (e.g. "ui_typing.day_0").
+ * @returns {string} The translated string, or the key if not found.
+ */
+function _t(key) {
+	return (window._i18n_strings && window._i18n_strings[key]) || key;
+}
+
+
 // ====================================
 // ====================================
-// ======= 1/ Main Chart Render =======
+// ======= 2/ Main Chart Render =======
 // ====================================
 // ====================================
 
@@ -81,9 +98,9 @@ function render_charts() {
 	} else {
 		// Restore daily titles in case they were previously changed by an hourly view
 		const wpm_title_el = document.getElementById('wpm_chart_title');
-		if (wpm_title_el) wpm_title_el.textContent = 'Vitesse (MPM)';
+		if (wpm_title_el) wpm_title_el.textContent = _t('ui_typing.h3_speed');
 		const prc_title_el = document.getElementById('precision_chart_title');
-		if (prc_title_el) prc_title_el.textContent = 'Précision (%)';
+		if (prc_title_el) prc_title_el.textContent = _t('ui_typing.h3_precision');
 
 		_render_wpm_chart(wpm_pts, rgb_wpm, x_min, x_max);
 		_render_precision_chart(sorted_keys, rgb_prc, x_min, x_max);
@@ -102,7 +119,7 @@ function reset_chart_zoom(chart_id) {
 
 // =====================================================
 // =====================================================
-// ======= 2/ Individual Chart Builder Helpers =======
+// ======= 3/ Individual Chart Builder Helpers =======
 // =====================================================
 // =====================================================
 
@@ -117,23 +134,32 @@ const ZOOM_OPTIONS = {
 
 const GRID_COLOR = 'rgba(128,128,128,0.2)';
 
-// French day names used by the x-axis tick formatter below
-const DAYS_FR = ['dimanche', 'lundi', 'mardi', 'mercredi', 'jeudi', 'vendredi', 'samedi'];
+// Day names used by the x-axis tick formatter below — resolved lazily via _t() so
+// locale changes after page load are picked up automatically.
+const DAYS_FR = [
+	_t('ui_typing.day_0'),
+	_t('ui_typing.day_1'),
+	_t('ui_typing.day_2'),
+	_t('ui_typing.day_3'),
+	_t('ui_typing.day_4'),
+	_t('ui_typing.day_5'),
+	_t('ui_typing.day_6')
+];
 
-// French month names (abbreviated to 4 chars max to keep tick labels compact)
+// Month names (abbreviated) — resolved via _t() for locale awareness.
 const MONTHS_FR = [
-	'janv.',
-	'févr.',
-	'mars',
-	'avr.',
-	'mai',
-	'juin',
-	'juil.',
-	'août',
-	'sept.',
-	'oct.',
-	'nov.',
-	'déc.'
+	_t('ui_typing.month_0'),
+	_t('ui_typing.month_1'),
+	_t('ui_typing.month_2'),
+	_t('ui_typing.month_3'),
+	_t('ui_typing.month_4'),
+	_t('ui_typing.month_5'),
+	_t('ui_typing.month_6'),
+	_t('ui_typing.month_7'),
+	_t('ui_typing.month_8'),
+	_t('ui_typing.month_9'),
+	_t('ui_typing.month_10'),
+	_t('ui_typing.month_11')
 ];
 
 /**
@@ -226,7 +252,7 @@ function _render_delegation_chart(manual_pts, hs_pts, llm_pts, rgb_ia, rgb_hs, r
 		data: {
 			datasets: [
 				{
-					label: 'IA',
+					label: _t('ui_typing.dataset_ai'),
 					data: llm_pts,
 					backgroundColor: `rgba(${rgb_ia}, 0.6)`,
 					fill: true,
@@ -235,7 +261,7 @@ function _render_delegation_chart(manual_pts, hs_pts, llm_pts, rgb_ia, rgb_hs, r
 					pointHitRadius: 10
 				},
 				{
-					label: 'Hotstrings',
+					label: _t('ui_typing.dataset_hs'),
 					data: hs_pts,
 					backgroundColor: `rgba(${rgb_hs}, 0.6)`,
 					fill: true,
@@ -244,7 +270,7 @@ function _render_delegation_chart(manual_pts, hs_pts, llm_pts, rgb_ia, rgb_hs, r
 					pointHitRadius: 10
 				},
 				{
-					label: 'Manuelles',
+					label: _t('ui_typing.dataset_manual'),
 					data: manual_pts,
 					backgroundColor: `rgba(${rgb_man}, 0.3)`,
 					fill: true,
@@ -266,7 +292,7 @@ function _render_delegation_chart(manual_pts, hs_pts, llm_pts, rgb_ia, rgb_hs, r
 						title: tooltipTitleCallback,
 						// format_number_plain avoids raw HTML in the tooltip (Chart.js renders labels as plain text)
 						label: (ctx) =>
-							`${ctx.dataset.label} : ${format_number_plain(Math.round(ctx.parsed.y))} touches`
+							`${ctx.dataset.label} : ${format_number_plain(Math.round(ctx.parsed.y))} ${_t('ui_typing.unit_keystrokes')}`
 					}
 				}
 			},
@@ -310,7 +336,7 @@ function _render_wpm_chart(wpm_pts, rgb_wpm, x_min = null, x_max = null) {
 		data: {
 			datasets: [
 				{
-					label: 'Vitesse',
+					label: _t('ui_typing.dataset_speed'),
 					data: wpm_pts,
 					borderColor: `rgb(${rgb_wpm})`,
 					backgroundColor: `rgba(${rgb_wpm}, 0.2)`,
@@ -330,7 +356,7 @@ function _render_wpm_chart(wpm_pts, rgb_wpm, x_min = null, x_max = null) {
 				tooltip: {
 					callbacks: {
 						title: tooltipTitleCallback,
-						label: (ctx) => `Vitesse : ${format_number_plain(Math.round(ctx.parsed.y))} MPM`
+						label: (ctx) => `${_t('ui_typing.dataset_speed')} : ${format_number_plain(Math.round(ctx.parsed.y))} MPM`
 					}
 				}
 			},
@@ -411,7 +437,7 @@ function _render_precision_chart(sorted_keys, rgb_prc, x_min = null, x_max = nul
 		data: {
 			datasets: [
 				{
-					label: 'Précision (%)',
+					label: _t('ui_typing.dataset_precision'),
 					data: precision_pts,
 					borderColor: `rgb(${rgb_prc})`,
 					backgroundColor: `rgba(${rgb_prc}, 0.2)`,
@@ -551,7 +577,7 @@ function _render_sparkline(ctx_id, chart_ref, data_pts, color) {
 
 // ====================================================
 // ====================================================
-// ======= 3/ Hourly Chart Helpers (single day) =======
+// ======= 4/ Hourly Chart Helpers (single day) =======
 // ====================================================
 // ====================================================
 
@@ -562,7 +588,11 @@ function _render_sparkline(ctx_id, chart_ref, data_pts, color) {
  * @returns {string} Hour-aware French-formatted label.
  */
 const tooltipTitleCallbackHourly = (context) => {
-	const days = ['dimanche', 'lundi', 'mardi', 'mercredi', 'jeudi', 'vendredi', 'samedi'];
+	const days = [
+		_t('ui_typing.day_0'), _t('ui_typing.day_1'), _t('ui_typing.day_2'),
+		_t('ui_typing.day_3'), _t('ui_typing.day_4'), _t('ui_typing.day_5'),
+		_t('ui_typing.day_6')
+	];
 	const d = new Date(context[0].parsed.x);
 	const dayName = days[d.getDay()];
 	const dd = String(d.getDate()).padStart(2, '0');
@@ -612,9 +642,9 @@ function _render_hourly_charts(date_str, rgb_wpm, rgb_prc) {
 
 	// Update chart titles to reflect hourly context
 	const wpm_title_el = document.getElementById('wpm_chart_title');
-	if (wpm_title_el) wpm_title_el.textContent = 'Activit\u00E9 (touches/h)';
+	if (wpm_title_el) wpm_title_el.textContent = _t('ui_typing.h3_activity_hourly');
 	const prc_title_el = document.getElementById('precision_chart_title');
-	if (prc_title_el) prc_title_el.textContent = 'Pr\u00E9cision (%) \u2014 vue horaire';
+	if (prc_title_el) prc_title_el.textContent = _t('ui_typing.h3_precision_hourly');
 
 	_render_hourly_activity_chart(act_pts, rgb_wpm, date_str, cutoff);
 	_render_hourly_precision_chart(prec_pts, rgb_prc, date_str, cutoff);
@@ -648,7 +678,7 @@ function _render_hourly_activity_chart(pts, color, date_str, cutoff) {
 		data: {
 			datasets: [
 				{
-					label: 'Touches/h',
+					label: _t('ui_typing.dataset_touches_h'),
 					data: pts,
 					borderColor: `rgb(${color})`,
 					backgroundColor: `rgba(${color}, 0.2)`,
@@ -668,7 +698,7 @@ function _render_hourly_activity_chart(pts, color, date_str, cutoff) {
 					callbacks: {
 						title: tooltipTitleCallbackHourly,
 						label: (ctx) =>
-							`Activit\u00E9\u00A0: ${format_number_plain(Math.round(ctx.parsed.y))}\u00A0touches`
+							`${_t('ui_typing.lbl_activity')}\u00A0: ${format_number_plain(Math.round(ctx.parsed.y))}\u00A0${_t('ui_typing.unit_keystrokes')}`
 					}
 				}
 			},
@@ -767,7 +797,11 @@ function _render_hourly_precision_chart(pts, color, date_str, cutoff) {
  * @returns {string} Minute-aware French-formatted label.
  */
 const tooltipTitleCallbackMinute5 = (context) => {
-	const days = ['dimanche', 'lundi', 'mardi', 'mercredi', 'jeudi', 'vendredi', 'samedi'];
+	const days = [
+		_t('ui_typing.day_0'), _t('ui_typing.day_1'), _t('ui_typing.day_2'),
+		_t('ui_typing.day_3'), _t('ui_typing.day_4'), _t('ui_typing.day_5'),
+		_t('ui_typing.day_6')
+	];
 	const d = new Date(context[0].parsed.x);
 	const dayName = days[d.getDay()];
 	const dd = String(d.getDate()).padStart(2, '0');
@@ -845,7 +879,7 @@ function _render_minute5_activity_chart(pts, color, date_str, cutoff) {
 		data: {
 			datasets: [
 				{
-					label: 'Touches / 5\u00A0min',
+					label: _t('ui_typing.dataset_touches_5min'),
 					data: pts,
 					borderColor: `rgb(${color})`,
 					backgroundColor: `rgba(${color}, 0.2)`,
@@ -865,7 +899,7 @@ function _render_minute5_activity_chart(pts, color, date_str, cutoff) {
 					callbacks: {
 						title: tooltipTitleCallbackMinute5,
 						label: (ctx) =>
-							`Activit\u00E9\u00A0: ${format_number_plain(Math.round(ctx.parsed.y))}\u00A0touches`
+							`${_t('ui_typing.lbl_activity')}\u00A0: ${format_number_plain(Math.round(ctx.parsed.y))}\u00A0${_t('ui_typing.unit_keystrokes')}`
 					}
 				}
 			},

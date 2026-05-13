@@ -11,8 +11,10 @@
 ---
 --- FEATURES & RATIONALE:
 --- 1. CapsWord Safety: Any pointer event signals the user has left the keyboard,
----    so CapsWord is cancelled automatically. A 100 ms subprocess throttle
----    prevents CPU spikes from high-frequency events such as mouseMoved.
+---    so CapsWord is cancelled automatically. Two complementary layers are used:
+---    hs.eventtap catches clicks, scrolls, and cursor movement; the undocumented
+---    MultitouchSupport frameCallback catches bare finger touches that eventtap
+---    cannot see. A 100 ms subprocess throttle prevents CPU spikes.
 --- 2. Layout Awareness: macOS can emit two input-source notifications in rapid
 ---    succession during a layout switch. Debouncing coalesces them into a
 ---    single callback so the caller does not rebuild the KE config twice.
@@ -23,9 +25,10 @@
 
 local M = {}
 
-local hs       = hs
-local Logger   = require("lib.logger")
-local Keycodes = require("lib.keycodes")
+local hs          = hs
+local Logger      = require("lib.logger")
+local Keycodes    = require("lib.keycodes")
+
 
 local LOG = "karabiner"
 
@@ -102,29 +105,39 @@ local function deactivate_capsword()
 
 		-- Clear the KE variable first so the engine does not re-activate CapsWord
 		-- when it sees the subsequent LED state change.
-		hs.task.new(KARABINER_CLI, function(_, _, _) end, {"--set-variable", "capsword", "0"}):start()
+		hs.task.new(KARABINER_CLI, function(_, _, _)
+			-- macOS sometimes re-displays the CapsLock indicator after a single
+			-- LED reset (race with the Karabiner virtual CapsLock state machine).
+			-- A second unconditional set 150 ms later ensures the indicator stays off.
+			pcall(hs.hid.capslock.set, false)
+			hs.timer.doAfter(0.15, function() pcall(hs.hid.capslock.set, false) end)
+			Logger.done(LOG, "CapsWord deactivated via pointer event.")
+		end, {"--set-variable", "capsword", "0"}):start()
 
 		-- hs.eventtap.keyStroke does not work for CapsLock on macOS — CapsLock is
 		-- a flagsChanged event, not a regular keyDown/keyUp, so keyStroke fails
 		-- silently. hs.hid.capslock.set is the only reliable way to toggle the LED.
 		pcall(hs.hid.capslock.set, false)
-
-		Logger.done(LOG, "CapsWord deactivated via pointer event.")
 	end, {"--get-variable", "capsword"}):start()
 end
 
 --- Starts the eventtap watching for any pointer event that signals the user
 --- has left the keyboard: movement, scroll, gestures, and all click types.
---- @return hs.eventtap The running watcher instance.
-function M.start_gesture_watcher()
+--- Bare finger contact is handled via gestures_engine.set_any_touch_hook(),
+--- which piggybacks on the existing touchdevice frameCallback in the gestures
+--- module rather than registering a competing second frameCallback.
+--- @param gestures_engine table The gestures engine module (may be nil).
+--- @return hs.eventtap The running eventtap watcher instance.
+function M.start_gesture_watcher(gestures_engine)
+	local ev = hs.eventtap.event.types
 	local watcher = hs.eventtap.new(
 		{
-			hs.eventtap.event.types.mouseMoved,
-			hs.eventtap.event.types.scrollWheel,
-			hs.eventtap.event.types.gesture,
-			hs.eventtap.event.types.leftMouseDown,
-			hs.eventtap.event.types.rightMouseDown,
-			hs.eventtap.event.types.otherMouseDown,
+			ev.mouseMoved,
+			ev.scrollWheel,
+			ev.gesture,
+			ev.leftMouseDown,
+			ev.rightMouseDown,
+			ev.otherMouseDown,
 		},
 		function(_event)
 			deactivate_capsword()
@@ -133,6 +146,16 @@ function M.start_gesture_watcher()
 	)
 	watcher:start()
 	Logger.success(LOG, "Trackpad CapsWord watcher started.")
+
+	-- Layer 2: hook into the gestures engine's existing frameCallback so bare
+	-- finger touch (no click, no movement) also deactivates CapsWord.
+	if gestures_engine and type(gestures_engine.set_any_touch_hook) == "function" then
+		gestures_engine.set_any_touch_hook(deactivate_capsword)
+		Logger.success(LOG, "Bare-touch CapsWord hook registered on gestures engine.")
+	else
+		Logger.warn(LOG, "gestures_engine unavailable — bare-touch CapsWord detection disabled.")
+	end
+
 	return watcher
 end
 

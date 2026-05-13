@@ -23,6 +23,7 @@ local fs = require("hs.fs")
 local AppPickerLib = require("lib.app_picker")
 local dialog       = require("lib.dialog_util")
 local kl_mod       = require("modules.keylogger")
+local i18n         = require("lib.i18n")
 
 local _prog_canvas = nil
 local _is_initialized = false
@@ -83,7 +84,7 @@ local function update_progress(current_index, total_files)
 	}
 
 	local percentage = total_files > 0 and (current_index / total_files) or 0
-	local ui_label = string.format("Traitement en cours : %d / %d", current_index, total_files)
+	local ui_label = string.format(i18n.get("dialog.metrics.progress_label"), current_index, total_files)
 
 	_prog_canvas:replaceElements({
 		{ type = "rectangle", action = "fill", fillColor = palette.bg_color, roundedRectRadii = { xRadius = 10, yRadius = 10 } },
@@ -112,12 +113,12 @@ local function process_files_with_ui(files_to_process, is_encrypt, password)
 			_prog_canvas = nil
 		end
 
-		local alert_msg = string.format("Opération terminée.\n\nFichiers traités avec succès : %d\nErreurs rencontrées : %d", success_count, error_count)
+		local alert_msg = string.format(i18n.get("dialog.metrics.complete_label"), success_count, error_count)
 		if has_bad_password then
-			alert_msg = alert_msg .. "\n\n⚠️ Attention : Échec de déchiffrement détecté. Le mot de passe est potentiellement incorrect."
+			alert_msg = alert_msg .. "\n\n" .. i18n.get("dialog.metrics.bad_password_warning")
 		end
 
-		dialog.block_alert("Encryptor", alert_msg, "OK")
+		dialog.block_alert("Encryptor", alert_msg, i18n.get("button.ok"))
 	end
 
 	local log_manager = require("modules.keylogger.log_manager")
@@ -187,7 +188,7 @@ function M.build(ctx)
 	local menu = {}
 	
 	table.insert(menu, {
-		title    = "Afficher les métriques de frappe",
+		title    = i18n.get("menu.metrics.show_typing"),
 		disabled = not state.keylogger_enabled,
 		fn       = function() 
 			local Keylogger = require("modules.keylogger")
@@ -195,7 +196,7 @@ function M.build(ctx)
 		end
 	})
 
-	local sc_label_metrics = "Aucun"
+	local sc_label_metrics = i18n.get("menu.metrics.shortcut_none")
 	if type(state.metrics_shortcut) == "table" then
 		local mods_cap = {}
 		for _, m in ipairs(state.metrics_shortcut.mods or {}) do
@@ -206,7 +207,7 @@ function M.build(ctx)
 	end
 
 	table.insert(menu, {
-		title = "↳ Raccourci : " .. sc_label_metrics,
+		title = string.format(i18n.get("menu.metrics.shortcut_item"), sc_label_metrics),
 		disabled = not state.keylogger_enabled,
 		fn = function()
 			local current_str = ""
@@ -214,8 +215,8 @@ function M.build(ctx)
 				current_str = table.concat(state.metrics_shortcut.mods or {}, "+") .. "+" .. (state.metrics_shortcut.key or "")
 			end
 			local ok_p, btn, raw = pcall(dialog.text_prompt,
-				"Raccourci métriques de frappe",
-				"Format : mods+touche  (ex : cmd+alt+m)\nMods disponibles : cmd, alt, ctrl, shift\nLaisser vide pour désactiver",
+				i18n.get("menu.metrics.shortcut_typing_title"),
+				i18n.get("menu.metrics.shortcut_prompt"),
 				current_str, "OK", "Annuler"
 			)
 			if not ok_p or btn ~= "OK" or type(raw) ~= "string" then return end
@@ -240,7 +241,7 @@ function M.build(ctx)
 	})
 
 	table.insert(menu, {
-		title    = "Afficher le temps sur les applications",
+		title    = i18n.get("menu.metrics.show_apps"),
 		disabled = not state.keylogger_enabled,
 		fn       = function() 
 			local ok, at = pcall(require, "ui.metrics_apps")
@@ -250,7 +251,7 @@ function M.build(ctx)
 		end
 	})
 
-	local sc_label_apps = "Aucun"
+	local sc_label_apps = i18n.get("menu.metrics.shortcut_none")
 	if type(state.apps_time_shortcut) == "table" then
 		local mods_cap = {}
 		for _, m in ipairs(state.apps_time_shortcut.mods or {}) do
@@ -261,7 +262,7 @@ function M.build(ctx)
 	end
 
 	table.insert(menu, {
-		title = "↳ Raccourci : " .. sc_label_apps,
+		title = string.format(i18n.get("menu.metrics.shortcut_item"), sc_label_apps),
 		disabled = not state.keylogger_enabled,
 		fn = function()
 			local current_str = ""
@@ -269,8 +270,8 @@ function M.build(ctx)
 				current_str = table.concat(state.apps_time_shortcut.mods or {}, "+") .. "+" .. (state.apps_time_shortcut.key or "")
 			end
 			local ok_p, btn, raw = pcall(dialog.text_prompt,
-				"Raccourci temps apps",
-				"Format : mods+touche  (ex : cmd+alt+t)\nMods disponibles : cmd, alt, ctrl, shift\nLaisser vide pour désactiver",
+				i18n.get("menu.metrics.shortcut_apps_title"),
+				i18n.get("menu.metrics.shortcut_prompt"),
 				current_str, "OK", "Annuler"
 			)
 			if not ok_p or btn ~= "OK" or type(raw) ~= "string" then return end
@@ -298,7 +299,7 @@ function M.build(ctx)
 	table.insert(menu, { title = "-" })
 
 	table.insert(menu, {
-		title = "Afficher le MPM dans la barre des menus",
+		title = i18n.get("menu.metrics.show_wpm_menubar"),
 		checked = state.keylogger_menubar_wpm,
 		disabled = not state.keylogger_enabled,
 		fn = function()
@@ -314,7 +315,7 @@ function M.build(ctx)
 	})
 
 	table.insert(menu, {
-		title = "↳ Couleurs selon la source",
+		title = i18n.get("menu.metrics.colors_by_source"),
 		checked = state.keylogger_menubar_colors,
 		disabled = not state.keylogger_enabled or not state.keylogger_menubar_wpm,
 		fn = function()
@@ -330,7 +331,7 @@ function M.build(ctx)
 	})
 
 	table.insert(menu, {
-		title = "Afficher le MPM dans un widget flottant",
+		title = i18n.get("menu.metrics.show_wpm_widget"),
 		checked = state.keylogger_float_wpm,
 		disabled = not state.keylogger_enabled,
 		fn = function()
@@ -346,7 +347,7 @@ function M.build(ctx)
 	})
 
 	table.insert(menu, {
-		title = "↳ Couleurs selon la source",
+		title = i18n.get("menu.metrics.colors_by_source"),
 		checked = state.keylogger_float_colors,
 		disabled = not state.keylogger_enabled or not state.keylogger_float_wpm,
 		fn = function()
@@ -362,7 +363,7 @@ function M.build(ctx)
 	})
 
 	table.insert(menu, {
-		title = "↳ Inclure le graphique en temps réel",
+		title = i18n.get("menu.metrics.include_realtime"),
 		checked = state.keylogger_float_graph,
 		disabled = not state.keylogger_enabled or not state.keylogger_float_wpm,
 		fn = function()
@@ -379,10 +380,10 @@ function M.build(ctx)
 
 	table.insert(menu, { title = "-" })
 	table.insert(menu, { title = "-" })
-	table.insert(menu, { title = "— FILTRES DE CONFIDENTIALITÉ —", disabled = true })
+	table.insert(menu, { title = i18n.get("menu.metrics.privacy_header"), disabled = true })
 
 	table.insert(menu, {
-		title    = "Ignorer la navigation privée",
+		title    = i18n.get("menu.metrics.filter_private"),
 		checked  = state.keylogger_private_filter_enabled,
 		disabled = not state.keylogger_enabled,
 		fn       = function()
@@ -396,7 +397,7 @@ function M.build(ctx)
 	})
 
 	table.insert(menu, {
-		title    = "Ignorer les champs mot de passe",
+		title    = i18n.get("menu.metrics.filter_secure"),
 		checked  = state.keylogger_secure_filter_enabled,
 		disabled = not state.keylogger_enabled,
 		fn       = function()
@@ -410,7 +411,7 @@ function M.build(ctx)
 	})
 
 	table.insert(menu, {
-		title    = "Ignorer les boîtes de dialogue d’authentification système",
+		title    = i18n.get("menu.metrics.filter_sysauth"),
 		checked  = state.keylogger_system_auth_filter_enabled,
 		disabled = not state.keylogger_enabled,
 		fn       = function()
@@ -424,7 +425,10 @@ function M.build(ctx)
 	})
 
 	local disabled_count = #(type(state.keylogger_disabled_apps) == "table" and state.keylogger_disabled_apps or {})
-	local label = "Désactivé dans" .. (disabled_count > 0 and (" " .. disabled_count .. " application" .. (disabled_count > 1 and "s" or "")) or " ces applications")
+	local label = i18n.get("menu.metrics.disabled_in_prefix")
+		.. (disabled_count > 0
+			and (disabled_count .. i18n.get("menu.metrics.disabled_in_suffix_s") .. (disabled_count > 1 and "s" or ""))
+			or i18n.get("menu.metrics.disabled_in_suffix_p"))
 
 	local exclusion_menu = AppPickerLib.build_menu(
 		state.keylogger_disabled_apps,
@@ -437,7 +441,7 @@ function M.build(ctx)
 			pcall(save_prefs)
 			pcall(updateMenu)
 		end,
-		"Exclure des métriques de frappe…"
+		i18n.get("menu.metrics.exclude_apps")
 	)
 
 	table.insert(menu, {
@@ -456,7 +460,7 @@ function M.build(ctx)
 	-- =================================
 
 	table.insert(menu, {
-		title    = "Chiffrer les logs sur le disque (Sécurité)",
+		title    = i18n.get("menu.metrics.encrypt_toggle"),
 		checked  = state.keylogger_encrypt,
 		disabled = not state.keylogger_enabled,
 		fn = function()
@@ -466,11 +470,11 @@ function M.build(ctx)
 			if type(log_manager.get_mac_serial) == "function" then default_pwd = log_manager.get_mac_serial() end
 
 			if not state.keylogger_encrypt then
-				local alert_msg = "L’activation va chiffrer tous vos anciens logs pour qu’ils soient illisibles sur le disque.\n\nConfirmer ?"
-				local res = dialog.block_alert("Protection des données", alert_msg, "Chiffrer", "Annuler")
-				if res ~= "Chiffrer" then return end
+				local alert_msg = i18n.get("dialog.metrics.encrypt_confirm_body")
+				local res = dialog.block_alert(i18n.get("dialog.metrics.encrypt_confirm_title"), alert_msg, i18n.get("button.encrypt"), i18n.get("button.cancel"))
+				if res ~= i18n.get("button.encrypt") then return end
 
-				local ok_prompt, btn, pwd = pcall(dialog.text_prompt, "Clé de sécurité", "Veuillez définir la clé de chiffrement (par défaut: numéro de série du Mac) :", default_pwd, "OK", "Annuler")
+				local ok_prompt, btn, pwd = pcall(dialog.text_prompt, i18n.get("dialog.metrics.encrypt_key_title"), i18n.get("dialog.metrics.encrypt_key_prompt"), default_pwd, i18n.get("button.ok"), i18n.get("button.cancel"))
 				if not ok_prompt or btn ~= "OK" or type(pwd) ~= "string" or pwd == "" then return end
 
 				if type(log_manager.register_encryptor_app) == "function" then
@@ -497,11 +501,11 @@ function M.build(ctx)
 					process_files_with_ui(files_to_process, true, pwd)
 				end
 			else
-				local alert_msg = "Tous vos logs chiffrés vont être restaurés en clair sur le disque.\n\nConfirmer ?"
-				local res = dialog.block_alert("Désactivation", alert_msg, "Déchiffrer", "Annuler")
-				if res ~= "Déchiffrer" then return end
+				local alert_msg = i18n.get("dialog.metrics.decrypt_confirm_body")
+				local res = dialog.block_alert(i18n.get("dialog.metrics.decrypt_confirm_title"), alert_msg, i18n.get("button.decrypt"), i18n.get("button.cancel"))
+				if res ~= i18n.get("button.decrypt") then return end
 
-				local ok_prompt, btn, pwd = pcall(dialog.text_prompt, "Clé de sécurité", "Entrez la clé de sécurité nécessaire au déchiffrement :", default_pwd, "OK", "Annuler")
+				local ok_prompt, btn, pwd = pcall(dialog.text_prompt, i18n.get("dialog.metrics.encrypt_key_title"), i18n.get("dialog.metrics.decrypt_key_prompt"), default_pwd, i18n.get("button.ok"), i18n.get("button.cancel"))
 				if not ok_prompt or btn ~= "OK" or type(pwd) ~= "string" or pwd == "" then return end
 
 				local files_to_process = {}
@@ -528,25 +532,25 @@ function M.build(ctx)
 	})
 
 	table.insert(menu, {
-		title = "↳ Ouvrir l’Encryptor autonome...",
+		title = i18n.get("menu.metrics.open_encryptor"),
 		fn = function()
 			local app_path = hs.configdir .. "/utils/encryptor/Encryptor.app"
 			if fs.attributes(app_path) then
 				hs.execute(string.format("open %q", app_path))
 			else
-				dialog.block_alert("Erreur", "L’application est introuvable. Veuillez d’abord générer l’application avec le script Python.", "OK")
+				dialog.block_alert(i18n.get("dialog.metrics.encryptor_error_title"), i18n.get("dialog.metrics.encryptor_error_body"), i18n.get("button.ok"))
 			end
 		end
 	})
 
 	return {
-		title   = "📊 Métriques",
+		title   = i18n.get("menu.metrics.title"),
 		checked = state.keylogger_enabled,
 		fn      = function()
 			if not state.keylogger_enabled then
-			local warnMsg = "⚠️  ATTENTION : Métriques et keylogger vont être activés.\n\nCe système enregistre vos frappes au clavier et l'activation des gestes trackpad.\n\n• Les logs sont stockés dans le dossier Hammerspoon\n• Les champs de mots de passe sont ignorés automatiquement\n• Il est recommandé de mettre le script en PAUSE lors de la saisie de données sensibles\n\nPour éviter les interférences avec vos gestes personnalisés :\n• Supprimez les gestes macOS pour swipe 3/4 doigts si utilisés\n• Désactivez mission control et app exposé via gestes"
-			local res = dialog.block_alert("Avertissement Sécurité & Gestes", warnMsg, "Activer", "Annuler", "warning")
-				if res ~= "Activer" then return end
+			local warnMsg = i18n.get("dialog.metrics.security_warning_body")
+			local res = dialog.block_alert(i18n.get("dialog.metrics.security_warning_title"), warnMsg, i18n.get("button.activate"), i18n.get("button.cancel"), "warning")
+				if res ~= i18n.get("button.activate") then return end
 			end
 
 			state.keylogger_enabled = not state.keylogger_enabled

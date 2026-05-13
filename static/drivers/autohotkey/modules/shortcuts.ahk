@@ -515,6 +515,34 @@ if Features["Shortcuts"]["SpotlightMouse"].Enabled {
     AddShortcut("#", "'", (*) => (MouseGetPos(&Mx, &My), SpotlightMouseAt(Mx, My, 5000)))
 }
 
+#HotIf Features["Shortcuts"]["ScreenInstant"].Enabled
+; SC029 (²/$ — key left of 1) — instant screenshot of the active window, saved to Pictures
+SC029:: {
+    WinGetPos(&WX, &WY, &WW, &WH, "A")
+    if (WW = 0 or WH = 0) {
+        MsgBox("Aucune fenêtre active.", "Capture d'écran", "OK T3")
+        return
+    }
+    PicsDir   := EnvGet("USERPROFILE") . "\Pictures\screenshots"
+    DirCreate(PicsDir)
+    Timestamp := FormatTime(, "yyyy_MM_dd_HH") . "h" . FormatTime(, "mm") . "min" . FormatTime(, "ss") . "sec"
+    FilePath  := PicsDir . "\screenshot_" . Timestamp . ".png"
+
+    ; Write a temp PS1 script to avoid all inline quoting issues
+    TmpScript := A_Temp . "\hs_screenshot.ps1"
+    ScriptContent := "Add-Type -AssemblyName System.Drawing`n"
+        . "$bmp = New-Object System.Drawing.Bitmap(" . WW . ", " . WH . ")`n"
+        . "$g = [System.Drawing.Graphics]::FromImage($bmp)`n"
+        . "$g.CopyFromScreen(" . WX . ", " . WY . ", 0, 0, $bmp.Size)`n"
+        . "$bmp.Save('" . FilePath . "')`n"
+        . "$g.Dispose(); $bmp.Dispose()"
+    FileDelete(TmpScript)
+    FileAppend(ScriptContent, TmpScript, "UTF-8")
+    RunWait('powershell -NoProfile -NonInteractive -WindowStyle Hidden -ExecutionPolicy Bypass -File "' . TmpScript . '"',, "Hide")
+    TrayTip(Format(t("notify.screenshot_saved_path"), FilePath), t("notify.screenshot_title"), "Icone=1")
+}
+#HotIf
+
 ; Draws a filled yellow circle around (X, Y) and a red × on every other monitor,
 ; matching the Hammerspoon spotlight visual exactly.
 ; Dismissed after DurationMs ms or as soon as the mouse moves more than 5 px.

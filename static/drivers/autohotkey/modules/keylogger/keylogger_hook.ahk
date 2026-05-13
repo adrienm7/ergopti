@@ -211,6 +211,8 @@ KL_Hook_OnChar(ih, c) {
     Keylogger.buffer_text .= c
     try KL_Ergo_OnKeystroke(delay, KLHook.last_vk)
     try KL_Roi_OnChar(c)
+    ; Feed the real-time WPM widget with each accepted manual keystroke.
+    try WPMWidget_Push(false, false)
 }
 
 KL_Hook_OnKeyDown(ih, vk, sc) {

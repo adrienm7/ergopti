@@ -28,6 +28,7 @@ local hs = hs
 local core_llm  = require("modules.llm")
 local Parser    = require("modules.llm.parser")
 local Logger    = require("lib.logger")
+local i18n      = require("lib.i18n")
 local Keycodes  = require("lib.keycodes")
 local tooltip   = require("ui.tooltip")
 local keylogger = require("modules.keylogger")
@@ -1317,8 +1318,8 @@ function M.perform_check(force_trigger, profile_name)
 						CONSECUTIVE_FAIL_WARN_THRESHOLD)
 					pcall(function()
 						hs.notify.new(nil, {
-							title            = "Prédictions LLM — Échecs répétés",
-							informativeText  = "Le serveur MLX ne répond pas. Vérifiez que le modèle est bien chargé et que le serveur tourne sur le port 8080.",
+							title            = i18n.get("notify.llm_mlx_failures_title"),
+							informativeText  = i18n.get("notify.llm_mlx_failures_body"),
 							alwaysPresent    = false,
 							autoWithdraw     = true,
 						}):send()

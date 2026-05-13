@@ -39,6 +39,42 @@ local RESELECT_DELAY_SEC = 0.08   -- Wait after paste before re-selecting
 local RESTORE_DELAY_SEC  = 0.15   -- Wait after re-select before restoring clipboard
 local MAX_RESELECT_CHARS = 5000   -- Safety cap: avoid freezing on huge pastes
 
+-- Symbols that should wrap the selection rather than replace it.
+-- Keys are the AltGr-layer characters; values are {left, right} pairs.
+-- Asymmetric pairs (e.g. parentheses) use distinct open/close symbols.
+local WRAP_PAIRS = {
+	["("]  = { left = "(",  right = ")"  },
+	[")"]  = { left = "(",  right = ")"  },
+	["["]  = { left = "[",  right = "]"  },
+	["]"]  = { left = "[",  right = "]"  },
+	["{"]  = { left = "{",  right = "}"  },
+	["}"]  = { left = "{",  right = "}"  },
+	["<"]  = { left = "<",  right = ">"  },
+	[">"]  = { left = "<",  right = ">"  },
+	['"']  = { left = '"',  right = '"'  },
+	["'"]  = { left = "'",  right = "'"  },
+	["`"]  = { left = "`",  right = "`"  },
+	["*"]  = { left = "*",  right = "*"  },
+	["_"]  = { left = "_",  right = "_"  },
+	["~"]  = { left = "~",  right = "~"  },
+	["|"]  = { left = "|",  right = "|"  },
+	["/"]  = { left = "/",  right = "/"  },
+	["\\"] = { left = "\\", right = "\\" },
+	["@"]  = { left = "@",  right = "@"  },
+	["#"]  = { left = "#",  right = "#"  },
+	["%"]  = { left = "%",  right = "%"  },
+	["$"]  = { left = "$",  right = "$"  },
+	["&"]  = { left = "&",  right = "&"  },
+	["!"]  = { left = "!",  right = "!"  },
+	["?"]  = { left = "?",  right = "?"  },
+	["+"]  = { left = "+",  right = "+"  },
+	["="]  = { left = "=",  right = "="  },
+	[";"]  = { left = ";",  right = ";"  },
+	[":"]  = { left = ":",  right = ":"  },
+	["« "] = { left = "« ", right = " »" },
+	[" »"] = { left = "« ", right = " »" },
+}
+
 
 
 
@@ -195,6 +231,52 @@ end
 function M.select_word()
 	eventtap.keyStroke({"alt"}, "right")
 	eventtap.keyStroke({"alt", "shift"}, "left")
+end
+
+--- Returns the AXSelectedText of the focused UI element, or nil if unavailable.
+--- Uses the Accessibility API so no clipboard manipulation is needed.
+--- @return string|nil The selected text, or nil when nothing is selected.
+local function ax_selected_text()
+	local ok_ax, ax = pcall(require, "hs.axuielement")
+	if not ok_ax or not ax then return nil end
+
+	local ok_el, el = pcall(function() return ax.systemWideElement():attributeValue("AXFocusedUIElement") end)
+	if not ok_el or not el then return nil end
+
+	local ok_sel, sel = pcall(function() return el:attributeValue("AXSelectedText") end)
+	if not ok_sel then return nil end
+	return (type(sel) == "string" and sel ~= "") and sel or nil
+end
+
+--- The WRAP_PAIRS table exposed for external inspection (e.g. the eventtap filter).
+M.WRAP_PAIRS = WRAP_PAIRS
+
+--- Wraps the current selection with left/right symbols, or types the symbol if nothing is selected.
+--- Uses AXSelectedText to avoid touching the clipboard.
+--- @param symbol string The raw character typed by the user.
+--- @param left string Opening symbol to prepend.
+--- @param right string Closing symbol to append.
+function M.surround_selection_if_selected(symbol, left, right)
+	local sel = ax_selected_text()
+
+	if sel then
+		Logger.debug(LOG, "Wrapping %d-char selection with '%s'…'%s'.", #sel, left, right)
+		local prior = pasteboard.getContents()
+		pcall(pasteboard.setContents, left .. sel .. right)
+		timer.doAfter(0, function()
+			eventtap.keyStroke({"cmd"}, "v", 0.02)
+			timer.doAfter(0.25, function()
+				pcall(function()
+					if prior and prior ~= "" then pasteboard.setContents(prior)
+					else pasteboard.clearContents() end
+				end)
+				Logger.done(LOG, "Selection wrapped.")
+			end)
+		end)
+	else
+		-- No selection — type the raw symbol so the key behaves normally
+		hs.eventtap.keyStrokes(symbol)
+	end
 end
 
 return M

@@ -10,6 +10,7 @@ local M = {}
 local hs = hs
 local dialog        = require("lib.dialog_util")
 local shortcuts_mod = require("modules.shortcuts")
+local i18n          = require("lib.i18n")
 
 
 
@@ -90,7 +91,7 @@ function M.build(ctx)
 	local cur_escape = state.script_control_shortcuts.escape     or "none"
 
 	return {
-		title   = "Contrôle du script",
+		title   = "i18n.get("menu.script_control.title")",
 		checked = (enabled and not paused) or nil,
 		fn      = function()
 			state.script_control_enabled = not state.script_control_enabled
@@ -106,15 +107,15 @@ function M.build(ctx)
 				end
 			end
 			ctx.save_prefs()
-			ctx.notify_feature("Contrôle du script", state.script_control_enabled)
+			ctx.notify_feature(i18n.get("notify.script_control"), state.script_control_enabled)
 			ctx.updateMenu()
 		end,
 		menu = {
-			{ title = "Option droite + ↩ : " .. get_label(cur_return),
+			{ title = string.format(i18n.get("menu.shortcuts.right_opt_return"), get_label(cur_return)),
 			   disabled = not enabled or paused or nil, menu = key_submenu("return_key") },
-			{ title = "Option droite + ⌫ : " .. get_label(cur_back),
+			{ title = string.format(i18n.get("menu.shortcuts.right_opt_back"), get_label(cur_back)),
 			   disabled = not enabled or paused or nil, menu = key_submenu("backspace") },
-			{ title = "Option droite + ⎋ : " .. get_label(cur_escape),
+			{ title = string.format(i18n.get("menu.shortcuts.right_opt_escape"), get_label(cur_escape)),
 			   disabled = not enabled or paused or nil, menu = key_submenu("escape") },
 		},
 

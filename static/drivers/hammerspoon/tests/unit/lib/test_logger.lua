@@ -89,11 +89,11 @@ helpers.describe("Logger: build wrapper", function()
 end)
 
 helpers.describe("Logger: init_log_path", function()
-	helpers.it("re-points UNIFIED_LOG_FILE under <config_dir>/logs/", function()
+	helpers.it("re-points UNIFIED_LOG_FILE under <config_dir>/hammerspoon/logs/", function()
 		Logger.init_log_path("/tmp/ergopti_test_config/", 14)
 		helpers.assert_true(
-			Logger.UNIFIED_LOG_FILE:find("/tmp/ergopti_test_config/logs/ErgoptiPlus_") ~= nil,
-			"UNIFIED_LOG_FILE should be re-pointed under logs/"
+			Logger.UNIFIED_LOG_FILE:find("/tmp/ergopti_test_config/hammerspoon/logs/ErgoptiPlus_") ~= nil,
+			"UNIFIED_LOG_FILE should be re-pointed under hammerspoon/logs/"
 		)
 		helpers.assert_true(
 			Logger.UNIFIED_LOG_FILE:find("%.log$") ~= nil,
@@ -104,7 +104,7 @@ helpers.describe("Logger: init_log_path", function()
 	helpers.it("appends a trailing slash to config_dir if missing", function()
 		Logger.init_log_path("/tmp/ergopti_test_no_slash", 14)
 		helpers.assert_true(
-			Logger.UNIFIED_LOG_FILE:find("/tmp/ergopti_test_no_slash/logs/") ~= nil,
+			Logger.UNIFIED_LOG_FILE:find("/tmp/ergopti_test_no_slash/hammerspoon/logs/") ~= nil,
 			"missing trailing slash on config_dir should be added"
 		)
 	end)
