@@ -522,7 +522,7 @@ function M.build_management(ctx)
 				local ok_p, btn, raw = pcall(dialog.text_prompt,
 					title,
 					i18n.get("menu.hotstrings.delay_prompt"),
-					tostring(cur_ms), "OK", "Annuler"
+					tostring(cur_ms), "OK", i18n.get("common.cancel")
 				)
 				if not ok_p or btn ~= "OK" then return end
 
@@ -590,7 +590,7 @@ function M.build_management(ctx)
 			local ok_p, btn, raw = pcall(dialog.text_prompt,
 				i18n.get("menu.hotstrings.magic_key_title"),
 				i18n.get("menu.hotstrings.magic_key_prompt"),
-				state.trigger_char, "OK", "Annuler"
+				state.trigger_char, "OK", i18n.get("common.cancel")
 			)
 			if ok_p and btn == "OK" and type(raw) == "string" and raw ~= "" then
 				local new_char = raw:match("^([%z\1-\127\194-\244][\128-\191]*)") or raw:sub(1,1)

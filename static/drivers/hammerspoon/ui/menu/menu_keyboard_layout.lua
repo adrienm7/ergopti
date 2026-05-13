@@ -1011,7 +1011,7 @@ function M.build(ctx)
 		-- duplication between ~/Library and /Library. A system install also
 		-- removes the user copy automatically, keeping a single canonical bundle.
 		submenu[#submenu + 1] = build_install_item(
-			"système", "🔐", system_best, latest, latest_ver,
+			i18n.get("menu.layout.scope_system"), "🔐", system_best, latest, latest_ver,
 			function()
 				run_install_and_chain(
 					function() return install_system(bundles_dir, latest) end,
@@ -1020,7 +1020,7 @@ function M.build(ctx)
 			end
 		)
 		submenu[#submenu + 1] = build_install_item(
-			"utilisateur", "📥", user_best, latest, latest_ver,
+			i18n.get("menu.layout.scope_user"), "📥", user_best, latest, latest_ver,
 			function()
 				run_install_and_chain(
 					function() return install_user(bundles_dir, latest) end,
@@ -1031,7 +1031,7 @@ function M.build(ctx)
 	else
 		Logger.warn(LOG, "No Ergopti bundle found in %s.", bundles_dir)
 		submenu[#submenu + 1] = {
-			title    = "Aucun bundle Ergopti trouvé",
+			title    = i18n.get("menu.layout.no_bundle"),
 			disabled = true,
 		}
 	end
@@ -1078,8 +1078,8 @@ function M.build(ctx)
 			fn    = function()
 				defer_tis_call(function()
 					local ok = upgrade_active_list(legacy_active)
-					if ok then pcall(notifications.notify, "Liste des dispositions mise à jour.", nil, "success") end
-					if not ok then pcall(notifications.notify, "Échec de la mise à jour — voir la console.", nil, "error") end
+					if ok then pcall(notifications.notify, i18n.get("menu.layout.update_list_ok"), nil, "success") end
+					if not ok then pcall(notifications.notify, i18n.get("menu.layout.update_list_fail"), nil, "error") end
 					schedule_menu_refresh(update_menu)
 				end)
 			end,
@@ -1112,7 +1112,7 @@ function M.build(ctx)
 			local already_added = active_id_set[id] == true
 			if already_added then
 				add_sub[#add_sub + 1] = {
-					title    = string.format("✅ %s v%s — déjà ajouté", var.label, latest_str),
+					title    = string.format(i18n.get("menu.layout.already_added"), var.label, latest_str),
 					disabled = true,
 				}
 			else
@@ -1121,8 +1121,8 @@ function M.build(ctx)
 					fn    = function()
 						defer_tis_call(function()
 							local ok = enable_and_select_source(id, var.label, bundle_full_path, internal_name)
-							if ok then pcall(notifications.notify, string.format("%s ajouté à la liste.", var.label), nil, "success") end
-							if not ok then pcall(notifications.notify, "Échec de l’ajout — voir la console.", nil, "error") end
+							if ok then pcall(notifications.notify, string.format(i18n.get("menu.layout.add_ok"), var.label), nil, "success") end
+							if not ok then pcall(notifications.notify, i18n.get("menu.layout.add_fail"), nil, "error") end
 							schedule_menu_refresh(update_menu)
 						end)
 					end,
@@ -1196,7 +1196,7 @@ function M.build(ctx)
 		return clean_layout_name(id)
 	end
 
-	submenu[#submenu + 1] = { title = "Dispositions actives", disabled = true }
+	submenu[#submenu + 1] = { title = i18n.get("menu.layout.active_layouts"), disabled = true }
 	if #records == 0 then
 		submenu[#submenu + 1] = {
 			title = i18n.get("menu.layout.open_prefs"),
@@ -1228,7 +1228,7 @@ function M.build(ctx)
 	end
 
 	return {
-		title = "🌐 Disposition clavier",
+		title = i18n.get("menu.layout.title"),
 		menu  = submenu,
 	}
 end

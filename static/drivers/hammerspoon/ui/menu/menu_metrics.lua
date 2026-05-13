@@ -217,7 +217,7 @@ function M.build(ctx)
 			local ok_p, btn, raw = pcall(dialog.text_prompt,
 				i18n.get("menu.metrics.shortcut_typing_title"),
 				i18n.get("menu.metrics.shortcut_prompt"),
-				current_str, "OK", "Annuler"
+				current_str, "OK", i18n.get("common.cancel")
 			)
 			if not ok_p or btn ~= "OK" or type(raw) ~= "string" then return end
 			raw = raw:match("^%s*(.-)%s*$"):lower()
@@ -272,7 +272,7 @@ function M.build(ctx)
 			local ok_p, btn, raw = pcall(dialog.text_prompt,
 				i18n.get("menu.metrics.shortcut_apps_title"),
 				i18n.get("menu.metrics.shortcut_prompt"),
-				current_str, "OK", "Annuler"
+				current_str, "OK", i18n.get("common.cancel")
 			)
 			if not ok_p or btn ~= "OK" or type(raw) ~= "string" then return end
 			raw = raw:match("^%s*(.-)%s*$"):lower()
