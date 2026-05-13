@@ -913,18 +913,20 @@ function M.get_sg_names()
 end
 
 function M.get_label(name)
-	if not name or name == "none" then return LABELS.none end
-	-- Hard-coded label first (covers 95% of actions identically in all locales)
-	if LABELS[name] then return LABELS[name] end
-	-- AX prefix variant
-	if LABELS["ax." .. name] then return LABELS["ax." .. name] end
-	-- Locale JSON only for the few truly language-specific labels (app_expose, mission_control…)
-	local key = "sg_actions." .. name
-	local t = i18n.get(key)
-	if t ~= key then return t end
+	if not name or name == "none" then
+		local s = i18n.get("sg_actions.none")
+		return (s ~= "sg_actions.none") and s or LABELS.none
+	end
+	-- Prefer locale JSON so the label is translated for the active language
+	local key_sg = "sg_actions." .. name
+	local s = i18n.get(key_sg)
+	if s ~= key_sg then return s end
 	local key_ax = "ax_actions." .. name
-	local t_ax = i18n.get(key_ax)
-	if t_ax ~= key_ax then return t_ax end
+	local s_ax = i18n.get(key_ax)
+	if s_ax ~= key_ax then return s_ax end
+	-- Fall back to hardcoded English label so new locales never show raw keys
+	if LABELS[name] then return LABELS[name] end
+	if LABELS["ax." .. name] then return LABELS["ax." .. name] end
 	return name
 end
 
