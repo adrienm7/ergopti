@@ -35,6 +35,7 @@ global _LLM_Deps_State          := "pending"   ; "pending" | "ready" | "failed"
 global _LLM_Deps_FailureMessage := ""
 global _LLM_Deps_Gui            := unset        ; progress Gui object, shown only on slow path
 global _LLM_Deps_Checking       := false        ; guard against concurrent calls
+global _LLM_Deps_PollTimer      := unset        ; lambda reference kept for explicit cancellation
 
 
 
@@ -105,6 +106,10 @@ LLM_Deps_CheckAndInstall(default_model := "qwen2.5:3b", on_ready := unset, on_fa
 		return
 	_LLM_Deps_Checking := true
 
+	; Reset failure state so a re-try after a failed install can proceed
+	if (_LLM_Deps_State == "failed")
+		_LLM_Deps_State := "pending"
+
 	; Fast path: server already running
 	if LLM_OllamaIsRunning() {
 		_LLM_Deps_State    := "ready"
@@ -156,8 +161,13 @@ LLM_Deps_RunInstaller(model, on_ready, on_failed) {
 		return
 	}
 
-	; Poll every 500 ms for new output lines and process completion
-	SetTimer(() => LLM_Deps_PollProcess(proc, on_ready, on_failed), 500)
+	; Poll every 500 ms for new output lines and process completion.
+	; Store the lambda reference so PollProcess can cancel it explicitly —
+	; SetTimer(, 0) only works when the caller IS the timer function, not
+	; when it is a helper called from a lambda wrapper.
+	global _LLM_Deps_PollTimer
+	_LLM_Deps_PollTimer := () => LLM_Deps_PollProcess(proc, on_ready, on_failed)
+	SetTimer(_LLM_Deps_PollTimer, 500)
 }
 
 /**
@@ -182,8 +192,10 @@ LLM_Deps_PollProcess(proc, on_ready, on_failed) {
 	if (proc.Status == 0)   ; 0 = running, 1 = finished, 2 = error
 		return   ; still running — timer will fire again
 
-	; Stop the polling timer
-	SetTimer(, 0)
+	; Stop the polling timer using the stored lambda reference
+	global _LLM_Deps_PollTimer
+	if IsSet(_LLM_Deps_PollTimer)
+		SetTimer(_LLM_Deps_PollTimer, 0)
 
 	; Drain remaining output
 	try {
