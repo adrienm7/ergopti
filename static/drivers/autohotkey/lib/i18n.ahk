@@ -33,25 +33,25 @@
 global I18N_LOCALES := [
 	{ Code: "ar", Tag: "[AR]", Name: "العربية"    },
 	{ Code: "cs", Tag: "[CS]", Name: "Čeština"    },
-	{ Code: "de", Tag: "[DE]", Name: "Deutsch"    },
-	{ Code: "en", Tag: "[EN]", Name: "English"    },
-	{ Code: "es", Tag: "[ES]", Name: "Español"    },
-	{ Code: "fr", Tag: "[FR]", Name: "Français"   },
-	{ Code: "it", Tag: "[IT]", Name: "Italiano"   },
-	{ Code: "ja", Tag: "[JA]", Name: "日本語"      },
-	{ Code: "ko", Tag: "[KO]", Name: "한국어"      },
-	{ Code: "nl", Tag: "[NL]", Name: "Nederlands"  },
-	{ Code: "pl", Tag: "[PL]", Name: "Polski"     },
-	{ Code: "pt", Tag: "[PT]", Name: "Português"  },
-	{ Code: "ru", Tag: "[RU]", Name: "Русский"    },
-	{ Code: "tr", Tag: "[TR]", Name: "Türkçe"     },
-	{ Code: "uk", Tag: "[UK]", Name: "Українська"  },
-	{ Code: "zh", Tag: "[ZH]", Name: "中文"        },
 	{ Code: "da", Tag: "[DA]", Name: "Dansk"       },
+	{ Code: "de", Tag: "[DE]", Name: "Deutsch"     },
+	{ Code: "en", Tag: "[EN]", Name: "English"     },
+	{ Code: "es", Tag: "[ES]", Name: "Español"     },
+	{ Code: "fr", Tag: "[FR]", Name: "Français"    },
 	{ Code: "he", Tag: "[HE]", Name: "עברית"       },
 	{ Code: "hi", Tag: "[HI]", Name: "हिन्दी"      },
-	{ Code: "no", Tag: "[NO]", Name: "Norsk"       },
-	{ Code: "sv", Tag: "[SV]", Name: "Svenska"     },
+	{ Code: "it", Tag: "[IT]", Name: "Italiano"    },
+	{ Code: "ja", Tag: "[JA]", Name: "日本語"       },
+	{ Code: "ko", Tag: "[KO]", Name: "한국어"       },
+	{ Code: "nl", Tag: "[NL]", Name: "Nederlands"  },
+	{ Code: "no", Tag: "[NO]", Name: "Norsk"        },
+	{ Code: "pl", Tag: "[PL]", Name: "Polski"       },
+	{ Code: "pt", Tag: "[PT]", Name: "Português"   },
+	{ Code: "ru", Tag: "[RU]", Name: "Русский"      },
+	{ Code: "sv", Tag: "[SV]", Name: "Svenska"      },
+	{ Code: "tr", Tag: "[TR]", Name: "Türkçe"       },
+	{ Code: "uk", Tag: "[UK]", Name: "Українська"   },
+	{ Code: "zh", Tag: "[ZH]", Name: "中文"          },
 ]
 
 ; Active locale code — read from config.toml at boot, then kept in memory.
@@ -264,6 +264,25 @@ _MakeLocaleSetter(Code) {
 	return (*) => I18nSetLocale(Code)
 }
 
+; Returns a copy of I18N_LOCALES sorted alphabetically by Name (case-insensitive).
+; Guarantees a stable display order regardless of the declaration order above.
+_I18nSortedLocales() {
+	Sorted := I18N_LOCALES.Clone()
+	n := Sorted.Length
+	Loop n - 1 {
+		i := A_Index
+		Loop n - i {
+			j := A_Index
+			if (StrLower(Sorted[j].Name) > StrLower(Sorted[j + 1].Name)) {
+				Tmp         := Sorted[j]
+				Sorted[j]   := Sorted[j + 1]
+				Sorted[j + 1] := Tmp
+			}
+		}
+	}
+	return Sorted
+}
+
 ; Populate a Menu object with one language entry per supported locale.
 ; Each item calls I18nSetLocale when clicked. A check mark is placed on the
 ; currently active locale. The menu is cleared first so this function is safe
@@ -275,7 +294,7 @@ I18nBuildLanguageMenu(LangMenu) {
 	global _StaticDir
 	try LangMenu.Delete()
 	FlagsDir := _StaticDir . "\img\flags\"
-	for Loc in I18N_LOCALES {
+	for Loc in _I18nSortedLocales() {
 		; _MakeLocaleSetter wraps the code in a named function so AHK captures
 		; the value at call time rather than sharing the loop variable reference.
 		Label    := Loc.Name
