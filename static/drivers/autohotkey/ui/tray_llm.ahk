@@ -148,15 +148,15 @@ LLM_Tray_Build() {
 
 	; Model submenu
 	model_menu := LLM_Tray_BuildModelMenu()
-	_LLM_Tray_Menu.Add(Format(t("menu.llm.model_label"), _LLM_Tray["model"]), model_menu)
+	_LLM_Tray_Menu.Add(StrReplace(t("menu.llm.model_label"), "%s", _LLM_Tray["model"]), model_menu)
 
 	; Profile submenu
 	profile_menu := LLM_Tray_BuildProfileMenu()
-	_LLM_Tray_Menu.Add(Format(t("menu.profiles.profile_label_prefix"), _LLM_Tray["profile_id"]), profile_menu)
+	_LLM_Tray_Menu.Add(StrReplace(t("menu.profiles.profile_label_prefix"), "%s", _LLM_Tray["profile_id"]), profile_menu)
 
 	; Number of predictions submenu
 	n_menu := LLM_Tray_BuildNMenu()
-	_LLM_Tray_Menu.Add(Format(t("menu.llm.num_predictions_label"), _LLM_Tray["n_predictions"]), n_menu)
+	_LLM_Tray_Menu.Add(StrReplace(t("menu.llm.num_predictions_label"), "%s", _LLM_Tray["n_predictions"]), n_menu)
 
 	_LLM_Tray_Menu.Add()  ; separator
 
@@ -253,7 +253,7 @@ LLM_Tray_BuildNMenu() {
 	m := Menu()
 	for n in LLM_TRAY_N_OPTIONS {
 		captured_n := n
-		label := Format(t("menu.llm.prediction_count_label"), n, (n > 1 ? "s" : ""))
+		label := StrReplace(StrReplace(t("menu.llm.prediction_count_label"), "%d", n), "%s", (n > 1 ? "s" : ""))
 		m.Add(label, (name, pos, menu) => LLM_Tray_SetN(captured_n))
 		if (n == _LLM_Tray["n_predictions"])
 			m.Check(label)
@@ -273,12 +273,12 @@ LLM_Tray_BuildTriggerMenu() {
 	debounce_menu := Menu()
 	for ms in LLM_TRAY_DEBOUNCE_OPTIONS {
 		captured_ms := ms
-		label := Format(t("menu.llm.debounce_label"), ms " ms")
+		label := StrReplace(t("menu.llm.debounce_label"), "%s", ms " ms")
 		debounce_menu.Add(label, (name, pos, menu) => LLM_Tray_SetDebounce(captured_ms))
 		if (ms == _LLM_Tray["debounce_ms"])
 			debounce_menu.Check(label)
 	}
-	m.Add(Format(t("menu.llm.debounce_label"), _LLM_Tray["debounce_ms"] " ms"), debounce_menu)
+	m.Add(StrReplace(t("menu.llm.debounce_label"), "%s", _LLM_Tray["debounce_ms"] " ms"), debounce_menu)
 
 	m.Add()  ; separator
 
@@ -303,12 +303,12 @@ LLM_Tray_BuildGenerationMenu() {
 	ctx_menu := Menu()
 	for chars in LLM_TRAY_CTX_OPTIONS {
 		captured_chars := chars
-		label := Format(t("menu.llm.context_length_label"), chars)
+		label := StrReplace(t("menu.llm.context_length_label"), "%s", chars)
 		ctx_menu.Add(label, (name, pos, menu) => LLM_Tray_SetCtxChars(captured_chars))
 		if (chars == _LLM_Tray["ctx_chars"])
 			ctx_menu.Check(label)
 	}
-	m.Add(Format(t("menu.llm.context_length_label"), _LLM_Tray["ctx_chars"]), ctx_menu)
+	m.Add(StrReplace(t("menu.llm.context_length_label"), "%s", _LLM_Tray["ctx_chars"]), ctx_menu)
 
 	m.Add()  ; separator
 
@@ -316,23 +316,23 @@ LLM_Tray_BuildGenerationMenu() {
 	min_menu := Menu()
 	for n in [1, 2, 3, 4, 5] {
 		captured_n := n
-		label := Format(t("menu.llm.min_words_label"), n)
+		label := StrReplace(t("menu.llm.min_words_label"), "%s", n)
 		min_menu.Add(label, (name, pos, menu) => LLM_Tray_SetMinWords(captured_n))
 		if (n == _LLM_Tray["min_words"])
 			min_menu.Check(label)
 	}
-	m.Add(Format(t("menu.llm.min_words_label"), _LLM_Tray["min_words"]), min_menu)
+	m.Add(StrReplace(t("menu.llm.min_words_label"), "%s", _LLM_Tray["min_words"]), min_menu)
 
 	; Max words sub-submenu
 	max_menu := Menu()
 	for n in [4, 6, 8, 10, 15, 20] {
 		captured_n := n
-		label := Format(t("menu.llm.max_words_label"), n)
+		label := StrReplace(t("menu.llm.max_words_label"), "%s", n)
 		max_menu.Add(label, (name, pos, menu) => LLM_Tray_SetMaxWords(captured_n))
 		if (n == _LLM_Tray["max_words"])
 			max_menu.Check(label)
 	}
-	m.Add(Format(t("menu.llm.max_words_label"), _LLM_Tray["max_words"]), max_menu)
+	m.Add(StrReplace(t("menu.llm.max_words_label"), "%s", _LLM_Tray["max_words"]), max_menu)
 
 	m.Add()  ; separator
 
@@ -340,12 +340,12 @@ LLM_Tray_BuildGenerationMenu() {
 	temp_menu := Menu()
 	for val in LLM_TRAY_TEMP_OPTIONS {
 		captured_val := val
-		label := Format(t("menu.llm.temperature_label"), val)
+		label := StrReplace(t("menu.llm.temperature_label"), "%s", val)
 		temp_menu.Add(label, (name, pos, menu) => LLM_Tray_SetTemperature(captured_val))
 		if (val == _LLM_Tray["temperature"])
 			temp_menu.Check(label)
 	}
-	m.Add(Format(t("menu.llm.temperature_label"), _LLM_Tray["temperature"]), temp_menu)
+	m.Add(StrReplace(t("menu.llm.temperature_label"), "%s", _LLM_Tray["temperature"]), temp_menu)
 
 	return m
 }
