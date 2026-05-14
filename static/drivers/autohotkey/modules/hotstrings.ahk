@@ -644,26 +644,29 @@ SpacedPrefix(SpacedStr, RawCount) {
 ; ===== 5.1) Date =====
 ; =====================
 
-; dt★ and td★ resolved at fire time — cannot be static TOML entries.
-InsertDateFr(*) {
-	global ScriptInformation
-	DateStr := FormatTime(, "dd/MM/yyyy")
-	TriggerLen := StrLen("dt" . ScriptInformation["MagicKey"])
-	SendEvent("{BackSpace " . TriggerLen . "}" . DateStr)
+; @dt★, @td★, @date★ resolved at fire time — cannot be static TOML entries.
+; Use CreateHotstring so the backspace count includes the leading "@".
+_DateShortFr(*) {
+	return FormatTime(, "dd/MM/yyyy")
 }
-InsertDateIso(*) {
-	global ScriptInformation
-	DateStr := FormatTime(, "yyyy_MM_dd")
-	TriggerLen := StrLen("td" . ScriptInformation["MagicKey"])
-	SendEvent("{BackSpace " . TriggerLen . "}" . DateStr)
+_DateLongFr(*) {
+	; A_WDay: 1=Sunday, 2=Monday, …, 7=Saturday
+	days   := ["dimanche", "lundi", "mardi", "mercredi", "jeudi", "vendredi", "samedi"]
+	months := ["janvier", "février", "mars", "avril", "mai", "juin",
+	           "juillet", "août", "septembre", "octobre", "novembre", "décembre"]
+	return days[A_WDay] . " " . FormatTime(, "d") . " " . months[FormatTime(, "M") + 0] . " " . FormatTime(, "yyyy")
+}
+_DateIso(*) {
+	return FormatTime(, "yyyy_MM_dd")
 }
 if Features.Has("DynamicHotstrings") {
 	MK := ScriptInformation["MagicKey"]
 	if Features["DynamicHotstrings"]["DateFr"].Enabled {
-		Hotstring(":*:dt" . MK, InsertDateFr)
+		CreateHotstring("*", "@dt" . MK,   _DateShortFr, Map("FinalResult", True))
+		CreateHotstring("*", "@date" . MK, _DateLongFr,  Map("FinalResult", True))
 	}
 	if Features["DynamicHotstrings"]["Date"].Enabled {
-		Hotstring(":*:td" . MK, InsertDateIso)
+		CreateHotstring("*", "@td" . MK, _DateIso, Map("FinalResult", True))
 	}
 }
 
