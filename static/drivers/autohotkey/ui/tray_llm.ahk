@@ -24,7 +24,7 @@
 ; ======================================
 ; ======================================
 
-LLM_TRAY_TITLE     := "Ergopti — IA"
+LLM_TRAY_TITLE     := "✨ Intelligence Artificielle"
 LLM_ICON_ACTIVE    := "✦"
 LLM_ICON_INACTIVE  := "◇"
 LLM_TRAY_N_OPTIONS := [1, 2, 3]   ; available prediction count choices

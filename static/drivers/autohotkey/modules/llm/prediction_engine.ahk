@@ -60,14 +60,22 @@ LLM_Engine_Init(opts) {
 	global _LLM_Engine
 	_LLM_Engine.enabled := true
 
-	if opts.Has("model")         _LLM_Engine.model         := opts["model"]
-	if opts.Has("profile_id")    _LLM_Engine.profile_id    := opts["profile_id"]
-	if opts.Has("n_predictions") _LLM_Engine.n_predictions := opts["n_predictions"]
-	if opts.Has("min_words")     _LLM_Engine.min_words     := opts["min_words"]
-	if opts.Has("max_words")     _LLM_Engine.max_words     := opts["max_words"]
-	if opts.Has("debounce_ms")   _LLM_Engine.debounce_ms   := opts["debounce_ms"]
-	if opts.Has("ctx_chars")     _LLM_Engine.ctx_chars     := opts["ctx_chars"]
-	if opts.Has("language")      _LLM_Engine.language      := opts["language"]
+	if opts.Has("model")
+		_LLM_Engine.model         := opts["model"]
+	if opts.Has("profile_id")
+		_LLM_Engine.profile_id    := opts["profile_id"]
+	if opts.Has("n_predictions")
+		_LLM_Engine.n_predictions := opts["n_predictions"]
+	if opts.Has("min_words")
+		_LLM_Engine.min_words     := opts["min_words"]
+	if opts.Has("max_words")
+		_LLM_Engine.max_words     := opts["max_words"]
+	if opts.Has("debounce_ms")
+		_LLM_Engine.debounce_ms   := opts["debounce_ms"]
+	if opts.Has("ctx_chars")
+		_LLM_Engine.ctx_chars     := opts["ctx_chars"]
+	if opts.Has("language")
+		_LLM_Engine.language      := opts["language"]
 }
 
 /**
