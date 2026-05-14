@@ -201,14 +201,19 @@ OllamaWV_Create(kind, subtitle) {
 	g.MarginY := 0
 	g.OnEvent("Close", (*) => OllamaWV_Close())
 
-	; Position bottom-right of the primary monitor work area (excludes taskbar)
+	; Position bottom-right of the primary monitor work area (excludes taskbar).
+	; Clamp to ensure the window never exceeds the visible area on any DPI config.
 	mon := MonitorGetPrimary()
 	MonitorGetWorkArea(mon, &ma_l, &ma_t, &ma_r, &ma_b)
-	pos_x := ma_r - _OllamaWV_W - _OllamaWV_Margin
-	pos_y := ma_b - _OllamaWV_H - _OllamaWV_Margin
-	LoggerInfo("LLM", "Window position: x=" pos_x " y=" pos_y " (monitor work area: " ma_l "," ma_t "-" ma_r "," ma_b ").")
+	work_w := ma_r - ma_l
+	work_h := ma_b - ma_t
+	win_w  := Min(_OllamaWV_W, work_w)
+	win_h  := Min(_OllamaWV_H, work_h)
+	pos_x  := ma_l + Max(0, work_w - win_w - _OllamaWV_Margin)
+	pos_y  := ma_t + Max(0, work_h - win_h - _OllamaWV_Margin)
+	LoggerInfo("LLM", "Window position: x=" pos_x " y=" pos_y " w=" win_w " h=" win_h " (work area: " ma_l "," ma_t "-" ma_r "," ma_b ").")
 
-	g.Show("w" _OllamaWV_W " h" _OllamaWV_H " NoActivate x" pos_x " y" pos_y)
+	g.Show("w" win_w " h" win_h " NoActivate x" pos_x " y" pos_y)
 	_OllamaWV_Gui := g
 
 	; Spin up WebView2
