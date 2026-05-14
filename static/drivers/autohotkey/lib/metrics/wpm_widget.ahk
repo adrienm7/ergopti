@@ -359,15 +359,16 @@ WPMWidget_OnControllerReady(wvc) {
         WPMWidget._graph_wv := wvc
         LoggerInfo("WPMWidget", "WebView2 controller ready — page loading.")
 
-        ; NavigateToString is async — wait 600 ms for the page to render before pushing.
-        SetTimer(WPMWidget_OnNavCompleted, -600)
+        ; Register NavigationCompleted so we fire exactly when the page is ready,
+        ; not after an arbitrary fixed delay. Uses __Call → add_NavigationCompleted.
+        wvc.CoreWebView2.NavigationCompleted(WPMWidget_OnNavCompleted)
     } catch as e {
         LoggerError("WPMWidget", "OnControllerReady failed: " . e.Message . " (" . e.File . ":" . e.Line . ")")
     }
 }
 
 
-WPMWidget_OnNavCompleted() {
+WPMWidget_OnNavCompleted(sender, args*) {
     WPMWidget._graph_wv_ready := true
     LoggerInfo("WPMWidget", "Page ready — pushing first graph update.")
     WPMWidget_PushGraphUpdate("0", WPMWidgetConst.COLOR_TXT_IDLE, false, false, false, true)

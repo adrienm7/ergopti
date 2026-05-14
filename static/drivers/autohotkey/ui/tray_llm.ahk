@@ -202,9 +202,10 @@ LLM_Tray_BuildModelMenu() {
 	global _LLM_Tray
 	m := Menu()
 
-	; Avoid a blocking HTTP call during startup or when IA is off.
-	; The current model name is shown on the parent entry label regardless.
-	if !_LLM_Tray["enabled"] {
+	; Avoid a blocking HTTP call during startup, when IA is off, or when Ollama
+	; is not yet confirmed running. The current model name is shown on the parent
+	; entry label regardless, so the submenu placeholder is always informative.
+	if !_LLM_Tray["enabled"] || !LLM_Deps_IsReady() {
 		placeholder := _LLM_Tray["model"]
 		m.Add(placeholder, (*) => 0)
 		m.Check(placeholder)
