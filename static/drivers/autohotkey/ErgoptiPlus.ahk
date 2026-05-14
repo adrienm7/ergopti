@@ -209,6 +209,11 @@ global _LogoDir := _StaticDir . "\img\logo"
 global IconPath := _LogoDir . "\logo_simple.ico"
 global IconPathDisabled := _LogoDir . "\logo_simple_disabled.ico"
 
+; Set the custom tray icon immediately so the default green AHK icon never
+; appears — even briefly during the module loading phase that follows.
+if FileExist(IconPath)
+    TraySetIcon(IconPath)
+
 ; Auto-create driver and shared subfolders under _ConfigDir on first launch.
 ; ahk/ holds driver-specific files; hotstrings/ holds the shared TOML files
 ; so a Mac+PC setup can keep both side by side without name collision.
