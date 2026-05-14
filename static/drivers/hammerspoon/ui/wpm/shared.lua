@@ -7,13 +7,15 @@
 ---
 --- FEATURES & RATIONALE:
 --- 1. Source Resolution: Keeps menubar and floating widget synchronized.
---- 2. Unified Palette: Guarantees identical colors for each source type.
+--- 2. Live Color Pipeline: Colors for hotstring sources are resolved from the
+---    same TOML metadata + shared user-override file used by the tooltip system,
+---    so any customization in the hotstrings config window is reflected here too.
+---    Manual (blue) and AI (purple) use hardcoded fallbacks.
 --- 3. Label Formatting: Provides consistent MPM text rendering utilities.
 --- ==============================================================================
 
 local M = {}
 local hs = hs
-
 
 
 
@@ -24,13 +26,40 @@ local hs = hs
 -- =================================
 -- =================================
 
-local SOURCE_COLOR_HEX = {
+-- Fallback hex colors used when no TOML/override color is available.
+local COLOR_FALLBACK = {
 	manual = "#007aff",
-	hotstring = "#ff3b30",
-	autocorrection = "#34c759",
-	llm = "#af52de",
+	llm    = "#af52de",
 }
 
+-- Maps a WPM source name to the hotstrings_config category whose TOML metadata
+-- (+ user override) drives its color. Sources not listed here use COLOR_FALLBACK.
+local SOURCE_TO_CATEGORY = {
+	hotstring      = "magickey",
+	autocorrection = "autocorrection",
+}
+
+--- Resolves the hex color string for a typing source.
+--- Resolution order for hotstring/autocorrection:
+---   1. hotstrings_config.resolve(category).color — TOML metadata + user override.
+---   2. COLOR_FALLBACK[source] or "#007aff" when unconfigured or unknown.
+--- For "manual" and "llm": COLOR_FALLBACK directly (no TOML source for these).
+--- @param source string Source name ("manual", "hotstring", "autocorrection", "llm").
+--- @return string Hex color string with leading "#".
+local function resolve_source_hex(source)
+	local category = SOURCE_TO_CATEGORY[source]
+	if category then
+		local ok, hs_cfg = pcall(require, "modules.hotstrings_config")
+		if ok and hs_cfg and type(hs_cfg.resolve) == "function" then
+			local resolved = hs_cfg.resolve(category, nil)
+			if resolved and type(resolved.color) == "string" and resolved.color ~= "" then
+				local c = resolved.color
+				return c:sub(1, 1) == "#" and c or ("#" .. c)
+			end
+		end
+	end
+	return COLOR_FALLBACK[source] or "#007aff"
+end
 
 
 
@@ -68,7 +97,6 @@ end
 
 
 
-
 -- =====================================
 -- =====================================
 -- ======= 3/ Shared UI Helpers ========
@@ -76,17 +104,16 @@ end
 -- =====================================
 
 --- Returns the canonical UI color for a typing source.
+--- Color for "hotstring" and "autocorrection" is resolved live from the TOML
+--- pipeline so user customizations are reflected without a restart.
 --- @param source string Active source name.
 --- @param alpha number|nil Opacity to apply.
 --- @return table hs.color-compatible table.
 function M.get_source_color(source, alpha)
-	local resolved_source = source or "manual"
-	if SOURCE_COLOR_HEX[resolved_source] == nil then
-		resolved_source = "manual"
-	end
+	local hex = resolve_source_hex(source or "manual")
 
 	return {
-		hex = SOURCE_COLOR_HEX[resolved_source],
+		hex   = hex,
 		alpha = type(alpha) == "number" and alpha or 0.8,
 	}
 end
