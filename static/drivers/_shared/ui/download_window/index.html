@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="fr">
+	<head>
+		<meta charset="utf-8" />
+		<title data-i18n="download_window.window_title"></title>
+		<link rel="stylesheet" href="style.css" />
+		<script src="../i18n.js"></script>
+	</head>
+	<body>
+		<div id="ui-controls">
+			<div class="header-group">
+				<h2 id="title" data-i18n="download_window.title"></h2>
+				<div id="model">—</div>
+				<div id="subtitle"></div>
+			</div>
+
+			<div class="progress-group">
+				<div id="status-line">
+					<div id="pct">0 %</div>
+					<div id="done-msg"></div>
+					<div id="file-count" style="display: none"></div>
+				</div>
+
+				<div id="bar-bg">
+					<div id="bar-fill"></div>
+				</div>
+
+				<div id="stats">
+					<div id="stats-details" style="display: none"></div>
+					<div id="eta-container" style="display: none"><span data-i18n="download_window.eta_label"></span> <b id="eta"></b></div>
+					<div id="stats-fallback" data-i18n="download_window.starting"></div>
+				</div>
+			</div>
+
+			<div id="bootstrap-group">
+				<div id="step-line" data-i18n="download_window.preparing"></div>
+				<div id="detail-line"></div>
+				<div id="bootstrap-bar-bg">
+					<div id="bootstrap-bar-fill"></div>
+				</div>
+			</div>
+
+			<div class="btn-row">
+				<button id="btn-cancel" onclick="doCancel()" data-i18n="download_window.btn_cancel"></button>
+				<button id="btn-term" onclick="doTerm()" data-i18n="download_window.btn_terminal"></button>
+				<button id="btn-retry" onclick="doRetry()" style="display: none" data-i18n="download_window.btn_retry"></button>
+			</div>
+		</div>
+
+		<div id="log-area"></div>
+
+		<script src="script.js"></script>
+	</body>
+</html>

@@ -79,12 +79,13 @@ LLM_Tray_Init(saved_opts := Map()) {
 
 	LLM_Tray_Build()
 
-	; Check Ollama availability and warn once
-	if !LLM_OllamaIsRunning() {
-		MsgBox("Ollama n'est pas démarré.`n`nLancez Ollama pour activer les suggestions IA.`nTéléchargement : https://ollama.com", LLM_TRAY_TITLE, "Icon!")
-	} else if _LLM_Tray["enabled"] {
-		LLM_Tray_StartBridge()
-	}
+	; Auto-bootstrap Ollama — installs binary + starts server if needed.
+	; The checker runs silently when the server is already running (fast path).
+	LLM_Deps_CheckAndInstall(
+		_LLM_Tray["model"],
+		(*) => LLM_Tray_OnDepsReady(),
+		(msg) => LLM_Tray_OnDepsFailed(msg)
+	)
 }
 
 
@@ -260,6 +261,30 @@ LLM_Tray_BuildOpts() {
 		"max_words",     _LLM_Tray["max_words"],
 		"language",      _LLM_Tray["language"]
 	)
+}
+
+
+
+
+/**
+ * Called by the deps checker when Ollama is confirmed ready.
+ * Starts the bridge if the user had enabled the feature.
+ */
+LLM_Tray_OnDepsReady() {
+	global _LLM_Tray
+	if _LLM_Tray["enabled"]
+		LLM_Tray_StartBridge()
+}
+
+/**
+ * Called by the deps checker on permanent failure.
+ * Disables the feature and updates the tray label.
+ * @param {string} msg - Failure reason.
+ */
+LLM_Tray_OnDepsFailed(msg) {
+	global _LLM_Tray
+	_LLM_Tray["enabled"] := false
+	LLM_Tray_Build()
 }
 
 
