@@ -27,18 +27,20 @@
 
 ; Default state — overridden by LLM_Engine_Init()
 global _LLM_Engine := Map(
-	"enabled",       false,
-	"model",         "qwen2.5:3b",
-	"profile_id",    "basic",
-	"n_predictions", 1,
-	"min_words",     2,
-	"max_words",     8,
-	"debounce_ms",   600,
-	"ctx_chars",     300,
-	"language",      "fr",
-	"timer_active",  false,
-	"last_ctx",      "",
-	"last_result",   ""
+	"enabled",            false,
+	"model",              "qwen2.5:3b",
+	"profile_id",         "basic",
+	"n_predictions",      1,
+	"min_words",          2,
+	"max_words",          8,
+	"debounce_ms",        600,
+	"ctx_chars",          300,
+	"language",           "fr",
+	"temperature",        "0.1",
+	"instant_on_word_end", false,
+	"timer_active",       false,
+	"last_ctx",           "",
+	"last_result",        ""
 )
 
 
@@ -71,11 +73,15 @@ LLM_Engine_Init(opts) {
 	if opts.Has("max_words")
 		_LLM_Engine["max_words"]     := opts["max_words"]
 	if opts.Has("debounce_ms")
-		_LLM_Engine["debounce_ms"]   := opts["debounce_ms"]
+		_LLM_Engine["debounce_ms"]        := opts["debounce_ms"]
 	if opts.Has("ctx_chars")
-		_LLM_Engine["ctx_chars"]     := opts["ctx_chars"]
+		_LLM_Engine["ctx_chars"]          := opts["ctx_chars"]
 	if opts.Has("language")
-		_LLM_Engine["language"]      := opts["language"]
+		_LLM_Engine["language"]           := opts["language"]
+	if opts.Has("temperature")
+		_LLM_Engine["temperature"]        := opts["temperature"]
+	if opts.Has("instant_on_word_end")
+		_LLM_Engine["instant_on_word_end"] := opts["instant_on_word_end"]
 }
 
 /**
@@ -172,7 +178,7 @@ LLM_Engine_FirePrediction(ctx) {
 	model_tag := LLM_ResolveOllamaTag(_LLM_Engine["model"])
 
 	; Call the backend (synchronous — runs in same thread)
-	result := LLM_OllamaGenerate(model_tag, system_prompt, ctx)
+	result := LLM_OllamaGenerate(model_tag, system_prompt, ctx, Float(_LLM_Engine["temperature"]))
 	if (result == "")
 		return
 
