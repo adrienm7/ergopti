@@ -1141,7 +1141,7 @@
 	"magickey.textexpansionsymbols": "Symbol expansion with magic key",
 	"magickey.textexpansionsymbolstypst": "Typst symbols with magic key",
 	"dynamichotstrings.group_label": "Dynamic hotstrings",
-	"dynamichotstrings.textexpansionpersonalinformation": "Form filling (@name, @email, ...)",
+	"dynamichotstrings.textexpansionpersonalinformation": "@np★ = Etternavn ⇥ Fornavn — hver bokstav = et felt (n=Etternavn, p=Fornavn, e=E-post…)",
 	"common.disabled": "Deaktivert",
 	"common.browse": "Browse…",
 	"sg_labels.script_altgr_enter": "AltGr + Enter",

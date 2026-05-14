@@ -1131,7 +1131,7 @@
 	"magickey.textexpansionsymbols": "Rozszerzanie symboli z magicznym klawiszem",
 	"magickey.textexpansionsymbolstypst": "Symbole Typst z magicznym klawiszem",
 	"dynamichotstrings.group_label": "Dynamiczne hotstring'i",
-	"dynamichotstrings.textexpansionpersonalinformation": "Wypełnianie formularzy (@imię, @email, ...)",
+	"dynamichotstrings.textexpansionpersonalinformation": "@np★ = Nazwisko ⇥ Imię — każda litera = pole (n=Nazwisko, p=Imię, e=Email…)",
 	"common.disabled": "Wyłączony",
 	"common.browse": "Przeglądaj…",
 	"sg_labels.script_altgr_enter": "AltGr + Enter",

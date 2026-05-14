@@ -1141,7 +1141,7 @@
 	"magickey.textexpansionsymbols": "Symbol-Erweiterung mit Zaubertaste",
 	"magickey.textexpansionsymbolstypst": "Typst-Symbole mit Zaubertaste",
 	"dynamichotstrings.group_label": "Dynamische Hotstrings",
-	"dynamichotstrings.textexpansionpersonalinformation": "Formularausfüllung (@name, @email, ...)",
+	"dynamichotstrings.textexpansionpersonalinformation": "@np★ = Name ⇥ Vorname — jeder Buchstabe = ein Feld (n=Name, p=Vorname, e=E-Mail…)",
 	"common.disabled": "Deaktiviert",
 	"common.browse": "Durchsuchen…",
 	"sg_labels.script_altgr_enter": "AltGr + Eingabe",

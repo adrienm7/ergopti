@@ -1141,7 +1141,7 @@
 	"magickey.textexpansionsymbols": "Expanze symbolů s kouzelnou klávesou",
 	"magickey.textexpansionsymbolstypst": "Symboly Typst s kouzelnou klávesou",
 	"dynamichotstrings.group_label": "Dynamické hotstrings",
-	"dynamichotstrings.textexpansionpersonalinformation": "Vyplňování formulářů (@jmeno, @email, ...)",
+	"dynamichotstrings.textexpansionpersonalinformation": "@np★ = Příjmení ⇥ Jméno — každé písmeno = pole (n=Příjmení, p=Jméno, e=Email…)",
 	"common.disabled": "Zakázáno",
 	"common.browse": "Procházet…",
 	"sg_labels.script_altgr_enter": "AltGr + Enter",

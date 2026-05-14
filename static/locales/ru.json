@@ -1141,7 +1141,7 @@
 	"magickey.textexpansionsymbols": "Расширение символов с магической клавишей",
 	"magickey.textexpansionsymbolstypst": "Символы Typst с магической клавишей",
 	"dynamichotstrings.group_label": "Динамические хотстринги",
-	"dynamichotstrings.textexpansionpersonalinformation": "Заполнение форм (@name, @email, ...)",
+	"dynamichotstrings.textexpansionpersonalinformation": "@np★ = Фамилия ⇥ Имя — каждая буква = поле (n=Фамилия, p=Имя, e=Email…)",
 	"common.disabled": "Отключено",
 	"common.browse": "Обзор…",
 	"sg_labels.script_altgr_enter": "AltGr + Enter",

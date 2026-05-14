@@ -1141,7 +1141,7 @@
 	"magickey.textexpansionsymbols": "Symbol expansion with magic key",
 	"magickey.textexpansionsymbolstypst": "Typst symbols with magic key",
 	"dynamichotstrings.group_label": "Dynamic hotstrings",
-	"dynamichotstrings.textexpansionpersonalinformation": "Form filling (@name, @email, ...)",
+	"dynamichotstrings.textexpansionpersonalinformation": "@np★ = उपनाम ⇥ नाम — प्रत्येक अक्षर = एक फ़ील्ड (n=उपनाम, p=नाम, e=ईमेल…)",
 	"common.disabled": "अक्षम",
 	"common.browse": "Browse…",
 	"sg_labels.script_altgr_enter": "AltGr + Enter",

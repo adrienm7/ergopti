@@ -1131,7 +1131,7 @@
 	"magickey.textexpansionsymbols": "Sihirli tuşla sembol genişletme",
 	"magickey.textexpansionsymbolstypst": "Sihirli tuşla Typst sembolleri",
 	"dynamichotstrings.group_label": "Dinamik hotstring'ler",
-	"dynamichotstrings.textexpansionpersonalinformation": "Form doldurma (@ad, @email, ...)",
+	"dynamichotstrings.textexpansionpersonalinformation": "@np★ = Soyadı ⇥ Ad — her harf = bir alan (n=Soyadı, p=Ad, e=E-posta…)",
 	"common.disabled": "Devre dışı",
 	"common.browse": "Gözat…",
 	"sg_labels.script_altgr_enter": "AltGr + Enter",
