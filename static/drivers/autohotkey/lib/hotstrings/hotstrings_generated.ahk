@@ -4381,42 +4381,42 @@ _GenLoad_autocorrection_multiplepunctuationmarks(FeatureConfig, ExtraOptions := 
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		_GenOpts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*?", "! !", "!!", _GenOpts)
+	CreateHotstring("*?", "! !", "!!", _GenOpts)
 	_GenOpts := Map("TimeActivationSeconds", _GenTimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		_GenOpts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*?", "! ?", "!?", _GenOpts)
+	CreateHotstring("*?", "! ?", "!?", _GenOpts)
 	_GenOpts := Map("TimeActivationSeconds", _GenTimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		_GenOpts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*?", "? !", "?!", _GenOpts)
+	CreateHotstring("*?", "? !", "?!", _GenOpts)
 	_GenOpts := Map("TimeActivationSeconds", _GenTimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		_GenOpts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*?", "? ?", "??", _GenOpts)
+	CreateHotstring("*?", "? ?", "??", _GenOpts)
 	_GenOpts := Map("TimeActivationSeconds", _GenTimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		_GenOpts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*?", " ! !", " !!", _GenOpts)
+	CreateHotstring("*?", " ! !", " !!", _GenOpts)
 	_GenOpts := Map("TimeActivationSeconds", _GenTimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		_GenOpts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*?", " ! ?", " !?", _GenOpts)
+	CreateHotstring("*?", " ! ?", " !?", _GenOpts)
 	_GenOpts := Map("TimeActivationSeconds", _GenTimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		_GenOpts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*?", " ? !", " ?!", _GenOpts)
+	CreateHotstring("*?", " ? !", " ?!", _GenOpts)
 	_GenOpts := Map("TimeActivationSeconds", _GenTimeAct, "FinalResult", false)
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		_GenOpts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateHotstring("*?", " ? ?", " ??", _GenOpts)
+	CreateHotstring("*?", " ? ?", " ??", _GenOpts)
 }
 
 _GenLoad_autocorrection_names(FeatureConfig, ExtraOptions := unset) {
