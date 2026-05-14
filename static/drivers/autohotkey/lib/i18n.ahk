@@ -237,6 +237,19 @@ I18nInit(Cache) {
 	try LoggerDone("i18n", "i18n initialised (locale: '{1}').", _I18nLocale)
 }
 
+; Pre-load all locale caches in a background timer so the first t() call during
+; menu construction never blocks the main thread on disk I/O.
+; Must be called after I18nInit() — schedule with SetTimer(..., -1).
+I18nPreload() {
+	try LoggerTrace("i18n", "Preloading locale caches…")
+	_I18nEnsureLoaded()
+	try LoggerDone("i18n", "Locale caches warm (%d keys active, %d EN, %d FR).",
+		_I18nCache.Count,
+		_I18nCacheEnLoaded ? _I18nCacheEn.Count : 0,
+		_I18nCacheFrLoaded ? _I18nCacheFr.Count : 0)
+}
+
+
 ; Change the active locale, persist it to config.toml, then reload the script
 ; so all menus are rebuilt in the new language.
 I18nSetLocale(Code) {
