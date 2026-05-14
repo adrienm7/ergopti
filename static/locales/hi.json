@@ -709,7 +709,7 @@
 	"menu.metrics.show_wpm_menubar": "मेनू बार में WPM",
 	"menu.metrics.show_wpm_widget": "फ्लोटिंग WPM विजेट",
 	"menu.metrics.title": "📊 मेट्रिक्स",
-	"menu.metrics.wpm_unit": "wpm",
+	"menu.metrics.wpm_unit": "शब्द/मि",
 	"menu.paths.menu_item": "कॉन्फ़िगरेशन फ़ोल्डर…",
 	"menu.paths.pick_prompt": "कॉन्फ़िगरेशन फ़ोल्डर चुनें",
 	"menu.paths.window_title": "कॉन्फ़िगरेशन फ़ोल्डर — Ergopti",
