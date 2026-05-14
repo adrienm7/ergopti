@@ -903,9 +903,9 @@ function M.create(deps)
                     if hw_active.download_gb or hw_active.disk_gb or hw_active.ram_gb then
                         table.insert(model_submenu, { title = "-" })
                         table.insert(model_submenu, { title = "— " .. string.format(i18n.get("menu.llm.hw_header"), display_backend) .. " —", disabled = true })
-                        if hw_active.download_gb then table.insert(model_submenu, { title = string.format(i18n.get("menu.llm.hw_download"), hw_active.download_gb)", fn = function() end }) end
-                        if hw_active.disk_gb then table.insert(model_submenu, { title = string.format(i18n.get("menu.llm.hw_disk"), hw_active.disk_gb)", fn = function() end }) end
-                        if hw_active.ram_gb then table.insert(model_submenu, { title = string.format(i18n.get("menu.llm.hw_ram"), hw_active.ram_gb)", fn = function() end }) end
+                        if hw_active.download_gb then table.insert(model_submenu, { title = string.format(i18n.get("menu.llm.hw_download"), hw_active.download_gb), fn = function() end }) end
+                        if hw_active.disk_gb then table.insert(model_submenu, { title = string.format(i18n.get("menu.llm.hw_disk"), hw_active.disk_gb), fn = function() end }) end
+                        if hw_active.ram_gb then table.insert(model_submenu, { title = string.format(i18n.get("menu.llm.hw_ram"), hw_active.ram_gb), fn = function() end }) end
                     end
 
                     table.insert(family_sub, {
