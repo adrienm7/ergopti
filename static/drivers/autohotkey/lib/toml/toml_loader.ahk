@@ -658,27 +658,38 @@ ApplyLocaleDescriptions(Locale := "fr") {
 
 ; Parse the ``[_meta]`` and ``[_meta.sections.<name>]`` blocks of a category
 ; TOML to extract the file-level and per-section default delay (seconds) and
-; tooltip color (hex). The result is cached in ``HotstringGroupConfig`` keyed
-; by lowercase category name so subsequent calls are free.
+; tooltip color (hex). The result is cached in ``HotstringGroupConfig``.
+;
+; When FilePath is provided the file is loaded directly from that path and
+; cached by the absolute path — this supports extension TOMLs and any
+; personal hotstring file without requiring a category name. When FilePath is
+; empty the path is resolved from CategoryName as before.
 ;
 ; Recognised keys:
 ;   [_meta]                       delay = <number>     color = "<hex>"
 ;   [_meta.sections.<name>]       delay = <number>     color = "<hex>"
 ;                                 description = "<...>"
 ;
-ParseTomlGroupConfig(CategoryName) {
+ParseTomlGroupConfig(CategoryName, FilePath := "") {
     global ScriptInformation, HotstringGroupConfig
     LowerCat := StrLower(CategoryName)
-    if HotstringGroupConfig.Has(LowerCat) {
-        return HotstringGroupConfig[LowerCat]
+
+    ; When a direct path is given, use it as the cache key so different files
+    ; with the same category name (e.g. multiple personal TOML files) are kept
+    ; separately.
+    CacheKey := (FilePath != "") ? FilePath : LowerCat
+    if HotstringGroupConfig.Has(CacheKey) {
+        return HotstringGroupConfig[CacheKey]
     }
 
-    if (LowerCat == "personal"
-        and IsSet(ScriptInformation)
-        and ScriptInformation.Has("PersonalTomlPath")) {
-        FilePath := ScriptInformation["PersonalTomlPath"]
-    } else {
-        FilePath := A_ScriptDir . "\..\hotstrings\" . LowerCat . ".toml"
+    if (FilePath == "") {
+        if (LowerCat == "personal"
+            and IsSet(ScriptInformation)
+            and ScriptInformation.Has("PersonalTomlPath")) {
+            FilePath := ScriptInformation["PersonalTomlPath"]
+        } else {
+            FilePath := A_ScriptDir . "\..\hotstrings\" . LowerCat . ".toml"
+        }
     }
 
     Config := { Delay: "", Color: "", Sections: Map() }
@@ -740,24 +751,29 @@ ParseTomlGroupConfig(CategoryName) {
         }
     }
 
-    HotstringGroupConfig[LowerCat] := Config
+    HotstringGroupConfig[CacheKey] := Config
     return Config
 }
 
 ; Count hotstring entries inside a specific [[section]] of a TOML category file.
 ; Returns 0 when the file or section does not exist.
 ; Uses the same ReadTomlFile cache to avoid redundant disk reads.
-CountTomlSection(CategoryName, SectionName) {
+; When FilePath is provided the file is loaded directly (for extensions or
+; multi-file personal hotstrings); CategoryName is used only for cache keying
+; when FilePath is empty.
+CountTomlSection(CategoryName, SectionName, FilePath := "") {
     global ScriptInformation, _TomlCountCache
-    CacheKey := StrLower(CategoryName) . "|" . StrLower(SectionName)
+    CacheKey := (FilePath != "" ? FilePath : StrLower(CategoryName)) . "|" . StrLower(SectionName)
     if _TomlCountCache.Has(CacheKey)
         return _TomlCountCache[CacheKey]
-    if (StrLower(CategoryName) == "personal"
-    and IsSet(ScriptInformation)
-    and ScriptInformation.Has("PersonalTomlPath")) {
-        FilePath := ScriptInformation["PersonalTomlPath"]
-    } else {
-        FilePath := A_ScriptDir . "\..\..\hotstrings\" . StrLower(CategoryName) . ".toml"
+    if (FilePath == "") {
+        if (StrLower(CategoryName) == "personal"
+        and IsSet(ScriptInformation)
+        and ScriptInformation.Has("PersonalTomlPath")) {
+            FilePath := ScriptInformation["PersonalTomlPath"]
+        } else {
+            FilePath := A_ScriptDir . "\..\..\hotstrings\" . StrLower(CategoryName) . ".toml"
+        }
     }
     if !FileExist(FilePath) {
         _TomlCountCache[CacheKey] := 0
@@ -791,17 +807,22 @@ CountTomlSection(CategoryName, SectionName) {
 ; Count all hotstring entries across every [[section]] in a TOML category file.
 ; Returns 0 when the file does not exist or contains no matching entries.
 ; Uses the same ReadTomlFile cache as the rest of the loader to avoid double I/O.
-CountTomlHotstrings(CategoryName) {
+; When FilePath is provided the file is loaded directly (for extensions or
+; multi-file personal hotstrings); CategoryName is used only for cache keying
+; when FilePath is empty.
+CountTomlHotstrings(CategoryName, FilePath := "") {
     global ScriptInformation, _TomlCountCache
-    CacheKey := StrLower(CategoryName) . "|*"
+    CacheKey := (FilePath != "" ? FilePath : StrLower(CategoryName)) . "|*"
     if _TomlCountCache.Has(CacheKey)
         return _TomlCountCache[CacheKey]
-    if (StrLower(CategoryName) == "personal"
-    and IsSet(ScriptInformation)
-    and ScriptInformation.Has("PersonalTomlPath")) {
-        FilePath := ScriptInformation["PersonalTomlPath"]
-    } else {
-        FilePath := A_ScriptDir . "\..\..\hotstrings\" . StrLower(CategoryName) . ".toml"
+    if (FilePath == "") {
+        if (StrLower(CategoryName) == "personal"
+        and IsSet(ScriptInformation)
+        and ScriptInformation.Has("PersonalTomlPath")) {
+            FilePath := ScriptInformation["PersonalTomlPath"]
+        } else {
+            FilePath := A_ScriptDir . "\..\..\hotstrings\" . StrLower(CategoryName) . ".toml"
+        }
     }
     if !FileExist(FilePath) {
         _TomlCountCache[CacheKey] := 0
