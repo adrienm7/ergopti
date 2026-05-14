@@ -24,7 +24,7 @@
 ; ======================================
 ; ======================================
 
-LLM_TRAY_TITLE     := "✨ Intelligence Artificielle"
+LLM_TRAY_TITLE     := t("menu.llm.title")
 LLM_TRAY_N_OPTIONS := [1, 2, 3]   ; available prediction count choices
 
 
