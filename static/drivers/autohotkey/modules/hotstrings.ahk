@@ -635,17 +635,15 @@ SpacedPrefix(SpacedStr, RawCount) {
 	return SpacedStr  ; Fallback — fewer raw chars than requested
 }
 
-; Dynamic hotstrings must be registered BEFORE the repeat section (#InputLevel 1)
-; so that e.g. "dt★" (3-char trigger) takes priority over "t★" (repeat, 2-char).
-; All Hotstring() calls here inherit the current #InputLevel 2.
-
-
 ; =====================
 ; ===== 5.1) Date =====
 ; =====================
 
 ; @dt★, @td★, @date★ resolved at fire time — cannot be static TOML entries.
-; Use CreateHotstring so the backspace count includes the leading "@".
+; InputLevel 2 ensures these triggers beat the repeat section (InputLevel 1):
+; without it, "t★" (repeat) wins over "@dt★" because InputLevel 1 > 0.
+; Triggers that start with "@" should never fall through to the repeat path.
+#InputLevel 2
 _DateShortFr(*) {
 	return FormatTime(, "dd/MM/yyyy")
 }
@@ -669,6 +667,7 @@ if Features.Has("DynamicHotstrings") {
 		CreateHotstring("*", "@td" . MK, _DateIso, Map("FinalResult", True))
 	}
 }
+#InputLevel 0
 
 
 ; ===================================================
