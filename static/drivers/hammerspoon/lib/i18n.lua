@@ -39,27 +39,27 @@ local locale_mod = require("lib.locale")
 
 --- Ordered list of supported locales.
 local LOCALES = {
-	{ code = "ar", flag = "🇸🇦", name = "العربية"   },
-	{ code = "cs", flag = "🇨🇿", name = "Čeština"   },
-	{ code = "de", flag = "🇩🇪", name = "Deutsch"   },
-	{ code = "en", flag = "🇬🇧", name = "English"   },
-	{ code = "es", flag = "🇪🇸", name = "Español"   },
-	{ code = "fr", flag = "🇫🇷", name = "Français"  },
-	{ code = "it", flag = "🇮🇹", name = "Italiano"  },
-	{ code = "ja", flag = "🇯🇵", name = "日本語"     },
-	{ code = "ko", flag = "🇰🇷", name = "한국어"     },
-	{ code = "nl", flag = "🇳🇱", name = "Nederlands" },
-	{ code = "pl", flag = "🇵🇱", name = "Polski"    },
-	{ code = "pt", flag = "🇧🇷", name = "Português" },
-	{ code = "ru", flag = "🇷🇺", name = "Русский"   },
-	{ code = "tr", flag = "🇹🇷", name = "Türkçe"    },
-	{ code = "uk", flag = "🇺🇦", name = "Українська" },
-	{ code = "zh", flag = "🇨🇳", name = "中文"       },
-	{ code = "da", flag = "🇩🇰", name = "Dansk"      },
-	{ code = "he", flag = "🇮🇱", name = "עברית"      },
-	{ code = "hi", flag = "🇮🇳", name = "हिन्दी"     },
-	{ code = "no", flag = "🇳🇴", name = "Norsk"      },
-	{ code = "sv", flag = "🇸🇪", name = "Svenska"    },
+	{ code = "ar", flag = "🇸🇦", name = "العربية"    },
+	{ code = "cs", flag = "🇨🇿", name = "Čeština"    },
+	{ code = "da", flag = "🇩🇰", name = "Dansk"       },
+	{ code = "de", flag = "🇩🇪", name = "Deutsch"     },
+	{ code = "en", flag = "🇬🇧", name = "English"     },
+	{ code = "es", flag = "🇪🇸", name = "Español"     },
+	{ code = "fr", flag = "🇫🇷", name = "Français"    },
+	{ code = "he", flag = "🇮🇱", name = "עברית"       },
+	{ code = "hi", flag = "🇮🇳", name = "हिन्दी"      },
+	{ code = "it", flag = "🇮🇹", name = "Italiano"    },
+	{ code = "ja", flag = "🇯🇵", name = "日本語"       },
+	{ code = "ko", flag = "🇰🇷", name = "한국어"       },
+	{ code = "nl", flag = "🇳🇱", name = "Nederlands"  },
+	{ code = "no", flag = "🇳🇴", name = "Norsk"        },
+	{ code = "pl", flag = "🇵🇱", name = "Polski"       },
+	{ code = "pt", flag = "🇧🇷", name = "Português"   },
+	{ code = "ru", flag = "🇷🇺", name = "Русский"      },
+	{ code = "sv", flag = "🇸🇪", name = "Svenska"      },
+	{ code = "tr", flag = "🇹🇷", name = "Türkçe"       },
+	{ code = "uk", flag = "🇺🇦", name = "Українська"   },
+	{ code = "zh", flag = "🇨🇳", name = "中文"          },
 }
 
 --- hs.settings key used to persist the locale between reloads.
@@ -167,8 +167,11 @@ end
 --- checked = true flag. Pass this list directly into an hs.menubar submenu.
 --- @return table[] List of menu item tables.
 function M.build_language_menu_items()
+	local sorted = {}
+	for _, loc in ipairs(LOCALES) do sorted[#sorted + 1] = loc end
+	table.sort(sorted, function(a, b) return a.name:lower() < b.name:lower() end)
 	local items = {}
-	for _, loc in ipairs(LOCALES) do
+	for _, loc in ipairs(sorted) do
 		local code = loc.code
 		items[#items + 1] = {
 			title   = loc.flag .. " " .. loc.name,
