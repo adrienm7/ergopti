@@ -311,7 +311,7 @@ OpenHotstringsConfigWindow() {
 	G.Add("Text", "xm y+14 w526 h1 0x10")   ; horizontal rule aligned to x=540
 
 	; ----- Close button (bottom, after HR) --------------------------------
-	BtnClose := G.Add("Button", "xm y+14 w90 h28", t("hs_config.btn_close"))
+	BtnClose := G.Add("Button", "x" . (14 + (526 - 90) // 2) . " y+14 w90 h28", t("hs_config.btn_close"))
 	BtnClose.OnEvent("Click", (*) => _HCWGui.Hide())
 
 	_HCWWidgets := {
