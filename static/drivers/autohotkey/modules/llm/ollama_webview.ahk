@@ -201,10 +201,12 @@ OllamaWV_Create(kind, subtitle) {
 	g.MarginY := 0
 	g.OnEvent("Close", (*) => OllamaWV_Close())
 
-	; Position bottom-right of the primary monitor (same as the old AHK Gui)
-	MonitorGetWorkArea(, , &mx2, , &my2)
-	pos_x := mx2 - _OllamaWV_W - _OllamaWV_Margin
-	pos_y := my2 - _OllamaWV_H - _OllamaWV_Margin
+	; Position bottom-right of the primary monitor work area (excludes taskbar)
+	mon := MonitorGetPrimary()
+	MonitorGetWorkArea(mon, &ma_l, &ma_t, &ma_r, &ma_b)
+	pos_x := ma_r - _OllamaWV_W - _OllamaWV_Margin
+	pos_y := ma_b - _OllamaWV_H - _OllamaWV_Margin
+	LoggerInfo("LLM", "Window position: x=" pos_x " y=" pos_y " (monitor work area: " ma_l "," ma_t "-" ma_r "," ma_b ").")
 
 	g.Show("w" _OllamaWV_W " h" _OllamaWV_H " NoActivate x" pos_x " y" pos_y)
 	_OllamaWV_Gui := g
@@ -236,6 +238,17 @@ OllamaWV_Create(kind, subtitle) {
 
 	; JS → AHK message bridge (cancel / retry buttons)
 	_OllamaWV_WebView.WebMessageReceived := OllamaWV_OnWebMessage
+
+	; Inject i18n strings before the page parses its own scripts so that
+	; data-i18n attributes are resolved on first render, not on a delayed fetch.
+	; We inject window.__i18n_base (path to static/locales/) and
+	; window._i18n_locale so i18n.js can fetch the right file via file://.
+	locales_url := OllamaWV_LocalesUrl()
+	locale_code := _I18nLocale
+	i18n_script := "window.__i18n_base = '" locales_url "';"
+		. "window._i18n_locale = '" locale_code "';"
+	try _OllamaWV_WebView.AddScriptToExecuteOnDocumentCreated(i18n_script, 0)
+	LoggerInfo("LLM", "i18n base injected: " locales_url " locale=" locale_code ".")
 
 	; Navigate to shared HTML
 	html_url := OllamaWV_HtmlUrl()
@@ -275,6 +288,17 @@ OllamaWV_HtmlUrl() {
 	base := A_ScriptDir . "\..\_shared\ui\download_window\index.html"
 	loop files, base
 		base := A_LoopFileFullPath
+	return "file:///" . StrReplace(base, "\", "/")
+}
+
+/**
+ * Returns the file:// URL for the static/locales/ directory (trailing slash).
+ * Injected as window.__i18n_base so i18n.js fetches the correct locale file.
+ * @returns {string}
+ */
+OllamaWV_LocalesUrl() {
+	global _StaticDir
+	base := _StaticDir . "\locales\"
 	return "file:///" . StrReplace(base, "\", "/")
 }
 
