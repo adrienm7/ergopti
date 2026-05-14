@@ -1,4 +1,4 @@
-{
+﻿{
 	"_meta.flag": "🇩🇪",
 	"_meta.locale": "de",
 	"_meta.name": "Deutsch",
@@ -654,6 +654,10 @@
 	"menu.llm.temperature_label": "Temperatur (Kreativität): %s",
 	"menu.llm.thinking_model_info": "  ↳ Info: Thinking-Modell (verdecktes Reasoning)",
 	"menu.llm.title": "✨ Künstliche Intelligenz",
+	"menu.llm.toggle_enable": "KI-Vorschläge aktivieren",
+	"menu.llm.toggle_disable": "KI-Vorschläge deaktivieren",
+	"menu.llm.about": "Über Ergopti KI",
+	"menu.llm.about_body": "Ergopti KI — Intelligente Tastaturvorschläge\nBackend: Ollama (lokal)\nVersion: 1.0",
 	"menu.llm.trigger_menu_title": "KI-Auslösung",
 	"menu.llm.trigger_shortcut_label": "Tastenkombination für manuelle Generierung: %s",
 	"menu.llm.trigger_shortcut_title": "KI-Generierungstastenkombination",

@@ -1,4 +1,4 @@
-{
+﻿{
 	"_meta.flag": "🇺🇦",
 	"_meta.locale": "uk",
 	"_meta.name": "Українська",
@@ -653,7 +653,13 @@
 	"menu.llm.specs_header": "ХАРАКТЕРИСТИКИ",
 	"menu.llm.temperature_label": "Температура (Креативність): %s",
 	"menu.llm.thinking_model_info": "  ↳ Інфо: Thinking-модель (приховане міркування)",
-	"menu.llm.title": "✨ Штучний інтелект",
+	"menu.llm.title": "✨ Штучний інтелект"
+	"menu.llm.toggle_enable": "Увімкнути підказки ШІ",
+	"menu.llm.toggle_disable": "Вимкнути підказки ШІ",
+	"menu.llm.about": "Про Ergopti ШІ",
+	"menu.llm.about_body": "Ergopti ШІ — Розумні підказки клавіатури
+Бекенд: Ollama (локально)
+Версія: 1.0",,
 	"menu.llm.trigger_menu_title": "Запуск ШІ",
 	"menu.llm.trigger_shortcut_label": "Скорочення для ручної генерації: %s",
 	"menu.llm.trigger_shortcut_title": "Скорочення для генерації ШІ",

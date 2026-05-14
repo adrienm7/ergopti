@@ -1,4 +1,4 @@
-{
+﻿{
 	"_meta.flag": "🇸🇦",
 	"_meta.locale": "ar",
 	"_meta.name": "العربية",
@@ -653,7 +653,13 @@
 	"menu.llm.specs_header": "المواصفات",
 	"menu.llm.temperature_label": "درجة الحرارة (الإبداعية): %s",
 	"menu.llm.thinking_model_info": "  ↳ معلومة: نموذج تفكيري (استدلال مخفي)",
-	"menu.llm.title": "✨ الذكاء الاصطناعي",
+	"menu.llm.title": "✨ الذكاء الاصطناعي"
+	"menu.llm.toggle_enable": "تفعيل اقتراحات الذكاء الاصطناعي",
+	"menu.llm.toggle_disable": "تعطيل اقتراحات الذكاء الاصطناعي",
+	"menu.llm.about": "حول Ergopti AI",
+	"menu.llm.about_body": "Ergopti AI — اقتراحات لوحة مفاتيح ذكية
+الخادم الخلفي: Ollama (محلي)
+الإصدار: 1.0",,
 	"menu.llm.trigger_menu_title": "تشغيل الذكاء الاصطناعي",
 	"menu.llm.trigger_shortcut_label": "الاختصار للتوليد اليدوي: %s",
 	"menu.llm.trigger_shortcut_title": "اختصار توليد الذكاء الاصطناعي",

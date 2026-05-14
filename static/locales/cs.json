@@ -1,4 +1,4 @@
-{
+﻿{
 	"_meta.flag": "🇨🇿",
 	"_meta.locale": "cs",
 	"_meta.name": "Čeština",
@@ -653,7 +653,13 @@
 	"menu.llm.specs_header": "SPECIFIKACE",
 	"menu.llm.temperature_label": "Teplota (Kreativita): %s",
 	"menu.llm.thinking_model_info": "  ↳ Info: Model myšlení (skryté uvažování)",
-	"menu.llm.title": "✨ Umělá inteligence",
+	"menu.llm.title": "✨ Umělá inteligence"
+	"menu.llm.toggle_enable": "Zapnout návrhy AI",
+	"menu.llm.toggle_disable": "Vypnout návrhy AI",
+	"menu.llm.about": "O aplikaci Ergopti AI",
+	"menu.llm.about_body": "Ergopti AI — Chytrá klávesnicová napovídání
+Backend: Ollama (lokálně)
+Verze: 1.0",,
 	"menu.llm.trigger_menu_title": "Spouštění AI",
 	"menu.llm.trigger_shortcut_label": "Zkratka pro ruční generování: %s",
 	"menu.llm.trigger_shortcut_title": "Zkratka generování AI",

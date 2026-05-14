@@ -1,4 +1,4 @@
-{
+﻿{
 	"_meta.flag": "🇨🇳",
 	"_meta.locale": "zh",
 	"_meta.name": "中文",
@@ -653,7 +653,13 @@
 	"menu.llm.specs_header": "规格",
 	"menu.llm.temperature_label": "温度（创造力）: %s",
 	"menu.llm.thinking_model_info": "  ↳ 信息: Thinking模型（隐藏推理）",
-	"menu.llm.title": "✨ 人工智能",
+	"menu.llm.title": "✨ 人工智能"
+	"menu.llm.toggle_enable": "启用 AI 建议",
+	"menu.llm.toggle_disable": "禁用 AI 建议",
+	"menu.llm.about": "关于 Ergopti AI",
+	"menu.llm.about_body": "Ergopti AI — 智能键盘建议
+后端: Ollama (本地)
+版本: 1.0",,
 	"menu.llm.trigger_menu_title": "AI触发",
 	"menu.llm.trigger_shortcut_label": "手动生成快捷键: %s",
 	"menu.llm.trigger_shortcut_title": "AI生成快捷键",
