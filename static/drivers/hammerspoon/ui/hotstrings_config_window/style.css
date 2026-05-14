@@ -103,6 +103,32 @@ body {
 	color: var(--danger);
 }
 
+.group-bar {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	padding: 8px 20px;
+	border-bottom: 1px solid var(--border);
+	background: var(--surface-2);
+}
+
+.group-bar label {
+	font-size: 12px;
+	color: var(--sub);
+	white-space: nowrap;
+}
+
+.group-bar select {
+	background: var(--surface);
+	border: 1px solid var(--border);
+	border-radius: 6px;
+	color: var(--text);
+	font: inherit;
+	font-size: 12px;
+	padding: 4px 8px;
+	cursor: pointer;
+}
+
 main {
 	flex: 1;
 	overflow-y: auto;

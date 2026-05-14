@@ -274,6 +274,16 @@ do
 			return hotstrings_dir .. category .. ".toml"
 		end,
 	})
+
+	-- Wire the config window so it can discover personal + extension files.
+	local ok_cw, cw = pcall(require, "ui.hotstrings_config_window")
+	if ok_cw and cw and type(cw.setup) == "function" then
+		local extensions_dir = base_dir .. "../../extensions"
+		cw.setup({
+			personal_dir   = menu_paths.get("PersonalHotstringsDir"),
+			extensions_dir = extensions_dir,
+		})
+	end
 end
 
 
