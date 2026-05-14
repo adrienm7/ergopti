@@ -316,6 +316,7 @@
 	"hs_config.btn_all_grey": "모두 회색",
 	"hs_config.btn_close": "닫기",
 	"hs_config.btn_reset_all": "모두 초기화",
+	"hs_config.notify_reset_all": "지연 및 색상이 초기화되었습니다.",
 	"hs_config.btn_reset_default": "기본값 복원",
 	"hs_config.cat_autocorrection": "자동 교정",
 	"hs_config.cat_distances": "거리 단축",

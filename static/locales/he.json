@@ -338,6 +338,7 @@
 	"hs_config.btn_all_grey": "הכל אפור",
 	"hs_config.btn_close": "סגור",
 	"hs_config.btn_reset_all": "אפס הכל",
+	"hs_config.notify_reset_all": "העיכובים והצבעים אופסו.",
 	"hs_config.btn_reset_default": "שחזר ברירת מחדל",
 	"hs_config.cat_autocorrection": "Autocorrection",
 	"hs_config.cat_distances": "הקטנת מרחקים",

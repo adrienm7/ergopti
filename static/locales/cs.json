@@ -316,6 +316,7 @@
 	"hs_config.btn_all_grey": "Vše šedé",
 	"hs_config.btn_close": "Zavřít",
 	"hs_config.btn_reset_all": "Resetovat vše",
+	"hs_config.notify_reset_all": "Zpoždění a barvy byly resetovány.",
 	"hs_config.btn_reset_default": "Obnovit výchozí",
 	"hs_config.cat_autocorrection": "Automatická oprava",
 	"hs_config.cat_distances": "Zkrácení vzdálenosti",

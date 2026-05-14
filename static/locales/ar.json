@@ -316,6 +316,7 @@
 	"hs_config.btn_all_grey": "الكل رمادي",
 	"hs_config.btn_close": "إغلاق",
 	"hs_config.btn_reset_all": "إعادة تعيين الكل",
+	"hs_config.notify_reset_all": "تمت إعادة تعيين التأخيرات والألوان.",
 	"hs_config.btn_reset_default": "استعادة الافتراضي",
 	"hs_config.cat_autocorrection": "التصحيح التلقائي",
 	"hs_config.cat_distances": "تقليل المسافة",

@@ -316,6 +316,7 @@
 	"hs_config.btn_all_grey": "Tout en gris",
 	"hs_config.btn_close": "Fermer",
 	"hs_config.btn_reset_all": "Tout réinitialiser",
+	"hs_config.notify_reset_all": "Délais et couleurs réinitialisés.",
 	"hs_config.btn_reset_default": "Revenir au défaut",
 	"hs_config.cat_autocorrection": "Autocorrection",
 	"hs_config.cat_distances": "Réduction des distances",

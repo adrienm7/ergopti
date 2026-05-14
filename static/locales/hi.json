@@ -338,6 +338,7 @@
 	"hs_config.btn_all_grey": "सभी ग्रे",
 	"hs_config.btn_close": "बंद करें",
 	"hs_config.btn_reset_all": "सभी रीसेट करें",
+	"hs_config.notify_reset_all": "विलंब और रंग रीसेट किए गए.",
 	"hs_config.btn_reset_default": "डिफॉल्ट पुनः स्थापित करें",
 	"hs_config.cat_autocorrection": "Autocorrection",
 	"hs_config.cat_distances": "दूरी में कमी",

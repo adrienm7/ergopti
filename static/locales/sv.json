@@ -338,6 +338,7 @@
 	"hs_config.btn_all_grey": "Allt grått",
 	"hs_config.btn_close": "Stäng",
 	"hs_config.btn_reset_all": "Återställ allt",
+	"hs_config.notify_reset_all": "Fördröjningar och färger har återställts.",
 	"hs_config.btn_reset_default": "Återställ standard",
 	"hs_config.cat_autocorrection": "Autocorrection",
 	"hs_config.cat_distances": "Avståndsreducering",

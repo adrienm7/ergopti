@@ -316,6 +316,7 @@
 	"hs_config.btn_all_grey": "Усі сірі",
 	"hs_config.btn_close": "Закрити",
 	"hs_config.btn_reset_all": "Скинути всі",
+	"hs_config.notify_reset_all": "Затримки та кольори скинуто.",
 	"hs_config.btn_reset_default": "Відновити за замовчуванням",
 	"hs_config.cat_autocorrection": "Автокорекція",
 	"hs_config.cat_distances": "Зменшення відстані",

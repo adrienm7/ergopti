@@ -316,6 +316,7 @@
 	"hs_config.btn_all_grey": "Wszystko szare",
 	"hs_config.btn_close": "Zamknij",
 	"hs_config.btn_reset_all": "Resetuj wszystko",
+	"hs_config.notify_reset_all": "Opóźnienia i kolory zostały zresetowane.",
 	"hs_config.btn_reset_default": "Przywróć domyślne",
 	"hs_config.cat_autocorrection": "Autokorekta",
 	"hs_config.cat_distances": "Redukcja odległości",

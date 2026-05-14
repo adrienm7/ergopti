@@ -707,7 +707,7 @@ ParseTomlGroupConfig(CategoryName, FilePath := "") {
             and ScriptInformation.Has("PersonalTomlPath")) {
             FilePath := ScriptInformation["PersonalTomlPath"]
         } else {
-            FilePath := A_ScriptDir . "\..\hotstrings\" . LowerCat . ".toml"
+            FilePath := A_ScriptDir . "\..\..\hotstrings\" . LowerCat . ".toml"
         }
     }
 

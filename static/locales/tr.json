@@ -316,6 +316,7 @@
 	"hs_config.btn_all_grey": "Tümü gri",
 	"hs_config.btn_close": "Kapat",
 	"hs_config.btn_reset_all": "Tümünü sıfırla",
+	"hs_config.notify_reset_all": "Gecikmeler ve renkler sıfırlandı.",
 	"hs_config.btn_reset_default": "Varsayılanı geri yükle",
 	"hs_config.cat_autocorrection": "Otomatik düzeltme",
 	"hs_config.cat_distances": "Mesafe azaltma",

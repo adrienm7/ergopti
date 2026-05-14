@@ -338,6 +338,7 @@
 	"hs_config.btn_all_grey": "Alt grått",
 	"hs_config.btn_close": "Lukk",
 	"hs_config.btn_reset_all": "Tilbakestill alle",
+	"hs_config.notify_reset_all": "Forsinkelser og farger er tilbakestilt.",
 	"hs_config.btn_reset_default": "Gjenopprett standard",
 	"hs_config.cat_autocorrection": "Autocorrection",
 	"hs_config.cat_distances": "Avstandsreduksjon",
