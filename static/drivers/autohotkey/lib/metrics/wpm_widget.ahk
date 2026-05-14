@@ -49,7 +49,7 @@ class WPMWidgetConst {
     static H                  := 56
     ; Graph mode dimensions (wider to show history).
     static GRAPH_W            := 220
-    static GRAPH_H            := 80
+    static GRAPH_H            := 100
     ; Margin from screen edges (px).
     static EDGE_MARGIN        := 12
     ; How long (ms) after the last keystroke to show the idle state.
@@ -123,6 +123,10 @@ class WPMWidget {
     static _last_hs       := false
     static _last_ai       := false
     static _last_ac       := false
+    ; Timestamps of the last HS/AI/AC keystroke (for source_color_duration logic).
+    static _last_hs_tick  := 0
+    static _last_ai_tick  := 0
+    static _last_ac_tick  := 0
 
     ; Display options.
     static use_colors     := false
@@ -156,10 +160,17 @@ WPMWidget_Push(is_hs := false, is_ai := false, is_ac := false) {
     else
         WPMWidget._ring[head + 1] := entry
     WPMWidget._ring_head := Mod(head + 1, cap)
-    WPMWidget._last_tick := A_TickCount
+    now_t := A_TickCount
+    WPMWidget._last_tick := now_t
     WPMWidget._last_hs   := is_hs
     WPMWidget._last_ai   := is_ai
     WPMWidget._last_ac   := is_ac
+    if is_hs
+        WPMWidget._last_hs_tick := now_t
+    if is_ai
+        WPMWidget._last_ai_tick := now_t
+    if is_ac
+        WPMWidget._last_ac_tick := now_t
 }
 
 
@@ -285,49 +296,80 @@ WPMWidget_BuildCompact() {
 
 
 WPMWidget_BuildGraph() {
-    w := WPMWidgetConst.GRAPH_W
-    h := WPMWidgetConst.GRAPH_H
-
     g := Gui("+AlwaysOnTop -Caption +ToolWindow +E0x80000 -DPIScale", "ErgoptiPlus WPM Graph")
     g.BackColor := WPMWidgetConst.COLOR_BG_IDLE
     g.MarginX   := 0
     g.MarginY   := 0
-
-    lbl := g.AddText("x0 y0 w" . w . " h" . h . " BackgroundTrans", "")
-    lbl.OnEvent("Click", WPMWidget_DragStart)
 
     g.OnEvent("Close", (*) => WPMWidget_Hide())
 
     WPMWidget._graph_gui      := g
     WPMWidget._graph_wv       := false
     WPMWidget._graph_wv_ready := false
-
-    ; Attempt to embed WebView2 for canvas rendering.
-    try {
-        wvc := WebView2.CreateControllerAsync(g.Hwnd).Await()
-        wv  := wvc.CoreWebView2
-
-        ; Opaque dark background matching the Gui — avoids white flash on load.
-        try wvc.DefaultBackgroundColor := 0xFF1a1a2e
-
-        wvc.Bounds := { X: 0, Y: 0, Width: w, Height: h }
-
-        ; Set _graph_wv_ready only after the page has fully loaded so that
-        ; ExecuteScriptAsync calls don't race against page initialization.
-        ; Force a first render immediately so the canvas is not blank while
-        ; waiting for the next tick interval.
-        wv.add_NavigationCompleted(WPMWidget_OnNavCompleted)
-        wv.NavigateToString(WPMWidget_GraphHtml(w, h))
-
-        WPMWidget._graph_wv := wvc
-    }
-
-    WPMWidget._gui := g
 }
 
 
-WPMWidget_OnNavCompleted(_wv, _args) {
+; Attaches WebView2 to the graph Gui after it has been shown.
+; WebView2.CreateControllerAsync requires the host window to be visible.
+; Uses the callback form of WebView2.create so the controller Ptr is fully
+; initialised before we call any methods on it — the await() form can return
+; an object whose COM Ptr is still 0 when the Promise resolves.
+WPMWidget_AttachWebView() {
+    w := WPMWidgetConst.GRAPH_W
+    h := WPMWidgetConst.GRAPH_H
+    g := WPMWidget._graph_gui
+    if !g
+        return
+    loader := A_ScriptDir . "\vendor\64bit\WebView2Loader.dll"
+    udir   := A_Temp . "\ergopti_wpm_wv2_" . A_TickCount
+    DirCreate(udir)
+    hwnd := g.Hwnd
+    LoggerInfo("WPMWidget", "AttachWebView hwnd=" . hwnd . " loader_exists=" . (FileExist(loader) ? "yes" : "no"))
+    try {
+        WebView2.create(hwnd, WPMWidget_OnControllerReady, 0, udir, "", 0, loader)
+    } catch as e {
+        LoggerError("WPMWidget", "WebView2 create failed: " . e.Message . " (" . e.File . ":" . e.Line . ")")
+    }
+}
+
+
+; Called by WebView2 once the controller is fully ready.
+WPMWidget_OnControllerReady(wvc) {
+    try {
+        ; Opaque dark background — avoids white flash before the canvas renders.
+        try wvc.DefaultBackgroundColor := 0xFF1a1a2e
+
+        ; Fill() resizes the WebView to match the host window client rect.
+        wvc.Fill()
+
+        ; WebView2 ignores the Gui's -DPIScale flag and applies the system DPI
+        ; factor internally, so the logical pixels it renders into are smaller
+        ; than the physical pixels we requested. We pass those logical dimensions
+        ; to the HTML so the canvas coordinate system matches exactly.
+        dpi := DllCall("GetDpiForWindow", "ptr", WPMWidget._graph_gui.Hwnd, "uint")
+        if (dpi < 72)
+            dpi := 96
+        scale := dpi / 96
+        w := Round(WPMWidgetConst.GRAPH_W / scale)
+        h := Round(WPMWidgetConst.GRAPH_H / scale)
+        LoggerInfo("WPMWidget", "DPI=%d scale=%.2f logical w=%d h=%d.", dpi, scale, w, h)
+
+        wvc.CoreWebView2.NavigateToString(WPMWidget_GraphHtml(w, h))
+
+        WPMWidget._graph_wv := wvc
+        LoggerInfo("WPMWidget", "WebView2 controller ready — page loading.")
+
+        ; NavigateToString is async — wait 600 ms for the page to render before pushing.
+        SetTimer(WPMWidget_OnNavCompleted, -600)
+    } catch as e {
+        LoggerError("WPMWidget", "OnControllerReady failed: " . e.Message . " (" . e.File . ":" . e.Line . ")")
+    }
+}
+
+
+WPMWidget_OnNavCompleted() {
     WPMWidget._graph_wv_ready := true
+    LoggerInfo("WPMWidget", "Page ready — pushing first graph update.")
     WPMWidget_PushGraphUpdate("0", WPMWidgetConst.COLOR_TXT_IDLE, false, false, false, true)
 }
 
@@ -340,48 +382,36 @@ WPMWidget_GraphHtml(w, h) {
     ; a rounded rectangle so the pill shape is preserved without relying on
     ; window-level transparency. Background colour matches COLOR_BG_IDLE so the
     ; Gui backdrop and the canvas surface are visually identical on load.
+    ; Hammerspoon style: black semi-transparent rounded pill, white 14px label,
+    ; colored fill+stroke graph, label centered at top.
+    bgRgba := "rgba(0,0,0,0.8)"
     return "<!DOCTYPE html><html><head><meta charset='utf-8'><style>"
-        . "html,body{margin:0;padding:0;background:#1a1a2e;overflow:hidden}"
-        . "canvas{display:block}"
+        . "html,body{margin:0;padding:0;width:" . w . "px;height:" . h . "px;overflow:hidden;background:transparent}"
         . "</style></head><body>"
-        . "<canvas id='c' width='" . w . "' height='" . h . "'></canvas>"
+        . "<canvas id='c' width='" . w . "' height='" . h . "' style='position:absolute;left:0;top:0'></canvas>"
         . "<script>"
         . "const c=document.getElementById('c'),ctx=c.getContext('2d');"
-        . "const W=c.width,H=c.height,R=10;"
-        . "const PAD=6,LH=22,GH=H-LH-PAD*2,GW=W-PAD*2;"
+        . "const W=" . w . ",H=" . h . ";"
+        . "const PAD=5,TS=15,LH=TS*2,GH=H-LH-PAD*2,GW=W-PAD*2,R=8,FA=0.2;"
         . "function rr(x,y,w,h,r){ctx.beginPath();ctx.moveTo(x+r,y);ctx.arcTo(x+w,y,x+w,y+r,r);ctx.arcTo(x+w,y+h,x+w-r,y+h,r);ctx.arcTo(x,y+h,x,y+h-r,r);ctx.arcTo(x,y,x+r,y,r);ctx.closePath();}"
-        . "function drawBg(col){"
-        . "  ctx.fillStyle=col;rr(0,0,W,H,R);ctx.fill();"
-        . "}"
-        . "function drawLabel(txt,col){"
-        . "  ctx.fillStyle=col;ctx.font='bold 13px Segoe UI,Arial';"
-        . "  ctx.textAlign='center';ctx.textBaseline='middle';"
-        . "  ctx.fillText(txt,W/2,LH/2);"
-        . "}"
-        . "window.updateGraph=function(data){"
-        . "  const d=JSON.parse(data);"
-        . "  ctx.clearRect(0,0,W,H);"
-        . "  drawBg('#1a1a2e');"
-        . "  const n=d.hist.length;"
-        . "  if(n<2){drawLabel(d.label,'#'+d.txt);return;}"
-        . "  const mx=d.scale||120,step=GW/(n-1),col='#'+d.color;"
-        . "  ctx.save();"
-        . "  rr(0,0,W,H,R);ctx.clip();"
-        . "  ctx.beginPath();"
-        . "  ctx.moveTo(PAD,LH+PAD+GH);"
+        . "function drawBg(){ctx.fillStyle='" . bgRgba . "';rr(0,0,W,H,R);ctx.fill();ctx.strokeStyle='rgba(255,255,255,0.4)';ctx.lineWidth=1;ctx.stroke();}"
+        . "function drawLabel(txt){ctx.save();ctx.fillStyle='rgba(255,255,255,1)';ctx.font=TS+'px Segoe UI,Arial';ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText(txt,W/2,LH/2);ctx.restore();}"
+        . "window.updateGraph=function(d){"
+        . "  ctx.clearRect(0,0,W,H);drawBg();"
+        . "  const n=d.hist?d.hist.length:0,lbl=d.label||'—';"
+        . "  if(n<2){drawLabel(lbl);return;}"
+        . "  const mx=d.scale||120,step=GW/(n-1),col='#'+(d.color||'4499ff');"
+        . "  ctx.save();rr(0,0,W,H,R);ctx.clip();"
+        . "  ctx.beginPath();ctx.moveTo(PAD,LH+PAD+GH);"
         . "  for(let i=0;i<n;i++)ctx.lineTo(PAD+i*step,LH+PAD+GH-(d.hist[i]/mx)*GH);"
         . "  ctx.lineTo(PAD+(n-1)*step,LH+PAD+GH);ctx.closePath();"
-        . "  ctx.fillStyle=col+'44';ctx.fill();"
+        . "  ctx.globalAlpha=0.2;ctx.fillStyle=col;ctx.fill();ctx.globalAlpha=1;"
         . "  ctx.beginPath();"
-        . "  for(let i=0;i<n;i++){"
-        . "    const x=PAD+i*step,y=LH+PAD+GH-(d.hist[i]/mx)*GH;"
-        . "    i===0?ctx.moveTo(x,y):ctx.lineTo(x,y);"
-        . "  }"
+        . "  for(let i=0;i<n;i++){const x=PAD+i*step,y=LH+PAD+GH-(d.hist[i]/mx)*GH;i===0?ctx.moveTo(x,y):ctx.lineTo(x,y);}"
         . "  ctx.strokeStyle=col;ctx.lineWidth=2;ctx.stroke();"
-        . "  ctx.restore();"
-        . "  drawLabel(d.label,'#'+d.txt);"
-        . "}"
-        . "drawBg('#1a1a2e');drawLabel('...',  '#555577');"
+        . "  ctx.restore();drawLabel(lbl);"
+        . "};"
+        . "drawBg();drawLabel('—');"
         . "</script></body></html>"
 }
 
@@ -454,6 +484,11 @@ WPMWidget_Show() {
     gui_ref.Show("x" . WPMWidget.pos_x . " y" . WPMWidget.pos_y
         . " w" . w . " h" . h . " NoActivate")
     WinSetTransparent(WPMWidgetConst.ALPHA_ACTIVE, gui_ref)
+
+    ; WebView2 must be attached after the window is visible.
+    if WPMWidget.show_graph && !WPMWidget._graph_wv
+        WPMWidget_AttachWebView()
+
     SetTimer(WPMWidget_Tick, WPMWidgetConst.TICK_MS)
     LoggerSuccess("WPMWidget", "Widget shown at (%d, %d) mode=%s, wv_ready=%s.",
         WPMWidget.pos_x, WPMWidget.pos_y, WPMWidget.show_graph ? "graph" : "compact",
@@ -495,9 +530,10 @@ WPMWidget_Tick() {
     idle   := (now - WPMWidget._last_tick) > WPMWidgetConst.IDLE_AFTER_MS
     result := WPMWidget_Calc()
     wpm    := result["wpm"]
-    has_hs := result["has_hs"]
-    has_ai := result["has_ai"]
-    has_ac := result["has_ac"]
+    ; Source color only active for 1 s after the last event of that type.
+    has_hs := (now - WPMWidget._last_hs_tick) < 1000
+    has_ai := (now - WPMWidget._last_ai_tick) < 1000
+    has_ac := (now - WPMWidget._last_ac_tick) < 1000
 
     ; Update graph history.
     WPMWidget._graph_hist.Push(wpm)
@@ -549,8 +585,9 @@ WPMWidget_PushGraphUpdate(wpm_str, txt_col, has_hs, has_ai, has_ac, is_idle) {
         . ',"label":"' . label . '"'
         . ',"scale":' . WPMWidgetConst.GRAPH_SCALE_MAX . '}'
 
+    ; Pass the JSON object directly — no extra string wrapping needed.
     try WPMWidget._graph_wv.CoreWebView2.ExecuteScriptAsync(
-        "if(window.updateGraph)window.updateGraph(" . JSON_Escape(json) . ")")
+        "if(window.updateGraph)window.updateGraph(" . json . ")")
 }
 
 
