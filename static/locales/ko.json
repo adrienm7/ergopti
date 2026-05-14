@@ -7,6 +7,7 @@
 	"layout.ergoptialtgr": "Ergopti 레이아웃의 AltGr 레이어 에뮬레이션",
 	"layout.ergoptiplus": "Ergopti➕의 소규모 AltGr 변경 사항 적용",
 	"dynamichotstrings.datefr": "dt★ 현재 날짜 삽입 ({date})",
+	"dynamichotstrings.datelongfr": "date★ 긴 형식 날짜 삽입 ({date})",
 	"dynamichotstrings.date": "td★ 현재 날짜 삽입 ({date})",
 	"dynamichotstrings.phoneprefixes": "전화번호 앞 자리를 입력하면 자동 완성됩니다",
 	"dynamichotstrings.ssnprefixes": "주민등록번호 앞 자리를 입력하면 자동 완성됩니다",

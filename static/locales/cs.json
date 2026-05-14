@@ -7,6 +7,7 @@
 	"layout.ergoptialtgr": "Emulovat vrstvu AltGr rozložení Ergopti",
 	"layout.ergoptiplus": "Použít drobné změny AltGr pro Ergopti➕",
 	"dynamichotstrings.datefr": "dt★ vloží aktuální datum ({date})",
+	"dynamichotstrings.datelongfr": "date★ vloží dlouhé datum ({date})",
 	"dynamichotstrings.date": "td★ vloží aktuální datum ({date})",
 	"dynamichotstrings.phoneprefixes": "Zadání prvních číslic telefonu jej automaticky doplní",
 	"dynamichotstrings.ssnprefixes": "Zadání prvních číslic rodného čísla jej automaticky doplní",

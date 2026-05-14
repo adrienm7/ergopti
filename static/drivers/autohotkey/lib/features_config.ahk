@@ -29,8 +29,11 @@ global Features := Map(
     "__Order", ["Layout", "DistancesReduction", "SFBsReduction", "Rolls", "Autocorrection", "MagicKey",
         "DynamicHotstrings", "Shortcuts", "TapHolds", "Gestures"],
     "DynamicHotstrings", Map(
-        "__Order", ["DateFr", "Date", "PhonePrefixes", "SsnPrefixes", "IbanPrefixes", "-", "TextExpansionPersonalInformation"],
+        "__Order", ["DateFr", "DateLongFr", "Date", "PhonePrefixes", "SsnPrefixes", "IbanPrefixes", "-", "TextExpansionPersonalInformation"],
         "DateFr", {
+            Enabled: True,
+        },
+        "DateLongFr", {
             Enabled: True,
         },
         "Date", {

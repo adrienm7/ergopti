@@ -34,6 +34,7 @@ M.DEFAULT_STATE = {
 	personal_info                    = true,
 	dynamichotstrings_enabled        = true,
 	dynamichotstrings_datefr         = true,
+	dynamichotstrings_datelongfr     = true,
 	dynamichotstrings_date           = true,
 	dynamichotstrings_phoneprefixes  = true,
 	dynamichotstrings_ssnprefixes    = true,

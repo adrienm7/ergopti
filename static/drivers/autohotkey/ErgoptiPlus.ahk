@@ -529,7 +529,7 @@ CountDynamicSection(SectionName) {
     IbanRaw := StrReplace(Iban, " ", "")
 
     switch SectionName {
-        case "DateFr", "Date":
+        case "DateFr", "DateLongFr", "Date":
             return 1
         case "PhonePrefixes":
             N := 0
@@ -566,6 +566,12 @@ if Features.Has("DynamicHotstrings") {
         switch _DynKey {
             case "DateFr":
                 _DynVal.Description := StrReplace(StrReplace(t("dynamichotstrings.datefr"), "★", MK), "{date}", FormatTime(, "dd/MM/yyyy")) . CountSuffix
+            case "DateLongFr":
+                _DynDays   := ["dimanche", "lundi", "mardi", "mercredi", "jeudi", "vendredi", "samedi"]
+                _DynMonths := ["janvier", "février", "mars", "avril", "mai", "juin",
+                               "juillet", "août", "septembre", "octobre", "novembre", "décembre"]
+                _DynLongDate := _DynDays[A_WDay] . " " . FormatTime(, "d") . " " . _DynMonths[FormatTime(, "M") + 0] . " " . FormatTime(, "yyyy")
+                _DynVal.Description := StrReplace(StrReplace(t("dynamichotstrings.datelongfr"), "★", MK), "{date}", _DynLongDate) . CountSuffix
             case "Date":
                 _DynVal.Description := StrReplace(StrReplace(t("dynamichotstrings.date"), "★", MK), "{date}", FormatTime(, "yyyy_MM_dd")) . CountSuffix
             default:

@@ -7,6 +7,7 @@
   "layout.ergoptialtgr": "محاكاة طبقة AltGr لتخطيط Ergopti",
   "layout.ergoptiplus": "تطبيق تعديلات AltGr الطفيفة لـ Ergopti➕",
   "dynamichotstrings.datefr": "dt★ يُدرج التاريخ الحالي ({date})",
+  "dynamichotstrings.datelongfr": "date★ يُدرج التاريخ الطويل ({date})",
   "dynamichotstrings.date": "td★ يُدرج التاريخ الحالي ({date})",
   "dynamichotstrings.phoneprefixes": "كتابة الأرقام الأولى من رقم هاتفك يُكمله تلقائيًا",
   "dynamichotstrings.ssnprefixes": "كتابة الأرقام الأولى من رقم الضمان الاجتماعي يُكمله تلقائيًا",

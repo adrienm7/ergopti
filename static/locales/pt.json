@@ -7,6 +7,7 @@
 	"layout.ergoptialtgr": "Emular a camada AltGr do layout Ergopti",
 	"layout.ergoptiplus": "Aplicar as alterações menores de AltGr do Ergopti➕",
 	"dynamichotstrings.datefr": "dt★ insere a data atual ({date})",
+	"dynamichotstrings.datelongfr": "date★ insere a data longa ({date})",
 	"dynamichotstrings.date": "td★ insere a data atual ({date})",
 	"dynamichotstrings.phoneprefixes": "Digitar os primeiros dígitos do seu número de telefone completa automaticamente",
 	"dynamichotstrings.ssnprefixes": "Digitar os primeiros dígitos do seu número de seguridade social completa automaticamente",

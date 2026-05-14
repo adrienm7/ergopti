@@ -63,6 +63,7 @@ local KEY_MAP = {
 	dynamichotstrings_enabled            = { sec = "hotstrings", path = "dynamic", key = "enabled"      },
 	dynamichotstrings_date               = { sec = "hotstrings", path = "dynamic", key = "date"         },
 	dynamichotstrings_datefr             = { sec = "hotstrings", path = "dynamic", key = "datefr"       },
+	dynamichotstrings_datelongfr         = { sec = "hotstrings", path = "dynamic", key = "datelongfr"   },
 	dynamichotstrings_ibanprefixes       = { sec = "hotstrings", path = "dynamic", key = "ibanprefixes" },
 	dynamichotstrings_phoneprefixes      = { sec = "hotstrings", path = "dynamic", key = "phoneprefixes"},
 	dynamichotstrings_ssnprefixes        = { sec = "hotstrings", path = "dynamic", key = "ssnprefixes"  },

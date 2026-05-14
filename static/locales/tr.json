@@ -7,6 +7,7 @@
 	"layout.ergoptialtgr": "Ergopti düzeninin AltGr katmanını taklit et",
 	"layout.ergoptiplus": "Ergopti➕'ın küçük AltGr değişikliklerini uygula",
 	"dynamichotstrings.datefr": "dt★ geçerli tarihi ekler ({date})",
+	"dynamichotstrings.datelongfr": "date★ uzun tarihi ekler ({date})",
 	"dynamichotstrings.date": "td★ geçerli tarihi ekler ({date})",
 	"dynamichotstrings.phoneprefixes": "Telefon numaranızın ilk rakamlarını yazmak otomatik tamamlar",
 	"dynamichotstrings.ssnprefixes": "Sosyal güvenlik numaranızın ilk rakamlarını yazmak otomatik tamamlar",
