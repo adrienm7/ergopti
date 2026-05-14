@@ -140,11 +140,14 @@ LLM_Tray_Build() {
 	; is a no-op in AHK v2, so this branch is always safe.
 	try _LLM_Tray_Menu.Delete()
 
-	; Enable / Disable toggle — same ✅/❌ pattern as every other category submenu
+	; Enable / Disable toggle — show "activé" only when both the user has toggled
+	; the feature ON and Ollama is confirmed ready. Mirrors the parent checkmark
+	; logic so label and tray check are always in sync.
+	_llm_is_operational := (_LLM_Tray["enabled"] && LLM_Deps_IsReady())
 	AddCategoryToggleItem(_LLM_Tray_Menu,
 		t("menu.llm.on"),
 		t("menu.llm.off"),
-		_LLM_Tray["enabled"],
+		_llm_is_operational,
 		LLM_Tray_OnToggle)
 
 	; Model submenu
