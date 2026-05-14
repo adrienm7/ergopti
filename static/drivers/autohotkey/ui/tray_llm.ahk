@@ -178,6 +178,14 @@ LLM_Tray_Build() {
 		A_TrayMenu.Add(t("menu.llm.title"), _LLM_Tray_Menu)
 		_LLM_Tray_InTray := true
 	}
+
+	; Check the parent tray entry only when enabled AND Ollama is confirmed
+	; ready — mirrors the Hotstrings pattern where the checkmark signals that
+	; the feature is both toggled on and fully operational.
+	if (_LLM_Tray["enabled"] && LLM_Deps_IsReady())
+		A_TrayMenu.Check(t("menu.llm.title"))
+	else
+		try A_TrayMenu.Uncheck(t("menu.llm.title"))
 }
 
 /**
@@ -507,6 +515,8 @@ LLM_Tray_BuildOpts() {
  */
 LLM_Tray_OnDepsReady() {
 	global _LLM_Tray
+	; Rebuild so the parent tray entry gets its checkmark now that deps are ready.
+	LLM_Tray_Build()
 	if _LLM_Tray["enabled"]
 		LLM_Tray_StartBridge()
 }
