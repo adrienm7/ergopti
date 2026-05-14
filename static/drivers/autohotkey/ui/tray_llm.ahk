@@ -4,13 +4,16 @@
 ; MODULE: LLM Tray Menu UI
 ; DESCRIPTION:
 ; System tray menu for the LLM feature on Windows. Provides enable/disable
-; toggle, model selection, profile selection, and prediction count controls —
-; mirroring the Hammerspoon menu_llm feature set.
+; toggle, model selection, profile selection, prediction count controls,
+; trigger settings (debounce, instant on word end), and generation settings
+; (context length, min/max words, temperature) — mirroring the Hammerspoon
+; menu_llm feature set.
 ;
 ; FEATURES & RATIONALE:
 ; 1. Tray-native: uses AHK v2's A_TrayMenu / Menu API — no external UI.
 ; 2. Settings persistence: reads/writes settings via the shared config helpers.
 ; 3. Ollama check: shows an install prompt if Ollama is not running on startup.
+; 4. Lazy bootstrap: Ollama is never touched until the user explicitly enables IA.
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
@@ -27,6 +30,15 @@
 LLM_TRAY_TITLE     := t("menu.llm.title")
 LLM_TRAY_N_OPTIONS := [1, 2, 3]   ; available prediction count choices
 
+; Debounce options in milliseconds (mirrors HS trigger settings)
+LLM_TRAY_DEBOUNCE_OPTIONS := [300, 500, 600, 800, 1000, 1500, 2000]
+
+; Temperature options (0.0 = deterministic, 1.0 = creative)
+LLM_TRAY_TEMP_OPTIONS := ["0.0", "0.1", "0.2", "0.3", "0.5", "0.7", "1.0"]
+
+; Context length options (characters)
+LLM_TRAY_CTX_OPTIONS := [100, 200, 300, 500, 800, 1200]
+
 
 
 
@@ -37,13 +49,17 @@ LLM_TRAY_N_OPTIONS := [1, 2, 3]   ; available prediction count choices
 ; ======================================
 
 global _LLM_Tray := Map(
-	"enabled",       false,
-	"model",         "qwen2.5:3b",
-	"profile_id",    "basic",
-	"n_predictions", 1,
-	"min_words",     2,
-	"max_words",     8,
-	"language",      "fr"
+	"enabled",            false,
+	"model",              "qwen2.5:3b",
+	"profile_id",         "basic",
+	"n_predictions",      1,
+	"min_words",          2,
+	"max_words",          8,
+	"language",           "fr",
+	"debounce_ms",        600,
+	"ctx_chars",          300,
+	"temperature",        "0.1",
+	"instant_on_word_end", false
 )
 
 
@@ -63,19 +79,27 @@ LLM_Tray_Init(saved_opts := Map()) {
 	global _LLM_Tray
 
 	if saved_opts.Has("model")
-		_LLM_Tray["model"]         := saved_opts["model"]
+		_LLM_Tray["model"]               := saved_opts["model"]
 	if saved_opts.Has("profile_id")
-		_LLM_Tray["profile_id"]    := saved_opts["profile_id"]
+		_LLM_Tray["profile_id"]          := saved_opts["profile_id"]
 	if saved_opts.Has("n_predictions")
-		_LLM_Tray["n_predictions"] := saved_opts["n_predictions"]
+		_LLM_Tray["n_predictions"]       := saved_opts["n_predictions"]
 	if saved_opts.Has("min_words")
-		_LLM_Tray["min_words"]     := saved_opts["min_words"]
+		_LLM_Tray["min_words"]           := saved_opts["min_words"]
 	if saved_opts.Has("max_words")
-		_LLM_Tray["max_words"]     := saved_opts["max_words"]
+		_LLM_Tray["max_words"]           := saved_opts["max_words"]
 	if saved_opts.Has("language")
-		_LLM_Tray["language"]      := saved_opts["language"]
+		_LLM_Tray["language"]            := saved_opts["language"]
+	if saved_opts.Has("debounce_ms")
+		_LLM_Tray["debounce_ms"]         := saved_opts["debounce_ms"]
+	if saved_opts.Has("ctx_chars")
+		_LLM_Tray["ctx_chars"]           := saved_opts["ctx_chars"]
+	if saved_opts.Has("temperature")
+		_LLM_Tray["temperature"]         := saved_opts["temperature"]
+	if saved_opts.Has("instant_on_word_end")
+		_LLM_Tray["instant_on_word_end"] := saved_opts["instant_on_word_end"]
 	if saved_opts.Has("enabled")
-		_LLM_Tray["enabled"]       := saved_opts["enabled"]
+		_LLM_Tray["enabled"]             := saved_opts["enabled"]
 
 	LLM_Tray_Build()
 
@@ -103,25 +127,35 @@ LLM_Tray_Build() {
 	llm_menu := Menu()
 
 	; Enable / Disable toggle
-	toggle_label := _LLM_Tray["enabled"] ? "Désactiver les suggestions IA" : "Activer les suggestions IA"
+	toggle_label := _LLM_Tray["enabled"] ? t("menu.llm.toggle_disable") : t("menu.llm.toggle_enable")
 	llm_menu.Add(toggle_label, LLM_Tray_OnToggle)
 
 	llm_menu.Add()  ; separator
 
 	; Model submenu
 	model_menu := LLM_Tray_BuildModelMenu()
-	llm_menu.Add("Modèle : " _LLM_Tray["model"], model_menu)
+	llm_menu.Add(Format(t("menu.llm.model_label"), _LLM_Tray["model"]), model_menu)
 
 	; Profile submenu
 	profile_menu := LLM_Tray_BuildProfileMenu()
-	llm_menu.Add("Profil : " _LLM_Tray["profile_id"], profile_menu)
+	llm_menu.Add(Format(t("menu.profiles.profile_label_prefix"), _LLM_Tray["profile_id"]), profile_menu)
 
 	; Number of predictions submenu
 	n_menu := LLM_Tray_BuildNMenu()
-	llm_menu.Add("Suggestions : " _LLM_Tray["n_predictions"], n_menu)
+	llm_menu.Add(Format(t("menu.llm.num_predictions_label"), _LLM_Tray["n_predictions"]), n_menu)
 
 	llm_menu.Add()  ; separator
-	llm_menu.Add("À propos d'Ergopti IA", LLM_Tray_OnAbout)
+
+	; Trigger settings submenu
+	trigger_menu := LLM_Tray_BuildTriggerMenu()
+	llm_menu.Add(t("menu.llm.trigger_menu_title"), trigger_menu)
+
+	; Generation settings submenu
+	gen_menu := LLM_Tray_BuildGenerationMenu()
+	llm_menu.Add(t("menu.llm.generation_menu_title"), gen_menu)
+
+	llm_menu.Add()  ; separator
+	llm_menu.Add(t("menu.llm.about"), LLM_Tray_OnAbout)
 
 	; Attach to system tray — delete old entry first to avoid duplicates on rebuild
 	try A_TrayMenu.Delete(LLM_TRAY_TITLE)
@@ -138,8 +172,8 @@ LLM_Tray_BuildModelMenu() {
 	installed := LLM_OllamaListModels()
 
 	if (installed.Length == 0) {
-		m.Add("(aucun modèle installé)", (*) => 0)
-		m.Disable("(aucun modèle installé)")
+		m.Add(t("menu.llm.no_model"), (*) => 0)
+		m.Disable(t("menu.llm.no_model"))
 		return m
 	}
 
@@ -160,15 +194,11 @@ LLM_Tray_BuildProfileMenu() {
 	global _LLM_Tray
 	m := Menu()
 
-	profile_labels := Map(
-		"raw",            "Brut (contexte seul)",
-		"basic",          "Basique",
-		"advanced",       "Avancé (correction + complétion)",
-		"batch_advanced", "Avancé — lots"
-	)
+	profile_keys := ["raw", "basic", "advanced", "batch_advanced"]
 
-	for id, label in profile_labels {
+	for id in profile_keys {
 		captured_id := id
+		label := t("llm.profile." id ".label")
 		m.Add(label, (name, pos, menu) => LLM_Tray_SetProfile(captured_id))
 		if (id == _LLM_Tray["profile_id"])
 			m.Check(label)
@@ -185,11 +215,100 @@ LLM_Tray_BuildNMenu() {
 	m := Menu()
 	for n in LLM_TRAY_N_OPTIONS {
 		captured_n := n
-		label := String(n) " suggestion" (n > 1 ? "s" : "")
+		label := Format(t("menu.llm.prediction_count_label"), n, (n > 1 ? "s" : ""))
 		m.Add(label, (name, pos, menu) => LLM_Tray_SetN(captured_n))
 		if (n == _LLM_Tray["n_predictions"])
 			m.Check(label)
 	}
+	return m
+}
+
+/**
+ * Builds the trigger settings submenu (debounce delay, instant on word end).
+ * @returns {Menu} Populated trigger submenu.
+ */
+LLM_Tray_BuildTriggerMenu() {
+	global _LLM_Tray
+	m := Menu()
+
+	; Debounce delay sub-submenu
+	debounce_menu := Menu()
+	for ms in LLM_TRAY_DEBOUNCE_OPTIONS {
+		captured_ms := ms
+		label := Format(t("menu.llm.debounce_label"), ms " ms")
+		debounce_menu.Add(label, (name, pos, menu) => LLM_Tray_SetDebounce(captured_ms))
+		if (ms == _LLM_Tray["debounce_ms"])
+			debounce_menu.Check(label)
+	}
+	m.Add(Format(t("menu.llm.debounce_label"), _LLM_Tray["debounce_ms"] " ms"), debounce_menu)
+
+	m.Add()  ; separator
+
+	; Instant on word end toggle
+	instant_label := t("menu.llm.instant_on_word_end")
+	m.Add(instant_label, LLM_Tray_OnInstantToggle)
+	if _LLM_Tray["instant_on_word_end"]
+		m.Check(instant_label)
+
+	return m
+}
+
+/**
+ * Builds the generation settings submenu (context, min/max words, temperature).
+ * @returns {Menu} Populated generation submenu.
+ */
+LLM_Tray_BuildGenerationMenu() {
+	global _LLM_Tray
+	m := Menu()
+
+	; Context length sub-submenu
+	ctx_menu := Menu()
+	for chars in LLM_TRAY_CTX_OPTIONS {
+		captured_chars := chars
+		label := Format(t("menu.llm.context_length_label"), chars)
+		ctx_menu.Add(label, (name, pos, menu) => LLM_Tray_SetCtxChars(captured_chars))
+		if (chars == _LLM_Tray["ctx_chars"])
+			ctx_menu.Check(label)
+	}
+	m.Add(Format(t("menu.llm.context_length_label"), _LLM_Tray["ctx_chars"]), ctx_menu)
+
+	m.Add()  ; separator
+
+	; Min words sub-submenu
+	min_menu := Menu()
+	for n in [1, 2, 3, 4, 5] {
+		captured_n := n
+		label := Format(t("menu.llm.min_words_label"), n)
+		min_menu.Add(label, (name, pos, menu) => LLM_Tray_SetMinWords(captured_n))
+		if (n == _LLM_Tray["min_words"])
+			min_menu.Check(label)
+	}
+	m.Add(Format(t("menu.llm.min_words_label"), _LLM_Tray["min_words"]), min_menu)
+
+	; Max words sub-submenu
+	max_menu := Menu()
+	for n in [4, 6, 8, 10, 15, 20] {
+		captured_n := n
+		label := Format(t("menu.llm.max_words_label"), n)
+		max_menu.Add(label, (name, pos, menu) => LLM_Tray_SetMaxWords(captured_n))
+		if (n == _LLM_Tray["max_words"])
+			max_menu.Check(label)
+	}
+	m.Add(Format(t("menu.llm.max_words_label"), _LLM_Tray["max_words"]), max_menu)
+
+	m.Add()  ; separator
+
+	; Temperature sub-submenu
+	temp_menu := Menu()
+	for val in LLM_TRAY_TEMP_OPTIONS {
+		captured_val := val
+		label := Format(t("menu.llm.temperature_label"), val)
+		temp_menu.Add(label, (name, pos, menu) => LLM_Tray_SetTemperature(captured_val))
+		if (val == _LLM_Tray["temperature"])
+			temp_menu.Check(label)
+	}
+	m.Add(Format(t("menu.llm.temperature_label"), _LLM_Tray["temperature"]), temp_menu)
+
 	return m
 }
 
@@ -211,6 +330,13 @@ LLM_Tray_OnToggle(*) {
 	} else {
 		LLM_Bridge_Stop()
 	}
+	LLM_Tray_Build()
+}
+
+LLM_Tray_OnInstantToggle(*) {
+	global _LLM_Tray
+	_LLM_Tray["instant_on_word_end"] := !_LLM_Tray["instant_on_word_end"]
+	LLM_Engine_Init(LLM_Tray_BuildOpts())
 	LLM_Tray_Build()
 }
 
@@ -251,8 +377,43 @@ LLM_Tray_SetN(n) {
 	LLM_Tray_Build()
 }
 
+LLM_Tray_SetDebounce(ms) {
+	global _LLM_Tray
+	_LLM_Tray["debounce_ms"] := ms
+	LLM_Engine_Init(LLM_Tray_BuildOpts())
+	LLM_Tray_Build()
+}
+
+LLM_Tray_SetCtxChars(chars) {
+	global _LLM_Tray
+	_LLM_Tray["ctx_chars"] := chars
+	LLM_Engine_Init(LLM_Tray_BuildOpts())
+	LLM_Tray_Build()
+}
+
+LLM_Tray_SetMinWords(n) {
+	global _LLM_Tray
+	_LLM_Tray["min_words"] := n
+	LLM_Engine_Init(LLM_Tray_BuildOpts())
+	LLM_Tray_Build()
+}
+
+LLM_Tray_SetMaxWords(n) {
+	global _LLM_Tray
+	_LLM_Tray["max_words"] := n
+	LLM_Engine_Init(LLM_Tray_BuildOpts())
+	LLM_Tray_Build()
+}
+
+LLM_Tray_SetTemperature(val) {
+	global _LLM_Tray
+	_LLM_Tray["temperature"] := val
+	LLM_Engine_Init(LLM_Tray_BuildOpts())
+	LLM_Tray_Build()
+}
+
 LLM_Tray_OnAbout(*) {
-	MsgBox("Ergopti IA — Suggestions intelligentes au clavier`nBackend : Ollama (local)`nVersion : 1.0", LLM_TRAY_TITLE)
+	MsgBox(t("menu.llm.about_body"), LLM_TRAY_TITLE)
 }
 
 /**
@@ -269,12 +430,16 @@ LLM_Tray_StartBridge() {
 LLM_Tray_BuildOpts() {
 	global _LLM_Tray
 	return Map(
-		"model",         _LLM_Tray["model"],
-		"profile_id",    _LLM_Tray["profile_id"],
-		"n_predictions", _LLM_Tray["n_predictions"],
-		"min_words",     _LLM_Tray["min_words"],
-		"max_words",     _LLM_Tray["max_words"],
-		"language",      _LLM_Tray["language"]
+		"model",               _LLM_Tray["model"],
+		"profile_id",          _LLM_Tray["profile_id"],
+		"n_predictions",       _LLM_Tray["n_predictions"],
+		"min_words",           _LLM_Tray["min_words"],
+		"max_words",           _LLM_Tray["max_words"],
+		"language",            _LLM_Tray["language"],
+		"debounce_ms",         _LLM_Tray["debounce_ms"],
+		"ctx_chars",           _LLM_Tray["ctx_chars"],
+		"temperature",         _LLM_Tray["temperature"],
+		"instant_on_word_end", _LLM_Tray["instant_on_word_end"]
 	)
 }
 

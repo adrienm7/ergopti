@@ -1557,9 +1557,12 @@ initMenu() {
         A_TrayMenu.Check(HotstringsMenuTitle)
     }
 
+    ; ── IA / LLM — sits right after Hotstrings, mirroring the Hammerspoon menu order ──
+    LLM_Tray_Init()
+
     ; ── 📊 Métriques — mirrors the HS Métriques submenu position exactly:
-    ; sits between Hotstrings (+ the AI item, absent on the AHK side) and
-    ; the Shortcuts (Raccourcis) submenu. The parent entry doubles as a
+    ; sits between Hotstrings + AI and the Shortcuts (Raccourcis) submenu.
+    ; The parent entry doubles as a
     ; global ON/OFF toggle for the keylogger feature. OFF by default — it
     ; *is* a keylogger — and only flips ON after the user explicitly
     ; acknowledges the security warning. While OFF, the sub-items remain
@@ -1597,9 +1600,6 @@ initMenu() {
     if Features["Gestures"]["Enabled"].Enabled {
         A_TrayMenu.Check(GetCategoryTitle("Gestures"))
     }
-
-    ; ── IA / LLM — suggestions de complétion via Ollama ──
-    LLM_Tray_Init()
 
     A_TrayMenu.Add() ; Single separator between feature submenus and configuration items
 
