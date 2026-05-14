@@ -403,6 +403,17 @@ function M.try_repeat_feature(chars, is_ignored)
 	-- Refuse to repeat whitespace — repeating a space or newline is never useful.
 	if last_char == "" or last_char:match("^%s$") then return false end
 
+	-- Refuse to repeat the first letter of a word: the char before last_char
+	-- must itself be a non-whitespace letter. Without this guard "c★" would
+	-- fire at the start of a word (buffer = "c★"), where the user most likely
+	-- intended a text-expansion, not a repeat.
+	local before_last = last_char_offset > 1 and before:sub(1, last_char_offset - 1) or ""
+	local pred_offset = before_last ~= "" and utf8.offset(before_last, -1) or nil
+	local pred_char   = pred_offset and before_last:sub(pred_offset) or ""
+	if pred_char == "" or pred_char:match("^%s$") or not text_utils.is_letter_char(pred_char) then
+		return false
+	end
+
 	if not is_ignored and tooltip.hide then tooltip.hide() end
 
 	-- In ignored windows, the magic key is already on screen and must be deleted.

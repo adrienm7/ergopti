@@ -312,6 +312,63 @@ HSE_ApplyExpansion(Spec, Replacement, EndChar := "") {
 }
 
 
+; Attempt the magic-key repeat: when the user types <x><MagicKey> and x is
+; preceded by at least one non-terminator letter (i.e. x is not the first
+; letter of the word), emit <x><x> instead. This is the engine-level fallback
+; that replaced the now-removed [[repeat]] TOML entries — it fires only when no
+; registered hotstring already claimed the <x><MagicKey> sequence.
+;
+; Returns a minimal Spec-like object compatible with HSE_DispatchMatch (star
+; trigger, no end char) or "" when the repeat condition is not met.
+HSE_TryRepeatKey(MagicKey) {
+    global HSE_Buffer, HSE_StartIsWordBoundary, HSE_WORD_TERMINATORS
+    MkLen := StrLen(MagicKey)
+    BufLen := StrLen(HSE_Buffer)
+    ; Buffer must contain at least <x><MagicKey> = MkLen+1 chars.
+    if (BufLen <= MkLen) {
+        return ""
+    }
+    ; Verify the buffer ends with MagicKey.
+    if (SubStr(HSE_Buffer, -MkLen) !== MagicKey) {
+        return ""
+    }
+    ; The char being repeated is immediately before the magic key.
+    RepeatCharPos := BufLen - MkLen
+    RepeatChar := SubStr(HSE_Buffer, RepeatCharPos, 1)
+    ; Refuse to repeat whitespace or terminators.
+    if (RepeatChar == "" or InStr(HSE_WORD_TERMINATORS, RepeatChar) > 0) {
+        return ""
+    }
+    ; The char before RepeatChar must be a non-terminator letter — this
+    ; ensures the repeated char is at least the 2nd letter of the current word.
+    PredPos := RepeatCharPos - 1
+    if (PredPos < 1) {
+        ; RepeatChar is at the very start of the buffer — check boundary flag.
+        if HSE_StartIsWordBoundary {
+            return ""
+        }
+        ; Unknown context left of buffer — refuse to repeat.
+        return ""
+    }
+    PredChar := SubStr(HSE_Buffer, PredPos, 1)
+    if (InStr(HSE_WORD_TERMINATORS, PredChar) > 0) {
+        return ""
+    }
+    ; All checks passed — build a transient Spec and fire.
+    TriggerStr := RepeatChar . MagicKey
+    return {
+        Trigger:     TriggerStr,
+        Length:      StrLen(TriggerStr),
+        Star:        true,
+        InWord:      true,
+        IsRepeat:    true,
+        Replacement: RepeatChar . RepeatChar,
+        OnlyText:    true,
+        FinalResult: false
+    }
+}
+
+
 ; ============================================
 ; ============================================
 ; ======= 5/ Match logic =======
@@ -432,6 +489,20 @@ _HSE_BucketsFor(LookupChar) {
 _HSE_WordBoundaryAllows(Buf, Spec) {
     global HSE_StartIsWordBoundary, HSE_WORD_TERMINATORS
     if Spec.InWord {
+        ; Repeat triggers (x★ → xx) require that the char being repeated is at
+        ; least the 2nd letter of the current word — i.e. the char immediately
+        ; before it in the buffer must itself be a non-terminator. Without this
+        ; guard "c★" would fire at the start of a word (buffer = "c★"), where
+        ; the repeat is meaningless and the user likely intended a text-expansion.
+        if (Spec.HasOwnProp("IsRepeat") and Spec.IsRepeat) {
+            ; Trigger is "x★": body char sits at BeforeLen, its predecessor at BeforeLen-1.
+            BeforeLen := StrLen(Buf) - Spec.Length
+            if (BeforeLen < 1) {
+                return false
+            }
+            PredChar := SubStr(Buf, BeforeLen, 1)
+            return InStr(HSE_WORD_TERMINATORS, PredChar) == 0
+        }
         return true
     }
     BeforeLen := StrLen(Buf) - Spec.Length

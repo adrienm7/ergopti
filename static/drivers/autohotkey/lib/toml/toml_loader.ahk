@@ -312,7 +312,12 @@ LoadExtTomlFile(FilePath, CategoryLabel) {
         if StrictCase {
             Flags .= "C"
         }
-        Options := Map("TimeActivationSeconds", 0, "FinalResult", FinalResult)
+        ; Only flag as repeat when the trigger contains the magic-key marker — plain
+        ; text corrections in repeatcorrections (e.g. "ccê" → "ccu") must bypass
+        ; the repeat-specific word-position check that blocks 1st-letter firing.
+        IsRepeat := (StrLower(CategoryName) == "magickey" and StrLower(SectionName) == "repeatcorrections"
+            and InStr(Trigger, ScriptInformation["MagicKey"]) > 0)
+        Options := Map("TimeActivationSeconds", 0, "FinalResult", FinalResult, "IsRepeat", IsRepeat)
         if IsCaseSens {
             CreateHotstring(Flags, Trigger, Output, Options)
         } else {
