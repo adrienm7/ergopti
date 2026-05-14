@@ -325,13 +325,13 @@ HSE_ApplyExpansion(Spec, Replacement, EndChar := "") {
 ; Returns a minimal Spec-like object compatible with HSE_DispatchMatch (star
 ; trigger, no end char) or "" when the repeat condition is not met.
 HSE_TryRepeatKey(MagicKey) {
-    global HSE_Buffer, HSE_StartIsWordBoundary, HSE_WORD_TERMINATORS, HSE_RepeatEnabled
-    if !HSE_RepeatEnabled {
+    global HSE_Buffer, HSE_StartIsWordBoundary, HSE_WORD_TERMINATORS, HSE_RepeatEnabled, HSE_Suppressed
+    if !HSE_RepeatEnabled or HSE_Suppressed {
         return ""
     }
     MkLen := StrLen(MagicKey)
     BufLen := StrLen(HSE_Buffer)
-    ; Buffer must contain at least <x><MagicKey> = MkLen+1 chars.
+    ; Buffer must contain at least <x><RepeatChar><MagicKey> = MkLen+2 chars.
     if (BufLen <= MkLen) {
         return ""
     }
@@ -346,19 +346,24 @@ HSE_TryRepeatKey(MagicKey) {
     if (RepeatChar == "" or InStr(HSE_WORD_TERMINATORS, RepeatChar) > 0) {
         return ""
     }
-    ; The char before RepeatChar must be a non-terminator letter — this
-    ; ensures the repeated char is at least the 2nd letter of the current word.
+    ; The char before RepeatChar must exist and be a non-terminator — this ensures
+    ; RepeatChar is at least the 2nd letter of the current word.
     PredPos := RepeatCharPos - 1
     if (PredPos < 1) {
-        ; RepeatChar is at the very start of the buffer — check boundary flag.
-        if HSE_StartIsWordBoundary {
-            return ""
-        }
-        ; Unknown context left of buffer — refuse to repeat.
+        ; RepeatChar is flush at the start of the buffer — refuse to repeat because
+        ; we cannot confirm it is mid-word.
         return ""
     }
     PredChar := SubStr(HSE_Buffer, PredPos, 1)
     if (InStr(HSE_WORD_TERMINATORS, PredChar) > 0) {
+        return ""
+    }
+    ; When PredChar sits at position 1 of the buffer (PredPos == 1) and the buffer
+    ; start context is unknown (HSE_StartIsWordBoundary = false), we cannot confirm
+    ; RepeatChar is truly the 2nd+ letter of a word — refuse to avoid false-positive
+    ; doubling when a registered text-expansion with the same suffix happens to fail
+    ; its own word-boundary check.
+    if (PredPos == 1 and !HSE_StartIsWordBoundary) {
         return ""
     }
     ; All checks passed — build a transient Spec and fire.
