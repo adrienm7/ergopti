@@ -31,9 +31,9 @@
  * @returns {string} Absolute path, or "" if not found.
  */
 LLM_GetSharedPath(filename) {
-	; This file lives at: .../autohotkey/modules/llm/models.ahk
-	; _shared lives at:   .../autohotkey/../_shared/llm/
-	base := A_ScriptDir  ; typically .../autohotkey/
+	; A_ScriptDir is the directory of the root script (ErgoptiPlus.ahk),
+	; i.e. .../autohotkey/. _shared lives one level up: .../_shared/llm/
+	base := A_ScriptDir
 
 	candidates := [
 		base "\..\..\_shared\llm\" filename,

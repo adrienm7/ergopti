@@ -15,11 +15,6 @@
 
 #Requires AutoHotkey v2.0
 
-#Include ..\modules\llm\llm_bridge.ahk
-#Include ..\modules\llm\api_ollama.ahk
-#Include ..\modules\llm\profiles.ahk
-#Include ..\modules\llm\models.ahk
-
 
 
 

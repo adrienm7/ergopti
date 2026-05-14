@@ -121,6 +121,13 @@ SendMode("Event") ; Everything concerning hotstrings MUST use SendEvent and not 
 #Include modules/keylogger/keylogger_prefetch.ahk
 #Include modules/keylogger/keylogger_webview.ahk
 #Include modules/keylogger/keylogger_ui.ahk
+#Include modules/llm/api_ollama.ahk
+#Include modules/llm/models.ahk
+#Include modules/llm/profiles.ahk
+#Include modules/llm/prediction_engine.ahk
+#Include modules/llm/llm_bridge.ahk
+#Include ui/tooltip_llm.ahk
+#Include ui/tray_llm.ahk
 
 ; ======================================================
 ; ======================================================
@@ -1589,6 +1596,9 @@ initMenu() {
     if Features["Gestures"]["Enabled"].Enabled {
         A_TrayMenu.Check(GetCategoryTitle("Gestures"))
     }
+
+    ; ── IA / LLM — suggestions de complétion via Ollama ──
+    LLM_Tray_Init()
 
     A_TrayMenu.Add() ; Single separator between feature submenus and configuration items
 

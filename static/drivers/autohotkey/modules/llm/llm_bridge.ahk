@@ -18,9 +18,6 @@
 
 #Requires AutoHotkey v2.0
 
-#Include prediction_engine.ahk
-#Include ..\..\ui\tooltip_llm.ahk
-
 
 
 
