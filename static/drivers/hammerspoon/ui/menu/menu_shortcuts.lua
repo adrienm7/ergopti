@@ -13,9 +13,11 @@
 
 local M = {}
 local hs = hs
+local Logger        = require("lib.logger")
 local dialog        = require("lib.dialog_util")
 local shortcuts_mod = require("modules.shortcuts")
 local i18n          = require("lib.i18n")
+local LOG           = "menu_shortcuts"
 
 
 
@@ -272,6 +274,80 @@ function M.build(ctx)
 			disabled = not enabled or paused or nil,
 			menu     = script_items,
 		})
+	end
+
+	-- Extensions shortcuts section
+	do
+		local ext_root = ctx and ctx.base_dir and (ctx.base_dir .. "../../extensions/")
+		local ok_attr, attr = ext_root and pcall(hs.fs.attributes, ext_root) or false
+		if ok_attr and type(attr) == "table" and attr.mode == "directory" then
+			local ext_ids = {}
+			for fname in hs.fs.dir(ext_root) do
+				if fname ~= "." and fname ~= ".." then
+					local ok_a2, a2 = pcall(hs.fs.attributes, ext_root .. fname)
+					if ok_a2 and type(a2) == "table" and a2.mode == "directory" then
+						table.insert(ext_ids, fname)
+					end
+				end
+			end
+			table.sort(ext_ids)
+
+			local ext_menu_items = {}
+			for _, ext_id in ipairs(ext_ids) do
+				local ext_dir      = ext_root .. ext_id .. "/"
+				local menu_lua     = ext_dir .. "shortcuts/menu.lua"
+				local manifest     = ext_dir .. "manifest.toml"
+				local ok_ml, aml   = pcall(hs.fs.attributes, menu_lua)
+				if not (ok_ml and type(aml) == "table" and aml.mode == "file") then goto continue_sc_ext end
+
+				local ext_name = ext_id
+				local ok_m, am = pcall(hs.fs.attributes, manifest)
+				if ok_m and type(am) == "table" and am.mode == "file" then
+					local fh = io.open(manifest, "r")
+					if fh then
+						for line in fh:lines() do
+							local v = line:match('^name%s*=%s*"(.-)"')
+							if v then ext_name = v; break end
+						end
+						fh:close()
+					end
+				end
+
+				local collected = {}
+				-- Sandbox: expose only add_item(), t() and a safe hs reference
+				local sandbox = {
+					add_item  = function(item) if type(item) == "table" then table.insert(collected, item) end end,
+					t         = function(k) return i18n.get(k) end,
+					ext_name  = ext_name,
+					hs        = hs,
+				}
+				sandbox._G = sandbox
+
+				local ok_load, chunk_or_err = pcall(loadfile, menu_lua)
+				if ok_load and type(chunk_or_err) == "function" then
+					setfenv(chunk_or_err, sandbox)
+					local ok_run, run_err = pcall(chunk_or_err)
+					if not ok_run then
+						Logger.warn(LOG, "Extension '%s' menu.lua error: %s.", ext_id, tostring(run_err))
+					end
+				else
+					Logger.warn(LOG, "Could not load '%s': %s.", menu_lua, tostring(chunk_or_err))
+				end
+
+				if #collected > 0 then
+					table.insert(ext_menu_items, { title = ext_name, menu = collected })
+				end
+				::continue_sc_ext::
+			end
+
+			if #ext_menu_items > 0 then
+				table.insert(s_menu, { title = "-" })
+				table.insert(s_menu, { title = "— " .. i18n.get("menu.extensions.header") .. " —", disabled = true })
+				for _, it in ipairs(ext_menu_items) do
+					table.insert(s_menu, it)
+				end
+			end
+		end
 	end
 
 	item.menu = s_menu
