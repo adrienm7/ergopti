@@ -405,7 +405,14 @@ local function run_trigger_checks()
 	-- Auto candidates: triggers whose last codepoint equals the just-typed
 	-- char. Bucketed by Registry so we scan a handful of entries instead of
 	-- the full ~10-15k global list.
-	local auto_bucket = Registry.mappings_for_tail(chars)
+	-- When Karabiner sends a multi-codepoint sequence (e.g. NNBSP + "?"),
+	-- only the last codepoint keys the bucket — extract it so we find triggers
+	-- whose tail is "?" even when chars = " ?".
+	local tail_chars = char_len <= 1 and chars or (function()
+		local ok, off = pcall(utf8.offset, chars, -1)
+		return (ok and off) and chars:sub(off) or chars
+	end)()
+	local auto_bucket = Registry.mappings_for_tail(tail_chars)
 	if auto_bucket then
 		for _, m in ipairs(auto_bucket) do
 			if m.auto and mapping_fires(m)

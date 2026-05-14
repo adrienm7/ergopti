@@ -71,14 +71,14 @@ _BuildShiftCapsTables() {
 	; pending hotstring buffer is committed before the new symbol arrives.
 	SHIFT_SYMBOLS := Map(
 		"SC039", () => WrapTextIfSelected("-", "-", "-"),
-		"SC029", () => (ActivateHotstrings(), SendNewResult(" €")),
-		"SC00C", () => (ActivateHotstrings(), SendNewResult(" %")),
+		"SC029", () => (ActivateHotstrings(), SendNewResult(Chr(0x202F) "€")),
+		"SC00C", () => (ActivateHotstrings(), SendNewResult(Chr(0x202F) "%")),
 		"SC00D", SendNewResult.Bind("º"),
 		"SC01B", SendNewResult.Bind("_"),
-		"SC022", () => (ActivateHotstrings(), SendNewResult(" :")),
-		"SC02B", () => (ActivateHotstrings(), SendNewResult(" !")),
-		"SC02F", () => (ActivateHotstrings(), SendNewResult(" " Chr(0x3B))),
-		"SC035", () => (ActivateHotstrings(), SendNewResult(" ?")),
+		"SC022", () => (ActivateHotstrings(), SendNewResult(Chr(0x202F) ":")),
+		"SC02B", () => (ActivateHotstrings(), SendNewResult(Chr(0x202F) "!")),
+		"SC02F", () => (ActivateHotstrings(), SendNewResult(Chr(0x202F) Chr(0x3B))),
+		"SC035", () => (ActivateHotstrings(), SendNewResult(Chr(0x202F) "?")),
 	)
 
 	; CapsLock-layer symbol overrides. The deadkey-bearing keys (SC01B, SC02B)
