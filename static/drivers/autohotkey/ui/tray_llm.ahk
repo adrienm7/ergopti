@@ -355,13 +355,16 @@ LLM_Tray_OnToggle(*) {
 	global _LLM_Tray
 	_LLM_Tray["enabled"] := !_LLM_Tray["enabled"]
 	LLM_Tray_SaveConfig()
+	; Rebuild immediately so the menu reflects the new state before any async
+	; Ollama work starts. If bootstrap fails, OnDepsFailed flips enabled back
+	; to false and rebuilds again — the user always sees the true final state.
+	LLM_Tray_Build()
 	if _LLM_Tray["enabled"] {
-		; First activation: bootstrap Ollama (install if needed), then start bridge.
+		; Start bootstrap after rebuild so the toggle is visible without delay.
 		LLM_Tray_BootstrapOllama()
 	} else {
 		LLM_Bridge_Stop()
 	}
-	LLM_Tray_Build()
 }
 
 /**
