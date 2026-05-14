@@ -246,6 +246,129 @@ function M.generate(ctx, menu_mods, actions)
 			table.insert(hotstrings_menu, custom_item)
 		end
 
+		-- 4. Extensions hotstrings section
+		local ext_total, ext_has_count = 0, false
+		do
+			local ext_root = ctx.base_dir and (ctx.base_dir .. "../../extensions/")
+			local ok_attr, attr = ext_root and pcall(hs.fs.attributes, ext_root) or false
+			if ok_attr and type(attr) == "table" and attr.mode == "directory" then
+				local ext_ids = {}
+				for fname in hs.fs.dir(ext_root) do
+					if fname ~= "." and fname ~= ".." then
+						local fpath = ext_root .. fname
+						local ok_a2, a2 = pcall(hs.fs.attributes, fpath)
+						if ok_a2 and type(a2) == "table" and a2.mode == "directory" then
+							table.insert(ext_ids, fname)
+						end
+					end
+				end
+				table.sort(ext_ids)
+
+				--- Counts hotstring entries in a TOML file by scanning for quoted keys.
+				--- Each line starting with `"` inside a [[section]] block is one hotstring.
+				local function count_toml_hotstrings(path)
+					local total = 0
+					local sections = {}   -- { name, count }
+					local current = nil
+					local fh = io.open(path, "r")
+					if not fh then return 0, {} end
+					for line in fh:lines() do
+						local sec = line:match("^%[%[([A-Za-z0-9_%-]+)%]%]")
+						if sec then
+							current = sec
+							table.insert(sections, { name = sec, count = 0 })
+						elseif line:match('^"') and current then
+							sections[#sections].count = sections[#sections].count + 1
+							total = total + 1
+						end
+					end
+					fh:close()
+					return total, sections
+				end
+
+				--- Reads the extension display name from its manifest.toml.
+				local function read_ext_name(manifest_path)
+					local fh = io.open(manifest_path, "r")
+					if not fh then return nil end
+					for line in fh:lines() do
+						local v = line:match('^name%s*=%s*"(.-)"')
+						if v then fh:close(); return v end
+					end
+					fh:close()
+					return nil
+				end
+
+				local ext_items_built = {}
+				for _, ext_id in ipairs(ext_ids) do
+					local ext_dir    = ext_root .. ext_id .. "/"
+					local hs_dir     = ext_dir .. "hotstrings/"
+					local manifest   = ext_dir .. "manifest.toml"
+					local ok_m, am   = pcall(hs.fs.attributes, manifest)
+					if not (ok_m and type(am) == "table" and am.mode == "file") then goto continue_ext end
+					local ext_name   = read_ext_name(manifest) or ext_id
+
+					local ok_hd, ahd = pcall(hs.fs.attributes, hs_dir)
+					if not (ok_hd and type(ahd) == "table" and ahd.mode == "directory") then goto continue_ext end
+
+					local toml_stems = {}
+					for fname in hs.fs.dir(hs_dir) do
+						if fname:match("%.toml$") and not fname:match("^_") then
+							local stem = fname:match("^(.-)%.toml$")
+							if stem and stem ~= "" then table.insert(toml_stems, stem) end
+						end
+					end
+					table.sort(toml_stems)
+
+					local ext_hs_total = 0
+					local toml_submenus = {}
+					for _, stem in ipairs(toml_stems) do
+						local toml_path = hs_dir .. stem .. ".toml"
+						local total, sections = count_toml_hotstrings(toml_path)
+						ext_hs_total = ext_hs_total + total
+						local sec_menu = {}
+						for _, sec in ipairs(sections) do
+							table.insert(sec_menu, {
+								title    = sec.name .. " (" .. fmt_grand(sec.count) .. ")",
+								disabled = true,
+							})
+						end
+						local toml_label = stem .. (total > 0 and (" (" .. fmt_grand(total) .. ")") or "")
+						if #sec_menu > 0 then
+							table.insert(toml_submenus, { title = toml_label, menu = sec_menu })
+						else
+							table.insert(toml_submenus, { title = toml_label, disabled = true })
+						end
+					end
+
+					if ext_hs_total > 0 then ext_has_count = true end
+					ext_total = ext_total + ext_hs_total
+
+					local ext_label = ext_name .. (ext_hs_total > 0 and (" (" .. fmt_grand(ext_hs_total) .. ")") or "")
+					table.insert(ext_items_built, { title = ext_label, menu = toml_submenus })
+					::continue_ext::
+				end
+
+				if #ext_items_built > 0 then
+					table.insert(hotstrings_menu, { title = "-" })
+					local ext_base   = i18n.get("menu.extensions.header")
+					local ext_header = ext_has_count
+						and ("— " .. ext_base .. " (" .. fmt_grand(ext_total) .. ") —")
+						or  ("— " .. ext_base .. " —")
+					table.insert(hotstrings_menu, { title = ext_header, disabled = true })
+					for _, it in ipairs(ext_items_built) do
+						table.insert(hotstrings_menu, it)
+					end
+				end
+			end
+		end
+
+		-- Grand total now includes extensions
+		grand_total     = grand_total + ext_total
+		grand_has_count = grand_has_count or ext_has_count
+		hotstrings_title = grand_has_count
+			and ("⚡ Hotstrings (" .. fmt_grand(grand_total) .. ")")
+			or  "⚡ Hotstrings"
+
 		if #hotstrings_menu > 0 then
 			table.insert(items, {
 				title = hotstrings_title,
