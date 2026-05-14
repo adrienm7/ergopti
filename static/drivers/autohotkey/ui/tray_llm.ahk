@@ -25,8 +25,6 @@
 ; ======================================
 
 LLM_TRAY_TITLE     := "✨ Intelligence Artificielle"
-LLM_ICON_ACTIVE    := "✦"
-LLM_ICON_INACTIVE  := "◇"
 LLM_TRAY_N_OPTIONS := [1, 2, 3]   ; available prediction count choices
 
 
@@ -38,15 +36,15 @@ LLM_TRAY_N_OPTIONS := [1, 2, 3]   ; available prediction count choices
 ; ======================================
 ; ======================================
 
-global _LLM_Tray := {
-	enabled:      false,
-	model:        "qwen2.5:3b",
-	profile_id:   "basic",
-	n_predictions: 1,
-	min_words:    2,
-	max_words:    8,
-	language:     "fr",
-}
+global _LLM_Tray := Map(
+	"enabled",       false,
+	"model",         "qwen2.5:3b",
+	"profile_id",    "basic",
+	"n_predictions", 1,
+	"min_words",     2,
+	"max_words",     8,
+	"language",      "fr"
+)
 
 
 
@@ -64,20 +62,27 @@ global _LLM_Tray := {
 LLM_Tray_Init(saved_opts := Map()) {
 	global _LLM_Tray
 
-	if saved_opts.Has("model")         _LLM_Tray.model         := saved_opts["model"]
-	if saved_opts.Has("profile_id")    _LLM_Tray.profile_id    := saved_opts["profile_id"]
-	if saved_opts.Has("n_predictions") _LLM_Tray.n_predictions := saved_opts["n_predictions"]
-	if saved_opts.Has("min_words")     _LLM_Tray.min_words     := saved_opts["min_words"]
-	if saved_opts.Has("max_words")     _LLM_Tray.max_words     := saved_opts["max_words"]
-	if saved_opts.Has("language")      _LLM_Tray.language      := saved_opts["language"]
-	if saved_opts.Has("enabled")       _LLM_Tray.enabled       := saved_opts["enabled"]
+	if saved_opts.Has("model")
+		_LLM_Tray["model"]         := saved_opts["model"]
+	if saved_opts.Has("profile_id")
+		_LLM_Tray["profile_id"]    := saved_opts["profile_id"]
+	if saved_opts.Has("n_predictions")
+		_LLM_Tray["n_predictions"] := saved_opts["n_predictions"]
+	if saved_opts.Has("min_words")
+		_LLM_Tray["min_words"]     := saved_opts["min_words"]
+	if saved_opts.Has("max_words")
+		_LLM_Tray["max_words"]     := saved_opts["max_words"]
+	if saved_opts.Has("language")
+		_LLM_Tray["language"]      := saved_opts["language"]
+	if saved_opts.Has("enabled")
+		_LLM_Tray["enabled"]       := saved_opts["enabled"]
 
 	LLM_Tray_Build()
 
 	; Check Ollama availability and warn once
 	if !LLM_OllamaIsRunning() {
 		MsgBox("Ollama n'est pas démarré.`n`nLancez Ollama pour activer les suggestions IA.`nTéléchargement : https://ollama.com", LLM_TRAY_TITLE, "Icon!")
-	} else if _LLM_Tray.enabled {
+	} else if _LLM_Tray["enabled"] {
 		LLM_Tray_StartBridge()
 	}
 }
@@ -100,28 +105,28 @@ LLM_Tray_Build() {
 	llm_menu := Menu()
 
 	; Enable / Disable toggle
-	toggle_label := _LLM_Tray.enabled ? "Désactiver les suggestions IA" : "Activer les suggestions IA"
+	toggle_label := _LLM_Tray["enabled"] ? "Désactiver les suggestions IA" : "Activer les suggestions IA"
 	llm_menu.Add(toggle_label, LLM_Tray_OnToggle)
 
 	llm_menu.Add()  ; separator
 
 	; Model submenu
 	model_menu := LLM_Tray_BuildModelMenu()
-	llm_menu.Add("Modèle : " _LLM_Tray.model, model_menu)
+	llm_menu.Add("Modèle : " _LLM_Tray["model"], model_menu)
 
 	; Profile submenu
 	profile_menu := LLM_Tray_BuildProfileMenu()
-	llm_menu.Add("Profil : " _LLM_Tray.profile_id, profile_menu)
+	llm_menu.Add("Profil : " _LLM_Tray["profile_id"], profile_menu)
 
 	; Number of predictions submenu
 	n_menu := LLM_Tray_BuildNMenu()
-	llm_menu.Add("Suggestions : " _LLM_Tray.n_predictions, n_menu)
+	llm_menu.Add("Suggestions : " _LLM_Tray["n_predictions"], n_menu)
 
 	llm_menu.Add()  ; separator
 	llm_menu.Add("À propos d'Ergopti IA", LLM_Tray_OnAbout)
 
-	; Attach to system tray
-	A_TrayMenu.Add()
+	; Attach to system tray — delete old entry first to avoid duplicates on rebuild
+	try A_TrayMenu.Delete(LLM_TRAY_TITLE)
 	A_TrayMenu.Add(LLM_TRAY_TITLE, llm_menu)
 }
 
@@ -141,10 +146,9 @@ LLM_Tray_BuildModelMenu() {
 	}
 
 	for tag in installed {
-		; Capture loop variable for closure
 		captured_tag := tag
 		m.Add(tag, (name, pos, menu) => LLM_Tray_SetModel(captured_tag))
-		if (tag == _LLM_Tray.model)
+		if (tag == _LLM_Tray["model"])
 			m.Check(tag)
 	}
 	return m
@@ -168,7 +172,7 @@ LLM_Tray_BuildProfileMenu() {
 	for id, label in profile_labels {
 		captured_id := id
 		m.Add(label, (name, pos, menu) => LLM_Tray_SetProfile(captured_id))
-		if (id == _LLM_Tray.profile_id)
+		if (id == _LLM_Tray["profile_id"])
 			m.Check(label)
 	}
 	return m
@@ -185,7 +189,7 @@ LLM_Tray_BuildNMenu() {
 		captured_n := n
 		label := String(n) " suggestion" (n > 1 ? "s" : "")
 		m.Add(label, (name, pos, menu) => LLM_Tray_SetN(captured_n))
-		if (n == _LLM_Tray.n_predictions)
+		if (n == _LLM_Tray["n_predictions"])
 			m.Check(label)
 	}
 	return m
@@ -202,31 +206,31 @@ LLM_Tray_BuildNMenu() {
 
 LLM_Tray_OnToggle(*) {
 	global _LLM_Tray
-	_LLM_Tray.enabled := !_LLM_Tray.enabled
-	if _LLM_Tray.enabled
+	_LLM_Tray["enabled"] := !_LLM_Tray["enabled"]
+	if _LLM_Tray["enabled"]
 		LLM_Tray_StartBridge()
 	else
 		LLM_Bridge_Stop()
-	LLM_Tray_Build()   ; Rebuild to update label
+	LLM_Tray_Build()
 }
 
 LLM_Tray_SetModel(tag) {
 	global _LLM_Tray
-	_LLM_Tray.model := tag
+	_LLM_Tray["model"] := tag
 	LLM_Engine_Init(LLM_Tray_BuildOpts())
 	LLM_Tray_Build()
 }
 
 LLM_Tray_SetProfile(id) {
 	global _LLM_Tray
-	_LLM_Tray.profile_id := id
+	_LLM_Tray["profile_id"] := id
 	LLM_Engine_Init(LLM_Tray_BuildOpts())
 	LLM_Tray_Build()
 }
 
 LLM_Tray_SetN(n) {
 	global _LLM_Tray
-	_LLM_Tray.n_predictions := n
+	_LLM_Tray["n_predictions"] := n
 	LLM_Engine_Init(LLM_Tray_BuildOpts())
 	LLM_Tray_Build()
 }
@@ -249,12 +253,12 @@ LLM_Tray_StartBridge() {
 LLM_Tray_BuildOpts() {
 	global _LLM_Tray
 	return Map(
-		"model",         _LLM_Tray.model,
-		"profile_id",    _LLM_Tray.profile_id,
-		"n_predictions", _LLM_Tray.n_predictions,
-		"min_words",     _LLM_Tray.min_words,
-		"max_words",     _LLM_Tray.max_words,
-		"language",      _LLM_Tray.language
+		"model",         _LLM_Tray["model"],
+		"profile_id",    _LLM_Tray["profile_id"],
+		"n_predictions", _LLM_Tray["n_predictions"],
+		"min_words",     _LLM_Tray["min_words"],
+		"max_words",     _LLM_Tray["max_words"],
+		"language",      _LLM_Tray["language"]
 	)
 }
 
