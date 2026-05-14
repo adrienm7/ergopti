@@ -294,14 +294,14 @@ OpenHotstringsConfigWindow() {
 	DelayEdit := G.Add("Edit", "x+6 yp-3 w80 Number")
 	DelayUpDown := G.Add("UpDown", "Range0-10000", 0)
 	G.Add("Text", "x+4 yp+3 w24", "ms")
-	DelayDefault := G.Add("Text", "x+6 yp w308 Right", "")
+	DelayDefault := G.Add("Text", "x+6 yp w300 Right", "")
 	DelayReset := G.Add("Button", "x512 yp-3 w28 h24", "↺")
 
 	; ----- Color row -------------------------------------------------------
 	G.Add("Text", "xm y+10 w70 h20", t("hs_config.label_color"))
 	ColorDD := G.Add("DropDownList", "x+6 yp-3 w180", _HCW_ColorLabels())
 	ColorSwatch := G.Add("Progress", "x+8 yp+1 w22 h22 BackgroundCCCCCC", 100)
-	ColorDefault := G.Add("Text", "x+10 yp+2 w202 Right", "")
+	ColorDefault := G.Add("Text", "x+10 yp+2 w194 Right", "")
 	ColorReset := G.Add("Button", "x512 yp-2 w28 h24", "↺")
 
 	; ----- Tooltip toggle row (same group as delay/color, no HR before) ---
