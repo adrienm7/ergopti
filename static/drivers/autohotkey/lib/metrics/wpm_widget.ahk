@@ -40,8 +40,8 @@
 ; ===================================
 
 class WPMWidgetConst {
-    ; Rolling window over which WPM is averaged.
-    static WINDOW_MS          := 30000
+    ; Rolling window over which WPM is averaged (matches Hammerspoon 15 s for identical feel).
+    static WINDOW_MS          := 15000
     ; Timer tick — how often the display refreshes (ms).
     static TICK_MS            := 500
     ; Compact mode pill dimensions (px).
@@ -77,6 +77,8 @@ class WPMWidgetConst {
     static CFG_Y              := "WpmWidgetY"
     static CFG_COLORS         := "WpmWidgetColors"
     static CFG_GRAPH          := "WpmWidgetGraph"
+    ; Minimum window for WPM calculation — avoids inflated values from short bursts (mirrors Hammerspoon).
+    static WPM_MIN_DURATION_MS := 2000
     ; Ring buffer capacity for recent keystrokes.
     static RING_CAP           := 2000
     ; Number of history ticks kept for the graph.
@@ -202,9 +204,10 @@ WPMWidget_Calc() {
     }
     if (count < 2)
         return Map("wpm", 0, "has_hs", has_hs, "has_ai", has_ai, "has_ac", has_ac)
-    elapsed_ms := latest - earliest
-    if (elapsed_ms < 50)
-        return Map("wpm", 0, "has_hs", has_hs, "has_ai", has_ai, "has_ac", has_ac)
+    ; Use now as the right edge (mirrors Hammerspoon): as time passes after the
+    ; last keystroke the window grows and WPM decays naturally to 0.
+    ; latest - earliest would freeze the WPM at the last typed value.
+    elapsed_ms := Max(now - earliest, WPMWidgetConst.WPM_MIN_DURATION_MS)
     wpm := (count / 5) / (elapsed_ms / 60000)
     return Map("wpm", Round(wpm), "has_hs", has_hs, "has_ai", has_ai, "has_ac", has_ac)
 }
