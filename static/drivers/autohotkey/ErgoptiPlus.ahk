@@ -126,6 +126,7 @@ SendMode("Event") ; Everything concerning hotstrings MUST use SendEvent and not 
 #Include modules/llm/profiles.ahk
 #Include modules/llm/prediction_engine.ahk
 #Include modules/llm/llm_bridge.ahk
+#Include modules/llm/ollama_deps_checker.ahk
 #Include ui/tooltip_llm.ahk
 #Include ui/tray_llm.ahk
 

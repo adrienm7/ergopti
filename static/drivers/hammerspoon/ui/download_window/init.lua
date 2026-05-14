@@ -46,7 +46,13 @@ local _kind      = nil      -- Active kind, if any (mlx_install, ollama_install,
 local _mode      = "download" -- "download" (model download) or "bootstrap" (engine install)
 
 local _src  = debug.getinfo(1, "S").source:sub(2)
-local ASSETS_DIR = _src:match("^(.*[/\\])") or "./"
+local _own_dir   = _src:match("^(.*[/\\])") or "./"
+-- HTML/CSS/JS assets live in the cross-platform _shared/ folder so all
+-- drivers benefit from the same UI without duplication.
+local ASSETS_DIR = _own_dir:gsub(
+	"drivers/hammerspoon/ui/download_window/",
+	"drivers/_shared/ui/download_window/"
+)
 
 
 -- Per-kind presets (titles / subtitles / accent colors). Kept in Lua so
