@@ -239,13 +239,14 @@ OllamaWV_Create(kind, subtitle) {
 	; JS → AHK message bridge (cancel / retry buttons)
 	_OllamaWV_WebView.WebMessageReceived := OllamaWV_OnWebMessage
 
-	; Pre-load the locale JSON from disk and inject it as window._i18n_strings so
-	; i18n.js can call apply() without a fetch() — WebView2 blocks file:// XHR
-	; from file:// pages by default, making fetch() unreliable here.
+	; Inject i18n base URL and locale code before page scripts run.
+	; The JSON strings are pushed later via ExecuteScript in FlushQueue to avoid
+	; the AddScriptToExecuteOnDocumentCreated size limit (~100 KB).
+	locales_url := OllamaWV_LocalesUrl()
 	locale_code := _I18nLocale
-	i18n_script := OllamaWV_BuildI18nScript(locale_code)
-	try _OllamaWV_WebView.AddScriptToExecuteOnDocumentCreated(i18n_script, 0)
-	LoggerInfo("LLM", "i18n strings injected inline for locale=" locale_code ".")
+	seed_script := "window.__i18n_base='" locales_url "';window._i18n_locale='" locale_code "';"
+	try _OllamaWV_WebView.AddScriptToExecuteOnDocumentCreated(seed_script, 0)
+	LoggerInfo("LLM", "i18n seed injected: base=" locales_url " locale=" locale_code ".")
 
 	; Navigate to shared HTML
 	html_url := OllamaWV_HtmlUrl()
@@ -289,31 +290,35 @@ OllamaWV_HtmlUrl() {
 }
 
 /**
- * Reads the locale JSON from disk and returns a JS snippet that pre-populates
- * window._i18n_strings and calls i18n_apply() so data-i18n elements are filled
- * without relying on fetch() (which WebView2 blocks for file:// origins).
- * Falls back to an empty object when the JSON file is missing.
- * @param {string} locale_code - BCP-47 locale code e.g. "fr".
- * @returns {string} JS source string safe for AddScriptToExecuteOnDocumentCreated.
+ * Returns the file:// URL for the static/locales/ directory (trailing slash).
+ * Injected as window.__i18n_base so i18n.js fetches the correct locale file.
+ * @returns {string}
  */
-OllamaWV_BuildI18nScript(locale_code) {
+OllamaWV_LocalesUrl() {
+	global _StaticDir
+	base := _StaticDir . "\locales\"
+	return "file:///" . StrReplace(base, "\", "/")
+}
+
+/**
+ * Reads the locale JSON from disk and returns a JS ExecuteScript call that
+ * populates window._i18n_strings and calls i18n_apply(). Delivered via
+ * ExecuteScript (no size limit) rather than AddScriptToExecuteOnDocumentCreated.
+ * @param {string} locale_code - BCP-47 locale code e.g. "fr".
+ * @returns {string} JS expression to pass to ExecuteScript.
+ */
+OllamaWV_I18nApplyScript(locale_code) {
 	global _StaticDir
 	json_path := _StaticDir . "\locales\" . locale_code . ".json"
 	json_str  := ""
-	if FileExist(json_path) {
+	if FileExist(json_path)
 		try json_str := FileRead(json_path, "UTF-8")
-	}
 	if (json_str == "") {
 		LoggerError("LLM", "i18n locale file not found: " json_path ".")
 		json_str := "{}"
 	}
-	; Inject as window._i18n_strings and call i18n_apply once the DOM is ready.
-	; i18n_apply is defined by i18n.js which runs before script.js.
-	return "window._i18n_strings=" json_str ";"
-		. "if(document.readyState==='loading'){"
-		. "document.addEventListener('DOMContentLoaded',function(){"
-		. "if(typeof window.i18n_apply==='function')window.i18n_apply(window._i18n_strings);});"
-		. "}else{if(typeof window.i18n_apply==='function')window.i18n_apply(window._i18n_strings);}"
+	return "window._i18n_strings=" json_str
+		. ";if(typeof window.i18n_apply==='function')window.i18n_apply(window._i18n_strings);"
 }
 
 
@@ -346,12 +351,19 @@ OllamaWV_EvalJS(js) {
 /**
  * Drains the queued JS calls in FIFO order.
  * Called when the page posts "ready" or after the 2-second safety timeout.
+ * Also pushes the locale JSON at this point — after the DOM is ready —
+ * so i18n_apply() can walk live DOM nodes instead of a not-yet-parsed tree.
  */
 OllamaWV_FlushQueue() {
 	global _OllamaWV_WebView, _OllamaWV_Ready, _OllamaWV_Queue
 	if !IsSet(_OllamaWV_WebView)
 		return
+	if _OllamaWV_Ready   ; Guard: flush must only run once
+		return
 	_OllamaWV_Ready := true
+	; Inject the full locale strings now that the DOM exists
+	i18n_js := OllamaWV_I18nApplyScript(_I18nLocale)
+	try _OllamaWV_WebView.ExecuteScript(i18n_js, 0)
 	for js in _OllamaWV_Queue
 		try _OllamaWV_WebView.ExecuteScript(js, 0)
 	_OllamaWV_Queue := []
