@@ -19,8 +19,11 @@
 ;    done via OllamaWV_* so macOS and Windows show the same window.
 ; 4. Rich progress parsing: extracts percentage, downloaded/total size, speed,
 ;    and ETA from ollama pull output lines and pushes them to the UI.
-; 5. Tri-state lifecycle: callers read LLM_Deps_GetState() — "pending" /
-;    "ready" / "failed" — identical to the Lua pattern.
+; 5. No-block execution: the Ollama reachability check and PS1 process are run
+;    from a SetTimer callback — never from the main AHK thread — so the
+;    keyboard and hotkeys remain fully responsive during install.
+; 6. Hidden PowerShell: stdout is redirected to a temp file so no console
+;    window appears; the poll timer tails that file every 500 ms.
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
@@ -38,6 +41,8 @@ global _LLM_Deps_State          := "pending"   ; "pending" | "ready" | "failed"
 global _LLM_Deps_FailureMessage := ""
 global _LLM_Deps_Checking       := false        ; guard against concurrent calls
 global _LLM_Deps_PollTimer      := unset        ; lambda reference kept for explicit cancellation
+global _LLM_Deps_OutFile        := ""           ; temp file path for PS1 stdout
+global _LLM_Deps_OutPos         := 0            ; byte offset already consumed from OutFile
 
 
 
@@ -96,7 +101,9 @@ LLM_Deps_GetFailureMessage() {
 /**
  * Asynchronously verifies and bootstraps the Ollama backend.
  * Safe to call repeatedly: fast-paths silently when already running.
- * @param {string} default_model - Ollama tag to pull if not yet available (e.g. "qwen2.5:3b").
+ * The reachability check itself runs from a one-shot timer so the
+ * main AHK thread (and therefore the keyboard) is never blocked.
+ * @param {string} default_model - Ollama tag to pull if not yet available.
  * @param {Func} on_ready - Optional callback fired when the server is confirmed ready.
  * @param {Func} on_failed - Optional callback fired on permanent failure.
  */
@@ -116,8 +123,21 @@ LLM_Deps_CheckAndInstall(default_model := "qwen2.5:3b", on_ready := unset, on_fa
 	if (_LLM_Deps_State == "failed")
 		_LLM_Deps_State := "pending"
 
-	; Fast path: server already running
-	LoggerInfo("LLM", "Checking if Ollama is running…")
+	; Defer the blocking HTTP check to a timer so the main thread stays free.
+	; The lambda captures the parameters for the slow path.
+	LoggerInfo("LLM", "Scheduling async Ollama reachability check…")
+	SetTimer(() => LLM_Deps_AsyncCheck(default_model, on_ready, on_failed), -1)
+}
+
+/**
+ * Runs inside a one-shot timer: checks Ollama reachability then either
+ * fast-paths or launches the installer. Called on a timer so the main
+ * AHK thread is not blocked by the synchronous WinHTTP call.
+ */
+LLM_Deps_AsyncCheck(default_model, on_ready, on_failed) {
+	global _LLM_Deps_Checking, _LLM_Deps_State
+
+	LoggerInfo("LLM", "AsyncCheck — checking if Ollama is running…")
 	if LLM_OllamaIsRunning() {
 		LoggerInfo("LLM", "Ollama already running — fast path, state → ready.")
 		_LLM_Deps_State    := "ready"
@@ -127,7 +147,6 @@ LLM_Deps_CheckAndInstall(default_model := "qwen2.5:3b", on_ready := unset, on_fa
 		return
 	}
 
-	; Slow path: run the PowerShell installer in a background thread
 	LoggerInfo("LLM", "Ollama not running — launching installer…")
 	LLM_Deps_RunInstaller(default_model, on_ready, on_failed)
 }
@@ -142,121 +161,152 @@ LLM_Deps_CheckAndInstall(default_model := "qwen2.5:3b", on_ready := unset, on_fa
 ; =============================================
 
 /**
- * Locates the shared PS1 installer and runs it in a hidden PowerShell process.
- * Streams stdout line-by-line to update the WebView UI.
+ * Locates the shared PS1 installer and launches it completely hidden by
+ * redirecting its stdout to a temp file. A poll timer tails the file
+ * every 500 ms to feed lines to the WebView UI.
  * @param {string} model - Model tag to pass to the installer.
  * @param {Func} on_ready - Callback on success.
  * @param {Func} on_failed - Callback on failure.
  */
 LLM_Deps_RunInstaller(model, on_ready, on_failed) {
+	global _LLM_Deps_OutFile, _LLM_Deps_OutPos, _LLM_Deps_PollTimer
+
 	ps1_path := LLM_GetSharedPath("install\ollama_install.ps1")
 	LoggerInfo("LLM", "PS1 path resolved: '" ps1_path "'.")
 	if (ps1_path == "") {
-		LoggerError("LLM", "ollama_install.ps1 not found in _shared/llm/install/ — aborting.")
-		LLM_Deps_Fail("Installeur ollama_install.ps1 introuvable dans _shared/llm/install/.", on_failed)
+		LoggerError("LLM", "ollama_install.ps1 not found — aborting.")
+		LLM_Deps_Fail("Installeur ollama_install.ps1 introuvable.", on_failed)
 		return
 	}
 
-	; Show WebView progress window before launching so user sees feedback immediately
-	OllamaWV_Show("ollama_install", "", , (*) => LLM_Deps_RunInstaller(model, on_ready, on_failed))
+	; Show WebView progress window before launching
+	OllamaWV_Show("ollama_install", t("ollama.install_title"),
+		, (*) => LLM_Deps_RunInstaller(model, on_ready, on_failed))
 
-	; Build PowerShell command: run script hidden, capture output line-by-line
-	cmd := 'powershell.exe -NoProfile -ExecutionPolicy Bypass -File "' ps1_path '" -Model "' model '"'
-	LoggerInfo("LLM", "Launching PS1: " cmd ".")
+	; Temp file that receives PS1 stdout (avoids a visible console window)
+	_LLM_Deps_OutFile := A_Temp . "\ergopti_ollama_out_" . A_TickCount . ".txt"
+	_LLM_Deps_OutPos  := 0
 
-	; Run asynchronously via a ComObject shell exec + polling timer
+	; Build command: redirect both stdout and stderr to the temp file,
+	; run entirely hidden via the cmd /c wrapper with START /B
+	cmd := 'cmd.exe /c powershell.exe -NoProfile -WindowStyle Hidden -ExecutionPolicy Bypass'
+		. ' -File "' ps1_path '" -Model "' model '"'
+		. ' > "' _LLM_Deps_OutFile '" 2>&1'
+	LoggerInfo("LLM", "Launching (hidden): " cmd ".")
+
+	; shell.Run returns immediately without exposing a console window.
+	; bWaitOnReturn=false + intWindowStyle=0 (hidden)
 	try {
 		shell := ComObject("WScript.Shell")
-		proc  := shell.Exec(cmd)
-		LoggerInfo("LLM", "PS1 process launched (Status=" proc.Status ").")
+		; Run returns the PID; we cannot poll Status on it, so we track
+		; process completion by watching when stdout stops growing and
+		; the PS1 process disappears from the task list.
+		pid := shell.Run(cmd, 0, false)
+		LoggerInfo("LLM", "PS1 process launched, PID=" pid ".")
 	} catch as err {
 		LoggerError("LLM", "Failed to launch PowerShell: " err.Message ".")
 		LLM_Deps_Fail("Impossible de lancer PowerShell : " err.Message, on_failed)
 		return
 	}
 
-	; Poll every 500 ms for new output lines and process completion.
-	; Store the lambda reference so PollProcess can cancel it explicitly —
-	; SetTimer(, 0) only works when the caller IS the timer function, not
-	; when it is a helper called from a lambda wrapper.
-	global _LLM_Deps_PollTimer
-	_LLM_Deps_PollTimer := () => LLM_Deps_PollProcess(proc, on_ready, on_failed)
+	; Poll every 500 ms: read new lines from the temp file, detect completion
+	; by checking whether the powershell.exe process is still alive.
+	_LLM_Deps_PollTimer := () => LLM_Deps_PollFile(pid, on_ready, on_failed)
 	SetTimer(_LLM_Deps_PollTimer, 500)
-	LoggerInfo("LLM", "Poll timer started.")
+	LoggerInfo("LLM", "Poll timer started (file: " _LLM_Deps_OutFile ").")
 }
 
 /**
- * Polling callback: reads pending output from the process, updates WebView UI,
- * and detects completion.
- * @param {Object} proc - WScript.Shell Exec object.
+ * Polling callback: reads new content from the PS1 output file and
+ * detects process completion by checking whether the PID is still alive.
+ * @param {integer} pid - PID returned by shell.Run.
  * @param {Func} on_ready - Callback on success.
  * @param {Func} on_failed - Callback on failure.
  */
-LLM_Deps_PollProcess(proc, on_ready, on_failed) {
-	global _LLM_Deps_Checking
+LLM_Deps_PollFile(pid, on_ready, on_failed) {
+	global _LLM_Deps_OutFile, _LLM_Deps_OutPos, _LLM_Deps_Checking, _LLM_Deps_PollTimer
 
-	; Read all available stdout lines
-	try {
-		while !proc.StdOut.AtEndOfStream {
-			line := proc.StdOut.ReadLine()
-			LLM_Deps_HandleLine(line)
-		}
-	}
+	; Read any new bytes from the output file
+	LLM_Deps_DrainOutputFile()
 
-	; Check if process finished
-	if (proc.Status == 0)   ; 0 = running, 1 = finished, 2 = error
+	; Check if the process is still running by testing its existence
+	still_running := ProcessExist(pid) ? true : false
+	if still_running
 		return   ; still running — timer will fire again
 
-	LoggerInfo("LLM", "PS1 process finished — Status=" proc.Status " ExitCode=" proc.ExitCode ".")
+	; Process finished — do one final drain then evaluate the exit state
+	LoggerInfo("LLM", "PS1 process (PID=" pid ") no longer running.")
 
-	; Stop the polling timer using the stored lambda reference
-	global _LLM_Deps_PollTimer
+	; Stop the poll timer
 	if IsSet(_LLM_Deps_PollTimer)
 		SetTimer(_LLM_Deps_PollTimer, 0)
 
-	; Drain remaining output
-	try {
-		while !proc.StdOut.AtEndOfStream {
-			line := proc.StdOut.ReadLine()
-			LLM_Deps_HandleLine(line)
-		}
-	}
+	; Final drain
+	LLM_Deps_DrainOutputFile()
+
+	; Clean up temp file
+	try FileDelete(_LLM_Deps_OutFile)
 
 	_LLM_Deps_Checking := false
-	exit_code := proc.ExitCode
 
-	if (exit_code == 0) {
-		; Verify server is now reachable
-		LoggerInfo("LLM", "PS1 exited 0 — verifying Ollama reachability…")
-		if LLM_OllamaIsRunning() {
-			LoggerInfo("LLM", "Ollama confirmed running — state → ready.")
-			OllamaWV_SetStep("✅ Ollama prêt")
-			OllamaWV_Done(true, "✅ Ollama prêt")
-			global _LLM_Deps_State := "ready"
-			if IsSet(on_ready)
-				on_ready()
-		} else {
-			LoggerError("LLM", "PS1 exited 0 but Ollama not reachable.")
-			LLM_Deps_Fail("Installeur terminé mais le serveur Ollama ne répond pas.", on_failed)
-		}
+	; We cannot read the exit code from shell.Run. Instead we verify
+	; Ollama reachability directly — if the server answers, install succeeded.
+	LoggerInfo("LLM", "Verifying Ollama reachability after PS1 exit…")
+	if LLM_OllamaIsRunning() {
+		LoggerInfo("LLM", "Ollama confirmed running — state → ready.")
+		OllamaWV_Done(true, "✅ Ollama prêt")
+		global _LLM_Deps_State := "ready"
+		if IsSet(on_ready)
+			on_ready()
 	} else {
-		LoggerError("LLM", "PS1 exited with code " exit_code ".")
-		LLM_Deps_Fail("L'installeur a échoué (code " exit_code ").", on_failed)
+		LoggerError("LLM", "PS1 exited but Ollama is not reachable.")
+		LLM_Deps_Fail("Installeur terminé mais le serveur Ollama ne répond pas.", on_failed)
+	}
+}
+
+/**
+ * Reads all new content from the PS1 output file since the last read
+ * position, splits it into lines, and routes each line to HandleLine.
+ */
+LLM_Deps_DrainOutputFile() {
+	global _LLM_Deps_OutFile, _LLM_Deps_OutPos
+
+	if !FileExist(_LLM_Deps_OutFile)
+		return
+
+	try {
+		f := FileOpen(_LLM_Deps_OutFile, "r", "UTF-8-RAW")
+		if !f
+			return
+		f.Seek(_LLM_Deps_OutPos, 0)
+		new_content := f.Read()
+		_LLM_Deps_OutPos := f.Pos
+		f.Close()
+	} catch {
+		return
+	}
+
+	if (new_content == "")
+		return
+
+	; Split on newlines and process each line
+	loop parse, new_content, "`n", "`r" {
+		line := A_LoopField
+		if (line != "")
+			LLM_Deps_HandleLine(line)
 	}
 }
 
 /**
  * Routes a single output line to the appropriate WebView update.
- * Marker lines drive the step label; progress lines are parsed for stats;
- * all other lines go to the log area.
- * @param {string} line - Raw line from the installer stdout.
+ * @param {string} line - Raw line from the installer stdout file.
  */
 LLM_Deps_HandleLine(line) {
 	line := Trim(line)
 	if (line == "")
 		return
 
-	; Marker lines drive the step label (same protocol as the bash/PS1 script)
+	; Marker lines drive the step label (same protocol as the PS1 script)
 	if (line == "OLLAMA_INSTALLING") {
 		LoggerInfo("LLM", "Marker: OLLAMA_INSTALLING.")
 		OllamaWV_SetStep("⬇️ Téléchargement d'Ollama…")
@@ -273,54 +323,48 @@ LLM_Deps_HandleLine(line) {
 		return
 	}
 
-	; Progress lines from "ollama pull" look like:
-	;   pulling abc123... 100% ▕████████▏ 847 MB/2.3 GB 2.5 MB/s 9m30s
-	; or the simpler PS1 echo: "Téléchargement du modèle qwen2.5:3b…"
+	; Progress lines from "ollama pull" — try to parse and push stats
 	if LLM_Deps_TryParseProgress(line)
 		return
 
-	; All other lines go to the terminal log area and detail line
+	; All other lines go to the terminal log area
 	OllamaWV_SetDetail(line)
 	OllamaWV_AddLog(line)
 }
 
 /**
  * Attempts to parse an ollama pull progress line and push stats to the WebView.
- * Returns true when the line was a progress line and was consumed.
+ * Returns true when the line was a recognised progress line.
  * @param {string} line - Raw output line.
  * @returns {boolean}
  */
 LLM_Deps_TryParseProgress(line) {
-	; Match the typical ollama pull streaming output:
-	;   "pulling <hash>... <pct>% ▕...▏ <downloaded>/<total> <speed> <eta>"
-	; The bar characters (▕▏) may or may not be present.
-	; Minimum pattern: something% ... <number><unit> <number><unit>
+	; Ollama pull lines look like:
+	;   pulling abc123... 47% ▕████  ▏ 1.1 GB/2.3 GB 12 MB/s 1m34s
+	; Require at least a percentage match to identify a progress line.
+	if !RegExMatch(line, "(\d+)%", &m)
+		return false
 
-	; Extract percentage
-	pct := 0
-	if RegExMatch(line, "(\d+)%", &m)
-		pct := Integer(m[1])
-	else
-		return false   ; not a progress line
+	pct := Integer(m[1])
 
-	; Extract downloaded/total size (e.g. "847 MB/2.3 GB" or "847 MB / 2.3 GB")
+	; Extract downloaded/total (e.g. "1.1 GB/2.3 GB")
 	dl_str := ""
 	if RegExMatch(line, "(\d+\.?\d*\s*[KMGkmg]?B)\s*/\s*(\d+\.?\d*\s*[KMGkmg]?B)", &ms)
 		dl_str := ms[1] " / " ms[2]
 
-	; Extract speed (e.g. "2.5 MB/s")
+	; Extract speed (e.g. "12 MB/s")
 	speed_str := ""
 	if RegExMatch(line, "(\d+\.?\d*\s*[KMGkmg]?B/s)", &mv)
 		speed_str := mv[1]
 
-	; Extract ETA (e.g. "9m30s" or "2h 5m" or "45s")
+	; Extract ETA (e.g. "1m34s", "45s", "2h5m")
 	eta_str := ""
-	if RegExMatch(line, "(\d+[hms]\d*[ms]?\d*[s]?)$", &me)
+	if RegExMatch(line, "\s(\d+[hms]\d*[ms]?\d*[s]?)\s*$", &me)
 		eta_str := me[1]
 
-	; Switch to download mode on first progress line if we were in bootstrap mode
+	; Ignore a bare "0%" with no size — not a real progress line
 	if (pct == 0 && dl_str == "" && speed_str == "")
-		return false   ; 0% with no size info — not a real progress line yet
+		return false
 
 	OllamaWV_Update(pct, dl_str, speed_str, eta_str)
 	return true
