@@ -259,7 +259,7 @@ function M.new(deps)
 
 		for i = -7, 7 do
 			local title_str = ((i == -1 or i == 0 or i == 1) and i18n.get("menu.settings.indent_space")) or (i .. i18n.get("menu.settings.indent_spaces"))
-			if i == default_val then title_str = title_str .. " " .. i18n.get("menu.settings.default_indicator")" end
+			if i == default_val then title_str = title_str .. " " .. i18n.get("menu.settings.default_indicator") end
 			
 			table.insert(menu, {
 				title   = title_str,
@@ -286,8 +286,8 @@ function M.new(deps)
 		local paused = deps.script_control and type(deps.script_control.is_paused) == "function" and deps.script_control.is_paused() or false
 
         local opts = {
-            {title = "i18n.get("menu.settings.disabled")", mods = {"none"}}, 
-            {title = "i18n.get("menu.settings.no_modifier")", mods = {}},
+            {title = i18n.get("menu.settings.disabled"), mods = {"none"}},
+            {title = i18n.get("menu.settings.no_modifier"), mods = {}},
             {title = "⇧ Shift", mods = {"shift"}}, 
             {title = "⌘ Cmd", mods = {"cmd"}},
             {title = "⌥ Option", mods = {"alt"}}, 
