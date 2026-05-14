@@ -98,18 +98,18 @@ local function build_profile_menu(deps, models_mgr)
 
 	-- Auto-detect recommendation logic
 	table.insert(menu, {
-		title    = "i18n.get("menu.profiles.auto_detect")",
+		title    = i18n.get("menu.profiles.auto_detect"),
 		disabled = paused or nil,
 		fn       = not paused and function()
 			if type(deps.apply_recommended_prompt_profile) == "function" then
-				deps.apply_recommended_prompt_profile({ dialog_title = "i18n.get("menu.profiles.recommended_profile")", force_dialog = true })
+				deps.apply_recommended_prompt_profile({ dialog_title = i18n.get("menu.profiles.recommended_profile"), force_dialog = true })
 				return
 			end
 
 			local model_name = state.llm_model
 			if type(model_name) ~= "string" or model_name == "" or not models_mgr then return end
 
-			pcall(notifications.notify, "i18n.get("menu.profiles.recommended_unavailable_title")", "i18n.get("menu.profiles.recommended_unavailable_body")", "warning")
+			pcall(notifications.notify, i18n.get("menu.profiles.recommended_unavailable_title"), i18n.get("menu.profiles.recommended_unavailable_body"), "warning")
 		end or nil,
 	})
 	table.insert(menu, { title = "-" })
@@ -124,7 +124,7 @@ local function build_profile_menu(deps, models_mgr)
 		
 		local extra = ""
 		if (pid == "basic" or pid == "advanced") and is_thinking then
-			extra = "i18n.get("menu.profiles.not_recommended")"
+			extra = i18n.get("menu.profiles.not_recommended")
 		end
 
 		local display_label = format_dynamic_label(profile.label, state.llm_num_predictions)
@@ -154,7 +154,7 @@ local function build_profile_menu(deps, models_mgr)
 		table.insert(menu, { title = i18n.section("menu.profiles.header_custom_profiles"), disabled = true })
 		for i, profile in ipairs(user_profiles) do
 			local pid = profile.id
-			local display_label = format_dynamic_label(profile.label or ("i18n.get("menu.profiles.custom_profile_label") .. " "" .. i), state.llm_num_predictions)
+			local display_label = format_dynamic_label(profile.label or (i18n.get("menu.profiles.custom_profile_label") .. " " .. i), state.llm_num_predictions)
 			local profile_shortcut = type(state.llm_profile_shortcuts) == "table" and state.llm_profile_shortcuts[pid] or nil
 			local item = {
 				title    = display_label,
@@ -165,7 +165,7 @@ local function build_profile_menu(deps, models_mgr)
 			-- User profiles get a sub-menu for Editing/Deleting
 			item.menu = {
 				{
-					title    = "i18n.get("menu.profiles.use_profile")",
+					title    = i18n.get("menu.profiles.use_profile"),
 					checked  = (state.llm_active_profile == pid) or nil,
 					disabled = paused or nil,
 					fn       = not paused and function()
@@ -181,11 +181,11 @@ local function build_profile_menu(deps, models_mgr)
 					end or nil,
 				},
 				{
-					title    = "i18n.get("menu.profiles.shortcut_prefix"),
+					title    = i18n.get("menu.profiles.shortcut_prefix"),
 					disabled = paused or nil,
 					fn       = not paused and function()
 						shortcut_ui.prompt_shortcut({
-							title = "i18n.get("menu.profiles.shortcut_title")",
+							title = i18n.get("menu.profiles.shortcut_title"),
 							message = i18n.get("menu.profiles.shortcut_prompt"),
 							current_shortcut = type(state.llm_profile_shortcuts) == "table" and state.llm_profile_shortcuts[pid] or nil,
 							default_mods = {"ctrl"},
@@ -199,7 +199,7 @@ local function build_profile_menu(deps, models_mgr)
 				},
 				{ title = "-" },
 				{
-					title = "i18n.get("menu.profiles.edit_profile")",
+					title = i18n.get("menu.profiles.edit_profile"),
 					fn    = function()
 						if prompt_editor and type(prompt_editor.open) == "function" then
 							hs.timer.doAfter(0.1, function()
@@ -255,7 +255,7 @@ local function build_profile_menu(deps, models_mgr)
 
 	table.insert(menu, { title = "-" })
 	table.insert(menu, {
-		title = "i18n.get("menu.profiles.create_profile")",
+		title = i18n.get("menu.profiles.create_profile"),
 		fn    = not paused and function()
 			if prompt_editor and type(prompt_editor.open) == "function" then
 				hs.timer.doAfter(0.1, function()
@@ -307,7 +307,7 @@ function M.new(deps, models_mgr)
 		local warning = (is_thinking and (deps.state.llm_active_profile == "basic" or deps.state.llm_active_profile == "advanced")) and "  ⚠️" or ""
 
 		return {
-			title = "string.format(i18n.get("menu.profiles.profile_label_prefix"), label) .. warning,
+			title = string.format(i18n.get("menu.profiles.profile_label_prefix"), label) .. warning,
 			menu  = build_profile_menu(deps, models_mgr)
 		}
 	end
