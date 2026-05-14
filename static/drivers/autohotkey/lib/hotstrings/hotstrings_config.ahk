@@ -11,7 +11,14 @@
 ;      to both at next reload.
 ;   2. TOML metadata — ``delay`` / ``color`` declared in each category TOML
 ;      under ``[_meta]`` (file scope) or ``[_meta.sections.<name>]`` (section).
-;   3. Hard fallback (``GLOBAL_DEFAULT_DELAY``, no color).
+;   3. Hard fallback (``GLOBAL_DEFAULT_DELAY``, ``GLOBAL_DEFAULT_COLOR``).
+;
+; SUPPORTED CATEGORY NAMESPACES:
+;   - Standard categories  : [magickey], [autocorrection], …
+;   - Extension overrides  : [ext.nom-extension] / [ext.nom-extension.sections.xxx]
+;     Written by the UI when the user customises a bundled extension's color or delay.
+;     The full dotted key (e.g. "ext.ergopti-demo") is used as the map key so it
+;     never collides with a bare category name.
 ;
 ; FEATURES & RATIONALE:
 ; 1. Single source of truth shared with HS — the override file format and
@@ -26,6 +33,7 @@
 ; Ultimate fallback when neither a user override nor a TOML default is set.
 ; Mirrors the HS module so behaviour is identical across drivers.
 global GLOBAL_DEFAULT_DELAY := 0.75
+global GLOBAL_DEFAULT_COLOR := "#e53935"  ; Red — applied to all extension/personal categories
 
 ; Absolute path of the user override file (set by HotstringsConfigInit).
 global _HotstringsOverridesPath := ""
@@ -52,9 +60,13 @@ HotstringsConfigInit(OverridePath) {
 }
 
 ; Parse the override TOML file. Returns an empty Map when the file is missing.
-; Recognises ``[category]`` and ``[category.section]`` headers, plus
-; ``delay = <number>`` and ``color = "<hex>"`` body lines. Anything else is
-; silently ignored — the file is mostly machine-written.
+; Recognises the following header forms:
+;   [category]                       — standard category (e.g. [magickey])
+;   [category.section]               — section override (e.g. [magickey.repeat])
+;   [ext.ext-name]                   — extension file-level override
+;   [ext.ext-name.section]           — extension section override
+; The full dotted key is used as the Map key for ext.* entries so it never
+; collides with a bare single-word category (e.g. "ext.ergopti-demo").
 _ParseOverrides(Path) {
     Result := Map()
     if (Path == "" or !FileExist(Path)) {
@@ -71,24 +83,43 @@ _ParseOverrides(Path) {
             continue
         }
 
-        if RegExMatch(Line, "^\[([A-Za-z0-9_\-]+)\.([A-Za-z0-9_\-]+)\]$", &SecMatch) {
-            CurrentCat := StrLower(SecMatch[1])
-            CurrentSec := StrLower(SecMatch[2])
-            if !Result.Has(CurrentCat) {
+        ; Extension section header: [ext.name.section] — 3 dotted segments
+        if RegExMatch(Line, "^\[ext\.([A-Za-z0-9_\-]+)\.([A-Za-z0-9_\-]+)\]$", &ExtSecMatch) {
+            CurrentCat := "ext." . StrLower(ExtSecMatch[1])
+            CurrentSec := StrLower(ExtSecMatch[2])
+            if !Result.Has(CurrentCat)
                 Result[CurrentCat] := { Delay: "", Color: "", Sections: Map() }
-            }
-            if !Result[CurrentCat].Sections.Has(CurrentSec) {
+            if !Result[CurrentCat].Sections.Has(CurrentSec)
                 Result[CurrentCat].Sections[CurrentSec] := { Delay: "", Color: "" }
-            }
             continue
         }
 
+        ; Extension file header: [ext.name] — 2 dotted segments starting with "ext."
+        if RegExMatch(Line, "^\[ext\.([A-Za-z0-9_\-]+)\]$", &ExtMatch) {
+            CurrentCat := "ext." . StrLower(ExtMatch[1])
+            CurrentSec := ""
+            if !Result.Has(CurrentCat)
+                Result[CurrentCat] := { Delay: "", Color: "", Sections: Map() }
+            continue
+        }
+
+        ; Standard section header: [category.section]
+        if RegExMatch(Line, "^\[([A-Za-z0-9_\-]+)\.([A-Za-z0-9_\-]+)\]$", &SecMatch) {
+            CurrentCat := StrLower(SecMatch[1])
+            CurrentSec := StrLower(SecMatch[2])
+            if !Result.Has(CurrentCat)
+                Result[CurrentCat] := { Delay: "", Color: "", Sections: Map() }
+            if !Result[CurrentCat].Sections.Has(CurrentSec)
+                Result[CurrentCat].Sections[CurrentSec] := { Delay: "", Color: "" }
+            continue
+        }
+
+        ; Standard category header: [category]
         if RegExMatch(Line, "^\[([A-Za-z0-9_\-]+)\]$", &CatMatch) {
             CurrentCat := StrLower(CatMatch[1])
             CurrentSec := ""
-            if !Result.Has(CurrentCat) {
+            if !Result.Has(CurrentCat)
                 Result[CurrentCat] := { Delay: "", Color: "", Sections: Map() }
-            }
             continue
         }
 
@@ -131,6 +162,11 @@ _SaveOverrides() {
 
     for _, Cat in Cats {
         Entry := _HotstringsOverrides[Cat]
+        ; Extension keys are stored as "ext.name" — the header must be written
+        ; as [ext.name] (2 segments), not [ext.name] which would be ambiguous
+        ; when parsed back. Section headers for ext keys: [ext.name.section].
+        IsExt := SubStr(Cat, 1, 4) == "ext."
+
         if (Entry.Delay != "" or Entry.Color != "") {
             Out .= "[" . Cat . "]`n"
             if (Entry.Delay != "") {
@@ -150,6 +186,7 @@ _SaveOverrides() {
         for _, Sec in Secs {
             S := Entry.Sections[Sec]
             if (S.Delay != "" or S.Color != "") {
+                ; Extension: [ext.name.section] — Cat already contains the dot
                 Out .= "[" . Cat . "." . Sec . "]`n"
                 if (S.Delay != "") {
                     Out .= "delay = " . S.Delay . "`n"
@@ -259,6 +296,64 @@ HotstringsResolve(CategoryName, SectionName := "") {
 
     return { Delay: Delay, Color: Color, HasOverride: HasOverride }
 }
+
+; Resolve the effective delay and color for an extension hotstring file.
+; ExtId  — the extension id (e.g. "ergopti-demo").
+; TomlPath — absolute path to the extension TOML file, used to read its [_meta].
+; SectionName — optional section name within the file.
+;
+; Resolution order (first non-empty wins):
+;   1. [ext.extid.section] in hotstrings_config.toml (user override, section level)
+;   2. [ext.extid]         in hotstrings_config.toml (user override, file level)
+;   3. [_meta.sections.*] in the extension TOML     (extension default, section)
+;   4. [_meta]             in the extension TOML     (extension default, file)
+;   5. GLOBAL_DEFAULT_DELAY / GLOBAL_DEFAULT_COLOR   (hard fallback)
+HotstringsResolveExt(ExtId, TomlPath, SectionName := "") {
+    global _HotstringsOverrides, GLOBAL_DEFAULT_DELAY, GLOBAL_DEFAULT_COLOR
+    OverrideKey := "ext." . StrLower(ExtId)
+    Sec := SectionName != "" ? StrLower(SectionName) : ""
+
+    UserCat := _HotstringsOverrides.Has(OverrideKey) ? _HotstringsOverrides[OverrideKey] : ""
+    UserSec := (UserCat != "" and Sec != "" and UserCat.Sections.Has(Sec))
+        ? UserCat.Sections[Sec]
+        : ""
+
+    TomlCfg := ParseTomlGroupConfig("", TomlPath)
+    TomlSec := (Sec != "" and TomlCfg.Sections.Has(Sec))
+        ? TomlCfg.Sections[Sec]
+        : ""
+
+    Delay := ""
+    if (UserSec != "" and UserSec.Delay != "") {
+        Delay := UserSec.Delay
+    } else if (UserCat != "" and UserCat.Delay != "") {
+        Delay := UserCat.Delay
+    } else if (TomlSec != "" and TomlSec.Delay != "") {
+        Delay := TomlSec.Delay
+    } else if (TomlCfg.Delay != "") {
+        Delay := TomlCfg.Delay
+    } else {
+        Delay := GLOBAL_DEFAULT_DELAY
+    }
+
+    Color := ""
+    if (UserSec != "" and UserSec.Color != "") {
+        Color := UserSec.Color
+    } else if (UserCat != "" and UserCat.Color != "") {
+        Color := UserCat.Color
+    } else if (TomlSec != "" and TomlSec.Color != "") {
+        Color := TomlSec.Color
+    } else if (TomlCfg.Color != "") {
+        Color := TomlCfg.Color
+    } else {
+        Color := GLOBAL_DEFAULT_COLOR
+    }
+
+    HasOverride := (UserSec != "" and (UserSec.Delay != "" or UserSec.Color != ""))
+        or  (UserCat != "" and (UserCat.Delay != "" or UserCat.Color != ""))
+    return { Delay: Delay, Color: Color, HasOverride: HasOverride }
+}
+
 
 ; Set a single override field for (category, section). Pass SectionName as ""
 ; to set the file-level override. ``Field`` must be "delay" or "color".
