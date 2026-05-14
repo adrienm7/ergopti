@@ -398,6 +398,8 @@
 	"llm.profile.raw.label": "○○○ 원시 — 프롬프트 없음, 컨텍스트만",
 	"llm.server_mlx_ready_body": "MLX 서버가 준비되었습니다.",
 	"llm.server_ollama_ready_body": "Ollama 서버가 준비되었습니다.",
+	"llm.deps.done_success": "✅ Ollama 逌비됨",
+	"llm.deps.fail_server_not_responding": "설치 프로그램이 종료되었지만 Ollama 서버가 응답하지 않습니다.",
 	"llm.server_ready_title": "LLM 활성화",
 	"magickey.repeat": "매직 키가 마지막 문자를 반복합니다",
 	"magickey.replace": "J를 매직 키로 교체",

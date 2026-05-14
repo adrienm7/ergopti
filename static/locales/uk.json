@@ -398,6 +398,8 @@
 	"llm.profile.raw.label": "○○○ Без промпту — лише контекст",
 	"llm.server_mlx_ready_body": "Сервер MLX готовий.",
 	"llm.server_ollama_ready_body": "Сервер Ollama готовий.",
+	"llm.deps.done_success": "✅ Ollama готовий",
+	"llm.deps.fail_server_not_responding": "Інсталятор завершився, але сервер Ollama не відповідає.",
 	"llm.server_ready_title": "LLM активний",
 	"magickey.repeat": "Чарівна клавіша повторює останній символ",
 	"magickey.replace": "Замінити J чарівною клавішею",

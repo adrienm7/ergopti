@@ -398,6 +398,8 @@
 	"llm.profile.raw.label": "○○○ Raw — No prompt, context only",
 	"llm.server_mlx_ready_body": "The MLX server is ready.",
 	"llm.server_ollama_ready_body": "The Ollama server is ready.",
+	"llm.deps.done_success": "✅ Ollama ready",
+	"llm.deps.fail_server_not_responding": "Installer exited but the Ollama server is not responding.",
 	"llm.server_ready_title": "LLM active",
 	"magickey.repeat": "Magic key repeats last character",
 	"magickey.replace": "Replace J with the magic key",

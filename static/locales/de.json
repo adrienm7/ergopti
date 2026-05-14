@@ -398,6 +398,8 @@
 	"llm.profile.raw.label": "○○○ Roh — Kein Prompt, nur Kontext",
 	"llm.server_mlx_ready_body": "Der MLX-Server ist bereit.",
 	"llm.server_ollama_ready_body": "Der Ollama-Server ist bereit.",
+	"llm.deps.done_success": "✅ Ollama bereit",
+	"llm.deps.fail_server_not_responding": "Installer beendet, aber der Ollama-Server antwortet nicht.",
 	"llm.server_ready_title": "LLM aktiv",
 	"magickey.repeat": "Zaubertaste wiederholt letztes Zeichen",
 	"magickey.replace": "J durch die Zaubertaste ersetzen",
