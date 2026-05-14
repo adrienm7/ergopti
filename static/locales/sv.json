@@ -423,6 +423,8 @@
 	"llm.profile.raw.label": "○○○ Rått — Ingen prompt, endast kontext",
 	"llm.server_mlx_ready_body": "MLX-servern är redo.",
 	"llm.server_ollama_ready_body": "Ollama-servern är redo.",
+	"llm.deps.done_success": "✅ Ollama redo",
+	"llm.deps.fail_server_not_responding": "Installationsprogrammet avslutades men Ollama-servern svarar inte.",
 	"llm.server_ready_title": "LLM aktiv",
 	"magickey.repeat": "Magisk tangent upprepar sista tecknet",
 	"magickey.replace": "Ersätt J med den magiska tangenten",

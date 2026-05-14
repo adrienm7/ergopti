@@ -398,6 +398,8 @@
 	"llm.profile.raw.label": "○○○ Bruto — Sem prompt, só contexto",
 	"llm.server_mlx_ready_body": "O servidor MLX está pronto.",
 	"llm.server_ollama_ready_body": "O servidor Ollama está pronto.",
+	"llm.deps.done_success": "✅ Ollama pronto",
+	"llm.deps.fail_server_not_responding": "O instalador terminou mas o servidor Ollama não está a responder.",
 	"llm.server_ready_title": "LLM ativo",
 	"magickey.repeat": "Tecla mágica repete o último caractere",
 	"magickey.replace": "Substituir J pela tecla mágica",

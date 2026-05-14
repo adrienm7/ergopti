@@ -398,6 +398,8 @@
 	"llm.profile.raw.label": "○○○ Grezzo — Nessun prompt, solo contesto",
 	"llm.server_mlx_ready_body": "Il server MLX è pronto.",
 	"llm.server_ollama_ready_body": "Il server Ollama è pronto.",
+	"llm.deps.done_success": "✅ Ollama pronto",
+	"llm.deps.fail_server_not_responding": "Il programma d’installazione è terminato ma il server Ollama non risponde.",
 	"llm.server_ready_title": "LLM attivo",
 	"magickey.repeat": "Il tasto magico ripete l'ultimo carattere",
 	"magickey.replace": "Sostituisci J con il tasto magico",

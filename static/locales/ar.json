@@ -398,6 +398,8 @@
 	"llm.profile.raw.label": "○○○ خام — بلا موجّه، السياق فقط",
 	"llm.server_mlx_ready_body": "خادم MLX جاهز.",
 	"llm.server_ollama_ready_body": "خادم Ollama جاهز.",
+	"llm.deps.done_success": "✅ Ollama جاهز",
+	"llm.deps.fail_server_not_responding": "انتهى المثبّت لكن خادم Ollama لا يستجيب.",
 	"llm.server_ready_title": "LLM نشط",
 	"magickey.repeat": "مفتاح السحر يكرر الحرف الأخير",
 	"magickey.replace": "استبدال J بمفتاح السحر",

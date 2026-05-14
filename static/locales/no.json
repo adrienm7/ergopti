@@ -423,6 +423,8 @@
 	"llm.profile.raw.label": "○○○ Rå — Ingen prompt, kun kontekst",
 	"llm.server_mlx_ready_body": "MLX-serveren er klar.",
 	"llm.server_ollama_ready_body": "Ollama-serveren er klar.",
+	"llm.deps.done_success": "✅ Ollama klar",
+	"llm.deps.fail_server_not_responding": "Installasjonsprogrammet er ferdig, men Ollama-serveren svarer ikke.",
 	"llm.server_ready_title": "LLM aktiv",
 	"magickey.repeat": "Magisk nøkkel gjentar siste tegn",
 	"magickey.replace": "Erstatt J med den magiske nøkkelen",

@@ -423,6 +423,8 @@
 	"llm.profile.raw.label": "○○○ कच्चा — कोई प्रॉम्प्ट नहीं, केवल संदर्भ",
 	"llm.server_mlx_ready_body": "MLX सर्वर तैयार है।",
 	"llm.server_ollama_ready_body": "Ollama सर्वर तैयार है।",
+	"llm.deps.done_success": "✅ Ollama तैयार है",
+	"llm.deps.fail_server_not_responding": "इंस्टॉलर समाप्त हो गया लेकिन Ollama सर्वर प्रतिक्रिया नहीं दे रहा।",
 	"llm.server_ready_title": "LLM सक्रिय",
 	"magickey.repeat": "जादू कुंजी पिछले वर्ण को दोहराती है",
 	"magickey.replace": "J को जादू कुंजी से बदलें",

@@ -359,18 +359,25 @@ WPMWidget_OnControllerReady(wvc) {
         WPMWidget._graph_wv := wvc
         LoggerInfo("WPMWidget", "WebView2 controller ready — page loading.")
 
-        ; Register NavigationCompleted so we fire exactly when the page is ready,
-        ; not after an arbitrary fixed delay. Uses __Call → add_NavigationCompleted.
-        wvc.CoreWebView2.NavigationCompleted(WPMWidget_OnNavCompleted)
+        ; Use WebMessageReceived (same pattern as ollama_webview) rather than
+        ; NavigationCompleted — the graph HTML posts "ready" from JS once the
+        ; canvas script has executed, giving us a reliable signal that
+        ; window.updateGraph is defined and safe to call.
+        wvc.CoreWebView2.WebMessageReceived(WPMWidget_OnWebMessage)
     } catch as e {
         LoggerError("WPMWidget", "OnControllerReady failed: " . e.Message . " (" . e.File . ":" . e.Line . ")")
     }
 }
 
 
-WPMWidget_OnNavCompleted(sender, args*) {
+WPMWidget_OnWebMessage(sender, args) {
+    try msg := args.TryGetWebMessageAsString()
+    catch
+        msg := ""
+    if (msg != "ready")
+        return
     WPMWidget._graph_wv_ready := true
-    LoggerInfo("WPMWidget", "Page ready — pushing first graph update.")
+    LoggerInfo("WPMWidget", "Page ready (web message) — pushing first graph update.")
     WPMWidget_PushGraphUpdate("0", WPMWidgetConst.COLOR_TXT_IDLE, false, false, false, true)
 }
 
@@ -413,6 +420,7 @@ WPMWidget_GraphHtml(w, h) {
         . "  ctx.restore();drawLabel(lbl);"
         . "};"
         . "drawBg();drawLabel('—');"
+        . "if(window.chrome&&window.chrome.webview)window.chrome.webview.postMessage('ready');"
         . "</script></body></html>"
 }
 
@@ -482,6 +490,9 @@ WPMWidget_Show() {
     h      := WPMWidget.show_graph ? WPMWidgetConst.GRAPH_H : WPMWidgetConst.H
     gui_ref := WPMWidget.show_graph ? WPMWidget._graph_gui : WPMWidget._gui
 
+    ; Show briefly so WebView2 can attach (requires a visible HWND), then hide
+    ; immediately. The tick shows the window only when the user is typing —
+    ; matching the Hammerspoon behaviour of zero presence at idle.
     gui_ref.Show("x" . WPMWidget.pos_x . " y" . WPMWidget.pos_y
         . " w" . w . " h" . h . " NoActivate")
     WinSetTransparent(WPMWidgetConst.ALPHA_ACTIVE, gui_ref)
@@ -489,6 +500,9 @@ WPMWidget_Show() {
     ; WebView2 must be attached after the window is visible.
     if WPMWidget.show_graph && !WPMWidget._graph_wv
         WPMWidget_AttachWebView()
+
+    ; Hide immediately — the Tick will re-show when the user starts typing.
+    gui_ref.Hide()
 
     SetTimer(WPMWidget_Tick, WPMWidgetConst.TICK_MS)
     LoggerSuccess("WPMWidget", "Widget shown at (%d, %d) mode=%s, wv_ready=%s.",

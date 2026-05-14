@@ -398,6 +398,8 @@
 	"llm.profile.raw.label": "○○○ Ham — Prompt yok, sadece bağlam",
 	"llm.server_mlx_ready_body": "MLX sunucusu hazır.",
 	"llm.server_ollama_ready_body": "Ollama sunucusu hazır.",
+	"llm.deps.done_success": "✅ Ollama hazır",
+	"llm.deps.fail_server_not_responding": "Yükleyici tamamlandı, ancak Ollama sunucusu yanıt vermiyor.",
 	"llm.server_ready_title": "LLM etkin",
 	"magickey.repeat": "Sihirli tuş son karakteri tekrar eder",
 	"magickey.replace": "J'yi sihirli tuşla değiştir",

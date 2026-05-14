@@ -423,6 +423,8 @@
 	"llm.profile.raw.label": "○○○ גולמי — ללא prompt, הקשר בלבד",
 	"llm.server_mlx_ready_body": "שרת MLX מוכן.",
 	"llm.server_ollama_ready_body": "שרת Ollama מוכן.",
+	"llm.deps.done_success": "✅ Ollama מוכן",
+	"llm.deps.fail_server_not_responding": "תוכנית ההתקנה סיימה אך שרת Ollama אינו מגיב.",
 	"llm.server_ready_title": "LLM פעיל",
 	"magickey.repeat": "מקש הקסם חוזר על התו האחרון",
 	"magickey.replace": "החלף J במקש הקסם",

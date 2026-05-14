@@ -398,6 +398,8 @@
 	"llm.profile.raw.label": "○○○ Rauw — Geen prompt, alleen context",
 	"llm.server_mlx_ready_body": "De MLX-server is gereed.",
 	"llm.server_ollama_ready_body": "De Ollama-server is gereed.",
+	"llm.deps.done_success": "✅ Ollama klaar",
+	"llm.deps.fail_server_not_responding": "Installatieprogramma beëindigd, maar de Ollama-server reageert niet.",
 	"llm.server_ready_title": "LLM actief",
 	"magickey.repeat": "Magische toets herhaalt het laatste teken",
 	"magickey.replace": "Vervang J door de magische toets",

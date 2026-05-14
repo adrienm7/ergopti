@@ -398,6 +398,8 @@
 	"llm.profile.raw.label": "○○○ 原始 — 无提示词，仅上下文",
 	"llm.server_mlx_ready_body": "MLX 服务器已就绪。",
 	"llm.server_ollama_ready_body": "Ollama 服务器已就绪。",
+	"llm.deps.done_success": "✅ Ollama 已就绪",
+	"llm.deps.fail_server_not_responding": "安装程序已退出，但 Ollama 服务器没有响应。",
 	"llm.server_ready_title": "LLM 已激活",
 	"magickey.repeat": "魔法键重复上一个字符",
 	"magickey.replace": "将 J 替换为魔法键",

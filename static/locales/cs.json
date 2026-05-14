@@ -398,6 +398,8 @@
 	"llm.profile.raw.label": "○○○ Surový — Žádný prompt, jen kontext",
 	"llm.server_mlx_ready_body": "Server MLX je připraven.",
 	"llm.server_ollama_ready_body": "Server Ollama je připraven.",
+	"llm.deps.done_success": "✅ Ollama připraven",
+	"llm.deps.fail_server_not_responding": "Instalátor skončil, ale server Ollama neodpovíí.",
 	"llm.server_ready_title": "LLM aktivní",
 	"magickey.repeat": "Kouzelná klávesa opakuje poslední znak",
 	"magickey.replace": "Nahradit J kouzelnou klávesou",

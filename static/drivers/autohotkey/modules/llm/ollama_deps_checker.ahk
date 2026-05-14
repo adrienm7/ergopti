@@ -264,13 +264,13 @@ LLM_Deps_PollFile(pid, on_ready, on_failed) {
 	LoggerInfo("LLM", "Verifying Ollama reachability after PS1 exit…")
 	if LLM_OllamaIsRunning() {
 		LoggerInfo("LLM", "Ollama confirmed running — state → ready.")
-		OllamaWV_Done(true, "✅ Ollama prêt")
+		OllamaWV_Done(true, t("llm.deps.done_success"))
 		global _LLM_Deps_State := "ready"
 		if IsSet(on_ready)
 			on_ready()
 	} else {
 		LoggerError("LLM", "PS1 exited but Ollama is not reachable.")
-		LLM_Deps_Fail("Installeur terminé mais le serveur Ollama ne répond pas.", on_failed)
+		LLM_Deps_Fail(t("llm.deps.fail_server_not_responding"), on_failed)
 	}
 }
 
@@ -319,17 +319,17 @@ LLM_Deps_HandleLine(line) {
 	; Marker lines drive the step label (same protocol as the PS1 script)
 	if (line == "OLLAMA_INSTALLING") {
 		LoggerInfo("LLM", "Marker: OLLAMA_INSTALLING.")
-		OllamaWV_SetStep("⬇️ Téléchargement d'Ollama…")
+		OllamaWV_SetStep(t("ollama.deps_step_installing"))
 		return
 	}
 	if (line == "OLLAMA_STARTING") {
 		LoggerInfo("LLM", "Marker: OLLAMA_STARTING.")
-		OllamaWV_SetStep("🚀 Démarrage du serveur…")
+		OllamaWV_SetStep(t("ollama.deps_step_starting"))
 		return
 	}
 	if (line == "OLLAMA_READY") {
 		LoggerInfo("LLM", "Marker: OLLAMA_READY.")
-		OllamaWV_SetStep("✅ Serveur prêt")
+		OllamaWV_SetStep(t("ollama.deps_step_ready"))
 		return
 	}
 
