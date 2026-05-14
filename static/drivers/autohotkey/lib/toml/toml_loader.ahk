@@ -72,6 +72,19 @@ ReadTomlFile(FilePath) {
     return Content
 }
 
+; Evict all cache entries for a given file path so that the next call to
+; ParseTomlGroupConfig or ReadTomlFile re-reads from disk. Called after
+; _HCW_PatchTomlMeta writes changes to a personal TOML file.
+_ParseTomlGroupConfig_InvalidatePath(FilePath) {
+    global _TomlFileCache, HotstringGroupConfig
+    if _TomlFileCache.Has(FilePath) {
+        _TomlFileCache.Delete(FilePath)
+    }
+    if HotstringGroupConfig.Has(FilePath) {
+        HotstringGroupConfig.Delete(FilePath)
+    }
+}
+
 ; Unescape a TOML double-quoted string literal (\\, \", \n, \t, \r).
 ; The generator at static/hotstrings/0_generate_hotstrings.py writes
 ; trigger/output with these escapes, so we mirror the inverse transform here.

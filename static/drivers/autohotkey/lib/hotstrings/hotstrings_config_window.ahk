@@ -5,27 +5,39 @@
 ; DESCRIPTION:
 ; Native Gui v2 editor for the per-group expansion delay and tooltip color of
 ; every hotstring category and section. The data layer lives in
-; lib\hotstrings_config.ahk; this module only renders / dispatches mutations.
+; lib\hotstrings_config.ahk for common categories; for personal TOML files the
+; overrides are written directly to [_meta] / [_meta.sections.*] inside the
+; target file so the file stays self-contained.
 ;
 ; FEATURES & RATIONALE:
-; 1. Compact selector form — a (category, section) pair drives the two
-;    edit rows, mirroring HS's webview without the rendering overhead of a
-;    full tree control. The user picks what they want to tune; the form
-;    reads / writes that single (category, section) at a time.
-; 2. "Niveau fichier" virtual section — picking it lets the user edit the
+; 1. Unified category list — common categories (magickey, autocorrection, …)
+;    and personal TOML files appear in one dropdown, giving one coherent UI.
+; 2. Source-aware mutations — the window checks whether the selected entry is
+;    a common category or a personal file and dispatches the write accordingly:
+;    common → hotstrings_config.toml via HotstringsSetOverride;
+;    personal → [_meta] in the TOML file via _HCW_PatchTomlMeta.
+; 3. "Niveau fichier" virtual section — picking it lets the user edit the
 ;    file-level [_meta] defaults without dropping into a leaf section.
-; 3. Singleton window — calling OpenHotstringsConfigWindow twice brings the
+; 4. Singleton window — calling OpenHotstringsConfigWindow twice brings the
 ;    existing window forward instead of stacking duplicates.
-; 4. Quick presets — "Tout en gris" overrides every file-level colour and
+; 5. Quick presets — "Tout en gris" overrides every file-level colour and
 ;    clears section-level overrides so the grey cascade is uniform; "Tout
 ;    réinitialiser" wipes the override file entirely.
 ; ==============================================================================
 
 global _HCWGui      := 0
 global _HCWWidgets  := 0
-global _HCW_CATEGORY_ORDER := [
+
+; Ordered list for the category dropdown — rebuilt each time the window opens.
+; Each entry: { Key, Label, Path, IsPersonal }
+; Common categories use their TOML name as Key.
+; Personal files use "personal:<stem>" as Key and carry Path to the TOML.
+global _HCW_CATEGORY_LIST := []
+
+; The six bundled common categories (always present, in display order).
+global _HCW_COMMON_CATS := [
     "magickey", "autocorrection", "rolls",
-    "sfbsreduction", "distancesreduction", "personal"
+    "sfbsreduction", "distancesreduction"
 ]
 
 ; Populated lazily in _HCW_InitLocaleStrings() — not at include time,
@@ -44,7 +56,6 @@ _HCW_InitLocaleStrings() {
         "rolls",              t("hs_config.cat_rolls"),
         "sfbsreduction",      t("hs_config.cat_sfbs"),
         "distancesreduction", t("hs_config.cat_distances"),
-        "personal",           t("hs_config.cat_personal"),
     )
     ; First six entries mirror the bootstrap defaults shipped in the category
     ; TOMLs; the four following ones are fillers offered for variety.
@@ -62,6 +73,61 @@ _HCW_InitLocaleStrings() {
     _HCW_FILE_LEVEL_LABEL := t("hs_config.file_level")
 }
 
+; Build the unified category list from the common categories + personal TOMLs.
+; Personal TOML files are discovered from PersonalHotstringsDir and appended
+; after the common categories.
+_HCW_BuildCategoryList() {
+    global _HCW_CATEGORY_LIST, _HCW_COMMON_CATS, _HCW_CATEGORY_LABELS
+    List := []
+
+    for _, Cat in _HCW_COMMON_CATS {
+        Label := _HCW_CATEGORY_LABELS.Has(Cat) ? _HCW_CATEGORY_LABELS[Cat] : Cat
+        List.Push({ Key: Cat, Label: Label, Path: "", IsPersonal: false })
+    }
+
+    ; Discover personal TOML files
+    if IsSet(ScriptInformation) and ScriptInformation.Has("PersonalHotstringsDir") {
+        HsDir := ScriptInformation["PersonalHotstringsDir"]
+        if DirExist(HsDir) {
+            PersonalFiles := []
+            Loop Files, HsDir . "*.toml" {
+                Stem := RegExReplace(A_LoopFileName, "\.toml$", "")
+                if (SubStr(Stem, 1, 1) == "_") {
+                    continue
+                }
+                PersonalFiles.Push({ Stem: Stem, Path: A_LoopFileFullPath })
+            }
+            ; Sort alphabetically by stem so the order is deterministic
+            PersonalFiles := _HCW_SortByKey(PersonalFiles, "Stem")
+            for _, F in PersonalFiles {
+                List.Push({
+                    Key:        "personal:" . F.Stem,
+                    Label:      F.Stem,
+                    Path:       F.Path,
+                    IsPersonal: true,
+                })
+            }
+        }
+    }
+
+    _HCW_CATEGORY_LIST := List
+}
+
+; Stable insertion sort (AHK v2 has no built-in stable sort for objects).
+_HCW_SortByKey(Arr, KeyName) {
+    N := Arr.Length
+    loop N - 1 {
+        I := A_Index + 1
+        while I > 1 and Arr[I - 1][KeyName] > Arr[I][KeyName] {
+            Tmp := Arr[I - 1]
+            Arr[I - 1] := Arr[I]
+            Arr[I] := Tmp
+            I--
+        }
+    }
+    return Arr
+}
+
 
 ; ============================================================
 ; ============================================================
@@ -72,6 +138,7 @@ _HCW_InitLocaleStrings() {
 OpenHotstringsConfigWindow() {
     global _HCWGui, _HCWWidgets
     _HCW_InitLocaleStrings()
+    _HCW_BuildCategoryList()
     if _HCWGui {
         try _HCWGui.Show()
         return
@@ -153,10 +220,10 @@ OpenHotstringsConfigWindow() {
 ; Refresh the sections dropdown for the currently selected category and
 ; refresh the form to display the file-level values for that category.
 _HCW_OnCategoryChanged() {
-    global _HCWWidgets, _HCW_CATEGORY_ORDER, _HCW_FILE_LEVEL_LABEL
-    Cat := _HCW_SelectedCategory()
+    global _HCWWidgets, _HCW_FILE_LEVEL_LABEL
+    Entry := _HCW_SelectedEntry()
     Items := [_HCW_FILE_LEVEL_LABEL]
-    Sections := _HCW_GetSections(Cat)
+    Sections := _HCW_GetSections(Entry)
     for _, Sec in Sections {
         Items.Push(Sec.Title . "  —  " . Sec.Name)
     }
@@ -172,11 +239,11 @@ _HCW_OnCategoryChanged() {
 ; needs to be refreshed.
 _HCW_LoadCurrent() {
     global _HCWWidgets
-    Cat := _HCW_SelectedCategory()
-    Sec := _HCW_SelectedSection()
-    Resolved := HotstringsResolve(Cat, Sec)
-    Defaults := _HCW_TomlDefaults(Cat, Sec)
-    Override := _HCW_UserOverride(Cat, Sec)
+    Entry := _HCW_SelectedEntry()
+    Sec := _HCW_SelectedSection(Entry)
+    Resolved := _HCW_Resolve(Entry, Sec)
+    Defaults := _HCW_TomlDefaults(Entry, Sec)
+    Override := _HCW_UserOverride(Entry, Sec)
 
     DelayMs := (Resolved.Delay != "") ? Round(Resolved.Delay * 1000) : 0
     DelayDefMs := (Defaults.Delay != "") ? Round(Defaults.Delay * 1000) : 0
@@ -222,7 +289,7 @@ _HCW_LoadCurrent() {
         _HCWWidgets.ColorReset.Enabled := false
     }
     _HCWWidgets.ColorDefault.Value := Hint
-    _HCWWidgets.Status.Value := t("hs_config.category_prefix") . Cat . "    " . t("hs_config.section_prefix") . (Sec ? Sec : t("hs_config.file_level_short"))
+    _HCWWidgets.Status.Value := t("hs_config.category_prefix") . Entry.Key . "    " . t("hs_config.section_prefix") . (Sec ? Sec : t("hs_config.file_level_short"))
 }
 
 
@@ -234,20 +301,20 @@ _HCW_LoadCurrent() {
 
 _HCW_OnDelayChanged() {
     global _HCWWidgets
-    Cat := _HCW_SelectedCategory()
-    Sec := _HCW_SelectedSection()
+    Entry := _HCW_SelectedEntry()
+    Sec := _HCW_SelectedSection(Entry)
     Ms := _HCWWidgets.DelayEdit.Value + 0
     if (Ms < 0) {
         Ms := 0
     }
-    HotstringsSetOverride(Cat, Sec, "delay", Ms / 1000)
+    _HCW_SetOverride(Entry, Sec, "delay", Ms / 1000)
     _HCW_LoadCurrent()
 }
 
 _HCW_OnColorChanged() {
     global _HCWWidgets, _HCW_CurrentColorOptions
-    Cat := _HCW_SelectedCategory()
-    Sec := _HCW_SelectedSection()
+    Entry := _HCW_SelectedEntry()
+    Sec := _HCW_SelectedSection(Entry)
     Idx := _HCWWidgets.ColorDD.Value
     if (Idx < 1) {
         return
@@ -255,26 +322,35 @@ _HCW_OnColorChanged() {
     Hex := _HCW_CurrentColorOptions[Idx].Hex
     if (Hex == "") {
         ; "— hérite du défaut —" — same effect as the reset button.
-        HotstringsClearOverride(Cat, Sec, "color")
+        _HCW_ClearOverride(Entry, Sec, "color")
     } else {
-        HotstringsSetOverride(Cat, Sec, "color", Hex)
+        _HCW_SetOverride(Entry, Sec, "color", Hex)
     }
     _HCW_LoadCurrent()
 }
 
 _HCW_ClearField(Field) {
-    Cat := _HCW_SelectedCategory()
-    Sec := _HCW_SelectedSection()
-    HotstringsClearOverride(Cat, Sec, Field)
+    Entry := _HCW_SelectedEntry()
+    Sec := _HCW_SelectedSection(Entry)
+    _HCW_ClearOverride(Entry, Sec, Field)
     _HCW_LoadCurrent()
 }
 
 _HCW_ResetAll() {
-    global _HCW_CATEGORY_ORDER
-    for _, Cat in _HCW_CATEGORY_ORDER {
-        HotstringsClearOverride(Cat, "", "")
-        for _, Sec in _HCW_GetSections(Cat) {
-            HotstringsClearOverride(Cat, Sec.Name, "")
+    global _HCW_CATEGORY_LIST
+    for _, E in _HCW_CATEGORY_LIST {
+        if E.IsPersonal {
+            _HCW_PatchTomlMeta(E.Path, "", "delay", "")
+            _HCW_PatchTomlMeta(E.Path, "", "color", "")
+            for _, Sec in _HCW_GetSections(E) {
+                _HCW_PatchTomlMeta(E.Path, Sec.Name, "delay", "")
+                _HCW_PatchTomlMeta(E.Path, Sec.Name, "color", "")
+            }
+        } else {
+            HotstringsClearOverride(E.Key, "", "")
+            for _, Sec in _HCW_GetSections(E) {
+                HotstringsClearOverride(E.Key, Sec.Name, "")
+            }
         }
     }
     _HCW_LoadCurrent()
@@ -284,12 +360,19 @@ _HCW_ResetAll() {
 ; overrides so the cascade stays consistent. Delays are intentionally left
 ; alone — the user might still want differentiated timings.
 _HCW_SetAllGrey() {
-    global _HCW_CATEGORY_ORDER
+    global _HCW_CATEGORY_LIST
     Grey := "#6e6e73"
-    for _, Cat in _HCW_CATEGORY_ORDER {
-        HotstringsSetOverride(Cat, "", "color", Grey)
-        for _, Sec in _HCW_GetSections(Cat) {
-            HotstringsClearOverride(Cat, Sec.Name, "color")
+    for _, E in _HCW_CATEGORY_LIST {
+        if E.IsPersonal {
+            _HCW_PatchTomlMeta(E.Path, "", "color", Grey)
+            for _, Sec in _HCW_GetSections(E) {
+                _HCW_PatchTomlMeta(E.Path, Sec.Name, "color", "")
+            }
+        } else {
+            HotstringsSetOverride(E.Key, "", "color", Grey)
+            for _, Sec in _HCW_GetSections(E) {
+                HotstringsClearOverride(E.Key, Sec.Name, "color")
+            }
         }
     }
     _HCW_LoadCurrent()
@@ -304,35 +387,89 @@ _HCW_OnClose() {
 
 ; ============================================================
 ; ============================================================
-; ======= 4/ Helpers ========================================
+; ======= 4/ Source-aware read/write dispatch ===============
+; ============================================================
+; ============================================================
+
+; Dispatch a set-override to the right backend.
+; For common categories: writes to hotstrings_config.toml via HotstringsSetOverride.
+; For personal files:    patches [_meta] / [_meta.sections.*] in the TOML itself.
+_HCW_SetOverride(Entry, Sec, Field, Value) {
+    if Entry.IsPersonal {
+        _HCW_PatchTomlMeta(Entry.Path, Sec, Field, Value)
+    } else {
+        HotstringsSetOverride(Entry.Key, Sec, Field, Value)
+    }
+}
+
+; Dispatch a clear-override to the right backend.
+_HCW_ClearOverride(Entry, Sec, Field) {
+    if Entry.IsPersonal {
+        _HCW_PatchTomlMeta(Entry.Path, Sec, Field, "")
+    } else {
+        HotstringsClearOverride(Entry.Key, Sec, Field)
+    }
+}
+
+; Dispatch a resolve call to get the effective delay + color.
+; For personal files the override IS the [_meta] value, so we read directly.
+_HCW_Resolve(Entry, Sec) {
+    if Entry.IsPersonal {
+        return _HCW_ReadTomlMeta(Entry.Path, Sec)
+    }
+    return HotstringsResolve(Entry.Key, Sec)
+}
+
+; Read the effective delay + color from [_meta] / [_meta.sections.*] in a
+; personal TOML file, applying the cascade: section → file → empty.
+_HCW_ReadTomlMeta(Path, Sec) {
+    FileCfg := ParseTomlGroupConfig("__personal__", Path)
+    Result := { Delay: FileCfg.Delay, Color: FileCfg.Color }
+    if (Sec != "" and FileCfg.Sections.Has(StrLower(Sec))) {
+        SecCfg := FileCfg.Sections[StrLower(Sec)]
+        if (SecCfg.Delay != "") {
+            Result.Delay := SecCfg.Delay
+        }
+        if (SecCfg.Color != "") {
+            Result.Color := SecCfg.Color
+        }
+    }
+    return Result
+}
+
+
+; ============================================================
+; ============================================================
+; ======= 5/ Helpers ========================================
 ; ============================================================
 ; ============================================================
 
 _HCW_CategoryItems() {
-    global _HCW_CATEGORY_ORDER, _HCW_CATEGORY_LABELS
+    global _HCW_CATEGORY_LIST
     Out := []
-    for _, Cat in _HCW_CATEGORY_ORDER {
-        Out.Push(_HCW_CATEGORY_LABELS[Cat] . "  —  " . Cat)
+    for _, E in _HCW_CATEGORY_LIST {
+        Out.Push(E.Label . "  —  " . E.Key)
     }
     return Out
 }
 
-_HCW_SelectedCategory() {
-    global _HCWWidgets, _HCW_CATEGORY_ORDER
+; Returns the full entry object for the currently selected category dropdown index.
+_HCW_SelectedEntry() {
+    global _HCWWidgets, _HCW_CATEGORY_LIST
     Idx := _HCWWidgets.CatDD.Value
-    if (Idx < 1 or Idx > _HCW_CATEGORY_ORDER.Length) {
-        return _HCW_CATEGORY_ORDER[1]
+    if (Idx < 1 or Idx > _HCW_CATEGORY_LIST.Length) {
+        return _HCW_CATEGORY_LIST[1]
     }
-    return _HCW_CATEGORY_ORDER[Idx]
+    return _HCW_CATEGORY_LIST[Idx]
 }
 
-_HCW_SelectedSection() {
+_HCW_SelectedSection(Entry) {
     global _HCWWidgets
     Idx := _HCWWidgets.SecDD.Value
     if (Idx <= 1) {
         return ""
     }
-    Sections := _HCW_GetSections(_HCW_SelectedCategory())
+    Sections := _HCW_GetSections(Entry)
     if (Idx - 1 > Sections.Length) {
         return ""
     }
@@ -358,16 +495,20 @@ _HCW_LocaleFromInlineTable(body) {
 
 
 ; Lightweight TOML scan — re-parses the [_meta] / [[section]] headers to list
-; the sections and their descriptions. We could share with toml_loader but
-; the scope here is small enough that duplicating is cheaper than coupling.
-_HCW_GetSections(Category) {
+; the sections and their descriptions. Accepts a category entry object.
+_HCW_GetSections(Entry) {
     global ScriptInformation
-    if (StrLower(Category) == "personal"
-            and IsSet(ScriptInformation)
-            and ScriptInformation.Has("PersonalTomlPath")) {
-        Path := ScriptInformation["PersonalTomlPath"]
+    if Entry.IsPersonal {
+        Path := Entry.Path
     } else {
-        Path := A_ScriptDir . "\..\..\hotstrings\" . StrLower(Category) . ".toml"
+        Cat := Entry.Key
+        if (StrLower(Cat) == "personal"
+                and IsSet(ScriptInformation)
+                and ScriptInformation.Has("PersonalTomlPath")) {
+            Path := ScriptInformation["PersonalTomlPath"]
+        } else {
+            Path := A_ScriptDir . "\..\..\hotstrings\" . StrLower(Cat) . ".toml"
+        }
     }
     Sections := []
     Seen := Map()
@@ -467,8 +608,12 @@ _HCW_GetSections(Category) {
     return Sections
 }
 
-_HCW_TomlDefaults(Category, Section) {
-    Cfg := ParseTomlGroupConfig(Category)
+_HCW_TomlDefaults(Entry, Section) {
+    if Entry.IsPersonal {
+        Cfg := ParseTomlGroupConfig("__personal__", Entry.Path)
+    } else {
+        Cfg := ParseTomlGroupConfig(Entry.Key)
+    }
     Default := { Delay: Cfg.Delay, Color: Cfg.Color }
     if (Section != "" and Cfg.Sections.Has(StrLower(Section))) {
         Sec := Cfg.Sections[StrLower(Section)]
@@ -482,21 +627,39 @@ _HCW_TomlDefaults(Category, Section) {
     return Default
 }
 
-_HCW_UserOverride(Category, Section) {
+_HCW_UserOverride(Entry, Section) {
     global _HotstringsOverrides
     Out := { Delay: "", Color: "" }
-    Cat := StrLower(Category)
+    if Entry.IsPersonal {
+        ; For personal files the stored value IS the override (no separate
+        ; overrides file). Re-read [_meta] to find what is actually stored.
+        ; Compare against the raw file-level value: if non-empty it was set.
+        Cfg := ParseTomlGroupConfig("__personal__", Entry.Path)
+        if (Section == "") {
+            Out.Delay := Cfg.Delay
+            Out.Color := Cfg.Color
+        } else {
+            Sec := StrLower(Section)
+            if Cfg.Sections.Has(Sec) {
+                S := Cfg.Sections[Sec]
+                Out.Delay := S.Delay
+                Out.Color := S.Color
+            }
+        }
+        return Out
+    }
+    Cat := StrLower(Entry.Key)
     if !_HotstringsOverrides.Has(Cat) {
         return Out
     }
-    Entry := _HotstringsOverrides[Cat]
+    Override := _HotstringsOverrides[Cat]
     if (Section == "") {
-        Out.Delay := Entry.Delay
-        Out.Color := Entry.Color
+        Out.Delay := Override.Delay
+        Out.Color := Override.Color
     } else {
         Sec := StrLower(Section)
-        if Entry.Sections.Has(Sec) {
-            S := Entry.Sections[Sec]
+        if Override.Sections.Has(Sec) {
+            S := Override.Sections[Sec]
             Out.Delay := S.Delay
             Out.Color := S.Color
         }
@@ -506,7 +669,117 @@ _HCW_UserOverride(Category, Section) {
 
 
 ; ============================================================
-; ======= 4.1) Color dropdown helpers =======================
+; ============================================================
+; ======= 6/ Personal TOML [_meta] patcher =================
+; ============================================================
+; ============================================================
+
+; Patch or clear a single field (delay or color) in [_meta] or
+; [_meta.sections.<sec>] of a personal TOML file. When Value is "" the key
+; is removed. The file is rewritten in-place; all other content is preserved.
+;
+; Strategy: scan lines once, track which "zone" we are in, emit each line
+; unchanged except for the target zone where the field is added or removed.
+; If the target header was never found, append it at the end.
+_HCW_PatchTomlMeta(Path, Sec, Field, Value) {
+    if !FileExist(Path) {
+        return
+    }
+
+    FileContent := ReadTomlFile(Path)
+    Lines := StrSplit(FileContent, "`n", "`r")
+    Field := StrLower(Field)
+    Sec   := StrLower(Sec)
+
+    ; Determine which header we target.
+    ; Section == "" → [_meta]; Section != "" → [_meta.sections.<sec>]
+    TargetHeader := (Sec == "") ? "[_meta]" : "[_meta.sections." . Sec . "]"
+
+    InTarget  := false
+    Found     := false
+    FieldDone := false
+    Out       := []
+
+    for _, RawLine in Lines {
+        Line := Trim(RawLine, " `t`r")
+
+        ; Detect header lines
+        if RegExMatch(Line, "^\[") {
+            ; Leaving the target zone — if the field was not yet written, write it now
+            if InTarget and !FieldDone and Value != "" {
+                Out.Push(Field . " = " . _HCW_TomlValue(Field, Value))
+                FieldDone := true
+            }
+            InTarget := (Line == TargetHeader)
+            if InTarget {
+                Found := true
+                FieldDone := false
+            }
+            Out.Push(RawLine)
+            continue
+        }
+
+        if InTarget {
+            ; Check if this line is the field we want to write / remove
+            if RegExMatch(Line, "^" . Field . "\s*=", &_) {
+                ; Remove the line; if we are setting a value, replace it
+                if Value != "" and !FieldDone {
+                    Out.Push(Field . " = " . _HCW_TomlValue(Field, Value))
+                    FieldDone := true
+                }
+                ; else: drop the line (clear)
+                continue
+            }
+        }
+
+        Out.Push(RawLine)
+    }
+
+    ; Handle end-of-file while still in the target zone
+    if InTarget and !FieldDone and Value != "" {
+        Out.Push(Field . " = " . _HCW_TomlValue(Field, Value))
+    }
+
+    ; If the header was never found and we need to add a value, append it
+    if !Found and Value != "" {
+        Out.Push("")
+        Out.Push(TargetHeader)
+        Out.Push(Field . " = " . _HCW_TomlValue(Field, Value))
+    }
+
+    ; Invalidate the ParseTomlGroupConfig cache for this path so the next
+    ; resolve call picks up the freshly written values.
+    _ParseTomlGroupConfig_InvalidatePath(Path)
+
+    NewContent := ""
+    for I, L in Out {
+        NewContent .= L
+        if (I < Out.Length) {
+            NewContent .= "`n"
+        }
+    }
+    try FileOpen(Path, "w", "UTF-8").Write(NewContent)
+}
+
+; Format a value for TOML output.
+; delay → bare number (seconds as float); color → quoted string.
+_HCW_TomlValue(Field, Value) {
+    if (Field == "delay") {
+        ; Write with one decimal place to avoid integer literals like "2"
+        ; which ParseTomlGroupConfig already handles, but being explicit
+        ; makes the TOML more readable.
+        Num := Value + 0
+        return Format("{:.3f}", Num)
+    }
+    ; color (or any other string field) — emit as a quoted TOML string
+    Escaped := StrReplace(Value, "\", "\\")
+    Escaped := StrReplace(Escaped, '"', '\"')
+    return '"' . Escaped . '"'
+}
+
+
+; ============================================================
+; ======= 5.1) Color dropdown helpers =======================
 ; ============================================================
 
 global _HCW_CurrentColorOptions := []
