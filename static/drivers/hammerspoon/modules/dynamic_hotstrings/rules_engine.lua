@@ -319,8 +319,8 @@ function M.start(keymap_module)
 	if desc_date == "" then desc_date = "td" .. _trigger .. " inserts current date ({date})" end
 	desc_date   = desc_date:gsub("{date}", date_iso)
 	_sections = {
-		{ name = "datefr",        description = desc_datefr,                                count = 1 },
 		{ name = "datelongfr",    description = desc_datelongfr,                            count = 1 },
+		{ name = "datefr",        description = desc_datefr,                                count = 1 },
 		{ name = "date",          description = desc_date,                                  count = 1 },
 		{ name = "phoneprefixes", description = loc("dynamichotstrings.phoneprefixes"),     count = 0 },
 		{ name = "ssnprefixes",   description = loc("dynamichotstrings.ssnprefixes"),       count = 0 },
