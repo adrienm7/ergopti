@@ -25,17 +25,18 @@ local LOG    = "llm.profiles"
 
 local RAW_PROMPT_SINGLE = [[{context}]]
 
-local BASIC_PROMPT_SINGLE = [[You are an ultra-concise keyboard completion engine. Respond in {language}.
+local BASIC_PROMPT_SINGLE = [[You are an ultra-concise keyboard completion engine.
 User context: {context}
 
 Output strictly the immediate continuation of the context.
 ABSOLUTE RULE: generate AT LEAST {min_words} words and AT MOST {max_words} words. NOT ONE WORD MORE OR LESS.
+Match the language of the context. If the context language is ambiguous, default to {language}.
 No explanation, no comment, no list, no bullet, no quote, no rephrasing of the context.
 Return only the words to append.]]
 
 -- Universal prompt: English instructions for cross-model reliability, minimal
 -- examples to reduce token overhead for small models (Qwen 3.5-4B, etc.)
-local ADVANCED_PROMPT_SINGLE = [[You are a text correction and completion engine. Respond in {language}.
+local ADVANCED_PROMPT_SINGLE = [[You are a text correction and completion engine.
 You receive PREFIX (full context) and TAIL (last few words).
 Reply with exactly two lines — nothing else:
 TAIL_CORRECTED: <corrected tail>
@@ -44,6 +45,7 @@ NEXT_WORDS: <continuation>
 Rules:
 - TAIL_CORRECTED: fix spelling/grammar in TAIL only. If already correct, copy it exactly unchanged.
 - NEXT_WORDS: natural continuation, between {min_words} and {max_words} words. Empty if the sentence is complete.
+- Match the language of the context. If the context language is ambiguous, default to {language}.
 - No explanations, no markdown, no quotes.
 
 PREFIX: "Je vous envoit ce mail pour vous dir"
