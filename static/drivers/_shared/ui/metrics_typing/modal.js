@@ -63,10 +63,10 @@ function update_app_btn_text() {
 	const tot = app_state.available_apps.length;
 
 	if (sel === tot) {
-		btn.innerText = "Apps (Toutes)";
+		btn.innerText = _t("ui_typing.apps_all");
 		btn.classList.add("active");
 	} else {
-		btn.innerText = sel === 0 ? "Apps (Aucune)" : `Apps (${sel}/${tot})`;
+		btn.innerText = sel === 0 ? _t("ui_typing.apps_none") : `Apps (${sel}/${tot})`;
 		btn.classList.remove("active");
 	}
 }
@@ -161,5 +161,5 @@ function render_app_list() {
 	});
 
 	container.innerHTML = html ||
-		"<div style=\"padding:15px; color:var(--text-muted); text-align:center;\">Aucune application trouv\u00E9e</div>";
+		`<div style="padding:15px; color:var(--text-muted); text-align:center;">${_t("ui_typing.no_app_found")}</div>`;
 }

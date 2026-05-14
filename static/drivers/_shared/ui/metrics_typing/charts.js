@@ -356,7 +356,7 @@ function _render_wpm_chart(wpm_pts, rgb_wpm, x_min = null, x_max = null) {
 				tooltip: {
 					callbacks: {
 						title: tooltipTitleCallback,
-						label: (ctx) => `${_t('ui_typing.dataset_speed')} : ${format_number_plain(Math.round(ctx.parsed.y))} MPM`
+						label: (ctx) => `${_t('ui_typing.dataset_speed')} : ${format_number_plain(Math.round(ctx.parsed.y))} ${_t('ui_typing.unit_mpm')}`
 					}
 				}
 			},
@@ -391,13 +391,7 @@ function _render_precision_chart(sorted_keys, rgb_prc, x_min = null, x_max = nul
 				: ui_thresh_ms >= 60000
 					? `${ui_thresh_ms / 60000}${NBSP}min`
 					: `${ui_thresh_ms / 1000}${NBSP}s`;
-		const tip =
-			`<strong>Calcul${NBSP}:</strong> précision = (caractères corrects) / (caractères au total).<br><br>` +
-			`<strong>Erreurs comptées</strong> (au numérateur, en moins)${NBSP}:<br>` +
-			`&nbsp;&nbsp;Seuls les retours-arrière déclenchés peu après une touche tapée comptent (délai ≤${NBSP}${thresh_label}, suit le sélecteur de pause). ` +
-			`Un backspace après une longue pause efface généralement une sélection ou une ligne et n'est donc pas une vraie erreur.<br>` +
-			`&nbsp;&nbsp;Par construction du filtre côté keylogger : deux backspaces consécutifs ne sont comptés tous les deux que si chacun a un délai court par rapport à sa touche précédente.<br><br>` +
-			`<strong>Caractères synthétiques${NBSP}:</strong> activer + HS ou + IA ajoute leurs caractères (sortie de l'expansion${NBSP}− leur déclencheur) au numérateur ET au dénominateur. Comme ils sont 100${NBSP}% corrects, activer une source ne peut que faire monter la précision.`;
+		const tip = _t('ui_typing.tooltip_precision_formula').replace('{thresh}', thresh_label);
 		info_el.innerHTML = `${INFO_SVG}<span class="tooltiptext" style="text-align:left;">${tip}</span>`;
 	}
 
@@ -848,9 +842,9 @@ function _render_minute5_charts(date_str, rgb_wpm, rgb_prc, cutoff) {
 
 	// Update chart titles for 5-minute context
 	const wpm_title_el = document.getElementById('wpm_chart_title');
-	if (wpm_title_el) wpm_title_el.textContent = 'Activit\u00E9 (touches / 5\u00A0min)';
+	if (wpm_title_el) wpm_title_el.textContent = _t('ui_typing.chart_title_activity_5min');
 	const prc_title_el = document.getElementById('precision_chart_title');
-	if (prc_title_el) prc_title_el.textContent = 'Pr\u00E9cision (%) \u2014 vue 5\u00A0min';
+	if (prc_title_el) prc_title_el.textContent = _t('ui_typing.chart_title_precision_5min');
 
 	_render_minute5_activity_chart(act_pts, rgb_wpm, date_str, cutoff);
 	_render_minute5_precision_chart(prec_pts, rgb_prc, date_str, cutoff);

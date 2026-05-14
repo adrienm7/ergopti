@@ -1012,13 +1012,13 @@ function render_kc_heatmap(kc_data_arr) {
 			"76":  "↵",
 		};
 		const SHORT_LABELS_WIN = {
-			"53":  "Échap",
-			"36":  "Entrée",
-			"48":  "Tab",
+			"53":  _t("ui_typing.key_esc"),
+			"36":  _t("ui_typing.key_enter"),
+			"48":  _t("ui_typing.key_tab"),
 			"51":  "←",       // backspace arrow
-			"56":  "Maj",
-			"60":  "Maj",
-			"57":  "Verr.",
+			"56":  _t("ui_typing.key_shift"),
+			"60":  _t("ui_typing.key_shift"),
+			"57":  _t("ui_typing.key_caps"),
 			"49":  "",
 			// Windows thumb row: Ctrl(kc63) | Fn(kc59) | Win(kc58) | Alt(kc55) | Space | AltGr(kc54) | Menu(kc61)
 			"63":  "Ctrl",
@@ -1360,8 +1360,8 @@ function render_sfb_heatmap(sfb_by_kc, sfb_pairs_by_kc, kc_raw) {
 		"126": "↑", "76": "⏎",
 	};
 	const SHORT_LABELS_WIN = {
-		"53": "Échap", "36": "Entrée", "48": "Tab", "51": "←",
-		"56": "Maj", "60": "Maj", "57": "Verr.", "49": "",
+		"53": _t("ui_typing.key_esc"), "36": _t("ui_typing.key_enter"), "48": _t("ui_typing.key_tab"), "51": "←",
+		"56": _t("ui_typing.key_shift"), "60": _t("ui_typing.key_shift"), "57": _t("ui_typing.key_caps"), "49": "",
 		"63": "Ctrl", "59": "Fn", "58": "Win", "55": "Alt", "54": "AltGr", "61": "Menu",
 		"114": "?",
 		"123": "←", "124": "→", "125": "↓", "126": "↑", "76": "⏎",
@@ -1743,7 +1743,7 @@ function render_table() {
 				: "-";
 
 			const wpm_color = item.wpm > 0 ? gradient_color(item.wpm, WPM_GRADIENT) : "inherit";
-			const wpm_str   = item.wpm > 0 ? `${format_number(item.wpm.toFixed(1))} MPM` : "-";
+			const wpm_str   = item.wpm > 0 ? `${format_number(item.wpm.toFixed(1))} ${_t('ui_typing.unit_mpm')}` : "-";
 
 			const acc_color = gradient_color(item.acc, PRECISION_GRADIENT);
 

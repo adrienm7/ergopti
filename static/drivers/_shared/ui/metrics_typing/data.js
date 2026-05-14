@@ -31,15 +31,6 @@
  * ==============================================================================
  */
 
-/**
- * Returns the translated string for a given i18n key, or the key itself as fallback.
- * Reads from window._i18n_strings populated by the shared i18n loader.
- * @param {string} key - The dotted i18n key.
- * @returns {string}
- */
-function _t(key) {
-	return (window._i18n_strings && window._i18n_strings[key]) || key;
-}
 
 
 // ===================================
@@ -450,12 +441,12 @@ function compute_manifest_metrics() {
 		wpm_val_elem.innerHTML =
 			`<div style="display:flex;flex-direction:column;justify-content:center;">` +
 			`<div style="display:flex;align-items:center;gap:6px;">` +
-			`<span>${format_number(manifest_wpm.toFixed(1))} <span class="stat-unit">MPM</span></span>` +
-			`<span class="tooltip stat-inline-tooltip">${INFO_SVG}<span class="tooltiptext"><strong>MPM&nbsp;:</strong> Mots par minute (mots r&#233;els du dictionnaire).</span></span>` +
+			`<span>${format_number(manifest_wpm.toFixed(1))} <span class="stat-unit">${_t('ui_typing.unit_mpm')}</span></span>` +
+			`<span class="tooltip stat-inline-tooltip">${INFO_SVG}<span class="tooltiptext">${_t('ui_typing.tooltip_mpm')}</span></span>` +
 			`</div>` +
 			`<div style="display:flex;align-items:center;gap:6px;font-size:0.65em;margin-top:5px;">` +
-			`<span>${format_number(manifest_cpm.toFixed(0))} <span class="stat-unit">CPM</span></span>` +
-			`<span class="tooltip stat-inline-tooltip">${INFO_SVG}<span class="tooltiptext"><strong>CPM&nbsp;:</strong> Caract&#232;res par minute (avec HS + IA par d&#233;faut).</span></span>` +
+			`<span>${format_number(manifest_cpm.toFixed(0))} <span class="stat-unit">${_t('ui_typing.unit_cpm')}</span></span>` +
+			`<span class="tooltip stat-inline-tooltip">${INFO_SVG}<span class="tooltiptext">${_t('ui_typing.tooltip_cpm_simple')}</span></span>` +
 			`</div>` +
 			`</div>`;
 	}
@@ -622,31 +613,23 @@ function recompute_speed_kpi() {
 					: _t('ui_typing.cpm_mode_manual');
 	const NBSP = String.fromCharCode(160);
 
-	// Tooltip explaining the exact formula in plain French
 	const formula_tooltip =
-		`<strong>Calcul${NBSP}:</strong> CPM = (transitions créditées) × 60000 / (temps actif hors déclencheurs).<br>` +
-		`<strong>Mode${NBSP}:</strong> ${mode_label}.<br><br>` +
-		`<strong>Numérateur</strong> (transitions créditées + gains synth.)${NBSP}:<br>` +
-		`&nbsp;&nbsp;• Manuel pur${NBSP}: ${format_number(pure_trans)} transitions inter-touches retenues (≤ ${thresh_label}, hors triggers)<br>` +
-		(show_hs
-			? `&nbsp;&nbsp;• + HS${NBSP}: ${format_number(add_hs)} caractères ajoutés (sortie HS − leur déclencheur)<br>`
-			: '') +
-		(show_llm
-			? `&nbsp;&nbsp;• + IA${NBSP}: ${format_number(add_llm)} caractères ajoutés (sortie IA − leur déclencheur)<br>`
-			: '') +
-		`&nbsp;&nbsp;= ${format_number(chars_total)} caractères crédités<br><br>` +
-		`<strong>Dénominateur</strong> (temps actif)${NBSP}:<br>` +
-		`&nbsp;&nbsp;Somme des délais inter-touches manuels ≤ ${thresh_label}, puis on retire le temps consommé par les triggers (les expansions sont instantanées : leur temps est nul). MPM = CPM / 5.<br><br>` +
-		`<em>On crédite des « transitions » et non des « caractères » pour éviter qu'une frappe isolée (suivie d’une longue pause) ne contribue 1 caractère pour 0 ms et n'envoie le CPM à l'infini.</em>`;
+		_t(‘ui_typing.tooltip_cpm_formula’)
+			.replace(‘{mode}’, mode_label)
+			.replace(‘{pure_trans}’, format_number(pure_trans))
+			.replace(‘{thresh}’, thresh_label)
+			.replace(‘{add_hs}’, show_hs ? ` • + HS : ${format_number(add_hs)} ${_t(‘ui_typing.tooltip_cpm_hs_chars’)}<br>` : ‘’)
+			.replace(‘{add_llm}’, show_llm ? ` • + IA : ${format_number(add_llm)} ${_t(‘ui_typing.tooltip_cpm_llm_chars’)}<br>` : ‘’)
+			.replace(‘{chars_total}’, format_number(chars_total));
 
 	wpm_val_elem.innerHTML =
 		`<div style="display:flex;flex-direction:column;justify-content:center;">` +
 		`<div style="display:flex;align-items:center;gap:6px;">` +
-		`<span>${format_number(output_wpm.toFixed(1))} <span class="stat-unit">MPM</span></span>` +
+		`<span>${format_number(output_wpm.toFixed(1))} <span class="stat-unit">${_t('ui_typing.unit_mpm')}</span></span>` +
 		`<span class="tooltip stat-inline-tooltip">${INFO_SVG}<span class="tooltiptext" style="text-align:left;">${formula_tooltip}</span></span>` +
 		`</div>` +
 		`<div style="display:flex;align-items:center;gap:6px;font-size:0.65em;margin-top:5px;">` +
-		`<span>${format_number(output_cpm.toFixed(0))} <span class="stat-unit">CPM</span></span>` +
+		`<span>${format_number(output_cpm.toFixed(0))} <span class="stat-unit">${_t('ui_typing.unit_cpm')}</span></span>` +
 		`<span class="tooltip stat-inline-tooltip">${INFO_SVG}<span class="tooltiptext" style="text-align:left;">${formula_tooltip}</span></span>` +
 		`</div>` +
 		`</div>`;
@@ -1517,7 +1500,7 @@ function render_dist_table() {
 
 	let rows_html;
 	if (sorted.length === 0) {
-		rows_html = `<tr><td colspan="4" style="text-align:center;padding:12px;color:var(--text-muted);">Aucune donnée</td></tr>`;
+		rows_html = `<tr><td colspan="4" style="text-align:center;padding:12px;color:var(--text-muted);">${_t('ui_typing.no_data')}</td></tr>`;
 	} else {
 		// Inline horizontal bar showing finger usage % so the table doubles as a
 		// visualization of the workload distribution.
@@ -2491,7 +2474,7 @@ function render_rhythm_kpi() {
 	};
 	set(
 		'rhythm_val',
-		`${format_number(max_cpm.toFixed(0))}<span class="stat-unit">CPM pic (rafale)</span>`
+		`${format_number(max_cpm.toFixed(0))}<span class="stat-unit">${_t('ui_typing.unit_cpm_burst')}</span>`
 	);
 	set('rhythm_max_chars', max_chars > 0 ? `${format_number(max_chars)} car.` : '—');
 	set('rhythm_count', format_number(total_bursts));
@@ -2693,7 +2676,7 @@ function render_records_kpi() {
 	};
 	set(
 		'records_val',
-		`${format_number(max_cpm.toFixed(0))}<span class="stat-unit">CPM record</span>`
+		`${format_number(max_cpm.toFixed(0))}<span class="stat-unit">${_t('ui_typing.unit_cpm_record')}</span>`
 	);
 	set(
 		'records_burst_chars',
@@ -3048,10 +3031,10 @@ function render_apps_table() {
 
 	container.innerHTML =
 		`<table class="ekpi-table"><thead><tr>` +
-		`<th onclick="sort_apps_table('name')" style="cursor:pointer;">App${arrow('name')}</th>` +
-		`<th onclick="sort_apps_table('chars')" style="cursor:pointer;">Caractères${arrow('chars')}</th>` +
-		`<th onclick="sort_apps_table('cpm')" style="cursor:pointer;text-align:right;">CPM${arrow('cpm')}</th>` +
-		`<th onclick="sort_apps_table('time_ms')" style="cursor:pointer;text-align:right;">Temps actif${arrow('time_ms')}</th>` +
+		`<th onclick="sort_apps_table('name')" style="cursor:pointer;">${_t('ui_typing.col_app')}${arrow('name')}</th>` +
+		`<th onclick="sort_apps_table('chars')" style="cursor:pointer;">${_t('ui_typing.col_chars')}${arrow('chars')}</th>` +
+		`<th onclick="sort_apps_table('cpm')" style="cursor:pointer;text-align:right;">${_t('ui_typing.unit_cpm')}${arrow('cpm')}</th>` +
+		`<th onclick="sort_apps_table('time_ms')" style="cursor:pointer;text-align:right;">${_t('ui_typing.col_active_time')}${arrow('time_ms')}</th>` +
 		`</tr></thead><tbody>${rows}</tbody></table>`;
 }
 

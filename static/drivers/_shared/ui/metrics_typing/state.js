@@ -16,6 +16,12 @@
 
 window.metrics_manifest = window.metrics_manifest || {};
 window.app_icons = window.app_icons || {};
+
+// Shared i18n helper — defined here so every module loaded after state.js can call it.
+// Reads from window._i18n_strings populated by the shared i18n loader (i18n.js).
+function _t(key) {
+	return (window._i18n_strings && window._i18n_strings[key]) || key;
+}
 window.keycode_layout = window.keycode_layout || {};
 window._lua_request = null;
 
