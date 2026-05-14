@@ -501,6 +501,10 @@ HSE_DispatchMatch(Spec, EndChar) {
         BSCount := Spec.Length + (EndChar != "" ? 1 : 0)
         BackSpaceSeq := "{BackSpace " . BSCount . "}"
         Replacement := Spec.Replacement
+        ; Allow Replacement to be a callable — resolved at fire time so
+        ; dynamic values (dates, live data) are computed on each keystroke.
+        if HasMethod(Replacement)
+            Replacement := Replacement()
         OnlyText := Spec.HasOwnProp("OnlyText") ? Spec.OnlyText : true
         FinalResult := Spec.HasOwnProp("FinalResult") ? Spec.FinalResult : false
 
