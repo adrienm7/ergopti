@@ -55,6 +55,11 @@ local LOCALES = {
 	{ code = "tr", flag = "🇹🇷", name = "Türkçe"    },
 	{ code = "uk", flag = "🇺🇦", name = "Українська" },
 	{ code = "zh", flag = "🇨🇳", name = "中文"       },
+	{ code = "da", flag = "🇩🇰", name = "Dansk"      },
+	{ code = "he", flag = "🇮🇱", name = "עברית"      },
+	{ code = "hi", flag = "🇮🇳", name = "हिन्दी"     },
+	{ code = "no", flag = "🇳🇴", name = "Norsk"      },
+	{ code = "sv", flag = "🇸🇪", name = "Svenska"    },
 }
 
 --- hs.settings key used to persist the locale between reloads.

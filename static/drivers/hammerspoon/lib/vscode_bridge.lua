@@ -11,6 +11,7 @@ local M = {}
 
 local hs     = hs
 local Logger = require("lib.logger")
+local i18n   = require("lib.i18n")
 local LOG    = "vscode_bridge"
 
 
@@ -168,7 +169,7 @@ function M.install_extension()
 	write_file(pkg_path, PACKAGE_JSON)
 	write_file(ext_path, EXTENSION_JS)
 	Logger.info(LOG, string.format("Extension installed in %s.", EXT_DIR))
-	hs.alert.show("Veuillez recharger VSCode (Cmd+Shift+P > Reload Window) pour activer l’extension de frappe", 4)
+	hs.alert.show(i18n.get("vscode.reload_required"), 4)
 	return true
 end
 

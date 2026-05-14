@@ -183,7 +183,7 @@ function M.prompt_shortcut(opts)
 		return true
 	end
 
-	pcall(dialog.alert, "Format invalide", "Utilisez le format mods+touche, par exemple cmd+shift+b")
+	pcall(dialog.alert, i18n.get("shortcut_utils.format_invalid"), i18n.get("shortcut_utils.format_hint"))
 	return false
 end
 

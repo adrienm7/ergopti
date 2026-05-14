@@ -534,7 +534,7 @@ end
 -- Special key shortcuts: space, enter, period, comma
 local HS_SPECIAL_KEYS = {
 	{id = "space",  key = "space",  label = "Espace"},
-	{id = "enter",  key = "return", label = "Entrée"},
+	{id = "enter",  key = "return", label = i18n.get("common.key_enter")},
 	{id = "period", key = ".",      label = "Point"},
 	{id = "comma",  key = ",",      label = "Virgule"},
 }

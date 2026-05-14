@@ -388,7 +388,7 @@ function M.check_and_install_deps(on_complete)
 	-- line. The step-line communicates the macro phase; the detail-line is
 	-- left blank so the very first real subprocess line populates it.
 	pcall(llm_progress.append_log, "$ " .. bash_cmd)
-	pcall(llm_progress.set_step, "Démarrage du script d’installation…")
+	pcall(llm_progress.set_step, i18n.get("mlx.deps_step_bootstrap"))
 	Logger.debug(LOG, "Full bash command: %s", bash_cmd)
 
 	-- Write the PTY wrapper to a temp file so we can pass it to Python properly
@@ -399,7 +399,7 @@ function M.check_and_install_deps(on_complete)
 	if not pty_file then
 		Logger.error(LOG, "Failed to write PTY wrapper to %s — aborting bootstrap.", pty_wrapper_path)
 		_bootstrap_state = "failed"
-		_last_failure_message = "Impossible d’écrire le fichier PTY wrapper."
+		_last_failure_message = i18n.get("mlx.deps_pty_write_failed")
 		return
 	end
 	-- pty.spawn() alone doesn't forward PTY output to stdout (the Python
@@ -466,7 +466,7 @@ function M.check_and_install_deps(on_complete)
 			_last_failure_message = nil
 			if ran_real_sync then
 				Logger.success(LOG, "MLX virtualenv synchronised — engine ready.")
-				pcall(llm_progress.set_step, "Moteur IA prêt.")
+				pcall(llm_progress.set_step, i18n.get("mlx.deps_step_ready"))
 				pcall(llm_progress.set_progress, 100)
 				hs.timer.doAfter(SUCCESS_AUTO_HIDE_SEC, function()
 					pcall(llm_progress.hide)

@@ -10,6 +10,7 @@
 local M = {}
 
 local Logger = require("lib.logger")
+local i18n   = require("lib.i18n")
 local LOG    = "gestures.conflicts"
 
 
@@ -31,36 +32,36 @@ local MACOS_GESTURE_GROUPS = {
 			"swipe_2_left", "swipe_2_right", "swipe_2_up", "swipe_2_down",
 			"swipe_2_left_up", "swipe_2_right_up", "swipe_2_left_down", "swipe_2_right_down"
 		},
-		description  = "Glisser 2 doigts — Défilement, Pages, Mission Control",
-		hint         = "Réglages Système › Trackpad\n→ Décocher les gestes à 2 doigts si vous souhaitez les utiliser dans Hammerspoon.",
+		description  = i18n.get("gestures.conflict_desc_swipe_2"),
+		hint         = i18n.get("gestures.conflict_hint_swipe_2"),
 		settings_url = "x-apple.systempreferences:com.apple.Trackpad-Settings.extension",
 	},
 	{
 		key          = "tap_3_conflict",
 		slots        = { "tap_3" },
-		description  = "Tap 3 doigts — Recherche & détection de données",
-		hint         = "Réglages Système › Trackpad › Pointer & cliquer\n→ Décocher « Recherche et détection de données »",
+		description  = i18n.get("gestures.conflict_desc_tap_3"),
+		hint         = i18n.get("gestures.conflict_hint_tap_3"),
 		settings_url = "x-apple.systempreferences:com.apple.Trackpad-Settings.extension",
 	},
 	{
 		key          = "swipe_3_horiz_conflict",
 		slots        = { "swipe_3_horiz", "swipe_3_left", "swipe_3_right" },
-		description  = "Glisser 3 doigts gauche/droite — Pages / Passer d’un espace",
-		hint         = "Réglages Système › Trackpad › Plus de gestes\n→ Décocher « Faire défiler entre les pages » et « Passer d’un espace à l’autre »",
+		description  = i18n.get("gestures.conflict_desc_swipe_3_horiz"),
+		hint         = i18n.get("gestures.conflict_hint_swipe_3_horiz"),
 		settings_url = "x-apple.systempreferences:com.apple.Trackpad-Settings.extension",
 	},
 	{
 		key          = "swipe_3_vert_conflict",
 		slots        = { "swipe_3_up", "swipe_3_down" },
-		description  = "Glisser 3 doigts haut/bas — Mission Control & App Exposé",
-		hint         = "Réglages Système › Trackpad › Plus de gestes\n→ Décocher « Mission Control » et « Exposé de l’app »",
+		description  = i18n.get("gestures.conflict_desc_swipe_3_vert"),
+		hint         = i18n.get("gestures.conflict_hint_swipe_3_vert"),
 		settings_url = "x-apple.systempreferences:com.apple.Trackpad-Settings.extension",
 	},
 	{
 		key          = "swipe_4_horiz_conflict",
 		slots        = { "swipe_4_horiz", "swipe_5_horiz", "swipe_4_left", "swipe_4_right", "swipe_5_left", "swipe_5_right" },
-		description  = "Glisser 4/5 doigts gauche/droite — Passer d’un espace à l’autre",
-		hint         = "Réglages Système › Trackpad › Plus de gestes\n→ Décocher « Passer d’un espace à l’autre »",
+		description  = i18n.get("gestures.conflict_desc_swipe_4_horiz"),
+		hint         = i18n.get("gestures.conflict_hint_swipe_4_horiz"),
 		settings_url = "x-apple.systempreferences:com.apple.Trackpad-Settings.extension",
 	},
 	{
@@ -70,8 +71,8 @@ local MACOS_GESTURE_GROUPS = {
 			"swipe_4_left_up", "swipe_4_right_up", "swipe_4_left_down", "swipe_4_right_down",
 			"swipe_5_left_up", "swipe_5_right_up", "swipe_5_left_down", "swipe_5_right_down"
 		},
-		description  = "Glisser 4/5 doigts haut/bas — Mission Control & App Exposé",
-		hint         = "Réglages Système › Trackpad › Plus de gestes\n→ Décocher « Mission Control » et « Exposé de l’app »",
+		description  = i18n.get("gestures.conflict_desc_swipe_4_vert"),
+		hint         = i18n.get("gestures.conflict_hint_swipe_4_vert"),
 		settings_url = "x-apple.systempreferences:com.apple.Trackpad-Settings.extension",
 	},
 }
@@ -130,11 +131,11 @@ function M.on_action_changed(slot, new_action)
 	return {
 		msg = string.format(
 			"%s\n"
-			.. "Ce geste est peut-être géré par macOS :\n"
+			.. i18n.get("gestures.conflict_dialog_line1") .. "\n"
 			.. "« %s »\n\n"
-			.. "Si c’est le cas, macOS et Hammerspoon réagiront tous deux en même temps :\n"
-			.. "les deux comportements seront envoyés simultanément.\n\n"
-			.. "Si encore actif, désactivez-le ici :\n"
+			.. i18n.get("gestures.conflict_dialog_line2") .. "\n"
+			.. i18n.get("gestures.conflict_dialog_line3") .. "\n\n"
+			.. i18n.get("gestures.conflict_dialog_line4") .. "\n"
 			.. "%s\n%s",
 			sep, grp.description, grp.hint, sep),
 		url = grp.settings_url,

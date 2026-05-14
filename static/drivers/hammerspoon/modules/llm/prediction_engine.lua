@@ -1034,7 +1034,7 @@ function M.perform_check(force_trigger, profile_name)
 	-- or previous LLM predictions). Avoids the blank gap that the spinner creates —
 	-- existing content stays visible and is replaced in-place when new predictions arrive.
 	if not predictions_visible then
-		tooltip.show_loading("⏳ Génération en cours…", is_ai_preview_enabled, tooltip.tint("ai_loading"))
+		tooltip.show_loading(i18n.get("llm.generating"), is_ai_preview_enabled, tooltip.tint("ai_loading"))
 	else
 		-- Mark any finalized predictions as placeholders so on_partial_cb evicts them
 		-- cleanly when streaming tokens start arriving, without needing to hide the tooltip.

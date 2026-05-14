@@ -47,6 +47,11 @@ global I18N_LOCALES := [
 	{ Code: "tr", Tag: "[TR]", Name: "Türkçe"     },
 	{ Code: "uk", Tag: "[UK]", Name: "Українська"  },
 	{ Code: "zh", Tag: "[ZH]", Name: "中文"        },
+	{ Code: "da", Tag: "[DA]", Name: "Dansk"       },
+	{ Code: "he", Tag: "[HE]", Name: "עברית"       },
+	{ Code: "hi", Tag: "[HI]", Name: "हिन्दी"      },
+	{ Code: "no", Tag: "[NO]", Name: "Norsk"       },
+	{ Code: "sv", Tag: "[SV]", Name: "Svenska"     },
 ]
 
 ; Active locale code — read from config.toml at boot, then kept in memory.
