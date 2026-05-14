@@ -653,7 +653,9 @@
 	"menu.llm.specs_header": "SPÉCIFICATIONS",
 	"menu.llm.temperature_label": "Température (Créativité) : %s",
 	"menu.llm.thinking_model_info": "  ↳ Info : Modèle thinking (réflexion masquée)",
-	"menu.llm.title": "✨ Intelligence Artificielle",
+	"menu.llm.title": "✨ Intelligence Artificielle"
+	"menu.llm.on": "✅ IA activée (cliquer pour désactiver)",
+	"menu.llm.off": "❌ IA désactivée (cliquer pour activer)",,
 	"menu.llm.toggle_enable": "Activer les suggestions IA",
 	"menu.llm.toggle_disable": "Désactiver les suggestions IA",
 	"menu.llm.about": "À propos d'Ergopti IA",

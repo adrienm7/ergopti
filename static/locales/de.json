@@ -653,7 +653,9 @@
 	"menu.llm.specs_header": "SPEZIFIKATIONEN",
 	"menu.llm.temperature_label": "Temperatur (Kreativität): %s",
 	"menu.llm.thinking_model_info": "  ↳ Info: Thinking-Modell (verdecktes Reasoning)",
-	"menu.llm.title": "✨ Künstliche Intelligenz",
+	"menu.llm.title": "✨ Künstliche Intelligenz"
+	"menu.llm.on": "✅ KI aktiviert (zum Deaktivieren klicken)",
+	"menu.llm.off": "❌ KI deaktiviert (zum Aktivieren klicken)",,
 	"menu.llm.toggle_enable": "KI-Vorschläge aktivieren",
 	"menu.llm.toggle_disable": "KI-Vorschläge deaktivieren",
 	"menu.llm.about": "Über Ergopti KI",

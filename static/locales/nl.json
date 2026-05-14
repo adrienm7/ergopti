@@ -654,6 +654,8 @@
 	"menu.llm.temperature_label": "Temperatuur (Creativiteit): %s",
 	"menu.llm.thinking_model_info": "  ↳ Info: Denkend model (verborgen redenering)",
 	"menu.llm.title": "✨ Kunstmatige intelligentie"
+	"menu.llm.on": "✅ AI ingeschakeld (klik om uit te schakelen)",
+	"menu.llm.off": "❌ AI uitgeschakeld (klik om in te schakelen)",
 	"menu.llm.toggle_enable": "AI-suggesties inschakelen",
 	"menu.llm.toggle_disable": "AI-suggesties uitschakelen",
 	"menu.llm.about": "Over Ergopti AI",
