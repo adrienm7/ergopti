@@ -38,7 +38,6 @@
 						id="quick_range"
 						class="filter-btn"
 						onchange="apply_quick_date_range()"
-						title="Raccourci période"
 						data-i18n-option-prefix="ui_typing.opt_quick_range"
 						data-i18n-title="ui_typing.title_quick_range"
 					>
@@ -64,7 +63,7 @@
 						class="filter-btn source-toggle"
 						id="btn_toggle_llm"
 						onclick="toggle_llm_source()"
-						title="+ IA : ajoute les caractères générés par l'IA aux statistiques (vitesse, précision, tableaux). Désactivé : seules les frappes manuelles sont prises en compte."
+						data-i18n-title="ui_typing.btn_toggle_llm_title"
 					>
 						+ IA
 					</button>
@@ -72,7 +71,7 @@
 						class="filter-btn source-toggle"
 						id="btn_toggle_hs"
 						onclick="toggle_hs_source()"
-						title="+ Hotstrings : ajoute les caractères générés par les hotstrings aux statistiques. Désactivé : seules les frappes manuelles sont prises en compte."
+						data-i18n-title="ui_typing.btn_toggle_hs_title"
 					>
 						+ Hotstrings
 					</button>
@@ -96,7 +95,7 @@
 
 					<div class="stat-details" id="llm_loading" data-i18n="ui_typing.loading"></div>
 					<div class="stat-details-split" id="llm_details" style="display: none">
-						<div class="split-col" title="Différence nette entre caractères effacés et générés">
+						<div class="split-col" data-i18n-title="ui_typing.title_net_llm">
 							<div class="split-label" data-i18n="ui_typing.lbl_saved"></div>
 							<div class="split-val"><strong id="llm_net_val">0</strong> <span data-i18n="ui_typing.unit_keystrokes"></span></div>
 						</div>
@@ -118,7 +117,7 @@
 
 					<div class="stat-details" id="hs_loading" data-i18n="ui_typing.loading"></div>
 					<div class="stat-details-split" id="hs_details" style="display: none">
-						<div class="split-col" title="Différence nette entre caractères tapés et générés">
+						<div class="split-col" data-i18n-title="ui_typing.title_net_hs">
 							<div class="split-label" data-i18n="ui_typing.lbl_saved"></div>
 							<div class="split-val"><strong id="hs_net_val">0</strong> <span data-i18n="ui_typing.unit_keystrokes"></span></div>
 						</div>
@@ -149,7 +148,7 @@
 							id="pause_threshold"
 							class="filter-btn"
 							onchange="apply_local_filters()"
-							title="Seuil de pause : pauses supérieures à ce seuil sont exclues du temps actif pour le calcul MPM."
+							data-i18n-title="ui_typing.title_pause_threshold"
 							style="font-size:11px;padding:3px 6px;height:auto;"
 							data-i18n-option-prefix="ui_typing.opt_pause"
 						>
@@ -246,9 +245,7 @@
 					style="padding: 2px 8px; font-size: 11px; border-color: var(--delegation-border)"
 						onclick="reset_chart_zoom('delegation')"
 						data-i18n="ui_typing.btn_restore_zoom"
-					>
-						Restaurer le zoom
-					</button>
+					></button>
 				</div>
 				<div style="flex: 1; min-height: 0; position: relative;">
 					<canvas id="delegation_chart"></canvas>
@@ -283,14 +280,14 @@
 						<div class="stat-details-split" id="dist_details" style="display: none">
 							<div
 								class="split-col"
-								title="Le doigt ayant parcouru la plus grande distance sur la période"
+								data-i18n-title="ui_typing.title_top_finger"
 							>
 								<div class="split-label" data-i18n="ui_typing.lbl_most_active_finger"></div>
 								<div class="split-val"><strong id="dist_top_finger">—</strong></div>
 							</div>
 							<div
 								class="split-col"
-								title="Équilibre des frappes entre la main gauche et la main droite. 50/50 = équilibre parfait."
+								data-i18n-title="ui_typing.title_hand_balance"
 							>
 								<div class="split-label" data-i18n="ui_typing.lbl_hand_balance"></div>
 								<div class="split-val"><strong id="dist_hand_balance">—</strong></div>
@@ -310,13 +307,13 @@
 						</div>
 						<div class="stat-details" id="rep_loading" data-i18n="ui_typing.loading"></div>
 						<div class="stat-details-split" id="rep_details" style="display: none">
-							<div class="split-col" title="Nombre total de redoublements sur la période">
+							<div class="split-col" data-i18n-title="ui_typing.title_rep_total">
 								<div class="split-label" data-i18n="ui_typing.lbl_total"></div>
-								<div class="split-val"><strong id="rep_pct">0 redoublements</strong></div>
+								<div class="split-val"><strong id="rep_pct">0 <span data-i18n="ui_typing.lbl_doublings"></span></strong></div>
 							</div>
 							<div
 								class="split-col"
-								title="Part des redoublements générés par la touche ★ (hotstring de répétition). Non nul uniquement en mode + Hotstrings."
+								data-i18n-title="ui_typing.title_rep_via_star"
 							>
 								<div class="split-label" data-i18n="ui_typing.lbl_via_magic_key"></div>
 								<div class="split-val">
@@ -774,10 +771,7 @@
 										<line x1="12" y1="16" x2="12" y2="12"></line>
 										<line x1="12" y1="8" x2="12.01" y2="8"></line>
 									</svg>
-									<span class="tooltiptext"
-										>Mots Par Minute : Vitesse estimée si vous tapiez ce fragment en boucle (1 mot =
-										5 touches). Ne prend en compte QUE vos vraies frappes.</span
-									>
+									<span class="tooltiptext" data-i18n="ui_typing.tooltip_col_mpm"></span>
 								</div>
 								↕<br />
 								<span id="col_global_wpm" class="th-stat"></span>
@@ -801,10 +795,7 @@
 										<line x1="12" y1="16" x2="12" y2="12"></line>
 										<line x1="12" y1="8" x2="12.01" y2="8"></line>
 									</svg>
-									<span class="tooltiptext"
-										>Précision : Pourcentage de fois où cette séquence a été tapée du premier coup
-										sans utiliser la touche Effacer (Backspace).</span
-									>
+									<span class="tooltiptext" data-i18n="ui_typing.tooltip_col_acc"></span>
 								</div>
 								↕<br />
 								<span id="col_global_acc" class="th-stat"></span>
