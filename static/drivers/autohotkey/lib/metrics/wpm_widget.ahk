@@ -13,11 +13,12 @@
 ;    (default 30 s) of recent keystrokes so the value reacts quickly to
 ;    speed changes without wild swings from isolated bursts.
 ; 2. Color coding: the background color encodes keystroke origin —
-;      - manual keystrokes  → blue
-;      - hotstring expanded → red
-;      - autocorrection     → green
-;      - IA suggestion      → purple
-;    Colors match the Hammerspoon widget color scheme for consistency.
+;      - manual keystrokes  → blue (default, user-configurable)
+;      - hotstring expanded → tooltip tint from magickey TOML + user override
+;      - autocorrection     → tooltip tint from autocorrection TOML + user override
+;      - IA suggestion      → purple fallback (no TOML source for AI)
+;    Colors are resolved live from the same TOML/override pipeline as tooltips,
+;    so any customisation in the hotstrings config window is reflected immediately.
 ; 3. Two display modes:
 ;      - Compact: colored pill with large WPM number + small unit label.
 ;      - Graph: sparkline of recent history rendered as a WebView2 canvas.
@@ -54,20 +55,17 @@ class WPMWidgetConst {
     static EDGE_MARGIN        := 12
     ; How long (ms) after the last keystroke to show the idle state.
     static IDLE_AFTER_MS      := 4000
-    ; Source background colors (RRGGBB for AHK BackColor / canvas).
-    static COLOR_BG_MANUAL    := "0055cc"   ; Blue
-    static COLOR_BG_HS        := "cc2200"   ; Red (hotstring)
-    static COLOR_BG_AC        := "1a8a3a"   ; Green (autocorrection)
-    static COLOR_BG_AI        := "7a30b0"   ; Purple (IA)
+    ; Compact mode background colors — resolved at runtime from TOML/override,
+    ; these fallbacks apply only when no category color is configured.
+    static COLOR_BG_MANUAL    := "0055cc"   ; Default blue (manual keystrokes)
+    static COLOR_BG_AI        := "7a30b0"   ; Purple fallback for AI (no TOML source)
     static COLOR_BG_IDLE      := "1a1a2e"   ; Near-black when idle
+    ; Graph accent line colors — raw hue, used directly as canvas stroke colors.
+    static COLOR_GRAPH_MANUAL := "4499ff"   ; Default blue graph line
+    static COLOR_GRAPH_AI     := "cc88ff"   ; Purple fallback for AI graph line
     ; Text colors.
     static COLOR_TXT_ACTIVE   := "ffffff"
     static COLOR_TXT_IDLE     := "555577"
-    ; Graph accent colors (same palette, slightly brighter for lines).
-    static COLOR_GRAPH_MANUAL := "4499ff"
-    static COLOR_GRAPH_HS     := "ff6644"
-    static COLOR_GRAPH_AC     := "44dd77"
-    static COLOR_GRAPH_AI     := "cc88ff"
     ; Transparency (0-255, 255=opaque).
     static ALPHA_ACTIVE       := 220
     static ALPHA_IDLE         := 140
@@ -213,7 +211,37 @@ WPMWidget_Calc() {
 }
 
 
-; Resolve the background color for the current source state.
+; Returns the tinted compact-mode background hex for a hotstring category
+; (without leading '#'). Delegates to HotstringsResolve for the canonical color
+; then passes it through _TooltipMixTintHex so the WPM pill matches the tooltip
+; appearance exactly. Falls back to FallbackHex when no color is configured.
+WPMWidget_CategoryBgColor(CategoryName, FallbackHex) {
+    try {
+        cfg := HotstringsResolve(CategoryName, "")
+        if (cfg.Color != "")
+            return _TooltipMixTintHex(cfg.Color)
+    }
+    return FallbackHex
+}
+
+; Returns the raw accent hex for a hotstring category (without leading '#'),
+; used as the graph sparkline stroke color. Falls back to FallbackHex.
+WPMWidget_CategoryGraphColor(CategoryName, FallbackHex) {
+    try {
+        cfg := HotstringsResolve(CategoryName, "")
+        raw := cfg.Color
+        if (raw != "") {
+            if (SubStr(raw, 1, 1) == "#")
+                raw := SubStr(raw, 2)
+            return raw
+        }
+    }
+    return FallbackHex
+}
+
+; Resolve the compact-mode background color for the current source state.
+; HS and AC colors are read live from the TOML/override pipeline so user
+; customizations in the hotstrings config window are reflected immediately.
 WPMWidget_ResolveBgColor(idle, has_hs, has_ai, has_ac, use_colors) {
     if idle
         return WPMWidgetConst.COLOR_BG_IDLE
@@ -221,23 +249,24 @@ WPMWidget_ResolveBgColor(idle, has_hs, has_ai, has_ac, use_colors) {
         if has_ai
             return WPMWidgetConst.COLOR_BG_AI
         if has_hs
-            return WPMWidgetConst.COLOR_BG_HS
+            return WPMWidget_CategoryBgColor("magickey", WPMWidgetConst.COLOR_BG_MANUAL)
         if has_ac
-            return WPMWidgetConst.COLOR_BG_AC
+            return WPMWidget_CategoryBgColor("autocorrection", WPMWidgetConst.COLOR_BG_MANUAL)
     }
     return WPMWidgetConst.COLOR_BG_MANUAL
 }
 
 
 ; Resolve the graph accent color hex string.
+; HS and AC colors are sourced from the same TOML pipeline as tooltips.
 WPMWidget_ResolveGraphColor(has_hs, has_ai, has_ac, use_colors) {
     if use_colors {
         if has_ai
             return WPMWidgetConst.COLOR_GRAPH_AI
         if has_hs
-            return WPMWidgetConst.COLOR_GRAPH_HS
+            return WPMWidget_CategoryGraphColor("magickey", WPMWidgetConst.COLOR_GRAPH_MANUAL)
         if has_ac
-            return WPMWidgetConst.COLOR_GRAPH_AC
+            return WPMWidget_CategoryGraphColor("autocorrection", WPMWidgetConst.COLOR_GRAPH_MANUAL)
     }
     return WPMWidgetConst.COLOR_GRAPH_MANUAL
 }
