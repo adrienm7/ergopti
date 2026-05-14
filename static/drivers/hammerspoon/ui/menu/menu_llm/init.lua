@@ -937,7 +937,7 @@ function M.create(deps)
         -- discoverable default — the custom entry is for power users.
         table.insert(menu, { title = "-" })
         table.insert(menu, {
-            title = i18n.get("menu.llm.add_model_entry")…",
+            title = i18n.get("menu.llm.add_model_entry"),
             fn    = function() prompt_add_user_model() end,
         })
 
