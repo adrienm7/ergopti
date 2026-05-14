@@ -196,7 +196,7 @@ OllamaWV_Create(kind, subtitle) {
 		return
 	}
 
-	g := Gui("+AlwaysOnTop -Caption +ToolWindow", "Ergopti — IA")
+	g := Gui("+AlwaysOnTop +Caption +MinimizeBox +Resize +ToolWindow", "Ergopti — IA")
 	g.MarginX := 0
 	g.MarginY := 0
 	g.OnEvent("Close", (*) => OllamaWV_Close())
@@ -239,16 +239,13 @@ OllamaWV_Create(kind, subtitle) {
 	; JS → AHK message bridge (cancel / retry buttons)
 	_OllamaWV_WebView.WebMessageReceived := OllamaWV_OnWebMessage
 
-	; Inject i18n strings before the page parses its own scripts so that
-	; data-i18n attributes are resolved on first render, not on a delayed fetch.
-	; We inject window.__i18n_base (path to static/locales/) and
-	; window._i18n_locale so i18n.js can fetch the right file via file://.
-	locales_url := OllamaWV_LocalesUrl()
+	; Pre-load the locale JSON from disk and inject it as window._i18n_strings so
+	; i18n.js can call apply() without a fetch() — WebView2 blocks file:// XHR
+	; from file:// pages by default, making fetch() unreliable here.
 	locale_code := _I18nLocale
-	i18n_script := "window.__i18n_base = '" locales_url "';"
-		. "window._i18n_locale = '" locale_code "';"
+	i18n_script := OllamaWV_BuildI18nScript(locale_code)
 	try _OllamaWV_WebView.AddScriptToExecuteOnDocumentCreated(i18n_script, 0)
-	LoggerInfo("LLM", "i18n base injected: " locales_url " locale=" locale_code ".")
+	LoggerInfo("LLM", "i18n strings injected inline for locale=" locale_code ".")
 
 	; Navigate to shared HTML
 	html_url := OllamaWV_HtmlUrl()
@@ -292,14 +289,31 @@ OllamaWV_HtmlUrl() {
 }
 
 /**
- * Returns the file:// URL for the static/locales/ directory (trailing slash).
- * Injected as window.__i18n_base so i18n.js fetches the correct locale file.
- * @returns {string}
+ * Reads the locale JSON from disk and returns a JS snippet that pre-populates
+ * window._i18n_strings and calls i18n_apply() so data-i18n elements are filled
+ * without relying on fetch() (which WebView2 blocks for file:// origins).
+ * Falls back to an empty object when the JSON file is missing.
+ * @param {string} locale_code - BCP-47 locale code e.g. "fr".
+ * @returns {string} JS source string safe for AddScriptToExecuteOnDocumentCreated.
  */
-OllamaWV_LocalesUrl() {
+OllamaWV_BuildI18nScript(locale_code) {
 	global _StaticDir
-	base := _StaticDir . "\locales\"
-	return "file:///" . StrReplace(base, "\", "/")
+	json_path := _StaticDir . "\locales\" . locale_code . ".json"
+	json_str  := ""
+	if FileExist(json_path) {
+		try json_str := FileRead(json_path, "UTF-8")
+	}
+	if (json_str == "") {
+		LoggerError("LLM", "i18n locale file not found: " json_path ".")
+		json_str := "{}"
+	}
+	; Inject as window._i18n_strings and call i18n_apply once the DOM is ready.
+	; i18n_apply is defined by i18n.js which runs before script.js.
+	return "window._i18n_strings=" json_str ";"
+		. "if(document.readyState==='loading'){"
+		. "document.addEventListener('DOMContentLoaded',function(){"
+		. "if(typeof window.i18n_apply==='function')window.i18n_apply(window._i18n_strings);});"
+		. "}else{if(typeof window.i18n_apply==='function')window.i18n_apply(window._i18n_strings);}"
 }
 
 

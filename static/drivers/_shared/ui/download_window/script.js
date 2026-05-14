@@ -18,6 +18,26 @@ let globalDoneState = false;
 
 function _t(key) { return (window._i18n_strings && window._i18n_strings[key]) || null; }
 
+/**
+ * Sends a message to the native backend, supporting both WebView2 (Windows/AHK)
+ * and WKWebView (macOS/Hammerspoon) bridge APIs.
+ * @param {string} msg - Message string to post.
+ */
+function postBridgeMessage(msg) {
+	if (window.chrome && window.chrome.webview) {
+		window.chrome.webview.postMessage(msg);
+	} else if (window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.dl_bridge) {
+		window.webkit.messageHandlers.dl_bridge.postMessage(msg);
+	}
+}
+
+// Signal readiness to the AHK/Lua backend so queued JS calls can be flushed
+if (document.readyState === 'loading') {
+	document.addEventListener('DOMContentLoaded', function () { postBridgeMessage('ready'); });
+} else {
+	postBridgeMessage('ready');
+}
+
 // KIND_TITLES is populated lazily in getKindTitle() after i18n is loaded
 const KIND_TITLE_KEYS = {
 	mlx_install: 'download_window.kind_mlx_install',
@@ -128,27 +148,21 @@ function doCancel() {
 		cancelButton.textContent = _t('download_window.cancelling') || 'Cancelling…';
 	}
 
-	if (window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.dl_bridge) {
-		window.webkit.messageHandlers.dl_bridge.postMessage('cancel');
-	}
+	postBridgeMessage('cancel');
 }
 
 /**
  * Sends a request to the backend to open the Terminal for manual intervention.
  */
 function doTerm() {
-	if (window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.dl_bridge) {
-		window.webkit.messageHandlers.dl_bridge.postMessage('terminal');
-	}
+	postBridgeMessage('terminal');
 }
 
 /**
  * Sends a retry request to relaunch the download.
  */
 function doRetry() {
-	if (window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.dl_bridge) {
-		window.webkit.messageHandlers.dl_bridge.postMessage('retry');
-	}
+	postBridgeMessage('retry');
 }
 
 // =============================
@@ -258,9 +272,7 @@ function update(percentage, downloadedSize, speed, eta, fileCount) {
  */
 function showLog() {
 	document.getElementById('log-area').style.display = 'block';
-	if (window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.dl_bridge) {
-		window.webkit.messageHandlers.dl_bridge.postMessage('expand');
-	}
+	postBridgeMessage('expand');
 }
 
 /**
