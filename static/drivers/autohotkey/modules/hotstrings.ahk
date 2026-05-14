@@ -220,8 +220,11 @@ if Features["Rolls"]["EZ"].Enabled {
 }
 
 ; === Bottom row ===
-if Features["Rolls"]["Comment"].Enabled {
-	LoadHotstringsSection("rolls", "comment", Features["Rolls"]["Comment"])
+if Features["Rolls"]["CommentOpen"].Enabled {
+	LoadHotstringsSection("rolls", "commentopen", Features["Rolls"]["CommentOpen"])
+}
+if Features["Rolls"]["CommentClose"].Enabled {
+	LoadHotstringsSection("rolls", "commentclose", Features["Rolls"]["CommentClose"])
 }
 
 
@@ -233,8 +236,11 @@ if Features["Rolls"]["Comment"].Enabled {
 if Features["Rolls"]["HashtagParenthesis"].Enabled {
 	LoadHotstringsSection("rolls", "hashtagparenthesis", Features["Rolls"]["HashtagParenthesis"])
 }
-if Features["Rolls"]["HashtagBracket"].Enabled {
-	LoadHotstringsSection("rolls", "hashtagbracket", Features["Rolls"]["HashtagBracket"])
+if Features["Rolls"]["HashtagOpenBracket"].Enabled {
+	LoadHotstringsSection("rolls", "hashtagopenbracket", Features["Rolls"]["HashtagOpenBracket"])
+}
+if Features["Rolls"]["HashtagCloseBracket"].Enabled {
+	LoadHotstringsSection("rolls", "hashtagclosebracket", Features["Rolls"]["HashtagCloseBracket"])
 }
 if Features["Rolls"]["HC"].Enabled {
 	LoadHotstringsSection("rolls", "hc", Features["Rolls"]["HC"])
