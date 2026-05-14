@@ -179,7 +179,7 @@ LLM_Deps_PollProcess(proc, on_ready, on_failed) {
 	}
 
 	; Check if process finished
-	if (proc.Status != 0)   ; 0 = running, 1 = finished, 2 = error
+	if (proc.Status == 0)   ; 0 = running, 1 = finished, 2 = error
 		return   ; still running — timer will fire again
 
 	; Stop the polling timer
