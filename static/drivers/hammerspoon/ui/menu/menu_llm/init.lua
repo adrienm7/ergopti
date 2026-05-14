@@ -1321,7 +1321,7 @@ function M.create(deps)
 
         table.insert(trigger_menu, { title = string.format(i18n.get("menu.llm.debounce_label"), debounce_display), disabled = is_disabled or nil, fn = settings_mgr.set_debounce })
         if state.llm_debounce ~= llm_mod.DEFAULT_STATE.llm_debounce then
-            table.insert(trigger_menu, { title = string.format(i18n.get("menu.llm.reset_label"), math.floor(llm_mod.DEFAULT_STATE.llm_debounce * 1000) .. " ms")", disabled = is_disabled or nil, fn = settings_mgr.reset_debounce })
+            table.insert(trigger_menu, { title = string.format(i18n.get("menu.llm.reset_label"), math.floor(llm_mod.DEFAULT_STATE.llm_debounce * 1000) .. " ms"), disabled = is_disabled or nil, fn = settings_mgr.reset_debounce })
         end
 
         table.insert(trigger_menu, {
@@ -1402,7 +1402,7 @@ function M.create(deps)
 
         table.insert(generation_menu, { title = string.format(i18n.get("menu.llm.context_length_label"), tostring(state.llm_context_length)), disabled = is_disabled or nil, fn = settings_mgr.set_context_length })
         if state.llm_context_length ~= llm_mod.DEFAULT_STATE.llm_context_length then
-            table.insert(generation_menu, { title = string.format(i18n.get("menu.llm.reset_label"), .. tostring(llm_mod.DEFAULT_STATE.llm_context_length)), disabled = is_disabled or nil, fn = settings_mgr.reset_context_length })
+            table.insert(generation_menu, { title = string.format(i18n.get("menu.llm.reset_label"), tostring(llm_mod.DEFAULT_STATE.llm_context_length)), disabled = is_disabled or nil, fn = settings_mgr.reset_context_length })
         end
 
         table.insert(generation_menu, {
@@ -1419,19 +1419,19 @@ function M.create(deps)
         local min_words_display = (state.llm_min_words and state.llm_min_words > 0) and tostring(state.llm_min_words) or "1"
         table.insert(generation_menu, { title = string.format(i18n.get("menu.llm.min_words_label"), min_words_display), disabled = is_disabled or nil, fn = settings_mgr.set_min_words })
         if state.llm_min_words ~= llm_mod.DEFAULT_STATE.llm_min_words then
-            table.insert(generation_menu, { title = string.format(i18n.get("menu.llm.reset_label"), .. tostring(llm_mod.DEFAULT_STATE.llm_min_words)), disabled = is_disabled or nil, fn = settings_mgr.reset_min_words })
+            table.insert(generation_menu, { title = string.format(i18n.get("menu.llm.reset_label"), tostring(llm_mod.DEFAULT_STATE.llm_min_words)), disabled = is_disabled or nil, fn = settings_mgr.reset_min_words })
         end
 
         local max_words_display = (state.llm_max_words and state.llm_max_words > 0) and tostring(state.llm_max_words) or i18n.get("menu.llm.unlimited")
         table.insert(generation_menu, { title = string.format(i18n.get("menu.llm.max_words_label"), max_words_display), disabled = is_disabled or nil, fn = settings_mgr.set_max_words })
         if state.llm_max_words ~= llm_mod.DEFAULT_STATE.llm_max_words then
             local def_w_disp = (llm_mod.DEFAULT_STATE.llm_max_words and llm_mod.DEFAULT_STATE.llm_max_words > 0) and tostring(llm_mod.DEFAULT_STATE.llm_max_words) or i18n.get("menu.llm.unlimited")
-            table.insert(generation_menu, { title = string.format(i18n.get("menu.llm.reset_label"), .. def_w_disp), disabled = is_disabled or nil, fn = settings_mgr.reset_max_words })
+            table.insert(generation_menu, { title = string.format(i18n.get("menu.llm.reset_label"), def_w_disp), disabled = is_disabled or nil, fn = settings_mgr.reset_max_words })
         end
 
         table.insert(generation_menu, { title = string.format(i18n.get("menu.llm.temperature_label"), tostring(state.llm_temperature)), disabled = is_disabled or nil, fn = settings_mgr.set_temperature })
         if state.llm_temperature ~= llm_mod.DEFAULT_STATE.llm_temperature then
-            table.insert(generation_menu, { title = "string.format(i18n.get("menu.llm.reset_label"), tostring(llm_mod.DEFAULT_STATE.llm_temperature))), disabled = is_disabled or nil, fn = settings_mgr.reset_temperature })
+            table.insert(generation_menu, { title = string.format(i18n.get("menu.llm.reset_label"), tostring(llm_mod.DEFAULT_STATE.llm_temperature)), disabled = is_disabled or nil, fn = settings_mgr.reset_temperature })
         end
         table.insert(generation_menu, {
             title    = i18n.get("menu.llm.auto_raise_temp"),
