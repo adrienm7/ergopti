@@ -22,7 +22,7 @@ param(
 	[string]$Model = "qwen2.5:3b"
 )
 
-$ErrorActionPreference = "Stop"
+$ErrorActionPreference = "Continue"
 
 $OLLAMA_INSTALLER_URL  = "https://ollama.com/download/OllamaSetup.exe"
 $INSTALLER_PATH        = "$env:TEMP\OllamaSetup.exe"
