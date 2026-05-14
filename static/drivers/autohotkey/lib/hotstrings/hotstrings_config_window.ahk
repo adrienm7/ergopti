@@ -508,7 +508,7 @@ _HCW_ClearField(Field) {
 }
 
 _HCW_ResetAll() {
-	global _HCW_CATEGORY_LIST
+	global _HCW_CATEGORY_LIST, _HCWGui
 	for _, E in _HCW_CATEGORY_LIST {
 		if E.IsPersonal {
 			_HCW_PatchTomlMeta(E.Path, "", "delay", "")
@@ -529,7 +529,10 @@ _HCW_ResetAll() {
 			}
 		}
 	}
-	_HCW_LoadCurrent()
+	if (_HCWGui != 0) {
+		_HCWGui.Destroy()
+	}
+	TrayTip(t("hs_config.notify_reset_all"), t("hs_config.btn_reset_all"), "Iconi Mute")
 }
 
 ; Force every category/extension to grey at file level; clear per-section colour

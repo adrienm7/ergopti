@@ -316,6 +316,7 @@
 	"hs_config.btn_all_grey": "全部置灰",
 	"hs_config.btn_close": "关闭",
 	"hs_config.btn_reset_all": "全部重置",
+	"hs_config.notify_reset_all": "延迟和颜色已重置.",
 	"hs_config.btn_reset_default": "恢复默认",
 	"hs_config.cat_autocorrection": "自动纠错",
 	"hs_config.cat_distances": "距离减少",

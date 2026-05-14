@@ -316,6 +316,7 @@
 	"hs_config.btn_all_grey": "すべてグレー",
 	"hs_config.btn_close": "閉じる",
 	"hs_config.btn_reset_all": "すべてリセット",
+	"hs_config.notify_reset_all": "遅延と色がリセットされました.",
 	"hs_config.btn_reset_default": "デフォルトに戻す",
 	"hs_config.cat_autocorrection": "自動修正",
 	"hs_config.cat_distances": "距離削減",

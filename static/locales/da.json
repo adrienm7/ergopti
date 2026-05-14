@@ -338,6 +338,7 @@
 	"hs_config.btn_all_grey": "Alle grå",
 	"hs_config.btn_close": "Luk",
 	"hs_config.btn_reset_all": "Nulstil alle",
+	"hs_config.notify_reset_all": "Forsinkelser og farver er nulstillet.",
 	"hs_config.btn_reset_default": "Gendan standardindstillinger",
 	"hs_config.cat_autocorrection": "Autocorrection",
 	"hs_config.cat_distances": "Afstandsreduktion",

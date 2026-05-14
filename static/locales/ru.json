@@ -316,6 +316,7 @@
 	"hs_config.btn_all_grey": "Все серые",
 	"hs_config.btn_close": "Закрыть",
 	"hs_config.btn_reset_all": "Сбросить все",
+	"hs_config.notify_reset_all": "Задержки и цвета сброшены.",
 	"hs_config.btn_reset_default": "Восстановить по умолчанию",
 	"hs_config.cat_autocorrection": "Автокоррекция",
 	"hs_config.cat_distances": "Уменьшение расстояния",

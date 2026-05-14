@@ -316,6 +316,7 @@
 	"hs_config.btn_all_grey": "Alles grijs",
 	"hs_config.btn_close": "Sluiten",
 	"hs_config.btn_reset_all": "Alles herstellen",
+	"hs_config.notify_reset_all": "Vertragingen en kleuren zijn gereset.",
 	"hs_config.btn_reset_default": "Standaard herstellen",
 	"hs_config.cat_autocorrection": "Automatische correctie",
 	"hs_config.cat_distances": "Afstandsvermindering",

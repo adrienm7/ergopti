@@ -316,6 +316,7 @@
 	"hs_config.btn_all_grey": "All grey",
 	"hs_config.btn_close": "Close",
 	"hs_config.btn_reset_all": "Reset all",
+	"hs_config.notify_reset_all": "Delays and colors have been reset.",
 	"hs_config.btn_reset_default": "Restore default",
 	"hs_config.cat_autocorrection": "Autocorrection",
 	"hs_config.cat_distances": "Distance reduction",

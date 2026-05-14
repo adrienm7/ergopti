@@ -316,6 +316,7 @@
 	"hs_config.btn_all_grey": "Todos cinza",
 	"hs_config.btn_close": "Fechar",
 	"hs_config.btn_reset_all": "Redefinir todos",
+	"hs_config.notify_reset_all": "Atrasos e cores redefinidos.",
 	"hs_config.btn_reset_default": "Restaurar padrão",
 	"hs_config.cat_autocorrection": "Autocorreção",
 	"hs_config.cat_distances": "Redução de distância",
