@@ -679,6 +679,11 @@ _LookupAndRender() {
     }
 
     Cfg := HotstringsResolve(Match.Category, Match.Section)
+    if !Cfg.ShowTooltip {
+        TooltipHide()
+        _NotifySuggestionDismissed()
+        return
+    }
     Color := (Cfg.Color != "") ? Cfg.Color : ""
     Delay := (Cfg.Delay != "") ? Cfg.Delay : 0
     TooltipShow(Match.Output, Color, Delay)

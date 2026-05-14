@@ -127,9 +127,10 @@ local function read_file_meta(toml_path)
 		return { sections = {} }
 	end
 	return {
-		delay    = parsed.meta and parsed.meta.delay,
-		color    = parsed.meta and parsed.meta.color,
-		sections = (parsed.meta and parsed.meta.sections) or {},
+		delay        = parsed.meta and parsed.meta.delay,
+		color        = parsed.meta and parsed.meta.color,
+		show_tooltip = parsed.meta and parsed.meta.show_tooltip,
+		sections     = (parsed.meta and parsed.meta.sections) or {},
 	}
 end
 
@@ -233,17 +234,23 @@ local function build_cat_entry(name, title, group, effective, default_meta, over
 	override = override or {}
 	default_meta = default_meta or {}
 
+	-- show_tooltip resolves to true when not explicitly set (safe default)
+	local eff_tooltip = effective.show_tooltip
+	if eff_tooltip == nil then eff_tooltip = true end
+
 	local cat_entry = {
-		name             = name,
-		group            = group,
-		title            = title,
-		delay_ms         = math.floor((effective.delay or 0) * 1000 + 0.5),
-		delay_default_ms = math.floor((default_meta.delay or 0) * 1000 + 0.5),
-		delay_overridden = override.delay ~= nil,
-		color            = effective.color,
-		color_default    = default_meta.color,
-		color_overridden = override.color ~= nil,
-		sections         = {},
+		name                  = name,
+		group                 = group,
+		title                 = title,
+		delay_ms              = math.floor((effective.delay or 0) * 1000 + 0.5),
+		delay_default_ms      = math.floor((default_meta.delay or 0) * 1000 + 0.5),
+		delay_overridden      = override.delay ~= nil,
+		color                 = effective.color,
+		color_default         = default_meta.color,
+		color_overridden      = override.color ~= nil,
+		show_tooltip          = eff_tooltip,
+		show_tooltip_overridden = override.show_tooltip ~= nil,
+		sections              = {},
 	}
 
 	for _, sec in ipairs(sections) do
@@ -251,15 +258,19 @@ local function build_cat_entry(name, title, group, effective, default_meta, over
 		local s_eff  = sv.effective  or {}
 		local s_def  = sv.default_meta or {}
 		local s_ov   = sv.override or {}
+		local s_tooltip = s_eff.show_tooltip
+		if s_tooltip == nil then s_tooltip = eff_tooltip end  -- inherit file-level
 		table.insert(cat_entry.sections, {
-			name             = sec.name,
-			title            = sec.description,
-			delay_ms         = math.floor((s_eff.delay or 0) * 1000 + 0.5),
-			delay_default_ms = math.floor((s_def.delay or 0) * 1000 + 0.5),
-			delay_overridden = s_ov.delay ~= nil,
-			color            = s_eff.color,
-			color_default    = s_def.color,
-			color_overridden = s_ov.color ~= nil,
+			name                    = sec.name,
+			title                   = sec.description,
+			delay_ms                = math.floor((s_eff.delay or 0) * 1000 + 0.5),
+			delay_default_ms        = math.floor((s_def.delay or 0) * 1000 + 0.5),
+			delay_overridden        = s_ov.delay ~= nil,
+			color                   = s_eff.color,
+			color_default           = s_def.color,
+			color_overridden        = s_ov.color ~= nil,
+			show_tooltip            = s_tooltip,
+			show_tooltip_overridden = s_ov.show_tooltip ~= nil,
 		})
 	end
 
@@ -328,8 +339,9 @@ local function build_state()
 			-- Personal files: the [_meta] IS the effective value — no override layer.
 			-- We still present them uniformly so the UI can render them consistently.
 			local effective = {
-				delay = file_meta.delay,
-				color = file_meta.color,
+				delay        = file_meta.delay,
+				color        = file_meta.color,
+				show_tooltip = file_meta.show_tooltip,
 			}
 
 			local entry = build_cat_entry(
@@ -343,8 +355,8 @@ local function build_state()
 				function(sec_name)
 					local sec_data = file_meta.sections[sec_name] or {}
 					return {
-						effective    = { delay = sec_data.delay, color = sec_data.color },
-						default_meta = { delay = sec_data.delay, color = sec_data.color },
+						effective    = { delay = sec_data.delay, color = sec_data.color, show_tooltip = sec_data.show_tooltip },
+						default_meta = { delay = sec_data.delay, color = sec_data.color, show_tooltip = sec_data.show_tooltip },
 						override     = {},
 					}
 				end
@@ -401,7 +413,7 @@ local function build_state()
 							local ok2, parsed2 = pcall(function() return TomlReader.parse(toml_path) end)
 							if ok2 and parsed2 and parsed2.meta and parsed2.meta.sections then
 								local s = parsed2.meta.sections[sec_name] or {}
-								return { delay = s.delay, color = s.color }
+								return { delay = s.delay, color = s.color, show_tooltip = s.show_tooltip }
 							end
 							return {}
 						end)(),
@@ -475,6 +487,8 @@ local function patch_personal_toml(toml_path, section, field, value)
 		local val_str
 		if field == "delay" then
 			val_str = tostring(value)
+		elseif field == "show_tooltip" then
+			val_str = value and "true" or "false"
 		else
 			val_str = '"' .. tostring(value) .. '"'
 		end
@@ -582,11 +596,15 @@ local function on_message(msg)
 			patch_personal_toml(toml_path, sec, "color", body.hex)
 		elseif action == "clear_color" then
 			patch_personal_toml(toml_path, sec, "color", nil)
+		elseif action == "set_tooltip" then
+			patch_personal_toml(toml_path, sec, "show_tooltip", body.show_tooltip == true)
+		elseif action == "clear_tooltip" then
+			patch_personal_toml(toml_path, sec, "show_tooltip", nil)
 		end
 
 	elseif group and group:sub(1, 4) == "ext:" then
 		-- Extension entries use "ext.<id>" as the override key in hotstrings_config
-		local ext_id     = body.ext_id
+		local ext_id       = body.ext_id
 		local override_key = ext_id and ("ext." .. ext_id) or cat
 		if action == "set_delay" and type(body.ms) == "number" then
 			hotstrings_config.set_override(override_key, sec, "delay", body.ms / 1000)
@@ -596,6 +614,10 @@ local function on_message(msg)
 			hotstrings_config.set_override(override_key, sec, "color", body.hex)
 		elseif action == "clear_color" then
 			hotstrings_config.clear_override(override_key, sec, "color")
+		elseif action == "set_tooltip" then
+			hotstrings_config.set_override(override_key, sec, "show_tooltip", body.show_tooltip == true)
+		elseif action == "clear_tooltip" then
+			hotstrings_config.clear_override(override_key, sec, "show_tooltip")
 		end
 
 	else
@@ -608,6 +630,10 @@ local function on_message(msg)
 			hotstrings_config.set_override(cat, sec, "color", body.hex)
 		elseif action == "clear_color" then
 			hotstrings_config.clear_override(cat, sec, "color")
+		elseif action == "set_tooltip" then
+			hotstrings_config.set_override(cat, sec, "show_tooltip", body.show_tooltip == true)
+		elseif action == "clear_tooltip" then
+			hotstrings_config.clear_override(cat, sec, "show_tooltip")
 		else
 			return
 		end

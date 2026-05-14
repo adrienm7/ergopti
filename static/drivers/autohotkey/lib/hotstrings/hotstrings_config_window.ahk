@@ -213,7 +213,7 @@ _HCW_SortByKey(Arr, KeyName) {
 	N := Arr.Length
 	loop N - 1 {
 		I := A_Index + 1
-		while I > 1 and Arr[I - 1][KeyName] > Arr[I][KeyName] {
+		while I > 1 and StrCompare(Arr[I - 1].%KeyName%, Arr[I].%KeyName%) > 0 {
 			Tmp := Arr[I - 1]
 			Arr[I - 1] := Arr[I]
 			Arr[I] := Tmp
@@ -294,8 +294,12 @@ OpenHotstringsConfigWindow() {
 	ColorReset := G.Add("Button", "x+8 yp-1 w28 h24", "↺")
 	ColorDefault := G.Add("Text", "x+8 yp+3 w180", "")
 
+	; ----- Tooltip toggle row ---------------------------------------------
+	TooltipChk := G.Add("Checkbox", "xm y+10", t("hs_config.label_tooltip"))
+	TooltipReset := G.Add("Button", "x+8 yp-2 w28 h24", "↺")
+
 	; ----- Status / hint ---------------------------------------------------
-	Status := G.Add("Text", "xm y+16 w600 h20 cGray", "")
+	Status := G.Add("Text", "xm y+12 w600 h20 cGray", "")
 
 	_HCWWidgets := {
 		Gui:          G,
@@ -309,6 +313,8 @@ OpenHotstringsConfigWindow() {
 		ColorSwatch:  ColorSwatch,
 		ColorReset:   ColorReset,
 		ColorDefault: ColorDefault,
+		TooltipChk:   TooltipChk,
+		TooltipReset: TooltipReset,
 		Status:       Status,
 	}
 
@@ -319,9 +325,11 @@ OpenHotstringsConfigWindow() {
 	SecDD.OnEvent("Change",     (*) => _HCW_LoadCurrent())
 	DelayEdit.OnEvent("Change", (*) => _HCW_OnDelayChanged())
 	DelayReset.OnEvent("Click", (*) => _HCW_ClearField("delay"))
-	ColorDD.OnEvent("Change",   (*) => _HCW_OnColorChanged())
-	ColorReset.OnEvent("Click", (*) => _HCW_ClearField("color"))
-	G.OnEvent("Close",          (*) => _HCW_OnClose())
+	ColorDD.OnEvent("Change",      (*) => _HCW_OnColorChanged())
+	ColorReset.OnEvent("Click",    (*) => _HCW_ClearField("color"))
+	TooltipChk.OnEvent("Click",    (*) => _HCW_OnTooltipChanged())
+	TooltipReset.OnEvent("Click",  (*) => _HCW_ClearField("show_tooltip"))
+	G.OnEvent("Close",             (*) => _HCW_OnClose())
 
 	_HCW_OnGroupChanged()    ; populate file + section dropdowns and first load
 
@@ -422,6 +430,13 @@ _HCW_LoadCurrent() {
 		_HCWWidgets.ColorReset.Enabled := false
 	}
 	_HCWWidgets.ColorDefault.Value := Hint
+
+	; Tooltip toggle — resolved ShowTooltip (true = checked).
+	TooltipResolved := Resolved.HasOwnProp("ShowTooltip") ? Resolved.ShowTooltip : true
+	_HCWWidgets.TooltipChk.Value := TooltipResolved ? 1 : 0
+	TooltipOverridden := (Override.HasOwnProp("ShowTooltip") and Override.ShowTooltip != "")
+	_HCWWidgets.TooltipReset.Enabled := TooltipOverridden
+
 	_HCWWidgets.Status.Value := Entry.Key . (Sec ? "  /  " . Sec : "")
 }
 
@@ -460,6 +475,15 @@ _HCW_OnColorChanged() {
 	} else {
 		_HCW_SetOverride(Entry, Sec, "color", Hex)
 	}
+	_HCW_LoadCurrent()
+}
+
+_HCW_OnTooltipChanged() {
+	global _HCWWidgets
+	Entry := _HCW_SelectedEntry()
+	Sec := _HCW_SelectedSection(Entry)
+	Val := (_HCWWidgets.TooltipChk.Value == 1)
+	_HCW_SetOverride(Entry, Sec, "show_tooltip", Val)
 	_HCW_LoadCurrent()
 }
 
@@ -560,23 +584,23 @@ _HCW_ClearOverride(Entry, Sec, Field) {
 	}
 }
 
-; Resolve the effective delay + color for the current entry.
+; Resolve the effective delay, color, and show_tooltip for the current entry.
 _HCW_Resolve(Entry, Sec) {
 	if Entry.IsPersonal {
 		return _HCW_ReadTomlMeta(Entry.Path, Sec)
 	}
 	if Entry.IsExtension {
 		R := HotstringsResolveExt(Entry.ExtId, Entry.Path, Sec)
-		return { Delay: R.Delay, Color: R.Color }
+		return { Delay: R.Delay, Color: R.Color, ShowTooltip: R.ShowTooltip }
 	}
 	return HotstringsResolve(Entry.Key, Sec)
 }
 
-; Read effective delay + color from [_meta] of a personal TOML file,
-; applying the cascade: section → file → empty.
+; Read effective delay, color, and show_tooltip from [_meta] of a personal TOML file,
+; applying the cascade: section → file → default (true for ShowTooltip).
 _HCW_ReadTomlMeta(Path, Sec) {
 	FileCfg := ParseTomlGroupConfig("__personal__", Path)
-	Result := { Delay: FileCfg.Delay, Color: FileCfg.Color }
+	Result := { Delay: FileCfg.Delay, Color: FileCfg.Color, ShowTooltip: FileCfg.ShowTooltip != "" ? FileCfg.ShowTooltip : true }
 	if (Sec != "" and FileCfg.Sections.Has(StrLower(Sec))) {
 		SecCfg := FileCfg.Sections[StrLower(Sec)]
 		if (SecCfg.Delay != "") {
@@ -584,6 +608,9 @@ _HCW_ReadTomlMeta(Path, Sec) {
 		}
 		if (SecCfg.Color != "") {
 			Result.Color := SecCfg.Color
+		}
+		if (SecCfg.ShowTooltip != "") {
+			Result.ShowTooltip := SecCfg.ShowTooltip
 		}
 	}
 	return Result
@@ -801,19 +828,21 @@ _HCW_TomlDefaults(Entry, Section) {
 
 _HCW_UserOverride(Entry, Section) {
 	global _HotstringsOverrides
-	Out := { Delay: "", Color: "" }
+	Out := { Delay: "", Color: "", ShowTooltip: "" }
 	if Entry.IsPersonal {
 		; The stored value IS the override — re-read [_meta] to find what is actually stored
 		Cfg := ParseTomlGroupConfig("__personal__", Entry.Path)
 		if (Section == "") {
 			Out.Delay := Cfg.Delay
 			Out.Color := Cfg.Color
+			Out.ShowTooltip := Cfg.ShowTooltip
 		} else {
 			Sec := StrLower(Section)
 			if Cfg.Sections.Has(Sec) {
 				S := Cfg.Sections[Sec]
 				Out.Delay := S.Delay
 				Out.Color := S.Color
+				Out.ShowTooltip := S.ShowTooltip
 			}
 		}
 		return Out
@@ -828,12 +857,14 @@ _HCW_UserOverride(Entry, Section) {
 	if (Section == "") {
 		Out.Delay := Override.Delay
 		Out.Color := Override.Color
+		Out.ShowTooltip := Override.ShowTooltip
 	} else {
 		Sec := StrLower(Section)
 		if Override.Sections.Has(Sec) {
 			S := Override.Sections[Sec]
 			Out.Delay := S.Delay
 			Out.Color := S.Color
+			Out.ShowTooltip := S.ShowTooltip
 		}
 	}
 	return Out
@@ -925,11 +956,14 @@ _HCW_PatchTomlMeta(Path, Sec, Field, Value) {
 }
 
 ; Format a value for TOML output.
-; delay → bare float (seconds); color → quoted string.
+; delay → bare float (seconds); show_tooltip → bare boolean; color → quoted string.
 _HCW_TomlValue(Field, Value) {
 	if (Field == "delay") {
 		Num := Value + 0
 		return Format("{:.3f}", Num)
+	}
+	if (Field == "show_tooltip") {
+		return Value ? "true" : "false"
 	}
 	Escaped := StrReplace(Value, "\", "\\")
 	Escaped := StrReplace(Escaped, '"', '\"')

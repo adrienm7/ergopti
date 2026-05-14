@@ -144,6 +144,12 @@ local function parse_overrides(path)
 				target.color = col
 				goto continue
 			end
+
+			local bool_val = line:match("^show_tooltip%s*=%s*(true|false)%s*$")
+			if bool_val then
+				target.show_tooltip = (bool_val == "true")
+				goto continue
+			end
 		end
 
 		::continue::
@@ -172,7 +178,7 @@ local function serialize_overrides(overrides)
 
 	for _, cat in ipairs(cats) do
 		local entry = overrides[cat]
-		local has_file_level = entry.delay ~= nil or entry.color ~= nil
+		local has_file_level = entry.delay ~= nil or entry.color ~= nil or entry.show_tooltip ~= nil
 		if has_file_level then
 			table.insert(out, string.format("[%s]", cat))
 			if entry.delay ~= nil then
@@ -180,6 +186,9 @@ local function serialize_overrides(overrides)
 			end
 			if entry.color ~= nil then
 				table.insert(out, string.format("color = \"%s\"", entry.color))
+			end
+			if entry.show_tooltip ~= nil then
+				table.insert(out, string.format("show_tooltip = %s", entry.show_tooltip and "true" or "false"))
 			end
 			table.insert(out, "")
 		end
@@ -190,13 +199,16 @@ local function serialize_overrides(overrides)
 			table.sort(secs)
 			for _, sec in ipairs(secs) do
 				local s_entry = entry.sections[sec]
-				if s_entry.delay ~= nil or s_entry.color ~= nil then
+				if s_entry.delay ~= nil or s_entry.color ~= nil or s_entry.show_tooltip ~= nil then
 					table.insert(out, string.format("[%s.%s]", cat, sec))
 					if s_entry.delay ~= nil then
 						table.insert(out, string.format("delay = %s", tostring(s_entry.delay)))
 					end
 					if s_entry.color ~= nil then
 						table.insert(out, string.format("color = \"%s\"", s_entry.color))
+					end
+					if s_entry.show_tooltip ~= nil then
+						table.insert(out, string.format("show_tooltip = %s", s_entry.show_tooltip and "true" or "false"))
 					end
 					table.insert(out, "")
 				end
@@ -251,9 +263,10 @@ local function get_toml_meta(category)
 
 	local parsed = TomlReader.parse(toml_path)
 	cache[category] = {
-		delay    = parsed.meta.delay,
-		color    = parsed.meta.color,
-		sections = parsed.meta.sections or {},
+		delay        = parsed.meta.delay,
+		color        = parsed.meta.color,
+		show_tooltip = parsed.meta.show_tooltip,
+		sections     = parsed.meta.sections or {},
 	}
 	return cache[category]
 end
@@ -315,12 +328,29 @@ function M.resolve(category, section)
 		or (meta_sec and meta_sec.color)
 		or meta.color
 
+	-- show_tooltip: explicit false anywhere in the chain suppresses the tooltip; default is true
+	local show_tooltip = true
+	local function first_set(...)
+		for i = 1, select("#", ...) do
+			local v = select(i, ...)
+			if v ~= nil then return v end
+		end
+		return nil
+	end
+	local st = first_set(
+		user_sec and user_sec.show_tooltip,
+		user.show_tooltip,
+		meta_sec and meta_sec.show_tooltip,
+		meta.show_tooltip
+	)
+	if st ~= nil then show_tooltip = st end
+
 	local has_override =
-		(user_sec and (user_sec.delay ~= nil or user_sec.color ~= nil))
-		or (user.delay ~= nil or user.color ~= nil)
+		(user_sec and (user_sec.delay ~= nil or user_sec.color ~= nil or user_sec.show_tooltip ~= nil))
+		or (user.delay ~= nil or user.color ~= nil or user.show_tooltip ~= nil)
 		or false
 
-	return { delay = delay, color = color, has_override = has_override }
+	return { delay = delay, color = color, show_tooltip = show_tooltip, has_override = has_override }
 end
 
 --- Resolves the effective delay and color for an extension hotstring file.
@@ -344,9 +374,10 @@ function M.resolve_ext(ext_id, toml_path, section)
 		local ok, parsed = pcall(function() return TomlReader.parse(toml_path) end)
 		if ok and parsed then
 			_state.toml_cache[cache_key] = {
-				delay    = parsed.meta and parsed.meta.delay,
-				color    = parsed.meta and parsed.meta.color,
-				sections = (parsed.meta and parsed.meta.sections) or {},
+				delay        = parsed.meta and parsed.meta.delay,
+				color        = parsed.meta and parsed.meta.color,
+				show_tooltip = parsed.meta and parsed.meta.show_tooltip,
+				sections     = (parsed.meta and parsed.meta.sections) or {},
 			}
 		else
 			_state.toml_cache[cache_key] = { sections = {} }
@@ -367,12 +398,28 @@ function M.resolve_ext(ext_id, toml_path, section)
 		or meta.color
 		or GLOBAL_DEFAULT_COLOR
 
+	local show_tooltip = true
+	local function first_set_ext(...)
+		for i = 1, select("#", ...) do
+			local v = select(i, ...)
+			if v ~= nil then return v end
+		end
+		return nil
+	end
+	local st_ext = first_set_ext(
+		user_sec and user_sec.show_tooltip,
+		user.show_tooltip,
+		meta_sec and meta_sec.show_tooltip,
+		meta.show_tooltip
+	)
+	if st_ext ~= nil then show_tooltip = st_ext end
+
 	local has_override =
-		(user_sec and (user_sec.delay ~= nil or user_sec.color ~= nil))
-		or (user.delay ~= nil or user.color ~= nil)
+		(user_sec and (user_sec.delay ~= nil or user_sec.color ~= nil or user_sec.show_tooltip ~= nil))
+		or (user.delay ~= nil or user.color ~= nil or user.show_tooltip ~= nil)
 		or false
 
-	return { delay = delay, color = color, has_override = has_override }
+	return { delay = delay, color = color, show_tooltip = show_tooltip, has_override = has_override }
 end
 
 --- Sets a user override for a single field. Pass section=nil for file-level.
@@ -383,8 +430,8 @@ end
 --- @return boolean True on success.
 function M.set_override(category, section, field, value)
 	if not require_state("set_override") then return false end
-	if field ~= "delay" and field ~= "color" then
-		Logger.error(LOG, "set_override(): field must be 'delay' or 'color', got '%s'.", tostring(field))
+	if field ~= "delay" and field ~= "color" and field ~= "show_tooltip" then
+		Logger.error(LOG, "set_override(): field must be 'delay', 'color', or 'show_tooltip', got '%s'.", tostring(field))
 		return false
 	end
 
@@ -420,8 +467,9 @@ function M.clear_override(category, section, field)
 	if field then
 		target[field] = nil
 	else
-		target.delay = nil
-		target.color = nil
+		target.delay        = nil
+		target.color        = nil
+		target.show_tooltip = nil
 	end
 
 	Logger.debug(LOG, "Override cleared: %s%s%s.",
@@ -506,8 +554,8 @@ function M.get_user_override(category, section)
 	if not cat then return nil end
 	local target = section and (cat.sections or {})[section] or cat
 	if not target then return nil end
-	if target.delay == nil and target.color == nil then return nil end
-	return { delay = target.delay, color = target.color }
+	if target.delay == nil and target.color == nil and target.show_tooltip == nil then return nil end
+	return { delay = target.delay, color = target.color, show_tooltip = target.show_tooltip }
 end
 
 return M

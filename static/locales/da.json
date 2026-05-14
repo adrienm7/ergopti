@@ -371,6 +371,7 @@
 	"hs_config.group_personal": "Personal",
 	"hs_config.label_group": "Group:",
 	"hs_config.label_file": "File:",
+	"hs_config.label_tooltip": "Vis tooltip",
 	"hs_config.window_title": "Hotstring-forsinkelser og farver",
 	"init.reload_files": "Filer ændret — genindlæser…",
 	"init.reload_hotstrings": "Hotstrings ændret — genindlæser…",

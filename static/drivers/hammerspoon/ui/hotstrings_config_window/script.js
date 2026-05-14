@@ -143,6 +143,7 @@ function render() {
 		// File-level (category) controls
 		bindDelay(card.querySelector(".field-delay"), cat, null);
 		bindColor(card.querySelector(".field-color"), cat, null);
+		bindTooltip(card.querySelector(".field-tooltip"), cat, null);
 
 		// Sections
 		for (const sec of cat.sections) {
@@ -152,6 +153,7 @@ function render() {
 				sec.title || sec.name;
 			bindDelay(secNode.querySelector(".field-delay"), cat, sec);
 			bindColor(secNode.querySelector(".field-color"), cat, sec);
+			bindTooltip(secNode.querySelector(".field-tooltip"), cat, sec);
 			sectionsBox.appendChild(secNode);
 		}
 
@@ -251,6 +253,41 @@ function bindColor(field, cat, sec) {
 	reset.addEventListener("click", () => {
 		send({
 			action:        "clear_color",
+			category:      cat.name,
+			group:         cat.group,
+			section:       sec ? sec.name : "",
+			personal_path: cat.personal_path || "",
+			ext_id:        cat.ext_id || "",
+		});
+	});
+}
+
+function bindTooltip(field, cat, sec) {
+	if (!field) return;
+	const showTooltip = sec ? sec.show_tooltip : cat.show_tooltip;
+	const overridden = sec ? sec.show_tooltip_overridden : cat.show_tooltip_overridden;
+	const chk = field.querySelector(".chk-tooltip");
+	const reset = field.querySelector(".reset");
+
+	chk.checked = (showTooltip !== false);
+	field.classList.toggle("overridden", !!overridden);
+	reset.disabled = !overridden;
+
+	chk.addEventListener("change", () => {
+		send({
+			action:        "set_tooltip",
+			category:      cat.name,
+			group:         cat.group,
+			section:       sec ? sec.name : "",
+			personal_path: cat.personal_path || "",
+			ext_id:        cat.ext_id || "",
+			show_tooltip:  chk.checked,
+		});
+	});
+
+	reset.addEventListener("click", () => {
+		send({
+			action:        "clear_tooltip",
 			category:      cat.name,
 			group:         cat.group,
 			section:       sec ? sec.name : "",

@@ -349,6 +349,7 @@
 	"hs_config.group_personal": "Personal",
 	"hs_config.label_group": "Group:",
 	"hs_config.label_file": "File:",
+	"hs_config.label_tooltip": "Zobrazit nápovědu",
 	"hs_config.window_title": "Zpoždění a barvy hotstring",
 	"init.reload_files": "Soubory změny — znovu načítám…",
 	"init.reload_hotstrings": "Hotstrings změny — znovu načítám…",

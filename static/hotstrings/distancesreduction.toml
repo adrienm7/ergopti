@@ -7,6 +7,7 @@
 [_meta]
 color = "#fb8c00"
 delay = 0.5
+show_tooltip = false
 description = { fr = "Réduction des distances", en = "Distance reduction", de = "Distanzreduktion", es = "Reducción de distancias", zh = "距离减少" }
 sections_order = ["qu", "suffixesa", "-", "commaj", "commafarletters", "-", "deadkeyecircumflex", "ecircumflexe", "-", "spacearoundsymbols"]
 

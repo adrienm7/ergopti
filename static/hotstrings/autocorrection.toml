@@ -7,6 +7,7 @@
 [_meta]
 color = "#43a047"
 delay = 1.0
+show_tooltip = true
 description = { fr = "Autocorrection", en = "Autocorrection", de = "Autokorrektur", es = "Autocorrección", zh = "自动纠错" }
 sections_order = ["accents", "names", "caps", "-", "typographicapostrophe", "-", "errors", "ou", "multiplepunctuationmarks", "suffixesachaining", "-", "minus", "minusapostrophe"]
 

@@ -27,15 +27,16 @@ local M = {}
 local hs        = hs
 local keyStroke = hs.eventtap.keyStroke
 
-local km_utils   = require("modules.keymap.utils")
-local text_utils = require("lib.text_utils")
-local core_llm   = require("modules.llm")
-local Logger     = require("lib.logger")
-local Keycodes   = require("lib.keycodes")
-local keylogger  = require("modules.keylogger")
-local tooltip    = require("ui.tooltip")
-local engine     = require("modules.llm.prediction_engine")
-local Registry   = require("modules.keymap.registry")
+local km_utils         = require("modules.keymap.utils")
+local text_utils       = require("lib.text_utils")
+local core_llm         = require("modules.llm")
+local Logger           = require("lib.logger")
+local Keycodes         = require("lib.keycodes")
+local keylogger        = require("modules.keylogger")
+local tooltip          = require("ui.tooltip")
+local engine           = require("modules.llm.prediction_engine")
+local Registry         = require("modules.keymap.registry")
+local hotstrings_config = require("modules.hotstrings_config")
 
 local LOG    = "keymap.llm_bridge"
 local _state = nil  -- Shared CoreState, injected via M.init().
@@ -472,6 +473,14 @@ function M.update_preview(buf)
 
 		-- Explicit branches required — the ternary idiom `A and B or C` fails when B is false.
 		local is_enabled = is_star and is_star_preview_enabled or (not is_star and is_autocorrect_preview_enabled)
+
+		-- Check per-category show_tooltip setting; suppress tooltip if explicitly disabled.
+		if is_enabled and match_group and type(hotstrings_config.resolve) == "function" then
+			local ok_cfg, cfg = pcall(function() return hotstrings_config.resolve(match_group, nil) end)
+			if ok_cfg and cfg and cfg.show_tooltip == false then
+				is_enabled = false
+			end
+		end
 		local type_str   = is_star and "star" or (match_type == "autocorrect" and "autocorrect" or "personal")
 		local delay_key  = is_star and "STAR_TRIGGER"
 			or (match_type == "autocorrect" and "autocorrection" or "dynamichotstrings")

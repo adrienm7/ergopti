@@ -7,6 +7,7 @@
 [_meta]
 color = "#fb8c00"
 delay = 0.5
+show_tooltip = false
 description = { fr = "Roulements", en = "Rolls", de = "Läufe", es = "Rodamientos", zh = "连击" }
 sections_order = ["hc", "sx", "cx", "englishnegation", "ez", "ct", "-", "closechevrontag", "chevronless", "chevrongreater", "commentopen", "commentclose", "-", "assign", "notequal", "-", "parenquote", "bracketquote", "hashtagparenthesis", "hashtagopenbracket", "hashtagclosebracket", "equalstring", "-", "leftarrow", "assignarrowequalright", "assignarrowequalleft", "assignarrowminusright", "assignarrowminusleft"]
 

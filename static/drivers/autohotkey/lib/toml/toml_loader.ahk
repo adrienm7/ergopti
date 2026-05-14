@@ -43,9 +43,10 @@ global _TomlCountCache   := Map()   ; key = CategoryName|SectionName → count
 ; populated lazily by ParseTomlGroupConfig and consumed by the tooltip and
 ; per-group delay gating layers. Keyed by lowercase category name. Shape:
 ;   {
-;       Delay:    Number | "",   ; file-level default delay in seconds
-;       Color:    String | "",   ; file-level tooltip color (hex e.g. "#e53935")
-;       Sections: Map(name -> { Delay, Color, Description })
+;       Delay:       Number | "",   ; file-level default delay in seconds
+;       Color:       String | "",   ; file-level tooltip color (hex e.g. "#e53935")
+;       ShowTooltip: true|"",       ; "" means unset (inherits default = true)
+;       Sections:    Map(name -> { Delay, Color, ShowTooltip, Description })
 ;   }
 global HotstringGroupConfig := Map()
 
@@ -705,7 +706,7 @@ ParseTomlGroupConfig(CategoryName, FilePath := "") {
         }
     }
 
-    Config := { Delay: "", Color: "", Sections: Map() }
+    Config := { Delay: "", Color: "", ShowTooltip: "", Sections: Map() }
     if !FileExist(FilePath) {
         HotstringGroupConfig[LowerCat] := Config
         return Config
@@ -731,7 +732,7 @@ ParseTomlGroupConfig(CategoryName, FilePath := "") {
             Mode := "meta_section"
             CurrentSec := StrLower(SecMatch[1])
             if !Config.Sections.Has(CurrentSec) {
-                Config.Sections[CurrentSec] := { Delay: "", Color: "", Description: "" }
+                Config.Sections[CurrentSec] := { Delay: "", Color: "", ShowTooltip: "", Description: "" }
             }
             continue
         }
@@ -751,6 +752,8 @@ ParseTomlGroupConfig(CategoryName, FilePath := "") {
                 Config.Delay := NumMatch[1] + 0
             } else if RegExMatch(Line, "^color\s*=\s*`"((?:[^`"\\]|\\.)*)`"\s*$", &ColMatch) {
                 Config.Color := UnescapeTomlString(ColMatch[1])
+            } else if RegExMatch(Line, "^show_tooltip\s*=\s*(true|false)\s*$", &BoolMatch) {
+                Config.ShowTooltip := (BoolMatch[1] == "true")
             }
         } else if (Mode == "meta_section" and CurrentSec != "") {
             Sec := Config.Sections[CurrentSec]
@@ -758,6 +761,8 @@ ParseTomlGroupConfig(CategoryName, FilePath := "") {
                 Sec.Delay := NumMatch[1] + 0
             } else if RegExMatch(Line, "^color\s*=\s*`"((?:[^`"\\]|\\.)*)`"\s*$", &ColMatch) {
                 Sec.Color := UnescapeTomlString(ColMatch[1])
+            } else if RegExMatch(Line, "^show_tooltip\s*=\s*(true|false)\s*$", &BoolMatch) {
+                Sec.ShowTooltip := (BoolMatch[1] == "true")
             } else if RegExMatch(Line, "^description\s*=\s*`"((?:[^`"\\]|\\.)*)`"\s*$", &DescMatch) {
                 Sec.Description := UnescapeTomlString(DescMatch[1])
             }

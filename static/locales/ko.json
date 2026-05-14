@@ -349,6 +349,7 @@
 	"hs_config.group_personal": "Personal",
 	"hs_config.label_group": "Group:",
 	"hs_config.label_file": "File:",
+	"hs_config.label_tooltip": "툴팁 표시",
 	"hs_config.window_title": "핫스트링 지연 및 색상",
 	"init.reload_files": "파일이 변경됨 — 다시 로드 중…",
 	"init.reload_hotstrings": "핫스트링이 변경됨 — 다시 로드 중…",

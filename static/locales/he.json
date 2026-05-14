@@ -371,6 +371,7 @@
 	"hs_config.group_personal": "Personal",
 	"hs_config.label_group": "Group:",
 	"hs_config.label_file": "File:",
+	"hs_config.label_tooltip": "הצג טיפ",
 	"hs_config.window_title": "השהיות וצבעי Hotstring",
 	"init.reload_files": "קבצים שונו — טוען מחדש…",
 	"init.reload_hotstrings": "הוטסטרינגים שונו — טוען מחדש…",

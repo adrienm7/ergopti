@@ -349,6 +349,7 @@
 	"hs_config.group_personal": "Personal",
 	"hs_config.label_group": "Group:",
 	"hs_config.label_file": "File:",
+	"hs_config.label_tooltip": "إظهار تلميح الأداة",
 	"hs_config.window_title": "تأخيرات وألوان السلاسل النصية",
 	"init.reload_files": "تم تعديل الملفات — جارٍ إعادة التحميل…",
 	"init.reload_hotstrings": "تم تعديل الهوتسترينغ — جارٍ إعادة التحميل…",
