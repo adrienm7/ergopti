@@ -380,7 +380,6 @@ function M.new(deps, presets, ram_getter)
 				local connection_error = pull_output:lower():find("could not connect") or pull_output:lower():find("connection refused")
 				
 				if requires_upgrade then
-					pcall(notifications.notify, "Mise à jour Ollama requise",
 					pcall(notifications.notify, i18n.get("ollama.upgrade_required_title"),
 						i18n.get("ollama.upgrade_required_body"), "warning")
 				elseif connection_error then
