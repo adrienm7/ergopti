@@ -187,25 +187,25 @@ LLM_Deps_RunInstaller(model, on_ready, on_failed) {
 	_LLM_Deps_OutFile := A_Temp . "\ergopti_ollama_out_" . A_TickCount . ".txt"
 	_LLM_Deps_OutPos  := 0
 
-	; Build command: redirect both stdout and stderr to the temp file,
-	; run entirely hidden via the cmd /c wrapper with START /B
-	cmd := 'cmd.exe /c powershell.exe -NoProfile -WindowStyle Hidden -ExecutionPolicy Bypass'
+	; Build command: redirect both stdout and stderr to the temp file.
+	; AHK Run with "Hide" suppresses the console window and returns a reliable PID.
+	cmd := 'powershell.exe -NoProfile -WindowStyle Hidden -ExecutionPolicy Bypass'
 		. ' -File "' ps1_path '" -Model "' model '"'
 		. ' > "' _LLM_Deps_OutFile '" 2>&1'
 	LoggerInfo("LLM", "Launching (hidden): " cmd ".")
 
-	; shell.Run returns immediately without exposing a console window.
-	; bWaitOnReturn=false + intWindowStyle=0 (hidden)
+	pid := 0
 	try {
-		shell := ComObject("WScript.Shell")
-		; Run returns the PID; we cannot poll Status on it, so we track
-		; process completion by watching when stdout stops growing and
-		; the PS1 process disappears from the task list.
-		pid := shell.Run(cmd, 0, false)
+		Run(cmd, , "Hide", &pid)
 		LoggerInfo("LLM", "PS1 process launched, PID=" pid ".")
 	} catch as err {
 		LoggerError("LLM", "Failed to launch PowerShell: " err.Message ".")
 		LLM_Deps_Fail("Impossible de lancer PowerShell : " err.Message, on_failed)
+		return
+	}
+	if (pid == 0) {
+		LoggerError("LLM", "Run() returned PID=0 — cannot track process.")
+		LLM_Deps_Fail("Impossible de démarrer l'installeur (PID=0).", on_failed)
 		return
 	}
 
