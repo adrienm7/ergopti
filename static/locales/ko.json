@@ -1,4 +1,4 @@
-{
+﻿{
 	"_meta.flag": "🇰🇷",
 	"_meta.locale": "ko",
 	"_meta.name": "한국어",
@@ -653,7 +653,13 @@
 	"menu.llm.specs_header": "사양",
 	"menu.llm.temperature_label": "온도 (창의성): %s",
 	"menu.llm.thinking_model_info": "  ↳ 정보: 사고 모델 (숨겨진 추론)",
-	"menu.llm.title": "✨ 인공 지능",
+	"menu.llm.title": "✨ 인공 지능"
+	"menu.llm.toggle_enable": "AI 제안 활성화",
+	"menu.llm.toggle_disable": "AI 제안 비활성화",
+	"menu.llm.about": "Ergopti AI 정보",
+	"menu.llm.about_body": "Ergopti AI — 스마트 키보드 제안
+백엔드: Ollama (로컬)
+버전: 1.0",,
 	"menu.llm.trigger_menu_title": "AI 트리거",
 	"menu.llm.trigger_shortcut_label": "수동 생성 단축키: %s",
 	"menu.llm.trigger_shortcut_title": "AI 생성 단축키",

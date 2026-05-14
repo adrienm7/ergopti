@@ -1,4 +1,4 @@
-{
+﻿{
 	"_meta.flag": "🇯🇵",
 	"_meta.locale": "ja",
 	"_meta.name": "日本語",
@@ -653,7 +653,13 @@
 	"menu.llm.specs_header": "仕様",
 	"menu.llm.temperature_label": "温度（創造性）: %s",
 	"menu.llm.thinking_model_info": "  ↳ 情報: Thinkingモデル（非表示推論）",
-	"menu.llm.title": "✨ 人工知能",
+	"menu.llm.title": "✨ 人工知能"
+	"menu.llm.toggle_enable": "AI提案を有効にする",
+	"menu.llm.toggle_disable": "AI提案を無効にする",
+	"menu.llm.about": "Ergopti AIについて",
+	"menu.llm.about_body": "Ergopti AI — スマートキーボード提案
+バックエンド: Ollama (ローカル)
+バージョン: 1.0",,
 	"menu.llm.trigger_menu_title": "AIトリガー",
 	"menu.llm.trigger_shortcut_label": "手動生成のショートカット: %s",
 	"menu.llm.trigger_shortcut_title": "AI生成ショートカット",

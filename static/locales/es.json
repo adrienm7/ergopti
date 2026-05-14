@@ -1,4 +1,4 @@
-{
+﻿{
 	"_meta.flag": "🇪🇸",
 	"_meta.locale": "es",
 	"_meta.name": "Español",
@@ -653,7 +653,13 @@
 	"menu.llm.specs_header": "ESPECIFICACIONES",
 	"menu.llm.temperature_label": "Temperatura (Creatividad): %s",
 	"menu.llm.thinking_model_info": "  ↳ Info: Modelo thinking (razonamiento oculto)",
-	"menu.llm.title": "✨ Inteligencia Artificial",
+	"menu.llm.title": "✨ Inteligencia Artificial"
+	"menu.llm.toggle_enable": "Activar sugerencias IA",
+	"menu.llm.toggle_disable": "Desactivar sugerencias IA",
+	"menu.llm.about": "Acerca de Ergopti IA",
+	"menu.llm.about_body": "Ergopti IA — Sugerencias inteligentes de teclado
+Backend: Ollama (local)
+Versión: 1.0",,
 	"menu.llm.trigger_menu_title": "Activación de IA",
 	"menu.llm.trigger_shortcut_label": "Atajo para generar manualmente: %s",
 	"menu.llm.trigger_shortcut_title": "Atajo de generación IA",

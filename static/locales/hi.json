@@ -1,4 +1,4 @@
-{
+﻿{
 	"_meta.flag": "🇮🇳",
 	"_meta.locale": "hi",
 	"_meta.name": "हिन्दी",
@@ -678,7 +678,13 @@
 	"menu.llm.specs_header": "विनिर्देश",
 	"menu.llm.temperature_label": "तापमान (रचनात्मकता): %s",
 	"menu.llm.thinking_model_info": "  ↳ जानकारी: थिंकिंग मॉडल (छिपी हुई तर्क)",
-	"menu.llm.title": "✨ कृत्रिम बुद्धिमत्ता",
+	"menu.llm.title": "✨ कृत्रिम बुद्धिमत्ता"
+	"menu.llm.toggle_enable": "AI सुझाव सक्षम करें",
+	"menu.llm.toggle_disable": "AI सुझाव अक्षम करें",
+	"menu.llm.about": "Ergopti AI के बारे में",
+	"menu.llm.about_body": "Ergopti AI — स्मार्ट कीबोर्ड सुझाव
+बैकएंड: Ollama (स्थानीय)
+संस्करण: 1.0",,
 	"menu.llm.trigger_menu_title": "AI ट्रिगर करना",
 	"menu.llm.trigger_shortcut_label": "मैन्युअल रूप से उत्पन्न करने के लिए शॉर्टकट: %s",
 	"menu.llm.trigger_shortcut_title": "AI पीढ़ी शॉर्टकट",
