@@ -372,7 +372,12 @@ _AddTriggerToIndex(Trigger, Output, Category, Section) {
                Length:   Len }
 
     KeyLen := HasMagic ? (Len - MkLen) : Len
-    if (KeyLen < _MIN_PREFIX_LEN) {
+    ; Magic-key triggers with a 1-char body (e.g. "c★") are allowed through
+    ; with KeyLen = 1: the ★ itself is the final discriminant, so a single
+    ; body character is enough signal to show a useful tooltip. Non-magic
+    ; triggers still require _MIN_PREFIX_LEN to avoid per-keystroke noise.
+    MinLen := HasMagic ? 1 : _MIN_PREFIX_LEN
+    if (KeyLen < MinLen) {
         return
     }
     Prefix := SubStr(Trigger, 1, KeyLen)
@@ -657,7 +662,11 @@ _LookupAndRender() {
     global _PrefixBuffer, _PrefixIndex, _MIN_PREFIX_LEN
     Buffer := _PrefixBuffer
     Len := StrLen(Buffer)
-    if (Len < _MIN_PREFIX_LEN) {
+    ; Short buffers are only skipped when they have no entry in the index.
+    ; A 1-char buffer may validly match a magic-key trigger body (e.g. "c"
+    ; is the body of "c★"), so we let the lookup below decide — the early
+    ; exit here only avoids the Map lookup for guaranteed-empty cases.
+    if (Len < 1) {
         TooltipHide()
         _NotifySuggestionDismissed()
         return
