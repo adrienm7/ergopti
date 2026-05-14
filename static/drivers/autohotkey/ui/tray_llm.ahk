@@ -159,18 +159,40 @@ LLM_Tray_Build() {
 	llm_menu.Add()  ; separator
 	llm_menu.Add(t("menu.llm.about"), LLM_Tray_OnAbout)
 
-	; Attach to system tray — delete old entry first to avoid duplicates on rebuild
+	; Attach to system tray — delete old entry first to avoid duplicates on rebuild,
+	; then re-insert at the canonical position (right after Hotstrings, before Metrics)
+	; using the Metrics title as the anchor. A_TrayMenu.Add() always appends to the
+	; bottom, so we must Insert explicitly to keep the correct menu order on rebuild.
 	try A_TrayMenu.Delete(t("menu.llm.title"))
-	A_TrayMenu.Add(t("menu.llm.title"), llm_menu)
+	try {
+		A_TrayMenu.Insert(t("menu.metrics.title") "&", t("menu.llm.title"), llm_menu)
+	} catch {
+		; Fallback: Metrics title not yet in the tray (first build during initMenu
+		; where LLM is inserted before Metrics is added). A_TrayMenu.Add is fine here
+		; because initMenu sequences the two inserts in the correct order.
+		A_TrayMenu.Add(t("menu.llm.title"), llm_menu)
+	}
 }
 
 /**
  * Builds the model selection submenu from installed Ollama models.
+ * Skips the network call when IA is disabled — the list is only relevant
+ * once the user has activated the feature (Ollama must be running then).
  * @returns {Menu} Populated model submenu.
  */
 LLM_Tray_BuildModelMenu() {
 	global _LLM_Tray
 	m := Menu()
+
+	; Avoid a blocking HTTP call during startup or when IA is off.
+	; The current model name is shown on the parent entry label regardless.
+	if !_LLM_Tray["enabled"] {
+		placeholder := _LLM_Tray["model"]
+		m.Add(placeholder, (*) => 0)
+		m.Check(placeholder)
+		return m
+	}
+
 	installed := LLM_OllamaListModels()
 
 	if (installed.Length == 0) {
