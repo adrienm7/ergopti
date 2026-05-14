@@ -302,16 +302,28 @@ _MakeHotstringMeta(Replacement, Abbreviation, OnlyText, FinalResult, TimeActivat
 ; closure with its own captures — safe to call in a loop over variants.
 _MakeHotstringCallback(Replacement, Abbreviation, OnlyText, FinalResult, TimeActivationSeconds) {
     BackSpaceSeq := "{BackSpace " . StrLen(Abbreviation) . "}"
+    AbbreviationLen := StrLen(Abbreviation)
     PrevCharKey := SubStr(Abbreviation, -2, 1)
     return (*) => _HotstringDispatch(Replacement, A_EndChar, BackSpaceSeq, PrevCharKey, OnlyText, FinalResult,
-        TimeActivationSeconds)
+        TimeActivationSeconds, AbbreviationLen)
 }
 
 ; Hot path — runs on every hotstring firing. ``BackSpaceSeq`` and
 ; ``PrevCharKey`` are pre-computed at registration time so this function
 ; does zero allocation / string work before dispatching the three sends.
-_HotstringDispatch(Replacement, EndChar, BackSpaceSeq, PrevCharKey, OnlyText, FinalResult, TimeActivationSeconds) {
+_HotstringDispatch(Replacement, EndChar, BackSpaceSeq, PrevCharKey, OnlyText, FinalResult, TimeActivationSeconds, AbbreviationLen := 0) {
     if IsTimeActivationExpired(PrevCharKey, TimeActivationSeconds) {
+        return
+    }
+    ; Yield to a longer registered trigger that covers the same suffix.
+    ; AHK native dispatches the most-recently-registered hotstring when two
+    ; triggers overlap (e.g. "t★" fires before "@dt★" because the repeat
+    ; section is registered last). HSE_LastMatch holds the longest match
+    ; found by HSE_FeedChar on the same keystroke — if it is longer than our
+    ; abbreviation, a better callback will fire (or already fired): abort.
+    if (AbbreviationLen > 0 and HSE_LastMatch != ""
+        and HSE_LastMatch.HasOwnProp("Length")
+        and HSE_LastMatch.Length > AbbreviationLen) {
         return
     }
     ; Allow Replacement to be a zero-argument callable — resolved at fire time
