@@ -1711,5 +1711,11 @@ Versão: 1.0",,
 	"ui_typing.unit_mpm": "MPM",
 	"ui_typing.unit_richness": "% riqueza",
 	"ui_typing.unit_sessions": "sessões",
-	"vscode.reload_required": "Recarregue o VSCode (Cmd+Shift+P > Reload Window) para ativar a extensão de escrita"
+	"vscode.reload_required": "Recarregue o VSCode (Cmd+Shift+P > Reload Window) para ativar a extensão de escrita",
+	"ext.demo.gui_message": "Olá da extensão de demonstração do Ergopti!",
+	"ext.demo.open_demo_gui": "Abrir interface de demonstração",
+	"ext.demo.show_info": "Mostrar informações",
+	"ext.demo.visit_docs": "Visitar documentação",
+	"menu.extensions.header": "Extensões",
+	"menu.extensions.empty": "Nenhuma extensão instalada"
 }

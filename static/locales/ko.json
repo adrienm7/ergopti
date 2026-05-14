@@ -1711,5 +1711,11 @@
 	"ui_typing.unit_mpm": "어/분",
 	"ui_typing.unit_richness": "% 풍부도",
 	"ui_typing.unit_sessions": "세션",
-	"vscode.reload_required": "타이핑 확장 프로그램을 활성화하려면 VSCode를 다시 로드하세요 (Cmd+Shift+P > Reload Window)"
+	"vscode.reload_required": "타이핑 확장 프로그램을 활성화하려면 VSCode를 다시 로드하세요 (Cmd+Shift+P > Reload Window)",
+	"ext.demo.gui_message": "Ergopti 데모 확장에서 안녕하세요!",
+	"ext.demo.open_demo_gui": "데모 인터페이스 열기",
+	"ext.demo.show_info": "정보 표시",
+	"ext.demo.visit_docs": "문서 방문",
+	"menu.extensions.header": "확장 기능",
+	"menu.extensions.empty": "설치된 확장 기능 없음"
 }

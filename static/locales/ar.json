@@ -1711,5 +1711,11 @@
 	"ui_typing.unit_mpm": "ك/د",
 	"ui_typing.unit_richness": "% ثراء",
 	"ui_typing.unit_sessions": "جلسات",
-	"vscode.reload_required": "يرجى إعادة تحميل VSCode (Cmd+Shift+P > Reload Window) لتفعيل امتداد الكتابة"
+	"vscode.reload_required": "يرجى إعادة تحميل VSCode (Cmd+Shift+P > Reload Window) لتفعيل امتداد الكتابة",
+	"ext.demo.gui_message": "مرحباً من إضافة Ergopti التجريبية!",
+	"ext.demo.open_demo_gui": "فتح واجهة العرض التوضيحي",
+	"ext.demo.show_info": "عرض المعلومات",
+	"ext.demo.visit_docs": "زيارة الوثائق",
+	"menu.extensions.header": "الإضافات",
+	"menu.extensions.empty": "لا توجد إضافة مثبتة"
 }

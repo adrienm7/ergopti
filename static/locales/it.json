@@ -1711,5 +1711,11 @@ Versione: 1.0",,
 	"ui_typing.unit_mpm": "MPM",
 	"ui_typing.unit_richness": "% ricchezza",
 	"ui_typing.unit_sessions": "sessioni",
-	"vscode.reload_required": "Ricaricare VSCode (Cmd+Shift+P > Reload Window) per attivare l’estensione di digitazione"
+	"vscode.reload_required": "Ricaricare VSCode (Cmd+Shift+P > Reload Window) per attivare l’estensione di digitazione",
+	"ext.demo.gui_message": "Ciao dall’estensione demo di Ergopti!",
+	"ext.demo.open_demo_gui": "Apri interfaccia demo",
+	"ext.demo.show_info": "Mostra informazioni",
+	"ext.demo.visit_docs": "Visita la documentazione",
+	"menu.extensions.header": "Estensioni",
+	"menu.extensions.empty": "Nessuna estensione installata"
 }

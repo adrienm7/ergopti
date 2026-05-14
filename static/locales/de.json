@@ -1709,5 +1709,11 @@
 	"ui_typing.unit_mpm": "MPM",
 	"ui_typing.unit_richness": "% Reichhaltigkeit",
 	"ui_typing.unit_sessions": "Sitzungen",
-	"vscode.reload_required": "Bitte VSCode neu laden (Cmd+Shift+P > Reload Window), um die Tipp-Erweiterung zu aktivieren"
+	"vscode.reload_required": "Bitte VSCode neu laden (Cmd+Shift+P > Reload Window), um die Tipp-Erweiterung zu aktivieren",
+	"ext.demo.gui_message": "Hallo von der Ergopti-Demo-Erweiterung!",
+	"ext.demo.open_demo_gui": "Demo-Oberfläche öffnen",
+	"ext.demo.show_info": "Informationen anzeigen",
+	"ext.demo.visit_docs": "Dokumentation besuchen",
+	"menu.extensions.header": "Erweiterungen",
+	"menu.extensions.empty": "Keine Erweiterung installiert"
 }

@@ -1737,5 +1737,11 @@
 	"ui_typing.unit_mpm": "מ/ד",
 	"ui_typing.unit_richness": "% עושר",
 	"ui_typing.unit_sessions": "פעילויות",
-	"vscode.reload_required": "טען מחדש את VSCode (Cmd+Shift+P > Reload Window) להפעלת תוסף הכתיבה"
+	"vscode.reload_required": "טען מחדש את VSCode (Cmd+Shift+P > Reload Window) להפעלת תוסף הכתיבה",
+	"ext.demo.gui_message": "!שלום מהרחבת ההדגמה של Ergopti",
+	"ext.demo.open_demo_gui": "פתח ממשק הדגמה",
+	"ext.demo.show_info": "הצג מידע",
+	"ext.demo.visit_docs": "בקר בתיעוד",
+	"menu.extensions.header": "הרחבות",
+	"menu.extensions.empty": "לא מותקנת הרחבה"
 }
