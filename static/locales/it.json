@@ -349,6 +349,7 @@
 	"hs_config.group_personal": "Personal",
 	"hs_config.label_group": "Group:",
 	"hs_config.label_file": "File:",
+	"hs_config.label_tooltip": "Mostra tooltip",
 	"hs_config.window_title": "Ritardi e colori hotstring",
 	"init.reload_files": "File modificati — ricaricamento…",
 	"init.reload_hotstrings": "Hotstring modificati — ricaricamento…",

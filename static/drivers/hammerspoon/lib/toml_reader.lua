@@ -419,6 +419,8 @@ function M.parse(path)
 						result.meta.delay = val
 					elseif key == "color" and type(val) == "string" then
 						result.meta.color = val
+					elseif key == "show_tooltip" and type(val) == "boolean" then
+						result.meta.show_tooltip = val
 					end
 				end
 
@@ -446,6 +448,8 @@ function M.parse(path)
 						entry.delay = val
 					elseif key == "color" and type(val) == "string" then
 						entry.color = val
+					elseif key == "show_tooltip" and type(val) == "boolean" then
+						entry.show_tooltip = val
 					end
 				end
 

@@ -349,6 +349,7 @@
 	"hs_config.group_personal": "Personal",
 	"hs_config.label_group": "Group:",
 	"hs_config.label_file": "File:",
+	"hs_config.label_tooltip": "Araç ipucunu göster",
 	"hs_config.window_title": "Kısaltma gecikmeleri ve renkleri",
 	"init.reload_files": "Dosyalar değişti — yeniden yükleniyor…",
 	"init.reload_hotstrings": "Hotstring'ler değişti — yeniden yükleniyor…",

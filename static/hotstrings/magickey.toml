@@ -7,6 +7,7 @@
 [_meta]
 color = "#e53935"
 delay = 2.0
+show_tooltip = true
 description = { fr = "Touche ★ et expansion de texte", en = "★ key and text expansion", de = "★-Taste und Texterweiterung", es = "Tecla ★ y expansión de texto", zh = "★ 键与文本扩展" }
 sections_order = ["replace", "repeat", "-", "textexpansion", "textexpansionauto", "textexpansionemojis", "textexpansionsymbols", "textexpansionsymbolstypst"]
 

@@ -39,7 +39,7 @@ global GLOBAL_DEFAULT_COLOR := "#e53935"  ; Red — applied to all extension/per
 global _HotstringsOverridesPath := ""
 
 ; In-memory cache of the override file content. Shape mirrors the HS module:
-;   Map(category -> { Delay: Number|"", Color: String|"", Sections: Map(name -> { Delay, Color }) })
+;   Map(category -> { Delay: Number|"", Color: String|"", ShowTooltip: true|"", Sections: Map(name -> { Delay, Color, ShowTooltip }) })
 global _HotstringsOverrides := Map()
 
 
@@ -88,9 +88,9 @@ _ParseOverrides(Path) {
             CurrentCat := "ext." . StrLower(ExtSecMatch[1])
             CurrentSec := StrLower(ExtSecMatch[2])
             if !Result.Has(CurrentCat)
-                Result[CurrentCat] := { Delay: "", Color: "", Sections: Map() }
+                Result[CurrentCat] := { Delay: "", Color: "", ShowTooltip: "", Sections: Map() }
             if !Result[CurrentCat].Sections.Has(CurrentSec)
-                Result[CurrentCat].Sections[CurrentSec] := { Delay: "", Color: "" }
+                Result[CurrentCat].Sections[CurrentSec] := { Delay: "", Color: "", ShowTooltip: "" }
             continue
         }
 
@@ -99,7 +99,7 @@ _ParseOverrides(Path) {
             CurrentCat := "ext." . StrLower(ExtMatch[1])
             CurrentSec := ""
             if !Result.Has(CurrentCat)
-                Result[CurrentCat] := { Delay: "", Color: "", Sections: Map() }
+                Result[CurrentCat] := { Delay: "", Color: "", ShowTooltip: "", Sections: Map() }
             continue
         }
 
@@ -108,9 +108,9 @@ _ParseOverrides(Path) {
             CurrentCat := StrLower(SecMatch[1])
             CurrentSec := StrLower(SecMatch[2])
             if !Result.Has(CurrentCat)
-                Result[CurrentCat] := { Delay: "", Color: "", Sections: Map() }
+                Result[CurrentCat] := { Delay: "", Color: "", ShowTooltip: "", Sections: Map() }
             if !Result[CurrentCat].Sections.Has(CurrentSec)
-                Result[CurrentCat].Sections[CurrentSec] := { Delay: "", Color: "" }
+                Result[CurrentCat].Sections[CurrentSec] := { Delay: "", Color: "", ShowTooltip: "" }
             continue
         }
 
@@ -119,7 +119,7 @@ _ParseOverrides(Path) {
             CurrentCat := StrLower(CatMatch[1])
             CurrentSec := ""
             if !Result.Has(CurrentCat)
-                Result[CurrentCat] := { Delay: "", Color: "", Sections: Map() }
+                Result[CurrentCat] := { Delay: "", Color: "", ShowTooltip: "", Sections: Map() }
             continue
         }
 
@@ -135,6 +135,8 @@ _ParseOverrides(Path) {
             Target.Delay := NumMatch[1] + 0
         } else if RegExMatch(Line, "^color\s*=\s*`"((?:[^`"\\]|\\.)*)`"\s*$", &ColMatch) {
             Target.Color := UnescapeTomlString(ColMatch[1])
+        } else if RegExMatch(Line, "^show_tooltip\s*=\s*(true|false)\s*$", &BoolMatch) {
+            Target.ShowTooltip := (BoolMatch[1] == "true")
         }
     }
 
@@ -167,13 +169,16 @@ _SaveOverrides() {
         ; when parsed back. Section headers for ext keys: [ext.name.section].
         IsExt := SubStr(Cat, 1, 4) == "ext."
 
-        if (Entry.Delay != "" or Entry.Color != "") {
+        if (Entry.Delay != "" or Entry.Color != "" or Entry.ShowTooltip != "") {
             Out .= "[" . Cat . "]`n"
             if (Entry.Delay != "") {
                 Out .= "delay = " . Entry.Delay . "`n"
             }
             if (Entry.Color != "") {
                 Out .= "color = `"" . Entry.Color . "`"`n"
+            }
+            if (Entry.ShowTooltip != "") {
+                Out .= "show_tooltip = " . (Entry.ShowTooltip ? "true" : "false") . "`n"
             }
             Out .= "`n"
         }
@@ -185,7 +190,7 @@ _SaveOverrides() {
         _SortStringsInPlace(Secs)
         for _, Sec in Secs {
             S := Entry.Sections[Sec]
-            if (S.Delay != "" or S.Color != "") {
+            if (S.Delay != "" or S.Color != "" or S.ShowTooltip != "") {
                 ; Extension: [ext.name.section] — Cat already contains the dot
                 Out .= "[" . Cat . "." . Sec . "]`n"
                 if (S.Delay != "") {
@@ -193,6 +198,9 @@ _SaveOverrides() {
                 }
                 if (S.Color != "") {
                     Out .= "color = `"" . S.Color . "`"`n"
+                }
+                if (S.ShowTooltip != "") {
+                    Out .= "show_tooltip = " . (S.ShowTooltip ? "true" : "false") . "`n"
                 }
                 Out .= "`n"
             }
@@ -287,14 +295,27 @@ HotstringsResolve(CategoryName, SectionName := "") {
         Color := TomlCfg.Color
     }
 
+    ; ShowTooltip — explicit false anywhere in the chain suppresses the tooltip.
+    ; Default when unset at every level is true.
+    ShowTooltip := true
+    if (UserSec != "" and UserSec.ShowTooltip != "") {
+        ShowTooltip := UserSec.ShowTooltip
+    } else if (UserCat != "" and UserCat.ShowTooltip != "") {
+        ShowTooltip := UserCat.ShowTooltip
+    } else if (TomlSec != "" and TomlSec.ShowTooltip != "") {
+        ShowTooltip := TomlSec.ShowTooltip
+    } else if (TomlCfg.ShowTooltip != "") {
+        ShowTooltip := TomlCfg.ShowTooltip
+    }
+
     HasOverride := false
-    if (UserSec != "" and (UserSec.Delay != "" or UserSec.Color != "")) {
+    if (UserSec != "" and (UserSec.Delay != "" or UserSec.Color != "" or UserSec.ShowTooltip != "")) {
         HasOverride := true
-    } else if (UserCat != "" and (UserCat.Delay != "" or UserCat.Color != "")) {
+    } else if (UserCat != "" and (UserCat.Delay != "" or UserCat.Color != "" or UserCat.ShowTooltip != "")) {
         HasOverride := true
     }
 
-    return { Delay: Delay, Color: Color, HasOverride: HasOverride }
+    return { Delay: Delay, Color: Color, ShowTooltip: ShowTooltip, HasOverride: HasOverride }
 }
 
 ; Resolve the effective delay and color for an extension hotstring file.
@@ -349,9 +370,20 @@ HotstringsResolveExt(ExtId, TomlPath, SectionName := "") {
         Color := GLOBAL_DEFAULT_COLOR
     }
 
-    HasOverride := (UserSec != "" and (UserSec.Delay != "" or UserSec.Color != ""))
-        or  (UserCat != "" and (UserCat.Delay != "" or UserCat.Color != ""))
-    return { Delay: Delay, Color: Color, HasOverride: HasOverride }
+    ShowTooltip := true
+    if (UserSec != "" and UserSec.ShowTooltip != "") {
+        ShowTooltip := UserSec.ShowTooltip
+    } else if (UserCat != "" and UserCat.ShowTooltip != "") {
+        ShowTooltip := UserCat.ShowTooltip
+    } else if (TomlSec != "" and TomlSec.ShowTooltip != "") {
+        ShowTooltip := TomlSec.ShowTooltip
+    } else if (TomlCfg.ShowTooltip != "") {
+        ShowTooltip := TomlCfg.ShowTooltip
+    }
+
+    HasOverride := (UserSec != "" and (UserSec.Delay != "" or UserSec.Color != "" or UserSec.ShowTooltip != ""))
+        or  (UserCat != "" and (UserCat.Delay != "" or UserCat.Color != "" or UserCat.ShowTooltip != ""))
+    return { Delay: Delay, Color: Color, ShowTooltip: ShowTooltip, HasOverride: HasOverride }
 }
 
 
@@ -360,21 +392,21 @@ HotstringsResolveExt(ExtId, TomlPath, SectionName := "") {
 ; Persists immediately and refreshes the in-memory cache.
 HotstringsSetOverride(CategoryName, SectionName, Field, Value) {
     global _HotstringsOverrides
-    if (Field != "delay" and Field != "color") {
-        try LoggerError("HotstringsConfig", "SetOverride: field must be 'delay' or 'color', got '{1}'.", Field)
+    if (Field != "delay" and Field != "color" and Field != "show_tooltip") {
+        try LoggerError("HotstringsConfig", "SetOverride: field must be 'delay', 'color', or 'show_tooltip', got '{1}'.", Field)
         return false
     }
     Cat := StrLower(CategoryName)
     Sec := StrLower(SectionName)
 
     if !_HotstringsOverrides.Has(Cat) {
-        _HotstringsOverrides[Cat] := { Delay: "", Color: "", Sections: Map() }
+        _HotstringsOverrides[Cat] := { Delay: "", Color: "", ShowTooltip: "", Sections: Map() }
     }
     Entry := _HotstringsOverrides[Cat]
 
     if (Sec != "") {
         if !Entry.Sections.Has(Sec) {
-            Entry.Sections[Sec] := { Delay: "", Color: "" }
+            Entry.Sections[Sec] := { Delay: "", Color: "", ShowTooltip: "" }
         }
         Target := Entry.Sections[Sec]
     } else {
@@ -383,8 +415,10 @@ HotstringsSetOverride(CategoryName, SectionName, Field, Value) {
 
     if (Field == "delay") {
         Target.Delay := Value
-    } else {
+    } else if (Field == "color") {
         Target.Color := Value
+    } else {
+        Target.ShowTooltip := Value
     }
 
     try LoggerDebug("HotstringsConfig", "Override set: {1}{2}.{3} = {4}.",
@@ -418,6 +452,9 @@ HotstringsClearOverride(CategoryName, SectionName, Field := "") {
     }
     if (Field == "" or Field == "color") {
         Target.Color := ""
+    }
+    if (Field == "" or Field == "show_tooltip") {
+        Target.ShowTooltip := ""
     }
 
     try LoggerDebug("HotstringsConfig", "Override cleared: {1}{2}{3}.",

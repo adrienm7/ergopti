@@ -349,6 +349,7 @@
 	"hs_config.group_personal": "Personal",
 	"hs_config.label_group": "Group:",
 	"hs_config.label_file": "File:",
+	"hs_config.label_tooltip": "Показывать подсказку",
 	"hs_config.window_title": "Задержки и цвета хотстрингов",
 	"init.reload_files": "Файлы изменены — перезагрузка…",
 	"init.reload_hotstrings": "Хотстринги изменены — перезагрузка…",

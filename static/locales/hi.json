@@ -371,6 +371,7 @@
 	"hs_config.group_personal": "Personal",
 	"hs_config.label_group": "Group:",
 	"hs_config.label_file": "File:",
+	"hs_config.label_tooltip": "टूलटिप दिखाएं",
 	"hs_config.window_title": "Hotstring विलंब और रंग",
 	"init.reload_files": "फ़ाइलें बदली गईं — पुनः लोड हो रहा है…",
 	"init.reload_hotstrings": "हॉटस्ट्रिंग बदले गए — पुनः लोड हो रहा है…",

@@ -7,6 +7,7 @@
 [_meta]
 color = "#fb8c00"
 delay = 0.5
+show_tooltip = true
 description = { fr = "Réduction des SFBs", en = "SFB reduction", de = "SFB-Reduktion", es = "Reducción de SFBs", zh = "SFB 减少" }
 sections_order = ["comma", "-", "ecirc", "egrave", "-", "bu", "ie"]
 

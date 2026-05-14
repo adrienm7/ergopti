@@ -349,6 +349,7 @@
 	"hs_config.group_personal": "Personal",
 	"hs_config.label_group": "Group:",
 	"hs_config.label_file": "File:",
+	"hs_config.label_tooltip": "显示提示",
 	"hs_config.window_title": "热字符串延迟与颜色",
 	"init.reload_files": "文件已修改 — 重新加载中…",
 	"init.reload_hotstrings": "热字符串已修改 — 重新加载中…",
