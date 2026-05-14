@@ -273,7 +273,7 @@ _I18nSortedLocales() {
 		i := A_Index
 		Loop n - i {
 			j := A_Index
-			if (StrLower(Sorted[j].Name) > StrLower(Sorted[j + 1].Name)) {
+			if (StrCompare(Sorted[j].Name, Sorted[j + 1].Name, false) > 0) {
 				Tmp         := Sorted[j]
 				Sorted[j]   := Sorted[j + 1]
 				Sorted[j + 1] := Tmp
