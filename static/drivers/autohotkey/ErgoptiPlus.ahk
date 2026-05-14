@@ -342,6 +342,11 @@ ReadScriptConfig(Cache) {
     Raw := IniCacheGet(Cache, "Script", "MagicKey")
     if Raw != "_"
         ScriptInformation["MagicKey"] := Raw
+    ; Restore the engine-level repeat-key toggle (defaults to enabled when absent)
+    global HSE_RepeatEnabled
+    RawRepeat := IniCacheGet(Cache, "Hotstrings", "RepeatKeyEnabled")
+    if RawRepeat != "_"
+        HSE_RepeatEnabled := (RawRepeat == "1" or RawRepeat == "true")
     ; Paths are always derived from _ConfigDir at startup and are never persisted
 }
 
@@ -1438,6 +1443,11 @@ initMenu() {
     ParamsMenu.Add(t("menu.hotstrings.delays_colors"),
         (*) => OpenHotstringsConfigWindow())
     ParamsMenu.Add(t("menu.hotstrings.magic_key_prefix") . ScriptInformation["MagicKey"], MagicKeyEditor)
+    RepeatToggleLabel := t("menu.hotstrings.repeat_key_toggle")
+    ParamsMenu.Add(RepeatToggleLabel, ToggleRepeatKeyEnabled)
+    if HSE_RepeatEnabled {
+        ParamsMenu.Check(RepeatToggleLabel)
+    }
     HotstringsMenu.Add(t("menu.hotstrings.params"), ParamsMenu)
     HotstringsMenu.Add() ; Separator after paramètres block
 
@@ -2353,6 +2363,13 @@ ModifyMagicKey(gui, NewValue) {
     TOML_Write(NewValue, ConfigurationFile, "Hotstrings", "MagicKey")
 
     gui.Destroy()
+    Reload
+}
+
+ToggleRepeatKeyEnabled(*) {
+    global HSE_RepeatEnabled, ConfigurationFile
+    HSE_RepeatEnabled := !HSE_RepeatEnabled
+    TOML_Write(HSE_RepeatEnabled, ConfigurationFile, "Hotstrings", "RepeatKeyEnabled")
     Reload
 }
 

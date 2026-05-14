@@ -501,6 +501,7 @@
 	"menu.hotstrings.personal_header": "我的热字符串",
 	"menu.hotstrings.preview_bubbles": "预览气泡",
 	"menu.hotstrings.reset_magic_key": "   ↳ 重置（默认：★）",
+	"menu.hotstrings.repeat_key_toggle": "   ↳ 使用 ★ 键重复字符",
 	"menu.hotstrings.shortcut_default_ctrl": "Ctrl + %s",
 	"menu.hotstrings.shortcut_none": "无快捷键",
 	"menu.hotstrings.shortcut_prefix": "快捷键：Win + ",

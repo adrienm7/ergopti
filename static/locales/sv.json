@@ -526,6 +526,7 @@
 	"menu.hotstrings.personal_header": "Mina hotstrings",
 	"menu.hotstrings.preview_bubbles": "Förhandsgranska bubblor",
 	"menu.hotstrings.reset_magic_key": "   ↳ Återställ (standard: ★)",
+	"menu.hotstrings.repeat_key_toggle": "   ↳ Upprepa tecken med ★-tangenten",
 	"menu.hotstrings.shortcut_default_ctrl": "Ctrl + %s",
 	"menu.hotstrings.shortcut_none": "Ingen genväg",
 	"menu.hotstrings.shortcut_prefix": "Genväg: Win + ",

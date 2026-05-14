@@ -501,6 +501,7 @@
 	"menu.hotstrings.personal_header": "سلاسلي النصية",
 	"menu.hotstrings.preview_bubbles": "فقاعات المعاينة",
 	"menu.hotstrings.reset_magic_key": "   ↳ إعادة تعيين (افتراضي: ★)",
+	"menu.hotstrings.repeat_key_toggle": "   ↳ توليد الكتابة المتكررة بالضغط على ★",
 	"menu.hotstrings.shortcut_default_ctrl": "Ctrl + %s",
 	"menu.hotstrings.shortcut_none": "لا اختصار",
 	"menu.hotstrings.shortcut_prefix": "الاختصار: Win + ",

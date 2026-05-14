@@ -501,6 +501,7 @@
 	"menu.hotstrings.personal_header": "I miei hotstring",
 	"menu.hotstrings.preview_bubbles": "Bolle di anteprima",
 	"menu.hotstrings.reset_magic_key": "   ↳ Ripristina (predefinito: ★)",
+	"menu.hotstrings.repeat_key_toggle": "   ↳ Ripeti carattere con tasto ★",
 	"menu.hotstrings.shortcut_default_ctrl": "Ctrl + %s",
 	"menu.hotstrings.shortcut_none": "Nessuna scorciatoia",
 	"menu.hotstrings.shortcut_prefix": "Scorciatoia: Win + ",

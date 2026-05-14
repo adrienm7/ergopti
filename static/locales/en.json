@@ -501,6 +501,7 @@
 	"menu.hotstrings.personal_header": "My hotstrings",
 	"menu.hotstrings.preview_bubbles": "Preview bubbles",
 	"menu.hotstrings.reset_magic_key": "   ↳ Reset (default: ★)",
+	"menu.hotstrings.repeat_key_toggle": "   ↳ Repeat character with ★ key",
 	"menu.hotstrings.shortcut_default_ctrl": "Ctrl + %s",
 	"menu.hotstrings.shortcut_none": "No shortcut",
 	"menu.hotstrings.shortcut_prefix": "Shortcut: Win + ",

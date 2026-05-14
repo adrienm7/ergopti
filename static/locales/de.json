@@ -501,6 +501,7 @@
 	"menu.hotstrings.personal_header": "Meine Hotstrings",
 	"menu.hotstrings.preview_bubbles": "Vorschau-Blasen",
 	"menu.hotstrings.reset_magic_key": "   ↳ Zurücksetzen (Standard: ★)",
+	"menu.hotstrings.repeat_key_toggle": "   ↳ Zeichen mit ★ wiederholen",
 	"menu.hotstrings.shortcut_default_ctrl": "Strg + %s",
 	"menu.hotstrings.shortcut_none": "Kein Kürzel",
 	"menu.hotstrings.shortcut_prefix": "Tastenkürzel: Win + ",

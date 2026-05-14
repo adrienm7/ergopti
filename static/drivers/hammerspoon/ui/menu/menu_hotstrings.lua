@@ -621,8 +621,23 @@ function M.build_management(ctx)
 		}
 	end
 
+	local repeat_enabled = ctx.keymap and type(ctx.keymap.is_repeat_feature_enabled) == "function"
+		and ctx.keymap.is_repeat_feature_enabled()
+	local repeat_toggle_item = {
+		title   = i18n.get("menu.hotstrings.repeat_key_toggle"),
+		checked = repeat_enabled,
+		disabled = paused or nil,
+		fn      = not paused and function()
+			if ctx.keymap and type(ctx.keymap.set_repeat_feature_enabled) == "function" then
+				pcall(ctx.keymap.set_repeat_feature_enabled, not repeat_enabled)
+			end
+			ctx.do_reload("menu")
+		end or nil,
+	}
+
 	if magic_item then table.insert(menu, magic_item) end
 	if magic_reset_item then table.insert(menu, magic_reset_item) end
+	table.insert(menu, repeat_toggle_item)
 	if exp_item then table.insert(menu, exp_item) end
 	if delays_item then table.insert(menu, delays_item) end
 	table.insert(menu, { title = "-" })

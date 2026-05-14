@@ -501,6 +501,7 @@
 	"menu.hotstrings.personal_header": "Mijn hotstrings",
 	"menu.hotstrings.preview_bubbles": "Voorbeeldballonnen",
 	"menu.hotstrings.reset_magic_key": "   ↳ Herstellen (standaard: ★)",
+	"menu.hotstrings.repeat_key_toggle": "   ↳ Teken herhalen met ★-toets",
 	"menu.hotstrings.shortcut_default_ctrl": "Ctrl + %s",
 	"menu.hotstrings.shortcut_none": "Geen sneltoets",
 	"menu.hotstrings.shortcut_prefix": "Sneltoets: Win + ",
