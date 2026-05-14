@@ -104,13 +104,15 @@ LLM_Deps_GetFailureMessage() {
  * The reachability check itself runs from a one-shot timer so the
  * main AHK thread (and therefore the keyboard) is never blocked.
  * @param {string} default_model - Ollama tag to pull if not yet available.
- * @param {Func} on_ready - Optional callback fired when the server is confirmed ready.
- * @param {Func} on_failed - Optional callback fired on permanent failure.
+ * @param {Func}   on_ready      - Optional callback fired when the server is confirmed ready.
+ * @param {Func}   on_failed     - Optional callback fired on permanent failure.
+ * @param {boolean} show_ui      - When false, suppresses the install window on auto-boot.
+ *                                 Pass true only when the user explicitly triggered the install.
  */
-LLM_Deps_CheckAndInstall(default_model := "qwen2.5:3b", on_ready := unset, on_failed := unset) {
+LLM_Deps_CheckAndInstall(default_model := "qwen2.5:3b", on_ready := unset, on_failed := unset, show_ui := true) {
 	global _LLM_Deps_Checking, _LLM_Deps_State
 
-	LoggerInfo("LLM", "CheckAndInstall — state: " _LLM_Deps_State ", checking: " (_LLM_Deps_Checking ? "true" : "false") ".")
+	LoggerInfo("LLM", "CheckAndInstall — state: " _LLM_Deps_State ", checking: " (_LLM_Deps_Checking ? "true" : "false") " show_ui=" (show_ui ? "true" : "false") ".")
 
 	; Guard: only one concurrent bootstrap
 	if _LLM_Deps_Checking {
@@ -126,7 +128,7 @@ LLM_Deps_CheckAndInstall(default_model := "qwen2.5:3b", on_ready := unset, on_fa
 	; Defer the blocking HTTP check to a timer so the main thread stays free.
 	; The lambda captures the parameters for the slow path.
 	LoggerInfo("LLM", "Scheduling async Ollama reachability check…")
-	SetTimer(() => LLM_Deps_AsyncCheck(default_model, on_ready, on_failed), -1)
+	SetTimer(() => LLM_Deps_AsyncCheck(default_model, on_ready, on_failed, show_ui), -1)
 }
 
 /**
@@ -134,7 +136,7 @@ LLM_Deps_CheckAndInstall(default_model := "qwen2.5:3b", on_ready := unset, on_fa
  * fast-paths or launches the installer. Called on a timer so the main
  * AHK thread is not blocked by the synchronous WinHTTP call.
  */
-LLM_Deps_AsyncCheck(default_model, on_ready, on_failed) {
+LLM_Deps_AsyncCheck(default_model, on_ready, on_failed, show_ui) {
 	global _LLM_Deps_Checking, _LLM_Deps_State
 
 	LoggerInfo("LLM", "AsyncCheck — checking if Ollama is running…")
@@ -144,6 +146,14 @@ LLM_Deps_AsyncCheck(default_model, on_ready, on_failed) {
 		_LLM_Deps_Checking := false
 		if IsSet(on_ready)
 			on_ready()
+		return
+	}
+
+	; When called from the auto-boot path (show_ui=false), do not open the
+	; install window — the user has not asked for an installation.
+	if !show_ui {
+		LoggerInfo("LLM", "Ollama not running but show_ui=false — silent abort, state stays pending.")
+		_LLM_Deps_Checking := false
 		return
 	}
 

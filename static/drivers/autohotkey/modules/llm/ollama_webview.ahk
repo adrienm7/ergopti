@@ -355,7 +355,7 @@ OllamaWV_EvalJS(js) {
  * so i18n_apply() can walk live DOM nodes instead of a not-yet-parsed tree.
  */
 OllamaWV_FlushQueue() {
-	global _OllamaWV_WebView, _OllamaWV_Ready, _OllamaWV_Queue
+	global _OllamaWV_WebView, _OllamaWV_Ready, _OllamaWV_Queue, _I18nLocale
 	if !IsSet(_OllamaWV_WebView)
 		return
 	if _OllamaWV_Ready   ; Guard: flush must only run once

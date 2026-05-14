@@ -110,11 +110,11 @@ LLM_Tray_Init(saved_opts := Map()) {
 
 	LLM_Tray_Build()
 
-	; Bootstrap Ollama only if the user has explicitly enabled the AI feature.
-	; Deferred via one-shot timer so the tray menu renders before the blocking
-	; HTTP check fires.
+	; Bootstrap Ollama silently on reload when the feature was already enabled.
+	; show_ui=false so the install window never opens automatically — the user
+	; must click the menu toggle to trigger a visible installation.
 	if _LLM_Tray["enabled"]
-		SetTimer(LLM_Tray_BootstrapOllama, -1)
+		SetTimer(() => LLM_Tray_BootstrapOllama(false), -1)
 }
 
 
@@ -402,11 +402,13 @@ LLM_Tray_OnInstantToggle(*) {
 }
 
 /**
- * Triggers the Ollama deps checker. Called only when the user activates the feature.
- * If already ready, starts the bridge immediately.
+ * Triggers the Ollama deps checker.
+ * @param {boolean} show_ui - True when the user explicitly clicked the toggle
+ *                            (shows the install window if Ollama is absent).
+ *                            False on automatic reload boot (silent fast-path only).
  */
-LLM_Tray_BootstrapOllama() {
-	LoggerInfo("LLM", "BootstrapOllama fired — deps state: " LLM_Deps_GetState() ".")
+LLM_Tray_BootstrapOllama(show_ui := true) {
+	LoggerInfo("LLM", "BootstrapOllama fired — deps state: " LLM_Deps_GetState() " show_ui=" (show_ui ? "true" : "false") ".")
 	if LLM_Deps_IsReady() {
 		LoggerInfo("LLM", "Ollama already ready — starting bridge directly.")
 		LLM_Tray_OnDepsReady()
@@ -416,7 +418,8 @@ LLM_Tray_BootstrapOllama() {
 	LLM_Deps_CheckAndInstall(
 		_LLM_Tray["model"],
 		(*) => LLM_Tray_OnDepsReady(),
-		(msg) => LLM_Tray_OnDepsFailed(msg)
+		(msg) => LLM_Tray_OnDepsFailed(msg),
+		show_ui
 	)
 }
 
