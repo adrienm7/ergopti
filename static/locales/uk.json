@@ -653,7 +653,7 @@
 	"menu.llm.specs_header": "ХАРАКТЕРИСТИКИ",
 	"menu.llm.temperature_label": "Температура (Креативність): %s",
 	"menu.llm.thinking_model_info": "  ↳ Інфо: Thinking-модель (приховане міркування)",
-	"menu.llm.title": "✨ Штучний інтелект"
+	"menu.llm.title": "✨ Штучний інтелект",
 	"menu.llm.on": "✅ ШІ увімкнено (натисніть для вимкнення)",
 	"menu.llm.off": "❌ ШІ вимкнено (натисніть для увімкнення)",
 	"menu.llm.toggle_enable": "Увімкнути підказки ШІ",

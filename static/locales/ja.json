@@ -653,7 +653,7 @@
 	"menu.llm.specs_header": "仕様",
 	"menu.llm.temperature_label": "温度（創造性）: %s",
 	"menu.llm.thinking_model_info": "  ↳ 情報: Thinkingモデル（非表示推論）",
-	"menu.llm.title": "✨ 人工知能"
+	"menu.llm.title": "✨ 人工知能",
 	"menu.llm.on": "✅ AI有効（クリックして無効化）",
 	"menu.llm.off": "❌ AI無効（クリックして有効化）",
 	"menu.llm.toggle_enable": "AI提案を有効にする",

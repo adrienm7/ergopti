@@ -653,7 +653,7 @@
 	"menu.llm.specs_header": "规格",
 	"menu.llm.temperature_label": "温度（创造力）: %s",
 	"menu.llm.thinking_model_info": "  ↳ 信息: Thinking模型（隐藏推理）",
-	"menu.llm.title": "✨ 人工智能"
+	"menu.llm.title": "✨ 人工智能",
 	"menu.llm.on": "✅ AI 已启用（单击禁用）",
 	"menu.llm.off": "❌ AI 已禁用（单击启用）",
 	"menu.llm.toggle_enable": "启用 AI 建议",

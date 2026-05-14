@@ -653,7 +653,7 @@
 	"menu.llm.specs_header": "ÖZELLİKLER",
 	"menu.llm.temperature_label": "Sıcaklık (Yaratıcılık): %s",
 	"menu.llm.thinking_model_info": "  ↳ Bilgi: Düşünen model (gizli akıl yürütme)",
-	"menu.llm.title": "✨ Yapay Zeka"
+	"menu.llm.title": "✨ Yapay Zeka",
 	"menu.llm.on": "✅ AI etkin (devre dışı bırakmak için tıklayın)",
 	"menu.llm.off": "❌ AI devre dışı (etkinleştirmek için tıklayın)",
 	"menu.llm.toggle_enable": "AI önerilerini etkinleştir",

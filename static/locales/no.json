@@ -678,7 +678,7 @@
 	"menu.llm.specs_header": "SPESIFIKASJONER",
 	"menu.llm.temperature_label": "Temperatur (Kreativitet): %s",
 	"menu.llm.thinking_model_info": "  ↳ Info: Tenkemodell (skjult resonnering)",
-	"menu.llm.title": "✨ Kunstig intelligens"
+	"menu.llm.title": "✨ Kunstig intelligens",
 	"menu.llm.on": "✅ AI aktivert (klikk for å deaktivere)",
 	"menu.llm.off": "❌ AI deaktivert (klikk for å aktivere)",
 	"menu.llm.toggle_enable": "Aktiver AI-forslag",

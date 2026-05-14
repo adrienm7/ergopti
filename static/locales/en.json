@@ -1,4 +1,4 @@
-{
+﻿{
 	"_meta.flag": "🇬🇧",
 	"_meta.locale": "en",
 	"_meta.name": "English",
@@ -653,9 +653,9 @@
 	"menu.llm.specs_header": "SPECIFICATIONS",
 	"menu.llm.temperature_label": "Temperature (Creativity): %s",
 	"menu.llm.thinking_model_info": "  ↳ Info: Thinking model (hidden reasoning)",
-	"menu.llm.title": "✨ Artificial Intelligence"
+	"menu.llm.title": "✨ Artificial Intelligence",
 	"menu.llm.on": "✅ AI enabled (click to disable)",
-	"menu.llm.off": "❌ AI disabled (click to enable)",,
+	"menu.llm.off": "❌ AI disabled (click to enable)",
 	"menu.llm.toggle_enable": "Enable AI suggestions",
 	"menu.llm.toggle_disable": "Disable AI suggestions",
 	"menu.llm.about": "About Ergopti AI",
