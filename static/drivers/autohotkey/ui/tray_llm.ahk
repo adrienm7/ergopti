@@ -348,6 +348,7 @@ LLM_Tray_BuildGenerationMenu() {
 LLM_Tray_OnToggle(*) {
 	global _LLM_Tray
 	_LLM_Tray["enabled"] := !_LLM_Tray["enabled"]
+	LLM_Tray_SaveConfig()
 	if _LLM_Tray["enabled"] {
 		; First activation: bootstrap Ollama (install if needed), then start bridge.
 		LLM_Tray_BootstrapOllama()
@@ -357,9 +358,23 @@ LLM_Tray_OnToggle(*) {
 	LLM_Tray_Build()
 }
 
+/**
+ * Persists the current LLM tray state to the shared config TOML.
+ * Called after every user-visible state change so settings survive reload.
+ */
+LLM_Tray_SaveConfig() {
+	; Delegate to the main driver's full-config writer — it already knows how
+	; to write [LLM] settings from _LLM_Tray (wired in SaveFullConfig).
+	; IsSet guard: SaveFullConfig may not exist when tray_llm.ahk is unit-tested
+	; in isolation (the test runner does not include ErgoptiPlus.ahk).
+	if IsSet(SaveFullConfig)
+		SaveFullConfig()
+}
+
 LLM_Tray_OnInstantToggle(*) {
 	global _LLM_Tray
 	_LLM_Tray["instant_on_word_end"] := !_LLM_Tray["instant_on_word_end"]
+	LLM_Tray_SaveConfig()
 	LLM_Engine_Init(LLM_Tray_BuildOpts())
 	LLM_Tray_Build()
 }
@@ -383,6 +398,7 @@ LLM_Tray_BootstrapOllama() {
 LLM_Tray_SetModel(tag) {
 	global _LLM_Tray
 	_LLM_Tray["model"] := tag
+	LLM_Tray_SaveConfig()
 	LLM_Engine_Init(LLM_Tray_BuildOpts())
 	LLM_Tray_Build()
 }
@@ -390,6 +406,7 @@ LLM_Tray_SetModel(tag) {
 LLM_Tray_SetProfile(id) {
 	global _LLM_Tray
 	_LLM_Tray["profile_id"] := id
+	LLM_Tray_SaveConfig()
 	LLM_Engine_Init(LLM_Tray_BuildOpts())
 	LLM_Tray_Build()
 }
@@ -397,6 +414,7 @@ LLM_Tray_SetProfile(id) {
 LLM_Tray_SetN(n) {
 	global _LLM_Tray
 	_LLM_Tray["n_predictions"] := n
+	LLM_Tray_SaveConfig()
 	LLM_Engine_Init(LLM_Tray_BuildOpts())
 	LLM_Tray_Build()
 }
@@ -404,6 +422,7 @@ LLM_Tray_SetN(n) {
 LLM_Tray_SetDebounce(ms) {
 	global _LLM_Tray
 	_LLM_Tray["debounce_ms"] := ms
+	LLM_Tray_SaveConfig()
 	LLM_Engine_Init(LLM_Tray_BuildOpts())
 	LLM_Tray_Build()
 }
@@ -411,6 +430,7 @@ LLM_Tray_SetDebounce(ms) {
 LLM_Tray_SetCtxChars(chars) {
 	global _LLM_Tray
 	_LLM_Tray["ctx_chars"] := chars
+	LLM_Tray_SaveConfig()
 	LLM_Engine_Init(LLM_Tray_BuildOpts())
 	LLM_Tray_Build()
 }
@@ -418,6 +438,7 @@ LLM_Tray_SetCtxChars(chars) {
 LLM_Tray_SetMinWords(n) {
 	global _LLM_Tray
 	_LLM_Tray["min_words"] := n
+	LLM_Tray_SaveConfig()
 	LLM_Engine_Init(LLM_Tray_BuildOpts())
 	LLM_Tray_Build()
 }
@@ -425,6 +446,7 @@ LLM_Tray_SetMinWords(n) {
 LLM_Tray_SetMaxWords(n) {
 	global _LLM_Tray
 	_LLM_Tray["max_words"] := n
+	LLM_Tray_SaveConfig()
 	LLM_Engine_Init(LLM_Tray_BuildOpts())
 	LLM_Tray_Build()
 }
@@ -432,6 +454,7 @@ LLM_Tray_SetMaxWords(n) {
 LLM_Tray_SetTemperature(val) {
 	global _LLM_Tray
 	_LLM_Tray["temperature"] := val
+	LLM_Tray_SaveConfig()
 	LLM_Engine_Init(LLM_Tray_BuildOpts())
 	LLM_Tray_Build()
 }

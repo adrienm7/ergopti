@@ -1563,7 +1563,25 @@ initMenu() {
     }
 
     ; ── IA / LLM — sits right after Hotstrings, mirroring the Hammerspoon menu order ──
-    LLM_Tray_Init()
+    ; Load persisted LLM settings from the shared config TOML cache.
+    _LlmSavedOpts := Map()
+    _LlmRawEnabled := IniCacheGet(_IniCache, "LLM", "enabled")
+    if _LlmRawEnabled != "_"
+        _LlmSavedOpts["enabled"] := (_LlmRawEnabled == "1" || _LlmRawEnabled == "true")
+    for _LlmKey in ["model", "profile_id", "temperature"] {
+        _LlmRaw := IniCacheGet(_IniCache, "LLM", _LlmKey)
+        if _LlmRaw != "_"
+            _LlmSavedOpts[_LlmKey] := _LlmRaw
+    }
+    for _LlmKey in ["n_predictions", "min_words", "max_words", "debounce_ms", "ctx_chars"] {
+        _LlmRaw := IniCacheGet(_IniCache, "LLM", _LlmKey)
+        if _LlmRaw != "_"
+            _LlmSavedOpts[_LlmKey] := Integer(_LlmRaw)
+    }
+    _LlmRawInstant := IniCacheGet(_IniCache, "LLM", "instant_on_word_end")
+    if _LlmRawInstant != "_"
+        _LlmSavedOpts["instant_on_word_end"] := (_LlmRawInstant == "1" || _LlmRawInstant == "true")
+    LLM_Tray_Init(_LlmSavedOpts)
 
     ; ── 📊 Métriques — mirrors the HS Métriques submenu position exactly:
     ; sits between Hotstrings + AI and the Shortcuts (Raccourcis) submenu.
@@ -1701,7 +1719,7 @@ global PERSONAL_SHORTCUTS_TEMPLATE := "; personal_shortcuts.ahk`r`n"
     . ";`r`n"
     . "; FEATURES & RATIONALE:`r`n"
     . "; 1. Toggle-gated bindings — every binding is wrapped in`r`n"
-    . ";    #HotIf Features[`"Shortcuts`"][`"Personal`"][`"<Name>`"].Enabled so the matching`r`n"
+    . ";    #HotIf PersonalFeatureEnabled(`"<Name>`") so the matching`r`n"
     . ";    tray-menu checkbox in « 🎯 Raccourcis » → « Raccourcis personnels » fully controls`r`n"
     . ";    whether the binding fires, with persistence in the configuration INI.`r`n"
     . "; 2. Two-section layout — every feature is registered in section 1 and bound`r`n"
@@ -1719,7 +1737,7 @@ global PERSONAL_SHORTCUTS_TEMPLATE := "; personal_shortcuts.ahk`r`n"
     . ";     RegisterPersonalFeature(`"LockScreen`", true,`r`n"
     . ";         `"Lock the workstation with Ctrl + Alt + L`")`r`n"
     . ";`r`n"
-    . ";     #HotIf Features[`"Shortcuts`"][`"Personal`"][`"LockScreen`"].Enabled`r`n"
+    . ";     #HotIf PersonalFeatureEnabled(`"LockScreen`")`r`n"
     . ";     ^!l:: DllCall(`"user32\LockWorkStation`")`r`n"
     . ";     #HotIf`r`n"
     . "; ==============================================================================`r`n"
@@ -1814,6 +1832,24 @@ RegisterPersonalFeature(Name, DefaultEnabled := false, Description := "") {
     if !HasPersonalEntry {
         Sc["__Order"].Push("-")
         Sc["__Order"].Push("Personal")
+    }
+}
+
+/**
+ * Safe accessor for a personal feature's enabled state.
+ * Use this in #HotIf expressions instead of the raw Map lookup to avoid
+ * "Item has no value" crashes when the feature key is evaluated before
+ * RegisterPersonalFeature() has run (e.g. during AHK's hotkey-condition
+ * sweep on the very first keypress after a rapid reload).
+ * @param {string} name - The feature name passed to RegisterPersonalFeature.
+ * @returns {boolean} True if enabled, false if absent or disabled.
+ */
+PersonalFeatureEnabled(name) {
+    global Features
+    try {
+        return Features["Shortcuts"]["Personal"][name].Enabled
+    } catch {
+        return false
     }
 }
 
@@ -2470,6 +2506,18 @@ SaveFullConfig() {
     Updates.Push({ Section: "Script", Key: WPMWidgetConst.CFG_Y,       Value: String(WPMWidget.pos_y) })
     Updates.Push({ Section: "Script", Key: WPMWidgetConst.CFG_COLORS,  Value: WPMWidget.use_colors ? "1" : "0" })
     Updates.Push({ Section: "Script", Key: WPMWidgetConst.CFG_GRAPH,   Value: WPMWidget.show_graph  ? "1" : "0" })
+
+    ; [LLM] section — IA feature settings
+    Updates.Push({ Section: "LLM", Key: "enabled",             Value: _LLM_Tray["enabled"] ? "1" : "0" })
+    Updates.Push({ Section: "LLM", Key: "model",               Value: _LLM_Tray["model"] })
+    Updates.Push({ Section: "LLM", Key: "profile_id",          Value: _LLM_Tray["profile_id"] })
+    Updates.Push({ Section: "LLM", Key: "n_predictions",       Value: String(_LLM_Tray["n_predictions"]) })
+    Updates.Push({ Section: "LLM", Key: "min_words",           Value: String(_LLM_Tray["min_words"]) })
+    Updates.Push({ Section: "LLM", Key: "max_words",           Value: String(_LLM_Tray["max_words"]) })
+    Updates.Push({ Section: "LLM", Key: "debounce_ms",         Value: String(_LLM_Tray["debounce_ms"]) })
+    Updates.Push({ Section: "LLM", Key: "ctx_chars",           Value: String(_LLM_Tray["ctx_chars"]) })
+    Updates.Push({ Section: "LLM", Key: "temperature",         Value: _LLM_Tray["temperature"] })
+    Updates.Push({ Section: "LLM", Key: "instant_on_word_end", Value: _LLM_Tray["instant_on_word_end"] ? "1" : "0" })
 
     ; Strict schema: rewrite from scratch so stale/unknown sections and keys
     ; are removed on each full save
