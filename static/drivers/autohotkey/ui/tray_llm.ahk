@@ -366,6 +366,7 @@ LLM_Tray_BuildGenerationMenu() {
 LLM_Tray_OnToggle(*) {
 	global _LLM_Tray
 	_LLM_Tray["enabled"] := !_LLM_Tray["enabled"]
+	LoggerInfo("LLM", "Toggle clicked — enabled: " (_LLM_Tray["enabled"] ? "true" : "false") ".")
 	LLM_Tray_SaveConfig()
 	; Rebuild immediately so the menu reflects the new state before any async
 	; Ollama work starts. If bootstrap fails, OnDepsFailed flips enabled back
@@ -405,10 +406,13 @@ LLM_Tray_OnInstantToggle(*) {
  * If already ready, starts the bridge immediately.
  */
 LLM_Tray_BootstrapOllama() {
+	LoggerInfo("LLM", "BootstrapOllama fired — deps state: " LLM_Deps_GetState() ".")
 	if LLM_Deps_IsReady() {
+		LoggerInfo("LLM", "Ollama already ready — starting bridge directly.")
 		LLM_Tray_OnDepsReady()
 		return
 	}
+	LoggerInfo("LLM", "Ollama not ready — launching CheckAndInstall…")
 	LLM_Deps_CheckAndInstall(
 		_LLM_Tray["model"],
 		(*) => LLM_Tray_OnDepsReady(),

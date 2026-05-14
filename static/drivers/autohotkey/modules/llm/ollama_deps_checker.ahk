@@ -101,9 +101,13 @@ LLM_Deps_GetFailureMessage() {
 LLM_Deps_CheckAndInstall(default_model := "qwen2.5:3b", on_ready := unset, on_failed := unset) {
 	global _LLM_Deps_Checking, _LLM_Deps_State
 
+	LoggerInfo("LLM", "CheckAndInstall — state: " _LLM_Deps_State ", checking: " (_LLM_Deps_Checking ? "true" : "false") ".")
+
 	; Guard: only one concurrent bootstrap
-	if _LLM_Deps_Checking
+	if _LLM_Deps_Checking {
+		LoggerInfo("LLM", "CheckAndInstall — already in progress, skipping.")
 		return
+	}
 	_LLM_Deps_Checking := true
 
 	; Reset failure state so a re-try after a failed install can proceed
@@ -111,7 +115,9 @@ LLM_Deps_CheckAndInstall(default_model := "qwen2.5:3b", on_ready := unset, on_fa
 		_LLM_Deps_State := "pending"
 
 	; Fast path: server already running
+	LoggerInfo("LLM", "Checking if Ollama is running…")
 	if LLM_OllamaIsRunning() {
+		LoggerInfo("LLM", "Ollama already running — fast path, state → ready.")
 		_LLM_Deps_State    := "ready"
 		_LLM_Deps_Checking := false
 		if IsSet(on_ready)
@@ -120,6 +126,7 @@ LLM_Deps_CheckAndInstall(default_model := "qwen2.5:3b", on_ready := unset, on_fa
 	}
 
 	; Slow path: run the PowerShell installer in a background thread
+	LoggerInfo("LLM", "Ollama not running — launching installer…")
 	LLM_Deps_RunInstaller(default_model, on_ready, on_failed)
 }
 
@@ -141,7 +148,9 @@ LLM_Deps_CheckAndInstall(default_model := "qwen2.5:3b", on_ready := unset, on_fa
  */
 LLM_Deps_RunInstaller(model, on_ready, on_failed) {
 	ps1_path := LLM_GetSharedPath("install\ollama_install.ps1")
+	LoggerInfo("LLM", "PS1 path resolved: '" ps1_path "'.")
 	if (ps1_path == "") {
+		LoggerError("LLM", "ollama_install.ps1 not found in _shared/llm/install/ — aborting.")
 		LLM_Deps_Fail("Installeur ollama_install.ps1 introuvable dans _shared/llm/install/.", on_failed)
 		return
 	}
@@ -151,12 +160,15 @@ LLM_Deps_RunInstaller(model, on_ready, on_failed) {
 
 	; Build PowerShell command: run script hidden, capture output line-by-line
 	cmd := 'powershell.exe -NoProfile -ExecutionPolicy Bypass -File "' ps1_path '" -Model "' model '"'
+	LoggerInfo("LLM", "Launching PS1: " cmd ".")
 
 	; Run asynchronously via a ComObject shell exec + polling timer
 	try {
 		shell := ComObject("WScript.Shell")
 		proc  := shell.Exec(cmd)
+		LoggerInfo("LLM", "PS1 process launched (Status=" proc.Status ").")
 	} catch as err {
+		LoggerError("LLM", "Failed to launch PowerShell: " err.Message ".")
 		LLM_Deps_Fail("Impossible de lancer PowerShell : " err.Message, on_failed)
 		return
 	}
@@ -168,6 +180,7 @@ LLM_Deps_RunInstaller(model, on_ready, on_failed) {
 	global _LLM_Deps_PollTimer
 	_LLM_Deps_PollTimer := () => LLM_Deps_PollProcess(proc, on_ready, on_failed)
 	SetTimer(_LLM_Deps_PollTimer, 500)
+	LoggerInfo("LLM", "Poll timer started.")
 }
 
 /**
@@ -192,6 +205,8 @@ LLM_Deps_PollProcess(proc, on_ready, on_failed) {
 	if (proc.Status == 0)   ; 0 = running, 1 = finished, 2 = error
 		return   ; still running — timer will fire again
 
+	LoggerInfo("LLM", "PS1 process finished — Status=" proc.Status " ExitCode=" proc.ExitCode ".")
+
 	; Stop the polling timer using the stored lambda reference
 	global _LLM_Deps_PollTimer
 	if IsSet(_LLM_Deps_PollTimer)
@@ -210,16 +225,20 @@ LLM_Deps_PollProcess(proc, on_ready, on_failed) {
 
 	if (exit_code == 0) {
 		; Verify server is now reachable
+		LoggerInfo("LLM", "PS1 exited 0 — verifying Ollama reachability…")
 		if LLM_OllamaIsRunning() {
+			LoggerInfo("LLM", "Ollama confirmed running — state → ready.")
 			LLM_Deps_GuiStep(t("ollama.deps_step_ready"))
 			LLM_Deps_GuiComplete()
 			global _LLM_Deps_State := "ready"
 			if IsSet(on_ready)
 				on_ready()
 		} else {
+			LoggerError("LLM", "PS1 exited 0 but Ollama not reachable.")
 			LLM_Deps_Fail("Installeur terminé mais le serveur Ollama ne répond pas.", on_failed)
 		}
 	} else {
+		LoggerError("LLM", "PS1 exited with code " exit_code ".")
 		LLM_Deps_Fail("L'installeur a échoué (code " exit_code ").", on_failed)
 	}
 }
@@ -258,6 +277,7 @@ LLM_Deps_HandleLine(line) {
  */
 LLM_Deps_Fail(msg, on_failed) {
 	global _LLM_Deps_State, _LLM_Deps_FailureMessage, _LLM_Deps_Checking
+	LoggerError("LLM", "Deps failure: " msg)
 	_LLM_Deps_State          := "failed"
 	_LLM_Deps_FailureMessage := msg
 	_LLM_Deps_Checking       := false
