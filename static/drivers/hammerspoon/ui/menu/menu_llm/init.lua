@@ -949,7 +949,7 @@ function M.create(deps)
         local m = {}
         for i = 1, 10 do
             table.insert(m, {
-                title   = string.format(i18n.get("menu.llm.prediction_count_label"), i),
+                title   = string.format(i18n.get("menu.llm.prediction_count_label"), i, i > 1 and "s" or ""),
                 checked = (state.llm_num_predictions == i),
                 fn      = function()
                     Logger.info(LOG, string.format("Changing number of predictions -> %d", i))
