@@ -390,15 +390,10 @@ function M.add(trigger, replacement, opts)
 	--- @param plain_r string Precomputed plain_text of r.
 	local function add_with_space_variants(t, r, plain_r)
 		add_raw(t, r, is_auto, plain_r)
-		-- Generate space variants (nbsp, nnbsp) when the trigger contains regular
-		-- spaces.  Triggers that *only* start with a space and have no other spaces
-		-- are word-boundary guards — skip them.  Triggers that start with a space
-		-- but also have internal spaces (e.g. " ! ?" for French multi-punctuation)
-		-- still need their all-nbsp form so the buffer with nbsp-prefixed punctuation
-		-- matches too.
-		local starts_with_space = t:sub(1, 1) == " "
-		local has_internal_space = starts_with_space and t:sub(2):match(" ") ~= nil
-		if t:match(" ") and (not starts_with_space or has_internal_space) then
+		-- Only generate space variants for triggers that contain spaces but do not
+		-- *start* with a space (starting-space triggers are word-boundary guards).
+		local starts_with_space = t:match("^[ \194\160\226\128\175]") ~= nil
+		if not starts_with_space and t:match(" ") then
 			add_raw((t:gsub(" ", "\194\160")),   r, is_auto, plain_r)  -- regular nbsp
 			add_raw((t:gsub(" ", "\226\128\175")), r, is_auto, plain_r) -- narrow nbsp
 		end
