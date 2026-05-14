@@ -640,10 +640,10 @@ SpacedPrefix(SpacedStr, RawCount) {
 ; =====================
 
 ; @dt★, @td★, @date★ resolved at fire time — cannot be static TOML entries.
-; InputLevel 2 ensures these triggers beat the repeat section (InputLevel 1):
-; without it, "t★" (repeat) wins over "@dt★" because InputLevel 1 > 0.
-; Triggers that start with "@" should never fall through to the repeat path.
-#InputLevel 2
+; "??" flag required: after a prior expansion the output lands immediately
+; before the next "@", so the word boundary before "@" is a digit or letter —
+; not a terminator. Without "?", HSEv2 rejects the match and the shorter
+; "t★" (InWord=true) wins instead.
 _DateShortFr(*) {
 	return FormatTime(, "dd/MM/yyyy")
 }
@@ -660,14 +660,13 @@ _DateIso(*) {
 if Features.Has("DynamicHotstrings") {
 	MK := ScriptInformation["MagicKey"]
 	if Features["DynamicHotstrings"]["DateFr"].Enabled {
-		CreateHotstring("*", "@dt" . MK,   _DateShortFr, Map("FinalResult", True))
-		CreateHotstring("*", "@date" . MK, _DateLongFr,  Map("FinalResult", True))
+		CreateHotstring("*?", "@dt" . MK,   _DateShortFr, Map("FinalResult", True))
+		CreateHotstring("*?", "@date" . MK, _DateLongFr,  Map("FinalResult", True))
 	}
 	if Features["DynamicHotstrings"]["Date"].Enabled {
-		CreateHotstring("*", "@td" . MK, _DateIso, Map("FinalResult", True))
+		CreateHotstring("*?", "@td" . MK, _DateIso, Map("FinalResult", True))
 	}
 }
-#InputLevel 0
 
 
 ; ===================================================
