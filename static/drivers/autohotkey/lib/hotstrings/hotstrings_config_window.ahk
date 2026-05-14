@@ -264,16 +264,16 @@ OpenHotstringsConfigWindow() {
 	G.MarginX := 14
 	G.MarginY := 12
 
-	; ----- Top action row --------------------------------------------------
-	BtnGrey  := G.Add("Button", "w120 h28",        t("hs_config.btn_all_gray"))
-	BtnReset := G.Add("Button", "x+6 yp w160 h28", t("hs_config.btn_reset_all"))
-	BtnClose := G.Add("Button", "x+6 yp w90 h28",  t("hs_config.btn_close"))
-	BtnGrey.OnEvent("Click",  (*) => _HCW_SetAllGrey())
+	; ----- Top action row (reset all first, then grey, no close here) ------
+	BtnReset := G.Add("Button", "w160 h28",         t("hs_config.btn_reset_all"))
+	BtnGrey  := G.Add("Button", "x+6 yp w120 h28",  t("hs_config.btn_all_gray"))
 	BtnReset.OnEvent("Click", (*) => _HCW_ResetAll())
-	BtnClose.OnEvent("Click", (*) => _HCWGui.Hide())
+	BtnGrey.OnEvent("Click",  (*) => _HCW_SetAllGrey())
+
+	G.Add("Text", "xm y+14 w530 h1 0x10")   ; horizontal rule (SS_SUNKEN)
 
 	; ----- Group selector (full-width row) ---------------------------------
-	G.Add("Text", "xm y+18 w70 h20", t("hs_config.label_group"))
+	G.Add("Text", "xm y+14 w70 h20", t("hs_config.label_group"))
 	GroupDD := G.Add("DropDownList", "x+6 yp-3 w450 r14", _HCW_GroupItems())
 
 	; ----- File selector (full-width row) ----------------------------------
@@ -304,11 +304,15 @@ OpenHotstringsConfigWindow() {
 	ColorDefault := G.Add("Text", "x+10 yp+2 w180", "")
 	ColorReset := G.Add("Button", "x530 yp-2 w28 h24", "↺")
 
+	; ----- Tooltip toggle row (same group as delay/color, no HR before) ---
+	TooltipChk := G.Add("Checkbox", "xm y+10", t("hs_config.label_tooltip"))
+	TooltipReset := G.Add("Button", "x530 yp-2 w28 h24", "↺")
+
 	G.Add("Text", "xm y+14 w530 h1 0x10")   ; horizontal rule (SS_SUNKEN)
 
-	; ----- Tooltip toggle row ---------------------------------------------
-	TooltipChk := G.Add("Checkbox", "xm y+14", t("hs_config.label_tooltip"))
-	TooltipReset := G.Add("Button", "x530 yp-2 w28 h24", "↺")
+	; ----- Close button (bottom, after HR) --------------------------------
+	BtnClose := G.Add("Button", "xm y+14 w90 h28", t("hs_config.btn_close"))
+	BtnClose.OnEvent("Click", (*) => _HCWGui.Hide())
 
 	_HCWWidgets := {
 		Gui:          G,
