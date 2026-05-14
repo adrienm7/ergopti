@@ -1711,5 +1711,11 @@ Versie: 1.0",,
 	"ui_typing.unit_mpm": "MPM",
 	"ui_typing.unit_richness": "% rijkheid",
 	"ui_typing.unit_sessions": "sessies",
-	"vscode.reload_required": "Herlaad VSCode (Cmd+Shift+P > Reload Window) om de typextensie te activeren"
+	"vscode.reload_required": "Herlaad VSCode (Cmd+Shift+P > Reload Window) om de typextensie te activeren",
+	"ext.demo.gui_message": "Hallo vanuit de Ergopti-demo-extensie!",
+	"ext.demo.open_demo_gui": "Demo-interface openen",
+	"ext.demo.show_info": "Informatie tonen",
+	"ext.demo.visit_docs": "Documentatie bezoeken",
+	"menu.extensions.header": "Extensies",
+	"menu.extensions.empty": "Geen extensie geïnstalleerd"
 }

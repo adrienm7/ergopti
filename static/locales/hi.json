@@ -1737,5 +1737,11 @@
 	"ui_typing.unit_mpm": "श/मि",
 	"ui_typing.unit_richness": "% विविधता",
 	"ui_typing.unit_sessions": "सत्र",
-	"vscode.reload_required": "टाइपिंग एक्सटेंशन सक्रिय करने के लिए VSCode पुनः लोड करें (Cmd+Shift+P > Reload Window)"
+	"vscode.reload_required": "टाइपिंग एक्सटेंशन सक्रिय करने के लिए VSCode पुनः लोड करें (Cmd+Shift+P > Reload Window)",
+	"ext.demo.gui_message": "Ergopti डेमो एक्सटेंशन से नमस्ते!",
+	"ext.demo.open_demo_gui": "डेमो इंटरफ़ेस खोलें",
+	"ext.demo.show_info": "जानकारी दिखाएँ",
+	"ext.demo.visit_docs": "दस्तावेज़ देखें",
+	"menu.extensions.header": "एक्सटेंशन",
+	"menu.extensions.empty": "कोई एक्सटेंशन स्थापित नहीं"
 }

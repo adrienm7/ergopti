@@ -1737,5 +1737,11 @@ Version: 1.0",,
 	"ui_typing.unit_mpm": "OPM",
 	"ui_typing.unit_richness": "% rikelighed",
 	"ui_typing.unit_sessions": "sessioner",
-	"vscode.reload_required": "Genindlæs VSCode (Cmd+Shift+P > Reload Window) for at aktivere skriveudvidelsen"
+	"vscode.reload_required": "Genindlæs VSCode (Cmd+Shift+P > Reload Window) for at aktivere skriveudvidelsen",
+	"ext.demo.gui_message": "Hej fra Ergopti-demoudvidelsen!",
+	"ext.demo.open_demo_gui": "Åbn demogrænseflade",
+	"ext.demo.show_info": "Vis oplysninger",
+	"ext.demo.visit_docs": "Besøg dokumentation",
+	"menu.extensions.header": "Udvidelser",
+	"menu.extensions.empty": "Ingen udvidelse installeret"
 }

@@ -1711,5 +1711,11 @@
 	"ui_typing.unit_mpm": "СПХ",
 	"ui_typing.unit_richness": "% багатства",
 	"ui_typing.unit_sessions": "сесій",
-	"vscode.reload_required": "Перезавантажте VSCode (Cmd+Shift+P > Reload Window), щоб активувати розширення введення"
+	"vscode.reload_required": "Перезавантажте VSCode (Cmd+Shift+P > Reload Window), щоб активувати розширення введення",
+	"ext.demo.gui_message": "Привіт від демо-розширення Ergopti!",
+	"ext.demo.open_demo_gui": "Відкрити демо-інтерфейс",
+	"ext.demo.show_info": "Показати інформацію",
+	"ext.demo.visit_docs": "Відвідати документацію",
+	"menu.extensions.header": "Розширення",
+	"menu.extensions.empty": "Жодне розширення не встановлено"
 }

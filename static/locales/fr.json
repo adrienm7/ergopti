@@ -1709,5 +1709,11 @@
 	"ui_typing.unit_mpm": "MPM",
 	"ui_typing.unit_richness": "% richesse",
 	"ui_typing.unit_sessions": "séances",
-	"vscode.reload_required": "Veuillez recharger VSCode (Cmd+Shift+P > Reload Window) pour activer l’extension de frappe"
+	"vscode.reload_required": "Veuillez recharger VSCode (Cmd+Shift+P > Reload Window) pour activer l’extension de frappe",
+	"ext.demo.gui_message": "Bonjour depuis l’extension Ergopti Demo !",
+	"ext.demo.open_demo_gui": "Ouvrir l’interface de démo",
+	"ext.demo.show_info": "Afficher les informations",
+	"ext.demo.visit_docs": "Visiter la documentation",
+	"menu.extensions.header": "Extensions",
+	"menu.extensions.empty": "Aucune extension installée"
 }

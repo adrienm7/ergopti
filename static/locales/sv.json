@@ -1737,5 +1737,11 @@ Version: 1.0",,
 	"ui_typing.unit_mpm": "OPM",
 	"ui_typing.unit_richness": "% rikedom",
 	"ui_typing.unit_sessions": "sessioner",
-	"vscode.reload_required": "Ladda om VSCode (Cmd+Shift+P > Reload Window) för att aktivera skrivtillägget"
+	"vscode.reload_required": "Ladda om VSCode (Cmd+Shift+P > Reload Window) för att aktivera skrivtillägget",
+	"ext.demo.gui_message": "Hej från Ergopti-demoutvidningen!",
+	"ext.demo.open_demo_gui": "Öppna demogränssnitt",
+	"ext.demo.show_info": "Visa information",
+	"ext.demo.visit_docs": "Besök dokumentation",
+	"menu.extensions.header": "Tillägg",
+	"menu.extensions.empty": "Inget tillägg installerat"
 }

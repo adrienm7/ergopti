@@ -1711,5 +1711,11 @@ Wersja: 1.0",,
 	"ui_typing.unit_mpm": "MPM",
 	"ui_typing.unit_richness": "% bogactwo",
 	"ui_typing.unit_sessions": "sesje",
-	"vscode.reload_required": "Przeładuj VSCode (Cmd+Shift+P > Reload Window), aby aktywować rozszerzenie pisania"
+	"vscode.reload_required": "Przeładuj VSCode (Cmd+Shift+P > Reload Window), aby aktywować rozszerzenie pisania",
+	"ext.demo.gui_message": "Cześć z rozszerzenia demonstracyjnego Ergopti!",
+	"ext.demo.open_demo_gui": "Otwórz interfejs demonstracyjny",
+	"ext.demo.show_info": "Pokaż informacje",
+	"ext.demo.visit_docs": "Odwiedź dokumentację",
+	"menu.extensions.header": "Rozszerzenia",
+	"menu.extensions.empty": "Żadne rozszerzenie nie jest zainstalowane"
 }

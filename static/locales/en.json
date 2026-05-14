@@ -1709,5 +1709,11 @@
 	"ui_typing.unit_mpm": "MPM",
 	"ui_typing.unit_richness": "% richness",
 	"ui_typing.unit_sessions": "sessions",
-	"vscode.reload_required": "Please reload VSCode (Cmd+Shift+P > Reload Window) to activate the typing extension"
+	"vscode.reload_required": "Please reload VSCode (Cmd+Shift+P > Reload Window) to activate the typing extension",
+	"ext.demo.gui_message": "Hello from the Ergopti Demo extension!",
+	"ext.demo.open_demo_gui": "Open demo interface",
+	"ext.demo.show_info": "Show information",
+	"ext.demo.visit_docs": "Visit documentation",
+	"menu.extensions.header": "Extensions",
+	"menu.extensions.empty": "No extension installed"
 }

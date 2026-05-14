@@ -1711,5 +1711,11 @@
 	"ui_typing.unit_mpm": "词/分",
 	"ui_typing.unit_richness": "% 丰富度",
 	"ui_typing.unit_sessions": "次会话",
-	"vscode.reload_required": "请重新加载 VSCode（Cmd+Shift+P > Reload Window）以激活输入扩展"
+	"vscode.reload_required": "请重新加载 VSCode（Cmd+Shift+P > Reload Window）以激活输入扩展",
+	"ext.demo.gui_message": "来自 Ergopti 演示扩展的问候！",
+	"ext.demo.open_demo_gui": "打开演示界面",
+	"ext.demo.show_info": "显示信息",
+	"ext.demo.visit_docs": "访问文档",
+	"menu.extensions.header": "扩展",
+	"menu.extensions.empty": "未安装扩展"
 }

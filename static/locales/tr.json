@@ -1711,5 +1711,11 @@ Sürüm: 1.0",,
 	"ui_typing.unit_mpm": "KDK",
 	"ui_typing.unit_richness": "% zenginlik",
 	"ui_typing.unit_sessions": "oturumlar",
-	"vscode.reload_required": "Yazım uzantısını etkinleştirmek için VSCode’u yeniden yükleyin (Cmd+Shift+P > Reload Window)"
+	"vscode.reload_required": "Yazım uzantısını etkinleştirmek için VSCode’u yeniden yükleyin (Cmd+Shift+P > Reload Window)",
+	"ext.demo.gui_message": "Ergopti Demo uzantısından merhaba!",
+	"ext.demo.open_demo_gui": "Demo arayüzünü aç",
+	"ext.demo.show_info": "Bilgileri göster",
+	"ext.demo.visit_docs": "Belgeleri ziyaret et",
+	"menu.extensions.header": "Uzantılar",
+	"menu.extensions.empty": "Yüklü uzantı yok"
 }

@@ -1711,5 +1711,11 @@ Verze: 1.0",,
 	"ui_typing.unit_mpm": "S/M",
 	"ui_typing.unit_richness": "% bohatost",
 	"ui_typing.unit_sessions": "sezení",
-	"vscode.reload_required": "Přenačtěte VSCode (Cmd+Shift+P > Reload Window) pro aktivaci rozšíření psaní"
+	"vscode.reload_required": "Přenačtěte VSCode (Cmd+Shift+P > Reload Window) pro aktivaci rozšíření psaní",
+	"ext.demo.gui_message": "Ahoj z ukázkového rozšíření Ergopti!",
+	"ext.demo.open_demo_gui": "Otevřít ukázkové rozhraní",
+	"ext.demo.show_info": "Zobrazit informace",
+	"ext.demo.visit_docs": "Navštívit dokumentaci",
+	"menu.extensions.header": "Rozšíření",
+	"menu.extensions.empty": "Žádné rozšíření není nainstalováno"
 }

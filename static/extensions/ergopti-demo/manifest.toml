@@ -1,0 +1,8 @@
+# static/extensions/ergopti-demo/manifest.toml
+
+[extension]
+id          = "ergopti-demo"
+name        = "Ergopti Demo"
+version     = "1.0.0"
+author      = "Ergopti"
+description = { fr = "Extension de démonstration — montre comment créer une extension avec hotstrings et raccourcis personnalisés.", en = "Demo extension — shows how to create an extension with hotstrings and custom shortcuts.", de = "Demo-Erweiterung — zeigt, wie man eine Erweiterung mit Hotstrings und benutzerdefinierten Shortcuts erstellt.", es = "Extensión de demostración — muestra cómo crear una extensión con hotstrings y accesos directos personalizados." }

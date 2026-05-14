@@ -1711,5 +1711,11 @@
 	"ui_typing.unit_mpm": "語/分",
 	"ui_typing.unit_richness": "% 豊かさ",
 	"ui_typing.unit_sessions": "セッション",
-	"vscode.reload_required": "タイピング拡張機能を有効にするには VSCode を再読込してください (Cmd+Shift+P > Reload Window)"
+	"vscode.reload_required": "タイピング拡張機能を有効にするには VSCode を再読込してください (Cmd+Shift+P > Reload Window)",
+	"ext.demo.gui_message": "Ergoptiデモ拡張からこんにちは！",
+	"ext.demo.open_demo_gui": "デモインターフェースを開く",
+	"ext.demo.show_info": "情報を表示",
+	"ext.demo.visit_docs": "ドキュメントを見る",
+	"menu.extensions.header": "拡張機能",
+	"menu.extensions.empty": "拡張機能がインストールされていません"
 }

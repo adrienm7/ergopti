@@ -1,0 +1,55 @@
+# static/extensions/ergopti-demo/hotstrings/demo-symbols.toml
+
+# ====================
+# ====================
+# ======= Meta =======
+# ====================
+# ====================
+
+[_meta]
+color = "#00838f"
+delay = 0.8
+description = { fr = "Symboles et flèches de démonstration", en = "Demo symbols and arrows", de = "Demo-Symbole und Pfeile", es = "Símbolos y flechas de demostración" }
+sections_order = ["arrows", "math"]
+
+
+
+# =========================
+# ===== Meta.Sections =====
+# =========================
+
+[_meta.sections]
+arrows = { fr = "Flèches Unicode pratiques", en = "Handy Unicode arrows", de = "Praktische Unicode-Pfeile", es = "Flechas Unicode prácticas" }
+math   = { fr = "Symboles mathématiques courants", en = "Common math symbols", de = "Häufige mathematische Symbole", es = "Símbolos matemáticos comunes" }
+
+
+
+
+# ======================
+# ======================
+# ======= Arrows =======
+# ======================
+# ======================
+
+[[arrows]]
+"-->★"  = { output = "→", is_word = false, auto_expand = false, is_case_sensitive = true, final_result = true }
+"<--★"  = { output = "←", is_word = false, auto_expand = false, is_case_sensitive = true, final_result = true }
+"<->★"  = { output = "↔", is_word = false, auto_expand = false, is_case_sensitive = true, final_result = true }
+"==>★"  = { output = "⇒", is_word = false, auto_expand = false, is_case_sensitive = true, final_result = true }
+"<=>★"  = { output = "⇔", is_word = false, auto_expand = false, is_case_sensitive = true, final_result = true }
+
+
+
+
+# ====================
+# ====================
+# ======= Math =======
+# ====================
+# ====================
+
+[[math]]
+"neq★"   = { output = "≠", is_word = true,  auto_expand = false, is_case_sensitive = false, final_result = true }
+"approx★" = { output = "≈", is_word = true,  auto_expand = false, is_case_sensitive = false, final_result = true }
+"inf★"   = { output = "∞", is_word = true,  auto_expand = false, is_case_sensitive = false, final_result = true }
+"sqrt★"  = { output = "√", is_word = true,  auto_expand = false, is_case_sensitive = false, final_result = true }
+"sum★"   = { output = "∑", is_word = true,  auto_expand = false, is_case_sensitive = false, final_result = true }
