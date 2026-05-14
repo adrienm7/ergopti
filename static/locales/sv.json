@@ -7,6 +7,7 @@
 	"layout.ergoptialtgr": "Emulate the AltGr layer of the Ergopti layout",
 	"layout.ergoptiplus": "Apply the minor AltGr changes of Ergopti➕",
 	"dynamichotstrings.datefr": "Datum (fr)",
+	"dynamichotstrings.datelongfr": "Datum (lång)",
 	"dynamichotstrings.date": "Datum",
 	"dynamichotstrings.phoneprefixes": "Telefonprefix",
 	"dynamichotstrings.ssnprefixes": "SSN-prefix",

@@ -7,6 +7,7 @@
 	"layout.ergoptialtgr": "Emulate the AltGr layer of the Ergopti layout",
 	"layout.ergoptiplus": "Apply the minor AltGr changes of Ergopti➕",
 	"dynamichotstrings.datefr": "dt★ inserts the current date ({date})",
+	"dynamichotstrings.datelongfr": "date★ inserts the long date ({date})",
 	"dynamichotstrings.date": "td★ inserts the current date ({date})",
 	"dynamichotstrings.phoneprefixes": "Typing the first digits of your phone number auto-completes it",
 	"dynamichotstrings.ssnprefixes": "Typing the first digits of your social security number auto-completes it",

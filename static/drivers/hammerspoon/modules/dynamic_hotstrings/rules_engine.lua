@@ -278,12 +278,27 @@ function M.start(keymap_module)
 	end
 	_km = keymap_module
 
-	M.add_rule("td", "date",   function() return os.date("%Y_%m_%d") end)
-	M.add_rule("dt", "datefr", function() return os.date("%d/%m/%Y") end)
+	M.add_rule("td",   "date",       function() return os.date("%Y_%m_%d") end)
+	M.add_rule("dt",   "datefr",    function() return os.date("%d/%m/%Y") end)
+	M.add_rule("date", "datelongfr", function()
+		local days   = { "dimanche", "lundi", "mardi", "mercredi", "jeudi", "vendredi", "samedi" }
+		local months = { "janvier", "février", "mars", "avril", "mai", "juin",
+		                 "juillet", "août", "septembre", "octobre", "novembre", "décembre" }
+		local wday = tonumber(os.date("%w")) + 1  -- os.date %w: 0=Sunday
+		local mday = tonumber(os.date("%d"))
+		local mon  = tonumber(os.date("%m"))
+		local year = os.date("%Y")
+		return days[wday] .. " " .. mday .. " " .. months[mon] .. " " .. year
+	end)
 
 	-- Descriptions show today's date so the user can immediately see the expected output.
-	local date_iso = os.date("%Y_%m_%d")
-	local date_fr  = os.date("%d/%m/%Y")
+	local date_iso  = os.date("%Y_%m_%d")
+	local date_fr   = os.date("%d/%m/%Y")
+	local _days_l   = { "dimanche", "lundi", "mardi", "mercredi", "jeudi", "vendredi", "samedi" }
+	local _months_l = { "janvier", "février", "mars", "avril", "mai", "juin",
+	                    "juillet", "août", "septembre", "octobre", "novembre", "décembre" }
+	local date_long_fr = _days_l[tonumber(os.date("%w")) + 1] .. " " .. tonumber(os.date("%d"))
+	                     .. " " .. _months_l[tonumber(os.date("%m"))] .. " " .. os.date("%Y")
 
 	-- Sections ordered identically to the AHK DynamicHotstrings feature map.
 	-- Prefix section counts start at 0; register_prefix_entries updates them with
@@ -297,11 +312,15 @@ function M.start(keymap_module)
 	local desc_datefr = loc("dynamichotstrings.datefr")
 	if desc_datefr == "" then desc_datefr = "dt" .. _trigger .. " inserts current date ({date})" end
 	desc_datefr = desc_datefr:gsub("{date}", date_fr)
+	local desc_datelongfr = loc("dynamichotstrings.datelongfr")
+	if desc_datelongfr == "" then desc_datelongfr = "date" .. _trigger .. " inserts long date ({date})" end
+	desc_datelongfr = desc_datelongfr:gsub("{date}", date_long_fr)
 	local desc_date   = loc("dynamichotstrings.date")
 	if desc_date == "" then desc_date = "td" .. _trigger .. " inserts current date ({date})" end
 	desc_date   = desc_date:gsub("{date}", date_iso)
 	_sections = {
 		{ name = "datefr",        description = desc_datefr,                                count = 1 },
+		{ name = "datelongfr",    description = desc_datelongfr,                            count = 1 },
 		{ name = "date",          description = desc_date,                                  count = 1 },
 		{ name = "phoneprefixes", description = loc("dynamichotstrings.phoneprefixes"),     count = 0 },
 		{ name = "ssnprefixes",   description = loc("dynamichotstrings.ssnprefixes"),       count = 0 },

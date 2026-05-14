@@ -7,6 +7,7 @@
 	"layout.ergoptialtgr": "Emuluj warstwę AltGr układu Ergopti",
 	"layout.ergoptiplus": "Zastosuj drobne zmiany AltGr Ergopti➕",
 	"dynamichotstrings.datefr": "dt★ wstawia bieżącą datę ({date})",
+	"dynamichotstrings.datelongfr": "date★ wstawia pełną datę ({date})",
 	"dynamichotstrings.date": "td★ wstawia bieżącą datę ({date})",
 	"dynamichotstrings.phoneprefixes": "Wpisanie pierwszych cyfr numeru telefonu automatycznie go uzupełnia",
 	"dynamichotstrings.ssnprefixes": "Wpisanie pierwszych cyfr numeru PESEL automatycznie go uzupełnia",

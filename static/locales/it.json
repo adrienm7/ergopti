@@ -7,6 +7,7 @@
 	"layout.ergoptialtgr": "Emula il livello AltGr del layout Ergopti",
 	"layout.ergoptiplus": "Applica le modifiche minori AltGr di Ergopti➕",
 	"dynamichotstrings.datefr": "dt★ inserisce la data corrente ({date})",
+	"dynamichotstrings.datelongfr": "date★ inserisce la data estesa ({date})",
 	"dynamichotstrings.date": "td★ inserisce la data corrente ({date})",
 	"dynamichotstrings.phoneprefixes": "Digitando le prime cifre del numero di telefono viene completato automaticamente",
 	"dynamichotstrings.ssnprefixes": "Digitando le prime cifre del codice fiscale viene completato automaticamente",

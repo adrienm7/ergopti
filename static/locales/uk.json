@@ -7,6 +7,7 @@
   "layout.ergoptialtgr": "Емулювати шар AltGr розкладки Ergopti",
   "layout.ergoptiplus": "Застосувати незначні зміни AltGr в Ergopti➕",
   "dynamichotstrings.datefr": "dt★ вставляє поточну дату ({date})",
+  "dynamichotstrings.datelongfr": "date★ вставляє довгу дату ({date})",
   "dynamichotstrings.date": "td★ вставляє поточну дату ({date})",
   "dynamichotstrings.phoneprefixes": "Введення перших цифр номера телефону автоматично його доповнює",
   "dynamichotstrings.ssnprefixes": "Введення перших цифр номера соціального страхування автоматично його доповнює",

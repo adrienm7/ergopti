@@ -7,6 +7,7 @@
 	"layout.ergoptialtgr": "Emulate the AltGr layer of the Ergopti layout",
 	"layout.ergoptiplus": "Apply the minor AltGr changes of Ergopti➕",
 	"dynamichotstrings.datefr": "तारीख (fr)",
+	"dynamichotstrings.datelongfr": "तारीख (लंबी)",
 	"dynamichotstrings.date": "तारीख",
 	"dynamichotstrings.phoneprefixes": "फ़ोन उपसर्ग",
 	"dynamichotstrings.ssnprefixes": "SSN उपसर्ग",

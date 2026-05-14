@@ -7,6 +7,7 @@
 	"layout.ergoptialtgr": "ErgoptiレイアウトのAltGr層をエミュレート",
 	"layout.ergoptiplus": "Ergopti➕のマイナーなAltGr変更を適用",
 	"dynamichotstrings.datefr": "dt★ で現在の日付を入力 ({date})",
+	"dynamichotstrings.datelongfr": "date★ で長い形式の日付を入力 ({date})",
 	"dynamichotstrings.date": "td★ で現在の日付を入力 ({date})",
 	"dynamichotstrings.phoneprefixes": "電話番号の最初の数桁を入力すると自動補完されます",
 	"dynamichotstrings.ssnprefixes": "社会保障番号の最初の数桁を入力すると自動補完されます",

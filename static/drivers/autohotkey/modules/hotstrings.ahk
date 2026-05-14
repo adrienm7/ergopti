@@ -660,8 +660,10 @@ _DateIso(*) {
 if Features.Has("DynamicHotstrings") {
 	MK := ScriptInformation["MagicKey"]
 	if Features["DynamicHotstrings"]["DateFr"].Enabled {
-		CreateHotstring("*?", "@dt" . MK,   _DateShortFr, Map("FinalResult", True))
-		CreateHotstring("*?", "@date" . MK, _DateLongFr,  Map("FinalResult", True))
+		CreateHotstring("*?", "@dt" . MK, _DateShortFr, Map("FinalResult", True))
+	}
+	if Features["DynamicHotstrings"]["DateLongFr"].Enabled {
+		CreateHotstring("*?", "@date" . MK, _DateLongFr, Map("FinalResult", True))
 	}
 	if Features["DynamicHotstrings"]["Date"].Enabled {
 		CreateHotstring("*?", "@td" . MK, _DateIso, Map("FinalResult", True))

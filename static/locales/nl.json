@@ -7,6 +7,7 @@
 	"layout.ergoptialtgr": "Emuleer de AltGr-laag van de Ergopti-indeling",
 	"layout.ergoptiplus": "Pas de kleine AltGr-wijzigingen van Ergopti➕ toe",
 	"dynamichotstrings.datefr": "dt★ voegt de huidige datum in ({date})",
+	"dynamichotstrings.datelongfr": "date★ voegt de lange datum in ({date})",
 	"dynamichotstrings.date": "td★ voegt de huidige datum in ({date})",
 	"dynamichotstrings.phoneprefixes": "De eerste cijfers van uw telefoonnummer intypen vult het automatisch aan",
 	"dynamichotstrings.ssnprefixes": "De eerste cijfers van uw burgerservicenummer intypen vult het automatisch aan",
