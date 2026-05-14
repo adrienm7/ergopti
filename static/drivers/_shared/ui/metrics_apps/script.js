@@ -1093,7 +1093,7 @@ function updateCharts(appsArray, aggregatedData) {
 	const tlCtx = $id('timeline_stacked_chart');
 	if (tlCtx) {
 		$id('timeline_chart_title').textContent =
-			currentPeriod === 'day' ? 'Évolution de la journée' : 'Évolution sur la période';
+			currentPeriod === 'day' ? _t('ui_apps.chart_title_day') : _t('ui_apps.chart_title_period');
 
 		let tlKeys = Object.keys(aggregatedData.timeline);
 		if (currentPeriod === 'day') tlKeys.sort((a, b) => parseInt(a) - parseInt(b));
@@ -1243,7 +1243,7 @@ function renderDashboard() {
 		setText('kpi-passive-detail',
 			passive_ms > 0
 				? `verrou ${formatDuration(rt.passive_locked_ms || 0)} · veille ${formatDuration(rt.passive_sleep_ms || 0)}`
-				: 'aucun verrou / veille détecté');
+				: _t('ui_apps.kpi_no_lock'));
 
 		// First / last typed
 		const fmtMin = (m) => m && m.str ? m.str : '—';
@@ -1266,31 +1266,31 @@ function renderDashboard() {
 				`amplitude ${Math.floor(amp_min / 60)}h${String(amp_min % 60).padStart(2, '0')}`);
 		} else {
 			setText('kpi-day-bounds', '—');
-			setText('kpi-day-amplitude', 'aucune frappe sur la période');
+			setText('kpi-day-amplitude', _t('ui_apps.kpi_no_keystrokes'));
 		}
 
 		// Longest session
 		if ((rs.longest_ms || 0) > 0) {
 			setText('kpi-longest-session', formatDuration(rs.longest_ms));
 			setText('kpi-longest-session-app',
-				rs.longest_app ? `dans ${rs.longest_app}` : '');
+				rs.longest_app ? _t('ui_apps.kpi_in_app').replace('{name}', rs.longest_app) : '');
 		} else {
 			setText('kpi-longest-session', '—');
-			setText('kpi-longest-session-app', 'aucune séance');
+			setText('kpi-longest-session-app', _t('ui_apps.kpi_no_session'));
 		}
 
 		// Sessions count + mean
 		const session_mean_ms = (rs.count || 0) > 0 ? (rs.total_active_ms || 0) / rs.count : 0;
 		setText('kpi-sessions-count', String(rs.count || 0));
 		setText('kpi-sessions-mean',
-			session_mean_ms > 0 ? `moy. ${formatDuration(session_mean_ms)}` : '—');
+			session_mean_ms > 0 ? _t('ui_apps.kpi_session_mean').replace('{dur}', formatDuration(session_mean_ms)) : '—');
 
 		// Density: chars / focus minute
 		const density_cpm = (rt.focus_ms || 0) > 0
 			? ((r.typing && r.typing.chars) || 0) / (rt.focus_ms / 60000) : 0;
 		setText('kpi-density', density_cpm > 0 ? `${density_cpm.toFixed(0)}` : '—');
 		setText('kpi-density-detail',
-			density_cpm > 0 ? 'car. / minute focus' : 'aucune frappe');
+			density_cpm > 0 ? _t('ui_apps.kpi_car_per_min') : _t('ui_apps.kpi_no_keystrokes'));
 
 		// ── Multitâche / context-switching KPIs ───────────────────────────
 		// Compute aggregates across the period from appsArray + aggData.
@@ -1304,7 +1304,7 @@ function renderDashboard() {
 		setText('kpi-hopping-rate',
 			focus_min_eff > 0 ? `${hopping_rate.toFixed(1)}` : '—');
 		setText('kpi-hopping-detail',
-			focus_min_eff > 0 ? 'bascules / min focus' : 'pas assez de focus');
+			focus_min_eff > 0 ? _t('ui_apps.kpi_hopping_detail') : _t('ui_apps.kpi_no_focus'));
 
 		// Profondeur moyenne par app = Σ app_time / Σ switches
 		const depth_mean_ms = totalSwitches > 0 ? sum_focus_ms / totalSwitches : 0;
@@ -1312,8 +1312,8 @@ function renderDashboard() {
 			depth_mean_ms > 0 ? formatDuration(depth_mean_ms) : '—');
 		setText('kpi-depth-detail',
 			depth_mean_ms > 0
-				? `entre 2 bascules (${totalSwitches} bascules)`
-				: 'aucune bascule');
+				? _t('ui_apps.kpi_switches_between').replace('{n}', totalSwitches)
+				: _t('ui_apps.kpi_no_switch'));
 
 		// Top trio
 		const top3 = apps_by_time.slice(0, 3);
@@ -1338,7 +1338,7 @@ function renderDashboard() {
 		setText('kpi-pivot-app',
 			pivot ? pivot : '—');
 		setText('kpi-pivot-detail',
-			pivot ? `vers ${pivot_dests} apps distinctes` : 'aucune bascule');
+			pivot ? _t('ui_apps.kpi_towards_apps').replace('{n}', pivot_dests) : _t('ui_apps.kpi_no_switch'));
 
 		// Index focus = part du temps focus dans la top app
 		const focus_index = (sum_focus_ms > 0 && apps_by_time.length > 0)
@@ -1346,14 +1346,14 @@ function renderDashboard() {
 		setText('kpi-focus-index',
 			apps_by_time.length > 0 ? `${focus_index.toFixed(0)}%` : '—');
 		setText('kpi-focus-index-detail',
-			apps_by_time.length > 0 ? `dans ${apps_by_time[0].name}` : '');
+			apps_by_time.length > 0 ? _t('ui_apps.kpi_in_app').replace('{name}', apps_by_time[0].name) : '');
 
 		// Context volume = sum of switching events on the period
 		setText('kpi-context-volume', String(totalSwitches));
 		setText('kpi-context-detail',
 			(r.time && r.time.passive_count > 0)
 				? `+ ${r.time.passive_count} verrou(s) / veille(s)`
-				: 'bascules d’app');
+				: _t('ui_apps.kpi_app_switches'));
 
 		// ── Records personnels (period-best scores) ───────────────────────
 		const rb = r.bursts      || {};
@@ -1362,16 +1362,16 @@ function renderDashboard() {
 		setText('kpi-rec-burst',
 			(rb.max_cpm || 0) > 0 ? `${rb.max_cpm.toFixed(0)} CPM` : '—');
 		setText('kpi-rec-burst-detail',
-			(rb.count || 0) > 0 ? `sur ${rb.count} burst(s)` : 'aucun burst');
+			(rb.count || 0) > 0 ? _t('ui_apps.kpi_bursts_count').replace('{n}', rb.count) : _t('ui_apps.kpi_no_burst'));
 		setText('kpi-rec-burst-chars',
 			(rb.max_chars || 0) > 0 ? format_int(rb.max_chars) : '—');
 		setText('kpi-rec-burst-chars-detail',
-			(rb.max_chars || 0) > 0 ? 'caractères d’affilée' : '');
+			(rb.max_chars || 0) > 0 ? _t('ui_apps.kpi_chars_in_a_row') : '');
 
 		setText('kpi-rec-session',
 			(rs.longest_ms || 0) > 0 ? formatDuration(rs.longest_ms) : '—');
 		setText('kpi-rec-session-detail',
-			rs.longest_app ? `dans ${rs.longest_app}` : '');
+			rs.longest_app ? _t('ui_apps.kpi_in_app').replace('{name}', rs.longest_app) : '');
 
 		setText('kpi-rec-finger-streak',
 			(re.same_finger_streak_max || 0) > 0
@@ -1382,10 +1382,10 @@ function renderDashboard() {
 
 		setText('kpi-rec-cascade',
 			(rty.cascade_max_len || 0) > 0
-				? `${rty.cascade_max_len} backspaces` : '—');
+				? `${rty.cascade_max_len} backspaces` : '—');  // "backspaces" is a technical term, kept as-is
 		setText('kpi-rec-cascade-detail',
 			(rty.cascade_count_total || 0) > 0
-				? `${rty.cascade_count_total} cascade(s) sur la période` : '');
+				? _t('ui_apps.kpi_cascades_period').replace('{n}', rty.cascade_count_total) : '');
 
 		// Top day by chars
 		let best_day = null, best_day_chars = 0;
@@ -1398,31 +1398,31 @@ function renderDashboard() {
 		setText('kpi-rec-day-chars',
 			best_day_chars > 0 ? format_int(best_day_chars) : '—');
 		setText('kpi-rec-day-chars-detail',
-			best_day ? `le ${formatDisplayDate(best_day)}` : '');
+			best_day ? _t('ui_apps.kpi_day_best').replace('{date}', formatDisplayDate(best_day)) : '');
 
 		// ── Typing × Temps (#40-43, 49) ───────────────────────────────────
 		const fl   = r.focus_latency || { sum_ms: 0, count: 0 };
 		const flMs = (fl.count || 0) > 0 ? fl.sum_ms / fl.count : 0;
 		setText('kpi-tx-focus-lat', flMs > 0 ? `${flMs.toFixed(0)} ms` : '—');
 		setText('kpi-tx-focus-lat-detail',
-			(fl.count || 0) > 0 ? `sur ${fl.count} prises de focus` : 'pas encore mesuré');
+			(fl.count || 0) > 0 ? _t('ui_apps.kpi_focus_taken').replace('{n}', fl.count) : _t('ui_apps.kpi_not_measured'));
 
 		const layoutsCount = Object.keys(r.layouts || {}).length;
 		setText('kpi-tx-layouts', String(layoutsCount));
 		const topLayout = Object.entries(r.layouts || {}).sort((a, b) => b[1] - a[1])[0];
 		setText('kpi-tx-layouts-detail',
-			topLayout ? `top : ${topLayout[0]}` : '—');
+			topLayout ? _t('ui_apps.kpi_top_layout').replace('{name}', topLayout[0]) : '—');
 
 		setText('kpi-tx-long-sessions', String(r.long_sessions || 0));
 		setText('kpi-tx-long-sessions-detail',
-			(r.long_sessions || 0) > 0 ? 'app-jours ≥ 90 min' : 'aucune longue séance');
+			(r.long_sessions || 0) > 0 ? _t('ui_apps.kpi_app_days_90') : _t('ui_apps.kpi_no_long_session'));
 
 		const totalChars   = (r.typing && r.typing.chars) || 0;
 		const autoRepCount = (r.typing && r.typing.auto_repeat_count) || 0;
 		const arPct = totalChars > 0 ? (autoRepCount / totalChars) * 100 : 0;
 		setText('kpi-tx-autorepeat', totalChars > 0 ? `${arPct.toFixed(1)} %` : '—');
 		setText('kpi-tx-autorepeat-detail',
-			autoRepCount > 0 ? `${format_int(autoRepCount)} touches répétées` : 'aucune répétition');
+			autoRepCount > 0 ? `${format_int(autoRepCount)} touches répétées` : _t('ui_apps.kpi_no_repeat'));
 
 		// Worst app for errors (#49): highest bs_total / chars (min 200 chars to avoid noise)
 		let wErrApp = null, wErrPct = 0;
@@ -1434,7 +1434,7 @@ function renderDashboard() {
 		});
 		setText('kpi-tx-error-app', wErrApp || '—');
 		setText('kpi-tx-error-app-detail',
-			wErrApp ? `${wErrPct.toFixed(1)} % de backspaces` : 'pas assez de frappe');
+			wErrApp ? `${wErrPct.toFixed(1)} % de backspaces` : _t('ui_apps.kpi_no_enough_typing'));
 
 		// Worst app for recovery (#50)
 		let wRecApp = null, wRecMs = 0;
@@ -1446,7 +1446,7 @@ function renderDashboard() {
 		});
 		setText('kpi-tx-recovery-app', wRecApp || '—');
 		setText('kpi-tx-recovery-app-detail',
-			wRecApp ? `${wRecMs.toFixed(0)} ms en moyenne` : 'pas assez d’erreurs');
+			wRecApp ? `${wRecMs.toFixed(0)} ms en moyenne` : _t('ui_apps.kpi_no_enough_errors'));
 
 		// CPM par catégorie (#47)
 		(function renderCpmByCategory() {
@@ -1497,10 +1497,10 @@ function renderDashboard() {
 					`<div title="Neutre"    style="background:#8e8e93;width:${pNeu}%"></div>` +
 					`<div title="Distraction" style="background:#FF453A;width:${pNeg}%"></div>`;
 				setText('kpi-prod-bar-detail',
-					`productif ${pPos.toFixed(0)}% · neutre ${pNeu.toFixed(0)}% · distraction ${pNeg.toFixed(0)}%`);
+					_t('ui_apps.kpi_productive').replace('{p}', pPos.toFixed(0)).replace('{n}', pNeu.toFixed(0)).replace('{d}', pNeg.toFixed(0)));
 			} else {
 				elProdBar.innerHTML = '';
-				setText('kpi-prod-bar-detail', 'aucune donnée');
+				setText('kpi-prod-bar-detail', _t('ui_apps.kpi_no_data'));
 			}
 		}
 
@@ -1515,10 +1515,10 @@ function renderDashboard() {
 		if (bestHour != null) {
 			setText('kpi-best-hour', `${bestHour}h`);
 			setText('kpi-best-hour-detail',
-				`score moyen ${bestHourScore.toFixed(2)} (-2 à 2)`);
+				_t('ui_apps.kpi_best_hour_score').replace('{score}', bestHourScore.toFixed(2)));
 		} else {
 			setText('kpi-best-hour', '—');
-			setText('kpi-best-hour-detail', 'pas de focus tracké');
+			setText('kpi-best-hour-detail', _t('ui_apps.kpi_no_focus_tracked'));
 		}
 
 		// #22 Dominant category per weekday — render as compact 7-day rundown
@@ -1538,7 +1538,7 @@ function renderDashboard() {
 		});
 		setText('kpi-dom-cat', domToday || (wkLines.length > 0 ? wkLines[0].split(' : ')[1] : '—'));
 		setText('kpi-dom-cat-detail',
-			wkLines.length > 0 ? wkLines.join(' · ') : 'pas de données par jour');
+			wkLines.length > 0 ? wkLines.join(' · ') : _t('ui_apps.kpi_no_day_data'));
 
 		// ── Streaks (#58) ─────────────────────────────────────────────────
 		// Compute the longest run of consecutive calendar days where the
@@ -1575,9 +1575,9 @@ function renderDashboard() {
 			const streakChars = longestRun((k) => (dayChars[k] || 0) >= 1000);
 			const streakFocus = longestRun((k) => (dayActive[k] || 0) >= 30 * 60 * 1000);
 			setText('kpi-streak-chars', `${streakChars} j`);
-			setText('kpi-streak-chars-detail', streakChars > 0 ? 'jours consécutifs ≥ 1000 chars' : 'jamais atteint');
+			setText('kpi-streak-chars-detail', streakChars > 0 ? _t('ui_apps.kpi_streak_chars') : _t('ui_apps.kpi_never_reached'));
 			setText('kpi-streak-focus', `${streakFocus} j`);
-			setText('kpi-streak-focus-detail', streakFocus > 0 ? 'jours consécutifs ≥ 30 min actif' : 'jamais atteint');
+			setText('kpi-streak-focus-detail', streakFocus > 0 ? _t('ui_apps.kpi_streak_focus') : _t('ui_apps.kpi_never_reached'));
 		})();
 
 		// ── Objectif quotidien (#60) ──────────────────────────────────────
@@ -1606,12 +1606,12 @@ function renderDashboard() {
 			const bar = document.getElementById('kpi-goal-bar');
 			if (bar) bar.style.width = `${pct}%`;
 			setText('kpi-goal-detail',
-				pct >= 100 ? 'Objectif atteint pour aujourd’hui ✓' : `${(100 - pct).toFixed(0)}% restant pour atteindre l’objectif`);
+				pct >= 100 ? _t('ui_apps.goal_reached') : _t('ui_apps.goal_remaining').replace('{pct}', (100 - pct).toFixed(0)));
 
 			const valEl = document.getElementById('kpi-goal-value');
 			if (valEl && !valEl._bound) {
 				valEl.addEventListener('click', () => {
-					const next = prompt('Objectif quotidien en minutes de focus actif :', String(goalMin));
+					const next = prompt(_t('ui_apps.goal_prompt'), String(goalMin));
 					const n = parseInt(next || '', 10);
 					if (isFinite(n) && n > 0 && n < 24 * 60) {
 						window._goalStore.daily_min = n;
@@ -1629,19 +1629,19 @@ function renderDashboard() {
 		setText('kpi-sys-passive', String(rt.passive_count || 0));
 		setText('kpi-sys-passive-detail',
 			(rt.passive_count || 0) > 0
-				? `${formatDuration(lock_ms + sleep_ms)} cumulés`
-				: 'aucun verrou détecté');
+				? _t('ui_apps.kpi_lock_sleep_cumul').replace('{dur}', formatDuration(lock_ms + sleep_ms))
+				: _t('ui_apps.kpi_no_lock'));
 
 		setText('kpi-sys-lock-vs-sleep',
 			(lock_ms + sleep_ms) > 0
 				? `${formatDuration(lock_ms)} / ${formatDuration(sleep_ms)}`
 				: '—');
 		setText('kpi-sys-lock-vs-sleep-detail',
-			(lock_ms + sleep_ms) > 0 ? 'verrou / veille' : '');
+			(lock_ms + sleep_ms) > 0 ? _t('ui_apps.kpi_lock_vs_sleep') : '');
 
 		setText('kpi-sys-wifi', String(sys.wifi_changes || 0));
 		setText('kpi-sys-wifi-detail',
-			(sys.wifi_changes || 0) > 0 ? 'bascules de réseau' : 'pas de mobilité');
+			(sys.wifi_changes || 0) > 0 ? _t('ui_apps.kpi_wifi_switches') : _t('ui_apps.kpi_no_mobility'));
 
 		const bat_avg = (sys.battery_count || 0) > 0
 			? Math.round(sys.battery_sum / sys.battery_count) : null;
@@ -1650,7 +1650,7 @@ function renderDashboard() {
 		setText('kpi-sys-battery-detail',
 			(sys.battery_min != null)
 				? `min ${Math.round(sys.battery_min)}% · max ${Math.round(sys.battery_max)}%`
-				: 'aucune observation');
+				: _t('ui_apps.kpi_no_data'));
 
 		const muted_pct = (rt.focus_ms || 0) > 0
 			? ((sys.audio_muted_ms || 0) / rt.focus_ms) * 100 : 0;
@@ -1659,23 +1659,23 @@ function renderDashboard() {
 				? formatDuration(sys.audio_muted_ms) : '—');
 		setText('kpi-sys-mute-detail',
 			(sys.audio_muted_ms || 0) > 0
-				? `${muted_pct.toFixed(0)}% du temps focus`
-				: 'jamais en muet');
+				? _t('ui_apps.kpi_pct_focus_time').replace('{pct}', muted_pct.toFixed(0))
+				: _t('ui_apps.kpi_no_mute'));
 
 		setText('kpi-sys-spaces', String(sys.space_switches || 0));
 		setText('kpi-sys-spaces-detail',
-			(sys.space_switches || 0) > 0 ? 'bascules de Space' : '—');
+			(sys.space_switches || 0) > 0 ? _t('ui_apps.kpi_space_switches') : '—');
 
 		setText('kpi-sys-night', String(sys.night_wake_count || 0));
 		setText('kpi-sys-night-detail',
-			(sys.night_wake_count || 0) > 0 ? 'reprises entre 0 h et 6 h' : 'sommeil intact');
+			(sys.night_wake_count || 0) > 0 ? _t('ui_apps.kpi_night_wakes') : _t('ui_apps.kpi_sleep_intact'));
 
 		const awakeMs = rt.awake_ms || 0;
 		setText('kpi-sys-awake', awakeMs > 0 ? formatDuration(awakeMs) : '—');
 		setText('kpi-sys-awake-detail',
 			awakeMs > 0
-				? (currentCountAwake ? 'inclus dans les stats' : 'exclu des stats (toggle off)')
-				: 'jamais activé');
+				? (currentCountAwake ? _t('ui_apps.kpi_awake_included') : _t('ui_apps.kpi_awake_excluded'))
+				: _t('ui_apps.kpi_never_active'));
 
 		// Hour × weekday heatmap (decoupled from the existing day-only timeline)
 		renderHourWeekdayHeatmap(aggData);
@@ -1723,13 +1723,13 @@ function renderDashboard() {
 
 		if (appsArray.length === 0) {
 			if (tbody)
-				tbody.innerHTML = `<tr><td colspan="9" style="text-align: center;">Aucune donnée pour cette période.</td></tr>`;
+				tbody.innerHTML = `<tr><td colspan="9" style="text-align: center;">${_t('ui_apps.empty_period')}</td></tr>`;
 			return;
 		}
 
 		appsArray.forEach((app) => {
 			const tr = document.createElement('tr');
-			tr.title = `Voir le détail de ${app.name}`;
+			tr.title = _t('ui_apps.row_tooltip').replace('{name}', app.name);
 			tr.addEventListener('click', (ev) => {
 				// Ignore clicks bubbling up from the category cell (which has its own handler)
 				if (ev.target && ev.target.closest('td.app-cat-cell')) return;
@@ -1856,7 +1856,7 @@ function renderHourWeekdayHeatmap(aggData) {
 	});
 
 	if (max_v === 0) {
-		container.innerHTML = '<div style="color:var(--text-muted);font-size:12px;padding:10px;">Aucune activité enregistrée sur la période.</div>';
+		container.innerHTML = `<div style="color:var(--text-muted);font-size:12px;padding:10px;">${_t('ui_apps.empty_activity')}</div>`;
 		return;
 	}
 
@@ -1922,7 +1922,7 @@ function renderRibbon(aggData) {
 	const ribbon = (aggData && aggData.rich && aggData.rich.ribbon) || {};
 	const days = Object.keys(ribbon).sort(); // ascending date
 	if (days.length === 0) {
-		container.innerHTML = '<div style="color:var(--text-muted);font-size:12px;padding:10px;">Aucune activité enregistrée sur la période.</div>';
+		container.innerHTML = `<div style="color:var(--text-muted);font-size:12px;padding:10px;">${_t('ui_apps.empty_activity')}</div>`;
 		if (legend) legend.innerHTML = '';
 		return;
 	}
@@ -2009,7 +2009,7 @@ function renderSankey(aggData) {
 	edges.sort((a, b) => b.count - a.count);
 	const TOP_EDGES = edges.slice(0, 18);
 	if (TOP_EDGES.length === 0) {
-		container.innerHTML = '<div style="color:var(--text-muted);font-size:12px;padding:10px;">Aucune bascule sur la période.</div>';
+		container.innerHTML = `<div style="color:var(--text-muted);font-size:12px;padding:10px;">${_t('ui_apps.empty_switches')}</div>`;
 		return;
 	}
 
@@ -2101,7 +2101,7 @@ function renderDayTimeline() {
 		targetDay = dates[dates.length - 1] || null;
 	}
 	if (!targetDay) {
-		container.innerHTML = '<div style="color:var(--text-muted);font-size:12px;padding:10px;">Aucun jour sélectionné.</div>';
+		container.innerHTML = `<div style="color:var(--text-muted);font-size:12px;padding:10px;">${_t('ui_apps.empty_day')}</div>`;
 		return;
 	}
 
@@ -2203,7 +2203,7 @@ function renderComparator(currentAgg) {
 	const PERIOD_DAYS = { day: 1, week: 7, month: 30, year: 365 };
 	const days = PERIOD_DAYS[currentPeriod];
 	if (!days || !currentSelectedDate) {
-		panel.innerHTML = '<div style="font-size:12px;color:var(--text-muted);">Sélectionnez une période bornée pour activer la comparaison.</div>';
+		panel.innerHTML = `<div style="font-size:12px;color:var(--text-muted);">${_t('ui_apps.empty_comparator')}</div>`;
 		return;
 	}
 
@@ -2223,7 +2223,7 @@ function renderComparator(currentAgg) {
 	const prev = summarizeAggregate(prevAgg);
 
 	const win = document.getElementById('compare-window');
-	if (win) win.textContent = `actuel : ${formatDisplayDate(currentSelectedDate)} ‹${currentPeriod}› · précédent : ${formatDisplayDate(prevKey)}`;
+	if (win) win.textContent = _t('ui_apps.cmp_window').replace('{cur}', formatDisplayDate(currentSelectedDate)).replace('{period}', currentPeriod).replace('{prev}', formatDisplayDate(prevKey));
 
 	const rows = document.getElementById('compare-rows');
 	if (!rows) return;
@@ -2242,12 +2242,12 @@ function renderComparator(currentAgg) {
 		</div>`;
 
 	rows.innerHTML =
-		card('Temps focus',    fmtDelta(cur.focus_ms,         prev.focus_ms,         (v) => formatDuration(v))) +
-		card('Temps actif',    fmtDelta(cur.active_ms,        prev.active_ms,        (v) => formatDuration(v))) +
-		card('Caractères',     fmtDelta(cur.chars,            prev.chars,            (v) => format_int(Math.round(v)))) +
-		card('Bascules',       fmtDelta(cur.switches,         prev.switches,         (v) => format_int(Math.round(v)))) +
-		card('Séances',        fmtDelta(cur.sessions,         prev.sessions,         (v) => format_int(Math.round(v)))) +
-		card('Productivité',   fmtDelta(cur.productivity_pct, prev.productivity_pct, (v) => `${v.toFixed(0)}%`));
+		card(_t('ui_apps.cmp_focus_time'),    fmtDelta(cur.focus_ms,         prev.focus_ms,         (v) => formatDuration(v))) +
+		card(_t('ui_apps.cmp_active_time'),    fmtDelta(cur.active_ms,        prev.active_ms,        (v) => formatDuration(v))) +
+		card(_t('ui_apps.cmp_chars'),     fmtDelta(cur.chars,            prev.chars,            (v) => format_int(Math.round(v)))) +
+		card(_t('ui_apps.cmp_switches'),       fmtDelta(cur.switches,         prev.switches,         (v) => format_int(Math.round(v)))) +
+		card(_t('ui_apps.cmp_sessions'),        fmtDelta(cur.sessions,         prev.sessions,         (v) => format_int(Math.round(v)))) +
+		card(_t('ui_apps.cmp_productivity'),   fmtDelta(cur.productivity_pct, prev.productivity_pct, (v) => `${v.toFixed(0)}%`));
 }
 
 /**
@@ -2284,7 +2284,7 @@ function renderSessionBoxplots(aggData) {
 	rows.sort((a, b) => b.time_ms - a.time_ms);
 	const top = rows.slice(0, 10);
 	if (top.length === 0) {
-		container.innerHTML = '<div style="color:var(--text-muted);font-size:12px;padding:10px;">Pas assez de séances pour tracer un boxplot (≥ 4 par app).</div>';
+		container.innerHTML = `<div style="color:var(--text-muted);font-size:12px;padding:10px;">${_t('ui_apps.empty_boxplot')}</div>`;
 		return;
 	}
 	const max_ms = Math.max(...top.map((r) => r.max));
@@ -2312,12 +2312,12 @@ function renderSessionBoxplots(aggData) {
 		// Median tick
 		svg += `<line x1="${xFor(r.med)}" x2="${xFor(r.med)}" y1="${y - 12}" y2="${y + 12}" stroke="#fff" stroke-width="2"/>`;
 		// Tooltip rect (transparent overlay)
-		const tip = `${r.name} — ${r.count} séances · médiane ${formatDuration(r.med)} (Q1 ${formatDuration(r.q1)}, Q3 ${formatDuration(r.q3)})`;
+		const tip = `${r.name} — ${_t('ui_apps.boxplot_tip').replace('{n}', r.count).replace('{med}', formatDuration(r.med)).replace('{q1}', formatDuration(r.q1)).replace('{q3}', formatDuration(r.q3))}`;
 		svg += `<rect x="${LABEL_LEFT}" y="${y - 16}" width="${TRACK_W}" height="32" fill="transparent"><title>${escapeHtml(tip)}</title></rect>`;
 	});
 	container.innerHTML =
 		`<svg width="${W}" height="${SVG_H}" viewBox="0 0 ${W} ${SVG_H}" xmlns="http://www.w3.org/2000/svg">${svg}</svg>` +
-		`<div style="font-size:11px;color:var(--text-muted);margin-top:6px;">Échelle : 0 → ${formatDuration(max_ms)}</div>`;
+		`<div style="font-size:11px;color:var(--text-muted);margin-top:6px;">${_t('ui_apps.boxplot_scale').replace('{max}', formatDuration(max_ms))}</div>`;
 }
 
 /**
@@ -2335,7 +2335,7 @@ function renderTopWindowsTable(aggData) {
 	});
 	rows.sort((a, b) => b.c - a.c);
 	if (rows.length === 0) {
-		tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;color:var(--text-muted);">Aucun titre de fenêtre agrégé pour le moment.</td></tr>';
+		tbody.innerHTML = `<tr><td colspan="4" style="text-align:center;color:var(--text-muted);">${_t('ui_apps.empty_windows')}</td></tr>`;
 		return;
 	}
 	tbody.innerHTML = rows.slice(0, 30).map((r) => `<tr>
@@ -2371,7 +2371,7 @@ function renderTopSessionsTable() {
 	rows.sort((a, b) => b.ms - a.ms);
 	const top = rows.slice(0, 30);
 	if (top.length === 0) {
-		tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;color:var(--text-muted);">Aucune séance détectée.</td></tr>';
+		tbody.innerHTML = `<tr><td colspan="4" style="text-align:center;color:var(--text-muted);">${_t('ui_apps.empty_sessions')}</td></tr>`;
 		return;
 	}
 	tbody.innerHTML = top.map((r) => `<tr>
@@ -2394,7 +2394,7 @@ function renderTopDaysTable(aggData) {
 		.sort((a, b) => (b.chars || 0) - (a.chars || 0))
 		.slice(0, 20);
 	if (days.length === 0) {
-		tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;color:var(--text-muted);">Aucune journée enregistrée.</td></tr>';
+		tbody.innerHTML = `<tr><td colspan="5" style="text-align:center;color:var(--text-muted);">${_t('ui_apps.empty_days')}</td></tr>`;
 		return;
 	}
 	tbody.innerHTML = days.map((d) => `<tr>
@@ -2421,7 +2421,7 @@ function renderAppPairsTable(aggData) {
 	edges.sort((a, b) => b.count - a.count);
 	const total = edges.reduce((s, e) => s + e.count, 0);
 	if (edges.length === 0) {
-		tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;color:var(--text-muted);">Aucune bascule sur la période.</td></tr>';
+		tbody.innerHTML = `<tr><td colspan="4" style="text-align:center;color:var(--text-muted);">${_t('ui_apps.empty_app_switches')}</td></tr>`;
 		return;
 	}
 	const top = edges.slice(0, 30);
@@ -2458,9 +2458,9 @@ function renderDailyTrajectories(aggData) {
 			data: {
 				labels,
 				datasets: [
-					{ label: 'Focus (h)',    data: dates.map((d) => +(byDate[d].time_ms / 3600000).toFixed(2)),  borderColor: '#0A84FF', backgroundColor: 'rgba(10,132,255,0.15)', tension: 0.25, yAxisID: 'y1', borderWidth: 2 },
-					{ label: 'Caractères',   data: dates.map((d) => byDate[d].chars || 0),                      borderColor: '#FF9F0A', backgroundColor: 'rgba(255,159,10,0.10)', tension: 0.25, yAxisID: 'y2', borderWidth: 2 },
-					{ label: 'Bascules',     data: dates.map((d) => byDate[d].switches || 0),                   borderColor: '#BF5AF2', backgroundColor: 'rgba(191,90,242,0.10)', tension: 0.25, yAxisID: 'y2', borderWidth: 2 },
+					{ label: _t('ui_apps.ds_focus_h'),    data: dates.map((d) => +(byDate[d].time_ms / 3600000).toFixed(2)),  borderColor: '#0A84FF', backgroundColor: 'rgba(10,132,255,0.15)', tension: 0.25, yAxisID: 'y1', borderWidth: 2 },
+					{ label: _t('ui_apps.ds_chars'),   data: dates.map((d) => byDate[d].chars || 0),                      borderColor: '#FF9F0A', backgroundColor: 'rgba(255,159,10,0.10)', tension: 0.25, yAxisID: 'y2', borderWidth: 2 },
+					{ label: _t('ui_apps.ds_switches'),     data: dates.map((d) => byDate[d].switches || 0),                   borderColor: '#BF5AF2', backgroundColor: 'rgba(191,90,242,0.10)', tension: 0.25, yAxisID: 'y2', borderWidth: 2 },
 				]
 			},
 			options: {
@@ -2486,7 +2486,7 @@ function renderDailyTrajectories(aggData) {
 		if (dailyActiveRatioChart) dailyActiveRatioChart.destroy();
 		dailyActiveRatioChart = new Chart(c30.getContext('2d'), {
 			type: 'bar',
-			data: { labels, datasets: [{ label: 'Ratio actif (%)', data: ratios, backgroundColor: colors, borderRadius: 4 }] },
+			data: { labels, datasets: [{ label: _t('ui_apps.ds_active_ratio'), data: ratios, backgroundColor: colors, borderRadius: 4 }] },
 			options: {
 				responsive: true, maintainAspectRatio: false,
 				plugins: { legend: { display: false } },
@@ -2539,8 +2539,8 @@ function renderDailyTrajectories(aggData) {
 			data: {
 				labels,
 				datasets: [
-					{ label: 'Première frappe', data: firstHrs, borderColor: '#0A84FF', backgroundColor: 'rgba(10,132,255,0.10)', tension: 0.25, borderWidth: 2, spanGaps: true },
-					{ label: 'Dernière frappe', data: lastHrs,  borderColor: '#FF453A', backgroundColor: 'rgba(255,69,58,0.10)',  tension: 0.25, borderWidth: 2, spanGaps: true },
+					{ label: _t('ui_apps.ds_first_key'), data: firstHrs, borderColor: '#0A84FF', backgroundColor: 'rgba(10,132,255,0.10)', tension: 0.25, borderWidth: 2, spanGaps: true },
+					{ label: _t('ui_apps.ds_last_key'), data: lastHrs,  borderColor: '#FF453A', backgroundColor: 'rgba(255,69,58,0.10)',  tension: 0.25, borderWidth: 2, spanGaps: true },
 				]
 			},
 			options: {
@@ -2581,8 +2581,8 @@ function renderRadialTop8(appsArray) {
 		data: {
 			labels,
 			datasets: [
-				{ label: 'Temps focus', data: time_norm,  borderColor: '#0A84FF', backgroundColor: 'rgba(10,132,255,0.18)', borderWidth: 2 },
-				{ label: 'Caractères',  data: chars_norm, borderColor: '#FF9F0A', backgroundColor: 'rgba(255,159,10,0.18)', borderWidth: 2 },
+				{ label: _t('ui_apps.ds_focus_time'), data: time_norm,  borderColor: '#0A84FF', backgroundColor: 'rgba(10,132,255,0.18)', borderWidth: 2 },
+				{ label: _t('ui_apps.ds_chars'),  data: chars_norm, borderColor: '#FF9F0A', backgroundColor: 'rgba(255,159,10,0.18)', borderWidth: 2 },
 			],
 		},
 		options: {
@@ -2626,7 +2626,7 @@ function renderBurstHistogram(aggData) {
 	if (burstHistogramChart) burstHistogramChart.destroy();
 	burstHistogramChart = new Chart(canvas.getContext('2d'), {
 		type: 'bar',
-		data: { labels, datasets: [{ label: 'Bursts', data, backgroundColor: '#30D158', borderRadius: 4 }] },
+		data: { labels, datasets: [{ label: _t('ui_apps.ds_bursts'), data, backgroundColor: '#30D158', borderRadius: 4 }] },
 		options: {
 			responsive: true,
 			maintainAspectRatio: false,
@@ -2818,7 +2818,7 @@ function renderCpmByHourChart(aggData) {
 			datasets: [
 				{
 					type: 'bar',
-					label: 'Caractères',
+					label: _t('ui_apps.ds_chars'),
 					data: chars,
 					backgroundColor: 'rgba(34, 211, 238, 0.35)',
 					borderColor: 'rgba(34, 211, 238, 0.8)',
@@ -2827,7 +2827,7 @@ function renderCpmByHourChart(aggData) {
 				},
 				{
 					type: 'line',
-					label: 'Vitesse (car. / min focus)',
+					label: _t('ui_apps.ds_speed'),
 					data: cpm,
 					borderColor: 'rgba(245, 158, 11, 1)',
 					backgroundColor: 'rgba(245, 158, 11, 0.15)',
@@ -2855,13 +2855,13 @@ function renderCpmByHourChart(aggData) {
 					type: 'linear', position: 'left',
 					ticks: { color: '#888', font: { size: 10 } },
 					grid: { color: 'rgba(255,255,255,0.04)' },
-					title: { display: true, text: 'Caractères', color: '#888', font: { size: 10 } },
+					title: { display: true, text: _t('ui_apps.axis_chars'), color: '#888', font: { size: 10 } },
 				},
 				y_cpm: {
 					type: 'linear', position: 'right',
 					ticks: { color: '#f59e0b', font: { size: 10 } },
 					grid: { drawOnChartArea: false },
-					title: { display: true, text: 'Car. / min focus', color: '#f59e0b', font: { size: 10 } },
+					title: { display: true, text: _t('ui_apps.axis_speed'), color: '#f59e0b', font: { size: 10 } },
 				},
 			},
 		},
@@ -2942,17 +2942,17 @@ function openAppDrilldown(appName) {
 	const focus_lat_mean = (a.focus_latency_count || 0) > 0
 		? a.focus_latency_sum_ms / a.focus_latency_count : 0;
 	const tiles = [
-		{ label: 'Focus',          value: formatDuration(a.time_ms || 0), detail: '' },
-		{ label: 'Frappe active',  value: formatDuration(a.typing_time || 0),
-			detail: a.time_ms > 0 ? `${((a.typing_time / a.time_ms) * 100).toFixed(1)}% du focus` : '' },
-		{ label: 'Caractères',     value: format_int(a.chars || 0),
-			detail: density > 0 ? `${density.toFixed(0)} car./min` : '' },
-		{ label: 'Séances',        value: String(a.session_count || 0),
-			detail: a.session_longest_ms > 0 ? `+ longue ${formatDuration(a.session_longest_ms)}` : '' },
-		{ label: 'Latence focus',  value: focus_lat_mean > 0 ? `${Math.round(focus_lat_mean)} ms` : '—',
+		{ label: _t('ui_apps.tile_focus'),          value: formatDuration(a.time_ms || 0), detail: '' },
+		{ label: _t('ui_apps.tile_typing'),  value: formatDuration(a.typing_time || 0),
+			detail: a.time_ms > 0 ? _t('ui_apps.modal_pct_focus').replace('{pct}', ((a.typing_time / a.time_ms) * 100).toFixed(1)) : '' },
+		{ label: _t('ui_apps.tile_chars'),     value: format_int(a.chars || 0),
+			detail: density > 0 ? _t('ui_apps.modal_density').replace('{n}', density.toFixed(0)) : '' },
+		{ label: _t('ui_apps.tile_sessions'),        value: String(a.session_count || 0),
+			detail: a.session_longest_ms > 0 ? _t('ui_apps.modal_longest_session').replace('{dur}', formatDuration(a.session_longest_ms)) : '' },
+		{ label: _t('ui_apps.tile_focus_lat'),  value: focus_lat_mean > 0 ? `${Math.round(focus_lat_mean)} ms` : '—',
 			detail: a.focus_latency_count > 0 ? `n=${a.focus_latency_count}` : '' },
-		{ label: 'Backspaces',     value: format_int(a.bs_total || 0),
-			detail: a.chars > 0 ? `${((a.bs_total / a.chars) * 100).toFixed(1)}% des chars` : '' },
+		{ label: _t('ui_apps.tile_backspaces'),     value: format_int(a.bs_total || 0),
+			detail: a.chars > 0 ? _t('ui_apps.modal_backspace_pct').replace('{pct}', ((a.bs_total / a.chars) * 100).toFixed(1)) : '' },
 	];
 	document.getElementById('app_modal_tiles').innerHTML = tiles.map(t =>
 		`<div class="app-modal-tile">
@@ -2974,7 +2974,7 @@ function openAppDrilldown(appName) {
 	_appModalChart = new Chart(ctx, {
 		type: 'bar',
 		data: { labels, datasets: [{
-			label: 'Caractères',
+			label: _t('ui_apps.ds_chars'),
 			data: chars_arr,
 			backgroundColor: 'rgba(34, 211, 238, 0.55)',
 			borderRadius: 2,
@@ -2994,7 +2994,7 @@ function openAppDrilldown(appName) {
 		? Object.entries(a.switches).sort((x, y) => y[1] - x[1]).slice(0, 8)
 			.map(([dest, n]) => `<div style="display:flex;justify-content:space-between;padding:3px 0;font-size:12px;"><span>${escapeHtml(dest)}</span><span style="color:#aaa;">${n}</span></div>`)
 			.join('')
-		: '<div style="color:#888;font-size:12px;">aucune bascule sortante</div>';
+		: `<div style="color:#888;font-size:12px;">${_t('ui_apps.kpi_no_backslash_out')}</div>`;
 	document.getElementById('app_modal_dests').innerHTML = dest_html;
 
 	// Layouts seen — sum from manifest for this app within the period.
@@ -3011,32 +3011,32 @@ function openAppDrilldown(appName) {
 		? Object.entries(layouts).sort((x, y) => y[1] - x[1])
 			.map(([id, n]) => `<div style="display:flex;justify-content:space-between;padding:3px 0;font-size:12px;"><span>${escapeHtml(id)}</span><span style="color:#aaa;">${n}×</span></div>`)
 			.join('')
-		: '<div style="color:#888;font-size:12px;">aucun layout enregistré</div>';
+		: `<div style="color:#888;font-size:12px;">${_t('ui_apps.kpi_no_layout')}</div>`;
 	document.getElementById('app_modal_layouts').innerHTML = layouts_html;
 
 	// Records
 	const recs = [];
 	if (a.session_longest_ms > 0) {
-		recs.push(`<div>Plus longue séance : <strong>${formatDuration(a.session_longest_ms)}</strong>${a.session_longest_chars > 0 ? ` (${a.session_longest_chars} car.)` : ''}</div>`);
+		recs.push(`<div>${_t('ui_apps.modal_record_session').replace('{dur}', formatDuration(a.session_longest_ms)).replace('{chars}', a.session_longest_chars > 0 ? ` (${a.session_longest_chars} car.)` : '')}</div>`);
 	}
 	if ((a.burst_max_cpm || 0) > 0) {
-		recs.push(`<div>Meilleur burst CPM : <strong>${a.burst_max_cpm.toFixed(0)}</strong></div>`);
+		recs.push(`<div>${_t('ui_apps.modal_record_burst').replace('{n}', a.burst_max_cpm.toFixed(0))}</div>`);
 	}
 	if ((a.cascade_count || 0) > 0) {
-		recs.push(`<div>Cascades de backspace : <strong>${a.cascade_count}</strong></div>`);
+		recs.push(`<div>${_t('ui_apps.modal_record_cascade').replace('{n}', a.cascade_count)}</div>`);
 	}
 	const rec_html = recs.length > 0
 		? recs.map(r => `<div style="font-size:12px;padding:3px 0;">${r}</div>`).join('')
-		: '<div style="color:#888;font-size:12px;">aucun record sur la période</div>';
+		: `<div style="color:#888;font-size:12px;">${_t('ui_apps.kpi_no_record')}</div>`;
 	document.getElementById('app_modal_records').innerHTML = rec_html;
 
 	// Hotstrings & IA
 	const hs_pct  = (a.chars || 0) > 0 ? (a.hs_chars  / a.chars) * 100 : 0;
 	const llm_pct = (a.chars || 0) > 0 ? (a.llm_chars / a.chars) * 100 : 0;
 	document.getElementById('app_modal_assist').innerHTML =
-		`<div style="font-size:12px;padding:3px 0;">Hotstrings : <strong>${format_int(a.hs_chars || 0)}</strong> car. (${hs_pct.toFixed(1)}%)</div>` +
-		`<div style="font-size:12px;padding:3px 0;">IA : <strong>${format_int(a.llm_chars || 0)}</strong> car. (${llm_pct.toFixed(1)}%)</div>` +
-		`<div style="font-size:12px;padding:3px 0;color:#888;">Total chars typés : ${format_int(a.chars || 0)}</div>`;
+		`<div style="font-size:12px;padding:3px 0;">${_t('ui_apps.modal_hs_line').replace('{n}', format_int(a.hs_chars || 0)).replace('{pct}', hs_pct.toFixed(1))}</div>` +
+		`<div style="font-size:12px;padding:3px 0;">${_t('ui_apps.modal_llm_line').replace('{n}', format_int(a.llm_chars || 0)).replace('{pct}', llm_pct.toFixed(1))}</div>` +
+		`<div style="font-size:12px;padding:3px 0;color:#888;">${_t('ui_apps.modal_total_chars').replace('{n}', format_int(a.chars || 0))}</div>`;
 
 	modal.style.display = 'flex';
 }
