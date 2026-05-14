@@ -270,7 +270,7 @@ OpenHotstringsConfigWindow() {
 	BtnReset.OnEvent("Click", (*) => _HCW_ResetAll())
 	BtnGrey.OnEvent("Click",  (*) => _HCW_SetAllGrey())
 
-	G.Add("Text", "xm y+14 w530 h1 0x10")   ; horizontal rule (SS_SUNKEN)
+	G.Add("Text", "xm y+14 w526 h1 0x10")   ; horizontal rule (SS_SUNKEN)
 
 	; ----- Group selector (full-width row) ---------------------------------
 	G.Add("Text", "xm y+14 w70 h20", t("hs_config.label_group"))
@@ -285,30 +285,30 @@ OpenHotstringsConfigWindow() {
 	SecDD := G.Add("DropDownList", "x+6 yp-3 w450 r14", [])
 
 	; ----- Current path hint (below selectors) ----------------------------
-	Status := G.Add("Text", "xm y+6 w530 h18 cGray", "")
+	Status := G.Add("Text", "xm y+6 w526 h18 cGray", "")
 
-	G.Add("Text", "xm y+14 w530 h1 0x10")   ; horizontal rule (SS_SUNKEN)
+	G.Add("Text", "xm y+14 w526 h1 0x10")   ; horizontal rule (SS_SUNKEN)
 
 	; ----- Delay row -------------------------------------------------------
 	G.Add("Text", "xm y+14 w70 h20", t("hs_config.label_delay"))
 	DelayEdit := G.Add("Edit", "x+6 yp-3 w80 Number")
 	DelayUpDown := G.Add("UpDown", "Range0-10000", 0)
 	G.Add("Text", "x+4 yp+3 w24", "ms")
-	DelayDefault := G.Add("Text", "x+6 yp w194 Right", "")
-	DelayReset := G.Add("Button", "x530 yp-3 w28 h24", "↺")
+	DelayDefault := G.Add("Text", "x+6 yp w308 Right", "")
+	DelayReset := G.Add("Button", "x512 yp-3 w28 h24", "↺")
 
 	; ----- Color row -------------------------------------------------------
 	G.Add("Text", "xm y+10 w70 h20", t("hs_config.label_color"))
 	ColorDD := G.Add("DropDownList", "x+6 yp-3 w180", _HCW_ColorLabels())
 	ColorSwatch := G.Add("Progress", "x+8 yp+1 w22 h22 BackgroundCCCCCC", 100)
-	ColorDefault := G.Add("Text", "x+10 yp+2 w138 Right", "")
-	ColorReset := G.Add("Button", "x530 yp-2 w28 h24", "↺")
+	ColorDefault := G.Add("Text", "x+10 yp+2 w202 Right", "")
+	ColorReset := G.Add("Button", "x512 yp-2 w28 h24", "↺")
 
 	; ----- Tooltip toggle row (same group as delay/color, no HR before) ---
 	TooltipChk := G.Add("Checkbox", "xm y+10", t("hs_config.label_tooltip"))
-	TooltipReset := G.Add("Button", "x530 yp-2 w28 h24", "↺")
+	TooltipReset := G.Add("Button", "x512 yp-2 w28 h24", "↺")
 
-	G.Add("Text", "xm y+14 w530 h1 0x10")   ; horizontal rule (SS_SUNKEN)
+	G.Add("Text", "xm y+14 w526 h1 0x10")   ; horizontal rule aligned to x=540
 
 	; ----- Close button (bottom, after HR) --------------------------------
 	BtnClose := G.Add("Button", "xm y+14 w90 h28", t("hs_config.btn_close"))
