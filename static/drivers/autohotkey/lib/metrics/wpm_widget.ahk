@@ -505,19 +505,17 @@ WPMWidget_Show() {
     h      := WPMWidget.show_graph ? WPMWidgetConst.GRAPH_H : WPMWidgetConst.H
     gui_ref := WPMWidget.show_graph ? WPMWidget._graph_gui : WPMWidget._gui
 
-    ; Show briefly so WebView2 can attach (requires a visible HWND), then hide
-    ; immediately. The tick shows the window only when the user is typing —
-    ; matching the Hammerspoon behaviour of zero presence at idle.
+    ; Show the window fully transparent (alpha=0) so WebView2 can attach and
+    ; render without being visible to the user. Hide() suspends the WebView2
+    ; renderer, making ExecuteScriptAsync a no-op — transparency avoids that.
+    ; The Tick sets the real alpha when the user starts typing.
     gui_ref.Show("x" . WPMWidget.pos_x . " y" . WPMWidget.pos_y
         . " w" . w . " h" . h . " NoActivate")
-    WinSetTransparent(WPMWidgetConst.ALPHA_ACTIVE, gui_ref)
+    WinSetTransparent(0, gui_ref)
 
     ; WebView2 must be attached after the window is visible.
     if WPMWidget.show_graph && !WPMWidget._graph_wv
         WPMWidget_AttachWebView()
-
-    ; Hide immediately — the Tick will re-show when the user starts typing.
-    gui_ref.Hide()
 
     SetTimer(WPMWidget_Tick, WPMWidgetConst.TICK_MS)
     LoggerSuccess("WPMWidget", "Widget shown at (%d, %d) mode=%s, wv_ready=%s.",
@@ -574,10 +572,17 @@ WPMWidget_Tick() {
     should_show := (wpm > 0) || has_hs || has_ai || has_ac
     gui_ref := WPMWidget.show_graph ? WPMWidget._graph_gui : WPMWidget._gui
     if gui_ref {
-        if should_show
+        if should_show {
             gui_ref.Show("NoActivate")
-        else
-            gui_ref.Hide()
+            WinSetTransparent(WPMWidgetConst.ALPHA_ACTIVE, gui_ref)
+        } else {
+            ; Graph mode: keep window alive (alpha=0) so WebView2 stays active.
+            ; Compact mode: Hide() is fine, no WebView2 to preserve.
+            if WPMWidget.show_graph
+                WinSetTransparent(0, gui_ref)
+            else
+                gui_ref.Hide()
+        }
     }
     if !should_show
         return
