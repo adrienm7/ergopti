@@ -526,6 +526,7 @@
 	"menu.hotstrings.personal_header": "मेरे hotstrings",
 	"menu.hotstrings.preview_bubbles": "बबल का पूर्वावलोकन करें",
 	"menu.hotstrings.reset_magic_key": "   ↳ रीसेट करें (डिफ़ॉल्ट: ★)",
+	"menu.hotstrings.repeat_key_toggle": "   ↳ ★ कुंजी से वर्ण दोहराएं",
 	"menu.hotstrings.shortcut_default_ctrl": "Ctrl + %s",
 	"menu.hotstrings.shortcut_none": "कोई शॉर्टकट नहीं",
 	"menu.hotstrings.shortcut_prefix": "शॉर्टकट: Win + ",

@@ -602,19 +602,23 @@ function M.is_section_enabled(group_name, section_name)
 	return hs.settings.get("hotstrings_section_" .. tostring(group_name) .. "_" .. tostring(section_name)) ~= false
 end
 
---- Returns true when the "repeatcorrections" section is present and enabled in any active group.
---- Used to gate the magic-key repeat feature.
+--- Returns true when the magic-key repeat engine is enabled.
+--- The repeat feature is now handled by the hotstring engine directly (not by a
+--- TOML section), so the gate is a standalone hs.settings key. Defaults to true
+--- when the setting has never been written (opt-out, not opt-in).
 --- @return boolean
 function M.is_repeat_feature_enabled()
-	if not _state then return false end
-	for name, g in pairs(_state.groups) do
-		if g.enabled and g.sections then
-			for _, sec in ipairs(g.sections) do
-				if sec.name == "repeatcorrections" then return M.is_section_enabled(name, "repeatcorrections") end
-			end
-		end
+	return hs.settings.get("magickey_repeat_enabled") ~= false
+end
+
+--- Enable or disable the magic-key repeat engine and persist the choice.
+--- @param enabled boolean
+function M.set_repeat_feature_enabled(enabled)
+	if enabled then
+		hs.settings.set("magickey_repeat_enabled", nil)
+	else
+		hs.settings.set("magickey_repeat_enabled", false)
 	end
-	return false
 end
 
 --- Disables a section and reloads its group so the mapping database reflects the change.

@@ -526,6 +526,7 @@
 	"menu.hotstrings.personal_header": "Mine hotstrings",
 	"menu.hotstrings.preview_bubbles": "Forhåndsvis bobler",
 	"menu.hotstrings.reset_magic_key": "   ↳ Nulstil (standard: ★)",
+	"menu.hotstrings.repeat_key_toggle": "   ↳ Gentag tegn med ★-tasten",
 	"menu.hotstrings.shortcut_default_ctrl": "Ctrl + %s",
 	"menu.hotstrings.shortcut_none": "Ingen genvej",
 	"menu.hotstrings.shortcut_prefix": "Genvej: Win + ",

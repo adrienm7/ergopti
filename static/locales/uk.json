@@ -501,6 +501,7 @@
 	"menu.hotstrings.personal_header": "Мої хотстринги",
 	"menu.hotstrings.preview_bubbles": "Бульбашки попереднього перегляду",
 	"menu.hotstrings.reset_magic_key": "   ↳ Скинути (за замовчуванням: ★)",
+	"menu.hotstrings.repeat_key_toggle": "   ↳ Повторення символу клавішею ★",
 	"menu.hotstrings.shortcut_default_ctrl": "Ctrl + %s",
 	"menu.hotstrings.shortcut_none": "Немає скорочення",
 	"menu.hotstrings.shortcut_prefix": "Скорочення: Win + ",

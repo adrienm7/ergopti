@@ -501,6 +501,7 @@
 	"menu.hotstrings.personal_header": "Kısaltmalarım",
 	"menu.hotstrings.preview_bubbles": "Önizleme baloncukları",
 	"menu.hotstrings.reset_magic_key": "   ↳ Sıfırla (varsayılan: ★)",
+	"menu.hotstrings.repeat_key_toggle": "   ↳ ★ tuşuyla karakter tekrarla",
 	"menu.hotstrings.shortcut_default_ctrl": "Ctrl + %s",
 	"menu.hotstrings.shortcut_none": "Kısayol yok",
 	"menu.hotstrings.shortcut_prefix": "Kısayol: Win + ",

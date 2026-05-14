@@ -526,6 +526,7 @@
 	"menu.hotstrings.personal_header": "ה-hotstrings שלי",
 	"menu.hotstrings.preview_bubbles": "תצוגה מקדימה של בועות",
 	"menu.hotstrings.reset_magic_key": "   ↳ אפס (ברירת מחדל: ★)",
+	"menu.hotstrings.repeat_key_toggle": "   ↳ חזרה על תו עם מקש ★",
 	"menu.hotstrings.shortcut_default_ctrl": "Ctrl + %s",
 	"menu.hotstrings.shortcut_none": "ללא קיצור",
 	"menu.hotstrings.shortcut_prefix": "קיצור: Win + ",

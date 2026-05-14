@@ -501,6 +501,7 @@
 	"menu.hotstrings.personal_header": "Moje hotstring",
 	"menu.hotstrings.preview_bubbles": "Náhledové bubliny",
 	"menu.hotstrings.reset_magic_key": "   ↳ Obnovit (výchozí: ★)",
+	"menu.hotstrings.repeat_key_toggle": "   ↳ Opakování znaku klávesou ★",
 	"menu.hotstrings.shortcut_default_ctrl": "Ctrl + %s",
 	"menu.hotstrings.shortcut_none": "Žádná zkratka",
 	"menu.hotstrings.shortcut_prefix": "Zkratka: Win + ",

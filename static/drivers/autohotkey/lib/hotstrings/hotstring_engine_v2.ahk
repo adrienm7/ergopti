@@ -110,6 +110,10 @@ global HSE_LastMatch := ""
 ; an extra char and re-emit it after the replacement.
 global HSE_LastEndChar := ""
 
+; When false the engine-level repeat-key fallback (HSE_TryRepeatKey) is
+; disabled — typed <x>★ sequences fall through unchanged.
+global HSE_RepeatEnabled := true
+
 
 ; ============================================
 ; ============================================
@@ -321,7 +325,10 @@ HSE_ApplyExpansion(Spec, Replacement, EndChar := "") {
 ; Returns a minimal Spec-like object compatible with HSE_DispatchMatch (star
 ; trigger, no end char) or "" when the repeat condition is not met.
 HSE_TryRepeatKey(MagicKey) {
-    global HSE_Buffer, HSE_StartIsWordBoundary, HSE_WORD_TERMINATORS
+    global HSE_Buffer, HSE_StartIsWordBoundary, HSE_WORD_TERMINATORS, HSE_RepeatEnabled
+    if !HSE_RepeatEnabled {
+        return ""
+    }
     MkLen := StrLen(MagicKey)
     BufLen := StrLen(HSE_Buffer)
     ; Buffer must contain at least <x><MagicKey> = MkLen+1 chars.

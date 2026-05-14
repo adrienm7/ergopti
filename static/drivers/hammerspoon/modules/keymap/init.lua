@@ -122,7 +122,8 @@ local CoreState = CoreStateM.new(M.DEFAULT_STATE, M.DELAYS_DEFAULT)
 -- Registry exposes the repeat-feature toggle used by the event loop. Binding
 -- it after state.new() avoids a circular require (state.lua cannot reference
 -- Registry without pulling the full keymap module in).
-CoreState.is_repeat_feature_enabled = Registry.is_repeat_feature_enabled
+CoreState.is_repeat_feature_enabled  = Registry.is_repeat_feature_enabled
+CoreState.set_repeat_feature_enabled = Registry.set_repeat_feature_enabled
 
 -- Mount dependencies (order matters: Registry before Expander/LLMBridge).
 Registry.init(CoreState)
@@ -271,6 +272,9 @@ M.enable_group          = Registry.enable_group
 M.sort_mappings         = Registry.sort_mappings
 M.defer_sort            = Registry.defer_sort
 M.flush_sort            = Registry.flush_sort
+
+M.is_repeat_feature_enabled  = Registry.is_repeat_feature_enabled
+M.set_repeat_feature_enabled = Registry.set_repeat_feature_enabled
 
 M.set_terminator_enabled   = Registry.set_terminator_enabled
 M.is_terminator_enabled    = Registry.is_terminator_enabled

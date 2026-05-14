@@ -526,6 +526,7 @@
 	"menu.hotstrings.personal_header": "Mine hotstrings",
 	"menu.hotstrings.preview_bubbles": "Forhåndsvis bobler",
 	"menu.hotstrings.reset_magic_key": "   ↳ Tilbakestill (standard: ★)",
+	"menu.hotstrings.repeat_key_toggle": "   ↳ Gjenta tegn med ★-tasten",
 	"menu.hotstrings.shortcut_default_ctrl": "Ctrl + %s",
 	"menu.hotstrings.shortcut_none": "Ingen snarvei",
 	"menu.hotstrings.shortcut_prefix": "Snarvei: Win + ",

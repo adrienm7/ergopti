@@ -501,6 +501,7 @@
 	"menu.hotstrings.personal_header": "マイホットストリング",
 	"menu.hotstrings.preview_bubbles": "プレビューバブル",
 	"menu.hotstrings.reset_magic_key": "   ↳ リセット（デフォルト: ★）",
+	"menu.hotstrings.repeat_key_toggle": "   ↳ ★キーで文字を繰り返す",
 	"menu.hotstrings.shortcut_default_ctrl": "Ctrl + %s",
 	"menu.hotstrings.shortcut_none": "ショートカットなし",
 	"menu.hotstrings.shortcut_prefix": "ショートカット: Win + ",
