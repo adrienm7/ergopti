@@ -1141,7 +1141,7 @@
 	"magickey.textexpansionsymbols": "マジックキーによる記号展開",
 	"magickey.textexpansionsymbolstypst": "マジックキーによるTypst記号",
 	"dynamichotstrings.group_label": "動的ホットストリング",
-	"dynamichotstrings.textexpansionpersonalinformation": "フォーム入力 (@name, @email, ...)",
+	"dynamichotstrings.textexpansionpersonalinformation": "@np★ = 姓 ⇥ 名 — 各文字がフィールドに対応（n=姓, p=名, e=メール…）",
 	"common.disabled": "無効",
 	"common.browse": "参照…",
 	"sg_labels.script_altgr_enter": "AltGr + Enter",

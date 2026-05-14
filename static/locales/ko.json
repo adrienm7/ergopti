@@ -1141,7 +1141,7 @@
 	"magickey.textexpansionsymbols": "매직 키를 사용한 기호 확장",
 	"magickey.textexpansionsymbolstypst": "매직 키를 사용한 Typst 기호",
 	"dynamichotstrings.group_label": "동적 핫스트링",
-	"dynamichotstrings.textexpansionpersonalinformation": "양식 작성 (@name, @email, ...)",
+	"dynamichotstrings.textexpansionpersonalinformation": "@np★ = 성 ⇥ 이름 — 각 글자 = 하나의 필드 (n=성, p=이름, e=이메일…)",
 	"common.disabled": "비활성화됨",
 	"common.browse": "찾아보기…",
 	"sg_labels.script_altgr_enter": "AltGr + Enter",

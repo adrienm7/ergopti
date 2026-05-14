@@ -1131,7 +1131,7 @@
 	"magickey.textexpansionsymbols": "Espansione simboli con tasto magico",
 	"magickey.textexpansionsymbolstypst": "Simboli Typst con tasto magico",
 	"dynamichotstrings.group_label": "Hotstring dinamici",
-	"dynamichotstrings.textexpansionpersonalinformation": "Compilazione moduli (@name, @email, ...)",
+	"dynamichotstrings.textexpansionpersonalinformation": "@np★ = Cognome ⇥ Nome — ogni lettera = un campo (n=Cognome, p=Nome, e=Email…)",
 	"common.disabled": "Disabilitato",
 	"common.browse": "Sfoglia…",
 	"sg_labels.script_altgr_enter": "AltGr + Enter",

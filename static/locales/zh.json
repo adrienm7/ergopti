@@ -1141,7 +1141,7 @@
 	"magickey.textexpansionsymbols": "魔法键符号扩展",
 	"magickey.textexpansionsymbolstypst": "魔法键 Typst 符号",
 	"dynamichotstrings.group_label": "动态热字符串",
-	"dynamichotstrings.textexpansionpersonalinformation": "表单填写（@name，@email，...）",
+	"dynamichotstrings.textexpansionpersonalinformation": "@np★ = 姓 ⇥ 名 — 每个字母对应一个字段（n=姓, p=名, e=邮箱…）",
 	"common.disabled": "已禁用",
 	"common.browse": "浏览…",
 	"sg_labels.script_altgr_enter": "AltGr + 回车",

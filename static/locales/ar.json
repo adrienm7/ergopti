@@ -1141,7 +1141,7 @@
   "magickey.textexpansionsymbols": "توسيع الرموز بمفتاح السحر",
   "magickey.textexpansionsymbolstypst": "رموز Typst بمفتاح السحر",
   "dynamichotstrings.group_label": "الحقول التلقائية الديناميكية",
-  "dynamichotstrings.textexpansionpersonalinformation": "تعبئة النماذج (@name، @email، ...)",
+  "dynamichotstrings.textexpansionpersonalinformation": "@np★ = اللقب ⇥ الاسم — كل حرف = حقل (n=اللقب, p=الاسم, e=البريد…)",
   "common.disabled": "مُعطَّل",
   "common.browse": "استعراض…",
   "sg_labels.script_altgr_enter": "AltGr + Enter",
