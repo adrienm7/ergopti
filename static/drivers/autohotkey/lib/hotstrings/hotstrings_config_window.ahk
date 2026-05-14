@@ -259,7 +259,7 @@ OpenHotstringsConfigWindow() {
 		return
 	}
 
-	G := Gui("+Resize +MinSize620x280", t("hs_config.window_title"))
+	G := Gui("+Resize +MinSize580x320", t("hs_config.window_title"))
 	G.SetFont("s10", "Segoe UI")
 	G.MarginX := 14
 	G.MarginY := 12
@@ -272,34 +272,43 @@ OpenHotstringsConfigWindow() {
 	BtnReset.OnEvent("Click", (*) => _HCW_ResetAll())
 	BtnClose.OnEvent("Click", (*) => _HCWGui.Hide())
 
-	; ----- Group + File + Section selectors --------------------------------
-	G.Add("Text", "xm y+18 w58", t("hs_config.label_group"))
-	GroupDD := G.Add("DropDownList", "x+6 yp-3 w160", _HCW_GroupItems())
-	G.Add("Text", "x+12 yp+3 w46", t("hs_config.label_file"))
-	FileDD := G.Add("DropDownList", "x+6 yp-3 w160 r14", [])
-	G.Add("Text", "x+12 yp+3 w58", t("hs_config.label_section"))
-	SecDD := G.Add("DropDownList", "x+6 yp-3 w160 r14", [])
+	; ----- Group selector (full-width row) ---------------------------------
+	G.Add("Text", "xm y+18 w70 h20", t("hs_config.label_group"))
+	GroupDD := G.Add("DropDownList", "x+6 yp-3 w450 r14", _HCW_GroupItems())
+
+	; ----- File selector (full-width row) ----------------------------------
+	G.Add("Text", "xm y+10 w70 h20", t("hs_config.label_file"))
+	FileDD := G.Add("DropDownList", "x+6 yp-3 w450 r14", [])
+
+	; ----- Section selector (full-width row) -------------------------------
+	G.Add("Text", "xm y+10 w70 h20", t("hs_config.label_section"))
+	SecDD := G.Add("DropDownList", "x+6 yp-3 w450 r14", [])
+
+	; ----- Current path hint (below selectors) ----------------------------
+	Status := G.Add("Text", "xm y+6 w530 h18 cGray", "")
+
+	G.Add("Text", "xm y+14 w530 h1 0x10")   ; horizontal rule (SS_SUNKEN)
 
 	; ----- Delay row -------------------------------------------------------
-	G.Add("Text", "xm y+18 w58", t("hs_config.label_delay"))
-	DelayEdit := G.Add("Edit", "x+6 yp-3 w90 Number")
+	G.Add("Text", "xm y+14 w70 h20", t("hs_config.label_delay"))
+	DelayEdit := G.Add("Edit", "x+6 yp-3 w80 Number")
 	DelayUpDown := G.Add("UpDown", "Range0-10000", 0)
-	DelayReset := G.Add("Button", "x+6 yp w28 h24", "↺")
-	DelayDefault := G.Add("Text", "x+8 yp+3 w260", "")
+	G.Add("Text", "x+4 yp+3 w24", "ms")
+	DelayDefault := G.Add("Text", "x+10 yp w200", "")
+	DelayReset := G.Add("Button", "x530 yp-3 w28 h24", "↺")
 
 	; ----- Color row -------------------------------------------------------
-	G.Add("Text", "xm y+10 w58", t("hs_config.label_color"))
+	G.Add("Text", "xm y+10 w70 h20", t("hs_config.label_color"))
 	ColorDD := G.Add("DropDownList", "x+6 yp-3 w180", _HCW_ColorLabels())
 	ColorSwatch := G.Add("Progress", "x+8 yp+1 w22 h22 BackgroundCCCCCC", 100)
-	ColorReset := G.Add("Button", "x+8 yp-1 w28 h24", "↺")
-	ColorDefault := G.Add("Text", "x+8 yp+3 w180", "")
+	ColorDefault := G.Add("Text", "x+10 yp+2 w180", "")
+	ColorReset := G.Add("Button", "x530 yp-2 w28 h24", "↺")
+
+	G.Add("Text", "xm y+14 w530 h1 0x10")   ; horizontal rule (SS_SUNKEN)
 
 	; ----- Tooltip toggle row ---------------------------------------------
-	TooltipChk := G.Add("Checkbox", "xm y+10", t("hs_config.label_tooltip"))
-	TooltipReset := G.Add("Button", "x+8 yp-2 w28 h24", "↺")
-
-	; ----- Status / hint ---------------------------------------------------
-	Status := G.Add("Text", "xm y+12 w600 h20 cGray", "")
+	TooltipChk := G.Add("Checkbox", "xm y+14", t("hs_config.label_tooltip"))
+	TooltipReset := G.Add("Button", "x530 yp-2 w28 h24", "↺")
 
 	_HCWWidgets := {
 		Gui:          G,
@@ -437,7 +446,7 @@ _HCW_LoadCurrent() {
 	TooltipOverridden := (Override.HasOwnProp("ShowTooltip") and Override.ShowTooltip != "")
 	_HCWWidgets.TooltipReset.Enabled := TooltipOverridden
 
-	_HCWWidgets.Status.Value := Entry.Key . (Sec ? "  /  " . Sec : "")
+	_HCWWidgets.Status.Value := _HCW_StatusPath(Entry, Sec)
 }
 
 
@@ -804,6 +813,34 @@ _HCW_GetSections(Entry) {
 	}
 	return Sections
 }
+
+; Build the repo-relative path string shown in the status bar.
+; For common categories: hotstrings/<name>.toml
+; For personal files: path relative to the repo root (PersonalHotstringsDir ancestor)
+; For extensions: extensions/<ext_id>/hotstrings/<stem>.toml
+; A section name is appended when one is selected.
+_HCW_StatusPath(Entry, Sec) {
+	if Entry.IsPersonal {
+		; Make path relative to the repo root by stripping the static/ ancestor prefix
+		Path := Entry.Path
+		SplitPath(A_ScriptDir, , &DriversDir)
+		SplitPath(DriversDir, , &StaticDir)
+		SplitPath(StaticDir, , &RepoDir)
+		Rel := StrReplace(Path, RepoDir . "\", "")
+		Rel := StrReplace(Rel, "\", "/")
+	} else if Entry.IsExtension {
+		SplitPath(Entry.Path, &FileName)
+		Stem := RegExReplace(FileName, "\.toml$", "")
+		Rel := "extensions/" . Entry.ExtId . "/hotstrings/" . Stem . ".toml"
+	} else {
+		Rel := "hotstrings/" . StrLower(Entry.Key) . ".toml"
+	}
+	if (Sec != "") {
+		Rel .= "  [" . Sec . "]"
+	}
+	return Rel
+}
+
 
 _HCW_TomlDefaults(Entry, Section) {
 	if Entry.IsPersonal {
