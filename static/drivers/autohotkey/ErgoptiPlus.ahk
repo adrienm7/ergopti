@@ -43,7 +43,7 @@ ErgoptiGlobalErrorHandler(Exc, Mode) {
         Exc.Message . (Exc.HasProp("Stack") ? " | " . Exc.Stack : ""))
     ; Surface the error to the user once, without blocking subsequent keys
     try {
-        MsgBox("ErgoptiPlus — erreur interne capturée :`n`n" . Exc.Message . "`n`n" . (Exc.HasProp("Stack") ? Exc.Stack :
+        MsgBox(t("ergopti.error_caught") . "`n`n" . Exc.Message . "`n`n" . (Exc.HasProp("Stack") ? Exc.Stack :
             ""), "ErgoptiPlus", "Icon!")
     }
     return true
@@ -3057,7 +3057,7 @@ WindowSpy(*) {
     if FileExist(spyPath) {
         Run(spyPath)
     } else {
-        MsgBox("WindowSpy.ahk n'a pas été trouvé à l'emplacement suivant : " spyPath)
+        MsgBox(Format(t("ergopti.windowspy_not_found"), spyPath))
     }
 }
 

@@ -12,8 +12,9 @@
 --- ==============================================================================
 
 local M = {}
-local hs = hs
+local hs     = hs
 local Logger = require("lib.logger")
+local i18n   = require("lib.i18n")
 
 local LOG = "app_picker"
 
@@ -159,7 +160,7 @@ function M.build_menu(current_apps, on_change, placeholder_text)
 					end
 				end)
 
-				chooser:placeholderText(placeholder_text or "Rechercher une application…")
+				chooser:placeholderText(placeholder_text or i18n.get("app_picker.search_placeholder"))
 				chooser:choices(choices)
 				chooser:bgDark(false)
 				chooser:show()
@@ -208,7 +209,7 @@ function M.build_menu(current_apps, on_change, placeholder_text)
 
 	Logger.info(LOG, "Application exclusion menu built successfully.")
 	if #menu == 0 then
-		table.insert(menu, { title = "Aucune application à exclure", disabled = true })
+		table.insert(menu, { title = i18n.get("app_picker.no_app_excluded"), disabled = true })
 	end
 	return type(menu) == "table" and menu or {}
 end

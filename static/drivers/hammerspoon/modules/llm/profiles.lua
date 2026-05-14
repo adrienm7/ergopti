@@ -9,6 +9,7 @@
 local M = {}
 
 local Logger = require("lib.logger")
+local i18n   = require("lib.i18n")
 local hs     = hs
 local LOG    = "llm.profiles"
 
@@ -90,28 +91,28 @@ end
 M.BUILTIN_PROFILES = {
 	{
 		id            = "raw",
-		label         = "○○○ Autocomplétion — Aucun prompt, juste le contexte",
+		label         = i18n.get("llm.profile.raw.label"),
 		batch         = false,
 		system_single = RAW_PROMPT_SINGLE,
 		system_multi  = nil,
 	},
 	{
 		id            = "basic",
-		label         = "●○○ Basique — Prédiction simple",
+		label         = i18n.get("llm.profile.basic.label"),
 		batch         = false,
 		system_single = BASIC_PROMPT_SINGLE,
 		system_multi  = nil,
 	},
 	{
 		id            = "advanced",
-		label         = "●●○ Avancé — Correction + Prédiction",
+		label         = i18n.get("llm.profile.advanced.label"),
 		batch         = false,
 		system_single = ADVANCED_PROMPT_SINGLE,
 		system_multi  = nil,
 	},
 	{
 		id            = "batch_advanced",
-		label         = "●●● Batch Avancé — 1 req. avancée avec {n} prédiction{s}",
+		label         = i18n.get("llm.profile.batch_advanced.label"),
 		batch         = true,
 		system_single = ADVANCED_PROMPT_SINGLE,
 		system_multi  = BATCH_ADVANCED_PROMPT,

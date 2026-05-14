@@ -592,7 +592,7 @@ if Features["Shortcuts"]["TeleportMouse"].Enabled {
         }
 
         if (Count < 2) {
-            MsgBox("Aucun autre moniteur détecté.")
+            MsgBox(t("shortcuts.no_other_monitor"))
             return
         }
 
@@ -628,7 +628,7 @@ if Features["Shortcuts"]["SpotlightMouse"].Enabled {
 SC029:: {
     WinGetPos(&WX, &WY, &WW, &WH, "A")
     if (WW = 0 or WH = 0) {
-        MsgBox("Aucune fenêtre active.", "Capture d'écran", "OK T3")
+        MsgBox(t("shortcuts.no_active_window"), t("shortcuts.screenshot_title"), "OK T3")
         return
     }
     PicsDir   := EnvGet("USERPROFILE") . "\Pictures\screenshots"

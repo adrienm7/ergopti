@@ -753,7 +753,7 @@ CountTomlSection(CategoryName, SectionName) {
     and ScriptInformation.Has("PersonalTomlPath")) {
         FilePath := ScriptInformation["PersonalTomlPath"]
     } else {
-        FilePath := A_ScriptDir . "\..\hotstrings\" . StrLower(CategoryName) . ".toml"
+        FilePath := A_ScriptDir . "\..\..\hotstrings\" . StrLower(CategoryName) . ".toml"
     }
     if !FileExist(FilePath) {
         return 0
@@ -792,7 +792,7 @@ CountTomlHotstrings(CategoryName) {
     and ScriptInformation.Has("PersonalTomlPath")) {
         FilePath := ScriptInformation["PersonalTomlPath"]
     } else {
-        FilePath := A_ScriptDir . "\..\hotstrings\" . StrLower(CategoryName) . ".toml"
+        FilePath := A_ScriptDir . "\..\..\hotstrings\" . StrLower(CategoryName) . ".toml"
     }
     if !FileExist(FilePath) {
         return 0

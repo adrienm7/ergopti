@@ -635,7 +635,7 @@ _GestureActionLabel(Name) {
 GestureScreenshotInstant() {
     WinGetPos(&WX, &WY, &WW, &WH, "A")
     if (WW = 0 or WH = 0) {
-        MsgBox("Aucune fenêtre active.", "Capture d'écran", "OK T3")
+        MsgBox(t("shortcuts.no_active_window"), t("shortcuts.screenshot_title"), "OK T3")
         return
     }
     PicsDir   := EnvGet("USERPROFILE") . "\Pictures\screenshots"
@@ -668,7 +668,7 @@ GesturePickColor() {
     HexColor := PixelGetColor(MouseX, MouseY, "RGB")
     HexColor := "#" . StrLower(SubStr(HexColor, 3))
     A_Clipboard := HexColor
-    MsgBox("La couleur sous le curseur est " . HexColor . "`nElle a été sauvegardée dans le presse-papiers : " . A_Clipboard)
+    MsgBox(Format(t("shortcuts.color_picker_result"), HexColor, A_Clipboard), t("shortcuts.color_picker_title"))
 }
 
 GestureTakeNote() {
@@ -749,7 +749,7 @@ GestureTeleportMouse() {
         Monitors.Push({Left: Left, Top: Top, Right: Right, Bottom: Bottom})
     }
     if (Count < 2) {
-        MsgBox("Aucun autre moniteur détecté.")
+        MsgBox(t("shortcuts.no_other_monitor"))
         return
     }
     MouseGetPos(&CurX, &CurY)

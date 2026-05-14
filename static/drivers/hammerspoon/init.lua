@@ -121,7 +121,7 @@ local ui_restore         = require("lib.ui_restore")
 -- without any module needing to call notifications.notify() directly.
 -- Registered here (after notifications is loaded) to keep logger dependency-free.
 Logger.set_error_notification_handler(function(module_name, message)
-	pcall(notifications.notify, "Erreur — " .. tostring(module_name), message, "error")
+	pcall(notifications.notify, i18n.get("common.error_prefix") .. tostring(module_name), message, "error")
 end)
 
 

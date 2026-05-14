@@ -170,8 +170,8 @@ KLUI_LaunchWindow(url, title) {
     pid := 0
     try Run('"' . edge . '" ' . args, , , &pid)
     catch as err {
-        MsgBox("Impossible de lancer le tableau de bord : " . err.Message,
-            "Erreur — " . title, "Iconx")
+        MsgBox(Format(t("keylogger_ui.launch_error"), err.Message),
+            t("common.error_title"), "Iconx")
         return 0
     }
     return pid
@@ -203,10 +203,8 @@ KLUI_RequireEnabled() {
     if MetricsShortcuts.enabled
         return true
     MsgBox(
-        "Les métriques sont désactivées.`n`n"
-        . "Pour les activer : icône de la zone de notification → 📊 Métriques → "
-        . "« ❌ Métriques désactivées (cliquer pour activer) ».",
-        "📊 Métriques", "Iconi"
+        t("keylogger_ui.metrics_disabled") . "`n`n" . t("keylogger_ui.metrics_disabled_body"),
+        t("keylogger_ui.metrics_title"), "Iconi"
     )
     return false
 }
@@ -214,13 +212,13 @@ KLUI_RequireEnabled() {
 KLUI_ToggleTyping(*) {
     if !KLUI_RequireEnabled()
         return
-    KLUI_ToggleDashboard("typing", "Métriques de frappe")
+    KLUI_ToggleDashboard("typing", t("keylogger_ui.typing_metrics"))
 }
 
 KLUI_ToggleApps(*) {
     if !KLUI_RequireEnabled()
         return
-    KLUI_ToggleDashboard("apps", "Temps sur les applications")
+    KLUI_ToggleDashboard("apps", t("keylogger_ui.app_metrics"))
 }
 
 ; Shared toggle implementation. Tries WebView2 first (B niveau 2 — live

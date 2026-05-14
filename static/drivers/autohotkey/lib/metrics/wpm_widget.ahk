@@ -540,11 +540,23 @@ WPMWidget_Tick() {
     while (WPMWidget._graph_hist.Length > WPMWidgetConst.GRAPH_HISTORY)
         WPMWidget._graph_hist.RemoveAt(1)
 
-    is_idle  := idle || wpm = 0
+    ; Show only while typing — hide when idle, matching Hammerspoon behaviour.
+    should_show := (wpm > 0) || has_hs || has_ai || has_ac
+    gui_ref := WPMWidget.show_graph ? WPMWidget._graph_gui : WPMWidget._gui
+    if gui_ref {
+        if should_show
+            gui_ref.Show("NoActivate")
+        else
+            gui_ref.Hide()
+    }
+    if !should_show
+        return
+
+    is_idle  := false
     bg_color := WPMWidget_ResolveBgColor(is_idle, has_hs, has_ai, has_ac, WPMWidget.use_colors)
-    alpha    := is_idle ? WPMWidgetConst.ALPHA_IDLE : WPMWidgetConst.ALPHA_ACTIVE
-    wpm_str  := is_idle ? "—" : String(wpm)
-    txt_col  := is_idle ? WPMWidgetConst.COLOR_TXT_IDLE : WPMWidgetConst.COLOR_TXT_ACTIVE
+    alpha    := WPMWidgetConst.ALPHA_ACTIVE
+    wpm_str  := String(wpm)
+    txt_col  := WPMWidgetConst.COLOR_TXT_ACTIVE
 
     if WPMWidget.show_graph {
         if WPMWidget._graph_gui {

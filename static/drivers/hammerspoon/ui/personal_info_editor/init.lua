@@ -16,6 +16,7 @@ local M = {}
 local hs     = hs
 local timer  = hs.timer
 local Logger = require("lib.logger")
+local i18n   = require("lib.i18n")
 
 local LOG   = "personal_info_editor"
 
@@ -34,29 +35,33 @@ local _srv        = nil
 
 -- Field definitions for the form. Keys match the preferences table.
 local FIELDS = {
-	{ key = "FirstName",            label = "Prénom" },
+	{ key = "FirstName",            label = i18n.get("personal_info.field_firstname") },
 	{ key = "LastName",             label = "Nom" },
 	{ key = "DateOfBirth",          label = "Date de naissance" },
 	{ key = "EmailAddress",         label = "E-mail" },
 	{ key = "WorkEmailAddress",     label = "E-mail professionnel" },
-	{ key = "PhoneNumber",          label = "Téléphone (chiffres seuls)" },
-	{ key = "PhoneNumberFormatted", label = "Téléphone (formaté)" },
+	{ key = "PhoneNumber",          label = i18n.get("personal_info.field_phone_digits") },
+	{ key = "PhoneNumberFormatted", label = i18n.get("personal_info.field_phone_formatted") },
 	{ key = "StreetAddress",        label = "Adresse" },
 	{ key = "PostalCode",           label = "Code postal" },
 	{ key = "City",                 label = "Ville" },
 	{ key = "Country",              label = "Pays" },
 	{ key = "IBAN",                 label = "IBAN" },
 	{ key = "BIC",                  label = "BIC" },
-	{ key = "CreditCard",           label = "Carte de crédit" },
-	{ key = "SocialSecurityNumber", label = "Numéro de Sécurité Sociale" },
+	{ key = "CreditCard",           label = i18n.get("personal_info.field_credit_card") },
+	{ key = "SocialSecurityNumber", label = i18n.get("personal_info.field_ssn") },
 }
 
--- Response HTML displayed after a successful save
-local HTML_OK = [[<!DOCTYPE html><html><head><meta charset="utf-8">
-<style>body{font-family:-apple-system,sans-serif;padding:40px;text-align:center}
-h2{color:#007AFF}</style></head>
-<body><h2>✓ Enregistré</h2><p>Vous pouvez fermer cet onglet.</p>
-<script>window.close()</script></body></html>]]
+-- Response HTML displayed after a successful save (built at require-time so
+-- i18n is already loaded and the locale is active)
+local function build_html_ok()
+	return "<!DOCTYPE html><html><head><meta charset=\"utf-8\">"
+		.. "<style>body{font-family:-apple-system,sans-serif;padding:40px;text-align:center}"
+		.. "h2{color:#007AFF}</style></head>"
+		.. "<body><h2>" .. i18n.get("personal_info.saved_title") .. "</h2>"
+		.. "<p>" .. i18n.get("personal_info.saved_body") .. "</p>"
+		.. "<script>window.close()</script></body></html>"
+end
 
 -- Determine absolute path to the assets directory
 local _src  = debug.getinfo(1, "S").source:sub(2)
@@ -205,7 +210,7 @@ function M.open(current_info, save_callback)
 					_srv = nil 
 				end 
 			end)
-			return HTML_OK, 200, { ["Content-Type"] = "text/html; charset=utf-8" }
+			return build_html_ok(), 200, { ["Content-Type"] = "text/html; charset=utf-8" }
 			
 		-- 5. Cancellation handler
 		elseif path == "/cancel" then

@@ -377,7 +377,7 @@ PY
 			deps.active_tasks["hf_login"] = task
 			pcall(function() task:start() end)
 		else
-			pcall(notifications.notify, "Connexion HuggingFace impossible", nil, "error")
+			pcall(notifications.notify, i18n.get("mlx.hf_connection_failed"), nil, "error")
 			if type(on_done) == "function" then pcall(on_done, false) end
 		end
 	end
@@ -849,8 +849,7 @@ PY
 				dump_mlx_server_log("MLX crash for ‘" .. tostring(target_model) .. "’")
 				if not silent_notifications then
 					pcall(notifications.notify, "MLX incompatible",
-						"Le modèle " .. tostring(target_model) ..
-						" n’est pas compatible avec mlx-lm. Choisissez un autre modèle.", "error")
+						string.format(i18n.get("mlx.model_incompatible"), tostring(target_model)), "error")
 				end
 				-- Release the caller’s prediction lock so the user can switch to a working
 				-- model without having to reload Hammerspoon
@@ -1660,11 +1659,11 @@ PY
 						or "Cause inconnue. Consultez la console Hammerspoon."
 					Logger.error(LOG, "MLX dependencies missing — bootstrap definitively failed: %s",
 						tostring(cause):gsub("\n", " | "))
-					pcall(notifications.notify, "Dépendances MLX manquantes", cause, "error")
+					pcall(notifications.notify, i18n.get("mlx.deps_missing"), cause, "error")
 				else
 					Logger.error(LOG, "MLX dependencies missing in %s — auto-bootstrap may have failed.", project_venv_python_escaped)
-					pcall(notifications.notify, "Dépendances MLX manquantes",
-						"Le bootstrap automatique du venv a échoué. Rechargez Hammerspoon et consultez la console.", "error")
+					pcall(notifications.notify, i18n.get("mlx.deps_missing"),
+						i18n.get("mlx.deps_missing_body"), "error")
 				end
 				if on_cancel then pcall(on_cancel) end
 			end
@@ -1686,7 +1685,7 @@ PY
 		local safe_repo = "models--" .. repo:gsub("/", "--")
 		local path = home .. "/.cache/huggingface/hub/" .. safe_repo
 		os.execute("rm -rf " .. path)
-		pcall(notifications.notify, "Supprimé (MLX)", model_name, "success")
+		pcall(notifications.notify, i18n.get("mlx.model_deleted"), model_name, "success")
 		pcall(deps.update_menu)
 	end
 

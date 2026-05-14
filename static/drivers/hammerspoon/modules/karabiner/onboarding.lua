@@ -556,15 +556,14 @@ function M.run_first_run_wizard()
 	-- of the install pipeline (app → sysext → daemon running).
 	if not report.ke_installed or not report.grabber_present then
 		local choice = hs.dialog.blockAlert(
-			"Configuration de Karabiner-Elements requise",
-			"Ergopti+ a besoin de Karabiner-Elements pour fonctionner.\n\n"
-				.. "Éléments manquants :\n" .. summary
+			i18n.get("karabiner.onboarding.required_title"),
+			i18n.get("karabiner.onboarding.missing_prefix") .. summary
 				.. "\n\nL'application va être téléchargée depuis le dépôt officiel "
 				.. "(pqrs-org/Karabiner-Elements) et installée automatiquement. "
 				.. "Le mot de passe administrateur sera demandé.",
-			"Installer maintenant", "Plus tard", "warning")
+			i18n.get("karabiner.onboarding.btn_install_now"), i18n.get("common.later"), "warning")
 		Logger.info(LOG, "Wizard step (install): user chose '%s'.", tostring(choice))
-		if choice ~= "Installer maintenant" then
+		if choice ~= i18n.get("karabiner.onboarding.btn_install_now") then
 			Logger.success(LOG, "Onboarding wizard step completed (user deferred).")
 			return
 		end
@@ -586,55 +585,44 @@ function M.run_first_run_wizard()
 
 	if not report.sysext_activated then
 		local choice = hs.dialog.blockAlert(
-			"Activer l'extension système",
-			"Karabiner-Elements est installé, mais son extension de système "
-				.. "(DriverKit virtual HID) n'est pas encore activée.\n\n"
-				.. "Cliquez sur « Ouvrir les Réglages », puis activez "
-				.. "« Karabiner-DriverKit-VirtualHIDDevice » dans la section "
-				.. "Extensions de système.",
-			"Ouvrir les Réglages", "Plus tard", "warning")
+			i18n.get("karabiner.onboarding.ext_title"),
+			i18n.get("karabiner.onboarding.ext_body"),
+			i18n.get("karabiner.onboarding.btn_open_settings"), i18n.get("common.later"), "warning")
 		Logger.info(LOG, "Wizard step (sysext): user chose '%s'.", tostring(choice))
-		if choice ~= "Ouvrir les Réglages" then
+		if choice ~= i18n.get("karabiner.onboarding.btn_open_settings") then
 			Logger.success(LOG, "Onboarding wizard step completed (user deferred).")
 			return
 		end
 		M.open_system_extensions_pane()
-		notify("En attente de l'activation de l'extension système…", "info")
+		notify(i18n.get("karabiner.onboarding.ext_waiting"), "info")
 		poll_until(M.is_sysext_activated,
 			function()
-				notify("Extension système activée.", "success")
+				notify(i18n.get("karabiner.onboarding.ext_activated"), "success")
 				hs.timer.doAfter(1.0, function() M.run_first_run_wizard() end)
 			end,
-			function() notify("Délai dépassé pour l'activation de l'extension système.", "warning") end)
+			function() notify(i18n.get("karabiner.onboarding.ext_timeout"), "warning") end)
 		Logger.success(LOG, "Onboarding wizard step completed (waiting on sysext).")
 		return
 	end
 
 	if not report.grabber_running then
 		local choice = hs.dialog.blockAlert(
-			"Autoriser Karabiner-Elements",
-			"L'extension système est activée mais le daemon Karabiner ne "
-				.. "tourne pas. Karabiner-Elements v16+ a besoin de la "
-				.. "permission « Accessibilité » (les versions plus anciennes "
-				.. "demandent « Surveillance des saisies » à la place).\n\n"
-				.. "Cliquez sur « Ouvrir Accessibilité », puis activez "
-				.. "Karabiner-Elements dans la liste. Si l'entrée n'apparaît "
-				.. "pas, ouvrez Karabiner-Elements une fois depuis "
-				.. "/Applications/ pour qu'il s'enregistre auprès de macOS.",
-			"Ouvrir Accessibilité", "Plus tard", "warning")
+			i18n.get("karabiner.onboarding.accessibility_title"),
+			i18n.get("karabiner.onboarding.accessibility_body"),
+			i18n.get("karabiner.onboarding.btn_open_accessibility"), i18n.get("common.later"), "warning")
 		Logger.info(LOG, "Wizard step (accessibility): user chose '%s'.", tostring(choice))
-		if choice ~= "Ouvrir Accessibilité" then
+		if choice ~= i18n.get("karabiner.onboarding.btn_open_accessibility") then
 			Logger.success(LOG, "Onboarding wizard step completed (user deferred).")
 			return
 		end
 		M.open_accessibility_pane()
-		notify("En attente du démarrage du daemon Karabiner…", "info")
+		notify(i18n.get("karabiner.onboarding.daemon_waiting"), "info")
 		poll_until(M.is_grabber_running,
 			function()
-				notify("Karabiner-Elements opérationnel.", "success")
+				notify(i18n.get("karabiner.onboarding.daemon_ready"), "success")
 				hs.timer.doAfter(1.0, function() M.run_first_run_wizard() end)
 			end,
-			function() notify("Délai dépassé pour le démarrage du daemon Karabiner.", "warning") end)
+			function() notify(i18n.get("karabiner.onboarding.daemon_timeout"), "warning") end)
 		Logger.success(LOG, "Onboarding wizard step completed (waiting on daemon).")
 		return
 	end

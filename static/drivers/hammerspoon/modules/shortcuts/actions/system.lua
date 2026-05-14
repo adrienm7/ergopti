@@ -217,7 +217,7 @@ function M.toggle_awake()
 		end
 
 		Logger.info(LOG, "Keep-awake disabled.")
-		pcall(hs.alert.show, "☕ Keep-awake désactivé", 2)
+		pcall(hs.alert.show, i18n.get("shortcuts.keep_awake_off"), 2)
 	else
 		awake_active = true
 		awake_started_at = hs.timer.secondsSinceEpoch()
@@ -229,7 +229,7 @@ function M.toggle_awake()
 		end
 		math.randomseed(os.time())
 
-		local ok, aid = pcall(hs.alert.show, "☕ Keep-awake actif — Ctrl+M pour désactiver", math.huge)
+		local ok, aid = pcall(hs.alert.show, i18n.get("shortcuts.keep_awake_on"), math.huge)
 		if ok then awake_alert_id = aid end
 
 		-- Record the current mouse position as the jitter origin
@@ -407,7 +407,7 @@ function M.copy_pixel_color()
 
 	local hex = pixel_hex_at(math.floor(pos.x), math.floor(pos.y))
 	if not hex then
-		notifications.notify("Impossible de lire la couleur du pixel", nil, "error")
+		notifications.notify(i18n.get("shortcuts.pixel_read_error"), nil, "error")
 		return
 	end
 

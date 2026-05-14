@@ -175,7 +175,7 @@ end
 
 local function format_shortcut_title(action, mods, none_label, mod_label)
     if not mods or (#mods == 1 and mods[1] == "none") then
-        return action .. " : Désactivé"
+        return action .. " : " .. i18n.get("common.disabled")
     elseif #mods == 0 then
         return action .. " : " .. none_label
     else
@@ -421,16 +421,16 @@ function M.create(deps)
         local batch_suffix = current_preds > 1 and "s" or ""
         
         local labels = {
-            raw = "○○○ Raw — Aucun prompt, juste le contexte",
-            basic = "●○○ Basique — Prédiction simple",
-            advanced = "●●○ Avancé — Correction + Prédiction",
-            batch_advanced = string.format("●●● Batch Avancé — 1 req. avancée avec %d prédiction%s", current_preds, batch_suffix),
-            parallel_simple = "●○○ Basique — Prédiction simple",
-            parallel = "●○○ Basique — Prédiction simple",
-            batch_simple = "●○○ Basique — Prédiction simple",
-            batch = string.format("●●● Batch Avancé — 1 req. avancée avec %d prédiction%s", current_preds, batch_suffix),
-            parallel_advanced = "●●○ Avancé — Correction + Prédiction",
-            base_completion = "○○○ Raw — Aucun prompt, juste le contexte",
+            raw = i18n.get("llm.profile.raw.label"),
+            basic = i18n.get("llm.profile.basic.label"),
+            advanced = i18n.get("llm.profile.advanced.label"),
+            batch_advanced = string.format(i18n.get("llm.profile.batch_advanced.label"), current_preds, batch_suffix),
+            parallel_simple = i18n.get("llm.profile.basic.label"),
+            parallel = i18n.get("llm.profile.basic.label"),
+            batch_simple = i18n.get("llm.profile.basic.label"),
+            batch = string.format(i18n.get("llm.profile.batch_advanced.label"), current_preds, batch_suffix),
+            parallel_advanced = i18n.get("llm.profile.advanced.label"),
+            base_completion = i18n.get("llm.profile.raw.label"),
         }
         return labels[profile_id] or tostring(profile_id)
     end
@@ -469,13 +469,7 @@ function M.create(deps)
             local rec_profile, _ = get_recommended_profile_info(model_name)
             local rec_label = get_profile_label(rec_profile)
             local selected_label = get_profile_label(selected_profile_id)
-            local msg = string.format(
-                "⚠️  Profil puissant\n\n" ..
-                "Recommandé:  %s\n" ..
-                "Sélectionné:  %s\n\n" ..
-                "Le modèle peut ne pas être assez puissant.",
-                rec_label, selected_label
-            )
+            local msg = string.format(i18n.get("menu.llm.profile_power_warning"), rec_label, selected_label)
             pcall(notifications.notify, msg, nil, "warning")
         end
     end
@@ -1775,7 +1769,7 @@ function M.create(deps)
         if not is_active then return nil end
         local _dw = package.loaded["ui.download_window"]
         return {
-            title = "📥 Téléchargement en cours — Afficher la fenêtre",
+            title = i18n.get("menu.llm.show_download_window"),
             fn = function()
                 if _dw and type(_dw.focus) == "function" then
                     pcall(_dw.focus)

@@ -144,8 +144,8 @@ MS_BindHotkey(prev_ahk, new_human, callback) {
         return new_ahk
     }
     catch as err {
-        MsgBox("Le raccourci « " . new_human . " » n'a pas pu être enregistré : " . err.Message,
-            "Raccourci invalide", "Iconx")
+        MsgBox(Format(t("metrics.shortcut_register_error"), new_human, err.Message),
+            t("metrics.shortcut_invalid_title"), "Iconx")
         return ""
     }
 }
@@ -174,12 +174,10 @@ MS_ApplyAll(ToggleTypingFn, ToggleAppsFn) {
 MS_PromptShortcut(which, ToggleFn) {
     ; Shows an InputBox to capture the new shortcut. ``which`` ∈
     ; {"typing", "apps"}. Empty string clears the binding.
-    label := (which = "typing") ? "Métriques de frappe" : "Temps sur les applications"
+    label := (which = "typing") ? t("keylogger_ui.typing_metrics") : t("keylogger_ui.app_metrics")
     cur   := (which = "typing") ? MetricsShortcuts.typing_str : MetricsShortcuts.apps_str
-    msg := "Format : mods+touche  (ex : ctrl+alt+m)`n"
-        .  "Mods disponibles : ctrl, alt, shift, win`n"
-        .  "Laisser vide pour désactiver."
-    ib := InputBox(msg, "Raccourci — " . label, "w400 h160", cur)
+    msg := t("metrics.shortcut_format_hint")
+    ib := InputBox(msg, Format(t("metrics.shortcut_prompt_title"), label), "w400 h160", cur)
     if (ib.Result != "OK")
         return
     raw := Trim(StrLower(ib.Value))

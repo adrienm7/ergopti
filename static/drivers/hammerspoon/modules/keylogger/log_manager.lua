@@ -48,6 +48,7 @@ local timer   = require("hs.timer")
 local utf8    = utf8
 
 local Logger = require("lib.logger")
+local i18n   = require("lib.i18n")
 local LOG    = "keylogger.log_manager"
 
 
@@ -132,28 +133,28 @@ local KC_TO_FINGER = {
 --- to populate `agg_app_day.category`. Kept minimal; the AHK port will
 --- ship its own equivalent table for Windows process names.
 local MAC_CATEGORIES_FR = {
-	["Productivity"]      = "Productivité",
-	["Social networking"] = "Réseaux sociaux",
-	["Games"]             = "Jeux",
-	["Entertainment"]     = "Divertissement",
-	["Utilities"]         = "Utilitaires",
-	["Education"]         = "Éducation",
-	["Finance"]           = "Finance",
-	["Business"]          = "Business",
-	["Graphics design"]   = "Design graphique",
-	["Photography"]       = "Photographie",
-	["Video"]             = "Vidéo",
-	["Music"]             = "Musique",
-	["Medical"]           = "Médical",
-	["Health fitness"]    = "Santé & Forme",
-	["Lifestyle"]         = "Style de vie",
-	["News"]              = "Actualités",
-	["Weather"]           = "Météo",
-	["Sports"]            = "Sport",
-	["Travel"]            = "Voyage",
-	["Navigation"]        = "Navigation",
-	["Reference"]         = "Références",
-	["Developer tools"]   = "Développement",
+	["Productivity"]      = i18n.get("app_category.productivity"),
+	["Social networking"] = i18n.get("app_category.social"),
+	["Games"]             = i18n.get("app_category.games"),
+	["Entertainment"]     = i18n.get("app_category.entertainment"),
+	["Utilities"]         = i18n.get("app_category.utility"),
+	["Education"]         = i18n.get("app_category.education"),
+	["Finance"]           = i18n.get("app_category.finance"),
+	["Business"]          = i18n.get("app_category.business"),
+	["Graphics design"]   = i18n.get("app_category.graphics_design"),
+	["Photography"]       = i18n.get("app_category.photography"),
+	["Video"]             = i18n.get("app_category.video"),
+	["Music"]             = i18n.get("app_category.music"),
+	["Medical"]           = i18n.get("app_category.medical"),
+	["Health fitness"]    = i18n.get("app_category.health"),
+	["Lifestyle"]         = i18n.get("app_category.lifestyle"),
+	["News"]              = i18n.get("app_category.news"),
+	["Weather"]           = i18n.get("app_category.weather"),
+	["Sports"]            = i18n.get("app_category.sports"),
+	["Travel"]            = i18n.get("app_category.travel"),
+	["Navigation"]        = i18n.get("app_category.navigation"),
+	["Reference"]         = i18n.get("app_category.reference"),
+	["Developer tools"]   = i18n.get("app_category.development"),
 }
 
 
@@ -1914,11 +1915,11 @@ end
 --- LSApplicationCategoryType. Falls back to "Général" when the app is
 --- not running or not categorized.
 function M.get_native_app_category(app_name)
-	if type(app_name) ~= "string" or app_name == "" then return "Général" end
+	if type(app_name) ~= "string" or app_name == "" then return i18n.get("metrics_apps.general_category") end
 	local app = hs.application.get(app_name)
 	if app then
 		local app_path = app:path()
-		if type(app_path) ~= "string" then return "Général" end
+		if type(app_path) ~= "string" then return i18n.get("metrics_apps.general_category") end
 		local info = hs.application.infoForBundlePath(app_path)
 		if info and info.LSApplicationCategoryType then
 			local raw = info.LSApplicationCategoryType:gsub("public%.app%-category%.", "")
@@ -1927,7 +1928,7 @@ function M.get_native_app_category(app_name)
 			return MAC_CATEGORIES_FR[cap] or cap
 		end
 	end
-	return "Général"
+	return i18n.get("metrics_apps.general_category")
 end
 
 --- Returns a stable identifier for the current device, kept here so menu
