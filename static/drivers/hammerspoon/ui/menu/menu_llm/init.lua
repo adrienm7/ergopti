@@ -1284,7 +1284,7 @@ function M.create(deps)
         table.insert(main_menu, { title = string.format(i18n.get("menu.llm.num_predictions_label"), tostring(state.llm_num_predictions or llm_mod.DEFAULT_STATE.llm_num_predictions)), disabled = is_disabled or nil, menu = build_num_pred_menu() })
         if state.llm_num_predictions ~= llm_mod.DEFAULT_STATE.llm_num_predictions then
             table.insert(main_menu, {
-                title    = string.format(i18n.get("menu.llm.reset_label"), .. tostring(llm_mod.DEFAULT_STATE.llm_num_predictions)),
+                title    = string.format(i18n.get("menu.llm.reset_label"), tostring(llm_mod.DEFAULT_STATE.llm_num_predictions)),
                 disabled = is_disabled or nil,
                 fn       = function()
                     state.llm_num_predictions = llm_mod.DEFAULT_STATE.llm_num_predictions
