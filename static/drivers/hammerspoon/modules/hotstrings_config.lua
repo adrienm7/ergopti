@@ -10,7 +10,13 @@
 ---      edited from the "Délais & couleurs hotstrings" window.
 ---   2. TOML metadata — `delay` / `color` declared in each category TOML
 ---      under `[_meta]` (file scope) or `[_meta.sections.<name>]` (section).
----   3. Hard fallbacks (`GLOBAL_DEFAULT_DELAY`, no color).
+---   3. Hard fallbacks (`GLOBAL_DEFAULT_DELAY`, `GLOBAL_DEFAULT_COLOR`).
+---
+--- SUPPORTED CATEGORY NAMESPACES:
+---   - Standard categories  : resolve("magickey"), resolve("autocorrection"), …
+---   - Extension overrides  : resolve_ext("ergopti-demo", toml_path, section?)
+---     The user override key in hotstrings_config.toml is "ext.<id>" so it
+---     never collides with a bare category name.
 ---
 --- FEATURES & RATIONALE:
 --- 1. Single source of truth: HS and AHK both read the same TOML metadata,
@@ -37,6 +43,8 @@ local LOG        = "hotstrings_config"
 -- Mirrors the previous expansion baseline so removing every override returns
 -- the user to the historical behaviour.
 local GLOBAL_DEFAULT_DELAY = 0.75
+-- Applied to extension and personal hotstring categories when no color is set.
+local GLOBAL_DEFAULT_COLOR = "#e53935"
 
 
 -- =================================
@@ -80,7 +88,27 @@ local function parse_overrides(path)
 		local line = raw:match("^%s*(.-)%s*$")
 		if not line or line == "" or line:sub(1, 1) == "#" then goto continue end
 
-		-- [category.section] — must be tested before plain [category]
+		-- [ext.name.section] — extension section override (3 dotted segments)
+		local ext_name, ext_sec = line:match("^%[ext%.([%w_%-]+)%.([%w_%-]+)%]$")
+		if ext_name and ext_sec then
+			local key = "ext." .. ext_name
+			result[key] = result[key] or { sections = {} }
+			result[key].sections = result[key].sections or {}
+			result[key].sections[ext_sec] = result[key].sections[ext_sec] or {}
+			current_cat, current_sec = key, ext_sec
+			goto continue
+		end
+
+		-- [ext.name] — extension file-level override (2 dotted segments, "ext." prefix)
+		local ext_only = line:match("^%[ext%.([%w_%-]+)%]$")
+		if ext_only then
+			local key = "ext." .. ext_only
+			result[key] = result[key] or { sections = {} }
+			current_cat, current_sec = key, nil
+			goto continue
+		end
+
+		-- [category.section] — standard section override (must be tested before plain [category])
 		local cat, sec = line:match("^%[([%w_%-]+)%.([%w_%-]+)%]$")
 		if cat and sec then
 			result[cat] = result[cat] or { sections = {} }
@@ -286,6 +314,58 @@ function M.resolve(category, section)
 		or user.color
 		or (meta_sec and meta_sec.color)
 		or meta.color
+
+	local has_override =
+		(user_sec and (user_sec.delay ~= nil or user_sec.color ~= nil))
+		or (user.delay ~= nil or user.color ~= nil)
+		or false
+
+	return { delay = delay, color = color, has_override = has_override }
+end
+
+--- Resolves the effective delay and color for an extension hotstring file.
+--- Mirrors HotstringsResolveExt() on the AHK side.
+--- @param ext_id string Extension identifier (e.g. "ergopti-demo").
+--- @param toml_path string Absolute path to the extension TOML file.
+--- @param section string|nil Optional section name within the file.
+--- @return table { delay = number, color = string|nil, has_override = boolean }
+function M.resolve_ext(ext_id, toml_path, section)
+	if not require_state("resolve_ext") then
+		return { delay = GLOBAL_DEFAULT_DELAY, color = GLOBAL_DEFAULT_COLOR, has_override = false }
+	end
+
+	local override_key = "ext." .. ext_id:lower()
+	local user = _state.overrides[override_key] or { sections = {} }
+	local user_sec = section and (user.sections or {})[section] or nil
+
+	-- Read the extension TOML meta directly (bypasses the category-name resolver).
+	local cache_key = "ext:" .. toml_path
+	if not _state.toml_cache[cache_key] then
+		local ok, parsed = pcall(function() return TomlReader.parse(toml_path) end)
+		if ok and parsed then
+			_state.toml_cache[cache_key] = {
+				delay    = parsed.meta and parsed.meta.delay,
+				color    = parsed.meta and parsed.meta.color,
+				sections = (parsed.meta and parsed.meta.sections) or {},
+			}
+		else
+			_state.toml_cache[cache_key] = { sections = {} }
+		end
+	end
+	local meta     = _state.toml_cache[cache_key]
+	local meta_sec = section and meta.sections[section] or nil
+
+	local delay = (user_sec and user_sec.delay)
+		or user.delay
+		or (meta_sec and meta_sec.delay)
+		or meta.delay
+		or GLOBAL_DEFAULT_DELAY
+
+	local color = (user_sec and user_sec.color)
+		or user.color
+		or (meta_sec and meta_sec.color)
+		or meta.color
+		or GLOBAL_DEFAULT_COLOR
 
 	local has_override =
 		(user_sec and (user_sec.delay ~= nil or user_sec.color ~= nil))
