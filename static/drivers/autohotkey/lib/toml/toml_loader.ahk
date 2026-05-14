@@ -36,7 +36,8 @@
 ; ApplyTomlMetadataToFeatures resolve content through ReadTomlFile so that
 ; large category files (autocorrection.toml, magickey.toml) are read at most
 ; once even when many sections are loaded from the same file.
-global _TomlFileCache := Map()
+global _TomlFileCache    := Map()
+global _TomlCountCache   := Map()   ; key = CategoryName|SectionName → count
 
 ; Per-category hotstring group configuration (default delay + tooltip color),
 ; populated lazily by ParseTomlGroupConfig and consumed by the tooltip and
@@ -747,7 +748,10 @@ ParseTomlGroupConfig(CategoryName) {
 ; Returns 0 when the file or section does not exist.
 ; Uses the same ReadTomlFile cache to avoid redundant disk reads.
 CountTomlSection(CategoryName, SectionName) {
-    global ScriptInformation
+    global ScriptInformation, _TomlCountCache
+    CacheKey := StrLower(CategoryName) . "|" . StrLower(SectionName)
+    if _TomlCountCache.Has(CacheKey)
+        return _TomlCountCache[CacheKey]
     if (StrLower(CategoryName) == "personal"
     and IsSet(ScriptInformation)
     and ScriptInformation.Has("PersonalTomlPath")) {
@@ -756,6 +760,7 @@ CountTomlSection(CategoryName, SectionName) {
         FilePath := A_ScriptDir . "\..\..\hotstrings\" . StrLower(CategoryName) . ".toml"
     }
     if !FileExist(FilePath) {
+        _TomlCountCache[CacheKey] := 0
         return 0
     }
     Count := 0
@@ -779,6 +784,7 @@ CountTomlSection(CategoryName, SectionName) {
             Count++
         }
     }
+    _TomlCountCache[CacheKey] := Count
     return Count
 }
 
@@ -786,7 +792,10 @@ CountTomlSection(CategoryName, SectionName) {
 ; Returns 0 when the file does not exist or contains no matching entries.
 ; Uses the same ReadTomlFile cache as the rest of the loader to avoid double I/O.
 CountTomlHotstrings(CategoryName) {
-    global ScriptInformation
+    global ScriptInformation, _TomlCountCache
+    CacheKey := StrLower(CategoryName) . "|*"
+    if _TomlCountCache.Has(CacheKey)
+        return _TomlCountCache[CacheKey]
     if (StrLower(CategoryName) == "personal"
     and IsSet(ScriptInformation)
     and ScriptInformation.Has("PersonalTomlPath")) {
@@ -795,9 +804,9 @@ CountTomlHotstrings(CategoryName) {
         FilePath := A_ScriptDir . "\..\..\hotstrings\" . StrLower(CategoryName) . ".toml"
     }
     if !FileExist(FilePath) {
+        _TomlCountCache[CacheKey] := 0
         return 0
     }
-    ; Count lines that look like a hotstring entry: start with a quoted trigger
     Count := 0
     Q := Chr(34)
     loop parse, ReadTomlFile(FilePath), "`n", "`r" {
@@ -806,6 +815,7 @@ CountTomlHotstrings(CategoryName) {
             Count++
         }
     }
+    _TomlCountCache[CacheKey] := Count
     return Count
 }
 
