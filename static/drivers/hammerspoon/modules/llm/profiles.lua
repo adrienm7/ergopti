@@ -25,17 +25,17 @@ local LOG    = "llm.profiles"
 
 local RAW_PROMPT_SINGLE = [[{context}]]
 
-local BASIC_PROMPT_SINGLE = [[Tu es un moteur de complétion clavier ultra-concis.
-Contexte utilisateur : {context}
+local BASIC_PROMPT_SINGLE = [[You are an ultra-concise keyboard completion engine. Respond in {language}.
+User context: {context}
 
-Donne strictement la suite immédiate du contexte.
-C’EST UNE OBLIGATION ABSOLUE : Tu DOIS générer AU MINIMUM {min_words} mots et AU MAXIMUM {max_words} mots. PAS UN MOT DE PLUS OU DE MOINS.
-N’ajoute aucune explication, aucun commentaire, aucune liste, aucune puce, aucun guillemet, aucune reformulation du contexte.
-Retourne uniquement les mots à ajouter.]]
+Output strictly the immediate continuation of the context.
+ABSOLUTE RULE: generate AT LEAST {min_words} words and AT MOST {max_words} words. NOT ONE WORD MORE OR LESS.
+No explanation, no comment, no list, no bullet, no quote, no rephrasing of the context.
+Return only the words to append.]]
 
 -- Universal prompt: English instructions for cross-model reliability, minimal
 -- examples to reduce token overhead for small models (Qwen 3.5-4B, etc.)
-local ADVANCED_PROMPT_SINGLE = [[You are a text correction and completion engine.
+local ADVANCED_PROMPT_SINGLE = [[You are a text correction and completion engine. Respond in {language}.
 You receive PREFIX (full context) and TAIL (last few words).
 Reply with exactly two lines — nothing else:
 TAIL_CORRECTED: <corrected tail>
@@ -197,7 +197,12 @@ function M.resolve_system_prompt(profile, n)
 	
 	prompt = prompt:gsub("{max_words}", max_w_str)
 	prompt = prompt:gsub("{min_words}", min_w_str)
-	
+
+	-- Inject the active UI locale so the model replies in the user's language
+	local i18n    = require("lib.i18n")
+	local locale  = i18n.get_locale() or "fr"
+	prompt = prompt:gsub("{language}", locale)
+
 	return prompt
 end
 

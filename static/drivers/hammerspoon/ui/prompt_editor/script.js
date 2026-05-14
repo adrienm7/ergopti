@@ -57,7 +57,8 @@ function parseToNodes(text) {
 			tokenName === 'context' ||
 			tokenName === 'n' ||
 			tokenName === 'min_words' ||
-			tokenName === 'max_words'
+			tokenName === 'max_words' ||
+			tokenName === 'language'
 		) {
 			nodes.push(makeChip(tokenName));
 		} else {
@@ -211,7 +212,7 @@ function tryConvertToken(editorElement) {
 
 	var offset = range.startOffset;
 	var beforeContent = node.textContent.slice(0, offset);
-	var match = beforeContent.match(/\{(context|n|min_words|max_words)\}$/i);
+	var match = beforeContent.match(/\{(context|n|min_words|max_words|language)\}$/i);
 	if (!match) return;
 
 	var matchStart = offset - match[0].length;
@@ -242,7 +243,7 @@ function tryConvertToken(editorElement) {
 
 var acItems = [];
 var acIdx = 0;
-var TOKEN_NAMES = ['context', 'n', 'min_words', 'max_words'];
+var TOKEN_NAMES = ['context', 'n', 'min_words', 'max_words', 'language'];
 
 /**
  * Retrieves the context under the cursor to determine if autocomplete should trigger.
