@@ -2022,15 +2022,15 @@ global _SaveFullConfigReady := true
 if MetricsShortcuts.enabled
     WPMWidget_LoadConfig(_IniCache)
 
-; Now that all modules are loaded and config is hydrated, persist the
-; complete state to ensure the on-disk TOML contains every key — not
-; just the ones the user has ever toggled. This makes the file a
-; human-readable, complete reference of the current configuration.
-SaveFullConfig()
-
 InitSubMenus()
 initMenu()
 UpdateTrayIcon()
+
+; Defer config persistence until after the menu is visible — the write is
+; a multi-pass TOML rewrite that parses and rewrites the config file, so
+; doing it synchronously delays the tray icon appearing by ~300 ms.
+; A 500 ms one-shot timer keeps it off the critical startup path.
+SetTimer(SaveFullConfig, -500)
 
 ; The keylogger storage layer + the dashboard hotkeys only come up when
 ; the user has explicitly opted in. A fresh install starts OFF — this is

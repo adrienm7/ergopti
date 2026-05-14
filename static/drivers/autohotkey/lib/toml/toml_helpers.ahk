@@ -61,6 +61,9 @@ SortArray(arr) {
 ; ===================================
 ; ===================================
 
+; Parse result cache: keyed by file path, invalidated by TOML_BatchWrite.
+global _ParseTomlCache := Map()
+
 ; Parse a TOML file into Map<Section, Map<Key, Value>>. Values are coerced
 ; to AHK booleans / integers / strings / arrays of strings — anything more
 ; exotic falls through as a raw string. Returns an empty Map when the file
@@ -68,6 +71,9 @@ SortArray(arr) {
 ; ``FileExist``.
 ; Multi-line arrays ( key = [\n  "a",\n  "b"\n] ) are fully supported.
 ParseTomlFile(Path) {
+    global _ParseTomlCache
+    if _ParseTomlCache.Has(Path)
+        return _ParseTomlCache[Path]
     Sections := Map()
     if !FileExist(Path)
         return Sections
@@ -131,6 +137,7 @@ ParseTomlFile(Path) {
 
         Sections[Section][key] := TOML_CoerceValue(val)
     }
+    _ParseTomlCache[Path] := Sections
     return Sections
 }
 
@@ -310,6 +317,12 @@ TOML_BatchWrite(Path, Updates) {
     try FileMove(tmp, Path)
     catch
         return false
+
+    ; Invalidate the parse cache so the next ParseTomlFile call re-reads
+    ; the updated file rather than returning a stale snapshot.
+    global _ParseTomlCache
+    if _ParseTomlCache.Has(Path)
+        _ParseTomlCache.Delete(Path)
 
     TOML_RunStrictCanonicalization(Path)
     return true
