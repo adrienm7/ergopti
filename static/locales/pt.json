@@ -654,6 +654,8 @@
 	"menu.llm.temperature_label": "Temperatura (Criatividade): %s",
 	"menu.llm.thinking_model_info": "  ↳ Info: Modelo de raciocínio (raciocínio oculto)",
 	"menu.llm.title": "✨ Inteligência Artificial"
+	"menu.llm.on": "✅ IA ativada (clique para desativar)",
+	"menu.llm.off": "❌ IA desativada (clique para ativar)",
 	"menu.llm.toggle_enable": "Ativar sugestões de IA",
 	"menu.llm.toggle_disable": "Desativar sugestões de IA",
 	"menu.llm.about": "Sobre o Ergopti IA",

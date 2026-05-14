@@ -127,11 +127,12 @@ LLM_Tray_Build() {
 
 	llm_menu := Menu()
 
-	; Enable / Disable toggle
-	toggle_label := _LLM_Tray["enabled"] ? t("menu.llm.toggle_disable") : t("menu.llm.toggle_enable")
-	llm_menu.Add(toggle_label, LLM_Tray_OnToggle)
-
-	llm_menu.Add()  ; separator
+	; Enable / Disable toggle — same ✅/❌ pattern as every other category submenu
+	AddCategoryToggleItem(llm_menu,
+		t("menu.llm.on"),
+		t("menu.llm.off"),
+		_LLM_Tray["enabled"],
+		LLM_Tray_OnToggle)
 
 	; Model submenu
 	model_menu := LLM_Tray_BuildModelMenu()

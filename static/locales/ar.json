@@ -654,6 +654,8 @@
 	"menu.llm.temperature_label": "درجة الحرارة (الإبداعية): %s",
 	"menu.llm.thinking_model_info": "  ↳ معلومة: نموذج تفكيري (استدلال مخفي)",
 	"menu.llm.title": "✨ الذكاء الاصطناعي"
+	"menu.llm.on": "✅ الذكاء الاصطناعي مفعّل (انقر للتعطيل)",
+	"menu.llm.off": "❌ الذكاء الاصطناعي معطّل (انقر للتفعيل)",
 	"menu.llm.toggle_enable": "تفعيل اقتراحات الذكاء الاصطناعي",
 	"menu.llm.toggle_disable": "تعطيل اقتراحات الذكاء الاصطناعي",
 	"menu.llm.about": "حول Ergopti AI",

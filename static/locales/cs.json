@@ -654,6 +654,8 @@
 	"menu.llm.temperature_label": "Teplota (Kreativita): %s",
 	"menu.llm.thinking_model_info": "  ↳ Info: Model myšlení (skryté uvažování)",
 	"menu.llm.title": "✨ Umělá inteligence"
+	"menu.llm.on": "✅ AI aktivováno (kliknutím deaktivujete)",
+	"menu.llm.off": "❌ AI deaktivováno (kliknutím aktivujete)",
 	"menu.llm.toggle_enable": "Zapnout návrhy AI",
 	"menu.llm.toggle_disable": "Vypnout návrhy AI",
 	"menu.llm.about": "O aplikaci Ergopti AI",

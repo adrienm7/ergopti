@@ -679,6 +679,8 @@
 	"menu.llm.temperature_label": "Temperatur (Kreativitet): %s",
 	"menu.llm.thinking_model_info": "  ↳ Info: Tænkemodel (skjult ræsonnement)",
 	"menu.llm.title": "✨ Kunstig intelligens"
+	"menu.llm.on": "✅ AI aktiveret (klik for at deaktivere)",
+	"menu.llm.off": "❌ AI deaktiveret (klik for at aktivere)",
 	"menu.llm.toggle_enable": "Aktivér AI-forslag",
 	"menu.llm.toggle_disable": "Deaktivér AI-forslag",
 	"menu.llm.about": "Om Ergopti AI",

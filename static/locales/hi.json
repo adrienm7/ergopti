@@ -679,6 +679,8 @@
 	"menu.llm.temperature_label": "तापमान (रचनात्मकता): %s",
 	"menu.llm.thinking_model_info": "  ↳ जानकारी: थिंकिंग मॉडल (छिपी हुई तर्क)",
 	"menu.llm.title": "✨ कृत्रिम बुद्धिमत्ता"
+	"menu.llm.on": "✅ AI सक्षम (अक्षम करने के लिए क्लिक करें)",
+	"menu.llm.off": "❌ AI अक्षम (सक्षम करने के लिए क्लिक करें)",
 	"menu.llm.toggle_enable": "AI सुझाव सक्षम करें",
 	"menu.llm.toggle_disable": "AI सुझाव अक्षम करें",
 	"menu.llm.about": "Ergopti AI के बारे में",

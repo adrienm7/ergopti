@@ -679,6 +679,8 @@
 	"menu.llm.temperature_label": "טמפרטורה (יצירתיות): %s",
 	"menu.llm.thinking_model_info": "  ↳ מידע: מודל חשיבה (חשיבה מוסתרת)",
 	"menu.llm.title": "✨ בינה מלאכותית"
+	"menu.llm.on": "✅ AI מופעל (לחץ להשבתה)",
+	"menu.llm.off": "❌ AI מושבת (לחץ להפעלה)",
 	"menu.llm.toggle_enable": "הפעל הצעות בינה מלאכותית",
 	"menu.llm.toggle_disable": "בטל הצעות בינה מלאכותית",
 	"menu.llm.about": "אודות Ergopti AI",

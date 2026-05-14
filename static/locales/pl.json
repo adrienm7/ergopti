@@ -654,6 +654,8 @@
 	"menu.llm.temperature_label": "Temperatura (Kreatywność): %s",
 	"menu.llm.thinking_model_info": "  ↳ Info: Model myślący (ukryte rozumowanie)",
 	"menu.llm.title": "✨ Sztuczna inteligencja"
+	"menu.llm.on": "✅ AI włączone (kliknij, aby wyłączyć)",
+	"menu.llm.off": "❌ AI wyłączone (kliknij, aby włączyć)",
 	"menu.llm.toggle_enable": "Włącz sugestie AI",
 	"menu.llm.toggle_disable": "Wyłącz sugestie AI",
 	"menu.llm.about": "O Ergopti AI",

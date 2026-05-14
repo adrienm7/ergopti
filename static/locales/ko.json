@@ -654,6 +654,8 @@
 	"menu.llm.temperature_label": "온도 (창의성): %s",
 	"menu.llm.thinking_model_info": "  ↳ 정보: 사고 모델 (숨겨진 추론)",
 	"menu.llm.title": "✨ 인공 지능"
+	"menu.llm.on": "✅ AI 활성화 (비활성화하려면 클릭)",
+	"menu.llm.off": "❌ AI 비활성화 (활성화하려면 클릭)",
 	"menu.llm.toggle_enable": "AI 제안 활성화",
 	"menu.llm.toggle_disable": "AI 제안 비활성화",
 	"menu.llm.about": "Ergopti AI 정보",
