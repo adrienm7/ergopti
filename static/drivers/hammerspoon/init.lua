@@ -490,21 +490,12 @@ table.sort(remaining)
 for _, fname in ipairs(remaining) do table.insert(toml_fnames, fname) end
 
 local hotfiles = {}
--- Defer sorting for the entire startup load: TOML files, dynamic hotstrings, and the
--- custom group all feed into the same mappings list. A single flush_sort() at the end
--- of section 5 collapses what used to be 8+ full O(N log N) passes into one.
+-- Defer sorting for the entire startup load: personal, dynamic, and TOML files all
+-- feed into the same mappings list. A single flush_sort() at the end collapses
+-- what used to be 8+ full O(N log N) passes into one.
+-- Loading order determines group_order (asc = higher priority), so personal
+-- hotstrings must be registered FIRST to beat same-length common hotstrings.
 keymap.defer_sort()
-local _toml_load_t0 = hs.timer.secondsSinceEpoch()
-for _, fname in ipairs(toml_fnames) do
-	local name = fname:match("^(.-)%.toml$")
-	Logger.debug(LOG, string.format("Loading TOML file: %s…", name))
-	keymap.load_toml(name, hotstrings_dir .. fname)
-	table.insert(hotfiles, name)
-end
--- Visible at INFO so anyone watching the console can correlate launch time
--- with TOML volume without having to enable perf sampling explicitly.
-Logger.info(LOG, string.format("Loaded %d TOML hotstring file(s) in %.1fms.",
-	#toml_fnames, (hs.timer.secondsSinceEpoch() - _toml_load_t0) * 1000))
 
 
 
@@ -516,24 +507,17 @@ Logger.info(LOG, string.format("Loaded %d TOML hotstring file(s) in %.1fms.",
 -- ==================================
 -- ==================================
 
--- Start the dynamic hotstrings module which handles personal info internally
-Logger.debug(LOG, "Starting dynamic hotstrings module…")
-local personal_info_toml_path = menu_paths.get("PersonalInfoTomlPath")
-dynamic_hotstrings.start(base_dir, keymap, personal_info_toml_path)
-table.insert(hotfiles, "dynamichotstrings")
-
-Logger.debug(LOG, "Initializing custom hotstrings…")
-
 
 
 -- ==================================
 -- ===== 5.1) Custom Hotstrings =====
 -- ==================================
 
+-- Loaded FIRST so their group_order is lowest (= highest priority).
+-- Priority order: personal > personal_ext_* > dynamic > common TOMLs > repeat.
 -- personal_hotstrings.toml lives in <config_dir>/hotstrings/ (configurable via
 -- the paths editor). Additional *.toml files placed in the same folder are loaded
--- automatically as extra personal extension groups, displayed after the main
--- personal group in alphabetical order by filename stem.
+-- automatically as extra personal extension groups in alphabetical order by stem.
 do
 	local personal_path = menu_paths.get("PersonalTomlPath")
 	hotstring_editor.init(personal_path, keymap)
@@ -564,7 +548,26 @@ do
 	end
 end
 
--- Single final sort covering TOML + dynamic + custom groups.
+-- Dynamic hotstrings (personal info, date triggers, etc.) — after personal,
+-- before common TOMLs, so dynamic rules beat same-length common hotstrings.
+Logger.debug(LOG, "Starting dynamic hotstrings module…")
+local personal_info_toml_path = menu_paths.get("PersonalInfoTomlPath")
+dynamic_hotstrings.start(base_dir, keymap, personal_info_toml_path)
+table.insert(hotfiles, "dynamichotstrings")
+
+-- Common TOML hotstring files — lowest priority among user-visible groups.
+Logger.debug(LOG, "Loading common TOML hotstring files…")
+local _toml_load_t0 = hs.timer.secondsSinceEpoch()
+for _, fname in ipairs(toml_fnames) do
+	local name = fname:match("^(.-)%.toml$")
+	Logger.debug(LOG, string.format("Loading TOML file: %s…", name))
+	keymap.load_toml(name, hotstrings_dir .. fname)
+	table.insert(hotfiles, name)
+end
+Logger.info(LOG, string.format("Loaded %d TOML hotstring file(s) in %.1fms.",
+	#toml_fnames, (hs.timer.secondsSinceEpoch() - _toml_load_t0) * 1000))
+
+-- Single final sort covering personal + dynamic + common TOML groups.
 local _sort_t0 = hs.timer.secondsSinceEpoch()
 keymap.flush_sort()
 Logger.info(LOG, string.format("Final mapping sort completed in %.1fms.",
