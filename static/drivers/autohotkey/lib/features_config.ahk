@@ -136,6 +136,9 @@ global Features := Map(
         "ChevronGreater", {
             Enabled: True,
         },
+        "ChevronEqual", {
+            Enabled: True,
+        },
         "CommentOpen", {
             Enabled: True,
         },
@@ -161,6 +164,9 @@ global Features := Map(
             Enabled: True,
         },
         "HashtagCloseBracket", {
+            Enabled: True,
+        },
+        "HashtagQuote", {
             Enabled: True,
         },
         "EqualString", {
