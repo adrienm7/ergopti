@@ -130,10 +130,16 @@ global Features := Map(
         "CloseChevronTag", {
             Enabled: True,
         },
-        "ChevronEqual", {
+        "ChevronLess", {
             Enabled: True,
         },
-        "Comment", {
+        "ChevronGreater", {
+            Enabled: True,
+        },
+        "CommentOpen", {
+            Enabled: True,
+        },
+        "CommentClose", {
             Enabled: True,
         },
         "Assign", {
@@ -142,13 +148,19 @@ global Features := Map(
         "NotEqual", {
             Enabled: True,
         },
-        "HashtagQuote", {
+        "ParenQuote", {
+            Enabled: True,
+        },
+        "BracketQuote", {
             Enabled: True,
         },
         "HashtagParenthesis", {
             Enabled: True,
         },
-        "HashtagBracket", {
+        "HashtagOpenBracket", {
+            Enabled: True,
+        },
+        "HashtagCloseBracket", {
             Enabled: True,
         },
         "EqualString", {

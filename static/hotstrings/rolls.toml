@@ -8,7 +8,7 @@
 color = "#fb8c00"
 delay = 0.5
 description = { fr = "Roulements", en = "Rolls", de = "Läufe", es = "Rodamientos", zh = "连击" }
-sections_order = ["hc", "sx", "cx", "englishnegation", "ez", "ct", "-", "closechevrontag", "chevronequal", "comment", "-", "assign", "notequal", "-", "hashtagquote", "hashtagparenthesis", "hashtagbracket", "equalstring", "-", "leftarrow", "assignarrowequalright", "assignarrowequalleft", "assignarrowminusright", "assignarrowminusleft"]
+sections_order = ["hc", "sx", "cx", "englishnegation", "ez", "ct", "-", "closechevrontag", "chevronless", "chevrongreater", "commentopen", "commentclose", "-", "assign", "notequal", "-", "parenquote", "bracketquote", "hashtagparenthesis", "hashtagopenbracket", "hashtagclosebracket", "equalstring", "-", "leftarrow", "assignarrowequalright", "assignarrowequalleft", "assignarrowminusright", "assignarrowminusleft"]
 
 
 
@@ -22,17 +22,21 @@ assignarrowequalleft = "=$ ➜ <="
 assignarrowequalright = "$= ➜ =>"
 assignarrowminusleft = "?+ ➜ <-"
 assignarrowminusright = "+? ➜ ->"
-chevronequal = "<% ➜ <= et >% ➜ >="
+bracketquote = "[# ➜ [\""
+chevrongreater = ">% ➜ >="
+chevronless = "<% ➜ <="
 closechevrontag = "<@ ➜ </"
-comment = "\\\" ➜ /* et \"\\ ➜ */"
+commentclose = "\"\\  ➜ */"
+commentopen = "\\\" ➜ /*"
 ct = "P' ➜ CT"
 cx = "CX ➜ CK"
 englishnegation = "NT' ➜ = N’T"
 equalstring = "[ ) ➜ = \"\""
 ez = "EÉ ➜ EZ"
-hashtagbracket = "#[ ➜ \"] et #] ➜ \"]"
+hashtagclosebracket = "#] ➜ \"]"
+hashtagopenbracket = "#[ ➜ \"]"
 hashtagparenthesis = "#( ➜ \")"
-hashtagquote = "(# ➜ (\" et [# ➜ [\""
+parenquote = "(# ➜ (\""
 hc = "HC ➜ WH"
 leftarrow = "=+ = ➜"
 notequal = "!# ➜ !="
@@ -113,14 +117,25 @@ sx = "SX ➜ SK"
 
 
 
-# ============================
-# ============================
-# ======= Chevronequal =======
-# ============================
-# ============================
+# ===========================
+# ===========================
+# ======= Chevronless =======
+# ===========================
+# ===========================
 
-[[chevronequal]]
+[[chevronless]]
 "<%" = { output = "<=", is_word = false, auto_expand = true, is_case_sensitive = true, final_result = true }
+
+
+
+
+# ==============================
+# ==============================
+# ======= Chevrongreater =======
+# ==============================
+# ==============================
+
+[[chevrongreater]]
 ">%" = { output = ">=", is_word = false, auto_expand = true, is_case_sensitive = true, final_result = true }
 
 
@@ -140,15 +155,26 @@ sx = "SX ➜ SK"
 
 
 
-# =======================
-# =======================
-# ======= Comment =======
-# =======================
-# =======================
+# ===========================
+# ===========================
+# ======= Commentopen =======
+# ===========================
+# ===========================
 
-[[comment]]
-"\"\\" = { output = "*/", is_word = false, auto_expand = true, is_case_sensitive = true, final_result = true }
+[[commentopen]]
 "\\\"" = { output = "/*", is_word = false, auto_expand = true, is_case_sensitive = true, final_result = true }
+
+
+
+
+# ============================
+# ============================
+# ======= Commentclose =======
+# ============================
+# ============================
+
+[[commentclose]]
+"\"\\" = { output = "*/", is_word = false, auto_expand = true, is_case_sensitive = true, final_result = true }
 
 
 
@@ -221,14 +247,25 @@ sx = "SX ➜ SK"
 
 
 
-# ==============================
-# ==============================
-# ======= Hashtagbracket =======
-# ==============================
-# ==============================
+# ==================================
+# ==================================
+# ======= Hashtagopenbracket =======
+# ==================================
+# ==================================
 
-[[hashtagbracket]]
+[[hashtagopenbracket]]
 "#[" = { output = "\"]", is_word = false, auto_expand = true, is_case_sensitive = true, final_result = true }
+
+
+
+
+# ===================================
+# ===================================
+# ======= Hashtagclosebracket =======
+# ===================================
+# ===================================
+
+[[hashtagclosebracket]]
 "#]" = { output = "\"]", is_word = false, auto_expand = true, is_case_sensitive = true, final_result = true }
 
 
@@ -248,14 +285,25 @@ sx = "SX ➜ SK"
 
 
 
+# ==========================
+# ==========================
+# ======= Parenquote =======
+# ==========================
+# ==========================
+
+[[parenquote]]
+"(#" = { output = "(\"", is_word = false, auto_expand = true, is_case_sensitive = true, final_result = true }
+
+
+
+
 # ============================
 # ============================
-# ======= Hashtagquote =======
+# ======= Bracketquote =======
 # ============================
 # ============================
 
-[[hashtagquote]]
-"(#" = { output = "(\"", is_word = false, auto_expand = true, is_case_sensitive = true, final_result = true }
+[[bracketquote]]
 "[#" = { output = "[\"", is_word = false, auto_expand = true, is_case_sensitive = true, final_result = true }
 
 
