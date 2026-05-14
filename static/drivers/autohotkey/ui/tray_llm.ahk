@@ -27,7 +27,8 @@
 ; ======================================
 ; ======================================
 
-LLM_TRAY_TITLE     := t("menu.llm.title")
+; Title is resolved at call-time via a function — never at load-time —
+; so the active language is already set when the menu is built or rebuilt.
 LLM_TRAY_N_OPTIONS := [1, 2, 3]   ; available prediction count choices
 
 ; Debounce options in milliseconds (mirrors HS trigger settings)
@@ -158,8 +159,8 @@ LLM_Tray_Build() {
 	llm_menu.Add(t("menu.llm.about"), LLM_Tray_OnAbout)
 
 	; Attach to system tray — delete old entry first to avoid duplicates on rebuild
-	try A_TrayMenu.Delete(LLM_TRAY_TITLE)
-	A_TrayMenu.Add(LLM_TRAY_TITLE, llm_menu)
+	try A_TrayMenu.Delete(t("menu.llm.title"))
+	A_TrayMenu.Add(t("menu.llm.title"), llm_menu)
 }
 
 /**
@@ -413,7 +414,7 @@ LLM_Tray_SetTemperature(val) {
 }
 
 LLM_Tray_OnAbout(*) {
-	MsgBox(t("menu.llm.about_body"), LLM_TRAY_TITLE)
+	MsgBox(t("menu.llm.about_body"), t("menu.llm.title"))
 }
 
 /**
