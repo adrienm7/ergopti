@@ -653,7 +653,7 @@
 	"menu.llm.specs_header": "ХАРАКТЕРИСТИКИ",
 	"menu.llm.temperature_label": "Температура (Креативность): %s",
 	"menu.llm.thinking_model_info": "  ↳ Инфо: Thinking-модель (скрытое рассуждение)",
-	"menu.llm.title": "✨ Искусственный интеллект"
+	"menu.llm.title": "✨ Искусственный интеллект",
 	"menu.llm.on": "✅ ИИ включён (нажмите для отключения)",
 	"menu.llm.off": "❌ ИИ выключен (нажмите для включения)",
 	"menu.llm.toggle_enable": "Включить подсказки ИИ",
