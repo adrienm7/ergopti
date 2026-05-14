@@ -111,9 +111,10 @@ LLM_Tray_Init(saved_opts := Map()) {
 	LLM_Tray_Build()
 
 	; Bootstrap Ollama only if the user has explicitly enabled the AI feature.
-	; Users who never activate it incur zero network or CPU overhead.
+	; Deferred via one-shot timer so the tray menu renders before the blocking
+	; HTTP check fires.
 	if _LLM_Tray["enabled"]
-		LLM_Tray_BootstrapOllama()
+		SetTimer(LLM_Tray_BootstrapOllama, -1)
 }
 
 
@@ -368,8 +369,9 @@ LLM_Tray_OnToggle(*) {
 	; to false and rebuilds again — the user always sees the true final state.
 	LLM_Tray_Build()
 	if _LLM_Tray["enabled"] {
-		; Start bootstrap after rebuild so the toggle is visible without delay.
-		LLM_Tray_BootstrapOllama()
+		; Defer bootstrap via a one-shot timer so the menu closes and redraws
+		; before the 2-second blocking HTTP check for Ollama fires.
+		SetTimer(LLM_Tray_BootstrapOllama, -1)
 	} else {
 		LLM_Bridge_Stop()
 	}
