@@ -7,16 +7,19 @@
 ; Ensures the Ollama binary is installed and the local inference server is
 ; reachable on http://localhost:11434. The heavy lifting is done by the shared
 ; PowerShell installer (_shared/llm/install/ollama_install.ps1); this module
-; handles async invocation, marker parsing, and a native AHK progress GUI.
+; handles async invocation, output parsing, and drives the shared WebView2
+; download_window UI (ollama_webview.ahk) — the same HTML/CSS/JS used on macOS.
 ;
 ; FEATURES & RATIONALE:
 ; 1. Self-bootstrapping: runs the shared PS1 installer silently, pulling the
 ;    configured default model automatically — zero manual setup for the user.
 ; 2. Silent fast path: when Ollama is already running, the check exits in
 ;    milliseconds with no UI shown.
-; 3. Granular progress UI: a native AHK Gui mirrors the macOS download_window
-;    style (step label, detail line, indeterminate progress bar).
-; 4. Tri-state lifecycle: callers read LLM_Deps_GetState() — "pending" /
+; 3. Shared WebView UI: drives setKind / setStep / setDetail / addLog / update /
+;    done via OllamaWV_* so macOS and Windows show the same window.
+; 4. Rich progress parsing: extracts percentage, downloaded/total size, speed,
+;    and ETA from ollama pull output lines and pushes them to the UI.
+; 5. Tri-state lifecycle: callers read LLM_Deps_GetState() — "pending" /
 ;    "ready" / "failed" — identical to the Lua pattern.
 ; ==============================================================================
 
@@ -33,7 +36,6 @@
 
 global _LLM_Deps_State          := "pending"   ; "pending" | "ready" | "failed"
 global _LLM_Deps_FailureMessage := ""
-global _LLM_Deps_Gui            := unset        ; progress Gui object, shown only on slow path
 global _LLM_Deps_Checking       := false        ; guard against concurrent calls
 global _LLM_Deps_PollTimer      := unset        ; lambda reference kept for explicit cancellation
 
@@ -141,7 +143,7 @@ LLM_Deps_CheckAndInstall(default_model := "qwen2.5:3b", on_ready := unset, on_fa
 
 /**
  * Locates the shared PS1 installer and runs it in a hidden PowerShell process.
- * Streams stdout line-by-line to update the progress GUI.
+ * Streams stdout line-by-line to update the WebView UI.
  * @param {string} model - Model tag to pass to the installer.
  * @param {Func} on_ready - Callback on success.
  * @param {Func} on_failed - Callback on failure.
@@ -155,8 +157,8 @@ LLM_Deps_RunInstaller(model, on_ready, on_failed) {
 		return
 	}
 
-	; Show progress GUI before launching so the user sees feedback immediately
-	LLM_Deps_GuiShow(t("ollama.deps_step_installing"))
+	; Show WebView progress window before launching so user sees feedback immediately
+	OllamaWV_Show("ollama_install", "", , (*) => LLM_Deps_RunInstaller(model, on_ready, on_failed))
 
 	; Build PowerShell command: run script hidden, capture output line-by-line
 	cmd := 'powershell.exe -NoProfile -ExecutionPolicy Bypass -File "' ps1_path '" -Model "' model '"'
@@ -184,7 +186,7 @@ LLM_Deps_RunInstaller(model, on_ready, on_failed) {
 }
 
 /**
- * Polling callback: reads pending output from the process, updates GUI,
+ * Polling callback: reads pending output from the process, updates WebView UI,
  * and detects completion.
  * @param {Object} proc - WScript.Shell Exec object.
  * @param {Func} on_ready - Callback on success.
@@ -228,8 +230,8 @@ LLM_Deps_PollProcess(proc, on_ready, on_failed) {
 		LoggerInfo("LLM", "PS1 exited 0 — verifying Ollama reachability…")
 		if LLM_OllamaIsRunning() {
 			LoggerInfo("LLM", "Ollama confirmed running — state → ready.")
-			LLM_Deps_GuiStep(t("ollama.deps_step_ready"))
-			LLM_Deps_GuiComplete()
+			OllamaWV_SetStep("✅ Ollama prêt")
+			OllamaWV_Done(true, "✅ Ollama prêt")
 			global _LLM_Deps_State := "ready"
 			if IsSet(on_ready)
 				on_ready()
@@ -244,7 +246,9 @@ LLM_Deps_PollProcess(proc, on_ready, on_failed) {
 }
 
 /**
- * Routes a single output line to the appropriate GUI update.
+ * Routes a single output line to the appropriate WebView update.
+ * Marker lines drive the step label; progress lines are parsed for stats;
+ * all other lines go to the log area.
  * @param {string} line - Raw line from the installer stdout.
  */
 LLM_Deps_HandleLine(line) {
@@ -252,26 +256,78 @@ LLM_Deps_HandleLine(line) {
 	if (line == "")
 		return
 
-	; Marker lines drive the step label (same protocol as the bash script)
+	; Marker lines drive the step label (same protocol as the bash/PS1 script)
 	if (line == "OLLAMA_INSTALLING") {
-		LLM_Deps_GuiStep(t("ollama.deps_step_installing"))
+		LoggerInfo("LLM", "Marker: OLLAMA_INSTALLING.")
+		OllamaWV_SetStep("⬇️ Téléchargement d'Ollama…")
 		return
 	}
 	if (line == "OLLAMA_STARTING") {
-		LLM_Deps_GuiStep(t("ollama.deps_step_starting"))
+		LoggerInfo("LLM", "Marker: OLLAMA_STARTING.")
+		OllamaWV_SetStep("🚀 Démarrage du serveur…")
 		return
 	}
 	if (line == "OLLAMA_READY") {
-		LLM_Deps_GuiStep(t("ollama.deps_step_ready"))
+		LoggerInfo("LLM", "Marker: OLLAMA_READY.")
+		OllamaWV_SetStep("✅ Serveur prêt")
 		return
 	}
 
-	; All other lines go to the detail line (subprocess progress)
-	LLM_Deps_GuiDetail(line)
+	; Progress lines from "ollama pull" look like:
+	;   pulling abc123... 100% ▕████████▏ 847 MB/2.3 GB 2.5 MB/s 9m30s
+	; or the simpler PS1 echo: "Téléchargement du modèle qwen2.5:3b…"
+	if LLM_Deps_TryParseProgress(line)
+		return
+
+	; All other lines go to the terminal log area and detail line
+	OllamaWV_SetDetail(line)
+	OllamaWV_AddLog(line)
 }
 
 /**
- * Records a permanent failure, updates state, shows error in GUI, fires callback.
+ * Attempts to parse an ollama pull progress line and push stats to the WebView.
+ * Returns true when the line was a progress line and was consumed.
+ * @param {string} line - Raw output line.
+ * @returns {boolean}
+ */
+LLM_Deps_TryParseProgress(line) {
+	; Match the typical ollama pull streaming output:
+	;   "pulling <hash>... <pct>% ▕...▏ <downloaded>/<total> <speed> <eta>"
+	; The bar characters (▕▏) may or may not be present.
+	; Minimum pattern: something% ... <number><unit> <number><unit>
+
+	; Extract percentage
+	pct := 0
+	if RegExMatch(line, "(\d+)%", &m)
+		pct := Integer(m[1])
+	else
+		return false   ; not a progress line
+
+	; Extract downloaded/total size (e.g. "847 MB/2.3 GB" or "847 MB / 2.3 GB")
+	dl_str := ""
+	if RegExMatch(line, "(\d+\.?\d*\s*[KMGkmg]?B)\s*/\s*(\d+\.?\d*\s*[KMGkmg]?B)", &ms)
+		dl_str := ms[1] " / " ms[2]
+
+	; Extract speed (e.g. "2.5 MB/s")
+	speed_str := ""
+	if RegExMatch(line, "(\d+\.?\d*\s*[KMGkmg]?B/s)", &mv)
+		speed_str := mv[1]
+
+	; Extract ETA (e.g. "9m30s" or "2h 5m" or "45s")
+	eta_str := ""
+	if RegExMatch(line, "(\d+[hms]\d*[ms]?\d*[s]?)$", &me)
+		eta_str := me[1]
+
+	; Switch to download mode on first progress line if we were in bootstrap mode
+	if (pct == 0 && dl_str == "" && speed_str == "")
+		return false   ; 0% with no size info — not a real progress line yet
+
+	OllamaWV_Update(pct, dl_str, speed_str, eta_str)
+	return true
+}
+
+/**
+ * Records a permanent failure, updates state, shows error in WebView, fires callback.
  * @param {string} msg - Human-readable failure reason.
  * @param {Func} on_failed - Optional callback.
  */
@@ -281,149 +337,8 @@ LLM_Deps_Fail(msg, on_failed) {
 	_LLM_Deps_State          := "failed"
 	_LLM_Deps_FailureMessage := msg
 	_LLM_Deps_Checking       := false
-	LLM_Deps_GuiError(msg)
+	OllamaWV_SetError("❌ " msg)
+	OllamaWV_Done(false, "❌ " msg)
 	if IsSet(on_failed)
 		on_failed(msg)
-}
-
-
-
-
-; ==========================================
-; ==========================================
-; ======= 5/ Progress GUI =======
-; ==========================================
-; ==========================================
-
-; Indeterminate bar animation state
-global _LLM_Deps_BarPos := 0
-
-/**
- * Creates and shows the bootstrap progress GUI (dark theme, bottom-right).
- * Only called on the slow path — server not running at check time.
- * @param {string} step_text - Initial step label to display.
- */
-LLM_Deps_GuiShow(step_text := "") {
-	global _LLM_Deps_Gui
-
-	if IsSet(_LLM_Deps_Gui) {
-		try _LLM_Deps_Gui.Show()
-		return
-	}
-
-	g := Gui("+AlwaysOnTop -Caption +ToolWindow", t("menu.llm.title"))
-	g.BackColor := "242426"
-	g.SetFont("s12 cFFFFFF w600", "Segoe UI")
-	g.Add("Text", "x18 y18 w424", t("ollama.install_title"))
-
-	g.SetFont("s11 c73d98c w400", "Segoe UI")
-	g.Add("Text", "x18 y44 w424", "✦ Ollama")
-
-	g.SetFont("s10 cAAAAAA w400", "Segoe UI")
-	step_ctrl := g.Add("Text", "x18 y72 w424 vStepLine", step_text)
-
-	g.SetFont("s9 c888888 w400", "SF Mono, Consolas, monospace")
-	detail_ctrl := g.Add("Text", "x18 y94 w424 vDetailLine", "")
-
-	; Indeterminate progress bar (green accent for Ollama)
-	; AHK v2 Progress bar: color via c<hex>, background via Background<hex>
-	g.Add("Progress", "x18 y120 w424 h4 vProgressBar c73d98c Background242426 Range0-100")
-
-	g.SetFont("s9 cAAAAAA w400", "Segoe UI")
-	g.Add("Button", "x18 y138 w80 vBtnCancel", t("download_window.btn_cancel")).OnEvent("Click",
-		(*) => LLM_Deps_GuiCancel())
-
-	_LLM_Deps_Gui := g
-
-	; Position bottom-right of the primary monitor
-	MonitorGetWorkArea(, , &mx2, , &my2)
-	g.Show("w460 h180 NoActivate x" (mx2 - 476) " y" (my2 - 196))
-
-	; Animate indeterminate bar every 80 ms
-	SetTimer(LLM_Deps_GuiAnimate, 80)
-}
-
-/**
- * Updates the step label in the progress GUI.
- * @param {string} text - New step label.
- */
-LLM_Deps_GuiStep(text) {
-	global _LLM_Deps_Gui
-	if !IsSet(_LLM_Deps_Gui)
-		return
-	try _LLM_Deps_Gui["StepLine"].Value := text
-}
-
-/**
- * Updates the detail line (subprocess output) in the progress GUI.
- * @param {string} text - Raw output line (ANSI codes stripped).
- */
-LLM_Deps_GuiDetail(text) {
-	global _LLM_Deps_Gui
-	if !IsSet(_LLM_Deps_Gui)
-		return
-	; Strip ANSI escape sequences
-	clean := RegExReplace(text, "\x1b\[[0-9;]*[A-Za-z]", "")
-	; Truncate to prevent overflow
-	if (StrLen(clean) > 70)
-		clean := "…" SubStr(clean, -67)
-	try _LLM_Deps_Gui["DetailLine"].Value := clean
-}
-
-/**
- * Switches the GUI to success state and auto-hides after 1.5 s.
- */
-LLM_Deps_GuiComplete() {
-	global _LLM_Deps_Gui
-	SetTimer(LLM_Deps_GuiAnimate, 0)   ; stop animation
-	if !IsSet(_LLM_Deps_Gui)
-		return
-	try _LLM_Deps_Gui["ProgressBar"].Value := 100
-	try _LLM_Deps_Gui["BtnCancel"].Enabled := false
-	SetTimer(() => LLM_Deps_GuiHide(), -1500)
-}
-
-/**
- * Switches the GUI to error state (red step, retry hint).
- * @param {string} msg - Error message to display.
- */
-LLM_Deps_GuiError(msg) {
-	global _LLM_Deps_Gui
-	SetTimer(LLM_Deps_GuiAnimate, 0)
-	if !IsSet(_LLM_Deps_Gui) {
-		MsgBox(msg, t("menu.llm.title") " — Erreur", "Icon!")
-		return
-	}
-	try {
-		_LLM_Deps_Gui["StepLine"].Value  := "❌ " msg
-		_LLM_Deps_Gui["DetailLine"].Value := "Vérifiez votre connexion et relancez Ergopti."
-		_LLM_Deps_Gui["BtnCancel"].Value := t("common.close")
-	}
-}
-
-/**
- * Hides and destroys the progress GUI.
- */
-LLM_Deps_GuiHide() {
-	global _LLM_Deps_Gui
-	SetTimer(LLM_Deps_GuiAnimate, 0)
-	if IsSet(_LLM_Deps_Gui) {
-		try _LLM_Deps_Gui.Destroy()
-		_LLM_Deps_Gui := unset
-	}
-}
-
-LLM_Deps_GuiCancel() {
-	LLM_Deps_GuiHide()
-}
-
-/**
- * Advances the indeterminate progress bar animation frame.
- */
-LLM_Deps_GuiAnimate() {
-	global _LLM_Deps_Gui, _LLM_Deps_BarPos
-	if !IsSet(_LLM_Deps_Gui)
-		return
-	_LLM_Deps_BarPos := Mod(_LLM_Deps_BarPos + 4, 100)
-	try _LLM_Deps_Gui["ProgressBar"].Value := _LLM_Deps_BarPos
 }
