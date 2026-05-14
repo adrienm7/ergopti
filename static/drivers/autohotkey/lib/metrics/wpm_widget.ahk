@@ -354,16 +354,20 @@ WPMWidget_OnControllerReady(wvc) {
         h := Round(WPMWidgetConst.GRAPH_H / scale)
         LoggerInfo("WPMWidget", "DPI=%d scale=%.2f logical w=%d h=%d.", dpi, scale, w, h)
 
+        ; Register WebMessageReceived BEFORE NavigateToString so the handler is
+        ; in place before the inline HTML script runs and posts "ready". If the
+        ; handler were registered after, the message could be lost on fast loads.
+        wvc.CoreWebView2.WebMessageReceived(WPMWidget_OnWebMessage)
+
         wvc.CoreWebView2.NavigateToString(WPMWidget_GraphHtml(w, h))
 
         WPMWidget._graph_wv := wvc
         LoggerInfo("WPMWidget", "WebView2 controller ready — page loading.")
 
-        ; Use WebMessageReceived (same pattern as ollama_webview) rather than
-        ; NavigationCompleted — the graph HTML posts "ready" from JS once the
-        ; canvas script has executed, giving us a reliable signal that
-        ; window.updateGraph is defined and safe to call.
-        wvc.CoreWebView2.WebMessageReceived(WPMWidget_OnWebMessage)
+        ; Safety fallback: if the web message is never received (e.g. WebView2
+        ; processed the inline HTML before the handler was registered), mark
+        ; ready after 2 s so the graph is not permanently stuck.
+        SetTimer(WPMWidget_FallbackReady, -2000)
     } catch as e {
         LoggerError("WPMWidget", "OnControllerReady failed: " . e.Message . " (" . e.File . ":" . e.Line . ")")
     }
@@ -376,8 +380,19 @@ WPMWidget_OnWebMessage(sender, args) {
         msg := ""
     if (msg != "ready")
         return
+    if WPMWidget._graph_wv_ready  ; already handled by fallback
+        return
     WPMWidget._graph_wv_ready := true
     LoggerInfo("WPMWidget", "Page ready (web message) — pushing first graph update.")
+    WPMWidget_PushGraphUpdate("0", WPMWidgetConst.COLOR_TXT_IDLE, false, false, false, true)
+}
+
+
+WPMWidget_FallbackReady() {
+    if WPMWidget._graph_wv_ready  ; web message already handled it
+        return
+    WPMWidget._graph_wv_ready := true
+    LoggerInfo("WPMWidget", "Page ready (fallback timer) — pushing first graph update.")
     WPMWidget_PushGraphUpdate("0", WPMWidgetConst.COLOR_TXT_IDLE, false, false, false, true)
 }
 
