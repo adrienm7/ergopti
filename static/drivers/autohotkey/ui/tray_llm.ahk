@@ -79,13 +79,10 @@ LLM_Tray_Init(saved_opts := Map()) {
 
 	LLM_Tray_Build()
 
-	; Auto-bootstrap Ollama — installs binary + starts server if needed.
-	; The checker runs silently when the server is already running (fast path).
-	LLM_Deps_CheckAndInstall(
-		_LLM_Tray["model"],
-		(*) => LLM_Tray_OnDepsReady(),
-		(msg) => LLM_Tray_OnDepsFailed(msg)
-	)
+	; Bootstrap Ollama only if the user has explicitly enabled the AI feature.
+	; Users who never activate it incur zero network or CPU overhead.
+	if _LLM_Tray["enabled"]
+		LLM_Tray_BootstrapOllama()
 }
 
 
@@ -208,11 +205,29 @@ LLM_Tray_BuildNMenu() {
 LLM_Tray_OnToggle(*) {
 	global _LLM_Tray
 	_LLM_Tray["enabled"] := !_LLM_Tray["enabled"]
-	if _LLM_Tray["enabled"]
-		LLM_Tray_StartBridge()
-	else
+	if _LLM_Tray["enabled"] {
+		; First activation: bootstrap Ollama (install if needed), then start bridge.
+		LLM_Tray_BootstrapOllama()
+	} else {
 		LLM_Bridge_Stop()
+	}
 	LLM_Tray_Build()
+}
+
+/**
+ * Triggers the Ollama deps checker. Called only when the user activates the feature.
+ * If already ready, starts the bridge immediately.
+ */
+LLM_Tray_BootstrapOllama() {
+	if LLM_Deps_IsReady() {
+		LLM_Tray_OnDepsReady()
+		return
+	}
+	LLM_Deps_CheckAndInstall(
+		_LLM_Tray["model"],
+		(*) => LLM_Tray_OnDepsReady(),
+		(msg) => LLM_Tray_OnDepsFailed(msg)
+	)
 }
 
 LLM_Tray_SetModel(tag) {

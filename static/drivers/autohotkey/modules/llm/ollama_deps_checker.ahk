@@ -294,7 +294,7 @@ LLM_Deps_GuiShow(step_text := "") {
 	detail_ctrl := g.Add("Text", "x18 y94 w424 vDetailLine", "")
 
 	; Indeterminate progress bar (green accent for Ollama)
-	g.Add("Progress", "x18 y120 w424 h4 vProgressBar BackgroundColor242426 c73d98c Range0-100", 0)
+	g.Add("Progress", "x18 y120 w424 h4 vProgressBar cGreen Background242426 Range0-100")
 
 	g.SetFont("s9 cAAAAAA w400", "Segoe UI")
 	g.Add("Button", "x18 y138 w80 vBtnCancel", t("download_window.btn_cancel")).OnEvent("Click",
