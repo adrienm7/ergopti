@@ -63,6 +63,12 @@ global _LLM_Tray := Map(
 	"instant_on_word_end", false
 )
 
+; Persistent Menu object — reused across rebuilds so the tray entry never
+; moves. AHK v2 Menu.Delete+Add always appends; updating the same object
+; in place is the only way to keep the canonical menu position.
+global _LLM_Tray_Menu := Menu()
+global _LLM_Tray_InTray := false
+
 
 
 
@@ -121,14 +127,20 @@ LLM_Tray_Init(saved_opts := Map()) {
 
 /**
  * Builds (or rebuilds) the LLM submenu inside the tray.
+ * Uses the persistent _LLM_Tray_Menu object: first call registers it in the
+ * tray (position is determined by call order in initMenu); subsequent calls
+ * delete all items and repopulate in place, so the entry never moves.
  */
 LLM_Tray_Build() {
-	global _LLM_Tray
+	global _LLM_Tray, _LLM_Tray_Menu
 
-	llm_menu := Menu()
+	; Clear all existing items so we can repopulate in place.
+	; On the very first call the menu is empty — Delete("") on an empty menu
+	; is a no-op in AHK v2, so this branch is always safe.
+	try _LLM_Tray_Menu.Delete()
 
 	; Enable / Disable toggle — same ✅/❌ pattern as every other category submenu
-	AddCategoryToggleItem(llm_menu,
+	AddCategoryToggleItem(_LLM_Tray_Menu,
 		t("menu.llm.on"),
 		t("menu.llm.off"),
 		_LLM_Tray["enabled"],
@@ -136,41 +148,35 @@ LLM_Tray_Build() {
 
 	; Model submenu
 	model_menu := LLM_Tray_BuildModelMenu()
-	llm_menu.Add(Format(t("menu.llm.model_label"), _LLM_Tray["model"]), model_menu)
+	_LLM_Tray_Menu.Add(Format(t("menu.llm.model_label"), _LLM_Tray["model"]), model_menu)
 
 	; Profile submenu
 	profile_menu := LLM_Tray_BuildProfileMenu()
-	llm_menu.Add(Format(t("menu.profiles.profile_label_prefix"), _LLM_Tray["profile_id"]), profile_menu)
+	_LLM_Tray_Menu.Add(Format(t("menu.profiles.profile_label_prefix"), _LLM_Tray["profile_id"]), profile_menu)
 
 	; Number of predictions submenu
 	n_menu := LLM_Tray_BuildNMenu()
-	llm_menu.Add(Format(t("menu.llm.num_predictions_label"), _LLM_Tray["n_predictions"]), n_menu)
+	_LLM_Tray_Menu.Add(Format(t("menu.llm.num_predictions_label"), _LLM_Tray["n_predictions"]), n_menu)
 
-	llm_menu.Add()  ; separator
+	_LLM_Tray_Menu.Add()  ; separator
 
 	; Trigger settings submenu
 	trigger_menu := LLM_Tray_BuildTriggerMenu()
-	llm_menu.Add(t("menu.llm.trigger_menu_title"), trigger_menu)
+	_LLM_Tray_Menu.Add(t("menu.llm.trigger_menu_title"), trigger_menu)
 
 	; Generation settings submenu
 	gen_menu := LLM_Tray_BuildGenerationMenu()
-	llm_menu.Add(t("menu.llm.generation_menu_title"), gen_menu)
+	_LLM_Tray_Menu.Add(t("menu.llm.generation_menu_title"), gen_menu)
 
-	llm_menu.Add()  ; separator
-	llm_menu.Add(t("menu.llm.about"), LLM_Tray_OnAbout)
+	_LLM_Tray_Menu.Add()  ; separator
+	_LLM_Tray_Menu.Add(t("menu.llm.about"), LLM_Tray_OnAbout)
 
-	; Attach to system tray — delete old entry first to avoid duplicates on rebuild,
-	; then re-insert at the canonical position (right after Hotstrings, before Metrics)
-	; using the Metrics title as the anchor. A_TrayMenu.Add() always appends to the
-	; bottom, so we must Insert explicitly to keep the correct menu order on rebuild.
-	try A_TrayMenu.Delete(t("menu.llm.title"))
-	try {
-		A_TrayMenu.Insert(t("menu.metrics.title") "&", t("menu.llm.title"), llm_menu)
-	} catch {
-		; Fallback: Metrics title not yet in the tray (first build during initMenu
-		; where LLM is inserted before Metrics is added). A_TrayMenu.Add is fine here
-		; because initMenu sequences the two inserts in the correct order.
-		A_TrayMenu.Add(t("menu.llm.title"), llm_menu)
+	; Register in the system tray on first call only. On subsequent rebuilds
+	; the same Menu object is already wired to the tray entry — items were
+	; updated in place above, so the position is unchanged.
+	if !_LLM_Tray_InTray {
+		A_TrayMenu.Add(t("menu.llm.title"), _LLM_Tray_Menu)
+		_LLM_Tray_InTray := true
 	}
 }
 
@@ -363,11 +369,10 @@ LLM_Tray_OnToggle(*) {
  * Called after every user-visible state change so settings survive reload.
  */
 LLM_Tray_SaveConfig() {
-	; Delegate to the main driver's full-config writer — it already knows how
-	; to write [LLM] settings from _LLM_Tray (wired in SaveFullConfig).
-	; IsSet guard: SaveFullConfig may not exist when tray_llm.ahk is unit-tested
-	; in isolation (the test runner does not include ErgoptiPlus.ahk).
-	if IsSet(SaveFullConfig)
+	global _SaveFullConfigReady
+	; _SaveFullConfigReady is set by ErgoptiPlus.ahk after all modules load.
+	; When tray_llm.ahk runs standalone (unit tests) the flag is absent — skip.
+	if IsSet(_SaveFullConfigReady) && _SaveFullConfigReady
 		SaveFullConfig()
 }
 
