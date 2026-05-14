@@ -155,7 +155,9 @@ def compute_flags(entry: dict[str, Any]) -> str:
     return flags
 
 
-def emit_entry(out: list[str], trigger: str, entry: dict[str, Any]) -> None:
+def emit_entry(
+    out: list[str], trigger: str, entry: dict[str, Any], is_repeat_section: bool = False
+) -> None:
     """Emit the two lines (options + call) for one TOML hotstring entry."""
     output = entry.get("output", "")
     flags = compute_flags(entry)
@@ -164,10 +166,14 @@ def emit_entry(out: list[str], trigger: str, entry: dict[str, Any]) -> None:
     #   ``is_case_sensitive = false`` ➜ all-variants ``CreateCaseSensitiveHotstrings``
     is_case_sens = entry.get("is_case_sensitive", False)
     final_result = entry.get("final_result", False)
+    # Only mark as a repeat trigger when the trigger itself contains the magic-key
+    # marker — plain-text corrections in repeatcorrections (e.g. "ccê" → "ccu")
+    # must not be gated by the repeat-specific word-position check.
+    is_repeat = is_repeat_section and MAGIC_KEY_MARKER in trigger
 
     options_line = (
         '\t_GenOpts := Map("TimeActivationSeconds", _GenTimeAct, "FinalResult", '
-        f"{ahk_bool(final_result)})"
+        f'{ahk_bool(final_result)}, "IsRepeat", {ahk_bool(is_repeat)})'
     )
     out.append(options_line)
     out.append(
@@ -205,10 +211,11 @@ def emit_section(
         "? FeatureConfig.TimeActivationSeconds : 0"
     )
     out.append('\t_GenMK := ScriptInformation["MagicKey"]')
+    is_repeat_section = (category == "magickey" and section == "repeatcorrections")
     for entry_dict in entries:
         # Each TOML ``[[section]]`` row is a single-key mapping in the parsed form.
         for trigger, data in entry_dict.items():
-            emit_entry(out, trigger, data)
+            emit_entry(out, trigger, data, is_repeat_section=is_repeat_section)
     out.append("}")
     out.append("")
     return fn_name
@@ -270,7 +277,7 @@ def build(root: Path) -> str:
 def main() -> int:
     root = Path(__file__).resolve().parent.parent
     output_path = (
-        root / "static" / "drivers" / "autohotkey" / "lib" / "hotstrings_generated.ahk"
+        root / "static" / "drivers" / "autohotkey" / "lib" / "hotstrings" / "hotstrings_generated.ahk"
     )
     content = build(root)
     output_path.write_text(content, encoding="utf-8")

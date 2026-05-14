@@ -431,6 +431,13 @@ _OnPrefixChar(IH, Char) {
         ; trigger a STAR match (e.g. a personal ``,a → ja`` rule fires
         ; on the « a », not on the comma).
         HSEMatch := HSE_FeedChar(Char)
+        ; When no registered hotstring matched, try the engine-level repeat
+        ; fallback: <x><MagicKey> repeats <x> when x is at least the 2nd
+        ; letter of the current word. This replaces the now-removed [[repeat]]
+        ; TOML entries and fires at the lowest priority (only on no-match).
+        if (HSEMatch == "" and IsSet(ScriptInformation) and ScriptInformation.Has("MagicKey")) {
+            HSEMatch := HSE_TryRepeatKey(ScriptInformation["MagicKey"])
+        }
         if (HSEMatch != "") {
             HSE_DispatchMatch(HSEMatch, HSE_LastEndChar)
             ; Log the fired hotstring. ``h_type`` is taken from the

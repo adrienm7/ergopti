@@ -602,7 +602,7 @@ function M.is_section_enabled(group_name, section_name)
 	return hs.settings.get("hotstrings_section_" .. tostring(group_name) .. "_" .. tostring(section_name)) ~= false
 end
 
---- Returns true when the "repeat" section is present and enabled in any active group.
+--- Returns true when the "repeatcorrections" section is present and enabled in any active group.
 --- Used to gate the magic-key repeat feature.
 --- @return boolean
 function M.is_repeat_feature_enabled()
@@ -610,7 +610,7 @@ function M.is_repeat_feature_enabled()
 	for name, g in pairs(_state.groups) do
 		if g.enabled and g.sections then
 			for _, sec in ipairs(g.sections) do
-				if sec.name == "repeat" then return M.is_section_enabled(name, "repeat") end
+				if sec.name == "repeatcorrections" then return M.is_section_enabled(name, "repeatcorrections") end
 			end
 		end
 	end

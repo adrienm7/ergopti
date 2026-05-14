@@ -752,8 +752,8 @@ if Features.Has("DynamicHotstrings") {
 
 ; ★ becomes a repeat key. It will activate will the lowest priority of all hotstrings
 ; That means a letter will only be repeated if no hotstring defined above matches
-if Features["MagicKey"]["Repeat"].Enabled {
-	LoadHotstringsSection("magickey", "repeat", Features["MagicKey"]["Repeat"])
+if Features["MagicKey"]["RepeatCorrections"].Enabled {
+	LoadHotstringsSection("magickey", "repeatcorrections", Features["MagicKey"]["RepeatCorrections"])
 }
 
 CreateHotstring("*", "clé" . ScriptInformation["MagicKey"], "🔑")

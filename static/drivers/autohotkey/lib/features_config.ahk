@@ -224,7 +224,7 @@ global Features := Map(
         "Replace", {
             Enabled: True,
         },
-        "Repeat", {
+        "RepeatCorrections", {
             Enabled: True,
         },
         "TextExpansion", {
