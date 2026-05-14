@@ -236,8 +236,10 @@ OllamaWV_Create(kind, subtitle) {
 		s.AreBrowserAcceleratorKeysEnabled := false
 	}
 
-	; JS → AHK message bridge (cancel / retry buttons)
-	_OllamaWV_WebView.WebMessageReceived := OllamaWV_OnWebMessage
+	; JS → AHK message bridge (cancel / retry buttons).
+	; The wrapper's __Call intercepts obj.Method(fn) and routes it to
+	; add_WebMessageReceived — the := assignment form does NOT work.
+	_OllamaWV_WebView.WebMessageReceived(OllamaWV_OnWebMessage)
 
 	; Inject i18n base URL and locale code before page scripts run.
 	; The JSON strings are pushed later via ExecuteScript in FlushQueue to avoid
@@ -245,7 +247,7 @@ OllamaWV_Create(kind, subtitle) {
 	locales_url := OllamaWV_LocalesUrl()
 	locale_code := _I18nLocale
 	seed_script := "window.__i18n_base='" locales_url "';window._i18n_locale='" locale_code "';"
-	try _OllamaWV_WebView.AddScriptToExecuteOnDocumentCreated(seed_script, 0)
+	try _OllamaWV_WebView.AddScriptToExecuteOnDocumentCreated(seed_script)
 	LoggerInfo("LLM", "i18n seed injected: base=" locales_url " locale=" locale_code ".")
 
 	; Navigate to shared HTML
@@ -345,7 +347,7 @@ OllamaWV_EvalJS(js) {
 		_OllamaWV_Queue.Push(js)
 		return
 	}
-	try _OllamaWV_WebView.ExecuteScript(js, 0)
+	try _OllamaWV_WebView.ExecuteScript(js)
 }
 
 /**
@@ -363,9 +365,9 @@ OllamaWV_FlushQueue() {
 	_OllamaWV_Ready := true
 	; Inject the full locale strings now that the DOM exists
 	i18n_js := OllamaWV_I18nApplyScript(_I18nLocale)
-	try _OllamaWV_WebView.ExecuteScript(i18n_js, 0)
+	try _OllamaWV_WebView.ExecuteScript(i18n_js)
 	for js in _OllamaWV_Queue
-		try _OllamaWV_WebView.ExecuteScript(js, 0)
+		try _OllamaWV_WebView.ExecuteScript(js)
 	_OllamaWV_Queue := []
 }
 
