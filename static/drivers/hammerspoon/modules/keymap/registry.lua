@@ -520,7 +520,11 @@ function M.load_toml(name, path)
 	_state.current_group = name
 	local sections_info  = {}
 
-	for _, sec_name in ipairs(data.sections_order or {}) do
+	local sections_order = (data.sections_order and #data.sections_order > 0)
+		and data.sections_order
+		or  (data.meta and data.meta.sections_order or {})
+
+	for _, sec_name in ipairs(sections_order) do
 		if sec_name == "-" then
 			table.insert(sections_info, { name = "-", description = "-", count = 0 })
 			goto continue_sec
