@@ -132,7 +132,7 @@ LLM_Tray_Init(saved_opts := Map()) {
  * delete all items and repopulate in place, so the entry never moves.
  */
 LLM_Tray_Build() {
-	global _LLM_Tray, _LLM_Tray_Menu
+	global _LLM_Tray, _LLM_Tray_Menu, _LLM_Tray_InTray
 
 	; Clear all existing items so we can repopulate in place.
 	; On the very first call the menu is empty — Delete("") on an empty menu
