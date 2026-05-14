@@ -314,6 +314,10 @@ _HotstringDispatch(Replacement, EndChar, BackSpaceSeq, PrevCharKey, OnlyText, Fi
     if IsTimeActivationExpired(PrevCharKey, TimeActivationSeconds) {
         return
     }
+    ; Allow Replacement to be a zero-argument callable — resolved at fire time
+    ; so dynamic values (dates, live data) are computed on each keystroke.
+    if HasMethod(Replacement)
+        Replacement := Replacement()
 
     if _ALTGR_KANA_FIXUP {
         ; Only needed when AltGr (SC138) is remapped to Kana at the driver
