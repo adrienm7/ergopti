@@ -1,14 +1,15 @@
 ; static/extensions/ergopti-demo/shortcuts/menu.ahk
 ;
-; Ergopti extension shortcut menu — AHK driver.
-; This file is loaded in a sandboxed context. The variable `ExtMenu` is a
-; pre-created AHK Menu object; populate it freely. `ExtName` holds the
-; extension display name. `t` (i18n) and Logger* functions are available.
+; Ergopti Demo extension — AHK shortcuts menu.
+; Must define BuildExtMenu_ergopti_demo(ExtMenu, ExtName) which the loader
+; calls to populate the extension's submenu in the Shortcuts tray entry.
 
-ExtMenu.Add(t("ext.demo.open_demo_gui"), _ErgoptiDemo_OpenGui)
-ExtMenu.Add(t("ext.demo.show_info"),     _ErgoptiDemo_ShowInfo)
-ExtMenu.Add()   ; separator
-ExtMenu.Add(t("ext.demo.visit_docs"),    _ErgoptiDemo_VisitDocs)
+BuildExtMenu_ergopti_demo(ExtMenu, ExtName) {
+    ExtMenu.Add(t("ext.demo.open_demo_gui"), _ErgoptiDemo_OpenGui)
+    ExtMenu.Add(t("ext.demo.show_info"),     _ErgoptiDemo_ShowInfo)
+    ExtMenu.Add()   ; separator
+    ExtMenu.Add(t("ext.demo.visit_docs"),    _ErgoptiDemo_VisitDocs)
+}
 
 _ErgoptiDemo_OpenGui(*) {
     MsgBox(t("ext.demo.gui_message"), "Ergopti Demo", "OK")

@@ -8,10 +8,17 @@
  * sends every user mutation back through the `hotstrings_config_bridge`
  * usercontent channel. The page never keeps a divergent local copy of the
  * truth — Lua pushes a fresh state after each action, and we re-render.
+ *
+ * A group selector (<select>) at the top of the page filters the category
+ * list to the active group (Commun / Personnel / one per extension).
  * ==============================================================================
  */
 
-let state = { categories: [], presets: [] };
+let state = { categories: [], groups: [], presets: [], global_default_delay_ms: 750 };
+
+// The currently selected group key — persisted across Lua-pushed state updates
+// so the user's position is not lost after every mutation round-trip.
+let activeGroup = null;
 
 // Resolve a translation key via the loaded locale strings (set by i18n.js).
 function _t(key) {
@@ -47,6 +54,16 @@ function send(payload) {
 function setData(next) {
 	if (!next || typeof next !== "object") return;
 	state = next;
+
+	// Preserve the active group across state pushes; fall back to the first group.
+	if (state.groups && state.groups.length > 0) {
+		const keys = state.groups.map(function (g) { return g.key; });
+		if (!activeGroup || keys.indexOf(activeGroup) === -1) {
+			activeGroup = keys[0];
+		}
+	}
+
+	renderGroupSelector();
 	render();
 }
 
@@ -62,8 +79,33 @@ function setAllGrey() {
 	send({ action: "set_all_grey" });
 }
 
+
 // ============================================================
-// 2/ Rendering
+// 2/ Group selector
+// ============================================================
+
+function renderGroupSelector() {
+	const sel = document.getElementById("group-select");
+	if (!sel) return;
+	sel.innerHTML = "";
+	(state.groups || []).forEach(function (g) {
+		const o = document.createElement("option");
+		o.value = g.key;
+		o.textContent = g.label;
+		if (g.key === activeGroup) o.selected = true;
+		sel.appendChild(o);
+	});
+}
+
+function onGroupChange() {
+	const sel = document.getElementById("group-select");
+	if (sel) activeGroup = sel.value;
+	render();
+}
+
+
+// ============================================================
+// 3/ Rendering
 // ============================================================
 
 function render() {
@@ -73,7 +115,12 @@ function render() {
 	const tplCat = document.getElementById("tpl-category").content;
 	const tplSec = document.getElementById("tpl-section").content;
 
-	for (const cat of state.categories) {
+	// Filter categories to the active group only
+	const visible = (state.categories || []).filter(function (cat) {
+		return cat.group === activeGroup;
+	});
+
+	for (const cat of visible) {
 		const node = document.importNode(tplCat, true);
 		applyTemplateI18n(node);
 		const card = node.querySelector(".cat");
@@ -112,36 +159,49 @@ function render() {
 	}
 }
 
+
 // ============================================================
-// 3/ Field bindings
+// 4/ Field bindings
 // ============================================================
 
 function bindDelay(field, cat, sec) {
 	const ms = sec ? sec.delay_ms : cat.delay_ms;
 	const overridden = sec ? sec.delay_overridden : cat.delay_overridden;
+	// When the TOML default is 0, fall back to the global default as the hint
+	// so the user understands what value will actually be applied.
+	const defaultMs = (sec ? sec.delay_default_ms : cat.delay_default_ms)
+		|| state.global_default_delay_ms
+		|| 750;
 	const input = field.querySelector("input");
 	const reset = field.querySelector(".reset");
 
-	input.value = ms;
+	input.value = ms || defaultMs;
+	input.placeholder = defaultMs;
 	field.classList.toggle("overridden", !!overridden);
 
 	input.addEventListener("change", () => {
 		const v = parseInt(input.value, 10);
 		if (Number.isFinite(v) && v >= 0) {
 			send({
-				action: "set_delay",
-				category: cat.name,
-				section: sec ? sec.name : "",
-				ms: v,
+				action:        "set_delay",
+				category:      cat.name,
+				group:         cat.group,
+				section:       sec ? sec.name : "",
+				personal_path: cat.personal_path || "",
+				ext_id:        cat.ext_id || "",
+				ms:            v,
 			});
 		}
 	});
 
 	reset.addEventListener("click", () => {
 		send({
-			action: "clear_delay",
-			category: cat.name,
-			section: sec ? sec.name : "",
+			action:        "clear_delay",
+			category:      cat.name,
+			group:         cat.group,
+			section:       sec ? sec.name : "",
+			personal_path: cat.personal_path || "",
+			ext_id:        cat.ext_id || "",
 		});
 	});
 }
@@ -177,9 +237,12 @@ function bindColor(field, cat, sec) {
 		const hex = select.value;
 		if (hex) {
 			send({
-				action: "set_color",
-				category: cat.name,
-				section: sec ? sec.name : "",
+				action:        "set_color",
+				category:      cat.name,
+				group:         cat.group,
+				section:       sec ? sec.name : "",
+				personal_path: cat.personal_path || "",
+				ext_id:        cat.ext_id || "",
 				hex,
 			});
 		}
@@ -187,9 +250,12 @@ function bindColor(field, cat, sec) {
 
 	reset.addEventListener("click", () => {
 		send({
-			action: "clear_color",
-			category: cat.name,
-			section: sec ? sec.name : "",
+			action:        "clear_color",
+			category:      cat.name,
+			group:         cat.group,
+			section:       sec ? sec.name : "",
+			personal_path: cat.personal_path || "",
+			ext_id:        cat.ext_id || "",
 		});
 	});
 }
