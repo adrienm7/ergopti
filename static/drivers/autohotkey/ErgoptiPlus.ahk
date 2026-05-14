@@ -117,6 +117,11 @@ SendMode("Event") ; Everything concerning hotstrings MUST use SendEvent and not 
 #Include modules/keylogger/keylogger_network.ahk
 #Include modules/keylogger/keylogger_clipboard.ahk
 #Include modules/keylogger/keylogger_trigger_roi.ahk
+
+; Bundled extension shortcut menus — each defines BuildExtMenu_<id>().
+; ``*i`` keeps the driver runnable if an extension is removed without
+; updating this list.
+#Include *i ..\..\extensions\ergopti-demo\shortcuts\menu.ahk
 #Include modules/keylogger/keylogger_reader.ahk
 #Include modules/keylogger/keylogger_prefetch.ahk
 #Include modules/keylogger/keylogger_webview.ahk
@@ -1337,6 +1342,64 @@ initMenu() {
     if SubMenus.Has("Shortcuts") {
         InsertKeyboardShortcutGroups(SubMenus["Shortcuts"], t("menu.shortcuts.group_modifiers"))
         SubMenus["Shortcuts"].Add(t("menu.shortcuts.script_shortcuts"), BuildScriptShortcutsMenu())
+
+        ; Extensions shortcuts — one submenu per bundled extension that ships a
+        ; shortcuts/menu.ahk. The script is run in a sandboxed #Include context
+        ; receiving a pre-created Menu object named ExtMenu and the string ExtName.
+        global _StaticDir
+        ExtShortcutsBaseDir := _StaticDir . "\extensions\"
+        HasExtShortcuts := false
+        if DirExist(ExtShortcutsBaseDir) {
+            Loop Files ExtShortcutsBaseDir . "*", "D" {
+                MenuAhkPath := A_LoopFileFullPath . "\shortcuts\menu.ahk"
+                if FileExist(MenuAhkPath) {
+                    HasExtShortcuts := true
+                    break
+                }
+            }
+        }
+        if HasExtShortcuts {
+            SubMenus["Shortcuts"].Add() ; Separator before Extensions block
+            ExtShortcutsHeader := MenuSectionTitle(t("menu.extensions.header"))
+            SubMenus["Shortcuts"].Add(ExtShortcutsHeader, (*) => NoAction())
+            SubMenus["Shortcuts"].Disable(ExtShortcutsHeader)
+            Loop Files ExtShortcutsBaseDir . "*", "D" {
+                ExtId        := A_LoopFileName
+                ExtDir       := A_LoopFileFullPath
+                MenuAhkPath  := ExtDir . "\shortcuts\menu.ahk"
+                if !FileExist(MenuAhkPath)
+                    continue
+                ; Read display name from manifest
+                ExtName      := ExtId
+                ManifestPath := ExtDir . "\manifest.toml"
+                if FileExist(ManifestPath) {
+                    try {
+                        MC := FileRead(ManifestPath, "UTF-8")
+                        if RegExMatch(MC, "name\s*=\s*`"([^`"]+)`"", &MN)
+                            ExtName := MN[1]
+                    }
+                }
+                ; Build the extension's submenu. menu.ahk must define a function
+                ; named BuildExtMenu(ExtMenu, ExtName) that populates the menu.
+                ; The file is sourced by the extension loader at startup via
+                ; #Include; here we just call the registered builder function.
+                ExtMenu   := Menu()
+                BuilderFn := "BuildExtMenu_" . StrReplace(ExtId, "-", "_")
+                if IsSet(%BuilderFn%) and HasMethod(%BuilderFn%) {
+                    try {
+                        %BuilderFn%(ExtMenu, ExtName)
+                    } catch as Err {
+                        LoggerWarn("Extensions", "BuildExtMenu for '{1}' threw: {2}.", ExtId, Err.Message)
+                    }
+                } else {
+                    LoggerWarn("Extensions", "No BuildExtMenu_{1} function found — menu.ahk not loaded?", StrReplace(ExtId, "-", "_"))
+                    NaLabel := t("menu.extensions.empty")
+                    ExtMenu.Add(NaLabel, (*) => NoAction())
+                    ExtMenu.Disable(NaLabel)
+                }
+                SubMenus["Shortcuts"].Add(ExtName, ExtMenu)
+            }
+        }
     }
 
     ; ── 🌐 Disposition clavier — mirrors the HS layout submenu naming ──
@@ -1555,8 +1618,88 @@ initMenu() {
         ExtTitle := ExtStem . (ExtCount > 0 ? " (" . FmtCount(ExtCount) . ")" : "")
         HotstringsMenu.Add(ExtTitle, ExtMenu)
     }
-    ; Compute grand total = common + personal
-    GrandTotal := CommonTotal + TotalPersonal
+    ; 4. Bundled Extensions — one submenu per extension folder, then one sub-submenu
+    ;    per TOML file inside that extension's hotstrings/ sub-folder.
+    ;    The extensions directory lives at static/extensions/ next to the drivers.
+    global _StaticDir
+    ExtensionsBaseDir := _StaticDir . "\extensions\"
+    BundledExtensions := []   ; [{id, name, toml_files: [{path, stem, sections, count}]}]
+    ExtTotal := 0
+    if DirExist(ExtensionsBaseDir) {
+        Loop Files ExtensionsBaseDir . "*", "D" {
+            ExtId   := A_LoopFileName
+            ExtDir  := A_LoopFileFullPath
+            ManifestPath := ExtDir . "\manifest.toml"
+            ; Read extension display name from manifest (fall back to folder id)
+            ExtDisplayName := ExtId
+            if FileExist(ManifestPath) {
+                try {
+                    ManifestContent := FileRead(ManifestPath, "UTF-8")
+                    if RegExMatch(ManifestContent, "name\s*=\s*`"([^`"]+)`"", &NM)
+                        ExtDisplayName := NM[1]
+                }
+            }
+            HsDir := ExtDir . "\hotstrings\"
+            TomlFiles := []
+            if DirExist(HsDir) {
+                Loop Files HsDir . "*.toml" {
+                    FileSections := _ParseExtTomlSections(A_LoopFileFullPath)
+                    FileCount := 0
+                    for _, _FS in FileSections
+                        FileCount += _FS["count"]
+                    ExtTotal += FileCount
+                    SplitPath A_LoopFileFullPath, , , , &FileStem
+                    TomlFiles.Push({ path: A_LoopFileFullPath, stem: FileStem
+                        , sections: FileSections, count: FileCount })
+                }
+            }
+            BundledExtensions.Push({ id: ExtId, name: ExtDisplayName, toml_files: TomlFiles })
+        }
+    }
+
+    HotstringsMenu.Add() ; Separator before Extensions block
+    ExtHeader := MenuSectionTitle(t("menu.extensions.header") . (ExtTotal > 0 ? " (" . FmtCount(ExtTotal) . ")" : ""))
+    HotstringsMenu.Add(ExtHeader, (*) => NoAction())
+    HotstringsMenu.Disable(ExtHeader)
+    if (BundledExtensions.Length == 0) {
+        EmptyLabel := t("menu.extensions.empty")
+        HotstringsMenu.Add(EmptyLabel, (*) => NoAction())
+        HotstringsMenu.Disable(EmptyLabel)
+    } else {
+        for _, Ext in BundledExtensions {
+            ExtHsMenu := Menu()
+            ExtTotalForExt := 0
+            for _, TF in Ext.toml_files
+                ExtTotalForExt += TF.count
+            if (Ext.toml_files.Length == 0) {
+                NoHsLabel := t("menu.extensions.empty")
+                ExtHsMenu.Add(NoHsLabel, (*) => NoAction())
+                ExtHsMenu.Disable(NoHsLabel)
+            } else {
+                for _, TF in Ext.toml_files {
+                    TFMenu := Menu()
+                    if (TF.sections.Length == 0) {
+                        NoSecLabel := t("menu.extensions.empty")
+                        TFMenu.Add(NoSecLabel, (*) => NoAction())
+                        TFMenu.Disable(NoSecLabel)
+                    } else {
+                        for _, Sec in TF.sections {
+                            SecLabel := Sec["description"] . " (" . FmtCount(Sec["count"]) . ")"
+                            TFMenu.Add(SecLabel, (*) => NoAction())
+                            TFMenu.Disable(SecLabel)
+                        }
+                    }
+                    TFTitle := TF.stem . (TF.count > 0 ? " (" . FmtCount(TF.count) . ")" : "")
+                    ExtHsMenu.Add(TFTitle, TFMenu)
+                }
+            }
+            ExtMenuTitle := Ext.name . (ExtTotalForExt > 0 ? " (" . FmtCount(ExtTotalForExt) . ")" : "")
+            HotstringsMenu.Add(ExtMenuTitle, ExtHsMenu)
+        }
+    }
+
+    ; Compute grand total = common + personal + extensions
+    GrandTotal := CommonTotal + TotalPersonal + ExtTotal
     HotstringsMenuTitle := t("menu.hotstrings.title") . (GrandTotal > 0 ? " (" . FmtCount(GrandTotal) . ")" : "")
     A_TrayMenu.Add(HotstringsMenuTitle, HotstringsMenu)
     if HotstringsAllEnabled {
