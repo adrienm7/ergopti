@@ -246,7 +246,7 @@ _PrefixWatcherTomlPath(Category) {
             and ScriptInformation.Has("PersonalTomlPath")) {
         return ScriptInformation["PersonalTomlPath"]
     }
-    return A_ScriptDir . "\..\hotstrings\" . LowerCat . ".toml"
+    return A_ScriptDir . "\..\..\hotstrings\" . LowerCat . ".toml"
 }
 
 ; Scan a category TOML and add every (trigger, output) pair to the prefix
