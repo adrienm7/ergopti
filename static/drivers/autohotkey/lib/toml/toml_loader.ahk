@@ -397,13 +397,13 @@ BootstrapPersonalFeatures() {
 }
 
 ApplyTomlMetadataToFeatures(CategoryName) {
-    global ScriptInformation
+    global ScriptInformation, _StaticDir
     if (StrLower(CategoryName) == "personal"
     and IsSet(ScriptInformation)
     and ScriptInformation.Has("PersonalTomlPath")) {
         FilePath := ScriptInformation["PersonalTomlPath"]
     } else {
-        FilePath := A_ScriptDir . "\..\hotstrings\" . StrLower(CategoryName) . ".toml"
+        FilePath := _StaticDir . "\hotstrings\" . StrLower(CategoryName) . ".toml"
     }
     if !FileExist(FilePath) {
         return
