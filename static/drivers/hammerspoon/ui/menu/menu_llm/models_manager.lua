@@ -249,6 +249,8 @@ function M.new(deps)
 	local obj = {}
 
 	local candidates = {
+		hs.configdir .. "/../_shared/llm/models.json",
+		hs.configdir .. "/../../_shared/llm/models.json",
 		hs.configdir .. "/data/llm_models.json",
 		hs.configdir .. "/../hammerspoon/data/llm_models.json",
 	}

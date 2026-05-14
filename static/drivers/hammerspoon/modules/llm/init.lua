@@ -241,6 +241,8 @@ local _model_index = nil
 local function get_model_index()
 	if _model_index then return _model_index end
 	local candidates = {
+		hs.configdir .. "/../_shared/llm/models.json",
+		hs.configdir .. "/../../_shared/llm/models.json",
 		hs.configdir .. "/data/llm_models.json",
 		hs.configdir .. "/../hammerspoon/data/llm_models.json",
 	}
