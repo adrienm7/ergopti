@@ -570,7 +570,7 @@ const FINGER_DISTANCE_TOOLTIP_HTML = (() => {
 		`On compte un aller-retour (×${NBSP}2) puisque le doigt revient au repos.<br><br>` +
 		`<strong>Cas particuliers${NBSP}:</strong><br>` +
 		`&nbsp;&nbsp;• Si la touche frappée est la touche de repos elle-même (espace pour le pouce gauche par exemple), la distance est de 0.<br>` +
-		`&nbsp;&nbsp;• Le décalage horizontal entre rangées d’un clavier ISO n'est pas pris en compte${NBSP}: on traite le clavier comme une grille orthogonale, ce qui simplifie le calcul et reste valide pour les claviers ortholinéaires.<br>` +
+		`&nbsp;&nbsp;• Le décalage horizontal entre rangées d'un clavier ISO n'est pas pris en compte${NBSP}: on traite le clavier comme une grille orthogonale, ce qui simplifie le calcul et reste valide pour les claviers ortholinéaires.<br>` +
 		`&nbsp;&nbsp;• Frapper deux fois la même touche ne compte pas deux allers-retours complets : la distance est sommée par-dessus le compteur de la touche, ce qui sous-estime légèrement les répétitions mais reflète bien la fatigue cumulée.<br><br>` +
 		`<strong>Effet des toggles${NBSP}:</strong> diminue significativement quand les hotstrings ou l'IA génèrent des caractères à votre place — vos doigts ne se déplacent plus pour ces caractères-là.`
 	);

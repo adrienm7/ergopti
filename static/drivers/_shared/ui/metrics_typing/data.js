@@ -614,13 +614,13 @@ function recompute_speed_kpi() {
 	const NBSP = String.fromCharCode(160);
 
 	const formula_tooltip =
-		_t(‘ui_typing.tooltip_cpm_formula’)
-			.replace(‘{mode}’, mode_label)
-			.replace(‘{pure_trans}’, format_number(pure_trans))
-			.replace(‘{thresh}’, thresh_label)
-			.replace(‘{add_hs}’, show_hs ? ` • + HS : ${format_number(add_hs)} ${_t(‘ui_typing.tooltip_cpm_hs_chars’)}<br>` : ‘’)
-			.replace(‘{add_llm}’, show_llm ? ` • + IA : ${format_number(add_llm)} ${_t(‘ui_typing.tooltip_cpm_llm_chars’)}<br>` : ‘’)
-			.replace(‘{chars_total}’, format_number(chars_total));
+		_t('ui_typing.tooltip_cpm_formula')
+			.replace('{mode}', mode_label)
+			.replace('{pure_trans}', format_number(pure_trans))
+			.replace('{thresh}', thresh_label)
+			.replace('{add_hs}', show_hs ? ` • + HS : ${format_number(add_hs)} ${_t('ui_typing.tooltip_cpm_hs_chars')}<br>` : '')
+			.replace('{add_llm}', show_llm ? ` • + IA : ${format_number(add_llm)} ${_t('ui_typing.tooltip_cpm_llm_chars')}<br>` : '')
+			.replace('{chars_total}', format_number(chars_total));
 
 	wpm_val_elem.innerHTML =
 		`<div style="display:flex;flex-direction:column;justify-content:center;">` +
@@ -1768,7 +1768,7 @@ function render_ergo_bigram_kpi() {
 			`<strong>SHB / SHU${NBSP}:</strong> bigrammes même main / leur part dans le total des bigrammes.<br>` +
 			`<strong>Roulement intérieur${NBSP}:</strong> auriculaire vers index. Le plus confortable.<br>` +
 			`<strong>Roulement extérieur${NBSP}:</strong> index vers auriculaire.<br>` +
-			`<strong>LSB${NBSP}:</strong> Lateral Stretch Bigram — un des deux doigts s'écarte d’au moins 1,5 colonne de son repos.<br>` +
+			`<strong>LSB${NBSP}:</strong> Lateral Stretch Bigram — un des deux doigts s'écarte d'au moins 1,5 colonne de son repos.<br>` +
 			`<strong>Ciseau${NBSP}:</strong> SHB qui croise ≥ 2 rangées avec le doigt court qui descend (ex. auriculaire en bas + majeur en haut).`;
 		info.innerHTML = `${INFO_SVG}<span class="tooltiptext" style="text-align:left;">${tip}</span>`;
 	}
@@ -1961,7 +1961,7 @@ function render_ergo_trigram_kpi() {
 	if (info && typeof INFO_SVG === 'string') {
 		const NBSP = String.fromCharCode(160);
 		const tip =
-			`<strong>SFS${NBSP}:</strong> Same-Finger Skipgram — un SFB avec une touche d’un autre doigt intercalée (ex. EAD).<br>` +
+			`<strong>SFS${NBSP}:</strong> Same-Finger Skipgram — un SFB avec une touche d'un autre doigt intercalée (ex. EAD).<br>` +
 			`<strong>SKS${NBSP}:</strong> Same-Key Skipgram — la même touche en positions 1 et 3 (ex. ELE).<br>` +
 			`<strong>Redirection${NBSP}:</strong> trois touches même main avec un changement de direction (auriculaire→majeur→annulaire = pic). Inconfortable.<br>` +
 			`<strong>Mauv. redir.${NBSP}:</strong> redirection où aucun des trois doigts n'est l'index. Parmi les pires enchaînements faisables sur un clavier.`;
@@ -2113,7 +2113,7 @@ function render_errors_kpi() {
 	if (info && typeof INFO_SVG === 'string') {
 		const NBSP = String.fromCharCode(160);
 		const tip =
-			`<strong>Lecture${NBSP}:</strong> bigrammes (deux touches consécutives) classés par <em>taux d’erreur</em> = nombre de fois où la 2ᵉ touche a été effacée par un backspace, divisé par le nombre d’occurrences totales.<br><br>` +
+			`<strong>Lecture${NBSP}:</strong> bigrammes (deux touches consécutives) classés par <em>taux d'erreur</em> = nombre de fois où la 2ᵉ touche a été effacée par un backspace, divisé par le nombre d'occurrences totales.<br><br>` +
 			`<strong>Filtre${NBSP}:</strong> seuls les bigrammes apparus ≥ 5 fois sur la période sont affichés, pour éviter le bruit statistique des séquences rares.<br><br>` +
 			`<strong>Cascades${NBSP}:</strong> runs de ≥ 3 backspaces consécutifs (correction majeure : un mot ou une phrase effacés). Le compteur sépare ce signal des erreurs ponctuelles.<br><br>` +
 			`<strong>Temps de récup.${NBSP}:</strong> délai moyen entre un backspace et la touche suivante. Plus c'est long, plus la correction casse votre flux mental.`;
@@ -2491,7 +2491,7 @@ function render_rhythm_kpi() {
 		const NBSP = String.fromCharCode(160);
 		const tip =
 			`<strong>Rafale${NBSP}:</strong> stretch de frappe sans gap > 1${NBSP}s entre deux touches.<br><br>` +
-			`<strong>CPM pic${NBSP}:</strong> meilleur CPM observé sur une rafale d’au moins 10 caractères. Le seuil exclut les sprints fugaces non représentatifs.<br><br>` +
+			`<strong>CPM pic${NBSP}:</strong> meilleur CPM observé sur une rafale d'au moins 10 caractères. Le seuil exclut les sprints fugaces non représentatifs.<br><br>` +
 			`<strong>Régularité (CV)${NBSP}:</strong> coefficient de variation = écart-type ÷ moyenne. 0 = métronome parfait, > 0,6 = très irrégulier.`;
 		info.innerHTML = `${INFO_SVG}<span class="tooltiptext" style="text-align:left;">${tip}</span>`;
 	}
@@ -2702,7 +2702,7 @@ function render_records_kpi() {
 	if (info && typeof INFO_SVG === 'string') {
 		const NBSP = String.fromCharCode(160);
 		const tip =
-			`<strong>Portée${NBSP}:</strong> les records sont calculés sur <em>toute</em> la base de données — ils ne suivent pas le filtre de dates de l'UI (sinon le record disparaît dès qu'on zoome). Le filtre d’apps reste appliqué.<br><br>` +
+			`<strong>Portée${NBSP}:</strong> les records sont calculés sur <em>toute</em> la base de données — ils ne suivent pas le filtre de dates de l'UI (sinon le record disparaît dès qu'on zoome). Le filtre d'apps reste appliqué.<br><br>` +
 			`<strong>Streak${NBSP}:</strong> plus longue suite de jours consécutifs avec au moins une frappe. Manquer une journée remet le compteur à zéro.`;
 		info.innerHTML = `${INFO_SVG}<span class="tooltiptext" style="text-align:left;">${tip}</span>`;
 	}

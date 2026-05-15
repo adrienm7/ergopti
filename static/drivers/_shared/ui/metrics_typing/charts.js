@@ -1121,8 +1121,8 @@ function _render_activity_calendar() {
 	container.innerHTML =
 		`<div style="background:var(--panel-bg);border:1px solid var(--border);border-radius:10px;padding:12px 14px;">` +
 		`<div style="display:flex;align-items:baseline;justify-content:space-between;margin-bottom:8px;">` +
-		`<h3 style="margin:0;font-size:14px;color:var(--text-color);">${_t(‘ui_typing.calendar_title’)} <span style="color:var(--text-muted);font-weight:normal;font-size:12px;">— ${_t(‘ui_typing.calendar_subtitle’)}</span></h3>` +
-		`<span style="font-size:11px;color:var(--text-muted);">${active_days} ${_t(‘ui_typing.calendar_active_days’)} · ${format_number(total_chars)} ${_t(‘ui_typing.calendar_chars’)}</span>` +
+		`<h3 style="margin:0;font-size:14px;color:var(--text-color);">${_t('ui_typing.calendar_title')} <span style="color:var(--text-muted);font-weight:normal;font-size:12px;">— ${_t('ui_typing.calendar_subtitle')}</span></h3>` +
+		`<span style="font-size:11px;color:var(--text-muted);">${active_days} ${_t('ui_typing.calendar_active_days')} · ${format_number(total_chars)} ${_t('ui_typing.calendar_chars')}</span>` +
 		`</div>` +
 		`<svg width="${svg_w}" height="${svg_h}" xmlns="http://www.w3.org/2000/svg" style="display:block;max-width:100%;">` +
 		weekday_labels +
