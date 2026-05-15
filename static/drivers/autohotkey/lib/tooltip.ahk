@@ -212,7 +212,11 @@ _TooltipBuildGui(Items) {
         }
     }
     ; Total width = left padding + output text + gap + label + right padding.
-    LabelExtra := (MaxLabelW > 0) ? (_TOOLTIP_LABEL_GAP + MaxLabelW) : 0
+    ; Add an extra 16 px margin on the label side — Unicode symbols like ★
+    ; and ⏎ are rendered by a fallback font (Segoe UI Symbol) that is wider
+    ; than what GetTextExtentPoint32W returns for Segoe UI, so the measured
+    ; width under-counts and the control gets clipped without this slack.
+    LabelExtra := (MaxLabelW > 0) ? (_TOOLTIP_LABEL_GAP + MaxLabelW + 16) : 0
     TotalW := MaxW + 4 + LabelExtra + _TOOLTIP_PADDING_X * 2
 
     NewGuis := []
@@ -238,8 +242,10 @@ _TooltipBuildGui(Items) {
         if (LS.W > 0) {
             LabelX := _TOOLTIP_PADDING_X + MaxW + 4 + _TOOLTIP_LABEL_GAP
             LabelY := _TOOLTIP_PADDING_Y + (S.H - LS.H) // 2   ; vertically centred
+            ; Use LS.W + 20 so Unicode symbols rendered by a wider fallback
+            ; font are never clipped — extra space is invisible (transparent).
             LabelOpts := Format("BackgroundTrans 0xC x{1} y{2} w{3} h{4}",
-                LabelX, LabelY, LS.W + 4, LS.H)
+                LabelX, LabelY, LS.W + 20, LS.H)
             G.SetFont("c808080 s" . _TOOLTIP_FONT_SIZE_LABEL, _TOOLTIP_FONT_NAME)
             G.Add("Text", LabelOpts, Item.TriggerLabel)
             ; Restore main font for any subsequent control.

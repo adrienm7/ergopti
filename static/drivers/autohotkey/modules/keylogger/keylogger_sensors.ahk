@@ -10,29 +10,24 @@
 ; column so we can add fields freely without schema migrations.
 ;
 ; FEATURES & RATIONALE:
-; 1. CPU % — queried via WMI Win32_PerfFormattedData_PerfOS_Processor
-;    (instance "_Total"). This is the same counter Taskmgr displays; it
-;    is a rolling average over the WMI refresh interval (~1 s) so a
-;    single reading is already noise-smoothed without extra math.
-; 2. RAM — two counters from WMI Win32_OperatingSystem:
-;    FreePhysicalMemory (kB) and TotalVisibleMemorySize (kB). We compute
-;    ram_used_pct = Round((total - free) / total * 100). No external DLL.
-; 3. Battery — Win32_Battery gives EstimatedChargeRemaining (0-100) and
-;    BatteryStatus (1=discharging, 2=AC, 3=fully charged). If no battery
-;    is present the WMI query returns an empty result and the fields are
-;    omitted from the snapshot.
+; 1. CPU % — two calls to GetSystemTimes spaced one tick apart give idle,
+;    kernel, and user time deltas; cpu_pct = 100 - idle_pct. This is the
+;    same approach used by Task Manager and is a pure kernel32 call with
+;    microsecond latency — no subprocess, no WMI cold-start.
+; 2. RAM — GlobalMemoryStatusEx (kernel32) returns dwMemoryLoad (0-100 %
+;    used), ullTotalPhys, and ullAvailPhys in a single in-process call.
+;    Replaces WMI Win32_OperatingSystem which blocked the AHK thread.
+; 3. Battery — GetSystemPowerStatus (kernel32) returns the charge level
+;    (0-100, 255 = unknown) and AC/DC flag in one syscall. Replaces WMI
+;    Win32_Battery which is unavailable on desktops and slow on laptops.
 ; 4. Thermal state — heuristic derived from CPU load:
 ;    < 40 % → "normal", 40-79 % → "moderate", ≥ 80 % → "high".
-;    Full hardware thermal readings require WMI provider extensions that
-;    are not available on all OEMs; the load-based proxy is reliable
-;    enough for heatmap visualization and break suggestions.
 ; 5. Privacy — snapshots are only emitted when Keylogger.initialized is
 ;    true (i.e., the metrics feature is on) and pass through the standard
 ;    MF_ShouldFilter() gate. No personal data is captured.
 ; 6. Batching — the timer period is intentionally long
 ;    (SENSOR_TICK_MS = 60 000 ms). One snapshot per minute is sufficient
-;    for trend graphs; more frequent polls add WMI overhead without
-;    improving UI accuracy at the dashboard’s 5-minute granularity.
+;    for trend graphs.
 ;
 ; LIFECYCLE:
 ; - KL_Sensors_Start() is called after KL_Mouse_Start() in ErgoptiPlus.ahk.
@@ -41,6 +36,9 @@
 
 #Requires Autohotkey v2.0+
 
+
+
+
 ; ===================================
 ; ===================================
 ; ======= 1/ Constants =======
@@ -48,14 +46,17 @@
 ; ===================================
 
 class KLSensorConst {
-    ; One snapshot per minute — coarse enough to be cheap, fine enough
-    ; for per-hour aggregation in the dashboard.
-    static SENSOR_TICK_MS := 60000
+	; One snapshot per minute — coarse enough to be cheap, fine enough
+	; for per-hour aggregation in the dashboard.
+	static SENSOR_TICK_MS := 60000
 
-    ; CPU load thresholds for the thermal_state heuristic (%).
-    static THERMAL_MODERATE := 40
-    static THERMAL_HIGH := 80
+	; CPU load thresholds for the thermal_state heuristic (%).
+	static THERMAL_MODERATE := 40
+	static THERMAL_HIGH      := 80
 }
+
+
+
 
 ; ===================================
 ; ===================================
@@ -64,8 +65,18 @@ class KLSensorConst {
 ; ===================================
 
 class KLSensors {
-    static tick_fn := unset
+	static tick_fn := unset
+
+	; Last GetSystemTimes snapshot for CPU delta computation.
+	; FILETIME values are 64-bit 100-ns ticks stored as two 32-bit DWORDs
+	; (low, high); we combine them into a single integer for arithmetic.
+	static prev_idle   := -1
+	static prev_kernel := -1
+	static prev_user   := -1
 }
+
+
+
 
 ; =========================================
 ; =========================================
@@ -74,72 +85,88 @@ class KLSensors {
 ; =========================================
 
 KL_Sensors_Tick() {
-    if !Keylogger.initialized
-        return
-    filtered := false
-    try filtered := MF_ShouldFilter()
-    if filtered
-        return
+	if !Keylogger.initialized
+		return
+	filtered := false
+	try filtered := MF_ShouldFilter()
+	if filtered
+		return
 
-    meta := Map()
+	meta := Map()
 
-    ; ── CPU ──────────────────────────────────────────────────────────────
-    cpu_pct := -1
-    try {
-        q := ComObjGet("winmgmts:").ExecQuery(
-            "SELECT PercentProcessorTime FROM Win32_PerfFormattedData_PerfOS_Processor"
-            . " WHERE Name='_Total'")
-        for item in q {
-            cpu_pct := item.PercentProcessorTime
-            break
-        }
-    }
-    if (cpu_pct >= 0) {
-        meta["cpu_pct"] := cpu_pct
-        ; Thermal heuristic
-        if (cpu_pct >= KLSensorConst.THERMAL_HIGH)
-            meta["thermal_state"] := "high"
-        else if (cpu_pct >= KLSensorConst.THERMAL_MODERATE)
-            meta["thermal_state"] := "moderate"
-        else
-            meta["thermal_state"] := "normal"
-    }
+	; ── CPU via GetSystemTimes ────────────────────────────────────────────
+	; GetSystemTimes fills three FILETIME structs (idle, kernel, user).
+	; FILETIME = two consecutive DWORDs (low word first); we combine them
+	; with (high << 32 | low) to get 64-bit 100-ns tick counts.
+	; cpu_pct = (1 - idle_delta / (kernel_delta + user_delta)) * 100.
+	; Note: kernel time includes idle time, so total = kernel + user (not idle).
+	buf := Buffer(24, 0)   ; 3 × FILETIME (8 bytes each)
+	if DllCall("kernel32\GetSystemTimes",
+			"Ptr", buf.Ptr,      ; lpIdleTime
+			"Ptr", buf.Ptr + 8,  ; lpKernelTime
+			"Ptr", buf.Ptr + 16, ; lpUserTime
+			"Int") {
+		idle   := NumGet(buf,  0, "UInt") | (NumGet(buf,  4, "UInt") << 32)
+		kernel := NumGet(buf,  8, "UInt") | (NumGet(buf, 12, "UInt") << 32)
+		user   := NumGet(buf, 16, "UInt") | (NumGet(buf, 20, "UInt") << 32)
 
-    ; ── RAM ──────────────────────────────────────────────────────────────
-    try {
-        q := ComObjGet("winmgmts:").ExecQuery(
-            "SELECT FreePhysicalMemory, TotalVisibleMemorySize FROM Win32_OperatingSystem")
-        for item in q {
-            total := item.TotalVisibleMemorySize
-            free := item.FreePhysicalMemory
-            if (total > 0)
-                meta["ram_used_pct"] := Round((total - free) / total * 100)
-            ; Expose absolute values in MB for the dashboard
-            meta["ram_total_mb"] := Round(total / 1024)
-            meta["ram_free_mb"] := Round(free / 1024)
-            break
-        }
-    }
+		if (KLSensors.prev_idle >= 0) {
+			d_idle   := idle   - KLSensors.prev_idle
+			d_kernel := kernel - KLSensors.prev_kernel
+			d_user   := user   - KLSensors.prev_user
+			d_total  := d_kernel + d_user   ; kernel already includes idle
+			if (d_total > 0) {
+				cpu_pct := Round((1.0 - d_idle / d_total) * 100)
+				cpu_pct := Max(0, Min(100, cpu_pct))
+				meta["cpu_pct"] := cpu_pct
+				if (cpu_pct >= KLSensorConst.THERMAL_HIGH)
+					meta["thermal_state"] := "high"
+				else if (cpu_pct >= KLSensorConst.THERMAL_MODERATE)
+					meta["thermal_state"] := "moderate"
+				else
+					meta["thermal_state"] := "normal"
+			}
+		}
 
-    ; ── Battery ──────────────────────────────────────────────────────────
-    try {
-        q := ComObjGet("winmgmts:").ExecQuery(
-            "SELECT EstimatedChargeRemaining, BatteryStatus"
-            . " FROM Win32_Battery")
-        for item in q {
-            meta["battery_pct"] := item.EstimatedChargeRemaining
-            ; BatteryStatus: 1=discharging, 2=AC, 3=fully-charged
-            st := item.BatteryStatus
-            if (st = 2 or st = 3)
-                meta["on_ac"] := true
-            else
-                meta["on_ac"] := false
-            break
-        }
-    }
+		KLSensors.prev_idle   := idle
+		KLSensors.prev_kernel := kernel
+		KLSensors.prev_user   := user
+	}
 
-    KL_LogSystemEvent("system_load", meta)
+	; ── RAM via GlobalMemoryStatusEx ─────────────────────────────────────
+	; MEMORYSTATUSEX: dwLength(4) + dwMemoryLoad(4) + ullTotalPhys(8) +
+	; ullAvailPhys(8) + … = 64 bytes total. dwLength must be pre-filled.
+	mem := Buffer(64, 0)
+	NumPut("UInt", 64, mem, 0)   ; dwLength
+	if DllCall("kernel32\GlobalMemoryStatusEx", "Ptr", mem, "Int") {
+		ram_used_pct := NumGet(mem, 4, "UInt")
+		total_phys   := NumGet(mem, 8, "UInt64")
+		avail_phys   := NumGet(mem, 16, "UInt64")
+		meta["ram_used_pct"] := ram_used_pct
+		meta["ram_total_mb"] := Round(total_phys / 1048576)
+		meta["ram_free_mb"]  := Round(avail_phys / 1048576)
+	}
+
+	; ── Battery via GetSystemPowerStatus ─────────────────────────────────
+	; SYSTEM_POWER_STATUS: ACLineStatus(1) + BatteryFlag(1) +
+	; BatteryLifePercent(1) + SystemStatusFlag(1) + BatteryLifeTime(4) +
+	; BatteryFullLifeTime(4) = 12 bytes.
+	; BatteryLifePercent = 255 when unknown (no battery / desktop).
+	pwr := Buffer(12, 0)
+	if DllCall("kernel32\GetSystemPowerStatus", "Ptr", pwr, "Int") {
+		ac_line  := NumGet(pwr, 0, "UChar")   ; 0=battery, 1=AC, 255=unknown
+		batt_pct := NumGet(pwr, 2, "UChar")   ; 255 = unknown
+		if (batt_pct != 255) {
+			meta["battery_pct"] := batt_pct
+			meta["on_ac"]       := (ac_line = 1)
+		}
+	}
+
+	KL_LogSystemEvent("system_load", meta)
 }
+
+
+
 
 ; =====================================
 ; =====================================
@@ -148,18 +175,18 @@ KL_Sensors_Tick() {
 ; =====================================
 
 KL_Sensors_Start() {
-    if KLSensors.HasOwnProp("tick_fn") && IsObject(KLSensors.tick_fn)
-        return
-    KLSensors.tick_fn := KL_Sensors_Tick.Bind()
-    ; Fire once shortly after start so the dashboard has initial data
-    ; without waiting the full 60 s.
-    SetTimer(KLSensors.tick_fn, -2000)
-    SetTimer(KLSensors.tick_fn, KLSensorConst.SENSOR_TICK_MS)
+	if KLSensors.HasOwnProp("tick_fn") && IsObject(KLSensors.tick_fn)
+		return
+	KLSensors.tick_fn := KL_Sensors_Tick.Bind()
+	; Fire once shortly after start so the dashboard has initial data
+	; without waiting the full 60 s.
+	SetTimer(KLSensors.tick_fn, -2000)
+	SetTimer(KLSensors.tick_fn, KLSensorConst.SENSOR_TICK_MS)
 }
 
 KL_Sensors_Stop() {
-    if KLSensors.HasOwnProp("tick_fn") && IsObject(KLSensors.tick_fn) {
-        try SetTimer(KLSensors.tick_fn, 0)
-        KLSensors.tick_fn := unset
-    }
+	if KLSensors.HasOwnProp("tick_fn") && IsObject(KLSensors.tick_fn) {
+		try SetTimer(KLSensors.tick_fn, 0)
+		KLSensors.tick_fn := unset
+	}
 }
