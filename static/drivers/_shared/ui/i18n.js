@@ -33,22 +33,25 @@
 (function () {
 	"use strict";
 
+	// Capture currentScript.src immediately — currentScript is only set while
+	// the <script> tag is being synchronously parsed; it is null by the time
+	// DOMContentLoaded fires and resolve_locale_url() is called from load().
+	var _script_src = document.currentScript ? document.currentScript.src : null;
+
 	// Resolve the path to static/locales/<code>.json relative to this script's
 	// own URL. Works regardless of how many levels deep the calling page sits.
 	function resolve_locale_url(code) {
 		if (window.__i18n_base) return window.__i18n_base + code + ".json";
-		// currentScript is set while the <script> tag is being parsed.
-		// Walk up from i18n.js location to find static/locales/.
-		var src = document.currentScript ? document.currentScript.src : null;
-		if (src) {
-			// i18n.js lives at static/drivers/_shared/ui/i18n.js
-			// static/locales/ is three dirs above: ui/ → _shared/ → drivers/ → static/locales/
-			var base = src.replace(/[^/]+$/, "../../../locales/");
+		// i18n.js lives at static/drivers/_shared/ui/i18n.js
+		// static/locales/ is three dirs above: ui/ → _shared/ → drivers/ → static/locales/
+		if (_script_src) {
+			var base = _script_src.replace(/[^/]+$/, "../../../locales/");
 			return base + code + ".json";
 		}
-		// Fallback: walk up two levels from the page URL (legacy path)
+		// Fallback: page is at metrics_<x>/index.html — go up 4 levels to reach static/
+		// file:///…/static/drivers/_shared/ui/metrics_x/index.html → static/locales/
 		var parts = location.href.split("/");
-		var base_parts = parts.slice(0, parts.length - 2);
+		var base_parts = parts.slice(0, parts.length - 5);
 		return base_parts.join("/") + "/locales/" + code + ".json";
 	}
 
