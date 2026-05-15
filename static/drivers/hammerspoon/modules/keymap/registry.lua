@@ -206,6 +206,46 @@ function M.mappings_for_star_tail(tail_char)
 	return _state.mappings_by_star_tail_char[tail_char]
 end
 
+--- Returns true when `str` matches a registered trigger exactly.
+--- Used by the personal-info interceptor to yield to the hotstring engine when
+--- the typed sequence is already a known hotstring trigger.
+--- @param str string The string to test.
+--- @return boolean
+function M.has_exact_trigger(str)
+	if not _state or type(str) ~= "string" or str == "" then return false end
+	for _, m in ipairs(_state.mappings) do
+		if m.trigger == str then return true end
+	end
+	return false
+end
+
+--- Returns true when `str` is a prefix of any registered trigger.
+--- Allows the personal-info interceptor to detect that the current buffer
+--- could grow into a known hotstring and stay out of its way.
+--- @param str string The string to test.
+--- @return boolean
+function M.has_trigger_prefix(str)
+	if not _state or type(str) ~= "string" or str == "" then return false end
+	local n = #str
+	for _, m in ipairs(_state.mappings) do
+		if m.trigger:sub(1, n) == str then return true end
+	end
+	return false
+end
+
+--- Returns true when `str` is a suffix of any registered trigger.
+--- @param str string The string to test.
+--- @return boolean
+function M.has_trigger_suffix(str)
+	if not _state or type(str) ~= "string" or str == "" then return false end
+	local n = #str
+	for _, m in ipairs(_state.mappings) do
+		if m.trigger:sub(-n) == str then return true end
+	end
+	return false
+end
+
+
 --- Suspends automatic re-sorting. Every subsequent call to sort_mappings() becomes
 --- a no-op that only marks a sort as pending. Paired with flush_sort() at the end
 --- of a batch (e.g. the initial TOML load loop) to avoid 6+ O(N log N) passes.

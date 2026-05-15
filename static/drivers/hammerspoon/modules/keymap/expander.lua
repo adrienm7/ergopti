@@ -430,8 +430,8 @@ function M.try_repeat_feature(chars, is_ignored)
 	keyStrokes(last_char)
 
 	-- Update the buffer: strip the magic key and append the repeated character.
-	local tstart      = utf8.offset(_state.buffer, -char_len)
-	_state.buffer     = (tstart and _state.buffer:sub(1, tstart - 1) or "") .. last_char
+	-- magic_offset is already the byte start of the magic key — reuse it.
+	_state.buffer = _state.buffer:sub(1, magic_offset - 1) .. last_char
 
 	if not is_ignored and _llm.get_llm_enabled() then
 		_llm.start_timer()
