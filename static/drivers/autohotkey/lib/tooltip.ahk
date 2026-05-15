@@ -40,7 +40,7 @@ global _TOOLTIP_LABEL_GAP        := 10    ; gap between output text and badge le
 ; regardless of which symbol it shows.  The symbol is rendered in the row's
 ; accent colour on a neutral dark background so it pops on any tint.
 global _TOOLTIP_BADGE_W          := 24    ; total badge width (px) — fixed across all rows
-global _TOOLTIP_BADGE_H_PAD      := 2     ; extra vertical padding inside the badge
+global _TOOLTIP_BADGE_V_PAD      := 3     ; vertical inset from row top/bottom to badge edge
 global _TOOLTIP_BADGE_BG_HEX     := "2D2D2D"   ; neutral dark grey badge background
 global _TOOLTIP_OFFSET_BELOW     := 18   ; pixels below the anchor (caret / box)
 global _TOOLTIP_OFFSET_RIGHT     := 4    ; small horizontal nudge for caret anchor
@@ -195,7 +195,7 @@ _TooltipBuildGui(Items) {
     global _TooltipGui, _TooltipRowGuis
     global _TOOLTIP_FONT_NAME, _TOOLTIP_FONT_SIZE, _TOOLTIP_FONT_SIZE_LABEL
     global _TOOLTIP_PADDING_X, _TOOLTIP_PADDING_Y, _TOOLTIP_LABEL_GAP
-    global _TOOLTIP_BADGE_W, _TOOLTIP_BADGE_H_PAD, _TOOLTIP_BADGE_BG_HEX
+    global _TOOLTIP_BADGE_W, _TOOLTIP_BADGE_V_PAD, _TOOLTIP_BADGE_BG_HEX
 
     OldGuis := _TooltipGui ? _TooltipRowGuis : []
 
@@ -249,8 +249,12 @@ _TooltipBuildGui(Items) {
         HasLabel := Item.HasOwnProp("TriggerLabel") and Item.TriggerLabel != ""
         if HasLabel {
             BadgeX := _TOOLTIP_PADDING_X + MaxW + _TOOLTIP_LABEL_GAP
-            BadgeH := S.H - _TOOLTIP_BADGE_H_PAD * 2   ; slightly shorter than text
-            BadgeY := _TOOLTIP_PADDING_Y + _TOOLTIP_BADGE_H_PAD
+            ; Badge spans the full row minus symmetric vertical inset so the
+            ; grey pill is evenly padded top and bottom.  AHK Text controls
+            ; render content at the top of the rect, so we size the badge to
+            ; exactly the font height and centre it in the row manually.
+            BadgeH := RowH - _TOOLTIP_BADGE_V_PAD * 2
+            BadgeY := _TOOLTIP_BADGE_V_PAD
 
             ; Accent colour: use the raw ColorHex at full brightness so the
             ; symbol pops against the neutral badge background.
