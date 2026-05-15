@@ -375,6 +375,7 @@ KLWV_PushPrefetch(which) {
 KLWV_InjectI18n(which) {
     global _StaticDir, _ConfigDir
     log := _ConfigDir . "ahk\logs\webview.log"
+    try FileAppend("[" . A_Now . "] InjectI18n(" . which . "): called, has_window=" . (KLWV.windows.Has(which) ? "1" : "0") . "`r`n", log, "UTF-8")
     if !KLWV.windows.Has(which)
         return
     locale_code := I18nGetLocale()
@@ -410,6 +411,9 @@ KLWV_MonitorFromPoint(x, y) {
 }
 
 KLWV_DelayedFirstPush(which) {
+    global _ConfigDir
+    log := _ConfigDir . "ahk\logs\webview.log"
+    try FileAppend("[" . A_Now . "] DelayedFirstPush(" . which . "): fired, has_window=" . (KLWV.windows.Has(which) ? "1" : "0") . "`r`n", log, "UTF-8")
     if !KLWV.windows.Has(which)
         return
     global KLPF_LAST_JSON
