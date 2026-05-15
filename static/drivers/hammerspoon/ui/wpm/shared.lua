@@ -32,10 +32,14 @@ local COLOR_FALLBACK = {
 	llm    = "#af52de",
 }
 
--- Maps a WPM source name to the hotstrings_config category whose TOML metadata
+-- Maps a WPM source variant to the hotstrings_config category whose TOML metadata
 -- (+ user override) drives its color. Sources not listed here use COLOR_FALLBACK.
+-- Roll, sfbsreduction, distancesreduction, and repeat_key are intentionally absent:
+-- these expansions are low-level ergonomic substitutions and should not alter the
+-- widget color — they fall through to COLOR_FALLBACK["manual"] (blue default).
 local SOURCE_TO_CATEGORY = {
 	hotstring      = "magickey",
+	magickey       = "magickey",
 	autocorrection = "autocorrection",
 }
 

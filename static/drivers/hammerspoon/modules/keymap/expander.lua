@@ -250,7 +250,7 @@ function M.try_auto_expand(m, char_len, is_ignored)
 		m.final_result,
 		is_ignored,
 		"hotstring",
-		(m.group == "autocorrection") and "autocorrection" or nil
+		m.group or nil
 	)
 
 	if keylogger and type(keylogger.log_hotstring) == "function" then
@@ -353,7 +353,7 @@ function M.try_terminator_expand(m, chars, char_len, is_ignored)
 			m.final_result,
 			is_ignored,
 			"hotstring",
-			(m.group == "autocorrection") and "autocorrection" or nil
+			m.group or nil
 		)
 
 		if keylogger and type(keylogger.log_hotstring) == "function" then
@@ -425,7 +425,7 @@ function M.try_repeat_feature(chars, is_ignored)
 	_state.expected_synthetic_chars = _state.expected_synthetic_chars .. last_char
 
 	if keylogger and type(keylogger.notify_synthetic) == "function" then
-		keylogger.notify_synthetic(last_char, "hotstring", is_ignored and 1 or 0)
+		keylogger.notify_synthetic(last_char, "hotstring", is_ignored and 1 or 0, "repeat_key")
 	end
 	keyStrokes(last_char)
 
