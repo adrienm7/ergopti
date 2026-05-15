@@ -422,6 +422,7 @@ KLWV_DelayedFirstPush(which) {
         if KLWV.metrics_dir
             try KLPF_BuildAndWrite(which, KLWV.metrics_dir, , "manifest")
     }
+    KLWV_InjectI18n(which)
     KLWV_PushPrefetch(which)
     ; Mark first paint done so live ticks can fan out from now on.
     if KLWV.windows.Has(which)
