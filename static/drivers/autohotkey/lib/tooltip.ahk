@@ -83,6 +83,15 @@ TooltipShow(Text, ColorHex := "", DurationSec := 0) {
     BgHex := _TooltipMixTintHex(ColorHex)
     FgHex := "FFFFFF"   ; always white on the dark mixed background
 
+    ; Cancel any pending auto-hide timer BEFORE rebuilding the Gui. If the
+    ; timer fires between Destroy() and the new Gui being shown, _TooltipGui
+    ; is 0 and the hide is silently skipped — leaving the new window orphaned
+    ; with no timer to ever dismiss it (ghost tooltip).
+    if _TooltipTimer {
+        SetTimer(_TooltipTimer, 0)
+        _TooltipTimer := 0
+    }
+
     ; Recreate the Gui (and its Text control) on every show so the control
     ; auto-sizes to the new content. AHK v2 does not resize a Text control
     ; when its `.Value` changes, so reusing the previous Gui produced a
@@ -93,11 +102,6 @@ TooltipShow(Text, ColorHex := "", DurationSec := 0) {
     _TooltipGui.Show(Format("AutoSize x{1} y{2} NoActivate", Pos.X, Pos.Y))
     _TooltipApplyRoundedCorners()
 
-    ; Reset the auto-hide timer on every refresh so a flurry of partial-prefix
-    ; updates does not race with a stale timer firing mid-update.
-    if _TooltipTimer {
-        SetTimer(_TooltipTimer, 0)
-    }
     if (DurationSec > 0) {
         global _TOOLTIP_TIMEOUT_DECREMENT_SEC, _TOOLTIP_TIMEOUT_FLOOR_SEC
         Effective := Max(_TOOLTIP_TIMEOUT_FLOOR_SEC,
@@ -141,11 +145,10 @@ _TooltipBuildGui(BgHex, FgHex, Text) {
     global _TOOLTIP_FONT_NAME, _TOOLTIP_FONT_SIZE
     global _TOOLTIP_PADDING_X, _TOOLTIP_PADDING_Y
 
-    if _TooltipGui {
-        try _TooltipGui.Destroy()
-    }
-    _TooltipGui := 0
-    _TooltipText := 0
+    ; Destroy the old window only after the new one is fully built, so that
+    ; any TooltipHide() call arriving during construction still targets a valid
+    ; handle (the old one) rather than 0, which would let the old window leak.
+    OldGui := _TooltipGui
 
     G := Gui("+AlwaysOnTop +ToolWindow -Caption +E0x20 +LastFound")
     G.BackColor := BgHex
@@ -159,6 +162,10 @@ _TooltipBuildGui(BgHex, FgHex, Text) {
     Opts := "BackgroundTrans 0xC w" . (Size.W + 4) . " h" . Size.H
     _TooltipText := G.Add("Text", Opts, Text)
     _TooltipGui := G
+
+    if OldGui {
+        try OldGui.Destroy()
+    }
 }
 
 ; Measure ``Text`` width and height in pixels using a transient GDI font
