@@ -230,7 +230,8 @@ function M.build(ctx)
 					end,
 					function() return false end,
 					{
-						"--env", "ERGOPTI_LOCALE="    .. locale_code,
+						"-n",
+						"--env", "ERGOPTI_LOCALE="     .. locale_code,
 						"--env", "ERGOPTI_LOCALES_DIR=" .. locales_dir,
 						app_path,
 					}
