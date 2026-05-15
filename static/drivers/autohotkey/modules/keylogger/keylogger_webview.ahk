@@ -85,6 +85,14 @@ KLWV_AssetUrl(which) {
     return "file:///" . StrReplace(base, "\", "/")
 }
 
+; Resolve the absolute file:// URL of the shared locales directory.
+; Matches the convention used by OllamaWV_LocalesUrl in ollama_webview.ahk.
+KLWV_LocalesUrl() {
+    global _StaticDir
+    base := _StaticDir . "\locales\"
+    return "file:///" . StrReplace(base, "\", "/")
+}
+
 ; ============================================
 ; ============================================
 ; ======= 4/ Lifecycle (open / close) =======
@@ -190,6 +198,15 @@ KLWV_Open(which, metrics_dir) {
     ; Bridge: JS → AHK. Page sends `chrome.webview.postMessage(obj)`;
     ; we receive a string here.
     webview.WebMessageReceived := KLWV_OnWebMessage.Bind(which)
+
+    ; Inject i18n base URL and locale code before page scripts run so
+    ; i18n.js can resolve locale files without relying on currentScript
+    ; path heuristics (which are unreliable across WebView2 versions).
+    locales_url := KLWV_LocalesUrl()
+    locale_code := I18nGetLocale()
+    seed_script := "window.__i18n_base='" . locales_url . "';window._i18n_locale='" . locale_code . "';"
+    try webview.AddScriptToExecuteOnDocumentCreated(seed_script)
+    try FileAppend("[" . A_Now . "] i18n seed: base=" . locales_url . " locale=" . locale_code . "`r`n", log, "UTF-8")
 
     asset := KLWV_AssetUrl(which)
     try FileAppend("[" . A_Now . "] navigating to " . asset . "`r`n", log, "UTF-8")
