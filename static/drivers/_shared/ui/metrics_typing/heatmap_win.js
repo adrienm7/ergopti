@@ -4,7 +4,7 @@
  * ==============================================================================
  * MODULE: Windows scancode → HS keycode bridge
  * DESCRIPTION:
- * The dashboard’s heatmap geometry (KEY_POSITIONS, KEYCODE_DATA, SFB_COLUMNS)
+ * The dashboard's heatmap geometry (KEY_POSITIONS, KEYCODE_DATA, SFB_COLUMNS)
  * is keyed by Hammerspoon keycodes — the macOS driver's native identifier.
  * The AHK driver captures hardware scancodes (set 1) instead. Rather than
  * forking the entire layout for Windows, we translate each scancode to its
