@@ -40,7 +40,11 @@ global _TOOLTIP_LABEL_GAP        := 10    ; gap between output text and badge le
 ; regardless of which symbol it shows.  The symbol is rendered in the row's
 ; accent colour on a neutral dark background so it pops on any tint.
 global _TOOLTIP_BADGE_W          := 24    ; total badge width (px) — fixed across all rows
-global _TOOLTIP_BADGE_V_PAD      := 3     ; vertical inset from row top/bottom to badge edge
+; Vertical nudge applied to the badge rect to compensate for the baseline
+; difference between Segoe UI (main text) and the fallback font used to
+; render Unicode symbols like ★ and ⏎ — the fallback glyph sits higher
+; inside its cell than a Segoe UI glyph of the same point size.
+global _TOOLTIP_BADGE_Y_OFFSET   := 3     ; pixels to shift badge rect downward
 global _TOOLTIP_BADGE_BG_HEX     := "2D2D2D"   ; neutral dark grey badge background
 global _TOOLTIP_OFFSET_BELOW     := 18   ; pixels below the anchor (caret / box)
 global _TOOLTIP_OFFSET_RIGHT     := 4    ; small horizontal nudge for caret anchor
@@ -195,7 +199,7 @@ _TooltipBuildGui(Items) {
     global _TooltipGui, _TooltipRowGuis
     global _TOOLTIP_FONT_NAME, _TOOLTIP_FONT_SIZE, _TOOLTIP_FONT_SIZE_LABEL
     global _TOOLTIP_PADDING_X, _TOOLTIP_PADDING_Y, _TOOLTIP_LABEL_GAP
-    global _TOOLTIP_BADGE_W, _TOOLTIP_BADGE_V_PAD, _TOOLTIP_BADGE_BG_HEX
+    global _TOOLTIP_BADGE_W, _TOOLTIP_BADGE_Y_OFFSET, _TOOLTIP_BADGE_BG_HEX
 
     OldGuis := _TooltipGui ? _TooltipRowGuis : []
 
@@ -249,11 +253,11 @@ _TooltipBuildGui(Items) {
         HasLabel := Item.HasOwnProp("TriggerLabel") and Item.TriggerLabel != ""
         if HasLabel {
             BadgeX := _TOOLTIP_PADDING_X + MaxW + _TOOLTIP_LABEL_GAP
-            ; Align the badge rect to the text line: same Y and height as the
-            ; output text control so AHK's top-aligned text rendering lands
-            ; exactly at the same baseline as the main label.
-            BadgeY := _TOOLTIP_PADDING_Y
-            BadgeH := S.H
+            ; Shift the badge rect down by _TOOLTIP_BADGE_Y_OFFSET to compensate
+            ; for the fallback font's glyph sitting higher in its cell than
+            ; Segoe UI — keeps ★/⏎ visually aligned with the output text.
+            BadgeY := _TOOLTIP_PADDING_Y + _TOOLTIP_BADGE_Y_OFFSET
+            BadgeH := S.H - _TOOLTIP_BADGE_Y_OFFSET
 
             ; Accent colour: use the raw ColorHex at full brightness so the
             ; symbol pops against the neutral badge background.
