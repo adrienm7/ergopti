@@ -45,7 +45,7 @@ global _TOOLTIP_BADGE_W          := 24    ; total badge width (px) — fixed acr
 ; render Unicode symbols like ★ and ⏎ — the fallback glyph sits higher
 ; inside its cell than a Segoe UI glyph of the same point size.
 global _TOOLTIP_BADGE_Y_OFFSET   := 3     ; pixels to shift badge rect downward
-global _TOOLTIP_BADGE_H_SHRINK   := 5     ; extra pixels trimmed from badge height to remove bottom slack
+global _TOOLTIP_BADGE_H_SHRINK   := 3     ; extra pixels trimmed from badge height (top+bottom balance)
 global _TOOLTIP_BADGE_BG_HEX     := "2D2D2D"   ; neutral dark grey badge background
 global _TOOLTIP_OFFSET_BELOW     := 18   ; pixels below the anchor (caret / box)
 global _TOOLTIP_OFFSET_RIGHT     := 4    ; small horizontal nudge for caret anchor
@@ -223,6 +223,9 @@ _TooltipBuildGui(Items) {
         if (S.W + 4 > MaxW)
             MaxW := S.W + 4
     }
+    ; Add a safety margin so GDI measurement under-counts never cause the
+    ; text control to visually overflow into the badge column.
+    MaxW += 8
 
     ; Total width: left padding + output text + gap + badge + right padding.
     ; Right padding (_TOOLTIP_PADDING_X) is added after the badge so the pill
