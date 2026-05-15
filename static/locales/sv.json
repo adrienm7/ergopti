@@ -1798,5 +1798,6 @@ Version: 1.0",,
 	"apps.cloner.lbl_progress_dock": "Registrerar i Dock…",
 	"apps.cloner.lbl_progress_done": "Klar",
 	"apps.cloner.lbl_progress_title": "Skapar klon…",
-	"apps.cloner.btn_back": "Tillbaka"
+	"apps.cloner.btn_back": "Tillbaka",
+	"menu.apps.title": "🛠️ Program"
 }

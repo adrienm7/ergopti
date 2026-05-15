@@ -1772,5 +1772,6 @@ Verze: 1.0",,
 	"apps.cloner.lbl_progress_dock": "Registrace v Docku…",
 	"apps.cloner.lbl_progress_done": "Hotovo",
 	"apps.cloner.lbl_progress_title": "Vytváření klonu…",
-	"apps.cloner.btn_back": "Zpět"
+	"apps.cloner.btn_back": "Zpět",
+	"menu.apps.title": "🛠️ Aplikace"
 }

@@ -1798,5 +1798,6 @@ Version: 1.0",,
 	"apps.cloner.lbl_progress_dock": "Registrerer i Dock…",
 	"apps.cloner.lbl_progress_done": "Færdig",
 	"apps.cloner.lbl_progress_title": "Opretter klon…",
-	"apps.cloner.btn_back": "Tilbage"
+	"apps.cloner.btn_back": "Tilbage",
+	"menu.apps.title": "🛠️ Programmer"
 }

@@ -1798,5 +1798,6 @@
 	"apps.cloner.lbl_progress_dock": "Dock में पंजीकरण…",
 	"apps.cloner.lbl_progress_done": "हो गया",
 	"apps.cloner.lbl_progress_title": "क्लोन बना रहे हैं…",
-	"apps.cloner.btn_back": "वापस"
+	"apps.cloner.btn_back": "वापस",
+	"menu.apps.title": "🛠️ एप्लिकेशन"
 }

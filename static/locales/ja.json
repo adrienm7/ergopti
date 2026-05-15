@@ -1772,5 +1772,6 @@
 	"apps.cloner.lbl_progress_dock": "Dockに登録中…",
 	"apps.cloner.lbl_progress_done": "完了",
 	"apps.cloner.lbl_progress_title": "クローン作成中…",
-	"apps.cloner.btn_back": "戻る"
+	"apps.cloner.btn_back": "戻る",
+	"menu.apps.title": "🛠️ アプリケーション"
 }

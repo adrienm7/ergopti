@@ -1770,5 +1770,6 @@
 	"apps.cloner.lbl_progress_dock": "Im Dock registrieren…",
 	"apps.cloner.lbl_progress_done": "Fertig",
 	"apps.cloner.lbl_progress_title": "Klon wird erstellt…",
-	"apps.cloner.btn_back": "Zurück"
+	"apps.cloner.btn_back": "Zurück",
+	"menu.apps.title": "🛠️ Anwendungen"
 }

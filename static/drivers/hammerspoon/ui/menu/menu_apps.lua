@@ -217,9 +217,10 @@ function M.build(ctx)
 				-- automatically works in the apps.
 				local config_base = (hs.configdir or ""):match("^(.*)/drivers/hammerspoon") or ""
 				local locales_dir = config_base .. "/locales"
-				-- Launch the .app bundle via `open -a` in a task so env vars
-				-- propagate into the AppleScript process. hs.application.launchOrFocus
-				-- does not expose environment injection.
+				-- Launch the .app bundle via `open --env` so the locale variables
+				-- are injected directly into the launched app's environment.
+				-- `setEnvironment` on the `open` process itself does not propagate
+				-- to the app it spawns; `--env KEY=VALUE` does.
 				local task = hs.task.new(
 					"/usr/bin/open",
 					function(code, _, stderr)
@@ -228,9 +229,12 @@ function M.build(ctx)
 						end
 					end,
 					function() return false end,
-					{ "-a", app_path }
+					{
+						"--env", "ERGOPTI_LOCALE="    .. locale_code,
+						"--env", "ERGOPTI_LOCALES_DIR=" .. locales_dir,
+						app_path,
+					}
 				)
-				task:setEnvironment({ ERGOPTI_LOCALE = locale_code, ERGOPTI_LOCALES_DIR = locales_dir })
 				local ok_start, err = pcall(function() task:start() end)
 				if not ok_start then
 					Logger.error(LOG, "Failed to launch '%s': %s.", app_name, tostring(err))
@@ -245,7 +249,7 @@ function M.build(ctx)
 
 	Logger.done(LOG, "Applications submenu built (%d item(s)).", #rows)
 	return {
-		title    = "🛠️ Applications",
+		title    = i18n.get("menu.apps.title"),
 		disabled = paused,
 		menu     = rows,
 	}

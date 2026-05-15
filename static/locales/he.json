@@ -1798,5 +1798,6 @@
 	"apps.cloner.lbl_progress_dock": "רישום ב-Dock…",
 	"apps.cloner.lbl_progress_done": "הושלם",
 	"apps.cloner.lbl_progress_title": "יוצר שכפול…",
-	"apps.cloner.btn_back": "חזרה"
+	"apps.cloner.btn_back": "חזרה",
+	"menu.apps.title": "🛠️ יישומים"
 }
