@@ -187,6 +187,42 @@ CREATE TABLE IF NOT EXISTS events_session (
 	PRIMARY KEY (device_id, id)
 );
 
+CREATE TABLE IF NOT EXISTS events_mouse (
+	device_id   TEXT NOT NULL,
+	id          INTEGER NOT NULL,
+	ts          TEXT NOT NULL,
+	date        TEXT NOT NULL,
+	kind        TEXT NOT NULL,
+	app         TEXT NOT NULL,
+	meta_json   TEXT,
+	PRIMARY KEY (device_id, id)
+);
+CREATE INDEX IF NOT EXISTS idx_events_mouse_date ON events_mouse(date);
+
+CREATE TABLE IF NOT EXISTS events_ergo (
+	device_id   TEXT NOT NULL,
+	id          INTEGER NOT NULL,
+	ts          TEXT NOT NULL,
+	date        TEXT NOT NULL,
+	kind        TEXT NOT NULL,
+	app         TEXT NOT NULL,
+	meta_json   TEXT,
+	PRIMARY KEY (device_id, id)
+);
+CREATE INDEX IF NOT EXISTS idx_events_ergo_date ON events_ergo(date);
+
+CREATE TABLE IF NOT EXISTS events_window_topo (
+	device_id   TEXT NOT NULL,
+	id          INTEGER NOT NULL,
+	ts          TEXT NOT NULL,
+	date        TEXT NOT NULL,
+	kind        TEXT NOT NULL,
+	app         TEXT NOT NULL,
+	meta_json   TEXT,
+	PRIMARY KEY (device_id, id)
+);
+CREATE INDEX IF NOT EXISTS idx_events_window_topo_date ON events_window_topo(date);
+
 
 -- ============================================================================
 -- 3. PRECOMPUTED AGGREGATES
