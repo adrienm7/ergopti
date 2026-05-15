@@ -134,33 +134,14 @@ const ZOOM_OPTIONS = {
 
 const GRID_COLOR = 'rgba(128,128,128,0.2)';
 
-// Day names used by the x-axis tick formatter below — resolved lazily via _t() so
-// locale changes after page load are picked up automatically.
-const DAYS_FR = [
-	_t('ui_typing.day_0'),
-	_t('ui_typing.day_1'),
-	_t('ui_typing.day_2'),
-	_t('ui_typing.day_3'),
-	_t('ui_typing.day_4'),
-	_t('ui_typing.day_5'),
-	_t('ui_typing.day_6')
-];
-
-// Month names (abbreviated) — resolved via _t() for locale awareness.
-const MONTHS_FR = [
-	_t('ui_typing.month_0'),
-	_t('ui_typing.month_1'),
-	_t('ui_typing.month_2'),
-	_t('ui_typing.month_3'),
-	_t('ui_typing.month_4'),
-	_t('ui_typing.month_5'),
-	_t('ui_typing.month_6'),
-	_t('ui_typing.month_7'),
-	_t('ui_typing.month_8'),
-	_t('ui_typing.month_9'),
-	_t('ui_typing.month_10'),
-	_t('ui_typing.month_11')
-];
+// Day/month name arrays resolved at call time so i18n strings injected
+// after script parse are always reflected in axis labels.
+function days_fr() {
+	return [0,1,2,3,4,5,6].map(i => _t('ui_typing.day_' + i));
+}
+function months_fr() {
+	return [0,1,2,3,4,5,6,7,8,9,10,11].map(i => _t('ui_typing.month_' + i));
+}
 
 /**
  * Returns a two-line French day tick label for a daily x-axis value.
@@ -171,7 +152,7 @@ const MONTHS_FR = [
  */
 function _format_day_tick(value) {
 	const d = new Date(value);
-	return [DAYS_FR[d.getDay()], `${d.getDate()} ${MONTHS_FR[d.getMonth()]}`];
+	return [days_fr()[d.getDay()], `${d.getDate()} ${months_fr()[d.getMonth()]}`];
 }
 
 // Canvas IDs of daily charts that use the two-line day+date tick renderer.
@@ -222,11 +203,11 @@ if (typeof Chart !== 'undefined') {
 
 				// Line 1 — day name, normal weight
 				ctx.font = `${size}px sans-serif`;
-				ctx.fillText(DAYS_FR[d.getDay()], x, y1);
+				ctx.fillText(days_fr()[d.getDay()], x, y1);
 
 				// Line 2 — "d month" in bold (e.g. "12 avr.")
 				ctx.font = `bold ${size}px sans-serif`;
-				ctx.fillText(`${d.getDate()} ${MONTHS_FR[d.getMonth()]}`, x, y2);
+				ctx.fillText(`${d.getDate()} ${months_fr()[d.getMonth()]}`, x, y2);
 			});
 
 			ctx.restore();
