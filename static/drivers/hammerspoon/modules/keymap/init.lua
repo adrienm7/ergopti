@@ -453,8 +453,12 @@ local function run_trigger_checks()
 				local prev_char  = prev_sub:sub(poff)
 				local term_bucket = Registry.mappings_for_tail(prev_char)
 				if term_bucket then
+					-- When ★ is pressed, it is an explicit validation of the displayed
+					-- tooltip — bypass the typing-speed delay so a slow typist never
+					-- gets a repeat-key instead of the intended expansion.
+					local skip_delay = chars == CoreState.magic_key
 					for _, m in ipairs(term_bucket) do
-						if not m.auto and mapping_fires(m)
+						if not m.auto and (skip_delay or mapping_fires(m))
 							and Expander.try_terminator_expand(m, chars, char_len, is_ignored)
 						then
 							return true
