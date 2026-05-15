@@ -249,12 +249,11 @@ _TooltipBuildGui(Items) {
         HasLabel := Item.HasOwnProp("TriggerLabel") and Item.TriggerLabel != ""
         if HasLabel {
             BadgeX := _TOOLTIP_PADDING_X + MaxW + _TOOLTIP_LABEL_GAP
-            ; Badge spans the full row minus symmetric vertical inset so the
-            ; grey pill is evenly padded top and bottom.  AHK Text controls
-            ; render content at the top of the rect, so we size the badge to
-            ; exactly the font height and centre it in the row manually.
-            BadgeH := RowH - _TOOLTIP_BADGE_V_PAD * 2
-            BadgeY := _TOOLTIP_BADGE_V_PAD
+            ; Align the badge rect to the text line: same Y and height as the
+            ; output text control so AHK's top-aligned text rendering lands
+            ; exactly at the same baseline as the main label.
+            BadgeY := _TOOLTIP_PADDING_Y
+            BadgeH := S.H
 
             ; Accent colour: use the raw ColorHex at full brightness so the
             ; symbol pops against the neutral badge background.
