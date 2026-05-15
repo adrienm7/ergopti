@@ -23,10 +23,10 @@
 ;    group colors both stay readable without the caller doing the math.
 ; ==============================================================================
 
-; Reused Gui object — lazily created by _TooltipEnsureGui on first show.
-global _TooltipGui   := 0
-global _TooltipText  := 0
-global _TooltipTimer := 0
+; Primary Gui reference (first row). _TooltipRowGuis holds all rows.
+global _TooltipGui     := 0
+global _TooltipRowGuis := []
+global _TooltipTimer   := 0
 
 ; Style constants.
 global _TOOLTIP_FONT_NAME      := "Segoe UI"
@@ -72,54 +72,69 @@ global _TOOLTIP_WINDOW_BOTTOM_INSET_PX := 60
 ; ============================================================
 ; ============================================================
 
-; Show or update the tooltip with the given text and background color.
-; ColorHex may be in either "#rrggbb" or "rrggbb" form; an empty string falls
-; back to the neutral default. DurationSec is optional — pass 0 (or omit) to
-; let the tooltip stay visible until TooltipHide() is called explicitly.
-TooltipShow(Text, ColorHex := "", DurationSec := 0) {
+; Show or update the tooltip with one or more stacked items.
+;
+; Items may be:
+;   - A plain string  → single item with default color, no auto-hide.
+;   - A single object { Text, ColorHex?, DurationSec? }.
+;   - An Array of such objects → stacked rows; widths are equalised to the
+;     widest row; corners are rounded only at the very top and very bottom
+;     (flat borders between adjacent rows).
+;
+; The shortest DurationSec across all items drives the auto-hide timer
+; (0 / omitted means "stay until TooltipHide()").
+TooltipShow(Items, DurationSec := 0) {
     global _TooltipTimer
-    ; The accent only contributes its hue — the actual background is a near-
-    ; black tinted with that hue (mirrors Hammerspoon's renderer behaviour).
-    BgHex := _TooltipMixTintHex(ColorHex)
-    FgHex := "FFFFFF"   ; always white on the dark mixed background
 
-    ; Cancel any pending auto-hide timer BEFORE rebuilding the Gui. If the
-    ; timer fires between Destroy() and the new Gui being shown, _TooltipGui
-    ; is 0 and the hide is silently skipped — leaving the new window orphaned
-    ; with no timer to ever dismiss it (ghost tooltip).
+    ; Normalise to an Array of { Text, ColorHex } objects.
+    if !IsObject(Items) {
+        Items := [{ Text: Items, ColorHex: "", DurationSec: DurationSec }]
+    } else if !Items.HasMethod("Push") {
+        Items := [Items]
+    }
+
+    ; Cancel any pending auto-hide timer BEFORE rebuilding the Gui.
     if _TooltipTimer {
         SetTimer(_TooltipTimer, 0)
         _TooltipTimer := 0
     }
 
-    ; Recreate the Gui (and its Text control) on every show so the control
-    ; auto-sizes to the new content. AHK v2 does not resize a Text control
-    ; when its `.Value` changes, so reusing the previous Gui produced a
-    ; truncated tooltip ("c'" instead of "c'était").
-    _TooltipBuildGui(BgHex, FgHex, Text)
+    _TooltipBuildGui(Items)
 
     Pos := _TooltipResolvePosition()
-    _TooltipGui.Show(Format("AutoSize x{1} y{2} NoActivate", Pos.X, Pos.Y))
-    _TooltipApplyRoundedCorners()
+    CurY := Pos.Y
+    for Idx, Row in _TooltipRowGuis {
+        Row.Gui.Show(Format("w{1} h{2} x{3} y{4} NoActivate",
+            Row.W, Row.H, Pos.X, CurY))
+        CurY += Row.H
+    }
+    _TooltipApplyStackedCorners()
 
-    if (DurationSec > 0) {
+    ; Use the shortest non-zero DurationSec across all items.
+    EffectiveDur := DurationSec
+    for _, Item in Items {
+        D := Item.HasOwnProp("DurationSec") ? Item.DurationSec : 0
+        if (D > 0 and (EffectiveDur == 0 or D < EffectiveDur))
+            EffectiveDur := D
+    }
+    if (EffectiveDur > 0) {
         global _TOOLTIP_TIMEOUT_DECREMENT_SEC, _TOOLTIP_TIMEOUT_FLOOR_SEC
         Effective := Max(_TOOLTIP_TIMEOUT_FLOOR_SEC,
-            DurationSec - _TOOLTIP_TIMEOUT_DECREMENT_SEC)
+            EffectiveDur - _TOOLTIP_TIMEOUT_DECREMENT_SEC)
         _TooltipTimer := () => TooltipHide()
         SetTimer(_TooltipTimer, -Round(Effective * 1000))
     }
 }
 
-; Hide the tooltip immediately and cancel any pending auto-hide timer.
+; Hide all tooltip rows immediately and cancel any pending auto-hide timer.
 TooltipHide() {
-    global _TooltipGui, _TooltipTimer
+    global _TooltipGui, _TooltipRowGuis, _TooltipTimer
     if _TooltipTimer {
         SetTimer(_TooltipTimer, 0)
         _TooltipTimer := 0
     }
-    if _TooltipGui {
-        try _TooltipGui.Hide()
+    for _, Row in _TooltipRowGuis {
+        try Row.Gui.Hide()
     }
 }
 
@@ -130,41 +145,55 @@ TooltipHide() {
 ; ============================================================
 ; ============================================================
 
-; Build a fresh Gui + Text control sized for the given content. We rebuild
-; on every show because AHK v2 does not resize a Text control after its
-; `.Value` is set; reusing the previous Gui truncated the visible string.
-;
-; The Static (Text) control's auto-sizing in AHK v2 does not always pick up
-; the gui's SetFont when measuring the natural width — short strings can
-; end up clipped because the measurement is done with a smaller fallback
-; font. We therefore measure the text ourselves with GetTextExtentPoint32W
-; against a font handle matching what the control will actually render with,
-; then pass explicit `w` / `h` options so the control is the right size.
-_TooltipBuildGui(BgHex, FgHex, Text) {
-    global _TooltipGui, _TooltipText
+; Build one Gui per row (one row = one item), store them in _TooltipRowGuis.
+; All rows are positioned at the same X; Y increments by each row's height.
+; Widths are equalised to the widest row so the stack looks uniform.
+; The first row's Gui is the "primary" stored in _TooltipGui (used by
+; TooltipHide and position queries); all rows are shown/hidden together.
+_TooltipBuildGui(Items) {
+    global _TooltipGui, _TooltipRowGuis
     global _TOOLTIP_FONT_NAME, _TOOLTIP_FONT_SIZE
     global _TOOLTIP_PADDING_X, _TOOLTIP_PADDING_Y
 
-    ; Destroy the old window only after the new one is fully built, so that
-    ; any TooltipHide() call arriving during construction still targets a valid
-    ; handle (the old one) rather than 0, which would let the old window leak.
-    OldGui := _TooltipGui
+    OldGuis := _TooltipGui ? _TooltipRowGuis : []
 
-    G := Gui("+AlwaysOnTop +ToolWindow -Caption +E0x20 +LastFound")
-    G.BackColor := BgHex
-    G.MarginX := _TOOLTIP_PADDING_X
-    G.MarginY := _TOOLTIP_PADDING_Y
-    G.SetFont("c" . FgHex . " s" . _TOOLTIP_FONT_SIZE, _TOOLTIP_FONT_NAME)
+    ; Measure all rows first to compute the common width.
+    Sizes := []
+    MaxW := 0
+    for _, Item in Items {
+        S := _TooltipMeasureText(Item.Text)
+        Sizes.Push(S)
+        if (S.W + 4 > MaxW)
+            MaxW := S.W + 4
+    }
 
-    Size := _TooltipMeasureText(Text)
-    ; +4 px horizontal slack — Windows kerning / italic overhang sometimes
-    ; needs a hair more pixels than GetTextExtentPoint32W reports.
-    Opts := "BackgroundTrans 0xC w" . (Size.W + 4) . " h" . Size.H
-    _TooltipText := G.Add("Text", Opts, Text)
-    _TooltipGui := G
+    TotalW := MaxW + _TOOLTIP_PADDING_X * 2
+    NewGuis := []
+    for Idx, Item in Items {
+        ColorHex := Item.HasOwnProp("ColorHex") ? Item.ColorHex : ""
+        BgHex := _TooltipMixTintHex(ColorHex)
+        S := Sizes[Idx]
+        RowH := S.H + _TOOLTIP_PADDING_Y * 2
 
-    if OldGui {
-        try OldGui.Destroy()
+        G := Gui("+AlwaysOnTop +ToolWindow -Caption +E0x20 +LastFound")
+        G.BackColor := BgHex
+        G.MarginX := _TOOLTIP_PADDING_X
+        G.MarginY := _TOOLTIP_PADDING_Y
+        G.SetFont("cFFFFFF s" . _TOOLTIP_FONT_SIZE, _TOOLTIP_FONT_NAME)
+
+        ; +4 px horizontal slack for kerning/italic overhang.
+        Opts := "BackgroundTrans 0xC w" . (MaxW + 4) . " h" . S.H
+        G.Add("Text", Opts, Item.Text)
+        NewGuis.Push({ Gui: G, H: RowH, W: TotalW })
+    }
+
+    _TooltipGui     := NewGuis[1].Gui
+    _TooltipRowGuis := NewGuis
+
+    ; Destroy old Guis after building new ones so any in-flight Hide() calls
+    ; still target a valid handle rather than 0.
+    for _, OldG in OldGuis {
+        try OldG.Gui.Destroy()
     }
 }
 
@@ -220,41 +249,105 @@ _TooltipMeasureText(Text) {
     return { W: Width, H: Height }
 }
 
-; Apply a rounded-rectangle clipping region to the tooltip window so the
-; final shape matches the Hammerspoon look (12 px radius). Done after
-; Show() because the window must already exist for SetWindowRgn to apply.
-; CreateRoundRectRgn is owned by the system once we hand it to SetWindowRgn
-; (last argument bDelete = 1), so we never call DeleteObject ourselves.
-_TooltipApplyRoundedCorners() {
-    global _TooltipGui, _TOOLTIP_CORNER_RADIUS
-    if !_TooltipGui {
+; Apply rounded corners to the tooltip stack:
+;   - First row : rounded top-left + top-right, square bottom corners.
+;   - Middle rows: all square corners.
+;   - Last row  : square top corners, rounded bottom-left + bottom-right.
+;   - Single row: fully rounded (all four corners).
+;
+; Technique: CreateRoundRectRgn produces a rect with all four corners rounded.
+; To keep only the desired pair, we CombineRgn-intersect it with a plain
+; rectangular region that covers the half we want to keep square.
+_TooltipApplyStackedCorners() {
+    global _TooltipRowGuis, _TOOLTIP_CORNER_RADIUS
+    Count := _TooltipRowGuis.Length
+    if (Count == 0) {
         return
     }
-    W := 0
-    H := 0
-    try _TooltipGui.GetClientPos(, , &W, &H)
-    if (W <= 0 or H <= 0) {
-        return
+    for Idx, Row in _TooltipRowGuis {
+        G := Row.Gui
+        W := Row.W
+        H := Row.H
+        if (W <= 0 or H <= 0) {
+            continue
+        }
+        Radius := _TOOLTIP_CORNER_RADIUS
+        if (Radius * 2 > W)
+            Radius := W // 2
+        if (Radius * 2 > H)
+            Radius := H // 2
+        Diam := Radius * 2
+
+        IsFirst := (Idx == 1)
+        IsLast  := (Idx == Count)
+
+        if (Count == 1) {
+            ; Single row — fully rounded.
+            Rgn := DllCall("Gdi32\CreateRoundRectRgn",
+                "Int", 0, "Int", 0, "Int", W + 1, "Int", H + 1,
+                "Int", Diam, "Int", Diam, "Ptr")
+        } else if IsFirst {
+            ; Rounded top, square bottom: intersect round-rect with a rect
+            ; that covers the bottom half so the rounded bottom is cropped.
+            Rgn := _TooltipMakeTopRoundedRgn(W, H, Diam)
+        } else if IsLast {
+            ; Square top, rounded bottom.
+            Rgn := _TooltipMakeBottomRoundedRgn(W, H, Diam)
+        } else {
+            ; Middle row — plain rectangle.
+            Rgn := DllCall("Gdi32\CreateRectRgn",
+                "Int", 0, "Int", 0, "Int", W + 1, "Int", H + 1, "Ptr")
+        }
+        if Rgn {
+            DllCall("User32\SetWindowRgn", "Ptr", G.Hwnd, "Ptr", Rgn, "Int", 1)
+        }
     }
-    ; Cap the radius so the corner arcs never overlap and clip the content.
-    ; Without this guard, a small tooltip (W or H < 2 * radius) ends up with
-    ; opposing corners eating into the same pixels and the text is cut.
-    Radius := _TOOLTIP_CORNER_RADIUS
-    if (Radius * 2 > W) {
-        Radius := W // 2
-    }
-    if (Radius * 2 > H) {
-        Radius := H // 2
-    }
-    Rgn := DllCall("Gdi32\CreateRoundRectRgn",
-        "Int", 0, "Int", 0,
-        "Int", W + 1, "Int", H + 1,
-        "Int", Radius * 2,
-        "Int", Radius * 2,
-        "Ptr")
-    if Rgn {
-        DllCall("User32\SetWindowRgn", "Ptr", _TooltipGui.Hwnd, "Ptr", Rgn, "Int", 1)
-    }
+}
+
+; Rounded top corners only: intersect a full round-rect with a rectangle
+; that covers only the top half + Radius pixels so the bottom stays square.
+_TooltipMakeTopRoundedRgn(W, H, Diam) {
+    ; Full round-rect (all four corners rounded).
+    RoundRgn := DllCall("Gdi32\CreateRoundRectRgn",
+        "Int", 0, "Int", 0, "Int", W + 1, "Int", H + 1,
+        "Int", Diam, "Int", Diam, "Ptr")
+    ; Rectangle covering top half + enough to keep rounded top visible.
+    ; Bottom edge at H (full height) but top portion is the interesting bit —
+    ; we intersect with a rect from y=0 to y=(H - Radius) as a square cap,
+    ; then union with a plain rect for y=(H - Radius) to y=H.
+    ; Simpler: combine round-rect (all 4 rounded) ∩ rect(0,0,W,H-Radius)
+    ;          then union rect(0, H-Radius, W, H).
+    CapRgn := DllCall("Gdi32\CreateRectRgn",
+        "Int", 0, "Int", 0, "Int", W + 1, "Int", H - Diam // 2 + 1, "Ptr")
+    SquareBottomRgn := DllCall("Gdi32\CreateRectRgn",
+        "Int", 0, "Int", H - Diam // 2, "Int", W + 1, "Int", H + 1, "Ptr")
+    ; Intersect round-rect with cap → keeps rounded top, clips bottom arc.
+    CombinedRgn := DllCall("Gdi32\CreateRectRgn", "Int", 0, "Int", 0, "Int", 1, "Int", 1, "Ptr")
+    DllCall("Gdi32\CombineRgn", "Ptr", CombinedRgn, "Ptr", RoundRgn, "Ptr", CapRgn, "Int", 1)   ; RGN_AND=1
+    ; Union with square-bottom rect.
+    DllCall("Gdi32\CombineRgn", "Ptr", CombinedRgn, "Ptr", CombinedRgn, "Ptr", SquareBottomRgn, "Int", 2)  ; RGN_OR=2
+    DllCall("Gdi32\DeleteObject", "Ptr", RoundRgn)
+    DllCall("Gdi32\DeleteObject", "Ptr", CapRgn)
+    DllCall("Gdi32\DeleteObject", "Ptr", SquareBottomRgn)
+    return CombinedRgn
+}
+
+; Rounded bottom corners only: symmetric to _TooltipMakeTopRoundedRgn.
+_TooltipMakeBottomRoundedRgn(W, H, Diam) {
+    RoundRgn := DllCall("Gdi32\CreateRoundRectRgn",
+        "Int", 0, "Int", 0, "Int", W + 1, "Int", H + 1,
+        "Int", Diam, "Int", Diam, "Ptr")
+    CapRgn := DllCall("Gdi32\CreateRectRgn",
+        "Int", 0, "Int", Diam // 2, "Int", W + 1, "Int", H + 1, "Ptr")
+    SquareTopRgn := DllCall("Gdi32\CreateRectRgn",
+        "Int", 0, "Int", 0, "Int", W + 1, "Int", Diam // 2 + 1, "Ptr")
+    CombinedRgn := DllCall("Gdi32\CreateRectRgn", "Int", 0, "Int", 0, "Int", 1, "Int", 1, "Ptr")
+    DllCall("Gdi32\CombineRgn", "Ptr", CombinedRgn, "Ptr", RoundRgn, "Ptr", CapRgn, "Int", 1)
+    DllCall("Gdi32\CombineRgn", "Ptr", CombinedRgn, "Ptr", CombinedRgn, "Ptr", SquareTopRgn, "Int", 2)
+    DllCall("Gdi32\DeleteObject", "Ptr", RoundRgn)
+    DllCall("Gdi32\DeleteObject", "Ptr", CapRgn)
+    DllCall("Gdi32\DeleteObject", "Ptr", SquareTopRgn)
+    return CombinedRgn
 }
 
 ; Mix an accent colour with a near-black background, mirroring Hammerspoon's

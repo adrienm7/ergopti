@@ -693,42 +693,39 @@ _LookupAndRender() {
         return
     }
 
-    Match := _BestCandidate(_PrefixIndex[Buffer])
-    if (Match == "") {
-        TooltipHide()
-        _NotifySuggestionDismissed()
-        return
-    }
-
-    Cfg := HotstringsResolve(Match.Category, Match.Section)
-    if !Cfg.ShowTooltip {
-        TooltipHide()
-        _NotifySuggestionDismissed()
-        return
-    }
-    Color := (Cfg.Color != "") ? Cfg.Color : ""
-    Delay := (Cfg.Delay != "") ? Cfg.Delay : 0
-    TooltipShow(Match.Output, Color, Delay)
-    ; Log the suggestion only when the displayed trigger actually changed
-    ; (typing the next char of the same trigger keeps the same tooltip up
-    ; on screen but we already logged that suggestion). The category is
-    ; mirrored as ``h_type`` — this is richer than the macOS side which
-    ; defaults to "unknown" for tooltip events without a TOML category.
-    _NotifySuggestionShown(Match.Trigger, Match.Output, Match.Category)
-}
-
-; Pick the shortest trigger from a candidate list. Prefering the shortest
-; trigger feels more like a "you're almost there" preview because it
-; minimises the remaining keystrokes before the expansion fires.
-_BestCandidate(Candidates) {
-    if !IsObject(Candidates) or Candidates.Length == 0 {
-        return ""
-    }
-    Best := Candidates[1]
+    ; Collect all candidates that have ShowTooltip enabled, sorted so that
+    ; magic-key triggers (those ending with ★) appear first — they represent
+    ; the shortest-keystroke path and should be most prominent visually.
+    Candidates := _PrefixIndex[Buffer]
+    Items := []
+    FirstMatch := ""
     for _, Entry in Candidates {
-        if (Entry.Length < Best.Length) {
-            Best := Entry
+        Cfg := HotstringsResolve(Entry.Category, Entry.Section)
+        if !Cfg.ShowTooltip {
+            continue
+        }
+        Color := (Cfg.Color != "") ? Cfg.Color : ""
+        Delay := (Cfg.Delay != "") ? Cfg.Delay : 0
+        ; Magic-key triggers go first so they appear at the top of the stack.
+        Item := { Text: Entry.Output, ColorHex: Color, DurationSec: Delay,
+                  Trigger: Entry.Trigger, Category: Entry.Category }
+        if InStr(Entry.Trigger, ScriptInformation["MagicKey"]) {
+            Items.InsertAt(1, Item)
+            if (FirstMatch == "")
+                FirstMatch := Entry
+        } else {
+            Items.Push(Item)
+            if (FirstMatch == "")
+                FirstMatch := Entry
         }
     }
-    return Best
+    if (Items.Length == 0) {
+        TooltipHide()
+        _NotifySuggestionDismissed()
+        return
+    }
+    TooltipShow(Items)
+    ; Log the suggestion based on the first (top) item only.
+    Primary := Items[1]
+    _NotifySuggestionShown(Primary.Trigger, Primary.Text, Primary.Category)
 }
