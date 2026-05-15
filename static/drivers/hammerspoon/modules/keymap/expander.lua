@@ -34,6 +34,25 @@ if not ok_kl then keylogger = nil end
 local ok_tt, tooltip = pcall(require, "ui.tooltip")
 if not ok_tt then tooltip = { hide = function() end } end
 
+-- Groups whose expansions are silent ergonomic substitutions (no tooltip shown).
+-- Passing nil as source_variant for these keeps the widget at its default color
+-- instead of inheriting whatever color the group's TOML metadata defines.
+local NEUTRAL_SOURCE_GROUPS = {
+	rolls              = true,
+	sfbsreduction      = true,
+	distancesreduction = true,
+}
+
+--- Returns the source_variant to report to the keylogger for a given mapping.
+--- Neutral groups (ergonomic substitutions without a visible tooltip) report nil
+--- so the widget stays at the default blue instead of picking up the group color.
+--- @param m table The mapping entry.
+--- @return string|nil
+local function source_variant_for(m)
+	if m.group and NEUTRAL_SOURCE_GROUPS[m.group] then return nil end
+	return m.group or nil
+end
+
 local _state    = nil  -- Shared CoreState injected via M.init().
 local _registry = nil  -- Registry module injected via M.init().
 local _llm      = nil  -- LLMBridge module injected via M.init().
@@ -250,7 +269,7 @@ function M.try_auto_expand(m, char_len, is_ignored)
 		m.final_result,
 		is_ignored,
 		"hotstring",
-		m.group or nil
+		source_variant_for(m)
 	)
 
 	if keylogger and type(keylogger.log_hotstring) == "function" then
@@ -353,7 +372,7 @@ function M.try_terminator_expand(m, chars, char_len, is_ignored)
 			m.final_result,
 			is_ignored,
 			"hotstring",
-			m.group or nil
+			source_variant_for(m)
 		)
 
 		if keylogger and type(keylogger.log_hotstring) == "function" then
