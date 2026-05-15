@@ -50,9 +50,9 @@ def resolve_locales_dir(app_root: str) -> str:
     d = os.environ.get("ERGOPTI_LOCALES_DIR", "").strip()
     if d:
         return d
-    # Climb: app_root → apps/ → hammerspoon/ → drivers/ → static/ → locales/
+    # Climb: app_root (.app) → apps/ → hammerspoon/ → drivers/ → static/ → locales/
     candidate = os.path.join(
-        os.path.dirname(os.path.dirname(os.path.dirname(app_root))),
+        os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(app_root)))),
         "locales",
     )
     if os.path.isdir(candidate):

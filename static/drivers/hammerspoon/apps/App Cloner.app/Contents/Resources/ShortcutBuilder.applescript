@@ -49,7 +49,7 @@ on resolve_locales_dir()
 	try
 		set bundle_res to POSIX path of (path to me)
 		set cmd to "d=" & quoted form of bundle_res ¬
-			& "; d=$(dirname \"$d\"); d=$(dirname \"$d\"); d=$(dirname \"$d\"); d=$(dirname \"$d\"); echo \"$d/locales\""
+			& "; d=$(dirname \"$d\"); d=$(dirname \"$d\"); d=$(dirname \"$d\"); d=$(dirname \"$d\"); d=$(dirname \"$d\"); echo \"$d/locales\""
 		set d to do shell script cmd
 	end try
 	return d
