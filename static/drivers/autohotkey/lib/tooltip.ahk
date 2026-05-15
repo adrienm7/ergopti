@@ -64,6 +64,12 @@ global _TOOLTIP_SATURATION := 0.40
 global _TOOLTIP_TIMEOUT_DECREMENT_SEC := 0.15
 global _TOOLTIP_TIMEOUT_FLOOR_SEC     := 0.05
 
+; Safety deadline applied whenever the caller passes DurationSec = 0
+; (i.e. "stay until TooltipHide()"). Guards against ghost tooltips that
+; linger when the normal hide path (buffer reset, expansion fire, etc.)
+; is skipped due to an unhandled exception or a missed timer callback.
+global _TOOLTIP_SAFETY_SEC := 10.0
+
 ; Mirrors Hammerspoon's max_caret_height = 80 — when the focused element is
 ; tall (e.g. a multi-line text area, a list, a whole panel) we treat it as
 ; an "input box" anchor (bottom-centre) rather than a caret anchor, because
@@ -131,12 +137,18 @@ TooltipShow(Items, DurationSec := 0) {
         if (D > 0 and (EffectiveDur == 0 or D < EffectiveDur))
             EffectiveDur := D
     }
+    global _TOOLTIP_TIMEOUT_DECREMENT_SEC, _TOOLTIP_TIMEOUT_FLOOR_SEC, _TOOLTIP_SAFETY_SEC
     if (EffectiveDur > 0) {
-        global _TOOLTIP_TIMEOUT_DECREMENT_SEC, _TOOLTIP_TIMEOUT_FLOOR_SEC
         Effective := Max(_TOOLTIP_TIMEOUT_FLOOR_SEC,
             EffectiveDur - _TOOLTIP_TIMEOUT_DECREMENT_SEC)
         _TooltipTimer := () => TooltipHide()
         SetTimer(_TooltipTimer, -Round(Effective * 1000))
+    } else {
+        ; No caller-specified duration — arm a safety deadline so the tooltip
+        ; cannot become a ghost if the normal hide path (expansion fire or
+        ; buffer reset) is missed.
+        _TooltipTimer := () => TooltipHide()
+        SetTimer(_TooltipTimer, -Round(_TOOLTIP_SAFETY_SEC * 1000))
     }
 }
 

@@ -193,7 +193,10 @@ KL_AV_SlowTick() {
     if !Keylogger.initialized
         return
     KL_AV_ScanCapture()
-    KL_AV_PollFocusMode()
+    ; KL_AV_PollFocusMode() is intentionally excluded — its `loop reg "KR"`
+    ; walk on a deep CloudStore path blocks the AHK main thread under some
+    ; Windows builds, causing the same 30-second keyboard lockup as the
+    ; previous WMI call.
 }
 
 KL_AV_ScanCapture() {
