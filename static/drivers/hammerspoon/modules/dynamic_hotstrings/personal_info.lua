@@ -241,22 +241,31 @@ local function do_expand(combo)
 		_keymap.suppress_rescan()
 	end
 
-	-- Delete the typed combo characters
-	for _ = 1, n_back do
-		eventtap.keyStroke({}, "delete", 0)
-	end
-	
-	-- Insert the resolved strings with tabs in between
-	for i, value in ipairs(parts) do
-		eventtap.keyStrokes(value)
-		if i < #parts then
-			eventtap.keyStroke({}, "tab", 0)
+	local ok, err = pcall(function()
+		-- Delete the typed combo characters
+		for _ = 1, n_back do
+			eventtap.keyStroke({}, "delete", 0)
 		end
+
+		-- Insert the resolved strings with tabs in between
+		for i, value in ipairs(parts) do
+			eventtap.keyStrokes(value)
+			if i < #parts then
+				eventtap.keyStroke({}, "tab", 0)
+			end
+		end
+	end)
+
+	if not ok then
+		Logger.error(LOG, "Personal data injection failed: %s.", tostring(err))
 	end
 
+	-- Always release the flag, even on error, so future expansions are not blocked.
 	timer.doAfter(0.15, function()
 		_replacing = false
-		Logger.info(LOG, "Personal data injection completed.")
+		if ok then
+			Logger.info(LOG, "Personal data injection completed.")
+		end
 	end)
 end
 

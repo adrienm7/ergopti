@@ -88,22 +88,31 @@ local function interceptor(event, km_buffer)
 					
 					hs.timer.doAfter(0, function()
 						_is_injecting = true
-						
-						-- Delete the suffix characters
-						for _ = 1, n_back do
-							hs.eventtap.keyStroke({}, "delete", 0)
+
+						local ok, err = pcall(function()
+							-- Delete the suffix characters
+							for _ = 1, n_back do
+								hs.eventtap.keyStroke({}, "delete", 0)
+							end
+
+							-- Emit the actual result
+							if km_utils and type(km_utils.emit_text) == "function" then
+								km_utils.emit_text(result)
+							else
+								hs.eventtap.keyStrokes(result)
+							end
+						end)
+
+						if not ok then
+							Logger.error(LOG, "Dynamic rule injection failed: %s.", tostring(err))
 						end
-						
-						-- Emit the actual result
-						if km_utils and type(km_utils.emit_text) == "function" then
-							km_utils.emit_text(result)
-						else
-							hs.eventtap.keyStrokes(result)
-						end
-						
+
+						-- Always release the flag, even on error, so future injections are not blocked.
 						hs.timer.doAfter(0.15, function()
 							_is_injecting = false
-							Logger.info(LOG, "Dynamic rule injection completed.")
+							if ok then
+								Logger.info(LOG, "Dynamic rule injection completed.")
+							end
 						end)
 					end)
 					

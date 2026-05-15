@@ -202,9 +202,10 @@ PrefixWatcherSuppress(YesNo) {
     global _PrefixWatcherSuppressed, _PrefixBuffer
     _PrefixWatcherSuppressed := !!YesNo
     ; Mirror the suppression into HSEv2 so its parallel buffer stays aligned
-    ; with the prefix watcher during SendEvent bursts. Releasing the flag
-    ; also clears the HSE buffer (HSE_Suppress(false) does that), matching
-    ; the watcher's own reset of _PrefixBuffer below.
+    ; with the prefix watcher during SendEvent bursts. HSE_Suppress only
+    ; flips the flag — the HSE buffer is NOT wiped here; HSE_DispatchMatch
+    ; already called HSE_ApplyExpansion before deferring this release,
+    ; so the buffer already reflects the post-expansion screen state.
     HSE_Suppress(YesNo)
     if !YesNo {
         _PrefixBuffer := ""
