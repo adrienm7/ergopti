@@ -919,9 +919,13 @@
 					// — which synchronously paints the loader spinner). Subsequent
 					// live pushes go directly to receive_range_data so the spinner
 					// doesn't clobber the rendered tables every 200 ms.
-					if (!manifest_seeded && typeof window.process_manifest === "function") {
-						manifest_seeded = true;
-						window.process_manifest();
+					if (!manifest_seeded) {
+						if (typeof window.process_manifest === "function") {
+							manifest_seeded = true;
+							window.process_manifest();
+						} else {
+							console.error("[apply_prefetch] window.process_manifest not defined — JS scripts may have failed to load");
+						}
 					}
 					if (merged && typeof window.receive_range_data === "function") {
 						try {
