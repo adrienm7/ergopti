@@ -197,20 +197,10 @@ KL_AV_SlowTick() {
 }
 
 KL_AV_ScanCapture() {
-    running_exe := ""
-    try {
-        q := ComObjGet("winmgmts:").ExecQuery(
-            "SELECT Name FROM Win32_Process")
-        for proc in q {
-            name := StrLower(proc.Name)
-            for _, cap_exe in KLAVConst.CAPTURE_EXES {
-                if (name = cap_exe) {
-                    running_exe := name
-                    break 2
-                }
-            }
-        }
-    }
+    ; Use CreateToolhelp32Snapshot instead of WMI — WMI ExecQuery on
+    ; Win32_Process can block the AHK thread for several seconds, which
+    ; manifests as a keyboard lockup every SLOW_TICK_MS under sustained typing.
+    running_exe := _KL_AV_FindCaptureExeSnapshot()
     now_active := (running_exe != "")
     if (now_active and !KLAVState.capture_active) {
         KLAVState.capture_active := true
@@ -229,6 +219,42 @@ KL_AV_ScanCapture() {
         ))
         KLAVState.capture_exe := ""
     }
+}
+
+; Enumerate running processes via CreateToolhelp32Snapshot (Win32 API).
+; Returns the lower-cased exe name of the first capture/conferencing process
+; found in KLAVConst.CAPTURE_EXES, or "" when none are running.
+; This replaces the previous WMI ExecQuery path which blocked AHK for
+; several seconds on each call.
+_KL_AV_FindCaptureExeSnapshot() {
+    TH32CS_SNAPPROCESS := 0x2
+    snap := DllCall("CreateToolhelp32Snapshot", "UInt", TH32CS_SNAPPROCESS, "UInt", 0, "Ptr")
+    if (snap = -1 or snap = 0) {
+        return ""
+    }
+    ; PROCESSENTRY32W: dwSize(4) + cntUsage(4) + th32ProcessID(4) + th32DefaultHeapID(8) +
+    ; th32ModuleID(4) + cntThreads(4) + th32ParentProcessID(4) + pcPriClassBase(4) +
+    ; dwFlags(4) + szExeFile(MAX_PATH*2 = 520 bytes) = total 560 bytes
+    entry := Buffer(560, 0)
+    NumPut("UInt", 560, entry, 0)   ; dwSize must be set before Process32First
+    found := ""
+    if DllCall("Process32FirstW", "Ptr", snap, "Ptr", entry) {
+        loop {
+            ; szExeFile starts at offset 44, MAX_PATH wchars
+            exe_name := StrLower(StrGet(entry.Ptr + 44, 260, "UTF-16"))
+            for _, cap_exe in KLAVConst.CAPTURE_EXES {
+                if (exe_name = cap_exe) {
+                    found := exe_name
+                    break 2
+                }
+            }
+            if !DllCall("Process32NextW", "Ptr", snap, "Ptr", entry) {
+                break
+            }
+        }
+    }
+    DllCall("CloseHandle", "Ptr", snap)
+    return found
 }
 
 KL_AV_PollFocusMode() {
