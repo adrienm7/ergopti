@@ -34,7 +34,14 @@ global _TOOLTIP_FONT_SIZE        := 11
 global _TOOLTIP_FONT_SIZE_LABEL  := 9     ; smaller dim font for the trigger label
 global _TOOLTIP_PADDING_X        := 14
 global _TOOLTIP_PADDING_Y        := 8
-global _TOOLTIP_LABEL_GAP        := 12    ; gap between output text and trigger label
+global _TOOLTIP_LABEL_GAP        := 10    ; gap between output text and badge left edge
+
+; Badge (★ / ⏎) visual pill: fixed-width box so every row is identical
+; regardless of which symbol it shows.  The symbol is rendered in the row's
+; accent colour on a neutral dark background so it pops on any tint.
+global _TOOLTIP_BADGE_W          := 24    ; total badge width (px) — fixed across all rows
+global _TOOLTIP_BADGE_H_PAD      := 2     ; extra vertical padding inside the badge
+global _TOOLTIP_BADGE_BG_HEX     := "2D2D2D"   ; neutral dark grey badge background
 global _TOOLTIP_OFFSET_BELOW     := 18   ; pixels below the anchor (caret / box)
 global _TOOLTIP_OFFSET_RIGHT     := 4    ; small horizontal nudge for caret anchor
 global _TOOLTIP_DEFAULT_BG_HEX   := "1A1A1A"
@@ -184,10 +191,21 @@ _TooltipBuildGui(Items) {
     global _TooltipGui, _TooltipRowGuis
     global _TOOLTIP_FONT_NAME, _TOOLTIP_FONT_SIZE, _TOOLTIP_FONT_SIZE_LABEL
     global _TOOLTIP_PADDING_X, _TOOLTIP_PADDING_Y, _TOOLTIP_LABEL_GAP
+    global _TOOLTIP_BADGE_W, _TOOLTIP_BADGE_H_PAD, _TOOLTIP_BADGE_BG_HEX
 
     OldGuis := _TooltipGui ? _TooltipRowGuis : []
 
-    ; Measure all rows first to compute the common width.
+    ; Determine whether any row has a trigger label — if none do, skip the
+    ; badge column entirely so plain tooltips stay compact.
+    HasAnyLabel := false
+    for _, Item in Items {
+        if (Item.HasOwnProp("TriggerLabel") and Item.TriggerLabel != "") {
+            HasAnyLabel := true
+            break
+        }
+    }
+
+    ; Measure all rows to find the widest output text.
     Sizes := []
     MaxW := 0
     for _, Item in Items {
@@ -197,34 +215,17 @@ _TooltipBuildGui(Items) {
             MaxW := S.W + 4
     }
 
-    ; Measure trigger labels to include their width in the total row width.
-    LabelSizes := []
-    MaxLabelW := 0
-    for _, Item in Items {
-        Label := Item.HasOwnProp("TriggerLabel") ? Item.TriggerLabel : ""
-        if (Label != "") {
-            LS := _TooltipMeasureTextSize(Label, _TOOLTIP_FONT_SIZE_LABEL)
-            LabelSizes.Push(LS)
-            if (LS.W > MaxLabelW)
-                MaxLabelW := LS.W
-        } else {
-            LabelSizes.Push({ W: 0, H: 0 })
-        }
-    }
-    ; Total width = left padding + output text + gap + label + right padding.
-    ; Add an extra 16 px margin on the label side — Unicode symbols like ★
-    ; and ⏎ are rendered by a fallback font (Segoe UI Symbol) that is wider
-    ; than what GetTextExtentPoint32W returns for Segoe UI, so the measured
-    ; width under-counts and the control gets clipped without this slack.
-    LabelExtra := (MaxLabelW > 0) ? (_TOOLTIP_LABEL_GAP + MaxLabelW + 16) : 0
-    TotalW := MaxW + 4 + LabelExtra + _TOOLTIP_PADDING_X * 2
+    ; Total width: left padding + output text area + gap + fixed badge + right padding.
+    ; The badge column is always _TOOLTIP_BADGE_W wide (fixed), so all rows align
+    ; and there is never a large gap caused by short output text.
+    BadgeColW := HasAnyLabel ? (_TOOLTIP_LABEL_GAP + _TOOLTIP_BADGE_W) : 0
+    TotalW := _TOOLTIP_PADDING_X + MaxW + BadgeColW + _TOOLTIP_PADDING_X
 
     NewGuis := []
     for Idx, Item in Items {
         ColorHex := Item.HasOwnProp("ColorHex") ? Item.ColorHex : ""
         BgHex := _TooltipMixTintHex(ColorHex)
         S := Sizes[Idx]
-        LS := LabelSizes[Idx]
         RowH := S.H + _TOOLTIP_PADDING_Y * 2
 
         G := Gui("+AlwaysOnTop +ToolWindow -Caption +E0x20 +LastFound")
@@ -235,20 +236,26 @@ _TooltipBuildGui(Items) {
 
         ; Output text — left-aligned with left padding.
         TextOpts := Format("BackgroundTrans 0xC x{1} y{2} w{3} h{4}",
-            _TOOLTIP_PADDING_X, _TOOLTIP_PADDING_Y, MaxW + 4, S.H)
+            _TOOLTIP_PADDING_X, _TOOLTIP_PADDING_Y, MaxW, S.H)
         G.Add("Text", TextOpts, Item.Text)
 
-        ; Trigger label — right-aligned in a dimmer color.
-        if (LS.W > 0) {
-            LabelX := _TOOLTIP_PADDING_X + MaxW + 4 + _TOOLTIP_LABEL_GAP
-            LabelY := _TOOLTIP_PADDING_Y + (S.H - LS.H) // 2   ; vertically centred
-            ; Use LS.W + 20 so Unicode symbols rendered by a wider fallback
-            ; font are never clipped — extra space is invisible (transparent).
-            LabelOpts := Format("BackgroundTrans 0xC x{1} y{2} w{3} h{4}",
-                LabelX, LabelY, LS.W + 20, LS.H)
-            G.SetFont("c808080 s" . _TOOLTIP_FONT_SIZE_LABEL, _TOOLTIP_FONT_NAME)
-            G.Add("Text", LabelOpts, Item.TriggerLabel)
-            ; Restore main font for any subsequent control.
+        ; Badge pill — fixed-width box, neutral dark background, symbol in
+        ; accent colour.  Using a solid-background Text control avoids the
+        ; need for a separate child window and keeps z-order trivial.
+        HasLabel := Item.HasOwnProp("TriggerLabel") and Item.TriggerLabel != ""
+        if HasLabel {
+            BadgeX := _TOOLTIP_PADDING_X + MaxW + _TOOLTIP_LABEL_GAP
+            BadgeH := S.H - _TOOLTIP_BADGE_H_PAD * 2   ; slightly shorter than text
+            BadgeY := _TOOLTIP_PADDING_Y + _TOOLTIP_BADGE_H_PAD
+
+            ; Accent colour: use the raw ColorHex at full brightness so the
+            ; symbol pops against the neutral badge background.
+            AccentColor := (ColorHex != "") ? Trim(ColorHex, "#") : "FFFFFF"
+
+            BadgeOpts := Format("Background{1} x{2} y{3} w{4} h{5} Center",
+                _TOOLTIP_BADGE_BG_HEX, BadgeX, BadgeY, _TOOLTIP_BADGE_W, BadgeH)
+            G.SetFont("c" . AccentColor . " s" . _TOOLTIP_FONT_SIZE_LABEL, _TOOLTIP_FONT_NAME)
+            G.Add("Text", BadgeOpts, Item.TriggerLabel)
             G.SetFont("cFFFFFF s" . _TOOLTIP_FONT_SIZE, _TOOLTIP_FONT_NAME)
         }
 
