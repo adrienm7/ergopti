@@ -312,9 +312,10 @@ KLWV_OnWebMessage(which, sender, args) {
     switch action {
         case "ready":
             ; Page just finished loading and signals it's ready to
-            ; receive pushes. Send the latest prefetch immediately so
-            ; the dashboard renders without waiting for the next ingest
-            ; tick.
+            ; receive pushes. Inject i18n strings first (fetch() is
+            ; blocked by CORS on file:// origins in WebView2), then
+            ; send the latest prefetch so the dashboard renders.
+            KLWV_InjectI18n(which)
             KLWV_PushPrefetch(which)
         case "request_refresh":
             try KLPF_BuildAndWrite(which, KLWV.metrics_dir)
@@ -363,6 +364,33 @@ KLWV_PushPrefetch(which) {
         FileAppend("[" . A_Now . "] PushPrefetch(" . which . "): pushed " . StrLen(msg) . " bytes`r`n", log, "UTF-8")
     } catch as err {
         FileAppend("[" . A_Now . "] PushPrefetch(" . which . "): FAIL " . err.Message . "`r`n", log, "UTF-8")
+    }
+}
+
+; Inject the active locale strings directly into the WebView via ExecuteScript.
+; fetch() is blocked by CORS on file:// origins in WebView2, so i18n.js cannot
+; load locale JSON on its own. We read the file on the AHK side and push the
+; pre-parsed strings into window._i18n_strings, then call i18n_apply() to
+; populate all data-i18n attributes immediately.
+KLWV_InjectI18n(which) {
+    global _StaticDir, _ConfigDir
+    log := _ConfigDir . "ahk\logs\webview.log"
+    if !KLWV.windows.Has(which)
+        return
+    locale_code := I18nGetLocale()
+    json_path := _StaticDir . "\locales\" . locale_code . ".json"
+    json_str := "{}"
+    if FileExist(json_path)
+        try json_str := FileRead(json_path, "UTF-8")
+    ; Strip UTF-8 BOM if present — FileRead may leave it in.
+    if (SubStr(json_str, 1, 1) = Chr(0xFEFF))
+        json_str := SubStr(json_str, 2)
+    js := "window._i18n_strings=" . json_str . ";if(typeof window.i18n_apply==='function')window.i18n_apply(window._i18n_strings);"
+    try {
+        KLWV.windows[which]["webview"].ExecuteScript(js)
+        try FileAppend("[" . A_Now . "] InjectI18n(" . which . "): injected locale='" . locale_code . "' len=" . StrLen(json_str) . "`r`n", log, "UTF-8")
+    } catch as err {
+        try FileAppend("[" . A_Now . "] InjectI18n(" . which . "): FAIL " . err.Message . "`r`n", log, "UTF-8")
     }
 }
 
