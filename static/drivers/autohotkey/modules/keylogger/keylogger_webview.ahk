@@ -422,11 +422,17 @@ KLWV_DelayedFirstPush(which) {
     ; If a live-tick blob is already cached, use it directly (it has today's
     ; n-grams); otherwise run a manifest-only build that takes ~50 ms.
     need_manifest_build := !IsSet(KLPF_LAST_JSON) || !KLPF_LAST_JSON.Has(which)
+    try FileAppend("[" . A_Now . "] DelayedFirstPush(" . which . "): need_build=" . (need_manifest_build ? "1" : "0") . " metrics_dir=" . KLWV.metrics_dir . "`r`n", log, "UTF-8")
     if need_manifest_build {
-        if KLWV.metrics_dir
+        if KLWV.metrics_dir {
+            try FileAppend("[" . A_Now . "] DelayedFirstPush(" . which . "): calling BuildAndWrite manifest…`r`n", log, "UTF-8")
             try KLPF_BuildAndWrite(which, KLWV.metrics_dir, , "manifest")
+            try FileAppend("[" . A_Now . "] DelayedFirstPush(" . which . "): BuildAndWrite done`r`n", log, "UTF-8")
+        }
     }
+    try FileAppend("[" . A_Now . "] DelayedFirstPush(" . which . "): calling InjectI18n…`r`n", log, "UTF-8")
     KLWV_InjectI18n(which)
+    try FileAppend("[" . A_Now . "] DelayedFirstPush(" . which . "): calling PushPrefetch…`r`n", log, "UTF-8")
     KLWV_PushPrefetch(which)
     ; Mark first paint done so live ticks can fan out from now on.
     if KLWV.windows.Has(which)
