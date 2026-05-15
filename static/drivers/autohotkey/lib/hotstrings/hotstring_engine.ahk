@@ -275,26 +275,28 @@ CreateHotstring(Flags, Abbreviation, Replacement, options := unset) {
     TimeActivationSeconds := (IsSet(options) and options.Has("TimeActivationSeconds")) ? options[
         "TimeActivationSeconds"] : 0
     IsRepeat := (IsSet(options) and options.Has("IsRepeat")) ? options["IsRepeat"] : False
+    Category := (IsSet(options) and options.Has("Category")) ? options["Category"] : ""
 
     FlagsPortion := ":" Flags "B0O:" ; O omits the ending character from the abbreviation
     _RegisterHotstring(
         FlagsPortion Abbreviation,
         _MakeHotstringCallback(Replacement, Abbreviation, OnlyText, FinalResult, TimeActivationSeconds),
-        _MakeHotstringMeta(Replacement, Abbreviation, OnlyText, FinalResult, TimeActivationSeconds, IsRepeat)
+        _MakeHotstringMeta(Replacement, Abbreviation, OnlyText, FinalResult, TimeActivationSeconds, IsRepeat, Category)
     )
 }
 
 ; Build the dispatch-metadata object HSE_DispatchMatch consumes. Kept next
 ; to the callback factory so the two stay in lockstep — every field used
 ; by the dispatcher has a clear origin in the original options dict.
-_MakeHotstringMeta(Replacement, Abbreviation, OnlyText, FinalResult, TimeActivationSeconds, IsRepeat := false) {
+_MakeHotstringMeta(Replacement, Abbreviation, OnlyText, FinalResult, TimeActivationSeconds, IsRepeat := false, Category := "") {
     return {
         Replacement: Replacement,
         OnlyText: OnlyText,
         FinalResult: FinalResult,
         TimeActivationSeconds: TimeActivationSeconds,
         PrevCharKey: SubStr(Abbreviation, -2, 1),
-        IsRepeat: IsRepeat
+        IsRepeat: IsRepeat,
+        Category: Category
     }
 }
 
