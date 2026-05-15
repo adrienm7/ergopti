@@ -14,8 +14,9 @@
 --- 3. Icon Loading: Loads icons directly from the .icns file in Resources/ to
 ---    avoid relying on bundle ID registration (which may not be done on first
 ---    install). Falls back to AppIcon.svg, then to no icon.
---- 4. Launch: Each entry opens the app via hs.application.launchOrFocus so the
----    OS handles focus correctly.
+--- 4. Launch: Each entry opens the app via hs.task with ERGOPTI_LOCALE set so
+---    AppleScript apps can read the active Hammerspoon locale. Falls back to
+---    the system locale, then to "en".
 --- ==============================================================================
 
 local M = {}
@@ -195,9 +196,36 @@ function M.build(ctx)
 			disabled = paused,
 			fn       = function()
 				Logger.info(LOG, "Opening bundled app '%s'…", app_name)
-				local ok_open, err = pcall(hs.application.launchOrFocus, app_path)
-				if not ok_open then
-					Logger.error(LOG, "Failed to open '%s': %s.", app_name, tostring(err))
+				-- Resolve locale: Hammerspoon active locale → system locale → "en".
+				-- The two-letter ISO code is extracted from the system locale string
+				-- (e.g. "fr_FR@currency=EUR" → "fr") so AppleScript apps receive a
+				-- clean code they can use to load the matching locale JSON.
+				local locale_code = i18n.get_locale and i18n.get_locale()
+				if not locale_code or locale_code == "" then
+					local sys = hs.host and hs.host.locale and hs.host.locale.current()
+					if type(sys) == "string" then
+						locale_code = sys:match("^([a-z][a-z])") or "en"
+					else
+						locale_code = "en"
+					end
+				end
+				-- Launch the .app bundle via `open -a` in a task so the env var
+				-- propagates into the AppleScript process. hs.application.launchOrFocus
+				-- does not expose environment injection.
+				local task = hs.task.new(
+					"/usr/bin/open",
+					function(code, _, stderr)
+						if code ~= 0 then
+							Logger.error(LOG, "open '%s' exited %d: %s.", app_name, code, stderr)
+						end
+					end,
+					function() return false end,
+					{ "-a", app_path }
+				)
+				task:setEnvironment({ ERGOPTI_LOCALE = locale_code })
+				local ok_start, err = pcall(function() task:start() end)
+				if not ok_start then
+					Logger.error(LOG, "Failed to launch '%s': %s.", app_name, tostring(err))
 				end
 			end,
 		})

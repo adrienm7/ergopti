@@ -11,6 +11,176 @@ use framework "Foundation"
 use framework "AppKit"
 use scripting additions
 
+-- =========================================
+-- =========================================
+-- ======= 0/ Locale & UI strings ==========
+-- =========================================
+-- =========================================
+
+-- Resolve the active locale: ERGOPTI_LOCALE (injected by menu_apps.lua)
+-- → $LANG prefix → "fr" default (App Cloner's native language).
+on resolve_locale()
+	set loc to ""
+	try
+		set loc to do shell script "echo \"$ERGOPTI_LOCALE\""
+	end try
+	if loc is "" then
+		try
+			set lang_val to do shell script "echo \"$LANG\""
+			if (length of lang_val) >= 2 then
+				set loc to text 1 thru 2 of lang_val
+			end if
+		end try
+	end if
+	if loc is "" then set loc to "fr"
+	return loc
+end resolve_locale
+
+-- Return a record with the UI button/title strings for the given locale.
+-- Only the repeated interactive strings are translated here; longer
+-- descriptive bodies remain in French (App Cloner's native language).
+-- Unsupported locales fall back to French.
+on ac_ui(loc)
+	if loc is "en" then
+		return {¬
+			btn_cancel: "Cancel", ¬
+			btn_ok: "OK", ¬
+			btn_back: "Back", ¬
+			btn_choose: "Choose", ¬
+			btn_clone: "Clone app", ¬
+			btn_validate: "Validate", ¬
+			btn_browse: "Browse…", ¬
+			btn_pwa_recommended: "PWA (recommended)", ¬
+			btn_try_native: "Try native", ¬
+			btn_native_clone: "Clone native app", ¬
+			btn_pwa_webapp: "PWA web app", ¬
+			btn_custom_icon: "Custom", ¬
+			btn_tint_icon: "Colour tint", ¬
+			btn_open_log: "Open log", ¬
+			btn_close: "Close", ¬
+			title_clone_name: "Clone name", ¬
+			title_pwa_mode: "PWA mode?", ¬
+			title_pwa_recommended: "PWA mode recommended", ¬
+			title_open_arg: "Item to open at launch", ¬
+			title_url_path: "URL or path", ¬
+			title_pwa_url: "PWA URL", ¬
+			title_icon_style: "Icon style", ¬
+			title_summary: "Summary", ¬
+			title_error: "Clone creation failed", ¬
+			title_tint: "Colour tint", ¬
+			msg_bundle_missing: "Error: bundle path missing. Launch the app normally.", ¬
+			lbl_progress_prep: "Preparing icon and bundle", ¬
+			lbl_progress_icon: "Generating tinted icon…", ¬
+			lbl_progress_sign: "Ad-hoc signing bundle…", ¬
+			lbl_progress_dock: "Registering in Dock…", ¬
+			lbl_progress_done: "Done", ¬
+			lbl_progress_title: "Creating clone…"}
+	else if loc is "de" then
+		return {¬
+			btn_cancel: "Abbrechen", ¬
+			btn_ok: "OK", ¬
+			btn_back: "Zurück", ¬
+			btn_choose: "Auswählen", ¬
+			btn_clone: "App klonen", ¬
+			btn_validate: "Bestätigen", ¬
+			btn_browse: "Durchsuchen…", ¬
+			btn_pwa_recommended: "PWA (empfohlen)", ¬
+			btn_try_native: "Nativ versuchen", ¬
+			btn_native_clone: "Native App klonen", ¬
+			btn_pwa_webapp: "PWA-Web-App", ¬
+			btn_custom_icon: "Eigenes Symbol", ¬
+			btn_tint_icon: "Farbtönung", ¬
+			btn_open_log: "Log öffnen", ¬
+			btn_close: "Schließen", ¬
+			title_clone_name: "Klon-Name", ¬
+			title_pwa_mode: "PWA-Modus?", ¬
+			title_pwa_recommended: "PWA-Modus empfohlen", ¬
+			title_open_arg: "Beim Start zu öffnender Eintrag", ¬
+			title_url_path: "URL oder Pfad", ¬
+			title_pwa_url: "PWA-URL", ¬
+			title_icon_style: "Symbol-Stil", ¬
+			title_summary: "Zusammenfassung", ¬
+			title_error: "Klon-Erstellung fehlgeschlagen", ¬
+			title_tint: "Farbtönung", ¬
+			msg_bundle_missing: "Fehler: Bundle-Pfad fehlt. App normal starten.", ¬
+			lbl_progress_prep: "Symbol und Bundle vorbereiten", ¬
+			lbl_progress_icon: "Getöntes Symbol generieren…", ¬
+			lbl_progress_sign: "Bundle ad-hoc signieren…", ¬
+			lbl_progress_dock: "Im Dock registrieren…", ¬
+			lbl_progress_done: "Fertig", ¬
+			lbl_progress_title: "Klon wird erstellt…"}
+	else if loc is "es" then
+		return {¬
+			btn_cancel: "Cancelar", ¬
+			btn_ok: "OK", ¬
+			btn_back: "Volver", ¬
+			btn_choose: "Elegir", ¬
+			btn_clone: "Clonar app", ¬
+			btn_validate: "Validar", ¬
+			btn_browse: "Explorar…", ¬
+			btn_pwa_recommended: "PWA (recomendado)", ¬
+			btn_try_native: "Intentar nativo", ¬
+			btn_native_clone: "Clonar app nativa", ¬
+			btn_pwa_webapp: "PWA web app", ¬
+			btn_custom_icon: "Personalizado", ¬
+			btn_tint_icon: "Tinte de color", ¬
+			btn_open_log: "Abrir log", ¬
+			btn_close: "Cerrar", ¬
+			title_clone_name: "Nombre del clon", ¬
+			title_pwa_mode: "¿Modo PWA?", ¬
+			title_pwa_recommended: "Modo PWA recomendado", ¬
+			title_open_arg: "Elemento a abrir al iniciar", ¬
+			title_url_path: "URL o ruta", ¬
+			title_pwa_url: "URL PWA", ¬
+			title_icon_style: "Estilo de icono", ¬
+			title_summary: "Resumen", ¬
+			title_error: "Fallo al crear el clon", ¬
+			title_tint: "Tinte de color", ¬
+			msg_bundle_missing: "Error: ruta del bundle faltante. Lanza la app normalmente.", ¬
+			lbl_progress_prep: "Preparando icono y bundle", ¬
+			lbl_progress_icon: "Generando icono con tinte…", ¬
+			lbl_progress_sign: "Firmando bundle ad-hoc…", ¬
+			lbl_progress_dock: "Registrando en el Dock…", ¬
+			lbl_progress_done: "Terminado", ¬
+			lbl_progress_title: "Creando clon…"}
+	-- French (default — App Cloner's native language)
+	else
+		return {¬
+			btn_cancel: "Annuler", ¬
+			btn_ok: "OK", ¬
+			btn_back: "Retour", ¬
+			btn_choose: "Choisir", ¬
+			btn_clone: "Cloner l'application", ¬
+			btn_validate: "Valider", ¬
+			btn_browse: "Parcourir…", ¬
+			btn_pwa_recommended: "PWA (recommandé)", ¬
+			btn_try_native: "Tenter natif", ¬
+			btn_native_clone: "Cloner l'app native", ¬
+			btn_pwa_webapp: "PWA web app", ¬
+			btn_custom_icon: "Personnalisée", ¬
+			btn_tint_icon: "Teinte couleur", ¬
+			btn_open_log: "Ouvrir le log", ¬
+			btn_close: "Fermer", ¬
+			title_clone_name: "Nom du clone", ¬
+			title_pwa_mode: "Mode PWA ?", ¬
+			title_pwa_recommended: "Mode PWA recommandé", ¬
+			title_open_arg: "Élément à ouvrir au lancement", ¬
+			title_url_path: "URL ou chemin", ¬
+			title_pwa_url: "URL PWA", ¬
+			title_icon_style: "Style d'icône", ¬
+			title_summary: "Récapitulatif", ¬
+			title_error: "❌  Échec de la création du clone", ¬
+			title_tint: "Teinte de couleur", ¬
+			msg_bundle_missing: "Erreur : chemin du bundle manquant. Lancez l'app normalement.", ¬
+			lbl_progress_prep: "Préparation de l'icône et du bundle", ¬
+			lbl_progress_icon: "Génération de l'icône teintée…", ¬
+			lbl_progress_sign: "Signature ad-hoc du bundle…", ¬
+			lbl_progress_dock: "Enregistrement dans le Dock…", ¬
+			lbl_progress_done: "Terminé", ¬
+			lbl_progress_title: "Création du clone en cours…"}
+	end if
+end ac_ui
+
 -- osascript runs without a real Edit menu. Even though NSTextField responds
 -- to selectAll:/cut:/copy:/paste:, the keyboard shortcuts are dispatched via
 -- the menu — without those menu items, Cmd+A/C/V/X are dropped. We install
@@ -624,7 +794,7 @@ end resolveAppIcon
 -- well fires its target/action on every change in the system NSColorPanel,
 -- giving immediate visual feedback as the user drags sliders.
 -- Returns the chosen NSColor, or missing value when the user clicks Retour.
-on showTintColorPicker(appPath)
+on showTintColorPicker(appPath, titleStr, btnValidate, btnBack)
 	set srcImage to my resolveAppIcon(appPath)
 	set my tintPreviewSourceImage to srcImage
 	set my tintPreviewAppPath to appPath
@@ -642,7 +812,7 @@ on showTintColorPicker(appPath)
 
 	-- Header
 	set hLabel to current application's NSTextField's alloc()'s initWithFrame:(current application's NSMakeRect(16, pH - 42, pW - 32, 22))
-	hLabel's setStringValue:"Teinte de couleur"
+	hLabel's setStringValue:titleStr
 	set pickerHeaderFont to current application's NSFont's boldSystemFontOfSize:14
 	hLabel's setFont:pickerHeaderFont
 	hLabel's setBordered:false
@@ -697,7 +867,7 @@ on showTintColorPicker(appPath)
 	set btnH to 28
 	set btnW to 90
 	set valBtn to current application's NSButton's alloc()'s initWithFrame:(current application's NSMakeRect(pW - 16 - btnW, btnY, btnW, btnH))
-	valBtn's setTitle:"Valider"
+	valBtn's setTitle:btnValidate
 	valBtn's setBezelStyle:1
 	valBtn's setTarget:me
 	valBtn's setAction:"btn2Clicked:"
@@ -705,7 +875,7 @@ on showTintColorPicker(appPath)
 	cv's addSubview:valBtn
 
 	set retBtn to current application's NSButton's alloc()'s initWithFrame:(current application's NSMakeRect(16, btnY, btnW, btnH))
-	retBtn's setTitle:"Retour"
+	retBtn's setTitle:btnBack
 	retBtn's setBezelStyle:1
 	retBtn's setTarget:me
 	retBtn's setAction:"btn1Clicked:"
@@ -787,6 +957,10 @@ on rgbToHex(r, g, b)
 end rgbToHex
 
 on run argv
+	-- Resolve locale and load UI strings once for the whole session.
+	set _loc to my resolve_locale()
+	set u to my ac_ui(_loc)
+
 	-- Promote osascript from background/accessory to a regular foreground app.
 	-- Without this, NSApp.sendEvent: never checks the main menu for key
 	-- equivalents — Cmd+V/A/C/X and every other shortcut are silently dropped
@@ -805,7 +979,7 @@ on run argv
 
 	-- argv[1]: absolute bundle path, forwarded by Contents/MacOS/AppCloner
 	if argv is {} or item 1 of argv is "" then
-		display dialog "Erreur : chemin du bundle manquant. Lancez l'app normalement." buttons {"OK"} default button 1
+		display dialog (msg_bundle_missing of u) buttons {btn_ok of u} default button 1
 		return
 	end if
 	set appDir to item 1 of argv
@@ -873,9 +1047,9 @@ on run argv
 		else if step = 2 then
 			tell me to activate
 			try
-				set r to my customDialog("Nom du clone", "Nom à afficher sous l’icône du Dock.", ¬
-					{"Retour", "OK"}, true, cloneName, 1, 280, false, "")
-				if (chosenButton of r) is "Retour" then
+				set r to my customDialog((title_clone_name of u), "Nom à afficher sous l’icône du Dock.", ¬
+					{btn_back of u, btn_ok of u}, true, cloneName, 1, 280, false, "")
+				if (chosenButton of r) is (btn_back of u) then
 					set step to 1
 				else
 					set entered to my trim(inputText of r)
@@ -900,20 +1074,20 @@ on run argv
 			tell me to activate
 			try
 				if pwaForced then
-					set pwaAnswer to my chooseButton("Mode PWA recommandé", ¬
+					set pwaAnswer to my chooseButton((title_pwa_recommended of u), ¬
 						"Cette app ne peut pas être clonée au niveau binaire" & return & ¬
 						"(sandbox + signature liée au fournisseur)." & return & return & ¬
 						"Le mode PWA installe une version web isolée via un navigateur" & return & ¬
 						"avec sa propre fenêtre, son propre profil et son propre compte.", ¬
-						{"Retour", "Tenter natif", "PWA (recommandé)"}, "App Cloner")
+						{btn_back of u, btn_try_native of u, btn_pwa_recommended of u}, "App Cloner")
 				else
-					set pwaAnswer to my chooseButton("Mode PWA ?", ¬
+					set pwaAnswer to my chooseButton((title_pwa_mode of u), ¬
 						"Cloner via une web app (navigateur --app=URL)" & return & ¬
 						"au lieu de relancer l’app native." & return & return & ¬
 						"Utile pour avoir des comptes séparés sans dépendance au binaire.", ¬
-						{"Retour", "PWA web app", "Cloner l’app native"}, "App Cloner")
+						{btn_back of u, btn_pwa_webapp of u, btn_native_clone of u}, "App Cloner")
 				end if
-				if pwaAnswer is "Retour" then
+				if pwaAnswer is (btn_back of u) then
 					set step to 2
 				else if pwaAnswer contains "PWA" then
 					set pwaMode to true
@@ -948,9 +1122,9 @@ on run argv
 					"Boîte de réception : https://outlook.office.com/mail/" & return & ¬
 					"Calendrier : https://outlook.office.com/calendar/"
 				try
-					set r to my customDialog("URL PWA", urlBody, ¬
-						{"Retour", "OK"}, true, pwaURL, -1, 600, false, "")
-					if (chosenButton of r) is "Retour" then
+					set r to my customDialog((title_pwa_url of u), urlBody, ¬
+						{btn_back of u, btn_ok of u}, true, pwaURL, -1, 600, false, "")
+					if (chosenButton of r) is (btn_back of u) then
 						set step to 3
 					else
 						set candidate to my trim(inputText of r)
@@ -977,10 +1151,10 @@ on run argv
 				repeat while not nativeDone
 					if nativeSubStep = 0 then
 						try
-							set openTypeAnswer to my chooseButton("Élément à ouvrir au lancement", ¬
+							set openTypeAnswer to my chooseButton((title_open_arg of u), ¬
 								"Optionnel — laisser à « Rien » pour simplement lancer l’app.", ¬
-								{"Retour", "Rien", "URL ou chemin"}, "App Cloner")
-							if openTypeAnswer is "Retour" then
+								{btn_back of u, "Rien", (title_url_path of u)}, "App Cloner")
+							if openTypeAnswer is (btn_back of u) then
 								set step to 3
 								set nativeDone to true
 							else if openTypeAnswer is "Rien" then
@@ -1016,14 +1190,14 @@ on run argv
 						set inputDone to false
 						repeat while not inputDone
 							try
-								set r to my customDialog("URL ou chemin", urlPrompt, ¬
-									{"Retour", "Parcourir…", "Valider"}, true, inputDefault, 1, 560, false, "")
+								set r to my customDialog((title_url_path of u), urlPrompt, ¬
+									{btn_back of u, btn_browse of u, btn_validate of u}, true, inputDefault, 1, 560, false, "")
 								set btnChosen to chosenButton of r
-								if btnChosen is "Retour" then
+								if btnChosen is (btn_back of u) then
 									-- Go back to choice dialog (Rien / URL ou chemin)
 									set nativeSubStep to 0
 									set inputDone to true
-								else if btnChosen is "Parcourir…" then
+								else if btnChosen is (btn_browse of u) then
 									-- Open folder picker and pre-fill the text field
 									try
 										set folderAlias to choose folder with prompt "Dossier à ouvrir avec le clone"
@@ -1065,18 +1239,18 @@ on run argv
 			set iconChosen to false
 			repeat while not iconChosen
 				try
-					set iconChoice to my chooseButton("Style d’icône", ¬
+					set iconChoice to my chooseButton((title_icon_style of u), ¬
 						"  • Personnalisée — utilise une image (PNG, ICNS, JPG…)" & return & ¬
 						"    en remplacement de l’icône d’origine." & return & ¬
 						return & ¬
 						"  • Teinte couleur — applique une teinte sur l’icône d’origine." & return & ¬
 						"    (opacité 0 = noir & blanc)", ¬
-						{"Retour", "Personnalisée", "Teinte couleur"}, "App Cloner")
-					if iconChoice is "Retour" then
+						{btn_back of u, btn_custom_icon of u, btn_tint_icon of u}, "App Cloner")
+					if iconChoice is (btn_back of u) then
 						set step to 4
 						set iconChosen to true -- exit inner loop; outer repeat re-enters step 4
-					else if iconChoice is "Teinte couleur" then
-						set chosenNSColor to my showTintColorPicker(sourcePath)
+					else if iconChoice is (btn_tint_icon of u) then
+						set chosenNSColor to my showTintColorPicker(sourcePath, title_tint of u, btn_validate of u, btn_back of u)
 						if chosenNSColor is not missing value then
 							-- Convert sRGB float components (0.0–1.0) to 16-bit integers for rgbToHex
 							set sRGBSpace to current application's NSColorSpace's sRGBColorSpace
@@ -1090,7 +1264,7 @@ on run argv
 							set iconChosen to true
 						end if
 						-- missing value means Retour → iconChosen stays false, re-loop to style chooser
-					else if iconChoice is "Personnalisée" then
+					else if iconChoice is (btn_custom_icon of u) then
 						try
 							set iconAlias to choose file ¬
 								with prompt "Image à utiliser pour l’icône" ¬
@@ -1131,9 +1305,9 @@ on run argv
 				& "• URL : " & openArgDisplay
 			tell me to activate
 			try
-				set summaryResult to my customDialog("Récapitulatif", summary, ¬
-					{"Retour", "Cloner l’application"}, false, "", 0, 460, false, "")
-				if (chosenButton of summaryResult) is "Retour" then
+				set summaryResult to my customDialog((title_summary of u), summary, ¬
+					{btn_back of u, btn_clone of u}, false, "", 0, 460, false, "")
+				if (chosenButton of summaryResult) is (btn_back of u) then
 					set step to 5
 				else
 					-- User confirmed — exit the step machine and proceed to creation
@@ -1172,8 +1346,8 @@ on run argv
 
 	set progress total steps to 100
 	set progress completed steps to 0
-	set progress description to "Création du clone en cours…"
-	set progress additional description to "Préparation de l’icône et du bundle"
+	set progress description to (lbl_progress_title of u)
+	set progress additional description to (lbl_progress_prep of u)
 
 	set tickCount to 0
 	set isDone to false
@@ -1184,11 +1358,11 @@ on run argv
 		set pct to round (95 * (1 - (0.96 ^ tickCount)))
 		set progress completed steps to pct
 		if tickCount = 12 then
-			set progress additional description to "Génération de l’icône teintée…"
+			set progress additional description to (lbl_progress_icon of u)
 		else if tickCount = 30 then
-			set progress additional description to "Signature ad-hoc du bundle…"
+			set progress additional description to (lbl_progress_sign of u)
 		else if tickCount = 50 then
-			set progress additional description to "Enregistrement dans le Dock…"
+			set progress additional description to (lbl_progress_dock of u)
 		end if
 		try
 			do shell script "test -e /tmp/appcloner_done"
@@ -1197,7 +1371,7 @@ on run argv
 	end repeat
 
 	set progress completed steps to 100
-	set progress additional description to "Terminé"
+	set progress additional description to (lbl_progress_done of u)
 	delay 0.2
 
 	-- Pull the result (last line of stdout) plus any error output
@@ -1206,10 +1380,10 @@ on run argv
 	logmsg("result: " & result_path)
 
 	if result_path does not start with "/" then
-		set errBtn to my chooseButton("❌  Échec de la création du clone", ¬
+		set errBtn to my chooseButton((title_error of u), ¬
 			"Le diagnostic complet est dans /tmp/clone_diag.log", ¬
-			{"Ouvrir le log", "Fermer"}, "App Cloner")
-		if errBtn is "Ouvrir le log" then
+			{btn_open_log of u, btn_close of u}, "App Cloner")
+		if errBtn is (btn_open_log of u) then
 			do shell script "open -e /tmp/clone_diag.log"
 		end if
 		return
