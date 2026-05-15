@@ -151,7 +151,8 @@ TooltipHide() {
         try Row.Gui.Hide()
     }
     if _TooltipBorderGui {
-        try _TooltipBorderGui.Hide()
+        try _TooltipBorderGui.Destroy()
+        _TooltipBorderGui := 0
     }
 }
 
@@ -169,8 +170,8 @@ TooltipHide() {
 ; TooltipHide and position queries); all rows are shown/hidden together.
 _TooltipBuildGui(Items) {
     global _TooltipGui, _TooltipRowGuis
-    global _TOOLTIP_FONT_NAME, _TOOLTIP_FONT_SIZE
-    global _TOOLTIP_PADDING_X, _TOOLTIP_PADDING_Y
+    global _TOOLTIP_FONT_NAME, _TOOLTIP_FONT_SIZE, _TOOLTIP_FONT_SIZE_LABEL
+    global _TOOLTIP_PADDING_X, _TOOLTIP_PADDING_Y, _TOOLTIP_LABEL_GAP
 
     OldGuis := _TooltipGui ? _TooltipRowGuis : []
 
@@ -403,19 +404,25 @@ _TooltipMakeBottomRoundedRgn(W, H, Diam) {
     return CombinedRgn
 }
 
-; Show (or reuse) a single border Gui that overlays the entire stack with a
-; 1 px white rounded-rectangle outline. Uses WS_EX_LAYERED + LWA_ALPHA so
-; the interior is fully transparent and only the 1 px ring is visible.
+; Show a fresh border Gui that overlays the entire stack with a 1 px white
+; rounded-rectangle outline. A new Gui is created on every call (and the
+; previous one destroyed) so stale geometry never leaks between tooltip
+; updates — reusing a layered window and re-calling SetWindowRgn is fragile
+; because the region is applied before the window compositor has processed
+; the new Show() geometry.
 _TooltipShowBorder(X, Y, W, H) {
     global _TooltipBorderGui, _TOOLTIP_CORNER_RADIUS, _TOOLTIP_BORDER_THICKNESS
 
-    if !_TooltipBorderGui {
-        _TooltipBorderGui := Gui("+AlwaysOnTop +ToolWindow -Caption +E0x80000 +LastFound")
-        _TooltipBorderGui.BackColor := "000001"   ; near-black key color
-        ; Layered window: make key color fully transparent.
-        WinSetTransColor("000001", _TooltipBorderGui)
+    ; Destroy any previous border so stale region / size never bleeds through.
+    if _TooltipBorderGui {
+        try _TooltipBorderGui.Destroy()
+        _TooltipBorderGui := 0
     }
-    _TooltipBorderGui.Show(Format("w{1} h{2} x{3} y{4} NoActivate", W, H, X, Y))
+
+    ; +E0x80000 = WS_EX_LAYERED  +E0x20 = WS_EX_TRANSPARENT (click-through).
+    _TooltipBorderGui := Gui("+AlwaysOnTop +ToolWindow -Caption +E0x80000 +E0x20 +LastFound")
+    _TooltipBorderGui.BackColor := "FFFFFF"   ; ring color; interior punched by region
+    Hwnd := _TooltipBorderGui.Hwnd
 
     ; Build a "hollow" region: outer round-rect minus the inset round-rect.
     Radius := _TOOLTIP_CORNER_RADIUS
@@ -433,13 +440,13 @@ _TooltipShowBorder(X, Y, W, H) {
     DllCall("Gdi32\CombineRgn", "Ptr", BorderRgn, "Ptr", OuterRgn, "Ptr", InnerRgn, "Int", 4)  ; RGN_DIFF=4
     DllCall("Gdi32\DeleteObject", "Ptr", OuterRgn)
     DllCall("Gdi32\DeleteObject", "Ptr", InnerRgn)
+
+    ; Apply region before Show so the compositor never paints the full rect.
     if BorderRgn {
-        DllCall("User32\SetWindowRgn", "Ptr", _TooltipBorderGui.Hwnd, "Ptr", BorderRgn, "Int", 1)
+        DllCall("User32\SetWindowRgn", "Ptr", Hwnd, "Ptr", BorderRgn, "Int", 0)
     }
-    ; Paint the ring white via a static control that fills the clipped region.
-    ; Easier: set the Gui BackColor to white — the transparent key color punches
-    ; through the hollow interior so only the ring pixels are white.
-    _TooltipBorderGui.BackColor := "FFFFFF"
+
+    _TooltipBorderGui.Show(Format("w{1} h{2} x{3} y{4} NoActivate", W, H, X, Y))
 }
 
 
