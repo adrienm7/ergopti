@@ -45,6 +45,7 @@ global _TOOLTIP_BADGE_W          := 24    ; total badge width (px) — fixed acr
 ; render Unicode symbols like ★ and ⏎ — the fallback glyph sits higher
 ; inside its cell than a Segoe UI glyph of the same point size.
 global _TOOLTIP_BADGE_Y_OFFSET   := 3     ; pixels to shift badge rect downward
+global _TOOLTIP_BADGE_H_SHRINK   := 5     ; extra pixels trimmed from badge height to remove bottom slack
 global _TOOLTIP_BADGE_BG_HEX     := "2D2D2D"   ; neutral dark grey badge background
 global _TOOLTIP_OFFSET_BELOW     := 18   ; pixels below the anchor (caret / box)
 global _TOOLTIP_OFFSET_RIGHT     := 4    ; small horizontal nudge for caret anchor
@@ -199,7 +200,7 @@ _TooltipBuildGui(Items) {
     global _TooltipGui, _TooltipRowGuis
     global _TOOLTIP_FONT_NAME, _TOOLTIP_FONT_SIZE, _TOOLTIP_FONT_SIZE_LABEL
     global _TOOLTIP_PADDING_X, _TOOLTIP_PADDING_Y, _TOOLTIP_LABEL_GAP
-    global _TOOLTIP_BADGE_W, _TOOLTIP_BADGE_Y_OFFSET, _TOOLTIP_BADGE_BG_HEX
+    global _TOOLTIP_BADGE_W, _TOOLTIP_BADGE_Y_OFFSET, _TOOLTIP_BADGE_H_SHRINK, _TOOLTIP_BADGE_BG_HEX
 
     OldGuis := _TooltipGui ? _TooltipRowGuis : []
 
@@ -257,7 +258,7 @@ _TooltipBuildGui(Items) {
             ; for the fallback font's glyph sitting higher in its cell than
             ; Segoe UI — keeps ★/⏎ visually aligned with the output text.
             BadgeY := _TOOLTIP_PADDING_Y + _TOOLTIP_BADGE_Y_OFFSET
-            BadgeH := S.H - _TOOLTIP_BADGE_Y_OFFSET
+            BadgeH := S.H - _TOOLTIP_BADGE_Y_OFFSET - _TOOLTIP_BADGE_H_SHRINK
 
             ; Accent colour: use the raw ColorHex at full brightness so the
             ; symbol pops against the neutral badge background.
