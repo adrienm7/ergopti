@@ -91,6 +91,12 @@ global HSE_StartIsWordBoundary := true
 ; the literal last char.
 global HSE_RegistryByLastChar := Map()
 
+; Flat array of all star-trigger Spec objects. Maintained alongside
+; HSE_RegistryByLastChar so _HSE_StarTriggerCoversBody can scan only star
+; triggers without iterating the full registry — avoids an O(all_triggers)
+; walk on every word-terminator keystroke.
+global HSE_StarSpecs := []
+
 ; Suppression flag. When true, FeedChar / FeedBackspace / FeedReset
 ; short-circuit. The dispatch loop sets it for the duration of the
 ; SendEvent burst so its own replacement output does not feed back into
@@ -135,7 +141,7 @@ global HSE_RepeatEnabled := true
 ; HSE_WORD_TERMINATORS) is typed right after — that end character is
 ; consumed by the dispatch and re-injected by HSE_ApplyExpansion.
 HSE_Register(Flags, Trigger, Callback, Meta := unset) {
-    global HSE_RegistryByLastChar
+    global HSE_RegistryByLastChar, HSE_StarSpecs
     if (Trigger == "") {
         return
     }
@@ -163,14 +169,20 @@ HSE_Register(Flags, Trigger, Callback, Meta := unset) {
         HSE_RegistryByLastChar[LookupKey] := []
     }
     HSE_RegistryByLastChar[LookupKey].Push(Spec)
+    ; Maintain the flat star-spec index so _HSE_StarTriggerCoversBody
+    ; never has to walk the entire registry on every terminator keystroke.
+    if Spec.Star {
+        HSE_StarSpecs.Push(Spec)
+    }
 }
 
 ; Erase the entire registry. Tests rely on this between cases; the live
 ; engine never needs it because Reload re-runs the registration code from
 ; scratch with a fresh module state.
 HSE_RegistryClear() {
-    global HSE_RegistryByLastChar
+    global HSE_RegistryByLastChar, HSE_StarSpecs
     HSE_RegistryByLastChar := Map()
+    HSE_StarSpecs := []
 }
 
 
@@ -496,24 +508,21 @@ HSE_FindMatchAtEnd(JustTypedChar) {
 ; Example: Spec.Trigger = "ia", star trigger "ia★" registered.
 ; "ia" is a strict prefix of "ia★" → end-char match on "ia" is suppressed.
 _HSE_StarTriggerCoversBody(BodyBuf, Spec) {
-    global HSE_RegistryByLastChar
-    for _, Bucket in HSE_RegistryByLastChar {
-        for _, StarSpec in Bucket {
-            if !StarSpec.Star {
-                continue
-            }
-            if StarSpec.Length <= Spec.Length {
-                continue
-            }
-            ; Spec.Trigger must be a strict prefix of StarSpec.Trigger.
-            ; Use case-insensitive comparison unless both triggers are C-flagged.
-            StarPrefix := SubStr(StarSpec.Trigger, 1, Spec.Length)
-            CaseSens := Spec.CaseSensitive and StarSpec.CaseSensitive
-            if CaseSens ? (StarPrefix !== Spec.Trigger) : (StrLower(StarPrefix) != StrLower(Spec.Trigger)) {
-                continue
-            }
-            return true
+    global HSE_StarSpecs
+    ; Scan only pre-filtered star specs (O(n_star) not O(all_triggers)) so
+    ; this check does not stall the InputHook on terminator keystrokes.
+    for _, StarSpec in HSE_StarSpecs {
+        if StarSpec.Length <= Spec.Length {
+            continue
         }
+        ; Spec.Trigger must be a strict prefix of StarSpec.Trigger.
+        ; Use case-insensitive comparison unless both triggers are C-flagged.
+        StarPrefix := SubStr(StarSpec.Trigger, 1, Spec.Length)
+        CaseSens := Spec.CaseSensitive and StarSpec.CaseSensitive
+        if CaseSens ? (StarPrefix !== Spec.Trigger) : (StrLower(StarPrefix) != StrLower(Spec.Trigger)) {
+            continue
+        }
+        return true
     }
     return false
 }

@@ -736,7 +736,7 @@ KL_LogSystemEvent(action, metadata := unset) {
 ;     to (HS does the same with utf8.len),
 ;   - falls back to the session app when the caller omits ``app_name``,
 ;   - emits the same ``tag`` marker (`<hotstring>…</hotstring>`) HS writes.
-KL_LogHotstring(trigger, replacement, h_type := "unknown", app_name := "", category := "") {
+KL_LogHotstring(trigger, replacement, h_type := "unknown", app_name := "", category := "", section := "") {
     if !Keylogger.initialized
         return
     KL_FlushBuffer()
@@ -757,7 +757,7 @@ KL_LogHotstring(trigger, replacement, h_type := "unknown", app_name := "", categ
     ; can resolve the correct color and skip coloring for neutral groups.
     repl_len := StrLen(replacement)
     Loop repl_len
-        try WPMWidget_Push(true, false, false, category)
+        try WPMWidget_Push(true, false, false, category, section)
 }
 
 ; Logs that a hotstring tooltip was shown to the user. Mirrors HS init.lua:1196.

@@ -454,7 +454,8 @@ _OnPrefixChar(IH, Char) {
             HotstringCategory := HSEMatch.HasOwnProp("IsRepeat") && HSEMatch.IsRepeat
                 ? "repeat_key"
                 : (HSEMatch.HasOwnProp("Category") ? HSEMatch.Category : "")
-            try KL_LogHotstring(HSEMatch.Trigger, HotstringRepl, HotstringHType, "", HotstringCategory)
+            HotstringSection := HSEMatch.HasOwnProp("Section") ? HSEMatch.Section : ""
+            try KL_LogHotstring(HSEMatch.Trigger, HotstringRepl, HotstringHType, "", HotstringCategory, HotstringSection)
             ; Wipe the prefix watcher's own buffer so the post-expansion
             ; tail (which the user just observed on screen) does not
             ; surface a stale tooltip preview from the trigger we just

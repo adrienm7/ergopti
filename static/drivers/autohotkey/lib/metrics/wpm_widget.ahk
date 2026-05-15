@@ -131,6 +131,10 @@ class WPMWidget {
     ; TOML category of the last HS expansion (e.g. "magickey", "autocorrection").
     ; Used to resolve the widget color from the same pipeline as the tooltip.
     static _last_hs_category  := "magickey"
+    ; Section hint for the last HS expansion. When the category is "personal" the
+    ; section name mirrors a standard category (e.g. "autocorrectionJ") and is
+    ; used as a color fallback so personal hotstrings match their group color.
+    static _last_hs_section   := ""
 
     ; Display options.
     static use_colors     := false
@@ -162,7 +166,7 @@ _WPMWidget_NeutralCategory(category) {
 ; category: TOML group name of the hotstring ("magickey", "rolls", …).
 ;   Pass "" for manual keystrokes or when the category is unknown.
 ;   "rolls" and "repeat_key" are treated as neutral and do not color the widget.
-WPMWidget_Push(is_hs := false, is_ai := false, is_ac := false, category := "") {
+WPMWidget_Push(is_hs := false, is_ai := false, is_ac := false, category := "", section := "") {
     if !WPMWidget.visible
         return
     ; Neutral categories count as keystrokes but must not trigger HS color.
@@ -184,6 +188,7 @@ WPMWidget_Push(is_hs := false, is_ai := false, is_ac := false, category := "") {
     if is_hs {
         WPMWidget._last_hs_tick     := now_t
         WPMWidget._last_hs_category := (category != "") ? category : "magickey"
+        WPMWidget._last_hs_section  := section
     }
     if is_ai
         WPMWidget._last_ai_tick := now_t
@@ -232,19 +237,32 @@ WPMWidget_Calc() {
 ; Returns the tinted compact-mode background hex for a hotstring category
 ; (without leading '#'). Delegates to HotstringsResolve for the canonical color
 ; then passes it through _TooltipMixTintHex so the WPM pill matches the tooltip
-; appearance exactly. Falls back to FallbackHex when no color is configured.
-WPMWidget_CategoryBgColor(CategoryName, FallbackHex) {
+; appearance exactly. When the primary resolution returns no color, SectionHint
+; (e.g. "autocorrectionJ" from a personal hotstring) is tried as a category name
+; so personal hotstrings inherit their group's color. Falls back to FallbackHex.
+WPMWidget_CategoryBgColor(CategoryName, FallbackHex, SectionHint := "") {
     try {
         cfg := HotstringsResolve(CategoryName, "")
         if (cfg.Color != "")
             return _TooltipMixTintHex(cfg.Color)
+        ; Section names like "autocorrectionJ" mirror standard category names
+        ; (prefix before the first uppercase letter). Strip the trailing
+        ; PascalCase suffix and try the base name as a category.
+        if (SectionHint != "") {
+            Basecat := _WPMWidget_SectionBaseCategory(SectionHint)
+            if (Basecat != "") {
+                cfg2 := HotstringsResolve(Basecat, "")
+                if (cfg2.Color != "")
+                    return _TooltipMixTintHex(cfg2.Color)
+            }
+        }
     }
     return FallbackHex
 }
 
 ; Returns the raw accent hex for a hotstring category (without leading '#'),
 ; used as the graph sparkline stroke color. Falls back to FallbackHex.
-WPMWidget_CategoryGraphColor(CategoryName, FallbackHex) {
+WPMWidget_CategoryGraphColor(CategoryName, FallbackHex, SectionHint := "") {
     try {
         cfg := HotstringsResolve(CategoryName, "")
         raw := cfg.Color
@@ -253,8 +271,35 @@ WPMWidget_CategoryGraphColor(CategoryName, FallbackHex) {
                 raw := SubStr(raw, 2)
             return raw
         }
+        if (SectionHint != "") {
+            Basecat := _WPMWidget_SectionBaseCategory(SectionHint)
+            if (Basecat != "") {
+                cfg2 := HotstringsResolve(Basecat, "")
+                raw2 := cfg2.Color
+                if (raw2 != "") {
+                    if (SubStr(raw2, 1, 1) == "#")
+                        raw2 := SubStr(raw2, 2)
+                    return raw2
+                }
+            }
+        }
     }
     return FallbackHex
+}
+
+; Derive the standard category name from a section name by stripping the
+; trailing PascalCase qualifier (e.g. "autocorrectionJ" → "autocorrection",
+; "magickey" → "magickey", "distancesreductionQU" → "distancesreduction").
+; Returns "" when no known base category can be derived.
+_WPMWidget_SectionBaseCategory(SectionName) {
+    static KnownCats := ["autocorrection", "magickey", "distancesreduction",
+                         "sfbsreduction", "rolls", "personal"]
+    Lower := StrLower(SectionName)
+    for _, Cat in KnownCats {
+        if (SubStr(Lower, 1, StrLen(Cat)) == Cat)
+            return Cat
+    }
+    return ""
 }
 
 ; Resolve the compact-mode background color for the current source state.
@@ -267,7 +312,7 @@ WPMWidget_ResolveBgColor(idle, has_hs, has_ai, has_ac, use_colors) {
         if has_ai
             return WPMWidgetConst.COLOR_BG_AI
         if has_hs
-            return WPMWidget_CategoryBgColor(WPMWidget._last_hs_category, WPMWidgetConst.COLOR_BG_MANUAL)
+            return WPMWidget_CategoryBgColor(WPMWidget._last_hs_category, WPMWidgetConst.COLOR_BG_MANUAL, WPMWidget._last_hs_section)
         if has_ac
             return WPMWidget_CategoryBgColor("autocorrection", WPMWidgetConst.COLOR_BG_MANUAL)
     }
@@ -282,7 +327,7 @@ WPMWidget_ResolveGraphColor(has_hs, has_ai, has_ac, use_colors) {
         if has_ai
             return WPMWidgetConst.COLOR_GRAPH_AI
         if has_hs
-            return WPMWidget_CategoryGraphColor(WPMWidget._last_hs_category, WPMWidgetConst.COLOR_GRAPH_MANUAL)
+            return WPMWidget_CategoryGraphColor(WPMWidget._last_hs_category, WPMWidgetConst.COLOR_GRAPH_MANUAL, WPMWidget._last_hs_section)
         if has_ac
             return WPMWidget_CategoryGraphColor("autocorrection", WPMWidgetConst.COLOR_GRAPH_MANUAL)
     }

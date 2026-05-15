@@ -157,7 +157,7 @@ def compute_flags(entry: dict[str, Any]) -> str:
 
 def emit_entry(
     out: list[str], trigger: str, entry: dict[str, Any],
-    is_repeat_section: bool = False, category: str = ""
+    is_repeat_section: bool = False, category: str = "", section: str = ""
 ) -> None:
     """Emit the two lines (options + call) for one TOML hotstring entry."""
     output = entry.get("output", "")
@@ -176,6 +176,7 @@ def emit_entry(
         '\t_GenOpts := Map("TimeActivationSeconds", _GenTimeAct, "FinalResult", '
         f'{ahk_bool(final_result)}, "IsRepeat", {ahk_bool(is_repeat)}'
         + (f', "Category", "{category}"' if category else "")
+        + (f', "Section", "{section}"' if section else "")
         + ")"
     )
     out.append(options_line)
@@ -218,7 +219,7 @@ def emit_section(
     for entry_dict in entries:
         # Each TOML ``[[section]]`` row is a single-key mapping in the parsed form.
         for trigger, data in entry_dict.items():
-            emit_entry(out, trigger, data, is_repeat_section=is_repeat_section, category=category)
+            emit_entry(out, trigger, data, is_repeat_section=is_repeat_section, category=category, section=section)
     out.append("}")
     out.append("")
     return fn_name

@@ -240,6 +240,8 @@ LoadHotstringsSection(CategoryName, SectionName, FeatureConfig, ExtraOptions := 
         Options := Map(
             "TimeActivationSeconds", TimeActivationSeconds,
             "FinalResult", FinalResult,
+            "Category", CategoryName,
+            "Section", SectionName,
         )
         if ExtraOptions.Has("OnlyText") {
             Options["OnlyText"] := ExtraOptions["OnlyText"]
