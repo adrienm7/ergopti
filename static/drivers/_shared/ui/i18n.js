@@ -42,8 +42,8 @@
 		var src = document.currentScript ? document.currentScript.src : null;
 		if (src) {
 			// i18n.js lives at static/drivers/_shared/ui/i18n.js
-			// static/locales/ is two dirs above _shared/ui/
-			var base = src.replace(/[^/]+$/, "../../locales/");
+			// static/locales/ is three dirs above: ui/ → _shared/ → drivers/ → static/locales/
+			var base = src.replace(/[^/]+$/, "../../../locales/");
 			return base + code + ".json";
 		}
 		// Fallback: walk up two levels from the page URL (legacy path)
