@@ -705,6 +705,7 @@ typographicapostrophe = { fr = "L’apostrophe devient typographique lors de l�
 "t'i" = { output = "t-i", is_word = false, auto_expand = true, is_case_sensitive = false, final_result = false }
 "t'o" = { output = "t-o", is_word = false, auto_expand = true, is_case_sensitive = false, final_result = false }
 "x't" = { output = "x-t", is_word = false, auto_expand = true, is_case_sensitive = false, final_result = false }
+"ya" = { output = "y'a", is_word = true, auto_expand = false, is_case_sensitive = false, final_result = false }
 "z'v" = { output = "z-v", is_word = false, auto_expand = true, is_case_sensitive = false, final_result = false }
 
 
@@ -832,8 +833,9 @@ typographicapostrophe = { fr = "L’apostrophe devient typographique lors de l�
 "c'" = { output = "c’", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
 "d'" = { output = "d’", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
 "ch'ti" = { output = "ch’ti", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
-"j'" = { output = "j’", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
-"l'" = { output = "l’", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
+"j’" = { output = "j’", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
+"ju’" = { output = "jusqu’", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
+"l’" = { output = "l’", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
 "m'" = { output = "m’", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
 "n'" = { output = "n’", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
 "n't" = { output = "n’t", is_word = false, auto_expand = true, is_case_sensitive = false, final_result = false }

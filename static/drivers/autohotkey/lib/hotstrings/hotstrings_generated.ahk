@@ -74,7 +74,6 @@ global _GENERATED_HOTSTRINGS := Map(
 	"autocorrection.typographicapostrophe", _GenLoad_autocorrection_typographicapostrophe,
 	"magickey.repeatcorrections", _GenLoad_magickey_repeatcorrections,
 	"magickey.textexpansion", _GenLoad_magickey_textexpansion,
-	"magickey.textexpansionauto", _GenLoad_magickey_textexpansionauto,
 	"magickey.textexpansionemojis", _GenLoad_magickey_textexpansionemojis,
 	"magickey.textexpansionsymbols", _GenLoad_magickey_textexpansionsymbols,
 	"magickey.textexpansionsymbolstypst", _GenLoad_magickey_textexpansionsymbolstypst,
@@ -4370,6 +4369,11 @@ _GenLoad_autocorrection_minusapostrophe(FeatureConfig, ExtraOptions := unset) {
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		_GenOpts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
+	CreateCaseSensitiveHotstrings("", "ya", "y'a", _GenOpts)
+	_GenOpts := Map("TimeActivationSeconds", _GenTimeAct, "FinalResult", false, "IsRepeat", false, "Category", "autocorrection", "Section", "minusapostrophe")
+	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
+		_GenOpts["OnlyText"] := ExtraOptions["OnlyText"]
+	}
 	CreateCaseSensitiveHotstrings("*?", "z'v", "z-v", _GenOpts)
 }
 
@@ -4745,12 +4749,17 @@ _GenLoad_autocorrection_typographicapostrophe(FeatureConfig, ExtraOptions := uns
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		_GenOpts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", "j'", "j’", _GenOpts)
+	CreateCaseSensitiveHotstrings("*", "j’", "j’", _GenOpts)
 	_GenOpts := Map("TimeActivationSeconds", _GenTimeAct, "FinalResult", false, "IsRepeat", false, "Category", "autocorrection", "Section", "typographicapostrophe")
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		_GenOpts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
-	CreateCaseSensitiveHotstrings("*", "l'", "l’", _GenOpts)
+	CreateCaseSensitiveHotstrings("*", "ju’", "jusqu’", _GenOpts)
+	_GenOpts := Map("TimeActivationSeconds", _GenTimeAct, "FinalResult", false, "IsRepeat", false, "Category", "autocorrection", "Section", "typographicapostrophe")
+	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
+		_GenOpts["OnlyText"] := ExtraOptions["OnlyText"]
+	}
+	CreateCaseSensitiveHotstrings("*", "l’", "l’", _GenOpts)
 	_GenOpts := Map("TimeActivationSeconds", _GenTimeAct, "FinalResult", false, "IsRepeat", false, "Category", "autocorrection", "Section", "typographicapostrophe")
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		_GenOpts["OnlyText"] := ExtraOptions["OnlyText"]
@@ -7513,22 +7522,6 @@ _GenLoad_magickey_textexpansion(FeatureConfig, ExtraOptions := unset) {
 		_GenOpts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
 	CreateCaseSensitiveHotstrings("*", StrReplace("ê★", "★", _GenMK), "être", _GenOpts)
-}
-
-_GenLoad_magickey_textexpansionauto(FeatureConfig, ExtraOptions := unset) {
-	global ScriptInformation
-	_GenTimeAct := FeatureConfig.HasOwnProp("TimeActivationSeconds") ? FeatureConfig.TimeActivationSeconds : 0
-	_GenMK := ScriptInformation["MagicKey"]
-	_GenOpts := Map("TimeActivationSeconds", _GenTimeAct, "FinalResult", false, "IsRepeat", false, "Category", "magickey", "Section", "textexpansionauto")
-	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
-		_GenOpts["OnlyText"] := ExtraOptions["OnlyText"]
-	}
-	CreateCaseSensitiveHotstrings("*", "ju'", "jusqu’", _GenOpts)
-	_GenOpts := Map("TimeActivationSeconds", _GenTimeAct, "FinalResult", false, "IsRepeat", false, "Category", "magickey", "Section", "textexpansionauto")
-	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
-		_GenOpts["OnlyText"] := ExtraOptions["OnlyText"]
-	}
-	CreateCaseSensitiveHotstrings("", "ya", "y’a", _GenOpts)
 }
 
 _GenLoad_magickey_textexpansionemojis(FeatureConfig, ExtraOptions := unset) {

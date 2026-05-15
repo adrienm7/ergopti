@@ -9,7 +9,7 @@ color = "#e53935"
 delay = 2.0
 show_tooltip = true
 description = { fr = "Touche ★ et expansion de texte", en = "★ key and text expansion", de = "★-Taste und Texterweiterung", es = "Tecla ★ y expansión de texto", zh = "★ 键与文本扩展" }
-sections_order = ["replace", "repeatcorrections", "-", "textexpansion", "textexpansionauto", "textexpansionemojis", "textexpansionsymbols", "textexpansionsymbolstypst"]
+sections_order = ["replace", "repeatcorrections", "-", "textexpansion", "textexpansionemojis", "textexpansionsymbols", "textexpansionsymbolstypst"]
 
 
 
@@ -21,7 +21,6 @@ sections_order = ["replace", "repeatcorrections", "-", "textexpansion", "textexp
 repeatcorrections = { fr = "Corrections de la touche ★ repeat", en = "★ repeat key corrections", de = "Korrekturen der ★-Wiederholtaste", es = "Correcciones de la tecla ★ repetir", zh = "★ 重复键修正" }
 replace = { fr = "Transformer la touche J en ★", en = "Transform the J key into ★", de = "Die J-Taste in ★ umwandeln", es = "Transformar la tecla J en ★", zh = "将 J 键转换为 ★" }
 textexpansion = { fr = "Expansion de texte : c★ = c’est, gt★ = j’étais, pex★ = par exemple, …", en = "Text expansion: c★ = c’est, gt★ = j’étais, pex★ = par exemple, …", de = "Texterweiterung: c★ = c’est, gt★ = j’étais, pex★ = par exemple, …", es = "Expansión de texto: c★ = c’est, gt★ = j’étais, pex★ = par exemple, …", zh = "文本扩展：c★ = c’est，gt★ = j’étais，pex★ = par exemple，…" }
-textexpansionauto = { fr = "Expansion de texte sans touche ★ : ju’ = jusqu’, ya = y’a, …", en = "Text expansion without ★ key: ju’ = jusqu’, ya = y’a, …", de = "Texterweiterung ohne ★-Taste: ju’ = jusqu’, ya = y’a, …", es = "Expansión de texto sin tecla ★: ju’ = jusqu’, ya = y’a, …", zh = "无需 ★ 键的文本扩展：ju’ = jusqu’，ya = y’a，…" }
 textexpansionemojis = { fr = "Expansion de texte Emojis : voiture★ = 🚗, koala★ = 🐨, …", en = "Emoji text expansion: voiture★ = 🚗, koala★ = 🐨, …", de = "Emoji-Texterweiterung: voiture★ = 🚗, koala★ = 🐨, …", es = "Expansión de texto con emojis: voiture★ = 🚗, koala★ = 🐨, …", zh = "表情文本扩展：voiture★ = 🚗，koala★ = 🐨，…" }
 textexpansionsymbols = { fr = "Expansion de texte Symboles : -->★ = ➜, (v)★ = ✓, …", en = "Symbol text expansion: -->★ = ➜, (v)★ = ✓, …", de = "Symbol-Texterweiterung: -->★ = ➜, (v)★ = ✓, …", es = "Expansión de texto con símbolos: -->★ = ➜, (v)★ = ✓, …", zh = "符号文本扩展：-->★ = ➜，(v)★ = ✓，…" }
 textexpansionsymbolstypst = { fr = "Expansion de texte Symboles Typst : $eq.not$ = ≠, $PP$ = ℙ, $integral$ = ∫ …", en = "Typst symbol text expansion: $eq.not$ = ≠, $PP$ = ℙ, $integral$ = ∫ …", de = "Typst-Symbol-Texterweiterung: $eq.not$ = ≠, $PP$ = ℙ, $integral$ = ∫ …", es = "Expansión de texto con símbolos Typst: $eq.not$ = ≠, $PP$ = ℙ, $integral$ = ∫ …", zh = "Typst 符号文本扩展：$eq.not$ = ≠，$PP$ = ℙ，$integral$ = ∫ …" }
@@ -595,19 +594,6 @@ textexpansionsymbolstypst = { fr = "Expansion de texte Symboles Typst : $eq.not$
 "êt★" = { output = "es-tu", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
 "ê★" = { output = "être", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
 
-
-
-
-
-# =================================
-# =================================
-# ======= Textexpansionauto =======
-# =================================
-# =================================
-
-[[textexpansionauto]]
-"ju'" = { output = "jusqu’", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
-"ya" = { output = "y’a", is_word = true, auto_expand = false, is_case_sensitive = false, final_result = false }
 
 
 
