@@ -319,6 +319,18 @@ M.set_preview_colored_tooltips    = LLMBridge.set_preview_colored_tooltips
 M.trigger_prediction = LLMBridge._perform_llm_check
 M.reset_predictions  = LLMBridge.reset_predictions
 
+M.has_exact_trigger  = Registry.has_exact_trigger
+M.has_trigger_prefix = Registry.has_trigger_prefix
+M.has_trigger_suffix = Registry.has_trigger_suffix
+
+--- Suppresses rescan for a short window so dynamic-hotstring injectors
+--- (personal_info, rules_engine) can issue their synthetic keystrokes without
+--- triggering a parallel hotstring expansion on the same buffer content.
+--- @param duration number|nil Suppression window in seconds (default 0.5 s).
+function M.suppress_rescan(duration)
+	CoreState.suppress_rescan(duration)
+end
+
 
 -- ── Perf telemetry proxies ───────────────────────────────────────────────────
 -- Exposed on M so the Hammerspoon console can toggle sampling and read the
