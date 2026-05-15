@@ -106,9 +106,13 @@ KLWV_Open(which, metrics_dir) {
 
     KLWV.metrics_dir := metrics_dir
 
-    ; Generate a fresh prefetch.json before navigating so the page's
-    ; bootstrap fetch always sees the freshest data.
-    try KLPF_BuildAndWrite(which, metrics_dir)
+    ; Do NOT build here — on a cold DB the full build takes 30-75 s and
+    ; blocks the window from appearing at all. The window navigates first;
+    ; KLWV_DelayedFirstPush (1.5 s after nav) pushes the freshest available
+    ; blob from KLPF_LAST_JSON, which live ticks keep warm.
+    ; If no live-tick blob exists yet (very first open after reload), the
+    ; delayed push triggers a fast manifest-only build so the user sees
+    ; KPIs within 2 s, and the first live tick (≤30 s) fills in n-grams.
 
     title := (which = "typing") ? "Métriques de frappe" : "Temps sur les applications"
     g := Gui("+Resize +MinSize800x600", title)
@@ -363,12 +367,32 @@ KLWV_MonitorFromPoint(x, y) {
 KLWV_DelayedFirstPush(which) {
     if !KLWV.windows.Has(which)
         return
-    if KLWV.metrics_dir
-        try KLPF_BuildAndWrite(which, KLWV.metrics_dir, , "full")
+    global KLPF_LAST_JSON
+    ; Phase 1 — fast manifest push (< 1 s, always runs).
+    ; Gives the page KPI counters and date range immediately.
+    ; If a live-tick blob is already cached, use it directly (it has today's
+    ; n-grams); otherwise run a manifest-only build that takes ~50 ms.
+    need_manifest_build := !IsSet(KLPF_LAST_JSON) || !KLPF_LAST_JSON.Has(which)
+    if need_manifest_build {
+        if KLWV.metrics_dir
+            try KLPF_BuildAndWrite(which, KLWV.metrics_dir, , "manifest")
+    }
     KLWV_PushPrefetch(which)
     ; Mark first paint done so live ticks can fan out from now on.
     if KLWV.windows.Has(which)
         KLWV.windows[which]["first_paint_done"] := true
+    ; Phase 2 — full historical build in a deferred timer (2 s later).
+    ; Provides the historical n-gram tables without blocking the first paint.
+    SetTimer(KLWV_DelayedFullBuild.Bind(which), -2000)
+}
+
+KLWV_DelayedFullBuild(which) {
+    if !KLWV.windows.Has(which)
+        return
+    if KLWV.metrics_dir
+        try KLPF_BuildAndWrite(which, KLWV.metrics_dir, , "full")
+    if KLWV.windows.Has(which)
+        KLWV_PushPrefetch(which)
 }
 
 ; Called by the ingest tick after data.sql has new rows. Rebuilds the
