@@ -332,4 +332,207 @@ function M.hide()
 	end)
 end
 
+
+-- ============================================
+-- ============================================
+-- ======= 4/ Stacked hotstring tooltip =======
+-- ============================================
+-- ============================================
+
+-- Reusable stacked canvas (separate from the LLM canvas so the two never
+-- interfere). Created lazily on first render_stacked() call.
+M.stacked_canvas = nil
+
+-- Build or rebuild the stacked canvas with the correct number of elements.
+-- Each row needs: bg_rect + output_text + label_text = 3 elements.
+-- Plus separators between rows (count - 1) and one top-level border = fixed overhead.
+-- Element layout per row i (1-based): base = (i-1)*3 + 1
+--   [base]   : background fill rectangle
+--   [base+1] : output styled text
+--   [base+2] : trigger label styled text
+-- After all rows:
+--   [N*3+1] : separator lines (one rectangle per gap, drawn via individual elements)
+--   [N*3+k] : white border strokeAndFill rectangle
+local function _ensure_stacked_canvas(row_count)
+	local needed = row_count * 3 + (row_count - 1) + 1   -- rows + separators + border
+	if M.stacked_canvas then
+		local current = #M.stacked_canvas
+		if current ~= needed then
+			M.stacked_canvas:delete()
+			M.stacked_canvas = nil
+		end
+	end
+	if not M.stacked_canvas then
+		M.stacked_canvas = hs.canvas.new({ x = 0, y = 0, w = 0, h = 0 })
+		if not M.stacked_canvas then return false end
+		M.stacked_canvas:level(hs.canvas.windowLevels.cursor)
+		M.stacked_canvas:behavior(hs.canvas.windowBehaviors.canJoinAllSpaces)
+		local elements = {}
+		for _ = 1, row_count do
+			table.insert(elements, { type = "rectangle", action = "fill" })
+			table.insert(elements, { type = "text", action = "fill" })
+			table.insert(elements, { type = "text", action = "fill" })
+		end
+		for _ = 1, row_count - 1 do
+			table.insert(elements, { type = "rectangle", action = "fill" })
+		end
+		-- Border: strokeAndFill with transparent fill so only the stroke shows.
+		table.insert(elements, {
+			type = "rectangle", action = "strokeAndFill",
+			fillColor = { white = 0, alpha = 0 },
+			strokeColor = { white = 1, alpha = 0.25 },
+			strokeWidth = 1,
+			roundedRectRadii = { xRadius = 7, yRadius = 7 }
+		})
+		M.stacked_canvas:appendElements(table.unpack(elements))
+	end
+	return true
+end
+
+--- Renders a stack of hotstring rows into a single canvas.
+--- Each row is { text: string, tint: table|nil, trigger_label: string|nil }.
+--- @param rows table Array of row descriptors.
+--- @param state table Must contain fixed_width (or nil) and timeout_sec.
+--- @param start_watchers_callback function|nil Called after canvas is shown.
+function M.render_stacked(rows, state, start_watchers_callback)
+	local ok, err = pcall(function()
+		if not rows or #rows == 0 then return end
+		if not _ensure_stacked_canvas(#rows) then return end
+
+		local pad_x     = Config.layout.pad_x
+		local pad_y     = Config.layout.pad_y
+		local label_gap = 16   -- gap between output text and trigger label
+		local row_count = #rows
+
+		-- Measure all rows to compute common width.
+		local temp_canvas = M.stacked_canvas
+		local max_text_w  = 0
+		local max_label_w = 0
+		local row_heights = {}
+
+		for _, row in ipairs(rows) do
+			local styled = hs.styledtext.new(row.text, {
+				font  = { name = Config.fonts.main, size = Config.sizes.main },
+				color = { white = 1, alpha = 1 },
+			})
+			local sz = temp_canvas:minimumTextSize(2, styled)
+			if sz.w > max_text_w then max_text_w = sz.w end
+			table.insert(row_heights, sz.h)
+			if row.trigger_label and row.trigger_label ~= "" then
+				local lsz = temp_canvas:minimumTextSize(2, hs.styledtext.new(row.trigger_label, {
+					font  = { name = Config.fonts.main, size = Config.sizes.hint },
+					color = { white = 0.45, alpha = 1 },
+				}))
+				if lsz.w > max_label_w then max_label_w = lsz.w end
+			end
+		end
+
+		local label_zone = max_label_w > 0 and (label_gap + max_label_w) or 0
+		local canvas_width  = pad_x + max_text_w + label_zone + pad_x
+		local total_height  = 0
+		local row_top_y     = {}
+		for i, rh in ipairs(row_heights) do
+			row_top_y[i] = total_height
+			total_height = total_height + pad_y + rh + pad_y
+			if i < row_count then
+				total_height = total_height + 1   -- 1 px separator
+			end
+		end
+
+		-- Resolve position (same anchor cascade as render()).
+		local anchor = M.resolve_anchor()
+		local focused_window = hs.window.focusedWindow()
+		local window_screen
+		if focused_window and type(focused_window.screen) == "function" then
+			pcall(function() window_screen = focused_window:screen() end)
+		end
+		local screen_frame = (window_screen or hs.screen.mainScreen()):frame()
+
+		local pos_x, pos_y
+		if anchor then
+			if anchor.type == "caret" then
+				pos_x = anchor.x + Config.layout.caret_offset_x
+				pos_y = anchor.y + (anchor.h or 0) + Config.layout.caret_offset_y
+			else
+				pos_x = anchor.x - canvas_width / 2
+				pos_y = anchor.y + Config.layout.window_offset_y
+				if pos_y + total_height > screen_frame.y + screen_frame.h then
+					pos_y = anchor.y - total_height - Config.layout.window_offset_y
+				end
+			end
+		else
+			pos_x = screen_frame.x + (screen_frame.w - canvas_width) / 2
+			pos_y = screen_frame.y + screen_frame.h - total_height - Config.layout.window_offset_y
+		end
+		pos_x = math.max(screen_frame.x + Config.layout.screen_margin,
+			math.min(pos_x, screen_frame.x + screen_frame.w - canvas_width - Config.layout.screen_margin))
+		pos_y = math.max(screen_frame.y + Config.layout.screen_margin,
+			math.min(pos_y, screen_frame.y + screen_frame.h - total_height - Config.layout.screen_margin))
+
+		M.stacked_canvas:frame({ x = pos_x, y = pos_y, w = canvas_width, h = total_height })
+
+		-- Fill in per-row elements.
+		for i, row in ipairs(rows) do
+			local base   = (i - 1) * 3 + 1
+			local top_y  = row_top_y[i]
+			local row_h  = row_heights[i] + pad_y * 2
+			local bg_col = M.apply_tint(row.tint)
+
+			-- Background.
+			M.stacked_canvas[base].frame     = { x = 0, y = top_y, w = canvas_width, h = row_h }
+			M.stacked_canvas[base].fillColor = bg_col
+
+			-- Output text.
+			local styled_text = hs.styledtext.new(row.text, {
+				font  = { name = Config.fonts.main, size = Config.sizes.main },
+				color = { white = 1, alpha = 1 },
+			})
+			M.stacked_canvas[base + 1].text  = styled_text
+			M.stacked_canvas[base + 1].frame = { x = pad_x, y = top_y + pad_y,
+				w = max_text_w, h = row_heights[i] }
+
+			-- Trigger label (dim, smaller font, right-aligned in label zone).
+			if row.trigger_label and row.trigger_label ~= "" and label_zone > 0 then
+				local label_x  = pad_x + max_text_w + label_gap
+				M.stacked_canvas[base + 2].action = "fill"
+				M.stacked_canvas[base + 2].text   = hs.styledtext.new(row.trigger_label, {
+					font  = { name = Config.fonts.main, size = Config.sizes.hint },
+					color = { white = 0.45, alpha = 1 },
+				})
+				M.stacked_canvas[base + 2].frame = { x = label_x,
+					y = top_y + pad_y,
+					w = max_label_w, h = row_heights[i] }
+			else
+				M.stacked_canvas[base + 2].action = "skip"
+			end
+		end
+
+		-- Separators between rows.
+		local sep_base = row_count * 3 + 1
+		for i = 1, row_count - 1 do
+			local sep_y = row_top_y[i] + row_heights[i] + pad_y * 2
+			M.stacked_canvas[sep_base + i - 1].frame     = { x = 0, y = sep_y, w = canvas_width, h = 1 }
+			M.stacked_canvas[sep_base + i - 1].fillColor = { white = 1, alpha = 0.12 }
+			M.stacked_canvas[sep_base + i - 1].action    = "fill"
+		end
+
+		-- Top-level border (last element).
+		local border_idx = row_count * 3 + (row_count - 1) + 1
+		M.stacked_canvas[border_idx].frame = { x = 0, y = 0, w = canvas_width, h = total_height }
+
+		M.stacked_canvas:show()
+		if type(start_watchers_callback) == "function" then start_watchers_callback() end
+	end)
+	if not ok then Logger.error(LOG, "Crash during stacked tooltip rendering: " .. tostring(err) .. ".") end
+end
+
+--- Hides the stacked canvas.
+function M.hide_stacked()
+	pcall(function()
+		if M.stacked_canvas and type(M.stacked_canvas.hide) == "function" then
+			M.stacked_canvas:hide()
+		end
+	end)
+end
+
 return M

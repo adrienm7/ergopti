@@ -190,4 +190,28 @@ function M.is_visible()
 	return _state.is_visible
 end
 
+--- Shows a stacked multi-row tooltip where each row has its own tint.
+--- Rows are { text: string, tint: table|nil, trigger_label: string|nil }.
+--- The tooltip stays until explicitly hidden (no per-row auto-hide on HS side —
+--- the overall timeout is driven by the shortest delay across rows, set by the
+--- caller via tooltip.set_timeout before calling show_stacked).
+--- @param rows table Array of row descriptor objects.
+--- @param is_enabled boolean Guard clause — skips render if false.
+function M.show_stacked(rows, is_enabled)
+	local ok, err = pcall(function()
+		if not is_enabled then return end
+		if not rows or #rows == 0 then M.hide(); return end
+		_state.is_visible = true
+		Renderer.render_stacked(rows, _state, start_watchers)
+	end)
+	if not ok then Logger.error(LOG, "Crash during stacked tooltip rendering: " .. tostring(err) .. ".") end
+end
+
+--- Hides the stacked canvas alongside the standard one.
+local _original_hide = M.hide
+M.hide = function()
+	_original_hide()
+	pcall(Renderer.hide_stacked)
+end
+
 return M

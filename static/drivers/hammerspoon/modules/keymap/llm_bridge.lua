@@ -365,26 +365,28 @@ function M.update_preview(buf)
 		return
 	end
 
-	local matched_repl, matched_plain_repl, matched_input, match_type, match_group = nil, nil, nil, nil, nil
+	-- Collect all matching candidates: provider match first, then star, then
+	-- autocorrect. Both star and autocorrect are kept when both match the same
+	-- buffer so the stacked tooltip can show all options simultaneously.
+	local matches = {}   -- array of { repl, plain_repl, input, type, group }
 
 	-- Custom preview providers take precedence over the static mapping lookup.
 	for _, provider in ipairs(_state.preview_providers) do
 		local ok, res = pcall(provider, buf)
 		if ok and res then
-			matched_repl       = res
-			-- Providers return raw strings; plain_repl must be derived on the
-			-- fly, but we memoize the projection so keystroke-frequency calls
-			-- with the same raw value become a single table lookup.
-			matched_plain_repl = provider_plain(res)
-			match_type         = "provider"
+			matches[#matches + 1] = {
+				repl       = res,
+				plain_repl = provider_plain(res),
+				input      = nil,
+				type       = "provider",
+				group      = nil,
+			}
 			break
 		end
 	end
 
-	-- Walk static mappings via the tail-char indexes so we only visit the
-	-- handful of candidates whose trigger / star_base ends with the buffer's
-	-- last codepoint, instead of scanning all ~10-15k mappings.
-	if not matched_repl then
+	-- Walk static mappings via the tail-char indexes.
+	if #matches == 0 then
 		local poff          = utf8.offset(buf, -1)
 		local buf_tail_char = poff and buf:sub(poff) or ""
 
@@ -394,12 +396,6 @@ function M.update_preview(buf)
 				or _state.groups[mapping.group].enabled
 		end
 
-		-- Repetition star mappings (e.g. "t★ → tt", used by the magic-key
-		-- repeat feature) match nearly every keystroke whose tail char is also
-		-- the previous-to-last char of the replacement. If we let them break
-		-- out of the star loop, they shadow longer non-repetition matches
-		-- further down (e.g. "chatgpt → ChatGPT" lives in the tail bucket and
-		-- never gets a chance). Detect them inline and skip.
 		local repeat_enabled = _state.is_repeat_feature_enabled()
 		local function is_repetition_star(mapping, star_base)
 			if not repeat_enabled then return false end
@@ -408,10 +404,7 @@ function M.update_preview(buf)
 			return mapping.plain_repl == star_base .. star_base:sub(offset)
 		end
 
-		-- Star-base path first: when a has_magic mapping's star_base matches,
-		-- its preview wins over a shorter non-magic trigger that happens to
-		-- end at the same character, matching the sort-order priority of the
-		-- original linear scan (longest trigger first).
+		-- Star matches (magic-key triggers) — collect the first one (longest wins).
 		local star_bucket = Registry.mappings_for_star_tail(buf_tail_char)
 		if star_bucket then
 			for _, mapping in ipairs(star_bucket) do
@@ -422,79 +415,99 @@ function M.update_preview(buf)
 						and mapping.plain_repl ~= star_base
 						and not is_repetition_star(mapping, star_base)
 					then
-						matched_repl       = mapping.repl
-						matched_plain_repl = mapping.plain_repl
-						match_type         = "star"
-						match_group        = mapping.group
-						matched_input      = star_base
+						matches[#matches + 1] = {
+							repl       = mapping.repl,
+							plain_repl = mapping.plain_repl,
+							input      = star_base,
+							type       = "star",
+							group      = mapping.group,
+						}
 						break
 					end
 				end
 			end
 		end
 
-		if not matched_repl then
-			local tail_bucket = Registry.mappings_for_tail(buf_tail_char)
-			if tail_bucket then
-				for _, mapping in ipairs(tail_bucket) do
-					local ga = group_active(mapping)
-					local c2 = not (mapping.is_word == false and mapping.auto == true)
-					local c3 = ends_with_trigger(buf, mapping.trigger, mapping.is_word)
-					local c4 = mapping.plain_repl ~= mapping.trigger
-					if ga and c2 and c3 and c4 then
-						matched_repl       = mapping.repl
-						matched_plain_repl = mapping.plain_repl
-						match_type         = "autocorrect"
-						match_group        = mapping.group
-						matched_input      = mapping.trigger
-						break
-					end
+		-- Autocorrect match — kept even when a star match was found so both
+		-- can appear as separate rows in the stacked tooltip.
+		local tail_bucket = Registry.mappings_for_tail(buf_tail_char)
+		if tail_bucket then
+			for _, mapping in ipairs(tail_bucket) do
+				local ga = group_active(mapping)
+				local c2 = not (mapping.is_word == false and mapping.auto == true)
+				local c3 = ends_with_trigger(buf, mapping.trigger, mapping.is_word)
+				local c4 = mapping.plain_repl ~= mapping.trigger
+				if ga and c2 and c3 and c4 then
+					matches[#matches + 1] = {
+						repl       = mapping.repl,
+						plain_repl = mapping.plain_repl,
+						input      = mapping.trigger,
+						type       = "autocorrect",
+						group      = mapping.group,
+					}
+					break
 				end
 			end
 		end
 	end
 
-	if matched_repl then
-		-- Hotstring match found — show the tooltip.
+	if #matches > 0 then
 		M.reset_predictions(true)
 
-		local display_text = matched_plain_repl
-		local is_star      = (match_type == "star")
+		-- Build tooltip rows (one per match). Magic-key star rows appear first.
+		local magic_key = "★"
+		local rows          = {}
+		local any_enabled   = false
+		local min_timeout   = nil
+		local primary_match = matches[1]
 
-		-- Resolve accent tint based on hotstring type.
-		local accent_color
-		if match_group == "personal" or match_group == "custom" or match_type == "provider" then
-			accent_color = tooltip.tint("hotstring_personal")
-		elseif is_star then
-			accent_color = tooltip.tint("hotstring_star")
-		else
-			accent_color = tooltip.tint("hotstring_autocorrect")
-		end
+		for _, m in ipairs(matches) do
+			local is_star = (m.type == "star")
 
-		-- Explicit branches required — the ternary idiom `A and B or C` fails when B is false.
-		local is_enabled = is_star and is_star_preview_enabled or (not is_star and is_autocorrect_preview_enabled)
-
-		-- Check per-category show_tooltip setting; suppress tooltip if explicitly disabled.
-		if is_enabled and match_group and type(hotstrings_config.resolve) == "function" then
-			local ok_cfg, cfg = pcall(function() return hotstrings_config.resolve(match_group, nil) end)
-			if ok_cfg and cfg and cfg.show_tooltip == false then
-				is_enabled = false
+			local tint_key
+			if m.group == "personal" or m.group == "custom" or m.type == "provider" then
+				tint_key = "hotstring_personal"
+			elseif is_star then
+				tint_key = "hotstring_star"
+			else
+				tint_key = "hotstring_autocorrect"
 			end
+
+			local enabled = is_star and is_star_preview_enabled
+				or (not is_star and is_autocorrect_preview_enabled)
+			if enabled and m.group and type(hotstrings_config.resolve) == "function" then
+				local ok_cfg, cfg = pcall(function() return hotstrings_config.resolve(m.group, nil) end)
+				if ok_cfg and cfg and cfg.show_tooltip == false then enabled = false end
+			end
+
+			local delay_key = is_star and "STAR_TRIGGER"
+				or (m.type == "autocorrect" and "autocorrection" or "dynamichotstrings")
+			local raw_delay = _state.DELAYS[delay_key] or 0
+			local row_timeout = raw_delay == 0 and INFINITE_TOOLTIP_SEC
+				or math.max(MIN_TOOLTIP_DURATION_SEC, raw_delay)
+
+			if enabled then
+				any_enabled = true
+				if not min_timeout or row_timeout < min_timeout then
+					min_timeout = row_timeout
+				end
+				rows[#rows + 1] = {
+					text          = m.plain_repl,
+					tint          = tooltip.tint(tint_key),
+					trigger_label = is_star and magic_key or "⏎",
+				}
+			end
+
+			Logger.debug(LOG, "Hotstring '%s' → '%s' [%s].",
+				tostring(m.input), m.plain_repl, m.type)
 		end
-		local type_str   = is_star and "star" or (match_type == "autocorrect" and "autocorrect" or "personal")
-		local delay_key  = is_star and "STAR_TRIGGER"
-			or (match_type == "autocorrect" and "autocorrection" or "dynamichotstrings")
-		local raw_delay  = _state.DELAYS[delay_key] or 0
 
-		-- A raw_delay of 0 means "never auto-fire"; substitute a large finite value.
-		local tooltip_timeout = raw_delay == 0 and INFINITE_TOOLTIP_SEC
-			or math.max(MIN_TOOLTIP_DURATION_SEC, raw_delay)
-
-		Logger.debug(LOG, "Hotstring '%s' → '%s' [%s | %.3gs].",
-			tostring(matched_input), display_text, type_str, tooltip_timeout)
-
+		local tooltip_timeout = min_timeout or INFINITE_TOOLTIP_SEC
 		tooltip.set_timeout(tooltip_timeout)
-		tooltip.show(display_text, false, is_enabled, accent_color)
+
+		if any_enabled then
+			tooltip.show_stacked(rows, true)
+		end
 
 		-- Chain: arm the LLM timer so it fires just as the tooltip window closes.
 		if fire_llm_after_hotstring and llm_on then
@@ -502,18 +515,18 @@ function M.update_preview(buf)
 			engine.start_timer(tooltip_timeout + HOTSTRING_CHAIN_OFFSET_SEC)
 		end
 
-		local trigger_key = matched_input or last_word
+		local trigger_key = primary_match.input or last_word
+		local type_str    = primary_match.type == "star" and "star"
+			or (primary_match.type == "autocorrect" and "autocorrect" or "personal")
 		if not last_shown_hotstring or last_shown_hotstring.trigger ~= trigger_key then
-			last_shown_hotstring = { trigger = trigger_key, replacement = matched_repl, h_type = type_str }
-			keylogger.log_hotstring_suggested(nil, trigger_key, matched_repl, type_str)
+			last_shown_hotstring = { trigger = trigger_key, replacement = primary_match.repl, h_type = type_str }
+			keylogger.log_hotstring_suggested(nil, trigger_key, primary_match.repl, type_str)
 		end
 	else
 		-- No hotstring match — let the inactivity timer drive the LLM.
 		Logger.debug(LOG, "No hotstring for '%s' — LLM timer armed.", tostring(last_word))
 		M.reset_predictions()
 		if llm_on then
-			-- Punctuation after a word (comma, period, etc.) is a word boundary:
-			-- use the instant trigger path, same as the trailing-space branch above.
 			if is_word_boundary(buf) then
 				engine.start_timer_word_end()
 			else

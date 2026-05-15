@@ -697,8 +697,8 @@ _LookupAndRender() {
     ; magic-key triggers (those ending with ★) appear first — they represent
     ; the shortest-keystroke path and should be most prominent visually.
     Candidates := _PrefixIndex[Buffer]
+    MK := ScriptInformation["MagicKey"]
     Items := []
-    FirstMatch := ""
     for _, Entry in Candidates {
         Cfg := HotstringsResolve(Entry.Category, Entry.Section)
         if !Cfg.ShowTooltip {
@@ -706,17 +706,17 @@ _LookupAndRender() {
         }
         Color := (Cfg.Color != "") ? Cfg.Color : ""
         Delay := (Cfg.Delay != "") ? Cfg.Delay : 0
-        ; Magic-key triggers go first so they appear at the top of the stack.
-        Item := { Text: Entry.Output, ColorHex: Color, DurationSec: Delay,
+        ; Trigger label shown on the right side of the row:
+        ;   ★ (or the configured magic key) for star triggers,
+        ;   ⏎  for end-char-gated triggers (space / punctuation / enter).
+        TriggerLabel := InStr(Entry.Trigger, MK) ? MK : "⏎"
+        Item := { Text: Entry.Output, TriggerLabel: TriggerLabel,
+                  ColorHex: Color, DurationSec: Delay,
                   Trigger: Entry.Trigger, Category: Entry.Category }
-        if InStr(Entry.Trigger, ScriptInformation["MagicKey"]) {
+        if InStr(Entry.Trigger, MK) {
             Items.InsertAt(1, Item)
-            if (FirstMatch == "")
-                FirstMatch := Entry
         } else {
             Items.Push(Item)
-            if (FirstMatch == "")
-                FirstMatch := Entry
         }
     }
     if (Items.Length == 0) {
