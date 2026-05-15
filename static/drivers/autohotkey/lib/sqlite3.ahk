@@ -166,8 +166,12 @@ SQLite_Exec(db, sql) {
             "Int")
         pstmt := NumGet(pstmt_buf, 0, "Ptr")
         ptail := NumGet(ptail_buf, 0, "Ptr")
-        if (rc != SQLiteConst.OK)
+        if (rc != SQLiteConst.OK) {
+            ; Surface the SQLite error so callers can diagnose schema mismatches
+            ; rather than silently receiving an empty result set.
+            try LoggerError("sqlite3", "sqlite3_prepare_v2 failed (rc=%d): %s", rc, SQLite_LastError(db))
             return false
+        }
         if pstmt {
             ; Drive the statement to completion. Most schema/INSERT
             ; statements step once and return DONE; SELECTs would loop.
