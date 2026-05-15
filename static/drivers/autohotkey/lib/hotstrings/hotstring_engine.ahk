@@ -276,19 +276,20 @@ CreateHotstring(Flags, Abbreviation, Replacement, options := unset) {
         "TimeActivationSeconds"] : 0
     IsRepeat := (IsSet(options) and options.Has("IsRepeat")) ? options["IsRepeat"] : False
     Category := (IsSet(options) and options.Has("Category")) ? options["Category"] : ""
+    Section  := (IsSet(options) and options.Has("Section"))  ? options["Section"]  : ""
 
     FlagsPortion := ":" Flags "B0O:" ; O omits the ending character from the abbreviation
     _RegisterHotstring(
         FlagsPortion Abbreviation,
         _MakeHotstringCallback(Replacement, Abbreviation, OnlyText, FinalResult, TimeActivationSeconds),
-        _MakeHotstringMeta(Replacement, Abbreviation, OnlyText, FinalResult, TimeActivationSeconds, IsRepeat, Category)
+        _MakeHotstringMeta(Replacement, Abbreviation, OnlyText, FinalResult, TimeActivationSeconds, IsRepeat, Category, Section)
     )
 }
 
 ; Build the dispatch-metadata object HSE_DispatchMatch consumes. Kept next
 ; to the callback factory so the two stay in lockstep — every field used
 ; by the dispatcher has a clear origin in the original options dict.
-_MakeHotstringMeta(Replacement, Abbreviation, OnlyText, FinalResult, TimeActivationSeconds, IsRepeat := false, Category := "") {
+_MakeHotstringMeta(Replacement, Abbreviation, OnlyText, FinalResult, TimeActivationSeconds, IsRepeat := false, Category := "", Section := "") {
     return {
         Replacement: Replacement,
         OnlyText: OnlyText,
@@ -296,7 +297,8 @@ _MakeHotstringMeta(Replacement, Abbreviation, OnlyText, FinalResult, TimeActivat
         TimeActivationSeconds: TimeActivationSeconds,
         PrevCharKey: SubStr(Abbreviation, -2, 1),
         IsRepeat: IsRepeat,
-        Category: Category
+        Category: Category,
+        Section: Section
     }
 }
 
@@ -401,6 +403,7 @@ CreateCaseSensitiveHotstrings(Flags, Abbreviation, Replacement, options := unset
         "TimeActivationSeconds"] : 0
     IsRepeat := (IsSet(options) and options.Has("IsRepeat")) ? options["IsRepeat"] : False
     Category := (IsSet(options) and options.Has("Category")) ? options["Category"] : ""
+    Section  := (IsSet(options) and options.Has("Section"))  ? options["Section"]  : ""
 
     FlagsPortion := ":" Flags "CB0O:" ; O omits the ending character from the abbreviation
 
@@ -427,7 +430,7 @@ CreateCaseSensitiveHotstrings(Flags, Abbreviation, Replacement, options := unset
     RegisterVariant := (Abbr, Repl) => _RegisterHotstring(
         FlagsPortion Abbr,
         _MakeHotstringCallback(Repl, Abbr, OnlyText, FinalResult, TimeActivationSeconds),
-        _MakeHotstringMeta(Repl, Abbr, OnlyText, FinalResult, TimeActivationSeconds, IsRepeat, Category)
+        _MakeHotstringMeta(Repl, Abbr, OnlyText, FinalResult, TimeActivationSeconds, IsRepeat, Category, Section)
     )
 
     RegisterVariant(AbbreviationLowerCase, ReplacementLowerCase)
