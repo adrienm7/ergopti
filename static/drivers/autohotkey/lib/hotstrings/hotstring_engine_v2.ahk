@@ -460,6 +460,12 @@ HSE_FindMatchAtEnd(JustTypedChar) {
                 if !_HSE_WordBoundaryAllows(BodyBuf, Spec) {
                     continue
                 }
+                ; Star-prefix priority: if a star trigger whose body starts with
+                ; this trigger exists (e.g. "ia★" for end-char "ia"), suppress
+                ; the end-char match so the user can still reach the star trigger.
+                if _HSE_StarTriggerCoversBody(BodyBuf, Spec) {
+                    continue
+                }
                 if (BestMatch == "" or Spec.Length > BestMatch.Length) {
                     BestMatch := Spec
                     BestEndChar := JustTypedChar
@@ -471,6 +477,47 @@ HSE_FindMatchAtEnd(JustTypedChar) {
     HSE_LastEndChar := BestEndChar
     return BestMatch
 }
+
+; Return true when a registered star trigger would shadow the given end-char
+; Spec: i.e. a star trigger exists that is strictly longer than Spec.Trigger
+; and whose suffix in the buffer starts where Spec.Trigger starts. This means
+; the user may still type more characters to reach that star trigger, so the
+; shorter end-char match must not fire prematurely.
+;
+; Example: Spec.Trigger = "ia", star trigger "ia★" registered.
+; BodyBuf ends with "ia" — the star trigger starts where "ia" starts, and is
+; longer, so the end-char match is suppressed.
+; Return true when a registered star trigger would shadow the given end-char
+; Spec: i.e. a star trigger exists whose trigger body starts with Spec.Trigger
+; (Spec.Trigger is a strict prefix of StarSpec.Trigger). This means the user
+; may still type more characters to reach that star trigger, so the shorter
+; end-char match must not fire prematurely.
+;
+; Example: Spec.Trigger = "ia", star trigger "ia★" registered.
+; "ia" is a strict prefix of "ia★" → end-char match on "ia" is suppressed.
+_HSE_StarTriggerCoversBody(BodyBuf, Spec) {
+    global HSE_RegistryByLastChar
+    for _, Bucket in HSE_RegistryByLastChar {
+        for _, StarSpec in Bucket {
+            if !StarSpec.Star {
+                continue
+            }
+            if StarSpec.Length <= Spec.Length {
+                continue
+            }
+            ; Spec.Trigger must be a strict prefix of StarSpec.Trigger.
+            ; Use case-insensitive comparison unless both triggers are C-flagged.
+            StarPrefix := SubStr(StarSpec.Trigger, 1, Spec.Length)
+            CaseSens := Spec.CaseSensitive and StarSpec.CaseSensitive
+            if CaseSens ? (StarPrefix !== Spec.Trigger) : (StrLower(StarPrefix) != StrLower(Spec.Trigger)) {
+                continue
+            }
+            return true
+        }
+    }
+    return false
+}
+
 
 ; Return the bucket array(s) to scan for triggers ending in LookupChar.
 ; Both the case-sensitive bucket (literal LookupChar) and the
