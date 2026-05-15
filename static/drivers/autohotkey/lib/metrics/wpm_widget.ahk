@@ -14,11 +14,12 @@
 ;    speed changes without wild swings from isolated bursts.
 ; 2. Color coding: the background color encodes keystroke origin —
 ;      - manual keystrokes  → blue (default, user-configurable)
-;      - hotstring expanded → tooltip tint from magickey TOML + user override
+;      - hotstring expanded → tooltip tint from the group's TOML _meta.color + user override
 ;      - autocorrection     → tooltip tint from autocorrection TOML + user override
 ;      - IA suggestion      → purple fallback (no TOML source for AI)
-;    Colors are resolved live from the same TOML/override pipeline as tooltips,
-;    so any customisation in the hotstrings config window is reflected immediately.
+;      - rolls / repeat_key → no color change (stays blue, no tooltip shown)
+;    The TOML category is passed through KL_LogHotstring → WPMWidget_Push so the
+;    widget color always matches the group color, not a hardcoded "magickey" fallback.
 ; 3. Two display modes:
 ;      - Compact: colored pill with large WPM number + small unit label.
 ;      - Graph: sparkline of recent history rendered as a WebView2 canvas.
@@ -124,9 +125,12 @@ class WPMWidget {
     static _last_ai       := false
     static _last_ac       := false
     ; Timestamps of the last HS/AI/AC keystroke (for source_color_duration logic).
-    static _last_hs_tick  := 0
-    static _last_ai_tick  := 0
-    static _last_ac_tick  := 0
+    static _last_hs_tick      := 0
+    static _last_ai_tick      := 0
+    static _last_ac_tick      := 0
+    ; TOML category of the last HS expansion (e.g. "magickey", "autocorrection").
+    ; Used to resolve the widget color from the same pipeline as the tooltip.
+    static _last_hs_category  := "magickey"
 
     ; Display options.
     static use_colors     := false
@@ -148,10 +152,22 @@ class WPMWidget {
 ; ============================================
 ; ============================================
 
+; Categories whose expansions must not color the widget (no visible tooltip,
+; or ergonomic substitutions that should stay at the default blue color).
+_WPMWidget_NeutralCategory(category) {
+    return (category == "rolls" or category == "repeat_key")
+}
+
 ; Called by the keylogger hook after each accepted keystroke.
-WPMWidget_Push(is_hs := false, is_ai := false, is_ac := false) {
+; category: TOML group name of the hotstring ("magickey", "rolls", …).
+;   Pass "" for manual keystrokes or when the category is unknown.
+;   "rolls" and "repeat_key" are treated as neutral and do not color the widget.
+WPMWidget_Push(is_hs := false, is_ai := false, is_ac := false, category := "") {
     if !WPMWidget.visible
         return
+    ; Neutral categories count as keystrokes but must not trigger HS color.
+    if (is_hs and _WPMWidget_NeutralCategory(category))
+        is_hs := false
     cap  := WPMWidgetConst.RING_CAP
     head := WPMWidget._ring_head
     entry := Map("t", A_TickCount, "hs", is_hs, "ai", is_ai, "ac", is_ac)
@@ -165,8 +181,10 @@ WPMWidget_Push(is_hs := false, is_ai := false, is_ac := false) {
     WPMWidget._last_hs   := is_hs
     WPMWidget._last_ai   := is_ai
     WPMWidget._last_ac   := is_ac
-    if is_hs
-        WPMWidget._last_hs_tick := now_t
+    if is_hs {
+        WPMWidget._last_hs_tick     := now_t
+        WPMWidget._last_hs_category := (category != "") ? category : "magickey"
+    }
     if is_ai
         WPMWidget._last_ai_tick := now_t
     if is_ac
@@ -249,7 +267,7 @@ WPMWidget_ResolveBgColor(idle, has_hs, has_ai, has_ac, use_colors) {
         if has_ai
             return WPMWidgetConst.COLOR_BG_AI
         if has_hs
-            return WPMWidget_CategoryBgColor("magickey", WPMWidgetConst.COLOR_BG_MANUAL)
+            return WPMWidget_CategoryBgColor(WPMWidget._last_hs_category, WPMWidgetConst.COLOR_BG_MANUAL)
         if has_ac
             return WPMWidget_CategoryBgColor("autocorrection", WPMWidgetConst.COLOR_BG_MANUAL)
     }
@@ -264,7 +282,7 @@ WPMWidget_ResolveGraphColor(has_hs, has_ai, has_ac, use_colors) {
         if has_ai
             return WPMWidgetConst.COLOR_GRAPH_AI
         if has_hs
-            return WPMWidget_CategoryGraphColor("magickey", WPMWidgetConst.COLOR_GRAPH_MANUAL)
+            return WPMWidget_CategoryGraphColor(WPMWidget._last_hs_category, WPMWidgetConst.COLOR_GRAPH_MANUAL)
         if has_ac
             return WPMWidget_CategoryGraphColor("autocorrection", WPMWidgetConst.COLOR_GRAPH_MANUAL)
     }
