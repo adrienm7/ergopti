@@ -1772,5 +1772,6 @@ Versie: 1.0",,
 	"apps.cloner.lbl_progress_dock": "Registreren in Dock…",
 	"apps.cloner.lbl_progress_done": "Klaar",
 	"apps.cloner.lbl_progress_title": "Kloon aanmaken…",
-	"apps.cloner.btn_back": "Terug"
+	"apps.cloner.btn_back": "Terug",
+	"menu.apps.title": "🛠️ Toepassingen"
 }

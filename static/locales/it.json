@@ -1772,5 +1772,6 @@ Versione: 1.0",,
 	"apps.cloner.lbl_progress_dock": "Registrazione nel Dock…",
 	"apps.cloner.lbl_progress_done": "Completato",
 	"apps.cloner.lbl_progress_title": "Creazione clone in corso…",
-	"apps.cloner.btn_back": "Indietro"
+	"apps.cloner.btn_back": "Indietro",
+	"menu.apps.title": "🛠️ Applicazioni"
 }

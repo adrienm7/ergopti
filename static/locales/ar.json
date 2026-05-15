@@ -1772,5 +1772,6 @@
 	"apps.cloner.lbl_progress_dock": "التسجيل في Dock…",
 	"apps.cloner.lbl_progress_done": "تم",
 	"apps.cloner.lbl_progress_title": "جارٍ إنشاء النسخة…",
-	"apps.cloner.btn_back": "رجوع"
+	"apps.cloner.btn_back": "رجوع",
+	"menu.apps.title": "🛠️ التطبيقات"
 }

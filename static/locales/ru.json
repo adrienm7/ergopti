@@ -1772,5 +1772,6 @@
 	"apps.cloner.lbl_progress_dock": "Регистрация в Dock…",
 	"apps.cloner.lbl_progress_done": "Готово",
 	"apps.cloner.lbl_progress_title": "Создание клона…",
-	"apps.cloner.btn_back": "Назад"
+	"apps.cloner.btn_back": "Назад",
+	"menu.apps.title": "🛠️ Приложения"
 }

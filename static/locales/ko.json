@@ -1772,5 +1772,6 @@
 	"apps.cloner.lbl_progress_dock": "Dock에 등록 중…",
 	"apps.cloner.lbl_progress_done": "완료",
 	"apps.cloner.lbl_progress_title": "복제 생성 중…",
-	"apps.cloner.btn_back": "뒤로"
+	"apps.cloner.btn_back": "뒤로",
+	"menu.apps.title": "🛠️ 응용 프로그램"
 }

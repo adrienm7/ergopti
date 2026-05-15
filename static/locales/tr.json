@@ -1772,5 +1772,6 @@ Sürüm: 1.0",,
 	"apps.cloner.lbl_progress_dock": "Dock'a kaydediliyor…",
 	"apps.cloner.lbl_progress_done": "Tamamlandı",
 	"apps.cloner.lbl_progress_title": "Klon oluşturuluyor…",
-	"apps.cloner.btn_back": "Geri"
+	"apps.cloner.btn_back": "Geri",
+	"menu.apps.title": "🛠️ Uygulamalar"
 }

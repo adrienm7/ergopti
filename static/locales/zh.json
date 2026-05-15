@@ -1772,5 +1772,6 @@
 	"apps.cloner.lbl_progress_dock": "正在注册到 Dock…",
 	"apps.cloner.lbl_progress_done": "完成",
 	"apps.cloner.lbl_progress_title": "正在创建克隆…",
-	"apps.cloner.btn_back": "返回"
+	"apps.cloner.btn_back": "返回",
+	"menu.apps.title": "🛠️ 应用程序"
 }
