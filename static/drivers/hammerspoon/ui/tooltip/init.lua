@@ -82,6 +82,16 @@ function M.show(content, is_llm_origin, is_enabled, background_color)
 	if is_enabled and _on_show_callback then pcall(_on_show_callback) end
 end
 
+--- Displays a stacked multi-row tooltip for hotstring previews.
+--- Each row is { text, tint, trigger_label }.
+--- @param rows table Array of row descriptors.
+--- @param is_enabled boolean Guard clause.
+function M.show_stacked(rows, is_enabled)
+	TooltipLLM.hide()
+	TooltipHotstring.show_stacked(rows, is_enabled)
+	if is_enabled and _on_show_callback then pcall(_on_show_callback) end
+end
+
 --- Displays a persistent loading indicator that will not auto-dismiss.
 --- Must be used instead of show() for LLM generation states so the indicator
 --- stays on screen until replaced in-place by the prediction results.

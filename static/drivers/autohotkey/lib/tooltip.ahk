@@ -29,17 +29,26 @@ global _TooltipRowGuis := []
 global _TooltipTimer   := 0
 
 ; Style constants.
-global _TOOLTIP_FONT_NAME      := "Segoe UI"
-global _TOOLTIP_FONT_SIZE      := 11
-global _TOOLTIP_PADDING_X      := 14
-global _TOOLTIP_PADDING_Y      := 8
-global _TOOLTIP_OFFSET_BELOW   := 18   ; pixels below the anchor (caret / box)
-global _TOOLTIP_OFFSET_RIGHT   := 4    ; small horizontal nudge for caret anchor
-global _TOOLTIP_DEFAULT_BG_HEX := "1A1A1A"
+global _TOOLTIP_FONT_NAME        := "Segoe UI"
+global _TOOLTIP_FONT_SIZE        := 11
+global _TOOLTIP_FONT_SIZE_LABEL  := 9     ; smaller dim font for the trigger label
+global _TOOLTIP_PADDING_X        := 14
+global _TOOLTIP_PADDING_Y        := 8
+global _TOOLTIP_LABEL_GAP        := 12    ; gap between output text and trigger label
+global _TOOLTIP_OFFSET_BELOW     := 18   ; pixels below the anchor (caret / box)
+global _TOOLTIP_OFFSET_RIGHT     := 4    ; small horizontal nudge for caret anchor
+global _TOOLTIP_DEFAULT_BG_HEX   := "1A1A1A"
+global _TOOLTIP_BORDER_COLOR_HEX := "FFFFFF"   ; white border
+global _TOOLTIP_BORDER_ALPHA     := 0.18        ; subtle transparency
+; 1 px logical border drawn via a separate always-on-top Gui layered on top.
+global _TOOLTIP_BORDER_THICKNESS := 1
 ; Pixel radius for the rounded corners. Capped at runtime to half of the
 ; smallest gui dimension so a small tooltip (e.g. just "c'") does not have
 ; its content clipped by overlapping corner arcs.
-global _TOOLTIP_CORNER_RADIUS  := 8
+global _TOOLTIP_CORNER_RADIUS    := 8
+
+; Border overlay Gui — single frameless window covering the entire stack.
+global _TooltipBorderGui := 0
 
 ; Tint mixing — mirrors Hammerspoon's renderer.lua (lightness 0.10, saturation
 ; 0.40). The accent colour only contributes its hue; the background stays a
@@ -103,12 +112,17 @@ TooltipShow(Items, DurationSec := 0) {
 
     Pos := _TooltipResolvePosition()
     CurY := Pos.Y
+    TotalH := 0
+    StackW := 0
     for Idx, Row in _TooltipRowGuis {
         Row.Gui.Show(Format("w{1} h{2} x{3} y{4} NoActivate",
             Row.W, Row.H, Pos.X, CurY))
         CurY += Row.H
+        TotalH += Row.H
+        StackW := Row.W
     }
     _TooltipApplyStackedCorners()
+    _TooltipShowBorder(Pos.X, Pos.Y, StackW, TotalH)
 
     ; Use the shortest non-zero DurationSec across all items.
     EffectiveDur := DurationSec
@@ -126,15 +140,18 @@ TooltipShow(Items, DurationSec := 0) {
     }
 }
 
-; Hide all tooltip rows immediately and cancel any pending auto-hide timer.
+; Hide all tooltip rows and the border overlay immediately.
 TooltipHide() {
-    global _TooltipGui, _TooltipRowGuis, _TooltipTimer
+    global _TooltipGui, _TooltipRowGuis, _TooltipBorderGui, _TooltipTimer
     if _TooltipTimer {
         SetTimer(_TooltipTimer, 0)
         _TooltipTimer := 0
     }
     for _, Row in _TooltipRowGuis {
         try Row.Gui.Hide()
+    }
+    if _TooltipBorderGui {
+        try _TooltipBorderGui.Hide()
     }
 }
 
@@ -167,23 +184,55 @@ _TooltipBuildGui(Items) {
             MaxW := S.W + 4
     }
 
-    TotalW := MaxW + _TOOLTIP_PADDING_X * 2
+    ; Measure trigger labels to include their width in the total row width.
+    LabelSizes := []
+    MaxLabelW := 0
+    for _, Item in Items {
+        Label := Item.HasOwnProp("TriggerLabel") ? Item.TriggerLabel : ""
+        if (Label != "") {
+            LS := _TooltipMeasureTextSize(Label, _TOOLTIP_FONT_SIZE_LABEL)
+            LabelSizes.Push(LS)
+            if (LS.W > MaxLabelW)
+                MaxLabelW := LS.W
+        } else {
+            LabelSizes.Push({ W: 0, H: 0 })
+        }
+    }
+    ; Total width = left padding + output text + gap + label + right padding.
+    LabelExtra := (MaxLabelW > 0) ? (_TOOLTIP_LABEL_GAP + MaxLabelW) : 0
+    TotalW := MaxW + 4 + LabelExtra + _TOOLTIP_PADDING_X * 2
+
     NewGuis := []
     for Idx, Item in Items {
         ColorHex := Item.HasOwnProp("ColorHex") ? Item.ColorHex : ""
         BgHex := _TooltipMixTintHex(ColorHex)
         S := Sizes[Idx]
+        LS := LabelSizes[Idx]
         RowH := S.H + _TOOLTIP_PADDING_Y * 2
 
         G := Gui("+AlwaysOnTop +ToolWindow -Caption +E0x20 +LastFound")
         G.BackColor := BgHex
-        G.MarginX := _TOOLTIP_PADDING_X
-        G.MarginY := _TOOLTIP_PADDING_Y
+        G.MarginX := 0
+        G.MarginY := 0
         G.SetFont("cFFFFFF s" . _TOOLTIP_FONT_SIZE, _TOOLTIP_FONT_NAME)
 
-        ; +4 px horizontal slack for kerning/italic overhang.
-        Opts := "BackgroundTrans 0xC w" . (MaxW + 4) . " h" . S.H
-        G.Add("Text", Opts, Item.Text)
+        ; Output text — left-aligned with left padding.
+        TextOpts := Format("BackgroundTrans 0xC x{1} y{2} w{3} h{4}",
+            _TOOLTIP_PADDING_X, _TOOLTIP_PADDING_Y, MaxW + 4, S.H)
+        G.Add("Text", TextOpts, Item.Text)
+
+        ; Trigger label — right-aligned in a dimmer color.
+        if (LS.W > 0) {
+            LabelX := _TOOLTIP_PADDING_X + MaxW + 4 + _TOOLTIP_LABEL_GAP
+            LabelY := _TOOLTIP_PADDING_Y + (S.H - LS.H) // 2   ; vertically centred
+            LabelOpts := Format("BackgroundTrans 0xC x{1} y{2} w{3} h{4}",
+                LabelX, LabelY, LS.W + 4, LS.H)
+            G.SetFont("c808080 s" . _TOOLTIP_FONT_SIZE_LABEL, _TOOLTIP_FONT_NAME)
+            G.Add("Text", LabelOpts, Item.TriggerLabel)
+            ; Restore main font for any subsequent control.
+            G.SetFont("cFFFFFF s" . _TOOLTIP_FONT_SIZE, _TOOLTIP_FONT_NAME)
+        }
+
         NewGuis.Push({ Gui: G, H: RowH, W: TotalW })
     }
 
@@ -197,15 +246,19 @@ _TooltipBuildGui(Items) {
     }
 }
 
-; Measure ``Text`` width and height in pixels using a transient GDI font
-; that mirrors the one ``Gui.SetFont`` will apply to the control. Returns
-; { W, H } with sensible fallbacks if any DllCall fails (the tooltip
-; should never crash the script over a measurement glitch).
+; Measure ``Text`` at a given font size. Delegates to _TooltipMeasureTextSize.
 _TooltipMeasureText(Text) {
-    global _TOOLTIP_FONT_NAME, _TOOLTIP_FONT_SIZE
+    global _TOOLTIP_FONT_SIZE
+    return _TooltipMeasureTextSize(Text, _TOOLTIP_FONT_SIZE)
+}
 
-    Fallback := { W: Max(80, StrLen(Text) * Round(_TOOLTIP_FONT_SIZE * 0.75)),
-                  H: _TOOLTIP_FONT_SIZE + 8 }
+; Measure ``Text`` width and height in pixels using a transient GDI font
+; at the specified FontSize. Returns { W, H } with sensible fallbacks.
+_TooltipMeasureTextSize(Text, FontSize) {
+    global _TOOLTIP_FONT_NAME
+
+    Fallback := { W: Max(80, StrLen(Text) * Round(FontSize * 0.75)),
+                  H: FontSize + 8 }
 
     HDC := DllCall("User32\GetDC", "Ptr", 0, "Ptr")
     if !HDC {
@@ -218,7 +271,7 @@ _TooltipMeasureText(Text) {
     if (DPI <= 0) {
         DPI := 96
     }
-    HeightPx := -Round(_TOOLTIP_FONT_SIZE * DPI / 72)
+    HeightPx := -Round(FontSize * DPI / 72)
 
     HFont := DllCall("Gdi32\CreateFontW",
         "Int", HeightPx, "Int", 0, "Int", 0, "Int", 0,
@@ -349,6 +402,46 @@ _TooltipMakeBottomRoundedRgn(W, H, Diam) {
     DllCall("Gdi32\DeleteObject", "Ptr", SquareTopRgn)
     return CombinedRgn
 }
+
+; Show (or reuse) a single border Gui that overlays the entire stack with a
+; 1 px white rounded-rectangle outline. Uses WS_EX_LAYERED + LWA_ALPHA so
+; the interior is fully transparent and only the 1 px ring is visible.
+_TooltipShowBorder(X, Y, W, H) {
+    global _TooltipBorderGui, _TOOLTIP_CORNER_RADIUS, _TOOLTIP_BORDER_THICKNESS
+
+    if !_TooltipBorderGui {
+        _TooltipBorderGui := Gui("+AlwaysOnTop +ToolWindow -Caption +E0x80000 +LastFound")
+        _TooltipBorderGui.BackColor := "000001"   ; near-black key color
+        ; Layered window: make key color fully transparent.
+        WinSetTransColor("000001", _TooltipBorderGui)
+    }
+    _TooltipBorderGui.Show(Format("w{1} h{2} x{3} y{4} NoActivate", W, H, X, Y))
+
+    ; Build a "hollow" region: outer round-rect minus the inset round-rect.
+    Radius := _TOOLTIP_CORNER_RADIUS
+    if (Radius * 2 > W) Radius := W // 2
+    if (Radius * 2 > H) Radius := H // 2
+    T := _TOOLTIP_BORDER_THICKNESS
+    Diam := Radius * 2
+    OuterRgn := DllCall("Gdi32\CreateRoundRectRgn",
+        "Int", 0, "Int", 0, "Int", W + 1, "Int", H + 1,
+        "Int", Diam, "Int", Diam, "Ptr")
+    InnerRgn := DllCall("Gdi32\CreateRoundRectRgn",
+        "Int", T, "Int", T, "Int", W - T + 1, "Int", H - T + 1,
+        "Int", Diam, "Int", Diam, "Ptr")
+    BorderRgn := DllCall("Gdi32\CreateRectRgn", "Int", 0, "Int", 0, "Int", 1, "Int", 1, "Ptr")
+    DllCall("Gdi32\CombineRgn", "Ptr", BorderRgn, "Ptr", OuterRgn, "Ptr", InnerRgn, "Int", 4)  ; RGN_DIFF=4
+    DllCall("Gdi32\DeleteObject", "Ptr", OuterRgn)
+    DllCall("Gdi32\DeleteObject", "Ptr", InnerRgn)
+    if BorderRgn {
+        DllCall("User32\SetWindowRgn", "Ptr", _TooltipBorderGui.Hwnd, "Ptr", BorderRgn, "Int", 1)
+    }
+    ; Paint the ring white via a static control that fills the clipped region.
+    ; Easier: set the Gui BackColor to white — the transparent key color punches
+    ; through the hollow interior so only the ring pixels are white.
+    _TooltipBorderGui.BackColor := "FFFFFF"
+}
+
 
 ; Mix an accent colour with a near-black background, mirroring Hammerspoon's
 ; renderer.lua: only the hue of the accent contributes — lightness is fixed
