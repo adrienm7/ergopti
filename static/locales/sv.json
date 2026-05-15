@@ -35,6 +35,8 @@
 	"app_category.video": "Video",
 	"app_category.weather": "Väder",
 	"app_picker.no_app_excluded": "Inga appar att exkludera",
+	"app_picker.add_another_app": "+ Lägg till ett annat program…",
+	"app_picker.exclude_current": "Uteslut {app} (aktuell)",
 	"app_picker.search_placeholder": "Sök en app…",
 	"autocorrection.accents": "Automatisk accentkorrigering",
 	"autocorrection.caps": "Automatisk versal i mening",

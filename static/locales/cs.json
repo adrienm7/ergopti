@@ -25,6 +25,8 @@
 	"app_category.video": "Video",
 	"app_category.weather": "Počasí",
 	"app_picker.no_app_excluded": "Žádná aplikace k vyloučení",
+	"app_picker.add_another_app": "+ Přidat další aplikaci…",
+	"app_picker.exclude_current": "Vyloučit {app} (aktuální)",
 	"app_picker.search_placeholder": "Hledat aplikaci…",
 	"autocorrection.accents": "Automatická oprava přízvuků",
 	"autocorrection.caps": "Automatické velké písmeno na začátku věty",

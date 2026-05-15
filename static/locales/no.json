@@ -35,6 +35,8 @@
 	"app_category.video": "Video",
 	"app_category.weather": "Vær",
 	"app_picker.no_app_excluded": "Ingen apper å ekskludere",
+	"app_picker.add_another_app": "+ Legg til et annet program…",
+	"app_picker.exclude_current": "Utelat {app} (gjeldende)",
 	"app_picker.search_placeholder": "Søk etter en app…",
 	"autocorrection.accents": "Automatisk aksenkorreksjon",
 	"autocorrection.caps": "Automatisk stor forbokstav i setning",

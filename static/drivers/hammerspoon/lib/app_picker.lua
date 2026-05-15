@@ -135,7 +135,7 @@ function M.build_menu(current_apps, on_change, placeholder_text)
 	if #menu > 0 then table.insert(menu, {title = "-"}) end
 
 	table.insert(menu, {
-		title = "+ Ajouter une autre application…",
+		title = i18n.get("app_picker.add_another_app"),
 		fn    = function()
 			hs.timer.doAfter(0.1, function()
 				local choices = M.discover_apps()
@@ -193,7 +193,7 @@ function M.build_menu(current_apps, on_change, placeholder_text)
 				end
 			end
 			table.insert(menu, {
-				title = "Exclure " .. appName .. " (actuelle)",
+				title = i18n.get("app_picker.exclude_current"):gsub("{app}", appName),
 				image = icon,
 				fn    = function()
 					local new_apps = {}

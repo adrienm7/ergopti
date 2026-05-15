@@ -25,6 +25,8 @@
 	"app_category.video": "视频",
 	"app_category.weather": "天气",
 	"app_picker.no_app_excluded": "没有要排除的应用",
+	"app_picker.add_another_app": "+ 添加另一个应用…",
+	"app_picker.exclude_current": "排除 {app}（当前）",
 	"app_picker.search_placeholder": "搜索应用…",
 	"autocorrection.accents": "自动修正重音符号",
 	"autocorrection.caps": "句首自动大写",

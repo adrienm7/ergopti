@@ -35,6 +35,8 @@
 	"app_category.video": "Video",
 	"app_category.weather": "Vejr",
 	"app_picker.no_app_excluded": "Ingen apps at ekskludere",
+	"app_picker.add_another_app": "+ Tilføj endnu en applikation…",
+	"app_picker.exclude_current": "Udeluk {app} (aktuel)",
 	"app_picker.search_placeholder": "Søg efter en app…",
 	"autocorrection.accents": "Automatisk akcentkorrektion",
 	"autocorrection.caps": "Automatisk stort begyndelsesbogstav",
