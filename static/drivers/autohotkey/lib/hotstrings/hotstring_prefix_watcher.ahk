@@ -449,7 +449,12 @@ _OnPrefixChar(IH, Char) {
             ; _MIN_PREFIX_LEN) still carry meaningful metadata.
             HotstringHType := _ResolveFireHType(HSEMatch)
             HotstringRepl := HSEMatch.HasOwnProp("Replacement") ? HSEMatch.Replacement : HSEMatch.Trigger
-            try KL_LogHotstring(HSEMatch.Trigger, HotstringRepl, HotstringHType)
+            ; IsRepeat matches have no Category property — pass "repeat_key" explicitly
+            ; so the WPM widget knows to stay at the default color.
+            HotstringCategory := HSEMatch.HasOwnProp("IsRepeat") && HSEMatch.IsRepeat
+                ? "repeat_key"
+                : (HSEMatch.HasOwnProp("Category") ? HSEMatch.Category : "")
+            try KL_LogHotstring(HSEMatch.Trigger, HotstringRepl, HotstringHType, "", HotstringCategory)
             ; Wipe the prefix watcher's own buffer so the post-expansion
             ; tail (which the user just observed on screen) does not
             ; surface a stale tooltip preview from the trigger we just

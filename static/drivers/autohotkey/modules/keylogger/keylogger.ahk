@@ -736,7 +736,7 @@ KL_LogSystemEvent(action, metadata := unset) {
 ;     to (HS does the same with utf8.len),
 ;   - falls back to the session app when the caller omits ``app_name``,
 ;   - emits the same ``tag`` marker (`<hotstring>…</hotstring>`) HS writes.
-KL_LogHotstring(trigger, replacement, h_type := "unknown", app_name := "") {
+KL_LogHotstring(trigger, replacement, h_type := "unknown", app_name := "", category := "") {
     if !Keylogger.initialized
         return
     KL_FlushBuffer()
@@ -753,10 +753,11 @@ KL_LogHotstring(trigger, replacement, h_type := "unknown", app_name := "") {
     ))
     Keylogger.last_flush_time := A_TickCount
     try KL_Roi_OnHotstring(trigger, net_saved)
-    ; Feed the real-time WPM widget — the expansion counts as HS-typed chars.
+    ; Feed the real-time WPM widget — pass the TOML category so the widget
+    ; can resolve the correct color and skip coloring for neutral groups.
     repl_len := StrLen(replacement)
     Loop repl_len
-        try WPMWidget_Push(true, false)
+        try WPMWidget_Push(true, false, false, category)
 }
 
 ; Logs that a hotstring tooltip was shown to the user. Mirrors HS init.lua:1196.
