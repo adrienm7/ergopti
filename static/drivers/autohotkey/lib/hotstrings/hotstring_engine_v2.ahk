@@ -97,6 +97,16 @@ global HSE_RegistryByLastChar := Map()
 ; walk on every word-terminator keystroke.
 global HSE_StarSpecs := []
 
+; Pre-computed prefix set for O(1) star-trigger cover check. For each star
+; trigger registered, every strict prefix (length 1 to len-1) is stored in
+; a case-insensitive set (lowercase key → true). A second map stores the
+; exact-cased keys for case-sensitive triggers. Populated atomically in
+; HSE_Register alongside HSE_StarSpecs; reset in HSE_RegistryClear.
+; This replaces the O(n_star) scan in _HSE_StarTriggerCoversBody with an O(1)
+; Map.Has() lookup, eliminating the per-space keystroke bottleneck entirely.
+global HSE_StarPrefixSetCI := Map()   ; case-insensitive star prefixes (lowercased)
+global HSE_StarPrefixSetCS := Map()   ; case-sensitive star prefixes (exact casing)
+
 ; Suppression flag. When true, FeedChar / FeedBackspace / FeedReset
 ; short-circuit. The dispatch loop sets it for the duration of the
 ; SendEvent burst so its own replacement output does not feed back into
@@ -141,7 +151,7 @@ global HSE_RepeatEnabled := true
 ; HSE_WORD_TERMINATORS) is typed right after — that end character is
 ; consumed by the dispatch and re-injected by HSE_ApplyExpansion.
 HSE_Register(Flags, Trigger, Callback, Meta := unset) {
-    global HSE_RegistryByLastChar, HSE_StarSpecs
+    global HSE_RegistryByLastChar, HSE_StarSpecs, HSE_StarPrefixSetCI, HSE_StarPrefixSetCS
     if (Trigger == "") {
         return
     }
@@ -169,10 +179,11 @@ HSE_Register(Flags, Trigger, Callback, Meta := unset) {
         HSE_RegistryByLastChar[LookupKey] := []
     }
     HSE_RegistryByLastChar[LookupKey].Push(Spec)
-    ; Maintain the flat star-spec index so _HSE_StarTriggerCoversBody
-    ; never has to walk the entire registry on every terminator keystroke.
+    ; Maintain the flat star-spec index and the O(1) prefix set so
+    ; _HSE_StarTriggerCoversBody never has to scan on every terminator keystroke.
     if Spec.Star {
         HSE_StarSpecs.Push(Spec)
+        _HSE_IndexStarPrefixes(Spec)
     }
 }
 
@@ -180,9 +191,11 @@ HSE_Register(Flags, Trigger, Callback, Meta := unset) {
 ; engine never needs it because Reload re-runs the registration code from
 ; scratch with a fresh module state.
 HSE_RegistryClear() {
-    global HSE_RegistryByLastChar, HSE_StarSpecs
+    global HSE_RegistryByLastChar, HSE_StarSpecs, HSE_StarPrefixSetCI, HSE_StarPrefixSetCS
     HSE_RegistryByLastChar := Map()
     HSE_StarSpecs := []
+    HSE_StarPrefixSetCI := Map()
+    HSE_StarPrefixSetCS := Map()
 }
 
 
@@ -491,15 +504,6 @@ HSE_FindMatchAtEnd(JustTypedChar) {
 }
 
 ; Return true when a registered star trigger would shadow the given end-char
-; Spec: i.e. a star trigger exists that is strictly longer than Spec.Trigger
-; and whose suffix in the buffer starts where Spec.Trigger starts. This means
-; the user may still type more characters to reach that star trigger, so the
-; shorter end-char match must not fire prematurely.
-;
-; Example: Spec.Trigger = "ia", star trigger "ia★" registered.
-; BodyBuf ends with "ia" — the star trigger starts where "ia" starts, and is
-; longer, so the end-char match is suppressed.
-; Return true when a registered star trigger would shadow the given end-char
 ; Spec: i.e. a star trigger exists whose trigger body starts with Spec.Trigger
 ; (Spec.Trigger is a strict prefix of StarSpec.Trigger). This means the user
 ; may still type more characters to reach that star trigger, so the shorter
@@ -507,24 +511,38 @@ HSE_FindMatchAtEnd(JustTypedChar) {
 ;
 ; Example: Spec.Trigger = "ia", star trigger "ia★" registered.
 ; "ia" is a strict prefix of "ia★" → end-char match on "ia" is suppressed.
+;
+; Implementation: O(1) lookup into HSE_StarPrefixSetCI (case-insensitive) or
+; HSE_StarPrefixSetCS (case-sensitive). The sets are populated at registration
+; time by _HSE_IndexStarPrefixes — each star trigger contributes all its strict
+; prefixes. This replaces the O(n_star) scan the previous implementation used,
+; which caused keyboard lockups under heavy typing with large trigger sets.
 _HSE_StarTriggerCoversBody(BodyBuf, Spec) {
-    global HSE_StarSpecs
-    ; Scan only pre-filtered star specs (O(n_star) not O(all_triggers)) so
-    ; this check does not stall the InputHook on terminator keystrokes.
-    for _, StarSpec in HSE_StarSpecs {
-        if StarSpec.Length <= Spec.Length {
-            continue
-        }
-        ; Spec.Trigger must be a strict prefix of StarSpec.Trigger.
-        ; Use case-insensitive comparison unless both triggers are C-flagged.
-        StarPrefix := SubStr(StarSpec.Trigger, 1, Spec.Length)
-        CaseSens := Spec.CaseSensitive and StarSpec.CaseSensitive
-        if CaseSens ? (StarPrefix !== Spec.Trigger) : (StrLower(StarPrefix) != StrLower(Spec.Trigger)) {
-            continue
-        }
-        return true
+    global HSE_StarPrefixSetCI, HSE_StarPrefixSetCS
+    ; Case-sensitive triggers only shadow other case-sensitive triggers.
+    ; Case-insensitive triggers shadow both CI and CS (conservative suppression).
+    if Spec.CaseSensitive {
+        return HSE_StarPrefixSetCS.Has(Spec.Trigger)
     }
-    return false
+    return HSE_StarPrefixSetCI.Has(StrLower(Spec.Trigger))
+}
+
+; Populate HSE_StarPrefixSetCI and HSE_StarPrefixSetCS with all strict prefixes
+; of the given star-trigger Spec. Called once per registration (cold path only).
+_HSE_IndexStarPrefixes(Spec) {
+    global HSE_StarPrefixSetCI, HSE_StarPrefixSetCS
+    Len := Spec.Length
+    if (Len <= 1) {
+        return
+    }
+    loop (Len - 1) {
+        Prefix := SubStr(Spec.Trigger, 1, A_Index)
+        if Spec.CaseSensitive {
+            HSE_StarPrefixSetCS[Prefix] := true
+        } else {
+            HSE_StarPrefixSetCI[StrLower(Prefix)] := true
+        }
+    }
 }
 
 
