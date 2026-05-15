@@ -40,12 +40,6 @@ global _TOOLTIP_LABEL_GAP        := 10    ; gap between output text and badge le
 ; regardless of which symbol it shows.  The symbol is rendered in the row's
 ; accent colour on a neutral dark background so it pops on any tint.
 global _TOOLTIP_BADGE_W          := 24    ; total badge width (px) — fixed across all rows
-; Vertical nudge applied to the badge rect to compensate for the baseline
-; difference between Segoe UI (main text) and the fallback font used to
-; render Unicode symbols like ★ and ⏎ — the fallback glyph sits higher
-; inside its cell than a Segoe UI glyph of the same point size.
-global _TOOLTIP_BADGE_Y_OFFSET   := 3     ; pixels to shift badge rect downward
-global _TOOLTIP_BADGE_H_SHRINK   := 3     ; extra pixels trimmed from badge height (top+bottom balance)
 global _TOOLTIP_BADGE_BG_HEX     := "2D2D2D"   ; neutral dark grey badge background
 global _TOOLTIP_OFFSET_BELOW     := 18   ; pixels below the anchor (caret / box)
 global _TOOLTIP_OFFSET_RIGHT     := 4    ; small horizontal nudge for caret anchor
@@ -200,7 +194,7 @@ _TooltipBuildGui(Items) {
     global _TooltipGui, _TooltipRowGuis
     global _TOOLTIP_FONT_NAME, _TOOLTIP_FONT_SIZE, _TOOLTIP_FONT_SIZE_LABEL
     global _TOOLTIP_PADDING_X, _TOOLTIP_PADDING_Y, _TOOLTIP_LABEL_GAP
-    global _TOOLTIP_BADGE_W, _TOOLTIP_BADGE_Y_OFFSET, _TOOLTIP_BADGE_H_SHRINK, _TOOLTIP_BADGE_BG_HEX
+    global _TOOLTIP_BADGE_W, _TOOLTIP_BADGE_BG_HEX
 
     OldGuis := _TooltipGui ? _TooltipRowGuis : []
 
@@ -251,26 +245,37 @@ _TooltipBuildGui(Items) {
             _TOOLTIP_PADDING_X, _TOOLTIP_PADDING_Y, MaxW, S.H)
         G.Add("Text", TextOpts, Item.Text)
 
-        ; Badge pill — fixed-width box, neutral dark background, symbol in
-        ; accent colour.  Using a solid-background Text control avoids the
-        ; need for a separate child window and keeps z-order trivial.
+        ; Badge pill — fixed-width neutral box with the symbol in accent colour.
+        ; Two overlapping controls: an opaque background rect, then a
+        ; BackgroundTrans text control sized to the measured glyph height and
+        ; vertically centred inside the badge — this is the only reliable way
+        ; to get vertical centering since AHK Text always renders top-aligned.
         HasLabel := Item.HasOwnProp("TriggerLabel") and Item.TriggerLabel != ""
         if HasLabel {
             BadgeX := _TOOLTIP_PADDING_X + MaxW + _TOOLTIP_LABEL_GAP
-            ; Shift the badge rect down by _TOOLTIP_BADGE_Y_OFFSET to compensate
-            ; for the fallback font's glyph sitting higher in its cell than
-            ; Segoe UI — keeps ★/⏎ visually aligned with the output text.
-            BadgeY := _TOOLTIP_PADDING_Y + _TOOLTIP_BADGE_Y_OFFSET
-            BadgeH := S.H - _TOOLTIP_BADGE_Y_OFFSET - _TOOLTIP_BADGE_H_SHRINK
 
-            ; Accent colour: use the raw ColorHex at full brightness so the
-            ; symbol pops against the neutral badge background.
+            ; Measure the actual glyph height at the badge font size.
+            GlyphH := _TooltipMeasureTextSize(Item.TriggerLabel, _TOOLTIP_FONT_SIZE_LABEL).H
+
+            ; Badge background: full row height minus symmetric 2 px inset.
+            BgY := _TOOLTIP_PADDING_Y - 2
+            BgH := S.H + 4
+
+            ; Text rect: glyph-height, centred inside the badge background.
+            TextY := BgY + (BgH - GlyphH) // 2
+
             AccentColor := (ColorHex != "") ? Trim(ColorHex, "#") : "FFFFFF"
 
-            BadgeOpts := Format("Background{1} x{2} y{3} w{4} h{5} Center",
-                _TOOLTIP_BADGE_BG_HEX, BadgeX, BadgeY, _TOOLTIP_BADGE_W, BadgeH)
+            ; 1) Opaque background rectangle (no text).
+            G.SetFont("s1", _TOOLTIP_FONT_NAME)
+            G.Add("Text", Format("Background{1} x{2} y{3} w{4} h{5}",
+                _TOOLTIP_BADGE_BG_HEX, BadgeX, BgY, _TOOLTIP_BADGE_W, BgH), "")
+
+            ; 2) Transparent text control centred over the background.
             G.SetFont("c" . AccentColor . " s" . _TOOLTIP_FONT_SIZE_LABEL, _TOOLTIP_FONT_NAME)
-            G.Add("Text", BadgeOpts, Item.TriggerLabel)
+            G.Add("Text", Format("BackgroundTrans 0xC x{1} y{2} w{3} h{4} Center",
+                BadgeX, TextY, _TOOLTIP_BADGE_W, GlyphH), Item.TriggerLabel)
+
             G.SetFont("cFFFFFF s" . _TOOLTIP_FONT_SIZE, _TOOLTIP_FONT_NAME)
         }
 
