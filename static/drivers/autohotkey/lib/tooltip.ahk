@@ -160,6 +160,8 @@ TooltipShow(Items, DurationSec := 0) {
 }
 
 ; Hide all tooltip rows and the border overlay immediately.
+; Destroys the row Guis (not just hides) so stale window handles cannot
+; resurface as ghosts if a new TooltipShow fires before the old timer fires.
 TooltipHide() {
     global _TooltipGui, _TooltipRowGuis, _TooltipBorderGui, _TooltipTimer
     if _TooltipTimer {
@@ -167,8 +169,10 @@ TooltipHide() {
         _TooltipTimer := 0
     }
     for _, Row in _TooltipRowGuis {
-        try Row.Gui.Hide()
+        try Row.Gui.Destroy()
     }
+    _TooltipGui     := 0
+    _TooltipRowGuis := []
     if _TooltipBorderGui {
         try _TooltipBorderGui.Destroy()
         _TooltipBorderGui := 0
@@ -215,10 +219,10 @@ _TooltipBuildGui(Items) {
             MaxW := S.W + 4
     }
 
-    ; Total width: left padding + output text area + gap + fixed badge + right padding.
-    ; The badge column is always _TOOLTIP_BADGE_W wide (fixed), so all rows align
-    ; and there is never a large gap caused by short output text.
-    BadgeColW := HasAnyLabel ? (_TOOLTIP_LABEL_GAP + _TOOLTIP_BADGE_W) : 0
+    ; Total width: left padding + output text + gap + badge + right padding.
+    ; Right padding (_TOOLTIP_PADDING_X) is added after the badge so the pill
+    ; is never clipped by the window edge.
+    BadgeColW := HasAnyLabel ? (_TOOLTIP_LABEL_GAP + _TOOLTIP_BADGE_W + _TOOLTIP_PADDING_X) : 0
     TotalW := _TOOLTIP_PADDING_X + MaxW + BadgeColW + _TOOLTIP_PADDING_X
 
     NewGuis := []

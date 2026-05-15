@@ -36,13 +36,13 @@ textexpansionsymbolstypst = { fr = "Expansion de texte Symboles Typst : $eq.not$
 # ======================
 
 [[repeatcorrections]]
-"arrê" = { output = "arrê", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
+"arrê" = { output = "arrê", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = true }
 "ccê" = { output = "ccu", is_word = false, auto_expand = true, is_case_sensitive = false, final_result = false }
 "ddê" = { output = "ddu", is_word = false, auto_expand = true, is_case_sensitive = false, final_result = false }
 "emmê" = { output = "emmê", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = true }
 "ffê" = { output = "ffu", is_word = false, auto_expand = true, is_case_sensitive = false, final_result = false }
 "ggê" = { output = "ggu", is_word = false, auto_expand = true, is_case_sensitive = false, final_result = false }
-"honnê" = { output = "honnê", is_word = false, auto_expand = true, is_case_sensitive = false, final_result = false }
+"honnê" = { output = "honnê", is_word = false, auto_expand = true, is_case_sensitive = false, final_result = true }
 "llê" = { output = "llu", is_word = false, auto_expand = true, is_case_sensitive = false, final_result = false }
 "mmê" = { output = "mmu", is_word = false, auto_expand = true, is_case_sensitive = false, final_result = false }
 "nnê" = { output = "nnu", is_word = false, auto_expand = true, is_case_sensitive = false, final_result = false }

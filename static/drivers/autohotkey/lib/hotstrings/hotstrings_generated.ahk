@@ -4791,7 +4791,7 @@ _GenLoad_magickey_repeatcorrections(FeatureConfig, ExtraOptions := unset) {
 	global ScriptInformation
 	_GenTimeAct := FeatureConfig.HasOwnProp("TimeActivationSeconds") ? FeatureConfig.TimeActivationSeconds : 0
 	_GenMK := ScriptInformation["MagicKey"]
-	_GenOpts := Map("TimeActivationSeconds", _GenTimeAct, "FinalResult", false, "IsRepeat", false, "Category", "magickey", "Section", "repeatcorrections")
+	_GenOpts := Map("TimeActivationSeconds", _GenTimeAct, "FinalResult", true, "IsRepeat", false, "Category", "magickey", "Section", "repeatcorrections")
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		_GenOpts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
@@ -4821,7 +4821,7 @@ _GenLoad_magickey_repeatcorrections(FeatureConfig, ExtraOptions := unset) {
 		_GenOpts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
 	CreateCaseSensitiveHotstrings("*?", "ggê", "ggu", _GenOpts)
-	_GenOpts := Map("TimeActivationSeconds", _GenTimeAct, "FinalResult", false, "IsRepeat", false, "Category", "magickey", "Section", "repeatcorrections")
+	_GenOpts := Map("TimeActivationSeconds", _GenTimeAct, "FinalResult", true, "IsRepeat", false, "Category", "magickey", "Section", "repeatcorrections")
 	if IsSet(ExtraOptions) and ExtraOptions.Has("OnlyText") {
 		_GenOpts["OnlyText"] := ExtraOptions["OnlyText"]
 	}
