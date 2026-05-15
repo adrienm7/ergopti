@@ -7,10 +7,10 @@
 ---
 --- FEATURES & RATIONALE:
 --- 1. Source Resolution: Keeps menubar and floating widget synchronized.
---- 2. Live Color Pipeline: Colors for hotstring sources are resolved from the
----    same TOML metadata + shared user-override file used by the tooltip system,
----    so any customization in the hotstrings config window is reflected here too.
----    Manual (blue) and AI (purple) use hardcoded fallbacks.
+--- 2. Live Color Pipeline: The source_variant (= TOML group name) is passed
+---    directly to hotstrings_config.resolve() so the widget color always matches
+---    the group's _meta.color + any user override. Exceptions: "manual", "llm",
+---    "hotstring" (generic), "repeat_key", and "rolls" use hardcoded fallbacks.
 --- 3. Label Formatting: Provides consistent MPM text rendering utilities.
 --- ==============================================================================
 
@@ -32,31 +32,28 @@ local COLOR_FALLBACK = {
 	llm    = "#af52de",
 }
 
--- Maps a WPM source variant to the hotstrings_config category whose TOML metadata
--- (+ user override) drives its color. Only groups that display a visible tooltip
--- are listed here — the widget color must always match the tooltip color.
--- Sources not listed here use COLOR_FALLBACK (blue default).
--- Rolls, sfbsreduction, distancesreduction, repeat_key, and the generic "hotstring"
--- source are intentionally absent: they either show no tooltip or are low-level
--- ergonomic substitutions whose color should not bleed into the widget.
-local SOURCE_TO_CATEGORY = {
-	magickey       = "magickey",
-	autocorrection = "autocorrection",
+-- Sources that must never color the widget — they are not hotstring groups backed
+-- by a TOML file, or are ergonomic substitutions that should stay at the default color.
+local NO_COLOR_SOURCES = {
+	none       = true,
+	manual     = true,
+	hotstring  = true,  -- Generic fallback when no group is known
+	repeat_key = true,
+	rolls      = true,
 }
 
 --- Resolves the hex color string for a typing source.
---- Resolution order for hotstring/autocorrection:
----   1. hotstrings_config.resolve(category).color — TOML metadata + user override.
----   2. COLOR_FALLBACK[source] or "#007aff" when unconfigured or unknown.
---- For "manual" and "llm": COLOR_FALLBACK directly (no TOML source for these).
---- @param source string Source name ("manual", "hotstring", "autocorrection", "llm").
+--- For sources backed by a TOML group (e.g. "magickey", "autocorrection",
+--- "sfbsreduction"…) the color comes from hotstrings_config.resolve(source),
+--- which merges the TOML _meta.color with any user override.
+--- Sources in NO_COLOR_SOURCES and "llm" use COLOR_FALLBACK directly.
+--- @param source string Source name — matches the TOML filename / group name.
 --- @return string Hex color string with leading "#".
 local function resolve_source_hex(source)
-	local category = SOURCE_TO_CATEGORY[source]
-	if category then
+	if not NO_COLOR_SOURCES[source] and source ~= "llm" then
 		local ok, hs_cfg = pcall(require, "modules.hotstrings_config")
 		if ok and hs_cfg and type(hs_cfg.resolve) == "function" then
-			local resolved = hs_cfg.resolve(category, nil)
+			local resolved = hs_cfg.resolve(source, nil)
 			if resolved and type(resolved.color) == "string" and resolved.color ~= "" then
 				local c = resolved.color
 				return c:sub(1, 1) == "#" and c or ("#" .. c)
