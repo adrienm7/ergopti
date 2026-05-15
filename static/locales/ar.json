@@ -25,6 +25,8 @@
 	"app_category.video": "الفيديو",
 	"app_category.weather": "الطقس",
 	"app_picker.no_app_excluded": "لا توجد تطبيقات للاستثناء",
+	"app_picker.add_another_app": "+ إضافة تطبيق آخر…",
+	"app_picker.exclude_current": "استبعاد {app} (الحالي)",
 	"app_picker.search_placeholder": "البحث عن تطبيق…",
 	"autocorrection.accents": "تصحيح تلقائي للتشكيل",
 	"autocorrection.caps": "حرف كبير تلقائي في بداية الجملة",

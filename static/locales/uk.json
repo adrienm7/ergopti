@@ -25,6 +25,8 @@
 	"app_category.video": "Відео",
 	"app_category.weather": "Погода",
 	"app_picker.no_app_excluded": "Немає програм для виключення",
+	"app_picker.add_another_app": "+ Додати іншу програму…",
+	"app_picker.exclude_current": "Виключити {app} (поточне)",
 	"app_picker.search_placeholder": "Пошук програми…",
 	"autocorrection.accents": "Автоматичне виправлення наголосів",
 	"autocorrection.caps": "Автоматична велика літера на початку речення",

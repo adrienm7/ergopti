@@ -35,6 +35,8 @@
 	"app_category.video": "वीडियो",
 	"app_category.weather": "मौसम",
 	"app_picker.no_app_excluded": "बाहर करने के लिए कोई ऐप नहीं",
+	"app_picker.add_another_app": "+ एक और एप जोड़ें…",
+	"app_picker.exclude_current": "{app} को हटाएं (वर्तमान)",
 	"app_picker.search_placeholder": "कोई ऐप खोजें…",
 	"autocorrection.accents": "स्वचालित उच्चारण चिह्न सुधार",
 	"autocorrection.caps": "वाक्य की शुरुआत में स्वचालित बड़ा अक्षर",

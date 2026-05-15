@@ -25,6 +25,8 @@
 	"app_category.video": "비디오",
 	"app_category.weather": "날씨",
 	"app_picker.no_app_excluded": "제외할 애플리케이션 없음",
+	"app_picker.add_another_app": "+ 다른 앱 추가…",
+	"app_picker.exclude_current": "{app} 제외 (현재)",
 	"app_picker.search_placeholder": "애플리케이션 검색…",
 	"autocorrection.accents": "자동 악센트 교정",
 	"autocorrection.caps": "문장 시작 시 자동 대문자",

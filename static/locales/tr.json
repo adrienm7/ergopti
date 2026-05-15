@@ -25,6 +25,8 @@
 	"app_category.video": "Video",
 	"app_category.weather": "Hava durumu",
 	"app_picker.no_app_excluded": "Hariç tutulacak uygulama yok",
+	"app_picker.add_another_app": "+ Başka bir uygulama ekle…",
+	"app_picker.exclude_current": "{app} uygulamasını dışla (geçerli)",
 	"app_picker.search_placeholder": "Uygulama ara…",
 	"autocorrection.accents": "Otomatik aksan düzeltme",
 	"autocorrection.caps": "Cümle başında otomatik büyük harf",

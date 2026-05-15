@@ -25,6 +25,8 @@
 	"app_category.video": "Видео",
 	"app_category.weather": "Погода",
 	"app_picker.no_app_excluded": "Нет приложений для исключения",
+	"app_picker.add_another_app": "+ Добавить другое приложение…",
+	"app_picker.exclude_current": "Исключить {app} (текущее)",
 	"app_picker.search_placeholder": "Поиск приложения…",
 	"autocorrection.accents": "Автоматическая коррекция акцентов",
 	"autocorrection.caps": "Автоматическая заглавная буква в начале предложения",

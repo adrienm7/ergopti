@@ -35,6 +35,8 @@
 	"app_category.video": "וידאו",
 	"app_category.weather": "מזג אוויר",
 	"app_picker.no_app_excluded": "אין אפליקציות להחרגה",
+	"app_picker.add_another_app": "+ הוסף יישום נוסף…",
+	"app_picker.exclude_current": "הדר {app} (נוכחי)",
 	"app_picker.search_placeholder": "חפש אפליקציה…",
 	"autocorrection.accents": "תיקון אוטומטי של ניקוד",
 	"autocorrection.caps": "אות גדולה אוטומטית בתחילת משפט",

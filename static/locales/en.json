@@ -25,6 +25,8 @@
 	"app_category.video": "Video",
 	"app_category.weather": "Weather",
 	"app_picker.no_app_excluded": "No application to exclude",
+	"app_picker.add_another_app": "+ Add another application…",
+	"app_picker.exclude_current": "Exclude {app} (current)",
 	"app_picker.search_placeholder": "Search for an application…",
 	"autocorrection.accents": "Automatic accent correction",
 	"autocorrection.caps": "Auto-capitalise at start of sentence",

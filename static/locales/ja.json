@@ -25,6 +25,8 @@
 	"app_category.video": "ビデオ",
 	"app_category.weather": "天気",
 	"app_picker.no_app_excluded": "除外するアプリケーションなし",
+	"app_picker.add_another_app": "+ 別のアプリを追加…",
+	"app_picker.exclude_current": "{app} を除外（現在）",
 	"app_picker.search_placeholder": "アプリケーションを検索…",
 	"autocorrection.accents": "アクセントの自動修正",
 	"autocorrection.caps": "文頭の自動大文字化",

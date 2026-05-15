@@ -25,6 +25,8 @@
 	"app_category.video": "Video",
 	"app_category.weather": "Weer",
 	"app_picker.no_app_excluded": "Geen applicatie om uit te sluiten",
+	"app_picker.add_another_app": "+ Een andere toepassing toevoegen…",
+	"app_picker.exclude_current": "{app} uitsluiten (huidig)",
 	"app_picker.search_placeholder": "Zoek een applicatie…",
 	"autocorrection.accents": "Automatische accentcorrectie",
 	"autocorrection.caps": "Automatische hoofdletter aan begin van zin",
