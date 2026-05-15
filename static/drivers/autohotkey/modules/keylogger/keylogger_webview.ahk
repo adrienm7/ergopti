@@ -417,19 +417,16 @@ KLWV_DelayedFirstPush(which) {
     if !KLWV.windows.Has(which)
         return
     global KLPF_LAST_JSON
-    ; Phase 1 — fast manifest push (< 1 s, always runs).
-    ; Gives the page KPI counters and date range immediately.
-    ; If a live-tick blob is already cached, use it directly (it has today's
-    ; n-grams); otherwise run a manifest-only build that takes ~50 ms.
-    need_manifest_build := !IsSet(KLPF_LAST_JSON) || !KLPF_LAST_JSON.Has(which)
-    ; Inject i18n immediately — before any potentially long DB build — so
-    ; translated texts appear as soon as the page is ready to receive them.
+    ; Inject i18n first — must happen before any DB build which can block
+    ; for tens of seconds on a cold cache.
     KLWV_InjectI18n(which)
+    ; Only build if we have no cached blob yet. If KLRCache.db is 0 (cold
+    ; start, data.sql not yet loaded) we skip the build entirely to avoid
+    ; blocking the thread for minutes — the first live-tick will build and
+    ; push. If KLRCache.db is warm the manifest build takes ~50 ms.
     need_manifest_build := !IsSet(KLPF_LAST_JSON) || !KLPF_LAST_JSON.Has(which)
-    if need_manifest_build {
-        if KLWV.metrics_dir
-            try KLPF_BuildAndWrite(which, KLWV.metrics_dir, , "manifest")
-    }
+    if need_manifest_build && KLWV.metrics_dir && KLRCache.db
+        try KLPF_BuildAndWrite(which, KLWV.metrics_dir, , "manifest")
     KLWV_PushPrefetch(which)
     ; Mark first paint done so live ticks can fan out from now on.
     if KLWV.windows.Has(which)
