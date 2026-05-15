@@ -7,8 +7,9 @@
 --
 -- Locale : lit ERGOPTI_LOCALE (injecté par menu_apps.lua) en priorité,
 -- puis le préfixe ISO-2 de $LANG, puis "en" par défaut.
--- Les chaînes UI sont définies dans le handler ui_strings() et couvrent
--- fr, en, de, es, it, pt, nl, pl, ja, zh — fallback en anglais.
+-- Les chaînes UI sont chargées depuis le fichier JSON
+-- <ERGOPTI_LOCALES_DIR>/<code>.json (injecté par menu_apps.lua).
+-- Cela couvre automatiquement toutes les locales supportées par Ergopti.
 --
 -- Compilation : osacompile -o main.scpt main.applescript
 -- (à lancer sur macOS depuis le dossier Scripts/).
@@ -42,241 +43,115 @@ on resolve_locale()
 	return loc
 end resolve_locale
 
--- Return a record with all UI strings for the given locale code.
--- Unsupported locales fall back to English.
-on ui_strings(loc)
-	-- French
-	if loc is "fr" then
-		return {¬
-			title_encrypt: "Chiffrer le fichier", ¬
-			title_decrypt: "Déchiffrer le fichier", ¬
-			prompt_password: "Mot de passe :", ¬
-			prompt_confirm: "Confirmer le mot de passe :", ¬
-			btn_encrypt: "Chiffrer", ¬
-			btn_decrypt: "Déchiffrer", ¬
-			btn_cancel: "Annuler", ¬
-			err_empty_password: "Le mot de passe ne peut pas être vide.", ¬
-			err_password_mismatch: "Les mots de passe ne correspondent pas.", ¬
-			err_file_missing: "Fichier introuvable.", ¬
-			err_openssl_missing: "openssl est introuvable. Installez les Xcode Command Line Tools.", ¬
-			err_encrypt_failed: "Le chiffrement a échoué.", ¬
-			err_decrypt_failed: "Le déchiffrement a échoué. Mot de passe incorrect ou fichier corrompu ?", ¬
-			success_encrypted: "Fichier chiffré :", ¬
-			success_decrypted: "Fichier déchiffré :", ¬
-			btn_reveal: "Afficher dans le Finder", ¬
-			btn_close: "Fermer", ¬
-			warn_overwrite: "Un fichier de destination existe déjà. Écraser ?", ¬
-			btn_overwrite: "Écraser", ¬
-			lbl_file: "Fichier :"}
-	-- German
-	else if loc is "de" then
-		return {¬
-			title_encrypt: "Datei verschlüsseln", ¬
-			title_decrypt: "Datei entschlüsseln", ¬
-			prompt_password: "Passwort:", ¬
-			prompt_confirm: "Passwort bestätigen:", ¬
-			btn_encrypt: "Verschlüsseln", ¬
-			btn_decrypt: "Entschlüsseln", ¬
-			btn_cancel: "Abbrechen", ¬
-			err_empty_password: "Das Passwort darf nicht leer sein.", ¬
-			err_password_mismatch: "Die Passwörter stimmen nicht überein.", ¬
-			err_file_missing: "Datei nicht gefunden.", ¬
-			err_openssl_missing: "openssl nicht gefunden. Installieren Sie die Xcode Command Line Tools.", ¬
-			err_encrypt_failed: "Verschlüsselung fehlgeschlagen.", ¬
-			err_decrypt_failed: "Entschlüsselung fehlgeschlagen. Falsches Passwort oder beschädigte Datei?", ¬
-			success_encrypted: "Datei verschlüsselt:", ¬
-			success_decrypted: "Datei entschlüsselt:", ¬
-			btn_reveal: "Im Finder anzeigen", ¬
-			btn_close: "Schließen", ¬
-			warn_overwrite: "Eine Zieldatei existiert bereits. Überschreiben?", ¬
-			btn_overwrite: "Überschreiben", ¬
-			lbl_file: "Datei:"}
-	-- Spanish
-	else if loc is "es" then
-		return {¬
-			title_encrypt: "Cifrar archivo", ¬
-			title_decrypt: "Descifrar archivo", ¬
-			prompt_password: "Contraseña:", ¬
-			prompt_confirm: "Confirmar contraseña:", ¬
-			btn_encrypt: "Cifrar", ¬
-			btn_decrypt: "Descifrar", ¬
-			btn_cancel: "Cancelar", ¬
-			err_empty_password: "La contraseña no puede estar vacía.", ¬
-			err_password_mismatch: "Las contraseñas no coinciden.", ¬
-			err_file_missing: "Archivo no encontrado.", ¬
-			err_openssl_missing: "openssl no encontrado. Instale las Xcode Command Line Tools.", ¬
-			err_encrypt_failed: "El cifrado ha fallado.", ¬
-			err_decrypt_failed: "El descifrado ha fallado. ¿Contraseña incorrecta o archivo dañado?", ¬
-			success_encrypted: "Archivo cifrado:", ¬
-			success_decrypted: "Archivo descifrado:", ¬
-			btn_reveal: "Mostrar en Finder", ¬
-			btn_close: "Cerrar", ¬
-			warn_overwrite: "Ya existe un archivo de destino. ¿Sobrescribir?", ¬
-			btn_overwrite: "Sobrescribir", ¬
-			lbl_file: "Archivo:"}
-	-- Italian
-	else if loc is "it" then
-		return {¬
-			title_encrypt: "Cifra il file", ¬
-			title_decrypt: "Decifra il file", ¬
-			prompt_password: "Password:", ¬
-			prompt_confirm: "Conferma password:", ¬
-			btn_encrypt: "Cifra", ¬
-			btn_decrypt: "Decifra", ¬
-			btn_cancel: "Annulla", ¬
-			err_empty_password: "La password non può essere vuota.", ¬
-			err_password_mismatch: "Le password non corrispondono.", ¬
-			err_file_missing: "File non trovato.", ¬
-			err_openssl_missing: "openssl non trovato. Installa gli Xcode Command Line Tools.", ¬
-			err_encrypt_failed: "La cifratura è fallita.", ¬
-			err_decrypt_failed: "La decifratura è fallita. Password errata o file corrotto?", ¬
-			success_encrypted: "File cifrato:", ¬
-			success_decrypted: "File decifrato:", ¬
-			btn_reveal: "Mostra nel Finder", ¬
-			btn_close: "Chiudi", ¬
-			warn_overwrite: "Esiste già un file di destinazione. Sovrascrivere?", ¬
-			btn_overwrite: "Sovrascrivi", ¬
-			lbl_file: "File:"}
-	-- Portuguese
-	else if loc is "pt" then
-		return {¬
-			title_encrypt: "Cifrar arquivo", ¬
-			title_decrypt: "Decifrar arquivo", ¬
-			prompt_password: "Senha:", ¬
-			prompt_confirm: "Confirmar senha:", ¬
-			btn_encrypt: "Cifrar", ¬
-			btn_decrypt: "Decifrar", ¬
-			btn_cancel: "Cancelar", ¬
-			err_empty_password: "A senha não pode estar vazia.", ¬
-			err_password_mismatch: "As senhas não coincidem.", ¬
-			err_file_missing: "Arquivo não encontrado.", ¬
-			err_openssl_missing: "openssl não encontrado. Instale as Xcode Command Line Tools.", ¬
-			err_encrypt_failed: "A cifragem falhou.", ¬
-			err_decrypt_failed: "A decifragem falhou. Senha incorreta ou arquivo corrompido?", ¬
-			success_encrypted: "Arquivo cifrado:", ¬
-			success_decrypted: "Arquivo decifrado:", ¬
-			btn_reveal: "Mostrar no Finder", ¬
-			btn_close: "Fechar", ¬
-			warn_overwrite: "Já existe um arquivo de destino. Substituir?", ¬
-			btn_overwrite: "Substituir", ¬
-			lbl_file: "Arquivo:"}
-	-- Dutch
-	else if loc is "nl" then
-		return {¬
-			title_encrypt: "Bestand versleutelen", ¬
-			title_decrypt: "Bestand ontsleutelen", ¬
-			prompt_password: "Wachtwoord:", ¬
-			prompt_confirm: "Wachtwoord bevestigen:", ¬
-			btn_encrypt: "Versleutelen", ¬
-			btn_decrypt: "Ontsleutelen", ¬
-			btn_cancel: "Annuleren", ¬
-			err_empty_password: "Het wachtwoord mag niet leeg zijn.", ¬
-			err_password_mismatch: "De wachtwoorden komen niet overeen.", ¬
-			err_file_missing: "Bestand niet gevonden.", ¬
-			err_openssl_missing: "openssl niet gevonden. Installeer de Xcode Command Line Tools.", ¬
-			err_encrypt_failed: "Versleuteling mislukt.", ¬
-			err_decrypt_failed: "Ontsleuteling mislukt. Verkeerd wachtwoord of beschadigd bestand?", ¬
-			success_encrypted: "Bestand versleuteld:", ¬
-			success_decrypted: "Bestand ontsleuteld:", ¬
-			btn_reveal: "Toon in Finder", ¬
-			btn_close: "Sluiten", ¬
-			warn_overwrite: "Er bestaat al een doelbestand. Overschrijven?", ¬
-			btn_overwrite: "Overschrijven", ¬
-			lbl_file: "Bestand:"}
-	-- Polish
-	else if loc is "pl" then
-		return {¬
-			title_encrypt: "Zaszyfruj plik", ¬
-			title_decrypt: "Odszyfruj plik", ¬
-			prompt_password: "Hasło:", ¬
-			prompt_confirm: "Potwierdź hasło:", ¬
-			btn_encrypt: "Szyfruj", ¬
-			btn_decrypt: "Odszyfruj", ¬
-			btn_cancel: "Anuluj", ¬
-			err_empty_password: "Hasło nie może być puste.", ¬
-			err_password_mismatch: "Hasła nie są zgodne.", ¬
-			err_file_missing: "Plik nie znaleziony.", ¬
-			err_openssl_missing: "openssl nie znaleziony. Zainstaluj Xcode Command Line Tools.", ¬
-			err_encrypt_failed: "Szyfrowanie nie powiodło się.", ¬
-			err_decrypt_failed: "Deszyfrowanie nie powiodło się. Błędne hasło lub uszkodzony plik?", ¬
-			success_encrypted: "Plik zaszyfrowany:", ¬
-			success_decrypted: "Plik odszyfrowany:", ¬
-			btn_reveal: "Pokaż w Finderze", ¬
-			btn_close: "Zamknij", ¬
-			warn_overwrite: "Plik docelowy już istnieje. Nadpisać?", ¬
-			btn_overwrite: "Nadpisz", ¬
-			lbl_file: "Plik:"}
-	-- Japanese
-	else if loc is "ja" then
-		return {¬
-			title_encrypt: "ファイルを暗号化", ¬
-			title_decrypt: "ファイルを復号", ¬
-			prompt_password: "パスワード：", ¬
-			prompt_confirm: "パスワード確認：", ¬
-			btn_encrypt: "暗号化", ¬
-			btn_decrypt: "復号", ¬
-			btn_cancel: "キャンセル", ¬
-			err_empty_password: "パスワードを入力してください。", ¬
-			err_password_mismatch: "パスワードが一致しません。", ¬
-			err_file_missing: "ファイルが見つかりません。", ¬
-			err_openssl_missing: "opensslが見つかりません。Xcode Command Line Toolsをインストールしてください。", ¬
-			err_encrypt_failed: "暗号化に失敗しました。", ¬
-			err_decrypt_failed: "復号に失敗しました。パスワードが違うか、ファイルが破損しています。", ¬
-			success_encrypted: "暗号化完了：", ¬
-			success_decrypted: "復号完了：", ¬
-			btn_reveal: "Finderで表示", ¬
-			btn_close: "閉じる", ¬
-			warn_overwrite: "同名のファイルが既に存在します。上書きしますか？", ¬
-			btn_overwrite: "上書き", ¬
-			lbl_file: "ファイル："}
-	-- Chinese
-	else if loc is "zh" then
-		return {¬
-			title_encrypt: "加密文件", ¬
-			title_decrypt: "解密文件", ¬
-			prompt_password: "密码：", ¬
-			prompt_confirm: "确认密码：", ¬
-			btn_encrypt: "加密", ¬
-			btn_decrypt: "解密", ¬
-			btn_cancel: "取消", ¬
-			err_empty_password: "密码不能为空。", ¬
-			err_password_mismatch: "两次输入的密码不一致。", ¬
-			err_file_missing: "文件未找到。", ¬
-			err_openssl_missing: "未找到 openssl。请安装 Xcode Command Line Tools。", ¬
-			err_encrypt_failed: "加密失败。", ¬
-			err_decrypt_failed: "解密失败。密码错误或文件已损坏？", ¬
-			success_encrypted: "文件已加密：", ¬
-			success_decrypted: "文件已解密：", ¬
-			btn_reveal: "在 Finder 中显示", ¬
-			btn_close: "关闭", ¬
-			warn_overwrite: "目标文件已存在。是否覆盖？", ¬
-			btn_overwrite: "覆盖", ¬
-			lbl_file: "文件："}
-	-- English (default)
-	else
-		return {¬
-			title_encrypt: "Encrypt File", ¬
-			title_decrypt: "Decrypt File", ¬
-			prompt_password: "Password:", ¬
-			prompt_confirm: "Confirm password:", ¬
-			btn_encrypt: "Encrypt", ¬
-			btn_decrypt: "Decrypt", ¬
-			btn_cancel: "Cancel", ¬
-			err_empty_password: "Password cannot be empty.", ¬
-			err_password_mismatch: "Passwords do not match.", ¬
-			err_file_missing: "File not found.", ¬
-			err_openssl_missing: "openssl not found. Install Xcode Command Line Tools.", ¬
-			err_encrypt_failed: "Encryption failed.", ¬
-			err_decrypt_failed: "Decryption failed. Wrong password or corrupted file?", ¬
-			success_encrypted: "File encrypted:", ¬
-			success_decrypted: "File decrypted:", ¬
-			btn_reveal: "Show in Finder", ¬
-			btn_close: "Close", ¬
-			warn_overwrite: "A destination file already exists. Overwrite?", ¬
-			btn_overwrite: "Overwrite", ¬
-			lbl_file: "File:"}
+-- Extract a single string value from a JSON file by key, using grep+sed.
+-- Returns the fallback string if the key is not found or the file does not exist.
+-- This approach requires no external tools beyond macOS-native grep/sed.
+on json_get(json_path, json_key, fallback)
+	try
+		-- grep finds the line containing the key, sed strips the surrounding JSON syntax.
+		-- The pattern matches: "key": "value" and extracts value.
+		set cmd to "grep -m1 '\"" & json_key & "\"' " & quoted form of json_path ¬
+			& " | sed 's/.*\"" & json_key & "\"[[:space:]]*:[[:space:]]*\"//;s/\"[[:space:]]*,\\{0,1\\}[[:space:]]*$//'"
+		set val to do shell script cmd
+		if val is "" then return fallback
+		return val
+	on error
+		return fallback
+	end try
+end json_get
+
+-- Load all UI strings for the given locale from the locale JSON file.
+-- Falls back to English if the locale file is not found, then to hardcoded
+-- English strings as a last resort (so the app always works even without the
+-- locales directory).
+on load_ui(loc, locales_dir)
+	-- Determine which JSON file to read, falling back to English.
+	set json_path to locales_dir & "/" & loc & ".json"
+	set ok to false
+	try
+		do shell script "test -f " & quoted form of json_path
+		set ok to true
+	end try
+	if not ok then
+		set json_path to locales_dir & "/en.json"
+		try
+			do shell script "test -f " & quoted form of json_path
+		on error
+			-- No locale files at all — return hardcoded English strings.
+			return my hardcoded_en_strings()
+		end try
 	end if
-end ui_strings
+
+	-- Load each string from the JSON file, with inline English fallback.
+	return {¬
+		title_encrypt: my json_get(json_path, "apps.encryptor.title_encrypt", "Encrypt File"), ¬
+		title_decrypt: my json_get(json_path, "apps.encryptor.title_decrypt", "Decrypt File"), ¬
+		prompt_password: my json_get(json_path, "apps.encryptor.prompt_password", "Password:"), ¬
+		prompt_confirm: my json_get(json_path, "apps.encryptor.prompt_confirm", "Confirm password:"), ¬
+		btn_encrypt: my json_get(json_path, "button.encrypt", "Encrypt"), ¬
+		btn_decrypt: my json_get(json_path, "button.decrypt", "Decrypt"), ¬
+		btn_cancel: my json_get(json_path, "button.cancel", "Cancel"), ¬
+		err_empty_password: my json_get(json_path, "apps.encryptor.err_empty_password", "Password cannot be empty."), ¬
+		err_password_mismatch: my json_get(json_path, "apps.encryptor.err_password_mismatch", "Passwords do not match."), ¬
+		err_file_missing: my json_get(json_path, "apps.encryptor.err_file_missing", "File not found."), ¬
+		err_openssl_missing: my json_get(json_path, "apps.encryptor.err_openssl_missing", "openssl not found. Install Xcode Command Line Tools."), ¬
+		err_encrypt_failed: my json_get(json_path, "apps.encryptor.err_encrypt_failed", "Encryption failed."), ¬
+		err_decrypt_failed: my json_get(json_path, "apps.encryptor.err_decrypt_failed", "Decryption failed. Wrong password or corrupted file?"), ¬
+		success_encrypted: my json_get(json_path, "apps.encryptor.success_encrypted", "File encrypted:"), ¬
+		success_decrypted: my json_get(json_path, "apps.encryptor.success_decrypted", "File decrypted:"), ¬
+		btn_reveal: my json_get(json_path, "apps.encryptor.btn_reveal", "Show in Finder"), ¬
+		btn_close: my json_get(json_path, "common.close", "Close"), ¬
+		warn_overwrite: my json_get(json_path, "apps.encryptor.warn_overwrite", "A destination file already exists. Overwrite?"), ¬
+		btn_overwrite: my json_get(json_path, "apps.encryptor.btn_overwrite", "Overwrite"), ¬
+		lbl_file: my json_get(json_path, "apps.encryptor.lbl_file", "File:")}
+end load_ui
+
+-- Hardcoded English strings used only when the locales directory is unavailable.
+on hardcoded_en_strings()
+	return {¬
+		title_encrypt: "Encrypt File", ¬
+		title_decrypt: "Decrypt File", ¬
+		prompt_password: "Password:", ¬
+		prompt_confirm: "Confirm password:", ¬
+		btn_encrypt: "Encrypt", ¬
+		btn_decrypt: "Decrypt", ¬
+		btn_cancel: "Cancel", ¬
+		err_empty_password: "Password cannot be empty.", ¬
+		err_password_mismatch: "Passwords do not match.", ¬
+		err_file_missing: "File not found.", ¬
+		err_openssl_missing: "openssl not found. Install Xcode Command Line Tools.", ¬
+		err_encrypt_failed: "Encryption failed.", ¬
+		err_decrypt_failed: "Decryption failed. Wrong password or corrupted file?", ¬
+		success_encrypted: "File encrypted:", ¬
+		success_decrypted: "File decrypted:", ¬
+		btn_reveal: "Show in Finder", ¬
+		btn_close: "Close", ¬
+		warn_overwrite: "A destination file already exists. Overwrite?", ¬
+		btn_overwrite: "Overwrite", ¬
+		lbl_file: "File:"}
+end hardcoded_en_strings
+
+-- Resolve the absolute path to the locales directory.
+-- Priority: ERGOPTI_LOCALES_DIR (injected by menu_apps.lua) → path relative
+-- to the .app bundle's Resources/ folder (for standalone use).
+on resolve_locales_dir()
+	set d to ""
+	try
+		set d to do shell script "echo \"$ERGOPTI_LOCALES_DIR\""
+	end try
+	if d is not "" then return d
+	-- Fallback: climb from Scripts/ → Resources/ → Contents/ → .app/ → parent → locales/
+	-- This allows the app to work when launched directly from the Finder without
+	-- the env var, as long as the locales/ folder is adjacent to the .app bundle.
+	try
+		set bundle_res to POSIX path of (path to me)
+		-- Strip trailing "/Contents/Resources/Scripts/main.scpt" or similar
+		set cmd to "d=" & quoted form of bundle_res ¬
+			& "; d=$(dirname \"$d\"); d=$(dirname \"$d\"); d=$(dirname \"$d\"); d=$(dirname \"$d\"); echo \"$d/locales\""
+		set d to do shell script cmd
+	end try
+	return d
+end resolve_locales_dir
 
 
 -- ================================================
@@ -287,10 +162,10 @@ end ui_strings
 
 -- Ask for a password using a secure dialog (text is hidden).
 -- Returns the entered string, or throws error -128 on cancel.
-on ask_password(prompt_text, dialog_title)
+on ask_password(prompt_text, dialog_title, btn_cancel_label)
 	set r to display dialog prompt_text with title dialog_title ¬
 		default answer "" with hidden answer ¬
-		buttons {"Annuler", "OK"} default button "OK" cancel button "Annuler"
+		buttons {btn_cancel_label, "OK"} default button "OK" cancel button btn_cancel_label
 	return text returned of r
 end ask_password
 
@@ -305,7 +180,8 @@ end ask_password
 -- `open -a Encryptor file1 file2 …`. Each file is processed in sequence.
 on open dropped_files
 	set loc to my resolve_locale()
-	set s to my ui_strings(loc)
+	set locales_dir to my resolve_locales_dir()
+	set s to my load_ui(loc, locales_dir)
 
 	-- Verify openssl is available once before processing any file.
 	try
@@ -389,7 +265,7 @@ on process_file(file_path, is_encrypt, s)
 	set the_password to ""
 	repeat until password_ok
 		try
-			set the_password to my ask_password(prompt_password of s, dialog_title)
+			set the_password to my ask_password(prompt_password of s, dialog_title, btn_cancel of s)
 		on error number -128
 			return
 		end try
@@ -402,7 +278,7 @@ on process_file(file_path, is_encrypt, s)
 			repeat until confirm_ok
 				set confirm_pw to ""
 				try
-					set confirm_pw to my ask_password(prompt_confirm of s, dialog_title)
+					set confirm_pw to my ask_password(prompt_confirm of s, dialog_title, btn_cancel of s)
 				on error number -128
 					return
 				end try
@@ -488,7 +364,8 @@ end process_file
 -- present a file picker so the user can select a file to process.
 on run
 	set loc to my resolve_locale()
-	set s to my ui_strings(loc)
+	set locales_dir to my resolve_locales_dir()
+	set s to my load_ui(loc, locales_dir)
 
 	-- Verify openssl is available.
 	try

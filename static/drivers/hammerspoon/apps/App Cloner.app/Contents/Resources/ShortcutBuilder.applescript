@@ -36,150 +36,130 @@ on resolve_locale()
 	return loc
 end resolve_locale
 
--- Return a record with the UI button/title strings for the given locale.
--- Only the repeated interactive strings are translated here; longer
--- descriptive bodies remain in French (App Cloner's native language).
--- Unsupported locales fall back to French.
-on ac_ui(loc)
-	if loc is "en" then
-		return {¬
-			btn_cancel: "Cancel", ¬
-			btn_ok: "OK", ¬
-			btn_back: "Back", ¬
-			btn_choose: "Choose", ¬
-			btn_clone: "Clone app", ¬
-			btn_validate: "Validate", ¬
-			btn_browse: "Browse…", ¬
-			btn_pwa_recommended: "PWA (recommended)", ¬
-			btn_try_native: "Try native", ¬
-			btn_native_clone: "Clone native app", ¬
-			btn_pwa_webapp: "PWA web app", ¬
-			btn_custom_icon: "Custom", ¬
-			btn_tint_icon: "Colour tint", ¬
-			btn_open_log: "Open log", ¬
-			btn_close: "Close", ¬
-			title_clone_name: "Clone name", ¬
-			title_pwa_mode: "PWA mode?", ¬
-			title_pwa_recommended: "PWA mode recommended", ¬
-			title_open_arg: "Item to open at launch", ¬
-			title_url_path: "URL or path", ¬
-			title_pwa_url: "PWA URL", ¬
-			title_icon_style: "Icon style", ¬
-			title_summary: "Summary", ¬
-			title_error: "Clone creation failed", ¬
-			title_tint: "Colour tint", ¬
-			msg_bundle_missing: "Error: bundle path missing. Launch the app normally.", ¬
-			lbl_progress_prep: "Preparing icon and bundle", ¬
-			lbl_progress_icon: "Generating tinted icon…", ¬
-			lbl_progress_sign: "Ad-hoc signing bundle…", ¬
-			lbl_progress_dock: "Registering in Dock…", ¬
-			lbl_progress_done: "Done", ¬
-			lbl_progress_title: "Creating clone…"}
-	else if loc is "de" then
-		return {¬
-			btn_cancel: "Abbrechen", ¬
-			btn_ok: "OK", ¬
-			btn_back: "Zurück", ¬
-			btn_choose: "Auswählen", ¬
-			btn_clone: "App klonen", ¬
-			btn_validate: "Bestätigen", ¬
-			btn_browse: "Durchsuchen…", ¬
-			btn_pwa_recommended: "PWA (empfohlen)", ¬
-			btn_try_native: "Nativ versuchen", ¬
-			btn_native_clone: "Native App klonen", ¬
-			btn_pwa_webapp: "PWA-Web-App", ¬
-			btn_custom_icon: "Eigenes Symbol", ¬
-			btn_tint_icon: "Farbtönung", ¬
-			btn_open_log: "Log öffnen", ¬
-			btn_close: "Schließen", ¬
-			title_clone_name: "Klon-Name", ¬
-			title_pwa_mode: "PWA-Modus?", ¬
-			title_pwa_recommended: "PWA-Modus empfohlen", ¬
-			title_open_arg: "Beim Start zu öffnender Eintrag", ¬
-			title_url_path: "URL oder Pfad", ¬
-			title_pwa_url: "PWA-URL", ¬
-			title_icon_style: "Symbol-Stil", ¬
-			title_summary: "Zusammenfassung", ¬
-			title_error: "Klon-Erstellung fehlgeschlagen", ¬
-			title_tint: "Farbtönung", ¬
-			msg_bundle_missing: "Fehler: Bundle-Pfad fehlt. App normal starten.", ¬
-			lbl_progress_prep: "Symbol und Bundle vorbereiten", ¬
-			lbl_progress_icon: "Getöntes Symbol generieren…", ¬
-			lbl_progress_sign: "Bundle ad-hoc signieren…", ¬
-			lbl_progress_dock: "Im Dock registrieren…", ¬
-			lbl_progress_done: "Fertig", ¬
-			lbl_progress_title: "Klon wird erstellt…"}
-	else if loc is "es" then
-		return {¬
-			btn_cancel: "Cancelar", ¬
-			btn_ok: "OK", ¬
-			btn_back: "Volver", ¬
-			btn_choose: "Elegir", ¬
-			btn_clone: "Clonar app", ¬
-			btn_validate: "Validar", ¬
-			btn_browse: "Explorar…", ¬
-			btn_pwa_recommended: "PWA (recomendado)", ¬
-			btn_try_native: "Intentar nativo", ¬
-			btn_native_clone: "Clonar app nativa", ¬
-			btn_pwa_webapp: "PWA web app", ¬
-			btn_custom_icon: "Personalizado", ¬
-			btn_tint_icon: "Tinte de color", ¬
-			btn_open_log: "Abrir log", ¬
-			btn_close: "Cerrar", ¬
-			title_clone_name: "Nombre del clon", ¬
-			title_pwa_mode: "¿Modo PWA?", ¬
-			title_pwa_recommended: "Modo PWA recomendado", ¬
-			title_open_arg: "Elemento a abrir al iniciar", ¬
-			title_url_path: "URL o ruta", ¬
-			title_pwa_url: "URL PWA", ¬
-			title_icon_style: "Estilo de icono", ¬
-			title_summary: "Resumen", ¬
-			title_error: "Fallo al crear el clon", ¬
-			title_tint: "Tinte de color", ¬
-			msg_bundle_missing: "Error: ruta del bundle faltante. Lanza la app normalmente.", ¬
-			lbl_progress_prep: "Preparando icono y bundle", ¬
-			lbl_progress_icon: "Generando icono con tinte…", ¬
-			lbl_progress_sign: "Firmando bundle ad-hoc…", ¬
-			lbl_progress_dock: "Registrando en el Dock…", ¬
-			lbl_progress_done: "Terminado", ¬
-			lbl_progress_title: "Creando clon…"}
-	-- French (default — App Cloner's native language)
-	else
-		return {¬
-			btn_cancel: "Annuler", ¬
-			btn_ok: "OK", ¬
-			btn_back: "Retour", ¬
-			btn_choose: "Choisir", ¬
-			btn_clone: "Cloner l'application", ¬
-			btn_validate: "Valider", ¬
-			btn_browse: "Parcourir…", ¬
-			btn_pwa_recommended: "PWA (recommandé)", ¬
-			btn_try_native: "Tenter natif", ¬
-			btn_native_clone: "Cloner l'app native", ¬
-			btn_pwa_webapp: "PWA web app", ¬
-			btn_custom_icon: "Personnalisée", ¬
-			btn_tint_icon: "Teinte couleur", ¬
-			btn_open_log: "Ouvrir le log", ¬
-			btn_close: "Fermer", ¬
-			title_clone_name: "Nom du clone", ¬
-			title_pwa_mode: "Mode PWA ?", ¬
-			title_pwa_recommended: "Mode PWA recommandé", ¬
-			title_open_arg: "Élément à ouvrir au lancement", ¬
-			title_url_path: "URL ou chemin", ¬
-			title_pwa_url: "URL PWA", ¬
-			title_icon_style: "Style d'icône", ¬
-			title_summary: "Récapitulatif", ¬
-			title_error: "❌  Échec de la création du clone", ¬
-			title_tint: "Teinte de couleur", ¬
-			msg_bundle_missing: "Erreur : chemin du bundle manquant. Lancez l'app normalement.", ¬
-			lbl_progress_prep: "Préparation de l'icône et du bundle", ¬
-			lbl_progress_icon: "Génération de l'icône teintée…", ¬
-			lbl_progress_sign: "Signature ad-hoc du bundle…", ¬
-			lbl_progress_dock: "Enregistrement dans le Dock…", ¬
-			lbl_progress_done: "Terminé", ¬
-			lbl_progress_title: "Création du clone en cours…"}
+-- Resolve the absolute path to the locales directory.
+-- Priority: ERGOPTI_LOCALES_DIR (injected by menu_apps.lua) → path relative
+-- to the .app bundle's Resources/ folder for standalone use.
+on resolve_locales_dir()
+	set d to ""
+	try
+		set d to do shell script "echo \"$ERGOPTI_LOCALES_DIR\""
+	end try
+	if d is not "" then return d
+	-- Fallback: climb from this script's bundle to find a sibling locales/ dir.
+	try
+		set bundle_res to POSIX path of (path to me)
+		set cmd to "d=" & quoted form of bundle_res ¬
+			& "; d=$(dirname \"$d\"); d=$(dirname \"$d\"); d=$(dirname \"$d\"); d=$(dirname \"$d\"); echo \"$d/locales\""
+		set d to do shell script cmd
+	end try
+	return d
+end resolve_locales_dir
+
+-- Extract a single string value from a JSON file by key, using grep+sed.
+-- Returns the fallback string if the key is absent or the file does not exist.
+on json_get(json_path, json_key, fallback)
+	try
+		set cmd to "grep -m1 '\"" & json_key & "\"' " & quoted form of json_path ¬
+			& " | sed 's/.*\"" & json_key & "\"[[:space:]]*:[[:space:]]*\"//;s/\"[[:space:]]*,\\{0,1\\}[[:space:]]*$//'"
+		set val to do shell script cmd
+		if val is "" then return fallback
+		return val
+	on error
+		return fallback
+	end try
+end json_get
+
+-- Load all UI strings for the given locale from the locale JSON file.
+-- Falls back to French (App Cloner's native language) if the locale file
+-- is not found, then to hardcoded French as a last resort.
+on load_ui(loc, locales_dir)
+	set json_path to locales_dir & "/" & loc & ".json"
+	set ok to false
+	try
+		do shell script "test -f " & quoted form of json_path
+		set ok to true
+	end try
+	if not ok then
+		set json_path to locales_dir & "/fr.json"
+		try
+			do shell script "test -f " & quoted form of json_path
+		on error
+			return my hardcoded_fr_strings()
+		end try
 	end if
-end ac_ui
+
+	return {¬
+		btn_cancel: my json_get(json_path, "button.cancel", "Annuler"), ¬
+		btn_ok: my json_get(json_path, "common.ok", "OK"), ¬
+		btn_back: my json_get(json_path, "apps.cloner.btn_back", "Retour"), ¬
+		btn_choose: my json_get(json_path, "apps.cloner.btn_choose", "Choisir"), ¬
+		btn_clone: my json_get(json_path, "apps.cloner.btn_clone", "Cloner l'application"), ¬
+		btn_validate: my json_get(json_path, "apps.cloner.btn_validate", "Valider"), ¬
+		btn_browse: my json_get(json_path, "apps.cloner.btn_browse", "Parcourir…"), ¬
+		btn_pwa_recommended: my json_get(json_path, "apps.cloner.btn_pwa_recommended", "PWA (recommandé)"), ¬
+		btn_try_native: my json_get(json_path, "apps.cloner.btn_try_native", "Tenter natif"), ¬
+		btn_native_clone: my json_get(json_path, "apps.cloner.btn_native_clone", "Cloner l'app native"), ¬
+		btn_pwa_webapp: my json_get(json_path, "apps.cloner.btn_pwa_webapp", "PWA web app"), ¬
+		btn_custom_icon: my json_get(json_path, "apps.cloner.btn_custom_icon", "Personnalisée"), ¬
+		btn_tint_icon: my json_get(json_path, "apps.cloner.btn_tint_icon", "Teinte couleur"), ¬
+		btn_open_log: my json_get(json_path, "apps.cloner.btn_open_log", "Ouvrir le log"), ¬
+		btn_close: my json_get(json_path, "common.close", "Fermer"), ¬
+		title_clone_name: my json_get(json_path, "apps.cloner.title_clone_name", "Nom du clone"), ¬
+		title_pwa_mode: my json_get(json_path, "apps.cloner.title_pwa_mode", "Mode PWA ?"), ¬
+		title_pwa_recommended: my json_get(json_path, "apps.cloner.title_pwa_recommended", "Mode PWA recommandé"), ¬
+		title_open_arg: my json_get(json_path, "apps.cloner.title_open_arg", "Élément à ouvrir au lancement"), ¬
+		title_url_path: my json_get(json_path, "apps.cloner.title_url_path", "URL ou chemin"), ¬
+		title_pwa_url: my json_get(json_path, "apps.cloner.title_pwa_url", "URL PWA"), ¬
+		title_icon_style: my json_get(json_path, "apps.cloner.title_icon_style", "Style d'icône"), ¬
+		title_summary: my json_get(json_path, "apps.cloner.title_summary", "Récapitulatif"), ¬
+		title_error: my json_get(json_path, "apps.cloner.title_error", "❌  Échec de la création du clone"), ¬
+		title_tint: my json_get(json_path, "apps.cloner.title_tint", "Teinte de couleur"), ¬
+		msg_bundle_missing: my json_get(json_path, "apps.cloner.msg_bundle_missing", "Erreur : chemin du bundle manquant. Lancez l'app normalement."), ¬
+		lbl_progress_prep: my json_get(json_path, "apps.cloner.lbl_progress_prep", "Préparation de l'icône et du bundle"), ¬
+		lbl_progress_icon: my json_get(json_path, "apps.cloner.lbl_progress_icon", "Génération de l'icône teintée…"), ¬
+		lbl_progress_sign: my json_get(json_path, "apps.cloner.lbl_progress_sign", "Signature ad-hoc du bundle…"), ¬
+		lbl_progress_dock: my json_get(json_path, "apps.cloner.lbl_progress_dock", "Enregistrement dans le Dock…"), ¬
+		lbl_progress_done: my json_get(json_path, "apps.cloner.lbl_progress_done", "Terminé"), ¬
+		lbl_progress_title: my json_get(json_path, "apps.cloner.lbl_progress_title", "Création du clone en cours…")}
+end load_ui
+
+-- Hardcoded French strings used only when the locales directory is unavailable.
+on hardcoded_fr_strings()
+	return {¬
+		btn_cancel: "Annuler", ¬
+		btn_ok: "OK", ¬
+		btn_back: "Retour", ¬
+		btn_choose: "Choisir", ¬
+		btn_clone: "Cloner l'application", ¬
+		btn_validate: "Valider", ¬
+		btn_browse: "Parcourir…", ¬
+		btn_pwa_recommended: "PWA (recommandé)", ¬
+		btn_try_native: "Tenter natif", ¬
+		btn_native_clone: "Cloner l'app native", ¬
+		btn_pwa_webapp: "PWA web app", ¬
+		btn_custom_icon: "Personnalisée", ¬
+		btn_tint_icon: "Teinte couleur", ¬
+		btn_open_log: "Ouvrir le log", ¬
+		btn_close: "Fermer", ¬
+		title_clone_name: "Nom du clone", ¬
+		title_pwa_mode: "Mode PWA ?", ¬
+		title_pwa_recommended: "Mode PWA recommandé", ¬
+		title_open_arg: "Élément à ouvrir au lancement", ¬
+		title_url_path: "URL ou chemin", ¬
+		title_pwa_url: "URL PWA", ¬
+		title_icon_style: "Style d'icône", ¬
+		title_summary: "Récapitulatif", ¬
+		title_error: "❌  Échec de la création du clone", ¬
+		title_tint: "Teinte de couleur", ¬
+		msg_bundle_missing: "Erreur : chemin du bundle manquant. Lancez l'app normalement.", ¬
+		lbl_progress_prep: "Préparation de l'icône et du bundle", ¬
+		lbl_progress_icon: "Génération de l'icône teintée…", ¬
+		lbl_progress_sign: "Signature ad-hoc du bundle…", ¬
+		lbl_progress_dock: "Enregistrement dans le Dock…", ¬
+		lbl_progress_done: "Terminé", ¬
+		lbl_progress_title: "Création du clone en cours…"}
+end hardcoded_fr_strings
+
 
 -- osascript runs without a real Edit menu. Even though NSTextField responds
 -- to selectAll:/cut:/copy:/paste:, the keyboard shortcuts are dispatched via
@@ -959,7 +939,8 @@ end rgbToHex
 on run argv
 	-- Resolve locale and load UI strings once for the whole session.
 	set _loc to my resolve_locale()
-	set u to my ac_ui(_loc)
+	set _locales_dir to my resolve_locales_dir()
+	set u to my load_ui(_loc, _locales_dir)
 
 	-- Promote osascript from background/accessory to a regular foreground app.
 	-- Without this, NSApp.sendEvent: never checks the main menu for key
