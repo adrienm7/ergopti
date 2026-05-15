@@ -209,8 +209,16 @@ function M.build(ctx)
 						locale_code = "en"
 					end
 				end
-				-- Launch the .app bundle via `open -a` in a task so the env var
-				-- propagates into the AppleScript process. hs.application.launchOrFocus
+				-- Resolve the locales directory relative to the Hammerspoon config root.
+				-- hs.configdir resolves to .../static/drivers/hammerspoon/;
+				-- the shared locales live two levels up at .../static/locales/.
+				-- AppleScript apps read this to load UI strings for any locale without
+				-- hardcoding translations; adding a new locale to static/locales/
+				-- automatically works in the apps.
+				local config_base = (hs.configdir or ""):match("^(.*)/drivers/hammerspoon") or ""
+				local locales_dir = config_base .. "/locales"
+				-- Launch the .app bundle via `open -a` in a task so env vars
+				-- propagate into the AppleScript process. hs.application.launchOrFocus
 				-- does not expose environment injection.
 				local task = hs.task.new(
 					"/usr/bin/open",
@@ -222,7 +230,7 @@ function M.build(ctx)
 					function() return false end,
 					{ "-a", app_path }
 				)
-				task:setEnvironment({ ERGOPTI_LOCALE = locale_code })
+				task:setEnvironment({ ERGOPTI_LOCALE = locale_code, ERGOPTI_LOCALES_DIR = locales_dir })
 				local ok_start, err = pcall(function() task:start() end)
 				if not ok_start then
 					Logger.error(LOG, "Failed to launch '%s': %s.", app_name, tostring(err))
