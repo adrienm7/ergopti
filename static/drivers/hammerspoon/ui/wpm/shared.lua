@@ -33,12 +33,13 @@ local COLOR_FALLBACK = {
 }
 
 -- Maps a WPM source variant to the hotstrings_config category whose TOML metadata
--- (+ user override) drives its color. Sources not listed here use COLOR_FALLBACK.
--- Roll, sfbsreduction, distancesreduction, and repeat_key are intentionally absent:
--- these expansions are low-level ergonomic substitutions and should not alter the
--- widget color — they fall through to COLOR_FALLBACK["manual"] (blue default).
+-- (+ user override) drives its color. Only groups that display a visible tooltip
+-- are listed here — the widget color must always match the tooltip color.
+-- Sources not listed here use COLOR_FALLBACK (blue default).
+-- Rolls, sfbsreduction, distancesreduction, repeat_key, and the generic "hotstring"
+-- source are intentionally absent: they either show no tooltip or are low-level
+-- ergonomic substitutions whose color should not bleed into the widget.
 local SOURCE_TO_CATEGORY = {
-	hotstring      = "magickey",
 	magickey       = "magickey",
 	autocorrection = "autocorrection",
 }
