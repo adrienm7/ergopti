@@ -29,7 +29,7 @@
 
 ; Title is resolved at call-time via a function — never at load-time —
 ; so the active language is already set when the menu is built or rebuilt.
-LLM_TRAY_N_OPTIONS := [1, 2, 3]   ; available prediction count choices
+LLM_TRAY_N_OPTIONS := [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]   ; available prediction count choices
 
 ; Debounce options in milliseconds (mirrors HS trigger settings)
 LLM_TRAY_DEBOUNCE_OPTIONS := [300, 500, 600, 800, 1000, 1500, 2000]
