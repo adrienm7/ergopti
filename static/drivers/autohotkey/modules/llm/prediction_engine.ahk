@@ -25,23 +25,82 @@
 ; ======================================
 ; ======================================
 
-; Default state — overridden by LLM_Engine_Init()
+; Runtime state — populated at first LLM_Engine_Init() call from LLM_Defaults
+; (loaded by lib/llm_defaults.ahk at boot) so all values come from the shared
+; defaults.json rather than being hardcoded here.
+; Timer/cache keys are always initialised to their zero values regardless.
 global _LLM_Engine := Map(
-	"enabled",            false,
-	"model",              "qwen2.5:3b",
-	"profile_id",         "basic",
-	"n_predictions",      1,
-	"min_words",          2,
-	"max_words",          8,
-	"debounce_ms",        600,
-	"ctx_chars",          300,
-	"language",           "fr",
-	"temperature",        "0.1",
-	"instant_on_word_end", false,
-	"timer_active",       false,
-	"last_ctx",           "",
-	"last_result",        ""
+	"enabled",                    false,
+	"model",                      "qwen2.5:3b",
+	"profile_id",                 "basic",
+	"user_profiles",              [],
+	"n_predictions",              3,
+	"min_words",                  3,
+	"max_words",                  15,
+	"debounce_ms",                500,
+	"ctx_chars",                  500,
+	"language",                   "fr",
+	"temperature",                "0.10",
+	"instant_on_word_end",        true,
+	"after_hotstring",            true,
+	"reset_on_nav",               true,
+	"disable_url_bars",           false,
+	"disable_password_fields",    false,
+	"disabled_apps",              [],
+	"show_info_bar",              true,
+	"streaming",                  true,
+	"show_all_at_once",           true,
+	"pred_indent",                0,
+	"auto_raise_temp",            true,
+	"nav_modifiers",              "",
+	"val_modifiers",              "alt",
+	"timer_active",               false,
+	"last_ctx",                   "",
+	"last_result",                ""
 )
+
+; Overwrite the defaults with values loaded from defaults.json at module load time.
+; LLM_Defaults is populated by LLM_Defaults_Load() which runs before this file.
+LLM_Engine_ApplySharedDefaults() {
+	global _LLM_Engine, LLM_Defaults
+	if !IsSet(LLM_Defaults)
+		return
+
+	static _num := ["n_predictions", "min_words", "max_words", "debounce_ms", "ctx_chars", "pred_indent"]
+	static _bool := ["show_info_bar", "streaming", "show_all_at_once", "instant_on_word_end",
+		"after_hotstring", "reset_on_nav", "auto_raise_temp", "disable_url_bars", "disable_password_fields"]
+	static _str := ["profile_id", "model", "val_modifiers", "nav_modifiers", "temperature"]
+
+	; Map shared-default key names → engine key names
+	static _key_map := Map(
+		"llm_active_profile",       "profile_id",
+		"llm_model",                "model",
+		"llm_num_predictions",      "n_predictions",
+		"llm_min_words",            "min_words",
+		"llm_max_words",            "max_words",
+		"llm_debounce_ms",          "debounce_ms",
+		"llm_context_length",       "ctx_chars",
+		"llm_pred_indent",          "pred_indent",
+		"llm_temperature",          "temperature",
+		"llm_show_info_bar",        "show_info_bar",
+		"llm_streaming",            "streaming",
+		"llm_streaming_multi",      "show_all_at_once",
+		"llm_instant_on_word_end",  "instant_on_word_end",
+		"llm_after_hotstring",      "after_hotstring",
+		"llm_reset_on_nav",         "reset_on_nav",
+		"llm_auto_raise_temp",      "auto_raise_temp",
+		"llm_disable_url_bars",     "disable_url_bars",
+		"llm_disable_password_fields", "disable_password_fields",
+		"llm_nav_modifiers",        "nav_modifiers",
+		"llm_val_modifiers",        "val_modifiers"
+	)
+
+	for shared_key, engine_key in _key_map {
+		if LLM_Defaults.Has(shared_key)
+			_LLM_Engine[engine_key] := LLM_Defaults[shared_key]
+	}
+}
+LLM_Engine_ApplySharedDefaults()
 
 
 
@@ -62,26 +121,22 @@ LLM_Engine_Init(opts) {
 	global _LLM_Engine
 	_LLM_Engine["enabled"] := true
 
-	if opts.Has("model")
-		_LLM_Engine["model"]         := opts["model"]
-	if opts.Has("profile_id")
-		_LLM_Engine["profile_id"]    := opts["profile_id"]
-	if opts.Has("n_predictions")
-		_LLM_Engine["n_predictions"] := opts["n_predictions"]
-	if opts.Has("min_words")
-		_LLM_Engine["min_words"]     := opts["min_words"]
-	if opts.Has("max_words")
-		_LLM_Engine["max_words"]     := opts["max_words"]
-	if opts.Has("debounce_ms")
-		_LLM_Engine["debounce_ms"]        := opts["debounce_ms"]
-	if opts.Has("ctx_chars")
-		_LLM_Engine["ctx_chars"]          := opts["ctx_chars"]
-	if opts.Has("language")
-		_LLM_Engine["language"]           := opts["language"]
-	if opts.Has("temperature")
-		_LLM_Engine["temperature"]        := opts["temperature"]
-	if opts.Has("instant_on_word_end")
-		_LLM_Engine["instant_on_word_end"] := opts["instant_on_word_end"]
+	static _keys := ["model", "profile_id", "n_predictions", "min_words", "max_words",
+		"debounce_ms", "ctx_chars", "language", "temperature",
+		"instant_on_word_end", "after_hotstring", "reset_on_nav",
+		"disable_url_bars", "disable_password_fields",
+		"show_info_bar", "streaming", "show_all_at_once",
+		"pred_indent", "auto_raise_temp", "nav_modifiers", "val_modifiers"]
+
+	for k in _keys
+		if opts.Has(k)
+			_LLM_Engine[k] := opts[k]
+
+	; Arrays require explicit copy to avoid shared references
+	if opts.Has("user_profiles") && (opts["user_profiles"] is Array)
+		_LLM_Engine["user_profiles"] := opts["user_profiles"]
+	if opts.Has("disabled_apps") && (opts["disabled_apps"] is Array)
+		_LLM_Engine["disabled_apps"] := opts["disabled_apps"]
 }
 
 /**
