@@ -230,21 +230,19 @@ _TooltipBuildGui(Items) {
     ; GetDpiForSystem (Win10+) returns the real DPI regardless of process
     ; DPI-awareness mode, unlike GetDeviceCaps which returns 96 when the
     ; process is DPI-unaware.
-    SysDPI := DllCall("User32\GetDpiForSystem", "UInt")
-    if (SysDPI <= 0)
-        SysDPI := 96
     BadgeColW := HasAnyLabel ? (_TOOLTIP_LABEL_GAP + _TOOLTIP_BADGE_W + _TOOLTIP_PADDING_X) : 0
     Sizes := []
     MaxW := 0
     for _, Item in Items {
         S := _TooltipMeasureText(Item.Text)
-        ; GDI measures at 96 DPI; scale to actual screen pixels.
-        W := Round(S.W * SysDPI / 96)
-        H := Round(S.H * SysDPI / 96)
-        Sizes.Push({ W: W, H: H })
-        if (W > MaxW)
-            MaxW := W
+        Sizes.Push(S)
+        if (S.W > MaxW)
+            MaxW := S.W
     }
+    ; GDI under-counts due to font hinting and sub-pixel rendering differences.
+    ; Apply 15 % slack + 8 px absolute margin — empirically correct for Segoe UI
+    ; at sizes 10-12 pt regardless of DPI scaling mode.
+    MaxW := Round(MaxW * 1.15) + 8
 
     ; Total width: left pad + text + badge column (gap + badge + right pad).
     TotalW := _TOOLTIP_PADDING_X + MaxW + BadgeColW
