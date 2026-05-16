@@ -208,23 +208,27 @@ _TooltipBuildGui(Items) {
         }
     }
 
-    ; Measure all rows to find the widest output text.
+    ; Measure true text width by creating a throw-away Gui, adding an AutoSize
+    ; Text control, showing it off-screen, reading its rendered width, then
+    ; destroying it.  This bypasses GDI font measurement entirely and works
+    ; correctly regardless of DPI scaling or font substitution.
+    BadgeColW := HasAnyLabel ? (_TOOLTIP_LABEL_GAP + _TOOLTIP_BADGE_W + _TOOLTIP_PADDING_X) : 0
     Sizes := []
     MaxW := 0
     for _, Item in Items {
-        S := _TooltipMeasureText(Item.Text)
-        Sizes.Push(S)
-        if (S.W > MaxW)
-            MaxW := S.W
+        ProbeGui := Gui("-Caption +LastFound")
+        ProbeGui.SetFont("s" . _TOOLTIP_FONT_SIZE, _TOOLTIP_FONT_NAME)
+        ProbeCtrl := ProbeGui.Add("Text", "", Item.Text)
+        ProbeGui.Show("x-9999 y-9999 NoActivate")
+        ProbeCtrl.GetPos(, , &CtrlW, &CtrlH)
+        ProbeGui.Destroy()
+        Sizes.Push({ W: CtrlW, H: CtrlH })
+        if (CtrlW > MaxW)
+            MaxW := CtrlW
     }
-    ; GDI measurement under-counts significantly for Unicode and multi-word
-    ; strings — add 40 % slack + a 16 px absolute margin so the text control
-    ; never visually overflows into the badge column regardless of DPI scaling.
-    MaxW := Round(MaxW * 1.4) + 16
 
     ; Total width: left pad + text + gap + badge + right pad.
-    BadgeColW := HasAnyLabel ? (_TOOLTIP_LABEL_GAP + _TOOLTIP_BADGE_W + _TOOLTIP_PADDING_X) : 0
-    TotalW := _TOOLTIP_PADDING_X + MaxW + BadgeColW
+    TotalW := _TOOLTIP_PADDING_X + MaxW + _TOOLTIP_PADDING_X + BadgeColW
 
     NewGuis := []
     for Idx, Item in Items {
