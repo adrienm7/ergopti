@@ -239,8 +239,7 @@ _TooltipBuildGui(Items) {
         if (S.W > MaxW)
             MaxW := S.W
     }
-    MsgBox("GDI raw MaxW=" . MaxW . " -> after slack=" . Round(MaxW * 1.15 + 8))
-    MaxW := Round(MaxW * 1.15) + 8
+    MaxW := Round(MaxW * 1.25) + 12
 
     ; Total width: left pad + text + badge column (gap + badge + right pad).
     TotalW := _TOOLTIP_PADDING_X + MaxW + BadgeColW
@@ -259,8 +258,11 @@ _TooltipBuildGui(Items) {
         G.SetFont("cFFFFFF s" . _TOOLTIP_FONT_SIZE, _TOOLTIP_FONT_NAME)
 
         ; Output text — left-aligned with left padding.
+        ; Width is oversized (2000 px) so GDI under-estimation never clips the
+        ; text inside the control. The visible area is bounded by TotalW (the
+        ; Gui window width) and the badge starts at a fixed BadgeX offset.
         TextOpts := Format("BackgroundTrans 0xC x{1} y{2} w{3} h{4}",
-            _TOOLTIP_PADDING_X, _TOOLTIP_PADDING_Y, MaxW, S.H)
+            _TOOLTIP_PADDING_X, _TOOLTIP_PADDING_Y, 2000, S.H)
         G.Add("Text", TextOpts, Item.Text)
 
         ; Badge pill — fixed-width neutral box with the symbol in accent colour.
