@@ -676,12 +676,11 @@ global MenuConfigurationShortcuts := t("menu.script_control.title")
 global MenuSuspend := t("menu.global.suspend")
 global MenuDebugging := t("menu.debug.title")
 
-; Categories that live inside the Hotstrings submenu (ordered to match HS menu)
-global HotstringCategories := ["DistancesReduction", "SFBsReduction", "Rolls", "Autocorrection", "MagicKey"]
-; Standard (layout-agnostic) hotstring categories
-global HotstringCategoriesStd := ["DistancesReduction", "Autocorrection", "MagicKey"]
-; Layout-specific categories for the Ergopti keyboard disposition
-global HotstringCategoriesErgopti := ["SFBsReduction", "Rolls"]
+; Load category lists from the shared manifest instead of hard-coding them here
+global _HotstringGroups        := MenuManifest_LoadHotstringGroups()
+global HotstringCategories     := _HotstringGroups.all
+global HotstringCategoriesStd  := _HotstringGroups.standard
+global HotstringCategoriesErgopti := _HotstringGroups.ergopti
 
 InitSubMenus() {
 	global Features, SubMenus
