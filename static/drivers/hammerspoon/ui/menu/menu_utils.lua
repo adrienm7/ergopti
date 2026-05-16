@@ -35,4 +35,30 @@ function M.build_section_header(label)
 	return { title = "— " .. label .. " —", disabled = true }
 end
 
+--- Builds a filtered and grouped picker submenu for a list of named actions.
+--- @param actions table List of { id, label, category, holdable?, tappable? }.
+--- @param current_id string Currently selected action id.
+--- @param on_select function Callback receiving the selected action id.
+--- @param filter function|nil Optional predicate (action) -> bool to exclude items.
+--- @return table List of hs.menubar items with category headers and checkmarks.
+function M.build_action_picker(actions, current_id, on_select, filter)
+	local items = {}
+	local current_category = nil
+	for _, action in ipairs(actions) do
+		if filter and not filter(action) then goto continue end
+		if action.category ~= current_category then
+			current_category = action.category
+			items[#items + 1] = M.build_section_header(action.category)
+		end
+		local aid = action.id
+		items[#items + 1] = {
+			title   = action.label,
+			checked = (aid == current_id),
+			fn      = function() on_select(aid) end,
+		}
+		::continue::
+	end
+	return items
+end
+
 return M
