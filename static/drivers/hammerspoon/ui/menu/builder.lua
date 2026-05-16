@@ -20,6 +20,37 @@ local HotCounter  = require("ui.menu.hotstring_counter")
 local CanvasBadge = require("ui.menu.canvas_badge")
 
 
+-- Fallback used when the manifest cannot be loaded
+local ERGOPTI_GROUPS_FALLBACK = { sfbsreduction = true, rolls = true }
+
+
+--- Loads hotstring group classification from the shared menu_manifest.json.
+--- Falls back to the hardcoded set if the file cannot be read or parsed.
+--- @return table<string,boolean> Set of group IDs specific to the Ergopti layout.
+local function load_ergopti_groups()
+	-- Walk up from hammerspoon/ to static/ to reach menu_manifest.json
+	local manifest_path = hs.configdir:gsub("[/\\]hammerspoon[/\\]?$", "") .. "/menu_manifest.json"
+	local ok_r, fh = pcall(io.open, manifest_path, "r")
+	if not ok_r or not fh then
+		Logger.warn(LOG, "Cannot open menu_manifest.json at '%s' — using hardcoded fallback.", manifest_path)
+		return ERGOPTI_GROUPS_FALLBACK
+	end
+	local content = fh:read("*a")
+	fh:close()
+	local ok_j, data = pcall(hs.json.decode, content)
+	if not ok_j or type(data) ~= "table" or type(data.hotstring_groups) ~= "table" then
+		Logger.warn(LOG, "Failed to parse menu_manifest.json — using hardcoded fallback.")
+		return ERGOPTI_GROUPS_FALLBACK
+	end
+	local groups = {}
+	for _, id in ipairs(data.hotstring_groups.ergopti or {}) do
+		groups[id] = true
+	end
+	Logger.debug(LOG, "Ergopti groups loaded from manifest (%d group(s)).", #(data.hotstring_groups.ergopti or {}))
+	return groups
+end
+
+
 
 
 
@@ -67,8 +98,8 @@ function M.generate(ctx, menu_mods, actions)
 	if type(menu_mods.hotstrings) == "table" then
 		Logger.debug(LOG, "Building hotstrings submenu…")
 
-		-- Groups that are specific to the Ergopti keyboard layout
-		local ERGOPTI_GROUPS = { sfbsreduction = true, rolls = true }
+		-- Groups that are specific to the Ergopti keyboard layout — sourced from menu_manifest.json
+		local ERGOPTI_GROUPS = load_ergopti_groups()
 
 		local counts = HotCounter.count_all(ctx, ERGOPTI_GROUPS)
 		local fmt_grand = HotCounter.fmt_grand
