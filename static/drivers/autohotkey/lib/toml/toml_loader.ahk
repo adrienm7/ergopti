@@ -476,11 +476,25 @@ ApplyTomlMetadataToFeatures(CategoryName) {
             continue
         }
 
-        ; Inside ``[_meta.sections]`` — ``key = "description"`` pairs.
+        ; Inside ``[_meta.sections]`` — ``key = "…"`` or ``key = { fr = "…", en = "…", … }`` pairs.
         if InMetaSections {
+            LowerKey := ""
+            DescRaw  := ""
             if RegExMatch(Line, "^([A-Za-z0-9_]+)\s*=\s*`"((?:[^`"\\]|\\.)*)`"\s*$", &DescMatch) {
+                ; Plain string description
                 LowerKey := StrLower(DescMatch[1])
-                DescRaw := UnescapeTomlString(DescMatch[2])
+                DescRaw  := UnescapeTomlString(DescMatch[2])
+            } else if RegExMatch(Line, "^([A-Za-z0-9_]+)\s*=\s*\{", &InlineMatch) {
+                ; Inline-table description — pick the current locale, fall back to "fr"
+                LowerKey  := StrLower(InlineMatch[1])
+                Locale    := I18nGetLocale()
+                ; Try current locale first, then "fr" as fallback
+                if RegExMatch(Line, '"' Locale '"\s*=\s*"((?:[^"\\]|\\.)*)"', &LocaleM)
+                    DescRaw := UnescapeTomlString(LocaleM[1])
+                else if RegExMatch(Line, '"fr"\s*=\s*"((?:[^"\\]|\\.)*)"', &FrM)
+                    DescRaw := UnescapeTomlString(FrM[1])
+            }
+            if (LowerKey != "" and DescRaw != "") {
                 DescRaw := StrReplace(DescRaw, "★", ScriptInformation["MagicKey"])
                 if KeyByFolded.Has(LowerKey) {
                     ActualKey := KeyByFolded[LowerKey]
