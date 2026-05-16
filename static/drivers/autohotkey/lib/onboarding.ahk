@@ -128,11 +128,16 @@ _Onboarding_Step1() {
 
 	g.AddText("w" ONBOARDING_WIN_W - 40 " y+10", "")
 
-	btnNext := g.AddButton("Default w100 x" ONBOARDING_WIN_W - 120, "Next →")
+	; Initialise label in the locale that is already active (user may have set one before)
+	btnNext := g.AddButton("Default w100 x" ONBOARDING_WIN_W - 120, t("onboarding.next"))
 	btnNext.OnEvent("Click", _Step1_Next.Bind(g, lv))
 
-	; Update button text to "Next →" in the selected language when the selection changes
+	; Re-render the button in the selected locale whenever the selection changes
 	lv.OnEvent("ItemSelect", _Step1_UpdateNextBtn.Bind(btnNext))
+
+	; Immediately render the button in the pre-selected locale — Modify(Select) does
+	; not fire ItemSelect, so we call the handler manually with the default row index
+	_Step1_UpdateNextBtn(btnNext, lv, ONBOARDING_DEFAULT_LOCALE_INDEX, true)
 
 	_Onboarding_Show(g)
 	global _ob_gui := g
@@ -270,6 +275,7 @@ _Step3_Next(g, edKey, *) {
 ; =============================================
 
 _Onboarding_Step4() {
+	global _ConfigDir
 	g := Gui("+AlwaysOnTop", t("onboarding.metrics.title"))
 	g.SetFont("s10", "Segoe UI")
 	g.MarginX := 20
@@ -278,7 +284,12 @@ _Onboarding_Step4() {
 	g.AddText("w" ONBOARDING_WIN_W - 40, t("onboarding.metrics.title"))
 	g.SetFont("s9")
 	g.AddText("w" ONBOARDING_WIN_W - 40 " y+8", t("onboarding.metrics.desc"))
-	g.SetFont("s10")
+	; Show the exact same privacy warning that ToggleMetricsEnabled() displays,
+	; so the user sees the full implications before answering yes/no
+	metrics_path := _ConfigDir . "metrics"
+	g.SetFont("s8 italic")
+	g.AddText("w" ONBOARDING_WIN_W - 40 " y+8 cRed", Format(t("dialog.metrics.enable_warning"), metrics_path))
+	g.SetFont("s10 norm")
 
 	g.AddText("w" ONBOARDING_WIN_W - 40 " y+12", "")
 	rYes := g.AddRadio("vMetricsChoice", t("onboarding.yes"))

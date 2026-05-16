@@ -180,6 +180,7 @@ function renderStep3() {
 function renderStep4() {
 	document.getElementById("s4-title").textContent = _t("onboarding.metrics.title");
 	document.getElementById("s4-desc").textContent  = _t("onboarding.metrics.desc");
+	document.getElementById("s4-warning").textContent = _t("dialog.metrics.enable_warning_formatted");
 	document.getElementById("s4-yes-label").textContent = _t("onboarding.yes");
 	document.getElementById("s4-no-label").textContent  = _t("onboarding.no");
 	document.getElementById("s4-back").textContent = _t("onboarding.back");
