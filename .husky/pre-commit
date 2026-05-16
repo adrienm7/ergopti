@@ -1,2 +1,17 @@
 #!/usr/bin/env sh
 . "$(dirname -- "$0")/_/husky.sh"
+
+# Sort and format any staged hotstring TOML files before committing.
+# Only processes files that are actually staged to avoid touching unrelated
+# files in the working tree. Re-stages each file after formatting so the
+# commit includes the sorted version without requiring a manual git add.
+
+HOTSTRING_PATTERN="static/hotstrings/*.toml"
+STAGED=$(git diff --cached --name-only --diff-filter=ACM | grep -E '^static/hotstrings/[^/]+\.toml$' || true)
+
+if [ -n "$STAGED" ]; then
+    for f in $STAGED; do
+        python tools/format_toml.py --hotstrings "$f"
+        git add "$f"
+    done
+fi

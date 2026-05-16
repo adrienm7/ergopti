@@ -8,10 +8,15 @@ Features:
 - Sorts keys within each section alphabetically
 - Handles nested sections [section.subsection] and arrays [[array]]
 - Generates TOML from JSON/Python dict input (for Hammerspoon/AHK integration)
+- Hotstring mode: locale-aware French sort (é/è/ê grouped with e, not after z)
 
 Usage:
-  Format existing TOML:
+  Format existing TOML (generic):
     python3 format_toml.py <toml_file> [--preview]
+
+  Sort hotstring TOML files (locale-aware):
+    python3 format_toml.py --hotstrings <file> [--check]
+    python3 format_toml.py --hotstrings --all [--check]
 
   Generate TOML from JSON (Hammerspoon/AHK):
     cat data.json | python3 format_toml.py --generate <output_file>
@@ -21,8 +26,19 @@ Usage:
 import json
 import re
 import sys
+import unicodedata
 from collections import OrderedDict
 from pathlib import Path
+
+HOTSTRING_FILES = [
+    "static/hotstrings/distancesreduction.toml",
+    "static/hotstrings/sfbsreduction.toml",
+    "static/hotstrings/rolls.toml",
+    "static/hotstrings/autocorrection.toml",
+    "static/hotstrings/magickey.toml",
+]
+
+_REPO_ROOT = Path(__file__).parent.parent
 
 
 def section_display_name(section_key: str) -> str:
@@ -309,8 +325,159 @@ def dict_to_toml(data: dict) -> str:
     return "\n".join(lines)
 
 
+# ====================================================
+# ====================================================
+# ======= Hotstring sort (locale-aware, fr) =======
+# ====================================================
+# ====================================================
+
+_HS_ARRAY_RE = re.compile(r"^\[\[([^\[\]]+)\]\]$")
+_HS_ENTRY_RE = re.compile(r'^"((?:[^"\\]|\\.)*)"\s*=\s*(\{.*\})\s*$')
+
+
+def _locale_sort_key(s: str) -> tuple:
+    """Return a (base, original) sort key that groups accented variants.
+
+    NFD-decomposes the string, strips combining diacritics from the base
+    used for primary ordering, so é/è/ê/ë all sort next to e rather than
+    after z.  The original (case-folded) string is the tiebreaker so two
+    keys differing only by accent are still ordered consistently.
+    """
+    nfd = unicodedata.normalize("NFD", s.casefold())
+    base = "".join(c for c in nfd if unicodedata.category(c) != "Mn")
+    return (base, s.casefold())
+
+
+def _hs_parse(content: str) -> dict:
+    """Parse a hotstring TOML into meta lines + ordered section dict.
+
+    Returns::
+
+        {
+            "meta_lines": [...],   # verbatim lines up to first [[section]]
+            "sections":   {name: [(trigger, value), ...]},
+        }
+    """
+    lines = content.splitlines()
+    meta_lines: list[str] = []
+    sections: dict[str, list[tuple[str, str]]] = {}
+    current: str | None = None
+    in_meta = True
+
+    for line in lines:
+        stripped = line.rstrip()
+        if in_meta:
+            m = _HS_ARRAY_RE.match(stripped)
+            if m:
+                in_meta = False
+                current = m.group(1)
+                sections.setdefault(current, [])
+                # Remove any section-header comment lines (# ===...) and
+                # blank lines that _hs_rebuild injected before the first [[.
+                # These must not end up in meta_lines or the second pass will
+                # produce a longer meta block than the first (non-idempotent).
+                while meta_lines and (
+                    meta_lines[-1] == ""
+                    or meta_lines[-1].startswith("# =")
+                ):
+                    meta_lines.pop()
+            else:
+                meta_lines.append(stripped)
+            continue
+        m = _HS_ARRAY_RE.match(stripped)
+        if m:
+            current = m.group(1)
+            sections.setdefault(current, [])
+            continue
+        if current is not None:
+            em = _HS_ENTRY_RE.match(stripped)
+            if em:
+                sections[current].append((em.group(1), em.group(2)))
+
+    return {"meta_lines": meta_lines, "sections": sections}
+
+
+def _hs_rebuild(parsed: dict) -> str:
+    """Reassemble the hotstring TOML with sorted sections and entries."""
+    out: list[str] = []
+
+    meta = list(parsed["meta_lines"])
+    while meta and meta[-1] == "":
+        meta.pop()
+    out.extend(meta)
+
+    for section in sorted(parsed["sections"].keys(), key=_locale_sort_key):
+        entries = sorted(
+            parsed["sections"][section],
+            key=lambda e: _locale_sort_key(e[0]),
+        )
+        out += ["", "", "", "", ""]
+        out += create_section_header(section[0].upper() + section[1:])
+        out.append("")
+        out.append(f"[[{section}]]")
+        for trigger, value in entries:
+            out.append(f'"{trigger}" = {value}')
+
+    out.append("")
+    return "\n".join(out)
+
+
+def sort_hotstring_file(path: Path, check: bool = False) -> bool:
+    """Sort and format a hotstring TOML in-place (or check only).
+
+    Returns True when the file was (or would be) changed.
+    """
+    original = path.read_text(encoding="utf-8").lstrip("﻿")
+    formatted = _hs_rebuild(_hs_parse(original))
+    changed = formatted != original
+
+    rel = path.relative_to(_REPO_ROOT) if path.is_absolute() else path
+
+    if check:
+        print(f"  {'FAIL' if changed else 'ok  '}  {rel}")
+        return changed
+
+    if changed:
+        path.write_text(formatted, encoding="utf-8")
+        print(f"  formatted  {rel}")
+    else:
+        print(f"  ok         {rel}")
+    return changed
+
+
+def hotstrings_mode() -> None:
+    """Entry point for --hotstrings mode."""
+    args = sys.argv[2:]
+    check = "--check" in args
+    all_mode = "--all" in args
+    args = [a for a in args if a not in ("--check", "--all")]
+
+    if all_mode:
+        targets = [(_REPO_ROOT / p).resolve() for p in HOTSTRING_FILES]
+    else:
+        targets = [Path(a).resolve() for a in args]
+
+    if not targets:
+        print("Error: provide a file path or use --all")
+        sys.exit(1)
+
+    any_changed = False
+    for target in targets:
+        if not target.exists():
+            print(f"  skip  {target} (not found)")
+            continue
+        any_changed |= sort_hotstring_file(target, check=check)
+
+    if check and any_changed:
+        print()
+        print("Some hotstring files are not sorted/formatted.")
+        print("Run: python3 tools/format_toml.py --hotstrings --all")
+        sys.exit(1)
+
+
 def print_usage():
     print("Usage: format_toml.py <toml_file> [--preview]")
+    print("       format_toml.py --hotstrings <file|--all> [--check]")
     print("       format_toml.py --generate <output_file> [--data JSON_STRING]")
     print("\nFormat existing TOML files:")
     print("- Adds styled section headers")
@@ -402,7 +569,9 @@ def main():
         print_usage()
         sys.exit(1)
 
-    if "--generate" in sys.argv:
+    if "--hotstrings" in sys.argv:
+        hotstrings_mode()
+    elif "--generate" in sys.argv:
         generate_mode()
     else:
         format_mode()

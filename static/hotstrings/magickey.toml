@@ -29,11 +29,11 @@ textexpansionsymbolstypst = { fr = "Expansion de texte Symboles Typst : $eq.not$
 
 
 
-# ======================
-# ======================
-# ======= Repeat =======
-# ======================
-# ======================
+# =================================
+# =================================
+# ======= Repeatcorrections =======
+# =================================
+# =================================
 
 [[repeatcorrections]]
 "arrê" = { output = "arrê", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = true }
@@ -143,8 +143,8 @@ textexpansionsymbolstypst = { fr = "Expansion de texte Symboles Typst : $eq.not$
 "caract★" = { output = "caractéristique", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
 "carac★" = { output = "caractère", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
 "cb★" = { output = "combien", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
-"ccl★" = { output = "conclusion", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
 "ccé★" = { output = "copié-collé", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
+"ccl★" = { output = "conclusion", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
 "cc★" = { output = "copier-coller", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
 "cdg★" = { output = "Charles de Gaulle", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false }
 "cdt★" = { output = "cordialement", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
@@ -179,14 +179,21 @@ textexpansionsymbolstypst = { fr = "Expansion de texte Symboles Typst : $eq.not$
 "dac★" = { output = "d’accord", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
 "ddl★" = { output = "download", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
 "dec★" = { output = "décembre", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
+"déc★" = { output = "décembre", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
 "dedt★" = { output = "d’emploi du temps", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
+"défs★" = { output = "définitions", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
 "def★" = { output = "définition", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
+"déf★" = { output = "définition", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
 "demo★" = { output = "démonstration", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
+"démo★" = { output = "démonstration", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
 "dep★" = { output = "département", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
 "desc★" = { output = "description", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
 "deux★" = { output = "deuxième", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
 "devt★" = { output = "développement", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
 "dev★" = { output = "développeur", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
+"dév★" = { output = "développeur", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
+"dé★" = { output = "déjà", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
+"dê★" = { output = "d’être", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
 "dico★" = { output = "dictionnaire", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
 "difft★" = { output = "différent", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
 "diff★" = { output = "différence", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
@@ -206,21 +213,18 @@ textexpansionsymbolstypst = { fr = "Expansion de texte Symboles Typst : $eq.not$
 "ds★" = { output = "data science", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
 "dtm★" = { output = "détermine", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
 "dvlp★" = { output = "développe", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
-"déc★" = { output = "décembre", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
-"défs★" = { output = "définitions", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
-"déf★" = { output = "définition", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
-"démo★" = { output = "démonstration", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
-"dév★" = { output = "développeur", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
-"dé★" = { output = "déjà", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
-"dê★" = { output = "d’être", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
 "echants★" = { output = "échantillons", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
+"échants★" = { output = "échantillons", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
 "echant★" = { output = "échantillon", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
+"échant★" = { output = "échantillon", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
 "eco★" = { output = "économie", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
+"éco★" = { output = "économie", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
 "ecq★" = { output = "est-ce que", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
 "edt★" = { output = "emploi du temps", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
 "eef★" = { output = "en effet", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
 "elts★" = { output = "éléments", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
 "elt★" = { output = "élément", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
+"ém★" = { output = "écris-moi", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
 "enc★" = { output = "encore", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
 "enft★" = { output = "en fait", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
 "eng★" = { output = "english", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
@@ -231,7 +235,9 @@ textexpansionsymbolstypst = { fr = "Expansion de texte Symboles Typst : $eq.not$
 "eps★" = { output = "épisodes", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
 "ep★" = { output = "épisode", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
 "eq★" = { output = "équation", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
+"éq★" = { output = "équation", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
 "ety★" = { output = "étymologie", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
+"êt★" = { output = "es-tu", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
 "eve★" = { output = "événement", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
 "evtle★" = { output = "éventuelle", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
 "evtlt★" = { output = "éventuellement", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
@@ -241,6 +247,8 @@ textexpansionsymbolstypst = { fr = "Expansion de texte Symboles Typst : $eq.not$
 "exp★" = { output = "expérience", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
 "ex★" = { output = "exemple", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
 "e★" = { output = "est", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
+"é★" = { output = "écart", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
+"ê★" = { output = "être", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
 "fam★" = { output = "famille", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
 "fb★" = { output = "facebook", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
 "fct★" = { output = "fonction", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
@@ -249,8 +257,8 @@ textexpansionsymbolstypst = { fr = "Expansion de texte Symboles Typst : $eq.not$
 "fea★" = { output = "feature", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
 "fev★" = { output = "février", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
 "ff★" = { output = "firefox", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
-"fig★" = { output = "figure", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
 "fiè★" = { output = "financière", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
+"fig★" = { output = "figure", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
 "fi★" = { output = "financier", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
 "fl★" = { output = "falloir", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
 "freq★" = { output = "fréquence", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
@@ -328,13 +336,15 @@ textexpansionsymbolstypst = { fr = "Expansion de texte Symboles Typst : $eq.not$
 "la★" = { output = "Los Angeles", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
 "ledt★" = { output = "l’emploi du temps", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
 "lex★" = { output = "l’exemple", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
+"lê★" = { output = "l’être", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
 "lgb★" = { output = "lightgbm", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
 "lim★" = { output = "limite", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
 "llm★" = { output = "large language model", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
-"lê★" = { output = "l’être", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
 "l★" = { output = "elle", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
 "majs★" = { output = "mises à jour", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
+"màjs★" = { output = "mises à jour", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
 "maj★" = { output = "mise à jour", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
+"màj★" = { output = "mise à jour", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
 "manip★" = { output = "manipulation", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
 "maths★" = { output = "mathématiques", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
 "math★" = { output = "mathématique", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
@@ -346,6 +356,7 @@ textexpansionsymbolstypst = { fr = "Expansion de texte Symboles Typst : $eq.not$
 "mdps★" = { output = "mots de passe", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
 "mdp★" = { output = "mot de passe", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
 "md★" = { output = "markdown", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
+"méthodo★" = { output = "méthodologie", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
 "min★" = { output = "minimum", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
 "mios★" = { output = "millions", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
 "mio★" = { output = "million", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
@@ -364,9 +375,6 @@ textexpansionsymbolstypst = { fr = "Expansion de texte Symboles Typst : $eq.not$
 "mtn★" = { output = "maintenant", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
 "mutu★" = { output = "mutualiser", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
 "mvt★" = { output = "mouvement", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
-"màjs★" = { output = "mises à jour", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
-"màj★" = { output = "mise à jour", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
-"méthodo★" = { output = "méthodologie", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
 "m★" = { output = "mais", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
 "nav★" = { output = "navigation", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
 "nb★" = { output = "nombre", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
@@ -405,7 +413,6 @@ textexpansionsymbolstypst = { fr = "Expansion de texte Symboles Typst : $eq.not$
 "outv★" = { output = "Où êtes-vous ?", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false }
 "out★" = { output = "Où es-tu ?", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false }
 "ouv★" = { output = "ouverture", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
-"p★" = { output = "prendre", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
 "p//★" = { output = "par rapport", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
 "params★" = { output = "paramètres", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
 "param★" = { output = "paramètre", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
@@ -422,12 +429,12 @@ textexpansionsymbolstypst = { fr = "Expansion de texte Symboles Typst : $eq.not$
 "pdv★" = { output = "point de vue", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
 "pd★" = { output = "pendant", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
 "perf★" = { output = "performance", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
+"périm★" = { output = "périmètre", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
+"péri★" = { output = "périmètre", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
 "perso★" = { output = "personne", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
 "peut-ê★" = { output = "peut-être", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
 "pex★" = { output = "par exemple", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
 "pè★" = { output = "problème", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
-"périm★" = { output = "périmètre", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
-"péri★" = { output = "périmètre", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
 "pê★" = { output = "peut-être", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
 "pf★" = { output = "portefeuille", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
 "pgm★" = { output = "programme", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
@@ -475,6 +482,7 @@ textexpansionsymbolstypst = { fr = "Expansion de texte Symboles Typst : $eq.not$
 "pub★" = { output = "publicité", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
 "pvv★" = { output = "pouvez-vous", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
 "py★" = { output = "python", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
+"p★" = { output = "prendre", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
 "qcq'★" = { output = "qu’est-ce qu’", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
 "qcq★" = { output = "qu’est-ce que", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
 "qc★" = { output = "qu’est-ce", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
@@ -492,16 +500,17 @@ textexpansionsymbolstypst = { fr = "Expansion de texte Symboles Typst : $eq.not$
 "reco★" = { output = "recommandation", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
 "ref★" = { output = "référence", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
 "rep★" = { output = "répertoire", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
+"rép★" = { output = "répertoire", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
+"résil★" = { output = "résiliation", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
+"rés★" = { output = "réunions", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
 "rex★" = { output = "retour d’expérience", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
+"ré★" = { output = "réunion", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
 "rh★" = { output = "ressources humaines", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
 "rmq★" = { output = "remarque", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
 "rpz★" = { output = "représente", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
 "rs★" = { output = "résultat", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
-"rép★" = { output = "répertoire", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
-"résil★" = { output = "résiliation", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
-"rés★" = { output = "réunions", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
-"ré★" = { output = "réunion", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
 "r★" = { output = "rien", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
+"sécu★" = { output = "sécurité", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
 "segm★" = { output = "segment", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
 "seg★" = { output = "segment", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
 "sept★" = { output = "septembre", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
@@ -527,7 +536,6 @@ textexpansionsymbolstypst = { fr = "Expansion de texte Symboles Typst : $eq.not$
 "sync★" = { output = "synchronisation", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
 "syn★" = { output = "synonyme", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
 "sys★" = { output = "système", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
-"sécu★" = { output = "sécurité", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
 "ta dispo★" = { output = "ta disposition", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
 "tb★" = { output = "très bien", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
 "temp★" = { output = "temporaire", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
@@ -536,8 +544,8 @@ textexpansionsymbolstypst = { fr = "Expansion de texte Symboles Typst : $eq.not$
 "tes★" = { output = "tu es", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
 "tfk★" = { output = "qu’est-ce que tu fais ?", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
 "tgh★" = { output = "together", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
-"thm★" = { output = "théorème", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
 "théo★" = { output = "théorie", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
+"thm★" = { output = "théorème", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
 "tjr★" = { output = "toujours", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
 "tj★" = { output = "toujours", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
 "tlm★" = { output = "tout le monde", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
@@ -553,7 +561,6 @@ textexpansionsymbolstypst = { fr = "Expansion de texte Symboles Typst : $eq.not$
 "tv★" = { output = "télévision", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
 "typo★" = { output = "typographie", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
 "ty★" = { output = "thank you", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
-"tél★" = { output = "téléphone", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }  # "tel" can’t be used, because there would be a conflict with "tel★e que"
 "t★" = { output = "très", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
 "une amé★" = { output = "une amélioration", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
 "une dispo★" = { output = "une disposition", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
@@ -563,13 +570,13 @@ textexpansionsymbolstypst = { fr = "Expansion de texte Symboles Typst : $eq.not$
 "var★" = { output = "variable", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
 "vav★" = { output = "vis-à-vis", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
 "verif★" = { output = "vérification", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
+"vérif★" = { output = "vérification", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
 "vocab★" = { output = "vocabulaire", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
 "volat★" = { output = "volatilité", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
 "vrmt★" = { output = "vraiment", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
 "vrm★" = { output = "vraiment", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
 "vsc★" = { output = "VSCode", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false }
 "vs★" = { output = "vous êtes", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
-"vérif★" = { output = "vérification", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
 "v★" = { output = "version", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
 "wd★" = { output = "windows", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
 "wiki★" = { output = "wikipédia", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
@@ -585,15 +592,6 @@ textexpansionsymbolstypst = { fr = "Expansion de texte Symboles Typst : $eq.not$
 "ya★" = { output = "il y a", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
 "yc★" = { output = "y compris", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
 "yt★" = { output = "youtube", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
-"échants★" = { output = "échantillons", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
-"échant★" = { output = "échantillon", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
-"éco★" = { output = "économie", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
-"ém★" = { output = "écris-moi", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
-"éq★" = { output = "équation", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
-"é★" = { output = "écart", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
-"êt★" = { output = "es-tu", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
-"ê★" = { output = "être", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
-
 
 
 
@@ -636,8 +634,8 @@ textexpansionsymbolstypst = { fr = "Expansion de texte Symboles Typst : $eq.not$
 "ballon★" = { output = "🎈", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false }
 "banane★" = { output = "🍌", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false }
 "batterie★" = { output = "🔋", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false }
-"bisou★" = { output = "😘", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false }
 "bière★" = { output = "🍺", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false }
+"bisou★" = { output = "😘", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false }
 "blanc★" = { output = "🏳️", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = true }
 "bombe★" = { output = "💣", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false }
 "bouche★" = { output = "🤭", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false }
@@ -663,15 +661,15 @@ textexpansionsymbolstypst = { fr = "Expansion de texte Symboles Typst : $eq.not$
 "chauve-souris★" = { output = "🦇", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false }
 "check★" = { output = "✔️", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = true }
 "cheval★" = { output = "🐎", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false }
+"chèvre★" = { output = "🐐", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false }
 "chien★" = { output = "🐕", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false }
 "chocolat★" = { output = "🍫", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false }
-"chèvre★" = { output = "🐐", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false }
 "citron★" = { output = "🍋", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false }
 "clap★" = { output = "👏", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false }
 "clavier★" = { output = "⌨️", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = true }
+"clé★" = { output = "🔑", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false }
 "clin★" = { output = "😉", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false }
 "cloche★" = { output = "🔔", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false }
-"clé★" = { output = "🔑", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false }
 "cochon★" = { output = "🐖", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false }
 "coco★" = { output = "🥥", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false }
 "coeur★" = { output = "❤️", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = true }
@@ -690,6 +688,9 @@ textexpansionsymbolstypst = { fr = "Expansion de texte Symboles Typst : $eq.not$
 "cœur★" = { output = "❤️", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = true }
 "danse★" = { output = "💃", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false }
 "dauphin★" = { output = "🐬", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false }
+"dégoût★" = { output = "🤮", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false }
+"délice★" = { output = "😋", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false }
+"délicieux★" = { output = "😋", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false }
 "diable★" = { output = "😈", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false }
 "diamant★" = { output = "💎", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false }
 "dislike★" = { output = "👎", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false }
@@ -698,17 +699,20 @@ textexpansionsymbolstypst = { fr = "Expansion de texte Symboles Typst : $eq.not$
 "douche★" = { output = "🛁", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false }
 "dragon★" = { output = "🐉", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false }
 "drapeau★" = { output = "🏁", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false }
-"dégoût★" = { output = "🤮", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false }
-"délice★" = { output = "😋", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false }
-"délicieux★" = { output = "😋", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false }
 "eau★" = { output = "💧", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false }
+"éclair★" = { output = "⚡", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false }
+"écureuil★" = { output = "🐿️", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = true }
 "effroi★" = { output = "😱", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false }
+"éléphant★" = { output = "🐘", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false }
 "email★" = { output = "📧", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false }
+"épée★" = { output = "⚔️", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = true }
 "escargot★" = { output = "🐌", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false }
+"étoile★" = { output = "⭐", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false }
 "facepalm★" = { output = "🤦", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false }
 "fatigue★" = { output = "😩", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false }
 "faux★" = { output = "❌", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false }
 "fete★" = { output = "🎉", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false }
+"fête★" = { output = "🎉", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false }
 "feu★" = { output = "🔥", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false }
 "fier★" = { output = "😤", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false }
 "film★" = { output = "🎬", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false }
@@ -721,21 +725,20 @@ textexpansionsymbolstypst = { fr = "Expansion de texte Symboles Typst : $eq.not$
 "frites★" = { output = "🍟", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false }
 "fromage★" = { output = "🧀", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false }
 "fusée★" = { output = "🚀", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false }
-"fête★" = { output = "🎉", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false }
+"gâteau★" = { output = "🎂", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false }
 "girafe★" = { output = "🦒", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false }
 "glace★" = { output = "🍦", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false }
 "gorille★" = { output = "🦍", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false }
 "grenouille★" = { output = "🐸", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false }
 "guitare★" = { output = "🎸", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false }
-"gâteau★" = { output = "🎂", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false }
 "hamburger★" = { output = "🍔", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false }
 "hamster★" = { output = "🐹", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false }
+"hérisson★" = { output = "🦔", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false }
 "heureux★" = { output = "😊", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false }
 "hibou★" = { output = "🦉", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false }
 "hippopotame★" = { output = "🦛", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false }
 "homard★" = { output = "🦞", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false }
 "hotdog★" = { output = "🌭", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false }
-"hérisson★" = { output = "🦔", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false }
 "idee★" = { output = "💡", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false }
 "idée★" = { output = "💡", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false }
 "innocent★" = { output = "😇", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false }
@@ -752,6 +755,7 @@ textexpansionsymbolstypst = { fr = "Expansion de texte Symboles Typst : $eq.not$
 "lapin★" = { output = "🐇", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false }
 "larmes★" = { output = "😭", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false }
 "larme★" = { output = "😢", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false }
+"léopard★" = { output = "🐆", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false }
 "licorne★" = { output = "🦄", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false }
 "like★" = { output = "👍", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false }
 "lion★" = { output = "🦁", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false }
@@ -761,12 +765,12 @@ textexpansionsymbolstypst = { fr = "Expansion de texte Symboles Typst : $eq.not$
 "loup★" = { output = "🐺", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false }
 "lunettes★" = { output = "🤓", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false }
 "lune★" = { output = "🌙", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false }
-"léopard★" = { output = "🐆", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false }
+"maïs★" = { output = "🌽", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false }
 "malade★" = { output = "🤒", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false }
 "masque★" = { output = "😷", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false }
-"maïs★" = { output = "🌽", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false }
 "mdr★" = { output = "😂", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false }
 "medaille★" = { output = "🥇", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false }
+"médaille★" = { output = "🥇", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false }
 "melon★" = { output = "🍈", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false }
 "microphone★" = { output = "🎤", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false }
 "miel★" = { output = "🍯", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false }
@@ -777,7 +781,6 @@ textexpansionsymbolstypst = { fr = "Expansion de texte Symboles Typst : $eq.not$
 "mouton★" = { output = "🐑", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false }
 "muscles★" = { output = "💪", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false }
 "musique★" = { output = "🎵", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false }
-"médaille★" = { output = "🥇", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false }
 "nice★" = { output = "👌", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false }
 "noel★" = { output = "🎄", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false }
 "nuage★" = { output = "☁️", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = true }
@@ -799,6 +802,7 @@ textexpansionsymbolstypst = { fr = "Expansion de texte Symboles Typst : $eq.not$
 "pastèque★" = { output = "🍉", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false }
 "pates★" = { output = "🍝", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false }
 "pc★" = { output = "💻", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false }
+"pêche★" = { output = "🍑", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false }
 "penser★" = { output = "🤔", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false }
 "pensif★" = { output = "🤔", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false }
 "perroquet★" = { output = "🦜", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false }
@@ -817,7 +821,6 @@ textexpansionsymbolstypst = { fr = "Expansion de texte Symboles Typst : $eq.not$
 "pouce★" = { output = "👍", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false }
 "poule★" = { output = "🐔", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false }
 "poussin★" = { output = "🐣", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false }
-"pêche★" = { output = "🍑", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false }
 "radioactif★" = { output = "☢️", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = true }
 "rage★" = { output = "😡", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false }
 "raisin★" = { output = "🍇", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false }
@@ -848,6 +851,7 @@ textexpansionsymbolstypst = { fr = "Expansion de texte Symboles Typst : $eq.not$
 "tacos★" = { output = "🌮", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false }
 "taco★" = { output = "🌮", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false }
 "telephone★" = { output = "☎️", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = true }
+"téléphone★" = { output = "☎️", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = true }
 "terre★" = { output = "🌍", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false }
 "thermomètre★" = { output = "🌡️", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = true }
 "thé★" = { output = "🍵", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false }
@@ -861,22 +865,16 @@ textexpansionsymbolstypst = { fr = "Expansion de texte Symboles Typst : $eq.not$
 "trex★" = { output = "🦖", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false }
 "triste★" = { output = "😢", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false }
 "trophee★" = { output = "🏆", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false }
-"trophy★" = { output = "🏆", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false }
 "trophée★" = { output = "🏆", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false }
-"téléphone★" = { output = "☎️", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = true }
+"trophy★" = { output = "🏆", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false }
 "vache★" = { output = "🐄", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false }
+"vélo★" = { output = "🚲", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false }
 "victoire★" = { output = "✌️", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = true }
 "vin★" = { output = "🍷", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false }
 "voiture★" = { output = "🚗", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false }
-"vélo★" = { output = "🚲", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false }
 "yeux★" = { output = "👀", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false }
-"zombie★" = { output = "🧟", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false }
 "zèbre★" = { output = "🦓", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false }
-"éclair★" = { output = "⚡", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false }
-"écureuil★" = { output = "🐿️", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = true }
-"éléphant★" = { output = "🐘", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false }
-"épée★" = { output = "⚔️", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = true }
-"étoile★" = { output = "⭐", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false }
+"zombie★" = { output = "🧟", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false }
 
 
 
@@ -889,12 +887,10 @@ textexpansionsymbolstypst = { fr = "Expansion de texte Symboles Typst : $eq.not$
 # ====================================
 
 [[textexpansionsymbols]]
-" = /=>★" = { output = "⇏", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
 " -> ★" = { output = " ➜ ", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
+" = /=>★" = { output = "⇏", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
 "( = )★" = { output = "≡", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
 "(0)★" = { output = "🄋", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
-"(0b)★" = { output = "𝟎", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }  # B for Bold
-"(0g)★" = { output = "𝟬", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }  # G for Gras
 "(0n)★" = { output = "🄌", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
 "(1)★" = { output = "➀", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
 "(10)★" = { output = "➉", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
@@ -947,6 +943,7 @@ textexpansionsymbolstypst = { fr = "Expansion de texte Symboles Typst : $eq.not$
 "(ensemble vide)★" = { output = "∅", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
 "(eop)★" = { output = "∎", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
 "(equivalent)★" = { output = "⇔", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
+"(équivalent)★" = { output = "⇔", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
 "(et)★" = { output = "∧", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
 "(exist)★" = { output = "∃", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
 "(exists)★" = { output = "∃", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
@@ -961,10 +958,10 @@ textexpansionsymbolstypst = { fr = "Expansion de texte Symboles Typst : $eq.not$
 "(intersection)★" = { output = "⋂", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
 "(nabla)★" = { output = "∇", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
 "(non appartient)★" = { output = "∉", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
+"(non équivalent)★" = { output = "⇎", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
 "(non implique)★" = { output = "⇏", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
 "(non impliqué)★" = { output = "⇏", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
 "(non inclus)★" = { output = "⊄", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
-"(non équivalent)★" = { output = "⇎", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
 "(non)★" = { output = "¬", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
 "(not equivalent)★" = { output = "⇎", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
 "(n’appartient pas)★" = { output = "∉", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
@@ -990,7 +987,6 @@ textexpansionsymbolstypst = { fr = "Expansion de texte Symboles Typst : $eq.not$
 "(vide)★" = { output = "∅", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
 "(void)★" = { output = "∅", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
 "(x)★" = { output = "✗", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
-"(équivalent)★" = { output = "⇔", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
 "**★" = { output = "⁂", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
 "-->★" = { output = " ➜ ", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
 "->>★" = { output = "➡", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
@@ -1020,18 +1016,17 @@ textexpansionsymbolstypst = { fr = "Expansion de texte Symboles Typst : $eq.not$
 "<-|★" = { output = "↩", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
 "<-★" = { output = "←", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
 "<<-★" = { output = "⬅", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
-">★" = { output = "➢", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }  # ATtention, order matters, needs to be after -->
 "[v]★" = { output = "☑", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
 "[x]★" = { output = "☒", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
 "^|-★" = { output = "⭮", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
 "^|★" = { output = "↑", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
 "eme★" = { output = "ᵉ", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false }
+"ème★" = { output = "ᵉ", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false }
 "ieme★" = { output = "ᵉ", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false }
 "ième★" = { output = "ᵉ", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false }
 "|->★" = { output = "↪", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
 "|^★" = { output = "↓", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
 "°C★" = { output = "℃", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
-"ème★" = { output = "ᵉ", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false }
 
 
 
@@ -1045,67 +1040,12 @@ textexpansionsymbolstypst = { fr = "Expansion de texte Symboles Typst : $eq.not$
 
 [[textexpansionsymbolstypst]]
 "$AA$" = { output = "𝔸", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
-"$Alpha$" = { output = "Α", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
-"$BB$" = { output = "𝔹", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
-"$Beta$" = { output = "Β", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
-"$CC$" = { output = "ℂ", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
-"$Chi$" = { output = "Χ", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
-"$DD$" = { output = "𝔻", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
-"$Delta$" = { output = "Δ", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
-"$Digamma$" = { output = "Ϝ", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
-"$EE$" = { output = "𝔼", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
-"$Epsilon$" = { output = "Ε", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
-"$Eta$" = { output = "Η", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
-"$FF$" = { output = "𝔽", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
-"$GG$" = { output = "𝔾", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
-"$Gamma$" = { output = "Γ", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
-"$HH$" = { output = "ℍ", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
-"$II$" = { output = "𝕀", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
-"$Im$" = { output = "ℑ", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
-"$Iota$" = { output = "Ι", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
-"$JJ$" = { output = "𝕁", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
-"$KK$" = { output = "𝕂", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
-"$Kai$" = { output = "Ϗ", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
-"$Kappa$" = { output = "Κ", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
-"$LL$" = { output = "𝕃", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
-"$Lambda$" = { output = "Λ", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
-"$MM$" = { output = "𝕄", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
-"$Mu$" = { output = "Μ", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
-"$NN$" = { output = "ℕ", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
-"$Nu$" = { output = "Ν", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
-"$OO$" = { output = "𝕆", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
-"$Omega$" = { output = "Ω", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
-"$Omega.inv$" = { output = "℧", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
-"$Omicron$" = { output = "Ο", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
-"$PP$" = { output = "ℙ", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
-"$Phi$" = { output = "Φ", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
-"$Pi$" = { output = "Π", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
-"$Psi$" = { output = "Ψ", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
-"$QQ$" = { output = "ℚ", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
-"$RR$" = { output = "ℝ", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
-"$Re$" = { output = "ℜ", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
-"$Rho$" = { output = "Ρ", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
-"$SS$" = { output = "𝕊", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
-"$Sha$" = { output = "Ш", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
-"$Sigma$" = { output = "Σ", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
-"$TT$" = { output = "𝕋", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
-"$Tau$" = { output = "Τ", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
-"$Theta$" = { output = "Θ", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
-"$Theta.alt$" = { output = "ϴ", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
-"$UU$" = { output = "𝕌", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
-"$Upsilon$" = { output = "Υ", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
-"$VV$" = { output = "𝕍", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
-"$WW$" = { output = "𝕎", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
-"$XX$" = { output = "𝕏", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
-"$Xi$" = { output = "Ξ", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
-"$YY$" = { output = "𝕐", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
-"$ZZ$" = { output = "ℤ", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
-"$Zeta$" = { output = "Ζ", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
 "$acute$" = { output = "´", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
 "$acute.double$" = { output = "˝", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
 "$afghani$" = { output = "؋", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
 "$alef$" = { output = "א", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
 "$aleph$" = { output = "א", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
+"$Alpha$" = { output = "Α", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
 "$alpha$" = { output = "α", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
 "$amp$" = { output = "&", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
 "$amp.inv$" = { output = "⅋", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
@@ -1338,8 +1278,10 @@ textexpansionsymbolstypst = { fr = "Expansion de texte Symboles Typst : $eq.not$
 "$bar.v.double$" = { output = "‖", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
 "$bar.v.o$" = { output = "⦶", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
 "$bar.v.triple$" = { output = "⦀", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
+"$BB$" = { output = "𝔹", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
 "$because$" = { output = "∵", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
 "$bet$" = { output = "ב", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
+"$Beta$" = { output = "Β", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
 "$beta$" = { output = "β", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
 "$beta.alt$" = { output = "ϐ", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
 "$beth$" = { output = "ב", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
@@ -1378,6 +1320,7 @@ textexpansionsymbolstypst = { fr = "Expansion de texte Symboles Typst : $eq.not$
 "$bullet.tri$" = { output = "‣", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
 "$caret$" = { output = "‸", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
 "$caron$" = { output = "ˇ", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
+"$CC$" = { output = "ℂ", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
 "$cc$" = { output = "🅭", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
 "$cc.by$" = { output = "🅯", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
 "$cc.nc$" = { output = "🄏", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
@@ -1402,6 +1345,7 @@ textexpansionsymbolstypst = { fr = "Expansion de texte Symboles Typst : $eq.not$
 "$chevron.r.curly$" = { output = "⧽", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
 "$chevron.r.dot$" = { output = "⦒", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
 "$chevron.r.double$" = { output = "⟫", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
+"$Chi$" = { output = "Χ", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
 "$chi$" = { output = "χ", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
 "$circle.dotted$" = { output = "◌", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
 "$circle.filled$" = { output = "●", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
@@ -1457,7 +1401,9 @@ textexpansionsymbolstypst = { fr = "Expansion de texte Symboles Typst : $eq.not$
 "$dash.o$" = { output = "⊝", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
 "$dash.wave$" = { output = "〜", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
 "$dash.wave.double$" = { output = "〰", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
+"$DD$" = { output = "𝔻", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
 "$degree$" = { output = "°", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
+"$Delta$" = { output = "Δ", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
 "$delta$" = { output = "δ", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
 "$diaer$" = { output = "¨", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
 "$diameter$" = { output = "⌀", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
@@ -1475,6 +1421,7 @@ textexpansionsymbolstypst = { fr = "Expansion de texte Symboles Typst : $eq.not$
 "$die.three$" = { output = "⚂", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
 "$die.two$" = { output = "⚁", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
 "$diff$" = { output = "∂", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
+"$Digamma$" = { output = "Ϝ", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
 "$digamma$" = { output = "ϝ", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
 "$div$" = { output = "÷", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
 "$div.circle$" = { output = "⨸", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
@@ -1508,6 +1455,7 @@ textexpansionsymbolstypst = { fr = "Expansion de texte Symboles Typst : $eq.not$
 "$dram$" = { output = "֏", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
 "$earth$" = { output = "🜨", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
 "$earth.alt$" = { output = "♁", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
+"$EE$" = { output = "𝔼", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
 "$ell$" = { output = "ℓ", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
 "$ellipse.filled.h$" = { output = "⬬", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
 "$ellipse.filled.v$" = { output = "⬮", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
@@ -1519,6 +1467,7 @@ textexpansionsymbolstypst = { fr = "Expansion de texte Symboles Typst : $eq.not$
 "$emptyset.bar$" = { output = "⦱", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
 "$emptyset.circle$" = { output = "⦲", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
 "$emptyset.rev$" = { output = "⦰", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
+"$Epsilon$" = { output = "Ε", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
 "$epsilon$" = { output = "ε", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
 "$epsilon.alt$" = { output = "ϵ", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
 "$epsilon.alt.rev$" = { output = "϶", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
@@ -1553,6 +1502,7 @@ textexpansionsymbolstypst = { fr = "Expansion de texte Symboles Typst : $eq.not$
 "$errorbar.diamond.stroked$" = { output = "⧰", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
 "$errorbar.square.filled$" = { output = "⧯", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
 "$errorbar.square.stroked$" = { output = "⧮", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
+"$Eta$" = { output = "Η", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
 "$eta$" = { output = "η", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
 "$euro$" = { output = "€", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
 "$excl$" = { output = "!", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
@@ -1566,6 +1516,7 @@ textexpansionsymbolstypst = { fr = "Expansion de texte Symboles Typst : $eq.not$
 "$fence.l.double$" = { output = "⧚", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
 "$fence.r$" = { output = "⧙", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
 "$fence.r.double$" = { output = "⧛", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
+"$FF$" = { output = "𝔽", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
 "$flat$" = { output = "♭", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
 "$flat.b$" = { output = "𝄭", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
 "$flat.double$" = { output = "𝄫", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
@@ -1581,6 +1532,7 @@ textexpansionsymbolstypst = { fr = "Expansion de texte Symboles Typst : $eq.not$
 "$forces.not$" = { output = "⊮", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
 "$franc$" = { output = "₣", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
 "$frown$" = { output = "⌢", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
+"$Gamma$" = { output = "Γ", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
 "$gamma$" = { output = "γ", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
 "$gender.female$" = { output = "♀", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
 "$gender.female.double$" = { output = "⚢", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
@@ -1594,6 +1546,7 @@ textexpansionsymbolstypst = { fr = "Expansion de texte Symboles Typst : $eq.not$
 "$gender.male.stroke.t$" = { output = "⚨", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
 "$gender.neuter$" = { output = "⚲", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
 "$gender.trans$" = { output = "⚧", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
+"$GG$" = { output = "𝔾", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
 "$gimel$" = { output = "ג", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
 "$gimmel$" = { output = "ג", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
 "$gradient$" = { output = "∇", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
@@ -1674,6 +1627,7 @@ textexpansionsymbolstypst = { fr = "Expansion de texte Symboles Typst : $eq.not$
 "$hat$" = { output = "^", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
 "$hexa.filled$" = { output = "⬢", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
 "$hexa.stroked$" = { output = "⬡", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
+"$HH$" = { output = "ℍ", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
 "$hourglass.filled$" = { output = "⧗", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
 "$hourglass.stroked$" = { output = "⧖", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
 "$hryvnia$" = { output = "₴", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
@@ -1682,6 +1636,8 @@ textexpansionsymbolstypst = { fr = "Expansion de texte Symboles Typst : $eq.not$
 "$hyph.nobreak$" = { output = "{U+2011}", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
 "$hyph.point$" = { output = "‧", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
 "$hyph.soft$" = { output = "{U+00AD}", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
+"$II$" = { output = "𝕀", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
+"$Im$" = { output = "ℑ", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
 "$image$" = { output = "⊷", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
 "$in$" = { output = "∈", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
 "$in.not$" = { output = "∉", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
@@ -1726,23 +1682,30 @@ textexpansionsymbolstypst = { fr = "Expansion de texte Symboles Typst : $eq.not$
 "$interleave.struck$" = { output = "⫵", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
 "$interrobang$" = { output = "‽", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
 "$interrobang.inv$" = { output = "⸘", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
+"$Iota$" = { output = "Ι", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
 "$iota$" = { output = "ι", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
 "$iota.inv$" = { output = "℩", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
+"$JJ$" = { output = "𝕁", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
 "$join$" = { output = "⨝", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
 "$join.l$" = { output = "⟕", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
 "$join.l.r$" = { output = "⟗", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
 "$join.r$" = { output = "⟖", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
 "$jupiter$" = { output = "♃", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
+"$Kai$" = { output = "Ϗ", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
 "$kai$" = { output = "ϗ", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
+"$Kappa$" = { output = "Κ", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
 "$kappa$" = { output = "κ", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
 "$kappa.alt$" = { output = "ϰ", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
 "$kip$" = { output = "₭", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
+"$KK$" = { output = "𝕂", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
+"$Lambda$" = { output = "Λ", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
 "$lambda$" = { output = "λ", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
 "$laplace$" = { output = "∆", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
 "$lari$" = { output = "₾", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
 "$lat$" = { output = "⪫", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
 "$lat.eq$" = { output = "⪭", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
 "$lira$" = { output = "₺", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
+"$LL$" = { output = "𝕃", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
 "$lozenge.filled$" = { output = "⧫", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
 "$lozenge.filled.medium$" = { output = "⬧", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
 "$lozenge.filled.small$" = { output = "⬪", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
@@ -1793,7 +1756,9 @@ textexpansionsymbolstypst = { fr = "Expansion de texte Symboles Typst : $eq.not$
 "$minus.tilde$" = { output = "≂", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
 "$minus.triangle$" = { output = "⨺", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
 "$miny$" = { output = "⧿", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
+"$MM$" = { output = "𝕄", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
 "$models$" = { output = "⊧", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
+"$Mu$" = { output = "Μ", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
 "$mu$" = { output = "μ", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
 "$multimap$" = { output = "⊸", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
 "$multimap.double$" = { output = "⧟", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
@@ -1806,6 +1771,7 @@ textexpansionsymbolstypst = { fr = "Expansion de texte Symboles Typst : $eq.not$
 "$natural.t$" = { output = "𝄮", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
 "$neptune$" = { output = "♆", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
 "$neptune.alt$" = { output = "⯉", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
+"$NN$" = { output = "ℕ", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
 "$not$" = { output = "¬", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
 "$note.down$" = { output = "🎝", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
 "$note.eighth$" = { output = "𝅘𝅥𝅮", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
@@ -1826,10 +1792,15 @@ textexpansionsymbolstypst = { fr = "Expansion de texte Symboles Typst : $eq.not$
 "$nothing.bar$" = { output = "⦱", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
 "$nothing.circle$" = { output = "⦲", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
 "$nothing.rev$" = { output = "⦰", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
+"$Nu$" = { output = "Ν", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
 "$nu$" = { output = "ν", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
 "$numero$" = { output = "№", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
+"$Omega$" = { output = "Ω", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
 "$omega$" = { output = "ω", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
+"$Omega.inv$" = { output = "℧", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
+"$Omicron$" = { output = "Ο", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
 "$omicron$" = { output = "ο", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
+"$OO$" = { output = "𝕆", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
 "$oo$" = { output = "∞", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
 "$or$" = { output = "∨", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
 "$or.big$" = { output = "⋁", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
@@ -1874,8 +1845,10 @@ textexpansionsymbolstypst = { fr = "Expansion de texte Symboles Typst : $eq.not$
 "$perp.o$" = { output = "⦹", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
 "$peso$" = { output = "$", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
 "$peso.philippine$" = { output = "₱", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
+"$Phi$" = { output = "Φ", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
 "$phi$" = { output = "φ", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
 "$phi.alt$" = { output = "ϕ", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
+"$Pi$" = { output = "Π", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
 "$pi$" = { output = "π", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
 "$pi.alt$" = { output = "ϖ", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
 "$pilcrow$" = { output = "¶", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
@@ -1904,6 +1877,7 @@ textexpansionsymbolstypst = { fr = "Expansion de texte Symboles Typst : $eq.not$
 "$power.on.off$" = { output = "⏼", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
 "$power.sleep$" = { output = "⏾", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
 "$power.standby$" = { output = "⏻", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
+"$PP$" = { output = "ℙ", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
 "$prec$" = { output = "≺", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
 "$prec.approx$" = { output = "⪷", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
 "$prec.curly.eq$" = { output = "≼", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
@@ -1927,8 +1901,10 @@ textexpansionsymbolstypst = { fr = "Expansion de texte Symboles Typst : $eq.not$
 "$product$" = { output = "∏", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
 "$product.co$" = { output = "∐", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
 "$prop$" = { output = "∝", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
+"$Psi$" = { output = "Ψ", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
 "$psi$" = { output = "ψ", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
 "$qed$" = { output = "∎", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
+"$QQ$" = { output = "ℚ", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
 "$quest$" = { output = "?", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
 "$quest.double$" = { output = "⁇", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
 "$quest.excl$" = { output = "⁈", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
@@ -1952,6 +1928,7 @@ textexpansionsymbolstypst = { fr = "Expansion de texte Symboles Typst : $eq.not$
 "$quote.r.single$" = { output = "’", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
 "$quote.single$" = { output = "'", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
 "$ratio$" = { output = "∶", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
+"$Re$" = { output = "ℜ", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
 "$rect.filled.h$" = { output = "▬", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
 "$rect.filled.v$" = { output = "▮", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
 "$rect.stroked.h$" = { output = "▭", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
@@ -1964,10 +1941,12 @@ textexpansionsymbolstypst = { fr = "Expansion de texte Symboles Typst : $eq.not$
 "$rest.quarter$" = { output = "𝄽", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
 "$rest.sixteenth$" = { output = "𝄿", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
 "$rest.whole$" = { output = "𝄻", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
+"$Rho$" = { output = "Ρ", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
 "$rho$" = { output = "ρ", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
 "$rho.alt$" = { output = "ϱ", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
 "$riel$" = { output = "៛", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
 "$rlm$" = { output = "{U+200F}", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
+"$RR$" = { output = "ℝ", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
 "$ruble$" = { output = "₽", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
 "$rupee.generic$" = { output = "₨", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
 "$rupee.indian$" = { output = "₹", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
@@ -1986,6 +1965,7 @@ textexpansionsymbolstypst = { fr = "Expansion de texte Symboles Typst : $eq.not$
 "$semi$" = { output = ";", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
 "$semi.inv$" = { output = "⸵", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
 "$semi.rev$" = { output = "⁏", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
+"$Sha$" = { output = "Ш", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
 "$sha$" = { output = "ш", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
 "$sharp$" = { output = "♯", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
 "$sharp.b$" = { output = "𝄱", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
@@ -2004,6 +1984,7 @@ textexpansionsymbolstypst = { fr = "Expansion de texte Symboles Typst : $eq.not$
 "$shell.r.stroked$" = { output = "⟭", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
 "$shell.t$" = { output = "⏠", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
 "$shin$" = { output = "ש", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
+"$Sigma$" = { output = "Σ", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
 "$sigma$" = { output = "σ", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
 "$sigma.alt$" = { output = "ς", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
 "$slash$" = { output = "/", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
@@ -2041,6 +2022,7 @@ textexpansionsymbolstypst = { fr = "Expansion de texte Symboles Typst : $eq.not$
 "$square.stroked.rounded$" = { output = "▢", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
 "$square.stroked.small$" = { output = "◽", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
 "$square.stroked.tiny$" = { output = "▫", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
+"$SS$" = { output = "𝕊", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
 "$star.filled$" = { output = "★", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
 "$star.op$" = { output = "⋆", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
 "$star.stroked$" = { output = "☆", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
@@ -2111,10 +2093,13 @@ textexpansionsymbolstypst = { fr = "Expansion de texte Symboles Typst : $eq.not$
 "$tack.t.short$" = { output = "⫠", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
 "$taka$" = { output = "৳", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
 "$taman$" = { output = "߿", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
+"$Tau$" = { output = "Τ", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
 "$tau$" = { output = "τ", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
 "$tenge$" = { output = "₸", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
 "$therefore$" = { output = "∴", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
+"$Theta$" = { output = "Θ", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
 "$theta$" = { output = "θ", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
+"$Theta.alt$" = { output = "ϴ", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
 "$theta.alt$" = { output = "ϑ", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
 "$tilde.basic$" = { output = "~", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
 "$tilde.dot$" = { output = "⩪", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
@@ -2178,6 +2163,7 @@ textexpansionsymbolstypst = { fr = "Expansion de texte Symboles Typst : $eq.not$
 "$triangle.stroked.t$" = { output = "△", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
 "$triangle.stroked.tl$" = { output = "◸", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
 "$triangle.stroked.tr$" = { output = "◹", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
+"$TT$" = { output = "𝕋", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
 "$union$" = { output = "∪", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
 "$union.arrow$" = { output = "⊌", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
 "$union.big$" = { output = "⋃", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
@@ -2191,20 +2177,29 @@ textexpansionsymbolstypst = { fr = "Expansion de texte Symboles Typst : $eq.not$
 "$union.sq$" = { output = "⊔", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
 "$union.sq.big$" = { output = "⨆", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
 "$union.sq.double$" = { output = "⩏", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
+"$Upsilon$" = { output = "Υ", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
 "$upsilon$" = { output = "υ", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
 "$uranus$" = { output = "⛢", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
 "$uranus.alt$" = { output = "♅", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
+"$UU$" = { output = "𝕌", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
 "$venus$" = { output = "♀", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
+"$VV$" = { output = "𝕍", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
 "$without$" = { output = "∖", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
 "$wj$" = { output = "{U+2060}", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
 "$won$" = { output = "₩", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
 "$wreath$" = { output = "≀", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
+"$WW$" = { output = "𝕎", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
+"$Xi$" = { output = "Ξ", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
 "$xi$" = { output = "ξ", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
 "$xor$" = { output = "⊕", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
 "$xor.big$" = { output = "⨁", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
+"$XX$" = { output = "𝕏", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
 "$yen$" = { output = "¥", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
 "$yuan$" = { output = "¥", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
+"$YY$" = { output = "𝕐", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
+"$Zeta$" = { output = "Ζ", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
 "$zeta$" = { output = "ζ", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
 "$zwj$" = { output = "{U+200D}", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
 "$zwnj$" = { output = "{U+200C}", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
 "$zws$" = { output = "{U+200B}", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }
+"$ZZ$" = { output = "ℤ", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false, is_case_sensitive_strict = true }

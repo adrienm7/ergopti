@@ -35,18 +35,18 @@ ie = { fr = "À + É corrige 2 SFBs : éà = ié et àé = éi", en = "À + É f
 # ==================
 
 [[bu]]
+"àu" = { output = "ub", is_word = false, auto_expand = true, is_case_sensitive = false, final_result = false }
+"à★" = { output = "bu", is_word = false, auto_expand = true, is_case_sensitive = false, final_result = false }
 "e mà★" = { output = "e mise à jour", is_word = false, auto_expand = true, is_case_sensitive = false, final_result = false }
 "es mà★" = { output = "es mises à jour", is_word = false, auto_expand = true, is_case_sensitive = false, final_result = false }
 "il a mà★" = { output = "il a mis à jour", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
 "la mà★" = { output = "la mise à jour", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
 "ma mà★" = { output = "ma mise à jour", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
-"mià★" = { output = "mise à jour", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
 "mà★" = { output = "mettre à jour", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
+"mià★" = { output = "mise à jour", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
 "pià★" = { output = "pièce jointe", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
 "ta mà★" = { output = "ta mise à jour", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
 "tà★" = { output = "toujours", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false }
-"àu" = { output = "ub", is_word = false, auto_expand = true, is_case_sensitive = false, final_result = false }
-"à★" = { output = "bu", is_word = false, auto_expand = true, is_case_sensitive = false, final_result = false }
 
 
 
@@ -84,9 +84,9 @@ ie = { fr = "À + É corrige 2 SFBs : éà = ié et àé = éi", en = "À + É f
 # =====================
 
 [[ecirc]]
-"éê" = { output = "eo", is_word = false, auto_expand = true, is_case_sensitive = false, final_result = false }
 "ê," = { output = "u,", is_word = false, auto_expand = true, is_case_sensitive = false, final_result = false }
 "ê." = { output = "u.", is_word = false, auto_expand = true, is_case_sensitive = false, final_result = false }
+"éê" = { output = "eo", is_word = false, auto_expand = true, is_case_sensitive = false, final_result = false }
 "êé" = { output = "oe", is_word = false, auto_expand = true, is_case_sensitive = false, final_result = false }
 
 
@@ -100,8 +100,8 @@ ie = { fr = "À + É corrige 2 SFBs : éà = ié et àé = éi", en = "À + É f
 # ======================
 
 [[egrave]]
-"yè" = { output = "â", is_word = false, auto_expand = true, is_case_sensitive = false, final_result = false }
 "èy" = { output = "aî", is_word = false, auto_expand = true, is_case_sensitive = false, final_result = false }
+"yè" = { output = "â", is_word = false, auto_expand = true, is_case_sensitive = false, final_result = false }
 
 
 
@@ -114,6 +114,6 @@ ie = { fr = "À + É corrige 2 SFBs : éà = ié et àé = éi", en = "À + É f
 # ==================
 
 [[ie]]
-"ié★" = { output = "ébu", is_word = false, auto_expand = true, is_case_sensitive = false, final_result = false }
 "àé" = { output = "éi", is_word = false, auto_expand = true, is_case_sensitive = false, final_result = false }
 "éà" = { output = "ié", is_word = false, auto_expand = true, is_case_sensitive = false, final_result = false }
+"ié★" = { output = "ébu", is_word = false, auto_expand = true, is_case_sensitive = false, final_result = false }

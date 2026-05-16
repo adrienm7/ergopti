@@ -118,14 +118,15 @@ sx = "SX ➜ SK"
 
 
 
-# ===========================
-# ===========================
-# ======= Chevronless =======
-# ===========================
-# ===========================
+# ============================
+# ============================
+# ======= Bracketquote =======
+# ============================
+# ============================
 
-[[chevronless]]
-"<%" = { output = "<=", is_word = false, auto_expand = true, is_case_sensitive = true, final_result = true }
+[[bracketquote]]
+"[#" = { output = "[\"", is_word = false, auto_expand = true, is_case_sensitive = true, final_result = true }
+
 
 
 
@@ -138,6 +139,19 @@ sx = "SX ➜ SK"
 
 [[chevrongreater]]
 ">%" = { output = ">=", is_word = false, auto_expand = true, is_case_sensitive = true, final_result = true }
+
+
+
+
+
+# ===========================
+# ===========================
+# ======= Chevronless =======
+# ===========================
+# ===========================
+
+[[chevronless]]
+"<%" = { output = "<=", is_word = false, auto_expand = true, is_case_sensitive = true, final_result = true }
 
 
 
@@ -156,18 +170,6 @@ sx = "SX ➜ SK"
 
 
 
-# ===========================
-# ===========================
-# ======= Commentopen =======
-# ===========================
-# ===========================
-
-[[commentopen]]
-"\\\"" = { output = "/*", is_word = false, auto_expand = true, is_case_sensitive = true, final_result = true }
-
-
-
-
 # ============================
 # ============================
 # ======= Commentclose =======
@@ -176,6 +178,19 @@ sx = "SX ➜ SK"
 
 [[commentclose]]
 "\"\\" = { output = "*/", is_word = false, auto_expand = true, is_case_sensitive = true, final_result = true }
+
+
+
+
+
+# ===========================
+# ===========================
+# ======= Commentopen =======
+# ===========================
+# ===========================
+
+[[commentopen]]
+"\\\"" = { output = "/*", is_word = false, auto_expand = true, is_case_sensitive = true, final_result = true }
 
 
 
@@ -248,18 +263,6 @@ sx = "SX ➜ SK"
 
 
 
-# ==================================
-# ==================================
-# ======= Hashtagopenbracket =======
-# ==================================
-# ==================================
-
-[[hashtagopenbracket]]
-"#[" = { output = "\"]", is_word = false, auto_expand = true, is_case_sensitive = true, final_result = true }
-
-
-
-
 # ===================================
 # ===================================
 # ======= Hashtagclosebracket =======
@@ -275,37 +278,25 @@ sx = "SX ➜ SK"
 
 # ==================================
 # ==================================
+# ======= Hashtagopenbracket =======
+# ==================================
+# ==================================
+
+[[hashtagopenbracket]]
+"#[" = { output = "\"]", is_word = false, auto_expand = true, is_case_sensitive = true, final_result = true }
+
+
+
+
+
+# ==================================
+# ==================================
 # ======= Hashtagparenthesis =======
 # ==================================
 # ==================================
 
 [[hashtagparenthesis]]
 "#(" = { output = "\")", is_word = false, auto_expand = true, is_case_sensitive = true, final_result = true }
-
-
-
-
-
-# ==========================
-# ==========================
-# ======= Parenquote =======
-# ==========================
-# ==========================
-
-[[parenquote]]
-"(#" = { output = "(\"", is_word = false, auto_expand = true, is_case_sensitive = true, final_result = true }
-
-
-
-
-# ============================
-# ============================
-# ======= Bracketquote =======
-# ============================
-# ============================
-
-[[bracketquote]]
-"[#" = { output = "[\"", is_word = false, auto_expand = true, is_case_sensitive = true, final_result = true }
 
 
 
@@ -353,6 +344,19 @@ sx = "SX ➜ SK"
 
 
 
+# ==========================
+# ==========================
+# ======= Parenquote =======
+# ==========================
+# ==========================
+
+[[parenquote]]
+"(#" = { output = "(\"", is_word = false, auto_expand = true, is_case_sensitive = true, final_result = true }
+
+
+
+
+
 # ==================
 # ==================
 # ======= Sx =======
@@ -361,4 +365,3 @@ sx = "SX ➜ SK"
 
 [[sx]]
 "sx" = { output = "sk", is_word = false, auto_expand = true, is_case_sensitive = false, final_result = false }
-"xlsx" = { output = "xlsx", is_word = false, auto_expand = true, is_case_sensitive = false, final_result = false }  # To not trigger the replacement in this particular case
