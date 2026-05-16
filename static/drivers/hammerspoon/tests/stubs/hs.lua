@@ -279,13 +279,19 @@ M.fs = {
 
 local KEYSTROKES = {}
 
+M.mouse = {
+	absolutePosition = function() return { x = 0, y = 0 } end,
+	setAbsolutePosition = function() end,
+}
+
 M.eventtap = {
 	keyStroke = function(mods, key) table.insert(KEYSTROKES, { mods = mods, key = key }) end,
 	keyStrokes = function(s) table.insert(KEYSTROKES, { text = s }) end,
 	new = function(_, _) return { start = function() end, stop = function() end } end,
 	event = {
-		types = { keyDown = 10, keyUp = 11, flagsChanged = 12 },
-		newKeyEvent = function(mods, key, isDown) return { mods = mods, key = key, isDown = isDown, post = function() end } end,
+		types = { keyDown = 10, keyUp = 11, flagsChanged = 12, leftMouseUp = 1, rightMouseUp = 2 },
+		newKeyEvent   = function(mods, key, isDown) return { mods = mods, key = key, isDown = isDown, post = function() end } end,
+		newMouseEvent = function(t, pos) return { t = t, pos = pos, post = function() end } end,
 	},
 	checkKeyboardModifiers = function() return {} end,
 	keyRepeatInterval = function() return 0.05 end,
