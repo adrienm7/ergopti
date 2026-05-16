@@ -214,12 +214,13 @@ _TooltipBuildGui(Items) {
     for _, Item in Items {
         S := _TooltipMeasureText(Item.Text)
         Sizes.Push(S)
-        if (S.W + 4 > MaxW)
-            MaxW := S.W + 4
+        if (S.W > MaxW)
+            MaxW := S.W
     }
-    ; GDI measurement under-counts for many fonts/glyphs — add 20 % slack
-    ; so the text control never visually overflows into the badge column.
-    MaxW := Round(MaxW * 1.2) + 8
+    ; GDI measurement under-counts significantly for Unicode and multi-word
+    ; strings — add 40 % slack + a 16 px absolute margin so the text control
+    ; never visually overflows into the badge column regardless of DPI scaling.
+    MaxW := Round(MaxW * 1.4) + 16
 
     ; Total width: left pad + text + gap + badge + right pad.
     BadgeColW := HasAnyLabel ? (_TOOLTIP_LABEL_GAP + _TOOLTIP_BADGE_W + _TOOLTIP_PADDING_X) : 0
