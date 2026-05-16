@@ -77,6 +77,12 @@ local function inject_strings(code)
 		strings[k] = i18n.get(k)
 	end
 
+	-- Inject the privacy warning pre-formatted with the actual metrics path so
+	-- the user sees exactly the same text as the tray-menu toggle dialog
+	local metrics_dir = (_config_path or ""):match("^(.*[/\\])") or ""
+	strings["dialog.metrics.enable_warning_formatted"] =
+		string.format(i18n.get("dialog.metrics.enable_warning"), metrics_dir .. "metrics")
+
 	i18n.set_locale_no_reload(prev_code)
 
 	local ok_enc, json = pcall(hs.json.encode, strings)
@@ -112,6 +118,11 @@ local function inject_init_data()
 	for _, k in ipairs(keys) do
 		strings[k] = i18n.get(k)
 	end
+
+	-- Same privacy warning as inject_strings — pre-formatted with the metrics path
+	local metrics_dir = (_config_path or ""):match("^(.*[/\\])") or ""
+	strings["dialog.metrics.enable_warning_formatted"] =
+		string.format(i18n.get("dialog.metrics.enable_warning"), metrics_dir .. "metrics")
 
 	local payload = {
 		locale  = current_locale,
