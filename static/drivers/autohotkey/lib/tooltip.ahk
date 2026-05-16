@@ -218,12 +218,15 @@ _TooltipBuildGui(Items) {
         if (S.W > MaxW)
             MaxW := S.W
     }
-    ; Debug: show DPI and GDI measurement.
-    HDC_tmp := DllCall("User32\GetDC", "Ptr", 0, "Ptr")
-    DPI_tmp := DllCall("Gdi32\GetDeviceCaps", "Ptr", HDC_tmp, "Int", 88, "Int")
-    DllCall("User32\ReleaseDC", "Ptr", 0, "Ptr", HDC_tmp)
-    MsgBox("GDI MaxW=" . MaxW . " DPI=" . DPI_tmp . " BadgeColW=" . BadgeColW)
-    MaxW += 60
+    ; GDI measures in virtualized 96-DPI pixels when AHK is not per-monitor
+    ; DPI-aware. Scale up to physical pixels using the actual system DPI so
+    ; the tooltip is correctly sized on 125 %, 150 %, 200 % displays.
+    HDC_dpi := DllCall("User32\GetDC", "Ptr", 0, "Ptr")
+    SysDPI  := DllCall("Gdi32\GetDeviceCaps", "Ptr", HDC_dpi, "Int", 88, "Int")
+    DllCall("User32\ReleaseDC", "Ptr", 0, "Ptr", HDC_dpi)
+    if (SysDPI > 0 and SysDPI != 96)
+        MaxW := Round(MaxW * SysDPI / 96)
+    MaxW += 8   ; small absolute margin for sub-pixel rounding
 
     ; Total width: left pad + text + badge column (gap + badge + right pad).
     TotalW := _TOOLTIP_PADDING_X + MaxW + BadgeColW
