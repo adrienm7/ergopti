@@ -1313,3 +1313,15 @@ global PERSONAL_SHORTCUTS_TEMPLATE := "; personal_shortcuts.ahk`r`n"
 	. "`r`n"
 	. "; (Add #HotIf-gated hotkey blocks here — see the example in the header.)`r`n"
 	. "`r`n"
+
+; Reconstructs the tray menu in place without a full process restart.
+; Suitable for lightweight UI-only toggles (WPM display, color themes) that
+; do not require re-parsing config or rebinding hotkeys. State-changing
+; toggles that write to TOML must still call Reload().
+RebuildTrayMenu() {
+	global SubMenus
+	A_TrayMenu.Delete()
+	SubMenus := Map()
+	InitSubMenus()
+	initMenu()
+}
