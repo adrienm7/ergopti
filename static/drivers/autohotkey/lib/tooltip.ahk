@@ -231,7 +231,8 @@ _TooltipBuildGui(Items) {
     }
 
     ; Total width: left pad + text + badge column (gap + badge + right pad).
-    TotalW := _TOOLTIP_PADDING_X + MaxW + BadgeColW
+    ; +30 px buffer to absorb sub-pixel rounding and font rendering overhang.
+    TotalW := _TOOLTIP_PADDING_X + MaxW + 30 + BadgeColW
 
     NewGuis := []
     for Idx, Item in Items {
