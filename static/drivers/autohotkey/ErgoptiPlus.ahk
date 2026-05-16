@@ -80,6 +80,7 @@ SendMode("Event") ; Everything concerning hotstrings MUST use SendEvent and not 
 #Include lib/hotstrings/hotstring_engine_v2.ahk
 #Include lib/toml/toml_loader.ahk
 #Include lib/menu_manifest.ahk
+#Include lib/llm_defaults.ahk
 ; i18n module — must come after toml_loader.ahk (TOML_BatchWrite) and logger.ahk
 #Include lib/i18n.ahk
 #Include lib/onboarding.ahk
@@ -129,6 +130,9 @@ SendMode("Event") ; Everything concerning hotstrings MUST use SendEvent and not 
 #Include modules/keylogger/keylogger_ui.ahk
 #Include modules/llm/api_ollama.ahk
 #Include modules/llm/models.ahk
+; LLM_GetSharedPath is now available — load the cross-platform defaults before
+; prediction_engine.ahk and tray_llm.ahk initialise their state maps.
+LLM_Defaults_Load()
 #Include modules/llm/profiles.ahk
 #Include modules/llm/prediction_engine.ahk
 #Include modules/llm/llm_bridge.ahk
