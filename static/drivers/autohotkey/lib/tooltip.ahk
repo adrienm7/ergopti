@@ -239,9 +239,7 @@ _TooltipBuildGui(Items) {
         if (S.W > MaxW)
             MaxW := S.W
     }
-    ; GDI under-counts due to font hinting and sub-pixel rendering differences.
-    ; Apply 15 % slack + 8 px absolute margin — empirically correct for Segoe UI
-    ; at sizes 10-12 pt regardless of DPI scaling mode.
+    MsgBox("GDI raw MaxW=" . MaxW . " -> after slack=" . Round(MaxW * 1.15 + 8))
     MaxW := Round(MaxW * 1.15) + 8
 
     ; Total width: left pad + text + badge column (gap + badge + right pad).
