@@ -216,10 +216,11 @@ _TooltipBuildGui(Items) {
         ProbeGui.MarginY := 0
         ProbeGui.SetFont("s" . _TOOLTIP_FONT_SIZE, _TOOLTIP_FONT_NAME)
         ProbeCtrl := ProbeGui.Add("Text", "x0 y0", Item.Text)
-        ProbeGui.Show("Hide")
+        ProbeGui.Show("NoActivate")
         ProbeCtrl.GetPos(, , &CtrlW, &CtrlH)
+        WinGetClientPos(, , , &GuiH, ProbeGui.Hwnd)
         ProbeGui.Destroy()
-        Sizes.Push({ W: CtrlW, H: CtrlH })
+        Sizes.Push({ W: CtrlW, H: GuiH })
         if (CtrlW > MaxW)
             MaxW := CtrlW
     }
