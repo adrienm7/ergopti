@@ -218,8 +218,8 @@ _TooltipBuildGui(Items) {
         if (S.W > MaxW)
             MaxW := S.W
     }
-    ; GDI under-counts — add a flat 60 px bonus that covers DPI scaling at
-    ; 125 % (factor ~1.25) and font substitution overhang on long strings.
+    ; Debug: show exact GDI measurement before any bonus.
+    MsgBox("GDI MaxW=" . MaxW . " BadgeColW=" . BadgeColW)
     MaxW += 60
 
     ; Total width: left pad + text + badge column (gap + badge + right pad).
