@@ -218,8 +218,11 @@ _TooltipBuildGui(Items) {
         if (S.W > MaxW)
             MaxW := S.W
     }
-    ; Debug: show exact GDI measurement before any bonus.
-    MsgBox("GDI MaxW=" . MaxW . " BadgeColW=" . BadgeColW)
+    ; Debug: show DPI and GDI measurement.
+    HDC_tmp := DllCall("User32\GetDC", "Ptr", 0, "Ptr")
+    DPI_tmp := DllCall("Gdi32\GetDeviceCaps", "Ptr", HDC_tmp, "Int", 88, "Int")
+    DllCall("User32\ReleaseDC", "Ptr", 0, "Ptr", HDC_tmp)
+    MsgBox("GDI MaxW=" . MaxW . " DPI=" . DPI_tmp . " BadgeColW=" . BadgeColW)
     MaxW += 60
 
     ; Total width: left pad + text + badge column (gap + badge + right pad).
