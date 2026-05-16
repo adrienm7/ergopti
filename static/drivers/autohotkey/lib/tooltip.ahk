@@ -208,25 +208,27 @@ _TooltipBuildGui(Items) {
         }
     }
 
-    ; Measure all rows to find the widest output text.
+    ; Measure the true rendered width of each row by creating a throw-away Gui,
+    ; setting MarginX/Y to 0, adding the Text control, showing off-screen, and
+    ; reading the control width via GetPos — not the Gui width which includes
+    ; internal padding. This is DPI-correct because AHK renders the control
+    ; in the same coordinate space as the real tooltip Gui.
     BadgeColW := HasAnyLabel ? (_TOOLTIP_LABEL_GAP + _TOOLTIP_BADGE_W + _TOOLTIP_PADDING_X) : 0
     Sizes := []
     MaxW := 0
     for _, Item in Items {
-        S := _TooltipMeasureText(Item.Text)
-        Sizes.Push(S)
-        if (S.W > MaxW)
-            MaxW := S.W
+        ProbeGui := Gui("-Caption +LastFound")
+        ProbeGui.MarginX := 0
+        ProbeGui.MarginY := 0
+        ProbeGui.SetFont("s" . _TOOLTIP_FONT_SIZE, _TOOLTIP_FONT_NAME)
+        ProbeCtrl := ProbeGui.Add("Text", "x0 y0", Item.Text)
+        ProbeGui.Show("x-9999 y-9999 NoActivate")
+        ProbeCtrl.GetPos(, , &CtrlW, &CtrlH)
+        ProbeGui.Destroy()
+        Sizes.Push({ W: CtrlW, H: CtrlH })
+        if (CtrlW > MaxW)
+            MaxW := CtrlW
     }
-    ; GDI measures in virtualized 96-DPI pixels when AHK is not per-monitor
-    ; DPI-aware. Scale up to physical pixels using the actual system DPI so
-    ; the tooltip is correctly sized on 125 %, 150 %, 200 % displays.
-    HDC_dpi := DllCall("User32\GetDC", "Ptr", 0, "Ptr")
-    SysDPI  := DllCall("Gdi32\GetDeviceCaps", "Ptr", HDC_dpi, "Int", 88, "Int")
-    DllCall("User32\ReleaseDC", "Ptr", 0, "Ptr", HDC_dpi)
-    if (SysDPI > 0 and SysDPI != 96)
-        MaxW := Round(MaxW * SysDPI / 96)
-    MaxW += 8   ; small absolute margin for sub-pixel rounding
 
     ; Total width: left pad + text + badge column (gap + badge + right pad).
     TotalW := _TOOLTIP_PADDING_X + MaxW + BadgeColW
