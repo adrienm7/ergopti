@@ -223,7 +223,7 @@ _TooltipBuildGui(Items) {
         if (GuiW > MaxW)
             MaxW := GuiW
     }
-    TotalW := _TOOLTIP_PADDING_X + MaxW + _TOOLTIP_PADDING_X
+    TotalW := _TOOLTIP_PADDING_X + MaxW + _TOOLTIP_PADDING_X + 6
 
     NewGuis := []
     for Idx, Item in Items {
