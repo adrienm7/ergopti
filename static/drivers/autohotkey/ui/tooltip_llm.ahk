@@ -28,6 +28,11 @@ LLM_TOOLTIP_SLOT      := 10      ; ToolTip slot reserved for LLM predictions (1-
 LLM_TOOLTIP_OFFSET_Y  := 24      ; Vertical offset below caret in pixels
 LLM_TOOLTIP_TIMEOUT   := 5000    ; Auto-dismiss after 5 s of no interaction
 
+; Stable timer reference — must not be a closure so SetTimer can cancel by
+; identity. Each fresh () => lambda is a new object; re-scheduling it never
+; cancels the prior timer, letting N calls accumulate N independent hiders.
+_LLM_Tooltip_TimerFn() => LLM_Tooltip_Hide()
+
 
 
 
@@ -74,8 +79,10 @@ LLM_Tooltip_Show(text) {
 	label := "↵ " text " [Tab]"
 	ToolTip(label, x, y, LLM_TOOLTIP_SLOT)
 
-	; Auto-dismiss timer
-	SetTimer(() => LLM_Tooltip_Hide(), -LLM_TOOLTIP_TIMEOUT)
+	; Cancel any pending hide before rescheduling — _LLM_Tooltip_TimerFn is a
+	; stable named function so SetTimer can reliably cancel the old call.
+	SetTimer(_LLM_Tooltip_TimerFn, 0)
+	SetTimer(_LLM_Tooltip_TimerFn, -LLM_TOOLTIP_TIMEOUT)
 }
 
 /**
@@ -83,6 +90,7 @@ LLM_Tooltip_Show(text) {
  */
 LLM_Tooltip_Hide() {
 	global _LLM_Tooltip_Visible, _LLM_Tooltip_Text
+	SetTimer(_LLM_Tooltip_TimerFn, 0)
 	_LLM_Tooltip_Visible := false
 	_LLM_Tooltip_Text    := ""
 	ToolTip(, , , LLM_TOOLTIP_SLOT)
