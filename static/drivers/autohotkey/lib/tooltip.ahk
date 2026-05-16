@@ -74,7 +74,7 @@ global _TOOLTIP_TIMEOUT_FLOOR_SEC     := 0.05
 ; (i.e. "stay until TooltipHide()"). Guards against ghost tooltips that
 ; linger when the normal hide path (buffer reset, expansion fire, etc.)
 ; is skipped due to an unhandled exception or a missed timer callback.
-global _TOOLTIP_SAFETY_SEC := 10.0
+global _TOOLTIP_SAFETY_SEC := 3.0
 
 ; Mirrors Hammerspoon's max_caret_height = 80 — when the focused element is
 ; tall (e.g. a multi-line text area, a list, a whole panel) we treat it as
@@ -120,7 +120,17 @@ TooltipShow(Items, DurationSec := 0) {
         _TooltipTimer := 0
     }
 
-    _TooltipBuildGui(Items)
+    try {
+        _TooltipBuildGui(Items)
+    } catch {
+        TooltipHide()
+        return
+    }
+
+    if (_TooltipRowGuis.Length == 0) {
+        TooltipHide()
+        return
+    }
 
     Pos := _TooltipResolvePosition()
     CurY := Pos.Y
@@ -224,14 +234,24 @@ _TooltipBuildGui(Items) {
     Sizes := []
     MaxW := 0
     for _, Item in Items {
+        CtrlW := 0
+        CtrlH := 0
         ProbeGui := Gui("-Caption +LastFound")
-        ProbeGui.MarginX := 0
-        ProbeGui.MarginY := 0
-        ProbeGui.SetFont("s" . _TOOLTIP_FONT_SIZE, _TOOLTIP_FONT_NAME)
-        ProbeCtrl := ProbeGui.Add("Text", "x0 y0", Item.Text)
-        ProbeGui.Show("x-9999 y-9999 NoActivate")
-        ProbeCtrl.GetPos(, , &CtrlW, &CtrlH)
+        try {
+            ProbeGui.MarginX := 0
+            ProbeGui.MarginY := 0
+            ProbeGui.SetFont("s" . _TOOLTIP_FONT_SIZE, _TOOLTIP_FONT_NAME)
+            ProbeCtrl := ProbeGui.Add("Text", "x0 y0", Item.Text)
+            ProbeGui.Show("x-9999 y-9999 NoActivate")
+            ProbeCtrl.GetPos(, , &CtrlW, &CtrlH)
+        }
         ProbeGui.Destroy()
+        ; Fall back to GDI if probe failed (CtrlW = 0).
+        if (CtrlW <= 0) {
+            S := _TooltipMeasureText(Item.Text)
+            CtrlW := S.W
+            CtrlH := S.H
+        }
         Sizes.Push({ W: CtrlW, H: CtrlH })
         if (CtrlW > MaxW)
             MaxW := CtrlW
