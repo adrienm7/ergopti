@@ -41,6 +41,10 @@ global _TOOLTIP_LABEL_GAP        := 10    ; gap between output text and badge le
 ; accent colour on a neutral dark background so it pops on any tint.
 global _TOOLTIP_BADGE_W          := 24    ; total badge width (px) — fixed across all rows
 global _TOOLTIP_BADGE_BG_HEX     := "2D2D2D"   ; neutral dark grey badge background
+
+; Maximum width of the output text column. Outputs wider than this are
+; capped so the badge is always visible regardless of text length.
+global _TOOLTIP_MAX_TEXT_W       := 320
 global _TOOLTIP_OFFSET_BELOW     := 18   ; pixels below the anchor (caret / box)
 global _TOOLTIP_OFFSET_RIGHT     := 4    ; small horizontal nudge for caret anchor
 global _TOOLTIP_DEFAULT_BG_HEX   := "1A1A1A"
@@ -194,7 +198,7 @@ _TooltipBuildGui(Items) {
     global _TooltipGui, _TooltipRowGuis
     global _TOOLTIP_FONT_NAME, _TOOLTIP_FONT_SIZE, _TOOLTIP_FONT_SIZE_LABEL
     global _TOOLTIP_PADDING_X, _TOOLTIP_PADDING_Y, _TOOLTIP_LABEL_GAP
-    global _TOOLTIP_BADGE_W, _TOOLTIP_BADGE_BG_HEX
+    global _TOOLTIP_BADGE_W, _TOOLTIP_BADGE_BG_HEX, _TOOLTIP_MAX_TEXT_W
 
     OldGuis := _TooltipGui ? _TooltipRowGuis : []
 
@@ -217,9 +221,9 @@ _TooltipBuildGui(Items) {
         if (S.W + 4 > MaxW)
             MaxW := S.W + 4
     }
-    ; Add a safety margin so GDI measurement under-counts never cause the
-    ; text control to visually overflow into the badge column.
-    MaxW += 8
+    ; Safety margin for GDI under-counts, then hard cap so the badge column
+    ; is always visible regardless of output text length.
+    MaxW := Min(MaxW + 8, _TOOLTIP_MAX_TEXT_W)
 
     ; Total width: left padding + output text + gap + badge + right padding.
     ; Right padding (_TOOLTIP_PADDING_X) is added after the badge so the pill
@@ -241,7 +245,8 @@ _TooltipBuildGui(Items) {
         G.SetFont("cFFFFFF s" . _TOOLTIP_FONT_SIZE, _TOOLTIP_FONT_NAME)
 
         ; Output text — left-aligned with left padding.
-        TextOpts := Format("BackgroundTrans 0xC x{1} y{2} w{3} h{4}",
+        ; 0x1000 = SS_ENDELLIPSIS: truncates with … when text exceeds MaxW.
+        TextOpts := Format("BackgroundTrans 0xC 0x1000 x{1} y{2} w{3} h{4}",
             _TOOLTIP_PADDING_X, _TOOLTIP_PADDING_Y, MaxW, S.H)
         G.Add("Text", TextOpts, Item.Text)
 
