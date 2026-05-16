@@ -79,6 +79,7 @@ SendMode("Event") ; Everything concerning hotstrings MUST use SendEvent and not 
 #Include lib/hotstrings/hotstring_engine.ahk
 #Include lib/hotstrings/hotstring_engine_v2.ahk
 #Include lib/toml/toml_loader.ahk
+#Include lib/menu_manifest.ahk
 ; i18n module — must come after toml_loader.ahk (TOML_BatchWrite) and logger.ahk
 #Include lib/i18n.ahk
 #Include lib/onboarding.ahk
