@@ -1,0 +1,38 @@
+{
+	"_comment": "Single source of truth for LLM default settings, shared by AHK and Hammerspoon drivers.",
+	"_comment2": "When adding a new setting: add it here first, then consume it in both drivers.",
+
+	"llm_enabled":              false,
+	"llm_active_profile":       "basic",
+	"llm_temperature":          0.1,
+	"llm_num_predictions":      3,
+	"llm_debounce_ms":          500,
+	"llm_context_length":       500,
+	"llm_min_words":            3,
+	"llm_max_words":            15,
+	"llm_pred_indent":          0,
+	"llm_show_info_bar":        true,
+	"llm_streaming":            true,
+	"llm_streaming_multi":      true,
+	"llm_instant_on_word_end":  true,
+	"llm_after_hotstring":      true,
+	"llm_reset_on_nav":         true,
+	"llm_auto_raise_temp":      true,
+	"llm_disable_url_bars":     false,
+	"llm_disable_password_fields": false,
+	"llm_nav_modifiers":        [],
+	"llm_val_modifiers":        ["alt"],
+
+	"_comment_platform": "These values differ per platform and are NOT overridden by this file.",
+	"_platform_defaults": {
+		"ahk": {
+			"llm_model":   "qwen2.5:3b",
+			"llm_backend": "ollama"
+		},
+		"hs": {
+			"llm_model_ollama": "gemma-4-E2B-it",
+			"llm_model_mlx":    "Qwen3.5-2B",
+			"llm_backend":      "ollama"
+		}
+	}
+}

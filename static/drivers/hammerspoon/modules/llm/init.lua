@@ -29,32 +29,112 @@ M.BUILTIN_PROFILES = Profiles.BUILTIN_PROFILES
 -- =======================================
 -- =======================================
 
-M.DEFAULT_STATE = {
+--- Loads the cross-platform defaults.json from _shared/llm/ and merges its
+--- values into the provided base table. Values present in the JSON override the
+--- base; missing values keep the base value. HS-specific keys (model names,
+--- llm_debounce in seconds) are NOT in the JSON and keep their base values.
+--- @param base table Hardcoded fallback defaults to merge into.
+--- @return table Merged defaults table.
+local function load_shared_defaults(base)
+	-- Resolve path: hammerspoon/ is two levels above _shared/
+	local script_dir = hs.processInfo.bundlePath or ""
+	local candidates = {
+		(os.getenv("HOME") or "") .. "/Library/Application Support/Hammerspoon/../../../static/drivers/_shared/llm/defaults.json",
+		hs.configdir .. "/../../static/drivers/_shared/llm/defaults.json",
+		hs.configdir .. "/../_shared/llm/defaults.json",
+	}
+
+	local raw = nil
+	for _, p in ipairs(candidates) do
+		local fh = io.open(p, "r")
+		if fh then raw = fh:read("*a"); fh:close(); break end
+	end
+
+	if not raw or raw == "" then
+		Logger.warn(LOG, "defaults.json not found — using hardcoded defaults.")
+		return base
+	end
+
+	local ok, parsed = pcall(hs.json.decode, raw)
+	if not ok or type(parsed) ~= "table" then
+		Logger.warn(LOG, "defaults.json parse failed — using hardcoded defaults.")
+		return base
+	end
+
+	-- Mapping: shared key → HS DEFAULT_STATE key (only keys that exist in both)
+	local mapping = {
+		llm_enabled             = "llm_enabled",
+		llm_active_profile      = "llm_active_profile",
+		llm_temperature         = "llm_temperature",
+		llm_num_predictions     = "llm_num_predictions",
+		llm_context_length      = "llm_context_length",
+		llm_min_words           = "llm_min_words",
+		llm_max_words           = "llm_max_words",
+		llm_pred_indent         = "llm_pred_indent",
+		llm_show_info_bar       = "llm_show_info_bar",
+		llm_streaming           = "llm_streaming",
+		llm_streaming_multi     = "llm_streaming_multi",
+		llm_instant_on_word_end = "llm_instant_on_word_end",
+		llm_after_hotstring     = "llm_after_hotstring",
+		llm_reset_on_nav        = "llm_reset_on_nav",
+		llm_auto_raise_temp     = "llm_auto_raise_temp",
+	}
+
+	local merged = {}
+	for k, v in pairs(base) do merged[k] = v end
+
+	for shared_key, hs_key in pairs(mapping) do
+		if parsed[shared_key] ~= nil then
+			merged[hs_key] = parsed[shared_key]
+		end
+	end
+
+	-- llm_val_modifiers: shared stores ["alt"], HS stores {"alt"}
+	if type(parsed.llm_val_modifiers) == "table" then
+		merged.llm_val_modifiers = parsed.llm_val_modifiers
+	end
+	-- llm_nav_modifiers: shared stores [], HS stores {}
+	if type(parsed.llm_nav_modifiers) == "table" then
+		merged.llm_nav_modifiers = parsed.llm_nav_modifiers
+	end
+
+	-- llm_debounce_ms: shared is in ms (500), HS uses seconds (0.2) — convert
+	if type(parsed.llm_debounce_ms) == "number" then
+		merged.llm_debounce = parsed.llm_debounce_ms / 1000
+	end
+
+	Logger.done(LOG, "Shared defaults loaded from defaults.json.")
+	return merged
+end
+
+-- Hardcoded fallback base — HS-specific keys that are not in defaults.json.
+local _BASE_DEFAULTS = {
 	llm_enabled           = false,
 	llm_backend           = "ollama",
 	llm_model_ollama      = "gemma-4-E2B-it",
 	llm_model_mlx         = "Qwen3.5-2B",
-	llm_debounce          = 0.2,
+	llm_debounce          = 0.5,
 	llm_num_predictions   = 3,
 	llm_sequential_mode   = false,
 	llm_context_length    = 500,
 	llm_temperature       = 0.1,
-	llm_min_words         = 5,
-	llm_max_words         = 20,
+	llm_min_words         = 3,
+	llm_max_words         = 15,
 	llm_arrow_nav_enabled = false,
 	llm_nav_modifiers     = {},
 	llm_show_info_bar     = true,
 	llm_val_modifiers     = {"alt"},
-	llm_pred_indent       = -3,
+	llm_pred_indent       = 0,
 	llm_active_profile    = "basic",
-	-- Bridge behavioral flags (read by llm_bridge, overridden by menu_llm at startup)
 	llm_reset_on_nav      = true,
 	llm_after_hotstring   = true,
-	llm_auto_raise_temp   = true,  -- Incrementally raise temperature for each extra prediction
-	llm_streaming             = true,  -- Token-by-token streaming
-	llm_streaming_multi       = true,  -- Show predictions as they arrive when num_predictions > 1 (otherwise wait for all to complete before showing any)
-	llm_instant_on_word_end   = true,  -- Fire the LLM immediately when the buffer ends with whitespace (word just completed)
+	llm_auto_raise_temp   = true,
+	llm_streaming             = true,
+	llm_streaming_multi       = true,
+	llm_instant_on_word_end   = true,
 }
+
+M.DEFAULT_STATE = load_shared_defaults(_BASE_DEFAULTS)
 
 -- Single source of truth for the streaming flag; backends receive it as a parameter
 -- on each fetch call so they hold no state of their own for this flag
