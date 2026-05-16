@@ -362,6 +362,13 @@ _Step5_Finish(g, rYes, *) {
 ; Write all collected wizard answers to config.toml in one atomic call, then
 ; reload so ErgoptiPlus boots with a fully-configured environment.
 _Onboarding_Commit() {
+	; Block strict canonicalisation: SaveFullConfig() reads in-memory feature
+	; state which still reflects defaults (the wizard never called Reload).
+	; Without this guard, TOML_BatchWrite would immediately trigger
+	; SaveFullConfig() which would overwrite the wizard's values with false.
+	global _TOML_STRICT_CANON_IN_PROGRESS
+	_TOML_STRICT_CANON_IN_PROGRESS := true
+
 	TOML_BatchWrite(ConfigurationFile, [
 		{ Section: "Script",     Key: "Locale",          Value: _ob_locale    },
 		{ Section: "Layout",     Key: "ErgoptiBase",     Value: _ob_layout    },
