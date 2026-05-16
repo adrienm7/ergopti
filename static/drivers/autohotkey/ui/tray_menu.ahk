@@ -412,22 +412,15 @@ BuildMetricsMenu() {
 	WpmWidgetColorsLabel  := t("menu.metrics.colors_by_source")
 	WpmWidgetGraphLabel   := t("menu.metrics.include_realtime")
 
-	MetricsMenu.Add(WpmMenubarLabel,
-		((m, lbl, col_lbl) => (*) => _ToggleWpmMenubar(m, lbl, col_lbl))
-		(MetricsMenu, WpmMenubarLabel, WpmMenubarColorsLabel))
-	MetricsMenu.Add(WpmMenubarColorsLabel,
-		((m, lbl) => (*) => _ToggleWpmMenubarColors(m, lbl))
-		(MetricsMenu, WpmMenubarColorsLabel))
+	; Fat-arrow lambdas capture their enclosing locals by reference in AHK v2,
+	; so passing them directly is simpler and more reliable than IIFE patterns,
+	; which AHK does not support across line breaks.
+	MetricsMenu.Add(WpmMenubarLabel,       (*) => _ToggleWpmMenubar(MetricsMenu, WpmMenubarLabel, WpmMenubarColorsLabel))
+	MetricsMenu.Add(WpmMenubarColorsLabel, (*) => _ToggleWpmMenubarColors(MetricsMenu, WpmMenubarColorsLabel))
 	MetricsMenu.Add()
-	MetricsMenu.Add(WpmWidgetLabel,
-		((m, w_lbl, c_lbl, g_lbl) => (*) => _ToggleWpmWidget(m, w_lbl, c_lbl, g_lbl))
-		(MetricsMenu, WpmWidgetLabel, WpmWidgetColorsLabel, WpmWidgetGraphLabel))
-	MetricsMenu.Add(WpmWidgetColorsLabel,
-		((m, lbl) => (*) => _ToggleWpmWidgetColors(m, lbl))
-		(MetricsMenu, WpmWidgetColorsLabel))
-	MetricsMenu.Add(WpmWidgetGraphLabel,
-		((m, lbl) => (*) => _ToggleWpmWidgetGraph(m, lbl))
-		(MetricsMenu, WpmWidgetGraphLabel))
+	MetricsMenu.Add(WpmWidgetLabel,        (*) => _ToggleWpmWidget(MetricsMenu, WpmWidgetLabel, WpmWidgetColorsLabel, WpmWidgetGraphLabel))
+	MetricsMenu.Add(WpmWidgetColorsLabel,  (*) => _ToggleWpmWidgetColors(MetricsMenu, WpmWidgetColorsLabel))
+	MetricsMenu.Add(WpmWidgetGraphLabel,   (*) => _ToggleWpmWidgetGraph(MetricsMenu, WpmWidgetGraphLabel))
 
 	if MetricsShortcuts.show_wpm_menubar
 		MetricsMenu.Check(WpmMenubarLabel)
