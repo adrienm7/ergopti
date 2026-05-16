@@ -31,16 +31,8 @@ global _TooltipTimer   := 0
 ; Style constants.
 global _TOOLTIP_FONT_NAME        := "Segoe UI"
 global _TOOLTIP_FONT_SIZE        := 11
-global _TOOLTIP_FONT_SIZE_LABEL  := 9     ; smaller dim font for the trigger label
 global _TOOLTIP_PADDING_X        := 14
 global _TOOLTIP_PADDING_Y        := 8
-global _TOOLTIP_LABEL_GAP        := 10    ; gap between output text and badge left edge
-
-; Badge (★ / ⏎) visual pill: fixed-width box so every row is identical
-; regardless of which symbol it shows.  The symbol is rendered in the row's
-; accent colour on a neutral dark background so it pops on any tint.
-global _TOOLTIP_BADGE_W          := 24    ; total badge width (px) — fixed across all rows
-global _TOOLTIP_BADGE_BG_HEX     := "2D2D2D"   ; neutral dark grey badge background
 global _TOOLTIP_OFFSET_BELOW     := 18   ; pixels below the anchor (caret / box)
 global _TOOLTIP_OFFSET_RIGHT     := 4    ; small horizontal nudge for caret anchor
 global _TOOLTIP_DEFAULT_BG_HEX   := "1A1A1A"
@@ -202,9 +194,8 @@ TooltipHide() {
 ; TooltipHide and position queries); all rows are shown/hidden together.
 _TooltipBuildGui(Items) {
     global _TooltipGui, _TooltipRowGuis
-    global _TOOLTIP_FONT_NAME, _TOOLTIP_FONT_SIZE, _TOOLTIP_FONT_SIZE_LABEL
-    global _TOOLTIP_PADDING_X, _TOOLTIP_PADDING_Y, _TOOLTIP_LABEL_GAP
-    global _TOOLTIP_BADGE_W, _TOOLTIP_BADGE_BG_HEX
+    global _TOOLTIP_FONT_NAME, _TOOLTIP_FONT_SIZE
+    global _TOOLTIP_PADDING_X, _TOOLTIP_PADDING_Y
 
     ; Destroy previous row Guis immediately so no stale window can become a
     ; ghost — if TooltipHide() fires mid-build it will find _TooltipRowGuis
@@ -215,34 +206,24 @@ _TooltipBuildGui(Items) {
     _TooltipGui     := 0
     _TooltipRowGuis := []
 
-    ; Determine whether any row has a trigger label — if none do, skip the
-    ; badge column entirely so plain tooltips stay compact.
-    HasAnyLabel := false
-    for _, Item in Items {
-        if (Item.HasOwnProp("TriggerLabel") and Item.TriggerLabel != "") {
-            HasAnyLabel := true
-            break
-        }
-    }
-
-    ; Measure text width via GDI, scaled by the true system DPI so the result
-    ; is correct on 100 %, 125 %, 150 %, 200 % displays.
-    ; GetDpiForSystem (Win10+) returns the real DPI regardless of process
-    ; DPI-awareness mode, unlike GetDeviceCaps which returns 96 when the
-    ; process is DPI-unaware.
-    BadgeColW := HasAnyLabel ? (_TOOLTIP_LABEL_GAP + _TOOLTIP_BADGE_W + _TOOLTIP_PADDING_X) : 0
+    ; Measure each row using a throw-away Gui with no margins so AHK reports
+    ; the true rendered control size in its own coordinate space.
     Sizes := []
     MaxW := 0
     for _, Item in Items {
-        S := _TooltipMeasureText(Item.Text)
-        Sizes.Push(S)
-        if (S.W > MaxW)
-            MaxW := S.W
+        ProbeGui := Gui("-Caption +LastFound")
+        ProbeGui.MarginX := 0
+        ProbeGui.MarginY := 0
+        ProbeGui.SetFont("s" . _TOOLTIP_FONT_SIZE, _TOOLTIP_FONT_NAME)
+        ProbeCtrl := ProbeGui.Add("Text", "x0 y0", Item.Text)
+        ProbeGui.Show("Hide")
+        ProbeCtrl.GetPos(, , &CtrlW, &CtrlH)
+        ProbeGui.Destroy()
+        Sizes.Push({ W: CtrlW, H: CtrlH })
+        if (CtrlW > MaxW)
+            MaxW := CtrlW
     }
-    MaxW := Round(MaxW * 1.25) + 12
-
-    ; Total width: left pad + text + badge column (gap + badge + right pad).
-    TotalW := _TOOLTIP_PADDING_X + MaxW + BadgeColW
+    TotalW := _TOOLTIP_PADDING_X + MaxW + _TOOLTIP_PADDING_X
 
     NewGuis := []
     for Idx, Item in Items {
@@ -256,48 +237,8 @@ _TooltipBuildGui(Items) {
         G.MarginX := 0
         G.MarginY := 0
         G.SetFont("cFFFFFF s" . _TOOLTIP_FONT_SIZE, _TOOLTIP_FONT_NAME)
-
-        ; Output text — left-aligned with left padding.
-        ; Width is oversized (2000 px) so GDI under-estimation never clips the
-        ; text inside the control. The visible area is bounded by TotalW (the
-        ; Gui window width) and the badge starts at a fixed BadgeX offset.
-        TextOpts := Format("BackgroundTrans 0xC x{1} y{2} w{3} h{4}",
-            _TOOLTIP_PADDING_X, _TOOLTIP_PADDING_Y, 2000, S.H)
-        G.Add("Text", TextOpts, Item.Text)
-
-        ; Badge pill — fixed-width neutral box with the symbol in accent colour.
-        ; Two overlapping controls: an opaque background rect, then a
-        ; BackgroundTrans text control sized to the measured glyph height and
-        ; vertically centred inside the badge — this is the only reliable way
-        ; to get vertical centering since AHK Text always renders top-aligned.
-        HasLabel := Item.HasOwnProp("TriggerLabel") and Item.TriggerLabel != ""
-        if HasLabel {
-            BadgeX := _TOOLTIP_PADDING_X + MaxW + _TOOLTIP_LABEL_GAP
-
-            ; Measure the actual glyph height at the badge font size.
-            GlyphH := _TooltipMeasureTextSize(Item.TriggerLabel, _TOOLTIP_FONT_SIZE_LABEL).H
-
-            ; Badge background: full row height minus symmetric 2 px inset.
-            BgY := _TOOLTIP_PADDING_Y - 2
-            BgH := S.H + 4
-
-            ; Text rect: glyph-height, centred inside the badge background.
-            TextY := BgY + (BgH - GlyphH) // 2
-
-            AccentColor := (ColorHex != "") ? Trim(ColorHex, "#") : "FFFFFF"
-
-            ; 1) Opaque background rectangle (no text).
-            G.SetFont("s1", _TOOLTIP_FONT_NAME)
-            G.Add("Text", Format("Background{1} x{2} y{3} w{4} h{5}",
-                _TOOLTIP_BADGE_BG_HEX, BadgeX, BgY, _TOOLTIP_BADGE_W, BgH), "")
-
-            ; 2) Transparent text control centred over the background.
-            G.SetFont("c" . AccentColor . " s" . _TOOLTIP_FONT_SIZE_LABEL, _TOOLTIP_FONT_NAME)
-            G.Add("Text", Format("BackgroundTrans 0xC x{1} y{2} w{3} h{4} Center",
-                BadgeX, TextY, _TOOLTIP_BADGE_W, GlyphH), Item.TriggerLabel)
-
-            G.SetFont("cFFFFFF s" . _TOOLTIP_FONT_SIZE, _TOOLTIP_FONT_NAME)
-        }
+        G.Add("Text", Format("BackgroundTrans x{1} y{2} w{3} h{4}",
+            _TOOLTIP_PADDING_X, _TOOLTIP_PADDING_Y, MaxW, S.H), Item.Text)
 
         NewGuis.Push({ Gui: G, H: RowH, W: TotalW })
     }
