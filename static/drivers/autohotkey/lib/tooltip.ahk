@@ -216,15 +216,20 @@ _TooltipBuildGui(Items) {
     Sizes := []
     MaxW := 0
     for _, Item in Items {
+        ; Show a throw-away Gui with just the Text control and no explicit size.
+        ; AHK auto-sizes the Gui to fit the control — WinGetClientPos then
+        ; gives the true rendered width, DPI-correct and font-correct.
         ProbeGui := Gui("-Caption +LastFound")
+        ProbeGui.MarginX := 0
+        ProbeGui.MarginY := 0
         ProbeGui.SetFont("s" . _TOOLTIP_FONT_SIZE, _TOOLTIP_FONT_NAME)
         ProbeCtrl := ProbeGui.Add("Text", "", Item.Text)
         ProbeGui.Show("x-9999 y-9999 NoActivate")
-        ProbeCtrl.GetPos(, , &CtrlW, &CtrlH)
+        WinGetClientPos(, , &GuiW, &GuiH, ProbeGui.Hwnd)
         ProbeGui.Destroy()
-        Sizes.Push({ W: CtrlW, H: CtrlH })
-        if (CtrlW > MaxW)
-            MaxW := CtrlW
+        Sizes.Push({ W: GuiW, H: GuiH })
+        if (GuiW > MaxW)
+            MaxW := GuiW
     }
 
     ; Total width: left pad + text + gap + badge + right pad.
