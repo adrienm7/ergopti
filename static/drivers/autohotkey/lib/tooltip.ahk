@@ -208,34 +208,21 @@ _TooltipBuildGui(Items) {
         }
     }
 
-    ; Measure true text width by creating a throw-away Gui, adding an AutoSize
-    ; Text control, showing it off-screen, reading its rendered width, then
-    ; destroying it.  This bypasses GDI font measurement entirely and works
-    ; correctly regardless of DPI scaling or font substitution.
+    ; Measure all rows to find the widest output text.
     BadgeColW := HasAnyLabel ? (_TOOLTIP_LABEL_GAP + _TOOLTIP_BADGE_W + _TOOLTIP_PADDING_X) : 0
     Sizes := []
     MaxW := 0
     for _, Item in Items {
-        ; Show a throw-away Gui with just the Text control and no explicit size.
-        ; AHK auto-sizes the Gui to fit the control — WinGetClientPos then
-        ; gives the true rendered width, DPI-correct and font-correct.
-        ProbeGui := Gui("-Caption +LastFound")
-        ProbeGui.MarginX := 0
-        ProbeGui.MarginY := 0
-        ProbeGui.SetFont("s" . _TOOLTIP_FONT_SIZE, _TOOLTIP_FONT_NAME)
-        ProbeCtrl := ProbeGui.Add("Text", "", Item.Text)
-        ProbeGui.Show("x-9999 y-9999 NoActivate")
-        WinGetClientPos(, , &GuiW, &GuiH, ProbeGui.Hwnd)
-        ProbeGui.Destroy()
-        Sizes.Push({ W: GuiW, H: GuiH })
-        if (GuiW > MaxW)
-            MaxW := GuiW
+        S := _TooltipMeasureText(Item.Text)
+        Sizes.Push(S)
+        if (S.W > MaxW)
+            MaxW := S.W
     }
+    ; GDI under-counts — add a flat 60 px bonus that covers DPI scaling at
+    ; 125 % (factor ~1.25) and font substitution overhang on long strings.
+    MaxW += 60
 
-    ; Total width: left pad + text + gap + badge + right pad.
-    ; Add 40 px to MaxW to absorb AHK Gui default margins baked into GuiW
-    ; and any rendering overhang before the badge column starts.
-    MaxW += 40
+    ; Total width: left pad + text + badge column (gap + badge + right pad).
     TotalW := _TOOLTIP_PADDING_X + MaxW + BadgeColW
 
     NewGuis := []
