@@ -360,20 +360,9 @@ AddCategoryToggleItem(menu, on_label, off_label, is_enabled, on_click) {
 ; When the feature is OFF, the sub-items remain visible (so the user can
 ; still see what the menu looks like) but are disabled — no dashboard can
 ; open, no shortcut binding takes effect.
-; Global reference kept so toggle callbacks can call .ToggleCheck without Reload.
-global _MetricsMenu := unset
-global _WpmMenubarLabel := ""
-global _WpmWidgetLabel  := ""
-global _WpmMenubarColorsLabel := ""
-global _WpmWidgetColorsLabel  := ""
-global _WpmWidgetGraphLabel   := ""
-
 BuildMetricsMenu() {
-	global A_TrayMenu, _MetricsMenu
-	global _WpmMenubarLabel, _WpmWidgetLabel
-	global _WpmMenubarColorsLabel, _WpmWidgetColorsLabel, _WpmWidgetGraphLabel
+	global A_TrayMenu
 	MetricsMenu := Menu()
-	_MetricsMenu := MetricsMenu
 
 	enabled := MetricsShortcuts.enabled
 	typing_label := t("menu.metrics.show_typing")
@@ -420,36 +409,46 @@ BuildMetricsMenu() {
 
 	; ── Real-time WPM display ──────────────────────────────────────────────
 	MetricsMenu.Add()
-	_WpmMenubarLabel        := t("menu.metrics.show_wpm_menubar")
-	_WpmMenubarColorsLabel  := t("menu.metrics.colors_by_source") . Chr(0x200B)
-	_WpmWidgetLabel         := t("menu.metrics.show_wpm_widget")
-	_WpmWidgetColorsLabel   := t("menu.metrics.colors_by_source")
-	_WpmWidgetGraphLabel    := t("menu.metrics.include_realtime")
+	WpmMenubarLabel       := t("menu.metrics.show_wpm_menubar")
+	WpmMenubarColorsLabel := t("menu.metrics.colors_by_source") . Chr(0x200B)
+	WpmWidgetLabel        := t("menu.metrics.show_wpm_widget")
+	WpmWidgetColorsLabel  := t("menu.metrics.colors_by_source")
+	WpmWidgetGraphLabel   := t("menu.metrics.include_realtime")
 
-	MetricsMenu.Add(_WpmMenubarLabel,       (*) => ToggleWpmMenubar())
-	MetricsMenu.Add(_WpmMenubarColorsLabel, (*) => ToggleWpmMenubarColors())
+	MetricsMenu.Add(WpmMenubarLabel,
+		((m, lbl, col_lbl) => (*) => _ToggleWpmMenubar(m, lbl, col_lbl))
+		(MetricsMenu, WpmMenubarLabel, WpmMenubarColorsLabel))
+	MetricsMenu.Add(WpmMenubarColorsLabel,
+		((m, lbl) => (*) => _ToggleWpmMenubarColors(m, lbl))
+		(MetricsMenu, WpmMenubarColorsLabel))
 	MetricsMenu.Add()
-	MetricsMenu.Add(_WpmWidgetLabel,        (*) => ToggleWpmWidget())
-	MetricsMenu.Add(_WpmWidgetColorsLabel,  (*) => ToggleWpmWidgetColors())
-	MetricsMenu.Add(_WpmWidgetGraphLabel,   (*) => ToggleWpmWidgetGraph())
+	MetricsMenu.Add(WpmWidgetLabel,
+		((m, w_lbl, c_lbl, g_lbl) => (*) => _ToggleWpmWidget(m, w_lbl, c_lbl, g_lbl))
+		(MetricsMenu, WpmWidgetLabel, WpmWidgetColorsLabel, WpmWidgetGraphLabel))
+	MetricsMenu.Add(WpmWidgetColorsLabel,
+		((m, lbl) => (*) => _ToggleWpmWidgetColors(m, lbl))
+		(MetricsMenu, WpmWidgetColorsLabel))
+	MetricsMenu.Add(WpmWidgetGraphLabel,
+		((m, lbl) => (*) => _ToggleWpmWidgetGraph(m, lbl))
+		(MetricsMenu, WpmWidgetGraphLabel))
 
 	if MetricsShortcuts.show_wpm_menubar
-		MetricsMenu.Check(_WpmMenubarLabel)
+		MetricsMenu.Check(WpmMenubarLabel)
 	if MetricsShortcuts.show_wpm_menubar && MetricsShortcuts.wpm_menubar_colors
-		MetricsMenu.Check(_WpmMenubarColorsLabel)
+		MetricsMenu.Check(WpmMenubarColorsLabel)
 	if WPMWidget.visible
-		MetricsMenu.Check(_WpmWidgetLabel)
+		MetricsMenu.Check(WpmWidgetLabel)
 	if WPMWidget.visible && WPMWidget.use_colors
-		MetricsMenu.Check(_WpmWidgetColorsLabel)
+		MetricsMenu.Check(WpmWidgetColorsLabel)
 	if WPMWidget.visible && WPMWidget.show_graph
-		MetricsMenu.Check(_WpmWidgetGraphLabel)
+		MetricsMenu.Check(WpmWidgetGraphLabel)
 
 	; Sub-options are disabled when their parent toggle is off.
 	if !MetricsShortcuts.show_wpm_menubar
-		MetricsMenu.Disable(_WpmMenubarColorsLabel)
+		MetricsMenu.Disable(WpmMenubarColorsLabel)
 	if !WPMWidget.visible {
-		MetricsMenu.Disable(_WpmWidgetColorsLabel)
-		MetricsMenu.Disable(_WpmWidgetGraphLabel)
+		MetricsMenu.Disable(WpmWidgetColorsLabel)
+		MetricsMenu.Disable(WpmWidgetGraphLabel)
 	}
 
 	if !enabled {
@@ -461,11 +460,11 @@ BuildMetricsMenu() {
 		MetricsMenu.Disable(secure_label)
 		MetricsMenu.Disable(sysauth_label)
 		MetricsMenu.Disable(excl_label)
-		MetricsMenu.Disable(_WpmMenubarLabel)
-		MetricsMenu.Disable(_WpmMenubarColorsLabel)
-		MetricsMenu.Disable(_WpmWidgetLabel)
-		MetricsMenu.Disable(_WpmWidgetColorsLabel)
-		MetricsMenu.Disable(_WpmWidgetGraphLabel)
+		MetricsMenu.Disable(WpmMenubarLabel)
+		MetricsMenu.Disable(WpmMenubarColorsLabel)
+		MetricsMenu.Disable(WpmWidgetLabel)
+		MetricsMenu.Disable(WpmWidgetColorsLabel)
+		MetricsMenu.Disable(WpmWidgetGraphLabel)
 	}
 
 	A_TrayMenu.Add(t("menu.metrics.title"), MetricsMenu)
@@ -503,52 +502,48 @@ ToggleFilterSystemAuth(*) {
 	Reload
 }
 
-; ── WPM toggle callbacks — no Reload; ToggleCheck updates the menu live. ──────
+; ── WPM toggle helpers — closures capture the menu reference and label strings
+; from BuildMetricsMenu locals, so no global state is needed. ──────────────────
 
-ToggleWpmMenubar(*) {
-	global _MetricsMenu, _WpmMenubarLabel, _WpmMenubarColorsLabel
+_ToggleWpmMenubar(menu, label, colors_label) {
 	MetricsShortcuts.show_wpm_menubar := !MetricsShortcuts.show_wpm_menubar
 	CS_Save()
-	try _MetricsMenu.ToggleCheck(_WpmMenubarLabel)
+	try menu.ToggleCheck(label)
 	if MetricsShortcuts.show_wpm_menubar {
 		SetTimer(WpmMenubar_Tick, 1000)
-		try _MetricsMenu.Enable(_WpmMenubarColorsLabel)
+		try menu.Enable(colors_label)
 	} else {
 		SetTimer(WpmMenubar_Tick, 0)
 		A_IconTip := "ErgoptiPlus"
-		try _MetricsMenu.Disable(_WpmMenubarColorsLabel)
+		try menu.Disable(colors_label)
 	}
 }
 
-ToggleWpmMenubarColors(*) {
-	global _MetricsMenu, _WpmMenubarColorsLabel
+_ToggleWpmMenubarColors(menu, label) {
 	MetricsShortcuts.wpm_menubar_colors := !MetricsShortcuts.wpm_menubar_colors
 	CS_Save()
-	try _MetricsMenu.ToggleCheck(_WpmMenubarColorsLabel)
+	try menu.ToggleCheck(label)
 }
 
-ToggleWpmWidget(*) {
-	global _MetricsMenu, _WpmWidgetLabel, _WpmWidgetColorsLabel, _WpmWidgetGraphLabel
+_ToggleWpmWidget(menu, widget_lbl, colors_lbl, graph_lbl) {
 	WPMWidget_Toggle()
-	try _MetricsMenu.ToggleCheck(_WpmWidgetLabel)
+	try menu.ToggleCheck(widget_lbl)
 	if WPMWidget.visible {
-		try _MetricsMenu.Enable(_WpmWidgetColorsLabel)
-		try _MetricsMenu.Enable(_WpmWidgetGraphLabel)
+		try menu.Enable(colors_lbl)
+		try menu.Enable(graph_lbl)
 	} else {
-		try _MetricsMenu.Disable(_WpmWidgetColorsLabel)
-		try _MetricsMenu.Disable(_WpmWidgetGraphLabel)
+		try menu.Disable(colors_lbl)
+		try menu.Disable(graph_lbl)
 	}
 }
 
-ToggleWpmWidgetColors(*) {
-	global _MetricsMenu, _WpmWidgetColorsLabel
+_ToggleWpmWidgetColors(menu, label) {
 	WPMWidget.use_colors := !WPMWidget.use_colors
 	WPMWidget_SaveConfig()
-	try _MetricsMenu.ToggleCheck(_WpmWidgetColorsLabel)
+	try menu.ToggleCheck(label)
 }
 
-ToggleWpmWidgetGraph(*) {
-	global _MetricsMenu, _WpmWidgetGraphLabel
+_ToggleWpmWidgetGraph(menu, label) {
 	was_visible := WPMWidget.visible
 	; Rebuild the widget in the new mode — compact and graph use different Gui layouts.
 	if was_visible
@@ -571,7 +566,7 @@ ToggleWpmWidgetGraph(*) {
 	WPMWidget.pos_x := -1
 	WPMWidget.pos_y := -1
 	WPMWidget_SaveConfig()
-	try _MetricsMenu.ToggleCheck(_WpmWidgetGraphLabel)
+	try menu.ToggleCheck(label)
 	if was_visible
 		WPMWidget_Show()
 }
