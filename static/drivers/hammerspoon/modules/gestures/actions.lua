@@ -858,6 +858,11 @@ M.AX_NAMES = build_ax_names(_shared) or {
 	"tabs", "windows", "spaces", "volume", "brightness", "tracks",
 }
 
+-- Static export so callers (script_control, tests) can read SG_NAMES directly
+-- without calling get_sg_names(); mirrors the AX_NAMES pattern above.
+-- Built once at module load time using the fallback list when _shared is absent.
+M.SG_NAMES = nil  -- populated below after get_sg_names() is defined
+
 --- Returns the ordered list of SG action names with translated section headers.
 --- Called at menu-build time so headers always reflect the active locale.
 function M.get_sg_names()
@@ -975,5 +980,8 @@ end
 function M.set_gesture_in_progress(active)
 	gestureInProgress = active
 end
+
+-- Populate the static SG_NAMES now that get_sg_names() is defined
+M.SG_NAMES = M.get_sg_names()
 
 return M
