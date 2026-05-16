@@ -1,0 +1,55 @@
+{
+	"_comment": "Single source of truth for menu structure shared across AHK and Hammerspoon drivers.",
+	"_comment2": "platforms field: omit or 'both' = all platforms, 'ahk' = Windows only, 'hs' = macOS only.",
+
+	"top_level": [
+		{ "id": "keyboard_layout" },
+		{ "id": "hotstrings" },
+		{ "id": "llm" },
+		{ "id": "metrics" },
+		{ "id": "shortcuts" },
+		{ "id": "tap_holds",  "platforms": ["ahk"] },
+		{ "id": "karabiner",  "platforms": ["hs"] },
+		{ "id": "gestures" },
+		{ "id": "apps",       "platforms": ["hs"] },
+		{ "id": "---" },
+		{ "id": "global_actions" },
+		{ "id": "config_folder" },
+		{ "id": "setup_wizard" },
+		{ "id": "---" },
+		{ "id": "edit_shortcuts" },
+		{ "id": "suspend",    "platforms": ["ahk"] },
+		{ "id": "reload" },
+		{ "id": "quit" },
+		{ "id": "debug" }
+	],
+
+	"global_actions": [
+		{ "id": "enable_all" },
+		{ "id": "disable_all" },
+		{ "id": "reset_defaults" },
+		{ "id": "---" },
+		{ "id": "language" }
+	],
+
+	"debug_items": {
+		"common":   ["open_logs", "open_today_log"],
+		"ahk_only": ["window_spy", "list_vars", "key_history"],
+		"hs_only":  ["console"]
+	},
+
+	"hotstring_groups": {
+		"standard": ["distances_reduction", "autocorrection", "magic_key"],
+		"ergopti":  ["sfbs_reduction", "rolls"],
+		"dynamic":  ["dynamic_hotstrings"]
+	},
+
+	"hotstring_category_keys": {
+		"distances_reduction": "DistancesReduction",
+		"autocorrection":      "Autocorrection",
+		"magic_key":           "MagicKey",
+		"sfbs_reduction":      "SFBsReduction",
+		"rolls":               "Rolls",
+		"dynamic_hotstrings":  "DynamicHotstrings"
+	}
+}
