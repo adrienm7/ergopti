@@ -217,12 +217,11 @@ _TooltipBuildGui(Items) {
         ProbeGui.SetFont("s" . _TOOLTIP_FONT_SIZE, _TOOLTIP_FONT_NAME)
         ProbeCtrl := ProbeGui.Add("Text", "x0 y0", Item.Text)
         ProbeGui.Show("NoActivate")
-        ProbeCtrl.GetPos(, , &CtrlW, &CtrlH)
-        WinGetClientPos(, , , &GuiH, ProbeGui.Hwnd)
+        WinGetClientPos(, , &GuiW, &GuiH, ProbeGui.Hwnd)
         ProbeGui.Destroy()
-        Sizes.Push({ W: CtrlW, H: GuiH })
-        if (CtrlW > MaxW)
-            MaxW := CtrlW
+        Sizes.Push({ W: GuiW, H: GuiH })
+        if (GuiW > MaxW)
+            MaxW := GuiW
     }
     TotalW := _TOOLTIP_PADDING_X + MaxW + _TOOLTIP_PADDING_X
 
