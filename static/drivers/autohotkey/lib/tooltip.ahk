@@ -225,41 +225,29 @@ _TooltipBuildGui(Items) {
         }
     }
 
-    ; Measure the true rendered width of each row by creating a throw-away Gui,
-    ; setting MarginX/Y to 0, adding the Text control, showing off-screen, and
-    ; reading the control width via GetPos — not the Gui width which includes
-    ; internal padding. This is DPI-correct because AHK renders the control
-    ; in the same coordinate space as the real tooltip Gui.
+    ; Measure text width via GDI, scaled by the true system DPI so the result
+    ; is correct on 100 %, 125 %, 150 %, 200 % displays.
+    ; GetDpiForSystem (Win10+) returns the real DPI regardless of process
+    ; DPI-awareness mode, unlike GetDeviceCaps which returns 96 when the
+    ; process is DPI-unaware.
+    SysDPI := DllCall("User32\GetDpiForSystem", "UInt")
+    if (SysDPI <= 0)
+        SysDPI := 96
     BadgeColW := HasAnyLabel ? (_TOOLTIP_LABEL_GAP + _TOOLTIP_BADGE_W + _TOOLTIP_PADDING_X) : 0
     Sizes := []
     MaxW := 0
     for _, Item in Items {
-        CtrlW := 0
-        CtrlH := 0
-        ProbeGui := Gui("-Caption +LastFound")
-        try {
-            ProbeGui.MarginX := 0
-            ProbeGui.MarginY := 0
-            ProbeGui.SetFont("s" . _TOOLTIP_FONT_SIZE, _TOOLTIP_FONT_NAME)
-            ProbeCtrl := ProbeGui.Add("Text", "x0 y0", Item.Text)
-            ProbeGui.Show("x-9999 y-9999 NoActivate")
-            ProbeCtrl.GetPos(, , &CtrlW, &CtrlH)
-        }
-        ProbeGui.Destroy()
-        ; Fall back to GDI if probe failed (CtrlW = 0).
-        if (CtrlW <= 0) {
-            S := _TooltipMeasureText(Item.Text)
-            CtrlW := S.W
-            CtrlH := S.H
-        }
-        Sizes.Push({ W: CtrlW, H: CtrlH })
-        if (CtrlW > MaxW)
-            MaxW := CtrlW
+        S := _TooltipMeasureText(Item.Text)
+        ; GDI measures at 96 DPI; scale to actual screen pixels.
+        W := Round(S.W * SysDPI / 96)
+        H := Round(S.H * SysDPI / 96)
+        Sizes.Push({ W: W, H: H })
+        if (W > MaxW)
+            MaxW := W
     }
 
     ; Total width: left pad + text + badge column (gap + badge + right pad).
-    ; +30 px buffer to absorb sub-pixel rounding and font rendering overhang.
-    TotalW := _TOOLTIP_PADDING_X + MaxW + 30 + BadgeColW
+    TotalW := _TOOLTIP_PADDING_X + MaxW + BadgeColW
 
     NewGuis := []
     for Idx, Item in Items {
