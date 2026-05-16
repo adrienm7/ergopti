@@ -12,10 +12,11 @@
 --- ==============================================================================
 
 local M = {}
-local hs     = hs
-local Logger = require("lib.logger")
-local LOG    = "builder"
-local i18n   = require("lib.i18n")
+local hs         = hs
+local Logger     = require("lib.logger")
+local LOG        = "builder"
+local i18n       = require("lib.i18n")
+local HotCounter = require("ui.menu.hotstring_counter")
 
 
 
@@ -65,76 +66,22 @@ function M.generate(ctx, menu_mods, actions)
 	if type(menu_mods.hotstrings) == "table" then
 		Logger.debug(LOG, "Building hotstrings submenu…")
 
-		local function fmt_grand(n)
-			local s = tostring(math.floor(n + 0.5)); local r = ""
-			for i = 1, #s do
-				if i > 1 and (#s - i + 1) % 3 == 0 then r = r .. " " end
-				r = r .. s:sub(i, i)
-			end
-			return r
-		end
-
 		-- Groups that are specific to the Ergopti keyboard layout
 		local ERGOPTI_GROUPS = { sfbsreduction = true, rolls = true }
 
-		-- Count hotstrings for common groups split into "communs" and "ergopti"
-		local common_total, ergopti_total = 0, 0
-		local common_has_count, ergopti_has_count = false, false
-		if ctx and ctx.hotfiles and type(ctx.hotfiles) == "table"
-		and ctx.keymap and type(ctx.keymap.get_sections) == "function" then
-			for _, f in ipairs(ctx.hotfiles) do
-				local name = ctx.get_group_name and ctx.get_group_name(f) or f
-				if name ~= "custom" and name ~= "personal" and name:sub(1, 13) ~= "personal_ext_" then
-					local secs = ctx.keymap.get_sections(name)
-					if type(secs) == "table" then
-						for _, sec in ipairs(secs) do
-							if type(sec) == "table" and sec.name ~= "-" and not sec.is_module_placeholder
-							and sec.count ~= nil then
-								local cnt = tonumber(sec.count)
-								if ERGOPTI_GROUPS[name] then
-									ergopti_has_count = true
-									ergopti_total = ergopti_total + cnt
-								else
-									common_has_count = true
-									common_total = common_total + cnt
-								end
-							end
-						end
-					end
-				end
-			end
-		end
-		local all_common_total    = common_total + ergopti_total
-		local all_common_has_count = common_has_count or ergopti_has_count
+		local counts = HotCounter.count_all(ctx, ERGOPTI_GROUPS)
+		local fmt_grand = HotCounter.fmt_grand
 
-		-- Count hotstrings for personal/custom groups (includes personal_ext_* extensions)
-		local personal_total, personal_has_count = 0, false
-		if ctx and ctx.keymap and type(ctx.keymap.get_sections) == "function" then
-			local personal_group_names = {"personal", "custom"}
-			if ctx.hotfiles then
-				for _, f in ipairs(ctx.hotfiles) do
-					local n = ctx.get_group_name and ctx.get_group_name(f) or f
-					if n:sub(1, 13) == "personal_ext_" then
-						table.insert(personal_group_names, n)
-					end
-				end
-			end
-			for _, gname in ipairs(personal_group_names) do
-				local secs = ctx.keymap.get_sections(gname)
-				if type(secs) == "table" then
-					for _, sec in ipairs(secs) do
-						if type(sec) == "table" and sec.name ~= "-" and not sec.is_module_placeholder
-						and sec.count ~= nil then
-							personal_has_count = true
-							personal_total = personal_total + tonumber(sec.count)
-						end
-					end
-				end
-			end
-		end
-
-		local grand_total     = all_common_total + personal_total
-		local grand_has_count = all_common_has_count or personal_has_count
+		local common_total      = counts.common
+		local ergopti_total     = counts.ergopti
+		local personal_total    = counts.personal
+		local ext_total         = counts.ext
+		local common_has_count  = counts.has_common
+		local ergopti_has_count = counts.has_ergopti
+		local personal_has_count= counts.has_personal
+		local ext_has_count     = counts.has_ext
+		local grand_total       = counts.grand
+		local grand_has_count   = counts.has_grand
 
 		-- Détection de l’état global : tous les hotstrings activés ?
 		local all_enabled = true
@@ -246,8 +193,7 @@ function M.generate(ctx, menu_mods, actions)
 			table.insert(hotstrings_menu, custom_item)
 		end
 
-		-- 4. Extensions hotstrings section
-		local ext_total, ext_has_count = 0, false
+		-- 4. Extensions hotstrings section (counts already included in grand_total via HotCounter)
 		do
 			local ext_root = ctx.base_dir and (ctx.base_dir .. "../../extensions/")
 			local ok_attr, attr = ext_root and pcall(hs.fs.attributes, ext_root) or false
@@ -268,7 +214,7 @@ function M.generate(ctx, menu_mods, actions)
 				--- Each line starting with `"` inside a [[section]] block is one hotstring.
 				local function count_toml_hotstrings(path)
 					local total = 0
-					local sections = {}   -- { name, count }
+					local sections = {}
 					local current = nil
 					local fh = io.open(path, "r")
 					if not fh then return 0, {} end
@@ -340,9 +286,6 @@ function M.generate(ctx, menu_mods, actions)
 						end
 					end
 
-					if ext_hs_total > 0 then ext_has_count = true end
-					ext_total = ext_total + ext_hs_total
-
 					local ext_label = ext_name .. (ext_hs_total > 0 and (" (" .. fmt_grand(ext_hs_total) .. ")") or "")
 					table.insert(ext_items_built, { title = ext_label, menu = toml_submenus })
 					::continue_ext::
@@ -362,9 +305,7 @@ function M.generate(ctx, menu_mods, actions)
 			end
 		end
 
-		-- Grand total now includes extensions
-		grand_total     = grand_total + ext_total
-		grand_has_count = grand_has_count or ext_has_count
+		-- Grand total already includes extensions (computed by HotCounter.count_all)
 		hotstrings_title = grand_has_count
 			and ("⚡ Hotstrings (" .. fmt_grand(grand_total) .. ")")
 			or  "⚡ Hotstrings"
