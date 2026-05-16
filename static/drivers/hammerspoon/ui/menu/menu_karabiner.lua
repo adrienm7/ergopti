@@ -18,6 +18,7 @@ local M = {}
 
 local Logger      = require("lib.logger")
 local KeLifecycle = require("modules.karabiner.ke_lifecycle")
+local MenuUtils   = require("ui.menu.menu_utils")
 local LOG         = "menu.karabiner"
 local i18n        = require("lib.i18n")
 
@@ -108,40 +109,55 @@ end
 --- @param set_fn      function Called with (action_id) when user picks.
 --- @param current_id  string   Currently selected action id.
 --- @param update_menu function Callback to refresh the menu bar.
---- @param slot        string   "tap" or "hold".
+--- @param slot        string   "tap", "hold", or "combo".
 --- @return table List of hs.menubar menu item tables.
 local function build_action_picker(karabiner, set_fn, current_id, update_menu, slot)
-	local items            = {}
-	local current_category = nil
+	-- Filter: exclude actions that don't match the slot mode
+	local function slot_filter(action)
+		if slot == "hold" and not action.holdable      then return false end
+		if slot == "tap"  and action.tappable == false then return false end
+		return true
+	end
 
+	-- "Spécial" items (none, CapsWord) are shown ungrouped at the top — skip the header
+	local function special_filter(action)
+		return action.category ~= "Spécial"
+	end
+
+	-- Collect Spécial actions first (ungrouped), then the rest via MenuUtils
+	local items = {}
+	local non_special = {}
 	for _, action in ipairs(karabiner.AVAILABLE_ACTIONS) do
-		if slot == "hold" and not action.holdable       then goto continue end
-		if slot == "tap"  and action.tappable == false  then goto continue end
-
-		if action.category ~= current_category then
-			if current_category ~= nil then
-				items[#items + 1] = { title = "-" }
-			end
-			-- "Spécial" items (none, CapsWord) are shown ungrouped at the top
-			if action.category ~= "Spécial" then
-				items[#items + 1] = { title = "— " .. action.category .. " —", disabled = true }
-			end
-			current_category = action.category
+		if not slot_filter(action) then goto continue end
+		if not special_filter(action) then
+			-- Spécial: show directly without category header
+			local aid = action.id
+			items[#items + 1] = {
+				title   = action.label,
+				checked = (aid == current_id),
+				fn      = function()
+					pcall(set_fn, aid)
+					pcall(karabiner.regenerate)
+					if update_menu then update_menu() end
+				end,
+			}
+		else
+			table.insert(non_special, action)
 		end
-
-		-- Capture action.id as a local so each closure has its own value
-		local aid = action.id
-		items[#items + 1] = {
-			title   = action.label,
-			checked = (aid == current_id),
-			fn      = function()
-				pcall(set_fn, aid)
-				pcall(karabiner.regenerate)
-				if update_menu then update_menu() end
-			end,
-		}
-
 		::continue::
+	end
+
+	-- Now use MenuUtils for the grouped, non-Spécial actions
+	if #non_special > 0 then
+		if #items > 0 then items[#items + 1] = { title = "-" } end
+		local grouped = MenuUtils.build_action_picker(non_special, current_id, function(aid)
+			pcall(set_fn, aid)
+			pcall(karabiner.regenerate)
+			if update_menu then update_menu() end
+		end)
+		for _, it in ipairs(grouped) do
+			items[#items + 1] = it
+		end
 	end
 
 	return items
