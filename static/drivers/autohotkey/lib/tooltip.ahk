@@ -26,7 +26,12 @@
 ; Primary Gui reference (first row). _TooltipRowGuis holds all rows.
 global _TooltipGui     := 0
 global _TooltipRowGuis := []
-global _TooltipTimer   := 0
+
+; Stable function reference used as the auto-hide timer. A single named
+; function (not a fresh closure per call) is mandatory so SetTimer can
+; cancel it by identity — each closure literal produces a distinct object
+; that SetTimer treats as a different timer, making cancellation impossible.
+_TooltipTimerFn() => TooltipHide()
 
 ; Style constants.
 global _TOOLTIP_FONT_NAME        := "Segoe UI"
@@ -97,8 +102,6 @@ global _TOOLTIP_WINDOW_BOTTOM_INSET_PX := 60
 ; The shortest DurationSec across all items drives the auto-hide timer
 ; (0 / omitted means "stay until TooltipHide()").
 TooltipShow(Items, DurationSec := 0) {
-    global _TooltipTimer
-
     ; Normalise to an Array of { Text, ColorHex } objects.
     if !IsObject(Items) {
         Items := [{ Text: Items, ColorHex: "", DurationSec: DurationSec }]
@@ -107,10 +110,10 @@ TooltipShow(Items, DurationSec := 0) {
     }
 
     ; Cancel any pending auto-hide timer BEFORE rebuilding the Gui.
-    if _TooltipTimer {
-        SetTimer(_TooltipTimer, 0)
-        _TooltipTimer := 0
-    }
+    ; _TooltipTimerFn is a stable named function — SetTimer identifies timers
+    ; by function reference, so this reliably cancels the previously scheduled
+    ; call regardless of how many TooltipShow calls were made before it fired.
+    SetTimer(_TooltipTimerFn, 0)
 
     try {
         _TooltipBuildGui(Items)
@@ -149,14 +152,12 @@ TooltipShow(Items, DurationSec := 0) {
     if (EffectiveDur > 0) {
         Effective := Max(_TOOLTIP_TIMEOUT_FLOOR_SEC,
             EffectiveDur - _TOOLTIP_TIMEOUT_DECREMENT_SEC)
-        _TooltipTimer := () => TooltipHide()
-        SetTimer(_TooltipTimer, -Round(Effective * 1000))
+        SetTimer(_TooltipTimerFn, -Round(Effective * 1000))
     } else {
         ; No caller-specified duration — arm a safety deadline so the tooltip
         ; cannot become a ghost if the normal hide path (expansion fire or
         ; buffer reset) is missed.
-        _TooltipTimer := () => TooltipHide()
-        SetTimer(_TooltipTimer, -Round(_TOOLTIP_SAFETY_SEC * 1000))
+        SetTimer(_TooltipTimerFn, -Round(_TOOLTIP_SAFETY_SEC * 1000))
     }
 }
 
@@ -164,11 +165,8 @@ TooltipShow(Items, DurationSec := 0) {
 ; Destroys the row Guis (not just hides) so stale window handles cannot
 ; resurface as ghosts if a new TooltipShow fires before the old timer fires.
 TooltipHide() {
-    global _TooltipGui, _TooltipRowGuis, _TooltipBorderGui, _TooltipTimer
-    if _TooltipTimer {
-        SetTimer(_TooltipTimer, 0)
-        _TooltipTimer := 0
-    }
+    global _TooltipGui, _TooltipRowGuis, _TooltipBorderGui
+    SetTimer(_TooltipTimerFn, 0)
     for _, Row in _TooltipRowGuis {
         try Row.Gui.Destroy()
     }
@@ -208,20 +206,24 @@ _TooltipBuildGui(Items) {
 
     ; Measure each row using a throw-away Gui with no margins so AHK reports
     ; the true rendered control size in its own coordinate space.
+    ; try/finally guarantees Destroy even if an exception fires mid-loop.
     Sizes := []
     MaxW := 0
     for _, Item in Items {
         ProbeGui := Gui("-Caption +LastFound")
-        ProbeGui.MarginX := 0
-        ProbeGui.MarginY := 0
-        ProbeGui.SetFont("s" . _TOOLTIP_FONT_SIZE, _TOOLTIP_FONT_NAME)
-        ProbeCtrl := ProbeGui.Add("Text", "x0 y0", Item.Text)
-        ProbeGui.Show("NoActivate")
-        WinGetClientPos(, , &GuiW, &GuiH, ProbeGui.Hwnd)
-        ProbeGui.Destroy()
-        Sizes.Push({ W: GuiW, H: GuiH })
-        if (GuiW > MaxW)
-            MaxW := GuiW
+        try {
+            ProbeGui.MarginX := 0
+            ProbeGui.MarginY := 0
+            ProbeGui.SetFont("s" . _TOOLTIP_FONT_SIZE, _TOOLTIP_FONT_NAME)
+            ProbeGui.Add("Text", "x0 y0", Item.Text)
+            ProbeGui.Show("NoActivate")
+            WinGetClientPos(, , &GuiW, &GuiH, ProbeGui.Hwnd)
+            Sizes.Push({ W: GuiW, H: GuiH })
+            if (GuiW > MaxW)
+                MaxW := GuiW
+        } finally {
+            ProbeGui.Destroy()
+        }
     }
     TotalW := _TOOLTIP_PADDING_X + MaxW + _TOOLTIP_PADDING_X + 6
 
