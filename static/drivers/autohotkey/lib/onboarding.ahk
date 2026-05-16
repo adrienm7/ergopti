@@ -88,7 +88,11 @@ Onboarding_ShowFromMenu(*) {
 
 _Onboarding_Step1() {
 	_Onboarding_DestroyActive()
-	global _StaticDir
+	global _StaticDir, _ob_layout, _ob_magic_key, _ob_metrics, _ob_gestures
+	_ob_layout    := false
+	_ob_magic_key := "★"
+	_ob_metrics   := false
+	_ob_gestures  := false
 
 	g := Gui("+AlwaysOnTop", "Welcome / Bienvenue / Willkommen")
 	g.SetFont("s10", "Segoe UI")
@@ -358,18 +362,14 @@ _Step5_Finish(g, rYes, *) {
 ; Write all collected wizard answers to config.toml in one atomic call, then
 ; reload so ErgoptiPlus boots with a fully-configured environment.
 _Onboarding_Commit() {
-	layoutVal := _ob_layout ? "true" : "false"
-	metricsVal := _ob_metrics ? "true" : "false"
-	gesturesVal := _ob_gestures ? "true" : "false"
-
 	TOML_BatchWrite(ConfigurationFile, [
-		{ Section: "Script",    Key: "Locale",           Value: _ob_locale    },
-		{ Section: "Layout",    Key: "ErgoptiBase",      Value: layoutVal     },
-		{ Section: "Layout",    Key: "ErgoptiAltGr",     Value: layoutVal     },
-		{ Section: "Layout",    Key: "ErgoptiPlus",      Value: layoutVal     },
+		{ Section: "Script",     Key: "Locale",          Value: _ob_locale    },
+		{ Section: "Layout",     Key: "ErgoptiBase",     Value: _ob_layout    },
+		{ Section: "Layout",     Key: "ErgoptiAltGr",    Value: _ob_layout    },
+		{ Section: "Layout",     Key: "ErgoptiPlus",     Value: _ob_layout    },
 		{ Section: "Hotstrings", Key: "MagicKey",        Value: _ob_magic_key },
-		{ Section: "Metrics",   Key: "metrics_enabled",  Value: metricsVal    },
-		{ Section: "Gestures",  Key: "Enabled",          Value: gesturesVal   },
+		{ Section: "Metrics",    Key: "metrics_enabled", Value: _ob_metrics   },
+		{ Section: "Gestures",   Key: "Enabled",         Value: _ob_gestures  },
 	])
 
 	Reload
