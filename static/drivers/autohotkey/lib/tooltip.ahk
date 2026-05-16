@@ -196,7 +196,14 @@ _TooltipBuildGui(Items) {
     global _TOOLTIP_PADDING_X, _TOOLTIP_PADDING_Y, _TOOLTIP_LABEL_GAP
     global _TOOLTIP_BADGE_W, _TOOLTIP_BADGE_BG_HEX
 
-    OldGuis := _TooltipGui ? _TooltipRowGuis : []
+    ; Destroy previous row Guis immediately so no stale window can become a
+    ; ghost — if TooltipHide() fires mid-build it will find _TooltipRowGuis
+    ; already empty and there is nothing left to leak.
+    for _, OldRow in _TooltipRowGuis {
+        try OldRow.Gui.Destroy()
+    }
+    _TooltipGui     := 0
+    _TooltipRowGuis := []
 
     ; Determine whether any row has a trigger label — if none do, skip the
     ; badge column entirely so plain tooltips stay compact.
@@ -291,12 +298,6 @@ _TooltipBuildGui(Items) {
 
     _TooltipGui     := NewGuis[1].Gui
     _TooltipRowGuis := NewGuis
-
-    ; Destroy old Guis after building new ones so any in-flight Hide() calls
-    ; still target a valid handle rather than 0.
-    for _, OldG in OldGuis {
-        try OldG.Gui.Destroy()
-    }
 }
 
 ; Measure ``Text`` at a given font size. Delegates to _TooltipMeasureTextSize.
