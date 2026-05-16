@@ -174,16 +174,13 @@ SetFeatureLetterOff(FullPath) {
 }
 
 ; Resolve the visible label of a sub-Map menu entry. Defaults to the raw
-; FallbackKey (the map key as written in features_config.ahk), but lets us
-; localise specific paths whose code identifier is intentionally English
-; while the menu UI is French. Add a case here whenever a new sub-Map needs
-; a different label than its key — the rest of the menu builder picks it up
-; automatically through CreateSubMenusRecursiveCommonCode.
+; FallbackKey (the map key as written in features_config.ahk). When the node
+; carries a "__Label" key its value is used as an i18n key — avoids hardcoding
+; every path here as the feature tree grows.
 GetSubMenuLabel(FullPath, FallbackKey) {
-	switch FullPath {
-		case "Shortcuts.Personal":
-			return t("menu.shortcuts.personal")
-	}
+	Node := GetFeatureByPath(FullPath)
+	if IsObject(Node) and Node.HasOwnProp("__Label")
+		return t(Node["__Label"])
 	return FallbackKey
 }
 
