@@ -233,7 +233,10 @@ _TooltipBuildGui(Items) {
     }
 
     ; Total width: left pad + text + gap + badge + right pad.
-    TotalW := _TOOLTIP_PADDING_X + MaxW + _TOOLTIP_PADDING_X + BadgeColW
+    ; Add 40 px to MaxW to absorb AHK Gui default margins baked into GuiW
+    ; and any rendering overhang before the badge column starts.
+    MaxW += 40
+    TotalW := _TOOLTIP_PADDING_X + MaxW + BadgeColW
 
     NewGuis := []
     for Idx, Item in Items {
