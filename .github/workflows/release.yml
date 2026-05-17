@@ -1,0 +1,190 @@
+# .github/workflows/release.yml
+#
+# Triggered when a GitHub Release is published (by release-please or manually).
+# Builds both platform artefacts from the exact release tag, signs the macOS
+# zip with Sparkle, generates appcast-main.xml, and uploads everything as
+# release assets so users and Sparkle can download them.
+name: Release Build
+
+on:
+    release:
+        types: [published]
+    workflow_dispatch:
+        inputs:
+            tag:
+                description: "Tag to build (e.g. v0.1.0)"
+                required: true
+                default: "v0.1.0"
+
+concurrency:
+    group: release-${{ github.ref }}
+    cancel-in-progress: false
+
+
+
+
+# ============================================================
+# ============================================================
+# ======= 1/ macOS — Ergopti.app + Sparkle appcast ===========
+# ============================================================
+# ============================================================
+
+jobs:
+    build-macos:
+        runs-on: macos-latest
+        # Make the private key visible to the "if:" condition on signing steps.
+        env:
+            SPARKLE_ED_PRIVATE_KEY: ${{ secrets.SPARKLE_ED_PRIVATE_KEY }}
+
+        steps:
+            - name: Checkout at release tag
+              uses: actions/checkout@v4
+              with:
+                  ref: ${{ github.event.inputs.tag || github.ref }}
+                  fetch-depth: 0
+
+            - name: Resolve version from tag
+              id: meta
+              shell: bash
+              run: |
+                  set -euo pipefail
+                  tag="${{ github.event.inputs.tag || github.ref_name }}"
+                  version="${tag#v}"
+                  build_num="${GITHUB_RUN_NUMBER}"
+                  echo "version=$version" >> "$GITHUB_OUTPUT"
+                  echo "build=$build_num" >> "$GITHUB_OUTPUT"
+                  echo "tag=$tag"         >> "$GITHUB_OUTPUT"
+                  echo "Version : $version   Build : $build_num"
+
+            - name: Build Ergopti.app
+              shell: bash
+              env:
+                  ERGOPTI_VERSION:    ${{ steps.meta.outputs.version }}
+                  ERGOPTI_BUILD:      ${{ steps.meta.outputs.build }}
+                  ERGOPTI_CHANNEL:    main
+                  SPARKLE_PUBLIC_KEY: ${{ secrets.SPARKLE_PUBLIC_KEY }}
+                  GH_OWNER:           ${{ github.repository_owner }}
+                  GH_REPO:            ${{ github.event.repository.name }}
+              run: bash tools/build_macos_app.sh
+
+            - name: Install Sparkle signing tool
+              if: ${{ env.SPARKLE_ED_PRIVATE_KEY != '' }}
+              shell: bash
+              env:
+                  SPARKLE_VERSION: "2.6.4"
+              run: |
+                  set -euo pipefail
+                  curl -fsSLo /tmp/Sparkle.tar.bz2 \
+                      "https://github.com/sparkle-project/Sparkle/releases/download/${SPARKLE_VERSION}/Sparkle-${SPARKLE_VERSION}.tar.bz2"
+                  mkdir -p /tmp/sparkle-dist
+                  tar -xjf /tmp/Sparkle.tar.bz2 -C /tmp/sparkle-dist
+                  echo "SIGN_UPDATE=/tmp/sparkle-dist/bin/sign_update" >> "$GITHUB_ENV"
+
+            - name: Sign zip with Sparkle EdDSA key
+              if: ${{ env.SPARKLE_ED_PRIVATE_KEY != '' }}
+              shell: bash
+              run: |
+                  set -euo pipefail
+                  printf '%s' "$SPARKLE_ED_PRIVATE_KEY" > /tmp/sparkle_priv.key
+                  "$SIGN_UPDATE" -f /tmp/sparkle_priv.key build/macos/Ergopti.app.zip \
+                      > build/macos/Ergopti.app.zip.sig
+                  rm -f /tmp/sparkle_priv.key
+                  echo "Sparkle EdDSA signature written to Ergopti.app.zip.sig"
+
+            - name: Generate Sparkle appcast
+              if: ${{ env.SPARKLE_ED_PRIVATE_KEY != '' }}
+              shell: bash
+              env:
+                  ERGOPTI_VERSION:  ${{ steps.meta.outputs.version }}
+                  ERGOPTI_BUILD:    ${{ steps.meta.outputs.build }}
+                  ERGOPTI_CHANNEL:  main
+                  SPARKLE_SIG_FILE: build/macos/Ergopti.app.zip.sig
+                  ZIP_PATH:         build/macos/Ergopti.app.zip
+                  GH_OWNER:         ${{ github.repository_owner }}
+                  GH_REPO:          ${{ github.event.repository.name }}
+                  OUTPUT_PATH:      build/macos/appcast-main.xml
+              run: bash tools/generate_appcast.sh
+
+            - name: Upload macOS assets to release
+              shell: bash
+              env:
+                  GH_TOKEN: ${{ github.token }}
+              run: |
+                  set -euo pipefail
+                  tag="${{ steps.meta.outputs.tag }}"
+                  assets=(build/macos/Ergopti.app.zip)
+                  [ -f build/macos/Ergopti.app.zip.sig  ] && assets+=(build/macos/Ergopti.app.zip.sig)
+                  [ -f build/macos/appcast-main.xml      ] && assets+=(build/macos/appcast-main.xml)
+                  gh release upload "$tag" "${assets[@]}" --clobber
+
+
+
+
+# ============================================================
+# ============================================================
+# ======= 2/ Windows — ErgoptiPlus.exe =======================
+# ============================================================
+# ============================================================
+
+    build-windows:
+        runs-on: windows-latest
+
+        steps:
+            - name: Checkout at release tag
+              uses: actions/checkout@v4
+              with:
+                  ref: ${{ github.event.inputs.tag || github.ref }}
+                  fetch-depth: 0
+
+            - name: Set up Python
+              uses: actions/setup-python@v5
+              with:
+                  python-version: "3.12"
+
+            - name: Regenerate hotstrings_generated.ahk
+              run: python tools/compile_hotstrings.py
+              shell: bash
+
+            - name: Build static asset bundle
+              run: python tools/build_static_bundle.py
+              shell: bash
+
+            - name: Stamp BUNDLE_VERSION with release tag
+              shell: pwsh
+              run: |
+                  $version = "${{ github.ref_name }}".TrimStart("v")
+                  $bundlePath = "${{ github.workspace }}\static\drivers\autohotkey\lib\bundle.ahk"
+                  (Get-Content -Raw -Path $bundlePath).Replace("__BUNDLE_VERSION__", $version) `
+                      | Set-Content -Path $bundlePath -Encoding UTF8 -NoNewline
+                  Write-Host "BUNDLE_VERSION stamped: $version"
+
+            - name: Download AutoHotkey v2 runtime and Ahk2Exe
+              shell: pwsh
+              env:
+                  GH_TOKEN: ${{ github.token }}
+              run: |
+                  Invoke-WebRequest -Uri "https://github.com/AutoHotkey/AutoHotkey/releases/download/v2.0.19/AutoHotkey_2.0.19.zip" -OutFile "$env:TEMP\AHK.zip" -UseBasicParsing
+                  Expand-Archive -Path "$env:TEMP\AHK.zip" -DestinationPath "$env:TEMP\AutoHotkey" -Force
+                  gh release download --repo AutoHotkey/Ahk2Exe --pattern "*.zip" --dir "$env:TEMP\Ahk2ExeZip"
+                  $z = Get-ChildItem "$env:TEMP\Ahk2ExeZip" -Filter "*.zip" | Select-Object -First 1
+                  Expand-Archive -Path $z.FullName -DestinationPath "$env:TEMP\Ahk2Exe" -Force
+
+            - name: Compile ErgoptiPlus.ahk
+              shell: pwsh
+              run: |
+                  $ahk2exe = Get-ChildItem "$env:TEMP\Ahk2Exe" -Recurse -Filter "Ahk2Exe.exe" | Select-Object -First 1 -ExpandProperty FullName
+                  $runtime = Get-ChildItem "$env:TEMP\AutoHotkey" -Filter "AutoHotkey64.exe" | Select-Object -First 1 -ExpandProperty FullName
+                  $in   = "${{ github.workspace }}\static\drivers\autohotkey\ErgoptiPlus.ahk"
+                  $out  = "${{ github.workspace }}\static\drivers\autohotkey\ErgoptiPlus.exe"
+                  $icon = "${{ github.workspace }}\static\favicon.ico"
+                  & $ahk2exe /in $in /out $out /base $runtime /icon $icon
+                  if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+            - name: Upload Windows EXE to release
+              shell: bash
+              env:
+                  GH_TOKEN: ${{ github.token }}
+              run: |
+                  gh release upload "${{ github.ref_name }}" \
+                      static/drivers/autohotkey/ErgoptiPlus.exe \
+                      --clobber
