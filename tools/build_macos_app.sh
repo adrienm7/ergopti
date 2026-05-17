@@ -57,13 +57,13 @@ ERGOPTI_CHANNEL="${ERGOPTI_CHANNEL:-main}"
 # at build time and vendored inside Resources/Tools/ so users never need a
 # separate download; the Lua driver opens the installer on first use if KE is
 # not yet installed (a one-time system-extension approval is still required).
-KARABINER_VERSION="${KARABINER_VERSION:-14.13.0}"
+KARABINER_VERSION="${KARABINER_VERSION:-16.0.0}"
 
 # Ollama CLI version bundled for local LLM inference. The universal binary is
 # downloaded at build time and stored in Resources/Tools/ so the app can run
 # local models on first launch without any manual install step. Users still
 # need to pull a model the first time (models are multi-GB, not bundled).
-OLLAMA_VERSION="${OLLAMA_VERSION:-0.6.0}"
+OLLAMA_VERSION="${OLLAMA_VERSION:-0.24.0}"
 
 # Sparkle EdDSA public key (base64). Empty string means "Sparkle will refuse
 # to install updates"; CI must inject the real value from a secret.
