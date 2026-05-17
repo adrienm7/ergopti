@@ -165,7 +165,8 @@ download_karabiner() {
 		log "Extracting Karabiner-Elements.app from DMG"
 		local mount_point
 		mount_point="$(mktemp -d)"
-		hdiutil attach "$dmg_path" -nobrowse -mountpoint "$mount_point" -quiet
+		log "DMG path: $dmg_path (size: $(wc -c < "$dmg_path") bytes)"
+		hdiutil attach "$dmg_path" -nobrowse -mountpoint "$mount_point" || fail "hdiutil attach failed."
 		log "DMG contents: $(find "$mount_point" -maxdepth 3 | head -30)"
 		local ke_in_dmg
 		ke_in_dmg="$(find "$mount_point" -maxdepth 3 -name "*.app" -type d | head -1)"
