@@ -101,7 +101,6 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 HS_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 VENV_DIR="$HS_ROOT/.venv"
 PYPROJECT="$HS_ROOT/pyproject.toml"
-SYNC_HASH_FILE="$VENV_DIR/.last_sync_hash"
 
 # Pinned interpreter version. Kept in sync with pyproject.toml's
 # requires-python clause — bumping one without the other breaks the
@@ -163,6 +162,26 @@ locate_uv() {
 	fi
 	return 1
 }
+
+# When the Swift launcher starts Ergopti.app it exports ERGOPTI_CONFIG_DIR.
+# The .app bundle is read-only, so the venv cannot be created inside it.
+# We redirect VENV_DIR to ~/Library/Application Support/Ergopti/mlx-venv
+# and set UV_SYNC_FROZEN_FLAG to "--frozen" so uv never tries to rewrite
+# uv.lock (the lock file is already committed inside the read-only bundle
+# and must not be mutated).
+if [ -n "${ERGOPTI_CONFIG_DIR:-}" ]; then
+	APP_SUPPORT_DIR="$HOME/Library/Application Support/Ergopti"
+	mkdir -p "$APP_SUPPORT_DIR"
+	VENV_DIR="$APP_SUPPORT_DIR/mlx-venv"
+	UV_SYNC_FROZEN_FLAG="--frozen"
+	log_info "Mode bundle détecté — venv redirigé vers $VENV_DIR"
+else
+	UV_SYNC_FROZEN_FLAG=""
+fi
+
+# Derived from VENV_DIR after the potential bundle-mode override so the
+# marker file lands next to the actual environment.
+SYNC_HASH_FILE="$VENV_DIR/.last_sync_hash"
 
 
 
@@ -364,9 +383,13 @@ cd "$HS_ROOT"
 # stalled wheel download. uv has internal retries but they are not
 # configurable, so this outer retry covers cases where uv itself gives up.
 uv_deps_sync() {
+	# $UV_SYNC_FROZEN_FLAG is "--frozen" in bundle mode (read-only .app) so uv
+	# reads the committed lock file without attempting to rewrite it.
+	# shellcheck disable=SC2086
 	VIRTUAL_ENV="$VENV_DIR" "$UV_BIN" sync \
 		--project "$HS_ROOT" \
 		--python "$VENV_DIR/bin/python" \
+		$UV_SYNC_FROZEN_FLAG \
 		--verbose --no-progress >&2
 }
 if ! retry_network uv_deps_sync; then
