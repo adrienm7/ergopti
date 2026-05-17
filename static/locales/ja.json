@@ -1,4 +1,4 @@
-﻿{
+{
 	"_meta.flag": "🇯🇵",
 	"_meta.locale": "ja",
 	"_meta.name": "日本語",
@@ -885,6 +885,7 @@
 	"ollama.deleted_title": "削除されました (Ollama)",
 	"ollama.deps_failed": "失敗…",
 	"ollama.deps_step_installing": "Ollamaをインストール中…",
+	"ollama.deps_step_checking": "Ollama を確認中…",
 	"ollama.deps_step_ready": "Ollamaサーバーの準備ができました。",
 	"ollama.deps_step_starting": "Ollamaサーバーを起動中…",
 	"ollama.deps_task_create_failed": "hs.taskを作成できません。",

@@ -1,4 +1,4 @@
-﻿{
+{
 	"_meta.flag": "🇨🇿",
 	"_meta.locale": "cs",
 	"_meta.name": "Čeština",
@@ -885,6 +885,7 @@ Verze: 1.0",,
 	"ollama.deleted_title": "Smazáno (Ollama)",
 	"ollama.deps_failed": "Selhalo…",
 	"ollama.deps_step_installing": "Instalace Ollama…",
+	"ollama.deps_step_checking": "Kontrola Ollama…",
 	"ollama.deps_step_ready": "Server Ollama připraven.",
 	"ollama.deps_step_starting": "Spouštění serveru Ollama…",
 	"ollama.deps_task_create_failed": "Nelze vytvořit úlohu hs.task.",

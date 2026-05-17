@@ -1,4 +1,4 @@
-﻿{
+{
 	"_meta.flag": "🇹🇷",
 	"_meta.locale": "tr",
 	"_meta.name": "Türkçe",
@@ -885,6 +885,7 @@ Sürüm: 1.0",,
 	"ollama.deleted_title": "Silindi (Ollama)",
 	"ollama.deps_failed": "Başarısız…",
 	"ollama.deps_step_installing": "Ollama yükleniyor…",
+	"ollama.deps_step_checking": "Ollama kontrol ediliyor…",
 	"ollama.deps_step_ready": "Ollama sunucusu hazır.",
 	"ollama.deps_step_starting": "Ollama sunucusu başlatılıyor…",
 	"ollama.deps_task_create_failed": "hs.task oluşturulamıyor.",

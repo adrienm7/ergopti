@@ -1,4 +1,4 @@
-﻿{
+{
 	"_meta.flag": "🇳🇱",
 	"_meta.locale": "nl",
 	"_meta.name": "Nederlands",
@@ -885,6 +885,7 @@ Versie: 1.0",,
 	"ollama.deleted_title": "Verwijderd (Ollama)",
 	"ollama.deps_failed": "Mislukt…",
 	"ollama.deps_step_installing": "Ollama installeren…",
+	"ollama.deps_step_checking": "Ollama controleren…",
 	"ollama.deps_step_ready": "Ollama-server gereed.",
 	"ollama.deps_step_starting": "Ollama-server starten…",
 	"ollama.deps_task_create_failed": "Kan hs.task niet aanmaken.",

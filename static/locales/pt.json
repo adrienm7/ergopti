@@ -1,4 +1,4 @@
-﻿{
+{
 	"_meta.flag": "🇧🇷",
 	"_meta.locale": "pt",
 	"_meta.name": "Português",
@@ -885,6 +885,7 @@ Versão: 1.0",,
 	"ollama.deleted_title": "Eliminado (Ollama)",
 	"ollama.deps_failed": "Falhou…",
 	"ollama.deps_step_installing": "Instalando Ollama…",
+	"ollama.deps_step_checking": "Verificando Ollama…",
 	"ollama.deps_step_ready": "Servidor Ollama pronto.",
 	"ollama.deps_step_starting": "Iniciando servidor Ollama…",
 	"ollama.deps_task_create_failed": "Impossível criar a tarefa hs.task.",

@@ -1,4 +1,4 @@
-﻿{
+{
 	"_meta.flag": "🇨🇳",
 	"_meta.locale": "zh",
 	"_meta.name": "中文",
@@ -884,6 +884,7 @@
 	"ollama.deleted_title": "已删除 (Ollama)",
 	"ollama.deps_failed": "失败…",
 	"ollama.deps_step_installing": "正在安装 Ollama…",
+	"ollama.deps_step_checking": "正在检查 Ollama…",
 	"ollama.deps_step_ready": "Ollama 服务器已就绪。",
 	"ollama.deps_step_starting": "正在启动 Ollama 服务器…",
 	"ollama.deps_task_create_failed": "无法创建 hs.task 任务。",
