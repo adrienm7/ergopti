@@ -684,9 +684,7 @@
 	"menu.llm.toggle_enable": "AI 제안 활성화",
 	"menu.llm.toggle_disable": "AI 제안 비활성화",
 	"menu.llm.about": "Ergopti AI 정보",
-	"menu.llm.about_body": "Ergopti AI — 스마트 키보드 제안
-백엔드: Ollama (로컬)
-버전: 1.0",,
+	"menu.llm.about_body": "Ergopti AI — 스마트 키보드 제안\n백엔드: Ollama (로컬)\n버전: 1.0",
 	"menu.llm.trigger_menu_title": "AI 트리거",
 	"menu.llm.trigger_shortcut_label": "수동 생성 단축키: %s",
 	"menu.llm.trigger_shortcut_title": "AI 생성 단축키",

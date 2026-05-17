@@ -684,9 +684,7 @@
 	"menu.llm.toggle_enable": "AI önerilerini etkinleştir",
 	"menu.llm.toggle_disable": "AI önerilerini devre dışı bırak",
 	"menu.llm.about": "Ergopti AI Hakkında",
-	"menu.llm.about_body": "Ergopti AI — Akıllı klavye önerileri
-Backend: Ollama (yerel)
-Sürüm: 1.0",,
+	"menu.llm.about_body": "Ergopti AI — Akıllı klavye önerileri\nBackend: Ollama (yerel)\nSürüm: 1.0",
 	"menu.llm.trigger_menu_title": "YZ Tetikleme",
 	"menu.llm.trigger_shortcut_label": "Manuel oluşturma kısayolu: %s",
 	"menu.llm.trigger_shortcut_title": "YZ Oluşturma Kısayolu",

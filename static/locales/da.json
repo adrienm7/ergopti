@@ -709,9 +709,7 @@
 	"menu.llm.toggle_enable": "Aktivér AI-forslag",
 	"menu.llm.toggle_disable": "Deaktivér AI-forslag",
 	"menu.llm.about": "Om Ergopti AI",
-	"menu.llm.about_body": "Ergopti AI — Intelligente tastaturforslag
-Backend: Ollama (lokal)
-Version: 1.0",,
+	"menu.llm.about_body": "Ergopti AI — Intelligente tastaturforslag\nBackend: Ollama (lokal)\nVersion: 1.0",
 	"menu.llm.trigger_menu_title": "AI-udløsning",
 	"menu.llm.trigger_shortcut_label": "Genvej til manuel generering: %s",
 	"menu.llm.trigger_shortcut_title": "AI-genereringsgenvel",
