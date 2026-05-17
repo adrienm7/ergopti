@@ -113,6 +113,19 @@ function M.new(deps, presets)
 	-- trying to eliminate.
 	local hs_root = project_root and (project_root .. "/static/drivers/hammerspoon") or ""
 	local project_venv_python = hs_root ~= "" and (hs_root .. "/.venv/bin/python") or ""
+
+	-- When the Swift launcher is running (ERGOPTI_CONFIG_DIR is set), the
+	-- bundle is read-only and ensure-mlx-deps.sh redirected the venv to
+	-- ~/Library/Application Support/Ergopti/mlx-venv (same logic as the
+	-- shell script). Override the computed in-bundle path accordingly.
+	local _ergopti_config_dir = os.getenv("ERGOPTI_CONFIG_DIR")
+	if _ergopti_config_dir and _ergopti_config_dir ~= "" then
+		local home = os.getenv("HOME") or ""
+		if home ~= "" then
+			project_venv_python = home .. "/Library/Application Support/Ergopti/mlx-venv/bin/python"
+		end
+	end
+
 	if project_venv_python == "" or not hs.fs.attributes(project_venv_python, "mode") then
 		-- The auto-bootstrap (lib/mlx_deps_checker) provisions this interpreter
 		-- on every reload; if it is still missing here the bootstrap failed and
