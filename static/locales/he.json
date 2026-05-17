@@ -1,4 +1,4 @@
-﻿{
+{
 	"_meta.flag": "🇮🇱",
 	"_meta.locale": "he",
 	"_meta.name": "עברית",
@@ -910,6 +910,7 @@
 	"ollama.deleted_title": "נמחק (Ollama)",
 	"ollama.deps_failed": "נכשל…",
 	"ollama.deps_step_installing": "מתקין Ollama…",
+	"ollama.deps_step_checking": "בודק את Ollama…",
 	"ollama.deps_step_ready": "שרת Ollama מוכן.",
 	"ollama.deps_step_starting": "מפעיל שרת Ollama…",
 	"ollama.deps_task_create_failed": "לא ניתן ליצור hs.task.",

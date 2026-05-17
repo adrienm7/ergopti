@@ -1,4 +1,4 @@
-﻿{
+{
 	"_meta.flag": "🇸🇦",
 	"_meta.locale": "ar",
 	"_meta.name": "العربية",
@@ -885,6 +885,7 @@
 	"ollama.deleted_title": "تم الحذف (Ollama)",
 	"ollama.deps_failed": "فشل…",
 	"ollama.deps_step_installing": "جارٍ تثبيت Ollama…",
+	"ollama.deps_step_checking": "جارٍ التحقق من Ollama…",
 	"ollama.deps_step_ready": "خادم Ollama جاهز.",
 	"ollama.deps_step_starting": "جارٍ بدء خادم Ollama…",
 	"ollama.deps_task_create_failed": "تعذر إنشاء مهمة hs.task.",

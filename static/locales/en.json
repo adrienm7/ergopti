@@ -1,4 +1,4 @@
-﻿{
+{
 	"_meta.flag": "🇬🇧",
 	"_meta.locale": "en",
 	"_meta.name": "English",
@@ -883,6 +883,7 @@
 	"ollama.deleted_title": "Deleted (Ollama)",
 	"ollama.deps_failed": "Failed…",
 	"ollama.deps_step_installing": "Installing Ollama…",
+	"ollama.deps_step_checking": "Checking Ollama…",
 	"ollama.deps_step_ready": "Ollama server ready.",
 	"ollama.deps_step_starting": "Starting Ollama server…",
 	"ollama.deps_task_create_failed": "Unable to create hs.task.",

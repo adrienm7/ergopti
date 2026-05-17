@@ -1,4 +1,4 @@
-﻿{
+{
 	"_meta.flag": "🇷🇺",
 	"_meta.locale": "ru",
 	"_meta.name": "Русский",
@@ -885,6 +885,7 @@
 	"ollama.deleted_title": "Удалено (Ollama)",
 	"ollama.deps_failed": "Ошибка…",
 	"ollama.deps_step_installing": "Установка Ollama…",
+	"ollama.deps_step_checking": "Проверка Ollama…",
 	"ollama.deps_step_ready": "Сервер Ollama готов.",
 	"ollama.deps_step_starting": "Запуск сервера Ollama…",
 	"ollama.deps_task_create_failed": "Невозможно создать задачу hs.task.",

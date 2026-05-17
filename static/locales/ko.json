@@ -1,4 +1,4 @@
-﻿{
+{
 	"_meta.flag": "🇰🇷",
 	"_meta.locale": "ko",
 	"_meta.name": "한국어",
@@ -885,6 +885,7 @@
 	"ollama.deleted_title": "삭제됨 (Ollama)",
 	"ollama.deps_failed": "실패…",
 	"ollama.deps_step_installing": "Ollama 설치 중…",
+	"ollama.deps_step_checking": "Ollama 확인 중…",
 	"ollama.deps_step_ready": "Ollama 서버 준비 완료.",
 	"ollama.deps_step_starting": "Ollama 서버 시작 중…",
 	"ollama.deps_task_create_failed": "hs.task를 생성할 수 없습니다.",
