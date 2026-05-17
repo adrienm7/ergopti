@@ -418,8 +418,14 @@ _StartInputHook() {
 ; does not silently kill the InputHook callback chain — AHK v2 stops invoking
 ; the OnChar callback permanently if an unhandled error propagates out of it.
 _OnPrefixChar(IH, Char) {
-    global _PrefixBuffer, _MAX_BUFFER_LEN, _PrefixWatcherSuppressed
-    if _PrefixWatcherSuppressed {
+    global _PrefixBuffer, _MAX_BUFFER_LEN, _PrefixWatcherSuppressed, HSE_Suppressed
+    ; Honour BOTH suppression flags. _PrefixWatcherSuppressed is set by
+    ; PrefixWatcherSuppress (manual / tray toggles); HSE_Suppressed is
+    ; set by HSE_DispatchMatch while it is replaying its SendEvent burst.
+    ; Missing the HSE flag here lets AHK's own output refill _PrefixBuffer
+    ; and resurface a ghost tooltip on a prefix match against the
+    ; expansion we just emitted.
+    if (_PrefixWatcherSuppressed or HSE_Suppressed) {
         return
     }
     try {
@@ -493,8 +499,13 @@ _OnPrefixChar(IH, Char) {
 ; are not handled here; the InputHook does not see them. We rely on the
 ; tooltip's auto-hide timer for that case.
 _OnPrefixKeyDown(IH, VK, SC) {
-    global _PrefixWatcherSuppressed
-    if _PrefixWatcherSuppressed {
+    global _PrefixWatcherSuppressed, HSE_Suppressed
+    ; Same dual-flag guard as _OnPrefixChar — the BackSpace events the
+    ; dispatcher fires via SendEvent reach this callback as VK 0x08 events.
+    ; Without the HSE_Suppressed check the watcher would call
+    ; _ResetPrefixBuffer() once per replayed BackSpace, which is harmless
+    ; on its own but pairs with the OnChar pollution to produce ghosts.
+    if (_PrefixWatcherSuppressed or HSE_Suppressed) {
         return
     }
     static ResetVKs := Map(
