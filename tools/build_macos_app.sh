@@ -166,10 +166,12 @@ download_karabiner() {
 		local mount_point
 		mount_point="$(mktemp -d)"
 		hdiutil attach "$dmg_path" -nobrowse -mountpoint "$mount_point" -quiet
+		log "DMG contents: $(find "$mount_point" -maxdepth 3 | head -30)"
 		local ke_in_dmg
-		ke_in_dmg="$(find "$mount_point" -maxdepth 3 -name "Karabiner-Elements.app" -type d | head -1)"
+		ke_in_dmg="$(find "$mount_point" -maxdepth 3 -name "*.app" -type d | head -1)"
 		[ -n "$ke_in_dmg" ] \
-			|| fail "Karabiner-Elements.app not found in DMG at $mount_point."
+			|| fail "No .app found in DMG at $mount_point."
+		log "Found app: $ke_in_dmg"
 		cp -R "$ke_in_dmg" "$ke_extracted"
 		hdiutil detach "$mount_point" -quiet
 		rmdir "$mount_point"
