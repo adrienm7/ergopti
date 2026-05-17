@@ -654,7 +654,7 @@ LLM_Tray_OnToggle(*) {
 	LLM_Tray_SaveConfig()
 	LLM_Tray_Build()
 	if _LLM_Tray["enabled"] {
-		SetTimer(LLM_Tray_BootstrapOllama, -1)
+		SetTimer(() => LLM_Tray_BootstrapOllama(true), -1)
 	} else {
 		LLM_Bridge_Stop()
 	}

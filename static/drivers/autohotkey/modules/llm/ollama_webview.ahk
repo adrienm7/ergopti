@@ -35,7 +35,7 @@
 ; Window dimensions — matches the Hammerspoon download_window proportions
 global _OllamaWV_W      := 460
 global _OllamaWV_H      := 380
-global _OllamaWV_Margin := 16   ; gap from screen edge (bottom-right)
+global _OllamaWV_Margin := 10   ; gap from screen edge and taskbar (physical pixels, -DPIScale)
 
 ; Internal state
 global _OllamaWV_Gui        := unset
@@ -196,24 +196,34 @@ OllamaWV_Create(kind, subtitle) {
 		return
 	}
 
-	g := Gui("+AlwaysOnTop +Caption +MinimizeBox +Resize +ToolWindow", "Ergopti — IA")
+	; -DPIScale: tell AHK to treat all coordinates as logical pixels (no auto-scaling).
+	; Without this, AHK v2 in PerMonitorV2 mode interprets Gui dimensions as physical
+	; pixels, making the window larger than intended on scaled displays.
+	g := Gui("+AlwaysOnTop +Caption +MinimizeBox +Resize +ToolWindow -DPIScale", "Ergopti — IA")
 	g.MarginX := 0
 	g.MarginY := 0
 	g.OnEvent("Close", (*) => OllamaWV_Close())
 
-	; Position bottom-right of the primary monitor work area (excludes taskbar).
-	; Clamp to ensure the window never exceeds the visible area on any DPI config.
-	mon := MonitorGetPrimary()
-	MonitorGetWorkArea(mon, &ma_l, &ma_t, &ma_r, &ma_b)
-	work_w := ma_r - ma_l
-	work_h := ma_b - ma_t
-	win_w  := Min(_OllamaWV_W, work_w)
-	win_h  := Min(_OllamaWV_H, work_h)
-	pos_x  := ma_l + Max(0, work_w - win_w - _OllamaWV_Margin)
-	pos_y  := ma_t + Max(0, work_h - win_h - _OllamaWV_Margin)
-	LoggerInfo("LLM", "Window position: x=" pos_x " y=" pos_y " w=" win_w " h=" win_h " (work area: " ma_l "," ma_t "-" ma_r "," ma_b ").")
+	; Position bottom-right, flush above the taskbar with a small margin.
+	; SPI_GETWORKAREA (48) always returns physical pixels.
+	; With -DPIScale, Gui.Show() position coords are physical pixels too, but
+	; window dimensions (w/h) are logical pixels — AHK scales them up internally.
+	; So the physical footprint of the window is w*scale × h*scale; we must
+	; subtract that from wa_r/wa_b to keep the window fully on-screen.
+	work_rc   := Buffer(16, 0)
+	DllCall("SystemParametersInfo", "UInt", 48, "UInt", 0, "Ptr", work_rc, "UInt", 0)
+	wa_r      := NumGet(work_rc,  8, "Int")
+	wa_b      := NumGet(work_rc, 12, "Int")
+	dpi_scale := A_ScreenDPI / 96
+	win_w     := _OllamaWV_W
+	win_h     := _OllamaWV_H
+	phy_w     := Round(win_w * dpi_scale)
+	phy_h     := Round(win_h * dpi_scale)
+	pos_x     := wa_r - phy_w - _OllamaWV_Margin
+	pos_y     := wa_b - phy_h - _OllamaWV_Margin
+	LoggerInfo("LLM", "Window position: x=" pos_x " y=" pos_y " logical=" win_w "x" win_h " physical=" phy_w "x" phy_h " (wa_r=" wa_r " wa_b=" wa_b " dpi=" A_ScreenDPI ").")
 
-	g.Show("w" win_w " h" win_h " NoActivate x" pos_x " y" pos_y)
+	g.Show("w" win_w " h" win_h " x" pos_x " y" pos_y)
 	_OllamaWV_Gui := g
 
 	; Spin up WebView2
