@@ -166,11 +166,8 @@ download_karabiner() {
 		local mount_point
 		mount_point="$(mktemp -d)"
 		log "DMG path: $dmg_path (size: $(wc -c < "$dmg_path") bytes)"
-		log "hdiutil imageinfo:"
-		hdiutil imageinfo "$dmg_path" 2>&1 | head -20 || true
-		hdiutil attach "$dmg_path" -nobrowse -mountpoint "$mount_point" -verbose 2>&1 | tail -20 || fail "hdiutil attach failed."
-		log "mount_point ls: $(ls -la "$mount_point" 2>&1)"
-		log "DMG contents: $(find "$mount_point" -maxdepth 3 2>&1 | head -30)"
+		hdiutil attach "$dmg_path" -nobrowse -mountpoint "$mount_point" -agreetolicense || fail "hdiutil attach failed."
+		log "DMG contents: $(find "$mount_point" -maxdepth 4 2>&1 | head -40)"
 		local ke_in_dmg
 		ke_in_dmg="$(find "$mount_point" -maxdepth 3 -name "*.app" -type d | head -1)"
 		[ -n "$ke_in_dmg" ] \
