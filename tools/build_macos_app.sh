@@ -166,16 +166,23 @@ download_karabiner() {
 		local mount_point
 		mount_point="$(mktemp -d)"
 		log "DMG path: $dmg_path (size: $(wc -c < "$dmg_path") bytes)"
-		echo y | hdiutil attach "$dmg_path" -nobrowse -mountpoint "$mount_point" || fail "hdiutil attach failed."
-		log "DMG contents: $(find "$mount_point" -maxdepth 4 2>&1 | head -40)"
+		local attach_out
+		attach_out="$(echo y | hdiutil attach "$dmg_path" -nobrowse -noverify 2>&1)" \
+			|| fail "hdiutil attach failed: $attach_out"
+		log "hdiutil attach output: $attach_out"
+		local actual_mount
+		actual_mount="$(echo "$attach_out" | grep -oE '/Volumes/[^\t]+' | tail -1 | sed 's/[[:space:]]*$//')"
+		log "Detected mount: '$actual_mount'"
+		[ -n "$actual_mount" ] || fail "Could not detect mount point from hdiutil output."
+		log "DMG contents: $(find "$actual_mount" -maxdepth 4 2>&1 | head -40)"
 		local ke_in_dmg
-		ke_in_dmg="$(find "$mount_point" -maxdepth 3 -name "*.app" -type d | head -1)"
+		ke_in_dmg="$(find "$actual_mount" -maxdepth 4 -name "*.app" -type d | head -1)"
 		[ -n "$ke_in_dmg" ] \
-			|| fail "No .app found in DMG at $mount_point."
+			|| fail "No .app found in DMG at $actual_mount."
 		log "Found app: $ke_in_dmg"
 		cp -R "$ke_in_dmg" "$ke_extracted"
-		hdiutil detach "$mount_point" -quiet
-		rmdir "$mount_point"
+		hdiutil detach "$actual_mount" -quiet || true
+		rmdir "$mount_point" 2>/dev/null || true
 	fi
 	[ -d "$ke_extracted" ] || fail "Karabiner-Elements.app not extracted."
 	echo "$ke_extracted"
