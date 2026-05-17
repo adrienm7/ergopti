@@ -290,7 +290,11 @@ OllamaWV_WebView2Available() {
  * @returns {string}
  */
 OllamaWV_HtmlUrl() {
-	base := A_ScriptDir . "\..\_shared\ui\download_window\index.html"
+	global _StaticDir
+	; _StaticDir already resolves to <repo>/static in dev and to the extracted
+	; A_ScriptDir/static in compiled mode, so the _shared tree lives at the
+	; same relative offset in both layouts.
+	base := _StaticDir . "\drivers\_shared\ui\download_window\index.html"
 	loop files, base
 		base := A_LoopFileFullPath
 	return "file:///" . StrReplace(base, "\", "/")

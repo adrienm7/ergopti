@@ -44,6 +44,26 @@ jobs:
               run: python tools/compile_hotstrings.py
               shell: bash
 
+            - name: Build static asset bundle
+              # Assembles every runtime asset (hotstrings TOMLs, locales,
+              # icons, _shared/, vendor DLLs) into a single zip that the .exe
+              # embeds via FileInstall and extracts next to itself on first
+              # launch. Output: static/drivers/autohotkey/build/static_bundle.zip.
+              run: python tools/build_static_bundle.py
+              shell: bash
+
+            - name: Stamp BUNDLE_VERSION in lib/bundle.ahk
+              # Replace the "__BUNDLE_VERSION__" placeholder with the short
+              # commit SHA so the runtime can decide whether to re-extract on
+              # boot. Phase 3 (release-please) will swap this for a semver tag.
+              shell: pwsh
+              run: |
+                  $sha = (git rev-parse --short HEAD).Trim()
+                  $bundlePath = "${{ github.workspace }}\static\drivers\autohotkey\lib\bundle.ahk"
+                  (Get-Content -Raw -Path $bundlePath).Replace("__BUNDLE_VERSION__", $sha) `
+                      | Set-Content -Path $bundlePath -Encoding UTF8 -NoNewline
+                  Write-Host "BUNDLE_VERSION stamped: $sha"
+
             - name: Download AutoHotkey v2 runtime and Ahk2Exe
               run: |
                   # AHK v2 runtime (contains AutoHotkey64.exe needed by Ahk2Exe)

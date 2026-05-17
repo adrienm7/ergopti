@@ -129,7 +129,7 @@ UnescapeTomlString(s) {
 ;   TOML is_case_sensitive = true  ➜ original call was CreateHotstring
 ;   TOML is_case_sensitive = false ➜ original call was CreateCaseSensitiveHotstrings
 LoadHotstringsSection(CategoryName, SectionName, FeatureConfig, ExtraOptions := Map()) {
-    global ScriptInformation, _GENERATED_HOTSTRINGS
+    global ScriptInformation, _GENERATED_HOTSTRINGS, _StaticDir
 
     ; Per-group delay gating — override the per-feature TimeActivationSeconds
     ; with the value resolved from the TOML metadata + user override file.
@@ -165,7 +165,7 @@ LoadHotstringsSection(CategoryName, SectionName, FeatureConfig, ExtraOptions := 
     and ScriptInformation.Has("PersonalTomlPath")) {
         FilePath := ScriptInformation["PersonalTomlPath"]
     } else {
-        FilePath := A_ScriptDir . "\..\..\hotstrings\" . CategoryName . ".toml"
+        FilePath := _StaticDir . "\hotstrings\" . CategoryName . ".toml"
     }
     if !FileExist(FilePath) {
         try LoggerWarn("TomlLoader", "Section [{1}.{2}]: file {3} not found.",
@@ -539,8 +539,8 @@ ApplyTomlMetadataToFeatures(CategoryName) {
 ; This makes ``_index.toml`` the single source of truth for those descriptions,
 ; shared with Hammerspoon (which reads the same file at startup).
 ApplyIndexTomlToDynamicHotstrings() {
-    global ScriptInformation
-    FilePath := A_ScriptDir . "\..\..\hotstrings\_index.toml"
+    global ScriptInformation, _StaticDir
+    FilePath := _StaticDir . "\hotstrings\_index.toml"
     if !FileExist(FilePath) {
         return
     }
@@ -706,7 +706,7 @@ ApplyLocaleDescriptions(Locale := "fr") {
 ;                                 description = "<...>"
 ;
 ParseTomlGroupConfig(CategoryName, FilePath := "") {
-    global ScriptInformation, HotstringGroupConfig
+    global ScriptInformation, HotstringGroupConfig, _StaticDir
     LowerCat := StrLower(CategoryName)
 
     ; When a direct path is given, use it as the cache key so different files
@@ -723,7 +723,7 @@ ParseTomlGroupConfig(CategoryName, FilePath := "") {
             and ScriptInformation.Has("PersonalTomlPath")) {
             FilePath := ScriptInformation["PersonalTomlPath"]
         } else {
-            FilePath := A_ScriptDir . "\..\..\hotstrings\" . LowerCat . ".toml"
+            FilePath := _StaticDir . "\hotstrings\" . LowerCat . ".toml"
         }
     }
 
@@ -801,7 +801,7 @@ ParseTomlGroupConfig(CategoryName, FilePath := "") {
 ; multi-file personal hotstrings); CategoryName is used only for cache keying
 ; when FilePath is empty.
 CountTomlSection(CategoryName, SectionName, FilePath := "") {
-    global ScriptInformation, _TomlCountCache
+    global ScriptInformation, _TomlCountCache, _StaticDir
     CacheKey := (FilePath != "" ? FilePath : StrLower(CategoryName)) . "|" . StrLower(SectionName)
     if _TomlCountCache.Has(CacheKey)
         return _TomlCountCache[CacheKey]
@@ -811,7 +811,7 @@ CountTomlSection(CategoryName, SectionName, FilePath := "") {
         and ScriptInformation.Has("PersonalTomlPath")) {
             FilePath := ScriptInformation["PersonalTomlPath"]
         } else {
-            FilePath := A_ScriptDir . "\..\..\hotstrings\" . StrLower(CategoryName) . ".toml"
+            FilePath := _StaticDir . "\hotstrings\" . StrLower(CategoryName) . ".toml"
         }
     }
     if !FileExist(FilePath) {
@@ -850,7 +850,7 @@ CountTomlSection(CategoryName, SectionName, FilePath := "") {
 ; multi-file personal hotstrings); CategoryName is used only for cache keying
 ; when FilePath is empty.
 CountTomlHotstrings(CategoryName, FilePath := "") {
-    global ScriptInformation, _TomlCountCache
+    global ScriptInformation, _TomlCountCache, _StaticDir
     CacheKey := (FilePath != "" ? FilePath : StrLower(CategoryName)) . "|*"
     if _TomlCountCache.Has(CacheKey)
         return _TomlCountCache[CacheKey]
@@ -860,7 +860,7 @@ CountTomlHotstrings(CategoryName, FilePath := "") {
         and ScriptInformation.Has("PersonalTomlPath")) {
             FilePath := ScriptInformation["PersonalTomlPath"]
         } else {
-            FilePath := A_ScriptDir . "\..\..\hotstrings\" . StrLower(CategoryName) . ".toml"
+            FilePath := _StaticDir . "\hotstrings\" . StrLower(CategoryName) . ".toml"
         }
     }
     if !FileExist(FilePath) {

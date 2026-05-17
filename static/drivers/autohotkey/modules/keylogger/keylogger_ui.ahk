@@ -53,9 +53,11 @@ class KLUI {
 ; ============================================
 
 KLUI_ResolveAssetUrl(which) {
-    ; A_ScriptDir = …/autohotkey/
-    ; The shared UI assets live in the sibling _shared/ folder.
-    base := A_ScriptDir . "\..\_shared\ui\" . which . "\index.html"
+    global _StaticDir
+    ; The shared UI assets live under static/drivers/_shared/. _StaticDir
+    ; already resolves to <repo>/static (dev) or A_ScriptDir\static
+    ; (compiled), so the same offset works in both modes.
+    base := _StaticDir . "\drivers\_shared\ui\" . which . "\index.html"
     ; Resolve to absolute, normalised path.
     loop files, base
         base := A_LoopFileFullPath

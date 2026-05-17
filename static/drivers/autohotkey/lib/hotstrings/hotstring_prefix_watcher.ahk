@@ -240,14 +240,14 @@ HotstringPrefixWatcherStop() {
 ; honour the user-relocatable path stored in ScriptInformation; everything
 ; else lives next to the bundled hotstrings directory.
 _PrefixWatcherTomlPath(Category) {
-    global ScriptInformation
+    global ScriptInformation, _StaticDir
     LowerCat := StrLower(Category)
     if (LowerCat == "personal"
             and IsSet(ScriptInformation)
             and ScriptInformation.Has("PersonalTomlPath")) {
         return ScriptInformation["PersonalTomlPath"]
     }
-    return A_ScriptDir . "\..\..\hotstrings\" . LowerCat . ".toml"
+    return _StaticDir . "\hotstrings\" . LowerCat . ".toml"
 }
 
 ; Scan a category TOML and add every (trigger, output) pair to the prefix

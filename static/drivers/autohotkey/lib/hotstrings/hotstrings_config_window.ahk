@@ -715,7 +715,7 @@ _HCW_LocaleFromInlineTable(body) {
 
 ; Scan a TOML file to list its [[section]] blocks with titles/descriptions.
 _HCW_GetSections(Entry) {
-	global ScriptInformation
+	global ScriptInformation, _StaticDir
 	if Entry.IsPersonal or Entry.IsExtension {
 		Path := Entry.Path
 	} else {
@@ -725,7 +725,7 @@ _HCW_GetSections(Entry) {
 				and ScriptInformation.Has("PersonalTomlPath")) {
 			Path := ScriptInformation["PersonalTomlPath"]
 		} else {
-			Path := A_ScriptDir . "\..\..\hotstrings\" . StrLower(Cat) . ".toml"
+			Path := _StaticDir . "\hotstrings\" . StrLower(Cat) . ".toml"
 		}
 	}
 	Sections := []

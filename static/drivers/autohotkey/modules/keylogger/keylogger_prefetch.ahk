@@ -38,7 +38,8 @@
 ; or « apps »). The dashboards live under
 ; ``<repo>/static/drivers/_shared/ui/metrics_<key>/``.
 KLPF_AssetsDir(which) {
-    base := A_ScriptDir . "\..\_shared\ui\metrics_" . which . "\"
+    global _StaticDir
+    base := _StaticDir . "\drivers\_shared\ui\metrics_" . which . "\"
     loop files, base, "D"
         return A_LoopFileFullPath . "\"
     return base

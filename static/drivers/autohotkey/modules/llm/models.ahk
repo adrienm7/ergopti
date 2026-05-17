@@ -31,20 +31,14 @@
  * @returns {string} Absolute path, or "" if not found.
  */
 LLM_GetSharedPath(filename) {
-	; A_ScriptDir is the directory of the root script (ErgoptiPlus.ahk),
-	; i.e. .../autohotkey/. _shared lives one level up: .../_shared/llm/
-	base := A_ScriptDir
-
-	candidates := [
-		base "\..\..\_shared\llm\" filename,
-		base "\..\_shared\llm\" filename,
-		base "\_shared\llm\" filename,
-	]
-
-	for path in candidates {
-		if FileExist(path)
-			return path
-	}
+	global _StaticDir
+	; _StaticDir resolves to <repo>/static (dev) or A_ScriptDir\static
+	; (compiled). _shared lives under drivers/_shared in both layouts so a
+	; single canonical path is enough; the legacy multi-candidate fallback
+	; was only useful when the script could be invoked from arbitrary cwds.
+	canonical := _StaticDir . "\drivers\_shared\llm\" . filename
+	if FileExist(canonical)
+		return canonical
 	return ""
 }
 

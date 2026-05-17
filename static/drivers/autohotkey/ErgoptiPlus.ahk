@@ -3,11 +3,24 @@
 #SingleInstance Force ; Ensure that only one instance of the script can run at once
 SetWorkingDir(A_ScriptDir) ; Set the working directory where the script is located
 
-; Compute _StaticDir early so i18n.ahk and any module-level t() calls that run
-; during #Include processing can resolve locale file paths. _StaticDir is later
-; re-confirmed at line ~184 via SplitPath — the two computations are identical.
-SplitPath(A_ScriptDir, , &_DriversDir_early)    ; static/drivers
-SplitPath(_DriversDir_early, , &_StaticDir)     ; static
+; In compiled mode the .exe ships an embedded zip of every runtime asset
+; (hotstrings TOMLs, locales, icons, _shared tree, vendor DLLs). The bundle
+; bootstrapper extracts it next to the .exe on first launch so the rest of
+; the driver can keep reading from _StaticDir without caring whether it runs
+; from source or from a compiled binary. In dev mode Bundle_Init() is a no-op.
+#Include lib/bundle.ahk
+Bundle_Init()
+
+; Compute _StaticDir early so i18n.ahk and any module-level t() calls that
+; run during #Include processing can resolve locale file paths. The compiled
+; branch points at the extracted static/ folder; the dev branch walks up two
+; levels from the script location (static/drivers/autohotkey → static).
+if A_IsCompiled {
+    _StaticDir := A_ScriptDir . "\static"
+} else {
+    SplitPath(A_ScriptDir, , &_DriversDir_early)    ; static/drivers
+    SplitPath(_DriversDir_early, , &_StaticDir)     ; static
+}
 global _StaticDir
 
 ; #Warn directives apply to the whole compilation unit in AHK v2 — they
@@ -204,12 +217,10 @@ global ConfigurationFile := _ConfigDir . "ahk\config.toml"
 ; Hammerspoon, so edits made from either menu apply to both at next reload.
 HotstringsConfigInit(_ConfigDir . "hotstrings_config.toml")
 
-; Resolve the shared static/img/logo directory by walking up two levels from
-; the script location (static/drivers/autohotkey → static/drivers → static).
-; Building a fully-normalized absolute path avoids any '..' traversal that
-; TraySetIcon may refuse to resolve on some Windows configurations.
-SplitPath(A_ScriptDir, , &_DriversDir)         ; <repo>/static/drivers
-SplitPath(_DriversDir, , &_StaticDir)          ; <repo>/static
+; _StaticDir was already resolved at the top of the script (compiled vs dev
+; aware), so here we only derive _LogoDir from it. Building a fully-normalized
+; absolute path avoids any '..' traversal that TraySetIcon may refuse to
+; resolve on some Windows configurations.
 global _LogoDir := _StaticDir . "\img\logo"
 
 ; Tray icon paths are deliberately NOT part of ScriptInformation so that
