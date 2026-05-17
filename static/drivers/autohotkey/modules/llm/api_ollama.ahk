@@ -66,7 +66,9 @@ LLM_OllamaIsRunning() {
 	try {
 		http := ComObject("WinHttp.WinHttpRequest.5.1")
 		http.Open("GET", LLM_OLLAMA_BASE_URL, false)
-		http.SetTimeouts(2000, 2000, 2000, 2000)
+		; 500 ms is enough to detect a locally running server; long timeouts
+		; block the AHK message loop and prevent the install window from painting.
+		http.SetTimeouts(500, 500, 500, 500)
 		http.Send()
 		return (http.Status == 200)
 	} catch {

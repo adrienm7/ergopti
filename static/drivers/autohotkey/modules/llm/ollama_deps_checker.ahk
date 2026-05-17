@@ -125,25 +125,55 @@ LLM_Deps_CheckAndInstall(default_model := "qwen2.5:3b", on_ready := unset, on_fa
 	if (_LLM_Deps_State == "failed")
 		_LLM_Deps_State := "pending"
 
-	; Defer the blocking HTTP check to a timer so the main thread stays free.
-	; The lambda captures the parameters for the slow path.
+	; Defer everything to a timer so the menu can close and the message loop
+	; can process pending paint events before any blocking call (WinHTTP, WebView2).
 	LoggerInfo("LLM", "Scheduling async Ollama reachability check…")
-	SetTimer(() => LLM_Deps_AsyncCheck(default_model, on_ready, on_failed, show_ui), -1)
+	SetTimer(() => LLM_Deps_AsyncCheck(default_model, on_ready, on_failed, show_ui), -50)
 }
 
 /**
- * Runs inside a one-shot timer: checks Ollama reachability then either
- * fast-paths or launches the installer. Called on a timer so the main
- * AHK thread is not blocked by the synchronous WinHTTP call.
+ * Phase 1 of the async bootstrap: shows the UI (which calls WebView2.create
+ * synchronously and blocks ~1 s), then defers the blocking HTTP check to a
+ * second timer so the window gets at least one paint cycle before freezing.
+ * For the silent auto-boot path (show_ui=false) the UI is skipped and the
+ * HTTP check runs immediately (no window to paint anyway).
  */
 LLM_Deps_AsyncCheck(default_model, on_ready, on_failed, show_ui) {
 	global _LLM_Deps_Checking, _LLM_Deps_State
 
-	LoggerInfo("LLM", "AsyncCheck — checking if Ollama is running…")
+	if show_ui {
+		; WebView2.create blocks ~1 s while initialising. Do it here so the
+		; message loop can process paint messages once this timer returns.
+		if !OllamaWV_IsAlive() {
+			OllamaWV_Show("ollama_install", t("ollama.install_title"),
+				, (*) => LLM_Deps_RunInstaller(default_model, on_ready, on_failed))
+			OllamaWV_SetStep(t("ollama.deps_step_checking"))
+		}
+		LoggerInfo("LLM", "AsyncCheck — UI shown, deferring HTTP check…")
+		; Give the message loop a full tick to paint the window before the
+		; blocking WinHTTP call freezes the thread again.
+		SetTimer(() => LLM_Deps_DoCheck(default_model, on_ready, on_failed, show_ui), -50)
+		return
+	}
+
+	; Silent path: no UI to paint, run the check directly.
+	LLM_Deps_DoCheck(default_model, on_ready, on_failed, show_ui)
+}
+
+/**
+ * Phase 2 of the async bootstrap: performs the blocking HTTP reachability
+ * check and either fast-paths (already running) or launches the installer.
+ */
+LLM_Deps_DoCheck(default_model, on_ready, on_failed, show_ui) {
+	global _LLM_Deps_Checking, _LLM_Deps_State
+
+	LoggerInfo("LLM", "DoCheck — checking if Ollama is running…")
 	if LLM_OllamaIsRunning() {
 		LoggerInfo("LLM", "Ollama already running — fast path, state → ready.")
 		_LLM_Deps_State    := "ready"
 		_LLM_Deps_Checking := false
+		if show_ui && OllamaWV_IsAlive()
+			OllamaWV_Close()
 		if IsSet(on_ready)
 			on_ready()
 		return
@@ -189,19 +219,17 @@ LLM_Deps_RunInstaller(model, on_ready, on_failed) {
 		return
 	}
 
-	; Show WebView progress window before launching
-	OllamaWV_Show("ollama_install", t("ollama.install_title"),
-		, (*) => LLM_Deps_RunInstaller(model, on_ready, on_failed))
-
 	; Temp file that receives PS1 stdout (avoids a visible console window)
 	_LLM_Deps_OutFile := A_Temp . "\ergopti_ollama_out_" . A_TickCount . ".txt"
 	_LLM_Deps_OutPos  := 0
 
-	; Build command: redirect both stdout and stderr to the temp file.
-	; AHK Run with "Hide" suppresses the console window and returns a reliable PID.
-	cmd := 'powershell.exe -NoProfile -WindowStyle Hidden -ExecutionPolicy Bypass'
-		. ' -File "' ps1_path '" -Model "' model '"'
-		. ' > "' _LLM_Deps_OutFile '" 2>&1'
+	; The PS1 script writes directly to -OutFile via StreamWriter (UTF-8, no BOM),
+	; bypassing shell redirection entirely — PowerShell 5.1 double-encodes UTF-8
+	; when stdout is piped through cmd.exe ">", corrupting accented characters.
+	cmd := "powershell.exe -NoProfile -WindowStyle Hidden -ExecutionPolicy Bypass"
+		. ' -File "' ps1_path '"'
+		. ' -Model "' model '"'
+		. ' -OutFile "' _LLM_Deps_OutFile '"'
 	LoggerInfo("LLM", "Launching (hidden): " cmd ".")
 
 	pid := 0
@@ -285,7 +313,7 @@ LLM_Deps_DrainOutputFile() {
 		return
 
 	try {
-		f := FileOpen(_LLM_Deps_OutFile, "r", "UTF-8-RAW")
+		f := FileOpen(_LLM_Deps_OutFile, "r", "UTF-8")
 		if !f
 			return
 		f.Seek(_LLM_Deps_OutPos, 0)

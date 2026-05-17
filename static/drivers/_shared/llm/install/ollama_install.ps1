@@ -16,19 +16,33 @@
 # 2. Silent install: MSI run with /S flag, no UI shown.
 # 3. Server lifecycle: spawns `ollama serve` detached and polls /api/tags.
 # 4. Model pull: downloads the requested model after server is ready.
+# 5. ASCII-only log strings: PowerShell 5.1 reads .ps1 files in the system
+#    codepage (CP1252/CP850), which corrupts UTF-8 string literals. All
+#    user-visible text is localised by the AHK caller via i18n markers.
 # ==============================================================================
 
 param(
-	[string]$Model = "qwen2.5:3b"
+	[string]$Model   = "qwen2.5:3b",
+	[string]$OutFile = ""
 )
 
 $ErrorActionPreference = "Continue"
 
-$OLLAMA_INSTALLER_URL  = "https://ollama.com/download/OllamaSetup.exe"
-$INSTALLER_PATH        = "$env:TEMP\OllamaSetup.exe"
-$OLLAMA_HEALTH_URL     = "http://localhost:11434/api/tags"
-$OLLAMA_READY_TIMEOUT  = 30   ; seconds to wait for server readiness
-$UNIFIED_LOG           = "$env:TEMP\ergopti.log"
+$OLLAMA_INSTALLER_URL = "https://ollama.com/download/OllamaSetup.exe"
+# Unique name avoids conflicts with a locked leftover from a previous run
+$INSTALLER_PATH       = "$env:TEMP\OllamaSetup_ergopti_$([System.Diagnostics.Process]::GetCurrentProcess().Id).exe"
+$OLLAMA_HEALTH_URL    = "http://localhost:11434/api/tags"
+$OLLAMA_READY_TIMEOUT = 30
+$UNIFIED_LOG          = "$env:TEMP\ergopti_ollama_serve.log"
+
+# Write directly to OutFile via StreamWriter (UTF-8, no BOM) to bypass the
+# double-encoding PowerShell 5.1 produces when stdout is captured by cmd.exe.
+$_utf8nobom = [System.Text.UTF8Encoding]::new($false)
+$_writer = if ($OutFile -ne "") {
+	[System.IO.StreamWriter]::new($OutFile, $false, $_utf8nobom)
+} else {
+	$null
+}
 
 
 
@@ -39,13 +53,24 @@ $UNIFIED_LOG           = "$env:TEMP\ergopti.log"
 # ======================================
 # ======================================
 
-function Emit-Marker([string]$marker) {
-	Write-Output $marker
-	[Console]::Out.Flush()
+function Emit([string]$line) {
+	if ($script:_writer) {
+		$script:_writer.WriteLine($line)
+		$script:_writer.Flush()
+	} else {
+		Write-Output $line
+	}
 }
 
-function Log-Info([string]$msg) {
-	Write-Error "[OLLAMA-DEPS] $msg"
+function Emit-Marker([string]$marker) { Emit $marker }
+
+# Log-Info messages are developer-facing and must stay ASCII-only.
+# PowerShell 5.1 reads .ps1 source in the system codepage, so any non-ASCII
+# literal in the script itself gets corrupted before it can be written.
+function Log-Info([string]$msg) { Emit "[OLLAMA-DEPS] $msg" }
+
+function Close-Writer {
+	if ($script:_writer) { $script:_writer.Close() }
 }
 
 function Test-OllamaOnPath {
@@ -82,25 +107,25 @@ function Wait-ForServer {
 
 if (-not (Test-OllamaOnPath)) {
 	Emit-Marker "OLLAMA_INSTALLING"
-	Log-Info "Téléchargement d'Ollama depuis $OLLAMA_INSTALLER_URL…"
+	Log-Info "Downloading Ollama from $OLLAMA_INSTALLER_URL..."
 
 	try {
 		Invoke-WebRequest -Uri $OLLAMA_INSTALLER_URL -OutFile $INSTALLER_PATH -UseBasicParsing
 	} catch {
-		Log-Info "Échec du téléchargement : $_"
-		exit 1
+		Log-Info "Download failed: $_"
+		Close-Writer; exit 1
 	}
 
-	Log-Info "Lancement de l'installeur silencieux…"
+	Log-Info "Running silent installer..."
 	try {
 		$proc = Start-Process -FilePath $INSTALLER_PATH -ArgumentList "/S" -Wait -PassThru
 		if ($proc.ExitCode -ne 0) {
-			Log-Info "L'installeur a échoué (code $($proc.ExitCode))."
-			exit 1
+			Log-Info "Installer exited with code $($proc.ExitCode)."
+			Close-Writer; exit 1
 		}
 	} catch {
-		Log-Info "Impossible de lancer l'installeur : $_"
-		exit 1
+		Log-Info "Could not launch installer: $_"
+		Close-Writer; exit 1
 	} finally {
 		Remove-Item $INSTALLER_PATH -ErrorAction SilentlyContinue
 	}
@@ -110,11 +135,11 @@ if (-not (Test-OllamaOnPath)) {
 	            [System.Environment]::GetEnvironmentVariable("Path", "User")
 
 	if (-not (Test-OllamaOnPath)) {
-		Log-Info "Ollama installé mais introuvable dans le PATH."
-		exit 1
+		Log-Info "Ollama installed but not found in PATH."
+		Close-Writer; exit 1
 	}
 
-	Log-Info "Ollama installé avec succès."
+	Log-Info "Ollama installed successfully."
 }
 
 
@@ -127,33 +152,31 @@ if (-not (Test-OllamaOnPath)) {
 # ==========================================
 
 if (Test-ServerAlive) {
-	# Fast path: server already running — exit silently, no markers
-	# Model pull still happens so we ensure the requested model is available
+	# Fast path: server already running — model pull still happens below
 } else {
 	Emit-Marker "OLLAMA_STARTING"
-	Log-Info "Démarrage du serveur Ollama en arrière-plan…"
+	Log-Info "Starting Ollama server in background..."
 
 	try {
 		$serverProc = Start-Process -FilePath "ollama" -ArgumentList "serve" `
 			-WindowStyle Hidden -PassThru `
 			-RedirectStandardOutput $UNIFIED_LOG -RedirectStandardError $UNIFIED_LOG
 	} catch {
-		# RedirectStandardOutput may fail if file is locked; try without redirect
 		try {
 			$serverProc = Start-Process -FilePath "ollama" -ArgumentList "serve" -WindowStyle Hidden -PassThru
 		} catch {
-			Log-Info "Impossible de démarrer ollama serve : $_"
-			exit 1
+			Log-Info "Could not start ollama serve: $_"
+			Close-Writer; exit 1
 		}
 	}
 
 	if (-not (Wait-ForServer)) {
-		Log-Info "Le serveur Ollama n'a pas répondu dans les ${OLLAMA_READY_TIMEOUT}s."
-		exit 1
+		Log-Info "Server did not respond within ${OLLAMA_READY_TIMEOUT}s."
+		Close-Writer; exit 1
 	}
 
 	Emit-Marker "OLLAMA_READY"
-	Log-Info "Serveur Ollama prêt sur http://localhost:11434."
+	Log-Info "Server ready at http://localhost:11434."
 }
 
 
@@ -166,33 +189,32 @@ if (Test-ServerAlive) {
 # ======================================
 
 if ($Model -ne "") {
-	Log-Info "Vérification du modèle '$Model'…"
+	Log-Info "Checking model '$Model'..."
 
-	# Check if model already present
 	try {
 		$tags_resp = Invoke-WebRequest -Uri $OLLAMA_HEALTH_URL -UseBasicParsing -TimeoutSec 5 -ErrorAction Stop
 		$tags_json = $tags_resp.Content
 		if ($tags_json -match [regex]::Escape('"' + $Model.Split(':')[0])) {
-			Log-Info "Modèle '$Model' déjà disponible."
-			exit 0
+			Log-Info "Model '$Model' already available."
+			Close-Writer; exit 0
 		}
 	} catch {}
 
-	Log-Info "Téléchargement du modèle '$Model'…"
-	Write-Output "Téléchargement du modèle $Model…"
+	Log-Info "Pulling model '$Model'..."
 
 	try {
-		& ollama pull $Model 2>&1 | ForEach-Object { Write-Output $_ }
+		& ollama pull $Model 2>&1 | ForEach-Object { Emit "$_" }
 		if ($LASTEXITCODE -ne 0) {
-			Log-Info "Échec du téléchargement du modèle '$Model' (code $LASTEXITCODE)."
-			exit 1
+			Log-Info "Model pull failed (exit code $LASTEXITCODE)."
+			Close-Writer; exit 1
 		}
 	} catch {
-		Log-Info "Erreur lors du pull du modèle : $_"
-		exit 1
+		Log-Info "Error during model pull: $_"
+		Close-Writer; exit 1
 	}
 
-	Log-Info "Modèle '$Model' prêt."
+	Log-Info "Model '$Model' ready."
 }
 
+Close-Writer
 exit 0
