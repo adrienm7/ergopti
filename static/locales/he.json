@@ -709,9 +709,7 @@
 	"menu.llm.toggle_enable": "הפעל הצעות בינה מלאכותית",
 	"menu.llm.toggle_disable": "בטל הצעות בינה מלאכותית",
 	"menu.llm.about": "אודות Ergopti AI",
-	"menu.llm.about_body": "Ergopti AI — הצעות מקלדת חכמות
-צד שרת: Ollama (מקומי)
-גרסה: 1.0",,
+	"menu.llm.about_body": "Ergopti AI — הצעות מקלדת חכמות\nצד שרת: Ollama (מקומי)\nגרסה: 1.0",
 	"menu.llm.trigger_menu_title": "הפעלת AI",
 	"menu.llm.trigger_shortcut_label": "קיצור ליצירה ידנית: %s",
 	"menu.llm.trigger_shortcut_title": "קיצור יצירת AI",

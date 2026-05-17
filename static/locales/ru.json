@@ -684,9 +684,7 @@
 	"menu.llm.toggle_enable": "Включить подсказки ИИ",
 	"menu.llm.toggle_disable": "Отключить подсказки ИИ",
 	"menu.llm.about": "О Ergopti ИИ",
-	"menu.llm.about_body": "Ergopti ИИ — Умные подсказки клавиатуры
-Бэкенд: Ollama (локально)
-Версия: 1.0",,
+	"menu.llm.about_body": "Ergopti ИИ — Умные подсказки клавиатуры\nБэкенд: Ollama (локально)\nВерсия: 1.0",
 	"menu.llm.trigger_menu_title": "Запуск ИИ",
 	"menu.llm.trigger_shortcut_label": "Сочетание для ручной генерации: %s",
 	"menu.llm.trigger_shortcut_title": "Сочетание для генерации ИИ",

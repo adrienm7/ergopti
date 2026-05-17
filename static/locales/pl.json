@@ -684,9 +684,7 @@
 	"menu.llm.toggle_enable": "Włącz sugestie AI",
 	"menu.llm.toggle_disable": "Wyłącz sugestie AI",
 	"menu.llm.about": "O Ergopti AI",
-	"menu.llm.about_body": "Ergopti AI — Inteligentne podpowiedzi klawiatury
-Backend: Ollama (lokalne)
-Wersja: 1.0",,
+	"menu.llm.about_body": "Ergopti AI — Inteligentne podpowiedzi klawiatury\nBackend: Ollama (lokalne)\nWersja: 1.0",
 	"menu.llm.trigger_menu_title": "Wyzwalanie SI",
 	"menu.llm.trigger_shortcut_label": "Skrót do ręcznego generowania: %s",
 	"menu.llm.trigger_shortcut_title": "Skrót generowania SI",

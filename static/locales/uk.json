@@ -684,9 +684,7 @@
 	"menu.llm.toggle_enable": "Увімкнути підказки ШІ",
 	"menu.llm.toggle_disable": "Вимкнути підказки ШІ",
 	"menu.llm.about": "Про Ergopti ШІ",
-	"menu.llm.about_body": "Ergopti ШІ — Розумні підказки клавіатури
-Бекенд: Ollama (локально)
-Версія: 1.0",,
+	"menu.llm.about_body": "Ergopti ШІ — Розумні підказки клавіатури\nБекенд: Ollama (локально)\nВерсія: 1.0",
 	"menu.llm.trigger_menu_title": "Запуск ШІ",
 	"menu.llm.trigger_shortcut_label": "Скорочення для ручної генерації: %s",
 	"menu.llm.trigger_shortcut_title": "Скорочення для генерації ШІ",
