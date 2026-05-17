@@ -126,6 +126,20 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 		return "\(Bundle.main.bundlePath)/Contents/Resources/static/drivers/hammerspoon"
 	}
 
+	// Path to the vendored Karabiner-Elements installer .app. The Lua driver
+	// calls hs.open() on this path when KE is not yet installed so the user
+	// steps through the system-extension approval without any download.
+	private func bundledKarabinerInstallerPath() -> String {
+		return "\(Bundle.main.bundlePath)/Contents/Resources/Tools/Karabiner/Karabiner-Elements.app"
+	}
+
+	// Path to the vendored Ollama server binary. The Lua driver sets
+	// OLLAMA_MODELS and spawns this binary directly so local LLM inference
+	// works without a separate Ollama install.
+	private func bundledOllamaBinPath() -> String {
+		return "\(Bundle.main.bundlePath)/Contents/Resources/Tools/Ollama/ollama"
+	}
+
 
 
 
@@ -152,8 +166,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 		// Inherit our environment and add a marker the bundled Lua config can
 		// optionally read to know it is running under the Ergopti launcher.
 		var env = ProcessInfo.processInfo.environment
-		env["ERGOPTI_LAUNCHER_VERSION"] = bundleVersionString()
-		env["ERGOPTI_CONFIG_DIR"]       = bundledConfigDir()
+		env["ERGOPTI_LAUNCHER_VERSION"]       = bundleVersionString()
+		env["ERGOPTI_CONFIG_DIR"]             = bundledConfigDir()
+		env["ERGOPTI_KARABINER_INSTALLER"]    = bundledKarabinerInstallerPath()
+		env["ERGOPTI_OLLAMA_BIN"]             = bundledOllamaBinPath()
 		proc.environment = env
 
 		proc.terminationHandler = { [weak self] terminated in
