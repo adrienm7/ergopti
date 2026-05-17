@@ -41,7 +41,7 @@ set -euo pipefail
 
 # Hammerspoon version pinned at the source of truth here. Bump in lock-step
 # with any breaking API change observed in the Lua tree.
-HAMMERSPOON_VERSION="${HAMMERSPOON_VERSION:-1.0.0}"
+HAMMERSPOON_VERSION="${HAMMERSPOON_VERSION:-1.1.1}"
 
 # Version stamped into the .app Info.plist. CI replaces it with the
 # release-please-driven tag; local builds get a "dev" placeholder.
@@ -52,6 +52,18 @@ ERGOPTI_BUILD="${ERGOPTI_BUILD:-1}"
 # appcast-dev.xml on the release host. Default is main; dev branch builds set
 # this to "dev" via the CI workflow.
 ERGOPTI_CHANNEL="${ERGOPTI_CHANNEL:-main}"
+
+# Karabiner-Elements version bundled for key-remapping. The DMG is downloaded
+# at build time and vendored inside Resources/Tools/ so users never need a
+# separate download; the Lua driver opens the installer on first use if KE is
+# not yet installed (a one-time system-extension approval is still required).
+KARABINER_VERSION="${KARABINER_VERSION:-14.13.0}"
+
+# Ollama CLI version bundled for local LLM inference. The universal binary is
+# downloaded at build time and stored in Resources/Tools/ so the app can run
+# local models on first launch without any manual install step. Users still
+# need to pull a model the first time (models are multi-GB, not bundled).
+OLLAMA_VERSION="${OLLAMA_VERSION:-0.6.0}"
 
 # Sparkle EdDSA public key (base64). Empty string means "Sparkle will refuse
 # to install updates"; CI must inject the real value from a secret.
@@ -125,9 +137,81 @@ download_hammerspoon() {
 
 
 
+# ==================================================
+# ==================================================
+# ======= 4/ Karabiner-Elements download ===========
+# ==================================================
+# ==================================================
+
+# Download the Karabiner-Elements DMG and extract Karabiner-Elements.app so
+# it can be vendored inside the bundle. Bundling the installer eliminates any
+# runtime download; when the Lua driver first needs KE it detects whether it
+# is installed, and if not, opens the bundled .app — the user then steps
+# through the one-time system-extension approval prompt.
+download_karabiner() {
+	local cache_dir="$BUILD_DIR/cache"
+	local dmg_name="Karabiner-Elements-$KARABINER_VERSION.dmg"
+	local dmg_path="$cache_dir/$dmg_name"
+	local ke_extracted="$BUILD_DIR/Karabiner-Elements.app"
+	local url="https://github.com/pqrs-org/Karabiner-Elements/releases/download/v$KARABINER_VERSION/$dmg_name"
+	mkdir -p "$cache_dir"
+	if [ ! -f "$dmg_path" ]; then
+		log "Downloading Karabiner-Elements $KARABINER_VERSION from $url"
+		curl -sSfL "$url" -o "$dmg_path" || fail "Karabiner-Elements download failed."
+	else
+		log "Using cached $dmg_path"
+	fi
+	if [ ! -d "$ke_extracted" ]; then
+		log "Extracting Karabiner-Elements.app from DMG"
+		local mount_point
+		mount_point="$(mktemp -d)"
+		hdiutil attach "$dmg_path" -nobrowse -mountpoint "$mount_point" -quiet
+		[ -d "$mount_point/Karabiner-Elements.app" ] \
+			|| fail "Karabiner-Elements.app not found in DMG at $mount_point."
+		cp -R "$mount_point/Karabiner-Elements.app" "$ke_extracted"
+		hdiutil detach "$mount_point" -quiet
+		rmdir "$mount_point"
+	fi
+	[ -d "$ke_extracted" ] || fail "Karabiner-Elements.app not extracted."
+	echo "$ke_extracted"
+}
+
+
+
+
+# ==================================================
+# ==================================================
+# ======= 5/ Ollama download =======================
+# ==================================================
+# ==================================================
+
+# Download the pinned Ollama universal binary (amd64 + arm64) for macOS.
+# Vendoring the binary inside Resources/Tools/ means local LLM inference works
+# out-of-the-box; models are still pulled on demand by the user (they are
+# multi-GB and cannot be bundled).
+download_ollama() {
+	local cache_dir="$BUILD_DIR/cache"
+	local bin_name="ollama-darwin-$OLLAMA_VERSION"
+	local bin_path="$cache_dir/$bin_name"
+	local url="https://github.com/ollama/ollama/releases/download/v$OLLAMA_VERSION/ollama-darwin"
+	mkdir -p "$cache_dir"
+	if [ ! -f "$bin_path" ]; then
+		log "Downloading Ollama $OLLAMA_VERSION from $url"
+		curl -sSfL "$url" -o "$bin_path" || fail "Ollama download failed."
+		chmod +x "$bin_path"
+	else
+		log "Using cached $bin_path"
+	fi
+	[ -f "$bin_path" ] || fail "Ollama binary not found after download."
+	echo "$bin_path"
+}
+
+
+
+
 # =====================================================
 # =====================================================
-# ======= 4/ Swift launcher compilation ==============
+# ======= 6/ Swift launcher compilation ==============
 # =====================================================
 # =====================================================
 
@@ -150,7 +234,7 @@ build_launcher() {
 
 # ====================================================
 # ====================================================
-# ======= 5/ App bundle assembly =====================
+# ======= 7/ App bundle assembly =====================
 # ====================================================
 # ====================================================
 
@@ -159,6 +243,8 @@ build_launcher() {
 # Hammerspoon's bundle id is rewritten so its preferences land under our id.
 assemble_app() {
 	local launcher_bin="$1"
+	local ke_app_path="$2"
+	local ollama_bin_path="$3"
 	log "Assembling $APP_PATH"
 	mkdir -p "$APP_PATH/Contents/MacOS"
 	mkdir -p "$APP_PATH/Contents/Resources/config"
@@ -216,6 +302,19 @@ assemble_app() {
 	cp -R "$REPO_ROOT/static/hotstrings"          "$static_root/"
 	cp -R "$REPO_ROOT/static/img"                 "$static_root/"
 	cp -R "$REPO_ROOT/static/shared"              "$static_root/"
+
+	# Bundle third-party tools so they are available on first launch with no
+	# runtime download. KE remains an installer app (a one-time system-extension
+	# approval prompt is unavoidable); Ollama is the CLI server binary and runs
+	# directly — models are pulled on demand.
+	local tools_dir="$APP_PATH/Contents/Resources/Tools"
+	mkdir -p "$tools_dir/Karabiner"
+	mkdir -p "$tools_dir/Ollama"
+	log "Bundling Karabiner-Elements $KARABINER_VERSION"
+	cp -R "$ke_app_path" "$tools_dir/Karabiner/Karabiner-Elements.app"
+	log "Bundling Ollama $OLLAMA_VERSION"
+	cp "$ollama_bin_path" "$tools_dir/Ollama/ollama"
+	chmod +x "$tools_dir/Ollama/ollama"
 }
 
 
@@ -223,7 +322,7 @@ assemble_app() {
 
 # ===========================================
 # ===========================================
-# ======= 6/ Icon generation ================
+# ======= 8/ Icon generation ================
 # ===========================================
 # ===========================================
 
@@ -251,7 +350,7 @@ build_icon() {
 
 # =====================================================
 # =====================================================
-# ======= 7/ Info.plist generation ====================
+# ======= 9/ Info.plist generation ====================
 # =====================================================
 # =====================================================
 
@@ -299,7 +398,7 @@ generate_info_plist() {
 
 # ===============================================
 # ===============================================
-# ======= 8/ Codesign + zip =====================
+# ======= 10/ Codesign + zip ====================
 # ===============================================
 # ===============================================
 
@@ -308,8 +407,10 @@ generate_info_plist() {
 # will see a one-time "developer cannot be verified" prompt on first launch.
 codesign_app() {
 	log "Codesigning Ergopti.app (ad-hoc)"
-	# Sign nested .app first, then the host bundle, then everything together.
+	# Sign nested .app bundles first so the host-level --deep pass finds them
+	# already valid rather than re-signing them in an undefined order.
 	codesign --force --deep --sign - "$APP_PATH/Contents/Frameworks/Hammerspoon.app"
+	codesign --force --deep --sign - "$APP_PATH/Contents/Resources/Tools/Karabiner/Karabiner-Elements.app"
 	codesign --force --sign - "$APP_PATH/Contents/MacOS/Ergopti"
 	codesign --force --deep --sign - "$APP_PATH"
 }
@@ -327,12 +428,12 @@ zip_app() {
 
 # ==========================================
 # ==========================================
-# ======= 9/ Entrypoint ====================
+# ======= 11/ Entrypoint ===================
 # ==========================================
 # ==========================================
 
 main() {
-	for cmd in curl unzip zip swift codesign iconutil sips plutil rsync; do
+	for cmd in curl unzip zip swift codesign iconutil sips plutil rsync hdiutil; do
 		require_cmd "$cmd"
 	done
 
@@ -340,17 +441,24 @@ main() {
 	download_hammerspoon
 	local launcher_bin
 	launcher_bin="$(build_launcher)"
-	assemble_app "$launcher_bin"
+	local ke_app_path
+	ke_app_path="$(download_karabiner)"
+	local ollama_bin_path
+	ollama_bin_path="$(download_ollama)"
+	assemble_app "$launcher_bin" "$ke_app_path" "$ollama_bin_path"
 	build_icon
 	generate_info_plist
 	codesign_app
 	zip_app
 
 	log "Done."
-	log "  bundle : $APP_PATH"
-	log "  zip    : $ZIP_PATH"
-	log "  version: $ERGOPTI_VERSION ($ERGOPTI_BUILD)"
-	log "  channel: $ERGOPTI_CHANNEL"
+	log "  bundle     : $APP_PATH"
+	log "  zip        : $ZIP_PATH"
+	log "  version    : $ERGOPTI_VERSION ($ERGOPTI_BUILD)"
+	log "  channel    : $ERGOPTI_CHANNEL"
+	log "  hammerspoon: $HAMMERSPOON_VERSION"
+	log "  karabiner  : $KARABINER_VERSION"
+	log "  ollama     : $OLLAMA_VERSION"
 }
 
 main "$@"
