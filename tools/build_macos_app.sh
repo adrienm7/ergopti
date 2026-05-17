@@ -166,14 +166,20 @@ download_karabiner() {
 		local mount_point
 		mount_point="$(mktemp -d)"
 		log "DMG path: $dmg_path (size: $(wc -c < "$dmg_path") bytes)"
-		local attach_out
-		attach_out="$(echo y | hdiutil attach "$dmg_path" -nobrowse -noverify 2>&1)" \
-			|| fail "hdiutil attach failed: $attach_out"
-		log "hdiutil attach output: $attach_out"
+		local plist_out
+		plist_out="$(echo y | hdiutil attach "$dmg_path" -nobrowse -noverify -plist 2>/dev/null)" \
+			|| fail "hdiutil attach failed."
 		local actual_mount
-		actual_mount="$(echo "$attach_out" | grep -oE '/Volumes/[^\t]+' | tail -1 | sed 's/[[:space:]]*$//')"
+		actual_mount="$(echo "$plist_out" | python3 -c "
+import sys, plistlib
+p = plistlib.loads(sys.stdin.buffer.read())
+for e in p.get('system-entities', []):
+    mp = e.get('mount-point')
+    if mp:
+        print(mp)
+" | tail -1)"
 		log "Detected mount: '$actual_mount'"
-		[ -n "$actual_mount" ] || fail "Could not detect mount point from hdiutil output."
+		[ -n "$actual_mount" ] || fail "Could not detect mount point from hdiutil plist output."
 		log "DMG contents: $(find "$actual_mount" -maxdepth 4 2>&1 | head -40)"
 		local ke_in_dmg
 		ke_in_dmg="$(find "$actual_mount" -maxdepth 4 -name "*.app" -type d | head -1)"
