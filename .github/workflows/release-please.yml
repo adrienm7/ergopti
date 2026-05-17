@@ -1,0 +1,29 @@
+# .github/workflows/release-please.yml
+#
+# Runs on every push to main. release-please reads the conventional-commit
+# history and keeps a "Release PR" up to date. When that PR is merged it
+# creates a GitHub Release (tag + draft notes), which in turn triggers
+# release.yml to build and attach the distributable artefacts.
+name: Release Please
+
+on:
+    push:
+        branches: [main]
+
+permissions:
+    contents: write
+    pull-requests: write
+
+jobs:
+    release-please:
+        runs-on: ubuntu-latest
+        outputs:
+            release_created: ${{ steps.release.outputs.release_created }}
+            tag_name:        ${{ steps.release.outputs.tag_name }}
+        steps:
+            - uses: googleapis/release-please-action@v4
+              id: release
+              with:
+                  config-file:   .github/release-please-config.json
+                  manifest-file: .github/release-please-manifest.json
+                  token: ${{ secrets.PAT_ERGOPTI }}
