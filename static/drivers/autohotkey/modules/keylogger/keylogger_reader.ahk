@@ -50,11 +50,11 @@ class KLReadConst {
 ; ===================================
 
 ; Resolve the canonical schema.sql path. The shared schema lives at
-; `<repo>/static/drivers/_shared/schema/schema.sql`; from
-; `<repo>/static/drivers/autohotkey/` (A_ScriptDir) it sits at
-; ``..\_shared\schema\schema.sql``.
+; `<repo>/static/drivers/_shared/schema/schema.sql`; _StaticDir already
+; resolves to the right root in both dev and compiled modes.
 KLR_ResolveSchemaPath() {
-    base := A_ScriptDir . "\..\_shared\schema\schema.sql"
+    global _StaticDir
+    base := _StaticDir . "\drivers\_shared\schema\schema.sql"
     loop files, base
         return A_LoopFileFullPath
     return base

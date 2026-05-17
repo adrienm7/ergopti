@@ -52,3 +52,7 @@ luac.out
 
 # Auto-generated hotstrings file (built at runtime from TOML sources)
 static/drivers/autohotkey/lib/hotstrings_generated.ahk
+
+# Static asset bundle assembled by tools/build_static_bundle.py for the
+# compiled .exe — never committed; produced fresh on every CI build.
+static/drivers/autohotkey/build/
