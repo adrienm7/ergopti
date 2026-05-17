@@ -9,6 +9,12 @@ name: Release Build
 on:
     release:
         types: [published]
+    workflow_dispatch:
+        inputs:
+            tag:
+                description: "Tag to build (e.g. v0.1.0)"
+                required: true
+                default: "v0.1.0"
 
 concurrency:
     group: release-${{ github.ref }}
@@ -34,7 +40,7 @@ jobs:
             - name: Checkout at release tag
               uses: actions/checkout@v4
               with:
-                  ref: ${{ github.ref }}
+                  ref: ${{ github.event.inputs.tag || github.ref }}
                   fetch-depth: 0
 
             - name: Resolve version from tag
@@ -42,7 +48,7 @@ jobs:
               shell: bash
               run: |
                   set -euo pipefail
-                  tag="${GITHUB_REF_NAME}"
+                  tag="${{ github.event.inputs.tag || github.ref_name }}"
                   version="${tag#v}"
                   build_num="${GITHUB_RUN_NUMBER}"
                   echo "version=$version" >> "$GITHUB_OUTPUT"
@@ -127,7 +133,7 @@ jobs:
             - name: Checkout at release tag
               uses: actions/checkout@v4
               with:
-                  ref: ${{ github.ref }}
+                  ref: ${{ github.event.inputs.tag || github.ref }}
                   fetch-depth: 0
 
             - name: Set up Python
