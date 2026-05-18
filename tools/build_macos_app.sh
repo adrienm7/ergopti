@@ -92,7 +92,7 @@ LAUNCHER_DIR="$REPO_ROOT/static/drivers/hammerspoon/launcher"
 # ============================================
 # ============================================
 
-log()  { printf '[macos-build] %s\n' "$*"; }
+log()  { printf '[macos-build] %s\n' "$*" >&2; }
 fail() { printf '[macos-build] ERROR: %s\n' "$*" >&2; exit 1; }
 
 require_cmd() {
