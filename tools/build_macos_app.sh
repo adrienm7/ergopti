@@ -186,8 +186,10 @@ for e in p.get('system-entities', []):
 		ke_in_dmg="$(find "$actual_mount" -maxdepth 5 \( -name "*.app" -o -name "*.pkg" \) | head -1)"
 		[ -n "$ke_in_dmg" ] \
 			|| fail "No .app or .pkg found in DMG at $actual_mount."
-		log "Found: $ke_in_dmg"
-		cp -R "$ke_in_dmg" "$ke_extracted"
+		local ke_src_ext="${ke_in_dmg##*.}"
+		log "Found: $ke_in_dmg (ext: $ke_src_ext)"
+		cp -R "$ke_in_dmg" "$ke_extracted.$ke_src_ext"
+		ln -sf "$ke_extracted.$ke_src_ext" "$ke_extracted"
 		hdiutil detach "$actual_mount" -quiet || true
 		rmdir "$mount_point" 2>/dev/null || true
 	fi
@@ -334,9 +336,11 @@ assemble_app() {
 	local tools_dir="$APP_PATH/Contents/Resources/Tools"
 	mkdir -p "$tools_dir/Karabiner"
 	mkdir -p "$tools_dir/Ollama"
-	log "Bundling Karabiner-Elements $KARABINER_VERSION (source: $ke_app_path)"
-	local ke_ext="${ke_app_path##*.}"
-	cp -R "$ke_app_path" "$tools_dir/Karabiner/Karabiner-Elements.$ke_ext"
+	local ke_real
+	ke_real="$(readlink "$ke_app_path" 2>/dev/null || echo "$ke_app_path")"
+	local ke_ext="${ke_real##*.}"
+	log "Bundling Karabiner-Elements $KARABINER_VERSION (source: $ke_real ext: $ke_ext)"
+	cp -R "$ke_real" "$tools_dir/Karabiner/Karabiner-Elements.$ke_ext"
 	log "Bundling Ollama $OLLAMA_VERSION"
 	cp "$ollama_bin_path" "$tools_dir/Ollama/ollama"
 	chmod +x "$tools_dir/Ollama/ollama"
