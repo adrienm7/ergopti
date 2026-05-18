@@ -247,8 +247,9 @@ build_launcher() {
 		swift build -c release --product Ergopti
 	)
 	local built_bin
-	built_bin="$(cd "$LAUNCHER_DIR" && swift build -c release --show-bin-path)/Ergopti"
+	built_bin="$(find "$LAUNCHER_DIR/.build" -name "Ergopti" -type f -path "*/release/Ergopti" | head -1)"
 	[ -f "$built_bin" ] || fail "Swift build did not produce Ergopti binary."
+	log "Launcher binary: $built_bin"
 	echo "$built_bin"
 }
 
