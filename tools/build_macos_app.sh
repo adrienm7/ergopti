@@ -180,11 +180,12 @@ for e in p.get('system-entities', []):
 " | tail -1)"
 		log "Detected mount: '$actual_mount'"
 		[ -n "$actual_mount" ] || fail "Could not detect mount point from hdiutil plist output."
-		log "DMG contents: $(find "$actual_mount" -maxdepth 4 2>&1 | head -40)"
+		log "DMG contents:"
+		find "$actual_mount" -maxdepth 5 2>&1 | head -60 | while IFS= read -r line; do log "  $line"; done
 		local ke_in_dmg
-		ke_in_dmg="$(find "$actual_mount" -maxdepth 4 -name "*.app" -type d | head -1)"
+		ke_in_dmg="$(find "$actual_mount" -maxdepth 5 \( -name "*.app" -o -name "*.pkg" \) | head -1)"
 		[ -n "$ke_in_dmg" ] \
-			|| fail "No .app found in DMG at $actual_mount."
+			|| fail "No .app or .pkg found in DMG at $actual_mount."
 		log "Found app: $ke_in_dmg"
 		cp -R "$ke_in_dmg" "$ke_extracted"
 		hdiutil detach "$actual_mount" -quiet || true
