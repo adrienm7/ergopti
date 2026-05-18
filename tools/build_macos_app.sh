@@ -152,7 +152,7 @@ download_karabiner() {
 	local cache_dir="$BUILD_DIR/cache"
 	local dmg_name="Karabiner-Elements-$KARABINER_VERSION.dmg"
 	local dmg_path="$cache_dir/$dmg_name"
-	local ke_extracted="$BUILD_DIR/Karabiner-Elements.app"
+	local ke_extracted="$BUILD_DIR/Karabiner-Elements"
 	local url="https://github.com/pqrs-org/Karabiner-Elements/releases/download/v$KARABINER_VERSION/$dmg_name"
 	mkdir -p "$cache_dir"
 	if [ ! -f "$dmg_path" ]; then
@@ -161,7 +161,7 @@ download_karabiner() {
 	else
 		log "Using cached $dmg_path"
 	fi
-	if [ ! -d "$ke_extracted" ]; then
+	if [ ! -e "$ke_extracted" ]; then
 		log "Extracting Karabiner-Elements.app from DMG"
 		local mount_point
 		mount_point="$(mktemp -d)"
@@ -186,12 +186,12 @@ for e in p.get('system-entities', []):
 		ke_in_dmg="$(find "$actual_mount" -maxdepth 5 \( -name "*.app" -o -name "*.pkg" \) | head -1)"
 		[ -n "$ke_in_dmg" ] \
 			|| fail "No .app or .pkg found in DMG at $actual_mount."
-		log "Found app: $ke_in_dmg"
+		log "Found: $ke_in_dmg"
 		cp -R "$ke_in_dmg" "$ke_extracted"
 		hdiutil detach "$actual_mount" -quiet || true
 		rmdir "$mount_point" 2>/dev/null || true
 	fi
-	[ -d "$ke_extracted" ] || fail "Karabiner-Elements.app not extracted."
+	[ -e "$ke_extracted" ] || fail "Karabiner-Elements not extracted."
 	echo "$ke_extracted"
 }
 
@@ -329,8 +329,9 @@ assemble_app() {
 	local tools_dir="$APP_PATH/Contents/Resources/Tools"
 	mkdir -p "$tools_dir/Karabiner"
 	mkdir -p "$tools_dir/Ollama"
-	log "Bundling Karabiner-Elements $KARABINER_VERSION"
-	cp -R "$ke_app_path" "$tools_dir/Karabiner/Karabiner-Elements.app"
+	log "Bundling Karabiner-Elements $KARABINER_VERSION (source: $ke_app_path)"
+	local ke_ext="${ke_app_path##*.}"
+	cp -R "$ke_app_path" "$tools_dir/Karabiner/Karabiner-Elements.$ke_ext"
 	log "Bundling Ollama $OLLAMA_VERSION"
 	cp "$ollama_bin_path" "$tools_dir/Ollama/ollama"
 	chmod +x "$tools_dir/Ollama/ollama"
@@ -429,7 +430,9 @@ codesign_app() {
 	# Sign nested .app bundles first so the host-level --deep pass finds them
 	# already valid rather than re-signing them in an undefined order.
 	codesign --force --deep --sign - "$APP_PATH/Contents/Frameworks/Hammerspoon.app"
-	codesign --force --deep --sign - "$APP_PATH/Contents/Resources/Tools/Karabiner/Karabiner-Elements.app"
+	# Sign KE only if it's a .app bundle — .pkg files are not codesignable this way
+	local ke_app="$APP_PATH/Contents/Resources/Tools/Karabiner/Karabiner-Elements.app"
+	[ -d "$ke_app" ] && codesign --force --deep --sign - "$ke_app" || true
 	codesign --force --sign - "$APP_PATH/Contents/MacOS/Ergopti"
 	codesign --force --deep --sign - "$APP_PATH"
 }
