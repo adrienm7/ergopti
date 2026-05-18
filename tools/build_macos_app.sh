@@ -244,7 +244,7 @@ build_launcher() {
 	log "Building Swift launcher (release)"
 	(
 		cd "$LAUNCHER_DIR"
-		swift build -c release --product Ergopti
+		swift build -c release --product Ergopti >&2
 	)
 	local built_bin
 	built_bin="$(find "$LAUNCHER_DIR/.build" -name "Ergopti" -type f -path "*/release/Ergopti" | head -1)"
