@@ -468,6 +468,9 @@ main() {
 	download_hammerspoon
 	local launcher_bin
 	launcher_bin="$(build_launcher)"
+	launcher_bin="${launcher_bin%%$'\n'*}"
+	log "launcher_bin resolved: '$launcher_bin'"
+	[ -f "$launcher_bin" ] || fail "launcher_bin does not exist: $launcher_bin"
 	local ke_app_path
 	ke_app_path="$(download_karabiner)"
 	local ollama_bin_path
