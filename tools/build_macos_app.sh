@@ -210,13 +210,17 @@ for e in p.get('system-entities', []):
 # multi-GB and cannot be bundled).
 download_ollama() {
 	local cache_dir="$BUILD_DIR/cache"
-	local bin_name="ollama-darwin-$OLLAMA_VERSION"
-	local bin_path="$cache_dir/$bin_name"
-	local url="https://github.com/ollama/ollama/releases/download/v$OLLAMA_VERSION/ollama-darwin"
+	local tgz_name="ollama-darwin-$OLLAMA_VERSION.tgz"
+	local tgz_path="$cache_dir/$tgz_name"
+	local bin_path="$cache_dir/ollama-darwin-$OLLAMA_VERSION"
+	local url="https://github.com/ollama/ollama/releases/download/v$OLLAMA_VERSION/ollama-darwin.tgz"
 	mkdir -p "$cache_dir"
 	if [ ! -f "$bin_path" ]; then
 		log "Downloading Ollama $OLLAMA_VERSION from $url"
-		curl -sSfL "$url" -o "$bin_path" || fail "Ollama download failed."
+		curl -sSfL "$url" -o "$tgz_path" || fail "Ollama download failed."
+		tar -xzf "$tgz_path" -C "$cache_dir" --strip-components=0 2>/dev/null || true
+		# The tgz contains a single binary named "ollama"
+		[ -f "$cache_dir/ollama" ] && mv "$cache_dir/ollama" "$bin_path"
 		chmod +x "$bin_path"
 	else
 		log "Using cached $bin_path"
