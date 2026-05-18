@@ -74,10 +74,10 @@ jobs:
                   SPARKLE_VERSION: "2.9.2"
               run: |
                   set -euo pipefail
-                  curl -fsSLo /tmp/Sparkle.tar.bz2 \
-                      "https://github.com/sparkle-project/Sparkle/releases/download/${SPARKLE_VERSION}/Sparkle-${SPARKLE_VERSION}.tar.bz2"
+                  curl -fsSLo /tmp/Sparkle.tar.xz \
+                      "https://github.com/sparkle-project/Sparkle/releases/download/${SPARKLE_VERSION}/Sparkle-${SPARKLE_VERSION}.tar.xz"
                   mkdir -p /tmp/sparkle-dist
-                  tar -xjf /tmp/Sparkle.tar.bz2 -C /tmp/sparkle-dist
+                  tar -xJf /tmp/Sparkle.tar.xz -C /tmp/sparkle-dist
                   echo "SIGN_UPDATE=/tmp/sparkle-dist/bin/sign_update" >> "$GITHUB_ENV"
 
             - name: Sign zip with Sparkle EdDSA key
