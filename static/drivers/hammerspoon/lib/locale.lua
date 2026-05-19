@@ -44,14 +44,37 @@ local function locale_path(code)
 	local cfg = hs.configdir or ""
 	-- Strip any trailing slash so the pattern anchor $ works reliably
 	cfg = cfg:gsub("[/\\]+$", "")
-	-- Remove the hammerspoon config dir suffix using a flexible pattern that
-	-- handles both forward and back slashes (mixed paths on Windows/macOS)
-	local repo_root = cfg:gsub("[/\\]static[/\\]drivers[/\\]hammerspoon$", "")
-	if repo_root == cfg then
-		-- Pattern did not match — log and try a last-resort fallback
-		Logger.warn(LOG, "locale_path: could not strip hammerspoon suffix from '%s'.", cfg)
+	-- Walk up the directory tree looking for a static/locales/ sibling at each
+	-- level. This is resilient to symlinks, realpath resolution, and any path
+	-- prefix differences between dev and packaged .app builds where hs.configdir
+	-- may not end with the expected /static/drivers/hammerspoon suffix.
+	local function find_locales_root(dir)
+		local max_steps = 8
+		local current = dir
+		for _ = 1, max_steps do
+			local candidate = current .. "/static/locales"
+			local ok, attr = pcall(hs.fs.attributes, candidate)
+			if ok and type(attr) == "table" and attr.mode == "directory" then
+				return current
+			end
+			-- Move one level up
+			local parent = current:match("^(.*)[/\\][^/\\]+$")
+			if not parent or parent == current then break end
+			current = parent
+		end
+		return nil
 	end
-	return repo_root .. "/static/locales/" .. code .. ".json"
+
+	local root = find_locales_root(cfg)
+	if not root then
+		Logger.warn(LOG, "locale_path: could not find static/locales/ walking up from '%s'.", cfg)
+		-- Last-resort: try stripping the known suffix pattern
+		root = cfg:gsub("[/\\]static[/\\]drivers[/\\]hammerspoon$", "")
+		if root == cfg then
+			Logger.error(LOG, "locale_path: giving up — path resolution failed for '%s'.", cfg)
+		end
+	end
+	return root .. "/static/locales/" .. code .. ".json"
 end
 
 --- Loads a JSON locale file and returns a flat key→string table, or {}.
