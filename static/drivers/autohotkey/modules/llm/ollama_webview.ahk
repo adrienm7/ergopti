@@ -227,7 +227,7 @@ OllamaWV_Create(kind, subtitle) {
 	_OllamaWV_Gui := g
 
 	; Spin up WebView2
-	loader := A_ScriptDir . "\vendor\64bit\WebView2Loader.dll"
+	loader := _VendorDir . "\64bit\WebView2Loader.dll"
 	udir   := A_Temp . "\ergopti_ollama_wv_" . A_TickCount
 	try DirCreate(udir)
 
@@ -287,7 +287,7 @@ OllamaWV_Create(kind, subtitle) {
  * @returns {boolean}
  */
 OllamaWV_WebView2Available() {
-	loader := A_ScriptDir . "\vendor\64bit\WebView2Loader.dll"
+	loader := _VendorDir . "\64bit\WebView2Loader.dll"
 	if !FileExist(loader)
 		return false
 	if !IsSet(WebView2)

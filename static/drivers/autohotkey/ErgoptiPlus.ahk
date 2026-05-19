@@ -11,17 +11,22 @@ SetWorkingDir(A_ScriptDir) ; Set the working directory where the script is locat
 #Include lib/bundle.ahk
 Bundle_Init()
 
-; Compute _StaticDir early so i18n.ahk and any module-level t() calls that
-; run during #Include processing can resolve locale file paths. The compiled
-; branch points at the extracted static/ folder; the dev branch walks up two
-; levels from the script location (static/drivers/autohotkey → static).
+; Compute _StaticDir and _VendorDir early so i18n.ahk and any module-level
+; t() calls that run during #Include processing can resolve locale file paths.
+; In compiled mode both point at the extracted bundle dir under LocalAppData
+; (resolved by Bundle_Init above). In dev mode _StaticDir walks up two levels
+; from the script location (static/drivers/autohotkey → static) and _VendorDir
+; is the vendor/ sibling of the entry script.
 if A_IsCompiled {
-    _StaticDir := A_ScriptDir . "\static"
+    _StaticDir := _BundleDir . "\static"
+    _VendorDir := _BundleDir . "\vendor"
 } else {
     SplitPath(A_ScriptDir, , &_DriversDir_early)    ; static/drivers
     SplitPath(_DriversDir_early, , &_StaticDir)     ; static
+    _VendorDir := A_ScriptDir . "\vendor"
 }
 global _StaticDir
+global _VendorDir
 
 ; #Warn directives apply to the whole compilation unit in AHK v2 — they
 ; cannot be scoped to a single #Include. VarUnset and LocalSameAsGlobal are
