@@ -1123,6 +1123,7 @@ function M.create(deps)
         local backend_title_str = "Moteur IA (Backend) : "
         if state.llm_backend == "mlx" then backend_title_str = backend_title_str .. "MLX 🚀"
         elseif state.llm_backend == "ollama" then backend_title_str = backend_title_str .. "Ollama 🦙"
+        elseif state.llm_backend == "api" then backend_title_str = backend_title_str .. "API 🌐"
         else backend_title_str = backend_title_str .. "Inconnu" end
 
         local backend_title = backend_title_str
@@ -1213,11 +1214,190 @@ function M.create(deps)
             end or nil
         })
 
+        -- Remote API backend — covers OpenAI / Anthropic / Gemini / OpenAI-compat.
+        -- The actual entry CRUD (provider, URL, token, model) lives in its own
+        -- top-level row built below: this entry only flips the backend so the
+        -- prediction engine routes through ApiRemote on the next request.
+        table.insert(backend_menu, {
+            title    = "API 🌐 — Distant (OpenAI / Anthropic / Gemini / OpenAI-compatible)",
+            checked  = (state.llm_backend == "api"),
+            disabled = paused or nil,
+            fn       = not paused and function()
+                if state.llm_backend ~= "api" then
+                    Logger.info(LOG, "Activating remote API backend…")
+                    state.llm_backend = "api"
+                    llm_mod.set_backend("api")
+                    -- Kill any local server that would burn RAM / GPU for nothing now
+                    -- that predictions go over the network.
+                    if models_mgr.stop_mlx_server_if_needed then pcall(models_mgr.stop_mlx_server_if_needed) end
+                    os.execute("pkill -f '[o]llama serve' 2>/dev/null || true")
+                    if keymap and type(keymap.set_llm_backend_name) == "function" then
+                        pcall(keymap.set_llm_backend_name, "API 🌐")
+                    end
+                    -- Reload persisted entries (no-op when already in memory),
+                    -- then ping the active one so the health indicator reflects
+                    -- reality before the next prediction would fire.
+                    if type(llm_mod.load_api_entries) == "function" then pcall(llm_mod.load_api_entries) end
+                    pcall(llm_mod.warmup_model, llm_mod.get_current_model())
+                    save_prefs()
+                    update_menu()
+                end
+            end or nil
+        })
+
         table.insert(main_menu, {
             title    = backend_title,
             disabled = paused or nil,
             menu     = backend_menu
         })
+
+        -- API entries CRUD — only surfaced when the active backend is the
+        -- remote API. Mirrors the AHK tray menu: list configured entries
+        -- with a check mark on the active one, plus per-entry add / remove
+        -- actions. Sequential text prompts collect provider / URL / token /
+        -- model on add — hs.dialog has no native multi-field form, but the
+        -- three-step prompt is fast enough for a one-off setup.
+        if state.llm_backend == "api" then
+            local api_remote = llm_mod.api_remote
+            local entries    = (api_remote and api_remote.get_entries()) or {}
+            local active_id  = (api_remote and api_remote.get_active_entry_id()) or ""
+            local api_menu   = {}
+
+            -- One row per configured entry — clicking sets it as active and
+            -- triggers a warmup so the next prediction uses the new entry
+            -- immediately. The label puts the provider first so the user can
+            -- tell openai / anthropic / gemini apart at a glance even when
+            -- multiple share the same alias.
+            for _, e in ipairs(entries) do
+                local provider_label = (api_remote.PROVIDERS[e.provider] and api_remote.PROVIDERS[e.provider].label) or e.provider
+                local entry_title = string.format("%s — %s (%s)",
+                    tostring(e.label or e.id or "?"),
+                    tostring(e.model or "?"),
+                    provider_label)
+                table.insert(api_menu, {
+                    title    = entry_title,
+                    checked  = (e.id == active_id),
+                    disabled = paused or nil,
+                    fn       = not paused and function()
+                        api_remote.set_active_entry_id(e.id)
+                        pcall(llm_mod.persist_api_entries)
+                        pcall(llm_mod.warmup_model, llm_mod.get_current_model())
+                        update_menu()
+                    end or nil
+                })
+            end
+
+            if #entries > 0 then
+                table.insert(api_menu, { title = "-" })
+            end
+
+            -- One "Add" entry per provider so the user picks the shape first
+            -- (Bearer auth vs x-api-key vs Gemini's URL token, plus the right
+            -- default model). Subsequent prompts collect the credentials.
+            local add_submenu = {}
+            for _, pid in ipairs(api_remote.PROVIDER_ORDER) do
+                local p = api_remote.PROVIDERS[pid]
+                if p then
+                    table.insert(add_submenu, {
+                        title    = string.format("➕ %s", p.label),
+                        disabled = paused or nil,
+                        fn       = not paused and function()
+                            local function trim(s) return (tostring(s or ""):gsub("^%s+", ""):gsub("%s+$", "")) end
+                            local function prompt_field(title_key, default_val, hint)
+                                local ok, ret_a, ret_b = pcall(dialog.text_prompt,
+                                    title_key, hint, default_val or "",
+                                    "OK", i18n.get("button.cancel"))
+                                if not ok then return nil end
+                                local picked_btn, picked_text
+                                if ret_a == "OK" or ret_a == i18n.get("button.cancel") then
+                                    picked_btn, picked_text = ret_a, ret_b
+                                else
+                                    picked_text, picked_btn = ret_a, ret_b
+                                end
+                                if picked_btn ~= "OK" then return nil end
+                                return trim(picked_text)
+                            end
+
+                            local base_url = prompt_field(
+                                string.format("API %s — URL", p.label),
+                                p.base_url,
+                                "Base URL (laisser vide pour la valeur par défaut)") or ""
+                            local token = prompt_field(
+                                string.format("API %s — Clé / Token", p.label),
+                                "",
+                                "Clé API (sera stockée localement via hs.settings)")
+                            if not token or token == "" then return end
+                            local model = prompt_field(
+                                string.format("API %s — Modèle", p.label),
+                                p.default_model,
+                                "Identifiant du modèle exposé par le fournisseur") or p.default_model
+                            local label = prompt_field(
+                                string.format("API %s — Libellé (facultatif)", p.label),
+                                "",
+                                "Nom court affiché dans le menu") or ""
+
+                            local id = string.format("%s-%d", pid, os.time())
+                            local new_entry = {
+                                id       = id,
+                                provider = pid,
+                                base_url = (base_url ~= "" and base_url ~= p.base_url) and base_url or "",
+                                token    = token,
+                                model    = (model ~= "" and model) or p.default_model,
+                                label    = (label ~= "" and label) or p.label,
+                            }
+                            local list = api_remote.get_entries() or {}
+                            local clone = {}
+                            for _, x in ipairs(list) do table.insert(clone, x) end
+                            table.insert(clone, new_entry)
+                            api_remote.set_entries(clone)
+                            api_remote.set_active_entry_id(id)
+                            pcall(llm_mod.persist_api_entries)
+                            pcall(llm_mod.warmup_model, llm_mod.get_current_model())
+                            update_menu()
+                        end or nil,
+                    })
+                end
+            end
+
+            table.insert(api_menu, {
+                title    = "➕ Ajouter une entrée",
+                disabled = paused or nil,
+                menu     = add_submenu,
+            })
+
+            -- Remove only the active entry — keeps the action unambiguous and
+            -- mirrors the AHK tray's "remove active" semantics. Disabled when
+            -- nothing is configured so the user does not chase a no-op click.
+            local active_entry = api_remote and api_remote.get_active_entry() or nil
+            local active_label = active_entry and (active_entry.label or active_entry.id or "") or ""
+            table.insert(api_menu, {
+                title    = active_entry
+                    and string.format("🗑️ Supprimer l'entrée active (%s)", active_label)
+                    or  "🗑️ Supprimer l'entrée active",
+                disabled = (paused or (active_entry == nil)) or nil,
+                fn       = (not paused and active_entry) and function()
+                    local kept = {}
+                    for _, x in ipairs(api_remote.get_entries() or {}) do
+                        if x.id ~= active_entry.id then table.insert(kept, x) end
+                    end
+                    api_remote.set_entries(kept)
+                    api_remote.set_active_entry_id(kept[1] and kept[1].id or "")
+                    pcall(llm_mod.persist_api_entries)
+                    pcall(llm_mod.warmup_model, llm_mod.get_current_model())
+                    update_menu()
+                end or nil,
+            })
+
+            local api_title = active_entry
+                and string.format("Entrées API — %s (%s)", active_label,
+                    (api_remote.PROVIDERS[active_entry.provider] and api_remote.PROVIDERS[active_entry.provider].label) or active_entry.provider)
+                or  "Entrées API — aucune entrée configurée"
+            table.insert(main_menu, {
+                title    = api_title,
+                disabled = paused or nil,
+                menu     = api_menu,
+            })
+        end
 
         local active_display_model = get_display_model_name(state.llm_model)
         local info = models_mgr.get_model_info(active_display_model) or {}
