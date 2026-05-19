@@ -41,10 +41,9 @@ global ONBOARDING_WIN_W := 460
 ; Height of the language ListView — fits ~8 rows, scrollable beyond that
 global ONBOARDING_LV_H := 240
 
-; Default magic key inserted into the Step 3 input. Asterisk is reachable on
-; every layout without a dead key and is the documented "safe" default. The
-; user can change it to ù, ; or any single character.
-global ONBOARDING_DEFAULT_MAGIC_KEY := "*"
+; Default magic key inserted into the Step 3 input. ★ is the canonical visual
+; symbol for the magic key; the user can change it to ù, ; or any single character.
+global ONBOARDING_DEFAULT_MAGIC_KEY := "★"
 
 ; Collected answers — populated as the user advances through each step
 global _ob_locale            := "en"
