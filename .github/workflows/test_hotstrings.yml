@@ -1,4 +1,4 @@
-name: Lint hotstring TOML files
+name: Test Hotstrings
 
 on:
     push:
