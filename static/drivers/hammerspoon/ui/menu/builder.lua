@@ -378,7 +378,9 @@ function M.generate(ctx, menu_mods, actions)
 	end
 
 	if type(menu_mods.shortcuts) == "table" then
-		push("shortcuts.build", menu_mods.shortcuts.build, ctx)
+		-- Inject the edit-shortcuts callback so the shortcuts submodule can surface it
+		local shortcuts_ctx = setmetatable({ actions = actions }, { __index = ctx })
+		push("shortcuts.build", menu_mods.shortcuts.build, shortcuts_ctx)
 	end
 
 	-- Karabiner then Gestures — keyboard first, then trackpad
@@ -393,43 +395,50 @@ function M.generate(ctx, menu_mods, actions)
 	end
 
 
-	-- Script-management zone — kept iso with the AutoHotkey tray menu so users
-	-- moving between platforms see the same labels, icons and ordering. The
-	-- only difference is the missing "⏸︎ Suspendre" entry: pause/resume on the
-	-- macOS side is driven by the big title button at the very top of the menu.
+	-- Build the about item early so it can be embedded in the global submenu
+	local _about_item = nil
+	if type(menu_mods.about) == "table" and type(menu_mods.about.build) == "function" then
+		local ok_a, about_item = pcall(menu_mods.about.build, ctx)
+		if ok_a and about_item then
+			_about_item = about_item
+		end
+	end
+
+	-- Assemble global actions submenu: bulk toggles + version/update block
+	local global_menu_items = {
+		{ title = i18n.get("menu.global.enable_all"),    fn = actions.enable_all },
+		{ title = i18n.get("menu.global.disable_all"),   fn = actions.disable_all },
+		{ title = i18n.get("menu.global.reset_defaults"), fn = actions.reset_defaults },
+	}
+	if _about_item then
+		table.insert(global_menu_items, { title = "-" })
+		-- Inline the about submenu items rather than nesting a submenu-of-submenu
+		if type(_about_item.menu) == "table" then
+			for _, it in ipairs(_about_item.menu) do
+				table.insert(global_menu_items, it)
+			end
+		else
+			table.insert(global_menu_items, _about_item)
+		end
+	end
+
 	table.insert(items, { title = "-" })
 	table.insert(items, {
 		title = i18n.get("menu.global.title"),
-		menu = {
-			{ title = i18n.get("menu.global.enable_all"),    fn = actions.enable_all },
-			{ title = i18n.get("menu.global.disable_all"),   fn = actions.disable_all },
-			{ title = i18n.get("menu.global.reset_defaults"), fn = actions.reset_defaults },
-			{ title = "-" },
-			{
-				title = i18n.get("menu.global.language"),
-				menu  = i18n.build_language_menu_items(),
-			},
-		}
+		menu  = global_menu_items,
 	})
 	table.insert(items, { title = i18n.get("menu.global.config_folder"), fn = actions.open_paths })
 	table.insert(items, { title = i18n.get("menu.global.setup_wizard"),  fn = actions.show_setup_wizard })
 	table.insert(items, { title = "-" })
-	table.insert(items, { title = i18n.get("menu.global.edit_shortcuts"), fn = actions.open_personal_shortcuts })
 	-- Strip the leading emoji token from the shared i18n string and replace with
 	-- plain Unicode symbols — emoji render poorly in native macOS menu bars
 	table.insert(items, { title = "↺ " .. i18n.get("menu.global.reload"):gsub("^%S+ ", ""),  fn = actions.reload })
 	table.insert(items, { title = "✕ " .. i18n.get("menu.global.quit"):gsub("^%S+ ", ""),    fn = actions.quit })
-	-- Debug submenu — groups the developer-facing tools (Hammerspoon Console,
-	-- log-folder shortcut, today's log) so the top-level tray stays scannable.
-	-- Mirrors AutoHotkey's "⚠ Débogage" entry, which adds Window Spy / List Vars
-	-- / Key History on top of the same log shortcuts.
-	-- About / Update — version display, channel selector, changelog
-	if type(menu_mods.about) == "table" and type(menu_mods.about.build) == "function" then
-		local ok_a, about_item = pcall(menu_mods.about.build, ctx)
-		if ok_a and about_item then
-			table.insert(items, about_item)
-		end
-	end
+	-- Language selector sits below the lifecycle actions, after the version block
+	table.insert(items, {
+		title = i18n.get("menu.global.language"),
+		menu  = i18n.build_language_menu_items(),
+	})
 
 	table.insert(items, {
 		title = i18n.get("menu.debug.title"),

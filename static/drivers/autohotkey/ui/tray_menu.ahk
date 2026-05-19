@@ -730,6 +730,8 @@ initMenu() {
 	if SubMenus.Has("Shortcuts") {
 		InsertKeyboardShortcutGroups(SubMenus["Shortcuts"], t("menu.shortcuts.group_modifiers"))
 		SubMenus["Shortcuts"].Add(t("menu.shortcuts.script_shortcuts"), BuildScriptShortcutsMenu())
+		SubMenus["Shortcuts"].Add() ; Separator before edit personal shortcuts
+		SubMenus["Shortcuts"].Add(t("menu.global.edit_shortcuts"), OpenPersonalShortcuts)
 
 		; Extensions shortcuts — one submenu per bundled extension that ships a
 		; shortcuts/menu.ahk. The script is run in a sandboxed #Include context
@@ -1163,17 +1165,33 @@ initMenu() {
 
 	A_TrayMenu.Add() ; Single separator between feature submenus and configuration items
 
-	; ── Actions globales — bulk-toggle / reset-defaults actions kept as a
-	; single submenu so the top-level tray stays scannable. ──
+	; ── Actions globales — bulk-toggle / reset-defaults + version/update actions ──
 	GlobalActionsMenu := Menu()
 	GlobalActionsMenu.Add(t("menu.global.enable_all"),  ToggleAllFeaturesOn)
 	GlobalActionsMenu.Add(t("menu.global.disable_all"), ToggleAllFeaturesOff)
 	GlobalActionsMenu.Add(t("menu.global.reset_defaults"), ReloadWithDefaultConfig)
-	GlobalActionsMenu.Add()
-	; Language selector — one entry per supported locale, check mark on active one
-	LangMenu := Menu()
-	I18nBuildLanguageMenu(LangMenu)
-	GlobalActionsMenu.Add(t("menu.global.language"), LangMenu)
+	GlobalActionsMenu.Add() ; Separator before version/update block
+	; Version display, update channel picker and changelog
+	Ver := Updater_CurrentVersion()
+	VerLabel := "ErgoptiPlus " . Ver
+	GlobalActionsMenu.Add(VerLabel, Updater_ShowVersion)
+	GlobalActionsMenu.Add() ; Separator
+	global UPDATER_CHANNEL
+	if Updater_IsLocalSource() {
+		; Local source build — channel selection is meaningless, show a grayed info item
+		LocalSourceLabel := "✔  Local source"
+		GlobalActionsMenu.Add(LocalSourceLabel, (*) => NoAction())
+		GlobalActionsMenu.Disable(LocalSourceLabel)
+	} else {
+		ChannelMainLabel := (UPDATER_CHANNEL != "dev") ? "✔  Stable (main)" : "   Stable (main)"
+		ChannelDevLabel  := (UPDATER_CHANNEL == "dev") ? "✔  Pre-release (dev)" : "   Pre-release (dev)"
+		GlobalActionsMenu.Add(ChannelMainLabel, (*) => Updater_SetChannel("main"))
+		GlobalActionsMenu.Add(ChannelDevLabel,  (*) => Updater_SetChannel("dev"))
+	}
+	GlobalActionsMenu.Add() ; Separator
+	GlobalActionsMenu.Add("Check for updates", Updater_CheckForUpdate)
+	GlobalActionsMenu.Add("Changelog",         Updater_ShowChangelog)
+	GlobalActionsMenu.Add("Open releases page", (*) => Run(Updater_ReleasesPageUrl()))
 
 	; ── Script management — flattened into the top-level tray menu (used to
 	; live in a "Gestion du script" submenu). The lifecycle actions sit one
@@ -1184,34 +1202,14 @@ initMenu() {
 	A_TrayMenu.Add(t("menu.global.config_folder"), FilePathsEditor)
 	A_TrayMenu.Add(t("menu.global.setup_wizard"), Onboarding_ShowFromMenu)
 	A_TrayMenu.Add() ; Separator before lifecycle actions
-	A_TrayMenu.Add(t("menu.global.edit_shortcuts"), OpenPersonalShortcuts)
 	A_TrayMenu.Add(MenuSuspend, ToggleSuspend)
 	A_TrayMenu.Add(t("menu.global.reload"), ActivateReload)
 	A_TrayMenu.Add(t("menu.global.quit"), ActivateExitApp)
 
-	; ── About / Update — version display, changelog and update channel picker ──
-	AboutMenu := Menu()
-	Ver := Updater_CurrentVersion()
-	VerLabel := "ErgoptiPlus " . Ver
-	AboutMenu.Add(VerLabel, Updater_ShowVersion)
-	AboutMenu.Add() ; Separator
-	global UPDATER_CHANNEL
-	if Updater_IsLocalSource() {
-		; Local source build — channel selection is meaningless, show a grayed info item
-		LocalSourceLabel := "✔  Local source"
-		AboutMenu.Add(LocalSourceLabel, (*) => NoAction())
-		AboutMenu.Disable(LocalSourceLabel)
-	} else {
-		ChannelMainLabel := (UPDATER_CHANNEL != "dev") ? "✔  Stable (main)" : "   Stable (main)"
-		ChannelDevLabel  := (UPDATER_CHANNEL == "dev") ? "✔  Pre-release (dev)" : "   Pre-release (dev)"
-		AboutMenu.Add(ChannelMainLabel, (*) => Updater_SetChannel("main"))
-		AboutMenu.Add(ChannelDevLabel,  (*) => Updater_SetChannel("dev"))
-	}
-	AboutMenu.Add() ; Separator
-	AboutMenu.Add("Check for updates", Updater_CheckForUpdate)
-	AboutMenu.Add("Changelog",         Updater_ShowChangelog)
-	AboutMenu.Add("Open releases page", (*) => Run(Updater_ReleasesPageUrl()))
-	A_TrayMenu.Add("ErgoptiPlus " . Ver, AboutMenu)
+	; Language selector — sits after the lifecycle actions, below version info
+	LangMenu := Menu()
+	I18nBuildLanguageMenu(LangMenu)
+	A_TrayMenu.Add(t("menu.global.language"), LangMenu)
 
 	; ── Debug tools — grouped in a submenu to keep the top-level menu tidy.
 	; Mirrors Hammerspoon's "⚠ Debug" entry (Console + log shortcuts);
