@@ -417,7 +417,6 @@ function M.generate(ctx, menu_mods, actions)
 		title = i18n.get("menu.global.language"),
 		menu  = i18n.build_language_menu_items(),
 	})
-	table.insert(items, { title = "-" })
 	table.insert(items, { title = i18n.get("menu.global.config_folder"), fn = actions.open_paths })
 	table.insert(items, { title = i18n.get("menu.global.setup_wizard"),  fn = actions.show_setup_wizard })
 	table.insert(items, { title = "-" })
