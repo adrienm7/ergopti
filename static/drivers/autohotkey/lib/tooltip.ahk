@@ -62,6 +62,7 @@ global _TOOLTIP_BORDER_THICKNESS := UI_BORDER_THICKNESS
 global _TOOLTIP_CORNER_RADIUS := UI_CORNER_RADIUS
 global _TOOLTIP_LABEL_FONT_SIZE := UI_FONT_SIZE_HINT
 global _TOOLTIP_LABEL_GAP := UI_LABEL_GAP
+global _TOOLTIP_LABEL_COLOR_HEX := UI_LABEL_COLOR_HEX
 global _TOOLTIP_LIGHTNESS := UI_TINT_LIGHTNESS
 global _TOOLTIP_SATURATION := UI_TINT_SATURATION
 global _TOOLTIP_MAX_CARET_HEIGHT_PX := UI_MAX_CARET_HEIGHT_PX
@@ -397,11 +398,12 @@ _TooltipBuildGui(Items) {
             LS := LabelSizes[Idx]
             LabelX := TotalW - _TOOLTIP_PADDING_X - MaxLabelW
             ; ↵ has a descender that makes it appear lower than center — shift up.
-            ; ★ and other labels sit at true center so no correction needed.
+            ; * sits high in its bounding box in Segoe UI — nudge down.
             DescenderFix := (Label == "↵") ? 4 : 0
+            StarFix      := (Label == "*") ? 1 : 0
             RightFix     := (Label == "↵") ? 3 : 0
-            LabelY := RowY + _TOOLTIP_PADDING_Y + Max(0, (S.H - LS.H) // 2) - DescenderFix
-            G.SetFont("c737373 s" . _TOOLTIP_LABEL_FONT_SIZE, _TOOLTIP_FONT_NAME)
+            LabelY := RowY + _TOOLTIP_PADDING_Y + Max(0, (S.H - LS.H) // 2) - DescenderFix + StarFix
+            G.SetFont("c" . _TOOLTIP_LABEL_COLOR_HEX . " s" . _TOOLTIP_LABEL_FONT_SIZE, _TOOLTIP_FONT_NAME)
             G.Add("Text", Format("BackgroundTrans x{1} y{2} w{3} h{4}",
                 LabelX + RightFix, LabelY, MaxLabelW, LS.H), Label)
         }

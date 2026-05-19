@@ -46,6 +46,9 @@ global UI_BORDER_COLOR_HEX := "FFFFFF"
 global UI_BORDER_ALPHA     := 0.25
 ; 1 px logical border drawn via a layered Gui overlay.
 global UI_BORDER_THICKNESS := 1
+; Trigger-label symbol color (★, ↵) — lighter than mid-gray, dimmer than the
+; expansion text (FFFFFF) so the symbol reads as secondary information.
+global UI_LABEL_COLOR_HEX  := "AAAAAA"
 
 ; ── Tint mixing ─────────────────────────────────────────────────────────────
 ; HSL target when mixing an accent hue into the background.
