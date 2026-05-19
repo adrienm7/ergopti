@@ -56,7 +56,22 @@ global _LLM_Engine := Map(
 	"val_modifiers",              "alt",
 	"timer_active",               false,
 	"last_ctx",                   "",
-	"last_result",                ""
+	"last_result",                "",
+	"last_request_tick",          0,
+	"backend",                    "ollama"
+)
+
+; Per-backend minimum interval (ms) between two prediction requests. The user
+; can debounce as low as they want via the menu, but the engine still enforces
+; this floor — chiefly to keep paid API providers from being hammered by a
+; fast typist (a 50 ms debounce on a remote backend would burn tokens at every
+; keystroke), and as an energy-saving cap on local backends where back-to-back
+; inferences keep the GPU spinning for no perceptible UX gain. Add a new
+; backend here and it inherits the same rate-limit guarantee for free.
+global LLM_BACKEND_MIN_REQUEST_INTERVAL_MS := Map(
+	"ollama", 300,
+	"mlx",    300,
+	"api",    500
 )
 
 ; Overwrite the defaults with values loaded from defaults.json at module load time.
@@ -206,7 +221,7 @@ LLM_Engine_CancelTimer() {
  * @param {string} ctx - The context string captured at debounce arm time.
  */
 LLM_Engine_FirePrediction(ctx) {
-	global _LLM_Engine
+	global _LLM_Engine, LLM_BACKEND_MIN_REQUEST_INTERVAL_MS
 	_LLM_Engine["timer_active"] := false
 
 	if !_LLM_Engine["enabled"] || ctx == ""
@@ -215,6 +230,24 @@ LLM_Engine_FirePrediction(ctx) {
 	; Cache hit: re-display last result without an API call
 	if (ctx == _LLM_Engine["last_ctx"] && _LLM_Engine["last_result"] != "") {
 		LLM_Engine_OnResult(_LLM_Engine["last_result"], ctx)
+		return
+	}
+
+	; ── Backend-aware request floor ──
+	; Even when the user has set a 50 ms debounce, fire no more than one
+	; request per ``min_interval`` ms for the active backend (paid APIs need
+	; this hard cap; local backends benefit from it for energy). When the
+	; floor blocks, re-arm the debounce timer for the remaining gap so the
+	; next attempt fires at exactly the right moment instead of being lost.
+	backend := _LLM_Engine.Has("backend") ? _LLM_Engine["backend"] : "ollama"
+	min_interval := LLM_BACKEND_MIN_REQUEST_INTERVAL_MS.Has(backend)
+		? LLM_BACKEND_MIN_REQUEST_INTERVAL_MS[backend] : 300
+	now := A_TickCount
+	last := _LLM_Engine.Has("last_request_tick") ? _LLM_Engine["last_request_tick"] : 0
+	if (last > 0 and (now - last) < min_interval) {
+		remaining := min_interval - (now - last)
+		SetTimer(() => LLM_Engine_FirePrediction(ctx), -remaining)
+		_LLM_Engine["timer_active"] := true
 		return
 	}
 
@@ -231,6 +264,11 @@ LLM_Engine_FirePrediction(ctx) {
 
 	; Resolve Ollama tag from display name
 	model_tag := LLM_ResolveOllamaTag(_LLM_Engine["model"])
+
+	; Stamp the request tick BEFORE the synchronous call so the floor uses the
+	; time the request was issued (not when the response came back) — a slow
+	; backend should not allow a second request to fire concurrently.
+	_LLM_Engine["last_request_tick"] := A_TickCount
 
 	; Call the backend (synchronous — runs in same thread)
 	result := LLM_OllamaGenerate(model_tag, system_prompt, ctx, Float(_LLM_Engine["temperature"]))
