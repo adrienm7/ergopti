@@ -64,13 +64,23 @@ Updater_SetChannel(Channel) {
 ; ===== 1.3) Version helpers ==========
 ; ====================================
 
+; Returns true when running directly from the AHK source tree (not compiled).
+; Detected by checking A_IsCompiled, which is 1 only for .exe builds.
+; This state takes priority over any user-selected channel — update checking
+; is meaningless and channel selection is hidden when running from source.
+Updater_IsLocalSource() {
+	return !A_IsCompiled
+}
+
 ; Returns the current driver version string.
 ; In compiled mode: BUNDLE_VERSION (stamped at build time).
-; In dev mode:      the placeholder "__BUNDLE_VERSION__" → shown as "dev".
+; In local-source mode: the placeholder stays as-is → shown as "local".
 Updater_CurrentVersion() {
 	global BUNDLE_VERSION
+	if Updater_IsLocalSource()
+		return "local"
 	if (BUNDLE_VERSION == "__BUNDLE_VERSION__" or BUNDLE_VERSION == "")
-		return "dev"
+		return "local"
 	return BUNDLE_VERSION
 }
 
@@ -161,7 +171,10 @@ Updater_ParseBody(Json) {
 Updater_ShowVersion(*) {
 	Ver := Updater_CurrentVersion()
 	global UPDATER_CHANNEL
-	Channel := (UPDATER_CHANNEL == "dev") ? " (dev channel)" : " (stable channel)"
+	if Updater_IsLocalSource()
+		Channel := " (local source — not a release build)"
+	else
+		Channel := (UPDATER_CHANNEL == "dev") ? " (pre-release channel)" : " (stable channel)"
 	Res := MsgBox(
 		"ErgoptiPlus " . Ver . Channel . "`n`nOpen the releases page on GitHub?",
 		"ErgoptiPlus — Version",
@@ -174,11 +187,12 @@ Updater_ShowVersion(*) {
 ; Checks GitHub for a newer release and shows the result.
 Updater_CheckForUpdate(*) {
 	global UPDATER_CHANNEL
-	Current := Updater_CurrentVersion()
-	if (Current == "dev") {
-		MsgBox("Running in dev mode — update checking is disabled.", "ErgoptiPlus — Update", "Iconi")
+	if Updater_IsLocalSource() {
+		MsgBox("Running from local source — update checking is only available for release builds.",
+			"ErgoptiPlus — Update", "Iconi")
 		return
 	}
+	Current := Updater_CurrentVersion()
 	MsgBox("Checking for updates on the '" . UPDATER_CHANNEL . "' channel…`n(This may take a few seconds.)",
 		"ErgoptiPlus — Update", "Iconi T2")
 	Json := Updater_FetchLatestJson(UPDATER_CHANNEL)
@@ -211,7 +225,10 @@ Updater_CheckForUpdate(*) {
 ; Fetches and displays the release notes for the latest release on the active channel.
 Updater_ShowChangelog(*) {
 	global UPDATER_CHANNEL
-	Json := Updater_FetchLatestJson(UPDATER_CHANNEL)
+	; In local-source mode fall back to the "main" channel for changelog browsing
+	; (the user has no installed version to compare against anyway).
+	EffectiveChannel := Updater_IsLocalSource() ? "main" : UPDATER_CHANNEL
+	Json := Updater_FetchLatestJson(EffectiveChannel)
 	if (Json == "") {
 		MsgBox("Could not reach GitHub. Check your internet connection and try again.",
 			"ErgoptiPlus — Changelog", "Icon!")

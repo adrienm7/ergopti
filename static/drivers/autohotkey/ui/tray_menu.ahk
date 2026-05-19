@@ -1196,14 +1196,17 @@ initMenu() {
 	AboutMenu.Add(VerLabel, Updater_ShowVersion)
 	AboutMenu.Add() ; Separator
 	global UPDATER_CHANNEL
-	ChannelMainLabel := "✔  Stable (main)"
-	ChannelDevLabel  := "   Pre-release (dev)"
-	if (UPDATER_CHANNEL == "dev") {
-		ChannelMainLabel := "   Stable (main)"
-		ChannelDevLabel  := "✔  Pre-release (dev)"
+	if Updater_IsLocalSource() {
+		; Local source build — channel selection is meaningless, show a grayed info item
+		LocalSourceLabel := "✔  Local source"
+		AboutMenu.Add(LocalSourceLabel, (*) => NoAction())
+		AboutMenu.Disable(LocalSourceLabel)
+	} else {
+		ChannelMainLabel := (UPDATER_CHANNEL != "dev") ? "✔  Stable (main)" : "   Stable (main)"
+		ChannelDevLabel  := (UPDATER_CHANNEL == "dev") ? "✔  Pre-release (dev)" : "   Pre-release (dev)"
+		AboutMenu.Add(ChannelMainLabel, (*) => Updater_SetChannel("main"))
+		AboutMenu.Add(ChannelDevLabel,  (*) => Updater_SetChannel("dev"))
 	}
-	AboutMenu.Add(ChannelMainLabel, (*) => Updater_SetChannel("main"))
-	AboutMenu.Add(ChannelDevLabel,  (*) => Updater_SetChannel("dev"))
 	AboutMenu.Add() ; Separator
 	AboutMenu.Add("Check for updates", Updater_CheckForUpdate)
 	AboutMenu.Add("Changelog",         Updater_ShowChangelog)
