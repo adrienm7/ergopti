@@ -298,9 +298,16 @@ OpenHotstringsConfigWindow() {
 	DelayReset := G.Add("Button", "x512 yp-3 w28 h24", "↺")
 
 	; ----- Color row -------------------------------------------------------
+	; The swatch is a filled Progress at value=100 — the BAR fills the whole
+	; rectangle, so we set its bar color (cXXXXXX) AND background to the same
+	; hex. Setting only Background, as we used to, left the bar painted in
+	; the OS default tint (system blue) regardless of what the user picked.
 	G.Add("Text", "xm y+10 w70 h20", t("hs_config.label_color"))
 	ColorDD := G.Add("DropDownList", "x+6 yp-3 w180", _HCW_ColorLabels())
-	ColorSwatch := G.Add("Progress", "x+8 yp+1 w22 h22 BackgroundCCCCCC", 100)
+	InitSwatchHex := _HCW_HexNoHash(GLOBAL_DEFAULT_COLOR)
+	ColorSwatch := G.Add("Progress",
+		"x+8 yp+1 w22 h22 c" . InitSwatchHex . " Background" . InitSwatchHex,
+		100)
 	ColorDefault := G.Add("Text", "x+10 yp+2 w194 Right", "")
 	ColorReset := G.Add("Button", "x512 yp-2 w28 h24", "↺")
 
@@ -431,7 +438,12 @@ _HCW_LoadCurrent() {
 		_HCW_RebuildColorDropdown("")
 	}
 	_HCWWidgets.ColorDD.Choose(Idx)
-	_HCWWidgets.ColorSwatch.Opt("Background" . _HCW_HexNoHash(ColorHex))
+	; ``Resolved.Color`` is now guaranteed non-empty by the resolver — when
+	; nothing is set anywhere, it returns the global default. Repaint BOTH
+	; the bar (cXXXXXX) and the background so the swatch fills with the
+	; selected color end-to-end.
+	SwatchHex := _HCW_HexNoHash(ColorHex)
+	_HCWWidgets.ColorSwatch.Opt("+c" . SwatchHex . " +Background" . SwatchHex)
 
 	ColorOverridden := (Override.HasOwnProp("Color") and Override.Color != "")
 	DefColor := (Defaults.Color != "") ? Defaults.Color : t("hs_config.none")

@@ -109,11 +109,21 @@ TestHotstringsConfig_ResolveFallsBackToGlobal() {
     R := HotstringsResolve("rolls", "")
     AssertEqual(GLOBAL_DEFAULT_DELAY, R.Delay,
         "no toml + no override → global default delay")
-    AssertEqual("", R.Color, "no toml + no override → empty color")
+    AssertEqual(GLOBAL_DEFAULT_COLOR, R.Color,
+        "no toml + no override → global default color (single source of truth)")
     AssertFalse(R.HasOverride, "no override flag")
 }
 Test("HotstringsConfig: resolve falls back to GLOBAL_DEFAULT_DELAY",
     TestHotstringsConfig_ResolveFallsBackToGlobal)
+
+TestHotstringsConfig_PersonalCategoryFallsBackToOrange() {
+    _HCfgTestReset()
+    R := HotstringsResolve("personal", "")
+    AssertEqual(HOTSTRINGS_CATEGORY_DEFAULT_COLORS["personal"], R.Color,
+        "personal category falls back to its per-category default (orange), not global blue")
+}
+Test("HotstringsConfig: personal category defaults to orange",
+    TestHotstringsConfig_PersonalCategoryFallsBackToOrange)
 
 TestHotstringsConfig_ResolveTomlFile() {
     _HCfgTestReset()
@@ -193,7 +203,8 @@ TestHotstringsConfig_ClearOverrideAllFields() {
     R := HotstringsResolve("rolls", "ct")
     AssertEqual(GLOBAL_DEFAULT_DELAY, R.Delay,
         "clearing all fields drops the override to the global fallback")
-    AssertEqual("", R.Color, "color is cleared back to empty")
+    AssertEqual(GLOBAL_DEFAULT_COLOR, R.Color,
+        "color is cleared back to the global default (rolls has no per-category baseline)")
 }
 Test("HotstringsConfig: clearOverride with empty field clears delay + color",
     TestHotstringsConfig_ClearOverrideAllFields)

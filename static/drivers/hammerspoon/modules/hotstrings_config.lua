@@ -40,11 +40,17 @@ local LOG        = "hotstrings_config"
 -- =================================
 
 -- Ultimate fallback when neither a user override nor a TOML default is set.
--- Mirrors the previous expansion baseline so removing every override returns
--- the user to the historical behaviour.
+-- ``GLOBAL_DEFAULT_COLOR`` is the SINGLE source of truth for "no color set" —
+-- every per-category lookup that finds nothing else lands here.
 local GLOBAL_DEFAULT_DELAY = 0.75
--- Applied to extension and personal hotstring categories when no color is set.
-local GLOBAL_DEFAULT_COLOR = "#e53935"
+local GLOBAL_DEFAULT_COLOR = "#1e88e5"  -- Blue — global tooltip tint when nothing else is configured
+
+-- Per-category baseline that overrides ``GLOBAL_DEFAULT_COLOR`` only when no
+-- TOML _meta or user override sets a color. Lives next to the global default
+-- so all defaults are visible in one place.
+local CATEGORY_DEFAULT_COLORS = {
+	personal = "#fb8c00",  -- Orange — distinguishes user-added entries from bundled ones
+}
 
 
 -- =================================
@@ -323,10 +329,17 @@ function M.resolve(category, section)
 		or meta.delay
 		or GLOBAL_DEFAULT_DELAY
 
+	-- Mirror the ext path: fall through to the per-category default first,
+	-- then to GLOBAL_DEFAULT_COLOR. Used to return nil here, which made
+	-- callers either crash or paint with whatever literal they happened to
+	-- have lying around — and the single source of truth could not be
+	-- enforced from a single constant.
 	local color = (user_sec and user_sec.color)
 		or user.color
 		or (meta_sec and meta_sec.color)
 		or meta.color
+		or CATEGORY_DEFAULT_COLORS[category]
+		or GLOBAL_DEFAULT_COLOR
 
 	-- show_tooltip: explicit false anywhere in the chain suppresses the tooltip; default is true
 	local show_tooltip = true

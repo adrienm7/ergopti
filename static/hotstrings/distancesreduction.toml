@@ -5,7 +5,6 @@
 # ====================
 
 [_meta]
-color = "#fb8c00"
 delay = 0.5
 show_tooltip = false
 description = { fr = "Réduction des distances", en = "Distance reduction", de = "Distanzreduktion", es = "Reducción de distancias", zh = "距离减少", ar = "تقليل المسافات", cs = "Snížení vzdáleností", da = "Afstandsreduktion", he = "הפחתת מרחקים", hi = "दूरी में कमी", it = "Riduzione delle distanze", ja = "距離削減", ko = "거리 감소", nl = "Afstandsreductie", no = "Avstandsreduksjon", pl = "Redukcja odległości", pt = "Redução de distâncias", ru = "Уменьшение расстояний", sv = "Avståndsminskning", tr = "Mesafe azaltma", uk = "Зменшення відстаней" }

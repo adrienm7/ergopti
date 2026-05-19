@@ -32,8 +32,17 @@
 
 ; Ultimate fallback when neither a user override nor a TOML default is set.
 ; Mirrors the HS module so behaviour is identical across drivers.
+; ``GLOBAL_DEFAULT_COLOR`` is the SINGLE source of truth for "no color set" —
+; every per-category lookup that finds nothing else lands here.
 global GLOBAL_DEFAULT_DELAY := 0.75
-global GLOBAL_DEFAULT_COLOR := "#e53935"  ; Red — applied to all extension/personal categories
+global GLOBAL_DEFAULT_COLOR := "#1e88e5"  ; Blue — global tooltip tint when nothing else is configured
+
+; Per-category baseline that overrides ``GLOBAL_DEFAULT_COLOR`` only when no
+; TOML _meta or user override sets a color. Lives next to the global default
+; so all defaults are visible in one place.
+global HOTSTRINGS_CATEGORY_DEFAULT_COLORS := Map(
+    "personal", "#fb8c00",  ; Orange — distinguishes user-added entries from bundled ones
+)
 
 ; Absolute path of the user override file (set by HotstringsConfigInit).
 global _HotstringsOverridesPath := ""
@@ -254,6 +263,7 @@ _SortStringsInPlace(Arr) {
 ;   5. GLOBAL_DEFAULT_DELAY (delay only); color stays empty.
 HotstringsResolve(CategoryName, SectionName := "") {
     global _HotstringsOverrides, GLOBAL_DEFAULT_DELAY
+    global GLOBAL_DEFAULT_COLOR, HOTSTRINGS_CATEGORY_DEFAULT_COLORS
     Cat := StrLower(CategoryName)
     ; Section names in features_config use PascalCase that may contain French
     ; letters (``IÉ``, ``ÊCirc``…). The TOML keeps the ASCII-folded lowercase
@@ -293,6 +303,16 @@ HotstringsResolve(CategoryName, SectionName := "") {
         Color := TomlSec.Color
     } else if (TomlCfg.Color != "") {
         Color := TomlCfg.Color
+    } else {
+        ; Nothing in user overrides or TOML _meta — fall back to the
+        ; per-category default first (e.g. personal → orange) then to the
+        ; single global default. ``HotstringsResolveExt`` already lands
+        ; here; ``HotstringsResolve`` now matches so a resolved color is
+        ; never empty, regardless of category.
+        CatKey := StrLower(CategoryName)
+        Color := HOTSTRINGS_CATEGORY_DEFAULT_COLORS.Has(CatKey)
+            ? HOTSTRINGS_CATEGORY_DEFAULT_COLORS[CatKey]
+            : GLOBAL_DEFAULT_COLOR
     }
 
     ; ShowTooltip — explicit false anywhere in the chain suppresses the tooltip.
