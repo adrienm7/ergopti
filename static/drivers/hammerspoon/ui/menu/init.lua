@@ -47,14 +47,15 @@ end
 
 -- Load isolated sub-menu builders safely
 local menu_mods = {
-	gestures   = safe_require("ui.menu.menu_gestures",   "gestures menu"),
-	shortcuts  = safe_require("ui.menu.menu_shortcuts",  "shortcuts menu"),
+	gestures        = safe_require("ui.menu.menu_gestures",        "gestures menu"),
+	shortcuts       = safe_require("ui.menu.menu_shortcuts",       "shortcuts menu"),
 	keyboard_layout = safe_require("ui.menu.menu_keyboard_layout", "keyboard layout menu"),
-	hotstrings = safe_require("ui.menu.menu_hotstrings", "hotstrings menu"),
-	llm        = safe_require("ui.menu.menu_llm",        "AI menu"),
-	keylogger  = safe_require("ui.menu.menu_metrics",    "metrics menu"),
-	karabiner  = safe_require("ui.menu.menu_karabiner",  "Karabiner menu"),
-	apps       = safe_require("ui.menu.menu_apps",       "apps menu"),
+	hotstrings      = safe_require("ui.menu.menu_hotstrings",      "hotstrings menu"),
+	llm             = safe_require("ui.menu.menu_llm",             "AI menu"),
+	keylogger       = safe_require("ui.menu.menu_metrics",         "metrics menu"),
+	karabiner       = safe_require("ui.menu.menu_karabiner",       "Karabiner menu"),
+	apps            = safe_require("ui.menu.menu_apps",            "apps menu"),
+	about           = safe_require("ui.menu.menu_about",           "about/update menu"),
 }
 
 -- Load core modules

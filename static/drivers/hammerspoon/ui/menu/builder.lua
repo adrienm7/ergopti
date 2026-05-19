@@ -423,6 +423,14 @@ function M.generate(ctx, menu_mods, actions)
 	-- log-folder shortcut, today's log) so the top-level tray stays scannable.
 	-- Mirrors AutoHotkey's "⚠ Débogage" entry, which adds Window Spy / List Vars
 	-- / Key History on top of the same log shortcuts.
+	-- About / Update — version display, channel selector, changelog
+	if type(menu_mods.about) == "table" and type(menu_mods.about.build) == "function" then
+		local ok_a, about_item = pcall(menu_mods.about.build, ctx)
+		if ok_a and about_item then
+			table.insert(items, about_item)
+		end
+	end
+
 	table.insert(items, {
 		title = i18n.get("menu.debug.title"),
 		menu = {
