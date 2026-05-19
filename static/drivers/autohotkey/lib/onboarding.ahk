@@ -230,6 +230,18 @@ _Onboarding_Step1() {
 	}
 	; Subtract scrollbar width (~17px) so the column never triggers horizontal overflow
 	lv.ModifyCol(1, ContentW - 20)
+	; Resize the ListView to an exact multiple of the actual row height so that
+	; scrolling stops on the last item with no blank space below it. We measure
+	; the real row height via LVM_GETITEMRECT (0x100E) on the first item, then
+	; snap the control height to min(allRows, maxRows) * rowH.
+	RECT := Buffer(16, 0)
+	SendMessage(0x100E, 0, RECT.Ptr, lv)  ; LVM_GETITEMRECT, item 0, LVIR_BOUNDS
+	rowH := NumGet(RECT, 12, "Int") - NumGet(RECT, 4, "Int")  ; bottom - top
+	if (rowH > 0) {
+		maxRows := 8
+		visRows := Min(SortedLocales.Length, maxRows)
+		lv.Move(,, , visRows * rowH)
+	}
 	; Pre-select the default locale row
 	lv.Modify(DefaultIndex, "Select Focus Vis")
 

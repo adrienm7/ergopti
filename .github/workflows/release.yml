@@ -410,8 +410,6 @@ jobs:
                   |---|---|
                   | \`ErgoptiPlus.app.zip\` | macOS application (Hammerspoon + Karabiner-Elements bundled) |
                   | \`Ergopti_macOS.zip\` | Keyboard layout bundle only — no app required |
-                  | \`ErgoptiPlus.app.zip.sig\` | Sparkle EdDSA signature — used internally by the auto-updater, no manual download needed |
-                  | \`appcast-main.xml\` | Sparkle appcast feed — used internally by the auto-updater, no manual download needed |
 
                   **Installation — app:**
                   1. Unzip \`ErgoptiPlus.app.zip\` and move \`Ergopti.app\` to \`/Applications\`.
