@@ -42,8 +42,15 @@ local _get_trigger = nil   -- injected by init.lua after keymap is ready
 --- @return string Absolute path to the JSON file.
 local function locale_path(code)
 	local cfg = hs.configdir or ""
-	local repo_root = cfg:gsub("/static/drivers/hammerspoon$", "")
-	                      :gsub("\\static\\drivers\\hammerspoon$", "")
+	-- Strip any trailing slash so the pattern anchor $ works reliably
+	cfg = cfg:gsub("[/\\]+$", "")
+	-- Remove the hammerspoon config dir suffix using a flexible pattern that
+	-- handles both forward and back slashes (mixed paths on Windows/macOS)
+	local repo_root = cfg:gsub("[/\\]static[/\\]drivers[/\\]hammerspoon$", "")
+	if repo_root == cfg then
+		-- Pattern did not match — log and try a last-resort fallback
+		Logger.warn(LOG, "locale_path: could not strip hammerspoon suffix from '%s'.", cfg)
+	end
 	return repo_root .. "/static/locales/" .. code .. ".json"
 end
 
@@ -55,7 +62,7 @@ local function load_locale(code)
 	local ok, data = pcall(function()
 		local f = io.open(path, "r")
 		if not f then
-			Logger.warn(LOG, "Locale file not found: '%s'.", path)
+			Logger.error(LOG, "Locale file not found: '%s' (hs.configdir='%s').", path, hs.configdir or "nil")
 			return {}
 		end
 		local raw = f:read("*a")
