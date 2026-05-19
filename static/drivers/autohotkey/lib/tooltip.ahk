@@ -440,9 +440,12 @@ _TooltipShowBorder(X, Y, W, H) {
         return
 
     Diam := _TOOLTIP_CORNER_RADIUS
-    if (Diam > Wp) Diam := Wp
-        if (Diam > Hp) Diam := Hp
-        ; ── Build a 32-bpp DIB ───────────────────────────────────────────────────
+    if (Diam > Wp)
+        Diam := Wp
+    if (Diam > Hp)
+        Diam := Hp
+
+    ; ── Build a 32-bpp DIB ───────────────────────────────────────────────────
             BmpInfo := Buffer(40, 0)
     NumPut("UInt", 40, BmpInfo, 0)   ; biSize
     NumPut("Int", Wp, BmpInfo, 4)   ; biWidth
@@ -476,6 +479,9 @@ _TooltipShowBorder(X, Y, W, H) {
     HNull := DllCall("Gdi32\GetStockObject", "Int", 5, "Ptr")   ; NULL_BRUSH=5
     OldPen := DllCall("Gdi32\SelectObject", "Ptr", MemDC, "Ptr", HPen, "Ptr")
     OldBr := DllCall("Gdi32\SelectObject", "Ptr", MemDC, "Ptr", HNull, "Ptr")
+    ; RoundRect with the same Diam as CreateRoundRectRgn — the transparent corner
+    ; pixels in the bitmap are what makes the border appear rounded (SetWindowRgn
+    ; on a layered window is unreliable; per-pixel alpha is the authoritative shape).
     DllCall("Gdi32\RoundRect",
         "Ptr", MemDC, "Int", 0, "Int", 0, "Int", Wp, "Int", Hp,
         "Int", Diam, "Int", Diam)
