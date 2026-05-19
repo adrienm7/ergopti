@@ -669,7 +669,7 @@
 	"menu.llm.arrows": "矢印",
 	"menu.llm.arrows_only": "矢印のみ",
 	"menu.llm.auto_raise_temp": "  ↳ 温度を自動的に上げる（提案ごとに+0.1）",
-	"menu.llm.backend_api": "API（リモート プロバイダ）",
+	"menu.llm.backend_api": "API 🌐（リモート プロバイダ）",
 	"menu.llm.backend_default_model": "↺ バックエンドデフォルトモデル (%s)",
 	"menu.llm.backend_label": "バックエンド: %s",
 	"menu.llm.backend_ollama": "Ollama 🦙 — 標準",

@@ -668,7 +668,7 @@
 	"menu.llm.arrows": "Flèches",
 	"menu.llm.arrows_only": "Flèches seules",
 	"menu.llm.auto_raise_temp": "  ↳ Hausser la temp. automatiquement (+0.1 par suggestion)",
-	"menu.llm.backend_api": "API (fournisseur distant)",
+	"menu.llm.backend_api": "API 🌐 (fournisseur distant)",
 	"menu.llm.backend_default_model": "↺ Modèle par défaut du backend (%s)",
 	"menu.llm.backend_label": "Backend : %s",
 	"menu.llm.backend_ollama": "Ollama 🦙 — Standard",

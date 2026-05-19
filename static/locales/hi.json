@@ -693,7 +693,7 @@
 	"menu.llm.arrows": "तीर",
 	"menu.llm.arrows_only": "केवल तीर",
 	"menu.llm.auto_raise_temp": "  ↳ स्वचालित रूप से तापमान बढ़ाएं (+0.1 प्रति सुझाव)",
-	"menu.llm.backend_api": "API (दूरस्थ प्रदाता)",
+	"menu.llm.backend_api": "API 🌐 (दूरस्थ प्रदाता)",
 	"menu.llm.backend_default_model": "↺ बैकएंड डिफ़ॉल्ट मॉडल (%s)",
 	"menu.llm.backend_label": "बैकएंड: %s",
 	"menu.llm.backend_ollama": "Ollama 🦙 — मानक",

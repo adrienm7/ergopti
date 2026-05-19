@@ -669,7 +669,7 @@
 	"menu.llm.arrows": "Strzałki",
 	"menu.llm.arrows_only": "Tylko strzałki",
 	"menu.llm.auto_raise_temp": "  ↳ Automatycznie podnoś temperaturę (+0,1 na sugestię)",
-	"menu.llm.backend_api": "API (zewnętrzny dostawca)",
+	"menu.llm.backend_api": "API 🌐 (zewnętrzny dostawca)",
 	"menu.llm.backend_default_model": "↺ Domyślny model backendu (%s)",
 	"menu.llm.backend_label": "Backend: %s",
 	"menu.llm.backend_ollama": "Ollama 🦙 — Standardowy",

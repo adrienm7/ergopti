@@ -669,7 +669,7 @@
 	"menu.llm.arrows": "화살표",
 	"menu.llm.arrows_only": "화살표만",
 	"menu.llm.auto_raise_temp": "  ↳ 온도 자동 증가 (제안당 +0.1)",
-	"menu.llm.backend_api": "API(원격 공급자)",
+	"menu.llm.backend_api": "API 🌐(원격 공급자)",
 	"menu.llm.backend_default_model": "↺ 백엔드 기본 모델 (%s)",
 	"menu.llm.backend_label": "백엔드: %s",
 	"menu.llm.backend_ollama": "Ollama 🦙 — 표준",

@@ -669,7 +669,7 @@
 	"menu.llm.arrows": "أسهم",
 	"menu.llm.arrows_only": "أسهم فقط",
 	"menu.llm.auto_raise_temp": "  ↳ رفع درجة الحرارة تلقائيًا (+0.1 لكل اقتراح)",
-	"menu.llm.backend_api": "API (مزوّد عن بُعد)",
+	"menu.llm.backend_api": "API 🌐 (مزوّد عن بُعد)",
 	"menu.llm.backend_default_model": "↺ النموذج الافتراضي للخادم الخلفي (%s)",
 	"menu.llm.backend_label": "الخادم الخلفي: %s",
 	"menu.llm.backend_ollama": "Ollama 🦙 — قياسي",

@@ -669,7 +669,7 @@
 	"menu.llm.arrows": "Pfeiltasten",
 	"menu.llm.arrows_only": "Nur Pfeiltasten",
 	"menu.llm.auto_raise_temp": "  ↳ Temperatur automatisch erhöhen (+0.1 pro Vorschlag)",
-	"menu.llm.backend_api": "API (entfernter Anbieter)",
+	"menu.llm.backend_api": "API 🌐 (entfernter Anbieter)",
 	"menu.llm.backend_default_model": "↺ Standard-Backend-Modell (%s)",
 	"menu.llm.backend_label": "Backend: %s",
 	"menu.llm.backend_ollama": "Ollama 🦙 — Standard",
