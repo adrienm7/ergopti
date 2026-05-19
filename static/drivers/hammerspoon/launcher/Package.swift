@@ -33,7 +33,14 @@ let package = Package(
 			dependencies: [
 				.product(name: "Sparkle", package: "Sparkle")
 			],
-			path: "Sources/Ergopti"
+			path: "Sources/Ergopti",
+			linkerSettings: [
+				// dyld resolves @rpath by walking each entry in LC_RPATH; without
+				// this entry the loader cannot find Sparkle.framework at runtime
+				// because SPM does not inject this path automatically for dynamic
+				// frameworks that land in Contents/Frameworks/ (not next to the binary).
+				.unsafeFlags(["-Xlinker", "-rpath", "-Xlinker", "@executable_path/../Frameworks"])
+			]
 		)
 	]
 )

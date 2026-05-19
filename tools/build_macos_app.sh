@@ -304,9 +304,22 @@ assemble_app() {
 	# .build/artifacts/<package>/Sparkle/Sparkle.framework rather than next
 	# to the binary — without this step dyld fails with "Library not loaded:
 	# @rpath/Sparkle.framework/Versions/B/Sparkle" at launch.
+	# SPM can place the extracted Sparkle.framework in different locations
+	# depending on the Sparkle package type (binary XCFramework vs source):
+	#   - .build/artifacts/**  (binary target, SPM 5.6+)
+	#   - .build/checkouts/**  (source build)
+	#   - .build/release/     (copied next to product by some SPM versions)
+	# We prefer the macOS slice from the XCFramework when present, then fall back
+	# to any Sparkle.framework found anywhere under .build.
 	local sparkle_fw
-	sparkle_fw="$(find "$LAUNCHER_DIR/.build" -name "Sparkle.framework" -type d -print -quit)"
-	[ -n "$sparkle_fw" ] || fail "Sparkle.framework not found under $LAUNCHER_DIR/.build — SPM artifacts missing."
+	sparkle_fw="$(find "$LAUNCHER_DIR/.build/artifacts" -name "Sparkle.framework" -type d 2>/dev/null | grep -i "macos" | head -1)"
+	if [ -z "$sparkle_fw" ]; then
+		sparkle_fw="$(find "$LAUNCHER_DIR/.build/artifacts" -name "Sparkle.framework" -type d 2>/dev/null | head -1)"
+	fi
+	if [ -z "$sparkle_fw" ]; then
+		sparkle_fw="$(find "$LAUNCHER_DIR/.build" -name "Sparkle.framework" -type d 2>/dev/null | head -1)"
+	fi
+	[ -n "$sparkle_fw" ] || fail "Sparkle.framework not found under $LAUNCHER_DIR/.build — run 'swift build' in $LAUNCHER_DIR first."
 	log "Bundling Sparkle.framework (source: $sparkle_fw)"
 	cp -R "$sparkle_fw" "$APP_PATH/Contents/Frameworks/Sparkle.framework"
 
