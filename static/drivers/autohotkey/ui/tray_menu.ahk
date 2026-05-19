@@ -1124,6 +1124,12 @@ initMenu() {
 	_LlmRawInstant := IniCacheGet(_IniCache, "LLM", "instant_on_word_end")
 	if _LlmRawInstant != "_"
 		_LlmSavedOpts["instant_on_word_end"] := (_LlmRawInstant == "1" || _LlmRawInstant == "true")
+	; Profile auto-detection by model size (mirrors HS's
+	; get_recommended_profile_info path). Persist alongside instant_on_word_end
+	; so the user's toggle survives reloads.
+	_LlmRawAutoProfile := IniCacheGet(_IniCache, "LLM", "auto_profile_for_model")
+	if _LlmRawAutoProfile != "_"
+		_LlmSavedOpts["auto_profile_for_model"] := (_LlmRawAutoProfile == "1" || _LlmRawAutoProfile == "true")
 	LLM_Tray_Init(_LlmSavedOpts)
 
 	; ── 📊 Métriques — mirrors the HS Métriques submenu position exactly:
