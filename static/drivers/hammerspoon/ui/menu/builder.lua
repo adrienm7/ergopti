@@ -395,37 +395,14 @@ function M.generate(ctx, menu_mods, actions)
 	end
 
 
-	-- Build the about item early so it can be embedded in the global submenu
-	local _about_item = nil
-	if type(menu_mods.about) == "table" and type(menu_mods.about.build) == "function" then
-		local ok_a, about_item = pcall(menu_mods.about.build, ctx)
-		if ok_a and about_item then
-			_about_item = about_item
-		end
-	end
-
-	-- Assemble global actions submenu: bulk toggles + version/update block
-	local global_menu_items = {
-		{ title = i18n.get("menu.global.enable_all"),    fn = actions.enable_all },
-		{ title = i18n.get("menu.global.disable_all"),   fn = actions.disable_all },
-		{ title = i18n.get("menu.global.reset_defaults"), fn = actions.reset_defaults },
-	}
-	if _about_item then
-		table.insert(global_menu_items, { title = "-" })
-		-- Inline the about submenu items rather than nesting a submenu-of-submenu
-		if type(_about_item.menu) == "table" then
-			for _, it in ipairs(_about_item.menu) do
-				table.insert(global_menu_items, it)
-			end
-		else
-			table.insert(global_menu_items, _about_item)
-		end
-	end
-
 	table.insert(items, { title = "-" })
 	table.insert(items, {
 		title = i18n.get("menu.global.title"),
-		menu  = global_menu_items,
+		menu = {
+			{ title = i18n.get("menu.global.enable_all"),    fn = actions.enable_all },
+			{ title = i18n.get("menu.global.disable_all"),   fn = actions.disable_all },
+			{ title = i18n.get("menu.global.reset_defaults"), fn = actions.reset_defaults },
+		}
 	})
 	table.insert(items, { title = i18n.get("menu.global.config_folder"), fn = actions.open_paths })
 	table.insert(items, { title = i18n.get("menu.global.setup_wizard"),  fn = actions.show_setup_wizard })
@@ -434,7 +411,14 @@ function M.generate(ctx, menu_mods, actions)
 	-- plain Unicode symbols — emoji render poorly in native macOS menu bars
 	table.insert(items, { title = "↺ " .. i18n.get("menu.global.reload"):gsub("^%S+ ", ""),  fn = actions.reload })
 	table.insert(items, { title = "✕ " .. i18n.get("menu.global.quit"):gsub("^%S+ ", ""),    fn = actions.quit })
-	-- Language selector sits below the lifecycle actions, after the version block
+	-- About / Update — version display, channel selector, changelog
+	if type(menu_mods.about) == "table" and type(menu_mods.about.build) == "function" then
+		local ok_a, about_item = pcall(menu_mods.about.build, ctx)
+		if ok_a and about_item then
+			table.insert(items, about_item)
+		end
+	end
+	-- Language selector sits below the version/update entry
 	table.insert(items, {
 		title = i18n.get("menu.global.language"),
 		menu  = i18n.build_language_menu_items(),
