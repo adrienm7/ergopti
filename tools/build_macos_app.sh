@@ -299,6 +299,17 @@ assemble_app() {
 	cp "$launcher_bin" "$APP_PATH/Contents/MacOS/Ergopti"
 	chmod +x "$APP_PATH/Contents/MacOS/Ergopti"
 
+	# Copy Sparkle.framework into Contents/Frameworks/. The launcher links
+	# against Sparkle via @rpath, and the SPM build leaves the framework in
+	# .build/artifacts/<package>/Sparkle/Sparkle.framework rather than next
+	# to the binary — without this step dyld fails with "Library not loaded:
+	# @rpath/Sparkle.framework/Versions/B/Sparkle" at launch.
+	local sparkle_fw
+	sparkle_fw="$(find "$LAUNCHER_DIR/.build" -name "Sparkle.framework" -type d -print -quit)"
+	[ -n "$sparkle_fw" ] || fail "Sparkle.framework not found under $LAUNCHER_DIR/.build — SPM artifacts missing."
+	log "Bundling Sparkle.framework (source: $sparkle_fw)"
+	cp -R "$sparkle_fw" "$APP_PATH/Contents/Frameworks/Sparkle.framework"
+
 	# Mirror the dev tree under Contents/Resources/ so every Lua path that
 	# walks up from hs.configdir (e.g. ``hs.configdir .. "/../_shared/..."``,
 	# ``locale.lua``'s gsub("/static/drivers/hammerspoon$"), etc.) resolves
@@ -439,6 +450,7 @@ codesign_app() {
 	# Sign nested .app bundles first so the host-level --deep pass finds them
 	# already valid rather than re-signing them in an undefined order.
 	codesign --force --deep --sign - "$APP_PATH/Contents/Frameworks/Hammerspoon.app"
+	codesign --force --deep --sign - "$APP_PATH/Contents/Frameworks/Sparkle.framework"
 	# Sign KE only if it's a .app bundle — .pkg files are not codesignable this way
 	local ke_app="$APP_PATH/Contents/Resources/Tools/Karabiner/Karabiner-Elements.app"
 	[ -d "$ke_app" ] && codesign --force --deep --sign - "$ke_app" || true
