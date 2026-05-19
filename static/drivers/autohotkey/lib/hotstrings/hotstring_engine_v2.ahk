@@ -60,7 +60,11 @@ global HSE_MAX_BUFFER_LEN := 64
 ; Word terminators: characters whose typing ends the current word and
 ; resets the buffer. The newline characters cover SendInput-injected
 ; replacements that terminate with `r`n (rare but possible).
-global HSE_WORD_TERMINATORS := " `t`r`n.,;:?!"
+; Apostrophes (both ASCII U+0027 and typographic U+2019) are included so
+; that French contractions like "l'ia" let the "ia" trigger fire on the
+; next terminator — the engine must treat the char after an apostrophe
+; as the start of a new word, exactly like after a space.
+global HSE_WORD_TERMINATORS := " `t`r`n.,;:?!'’"
 
 
 ; ============================================

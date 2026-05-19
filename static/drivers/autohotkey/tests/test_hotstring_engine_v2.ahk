@@ -315,6 +315,40 @@ TestHSEv2_InWordTriggerFiresAnywhere() {
 Test("HSEv2 InWord trigger ignores the word-boundary check",
     TestHSEv2_InWordTriggerFiresAnywhere)
 
+TestHSEv2_ApostropheActsAsWordBoundaryStraight() {
+    HSEv2_TestReset()
+    ; Non-star, is_word=true trigger "ia" — only fires when a terminator is
+    ; typed after AND the char preceding "i" is itself a word boundary.
+    HSE_Register("", "ia", () => 0)
+    ; Type "l'ia " with the ASCII apostrophe (Chr 0x27).
+    HSE_FeedChar("l")
+    HSE_FeedChar(Chr(0x27))
+    HSE_FeedChar("i")
+    HSE_FeedChar("a")
+    Match := HSE_FeedChar(" ")   ; terminator fires the end-char path
+    AssertTrue(Match != "",
+        "trigger fires after l'ia + space — ' is treated as a word boundary")
+    AssertEqual("ia", Match.Trigger)
+}
+Test("HSEv2 ASCII apostrophe acts as word boundary (l'ia + space fires)",
+    TestHSEv2_ApostropheActsAsWordBoundaryStraight)
+
+TestHSEv2_ApostropheActsAsWordBoundaryTypographic() {
+    HSEv2_TestReset()
+    HSE_Register("", "ia", () => 0)
+    ; Same as above but with the typographic apostrophe (Chr 0x2019).
+    HSE_FeedChar("l")
+    HSE_FeedChar(Chr(0x2019))
+    HSE_FeedChar("i")
+    HSE_FeedChar("a")
+    Match := HSE_FeedChar(" ")
+    AssertTrue(Match != "",
+        "trigger fires after l’ia + space — typographic apostrophe is a word boundary")
+    AssertEqual("ia", Match.Trigger)
+}
+Test("HSEv2 typographic apostrophe acts as word boundary (l’ia + space fires)",
+    TestHSEv2_ApostropheActsAsWordBoundaryTypographic)
+
 TestHSEv2_CaseInsensitiveMatchesAnyCase() {
     HSEv2_TestReset()
     HSE_Register("*", "ui", () => 0)
