@@ -720,8 +720,8 @@ _LookupAndRender() {
         Delay := (Cfg.Delay != "") ? Cfg.Delay : 0
         ; Trigger label shown on the right side of the row:
         ;   ★ (or the configured magic key) for star triggers,
-        ;   ⏎  for end-char-gated triggers (space / punctuation / enter).
-        TriggerLabel := InStr(Entry.Trigger, MK) ? MK : "⏎"
+        ;   ↵  for end-char-gated triggers (space / punctuation / enter).
+        TriggerLabel := InStr(Entry.Trigger, MK) ? MK : "↵"
         Item := { Text: Entry.Output, TriggerLabel: TriggerLabel,
                   ColorHex: Color, DurationSec: Delay,
                   Trigger: Entry.Trigger, Category: Entry.Category }
