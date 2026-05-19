@@ -59,11 +59,27 @@ global _ob_gui          := unset
 
 ; Run the wizard only when config.toml does not yet exist.
 ; Called at startup before features are loaded.
+;
+; BLOCKING contract: this function must NOT return while the wizard is on
+; screen. ``g.Show()`` is non-blocking on its own, so without this guard the
+; caller would continue with no config and ParseTomlFile() would raise
+; cascading errors that crash the GUI within ~1 second. We park here until
+; the wizard either commits (calls Reload, which kills the loop) or the user
+; dismisses it (in which case there is no usable config and we ExitApp).
 Onboarding_Run() {
 	if FileExist(ConfigurationFile) {
 		return
 	}
 	_Onboarding_Step1()
+	; Loop tick chosen large enough to leave the message pump idle most of
+	; the time, small enough to dismiss the script quickly when the user
+	; closes the wizard.
+	while IsSet(_ob_gui) {
+		Sleep(100)
+	}
+	; Reaching here means the wizard window was closed without committing —
+	; the driver cannot operate without a config, so exit cleanly.
+	ExitApp(0)
 }
 
 
@@ -406,10 +422,19 @@ _Onboarding_Commit() {
 ; ===== 5.1) Centering and display =====
 ; ========================================
 
-; Center the wizard window on the primary monitor and show it.
-; Width is fixed; height is computed automatically from the controls.
+; Center the wizard window on the primary monitor and show it. Also wire a
+; Close handler so the X button does not leave Onboarding_Run() looping on a
+; window that is no longer visible — instead it cleanly clears ``_ob_gui``
+; and lets the caller decide what to do next.
 _Onboarding_Show(g) {
+	g.OnEvent("Close", _Onboarding_OnGuiClose)
 	g.Show("w" ONBOARDING_WIN_W " AutoSize Center")
+}
+
+; Single close handler reused by every wizard page. Triggered when the user
+; clicks the window's X button or hits Alt+F4.
+_Onboarding_OnGuiClose(g, *) {
+	_Onboarding_DestroyActive()
 }
 
 
