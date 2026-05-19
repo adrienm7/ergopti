@@ -99,6 +99,7 @@ SendMode("Event") ; Everything concerning hotstrings MUST use SendEvent and not 
 #Include lib/toml/toml_loader.ahk
 #Include lib/menu_manifest.ahk
 #Include lib/llm_defaults.ahk
+#Include lib/updater.ahk
 ; i18n module — must come after toml_loader.ahk (TOML_BatchWrite) and logger.ahk
 #Include lib/i18n.ahk
 #Include lib/onboarding.ahk
@@ -195,7 +196,9 @@ global _TOML_STRICT_CANON_IN_PROGRESS := false
 
 ; Read path overrides from paths.toml — same file format as Hammerspoon.
 ; Auto-generated with defaults if absent.
-global _PathsFile := A_ScriptDir . "\paths.toml"
+; In compiled mode the file lives in the bundle dir (LocalAppData\Ergopti\bundle\)
+; so it never pollutes the folder the .exe was launched from (Downloads, Desktop…).
+global _PathsFile := (A_IsCompiled and _BundleDir != "") ? _BundleDir . "\paths.toml" : A_ScriptDir . "\paths.toml"
 global _PathsOverrides := ReadPathsToml(_PathsFile)
 
 ; ConfigDirPath is the single relocatable folder that holds all personal files.
@@ -386,6 +389,7 @@ HotstringEngineInit()
 ; Initialise the logger now that the ini cache is built and ScriptInformation
 ; reflects user overrides — LoggerInit reads [Script] LogLevel from the ini.
 LoggerInit()
+Updater_LoadChannel()
 LoggerStart("ErgoptiPlus", "Booting ErgoptiPlus driver…")
 
 ; Probe SC138 → VK directly so we can see what MapVirtualKeyExW actually
@@ -752,11 +756,10 @@ EnsurePersonalShortcutsFile(Path) {
     ; the loader to the canonical _ConfigDir copy. The inner `*i` is required
     ; so renaming or deleting the user's file does not break script loading
     ; before EnsurePersonalShortcutsFile gets a chance to recreate it.
-    ; Hide the stub in a sibling _generated/ folder so it does not clutter
-    ; the source tree alongside the actual driver files. The folder is
-    ; gitignored; AHK resolves `#Include *i _generated\personal_shortcuts.ahk`
-    ; relative to A_ScriptDir at parse time.
-    StubDir := A_ScriptDir . "\_generated"
+    ; In compiled mode place the stub in LocalAppData\Ergopti\_generated\ so it
+    ; never lands next to the .exe (Downloads, Desktop…). In dev mode the sibling
+    ; _generated/ folder (gitignored) keeps the source tree tidy as before.
+    StubDir := (A_IsCompiled) ? (A_LocalAppData . "\Ergopti\_generated") : (A_ScriptDir . "\_generated")
     try DirCreate(StubDir)
     StubPath := StubDir . "\personal_shortcuts.ahk"
     DesiredStub := "; Auto-generated forwarding stub — do not edit.`r`n"
@@ -801,7 +804,11 @@ EnsurePersonalShortcutsFile(ScriptInformation["PersonalAhkPath"])
 ; layout's key remappings (which run at the default level 0). We set it here so
 ; the user does not have to know about input levels in their personal file.
 #InputLevel 2
+; In dev mode: _generated/ sits next to the script (A_ScriptDir-relative).
+; In compiled mode: %A_LocalAppData%\Ergopti\_generated\ so the .exe never
+; litters its own folder (Downloads, Desktop, etc.) with generated files.
 #Include *i _generated/personal_shortcuts.ahk
+#Include *i %A_LocalAppData%\Ergopti\_generated\personal_shortcuts.ahk
 #InputLevel 0
 ; Apply user overrides from ahk/config.toml on top of the INI-driven
 ; configuration. The [script] and [features] sections are an optional "expert"

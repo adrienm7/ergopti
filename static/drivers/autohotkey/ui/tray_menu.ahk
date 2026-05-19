@@ -1189,6 +1189,27 @@ initMenu() {
 	A_TrayMenu.Add(t("menu.global.reload"), ActivateReload)
 	A_TrayMenu.Add(t("menu.global.quit"), ActivateExitApp)
 
+	; ── About / Update — version display, changelog and update channel picker ──
+	AboutMenu := Menu()
+	Ver := Updater_CurrentVersion()
+	VerLabel := "ErgoptiPlus " . Ver
+	AboutMenu.Add(VerLabel, Updater_ShowVersion)
+	AboutMenu.Add() ; Separator
+	global UPDATER_CHANNEL
+	ChannelMainLabel := "✔  Stable (main)"
+	ChannelDevLabel  := "   Pre-release (dev)"
+	if (UPDATER_CHANNEL == "dev") {
+		ChannelMainLabel := "   Stable (main)"
+		ChannelDevLabel  := "✔  Pre-release (dev)"
+	}
+	AboutMenu.Add(ChannelMainLabel, (*) => Updater_SetChannel("main"))
+	AboutMenu.Add(ChannelDevLabel,  (*) => Updater_SetChannel("dev"))
+	AboutMenu.Add() ; Separator
+	AboutMenu.Add("Check for updates", Updater_CheckForUpdate)
+	AboutMenu.Add("Changelog",         Updater_ShowChangelog)
+	AboutMenu.Add("Open releases page", (*) => Run(Updater_ReleasesPageUrl()))
+	A_TrayMenu.Add("ErgoptiPlus " . Ver, AboutMenu)
+
 	; ── Debug tools — grouped in a submenu to keep the top-level menu tidy.
 	; Mirrors Hammerspoon's "⚠ Debug" entry (Console + log shortcuts);
 	; Window Spy / List Vars / Key History are AutoHotkey-specific particulars. ──

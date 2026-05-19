@@ -35,7 +35,7 @@ local TomlCodec = require("lib.toml_codec")
 
 
 --- Top-level TOML section names in the order they appear on disk.
-local SECTIONS = { "gestures", "hotstrings", "metrics", "llm", "shortcuts" }
+local SECTIONS = { "gestures", "hotstrings", "metrics", "llm", "shortcuts", "updater" }
 
 --- Maps every flat state key (as used in memory throughout the codebase) to
 --- its on-disk location. Fields:
@@ -116,6 +116,9 @@ local KEY_MAP = {
 	shortcuts                            = { sec = "shortcuts", key = "enabled"              },
 	chatgpt_url                          = { sec = "shortcuts"                                },
 	script_control_enabled               = { sec = "shortcuts", path = "script_control", key = "enabled" },
+
+	-- ── Updater ────────────────────────────────────────────────────────────
+	update_channel                       = { sec = "updater",  key = "channel"               },
 }
 
 --- Maps nested-table flat state keys to their on-disk location.
