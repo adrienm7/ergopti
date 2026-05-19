@@ -404,7 +404,10 @@ function M.update_preview(buf)
 			return mapping.plain_repl == star_base .. star_base:sub(offset)
 		end
 
-		-- Star matches (magic-key triggers) — collect the first one (longest wins).
+		-- Star matches (magic-key triggers) — collect EVERY trigger whose star_base
+		-- matches the buffer end. The bucket is pre-sorted longest-first by the
+		-- registry, so the first collected match is the one the engine will
+		-- actually fire; the rest are alternatives shown dimmed + strikethrough.
 		local star_bucket = Registry.mappings_for_star_tail(buf_tail_char)
 		if star_bucket then
 			for _, mapping in ipairs(star_bucket) do
@@ -422,14 +425,14 @@ function M.update_preview(buf)
 							type       = "star",
 							group      = mapping.group,
 						}
-						break
 					end
 				end
 			end
 		end
 
-		-- Autocorrect match — kept even when a star match was found so both
-		-- can appear as separate rows in the stacked tooltip.
+		-- Autocorrect matches — same logic: collect every trigger whose body
+		-- matches, sorted longest-first by the registry. The first is what
+		-- fires; the rest are alternatives.
 		local tail_bucket = Registry.mappings_for_tail(buf_tail_char)
 		if tail_bucket then
 			for _, mapping in ipairs(tail_bucket) do
@@ -445,7 +448,6 @@ function M.update_preview(buf)
 						type       = "autocorrect",
 						group      = mapping.group,
 					}
-					break
 				end
 			end
 		end
@@ -454,14 +456,34 @@ function M.update_preview(buf)
 	if #matches > 0 then
 		M.reset_predictions(true)
 
-		-- Build tooltip rows (one per match). Magic-key star rows appear first.
+		-- Build tooltip rows (one per match). Within each kind (star / autocorrect /
+		-- provider) the FIRST surviving row is the one the engine will fire — the
+		-- rest are rendered dimmed + strikethrough so the user can see the
+		-- alternatives without confusing them with the real outcome.
 		local magic_key = "★"
 		local rows          = {}
 		local any_enabled   = false
 		local min_timeout   = nil
 		local primary_match = matches[1]
 
-		for _, m in ipairs(matches) do
+		-- Track whether each kind has already produced its primary row. Subsequent
+		-- enabled rows of the same kind are marked dimmed.
+		local primary_seen = { star = false, autocorrect = false, provider = false }
+		-- Re-order matches so end-char (↵) rows come first, then star (★) rows,
+		-- then providers. End-char triggers usually have a shorter delay (the
+		-- user types space/tab quickly) so they need maximum visibility on top.
+		-- Preserves intra-group order, which is priority order from the registry.
+		local ordered = {}
+		local function append_kind(kind)
+			for _, m in ipairs(matches) do
+				if m.type == kind then ordered[#ordered + 1] = m end
+			end
+		end
+		append_kind("autocorrect")
+		append_kind("star")
+		append_kind("provider")
+
+		for _, m in ipairs(ordered) do
 			local is_star = (m.type == "star")
 
 			local tint_key
@@ -491,10 +513,13 @@ function M.update_preview(buf)
 				if not min_timeout or row_timeout < min_timeout then
 					min_timeout = row_timeout
 				end
+				local is_primary = not primary_seen[m.type]
+				primary_seen[m.type] = true
 				rows[#rows + 1] = {
 					text          = m.plain_repl,
 					tint          = tooltip.tint(tint_key),
 					trigger_label = is_star and magic_key or "↵",
+					dimmed        = not is_primary,
 				}
 			end
 

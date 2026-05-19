@@ -382,13 +382,21 @@ _TooltipBuildGui(Items) {
         Meta := RowMeta[Idx]
         RowY := Meta.Y
         RowH := Meta.H
+        IsDimmed := Item.HasOwnProp("IsDimmed") && Item.IsDimmed
 
         ; Full-width background band for this row's tint color.
-        G.SetFont("s1", _TOOLTIP_FONT_NAME)
+        G.SetFont("norm s1", _TOOLTIP_FONT_NAME)
         G.Add("Text", Format("Background{1} x0 y{2} w{3} h{4}", BgHex, RowY, TotalW, RowH), "")
 
-        ; Main text overlay.
-        G.SetFont("cFFFFFF s" . _TOOLTIP_FONT_SIZE, _TOOLTIP_FONT_NAME)
+        ; Main text overlay. Dimmed alternates (rows beyond the firing one of
+        ; their group) get gray text + strikethrough so the user sees what is
+        ; available without confusing it with the actual outcome. ``norm``
+        ; resets any prior Strike/Bold/Italic before applying this row's style.
+        if IsDimmed {
+            G.SetFont("norm c8C8C8C strike s" . _TOOLTIP_FONT_SIZE, _TOOLTIP_FONT_NAME)
+        } else {
+            G.SetFont("norm cFFFFFF s" . _TOOLTIP_FONT_SIZE, _TOOLTIP_FONT_NAME)
+        }
         G.Add("Text", Format("BackgroundTrans x{1} y{2} w{3} h{4}",
             _TOOLTIP_PADDING_X, RowY + _TOOLTIP_PADDING_Y, MaxW, S.H), Item.Text)
 
@@ -406,7 +414,10 @@ _TooltipBuildGui(Items) {
             ; centering offset is 0 and no upward shift is needed.
             DescenderFix := (Label == "↵" and CenterOffset > 0) ? 4 : 0
             LabelY := RowY + _TOOLTIP_PADDING_Y + CenterOffset - DescenderFix + StarFix
-            G.SetFont("c" . _TOOLTIP_LABEL_COLOR_HEX . " s" . _TOOLTIP_LABEL_FONT_SIZE, _TOOLTIP_FONT_NAME)
+            ; Dimmed rows get a darker label so the entire row reads as
+            ; "disabled" — same visual treatment as the main text.
+            LabelColorHex := IsDimmed ? "707070" : _TOOLTIP_LABEL_COLOR_HEX
+            G.SetFont("norm c" . LabelColorHex . " s" . _TOOLTIP_LABEL_FONT_SIZE, _TOOLTIP_FONT_NAME)
             G.Add("Text", Format("BackgroundTrans x{1} y{2} w{3} h{4}",
                 LabelX + RightFix, LabelY, MaxLabelW, LS.H), Label)
         }

@@ -705,12 +705,18 @@ _LookupAndRender() {
         return
     }
 
-    ; Collect all candidates that have ShowTooltip enabled, sorted so that
-    ; magic-key triggers (those ending with ★) appear first — they represent
-    ; the shortest-keystroke path and should be most prominent visually.
+    ; Collect candidates per group and lay them out as the user requested:
+    ; end-char (↵) triggers FIRST (top), then magic-key (★) triggers below.
+    ; End-char triggers usually have a shorter delay (the user types
+    ; space/tab/enter quickly) so they need maximum visibility on top.
+    ; Within each group, the FIRST surviving candidate is the one the engine
+    ; will actually fire — it is rendered normally. Every subsequent candidate
+    ; of the same group is rendered dimmed + strikethrough (IsDimmed flag,
+    ; consumed by tooltip.ahk's _TooltipBuildGui).
     Candidates := _PrefixIndex[Buffer]
     MK := ScriptInformation["MagicKey"]
-    Items := []
+    EndItems := []
+    StarItems := []
     for _, Entry in Candidates {
         Cfg := HotstringsResolve(Entry.Category, Entry.Section)
         if !Cfg.ShowTooltip {
@@ -718,18 +724,24 @@ _LookupAndRender() {
         }
         Color := (Cfg.Color != "") ? Cfg.Color : ""
         Delay := (Cfg.Delay != "") ? Cfg.Delay : 0
+        IsMagic := InStr(Entry.Trigger, MK) > 0
         ; Trigger label shown on the right side of the row:
         ;   ★ (or the configured magic key) for star triggers,
         ;   ↵  for end-char-gated triggers (space / punctuation / enter).
-        TriggerLabel := InStr(Entry.Trigger, MK) ? MK : "↵"
+        TriggerLabel := IsMagic ? MK : "↵"
+        Bucket := IsMagic ? StarItems : EndItems
         Item := { Text: Entry.Output, TriggerLabel: TriggerLabel,
                   ColorHex: Color, DurationSec: Delay,
-                  Trigger: Entry.Trigger, Category: Entry.Category }
-        if InStr(Entry.Trigger, MK) {
-            Items.InsertAt(1, Item)
-        } else {
-            Items.Push(Item)
-        }
+                  Trigger: Entry.Trigger, Category: Entry.Category,
+                  IsDimmed: Bucket.Length > 0 }
+        Bucket.Push(Item)
+    }
+    Items := []
+    for _, Item in EndItems {
+        Items.Push(Item)
+    }
+    for _, Item in StarItems {
+        Items.Push(Item)
     }
     if (Items.Length == 0) {
         TooltipHide()
