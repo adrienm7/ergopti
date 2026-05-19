@@ -102,5 +102,11 @@ LLM_Tooltip_Hide() {
  */
 LLM_Tooltip_GetText() {
 	global _LLM_Tooltip_Visible, _LLM_Tooltip_Text
+	; Guarded reads — the ``#HotIf LLM_Tooltip_GetText() != ""`` predicate is
+	; evaluated by every Tab press, including those that arrive during early
+	; init (before Bundle_Init's RunWait has returned and the auto-execute
+	; flow has reached the global declarations above).
+	if !IsSet(_LLM_Tooltip_Visible) or !IsSet(_LLM_Tooltip_Text)
+		return ""
 	return _LLM_Tooltip_Visible ? _LLM_Tooltip_Text : ""
 }

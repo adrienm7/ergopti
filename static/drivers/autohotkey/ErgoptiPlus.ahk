@@ -3,6 +3,22 @@
 #SingleInstance Force ; Ensure that only one instance of the script can run at once
 SetWorkingDir(A_ScriptDir) ; Set the working directory where the script is located
 
+; Globals referenced by ``#HotIf`` expressions across the driver. They MUST
+; be assigned before any code that pumps the message loop runs — otherwise
+; AHK throws "global variable has not been assigned a value" the first time
+; a keystroke during early init causes a #HotIf expression to be evaluated.
+;
+; ``Bundle_Init()`` below shells out to PowerShell via ``RunWait`` (see
+; ``lib/bundle.ahk``), and RunWait pumps messages. Any key pressed during the
+; ~250ms unzip would otherwise trigger #HotIf evaluation on hotkeys like
+; ``#HotIf CapsWordEnabled``, ``#HotIf LayerEnabled`` or anything reading
+; ``Features["…"]…`` while those globals are still unset. Loading the
+; Features Map and the two layer-state booleans here keeps the very first
+; message pump well-formed.
+global CapsWordEnabled := False
+global LayerEnabled := False
+#Include lib/features_config.ahk
+
 ; In compiled mode the .exe ships an embedded zip of every runtime asset
 ; (hotstrings TOMLs, locales, icons, _shared tree, vendor DLLs). The bundle
 ; bootstrapper extracts it next to the .exe on first launch so the rest of
@@ -188,8 +204,9 @@ global LAST_SENT_KEY_TIME_MAX_AGE_MS := 60000
 global LAST_SENT_KEY_TIME_PRUNE_AT := 150
 ; LastSentCharacters ring buffer lives in lib/hotstring_engine.ahk (_LSC_*).
 ; Accessed only via UpdateLastSentCharacter / GetLastSentCharacterAt.
-global CapsWordEnabled := False ; If the keyboard layer is currently in CapsWord state
-global LayerEnabled := False ; If the keyboard layer is currently in navigation state
+; ``CapsWordEnabled`` and ``LayerEnabled`` are initialised at the very top of
+; the script (before Bundle_Init) so #HotIf evaluation during early message
+; pumping never sees them unset — do not re-declare them here.
 global NumberOfRepetitions := 1 ; Same as Vim where 3w does the w action 3 times, we can do the same in the navigation layer
 global ActivitySimulation := False
 global OneShotShiftEnabled := False
@@ -415,9 +432,11 @@ LoggerInfo("AltGrDetect",
 
 ; Features configuration (enabled flags, default parameters, submenu hierarchy)
 ; extracted to its own submodule so the main file is not dominated by a 650-line
-; data literal. INI overrides are still applied by ReadConfiguration() below, and
-; TOML metadata is still injected by ApplyTomlMetadataToFeatures() after that.
-#Include lib/features_config.ahk
+; data literal. The actual #Include lives at the top of the file (before
+; Bundle_Init) so the Features Map exists before any #HotIf can be evaluated
+; during early message pumping. INI overrides are still applied by
+; ReadConfiguration() below, and TOML metadata is still injected by
+; ApplyTomlMetadataToFeatures() after that.
 
 ; It is best to modify those values by using the option in the script menu
 global PersonalInformation := Map(
