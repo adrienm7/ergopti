@@ -749,11 +749,23 @@ _LookupAndRender() {
         return
     }
 
+    ; Walk the buffer from the right edge backwards; the first character we
+    ; meet that appears in ``HSE_WORD_TERMINATORS`` marks the boundary of
+    ; the leading context, and everything to its right is the current word
+    ; under typing. The straightforward ``InStr(..., , 1, -1)`` form does
+    ; NOT do this: with a positive StartingPos and a negative Occurrence,
+    ; AHK v2 essentially returns the first match from the left, not the
+    ; last from the right — verified by direct probe, which is why ``a'ia``
+    ; used to return ``a'ia`` (no terminator found) instead of ``ia``.
     LastTermPos := 0
-    for Char in StrSplit(HSE_WORD_TERMINATORS) {
-        Pos := InStr(Buffer, Char, , 1, -1)   ; Occurrence=-1 → search right-to-left
-        if (Pos > LastTermPos)
-            LastTermPos := Pos
+    BufScanIdx := StrLen(Buffer)
+    while (BufScanIdx >= 1) {
+        ScanChar := SubStr(Buffer, BufScanIdx, 1)
+        if (InStr(HSE_WORD_TERMINATORS, ScanChar) > 0) {
+            LastTermPos := BufScanIdx
+            break
+        }
+        BufScanIdx -= 1
     }
     SearchKey := (LastTermPos > 0) ? SubStr(Buffer, LastTermPos + 1) : Buffer
     if (SearchKey == "") {
