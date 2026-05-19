@@ -41,9 +41,8 @@ global ONBOARDING_WIN_W := 460
 ; Height of the language ListView — fits ~8 rows, scrollable beyond that
 global ONBOARDING_LV_H := 240
 
-; Default magic key inserted into the Step 3 input. ★ is the canonical visual
-; symbol for the magic key; the user can change it to ù, ; or any single character.
-global ONBOARDING_DEFAULT_MAGIC_KEY := "★"
+; Default magic key inserted into the Step 3 input.
+global ONBOARDING_DEFAULT_MAGIC_KEY := "*"
 
 ; Collected answers — populated as the user advances through each step
 global _ob_locale            := "en"
@@ -382,7 +381,7 @@ _Onboarding_Step3() {
 	; Pre-select whichever radio matches the persisted/default value, falling
 	; back to the Ergopti+ star so the wizard always starts with a sensible pick.
 	switch _ob_magic_key {
-		case "★": rStar.Value   := 1
+		case "*": rStar.Value   := 1
 		case "ù": rUGrave.Value := 1
 		case ";": rSemi.Value   := 1
 		default:
@@ -436,7 +435,7 @@ _Step3_Back(g, *) {
 _Step3_Next(g, rStar, rUGrave, rSemi, rCustom, edKey, *) {
 	val := ""
 	if (rStar.Value = 1) {
-		val := "★"
+		val := "*"
 	} else if (rUGrave.Value = 1) {
 		val := "ù"
 	} else if (rSemi.Value = 1) {
