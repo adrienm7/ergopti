@@ -1830,5 +1830,6 @@
 	"updater.version_message": "ErgoptiPlus {1}{2}\n\nهل تريد فتح صفحة الإصدارات في GitHub؟",
 	"updater.channel_local_source_suffix": " (مصدر محلي — ليس إصدار إطلاق)",
 	"updater.channel_dev_suffix": " (قناة ما قبل الإطلاق)",
-	"updater.channel_main_suffix": " (القناة المستقرة)"
+	"updater.channel_main_suffix": " (القناة المستقرة)",
+	"menu.llm.indent_space": "مسافة"
 }

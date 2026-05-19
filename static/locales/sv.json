@@ -1856,5 +1856,6 @@
 	"updater.version_message": "ErgoptiPlus {1}{2}\n\nÖppna utgåvesidan på GitHub?",
 	"updater.channel_local_source_suffix": " (lokal källa — inte ett utgåvebygg)",
 	"updater.channel_dev_suffix": " (förhandskanal)",
-	"updater.channel_main_suffix": " (stabil kanal)"
+	"updater.channel_main_suffix": " (stabil kanal)",
+	"menu.llm.indent_space": "blanksteg"
 }

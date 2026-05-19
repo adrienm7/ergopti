@@ -1830,5 +1830,6 @@
 	"updater.version_message": "ErgoptiPlus {1}{2}\n\nOtevřít stránku vydání na GitHubu?",
 	"updater.channel_local_source_suffix": " (lokální zdroj — není to vydané sestavení)",
 	"updater.channel_dev_suffix": " (předběžný kanál)",
-	"updater.channel_main_suffix": " (stabilní kanál)"
+	"updater.channel_main_suffix": " (stabilní kanál)",
+	"menu.llm.indent_space": "mezera"
 }

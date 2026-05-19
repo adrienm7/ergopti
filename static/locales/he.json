@@ -1856,5 +1856,6 @@
 	"updater.version_message": "ErgoptiPlus {1}{2}\n\nלפתוח את עמוד ההפצות ב-GitHub?",
 	"updater.channel_local_source_suffix": " (מקור מקומי — אינו בניית הפצה)",
 	"updater.channel_dev_suffix": " (ערוץ קדם-הפצה)",
-	"updater.channel_main_suffix": " (ערוץ יציב)"
+	"updater.channel_main_suffix": " (ערוץ יציב)",
+	"menu.llm.indent_space": "רווח"
 }

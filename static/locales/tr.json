@@ -1830,5 +1830,6 @@
 	"updater.version_message": "ErgoptiPlus {1}{2}\n\nGitHub’da sürümler sayfasını açayım mı?",
 	"updater.channel_local_source_suffix": " (yerel kaynak — yayın sürümü değil)",
 	"updater.channel_dev_suffix": " (ön sürüm kanalı)",
-	"updater.channel_main_suffix": " (kararlı kanal)"
+	"updater.channel_main_suffix": " (kararlı kanal)",
+	"menu.llm.indent_space": "boşluk"
 }

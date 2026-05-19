@@ -1830,5 +1830,6 @@
 	"updater.version_message": "ErgoptiPlus {1}{2}\n\nВідкрити сторінку релізів на GitHub?",
 	"updater.channel_local_source_suffix": " (локальне джерело — не релізна збірка)",
 	"updater.channel_dev_suffix": " (попередній канал)",
-	"updater.channel_main_suffix": " (стабільний канал)"
+	"updater.channel_main_suffix": " (стабільний канал)",
+	"menu.llm.indent_space": "пробіл"
 }

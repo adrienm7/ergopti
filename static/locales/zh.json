@@ -1829,5 +1829,6 @@
 	"updater.version_message": "ErgoptiPlus {1}{2}\n\n在 GitHub 上打开发布页面?",
 	"updater.channel_local_source_suffix": " (本地源 — 非发布版本)",
 	"updater.channel_dev_suffix": " (预发布通道)",
-	"updater.channel_main_suffix": " (稳定通道)"
+	"updater.channel_main_suffix": " (稳定通道)",
+	"menu.llm.indent_space": "空格"
 }

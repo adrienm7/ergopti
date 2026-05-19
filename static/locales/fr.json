@@ -1828,5 +1828,6 @@
 	"updater.version_message": "ErgoptiPlus {1}{2}\n\nOuvrir la page des releases sur GitHub ?",
 	"updater.channel_local_source_suffix": " (source locale — pas une version de release)",
 	"updater.channel_dev_suffix": " (canal pré-version)",
-	"updater.channel_main_suffix": " (canal stable)"
+	"updater.channel_main_suffix": " (canal stable)",
+	"menu.llm.indent_space": "espace"
 }
