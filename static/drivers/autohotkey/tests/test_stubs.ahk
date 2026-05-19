@@ -96,6 +96,18 @@ global Features := Map(
 global ConfigurationFile := A_ScriptDir . "\test_config.ini"
 global SpaceAroundSymbols := ""
 
+; ``_StaticDir`` is normally computed by ErgoptiPlus.ahk and read by
+; lib/i18n.ahk to build the path to the locale JSON files. Without this stub,
+; the very first t() call (e.g. from modules/gestures.ahk's top-level
+; GESTURE_SLOT_LABELS builder) raised "global variable has not been assigned a
+; value" inside lib/i18n.ahk's _I18nLocalePath helper. AHK then surfaced the
+; error as a MsgBox under default settings — invisible but blocking on the
+; headless CI runner, which is the root cause of the recurring "5-minute
+; timeout" failures of the AHK test suite. Pointing it at the real static/
+; folder so locale files actually load is a bonus: tests that exercise t()
+; now get translated strings instead of raw key names.
+global _StaticDir := A_ScriptDir . "\..\..\.."
+
 ; Hotstring engine globals normally maintained by modules/layout.ahk.
 ; The LastSentCharacters ring buffer is defined in lib/hotstring_engine.ahk;
 ; tests seed it via _LSCResetFrom([...]) instead of touching it directly.
