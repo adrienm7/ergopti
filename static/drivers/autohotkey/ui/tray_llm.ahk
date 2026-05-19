@@ -195,6 +195,11 @@ LLM_Tray_Init(saved_opts := Map()) {
 	if (_LLM_Tray["trigger_shortcut"] != "")
 		LLM_Tray_ApplyTriggerShortcut(_LLM_Tray["trigger_shortcut"])
 
+	; Restore persisted remote API entries (lives in api_entries.json next to
+	; the main config.toml — kept separate because the array-of-maps shape
+	; would not survive the project's flat-TOML writer).
+	_LLM_Tray_LoadApiEntries()
+
 	LLM_Tray_Build()
 
 	; Bootstrap Ollama silently on reload when the feature was already enabled.
@@ -523,6 +528,7 @@ _LLM_Tray_PromptApiEntry(EditId) {
 		_LLM_Tray["api_entries"].Push(new_entry)
 		_LLM_Tray["api_entry_id"] := new_entry["Id"]
 	}
+	_LLM_Tray_PersistApiEntries()
 	LLM_Tray_SaveConfig()
 	LLM_Engine_Init(LLM_Tray_BuildOpts())
 	LLM_Tray_Build()
@@ -542,6 +548,7 @@ _LLM_Tray_RemoveActiveApiEntry() {
 	_LLM_Tray["api_entry_id"] := (kept.Length > 0)
 		? _LLM_TrayApiEntryGet(kept[1], "Id", "")
 		: ""
+	_LLM_Tray_PersistApiEntries()
 	LLM_Tray_SaveConfig()
 	LLM_Engine_Init(LLM_Tray_BuildOpts())
 	LLM_Tray_Build()
@@ -552,6 +559,138 @@ _LLM_Tray_NewApiId() {
 	; would only happen on two adds within the same millisecond — vanishingly
 	; unlikely from a user-driven dialog flow.
 	return "api_" . A_TickCount
+}
+
+
+; ================================================================
+; ================================================================
+; ===== Remote API entries — persistence =========================
+; ================================================================
+; ================================================================
+
+; Path of the JSON file holding the user's API entries. Lives next to the
+; main config.toml so removing the whole config folder wipes API entries
+; with everything else. Kept separate from config.toml because the schema
+; is a nested array-of-maps that the project's flat-TOML writer would
+; mangle.
+_LLM_Tray_ApiEntriesPath() {
+	global ConfigurationFile
+	if !IsSet(ConfigurationFile) or ConfigurationFile == ""
+		return ""
+	SplitPath(ConfigurationFile, , &ParentDir)
+	return ParentDir . "\api_entries.json"
+}
+
+; Read api_entries.json on startup and populate the tray state. Silent on
+; missing file (first-run user) and on parse failure (corrupt file) — both
+; cases just leave the user with an empty entries list, which the UI handles
+; gracefully via the "+ Add an API…" affordance.
+_LLM_Tray_LoadApiEntries() {
+	global _LLM_Tray
+	path := _LLM_Tray_ApiEntriesPath()
+	if (path == "" or !FileExist(path))
+		return
+	try {
+		raw := FileRead(path, "UTF-8")
+	} catch {
+		return
+	}
+	entries := []
+	; Scan for top-level {…} object blocks. The mini-JSON we write has flat
+	; string fields and no nested braces, so a naïve regex is enough — the
+	; defensive RegExMatch loop never escapes the array boundary.
+	pos := 1
+	while RegExMatch(raw, "s){[^{}]*}", &m, pos) {
+		obj := Map()
+		chunk := m[0]
+		for field in ["Id", "Name", "Provider", "BaseUrl", "Token", "Model"] {
+			if RegExMatch(chunk, '"' . field . '"\s*:\s*"((?:[^"\\]|\\.)*)"', &fm) {
+				obj[field] := _LLM_TrayApiJsonUnescape(fm[1])
+			} else {
+				obj[field] := ""
+			}
+		}
+		if (obj["Id"] != "")
+			entries.Push(obj)
+		pos := m.Pos + m.Len
+	}
+	_LLM_Tray["api_entries"] := entries
+	; Re-anchor the active id only if it still exists; otherwise pick the
+	; first entry so a corrupted ``api_entry_id`` does not leave the user
+	; with "no active entry" while entries exist on disk.
+	active := _LLM_Tray.Has("api_entry_id") ? _LLM_Tray["api_entry_id"] : ""
+	if (active != "") {
+		found := false
+		for e in entries {
+			if (e["Id"] == active) {
+				found := true
+				break
+			}
+		}
+		if !found
+			active := ""
+	}
+	if (active == "" and entries.Length > 0)
+		active := entries[1]["Id"]
+	_LLM_Tray["api_entry_id"] := active
+}
+
+; Write api_entries.json. Called from every CRUD action so the file always
+; reflects the in-memory state. The serialiser only handles the six string
+; fields the dialog writes, which is the entire schema by construction.
+_LLM_Tray_PersistApiEntries() {
+	global _LLM_Tray
+	path := _LLM_Tray_ApiEntriesPath()
+	if (path == "")
+		return
+	entries := _LLM_Tray["api_entries"]
+	if (Type(entries) != "Array")
+		entries := []
+	lines := []
+	for e in entries {
+		fields := []
+		for field in ["Id", "Name", "Provider", "BaseUrl", "Token", "Model"] {
+			val := _LLM_TrayApiEntryGet(e, field, "")
+			fields.Push('"' . field . '":"' . _LLM_TrayApiJsonEscape(val) . '"')
+		}
+		lines.Push("{" . _LLM_TrayJoin(fields, ",") . "}")
+	}
+	body := "[" . _LLM_TrayJoin(lines, ",`n  ") . "]"
+	; Ensure the parent directory exists before writing — first run on a
+	; freshly-checked-out repo would otherwise hit ENOENT.
+	SplitPath(path, , &parent)
+	if (parent != "" and !DirExist(parent))
+		try DirCreate(parent)
+	try {
+		if FileExist(path)
+			FileDelete(path)
+		FileAppend(body, path, "UTF-8")
+	}
+}
+
+_LLM_TrayJoin(arr, sep) {
+	out := ""
+	for i, v in arr
+		out .= (i > 1 ? sep : "") . v
+	return out
+}
+
+_LLM_TrayApiJsonEscape(s) {
+	s := StrReplace(s, "\",  "\\")
+	s := StrReplace(s, '"',  '\"')
+	s := StrReplace(s, "`n", "\n")
+	s := StrReplace(s, "`r", "\r")
+	s := StrReplace(s, "`t", "\t")
+	return s
+}
+
+_LLM_TrayApiJsonUnescape(s) {
+	s := StrReplace(s, "\n", "`n")
+	s := StrReplace(s, "\r", "`r")
+	s := StrReplace(s, "\t", "`t")
+	s := StrReplace(s, '\"', '"')
+	s := StrReplace(s, "\\",  "\")
+	return s
 }
 
 
