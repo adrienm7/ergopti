@@ -1,7 +1,8 @@
 # .github/workflows/release.yml
 #
-# Builds Ergopti.app (macOS) and ErgoptiPlus.exe (Windows) and attaches both
-# to a GitHub Release. Three trigger paths:
+# Builds Ergopti.app (macOS), ErgoptiPlus.exe (Windows), and packages keyboard
+# layout files for all three platforms, then attaches everything to a GitHub
+# Release. Three trigger paths:
 #   1. push to dev          — auto-creates a pre-release "dev-{date}-{sha7}".
 #   2. release: published   — fired by release-please after main is updated.
 #   3. workflow_dispatch    — manual, takes an explicit tag.
@@ -185,6 +186,15 @@ jobs:
                   OUTPUT_PATH:      build/macos/appcast-main.xml
               run: bash tools/generate_appcast.sh
 
+            - name: Package latest keylayout bundle
+              shell: bash
+              run: |
+                  set -euo pipefail
+                  latest=$(ls -d static/drivers/macos/bundles/*.bundle | sort -V | tail -1)
+                  bundle_name=$(basename "$latest")
+                  (cd static/drivers/macos/bundles && zip -r "../../../../build/macos/Ergopti_keylayout.zip" "$bundle_name")
+                  echo "Packaged keylayout: $bundle_name → Ergopti_keylayout.zip"
+
             - name: Upload macOS assets to release
               shell: bash
               env:
@@ -193,8 +203,9 @@ jobs:
                   set -euo pipefail
                   tag="${{ needs.prepare-release.outputs.tag }}"
                   assets=(build/macos/Ergopti.app.zip)
-                  [ -f build/macos/Ergopti.app.zip.sig ] && assets+=(build/macos/Ergopti.app.zip.sig)
-                  [ -f build/macos/appcast-main.xml    ] && assets+=(build/macos/appcast-main.xml)
+                  [ -f build/macos/Ergopti.app.zip.sig    ] && assets+=(build/macos/Ergopti.app.zip.sig)
+                  [ -f build/macos/appcast-main.xml        ] && assets+=(build/macos/appcast-main.xml)
+                  [ -f build/macos/Ergopti_keylayout.zip  ] && assets+=(build/macos/Ergopti_keylayout.zip)
                   gh release upload "$tag" "${assets[@]}" --clobber
 
 
@@ -202,7 +213,7 @@ jobs:
 
 # ============================================================
 # ============================================================
-# ======= 3/ Windows — ErgoptiPlus.exe =======================
+# ======= 3/ Windows — ErgoptiPlus.exe + keyboard layout =====
 # ============================================================
 # ============================================================
 
@@ -270,17 +281,71 @@ jobs:
                       static/drivers/autohotkey/ErgoptiPlus.exe \
                       --clobber
 
+            - name: Upload Windows keyboard layout and Kanata config
+              shell: bash
+              env:
+                  GH_TOKEN: ${{ github.token }}
+              run: |
+                  set -euo pipefail
+                  tag="${{ needs.prepare-release.outputs.tag }}"
+                  latest_kbd=$(ls static/drivers/windows/Ergopti_v*.exe | sort -V | tail -1)
+                  cp "$latest_kbd" static/drivers/windows/Ergopti_keyboard_layout.exe
+                  gh release upload "$tag" \
+                      static/drivers/windows/Ergopti_keyboard_layout.exe \
+                      static/drivers/kanata/kanata.kbd \
+                      --clobber
+
 
 
 
 # ============================================================
 # ============================================================
-# ======= 4/ Finalize release notes ==========================
+# ======= 4/ Linux — XKB keyboard layouts ====================
+# ============================================================
+# ============================================================
+
+    build-linux:
+        needs: prepare-release
+        runs-on: ubuntu-latest
+
+        steps:
+            - name: Checkout at build ref
+              uses: actions/checkout@v4
+              with:
+                  ref: ${{ needs.prepare-release.outputs.ref }}
+                  fetch-depth: 0
+
+            - name: Package latest XKB files
+              shell: bash
+              run: |
+                  set -euo pipefail
+                  latest_dir=$(ls -d static/drivers/linux/v*_* | sort -V | tail -1)
+                  dir_name=$(basename "$latest_dir")
+                  mkdir -p build/linux
+                  (cd static/drivers/linux && zip -r "../../build/linux/Ergopti_xkb.zip" "$dir_name")
+                  echo "Packaged XKB: $dir_name → Ergopti_xkb.zip"
+
+            - name: Upload Linux XKB to release
+              shell: bash
+              env:
+                  GH_TOKEN: ${{ github.token }}
+              run: |
+                  set -euo pipefail
+                  gh release upload "${{ needs.prepare-release.outputs.tag }}" \
+                      build/linux/Ergopti_xkb.zip \
+                      --clobber
+
+
+
+
+# ============================================================
+# ============================================================
+# ======= 5/ Finalize release notes ==========================
 # ============================================================
 # ============================================================
 
     finalize-release:
-        needs: [prepare-release, build-macos, build-windows]
+        needs: [prepare-release, build-macos, build-windows, build-linux]
         runs-on: ubuntu-latest
 
         steps:
@@ -305,16 +370,22 @@ jobs:
                   | Asset | Description |
                   |---|---|
                   | \`Ergopti.app.zip\` | macOS application (Hammerspoon + Karabiner-Elements + Ollama bundled) |
-                  | \`Ergopti.app.zip.sig\` | Sparkle EdDSA signature (used by the auto-updater) |
-                  | \`appcast-main.xml\` | Sparkle appcast feed (used by the auto-updater) |
+                  | \`Ergopti.app.zip.sig\` | Sparkle EdDSA signature (auto-updater) |
+                  | \`appcast-main.xml\` | Sparkle appcast feed (auto-updater) |
+                  | \`Ergopti_keylayout.zip\` | Keyboard layout bundle only — no app required |
 
-                  **Installation:**
+                  **Installation — app:**
                   1. Unzip \`Ergopti.app.zip\` and move \`Ergopti.app\` to \`/Applications\`.
                   2. Remove the quarantine flag (the app is not yet Apple-notarised):
                   \`\`\`bash
                   xattr -dr com.apple.quarantine /Applications/Ergopti.app
                   \`\`\`
                   3. Launch the app. On first run, Karabiner-Elements will request a System Extension approval — required for key remapping.
+
+                  **Installation — keyboard layout only:**
+                  1. Unzip \`Ergopti_keylayout.zip\`.
+                  2. Copy the \`.bundle\` folder to \`/Library/Keyboard Layouts/\`.
+                  3. Log out and back in, then add the layout in System Settings → Keyboard → Input Sources.
 
                   ---
 
@@ -323,16 +394,28 @@ jobs:
                   | Asset | Description |
                   |---|---|
                   | \`ErgoptiPlus.exe\` | Compiled AutoHotkey executable (AHK v2 runtime bundled) |
+                  | \`Ergopti_keyboard_layout.exe\` | Windows keyboard layout installer — no app required |
+                  | \`kanata.kbd\` | Kanata config file (for Kanata users) |
 
-                  **Installation:**
+                  **Installation — app:**
                   1. Download \`ErgoptiPlus.exe\`.
                   2. Double-click to run. On first launch, resources are extracted to \`%LOCALAPPDATA%\Ergopti\`.
+
+                  **Installation — keyboard layout only:**
+                  1. Download \`Ergopti_keyboard_layout.exe\` and run it as Administrator.
+                  2. Log out and back in, then select the layout in Settings → Time & Language → Language & region.
 
                   ---
 
                   ### 🐧 Linux
 
-                  The Linux driver (XKB) is served directly from the website — no binary asset to download. See the [repository](https://github.com/${GITHUB_REPOSITORY}) for the config sources.
+                  | Asset | Description |
+                  |---|---|
+                  | \`Ergopti_xkb.zip\` | XKB layout files (standard, ANSI, plus, plus-ANSI variants) |
+
+                  **Installation:**
+                  1. Unzip \`Ergopti_xkb.zip\`.
+                  2. Follow the [XKB installation guide](https://github.com/${GITHUB_REPOSITORY}/tree/main/static/drivers/linux/xkb_installation) in the repository.
 
                   ---
 
