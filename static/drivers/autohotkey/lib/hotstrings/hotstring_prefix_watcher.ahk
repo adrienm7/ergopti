@@ -317,6 +317,19 @@ _RegisterCategoryTriggers(Category) {
 ; index every variant so the runtime lookup never has to transform anything
 ; — what the user types either matches a variant exactly (exact preview) or
 ; matches none (no tooltip, in line with the engine not firing either).
+;
+; ── Single-character body special case ──
+; When the trigger body is a single character (e.g. ``e★``, or a plain ``e``),
+; ``StrTitle`` and ``StrUpper`` produce the SAME string (``E★`` / ``E``). The
+; engine's ``CreateCaseSensitiveHotstrings`` handles this at lines 438-441 of
+; hotstring_engine.ahk: it registers only Lower + Title and skips Upper.
+; The prefix watcher has to mirror that — otherwise we would push two entries
+; (title + upper) into the same prefix bucket with identical triggers but
+; different replacements (``Est`` for title, ``EST`` for upper), and the
+; tooltip would surface the upper variant as a dimmed strikethrough alternative
+; that the engine could never actually fire. The dedup condition ``Upper ==
+; Title`` is robust to non-letter bodies (digits, punctuation) where both case
+; transforms are no-ops and only a single variant should be indexed.
 _AddTriggerVariants(Trigger, Output, Category, Section, IsCaseSensitive, IsStrict) {
     if IsStrict {
         ; Strict triggers only match the exact casing in the TOML — anything
@@ -330,10 +343,14 @@ _AddTriggerVariants(Trigger, Output, Category, Section, IsCaseSensitive, IsStric
         _AddTriggerToIndex(Trigger, Output, Category, Section)
         return
     }
-    ; Three case variants — exact mirror of CreateCaseSensitiveHotstrings.
-    _AddTriggerToIndex(StrLower(Trigger), StrLower(Output), Category, Section)
-    _AddTriggerToIndex(StrTitle(Trigger), StrTitle(Output), Category, Section)
-    _AddTriggerToIndex(StrUpper(Trigger), StrUpper(Output), Category, Section)
+    LowerTrig := StrLower(Trigger)
+    TitleTrig := StrTitle(Trigger)
+    UpperTrig := StrUpper(Trigger)
+    _AddTriggerToIndex(LowerTrig, StrLower(Output), Category, Section)
+    _AddTriggerToIndex(TitleTrig, StrTitle(Output), Category, Section)
+    if (UpperTrig != TitleTrig) {
+        _AddTriggerToIndex(UpperTrig, StrUpper(Output), Category, Section)
+    }
 }
 
 ; Add at most ONE prefix entry per trigger so the tooltip only surfaces
