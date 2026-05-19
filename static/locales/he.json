@@ -1862,5 +1862,8 @@
 	"hs_config.color_indigo": "אינדיגו",
 	"hs_config.color_turquoise": "טורקיז",
 	"hs_config.color_lime": "ליים",
-	"hs_config.color_brown": "חום"
+	"hs_config.color_brown": "חום",
+	"updater.changelog_select_release": "בחר גרסה:",
+	"updater.open_on_github": "פתח ב-GitHub",
+	"updater.close": "סגור"
 }

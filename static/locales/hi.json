@@ -1862,5 +1862,8 @@
 	"hs_config.color_indigo": "नीला (इंडिगो)",
 	"hs_config.color_turquoise": "फ़िरोज़ी",
 	"hs_config.color_lime": "नीबू-हरा",
-	"hs_config.color_brown": "भूरा"
+	"hs_config.color_brown": "भूरा",
+	"updater.changelog_select_release": "एक संस्करण चुनें:",
+	"updater.open_on_github": "GitHub पर खोलें",
+	"updater.close": "बंद करें"
 }

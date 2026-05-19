@@ -1835,5 +1835,8 @@
 	"hs_config.color_indigo": "靛蓝",
 	"hs_config.color_turquoise": "蓝绿色",
 	"hs_config.color_lime": "黄绿",
-	"hs_config.color_brown": "棕色"
+	"hs_config.color_brown": "棕色",
+	"updater.changelog_select_release": "选择一个版本:",
+	"updater.open_on_github": "在 GitHub 上打开",
+	"updater.close": "关闭"
 }

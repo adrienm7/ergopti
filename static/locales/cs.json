@@ -1836,5 +1836,8 @@
 	"hs_config.color_indigo": "Indigo",
 	"hs_config.color_turquoise": "Tyrkysová",
 	"hs_config.color_lime": "Limetková",
-	"hs_config.color_brown": "Hnědá"
+	"hs_config.color_brown": "Hnědá",
+	"updater.changelog_select_release": "Vyberte verzi:",
+	"updater.open_on_github": "Otevřít na GitHubu",
+	"updater.close": "Zavřít"
 }

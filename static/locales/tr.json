@@ -1836,5 +1836,8 @@
 	"hs_config.color_indigo": "Çivit",
 	"hs_config.color_turquoise": "Turkuaz",
 	"hs_config.color_lime": "Limon yeşili",
-	"hs_config.color_brown": "Kahverengi"
+	"hs_config.color_brown": "Kahverengi",
+	"updater.changelog_select_release": "Bir sürüm seçin:",
+	"updater.open_on_github": "GitHub’da aç",
+	"updater.close": "Kapat"
 }

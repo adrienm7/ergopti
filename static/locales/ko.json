@@ -1836,5 +1836,8 @@
 	"hs_config.color_indigo": "남색",
 	"hs_config.color_turquoise": "터쿠아즈",
 	"hs_config.color_lime": "라임",
-	"hs_config.color_brown": "갈색"
+	"hs_config.color_brown": "갈색",
+	"updater.changelog_select_release": "버전을 선택하세요:",
+	"updater.open_on_github": "GitHub에서 열기",
+	"updater.close": "닫기"
 }

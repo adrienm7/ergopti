@@ -1196,8 +1196,13 @@ initMenu() {
 		AboutMenu.Add(ChannelDevLabel,  (*) => Updater_SetChannel("dev"))
 	}
 	AboutMenu.Add() ; Separator
-	AboutMenu.Add(t("menu.about.check_for_updates"), Updater_CheckForUpdate)
-	AboutMenu.Add(t("menu.about.changelog"),         Updater_ShowChangelog)
+	; In local-source mode the user is running from a working copy; there are no
+	; "release notes" to surface and update checks would be misleading. Skip
+	; both rows entirely in that case — what is hidden cannot confuse.
+	if !Updater_IsLocalSource() {
+		AboutMenu.Add(t("menu.about.check_for_updates"), Updater_CheckForUpdate)
+		AboutMenu.Add(t("menu.about.changelog"),         Updater_ShowChangelog)
+	}
 	AboutMenu.Add(t("menu.about.open_releases_page"), (*) => Run(Updater_ReleasesPageUrl()))
 	A_TrayMenu.Add(t("menu.about.title"), AboutMenu)
 
