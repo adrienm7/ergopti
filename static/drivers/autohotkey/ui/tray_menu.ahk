@@ -1193,7 +1193,7 @@ initMenu() {
 	AboutMenu.Add("Check for updates", Updater_CheckForUpdate)
 	AboutMenu.Add("Changelog",         Updater_ShowChangelog)
 	AboutMenu.Add("Open releases page", (*) => Run(Updater_ReleasesPageUrl()))
-	A_TrayMenu.Add("ErgoptiPlus " . Ver, AboutMenu)
+	A_TrayMenu.Add("Version / Mises à jour", AboutMenu)
 
 	LangMenu := Menu()
 	I18nBuildLanguageMenu(LangMenu)

@@ -189,7 +189,7 @@ function M.build(ctx)
 	local channel = (type(state.update_channel) == "string" and state.update_channel ~= "")
 		and state.update_channel or "main"
 	local ver     = current_version()
-	local ver_label = "ErgoptiPlus " .. ver
+	local ver_label = "Version / Mises à jour"
 
 	local function set_channel(c)
 		state.update_channel = c
