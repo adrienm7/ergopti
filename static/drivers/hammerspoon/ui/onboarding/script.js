@@ -173,12 +173,15 @@ function renderStep2() {
  * (so the freedom-to-choose reminder closes the section).
  */
 function renderStep3() {
-	document.getElementById("s3-title").textContent     = _t("onboarding.magic_key.title");
-	document.getElementById("s3-desc").textContent      = _t("onboarding.magic_key.desc");
-	document.getElementById("s3-hint-top").textContent  = _t("onboarding.magic_key.hint");
-	document.getElementById("s3-hint").textContent      = _t("onboarding.magic_key.choose_freely");
-	document.getElementById("s3-back").textContent      = _t("onboarding.back");
-	document.getElementById("s3-next").textContent      = _t("onboarding.next");
+	document.getElementById("s3-title").textContent       = _t("onboarding.magic_key.title");
+	document.getElementById("s3-desc").textContent        = _t("onboarding.magic_key.desc");
+	// Suggestions sits above the input and lists the recommended characters per
+	// layout family (Ergopti+ / AZERTY / QWERTY); a single "rare but accessible"
+	// reminder sits below — same two-tier layout as the AHK driver's Step 3.
+	document.getElementById("s3-suggestions").textContent = _t("onboarding.magic_key.suggestions");
+	document.getElementById("s3-hint").textContent        = _t("onboarding.magic_key.choose_freely");
+	document.getElementById("s3-back").textContent        = _t("onboarding.back");
+	document.getElementById("s3-next").textContent        = _t("onboarding.next");
 
 	var inp = document.getElementById("s3-input");
 	inp.value = _answers.magic_key || DEFAULT_MAGIC_KEY;

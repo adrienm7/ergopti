@@ -317,17 +317,20 @@ _Onboarding_Step3() {
 	g.AddText("w" ONBOARDING_WIN_W - 40 " y+8", t("onboarding.magic_key.desc"))
 	g.SetFont("s10")
 
-	; Hint duplicated immediately above the input so the rules are visible
-	; whether the user reads top-down or bottom-up.
+	; Bullet-list of recommended characters (Ergopti+ / AZERTY / QWERTY) lives in
+	; a single translation key so locales control the wording in one place; the
+	; field stays a free-form Edit so the user can pick anything they like.
 	g.SetFont("s9 italic")
-	g.AddText("w" ONBOARDING_WIN_W - 40 " y+10", t("onboarding.magic_key.hint"))
+	g.AddText("w" ONBOARDING_WIN_W - 40 " y+10", t("onboarding.magic_key.suggestions"))
 	g.SetFont("s10 norm")
 
-	edKey := g.AddEdit("w80 y+6 vMagicKeyEdit", _ob_magic_key)
+	edKey := g.AddEdit("w80 y+10 vMagicKeyEdit", _ob_magic_key)
 
-	; Same hint repeated below — bottom anchor for the same information.
+	; Closing reminder — kept after the input so it acts as the answer to the
+	; implicit "but what should I actually pick?" question the user has once
+	; the field is in focus.
 	g.SetFont("s9 italic")
-	g.AddText("w" ONBOARDING_WIN_W - 40 " y+8", t("onboarding.magic_key.choose_freely"))
+	g.AddText("w" ONBOARDING_WIN_W - 40 " y+10", t("onboarding.magic_key.choose_freely"))
 	g.SetFont("s10 norm")
 
 	g.AddText("w" ONBOARDING_WIN_W - 40 " y+16", "")
@@ -375,7 +378,12 @@ _Onboarding_Step4() {
 	; text works on Hammerspoon (Lua's string.format) and AHK. AHK v2's
 	; Format() expects {1}-style placeholders and would leave ``%s`` verbatim,
 	; so the substitution is done with StrReplace here.
-	metrics_path := _ConfigDir . "metrics"
+	; Normalise the path with forward slashes — the cross-platform locale string
+	; is shared with the Hammerspoon driver, where macOS already uses ``/``;
+	; matching that style on Windows keeps the displayed path consistent across
+	; both drivers and avoids the visual clutter of Windows backslashes inside
+	; the red warning block.
+	metrics_path := StrReplace(_ConfigDir . "metrics", "\", "/")
 	warning := StrReplace(t("dialog.metrics.enable_warning"), "%s", metrics_path)
 	g.SetFont("s8 italic")
 	g.AddText("w" ONBOARDING_WIN_W - 40 " y+10 cRed", warning)
@@ -456,12 +464,12 @@ _Onboarding_Step5() {
 	regControls := [regSectionLbl, btnRegAuto, autoHint, btnRegManual, manualHint]
 
 	; Toggling visibility on radio change keeps the wizard tidy when the user
-	; declines gesture support (the registry stuff is irrelevant in that case).
+	; declines gesture support (the configuration step is irrelevant in that case).
 	rYes.OnEvent("Click", _Step5_OnRadioChange.Bind(regControls, statusLbl, true))
 	rNo.OnEvent("Click",  _Step5_OnRadioChange.Bind(regControls, statusLbl, false))
 
 	btnRegAuto.OnEvent("Click",   _Step5_AutoRegister.Bind(statusLbl))
-	btnRegManual.OnEvent("Click", _Step5_OpenManualEditor.Bind(statusLbl))
+	btnRegManual.OnEvent("Click", _Step5_ShowManualTutorial.Bind(g))
 
 	g.AddText("w" ONBOARDING_WIN_W - 40 " y+16", "")
 
@@ -527,19 +535,64 @@ _Step5_AutoRegister(statusLbl, *) {
 	}
 }
 
-_Step5_OpenManualEditor(statusLbl, *) {
-	; Open regedit directly at the PrecisionTouchPad key so the user can edit
-	; the values by hand. Falls back to the manual hint label if regedit fails.
-	try {
-		Run('regedit.exe /m')
-		try {
-			statusLbl.SetFont("s9 cGray")
-			statusLbl.Text    := t("onboarding.gestures.register_manual_hint")
-			statusLbl.Visible := true
+_Step5_ShowManualTutorial(parentGui, *) {
+	; Manual method is NOT "open the registry" — it is the same tutorial shown
+	; by the tray menu's gestures item, plus a one-click shortcut into the
+	; Windows touchpad settings page where the user can actually wire up the
+	; gestures. We assemble the body string the same way GestureShowSetupInstructions
+	; does (header + open-path + for-each + slot-by-slot lines + auto note) so
+	; the wording stays in lockstep with the rest of the driver — but we render
+	; it as our own Gui rather than calling the existing helper, because that
+	; helper depends on globals (GESTURE_SLOTS, GESTURE_SHORTCUT_LABELS) that
+	; may not be set yet at first-launch onboarding time.
+	tutorialBody := ""
+	tutorialBody .= t("gesture.setup.header") . "`n`n"
+	tutorialBody .= t("gesture.setup.open_path") . "`n`n"
+	tutorialBody .= t("gesture.setup.for_each") . "`n`n"
+	if IsSet(GESTURE_SLOTS) and IsSet(GESTURE_SHORTCUT_LABELS) {
+		for Slot in GESTURE_SLOTS {
+			tutorialBody .= "  " . t("gesture.slots." . Slot) . " :  "
+				. GESTURE_SHORTCUT_LABELS[Slot] . "`n"
 		}
-	} catch as e {
-		try LoggerError("onboarding", "Failed to launch regedit: {1}", e.Message)
+		tutorialBody .= "`n"
 	}
+	tutorialBody .= t("gesture.setup.auto_configure")
+
+	tg := Gui("+AlwaysOnTop +Owner" . parentGui.Hwnd, t("onboarding.gestures.register_manual"))
+	tg.SetFont("s9", "Segoe UI")
+	tg.MarginX := 18
+	tg.MarginY := 14
+	tg.AddEdit("ReadOnly w" ONBOARDING_WIN_W - 40 " h220 -Wrap +HScroll", tutorialBody)
+	tg.AddText("w" ONBOARDING_WIN_W - 40 " y+10",
+		_Onboarding_TryTranslate("onboarding.gestures.open_settings_hint"))
+	btnOpenSettings := tg.AddButton("w" ONBOARDING_WIN_W - 40 " y+8",
+		_Onboarding_TryTranslate("onboarding.gestures.open_settings"))
+	btnClose        := tg.AddButton("Default w110 x" ONBOARDING_WIN_W - 130 " y+12",
+		t("onboarding.btn.ok"))
+	btnOpenSettings.OnEvent("Click", (*) => _Onboarding_OpenTouchpadSettings())
+	btnClose.OnEvent("Click", ((*) => tg.Destroy()))
+	tg.Show("AutoSize Center")
+}
+
+_Onboarding_OpenTouchpadSettings() {
+	; ms-settings:devices-touchpad opens Settings → Bluetooth & devices → Touchpad
+	; on Windows 10/11. From there the user expands "Advanced gestures" and
+	; assigns Ctrl + Win + Shift + F1..F10 to each gesture slot.
+	try Run("ms-settings:devices-touchpad")
+}
+
+; t() falls back to the raw key if a translation is missing — fine for body
+; text but a button labelled e.g. ``onboarding.gestures.open_settings`` looks
+; broken. This helper substitutes a friendly default when nothing translates.
+_Onboarding_TryTranslate(key) {
+	val := t(key)
+	if (val == key) {
+		switch key {
+			case "onboarding.gestures.open_settings":      return "Open touchpad settings"
+			case "onboarding.gestures.open_settings_hint": return "Opens Settings → Bluetooth & devices → Touchpad → Advanced gestures."
+		}
+	}
+	return val
 }
 
 _Step5_Back(g, *) {

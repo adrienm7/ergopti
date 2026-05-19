@@ -2095,16 +2095,21 @@ ActivateKeyHistory(*) {
 ; suspended — and the #SuspendExempt directive does not survive that.
 ; Workaround for the user: resume by clicking the tray menu entry again.
 
-#SuspendExempt
+; The four script-management combos below are registered DYNAMICALLY at the
+; end of the auto-execute section via _RegisterScriptAltGrHotkeys(). Defining
+; them as static ``SC138 & X::`` blocks here would have AHK promote SC138 to a
+; prefix key at parse time — and the prefix status is parse-time-only, so it
+; would persist even after our onboarding ``IsRealAltGrPress`` short-circuit
+; made every variant evaluate false. With the registration happening after
+; Onboarding_Run returns, SC138 stays a vanilla key for the whole duration of
+; the first-run wizard, restoring native AltGr/Kana behaviour in the wizard's
+; Edit boxes (and anywhere else the user types while it is up).
 
-; Gate on a real AltGr/Kana press so a ghost SC138 (injected by an OS driver
-; for AltGr-mapped keys like Bépo's `'`) does not trigger these script
-; shortcuts on the next Enter/BackSpace/Delete/Escape press.
-#HotIf IsRealAltGrPress()
-
-RAlt & Enter::
-SC138 & SC01C::
-{
+; Handler bodies stay as named functions so the dynamic Hotkey() calls only
+; reference them. Each handler double-checks the modifier state via
+; GetKeyState — same defensive guard as the original blocks — so a stale
+; AltGr+key ghost cannot replay the action on the next isolated keystroke.
+_ScriptAltGrEnterHandler(*) {
     if (GetKeyState("SC138", "P") and GetKeyState("SC01C", "P")) {
         RunScriptShortcutAction("script_altgr_enter")
     } else {
@@ -2112,9 +2117,7 @@ SC138 & SC01C::
     }
 }
 
-RAlt & BackSpace::
-SC138 & SC00E::
-{
+_ScriptAltGrBackSpaceHandler(*) {
     if (GetKeyState("SC138", "P") and GetKeyState("SC00E", "P")) {
         RunScriptShortcutAction("script_altgr_backspace")
     } else {
@@ -2122,9 +2125,7 @@ SC138 & SC00E::
     }
 }
 
-RAlt & Delete::
-SC138 & SC153::
-{
+_ScriptAltGrDeleteHandler(*) {
     if (GetKeyState("SC138", "P") and GetKeyState("SC153", "P")) {
         RunScriptShortcutAction("script_altgr_delete")
     } else {
@@ -2132,9 +2133,7 @@ SC138 & SC153::
     }
 }
 
-RAlt & Escape::
-SC138 & SC001::
-{
+_ScriptAltGrEscapeHandler(*) {
     if (GetKeyState("SC138", "P") and GetKeyState("SC001", "P")) {
         RunScriptShortcutAction("script_altgr_escape")
     } else {
@@ -2142,9 +2141,28 @@ SC138 & SC001::
     }
 }
 
-#HotIf
+; Registration entry point. Called once Onboarding_Run() has returned so the
+; wizard never sees SC138 as a prefix key. Each Hotkey() inherits the HotIf
+; criterion set immediately before, which mirrors what the previous static
+; ``#HotIf IsRealAltGrPress()`` block established.
+_RegisterScriptAltGrHotkeys() {
+    HotIf(IsRealAltGrPress)
+    Hotkey("RAlt & Enter",     _ScriptAltGrEnterHandler,     "I2")
+    Hotkey("SC138 & SC01C",    _ScriptAltGrEnterHandler,     "I2")
+    Hotkey("RAlt & BackSpace", _ScriptAltGrBackSpaceHandler, "I2")
+    Hotkey("SC138 & SC00E",    _ScriptAltGrBackSpaceHandler, "I2")
+    Hotkey("RAlt & Delete",    _ScriptAltGrDeleteHandler,    "I2")
+    Hotkey("SC138 & SC153",    _ScriptAltGrDeleteHandler,    "I2")
+    Hotkey("RAlt & Escape",    _ScriptAltGrEscapeHandler,    "I2")
+    Hotkey("SC138 & SC001",    _ScriptAltGrEscapeHandler,    "I2")
+    HotIf()
+}
 
-#SuspendExempt False
+; Auto-execute hook: at this point Onboarding_Run() has long since returned
+; (line ~395 of the auto-exec section), so registering the SC138-prefixed
+; combos now is safe — the first-run wizard ran with SC138 still acting as a
+; vanilla key.
+_RegisterScriptAltGrHotkeys()
 
 ; =======================================================
 ; =======================================================
