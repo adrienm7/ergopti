@@ -397,12 +397,15 @@ _TooltipBuildGui(Items) {
         if (Label != "" and LabelZone > 0) {
             LS := LabelSizes[Idx]
             LabelX := TotalW - _TOOLTIP_PADDING_X - MaxLabelW
-            ; ↵ has a descender that makes it appear lower than center — shift up.
-            ; * sits high in its bounding box in Segoe UI — nudge down.
-            DescenderFix := (Label == "↵") ? 4 : 0
+            ; * sits high in its bounding box in Segoe UI — nudge down slightly.
             StarFix      := (Label == "*") ? 1 : 0
             RightFix     := (Label == "↵") ? 3 : 0
-            LabelY := RowY + _TOOLTIP_PADDING_Y + Max(0, (S.H - LS.H) // 2) - DescenderFix + StarFix
+            CenterOffset := Max(0, (S.H - LS.H) // 2)
+            ; ↵ appears lower than center only when the row is tall enough for
+            ; centering to kick in (multi-line text); for single-line rows the
+            ; centering offset is 0 and no upward shift is needed.
+            DescenderFix := (Label == "↵" and CenterOffset > 0) ? 4 : 0
+            LabelY := RowY + _TOOLTIP_PADDING_Y + CenterOffset - DescenderFix + StarFix
             G.SetFont("c" . _TOOLTIP_LABEL_COLOR_HEX . " s" . _TOOLTIP_LABEL_FONT_SIZE, _TOOLTIP_FONT_NAME)
             G.Add("Text", Format("BackgroundTrans x{1} y{2} w{3} h{4}",
                 LabelX + RightFix, LabelY, MaxLabelW, LS.H), Label)
