@@ -517,7 +517,14 @@ _OnPrefixChar(IH, Char) {
                 if (StrLen(_PrefixBuffer) > _MAX_BUFFER_LEN) {
                     _PrefixBuffer := SubStr(_PrefixBuffer, -_MAX_BUFFER_LEN)
                 }
-                TooltipHide()
+                ; The roll/cascade injected new text into the buffer — check
+                ; if it prefixes a registered trigger and show the tooltip
+                ; immediately. This handles « p'★ → c'était »: the roll fires
+                ; p' → ct, the buffer becomes "ct", and the tooltip for ct★
+                ; should appear right away so the user knows to press ★.
+                ; Without this call, TooltipHide() would clear the display and
+                ; the next keystroke (★) would look up "ct★" instead of "ct".
+                _LookupAndRender()
                 _NotifySuggestionConsumed()
             } else {
                 _ResetPrefixBuffer(true)
