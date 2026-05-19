@@ -519,7 +519,7 @@ function M.render_stacked(rows, state, start_watchers_callback)
 		for i = 1, row_count - 1 do
 			local sep_y = row_top_y[i] + row_heights[i] + pad_y * 2
 			M.stacked_canvas[sep_base + i - 1].frame     = { x = 0, y = sep_y, w = canvas_width, h = 1 }
-			M.stacked_canvas[sep_base + i - 1].fillColor = { white = 1, alpha = 0.12 }
+			M.stacked_canvas[sep_base + i - 1].fillColor = { white = 1, alpha = 0.25 }
 			M.stacked_canvas[sep_base + i - 1].action    = "fill"
 		end
 

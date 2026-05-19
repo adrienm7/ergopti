@@ -313,18 +313,19 @@ _TooltipBuildGui(Items) {
             ; ↵ has a descender that makes it appear lower than center — shift up.
             ; ★ and other labels sit at true center so no correction needed.
             DescenderFix := (Label == "↵") ? 4 : 0
+            RightFix     := (Label == "↵") ? 3 : 0
             LabelY := RowY + _TOOLTIP_PADDING_Y + Max(0, (S.H - LS.H) // 2) - DescenderFix
             G.SetFont("c737373 s" . _TOOLTIP_LABEL_FONT_SIZE, _TOOLTIP_FONT_NAME)
             G.Add("Text", Format("BackgroundTrans x{1} y{2} w{3} h{4}",
-                LabelX, LabelY, MaxLabelW, LS.H), Label)
+                LabelX + RightFix, LabelY, MaxLabelW, LS.H), Label)
         }
 
-        ; 1 px separator — mirrors Hammerspoon fillColor {white=1, alpha=0.12}:
-        ; 0x1A * (1-0.12) + 0xFF * 0.12 ≈ 0x31 → #313131
+        ; 1 px separator — same opacity as the tooltip border (white alpha=0.25):
+        ; 0x1A * (1-0.25) + 0xFF * 0.25 ≈ 0x54 → #545454
         if (Idx < Count) {
             SepY := RowY + RowH
             G.SetFont("s1", _TOOLTIP_FONT_NAME)
-            G.Add("Text", Format("Background313131 x0 y{1} w{2} h{3}", SepY, TotalW, SEP_H), "")
+            G.Add("Text", Format("Background545454 x0 y{1} w{2} h{3}", SepY, TotalW, SEP_H), "")
         }
     }
 
