@@ -310,7 +310,10 @@ _TooltipBuildGui(Items) {
         if (Label != "" and LabelZone > 0) {
             LS := LabelSizes[Idx]
             LabelX := TotalW - _TOOLTIP_PADDING_X - MaxLabelW
-            LabelY := RowY + _TOOLTIP_PADDING_Y + Max(0, (S.H - LS.H) // 2)
+            ; ↵ has a descender that makes it appear lower than center — shift up.
+            ; ★ and other labels sit at true center so no correction needed.
+            DescenderFix := (Label == "↵") ? 4 : 0
+            LabelY := RowY + _TOOLTIP_PADDING_Y + Max(0, (S.H - LS.H) // 2) - DescenderFix
             G.SetFont("c737373 s" . _TOOLTIP_LABEL_FONT_SIZE, _TOOLTIP_FONT_NAME)
             G.Add("Text", Format("BackgroundTrans x{1} y{2} w{3} h{4}",
                 LabelX, LabelY, MaxLabelW, LS.H), Label)
