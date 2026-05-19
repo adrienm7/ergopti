@@ -212,6 +212,22 @@ local _first_token_at_s         = nil
 local _chain_first_request_at_s = nil
 local _chain_last_token_at_s    = nil
 
+-- ── Backend-aware request floor ──
+-- The user can debounce as low as they want from the menu, but the engine
+-- still enforces this minimum gap between two consecutive backend calls.
+-- The cap protects paid API providers from a fast typist's per-keystroke
+-- bursts (one debounce = 50 ms × every char = token-burn galore), and
+-- doubles as an energy cap on local backends: back-to-back inference keeps
+-- the GPU spinning without giving the user a perceptibly snappier UI.
+-- Mirrors LLM_BACKEND_MIN_REQUEST_INTERVAL_MS on the AHK side so the
+-- floor stays consistent across both drivers.
+local BACKEND_MIN_REQUEST_INTERVAL_S = {
+	ollama = 0.3,
+	mlx    = 0.3,
+	api    = 0.5,
+}
+local _last_request_at_s = 0
+
 -- ── LLM engine configuration ─────────────────────────────────────────────────
 -- Stub values that prevent crashes during the brief startup window before the
 -- menu loads and calls the set_* setters. NOT the user-configured values.
@@ -955,8 +971,29 @@ function M.perform_check(force_trigger, profile_name)
 		Logger.debug(LOG, "Buffer unchanged — LLM request skipped (freshness).")
 		return
 	end
+
+	-- Backend-aware request floor — re-arm the debounce timer for the
+	-- remaining gap instead of firing immediately. ``force_trigger`` (the
+	-- manual hotkey path) bypasses the floor because it is an explicit user
+	-- request, not a per-keystroke burst.
+	if not force_trigger then
+		local now_s        = hs.timer.secondsSinceEpoch()
+		local backend_id   = core_llm.get_backend and core_llm.get_backend() or "ollama"
+		local min_interval = BACKEND_MIN_REQUEST_INTERVAL_S[backend_id] or 0.3
+		local elapsed      = now_s - _last_request_at_s
+		if _last_request_at_s > 0 and elapsed < min_interval then
+			local remaining = min_interval - elapsed
+			Logger.debug(LOG, "Backend '%s' floor (%dms) — deferring %dms.",
+				backend_id, math.floor(min_interval * 1000), math.floor(remaining * 1000))
+			if _inactivity_timer then _inactivity_timer:stop() end
+			_inactivity_timer = hs.timer.doAfter(remaining, function() M.perform_check(force_trigger, profile_name) end)
+			return
+		end
+	end
+
 	last_buffer_signature    = signature
 	_last_request_buffer_len = #buffer
+	_last_request_at_s       = hs.timer.secondsSinceEpoch()
 
 	-- Pre-build a model/backend info bar for use during streaming and n-gram display.
 	-- elapsed_ms is omitted here (stream not yet complete); on_success will replace this
