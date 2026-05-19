@@ -62,7 +62,7 @@ KLWV_IsAvailable() {
     if KLWV.HasOwnProp("available") && KLWV.available != ""
         return KLWV.available
     KLWV.available := false
-    loader := A_ScriptDir . "\vendor\64bit\WebView2Loader.dll"
+    loader := _VendorDir . "\64bit\WebView2Loader.dll"
     if !FileExist(loader)
         return false
     if !IsSet(WebView2)
@@ -165,7 +165,7 @@ KLWV_Open(which, metrics_dir) {
     ; launch so cached state from a previous open never bleeds in.
     udir := A_Temp . "\ergopti_webview2_" . A_TickCount
     DirCreate(udir)
-    loader := A_ScriptDir . "\vendor\64bit\WebView2Loader.dll"
+    loader := _VendorDir . "\64bit\WebView2Loader.dll"
 
     ; thqby's wrapper resolves WebView2 asynchronously through a
     ; Promise; we await it inline so the rest of the wiring runs

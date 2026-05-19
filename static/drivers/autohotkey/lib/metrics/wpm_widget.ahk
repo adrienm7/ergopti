@@ -415,7 +415,7 @@ WPMWidget_AttachWebView() {
     g := WPMWidget._graph_gui
     if !g
         return
-    loader := A_ScriptDir . "\vendor\64bit\WebView2Loader.dll"
+    loader := _VendorDir . "\64bit\WebView2Loader.dll"
     udir   := A_Temp . "\ergopti_wpm_wv2_" . A_TickCount
     DirCreate(udir)
     hwnd := g.Hwnd
