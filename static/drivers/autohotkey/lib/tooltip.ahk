@@ -24,7 +24,7 @@
 ; ==============================================================================
 
 ; Single Gui that holds the entire tooltip stack.
-global _TooltipGui     := 0
+global _TooltipGui := 0
 ; Metadata per row (H, W, IsSep) kept for corner/border calculations.
 global _TooltipRowGuis := []
 
@@ -32,8 +32,8 @@ global _TooltipRowGuis := []
 ; compares its captured generation against this value and aborts if they
 ; differ — prevents a stale timer from hiding a tooltip that was rebuilt
 ; after the timer was armed but before it fired.
-global _TooltipGeneration         := 0
-global _TooltipTimerGeneration    := 0
+global _TooltipGeneration := 0
+global _TooltipTimerGeneration := 0
 
 ; Stable function reference used as the auto-hide timer. A single named
 ; function (not a fresh closure per call) is mandatory so SetTimer can
@@ -49,22 +49,22 @@ _TooltipTimerFn() {
 ; Style constants — sourced from lib/ui_style.ahk (included before this file
 ; in ErgoptiPlus.ahk). All visual values are defined there and mapped to
 ; module-local aliases below so the rest of this file reads naturally.
-global _TOOLTIP_FONT_NAME        := UI_FONT_NAME
-global _TOOLTIP_FONT_SIZE        := UI_FONT_SIZE_MAIN
-global _TOOLTIP_PADDING_X        := UI_PAD_X
-global _TOOLTIP_PADDING_Y        := UI_PAD_Y
-global _TOOLTIP_OFFSET_BELOW     := UI_OFFSET_BELOW
-global _TOOLTIP_OFFSET_RIGHT     := UI_OFFSET_RIGHT
-global _TOOLTIP_DEFAULT_BG_HEX   := UI_BG_HEX
+global _TOOLTIP_FONT_NAME := UI_FONT_NAME
+global _TOOLTIP_FONT_SIZE := UI_FONT_SIZE_MAIN
+global _TOOLTIP_PADDING_X := UI_PAD_X
+global _TOOLTIP_PADDING_Y := UI_PAD_Y
+global _TOOLTIP_OFFSET_BELOW := UI_OFFSET_BELOW
+global _TOOLTIP_OFFSET_RIGHT := UI_OFFSET_RIGHT
+global _TOOLTIP_DEFAULT_BG_HEX := UI_BG_HEX
 global _TOOLTIP_BORDER_COLOR_HEX := UI_BORDER_COLOR_HEX
-global _TOOLTIP_BORDER_ALPHA     := UI_BORDER_ALPHA
+global _TOOLTIP_BORDER_ALPHA := UI_BORDER_ALPHA
 global _TOOLTIP_BORDER_THICKNESS := UI_BORDER_THICKNESS
-global _TOOLTIP_CORNER_RADIUS    := UI_CORNER_RADIUS
-global _TOOLTIP_LABEL_FONT_SIZE  := UI_FONT_SIZE_HINT
-global _TOOLTIP_LABEL_GAP        := UI_LABEL_GAP
-global _TOOLTIP_LIGHTNESS        := UI_TINT_LIGHTNESS
-global _TOOLTIP_SATURATION       := UI_TINT_SATURATION
-global _TOOLTIP_MAX_CARET_HEIGHT_PX    := UI_MAX_CARET_HEIGHT_PX
+global _TOOLTIP_CORNER_RADIUS := UI_CORNER_RADIUS
+global _TOOLTIP_LABEL_FONT_SIZE := UI_FONT_SIZE_HINT
+global _TOOLTIP_LABEL_GAP := UI_LABEL_GAP
+global _TOOLTIP_LIGHTNESS := UI_TINT_LIGHTNESS
+global _TOOLTIP_SATURATION := UI_TINT_SATURATION
+global _TOOLTIP_MAX_CARET_HEIGHT_PX := UI_MAX_CARET_HEIGHT_PX
 global _TOOLTIP_WINDOW_BOTTOM_INSET_PX := UI_WINDOW_BOTTOM_INSET_PX
 
 ; Border overlay Gui — single frameless window covering the entire stack.
@@ -76,14 +76,13 @@ global _TooltipBorderGui := 0
 ; just past the deadline, where the expansion silently does not fire.
 ; Mirrors Hammerspoon's TIMEOUT_DECREMENT_SEC / TIMEOUT_FLOOR_SEC.
 global _TOOLTIP_TIMEOUT_DECREMENT_SEC := 0.15
-global _TOOLTIP_TIMEOUT_FLOOR_SEC     := 0.05
+global _TOOLTIP_TIMEOUT_FLOOR_SEC := 0.05
 
 ; Safety deadline applied whenever the caller passes DurationSec = 0
 ; (i.e. "stay until TooltipHide()"). Guards against ghost tooltips that
 ; linger when the normal hide path (buffer reset, expansion fire, etc.)
 ; is skipped due to an unhandled exception or a missed timer callback.
 global _TOOLTIP_SAFETY_SEC := 3.0
-
 
 ; ============================================================
 ; ============================================================
@@ -133,9 +132,9 @@ TooltipShow(Items, DurationSec := 0) {
         return
     }
 
-    Pos  := _TooltipResolvePosition()
+    Pos := _TooltipResolvePosition()
     ; _TooltipRowGuis[1] holds the single unified Gui metadata.
-    Row  := _TooltipRowGuis[1]
+    Row := _TooltipRowGuis[1]
     ; Snapshot generation before Show so any exception after Show still arms
     ; the timer correctly and the ghost cannot outlive the safety deadline.
     _TooltipTimerGeneration := _TooltipGeneration
@@ -178,14 +177,13 @@ TooltipHide() {
     for _, Row in _TooltipRowGuis {
         try Row.Gui.Destroy()
     }
-    _TooltipGui     := 0
+    _TooltipGui := 0
     _TooltipRowGuis := []
     if _TooltipBorderGui {
         try _TooltipBorderGui.Destroy()
         _TooltipBorderGui := 0
     }
 }
-
 
 ; ============================================================
 ; ============================================================
@@ -207,7 +205,7 @@ _TooltipBuildGui(Items) {
     if _TooltipGui {
         try _TooltipGui.Destroy()
     }
-    _TooltipGui     := 0
+    _TooltipGui := 0
     _TooltipRowGuis := []
 
     ; WinGetClientPos returns physical pixels — divide by DpiScale to get logical.
@@ -215,7 +213,7 @@ _TooltipBuildGui(Items) {
 
     ; ── Measure all text items ──────────────────────────────────────────────
     Sizes := []
-    MaxW  := 0
+    MaxW := 0
     for _, Item in Items {
         ProbeGui := Gui("-Caption +LastFound")
         try {
@@ -262,15 +260,15 @@ _TooltipBuildGui(Items) {
     }
 
     LabelZone := MaxLabelW > 0 ? (_TOOLTIP_LABEL_GAP + MaxLabelW) : 0
-    TotalW    := _TOOLTIP_PADDING_X + MaxW + LabelZone + _TOOLTIP_PADDING_X
-    Count     := Items.Length
-    SEP_H     := 1   ; 1 px separator between rows, in logical pixels
+    TotalW := _TOOLTIP_PADDING_X + MaxW + LabelZone + _TOOLTIP_PADDING_X
+    Count := Items.Length
+    SEP_H := 1   ; 1 px separator between rows, in logical pixels
 
     ; ── Compute per-row heights and total canvas height ─────────────────────
     RowMeta := []
-    TotalH  := 0
+    TotalH := 0
     for Idx, Item in Items {
-        S    := Sizes[Idx]
+        S := Sizes[Idx]
         RowH := _TOOLTIP_PADDING_Y + S.H + _TOOLTIP_PADDING_Y
         RowMeta.Push({ H: RowH, Y: TotalH })
         TotalH += RowH
@@ -282,18 +280,21 @@ _TooltipBuildGui(Items) {
     ; Default background matches the first item's tint (the Gui BackColor covers
     ; any gap the compositor might paint before controls are drawn).
     FirstColorHex := Items[1].HasOwnProp("ColorHex") ? Items[1].ColorHex : ""
-    G := Gui("+AlwaysOnTop -Caption +E0x20 +LastFound")
+    ; WS_EX_TOOLWINDOW (0x80) suppresses the DWM drop shadow and rounded-corner
+    ; treatment that Windows 11 applies to all top-level windows; combined with
+    ; SetWindowRgn this gives us full control over the visible shape.
+    G := Gui("+AlwaysOnTop -Caption +E0x20 +E0x80 +LastFound")
     G.BackColor := _TooltipMixTintHex(FirstColorHex)
-    G.MarginX   := 0
-    G.MarginY   := 0
+    G.MarginX := 0
+    G.MarginY := 0
 
     for Idx, Item in Items {
         ColorHex := Item.HasOwnProp("ColorHex") ? Item.ColorHex : ""
-        BgHex    := _TooltipMixTintHex(ColorHex)
-        S        := Sizes[Idx]
-        Meta     := RowMeta[Idx]
-        RowY     := Meta.Y
-        RowH     := Meta.H
+        BgHex := _TooltipMixTintHex(ColorHex)
+        S := Sizes[Idx]
+        Meta := RowMeta[Idx]
+        RowY := Meta.Y
+        RowH := Meta.H
 
         ; Full-width background band for this row's tint color.
         G.SetFont("s1", _TOOLTIP_FONT_NAME)
@@ -307,7 +308,7 @@ _TooltipBuildGui(Items) {
         ; Trigger label on the right.
         Label := Item.HasOwnProp("TriggerLabel") ? Item.TriggerLabel : ""
         if (Label != "" and LabelZone > 0) {
-            LS     := LabelSizes[Idx]
+            LS := LabelSizes[Idx]
             LabelX := TotalW - _TOOLTIP_PADDING_X - MaxLabelW
             LabelY := RowY + _TOOLTIP_PADDING_Y + Max(0, (S.H - LS.H) // 2)
             G.SetFont("c737373 s" . _TOOLTIP_LABEL_FONT_SIZE, _TOOLTIP_FONT_NAME)
@@ -325,7 +326,7 @@ _TooltipBuildGui(Items) {
         }
     }
 
-    _TooltipGui     := G
+    _TooltipGui := G
     ; Store a single metadata record for the corner/border helper.
     _TooltipRowGuis := [{ Gui: G, H: TotalH, W: TotalW, IsSep: false }]
 }
@@ -342,7 +343,7 @@ _TooltipMeasureTextSize(Text, FontSize) {
     global _TOOLTIP_FONT_NAME
 
     Fallback := { W: Max(80, StrLen(Text) * Round(FontSize * 0.75)),
-                  H: FontSize + 8 }
+        H: FontSize + 8 }
 
     HDC := DllCall("User32\GetDC", "Ptr", 0, "Ptr")
     if !HDC {
@@ -395,7 +396,7 @@ _TooltipApplyStackedCorners() {
         return
 
     Row := _TooltipRowGuis[1]
-    G   := Row.Gui
+    G := Row.Gui
 
     ; SetWindowRgn operates in physical pixels.
     DpiScale := A_ScreenDPI / 96
@@ -407,9 +408,10 @@ _TooltipApplyStackedCorners() {
     ; UI_CORNER_RADIUS is the GDI ellipse *diameter* (nWidth/nHeight).
     ; Hammerspoon uses xRadius=7 (radius), so diameter = 14 → 7 px arc per corner.
     Diam := _TOOLTIP_CORNER_RADIUS
-    if (Diam > W) Diam := W
-    if (Diam > H) Diam := H
-
+    if (Diam > W)
+        Diam := W
+    if (Diam > H)
+        Diam := H
     Rgn := DllCall("Gdi32\CreateRoundRectRgn",
         "Int", 0, "Int", 0, "Int", W + 1, "Int", H + 1,
         "Int", Diam, "Int", Diam, "Ptr")
@@ -439,29 +441,28 @@ _TooltipShowBorder(X, Y, W, H) {
 
     Diam := _TOOLTIP_CORNER_RADIUS
     if (Diam > Wp) Diam := Wp
-    if (Diam > Hp) Diam := Hp
-
-    ; ── Build a 32-bpp DIB ───────────────────────────────────────────────────
-    BmpInfo := Buffer(40, 0)
-    NumPut("UInt",   40,  BmpInfo,  0)   ; biSize
-    NumPut("Int",    Wp,  BmpInfo,  4)   ; biWidth
-    NumPut("Int",   -Hp,  BmpInfo,  8)   ; biHeight (top-down)
-    NumPut("UShort",  1,  BmpInfo, 12)   ; biPlanes
-    NumPut("UShort", 32,  BmpInfo, 14)   ; biBitCount
-    NumPut("UInt",    0,  BmpInfo, 16)   ; biCompression = BI_RGB
+        if (Diam > Hp) Diam := Hp
+        ; ── Build a 32-bpp DIB ───────────────────────────────────────────────────
+            BmpInfo := Buffer(40, 0)
+    NumPut("UInt", 40, BmpInfo, 0)   ; biSize
+    NumPut("Int", Wp, BmpInfo, 4)   ; biWidth
+    NumPut("Int", -Hp, BmpInfo, 8)   ; biHeight (top-down)
+    NumPut("UShort", 1, BmpInfo, 12)   ; biPlanes
+    NumPut("UShort", 32, BmpInfo, 14)   ; biBitCount
+    NumPut("UInt", 0, BmpInfo, 16)   ; biCompression = BI_RGB
 
     ScreenDC := DllCall("User32\GetDC", "Ptr", 0, "Ptr")
-    PixPtr   := 0
-    HBmp     := DllCall("Gdi32\CreateDIBSection",
+    PixPtr := 0
+    HBmp := DllCall("Gdi32\CreateDIBSection",
         "Ptr", ScreenDC, "Ptr", BmpInfo, "UInt", 0,
         "Ptr*", &PixPtr, "Ptr", 0, "UInt", 0, "Ptr")
-    MemDC    := DllCall("Gdi32\CreateCompatibleDC", "Ptr", ScreenDC, "Ptr")
+    MemDC := DllCall("Gdi32\CreateCompatibleDC", "Ptr", ScreenDC, "Ptr")
     DllCall("User32\ReleaseDC", "Ptr", 0, "Ptr", ScreenDC)
 
     if (!HBmp or !MemDC) {
-        if HBmp  DllCall("Gdi32\DeleteObject", "Ptr", HBmp)
-        if MemDC DllCall("Gdi32\DeleteDC",     "Ptr", MemDC)
-        return
+        if HBmp DllCall("Gdi32\DeleteObject", "Ptr", HBmp)
+            if MemDC DllCall("Gdi32\DeleteDC", "Ptr", MemDC)
+                return
     }
     OldBmp := DllCall("Gdi32\SelectObject", "Ptr", MemDC, "Ptr", HBmp, "Ptr")
 
@@ -471,10 +472,10 @@ _TooltipShowBorder(X, Y, W, H) {
 
     ; Draw the ring with GDI: white pen, null brush, RoundRect.
     ; GDI writes opaque (alpha=0) pixels into the DIB — we fix alpha below.
-    HPen   := DllCall("Gdi32\CreatePen", "Int", 0, "Int", 1, "UInt", 0xFFFFFF, "Ptr")
-    HNull  := DllCall("Gdi32\GetStockObject", "Int", 5, "Ptr")   ; NULL_BRUSH=5
-    OldPen := DllCall("Gdi32\SelectObject", "Ptr", MemDC, "Ptr", HPen,  "Ptr")
-    OldBr  := DllCall("Gdi32\SelectObject", "Ptr", MemDC, "Ptr", HNull, "Ptr")
+    HPen := DllCall("Gdi32\CreatePen", "Int", 0, "Int", 1, "UInt", 0xFFFFFF, "Ptr")
+    HNull := DllCall("Gdi32\GetStockObject", "Int", 5, "Ptr")   ; NULL_BRUSH=5
+    OldPen := DllCall("Gdi32\SelectObject", "Ptr", MemDC, "Ptr", HPen, "Ptr")
+    OldBr := DllCall("Gdi32\SelectObject", "Ptr", MemDC, "Ptr", HNull, "Ptr")
     DllCall("Gdi32\RoundRect",
         "Ptr", MemDC, "Int", 0, "Int", 0, "Int", Wp, "Int", Hp,
         "Int", Diam, "Int", Diam)
@@ -488,7 +489,7 @@ _TooltipShowBorder(X, Y, W, H) {
     ; DIB memory layout: B G R A (little-endian UInt = 0xAARRGGBB).
     TotalPx := Wp * Hp
     AlphaByte := 0x40   ; 25 % opacity
-    PremulPx  := (AlphaByte << 24) | (AlphaByte << 16) | (AlphaByte << 8) | AlphaByte
+    PremulPx := (AlphaByte << 24) | (AlphaByte << 16) | (AlphaByte << 8) | AlphaByte
     loop TotalPx {
         Offset := (A_Index - 1) * 4
         Raw := NumGet(PixPtr, Offset, "UInt")
@@ -507,18 +508,18 @@ _TooltipShowBorder(X, Y, W, H) {
     ; UpdateLayeredWindow expects screen physical pixels — same coordinate space as
     ; AHK v2 Gui.Show (AHK v2 is per-monitor DPI-aware, so Show("xX yY") already
     ; uses physical px).  No DpiScale multiplication needed here.
-    PtDest  := Buffer(8, 0)
+    PtDest := Buffer(8, 0)
     NumPut("Int", X, PtDest, 0)
     NumPut("Int", Y, PtDest, 4)
     SizeSrc := Buffer(8, 0)
     NumPut("Int", Wp, SizeSrc, 0)
     NumPut("Int", Hp, SizeSrc, 4)
-    PtSrc   := Buffer(8, 0)   ; origin (0,0) in MemDC
-    Blend   := Buffer(4, 0)
-    NumPut("UChar",   0, Blend, 0)   ; BlendOp  = AC_SRC_OVER
-    NumPut("UChar",   0, Blend, 1)   ; BlendFlags
+    PtSrc := Buffer(8, 0)   ; origin (0,0) in MemDC
+    Blend := Buffer(4, 0)
+    NumPut("UChar", 0, Blend, 0)   ; BlendOp  = AC_SRC_OVER
+    NumPut("UChar", 0, Blend, 1)   ; BlendFlags
     NumPut("UChar", 255, Blend, 2)   ; SourceConstantAlpha = 255 (per-pixel alpha)
-    NumPut("UChar",   1, Blend, 3)   ; AlphaFormat = AC_SRC_ALPHA
+    NumPut("UChar", 1, Blend, 3)   ; AlphaFormat = AC_SRC_ALPHA
     DllCall("User32\UpdateLayeredWindow",
         "Ptr", Hwnd,
         "Ptr", 0,        ; hdcDst = NULL (use screen)
@@ -531,10 +532,9 @@ _TooltipShowBorder(X, Y, W, H) {
         "UInt", 2)       ; ULW_ALPHA
 
     DllCall("Gdi32\SelectObject", "Ptr", MemDC, "Ptr", OldBmp)
-    DllCall("Gdi32\DeleteDC",     "Ptr", MemDC)
+    DllCall("Gdi32\DeleteDC", "Ptr", MemDC)
     DllCall("Gdi32\DeleteObject", "Ptr", HBmp)
 }
-
 
 ; Tell DWM not to apply Windows 11 automatic corner rounding on this window.
 ; Without this, DWM rounds every top-level window regardless of SetWindowRgn,
@@ -668,11 +668,11 @@ _TooltipResolvePosition() {
                     if (H < _TOOLTIP_MAX_CARET_HEIGHT_PX) {
                         ; Caret-like: anchor under the rect's lower-left.
                         return { X: Rect.l + _TOOLTIP_OFFSET_RIGHT,
-                                 Y: Rect.b + _TOOLTIP_OFFSET_BELOW }
+                            Y: Rect.b + _TOOLTIP_OFFSET_BELOW }
                     } else {
                         ; Input-box-like: anchor under the bottom centre.
                         return { X: Rect.l + W // 2,
-                                 Y: Rect.b + _TOOLTIP_OFFSET_BELOW }
+                            Y: Rect.b + _TOOLTIP_OFFSET_BELOW }
                     }
                 }
             }
@@ -688,7 +688,7 @@ _TooltipResolvePosition() {
         WinGetPos(&Wx, &Wy, &Ww, &Wh, "A")
         if (Ww > 0 and Wh > 0) {
             return { X: Wx + Ww // 2,
-                     Y: Wy + Wh - _TOOLTIP_WINDOW_BOTTOM_INSET_PX }
+                Y: Wy + Wh - _TOOLTIP_WINDOW_BOTTOM_INSET_PX }
         }
     }
 
@@ -698,4 +698,3 @@ _TooltipResolvePosition() {
     try MouseGetPos(&Mx, &My)
     return { X: Mx, Y: My + _TOOLTIP_OFFSET_BELOW }
 }
-
