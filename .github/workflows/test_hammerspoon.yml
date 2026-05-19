@@ -1,4 +1,4 @@
-name: Lua Tests
+name: Test Hammerspoon
 
 on:
   push:
