@@ -52,8 +52,8 @@ $ReplacedKeys = @{
 	"onboarding.gestures.register_section"   = "Gestures must be wired up in Windows Settings (Bluetooth & devices " + $EmDash + " Touchpad " + $EmDash + " Advanced gestures). Choose how:"
 	"onboarding.gestures.register_success"   = "Gestures are now configured in Windows Settings."
 	"onboarding.magic_key.desc"              = "Pick the character that triggers your hotstrings."
-	"onboarding.magic_key.choose_freely"     = "You can actually pick any character " + $EmDash + " it just needs to be rare enough not to cause false positives, while still being accessible."
-	"onboarding.metrics.desc"                = "Do you want to enable typing metrics collection?\n\nWhat ErgoptiPlus tracks for you:\n" + $Bullet + " Typing speed (WPM) per session, per app and over time\n" + $Bullet + " Most-typed keys, words, n-grams and ergonomic strain\n" + $Bullet + " Hand alternation, finger load, same-finger bigrams\n" + $Bullet + " Time spent per application (RescueTime-style) with productivity scoring\n" + $Bullet + " Trends, heatmaps and detailed dashboards in the Metrics window"
+	"onboarding.magic_key.choose_freely"     = "You can actually pick any character " + $EmDash + " it just needs to be rare enough not to cause false positives while still staying easy to reach."
+	"onboarding.metrics.desc"                = "Do you want to enable typing metrics collection?\n\nWhat ErgoptiPlus tracks for you:\n" + $Bullet + " typing speed (WPM) per session, per app and over time;\n" + $Bullet + " most-typed keys, words, n-grams and ergonomic strain;\n" + $Bullet + " hand alternation, finger load, same-finger bigrams;\n" + $Bullet + " time spent per application (RescueTime-style) with productivity scoring;\n" + $Bullet + " trends, heatmaps and detailed dashboards in the Metrics window."
 }
 
 # --- Keys to delete (they were superseded). The magic_key.hint key duplicated
@@ -63,13 +63,30 @@ $DeletedKeys = @(
 )
 
 # --- Brand-new keys ---
+# Note: ``onboarding.welcome.title`` and ``onboarding.welcome.heading`` are
+# deliberately NOT listed here. Those two strings render BEFORE the user picks
+# a language, so they must be fully localised — they live in
+# tools/translate_welcome_keys.ps1 (per-locale table) and any value listed
+# here would clobber the real translation on every bulk-update run.
 $NewKeys = @{
 	"onboarding.gestures.open_settings"        = "Open touchpad settings"
 	"onboarding.gestures.open_settings_hint"   = "Opens Settings " + $EmDash + " Bluetooth & devices " + $EmDash + " Touchpad " + $EmDash + " Advanced gestures, where you assign Ctrl + Win + Shift + F1..F10 to each gesture slot."
 	"onboarding.gestures.register_manual"      = "Manual method"
+	"onboarding.magic_key.option_custom"       = "Custom (type your own below)"
+	"onboarding.magic_key.option_semicolon"    = "; " + $EmDash + " recommended on QWERTY"
+	"onboarding.magic_key.option_star"         = ([char]0x2605) + " " + $EmDash + " recommended on Ergopti+ (dedicated key)"
+	"onboarding.magic_key.option_ugrave"       = $UGrave + " " + $EmDash + " recommended on AZERTY"
+	# suggestions is kept for the Hammerspoon web wizard, which renders the
+	# recommended characters as a hint paragraph above the input. The AHK
+	# driver switched to the four radio options above; both stay in lockstep
+	# wording-wise.
 	"onboarding.magic_key.suggestions"         = "Recommended characters:\n   " + $Bullet + " " + ([char]0x2605) + " " + $EmDash + " on Ergopti+ (dedicated key)\n   " + $Bullet + " " + $UGrave + " " + $EmDash + " on AZERTY\n   " + $Bullet + " ; " + $EmDash + " on QWERTY"
-	"onboarding.welcome.heading"               = "Choose your language"
-	"onboarding.welcome.title"                 = "Ergopti " + $EmDash + " Setup"
+	# menu.gestures.manual_tutorial replaces the previous two-item flow
+	# (instructions + open touchpad). The single popup carries both.
+	# 📋 (U+1F4CB) is outside the BMP — build it from its UTF-16 surrogate
+	# pair so PowerShell 5.1 (which cannot cast 0x1F4CB to [char]) does not
+	# choke. High = 0xD83D, low = 0xDCCB.
+	"menu.gestures.manual_tutorial"            = ([char]0xD83D) + ([char]0xDCCB) + " Manual setup tutorial"
 }
 
 # Build a fast escape helper for regex special characters.
