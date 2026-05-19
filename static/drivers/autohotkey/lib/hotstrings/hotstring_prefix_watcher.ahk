@@ -327,10 +327,17 @@ _RegisterCategoryTriggers(Category) {
 ; (title + upper) into the same prefix bucket with identical triggers but
 ; different replacements (``Est`` for title, ``EST`` for upper), and the
 ; tooltip would surface the upper variant as a dimmed strikethrough alternative
-; that the engine could never actually fire. The dedup condition ``Upper ==
-; Title`` is robust to non-letter bodies (digits, punctuation) where both case
-; transforms are no-ops and only a single variant should be indexed.
+; that the engine could never actually fire.
+;
+; ⚠ The dedup MUST gate on body length (mirroring the engine's exact
+; ``StrLen(RTrim(Abbreviation, MagicKey)) == 1`` check), NOT on
+; ``UpperTrig != TitleTrig``. AHK v2's ``!=`` operator is case-INSENSITIVE,
+; so comparing ``IA★`` against ``Ia★`` with ``!=`` returns false for every
+; letter-only trigger of any length — which used to suppress the UPPER
+; variant globally and leave typings like ``IA`` without a tooltip even
+; though the engine still fires on the upper variant.
 _AddTriggerVariants(Trigger, Output, Category, Section, IsCaseSensitive, IsStrict) {
+    global ScriptInformation
     if IsStrict {
         ; Strict triggers only match the exact casing in the TOML — anything
         ; else neither fires nor previews.
@@ -348,7 +355,10 @@ _AddTriggerVariants(Trigger, Output, Category, Section, IsCaseSensitive, IsStric
     UpperTrig := StrUpper(Trigger)
     _AddTriggerToIndex(LowerTrig, StrLower(Output), Category, Section)
     _AddTriggerToIndex(TitleTrig, StrTitle(Output), Category, Section)
-    if (UpperTrig != TitleTrig) {
+    MagicSuffix := (IsSet(ScriptInformation) and ScriptInformation.Has("MagicKey"))
+        ? ScriptInformation["MagicKey"] : "★"
+    BodyLen := StrLen(RTrim(Trigger, MagicSuffix))
+    if (BodyLen != 1) {
         _AddTriggerToIndex(UpperTrig, StrUpper(Output), Category, Section)
     }
 }
