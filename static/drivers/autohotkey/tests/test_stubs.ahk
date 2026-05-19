@@ -103,10 +103,27 @@ global SpaceAroundSymbols := ""
 ; value" inside lib/i18n.ahk's _I18nLocalePath helper. AHK then surfaced the
 ; error as a MsgBox under default settings — invisible but blocking on the
 ; headless CI runner, which is the root cause of the recurring "5-minute
-; timeout" failures of the AHK test suite. Pointing it at the real static/
-; folder so locale files actually load is a bonus: tests that exercise t()
-; now get translated strings instead of raw key names.
+; timeout" failures of the AHK test suite.
+;
+; Points at the real ``static/`` tree (three levels up from the tests folder)
+; so:
+;   - i18n.ahk resolves real locale JSONs and t() returns translated strings
+;   - modules/gestures.ahk parses the bundled ``shared/actions.toml`` and
+;     populates GESTURE_ACTION_NAMES with the production gesture catalog
+;     (the gesture tests would otherwise see an empty registry).
+;
+; The hotstrings-config tests guard against picking up the bundled
+; rolls.toml / autocorrection.toml metadata by pre-caching empty entries in
+; ``HotstringGroupConfig`` from ``_HCfgTestReset`` — see test_hotstrings_config.ahk.
 global _StaticDir := A_ScriptDir . "\..\..\.."
+
+; Strict-canonicalisation guard read by TOML_RunStrictCanonicalization in
+; lib/toml/toml_helpers.ahk. Production declares this in ErgoptiPlus.ahk
+; (false) so the canonicaliser knows it is allowed to run; the test runner
+; does not include ErgoptiPlus.ahk, so the helper would otherwise raise
+; "global variable has not been assigned a value" the first time a test
+; writes through TOML_BatchWrite / TOML_Write.
+global _TOML_STRICT_CANON_IN_PROGRESS := false
 
 ; Hotstring engine globals normally maintained by modules/layout.ahk.
 ; The LastSentCharacters ring buffer is defined in lib/hotstring_engine.ahk;

@@ -13,18 +13,43 @@
 ; ==============================================================================
 
 ; Helper — wipe / seed the in-memory state for a single test case.
+;
+; Pre-seeds ``HotstringGroupConfig`` with empty entries for every category
+; the test suite resolves. Without this, ParseTomlGroupConfig would fall
+; through to a real file lookup under ``_StaticDir`` and the bundled
+; ``static/hotstrings/<category>.toml`` files would smuggle their real
+; delay/color into the resolution cascade, breaking the "falls back to
+; defaults" assertions. Tests that DO want to exercise toml metadata seed
+; their own values via _HCfgTestSeedToml, which overwrites these entries.
 _HCfgTestReset() {
     global _HotstringsOverrides, _HotstringsOverridesPath, HotstringGroupConfig
     _HotstringsOverrides := Map()
     _HotstringsOverridesPath := ""   ; disable persistence during tests
     HotstringGroupConfig := Map()
+    ; Build a fresh empty config per category so mutations in one test do not
+    ; leak into the next (each Sections map must be a distinct instance).
+    for Cat in ["rolls", "sfbsreduction", "autocorrection", "distancesreduction", "magickey"] {
+        HotstringGroupConfig[Cat] := { Delay: "", Color: "", ShowTooltip: "", Sections: Map() }
+    }
 }
 
 _HCfgTestSeedToml(Cat, Delay, Color, Sections := unset) {
     global HotstringGroupConfig
-    Cfg := { Delay: Delay, Color: Color, Sections: Map() }
+    ; ShowTooltip is part of the public Toml config schema (see toml_loader.ahk
+    ; ParseTomlGroupConfig — it always materialises a ShowTooltip field, empty
+    ; when the toml file does not set the value). The resolution cascade in
+    ; hotstrings_config.ahk reads ``TomlCfg.ShowTooltip`` directly, so seeded
+    ; test configs MUST expose that property too, otherwise AHK raises a
+    ; "no property named ShowTooltip" error during HotstringsResolve.
+    Cfg := { Delay: Delay, Color: Color, ShowTooltip: "", Sections: Map() }
     if IsSet(Sections) {
         for SecName, SecData in Sections {
+            ; Same shape contract for sections — if a caller passes a section
+            ; object without ShowTooltip, normalise it here so downstream
+            ; resolution can rely on the property being present.
+            if !SecData.HasOwnProp("ShowTooltip") {
+                SecData.ShowTooltip := ""
+            }
             Cfg.Sections[SecName] := SecData
         }
     }
