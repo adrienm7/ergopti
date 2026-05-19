@@ -1180,20 +1180,20 @@ initMenu() {
 	global UPDATER_CHANNEL
 	if Updater_IsLocalSource() {
 		; Local source build — channel selection is meaningless, show a grayed info item
-		LocalSourceLabel := "✔  Local source"
+		LocalSourceLabel := t("menu.about.channel_local_source")
 		AboutMenu.Add(LocalSourceLabel, (*) => NoAction())
 		AboutMenu.Disable(LocalSourceLabel)
 	} else {
-		ChannelMainLabel := (UPDATER_CHANNEL != "dev") ? "✔  Stable (main)" : "   Stable (main)"
-		ChannelDevLabel  := (UPDATER_CHANNEL == "dev") ? "✔  Pre-release (dev)" : "   Pre-release (dev)"
+		ChannelMainLabel := (UPDATER_CHANNEL != "dev") ? "✔  " . t("menu.about.channel_main") : "   " . t("menu.about.channel_main")
+		ChannelDevLabel  := (UPDATER_CHANNEL == "dev") ? "✔  " . t("menu.about.channel_dev")  : "   " . t("menu.about.channel_dev")
 		AboutMenu.Add(ChannelMainLabel, (*) => Updater_SetChannel("main"))
 		AboutMenu.Add(ChannelDevLabel,  (*) => Updater_SetChannel("dev"))
 	}
 	AboutMenu.Add() ; Separator
-	AboutMenu.Add("Check for updates", Updater_CheckForUpdate)
-	AboutMenu.Add("Changelog",         Updater_ShowChangelog)
-	AboutMenu.Add("Open releases page", (*) => Run(Updater_ReleasesPageUrl()))
-	A_TrayMenu.Add("Version / Mises à jour", AboutMenu)
+	AboutMenu.Add(t("menu.about.check_for_updates"), Updater_CheckForUpdate)
+	AboutMenu.Add(t("menu.about.changelog"),         Updater_ShowChangelog)
+	AboutMenu.Add(t("menu.about.open_releases_page"), (*) => Run(Updater_ReleasesPageUrl()))
+	A_TrayMenu.Add(t("menu.about.title"), AboutMenu)
 
 	LangMenu := Menu()
 	I18nBuildLanguageMenu(LangMenu)
