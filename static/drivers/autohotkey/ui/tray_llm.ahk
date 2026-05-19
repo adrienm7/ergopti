@@ -97,6 +97,12 @@ global _LLM_Tray := Map(
 	"nav_modifiers",              "",
 	"val_modifiers",              "alt",
 	"trigger_shortcut",           "",
+	; When true, switching to a new model auto-picks the matching profile
+	; (raw / basic / advanced / batch_advanced) using the params count from
+	; models.json. Mirrors the HS get_recommended_profile_info heuristic so
+	; the user does not have to manually re-pick a profile every time they
+	; try a different model size. Toggleable via the profile submenu.
+	"auto_profile_for_model",     true,
 	; ── Remote API backend ──
 	; Persisted across reloads via SaveFullConfig (config.toml [LLM]
 	; subsection). The user adds an entry via "+ Add an API…" in the model
@@ -105,6 +111,23 @@ global _LLM_Tray := Map(
 	"api_entries",                [],
 	"api_entry_id",               ""
 )
+
+; Profile-power thresholds used by LLM_RecommendProfileForModel — kept here
+; as named constants so the policy is the same as the HS reference (see
+; ui/menu/menu_llm/init.lua MODEL_ADVANCED_PARAMS_THRESHOLD_B and
+; MODEL_BATCH_PARAMS_THRESHOLD_B).
+global LLM_PROFILE_ADVANCED_PARAMS_B := 2.0   ; ≥ 2B → advanced
+global LLM_PROFILE_BATCH_PARAMS_B    := 4.0   ; ≥ 4B → batch_advanced
+
+; Ordered profile list used by the Ctrl+<n> hotkeys. Index 1 maps to the
+; first row of the profile submenu (Ctrl+1), index 2 to Ctrl+2, etc. The
+; built-ins always come first so the shortcut layout stays stable across
+; sessions — appending user profiles after them lets a user keep their
+; muscle memory while still reaching their own profiles by index.
+global LLM_PROFILE_BUILTIN_ORDER := ["raw", "basic", "advanced", "batch_advanced"]
+; How many Ctrl+<n> shortcuts we register. We stop at Ctrl+9 because Ctrl+0
+; collides with browser zoom reset on too many apps to be worth binding.
+global LLM_PROFILE_HOTKEY_LIMIT := 9
 
 /**
  * Overwrites _LLM_Tray defaults with values from the shared defaults.json.
@@ -175,7 +198,7 @@ LLM_Tray_Init(saved_opts := Map()) {
 	static _num_keys := ["n_predictions", "min_words", "max_words", "debounce_ms", "ctx_chars", "pred_indent"]
 	static _bool_keys := ["enabled", "instant_on_word_end", "after_hotstring", "reset_on_nav",
 		"disable_url_bars", "disable_password_fields", "show_info_bar", "streaming",
-		"show_all_at_once", "auto_raise_temp"]
+		"show_all_at_once", "auto_raise_temp", "auto_profile_for_model"]
 	static _arr_keys := ["user_profiles", "disabled_apps"]
 
 	for key in _str_keys
@@ -199,6 +222,12 @@ LLM_Tray_Init(saved_opts := Map()) {
 	; the main config.toml — kept separate because the array-of-maps shape
 	; would not survive the project's flat-TOML writer).
 	_LLM_Tray_LoadApiEntries()
+
+	; Register Ctrl+1 … Ctrl+9 once. Re-registering on every build_menu pass
+	; would be wasteful and noisy in the AHK Hotkey log; doing it here
+	; covers both fresh boots and post-Reload paths since LLM_Tray_Init is
+	; the only entry into the tray module.
+	LLM_Tray_BindProfileHotkeys()
 
 	LLM_Tray_Build()
 
@@ -767,7 +796,9 @@ LLM_Tray_BuildProfileMenu() {
 
 	for id in ["raw", "basic", "advanced", "batch_advanced"] {
 		captured_id := id
-		label := LLM_Tray_GetProfileLabel(id)
+		base_label := LLM_Tray_GetProfileLabel(id)
+		hint := LLM_Tray_GetProfileHotkeyHint(id)
+		label := (hint != "") ? base_label . "  (" . hint . ")" : base_label
 		m.Add(label, (name, pos, menu) => LLM_Tray_SetProfile(captured_id))
 		if (id == _LLM_Tray["profile_id"])
 			m.Check(label)
@@ -784,7 +815,9 @@ LLM_Tray_BuildProfileMenu() {
 		for p in user_profiles {
 			captured_p := p
 			pid        := p.Has("id") ? p["id"] : ""
-			plabel     := p.Has("label") ? p["label"] : pid
+			base_plabel := p.Has("label") ? p["label"] : pid
+			hint := LLM_Tray_GetProfileHotkeyHint(pid)
+			plabel := (hint != "") ? base_plabel . "  (" . hint . ")" : base_plabel
 			m.Add(plabel, (name, pos, menu) => LLM_Tray_OnUserProfileClick(captured_p))
 			if (pid == _LLM_Tray["profile_id"])
 				m.Check(plabel)
@@ -793,7 +826,28 @@ LLM_Tray_BuildProfileMenu() {
 
 	m.Add()
 	m.Add(t("menu.profiles.create_profile"), (*) => LLM_Tray_PromptCreateProfile())
+
+	; Auto-detect toggle: when ON, switching model in the model submenu also
+	; re-picks the matching profile based on the params count. Mirrors the
+	; HS get_recommended_profile_info path so the two drivers agree on what
+	; profile each model should run with by default.
+	m.Add()
+	auto_label := t("menu.profiles.auto_detect")
+	m.Add(auto_label, (*) => _LLM_Tray_ToggleAutoProfile())
+	if _LLM_Tray["auto_profile_for_model"]
+		m.Check(auto_label)
 	return m
+}
+
+_LLM_Tray_ToggleAutoProfile() {
+	global _LLM_Tray
+	_LLM_Tray["auto_profile_for_model"] := !_LLM_Tray["auto_profile_for_model"]
+	; Re-evaluate immediately on enable so the next prediction uses the
+	; recommended profile without waiting for the user to switch model.
+	if _LLM_Tray["auto_profile_for_model"]
+		LLM_Tray_AutoApplyProfileForModel()
+	LLM_Tray_SaveConfig()
+	LLM_Tray_Build()
 }
 
 
@@ -1153,6 +1207,10 @@ LLM_Tray_SetBackend(id) {
 LLM_Tray_SetModel(tag) {
 	global _LLM_Tray
 	_LLM_Tray["model"] := tag
+	; Honour the auto-detect toggle BEFORE saving so the new profile id
+	; lands in the same config write — keeps the on-disk state consistent
+	; whatever path the user took to switch model.
+	LLM_Tray_AutoApplyProfileForModel()
 	LLM_Tray_SaveConfig()
 	LLM_Engine_Init(LLM_Tray_BuildOpts())
 	LLM_Tray_Build()
@@ -1627,6 +1685,157 @@ LLM_Tray_BuildOpts() {
 		"api_entry_id",            _LLM_Tray["api_entry_id"]
 	)
 }
+
+
+; ============================================================
+; ============================================================
+; ======= 5.5) Profile auto-detection + Hotkeys =============
+; ============================================================
+; ============================================================
+
+/**
+ * Returns the recommended profile id for a given model display name.
+ * Mirrors the HS get_recommended_profile_info heuristic (ui/menu/menu_llm/init.lua):
+ *   - completion-style models           → "raw"
+ *   - params ≥ LLM_PROFILE_BATCH_PARAMS_B (4B) → "batch_advanced"
+ *   - params ≥ LLM_PROFILE_ADVANCED_PARAMS_B (2B) → "advanced"
+ *   - everything else (small models)    → "basic"
+ *
+ * Falls back to "basic" when the model is unknown so the menu never lands
+ * on an undefined profile id.
+ *
+ * @param {string} model - Display name as stored in models.json.
+ * @returns {string} One of "raw" | "basic" | "advanced" | "batch_advanced".
+ */
+LLM_RecommendProfileForModel(model) {
+	global LLM_PROFILE_ADVANCED_PARAMS_B, LLM_PROFILE_BATCH_PARAMS_B
+	if (model == "")
+		return "basic"
+	info := LLM_GetModelInfo(model)
+	if (info["type"] == "completion")
+		return "raw"
+	; MoE models: the "active" parameter count drives runtime behaviour
+	; much more than "total", so we gate the thresholds on the active count
+	; — falls back to total when active is missing.
+	effective := info.Has("active_b") && info["active_b"] > 0 ? info["active_b"] : info["params_b"]
+	if (effective >= LLM_PROFILE_BATCH_PARAMS_B)
+		return "batch_advanced"
+	if (effective >= LLM_PROFILE_ADVANCED_PARAMS_B)
+		return "advanced"
+	return "basic"
+}
+
+/**
+ * Applies the recommended profile for the active model, if the user has
+ * enabled auto-detection. No-op when the recommended profile already
+ * matches the current one. Returns the (possibly new) profile id so the
+ * caller can refresh the menu in a single roundtrip.
+ *
+ * @returns {string} Profile id in effect after the call.
+ */
+LLM_Tray_AutoApplyProfileForModel() {
+	global _LLM_Tray
+	if !_LLM_Tray["auto_profile_for_model"]
+		return _LLM_Tray["profile_id"]
+	recommended := LLM_RecommendProfileForModel(_LLM_Tray["model"])
+	if (recommended == "" or recommended == _LLM_Tray["profile_id"])
+		return _LLM_Tray["profile_id"]
+	_LLM_Tray["profile_id"] := recommended
+	LLM_Tray_SaveConfig()
+	LLM_Engine_Init(LLM_Tray_BuildOpts())
+	return recommended
+}
+
+/**
+ * Returns the ordered list of profile ids exposed to the Ctrl+<n>
+ * hotkeys: built-ins first (raw/basic/advanced/batch_advanced) then user
+ * profiles in the order they were defined. Truncated to
+ * LLM_PROFILE_HOTKEY_LIMIT so we don't try to register more hotkeys than
+ * the user can reach on a number row.
+ *
+ * @returns {Array} Ordered profile id strings.
+ */
+LLM_Tray_GetHotkeyProfileOrder() {
+	global _LLM_Tray, LLM_PROFILE_BUILTIN_ORDER, LLM_PROFILE_HOTKEY_LIMIT
+	out := []
+	for _, id in LLM_PROFILE_BUILTIN_ORDER {
+		out.Push(id)
+		if (out.Length >= LLM_PROFILE_HOTKEY_LIMIT)
+			return out
+	}
+	for p in _LLM_Tray["user_profiles"] {
+		if !(p is Map) or !p.Has("id")
+			continue
+		out.Push(p["id"])
+		if (out.Length >= LLM_PROFILE_HOTKEY_LIMIT)
+			return out
+	}
+	return out
+}
+
+/**
+ * Looks up the Ctrl+<n> label for a given profile id, or "" when the
+ * profile is not in the hotkey range. Used by LLM_Tray_BuildProfileMenu
+ * to append "(Ctrl+1)" / "(Ctrl+2)" hints next to each row so the user
+ * sees the binding without having to read the docs.
+ *
+ * @param {string} id - Profile id (built-in or user-defined).
+ * @returns {string} "Ctrl+<n>" or "" when the profile is unbound.
+ */
+LLM_Tray_GetProfileHotkeyHint(id) {
+	for i, pid in LLM_Tray_GetHotkeyProfileOrder() {
+		if (pid == id)
+			return "Ctrl+" . i
+	}
+	return ""
+}
+
+/**
+ * Registers Ctrl+1 … Ctrl+9 globally so the user can switch profiles from
+ * any focused app. Idempotent — calling this on every menu rebuild is safe
+ * because AHK's ``Hotkey`` API replaces an existing binding when the same
+ * key triple is re-registered. The hotkey only fires when the LLM feature
+ * is enabled (paused / disabled scripts still get the bare Ctrl+<n> their
+ * apps expect).
+ */
+LLM_Tray_BindProfileHotkeys() {
+	global LLM_PROFILE_HOTKEY_LIMIT
+	loop LLM_PROFILE_HOTKEY_LIMIT {
+		idx := A_Index
+		key := "^" . idx
+		try Hotkey(key, _LLM_Tray_MakeProfileHotkey(idx), "On")
+	}
+}
+
+/**
+ * Builds the closure assigned to a Ctrl+<n> shortcut. The closure resolves
+ * the active profile order each time it fires (not at registration time)
+ * so new user profiles created after boot are reachable without a reload.
+ * Falls through to the default Ctrl+<n> behaviour (passing the keystroke
+ * to the active app) when the index is out of range or the LLM feature is
+ * disabled — keeps the binding non-intrusive on slots the user hasn't
+ * configured yet.
+ */
+_LLM_Tray_MakeProfileHotkey(idx) {
+	return (*) => _LLM_Tray_OnProfileHotkey(idx)
+}
+
+_LLM_Tray_OnProfileHotkey(idx) {
+	global _LLM_Tray
+	if !_LLM_Tray["enabled"] {
+		; Pass the keystroke through so the user's app receives Ctrl+<n>.
+		Send "{Ctrl down}" . idx . "{Ctrl up}"
+		return
+	}
+	order := LLM_Tray_GetHotkeyProfileOrder()
+	if (idx < 1 or idx > order.Length) {
+		Send "{Ctrl down}" . idx . "{Ctrl up}"
+		return
+	}
+	LLM_Tray_SetProfile(order[idx])
+}
+
+
 
 
 ; ====================================================
