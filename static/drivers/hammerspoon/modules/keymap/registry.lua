@@ -462,7 +462,13 @@ function M.add(trigger, replacement, opts)
 		end
 
 		for _, ut in ipairs(upper_trigs) do
-			-- Skip the upper variant if it is identical to a title variant already added.
+			-- Single-character body special case: when the trigger body is one
+			-- char (e.g. "e★", or a plain "e"), title and upper are identical
+			-- strings. Registering both would surface a phantom "EST" entry as
+			-- a dimmed alternative in the multi-row tooltip — an alternative
+			-- the engine could never actually fire because title already wins.
+			-- The same invariant lives in the AHK prefix watcher
+			-- (_AddTriggerVariants in hotstring_prefix_watcher.ahk).
 			local is_title = false
 			for _, tt in ipairs(title_trigs) do
 				if ut == tt then is_title = true; break end
