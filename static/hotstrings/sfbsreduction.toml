@@ -5,7 +5,6 @@
 # ====================
 
 [_meta]
-color = "#fb8c00"
 delay = 0.5
 show_tooltip = true
 description = { fr = "Réduction des SFBs", en = "SFB reduction", de = "SFB-Reduktion", es = "Reducción de SFBs", zh = "SFB 减少", ar = "تقليل SFBs", cs = "Redukce SFBs", da = "SFB-reduktion", he = "הפחתת SFBs", hi = "SFB कमी", it = "Riduzione SFBs", ja = "SFB削減", ko = "SFB 감소", nl = "SFB-reductie", no = "SFB-reduksjon", pl = "Redukcja SFBs", pt = "Redução de SFBs", ru = "Снижение SFBs", sv = "SFB-reduktion", tr = "SFB azaltma", uk = "Зменшення SFBs" }

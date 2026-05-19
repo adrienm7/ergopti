@@ -5,7 +5,6 @@
 # ====================
 
 [_meta]
-color = "#fb8c00"
 delay = 0.5
 show_tooltip = false
 description = { fr = "Roulements", en = "Rolls", de = "Läufe", es = "Rodamientos", zh = "连击", ar = "تداول", cs = "Rolování", da = "Rolls", he = "גלגולים", hi = "रोल्स", it = "Rollate", ja = "ロール", ko = "롤", nl = "Rolls", no = "Rolls", pl = "Rolady", pt = "Rolagens", ru = "Перекаты", sv = "Rolls", tr = "Yuvarlamalar", uk = "Перекати" }
