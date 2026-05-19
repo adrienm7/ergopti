@@ -1836,5 +1836,8 @@
 	"hs_config.color_indigo": "Índigo",
 	"hs_config.color_turquoise": "Turquesa",
 	"hs_config.color_lime": "Lima",
-	"hs_config.color_brown": "Castanho"
+	"hs_config.color_brown": "Castanho",
+	"updater.changelog_select_release": "Selecione uma versão:",
+	"updater.open_on_github": "Abrir no GitHub",
+	"updater.close": "Fechar"
 }

@@ -1836,5 +1836,8 @@
 	"hs_config.color_indigo": "藍",
 	"hs_config.color_turquoise": "ターコイズ",
 	"hs_config.color_lime": "ライム",
-	"hs_config.color_brown": "茶"
+	"hs_config.color_brown": "茶",
+	"updater.changelog_select_release": "バージョンを選択:",
+	"updater.open_on_github": "GitHub で開く",
+	"updater.close": "閉じる"
 }

@@ -387,6 +387,154 @@ jobs:
         runs-on: ubuntu-latest
 
         steps:
+            # Need the full history so ``git log previous_tag..HEAD`` works
+            # for the main-channel changelog aggregation below.
+            - name: Checkout (full history)
+              uses: actions/checkout@v4
+              with:
+                  fetch-depth: 0
+
+            # Build the changelog section that goes ABOVE the platform install
+            # instructions in the release notes. Two cases:
+            #
+            # • dev push    — each commit on dev is itself a release. Quote the
+            #   commit title (first line) as an h3 and the body verbatim below.
+            #
+            # • main release — aggregate every commit since the previous main
+            #   release tag and group them by Conventional Commits type. Each
+            #   group becomes an h3 (`### Features`, `### Fix`, …) followed by
+            #   a bullet list of the matching commit subjects.
+            #
+            # The result is written to ``$RUNNER_TEMP/changelog.md`` and read
+            # by the next step. Failures fall back to an empty changelog so a
+            # malformed commit cannot abort the release.
+            - name: Build changelog section
+              shell: bash
+              env:
+                  EVENT:    ${{ github.event_name }}
+                  TAG:      ${{ needs.prepare-release.outputs.tag }}
+                  SHA:      ${{ github.sha }}
+              run: |
+                  set -euo pipefail
+                  changelog_file="$RUNNER_TEMP/changelog.md"
+                  : > "$changelog_file"
+
+                  if [ "$EVENT" = "push" ]; then
+                      # Dev push: the release IS a single commit. Quote its
+                      # title + body so the user reading the release page sees
+                      # exactly what landed, no more, no less.
+                      title="$(git log -1 --pretty=format:'%s' "$SHA")"
+                      body="$(git log -1 --pretty=format:'%b' "$SHA")"
+                      {
+                          echo "## Changelog"
+                          echo
+                          echo "### $title"
+                          echo
+                          if [ -n "$body" ]; then
+                              echo "$body"
+                              echo
+                          fi
+                          echo "---"
+                          echo
+                      } > "$changelog_file"
+                      echo "Dev changelog written ($(wc -l < "$changelog_file") lines)."
+                      exit 0
+                  fi
+
+                  # release (main) or workflow_dispatch on a vX.Y.Z tag.
+                  # Find the previous main-channel tag (vX.Y.Z) excluding the
+                  # current one. ``git for-each-ref`` lets us sort SemVer
+                  # tags correctly without external tools.
+                  prev_tag="$(git tag --list 'v[0-9]*.[0-9]*.[0-9]*' \
+                      --sort=-v:refname \
+                      | grep -v "^${TAG}$" \
+                      | head -n 1 || true)"
+                  if [ -z "$prev_tag" ]; then
+                      echo "No previous vX.Y.Z tag found — emitting empty changelog."
+                      exit 0
+                  fi
+
+                  # Commit list since previous tag. ``%H%x09%s`` gives
+                  # SHA<TAB>subject — easy to parse and survives subjects
+                  # containing colons, dashes, parentheses, etc.
+                  commits_file="$RUNNER_TEMP/commits.tsv"
+                  git log "${prev_tag}..${TAG}" --no-merges --pretty=format:'%H%x09%s' \
+                      > "$commits_file" || true
+                  if [ ! -s "$commits_file" ]; then
+                      echo "No commits between $prev_tag and $TAG — emitting empty changelog."
+                      exit 0
+                  fi
+
+                  # Conventional Commits type → human heading. Order matches
+                  # the section order the user wants the changelog to read in:
+                  # features first (most visible), then fixes, then the rest.
+                  declare -a TYPES=(feat fix perf refactor style docs test chore)
+                  declare -A HEADINGS=(
+                      [feat]="Features"
+                      [fix]="Fix"
+                      [perf]="Performance"
+                      [refactor]="Refactoring"
+                      [style]="Style"
+                      [docs]="Documentation"
+                      [test]="Tests"
+                      [chore]="Chores"
+                  )
+
+                  declare -A GROUPS
+                  declare -a OTHER
+
+                  while IFS=$'\t' read -r sha subject; do
+                      # Skip empty lines just in case.
+                      [ -z "$subject" ] && continue
+                      # Match ``type(scope)?!?: rest`` and capture the type.
+                      if [[ "$subject" =~ ^([a-z]+)(\([^)]+\))?(!)?:\ (.+)$ ]]; then
+                          ctype="${BASH_REMATCH[1]}"
+                          rest="${BASH_REMATCH[4]}"
+                          # Mark breaking changes with ⚠️ so they pop in the UI.
+                          if [ -n "${BASH_REMATCH[3]}" ]; then
+                              rest="⚠️ $rest"
+                          fi
+                          # Keep scope context if it exists.
+                          if [ -n "${BASH_REMATCH[2]}" ]; then
+                              scope_clean="${BASH_REMATCH[2]#(}"
+                              scope_clean="${scope_clean%)}"
+                              rest="**${scope_clean}:** ${rest}"
+                          fi
+                          if [ -n "${HEADINGS[$ctype]:-}" ]; then
+                              GROUPS[$ctype]="${GROUPS[$ctype]:-}- ${rest}"$'\n'
+                          else
+                              OTHER+=("- ${rest}")
+                          fi
+                      else
+                          OTHER+=("- ${subject}")
+                      fi
+                  done < "$commits_file"
+
+                  {
+                      echo "## Changelog"
+                      echo
+                      echo "_Commits since [\`$prev_tag\`](https://github.com/${GITHUB_REPOSITORY}/releases/tag/${prev_tag})._"
+                      echo
+                      for t in "${TYPES[@]}"; do
+                          if [ -n "${GROUPS[$t]:-}" ]; then
+                              echo "### ${HEADINGS[$t]}"
+                              echo
+                              # Trim trailing newline added by accumulation.
+                              printf '%s' "${GROUPS[$t]}"
+                              echo
+                          fi
+                      done
+                      if [ "${#OTHER[@]}" -gt 0 ]; then
+                          echo "### Other"
+                          echo
+                          for line in "${OTHER[@]}"; do echo "$line"; done
+                          echo
+                      fi
+                      echo "---"
+                      echo
+                  } > "$changelog_file"
+                  echo "Main changelog written ($(wc -l < "$changelog_file") lines)."
+
             - name: Write release body with platform sections
               shell: bash
               env:
@@ -396,7 +544,14 @@ jobs:
               run: |
                   set -euo pipefail
                   body_file="$(mktemp)"
-                  cat > "$body_file" << EOF
+                  # Prepend the per-channel changelog block built in the
+                  # previous step. When the file is empty (no prior tag, or
+                  # parse failure), this is a harmless no-op and the release
+                  # notes look exactly like before.
+                  if [ -s "$RUNNER_TEMP/changelog.md" ]; then
+                      cat "$RUNNER_TEMP/changelog.md" >> "$body_file"
+                  fi
+                  cat >> "$body_file" << EOF
                   ## Ergopti $VERSION
 
                   Select the platform below and download the corresponding file.

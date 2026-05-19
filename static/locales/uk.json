@@ -1836,5 +1836,8 @@
 	"hs_config.color_indigo": "Індиго",
 	"hs_config.color_turquoise": "Бірюзовий",
 	"hs_config.color_lime": "Лаймовий",
-	"hs_config.color_brown": "Коричневий"
+	"hs_config.color_brown": "Коричневий",
+	"updater.changelog_select_release": "Виберіть версію:",
+	"updater.open_on_github": "Відкрити на GitHub",
+	"updater.close": "Закрити"
 }
