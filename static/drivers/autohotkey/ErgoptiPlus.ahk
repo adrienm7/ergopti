@@ -1948,7 +1948,8 @@ FilePathsEditor(*) {
     W.MarginY := 12
 
     W.Add("Text", "xm", t("dialog.config_folder.label"))
-    DirEdit := W.Add("Edit", "xm w480", _ConfigDir)
+    ; Display path with forward slashes for readability
+    DirEdit := W.Add("Edit", "xm w480", StrReplace(_ConfigDir, "\", "/"))
     W.Add("Button", "x+6 w80", t("common.browse")).OnEvent("Click", BrowseDir)
 
     W.Add("Text", "xm y+14 cGray", t("dialog.config_folder.hint"))
@@ -1959,14 +1960,15 @@ FilePathsEditor(*) {
     BrowseDir(*) {
         ; Start from the current field value if it exists, otherwise fall back to
         ; My Documents so the dialog opens somewhere useful rather than the script root.
-        StartDir := Trim(DirEdit.Value)
+        StartDir := StrReplace(Trim(DirEdit.Value), "/", "\")
         if (StartDir == "" or !DirExist(StartDir)) {
             StartDir := A_MyDocuments
         }
         Selected := DirSelect("*" . StartDir, 1, t("dialog.config_folder.select_title"))
         if (Selected != "") {
-            if !RegExMatch(Selected, "\\$")
-                Selected .= "\"
+            Selected := StrReplace(Selected, "\", "/")
+            if !RegExMatch(Selected, "/$")
+                Selected .= "/"
             DirEdit.Value := Selected
         }
     }
@@ -1974,7 +1976,7 @@ FilePathsEditor(*) {
     SaveConfigDir(*) {
         global _ConfigDir, _DefaultConfigDir, _PathsFile, ScriptInformation, ConfigurationFile
 
-        NewDir := Trim(DirEdit.Value)
+        NewDir := StrReplace(Trim(DirEdit.Value), "/", "\")
         if (NewDir == "") {
             NewDir := _DefaultConfigDir
         } else if !RegExMatch(NewDir, "\\$") {
