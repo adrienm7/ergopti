@@ -1741,7 +1741,11 @@ GestureShowManualTutorialDialog() {
     tg.SetFont("s9", "Segoe UI")
     tg.MarginX := 18
     tg.MarginY := 14
-    tg.AddEdit("ReadOnly w480 h220 -Wrap +HScroll", GestureBuildSetupInstructions())
+    ; Edit height is sized to fit the full tutorial body without a vertical
+    ; scrollbar — the 10-slot list + section headers + auto-configure footer
+    ; comes out around 22 lines at the current font, so 340 px is the
+    ; comfortable minimum. -Wrap + HScroll keeps the shortcut column aligned.
+    tg.AddEdit("ReadOnly w480 h340 -Wrap +HScroll", GestureBuildSetupInstructions())
     tg.AddText("w480 y+10", t("onboarding.gestures.open_settings_hint"))
     btnOpenSettings := tg.AddButton("w480 y+8", t("onboarding.gestures.open_settings"))
     btnClose        := tg.AddButton("Default w110 x370 y+12", t("onboarding.btn.ok"))

@@ -16,7 +16,7 @@
 #   ERGOPTI_BUILD    — integer build number (CFBundleVersion in Info.plist)
 #   ERGOPTI_CHANNEL  — "main" or "dev"
 #   SPARKLE_SIG_FILE — path to the .sig file written by sign_update
-#   ZIP_PATH         — path to Ergopti.app.zip
+#   ZIP_PATH         — path to ErgoptiPlus.app.zip
 #   GH_OWNER         — GitHub organisation / user name
 #   GH_REPO          — GitHub repository name
 #   OUTPUT_PATH      — where to write the finished appcast-{channel}.xml
@@ -34,7 +34,7 @@ set -euo pipefail
 : "${OUTPUT_PATH:?Required: OUTPUT_PATH}"
 
 TAG="v${ERGOPTI_VERSION}"
-ZIP_URL="https://github.com/${GH_OWNER}/${GH_REPO}/releases/download/${TAG}/Ergopti.app.zip"
+ZIP_URL="https://github.com/${GH_OWNER}/${GH_REPO}/releases/download/${TAG}/ErgoptiPlus.app.zip"
 ZIP_SIZE="$(wc -c < "${ZIP_PATH}" | tr -d ' ')"
 SIG="$(cat "${SPARKLE_SIG_FILE}")"
 PUB_DATE="$(date -R)"
