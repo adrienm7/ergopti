@@ -391,7 +391,42 @@ function M.process_prediction(full_text, tail_text, block)
 
 		local normalized_full = (full_text or "")
 		local tc_norm = tc
-		
+
+		-- Stale-buffer guard: the last word of tc must not be completely disjoint
+		-- from the last word of the user buffer. If the Levenshtein distance
+		-- between them equals their maximum length (i.e. zero shared characters),
+		-- the LLM received a stale snapshot and the prediction must be discarded.
+		local function last_word(s)
+			return s:match("([%w\226\128\153']+)[%s\194\160\226\128\175]*$") or ""
+		end
+		local function char_lev(a, b)
+			local m, n = #a, #b
+			if m == 0 then return n end
+			if n == 0 then return m end
+			local prev, curr = {}, {}
+			for j = 0, n do prev[j] = j end
+			for i = 1, m do
+				curr[0] = i
+				for j = 1, n do
+					local cost = (a:sub(i, i) == b:sub(j, j)) and 0 or 1
+					curr[j] = math.min(prev[j] + 1, curr[j - 1] + 1, prev[j - 1] + cost)
+				end
+				prev, curr = curr, {}
+			end
+			return prev[n]
+		end
+		local orig_last = last_word(normalized_full):lower()
+		local tc_last   = last_word(tc_norm):lower()
+		if orig_last ~= "" and tc_last ~= "" then
+			local max_len = math.max(#orig_last, #tc_last)
+			local dist    = char_lev(orig_last, tc_last)
+			-- Fully disjoint last words (ratio == 1.0) → stale snapshot
+			if max_len > 0 and dist >= max_len then
+				Logger.warn(LOG, "Stale buffer: last word of tc ('%s') is fully disjoint from buffer tail ('%s') — discarding.", tc_last, orig_last)
+				return nil
+			end
+		end
+
 		-- Match user's trailing spaces to prevent cutting mid-word
 		local tail_trailing_space = normalized_full:match("([%s\194\160\226\128\175]+)$")
 		if tail_trailing_space and not tc_norm:match("[%s\194\160\226\128\175]$") then
@@ -612,8 +647,18 @@ function M.process_prediction(full_text, tail_text, block)
                 end
 				if not found_word then nw_start_idx = #visual_ops + 1 end
 			else
-				-- Equal or Sub: NW starts immediately after
+				-- Equal or Sub: NW starts immediately after the anchor.
+				-- Skip any trailing space-only equal ops that belong to tc_norm context
+				-- rather than to NW (e.g. orig trailing space propagated into visual_ops).
 				nw_start_idx = last_anchor_idx + 1
+				while nw_start_idx <= #visual_ops do
+					local op = visual_ops[nw_start_idx]
+					if op.type == "equal" and (op.t2 or ""):match("^[%s\194\160\226\128\175]+$") then
+						nw_start_idx = nw_start_idx + 1
+					else
+						break
+					end
+				end
 			end
 		else
 			nw_start_idx = 1

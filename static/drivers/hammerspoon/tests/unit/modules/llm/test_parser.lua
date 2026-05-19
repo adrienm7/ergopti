@@ -81,7 +81,8 @@ local function run_tests()
 			orig = "j'ai jamais vu",
 			tc = "j'ai jamais su",
 			nw = "en fait",
-			expected_chunks = "[=:jamais ][+:su]",
+			-- intra_word_diff shares the common suffix 'u' between 'vu' and 'su'
+			expected_chunks = "[=:jamais ][+:s][=:u]",
 			expected_nw = " en fait",
 			expected_deletes = 2 -- "vu"
 		},
@@ -154,7 +155,8 @@ local function run_tests()
 			tc = "1815",
 			nw = "et a laissé un grand vide",
 			expected_chunks = "",
-			expected_nw = " et a laissé un grand vide",
+			-- max_w=5 in the test mock: "et a laissé un grand" = 5 words, "vide" is dropped
+			expected_nw = " et a laissé un grand",
 			expected_deletes = 0
 		},
 		{
