@@ -23,9 +23,11 @@
 ;    .exe) means a downloaded ErgoptiPlus.exe sitting in ~/Downloads or any
 ;    other folder does not pollute its host directory with ``static/`` and
 ;    ``vendor/`` siblings. Users keep their download folder clean.
-; 2. Per-version directories: each ``BUNDLE_VERSION`` lives in its own
-;    folder (``bundle-1.2.3``), so a future updater can ship a new version
-;    without touching the old one and roll back trivially if needed.
+; 2. Single ``bundle/`` directory: one extraction location regardless of
+;    version. On version change the directory is wiped before re-extraction
+;    so orphan files from the previous version cannot accumulate, and disk
+;    usage stays bounded at ~one bundle worth (~10-20 MB) instead of growing
+;    linearly with every release.
 ; 3. Version-aware skip: a marker file under the bundle dir holds the build
 ;    version string; if it matches BUNDLE_VERSION the extraction is skipped,
 ;    so the .exe boots without paying the ~250ms unzip cost on every launch.
@@ -58,12 +60,11 @@ global _BundleDir := ""
 ; ===== 1.2) Internal helper functions =====
 ; ==========================================
 
-; Returns the per-version extraction root inside A_LocalAppData. We version
-; the folder so a future updater (Velopack) can ship new versions side-by-side
-; with old ones; the marker check then guarantees a single extraction per
-; install rather than per launch.
+; Returns the single extraction root inside A_LocalAppData. We use one fixed
+; folder (no version suffix) so disk usage stays bounded — on version change
+; the folder is wiped by Bundle_Init() before the new bundle is extracted.
 _Bundle_ResolveDir() {
-	return A_AppData . "\..\Local\Ergopti\bundle-" . BUNDLE_VERSION
+	return A_AppData . "\..\Local\Ergopti\bundle"
 }
 
 ; Reads the marker file's first line; returns "" if the file is missing or
@@ -123,10 +124,10 @@ _Bundle_Unzip(ZipPath, DestDir) {
 ; mode it is a no-op and ``_BundleDir`` stays empty (callers must fall back
 ; to A_ScriptDir-derived paths).
 ;
-; The extraction strategy is "wipe + rewrite" only when the version marker
-; mismatches — within a given version we trust the on-disk copy and skip the
-; ~250 ms unzip cost. Per-version folders mean cross-version orphan files
-; cannot accumulate.
+; The extraction strategy is "skip if marker matches, otherwise wipe + rewrite".
+; Wiping before re-extracting prevents stale files from a previous version
+; lingering (Expand-Archive merges into the destination, it does not prune
+; orphan entries). Disk usage therefore stays bounded at ~one bundle worth.
 Bundle_Init() {
 	; Dev mode: nothing to extract — the source tree is already laid out.
 	if !A_IsCompiled
@@ -135,7 +136,12 @@ Bundle_Init() {
 	BundleDir := _Bundle_ResolveDir()
 	global _BundleDir := BundleDir
 
-	; Ensure the bundle dir exists before any FS operation.
+	; Ensure the parent dir exists. The bundle dir itself is (re)created
+	; below by either the skip branch or the wipe-and-extract branch.
+	ParentDir := SubStr(BundleDir, 1, InStr(BundleDir, "\", , -1) - 1)
+	if !DirExist(ParentDir) {
+		try DirCreate(ParentDir)
+	}
 	if !DirExist(BundleDir) {
 		try DirCreate(BundleDir)
 	}
@@ -147,8 +153,16 @@ Bundle_Init() {
 		return
 	}
 
+	; Wipe the previous bundle so orphan files from an older version do not
+	; survive into the new install. The marker, being inside this dir, also
+	; gets removed — Expand-Archive will repopulate everything from scratch.
+	if DirExist(BundleDir) {
+		try DirDelete(BundleDir, true)
+	}
+	try DirCreate(BundleDir)
+
 	; Write the zip out of the .exe into a temp location, then unzip it
-	; into BundleDir so static/ and vendor/ end up under the per-version dir.
+	; into BundleDir so static/ and vendor/ end up under it.
 	TmpZip := A_Temp . "\ergopti_bundle_" . A_TickCount . ".zip"
 	try {
 		; Literal source path — Ahk2Exe scans this token at compile time to
