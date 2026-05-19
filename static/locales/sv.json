@@ -693,7 +693,7 @@
 	"menu.llm.arrows": "Pilar",
 	"menu.llm.arrows_only": "Endast pilar",
 	"menu.llm.auto_raise_temp": "  ↳ Höj automatiskt temperaturen (+0,1 per förslag)",
-	"menu.llm.backend_api": "API (fjärrleverantör)",
+	"menu.llm.backend_api": "API 🌐 (fjärrleverantör)",
 	"menu.llm.backend_default_model": "↺ Serverdels standardmodell (%s)",
 	"menu.llm.backend_label": "Serverdel: %s",
 	"menu.llm.backend_ollama": "Ollama 🦙 — Standard",

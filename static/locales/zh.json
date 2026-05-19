@@ -668,7 +668,7 @@
 	"menu.llm.arrows": "箭头",
 	"menu.llm.arrows_only": "仅箭头",
 	"menu.llm.auto_raise_temp": "  ↳ 自动提高温度（每条建议+0.1）",
-	"menu.llm.backend_api": "API（远程提供商）",
+	"menu.llm.backend_api": "API 🌐（远程提供商）",
 	"menu.llm.backend_default_model": "↺ 后端默认模型 (%s)",
 	"menu.llm.backend_label": "Backend：%s",
 	"menu.llm.backend_ollama": "Ollama 🦙 — 标准",

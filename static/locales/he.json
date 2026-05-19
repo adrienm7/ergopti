@@ -693,7 +693,7 @@
 	"menu.llm.arrows": "חצים",
 	"menu.llm.arrows_only": "חצים בלבד",
 	"menu.llm.auto_raise_temp": "  ↳ העלה טמפרטורה אוטומטית (+0.1 לכל הצעה)",
-	"menu.llm.backend_api": "API (ספק מרוחק)",
+	"menu.llm.backend_api": "API 🌐 (ספק מרוחק)",
 	"menu.llm.backend_default_model": "↺ מודל ברירת מחדל של ה-backend (%s)",
 	"menu.llm.backend_label": "Backend: %s",
 	"menu.llm.backend_ollama": "Ollama 🦙 — רגיל",

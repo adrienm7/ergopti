@@ -669,7 +669,7 @@
 	"menu.llm.arrows": "Oklar",
 	"menu.llm.arrows_only": "Yalnızca oklar",
 	"menu.llm.auto_raise_temp": "  ↳ Sıcaklığı otomatik artır (öneri başına +0,1)",
-	"menu.llm.backend_api": "API (uzak sağlayıcı)",
+	"menu.llm.backend_api": "API 🌐 (uzak sağlayıcı)",
 	"menu.llm.backend_default_model": "↺ Arka uç varsayılan modeli (%s)",
 	"menu.llm.backend_label": "Arka uç: %s",
 	"menu.llm.backend_ollama": "Ollama 🦙 — Standart",

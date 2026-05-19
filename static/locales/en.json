@@ -668,7 +668,7 @@
 	"menu.llm.arrows": "Arrows",
 	"menu.llm.arrows_only": "Arrows only",
 	"menu.llm.auto_raise_temp": "  ↳ Auto-raise temperature (+0.1 per suggestion)",
-	"menu.llm.backend_api": "API (remote provider)",
+	"menu.llm.backend_api": "API 🌐 (remote provider)",
 	"menu.llm.backend_default_model": "↺ Backend default model (%s)",
 	"menu.llm.backend_label": "Backend: %s",
 	"menu.llm.backend_ollama": "Ollama 🦙 — Standard",

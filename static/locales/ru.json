@@ -669,7 +669,7 @@
 	"menu.llm.arrows": "Стрелки",
 	"menu.llm.arrows_only": "Только стрелки",
 	"menu.llm.auto_raise_temp": "  ↳ Автоматически повышать температуру (+0.1 за предложение)",
-	"menu.llm.backend_api": "API (удалённый провайдер)",
+	"menu.llm.backend_api": "API 🌐 (удалённый провайдер)",
 	"menu.llm.backend_default_model": "↺ Модель по умолчанию бэкенда (%s)",
 	"menu.llm.backend_label": "Бэкенд: %s",
 	"menu.llm.backend_ollama": "Ollama 🦙 — Стандартный",

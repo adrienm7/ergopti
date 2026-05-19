@@ -669,7 +669,7 @@
 	"menu.llm.arrows": "Šipky",
 	"menu.llm.arrows_only": "Pouze šipky",
 	"menu.llm.auto_raise_temp": "  ↳ Automaticky zvýšit teplotu (+0,1 na návrh)",
-	"menu.llm.backend_api": "API (vzdálený poskytovatel)",
+	"menu.llm.backend_api": "API 🌐 (vzdálený poskytovatel)",
 	"menu.llm.backend_default_model": "↺ Výchozí model backendu (%s)",
 	"menu.llm.backend_label": "Backend: %s",
 	"menu.llm.backend_ollama": "Ollama 🦙 — Standardní",
