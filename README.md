@@ -27,11 +27,11 @@ Ergopti is an open-source keyboard layout designed to minimise finger travel and
 
 **→ Download the [latest release](https://github.com/adrienm7/ergopti/releases/latest)**
 
-### macOS — Ergopti.app
+### macOS — ErgoptiPlus.app
 
-The macOS release is a self-contained app that bundles Hammerspoon, Karabiner-Elements, and Ollama (for local LLM features). No separate installs required.
+The macOS release is a self-contained app that bundles Hammerspoon and Karabiner-Elements. No separate installs required.
 
-1. Download `Ergopti.app.zip` and unzip it.
+1. Download `ErgoptiPlus.app.zip` and unzip it.
 2. Move `Ergopti.app` to `/Applications`.
 3. Remove the quarantine flag (the app is not Apple-notarised yet):
    ```bash

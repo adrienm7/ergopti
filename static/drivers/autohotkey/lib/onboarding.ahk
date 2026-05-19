@@ -178,9 +178,24 @@ _Onboarding_Step1() {
 	_ob_gestures          := false
 	_ob_register_pending  := false
 
+	; Sort the locale list alphabetically by Name so the wizard's language
+	; picker matches the tray menu's order (both use _I18nSortedLocales) —
+	; users who know where English lives in the tray menu now find it in the
+	; same spot here. Resolve the default English row in the sorted list so
+	; the pre-selection is always correct regardless of sort comparator
+	; behaviour (case sensitivity, locale-specific collation, etc.).
+	SortedLocales := _I18nSortedLocales()
+	DefaultIndex := 1
+	for _i, _loc in SortedLocales {
+		if _loc.Code = "en" {
+			DefaultIndex := _i
+			break
+		}
+	}
+
 	; Title and heading initially rendered in the pre-selected locale (English)
 	; so the very first frame of the wizard is already in a sensible language.
-	DefaultCode := I18N_LOCALES[ONBOARDING_DEFAULT_LOCALE_INDEX].Code
+	DefaultCode := SortedLocales[DefaultIndex].Code
 	g := Gui("+AlwaysOnTop", _Onboarding_Translate(DefaultCode, "onboarding.welcome.title"))
 	g.SetFont("s10", "Segoe UI")
 	g.MarginX := 20
@@ -195,10 +210,10 @@ _Onboarding_Step1() {
 
 	; Build a 32×24 image list from flag PNGs in static/img/flags/
 	FlagsDir := _StaticDir . "\img\flags\"
-	IL := IL_Create(I18N_LOCALES.Length, 1, false)
+	IL := IL_Create(SortedLocales.Length, 1, false)
 	FlagIndexMap := Map()  ; Code -> 1-based IL index
-	loop I18N_LOCALES.Length {
-		loc      := I18N_LOCALES[A_Index]
+	loop SortedLocales.Length {
+		loc      := SortedLocales[A_Index]
 		FlagFile := FlagsDir . loc.Code . ".png"
 		idx      := IL_Add(IL, FlagFile)
 		FlagIndexMap[loc.Code] := (idx > 0) ? idx : 0
@@ -208,50 +223,50 @@ _Onboarding_Step1() {
 	ContentW := ONBOARDING_WIN_W - 40
 	lv := g.AddListView("w" ContentW " h" ONBOARDING_LV_H " -Hdr -Multi -HScroll LV0x10 NoSortHdr y+10", ["Language"])
 	lv.SetImageList(IL)
-	loop I18N_LOCALES.Length {
-		loc   := I18N_LOCALES[A_Index]
+	loop SortedLocales.Length {
+		loc   := SortedLocales[A_Index]
 		iIcon := FlagIndexMap.Has(loc.Code) ? FlagIndexMap[loc.Code] : 0
 		lv.Add("Icon" iIcon, loc.Name)
 	}
 	; Subtract scrollbar width (~17px) so the column never triggers horizontal overflow
 	lv.ModifyCol(1, ContentW - 20)
 	; Pre-select the default locale row
-	lv.Modify(ONBOARDING_DEFAULT_LOCALE_INDEX, "Select Focus Vis")
+	lv.Modify(DefaultIndex, "Select Focus Vis")
 
 	; Single Next button anchored to the right edge — no Back button on step 1
 	; because there is nothing to go back to.
 	btnNext := g.AddButton("Default w110 x" ONBOARDING_WIN_W - 130 " y+14", t("onboarding.next"))
-	btnNext.OnEvent("Click", _Step1_Next.Bind(g, lv))
+	btnNext.OnEvent("Click", _Step1_Next.Bind(g, lv, SortedLocales, DefaultIndex))
 
 	; Re-render the title, heading and button label in the previewed locale
 	; whenever the selection changes
-	lv.OnEvent("ItemSelect", _Step1_UpdateUi.Bind(g, headingText, btnNext))
+	lv.OnEvent("ItemSelect", _Step1_UpdateUi.Bind(g, headingText, btnNext, SortedLocales))
 
 	; Immediately render in the pre-selected locale — Modify(Select) does not
 	; fire ItemSelect, so we invoke the handler manually with the default row.
-	_Step1_UpdateUi(g, headingText, btnNext, lv, ONBOARDING_DEFAULT_LOCALE_INDEX, true)
+	_Step1_UpdateUi(g, headingText, btnNext, SortedLocales, lv, DefaultIndex, true)
 
 	_Onboarding_Show(g)
 	global _ob_gui := g
 }
 
-_Step1_UpdateUi(g, headingText, btn, lv, row, selected, *) {
+_Step1_UpdateUi(g, headingText, btn, SortedLocales, lv, row, selected, *) {
 	if !selected or row <= 0
 		return
-	Code := I18N_LOCALES[row].Code
+	Code := SortedLocales[row].Code
 	try g.Title       := _Onboarding_Translate(Code, "onboarding.welcome.title")
 	try headingText.Text := _Onboarding_Translate(Code, "onboarding.welcome.heading")
 	try btn.Text      := _Onboarding_Translate(Code, "onboarding.next")
 }
 
-_Step1_Next(g, lv, *) {
+_Step1_Next(g, lv, SortedLocales, DefaultIndex, *) {
 	; Get the selected row index (1-based); fall back to default if none selected
-	selectedIndex := ONBOARDING_DEFAULT_LOCALE_INDEX
+	selectedIndex := DefaultIndex
 	row := lv.GetNext(0, "Focused")
 	if row > 0
 		selectedIndex := row
 
-	locale := I18N_LOCALES[selectedIndex]
+	locale := SortedLocales[selectedIndex]
 	global _ob_locale := locale.Code
 
 	; Switch locale in memory only — avoid Reload during the wizard
@@ -269,6 +284,7 @@ _Step1_Next(g, lv, *) {
 ; ===================================================
 
 _Onboarding_Step2() {
+	global _StaticDir
 	g := Gui("+AlwaysOnTop", t("onboarding.layout.title"))
 	g.SetFont("s10", "Segoe UI")
 	g.MarginX := 20
@@ -278,6 +294,16 @@ _Onboarding_Step2() {
 	g.SetFont("s9")
 	g.AddText("w" ONBOARDING_WIN_W - 40 " y+8", t("onboarding.layout.desc"))
 	g.SetFont("s10")
+
+	; Visual preview of the Ergopti layout — picking it blind from a one-line
+	; description ("Yes/No, use Ergopti layout") makes the user guess what they
+	; are agreeing to. AHK scales the JPG to the requested width while
+	; preserving aspect ratio (``h-1``). The picture is best-effort: if the
+	; static dir is unreachable (e.g. an unusual install), we just skip it.
+	imgPath := _StaticDir . "\img\ergopti.jpg"
+	if FileExist(imgPath) {
+		try g.AddPicture("w" ONBOARDING_WIN_W - 40 " h-1 y+10", imgPath)
+	}
 
 	g.AddText("w" ONBOARDING_WIN_W - 40 " y+12", "")
 	rYes := g.AddRadio("vLayoutChoice", t("onboarding.layout.yes"))

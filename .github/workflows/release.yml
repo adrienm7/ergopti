@@ -65,20 +65,34 @@ jobs:
                   prerelease="false"
                   case "$event" in
                       push)
-                          # Auto-tag for dev pushes: dev-YYYYMMDD-<short_sha>
-                          date_part="$(date -u +%Y%m%d-%H%M%S)"
+                          # Auto-tag for dev pushes. Format is intentionally
+                          # human-readable (dashes between date parts, an "h"
+                          # between hour and minute) so the GitHub releases
+                          # page shows "Ergopti dev 2026-05-19 19h02 — fab7976"
+                          # instead of the previous unintelligible
+                          # "dev-20260519-190225-fab7976". Git tags cannot
+                          # contain spaces, so dashes and underscores are the
+                          # readable substitutes we have.
+                          y="$(date -u +%Y)"
+                          m="$(date -u +%m)"
+                          d="$(date -u +%d)"
+                          h="$(date -u +%H)"
+                          n="$(date -u +%M)"
                           sha="${GITHUB_SHA:0:7}"
-                          tag="dev-${date_part}-${sha}"
+                          tag="dev-${y}-${m}-${d}-${h}h${n}-${sha}"
+                          title="Ergopti dev ${y}-${m}-${d} ${h}h${n} — ${sha}"
                           prerelease="true"
                           ref="${GITHUB_SHA}"
                           ;;
                       release)
                           tag="${GITHUB_REF_NAME}"
                           ref="$tag"
+                          title="Ergopti ${tag}"
                           ;;
                       workflow_dispatch)
                           tag="${{ github.event.inputs.tag }}"
                           ref="$tag"
+                          title="Ergopti ${tag}"
                           # Anything that does not look like vX.Y.Z is treated as pre-release
                           if ! [[ "$tag" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
                               prerelease="true"
@@ -87,10 +101,11 @@ jobs:
                   esac
                   version="${tag#v}"
                   echo "tag=$tag"               >> "$GITHUB_OUTPUT"
+                  echo "title=$title"           >> "$GITHUB_OUTPUT"
                   echo "version=$version"       >> "$GITHUB_OUTPUT"
                   echo "prerelease=$prerelease" >> "$GITHUB_OUTPUT"
                   echo "ref=$ref"               >> "$GITHUB_OUTPUT"
-                  echo "Resolved tag=$tag version=$version prerelease=$prerelease ref=$ref"
+                  echo "Resolved tag=$tag title='$title' version=$version prerelease=$prerelease ref=$ref"
 
             - name: Ensure release exists
               if: ${{ github.event_name != 'release' }}
@@ -111,7 +126,7 @@ jobs:
                   [ "$prerelease" = "true" ] && flags+=("--prerelease")
                   gh release create "$tag" \
                       --target "$ref" \
-                      --title "Ergopti $tag" \
+                      --title "${{ steps.meta.outputs.title }}" \
                       --notes "Build in progress — assets will appear in a few minutes." \
                       "${flags[@]}"
 
@@ -148,6 +163,19 @@ jobs:
                   GH_REPO:            ${{ github.event.repository.name }}
               run: bash tools/build_macos_app.sh
 
+            - name: Rename macOS zip to ErgoptiPlus.app.zip
+              shell: bash
+              # The build script still produces ``Ergopti.app.zip`` (the
+              # internal .app bundle keeps its historical name), but the user-
+              # facing release asset is renamed to ``ErgoptiPlus.app.zip`` so
+              # the file makes clear what the user is downloading: the full
+              # ErgoptiPlus application, not just the keyboard layout. The
+              # Sparkle signing and appcast steps below read from the new
+              # path, so the rename has to happen here before they run.
+              run: |
+                  set -euo pipefail
+                  mv build/macos/Ergopti.app.zip build/macos/ErgoptiPlus.app.zip
+
             - name: Install Sparkle signing tool
               if: ${{ env.SPARKLE_ED_PRIVATE_KEY != '' }}
               shell: bash
@@ -167,10 +195,10 @@ jobs:
               run: |
                   set -euo pipefail
                   printf '%s' "$SPARKLE_ED_PRIVATE_KEY" > /tmp/sparkle_priv.key
-                  "$SIGN_UPDATE" -f /tmp/sparkle_priv.key build/macos/Ergopti.app.zip \
-                      > build/macos/Ergopti.app.zip.sig
+                  "$SIGN_UPDATE" -f /tmp/sparkle_priv.key build/macos/ErgoptiPlus.app.zip \
+                      > build/macos/ErgoptiPlus.app.zip.sig
                   rm -f /tmp/sparkle_priv.key
-                  echo "Sparkle EdDSA signature written to Ergopti.app.zip.sig"
+                  echo "Sparkle EdDSA signature written to ErgoptiPlus.app.zip.sig"
 
             - name: Generate Sparkle appcast
               if: ${{ env.SPARKLE_ED_PRIVATE_KEY != '' }}
@@ -179,8 +207,8 @@ jobs:
                   ERGOPTI_VERSION:  ${{ needs.prepare-release.outputs.version }}
                   ERGOPTI_BUILD:    ${{ github.run_number }}
                   ERGOPTI_CHANNEL:  main
-                  SPARKLE_SIG_FILE: build/macos/Ergopti.app.zip.sig
-                  ZIP_PATH:         build/macos/Ergopti.app.zip
+                  SPARKLE_SIG_FILE: build/macos/ErgoptiPlus.app.zip.sig
+                  ZIP_PATH:         build/macos/ErgoptiPlus.app.zip
                   GH_OWNER:         ${{ github.repository_owner }}
                   GH_REPO:          ${{ github.event.repository.name }}
                   OUTPUT_PATH:      build/macos/appcast-main.xml
@@ -188,12 +216,16 @@ jobs:
 
             - name: Package latest keylayout bundle
               shell: bash
+              # Released as ``Ergopti.zip`` — this asset is *just* the keyboard
+              # layout (no app, no auto-replace, no macros), so its name
+              # mirrors the Windows ``Ergopti.exe`` keyboard-only installer
+              # for clarity: ``Ergopti`` = bare layout, ``ErgoptiPlus`` = full app.
               run: |
                   set -euo pipefail
                   latest=$(ls -d static/drivers/macos/bundles/*.bundle | sort -V | tail -1)
                   bundle_name=$(basename "$latest")
-                  (cd static/drivers/macos/bundles && zip -r "../../../../build/macos/Ergopti_keylayout.zip" "$bundle_name")
-                  echo "Packaged keylayout: $bundle_name → Ergopti_keylayout.zip"
+                  (cd static/drivers/macos/bundles && zip -r "../../../../build/macos/Ergopti.zip" "$bundle_name")
+                  echo "Packaged keylayout: $bundle_name → Ergopti.zip"
 
             - name: Upload macOS assets to release
               shell: bash
@@ -202,10 +234,10 @@ jobs:
               run: |
                   set -euo pipefail
                   tag="${{ needs.prepare-release.outputs.tag }}"
-                  assets=(build/macos/Ergopti.app.zip)
-                  [ -f build/macos/Ergopti.app.zip.sig    ] && assets+=(build/macos/Ergopti.app.zip.sig)
-                  [ -f build/macos/appcast-main.xml        ] && assets+=(build/macos/appcast-main.xml)
-                  [ -f build/macos/Ergopti_keylayout.zip  ] && assets+=(build/macos/Ergopti_keylayout.zip)
+                  assets=(build/macos/ErgoptiPlus.app.zip)
+                  [ -f build/macos/ErgoptiPlus.app.zip.sig ] && assets+=(build/macos/ErgoptiPlus.app.zip.sig)
+                  [ -f build/macos/appcast-main.xml         ] && assets+=(build/macos/appcast-main.xml)
+                  [ -f build/macos/Ergopti.zip              ] && assets+=(build/macos/Ergopti.zip)
                   gh release upload "$tag" "${assets[@]}" --clobber
 
 
@@ -289,9 +321,14 @@ jobs:
                   set -euo pipefail
                   tag="${{ needs.prepare-release.outputs.tag }}"
                   latest_kbd=$(ls static/drivers/windows/Ergopti_v*.exe | sort -V | tail -1)
-                  cp "$latest_kbd" static/drivers/windows/Ergopti_keyboard_layout.exe
+                  # Final asset name is just ``Ergopti.exe`` — this is the
+                  # bare keyboard-layout installer (no driver, no macros), so
+                  # it mirrors the macOS ``Ergopti.zip`` and stays clearly
+                  # distinct from the ``ErgoptiPlus.exe`` full-driver asset
+                  # that lives next to it on the release page.
+                  cp "$latest_kbd" static/drivers/windows/Ergopti.exe
                   gh release upload "$tag" \
-                      static/drivers/windows/Ergopti_keyboard_layout.exe \
+                      static/drivers/windows/Ergopti.exe \
                       static/drivers/kanata/kanata.kbd \
                       --clobber
 
@@ -369,13 +406,13 @@ jobs:
 
                   | Asset | Description |
                   |---|---|
-                  | \`Ergopti.app.zip\` | macOS application (Hammerspoon + Karabiner-Elements + Ollama bundled) |
-                  | \`Ergopti.app.zip.sig\` | Sparkle EdDSA signature (auto-updater) |
+                  | \`ErgoptiPlus.app.zip\` | macOS application (Hammerspoon + Karabiner-Elements bundled) |
+                  | \`ErgoptiPlus.app.zip.sig\` | Sparkle EdDSA signature (auto-updater) |
                   | \`appcast-main.xml\` | Sparkle appcast feed (auto-updater) |
-                  | \`Ergopti_keylayout.zip\` | Keyboard layout bundle only — no app required |
+                  | \`Ergopti.zip\` | Keyboard layout bundle only — no app required |
 
                   **Installation — app:**
-                  1. Unzip \`Ergopti.app.zip\` and move \`Ergopti.app\` to \`/Applications\`.
+                  1. Unzip \`ErgoptiPlus.app.zip\` and move \`Ergopti.app\` to \`/Applications\`.
                   2. Remove the quarantine flag (the app is not yet Apple-notarised):
                   \`\`\`bash
                   xattr -dr com.apple.quarantine /Applications/Ergopti.app
@@ -383,7 +420,7 @@ jobs:
                   3. Launch the app. On first run, Karabiner-Elements will request a System Extension approval — required for key remapping.
 
                   **Installation — keyboard layout only:**
-                  1. Unzip \`Ergopti_keylayout.zip\`.
+                  1. Unzip \`Ergopti.zip\`.
                   2. Copy the \`.bundle\` folder to \`/Library/Keyboard Layouts/\`.
                   3. Log out and back in, then add the layout in System Settings → Keyboard → Input Sources.
 
@@ -394,7 +431,7 @@ jobs:
                   | Asset | Description |
                   |---|---|
                   | \`ErgoptiPlus.exe\` | Compiled AutoHotkey executable (AHK v2 runtime bundled) |
-                  | \`Ergopti_keyboard_layout.exe\` | Windows keyboard layout installer — no app required |
+                  | \`Ergopti.exe\` | Windows keyboard layout installer — no app required |
                   | \`kanata.kbd\` | Kanata config file (for Kanata users) |
 
                   **Installation — app:**
@@ -402,7 +439,7 @@ jobs:
                   2. Double-click to run. On first launch, resources are extracted to \`%LOCALAPPDATA%\Ergopti\`.
 
                   **Installation — keyboard layout only:**
-                  1. Download \`Ergopti_keyboard_layout.exe\` and run it as Administrator.
+                  1. Download \`Ergopti.exe\` and run it as Administrator.
                   2. Log out and back in, then select the layout in Settings → Time & Language → Language & region.
 
                   ---
