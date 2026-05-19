@@ -322,7 +322,7 @@ jobs:
                   latest_dir=$(ls -d static/drivers/linux/v*_* | sort -V | tail -1)
                   dir_name=$(basename "$latest_dir")
                   mkdir -p build/linux
-                  (cd static/drivers/linux && zip -r "../../build/linux/Ergopti_xkb.zip" "$dir_name")
+                  (cd static/drivers/linux && zip -r "../../../build/linux/Ergopti_xkb.zip" "$dir_name")
                   echo "Packaged XKB: $dir_name → Ergopti_xkb.zip"
 
             - name: Upload Linux XKB to release
