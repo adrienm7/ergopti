@@ -296,7 +296,7 @@ jobs:
                   cat > "$body_file" << EOF
                   ## Ergopti $VERSION
 
-                  Choisis ton OS ci-dessous et télécharge le fichier correspondant.
+                  Select the platform below and download the corresponding file.
 
                   ---
 
@@ -304,17 +304,17 @@ jobs:
 
                   | Asset | Description |
                   |---|---|
-                  | \`Ergopti.app.zip\` | Application macOS (Hammerspoon + Karabiner-Elements + Ollama embarqués) |
-                  | \`Ergopti.app.zip.sig\` | Signature Sparkle EdDSA (auto-update) |
-                  | \`appcast-main.xml\` | Feed Sparkle (auto-update) |
+                  | \`Ergopti.app.zip\` | macOS application (Hammerspoon + Karabiner-Elements + Ollama bundled) |
+                  | \`Ergopti.app.zip.sig\` | Sparkle EdDSA signature (used by the auto-updater) |
+                  | \`appcast-main.xml\` | Sparkle appcast feed (used by the auto-updater) |
 
-                  **Installation :**
-                  1. Décompresse le \`.zip\` et glisse \`Ergopti.app\` dans \`/Applications\`.
-                  2. Retire la mise en quarantaine (l'app n'est pas notarisée Apple) :
+                  **Installation:**
+                  1. Unzip \`Ergopti.app.zip\` and move \`Ergopti.app\` to \`/Applications\`.
+                  2. Remove the quarantine flag (the app is not yet Apple-notarised):
                   \`\`\`bash
                   xattr -dr com.apple.quarantine /Applications/Ergopti.app
                   \`\`\`
-                  3. Lance l'app. Karabiner-Elements demandera une approbation de System Extension au premier démarrage.
+                  3. Launch the app. On first run, Karabiner-Elements will request a System Extension approval — required for key remapping.
 
                   ---
 
@@ -322,17 +322,17 @@ jobs:
 
                   | Asset | Description |
                   |---|---|
-                  | \`ErgoptiPlus.exe\` | Exécutable AutoHotkey compilé (runtime AHK v2 embarqué) |
+                  | \`ErgoptiPlus.exe\` | Compiled AutoHotkey executable (AHK v2 runtime bundled) |
 
-                  **Installation :**
-                  1. Télécharge \`ErgoptiPlus.exe\`.
-                  2. Double-clique pour lancer. Au premier démarrage, les ressources sont extraites dans \`%LOCALAPPDATA%\Ergopti\`.
+                  **Installation:**
+                  1. Download \`ErgoptiPlus.exe\`.
+                  2. Double-click to run. On first launch, resources are extracted to \`%LOCALAPPDATA%\Ergopti\`.
 
                   ---
 
                   ### 🐧 Linux
 
-                  Le driver Linux est servi directement par le site (cf. [.config sources](https://github.com/${GITHUB_REPOSITORY})). Pas d'asset binaire à télécharger.
+                  The Linux driver (XKB) is served directly from the website — no binary asset to download. See the [repository](https://github.com/${GITHUB_REPOSITORY}) for the config sources.
 
                   ---
 
