@@ -64,15 +64,23 @@ global _ob_register_pending  := false
 global _ob_gui          := unset
 
 ; AltGr passthrough switch — read by ``IsRealAltGrPress`` in lib/layout/layout_altgr.ahk
-; to neutralise every SC138-prefixed hotkey in the driver while the wizard is
-; on screen. AHK promotes a key to a "prefix key" the moment any ``SC138 & X::``
-; combo is parsed, which costs SC138 (= AltGr) its native function. By making
-; all #HotIf variants evaluate to false we restore native behaviour for the
-; duration of the wizard so the host Windows layout still produces its AltGr
-; characters in the wizard's edit boxes (and anywhere else the user types
-; while the wizard is up). The wizard always exits via Reload or ExitApp so
-; this flag never needs to be cleared by hand.
+; AND by ``IsOnboardingActive`` below. AHK promotes a key to a "prefix key" the
+; moment any ``SC138 & X::`` combo is parsed, which costs SC138 (= AltGr) its
+; native function. By making every related #HotIf variant evaluate to false we
+; restore native behaviour for the duration of the wizard so the host Windows
+; layout still produces its AltGr characters in the wizard's edit boxes (and
+; anywhere else the user types while it is up). The wizard always exits via
+; Reload or ExitApp so this flag never needs to be cleared by hand.
 global _OB_ALTGR_PASSTHROUGH := false
+
+; Public check used by other modules' #HotIf criteria to neutralise any
+; AltGr-capturing hotkey (e.g. the RAlt tap-hold in modules/tap_holds.ahk)
+; while the wizard is on screen. Standalone hotkeys disappear cleanly when
+; their #HotIf returns false, restoring the OS-native AltGr typing path.
+IsOnboardingActive() {
+	global _OB_ALTGR_PASSTHROUGH
+	return IsSet(_OB_ALTGR_PASSTHROUGH) and _OB_ALTGR_PASSTHROUGH
+}
 
 
 
@@ -312,25 +320,53 @@ _Onboarding_Step3() {
 	g.MarginX := 20
 	g.MarginY := 16
 
+	; Heading and short description — kept upright (no italic) so the page
+	; reads as a regular form rather than a long block of quoted text.
 	g.AddText("w" ONBOARDING_WIN_W - 40, t("onboarding.magic_key.title"))
 	g.SetFont("s9")
 	g.AddText("w" ONBOARDING_WIN_W - 40 " y+8", t("onboarding.magic_key.desc"))
 	g.SetFont("s10")
 
-	; Bullet-list of recommended characters (Ergopti+ / AZERTY / QWERTY) lives in
-	; a single translation key so locales control the wording in one place; the
-	; field stays a free-form Edit so the user can pick anything they like.
-	g.SetFont("s9 italic")
-	g.AddText("w" ONBOARDING_WIN_W - 40 " y+10", t("onboarding.magic_key.suggestions"))
-	g.SetFont("s10 norm")
+	; Three pre-baked picks (Ergopti+ / AZERTY / QWERTY) plus a "custom"
+	; option that re-enables the Edit field below. Single-select radio group
+	; keeps the choice unambiguous — the user picks exactly one starting point
+	; and can override the value with anything by switching to ``custom``.
+	g.AddText("w" ONBOARDING_WIN_W - 40 " y+14", "")
+	rStar   := g.AddRadio("vMK_Star",   t("onboarding.magic_key.option_star"))
+	rUGrave := g.AddRadio("y+4",        t("onboarding.magic_key.option_ugrave"))
+	rSemi   := g.AddRadio("y+4",        t("onboarding.magic_key.option_semicolon"))
+	rCustom := g.AddRadio("y+4",        t("onboarding.magic_key.option_custom"))
 
-	edKey := g.AddEdit("w80 y+10 vMagicKeyEdit", _ob_magic_key)
+	; Indent the free-form input under the "Custom" radio so the visual
+	; hierarchy makes it obvious the field belongs to that option.
+	edKey := g.AddEdit("w120 x40 y+4 vMagicKeyEdit", _ob_magic_key)
 
-	; Closing reminder — kept after the input so it acts as the answer to the
-	; implicit "but what should I actually pick?" question the user has once
-	; the field is in focus.
+	; Pre-select whichever radio matches the persisted/default value, falling
+	; back to the Ergopti+ star so the wizard always starts with a sensible pick.
+	switch _ob_magic_key {
+		case "★": rStar.Value   := 1
+		case "ù": rUGrave.Value := 1
+		case ";": rSemi.Value   := 1
+		default:
+			if (_ob_magic_key != "") {
+				rCustom.Value := 1
+			} else {
+				rStar.Value := 1
+			}
+	}
+	; The Edit is only meaningful when "Custom" is selected — disable it
+	; otherwise so the user can't accidentally type into an inert field.
+	edKey.Enabled := (rCustom.Value = 1)
+
+	; Wire every radio so flipping selection enables/disables the Edit live.
+	for r in [rStar, rUGrave, rSemi, rCustom] {
+		r.OnEvent("Click", _Step3_OnRadioClick.Bind(rCustom, edKey))
+	}
+
+	; Closing reminder — the ONLY italic line on this page, deliberately so it
+	; reads as a softer side-note rather than another header.
 	g.SetFont("s9 italic")
-	g.AddText("w" ONBOARDING_WIN_W - 40 " y+10", t("onboarding.magic_key.choose_freely"))
+	g.AddText("w" ONBOARDING_WIN_W - 40 " x20 y+14", t("onboarding.magic_key.choose_freely"))
 	g.SetFont("s10 norm")
 
 	g.AddText("w" ONBOARDING_WIN_W - 40 " y+16", "")
@@ -339,10 +375,19 @@ _Onboarding_Step3() {
 	btnNext := g.AddButton("Default w110 yp x" ONBOARDING_WIN_W - 130, t("onboarding.next"))
 
 	btnBack.OnEvent("Click", _Step3_Back.Bind(g))
-	btnNext.OnEvent("Click", _Step3_Next.Bind(g, edKey))
+	btnNext.OnEvent("Click", _Step3_Next.Bind(g, rStar, rUGrave, rSemi, rCustom, edKey))
 
 	_Onboarding_Show(g)
 	global _ob_gui := g
+}
+
+_Step3_OnRadioClick(rCustom, edKey, *) {
+	; Selecting any radio updates the Custom flag implicitly because radios
+	; share the same group; we just mirror that into the Edit's Enabled state.
+	try edKey.Enabled := (rCustom.Value = 1)
+	if (rCustom.Value = 1) {
+		try edKey.Focus()
+	}
 }
 
 _Step3_Back(g, *) {
@@ -350,10 +395,18 @@ _Step3_Back(g, *) {
 	_Onboarding_Step2()
 }
 
-_Step3_Next(g, edKey, *) {
-	val := Trim(edKey.Value)
-	; Fall back to the asterisk default so the config always has a non-empty value
-	global _ob_magic_key := (val != "") ? val : ONBOARDING_DEFAULT_MAGIC_KEY
+_Step3_Next(g, rStar, rUGrave, rSemi, rCustom, edKey, *) {
+	val := ""
+	if (rStar.Value = 1) {
+		val := "★"
+	} else if (rUGrave.Value = 1) {
+		val := "ù"
+	} else if (rSemi.Value = 1) {
+		val := ";"
+	} else if (rCustom.Value = 1) {
+		val := Trim(edKey.Value)
+	}
+	; Fall back to the star default so the config always has a non-empty value
 	_Onboarding_DestroyActive()
 	_Onboarding_Step4()
 }
@@ -536,63 +589,10 @@ _Step5_AutoRegister(statusLbl, *) {
 }
 
 _Step5_ShowManualTutorial(parentGui, *) {
-	; Manual method is NOT "open the registry" — it is the same tutorial shown
-	; by the tray menu's gestures item, plus a one-click shortcut into the
-	; Windows touchpad settings page where the user can actually wire up the
-	; gestures. We assemble the body string the same way GestureShowSetupInstructions
-	; does (header + open-path + for-each + slot-by-slot lines + auto note) so
-	; the wording stays in lockstep with the rest of the driver — but we render
-	; it as our own Gui rather than calling the existing helper, because that
-	; helper depends on globals (GESTURE_SLOTS, GESTURE_SHORTCUT_LABELS) that
-	; may not be set yet at first-launch onboarding time.
-	tutorialBody := ""
-	tutorialBody .= t("gesture.setup.header") . "`n`n"
-	tutorialBody .= t("gesture.setup.open_path") . "`n`n"
-	tutorialBody .= t("gesture.setup.for_each") . "`n`n"
-	if IsSet(GESTURE_SLOTS) and IsSet(GESTURE_SHORTCUT_LABELS) {
-		for Slot in GESTURE_SLOTS {
-			tutorialBody .= "  " . t("gesture.slots." . Slot) . " :  "
-				. GESTURE_SHORTCUT_LABELS[Slot] . "`n"
-		}
-		tutorialBody .= "`n"
-	}
-	tutorialBody .= t("gesture.setup.auto_configure")
-
-	tg := Gui("+AlwaysOnTop +Owner" . parentGui.Hwnd, t("onboarding.gestures.register_manual"))
-	tg.SetFont("s9", "Segoe UI")
-	tg.MarginX := 18
-	tg.MarginY := 14
-	tg.AddEdit("ReadOnly w" ONBOARDING_WIN_W - 40 " h220 -Wrap +HScroll", tutorialBody)
-	tg.AddText("w" ONBOARDING_WIN_W - 40 " y+10",
-		_Onboarding_TryTranslate("onboarding.gestures.open_settings_hint"))
-	btnOpenSettings := tg.AddButton("w" ONBOARDING_WIN_W - 40 " y+8",
-		_Onboarding_TryTranslate("onboarding.gestures.open_settings"))
-	btnClose        := tg.AddButton("Default w110 x" ONBOARDING_WIN_W - 130 " y+12",
-		t("onboarding.btn.ok"))
-	btnOpenSettings.OnEvent("Click", (*) => _Onboarding_OpenTouchpadSettings())
-	btnClose.OnEvent("Click", ((*) => tg.Destroy()))
-	tg.Show("AutoSize Center")
-}
-
-_Onboarding_OpenTouchpadSettings() {
-	; ms-settings:devices-touchpad opens Settings → Bluetooth & devices → Touchpad
-	; on Windows 10/11. From there the user expands "Advanced gestures" and
-	; assigns Ctrl + Win + Shift + F1..F10 to each gesture slot.
-	try Run("ms-settings:devices-touchpad")
-}
-
-; t() falls back to the raw key if a translation is missing — fine for body
-; text but a button labelled e.g. ``onboarding.gestures.open_settings`` looks
-; broken. This helper substitutes a friendly default when nothing translates.
-_Onboarding_TryTranslate(key) {
-	val := t(key)
-	if (val == key) {
-		switch key {
-			case "onboarding.gestures.open_settings":      return "Open touchpad settings"
-			case "onboarding.gestures.open_settings_hint": return "Opens Settings → Bluetooth & devices → Touchpad → Advanced gestures."
-		}
-	}
-	return val
+	; Single source of truth lives in modules/gestures.ahk — both the tray
+	; menu's "Manual tutorial" item and this wizard button render the same
+	; popup (tutorial body + in-panel "Open touchpad settings" button).
+	GestureShowManualTutorialDialog()
 }
 
 _Step5_Back(g, *) {

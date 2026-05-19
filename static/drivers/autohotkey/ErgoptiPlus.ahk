@@ -2146,7 +2146,11 @@ _ScriptAltGrEscapeHandler(*) {
 ; criterion set immediately before, which mirrors what the previous static
 ; ``#HotIf IsRealAltGrPress()`` block established.
 _RegisterScriptAltGrHotkeys() {
-    HotIf(IsRealAltGrPress)
+    ; HotIf() expects a callable of the form Callback(HotkeyName), so passing
+    ; the bare ``IsRealAltGrPress`` reference fails with "Invalid callback
+    ; function" — that helper takes no parameters. Wrap it in a varargs lambda
+    ; so AHK can hand it the hotkey name without tripping the signature check.
+    HotIf((*) => IsRealAltGrPress())
     Hotkey("RAlt & Enter",     _ScriptAltGrEnterHandler,     "I2")
     Hotkey("SC138 & SC01C",    _ScriptAltGrEnterHandler,     "I2")
     Hotkey("RAlt & BackSpace", _ScriptAltGrBackSpaceHandler, "I2")

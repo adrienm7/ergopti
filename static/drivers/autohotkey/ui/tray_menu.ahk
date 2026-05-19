@@ -284,8 +284,12 @@ BuildGesturesMenu() {
 		(*) => ToggleGesturesEnabled())
 
 	GMenu.Add(t("menu.gestures.auto_configure"),  (*) => GestureAutoConfigureAction())
-	GMenu.Add(t("menu.gestures.instructions"),    (*) => GestureShowSetupInstructions())
-	GMenu.Add(t("menu.gestures.open_touchpad"),   (*) => GestureOpenTouchpadSettings())
+	; Single tutorial entry — combines the previous "Show instructions" and
+	; "Open touchpad settings" items into one popup with the tutorial text
+	; plus an in-panel button that opens Settings. The two-item flow forced
+	; the user to bounce between menus to copy a shortcut and then go open
+	; Settings; one panel keeps the whole walkthrough in front of them.
+	GMenu.Add(t("menu.gestures.manual_tutorial"), (*) => GestureShowManualTutorialDialog())
 
 	GMenu.Add()
 
@@ -1195,15 +1199,22 @@ initMenu() {
 	AboutMenu.Add(t("menu.about.open_releases_page"), (*) => Run(Updater_ReleasesPageUrl()))
 	A_TrayMenu.Add(t("menu.about.title"), AboutMenu)
 
-	LangMenu := Menu()
-	I18nBuildLanguageMenu(LangMenu)
-	A_TrayMenu.Add(t("menu.global.language"), LangMenu)
+	; "Setup wizard" sits first — it is the only way to re-trigger onboarding
+	; and is also what users look for when something feels off, so it gets the
+	; top slot. "Config folder" comes next (it answers the very next question
+	; the user typically has: "where are my settings stored?"), and the
+	; language picker sits underneath the config folder rather than between
+	; the wizard and folder where it interrupted the natural reading flow.
+	A_TrayMenu.Add(t("menu.global.setup_wizard"), Onboarding_ShowFromMenu)
 
 	; ── Script management ──
 	global MenuSuspend
 	MenuSuspend := t("menu.global.suspend")
 	A_TrayMenu.Add(t("menu.global.config_folder"), FilePathsEditor)
-	A_TrayMenu.Add(t("menu.global.setup_wizard"), Onboarding_ShowFromMenu)
+
+	LangMenu := Menu()
+	I18nBuildLanguageMenu(LangMenu)
+	A_TrayMenu.Add(t("menu.global.language"), LangMenu)
 	A_TrayMenu.Add() ; Separator before lifecycle actions
 	A_TrayMenu.Add(MenuSuspend, ToggleSuspend)
 	A_TrayMenu.Add(t("menu.global.reload"), ActivateReload)

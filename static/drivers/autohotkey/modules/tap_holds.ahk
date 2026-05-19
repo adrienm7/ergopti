@@ -452,7 +452,13 @@ SC039 Up:: {
 ; ==============================
 ; ==============================
 
-#HotIf not LayerEnabled and HasAnyEnabled(Features["TapHolds"]["AltGr"])
+; The standalone ``RAlt::`` hotkey below consumes every AltGr/Kana press while
+; it is active, breaking native AltGr typing in any context where the user
+; expects their Windows layout to handle the key. We therefore gate it on
+; ``not IsOnboardingActive()`` so the wizard's Edit fields (and anything else
+; the user types while the first-run wizard is up) receive AltGr characters
+; from the OS instead of the tap-hold consuming them.
+#HotIf not LayerEnabled and not IsOnboardingActive() and HasAnyEnabled(Features["TapHolds"]["AltGr"])
 ; Tap-hold on "AltGr"
 SC01D & ~SC138:: ; LControl & RAlt is the only way to make it fire on tap directly
 RAlt:: ; Necessary to work on layouts like QWERTY

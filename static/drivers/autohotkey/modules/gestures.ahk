@@ -1713,27 +1713,47 @@ GestureRestartTouchpadDevice() {
     }
 }
 
-; Shows setup instructions to the user.
-GestureShowSetupInstructions() {
-    Instructions := t("gesture.setup.header")
-        . t("gesture.setup.open_path")
-        . t("gesture.setup.for_each")
-
-    for Slot in GESTURE_SLOTS {
-        Instructions .= "  " . t("gesture.slots." . Slot) . " :  "
-            . GESTURE_SHORTCUT_LABELS[Slot] . "`n"
+; Build the body of the manual-setup tutorial. Shared by the tray menu and the
+; onboarding wizard so the wording stays in lockstep between them.
+;
+; Locale fragments already embed their own trailing newlines (one after each
+; section, two after the header), so they are concatenated as-is here — adding
+; extra ``\n`` separators surfaced as visible blank-line clutter inside the
+; rendered popup.
+GestureBuildSetupInstructions() {
+    Body := t("gesture.setup.header") . t("gesture.setup.open_path") . t("gesture.setup.for_each")
+    if IsSet(GESTURE_SLOTS) and IsSet(GESTURE_SHORTCUT_LABELS) {
+        for Slot in GESTURE_SLOTS {
+            Body .= "  " . t("gesture.slots." . Slot) . " :  "
+                . GESTURE_SHORTCUT_LABELS[Slot] . "`n"
+        }
     }
-
-    Instructions .= t("gesture.setup.auto_configure")
-
-    MsgBox(Instructions, t("gesture.setup.title"), "Iconi")
+    Body .= t("gesture.setup.auto_configure")
+    return Body
 }
 
-; Opens Windows Settings to the touchpad page and reminds the user to drill
-; down into the "Mouvements avancés" sub-page (no deep-link URI exists for it).
+; Public entry point: shows the gesture setup tutorial in a single panel with
+; a one-click "Open touchpad settings" shortcut to ms-settings:devices-touchpad.
+; Replaces the previous two-step ``Show instructions`` + ``Open touchpad
+; settings`` menu items — the user only needs one path now.
+GestureShowManualTutorialDialog() {
+    tg := Gui("+AlwaysOnTop", t("onboarding.gestures.register_manual"))
+    tg.SetFont("s9", "Segoe UI")
+    tg.MarginX := 18
+    tg.MarginY := 14
+    tg.AddEdit("ReadOnly w480 h220 -Wrap +HScroll", GestureBuildSetupInstructions())
+    tg.AddText("w480 y+10", t("onboarding.gestures.open_settings_hint"))
+    btnOpenSettings := tg.AddButton("w480 y+8", t("onboarding.gestures.open_settings"))
+    btnClose        := tg.AddButton("Default w110 x370 y+12", t("onboarding.btn.ok"))
+    btnOpenSettings.OnEvent("Click", (*) => GestureOpenTouchpadSettings())
+    btnClose.OnEvent("Click", ((*) => tg.Destroy()))
+    tg.Show("AutoSize Center")
+}
+
+; Opens Windows Settings to the touchpad page. Used both by the tutorial
+; dialog's "Open settings" button and by the onboarding wizard.
 GestureOpenTouchpadSettings() {
     try Run("ms-settings:devices-touchpad")
-    MsgBox(t("gesture.touchpad_open.body"), t("gesture.setup.title"), "Iconi")
 }
 
 ; Read configuration on load
