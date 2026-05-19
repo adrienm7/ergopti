@@ -40,8 +40,20 @@ global LLM_TRAY_N_OPTIONS := [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
 ; is kept as an array so adding a future backend only requires appending here.
 global LLM_TRAY_BACKEND_OPTIONS := ["ollama"]
 
-; Indent level options for multi-prediction display
-global LLM_TRAY_INDENT_OPTIONS := [0, 2, 4, 6]
+; Indent level options for multi-prediction display. Range mirrors the HS
+; menu (modules/llm/init.lua DEFAULT_STATE + ui/menu/menu_llm/settings_manager.lua
+; build_indent_menu): negative values produce a leading deletion of N chars so
+; the prediction lines up at column-N relative to the original cursor, while
+; positive values insert N spaces before each line. Built lazily at startup
+; so the integer array stays a single source of truth.
+global LLM_TRAY_INDENT_OPTIONS := _LLMTrayBuildIndentRange()
+_LLMTrayBuildIndentRange() {
+    out := []
+    Loop 15 {
+        out.Push(A_Index - 8)   ; -7, -6, …, 0, …, 6, 7
+    }
+    return out
+}
 
 
 
@@ -588,11 +600,24 @@ LLM_Tray_BuildDisplayMenu() {
 
 	m.Add()
 
-	; Indent level submenu
+	; Indent level submenu — mirrors HS settings_manager.build_indent_menu():
+	;   0           → "Aucun" (special-cased so 0 reads naturally).
+	;   -1 or +1    → singular "espace" (with sign preserved so the user can
+	;                 tell -1 from +1 — HS has a quirk that hides the number
+	;                 for these values; AHK fixes the readability here).
+	;   anything else → "N espaces" (plural, sign preserved for negatives).
+	; Negative values yield a leading deletion of N chars so the predicted
+	; continuation lines up at column-N relative to the original cursor.
 	indent_menu := Menu()
 	for lvl in LLM_TRAY_INDENT_OPTIONS {
 		captured_lvl := lvl
-		indent_label := (lvl == 0) ? t("menu.llm.indent_none") : lvl . " " . t("menu.llm.indent_spaces")
+		if (lvl == 0) {
+			indent_label := t("menu.llm.indent_none")
+		} else if (lvl == 1 or lvl == -1) {
+			indent_label := lvl . " " . t("menu.llm.indent_space")
+		} else {
+			indent_label := lvl . " " . t("menu.llm.indent_spaces")
+		}
 		indent_menu.Add(indent_label, (name, pos, menu) => LLM_Tray_SetIndent(captured_lvl))
 		if (lvl == _LLM_Tray["pred_indent"])
 			indent_menu.Check(indent_label)

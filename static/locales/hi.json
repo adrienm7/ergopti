@@ -1856,5 +1856,6 @@
 	"updater.version_message": "ErgoptiPlus {1}{2}\n\nGitHub पर रिलीज़ पेज खोलें?",
 	"updater.channel_local_source_suffix": " (स्थानीय स्रोत — रिलीज़ बिल्ड नहीं)",
 	"updater.channel_dev_suffix": " (प्री-रिलीज़ चैनल)",
-	"updater.channel_main_suffix": " (स्थिर चैनल)"
+	"updater.channel_main_suffix": " (स्थिर चैनल)",
+	"menu.llm.indent_space": "स्थान"
 }

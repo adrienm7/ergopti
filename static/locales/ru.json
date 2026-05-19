@@ -1830,5 +1830,6 @@
 	"updater.version_message": "ErgoptiPlus {1}{2}\n\nОткрыть страницу выпусков на GitHub?",
 	"updater.channel_local_source_suffix": " (локальный исходник — не релизная сборка)",
 	"updater.channel_dev_suffix": " (предварительный канал)",
-	"updater.channel_main_suffix": " (стабильный канал)"
+	"updater.channel_main_suffix": " (стабильный канал)",
+	"menu.llm.indent_space": "пробел"
 }

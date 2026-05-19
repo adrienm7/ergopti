@@ -1830,5 +1830,6 @@
 	"updater.version_message": "ErgoptiPlus {1}{2}\n\nReleases-pagina op GitHub openen?",
 	"updater.channel_local_source_suffix": " (lokale bron — geen release-build)",
 	"updater.channel_dev_suffix": " (preview-kanaal)",
-	"updater.channel_main_suffix": " (stabiel kanaal)"
+	"updater.channel_main_suffix": " (stabiel kanaal)",
+	"menu.llm.indent_space": "spatie"
 }

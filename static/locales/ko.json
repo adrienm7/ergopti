@@ -1830,5 +1830,6 @@
 	"updater.version_message": "ErgoptiPlus {1}{2}\n\nGitHub의 릴리스 페이지를 여시겠습니까?",
 	"updater.channel_local_source_suffix": " (로컬 소스 — 릴리스 빌드 아님)",
 	"updater.channel_dev_suffix": " (사전 릴리스 채널)",
-	"updater.channel_main_suffix": " (안정 채널)"
+	"updater.channel_main_suffix": " (안정 채널)",
+	"menu.llm.indent_space": "공백"
 }

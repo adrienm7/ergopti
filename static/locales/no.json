@@ -1855,5 +1855,6 @@
 	"updater.version_message": "ErgoptiPlus {1}{2}\n\nÅpne utgivelsessiden på GitHub?",
 	"updater.channel_local_source_suffix": " (lokal kilde — ikke et utgivelsesbygg)",
 	"updater.channel_dev_suffix": " (forhåndskanal)",
-	"updater.channel_main_suffix": " (stabil kanal)"
+	"updater.channel_main_suffix": " (stabil kanal)",
+	"menu.llm.indent_space": "mellomrom"
 }
