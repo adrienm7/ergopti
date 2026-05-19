@@ -1865,5 +1865,16 @@
 	"hs_config.color_brown": "भूरा",
 	"updater.changelog_select_release": "एक संस्करण चुनें:",
 	"updater.open_on_github": "GitHub पर खोलें",
-	"updater.close": "बंद करें"
+	"updater.close": "बंद करें",
+	"menu.llm.backend_api": "API (दूरस्थ प्रदाता)",
+	"menu.llm.api_no_entry": "कोई API एंडपॉइंट कॉन्फ़िगर नहीं किया गया",
+	"menu.llm.api_add_entry": "+ एक API जोड़ें…",
+	"menu.llm.api_edit_entry": "चयनित API संपादित करें…",
+	"menu.llm.api_remove_entry": "चयनित API हटाएँ",
+	"menu.llm.api_dialog_title": "ErgoptiPlus — API एंडपॉइंट",
+	"menu.llm.api_prompt_name": "नाम (उदा. 'मेरी OpenAI कुंजी'):",
+	"menu.llm.api_prompt_provider": "प्रदाता ID ({1}):",
+	"menu.llm.api_prompt_url": "बेस URL:",
+	"menu.llm.api_prompt_token": "API टोकन / कुंजी (छिपा):",
+	"menu.llm.api_prompt_model": "मॉडल का नाम:"
 }

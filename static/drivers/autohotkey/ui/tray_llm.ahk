@@ -38,7 +38,11 @@ global LLM_TRAY_N_OPTIONS := [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
 
 ; Available backend IDs — Ollama is the only Windows backend today; the list
 ; is kept as an array so adding a future backend only requires appending here.
-global LLM_TRAY_BACKEND_OPTIONS := ["ollama"]
+; "api" routes through the LLM_RemoteGenerate adapter in api_remote.ahk and
+; lets the user plug into OpenAI / Anthropic / Google Gemini / any
+; OpenAI-compatible endpoint via the "+ Add an API…" item in the model
+; submenu. "mlx" is macOS-only — kept out of the AHK list deliberately.
+global LLM_TRAY_BACKEND_OPTIONS := ["ollama", "api"]
 
 ; Indent level options for multi-prediction display. Range mirrors the HS
 ; menu (modules/llm/init.lua DEFAULT_STATE + ui/menu/menu_llm/settings_manager.lua
@@ -92,7 +96,14 @@ global _LLM_Tray := Map(
 	"auto_raise_temp",            true,
 	"nav_modifiers",              "",
 	"val_modifiers",              "alt",
-	"trigger_shortcut",           ""
+	"trigger_shortcut",           "",
+	; ── Remote API backend ──
+	; Persisted across reloads via SaveFullConfig (config.toml [LLM]
+	; subsection). The user adds an entry via "+ Add an API…" in the model
+	; submenu when backend = "api"; each record is a Map with
+	; { Id, Name, Provider, BaseUrl, Token, Model }.
+	"api_entries",                [],
+	"api_entry_id",               ""
 )
 
 /**
@@ -326,6 +337,13 @@ LLM_Tray_BuildBackendMenu() {
  */
 LLM_Tray_BuildModelMenu() {
 	global _LLM_Tray
+	; Backend == "api": the model picker becomes an "API endpoints" picker —
+	; one entry per user-added provider record, plus "+ Add an API…" at the
+	; bottom. The remote adapter (LLM_RemoteGenerate) reads the active entry
+	; by id at request time.
+	if (_LLM_Tray["backend"] == "api") {
+		return _LLM_Tray_BuildApiEntriesMenu()
+	}
 	m := Menu()
 
 	; Avoid a blocking HTTP call during startup or when Ollama is not ready.
@@ -356,6 +374,184 @@ LLM_Tray_BuildModelMenu() {
 	m.Add()
 	m.Add(t("menu.llm.add_model_entry"), (*) => LLM_Tray_PromptAddModel())
 	return m
+}
+
+; Build the "API endpoints" submenu shown when backend == "api". When the user
+; has no entries yet, the menu carries a single greyed-out hint plus the
+; "+ Add" action so the next click takes them straight to the entry dialog.
+_LLM_Tray_BuildApiEntriesMenu() {
+	global _LLM_Tray
+	m := Menu()
+	entries := _LLM_Tray["api_entries"]
+	if (Type(entries) != "Array" or entries.Length == 0) {
+		label := t("menu.llm.api_no_entry")
+		m.Add(label, (*) => 0)
+		m.Disable(label)
+	} else {
+		active_id := _LLM_Tray.Has("api_entry_id") ? _LLM_Tray["api_entry_id"] : ""
+		for entry in entries {
+			captured := entry
+			id    := _LLM_TrayApiEntryGet(entry, "Id",       "")
+			name  := _LLM_TrayApiEntryGet(entry, "Name",     "(unnamed)")
+			prov  := _LLM_TrayApiEntryGet(entry, "Provider", "")
+			model := _LLM_TrayApiEntryGet(entry, "Model",    "")
+			suffix := (model != "" and prov != "") ? "  —  " . prov . " / " . model
+				: (model != "") ? "  —  " . model
+				: (prov  != "") ? "  —  " . prov
+				: ""
+			label := name . suffix
+			m.Add(label, (name, pos, menu) => _LLM_Tray_SelectApiEntry(captured))
+			if (id == active_id)
+				m.Check(label)
+		}
+	}
+	m.Add()
+	m.Add(t("menu.llm.api_add_entry"),  (*) => _LLM_Tray_PromptApiEntry(""))
+	if (Type(entries) == "Array" and entries.Length > 0) {
+		m.Add(t("menu.llm.api_edit_entry"), (*) => _LLM_Tray_PromptApiEntry(_LLM_Tray["api_entry_id"]))
+		m.Add(t("menu.llm.api_remove_entry"), (*) => _LLM_Tray_RemoveActiveApiEntry())
+	}
+	return m
+}
+
+_LLM_TrayApiEntryGet(Entry, Key, Default := "") {
+	if (Entry is Map) {
+		return Entry.Has(Key) ? Entry[Key] : Default
+	}
+	try {
+		return Entry.%Key%
+	} catch {
+		return Default
+	}
+}
+
+_LLM_Tray_SelectApiEntry(Entry) {
+	global _LLM_Tray
+	_LLM_Tray["api_entry_id"] := _LLM_TrayApiEntryGet(Entry, "Id", "")
+	LLM_Tray_SaveConfig()
+	LLM_Engine_Init(LLM_Tray_BuildOpts())
+	LLM_Tray_Build()
+}
+
+; Open the create/edit dialog for an API entry. When ``EditId`` is empty, the
+; dialog creates a new entry; otherwise it loads the matching record and
+; updates it in place. The dialog stays InputBox-driven (one field per call)
+; so it works on the AHK v2 baseline with no custom Gui — same UX as the
+; existing single-field prompts the menu already uses.
+_LLM_Tray_PromptApiEntry(EditId) {
+	global _LLM_Tray, LLM_API_PROVIDERS
+	existing := ""
+	if (EditId != "") {
+		for e in _LLM_Tray["api_entries"] {
+			if (_LLM_TrayApiEntryGet(e, "Id", "") == EditId) {
+				existing := e
+				break
+			}
+		}
+	}
+
+	; Step 1 — friendly name.
+	def_name := existing != "" ? _LLM_TrayApiEntryGet(existing, "Name", "") : ""
+	ib := InputBox(t("menu.llm.api_prompt_name"), t("menu.llm.api_dialog_title"),
+		"w420 h130", def_name)
+	if (ib.Result != "OK" or Trim(ib.Value) == "")
+		return
+	new_name := Trim(ib.Value)
+
+	; Step 2 — provider id.
+	provider_choices := ""
+	for k, v in LLM_API_PROVIDERS {
+		provider_choices .= k . " (" . v["Label"] . "), "
+	}
+	provider_choices := RTrim(provider_choices, ", ")
+	def_provider := existing != "" ? _LLM_TrayApiEntryGet(existing, "Provider", "openai") : "openai"
+	ib := InputBox(
+		Format(t("menu.llm.api_prompt_provider"), provider_choices),
+		t("menu.llm.api_dialog_title"), "w520 h150", def_provider)
+	if (ib.Result != "OK")
+		return
+	provider_id := Trim(ib.Value)
+	if !LLM_API_PROVIDERS.Has(provider_id)
+		provider_id := "openai_compat"
+	provider := LLM_API_PROVIDERS[provider_id]
+
+	; Step 3 — base URL (prefilled with the provider default).
+	def_url := existing != "" ? _LLM_TrayApiEntryGet(existing, "BaseUrl", "") : provider["BaseUrl"]
+	ib := InputBox(t("menu.llm.api_prompt_url"), t("menu.llm.api_dialog_title"),
+		"w520 h130", def_url)
+	if (ib.Result != "OK")
+		return
+	new_url := Trim(ib.Value)
+
+	; Step 4 — token. InputBox does not natively mask, so we use the Hide
+	; flag (HIDE) so the cleartext doesn't sit on screen / clipboard.
+	def_token := existing != "" ? _LLM_TrayApiEntryGet(existing, "Token", "") : ""
+	ib := InputBox(t("menu.llm.api_prompt_token"), t("menu.llm.api_dialog_title"),
+		"w520 h130 Password", def_token)
+	if (ib.Result != "OK")
+		return
+	new_token := ib.Value   ; do NOT Trim — leading/trailing chars are part of the secret
+
+	; Step 5 — model.
+	def_model := existing != "" ? _LLM_TrayApiEntryGet(existing, "Model", "") : provider["DefaultModel"]
+	ib := InputBox(t("menu.llm.api_prompt_model"), t("menu.llm.api_dialog_title"),
+		"w420 h130", def_model)
+	if (ib.Result != "OK" or Trim(ib.Value) == "")
+		return
+	new_model := Trim(ib.Value)
+
+	; Persist.
+	new_entry := Map(
+		"Id",       existing != "" ? _LLM_TrayApiEntryGet(existing, "Id", _LLM_Tray_NewApiId()) : _LLM_Tray_NewApiId(),
+		"Name",     new_name,
+		"Provider", provider_id,
+		"BaseUrl",  new_url,
+		"Token",    new_token,
+		"Model",    new_model
+	)
+	if (existing != "") {
+		idx := 0
+		for i, e in _LLM_Tray["api_entries"] {
+			if (_LLM_TrayApiEntryGet(e, "Id", "") == _LLM_TrayApiEntryGet(existing, "Id", "")) {
+				idx := i
+				break
+			}
+		}
+		if (idx > 0)
+			_LLM_Tray["api_entries"][idx] := new_entry
+	} else {
+		_LLM_Tray["api_entries"].Push(new_entry)
+		_LLM_Tray["api_entry_id"] := new_entry["Id"]
+	}
+	LLM_Tray_SaveConfig()
+	LLM_Engine_Init(LLM_Tray_BuildOpts())
+	LLM_Tray_Build()
+}
+
+_LLM_Tray_RemoveActiveApiEntry() {
+	global _LLM_Tray
+	active_id := _LLM_Tray["api_entry_id"]
+	if (active_id == "")
+		return
+	kept := []
+	for e in _LLM_Tray["api_entries"] {
+		if (_LLM_TrayApiEntryGet(e, "Id", "") != active_id)
+			kept.Push(e)
+	}
+	_LLM_Tray["api_entries"] := kept
+	_LLM_Tray["api_entry_id"] := (kept.Length > 0)
+		? _LLM_TrayApiEntryGet(kept[1], "Id", "")
+		: ""
+	LLM_Tray_SaveConfig()
+	LLM_Engine_Init(LLM_Tray_BuildOpts())
+	LLM_Tray_Build()
+}
+
+_LLM_Tray_NewApiId() {
+	; Tick-based id keeps it monotonic without pulling a UUID lib. Collisions
+	; would only happen on two adds within the same millisecond — vanishingly
+	; unlikely from a user-driven dialog flow.
+	return "api_" . A_TickCount
 }
 
 
@@ -1261,7 +1457,10 @@ LLM_Tray_BuildOpts() {
 		"pred_indent",             _LLM_Tray["pred_indent"],
 		"auto_raise_temp",         _LLM_Tray["auto_raise_temp"],
 		"nav_modifiers",           _LLM_Tray["nav_modifiers"],
-		"val_modifiers",           _LLM_Tray["val_modifiers"]
+		"val_modifiers",           _LLM_Tray["val_modifiers"],
+		"backend",                 _LLM_Tray["backend"],
+		"api_entries",             _LLM_Tray["api_entries"],
+		"api_entry_id",            _LLM_Tray["api_entry_id"]
 	)
 }
 

@@ -1839,5 +1839,16 @@
 	"hs_config.color_brown": "Hnědá",
 	"updater.changelog_select_release": "Vyberte verzi:",
 	"updater.open_on_github": "Otevřít na GitHubu",
-	"updater.close": "Zavřít"
+	"updater.close": "Zavřít",
+	"menu.llm.backend_api": "API (vzdálený poskytovatel)",
+	"menu.llm.api_no_entry": "Žádný API endpoint není nastaven",
+	"menu.llm.api_add_entry": "+ Přidat API…",
+	"menu.llm.api_edit_entry": "Upravit vybrané API…",
+	"menu.llm.api_remove_entry": "Odebrat vybrané API",
+	"menu.llm.api_dialog_title": "ErgoptiPlus — API endpoint",
+	"menu.llm.api_prompt_name": "Název (např. „Můj klíč OpenAI“):",
+	"menu.llm.api_prompt_provider": "ID poskytovatele ({1}):",
+	"menu.llm.api_prompt_url": "Základní URL:",
+	"menu.llm.api_prompt_token": "Token / klíč API (skrytý):",
+	"menu.llm.api_prompt_model": "Název modelu:"
 }

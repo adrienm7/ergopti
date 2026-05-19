@@ -1865,5 +1865,16 @@
 	"hs_config.color_brown": "Brun",
 	"updater.changelog_select_release": "Välj en version:",
 	"updater.open_on_github": "Öppna på GitHub",
-	"updater.close": "Stäng"
+	"updater.close": "Stäng",
+	"menu.llm.backend_api": "API (fjärrleverantör)",
+	"menu.llm.api_no_entry": "Ingen API-slutpunkt konfigurerad",
+	"menu.llm.api_add_entry": "+ Lägg till en API…",
+	"menu.llm.api_edit_entry": "Redigera vald API…",
+	"menu.llm.api_remove_entry": "Ta bort vald API",
+	"menu.llm.api_dialog_title": "ErgoptiPlus — API-slutpunkt",
+	"menu.llm.api_prompt_name": "Namn (t.ex. 'Min OpenAI-nyckel'):",
+	"menu.llm.api_prompt_provider": "Leverantörs-ID ({1}):",
+	"menu.llm.api_prompt_url": "Bas-URL:",
+	"menu.llm.api_prompt_token": "API-token / nyckel (dold):",
+	"menu.llm.api_prompt_model": "Modellnamn:"
 }

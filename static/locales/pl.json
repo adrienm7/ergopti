@@ -1839,5 +1839,16 @@
 	"hs_config.color_brown": "Brązowy",
 	"updater.changelog_select_release": "Wybierz wersję:",
 	"updater.open_on_github": "Otwórz na GitHubie",
-	"updater.close": "Zamknij"
+	"updater.close": "Zamknij",
+	"menu.llm.backend_api": "API (zewnętrzny dostawca)",
+	"menu.llm.api_no_entry": "Brak skonfigurowanego API",
+	"menu.llm.api_add_entry": "+ Dodaj API…",
+	"menu.llm.api_edit_entry": "Edytuj wybrane API…",
+	"menu.llm.api_remove_entry": "Usuń wybrane API",
+	"menu.llm.api_dialog_title": "ErgoptiPlus — Punkt API",
+	"menu.llm.api_prompt_name": "Nazwa (np. „Mój klucz OpenAI”):",
+	"menu.llm.api_prompt_provider": "Identyfikator dostawcy ({1}):",
+	"menu.llm.api_prompt_url": "URL bazowy:",
+	"menu.llm.api_prompt_token": "Token / klucz API (ukryty):",
+	"menu.llm.api_prompt_model": "Nazwa modelu:"
 }

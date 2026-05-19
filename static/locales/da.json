@@ -1865,5 +1865,16 @@
 	"hs_config.color_brown": "Brun",
 	"updater.changelog_select_release": "Vælg en version:",
 	"updater.open_on_github": "Åbn på GitHub",
-	"updater.close": "Luk"
+	"updater.close": "Luk",
+	"menu.llm.backend_api": "API (ekstern udbyder)",
+	"menu.llm.api_no_entry": "Intet API-endepunkt konfigureret",
+	"menu.llm.api_add_entry": "+ Tilføj en API…",
+	"menu.llm.api_edit_entry": "Rediger valgt API…",
+	"menu.llm.api_remove_entry": "Fjern valgt API",
+	"menu.llm.api_dialog_title": "ErgoptiPlus — API-endepunkt",
+	"menu.llm.api_prompt_name": "Navn (f.eks. 'Min OpenAI-nøgle'):",
+	"menu.llm.api_prompt_provider": "Udbyder-ID ({1}):",
+	"menu.llm.api_prompt_url": "Basis-URL:",
+	"menu.llm.api_prompt_token": "API-token / nøgle (skjult):",
+	"menu.llm.api_prompt_model": "Modelnavn:"
 }

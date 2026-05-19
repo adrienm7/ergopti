@@ -1838,5 +1838,16 @@
 	"hs_config.color_brown": "棕色",
 	"updater.changelog_select_release": "选择一个版本:",
 	"updater.open_on_github": "在 GitHub 上打开",
-	"updater.close": "关闭"
+	"updater.close": "关闭",
+	"menu.llm.backend_api": "API（远程提供商）",
+	"menu.llm.api_no_entry": "尚未配置 API 端点",
+	"menu.llm.api_add_entry": "+ 添加 API…",
+	"menu.llm.api_edit_entry": "编辑所选 API…",
+	"menu.llm.api_remove_entry": "删除所选 API",
+	"menu.llm.api_dialog_title": "ErgoptiPlus — API 端点",
+	"menu.llm.api_prompt_name": "名称（例如「我的 OpenAI 密钥」）：",
+	"menu.llm.api_prompt_provider": "提供商 ID（{1}）：",
+	"menu.llm.api_prompt_url": "基础 URL：",
+	"menu.llm.api_prompt_token": "API 令牌 / 密钥（隐藏）：",
+	"menu.llm.api_prompt_model": "模型名称："
 }

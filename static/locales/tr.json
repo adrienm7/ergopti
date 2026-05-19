@@ -1839,5 +1839,16 @@
 	"hs_config.color_brown": "Kahverengi",
 	"updater.changelog_select_release": "Bir sürüm seçin:",
 	"updater.open_on_github": "GitHub’da aç",
-	"updater.close": "Kapat"
+	"updater.close": "Kapat",
+	"menu.llm.backend_api": "API (uzak sağlayıcı)",
+	"menu.llm.api_no_entry": "Yapılandırılmış API uç noktası yok",
+	"menu.llm.api_add_entry": "+ API ekle…",
+	"menu.llm.api_edit_entry": "Seçili API'yi düzenle…",
+	"menu.llm.api_remove_entry": "Seçili API'yi kaldır",
+	"menu.llm.api_dialog_title": "ErgoptiPlus — API uç noktası",
+	"menu.llm.api_prompt_name": "Ad (örn. 'Benim OpenAI anahtarım'):",
+	"menu.llm.api_prompt_provider": "Sağlayıcı kimliği ({1}):",
+	"menu.llm.api_prompt_url": "Taban URL:",
+	"menu.llm.api_prompt_token": "API jetonu / anahtarı (gizli):",
+	"menu.llm.api_prompt_model": "Model adı:"
 }

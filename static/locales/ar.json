@@ -1839,5 +1839,16 @@
 	"hs_config.color_brown": "بني",
 	"updater.changelog_select_release": "اختر إصدارًا:",
 	"updater.open_on_github": "فتح على GitHub",
-	"updater.close": "إغلاق"
+	"updater.close": "إغلاق",
+	"menu.llm.backend_api": "API (مزوّد عن بُعد)",
+	"menu.llm.api_no_entry": "لم يتم تكوين أي نقطة نهاية API",
+	"menu.llm.api_add_entry": "+ إضافة API…",
+	"menu.llm.api_edit_entry": "تعديل API المحدّد…",
+	"menu.llm.api_remove_entry": "إزالة API المحدّد",
+	"menu.llm.api_dialog_title": "ErgoptiPlus — نقطة نهاية API",
+	"menu.llm.api_prompt_name": "الاسم (مثل «مفتاح OpenAI الخاص بي»):",
+	"menu.llm.api_prompt_provider": "معرّف المزوّد ({1}):",
+	"menu.llm.api_prompt_url": "عنوان URL الأساسي:",
+	"menu.llm.api_prompt_token": "رمز / مفتاح API (مخفي):",
+	"menu.llm.api_prompt_model": "اسم الطراز:"
 }
