@@ -240,6 +240,26 @@ LLM_Engine_FirePrediction(ctx) {
 	_LLM_Engine["last_ctx"]    := ctx
 	_LLM_Engine["last_result"] := result
 
+	; ── Keylogger LLM event ──
+	; Mirrors keylogger.log_llm() on the HS side (modules/keylogger/init.lua).
+	; Without this, replaying a session log makes it impossible to tell which
+	; backend / model / prompt produced any given prediction — essential when
+	; debugging prompt regressions or comparing providers. Wrapped in try so
+	; a logger failure can never derail the prediction pipeline.
+	try {
+		app_name := ""
+		try app_name := WinGetTitle("A")
+		KL_LogLlm("generation", Map(
+			"app",           app_name,
+			"context",       ctx,
+			"predictions",   [result],
+			"backend",       _LLM_Engine.Has("backend") ? _LLM_Engine["backend"] : "ollama",
+			"model",         model_tag,
+			"system_prompt", system_prompt,
+			"user_prompt",   ctx
+		))
+	}
+
 	LLM_Engine_OnResult(result, ctx)
 }
 
