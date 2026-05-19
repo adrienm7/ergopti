@@ -216,7 +216,18 @@ _BuildAltGrTables() {
 ; The discriminator is _ALTGR_KANA_FIXUP, auto-detected at boot (and on every
 ; layout change) by DetectAltGrKanaRemap() in lib/hotstring_engine.ahk.
 IsRealAltGrPress() {
-    global _ALTGR_KANA_FIXUP
+    global _ALTGR_KANA_FIXUP, _OB_ALTGR_PASSTHROUGH
+    ; While the onboarding wizard is on screen the user has not yet committed
+    ; any Ergopti feature, so every SC138-prefixed hotkey in the driver must
+    ; defer to the host Windows layout. Returning false here neutralises every
+    ; #HotIf that gates on IsRealAltGrPress(), which is the gate used by every
+    ; static SC138 combo in the codebase. AHK's "all variants false → prefix
+    ; reverts to native function" rule then restores native AltGr behaviour
+    ; for the duration of the wizard. The flag flips back automatically when
+    ; the wizard committed (Reload) or when the user closed it (ExitApp).
+    if (IsSet(_OB_ALTGR_PASSTHROUGH) and _OB_ALTGR_PASSTHROUGH) {
+        return false
+    }
     if (IsSet(_ALTGR_KANA_FIXUP) and _ALTGR_KANA_FIXUP) {
         ; Kana remap: SC138 stands alone, no LCtrl/RAlt — no ghost to filter.
         return true

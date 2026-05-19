@@ -63,11 +63,12 @@ local function inject_strings(code)
 
 	-- Collect all onboarding keys the JS wizard needs
 	local keys = {
+		"onboarding.welcome.title", "onboarding.welcome.heading",
 		"onboarding.language.placeholder",
 		"onboarding.layout.title", "onboarding.layout.desc",
 		"onboarding.layout.yes",  "onboarding.layout.no",
 		"onboarding.magic_key.title", "onboarding.magic_key.desc",
-		"onboarding.magic_key.hint",
+		"onboarding.magic_key.hint", "onboarding.magic_key.choose_freely",
 		"onboarding.metrics.title", "onboarding.metrics.desc",
 		"onboarding.gestures.title", "onboarding.gestures.desc",
 		"onboarding.yes", "onboarding.no",
@@ -105,11 +106,12 @@ local function inject_init_data()
 	local current_locale = i18n.get_locale()
 	local strings = {}
 	local keys = {
+		"onboarding.welcome.title", "onboarding.welcome.heading",
 		"onboarding.language.placeholder",
 		"onboarding.layout.title", "onboarding.layout.desc",
 		"onboarding.layout.yes",  "onboarding.layout.no",
 		"onboarding.magic_key.title", "onboarding.magic_key.desc",
-		"onboarding.magic_key.hint",
+		"onboarding.magic_key.hint", "onboarding.magic_key.choose_freely",
 		"onboarding.metrics.title", "onboarding.metrics.desc",
 		"onboarding.gestures.title", "onboarding.gestures.desc",
 		"onboarding.yes", "onboarding.no",
@@ -130,7 +132,10 @@ local function inject_init_data()
 		answers = {
 			locale       = current_locale,
 			use_ergopti  = true,
-			magic_key    = "★",
+			-- Asterisk is the documented "safe" default (single keypress on
+			-- every layout); the user can change it on step 3 to ù, ; or
+			-- anything else they like.
+			magic_key    = "*",
 			use_metrics  = false,
 			use_gestures = false,
 		},
@@ -184,7 +189,7 @@ local function commit(answers)
 		{ section = "Layout",    key = "ErgoptiBase",     value = to_bool(answers.use_ergopti)      },
 		{ section = "Layout",    key = "ErgoptiAltGr",    value = to_bool(answers.use_ergopti)      },
 		{ section = "Layout",    key = "ErgoptiPlus",     value = to_bool(answers.use_ergopti)      },
-		{ section = "Hotstrings", key = "MagicKey",       value = answers.magic_key or "★"          },
+		{ section = "Hotstrings", key = "MagicKey",       value = answers.magic_key or "*"          },
 		{ section = "Metrics",   key = "metrics_enabled", value = to_bool(answers.use_metrics)      },
 		{ section = "Gestures",  key = "Enabled",         value = to_bool(answers.use_gestures)     },
 	}
