@@ -28,9 +28,11 @@ jobs:
         # files under tests/unit/<subdir>/. Without lfs the runner falls back
         # to a `find | regex` path that strips intermediate directories and
         # tries to require modules under bogus shortened names.
+        # --lua-version 5.4 ensures luarocks links against the correct runtime;
+        # omitting it would install for the system default (5.1 on some runners).
         run: |
-          sudo luarocks install luacheck
-          sudo luarocks install luafilesystem
+          sudo luarocks --lua-version 5.4 install luacheck
+          sudo luarocks --lua-version 5.4 install luafilesystem
 
       - name: Run luacheck
         run: |
