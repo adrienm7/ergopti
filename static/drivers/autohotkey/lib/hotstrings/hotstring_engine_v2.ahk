@@ -101,15 +101,19 @@ global HSE_RegistryByLastChar := Map()
 ; walk on every word-terminator keystroke.
 global HSE_StarSpecs := []
 
-; Pre-computed prefix set for O(1) star-trigger cover check. For each star
-; trigger registered, every strict prefix (length 1 to len-1) is stored in
-; a case-insensitive set (lowercase key → true). A second map stores the
-; exact-cased keys for case-sensitive triggers. Populated atomically in
+; Pre-computed prefix map for O(1) star-trigger cover check. For each star
+; trigger registered, every strict prefix (length 1 to len-1) is stored as
+; a key mapping to the set of characters that immediately follow that prefix
+; in the registered star trigger(s). This lets _HSE_StarTriggerCoversBody
+; verify that the typed end-char can actually extend toward the star trigger
+; — suppression only happens when EndChar ∈ nextChars[prefix], preventing
+; false suppression of end-char triggers (e.g. "ia" → "IA") by unrelated
+; star triggers (e.g. "ia★") whose next char is the magic key, not space.
+; Two maps: CI for case-insensitive triggers (lowercased keys), CS for
+; case-sensitive triggers (exact-cased keys). Populated atomically in
 ; HSE_Register alongside HSE_StarSpecs; reset in HSE_RegistryClear.
-; This replaces the O(n_star) scan in _HSE_StarTriggerCoversBody with an O(1)
-; Map.Has() lookup, eliminating the per-space keystroke bottleneck entirely.
-global HSE_StarPrefixSetCI := Map()   ; case-insensitive star prefixes (lowercased)
-global HSE_StarPrefixSetCS := Map()   ; case-sensitive star prefixes (exact casing)
+global HSE_StarPrefixSetCI := Map()   ; prefix → Map(nextChar → true), CI
+global HSE_StarPrefixSetCS := Map()   ; prefix → Map(nextChar → true), CS
 
 ; Suppression flag. When true, FeedChar / FeedBackspace / FeedReset
 ; short-circuit. The dispatch loop sets it for the duration of the
@@ -198,8 +202,8 @@ HSE_RegistryClear() {
     global HSE_RegistryByLastChar, HSE_StarSpecs, HSE_StarPrefixSetCI, HSE_StarPrefixSetCS
     HSE_RegistryByLastChar := Map()
     HSE_StarSpecs := []
-    HSE_StarPrefixSetCI := Map()
-    HSE_StarPrefixSetCS := Map()
+    HSE_StarPrefixSetCI := Map()   ; prefix → Map(nextChar → true), CI
+    HSE_StarPrefixSetCS := Map()   ; prefix → Map(nextChar → true), CS
 }
 
 
@@ -489,10 +493,12 @@ HSE_FindMatchAtEnd(JustTypedChar) {
                 if !_HSE_WordBoundaryAllows(BodyBuf, Spec) {
                     continue
                 }
-                ; Star-prefix priority: if a star trigger whose body starts with
-                ; this trigger exists (e.g. "ia★" for end-char "ia"), suppress
-                ; the end-char match so the user can still reach the star trigger.
-                if _HSE_StarTriggerCoversBody(BodyBuf, Spec) {
+                ; Star-prefix priority: suppress the end-char match only when
+                ; the just-typed end char can itself continue toward a star
+                ; trigger (e.g. magic-key press after "ia" → yields to "ia★").
+                ; Typing space after "ia" does NOT suppress because space is not
+                ; the magic key and cannot reach "ia★".
+                if _HSE_StarTriggerCoversBody(BodyBuf, Spec, JustTypedChar) {
                     continue
                 }
                 if (BestMatch == "" or Spec.Length > BestMatch.Length) {
@@ -508,31 +514,45 @@ HSE_FindMatchAtEnd(JustTypedChar) {
 }
 
 ; Return true when a registered star trigger would shadow the given end-char
-; Spec: i.e. a star trigger exists whose trigger body starts with Spec.Trigger
-; (Spec.Trigger is a strict prefix of StarSpec.Trigger). This means the user
-; may still type more characters to reach that star trigger, so the shorter
-; end-char match must not fire prematurely.
+; Spec, taking the typed end character into account. Suppression only happens
+; when EndChar itself is the character that would continue Spec.Trigger toward
+; the star trigger — i.e. when (Spec.Trigger + EndChar) is a prefix of a
+; registered star trigger. If the end char cannot extend the prefix (e.g. the
+; user typed space but the star trigger continues with the magic key), the
+; end-char match is NOT suppressed.
 ;
-; Example: Spec.Trigger = "ia", star trigger "ia★" registered.
-; "ia" is a strict prefix of "ia★" → end-char match on "ia" is suppressed.
+; Example: Spec.Trigger = "ia", star trigger "ia★" (magic key = F20) registered.
+;   - EndChar = " " (space): HSE_StarPrefixSetCI["ia"] has no " " entry →
+;     suppression is FALSE → "ia " fires and expands to "IA ".   ✓
+;   - EndChar = F20 (magic key): HSE_StarPrefixSetCI["ia"] has F20 entry →
+;     suppression is TRUE → end-char match yields to the star trigger "ia★". ✓
 ;
-; Implementation: O(1) lookup into HSE_StarPrefixSetCI (case-insensitive) or
-; HSE_StarPrefixSetCS (case-sensitive). The sets are populated at registration
-; time by _HSE_IndexStarPrefixes — each star trigger contributes all its strict
-; prefixes. This replaces the O(n_star) scan the previous implementation used,
-; which caused keyboard lockups under heavy typing with large trigger sets.
-_HSE_StarTriggerCoversBody(BodyBuf, Spec) {
+; Implementation: O(1) double lookup — first check prefix exists, then check
+; whether EndChar is among the recorded continuation characters. The
+; HSE_StarPrefixSetCI/CS maps now store prefix → Map(nextChar → true) so the
+; next-char membership test is also O(1).
+_HSE_StarTriggerCoversBody(BodyBuf, Spec, EndChar) {
     global HSE_StarPrefixSetCI, HSE_StarPrefixSetCS
     ; Case-sensitive triggers only shadow other case-sensitive triggers.
     ; Case-insensitive triggers shadow both CI and CS (conservative suppression).
     if Spec.CaseSensitive {
-        return HSE_StarPrefixSetCS.Has(Spec.Trigger)
+        if !HSE_StarPrefixSetCS.Has(Spec.Trigger) {
+            return false
+        }
+        return HSE_StarPrefixSetCS[Spec.Trigger].Has(EndChar)
     }
-    return HSE_StarPrefixSetCI.Has(StrLower(Spec.Trigger))
+    LowerTrigger := StrLower(Spec.Trigger)
+    if !HSE_StarPrefixSetCI.Has(LowerTrigger) {
+        return false
+    }
+    return HSE_StarPrefixSetCI[LowerTrigger].Has(StrLower(EndChar))
 }
 
 ; Populate HSE_StarPrefixSetCI and HSE_StarPrefixSetCS with all strict prefixes
-; of the given star-trigger Spec. Called once per registration (cold path only).
+; of the given star-trigger Spec, recording for each prefix which character
+; immediately follows it in this star trigger. Multiple star triggers can share
+; the same prefix with different continuation characters — each is recorded.
+; Called once per registration (cold path only).
 _HSE_IndexStarPrefixes(Spec) {
     global HSE_StarPrefixSetCI, HSE_StarPrefixSetCS
     Len := Spec.Length
@@ -541,10 +561,18 @@ _HSE_IndexStarPrefixes(Spec) {
     }
     loop (Len - 1) {
         Prefix := SubStr(Spec.Trigger, 1, A_Index)
+        NextChar := SubStr(Spec.Trigger, A_Index + 1, 1)
         if Spec.CaseSensitive {
-            HSE_StarPrefixSetCS[Prefix] := true
+            if !HSE_StarPrefixSetCS.Has(Prefix) {
+                HSE_StarPrefixSetCS[Prefix] := Map()
+            }
+            HSE_StarPrefixSetCS[Prefix][NextChar] := true
         } else {
-            HSE_StarPrefixSetCI[StrLower(Prefix)] := true
+            LowerPrefix := StrLower(Prefix)
+            if !HSE_StarPrefixSetCI.Has(LowerPrefix) {
+                HSE_StarPrefixSetCI[LowerPrefix] := Map()
+            }
+            HSE_StarPrefixSetCI[LowerPrefix][StrLower(NextChar)] := true
         }
     }
 }

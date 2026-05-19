@@ -517,3 +517,39 @@ TestHSEv2_OuiBackspaceUiDoesNotFire() {
 }
 Test("HSEv2 regression: ui does not fire after oui+BS+UI",
     TestHSEv2_OuiBackspaceUiDoesNotFire)
+
+TestHSEv2_EndCharTriggerNotSuppressedByUnreachableStarTrigger() {
+    ; Regression: end-char trigger "ia" was incorrectly suppressed by star
+    ; trigger "ia★" even when the typed end char was space, not the magic key.
+    ; The suppression logic must only block the end-char match when the typed
+    ; end char could itself continue toward the star trigger — space cannot.
+    HSEv2_TestReset()
+    HSE_Register("", "ia", () => 0)        ; end-char trigger: ia + terminator
+    HSE_Register("*", "ia★", () => 0)      ; star trigger: ia + magic key
+    HSE_FeedChar("i")
+    HSE_FeedChar("a")
+    Match := HSE_FeedChar(" ")             ; space — cannot lead to ia★
+    AssertTrue(Match != "",
+        "ia + space fires the end-char trigger even though ia★ is registered")
+    AssertEqual("ia", Match.Trigger,
+        "end-char trigger ia is not suppressed by unrelated star trigger ia★")
+}
+Test("HSEv2 regression: ia + space fires end-char trigger despite ia★ star trigger",
+    TestHSEv2_EndCharTriggerNotSuppressedByUnreachableStarTrigger)
+
+TestHSEv2_EndCharTriggerSuppressedWhenEndCharLeadsToStarTrigger() {
+    ; Companion to the regression above: when the end char IS the magic key,
+    ; the star trigger ia★ should win over the end-char trigger ia.
+    HSEv2_TestReset()
+    HSE_Register("", "ia", () => 0)
+    HSE_Register("*", "ia★", () => 0)
+    HSE_FeedChar("i")
+    HSE_FeedChar("a")
+    Match := HSE_FeedChar("★")             ; magic key — can continue to ia★
+    AssertTrue(Match != "",
+        "ia★ star trigger fires when the magic key is typed after ia")
+    AssertEqual("ia★", Match.Trigger,
+        "star trigger ia★ wins over end-char trigger ia when ★ is typed")
+}
+Test("HSEv2 end-char trigger is suppressed when the end char continues toward a star trigger",
+    TestHSEv2_EndCharTriggerSuppressedWhenEndCharLeadsToStarTrigger)
