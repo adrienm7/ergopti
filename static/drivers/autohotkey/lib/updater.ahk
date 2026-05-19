@@ -172,12 +172,14 @@ Updater_ShowVersion(*) {
 	Ver := Updater_CurrentVersion()
 	global UPDATER_CHANNEL
 	if Updater_IsLocalSource()
-		Channel := " (local source — not a release build)"
+		ChannelSuffix := t("updater.channel_local_source_suffix")
 	else
-		Channel := (UPDATER_CHANNEL == "dev") ? " (pre-release channel)" : " (stable channel)"
+		ChannelSuffix := (UPDATER_CHANNEL == "dev")
+			? t("updater.channel_dev_suffix")
+			: t("updater.channel_main_suffix")
 	Res := MsgBox(
-		"ErgoptiPlus " . Ver . Channel . "`n`nOpen the releases page on GitHub?",
-		"ErgoptiPlus — Version",
+		Format(t("updater.version_message"), Ver, ChannelSuffix),
+		t("updater.title_version"),
 		"YesNo Iconi"
 	)
 	if (Res == "Yes")
@@ -188,34 +190,30 @@ Updater_ShowVersion(*) {
 Updater_CheckForUpdate(*) {
 	global UPDATER_CHANNEL
 	if Updater_IsLocalSource() {
-		MsgBox("Running from local source — update checking is only available for release builds.",
-			"ErgoptiPlus — Update", "Iconi")
+		MsgBox(t("updater.local_source"), t("updater.title_update"), "Iconi")
 		return
 	}
 	Current := Updater_CurrentVersion()
-	MsgBox("Checking for updates on the '" . UPDATER_CHANNEL . "' channel…`n(This may take a few seconds.)",
-		"ErgoptiPlus — Update", "Iconi T2")
+	MsgBox(Format(t("updater.checking"), UPDATER_CHANNEL),
+		t("updater.title_update"), "Iconi T2")
 	Json := Updater_FetchLatestJson(UPDATER_CHANNEL)
 	if (Json == "") {
-		MsgBox("Could not reach GitHub. Check your internet connection and try again.",
-			"ErgoptiPlus — Update", "Icon!")
+		MsgBox(t("updater.no_connection"), t("updater.title_update"), "Icon!")
 		return
 	}
 	Latest := Updater_ParseTagName(Json)
 	if (Latest == "") {
-		MsgBox("Could not parse the latest release tag from GitHub.",
-			"ErgoptiPlus — Update", "Icon!")
+		MsgBox(t("updater.parse_failed"), t("updater.title_update"), "Icon!")
 		return
 	}
 	if (Latest == Current) {
-		MsgBox("ErgoptiPlus is up to date." . "`n`nCurrent version: " . Current,
-			"ErgoptiPlus — Update", "Iconi")
+		MsgBox(Format(t("updater.up_to_date"), Current),
+			t("updater.title_update"), "Iconi")
 		return
 	}
 	Res := MsgBox(
-		"A new version is available!`n`nCurrent: " . Current . "`nLatest:  " . Latest
-		. "`n`nOpen the releases page to download?",
-		"ErgoptiPlus — Update available",
+		Format(t("updater.new_version"), Current, Latest),
+		t("updater.title_update_available"),
 		"YesNo Iconi"
 	)
 	if (Res == "Yes")
@@ -230,25 +228,23 @@ Updater_ShowChangelog(*) {
 	EffectiveChannel := Updater_IsLocalSource() ? "main" : UPDATER_CHANNEL
 	Json := Updater_FetchLatestJson(EffectiveChannel)
 	if (Json == "") {
-		MsgBox("Could not reach GitHub. Check your internet connection and try again.",
-			"ErgoptiPlus — Changelog", "Icon!")
+		MsgBox(t("updater.no_connection"), t("updater.title_changelog"), "Icon!")
 		return
 	}
 	Tag  := Updater_ParseTagName(Json)
 	Body := Updater_ParseBody(Json)
 	if (Tag == "") {
-		MsgBox("Could not retrieve release information from GitHub.",
-			"ErgoptiPlus — Changelog", "Icon!")
+		MsgBox(t("updater.changelog_unreachable"), t("updater.title_changelog"), "Icon!")
 		return
 	}
 	if (Body == "")
-		Body := "(No release notes available for this version.)"
+		Body := t("updater.changelog_empty")
 	; Truncate to 2000 chars so the MsgBox stays readable.
 	if (StrLen(Body) > 2000)
-		Body := SubStr(Body, 1, 2000) . "`n…(truncated)"
+		Body := SubStr(Body, 1, 2000) . t("updater.changelog_truncated")
 	Res := MsgBox(
-		"Release notes for " . Tag . ":`n`n" . Body . "`n`nOpen on GitHub?",
-		"ErgoptiPlus — Changelog",
+		Format(t("updater.changelog_release_notes"), Tag, Body),
+		t("updater.title_changelog"),
 		"YesNo Iconi"
 	)
 	if (Res == "Yes")
