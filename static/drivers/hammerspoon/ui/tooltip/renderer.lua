@@ -411,11 +411,28 @@ function M.render_stacked(rows, state, start_watchers_callback)
 		local row_heights  = {}
 		local label_heights = {}
 
-		for _, row in ipairs(rows) do
-			local styled = hs.styledtext.new(row.text, {
+		-- Dimmed (non-firing) alternative rows use a gray, strikethrough style so
+		-- the user can still read them but understands they will NOT be sent.
+		-- 1 = NSUnderlineStyleSingle. strikethroughColor is omitted so the line
+		-- inherits the foreground color, keeping the visual cue compact.
+		local DIM_COLOR = { white = 0.55, alpha = 1 }
+
+		local function build_text_style(dimmed)
+			if dimmed then
+				return {
+					font               = { name = Config.fonts.main, size = Config.sizes.main },
+					color              = DIM_COLOR,
+					strikethroughStyle = 1,
+				}
+			end
+			return {
 				font  = { name = Config.fonts.main, size = Config.sizes.main },
 				color = { white = 1, alpha = 1 },
-			})
+			}
+		end
+
+		for _, row in ipairs(rows) do
+			local styled = hs.styledtext.new(row.text, build_text_style(row.dimmed))
 			local sz = temp_canvas:minimumTextSize(2, styled)
 			if sz.w > max_text_w then max_text_w = sz.w end
 			table.insert(row_heights, sz.h)
@@ -486,25 +503,26 @@ function M.render_stacked(rows, state, start_watchers_callback)
 			M.stacked_canvas[base].frame     = { x = 0, y = top_y, w = canvas_width, h = row_h }
 			M.stacked_canvas[base].fillColor = bg_col
 
-			-- Output text.
-			local styled_text = hs.styledtext.new(row.text, {
-				font  = { name = Config.fonts.main, size = Config.sizes.main },
-				color = { white = 1, alpha = 1 },
-			})
+			-- Output text (gray + strikethrough when row.dimmed; see build_text_style).
+			local styled_text = hs.styledtext.new(row.text, build_text_style(row.dimmed))
 			M.stacked_canvas[base + 1].text  = styled_text
 			M.stacked_canvas[base + 1].frame = { x = pad_x, y = top_y + pad_y,
 				w = max_text_w, h = row_heights[i] }
 
 			-- Trigger label (dim, smaller font, right-aligned in label zone).
 			-- Vertically centred relative to the main text row height.
+			-- The label is pulled further down (alpha 0.25 vs 0.45) on dimmed
+			-- rows so the whole row reads as "disabled" together.
 			if row.trigger_label and row.trigger_label ~= "" and label_zone > 0 then
 				local label_x      = pad_x + max_text_w + label_gap
 				local label_h      = label_heights[i] > 0 and label_heights[i] or row_heights[i]
 				local label_offset = math.floor((row_heights[i] - label_h) / 2)
+				local label_color  = row.dimmed and { white = 0.45, alpha = 0.55 }
+					or { white = 0.45, alpha = 1 }
 				M.stacked_canvas[base + 2].action = "fill"
 				M.stacked_canvas[base + 2].text   = hs.styledtext.new(row.trigger_label, {
 					font  = { name = Config.fonts.main, size = Config.sizes.hint },
-					color = { white = 0.45, alpha = 1 },
+					color = label_color,
 				})
 				M.stacked_canvas[base + 2].frame = { x = label_x,
 					y = top_y + pad_y + label_offset,
