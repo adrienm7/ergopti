@@ -14,6 +14,7 @@
 local M = {}
 local hs         = hs
 local Logger     = require("lib.logger")
+local Paths      = require("lib.paths")
 local LOG        = "builder"
 local i18n       = require("lib.i18n")
 local HotCounter  = require("ui.menu.hotstring_counter")
@@ -28,26 +29,7 @@ local ERGOPTI_GROUPS_FALLBACK = { sfbsreduction = true, rolls = true }
 --- Falls back to the hardcoded set if the file cannot be read or parsed.
 --- @return table<string,boolean> Set of group IDs specific to the Ergopti layout.
 local function load_ergopti_groups()
-	-- Walk up from hs.configdir until we find the directory containing menu_manifest.json.
-	-- Using a directory-walk rather than a brittle suffix-strip so this works in both
-	-- dev (hs.configdir = .../static/drivers/hammerspoon) and packaged .app builds where
-	-- macOS path canonicalisation may produce a different prefix.
-	local function find_manifest()
-		local cfg = (hs.configdir or ""):gsub("[/\\]+$", "")
-		local current = cfg
-		for _ = 1, 8 do
-			local candidate = current .. "/menu_manifest.json"
-			local ok_a, attr = pcall(hs.fs.attributes, candidate)
-			if ok_a and type(attr) == "table" and attr.mode == "file" then
-				return candidate
-			end
-			local parent = current:match("^(.*)[/\\][^/\\]+$")
-			if not parent or parent == current then break end
-			current = parent
-		end
-		return nil
-	end
-	local manifest_path = find_manifest() or ""
+	local manifest_path = Paths.find_from_configdir("menu_manifest.json") or ""
 	local ok_r, fh = pcall(io.open, manifest_path, "r")
 	if not ok_r or not fh then
 		Logger.warn(LOG, "Cannot open menu_manifest.json at '%s' — using hardcoded fallback.", manifest_path)
