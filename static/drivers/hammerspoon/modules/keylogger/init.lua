@@ -1158,23 +1158,38 @@ function M.log_hotstring(trigger, replacement, h_type)
 	CoreState.last_flush_time = hs.timer.absoluteTime() / 1000000
 end
 
---- Logs an LLM prediction generation event.
+--- Logs an LLM prediction generation event with optional provenance metadata.
 --- @param context string The text context fed to the model.
 --- @param results table Array of prediction result objects.
---- @param app_name string The frontmost application at time of generation.
-function M.log_llm(context, results, app_name)
+--- @param app_name string|nil The frontmost application at time of generation.
+--- @param extras table|nil { backend = string?, model = string?, system_prompt = string?, user_prompt = string? }
+---
+--- The ``extras`` table records which backend (ollama / mlx / api), which
+--- model and which exact prompts produced the predictions. Without this,
+--- replaying a session log makes it impossible to tell after the fact whether
+--- a given prediction came from a local model or a remote API, or which
+--- precise system+user prompt the model saw — both essential when debugging
+--- a prompt regression or comparing providers.
+function M.log_llm(context, results, app_name, extras)
 	if not CoreState.is_enabled then return end
 	LogManager.flush_buffer()
 	local preds = {}
 	for _, r in ipairs(results or {}) do table.insert(preds, r.to_type) end
 	local target_app = (type(app_name) == "string" and app_name ~= "") and app_name or CoreState.session_app_name
-	LogManager.append_log({
+	local entry = {
 		type        = "llm_generation",
 		app         = target_app,
 		context     = context,
 		predictions = preds,
 		tag         = "<llm_generated>" .. (preds[1] or "") .. "</llm_generated>",
-	})
+	}
+	if type(extras) == "table" then
+		if type(extras.backend)       == "string" then entry.backend       = extras.backend end
+		if type(extras.model)         == "string" then entry.model         = extras.model end
+		if type(extras.system_prompt) == "string" then entry.system_prompt = extras.system_prompt end
+		if type(extras.user_prompt)   == "string" then entry.user_prompt   = extras.user_prompt end
+	end
+	LogManager.append_log(entry)
 	CoreState.last_flush_time = hs.timer.absoluteTime() / 1000000
 end
 

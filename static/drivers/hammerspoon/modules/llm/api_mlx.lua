@@ -943,7 +943,14 @@ local function post_and_parse(model_name, system_prompt, full_text, tail_text,
                 if type(on_fail) == "function" then pcall(on_fail) end return
             end
             Logger.debug(LOG, "[%s] #%d PARSED -> %d result(s)", model_name, req_id, #results)
-            if keylogger and type(keylogger.log_llm) == "function" then pcall(keylogger.log_llm, full_text, results) end
+            if keylogger and type(keylogger.log_llm) == "function" then
+                pcall(keylogger.log_llm, full_text, results, nil, {
+                    backend       = "mlx",
+                    model         = tostring(model_name),
+                    system_prompt = system_prompt,
+                    user_prompt   = user_prompt,
+                })
+            end
             if type(on_success) == "function" then pcall(on_success, results) end
         end
     )
@@ -1240,7 +1247,19 @@ local function post_and_parse_streaming(model_name, system_prompt, full_text, ta
 			return
 		end
 		Logger.debug(LOG, "[%s] #%d STREAM: %d result(s).", model_name, req_id, #results)
-		if keylogger and type(keylogger.log_llm) == "function" then pcall(keylogger.log_llm, full_text, results) end
+		if keylogger and type(keylogger.log_llm) == "function" then
+			pcall(keylogger.log_llm, full_text, results, nil, {
+				backend       = "mlx",
+				model         = tostring(model_name),
+				system_prompt = system_prompt,
+				-- mlx streaming builds the user prompt inline (line 798 of
+				-- post_and_parse_streaming uses ``merged_prompt``); fall back
+				-- to that when the local helper variable is in scope.
+				user_prompt   = (type(merged_prompt) == "string" and merged_prompt)
+					or (type(user_prompt) == "string" and user_prompt)
+					or nil,
+			})
+		end
 		if type(on_success) == "function" then pcall(on_success, results) end
 	end
 
