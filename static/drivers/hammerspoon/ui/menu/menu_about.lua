@@ -38,16 +38,30 @@ M.DEFAULT_STATE = {
 local GH_OWNER = "adrienm7"
 local GH_REPO  = "ergopti"
 
+--- Returns true when the driver is running from a local Hammerspoon config directory
+--- (not from inside a bundled Ergopti.app). Detected by checking whether the bundle
+--- identifier belongs to our app rather than stock Hammerspoon.
+--- @return boolean
+local function is_local_source()
+	local info = hs.processInfo
+	-- Our bundled app ships as com.ergopti.app; stock HS is org.hammerspoon.Hammerspoon.
+	-- If either the bundle id does not match or processInfo is absent we are in local mode.
+	if not info then return true end
+	local bid = info.bundleID or ""
+	return bid ~= "com.ergopti.app"
+end
+
 --- Returns the current app version string.
---- In the bundled Ergopti.app this is CFBundleShortVersionString from Info.plist.
---- When running from a bare Hammerspoon install it falls back to "dev".
+--- In the bundled Ergopti.app: CFBundleShortVersionString from Info.plist.
+--- When running from a local Hammerspoon config: "local".
 --- @return string
 local function current_version()
+	if is_local_source() then return "local" end
 	local info = hs.processInfo
 	if info and info.version and info.version ~= "" then
 		return info.version
 	end
-	return "dev"
+	return "local"
 end
 
 --- Builds the GitHub Releases API URL for the active channel.
@@ -98,11 +112,11 @@ end
 --- Checks GitHub for a newer version and shows an alert with the result.
 --- @param channel string "main" or "dev"
 local function check_for_update(channel)
-	local current = current_version()
-	if current == "dev" then
-		hs.dialog.alert(nil, "Running in dev mode — update checking is disabled.", "OK", "Informational")
+	if is_local_source() then
+		hs.dialog.alert(nil, "Running from local source — update checking is only available for release builds.", "OK", "Informational")
 		return
 	end
+	local current = current_version()
 	local url = api_url(channel)
 	hs.http.asyncGet(url, { ["User-Agent"] = "ErgoptiPlus-Updater/1.0" }, function(status, body, _)
 		if status ~= 200 or not body then
@@ -183,11 +197,16 @@ function M.build(ctx)
 		if type(ctx.updateMenu) == "function" then ctx.updateMenu() end
 	end
 
-	return {
-		title = ver_label,
-		menu = {
-			{ title = ver_label,                disabled = true },
-			{ title = "-" },
+	local local_src = is_local_source()
+	-- Channel items: shown and selectable only for release builds.
+	-- In local-source mode a single grayed "Local source" entry replaces them.
+	local channel_items
+	if local_src then
+		channel_items = {
+			{ title = "Local source", checked = true, disabled = true },
+		}
+	else
+		channel_items = {
 			{
 				title   = "Stable (main)",
 				checked = (channel == "main") or nil,
@@ -198,27 +217,38 @@ function M.build(ctx)
 				checked = (channel == "dev") or nil,
 				fn      = function() set_channel("dev") end,
 			},
-			{ title = "-" },
-			{
-				title = "Check for updates",
-				fn    = function()
-					Logger.info(LOG, "User triggered update check (channel: %s).", channel)
-					check_for_update(channel)
-				end,
-			},
-			{
-				title = "Changelog",
-				fn    = function()
-					Logger.info(LOG, "User opened changelog (channel: %s).", channel)
-					show_changelog(channel)
-				end,
-			},
-			{
-				title = "Open releases page",
-				fn    = function() hs.urlevent.openURL(releases_page_url()) end,
-			},
-		},
-	}
+		}
+	end
+
+	-- Changelog uses "main" when running from source (no installed version).
+	local effective_channel = local_src and "main" or channel
+
+	local menu_items = {}
+	table.insert(menu_items, { title = ver_label, disabled = true })
+	table.insert(menu_items, { title = "-" })
+	for _, it in ipairs(channel_items) do table.insert(menu_items, it) end
+	table.insert(menu_items, { title = "-" })
+	table.insert(menu_items, {
+		title    = "Check for updates",
+		disabled = local_src or nil,
+		fn       = not local_src and function()
+			Logger.info(LOG, "User triggered update check (channel: %s).", effective_channel)
+			check_for_update(effective_channel)
+		end or nil,
+	})
+	table.insert(menu_items, {
+		title = "Changelog",
+		fn    = function()
+			Logger.info(LOG, "User opened changelog (channel: %s).", effective_channel)
+			show_changelog(effective_channel)
+		end,
+	})
+	table.insert(menu_items, {
+		title = "Open releases page",
+		fn    = function() hs.urlevent.openURL(releases_page_url()) end,
+	})
+
+	return { title = ver_label, menu = menu_items }
 end
 
 return M
