@@ -257,6 +257,18 @@ LLM_Tray_Build() {
 		health_dot . StrReplace(t("menu.llm.model_label"), "%s", _LLM_Tray["model"]),
 		model_menu)
 
+	; Thinking-model warning row — surfaces when the active model has built-in
+	; reasoning ("-r1" suffix, "thinking" / "reasoning" in the name). The
+	; built-in "basic" / "advanced" profiles use short prompts that conflict
+	; with the model's chain-of-thought, so an unattended user wonders why
+	; the predictions are slow and verbose. The row is disabled (info-only)
+	; and mirrors HS's ui/menu/menu_llm/init.lua thinking-info insertion.
+	if _LLM_Tray_IsThinkingModel(_LLM_Tray["model"]) {
+		warning_label := t("menu.llm.thinking_model_info")
+		_LLM_Tray_Menu.Add(warning_label, (*) => 0)
+		_LLM_Tray_Menu.Disable(warning_label)
+	}
+
 	; Profile submenu
 	profile_menu := LLM_Tray_BuildProfileMenu()
 	active_label := LLM_Tray_GetProfileLabel(_LLM_Tray["profile_id"])
@@ -552,6 +564,19 @@ _LLM_Tray_RemoveActiveApiEntry() {
 	LLM_Tray_SaveConfig()
 	LLM_Engine_Init(LLM_Tray_BuildOpts())
 	LLM_Tray_Build()
+}
+
+; Heuristic: does the active model name suggest a built-in chain-of-thought
+; ("thinking" / "reasoning" / DeepSeek's -r1 suffix)? Mirrors HS's
+; ui/menu/menu_llm/models_manager.lua is_thinking check so both drivers
+; flag the same model set without a shared metadata table.
+_LLM_Tray_IsThinkingModel(model) {
+	if (model == "")
+		return false
+	lower := StrLower(model)
+	return InStr(lower, "-r1") > 0
+		or InStr(lower, "thinking") > 0
+		or InStr(lower, "reasoning") > 0
 }
 
 _LLM_Tray_NewApiId() {
