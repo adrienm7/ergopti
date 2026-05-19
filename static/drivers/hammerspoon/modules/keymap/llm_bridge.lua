@@ -494,7 +494,7 @@ function M.update_preview(buf)
 				rows[#rows + 1] = {
 					text          = m.plain_repl,
 					tint          = tooltip.tint(tint_key),
-					trigger_label = is_star and magic_key or "⏎",
+					trigger_label = is_star and magic_key or "↵",
 				}
 			end
 
