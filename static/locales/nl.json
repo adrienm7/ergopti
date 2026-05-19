@@ -1839,5 +1839,16 @@
 	"hs_config.color_brown": "Bruin",
 	"updater.changelog_select_release": "Selecteer een versie:",
 	"updater.open_on_github": "Openen op GitHub",
-	"updater.close": "Sluiten"
+	"updater.close": "Sluiten",
+	"menu.llm.backend_api": "API (externe provider)",
+	"menu.llm.api_no_entry": "Geen API-eindpunt geconfigureerd",
+	"menu.llm.api_add_entry": "+ Een API toevoegen…",
+	"menu.llm.api_edit_entry": "Geselecteerde API bewerken…",
+	"menu.llm.api_remove_entry": "Geselecteerde API verwijderen",
+	"menu.llm.api_dialog_title": "ErgoptiPlus — API-eindpunt",
+	"menu.llm.api_prompt_name": "Naam (bv. 'Mijn OpenAI-sleutel'):",
+	"menu.llm.api_prompt_provider": "Provider-ID ({1}):",
+	"menu.llm.api_prompt_url": "Basis-URL:",
+	"menu.llm.api_prompt_token": "API-token / sleutel (verborgen):",
+	"menu.llm.api_prompt_model": "Modelnaam:"
 }

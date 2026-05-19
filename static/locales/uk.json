@@ -1839,5 +1839,16 @@
 	"hs_config.color_brown": "Коричневий",
 	"updater.changelog_select_release": "Виберіть версію:",
 	"updater.open_on_github": "Відкрити на GitHub",
-	"updater.close": "Закрити"
+	"updater.close": "Закрити",
+	"menu.llm.backend_api": "API (віддалений постачальник)",
+	"menu.llm.api_no_entry": "API не налаштовано",
+	"menu.llm.api_add_entry": "+ Додати API…",
+	"menu.llm.api_edit_entry": "Редагувати вибране API…",
+	"menu.llm.api_remove_entry": "Видалити вибране API",
+	"menu.llm.api_dialog_title": "ErgoptiPlus — Точка API",
+	"menu.llm.api_prompt_name": "Назва (напр., «Мій ключ OpenAI»):",
+	"menu.llm.api_prompt_provider": "Ідентифікатор постачальника ({1}):",
+	"menu.llm.api_prompt_url": "Базова URL-адреса:",
+	"menu.llm.api_prompt_token": "Токен / ключ API (прихований):",
+	"menu.llm.api_prompt_model": "Назва моделі:"
 }

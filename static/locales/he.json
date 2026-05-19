@@ -1865,5 +1865,16 @@
 	"hs_config.color_brown": "חום",
 	"updater.changelog_select_release": "בחר גרסה:",
 	"updater.open_on_github": "פתח ב-GitHub",
-	"updater.close": "סגור"
+	"updater.close": "סגור",
+	"menu.llm.backend_api": "API (ספק מרוחק)",
+	"menu.llm.api_no_entry": "לא הוגדרה נקודת קצה API",
+	"menu.llm.api_add_entry": "+ הוסף API…",
+	"menu.llm.api_edit_entry": "ערוך את ה-API שנבחר…",
+	"menu.llm.api_remove_entry": "הסר את ה-API שנבחר",
+	"menu.llm.api_dialog_title": "ErgoptiPlus — נקודת קצה API",
+	"menu.llm.api_prompt_name": "שם (לדוגמה 'מפתח OpenAI שלי'):",
+	"menu.llm.api_prompt_provider": "מזהה ספק ({1}):",
+	"menu.llm.api_prompt_url": "כתובת URL בסיסית:",
+	"menu.llm.api_prompt_token": "טוקן / מפתח API (מוסתר):",
+	"menu.llm.api_prompt_model": "שם הדגם:"
 }

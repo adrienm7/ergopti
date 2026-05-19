@@ -1839,5 +1839,16 @@
 	"hs_config.color_brown": "갈색",
 	"updater.changelog_select_release": "버전을 선택하세요:",
 	"updater.open_on_github": "GitHub에서 열기",
-	"updater.close": "닫기"
+	"updater.close": "닫기",
+	"menu.llm.backend_api": "API(원격 공급자)",
+	"menu.llm.api_no_entry": "구성된 API 엔드포인트가 없습니다",
+	"menu.llm.api_add_entry": "+ API 추가…",
+	"menu.llm.api_edit_entry": "선택한 API 편집…",
+	"menu.llm.api_remove_entry": "선택한 API 제거",
+	"menu.llm.api_dialog_title": "ErgoptiPlus — API 엔드포인트",
+	"menu.llm.api_prompt_name": "이름(예: '내 OpenAI 키'):",
+	"menu.llm.api_prompt_provider": "공급자 ID({1}):",
+	"menu.llm.api_prompt_url": "기본 URL:",
+	"menu.llm.api_prompt_token": "API 토큰 / 키(숨김):",
+	"menu.llm.api_prompt_model": "모델 이름:"
 }

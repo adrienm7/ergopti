@@ -1839,5 +1839,16 @@
 	"hs_config.color_brown": "茶",
 	"updater.changelog_select_release": "バージョンを選択:",
 	"updater.open_on_github": "GitHub で開く",
-	"updater.close": "閉じる"
+	"updater.close": "閉じる",
+	"menu.llm.backend_api": "API（リモート プロバイダ）",
+	"menu.llm.api_no_entry": "API エンドポイントが未設定",
+	"menu.llm.api_add_entry": "+ API を追加…",
+	"menu.llm.api_edit_entry": "選択した API を編集…",
+	"menu.llm.api_remove_entry": "選択した API を削除",
+	"menu.llm.api_dialog_title": "ErgoptiPlus — API エンドポイント",
+	"menu.llm.api_prompt_name": "名前（例：「自分の OpenAI キー」）：",
+	"menu.llm.api_prompt_provider": "プロバイダ ID（{1}）：",
+	"menu.llm.api_prompt_url": "ベース URL：",
+	"menu.llm.api_prompt_token": "API トークン / キー（非表示）：",
+	"menu.llm.api_prompt_model": "モデル名："
 }

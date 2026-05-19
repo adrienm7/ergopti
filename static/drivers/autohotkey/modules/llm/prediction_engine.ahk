@@ -58,7 +58,14 @@ global _LLM_Engine := Map(
 	"last_ctx",                   "",
 	"last_result",                "",
 	"last_request_tick",          0,
-	"backend",                    "ollama"
+	"backend",                    "ollama",
+	; ── Remote API backend ──
+	; Populated by the tray menu when the user selects "api" and configures
+	; provider/url/token/model entries. ``api_entries`` is an array of
+	; per-user records; ``api_entry_id`` is the selected one. Both are
+	; persisted across reloads via the shared TOML config.
+	"api_entries",                [],
+	"api_entry_id",               ""
 )
 
 ; Per-backend minimum interval (ms) between two prediction requests. The user
@@ -262,16 +269,31 @@ LLM_Engine_FirePrediction(ctx) {
 	)
 	system_prompt := StrReplace(system_prompt, "{context}", ctx)
 
-	; Resolve Ollama tag from display name
-	model_tag := LLM_ResolveOllamaTag(_LLM_Engine["model"])
-
-	; Stamp the request tick BEFORE the synchronous call so the floor uses the
-	; time the request was issued (not when the response came back) — a slow
-	; backend should not allow a second request to fire concurrently.
+	; ── Backend dispatch ──
+	; Resolve which backend speaks for this request. ``backend`` is the tray
+	; setting (ollama / mlx / api). The "api" path looks up the active API
+	; entry by id (set by the tray menu) and routes through LLM_RemoteGenerate.
+	; Anything else falls back to the Ollama path so existing setups keep
+	; working unchanged.
 	_LLM_Engine["last_request_tick"] := A_TickCount
 
-	; Call the backend (synchronous — runs in same thread)
-	result := LLM_OllamaGenerate(model_tag, system_prompt, ctx, Float(_LLM_Engine["temperature"]))
+	model_tag := ""
+	result := ""
+	log_backend := backend
+	log_model := ""
+	if (backend == "api") {
+		entry := _LLM_Engine_GetActiveApiEntry()
+		if (entry == "")
+			return
+		model_tag := entry.HasOwnProp("Model") ? entry.Model : ""
+		log_model := model_tag
+		result := LLM_RemoteGenerate(entry, system_prompt, ctx, Float(_LLM_Engine["temperature"]))
+	} else {
+		; Default = Ollama (mlx not implemented on AHK / Windows).
+		model_tag := LLM_ResolveOllamaTag(_LLM_Engine["model"])
+		log_model := model_tag
+		result := LLM_OllamaGenerate(model_tag, system_prompt, ctx, Float(_LLM_Engine["temperature"]))
+	}
 	if (result == "")
 		return
 
@@ -280,10 +302,9 @@ LLM_Engine_FirePrediction(ctx) {
 
 	; ── Keylogger LLM event ──
 	; Mirrors keylogger.log_llm() on the HS side (modules/keylogger/init.lua).
-	; Without this, replaying a session log makes it impossible to tell which
-	; backend / model / prompt produced any given prediction — essential when
-	; debugging prompt regressions or comparing providers. Wrapped in try so
-	; a logger failure can never derail the prediction pipeline.
+	; The ``backend`` and ``model`` fields make it possible to tell ollama
+	; vs api vs mlx apart in the log when comparing prompt-regression tests
+	; across backends.
 	try {
 		app_name := ""
 		try app_name := WinGetTitle("A")
@@ -291,14 +312,37 @@ LLM_Engine_FirePrediction(ctx) {
 			"app",           app_name,
 			"context",       ctx,
 			"predictions",   [result],
-			"backend",       _LLM_Engine.Has("backend") ? _LLM_Engine["backend"] : "ollama",
-			"model",         model_tag,
+			"backend",       log_backend,
+			"model",         log_model,
 			"system_prompt", system_prompt,
 			"user_prompt",   ctx
 		))
 	}
 
 	LLM_Engine_OnResult(result, ctx)
+}
+
+; Look up the active remote API entry from the engine state. Returns the entry
+; record (Map or object) ready to feed into ``LLM_RemoteGenerate``, or "" when
+; no entries are configured / no active id is set. Keeps the lookup logic out
+; of the hot path so future changes (e.g. resolving by name, fallback chain)
+; only touch one place.
+_LLM_Engine_GetActiveApiEntry() {
+	global _LLM_Engine
+	entries := _LLM_Engine.Has("api_entries") ? _LLM_Engine["api_entries"] : []
+	if (Type(entries) != "Array" or entries.Length == 0)
+		return ""
+	active_id := _LLM_Engine.Has("api_entry_id") ? _LLM_Engine["api_entry_id"] : ""
+	if (active_id != "") {
+		for _, e in entries {
+			id := (e is Map and e.Has("Id")) ? e["Id"] : (e.HasOwnProp("Id") ? e.Id : "")
+			if (id == active_id)
+				return e
+		}
+	}
+	; Fallback: first entry. Better than silent zero predictions when the
+	; user has at least one entry configured but has not picked one yet.
+	return entries[1]
 }
 
 /**
