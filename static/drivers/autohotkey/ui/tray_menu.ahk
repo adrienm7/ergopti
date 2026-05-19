@@ -1165,33 +1165,11 @@ initMenu() {
 
 	A_TrayMenu.Add() ; Single separator between feature submenus and configuration items
 
-	; ── Actions globales — bulk-toggle / reset-defaults + version/update actions ──
+	; ── Actions globales — bulk-toggle / reset-defaults only ──
 	GlobalActionsMenu := Menu()
 	GlobalActionsMenu.Add(t("menu.global.enable_all"),  ToggleAllFeaturesOn)
 	GlobalActionsMenu.Add(t("menu.global.disable_all"), ToggleAllFeaturesOff)
 	GlobalActionsMenu.Add(t("menu.global.reset_defaults"), ReloadWithDefaultConfig)
-	GlobalActionsMenu.Add() ; Separator before version/update block
-	; Version display, update channel picker and changelog
-	Ver := Updater_CurrentVersion()
-	VerLabel := "ErgoptiPlus " . Ver
-	GlobalActionsMenu.Add(VerLabel, Updater_ShowVersion)
-	GlobalActionsMenu.Add() ; Separator
-	global UPDATER_CHANNEL
-	if Updater_IsLocalSource() {
-		; Local source build — channel selection is meaningless, show a grayed info item
-		LocalSourceLabel := "✔  Local source"
-		GlobalActionsMenu.Add(LocalSourceLabel, (*) => NoAction())
-		GlobalActionsMenu.Disable(LocalSourceLabel)
-	} else {
-		ChannelMainLabel := (UPDATER_CHANNEL != "dev") ? "✔  Stable (main)" : "   Stable (main)"
-		ChannelDevLabel  := (UPDATER_CHANNEL == "dev") ? "✔  Pre-release (dev)" : "   Pre-release (dev)"
-		GlobalActionsMenu.Add(ChannelMainLabel, (*) => Updater_SetChannel("main"))
-		GlobalActionsMenu.Add(ChannelDevLabel,  (*) => Updater_SetChannel("dev"))
-	}
-	GlobalActionsMenu.Add() ; Separator
-	GlobalActionsMenu.Add("Check for updates", Updater_CheckForUpdate)
-	GlobalActionsMenu.Add("Changelog",         Updater_ShowChangelog)
-	GlobalActionsMenu.Add("Open releases page", (*) => Run(Updater_ReleasesPageUrl()))
 
 	; ── Script management — flattened into the top-level tray menu (used to
 	; live in a "Gestion du script" submenu). The lifecycle actions sit one
@@ -1206,7 +1184,31 @@ initMenu() {
 	A_TrayMenu.Add(t("menu.global.reload"), ActivateReload)
 	A_TrayMenu.Add(t("menu.global.quit"), ActivateExitApp)
 
-	; Language selector — sits after the lifecycle actions, below version info
+	; ── About / Update — version display, changelog and update channel picker ──
+	AboutMenu := Menu()
+	Ver := Updater_CurrentVersion()
+	VerLabel := "ErgoptiPlus " . Ver
+	AboutMenu.Add(VerLabel, Updater_ShowVersion)
+	AboutMenu.Add() ; Separator
+	global UPDATER_CHANNEL
+	if Updater_IsLocalSource() {
+		; Local source build — channel selection is meaningless, show a grayed info item
+		LocalSourceLabel := "✔  Local source"
+		AboutMenu.Add(LocalSourceLabel, (*) => NoAction())
+		AboutMenu.Disable(LocalSourceLabel)
+	} else {
+		ChannelMainLabel := (UPDATER_CHANNEL != "dev") ? "✔  Stable (main)" : "   Stable (main)"
+		ChannelDevLabel  := (UPDATER_CHANNEL == "dev") ? "✔  Pre-release (dev)" : "   Pre-release (dev)"
+		AboutMenu.Add(ChannelMainLabel, (*) => Updater_SetChannel("main"))
+		AboutMenu.Add(ChannelDevLabel,  (*) => Updater_SetChannel("dev"))
+	}
+	AboutMenu.Add() ; Separator
+	AboutMenu.Add("Check for updates", Updater_CheckForUpdate)
+	AboutMenu.Add("Changelog",         Updater_ShowChangelog)
+	AboutMenu.Add("Open releases page", (*) => Run(Updater_ReleasesPageUrl()))
+	A_TrayMenu.Add("ErgoptiPlus " . Ver, AboutMenu)
+
+	; Language selector — sits below the version/update entry
 	LangMenu := Menu()
 	I18nBuildLanguageMenu(LangMenu)
 	A_TrayMenu.Add(t("menu.global.language"), LangMenu)
