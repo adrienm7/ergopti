@@ -70,6 +70,22 @@ global _TOOLTIP_WINDOW_BOTTOM_INSET_PX := UI_WINDOW_BOTTOM_INSET_PX
 ; Border overlay Gui — single frameless window covering the entire stack.
 global _TooltipBorderGui := 0
 
+; Defensive Hwnd tracking — every Gui handle shown by this module is pushed
+; here, and TooltipHide drains the arrays via raw Win32 DestroyWindow as a
+; last-chance sweep. Without this safety net, a Gui.Destroy that silently
+; failed (every Destroy site is wrapped in `try` so a transient Win32 error
+; would not propagate) leaked a window onto the screen, and successive
+; TooltipShow calls stacked more ghosts — exactly the « plein de tooltips
+; sur mon écran » symptom. DestroyWindow on a stale handle is a no-op
+; (returns FALSE, no exception) so the sweep is safe to run unconditionally.
+global _TooltipShownHwnds := []
+global _TooltipShownBorderHwnds := []
+
+; Cap on the tracking arrays so a long typing session cannot grow them
+; unbounded. Each entry is a single Ptr (8 B) so the cap is generous;
+; the value matters mostly as an upper bound on the sweep iteration.
+global _TOOLTIP_HWND_TRACK_CAP := 32
+
 ; Auto-hide is shortened by this many seconds (with a hard floor) so the
 ; tooltip vanishes a beat before the actual expansion window closes —
 ; otherwise the user can still see the preview and press the magic key
@@ -102,6 +118,14 @@ global _TOOLTIP_SAFETY_SEC := 3.0
 ; The shortest DurationSec across all items drives the auto-hide timer
 ; (0 / omitted means "stay until TooltipHide()").
 TooltipShow(Items, DurationSec := 0) {
+    ; Block other threads (input hook callbacks, timers) from preempting
+    ; this routine. Without Critical, a keystroke or timer firing
+    ; mid-build could enter a nested TooltipShow that destroys the very
+    ; Gui this call is about to display — the outer call would then
+    ; operate on stale Gui references and either crash or leak a window.
+    ; Critical is per-thread and auto-clears when the thread ends.
+    Critical
+
     ; Normalise to an Array of { Text, ColorHex } objects.
     if !IsObject(Items) {
         Items := [{ Text: Items, ColorHex: "", DurationSec: DurationSec }]
@@ -112,6 +136,8 @@ TooltipShow(Items, DurationSec := 0) {
     ; Bump the generation counter so any in-flight timer from the previous
     ; tooltip knows it is stale and must not call TooltipHide().
     global _TooltipGeneration, _TooltipTimerGeneration
+    global _TooltipShownHwnds, _TOOLTIP_HWND_TRACK_CAP
+    global _TOOLTIP_TIMEOUT_DECREMENT_SEC, _TOOLTIP_TIMEOUT_FLOOR_SEC, _TOOLTIP_SAFETY_SEC
     _TooltipGeneration += 1
 
     ; Cancel any pending auto-hide timer BEFORE rebuilding the Gui.
@@ -141,6 +167,23 @@ TooltipShow(Items, DurationSec := 0) {
     try {
         _TooltipDisableDwmRounding(Row.Gui.Hwnd)
         Row.Gui.Show(Format("w{1} h{2} x{3} y{4} NoActivate", Row.W, Row.H, Pos.X, Pos.Y))
+        ; Track the Hwnd RIGHT AFTER Show — from this point on, the window
+        ; exists on screen and must be tracked so TooltipHide's defensive
+        ; sweep can clean it up even if subsequent code fails. The cap
+        ; prevents the array from growing unbounded across a long typing
+        ; session; when we evict, we also issue a final DestroyWindow on
+        ; the dropped Hwnd in case its Gui.Destroy silently failed.
+        if (_TooltipShownHwnds.Length >= _TOOLTIP_HWND_TRACK_CAP) {
+            DroppedHwnd := _TooltipShownHwnds.RemoveAt(1)
+            try DllCall("User32\DestroyWindow", "Ptr", DroppedHwnd)
+        }
+        _TooltipShownHwnds.Push(Row.Gui.Hwnd)
+        ; Arm the safety timer IMMEDIATELY after Show so any subsequent
+        ; failure (corner region, border construction, duration math)
+        ; still has an auto-hide path — the tooltip cannot outlive the
+        ; safety deadline. The actual caller-specified duration overrides
+        ; this timer below if applicable.
+        SetTimer(_TooltipTimerFn, -Round(_TOOLTIP_SAFETY_SEC * 1000))
         _TooltipApplyStackedCorners()
         _TooltipShowBorder(Pos.X, Pos.Y, Row.W, Row.H)
     } catch as e {
@@ -148,41 +191,79 @@ TooltipShow(Items, DurationSec := 0) {
         return
     }
 
-    ; Use the shortest non-zero DurationSec across all items.
+    ; Use the shortest non-zero DurationSec across all items. The safety
+    ; timer set above stays armed unless we replace it with a stricter
+    ; caller-specified deadline below.
     EffectiveDur := DurationSec
     for _, Item in Items {
         D := Item.HasOwnProp("DurationSec") ? Item.DurationSec : 0
         if (D > 0 and (EffectiveDur == 0 or D < EffectiveDur))
             EffectiveDur := D
     }
-    global _TOOLTIP_TIMEOUT_DECREMENT_SEC, _TOOLTIP_TIMEOUT_FLOOR_SEC, _TOOLTIP_SAFETY_SEC
     if (EffectiveDur > 0) {
         Effective := Max(_TOOLTIP_TIMEOUT_FLOOR_SEC,
             EffectiveDur - _TOOLTIP_TIMEOUT_DECREMENT_SEC)
         SetTimer(_TooltipTimerFn, -Round(Effective * 1000))
-    } else {
-        ; No caller-specified duration — arm a safety deadline so the tooltip
-        ; cannot become a ghost if the normal hide path (expansion fire or
-        ; buffer reset) is missed.
-        SetTimer(_TooltipTimerFn, -Round(_TOOLTIP_SAFETY_SEC * 1000))
     }
+    ; else: the safety timer armed inside the try block above remains
+    ; the auto-hide deadline — no further action needed here.
 }
 
 ; Hide all tooltip rows and the border overlay immediately.
 ; Destroys the row Guis (not just hides) so stale window handles cannot
 ; resurface as ghosts if a new TooltipShow fires before the old timer fires.
+;
+; Sequence:
+;   1. Cancel pending auto-hide timer.
+;   2. Flip BOTH windows invisible via SW_HIDE in one compositor pass
+;      so they disappear in the same frame — preventing the « bordure
+;      orpheline » flash that the previous content-then-border destroy
+;      order produced. Border is hidden FIRST so even on slow compositors
+;      the worst visible interleave is « content alone » (a correct
+;      rounded fill) instead of an empty outline floating over the editor.
+;   3. Destroy the Gui objects (border first, same rationale).
+;   4. Defensive sweep through every tracked Hwnd in case a Gui.Destroy
+;      silently failed earlier — DestroyWindow on a stale handle is a
+;      harmless no-op so this is safe to run unconditionally.
 TooltipHide() {
+    Critical
     global _TooltipGui, _TooltipRowGuis, _TooltipBorderGui
+    global _TooltipShownHwnds, _TooltipShownBorderHwnds
     SetTimer(_TooltipTimerFn, 0)
+
+    ; Step 1 — make both windows invisible. SW_HIDE = 0.
+    if _TooltipBorderGui {
+        try DllCall("User32\ShowWindow", "Ptr", _TooltipBorderGui.Hwnd, "Int", 0)
+    }
+    for _, Row in _TooltipRowGuis {
+        try DllCall("User32\ShowWindow", "Ptr", Row.Gui.Hwnd, "Int", 0)
+    }
+
+    ; Step 2 — release Gui resources, same order.
+    if _TooltipBorderGui {
+        try _TooltipBorderGui.Destroy()
+        _TooltipBorderGui := 0
+    }
     for _, Row in _TooltipRowGuis {
         try Row.Gui.Destroy()
     }
     _TooltipGui := 0
     _TooltipRowGuis := []
-    if _TooltipBorderGui {
-        try _TooltipBorderGui.Destroy()
-        _TooltipBorderGui := 0
+
+    ; Step 3 — defensive sweep. Any Hwnd whose Gui.Destroy() silently
+    ; failed in the past (Destroy sites are wrapped in `try` so a
+    ; transient Win32 error would have leaked the underlying window)
+    ; gets a last-chance kill here via the raw Win32 DestroyWindow.
+    ; Without this safety net, accumulated ghost tooltips would remain
+    ; visible on screen until the script reloads.
+    for _, Hwnd in _TooltipShownBorderHwnds {
+        try DllCall("User32\DestroyWindow", "Ptr", Hwnd)
     }
+    for _, Hwnd in _TooltipShownHwnds {
+        try DllCall("User32\DestroyWindow", "Ptr", Hwnd)
+    }
+    _TooltipShownHwnds := []
+    _TooltipShownBorderHwnds := []
 }
 
 ; ============================================================
@@ -212,16 +293,21 @@ _TooltipBuildGui(Items) {
     DpiScale := A_ScreenDPI / 96
 
     ; ── Measure all text items ──────────────────────────────────────────────
+    ; Probe Guis are positioned far off-screen (-32000, -32000) so they
+    ; can never flash on the user's monitor during the show-then-destroy
+    ; measurement cycle. WS_EX_TOOLWINDOW (+E0x80) additionally keeps
+    ; them out of the taskbar and Alt-Tab switcher even in the unlikely
+    ; case they remain visible long enough for either to notice.
     Sizes := []
     MaxW := 0
     for _, Item in Items {
-        ProbeGui := Gui("-Caption +LastFound")
+        ProbeGui := Gui("-Caption +E0x80 +LastFound")
         try {
             ProbeGui.MarginX := 0
             ProbeGui.MarginY := 0
             ProbeGui.SetFont("s" . _TOOLTIP_FONT_SIZE, _TOOLTIP_FONT_NAME)
             ProbeGui.Add("Text", "x0 y0", Item.Text)
-            ProbeGui.Show("NoActivate")
+            ProbeGui.Show("NoActivate x-32000 y-32000")
             WinGetClientPos(, , &CW, &CH, ProbeGui.Hwnd)
             CW := Round(CW / DpiScale)
             CH := Round(CH / DpiScale)
@@ -238,13 +324,13 @@ _TooltipBuildGui(Items) {
     for _, Item in Items {
         Label := Item.HasOwnProp("TriggerLabel") ? Item.TriggerLabel : ""
         if (Label != "") {
-            ProbeL := Gui("-Caption +LastFound")
+            ProbeL := Gui("-Caption +E0x80 +LastFound")
             try {
                 ProbeL.MarginX := 0
                 ProbeL.MarginY := 0
                 ProbeL.SetFont("s" . _TOOLTIP_LABEL_FONT_SIZE, _TOOLTIP_FONT_NAME)
                 ProbeL.Add("Text", "x0 y0", Label)
-                ProbeL.Show("NoActivate")
+                ProbeL.Show("NoActivate x-32000 y-32000")
                 WinGetClientPos(, , &LW, &LH, ProbeL.Hwnd)
                 LW := Round(LW / DpiScale)
                 LH := Round(LH / DpiScale)
@@ -547,6 +633,17 @@ _TooltipShowBorder(X, Y, W, H) {
     ; ShowWindow after UpdateLayeredWindow — bitmap is already uploaded so the
     ; window appears with the correct pixels on the first painted frame, no ghost.
     DllCall("User32\ShowWindow", "Ptr", Hwnd, "Int", 4)   ; SW_SHOWNOACTIVATE=4
+
+    ; Track the new border Hwnd for TooltipHide's defensive sweep. Same
+    ; cap-and-evict policy as the content tracker — when the cap is hit
+    ; the oldest tracked Hwnd is dropped AND issued a final DestroyWindow
+    ; in case its Gui.Destroy silently failed.
+    global _TooltipShownBorderHwnds, _TOOLTIP_HWND_TRACK_CAP
+    if (_TooltipShownBorderHwnds.Length >= _TOOLTIP_HWND_TRACK_CAP) {
+        DroppedHwnd := _TooltipShownBorderHwnds.RemoveAt(1)
+        try DllCall("User32\DestroyWindow", "Ptr", DroppedHwnd)
+    }
+    _TooltipShownBorderHwnds.Push(Hwnd)
 }
 
 ; Tell DWM not to apply Windows 11 automatic corner rounding on this window.
