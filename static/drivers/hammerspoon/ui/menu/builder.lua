@@ -395,6 +395,7 @@ function M.generate(ctx, menu_mods, actions)
 	end
 
 
+	-- Grouped block: Actions globales / version / langue — three sibling entries
 	table.insert(items, { title = "-" })
 	table.insert(items, {
 		title = i18n.get("menu.global.title"),
@@ -404,6 +405,19 @@ function M.generate(ctx, menu_mods, actions)
 			{ title = i18n.get("menu.global.reset_defaults"), fn = actions.reset_defaults },
 		}
 	})
+	-- About / Update — sits directly below Actions globales in the same block
+	if type(menu_mods.about) == "table" and type(menu_mods.about.build) == "function" then
+		local ok_a, about_item = pcall(menu_mods.about.build, ctx)
+		if ok_a and about_item then
+			table.insert(items, about_item)
+		end
+	end
+	-- Language selector closes the block
+	table.insert(items, {
+		title = i18n.get("menu.global.language"),
+		menu  = i18n.build_language_menu_items(),
+	})
+	table.insert(items, { title = "-" })
 	table.insert(items, { title = i18n.get("menu.global.config_folder"), fn = actions.open_paths })
 	table.insert(items, { title = i18n.get("menu.global.setup_wizard"),  fn = actions.show_setup_wizard })
 	table.insert(items, { title = "-" })
@@ -411,18 +425,6 @@ function M.generate(ctx, menu_mods, actions)
 	-- plain Unicode symbols — emoji render poorly in native macOS menu bars
 	table.insert(items, { title = "↺ " .. i18n.get("menu.global.reload"):gsub("^%S+ ", ""),  fn = actions.reload })
 	table.insert(items, { title = "✕ " .. i18n.get("menu.global.quit"):gsub("^%S+ ", ""),    fn = actions.quit })
-	-- About / Update — version display, channel selector, changelog
-	if type(menu_mods.about) == "table" and type(menu_mods.about.build) == "function" then
-		local ok_a, about_item = pcall(menu_mods.about.build, ctx)
-		if ok_a and about_item then
-			table.insert(items, about_item)
-		end
-	end
-	-- Language selector sits below the version/update entry
-	table.insert(items, {
-		title = i18n.get("menu.global.language"),
-		menu  = i18n.build_language_menu_items(),
-	})
 
 	table.insert(items, {
 		title = i18n.get("menu.debug.title"),

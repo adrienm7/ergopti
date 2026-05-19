@@ -1165,26 +1165,13 @@ initMenu() {
 
 	A_TrayMenu.Add() ; Single separator between feature submenus and configuration items
 
-	; ── Actions globales — bulk-toggle / reset-defaults only ──
+	; ── Grouped block: Actions globales / version / langue ──
 	GlobalActionsMenu := Menu()
 	GlobalActionsMenu.Add(t("menu.global.enable_all"),  ToggleAllFeaturesOn)
 	GlobalActionsMenu.Add(t("menu.global.disable_all"), ToggleAllFeaturesOff)
 	GlobalActionsMenu.Add(t("menu.global.reset_defaults"), ReloadWithDefaultConfig)
-
-	; ── Script management — flattened into the top-level tray menu (used to
-	; live in a "Gestion du script" submenu). The lifecycle actions sit one
-	; click closer to the tray icon and stay grouped via separators. ──
-	global MenuSuspend
-	MenuSuspend := t("menu.global.suspend")
 	A_TrayMenu.Add(t("menu.global.title"), GlobalActionsMenu)
-	A_TrayMenu.Add(t("menu.global.config_folder"), FilePathsEditor)
-	A_TrayMenu.Add(t("menu.global.setup_wizard"), Onboarding_ShowFromMenu)
-	A_TrayMenu.Add() ; Separator before lifecycle actions
-	A_TrayMenu.Add(MenuSuspend, ToggleSuspend)
-	A_TrayMenu.Add(t("menu.global.reload"), ActivateReload)
-	A_TrayMenu.Add(t("menu.global.quit"), ActivateExitApp)
 
-	; ── About / Update — version display, changelog and update channel picker ──
 	AboutMenu := Menu()
 	Ver := Updater_CurrentVersion()
 	VerLabel := "ErgoptiPlus " . Ver
@@ -1208,10 +1195,20 @@ initMenu() {
 	AboutMenu.Add("Open releases page", (*) => Run(Updater_ReleasesPageUrl()))
 	A_TrayMenu.Add("ErgoptiPlus " . Ver, AboutMenu)
 
-	; Language selector — sits below the version/update entry
 	LangMenu := Menu()
 	I18nBuildLanguageMenu(LangMenu)
 	A_TrayMenu.Add(t("menu.global.language"), LangMenu)
+
+	; ── Script management ──
+	global MenuSuspend
+	MenuSuspend := t("menu.global.suspend")
+	A_TrayMenu.Add() ; Separator before config/lifecycle items
+	A_TrayMenu.Add(t("menu.global.config_folder"), FilePathsEditor)
+	A_TrayMenu.Add(t("menu.global.setup_wizard"), Onboarding_ShowFromMenu)
+	A_TrayMenu.Add() ; Separator before lifecycle actions
+	A_TrayMenu.Add(MenuSuspend, ToggleSuspend)
+	A_TrayMenu.Add(t("menu.global.reload"), ActivateReload)
+	A_TrayMenu.Add(t("menu.global.quit"), ActivateExitApp)
 
 	; ── Debug tools — grouped in a submenu to keep the top-level menu tidy.
 	; Mirrors Hammerspoon's "⚠ Debug" entry (Console + log shortcuts);
