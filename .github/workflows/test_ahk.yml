@@ -2,7 +2,7 @@ name: Test ErgoptiPlus AHK
 
 on:
     push:
-        branches: [main]
+        branches: [main, dev]
         paths:
             - "static/drivers/autohotkey/**"
             - ".github/workflows/test_ahk.yml"

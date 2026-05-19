@@ -1,12 +1,18 @@
 # .github/workflows/release.yml
 #
-# Triggered when a GitHub Release is published (by release-please or manually).
-# Builds both platform artefacts from the exact release tag, signs the macOS
-# zip with Sparkle, generates appcast-main.xml, and uploads everything as
-# release assets so users and Sparkle can download them.
+# Builds Ergopti.app (macOS) and ErgoptiPlus.exe (Windows) and attaches both
+# to a GitHub Release. Three trigger paths:
+#   1. push to dev          — auto-creates a pre-release "dev-{date}-{sha7}".
+#   2. release: published   — fired by release-please after main is updated.
+#   3. workflow_dispatch    — manual, takes an explicit tag.
+#
+# The "prepare-release" job is the single source of truth for the tag and
+# release: every build job depends on it and reads its outputs.
 name: Release Build
 
 on:
+    push:
+        branches: [dev]
     release:
         types: [published]
     workflow_dispatch:
@@ -15,6 +21,9 @@ on:
                 description: "Tag to build (e.g. v0.1.0)"
                 required: true
                 default: "v0.1.0"
+
+permissions:
+    contents: write
 
 concurrency:
     group: release-${{ github.ref }}
@@ -25,42 +34,113 @@ concurrency:
 
 # ============================================================
 # ============================================================
-# ======= 1/ macOS — Ergopti.app + Sparkle appcast ===========
+# ======= 1/ Prepare release =================================
 # ============================================================
 # ============================================================
 
 jobs:
+    prepare-release:
+        runs-on: ubuntu-latest
+        outputs:
+            tag:        ${{ steps.meta.outputs.tag }}
+            version:    ${{ steps.meta.outputs.version }}
+            prerelease: ${{ steps.meta.outputs.prerelease }}
+            ref:        ${{ steps.meta.outputs.ref }}
+
+        steps:
+            - name: Checkout
+              uses: actions/checkout@v4
+              with:
+                  fetch-depth: 0
+
+            - name: Resolve tag / version / channel
+              id: meta
+              shell: bash
+              env:
+                  GH_TOKEN: ${{ github.token }}
+              run: |
+                  set -euo pipefail
+                  event="${{ github.event_name }}"
+                  prerelease="false"
+                  case "$event" in
+                      push)
+                          # Auto-tag for dev pushes: dev-YYYYMMDD-<short_sha>
+                          date_part="$(date -u +%Y%m%d-%H%M%S)"
+                          sha="${GITHUB_SHA:0:7}"
+                          tag="dev-${date_part}-${sha}"
+                          prerelease="true"
+                          ref="${GITHUB_SHA}"
+                          ;;
+                      release)
+                          tag="${GITHUB_REF_NAME}"
+                          ref="$tag"
+                          ;;
+                      workflow_dispatch)
+                          tag="${{ github.event.inputs.tag }}"
+                          ref="$tag"
+                          # Anything that does not look like vX.Y.Z is treated as pre-release
+                          if ! [[ "$tag" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+                              prerelease="true"
+                          fi
+                          ;;
+                  esac
+                  version="${tag#v}"
+                  echo "tag=$tag"               >> "$GITHUB_OUTPUT"
+                  echo "version=$version"       >> "$GITHUB_OUTPUT"
+                  echo "prerelease=$prerelease" >> "$GITHUB_OUTPUT"
+                  echo "ref=$ref"               >> "$GITHUB_OUTPUT"
+                  echo "Resolved tag=$tag version=$version prerelease=$prerelease ref=$ref"
+
+            - name: Ensure release exists
+              if: ${{ github.event_name != 'release' }}
+              shell: bash
+              env:
+                  GH_TOKEN: ${{ github.token }}
+              run: |
+                  set -euo pipefail
+                  tag="${{ steps.meta.outputs.tag }}"
+                  prerelease="${{ steps.meta.outputs.prerelease }}"
+                  ref="${{ steps.meta.outputs.ref }}"
+                  if gh release view "$tag" >/dev/null 2>&1; then
+                      echo "Release '$tag' already exists — skipping creation."
+                      exit 0
+                  fi
+                  echo "Creating release '$tag' (prerelease=$prerelease)…"
+                  flags=()
+                  [ "$prerelease" = "true" ] && flags+=("--prerelease")
+                  gh release create "$tag" \
+                      --target "$ref" \
+                      --title "Ergopti $tag" \
+                      --notes "Build in progress — assets will appear in a few minutes." \
+                      "${flags[@]}"
+
+
+
+
+# ============================================================
+# ============================================================
+# ======= 2/ macOS — Ergopti.app + Sparkle appcast ===========
+# ============================================================
+# ============================================================
+
     build-macos:
+        needs: prepare-release
         runs-on: macos-latest
-        # Make the private key visible to the "if:" condition on signing steps.
         env:
             SPARKLE_ED_PRIVATE_KEY: ${{ secrets.SPARKLE_ED_PRIVATE_KEY }}
 
         steps:
-            - name: Checkout at release tag
+            - name: Checkout at build ref
               uses: actions/checkout@v4
               with:
-                  ref: ${{ github.event.inputs.tag || github.ref }}
+                  ref: ${{ needs.prepare-release.outputs.ref }}
                   fetch-depth: 0
-
-            - name: Resolve version from tag
-              id: meta
-              shell: bash
-              run: |
-                  set -euo pipefail
-                  tag="${{ github.event.inputs.tag || github.ref_name }}"
-                  version="${tag#v}"
-                  build_num="${GITHUB_RUN_NUMBER}"
-                  echo "version=$version" >> "$GITHUB_OUTPUT"
-                  echo "build=$build_num" >> "$GITHUB_OUTPUT"
-                  echo "tag=$tag"         >> "$GITHUB_OUTPUT"
-                  echo "Version : $version   Build : $build_num"
 
             - name: Build Ergopti.app
               shell: bash
               env:
-                  ERGOPTI_VERSION:    ${{ steps.meta.outputs.version }}
-                  ERGOPTI_BUILD:      ${{ steps.meta.outputs.build }}
+                  ERGOPTI_VERSION:    ${{ needs.prepare-release.outputs.version }}
+                  ERGOPTI_BUILD:      ${{ github.run_number }}
                   ERGOPTI_CHANNEL:    main
                   SPARKLE_PUBLIC_KEY: ${{ secrets.SPARKLE_PUBLIC_KEY }}
                   GH_OWNER:           ${{ github.repository_owner }}
@@ -95,8 +175,8 @@ jobs:
               if: ${{ env.SPARKLE_ED_PRIVATE_KEY != '' }}
               shell: bash
               env:
-                  ERGOPTI_VERSION:  ${{ steps.meta.outputs.version }}
-                  ERGOPTI_BUILD:    ${{ steps.meta.outputs.build }}
+                  ERGOPTI_VERSION:  ${{ needs.prepare-release.outputs.version }}
+                  ERGOPTI_BUILD:    ${{ github.run_number }}
                   ERGOPTI_CHANNEL:  main
                   SPARKLE_SIG_FILE: build/macos/Ergopti.app.zip.sig
                   ZIP_PATH:         build/macos/Ergopti.app.zip
@@ -111,10 +191,10 @@ jobs:
                   GH_TOKEN: ${{ github.token }}
               run: |
                   set -euo pipefail
-                  tag="${{ steps.meta.outputs.tag }}"
+                  tag="${{ needs.prepare-release.outputs.tag }}"
                   assets=(build/macos/Ergopti.app.zip)
-                  [ -f build/macos/Ergopti.app.zip.sig  ] && assets+=(build/macos/Ergopti.app.zip.sig)
-                  [ -f build/macos/appcast-main.xml      ] && assets+=(build/macos/appcast-main.xml)
+                  [ -f build/macos/Ergopti.app.zip.sig ] && assets+=(build/macos/Ergopti.app.zip.sig)
+                  [ -f build/macos/appcast-main.xml    ] && assets+=(build/macos/appcast-main.xml)
                   gh release upload "$tag" "${assets[@]}" --clobber
 
 
@@ -122,18 +202,19 @@ jobs:
 
 # ============================================================
 # ============================================================
-# ======= 2/ Windows — ErgoptiPlus.exe =======================
+# ======= 3/ Windows — ErgoptiPlus.exe =======================
 # ============================================================
 # ============================================================
 
     build-windows:
+        needs: prepare-release
         runs-on: windows-latest
 
         steps:
-            - name: Checkout at release tag
+            - name: Checkout at build ref
               uses: actions/checkout@v4
               with:
-                  ref: ${{ github.event.inputs.tag || github.ref }}
+                  ref: ${{ needs.prepare-release.outputs.ref }}
                   fetch-depth: 0
 
             - name: Set up Python
@@ -152,7 +233,7 @@ jobs:
             - name: Stamp BUNDLE_VERSION with release tag
               shell: pwsh
               run: |
-                  $version = "${{ github.ref_name }}".TrimStart("v")
+                  $version = "${{ needs.prepare-release.outputs.version }}"
                   $bundlePath = "${{ github.workspace }}\static\drivers\autohotkey\lib\bundle.ahk"
                   (Get-Content -Raw -Path $bundlePath).Replace("__BUNDLE_VERSION__", $version) `
                       | Set-Content -Path $bundlePath -Encoding UTF8 -NoNewline
@@ -185,6 +266,77 @@ jobs:
               env:
                   GH_TOKEN: ${{ github.token }}
               run: |
-                  gh release upload "${{ github.event.inputs.tag || github.ref_name }}" \
+                  gh release upload "${{ needs.prepare-release.outputs.tag }}" \
                       static/drivers/autohotkey/ErgoptiPlus.exe \
                       --clobber
+
+
+
+
+# ============================================================
+# ============================================================
+# ======= 4/ Finalize release notes ==========================
+# ============================================================
+# ============================================================
+
+    finalize-release:
+        needs: [prepare-release, build-macos, build-windows]
+        runs-on: ubuntu-latest
+
+        steps:
+            - name: Write release body with platform sections
+              shell: bash
+              env:
+                  GH_TOKEN: ${{ github.token }}
+                  TAG:      ${{ needs.prepare-release.outputs.tag }}
+                  VERSION:  ${{ needs.prepare-release.outputs.version }}
+              run: |
+                  set -euo pipefail
+                  body_file="$(mktemp)"
+                  cat > "$body_file" << EOF
+                  ## Ergopti $VERSION
+
+                  Choisis ton OS ci-dessous et télécharge le fichier correspondant.
+
+                  ---
+
+                  ### 🍎 macOS
+
+                  | Asset | Description |
+                  |---|---|
+                  | \`Ergopti.app.zip\` | Application macOS (Hammerspoon + Karabiner-Elements + Ollama embarqués) |
+                  | \`Ergopti.app.zip.sig\` | Signature Sparkle EdDSA (auto-update) |
+                  | \`appcast-main.xml\` | Feed Sparkle (auto-update) |
+
+                  **Installation :**
+                  1. Décompresse le \`.zip\` et glisse \`Ergopti.app\` dans \`/Applications\`.
+                  2. Retire la mise en quarantaine (l'app n'est pas notarisée Apple) :
+                  \`\`\`bash
+                  xattr -dr com.apple.quarantine /Applications/Ergopti.app
+                  \`\`\`
+                  3. Lance l'app. Karabiner-Elements demandera une approbation de System Extension au premier démarrage.
+
+                  ---
+
+                  ### 🪟 Windows
+
+                  | Asset | Description |
+                  |---|---|
+                  | \`ErgoptiPlus.exe\` | Exécutable AutoHotkey compilé (runtime AHK v2 embarqué) |
+
+                  **Installation :**
+                  1. Télécharge \`ErgoptiPlus.exe\`.
+                  2. Double-clique pour lancer. Au premier démarrage, les ressources sont extraites dans \`%LOCALAPPDATA%\Ergopti\`.
+
+                  ---
+
+                  ### 🐧 Linux
+
+                  Le driver Linux est servi directement par le site (cf. [.config sources](https://github.com/${GITHUB_REPOSITORY})). Pas d'asset binaire à télécharger.
+
+                  ---
+
+                  _Generated by [release.yml](https://github.com/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID})_
+                  EOF
+                  gh release edit "$TAG" --notes-file "$body_file"
+                  echo "Release notes updated for $TAG"
