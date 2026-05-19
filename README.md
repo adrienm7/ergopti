@@ -1,85 +1,134 @@
-# Disposition Ergopti
+# Ergopti
 
-![Couche de base](static/img/ergopti_visuel.jpg)
+**An ergonomic keyboard layout optimised for French, English, and code.**
 
----
+![Base layer](static/img/ergopti_visuel.jpg)
 
-➜ https://ergopti.fr
-
----
-
-Ergopti est une disposition de clavier ergonomique et optimisée possédant les caractéristiques suivantes :
-
-- Disposition **optimisée pour le français, l’anglais et le code** ;
-- Licence libre (MIT) ;
-- **Chiffres en accès direct** ;
-- Couche AltGr permettant d’accéder aux symboles de programmation, avec un placement logique pour faciliter la mémorisation ;
-  ![Couche AltGr](static/img/ergopti_altgr.jpg)
-- **Conservation de raccourcis usuels** : les raccourcis <kbd>Ctrl-{A, C, V, X, Z}</kbd> sont disponibles à gauche du clavier ;
-  ![Couche Ctrl](static/img/ergopti_ctrl.jpg)
-- Support de tous les caractères spéciaux utilisés en français (majuscules accentuées, lettres entrelacées, symboles de ponctuation…) ;
-- **Version « Ergopti + » avec de nombreuses autres fonctionnalités** :
-  ![Couche de base +](static/img/ergopti_plus.jpg)
-  - touche <kbd>★</kbd> de répétition (par exemple <kbd>el★e</kbd> donne <kbd>elle</kbd>) ;
-  - touche <kbd>★</kbd> d’abréviations (par exemple <kbd>pex★</kbd> donne <kbd>par exemple</kbd>) ;
-  - suppression de tous les SFBs restants (par exemple <kbd>,t</kbd> donne <kbd>pt</kbd>) ;
-  - la touche <kbd>q</kbd> donne <kbd>qu</kbd> lorsque suivie d’une voyelle ;
-  - divers raccourcis dont des tap-holds ;
-  - ajout de nouveaux roulements de confort (par exemple <kbd>hc</kbd> donne <kbd>wh</kbd>) ;
-  - etc.
-
-➜ Il est possible d’essayer la disposition en ligne sur la page suivante : https://ergopti.fr/utilisation#clavier_emulation.
+➜ **[ergopti.fr](https://ergopti.fr)** — interactive demo, full documentation, online emulator
 
 ---
 
-Le site de présentation du projet fonctionne à l’aide de [SvelteKit](https://kit.svelte.dev/).
+## Overview
+
+Ergopti is an open-source keyboard layout designed to minimise finger travel and same-finger bigrams while remaining immediately usable — numbers stay on the top row, and the most common shortcuts (<kbd>Ctrl</kbd>+<kbd>A/C/V/X/Z</kbd>) are kept on the left side of the keyboard.
+
+| | |
+|---|---|
+| **Languages** | French · English · Code |
+| **Licence** | MIT |
+| **Platforms** | macOS · Windows · Linux |
+| **Numbers** | Direct access on top row |
+| **AltGr layer** | Programming symbols, logically placed |
+| **Special characters** | Full French typographic support (accented capitals, ligatures, punctuation…) |
 
 ---
 
-## Génération des claviers
+## Install
 
-Les claviers sur le site ont été réalisés à partir de zéro, en créant une matrice de 16×7 touches vides.
-Une fonction va ensuite remplir ces touches grâce aux valeurs d’un fichier json, selon la géométrie, la couche choisie, l’emplacement de la touche, si la version Ergopti+ est activée, etc.
+**→ Download the [latest release](https://github.com/adrienm7/ergopti/releases/latest)**
 
-Le code de génération de ces claviers est fait sur-mesure pour mes besoins (nouvelles couches telle qu’une couche Layer, une couche Indices, Exposants, etc.) mais pourrait probablement être utilisé sur un autre projet moyennant des adaptations. En particulier, il faudrait voir comment faire pour utiliser la fonction de génération de clavier en dehors de SvelteKit.
+### macOS — Ergopti.app
 
-## Développement
+The macOS release is a self-contained app that bundles Hammerspoon, Karabiner-Elements, and Ollama (for local LLM features). No separate installs required.
 
-Après avoir cloné le projet, se placer dans le répertoire ergopti.
-Puis, installer les dépendances :
+1. Download `Ergopti.app.zip` and unzip it.
+2. Move `Ergopti.app` to `/Applications`.
+3. Remove the quarantine flag (the app is not Apple-notarised yet):
+   ```bash
+   xattr -dr com.apple.quarantine /Applications/Ergopti.app
+   ```
+4. Launch the app. On first run, Karabiner-Elements will ask for a System Extension approval — this is required for key remapping.
+
+### Windows — ErgoptiPlus.exe
+
+The Windows release is a compiled AutoHotkey v2 executable. The AHK runtime is embedded; no separate installation needed.
+
+1. Download `ErgoptiPlus.exe`.
+2. Double-click to run. On first launch, resources are extracted to `%LOCALAPPDATA%\Ergopti`.
+
+### Linux
+
+The Linux driver (XKB) is served from the website. Follow the instructions at **[ergopti.fr/utilisation](https://ergopti.fr/utilisation)**.
+
+---
+
+## Ergopti+
+
+Ergopti+ is the extended variant of the layout. It goes far beyond a simple key remapping — it is a complete typing automation layer that eliminates friction at every level.
+
+![Base layer +](static/img/ergopti_plus.jpg)
+
+### Repeat key <kbd>★</kbd>
+
+A dedicated repeat key eliminates double-letter awkwardness. Typing <kbd>el★e</kbd> produces `elle`; <kbd>★</kbd> always repeats the last character. No more same-finger rolls for doubles.
+
+### Abbreviation expansion
+
+The same <kbd>★</kbd> key doubles as an abbreviation trigger. Type a short code and press <kbd>★</kbd> to expand it — for example `pex★` → `par exemple`. Hundreds of built-in expansions, fully customisable.
+
+### SFB elimination
+
+All remaining same-finger bigrams are resolved via smart substitutions. For instance, pressing <kbd>,t</kbd> outputs `pt` — the layout silently routes around any uncomfortable finger combination.
+
+### Smart <kbd>q</kbd>
+
+The <kbd>q</kbd> key automatically outputs `qu` when followed by a vowel — covering the overwhelming majority of French usage — and outputs `q` in all other contexts. No extra keystrokes.
+
+### Tap-holds
+
+Keys have a secondary function when held. Tap for the letter, hold for a modifier, a layer switch, or a shortcut. Eliminates the need to reach for dedicated modifier keys in many situations.
+
+### Comfort rolls
+
+New rolling sequences are introduced to turn common bigrams into inward rolls. For example, <kbd>hc</kbd> outputs `wh`. These additions are chosen for frequency and ergonomic benefit, not arbitrary remapping.
+
+### And more
+
+- Navigation layer accessible from the home row
+- Local LLM integration (on macOS, via the bundled Ollama)
+- System tray icon with live status and toggle controls
+- Auto-update via Sparkle (macOS) / built-in updater (Windows)
+
+➜ Try the layout in the browser: **[ergopti.fr/utilisation#clavier_emulation](https://ergopti.fr/utilisation#clavier_emulation)**
+
+---
+
+## Layers
+
+**AltGr layer** — programming symbols, logically grouped for memorability:
+
+![AltGr layer](static/img/ergopti_altgr.jpg)
+
+**Ctrl layer** — standard shortcuts preserved on the left side:
+
+![Ctrl layer](static/img/ergopti_ctrl.jpg)
+
+---
+
+## Website development
+
+The project website runs on [SvelteKit](https://kit.svelte.dev/). The keyboard visualiser is built from scratch: a 16×7 grid of empty keys is filled from a JSON file according to the geometry, the active layer, and whether Ergopti+ is enabled.
+
+### Setup
 
 ```bash
-npm install  # ou pnpm install ou yarn
+git clone https://github.com/adrienm7/ergopti.git
+cd ergopti
+npm install
 ```
 
-Une fois cela fait, démarrer un serveur de développement avec la commande suivante :
+### Dev server
 
 ```bash
-npm run dev
+npm run dev          # start at http://localhost:5173
+npm run dev -- --open  # start and open in browser
 ```
 
-Cela devrait ouvrir un serveur local à l’adresse http://localhost:5173/.
-
-Il est également possible de démarrer le serveur et d’ouvrir automatiquement l'application dans un nouvel onglet de navigateur :
-
-```bash
-npm run dev -- --open
-```
-
-## Build
-
-Pour créer une version de production de l'application, utiliser :
+### Production build
 
 ```bash
 npm run build
+npm run preview      # preview the production build locally
 ```
 
-Une fois cela fait, pour prévisualiser la version de production, exécuter :
-
-```bash
-npm run preview
-```
-
-### Déploiement
-
-Pour déployer l'application, il peut être nécessaire d’installer un adaptateur en fonction de l'environnement cible.
+Deploying to a specific host may require installing the matching SvelteKit adapter.
