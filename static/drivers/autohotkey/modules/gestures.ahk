@@ -1739,4 +1739,22 @@ GestureOpenTouchpadSettings() {
 ; Read configuration on load
 GesturesReadConfig()
 
+; The onboarding wizard cannot call GestureAutoConfigureRegistry() directly —
+; when it runs (first launch, before this module's auto-exec body executes) the
+; PrecisionTouchPad registry maps above are still unset. So the wizard instead
+; records ``[Gestures] AutoConfigureOnNextStart = true`` in config.toml, and
+; this block consumes that flag now that every dependency is available. The
+; entry is cleared after one attempt regardless of outcome so we never retry on
+; every subsequent reload (the tray menu's "Auto-configure" action stays the
+; supported way to retry if something failed here).
+global _IniCache, ConfigurationFile
+RawAutoConfig := IniCacheGet(_IniCache, "Gestures", "AutoConfigureOnNextStart")
+if (RawAutoConfig == "1" or RawAutoConfig == "true") {
+    LoggerStart("gestures", "Consuming AutoConfigureOnNextStart flag from onboarding…")
+    try GestureAutoConfigureRegistry()
+    try TOML_BatchWrite(ConfigurationFile,
+        [{ Section: "Gestures", Key: "AutoConfigureOnNextStart", Value: false }])
+    LoggerSuccess("gestures", "AutoConfigureOnNextStart flag consumed and cleared.")
+}
+
 LoggerSuccess("gestures", "Gestures module initialised — ready.")

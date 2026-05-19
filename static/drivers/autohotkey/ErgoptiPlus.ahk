@@ -747,6 +747,15 @@ PersonalFeatureEnabled(name) {
 EnsurePersonalShortcutsFile(Path) {
     global PERSONAL_SHORTCUTS_TEMPLATE
 
+    ; Guard against an unusable Path early — an empty or non-string argument
+    ; would otherwise propagate into RegExReplace/FileExist and surface as a
+    ; misleading "local variable has not been assigned" error from somewhere
+    ; deep in this function.
+    if (!IsSet(Path) or Type(Path) != "String" or Path == "") {
+        try LoggerWarn("ErgoptiPlus", "EnsurePersonalShortcutsFile called with empty Path — skipping.")
+        return
+    }
+
     ; Step 1 — make sure the user's actual file exists at _ConfigDir, creating
     ; it from the template on first launch (and after the user renames or
     ; deletes it). FileWasCreated drives the reload at the end so the parser
@@ -758,7 +767,12 @@ EnsurePersonalShortcutsFile(Path) {
             if (Dir != "" and !DirExist(Dir)) {
                 DirCreate(Dir)
             }
-            FileAppend(PERSONAL_SHORTCUTS_TEMPLATE, Path, "UTF-8-RAW")
+            ; PERSONAL_SHORTCUTS_TEMPLATE is defined in ui/tray_menu.ahk which is
+            ; #Include'd before this call site. If somebody removes that include
+            ; (or renames the constant) we would otherwise crash here with the
+            ; opaque "local variable has not been assigned a value" error.
+            Template := IsSet(PERSONAL_SHORTCUTS_TEMPLATE) ? PERSONAL_SHORTCUTS_TEMPLATE : ""
+            FileAppend(Template, Path, "UTF-8-RAW")
             FileWasCreated := true
             try LoggerInfo("ErgoptiPlus", "Personal shortcuts file created from template at '{1}'.", Path)
         } catch as e {
@@ -779,7 +793,25 @@ EnsurePersonalShortcutsFile(Path) {
     ; In compiled mode place the stub in LocalAppData\Ergopti\_generated\ so it
     ; never lands next to the .exe (Downloads, Desktop…). In dev mode the sibling
     ; _generated/ folder (gitignored) keeps the source tree tidy as before.
-    StubDir := (A_IsCompiled) ? (A_LocalAppData . "\Ergopti\_generated") : (A_ScriptDir . "\_generated")
+    ;
+    ; Both branches of the original ternary were evaluated eagerly at parse time
+    ; in some AHK v2 releases, which made a missing/empty A_LocalAppData surface
+    ; as an "unassigned local variable" crash even in dev mode. EnvGet provides
+    ; a deterministic fallback when A_LocalAppData is somehow blank (RDP/service
+    ; contexts), and the explicit if/else avoids any ternary-eval ambiguity.
+    StubDir := ""
+    if A_IsCompiled {
+        LocalAppData := A_LocalAppData
+        if (LocalAppData == "") {
+            LocalAppData := EnvGet("LOCALAPPDATA")
+        }
+        if (LocalAppData == "") {
+            LocalAppData := EnvGet("USERPROFILE") . "\AppData\Local"
+        }
+        StubDir := LocalAppData . "\Ergopti\_generated"
+    } else {
+        StubDir := A_ScriptDir . "\_generated"
+    }
     try DirCreate(StubDir)
     StubPath := StubDir . "\personal_shortcuts.ahk"
     DesiredStub := "; Auto-generated forwarding stub — do not edit.`r`n"
@@ -819,7 +851,15 @@ EnsurePersonalShortcutsFile(Path) {
 ; exists by the time InitSubMenus / initMenu run. Create the file from a minimal
 ; template if the user has not authored one yet, so #Include *i has something to
 ; load on first launch (and the user can find it via the tray menu shortcut).
-EnsurePersonalShortcutsFile(ScriptInformation["PersonalAhkPath"])
+; Outer try guards the boot path against any internal failure inside the helper
+; — the driver must keep starting even when the personal shortcuts file cannot
+; be created (read-only home, locked AppData, …); the worst case is just that
+; personal hotkeys are inert until the user fixes the permissions.
+try {
+    EnsurePersonalShortcutsFile(ScriptInformation["PersonalAhkPath"])
+} catch as _epsErr {
+    try LoggerError("ErgoptiPlus", "EnsurePersonalShortcutsFile failed: {1}.", _epsErr.Message)
+}
 ; #InputLevel 2 is required for the user's personal hotkeys to fire after the
 ; layout's key remappings (which run at the default level 0). We set it here so
 ; the user does not have to know about input levels in their personal file.

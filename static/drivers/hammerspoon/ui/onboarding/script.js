@@ -29,8 +29,10 @@ var LOCALES = [
 // Default locale shown when no locale has been set yet
 var DEFAULT_LOCALE_CODE = "en";
 
-// Default magic key character
-var DEFAULT_MAGIC_KEY = "★";
+// Default magic key character — an asterisk is reachable on every keyboard
+// without a dead key and is the documented "safe" fallback; the user can
+// change it to ù, ; or any single character on step 3.
+var DEFAULT_MAGIC_KEY = "*";
 
 
 // ======================================
@@ -103,6 +105,8 @@ function showStep(n) {
 
 /**
  * Builds the language list for step 1 and pre-selects the current locale.
+ * Also refreshes the welcome title and heading so they read in the previewed
+ * locale rather than the old "Welcome / Bienvenue / Willkommen" mash-up.
  */
 function renderStep1() {
 	var list = document.getElementById("lang-list");
@@ -141,7 +145,10 @@ function renderStep1() {
 	var selected = list.querySelector(".lang-item.selected");
 	if (selected) selected.scrollIntoView({ block: "nearest" });
 
-	document.getElementById("s1-next").textContent = _t("onboarding.next");
+	document.getElementById("s1-title").textContent    = _t("onboarding.welcome.title");
+	document.getElementById("s1-subtitle").textContent = _t("onboarding.welcome.heading");
+	document.getElementById("s1-next").textContent     = _t("onboarding.next");
+	document.title = _t("onboarding.welcome.title");
 }
 
 /**
@@ -161,14 +168,17 @@ function renderStep2() {
 }
 
 /**
- * Refreshes step 3 labels.
+ * Refreshes step 3 labels. The same hint is shown above the input (so the
+ * defaults are visible before the user even thinks about typing) and below
+ * (so the freedom-to-choose reminder closes the section).
  */
 function renderStep3() {
-	document.getElementById("s3-title").textContent = _t("onboarding.magic_key.title");
-	document.getElementById("s3-desc").textContent  = _t("onboarding.magic_key.desc");
-	document.getElementById("s3-hint").textContent  = _t("onboarding.magic_key.hint");
-	document.getElementById("s3-back").textContent  = _t("onboarding.back");
-	document.getElementById("s3-next").textContent  = _t("onboarding.next");
+	document.getElementById("s3-title").textContent     = _t("onboarding.magic_key.title");
+	document.getElementById("s3-desc").textContent      = _t("onboarding.magic_key.desc");
+	document.getElementById("s3-hint-top").textContent  = _t("onboarding.magic_key.hint");
+	document.getElementById("s3-hint").textContent      = _t("onboarding.magic_key.choose_freely");
+	document.getElementById("s3-back").textContent      = _t("onboarding.back");
+	document.getElementById("s3-next").textContent      = _t("onboarding.next");
 
 	var inp = document.getElementById("s3-input");
 	inp.value = _answers.magic_key || DEFAULT_MAGIC_KEY;
