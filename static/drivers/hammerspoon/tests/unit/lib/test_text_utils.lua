@@ -222,6 +222,14 @@ helpers.describe("text_utils case helpers", function()
 		helpers.assert_true(not tu.is_letter_char(" "))
 		helpers.assert_true(not tu.is_letter_char(""))
 	end)
+
+	helpers.it("is_letter_char false for apostrophes (word boundary)", function()
+		-- Both apostrophes must be word-boundary chars: otherwise "ia" with
+		-- is_word=true would refuse to fire after "l'" / "l’" (French
+		-- contractions), which is the documented expectation.
+		helpers.assert_true(not tu.is_letter_char("'"))
+		helpers.assert_true(not tu.is_letter_char("’"))
+	end)
 end)
 
 
