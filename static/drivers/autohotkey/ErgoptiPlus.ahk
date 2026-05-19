@@ -105,6 +105,7 @@ SendMode("Event") ; Everything concerning hotstrings MUST use SendEvent and not 
 #Include lib/onboarding.ahk
 #Include lib/hotstrings/hotstrings_config.ahk
 #Include lib/hotstrings/hotstrings_config_window.ahk
+#Include lib/ui_style.ahk
 #Include lib/tooltip.ahk
 #Include lib/hotstrings/hotstring_prefix_watcher.ahk
 ; Auto-generated registrar for the bundled hotstring TOMLs. ``*i`` keeps the

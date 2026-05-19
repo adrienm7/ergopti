@@ -406,9 +406,10 @@ function M.render_stacked(rows, state, start_watchers_callback)
 
 		-- Measure all rows to compute common width.
 		local temp_canvas = M.stacked_canvas
-		local max_text_w  = 0
-		local max_label_w = 0
-		local row_heights = {}
+		local max_text_w   = 0
+		local max_label_w  = 0
+		local row_heights  = {}
+		local label_heights = {}
 
 		for _, row in ipairs(rows) do
 			local styled = hs.styledtext.new(row.text, {
@@ -424,6 +425,9 @@ function M.render_stacked(rows, state, start_watchers_callback)
 					color = { white = 0.45, alpha = 1 },
 				}))
 				if lsz.w > max_label_w then max_label_w = lsz.w end
+				table.insert(label_heights, lsz.h)
+			else
+				table.insert(label_heights, 0)
 			end
 		end
 
@@ -492,16 +496,19 @@ function M.render_stacked(rows, state, start_watchers_callback)
 				w = max_text_w, h = row_heights[i] }
 
 			-- Trigger label (dim, smaller font, right-aligned in label zone).
+			-- Vertically centred relative to the main text row height.
 			if row.trigger_label and row.trigger_label ~= "" and label_zone > 0 then
-				local label_x  = pad_x + max_text_w + label_gap
+				local label_x      = pad_x + max_text_w + label_gap
+				local label_h      = label_heights[i] > 0 and label_heights[i] or row_heights[i]
+				local label_offset = math.floor((row_heights[i] - label_h) / 2)
 				M.stacked_canvas[base + 2].action = "fill"
 				M.stacked_canvas[base + 2].text   = hs.styledtext.new(row.trigger_label, {
 					font  = { name = Config.fonts.main, size = Config.sizes.hint },
 					color = { white = 0.45, alpha = 1 },
 				})
 				M.stacked_canvas[base + 2].frame = { x = label_x,
-					y = top_y + pad_y,
-					w = max_label_w, h = row_heights[i] }
+					y = top_y + pad_y + label_offset,
+					w = max_label_w, h = label_h }
 			else
 				M.stacked_canvas[base + 2].action = "skip"
 			end
