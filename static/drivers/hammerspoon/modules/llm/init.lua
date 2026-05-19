@@ -13,6 +13,7 @@ local hs        = hs
 local Profiles  = require("modules.llm.profiles")
 local ApiOllama = require("modules.llm.api_ollama")
 local ApiMlx    = require("modules.llm.api_mlx")
+local ApiRemote = require("modules.llm.api_remote")
 local Logger    = require("lib.logger")
 
 local LOG = "llm.core"
@@ -225,8 +226,52 @@ local function get_api()
 	if CoreState.backend == "mlx" then
 		return ApiMlx
 	end
+	if CoreState.backend == "api" then
+		return ApiRemote
+	end
 	return ApiOllama
 end
+
+-- Expose the remote backend module so the menu / settings layer can configure
+-- entries (CRUD, active id) and call ``M.warmup_model`` immediately after,
+-- without going through the engine dispatcher. Kept as a direct field so the
+-- menu doesn't have to require the module separately and risk pulling a
+-- stale copy of the entry list.
+M.api_remote = ApiRemote
+
+-- Persistence keys for the remote API multi-entry state. These mirror the
+-- ``api_entries.json`` / ``api_entry_id`` slots on the AHK side; on HS we
+-- piggyback on ``hs.settings`` (the same store the rest of the LLM module
+-- uses for debounce / temperature / etc.) so there's a single durable
+-- backing store across reloads.
+local API_ENTRIES_KEY    = "llm_api_entries"
+local API_ENTRY_ID_KEY   = "llm_api_entry_id"
+
+--- Load persisted API entries from hs.settings and seed the remote backend.
+--- Idempotent — calling it more than once just refreshes the in-memory state
+--- from the durable store (useful right after the menu writes a new entry).
+function M.load_api_entries()
+	local entries = hs.settings.get(API_ENTRIES_KEY)
+	local active_id = hs.settings.get(API_ENTRY_ID_KEY)
+	if type(entries) == "table" then
+		ApiRemote.set_entries(entries)
+	end
+	if type(active_id) == "string" then
+		ApiRemote.set_active_entry_id(active_id)
+	end
+end
+
+--- Persist the current API entry list + active id to hs.settings. Called by
+--- the menu's CRUD actions after each mutation; keeping the write here means
+--- the menu doesn't have to know the storage scheme.
+function M.persist_api_entries()
+	pcall(function() hs.settings.set(API_ENTRIES_KEY,  ApiRemote.get_entries()) end)
+	pcall(function() hs.settings.set(API_ENTRY_ID_KEY, ApiRemote.get_active_entry_id()) end)
+end
+
+-- Restore persisted state before the first prediction can fire. ``hs.settings``
+-- is synchronous and cheap, so we don't defer this off the require path.
+pcall(M.load_api_entries)
 
 --- Primes the backend model and its KV cache with the active profile's system prompt.
 --- Must be called after both model and profile are configured; runs async so it does
@@ -371,6 +416,17 @@ end
 --- Resolves the current model name based on the active backend.
 --- @return string The model name for the active backend.
 function M.get_current_model()
+	if CoreState.backend == "api" then
+		-- For remote backends, the model is whatever string the user typed
+		-- when they configured the API entry — providers expose model names
+		-- that don't appear in the llm_models.json catalogue, so no
+		-- backend-specific resolution is meaningful.
+		local entry = ApiRemote.get_active_entry()
+		if entry and type(entry.model) == "string" and entry.model ~= "" then
+			return entry.model
+		end
+		return ""
+	end
 	local label = (CoreState.backend == "mlx") and CoreState.llm_model_mlx or CoreState.llm_model_ollama
 	return resolve_model_for_backend(label, CoreState.backend)
 end
@@ -487,8 +543,10 @@ function M.check_modifiers(eventFlags, targetMods)
 	return true
 end
 
--- Proxy Model Heuristics Methods
-M.is_thinking_model  = ApiOllama.is_thinking_model
+-- Proxy Model Heuristics Methods — dispatch to the active backend so the
+-- menu's thinking-model warning row also fires correctly when the user is
+-- pointed at a remote API serving qwen3 / deepseek / *-r1 / *-think* models.
+M.is_thinking_model  = function(name) return get_api().is_thinking_model(name) end
 M.check_availability = function(...) get_api().check_availability(...) end
 
 return M
