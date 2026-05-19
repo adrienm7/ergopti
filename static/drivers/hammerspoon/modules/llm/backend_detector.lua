@@ -42,6 +42,7 @@ local LOG = "backend_detector"
 -- immediately visible at lint time rather than at runtime.
 M.BACKEND_MLX    = "mlx"
 M.BACKEND_OLLAMA = "ollama"
+M.BACKEND_API    = "api"  -- remote provider (OpenAI / Anthropic / Gemini / …)
 
 -- macOS minimum version required for the MLX backend. MLX itself supports
 -- 13.5+ in practice; we accept ≥ 13.0 as a permissive floor and let the
@@ -118,13 +119,13 @@ end
 --- Returns the effective backend the rest of the stack should use. Honours
 --- a user-saved preference when present; otherwise falls back to
 --- M.auto_default().
---- @return string One of M.BACKEND_MLX / M.BACKEND_OLLAMA.
+--- @return string One of M.BACKEND_MLX / M.BACKEND_OLLAMA / M.BACKEND_API.
 function M.effective_backend()
 	local saved = nil
 	local ok = pcall(function()
 		saved = hs.settings.get(SETTING_KEY)
 	end)
-	if ok and (saved == M.BACKEND_MLX or saved == M.BACKEND_OLLAMA) then
+	if ok and (saved == M.BACKEND_MLX or saved == M.BACKEND_OLLAMA or saved == M.BACKEND_API) then
 		Logger.debug(LOG, "Effective backend = %s (user-saved).", saved)
 		return saved
 	end
@@ -133,9 +134,9 @@ end
 
 --- Persists an explicit backend choice. Validates the value to keep callers
 --- honest — a typo would otherwise silently corrupt hs.settings.
---- @param backend string Must equal M.BACKEND_MLX or M.BACKEND_OLLAMA.
+--- @param backend string Must equal M.BACKEND_MLX / M.BACKEND_OLLAMA / M.BACKEND_API.
 function M.set_backend(backend)
-	if backend ~= M.BACKEND_MLX and backend ~= M.BACKEND_OLLAMA then
+	if backend ~= M.BACKEND_MLX and backend ~= M.BACKEND_OLLAMA and backend ~= M.BACKEND_API then
 		Logger.error(LOG, "set_backend: invalid backend '%s' — refusing to persist.", tostring(backend))
 		return
 	end
