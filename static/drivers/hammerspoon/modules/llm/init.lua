@@ -37,7 +37,7 @@ M.BUILTIN_PROFILES = Profiles.BUILTIN_PROFILES
 --- @return table Merged defaults table.
 local function load_shared_defaults(base)
 	-- Resolve path: hammerspoon/ is two levels above _shared/
-	local script_dir = hs.processInfo.bundlePath or ""
+	local script_dir = (hs.processInfo and hs.processInfo.bundlePath) or ""
 	local candidates = {
 		(os.getenv("HOME") or "") .. "/Library/Application Support/Hammerspoon/../../../static/drivers/_shared/llm/defaults.json",
 		hs.configdir .. "/../../static/drivers/_shared/llm/defaults.json",
