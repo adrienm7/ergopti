@@ -479,13 +479,39 @@ _OnPrefixChar(IH, Char) {
                 : (HSEMatch.HasOwnProp("Category") ? HSEMatch.Category : "")
             HotstringSection := HSEMatch.HasOwnProp("Section") ? HSEMatch.Section : ""
             try KL_LogHotstring(HSEMatch.Trigger, HotstringRepl, HotstringHType, "", HotstringCategory, HotstringSection)
-            ; Wipe the prefix watcher's own buffer so the post-expansion
-            ; tail (which the user just observed on screen) does not
-            ; surface a stale tooltip preview from the trigger we just
-            ; fired. Pass ``true`` so the active suggestion is consumed
-            ; silently — the fire is the answer to the suggestion, no
-            ; ``dismissed`` event should pair with the ``suggested``.
-            _ResetPrefixBuffer(true)
+            ; ── Sync the watcher buffer to the post-expansion screen state ──
+            ; The naive "wipe to empty" used to drop the in-word context the
+            ; user is still typing inside of. After a STAR fire (no end-char),
+            ; the cursor sits IMMEDIATELY after the replacement and the user
+            ; usually keeps typing the same word — so the next keystroke
+            ; needs the post-expansion prefix as its lookup context. Without
+            ; this sync, typing ``l`` then the apostrophe trigger (``l’``)
+            ; would erase the watcher's memory of the ``l’`` boundary, and
+            ; subsequent ``ia`` would never surface the ``ia`` trigger
+            ; preview because the word-anchored lookup had no terminator to
+            ; anchor against.
+            ;
+            ; End-char fires are the original "word is done" case: the user
+            ; pressed a terminator, the trigger fired, the cursor is now at
+            ; a fresh word boundary. The old wipe behaviour is correct there.
+            if (HSE_LastEndChar == "") {
+                StripLen := (HSEMatch.HasOwnProp("Length") ? HSEMatch.Length : 0) - 1
+                if (StripLen > 0 and StrLen(_PrefixBuffer) >= StripLen) {
+                    _PrefixBuffer := SubStr(_PrefixBuffer, 1, StrLen(_PrefixBuffer) - StripLen)
+                } else if (StripLen > 0) {
+                    _PrefixBuffer := ""
+                }
+                if HSEMatch.HasOwnProp("Replacement") and Type(HSEMatch.Replacement) == "String" {
+                    _PrefixBuffer .= HSEMatch.Replacement
+                }
+                if (StrLen(_PrefixBuffer) > _MAX_BUFFER_LEN) {
+                    _PrefixBuffer := SubStr(_PrefixBuffer, -_MAX_BUFFER_LEN)
+                }
+                TooltipHide()
+                _NotifySuggestionConsumed()
+            } else {
+                _ResetPrefixBuffer(true)
+            }
             return
         }
 
