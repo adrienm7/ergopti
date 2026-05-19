@@ -49,6 +49,10 @@ SetWorkingDir(A_ScriptDir)
 #Include ../lib/dispatchers.ahk
 #Include ../lib/layout/layout_altgr.ahk
 #Include ../lib/layout/layout_shift_caps.ahk
+; i18n is included here because gestures.ahk calls t() at the top level
+; when building GESTURE_SLOT_LABELS; without this the process blocks on
+; an AHK runtime-error MsgBox and the CI job times out.
+#Include ../lib/i18n.ahk
 
 ; Install the hotstring hooks for the entire test process so neither real
 ; ``Hotstring()`` registrations nor real ``SendEvent`` keystrokes ever escape
