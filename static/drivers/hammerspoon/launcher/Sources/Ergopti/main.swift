@@ -147,13 +147,41 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 	// ===== 2.3) Hammerspoon Lifecycle ====
 	// =====================================
 
-	// Write our config-dir override into the bundle-id-scoped defaults plist
-	// the embedded Hammerspoon will read on launch. Done at every startup so
-	// a user who has moved the .app sees the new path immediately.
+	// Write Hammerspoon preference overrides into its NSUserDefaults store.
+	// Hammerspoon reads its prefs via [NSUserDefaults standardUserDefaults] under
+	// its own bundle ID (rewritten to kErgoptiBundleId at build time). Swift's
+	// UserDefaults(suiteName:) writes to a separate group-container store that HS
+	// does NOT read, so we use the `defaults` CLI which writes directly into
+	// ~/Library/Preferences/<bundleId>.plist — the exact file HS reads.
+	// Done at every startup so a user who moved the .app sees the new path.
 	private func seedConfigDirDefault() {
-		let defaults = UserDefaults(suiteName: kErgoptiBundleId)
-		defaults?.set(bundledConfigDir(), forKey: kHammerspoonConfigKey)
-		defaults?.synchronize()
+		let pairs: [(String, String)] = [
+			// Point HS at our bundled Lua tree instead of ~/.hammerspoon.
+			(kHammerspoonConfigKey, bundledConfigDir()),
+		]
+		for (key, value) in pairs {
+			runDefaults(["write", kErgoptiBundleId, key, "-string", value])
+		}
+		// Bool flags: suppress the native Hammerspoon hammer menubar icon and its
+		// Dock icon. Ergopti provides its own menubar item via hs.menubar; the HS
+		// default icons are redundant and reveal the underlying dependency.
+		let boolFalseKeys = ["MJShowMenuIconOnLaunch", "MJShowDockIconOnLaunch"]
+		for key in boolFalseKeys {
+			runDefaults(["write", kErgoptiBundleId, key, "-bool", "false"])
+		}
+	}
+
+	// Runs `/usr/bin/defaults` synchronously with the given arguments.
+	// Silent on failure — if defaults write cannot run, HS still launches;
+	// it may show its own icons, but the core functionality is unaffected.
+	private func runDefaults(_ args: [String]) {
+		let proc = Process()
+		proc.executableURL = URL(fileURLWithPath: "/usr/bin/defaults")
+		proc.arguments = args
+		proc.standardOutput = FileHandle.nullDevice
+		proc.standardError  = FileHandle.nullDevice
+		try? proc.run()
+		proc.waitUntilExit()
 	}
 
 	// Launch the embedded Hammerspoon as a child Process. We use Process
