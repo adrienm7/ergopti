@@ -5,12 +5,12 @@ on:
     branches: [main, dev]
     paths:
       - "static/drivers/hammerspoon/**"
-      - ".github/workflows/lua-tests.yml"
+      - ".github/workflows/test_hammerspoon.yml"
   pull_request:
     branches: [main, dev]
     paths:
       - "static/drivers/hammerspoon/**"
-      - ".github/workflows/lua-tests.yml"
+      - ".github/workflows/test_hammerspoon.yml"
 
 jobs:
   test:
@@ -23,8 +23,14 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y lua5.4 liblua5.4-dev luarocks
 
-      - name: Install luacheck
-        run: sudo luarocks install luacheck
+      - name: Install luacheck + lua-filesystem
+        # lfs is required by tests/run.lua to recursively discover test_*.lua
+        # files under tests/unit/<subdir>/. Without lfs the runner falls back
+        # to a `find | regex` path that strips intermediate directories and
+        # tries to require modules under bogus shortened names.
+        run: |
+          sudo luarocks install luacheck
+          sudo luarocks install luafilesystem
 
       - name: Run luacheck
         run: |
