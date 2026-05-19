@@ -419,6 +419,10 @@ LLM_Tray_BuildModelMenu() {
 
 	m.Add()
 	m.Add(t("menu.llm.add_model_entry"), (*) => LLM_Tray_PromptAddModel())
+	; Visual model browser — exposes the shared models.json catalogue with
+	; params / RAM / speed columns so the user can compare specs before
+	; picking. Mirrors the HS visual chooser in ui/menu/menu_llm/models_manager.
+	m.Add(t("menu.llm.browse_models_entry"), (*) => LLM_ModelBrowser_Show())
 	return m
 }
 

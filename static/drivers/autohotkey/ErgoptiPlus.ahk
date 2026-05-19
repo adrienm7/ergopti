@@ -177,6 +177,7 @@ LLM_Defaults_Load()
 #Include modules/llm/ollama_deps_checker.ahk
 #Include ui/tooltip_llm.ahk
 #Include ui/tray_llm.ahk
+#Include ui/llm_model_browser.ahk
 
 ; ======================================================
 ; ======================================================
