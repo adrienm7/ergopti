@@ -60,16 +60,27 @@ _HCW_InitLocaleStrings() {
 		"sfbsreduction",      t("hs_config.cat_sfbs"),
 		"distancesreduction", t("hs_config.cat_distances"),
 	)
+	; Color palette — labels intentionally carry NO category hint in parentheses;
+	; mapping a colour to a meaning (e.g. "orange = rolls") is the user's job,
+	; not the picker's, and a hint that was valid before
+	; ``rolls/sfbs/distancesreduction`` lost their hardcoded orange would
+	; now actively mislead. Colours are ordered along the standard hue wheel
+	; (warm → cool → neutral) so the picker reads naturally.
 	_HCW_COLOR_PRESETS := [
-		Map("Label", t("hs_config.color_inherit"), "Hex", ""),
-		Map("Label", t("hs_config.color_red"),     "Hex", "#e53935"),
-		Map("Label", t("hs_config.color_green"),   "Hex", "#43a047"),
-		Map("Label", t("hs_config.color_orange"),  "Hex", "#fb8c00"),
-		Map("Label", t("hs_config.color_blue"),    "Hex", "#1e88e5"),
-		Map("Label", t("hs_config.color_purple"),  "Hex", "#8e44ad"),
-		Map("Label", t("hs_config.color_cyan"),    "Hex", "#00838f"),
-		Map("Label", t("hs_config.color_yellow"),  "Hex", "#fdd835"),
-		Map("Label", t("hs_config.color_gray"),    "Hex", "#6e6e73"),
+		Map("Label", t("hs_config.color_inherit"),   "Hex", ""),
+		Map("Label", t("hs_config.color_red"),       "Hex", "#e53935"),
+		Map("Label", t("hs_config.color_pink"),      "Hex", "#e91e63"),
+		Map("Label", t("hs_config.color_purple"),    "Hex", "#8e44ad"),
+		Map("Label", t("hs_config.color_indigo"),    "Hex", "#3f51b5"),
+		Map("Label", t("hs_config.color_blue"),      "Hex", "#1e88e5"),
+		Map("Label", t("hs_config.color_cyan"),      "Hex", "#00838f"),
+		Map("Label", t("hs_config.color_turquoise"), "Hex", "#009688"),
+		Map("Label", t("hs_config.color_green"),     "Hex", "#43a047"),
+		Map("Label", t("hs_config.color_lime"),      "Hex", "#9e9d24"),
+		Map("Label", t("hs_config.color_yellow"),    "Hex", "#fdd835"),
+		Map("Label", t("hs_config.color_orange"),    "Hex", "#fb8c00"),
+		Map("Label", t("hs_config.color_brown"),     "Hex", "#8d6e63"),
+		Map("Label", t("hs_config.color_gray"),      "Hex", "#6e6e73"),
 	]
 	_HCW_FILE_LEVEL_LABEL := t("hs_config.file_level")
 }

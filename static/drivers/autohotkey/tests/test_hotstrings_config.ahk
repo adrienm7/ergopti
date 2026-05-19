@@ -116,14 +116,14 @@ TestHotstringsConfig_ResolveFallsBackToGlobal() {
 Test("HotstringsConfig: resolve falls back to GLOBAL_DEFAULT_DELAY",
     TestHotstringsConfig_ResolveFallsBackToGlobal)
 
-TestHotstringsConfig_PersonalCategoryFallsBackToOrange() {
+TestHotstringsConfig_PersonalCategoryFallsBackToBaseline() {
     _HCfgTestReset()
     R := HotstringsResolve("personal", "")
     AssertEqual(HOTSTRINGS_CATEGORY_DEFAULT_COLORS["personal"], R.Color,
-        "personal category falls back to its per-category default (orange), not global blue")
+        "personal category falls back to its per-category default, not global blue")
 }
-Test("HotstringsConfig: personal category defaults to orange",
-    TestHotstringsConfig_PersonalCategoryFallsBackToOrange)
+Test("HotstringsConfig: personal category falls back to its per-category baseline",
+    TestHotstringsConfig_PersonalCategoryFallsBackToBaseline)
 
 TestHotstringsConfig_ResolveTomlFile() {
     _HCfgTestReset()

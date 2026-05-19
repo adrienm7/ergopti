@@ -49,7 +49,7 @@ local GLOBAL_DEFAULT_COLOR = "#1e88e5"  -- Blue — global tooltip tint when not
 -- TOML _meta or user override sets a color. Lives next to the global default
 -- so all defaults are visible in one place.
 local CATEGORY_DEFAULT_COLORS = {
-	personal = "#fb8c00",  -- Orange — distinguishes user-added entries from bundled ones
+	personal = "#6e6e73",  -- Gray — neutral baseline so user-added entries stand out only when the user picks a colour themselves
 }
 
 
