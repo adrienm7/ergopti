@@ -498,12 +498,12 @@ _TooltipShowBorder(X, Y, W, H) {
     }
 
     ; ── Create the layered window ─────────────────────────────────────────────
-    _TooltipBorderGui := Gui("+AlwaysOnTop -Caption +E0x80000 +E0x20 +LastFound")
+    ; WS_EX_TOOLWINDOW (0x80) suppresses DWM automatic corner rounding, same as
+    ; the content Gui.  UpdateLayeredWindow is called BEFORE ShowWindow so the
+    ; window is never visible in an unpainted state (no ghost flash).
+    _TooltipBorderGui := Gui("+AlwaysOnTop -Caption +E0x80000 +E0x20 +E0x80 +LastFound")
     Hwnd := _TooltipBorderGui.Hwnd
     _TooltipDisableDwmRounding(Hwnd)
-
-    ; Show hidden first so UpdateLayeredWindow can position/paint it atomically.
-    DllCall("User32\ShowWindow", "Ptr", Hwnd, "Int", 4)   ; SW_SHOWNOACTIVATE=4
 
     ; UpdateLayeredWindow expects screen physical pixels — same coordinate space as
     ; AHK v2 Gui.Show (AHK v2 is per-monitor DPI-aware, so Show("xX yY") already
@@ -534,6 +534,10 @@ _TooltipShowBorder(X, Y, W, H) {
     DllCall("Gdi32\SelectObject", "Ptr", MemDC, "Ptr", OldBmp)
     DllCall("Gdi32\DeleteDC", "Ptr", MemDC)
     DllCall("Gdi32\DeleteObject", "Ptr", HBmp)
+
+    ; ShowWindow after UpdateLayeredWindow — bitmap is already uploaded so the
+    ; window appears with the correct pixels on the first painted frame, no ghost.
+    DllCall("User32\ShowWindow", "Ptr", Hwnd, "Int", 4)   ; SW_SHOWNOACTIVATE=4
 }
 
 ; Tell DWM not to apply Windows 11 automatic corner rounding on this window.
