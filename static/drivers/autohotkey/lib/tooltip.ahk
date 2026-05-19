@@ -316,13 +316,12 @@ _TooltipBuildGui(Items) {
                 LabelX, LabelY, MaxLabelW, LS.H), Label)
         }
 
-        ; 1 px separator line between rows (white at low alpha, drawn as a
-        ; background band — color approximates Hammerspoon's white 0.09 alpha
-        ; over the dark bg: 0x1A * (1-0.09) + 0xFF * 0.09 ≈ 0x28).
+        ; 1 px separator — mirrors Hammerspoon fillColor {white=1, alpha=0.12}:
+        ; 0x1A * (1-0.12) + 0xFF * 0.12 ≈ 0x31 → #313131
         if (Idx < Count) {
             SepY := RowY + RowH
             G.SetFont("s1", _TOOLTIP_FONT_NAME)
-            G.Add("Text", Format("Background282828 x0 y{1} w{2} h{3}", SepY, TotalW, SEP_H), "")
+            G.Add("Text", Format("Background313131 x0 y{1} w{2} h{3}", SepY, TotalW, SEP_H), "")
         }
     }
 
