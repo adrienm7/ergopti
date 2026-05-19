@@ -695,13 +695,22 @@ KL_LogHotstringNearMiss(kind, trigger, replacement, h_type) {
 }
 
 ; Look up the current buffer in the prefix index and update the tooltip.
-; The buffer must match a trigger prefix exactly — the previous suffix-shrink
-; recovery loop turned out to be unsafe: typing ``bon`` would shrink to
-; ``on`` and surface the ``onu``→``ONU`` trigger from autocorrection. The
-; buffer is already reset on every word-breaker (Space / Enter / Tab / arrow
-; keys / Backspace), so leading noise is not a real concern.
+;
+; ── Word-anchored lookup ──
+; The buffer holds every keystroke since the last reset (word-breaker, mouse
+; click, arrow key…), so for a mid-word context like ``l'ia`` the literal
+; buffer is "l'ia" but the trigger the user is reaching for is the substring
+; AFTER the last word-boundary char — here ``ia``. Looking up the full buffer
+; means we miss every trigger whose context includes an in-word terminator
+; (apostrophes for French contractions, punctuation, …) even though the
+; HSEv2 engine itself fires those triggers correctly via suffix matching.
+;
+; We slide a cursor across HSE_WORD_TERMINATORS to find the rightmost
+; terminator in the buffer; everything to its right is the effective "word
+; under typing", and that is what we look up. When no terminator is present
+; we fall back to the full buffer.
 _LookupAndRender() {
-    global _PrefixBuffer, _PrefixIndex, _MIN_PREFIX_LEN
+    global _PrefixBuffer, _PrefixIndex, _MIN_PREFIX_LEN, HSE_WORD_TERMINATORS
     Buffer := _PrefixBuffer
     Len := StrLen(Buffer)
     ; Short buffers are only skipped when they have no entry in the index.
@@ -713,14 +722,28 @@ _LookupAndRender() {
         _NotifySuggestionDismissed()
         return
     }
-    ; AHK v2's Map is case-sensitive by default, so this lookup distinguishes
-    ; ``ct`` from ``CT`` — the index registers each case variant separately
-    ; with its pre-cased output, exactly mirroring CreateCaseSensitiveHotstrings.
-    if !_PrefixIndex.Has(Buffer) {
+
+    LastTermPos := 0
+    for Char in StrSplit(HSE_WORD_TERMINATORS) {
+        Pos := InStr(Buffer, Char, , 1, -1)   ; Occurrence=-1 → search right-to-left
+        if (Pos > LastTermPos)
+            LastTermPos := Pos
+    }
+    SearchKey := (LastTermPos > 0) ? SubStr(Buffer, LastTermPos + 1) : Buffer
+    if (SearchKey == "") {
         TooltipHide()
         _NotifySuggestionDismissed()
         return
     }
+    ; AHK v2's Map is case-sensitive by default, so this lookup distinguishes
+    ; ``ct`` from ``CT`` — the index registers each case variant separately
+    ; with its pre-cased output, exactly mirroring CreateCaseSensitiveHotstrings.
+    if !_PrefixIndex.Has(SearchKey) {
+        TooltipHide()
+        _NotifySuggestionDismissed()
+        return
+    }
+    Buffer := SearchKey
 
     ; Collect candidates per group and lay them out as the user requested:
     ; end-char (↵) triggers FIRST (top), then magic-key (★) triggers below.
