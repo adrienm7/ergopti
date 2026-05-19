@@ -1202,7 +1202,6 @@ initMenu() {
 	; ── Script management ──
 	global MenuSuspend
 	MenuSuspend := t("menu.global.suspend")
-	A_TrayMenu.Add() ; Separator before config/lifecycle items
 	A_TrayMenu.Add(t("menu.global.config_folder"), FilePathsEditor)
 	A_TrayMenu.Add(t("menu.global.setup_wizard"), Onboarding_ShowFromMenu)
 	A_TrayMenu.Add() ; Separator before lifecycle actions
