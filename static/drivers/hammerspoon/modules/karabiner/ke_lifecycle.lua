@@ -681,6 +681,11 @@ function M.prime_ke_for_session(callback, force)
 	-- Idempotent defaults write — fast, kept synchronous (no UI side-effect).
 	hs.execute(KE_PERSISTENCE_OFF_CMD .. " 2>/dev/null")
 	hs.execute(KE_REENABLE_USER_LABELS_CMD)
+	-- Kill visible KE UI agents immediately, before the bridge spawns, so the
+	-- menubar hammer icon and app window never appear even during the prime window.
+	-- This is the same command run at the end of priming, but running it here
+	-- prevents the ~2-13 s window where launchd-started agents are visible.
+	pcall(function() hs.execute(KE_SUPPRESS_DOCK_HELPERS_CMD) end)
 
 	Logger.start(LOG, "Priming KE bridge (headless, async)…")
 	_prime_in_progress = true
