@@ -395,8 +395,9 @@ function M.generate(ctx, menu_mods, actions)
 	end
 
 
-	-- Grouped block: Actions globales / version / langue — three sibling entries
-	table.insert(items, { title = "-" })
+	-- Actions globales — last item of the features block (sits just above the
+	-- separator that closes the block), grouped with the other user-facing
+	-- toggles rather than with the About / version / language items.
 	table.insert(items, {
 		title = i18n.get("menu.global.title"),
 		menu = {
@@ -405,6 +406,7 @@ function M.generate(ctx, menu_mods, actions)
 			{ title = i18n.get("menu.global.reset_defaults"), fn = actions.reset_defaults },
 		}
 	})
+	table.insert(items, { title = "-" })
 	-- About / Update — sits directly below Actions globales in the same block
 	if type(menu_mods.about) == "table" and type(menu_mods.about.build) == "function" then
 		local ok_a, about_item = pcall(menu_mods.about.build, ctx)

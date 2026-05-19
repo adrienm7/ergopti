@@ -1167,14 +1167,16 @@ initMenu() {
 		A_TrayMenu.Check(GetCategoryTitle("Gestures"))
 	}
 
-	A_TrayMenu.Add() ; Single separator between feature submenus and configuration items
-
-	; ── Grouped block: Actions globales / version / langue ──
+	; ── Actions globales — last item of the features block (sits right above the
+	; separator that closes the block), grouped with the other user-facing toggles
+	; rather than with the version / channel / language items.
 	GlobalActionsMenu := Menu()
 	GlobalActionsMenu.Add(t("menu.global.enable_all"),  ToggleAllFeaturesOn)
 	GlobalActionsMenu.Add(t("menu.global.disable_all"), ToggleAllFeaturesOff)
 	GlobalActionsMenu.Add(t("menu.global.reset_defaults"), ReloadWithDefaultConfig)
 	A_TrayMenu.Add(t("menu.global.title"), GlobalActionsMenu)
+
+	A_TrayMenu.Add() ; Single separator between feature submenus and configuration items
 
 	AboutMenu := Menu()
 	Ver := Updater_CurrentVersion()
