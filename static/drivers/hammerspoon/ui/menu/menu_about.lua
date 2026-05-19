@@ -20,6 +20,7 @@
 local M = {}
 local hs     = hs
 local Logger = require("lib.logger")
+local i18n   = require("lib.i18n")
 local LOG    = "menu_about"
 
 M.DEFAULT_STATE = {
@@ -189,7 +190,7 @@ function M.build(ctx)
 	local channel = (type(state.update_channel) == "string" and state.update_channel ~= "")
 		and state.update_channel or "main"
 	local ver     = current_version()
-	local ver_label = "Version / Mises à jour"
+	local ver_label = i18n.get("menu.about.title")
 
 	local function set_channel(c)
 		state.update_channel = c
@@ -203,17 +204,17 @@ function M.build(ctx)
 	local channel_items
 	if local_src then
 		channel_items = {
-			{ title = "Local source", checked = true, disabled = true },
+			{ title = i18n.get("menu.about.channel_local_source"), checked = true, disabled = true },
 		}
 	else
 		channel_items = {
 			{
-				title   = "Stable (main)",
+				title   = i18n.get("menu.about.channel_main"),
 				checked = (channel == "main") or nil,
 				fn      = function() set_channel("main") end,
 			},
 			{
-				title   = "Pre-release (dev)",
+				title   = i18n.get("menu.about.channel_dev"),
 				checked = (channel == "dev") or nil,
 				fn      = function() set_channel("dev") end,
 			},
@@ -229,7 +230,7 @@ function M.build(ctx)
 	for _, it in ipairs(channel_items) do table.insert(menu_items, it) end
 	table.insert(menu_items, { title = "-" })
 	table.insert(menu_items, {
-		title    = "Check for updates",
+		title    = i18n.get("menu.about.check_for_updates"),
 		disabled = local_src or nil,
 		fn       = not local_src and function()
 			Logger.info(LOG, "User triggered update check (channel: %s).", effective_channel)
@@ -237,14 +238,14 @@ function M.build(ctx)
 		end or nil,
 	})
 	table.insert(menu_items, {
-		title = "Changelog",
+		title = i18n.get("menu.about.changelog"),
 		fn    = function()
 			Logger.info(LOG, "User opened changelog (channel: %s).", effective_channel)
 			show_changelog(effective_channel)
 		end,
 	})
 	table.insert(menu_items, {
-		title = "Open releases page",
+		title = i18n.get("menu.about.open_releases_page"),
 		fn    = function() hs.urlevent.openURL(releases_page_url()) end,
 	})
 
