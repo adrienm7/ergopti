@@ -271,7 +271,9 @@ TestHSEv2_WordBoundaryPassesAfterArrowReset() {
     HSE_FeedReset(true) ; arrow / mouse click — next run starts fresh
     HSE_FeedChar("u")
     Match := HSE_FeedChar("i")
-    AssertEqual("ui", Match,
+    AssertTrue(Match != "",
+        "navigation reset sets word boundary — trigger fires immediately after")
+    AssertEqual("ui", Match.Trigger,
         "navigation reset sets word boundary — trigger fires immediately after")
 }
 Test("HSEv2 word-boundary passes after navigation reset",

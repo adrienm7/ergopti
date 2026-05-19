@@ -49,8 +49,18 @@ Test("Gestures: all slots have shortcut labels", TestGestures_AllSlotsHaveShortc
 ; ==================================
 ; ==================================
 
+; Helper — separators (``--``) and section headers (``#…``) are visual-only
+; entries in GESTURE_ACTION_NAMES; they intentionally have no matching record
+; in the GESTURE_ACTIONS registry and must be filtered out before assertions
+; that walk the registry.
+_GestureIsRealAction(name) {
+    return name != "--" and SubStr(name, 1, 1) != "#"
+}
+
 TestGestures_AllActionNamesInRegistry() {
     for ActionName in GESTURE_ACTION_NAMES {
+        if !_GestureIsRealAction(ActionName)
+            continue
         AssertTrue(GESTURE_ACTIONS.Has(ActionName), "missing action in registry: " . ActionName)
     }
 }
@@ -58,6 +68,8 @@ Test("Gestures: all action names exist in registry", TestGestures_AllActionNames
 
 TestGestures_ActionsHaveProperties() {
     for ActionName in GESTURE_ACTION_NAMES {
+        if !_GestureIsRealAction(ActionName)
+            continue
         Action := GESTURE_ACTIONS[ActionName]
         AssertTrue(Action.HasOwnProp("Label"), "missing Label for: " . ActionName)
         AssertTrue(Action.HasOwnProp("Fn"), "missing Fn for: " . ActionName)
@@ -72,7 +84,16 @@ TestGestures_NoneReturnsZero() {
 Test("Gestures: none action Fn returns 0", TestGestures_NoneReturnsZero)
 
 TestGestures_RegistrySizeMatchesNames() {
-    AssertEqual(GESTURE_ACTION_NAMES.Length, GESTURE_ACTIONS.Count, "registry size mismatch")
+    ; Filter the visual sentinels from GESTURE_ACTION_NAMES before comparing
+    ; with GESTURE_ACTIONS.Count — every real action must have exactly one
+    ; entry in both lists, but separators and headers live only on the menu
+    ; (NAMES) side and never bubble up into the registry (ACTIONS).
+    ExpectedCount := 0
+    for ActionName in GESTURE_ACTION_NAMES {
+        if _GestureIsRealAction(ActionName)
+            ExpectedCount += 1
+    }
+    AssertEqual(ExpectedCount, GESTURE_ACTIONS.Count, "registry size mismatch (real actions only)")
 }
 Test("Gestures: action count matches GESTURE_ACTION_NAMES length", TestGestures_RegistrySizeMatchesNames)
 
