@@ -104,11 +104,12 @@ IsAltGrLAltEnabled() {
     return IsSet(_ALTGR_LALT_ENABLED) ? _ALTGR_LALT_ENABLED : False
 }
 
-; Gate on a real AltGr/Kana press so a ghost SC138 (injected by an OS driver
-; for AltGr-mapped keys like Bépo's `'`) cannot trigger this shortcut.
-#HotIf IsAltGrLAltEnabled() and IsRealAltGrPress()
-SC138 & SC038:: AltGrLAltShortcut()
-#HotIf
+; Dynamic registration of SC138 & SC038 — see _RegisterAltGrShortcutsHotkeys
+; below. Defining this hotkey as a static ``SC138 & SC038::`` block would have
+; AHK claim SC138 as a prefix key at parse time, which breaks native AltGr
+; behaviour for the entire first-run wizard window. Registering at runtime
+; through _RegisterAltGrShortcutsHotkeys() — called after Onboarding_Run
+; returns — keeps SC138 a vanilla key until the wizard is done.
 
 AltGrLAltShortcut() {
     if Features["Shortcuts"]["AltGrLAlt"]["BackSpace"].Enabled {
@@ -168,14 +169,31 @@ IsAltGrCapsLockEnabled() {
     return IsSet(_ALTGR_CAPSLOCK_ENABLED) ? _ALTGR_CAPSLOCK_ENABLED : False
 }
 
-; Gate on real AltGr/Kana press — same rationale as the AltGrLAlt block above.
-#HotIf IsAltGrCapsLockEnabled() and IsRealAltGrPress()
-SC138 & SC03A:: AltGrCapsLockShortcut()
-#HotIf
+; SC138 & SC03A is also registered dynamically (see _RegisterAltGrShortcutsHotkeys
+; below) for the same prefix-key-at-parse-time reason as the SC038 combo above.
 
 AltGrCapsLockShortcut() {
     RunFirstSimpleAction(Features["Shortcuts"]["AltGrCapsLock"])
 }
+
+; Dynamic registration entry point — called once Onboarding_Run() has returned
+; so the wizard never sees SC138 as a prefix key. Each Hotkey() pair below
+; mirrors the criterion of the previous static ``#HotIf`` block: AHK won't fire
+; the combo unless the feature is enabled AND the press came through a real
+; AltGr / Kana modifier.
+_RegisterAltGrShortcutsHotkeys() {
+    HotIf((*) => IsAltGrLAltEnabled() and IsRealAltGrPress())
+    Hotkey("SC138 & SC038", (*) => AltGrLAltShortcut(), "I2")
+    HotIf((*) => IsAltGrCapsLockEnabled() and IsRealAltGrPress())
+    Hotkey("SC138 & SC03A", (*) => AltGrCapsLockShortcut(), "I2")
+    HotIf()
+}
+
+; Auto-execute hook: shortcuts.ahk is #Include'd at line 2176 of ErgoptiPlus.ahk
+; which means by the time we reach this line in the merged auto-exec, the
+; onboarding wizard has either been skipped (config exists) or completed and
+; triggered a Reload. Registering now is therefore safe.
+_RegisterAltGrShortcutsHotkeys()
 
 ; =================================
 ; =================================

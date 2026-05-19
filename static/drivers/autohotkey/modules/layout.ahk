@@ -535,11 +535,11 @@ RegisterCapsLockLayer()
 ; =============================================
 ; =============================================
 
-; This code comes before remapping ErgoptiAltGr to be able to override the keys
-; Gate on a real AltGr/Kana press so a ghost SC138 (injected by an OS driver
-; for AltGr-mapped keys like Bépo's `'`) does not trigger this roll.
-#HotIf Features["Rolls"]["ChevronEqual"].Enabled and IsRealAltGrPress()
-SC138 & SC012:: {
+; The AltGr roll for SC012 (= / Œ / %) is registered dynamically via
+; _RegisterRollsAltGrHotkeys() below. Static ``SC138 & SC012::`` would have AHK
+; promote SC138 to a prefix key at parse time, which silently breaks native
+; AltGr/Kana behaviour during the first-run onboarding wizard.
+_RollChevronEqualHandler(*) {
 	if GetKeyState("Shift", "P") {
 		Features["Layout"]["ErgoptiPlus"].Enabled ? SendNewResult(" %") : SendNewResult("Œ")
 	} else {
@@ -560,11 +560,10 @@ AddRollEqual() {
 		SendNewResult("œ")
 	}
 }
-#HotIf
 
-; Same AltGr guard as above — prevents the roll from firing on a ghost SC138.
-#HotIf Features["Rolls"]["HashtagQuote"].Enabled and IsRealAltGrPress()
-SC138 & SC017:: {
+; The AltGr roll for SC017 (# / " / %) is also registered dynamically — same
+; rationale as the SC012 block above.
+_RollHashtagQuoteHandler(*) {
 	if GetKeyState("Shift", "P") {
 		SendNewResult("%")
 	} else {
@@ -583,7 +582,19 @@ HashtagOrQuote() {
 		WrapTextIfSelected("#", "#", "#")
 	}
 }
-#HotIf
+
+; Dynamic registration of the two AltGr rolls. Called immediately so the
+; behaviour matches the previous static blocks, but kept as a function so
+; the onboarding wizard can defer it (the wizard temporarily blocks it by
+; registering its hotkeys AFTER Onboarding_Run() to keep SC138 native during
+; first-run setup).
+_RegisterRollsAltGrHotkeys() {
+	HotIf((*) => Features["Rolls"]["ChevronEqual"].Enabled and IsRealAltGrPress())
+	Hotkey("SC138 & SC012", _RollChevronEqualHandler, "I2")
+	HotIf((*) => Features["Rolls"]["HashtagQuote"].Enabled and IsRealAltGrPress())
+	Hotkey("SC138 & SC017", _RollHashtagQuoteHandler, "I2")
+	HotIf()
+}
 
 ; ─────────────────────────────────────────────────────────────────────────────
 ; AltGr layer (ErgoptiPlus overrides + ErgoptiAltGr Number row + base rows).
@@ -593,6 +604,7 @@ HashtagOrQuote() {
 ; "most-recently-defined variant wins" rule still resolves identically when
 ; multiple Layout sub-features are simultaneously enabled.
 ; ─────────────────────────────────────────────────────────────────────────────
+_RegisterRollsAltGrHotkeys()
 RegisterAltGrLayer()
 
 

@@ -38,24 +38,36 @@ $Bullet      = [char]0x2022  # 'bullet'
 $Ellipsis    = [char]0x2026  # 'horizontal ellipsis'
 
 # --- Existing keys whose *value* changed (must be replaced if present) ---
+# The values below are the canonical English copies; non-EN/FR locales pick
+# them up verbatim as a placeholder until a translator authors a proper
+# rendering. The script is idempotent so subsequent runs only re-write lines
+# whose content actually differs from the source-of-truth here.
 $ReplacedKeys = @{
 	"dialog.metrics.enable_warning"   = "WARNING: You are about to enable the keylogger.\n\nIt records your keystrokes to the millisecond. Logs are stored locally under:\n    %s\n\nPassword fields are ignored automatically (UIA filter), and key content is also dropped while you are in a private/incognito browser window. Even so, this remains a keylogger " + $EmDash + " PAUSE the script when entering sensitive data outside those contexts.\n\nEnable?"
-	"onboarding.gestures.desc"        = "Do you want to enable trackpad gesture support?\n\nThis lets you trigger custom actions with trackpad gestures (swipes, taps, pinches)."
-	"onboarding.magic_key.desc"       = "Pick the character that triggers your hotstrings.\n\nDefault: * (asterisk). Recommended: " + $UGrave + " on AZERTY, ; on other layouts. Anything else works too."
-	"onboarding.magic_key.hint"       = "Default: * " + $EmDash + " Suggestions: " + $UGrave + " (AZERTY), ; (other layouts). Pick any character you prefer."
-	"onboarding.metrics.desc"         = "Do you want to enable typing metrics collection?\n\nWhat ErgoptiPlus tracks for you:\n" + $Bullet + " Typing speed (WPM) per session, per app and over time\n" + $Bullet + " Most-typed keys, words, n-grams and ergonomic strain\n" + $Bullet + " Hand alternation, finger load, same-finger bigrams\n" + $Bullet + " Time spent per application (RescueTime-style) with productivity scoring\n" + $Bullet + " Trends, heatmaps and detailed dashboards in the Metrics window"
+	"onboarding.gestures.desc"             = "Do you want to enable trackpad gesture support?\n\nThis lets you trigger custom actions with trackpad gestures (swipes, taps, pinches)."
+	"onboarding.gestures.register_auto"      = "Automatic configuration"
+	"onboarding.gestures.register_auto_hint" = "Fills in every gesture slot in Windows Settings for you. Does not require administrator rights."
+	"onboarding.gestures.register_failed"    = "Automatic configuration failed. Please use the manual method below."
+	"onboarding.gestures.register_manual_hint" = "Opens a step-by-step tutorial and a one-click shortcut to the touchpad settings page so you can wire up each gesture by hand."
+	"onboarding.gestures.register_section"   = "Gestures must be wired up in Windows Settings (Bluetooth & devices " + $EmDash + " Touchpad " + $EmDash + " Advanced gestures). Choose how:"
+	"onboarding.gestures.register_success"   = "Gestures are now configured in Windows Settings."
+	"onboarding.magic_key.desc"              = "Pick the character that triggers your hotstrings."
+	"onboarding.magic_key.choose_freely"     = "You can actually pick any character " + $EmDash + " it just needs to be rare enough not to cause false positives, while still being accessible."
+	"onboarding.metrics.desc"                = "Do you want to enable typing metrics collection?\n\nWhat ErgoptiPlus tracks for you:\n" + $Bullet + " Typing speed (WPM) per session, per app and over time\n" + $Bullet + " Most-typed keys, words, n-grams and ergonomic strain\n" + $Bullet + " Hand alternation, finger load, same-finger bigrams\n" + $Bullet + " Time spent per application (RescueTime-style) with productivity scoring\n" + $Bullet + " Trends, heatmaps and detailed dashboards in the Metrics window"
 }
+
+# --- Keys to delete (they were superseded). The magic_key.hint key duplicated
+#     magic_key.desc verbatim; the wizard now uses magic_key.suggestions instead. ---
+$DeletedKeys = @(
+	"onboarding.magic_key.hint"
+)
 
 # --- Brand-new keys ---
 $NewKeys = @{
-	"onboarding.gestures.register_auto"        = "Automatic registration (Registry)"
-	"onboarding.gestures.register_auto_hint"   = "Writes the touchpad gesture keys under HKCU\\" + $Ellipsis + "\\PrecisionTouchPad so Windows forwards your trackpad gestures to ErgoptiPlus. Does not require administrator rights."
-	"onboarding.gestures.register_failed"      = "Automatic registration failed. Please use the manual method below."
+	"onboarding.gestures.open_settings"        = "Open touchpad settings"
+	"onboarding.gestures.open_settings_hint"   = "Opens Settings " + $EmDash + " Bluetooth & devices " + $EmDash + " Touchpad " + $EmDash + " Advanced gestures, where you assign Ctrl + Win + Shift + F1..F10 to each gesture slot."
 	"onboarding.gestures.register_manual"      = "Manual method"
-	"onboarding.gestures.register_manual_hint" = "Open the Registry Editor at HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\PrecisionTouchPad and configure the gesture keys by hand. Use this if automatic registration is blocked."
-	"onboarding.gestures.register_section"     = "Gestures need a small Windows Registry entry to forward trackpad swipes/taps to ErgoptiPlus. Choose how to install it:"
-	"onboarding.gestures.register_success"     = "Registry entries created. Gestures are now ready."
-	"onboarding.magic_key.choose_freely"       = "You can choose any character you like " + $EmDash + " it just has to be reachable by a single keypress on your physical keyboard."
+	"onboarding.magic_key.suggestions"         = "Recommended characters:\n   " + $Bullet + " " + ([char]0x2605) + " " + $EmDash + " on Ergopti+ (dedicated key)\n   " + $Bullet + " " + $UGrave + " " + $EmDash + " on AZERTY\n   " + $Bullet + " ; " + $EmDash + " on QWERTY"
 	"onboarding.welcome.heading"               = "Choose your language"
 	"onboarding.welcome.title"                 = "Ergopti " + $EmDash + " Setup"
 }
@@ -84,6 +96,26 @@ function Replace-Key([string]$text, [string]$key, [string]$value, [ref]$changed)
 	if ($updated) {
 		$changed.Value = $true
 		return ($lines -join "`n")
+	}
+	return $text
+}
+
+# Delete a key entirely. Returns the new text (possibly unchanged).
+function Delete-Key([string]$text, [string]$key, [ref]$changed) {
+	$lines  = $text -split "`n"
+	$linePat = '^(\t)?"' + (Escape-Regex $key) + '":'
+	$kept = New-Object System.Collections.ArrayList
+	$removed = $false
+	foreach ($line in $lines) {
+		if ($line -match $linePat) {
+			$removed = $true
+			continue
+		}
+		[void]$kept.Add($line)
+	}
+	if ($removed) {
+		$changed.Value = $true
+		return ($kept -join "`n")
 	}
 	return $text
 }
@@ -151,6 +183,12 @@ Get-ChildItem -Path $LocalesDir -Filter "*.json" | ForEach-Object {
 	# Replace stale values first so newly-inserted keys never collide.
 	foreach ($entry in $ReplacedKeys.GetEnumerator()) {
 		$text = Replace-Key $text $entry.Key $entry.Value $changedRef
+	}
+
+	# Drop superseded keys before reinserting fresh ones — keeps the locale
+	# files free of stale dead weight.
+	foreach ($k in $DeletedKeys) {
+		$text = Delete-Key $text $k $changedRef
 	}
 
 	# For brand-new keys: refresh the value if it already exists (e.g. a previous
