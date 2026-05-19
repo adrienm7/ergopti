@@ -504,12 +504,12 @@ _TooltipShowBorder(X, Y, W, H) {
     ; Show hidden first so UpdateLayeredWindow can position/paint it atomically.
     DllCall("User32\ShowWindow", "Ptr", Hwnd, "Int", 4)   ; SW_SHOWNOACTIVATE=4
 
-    ; UpdateLayeredWindow: positions the window and uploads the bitmap in one call.
-    XPx := Round(X * DpiScale)
-    YPx := Round(Y * DpiScale)
+    ; UpdateLayeredWindow expects screen physical pixels — same coordinate space as
+    ; AHK v2 Gui.Show (AHK v2 is per-monitor DPI-aware, so Show("xX yY") already
+    ; uses physical px).  No DpiScale multiplication needed here.
     PtDest  := Buffer(8, 0)
-    NumPut("Int", XPx, PtDest, 0)
-    NumPut("Int", YPx, PtDest, 4)
+    NumPut("Int", X, PtDest, 0)
+    NumPut("Int", Y, PtDest, 4)
     SizeSrc := Buffer(8, 0)
     NumPut("Int", Wp, SizeSrc, 0)
     NumPut("Int", Hp, SizeSrc, 4)
