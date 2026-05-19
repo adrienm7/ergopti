@@ -227,18 +227,34 @@ LLM_Tray_Build() {
 	backend_label := t("menu.llm.backend_label")
 	_LLM_Tray_Menu.Add(StrReplace(backend_label, "%s", _LLM_Tray["backend"]), backend_menu)
 
-	; Model submenu
+	; Model submenu — prefix the label with a backend-health dot so the user
+	; can tell at a glance whether the active backend is reachable, mirroring
+	; HS's ui/menu/menu_llm/init.lua build_model_item (the "health_dot" block).
+	; 🟢 = backend ready (e.g. Ollama answered the latest probe), 🔴 = either
+	; not running or unreachable, "" when the feature is disabled entirely so
+	; the dot does not nag while the user is intentionally off.
 	model_menu := LLM_Tray_BuildModelMenu()
-	_LLM_Tray_Menu.Add(StrReplace(t("menu.llm.model_label"), "%s", _LLM_Tray["model"]), model_menu)
+	health_dot := _llm_is_operational
+		? (LLM_Deps_IsReady() ? "🟢 " : "🔴 ")
+		: ""
+	_LLM_Tray_Menu.Add(
+		health_dot . StrReplace(t("menu.llm.model_label"), "%s", _LLM_Tray["model"]),
+		model_menu)
 
 	; Profile submenu
 	profile_menu := LLM_Tray_BuildProfileMenu()
 	active_label := LLM_Tray_GetProfileLabel(_LLM_Tray["profile_id"])
 	_LLM_Tray_Menu.Add(StrReplace(t("menu.profiles.profile_label_prefix"), "%s", active_label), profile_menu)
 
-	; Number of predictions submenu
+	; Number of predictions submenu — with the same conditional reset row that
+	; HS exposes (ui/menu/menu_llm/init.lua build_menu near num_predictions).
 	n_menu := LLM_Tray_BuildNMenu()
 	_LLM_Tray_Menu.Add(StrReplace(t("menu.llm.num_predictions_label"), "%s", _LLM_Tray["n_predictions"]), n_menu)
+	_LLM_MaybeAddReset(_LLM_Tray_Menu,
+		_LLM_Tray["n_predictions"],
+		_LLM_DefaultFor("llm_num_predictions", 3),
+		(*) => _LLM_AssignAndRebuild("n_predictions",
+			_LLM_DefaultFor("llm_num_predictions", 3)))
 
 	_LLM_Tray_Menu.Add()  ; separator
 
@@ -465,6 +481,11 @@ LLM_Tray_BuildTriggerMenu() {
 	; Debounce — dialog like HS (free numeric input)
 	debounce_display := _LLM_Tray["debounce_ms"] . " ms"
 	m.Add(StrReplace(t("menu.llm.debounce_label"), "%s", debounce_display), (*) => LLM_Tray_PromptDebounce())
+	_LLM_MaybeAddReset(m,
+		_LLM_Tray["debounce_ms"],
+		_LLM_DefaultFor("llm_debounce_ms", 500),
+		(*) => _LLM_AssignAndRebuild("debounce_ms",
+			_LLM_DefaultFor("llm_debounce_ms", 500)))
 
 	m.Add()
 
@@ -522,6 +543,11 @@ LLM_Tray_BuildGenerationMenu() {
 	; Context length — dialog
 	ctx_display := _LLM_Tray["ctx_chars"]
 	m.Add(StrReplace(t("menu.llm.context_length_label"), "%s", ctx_display), (*) => LLM_Tray_PromptCtxChars())
+	_LLM_MaybeAddReset(m,
+		_LLM_Tray["ctx_chars"],
+		_LLM_DefaultFor("llm_context_length", 500),
+		(*) => _LLM_AssignAndRebuild("ctx_chars",
+			_LLM_DefaultFor("llm_context_length", 500)))
 
 	; Reset on nav toggle
 	nav_label := t("menu.llm.reset_on_nav")
@@ -534,17 +560,35 @@ LLM_Tray_BuildGenerationMenu() {
 	; Min words — dialog
 	min_display := _LLM_Tray["min_words"]
 	m.Add(StrReplace(t("menu.llm.min_words_label"), "%s", min_display), (*) => LLM_Tray_PromptMinWords())
+	_LLM_MaybeAddReset(m,
+		_LLM_Tray["min_words"],
+		_LLM_DefaultFor("llm_min_words", 3),
+		(*) => _LLM_AssignAndRebuild("min_words",
+			_LLM_DefaultFor("llm_min_words", 3)))
 
 	; Max words — dialog
 	max_val     := _LLM_Tray["max_words"]
 	max_display := (max_val == 0) ? t("menu.llm.unlimited") : max_val
 	m.Add(StrReplace(t("menu.llm.max_words_label"), "%s", max_display), (*) => LLM_Tray_PromptMaxWords())
+	_LLM_MaybeAddReset(m,
+		_LLM_Tray["max_words"],
+		_LLM_DefaultFor("llm_max_words", 15),
+		(*) => _LLM_AssignAndRebuild("max_words",
+			_LLM_DefaultFor("llm_max_words", 15)))
 
 	m.Add()
 
 	; Temperature — dialog
 	temp_display := _LLM_Tray["temperature"]
 	m.Add(StrReplace(t("menu.llm.temperature_label"), "%s", temp_display), (*) => LLM_Tray_PromptTemperature())
+	; ``temperature`` is stored as a formatted string ("0.10"), so compare the
+	; canonical form of the default to avoid spurious resets when the JSON
+	; carries a numeric 0.1 vs the stored "0.10".
+	_temp_default := Format("{:.2f}", Float(_LLM_DefaultFor("llm_temperature", "0.10")) + 0)
+	_LLM_MaybeAddReset(m,
+		_LLM_Tray["temperature"],
+		_temp_default,
+		(*) => _LLM_AssignAndRebuild("temperature", _temp_default))
 
 	; Auto-raise temperature
 	auto_raise_label := t("menu.llm.auto_raise_temp")
@@ -803,6 +847,45 @@ LLM_Tray_PromptNumeric(key, title, prompt, min_val := 0, max_val := 0) {
 	LLM_Tray_SaveConfig()
 	LLM_Engine_Init(LLM_Tray_BuildOpts())
 	LLM_Tray_Build()
+}
+
+; Resolve the shared default for ``shared_key`` (e.g. "llm_debounce_ms"). Prefers
+; the runtime ``LLM_Defaults`` map (populated from defaults.json) and falls back
+; to ``_LLM_DEFAULTS_FALLBACK`` so a missing file does not erase the reset rows.
+; Centralised so every "Reset to N" row in the menu hits the same single source
+; of truth (mirrors HS's llm_mod.DEFAULT_STATE[...] reads).
+_LLM_DefaultFor(shared_key, fallback := "") {
+	global LLM_Defaults, _LLM_DEFAULTS_FALLBACK
+	if IsSet(LLM_Defaults) and Type(LLM_Defaults) == "Map" and LLM_Defaults.Has(shared_key)
+		return LLM_Defaults[shared_key]
+	if _LLM_DEFAULTS_FALLBACK.Has(shared_key)
+		return _LLM_DEFAULTS_FALLBACK[shared_key]
+	return fallback
+}
+
+; Persist a numeric / boolean tray-state change and force a menu rebuild — same
+; tail every prompt setter runs. Factored out so the "Reset to N" rows can do
+; the right thing without copying the boilerplate inline at every call site.
+_LLM_AssignAndRebuild(tray_key, value) {
+	global _LLM_Tray
+	_LLM_Tray[tray_key] := value
+	LLM_Tray_SaveConfig()
+	LLM_Engine_Init(LLM_Tray_BuildOpts())
+	LLM_Tray_Build()
+}
+
+; Append a "Reset to <default>" row immediately below a setting when the
+; current value differs from the shared default. Mirrors HS's pattern of
+; surfacing the reset only when it would do something — a non-default value
+; means the user has customised the setting, so the reset is now useful;
+; an at-default value means the reset would be a no-op and we hide the row to
+; keep the menu compact. The label re-uses the existing ``menu.llm.reset_label``
+; i18n key which is already translated in every locale.
+_LLM_MaybeAddReset(menu, current, default_val, on_click) {
+	if (current = default_val)
+		return
+	label := StrReplace(t("menu.llm.reset_label"), "%s", default_val)
+	menu.Add(label, (*) => on_click())
 }
 
 LLM_Tray_PromptDebounce() {
