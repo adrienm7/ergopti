@@ -312,7 +312,11 @@ LLM_ApiCommon_InsertPrediction(results, pred, stats, dedup_enabled) {
 	}
 
 	for existing in results {
-		if (_LLM_ApiCommon_PredText(existing) == pred_text) {
+		; Case-SENSITIVE comparison via StrCompare(.., true). AHK v2's ``==``
+		; on strings is case-INSENSITIVE, so without this two predictions that
+		; differ only by case would collapse into one slot. Matches the HS
+		; api_common.lua behaviour (Lua's ``==`` is byte-exact by default).
+		if (StrCompare(_LLM_ApiCommon_PredText(existing), pred_text, true) == 0) {
 			if (IsObject(stats))
 				stats["duplicates"] := stats["duplicates"] + 1
 			return false

@@ -87,11 +87,12 @@ global LLM_API_PROVIDERS := Map(
         "DefaultModel", "deepseek-chat",
         "Format",       "openai"
     ),
-    ; Cohere: speaks OpenAI Chat Completions via the v2 ``/chat`` route.
-    ; ``command-r7b-12-2024`` is the small / fast tier.
+    ; Cohere: exposes an OpenAI-compatible Chat Completions route at
+    ; ``/compatibility/v1`` (NOT the native ``/v2/chat`` route, which has a
+    ; different schema). ``command-r7b-12-2024`` is the small / fast tier.
     "cohere", Map(
         "Label",        "Cohere",
-        "BaseUrl",      "https://api.cohere.com/v2",
+        "BaseUrl",      "https://api.cohere.ai/compatibility/v1",
         "DefaultModel", "command-r7b-12-2024",
         "Format",       "openai"
     ),
@@ -468,18 +469,20 @@ _LLMRemoteEntryGet(Entry, Key, Default := "") {
 ; URL builder. Gemini bakes the model + API key into the path (no Authorization
 ; header), so it needs a custom shape. OpenAI / Anthropic / OpenAI-compat all
 ; use POST against a fixed endpoint with the model in the JSON payload.
-_LLMRemoteBuildUrl(BaseUrl, Format, Token, Model) {
+_LLMRemoteBuildUrl(BaseUrl, Fmt, Token, Model) {
     Trimmed := RTrim(BaseUrl, "/")
-    if (Format == "anthropic") {
+    if (Fmt == "anthropic") {
         return Trimmed . "/messages"
     }
-    if (Format == "gemini") {
+    if (Fmt == "gemini") {
         ; Gemini's path is /models/<model>:generateContent?key=<token>.
-        Encoded := ""
-        try Encoded := DllCall("Shlwapi\UrlEscapeW", "WStr", Token, "WStr", "", "UInt*", &Out := 0, "UInt", 0, "Str")
-        ; Fallback: send token raw — providers accept basic URL-safe characters.
-        if (Encoded == "")
-            Encoded := Token
+        ; Google API keys are alphanumeric + dash + underscore (URL-safe by
+        ; construction), so we send the token raw. An earlier version tried
+        ; to call ``Shlwapi\UrlEscapeW`` with a broken signature AND then
+        ; used ``Token`` instead of the (never-produced) escaped value — the
+        ; whole branch was dead code that fortunately happened to do the
+        ; right thing in practice. Replaced by an explicit comment so the
+        ; intent is obvious to future readers.
         return Trimmed . "/models/" . Model . ":generateContent?key=" . Token
     }
     ; Default OpenAI Chat Completions shape.
@@ -509,19 +512,25 @@ _LLMRemoteSetAuthHeaders(Http, Format, Token) {
 ; minimal-but-correct body: a single system message + a single user message,
 ; plus the temperature. Streaming is intentionally OFF so the call is a single
 ; request/response round-trip (matches Ollama's non-streaming path).
-_LLMRemoteBuildPayload(Format, Model, SystemPrompt, UserText, Temperature) {
+; The parameter is named ``Fmt`` (not ``Format``) on purpose: AHK v2 lets a
+; parameter name shadow the built-in ``Format()`` function, and we need the
+; built-in available below to render the JSON payload templates. Using
+; ``Format`` as a parameter would silently break every API request — the
+; call ``Format("{:.2f}", ...)`` would try to invoke the parameter (a
+; string, e.g. "openai") as a function and throw at runtime.
+_LLMRemoteBuildPayload(Fmt, Model, SystemPrompt, UserText, Temperature) {
     SysEsc  := _LLMRemoteJsonEscape(SystemPrompt)
     UserEsc := _LLMRemoteJsonEscape(UserText)
     ModelEsc := _LLMRemoteJsonEscape(Model)
     Temp := Format("{:.2f}", Temperature)
 
-    if (Format == "anthropic") {
+    if (Fmt == "anthropic") {
         ; Anthropic Messages API: top-level ``system`` field, ``messages`` is
         ; user/assistant turns only. ``max_tokens`` is REQUIRED by Anthropic.
         return Format('{"model":"{1}","system":"{2}","messages":[{"role":"user","content":"{3}"}],"max_tokens":256,"temperature":{4}}',
             ModelEsc, SysEsc, UserEsc, Temp)
     }
-    if (Format == "gemini") {
+    if (Fmt == "gemini") {
         ; Gemini wraps the system instruction in ``systemInstruction`` and the
         ; user turn in ``contents.parts.text``.
         return Format('{"systemInstruction":{"parts":[{"text":"{1}"}]},"contents":[{"role":"user","parts":[{"text":"{2}"}]}],"generationConfig":{"temperature":{3},"maxOutputTokens":256}}',
