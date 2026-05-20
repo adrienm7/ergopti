@@ -118,6 +118,14 @@ global _LLM_Tray := Map(
 	; the user does not have to manually re-pick a profile every time they
 	; try a different model size. Toggleable via the profile submenu.
 	"auto_profile_for_model",     true,
+	; Onboarding flag — flipped to true the first time the user enables
+	; the LLM feature so the welcome TrayTip never fires twice. MUST be
+	; declared here (not only added at first-flip) because SaveFullConfig
+	; reads it as part of the [LLM] section on every save, including
+	; saves triggered during the hotstrings boot before any onboarding
+	; logic has had a chance to run. Without this default a fresh install
+	; would crash with ``Item has no value`` on the first config write.
+	"onboarding_seen",            false,
 	; ── Remote API backend ──
 	; Persisted across reloads via SaveFullConfig (config.toml [LLM]
 	; subsection). The user adds an entry via "+ Add an API…" in the model
