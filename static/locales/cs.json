@@ -730,6 +730,7 @@
 	"menu.llm.indent_none": "Bez odsazení",
 	"menu.llm.indent_space": "mezera",
 	"menu.llm.indent_spaces": "mezery",
+	"menu.llm.inline_autotype": "✍️ Inline auto-psaní (styl Copilot)",
 	"menu.llm.install_required_title": "Požadovaná konfigurace (%s)",
 	"menu.llm.instant_on_word_end": "Okamžitý návrh na konci slova",
 	"menu.llm.launch_download_prompt": "Chcete spustit stahování?",

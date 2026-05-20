@@ -730,6 +730,7 @@
 	"menu.llm.indent_none": "Keine Einrückung",
 	"menu.llm.indent_space": "Leerzeichen",
 	"menu.llm.indent_spaces": "Leerzeichen",
+	"menu.llm.inline_autotype": "✍️ Inline-Autotippen (Copilot-Stil)",
 	"menu.llm.install_required_title": "Einrichtung erforderlich (%s)",
 	"menu.llm.instant_on_word_end": "Sofortvorschlag am Wortende",
 	"menu.llm.launch_download_prompt": "Möchten Sie den Download starten?",

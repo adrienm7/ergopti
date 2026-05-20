@@ -276,6 +276,12 @@ LLM_Engine_FirePrediction(ctx) {
 	; Resolve profile and build the system prompt
 	profile       := LLM_GetActiveProfile(_LLM_Engine["profile_id"])
 	n_predictions := Max(1, Integer(_LLM_Engine["n_predictions"]))
+	; Inline auto-type mode forces a single variant: typing N
+	; alternatives sequentially into the active document would produce
+	; chaos. The user-facing n_predictions setting is left untouched so
+	; flipping inline mode back off restores the original count.
+	if (_LLM_Engine.Has("inline_autotype") and _LLM_Engine["inline_autotype"])
+		n_predictions := 1
 	system_prompt := LLM_ResolveSystemPrompt(
 		profile,
 		n_predictions,
@@ -688,6 +694,26 @@ _LLM_Engine_GetActiveApiEntry() {
  * @param {boolean}  is_final  - True only on the last update of a request.
  */
 LLM_Engine_OnResults(slots, ctx, active := 1, is_final := false) {
+	global _LLM_Engine
+	; Inline auto-type mode (Copilot-style): the prediction is typed
+	; directly into the active app instead of being shown in a tooltip.
+	; We only auto-type on the FINAL render — typing per-token from
+	; on_partial would race the user's own keystrokes with no clean way
+	; to roll back. Letting the variant complete first means one
+	; deterministic SendText burst with a known length.
+	if (is_final and _LLM_Engine.Has("inline_autotype") and _LLM_Engine["inline_autotype"]) {
+		if (slots.Length > 0) {
+			idx := Max(1, Min(active, slots.Length))
+			text := slots[idx]
+			if (text != "") {
+				_LLM_Engine["inline_last_typed"] := text
+				SendText(text)
+				; Don't fall through to the tooltip — inline mode owns
+				; the entire UI surface for this prediction.
+				return
+			}
+		}
+	}
 	LLM_Tooltip_Show(slots, active, is_final)
 }
 

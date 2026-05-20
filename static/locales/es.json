@@ -730,6 +730,7 @@
 	"menu.llm.indent_none": "Sin sangría",
 	"menu.llm.indent_space": "espacio",
 	"menu.llm.indent_spaces": "espacios",
+	"menu.llm.inline_autotype": "✍️ Auto-escritura en línea (estilo Copilot)",
 	"menu.llm.install_required_title": "Configuración requerida (%s)",
 	"menu.llm.instant_on_word_end": "Sugerencia instantánea al final de palabra",
 	"menu.llm.launch_download_prompt": "¿Desea iniciar la descarga?",

@@ -754,6 +754,7 @@
 	"menu.llm.indent_none": "Ingen indrykning",
 	"menu.llm.indent_space": "mellemrum",
 	"menu.llm.indent_spaces": "mellemrum",
+	"menu.llm.inline_autotype": "✍️ Inline auto-skrivning (Copilot-stil)",
 	"menu.llm.install_required_title": "Påkrævet opsætning (%s)",
 	"menu.llm.instant_on_word_end": "Øjeblikkeligt forslag ved ordafslutning",
 	"menu.llm.launch_download_prompt": "Vil du starte downloaden?",

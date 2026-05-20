@@ -730,6 +730,7 @@
 	"menu.llm.indent_none": "Без отступа",
 	"menu.llm.indent_space": "пробел",
 	"menu.llm.indent_spaces": "пробелы",
+	"menu.llm.inline_autotype": "✍️ Авто-ввод по месту (стиль Copilot)",
 	"menu.llm.install_required_title": "Требуемая настройка (%s)",
 	"menu.llm.instant_on_word_end": "Мгновенное предложение при конце слова",
 	"menu.llm.launch_download_prompt": "Хотите начать загрузку?",

@@ -1130,6 +1130,11 @@ initMenu() {
 	_LlmRawAutoProfile := IniCacheGet(_IniCache, "LLM", "auto_profile_for_model")
 	if _LlmRawAutoProfile != "_"
 		_LlmSavedOpts["auto_profile_for_model"] := (_LlmRawAutoProfile == "1" || _LlmRawAutoProfile == "true")
+	; Inline auto-type mode — when ON, predictions are typed into the
+	; active app rather than shown in a tooltip.
+	_LlmRawInline := IniCacheGet(_IniCache, "LLM", "inline_autotype")
+	if _LlmRawInline != "_"
+		_LlmSavedOpts["inline_autotype"] := (_LlmRawInline == "1" || _LlmRawInline == "true")
 	LLM_Tray_Init(_LlmSavedOpts)
 
 	; ── 📊 Métriques — mirrors the HS Métriques submenu position exactly:

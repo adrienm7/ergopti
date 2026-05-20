@@ -730,6 +730,7 @@
 	"menu.llm.indent_none": "Girinti yok",
 	"menu.llm.indent_space": "boşluk",
 	"menu.llm.indent_spaces": "boşluklar",
+	"menu.llm.inline_autotype": "✍️ Satır içi otomatik yazma (Copilot tarzı)",
 	"menu.llm.install_required_title": "Gerekli kurulum (%s)",
 	"menu.llm.instant_on_word_end": "Kelime sonunda anlık öneri",
 	"menu.llm.launch_download_prompt": "İndirmeyi başlatmak istiyor musunuz?",
