@@ -1879,5 +1879,6 @@
 	"updater.version_message": "ErgoptiPlus {1}{2}\n\n在 GitHub 上打开发布页面?",
 	"vscode.reload_required": "请重新加载 VSCode（Cmd+Shift+P > Reload Window）以激活输入扩展",
 	"menu.llm.warning_install_ollama": "📥 立即安装 Ollama",
-	"llm.deps.browser_install_tip": "请从浏览器打开的页面下载 Windows 版 Ollama，运行安装程序后返回 — 连接将被自动检测。"
+	"llm.deps.browser_install_tip": "请从浏览器打开的页面下载 Windows 版 Ollama，运行安装程序后返回 — 连接将被自动检测。",
+	"onboarding.magic_key.option_blackstar": "★ — 推荐（Ergopti 布局上的专用键）"
 }

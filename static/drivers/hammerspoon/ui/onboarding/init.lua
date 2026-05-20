@@ -154,17 +154,30 @@ local function inject_init_data()
 		end
 	end
 
+	-- Detect the active macOS keyboard layout name so the JS step 3 can
+	-- pre-select ù on AZERTY / ; on QWERTY. ``hs.keycodes.currentLayout``
+	-- returns a string like "U.S." or "French" — pass it through and let
+	-- the JS-side _pickDefaultMagicKey() classify by substring match.
+	local system_layout = ""
+	pcall(function()
+		local v = hs.keycodes.currentLayout()
+		if type(v) == "string" then system_layout = v end
+	end)
+
 	local payload = {
 		locale             = current_locale,
 		strings            = strings,
 		default_config_dir = default_config_dir,
+		system_layout      = system_layout,
 		answers = {
 			locale       = current_locale,
 			use_ergopti  = true,
-			-- Asterisk is the documented "safe" default (single keypress on
-			-- every layout); the user can change it on step 3 to ù, ; or
-			-- anything else they like.
-			magic_key    = "*",
+			-- ★ (BLACK STAR, U+2605) is the documented Ergopti default —
+			-- a dedicated key on the Ergopti+ layout, and what the rest
+			-- of the app already calls "the magic key". Step 3 will
+			-- swap this to ù / ; if the user picks a non-Ergopti layout
+			-- on step 2 and the system KB is AZERTY / QWERTY.
+			magic_key    = "★",
 			-- Pre-fill with the current config dir when it diverges from
 			-- the OS default — otherwise leave empty so the placeholder
 			-- shows the default and the wizard treats "no change" as the

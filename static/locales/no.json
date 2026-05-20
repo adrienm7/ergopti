@@ -1904,5 +1904,6 @@
 	"updater.version_message": "ErgoptiPlus {1}{2}\n\nÅpne utgivelsessiden på GitHub?",
 	"vscode.reload_required": "Last inn VSCode på nytt (Cmd+Shift+P > Reload Window) for å aktivere skriveutvidelsen",
 	"menu.llm.warning_install_ollama": "📥 Installer Ollama nå",
-	"llm.deps.browser_install_tip": "Last ned Ollama for Windows fra siden som åpnet seg i nettleseren, kjør installasjonsprogrammet og kom tilbake — tilkoblingen oppdages automatisk."
+	"llm.deps.browser_install_tip": "Last ned Ollama for Windows fra siden som åpnet seg i nettleseren, kjør installasjonsprogrammet og kom tilbake — tilkoblingen oppdages automatisk.",
+	"onboarding.magic_key.option_blackstar": "★ — anbefalt (egen tast på Ergopti-oppsettet)"
 }

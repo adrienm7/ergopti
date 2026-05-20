@@ -1880,5 +1880,6 @@
 	"updater.version_message": "ErgoptiPlus {1}{2}\n\nОткрыть страницу выпусков на GitHub?",
 	"vscode.reload_required": "Перезагрузите VSCode (Cmd+Shift+P > Reload Window), чтобы активировать расширение набора текста",
 	"menu.llm.warning_install_ollama": "📥 Установить Ollama сейчас",
-	"llm.deps.browser_install_tip": "Скачайте Ollama для Windows со страницы, открывшейся в браузере, запустите установщик и вернитесь сюда — подключение будет обнаружено автоматически."
+	"llm.deps.browser_install_tip": "Скачайте Ollama для Windows со страницы, открывшейся в браузере, запустите установщик и вернитесь сюда — подключение будет обнаружено автоматически.",
+	"onboarding.magic_key.option_blackstar": "★ — рекомендовано (выделенная клавиша в раскладке Ergopti)"
 }

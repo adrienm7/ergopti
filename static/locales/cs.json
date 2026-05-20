@@ -1880,5 +1880,6 @@
 	"updater.version_message": "ErgoptiPlus {1}{2}\n\nOtevřít stránku vydání na GitHubu?",
 	"vscode.reload_required": "Přenačtěte VSCode (Cmd+Shift+P > Reload Window) pro aktivaci rozšíření psaní",
 	"menu.llm.warning_install_ollama": "📥 Nainstalovat Ollama nyní",
-	"llm.deps.browser_install_tip": "Stáhněte si Ollama pro Windows ze stránky otevřené v prohlížeči, spusťte instalátor a vraťte se sem — připojení bude detekováno automaticky."
+	"llm.deps.browser_install_tip": "Stáhněte si Ollama pro Windows ze stránky otevřené v prohlížeči, spusťte instalátor a vraťte se sem — připojení bude detekováno automaticky.",
+	"onboarding.magic_key.option_blackstar": "★ — doporučeno (vyhrazená klávesa na klávesnici Ergopti)"
 }
