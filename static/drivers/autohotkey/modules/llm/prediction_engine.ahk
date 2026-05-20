@@ -68,18 +68,11 @@ global _LLM_Engine := Map(
 	"api_entry_id",               ""
 )
 
-; Per-backend minimum interval (ms) between two prediction requests. The user
-; can debounce as low as they want via the menu, but the engine still enforces
-; this floor — chiefly to keep paid API providers from being hammered by a
-; fast typist (a 50 ms debounce on a remote backend would burn tokens at every
-; keystroke), and as an energy-saving cap on local backends where back-to-back
-; inferences keep the GPU spinning for no perceptible UX gain. Add a new
-; backend here and it inherits the same rate-limit guarantee for free.
-global LLM_BACKEND_MIN_REQUEST_INTERVAL_MS := Map(
-	"ollama", 300,
-	"mlx",    300,
-	"api",    500
-)
+; Per-backend minimum interval (ms) between two prediction requests is now
+; defined in ``static/drivers/_shared/llm/inference.json`` and read via
+; ``LLM_ApiCommon_GetRateLimitMs(backend)``. The shared JSON keeps the AHK
+; and HS drivers in lockstep — changing a floor in one place applies to
+; both backends with no risk of drift.
 
 ; Overwrite the defaults with values loaded from defaults.json at module load time.
 ; LLM_Defaults is populated by LLM_Defaults_Load() which runs before this file.
@@ -247,8 +240,7 @@ LLM_Engine_FirePrediction(ctx) {
 	; floor blocks, re-arm the debounce timer for the remaining gap so the
 	; next attempt fires at exactly the right moment instead of being lost.
 	backend := _LLM_Engine.Has("backend") ? _LLM_Engine["backend"] : "ollama"
-	min_interval := LLM_BACKEND_MIN_REQUEST_INTERVAL_MS.Has(backend)
-		? LLM_BACKEND_MIN_REQUEST_INTERVAL_MS[backend] : 300
+	min_interval := LLM_ApiCommon_GetRateLimitMs(backend)
 	now := A_TickCount
 	last := _LLM_Engine.Has("last_request_tick") ? _LLM_Engine["last_request_tick"] : 0
 	if (last > 0 and (now - last) < min_interval) {
