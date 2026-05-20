@@ -413,6 +413,10 @@ HotstringEngineInit()
 ; reflects user overrides — LoggerInit reads [Script] LogLevel from the ini.
 LoggerInit()
 Updater_LoadChannel()
+Updater_LoadCheckInterval()
+; Schedule the background update poller. No-op in dev / source mode, or
+; when the user has chosen "never" — those checks happen inside the helper.
+try Updater_StartBackgroundChecks()
 LoggerStart("ErgoptiPlus", "Booting ErgoptiPlus driver…")
 
 ; Probe SC138 → VK directly so we can see what MapVirtualKeyExW actually
@@ -799,19 +803,28 @@ EnsurePersonalShortcutsFile(Path) {
     ; never lands next to the .exe (Downloads, Desktop…). In dev mode the sibling
     ; _generated/ folder (gitignored) keeps the source tree tidy as before.
     ;
-    ; Both branches of the original ternary were evaluated eagerly at parse time
-    ; in some AHK v2 releases, which made a missing/empty A_LocalAppData surface
-    ; as an "unassigned local variable" crash even in dev mode. EnvGet provides
-    ; a deterministic fallback when A_LocalAppData is somehow blank (RDP/service
-    ; contexts), and the explicit if/else avoids any ternary-eval ambiguity.
+    ; AHK v2's built-in ``A_LocalAppData`` can throw "This local variable has
+    ; not been assigned a value" in some compiled / restricted runtime contexts
+    ; (RDP sessions, services, ill-defined user profiles). EnvGet("LOCALAPPDATA")
+    ; is more reliable because it reads the environment block directly, and we
+    ; only fall back to ``A_LocalAppData`` inside a try so an unresolvable
+    ; built-in cannot crash the boot path. The compiled-only %USERPROFILE%
+    ; reconstruction is the last-resort safety net.
     StubDir := ""
     if A_IsCompiled {
-        LocalAppData := A_LocalAppData
+        LocalAppData := EnvGet("LOCALAPPDATA")
         if (LocalAppData == "") {
-            LocalAppData := EnvGet("LOCALAPPDATA")
+            try LocalAppData := A_LocalAppData
         }
         if (LocalAppData == "") {
-            LocalAppData := EnvGet("USERPROFILE") . "\AppData\Local"
+            UserProfile := EnvGet("USERPROFILE")
+            if (UserProfile != "") {
+                LocalAppData := UserProfile . "\AppData\Local"
+            }
+        }
+        if (LocalAppData == "") {
+            try LoggerWarn("ErgoptiPlus", "EnsurePersonalShortcutsFile: cannot resolve LocalAppData — skipping stub creation.")
+            return
         }
         StubDir := LocalAppData . "\Ergopti\_generated"
     } else {

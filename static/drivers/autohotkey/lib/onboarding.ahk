@@ -146,34 +146,10 @@ Onboarding_ShowFromMenu(*) {
 ; ===============================================
 ; ===============================================
 
-; Detects the Windows UI language using GetLocaleInfoEx (LOCALE_SISO639LANGNAME)
-; which returns the ISO 639-1 two-letter code directly (e.g. "fr", "en", "de").
-; Returns a supported locale code, or "en" as the fallback when the detected
-; language is not in our supported list.
-;
-; @returns string A supported two-letter locale code.
+; Thin alias kept for backwards-compatibility with existing callers in this
+; wizard. The real detector lives in lib/i18n.ahk so I18nInit can use it too.
 _Onboarding_DetectSystemLocale() {
-	; LOCALE_SISO639LANGNAME = 0x59 — returns the ISO 639-1 language code.
-	; We ask for the user default locale (LOCALE_NAME_USER_DEFAULT = "").
-	BufSize := 16
-	Buf := Buffer(BufSize * 2, 0)
-	Len := DllCall("GetLocaleInfoEx",
-		"Str", "",
-		"UInt", 0x59,
-		"Ptr", Buf,
-		"Int", BufSize,
-		"Int")
-	if Len > 1 {
-		Code := StrGet(Buf, "UTF-16")
-		Code := StrLower(SubStr(Code, 1, 2))
-		; Verify the code is in our supported list
-		for _loc in _I18nSortedLocales() {
-			if _loc.Code = Code {
-				return Code
-			}
-		}
-	}
-	return "en"
+	return _I18nDetectSystemLocale()
 }
 
 ; Resolve a translation key in a target locale WITHOUT touching the active
@@ -299,7 +275,8 @@ _Onboarding_Step1() {
 
 	; Single Next button anchored to the right edge — no Back button on step 1
 	; because there is nothing to go back to.
-	btnNext := g.AddButton("Default w110 x" ONBOARDING_WIN_W - 130 " y+14", t("onboarding.next"))
+	btns := _Onboarding_AddNavButtons(g, "", t("onboarding.next"))
+	btnNext := btns[2]
 	btnNext.OnEvent("Click", _Step1_Next.Bind(g, lv, SortedLocales, DefaultIndex))
 
 	; Re-render the title, heading and button label in the previewed locale
@@ -372,17 +349,27 @@ _Onboarding_StepConfigDir() {
 	; Edit + Browse button on the same row. The Edit shows forward slashes
 	; (matches paths.toml's on-disk format and reads cleaner to humans);
 	; we translate back to backslashes before persisting.
+	;
+	; Browse uses auto-width so long localised labels (German ``Durchsuchen``,
+	; Portuguese ``Procurar...``) are not clipped. We add Browse first with a
+	; placeholder Edit width, then re-flow once we know Browse's natural width.
 	current := _ob_config_dir != "" ? _ob_config_dir : (IsSet(_ConfigDir) ? _ConfigDir : "")
-	dirEdit := g.AddEdit("w" ONBOARDING_WIN_W - 130 " xm y+10", StrReplace(current, "\", "/"))
-	btnBrowse := g.AddButton("x+6 yp w90", t("common.browse"))
+	dirEdit := g.AddEdit("w100 xm y+10", StrReplace(current, "\", "/"))
+	btnBrowse := g.AddButton("x+6 yp", t("common.browse"))
+	; Re-flow: derive the Edit width from the wizard width minus Browse width
+	; and the inter-control gap so the row always spans the content area.
+	btnBrowse.GetPos(, , &browseW, )
+	editW := ONBOARDING_WIN_W - 40 - browseW - 6
+	dirEdit.Move(20, , editW)
+	btnBrowse.Move(20 + editW + 6, , browseW)
 
 	g.SetFont("s9 cGray")
 	g.AddText("w" ONBOARDING_WIN_W - 40 " xm y+12", t("dialog.config_folder.hint"))
 	g.SetFont("s10")
 
-	g.AddText("w" ONBOARDING_WIN_W - 40 " y+12", "")
-	btnBack := g.AddButton("w90 x20",                                  t("onboarding.back"))
-	btnNext := g.AddButton("Default w110 yp x" ONBOARDING_WIN_W - 130, t("onboarding.next"))
+	btns := _Onboarding_AddNavButtons(g, t("onboarding.back"), t("onboarding.next"))
+	btnBack := btns[1]
+	btnNext := btns[2]
 
 	btnBrowse.OnEvent("Click", _StepConfigDir_Browse.Bind(g, dirEdit))
 	btnBack.OnEvent("Click",   _StepConfigDir_Back.Bind(g))
@@ -426,8 +413,92 @@ _StepConfigDir_Next(g, dirEdit, *) {
 			val .= "\"
 	}
 	_ob_config_dir := val
+
+	; If the chosen folder already contains a config.toml, pre-fill the
+	; remaining wizard answers from it so a user who points the wizard at
+	; a previously-configured folder (e.g. after reinstalling on a new
+	; machine and selecting their synced Dropbox folder) does not have to
+	; re-pick the same options manually. Empty path → keep wizard defaults.
+	_Onboarding_PreloadFromExistingConfig(val)
+
 	_Onboarding_DestroyActive()
 	_Onboarding_Step2()
+}
+
+
+; ===================================================
+; ===== 4.1c) Pre-fill from existing config.toml ====
+; ===================================================
+
+; Inspect ``<chosen_dir>\ahk\config.toml`` and, if it exists, hydrate the
+; wizard globals so steps 2-5 open pre-selected with the user's previous
+; choices rather than the bare defaults. Used so a returning user can
+; click Next-Next-Next on familiar settings instead of re-picking every
+; option from scratch. Best-effort: any parse failure is logged and the
+; wizard falls back to the defaults that were set at the top of this file.
+;
+; @param ChosenDir string Backslash-terminated absolute folder picked on the
+;                         config-dir step. Empty → no pre-fill (default path).
+_Onboarding_PreloadFromExistingConfig(ChosenDir) {
+	global _ob_layout, _ob_magic_key, _ob_metrics, _ob_gestures, _DefaultConfigDir
+	; Resolve the actual folder we're about to read from: empty input means
+	; "use the OS default", so we hydrate from that location too — this lets
+	; an existing first-run user re-open the wizard from the tray menu and
+	; still see their saved choices.
+	Dir := (ChosenDir != "") ? ChosenDir : (IsSet(_DefaultConfigDir) ? _DefaultConfigDir : "")
+	if (Dir == "")
+		return
+	CfgPath := Dir . "ahk\config.toml"
+	if !FileExist(CfgPath) {
+		try LoggerDebug("onboarding", "No existing config at '{1}' — wizard keeps defaults.", CfgPath)
+		return
+	}
+	try LoggerTrace("onboarding", "Pre-loading wizard answers from '{1}'…", CfgPath)
+	Cache := ""
+	try {
+		Cache := ParseTomlFile(CfgPath)
+	} catch as e {
+		try LoggerWarn("onboarding", "Could not parse existing config — wizard keeps defaults: {1}.", e.Message)
+		return
+	}
+	if Type(Cache) != "Map" {
+		try LoggerWarn("onboarding", "Unexpected TOML cache type — wizard keeps defaults.")
+		return
+	}
+
+	; Layout: any of the three Ergopti switches ON means the user previously
+	; enabled the Ergopti emulation. The wizard treats this as a single yes/no
+	; choice so a partial state (only ErgoptiAltGr on, etc.) still flips Yes.
+	LayoutBase  := IniCacheGet(Cache, "Layout", "ErgoptiBase")
+	LayoutAltGr := IniCacheGet(Cache, "Layout", "ErgoptiAltGr")
+	LayoutPlus  := IniCacheGet(Cache, "Layout", "ErgoptiPlus")
+	if (LayoutBase != "_" or LayoutAltGr != "_" or LayoutPlus != "_") {
+		_ob_layout := (StrLower(LayoutBase) == "true")
+			or (StrLower(LayoutAltGr) == "true")
+			or (StrLower(LayoutPlus) == "true")
+	}
+
+	; Magic key: TOML strings come in with surrounding quotes already stripped
+	; by the parser, so the cache value is the raw character.
+	MagicKey := IniCacheGet(Cache, "Hotstrings", "MagicKey")
+	if (MagicKey != "_" and MagicKey != "") {
+		_ob_magic_key := MagicKey
+	}
+
+	; Metrics + gestures: boolean flags. ParseTomlFile preserves TOML's
+	; literal "true"/"false" strings so a case-insensitive compare suffices.
+	MetricsEnabled := IniCacheGet(Cache, "Metrics", "metrics_enabled")
+	if (MetricsEnabled != "_") {
+		_ob_metrics := (StrLower(MetricsEnabled) == "true")
+	}
+	GesturesEnabled := IniCacheGet(Cache, "Gestures", "Enabled")
+	if (GesturesEnabled != "_") {
+		_ob_gestures := (StrLower(GesturesEnabled) == "true")
+	}
+
+	try LoggerDone("onboarding", "Wizard pre-loaded (layout=%s, magic='%s', metrics=%s, gestures=%s).",
+		_ob_layout ? "true" : "false", _ob_magic_key,
+		_ob_metrics ? "true" : "false", _ob_gestures ? "true" : "false")
 }
 
 
@@ -451,23 +522,31 @@ _Onboarding_Step2() {
 	; description ("Yes/No, use Ergopti layout") makes the user guess what they
 	; are agreeing to. AHK scales the JPG to the requested width while
 	; preserving aspect ratio (``h-1``). The picture is best-effort: if the
-	; static dir is unreachable (e.g. an unusual install), we just skip it.
+	; static dir is unreachable (e.g. an unusual install), we log and skip so
+	; the rest of the step still renders. The build_static_bundle ASSET_FILES
+	; entry ships ``ergopti.jpg`` next to the EXE in compiled mode.
 	imgPath := _StaticDir . "\img\ergopti.jpg"
 	if FileExist(imgPath) {
-		try g.AddPicture("w" ONBOARDING_WIN_W - 40 " h-1 y+10", imgPath)
+		try {
+			g.AddPicture("w" ONBOARDING_WIN_W - 40 " h-1 y+10", imgPath)
+		} catch as e {
+			try LoggerWarn("onboarding", "Step 2: AddPicture failed for '{1}': {2}.", imgPath, e.Message)
+		}
+	} else {
+		try LoggerWarn("onboarding", "Step 2: layout preview missing at '{1}' — wizard renders without it.", imgPath)
 	}
 
+	; Pre-check the radio matching the wizard state. When the user pointed
+	; the wizard at an existing config in step 1b, _ob_layout reflects that
+	; saved value; otherwise it stays at its boot default (false).
+	global _ob_layout
 	g.AddText("w" ONBOARDING_WIN_W - 40 " y+12", "")
-	rYes := g.AddRadio("vLayoutChoice", t("onboarding.layout.yes"))
-	rNo  := g.AddRadio("Checked", t("onboarding.layout.no"))
+	rYes := g.AddRadio("vLayoutChoice" . (_ob_layout ? " Checked" : ""), t("onboarding.layout.yes"))
+	rNo  := g.AddRadio((_ob_layout ? "" : "Checked"), t("onboarding.layout.no"))
 
-	g.AddText("w" ONBOARDING_WIN_W - 40 " y+16", "")
-
-	; ``yp`` anchors the Next button to the same row as Back so they appear
-	; left/right on a single line — without it the second button drops to its
-	; own row and the wizard looks broken.
-	btnBack := g.AddButton("w90 x20",                                t("onboarding.back"))
-	btnNext := g.AddButton("Default w110 yp x" ONBOARDING_WIN_W - 130, t("onboarding.next"))
+	btns := _Onboarding_AddNavButtons(g, t("onboarding.back"), t("onboarding.next"))
+	btnBack := btns[1]
+	btnNext := btns[2]
 
 	btnBack.OnEvent("Click", _Step2_Back.Bind(g))
 	btnNext.OnEvent("Click", _Step2_Next.Bind(g, rYes))
@@ -585,10 +664,9 @@ _Onboarding_Step3() {
 	g.AddText("w" ONBOARDING_WIN_W - 40 " x20 y+14", t("onboarding.magic_key.choose_freely"))
 	g.SetFont("s10 norm")
 
-	g.AddText("w" ONBOARDING_WIN_W - 40 " y+16", "")
-
-	btnBack := g.AddButton("w90 x20",                                t("onboarding.back"))
-	btnNext := g.AddButton("Default w110 yp x" ONBOARDING_WIN_W - 130, t("onboarding.next"))
+	btns := _Onboarding_AddNavButtons(g, t("onboarding.back"), t("onboarding.next"))
+	btnBack := btns[1]
+	btnNext := btns[2]
 
 	btnBack.OnEvent("Click", _Step3_Back.Bind(g))
 	btnNext.OnEvent("Click", _Step3_Next.Bind(g, rBlackStar, rStar, rUGrave, rSemi, rCustom, edKey))
@@ -665,14 +743,16 @@ _Onboarding_Step4() {
 	g.AddText("w" ONBOARDING_WIN_W - 40 " y+10 cRed", warning)
 	g.SetFont("s10 norm")
 
+	; Restore the previously-saved Yes/No when the wizard was re-opened over
+	; an existing config (pre-load step in _StepConfigDir_Next).
+	global _ob_metrics
 	g.AddText("w" ONBOARDING_WIN_W - 40 " y+12", "")
-	rYes := g.AddRadio("vMetricsChoice", t("onboarding.yes"))
-	rNo  := g.AddRadio("Checked", t("onboarding.no"))
+	rYes := g.AddRadio("vMetricsChoice" . (_ob_metrics ? " Checked" : ""), t("onboarding.yes"))
+	rNo  := g.AddRadio((_ob_metrics ? "" : "Checked"), t("onboarding.no"))
 
-	g.AddText("w" ONBOARDING_WIN_W - 40 " y+16", "")
-
-	btnBack := g.AddButton("w90 x20",                                t("onboarding.back"))
-	btnNext := g.AddButton("Default w110 yp x" ONBOARDING_WIN_W - 130, t("onboarding.next"))
+	btns := _Onboarding_AddNavButtons(g, t("onboarding.back"), t("onboarding.next"))
+	btnBack := btns[1]
+	btnNext := btns[2]
 
 	btnBack.OnEvent("Click", _Step4_Back.Bind(g))
 	btnNext.OnEvent("Click", _Step4_Next.Bind(g, rYes))
@@ -708,9 +788,12 @@ _Onboarding_Step5() {
 	g.AddText("w" ONBOARDING_WIN_W - 40 " y+8", t("onboarding.gestures.desc"))
 	g.SetFont("s10")
 
+	; Restore the previously-saved Yes/No when the wizard was re-opened over
+	; an existing config (pre-load step in _StepConfigDir_Next).
+	global _ob_gestures
 	g.AddText("w" ONBOARDING_WIN_W - 40 " y+12", "")
-	rYes := g.AddRadio("vGesturesChoice", t("onboarding.yes"))
-	rNo  := g.AddRadio("Checked", t("onboarding.no"))
+	rYes := g.AddRadio("vGesturesChoice" . (_ob_gestures ? " Checked" : ""), t("onboarding.yes"))
+	rNo  := g.AddRadio((_ob_gestures ? "" : "Checked"), t("onboarding.no"))
 
 	; Registration panel — only visible when "Yes" is selected. We pre-build
 	; every control as hidden so the layout does not jump when the user clicks
@@ -744,13 +827,19 @@ _Onboarding_Step5() {
 	rYes.OnEvent("Click", _Step5_OnRadioChange.Bind(regControls, statusLbl, true))
 	rNo.OnEvent("Click",  _Step5_OnRadioChange.Bind(regControls, statusLbl, false))
 
+	; When the wizard was re-opened over an existing config that had gestures
+	; enabled, mirror the auto-checked Yes radio by showing the registration
+	; panel right away — otherwise the user sees Yes ticked but no controls.
+	if _ob_gestures {
+		_Step5_OnRadioChange(regControls, statusLbl, true)
+	}
+
 	btnRegAuto.OnEvent("Click",   _Step5_AutoRegister.Bind(statusLbl))
 	btnRegManual.OnEvent("Click", _Step5_ShowManualTutorial.Bind(g))
 
-	g.AddText("w" ONBOARDING_WIN_W - 40 " y+16", "")
-
-	btnBack   := g.AddButton("w90 x20",                                t("onboarding.back"))
-	btnFinish := g.AddButton("Default w110 yp x" ONBOARDING_WIN_W - 130, t("onboarding.finish"))
+	btns := _Onboarding_AddNavButtons(g, t("onboarding.back"), t("onboarding.finish"))
+	btnBack   := btns[1]
+	btnFinish := btns[2]
 
 	btnBack.OnEvent("Click", _Step5_Back.Bind(g))
 	btnFinish.OnEvent("Click", _Step5_Finish.Bind(g, rYes))
@@ -935,6 +1024,63 @@ _Onboarding_Commit() {
 _Onboarding_Show(g) {
 	g.OnEvent("Close", _Onboarding_OnGuiClose)
 	g.Show("w" ONBOARDING_WIN_W " AutoSize Center")
+}
+
+
+; =====================================================
+; ===== 6.1b) Dynamic-width nav button row helper =====
+; =====================================================
+
+; Minimum width applied to every Back / Next / Finish button so the wizard
+; keeps its proportions even when the active locale's labels are extremely
+; short (e.g. ``OK``/``次``). 90 px matches the historical fixed width.
+global ONBOARDING_BTN_MIN_W := 90
+
+; Builds the bottom navigation row (Back + Next, or just Next on step 1) with
+; both buttons sized to the longest label so they line up symmetrically across
+; locales. Without this, ``w90``/``w110`` clipped long German captions like
+; ``Durchsuchen`` or ``Auto-Konfiguration``.
+;
+; The helper creates both buttons with auto-width first, measures their
+; natural widths via GetPos, computes a shared width, then pins Back to the
+; left margin and Next to the right margin of the wizard window.
+;
+; @param g          Gui      The active wizard window.
+; @param backLabel  String   Localised Back label, or "" to skip the Back button.
+; @param nextLabel  String   Localised Next/Finish label (always shown).
+; @param isDefault  Bool     true → Next gets the ``Default`` option (Enter key triggers it).
+; @returns          [btnBack | unset, btnNext]   The control objects, ready for OnEvent wiring.
+_Onboarding_AddNavButtons(g, backLabel, nextLabel, isDefault := true) {
+	; ``y+16`` advances past whatever the previous control on the page was so
+	; the row sits visually separated. ``yp`` on the second control keeps both
+	; buttons on the same row.
+	hasBack := (backLabel != "")
+	if hasBack {
+		btnBack := g.AddButton("x20 y+16",                       backLabel)
+		btnNext := g.AddButton((isDefault ? "Default " : "") . "yp", nextLabel)
+	} else {
+		btnBack := unset
+		btnNext := g.AddButton((isDefault ? "Default " : "") . "x20 y+16", nextLabel)
+	}
+
+	; Measure the natural widths AHK assigned to each button, then take the
+	; max so both end up identical (matches the wizard's symmetric layout).
+	btnNext.GetPos(, , &nW, )
+	sharedW := nW
+	if hasBack {
+		btnBack.GetPos(, , &bW, )
+		sharedW := Max(bW, sharedW)
+	}
+	sharedW := Max(sharedW, ONBOARDING_BTN_MIN_W)
+
+	; Reposition: Back at the left margin, Next anchored to the right margin
+	; with the same width. Height left untouched so AHK keeps the native value.
+	if hasBack {
+		btnBack.Move(20, , sharedW)
+	}
+	btnNext.Move(ONBOARDING_WIN_W - 20 - sharedW, , sharedW)
+
+	return hasBack ? [btnBack, btnNext] : [unset, btnNext]
 }
 
 ; Single close handler reused by every wizard page. Triggered when the user

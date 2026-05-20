@@ -22,6 +22,7 @@ local M = {}
 
 local i18n         = require("lib.i18n")
 local toml_writer  = require("lib.toml_writer")
+local toml_codec   = require("lib.toml_codec")
 local notifications = require("lib.notifications")
 local Logger       = require("lib.logger")
 local LOG          = "onboarding"
@@ -38,6 +39,30 @@ local _usercontent  = nil
 -- Absolute path to the assets folder (same directory as this file)
 local _src       = debug.getinfo(1, "S").source:sub(2)
 local ASSETS_DIR = _src:match("^(.*[/\\])") or "./"
+
+--- Resolve the absolute file:// URL to the Ergopti layout preview JPG so
+--- the webview can <img src="…"> it directly. ASSETS_DIR is
+--- static/drivers/hammerspoon/ui/onboarding/ ; the image lives at
+--- static/img/ergopti.jpg, four directories above. Returns nil when the
+--- file is missing so the JS side keeps the preview hidden gracefully.
+--- @return string|nil
+local function _layout_image_url()
+	local img_path = ASSETS_DIR .. "../../../../img/ergopti.jpg"
+	local attrs = hs.fs.attributes(img_path)
+	if not attrs then
+		Logger.debug(LOG, "Layout preview image missing at '%s' — step 2 renders without it.", img_path)
+		return nil
+	end
+	-- Canonicalise to an absolute path so the file:// URI is well-formed
+	-- regardless of which working directory Hammerspoon was launched from.
+	local absolute = hs.fs.pathToAbsolute(img_path) or img_path
+	-- Percent-encode spaces (and a handful of other reserved chars) so the
+	-- browser engine treats the URL as a single resource. Slashes stay literal.
+	local encoded = absolute:gsub("([^%w%-%./_~/\\:])", function(c)
+		return string.format("%%%02X", string.byte(c))
+	end)
+	return "file://" .. encoded
+end
 
 
 
@@ -173,6 +198,7 @@ local function inject_init_data()
 		strings            = strings,
 		default_config_dir = default_config_dir,
 		system_layout      = system_layout,
+		layout_image_url   = _layout_image_url(),
 		answers = {
 			locale       = current_locale,
 			use_ergopti  = true,
@@ -355,6 +381,71 @@ local function handle_message(body)
 				pcall(function()
 					_webview:evaluateJavaScript("if(window.setConfigDir) window.setConfigDir(" .. encoded .. ")")
 				end)
+			end
+		end
+
+	elseif action == "loadExistingConfig" then
+		-- User confirmed a config directory on the config step. Check whether
+		-- ``<dir>/hammerspoon/config.toml`` already exists; if so, parse it and
+		-- ship the saved answers back to JS so steps 2-5 open pre-selected with
+		-- the user's previous choices instead of the bare defaults.
+		local chosen = type(body.config_dir) == "string" and body.config_dir or ""
+		if chosen == "" then
+			-- Empty input = "use the OS default" — read from the resolved
+			-- default location so a returning user gets pre-fill regardless
+			-- of whether they left the input empty or typed the same path.
+			local ok_mp, menu_paths = pcall(require, "ui.menu.menu_paths")
+			if ok_mp and menu_paths and menu_paths.get_default_config_dir then
+				local ok_v, v = pcall(menu_paths.get_default_config_dir)
+				if ok_v and type(v) == "string" then chosen = v end
+			end
+		end
+		if chosen ~= "" then
+			if not chosen:match("[/\\]$") then chosen = chosen .. "/" end
+			local cfg_path = chosen .. "hammerspoon/config.toml"
+			if hs.fs.attributes(cfg_path) then
+				local ok_read, content = pcall(function()
+					local f = io.open(cfg_path, "r")
+					if not f then return nil end
+					local c = f:read("*a")
+					f:close()
+					return c
+				end)
+				if ok_read and type(content) == "string" then
+					local ok_dec, parsed = pcall(toml_codec.decode, content)
+					if ok_dec and type(parsed) == "table" then
+						-- Mirror the AHK helper: any Ergopti layout switch ON
+						-- counts as "use Ergopti". A nil section yields false.
+						local layout = parsed.Layout or {}
+						local hotstrings = parsed.Hotstrings or {}
+						local metrics = parsed.Metrics or {}
+						local gestures = parsed.Gestures or {}
+						local answers = {
+							use_ergopti  = (layout.ErgoptiBase == true)
+								or (layout.ErgoptiAltGr == true)
+								or (layout.ErgoptiPlus == true),
+							magic_key    = type(hotstrings.MagicKey) == "string" and hotstrings.MagicKey ~= ""
+								and hotstrings.MagicKey or nil,
+							use_metrics  = metrics.metrics_enabled == true,
+							use_gestures = gestures.Enabled == true,
+						}
+						-- Strip nils so Object.assign on the JS side does not
+						-- overwrite the default magic key with undefined.
+						local clean = {}
+						for k, v in pairs(answers) do
+							if v ~= nil then clean[k] = v end
+						end
+						local ok_enc, json = pcall(hs.json.encode, clean)
+						if ok_enc and json and _webview then
+							Logger.info(LOG, "Pre-loaded wizard answers from existing config at '%s'.", cfg_path)
+							pcall(function()
+								_webview:evaluateJavaScript("if(window.applyExistingAnswers) window.applyExistingAnswers(" .. json .. ")")
+							end)
+						end
+					end
+				end
+			else
+				Logger.debug(LOG, "No existing config at '%s' — wizard keeps defaults.", cfg_path)
 			end
 		end
 
