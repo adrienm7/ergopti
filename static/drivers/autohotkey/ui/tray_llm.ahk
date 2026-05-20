@@ -101,6 +101,12 @@ global _LLM_Tray := Map(
 	; carries over. The user can rebind it via the tray menu; setting it
 	; to the empty string disables the feature entirely.
 	"trigger_shortcut",           "Ctrl+Space",
+	; Inline auto-type mode (Copilot-style). When ON, the prediction is
+	; typed directly into the active app instead of being shown in a
+	; tooltip. Forces n_predictions = 1 internally because typing N
+	; alternatives sequentially would be chaos. Disabled by default —
+	; the tooltip flow is the safer baseline.
+	"inline_autotype",            false,
 	; When true, switching to a new model auto-picks the matching profile
 	; (raw / basic / advanced / batch_advanced) using the params count from
 	; models.json. Mirrors the HS get_recommended_profile_info heuristic so
@@ -202,7 +208,8 @@ LLM_Tray_Init(saved_opts := Map()) {
 	static _num_keys := ["n_predictions", "min_words", "max_words", "debounce_ms", "ctx_chars", "pred_indent"]
 	static _bool_keys := ["enabled", "instant_on_word_end", "after_hotstring", "reset_on_nav",
 		"disable_url_bars", "disable_password_fields", "show_info_bar", "streaming",
-		"show_all_at_once", "auto_raise_temp", "auto_profile_for_model", "onboarding_seen"]
+		"show_all_at_once", "auto_raise_temp", "auto_profile_for_model", "onboarding_seen",
+		"inline_autotype"]
 	static _arr_keys := ["user_profiles", "disabled_apps"]
 
 	for key in _str_keys
@@ -1133,6 +1140,16 @@ LLM_Tray_BuildDisplayMenu() {
 	m.Add(info_label, (*) => LLM_Tray_ToggleBool("show_info_bar"))
 	if _LLM_Tray["show_info_bar"]
 		m.Check(info_label)
+
+	; Inline auto-type — when on, the prediction is typed directly into
+	; the active app instead of showing in a tooltip (Copilot-style). The
+	; engine forces n=1 internally so we never race two variants. The
+	; user keeps the option of bare Backspace / Ctrl+Z to roll back what
+	; was typed.
+	inline_label := t("menu.llm.inline_autotype")
+	m.Add(inline_label, (*) => LLM_Tray_ToggleBool("inline_autotype"))
+	if _LLM_Tray["inline_autotype"]
+		m.Check(inline_label)
 
 	m.Add()
 

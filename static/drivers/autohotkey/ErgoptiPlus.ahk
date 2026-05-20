@@ -1462,6 +1462,7 @@ SaveFullConfig() {
     Updates.Push({ Section: "LLM", Key: "instant_on_word_end", Value: _LLM_Tray["instant_on_word_end"] ? "1" : "0" })
     Updates.Push({ Section: "LLM", Key: "auto_profile_for_model", Value: _LLM_Tray["auto_profile_for_model"] ? "1" : "0" })
     Updates.Push({ Section: "LLM", Key: "onboarding_seen", Value: _LLM_Tray["onboarding_seen"] ? "1" : "0" })
+    Updates.Push({ Section: "LLM", Key: "inline_autotype", Value: _LLM_Tray["inline_autotype"] ? "1" : "0" })
 
     ; Strict schema: rewrite from scratch so stale/unknown sections and keys
     ; are removed on each full save

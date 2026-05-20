@@ -730,6 +730,7 @@
 	"menu.llm.indent_none": "インデントなし",
 	"menu.llm.indent_space": "スペース",
 	"menu.llm.indent_spaces": "スペース",
+	"menu.llm.inline_autotype": "✍️ インライン自動入力（Copilot 風）",
 	"menu.llm.install_required_title": "必要な設定 (%s)",
 	"menu.llm.instant_on_word_end": "単語末での即時提案",
 	"menu.llm.launch_download_prompt": "ダウンロードを開始しますか？",
