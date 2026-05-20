@@ -274,6 +274,13 @@ _Onboarding_Step1() {
 	; wParam = item count, lParam = (cy << 16) | cx with -1 meaning "use
 	; the default". The result is (cyOut << 16) | cxOut — we only want the
 	; height, masked to 16 bits.
+	; Measure the LV's natural row height via LVM_GETITEMRECT and shrink the
+	; control to ``visRows × rowH + 2 × SM_CYEDGE`` so it shows exactly N items
+	; with no white stripe at the bottom of the scroll. CRITICAL: we ALSO have
+	; to relocate the Next button by hand below because AHK's "next control"
+	; position tracker is set when the LV is *added* (with the initial h240)
+	; and is NOT updated by ``Move()`` — so a relative ``y+16`` on the button
+	; would land it on top of the (now-shorter) LV instead of below it.
 	RECT := Buffer(16, 0)
 	SendMessage(0x100E, 0, RECT.Ptr, lv)  ; LVM_GETITEMRECT, item 0, LVIR_BOUNDS
 	rowH := NumGet(RECT, 12, "Int") - NumGet(RECT, 4, "Int")  ; bottom - top
@@ -287,9 +294,14 @@ _Onboarding_Step1() {
 	lv.Modify(DefaultIndex, "Select Focus Vis")
 
 	; Single Next button anchored to the right edge — no Back button on step 1
-	; because there is nothing to go back to.
+	; because there is nothing to go back to. We snapshot the LV's actual
+	; bottom edge AFTER the Move() above, then override the button's Y so it
+	; sits 16 px below the LV regardless of what AHK's stale position tracker
+	; might decide. Without this, the button overlaps the last visible row.
+	lv.GetPos(, &_lvY, , &_lvH)
 	btns := _Onboarding_AddNavButtons(g, "", t("onboarding.next"))
 	btnNext := btns[2]
+	btnNext.Move(, _lvY + _lvH + 16)
 	btnNext.OnEvent("Click", _Step1_Next.Bind(g, lv, SortedLocales, DefaultIndex))
 
 	; Re-render the title, heading and button label in the previewed locale
