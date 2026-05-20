@@ -120,10 +120,22 @@ LLM_Deps_CheckAndInstall(default_model := "qwen2.5:3b", on_ready := unset, on_fa
 
 	LoggerInfo("LLM", "CheckAndInstall — state: " _LLM_Deps_State ", checking: " (_LLM_Deps_Checking ? "true" : "false") " show_ui=" (show_ui ? "true" : "false") ".")
 
-	; Guard: only one concurrent bootstrap
+	; Guard: only one concurrent bootstrap — EXCEPT when the user
+	; explicitly asked for a visible install (show_ui=true). The boot
+	; sequence kicks off a silent reachability check (show_ui=false)
+	; that can take up to 20 s to time out when Ollama isn't installed.
+	; During that window the warning-row click used to silently skip
+	; here, leaving the user waiting forever for ``nothing happens''.
+	; Now we cancel the in-flight silent check and continue with the
+	; explicit install.
 	if _LLM_Deps_Checking {
-		LoggerInfo("LLM", "CheckAndInstall — already in progress, skipping.")
-		return
+		if show_ui {
+			LoggerInfo("LLM", "Preempting silent check in progress — user asked for visible install.")
+			try LLM_Deps_Cancel()
+		} else {
+			LoggerInfo("LLM", "CheckAndInstall — already in progress, skipping.")
+			return
+		}
 	}
 	_LLM_Deps_Checking := true
 
@@ -162,8 +174,11 @@ LLM_Deps_AsyncCheck(default_model, on_ready, on_failed, show_ui) {
 LLM_Deps_DoCheck(default_model, on_ready, on_failed, show_ui) {
 	global _LLM_Deps_Checking, _LLM_Deps_State
 
+	t_start := A_TickCount
 	LoggerInfo("LLM", "DoCheck — checking if Ollama is running…")
-	if LLM_OllamaIsRunning() {
+	running := LLM_OllamaIsRunning()
+	LoggerInfo("LLM", "DoCheck — Ollama reachability check took " (A_TickCount - t_start) " ms, result=" (running ? "running" : "not running") ".")
+	if running {
 		LoggerInfo("LLM", "Ollama already running — fast path, state → ready.")
 		_LLM_Deps_State    := "ready"
 		_LLM_Deps_Checking := false
