@@ -43,6 +43,12 @@ global _LLM_Deps_Checking       := false        ; guard against concurrent calls
 global _LLM_Deps_PollTimer      := unset        ; lambda reference kept for explicit cancellation
 global _LLM_Deps_OutFile        := ""           ; temp file path for PS1 stdout
 global _LLM_Deps_OutPos         := 0            ; byte offset already consumed from OutFile
+; PID of the running PowerShell installer, or 0 when no install is in
+; flight. LLM_Deps_Cancel reads this to terminate the process tree when
+; the user clicks Cancel in the WebView — without it, closing the
+; window would leave a hidden powershell.exe downloading qwen2.5:3b
+; in the background indefinitely.
+global _LLM_Deps_InstallerPid   := 0
 
 
 
@@ -145,8 +151,17 @@ LLM_Deps_AsyncCheck(default_model, on_ready, on_failed, show_ui) {
 		; WebView2.create blocks ~1 s while initialising. Do it here so the
 		; message loop can process paint messages once this timer returns.
 		if !OllamaWV_IsAlive() {
+			; on_cancel: kill the installer tree + reset state + flip the
+			; tray toggle OFF, so the user's Cancel click actually stops
+			; everything (not just the visible window). Without this the
+			; hidden powershell.exe kept downloading and the tray toggle
+			; stayed ON.
+			; on_retry: re-launch the installer from scratch — same
+			; behaviour as the original wiring but only fires when the
+			; bootstrap finished in an error state.
 			OllamaWV_Show("ollama_install", t("ollama.install_title"),
-				, (*) => LLM_Deps_RunInstaller(default_model, on_ready, on_failed))
+				(*) => LLM_Deps_OnUserCancel(),
+				(*) => LLM_Deps_RunInstaller(default_model, on_ready, on_failed))
 			OllamaWV_SetStep(t("ollama.deps_step_checking"))
 		}
 		LoggerInfo("LLM", "AsyncCheck — UI shown, deferring HTTP check…")
@@ -247,11 +262,67 @@ LLM_Deps_RunInstaller(model, on_ready, on_failed) {
 		return
 	}
 
+	; Stash the PID globally so LLM_Deps_Cancel can terminate the process
+	; tree from the Cancel button in the WebView. Without this the user
+	; would close the window but the hidden powershell.exe would keep
+	; downloading Ollama indefinitely.
+	global _LLM_Deps_InstallerPid := pid
+
 	; Poll every 500 ms: read new lines from the temp file, detect completion
 	; by checking whether the powershell.exe process is still alive.
 	_LLM_Deps_PollTimer := () => LLM_Deps_PollFile(pid, on_ready, on_failed)
 	SetTimer(_LLM_Deps_PollTimer, 500)
 	LoggerInfo("LLM", "Poll timer started (file: " _LLM_Deps_OutFile ").")
+}
+
+/**
+ * User-driven cancel handler — bridges the WebView Cancel button to a
+ * full feature deactivation. Cancels the install (LLM_Deps_Cancel) AND
+ * flips ``_LLM_Tray["enabled"]`` to false so the tray toggle reflects
+ * the user's intent and LLM_Bridge_Stop releases its resources. Saves
+ * the new state so the toggle stays OFF across reloads.
+ */
+LLM_Deps_OnUserCancel() {
+	global _LLM_Tray
+	LoggerInfo("LLM", "User clicked Cancel — aborting install and disabling feature.")
+	LLM_Deps_Cancel()
+	if IsSet(_LLM_Tray) and _LLM_Tray["enabled"] {
+		_LLM_Tray["enabled"] := false
+		try LLM_Bridge_Stop()
+		try LLM_Tray_SaveConfig()
+		try LLM_Tray_Build()
+	}
+}
+
+/**
+ * Cancels an in-flight Ollama install: kills the hidden PowerShell tree
+ * and stops the poll timer. Safe to call when nothing is running — it
+ * just resets the state flags.
+ *
+ * Called from LLM_Deps_OnUserCancel (Cancel button) and from
+ * LLM_Tray_OnToggle when the user disables the feature mid-install.
+ * Without this, the install kept running in the background even after
+ * the user closed every visible cue.
+ */
+LLM_Deps_Cancel() {
+	global _LLM_Deps_InstallerPid, _LLM_Deps_PollTimer, _LLM_Deps_Checking, _LLM_Deps_State
+
+	if _LLM_Deps_InstallerPid {
+		LoggerInfo("LLM", "Cancel — killing installer PID=" _LLM_Deps_InstallerPid " and its child tree.")
+		; Use taskkill /T to terminate the whole process tree (powershell
+		; spawns ollama.exe + curl.exe for the model pull). /F forces
+		; termination even when the process is mid-IO.
+		try Run('taskkill /F /T /PID ' _LLM_Deps_InstallerPid, , "Hide")
+		_LLM_Deps_InstallerPid := 0
+	}
+	if IsSet(_LLM_Deps_PollTimer) and _LLM_Deps_PollTimer {
+		try SetTimer(_LLM_Deps_PollTimer, 0)
+		_LLM_Deps_PollTimer := unset
+	}
+	_LLM_Deps_Checking := false
+	; State stays "pending" — the user explicitly aborted, but the next
+	; toggle ON should be able to retry the install cleanly.
+	_LLM_Deps_State := "pending"
 }
 
 /**
@@ -286,6 +357,9 @@ LLM_Deps_PollFile(pid, on_ready, on_failed) {
 	try FileDelete(_LLM_Deps_OutFile)
 
 	_LLM_Deps_Checking := false
+	; Clear the global installer PID — the process is gone, so a later
+	; LLM_Deps_Cancel() must not try to taskkill a recycled PID.
+	global _LLM_Deps_InstallerPid := 0
 
 	; We cannot read the exit code from shell.Run. Instead we verify
 	; Ollama reachability directly — if the server answers, install succeeded.
