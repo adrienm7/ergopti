@@ -2094,36 +2094,54 @@ LLM_Tray_GetProfileHotkeyHint(id) {
  */
 LLM_Tray_BindProfileHotkeys() {
 	global LLM_PROFILE_HOTKEY_LIMIT
+	; Gate the Ctrl+<n> bindings on _LLM_Tray["enabled"] via HotIf so the
+	; OS never sees the binding when the feature is off — keystrokes pass
+	; through naturally to the active app (browsers, IDEs, …). Previously
+	; we registered the hotkey unconditionally and tried to synthesize
+	; ``{Ctrl down}<n>{Ctrl up}`` as a fallback, but that lost the user's
+	; held modifiers (Shift+Ctrl+1 etc.) and added a round-trip the active
+	; app could see as foreign input. The HotIf approach is the same one
+	; we already use for Tab + nav hotkeys further down in this file.
+	HotIf((*) => _LLM_Tray_IsProfileHotkeyActive())
 	loop LLM_PROFILE_HOTKEY_LIMIT {
 		idx := A_Index
 		key := "^" . idx
 		try Hotkey(key, _LLM_Tray_MakeProfileHotkey(idx), "On")
 	}
+	HotIf  ; reset
+}
+
+/**
+ * Predicate used by ``HotIf`` to decide whether the Ctrl+<n> bindings are
+ * active. True only when the LLM tray reports enabled AND there is at
+ * least one configured profile to map onto — otherwise the keystroke
+ * falls through to the active app unchanged.
+ */
+_LLM_Tray_IsProfileHotkeyActive() {
+	global _LLM_Tray
+	if !IsSet(_LLM_Tray) or !_LLM_Tray["enabled"]
+		return false
+	order := LLM_Tray_GetHotkeyProfileOrder()
+	return order.Length > 0
 }
 
 /**
  * Builds the closure assigned to a Ctrl+<n> shortcut. The closure resolves
  * the active profile order each time it fires (not at registration time)
  * so new user profiles created after boot are reachable without a reload.
- * Falls through to the default Ctrl+<n> behaviour (passing the keystroke
- * to the active app) when the index is out of range or the LLM feature is
- * disabled — keeps the binding non-intrusive on slots the user hasn't
- * configured yet.
  */
 _LLM_Tray_MakeProfileHotkey(idx) {
 	return (*) => _LLM_Tray_OnProfileHotkey(idx)
 }
 
 _LLM_Tray_OnProfileHotkey(idx) {
-	global _LLM_Tray
-	if !_LLM_Tray["enabled"] {
-		; Pass the keystroke through so the user's app receives Ctrl+<n>.
-		Send "{Ctrl down}" . idx . "{Ctrl up}"
-		return
-	}
+	; The HotIf predicate already guarantees the LLM is enabled and at
+	; least one profile is configured. We still guard against an out-of-
+	; range idx (user has fewer profiles than the bound 1..9) by sending
+	; the bare keystroke through so the app's own Ctrl+<n> handler runs.
 	order := LLM_Tray_GetHotkeyProfileOrder()
 	if (idx < 1 or idx > order.Length) {
-		Send "{Ctrl down}" . idx . "{Ctrl up}"
+		Send "^" . idx
 		return
 	}
 	LLM_Tray_SetProfile(order[idx])

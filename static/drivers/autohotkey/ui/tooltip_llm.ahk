@@ -191,7 +191,7 @@ LLM_Tooltip_Hide(accepted := false) {
 	if (was_visible and !accepted) {
 		try {
 			app_name := ""
-			try app_name := WinGetTitle("A")
+			try app_name := WinGetProcessName("A")
 			KL_LogLlmDismissed(app_name, slots_snapshot)
 		}
 	}

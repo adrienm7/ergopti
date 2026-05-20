@@ -692,7 +692,7 @@ _LLM_Engine_FinalizeRequest(state) {
 		; dropping. The tooltip auto-dismisses via its own timer.
 		try {
 			app_name := ""
-			try app_name := WinGetTitle("A")
+			try app_name := WinGetProcessName("A")
 			KL_LogLlmFailed(Map(
 				"app",            app_name,
 				"context",        state["ctx"],
@@ -724,7 +724,7 @@ _LLM_Engine_FinalizeRequest(state) {
 	; response (OpenAI's ``usage`` block, Anthropic's ``usage`` block).
 	try {
 		app_name := ""
-		try app_name := WinGetTitle("A")
+		try app_name := WinGetProcessName("A")
 		evt := Map(
 			"app",           app_name,
 			"context",       state["ctx"],
@@ -762,7 +762,7 @@ _LLM_Engine_FinalizeRequest(state) {
 	; both the tooltip flow and the inline-autotype flow contribute.
 	try {
 		app_name := ""
-		try app_name := WinGetTitle("A")
+		try app_name := WinGetProcessName("A")
 		KL_LogLlmSuggested(app_name, state["slots"].Length)
 	}
 
