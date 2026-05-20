@@ -100,15 +100,42 @@ local _locale_set_fn = nil  -- injected by init() below
 -- =========================================
 -- =========================================
 
---- Initialises the i18n module. Reads the persisted locale from hs.settings
---- (or falls back to "fr"). Must be called once at boot before any menu is built.
+--- Detects the macOS system UI locale and returns the best matching supported
+--- locale code.  Falls back to "en" when the system locale cannot be mapped.
+--- Uses ``hs.host.locale.current()`` (Hammerspoon 0.9.93+); degrades gracefully
+--- when the API is unavailable.
+--- @return string A supported locale code, e.g. ``"fr"`` or ``"en"``.
+function M.detect_system_locale()
+	local raw = nil
+	-- hs.host.locale.current() returns e.g. "fr_FR", "en_GB", "zh_Hans_CN"
+	if hs.host and hs.host.locale and type(hs.host.locale.current) == "function" then
+		local ok, val = pcall(hs.host.locale.current)
+		if ok and type(val) == "string" then raw = val end
+	end
+	if not raw or raw == "" then
+		Logger.debug(LOG, "detect_system_locale: API unavailable — falling back to 'en'.")
+		return "en"
+	end
+	-- Try exact two-letter prefix first (e.g. "fr" from "fr_FR")
+	local lang = raw:match("^([a-z][a-z])")
+	if lang and is_known(lang) then
+		Logger.debug(LOG, "detect_system_locale: '%s' → '%s'.", raw, lang)
+		return lang
+	end
+	Logger.debug(LOG, "detect_system_locale: '%s' not in supported list — falling back to 'en'.", raw)
+	return "en"
+end
+
+--- Initialises the i18n module. Reads the persisted locale from hs.settings;
+--- if none is saved, detects the macOS system locale (fallback: "en").
+--- Must be called once at boot before any menu is built.
 function M.init()
 	Logger.trace(LOG, "Initialising i18n…")
 	local saved = hs.settings.get(SETTINGS_KEY)
 	if type(saved) == "string" and is_known(saved) then
 		_locale = saved
 	else
-		_locale = "fr"
+		_locale = M.detect_system_locale()
 	end
 	-- Patch lib/locale so it loads the right file
 	if _locale_set_fn then _locale_set_fn(_locale) end

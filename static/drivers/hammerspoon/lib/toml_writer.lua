@@ -229,4 +229,121 @@ function M.write(path, data)
 		return true
 end
 
+--- Writes or updates a set of key/value pairs in a simple INI-style TOML file
+--- (the driver config.toml used by config_overrides and the onboarding wizard).
+--- Each entry in ``updates`` is a table ``{section, key, value}`` where:
+---   - ``section`` is the TOML section header without brackets, e.g. ``"Script"``.
+---   - ``key``     is the bare key name, e.g. ``"Locale"``.
+---   - ``value``   is a Lua string, boolean, or number — serialised to TOML.
+---
+--- Existing keys in the file are updated in-place; new sections and keys are
+--- appended.  Lines not matching any update are preserved verbatim.
+--- @param path string Absolute path to the config.toml to write.
+--- @param updates table Array of ``{section=string, key=string, value=any}`` tables.
+--- @return boolean, string|nil True on success, or false and an error string.
+function M.batch_write(path, updates)
+	if type(path) ~= "string" or path == "" then
+		Logger.error(LOG, "batch_write: invalid path.")
+		return false, "Invalid path."
+	end
+	if type(updates) ~= "table" then
+		Logger.error(LOG, "batch_write: updates must be a table.")
+		return false, "updates must be a table."
+	end
+
+	-- Build a lookup: section_lower → key_lower → update entry
+	local lookup = {}
+	for _, u in ipairs(updates) do
+		if type(u.section) == "string" and type(u.key) == "string" then
+			local sl = u.section:lower()
+			if not lookup[sl] then lookup[sl] = {} end
+			lookup[sl][u.key:lower()] = u
+		end
+	end
+
+	-- Serialise a Lua value to a TOML literal.
+	local function to_toml_value(v)
+		if type(v) == "boolean" then return v and "true" or "false" end
+		if type(v) == "number"  then return tostring(v) end
+		-- String: quote and escape
+		return "\"" .. tostring(v):gsub("\\", "\\\\"):gsub("\"", "\\\"") .. "\""
+	end
+
+	-- Read existing lines (empty table if file absent).
+	local lines = {}
+	local fh_r = io.open(path, "r")
+	if fh_r then
+		for line in fh_r:lines() do lines[#lines + 1] = line end
+		fh_r:close()
+	end
+
+	-- Walk existing lines, replacing matching key lines in-place.
+	local current_section = ""
+	local applied = {}   -- tracks which updates were already applied
+	for idx, line in ipairs(lines) do
+		local trimmed = line:match("^%s*(.-)%s*$") or ""
+		-- Section header
+		local hdr = trimmed:match("^%[([^%[%]]+)%]$")
+		if hdr then
+			current_section = hdr:lower()
+		else
+			local key = trimmed:match("^([%w_]+)%s*=")
+			if key then
+				local kl = key:lower()
+				local bucket = lookup[current_section]
+				if bucket and bucket[kl] then
+					local u = bucket[kl]
+					lines[idx] = u.key .. " = " .. to_toml_value(u.value)
+					applied[current_section .. "\0" .. kl] = true
+				end
+			end
+		end
+	end
+
+	-- Append any updates that were not found in the existing file.
+	-- Group by section so we don't emit duplicate section headers.
+	local pending = {}   -- section_original → list of update entries
+	for _, u in ipairs(updates) do
+		local sl = u.section:lower()
+		local kl = u.key:lower()
+		if not applied[sl .. "\0" .. kl] then
+			if not pending[u.section] then pending[u.section] = {} end
+			pending[u.section][#pending[u.section] + 1] = u
+		end
+	end
+
+	for section, entries in pairs(pending) do
+		-- Check whether the section header already exists anywhere in lines.
+		local section_exists = false
+		for _, line in ipairs(lines) do
+			if (line:match("^%s*%[([^%[%]]+)%]%s*$") or ""):lower() == section:lower() then
+				section_exists = true
+				break
+			end
+		end
+		if not section_exists then
+			lines[#lines + 1] = ""
+			lines[#lines + 1] = "[" .. section .. "]"
+		end
+		for _, u in ipairs(entries) do
+			lines[#lines + 1] = u.key .. " = " .. to_toml_value(u.value)
+		end
+	end
+
+	local fh_w, err_w = io.open(path, "w")
+	if not fh_w then
+		Logger.error(LOG, "batch_write: cannot open '%s' for writing — %s.", path, tostring(err_w))
+		return false, tostring(err_w)
+	end
+	local content = table.concat(lines, "\n")
+	local ok_w, err2 = pcall(function() fh_w:write(content) end)
+	pcall(function() fh_w:close() end)
+	if not ok_w then
+		Logger.error(LOG, "batch_write: write failed — %s.", tostring(err2))
+		return false, tostring(err2)
+	end
+	Logger.info(LOG, "batch_write: wrote %d line(s) to '%s'.", #lines, path)
+	return true
+end
+
 return M

@@ -330,7 +330,7 @@ function M.run(config_path)
 
 	_webview = ui_builder.show_webview({
 		frame       = ui_builder.get_centered_frame(win_w, win_h),
-		title       = "Ergopti — Setup",
+		title       = i18n.get("onboarding.welcome.title"),
 		style_masks = style_masks,
 		usercontent = _usercontent,
 		assets_dir  = ASSETS_DIR,

@@ -42,6 +42,18 @@ local _get_trigger = nil   -- injected by init.lua after keymap is ready
 --- @param code string Locale code, e.g. ``"fr"``.
 --- @return string Absolute path to the JSON file.
 local function locale_path(code)
+	-- Fast path: in both dev and packaged .app, hs.configdir is always
+	-- {root}/static/drivers/hammerspoon so locales sit exactly two levels up.
+	-- We try this direct path first to avoid the walk-up overhead and to
+	-- stay resilient against symlink canonicalization inside the .app bundle.
+	local cfg = (hs.configdir or ""):gsub("[/\\]+$", "")
+	local direct = cfg .. "/../../locales"
+	local ok_direct, attr_direct = pcall(hs.fs.attributes, direct)
+	if ok_direct and type(attr_direct) == "table" then
+		Logger.debug(LOG, "locale_path: resolved via direct path '%s'.", direct)
+		return direct .. "/" .. code .. ".json"
+	end
+	-- Fallback: walk up the directory tree for non-standard layouts.
 	local dir = Paths.find_from_configdir("static/locales")
 	if not dir then
 		Logger.error(LOG, "locale_path: static/locales/ not found — translations unavailable.")
