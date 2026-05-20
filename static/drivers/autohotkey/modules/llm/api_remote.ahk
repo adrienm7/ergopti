@@ -98,27 +98,12 @@ global LLM_REMOTE_TIMEOUT_MS := 30000   ; same generous ceiling as Ollama
 LLM_RemoteGenerate(Entry, SystemPrompt, UserText, Temperature := 0.1) {
     global LLM_API_PROVIDERS, LLM_REMOTE_TIMEOUT_MS
 
-    ProviderId := _LLMRemoteEntryGet(Entry, "Provider", "openai_compat")
-    if !LLM_API_PROVIDERS.Has(ProviderId) {
+    resolved := _LLMRemoteResolveEntry(Entry)
+    if (resolved == "")
         return ""
-    }
-    Provider := LLM_API_PROVIDERS[ProviderId]
-    Format   := Provider["Format"]
-    BaseUrl  := _LLMRemoteEntryGet(Entry, "BaseUrl", "")
-    if (BaseUrl == "") {
-        BaseUrl := Provider["BaseUrl"]
-    }
-    if (BaseUrl == "") {
-        return ""
-    }
-    Token := _LLMRemoteEntryGet(Entry, "Token", "")
-    Model := _LLMRemoteEntryGet(Entry, "Model", Provider["DefaultModel"])
-    if (Model == "") {
-        return ""
-    }
 
-    Url     := _LLMRemoteBuildUrl(BaseUrl, Format, Token, Model)
-    Payload := _LLMRemoteBuildPayload(Format, Model, SystemPrompt, UserText, Temperature)
+    Url     := _LLMRemoteBuildUrl(resolved["BaseUrl"], resolved["Format"], resolved["Token"], resolved["Model"])
+    Payload := _LLMRemoteBuildPayload(resolved["Format"], resolved["Model"], SystemPrompt, UserText, Temperature)
 
     try {
         Http := ComObject("WinHttp.WinHttpRequest.5.1")
@@ -126,15 +111,157 @@ LLM_RemoteGenerate(Entry, SystemPrompt, UserText, Temperature := 0.1) {
         Http.SetTimeouts(LLM_REMOTE_TIMEOUT_MS, LLM_REMOTE_TIMEOUT_MS,
                         LLM_REMOTE_TIMEOUT_MS, LLM_REMOTE_TIMEOUT_MS)
         Http.SetRequestHeader("Content-Type", "application/json")
-        _LLMRemoteSetAuthHeaders(Http, Format, Token)
+        _LLMRemoteSetAuthHeaders(Http, resolved["Format"], resolved["Token"])
         Http.Send(Payload)
         if (Http.Status < 200 or Http.Status >= 300) {
             return ""
         }
-        return _LLMRemoteParseResponse(Format, Http.ResponseText)
+        return _LLMRemoteParseResponse(resolved["Format"], Http.ResponseText)
     } catch as err {
         return ""
     }
+}
+
+; ============================================
+; ===== Async surface =====
+; ============================================
+
+; Registry of in-flight async remote requests (parallel to _LLM_Ollama_Async).
+global _LLM_Remote_Async := Map()
+global _LLM_Remote_AsyncCounter := 0
+global LLM_REMOTE_POLL_MS := 50
+global LLM_REMOTE_MAX_INFLIGHT := 16
+
+/**
+ * Non-blocking variant of LLM_RemoteGenerate. Mirrors hs.http.asyncPost on
+ * the HS side: fire-and-forget dispatch, callbacks fire when ready. See
+ * LLM_OllamaGenerate_Async for the polling model — both share the same
+ * WinHTTP-async + SetTimer-poll pattern.
+ *
+ * @param {Map|Object} Entry        - Active API entry record.
+ * @param {string}     SystemPrompt - Resolved system prompt.
+ * @param {string}     UserText     - User context.
+ * @param {number}     Temperature  - Sampling temperature.
+ * @param {function}   on_success   - Called with the generated text.
+ * @param {function}   on_fail      - Called on HTTP / parse failure.
+ * @returns {Integer}  Request id, usable with LLM_RemoteCancelAsync.
+ */
+LLM_RemoteGenerate_Async(Entry, SystemPrompt, UserText, Temperature, on_success, on_fail) {
+    global _LLM_Remote_Async, _LLM_Remote_AsyncCounter, LLM_REMOTE_TIMEOUT_MS
+
+    _LLM_Remote_AsyncCounter += 1
+    req_id := _LLM_Remote_AsyncCounter
+
+    resolved := _LLMRemoteResolveEntry(Entry)
+    if (resolved == "") {
+        try on_fail()
+        return req_id
+    }
+
+    Url     := _LLMRemoteBuildUrl(resolved["BaseUrl"], resolved["Format"], resolved["Token"], resolved["Model"])
+    Payload := _LLMRemoteBuildPayload(resolved["Format"], resolved["Model"], SystemPrompt, UserText, Temperature)
+
+    try {
+        http := ComObject("WinHttp.WinHttpRequest.5.1")
+        http.Open("POST", Url, true)
+        http.SetTimeouts(LLM_REMOTE_TIMEOUT_MS, LLM_REMOTE_TIMEOUT_MS, LLM_REMOTE_TIMEOUT_MS, LLM_REMOTE_TIMEOUT_MS)
+        http.SetRequestHeader("Content-Type", "application/json")
+        _LLMRemoteSetAuthHeaders(http, resolved["Format"], resolved["Token"])
+        http.Send(Payload)
+    } catch as err {
+        try on_fail()
+        return req_id
+    }
+
+    _LLMRemote_TrimAsyncRegistry()
+    _LLM_Remote_Async[req_id] := Map("http", http, "format", resolved["Format"], "on_success", on_success, "on_fail", on_fail, "cancelled", false)
+    _LLMRemote_PollRequest(req_id)
+    return req_id
+}
+
+LLM_RemoteCancelAsync(req_id) {
+    global _LLM_Remote_Async
+    if !_LLM_Remote_Async.Has(req_id)
+        return
+    _LLM_Remote_Async[req_id]["cancelled"] := true
+}
+
+LLM_RemoteCancelAllAsync() {
+    global _LLM_Remote_Async
+    for _id, entry in _LLM_Remote_Async
+        entry["cancelled"] := true
+}
+
+_LLMRemote_PollRequest(req_id) {
+    global _LLM_Remote_Async, LLM_REMOTE_POLL_MS
+    if !_LLM_Remote_Async.Has(req_id)
+        return
+    entry := _LLM_Remote_Async[req_id]
+    if entry["cancelled"] {
+        _LLM_Remote_Async.Delete(req_id)
+        return
+    }
+    http := entry["http"]
+    ready := false
+    try ready := http.WaitForResponse(0)
+    if !ready {
+        SetTimer(() => _LLMRemote_PollRequest(req_id), -LLM_REMOTE_POLL_MS)
+        return
+    }
+    on_success := entry["on_success"]
+    on_fail    := entry["on_fail"]
+    format     := entry["format"]
+    _LLM_Remote_Async.Delete(req_id)
+    try {
+        status := http.Status
+        body   := http.ResponseText
+    } catch {
+        try on_fail()
+        return
+    }
+    if (status < 200 or status >= 300) {
+        try on_fail()
+        return
+    }
+    text := _LLMRemoteParseResponse(format, body)
+    if (text == "") {
+        try on_fail()
+        return
+    }
+    try on_success(text)
+}
+
+_LLMRemote_TrimAsyncRegistry() {
+    global _LLM_Remote_Async, LLM_REMOTE_MAX_INFLIGHT
+    if (_LLM_Remote_Async.Count < LLM_REMOTE_MAX_INFLIGHT)
+        return
+    for oldest_id, _entry in _LLM_Remote_Async {
+        _LLM_Remote_Async.Delete(oldest_id)
+        return
+    }
+}
+
+; Resolves an entry record to a normalised Map(Provider, Format, BaseUrl,
+; Token, Model). Returns "" when the entry is unusable (missing token /
+; model / unknown provider) so the caller can fail cleanly on a single
+; check instead of repeating the same six guards everywhere.
+_LLMRemoteResolveEntry(Entry) {
+    global LLM_API_PROVIDERS
+    ProviderId := _LLMRemoteEntryGet(Entry, "Provider", "openai_compat")
+    if !LLM_API_PROVIDERS.Has(ProviderId)
+        return ""
+    Provider := LLM_API_PROVIDERS[ProviderId]
+    Format   := Provider["Format"]
+    BaseUrl  := _LLMRemoteEntryGet(Entry, "BaseUrl", "")
+    if (BaseUrl == "")
+        BaseUrl := Provider["BaseUrl"]
+    if (BaseUrl == "")
+        return ""
+    Token := _LLMRemoteEntryGet(Entry, "Token", "")
+    Model := _LLMRemoteEntryGet(Entry, "Model", Provider["DefaultModel"])
+    if (Model == "")
+        return ""
+    return Map("Provider", ProviderId, "Format", Format, "BaseUrl", BaseUrl, "Token", Token, "Model", Model)
 }
 
 ; Probes the API endpoint with a lightweight call (the providers' canonical
