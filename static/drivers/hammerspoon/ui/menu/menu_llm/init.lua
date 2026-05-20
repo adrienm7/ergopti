@@ -107,7 +107,12 @@ M.DEFAULT_STATE = {
     llm_secure_field_filter_enabled   = true,
     llm_user_profiles     = {},
     llm_profile_shortcuts = {},
-    llm_trigger_shortcut  = false,
+    -- On-demand prediction shortcut. Defaults to Ctrl+Space (real Ctrl,
+    -- not Cmd — on macOS the Cmd+Space slot is owned by Spotlight and
+    -- system-wide search, so it's a poor default for an editor cue).
+    -- The user can rebind it from the trigger settings submenu or set
+    -- the value to false to disable.
+    llm_trigger_shortcut  = { mods = { "ctrl" }, key = "space" },
     llm_after_hotstring   = llm_mod.DEFAULT_STATE.llm_after_hotstring,
     llm_auto_raise_temp   = llm_mod.DEFAULT_STATE.llm_auto_raise_temp,
     llm_min_words         = llm_mod.DEFAULT_STATE.llm_min_words,
