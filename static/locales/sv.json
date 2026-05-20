@@ -1904,6 +1904,6 @@
 	"updater.up_to_date": "ErgoptiPlus är uppdaterad.\n\nAktuell version: {1}",
 	"updater.version_message": "ErgoptiPlus {1}{2}\n\nÖppna utgåvesidan på GitHub?",
 	"vscode.reload_required": "Ladda om VSCode (Cmd+Shift+P > Reload Window) för att aktivera skrivtillägget",
-	"menu.llm.warning_install_ollama": "⚠️  Ollama är inte installerad — klicka för att starta om installationen",
+	"menu.llm.warning_install_ollama": "📥 Installera Ollama nu",
 	"llm.deps.browser_install_tip": "Ladda ned Ollama för Windows från sidan som öppnats i webbläsaren, kör installationsprogrammet och kom tillbaka — anslutningen upptäcks automatiskt."
 }

@@ -337,8 +337,13 @@ LLM_Tray_Build() {
 	; tooltip ever appeared, and the user had no obvious next step.
 	if (_LLM_Tray["enabled"] and _LLM_Tray["backend"] == "ollama" and !LLM_Deps_IsReady()) {
 		LoggerInfo("LLM", "Tray: showing 'Ollama not installed' warning row.")
-		_LLM_Tray_Menu.Add(t("menu.llm.warning_install_ollama"),
-			(*) => _LLM_Tray_OnWarningInstallClick())
+		; Pass the function reference DIRECTLY (no fat-arrow wrapper). AHK
+		; v2 menu callbacks call ``fn(ItemName, ItemPos, MenuObj)``, which
+		; works because _LLM_Tray_OnWarningInstallClick is variadic. The
+		; previous ``(*) => …`` lambda may have been swallowing exceptions
+		; silently — when the user clicked nothing ever fired and no log
+		; line was emitted.
+		_LLM_Tray_Menu.Add(t("menu.llm.warning_install_ollama"), _LLM_Tray_OnWarningInstallClick)
 	}
 
 	; Backend submenu
@@ -1435,12 +1440,17 @@ LLM_Tray_BuildNavMenu() {
  * reached the handler at all (menu binding issue); if it's present but
  * BootstrapOllama isn't, the handoff dropped somewhere downstream.
  */
-_LLM_Tray_OnWarningInstallClick() {
+_LLM_Tray_OnWarningInstallClick(ItemName := "", ItemPos := 0, MenuObj := 0) {
+	; Variadic-friendly signature so AHK's menu callback contract works
+	; whether we're bound directly or via a fat-arrow wrapper. AHK calls
+	; menu callbacks as ``fn(name, pos, menu)`` — if those args weren't
+	; accepted the call threw immediately and the user saw nothing.
 	LoggerInfo("LLM", "Warning row clicked — forcing visible install.")
-	; Direct call (was a -1 SetTimer one-shot, which made the trace
-	; harder to follow without buying us anything: the menu click is
-	; already on a separate AHK thread from the rebuild path).
-	LLM_Tray_BootstrapOllama(true)
+	try {
+		LLM_Tray_BootstrapOllama(true)
+	} catch as err {
+		LoggerError("LLM", "Bootstrap raised: " err.Message ".")
+	}
 }
 
 LLM_Tray_OnToggle(*) {
