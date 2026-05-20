@@ -1207,19 +1207,43 @@ initMenu() {
 	AboutMenu := Menu()
 	Ver := Updater_CurrentVersion()
 	VerLabel := "ErgoptiPlus " . Ver
-	AboutMenu.Add(VerLabel, Updater_ShowVersion)
+	; First item: clicking the version label opens the release page DIRECTLY,
+	; with no intermediate dialog. The URL is the build-stamped
+	; BUNDLE_RELEASE_URL (deep-links to the exact running version) when
+	; available, the channel "latest" page otherwise.
+	AboutMenu.Add(VerLabel, Updater_OpenCurrentRelease)
 	AboutMenu.Add() ; Separator
-	global UPDATER_CHANNEL
+	global UPDATER_CHANNEL, UPDATER_CHECK_INTERVAL, UPDATER_INTERVAL_PRESETS
+	global UPDATER_LATEST_RELEASE
 	if Updater_IsLocalSource() {
-		; Local source build — channel selection is meaningless, show a grayed info item
+		; Local source build — channel selection is meaningless, show a grayed info item.
 		LocalSourceLabel := t("menu.about.channel_local_source")
 		AboutMenu.Add(LocalSourceLabel, (*) => NoAction())
 		AboutMenu.Disable(LocalSourceLabel)
 	} else {
-		ChannelMainLabel := (UPDATER_CHANNEL != "dev") ? "✔  " . t("menu.about.channel_main") : "   " . t("menu.about.channel_main")
-		ChannelDevLabel  := (UPDATER_CHANNEL == "dev") ? "✔  " . t("menu.about.channel_dev")  : "   " . t("menu.about.channel_dev")
-		AboutMenu.Add(ChannelMainLabel, (*) => Updater_SetChannel("main"))
-		AboutMenu.Add(ChannelDevLabel,  (*) => Updater_SetChannel("dev"))
+		; Update channel as a SUBMENU rather than two siblings with check marks.
+		; Reduces vertical noise in the parent menu and groups the mutually-
+		; exclusive choice under a single header.
+		ChannelMenu := Menu()
+		ChannelMenu.Add(t("menu.about.channel_main"), (*) => Updater_SetChannel("main"))
+		ChannelMenu.Add(t("menu.about.channel_dev"),  (*) => Updater_SetChannel("dev"))
+		ChannelMenu.Check((UPDATER_CHANNEL == "dev") ? t("menu.about.channel_dev") : t("menu.about.channel_main"))
+		AboutMenu.Add(t("menu.about.channel_menu"), ChannelMenu)
+
+		; Frequency submenu: 12 presets, current cadence pre-checked.
+		; ``Updater_SetCheckInterval`` re-arms the background timer immediately
+		; so the user feels the change without waiting for the next tick.
+		FreqMenu := Menu()
+		CurrentLabel := ""
+		for Preset in UPDATER_INTERVAL_PRESETS {
+			Label := t("menu.about.frequency." . Preset.Code)
+			FreqMenu.Add(Label, _MakeFreqSetter(Preset.Seconds))
+			if (Preset.Seconds == UPDATER_CHECK_INTERVAL)
+				CurrentLabel := Label
+		}
+		if (CurrentLabel != "")
+			FreqMenu.Check(CurrentLabel)
+		AboutMenu.Add(t("menu.about.frequency_menu"), FreqMenu)
 	}
 	AboutMenu.Add() ; Separator
 	; In local-source mode the user is running from a working copy; there are no
@@ -1228,6 +1252,12 @@ initMenu() {
 	if !Updater_IsLocalSource() {
 		AboutMenu.Add(t("menu.about.check_for_updates"), Updater_CheckForUpdate)
 		AboutMenu.Add(t("menu.about.changelog"),         Updater_ShowChangelog)
+		; "Install update" — visible only when the background poller has
+		; detected a new version (cache populated). One click opens the
+		; install prompt with release notes + the binary-swap button.
+		if IsSet(UPDATER_LATEST_RELEASE) and Type(UPDATER_LATEST_RELEASE) == "Object" {
+			AboutMenu.Add(t("menu.about.install_update"), Updater_ShowAvailableUpdate)
+		}
 	}
 	AboutMenu.Add(t("menu.about.open_releases_page"), (*) => Run(Updater_ReleasesPageUrl()))
 	A_TrayMenu.Add(t("menu.about.title"), AboutMenu)
@@ -1264,6 +1294,15 @@ initMenu() {
 	DebuggingMenu.Add(t("menu.debug.open_today_log"), OpenTodayLog)
 	A_TrayMenu.Add(t("menu.debug.title"), DebuggingMenu)
 }
+
+; Returns a menu callback bound to a specific check interval (in seconds).
+; Defined here rather than inline inside the menu builder so AHK captures the
+; value at call time — fat-arrow closures defined inside the loop would all
+; share the same loop-variable reference and persist only the last preset.
+_MakeFreqSetter(Seconds) {
+	return (*) => Updater_SetCheckInterval(Seconds)
+}
+
 
 ; Opens personal_shortcuts.ahk in Notepad. Same function the gesture binding
 ; uses (modules/gestures.ahk:GestureEditPersonalShortcuts), but kept callable

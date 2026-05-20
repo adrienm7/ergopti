@@ -47,6 +47,10 @@
 			<div class="step hidden" id="step-2">
 				<h1 id="s2-title"></h1>
 				<p class="desc" id="s2-desc"></p>
+				<!-- Layout preview: src is set from the Lua-injected
+				     layout_image_url. The element is hidden when no URL is
+				     available so an asset-less install still renders cleanly. -->
+				<img id="s2-preview" class="layout-preview" alt="" hidden />
 				<div class="radio-group">
 					<label class="radio-card" id="s2-yes-card">
 						<input type="radio" name="layout" value="yes" checked />

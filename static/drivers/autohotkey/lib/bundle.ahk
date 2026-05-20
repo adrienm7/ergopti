@@ -48,6 +48,18 @@
 ; placeholder stays as-is and we treat it as ``dev`` to disable any skip.
 global BUNDLE_VERSION := "__BUNDLE_VERSION__"
 
+; GitHub release URL frozen at build time so the tray menu's first item can
+; deep-link to *this exact release* without an extra API call. The release
+; workflow rewrites the placeholder right after stamping BUNDLE_VERSION,
+; mirroring the pattern above. Empty in dev — callers fall back to the
+; channel's "latest" page resolved at runtime.
+global BUNDLE_RELEASE_URL := "__BUNDLE_RELEASE_URL__"
+
+; Asset name pattern for the self-updater download. Frozen at build time to
+; keep the runtime decoupled from the release-workflow naming convention —
+; if a future rename happens, only this placeholder needs to track it.
+global BUNDLE_RELEASE_ASSET := "ErgoptiPlus.exe"
+
 ; Resolved at runtime by Bundle_Init() — empty string in dev mode (callers
 ; must fall back to A_ScriptDir-derived paths), versioned LocalAppData path
 ; in compiled mode. Exposed as a global so every module can read it.

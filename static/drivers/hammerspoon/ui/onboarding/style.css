@@ -185,6 +185,24 @@ h1 {
 	font-size: 13px;
 }
 
+/* =========================================== */
+/* =========================================== */
+/* ======= 5b/ Layout Preview Image ========== */
+/* =========================================== */
+/* =========================================== */
+
+/* Scales the layout JPG to the wizard's content width while keeping its
+   aspect ratio — so the visual cue does not push the radios off-screen
+   on a narrow window. */
+.layout-preview {
+	border: 1px solid #e0e0e0;
+	border-radius: 6px;
+	display: block;
+	height: auto;
+	margin: 0 0 12px;
+	max-width: 100%;
+}
+
 /* ====================================== */
 /* ====================================== */
 /* ======= 6/ Radio Cards ============== */

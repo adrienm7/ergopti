@@ -67,6 +67,10 @@ ASSET_FILES: list[tuple[str, str]] = [
 	("static/menu_manifest.json", "static/menu_manifest.json"),
 	("static/version.json",       "static/version.json"),
 	("static/favicon.ico",        "static/favicon.ico"),
+	# Layout preview shown on the onboarding wizard's Step 2 (AHK + HS). The
+	# rest of the ergopti_*.jpg variants are web-only marketing assets and
+	# stay out of the bundle per the size-filter rationale above.
+	("static/img/ergopti.jpg",    "static/img/ergopti.jpg"),
 ]
 
 

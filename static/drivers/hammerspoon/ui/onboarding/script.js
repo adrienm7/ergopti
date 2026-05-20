@@ -207,6 +207,19 @@ function renderStep2() {
 	document.getElementById("s2-back").textContent = _t("onboarding.back");
 	document.getElementById("s2-next").textContent = _t("onboarding.next");
 
+	// Layout preview image — only show when Lua injected a usable URL.
+	// Keeps the wizard graceful on installs where static/img/ergopti.jpg
+	// is missing (asset-less build, unusual install path…).
+	var preview = document.getElementById("s2-preview");
+	if (preview) {
+		if (window.LAYOUT_IMAGE_URL) {
+			preview.src    = window.LAYOUT_IMAGE_URL;
+			preview.hidden = false;
+		} else {
+			preview.hidden = true;
+		}
+	}
+
 	// Restore saved answer
 	var radios = document.querySelectorAll("input[name='layout']");
 	radios.forEach(function (r) { r.checked = (r.value === (_answers.use_ergopti ? "yes" : "no")); });
@@ -362,6 +375,9 @@ window.initData = function (data) {
 	// AZERTY-flavoured layouts and ; otherwise. Lua resolves it via
 	// hs.keycodes.currentLayout().
 	if (data && data.system_layout) window.SYSTEM_LAYOUT = data.system_layout;
+	// Layout preview image URL (file:// URI to static/img/ergopti.jpg).
+	// Optional — when absent step 2 renders without the visual cue.
+	if (data && data.layout_image_url) window.LAYOUT_IMAGE_URL = data.layout_image_url;
 	window.applyStrings(data && data.strings ? data.strings : {});
 	renderStep1();
 	showStep(1);
@@ -374,6 +390,21 @@ window.setConfigDir = function (path) {
 	var inp = document.getElementById("sc-input");
 	if (inp) inp.value = path;
 	_answers.config_dir = path;
+};
+
+// Called by Lua after parsing an existing config.toml at the chosen folder.
+// Merges the saved answers into _answers and re-renders whichever step is
+// currently on screen so the pre-fill becomes visible without a manual nav.
+window.applyExistingAnswers = function (saved) {
+	if (!saved || typeof saved !== "object") return;
+	_answers = Object.assign(_answers, saved);
+	// Re-render the active step so freshly-hydrated values show up. Subsequent
+	// steps read _answers directly when first rendered (via renderStepN), so
+	// only the current one needs an explicit refresh.
+	if (_currentStep === 2)      renderStep2();
+	else if (_currentStep === 3) renderStep3();
+	else if (_currentStep === 4) renderStep4();
+	else if (_currentStep === 5) renderStep5();
 };
 
 
@@ -400,6 +431,11 @@ document.getElementById("sc-back").addEventListener("click", function () {
 document.getElementById("sc-next").addEventListener("click", function () {
 	var val = (document.getElementById("sc-input").value || "").trim();
 	_answers.config_dir = val;
+	// Ask Lua to load any existing config.toml at the chosen folder so steps
+	// 2-5 open pre-selected with the user's previous answers. The reply
+	// arrives asynchronously via window.applyExistingAnswers(), which
+	// re-renders the active step in place — so showing step 2 first is fine.
+	_post({ action: "loadExistingConfig", config_dir: val });
 	renderStep2();
 	showStep(2);
 });

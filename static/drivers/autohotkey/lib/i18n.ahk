@@ -81,6 +81,42 @@ _I18nLocalePath(Code) {
 	return _StaticDir . "\locales\" . Code . ".json"
 }
 
+; Detect the Windows UI language via GetLocaleInfoEx(LOCALE_SISO639LANGNAME)
+; and map it to a supported locale code. Falls back to "en" when the detected
+; language is not in the supported list or the API call fails.
+;
+; CRITICAL: LOCALE_NAME_USER_DEFAULT is the NULL pointer, NOT L"". Passing an
+; empty string here would silently switch to LOCALE_NAME_INVARIANT and return
+; "iv" — historical source of "everyone gets English regardless of Windows
+; language" bugs. Pass "Ptr", 0 explicitly.
+;
+; @returns string A supported two-letter locale code (e.g. "fr", "en", "de").
+_I18nDetectSystemLocale() {
+	; LOCALE_SISO639LANGNAME = 0x59 — returns the ISO 639-1 language code.
+	BufSize := 16
+	Buf := Buffer(BufSize * 2, 0)
+	Len := DllCall("GetLocaleInfoEx",
+		"Ptr", 0,           ; LOCALE_NAME_USER_DEFAULT (must be NULL, not L"")
+		"UInt", 0x59,
+		"Ptr", Buf,
+		"Int", BufSize,
+		"Int")
+	if Len > 1 {
+		Code := StrGet(Buf, "UTF-16")
+		Code := StrLower(SubStr(Code, 1, 2))
+		for _loc in I18N_LOCALES {
+			if _loc.Code = Code {
+				try LoggerDebug("i18n", "detect_system_locale: matched '{1}'.", Code)
+				return Code
+			}
+		}
+		try LoggerDebug("i18n", "detect_system_locale: '{1}' not supported — falling back to 'en'.", Code)
+	} else {
+		try LoggerDebug("i18n", "detect_system_locale: GetLocaleInfoEx returned 0 — falling back to 'en'.")
+	}
+	return "en"
+}
+
 ; Parse the JSON file at FilePath and populate _I18nCache. Substitutes ★ with
 ; the user's configured MagicKey. Does nothing and logs a warning on file error.
 _I18nLoadFile(FilePath) {
@@ -229,9 +265,18 @@ I18nInit(Cache) {
 		if IsKnown {
 			_I18nLocale := NewLocale
 		} else {
-			try LoggerWarn("i18n", "Unknown locale '{1}' in config — defaulting to 'fr'.", NewLocale)
-			_I18nLocale := "fr"
+			; Unknown code in config: pick the Windows UI language rather than
+			; silently defaulting to French — the user clearly wanted something
+			; else, and the system locale is the closest reasonable guess.
+			Detected := _I18nDetectSystemLocale()
+			try LoggerWarn("i18n", "Unknown locale '{1}' in config — falling back to system locale '{2}'.", NewLocale, Detected)
+			_I18nLocale := Detected
 		}
+	} else {
+		; No locale persisted yet: detect the Windows UI language so a freshly
+		; installed (or freshly reset) driver starts in the user's actual
+		; language rather than always French.
+		_I18nLocale := _I18nDetectSystemLocale()
 	}
 	_I18nCacheLoaded := false
 	try LoggerDone("i18n", "i18n initialised (locale: '{1}').", _I18nLocale)
