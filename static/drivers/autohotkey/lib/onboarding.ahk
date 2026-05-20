@@ -133,6 +133,36 @@ Onboarding_ShowFromMenu(*) {
 ; ===============================================
 ; ===============================================
 
+; Detects the Windows UI language using GetLocaleInfoEx (LOCALE_SISO639LANGNAME)
+; which returns the ISO 639-1 two-letter code directly (e.g. "fr", "en", "de").
+; Returns a supported locale code, or "en" as the fallback when the detected
+; language is not in our supported list.
+;
+; @returns string A supported two-letter locale code.
+_Onboarding_DetectSystemLocale() {
+	; LOCALE_SISO639LANGNAME = 0x59 — returns the ISO 639-1 language code.
+	; We ask for the user default locale (LOCALE_NAME_USER_DEFAULT = "").
+	BufSize := 16
+	Buf := Buffer(BufSize * 2, 0)
+	Len := DllCall("GetLocaleInfoEx",
+		"Str", "",
+		"UInt", 0x59,
+		"Ptr", Buf,
+		"Int", BufSize,
+		"Int")
+	if Len > 1 {
+		Code := StrGet(Buf, "UTF-16")
+		Code := StrLower(SubStr(Code, 1, 2))
+		; Verify the code is in our supported list
+		for _loc in _I18nSortedLocales() {
+			if _loc.Code = Code {
+				return Code
+			}
+		}
+	}
+	return "en"
+}
+
 ; Resolve a translation key in a target locale WITHOUT touching the active
 ; locale cache. Used by step 1 so the heading/title/button can be re-rendered
 ; in the language being previewed while the rest of the running script keeps
@@ -180,15 +210,25 @@ _Onboarding_Step1() {
 	; Sort the locale list alphabetically by Name so the wizard's language
 	; picker matches the tray menu's order (both use _I18nSortedLocales) —
 	; users who know where English lives in the tray menu now find it in the
-	; same spot here. Resolve the default English row in the sorted list so
-	; the pre-selection is always correct regardless of sort comparator
-	; behaviour (case sensitivity, locale-specific collation, etc.).
+	; same spot here. Detect the Windows UI language and pre-select it when
+	; it is in our supported list; otherwise fall back to English.
 	SortedLocales := _I18nSortedLocales()
+	DetectedCode := _Onboarding_DetectSystemLocale()
 	DefaultIndex := 1
 	for _i, _loc in SortedLocales {
-		if _loc.Code = "en" {
+		if _loc.Code = DetectedCode {
 			DefaultIndex := _i
 			break
+		}
+	}
+	; Safety net: if detected code not found (shouldn't happen given the logic
+	; in _Onboarding_DetectSystemLocale), fall back to English.
+	if DefaultIndex = 1 and SortedLocales[1].Code != DetectedCode {
+		for _i, _loc in SortedLocales {
+			if _loc.Code = "en" {
+				DefaultIndex := _i
+				break
+			}
 		}
 	}
 
