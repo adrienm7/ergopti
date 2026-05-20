@@ -1935,4 +1935,44 @@ Tab:: {
 	if (text != "")
 		LLM_Bridge_OnAccept(text)
 }
+
+; ── Slot navigation ──
+; When the tooltip shows multiple predictions, the user can cycle the
+; active slot with the configured modifier + Up / Down. The empty
+; nav_modifiers case (default) binds bare Up / Down — matches the HS
+; default where llm_nav_modifiers = {}. Alt+1..9 jumps directly to a
+; slot, mirroring HS's val_modifiers = {"alt"}. Both bindings re-render
+; the tooltip in place so the ▶ marker moves without any flicker.
+~Up:: _LLM_Nav_Cycle(-1)
+~Down:: _LLM_Nav_Cycle(1)
+!1:: _LLM_Nav_Jump(1)
+!2:: _LLM_Nav_Jump(2)
+!3:: _LLM_Nav_Jump(3)
+!4:: _LLM_Nav_Jump(4)
+!5:: _LLM_Nav_Jump(5)
+!6:: _LLM_Nav_Jump(6)
+!7:: _LLM_Nav_Jump(7)
+!8:: _LLM_Nav_Jump(8)
+!9:: _LLM_Nav_Jump(9)
 #HotIf
+
+_LLM_Nav_Cycle(delta) {
+	slots := LLM_Tooltip_GetSlots()
+	if (slots.Length <= 1)
+		return
+	cur := LLM_Tooltip_GetActiveIdx()
+	new_idx := cur + delta
+	; Wrap around for a snappier feel — going past the end loops to the start.
+	if (new_idx < 1)
+		new_idx := slots.Length
+	else if (new_idx > slots.Length)
+		new_idx := 1
+	LLM_Tooltip_SetActiveIdx(new_idx)
+}
+
+_LLM_Nav_Jump(idx) {
+	slots := LLM_Tooltip_GetSlots()
+	if (idx > slots.Length)
+		return
+	LLM_Tooltip_SetActiveIdx(idx)
+}
