@@ -136,15 +136,13 @@ jobs:
 
 # ============================================================
 # ============================================================
-# ======= 2/ macOS — Ergopti.app + Sparkle appcast ===========
+# ======= 2/ macOS — ErgoptiPlus.app =========================
 # ============================================================
 # ============================================================
 
     build-macos:
         needs: prepare-release
         runs-on: macos-latest
-        env:
-            SPARKLE_ED_PRIVATE_KEY: ${{ secrets.SPARKLE_ED_PRIVATE_KEY }}
 
         steps:
             - name: Checkout at build ref
@@ -153,74 +151,18 @@ jobs:
                   ref: ${{ needs.prepare-release.outputs.ref }}
                   fetch-depth: 0
 
-            - name: Build Ergopti.app
+            - name: Build ErgoptiPlus.app
               shell: bash
               env:
-                  ERGOPTI_VERSION:    ${{ needs.prepare-release.outputs.version }}
-                  ERGOPTI_BUILD:      ${{ github.run_number }}
-                  ERGOPTI_CHANNEL:    main
-                  SPARKLE_PUBLIC_KEY: ${{ secrets.SPARKLE_PUBLIC_KEY }}
-                  GH_OWNER:           ${{ github.repository_owner }}
-                  GH_REPO:            ${{ github.event.repository.name }}
+                  ERGOPTI_VERSION: ${{ needs.prepare-release.outputs.version }}
+                  ERGOPTI_BUILD:   ${{ github.run_number }}
+                  GH_OWNER:        ${{ github.repository_owner }}
+                  GH_REPO:         ${{ github.event.repository.name }}
               run: bash tools/build_macos_app.sh
-
-            - name: Rename macOS zip to ErgoptiPlus.app.zip
-              shell: bash
-              # The build script still produces ``Ergopti.app.zip`` (the
-              # internal .app bundle keeps its historical name), but the user-
-              # facing release asset is renamed to ``ErgoptiPlus.app.zip`` so
-              # the file makes clear what the user is downloading: the full
-              # ErgoptiPlus application, not just the keyboard layout. The
-              # Sparkle signing and appcast steps below read from the new
-              # path, so the rename has to happen here before they run.
-              run: |
-                  set -euo pipefail
-                  mv build/macos/Ergopti.app.zip build/macos/ErgoptiPlus.app.zip
-
-            - name: Install Sparkle signing tool
-              if: ${{ env.SPARKLE_ED_PRIVATE_KEY != '' }}
-              shell: bash
-              env:
-                  SPARKLE_VERSION: "2.9.2"
-              run: |
-                  set -euo pipefail
-                  curl -fsSLo /tmp/Sparkle.tar.xz \
-                      "https://github.com/sparkle-project/Sparkle/releases/download/${SPARKLE_VERSION}/Sparkle-${SPARKLE_VERSION}.tar.xz"
-                  mkdir -p /tmp/sparkle-dist
-                  tar -xJf /tmp/Sparkle.tar.xz -C /tmp/sparkle-dist
-                  echo "SIGN_UPDATE=/tmp/sparkle-dist/bin/sign_update" >> "$GITHUB_ENV"
-
-            - name: Sign zip with Sparkle EdDSA key
-              if: ${{ env.SPARKLE_ED_PRIVATE_KEY != '' }}
-              shell: bash
-              run: |
-                  set -euo pipefail
-                  printf '%s' "$SPARKLE_ED_PRIVATE_KEY" > /tmp/sparkle_priv.key
-                  "$SIGN_UPDATE" -f /tmp/sparkle_priv.key build/macos/ErgoptiPlus.app.zip \
-                      > build/macos/ErgoptiPlus.app.zip.sig
-                  rm -f /tmp/sparkle_priv.key
-                  echo "Sparkle EdDSA signature written to ErgoptiPlus.app.zip.sig"
-
-            - name: Generate Sparkle appcast
-              if: ${{ env.SPARKLE_ED_PRIVATE_KEY != '' }}
-              shell: bash
-              env:
-                  ERGOPTI_VERSION:  ${{ needs.prepare-release.outputs.version }}
-                  ERGOPTI_BUILD:    ${{ github.run_number }}
-                  ERGOPTI_CHANNEL:  main
-                  SPARKLE_SIG_FILE: build/macos/ErgoptiPlus.app.zip.sig
-                  ZIP_PATH:         build/macos/ErgoptiPlus.app.zip
-                  GH_OWNER:         ${{ github.repository_owner }}
-                  GH_REPO:          ${{ github.event.repository.name }}
-                  OUTPUT_PATH:      build/macos/appcast-main.xml
-              run: bash tools/generate_appcast.sh
 
             - name: Package latest keylayout bundle
               shell: bash
-              # Released as ``Ergopti.zip`` — this asset is *just* the keyboard
-              # layout (no app, no auto-replace, no macros), so its name
-              # mirrors the Windows ``Ergopti.exe`` keyboard-only installer
-              # for clarity: ``Ergopti`` = bare layout, ``ErgoptiPlus`` = full app.
+              # Released as ``Ergopti_macOS.zip`` — keyboard layout only, no app.
               run: |
                   set -euo pipefail
                   latest=$(ls -d static/drivers/macos/bundles/*.bundle | sort -V | tail -1)
@@ -236,9 +178,7 @@ jobs:
                   set -euo pipefail
                   tag="${{ needs.prepare-release.outputs.tag }}"
                   assets=(build/macos/ErgoptiPlus.app.zip)
-                  [ -f build/macos/Ergopti_macOS.zip           ] && assets+=(build/macos/Ergopti_macOS.zip)
-                  [ -f build/macos/ErgoptiPlus.app.zip.sig     ] && assets+=(build/macos/ErgoptiPlus.app.zip.sig)
-                  [ -f build/macos/appcast-main.xml             ] && assets+=(build/macos/appcast-main.xml)
+                  [ -f build/macos/Ergopti_macOS.zip ] && assets+=(build/macos/Ergopti_macOS.zip)
                   gh release upload "$tag" "${assets[@]}" --clobber
 
 
@@ -567,10 +507,10 @@ jobs:
                   | \`Ergopti_macOS.zip\` | Keyboard layout bundle only — no app required |
 
                   **Installation — app:**
-                  1. Unzip \`ErgoptiPlus.app.zip\` and move \`Ergopti.app\` to \`/Applications\`.
+                  1. Unzip \`ErgoptiPlus.app.zip\` and move \`ErgoptiPlus.app\` to \`/Applications\`.
                   2. Remove the quarantine flag (the app is not yet Apple-notarised):
                   \`\`\`bash
-                  xattr -dr com.apple.quarantine /Applications/Ergopti.app
+                  xattr -d com.apple.quarantine /Applications/ErgoptiPlus.app
                   \`\`\`
                   3. Launch the app. On first run, Karabiner-Elements will request a System Extension approval — required for key remapping.
                   4. Your personal configuration is stored in \`~/.config/ergopti_plus/\`. If this folder does not exist yet (first launch), the setup wizard will open automatically.

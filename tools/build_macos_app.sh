@@ -75,12 +75,12 @@ GH_REPO="${GH_REPO:-Ergopti}"
 
 # Bundle identifier for the embedded Hammerspoon. Picked so preferences land
 # in ~/Library/Preferences/com.ergopti.app.plist, isolated from stock HS.
-BUNDLE_ID="com.ergopti.app"
+BUNDLE_ID="com.ergoptiplus.app"
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 BUILD_DIR="$REPO_ROOT/build/macos"
-APP_PATH="$BUILD_DIR/Ergopti.app"
-ZIP_PATH="$BUILD_DIR/Ergopti.app.zip"
+APP_PATH="$BUILD_DIR/ErgoptiPlus.app"
+ZIP_PATH="$BUILD_DIR/ErgoptiPlus.app.zip"
 LAUNCHER_DIR="$REPO_ROOT/static/drivers/hammerspoon/launcher"
 
 
@@ -246,11 +246,11 @@ build_launcher() {
 	log "Building Swift launcher (release)"
 	(
 		cd "$LAUNCHER_DIR"
-		swift build -c release --product Ergopti >&2
+		swift build -c release --product ErgoptiPlus >&2
 	)
 	local built_bin
-	built_bin="$(find "$LAUNCHER_DIR/.build" -name "Ergopti" -type f -path "*/release/Ergopti" | head -1)"
-	[ -f "$built_bin" ] || fail "Swift build did not produce Ergopti binary."
+	built_bin="$(find "$LAUNCHER_DIR/.build" -name "ErgoptiPlus" -type f -path "*/release/ErgoptiPlus" | head -1)"
+	[ -f "$built_bin" ] || fail "Swift build did not produce ErgoptiPlus binary."
 	log "Launcher binary: $built_bin"
 	echo "$built_bin"
 }
@@ -296,8 +296,8 @@ assemble_app() {
 	plutil -replace SUEnableAutomaticChecks -bool false "$hs_plist"
 
 	# Copy the launcher binary into the standard host-executable location.
-	cp "$launcher_bin" "$APP_PATH/Contents/MacOS/Ergopti"
-	chmod +x "$APP_PATH/Contents/MacOS/Ergopti"
+	cp "$launcher_bin" "$APP_PATH/Contents/MacOS/ErgoptiPlus"
+	chmod +x "$APP_PATH/Contents/MacOS/ErgoptiPlus"
 
 	# Copy Sparkle.framework into Contents/Frameworks/. The launcher links
 	# against Sparkle via @rpath, and the SPM build leaves the framework in
@@ -383,10 +383,10 @@ assemble_app() {
 # a .iconset folder containing multiple sizes named per Apple's convention,
 # so we synthesize them with sips on the fly.
 build_icon() {
-	log "Generating Ergopti.icns from logo_simple_square.png"
+	log "Generating ErgoptiPlus.icns from logo_simple_square.png"
 	local src="$REPO_ROOT/static/img/logo/logo_simple_square.png"
 	[ -f "$src" ] || fail "icon source missing: $src"
-	local iconset="$BUILD_DIR/Ergopti.iconset"
+	local iconset="$BUILD_DIR/ErgoptiPlus.iconset"
 	rm -rf "$iconset"
 	mkdir -p "$iconset"
 	# Apple wants @1x and @2x for each of 16, 32, 128, 256, 512 pixel sizes.
@@ -395,7 +395,7 @@ build_icon() {
 		double=$((size * 2))
 		sips -z "$double" "$double" "$src" --out "$iconset/icon_${size}x${size}@2x.png" >/dev/null
 	done
-	iconutil -c icns "$iconset" -o "$APP_PATH/Contents/Resources/Ergopti.icns"
+	iconutil -c icns "$iconset" -o "$APP_PATH/Contents/Resources/ErgoptiPlus.icns"
 }
 
 
@@ -418,14 +418,14 @@ generate_info_plist() {
 		<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 		<plist version="1.0">
 		<dict>
-			<key>CFBundleName</key>                   <string>Ergopti</string>
-			<key>CFBundleDisplayName</key>            <string>Ergopti</string>
-			<key>CFBundleExecutable</key>             <string>Ergopti</string>
+			<key>CFBundleName</key>                   <string>ErgoptiPlus</string>
+			<key>CFBundleDisplayName</key>            <string>ErgoptiPlus</string>
+			<key>CFBundleExecutable</key>             <string>ErgoptiPlus</string>
 			<key>CFBundleIdentifier</key>             <string>$BUNDLE_ID</string>
 			<key>CFBundlePackageType</key>            <string>APPL</string>
 			<key>CFBundleShortVersionString</key>     <string>$ERGOPTI_VERSION</string>
 			<key>CFBundleVersion</key>                <string>$ERGOPTI_BUILD</string>
-			<key>CFBundleIconFile</key>               <string>Ergopti</string>
+			<key>CFBundleIconFile</key>               <string>ErgoptiPlus</string>
 			<key>LSMinimumSystemVersion</key>         <string>11.0</string>
 			<key>LSUIElement</key>                    <false/>
 			<key>NSHighResolutionCapable</key>        <true/>
@@ -467,8 +467,8 @@ generate_info_plist() {
 # com.apple.security.automation.apple-events claim. Without it some macOS
 # versions pop an extra automation-permission dialog on first use.
 codesign_app() {
-	log "Codesigning Ergopti.app (ad-hoc, identifier: $BUNDLE_ID)"
-	local entitlements="$LAUNCHER_DIR/Ergopti.entitlements"
+	log "Codesigning ErgoptiPlus.app (ad-hoc, identifier: $BUNDLE_ID)"
+	local entitlements="$LAUNCHER_DIR/ErgoptiPlus.entitlements"
 	[ -f "$entitlements" ] || fail "Entitlements file missing: $entitlements"
 
 	# Sign nested bundles first so the host-level pass finds them already valid.
@@ -482,7 +482,7 @@ codesign_app() {
 		--sign - \
 		--identifier "$BUNDLE_ID" \
 		--entitlements "$entitlements" \
-		"$APP_PATH/Contents/MacOS/Ergopti"
+		"$APP_PATH/Contents/MacOS/ErgoptiPlus"
 
 	# Sign the outer bundle. --identifier here pins the bundle's own identity.
 	codesign --force \
@@ -496,7 +496,7 @@ codesign_app() {
 zip_app() {
 	log "Zipping $APP_PATH → $ZIP_PATH"
 	(cd "$BUILD_DIR" && zip -qry "$(basename "$ZIP_PATH")" "$(basename "$APP_PATH")")
-	[ -f "$ZIP_PATH" ] || fail "zip did not produce expected output."
+	[ -f "$ZIP_PATH" ] || fail "Zip did not produce expected output."
 }
 
 
@@ -531,8 +531,8 @@ main() {
 	zip_app
 
 	log "Done."
-	log "  bundle     : $APP_PATH"
-	log "  zip        : $ZIP_PATH"
+	log "  bundle      : $APP_PATH"
+	log "  zip         : $ZIP_PATH"
 	log "  version    : $ERGOPTI_VERSION ($ERGOPTI_BUILD)"
 	log "  channel    : $ERGOPTI_CHANNEL"
 	log "  hammerspoon: $HAMMERSPOON_VERSION"
