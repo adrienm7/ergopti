@@ -94,35 +94,42 @@ LLM_ModelBrowser_Show() {
  * @returns {Gui} New browser window.
  */
 _LLM_ModelBrowser_Build() {
-	gui := Gui("+Resize +MinSize720x420", t("menu.llm.browse_models_title"))
-	gui.OnEvent("Close", _LLM_ModelBrowser_OnClose)
-	gui.OnEvent("Escape", _LLM_ModelBrowser_OnClose)
-	gui.MarginX := 10
-	gui.MarginY := 10
+	; Variable name is ``g`` rather than ``gui`` because AHK v2 identifiers
+	; are case-insensitive: a local ``gui`` shadows the built-in ``Gui``
+	; class, so ``gui := Gui(...)`` resolves the right-hand side against
+	; the just-declared (and still unset) local — triggering "This local
+	; variable has not been assigned a value" the first time the menu
+	; fires. ``g`` (matching the convention used elsewhere in the driver)
+	; sidesteps the collision entirely.
+	g := Gui("+Resize +MinSize720x420", t("menu.llm.browse_models_title"))
+	g.OnEvent("Close", _LLM_ModelBrowser_OnClose)
+	g.OnEvent("Escape", _LLM_ModelBrowser_OnClose)
+	g.MarginX := 10
+	g.MarginY := 10
 
-	gui.SetFont("s10")
+	g.SetFont("s10")
 
 	; Filter row — search the table by typing a substring. Live filter on
 	; every keystroke so the list narrows as the user thinks, no Apply
 	; button needed. The hint label is dimmed to make the intent obvious.
-	gui.Add("Text",, t("menu.llm.browse_models_filter"))
-	filter_edit := gui.Add("Edit", "w560 vFilter")
+	g.Add("Text",, t("menu.llm.browse_models_filter"))
+	filter_edit := g.Add("Edit", "w560 vFilter")
 	; Debounce the refresh: ``RefreshRows`` reloads the installed-tag list
 	; via ``LLM_OllamaListModels()`` and re-runs the two-key sort over the
 	; full catalogue, both of which are expensive. Without debounce a
 	; fast typist locks the Gui mid-search. The timer reference is stored
 	; on the Gui so SetTimer can cancel-by-identity across keystrokes.
-	gui.FilterDebounce := () => _LLM_ModelBrowser_RefreshRows(gui.ListView, filter_edit.Value)
+	g.FilterDebounce := () => _LLM_ModelBrowser_RefreshRows(g.ListView, filter_edit.Value)
 	filter_edit.OnEvent("Change", (*) => (
-		SetTimer(gui.FilterDebounce, 0),
-		SetTimer(gui.FilterDebounce, -120)
+		SetTimer(g.FilterDebounce, 0),
+		SetTimer(g.FilterDebounce, -120)
 	))
 
 	; ListView — columns mirror the metadata extracted in
 	; LLM_LoadModelsJSON. Status reads ``ollama list`` so the user can
 	; tell installed vs available at a glance, but the column is filled
 	; lazily on refresh to avoid blocking the Gui at construction.
-	lv := gui.Add("ListView",
+	lv := g.Add("ListView",
 		"r18 w780 vListView Sort -Multi",
 		[ t("menu.llm.browse_col_name")
 		, t("menu.llm.browse_col_family")
@@ -132,18 +139,18 @@ _LLM_ModelBrowser_Build() {
 		, t("menu.llm.browse_col_type")
 		, t("menu.llm.browse_col_status") ])
 	lv.OnEvent("DoubleClick", (LV, RowNumber) => _LLM_ModelBrowser_PickRow(LV, RowNumber))
-	gui.ListView := lv
+	g.ListView := lv
 
 	; Action footer — Pick the current selection, Close. Pick mirrors a
 	; double-click so users used to right-clicking lists still discover
 	; the action.
-	gui.Add("Button", "w120 Default", t("menu.llm.browse_pick"))
+	g.Add("Button", "w120 Default", t("menu.llm.browse_pick"))
 		.OnEvent("Click", (*) => _LLM_ModelBrowser_PickRow(lv, lv.GetNext(0)))
-	gui.Add("Button", "x+10 w120", t("button.close"))
+	g.Add("Button", "x+10 w120", t("button.close"))
 		.OnEvent("Click", _LLM_ModelBrowser_OnClose)
 
 	_LLM_ModelBrowser_RefreshRows(lv)
-	return gui
+	return g
 }
 
 /**
