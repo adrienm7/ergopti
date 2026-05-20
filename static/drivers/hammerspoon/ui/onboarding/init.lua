@@ -73,6 +73,11 @@ local function inject_strings(code)
 		"onboarding.gestures.title", "onboarding.gestures.desc",
 		"onboarding.yes", "onboarding.no",
 		"onboarding.back", "onboarding.next", "onboarding.finish",
+		-- Inserted config-folder step reuses the same labels as the
+		-- tray-menu folder editor so we don't duplicate translations.
+		"dialog.config_folder.title", "dialog.config_folder.label",
+		"dialog.config_folder.hint", "dialog.config_folder.select_title",
+		"common.browse",
 	}
 	for _, k in ipairs(keys) do
 		strings[k] = i18n.get(k)
@@ -126,9 +131,33 @@ local function inject_init_data()
 	strings["dialog.metrics.enable_warning_formatted"] =
 		string.format(i18n.get("dialog.metrics.enable_warning"), metrics_dir .. "metrics")
 
+	-- Also include the labels needed by the inserted config-folder step.
+	local config_step_keys = {
+		"dialog.config_folder.title", "dialog.config_folder.label",
+		"dialog.config_folder.hint", "dialog.config_folder.select_title",
+		"common.browse",
+	}
+	for _, k in ipairs(config_step_keys) do
+		if strings[k] == nil then strings[k] = i18n.get(k) end
+	end
+
+	-- Resolve the current + default config directories so the wizard can
+	-- pre-fill the input AND show the default as a placeholder.
+	local cur_config_dir, default_config_dir = "", ""
+	local ok_mp, menu_paths = pcall(require, "ui.menu.menu_paths")
+	if ok_mp and menu_paths then
+		local ok1, v1 = pcall(menu_paths.get_config_dir)
+		if ok1 and type(v1) == "string" then cur_config_dir = v1 end
+		if menu_paths.get_default_config_dir then
+			local ok2, v2 = pcall(menu_paths.get_default_config_dir)
+			if ok2 and type(v2) == "string" then default_config_dir = v2 end
+		end
+	end
+
 	local payload = {
-		locale  = current_locale,
-		strings = strings,
+		locale             = current_locale,
+		strings            = strings,
+		default_config_dir = default_config_dir,
 		answers = {
 			locale       = current_locale,
 			use_ergopti  = true,
@@ -136,6 +165,11 @@ local function inject_init_data()
 			-- every layout); the user can change it on step 3 to ù, ; or
 			-- anything else they like.
 			magic_key    = "*",
+			-- Pre-fill with the current config dir when it diverges from
+			-- the OS default — otherwise leave empty so the placeholder
+			-- shows the default and the wizard treats "no change" as the
+			-- happy path.
+			config_dir   = (cur_config_dir ~= default_config_dir) and cur_config_dir or "",
 			use_metrics  = false,
 			use_gestures = false,
 		},
@@ -182,6 +216,21 @@ end
 --- @param answers table The answers object from the JS "finish" message.
 local function commit(answers)
 	Logger.start(LOG, "Writing onboarding answers to config.toml…")
+
+	-- Persist the chosen config dir to paths.toml BEFORE writing
+	-- config.toml: the path resolver picks the new location up on the
+	-- final reload, so subsequent saves go there straight away. An
+	-- empty / unchanged path is a no-op (menu_paths handles the
+	-- "drop the override" case internally).
+	if type(answers.config_dir) == "string" and answers.config_dir ~= "" then
+		local ok_mp, menu_paths = pcall(require, "ui.menu.menu_paths")
+		if ok_mp and menu_paths and menu_paths.persist_config_dir_for_wizard then
+			local ok_persist, err = pcall(menu_paths.persist_config_dir_for_wizard, answers.config_dir)
+			if not ok_persist then
+				Logger.warn(LOG, "Failed to persist config dir override: %s.", tostring(err))
+			end
+		end
+	end
 
 	local locale = type(answers.locale) == "string" and answers.locale ~= "" and answers.locale or "en"
 	local updates = {
@@ -252,6 +301,45 @@ local function handle_message(body)
 		local code = type(body.locale) == "string" and body.locale or "en"
 		i18n.set_locale_no_reload(code)
 		Logger.info(LOG, "Onboarding locale set to '%s'.", code)
+
+	elseif action == "pickConfigDir" then
+		-- Open the macOS native folder picker via osascript and ship the
+		-- chosen path back to JS so the input box fills in.
+		local seed = type(body.current) == "string" and body.current or ""
+		if seed == "" then
+			-- Default seed = the current config dir resolved by menu_paths,
+			-- so the picker opens somewhere meaningful even on first run.
+			local ok_mp, menu_paths = pcall(require, "ui.menu.menu_paths")
+			if ok_mp and menu_paths then
+				local ok_v, v = pcall(menu_paths.get_config_dir)
+				if ok_v and type(v) == "string" then seed = v end
+			end
+		end
+		local escaped = seed:gsub('"', '\\"')
+		local prompt = (i18n.get("dialog.config_folder.select_title") or ""):gsub('"', '\\"')
+		local script = string.format([[
+			try
+				set r to choose folder with prompt "%s" default location ((POSIX file "%s") as alias)
+				return POSIX path of r
+			on error
+				return ""
+			end try
+		]], prompt, escaped)
+		local ok_as, _r2, raw = hs.osascript.applescript(script)
+		Logger.debug(LOG, "pickConfigDir: ok=%s raw=%s.", tostring(ok_as), tostring(raw))
+		local chosen = type(raw) == "string" and raw or ""
+		chosen = chosen:gsub("^%s+", ""):gsub("%s+$", "")
+		if chosen ~= "" then
+			if not chosen:match("[/\\]$") then chosen = chosen .. "/" end
+			-- Encode the path as a JSON string so AppleScript paths with
+			-- spaces / accents survive the JS eval.
+			local ok_enc, encoded = pcall(hs.json.encode, chosen)
+			if ok_enc and encoded and _webview then
+				pcall(function()
+					_webview:evaluateJavaScript("if(window.setConfigDir) window.setConfigDir(" .. encoded .. ")")
+				end)
+			end
+		end
 
 	elseif action == "finish" then
 		-- User reached the last step and clicked Finish — write config and reload

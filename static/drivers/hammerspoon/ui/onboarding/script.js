@@ -60,10 +60,17 @@ function _t(key) {
 // ======================================
 // ======================================
 
+// _currentStep is a string so we can distinguish the inserted "config"
+// step from the numeric ones (1..5). The step-bar dot id mirrors this:
+// numeric steps light up dot-1..dot-5, the config step lights up
+// dot-config.
 var _currentStep = 1;
 var _selectedLocale = DEFAULT_LOCALE_CODE;
 var _answers = {
 	locale:       DEFAULT_LOCALE_CODE,
+	config_dir:   "",       // empty = keep OS default; Lua injects the
+	                        // current value via initData when the wizard
+	                        // re-runs over an already-configured install.
 	use_ergopti:  true,
 	magic_key:    DEFAULT_MAGIC_KEY,
 	use_metrics:  false,
@@ -82,17 +89,33 @@ var _answers = {
  * @param {number} n
  */
 function showStep(n) {
+	// Hide every step (numeric + the inserted config step) first.
 	for (var i = 1; i <= 5; i++) {
 		var el = document.getElementById("step-" + i);
-		if (el) el.classList.toggle("hidden", i !== n);
-
-		var dot = document.getElementById("dot-" + i);
-		if (dot) {
-			dot.classList.remove("active", "done");
-			if (i < n) dot.classList.add("done");
-			else if (i === n) dot.classList.add("active");
-		}
+		if (el) el.classList.add("hidden");
 	}
+	var cfgEl = document.getElementById("step-config");
+	if (cfgEl) cfgEl.classList.add("hidden");
+
+	// Show the requested step.
+	if (n === "config") {
+		if (cfgEl) cfgEl.classList.remove("hidden");
+	} else {
+		var target = document.getElementById("step-" + n);
+		if (target) target.classList.remove("hidden");
+	}
+
+	// Update the step-bar. Sequence order: 1 → config → 2 → 3 → 4 → 5.
+	var ORDER = [1, "config", 2, 3, 4, 5];
+	var DOT_IDS = { 1: "dot-1", "config": "dot-config", 2: "dot-2", 3: "dot-3", 4: "dot-4", 5: "dot-5" };
+	var pos = ORDER.indexOf(n);
+	ORDER.forEach(function (id, idx) {
+		var dot = document.getElementById(DOT_IDS[id]);
+		if (!dot) return;
+		dot.classList.remove("active", "done");
+		if (idx < pos) dot.classList.add("done");
+		else if (idx === pos) dot.classList.add("active");
+	});
 	_currentStep = n;
 }
 
@@ -149,6 +172,26 @@ function renderStep1() {
 	document.getElementById("s1-subtitle").textContent = _t("onboarding.welcome.heading");
 	document.getElementById("s1-next").textContent     = _t("onboarding.next");
 	document.title = _t("onboarding.welcome.title");
+}
+
+/**
+ * Refreshes the inserted config-folder step labels and fills the input
+ * with the user's current path. Lua injects ``_answers.config_dir`` via
+ * initData; an empty value means "use the OS default", which we then
+ * resolve via DEFAULT_CONFIG_DIR (also injected by Lua) for the
+ * placeholder so the user sees what the default would be.
+ */
+function renderStepConfig() {
+	document.getElementById("sc-title").textContent  = _t("dialog.config_folder.title");
+	document.getElementById("sc-desc").textContent   = _t("dialog.config_folder.label");
+	document.getElementById("sc-hint").textContent   = _t("dialog.config_folder.hint");
+	document.getElementById("sc-browse").textContent = _t("common.browse");
+	document.getElementById("sc-back").textContent   = _t("onboarding.back");
+	document.getElementById("sc-next").textContent   = _t("onboarding.next");
+
+	var inp = document.getElementById("sc-input");
+	inp.value       = _answers.config_dir || "";
+	inp.placeholder = window.DEFAULT_CONFIG_DIR || "";
 }
 
 /**
@@ -248,6 +291,7 @@ window.applyStrings = function (strings) {
 	_strings = strings || {};
 	// Re-render the current step with the new strings
 	if (_currentStep === 1) renderStep1();
+	else if (_currentStep === "config") renderStepConfig();
 	else if (_currentStep === 2) renderStep2();
 	else if (_currentStep === 3) renderStep3();
 	else if (_currentStep === 4) renderStep4();
@@ -261,9 +305,19 @@ window.applyStrings = function (strings) {
 window.initData = function (data) {
 	if (data && data.locale) _selectedLocale = data.locale;
 	if (data && data.answers) _answers = Object.assign(_answers, data.answers);
+	if (data && data.default_config_dir) window.DEFAULT_CONFIG_DIR = data.default_config_dir;
 	window.applyStrings(data && data.strings ? data.strings : {});
 	renderStep1();
 	showStep(1);
+};
+
+// Called by Lua after the native folder picker resolves. Fills the input
+// + remembers the choice without leaving the config step.
+window.setConfigDir = function (path) {
+	if (typeof path !== "string" || path === "") return;
+	var inp = document.getElementById("sc-input");
+	if (inp) inp.value = path;
+	_answers.config_dir = path;
 };
 
 
@@ -273,19 +327,38 @@ window.initData = function (data) {
 // ======================================
 // ======================================
 
-// Step 1 → 2
+// Step 1 → config
 document.getElementById("s1-next").addEventListener("click", function () {
 	_answers.locale = _selectedLocale;
 	// Ask Lua to commit the locale selection in memory
 	_post({ action: "localeSelected", locale: _selectedLocale });
+	renderStepConfig();
+	showStep("config");
+});
+
+// Config step ← →
+document.getElementById("sc-back").addEventListener("click", function () {
+	renderStep1();
+	showStep(1);
+});
+document.getElementById("sc-next").addEventListener("click", function () {
+	var val = (document.getElementById("sc-input").value || "").trim();
+	_answers.config_dir = val;
 	renderStep2();
 	showStep(2);
+});
+// Browse → asks Lua to open the macOS native folder picker. Lua replies
+// via window.setConfigDir(path) which fills the input back in.
+document.getElementById("sc-browse").addEventListener("click", function () {
+	_post({ action: "pickConfigDir", current: (document.getElementById("sc-input").value || "") });
 });
 
 // Step 2 ← →
 document.getElementById("s2-back").addEventListener("click", function () {
-	renderStep1();
-	showStep(1);
+	// Going back from layout returns to the inserted config step, not the
+	// language step — keeps the wizard's forward sequence reversible.
+	renderStepConfig();
+	showStep("config");
 });
 document.getElementById("s2-next").addEventListener("click", function () {
 	var checked = document.querySelector("input[name='layout']:checked");

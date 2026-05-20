@@ -290,6 +290,38 @@ function M.get_config_dir()
 	return config_dir()
 end
 
+--- Returns the OS-default config directory (with trailing slash). Used by
+--- the onboarding wizard to pre-fill the form and to detect "user kept
+--- the default" so we don't write a redundant override to paths.toml.
+--- @return string
+function M.get_default_config_dir()
+	return _default_config_dir or _base_dir or ""
+end
+
+--- Persists a new config directory to paths.toml WITHOUT reloading
+--- Hammerspoon. Used by the onboarding wizard which writes config.toml
+--- right after this call and triggers its own reload at the end —
+--- chaining hs.reload() inside the menu_paths path-editor flow would
+--- restart the script mid-wizard and lose the rest of the answers.
+--- @param new_dir string Absolute path with trailing slash, or "" / nil
+---                       to mean "use the OS default".
+function M.persist_config_dir_for_wizard(new_dir)
+	if type(new_dir) ~= "string" then new_dir = "" end
+	if new_dir ~= "" and not new_dir:match("[/\\]$") then
+		new_dir = new_dir .. "/"
+	end
+	-- An empty path or one equal to the default → clear the override so
+	-- paths.toml stays as a commented-out template (lets a future
+	-- ``hs.reload`` follow the OS default path).
+	if new_dir == "" or new_dir == (_default_config_dir or "") then
+		_bootstrap[CONFIG_DIR_KEY] = nil
+	else
+		_bootstrap[CONFIG_DIR_KEY] = new_dir
+		ensure_dir(new_dir)
+	end
+	save_bootstrap()
+end
+
 
 
 

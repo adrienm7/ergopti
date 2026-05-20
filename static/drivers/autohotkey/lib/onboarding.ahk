@@ -50,6 +50,12 @@ global _ob_layout            := false
 global _ob_magic_key         := ONBOARDING_DEFAULT_MAGIC_KEY
 global _ob_metrics           := false
 global _ob_gestures          := false
+; Config folder choice. Initialised to the current _ConfigDir so a re-run via
+; the tray menu shows the user's existing location pre-filled. The first-run
+; path inherits whatever paths.toml resolved at boot — typically the OS default
+; (``%USERPROFILE%\.config\ergopti_plus\``) since the wizard runs precisely
+; when paths.toml hasn't been customised yet.
+global _ob_config_dir        := IsSet(_ConfigDir) ? _ConfigDir : ""
 ; When the user clicks "Auto-register" on the gestures step at first launch, the
 ; gestures module has not yet executed its top-level globals (Onboarding_Run is
 ; called early in ErgoptiPlus.ahk auto-exec, long before ``#Include modules/gestures.ahk``
@@ -326,6 +332,94 @@ _Step1_Next(g, lv, SortedLocales, DefaultIndex, *) {
 	_I18nCacheLoaded := false
 
 	_Onboarding_DestroyActive()
+	_Onboarding_StepConfigDir()
+}
+
+
+; ===========================================================
+; ===== 4.1b) Step 1b — Config folder selection ==========
+; ===========================================================
+
+; New step inserted between locale (step 1) and layout (step 2). Lets the
+; user point Ergopti at a custom personal-data folder during first-run,
+; instead of accepting the default ``%USERPROFILE%\.config\ergopti_plus\``.
+; Useful for users who keep their dotfiles on a synced volume (Dropbox,
+; OneDrive, …) — they can route ALL Ergopti data into that volume from
+; day one without manually editing paths.toml after the fact.
+;
+; The selection is committed to paths.toml in _Onboarding_Commit alongside
+; the other wizard answers; the subsequent Reload re-evaluates paths.toml
+; so every module picks up the new location.
+_Onboarding_StepConfigDir() {
+	global _ob_config_dir, _ConfigDir
+	g := Gui("+AlwaysOnTop", t("dialog.config_folder.title"))
+	g.SetFont("s10", "Segoe UI")
+	g.MarginX := 20
+	g.MarginY := 16
+
+	g.AddText("w" ONBOARDING_WIN_W - 40, t("dialog.config_folder.title"))
+	g.SetFont("s9")
+	g.AddText("w" ONBOARDING_WIN_W - 40 " y+8", t("dialog.config_folder.label"))
+	g.SetFont("s10")
+
+	; Edit + Browse button on the same row. The Edit shows forward slashes
+	; (matches paths.toml's on-disk format and reads cleaner to humans);
+	; we translate back to backslashes before persisting.
+	current := _ob_config_dir != "" ? _ob_config_dir : (IsSet(_ConfigDir) ? _ConfigDir : "")
+	dirEdit := g.AddEdit("w" ONBOARDING_WIN_W - 130 " xm y+10", StrReplace(current, "\", "/"))
+	btnBrowse := g.AddButton("x+6 yp w90", t("common.browse"))
+
+	g.SetFont("s9 cGray")
+	g.AddText("w" ONBOARDING_WIN_W - 40 " xm y+12", t("dialog.config_folder.hint"))
+	g.SetFont("s10")
+
+	g.AddText("w" ONBOARDING_WIN_W - 40 " y+12", "")
+	btnBack := g.AddButton("w90 x20",                                  t("onboarding.back"))
+	btnNext := g.AddButton("Default w110 yp x" ONBOARDING_WIN_W - 130, t("onboarding.next"))
+
+	btnBrowse.OnEvent("Click", _StepConfigDir_Browse.Bind(g, dirEdit))
+	btnBack.OnEvent("Click",   _StepConfigDir_Back.Bind(g))
+	btnNext.OnEvent("Click",   _StepConfigDir_Next.Bind(g, dirEdit))
+
+	_Onboarding_Show(g)
+	global _ob_gui := g
+}
+
+_StepConfigDir_Browse(g, dirEdit, *) {
+	; Seed the picker from the current edit value when it's a real folder;
+	; otherwise fall back to %USERPROFILE% so the dialog opens somewhere
+	; familiar. Convert back to backslashes for DirSelect's native format.
+	startDir := StrReplace(Trim(dirEdit.Value), "/", "\")
+	if (startDir == "" or !DirExist(startDir))
+		startDir := A_MyDocuments
+	selected := DirSelect("*" . startDir, 1, t("dialog.config_folder.select_title"))
+	if (selected != "") {
+		selected := StrReplace(selected, "\", "/")
+		if !RegExMatch(selected, "/$")
+			selected .= "/"
+		dirEdit.Value := selected
+	}
+}
+
+_StepConfigDir_Back(g, *) {
+	_Onboarding_DestroyActive()
+	_Onboarding_Step1()
+}
+
+_StepConfigDir_Next(g, dirEdit, *) {
+	global _ob_config_dir
+	; Normalise: trim, swap forward slashes to backslashes (AHK-native),
+	; ensure trailing slash. An empty input means "use the OS default" —
+	; we store "" and the commit step will write a commented-out line to
+	; paths.toml so the boot resolver picks the default again.
+	val := Trim(dirEdit.Value)
+	if (val != "") {
+		val := StrReplace(val, "/", "\")
+		if !RegExMatch(val, "\\$")
+			val .= "\"
+	}
+	_ob_config_dir := val
+	_Onboarding_DestroyActive()
 	_Onboarding_Step2()
 }
 
@@ -377,7 +471,9 @@ _Onboarding_Step2() {
 
 _Step2_Back(g, *) {
 	_Onboarding_DestroyActive()
-	_Onboarding_Step1()
+	; Back returns to the inserted config-folder step (was Step1 before
+	; the picker was added between Step1 and Step2).
+	_Onboarding_StepConfigDir()
 }
 
 _Step2_Next(g, rYes, *) {
@@ -694,6 +790,27 @@ _Step5_Finish(g, rYes, *) {
 
 ; Write all collected wizard answers to config.toml in one atomic call, then
 ; reload so ErgoptiPlus boots with a fully-configured environment.
+; Persist the chosen config dir to paths.toml. Same format produced by
+; the FilePathsEditor dialog (lib/onboarding-independent helper in
+; ErgoptiPlus.ahk) so a wizard pass and a later edit-via-tray produce
+; structurally identical files.
+_WritePathsToml(NewDir) {
+	global _PathsFile, _DefaultConfigDir
+	try {
+		f := FileOpen(_PathsFile, "w", "UTF-8")
+		if !f
+			return
+		DefaultDirFwd := StrReplace(IsSet(_DefaultConfigDir) ? _DefaultConfigDir : "", "\", "/")
+		NewDirFwd := StrReplace(NewDir, "\", "/")
+		f.Write("# Custom paths — auto-generated by ErgoptiPlus.`r`n")
+		f.Write("# Edit this file to point to your personal configuration folder.`r`n")
+		f.Write("# If absent or commented out, files are looked up in: " . DefaultDirFwd . "`r`n")
+		f.Write("`r`n")
+		f.Write('ConfigDirPath = "' . NewDirFwd . '"`r`n')
+		f.Close()
+	}
+}
+
 _Onboarding_Commit() {
 	; Block strict canonicalisation: SaveFullConfig() reads in-memory feature
 	; state which still reflects defaults (the wizard never called Reload).
@@ -701,6 +818,27 @@ _Onboarding_Commit() {
 	; SaveFullConfig() which would overwrite the wizard's values with false.
 	global _TOML_STRICT_CANON_IN_PROGRESS
 	_TOML_STRICT_CANON_IN_PROGRESS := true
+
+	; If the user picked a custom config directory in the StepConfigDir
+	; wizard step, persist it to paths.toml BEFORE writing config.toml —
+	; the boot path resolver will then route ConfigurationFile to the
+	; new location on the upcoming Reload. We also rewrite the in-memory
+	; ``ConfigurationFile`` so the TOML_BatchWrite below lands in the
+	; right spot, not the stale default. An empty ``_ob_config_dir``
+	; means "keep the default" — paths.toml is left untouched.
+	global _ob_config_dir, _ConfigDir, _DefaultConfigDir, _PathsFile, ConfigurationFile
+	if (IsSet(_ob_config_dir) and _ob_config_dir != "") {
+		newDir := _ob_config_dir
+		if !RegExMatch(newDir, "\\$")
+			newDir .= "\"
+		if (newDir != _ConfigDir) {
+			try DirCreate(newDir)
+			_WritePathsToml(newDir)
+			_ConfigDir := newDir
+			ConfigurationFile := newDir . "ahk\config.toml"
+			try DirCreate(newDir . "ahk")
+		}
+	}
 
 	updates := [
 		{ Section: "Script",     Key: "Locale",          Value: _ob_locale    },
