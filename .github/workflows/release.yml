@@ -390,19 +390,31 @@ jobs:
                   fetch-depth: 0
 
             # Build the changelog section that goes ABOVE the platform install
-            # instructions in the release notes. Two cases:
+            # instructions in the release notes. Same aggregation logic on both
+            # channels — only the "previous tag" lookup differs:
             #
-            # • dev push    — each commit on dev is itself a release. Quote the
-            #   commit title (first line) as an h3 and the body verbatim below.
+            # • dev push    — previous tag is the most recent of any kind
+            #   (dev-* OR vX.Y.Z) excluding the current one. So every dev
+            #   release contains every commit landed since the last dev or
+            #   main release, whichever was more recent.
             #
-            # • main release — aggregate every commit since the previous main
-            #   release tag and group them by Conventional Commits type. Each
-            #   group becomes an h3 (`### Features`, `### Fix`, …) followed by
-            #   a bullet list of the matching commit subjects.
+            # • main release — previous tag is the most recent vX.Y.Z
+            #   excluding the current one. Catches the full delta between
+            #   two stable releases regardless of how many dev pre-releases
+            #   were cut in between.
             #
-            # The result is written to ``$RUNNER_TEMP/changelog.md`` and read
-            # by the next step. Failures fall back to an empty changelog so a
-            # malformed commit cannot abort the release.
+            # For each commit between previous_tag..HEAD we extract title
+            # AND body, then group by Conventional Commits type. The body
+            # is rendered as indented prose under its parent bullet so the
+            # changelog reads as: a bulleted list of changes, each with
+            # optional rationale. Sections are h3 in a fixed order
+            # (Features → Fix → Performance → Refactoring → Style → Docs →
+            # Tests → Chores → Other) so users scanning for new features
+            # always find them at the top.
+            #
+            # The result is written to ``$RUNNER_TEMP/changelog.md`` and
+            # read by the next step. Failures fall back to an empty
+            # changelog so a malformed commit cannot abort the release.
             - name: Build changelog section
               shell: bash
               env:
@@ -414,10 +426,26 @@ jobs:
                   changelog_file="$RUNNER_TEMP/changelog.md"
                   : > "$changelog_file"
 
+                  # Resolve the previous release tag based on the channel.
+                  # On dev pushes the prior tag can be ANY pattern (dev-*
+                  # or vX.Y.Z) since both kinds count as "releases". On
+                  # a main release we only consider vX.Y.Z.
                   if [ "$EVENT" = "push" ]; then
-                      # Dev push: the release IS a single commit. Quote its
-                      # title + body so the user reading the release page sees
-                      # exactly what landed, no more, no less.
+                      # ``git describe --tags --abbrev=0 HEAD^`` returns the
+                      # most recent tag reachable from the parent of HEAD —
+                      # i.e. the last release before this commit, of any kind.
+                      prev_tag="$(git describe --tags --abbrev=0 HEAD^ 2>/dev/null || true)"
+                  else
+                      prev_tag="$(git tag --list 'v[0-9]*.[0-9]*.[0-9]*' \
+                          --sort=-v:refname \
+                          | grep -v "^${TAG}$" \
+                          | head -n 1 || true)"
+                  fi
+
+                  # No prior tag — first release ever, or an unusual repo state.
+                  # Fall back to the single-commit summary so the release page
+                  # is not empty.
+                  if [ -z "$prev_tag" ]; then
                       title="$(git log -1 --pretty=format:'%s' "$SHA")"
                       body="$(git log -1 --pretty=format:'%b' "$SHA")"
                       {
@@ -432,37 +460,32 @@ jobs:
                           echo "---"
                           echo
                       } > "$changelog_file"
-                      echo "Dev changelog written ($(wc -l < "$changelog_file") lines)."
+                      echo "First-release fallback changelog written ($(wc -l < "$changelog_file") lines)."
                       exit 0
                   fi
 
-                  # release (main) or workflow_dispatch on a vX.Y.Z tag.
-                  # Find the previous main-channel tag (vX.Y.Z) excluding the
-                  # current one. ``git for-each-ref`` lets us sort SemVer
-                  # tags correctly without external tools.
-                  prev_tag="$(git tag --list 'v[0-9]*.[0-9]*.[0-9]*' \
-                      --sort=-v:refname \
-                      | grep -v "^${TAG}$" \
-                      | head -n 1 || true)"
-                  if [ -z "$prev_tag" ]; then
-                      echo "No previous vX.Y.Z tag found — emitting empty changelog."
-                      exit 0
-                  fi
+                  echo "Aggregating commits ${prev_tag}..${TAG}"
 
-                  # Commit list since previous tag. ``%H%x09%s`` gives
-                  # SHA<TAB>subject — easy to parse and survives subjects
-                  # containing colons, dashes, parentheses, etc.
-                  commits_file="$RUNNER_TEMP/commits.tsv"
-                  git log "${prev_tag}..${TAG}" --no-merges --pretty=format:'%H%x09%s' \
+                  # Use unit separators (US=0x1f) between fields and a record
+                  # separator (RS=0x1e) between commits so titles, bodies
+                  # with newlines, and SHAs all survive shell parsing. The
+                  # ``%w(0,2,2)`` indent on the body keeps it as a sub-bullet
+                  # under the title when rendered. ``%n`` adds a newline
+                  # between %s and %b inside the same record.
+                  commits_file="$RUNNER_TEMP/commits.txt"
+                  git log "${prev_tag}..${TAG}" --no-merges \
+                      --pretty=format:'%H%x1f%s%x1f%b%x1e' \
                       > "$commits_file" || true
                   if [ ! -s "$commits_file" ]; then
                       echo "No commits between $prev_tag and $TAG — emitting empty changelog."
                       exit 0
                   fi
 
-                  # Conventional Commits type → human heading. Order matches
-                  # the section order the user wants the changelog to read in:
-                  # features first (most visible), then fixes, then the rest.
+                  # Conventional Commits type → human heading. Order
+                  # matches the section order the user wants the changelog
+                  # to read in: features first (most visible), then fixes,
+                  # then the rest. Anything that does not match a known
+                  # type lands in "Other" so nothing silently disappears.
                   declare -a TYPES=(feat fix perf refactor style docs test chore)
                   declare -A HEADINGS=(
                       [feat]="Features"
@@ -474,14 +497,41 @@ jobs:
                       [test]="Tests"
                       [chore]="Chores"
                   )
-
                   declare -A GROUPS
                   declare -a OTHER
 
-                  while IFS=$'\t' read -r sha subject; do
-                      # Skip empty lines just in case.
+                  # Append a body to an existing bullet, indenting every
+                  # body line by 2 spaces so markdown keeps it visually
+                  # attached to the parent list item. Trailing blank lines
+                  # in the commit body are stripped — they otherwise turn
+                  # the indented paragraph into a top-level paragraph that
+                  # breaks the list visually.
+                  format_body() {
+                      local raw="$1"
+                      # Strip Co-Authored-By trailers — the project rules forbid
+                      # crediting AI tools so any such trailer is a leftover and
+                      # should not surface in user-facing release notes.
+                      raw="$(printf '%s\n' "$raw" | grep -v -i '^Co-Authored-By:' || true)"
+                      # Trim leading/trailing blank lines.
+                      raw="$(printf '%s\n' "$raw" | sed -e '/./,$!d' | tac | sed -e '/./,$!d' | tac)"
+                      [ -z "$raw" ] && return 0
+                      printf '%s\n' "$raw" | sed 's/^/  /'
+                  }
+
+                  # ``read -d ''`` with IFS=$'\x1e' splits commit records.
+                  while IFS= read -r -d $'\x1e' record; do
+                      [ -z "$record" ] && continue
+                      # Each record: SHA<US>subject<US>body. Split on US (0x1f).
+                      sha="${record%%$'\x1f'*}"
+                      rest_record="${record#*$'\x1f'}"
+                      subject="${rest_record%%$'\x1f'*}"
+                      body="${rest_record#*$'\x1f'}"
+
                       [ -z "$subject" ] && continue
+
                       # Match ``type(scope)?!?: rest`` and capture the type.
+                      ctype=""
+                      bullet=""
                       if [[ "$subject" =~ ^([a-z]+)(\([^)]+\))?(!)?:\ (.+)$ ]]; then
                           ctype="${BASH_REMATCH[1]}"
                           rest="${BASH_REMATCH[4]}"
@@ -495,13 +545,28 @@ jobs:
                               scope_clean="${scope_clean%)}"
                               rest="**${scope_clean}:** ${rest}"
                           fi
-                          if [ -n "${HEADINGS[$ctype]:-}" ]; then
-                              GROUPS[$ctype]="${GROUPS[$ctype]:-}- ${rest}"$'\n'
-                          else
-                              OTHER+=("- ${rest}")
-                          fi
+                          bullet="- ${rest}"
                       else
-                          OTHER+=("- ${subject}")
+                          bullet="- ${subject}"
+                      fi
+
+                      # Indented body below the bullet (if present).
+                      body_block=""
+                      if [ -n "$body" ]; then
+                          body_block="$(format_body "$body")"
+                      fi
+
+                      # Compose the entry (bullet + optional body block).
+                      if [ -n "$body_block" ]; then
+                          entry="${bullet}"$'\n'"${body_block}"$'\n'
+                      else
+                          entry="${bullet}"$'\n'
+                      fi
+
+                      if [ -n "$ctype" ] && [ -n "${HEADINGS[$ctype]:-}" ]; then
+                          GROUPS[$ctype]="${GROUPS[$ctype]:-}${entry}"
+                      else
+                          OTHER+=("$entry")
                       fi
                   done < "$commits_file"
 
@@ -514,7 +579,6 @@ jobs:
                           if [ -n "${GROUPS[$t]:-}" ]; then
                               echo "### ${HEADINGS[$t]}"
                               echo
-                              # Trim trailing newline added by accumulation.
                               printf '%s' "${GROUPS[$t]}"
                               echo
                           fi
@@ -522,13 +586,13 @@ jobs:
                       if [ "${#OTHER[@]}" -gt 0 ]; then
                           echo "### Other"
                           echo
-                          for line in "${OTHER[@]}"; do echo "$line"; done
+                          for entry in "${OTHER[@]}"; do printf '%s' "$entry"; done
                           echo
                       fi
                       echo "---"
                       echo
                   } > "$changelog_file"
-                  echo "Main changelog written ($(wc -l < "$changelog_file") lines)."
+                  echo "Changelog written ($(wc -l < "$changelog_file") lines)."
 
             - name: Write release body with platform sections
               shell: bash
