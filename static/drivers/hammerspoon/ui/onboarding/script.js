@@ -346,6 +346,8 @@ window.applyStrings = function (strings) {
 	else if (_currentStep === 3) renderStep3();
 	else if (_currentStep === 4) renderStep4();
 	else if (_currentStep === 5) renderStep5();
+	// Keep the window title in sync with the active locale on every step
+	document.title = _t("onboarding.welcome.title");
 };
 
 /**
