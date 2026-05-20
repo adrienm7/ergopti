@@ -307,11 +307,18 @@ local MODEL_PRICES = {
 	["claude-haiku-4-5"]     = { ["in"] = 0.25,  ["out"] = 1.25 },
 	["claude-sonnet-4-6"]    = { ["in"] = 3.00,  ["out"] = 15.00 },
 	["claude-opus-4-7"]      = { ["in"] = 15.00, ["out"] = 75.00 },
-	-- Gemini
+	-- Gemini — ``gemini-2.0-pro`` was a tentative SKU that never shipped
+	-- under that exact name; the actual large-tier Gemini at the time of
+	-- writing is ``gemini-1.5-pro``. Both kept so an older config doesn't
+	-- regress to zero cost while the user retunes.
 	["gemini-2.0-flash"]     = { ["in"] = 0.10,  ["out"] = 0.40 },
+	["gemini-1.5-pro"]       = { ["in"] = 1.25,  ["out"] = 5.00 },
 	["gemini-2.0-pro"]       = { ["in"] = 1.25,  ["out"] = 5.00 },
-	-- xAI
+	-- xAI — ``grok-2-mini`` was the original public mini-tier slug; xAI's
+	-- current public API uses ``grok-2-1212`` (and ``grok-2`` as alias).
+	-- Verify against https://docs.x.ai/docs before billing on these.
 	["grok-2-mini"]          = { ["in"] = 0.30,  ["out"] = 0.50 },
+	["grok-2-1212"]          = { ["in"] = 2.00,  ["out"] = 10.00 },
 	["grok-2"]               = { ["in"] = 2.00,  ["out"] = 10.00 },
 	-- Mistral
 	["mistral-small-latest"] = { ["in"] = 0.20,  ["out"] = 0.60 },
