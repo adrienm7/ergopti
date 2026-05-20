@@ -597,6 +597,22 @@ _LLM_Tray_PromptApiEntry(EditId) {
 	}
 	_LLM_Tray_PersistApiEntries()
 	LLM_Tray_SaveConfig()
+
+	; Token validation: hit the provider's /models endpoint once with the
+	; freshly-saved credentials so the user finds out NOW (with an
+	; explicit TrayTip) instead of mid-typing with an empty tooltip and
+	; no idea why. LLM_RemoteIsReady uses a 2 s timeout so even an
+	; unreachable host doesn't block the menu visibly.
+	try {
+		if LLM_RemoteIsReady(new_entry) {
+			TrayTip(StrReplace(t("menu.llm.api_validated_body"), "%s", new_name),
+				t("menu.llm.api_validated_title"), "Iconi")
+		} else {
+			TrayTip(StrReplace(t("menu.llm.api_unreachable_body"), "%s", new_name),
+				t("menu.llm.api_unreachable_title"), "Icon!")
+		}
+	}
+
 	LLM_Engine_Init(LLM_Tray_BuildOpts())
 	LLM_Tray_Build()
 }
@@ -605,6 +621,24 @@ _LLM_Tray_RemoveActiveApiEntry() {
 	global _LLM_Tray
 	active_id := _LLM_Tray["api_entry_id"]
 	if (active_id == "")
+		return
+	; Confirm before destroying the entry — the saved token is gone for
+	; good once we delete it. Worth one extra click, especially because
+	; the user is one stray click away in a small menu.
+	active_entry := ""
+	for e in _LLM_Tray["api_entries"] {
+		if (_LLM_TrayApiEntryGet(e, "Id", "") == active_id) {
+			active_entry := e
+			break
+		}
+	}
+	entry_name := _LLM_TrayApiEntryGet(active_entry, "Name", active_id)
+	confirm := MsgBox(
+		StrReplace(t("menu.llm.api_remove_confirm_body"), "%s", entry_name),
+		t("menu.llm.api_remove_confirm_title"),
+		"4 48"  ; Yes/No + warning icon
+	)
+	if (confirm != "Yes")
 		return
 	kept := []
 	for e in _LLM_Tray["api_entries"] {
@@ -1123,6 +1157,11 @@ LLM_Tray_BuildDisplayMenu() {
 	m.Add(indent_parent_label, indent_menu)
 	if (n < 2)
 		m.Disable(indent_parent_label)
+	_LLM_MaybeAddReset(m,
+		_LLM_Tray["pred_indent"],
+		_LLM_DefaultFor("llm_pred_indent", 0),
+		(*) => _LLM_AssignAndRebuild("pred_indent",
+			_LLM_DefaultFor("llm_pred_indent", 0)))
 
 	return m
 }

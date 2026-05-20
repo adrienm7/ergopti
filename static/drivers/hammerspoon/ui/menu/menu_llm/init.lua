@@ -1354,6 +1354,25 @@ function M.create(deps)
                             pcall(llm_mod.persist_api_entries)
                             pcall(llm_mod.warmup_model, llm_mod.get_current_model())
                             update_menu()
+                            -- Validate the credentials immediately so the user
+                            -- finds out NOW whether the token + URL + model
+                            -- combo works, instead of mid-typing with an
+                            -- empty tooltip and no idea why. check_availability
+                            -- is async (no menu freeze) and the result is
+                            -- surfaced via a notification.
+                            api_remote.check_availability(new_entry.model,
+                                function()
+                                    pcall(notifications.notify,
+                                        string.format(i18n.get("menu.llm.api_validated_title")),
+                                        string.format(i18n.get("menu.llm.api_validated_body"), new_entry.label),
+                                        "success")
+                                end,
+                                function(unreachable)
+                                    pcall(notifications.notify,
+                                        i18n.get("menu.llm.api_unreachable_title"),
+                                        string.format(i18n.get("menu.llm.api_unreachable_body"), new_entry.label),
+                                        "warning")
+                                end)
                         end or nil,
                     })
                 end
@@ -1376,6 +1395,17 @@ function M.create(deps)
                     or  "🗑️ Supprimer l'entrée active",
                 disabled = (paused or (active_entry == nil)) or nil,
                 fn       = (not paused and active_entry) and function()
+                    -- Confirm before destroying — the saved token is gone
+                    -- for good once we delete it. Worth one extra click,
+                    -- especially in a small menu where the user is one
+                    -- stray click away from the action.
+                    local ok_c, choice = pcall(dialog.block_alert,
+                        string.format(i18n.get("menu.llm.api_remove_confirm_title"), active_label),
+                        i18n.get("menu.llm.api_remove_confirm_body"),
+                        i18n.get("button.delete"), i18n.get("button.cancel"), "critical")
+                    if not (ok_c and choice == i18n.get("button.delete")) then
+                        return
+                    end
                     local kept = {}
                     for _, x in ipairs(api_remote.get_entries() or {}) do
                         if x.id ~= active_entry.id then table.insert(kept, x) end
