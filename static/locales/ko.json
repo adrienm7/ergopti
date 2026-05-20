@@ -1879,5 +1879,6 @@
 	"updater.up_to_date": "ErgoptiPlus가 최신 상태입니다.\n\n현재 버전: {1}",
 	"updater.version_message": "ErgoptiPlus {1}{2}\n\nGitHub의 릴리스 페이지를 여시겠습니까?",
 	"vscode.reload_required": "타이핑 확장 프로그램을 활성화하려면 VSCode를 다시 로드하세요 (Cmd+Shift+P > Reload Window)",
-	"menu.llm.warning_install_ollama": "⚠️  Ollama가 설치되지 않았습니다 — 설치를 다시 시작하려면 클릭하세요"
+	"menu.llm.warning_install_ollama": "⚠️  Ollama가 설치되지 않았습니다 — 설치를 다시 시작하려면 클릭하세요",
+	"llm.deps.browser_install_tip": "브라우저에서 열린 페이지에서 Windows용 Ollama를 다운로드하고 설치 프로그램을 실행한 후 다시 돌아오세요 — 연결이 자동으로 감지됩니다."
 }

@@ -1879,5 +1879,6 @@
 	"updater.up_to_date": "ErgoptiPlus güncel.\n\nGeçerli sürüm: {1}",
 	"updater.version_message": "ErgoptiPlus {1}{2}\n\nGitHub’da sürümler sayfasını açayım mı?",
 	"vscode.reload_required": "Yazım uzantısını etkinleştirmek için VSCode’u yeniden yükleyin (Cmd+Shift+P > Reload Window)",
-	"menu.llm.warning_install_ollama": "⚠️  Ollama yüklü değil — kurulumu yeniden başlatmak için tıklayın"
+	"menu.llm.warning_install_ollama": "⚠️  Ollama yüklü değil — kurulumu yeniden başlatmak için tıklayın",
+	"llm.deps.browser_install_tip": "Tarayıcınızda açılan sayfadan Windows için Ollama'yı indirin, yükleyiciyi çalıştırın ve buraya dönün — bağlantı otomatik olarak algılanacak."
 }
