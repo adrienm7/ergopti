@@ -336,8 +336,9 @@ LLM_Tray_Build() {
 	; a missing install was completely silent: the toggle showed ON, no
 	; tooltip ever appeared, and the user had no obvious next step.
 	if (_LLM_Tray["enabled"] and _LLM_Tray["backend"] == "ollama" and !LLM_Deps_IsReady()) {
+		LoggerInfo("LLM", "Tray: showing 'Ollama not installed' warning row.")
 		_LLM_Tray_Menu.Add(t("menu.llm.warning_install_ollama"),
-			(*) => SetTimer(() => LLM_Tray_BootstrapOllama(true), -1))
+			(*) => _LLM_Tray_OnWarningInstallClick())
 	}
 
 	; Backend submenu
@@ -1425,6 +1426,22 @@ LLM_Tray_BuildNavMenu() {
 ; ======= 5/ Action Handlers =======
 ; =====================================
 ; =====================================
+
+/**
+ * Click handler for the ``⚠️ Ollama not installed`` warning row in the
+ * tray menu. Forces a visible install attempt (show_ui=true). Logs the
+ * click immediately so we can diagnose "I clicked but nothing happened"
+ * reports — if this line is missing from the log, the click never
+ * reached the handler at all (menu binding issue); if it's present but
+ * BootstrapOllama isn't, the handoff dropped somewhere downstream.
+ */
+_LLM_Tray_OnWarningInstallClick() {
+	LoggerInfo("LLM", "Warning row clicked — forcing visible install.")
+	; Direct call (was a -1 SetTimer one-shot, which made the trace
+	; harder to follow without buying us anything: the menu click is
+	; already on a separate AHK thread from the rebuild path).
+	LLM_Tray_BootstrapOllama(true)
+}
 
 LLM_Tray_OnToggle(*) {
 	global _LLM_Tray
