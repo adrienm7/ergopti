@@ -799,13 +799,14 @@ _Step5_AutoRegister(statusLbl, *) {
 		}
 	} else {
 		; Either the registry write actually failed or the module was not ready.
-		; Mark the intent for the post-Reload pass; surface a "success" status to
-		; the user because from their perspective the action is acknowledged and
-		; will complete on the next start.
+		; Mark the intent for the post-Reload pass and surface a NEUTRAL "will
+		; configure on next start" status — showing green success here misleads
+		; the user, because the actual UAC + touchpad-restart only happens after
+		; Reload, several seconds later. The orange tint signals "pending action".
 		_ob_register_pending := true
 		try {
-			statusLbl.SetFont("s9 cGreen")
-			statusLbl.Text    := t("onboarding.gestures.register_success")
+			statusLbl.SetFont("s9 c808000")
+			statusLbl.Text    := t("onboarding.gestures.register_deferred")
 			statusLbl.Visible := true
 		}
 	}

@@ -1035,6 +1035,7 @@
 	"onboarding.gestures.register_manual_hint": "Affiche un tutoriel étape par étape et un raccourci en un clic vers les paramètres du pavé tactile, pour configurer chaque geste à la main.",
 	"onboarding.gestures.register_section": "Les gestes doivent être configurés dans les Paramètres Windows (Bluetooth et appareils → Pavé tactile → Gestes avancés) :",
 	"onboarding.gestures.register_success": "Les gestes sont maintenant configurés dans les Paramètres Windows.",
+	"onboarding.gestures.register_deferred": "Les gestes seront configurés au prochain démarrage.",
 	"onboarding.gestures.title": "Gestes",
 	"onboarding.language.placeholder": "Choisissez votre langue…",
 	"onboarding.layout.desc": "Active l’émulation de disposition (couche de base + AltGr) et les hotstrings Ergopti.",

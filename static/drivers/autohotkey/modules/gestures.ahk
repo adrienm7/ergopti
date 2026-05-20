@@ -1760,6 +1760,26 @@ GestureOpenTouchpadSettings() {
     try Run("ms-settings:devices-touchpad")
 }
 
+; One-shot SetTimer target used by the post-Reload AutoConfigureOnNextStart
+; consumer. Wrapped as a named function because AHK fat-arrow lambdas cannot
+; contain ``try`` (parser treats it as an identifier). Logs the lifecycle pair
+; so a failure here is visible in the log.
+_DeferredGestureAutoConfigure(*) {
+    LoggerStart("gestures", "Running deferred touchpad auto-configuration…")
+    Ok := false
+    try {
+        Ok := GestureAutoConfigureRegistry()
+    } catch as e {
+        LoggerError("gestures", "Deferred auto-configuration threw: {1}.", e.Message)
+        return
+    }
+    if Ok {
+        LoggerSuccess("gestures", "Deferred touchpad auto-configuration completed.")
+    } else {
+        LoggerWarn("gestures", "Deferred touchpad auto-configuration reported failure — user can retry from the tray menu.")
+    }
+}
+
 ; Read configuration on load
 GesturesReadConfig()
 
@@ -1775,10 +1795,22 @@ global _IniCache, ConfigurationFile
 RawAutoConfig := IniCacheGet(_IniCache, "Gestures", "AutoConfigureOnNextStart")
 if (RawAutoConfig == "1" or RawAutoConfig == "true") {
     LoggerStart("gestures", "Consuming AutoConfigureOnNextStart flag from onboarding…")
-    try GestureAutoConfigureRegistry()
+
+    ; Clear the flag FIRST, before any blocking RunWait — the touchpad device
+    ; restart inside GestureAutoConfigureRegistry can cause the AHK process to
+    ; be killed mid-call (PnP cycling tears down the HID hook). If we clear
+    ; after, that kill leaves the flag set and the auto-relaunched script loops
+    ; forever, never reaching initMenu — user sees the default tray menu.
     try TOML_BatchWrite(ConfigurationFile,
         [{ Section: "Gestures", Key: "AutoConfigureOnNextStart", Value: false }])
-    LoggerSuccess("gestures", "AutoConfigureOnNextStart flag consumed and cleared.")
+
+    ; Defer the actual registry + touchpad restart to a one-shot timer so the
+    ; rest of auto-execute (notably initMenu in ErgoptiPlus.ahk) finishes
+    ; building the tray BEFORE the UAC prompt + ~20s PowerShell call blocks
+    ; the message loop. 2s is enough for the auto-execute tail to settle.
+    SetTimer(_DeferredGestureAutoConfigure, -2000)
+
+    LoggerSuccess("gestures", "AutoConfigureOnNextStart flag cleared — touchpad config deferred to T+2s.")
 }
 
 LoggerSuccess("gestures", "Gestures module initialised — ready.")
