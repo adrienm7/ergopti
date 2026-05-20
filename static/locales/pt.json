@@ -675,7 +675,7 @@
 	"menu.llm.arrows": "Setas",
 	"menu.llm.arrows_only": "Somente setas",
 	"menu.llm.auto_raise_temp": "  ↳ Aumentar temperatura automaticamente (+0,1 por sugestão)",
-	"menu.llm.backend_api_suffix": "fornecedor remoto",
+	"menu.llm.backend_api_suffix": "Fornecedor remoto",
 	"menu.llm.backend_default_model": "↺ Modelo padrão do backend (%s)",
 	"menu.llm.backend_label": "Backend: %s",
 	"menu.llm.backend_mlx_suffix": "Recomendado (nativo Apple Silicon)",

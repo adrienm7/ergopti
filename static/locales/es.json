@@ -675,7 +675,7 @@
 	"menu.llm.arrows": "Flechas",
 	"menu.llm.arrows_only": "Solo flechas",
 	"menu.llm.auto_raise_temp": "  ↳ Subir temp. automáticamente (+0,1 por sugerencia)",
-	"menu.llm.backend_api_suffix": "proveedor remoto",
+	"menu.llm.backend_api_suffix": "Proveedor remoto",
 	"menu.llm.backend_default_model": "↺ Modelo predeterminado del backend (%s)",
 	"menu.llm.backend_label": "Backend: %s",
 	"menu.llm.backend_mlx_suffix": "Recomendado (nativo Apple Silicon)",

@@ -675,7 +675,7 @@
 	"menu.llm.arrows": "Frecce",
 	"menu.llm.arrows_only": "Solo frecce",
 	"menu.llm.auto_raise_temp": "  ↳ Aumenta automaticamente la temperatura (+0.1 per suggerimento)",
-	"menu.llm.backend_api_suffix": "provider remoto",
+	"menu.llm.backend_api_suffix": "Provider remoto",
 	"menu.llm.backend_default_model": "↺ Modello predefinito backend (%s)",
 	"menu.llm.backend_label": "Backend: %s",
 	"menu.llm.backend_mlx_suffix": "Consigliato (nativo Apple Silicon)",

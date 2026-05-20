@@ -675,7 +675,7 @@
 	"menu.llm.arrows": "Pijlen",
 	"menu.llm.arrows_only": "Alleen pijlen",
 	"menu.llm.auto_raise_temp": "  ↳ Temperatuur automatisch verhogen (+0,1 per suggestie)",
-	"menu.llm.backend_api_suffix": "externe provider",
+	"menu.llm.backend_api_suffix": "Externe provider",
 	"menu.llm.backend_default_model": "↺ Standaardmodel backend (%s)",
 	"menu.llm.backend_label": "Backend: %s",
 	"menu.llm.backend_mlx_suffix": "Aanbevolen (Apple Silicon native)",
