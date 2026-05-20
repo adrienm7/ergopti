@@ -261,12 +261,14 @@ jobs:
               run: python tools/build_static_bundle.py
               shell: bash
 
-            - name: Stamp BUNDLE_VERSION and BUNDLE_RELEASE_URL with release tag
+            - name: Stamp BUNDLE_VERSION, BUNDLE_RELEASE_URL, BUNDLE_CHANNEL
               shell: pwsh
               run: |
                   $version = "${{ needs.prepare-release.outputs.version }}"
                   $tag     = "${{ needs.prepare-release.outputs.tag }}"
                   if (-not $tag) { $tag = $version }
+                  $prerelease = "${{ needs.prepare-release.outputs.prerelease }}"
+                  $channel = if ($prerelease -eq 'true') { 'dev' } else { 'main' }
                   $owner   = "${{ github.repository_owner }}"
                   $repo    = "${{ github.event.repository.name }}"
                   $releaseUrl = "https://github.com/$owner/$repo/releases/tag/$tag"
@@ -274,9 +276,11 @@ jobs:
                   $text = Get-Content -Raw -Path $bundlePath
                   $text = $text.Replace("__BUNDLE_VERSION__",     $version)
                   $text = $text.Replace("__BUNDLE_RELEASE_URL__", $releaseUrl)
+                  $text = $text.Replace("__BUNDLE_CHANNEL__",     $channel)
                   Set-Content -Path $bundlePath -Value $text -Encoding UTF8 -NoNewline
                   Write-Host "BUNDLE_VERSION     stamped: $version"
                   Write-Host "BUNDLE_RELEASE_URL stamped: $releaseUrl"
+                  Write-Host "BUNDLE_CHANNEL     stamped: $channel"
 
             - name: Download AutoHotkey v2 runtime and Ahk2Exe
               shell: pwsh

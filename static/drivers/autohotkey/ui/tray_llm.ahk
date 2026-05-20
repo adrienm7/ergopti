@@ -266,12 +266,10 @@ LLM_Tray_Init(saved_opts := Map()) {
 	; the only entry into the tray module.
 	LLM_Tray_BindProfileHotkeys()
 
-	; First-run onboarding: when the LLM feature has never been enabled
-	; on this install, fire a single tray notification suggesting the
-	; user to try it. The discovery is otherwise hidden behind a menu
-	; the user has to open intentionally. The flag in [LLM] persists
-	; across reloads so we never nag past the first run.
-	_LLM_Tray_MaybeShowOnboarding()
+	; (Removed) First-run LLM onboarding TrayTip — the unsolicited
+	; "Text predictions available" balloon was perceived as noise by users
+	; who already know what the tray menu offers. Discovery now lives
+	; purely in the menu's "IA" submenu; no opt-in nag at startup.
 
 	LLM_Tray_Build()
 
@@ -1937,24 +1935,12 @@ LLM_Tray_SetModel(tag) {
  * menu rebuild paints the dot accordingly. Mirrors the HS
  * ``probe_llm_health`` helper — fire-and-forget, paint on the next pass.
  */
-_LLM_Tray_MaybeShowOnboarding() {
-	global _LLM_Tray
-	if _LLM_Tray["enabled"]
-		return
-	; Persisted flag — once shown, never again. The flag lives in [LLM]
-	; alongside the other tray settings so a config reset (which wipes
-	; everything) re-arms the onboarding too, which is the right
-	; behaviour: a fresh-out-of-the-box state should re-introduce the
-	; feature.
-	if _LLM_Tray.Has("onboarding_seen") and _LLM_Tray["onboarding_seen"]
-		return
-	_LLM_Tray["onboarding_seen"] := true
-	LLM_Tray_SaveConfig()
-	; Defer the TrayTip slightly so it lands after the bundle finishes
-	; initialising — firing it during the require chain shows up before
-	; the tray icon itself, which looks broken.
-	SetTimer(() => TrayTip(t("menu.llm.onboarding_body"), t("menu.llm.onboarding_title"), "Iconi"), -2000)
-}
+; (Removed) ``_LLM_Tray_MaybeShowOnboarding`` — used to fire a tray balloon
+; on first launch telling the user "Text predictions available". The
+; notification was perceived as noise; users prefer to discover the LLM
+; menu themselves rather than be solicited at startup. The
+; ``menu.llm.onboarding_*`` locale keys it consumed have been deleted from
+; every locale.
 
 _LLM_Tray_FireHealthProbe() {
 	global _LLM_Tray
