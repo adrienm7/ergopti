@@ -522,11 +522,20 @@ _LLM_Engine_OnStreamPartial(state, slot_idx, partial) {
 	LLM_Engine_OnResults(preview, state["ctx"], slot_idx, false)
 }
 
-_LLM_Engine_OnVariantSuccess(state, text) {
+_LLM_Engine_OnVariantSuccess(state, text, meta := "") {
 	global _LLM_Engine
 	current_id := _LLM_Engine.Has("request_id") ? _LLM_Engine["request_id"] : 0
 	if (state["request_id"] != current_id)
 		return
+	; Accumulate token usage / cost across variants. The Ollama path does
+	; not pass meta (its sync /api/generate response carries different
+	; fields we don't bill on); the API path does. Missing values stay 0.
+	if (meta is Map) {
+		state["prompt_tokens"]     := (state.Has("prompt_tokens")     ? state["prompt_tokens"]     : 0) + (meta.Has("prompt_tokens")     ? meta["prompt_tokens"]     : 0)
+		state["completion_tokens"] := (state.Has("completion_tokens") ? state["completion_tokens"] : 0) + (meta.Has("completion_tokens") ? meta["completion_tokens"] : 0)
+		state["total_tokens"]      := (state.Has("total_tokens")      ? state["total_tokens"]      : 0) + (meta.Has("total_tokens")      ? meta["total_tokens"]      : 0)
+		state["est_cost_usd"]      := (state.Has("est_cost_usd")      ? state["est_cost_usd"]      : 0.0) + (meta.Has("est_cost_usd")    ? meta["est_cost_usd"]      : 0.0)
+	}
 	; Dedup against existing slots; skip empties.
 	inserted := false
 	if (text != "") {
@@ -578,8 +587,22 @@ _LLM_Engine_FinalizeRequest(state) {
 	if (state["request_id"] != current_id)
 		return
 	if (state["slots"].Length == 0) {
-		; No usable predictions and no retry budget left — let the tooltip
-		; fade out via its auto-dismiss timer instead of yanking it now.
+		; Every variant failed — log a single ``llm_generation_failed`` so
+		; the audit trail captures the failure instead of silently
+		; dropping. The tooltip auto-dismisses via its own timer.
+		try {
+			app_name := ""
+			try app_name := WinGetTitle("A")
+			KL_LogLlmFailed(Map(
+				"app",            app_name,
+				"context",        state["ctx"],
+				"backend",        state["backend"],
+				"model",          state["model"],
+				"system_prompt",  state["system_prompt"],
+				"user_prompt",    state["ctx"],
+				"failure_reason", "all_variants_failed"
+			))
+		}
 		return
 	}
 	_LLM_Engine["last_ctx"]     := state["ctx"]
@@ -593,11 +616,13 @@ _LLM_Engine_FinalizeRequest(state) {
 	; Keylogger event — same shape as HS (modules/keylogger/init.lua /
 	; M.log_llm) so a tail of the unified log reads identically across
 	; drivers. The ``predictions`` field carries the full slot array now
-	; rather than a single string.
+	; rather than a single string. Token usage / cost / latency are
+	; populated by the backend when the provider exposes them in its
+	; response (OpenAI's ``usage`` block, Anthropic's ``usage`` block).
 	try {
 		app_name := ""
 		try app_name := WinGetTitle("A")
-		KL_LogLlm("generation", Map(
+		evt := Map(
 			"app",           app_name,
 			"context",       state["ctx"],
 			"predictions",   state["slots"],
@@ -605,7 +630,16 @@ _LLM_Engine_FinalizeRequest(state) {
 			"model",         state["model"],
 			"system_prompt", state["system_prompt"],
 			"user_prompt",   state["ctx"]
-		))
+		)
+		if state.Has("prompt_tokens")     and state["prompt_tokens"]     > 0
+			evt["prompt_tokens"] := state["prompt_tokens"]
+		if state.Has("completion_tokens") and state["completion_tokens"] > 0
+			evt["completion_tokens"] := state["completion_tokens"]
+		if state.Has("total_tokens")      and state["total_tokens"]      > 0
+			evt["total_tokens"] := state["total_tokens"]
+		if state.Has("est_cost_usd")      and state["est_cost_usd"]      > 0
+			evt["est_cost_usd"] := state["est_cost_usd"]
+		KL_LogLlm("generation", evt)
 	}
 
 	LLM_Engine_OnResults(state["slots"], state["ctx"], 1, true)

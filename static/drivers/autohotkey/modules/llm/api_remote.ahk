@@ -216,7 +216,10 @@ LLM_RemoteGenerate_Async(Entry, SystemPrompt, UserText, Temperature, on_success,
     }
 
     _LLMRemote_TrimAsyncRegistry()
-    _LLM_Remote_Async[req_id] := Map("http", http, "format", resolved["Format"], "on_success", on_success, "on_fail", on_fail, "cancelled", false)
+    _LLM_Remote_Async[req_id] := Map(
+        "http", http, "format", resolved["Format"],
+        "model_id_at_dispatch", resolved["Model"],
+        "on_success", on_success, "on_fail", on_fail, "cancelled", false)
     _LLMRemote_PollRequest(req_id)
     return req_id
 }
@@ -270,7 +273,100 @@ _LLMRemote_PollRequest(req_id) {
         try on_fail()
         return
     }
-    try on_success(text)
+    ; Pull the per-provider ``usage`` block out of the response so the
+    ; engine can record tokens consumed + estimated cost in the keylogger
+    ; event. Same shape as OpenAI / Anthropic / Gemini all carry; Ollama
+    ; doesn't (its non-streaming response has ``eval_count`` /
+    ; ``prompt_eval_count`` instead, which we don't parse for the remote
+    ; path because the engine only treats local backends as "free").
+    meta := _LLMRemoteExtractUsage(format, body, entry.Has("model_id_at_dispatch") ? entry["model_id_at_dispatch"] : "")
+    try on_success(text, meta)
+}
+
+; Token + cost extraction. Each provider exposes the same numeric fields
+; under a top-level ``usage`` block (OpenAI / Anthropic / Cohere / Mistral
+; / xAI / Cerebras / DeepSeek) or under ``usageMetadata`` (Gemini). We
+; pull prompt + completion + total when present and compute an estimated
+; cost in USD from the per-model price table below.
+_LLMRemoteExtractUsage(format, body, model) {
+    out := Map("prompt_tokens", 0, "completion_tokens", 0, "total_tokens", 0, "est_cost_usd", 0.0)
+    if (body == "")
+        return out
+    ; Gemini uses ``promptTokenCount`` / ``candidatesTokenCount`` /
+    ; ``totalTokenCount`` inside ``usageMetadata``.
+    if (format == "gemini") {
+        if RegExMatch(body, '"promptTokenCount"\s*:\s*([0-9]+)', &m)
+            out["prompt_tokens"] := Integer(m[1])
+        if RegExMatch(body, '"candidatesTokenCount"\s*:\s*([0-9]+)', &m)
+            out["completion_tokens"] := Integer(m[1])
+        if RegExMatch(body, '"totalTokenCount"\s*:\s*([0-9]+)', &m)
+            out["total_tokens"] := Integer(m[1])
+    } else if (format == "anthropic") {
+        ; Anthropic: input_tokens / output_tokens at top level under ``usage``.
+        if RegExMatch(body, '"input_tokens"\s*:\s*([0-9]+)', &m)
+            out["prompt_tokens"] := Integer(m[1])
+        if RegExMatch(body, '"output_tokens"\s*:\s*([0-9]+)', &m)
+            out["completion_tokens"] := Integer(m[1])
+        out["total_tokens"] := out["prompt_tokens"] + out["completion_tokens"]
+    } else {
+        ; OpenAI shape (also used by Mistral / DeepSeek / Cohere / xAI /
+        ; Cerebras / openai_compat): prompt_tokens / completion_tokens /
+        ; total_tokens inside ``usage``.
+        if RegExMatch(body, '"prompt_tokens"\s*:\s*([0-9]+)', &m)
+            out["prompt_tokens"] := Integer(m[1])
+        if RegExMatch(body, '"completion_tokens"\s*:\s*([0-9]+)', &m)
+            out["completion_tokens"] := Integer(m[1])
+        if RegExMatch(body, '"total_tokens"\s*:\s*([0-9]+)', &m)
+            out["total_tokens"] := Integer(m[1])
+    }
+    if (out["total_tokens"] == 0 and out["prompt_tokens"] > 0)
+        out["total_tokens"] := out["prompt_tokens"] + out["completion_tokens"]
+    out["est_cost_usd"] := _LLMRemoteEstimateCost(model, out["prompt_tokens"], out["completion_tokens"])
+    return out
+}
+
+; Per-model USD price table (per 1M tokens). Hardcoded — kept in lockstep
+; with the published pricing pages as of the file's last edit. The user
+; can override pricing per entry via a ``price_in_per_m`` / ``price_out_per_m``
+; field on the entry record (see _LLMRemoteEntryGet at the bottom of this
+; file). Models not in the table fall back to 0 — cost is reported as 0
+; rather than a wrong number, and the user knows to add the pricing if
+; they care about the metric.
+global LLM_REMOTE_MODEL_PRICES := Map(
+    ; OpenAI
+    "gpt-4o-mini",          Map("in", 0.15,  "out", 0.60),
+    "gpt-4o",               Map("in", 2.50,  "out", 10.00),
+    "gpt-4.1-mini",         Map("in", 0.40,  "out", 1.60),
+    "gpt-4.1",              Map("in", 2.00,  "out", 8.00),
+    ; Anthropic
+    "claude-haiku-4-5",     Map("in", 0.25,  "out", 1.25),
+    "claude-sonnet-4-6",    Map("in", 3.00,  "out", 15.00),
+    "claude-opus-4-7",      Map("in", 15.00, "out", 75.00),
+    ; Google Gemini
+    "gemini-2.0-flash",     Map("in", 0.10,  "out", 0.40),
+    "gemini-2.0-pro",       Map("in", 1.25,  "out", 5.00),
+    ; xAI
+    "grok-2-mini",          Map("in", 0.30,  "out", 0.50),
+    "grok-2",               Map("in", 2.00,  "out", 10.00),
+    ; Mistral
+    "mistral-small-latest", Map("in", 0.20,  "out", 0.60),
+    "mistral-large-latest", Map("in", 2.00,  "out", 6.00),
+    ; DeepSeek
+    "deepseek-chat",        Map("in", 0.14,  "out", 0.28),
+    ; Cohere
+    "command-r7b-12-2024",  Map("in", 0.0375,"out", 0.15),
+    "command-r-plus",       Map("in", 2.50,  "out", 10.00),
+    ; Cerebras
+    "llama-3.1-8b",         Map("in", 0.10,  "out", 0.10),
+    "llama-3.1-70b",        Map("in", 0.60,  "out", 0.60)
+)
+
+_LLMRemoteEstimateCost(model, in_tokens, out_tokens) {
+    global LLM_REMOTE_MODEL_PRICES
+    if (model == "" or !LLM_REMOTE_MODEL_PRICES.Has(model))
+        return 0.0
+    p := LLM_REMOTE_MODEL_PRICES[model]
+    return (in_tokens * p["in"] + out_tokens * p["out"]) / 1000000.0
 }
 
 _LLMRemote_TrimAsyncRegistry() {

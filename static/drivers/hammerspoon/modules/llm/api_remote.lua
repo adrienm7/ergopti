@@ -288,6 +288,74 @@ local function build_payload(format, model, system_prompt, user_prompt, temperat
 	}
 end
 
+--- Per-model USD price table (per 1M tokens). Mirror of the AHK
+--- LLM_REMOTE_MODEL_PRICES map in api_remote.ahk — keep in lockstep when
+--- providers re-tariff. Models not in the table fall back to 0 — cost is
+--- reported as 0 rather than a wrong number, and the user knows to add
+--- the pricing if they care about the metric.
+local MODEL_PRICES = {
+	-- OpenAI
+	["gpt-4o-mini"]          = { ["in"] = 0.15,  ["out"] = 0.60 },
+	["gpt-4o"]               = { ["in"] = 2.50,  ["out"] = 10.00 },
+	["gpt-4.1-mini"]         = { ["in"] = 0.40,  ["out"] = 1.60 },
+	["gpt-4.1"]              = { ["in"] = 2.00,  ["out"] = 8.00 },
+	-- Anthropic
+	["claude-haiku-4-5"]     = { ["in"] = 0.25,  ["out"] = 1.25 },
+	["claude-sonnet-4-6"]    = { ["in"] = 3.00,  ["out"] = 15.00 },
+	["claude-opus-4-7"]      = { ["in"] = 15.00, ["out"] = 75.00 },
+	-- Gemini
+	["gemini-2.0-flash"]     = { ["in"] = 0.10,  ["out"] = 0.40 },
+	["gemini-2.0-pro"]       = { ["in"] = 1.25,  ["out"] = 5.00 },
+	-- xAI
+	["grok-2-mini"]          = { ["in"] = 0.30,  ["out"] = 0.50 },
+	["grok-2"]               = { ["in"] = 2.00,  ["out"] = 10.00 },
+	-- Mistral
+	["mistral-small-latest"] = { ["in"] = 0.20,  ["out"] = 0.60 },
+	["mistral-large-latest"] = { ["in"] = 2.00,  ["out"] = 6.00 },
+	-- DeepSeek
+	["deepseek-chat"]        = { ["in"] = 0.14,  ["out"] = 0.28 },
+	-- Cohere
+	["command-r7b-12-2024"]  = { ["in"] = 0.0375,["out"] = 0.15 },
+	["command-r-plus"]       = { ["in"] = 2.50,  ["out"] = 10.00 },
+	-- Cerebras
+	["llama-3.1-8b"]         = { ["in"] = 0.10,  ["out"] = 0.10 },
+	["llama-3.1-70b"]        = { ["in"] = 0.60,  ["out"] = 0.60 },
+}
+
+local function estimate_cost(model, in_tokens, out_tokens)
+	if not model or model == "" or not MODEL_PRICES[model] then return 0.0 end
+	local p = MODEL_PRICES[model]
+	return (in_tokens * p["in"] + out_tokens * p["out"]) / 1000000.0
+end
+
+--- Extract token usage from the provider response. Each format exposes the
+--- same numeric fields under a top-level ``usage`` block (OpenAI shape) or
+--- under ``usageMetadata`` (Gemini). We regex-scrape rather than re-parse
+--- JSON (the response body has already been parsed once in parse_response;
+--- doing it twice on every request is wasteful when this is a hot path).
+local function _extract_usage(format, body, model)
+	local out = { prompt_tokens = 0, completion_tokens = 0, total_tokens = 0, est_cost_usd = 0.0 }
+	if not body or body == "" then return out end
+	if format == "gemini" then
+		out.prompt_tokens     = tonumber((body:match('"promptTokenCount"%s*:%s*(%d+)'))     or 0) or 0
+		out.completion_tokens = tonumber((body:match('"candidatesTokenCount"%s*:%s*(%d+)')) or 0) or 0
+		out.total_tokens      = tonumber((body:match('"totalTokenCount"%s*:%s*(%d+)'))      or 0) or 0
+	elseif format == "anthropic" then
+		out.prompt_tokens     = tonumber((body:match('"input_tokens"%s*:%s*(%d+)'))  or 0) or 0
+		out.completion_tokens = tonumber((body:match('"output_tokens"%s*:%s*(%d+)')) or 0) or 0
+		out.total_tokens      = out.prompt_tokens + out.completion_tokens
+	else
+		out.prompt_tokens     = tonumber((body:match('"prompt_tokens"%s*:%s*(%d+)'))     or 0) or 0
+		out.completion_tokens = tonumber((body:match('"completion_tokens"%s*:%s*(%d+)')) or 0) or 0
+		out.total_tokens      = tonumber((body:match('"total_tokens"%s*:%s*(%d+)'))      or 0) or 0
+	end
+	if out.total_tokens == 0 and out.prompt_tokens > 0 then
+		out.total_tokens = out.prompt_tokens + out.completion_tokens
+	end
+	out.est_cost_usd = estimate_cost(model, out.prompt_tokens, out.completion_tokens)
+	return out
+end
+
 --- Pull the generated text out of a provider response. Each branch targets the
 --- canonical "first choice / first candidate / first content block" path. When
 --- the path is missing, returns "" — the caller treats that as a soft failure
@@ -527,6 +595,20 @@ local function post_and_parse(model_name, system_prompt, full_text, tail_text,
 			if not status or status < 200 or status >= 300 then
 				Logger.error(LOG, "[%s] #%d HTTP_ERROR status=%s body=%s",
 					model, req_id, tostring(status), (body or ""):sub(1, 200))
+				-- Log the failure so the audit trail shows it instead of
+				-- silently dropping. Same envelope as keylogger.log_llm
+				-- but routed to log_llm_failed; the engine doesn't need
+				-- to know about the distinction.
+				if keylogger and type(keylogger.log_llm_failed) == "function" then
+					pcall(keylogger.log_llm_failed, full_text, nil, {
+						backend        = "api",
+						model          = tostring(model),
+						system_prompt  = system_prompt,
+						user_prompt    = user_prompt,
+						failure_reason = "http_" .. tostring(status or "unknown"),
+						elapsed_ms     = ms,
+					})
+				end
 				if type(on_fail) == "function" then pcall(on_fail) end
 				return
 			end
@@ -534,6 +616,16 @@ local function post_and_parse(model_name, system_prompt, full_text, tail_text,
 			local raw_text = parse_response(provider.format, body)
 			if raw_text == "" then
 				Logger.warn(LOG, "[%s] #%d empty completion (could not parse).", model, req_id)
+				if keylogger and type(keylogger.log_llm_failed) == "function" then
+					pcall(keylogger.log_llm_failed, full_text, nil, {
+						backend        = "api",
+						model          = tostring(model),
+						system_prompt  = system_prompt,
+						user_prompt    = user_prompt,
+						failure_reason = "parse_empty",
+						elapsed_ms     = ms,
+					})
+				end
 				if type(on_fail) == "function" then pcall(on_fail) end
 				return
 			end
@@ -553,17 +645,38 @@ local function post_and_parse(model_name, system_prompt, full_text, tail_text,
 
 			if #results == 0 then
 				Logger.debug(LOG, "[%s] #%d PARSED -> 0 result (parser failure)", model, req_id)
+				if keylogger and type(keylogger.log_llm_failed) == "function" then
+					pcall(keylogger.log_llm_failed, full_text, nil, {
+						backend        = "api",
+						model          = tostring(model),
+						system_prompt  = system_prompt,
+						user_prompt    = user_prompt,
+						failure_reason = "parser_no_blocks",
+						elapsed_ms     = ms,
+					})
+				end
 				if type(on_fail) == "function" then pcall(on_fail) end
 				return
 			end
 
+			-- Token usage + cost extraction. Each provider exposes the same
+			-- numeric fields under a top-level ``usage`` block (OpenAI shape)
+			-- or under ``usageMetadata`` (Gemini). Cost is computed from the
+			-- per-model price table in pricing.lua.
+			local usage = _extract_usage(provider.format, body, tostring(model))
+
 			Logger.debug(LOG, "[%s] #%d PARSED -> %d result(s) in %dms", model, req_id, #results, ms)
 			if keylogger and type(keylogger.log_llm) == "function" then
 				pcall(keylogger.log_llm, full_text, results, nil, {
-					backend       = "api",
-					model         = tostring(model),
-					system_prompt = system_prompt,
-					user_prompt   = user_prompt,
+					backend           = "api",
+					model             = tostring(model),
+					system_prompt     = system_prompt,
+					user_prompt       = user_prompt,
+					prompt_tokens     = usage.prompt_tokens,
+					completion_tokens = usage.completion_tokens,
+					total_tokens      = usage.total_tokens,
+					est_cost_usd      = usage.est_cost_usd,
+					elapsed_ms        = ms,
 				})
 			end
 			if type(on_success) == "function" then pcall(on_success, results) end

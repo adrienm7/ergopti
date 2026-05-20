@@ -800,6 +800,26 @@ KL_LogLlm(kind, payload) {
     KL_AppendLog(e)
 }
 
+/**
+ * Logs a FAILED LLM prediction attempt — same envelope as KL_LogLlm but the
+ * predictions array is empty and ``failure_reason`` captures what went
+ * wrong. Without this event a tail of the log shows only successes and
+ * "are predictions silently dropping?" becomes impossible to answer.
+ *
+ * Mirrors keylogger.log_llm_failed on the HS side (modules/keylogger/init.lua).
+ *
+ * @param {Map} payload - Fields: app, context, backend, model, system_prompt,
+ *     user_prompt, failure_reason, elapsed_ms.
+ */
+KL_LogLlmFailed(payload) {
+    e := Map("type", "llm_generation_failed", "predictions", [])
+    if (payload is Map) {
+        for k, v in payload
+            e[k] := v
+    }
+    KL_AppendLog(e)
+}
+
 KL_LogSession(kind, duration_ms := unset) {
     e := Map("type", kind)
     if IsSet(duration_ms)

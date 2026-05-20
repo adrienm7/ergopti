@@ -299,11 +299,20 @@ local function post_and_parse(model_name, system_prompt, full_text, tail_text,
         function(status, body, _)
             pcall(function()
                 Logger.debug(LOG, "[%s] #%d HTTP_RESPONSE status=%d, body_len=%d", model_name, req_id, status or -1, #(body or ""))
-                
-                if not status or status ~= 200 then 
+
+                if not status or status ~= 200 then
                     Logger.error(LOG, "[%s] #%d HTTP_ERROR status=%d: %s", model_name, req_id, status or -1, (body or ""):sub(1, 200))
-                    if type(on_fail) == "function" then pcall(on_fail) end 
-                    return 
+                    if keylogger and type(keylogger.log_llm_failed) == "function" then
+                        pcall(keylogger.log_llm_failed, full_text, nil, {
+                            backend        = "ollama",
+                            model          = tostring(model_name),
+                            system_prompt  = system_prompt,
+                            user_prompt    = user_prompt,
+                            failure_reason = "http_" .. tostring(status or "unknown"),
+                        })
+                    end
+                    if type(on_fail) == "function" then pcall(on_fail) end
+                    return
                 end
                 
                 local ok_dec, resp = pcall(hs.json.decode, body)
