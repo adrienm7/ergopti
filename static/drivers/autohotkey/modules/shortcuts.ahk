@@ -535,12 +535,16 @@ if Features["Shortcuts"]["Search"].Enabled {
         A_Clipboard := PathWithSlash
 
         SetTimer ChangeButtonNames, 50
-        Result := MsgBox(Format(t("dialog.path_copy.msg_with_question"), A_Clipboard),
+        ; The shared locale strings use printf-style ``%s`` for cross-platform
+        ; compatibility with the Hammerspoon driver. AHK v2's Format() expects
+        ; ``{1}``-style placeholders and would leave ``%s`` verbatim, so the
+        ; substitution is done with StrReplace here.
+        Result := MsgBox(StrReplace(t("dialog.path_copy.msg_with_question"), "%s", A_Clipboard),
             t("dialog.path_copy.title"), "YesNo")
         if (Result == "No") {
             A_Clipboard := PathWithBackslash
             Sleep(200)
-            MsgBox(Format(t("dialog.path_copy.msg_simple"), A_Clipboard))
+            MsgBox(StrReplace(t("dialog.path_copy.msg_simple"), "%s", A_Clipboard))
         }
     }
     ChangeButtonNames() {
