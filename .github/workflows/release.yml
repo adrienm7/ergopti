@@ -486,3 +486,52 @@ jobs:
                   EOF
                   gh release edit "$TAG" --repo "${GITHUB_REPOSITORY}" --notes-file "$body_file"
                   echo "Release notes updated for $TAG"
+
+
+
+
+# ==================================================================
+# ==================================================================
+# ======= 6/ Cleanup on failure ====================================
+# ==================================================================
+# ==================================================================
+
+# When any build job fails, the release that ``prepare-release`` created
+# is half-baked: tag exists, body is empty or incomplete, assets may be
+# missing. Leaving it on GitHub causes two problems:
+#
+# 1. Users browsing releases see a broken entry.
+# 2. The NEXT run's changelog uses this broken tag as the "previous"
+#    tag, so the commit that introduced the failure (and any commits
+#    pushed in the same batch) disappear from the next changelog —
+#    they're filed under a release that nobody can read.
+#
+# This job deletes both the release AND the underlying git tag so the
+# slate is clean for the next push. ``if: failure()`` runs only when at
+# least one upstream job in ``needs`` failed; ``always()`` ensures we
+# still fire even if earlier jobs were cancelled mid-build (cancellation
+# leaves the tag dangling the same way).
+    cleanup-on-failure:
+        needs: [prepare-release, build-macos, build-windows, build-linux, finalize-release]
+        if: ${{ always() && (failure() || cancelled()) && needs.prepare-release.outputs.tag != '' }}
+        runs-on: ubuntu-latest
+        permissions:
+            contents: write
+
+        steps:
+            - name: Delete failed release + tag
+              env:
+                  GH_TOKEN: ${{ github.token }}
+                  TAG:      ${{ needs.prepare-release.outputs.tag }}
+              run: |
+                  set -euo pipefail
+                  echo "Build failed — deleting half-baked release '$TAG' so the next run's changelog can pick up from the previous good tag."
+                  # ``--cleanup-tag`` removes the underlying git tag in the
+                  # same call. ``|| true`` because the release may not have
+                  # been created yet (prepare-release itself can fail) and
+                  # ``gh release delete`` returns non-zero in that case.
+                  gh release delete "$TAG" \
+                      --repo "${{ github.repository }}" \
+                      --yes \
+                      --cleanup-tag || true
+                  echo "Cleanup attempted for tag $TAG."
