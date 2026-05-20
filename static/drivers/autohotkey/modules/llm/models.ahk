@@ -77,7 +77,11 @@ LLM_ResolveOllamaTag(display_name) {
 		if entry.Has("ollama") && entry["ollama"] != ""
 			return entry["ollama"]
 	}
-	; Unknown model: pass the name as-is (may work if already a valid tag)
+	; Unknown model: pass the name as-is (may work if already a valid tag).
+	; Log a warn so a "predictions silently stopped working after I typed a
+	; custom model name" diagnostic actually shows up in the unified log —
+	; the previous silent fallback hid the symptom.
+	try LoggerWarn("LLM.models", "Unknown model '{1}' — passing through as Ollama tag; predictions may fail.", display_name)
 	return display_name
 }
 
