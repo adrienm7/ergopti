@@ -1431,6 +1431,12 @@ LLM_Tray_OnToggle(*) {
 	if _LLM_Tray["enabled"] {
 		SetTimer(() => LLM_Tray_BootstrapOllama(true), -1)
 	} else {
+		; OFF flow — kill any in-flight Ollama install AND close the
+		; WebView so the user's Cancel intent reaches every layer.
+		; Without these, toggling OFF mid-install would leave the
+		; hidden powershell.exe running and the install window open.
+		try LLM_Deps_Cancel()
+		try OllamaWV_Close()
 		LLM_Bridge_Stop()
 	}
 }
