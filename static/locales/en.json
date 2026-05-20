@@ -1876,5 +1876,6 @@
 	"updater.title_version": "ErgoptiPlus — Version",
 	"updater.up_to_date": "ErgoptiPlus is up to date.\n\nCurrent version: {1}",
 	"updater.version_message": "ErgoptiPlus {1}{2}\n\nOpen the releases page on GitHub?",
-	"vscode.reload_required": "Please reload VSCode (Cmd+Shift+P > Reload Window) to activate the typing extension"
+	"vscode.reload_required": "Please reload VSCode (Cmd+Shift+P > Reload Window) to activate the typing extension",
+	"menu.llm.warning_install_ollama": "⚠️  Ollama is not installed — click to relaunch the installation"
 }

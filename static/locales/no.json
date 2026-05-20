@@ -1902,5 +1902,6 @@
 	"updater.title_version": "ErgoptiPlus — Versjon",
 	"updater.up_to_date": "ErgoptiPlus er oppdatert.\n\nNåværende versjon: {1}",
 	"updater.version_message": "ErgoptiPlus {1}{2}\n\nÅpne utgivelsessiden på GitHub?",
-	"vscode.reload_required": "Last inn VSCode på nytt (Cmd+Shift+P > Reload Window) for å aktivere skriveutvidelsen"
+	"vscode.reload_required": "Last inn VSCode på nytt (Cmd+Shift+P > Reload Window) for å aktivere skriveutvidelsen",
+	"menu.llm.warning_install_ollama": "⚠️  Ollama er ikke installert — klikk for å starte installasjonen på nytt"
 }

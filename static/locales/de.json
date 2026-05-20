@@ -1878,5 +1878,6 @@
 	"updater.title_version": "ErgoptiPlus — Version",
 	"updater.up_to_date": "ErgoptiPlus ist aktuell.\n\nAktuelle Version: {1}",
 	"updater.version_message": "ErgoptiPlus {1}{2}\n\nReleases-Seite auf GitHub öffnen?",
-	"vscode.reload_required": "Bitte VSCode neu laden (Cmd+Shift+P > Reload Window), um die Tipp-Erweiterung zu aktivieren"
+	"vscode.reload_required": "Bitte VSCode neu laden (Cmd+Shift+P > Reload Window), um die Tipp-Erweiterung zu aktivieren",
+	"menu.llm.warning_install_ollama": "⚠️  Ollama ist nicht installiert — klicken Sie, um die Installation neu zu starten"
 }

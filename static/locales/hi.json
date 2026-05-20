@@ -1903,5 +1903,6 @@
 	"updater.title_version": "ErgoptiPlus — संस्करण",
 	"updater.up_to_date": "ErgoptiPlus अद्यतित है।\n\nवर्तमान संस्करण: {1}",
 	"updater.version_message": "ErgoptiPlus {1}{2}\n\nGitHub पर रिलीज़ पेज खोलें?",
-	"vscode.reload_required": "टाइपिंग एक्सटेंशन सक्रिय करने के लिए VSCode पुनः लोड करें (Cmd+Shift+P > Reload Window)"
+	"vscode.reload_required": "टाइपिंग एक्सटेंशन सक्रिय करने के लिए VSCode पुनः लोड करें (Cmd+Shift+P > Reload Window)",
+	"menu.llm.warning_install_ollama": "⚠️  Ollama स्थापित नहीं है — स्थापना पुनः आरंभ करने के लिए क्लिक करें"
 }
