@@ -1188,6 +1188,48 @@ function M.log_llm(context, results, app_name, extras)
 		if type(extras.model)         == "string" then entry.model         = extras.model end
 		if type(extras.system_prompt) == "string" then entry.system_prompt = extras.system_prompt end
 		if type(extras.user_prompt)   == "string" then entry.user_prompt   = extras.user_prompt end
+		-- Token usage + cost tracking. The provider's response normally
+		-- carries ``usage.prompt_tokens`` / ``usage.completion_tokens``
+		-- (OpenAI shape) or equivalent fields. The backend wrapper
+		-- extracts them and forwards through extras so a tail of the
+		-- log answers "how much did I burn this hour?".
+		if type(extras.prompt_tokens)     == "number" then entry.prompt_tokens     = extras.prompt_tokens end
+		if type(extras.completion_tokens) == "number" then entry.completion_tokens = extras.completion_tokens end
+		if type(extras.total_tokens)      == "number" then entry.total_tokens      = extras.total_tokens end
+		if type(extras.est_cost_usd)      == "number" then entry.est_cost_usd      = extras.est_cost_usd end
+		if type(extras.elapsed_ms)        == "number" then entry.elapsed_ms        = extras.elapsed_ms end
+	end
+	LogManager.append_log(entry)
+	CoreState.last_flush_time = hs.timer.absoluteTime() / 1000000
+end
+
+--- Logs a FAILED LLM prediction attempt. Same envelope as ``log_llm`` but the
+--- predictions array is empty and ``failure_reason`` captures what went wrong
+--- (HTTP status, parse miss, timeout, …). Without this event a tail of the
+--- log shows only successes, and "are predictions silently dropping?" becomes
+--- impossible to answer.
+--- @param context string Full text up to the caret at request time.
+--- @param app_name string Frontmost app at request time.
+--- @param extras table Optional fields: backend, model, system_prompt,
+---     user_prompt, failure_reason, elapsed_ms.
+function M.log_llm_failed(context, app_name, extras)
+	if not CoreState.is_enabled then return end
+	LogManager.flush_buffer()
+	local target_app = (type(app_name) == "string" and app_name ~= "") and app_name or CoreState.session_app_name
+	local entry = {
+		type        = "llm_generation_failed",
+		app         = target_app,
+		context     = context,
+		predictions = {},
+		tag         = "<llm_failed/>",
+	}
+	if type(extras) == "table" then
+		if type(extras.backend)         == "string" then entry.backend         = extras.backend end
+		if type(extras.model)           == "string" then entry.model           = extras.model end
+		if type(extras.system_prompt)   == "string" then entry.system_prompt   = extras.system_prompt end
+		if type(extras.user_prompt)     == "string" then entry.user_prompt     = extras.user_prompt end
+		if type(extras.failure_reason)  == "string" then entry.failure_reason  = extras.failure_reason end
+		if type(extras.elapsed_ms)      == "number" then entry.elapsed_ms      = extras.elapsed_ms end
 	end
 	LogManager.append_log(entry)
 	CoreState.last_flush_time = hs.timer.absoluteTime() / 1000000
