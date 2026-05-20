@@ -3,14 +3,24 @@
 ; ==============================================================================
 ; MODULE: LLM Tooltip UI
 ; DESCRIPTION:
-; Floating tooltip that displays LLM text predictions near the current caret
-; position. Disappears on any keystroke and accepts the suggestion on Tab.
+; Floating tooltip that displays one or more LLM text predictions near the
+; current caret position. Disappears on any keystroke and accepts the active
+; suggestion on Tab. Mirrors the HS multi-slot tooltip semantics so the user
+; sees up to N predictions stacked, with the active one highlighted.
 ;
 ; FEATURES & RATIONALE:
 ; 1. Caret-relative: uses CaretGetPos() so the tooltip tracks the insertion point.
-; 2. Tab-to-accept: pressing Tab while the tooltip is visible inserts the text.
-; 3. Auto-dismiss: tooltip hides after a configurable timeout so it never blocks.
-; 4. Pure AHK: no external GUI framework — uses the built-in ToolTip() function.
+; 2. Tab-to-accept: pressing Tab while the tooltip is visible inserts the
+;    currently-active suggestion (slot 1 by default; navigation modifiers
+;    move the active slot up/down — wired by the engine).
+; 3. Multi-slot rendering: when the engine produces N predictions, every
+;    slot is stacked vertically. The active slot gets a ▶ prefix; the others
+;    are dimmed by a leading bullet. Empty slots show a placeholder line
+;    that fills in once that variant's request returns.
+; 4. Auto-dismiss: tooltip hides after a configurable timeout so it never
+;    blocks. Engine resets the timer on every new partial / final update.
+; 5. Pure AHK: no external GUI framework — uses the built-in ToolTip()
+;    function.
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
@@ -28,6 +38,18 @@ LLM_TOOLTIP_SLOT      := 10      ; ToolTip slot reserved for LLM predictions (1-
 LLM_TOOLTIP_OFFSET_Y  := 24      ; Vertical offset below caret in pixels
 LLM_TOOLTIP_TIMEOUT   := 5000    ; Auto-dismiss after 5 s of no interaction
 
+; Visual prefixes used by the multi-slot renderer. ▶ marks the active row;
+; the other rows are prefixed with a faint bullet so the user can see all
+; candidates without losing track of which one Tab will accept.
+LLM_TOOLTIP_ACTIVE_PREFIX   := "▶ "
+LLM_TOOLTIP_INACTIVE_PREFIX := "·  "
+; Suffix on the active row only — same Tab hint as before but only attached
+; to the slot Tab would actually fire on.
+LLM_TOOLTIP_TAB_SUFFIX      := "   [Tab]"
+; Placeholder shown while a slot is still being generated. Kept narrow so
+; the tooltip width doesn't jump when the slot finally fills in.
+LLM_TOOLTIP_PLACEHOLDER     := "…"
+
 ; Stable timer reference — must not be a closure so SetTimer can cancel by
 ; identity. Each fresh () => lambda is a new object; re-scheduling it never
 ; cancels the prior timer, letting N calls accumulate N independent hiders.
@@ -43,7 +65,14 @@ _LLM_Tooltip_TimerFn() => LLM_Tooltip_Hide()
 ; ====================================
 
 global _LLM_Tooltip_Visible := false
-global _LLM_Tooltip_Text    := ""
+; Array of slot texts. Empty string for "not generated yet" — rendered as
+; the placeholder so the user sees the full N rows even before all variants
+; have finished streaming.
+global _LLM_Tooltip_Slots := []
+; 1-based index of the currently-active slot — the one Tab inserts. The
+; engine bumps this when the user presses the navigation modifier; we
+; clamp it to the slot count on every render.
+global _LLM_Tooltip_ActiveIdx := 1
 
 
 
@@ -55,29 +84,43 @@ global _LLM_Tooltip_Text    := ""
 ; =========================================
 
 /**
- * Displays the prediction tooltip near the current caret position.
- * @param {string} text - Prediction text to show.
+ * Displays the prediction tooltip. Accepts either a single string (for
+ * backwards compatibility with the legacy single-prediction caller) or
+ * an array of slot texts. Empty array elements render as the placeholder
+ * "…" so the user sees the full row count immediately.
+ *
+ * @param {string|Array} payload - The prediction text(s) to show.
+ * @param {Integer}      active  - 1-based active slot index (default 1).
  */
-LLM_Tooltip_Show(text) {
-	global _LLM_Tooltip_Visible, _LLM_Tooltip_Text
+LLM_Tooltip_Show(payload, active := 1) {
+	global _LLM_Tooltip_Visible, _LLM_Tooltip_Slots, _LLM_Tooltip_ActiveIdx
 
-	if (text == "")
+	; Normalise payload → array of slot strings.
+	slots := []
+	if (Type(payload) == "Array") {
+		for s in payload
+			slots.Push(Type(s) == "String" ? s : "")
+	} else if (Type(payload) == "String") {
+		if (payload == "")
+			return
+		slots.Push(payload)
+	} else {
+		return
+	}
+
+	; Drop trailing empty slots so the tooltip doesn't grow taller than it
+	; needs to be on the last variants (placeholder rows are still drawn
+	; for empty slots BEFORE the last filled one — that's intentional, it
+	; tells the user a generation is still in flight).
+	while (slots.Length > 0 and slots[slots.Length] == "")
+		slots.Pop()
+	if (slots.Length == 0)
 		return
 
-	_LLM_Tooltip_Text    := text
+	_LLM_Tooltip_Slots := slots
+	_LLM_Tooltip_ActiveIdx := Max(1, Min(active, slots.Length))
 	_LLM_Tooltip_Visible := true
-
-	; Prefer caret position; fall back to mouse position
-	x := 0
-	y := 0
-	if !CaretGetPos(&x, &y) {
-		x := A_CaretX
-		y := A_CaretY
-	}
-	y += LLM_TOOLTIP_OFFSET_Y
-
-	label := "↵ " text " [Tab]"
-	ToolTip(label, x, y, LLM_TOOLTIP_SLOT)
+	_LLM_Tooltip_Render()
 
 	; Cancel any pending hide before rescheduling — _LLM_Tooltip_TimerFn is a
 	; stable named function so SetTimer can reliably cancel the old call.
@@ -86,27 +129,107 @@ LLM_Tooltip_Show(text) {
 }
 
 /**
+ * Updates the active slot index without rebuilding the rest of the tooltip.
+ * Used by the navigation hotkeys to move the ▶ marker up / down.
+ * @param {Integer} idx - 1-based slot index.
+ */
+LLM_Tooltip_SetActiveIdx(idx) {
+	global _LLM_Tooltip_Visible, _LLM_Tooltip_Slots, _LLM_Tooltip_ActiveIdx
+	if !_LLM_Tooltip_Visible
+		return
+	if (_LLM_Tooltip_Slots.Length == 0)
+		return
+	_LLM_Tooltip_ActiveIdx := Max(1, Min(idx, _LLM_Tooltip_Slots.Length))
+	_LLM_Tooltip_Render()
+}
+
+/**
  * Hides the prediction tooltip immediately.
  */
 LLM_Tooltip_Hide() {
-	global _LLM_Tooltip_Visible, _LLM_Tooltip_Text
+	global _LLM_Tooltip_Visible, _LLM_Tooltip_Slots
 	SetTimer(_LLM_Tooltip_TimerFn, 0)
 	_LLM_Tooltip_Visible := false
-	_LLM_Tooltip_Text    := ""
+	_LLM_Tooltip_Slots := []
 	ToolTip(, , , LLM_TOOLTIP_SLOT)
 }
 
 /**
- * Returns the text currently shown in the tooltip, or "" if hidden.
- * @returns {string} The visible prediction text.
+ * Returns the text of the active suggestion (the one Tab inserts), or ""
+ * when no tooltip is showing. Wired into the Tab hotkey via #HotIf in
+ * tray_llm.ahk so Tab only fires when a prediction is on screen.
  */
 LLM_Tooltip_GetText() {
-	global _LLM_Tooltip_Visible, _LLM_Tooltip_Text
-	; Guarded reads — the ``#HotIf LLM_Tooltip_GetText() != ""`` predicate is
-	; evaluated by every Tab press, including those that arrive during early
-	; init (before Bundle_Init's RunWait has returned and the auto-execute
-	; flow has reached the global declarations above).
-	if !IsSet(_LLM_Tooltip_Visible) or !IsSet(_LLM_Tooltip_Text)
+	global _LLM_Tooltip_Visible, _LLM_Tooltip_Slots, _LLM_Tooltip_ActiveIdx
+	if !IsSet(_LLM_Tooltip_Visible) or !_LLM_Tooltip_Visible
 		return ""
-	return _LLM_Tooltip_Visible ? _LLM_Tooltip_Text : ""
+	if !IsSet(_LLM_Tooltip_Slots) or _LLM_Tooltip_Slots.Length == 0
+		return ""
+	idx := IsSet(_LLM_Tooltip_ActiveIdx) ? _LLM_Tooltip_ActiveIdx : 1
+	if (idx < 1 or idx > _LLM_Tooltip_Slots.Length)
+		return ""
+	return _LLM_Tooltip_Slots[idx]
+}
+
+/**
+ * Returns the full slot array — used by the engine when it needs to know
+ * how many predictions are currently shown (e.g. when computing the next
+ * active slot for the navigation hotkey).
+ * @returns {Array} The currently displayed slot strings.
+ */
+LLM_Tooltip_GetSlots() {
+	global _LLM_Tooltip_Slots
+	if !IsSet(_LLM_Tooltip_Slots)
+		return []
+	return _LLM_Tooltip_Slots
+}
+
+LLM_Tooltip_GetActiveIdx() {
+	global _LLM_Tooltip_ActiveIdx
+	if !IsSet(_LLM_Tooltip_ActiveIdx)
+		return 1
+	return _LLM_Tooltip_ActiveIdx
+}
+
+LLM_Tooltip_IsVisible() {
+	global _LLM_Tooltip_Visible
+	return IsSet(_LLM_Tooltip_Visible) and _LLM_Tooltip_Visible
+}
+
+
+
+
+; =========================================
+; =========================================
+; ======= 4/ Rendering =====================
+; =========================================
+; =========================================
+
+_LLM_Tooltip_Render() {
+	global _LLM_Tooltip_Slots, _LLM_Tooltip_ActiveIdx
+
+	; Build a multi-line label. Each row is prefixed with ▶ for the active
+	; slot, "·" for inactive ones. Empty (in-flight) slots show the
+	; placeholder so the height stays stable as variants fill in.
+	rows := []
+	for i, txt in _LLM_Tooltip_Slots {
+		display := (txt != "") ? txt : LLM_TOOLTIP_PLACEHOLDER
+		prefix := (i == _LLM_Tooltip_ActiveIdx) ? LLM_TOOLTIP_ACTIVE_PREFIX : LLM_TOOLTIP_INACTIVE_PREFIX
+		suffix := (i == _LLM_Tooltip_ActiveIdx) ? LLM_TOOLTIP_TAB_SUFFIX : ""
+		rows.Push(prefix . display . suffix)
+	}
+	label := ""
+	for r in rows {
+		if (label != "")
+			label .= "`n"
+		label .= r
+	}
+
+	x := 0, y := 0
+	if !CaretGetPos(&x, &y) {
+		x := A_CaretX
+		y := A_CaretY
+	}
+	y += LLM_TOOLTIP_OFFSET_Y
+	ToolTip(label, x, y, LLM_TOOLTIP_SLOT)
 }

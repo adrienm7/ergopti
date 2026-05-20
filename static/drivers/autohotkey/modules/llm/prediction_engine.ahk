@@ -57,7 +57,13 @@ global _LLM_Engine := Map(
 	"timer_active",               false,
 	"last_ctx",                   "",
 	"last_result",                "",
+	"last_results",               [],
 	"last_request_tick",          0,
+	; Monotonic id bumped on every LLM_Engine_FirePrediction call. Every
+	; async variant captures the id at dispatch time and bails when its
+	; callback finds the engine has moved on. Mirrors the HS
+	; ``llm_request_counter`` pattern.
+	"request_id",                 0,
 	"backend",                    "ollama",
 	; ── Remote API backend ──
 	; Populated by the tray menu when the user selects "api" and configures
@@ -221,15 +227,19 @@ LLM_Engine_CancelTimer() {
  * @param {string} ctx - The context string captured at debounce arm time.
  */
 LLM_Engine_FirePrediction(ctx) {
-	global _LLM_Engine, LLM_BACKEND_MIN_REQUEST_INTERVAL_MS
+	global _LLM_Engine
 	_LLM_Engine["timer_active"] := false
 
 	if !_LLM_Engine["enabled"] || ctx == ""
 		return
 
-	; Cache hit: re-display last result without an API call
-	if (ctx == _LLM_Engine["last_ctx"] && _LLM_Engine["last_result"] != "") {
-		LLM_Engine_OnResult(_LLM_Engine["last_result"], ctx)
+	; Cache hit: re-display last result without an API call. The cache is
+	; an array of slot strings so the multi-prediction reveal animation
+	; replays exactly as it did the first time.
+	if (ctx == _LLM_Engine["last_ctx"] && _LLM_Engine.Has("last_results")
+			and Type(_LLM_Engine["last_results"]) == "Array"
+			and _LLM_Engine["last_results"].Length > 0) {
+		LLM_Engine_OnResults(_LLM_Engine["last_results"], ctx, 1, true)
 		return
 	}
 
@@ -250,68 +260,223 @@ LLM_Engine_FirePrediction(ctx) {
 		return
 	}
 
+	; ── Cancel any in-flight async variants from a previous fire ──
+	; Without this, late callbacks land on a stale context and paint the
+	; tooltip with predictions for text the user has since moved past.
+	try LLM_OllamaCancelAllAsync()
+	try LLM_RemoteCancelAllAsync()
+
+	; ── Bump the request id ──
+	; Every async callback closes over the id it saw at dispatch time. If
+	; the engine's current id has moved on, the callback bails — mirrors
+	; the HS llm_request_counter pattern in modules/llm/prediction_engine.lua.
+	_LLM_Engine["request_id"] := (_LLM_Engine.Has("request_id") ? _LLM_Engine["request_id"] : 0) + 1
+	this_request_id := _LLM_Engine["request_id"]
+
 	; Resolve profile and build the system prompt
 	profile       := LLM_GetActiveProfile(_LLM_Engine["profile_id"])
+	n_predictions := Max(1, Integer(_LLM_Engine["n_predictions"]))
 	system_prompt := LLM_ResolveSystemPrompt(
 		profile,
-		_LLM_Engine["n_predictions"],
+		n_predictions,
 		_LLM_Engine["min_words"],
 		_LLM_Engine["max_words"],
 		_LLM_Engine["language"]
 	)
 	system_prompt := StrReplace(system_prompt, "{context}", ctx)
 
-	; ── Backend dispatch ──
-	; Resolve which backend speaks for this request. ``backend`` is the tray
-	; setting (ollama / mlx / api). The "api" path looks up the active API
-	; entry by id (set by the tray menu) and routes through LLM_RemoteGenerate.
-	; Anything else falls back to the Ollama path so existing setups keep
-	; working unchanged.
 	_LLM_Engine["last_request_tick"] := A_TickCount
 
+	; Resolve the model + the per-backend async dispatch closure exactly
+	; once so the variant loop doesn't repeat the backend branch on every
+	; request.
 	model_tag := ""
-	result := ""
-	log_backend := backend
 	log_model := ""
+	dispatch_fn := ""
 	if (backend == "api") {
 		entry := _LLM_Engine_GetActiveApiEntry()
 		if (entry == "")
 			return
-		model_tag := entry.HasOwnProp("Model") ? entry.Model : ""
+		model_tag := (entry is Map and entry.Has("Model")) ? entry["Model"] : (entry.HasOwnProp("Model") ? entry.Model : "")
 		log_model := model_tag
-		result := LLM_RemoteGenerate(entry, system_prompt, ctx, Float(_LLM_Engine["temperature"]))
+		dispatch_fn := (temp, on_succ, on_fail) =>
+			LLM_RemoteGenerate_Async(entry, system_prompt, ctx, temp, on_succ, on_fail)
 	} else {
-		; Default = Ollama (mlx not implemented on AHK / Windows).
 		model_tag := LLM_ResolveOllamaTag(_LLM_Engine["model"])
 		log_model := model_tag
-		result := LLM_OllamaGenerate(model_tag, system_prompt, ctx, Float(_LLM_Engine["temperature"]))
+		dispatch_fn := (temp, on_succ, on_fail) =>
+			LLM_OllamaGenerate_Async(model_tag, system_prompt, ctx, temp, on_succ, on_fail)
 	}
-	if (result == "")
+
+	; ── Multi-variant sequential dispatch ──
+	; Mirrors api_ollama.lua fetch_sequential: one variant at a time so
+	; back-to-back requests don't trip Ollama's small-model concurrency
+	; limit. Each variant uses a diversity-temperature step on top of the
+	; user's base so the predictions don't all collapse to the same answer.
+	; Retry up to MAX_MULT × n_predictions attempts total when a variant
+	; fails. Dedup against the already-collected slots so identical
+	; completions don't fill multiple slots.
+	state := Map(
+		"ctx",            ctx,
+		"request_id",     this_request_id,
+		"backend",        backend,
+		"model",          log_model,
+		"system_prompt",  system_prompt,
+		"slots",          [],
+		"requested",      n_predictions,
+		"attempt_index",  1,
+		"max_attempts",   _LLM_Engine_MaxAttempts(n_predictions),
+		"base_temp",      Float(_LLM_Engine["temperature"]),
+		"dedup_stats",    LLM_ApiCommon_NewDedupStats(),
+		"dispatch_fn",    dispatch_fn
+	)
+	_LLM_Engine_DispatchVariant(state)
+}
+
+; Pumps one variant of the sequential loop. Recursively schedules itself
+; from the success / fail callbacks until either ``requested`` slots are
+; filled or ``max_attempts`` is exhausted.
+_LLM_Engine_DispatchVariant(state) {
+	global _LLM_Engine
+	; Bail if a newer request has been fired since this variant was queued —
+	; the closure may have been pending on the SetTimer queue and now lands
+	; into stale context.
+	current_id := _LLM_Engine.Has("request_id") ? _LLM_Engine["request_id"] : 0
+	if (state["request_id"] != current_id)
 		return
 
-	_LLM_Engine["last_ctx"]    := ctx
-	_LLM_Engine["last_result"] := result
+	; Done? Either we got enough predictions or we ran out of attempts.
+	if (state["slots"].Length >= state["requested"]
+			or state["attempt_index"] > state["max_attempts"]) {
+		_LLM_Engine_FinalizeRequest(state)
+		return
+	}
 
-	; ── Keylogger LLM event ──
-	; Mirrors keylogger.log_llm() on the HS side (modules/keylogger/init.lua).
-	; The ``backend`` and ``model`` fields make it possible to tell ollama
-	; vs api vs mlx apart in the log when comparing prompt-regression tests
-	; across backends.
+	variant_idx := state["attempt_index"]
+	state["attempt_index"] := variant_idx + 1
+	temp := LLM_ApiCommon_GetDiversityTemp(state["base_temp"], variant_idx)
+
+	; Reveal animation: as soon as the variant fires, paint a placeholder
+	; slot so the user sees "something is coming" instead of an empty
+	; tooltip. The placeholder is replaced when the variant completes.
+	; The current active slot is the first un-filled one so Tab still
+	; reaches a real prediction during the streaming reveal.
+	preview_slots := []
+	for s in state["slots"]
+		preview_slots.Push(s)
+	while (preview_slots.Length < variant_idx)
+		preview_slots.Push("")
+	active_idx := 1
+	for i, s in preview_slots {
+		if (s != "") {
+			active_idx := i
+			break
+		}
+	}
+	LLM_Engine_OnResults(preview_slots, state["ctx"], active_idx, false)
+
+	state_ref := state
+	dispatch_fn := state["dispatch_fn"]
+	dispatch_fn.Call(temp,
+		(text) => _LLM_Engine_OnVariantSuccess(state_ref, text),
+		() => _LLM_Engine_OnVariantFail(state_ref))
+}
+
+_LLM_Engine_OnVariantSuccess(state, text) {
+	global _LLM_Engine
+	current_id := _LLM_Engine.Has("request_id") ? _LLM_Engine["request_id"] : 0
+	if (state["request_id"] != current_id)
+		return
+	; Dedup against existing slots; skip empties.
+	inserted := false
+	if (text != "") {
+		dup := false
+		for s in state["slots"] {
+			if (s == text) {
+				dup := true
+				break
+			}
+		}
+		if !dup {
+			state["slots"].Push(text)
+			inserted := true
+		}
+		state["dedup_stats"]["candidates"] += 1
+		if dup
+			state["dedup_stats"]["duplicates"] += 1
+		else
+			state["dedup_stats"]["kept"] += 1
+	}
+	; Paint the current accumulated slots so the user sees the new
+	; prediction land immediately, even if more variants are still in
+	; flight. Active = the first un-filled slot OR the last filled when
+	; full so Tab always lands on a real prediction.
+	active_idx := state["slots"].Length > 0 ? state["slots"].Length : 1
+	if (state["slots"].Length >= state["requested"]) {
+		active_idx := 1
+	}
+	LLM_Engine_OnResults(state["slots"], state["ctx"], active_idx, false)
+	_LLM_Engine_DispatchVariant(state)
+}
+
+_LLM_Engine_OnVariantFail(state) {
+	global _LLM_Engine
+	current_id := _LLM_Engine.Has("request_id") ? _LLM_Engine["request_id"] : 0
+	if (state["request_id"] != current_id)
+		return
+	; The variant didn't yield a usable result. ``attempt_index`` already
+	; advanced for the next attempt; the retry budget (max_attempts) caps
+	; how often we keep trying. No special retry-temperature step here —
+	; the diversity step bumps the temperature on the next variant anyway,
+	; which is the same end effect.
+	_LLM_Engine_DispatchVariant(state)
+}
+
+_LLM_Engine_FinalizeRequest(state) {
+	global _LLM_Engine
+	current_id := _LLM_Engine.Has("request_id") ? _LLM_Engine["request_id"] : 0
+	if (state["request_id"] != current_id)
+		return
+	if (state["slots"].Length == 0) {
+		; No usable predictions and no retry budget left — let the tooltip
+		; fade out via its auto-dismiss timer instead of yanking it now.
+		return
+	}
+	_LLM_Engine["last_ctx"]     := state["ctx"]
+	_LLM_Engine["last_results"] := state["slots"]
+	; Keep ``last_result`` (singular) for the legacy cache hit path so any
+	; external code still reading that field keeps working.
+	_LLM_Engine["last_result"]  := state["slots"][1]
+
+	try LLM_ApiCommon_LogSummary("sequential", state["requested"], state["dedup_stats"], state["slots"].Length)
+
+	; Keylogger event — same shape as HS (modules/keylogger/init.lua /
+	; M.log_llm) so a tail of the unified log reads identically across
+	; drivers. The ``predictions`` field carries the full slot array now
+	; rather than a single string.
 	try {
 		app_name := ""
 		try app_name := WinGetTitle("A")
 		KL_LogLlm("generation", Map(
 			"app",           app_name,
-			"context",       ctx,
-			"predictions",   [result],
-			"backend",       log_backend,
-			"model",         log_model,
-			"system_prompt", system_prompt,
-			"user_prompt",   ctx
+			"context",       state["ctx"],
+			"predictions",   state["slots"],
+			"backend",       state["backend"],
+			"model",         state["model"],
+			"system_prompt", state["system_prompt"],
+			"user_prompt",   state["ctx"]
 		))
 	}
 
-	LLM_Engine_OnResult(result, ctx)
+	LLM_Engine_OnResults(state["slots"], state["ctx"], 1, true)
+}
+
+; Returns the max number of attempts for ``n`` requested predictions,
+; honouring the retry policy loaded from the shared inference.json.
+_LLM_Engine_MaxAttempts(n) {
+	policy := LLM_ApiCommon_GetRetryPolicy()
+	max_mult := policy[1]
+	return Max(n, n * Max(1, Integer(max_mult)))
 }
 
 ; Look up the active remote API entry from the engine state. Returns the entry
@@ -338,12 +503,26 @@ _LLM_Engine_GetActiveApiEntry() {
 }
 
 /**
- * Callback invoked with the generated prediction text.
- * Override or extend this function to hook up the tooltip UI.
+ * Multi-prediction tooltip update callback. Invoked by the variant loop
+ * every time a new slot fills in (intermediate) and once more when the
+ * full set is finalised. Mirrors the HS on_success(results, ms, is_final)
+ * signature minus the timing field, which lives in the per-variant logs.
+ *
+ * @param {Array}    slots     - Slot strings (empty string = in-flight placeholder).
+ * @param {string}   ctx       - The context that produced these slots.
+ * @param {Integer}  active    - 1-based active slot index (the one Tab fires on).
+ * @param {boolean}  is_final  - True only on the last update of a request.
+ */
+LLM_Engine_OnResults(slots, ctx, active := 1, is_final := false) {
+	LLM_Tooltip_Show(slots, active)
+}
+
+/**
+ * Backwards-compat alias used by external call sites that still feed a
+ * single completion string. New code should use LLM_Engine_OnResults.
  * @param {string} text - Generated completion text.
- * @param {string} ctx - The context that produced this result.
+ * @param {string} ctx  - The context that produced this result.
  */
 LLM_Engine_OnResult(text, ctx) {
-	; Delegate to tooltip module (loaded by ErgoptiPlus.ahk before this file)
-	LLM_Tooltip_Show(text)
+	LLM_Engine_OnResults([text], ctx, 1, true)
 }
