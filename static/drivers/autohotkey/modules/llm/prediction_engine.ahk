@@ -308,6 +308,25 @@ LLM_Engine_FirePrediction(ctx) {
 			LLM_OllamaGenerate_Async(model_tag, system_prompt, ctx, temp, on_succ, on_fail)
 	}
 
+	; ── Batch vs sequential dispatch ──
+	; A profile with batch=true asks the model to return all N predictions
+	; in a single response, separated by ===. Mirrors the HS fetch_batch
+	; path. Falls back to sequential when batch is off or n=1.
+	if (n_predictions > 1 and profile.Has("batch") and profile["batch"] == true) {
+		state := Map(
+			"ctx",           ctx,
+			"request_id",    this_request_id,
+			"backend",       backend,
+			"model",         log_model,
+			"system_prompt", system_prompt,
+			"requested",     n_predictions,
+			"base_temp",     Float(_LLM_Engine["temperature"]),
+			"dispatch_fn",   dispatch_fn
+		)
+		_LLM_Engine_DispatchBatch(state)
+		return
+	}
+
 	; ── Multi-variant sequential dispatch ──
 	; Mirrors api_ollama.lua fetch_sequential: one variant at a time so
 	; back-to-back requests don't trip Ollama's small-model concurrency
@@ -331,6 +350,80 @@ LLM_Engine_FirePrediction(ctx) {
 		"dispatch_fn",    dispatch_fn
 	)
 	_LLM_Engine_DispatchVariant(state)
+}
+
+; Single-shot batch dispatch: one async request, the model returns N
+; predictions separated by ``===`` (the convention HS's Parser.split_blocks
+; also expects), and we split / dedup the response into slots.
+_LLM_Engine_DispatchBatch(state) {
+	; Paint an empty placeholder row immediately so the user sees the
+	; reveal animation even though only one HTTP request is in flight.
+	preview_slots := []
+	loop state["requested"]
+		preview_slots.Push("")
+	LLM_Engine_OnResults(preview_slots, state["ctx"], 1, false)
+
+	state_ref := state
+	dispatch_fn := state["dispatch_fn"]
+	dispatch_fn.Call(state["base_temp"],
+		(text) => _LLM_Engine_OnBatchSuccess(state_ref, text),
+		() => _LLM_Engine_OnBatchFail(state_ref))
+}
+
+_LLM_Engine_OnBatchSuccess(state, text) {
+	global _LLM_Engine
+	current_id := _LLM_Engine.Has("request_id") ? _LLM_Engine["request_id"] : 0
+	if (state["request_id"] != current_id)
+		return
+	blocks := _LLM_Engine_SplitBatchBlocks(text)
+	stats  := LLM_ApiCommon_NewDedupStats()
+	slots  := []
+	for b in blocks {
+		if (slots.Length >= state["requested"])
+			break
+		LLM_ApiCommon_InsertPrediction(slots, b, stats, true)
+	}
+	state["slots"]       := slots
+	state["dedup_stats"] := stats
+	_LLM_Engine_FinalizeRequest(state)
+}
+
+_LLM_Engine_OnBatchFail(state) {
+	; Batch failures don't retry — the cost of a re-request is much higher
+	; than for a single variant, and the user has already paid the latency
+	; of the first attempt. Let the tooltip fade via its auto-dismiss
+	; timer instead.
+	global _LLM_Engine
+	current_id := _LLM_Engine.Has("request_id") ? _LLM_Engine["request_id"] : 0
+	if (state["request_id"] != current_id)
+		return
+	; Keep slots empty + finalize so any subsequent cache hit is consistent.
+	state["slots"]       := []
+	state["dedup_stats"] := LLM_ApiCommon_NewDedupStats()
+	_LLM_Engine_FinalizeRequest(state)
+}
+
+; Split a batch response on the ``===`` separator. Trims whitespace per
+; block and drops empties. Mirrors HS's Parser.split_blocks behaviour
+; (modules/llm/parser.lua) so the same model output yields the same
+; predictions on both drivers.
+_LLM_Engine_SplitBatchBlocks(raw) {
+	blocks := []
+	if (raw == "")
+		return blocks
+	; Append a trailing separator so the last block is captured by the
+	; while loop without a special case.
+	work := raw . "==="
+	pos := 1
+	while RegExMatch(work, "(.*?)===", &m, pos) {
+		piece := Trim(m[1], " `t`r`n")
+		if (piece != "")
+			blocks.Push(piece)
+		pos := m.Pos + m.Len
+	}
+	if (blocks.Length == 0 and raw != "")
+		blocks.Push(Trim(raw, " `t`r`n"))
+	return blocks
 }
 
 ; Pumps one variant of the sequential loop. Recursively schedules itself
