@@ -8,9 +8,10 @@
 	</head>
 	<body>
 		<div id="wizard">
-			<!-- Step indicator -->
+			<!-- Step indicator (6 dots: lang → config dir → layout → magic → metrics → gestures) -->
 			<div class="step-bar">
 				<div class="step-dot active" id="dot-1"></div>
+				<div class="step-dot" id="dot-config"></div>
 				<div class="step-dot" id="dot-2"></div>
 				<div class="step-dot" id="dot-3"></div>
 				<div class="step-dot" id="dot-4"></div>
@@ -24,6 +25,21 @@
 				<div class="lang-list" id="lang-list"></div>
 				<div class="btns">
 					<button type="button" class="btn-next primary" id="s1-next">Next →</button>
+				</div>
+			</div>
+
+			<!-- Step config-dir — personal data folder (inserted between Step 1 and Step 2) -->
+			<div class="step hidden" id="step-config">
+				<h1 id="sc-title"></h1>
+				<p class="desc" id="sc-desc"></p>
+				<div class="field-group">
+					<input type="text" id="sc-input" placeholder="" />
+					<button type="button" id="sc-browse" class="secondary"></button>
+				</div>
+				<p class="hint" id="sc-hint"></p>
+				<div class="btns">
+					<button type="button" class="btn-back secondary" id="sc-back"></button>
+					<button type="button" class="btn-next primary"  id="sc-next"></button>
 				</div>
 			</div>
 
