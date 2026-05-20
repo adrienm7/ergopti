@@ -455,20 +455,40 @@ generate_info_plist() {
 # ===============================================
 # ===============================================
 
-# Ad-hoc sign so Gatekeeper at least stops complaining about an unsigned
-# binary. A real Developer ID signature comes in Phase 5; for now the user
-# will see a one-time "developer cannot be verified" prompt on first launch.
+# Sign the app ad-hoc but with an explicit --identifier anchored to the bundle
+# ID. Without --identifier, ad-hoc signing uses the binary hash as the
+# identity — a hash that changes on every build — which causes macOS TCC to
+# treat each new build as an unknown app and re-prompt for Accessibility /
+# Input Monitoring permissions. Pinning the identifier to the stable bundle ID
+# makes TCC recognise every build as the same app, so granted permissions
+# survive updates (as long as the user installs over the same path).
+#
+# The entitlements file is included so the launcher binary carries an explicit
+# com.apple.security.automation.apple-events claim. Without it some macOS
+# versions pop an extra automation-permission dialog on first use.
 codesign_app() {
-	log "Codesigning Ergopti.app (ad-hoc)"
-	# Sign nested .app bundles first so the host-level --deep pass finds them
-	# already valid rather than re-signing them in an undefined order.
+	log "Codesigning Ergopti.app (ad-hoc, identifier: $BUNDLE_ID)"
+	local entitlements="$LAUNCHER_DIR/Ergopti.entitlements"
+	[ -f "$entitlements" ] || fail "Entitlements file missing: $entitlements"
+
+	# Sign nested bundles first so the host-level pass finds them already valid.
 	codesign --force --deep --sign - "$APP_PATH/Contents/Frameworks/Hammerspoon.app"
 	codesign --force --deep --sign - "$APP_PATH/Contents/Frameworks/Sparkle.framework"
-	# Sign KE only if it's a .app bundle — .pkg files are not codesignable this way
 	local ke_app="$APP_PATH/Contents/Resources/Tools/Karabiner/Karabiner-Elements.app"
 	[ -d "$ke_app" ] && codesign --force --deep --sign - "$ke_app" || true
-	codesign --force --sign - "$APP_PATH/Contents/MacOS/Ergopti"
-	codesign --force --deep --sign - "$APP_PATH"
+
+	# Sign the launcher binary with a stable identifier and entitlements.
+	codesign --force \
+		--sign - \
+		--identifier "$BUNDLE_ID" \
+		--entitlements "$entitlements" \
+		"$APP_PATH/Contents/MacOS/Ergopti"
+
+	# Sign the outer bundle. --identifier here pins the bundle's own identity.
+	codesign --force \
+		--sign - \
+		--identifier "$BUNDLE_ID" \
+		"$APP_PATH"
 }
 
 # Zip the bundle as a release artefact. Sparkle expects a zip whose top-level
