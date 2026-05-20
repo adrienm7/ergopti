@@ -688,7 +688,7 @@ _LLM_Engine_GetActiveApiEntry() {
  * @param {boolean}  is_final  - True only on the last update of a request.
  */
 LLM_Engine_OnResults(slots, ctx, active := 1, is_final := false) {
-	LLM_Tooltip_Show(slots, active)
+	LLM_Tooltip_Show(slots, active, is_final)
 }
 
 /**
