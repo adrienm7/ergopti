@@ -165,6 +165,7 @@ SendMode("Event") ; Everything concerning hotstrings MUST use SendEvent and not 
 #Include modules/keylogger/keylogger_webview.ahk
 #Include modules/keylogger/keylogger_ui.ahk
 #Include modules/llm/api_common.ahk
+#Include modules/llm/api_token_crypto.ahk
 #Include modules/llm/api_ollama.ahk
 #Include modules/llm/api_remote.ahk
 #Include modules/llm/models.ahk

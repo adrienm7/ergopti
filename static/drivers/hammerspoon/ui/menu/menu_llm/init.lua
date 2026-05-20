@@ -1413,6 +1413,13 @@ function M.create(deps)
                     api_remote.set_entries(kept)
                     api_remote.set_active_entry_id(kept[1] and kept[1].id or "")
                     pcall(llm_mod.persist_api_entries)
+                    -- Purge the Keychain entry too; without this, deleted
+                    -- entries leave their token in the user's Keychain
+                    -- indefinitely.
+                    local ok_kc, TokenCrypto = pcall(require, "modules.llm.api_token_crypto")
+                    if ok_kc and TokenCrypto and active_entry.id then
+                        pcall(TokenCrypto.delete, active_entry.id)
+                    end
                     pcall(llm_mod.warmup_model, llm_mod.get_current_model())
                     update_menu()
                 end or nil,

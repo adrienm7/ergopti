@@ -724,6 +724,12 @@ _LLM_Tray_LoadApiEntries() {
 				obj[field] := ""
 			}
 		}
+		; Decrypt the token field on load so callers always see cleartext.
+		; LLM_ApiToken_Decrypt is a no-op on legacy unencrypted values
+		; (any string without the ``dpapi:`` prefix), so existing configs
+		; keep working unchanged until the next persist re-encrypts.
+		if (obj["Token"] != "")
+			obj["Token"] := LLM_ApiToken_Decrypt(obj["Token"])
 		if (obj["Id"] != "")
 			entries.Push(obj)
 		pos := m.Pos + m.Len
@@ -765,6 +771,12 @@ _LLM_Tray_PersistApiEntries() {
 		fields := []
 		for field in ["Id", "Name", "Provider", "BaseUrl", "Token", "Model"] {
 			val := _LLM_TrayApiEntryGet(e, field, "")
+			; Encrypt the token via DPAPI before writing. The encrypted
+			; blob is base64-prefixed with ``dpapi:`` so the loader can
+			; detect it; legacy plaintext entries get encrypted on the
+			; first save after this build lands.
+			if (field == "Token" and val != "")
+				val := LLM_ApiToken_Encrypt(val)
 			fields.Push('"' . field . '":"' . _LLM_TrayApiJsonEscape(val) . '"')
 		}
 		lines.Push("{" . _LLM_TrayJoin(fields, ",") . "}")
