@@ -820,6 +820,41 @@ KL_LogLlmFailed(payload) {
     KL_AppendLog(e)
 }
 
+; ─── Acceptance-rate events ─────────────────────────────────────────────
+; Three matched events that let a tail of the log compute "what fraction
+; of suggestions did the user accept?". Mirrors keylogger.log_llm_suggested
+; / log_llm_dismissed / log_llm_accepted on the HS side.
+
+KL_LogLlmSuggested(app_name, count) {
+    KL_AppendLog(Map(
+        "type", "llm_suggested",
+        "app",  app_name,
+        "count", count
+    ))
+}
+
+KL_LogLlmDismissed(app_name, all_predictions) {
+    KL_AppendLog(Map(
+        "type", "llm_dismissed",
+        "app",  app_name,
+        "all_predictions", all_predictions
+    ))
+}
+
+KL_LogLlmAccepted(prediction_text, app_name, all_predictions, chosen_index) {
+    KL_AppendLog(Map(
+        "type", "llm_accepted",
+        "app",  app_name,
+        "prediction", prediction_text,
+        "all_predictions", all_predictions,
+        "chosen_index", chosen_index,
+        ; ``net_saved_chars`` matches the HS field — same accounting,
+        ; AHK side doesn't track backspaces, so ``deletes`` is 0 by
+        ; construction here.
+        "net_saved_chars", StrLen(prediction_text)
+    ))
+}
+
 KL_LogSession(kind, duration_ms := unset) {
     e := Map("type", kind)
     if IsSet(duration_ms)

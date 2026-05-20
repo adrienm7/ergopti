@@ -120,5 +120,18 @@ LLM_Bridge_OnAccept(text) {
 	global _LLM_Bridge_Buffer
 	SendText(text)
 	_LLM_Bridge_Buffer .= text
-	LLM_Tooltip_Hide()
+	; Audit event — pairs with the llm_suggested event the engine emitted
+	; when the tooltip first rendered. The pair lets a log tail compute
+	; "accepted / suggested" ratios per app / per model.
+	try {
+		app_name := ""
+		try app_name := WinGetTitle("A")
+		slots := LLM_Tooltip_GetSlots()
+		idx   := LLM_Tooltip_GetActiveIdx()
+		KL_LogLlmAccepted(text, app_name, slots, idx)
+	}
+	; Pass accepted=true so the tooltip's own hide path doesn't also emit
+	; an ``llm_dismissed`` event — we'd double-count this suggestion as
+	; both accepted AND dismissed.
+	LLM_Tooltip_Hide(true)
 }
