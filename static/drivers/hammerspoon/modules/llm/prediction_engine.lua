@@ -219,13 +219,10 @@ local _chain_last_token_at_s    = nil
 -- bursts (one debounce = 50 ms × every char = token-burn galore), and
 -- doubles as an energy cap on local backends: back-to-back inference keeps
 -- the GPU spinning without giving the user a perceptibly snappier UI.
--- Mirrors LLM_BACKEND_MIN_REQUEST_INTERVAL_MS on the AHK side so the
--- floor stays consistent across both drivers.
-local BACKEND_MIN_REQUEST_INTERVAL_S = {
-	ollama = 0.3,
-	mlx    = 0.3,
-	api    = 0.5,
-}
+-- The values live in ``_shared/llm/inference.json`` so the AHK twin
+-- (modules/llm/api_common.ahk) reads the same floor — a single source
+-- of truth across drivers.
+local ApiCommon = require("modules.llm.api_common")
 local _last_request_at_s = 0
 
 -- ── LLM engine configuration ─────────────────────────────────────────────────
@@ -979,7 +976,7 @@ function M.perform_check(force_trigger, profile_name)
 	if not force_trigger then
 		local now_s        = hs.timer.secondsSinceEpoch()
 		local backend_id   = core_llm.get_backend and core_llm.get_backend() or "ollama"
-		local min_interval = BACKEND_MIN_REQUEST_INTERVAL_S[backend_id] or 0.3
+		local min_interval = ApiCommon.get_rate_limit_min_interval_s(backend_id)
 		local elapsed      = now_s - _last_request_at_s
 		if _last_request_at_s > 0 and elapsed < min_interval then
 			local remaining = min_interval - elapsed
