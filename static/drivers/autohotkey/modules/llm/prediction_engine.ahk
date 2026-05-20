@@ -251,9 +251,17 @@ LLM_Engine_FirePrediction(ctx) {
 	; Cache hit (exact match): re-display last result without an API call.
 	; The cache is an array of slot strings so the multi-prediction reveal
 	; animation replays exactly as it did the first time.
+	;
+	; Bump request_id BEFORE rendering so any callback from a previous fire
+	; that's still in flight will bail (its ``state["request_id"] != current``
+	; check kicks in). Without this, a late async response from the previous
+	; ctx could land AFTER the cache hit rendered and clobber the tooltip.
 	if (ctx == _LLM_Engine["last_ctx"] && _LLM_Engine.Has("last_results")
 			and Type(_LLM_Engine["last_results"]) == "Array"
 			and _LLM_Engine["last_results"].Length > 0) {
+		try LLM_OllamaCancelAllAsync()
+		try LLM_RemoteCancelAllAsync()
+		_LLM_Engine["request_id"] := (_LLM_Engine.Has("request_id") ? _LLM_Engine["request_id"] : 0) + 1
 		LLM_Engine_OnResults(_LLM_Engine["last_results"], ctx, 1, true)
 		return
 	}
@@ -285,6 +293,11 @@ LLM_Engine_FirePrediction(ctx) {
 			}
 		}
 		if (sliced.Length > 0) {
+			; Same race fix as the exact-match cache branch above: cancel
+			; in-flight requests and bump request_id so late callbacks bail.
+			try LLM_OllamaCancelAllAsync()
+			try LLM_RemoteCancelAllAsync()
+			_LLM_Engine["request_id"] := (_LLM_Engine.Has("request_id") ? _LLM_Engine["request_id"] : 0) + 1
 			LLM_Engine_OnResults(sliced, ctx, 1, true)
 			return
 		}

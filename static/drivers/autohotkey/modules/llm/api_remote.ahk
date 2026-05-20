@@ -343,11 +343,17 @@ global LLM_REMOTE_MODEL_PRICES := Map(
     "claude-haiku-4-5",     Map("in", 0.25,  "out", 1.25),
     "claude-sonnet-4-6",    Map("in", 3.00,  "out", 15.00),
     "claude-opus-4-7",      Map("in", 15.00, "out", 75.00),
-    ; Google Gemini
+    ; Google Gemini — ``gemini-2.0-pro`` never shipped under that exact
+    ; SKU; the actual large-tier is ``gemini-1.5-pro``. Both kept so an
+    ; older config doesn't regress to zero cost while the user retunes.
     "gemini-2.0-flash",     Map("in", 0.10,  "out", 0.40),
+    "gemini-1.5-pro",       Map("in", 1.25,  "out", 5.00),
     "gemini-2.0-pro",       Map("in", 1.25,  "out", 5.00),
-    ; xAI
+    ; xAI — ``grok-2-mini`` was the early mini-tier slug; the current
+    ; public API uses ``grok-2-1212`` (with ``grok-2`` as alias). Verify
+    ; against https://docs.x.ai/docs before billing on these.
     "grok-2-mini",          Map("in", 0.30,  "out", 0.50),
+    "grok-2-1212",          Map("in", 2.00,  "out", 10.00),
     "grok-2",               Map("in", 2.00,  "out", 10.00),
     ; Mistral
     "mistral-small-latest", Map("in", 0.20,  "out", 0.60),

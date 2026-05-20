@@ -46,6 +46,21 @@ end
 
 local LOG = "menu_llm"
 
+--- Wraps pcall and logs Logger.error when the wrapped call fails, so we
+--- never swallow exceptions silently (violates project rule 5.3). Pass
+--- the call-site label as ``name`` so the log carries enough context to
+--- find the failing call. Returns the same ``ok, …`` tuple as pcall.
+--- @param name string Short label identifying the call site.
+--- @param fn function The function to call.
+--- @vararg any Arguments forwarded to ``fn``.
+local function pcall_log(name, fn, ...)
+	local ok, err = pcall(fn, ...)
+	if not ok then
+		Logger.error(LOG, "pcall '%s' failed: %s", tostring(name), tostring(err))
+	end
+	return ok, err
+end
+
 -- Holds the active models manager so M.stop_mlx_server() can reach it from any context
 -- (e.g., the Hammerspoon shutdown callback) without requiring a reference chain.
 local _active_models_mgr = nil
@@ -1285,8 +1300,8 @@ function M.create(deps)
                     disabled = paused or nil,
                     fn       = not paused and function()
                         api_remote.set_active_entry_id(e.id)
-                        pcall(llm_mod.persist_api_entries)
-                        pcall(llm_mod.warmup_model, llm_mod.get_current_model())
+                        pcall_log("persist_api_entries(set_active)", llm_mod.persist_api_entries)
+                        pcall_log("warmup_model(set_active)", llm_mod.warmup_model, llm_mod.get_current_model())
                         update_menu()
                     end or nil
                 })
@@ -1323,23 +1338,29 @@ function M.create(deps)
                                 return trim(picked_text)
                             end
 
+                            -- Use the existing i18n keys for prompt hints so
+                            -- non-French users see localized text. The title
+                            -- format ``API <provider> — <field>`` mixes a
+                            -- provider name with a field tag, so we localise
+                            -- the field tag via i18n.get and leave the
+                            -- composition pattern in place.
                             local base_url = prompt_field(
                                 string.format("API %s — URL", p.label),
                                 p.base_url,
-                                "Base URL (laisser vide pour la valeur par défaut)") or ""
+                                i18n.get("menu.llm.api_prompt_url")) or ""
                             local token = prompt_field(
-                                string.format("API %s — Clé / Token", p.label),
+                                string.format("API %s — Token", p.label),
                                 "",
-                                "Clé API (sera stockée localement via hs.settings)")
+                                i18n.get("menu.llm.api_prompt_token"))
                             if not token or token == "" then return end
                             local model = prompt_field(
-                                string.format("API %s — Modèle", p.label),
+                                string.format("API %s — Model", p.label),
                                 p.default_model,
-                                "Identifiant du modèle exposé par le fournisseur") or p.default_model
+                                i18n.get("menu.llm.api_prompt_model")) or p.default_model
                             local label = prompt_field(
-                                string.format("API %s — Libellé (facultatif)", p.label),
+                                string.format("API %s — Label", p.label),
                                 "",
-                                "Nom court affiché dans le menu") or ""
+                                i18n.get("menu.llm.api_prompt_name")) or ""
 
                             local id = string.format("%s-%d", pid, os.time())
                             local new_entry = {
@@ -1367,9 +1388,9 @@ function M.create(deps)
                             api_remote.check_availability(new_entry.model,
                                 function()
                                     -- Credentials accepted — NOW persist + warmup.
-                                    pcall(llm_mod.persist_api_entries)
-                                    pcall(llm_mod.warmup_model, llm_mod.get_current_model())
-                                    pcall(notifications.notify,
+                                    pcall_log("persist_api_entries(add_entry_ok)", llm_mod.persist_api_entries)
+                                    pcall_log("warmup_model(add_entry_ok)", llm_mod.warmup_model, llm_mod.get_current_model())
+                                    pcall_log("notify(api_validated)", notifications.notify,
                                         i18n.get("menu.llm.api_validated_title"),
                                         string.format(i18n.get("menu.llm.api_validated_body"), new_entry.label),
                                         "success")
@@ -1386,11 +1407,11 @@ function M.create(deps)
                                     end
                                     api_remote.set_entries(rolled)
                                     api_remote.set_active_entry_id(previous_active_id)
-                                    pcall(notifications.notify,
+                                    pcall_log("notify(api_unreachable)", notifications.notify,
                                         i18n.get("menu.llm.api_unreachable_title"),
                                         string.format(i18n.get("menu.llm.api_unreachable_body"), new_entry.label),
                                         "warning")
-                                    pcall(update_menu)
+                                    pcall_log("update_menu(rollback)", update_menu)
                                 end)
                         end or nil,
                     })
@@ -1398,7 +1419,7 @@ function M.create(deps)
             end
 
             table.insert(api_menu, {
-                title    = "➕ Ajouter une entrée",
+                title    = "➕ " .. i18n.get("menu.llm.api_add_entry"),
                 disabled = paused or nil,
                 menu     = add_submenu,
             })
@@ -1410,8 +1431,8 @@ function M.create(deps)
             local active_label = active_entry and (active_entry.label or active_entry.id or "") or ""
             table.insert(api_menu, {
                 title    = active_entry
-                    and string.format("🗑️ Supprimer l'entrée active (%s)", active_label)
-                    or  "🗑️ Supprimer l'entrée active",
+                    and string.format("🗑️ %s (%s)", i18n.get("menu.llm.api_remove_entry"), active_label)
+                    or  "🗑️ " .. i18n.get("menu.llm.api_remove_entry"),
                 disabled = (paused or (active_entry == nil)) or nil,
                 fn       = (not paused and active_entry) and function()
                     -- Confirm before destroying — the saved token is gone
@@ -1431,23 +1452,23 @@ function M.create(deps)
                     end
                     api_remote.set_entries(kept)
                     api_remote.set_active_entry_id(kept[1] and kept[1].id or "")
-                    pcall(llm_mod.persist_api_entries)
+                    pcall_log("persist_api_entries(delete)", llm_mod.persist_api_entries)
                     -- Purge the Keychain entry too; without this, deleted
                     -- entries leave their token in the user's Keychain
                     -- indefinitely.
                     local ok_kc, TokenCrypto = pcall(require, "modules.llm.api_token_crypto")
                     if ok_kc and TokenCrypto and active_entry.id then
-                        pcall(TokenCrypto.delete, active_entry.id)
+                        pcall_log("TokenCrypto.delete", TokenCrypto.delete, active_entry.id)
                     end
-                    pcall(llm_mod.warmup_model, llm_mod.get_current_model())
+                    pcall_log("warmup_model(delete)", llm_mod.warmup_model, llm_mod.get_current_model())
                     update_menu()
                 end or nil,
             })
 
             local api_title = active_entry
-                and string.format("Entrées API — %s (%s)", active_label,
+                and string.format("API — %s (%s)", active_label,
                     (api_remote.PROVIDERS[active_entry.provider] and api_remote.PROVIDERS[active_entry.provider].label) or active_entry.provider)
-                or  "Entrées API — aucune entrée configurée"
+                or  "API — " .. i18n.get("menu.llm.api_no_entry")
             table.insert(main_menu, {
                 title    = api_title,
                 disabled = paused or nil,
