@@ -72,6 +72,46 @@ M.PROVIDERS = {
 		default_model = "gemini-2.0-flash",
 		format        = "gemini",
 	},
+	-- xAI ships an OpenAI-compatible Chat Completions endpoint. Bearer auth.
+	xai = {
+		label         = "xAI (Grok)",
+		base_url      = "https://api.x.ai/v1",
+		default_model = "grok-2-mini",
+		format        = "openai",
+	},
+	-- Mistral: OpenAI-compatible Chat Completions. mistral-small-latest is
+	-- the cheap-and-fast default; codestral / large stay accessible via the
+	-- model field on the entry.
+	mistral = {
+		label         = "Mistral",
+		base_url      = "https://api.mistral.ai/v1",
+		default_model = "mistral-small-latest",
+		format        = "openai",
+	},
+	-- DeepSeek: same shape as OpenAI. deepseek-chat is sized like
+	-- gpt-4o-mini and competitively priced.
+	deepseek = {
+		label         = "DeepSeek",
+		base_url      = "https://api.deepseek.com",
+		default_model = "deepseek-chat",
+		format        = "openai",
+	},
+	-- Cohere: speaks OpenAI Chat Completions via the v2 /chat route.
+	cohere = {
+		label         = "Cohere",
+		base_url      = "https://api.cohere.com/v2",
+		default_model = "command-r7b-12-2024",
+		format        = "openai",
+	},
+	-- Cerebras: hardware-accelerated Llama / Qwen inference. Pure
+	-- OpenAI-compatible at /v1/chat/completions; the value-add is raw
+	-- tokens-per-second (~1700 tok/s on Llama 3.1 70B), not the schema.
+	cerebras = {
+		label         = "Cerebras",
+		base_url      = "https://api.cerebras.ai/v1",
+		default_model = "llama-3.1-8b",
+		format        = "openai",
+	},
 	-- Generic OpenAI-compatible covers Groq, OpenRouter, LM Studio, vLLM,
 	-- llama.cpp HTTP server, Together.ai, Fireworks, DeepInfra, … —
 	-- anything that speaks the Chat Completions schema. ``base_url`` is
@@ -87,7 +127,7 @@ M.PROVIDERS = {
 
 -- Per-provider ordered listing for the picker UI (Lua tables don't preserve
 -- order; this array is the user-facing display order).
-M.PROVIDER_ORDER = { "openai", "anthropic", "gemini", "openai_compat" }
+M.PROVIDER_ORDER = { "openai", "anthropic", "gemini", "xai", "mistral", "deepseek", "cohere", "cerebras", "openai_compat" }
 
 local REQUEST_TIMEOUT_S = 30
 

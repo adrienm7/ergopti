@@ -62,6 +62,48 @@ global LLM_API_PROVIDERS := Map(
         "DefaultModel", "gemini-2.0-flash",
         "Format",       "gemini"
     ),
+    ; xAI ships an OpenAI-compatible Chat Completions endpoint; the only
+    ; difference is the URL. Bearer auth.
+    "xai", Map(
+        "Label",        "xAI (Grok)",
+        "BaseUrl",      "https://api.x.ai/v1",
+        "DefaultModel", "grok-2-mini",
+        "Format",       "openai"
+    ),
+    ; Mistral: OpenAI-compatible at the URL below. ``mistral-small-latest``
+    ; is the cheap-and-fast default; codestral / large stay accessible
+    ; via the model field.
+    "mistral", Map(
+        "Label",        "Mistral",
+        "BaseUrl",      "https://api.mistral.ai/v1",
+        "DefaultModel", "mistral-small-latest",
+        "Format",       "openai"
+    ),
+    ; DeepSeek: same shape as OpenAI. The ``deepseek-chat`` model is
+    ; sized like gpt-4o-mini and competitively priced.
+    "deepseek", Map(
+        "Label",        "DeepSeek",
+        "BaseUrl",      "https://api.deepseek.com",
+        "DefaultModel", "deepseek-chat",
+        "Format",       "openai"
+    ),
+    ; Cohere: speaks OpenAI Chat Completions via the v2 ``/chat`` route.
+    ; ``command-r7b-12-2024`` is the small / fast tier.
+    "cohere", Map(
+        "Label",        "Cohere",
+        "BaseUrl",      "https://api.cohere.com/v2",
+        "DefaultModel", "command-r7b-12-2024",
+        "Format",       "openai"
+    ),
+    ; Cerebras: hardware-accelerated Llama / Qwen inference. Pure
+    ; OpenAI-compatible at /v1/chat/completions; the value-add is raw
+    ; tokens-per-second (~1700 tok/s on Llama 3.1 70B), not the schema.
+    "cerebras", Map(
+        "Label",        "Cerebras",
+        "BaseUrl",      "https://api.cerebras.ai/v1",
+        "DefaultModel", "llama-3.1-8b",
+        "Format",       "openai"
+    ),
     ; Generic OpenAI-compatible covers Groq, OpenRouter, LM Studio, vLLM,
     ; llama.cpp HTTP server, Together.ai, Fireworks, DeepInfra, … — anything
     ; that speaks the Chat Completions schema. BaseUrl is empty so the user
