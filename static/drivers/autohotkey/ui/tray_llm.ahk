@@ -1274,6 +1274,15 @@ _LLM_Tray_OnHealthProbeDone(reachable) {
 
 LLM_Tray_SetProfile(id) {
 	global _LLM_Tray
+	; If the user picks a profile manually while auto-detection is on, they
+	; clearly want a non-default choice — turn auto off so the next model
+	; switch doesn't silently overwrite their pick. The recommended profile
+	; for the current model is still computed live by the auto-detect
+	; helper, so flipping the toggle back on later re-applies it.
+	recommended := LLM_RecommendProfileForModel(_LLM_Tray["model"])
+	if (_LLM_Tray["auto_profile_for_model"] and recommended != "" and id != recommended) {
+		_LLM_Tray["auto_profile_for_model"] := false
+	}
 	_LLM_Tray["profile_id"] := id
 	LLM_Tray_SaveConfig()
 	LLM_Engine_Init(LLM_Tray_BuildOpts())
