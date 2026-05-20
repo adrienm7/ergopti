@@ -245,6 +245,35 @@ h1 {
 .field-group {
 	display: flex;
 	margin-bottom: 4px;
+	width: 100%;
+}
+
+#sc-input {
+	background: #fff;
+	border: 1.5px solid #d0d0d0;
+	border-radius: 7px 0 0 7px;
+	border-right: none;
+	color: #1d1d1f;
+	flex: 1;
+	font-family: -apple-system, BlinkMacSystemFont, 'Helvetica Neue', sans-serif;
+	font-size: 12.5px;
+	min-width: 0;
+	outline: none;
+	padding: 7px 10px;
+	transition: border-color 0.15s, box-shadow 0.15s;
+}
+
+#sc-input:focus {
+	border-color: #007aff;
+	box-shadow: 0 0 0 3px rgba(0, 122, 255, 0.15);
+	z-index: 1;
+}
+
+#sc-browse {
+	border-radius: 0 7px 7px 0;
+	flex-shrink: 0;
+	padding: 7px 12px;
+	white-space: nowrap;
 }
 
 #s3-input {

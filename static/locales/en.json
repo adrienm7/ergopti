@@ -193,7 +193,7 @@
 	"dialog.metrics.exclude_prompt": "Select the applications whose keystrokes will never be recorded by the keylogger.",
 	"dialog.metrics.exclude_title": "Exclude applications — Metrics",
 	"dialog.metrics.progress_label": "Processing: %d / %d",
-	"dialog.metrics.security_warning_body": "⚠️  WARNING: Metrics and keylogger are about to be enabled.\n\nThis system records your keystrokes and trackpad gesture activations.\n\n• Logs are stored in the Hammerspoon folder\n• Password fields are automatically ignored\n• It is recommended to PAUSE the script when entering sensitive data\n\nTo avoid interference with your custom gestures:\n• Remove macOS swipe 3/4-finger gestures if used\n• Disable Mission Control and App Exposé via gestures",
+	"dialog.metrics.security_warning_body": "⚠️  WARNING: Metrics and keylogger are about to be enabled.\n\nThis system records your keystrokes and trackpad gesture activations.\n\n• Logs are stored in the Hammerspoon folder\n• Password fields are automatically ignored\n• It is recommended to PAUSE the script when entering sensitive data",
 	"dialog.metrics.security_warning_title": "⚠ Security Warning — Metrics",
 	"dialog.metrics.title": "📊 Metrics",
 	"dialog.path_copy.btn_backslash": "&Backslash (\\)",

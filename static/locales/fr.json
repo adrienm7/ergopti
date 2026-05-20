@@ -193,7 +193,7 @@
 	"dialog.metrics.exclude_prompt": "Sélectionnez les applications dont les frappes ne seront jamais enregistrées par le keylogger.",
 	"dialog.metrics.exclude_title": "Exclure des applications — Métriques",
 	"dialog.metrics.progress_label": "Traitement en cours : %d / %d",
-	"dialog.metrics.security_warning_body": "⚠️  ATTENTION : Métriques et keylogger vont être activés.\n\nCe système enregistre vos frappes au clavier et l'activation des gestes trackpad.\n\n• Les logs sont stockés dans le dossier Hammerspoon\n• Les champs de mots de passe sont ignorés automatiquement\n• Il est recommandé de mettre le script en PAUSE lors de la saisie de données sensibles\n\nPour éviter les interférences avec vos gestes personnalisés :\n• Supprimez les gestes macOS pour swipe 3/4 doigts si utilisés\n• Désactivez mission control et app exposé via gestes",
+	"dialog.metrics.security_warning_body": "⚠️  ATTENTION : Métriques et keylogger vont être activés.\n\nCe système enregistre vos frappes au clavier et l'activation des gestes trackpad.\n\n• Les logs sont stockés dans le dossier Hammerspoon\n• Les champs de mots de passe sont ignorés automatiquement\n• Il est recommandé de mettre le script en PAUSE lors de la saisie de données sensibles",
 	"dialog.metrics.security_warning_title": "⚠ Avertissement de sécurité — Métriques",
 	"dialog.metrics.title": "📊 Métriques",
 	"dialog.path_copy.btn_backslash": "&Backslash (\\)",
