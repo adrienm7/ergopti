@@ -17,11 +17,13 @@
 ---    single table entry plus (optionally) a new branch in the formatter and
 ---    parser helpers; the engine and menu stay unchanged.
 --- 2. Async non-streaming — every call goes through ``hs.http.asyncPost`` so
----    the main thread never blocks. Streaming is intentionally OFF for the
----    remote path: the engine-level rate-limit floor
----    (``LLM_BACKEND_MIN_REQUEST_INTERVAL_MS["api"] = 500``) plus the user's
----    debounce already pace requests, and the synchronous request/response
----    schema keeps error paths trivial.
+---    the main thread never blocks. Remote streaming is intentionally OFF:
+---    the three popular streaming flavours (OpenAI SSE / Anthropic event
+---    stream / Gemini chunked JSONL) all parse differently, and for the
+---    short completions this engine targets (3–15 words) the latency gain
+---    is ~200–500 ms — not enough to justify three brittle codecs. The
+---    rate-limit floor in inference.json plus the user's debounce already
+---    pace requests, so the synchronous shape keeps error paths trivial.
 --- 3. Multi-entry state — the user can configure several API entries (one per
 ---    provider/account) and switch between them via the tray menu. Each
 ---    fetch picks up the active entry at dispatch time so a switch takes

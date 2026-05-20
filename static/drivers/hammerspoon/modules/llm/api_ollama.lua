@@ -21,7 +21,6 @@ if not ok_kl then keylogger = nil end
 
 local _req_counter = 0
 local _ollama_started = false
-local _model_cache = {}
 local DEDUPLICATION_ENABLED = ApiCommon.DEFAULT_DEDUPLICATION_ENABLED
 -- Retry policy lives in _shared/llm/inference.json so the AHK twin can read
 -- the same numbers. ``max_mult`` is the upper bound on attempts as a
@@ -192,8 +191,16 @@ end
 -- ======================================
 -- ======================================
 
--- Pre-allocated stop sequences for performance optimization
-local STOP_BASE     = { "<|eot_id|>", "<|im_end|>", "[/INST]", "PREFIX:", "TAIL:" }
+-- Pre-allocated stop sequences. Two flavours:
+--   STOP_BATCH — used by batch / non-line-mode requests. Prevents the
+--                model from drifting into its instruction tags and from
+--                echoing the PREFIX / TAIL markers back into the answer.
+--   STOP_LINE  — used in line mode (single completion, profile expects
+--                one continuation). Extends STOP_BATCH with newlines,
+--                the ``===`` separator (so a model that drifts into
+--                batch shape gets cut), the closing-tag prefix ``</``
+--                and a couple of common over-explanation tokens
+--                (``Suite finale``, ``SUITE``, ``NEXT_WORDS:``).
 local STOP_BATCH    = { "<|eot_id|>", "<|im_end|>", "[/INST]", "PREFIX:", "TAIL:" }
 local STOP_LINE     = { "<|eot_id|>", "<|im_end|>", "[/INST]", "PREFIX:", "TAIL:", "\n\n", "===", "\n", "\r", "</", "Suite finale", "SUITE", "NEXT_WORDS:" }
 
