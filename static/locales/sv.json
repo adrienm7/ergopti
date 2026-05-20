@@ -718,6 +718,7 @@
 	"menu.llm.delete_model": "🗑️ Ta bort den här modellen från cacheminnet",
 	"menu.llm.delete_model_body": "Vill du verkligen ta bort modellen \"%s\" från den lokala cachen?",
 	"menu.llm.delete_model_cache": "🗑️ Ta bort den här modellen från cacheminnet",
+	"menu.llm.download_model": "⬇️ Ladda ner den här modellen",
 	"menu.llm.delete_model_title": "Ta bort modellen?",
 	"menu.llm.delete_profile": "🗑️ Ta bort…",
 	"menu.llm.digits": "Siffror",

@@ -718,6 +718,7 @@
 	"menu.llm.delete_model": "🗑️ Usuń ten model z pamięci podręcznej",
 	"menu.llm.delete_model_body": "Czy naprawdę chcesz usunąć model \"%s\" z lokalnej pamięci podręcznej?",
 	"menu.llm.delete_model_cache": "🗑️ Usuń ten model z pamięci podręcznej",
+	"menu.llm.download_model": "⬇️ Pobierz ten model",
 	"menu.llm.delete_model_title": "Usunąć model?",
 	"menu.llm.delete_profile": "🗑️ Usuń…",
 	"menu.llm.digits": "Cyfry",

@@ -718,6 +718,7 @@
 	"menu.llm.delete_model": "🗑️ Odstranit tento model z mezipaměti",
 	"menu.llm.delete_model_body": "Opravdu chcete smazat model \"%s\" z lokální mezipaměti?",
 	"menu.llm.delete_model_cache": "🗑️ Smazat tento model z mezipaměti",
+	"menu.llm.download_model": "⬇️ Stáhnout tento model",
 	"menu.llm.delete_model_title": "Smazat model?",
 	"menu.llm.delete_profile": "🗑️ Smazat…",
 	"menu.llm.digits": "Číslice",

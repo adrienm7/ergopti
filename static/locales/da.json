@@ -718,6 +718,7 @@
 	"menu.llm.delete_model": "🗑️ Fjern dette model fra cache",
 	"menu.llm.delete_model_body": "Vil du virkelig slette modellen \"%s\" fra den lokale cache?",
 	"menu.llm.delete_model_cache": "🗑️ Slet dette model fra cache",
+	"menu.llm.download_model": "⬇️ Download denne model",
 	"menu.llm.delete_model_title": "Slet modellen?",
 	"menu.llm.delete_profile": "🗑️ Slet…",
 	"menu.llm.digits": "Tal",

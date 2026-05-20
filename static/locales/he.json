@@ -718,6 +718,7 @@
 	"menu.llm.delete_model": "🗑️ הסר מודל זה מהמטמון",
 	"menu.llm.delete_model_body": "האם באמת ברצונך למחוק את המודל \"%s\" מהמטמון המקומי?",
 	"menu.llm.delete_model_cache": "🗑️ מחק מודל זה מהמטמון",
+	"menu.llm.download_model": "⬇️ הורד מודל זה",
 	"menu.llm.delete_model_title": "למחוק את המודל?",
 	"menu.llm.delete_profile": "🗑️ מחק…",
 	"menu.llm.digits": "ספרות",

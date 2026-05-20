@@ -718,6 +718,7 @@
 	"menu.llm.delete_model": "🗑️ إزالة هذا النموذج من الذاكرة المؤقتة",
 	"menu.llm.delete_model_body": "هل تريد فعلًا حذف النموذج \"%s\" من الذاكرة المؤقتة المحلية؟",
 	"menu.llm.delete_model_cache": "🗑️ حذف هذا النموذج من الذاكرة المؤقتة",
+	"menu.llm.download_model": "⬇️ تنزيل هذا النموذج",
 	"menu.llm.delete_model_title": "حذف النموذج؟",
 	"menu.llm.delete_profile": "🗑️ حذف…",
 	"menu.llm.digits": "أرقام",

@@ -718,6 +718,7 @@
 	"menu.llm.delete_model": "🗑️ このモデルをキャッシュから削除",
 	"menu.llm.delete_model_body": "モデル\"%s\"をローカルキャッシュから削除してもよいですか？",
 	"menu.llm.delete_model_cache": "🗑️ このモデルをキャッシュから削除",
+	"menu.llm.download_model": "⬇️ このモデルをダウンロード",
 	"menu.llm.delete_model_title": "モデルを削除しますか？",
 	"menu.llm.delete_profile": "🗑️ 削除…",
 	"menu.llm.digits": "数字",

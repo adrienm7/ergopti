@@ -718,6 +718,7 @@
 	"menu.llm.delete_model": "🗑️ 从缓存中移除此模型",
 	"menu.llm.delete_model_body": "您确定要从本地缓存中删除模型«%s»?",
 	"menu.llm.delete_model_cache": "🗑️ 从缓存中删除此模型",
+	"menu.llm.download_model": "⬇️ 下载此模型",
 	"menu.llm.delete_model_title": "删除模型?",
 	"menu.llm.delete_profile": "🗑️ 删除…",
 	"menu.llm.digits": "数字",

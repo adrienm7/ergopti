@@ -718,6 +718,7 @@
 	"menu.llm.delete_model": "🗑️ 캐시에서 이 모델 제거",
 	"menu.llm.delete_model_body": "로컬 캐시에서 모델 \"%s\"를 정말로 삭제하시겠습니까?",
 	"menu.llm.delete_model_cache": "🗑️ 캐시에서 이 모델 삭제",
+	"menu.llm.download_model": "⬇️ 이 모델 다운로드",
 	"menu.llm.delete_model_title": "모델을 삭제하시겠습니까?",
 	"menu.llm.delete_profile": "🗑️ 삭제…",
 	"menu.llm.digits": "숫자",
