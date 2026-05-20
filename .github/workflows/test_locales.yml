@@ -1,0 +1,41 @@
+name: Test Locales
+
+on:
+    push:
+        branches: [dev, main]
+        paths:
+            - "static/locales/*.json"
+            - "tools/check_locales.py"
+            - ".github/workflows/test_locales.yml"
+    pull_request:
+        branches: [dev, main]
+        paths:
+            - "static/locales/*.json"
+            - "tools/check_locales.py"
+            - ".github/workflows/test_locales.yml"
+    workflow_dispatch:
+
+permissions:
+    contents: read
+
+concurrency:
+    group: test-locales-${{ github.ref }}
+    cancel-in-progress: true
+
+jobs:
+    check:
+        runs-on: ubuntu-latest
+
+        steps:
+            - name: Checkout repository
+              uses: actions/checkout@v4
+
+            - name: Set up Python
+              uses: actions/setup-python@v5
+              with:
+                  python-version: "3.12"
+
+            - name: Check every locale mirrors en.json's key set
+              # Exits 1 if any locale has missing or extra keys.
+              # Fix locally with: python tools/check_locales.py --fix
+              run: python tools/check_locales.py
