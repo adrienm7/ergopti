@@ -669,7 +669,7 @@ SC029:: {
     FileDelete(TmpScript)
     FileAppend(ScriptContent, TmpScript, "UTF-8")
     RunWait('powershell -NoProfile -NonInteractive -WindowStyle Hidden -ExecutionPolicy Bypass -File "' . TmpScript . '"',, "Hide")
-    TrayTip(Format(t("notify.screenshot_saved_path"), FilePath), t("notify.screenshot_title"), "Iconi Mute")
+    TrayTip(StrReplace(t("notify.screenshot_saved_path"), "%s", FilePath), t("notify.screenshot_title"), "Iconi Mute")
 }
 #HotIf
 
