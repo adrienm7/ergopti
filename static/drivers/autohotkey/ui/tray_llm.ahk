@@ -243,6 +243,14 @@ LLM_Tray_Init(saved_opts := Map()) {
 	; must click the menu toggle to trigger a visible installation.
 	if _LLM_Tray["enabled"]
 		SetTimer(() => LLM_Tray_BootstrapOllama(false), -1)
+
+	; Background health-tick: refreshes the dot every 10 s without waiting
+	; for the user to open the menu. The previous "probe on menu open"
+	; model painted a stale dot on the first open after the daemon died
+	; (probe result only landed the second time around). The tick uses
+	; the same flip-guard as the on-open probe, so a stable backend
+	; doesn't trigger spurious rebuilds.
+	SetTimer(_LLM_Tray_FireHealthProbe, 10000)
 }
 
 
