@@ -147,41 +147,37 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 	// ===== 2.3) Hammerspoon Lifecycle ====
 	// =====================================
 
-	// Write Hammerspoon preference overrides into its NSUserDefaults store.
+	// Write Hammerspoon preference overrides directly via CFPreferencesSetValue.
+	// This writes into ~/Library/Preferences/<bundleId>.plist synchronously,
+	// bypassing the cfprefsd async pipeline that `defaults write` goes through.
 	// Hammerspoon reads its prefs via [NSUserDefaults standardUserDefaults] under
-	// its own bundle ID (rewritten to kErgoptiBundleId at build time). Swift's
-	// UserDefaults(suiteName:) writes to a separate group-container store that HS
-	// does NOT read, so we use the `defaults` CLI which writes directly into
-	// ~/Library/Preferences/<bundleId>.plist — the exact file HS reads.
+	// its own bundle ID (rewritten to kErgoptiBundleId at build time); the plist
+	// is flushed before launchHammerspoon() so HS sees the correct path on the
+	// very first read, even on first-ever launch.
 	// Done at every startup so a user who moved the .app sees the new path.
 	private func seedConfigDirDefault() {
-		let pairs: [(String, String)] = [
-			// Point HS at our bundled Lua tree instead of ~/.hammerspoon.
-			(kHammerspoonConfigKey, bundledConfigDir()),
-		]
-		for (key, value) in pairs {
-			runDefaults(["write", kErgoptiBundleId, key, "-string", value])
-		}
-		// Bool flags: suppress the native Hammerspoon hammer menubar icon and its
-		// Dock icon. Ergopti provides its own menubar item via hs.menubar; the HS
-		// default icons are redundant and reveal the underlying dependency.
-		let boolFalseKeys = ["MJShowMenuIconOnLaunch", "MJShowDockIconOnLaunch"]
-		for key in boolFalseKeys {
-			runDefaults(["write", kErgoptiBundleId, key, "-bool", "false"])
-		}
-	}
+		let appId = kErgoptiBundleId as CFString
+		let user  = kCFPreferencesCurrentUser
+		let host  = kCFPreferencesAnyHost
 
-	// Runs `/usr/bin/defaults` synchronously with the given arguments.
-	// Silent on failure — if defaults write cannot run, HS still launches;
-	// it may show its own icons, but the core functionality is unaffected.
-	private func runDefaults(_ args: [String]) {
-		let proc = Process()
-		proc.executableURL = URL(fileURLWithPath: "/usr/bin/defaults")
-		proc.arguments = args
-		proc.standardOutput = FileHandle.nullDevice
-		proc.standardError  = FileHandle.nullDevice
-		try? proc.run()
-		proc.waitUntilExit()
+		// Point HS at our bundled Lua tree instead of ~/.hammerspoon.
+		CFPreferencesSetValue(
+			kHammerspoonConfigKey as CFString,
+			bundledConfigDir() as CFString,
+			appId, user, host)
+
+		// Suppress the native Hammerspoon hammer menubar icon and Dock icon.
+		// Ergopti provides its own menubar item via hs.menubar; the HS default
+		// icons are redundant and reveal the underlying dependency.
+		for key in ["MJShowMenuIconOnLaunch", "MJShowDockIconOnLaunch"] {
+			CFPreferencesSetValue(
+				key as CFString,
+				false as CFBoolean,
+				appId, user, host)
+		}
+
+		// Flush synchronously so the plist is on disk before we exec Hammerspoon.
+		CFPreferencesSynchronize(appId, user, host)
 	}
 
 	// Launch the embedded Hammerspoon as a child Process. We use Process
@@ -255,19 +251,21 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 // =====================================
 // =====================================
 
-// Write MJConfigDir before NSApplication.run() so Hammerspoon sees the correct
-// config path even if the app is launched for the very first time (Gatekeeper
-// may kill the process after applicationDidFinishLaunching fires but before our
-// seedConfigDirDefault() call completes). Writing here is synchronous and
-// happens before any Sparkle initialisation that could throw.
+// Write MJConfigDir via CFPreferences before NSApplication.run() so Hammerspoon
+// always sees the correct config path, even if applicationDidFinishLaunching is
+// never reached (Gatekeeper first-run kill, Sparkle init exception, etc.).
+// CFPreferencesSynchronize flushes synchronously to disk before app.run().
 let _earlyConfigDir = Bundle.main.bundlePath + "/Contents/Resources/static/drivers/hammerspoon"
-let _earlyDefaults = Process()
-_earlyDefaults.executableURL = URL(fileURLWithPath: "/usr/bin/defaults")
-_earlyDefaults.arguments = ["write", kErgoptiBundleId, kHammerspoonConfigKey, "-string", _earlyConfigDir]
-_earlyDefaults.standardOutput = FileHandle.nullDevice
-_earlyDefaults.standardError  = FileHandle.nullDevice
-try? _earlyDefaults.run()
-_earlyDefaults.waitUntilExit()
+CFPreferencesSetValue(
+    kHammerspoonConfigKey as CFString,
+    _earlyConfigDir as CFString,
+    kErgoptiBundleId as CFString,
+    kCFPreferencesCurrentUser,
+    kCFPreferencesAnyHost)
+CFPreferencesSynchronize(
+    kErgoptiBundleId as CFString,
+    kCFPreferencesCurrentUser,
+    kCFPreferencesAnyHost)
 
 let app      = NSApplication.shared
 let delegate = AppDelegate()
