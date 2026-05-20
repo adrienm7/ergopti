@@ -1747,8 +1747,17 @@ GestureShowManualTutorialDialog() {
     ; comfortable minimum. -Wrap + HScroll keeps the shortcut column aligned.
     tg.AddEdit("ReadOnly w480 h340 -Wrap +HScroll", GestureBuildSetupInstructions())
     tg.AddText("w480 y+10", t("onboarding.gestures.open_settings_hint"))
+    ; "Open settings" intentionally spans the full 480 px content width — the
+    ; localised label is the action's full sentence ("Open touchpad settings"),
+    ; not a control-bar verb, so a wide button reads as a call-to-action.
     btnOpenSettings := tg.AddButton("w480 y+8", t("onboarding.gestures.open_settings"))
-    btnClose        := tg.AddButton("Default w110 x370 y+12", t("onboarding.btn.ok"))
+    ; OK close: auto-sized with the 90 px floor so short labels keep their
+    ; historical heft and long localised "OK" variants (rare but possible) no
+    ; longer clip. Pinned to the right edge of the 480 px content column.
+    btnClose := tg.AddButton("Default x370 y+12", t("onboarding.btn.ok"))
+    Gui_HarmoniseButtonWidths([btnClose])
+    btnClose.GetPos(, , &_okW, )
+    btnClose.Move(498 - _okW)   ; 18 (margin) + 480 (content width) - btn width
     btnOpenSettings.OnEvent("Click", (*) => GestureOpenTouchpadSettings())
     btnClose.OnEvent("Click", ((*) => tg.Destroy()))
     tg.Show("AutoSize Center")

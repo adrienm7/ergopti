@@ -1063,22 +1063,12 @@ _Onboarding_AddNavButtons(g, backLabel, nextLabel, isDefault := true) {
 		btnNext := g.AddButton((isDefault ? "Default " : "") . "x20 y+16", nextLabel)
 	}
 
-	; Measure the natural widths AHK assigned to each button, then take the
-	; max so both end up identical (matches the wizard's symmetric layout).
-	btnNext.GetPos(, , &nW, )
-	sharedW := nW
-	if hasBack {
-		btnBack.GetPos(, , &bW, )
-		sharedW := Max(bW, sharedW)
-	}
-	sharedW := Max(sharedW, ONBOARDING_BTN_MIN_W)
-
-	; Reposition: Back at the left margin, Next anchored to the right margin
-	; with the same width. Height left untouched so AHK keeps the native value.
-	if hasBack {
-		btnBack.Move(20, , sharedW)
-	}
-	btnNext.Move(ONBOARDING_WIN_W - 20 - sharedW, , sharedW)
+	; Harmonise widths via the shared GUI helper so this wizard inherits the
+	; same dynamic-button policy applied across every other dialog. Pinning
+	; Next to the right margin happens AFTER harmonise so the shared width is
+	; the one used to compute the right-edge anchor.
+	sharedW := Gui_HarmoniseButtonWidths(hasBack ? [btnBack, btnNext] : [btnNext], ONBOARDING_BTN_MIN_W)
+	btnNext.Move(ONBOARDING_WIN_W - 20 - sharedW)
 
 	return hasBack ? [btnBack, btnNext] : [unset, btnNext]
 }
