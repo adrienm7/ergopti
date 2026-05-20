@@ -201,9 +201,14 @@ LLM_Engine_OnKeystroke(buffer) {
 	; Trim context to the last ctx_chars characters
 	ctx := SubStr(buffer, -_LLM_Engine["ctx_chars"])
 
-	; Arm debounce timer — closure captures current ctx value
+	; Arm debounce timer — closure captures current ctx value. We MUST keep a
+	; reference to the closure: SetTimer cancels by function identity, and a
+	; bare ``() => …`` lambda is a fresh object every keystroke. Without
+	; storing the reference, ``SetTimer(, 0)`` would not find a target to
+	; cancel and predictions would accumulate on fast typing.
 	_LLM_Engine["last_ctx"] := ctx
-	SetTimer(() => LLM_Engine_FirePrediction(ctx), -_LLM_Engine["debounce_ms"])
+	_LLM_Engine["pending_timer"] := LLM_Engine_FirePrediction.Bind(ctx)
+	SetTimer(_LLM_Engine["pending_timer"], -_LLM_Engine["debounce_ms"])
 	_LLM_Engine["timer_active"] := true
 }
 
@@ -213,8 +218,12 @@ LLM_Engine_OnKeystroke(buffer) {
 LLM_Engine_CancelTimer() {
 	global _LLM_Engine
 	if _LLM_Engine["timer_active"] {
-		SetTimer(, 0)
-		_LLM_Engine["timer_active"] := false
+		; Cancel by reference so the right closure is actually disarmed.
+		; SetTimer(, 0) without a target only works inside a timer thread.
+		if _LLM_Engine.Has("pending_timer") and _LLM_Engine["pending_timer"]
+			SetTimer(_LLM_Engine["pending_timer"], 0)
+		_LLM_Engine["pending_timer"] := ""
+		_LLM_Engine["timer_active"]  := false
 	}
 }
 
@@ -261,16 +270,17 @@ LLM_Engine_FirePrediction(ctx) {
 			and Type(_LLM_Engine["last_results"]) == "Array"
 			and _LLM_Engine["last_results"].Length > 0
 			and StrLen(ctx) > StrLen(_LLM_Engine["last_ctx"])
-			and SubStr(ctx, 1, StrLen(_LLM_Engine["last_ctx"])) == _LLM_Engine["last_ctx"]) {
+			and StrCompare(SubStr(ctx, 1, StrLen(_LLM_Engine["last_ctx"])), _LLM_Engine["last_ctx"], true) == 0) {
 		typed_delta := SubStr(ctx, StrLen(_LLM_Engine["last_ctx"]) + 1)
 		; Slice each cached slot by removing the prefix the user has
 		; already typed. Only slots whose start equals typed_delta
 		; contribute; the others are dropped (they don't match what
-		; the user is now committed to typing).
+		; the user is now committed to typing). Case-SENSITIVE prefix
+		; comparison so "Paris" doesn't get mis-matched with "paris".
 		sliced := []
 		for s in _LLM_Engine["last_results"] {
 			if (StrLen(s) > StrLen(typed_delta)
-					and SubStr(s, 1, StrLen(typed_delta)) == typed_delta) {
+					and StrCompare(SubStr(s, 1, StrLen(typed_delta)), typed_delta, true) == 0) {
 				sliced.Push(SubStr(s, StrLen(typed_delta) + 1))
 			}
 		}
@@ -292,7 +302,10 @@ LLM_Engine_FirePrediction(ctx) {
 	last := _LLM_Engine.Has("last_request_tick") ? _LLM_Engine["last_request_tick"] : 0
 	if (last > 0 and (now - last) < min_interval) {
 		remaining := min_interval - (now - last)
-		SetTimer(() => LLM_Engine_FirePrediction(ctx), -remaining)
+		; Same reasoning as LLM_Engine_OnKeystroke: keep a reference to the
+		; closure so the next CancelTimer call can actually cancel it.
+		_LLM_Engine["pending_timer"] := LLM_Engine_FirePrediction.Bind(ctx)
+		SetTimer(_LLM_Engine["pending_timer"], -remaining)
 		_LLM_Engine["timer_active"] := true
 		return
 	}
@@ -385,8 +398,9 @@ LLM_Engine_FirePrediction(ctx) {
 			"model",         log_model,
 			"system_prompt", system_prompt,
 			"requested",     n_predictions,
-			"base_temp",     Float(_LLM_Engine["temperature"]),
-			"dispatch_fn",   dispatch_fn
+			"base_temp",     _LLM_Engine["temperature"] + 0.0,
+			"dispatch_fn",   dispatch_fn,
+			"request_start", A_TickCount
 		)
 		_LLM_Engine_DispatchBatch(state)
 		return
@@ -410,11 +424,15 @@ LLM_Engine_FirePrediction(ctx) {
 		"requested",         n_predictions,
 		"attempt_index",     1,
 		"max_attempts",      _LLM_Engine_MaxAttempts(n_predictions),
-		"base_temp",         Float(_LLM_Engine["temperature"]),
+		"base_temp",         _LLM_Engine["temperature"] + 0.0,
 		"dedup_stats",       LLM_ApiCommon_NewDedupStats(),
 		"dispatch_fn",       dispatch_fn,
 		"dispatch_stream_fn",dispatch_stream_fn,
-		"streaming",         streaming_enabled
+		"streaming",         streaming_enabled,
+		; Wallclock at request start so the keylogger event can include the
+		; round-trip latency (matches the HS log_llm shape's ``elapsed_ms``
+		; field). Read at finalize time as ``A_TickCount - request_start``.
+		"request_start",     A_TickCount
 	)
 	_LLM_Engine_DispatchVariant(state)
 }
@@ -432,16 +450,29 @@ _LLM_Engine_DispatchBatch(state) {
 
 	state_ref := state
 	dispatch_fn := state["dispatch_fn"]
+	; The success callback receives ``(text, meta := "")`` so the API path's
+	; per-request token usage / cost block lands in the state map. Ollama's
+	; async callback only passes ``text`` — extra positional args are dropped
+	; at the call boundary, so the same signature works for both backends.
 	dispatch_fn.Call(state["base_temp"],
-		(text) => _LLM_Engine_OnBatchSuccess(state_ref, text),
+		(text, meta := "") => _LLM_Engine_OnBatchSuccess(state_ref, text, meta),
 		() => _LLM_Engine_OnBatchFail(state_ref))
 }
 
-_LLM_Engine_OnBatchSuccess(state, text) {
+_LLM_Engine_OnBatchSuccess(state, text, meta := "") {
 	global _LLM_Engine
 	current_id := _LLM_Engine.Has("request_id") ? _LLM_Engine["request_id"] : 0
 	if (state["request_id"] != current_id)
 		return
+	; Capture per-request token usage when the backend provided it. Same
+	; structure as the sequential path so the finalize step can emit a
+	; unified keylogger event regardless of dispatch strategy.
+	if (meta is Map) {
+		state["prompt_tokens"]     := (state.Has("prompt_tokens")     ? state["prompt_tokens"]     : 0) + (meta.Has("prompt_tokens")     ? meta["prompt_tokens"]     : 0)
+		state["completion_tokens"] := (state.Has("completion_tokens") ? state["completion_tokens"] : 0) + (meta.Has("completion_tokens") ? meta["completion_tokens"] : 0)
+		state["total_tokens"]      := (state.Has("total_tokens")      ? state["total_tokens"]      : 0) + (meta.Has("total_tokens")      ? meta["total_tokens"]      : 0)
+		state["est_cost_usd"]      := (state.Has("est_cost_usd")      ? state["est_cost_usd"]      : 0.0) + (meta.Has("est_cost_usd")    ? meta["est_cost_usd"]      : 0.0)
+	}
 	blocks := _LLM_Engine_SplitBatchBlocks(text)
 	stats  := LLM_ApiCommon_NewDedupStats()
 	slots  := []
@@ -482,7 +513,12 @@ _LLM_Engine_SplitBatchBlocks(raw) {
 	; while loop without a special case.
 	work := raw . "==="
 	pos := 1
-	while RegExMatch(work, "(.*?)===", &m, pos) {
+	; ``s)`` flag is critical here: by default ``.`` does NOT match newlines
+	; in PCRE, so a multi-line prediction block (which is the normal case for
+	; the batch profile — TAIL_CORRECTED + NEXT_WORDS on separate lines)
+	; would never match and the whole response would fall through to the
+	; ``blocks.Length == 0`` fallback, packed as a single block.
+	while RegExMatch(work, "s)(.*?)===", &m, pos) {
 		piece := Trim(m[1], " `t`r`n")
 		if (piece != "")
 			blocks.Push(piece)
@@ -543,16 +579,22 @@ _LLM_Engine_DispatchVariant(state) {
 	if (state["streaming"] and state["dispatch_stream_fn"] != "") {
 		this_slot_idx := state["slots"].Length + 1
 		stream_fn := state["dispatch_stream_fn"]
+		; ``(text, meta := "")`` signature matches both backends. The remote
+		; path always passes meta with token usage; the Ollama path passes
+		; only ``text`` and the default kicks in.
 		stream_fn.Call(temp,
 			(partial) => _LLM_Engine_OnStreamPartial(state_ref, this_slot_idx, partial),
-			(text) => _LLM_Engine_OnVariantSuccess(state_ref, text),
+			(text, meta := "") => _LLM_Engine_OnVariantSuccess(state_ref, text, meta),
 			() => _LLM_Engine_OnVariantFail(state_ref))
 		return
 	}
 
 	dispatch_fn := state["dispatch_fn"]
+	; Same signature as the streaming branch — forward ``meta`` so the
+	; finalize step can record token usage / cost. Without ``meta`` here
+	; the API path silently zeroed those metrics in the keylogger event.
 	dispatch_fn.Call(temp,
-		(text) => _LLM_Engine_OnVariantSuccess(state_ref, text),
+		(text, meta := "") => _LLM_Engine_OnVariantSuccess(state_ref, text, meta),
 		() => _LLM_Engine_OnVariantFail(state_ref))
 }
 
@@ -591,12 +633,15 @@ _LLM_Engine_OnVariantSuccess(state, text, meta := "") {
 		state["total_tokens"]      := (state.Has("total_tokens")      ? state["total_tokens"]      : 0) + (meta.Has("total_tokens")      ? meta["total_tokens"]      : 0)
 		state["est_cost_usd"]      := (state.Has("est_cost_usd")      ? state["est_cost_usd"]      : 0.0) + (meta.Has("est_cost_usd")    ? meta["est_cost_usd"]      : 0.0)
 	}
-	; Dedup against existing slots; skip empties.
+	; Dedup against existing slots; skip empties. Comparison is case-SENSITIVE
+	; via StrCompare(.., true): AHK v2's ``==`` operator is case-INSENSITIVE
+	; for strings, so without StrCompare two predictions that differ only by
+	; case ("Paris" vs "paris") would collapse into one slot.
 	inserted := false
 	if (text != "") {
 		dup := false
 		for s in state["slots"] {
-			if (s == text) {
+			if (StrCompare(s, text, true) == 0) {
 				dup := true
 				break
 			}
@@ -651,6 +696,9 @@ _LLM_Engine_FinalizeRequest(state) {
 			KL_LogLlmFailed(Map(
 				"app",            app_name,
 				"context",        state["ctx"],
+				; Same ``tag`` shape as the HS log_llm_failed event so a
+				; unified log tail can regex-filter both drivers identically.
+				"tag",            "<llm_failed/>",
 				"backend",        state["backend"],
 				"model",          state["model"],
 				"system_prompt",  state["system_prompt"],
@@ -681,11 +729,21 @@ _LLM_Engine_FinalizeRequest(state) {
 			"app",           app_name,
 			"context",       state["ctx"],
 			"predictions",   state["slots"],
+			; ``tag`` mirrors the HS log_llm shape (modules/keylogger/init.lua
+			; M.log_llm) — a tail of the unified log can filter generations
+			; with a single regex regardless of which driver produced them.
+			"tag",           "<llm_generated></llm_generated>",
 			"backend",       state["backend"],
 			"model",         state["model"],
 			"system_prompt", state["system_prompt"],
 			"user_prompt",   state["ctx"]
 		)
+		; ``elapsed_ms`` is the round-trip latency from variant 1 dispatch to
+		; the final render. Tracked via the ``request_start`` field stamped
+		; into ``state`` at FirePrediction time so streaming + sequential +
+		; batch all read the same wallclock.
+		if state.Has("request_start") and state["request_start"] > 0
+			evt["elapsed_ms"] := A_TickCount - state["request_start"]
 		if state.Has("prompt_tokens")     and state["prompt_tokens"]     > 0
 			evt["prompt_tokens"] := state["prompt_tokens"]
 		if state.Has("completion_tokens") and state["completion_tokens"] > 0
