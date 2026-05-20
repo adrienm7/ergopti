@@ -1036,6 +1036,7 @@
 	"onboarding.gestures.register_manual_hint": "Opens a step-by-step tutorial and a one-click shortcut to the touchpad settings page so you can wire up each gesture by hand.",
 	"onboarding.gestures.register_section": "Gestures must be configured in Windows Settings (Bluetooth & devices → Touchpad → Advanced gestures):",
 	"onboarding.gestures.register_success": "Gestures are now configured in Windows Settings.",
+	"onboarding.gestures.register_deferred": "Gestures will be configured on next start.",
 	"onboarding.gestures.title": "الإيماءات",
 	"onboarding.language.placeholder": "اختر لغتك…",
 	"onboarding.layout.desc": "Activates layout emulation (base layer + AltGr) and Ergopti hotstrings.",
