@@ -96,7 +96,11 @@ global _LLM_Tray := Map(
 	"auto_raise_temp",            true,
 	"nav_modifiers",              "",
 	"val_modifiers",              "alt",
-	"trigger_shortcut",           "",
+	; On-demand prediction shortcut. Ctrl+Space is the default — same key
+	; combo as Copilot's "trigger inline suggestion" so muscle memory
+	; carries over. The user can rebind it via the tray menu; setting it
+	; to the empty string disables the feature entirely.
+	"trigger_shortcut",           "Ctrl+Space",
 	; When true, switching to a new model auto-picks the matching profile
 	; (raw / basic / advanced / batch_advanced) using the params count from
 	; models.json. Mirrors the HS get_recommended_profile_info heuristic so
