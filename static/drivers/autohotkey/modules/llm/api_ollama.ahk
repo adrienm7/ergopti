@@ -167,6 +167,41 @@ LLM_OllamaListModels() {
 	return models
 }
 
+/**
+ * Removes the local copy of an Ollama model via the daemon's
+ * ``DELETE /api/delete`` endpoint. Blocking — the caller is responsible
+ * for confirming with the user before invoking this.
+ *
+ * @param {string} tag - Ollama model tag (e.g. ``qwen3-coder:30b``).
+ * @returns {Boolean} True on HTTP 200, false on any failure.
+ */
+LLM_OllamaDeleteModel(tag) {
+	if (tag == "")
+		return false
+	try {
+		http := ComObject("WinHttp.WinHttpRequest.5.1")
+		http.Open("DELETE", LLM_OLLAMA_BASE_URL "/api/delete", false)
+		http.SetTimeouts(5000, 5000, 10000, 10000)
+		http.SetRequestHeader("Content-Type", "application/json")
+		; The payload is intentionally minimal — Ollama tolerates the
+		; ``model`` field too on newer versions, but ``name`` is the
+		; documented one and works on every release we care about.
+		body := '{"name":"' . StrReplace(tag, '"', '\"') . '"}'
+		http.Send(body)
+		ok := (http.Status >= 200 and http.Status < 300)
+		try {
+			if (ok)
+				LoggerSuccess("LLM.ollama", "Deleted Ollama model '{1}'.", tag)
+			else
+				LoggerWarn("LLM.ollama", "Ollama delete '{1}' returned HTTP {2}.", tag, http.Status)
+		}
+		return ok
+	} catch as e {
+		try LoggerError("LLM.ollama", "Ollama delete '{1}' failed: {2}.", tag, e.Message)
+		return false
+	}
+}
+
 
 
 
