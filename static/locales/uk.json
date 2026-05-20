@@ -1878,5 +1878,6 @@
 	"updater.title_version": "ErgoptiPlus — Версія",
 	"updater.up_to_date": "ErgoptiPlus має останню версію.\n\nПоточна версія: {1}",
 	"updater.version_message": "ErgoptiPlus {1}{2}\n\nВідкрити сторінку релізів на GitHub?",
-	"vscode.reload_required": "Перезавантажте VSCode (Cmd+Shift+P > Reload Window), щоб активувати розширення введення"
+	"vscode.reload_required": "Перезавантажте VSCode (Cmd+Shift+P > Reload Window), щоб активувати розширення введення",
+	"menu.llm.warning_install_ollama": "⚠️  Ollama не встановлено — натисніть, щоб перезапустити встановлення"
 }

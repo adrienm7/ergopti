@@ -267,29 +267,21 @@ LLM_Tray_Init(saved_opts := Map()) {
 
 	LLM_Tray_Build()
 
-	; Bootstrap the active backend on reload when the feature was already enabled.
-	; * Backend = ollama:
-	;     - if Ollama is reachable → silent fast-path (show_ui=false), just
-	;       starts the bridge.
-	;     - if Ollama is NOT reachable → resume the install with the UI
-	;       visible (show_ui=true). The user explicitly enabled the feature
-	;       at some point; if the bundle crashed mid-install or the daemon
-	;       was uninstalled, we want them to SEE the install resume instead
-	;       of staring at a silently-broken toggle.
-	;       Probe synchronously here so we pick the right show_ui value
-	;       without re-entering the deps checker twice.
-	; * Backend = api / mlx: no install path, just start the bridge — keep
-	;   show_ui=false to avoid an irrelevant Ollama window.
-	if _LLM_Tray["enabled"] {
-		if (_LLM_Tray["backend"] == "ollama") {
-			ollama_up := false
-			try ollama_up := LLM_OllamaIsRunning()
-			boot_ui := !ollama_up
-			SetTimer(() => LLM_Tray_BootstrapOllama(boot_ui), -1)
-		} else {
-			SetTimer(() => LLM_Tray_BootstrapOllama(false), -1)
-		}
-	}
+	; Bootstrap Ollama silently on reload when the feature was already enabled.
+	; show_ui=false so the install window NEVER opens automatically — the user
+	; must click the menu toggle to trigger a visible installation.
+	;
+	; An earlier attempt (commit 6ac57794) auto-resumed the install with UI
+	; when Ollama wasn't reachable. Two problems: (a) the synchronous
+	; LLM_OllamaIsRunning probe blocked the main thread for up to 2 seconds
+	; on reload, which delayed PrefixWatcher's InputHook startup and caused
+	; the first few user keystrokes to be swallowed; (b) the multi-minute
+	; download then ran in the background while the user typed, contesting
+	; CPU with the input pipeline. The build_warning_row below now surfaces
+	; the missing-install state in the menu so the user can re-trigger the
+	; install themselves when they're ready.
+	if _LLM_Tray["enabled"]
+		SetTimer(() => LLM_Tray_BootstrapOllama(false), -1)
 
 	; Background health-tick: refreshes the dot every 10 s without waiting
 	; for the user to open the menu. The previous "probe on menu open"
@@ -335,6 +327,18 @@ LLM_Tray_Build() {
 		t("menu.llm.off"),
 		_LLM_Tray["enabled"],
 		LLM_Tray_OnToggle)
+
+	; Warning row — surfaces when the feature is ON but the active backend
+	; can't actually answer (Ollama not installed yet, install crashed
+	; mid-way, daemon got uninstalled). Clicking the row re-launches the
+	; install with the WebView visible — same path as the toggle ON click
+	; but without losing the user's enabled=true state. Without this row
+	; a missing install was completely silent: the toggle showed ON, no
+	; tooltip ever appeared, and the user had no obvious next step.
+	if (_LLM_Tray["enabled"] and _LLM_Tray["backend"] == "ollama" and !LLM_Deps_IsReady()) {
+		_LLM_Tray_Menu.Add(t("menu.llm.warning_install_ollama"),
+			(*) => SetTimer(() => LLM_Tray_BootstrapOllama(true), -1))
+	}
 
 	; Backend submenu
 	backend_menu := LLM_Tray_BuildBackendMenu()

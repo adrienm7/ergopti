@@ -1878,5 +1878,6 @@
 	"updater.title_version": "ErgoptiPlus — Versión",
 	"updater.up_to_date": "ErgoptiPlus está actualizado.\n\nVersión actual: {1}",
 	"updater.version_message": "ErgoptiPlus {1}{2}\n\n¿Abrir la página de releases en GitHub?",
-	"vscode.reload_required": "Recargue VSCode (Cmd+Shift+P > Reload Window) para activar la extensión de escritura"
+	"vscode.reload_required": "Recargue VSCode (Cmd+Shift+P > Reload Window) para activar la extensión de escritura",
+	"menu.llm.warning_install_ollama": "⚠️  Ollama no está instalado — haz clic para reiniciar la instalación"
 }
