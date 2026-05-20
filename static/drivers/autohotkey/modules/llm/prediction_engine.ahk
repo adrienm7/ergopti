@@ -659,6 +659,17 @@ _LLM_Engine_FinalizeRequest(state) {
 		KL_LogLlm("generation", evt)
 	}
 
+	; ``llm_suggested`` fires once per final render so a tail of the log
+	; pairs each suggestion with exactly one ``llm_accepted`` (Tab) or
+	; ``llm_dismissed`` (timeout / typing past it). Acceptance rate is
+	; the ratio of accepted vs suggested. Lives on the engine side so
+	; both the tooltip flow and the inline-autotype flow contribute.
+	try {
+		app_name := ""
+		try app_name := WinGetTitle("A")
+		KL_LogLlmSuggested(app_name, state["slots"].Length)
+	}
+
 	LLM_Engine_OnResults(state["slots"], state["ctx"], 1, true)
 }
 

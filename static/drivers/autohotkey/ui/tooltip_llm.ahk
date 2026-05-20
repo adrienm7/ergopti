@@ -168,13 +168,33 @@ LLM_Tooltip_SetActiveIdx(idx) {
 
 /**
  * Hides the prediction tooltip immediately.
+ *
+ * @param {boolean} accepted - True when called from the accept path so we
+ *     do NOT emit a duplicate ``llm_dismissed`` event (the accept path
+ *     emits ``llm_accepted`` itself). False everywhere else (timeout,
+ *     keystroke, bridge stop) so a tail of the log can compute
+ *     accepted/dismissed/suggested ratios.
  */
-LLM_Tooltip_Hide() {
+LLM_Tooltip_Hide(accepted := false) {
 	global _LLM_Tooltip_Visible, _LLM_Tooltip_Slots
 	SetTimer(_LLM_Tooltip_TimerFn, 0)
+	was_visible := _LLM_Tooltip_Visible
+	slots_snapshot := _LLM_Tooltip_Slots
 	_LLM_Tooltip_Visible := false
 	_LLM_Tooltip_Slots := []
 	ToolTip(, , , LLM_TOOLTIP_SLOT)
+	; Emit a dismissed event when the tooltip was actually showing AND
+	; the hide isn't part of the accept path. The engine's
+	; ``llm_suggested`` event landed when the tooltip first rendered;
+	; without this matching dismissed, "shown but not accepted" cases
+	; are invisible in the log.
+	if (was_visible and !accepted) {
+		try {
+			app_name := ""
+			try app_name := WinGetTitle("A")
+			KL_LogLlmDismissed(app_name, slots_snapshot)
+		}
+	}
 }
 
 /**
