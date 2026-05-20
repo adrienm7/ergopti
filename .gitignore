@@ -27,6 +27,10 @@ static/corpus/modifie/
 static/version.json
 version.json
 
+# Scratch / WIP folders (sub-agent runs, local experiments)
+.locale_work/
+.scratch/
+
 # Personal configuration files
 .claude/settings.local.json
 
