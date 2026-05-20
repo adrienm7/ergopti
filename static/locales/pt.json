@@ -833,6 +833,8 @@
 	"menu.profiles.header_custom_profiles": "PERFIS PERSONALIZADOS",
 	"menu.profiles.header_default_profiles": "PERFIS PADRÃO",
 	"menu.profiles.not_recommended": "  ⚠️ Não recomendado (Thinking)",
+	"menu.profiles.override_active_app_with_current": "➕ Usar o perfil atual para o app ativo",
+	"menu.profiles.per_app_overrides": "🪟 Perfis por aplicativo",
 	"menu.profiles.profile_label_prefix": "Perfil: %s",
 	"menu.profiles.prompt_label": "Nome do perfil:",
 	"menu.profiles.prompt_system_single": "Prompt de sistema (única geração):",

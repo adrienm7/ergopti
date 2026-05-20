@@ -832,6 +832,8 @@
 	"menu.profiles.header_custom_profiles": "自定义配置",
 	"menu.profiles.header_default_profiles": "默认配置",
 	"menu.profiles.not_recommended": "  ⚠️ 不推荐 (Thinking)",
+	"menu.profiles.override_active_app_with_current": "➕ 将当前配置用于活动应用",
+	"menu.profiles.per_app_overrides": "🪟 按应用的配置",
 	"menu.profiles.profile_label_prefix": "配置：%s",
 	"menu.profiles.prompt_label": "配置名称：",
 	"menu.profiles.prompt_system_single": "系统提示词（单次生成）：",

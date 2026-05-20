@@ -833,6 +833,8 @@
 	"menu.profiles.header_custom_profiles": "사용자 지정 프로필",
 	"menu.profiles.header_default_profiles": "기본 프로필",
 	"menu.profiles.not_recommended": "  ⚠️ 권장하지 않음 (Thinking)",
+	"menu.profiles.override_active_app_with_current": "➕ 현재 프로필을 활성 앱에 적용",
+	"menu.profiles.per_app_overrides": "🪟 앱별 프로필",
 	"menu.profiles.profile_label_prefix": "프로필: %s",
 	"menu.profiles.prompt_label": "프로필 이름:",
 	"menu.profiles.prompt_system_single": "시스템 프롬프트 (단일 생성):",

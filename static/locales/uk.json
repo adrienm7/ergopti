@@ -833,6 +833,8 @@
 	"menu.profiles.header_custom_profiles": "ВЛАСНІ ПРОФІЛІ",
 	"menu.profiles.header_default_profiles": "ПРОФІЛІ ЗА ЗАМОВЧУВАННЯМ",
 	"menu.profiles.not_recommended": "  ⚠️ Не рекомендується (Thinking)",
+	"menu.profiles.override_active_app_with_current": "➕ Використовувати поточний профіль для активної програми",
+	"menu.profiles.per_app_overrides": "🪟 Профілі за програмами",
 	"menu.profiles.profile_label_prefix": "Профіль: %s",
 	"menu.profiles.prompt_label": "Назва профілю:",
 	"menu.profiles.prompt_system_single": "Системний промпт (одна генерація):",

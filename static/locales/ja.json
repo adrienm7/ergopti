@@ -833,6 +833,8 @@
 	"menu.profiles.header_custom_profiles": "カスタムプロファイル",
 	"menu.profiles.header_default_profiles": "デフォルトプロファイル",
 	"menu.profiles.not_recommended": "  ⚠️ 推奨しません（Thinking）",
+	"menu.profiles.override_active_app_with_current": "➕ 現在のプロファイルをアクティブなアプリに適用",
+	"menu.profiles.per_app_overrides": "🪟 アプリ別プロファイル",
 	"menu.profiles.profile_label_prefix": "プロファイル: %s",
 	"menu.profiles.prompt_label": "プロファイル名:",
 	"menu.profiles.prompt_system_single": "システムプロンプト（単一生成）:",

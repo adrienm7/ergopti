@@ -107,6 +107,11 @@ global _LLM_Tray := Map(
 	; alternatives sequentially would be chaos. Disabled by default —
 	; the tooltip flow is the safer baseline.
 	"inline_autotype",            false,
+	; Per-app profile overrides. Map(app_name_lower -> profile_id).
+	; Resolved at fire time so the user can keep one global profile and
+	; override it just for Slack (short informal), VS Code (code), etc.
+	; Empty by default; populated via the per-app picker UI.
+	"app_profile_overrides",      Map(),
 	; When true, switching to a new model auto-picks the matching profile
 	; (raw / basic / advanced / batch_advanced) using the params count from
 	; models.json. Mirrors the HS get_recommended_profile_info heuristic so
@@ -228,6 +233,11 @@ LLM_Tray_Init(saved_opts := Map()) {
 	; Restore trigger shortcut hotkey
 	if (_LLM_Tray["trigger_shortcut"] != "")
 		LLM_Tray_ApplyTriggerShortcut(_LLM_Tray["trigger_shortcut"])
+
+	; Restore per-app profile overrides Map (defaults to empty when the
+	; config never carried the field).
+	if saved_opts.Has("app_profile_overrides") and (saved_opts["app_profile_overrides"] is Map)
+		_LLM_Tray["app_profile_overrides"] := saved_opts["app_profile_overrides"]
 
 	; Restore persisted remote API entries (lives in api_entries.json next to
 	; the main config.toml — kept separate because the array-of-maps shape
@@ -940,7 +950,59 @@ LLM_Tray_BuildProfileMenu() {
 	m.Add(auto_label, (*) => _LLM_Tray_ToggleAutoProfile())
 	if _LLM_Tray["auto_profile_for_model"]
 		m.Check(auto_label)
+
+	; Per-app profile overrides submenu — list current ones + "Override
+	; active app with active profile" / "Clear override for active app".
+	; The submenu opens lazily so we re-read the focused app each time.
+	m.Add()
+	per_app_menu := _LLM_Tray_BuildPerAppProfileMenu()
+	m.Add(t("menu.profiles.per_app_overrides"), per_app_menu)
 	return m
+}
+
+_LLM_Tray_BuildPerAppProfileMenu() {
+	global _LLM_Tray
+	sm := Menu()
+	overrides := _LLM_Tray["app_profile_overrides"]
+	; "Override active app with the currently-selected profile". Lazy
+	; closure so WinGetProcessName fires when the user clicks, not when
+	; the menu is built.
+	sm.Add(t("menu.profiles.override_active_app_with_current"),
+		(*) => _LLM_Tray_AddOverrideForActiveApp())
+	if (overrides is Map and overrides.Count > 0) {
+		sm.Add()
+		; List each override: "slack → informel"  + click clears it.
+		for app_name, profile_id in overrides {
+			captured_app := app_name
+			label := app_name . "  →  " . LLM_Tray_GetProfileLabel(profile_id)
+			sm.Add(label, (*) => _LLM_Tray_ClearOverrideFor(captured_app))
+		}
+	}
+	return sm
+}
+
+_LLM_Tray_AddOverrideForActiveApp() {
+	global _LLM_Tray
+	app := ""
+	try app := StrLower(WinGetProcessName("A"))
+	app := RegExReplace(app, "\.exe$", "")
+	if (app == "")
+		return
+	_LLM_Tray["app_profile_overrides"][app] := _LLM_Tray["profile_id"]
+	LLM_Tray_SaveConfig()
+	LLM_Engine_Init(LLM_Tray_BuildOpts())
+	LLM_Tray_Build()
+}
+
+_LLM_Tray_ClearOverrideFor(app_name) {
+	global _LLM_Tray
+	overrides := _LLM_Tray["app_profile_overrides"]
+	if !(overrides is Map) or !overrides.Has(app_name)
+		return
+	overrides.Delete(app_name)
+	LLM_Tray_SaveConfig()
+	LLM_Engine_Init(LLM_Tray_BuildOpts())
+	LLM_Tray_Build()
 }
 
 _LLM_Tray_ToggleAutoProfile() {
@@ -1912,7 +1974,9 @@ LLM_Tray_BuildOpts() {
 		"val_modifiers",           _LLM_Tray["val_modifiers"],
 		"backend",                 _LLM_Tray["backend"],
 		"api_entries",             _LLM_Tray["api_entries"],
-		"api_entry_id",            _LLM_Tray["api_entry_id"]
+		"api_entry_id",            _LLM_Tray["api_entry_id"],
+		"inline_autotype",         _LLM_Tray["inline_autotype"],
+		"app_profile_overrides",   _LLM_Tray["app_profile_overrides"]
 	)
 }
 

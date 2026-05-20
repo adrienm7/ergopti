@@ -833,6 +833,8 @@
 	"menu.profiles.header_custom_profiles": "NIESTANDARDOWE PROFILE",
 	"menu.profiles.header_default_profiles": "DOMYŚLNE PROFILE",
 	"menu.profiles.not_recommended": "  ⚠️ Niezalecane (Thinking)",
+	"menu.profiles.override_active_app_with_current": "➕ Użyj bieżącego profilu dla aktywnej aplikacji",
+	"menu.profiles.per_app_overrides": "🪟 Profile na aplikację",
 	"menu.profiles.profile_label_prefix": "Profil: %s",
 	"menu.profiles.prompt_label": "Nazwa profilu:",
 	"menu.profiles.prompt_system_single": "Prompt systemowy (jedno generowanie):",

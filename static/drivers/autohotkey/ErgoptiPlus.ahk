@@ -1463,6 +1463,16 @@ SaveFullConfig() {
     Updates.Push({ Section: "LLM", Key: "auto_profile_for_model", Value: _LLM_Tray["auto_profile_for_model"] ? "1" : "0" })
     Updates.Push({ Section: "LLM", Key: "onboarding_seen", Value: _LLM_Tray["onboarding_seen"] ? "1" : "0" })
     Updates.Push({ Section: "LLM", Key: "inline_autotype", Value: _LLM_Tray["inline_autotype"] ? "1" : "0" })
+    ; Per-app profile overrides — flat ``app=profile;app2=profile2`` so the
+    ; TOML writer doesn't need to support nested tables. The format keeps
+    ; the user's local config diffable.
+    _AppOverridesStr := ""
+    for _AppName, _AppProfileId in _LLM_Tray["app_profile_overrides"] {
+        if (_AppOverridesStr != "")
+            _AppOverridesStr .= ";"
+        _AppOverridesStr .= _AppName . "=" . _AppProfileId
+    }
+    Updates.Push({ Section: "LLM", Key: "app_profile_overrides", Value: _AppOverridesStr })
 
     ; Strict schema: rewrite from scratch so stale/unknown sections and keys
     ; are removed on each full save

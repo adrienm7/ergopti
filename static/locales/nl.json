@@ -833,6 +833,8 @@
 	"menu.profiles.header_custom_profiles": "AANGEPASTE PROFIELEN",
 	"menu.profiles.header_default_profiles": "STANDAARDPROFIELEN",
 	"menu.profiles.not_recommended": "  ⚠️ Niet aanbevolen (Thinking)",
+	"menu.profiles.override_active_app_with_current": "➕ Huidig profiel voor actieve app gebruiken",
+	"menu.profiles.per_app_overrides": "🪟 Profielen per app",
 	"menu.profiles.profile_label_prefix": "Profiel: %s",
 	"menu.profiles.prompt_label": "Profielnaam:",
 	"menu.profiles.prompt_system_single": "Systeemprompt (enkele generatie):",
