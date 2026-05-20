@@ -739,15 +739,15 @@ _LLM_Tray_LoadApiEntries() {
 		return
 	}
 	entries := []
-	; Scan for top-level {…} object blocks. The mini-JSON we write has flat
-	; string fields and no nested braces, so a naïve regex is enough — the
-	; defensive RegExMatch loop never escapes the array boundary.
-	pos := 1
-	while RegExMatch(raw, "s){[^{}]*}", &m, pos) {
+	; Split the array into top-level object blocks via a state-aware scanner
+	; (NOT a regex like ``{[^{}]*}``). A token that happens to contain a
+	; literal ``{`` or ``}`` would silently truncate one entry and shift the
+	; rest by one — a regression that's invisible until a user pastes an
+	; OAuth bearer token containing those characters.
+	for obj_str in _LLM_Tray_SplitJsonObjects(raw) {
 		obj := Map()
-		chunk := m[0]
 		for field in ["Id", "Name", "Provider", "BaseUrl", "Token", "Model"] {
-			if RegExMatch(chunk, '"' . field . '"\s*:\s*"((?:[^"\\]|\\.)*)"', &fm) {
+			if RegExMatch(obj_str, '"' . field . '"\s*:\s*"((?:[^"\\]|\\.)*)"', &fm) {
 				obj[field] := _LLM_TrayApiJsonUnescape(fm[1])
 			} else {
 				obj[field] := ""
@@ -761,7 +761,6 @@ _LLM_Tray_LoadApiEntries() {
 			obj["Token"] := LLM_ApiToken_Decrypt(obj["Token"])
 		if (obj["Id"] != "")
 			entries.Push(obj)
-		pos := m.Pos + m.Len
 	}
 	_LLM_Tray["api_entries"] := entries
 	; Re-anchor the active id only if it still exists; otherwise pick the
@@ -839,12 +838,91 @@ _LLM_TrayApiJsonEscape(s) {
 	return s
 }
 
+/**
+ * Splits a JSON array text into its top-level ``{...}`` object substrings,
+ * tracking string boundaries and backslash escapes so a literal ``{`` or
+ * ``}`` inside a token / URL never trips the split. Used by
+ * _LLM_Tray_LoadApiEntries.
+ *
+ * @param {string} raw - Raw file contents (typically the contents of api_entries.json).
+ * @returns {Array} Array of substrings, each one a complete ``{...}`` block.
+ */
+_LLM_Tray_SplitJsonObjects(raw) {
+	objects := []
+	n := StrLen(raw)
+	i := 1
+	while (i <= n) {
+		; Skip ahead to the next opening brace that's NOT inside a string.
+		start := 0
+		j := i
+		in_str := false
+		escape := false
+		while (j <= n) {
+			c := SubStr(raw, j, 1)
+			if escape {
+				escape := false
+			} else if (c == "\") {
+				escape := true
+			} else if (c == '"') {
+				in_str := !in_str
+			} else if (!in_str and c == "{") {
+				start := j
+				break
+			}
+			j += 1
+		}
+		if (start == 0)
+			break
+		; Scan from ``start`` to the matching close brace, tracking depth
+		; and string boundaries so braces inside strings don't count.
+		depth := 0
+		in_str := false
+		escape := false
+		k := start
+		end_at := 0
+		while (k <= n) {
+			c := SubStr(raw, k, 1)
+			if escape {
+				escape := false
+			} else if (c == "\") {
+				escape := true
+			} else if (c == '"') {
+				in_str := !in_str
+			} else if (!in_str) {
+				if (c == "{") {
+					depth += 1
+				} else if (c == "}") {
+					depth -= 1
+					if (depth == 0) {
+						end_at := k
+						break
+					}
+				}
+			}
+			k += 1
+		}
+		if (end_at == 0)
+			break   ; Malformed input — stop rather than loop forever.
+		objects.Push(SubStr(raw, start, end_at - start + 1))
+		i := end_at + 1
+	}
+	return objects
+}
+
 _LLM_TrayApiJsonUnescape(s) {
+	; Two-pass with a placeholder so an escaped backslash (``\\``) doesn't
+	; trick the subsequent passes. The naive ordering ``\n → newline ;
+	; \\ → \`` mis-handled input like ``\\n`` (escaped backslash + literal
+	; n): the first pass found ``\n`` inside ``\\n`` and consumed the
+	; backslash, leaving ``\<newline>`` instead of ``\n``. The placeholder
+	; is a Private-Use-Area codepoint that never appears in valid text.
+	PH := Chr(0xE000)
+	s := StrReplace(s, "\\", PH)
 	s := StrReplace(s, "\n", "`n")
 	s := StrReplace(s, "\r", "`r")
 	s := StrReplace(s, "\t", "`t")
 	s := StrReplace(s, '\"', '"')
-	s := StrReplace(s, "\\",  "\")
+	s := StrReplace(s, PH,   "\")
 	return s
 }
 
