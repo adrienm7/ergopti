@@ -76,10 +76,6 @@
 						<input type="radio" name="magickey" value="★" checked />
 						<span class="radio-label" id="s3-blackstar-label"></span>
 					</label>
-					<label class="radio-card" id="s3-star-card">
-						<input type="radio" name="magickey" value="*" />
-						<span class="radio-label" id="s3-star-label"></span>
-					</label>
 					<label class="radio-card" id="s3-ugrave-card">
 						<input type="radio" name="magickey" value="ù" />
 						<span class="radio-label" id="s3-ugrave-label"></span>
@@ -91,7 +87,7 @@
 					<label class="radio-card" id="s3-custom-card">
 						<input type="radio" name="magickey" value="__custom__" />
 						<span class="radio-label" id="s3-custom-label"></span>
-						<input type="text" id="s3-input" maxlength="3" />
+						<input type="text" id="s3-input" maxlength="3" value="*" />
 					</label>
 				</div>
 				<p class="hint" id="s3-hint"></p>
@@ -126,6 +122,11 @@
 			<div class="step hidden" id="step-5">
 				<h1 id="s5-title"></h1>
 				<p class="desc" id="s5-desc"></p>
+				<!-- Orange warning box mirroring the keylogger step. Tells the
+				     user that activating Ergopti gestures requires disabling
+				     certain macOS system gestures (otherwise 4-finger swipes
+				     etc. fire native shortcuts and never reach Hammerspoon). -->
+				<p class="warning" id="s5-warning"></p>
 				<div class="radio-group">
 					<label class="radio-card" id="s5-yes-card">
 						<input type="radio" name="gestures" value="yes" />
