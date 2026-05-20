@@ -718,6 +718,7 @@
 	"menu.llm.delete_model": "🗑️ Видалити цю модель із кешу",
 	"menu.llm.delete_model_body": "Справді видалити модель \"%s\" із локального кешу?",
 	"menu.llm.delete_model_cache": "🗑️ Видалити цю модель із кешу",
+	"menu.llm.download_model": "⬇️ Завантажити цю модель",
 	"menu.llm.delete_model_title": "Видалити модель?",
 	"menu.llm.delete_profile": "🗑️ Видалити…",
 	"menu.llm.digits": "Цифри",

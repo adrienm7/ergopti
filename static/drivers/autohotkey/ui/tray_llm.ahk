@@ -708,6 +708,9 @@ _LLM_Tray_BuildPerModelSubmenu(name, model, ollama_url, active) {
 	if LLM_IsModelInstalled(name) {
 		del_label := t("menu.llm.delete_model_cache")
 		sub.Add(del_label, _LLM_Tray_MakeDeleteCacheHandler(name))
+	} else {
+		dl_label := t("menu.llm.download_model")
+		sub.Add(dl_label, _LLM_Tray_MakeDownloadModelHandler(name))
 	}
 
 	sub.Add()  ; separator
@@ -820,6 +823,35 @@ _LLM_Tray_MakeSetModelHandler(name) {
 _LLM_Tray_MakeDeleteCacheHandler(name) {
 	captured := name
 	return (*) => _LLM_Tray_PromptDeleteCachedModel(captured)
+}
+
+_LLM_Tray_MakeDownloadModelHandler(name) {
+	captured := name
+	return (*) => _LLM_Tray_PullModel(captured)
+}
+
+/**
+ * Launches ``ollama pull <tag>`` in a visible cmd window so the user gets
+ * real-time download progress directly in the terminal. Resolves the Ollama
+ * tag from the catalogue display name first — identical to the warmup path.
+ * After the window closes the tray menu is rebuilt so the green dot appears.
+ *
+ * @param {string} name - Catalogue display name (e.g. "Qwen 2.5 3B").
+ */
+_LLM_Tray_PullModel(name) {
+	tag := LLM_ResolveOllamaTag(name)
+	if (tag == "") {
+		MsgBox(StrReplace(t("menu.llm.ollama_model_hint"), "%s", name), t("menu.llm.download_model"), "16")
+		return
+	}
+	; Open a persistent cmd window so the download progress (layer-by-layer
+	; progress bars) is fully visible. /k keeps it open after completion so
+	; the user can confirm the download succeeded before closing.
+	Run('cmd.exe /k ollama pull "' . tag . '"', , "")
+	; Rebuild after a short delay so the green dot appears once Ollama finishes
+	; (the user will close the window manually; this just keeps the menu fresh
+	; if they glance at it again while the terminal is still open).
+	SetTimer(() => LLM_Tray_Build(), -3000)
 }
 
 _LLM_Tray_MakeOpenUrlHandler(url) {

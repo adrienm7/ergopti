@@ -718,6 +718,7 @@
 	"menu.llm.delete_model": "🗑️ Bu modeli önbellekten kaldır",
 	"menu.llm.delete_model_body": "\"%s\" modelini yerel önbellekten gerçekten silmek istiyor musunuz?",
 	"menu.llm.delete_model_cache": "🗑️ Bu modeli önbellekten sil",
+	"menu.llm.download_model": "⬇️ Bu modeli indir",
 	"menu.llm.delete_model_title": "Model silinsin mi?",
 	"menu.llm.delete_profile": "🗑️ Sil…",
 	"menu.llm.digits": "Rakamlar",

@@ -718,6 +718,7 @@
 	"menu.llm.delete_model": "🗑️ इस मॉडल को कैश से हटाएं",
 	"menu.llm.delete_model_body": "क्या आप वास्तव में मॉडल \"%s\" को स्थानीय कैश से हटाना चाहते हैं?",
 	"menu.llm.delete_model_cache": "🗑️ इस मॉडल को कैश से हटाएं",
+	"menu.llm.download_model": "⬇️ इस मॉडल को डाउनलोड करें",
 	"menu.llm.delete_model_title": "मॉडल हटाएं?",
 	"menu.llm.delete_profile": "🗑️ हटाएं…",
 	"menu.llm.digits": "अंक",

@@ -718,6 +718,7 @@
 	"menu.llm.delete_model": "🗑️ Fjern denne modellen fra hurtigminne",
 	"menu.llm.delete_model_body": "Vil du virkelig slette modellen \"%s\" fra det lokale hurtigminnet?",
 	"menu.llm.delete_model_cache": "🗑️ Slett denne modellen fra hurtigminne",
+	"menu.llm.download_model": "⬇️ Last ned denne modellen",
 	"menu.llm.delete_model_title": "Slette modellen?",
 	"menu.llm.delete_profile": "🗑️ Slett…",
 	"menu.llm.digits": "Sifre",

@@ -718,6 +718,7 @@
 	"menu.llm.delete_model": "🗑️ Remove this model from cache",
 	"menu.llm.delete_model_body": "Do you really want to delete the model \"%s\" from the local cache?",
 	"menu.llm.delete_model_cache": "🗑️ Delete this model from cache",
+	"menu.llm.download_model": "⬇️ Download this model",
 	"menu.llm.delete_model_title": "Delete the model?",
 	"menu.llm.delete_profile": "🗑️ Delete…",
 	"menu.llm.digits": "Digits",
