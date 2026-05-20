@@ -812,6 +812,8 @@
 	"menu.paths.pick_prompt": "اختر مجلد الإعدادات",
 	"menu.paths.window_title": "مجلد الإعدادات — Ergopti",
 	"menu.profiles.auto_detect": "✨ الكشف التلقائي عن أفضل ملف شخصي",
+	"menu.profiles.clone_builtin": "✏️ استنساخ وتعديل هذا الملف الشخصي…",
+	"menu.profiles.copy_suffix": "(نسخة)",
 	"menu.profiles.create_profile": "إنشاء ملف شخصي مخصص…",
 	"menu.profiles.custom_profile_label": "ملف شخصي مخصص",
 	"menu.profiles.delete_confirm_body": "سيُحذف هذا الملف الشخصي المخصص نهائيًا.",

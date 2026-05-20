@@ -837,6 +837,19 @@ LLM_Tray_BuildProfileMenu() {
 	m.Add()
 	m.Add(t("menu.profiles.create_profile"), (*) => LLM_Tray_PromptCreateProfile())
 
+	; "Clone active built-in" — exposes the built-in system prompt for
+	; editing without requiring the user to type it from scratch. The
+	; built-in profiles in profiles.json are read-only by design (they're
+	; shared across drivers and any local edit would be overwritten on
+	; the next driver update); cloning them into a user profile is the
+	; supported way to customise their prompts.
+	active_id := _LLM_Tray["profile_id"]
+	is_builtin := (active_id == "raw" or active_id == "basic" or active_id == "advanced" or active_id == "batch_advanced")
+	if is_builtin {
+		clone_label := t("menu.profiles.clone_builtin")
+		m.Add(clone_label, (*) => LLM_Tray_CloneActiveBuiltinProfile())
+	}
+
 	; Auto-detect toggle: when ON, switching model in the model submenu also
 	; re-picks the matching profile based on the params count. Mirrors the
 	; HS get_recommended_profile_info path so the two drivers agree on what
@@ -1658,6 +1671,43 @@ LLM_Tray_PromptEditProfile(profile) {
 	LLM_Tray_SaveConfig()
 	LLM_Engine_Init(LLM_Tray_BuildOpts())
 	LLM_Tray_Build()
+}
+
+/**
+ * Clones the currently-active built-in profile into a new user profile
+ * pre-filled with the built-in's prompt, then opens the edit dialog so
+ * the user can tweak it. The new profile inherits the built-in label
+ * with a "(copy)" suffix and a fresh id so it never collides with the
+ * source. Used by the "Cloner ce profil par défaut…" menu entry which
+ * is the supported way to customise a built-in's system prompt.
+ */
+LLM_Tray_CloneActiveBuiltinProfile() {
+	global _LLM_Tray
+	src_id := _LLM_Tray["profile_id"]
+	; Pull the source profile from the live registry — covers the case
+	; where the user re-loaded profiles.json without restarting.
+	src_profile := LLM_GetActiveProfile(src_id, _LLM_Tray["user_profiles"])
+	if !IsObject(src_profile)
+		return
+	src_label := LLM_Tray_GetProfileLabel(src_id)
+	new_id    := "user_" . LLM_Tray_Slugify(src_label) . "_" . A_TickCount
+	new_label := src_label . " " . t("menu.profiles.copy_suffix")
+	new_profile := Map(
+		"id",                    new_id,
+		"label",                 new_label,
+		"system_single",         src_profile.Has("system_single")         ? src_profile["system_single"]         : "",
+		"system_multi",          src_profile.Has("system_multi")          ? src_profile["system_multi"]          : "",
+		"system_multi_template", src_profile.Has("system_multi_template") ? src_profile["system_multi_template"] : "",
+		"batch",                 src_profile.Has("batch") and src_profile["batch"] == true
+	)
+	_LLM_Tray["user_profiles"].Push(new_profile)
+	_LLM_Tray["profile_id"] := new_id
+	LLM_Tray_SaveConfig()
+	LLM_Engine_Init(LLM_Tray_BuildOpts())
+	LLM_Tray_Build()
+	; Immediately open the edit dialog so the user lands directly into
+	; what they wanted: a customisable copy of the built-in prompt.
+	LLM_Tray_PromptEditProfile(new_profile)
 }
 
 /**

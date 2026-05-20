@@ -812,6 +812,8 @@
 	"menu.paths.pick_prompt": "設定フォルダーを選択",
 	"menu.paths.window_title": "設定フォルダー — Ergopti",
 	"menu.profiles.auto_detect": "✨ 最適なプロファイルを自動検出",
+	"menu.profiles.clone_builtin": "✏️ このプロファイルを複製して編集…",
+	"menu.profiles.copy_suffix": "（コピー）",
 	"menu.profiles.create_profile": "カスタムプロファイルを作成…",
 	"menu.profiles.custom_profile_label": "カスタムプロファイル",
 	"menu.profiles.delete_confirm_body": "このカスタムプロファイルは完全に削除されます。",

@@ -133,17 +133,68 @@ local function build_profile_menu(deps, models_mgr)
 			title    = display_label .. (profile.description and ("  —  " .. profile.description) or "") .. extra,
 			checked  = (state.llm_active_profile == pid) or nil,
 			disabled = paused or nil,
-			fn       = not paused and function()
-				if type(deps.set_llm_profile) == "function" then
-					deps.set_llm_profile(pid)
-				else
-					state.llm_active_profile = pid
-					llm_mod.set_active_profile(pid)
-					sync_profiles(state)
-					pcall(deps.save_prefs)
-					pcall(deps.update_menu)
-				end
-			end or nil,
+			menu     = {
+				{
+					title   = i18n.get("menu.profiles.use_profile"),
+					checked = (state.llm_active_profile == pid) or nil,
+					fn      = not paused and function()
+						if type(deps.set_llm_profile) == "function" then
+							deps.set_llm_profile(pid)
+						else
+							state.llm_active_profile = pid
+							llm_mod.set_active_profile(pid)
+							sync_profiles(state)
+							pcall(deps.save_prefs)
+							pcall(deps.update_menu)
+						end
+					end or nil,
+				},
+				{
+					-- "Clone & edit" — the built-in profiles in profiles.json
+					-- ship with the driver and are read-only by design (any
+					-- local edit would be overwritten on the next update).
+					-- Cloning into a user profile is the supported way to
+					-- customise the prompt — same intent as the AHK twin's
+					-- LLM_Tray_CloneActiveBuiltinProfile helper.
+					title = i18n.get("menu.profiles.clone_builtin"),
+					fn    = not paused and function()
+						local src = profile
+						local copy = {
+							id                    = "user_" .. (src.id or "profile") .. "_" .. tostring(os.time()),
+							label                 = (src.label or src.id) .. " " .. i18n.get("menu.profiles.copy_suffix"),
+							system_single         = src.system_single or "",
+							system_multi          = src.system_multi or "",
+							system_multi_template = src.system_multi_template or "",
+							batch                 = src.batch == true,
+						}
+						state.llm_user_profiles = state.llm_user_profiles or {}
+						table.insert(state.llm_user_profiles, copy)
+						state.llm_active_profile = copy.id
+						sync_profiles(state)
+						pcall(deps.save_prefs)
+						pcall(deps.update_menu)
+						-- Open the edit dialog immediately so the user lands
+						-- in the prompt they can edit, not the menu.
+						if prompt_editor and type(prompt_editor.open) == "function" then
+							hs.timer.doAfter(0.1, function()
+								pcall(prompt_editor.open, copy, function(updated)
+									if type(updated) == "table" then
+										for j, p in ipairs(state.llm_user_profiles) do
+											if type(p) == "table" and p.id == updated.id then
+												state.llm_user_profiles[j] = updated
+												break
+											end
+										end
+										sync_profiles(state)
+										pcall(deps.save_prefs)
+										pcall(deps.update_menu)
+									end
+								end)
+							end)
+						end
+					end or nil,
+				},
+			},
 		})
 	end
 

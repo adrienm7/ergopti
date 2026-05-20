@@ -812,6 +812,8 @@
 	"menu.paths.pick_prompt": "설정 폴더를 선택하세요",
 	"menu.paths.window_title": "설정 폴더 — Ergopti",
 	"menu.profiles.auto_detect": "✨ 최적 프로필 자동 감지",
+	"menu.profiles.clone_builtin": "✏️ 이 프로필을 복제하여 편집…",
+	"menu.profiles.copy_suffix": "(복사본)",
 	"menu.profiles.create_profile": "사용자 지정 프로필 만들기…",
 	"menu.profiles.custom_profile_label": "사용자 지정 프로필",
 	"menu.profiles.delete_confirm_body": "이 사용자 지정 프로필이 영구적으로 삭제됩니다.",

@@ -811,6 +811,8 @@
 	"menu.paths.pick_prompt": "Select the configuration folder",
 	"menu.paths.window_title": "Configuration folder — Ergopti",
 	"menu.profiles.auto_detect": "✨ Automatically detect the best profile",
+	"menu.profiles.clone_builtin": "✏️ Clone & edit this profile…",
+	"menu.profiles.copy_suffix": "(copy)",
 	"menu.profiles.create_profile": "Create a custom profile…",
 	"menu.profiles.custom_profile_label": "Custom profile",
 	"menu.profiles.delete_confirm_body": "This custom profile will be permanently deleted.",

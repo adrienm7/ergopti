@@ -836,6 +836,8 @@
 	"menu.paths.pick_prompt": "कॉन्फ़िगरेशन फ़ोल्डर चुनें",
 	"menu.paths.window_title": "कॉन्फ़िगरेशन फ़ोल्डर — Ergopti",
 	"menu.profiles.auto_detect": "✨ सर्वोत्तम प्रोफ़ाइल स्वचालित रूप से पहचानें",
+	"menu.profiles.clone_builtin": "✏️ इस प्रोफ़ाइल को क्लोन करें और संपादित करें…",
+	"menu.profiles.copy_suffix": "(प्रति)",
 	"menu.profiles.create_profile": "कस्टम प्रोफ़ाइल बनाएँ…",
 	"menu.profiles.custom_profile_label": "कस्टम प्रोफ़ाइल",
 	"menu.profiles.delete_confirm_body": "यह कस्टम प्रोफ़ाइल स्थायी रूप से हटा दी जाएगी।",

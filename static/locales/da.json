@@ -836,6 +836,8 @@
 	"menu.paths.pick_prompt": "Vælg konfigurationsmappen",
 	"menu.paths.window_title": "Konfigurationsmappe — Ergopti",
 	"menu.profiles.auto_detect": "✨ Detektér automatisk det bedste profil",
+	"menu.profiles.clone_builtin": "✏️ Klon og rediger denne profil…",
+	"menu.profiles.copy_suffix": "(kopi)",
 	"menu.profiles.create_profile": "Opret et brugerdefineret profil…",
 	"menu.profiles.custom_profile_label": "Brugerdefineret profil",
 	"menu.profiles.delete_confirm_body": "Dette brugerdefinerede profil vil blive slettet permanent.",

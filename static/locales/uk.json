@@ -812,6 +812,8 @@
 	"menu.paths.pick_prompt": "Виберіть папку конфігурації",
 	"menu.paths.window_title": "Папка конфігурації — Ergopti",
 	"menu.profiles.auto_detect": "✨ Автоматично визначити найкращий профіль",
+	"menu.profiles.clone_builtin": "✏️ Клонувати та змінити цей профіль…",
+	"menu.profiles.copy_suffix": "(копія)",
 	"menu.profiles.create_profile": "Створити власний профіль…",
 	"menu.profiles.custom_profile_label": "Власний профіль",
 	"menu.profiles.delete_confirm_body": "Цей власний профіль буде видалено без можливості відновлення.",

@@ -812,6 +812,8 @@
 	"menu.paths.pick_prompt": "Seleziona la cartella di configurazione",
 	"menu.paths.window_title": "Cartella configurazione — Ergopti",
 	"menu.profiles.auto_detect": "✨ Rileva automaticamente il profilo migliore",
+	"menu.profiles.clone_builtin": "✏️ Clona e modifica questo profilo…",
+	"menu.profiles.copy_suffix": "(copia)",
 	"menu.profiles.create_profile": "Crea un profilo personalizzato…",
 	"menu.profiles.custom_profile_label": "Profilo personalizzato",
 	"menu.profiles.delete_confirm_body": "Questo profilo personalizzato verrà eliminato definitivamente.",

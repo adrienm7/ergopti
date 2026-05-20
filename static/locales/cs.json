@@ -812,6 +812,8 @@
 	"menu.paths.pick_prompt": "Vyberte konfigurační složku",
 	"menu.paths.window_title": "Konfigurační složka — Ergopti",
 	"menu.profiles.auto_detect": "✨ Automaticky detekovat nejlepší profil",
+	"menu.profiles.clone_builtin": "✏️ Klonovat a upravit tento profil…",
+	"menu.profiles.copy_suffix": "(kopie)",
 	"menu.profiles.create_profile": "Vytvořit vlastní profil…",
 	"menu.profiles.custom_profile_label": "Vlastní profil",
 	"menu.profiles.delete_confirm_body": "Tento vlastní profil bude trvale smazán.",
