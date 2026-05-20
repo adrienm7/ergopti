@@ -98,10 +98,12 @@ M.PROVIDERS = {
 		default_model = "deepseek-chat",
 		format        = "openai",
 	},
-	-- Cohere: speaks OpenAI Chat Completions via the v2 /chat route.
+	-- Cohere: exposes an OpenAI-compatible Chat Completions route at
+	-- ``/compatibility/v1`` (NOT the native ``/v2/chat`` route, which has a
+	-- different schema). Pointing at /v2 returned 404 on every request.
 	cohere = {
 		label         = "Cohere",
-		base_url      = "https://api.cohere.com/v2",
+		base_url      = "https://api.cohere.ai/compatibility/v1",
 		default_model = "command-r7b-12-2024",
 		format        = "openai",
 	},

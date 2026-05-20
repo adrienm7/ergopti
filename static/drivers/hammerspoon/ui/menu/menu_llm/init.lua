@@ -1350,33 +1350,47 @@ function M.create(deps)
                                 model    = (model ~= "" and model) or p.default_model,
                                 label    = (label ~= "" and label) or p.label,
                             }
+                            local previous_active_id = api_remote.get_active_entry_id and api_remote.get_active_entry_id() or ""
                             local list = api_remote.get_entries() or {}
                             local clone = {}
                             for _, x in ipairs(list) do table.insert(clone, x) end
                             table.insert(clone, new_entry)
+                            -- Stage the entry in memory only — DO NOT persist
+                            -- yet. check_availability needs an active entry to
+                            -- probe credentials against, but we don't want to
+                            -- write a bad token into the Keychain. Persist
+                            -- only on success; on failure, roll the in-memory
+                            -- state back so the menu mirrors disk.
                             api_remote.set_entries(clone)
                             api_remote.set_active_entry_id(id)
-                            pcall(llm_mod.persist_api_entries)
-                            pcall(llm_mod.warmup_model, llm_mod.get_current_model())
                             update_menu()
-                            -- Validate the credentials immediately so the user
-                            -- finds out NOW whether the token + URL + model
-                            -- combo works, instead of mid-typing with an
-                            -- empty tooltip and no idea why. check_availability
-                            -- is async (no menu freeze) and the result is
-                            -- surfaced via a notification.
                             api_remote.check_availability(new_entry.model,
                                 function()
+                                    -- Credentials accepted — NOW persist + warmup.
+                                    pcall(llm_mod.persist_api_entries)
+                                    pcall(llm_mod.warmup_model, llm_mod.get_current_model())
                                     pcall(notifications.notify,
-                                        string.format(i18n.get("menu.llm.api_validated_title")),
+                                        i18n.get("menu.llm.api_validated_title"),
                                         string.format(i18n.get("menu.llm.api_validated_body"), new_entry.label),
                                         "success")
                                 end,
-                                function(unreachable)
+                                function(_unreachable)
+                                    -- Validation failed: roll the in-memory
+                                    -- list back so the bogus token never lands
+                                    -- in Keychain. The user sees the menu
+                                    -- snap back to its previous state and a
+                                    -- toast explaining why.
+                                    local rolled = {}
+                                    for _, x in ipairs(api_remote.get_entries() or {}) do
+                                        if x.id ~= id then table.insert(rolled, x) end
+                                    end
+                                    api_remote.set_entries(rolled)
+                                    api_remote.set_active_entry_id(previous_active_id)
                                     pcall(notifications.notify,
                                         i18n.get("menu.llm.api_unreachable_title"),
                                         string.format(i18n.get("menu.llm.api_unreachable_body"), new_entry.label),
                                         "warning")
+                                    pcall(update_menu)
                                 end)
                         end or nil,
                     })

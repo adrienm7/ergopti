@@ -38,6 +38,19 @@ local KEYCHAIN_PREFIX = "keychain:"
 -- apps use (one service per app, one account per credential).
 local KEYCHAIN_SERVICE = "org.ergopti.llm-api-token"
 
+-- Wrap an argument in single quotes for the shell. ``security`` does not
+-- care about whitespace in arguments but treats most shell metacharacters
+-- as themselves; single-quoting is the safest way to ship arbitrary
+-- token bytes (which include base64 ``/`` and ``+``). Defined here as
+-- ``local`` (was an accidental global in an earlier revision, polluting
+-- ``_G`` and racing with any other module defining the same name).
+local function quote_shell(s)
+	s = tostring(s or "")
+	-- Escape any embedded single quotes by closing + concatenating +
+	-- reopening: ' → '\''
+	return "'" .. s:gsub("'", "'\\''") .. "'"
+end
+
 
 
 
@@ -71,15 +84,30 @@ function M.encrypt(entry_id, cleartext)
 	if M.is_encrypted(cleartext) then return cleartext end
 
 	-- ``security add-generic-password`` writes the token; -U updates
-	-- when the entry already exists. The token is passed via stdin to
-	-- avoid leaking it into the process command line.
-	local cmd = string.format(
-		"/usr/bin/security add-generic-password -U -a %s -s %s -w %s",
-		_quote(entry_id), _quote(KEYCHAIN_SERVICE), _quote(cleartext))
-	local out, ok, _kind, rc = hs.execute(cmd)
-	if not ok then
-		Logger.warn(LOG, "Keychain write failed (rc=%s) — token kept in plaintext on disk.",
-			tostring(rc))
+	-- when the entry already exists. The token is piped via stdin (NOT
+	-- placed in argv) so it doesn't show up in ``ps`` listings — the
+	-- security(1) man page documents that `-w` with no value reads the
+	-- password from stdin. hs.task with setInput is the cleanest way to
+	-- do that synchronously from Hammerspoon.
+	local task = hs.task.new("/usr/bin/security", nil, {
+		"add-generic-password", "-U",
+		"-a", entry_id,
+		"-s", KEYCHAIN_SERVICE,
+		"-w",
+	})
+	if not task then
+		Logger.warn(LOG, "hs.task.new failed — token kept in plaintext on disk.")
+		return cleartext
+	end
+	task:setInput(cleartext)
+	if not task:start() then
+		Logger.warn(LOG, "Keychain task start failed — token kept in plaintext on disk.")
+		return cleartext
+	end
+	task:waitUntilExit()
+	local rc = task:terminationStatus() or -1
+	if rc ~= 0 then
+		Logger.warn(LOG, "Keychain write failed (rc=%d) — token kept in plaintext on disk.", rc)
 		return cleartext
 	end
 	return KEYCHAIN_PREFIX .. entry_id
@@ -95,10 +123,11 @@ function M.decrypt(stored)
 	if not M.is_encrypted(stored) then return stored end
 	local entry_id = stored:sub(#KEYCHAIN_PREFIX + 1)
 	-- ``security find-generic-password -w`` prints just the password to
-	-- stdout when the account+service match.
+	-- stdout when the account+service match. Read-only path is fine via
+	-- argv since there's no secret material in the arguments themselves.
 	local cmd = string.format(
 		"/usr/bin/security find-generic-password -a %s -s %s -w",
-		_quote(entry_id), _quote(KEYCHAIN_SERVICE))
+		quote_shell(entry_id), quote_shell(KEYCHAIN_SERVICE))
 	local out, ok = hs.execute(cmd)
 	if not ok or not out or out == "" then
 		Logger.warn(LOG, "Keychain read failed for entry '%s'.", tostring(entry_id))
@@ -114,28 +143,12 @@ function M.delete(entry_id)
 	if type(entry_id) ~= "string" or entry_id == "" then return end
 	local cmd = string.format(
 		"/usr/bin/security delete-generic-password -a %s -s %s",
-		_quote(entry_id), _quote(KEYCHAIN_SERVICE))
-	pcall(hs.execute, cmd)
-end
-
-
-
-
--- ====================================
--- ====================================
--- ======= 2/ Helpers =================
--- ====================================
--- ====================================
-
--- Wrap an argument in single quotes for the shell. ``security`` does not
--- care about whitespace in arguments but treats most shell metacharacters
--- as themselves; single-quoting is the safest way to ship arbitrary
--- token bytes (which include base64 ``/`` and ``+``).
-function _quote(s)
-	s = tostring(s or "")
-	-- Escape any embedded single quotes by closing + concatenating +
-	-- reopening: ' → '\''
-	return "'" .. s:gsub("'", "'\\''") .. "'"
+		quote_shell(entry_id), quote_shell(KEYCHAIN_SERVICE))
+	local _out, ok, _kind, rc = hs.execute(cmd)
+	if not ok then
+		Logger.warn(LOG, "Keychain delete failed for entry '%s' (rc=%s).",
+			tostring(entry_id), tostring(rc))
+	end
 end
 
 return M
