@@ -233,13 +233,28 @@ LLM_Deps_DoCheck(default_model, on_ready, on_failed, show_ui) {
 LLM_Deps_RunInstaller(model, on_ready, on_failed) {
 	global _LLM_Deps_PollTimer, _LLM_Deps_Checking
 
+	; Boost AHK's own priority BEFORE we kick the installer off. Any heavy
+	; download — winget, the browser's download manager, the OllamaSetup
+	; exe itself — contests CPU and disk with the AHK message loop. If
+	; AHK loses scheduling slots, the PrefixWatcher's InputHook misses
+	; OnChar callbacks and characters get silently dropped from the
+	; user's typing. Pinning AHK to High keeps the keyboard responsive
+	; even when the OS is otherwise saturated.
+	try ProcessSetPriority("High")
+
 	; Try winget first — runs the real Ollama installer with its native
 	; UI, so the user gets familiar progress and UAC prompts.
 	winget_available := _LLM_Deps_HasWinget()
 	if winget_available {
-		LoggerInfo("LLM", "Handing off to winget install Ollama.Ollama…")
+		LoggerInfo("LLM", "Handing off to winget install Ollama.Ollama (BelowNormal priority)…")
 		try {
-			Run('winget install --id Ollama.Ollama -e --accept-package-agreements --accept-source-agreements')
+			; ``start /LOW /B`` launches winget in BelowNormal priority,
+			; isolated from the AHK process tree (/B = no new console
+			; window). That keeps the bandwidth saturation while the
+			; download runs from starving AHK's input pipeline of CPU
+			; ticks — the typing experience stays smooth even on a
+			; modest machine.
+			Run('cmd.exe /c start /LOW /B winget install --id Ollama.Ollama -e --accept-package-agreements --accept-source-agreements', , "Hide")
 		} catch as err {
 			LoggerError("LLM", "winget launch failed: " err.Message ".")
 			winget_available := false
@@ -297,6 +312,11 @@ LLM_Deps_PollServerReady(on_ready, on_failed) {
 		SetTimer(_LLM_Deps_PollTimer, 0)
 	_LLM_Deps_State    := "ready"
 	_LLM_Deps_Checking := false
+	; Drop AHK back to Normal priority — we boosted it in RunInstaller
+	; to keep typing responsive while the installer ran; with the
+	; install done, there's no reason to keep stealing CPU from other
+	; apps.
+	try ProcessSetPriority("Normal")
 	try OllamaWV_Close()
 	if IsSet(on_ready)
 		on_ready()
@@ -350,6 +370,9 @@ LLM_Deps_Cancel() {
 	; State stays "pending" — the user explicitly aborted, but the next
 	; toggle ON should be able to retry the install cleanly.
 	_LLM_Deps_State := "pending"
+	; Restore Normal priority — the install was running with AHK in
+	; High priority. Cancelling means we no longer need the boost.
+	try ProcessSetPriority("Normal")
 }
 
 /**
