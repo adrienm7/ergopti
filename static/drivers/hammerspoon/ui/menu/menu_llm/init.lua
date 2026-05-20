@@ -1130,7 +1130,7 @@ function M.create(deps)
         local backend_menu = {}
 
         table.insert(backend_menu, {
-            title    = "MLX 🚀 — Recommandé (natif Mac, ultra-rapide)",
+            title    = "MLX 🚀 — " .. i18n.get("menu.llm.backend_mlx_suffix"),
             checked  = (state.llm_backend == "mlx"),
             disabled = (not is_apple_silicon) or paused or nil,
             fn       = not paused and function()
@@ -1175,7 +1175,7 @@ function M.create(deps)
         })
 
         table.insert(backend_menu, {
-            title    = "Ollama 🦙 — Standard (idéal si MLX est indisponible)",
+            title    = "Ollama 🦙 — " .. i18n.get("menu.llm.backend_ollama_suffix"),
             checked  = (state.llm_backend == "ollama"),
             disabled = paused or nil,
             fn       = not paused and function()
@@ -1219,7 +1219,7 @@ function M.create(deps)
         -- top-level row built below: this entry only flips the backend so the
         -- prediction engine routes through ApiRemote on the next request.
         table.insert(backend_menu, {
-            title    = "API 🌐 — Distant (OpenAI / Anthropic / Gemini / OpenAI-compatible)",
+            title    = "API 🌐 — " .. i18n.get("menu.llm.backend_api_suffix"),
             checked  = (state.llm_backend == "api"),
             disabled = paused or nil,
             fn       = not paused and function()

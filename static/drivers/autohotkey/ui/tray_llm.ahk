@@ -198,7 +198,7 @@ LLM_Tray_Init(saved_opts := Map()) {
 	static _num_keys := ["n_predictions", "min_words", "max_words", "debounce_ms", "ctx_chars", "pred_indent"]
 	static _bool_keys := ["enabled", "instant_on_word_end", "after_hotstring", "reset_on_nav",
 		"disable_url_bars", "disable_password_fields", "show_info_bar", "streaming",
-		"show_all_at_once", "auto_raise_temp", "auto_profile_for_model"]
+		"show_all_at_once", "auto_raise_temp", "auto_profile_for_model", "onboarding_seen"]
 	static _arr_keys := ["user_profiles", "disabled_apps"]
 
 	for key in _str_keys
@@ -228,6 +228,13 @@ LLM_Tray_Init(saved_opts := Map()) {
 	; covers both fresh boots and post-Reload paths since LLM_Tray_Init is
 	; the only entry into the tray module.
 	LLM_Tray_BindProfileHotkeys()
+
+	; First-run onboarding: when the LLM feature has never been enabled
+	; on this install, fire a single tray notification suggesting the
+	; user to try it. The discovery is otherwise hidden behind a menu
+	; the user has to open intentionally. The flag in [LLM] persists
+	; across reloads so we never nag past the first run.
+	_LLM_Tray_MaybeShowOnboarding()
 
 	LLM_Tray_Build()
 
@@ -367,9 +374,18 @@ LLM_Tray_Build() {
 LLM_Tray_BuildBackendMenu() {
 	global _LLM_Tray
 	m := Menu()
+	; Hardcoded brand prefix per backend — name + emoji + em-dash. Only
+	; the localised descriptive suffix (e.g. "Standard" / "fournisseur
+	; distant") lives in the i18n catalogue; the rest is the same in
+	; every language and would just be noise to translate.
+	static _backend_prefix := Map(
+		"ollama", "Ollama 🦙 — ",
+		"api",    "API 🌐 — "
+	)
 	for backend_id in LLM_TRAY_BACKEND_OPTIONS {
 		captured_id := backend_id
-		label := t("menu.llm.backend_" backend_id)
+		prefix := _backend_prefix.Has(backend_id) ? _backend_prefix[backend_id] : ""
+		label := prefix . t("menu.llm.backend_" backend_id "_suffix")
 		m.Add(label, (name, pos, menu) => LLM_Tray_SetBackend(captured_id))
 		if (backend_id == _LLM_Tray["backend"])
 			m.Check(label)
@@ -1250,6 +1266,25 @@ LLM_Tray_SetModel(tag) {
  * menu rebuild paints the dot accordingly. Mirrors the HS
  * ``probe_llm_health`` helper — fire-and-forget, paint on the next pass.
  */
+_LLM_Tray_MaybeShowOnboarding() {
+	global _LLM_Tray
+	if _LLM_Tray["enabled"]
+		return
+	; Persisted flag — once shown, never again. The flag lives in [LLM]
+	; alongside the other tray settings so a config reset (which wipes
+	; everything) re-arms the onboarding too, which is the right
+	; behaviour: a fresh-out-of-the-box state should re-introduce the
+	; feature.
+	if _LLM_Tray.Has("onboarding_seen") and _LLM_Tray["onboarding_seen"]
+		return
+	_LLM_Tray["onboarding_seen"] := true
+	LLM_Tray_SaveConfig()
+	; Defer the TrayTip slightly so it lands after the bundle finishes
+	; initialising — firing it during the require chain shows up before
+	; the tray icon itself, which looks broken.
+	SetTimer(() => TrayTip(t("menu.llm.onboarding_body"), t("menu.llm.onboarding_title"), "Iconi"), -2000)
+}
+
 _LLM_Tray_FireHealthProbe() {
 	global _LLM_Tray
 	; Only probe Ollama for now. The API backend has its own readiness path
