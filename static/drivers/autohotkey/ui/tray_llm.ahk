@@ -275,12 +275,18 @@ LLM_Tray_Build() {
 	; Model submenu — prefix the label with a backend-health dot so the user
 	; can tell at a glance whether the active backend is reachable, mirroring
 	; HS's ui/menu/menu_llm/init.lua build_model_item (the "health_dot" block).
-	; 🟢 = backend ready (e.g. Ollama answered the latest probe), 🔴 = either
-	; not running or unreachable, "" when the feature is disabled entirely so
-	; the dot does not nag while the user is intentionally off.
+	; 🟢 = backend answered the latest async probe, 🔴 = either not running
+	; or unreachable, "" when the feature is disabled entirely so the dot
+	; does not nag while the user is intentionally off.
+	;
+	; The probe itself fires async every time the menu is rebuilt — the
+	; dot paints with the previously-cached status and the next rebuild
+	; reflects the new one. Same pattern as HS's probe_llm_health.
 	model_menu := LLM_Tray_BuildModelMenu()
+	_LLM_Tray_FireHealthProbe()
+	last_status := _LLM_Tray.Has("last_health_status") ? _LLM_Tray["last_health_status"] : ""
 	health_dot := _llm_is_operational
-		? (LLM_Deps_IsReady() ? "🟢 " : "🔴 ")
+		? ((last_status == "ok") ? "🟢 " : (last_status == "ko") ? "🔴 " : "")
 		: ""
 	_LLM_Tray_Menu.Add(
 		health_dot . StrReplace(t("menu.llm.model_label"), "%s", _LLM_Tray["model"]),
@@ -1217,7 +1223,45 @@ LLM_Tray_SetModel(tag) {
 	LLM_Tray_AutoApplyProfileForModel()
 	LLM_Tray_SaveConfig()
 	LLM_Engine_Init(LLM_Tray_BuildOpts())
+	; Pre-load the new model into Ollama's GPU cache asynchronously so the
+	; first real prediction skips the cold-start penalty. No-op for the
+	; remote API backend — there's no local server to warm.
+	if (_LLM_Tray["backend"] == "ollama") {
+		try LLM_OllamaWarmup(LLM_ResolveOllamaTag(tag))
+	}
 	LLM_Tray_Build()
+}
+
+/**
+ * Fires an async backend health probe and stashes the result so the next
+ * menu rebuild paints the dot accordingly. Mirrors the HS
+ * ``probe_llm_health`` helper — fire-and-forget, paint on the next pass.
+ */
+_LLM_Tray_FireHealthProbe() {
+	global _LLM_Tray
+	; Only probe Ollama for now. The API backend has its own readiness path
+	; (the per-entry ping in api_remote.ahk) and the user-facing health dot
+	; for a remote provider depends on the same probe, which we can layer
+	; on in a follow-up without touching this scaffolding.
+	if (_LLM_Tray["backend"] != "ollama")
+		return
+	if !_LLM_Tray["enabled"]
+		return
+	try {
+		LLM_OllamaIsRunning_Async((reachable) => _LLM_Tray_OnHealthProbeDone(reachable))
+	}
+}
+
+_LLM_Tray_OnHealthProbeDone(reachable) {
+	global _LLM_Tray
+	prev := _LLM_Tray.Has("last_health_status") ? _LLM_Tray["last_health_status"] : ""
+	new_status := reachable ? "ok" : "ko"
+	_LLM_Tray["last_health_status"] := new_status
+	; Only repaint when the status actually flipped — avoids an infinite
+	; rebuild loop and keeps the menu stable when the user is not staring
+	; at it.
+	if (prev != new_status)
+		LLM_Tray_Build()
 }
 
 LLM_Tray_SetProfile(id) {
@@ -1854,8 +1898,14 @@ _LLM_Tray_OnProfileHotkey(idx) {
 LLM_Tray_OnDepsReady() {
 	global _LLM_Tray
 	LLM_Tray_Build()
-	if _LLM_Tray["enabled"]
+	if _LLM_Tray["enabled"] {
 		LLM_Tray_StartBridge()
+		; Prime the current model so the first user keystroke does not
+		; pay the cold-start penalty. Async — no blocking on Build.
+		if (_LLM_Tray["backend"] == "ollama" and _LLM_Tray["model"] != "") {
+			try LLM_OllamaWarmup(LLM_ResolveOllamaTag(_LLM_Tray["model"]))
+		}
+	}
 }
 
 /**
