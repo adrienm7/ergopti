@@ -126,9 +126,17 @@ LLM_OllamaIsRunning_Async(on_result) {
 	try {
 		http := ComObject("WinHttp.WinHttpRequest.5.1")
 		http.Open("GET", LLM_OLLAMA_BASE_URL "/api/version", true)
-		http.SetTimeouts(2000, 2000, 2000, 2000)
+		; 1 s timeouts (was 2 s × 4 phases = 8 s worst case). A local
+		; Ollama answers in < 50 ms; if it doesn't reply within a single
+		; second the daemon is unreachable and there's nothing to gain
+		; from waiting longer.
+		http.SetTimeouts(1000, 1000, 1000, 1000)
 		http.Send()
-		_LLM_Ollama_PollGeneric(http, (status, _body) => on_result(status == 200), () => on_result(false))
+		; Use ``poll_ms = 500`` for the health probe — we don't need 50 ms
+		; reactivity for a check that fires every 10 s, and the tighter
+		; loop was firing ~60 timer callbacks per probe, contesting the
+		; message loop with the InputHook and dropping user keystrokes.
+		_LLM_Ollama_PollGeneric(http, (status, _body) => on_result(status == 200), () => on_result(false), 0, 500)
 	} catch {
 		try on_result(false)
 	}
@@ -294,12 +302,39 @@ _LLM_OllamaParseAsyncBody(body, on_success, on_fail) {
 /**
  * Generic async poll for non-/api/generate requests (e.g. health probe).
  * Calls ``on_ok(status, body)`` on response received, ``on_err()`` otherwise.
+ *
+ * The ``deadline`` argument is the absolute A_TickCount at which we MUST
+ * give up — without it, a WinHTTP request whose ``WaitForResponse(0)``
+ * never flips ``true`` (the COM proxy silently breaks under heavy load,
+ * or the server is unreachable AND WinHTTP fails to honour its own
+ * timeout) would re-arm ``SetTimer`` every 50 ms forever. With Ollama
+ * not installed, the 10 s tray health probe paired with that unbounded
+ * poll produced a continuous stream of timer callbacks that saturated
+ * the AHK message loop and caused the InputHook to drop keystrokes —
+ * the user's typing felt like characters were being eaten at random.
  */
-_LLM_Ollama_PollGeneric(http, on_ok, on_err) {
+_LLM_Ollama_PollGeneric(http, on_ok, on_err, deadline := 0, poll_ms := 0) {
+	; First entry — compute the deadline once and bind it to subsequent
+	; ticks. 3000 ms is generous enough for any local Ollama call (the
+	; WinHTTP per-phase timeout is 2 s) but short enough to guarantee
+	; the timer chain ends within a few hundred milliseconds of the
+	; underlying request actually failing.
+	if (deadline == 0)
+		deadline := A_TickCount + 3000
+	; Default poll cadence — callers that don't care use LLM_OLLAMA_POLL_MS
+	; (50 ms, optimal for prediction latency). The health probe overrides
+	; this with 500 ms because reactivity on a 10 s timer is irrelevant.
+	if (poll_ms == 0)
+		poll_ms := LLM_OLLAMA_POLL_MS
+
 	ready := false
 	try ready := http.WaitForResponse(0)
 	if !ready {
-		SetTimer(() => _LLM_Ollama_PollGeneric(http, on_ok, on_err), -LLM_OLLAMA_POLL_MS)
+		if (A_TickCount >= deadline) {
+			try on_err()
+			return
+		}
+		SetTimer(() => _LLM_Ollama_PollGeneric(http, on_ok, on_err, deadline, poll_ms), -poll_ms)
 		return
 	}
 	try {
