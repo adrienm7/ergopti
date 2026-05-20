@@ -245,16 +245,19 @@ LLM_Deps_RunInstaller(model, on_ready, on_failed) {
 	; Try winget first — runs the real Ollama installer with its native
 	; UI, so the user gets familiar progress and UAC prompts.
 	winget_available := _LLM_Deps_HasWinget()
+	LoggerInfo("LLM", "winget available: " (winget_available ? "yes" : "no") ".")
 	if winget_available {
 		LoggerInfo("LLM", "Handing off to winget install Ollama.Ollama (BelowNormal priority)…")
 		try {
-			; ``start /LOW /B`` launches winget in BelowNormal priority,
-			; isolated from the AHK process tree (/B = no new console
-			; window). That keeps the bandwidth saturation while the
-			; download runs from starving AHK's input pipeline of CPU
-			; ticks — the typing experience stays smooth even on a
-			; modest machine.
-			Run('cmd.exe /c start /LOW /B winget install --id Ollama.Ollama -e --accept-package-agreements --accept-source-agreements', , "Hide")
+			; ``start /LOW`` launches winget in BelowNormal priority.
+			; We DO want a console window (no ``/B``) — winget prints
+			; live progress there, otherwise the user has no feedback
+			; that anything is happening. The window closes on its own
+			; once winget exits. Setting ``"Hide"`` on the parent cmd
+			; keeps that wrapper invisible; only winget's own window
+			; is shown.
+			Run('cmd.exe /c start "Ollama install" /LOW winget install --id Ollama.Ollama -e --accept-package-agreements --accept-source-agreements', , "Hide")
+			LoggerInfo("LLM", "winget command launched.")
 		} catch as err {
 			LoggerError("LLM", "winget launch failed: " err.Message ".")
 			winget_available := false
@@ -285,13 +288,18 @@ LLM_Deps_RunInstaller(model, on_ready, on_failed) {
 /**
  * Returns true when winget is on PATH. We use it to decide between the
  * automated install path and the browser fallback.
+ *
+ * Reads RunWait's return value — that IS the exit code. Previous
+ * revision tested ``A_LastError`` instead, which is the LAST WINAPI
+ * error set by any AHK call (often unrelated to the child process),
+ * so the check effectively always returned the wrong answer and the
+ * winget branch was either always or never taken depending on
+ * preceding API noise.
  */
 _LLM_Deps_HasWinget() {
 	try {
-		out := ""
-		; Hide=true and timeout-protected; we only care about the exit code
-		RunWait('cmd.exe /c where winget >nul 2>&1', , "Hide")
-		return A_LastError == 0
+		exit_code := RunWait('cmd.exe /c where winget >nul 2>&1', , "Hide")
+		return exit_code == 0
 	} catch {
 		return false
 	}
