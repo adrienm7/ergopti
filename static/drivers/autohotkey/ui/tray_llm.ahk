@@ -267,11 +267,29 @@ LLM_Tray_Init(saved_opts := Map()) {
 
 	LLM_Tray_Build()
 
-	; Bootstrap Ollama silently on reload when the feature was already enabled.
-	; show_ui=false so the install window never opens automatically — the user
-	; must click the menu toggle to trigger a visible installation.
-	if _LLM_Tray["enabled"]
-		SetTimer(() => LLM_Tray_BootstrapOllama(false), -1)
+	; Bootstrap the active backend on reload when the feature was already enabled.
+	; * Backend = ollama:
+	;     - if Ollama is reachable → silent fast-path (show_ui=false), just
+	;       starts the bridge.
+	;     - if Ollama is NOT reachable → resume the install with the UI
+	;       visible (show_ui=true). The user explicitly enabled the feature
+	;       at some point; if the bundle crashed mid-install or the daemon
+	;       was uninstalled, we want them to SEE the install resume instead
+	;       of staring at a silently-broken toggle.
+	;       Probe synchronously here so we pick the right show_ui value
+	;       without re-entering the deps checker twice.
+	; * Backend = api / mlx: no install path, just start the bridge — keep
+	;   show_ui=false to avoid an irrelevant Ollama window.
+	if _LLM_Tray["enabled"] {
+		if (_LLM_Tray["backend"] == "ollama") {
+			ollama_up := false
+			try ollama_up := LLM_OllamaIsRunning()
+			boot_ui := !ollama_up
+			SetTimer(() => LLM_Tray_BootstrapOllama(boot_ui), -1)
+		} else {
+			SetTimer(() => LLM_Tray_BootstrapOllama(false), -1)
+		}
+	}
 
 	; Background health-tick: refreshes the dot every 10 s without waiting
 	; for the user to open the menu. The previous "probe on menu open"
