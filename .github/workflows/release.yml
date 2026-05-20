@@ -436,8 +436,8 @@ jobs:
 
                   | Asset | Description |
                   |---|---|
-                  | \`ErgoptiPlus.app.zip\` | macOS application (Hammerspoon + Karabiner-Elements bundled) |
-                  | \`Ergopti_macOS.zip\` | Keyboard layout bundle only — no app required |
+                  | [ErgoptiPlus.app.zip](https://github.com/${GITHUB_REPOSITORY}/releases/download/${TAG}/ErgoptiPlus.app.zip) | macOS application (Hammerspoon + Karabiner-Elements bundled) |
+                  | [Ergopti_macOS.zip](https://github.com/${GITHUB_REPOSITORY}/releases/download/${TAG}/Ergopti_macOS.zip) | Keyboard layout bundle only — no app required |
 
                   **Installation — app:**
                   1. Unzip \`ErgoptiPlus.app.zip\` and move \`ErgoptiPlus.app\` to \`/Applications\`.
@@ -459,8 +459,8 @@ jobs:
 
                   | Asset | Description |
                   |---|---|
-                  | \`ErgoptiPlus.exe\` | Compiled AutoHotkey executable (AHK v2 runtime bundled) |
-                  | \`Ergopti_windows.exe\` | Windows keyboard layout installer — no app required |
+                  | [ErgoptiPlus.exe](https://github.com/${GITHUB_REPOSITORY}/releases/download/${TAG}/ErgoptiPlus.exe) | Compiled AutoHotkey executable (AHK v2 runtime bundled) |
+                  | [Ergopti_windows.exe](https://github.com/${GITHUB_REPOSITORY}/releases/download/${TAG}/Ergopti_windows.exe) | Windows keyboard layout installer — no app required |
 
                   **Installation — app:**
                   1. Download \`ErgoptiPlus.exe\`.
@@ -477,8 +477,8 @@ jobs:
 
                   | Asset | Description |
                   |---|---|
-                  | \`Ergopti_xkb.zip\` | XKB layout files (standard, ANSI, plus, plus-ANSI variants) |
-                  | \`kanata.kbd\` | Kanata config file (for Kanata users) |
+                  | [Ergopti_xkb.zip](https://github.com/${GITHUB_REPOSITORY}/releases/download/${TAG}/Ergopti_xkb.zip) | XKB layout files (standard, ANSI, plus, plus-ANSI variants) |
+                  | [kanata.kbd](https://github.com/${GITHUB_REPOSITORY}/releases/download/${TAG}/kanata.kbd) | Kanata config file (for Kanata users) |
 
                   **Installation:**
                   1. Unzip \`Ergopti_xkb.zip\`.
