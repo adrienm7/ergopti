@@ -98,6 +98,10 @@ local function inject_strings(code)
 		"onboarding.magic_key.option_custom", "onboarding.magic_key.choose_freely",
 		"onboarding.metrics.title", "onboarding.metrics.desc",
 		"onboarding.gestures.title", "onboarding.gestures.desc",
+		-- Same macOS-gestures-conflict warning shown by the tray "Enable
+		-- gestures" toggle — surfaced on step 5 in an orange box so the
+		-- user knows about the system-setting conflict before committing.
+		"dialog.gestures.warning_msg",
 		"onboarding.yes", "onboarding.no",
 		"onboarding.back", "onboarding.next", "onboarding.finish",
 		-- Inserted config-folder step reuses the same labels as the
@@ -148,6 +152,10 @@ local function inject_init_data()
 		"onboarding.magic_key.option_custom", "onboarding.magic_key.choose_freely",
 		"onboarding.metrics.title", "onboarding.metrics.desc",
 		"onboarding.gestures.title", "onboarding.gestures.desc",
+		-- Same macOS-gestures-conflict warning shown by the tray "Enable
+		-- gestures" toggle — surfaced on step 5 in an orange box so the
+		-- user knows about the system-setting conflict before committing.
+		"dialog.gestures.warning_msg",
 		"onboarding.yes", "onboarding.no",
 		"onboarding.back", "onboarding.next", "onboarding.finish",
 	}

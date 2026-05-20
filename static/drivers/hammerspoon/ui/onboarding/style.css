@@ -27,6 +27,11 @@ body {
 	color: #333;
 	font-family: -apple-system, BlinkMacSystemFont, 'Helvetica Neue', sans-serif;
 	font-size: 14px;
+	/* Lock the outer page so the only scrollable region is whatever inner
+	   container chose to opt-in (.lang-list). Without this, a tall step
+	   pushed the .btns row below the fold and the user had to scroll the
+	   whole window to reach the Next button. */
+	overflow: hidden;
 }
 
 /* ====================================== */
@@ -39,13 +44,20 @@ body {
 	display: flex;
 	flex-direction: column;
 	height: 100%;
-	padding: 20px 24px 18px;
+	/* Bottom padding deliberately larger than the top so the Next button
+	   never sits flush against the window's bottom edge — gives the
+	   action row visual breathing room and matches macOS sheet spacing. */
+	padding: 20px 24px 26px;
 }
 
 .step {
 	display: flex;
 	flex-direction: column;
 	flex-grow: 1;
+	/* Allows .lang-list (flex-grow:1 inside) to actually shrink below its
+	   intrinsic content height so the scrollbar appears inside the list
+	   rather than on the outer window. */
+	min-height: 0;
 }
 
 .step.hidden {
@@ -300,14 +312,16 @@ h1 {
 	border-radius: 7px;
 	color: #1d1d1f;
 	font-family: 'SF Mono', 'Monaco', monospace;
-	font-size: 22px;
+	/* Matches the surrounding radio-label / desc text — the previous 22px
+	   made the field tower over its row's text and read as 1.5× the rest. */
+	font-size: 13px;
 	outline: none;
-	padding: 8px 14px;
+	padding: 5px 10px;
 	text-align: center;
 	transition:
 		border-color 0.15s,
 		box-shadow 0.15s;
-	width: 80px;
+	width: 70px;
 }
 
 #s3-input:focus {

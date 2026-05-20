@@ -256,7 +256,6 @@ function renderStep3() {
 	document.getElementById("s3-title").textContent          = _t("onboarding.magic_key.title");
 	document.getElementById("s3-desc").textContent           = _t("onboarding.magic_key.desc");
 	document.getElementById("s3-blackstar-label").textContent = _t("onboarding.magic_key.option_blackstar");
-	document.getElementById("s3-star-label").textContent      = _t("onboarding.magic_key.option_star");
 	document.getElementById("s3-ugrave-label").textContent    = _t("onboarding.magic_key.option_ugrave");
 	document.getElementById("s3-semicolon-label").textContent = _t("onboarding.magic_key.option_semicolon");
 	document.getElementById("s3-custom-label").textContent    = _t("onboarding.magic_key.option_custom");
@@ -274,13 +273,18 @@ function renderStep3() {
 		key = _pickDefaultMagicKey();
 		_answers.magic_key = key;
 	}
-	var preset = { "★": "★", "*": "*", "ù": "ù", ";": ";" };
+	// The dedicated ASCII-star radio was retired (folded into the custom
+	// input slot, which defaults to "*") so any saved "*" value now lands
+	// on the custom row pre-filled with that character.
+	var preset = { "★": "★", "ù": "ù", ";": ";" };
 	var radioValue = preset[key] || "__custom__";
 	var radios = document.querySelectorAll("input[name='magickey']");
 	radios.forEach(function (r) { r.checked = (r.value === radioValue); });
 
 	var inp = document.getElementById("s3-input");
-	inp.value    = (radioValue === "__custom__") ? key : "";
+	// Custom row: show the saved value if any, otherwise fall back to the
+	// historical ASCII-star ("*") that used to live on its own radio.
+	inp.value    = (radioValue === "__custom__") ? (key || "*") : "*";
 	inp.disabled = (radioValue !== "__custom__");
 
 	// Wire the radios so toggling Custom enables/disables the text input.
@@ -315,6 +319,11 @@ function renderStep4() {
 function renderStep5() {
 	document.getElementById("s5-title").textContent = _t("onboarding.gestures.title");
 	document.getElementById("s5-desc").textContent  = _t("onboarding.gestures.desc");
+	// Reuse the macOS-gestures-conflict warning shown by the tray "Enable
+	// gestures" toggle — same orange box style as the metrics keylogger
+	// warning on step 4. Tells the user that activating Ergopti gestures
+	// requires disabling certain macOS native swipes/taps first.
+	document.getElementById("s5-warning").textContent = _t("dialog.gestures.warning_msg");
 	document.getElementById("s5-yes-label").textContent = _t("onboarding.yes");
 	document.getElementById("s5-no-label").textContent  = _t("onboarding.no");
 	document.getElementById("s5-back").textContent   = _t("onboarding.back");
