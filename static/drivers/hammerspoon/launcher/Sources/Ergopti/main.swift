@@ -45,7 +45,9 @@ let kErgoptiBundleId = "com.ergopti.app"
 
 // Key Hammerspoon reads to locate its Lua config dir. Default would be
 // ~/.hammerspoon; we override to keep Ergopti's tree fully self-contained.
-let kHammerspoonConfigKey = "MJConfigDir"
+// Hammerspoon reads MJConfigFile (full path to init.lua), not MJConfigDir.
+// MJConfigDir is a community myth — variables.m uses MJConfigFile exclusively.
+let kHammerspoonConfigKey = "MJConfigFile"
 
 
 
@@ -116,14 +118,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 		return FileManager.default.isExecutableFile(atPath: candidate) ? candidate : nil
 	}
 
-	// Path to the bundled Lua config dir that ends up in MJConfigDir. The
-	// build script mirrors the dev tree under Contents/Resources/, so the
-	// config dir sits at the same offset as <repo>/static/drivers/hammerspoon
-	// from the static root. Every Lua path in the driver walks up from
-	// hs.configdir using that exact layout, so a single MJConfigDir override
-	// fixes every read site without touching the Lua sources.
+	// Full path to the bundled init.lua that Hammerspoon reads via MJConfigFile.
+	// MJConfigFile is the actual preference key HS uses (see variables.m); the
+	// directory is derived from the file path by HS internally, so every Lua
+	// require() and hs.configdir resolve correctly from this single override.
 	private func bundledConfigDir() -> String {
 		return "\(Bundle.main.bundlePath)/Contents/Resources/static/drivers/hammerspoon"
+	}
+
+	private func bundledInitLuaPath() -> String {
+		return bundledConfigDir() + "/init.lua"
 	}
 
 	// Path to the vendored Karabiner-Elements installer .app. The Lua driver
@@ -160,10 +164,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 		let user  = kCFPreferencesCurrentUser
 		let host  = kCFPreferencesAnyHost
 
-		// Point HS at our bundled Lua tree instead of ~/.hammerspoon.
+		// Point HS at our bundled init.lua — MJConfigFile takes the full file path.
 		CFPreferencesSetValue(
 			kHammerspoonConfigKey as CFString,
-			bundledConfigDir() as CFString,
+			bundledInitLuaPath() as CFString,
 			appId, user, host)
 
 		// Suppress the native Hammerspoon hammer menubar icon and Dock icon.
@@ -255,10 +259,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 // always sees the correct config path, even if applicationDidFinishLaunching is
 // never reached (Gatekeeper first-run kill, Sparkle init exception, etc.).
 // CFPreferencesSynchronize flushes synchronously to disk before app.run().
-let _earlyConfigDir = Bundle.main.bundlePath + "/Contents/Resources/static/drivers/hammerspoon"
+let _earlyInitLua = Bundle.main.bundlePath + "/Contents/Resources/static/drivers/hammerspoon/init.lua"
 CFPreferencesSetValue(
     kHammerspoonConfigKey as CFString,
-    _earlyConfigDir as CFString,
+    _earlyInitLua as CFString,
     kErgoptiBundleId as CFString,
     kCFPreferencesCurrentUser,
     kCFPreferencesAnyHost)
