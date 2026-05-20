@@ -1880,5 +1880,6 @@
 	"updater.version_message": "ErgoptiPlus {1}{2}\n\nهل تريد فتح صفحة الإصدارات في GitHub؟",
 	"vscode.reload_required": "يرجى إعادة تحميل VSCode (Cmd+Shift+P > Reload Window) لتفعيل امتداد الكتابة",
 	"menu.llm.warning_install_ollama": "📥 ثبّت Ollama الآن",
-	"llm.deps.browser_install_tip": "نزّل Ollama لنظام Windows من الصفحة التي فُتحت في متصفحك، شغّل المثبّت، ثم عُد إلى هنا — سيتم اكتشاف الاتصال تلقائيًا."
+	"llm.deps.browser_install_tip": "نزّل Ollama لنظام Windows من الصفحة التي فُتحت في متصفحك، شغّل المثبّت، ثم عُد إلى هنا — سيتم اكتشاف الاتصال تلقائيًا.",
+	"onboarding.magic_key.option_blackstar": "★ — موصى به (مفتاح مخصص في تخطيط Ergopti)"
 }

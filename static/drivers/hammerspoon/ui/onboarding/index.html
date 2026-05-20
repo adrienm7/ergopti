@@ -67,9 +67,28 @@
 			<div class="step hidden" id="step-3">
 				<h1 id="s3-title"></h1>
 				<p class="desc" id="s3-desc"></p>
-				<p class="hint" id="s3-suggestions"></p>
-				<div class="field-group">
-					<input type="text" id="s3-input" maxlength="3" />
+				<div class="radio-group">
+					<label class="radio-card" id="s3-blackstar-card">
+						<input type="radio" name="magickey" value="★" checked />
+						<span class="radio-label" id="s3-blackstar-label"></span>
+					</label>
+					<label class="radio-card" id="s3-star-card">
+						<input type="radio" name="magickey" value="*" />
+						<span class="radio-label" id="s3-star-label"></span>
+					</label>
+					<label class="radio-card" id="s3-ugrave-card">
+						<input type="radio" name="magickey" value="ù" />
+						<span class="radio-label" id="s3-ugrave-label"></span>
+					</label>
+					<label class="radio-card" id="s3-semicolon-card">
+						<input type="radio" name="magickey" value=";" />
+						<span class="radio-label" id="s3-semicolon-label"></span>
+					</label>
+					<label class="radio-card" id="s3-custom-card">
+						<input type="radio" name="magickey" value="__custom__" />
+						<span class="radio-label" id="s3-custom-label"></span>
+						<input type="text" id="s3-input" maxlength="3" />
+					</label>
 				</div>
 				<p class="hint" id="s3-hint"></p>
 				<div class="btns">

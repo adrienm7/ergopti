@@ -42,7 +42,14 @@ global ONBOARDING_WIN_W := 460
 global ONBOARDING_LV_H := 240
 
 ; Default magic key inserted into the Step 3 input.
-global ONBOARDING_DEFAULT_MAGIC_KEY := "*"
+; ★ (U+2605 BLACK STAR) is the canonical Ergopti default — it sits on a
+; dedicated key in the Ergopti+ layout and the rest of the codebase
+; (category.magic_key, dialog.magic_key.prompt, the auto-config menu)
+; already labels it as "the magic key". The wizard pre-selects this
+; option so a first-run user gets the documented default without any
+; extra step; the other radios (``*`` / ``ù`` / ``;``) stay available
+; as recommended fallbacks for non-Ergopti layouts.
+global ONBOARDING_DEFAULT_MAGIC_KEY := "★"
 
 ; Collected answers — populated as the user advances through each step
 global _ob_locale            := "en"
@@ -487,6 +494,28 @@ _Step2_Next(g, rYes, *) {
 ; ===== 4.3) Step 3 — Magic key binding =====
 ; =============================================
 
+; Returns the magic-key character that best matches the user's context:
+;   - ★ when they enabled the Ergopti emulation on step 2 (the dedicated
+;     key sits on the Ergopti+ layout, so ★ is the no-friction pick),
+;   - ù when the Windows keyboard layout is AZERTY (LANGID == 0x040C —
+;     French France), since ``;`` requires Shift+, on AZERTY and ù has
+;     its own dedicated key,
+;   - ``;`` otherwise (QWERTY family) — directly typeable on a single key.
+; Falls back to the documented Ergopti default (★) when nothing matches.
+_Onboarding_PickDefaultMagicKey() {
+	global _ob_layout
+	if (IsSet(_ob_layout) and _ob_layout)
+		return "★"
+	; Read the active KB layout. HKL = high 16 bits KLID + low 16 bits LANGID.
+	try {
+		hkl  := DllCall("GetKeyboardLayout", "UInt", 0, "Ptr")
+		lang := hkl & 0xFFFF
+		if (lang == 0x040C)
+			return "ù"
+	}
+	return ";"
+}
+
 _Onboarding_Step3() {
 	g := Gui("+AlwaysOnTop", t("onboarding.magic_key.title"))
 	g.SetFont("s10", "Segoe UI")
@@ -500,39 +529,53 @@ _Onboarding_Step3() {
 	g.AddText("w" ONBOARDING_WIN_W - 40 " y+8", t("onboarding.magic_key.desc"))
 	g.SetFont("s10")
 
-	; Three pre-baked picks (Ergopti+ / AZERTY / QWERTY) plus a "custom"
-	; option that re-enables the Edit field below. Single-select radio group
-	; keeps the choice unambiguous — the user picks exactly one starting point
-	; and can override the value with anything by switching to ``custom``.
+	; Four pre-baked picks (Ergopti+ / fallback / AZERTY / QWERTY) plus a
+	; "custom" option that re-enables the Edit field below. Single-select
+	; radio group keeps the choice unambiguous — the user picks exactly one
+	; starting point and can override the value with anything by switching
+	; to ``custom``.
+	;
+	; ★ (BLACK STAR) FIRST and pre-selected: it's the canonical Ergopti
+	; default (mapped to a dedicated layout key) and the value the rest of
+	; the app already calls "the magic key". The ASCII ``*`` row stays as
+	; a fallback for keyboards / fonts that don't render ★ comfortably.
 	g.AddText("w" ONBOARDING_WIN_W - 40 " y+14", "")
-	rStar   := g.AddRadio("vMK_Star",   t("onboarding.magic_key.option_star"))
-	rUGrave := g.AddRadio("y+4",        t("onboarding.magic_key.option_ugrave"))
-	rSemi   := g.AddRadio("y+4",        t("onboarding.magic_key.option_semicolon"))
-	rCustom := g.AddRadio("y+4",        t("onboarding.magic_key.option_custom"))
+	rBlackStar := g.AddRadio("vMK_BlackStar", t("onboarding.magic_key.option_blackstar"))
+	rStar      := g.AddRadio("y+4",           t("onboarding.magic_key.option_star"))
+	rUGrave    := g.AddRadio("y+4",           t("onboarding.magic_key.option_ugrave"))
+	rSemi      := g.AddRadio("y+4",           t("onboarding.magic_key.option_semicolon"))
+	rCustom    := g.AddRadio("y+4",           t("onboarding.magic_key.option_custom"))
 
 	; Indent the free-form input under the "Custom" radio so the visual
 	; hierarchy makes it obvious the field belongs to that option.
 	edKey := g.AddEdit("w120 x40 y+4 vMagicKeyEdit", _ob_magic_key)
 
-	; Pre-select whichever radio matches the persisted/default value, falling
-	; back to the Ergopti+ star so the wizard always starts with a sensible pick.
-	switch _ob_magic_key {
-		case "*": rStar.Value   := 1
-		case "ù": rUGrave.Value := 1
-		case ";": rSemi.Value   := 1
+	; Pre-select whichever radio matches the persisted/default value. The
+	; user has been through step 2 by now, so we know whether they chose
+	; the Ergopti emulation; combined with the system KB layout, that's
+	; enough to pick a sensible default per the contract documented in
+	; _Onboarding_PickDefaultMagicKey.
+	default_key := _Onboarding_PickDefaultMagicKey()
+	current_key := (_ob_magic_key != "" and _ob_magic_key != ONBOARDING_DEFAULT_MAGIC_KEY)
+		? _ob_magic_key
+		: default_key
+	; Persist so Back/Next preserves the choice even when the user only
+	; navigated past this step without explicitly clicking a radio.
+	global _ob_magic_key := current_key
+	switch current_key {
+		case "★": rBlackStar.Value := 1
+		case "*": rStar.Value      := 1
+		case "ù": rUGrave.Value    := 1
+		case ";": rSemi.Value      := 1
 		default:
-			if (_ob_magic_key != "") {
-				rCustom.Value := 1
-			} else {
-				rStar.Value := 1
-			}
+			rCustom.Value := 1
 	}
 	; The Edit is only meaningful when "Custom" is selected — disable it
 	; otherwise so the user can't accidentally type into an inert field.
 	edKey.Enabled := (rCustom.Value = 1)
 
 	; Wire every radio so flipping selection enables/disables the Edit live.
-	for r in [rStar, rUGrave, rSemi, rCustom] {
+	for r in [rBlackStar, rStar, rUGrave, rSemi, rCustom] {
 		r.OnEvent("Click", _Step3_OnRadioClick.Bind(rCustom, edKey))
 	}
 
@@ -548,7 +591,7 @@ _Onboarding_Step3() {
 	btnNext := g.AddButton("Default w110 yp x" ONBOARDING_WIN_W - 130, t("onboarding.next"))
 
 	btnBack.OnEvent("Click", _Step3_Back.Bind(g))
-	btnNext.OnEvent("Click", _Step3_Next.Bind(g, rStar, rUGrave, rSemi, rCustom, edKey))
+	btnNext.OnEvent("Click", _Step3_Next.Bind(g, rBlackStar, rStar, rUGrave, rSemi, rCustom, edKey))
 
 	_Onboarding_Show(g)
 	global _ob_gui := g
@@ -568,9 +611,11 @@ _Step3_Back(g, *) {
 	_Onboarding_Step2()
 }
 
-_Step3_Next(g, rStar, rUGrave, rSemi, rCustom, edKey, *) {
+_Step3_Next(g, rBlackStar, rStar, rUGrave, rSemi, rCustom, edKey, *) {
 	val := ""
-	if (rStar.Value = 1) {
+	if (rBlackStar.Value = 1) {
+		val := "★"
+	} else if (rStar.Value = 1) {
 		val := "*"
 	} else if (rUGrave.Value = 1) {
 		val := "ù"
@@ -579,7 +624,12 @@ _Step3_Next(g, rStar, rUGrave, rSemi, rCustom, edKey, *) {
 	} else if (rCustom.Value = 1) {
 		val := Trim(edKey.Value)
 	}
-	; Fall back to the star default so the config always has a non-empty value
+	; Fall back to the ★ default so the config always has a non-empty
+	; value — also commits the choice into the wizard state so the next
+	; step + the final TOML batch write see the same character.
+	if (val == "")
+		val := ONBOARDING_DEFAULT_MAGIC_KEY
+	global _ob_magic_key := val
 	_Onboarding_DestroyActive()
 	_Onboarding_Step4()
 }

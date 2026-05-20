@@ -29,10 +29,12 @@ var LOCALES = [
 // Default locale shown when no locale has been set yet
 var DEFAULT_LOCALE_CODE = "en";
 
-// Default magic key character — an asterisk is reachable on every keyboard
-// without a dead key and is the documented "safe" fallback; the user can
-// change it to ù, ; or any single character on step 3.
-var DEFAULT_MAGIC_KEY = "*";
+// Default magic key character. ★ (U+2605 BLACK STAR) is the documented
+// Ergopti default — a dedicated key in the Ergopti+ layout, and the value
+// the rest of the app already labels as "the magic key" (category headers,
+// reset menu, dialogs). Pre-selected on step 3; the other rows offer the
+// fallback picks for non-Ergopti layouts (*, ù, ;) plus a custom input.
+var DEFAULT_MAGIC_KEY = "★";
 
 
 // ======================================
@@ -211,23 +213,71 @@ function renderStep2() {
 }
 
 /**
- * Refreshes step 3 labels. The same hint is shown above the input (so the
- * defaults are visible before the user even thinks about typing) and below
- * (so the freedom-to-choose reminder closes the section).
+ * Picks the radio that best matches the user's context — same contract
+ * as the AHK _Onboarding_PickDefaultMagicKey helper so both drivers
+ * surface identical defaults:
+ *   - ★ when the user enabled the Ergopti emulation on step 2,
+ *   - ù when the macOS keyboard layout name suggests French / AZERTY,
+ *   - ; otherwise (QWERTY family).
+ * Lua injects the detected layout name via initData.system_layout
+ * (lowercase). When absent we fall back to ; for safety.
+ */
+function _pickDefaultMagicKey() {
+	if (_answers.use_ergopti) return "★";
+	var layout = (window.SYSTEM_LAYOUT || "").toLowerCase();
+	// Match French / AZERTY-flavoured layouts. The Apple-shipped layout
+	// names are "French" / "French - Numerical" / "French - PC" / etc.;
+	// the substring check catches them all without having to enumerate.
+	if (layout.indexOf("french") !== -1 || layout.indexOf("azerty") !== -1)
+		return "ù";
+	return ";";
+}
+
+/**
+ * Refreshes step 3 labels + restores the pre-selected radio. Five rows:
+ * ★ (Ergopti default, FIRST and checked), *, ù, ;, custom. The custom
+ * row is the only one with a text input — disabled until selected so
+ * the user can't accidentally type into an inert field.
  */
 function renderStep3() {
-	document.getElementById("s3-title").textContent       = _t("onboarding.magic_key.title");
-	document.getElementById("s3-desc").textContent        = _t("onboarding.magic_key.desc");
-	// Suggestions sits above the input and lists the recommended characters per
-	// layout family (Ergopti+ / AZERTY / QWERTY); a single "rare but accessible"
-	// reminder sits below — same two-tier layout as the AHK driver's Step 3.
-	document.getElementById("s3-suggestions").textContent = _t("onboarding.magic_key.suggestions");
-	document.getElementById("s3-hint").textContent        = _t("onboarding.magic_key.choose_freely");
-	document.getElementById("s3-back").textContent        = _t("onboarding.back");
-	document.getElementById("s3-next").textContent        = _t("onboarding.next");
+	document.getElementById("s3-title").textContent          = _t("onboarding.magic_key.title");
+	document.getElementById("s3-desc").textContent           = _t("onboarding.magic_key.desc");
+	document.getElementById("s3-blackstar-label").textContent = _t("onboarding.magic_key.option_blackstar");
+	document.getElementById("s3-star-label").textContent      = _t("onboarding.magic_key.option_star");
+	document.getElementById("s3-ugrave-label").textContent    = _t("onboarding.magic_key.option_ugrave");
+	document.getElementById("s3-semicolon-label").textContent = _t("onboarding.magic_key.option_semicolon");
+	document.getElementById("s3-custom-label").textContent    = _t("onboarding.magic_key.option_custom");
+	document.getElementById("s3-hint").textContent           = _t("onboarding.magic_key.choose_freely");
+	document.getElementById("s3-back").textContent           = _t("onboarding.back");
+	document.getElementById("s3-next").textContent           = _t("onboarding.next");
+
+	// Pre-select the radio matching the persisted value. If the user
+	// hasn't explicitly picked one yet (still at the wizard default ★),
+	// derive a context-aware default from the layout choice / system KB
+	// detection so AZERTY users land on ù, QWERTY on ; and Ergopti users
+	// keep ★.
+	var key = _answers.magic_key;
+	if (!key || key === DEFAULT_MAGIC_KEY) {
+		key = _pickDefaultMagicKey();
+		_answers.magic_key = key;
+	}
+	var preset = { "★": "★", "*": "*", "ù": "ù", ";": ";" };
+	var radioValue = preset[key] || "__custom__";
+	var radios = document.querySelectorAll("input[name='magickey']");
+	radios.forEach(function (r) { r.checked = (r.value === radioValue); });
 
 	var inp = document.getElementById("s3-input");
-	inp.value = _answers.magic_key || DEFAULT_MAGIC_KEY;
+	inp.value    = (radioValue === "__custom__") ? key : "";
+	inp.disabled = (radioValue !== "__custom__");
+
+	// Wire the radios so toggling Custom enables/disables the text input.
+	radios.forEach(function (r) {
+		r.addEventListener("change", function () {
+			var isCustom = (r.checked && r.value === "__custom__");
+			inp.disabled = !isCustom;
+			if (isCustom) inp.focus();
+		}, { once: true });
+	});
 }
 
 /**
@@ -306,6 +356,10 @@ window.initData = function (data) {
 	if (data && data.locale) _selectedLocale = data.locale;
 	if (data && data.answers) _answers = Object.assign(_answers, data.answers);
 	if (data && data.default_config_dir) window.DEFAULT_CONFIG_DIR = data.default_config_dir;
+	// System layout name (macOS) — used by step 3 to pre-select ù on
+	// AZERTY-flavoured layouts and ; otherwise. Lua resolves it via
+	// hs.keycodes.currentLayout().
+	if (data && data.system_layout) window.SYSTEM_LAYOUT = data.system_layout;
 	window.applyStrings(data && data.strings ? data.strings : {});
 	renderStep1();
 	showStep(1);
@@ -373,8 +427,20 @@ document.getElementById("s3-back").addEventListener("click", function () {
 	showStep(2);
 });
 document.getElementById("s3-next").addEventListener("click", function () {
-	var val = (document.getElementById("s3-input").value || "").trim();
-	_answers.magic_key = val !== "" ? val : DEFAULT_MAGIC_KEY;
+	// Read the value from the selected radio — the custom row carries
+	// its own text input that wins when checked. Empty input on custom
+	// row falls back to the Ergopti default so we never persist "".
+	var checked = document.querySelector("input[name='magickey']:checked");
+	var val;
+	if (!checked) {
+		val = _pickDefaultMagicKey();
+	} else if (checked.value === "__custom__") {
+		val = (document.getElementById("s3-input").value || "").trim();
+		if (val === "") val = DEFAULT_MAGIC_KEY;
+	} else {
+		val = checked.value;
+	}
+	_answers.magic_key = val;
 	renderStep4();
 	showStep(4);
 });

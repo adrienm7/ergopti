@@ -1878,5 +1878,6 @@
 	"updater.version_message": "ErgoptiPlus {1}{2}\n\nOpen the releases page on GitHub?",
 	"vscode.reload_required": "Please reload VSCode (Cmd+Shift+P > Reload Window) to activate the typing extension",
 	"menu.llm.warning_install_ollama": "📥 Install Ollama now",
-	"llm.deps.browser_install_tip": "Download Ollama for Windows from the page just opened in your browser, run the installer, then come back — the connection will be detected automatically."
+	"llm.deps.browser_install_tip": "Download Ollama for Windows from the page just opened in your browser, run the installer, then come back — the connection will be detected automatically.",
+	"onboarding.magic_key.option_blackstar": "★ — recommended (dedicated key on the Ergopti layout)"
 }

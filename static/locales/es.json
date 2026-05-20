@@ -1880,5 +1880,6 @@
 	"updater.version_message": "ErgoptiPlus {1}{2}\n\n¿Abrir la página de releases en GitHub?",
 	"vscode.reload_required": "Recargue VSCode (Cmd+Shift+P > Reload Window) para activar la extensión de escritura",
 	"menu.llm.warning_install_ollama": "📥 Instalar Ollama ahora",
-	"llm.deps.browser_install_tip": "Descarga Ollama para Windows desde la página abierta en tu navegador, ejecuta el instalador y vuelve aquí — la conexión se detectará automáticamente."
+	"llm.deps.browser_install_tip": "Descarga Ollama para Windows desde la página abierta en tu navegador, ejecuta el instalador y vuelve aquí — la conexión se detectará automáticamente.",
+	"onboarding.magic_key.option_blackstar": "★ — recomendado (tecla dedicada en el teclado Ergopti)"
 }

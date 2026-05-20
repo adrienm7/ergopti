@@ -1905,5 +1905,6 @@
 	"updater.version_message": "ErgoptiPlus {1}{2}\n\nGitHub पर रिलीज़ पेज खोलें?",
 	"vscode.reload_required": "टाइपिंग एक्सटेंशन सक्रिय करने के लिए VSCode पुनः लोड करें (Cmd+Shift+P > Reload Window)",
 	"menu.llm.warning_install_ollama": "📥 अभी Ollama स्थापित करें",
-	"llm.deps.browser_install_tip": "ब्राउज़र में खुले पृष्ठ से Windows के लिए Ollama डाउनलोड करें, इंस्टॉलर चलाएँ, फिर यहाँ वापस आएँ — कनेक्शन स्वचालित रूप से पहचाना जाएगा।"
+	"llm.deps.browser_install_tip": "ब्राउज़र में खुले पृष्ठ से Windows के लिए Ollama डाउनलोड करें, इंस्टॉलर चलाएँ, फिर यहाँ वापस आएँ — कनेक्शन स्वचालित रूप से पहचाना जाएगा।",
+	"onboarding.magic_key.option_blackstar": "★ — अनुशंसित (Ergopti लेआउट पर समर्पित कुंजी)"
 }
