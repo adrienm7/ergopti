@@ -699,7 +699,7 @@
 	"menu.llm.arrows": "Pile",
 	"menu.llm.arrows_only": "Kun pile",
 	"menu.llm.auto_raise_temp": "  ↳ Automatisk temperaturstigning (+0,1 pr. forslag)",
-	"menu.llm.backend_api_suffix": "ekstern udbyder",
+	"menu.llm.backend_api_suffix": "Ekstern udbyder",
 	"menu.llm.backend_default_model": "↺ Backend standardmodel (%s)",
 	"menu.llm.backend_label": "Backend: %s",
 	"menu.llm.backend_mlx_suffix": "Anbefalet (Apple Silicon native)",
