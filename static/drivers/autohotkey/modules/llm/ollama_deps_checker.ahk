@@ -147,31 +147,11 @@ LLM_Deps_CheckAndInstall(default_model := "qwen2.5:3b", on_ready := unset, on_fa
 LLM_Deps_AsyncCheck(default_model, on_ready, on_failed, show_ui) {
 	global _LLM_Deps_Checking, _LLM_Deps_State
 
-	if show_ui {
-		; WebView2.create blocks ~1 s while initialising. Do it here so the
-		; message loop can process paint messages once this timer returns.
-		if !OllamaWV_IsAlive() {
-			; on_cancel: kill the installer tree + reset state + flip the
-			; tray toggle OFF, so the user's Cancel click actually stops
-			; everything (not just the visible window). Without this the
-			; hidden powershell.exe kept downloading and the tray toggle
-			; stayed ON.
-			; on_retry: re-launch the installer from scratch — same
-			; behaviour as the original wiring but only fires when the
-			; bootstrap finished in an error state.
-			OllamaWV_Show("ollama_install", t("ollama.install_title"),
-				(*) => LLM_Deps_OnUserCancel(),
-				(*) => LLM_Deps_RunInstaller(default_model, on_ready, on_failed))
-			OllamaWV_SetStep(t("ollama.deps_step_checking"))
-		}
-		LoggerInfo("LLM", "AsyncCheck — UI shown, deferring HTTP check…")
-		; Give the message loop a full tick to paint the window before the
-		; blocking WinHTTP call freezes the thread again.
-		SetTimer(() => LLM_Deps_DoCheck(default_model, on_ready, on_failed, show_ui), -50)
-		return
-	}
-
-	; Silent path: no UI to paint, run the check directly.
+	; No more WebView2 + hidden-PowerShell UI. We hand the install off to
+	; winget (or the Ollama download page in the browser); the user gets
+	; the official installer's native UI, which is more familiar AND
+	; doesn't contest CPU/disk with the AHK input pipeline. Run the
+	; reachability check directly — there's nothing left to "paint" first.
 	LLM_Deps_DoCheck(default_model, on_ready, on_failed, show_ui)
 }
 
@@ -216,63 +196,110 @@ LLM_Deps_DoCheck(default_model, on_ready, on_failed, show_ui) {
 ; =============================================
 
 /**
- * Locates the shared PS1 installer and launches it completely hidden by
- * redirecting its stdout to a temp file. A poll timer tails the file
- * every 500 ms to feed lines to the WebView UI.
- * @param {string} model - Model tag to pass to the installer.
+ * Hands Ollama installation off to the OS-native installer flow, then
+ * polls every 3 s until the daemon answers.
+ *
+ * Why the simpler approach:
+ *   - The previous in-process PS1 installer downloaded a ~1.5 GB exe
+ *     via ``Invoke-WebRequest -OutFile`` (no progress streaming), then
+ *     ran ``Start-Process -Wait``. The hidden powershell process spent
+ *     10+ minutes contesting CPU + disk with the AHK input pipeline,
+ *     causing the user's keystrokes to be swallowed mid-typing. Worse,
+ *     the WebView never showed download progress (Invoke-WebRequest
+ *     doesn't stream stdout), so the user thought it was frozen.
+ *   - winget is the supported Microsoft package manager on every
+ *     Win 10 / 11 machine. It runs the OFFICIAL Ollama installer with
+ *     a normal UAC prompt and progress UI. The download is throttled
+ *     to a separate process tree so AHK's keystroke handling stays
+ *     responsive.
+ *   - Fallback to opening https://ollama.com/download in the default
+ *     browser when winget is not available. The user keeps full
+ *     control over the install experience and we don't have to babysit
+ *     a hidden subprocess.
+ *
+ * After the installer has been handed off, we keep a 3 s poll timer
+ * pinging http://localhost:11434 . Once Ollama answers, the state
+ * flips to "ready" and on_ready fires.
+ *
+ * @param {string} model - Model tag to pull AFTER the daemon is up.
+ *                         Currently the responsibility is on the user
+ *                         (Ollama's first-run flow handles it via the
+ *                         installer's wizard), so this argument is
+ *                         only kept for future use.
  * @param {Func} on_ready - Callback on success.
- * @param {Func} on_failed - Callback on failure.
+ * @param {Func} on_failed - Callback on failure (rare — only when we
+ *                           can't even launch the installer).
  */
 LLM_Deps_RunInstaller(model, on_ready, on_failed) {
-	global _LLM_Deps_OutFile, _LLM_Deps_OutPos, _LLM_Deps_PollTimer
+	global _LLM_Deps_PollTimer, _LLM_Deps_Checking
 
-	ps1_path := LLM_GetSharedPath("install\ollama_install.ps1")
-	LoggerInfo("LLM", "PS1 path resolved: '" ps1_path "'.")
-	if (ps1_path == "") {
-		LoggerError("LLM", "ollama_install.ps1 not found — aborting.")
-		LLM_Deps_Fail("Installeur ollama_install.ps1 introuvable.", on_failed)
-		return
+	; Try winget first — runs the real Ollama installer with its native
+	; UI, so the user gets familiar progress and UAC prompts.
+	winget_available := _LLM_Deps_HasWinget()
+	if winget_available {
+		LoggerInfo("LLM", "Handing off to winget install Ollama.Ollama…")
+		try {
+			Run('winget install --id Ollama.Ollama -e --accept-package-agreements --accept-source-agreements')
+		} catch as err {
+			LoggerError("LLM", "winget launch failed: " err.Message ".")
+			winget_available := false
+		}
 	}
 
-	; Temp file that receives PS1 stdout (avoids a visible console window)
-	_LLM_Deps_OutFile := A_Temp . "\ergopti_ollama_out_" . A_TickCount . ".txt"
-	_LLM_Deps_OutPos  := 0
+	if !winget_available {
+		LoggerInfo("LLM", "Opening https://ollama.com/download in the default browser.")
+		try {
+			Run('https://ollama.com/download')
+		} catch as err {
+			LoggerError("LLM", "Could not open the download page: " err.Message ".")
+			LLM_Deps_Fail("Impossible d'ouvrir la page de téléchargement Ollama.", on_failed)
+			return
+		}
+		; Surface a tray tip so the user knows what to do — without it,
+		; the browser opening out of nowhere can feel disconnected from
+		; their click in the menu.
+		try TrayTip("Ergopti — IA", t("llm.deps.browser_install_tip"), 0x1)
+	}
 
-	; The PS1 script writes directly to -OutFile via StreamWriter (UTF-8, no BOM),
-	; bypassing shell redirection entirely — PowerShell 5.1 double-encodes UTF-8
-	; when stdout is piped through cmd.exe ">", corrupting accented characters.
-	cmd := "powershell.exe -NoProfile -WindowStyle Hidden -ExecutionPolicy Bypass"
-		. ' -File "' ps1_path '"'
-		. ' -Model "' model '"'
-		. ' -OutFile "' _LLM_Deps_OutFile '"'
-	LoggerInfo("LLM", "Launching (hidden): " cmd ".")
+	; Poll the daemon every 3 s. When it answers, fire on_ready.
+	LoggerInfo("LLM", "Polling http://localhost:11434 every 3 s until Ollama responds…")
+	_LLM_Deps_PollTimer := () => LLM_Deps_PollServerReady(on_ready, on_failed)
+	SetTimer(_LLM_Deps_PollTimer, 3000)
+}
 
-	pid := 0
+/**
+ * Returns true when winget is on PATH. We use it to decide between the
+ * automated install path and the browser fallback.
+ */
+_LLM_Deps_HasWinget() {
 	try {
-		Run(cmd, , "Hide", &pid)
-		LoggerInfo("LLM", "PS1 process launched, PID=" pid ".")
-	} catch as err {
-		LoggerError("LLM", "Failed to launch PowerShell: " err.Message ".")
-		LLM_Deps_Fail("Impossible de lancer PowerShell : " err.Message, on_failed)
-		return
+		out := ""
+		; Hide=true and timeout-protected; we only care about the exit code
+		RunWait('cmd.exe /c where winget >nul 2>&1', , "Hide")
+		return A_LastError == 0
+	} catch {
+		return false
 	}
-	if (pid == 0) {
-		LoggerError("LLM", "Run() returned PID=0 — cannot track process.")
-		LLM_Deps_Fail("Impossible de démarrer l'installeur (PID=0).", on_failed)
-		return
-	}
+}
 
-	; Stash the PID globally so LLM_Deps_Cancel can terminate the process
-	; tree from the Cancel button in the WebView. Without this the user
-	; would close the window but the hidden powershell.exe would keep
-	; downloading Ollama indefinitely.
-	global _LLM_Deps_InstallerPid := pid
-
-	; Poll every 500 ms: read new lines from the temp file, detect completion
-	; by checking whether the powershell.exe process is still alive.
-	_LLM_Deps_PollTimer := () => LLM_Deps_PollFile(pid, on_ready, on_failed)
-	SetTimer(_LLM_Deps_PollTimer, 500)
-	LoggerInfo("LLM", "Poll timer started (file: " _LLM_Deps_OutFile ").")
+/**
+ * Poll callback set up by LLM_Deps_RunInstaller. Fires every 3 s; checks
+ * whether Ollama is reachable. As soon as it answers, the install is
+ * considered done (regardless of HOW the user installed it — via winget,
+ * a manual download, or anything else).
+ */
+LLM_Deps_PollServerReady(on_ready, on_failed) {
+	global _LLM_Deps_State, _LLM_Deps_Checking, _LLM_Deps_PollTimer
+	if !LLM_OllamaIsRunning()
+		return    ; still not up — keep polling
+	LoggerInfo("LLM", "Ollama is now reachable — install complete.")
+	if IsSet(_LLM_Deps_PollTimer)
+		SetTimer(_LLM_Deps_PollTimer, 0)
+	_LLM_Deps_State    := "ready"
+	_LLM_Deps_Checking := false
+	try OllamaWV_Close()
+	if IsSet(on_ready)
+		on_ready()
 }
 
 /**
