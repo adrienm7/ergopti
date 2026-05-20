@@ -243,17 +243,27 @@ M.api_remote = ApiRemote
 -- ``api_entries.json`` / ``api_entry_id`` slots on the AHK side; on HS we
 -- piggyback on ``hs.settings`` (the same store the rest of the LLM module
 -- uses for debounce / temperature / etc.) so there's a single durable
--- backing store across reloads.
+-- backing store across reloads. The token field is persisted as an
+-- opaque ``keychain:<id>`` reference, not the cleartext — see
+-- modules/llm/api_token_crypto.lua.
 local API_ENTRIES_KEY    = "llm_api_entries"
 local API_ENTRY_ID_KEY   = "llm_api_entry_id"
+local TokenCrypto = require("modules.llm.api_token_crypto")
 
 --- Load persisted API entries from hs.settings and seed the remote backend.
 --- Idempotent — calling it more than once just refreshes the in-memory state
 --- from the durable store (useful right after the menu writes a new entry).
+--- Tokens stored as ``keychain:<id>`` references are decrypted via the
+--- macOS Keychain so callers always see cleartext.
 function M.load_api_entries()
 	local entries = hs.settings.get(API_ENTRIES_KEY)
 	local active_id = hs.settings.get(API_ENTRY_ID_KEY)
 	if type(entries) == "table" then
+		for _, e in ipairs(entries) do
+			if type(e) == "table" and type(e.token) == "string" and e.token ~= "" then
+				e.token = TokenCrypto.decrypt(e.token)
+			end
+		end
 		ApiRemote.set_entries(entries)
 	end
 	if type(active_id) == "string" then
@@ -263,9 +273,21 @@ end
 
 --- Persist the current API entry list + active id to hs.settings. Called by
 --- the menu's CRUD actions after each mutation; keeping the write here means
---- the menu doesn't have to know the storage scheme.
+--- the menu doesn't have to know the storage scheme. Each token is
+--- encrypted (Keychain reference) before being written to the plist so the
+--- cleartext never lands on disk.
 function M.persist_api_entries()
-	pcall(function() hs.settings.set(API_ENTRIES_KEY,  ApiRemote.get_entries()) end)
+	local cleartext_entries = ApiRemote.get_entries() or {}
+	local serialised = {}
+	for _, e in ipairs(cleartext_entries) do
+		local copy = {}
+		for k, v in pairs(e) do copy[k] = v end
+		if type(copy.token) == "string" and copy.token ~= "" and type(copy.id) == "string" then
+			copy.token = TokenCrypto.encrypt(copy.id, copy.token)
+		end
+		table.insert(serialised, copy)
+	end
+	pcall(function() hs.settings.set(API_ENTRIES_KEY,  serialised) end)
 	pcall(function() hs.settings.set(API_ENTRY_ID_KEY, ApiRemote.get_active_entry_id()) end)
 end
 
