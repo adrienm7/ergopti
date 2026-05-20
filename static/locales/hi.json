@@ -857,6 +857,8 @@
 	"menu.profiles.header_custom_profiles": "कस्टम प्रोफ़ाइलें",
 	"menu.profiles.header_default_profiles": "डिफ़ॉल्ट प्रोफ़ाइलें",
 	"menu.profiles.not_recommended": "  ⚠️ अनुशंसित नहीं (विचारशील)",
+	"menu.profiles.override_active_app_with_current": "➕ सक्रिय ऐप के लिए वर्तमान प्रोफ़ाइल का उपयोग करें",
+	"menu.profiles.per_app_overrides": "🪟 ऐप-वार प्रोफ़ाइल",
 	"menu.profiles.profile_label_prefix": "प्रोफ़ाइल: %s",
 	"menu.profiles.prompt_label": "प्रोफ़ाइल नाम:",
 	"menu.profiles.prompt_system_single": "सिस्टम प्रॉम्प्ट (एकल जनरेशन):",

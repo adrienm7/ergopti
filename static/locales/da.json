@@ -857,6 +857,8 @@
 	"menu.profiles.header_custom_profiles": "BRUGERDEFINEREDE PROFILER",
 	"menu.profiles.header_default_profiles": "STANDARDPROFILER",
 	"menu.profiles.not_recommended": "  ⚠️ Ikke anbefalet (Thinking)",
+	"menu.profiles.override_active_app_with_current": "➕ Brug aktuel profil til aktiv app",
+	"menu.profiles.per_app_overrides": "🪟 Profil pr. app",
 	"menu.profiles.profile_label_prefix": "Profil: %s",
 	"menu.profiles.prompt_label": "Profilnavn:",
 	"menu.profiles.prompt_system_single": "Systemprompt (enkelt generering):",

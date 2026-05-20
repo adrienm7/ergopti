@@ -857,6 +857,8 @@
 	"menu.profiles.header_custom_profiles": "פרופילים מותאמים",
 	"menu.profiles.header_default_profiles": "פרופילי ברירת מחדל",
 	"menu.profiles.not_recommended": "  ⚠️ לא מומלץ (Thinking)",
+	"menu.profiles.override_active_app_with_current": "➕ השתמש בפרופיל הנוכחי עבור היישום הפעיל",
+	"menu.profiles.per_app_overrides": "🪟 פרופילים לפי יישום",
 	"menu.profiles.profile_label_prefix": "פרופיל: %s",
 	"menu.profiles.prompt_label": "שם הפרופיל:",
 	"menu.profiles.prompt_system_single": "פרומפט מערכת (יצירה אחת):",

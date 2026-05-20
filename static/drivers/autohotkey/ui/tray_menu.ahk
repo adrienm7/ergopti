@@ -1135,6 +1135,21 @@ initMenu() {
 	_LlmRawInline := IniCacheGet(_IniCache, "LLM", "inline_autotype")
 	if _LlmRawInline != "_"
 		_LlmSavedOpts["inline_autotype"] := (_LlmRawInline == "1" || _LlmRawInline == "true")
+	; Per-app profile overrides — flat ``app=profile;app2=profile2`` so
+	; the TOML writer doesn't need to support nested tables.
+	_LlmRawAppOverrides := IniCacheGet(_IniCache, "LLM", "app_profile_overrides")
+	if _LlmRawAppOverrides != "_" and _LlmRawAppOverrides != "" {
+		_LlmAppOverridesMap := Map()
+		for _LlmAppPair in StrSplit(_LlmRawAppOverrides, ";") {
+			_LlmAppPair := Trim(_LlmAppPair)
+			if (_LlmAppPair == "")
+				continue
+			_LlmAppKv := StrSplit(_LlmAppPair, "=", , 2)
+			if (_LlmAppKv.Length == 2 and _LlmAppKv[1] != "" and _LlmAppKv[2] != "")
+				_LlmAppOverridesMap[_LlmAppKv[1]] := _LlmAppKv[2]
+		}
+		_LlmSavedOpts["app_profile_overrides"] := _LlmAppOverridesMap
+	}
 	LLM_Tray_Init(_LlmSavedOpts)
 
 	; ── 📊 Métriques — mirrors the HS Métriques submenu position exactly:

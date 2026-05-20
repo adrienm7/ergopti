@@ -833,6 +833,8 @@
 	"menu.profiles.header_custom_profiles": "ПОЛЬЗОВАТЕЛЬСКИЕ ПРОФИЛИ",
 	"menu.profiles.header_default_profiles": "ПРОФИЛИ ПО УМОЛЧАНИЮ",
 	"menu.profiles.not_recommended": "  ⚠️ Не рекомендуется (Thinking)",
+	"menu.profiles.override_active_app_with_current": "➕ Использовать текущий профиль для активного приложения",
+	"menu.profiles.per_app_overrides": "🪟 Профили по приложениям",
 	"menu.profiles.profile_label_prefix": "Профиль: %s",
 	"menu.profiles.prompt_label": "Название профиля:",
 	"menu.profiles.prompt_system_single": "Системный промпт (одна генерация):",

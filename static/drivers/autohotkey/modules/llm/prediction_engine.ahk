@@ -147,7 +147,8 @@ LLM_Engine_Init(opts) {
 		"instant_on_word_end", "after_hotstring", "reset_on_nav",
 		"disable_url_bars", "disable_password_fields",
 		"show_info_bar", "streaming", "show_all_at_once",
-		"pred_indent", "auto_raise_temp", "nav_modifiers", "val_modifiers"]
+		"pred_indent", "auto_raise_temp", "nav_modifiers", "val_modifiers",
+		"inline_autotype"]
 
 	for k in _keys
 		if opts.Has(k)
@@ -158,6 +159,11 @@ LLM_Engine_Init(opts) {
 		_LLM_Engine["user_profiles"] := opts["user_profiles"]
 	if opts.Has("disabled_apps") && (opts["disabled_apps"] is Array)
 		_LLM_Engine["disabled_apps"] := opts["disabled_apps"]
+	; Per-app profile overrides Map(app_name -> profile_id). Copy by
+	; reference is fine — the tray owns the canonical Map and the engine
+	; only reads from it.
+	if opts.Has("app_profile_overrides") and (opts["app_profile_overrides"] is Map)
+		_LLM_Engine["app_profile_overrides"] := opts["app_profile_overrides"]
 }
 
 /**
@@ -273,8 +279,13 @@ LLM_Engine_FirePrediction(ctx) {
 	_LLM_Engine["request_id"] := (_LLM_Engine.Has("request_id") ? _LLM_Engine["request_id"] : 0) + 1
 	this_request_id := _LLM_Engine["request_id"]
 
-	; Resolve profile and build the system prompt
-	profile       := LLM_GetActiveProfile(_LLM_Engine["profile_id"])
+	; Resolve profile and build the system prompt. If the user has
+	; configured a per-app override for the focused window, that wins
+	; over the global profile id — same context, different prompt.
+	; Falls back to the global profile when the active app has no
+	; override or the override id is unknown.
+	effective_profile_id := _LLM_Engine_ResolveProfileIdForApp(_LLM_Engine["profile_id"])
+	profile       := LLM_GetActiveProfile(effective_profile_id)
 	n_predictions := Max(1, Integer(_LLM_Engine["n_predictions"]))
 	; Inline auto-type mode forces a single variant: typing N
 	; alternatives sequentially into the active document would produce
@@ -657,6 +668,32 @@ _LLM_Engine_MaxAttempts(n) {
 	policy := LLM_ApiCommon_GetRetryPolicy()
 	max_mult := policy[1]
 	return Max(n, n * Max(1, Integer(max_mult)))
+}
+
+; Resolves the profile id for the currently-focused window. The user can
+; map an app's process name (lower-cased) to a specific profile via the
+; tray UI; the engine consults that map on every fire so changing apps
+; mid-typing flips the prompt without any explicit toggle.
+_LLM_Engine_ResolveProfileIdForApp(default_id) {
+	global _LLM_Engine
+	if !_LLM_Engine.Has("app_profile_overrides")
+		return default_id
+	overrides := _LLM_Engine["app_profile_overrides"]
+	if !(overrides is Map) or overrides.Count == 0
+		return default_id
+	; Pull the focused process. WinGetProcessName can throw when no
+	; window is focused (lock screen, transient menu); fall back to the
+	; default in that case rather than blowing up the prediction.
+	app := ""
+	try app := StrLower(WinGetProcessName("A"))
+	if (app == "")
+		return default_id
+	; Drop any trailing ``.exe`` so user-entered overrides ("slack") match
+	; the OS-reported process name ("slack.exe").
+	app := RegExReplace(app, "\.exe$", "")
+	if overrides.Has(app)
+		return overrides[app]
+	return default_id
 }
 
 ; Look up the active remote API entry from the engine state. Returns the entry

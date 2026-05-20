@@ -833,6 +833,8 @@
 	"menu.profiles.header_custom_profiles": "VLASTNÍ PROFILY",
 	"menu.profiles.header_default_profiles": "VÝCHOZÍ PROFILY",
 	"menu.profiles.not_recommended": "  ⚠️ Nedoporučeno (myšlení)",
+	"menu.profiles.override_active_app_with_current": "➕ Použít aktuální profil pro aktivní aplikaci",
+	"menu.profiles.per_app_overrides": "🪟 Profily podle aplikace",
 	"menu.profiles.profile_label_prefix": "Profil: %s",
 	"menu.profiles.prompt_label": "Název profilu:",
 	"menu.profiles.prompt_system_single": "Systémový prompt (jedno generování):",

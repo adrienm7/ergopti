@@ -833,6 +833,8 @@
 	"menu.profiles.header_custom_profiles": "الملفات الشخصية المخصصة",
 	"menu.profiles.header_default_profiles": "الملفات الشخصية الافتراضية",
 	"menu.profiles.not_recommended": "  ⚠️ غير موصى به (التفكير)",
+	"menu.profiles.override_active_app_with_current": "➕ استخدم الملف الشخصي الحالي للتطبيق النشط",
+	"menu.profiles.per_app_overrides": "🪟 ملفات تعريف لكل تطبيق",
 	"menu.profiles.profile_label_prefix": "الملف الشخصي: %s",
 	"menu.profiles.prompt_label": "اسم الملف الشخصي:",
 	"menu.profiles.prompt_system_single": "موجّه النظام (توليد واحد):",
