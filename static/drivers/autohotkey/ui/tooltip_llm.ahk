@@ -46,9 +46,12 @@ LLM_TOOLTIP_INACTIVE_PREFIX := "·  "
 ; Suffix on the active row only — same Tab hint as before but only attached
 ; to the slot Tab would actually fire on.
 LLM_TOOLTIP_TAB_SUFFIX      := "   [Tab]"
-; Placeholder shown while a slot is still being generated. Kept narrow so
-; the tooltip width doesn't jump when the slot finally fills in.
-LLM_TOOLTIP_PLACEHOLDER     := "…"
+; Placeholder shown while a slot is still being generated. The hourglass
+; emoji is an explicit "thinking…" indicator (mirrors HS's "🔄 Génération
+; en cours" cue): the previous bare "…" was too subtle and users
+; mistook a streaming slot for a finished short prediction. Kept narrow
+; so the tooltip width doesn't jump when the slot finally fills in.
+LLM_TOOLTIP_PLACEHOLDER     := "⏳ …"
 
 ; Stable timer reference — must not be a closure so SetTimer can cancel by
 ; identity. Each fresh () => lambda is a new object; re-scheduling it never
@@ -87,12 +90,17 @@ global _LLM_Tooltip_ActiveIdx := 1
  * Displays the prediction tooltip. Accepts either a single string (for
  * backwards compatibility with the legacy single-prediction caller) or
  * an array of slot texts. Empty array elements render as the placeholder
- * "…" so the user sees the full row count immediately.
+ * "⏳ …" so the user sees the full row count immediately.
  *
- * @param {string|Array} payload - The prediction text(s) to show.
- * @param {Integer}      active  - 1-based active slot index (default 1).
+ * @param {string|Array} payload   - The prediction text(s) to show.
+ * @param {Integer}      active    - 1-based active slot index (default 1).
+ * @param {boolean}      is_final  - True on the final render of a request.
+ *                                   When true, trailing AND middle empty
+ *                                   slots are dropped so a failed variant
+ *                                   doesn't leave a stray "⏳ …" row on
+ *                                   screen forever.
  */
-LLM_Tooltip_Show(payload, active := 1) {
+LLM_Tooltip_Show(payload, active := 1, is_final := false) {
 	global _LLM_Tooltip_Visible, _LLM_Tooltip_Slots, _LLM_Tooltip_ActiveIdx
 
 	; Normalise payload → array of slot strings.
@@ -108,12 +116,23 @@ LLM_Tooltip_Show(payload, active := 1) {
 		return
 	}
 
-	; Drop trailing empty slots so the tooltip doesn't grow taller than it
-	; needs to be on the last variants (placeholder rows are still drawn
-	; for empty slots BEFORE the last filled one — that's intentional, it
-	; tells the user a generation is still in flight).
+	; Always drop trailing empty slots so the tooltip doesn't grow taller
+	; than it needs to be on the last variants.
 	while (slots.Length > 0 and slots[slots.Length] == "")
 		slots.Pop()
+	; On the final render, also drop middle empty slots — they would
+	; otherwise be drawn as the "⏳ …" placeholder for a generation that
+	; will never complete (the variant failed and the loop has moved on).
+	; Mid-stream we KEEP the empty slots so the user sees the upcoming
+	; prediction row appear in advance.
+	if is_final {
+		filtered := []
+		for s in slots {
+			if (s != "")
+				filtered.Push(s)
+		}
+		slots := filtered
+	}
 	if (slots.Length == 0)
 		return
 
@@ -160,8 +179,11 @@ LLM_Tooltip_Hide() {
 
 /**
  * Returns the text of the active suggestion (the one Tab inserts), or ""
- * when no tooltip is showing. Wired into the Tab hotkey via #HotIf in
- * tray_llm.ahk so Tab only fires when a prediction is on screen.
+ * when no usable prediction is available. Wired into the Tab hotkey via
+ * #HotIf in tray_llm.ahk so Tab only fires when a real prediction is on
+ * screen — when only placeholders are showing, GetText returns "" and
+ * the Tab keystroke falls through to the active app (which is the right
+ * behaviour: "tab" mid-streaming should not insert a "⏳ …" string).
  */
 LLM_Tooltip_GetText() {
 	global _LLM_Tooltip_Visible, _LLM_Tooltip_Slots, _LLM_Tooltip_ActiveIdx
@@ -172,7 +194,19 @@ LLM_Tooltip_GetText() {
 	idx := IsSet(_LLM_Tooltip_ActiveIdx) ? _LLM_Tooltip_ActiveIdx : 1
 	if (idx < 1 or idx > _LLM_Tooltip_Slots.Length)
 		return ""
-	return _LLM_Tooltip_Slots[idx]
+	active := _LLM_Tooltip_Slots[idx]
+	; Empty (= still-generating) active slot → fall through. If another
+	; slot in the array has finished, prefer that one so Tab inserts
+	; *something* useful rather than nothing. Walks left-to-right
+	; because that's the order variants completed in.
+	if (active == "") {
+		for s in _LLM_Tooltip_Slots {
+			if (s != "")
+				return s
+		}
+		return ""
+	}
+	return active
 }
 
 /**
