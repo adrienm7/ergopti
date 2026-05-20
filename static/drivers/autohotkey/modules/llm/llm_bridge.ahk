@@ -80,7 +80,13 @@ LLM_Bridge_OnChar(ch) {
 		return
 
 	_LLM_Bridge_Buffer .= ch
-	LLM_Tooltip_Hide()
+	; Pass ``silent := true`` so the bridge's natural "tooltip is stale,
+	; new keystroke incoming" hide does NOT emit an llm_dismissed event.
+	; Otherwise every keystroke while a tooltip is on screen produces a
+	; bogus dismissed event before the next suggestion arrives, flooding
+	; the keylogger with spurious dismiss / suggest pairs that ruin the
+	; acceptance-rate metric.
+	LLM_Tooltip_Hide(true)
 	LLM_Engine_OnKeystroke(_LLM_Bridge_Buffer)
 }
 
@@ -96,7 +102,9 @@ LLM_Bridge_OnBackspace() {
 	if (StrLen(_LLM_Bridge_Buffer) > 0)
 		_LLM_Bridge_Buffer := SubStr(_LLM_Bridge_Buffer, 1, -1)
 
-	LLM_Tooltip_Hide()
+	; Same reasoning as LLM_Bridge_OnChar — typing past a suggestion is a
+	; "stale" hide, not a "user said no" hide.
+	LLM_Tooltip_Hide(true)
 	LLM_Engine_OnKeystroke(_LLM_Bridge_Buffer)
 }
 
@@ -105,8 +113,13 @@ LLM_Bridge_OnBackspace() {
  * Flushes the buffer so the next prediction starts from a fresh context.
  */
 LLM_Bridge_OnFlush() {
-	global _LLM_Bridge_Buffer
+	global _LLM_Bridge_Buffer, _LLM_Bridge_Active
+	if !_LLM_Bridge_Active
+		return
 	_LLM_Bridge_Buffer := ""
+	; A flush IS a deliberate user action (Esc / Enter / Tab) — keep the
+	; default behaviour where Hide emits llm_dismissed so the acceptance
+	; metric counts these as "user moved on without taking the suggestion".
 	LLM_Tooltip_Hide()
 	LLM_Engine_CancelTimer()
 }
@@ -122,10 +135,13 @@ LLM_Bridge_OnAccept(text) {
 	_LLM_Bridge_Buffer .= text
 	; Audit event — pairs with the llm_suggested event the engine emitted
 	; when the tooltip first rendered. The pair lets a log tail compute
-	; "accepted / suggested" ratios per app / per model.
+	; "accepted / suggested" ratios per app / per model. We log the
+	; PROCESS NAME (not the window title) so per-app grouping is stable:
+	; window titles change as documents change (``Doc1 — Word``) but the
+	; process name (``WINWORD.EXE``) does not.
 	try {
 		app_name := ""
-		try app_name := WinGetTitle("A")
+		try app_name := WinGetProcessName("A")
 		slots := LLM_Tooltip_GetSlots()
 		idx   := LLM_Tooltip_GetActiveIdx()
 		KL_LogLlmAccepted(text, app_name, slots, idx)

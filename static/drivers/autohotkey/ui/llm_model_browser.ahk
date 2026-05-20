@@ -60,10 +60,17 @@ global LLM_MB_COL_STATUS    := 7
 LLM_ModelBrowser_Show() {
 	global _LLM_ModelBrowser_Gui, _LLM_Tray
 	if IsSet(_LLM_ModelBrowser_Gui) {
+		; A reused Gui that fails to refresh (e.g. models.json was edited
+		; and re-parses badly) used to fall through to rebuild a SECOND
+		; Gui without destroying the first — Gui handle leak. Catch the
+		; failure, destroy the stale Gui, and let the rebuild path run.
 		try {
 			_LLM_ModelBrowser_Gui.Show()
 			_LLM_ModelBrowser_RefreshRows(_LLM_ModelBrowser_Gui.ListView)
 			return _LLM_ModelBrowser_Gui
+		} catch {
+			try _LLM_ModelBrowser_Gui.Destroy()
+			_LLM_ModelBrowser_Gui := unset
 		}
 	}
 	_LLM_ModelBrowser_Gui := _LLM_ModelBrowser_Build()
@@ -100,7 +107,16 @@ _LLM_ModelBrowser_Build() {
 	; button needed. The hint label is dimmed to make the intent obvious.
 	gui.Add("Text",, t("menu.llm.browse_models_filter"))
 	filter_edit := gui.Add("Edit", "w560 vFilter")
-	filter_edit.OnEvent("Change", (*) => _LLM_ModelBrowser_RefreshRows(gui.ListView, filter_edit.Value))
+	; Debounce the refresh: ``RefreshRows`` reloads the installed-tag list
+	; via ``LLM_OllamaListModels()`` and re-runs the two-key sort over the
+	; full catalogue, both of which are expensive. Without debounce a
+	; fast typist locks the Gui mid-search. The timer reference is stored
+	; on the Gui so SetTimer can cancel-by-identity across keystrokes.
+	gui.FilterDebounce := () => _LLM_ModelBrowser_RefreshRows(gui.ListView, filter_edit.Value)
+	filter_edit.OnEvent("Change", (*) => (
+		SetTimer(gui.FilterDebounce, 0),
+		SetTimer(gui.FilterDebounce, -120)
+	))
 
 	; ListView — columns mirror the metadata extracted in
 	; LLM_LoadModelsJSON. Status reads ``ollama list`` so the user can
@@ -158,14 +174,19 @@ _LLM_ModelBrowser_RefreshRows(lv, filter := "") {
 	for name in names {
 		info := index[name]
 		family := _LLM_ModelBrowser_GuessFamily(name)
-		params := info["params_b"]
+		; Guard every Map read with .Has() — a partial models.json entry
+		; (older revisions of the file, custom user-added entries) would
+		; otherwise throw UnsetItemError and kill the browser.
+		params := info.Has("params_b")    ? info["params_b"]    : 0
 		params_lbl := (params > 0) ? Format("{:.2f} B", params) : "—"
 		if info.Has("active_b") and info["active_b"] > 0 and info["active_b"] != params
 			params_lbl := params_lbl . " (" . Format("{:.2f} B", info["active_b"]) . " active)"
-		ram_lbl := (info["ram_gb"] > 0) ? Format("{:.1f} Go", info["ram_gb"]) : "—"
-		speed_lbl := (info["speed_tok_s"] > 0) ? (info["speed_tok_s"] . " tok/s") : "—"
-		type_lbl := info["type"]
-		ollama_tag := info["ollama"]
+		ram_val   := info.Has("ram_gb")      ? info["ram_gb"]      : 0
+		ram_lbl := (ram_val > 0) ? Format("{:.1f} Go", ram_val) : "—"
+		speed_val := info.Has("speed_tok_s") ? info["speed_tok_s"] : 0
+		speed_lbl := (speed_val > 0) ? (speed_val . " tok/s") : "—"
+		type_lbl   := info.Has("type")   ? info["type"]   : "—"
+		ollama_tag := info.Has("ollama") ? info["ollama"] : ""
 		status_lbl := installed.Has(StrLower(ollama_tag)) ? t("menu.llm.browse_status_installed") : t("menu.llm.browse_status_available")
 		row_text := name . " | " . family . " | " . params_lbl . " | " . ram_lbl . " | " . speed_lbl . " | " . type_lbl . " | " . status_lbl
 		if (filter_lc != "" and !InStr(StrLower(row_text), filter_lc))
@@ -203,8 +224,13 @@ _LLM_ModelBrowser_Sort(names) {
 			bf := _LLM_ModelBrowser_GuessFamily(b)
 			cmp := StrCompare(af, bf, false)
 			if (cmp == 0) {
-				ap := LLM_GetModelInfo(a)["params_b"]
-				bp := LLM_GetModelInfo(b)["params_b"]
+				; Guard the secondary sort key the same way RefreshRows
+				; guards its column reads. Missing ``params_b`` should
+				; not throw — it should sort as 0 (unknown size first).
+				info_a := LLM_GetModelInfo(a)
+				info_b := LLM_GetModelInfo(b)
+				ap := (info_a is Map and info_a.Has("params_b")) ? info_a["params_b"] : 0
+				bp := (info_b is Map and info_b.Has("params_b")) ? info_b["params_b"] : 0
 				cmp := (ap < bp) ? -1 : (ap > bp ? 1 : 0)
 			}
 			if (cmp > 0) {
@@ -235,10 +261,18 @@ _LLM_ModelBrowser_GuessFamily(name) {
  * tolerated to silent failure: when the daemon is not running we simply
  * mark every entry as "available" — refreshing later (or after a manual
  * install) will pick the change up.
+ *
+ * ``try`` MUST wrap the function call in a block-form with a ``catch``,
+ * otherwise an exception inside LLM_OllamaListModels propagates up the
+ * stack and tears down the Gui. The previous ``try return …`` shorthand
+ * looked like it caught the error but actually didn't.
  */
 _LLM_ModelBrowser_GetInstalledTags() {
-	try return LLM_OllamaListModels()
-	return []
+	try {
+		return LLM_OllamaListModels()
+	} catch {
+		return []
+	}
 }
 
 
