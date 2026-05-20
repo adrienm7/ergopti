@@ -812,6 +812,8 @@
 	"menu.paths.pick_prompt": "Konfigurationsordner auswählen",
 	"menu.paths.window_title": "Konfigurationsordner — Ergopti",
 	"menu.profiles.auto_detect": "✨ Bestes Profil automatisch erkennen",
+	"menu.profiles.clone_builtin": "✏️ Profil klonen und bearbeiten…",
+	"menu.profiles.copy_suffix": "(Kopie)",
 	"menu.profiles.create_profile": "Benutzerdefiniertes Profil erstellen…",
 	"menu.profiles.custom_profile_label": "Benutzerdefiniertes Profil",
 	"menu.profiles.delete_confirm_body": "Dieses benutzerdefinierte Profil wird dauerhaft gelöscht.",

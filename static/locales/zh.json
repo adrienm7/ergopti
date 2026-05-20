@@ -811,6 +811,8 @@
 	"menu.paths.pick_prompt": "选择配置文件夹",
 	"menu.paths.window_title": "配置文件夹 — Ergopti",
 	"menu.profiles.auto_detect": "✨ 自动检测最佳配置",
+	"menu.profiles.clone_builtin": "✏️ 克隆并编辑此配置…",
+	"menu.profiles.copy_suffix": "（副本）",
 	"menu.profiles.create_profile": "创建自定义配置…",
 	"menu.profiles.custom_profile_label": "自定义配置",
 	"menu.profiles.delete_confirm_body": "该自定义配置将被永久删除。",

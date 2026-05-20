@@ -812,6 +812,8 @@
 	"menu.paths.pick_prompt": "Selecteer de configuratiemap",
 	"menu.paths.window_title": "Configuratiemap — Ergopti",
 	"menu.profiles.auto_detect": "✨ Automatisch het beste profiel detecteren",
+	"menu.profiles.clone_builtin": "✏️ Dit profiel klonen en bewerken…",
+	"menu.profiles.copy_suffix": "(kopie)",
 	"menu.profiles.create_profile": "Een aangepast profiel maken…",
 	"menu.profiles.custom_profile_label": "Aangepast profiel",
 	"menu.profiles.delete_confirm_body": "Dit aangepaste profiel wordt definitief verwijderd.",
