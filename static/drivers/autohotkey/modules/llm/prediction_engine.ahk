@@ -289,10 +289,15 @@ LLM_Engine_FirePrediction(ctx) {
 
 	; Resolve the model + the per-backend async dispatch closure exactly
 	; once so the variant loop doesn't repeat the backend branch on every
-	; request.
+	; request. Two flavours per backend: a non-streaming one (the default)
+	; and a streaming one (Ollama only; remote providers' streaming APIs
+	; have a different shape that the engine doesn't speak yet — same
+	; constraint as HS where the remote backend stays non-stream).
 	model_tag := ""
 	log_model := ""
 	dispatch_fn := ""
+	dispatch_stream_fn := ""
+	streaming_enabled := _LLM_Engine.Has("streaming") and _LLM_Engine["streaming"]
 	if (backend == "api") {
 		entry := _LLM_Engine_GetActiveApiEntry()
 		if (entry == "")
@@ -301,11 +306,16 @@ LLM_Engine_FirePrediction(ctx) {
 		log_model := model_tag
 		dispatch_fn := (temp, on_succ, on_fail) =>
 			LLM_RemoteGenerate_Async(entry, system_prompt, ctx, temp, on_succ, on_fail)
+		; No remote-streaming dispatcher — disable streaming for the API
+		; backend so the engine falls back to the async non-streaming path.
+		streaming_enabled := false
 	} else {
 		model_tag := LLM_ResolveOllamaTag(_LLM_Engine["model"])
 		log_model := model_tag
 		dispatch_fn := (temp, on_succ, on_fail) =>
 			LLM_OllamaGenerate_Async(model_tag, system_prompt, ctx, temp, on_succ, on_fail)
+		dispatch_stream_fn := (temp, on_partial, on_succ, on_fail) =>
+			LLM_OllamaGenerate_Streaming(model_tag, system_prompt, ctx, temp, on_partial, on_succ, on_fail)
 	}
 
 	; ── Batch vs sequential dispatch ──
@@ -336,18 +346,20 @@ LLM_Engine_FirePrediction(ctx) {
 	; fails. Dedup against the already-collected slots so identical
 	; completions don't fill multiple slots.
 	state := Map(
-		"ctx",            ctx,
-		"request_id",     this_request_id,
-		"backend",        backend,
-		"model",          log_model,
-		"system_prompt",  system_prompt,
-		"slots",          [],
-		"requested",      n_predictions,
-		"attempt_index",  1,
-		"max_attempts",   _LLM_Engine_MaxAttempts(n_predictions),
-		"base_temp",      Float(_LLM_Engine["temperature"]),
-		"dedup_stats",    LLM_ApiCommon_NewDedupStats(),
-		"dispatch_fn",    dispatch_fn
+		"ctx",               ctx,
+		"request_id",        this_request_id,
+		"backend",           backend,
+		"model",             log_model,
+		"system_prompt",     system_prompt,
+		"slots",             [],
+		"requested",         n_predictions,
+		"attempt_index",     1,
+		"max_attempts",      _LLM_Engine_MaxAttempts(n_predictions),
+		"base_temp",         Float(_LLM_Engine["temperature"]),
+		"dedup_stats",       LLM_ApiCommon_NewDedupStats(),
+		"dispatch_fn",       dispatch_fn,
+		"dispatch_stream_fn",dispatch_stream_fn,
+		"streaming",         streaming_enabled
 	)
 	_LLM_Engine_DispatchVariant(state)
 }
@@ -469,10 +481,45 @@ _LLM_Engine_DispatchVariant(state) {
 	LLM_Engine_OnResults(preview_slots, state["ctx"], active_idx, false)
 
 	state_ref := state
+	; Streaming path: when enabled and the backend exposes a streaming
+	; dispatcher, on_partial fires per token so the tooltip updates the
+	; in-flight slot live. on_success closes the slot with the final
+	; text just like the non-streaming path.
+	if (state["streaming"] and state["dispatch_stream_fn"] != "") {
+		this_slot_idx := state["slots"].Length + 1
+		stream_fn := state["dispatch_stream_fn"]
+		stream_fn.Call(temp,
+			(partial) => _LLM_Engine_OnStreamPartial(state_ref, this_slot_idx, partial),
+			(text) => _LLM_Engine_OnVariantSuccess(state_ref, text),
+			() => _LLM_Engine_OnVariantFail(state_ref))
+		return
+	}
+
 	dispatch_fn := state["dispatch_fn"]
 	dispatch_fn.Call(temp,
 		(text) => _LLM_Engine_OnVariantSuccess(state_ref, text),
 		() => _LLM_Engine_OnVariantFail(state_ref))
+}
+
+; Per-token streaming callback: paints the partial text into its slot in
+; real time. The slot index is captured at dispatch time so multiple
+; in-flight variants don't trip over each other. Same dedup is NOT applied
+; here — we run the full text through dedup on on_success, where the
+; comparison is meaningful.
+_LLM_Engine_OnStreamPartial(state, slot_idx, partial) {
+	global _LLM_Engine
+	current_id := _LLM_Engine.Has("request_id") ? _LLM_Engine["request_id"] : 0
+	if (state["request_id"] != current_id)
+		return
+	preview := []
+	for s in state["slots"]
+		preview.Push(s)
+	while (preview.Length < slot_idx - 1)
+		preview.Push("")
+	preview.Push(partial)
+	; Active = the slot currently streaming, so Tab during streaming still
+	; produces something sensible.
+	LLM_Engine_OnResults(preview, state["ctx"], slot_idx, false)
 }
 
 _LLM_Engine_OnVariantSuccess(state, text) {
