@@ -48,10 +48,14 @@ ResetStubRecorders() {
 }
 
 ResetHotstringRecorders() {
-    global _Stub_HotstringRegistrations, _Stub_RecordedSends, _Stub_LastChars
+    global _Stub_HotstringRegistrations, _Stub_RecordedSends, _Stub_LastChars, HSE_LastMatch
     _Stub_HotstringRegistrations := []
     _Stub_RecordedSends := []
     _Stub_LastChars := []
+    ; HSE_LastMatch may hold a stale match from a prior test (e.g. the v2 engine
+    ; test suite), causing _HotstringDispatch to abort via the "yield to longer
+    ; trigger" guard. Clear it here so every callback invocation starts clean.
+    HSE_LastMatch := ""
 }
 
 ; =====================================
