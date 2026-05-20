@@ -962,13 +962,32 @@ _Step5_AutoRegister(statusLbl, *) {
 	}
 }
 
+; Paints the status label red or green and makes it visible. Each call site
+; (success / failure) was previously identical bar one constant, so we extract
+; the duplication into this helper. The label was created with the ``Hidden``
+; option so we explicitly clear that AND set ``.Visible := true`` — relying on
+; the property alone has bitten us before when the layout reflowed.
+;
+; ALSO fires a MsgBox as a guaranteed fallback. Several users have reported
+; "PowerShell flashes then nothing happens" — i.e. the status label never
+; updated visibly. Whether that is a control-state bug, an autosize edge case
+; or just the label being below the fold, the MsgBox makes sure the user
+; ALWAYS gets a definitive confirmation that the registration finished.
+;
+; ``ok = true`` renders the success message in green; ``false`` paints failure
+; in red. The translation key — not the literal message — is chosen up front
+; so the locale's wording always wins over any cached string.
 _Step5_ShowGestureStatus(statusLbl, ok) {
-	try {
-		statusLbl.SetFont("s9 " . (ok ? "cGreen" : "cRed"))
-		statusLbl.Text    := t(ok ? "onboarding.gestures.register_success"
-			: "onboarding.gestures.register_failed")
-		statusLbl.Visible := true
-	}
+	Key := ok ? "onboarding.gestures.register_success" : "onboarding.gestures.register_failed"
+	Color := ok ? "cGreen" : "cRed"
+	Msg := t(Key)
+	try statusLbl.Opt("-Hidden")
+	try statusLbl.SetFont("s9 " . Color)
+	try statusLbl.Text    := Msg
+	try statusLbl.Visible := true
+	try statusLbl.Redraw()
+	; Guaranteed visible feedback — see comment above.
+	try MsgBox(Msg, t("onboarding.gestures.title"), ok ? "Iconi" : "Icon!")
 }
 
 ; Builds a self-contained PowerShell script that writes every PrecisionTouchPad
@@ -993,6 +1012,12 @@ _Onboarding_BuildGesturePsScript() {
 	S := ""
 	S .= "$ErrorActionPreference = 'Stop'" . CRLF
 	S .= "$Reg = 'HKCU:\Software\Microsoft\Windows\CurrentVersion\PrecisionTouchPad'" . CRLF
+	; Create the PrecisionTouchPad key if missing (machines that never had a
+	; precision touchpad driver loaded won't have it). Without this guard,
+	; Set-ItemProperty -Force still fails with "Cannot find path" and the
+	; whole script bails out before any value is written. -Force on New-Item
+	; makes the call idempotent so it's safe when the key already exists.
+	S .= "if (-not (Test-Path $Reg)) { New-Item -Path $Reg -Force | Out-Null }" . CRLF
 	S .= "$V = @{" . CRLF
 	; Master enables — turn the gesture families on
 	S .= "  'ThreeFingerSlideEnabled' = 65535" . CRLF
@@ -1036,7 +1061,11 @@ _Onboarding_BuildGesturePsScript() {
 	S .= "}" . CRLF
 	S .= "try {" . CRLF
 	S .= "  foreach ($n in $V.Keys) {" . CRLF
-	S .= "    Set-ItemProperty -Path $Reg -Name $n -Value $V[$n] -Type DWord -Force" . CRLF
+	; New-ItemProperty -Force creates the property OR updates it in place.
+	; Set-ItemProperty raises "Property X does not exist" on a first-time
+	; PrecisionTouchPad key (one we may have just created above), which
+	; aborts the whole script under $ErrorActionPreference='Stop'.
+	S .= "    New-ItemProperty -Path $Reg -Name $n -Value $V[$n] -PropertyType DWord -Force | Out-Null" . CRLF
 	S .= "  }" . CRLF
 	S .= "  $devs = Get-PnpDevice -PresentOnly | Where-Object {" . CRLF
 	S .= "    $_.Class -eq 'HIDClass' -and $_.FriendlyName -match 'Input Configuration|I2C HID'" . CRLF
