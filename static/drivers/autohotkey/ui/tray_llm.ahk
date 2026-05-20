@@ -303,12 +303,19 @@ LLM_Tray_Build() {
 	; Clear all existing items so we can repopulate in place.
 	try _LLM_Tray_Menu.Delete()
 
-	; Enable / Disable toggle
+	; Enable / Disable toggle. The checked state MUST reflect
+	; ``_LLM_Tray["enabled"]`` alone — that's the user's intent. We keep a
+	; separate ``_llm_is_operational`` flag (enabled AND deps ready) for the
+	; health dot below, because we still want a visual cue when the user
+	; has flipped the toggle ON but Ollama hasn't finished installing yet.
+	; Previously the checkbox itself used _llm_is_operational, so clicking
+	; ON while Ollama was missing left the toggle visually OFF — the user
+	; thought the click did nothing.
 	_llm_is_operational := (_LLM_Tray["enabled"] && LLM_Deps_IsReady())
 	AddCategoryToggleItem(_LLM_Tray_Menu,
 		t("menu.llm.on"),
 		t("menu.llm.off"),
-		_llm_is_operational,
+		_LLM_Tray["enabled"],
 		LLM_Tray_OnToggle)
 
 	; Backend submenu
