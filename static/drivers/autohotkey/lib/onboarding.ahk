@@ -38,6 +38,11 @@ global ONBOARDING_DEFAULT_LOCALE_INDEX := 5
 ; Wizard window width (height is computed automatically from controls)
 global ONBOARDING_WIN_W := 460
 
+; Step 2 (layout preview) uses a wider canvas so the embedded keyboard
+; layout JPG can be rendered closer to its native resolution — a 420 px-
+; wide scale-down on the default window made the keys barely legible.
+global ONBOARDING_STEP2_W := 820
+
 ; Height of the language ListView — fits ~8 rows, scrollable beyond that
 global ONBOARDING_LV_H := 240
 
@@ -261,14 +266,21 @@ _Onboarding_Step1() {
 	; Resize the ListView to an exact multiple of the actual row height so that
 	; scrolling stops on the last item with no blank space below it. We measure
 	; the real row height via LVM_GETITEMRECT (0x100E) on the first item, then
-	; snap the control height to min(allRows, maxRows) * rowH.
+	; snap the control height to min(allRows, maxRows) * rowH + 2 × edge.
+	;
+	; The +2 × SM_CYEDGE compensates for the ListView's 3D border: the control
+	; height includes the border, while only the CLIENT area (height − border)
+	; renders rows. Without this fudge, the last row scrolls off and the user
+	; sees an empty stripe of white at the bottom when scrolled to the end.
 	RECT := Buffer(16, 0)
 	SendMessage(0x100E, 0, RECT.Ptr, lv)  ; LVM_GETITEMRECT, item 0, LVIR_BOUNDS
 	rowH := NumGet(RECT, 12, "Int") - NumGet(RECT, 4, "Int")  ; bottom - top
 	if (rowH > 0) {
 		maxRows := 8
 		visRows := Min(SortedLocales.Length, maxRows)
-		lv.Move(,, , visRows * rowH)
+		; SM_CYEDGE = 13 — height of a single 3D border edge (typically 2 px).
+		borderPx := 2 * DllCall("GetSystemMetrics", "Int", 13, "Int")
+		lv.Move(,, , visRows * rowH + borderPx)
 	}
 	; Pre-select the default locale row
 	lv.Modify(DefaultIndex, "Select Focus Vis")
@@ -342,29 +354,27 @@ _Onboarding_StepConfigDir() {
 	g.MarginY := 16
 
 	g.AddText("w" ONBOARDING_WIN_W - 40, t("dialog.config_folder.title"))
+
+	; Row 1: short label + Browse on the same line. The previous "Personal
+	; configuration folder:" label was a near-duplicate of the title above, so
+	; we shortened it (``dialog.config_folder.label`` now reads "Path:" or
+	; equivalent in each locale) and put Browse next to it. Auto-sized so long
+	; localised "Browse" captions (German "Durchsuchen") never clip.
 	g.SetFont("s9")
-	g.AddText("w" ONBOARDING_WIN_W - 40 " y+8", t("dialog.config_folder.label"))
+	lblPath := g.AddText("xm y+10", t("dialog.config_folder.label"))
 	g.SetFont("s10")
+	btnBrowse := g.AddButton("x+8 yp", t("common.browse"))
 
-	; Edit + Browse button on the same row. The Edit shows forward slashes
-	; (matches paths.toml's on-disk format and reads cleaner to humans);
-	; we translate back to backslashes before persisting.
-	;
-	; Browse uses auto-width so long localised labels (German ``Durchsuchen``,
-	; Portuguese ``Procurar...``) are not clipped. We add Browse first with a
-	; placeholder Edit width, then re-flow once we know Browse's natural width.
+	; Row 2: full-width edit on its own line so the user sees the entire
+	; path even on a narrow window. Forward slashes display cleaner than the
+	; native Windows ``\`` and match paths.toml's on-disk format — we swap
+	; back to backslashes before persisting.
 	current := _ob_config_dir != "" ? _ob_config_dir : (IsSet(_ConfigDir) ? _ConfigDir : "")
-	dirEdit := g.AddEdit("w100 xm y+10", StrReplace(current, "\", "/"))
-	btnBrowse := g.AddButton("x+6 yp", t("common.browse"))
-	; Re-flow: derive the Edit width from the wizard width minus Browse width
-	; and the inter-control gap so the row always spans the content area.
-	btnBrowse.GetPos(, , &browseW, )
-	editW := ONBOARDING_WIN_W - 40 - browseW - 6
-	dirEdit.Move(20, , editW)
-	btnBrowse.Move(20 + editW + 6, , browseW)
+	dirEdit := g.AddEdit("xm y+6 w" ONBOARDING_WIN_W - 40, StrReplace(current, "\", "/"))
 
+	; Row 3: hint below the input. ``y+10`` measured from the edit's bottom.
 	g.SetFont("s9 cGray")
-	g.AddText("w" ONBOARDING_WIN_W - 40 " xm y+12", t("dialog.config_folder.hint"))
+	g.AddText("xm y+10 w" ONBOARDING_WIN_W - 40, t("dialog.config_folder.hint"))
 	g.SetFont("s10")
 
 	btns := _Onboarding_AddNavButtons(g, t("onboarding.back"), t("onboarding.next"))
@@ -513,9 +523,13 @@ _Onboarding_Step2() {
 	g.MarginX := 20
 	g.MarginY := 16
 
-	g.AddText("w" ONBOARDING_WIN_W - 40, t("onboarding.layout.title"))
+	; Step 2 uses the WIDER ``ONBOARDING_STEP2_W`` so the layout preview JPG
+	; renders larger — at the default 460 px wizard width, the keys were
+	; barely readable.
+	contentW := ONBOARDING_STEP2_W - 40
+	g.AddText("w" contentW, t("onboarding.layout.title"))
 	g.SetFont("s9")
-	g.AddText("w" ONBOARDING_WIN_W - 40 " y+8", t("onboarding.layout.desc"))
+	g.AddText("w" contentW " y+8", t("onboarding.layout.desc"))
 	g.SetFont("s10")
 
 	; Visual preview of the Ergopti layout — picking it blind from a one-line
@@ -528,7 +542,7 @@ _Onboarding_Step2() {
 	imgPath := _StaticDir . "\img\ergopti.jpg"
 	if FileExist(imgPath) {
 		try {
-			g.AddPicture("w" ONBOARDING_WIN_W - 40 " h-1 y+10", imgPath)
+			g.AddPicture("w" contentW " h-1 y+10", imgPath)
 		} catch as e {
 			try LoggerWarn("onboarding", "Step 2: AddPicture failed for '{1}': {2}.", imgPath, e.Message)
 		}
@@ -538,20 +552,26 @@ _Onboarding_Step2() {
 
 	; Pre-check the radio matching the wizard state. When the user pointed
 	; the wizard at an existing config in step 1b, _ob_layout reflects that
-	; saved value; otherwise it stays at its boot default (false).
+	; saved value; otherwise it stays at its boot default (false). Radios sit
+	; flush against the image (no spacer text) per the user's preference for
+	; a compact action area.
 	global _ob_layout
-	g.AddText("w" ONBOARDING_WIN_W - 40 " y+12", "")
-	rYes := g.AddRadio("vLayoutChoice" . (_ob_layout ? " Checked" : ""), t("onboarding.layout.yes"))
+	rYes := g.AddRadio("vLayoutChoice xm y+8" . (_ob_layout ? " Checked" : ""), t("onboarding.layout.yes"))
 	rNo  := g.AddRadio((_ob_layout ? "" : "Checked"), t("onboarding.layout.no"))
 
 	btns := _Onboarding_AddNavButtons(g, t("onboarding.back"), t("onboarding.next"))
 	btnBack := btns[1]
 	btnNext := btns[2]
+	; The nav-button helper anchored Next to ONBOARDING_WIN_W by default.
+	; Override to use the wider Step 2 width so the button sits at the right
+	; edge of the larger canvas rather than floating in the middle.
+	btnNext.GetPos(, , &_nextW_step2, )
+	btnNext.Move(ONBOARDING_STEP2_W - 20 - _nextW_step2)
 
 	btnBack.OnEvent("Click", _Step2_Back.Bind(g))
 	btnNext.OnEvent("Click", _Step2_Next.Bind(g, rYes))
 
-	_Onboarding_Show(g)
+	_Onboarding_Show(g, ONBOARDING_STEP2_W)
 	global _ob_gui := g
 }
 
@@ -860,45 +880,118 @@ _Step5_OnRadioChange(regControls, statusLbl, isYes, *) {
 }
 
 _Step5_AutoRegister(statusLbl, *) {
-	; At first launch, modules/gestures.ahk has not had its top-level globals
-	; (GESTURE_REG_PATH, GESTURE_REG_ACTIONS, …) initialised yet — Onboarding_Run
-	; is called early in the auto-execute section, long before the gestures
-	; module's #Include block runs. Calling GestureAutoConfigureRegistry() here
-	; would therefore crash on "global variable has not been assigned a value".
+	; Run the gesture auto-configuration SYNCHRONOUSLY via PowerShell so the
+	; user sees a definitive red/green status the moment they click — no more
+	; "will be configured on next start" deferred path. The PS script is
+	; self-contained (it hardcodes the same registry value set that
+	; modules/gestures.ahk would write) so this works at first-launch BEFORE
+	; the gestures module's #Include block has had a chance to assign its
+	; GESTURE_REG_* globals.
 	;
-	; Instead we record the intent and let _Onboarding_Commit persist a one-shot
-	; ``[Gestures] AutoConfigureOnNextStart`` flag that the gestures module
-	; consumes after Reload. When the wizard is re-opened from the tray menu
-	; (post-init), GestureAutoConfigureRegistry IS available — we attempt it
-	; directly in that case and fall back to the deferred path on any failure.
-	global _ob_register_pending
-	ok := false
+	; A single elevated PowerShell does both halves (registry writes + the
+	; touchpad PnP cycle), so the user sees ONE UAC prompt and the brief
+	; ~2 s freeze that follows. We do not pre-update the status label to
+	; "Configuring…" because RunWait blocks the message loop — the user
+	; would never see the intermediate state.
+	global _ob_register_pending := false  ; never defer anymore
+
+	PsCmd := _Onboarding_BuildGesturePsScript()
+	exitCode := -1
 	try {
-		ok := GestureAutoConfigureRegistry()
+		exitCode := RunWait('*RunAs powershell.exe -NoProfile -WindowStyle Hidden -Command "' . PsCmd . '"', , "Hide")
 	} catch as e {
-		try LoggerWarn("onboarding", "GestureAutoConfigureRegistry not callable yet — deferring: {1}", e.Message)
-		ok := false
+		try LoggerError("onboarding", "Gesture auto-config powershell threw: {1}.", e.Message)
+		exitCode := -1
 	}
-	if ok {
-		_ob_register_pending := false
+
+	if (exitCode == 0) {
+		try LoggerSuccess("onboarding", "Gesture auto-configuration succeeded.")
 		try {
 			statusLbl.SetFont("s9 cGreen")
 			statusLbl.Text    := t("onboarding.gestures.register_success")
 			statusLbl.Visible := true
 		}
 	} else {
-		; Either the registry write actually failed or the module was not ready.
-		; Mark the intent for the post-Reload pass and surface a NEUTRAL "will
-		; configure on next start" status — showing green success here misleads
-		; the user, because the actual UAC + touchpad-restart only happens after
-		; Reload, several seconds later. The orange tint signals "pending action".
-		_ob_register_pending := true
+		try LoggerWarn("onboarding", "Gesture auto-configuration failed (exitCode={1}).", exitCode)
 		try {
-			statusLbl.SetFont("s9 c808000")
-			statusLbl.Text    := t("onboarding.gestures.register_deferred")
+			statusLbl.SetFont("s9 cRed")
+			statusLbl.Text    := t("onboarding.gestures.register_failed")
 			statusLbl.Visible := true
 		}
 	}
+}
+
+; Builds a single-line PowerShell command that writes every PrecisionTouchPad
+; registry value AND restarts the touchpad PnP device so the new gesture map
+; takes effect without a logout. Values are hardcoded inline — they mirror the
+; ``GESTURE_REG_*`` maps in modules/gestures.ahk but live here so the wizard
+; can call them before that module's auto-execute runs. Keep both copies in
+; sync when adding / changing gesture slots.
+_Onboarding_BuildGesturePsScript() {
+	; KeyParams encoding: (VK << 16) | 0x07 where 0x07 = Ctrl|Shift|Win.
+	; F1..F10 = 0x70..0x79. Pre-computed below for clarity at the call site.
+	HashEntries := [
+		; Master enables — turn the gesture families on
+		"'ThreeFingerSlideEnabled'=65535",
+		"'ThreeFingerTapEnabled'=65535",
+		"'FourFingerSlideEnabled'=65535",
+		"'FourFingerTapEnabled'=65535",
+		; Per-direction enables (swipe slots only)
+		"'ThreeFingerUp'=65535",
+		"'ThreeFingerDown'=65535",
+		"'ThreeFingerLeft'=65535",
+		"'ThreeFingerRight'=65535",
+		"'FourFingerUp'=65535",
+		"'FourFingerDown'=65535",
+		"'FourFingerLeft'=65535",
+		"'FourFingerRight'=65535",
+		; CustomXFingerTap=7 sentinel ("user-defined shortcut")
+		"'CustomThreeFingerTap'=7",
+		"'CustomFourFingerTap'=7",
+		; KeyParams — actual Fn key encoding for each slot
+		"'CustomThreeFingerTapKeyParams'=7340039", ; F1
+		"'ThreeFingerUpKeyParams'=7405575",        ; F2
+		"'ThreeFingerDownKeyParams'=7471111",      ; F3
+		"'ThreeFingerLeftKeyParams'=7536647",      ; F4
+		"'ThreeFingerRightKeyParams'=7602183",     ; F5
+		"'CustomFourFingerTapKeyParams'=7667719",  ; F6
+		"'FourFingerUpKeyParams'=7733255",         ; F7
+		"'FourFingerDownKeyParams'=7798791",       ; F8
+		"'FourFingerLeftKeyParams'=7864327",       ; F9
+		"'FourFingerRightKeyParams'=7929863",      ; F10
+		; New-system *Action = 65535 disables them so KeyParams wins
+		"'ThreeFingerTapAction'=65535",
+		"'ThreeFingerSlideUpAction'=65535",
+		"'ThreeFingerSlideDownAction'=65535",
+		"'ThreeFingerSlideLeftAction'=65535",
+		"'ThreeFingerSlideRightAction'=65535",
+		"'FourFingerTapAction'=65535",
+		"'FourFingerSlideUpAction'=65535",
+		"'FourFingerSlideDownAction'=65535",
+		"'FourFingerSlideLeftAction'=65535",
+		"'FourFingerSlideRightAction'=65535",
+	]
+	; Glue with ``;`` — PowerShell uses semicolons inside @{} hashtable literals.
+	HashBody := ""
+	for entry in HashEntries {
+		HashBody .= (HashBody == "" ? "" : ";") . entry
+	}
+
+	; The PS body. Backticks in the original GestureRestartTouchpadDevice
+	; helper escape ``$`` for PowerShell ; here ``$false`` is plain because
+	; we sit at the outermost PowerShell parse level (no nested ``-Command``).
+	Ps := "$ErrorActionPreference='Stop';"
+		. "$Reg='HKCU:\Software\Microsoft\Windows\CurrentVersion\PrecisionTouchPad';"
+		. "$V=@{" . HashBody . "};"
+		. "try{"
+		. "foreach($n in $V.Keys){Set-ItemProperty -Path $Reg -Name $n -Value $V[$n] -Type DWord -Force};"
+		. "$devs=Get-PnpDevice -PresentOnly | Where-Object {$_.Class -eq 'HIDClass' -and $_.FriendlyName -match 'Input Configuration|I2C HID'};"
+		. "foreach($d in $devs){Disable-PnpDevice -InstanceId $d.InstanceId -Confirm:`$false -ErrorAction SilentlyContinue};"
+		. "Start-Sleep -Milliseconds 500;"
+		. "foreach($d in $devs){Enable-PnpDevice -InstanceId $d.InstanceId -Confirm:`$false -ErrorAction SilentlyContinue};"
+		. "exit 0"
+		. "}catch{exit 1}"
+	return Ps
 }
 
 _Step5_ShowManualTutorial(parentGui, *) {
@@ -1021,9 +1114,15 @@ _Onboarding_Commit() {
 ; Close handler so the X button does not leave Onboarding_Run() looping on a
 ; window that is no longer visible — instead it cleanly clears ``_ob_gui``
 ; and lets the caller decide what to do next.
-_Onboarding_Show(g) {
+;
+; @param g       Gui  The wizard window object.
+; @param widthW  Int  Optional override width. Defaults to the standard
+;                     ONBOARDING_WIN_W — Step 2 passes ONBOARDING_STEP2_W
+;                     so the layout preview JPG renders larger.
+_Onboarding_Show(g, widthW := unset) {
 	g.OnEvent("Close", _Onboarding_OnGuiClose)
-	g.Show("w" ONBOARDING_WIN_W " AutoSize Center")
+	w := IsSet(widthW) ? widthW : ONBOARDING_WIN_W
+	g.Show("w" w " AutoSize Center")
 }
 
 
