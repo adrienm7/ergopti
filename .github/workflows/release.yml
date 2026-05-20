@@ -184,9 +184,9 @@ jobs:
                   set -euo pipefail
                   printf '%s' "$SPARKLE_ED_PRIVATE_KEY" > /tmp/sparkle_priv.key
                   "$SIGN_UPDATE" -f /tmp/sparkle_priv.key build/macos/ErgoptiPlus.app.zip \
-                      > build/macos/ErgoptiPlus.app.zip.sig
+                      > build/macos/_ErgoptiPlus.app.zip.sig
                   rm -f /tmp/sparkle_priv.key
-                  echo "Sparkle EdDSA signature written to ErgoptiPlus.app.zip.sig"
+                  echo "Sparkle EdDSA signature written to _ErgoptiPlus.app.zip.sig"
 
             - name: Generate Sparkle appcast
               if: ${{ env.SPARKLE_ED_PRIVATE_KEY != '' }}
@@ -195,7 +195,7 @@ jobs:
                   ERGOPTI_VERSION:  ${{ needs.prepare-release.outputs.version }}
                   ERGOPTI_BUILD:    ${{ github.run_number }}
                   ERGOPTI_CHANNEL:  main
-                  SPARKLE_SIG_FILE: build/macos/ErgoptiPlus.app.zip.sig
+                  SPARKLE_SIG_FILE: build/macos/_ErgoptiPlus.app.zip.sig
                   ZIP_PATH:         build/macos/ErgoptiPlus.app.zip
                   GH_OWNER:         ${{ github.repository_owner }}
                   GH_REPO:          ${{ github.event.repository.name }}
@@ -221,8 +221,11 @@ jobs:
                   tag="${{ needs.prepare-release.outputs.tag }}"
                   assets=(build/macos/ErgoptiPlus.app.zip)
                   [ -f build/macos/Ergopti_macOS.zip           ] && assets+=(build/macos/Ergopti_macOS.zip)
-                  [ -f build/macos/ErgoptiPlus.app.zip.sig     ] && assets+=(build/macos/ErgoptiPlus.app.zip.sig)
-                  [ -f build/macos/appcast-main.xml             ] && assets+=(build/macos/appcast-main.xml)
+                  [ -f build/macos/_ErgoptiPlus.app.zip.sig    ] && assets+=(build/macos/_ErgoptiPlus.app.zip.sig)
+                  if [ -f build/macos/appcast-main.xml ]; then
+                      mv build/macos/appcast-main.xml build/macos/_appcast-main.xml
+                      assets+=(build/macos/_appcast-main.xml)
+                  fi
                   gh release upload "$tag" "${assets[@]}" --clobber
 
 
