@@ -328,17 +328,31 @@ _LLM_Deps_HasWinget() {
  */
 LLM_Deps_PollServerReady(on_ready, on_failed) {
 	global _LLM_Deps_State, _LLM_Deps_Checking, _LLM_Deps_PollTimer
-	if !LLM_OllamaIsRunning()
-		return    ; still not up — keep polling
+	; ASYNC probe — never call the sync LLM_OllamaIsRunning here. When
+	; Ollama isn't installed yet, that sync call blocks the message loop
+	; for ~4 s (4 × 1 s WinHTTP phases) at every poll tick. With the
+	; timer firing every 3 s, AHK was effectively frozen the entire
+	; install — the user's typing lagged hard for as long as the install
+	; ran. The async version dispatches the probe to WinHTTP's
+	; background thread and the result lands in a separate callback.
+	try LLM_OllamaIsRunning_Async((reachable) => _LLM_Deps_OnPollProbeResult(reachable, on_ready, on_failed))
+}
+
+/**
+ * Callback for the async probe scheduled by LLM_Deps_PollServerReady.
+ * Fires once Ollama answers (or fails to) on a given tick. When
+ * reachable, we finalise the install; otherwise we just wait for the
+ * next 3 s tick — no work done on the main thread.
+ */
+_LLM_Deps_OnPollProbeResult(reachable, on_ready, on_failed) {
+	global _LLM_Deps_State, _LLM_Deps_Checking, _LLM_Deps_PollTimer
+	if !reachable
+		return    ; still not up — next tick will probe again
 	LoggerInfo("LLM", "Ollama is now reachable — install complete.")
 	if IsSet(_LLM_Deps_PollTimer)
 		SetTimer(_LLM_Deps_PollTimer, 0)
 	_LLM_Deps_State    := "ready"
 	_LLM_Deps_Checking := false
-	; Drop AHK back to Normal priority — we boosted it in RunInstaller
-	; to keep typing responsive while the installer ran; with the
-	; install done, there's no reason to keep stealing CPU from other
-	; apps.
 	try ProcessSetPriority("Normal")
 	try OllamaWV_Close()
 	if IsSet(on_ready)
