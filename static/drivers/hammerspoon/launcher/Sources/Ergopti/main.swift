@@ -255,6 +255,20 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 // =====================================
 // =====================================
 
+// Write MJConfigDir before NSApplication.run() so Hammerspoon sees the correct
+// config path even if the app is launched for the very first time (Gatekeeper
+// may kill the process after applicationDidFinishLaunching fires but before our
+// seedConfigDirDefault() call completes). Writing here is synchronous and
+// happens before any Sparkle initialisation that could throw.
+let _earlyConfigDir = Bundle.main.bundlePath + "/Contents/Resources/static/drivers/hammerspoon"
+let _earlyDefaults = Process()
+_earlyDefaults.executableURL = URL(fileURLWithPath: "/usr/bin/defaults")
+_earlyDefaults.arguments = ["write", kErgoptiBundleId, kHammerspoonConfigKey, "-string", _earlyConfigDir]
+_earlyDefaults.standardOutput = FileHandle.nullDevice
+_earlyDefaults.standardError  = FileHandle.nullDevice
+try? _earlyDefaults.run()
+_earlyDefaults.waitUntilExit()
+
 let app      = NSApplication.shared
 let delegate = AppDelegate()
 app.delegate = delegate
