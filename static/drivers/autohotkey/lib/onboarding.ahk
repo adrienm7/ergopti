@@ -280,13 +280,8 @@ _Onboarding_Step1() {
 	if (rowH > 0) {
 		maxRows := 8
 		visRows := Min(SortedLocales.Length, maxRows)
-		approx := SendMessage(0x1041, visRows, -1, lv)
-		exactH := (approx >> 16) & 0xFFFF
-		if (exactH > 0) {
-			lv.Move(,, , exactH)
-		} else {
-			lv.Move(,, , visRows * rowH)
-		}
+		borderPx := 2 * DllCall("GetSystemMetrics", "Int", 13, "Int")
+		lv.Move(,, , visRows * rowH + borderPx)
 	}
 	; Pre-select the default locale row
 	lv.Modify(DefaultIndex, "Select Focus Vis")
@@ -976,71 +971,76 @@ _Step5_ShowGestureStatus(statusLbl, ok) {
 ; argv-quoting issues that plagued the previous ``-Command`` inline variant.
 _Onboarding_BuildGesturePsScript() {
 	; KeyParams encoding: (VK << 16) | 0x07 where 0x07 = Ctrl|Shift|Win.
-	; F1..F10 = 0x70..0x79. Pre-computed in the script body for clarity.
-	return "
-		(
-		`$ErrorActionPreference = 'Stop'
-		`$Reg = 'HKCU:\Software\Microsoft\Windows\CurrentVersion\PrecisionTouchPad'
-		`$V = @{
-			# Master enables — turn the gesture families on
-			'ThreeFingerSlideEnabled' = 65535
-			'ThreeFingerTapEnabled'   = 65535
-			'FourFingerSlideEnabled'  = 65535
-			'FourFingerTapEnabled'    = 65535
-			# Per-direction enables (swipe slots only)
-			'ThreeFingerUp'    = 65535
-			'ThreeFingerDown'  = 65535
-			'ThreeFingerLeft'  = 65535
-			'ThreeFingerRight' = 65535
-			'FourFingerUp'     = 65535
-			'FourFingerDown'   = 65535
-			'FourFingerLeft'   = 65535
-			'FourFingerRight'  = 65535
-			# CustomXFingerTap = 7 sentinel (user-defined shortcut)
-			'CustomThreeFingerTap' = 7
-			'CustomFourFingerTap'  = 7
-			# KeyParams — Fn key encoding for each slot (Ctrl+Win+Shift+Fn)
-			'CustomThreeFingerTapKeyParams' = 7340039   # F1
-			'ThreeFingerUpKeyParams'        = 7405575   # F2
-			'ThreeFingerDownKeyParams'      = 7471111   # F3
-			'ThreeFingerLeftKeyParams'      = 7536647   # F4
-			'ThreeFingerRightKeyParams'     = 7602183   # F5
-			'CustomFourFingerTapKeyParams'  = 7667719   # F6
-			'FourFingerUpKeyParams'         = 7733255   # F7
-			'FourFingerDownKeyParams'       = 7798791   # F8
-			'FourFingerLeftKeyParams'       = 7864327   # F9
-			'FourFingerRightKeyParams'      = 7929863   # F10
-			# *Action = 65535 disables the new-system actions so KeyParams wins
-			'ThreeFingerTapAction'        = 65535
-			'ThreeFingerSlideUpAction'    = 65535
-			'ThreeFingerSlideDownAction'  = 65535
-			'ThreeFingerSlideLeftAction'  = 65535
-			'ThreeFingerSlideRightAction' = 65535
-			'FourFingerTapAction'         = 65535
-			'FourFingerSlideUpAction'     = 65535
-			'FourFingerSlideDownAction'   = 65535
-			'FourFingerSlideLeftAction'   = 65535
-			'FourFingerSlideRightAction'  = 65535
-		}
-		try {
-			foreach (`$n in `$V.Keys) {
-				Set-ItemProperty -Path `$Reg -Name `$n -Value `$V[`$n] -Type DWord -Force
-			}
-			`$devs = Get-PnpDevice -PresentOnly | Where-Object {
-				`$_.Class -eq 'HIDClass' -and `$_.FriendlyName -match 'Input Configuration|I2C HID'
-			}
-			foreach (`$d in `$devs) {
-				Disable-PnpDevice -InstanceId `$d.InstanceId -Confirm:`$false -ErrorAction SilentlyContinue
-			}
-			Start-Sleep -Milliseconds 500
-			foreach (`$d in `$devs) {
-				Enable-PnpDevice -InstanceId `$d.InstanceId -Confirm:`$false -ErrorAction SilentlyContinue
-			}
-			exit 0
-		} catch {
-			exit 1
-		}
-		)"
+	; F1..F10 = 0x70..0x79. The script is assembled line-by-line instead of
+	; via a multi-line continuation section because the latter — combined
+	; with embedded ``foreach (...)`` lines — triggers a fail-fast crash
+	; (STATUS_STACK_BUFFER_OVERRUN, 0xC0000409) during AHK v2's continuation-
+	; section parser. Concatenating with explicit ``\`r\`n`` separators keeps
+	; the parser happy AND yields identical .ps1 content on disk.
+	CRLF := "`r`n"
+	S := ""
+	S .= "$ErrorActionPreference = 'Stop'" . CRLF
+	S .= "$Reg = 'HKCU:\Software\Microsoft\Windows\CurrentVersion\PrecisionTouchPad'" . CRLF
+	S .= "$V = @{" . CRLF
+	; Master enables — turn the gesture families on
+	S .= "  'ThreeFingerSlideEnabled' = 65535" . CRLF
+	S .= "  'ThreeFingerTapEnabled'   = 65535" . CRLF
+	S .= "  'FourFingerSlideEnabled'  = 65535" . CRLF
+	S .= "  'FourFingerTapEnabled'    = 65535" . CRLF
+	; Per-direction enables (swipe slots only)
+	S .= "  'ThreeFingerUp'    = 65535" . CRLF
+	S .= "  'ThreeFingerDown'  = 65535" . CRLF
+	S .= "  'ThreeFingerLeft'  = 65535" . CRLF
+	S .= "  'ThreeFingerRight' = 65535" . CRLF
+	S .= "  'FourFingerUp'     = 65535" . CRLF
+	S .= "  'FourFingerDown'   = 65535" . CRLF
+	S .= "  'FourFingerLeft'   = 65535" . CRLF
+	S .= "  'FourFingerRight'  = 65535" . CRLF
+	; CustomXFingerTap = 7 sentinel (user-defined shortcut)
+	S .= "  'CustomThreeFingerTap' = 7" . CRLF
+	S .= "  'CustomFourFingerTap'  = 7" . CRLF
+	; KeyParams — Fn key encoding for each slot (Ctrl+Win+Shift+Fn)
+	S .= "  'CustomThreeFingerTapKeyParams' = 7340039"  . CRLF  ; F1
+	S .= "  'ThreeFingerUpKeyParams'        = 7405575"  . CRLF  ; F2
+	S .= "  'ThreeFingerDownKeyParams'      = 7471111"  . CRLF  ; F3
+	S .= "  'ThreeFingerLeftKeyParams'      = 7536647"  . CRLF  ; F4
+	S .= "  'ThreeFingerRightKeyParams'     = 7602183"  . CRLF  ; F5
+	S .= "  'CustomFourFingerTapKeyParams'  = 7667719"  . CRLF  ; F6
+	S .= "  'FourFingerUpKeyParams'         = 7733255"  . CRLF  ; F7
+	S .= "  'FourFingerDownKeyParams'       = 7798791"  . CRLF  ; F8
+	S .= "  'FourFingerLeftKeyParams'       = 7864327"  . CRLF  ; F9
+	S .= "  'FourFingerRightKeyParams'      = 7929863"  . CRLF  ; F10
+	; *Action = 65535 disables the new-system actions so KeyParams wins
+	S .= "  'ThreeFingerTapAction'        = 65535" . CRLF
+	S .= "  'ThreeFingerSlideUpAction'    = 65535" . CRLF
+	S .= "  'ThreeFingerSlideDownAction'  = 65535" . CRLF
+	S .= "  'ThreeFingerSlideLeftAction'  = 65535" . CRLF
+	S .= "  'ThreeFingerSlideRightAction' = 65535" . CRLF
+	S .= "  'FourFingerTapAction'         = 65535" . CRLF
+	S .= "  'FourFingerSlideUpAction'     = 65535" . CRLF
+	S .= "  'FourFingerSlideDownAction'   = 65535" . CRLF
+	S .= "  'FourFingerSlideLeftAction'   = 65535" . CRLF
+	S .= "  'FourFingerSlideRightAction'  = 65535" . CRLF
+	S .= "}" . CRLF
+	S .= "try {" . CRLF
+	S .= "  foreach ($n in $V.Keys) {" . CRLF
+	S .= "    Set-ItemProperty -Path $Reg -Name $n -Value $V[$n] -Type DWord -Force" . CRLF
+	S .= "  }" . CRLF
+	S .= "  $devs = Get-PnpDevice -PresentOnly | Where-Object {" . CRLF
+	S .= "    $_.Class -eq 'HIDClass' -and $_.FriendlyName -match 'Input Configuration|I2C HID'" . CRLF
+	S .= "  }" . CRLF
+	S .= "  foreach ($d in $devs) {" . CRLF
+	S .= "    Disable-PnpDevice -InstanceId $d.InstanceId -Confirm:$false -ErrorAction SilentlyContinue" . CRLF
+	S .= "  }" . CRLF
+	S .= "  Start-Sleep -Milliseconds 500" . CRLF
+	S .= "  foreach ($d in $devs) {" . CRLF
+	S .= "    Enable-PnpDevice -InstanceId $d.InstanceId -Confirm:$false -ErrorAction SilentlyContinue" . CRLF
+	S .= "  }" . CRLF
+	S .= "  exit 0" . CRLF
+	S .= "} catch {" . CRLF
+	S .= "  exit 1" . CRLF
+	S .= "}" . CRLF
+	return S
 }
 
 _Step5_ShowManualTutorial(parentGui, *) {
