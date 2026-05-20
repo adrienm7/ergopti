@@ -39,9 +39,9 @@ import Sparkle
 // ==================================
 
 // Bundle identifier the embedded Hammerspoon will run under. Picked so the
-// embedded HS reads its preferences from ~/Library/Preferences/com.ergopti.app.plist
+// embedded HS reads its preferences from ~/Library/Preferences/com.ergoptiplus.app.plist
 // and cannot collide with a stock Hammerspoon install (org.hammerspoon.Hammerspoon).
-let kErgoptiBundleId = "com.ergopti.app"
+let kErgoptiBundleId = "com.ergoptiplus.app"
 
 // Key Hammerspoon reads to locate its Lua config dir. Default would be
 // ~/.hammerspoon; we override to keep Ergopti's tree fully self-contained.
