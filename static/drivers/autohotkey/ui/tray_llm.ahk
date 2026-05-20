@@ -1446,11 +1446,29 @@ _LLM_Tray_OnWarningInstallClick(ItemName := "", ItemPos := 0, MenuObj := 0) {
 	; menu callbacks as ``fn(name, pos, menu)`` — if those args weren't
 	; accepted the call threw immediately and the user saw nothing.
 	LoggerInfo("LLM", "Warning row clicked — forcing visible install.")
+	; Immediate, hard-to-miss visual confirmation that the click reached
+	; AHK. If the user clicks the row and DOESN'T see this TrayTip pop,
+	; we know the menu callback never fired — the bug is upstream of
+	; this function (binding broken, menu not bound to A_TrayMenu,
+	; AHK message loop saturated). Either way the answer is in the
+	; TrayTip's presence, not in a buried log line.
+	try TrayTip("Ergopti — IA", "Lancement de l'installation Ollama…", 0x1)
 	try {
 		LLM_Tray_BootstrapOllama(true)
 	} catch as err {
 		LoggerError("LLM", "Bootstrap raised: " err.Message ".")
+		try TrayTip("Ergopti — IA", "Erreur : " err.Message, 0x3)
 	}
+}
+
+; Debug hotkey: Ctrl+Alt+Shift+I directly fires the install bootstrap.
+; Useful when the tray menu binding is suspect — pressing the hotkey
+; bypasses the menu entirely. Always armed (no #HotIf) so the user
+; can rescue an LLM in a broken state without re-toggling anything.
+^!+i:: {
+	LoggerInfo("LLM", "Debug hotkey Ctrl+Alt+Shift+I — direct install trigger.")
+	try TrayTip("Ergopti — IA", "Installation Ollama (déclenchée par raccourci)…", 0x1)
+	try LLM_Tray_BootstrapOllama(true)
 }
 
 LLM_Tray_OnToggle(*) {
