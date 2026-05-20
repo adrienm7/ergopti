@@ -263,24 +263,30 @@ _Onboarding_Step1() {
 	}
 	; Subtract scrollbar width (~17px) so the column never triggers horizontal overflow
 	lv.ModifyCol(1, ContentW - 20)
-	; Resize the ListView to an exact multiple of the actual row height so that
-	; scrolling stops on the last item with no blank space below it. We measure
-	; the real row height via LVM_GETITEMRECT (0x100E) on the first item, then
-	; snap the control height to min(allRows, maxRows) * rowH + 2 × edge.
+	; Resize the ListView to the exact size Windows itself uses for N items.
+	; LVM_APPROXIMATEVIEWRECT (0x1041) returns the precise outer dimensions
+	; (border included) needed to show ``visRows`` items without a partial
+	; row at the bottom — historically the source of the "white stripe when
+	; scrolled" complaint. We fall back to the manual ``visRows × rowH``
+	; calc when the message returns an unusable height (rare; covers OS
+	; theme tweaks that intercept the message).
 	;
-	; The +2 × SM_CYEDGE compensates for the ListView's 3D border: the control
-	; height includes the border, while only the CLIENT area (height − border)
-	; renders rows. Without this fudge, the last row scrolls off and the user
-	; sees an empty stripe of white at the bottom when scrolled to the end.
+	; wParam = item count, lParam = (cy << 16) | cx with -1 meaning "use
+	; the default". The result is (cyOut << 16) | cxOut — we only want the
+	; height, masked to 16 bits.
 	RECT := Buffer(16, 0)
 	SendMessage(0x100E, 0, RECT.Ptr, lv)  ; LVM_GETITEMRECT, item 0, LVIR_BOUNDS
 	rowH := NumGet(RECT, 12, "Int") - NumGet(RECT, 4, "Int")  ; bottom - top
 	if (rowH > 0) {
 		maxRows := 8
 		visRows := Min(SortedLocales.Length, maxRows)
-		; SM_CYEDGE = 13 — height of a single 3D border edge (typically 2 px).
-		borderPx := 2 * DllCall("GetSystemMetrics", "Int", 13, "Int")
-		lv.Move(,, , visRows * rowH + borderPx)
+		approx := SendMessage(0x1041, visRows, -1, lv)
+		exactH := (approx >> 16) & 0xFFFF
+		if (exactH > 0) {
+			lv.Move(,, , exactH)
+		} else {
+			lv.Move(,, , visRows * rowH)
+		}
 	}
 	; Pre-select the default locale row
 	lv.Modify(DefaultIndex, "Select Focus Vis")
@@ -364,6 +370,14 @@ _Onboarding_StepConfigDir() {
 	lblPath := g.AddText("xm y+10", t("dialog.config_folder.label"))
 	g.SetFont("s10")
 	btnBrowse := g.AddButton("x+8 yp", t("common.browse"))
+	; Vertical alignment: the text and the button have different heights
+	; (s9 text ~16 px vs default button ~28 px), so ``yp`` only aligns them
+	; on their top edge — the smaller text visually floats above the
+	; button's center. Move the label down so both controls share a centre
+	; line, the optical alignment a reader actually expects.
+	btnBrowse.GetPos(, &_alignBtnY, , &_alignBtnH)
+	lblPath.GetPos(, , , &_alignLblH)
+	lblPath.Move(, _alignBtnY + (_alignBtnH - _alignLblH) // 2)
 
 	; Row 2: full-width edit on its own line so the user sees the entire
 	; path even on a narrow window. Forward slashes display cleaner than the
@@ -628,26 +642,30 @@ _Onboarding_Step3() {
 	g.AddText("w" ONBOARDING_WIN_W - 40 " y+8", t("onboarding.magic_key.desc"))
 	g.SetFont("s10")
 
-	; Four pre-baked picks (Ergopti+ / fallback / AZERTY / QWERTY) plus a
-	; "custom" option that re-enables the Edit field below. Single-select
-	; radio group keeps the choice unambiguous — the user picks exactly one
-	; starting point and can override the value with anything by switching
-	; to ``custom``.
+	; Three pre-baked picks (Ergopti+ / AZERTY / QWERTY) plus a free-form
+	; "custom input" row whose Edit defaults to ``*`` — the ASCII star that
+	; used to live on its own radio. Folding it into the custom slot keeps
+	; the radio list shorter without losing the ASCII fallback for users
+	; whose font cannot render ★ cleanly.
 	;
-	; ★ (BLACK STAR) FIRST and pre-selected: it's the canonical Ergopti
-	; default (mapped to a dedicated layout key) and the value the rest of
-	; the app already calls "the magic key". The ASCII ``*`` row stays as
-	; a fallback for keyboards / fonts that don't render ★ comfortably.
+	; ★ FIRST and pre-selected: it's the canonical Ergopti default (mapped
+	; to a dedicated layout key) and the value the rest of the app already
+	; calls "the magic key".
 	g.AddText("w" ONBOARDING_WIN_W - 40 " y+14", "")
 	rBlackStar := g.AddRadio("vMK_BlackStar", t("onboarding.magic_key.option_blackstar"))
-	rStar      := g.AddRadio("y+4",           t("onboarding.magic_key.option_star"))
 	rUGrave    := g.AddRadio("y+4",           t("onboarding.magic_key.option_ugrave"))
 	rSemi      := g.AddRadio("y+4",           t("onboarding.magic_key.option_semicolon"))
 	rCustom    := g.AddRadio("y+4",           t("onboarding.magic_key.option_custom"))
 
 	; Indent the free-form input under the "Custom" radio so the visual
-	; hierarchy makes it obvious the field belongs to that option.
-	edKey := g.AddEdit("w120 x40 y+4 vMagicKeyEdit", _ob_magic_key)
+	; hierarchy makes it obvious the field belongs to that option. The
+	; placeholder value is ``*`` because the dedicated ASCII-star radio
+	; was retired (folded into this row) and ``*`` remains the canonical
+	; fallback when ★ does not render comfortably.
+	edInitial := (_ob_magic_key != "" and _ob_magic_key != ONBOARDING_DEFAULT_MAGIC_KEY
+		and _ob_magic_key != "ù" and _ob_magic_key != ";")
+		? _ob_magic_key : "*"
+	edKey := g.AddEdit("w120 x40 y+4 vMagicKeyEdit", edInitial)
 
 	; Pre-select whichever radio matches the persisted/default value. The
 	; user has been through step 2 by now, so we know whether they chose
@@ -663,10 +681,12 @@ _Onboarding_Step3() {
 	global _ob_magic_key := current_key
 	switch current_key {
 		case "★": rBlackStar.Value := 1
-		case "*": rStar.Value      := 1
 		case "ù": rUGrave.Value    := 1
 		case ";": rSemi.Value      := 1
 		default:
+			; Anything that is not one of the three pre-baked picks (★ / ù / ;)
+			; lands on the custom-input row — including the historical ``*``,
+			; which now lives inside the Edit field rather than its own radio.
 			rCustom.Value := 1
 	}
 	; The Edit is only meaningful when "Custom" is selected — disable it
@@ -674,7 +694,7 @@ _Onboarding_Step3() {
 	edKey.Enabled := (rCustom.Value = 1)
 
 	; Wire every radio so flipping selection enables/disables the Edit live.
-	for r in [rBlackStar, rStar, rUGrave, rSemi, rCustom] {
+	for r in [rBlackStar, rUGrave, rSemi, rCustom] {
 		r.OnEvent("Click", _Step3_OnRadioClick.Bind(rCustom, edKey))
 	}
 
@@ -689,7 +709,7 @@ _Onboarding_Step3() {
 	btnNext := btns[2]
 
 	btnBack.OnEvent("Click", _Step3_Back.Bind(g))
-	btnNext.OnEvent("Click", _Step3_Next.Bind(g, rBlackStar, rStar, rUGrave, rSemi, rCustom, edKey))
+	btnNext.OnEvent("Click", _Step3_Next.Bind(g, rBlackStar, rUGrave, rSemi, rCustom, edKey))
 
 	_Onboarding_Show(g)
 	global _ob_gui := g
@@ -709,17 +729,18 @@ _Step3_Back(g, *) {
 	_Onboarding_Step2()
 }
 
-_Step3_Next(g, rBlackStar, rStar, rUGrave, rSemi, rCustom, edKey, *) {
+_Step3_Next(g, rBlackStar, rUGrave, rSemi, rCustom, edKey, *) {
 	val := ""
 	if (rBlackStar.Value = 1) {
 		val := "★"
-	} else if (rStar.Value = 1) {
-		val := "*"
 	} else if (rUGrave.Value = 1) {
 		val := "ù"
 	} else if (rSemi.Value = 1) {
 		val := ";"
 	} else if (rCustom.Value = 1) {
+		; The custom Edit defaults to ``*`` so a user who picks "Custom
+		; input" but never edits the field still ends up with the historical
+		; ASCII-star fallback that used to live on its own radio.
 		val := Trim(edKey.Value)
 	}
 	; Fall back to the ★ default so the config always has a non-empty
@@ -764,10 +785,12 @@ _Onboarding_Step4() {
 	g.SetFont("s10 norm")
 
 	; Restore the previously-saved Yes/No when the wizard was re-opened over
-	; an existing config (pre-load step in _StepConfigDir_Next).
+	; an existing config (pre-load step in _StepConfigDir_Next).  Radios sit
+	; right under the red warning with the radio control's natural padding —
+	; the empty spacer text used to add a ~12 px gap that pushed the action
+	; row off the screen on smaller displays.
 	global _ob_metrics
-	g.AddText("w" ONBOARDING_WIN_W - 40 " y+12", "")
-	rYes := g.AddRadio("vMetricsChoice" . (_ob_metrics ? " Checked" : ""), t("onboarding.yes"))
+	rYes := g.AddRadio("vMetricsChoice xm y+6" . (_ob_metrics ? " Checked" : ""), t("onboarding.yes"))
 	rNo  := g.AddRadio((_ob_metrics ? "" : "Checked"), t("onboarding.no"))
 
 	btns := _Onboarding_AddNavButtons(g, t("onboarding.back"), t("onboarding.next"))
@@ -893,105 +916,131 @@ _Step5_AutoRegister(statusLbl, *) {
 	; ~2 s freeze that follows. We do not pre-update the status label to
 	; "Configuring…" because RunWait blocks the message loop — the user
 	; would never see the intermediate state.
+	;
+	; Implementation note: the previous version inlined the PS via
+	; ``powershell -Command "…"`` and ran into argv-quoting / backtick
+	; pitfalls — the script launched but silently exited without doing any
+	; work. We now write the script to a temp ``.ps1`` file and invoke it
+	; with ``-File``, which sidesteps every shell-quoting question.
 	global _ob_register_pending := false  ; never defer anymore
 
-	PsCmd := _Onboarding_BuildGesturePsScript()
+	ScriptPath := A_Temp . "\ergopti_gesture_config.ps1"
+	try {
+		if FileExist(ScriptPath)
+			FileDelete(ScriptPath)
+		FileAppend(_Onboarding_BuildGesturePsScript(), ScriptPath, "UTF-8")
+	} catch as e {
+		try LoggerError("onboarding", "Could not write gesture PS script to '{1}': {2}.", ScriptPath, e.Message)
+		_Step5_ShowGestureStatus(statusLbl, false)
+		return
+	}
+
 	exitCode := -1
 	try {
-		exitCode := RunWait('*RunAs powershell.exe -NoProfile -WindowStyle Hidden -Command "' . PsCmd . '"', , "Hide")
+		exitCode := RunWait('*RunAs powershell.exe -NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File "' . ScriptPath . '"', , "Hide")
 	} catch as e {
 		try LoggerError("onboarding", "Gesture auto-config powershell threw: {1}.", e.Message)
 		exitCode := -1
 	}
 
+	; Clean up the temp script so the user doesn't accumulate junk in %TEMP%.
+	try FileDelete(ScriptPath)
+
 	if (exitCode == 0) {
 		try LoggerSuccess("onboarding", "Gesture auto-configuration succeeded.")
-		try {
-			statusLbl.SetFont("s9 cGreen")
-			statusLbl.Text    := t("onboarding.gestures.register_success")
-			statusLbl.Visible := true
-		}
+		_Step5_ShowGestureStatus(statusLbl, true)
 	} else {
 		try LoggerWarn("onboarding", "Gesture auto-configuration failed (exitCode={1}).", exitCode)
-		try {
-			statusLbl.SetFont("s9 cRed")
-			statusLbl.Text    := t("onboarding.gestures.register_failed")
-			statusLbl.Visible := true
-		}
+		_Step5_ShowGestureStatus(statusLbl, false)
 	}
 }
 
-; Builds a single-line PowerShell command that writes every PrecisionTouchPad
+_Step5_ShowGestureStatus(statusLbl, ok) {
+	try {
+		statusLbl.SetFont("s9 " . (ok ? "cGreen" : "cRed"))
+		statusLbl.Text    := t(ok ? "onboarding.gestures.register_success"
+			: "onboarding.gestures.register_failed")
+		statusLbl.Visible := true
+	}
+}
+
+; Builds a self-contained PowerShell script that writes every PrecisionTouchPad
 ; registry value AND restarts the touchpad PnP device so the new gesture map
 ; takes effect without a logout. Values are hardcoded inline — they mirror the
 ; ``GESTURE_REG_*`` maps in modules/gestures.ahk but live here so the wizard
 ; can call them before that module's auto-execute runs. Keep both copies in
 ; sync when adding / changing gesture slots.
+;
+; The returned text is a full .ps1 script (multi-line, comments allowed)
+; written to a temp file by the caller — running it via ``-File`` avoids the
+; argv-quoting issues that plagued the previous ``-Command`` inline variant.
 _Onboarding_BuildGesturePsScript() {
 	; KeyParams encoding: (VK << 16) | 0x07 where 0x07 = Ctrl|Shift|Win.
-	; F1..F10 = 0x70..0x79. Pre-computed below for clarity at the call site.
-	HashEntries := [
-		; Master enables — turn the gesture families on
-		"'ThreeFingerSlideEnabled'=65535",
-		"'ThreeFingerTapEnabled'=65535",
-		"'FourFingerSlideEnabled'=65535",
-		"'FourFingerTapEnabled'=65535",
-		; Per-direction enables (swipe slots only)
-		"'ThreeFingerUp'=65535",
-		"'ThreeFingerDown'=65535",
-		"'ThreeFingerLeft'=65535",
-		"'ThreeFingerRight'=65535",
-		"'FourFingerUp'=65535",
-		"'FourFingerDown'=65535",
-		"'FourFingerLeft'=65535",
-		"'FourFingerRight'=65535",
-		; CustomXFingerTap=7 sentinel ("user-defined shortcut")
-		"'CustomThreeFingerTap'=7",
-		"'CustomFourFingerTap'=7",
-		; KeyParams — actual Fn key encoding for each slot
-		"'CustomThreeFingerTapKeyParams'=7340039", ; F1
-		"'ThreeFingerUpKeyParams'=7405575",        ; F2
-		"'ThreeFingerDownKeyParams'=7471111",      ; F3
-		"'ThreeFingerLeftKeyParams'=7536647",      ; F4
-		"'ThreeFingerRightKeyParams'=7602183",     ; F5
-		"'CustomFourFingerTapKeyParams'=7667719",  ; F6
-		"'FourFingerUpKeyParams'=7733255",         ; F7
-		"'FourFingerDownKeyParams'=7798791",       ; F8
-		"'FourFingerLeftKeyParams'=7864327",       ; F9
-		"'FourFingerRightKeyParams'=7929863",      ; F10
-		; New-system *Action = 65535 disables them so KeyParams wins
-		"'ThreeFingerTapAction'=65535",
-		"'ThreeFingerSlideUpAction'=65535",
-		"'ThreeFingerSlideDownAction'=65535",
-		"'ThreeFingerSlideLeftAction'=65535",
-		"'ThreeFingerSlideRightAction'=65535",
-		"'FourFingerTapAction'=65535",
-		"'FourFingerSlideUpAction'=65535",
-		"'FourFingerSlideDownAction'=65535",
-		"'FourFingerSlideLeftAction'=65535",
-		"'FourFingerSlideRightAction'=65535",
-	]
-	; Glue with ``;`` — PowerShell uses semicolons inside @{} hashtable literals.
-	HashBody := ""
-	for entry in HashEntries {
-		HashBody .= (HashBody == "" ? "" : ";") . entry
-	}
-
-	; The PS body. Backticks in the original GestureRestartTouchpadDevice
-	; helper escape ``$`` for PowerShell ; here ``$false`` is plain because
-	; we sit at the outermost PowerShell parse level (no nested ``-Command``).
-	Ps := "$ErrorActionPreference='Stop';"
-		. "$Reg='HKCU:\Software\Microsoft\Windows\CurrentVersion\PrecisionTouchPad';"
-		. "$V=@{" . HashBody . "};"
-		. "try{"
-		. "foreach($n in $V.Keys){Set-ItemProperty -Path $Reg -Name $n -Value $V[$n] -Type DWord -Force};"
-		. "$devs=Get-PnpDevice -PresentOnly | Where-Object {$_.Class -eq 'HIDClass' -and $_.FriendlyName -match 'Input Configuration|I2C HID'};"
-		. "foreach($d in $devs){Disable-PnpDevice -InstanceId $d.InstanceId -Confirm:`$false -ErrorAction SilentlyContinue};"
-		. "Start-Sleep -Milliseconds 500;"
-		. "foreach($d in $devs){Enable-PnpDevice -InstanceId $d.InstanceId -Confirm:`$false -ErrorAction SilentlyContinue};"
-		. "exit 0"
-		. "}catch{exit 1}"
-	return Ps
+	; F1..F10 = 0x70..0x79. Pre-computed in the script body for clarity.
+	return "
+		(
+		`$ErrorActionPreference = 'Stop'
+		`$Reg = 'HKCU:\Software\Microsoft\Windows\CurrentVersion\PrecisionTouchPad'
+		`$V = @{
+			# Master enables — turn the gesture families on
+			'ThreeFingerSlideEnabled' = 65535
+			'ThreeFingerTapEnabled'   = 65535
+			'FourFingerSlideEnabled'  = 65535
+			'FourFingerTapEnabled'    = 65535
+			# Per-direction enables (swipe slots only)
+			'ThreeFingerUp'    = 65535
+			'ThreeFingerDown'  = 65535
+			'ThreeFingerLeft'  = 65535
+			'ThreeFingerRight' = 65535
+			'FourFingerUp'     = 65535
+			'FourFingerDown'   = 65535
+			'FourFingerLeft'   = 65535
+			'FourFingerRight'  = 65535
+			# CustomXFingerTap = 7 sentinel (user-defined shortcut)
+			'CustomThreeFingerTap' = 7
+			'CustomFourFingerTap'  = 7
+			# KeyParams — Fn key encoding for each slot (Ctrl+Win+Shift+Fn)
+			'CustomThreeFingerTapKeyParams' = 7340039   # F1
+			'ThreeFingerUpKeyParams'        = 7405575   # F2
+			'ThreeFingerDownKeyParams'      = 7471111   # F3
+			'ThreeFingerLeftKeyParams'      = 7536647   # F4
+			'ThreeFingerRightKeyParams'     = 7602183   # F5
+			'CustomFourFingerTapKeyParams'  = 7667719   # F6
+			'FourFingerUpKeyParams'         = 7733255   # F7
+			'FourFingerDownKeyParams'       = 7798791   # F8
+			'FourFingerLeftKeyParams'       = 7864327   # F9
+			'FourFingerRightKeyParams'      = 7929863   # F10
+			# *Action = 65535 disables the new-system actions so KeyParams wins
+			'ThreeFingerTapAction'        = 65535
+			'ThreeFingerSlideUpAction'    = 65535
+			'ThreeFingerSlideDownAction'  = 65535
+			'ThreeFingerSlideLeftAction'  = 65535
+			'ThreeFingerSlideRightAction' = 65535
+			'FourFingerTapAction'         = 65535
+			'FourFingerSlideUpAction'     = 65535
+			'FourFingerSlideDownAction'   = 65535
+			'FourFingerSlideLeftAction'   = 65535
+			'FourFingerSlideRightAction'  = 65535
+		}
+		try {
+			foreach (`$n in `$V.Keys) {
+				Set-ItemProperty -Path `$Reg -Name `$n -Value `$V[`$n] -Type DWord -Force
+			}
+			`$devs = Get-PnpDevice -PresentOnly | Where-Object {
+				`$_.Class -eq 'HIDClass' -and `$_.FriendlyName -match 'Input Configuration|I2C HID'
+			}
+			foreach (`$d in `$devs) {
+				Disable-PnpDevice -InstanceId `$d.InstanceId -Confirm:`$false -ErrorAction SilentlyContinue
+			}
+			Start-Sleep -Milliseconds 500
+			foreach (`$d in `$devs) {
+				Enable-PnpDevice -InstanceId `$d.InstanceId -Confirm:`$false -ErrorAction SilentlyContinue
+			}
+			exit 0
+		} catch {
+			exit 1
+		}
+		)"
 }
 
 _Step5_ShowManualTutorial(parentGui, *) {

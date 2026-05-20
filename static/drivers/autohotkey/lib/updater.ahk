@@ -77,9 +77,29 @@ global _UpdaterBackgroundFn        := unset
 ; ===================================
 
 ; Loads the saved channel from config.toml (via the shared INI cache).
-; Falls back to "main" when absent.
+;
+; Priority order:
+;   1. ``[Updater] UpdateChannel`` in config.toml — explicit user override
+;      via the tray menu's "Update channel" submenu.
+;   2. ``BUNDLE_CHANNEL`` stamped at build time — "dev" for pre-release exes,
+;      "main" for stable. This means a user who downloads a dev pre-release
+;      stays on dev (and gets pre-release update notifications) without
+;      flipping any setting; the same exe published to main defaults to
+;      "main".
+;   3. Hardcoded "main" — last-resort default for dev / source-tree runs
+;      where the build placeholder was never replaced.
 Updater_LoadChannel() {
 	global _IniCache, UPDATER_CHANNEL, UPDATER_INI_SECTION, UPDATER_INI_KEY
+	global BUNDLE_CHANNEL
+
+	; Step 2: seed from the build-stamped channel first (overridden below if
+	; the user has an explicit config-file override).
+	if IsSet(BUNDLE_CHANNEL)
+		and (BUNDLE_CHANNEL == "main" or BUNDLE_CHANNEL == "dev") {
+		UPDATER_CHANNEL := BUNDLE_CHANNEL
+	}
+
+	; Step 1: explicit user override always wins.
 	if IsSet(_IniCache) {
 		raw := IniCacheGet(_IniCache, UPDATER_INI_SECTION, UPDATER_INI_KEY)
 		if (raw != "_" and (raw == "main" or raw == "dev"))
