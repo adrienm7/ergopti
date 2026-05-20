@@ -239,14 +239,45 @@ LLM_Engine_FirePrediction(ctx) {
 	if !_LLM_Engine["enabled"] || ctx == ""
 		return
 
-	; Cache hit: re-display last result without an API call. The cache is
-	; an array of slot strings so the multi-prediction reveal animation
-	; replays exactly as it did the first time.
+	; Cache hit (exact match): re-display last result without an API call.
+	; The cache is an array of slot strings so the multi-prediction reveal
+	; animation replays exactly as it did the first time.
 	if (ctx == _LLM_Engine["last_ctx"] && _LLM_Engine.Has("last_results")
 			and Type(_LLM_Engine["last_results"]) == "Array"
 			and _LLM_Engine["last_results"].Length > 0) {
 		LLM_Engine_OnResults(_LLM_Engine["last_results"], ctx, 1, true)
 		return
+	}
+
+	; Cache hit (prefix match): the user has typed PAST the last cached
+	; context — e.g. cache was for ``"intelligen"`` and the user is now
+	; at ``"intelligence "``. If the cached top prediction STARTS with
+	; the user's typed delta, the rest of the prediction is still valid
+	; and we can re-display it (sliced to whatever remains). Mirrors the
+	; "soft cache" some IDE completions use: avoid a request when the
+	; previous answer was correct, just consumed partially.
+	if (_LLM_Engine.Has("last_ctx") and _LLM_Engine["last_ctx"] != ""
+			and _LLM_Engine.Has("last_results")
+			and Type(_LLM_Engine["last_results"]) == "Array"
+			and _LLM_Engine["last_results"].Length > 0
+			and StrLen(ctx) > StrLen(_LLM_Engine["last_ctx"])
+			and SubStr(ctx, 1, StrLen(_LLM_Engine["last_ctx"])) == _LLM_Engine["last_ctx"]) {
+		typed_delta := SubStr(ctx, StrLen(_LLM_Engine["last_ctx"]) + 1)
+		; Slice each cached slot by removing the prefix the user has
+		; already typed. Only slots whose start equals typed_delta
+		; contribute; the others are dropped (they don't match what
+		; the user is now committed to typing).
+		sliced := []
+		for s in _LLM_Engine["last_results"] {
+			if (StrLen(s) > StrLen(typed_delta)
+					and SubStr(s, 1, StrLen(typed_delta)) == typed_delta) {
+				sliced.Push(SubStr(s, StrLen(typed_delta) + 1))
+			}
+		}
+		if (sliced.Length > 0) {
+			LLM_Engine_OnResults(sliced, ctx, 1, true)
+			return
+		}
 	}
 
 	; ── Backend-aware request floor ──
@@ -329,10 +360,17 @@ LLM_Engine_FirePrediction(ctx) {
 	} else {
 		model_tag := LLM_ResolveOllamaTag(_LLM_Engine["model"])
 		log_model := model_tag
+		; Forward the per-profile stop sequences when the profile carries
+		; them. Power-user profiles use this to clip output at custom
+		; markers (e.g. ``"```"`` for a code profile, ``"\n\n"`` for a
+		; single-paragraph profile). Empty / missing → Ollama falls back
+		; to its built-in stops.
+		stop_seqs := (profile is Map and profile.Has("stop_sequences") and profile["stop_sequences"] is Array)
+			? profile["stop_sequences"] : ""
 		dispatch_fn := (temp, on_succ, on_fail) =>
-			LLM_OllamaGenerate_Async(model_tag, system_prompt, ctx, temp, on_succ, on_fail)
+			LLM_OllamaGenerate_Async(model_tag, system_prompt, ctx, temp, on_succ, on_fail, stop_seqs)
 		dispatch_stream_fn := (temp, on_partial, on_succ, on_fail) =>
-			LLM_OllamaGenerate_Streaming(model_tag, system_prompt, ctx, temp, on_partial, on_succ, on_fail)
+			LLM_OllamaGenerate_Streaming(model_tag, system_prompt, ctx, temp, on_partial, on_succ, on_fail, stop_seqs)
 	}
 
 	; ── Batch vs sequential dispatch ──

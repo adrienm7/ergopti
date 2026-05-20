@@ -196,7 +196,7 @@ LLM_ParseProfileObject(obj) {
 	m := Map()
 
 	; Extract string fields
-	for key in ["id", "system_single", "system_multi", "system_multi_template", "raw_prompt"] {
+	for key in ["id", "label", "system_single", "system_multi", "system_multi_template", "raw_prompt"] {
 		if RegExMatch(obj, '"' key '"\s*:\s*"((?:[^"\\]|\\.)*)"', &match)
 			m[key] := LLM_UnescapeJSON(match[1])
 		else
@@ -208,6 +208,21 @@ LLM_ParseProfileObject(obj) {
 		m["batch"] := (match[1] == "true")
 	else
 		m["batch"] := false
+
+	; Extract ``stop_sequences`` — optional string array. Power-user
+	; profiles can use this to clip generation at custom markers (e.g.
+	; ``"```"`` for a code profile, ``"\n\n"`` for a single-paragraph
+	; profile). Empty when the field is absent — Ollama then falls back
+	; to its own built-in stops.
+	m["stop_sequences"] := []
+	if RegExMatch(obj, '"stop_sequences"\s*:\s*\[([^\]]*)\]', &match) {
+		body := match[1]
+		pos := 1
+		while RegExMatch(body, '"((?:[^"\\]|\\.)*)"', &sm, pos) {
+			m["stop_sequences"].Push(LLM_UnescapeJSON(sm[1]))
+			pos := sm.Pos + sm.Len
+		}
+	}
 
 	return m
 }

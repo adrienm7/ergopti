@@ -186,13 +186,13 @@ LLM_OllamaListModels() {
  * @param {function} on_fail       - Callback fired on any failure.
  * @returns {Integer} The request id (use with LLM_OllamaCancelAsync to abort).
  */
-LLM_OllamaGenerate_Async(model, system_prompt, user_text, temperature, on_success, on_fail) {
+LLM_OllamaGenerate_Async(model, system_prompt, user_text, temperature, on_success, on_fail, stop_sequences := "") {
 	global _LLM_Ollama_Async, _LLM_Ollama_AsyncCounter, LLM_OLLAMA_BASE_URL, LLM_OLLAMA_TIMEOUT
 
 	_LLM_Ollama_AsyncCounter += 1
 	req_id := _LLM_Ollama_AsyncCounter
 
-	payload := LLM_BuildOllamaPayload(model, system_prompt, user_text, temperature)
+	payload := LLM_BuildOllamaPayload(model, system_prompt, user_text, temperature, false, stop_sequences)
 	try {
 		http := ComObject("WinHttp.WinHttpRequest.5.1")
 		http.Open("POST", LLM_OLLAMA_BASE_URL "/api/generate", true)
@@ -399,9 +399,9 @@ LLM_OllamaWarmup(model) {
  * @returns {Object} A handle ``{ Pid, Cancelled }`` callers can pass to
  *                   LLM_OllamaCancelStream to terminate the curl process.
  */
-LLM_OllamaGenerate_Streaming(model, system_prompt, user_text, temperature, on_partial, on_success, on_fail) {
+LLM_OllamaGenerate_Streaming(model, system_prompt, user_text, temperature, on_partial, on_success, on_fail, stop_sequences := "") {
 	; Build the streaming payload — ``stream:true`` flips Ollama to JSONL.
-	payload := LLM_BuildOllamaPayload(model, system_prompt, user_text, temperature, true)
+	payload := LLM_BuildOllamaPayload(model, system_prompt, user_text, temperature, true, stop_sequences)
 
 	; Write the payload to a temp file (curl --data-binary @file). Avoids
 	; command-line length limits and shell escaping headaches with the JSON
@@ -614,9 +614,15 @@ _Q(s) {
  * @param {boolean} streaming     - When true, emits ``stream:true`` for the
  *                                  curl-based streaming path; default false
  *                                  matches the existing sync caller behaviour.
+ * @param {Array}   stop_sequences - Optional array of strings the model
+ *                                   must stop generating at. When empty
+ *                                   (the default), Ollama uses its own
+ *                                   built-in stops. Power-user profiles
+ *                                   can override via the ``stop_sequences``
+ *                                   field on the profile JSON record.
  * @returns {string} JSON string ready to send.
  */
-LLM_BuildOllamaPayload(model, system_prompt, user_text, temperature, streaming := false) {
+LLM_BuildOllamaPayload(model, system_prompt, user_text, temperature, streaming := false, stop_sequences := "") {
 	EscapeJSON(s) {
 		s := StrReplace(s, "\", "\\")
 		s := StrReplace(s, '"', '\"')
@@ -626,11 +632,21 @@ LLM_BuildOllamaPayload(model, system_prompt, user_text, temperature, streaming :
 	}
 
 	stream_field := streaming ? "true" : "false"
+	options := '"temperature":' temperature
+	if (stop_sequences != "" and Type(stop_sequences) == "Array" and stop_sequences.Length > 0) {
+		stops_json := ""
+		for s in stop_sequences {
+			if (stops_json != "")
+				stops_json .= ","
+			stops_json .= '"' . EscapeJSON(s) . '"'
+		}
+		options .= ',"stop":[' . stops_json . ']'
+	}
 	return '{"model":"' EscapeJSON(model) '",'
 		. '"system":"' EscapeJSON(system_prompt) '",'
 		. '"prompt":"' EscapeJSON(user_text) '",'
 		. '"stream":' stream_field ','
-		. '"options":{"temperature":' temperature '}}'
+		. '"options":{' options '}}'
 }
 
 /**
