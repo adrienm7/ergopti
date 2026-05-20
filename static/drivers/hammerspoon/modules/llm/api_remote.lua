@@ -92,8 +92,11 @@ M.PROVIDER_ORDER = { "openai", "anthropic", "gemini", "openai_compat" }
 local REQUEST_TIMEOUT_S = 30
 
 local DEDUPLICATION_ENABLED      = ApiCommon.DEFAULT_DEDUPLICATION_ENABLED
-local RETRY_FAILED_PREDICTION    = true
-local RETRY_FAILED_MAX_MULT      = 2
+-- Retry policy from _shared/llm/inference.json (api_common.lua) so the
+-- remote backend tracks the same retry budget as Ollama / MLX.
+local _R_MAX_MULT, _R_TEMP_STEP, _R_EXTRA_TOKENS = ApiCommon.get_retry_policy()
+local RETRY_FAILED_PREDICTION    = (_R_MAX_MULT or 0) > 1
+local RETRY_FAILED_MAX_MULT      = _R_MAX_MULT
 
 
 
@@ -630,8 +633,8 @@ function M.fetch_sequential(full_text, tail_text, model_name, temperature,
 				end,
 				function()
 					if attempt < 2 then
-						local retry_tokens = tokens + 5
-						local retry_temp   = math.min(1.30, (tonumber(temp) or 0.1) + 0.18)
+						local retry_tokens = tokens + (_R_EXTRA_TOKENS or 5)
+						local retry_temp   = math.min(1.30, (tonumber(temp) or 0.1) + (_R_TEMP_STEP or 0.18))
 						request_variant(attempt + 1, retry_tokens, retry_temp)
 						return
 					end

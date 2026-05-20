@@ -1,0 +1,31 @@
+{
+	"_comment": "Single source of truth for LLM INFERENCE constants — diversity temperature, dedup, retry, rate-limit floor. Both drivers (HS api_common.lua and AHK api_common.ahk) load this file at boot. Change a value here and it propagates to both backends in lockstep.",
+
+	"diversity_temperature": {
+		"_comment":      "Per-variant temperature increment when generating N predictions sequentially. The step depends on the user's base temperature: low base → bigger step to compensate, high base → smaller step so variants stay coherent. effective_base raises a low base to 0.20 starting at variant 2 so the first variant stays faithful to the user's setting but the following ones have headroom.",
+		"step_when_base_le_0_15":  0.24,
+		"step_when_base_le_0_35":  0.18,
+		"step_default":            0.12,
+		"effective_base_floor":    0.20,
+		"max_temperature":         1.30
+	},
+
+	"dedup": {
+		"_comment": "Exact-text deduplication of predictions. When two variants produce the same to_type string, the second is dropped and counted as a duplicate.",
+		"enabled_by_default": true
+	},
+
+	"retry": {
+		"_comment":           "On a per-variant failure (HTTP error, empty completion, parse failure), the sequential fetch retries up to max_multiplier × requested_predictions attempts in total. retry_temperature_step is added on top of the diversity step for the second attempt.",
+		"max_multiplier":            2,
+		"retry_temperature_step":    0.18,
+		"retry_extra_tokens":        5
+	},
+
+	"rate_limit_min_interval_ms": {
+		"_comment": "Minimum interval between two consecutive prediction requests per backend. Floors the user's debounce so paid API providers are protected from per-keystroke token burn, and local backends save GPU energy on back-to-back calls.",
+		"ollama": 300,
+		"mlx":    300,
+		"api":    500
+	}
+}

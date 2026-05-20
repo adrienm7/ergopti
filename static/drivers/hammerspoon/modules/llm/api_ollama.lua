@@ -23,8 +23,14 @@ local _req_counter = 0
 local _ollama_started = false
 local _model_cache = {}
 local DEDUPLICATION_ENABLED = ApiCommon.DEFAULT_DEDUPLICATION_ENABLED
-local RETRY_FAILED_PREDICTION_ENABLED = true
-local RETRY_FAILED_PREDICTION_MAX_MULTIPLIER = 2
+-- Retry policy lives in _shared/llm/inference.json so the AHK twin can read
+-- the same numbers. ``max_mult`` is the upper bound on attempts as a
+-- multiple of requested_predictions; ``retry_temp_step`` is added on top of
+-- the diversity step for the 2nd attempt; ``retry_extra_tokens`` gives the
+-- retry a larger budget so a too-short first attempt has room to finish.
+local _RETRY_MAX_MULT, _RETRY_TEMP_STEP, _RETRY_EXTRA_TOKENS = ApiCommon.get_retry_policy()
+local RETRY_FAILED_PREDICTION_ENABLED        = (_RETRY_MAX_MULT or 0) > 1
+local RETRY_FAILED_PREDICTION_MAX_MULTIPLIER = _RETRY_MAX_MULT
 
 -- Holds the current in-flight hs.task; cancelled when a new streaming request starts.
 -- The streaming flag itself is owned by modules/llm/init.lua and passed per-call.
@@ -689,8 +695,8 @@ function M.fetch_sequential(full_text, tail_text, model_name, temperature,
 				end,
 				function()
 					if attempt < 2 then
-						local retry_tokens = tokens + 5
-						local retry_temp   = math.min(1.30, (tonumber(temp) or 0.1) + 0.18)
+						local retry_tokens = tokens + (_RETRY_EXTRA_TOKENS or 5)
+						local retry_temp   = math.min(1.30, (tonumber(temp) or 0.1) + (_RETRY_TEMP_STEP or 0.18))
 						Logger.debug(LOG, "[%s] Variant %d/%d quick retry: tokens=%d temp=%.2f",
 							model_name, variant_index, max_attempts, retry_tokens, retry_temp)
 						-- Retry does not stream partial updates (would overwrite the growing preview)

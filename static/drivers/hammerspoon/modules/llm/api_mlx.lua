@@ -22,8 +22,10 @@ if not ok_kl then keylogger = nil end
 
 local _req_counter = 0
 local DEDUPLICATION_ENABLED = false
-local RETRY_FAILED_PREDICTION_ENABLED = true
-local RETRY_FAILED_PREDICTION_MAX_MULTIPLIER = 2
+-- Retry policy comes from _shared/llm/inference.json (see api_common.lua).
+local _RETRY_MAX_MULT, _RETRY_TEMP_STEP, _RETRY_EXTRA_TOKENS = ApiCommon.get_retry_policy()
+local RETRY_FAILED_PREDICTION_ENABLED        = (_RETRY_MAX_MULT or 0) > 1
+local RETRY_FAILED_PREDICTION_MAX_MULTIPLIER = _RETRY_MAX_MULT
 local STREAM_CONNECT_TIMEOUT_SEC = 5    -- Fail fast if the MLX server does not accept the TCP connection
 local STREAM_HARD_TIMEOUT_SEC    = 90   -- Kill the task if the server accepts but never sends a token; large models need up to 60 s to load weights
 local WARMUP_POST_TIMEOUT_SEC    = 30   -- Unblock _warmup_in_flight if the single-token POST never returns
