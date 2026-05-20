@@ -1210,8 +1210,16 @@ initMenu() {
 	; First item: clicking the version label opens the release page DIRECTLY,
 	; with no intermediate dialog. The URL is the build-stamped
 	; BUNDLE_RELEASE_URL (deep-links to the exact running version) when
-	; available, the channel "latest" page otherwise.
-	AboutMenu.Add(VerLabel, Updater_OpenCurrentRelease)
+	; available, the channel "latest" page otherwise. In local-source mode
+	; there is no meaningful release page (the running code is whatever the
+	; dev tree happens to have on disk, not anything published) so the click
+	; handler is a no-op and the item is greyed out to hint at that.
+	if Updater_IsLocalSource() {
+		AboutMenu.Add(VerLabel, (*) => NoAction())
+		AboutMenu.Disable(VerLabel)
+	} else {
+		AboutMenu.Add(VerLabel, Updater_OpenCurrentRelease)
+	}
 	AboutMenu.Add() ; Separator
 	global UPDATER_CHANNEL, UPDATER_CHECK_INTERVAL, UPDATER_INTERVAL_PRESETS
 	global UPDATER_LATEST_RELEASE
