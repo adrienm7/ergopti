@@ -405,8 +405,11 @@ LLM_OllamaGenerate_Streaming(model, system_prompt, user_text, temperature, on_pa
 
 	; Write the payload to a temp file (curl --data-binary @file). Avoids
 	; command-line length limits and shell escaping headaches with the JSON
-	; quotes.
-	tmp_payload := A_Temp . "\ergopti_ollama_" . A_TickCount . ".json"
+	; quotes. The filename mixes the tick count with a per-call counter so
+	; two streams fired in the same millisecond can't share a file.
+	_LLM_Ollama_StreamCleanupOrphans()
+	uid := _LLM_Ollama_NextStreamUid()
+	tmp_payload := A_Temp . "\ergopti_ollama_" . uid . ".json"
 	try {
 		fh := FileOpen(tmp_payload, "w", "UTF-8")
 		fh.Write(payload)
@@ -416,7 +419,7 @@ LLM_OllamaGenerate_Streaming(model, system_prompt, user_text, temperature, on_pa
 		return { Pid: 0, Cancelled: false }
 	}
 
-	tmp_stdout := A_Temp . "\ergopti_ollama_" . A_TickCount . ".out"
+	tmp_stdout := A_Temp . "\ergopti_ollama_" . uid . ".out"
 	; -N = no-buffer, -s = silent, -X POST + URL, -H Content-Type
 	cmd := A_ComSpec . ' /c curl.exe -N -s -X POST '
 		. '-H "Content-Type: application/json" '
@@ -508,8 +511,14 @@ _LLM_Ollama_ConsumeStreamChunk(chunk, state, on_partial) {
 	full := leftover . chunk
 	lines := StrSplit(full, "`n", "`r")
 	new_acc := state["acc"]
-	; If the chunk ends mid-line, the last piece is incomplete.
-	if (SubStr(chunk, -1) != "`n") {
+	; If the chunk ends mid-line, the last piece is incomplete and we
+	; buffer it back for the next tick. Reading the very last character
+	; via ``SubStr(chunk, StrLen(chunk), 1)`` is unambiguous; the
+	; previous ``SubStr(chunk, -1)`` form was reading the last UTF-16
+	; code unit, which on chunks ending with ``\r\n`` would miss the
+	; \n and mistakenly keep the empty trailing string as "leftover".
+	last_char := (StrLen(chunk) > 0) ? SubStr(chunk, StrLen(chunk), 1) : ""
+	if (last_char != "`n") {
 		state["leftover"] := lines[lines.Length]
 		lines.RemoveAt(lines.Length)
 	} else {
@@ -547,6 +556,39 @@ _LLM_Ollama_CleanupStreamFiles(handle) {
 		return
 	try FileDelete(handle.TmpPayload)
 	try FileDelete(handle.TmpStdout)
+}
+
+; Per-call counter so two streams fired in the same millisecond cannot
+; collide on the temp filenames. Combined with A_TickCount this is enough
+; for uniqueness across the lifetime of a single script instance.
+global _LLM_Ollama_StreamCounter := 0
+
+_LLM_Ollama_NextStreamUid() {
+	global _LLM_Ollama_StreamCounter
+	_LLM_Ollama_StreamCounter += 1
+	return A_TickCount . "_" . _LLM_Ollama_StreamCounter
+}
+
+; Wipes any leftover ``ergopti_ollama_*`` temp files older than 60 s. Runs
+; before each new stream so a previous AHK instance that crashed mid-stream
+; (Power loss, hard kill, …) never leaks files indefinitely. The 60 s
+; window is generous — typical predictions complete in 1-3 s and any
+; legitimate in-flight stream on a fresh AHK instance is younger than that.
+_LLM_Ollama_StreamCleanupOrphans() {
+	now := A_Now
+	loop files, A_Temp . "\ergopti_ollama_*.json"
+		_LLM_Ollama_TryDeleteIfOld(A_LoopFilePath, A_LoopFileTimeModified, now)
+	loop files, A_Temp . "\ergopti_ollama_*.out"
+		_LLM_Ollama_TryDeleteIfOld(A_LoopFilePath, A_LoopFileTimeModified, now)
+}
+
+_LLM_Ollama_TryDeleteIfOld(path, file_time, now) {
+	try {
+		age_s := DateDiff(now, file_time, "Seconds")
+		if (age_s > 60)
+			try FileDelete(path)
+	} catch {
+	}
 }
 
 ; Tiny helper: wrap a path in double quotes for CMD. Not exported.

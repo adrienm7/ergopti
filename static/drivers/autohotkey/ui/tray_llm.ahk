@@ -1247,6 +1247,14 @@ _LLM_Tray_FireHealthProbe() {
 		return
 	if !_LLM_Tray["enabled"]
 		return
+	; Throttle to one probe every 3 seconds. Opening the tray menu fires a
+	; rebuild which calls this helper; without the throttle the user
+	; opening the menu twice in 100 ms would fire two redundant pings.
+	now := A_TickCount
+	last := _LLM_Tray.Has("last_health_probe_tick") ? _LLM_Tray["last_health_probe_tick"] : 0
+	if (last > 0 and (now - last) < 3000)
+		return
+	_LLM_Tray["last_health_probe_tick"] := now
 	try {
 		LLM_OllamaIsRunning_Async((reachable) => _LLM_Tray_OnHealthProbeDone(reachable))
 	}

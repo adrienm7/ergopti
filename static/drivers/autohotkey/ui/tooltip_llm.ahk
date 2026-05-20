@@ -118,7 +118,11 @@ LLM_Tooltip_Show(payload, active := 1) {
 		return
 
 	_LLM_Tooltip_Slots := slots
-	_LLM_Tooltip_ActiveIdx := Max(1, Min(active, slots.Length))
+	; Clamp the active index defensively — callers may pass an idx that
+	; was valid for a previous slot array but is now out of bounds (a
+	; variant failed and the array shrank between renders). Reading
+	; outside the array would throw in _Render and kill the tooltip.
+	_LLM_Tooltip_ActiveIdx := Max(1, Min(Integer(active), slots.Length))
 	_LLM_Tooltip_Visible := true
 	_LLM_Tooltip_Render()
 
