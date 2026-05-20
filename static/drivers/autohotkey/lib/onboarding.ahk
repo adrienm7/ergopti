@@ -417,7 +417,20 @@ _StepConfigDir_Browse(g, dirEdit, *) {
 	startDir := StrReplace(Trim(dirEdit.Value), "/", "\")
 	if (startDir == "" or !DirExist(startDir))
 		startDir := A_MyDocuments
-	selected := DirSelect("*" . startDir, 1, t("dialog.config_folder.select_title"))
+	; The wizard window is +AlwaysOnTop so it never gets occluded by other
+	; apps mid-setup. But ``DirSelect`` opens a *system* shell dialog which
+	; honours topmost z-order too, and on Windows the parent topmost wins
+	; the tie — leaving the picker entirely behind the wizard and the user
+	; staring at a frozen UI. Drop the wizard's topmost flag for the
+	; duration of the picker, then restore it afterwards (try-wrapped so a
+	; user-cancel still re-arms AlwaysOnTop instead of leaving the wizard
+	; demoted to a normal window).
+	try g.Opt("-AlwaysOnTop")
+	selected := ""
+	try {
+		selected := DirSelect("*" . startDir, 1, t("dialog.config_folder.select_title"))
+	}
+	try g.Opt("+AlwaysOnTop")
 	if (selected != "") {
 		selected := StrReplace(selected, "\", "/")
 		if !RegExMatch(selected, "/$")
