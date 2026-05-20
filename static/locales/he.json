@@ -1904,6 +1904,6 @@
 	"updater.up_to_date": "ErgoptiPlus מעודכן.\n\nגרסה נוכחית: {1}",
 	"updater.version_message": "ErgoptiPlus {1}{2}\n\nלפתוח את עמוד ההפצות ב-GitHub?",
 	"vscode.reload_required": "טען מחדש את VSCode (Cmd+Shift+P > Reload Window) להפעלת תוסף הכתיבה",
-	"menu.llm.warning_install_ollama": "⚠️  Ollama אינו מותקן — לחץ כדי להפעיל מחדש את ההתקנה",
+	"menu.llm.warning_install_ollama": "📥 התקן את Ollama עכשיו",
 	"llm.deps.browser_install_tip": "הורד את Ollama עבור Windows מהדף שנפתח בדפדפן, הפעל את תוכנת ההתקנה וחזור לכאן — החיבור יזוהה אוטומטית."
 }
