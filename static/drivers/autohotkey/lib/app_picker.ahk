@@ -81,8 +81,12 @@ AppPicker_Show(opts) {
     ; Footer: count + buttons.
     g.AddText("xs y+10 w300 vAppPickerStatus",
         StrReplace(t("dialog.app_picker.running_count"), "{n}", rows.Length))
-    btn_ok := g.AddButton("x+10 yp-4 w100 Default", ok_label)
-    btn_cancel := g.AddButton("x+5 yp w100", t("common.cancel"))
+    ; Auto-sized OK / Cancel pair — harmonised so both buttons share the
+    ; widest natural width (prevents clipping of long localised labels like
+    ; German "Abbrechen" or Portuguese "Cancelar" inside a fixed w100).
+    btn_ok     := g.AddButton("x+10 yp-4 Default", ok_label)
+    btn_cancel := g.AddButton("x+5 yp",            t("common.cancel"))
+    Gui_HarmoniseButtonWidths([btn_ok, btn_cancel])
 
     btn_ok.OnEvent("Click", (*) => AppPicker_OnOK(g, lv, rows, on_save))
     btn_cancel.OnEvent("Click", (*) => g.Destroy())

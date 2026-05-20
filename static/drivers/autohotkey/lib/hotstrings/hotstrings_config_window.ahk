@@ -276,8 +276,12 @@ OpenHotstringsConfigWindow() {
 	G.MarginY := 12
 
 	; ----- Top action row (reset all first, then grey, no close here) ------
-	BtnReset := G.Add("Button", "w160 h28",         t("hs_config.btn_reset_all"))
-	BtnGrey  := G.Add("Button", "x+6 yp w120 h28",  t("hs_config.btn_all_gray"))
+	; Auto-sized + harmonised so both buttons share the widest label — keeps
+	; the pair aligned across locales whose verbs vary (e.g. German "Alles
+	; zurücksetzen" is much wider than English "Reset all").
+	BtnReset := G.Add("Button", "h28",         t("hs_config.btn_reset_all"))
+	BtnGrey  := G.Add("Button", "x+6 yp h28",  t("hs_config.btn_all_gray"))
+	Gui_HarmoniseButtonWidths([BtnReset, BtnGrey])
 	BtnReset.OnEvent("Click", (*) => _HCW_ResetAll())
 	BtnGrey.OnEvent("Click",  (*) => _HCW_SetAllGrey())
 
@@ -329,7 +333,13 @@ OpenHotstringsConfigWindow() {
 	G.Add("Text", "xm y+14 w526 h1 0x10")   ; horizontal rule aligned to x=540
 
 	; ----- Close button (bottom, after HR) --------------------------------
-	BtnClose := G.Add("Button", "x" . (14 + (526 - 90) // 2) . " y+14 w90 h28", t("hs_config.btn_close"))
+	; Auto-sized to the localised label (with the 90 px floor) then centred
+	; horizontally inside the 526 px content column. Computing X after the
+	; harmonise step ensures the button stays centred regardless of locale.
+	BtnClose := G.Add("Button", "xm y+14 h28", t("hs_config.btn_close"))
+	Gui_HarmoniseButtonWidths([BtnClose])
+	BtnClose.GetPos(, , &_closeW, )
+	BtnClose.Move(14 + (526 - _closeW) // 2)
 	BtnClose.OnEvent("Click", (*) => _HCWGui.Hide())
 
 	_HCWWidgets := {
