@@ -1538,9 +1538,9 @@ GestureReleaseRightClick() {
 
 ; Executes the action assigned to a gesture slot.
 GestureDispatch(slot) {
-    global GestureAssignments, GESTURE_ACTIONS, Features
+    global GestureAssignments, GESTURE_ACTIONS, FeaturesV2
 
-    if !Features["Gestures"]["Enabled"].Enabled {
+    if !FeaturesV2["gestures"]["enabled"] {
         return
     }
 
