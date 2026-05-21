@@ -181,6 +181,89 @@ global FeaturesV2 := Map(
             "tab",            false,
         ),
     ),
+    ; Phase 5 — modules/hotstrings.ahk + modules/layout.ahk read these gates
+    ; for hotstring registration and AltGr rolls. Each entry is a Map with
+    ; at least an "enabled" key; the production loader pulls extra props
+    ; (time_activation_seconds, pattern_max_length) from the manifest, but
+    ; tests don't exercise those — the "enabled" key alone is enough to
+    ; satisfy the migrated `if FeaturesV2["hotstrings"][...][...]["enabled"]`
+    ; gates without crashing.
+    "hotstrings", Map(
+        "distances_reduction", Map(
+            "qu",                    Map("enabled", true),
+            "suffixes_a",            Map("enabled", true),
+            "comma_j",               Map("enabled", true),
+            "comma_far_letters",     Map("enabled", true),
+            "dead_key_e_circumflex", Map("enabled", true),
+            "e_circumflex_e",        Map("enabled", true),
+            "space_around_symbols",  Map("enabled", true),
+        ),
+        "sfbs_reduction", Map(
+            "comma",     Map("enabled", true),
+            "e_circ",    Map("enabled", true),
+            "e_grave",   Map("enabled", true),
+            "bu",        Map("enabled", true),
+            "i_e_acute", Map("enabled", true),
+        ),
+        "rolls", Map(
+            "hc",                       Map("enabled", true),
+            "sx",                       Map("enabled", true),
+            "cx",                       Map("enabled", true),
+            "english_negation",         Map("enabled", true),
+            "ez",                       Map("enabled", true),
+            "ct",                       Map("enabled", true),
+            "close_chevron_tag",        Map("enabled", true),
+            "chevron_less",             Map("enabled", true),
+            "chevron_greater",          Map("enabled", true),
+            "chevron_equal",            Map("enabled", true),
+            "comment_open",             Map("enabled", true),
+            "comment_close",            Map("enabled", true),
+            "assign",                   Map("enabled", true),
+            "not_equal",                Map("enabled", true),
+            "paren_quote",              Map("enabled", true),
+            "bracket_quote",            Map("enabled", true),
+            "hashtag_parenthesis",      Map("enabled", true),
+            "hashtag_open_bracket",     Map("enabled", true),
+            "hashtag_close_bracket",    Map("enabled", true),
+            "hashtag_quote",            Map("enabled", true),
+            "equal_string",             Map("enabled", true),
+            "left_arrow",               Map("enabled", true),
+            "assign_arrow_equal_right", Map("enabled", true),
+            "assign_arrow_equal_left",  Map("enabled", true),
+            "assign_arrow_minus_right", Map("enabled", true),
+            "assign_arrow_minus_left",  Map("enabled", true),
+        ),
+        "autocorrection", Map(
+            "typographic_apostrophe",     Map("enabled", true),
+            "errors",                     Map("enabled", true),
+            "suffixes_a_chaining",        Map("enabled", true),
+            "accents",                    Map("enabled", true),
+            "caps",                       Map("enabled", true),
+            "names",                      Map("enabled", true),
+            "minus",                      Map("enabled", true),
+            "minus_apostrophe",           Map("enabled", true),
+            "ou",                         Map("enabled", true),
+            "multiple_punctuation_marks", Map("enabled", true),
+        ),
+        "magic_key", Map(
+            "replace",                      Map("enabled", true),
+            "repeat_corrections",           Map("enabled", true),
+            "text_expansion",               Map("enabled", true),
+            "text_expansion_auto",          Map("enabled", true),
+            "text_expansion_emojis",        Map("enabled", true),
+            "text_expansion_symbols",       Map("enabled", true),
+            "text_expansion_symbols_typst", Map("enabled", true),
+        ),
+        "dynamic", Map(
+            "date",                              Map("enabled", true),
+            "date_fr",                           Map("enabled", true),
+            "date_long_fr",                      Map("enabled", true),
+            "iban_prefixes",                     Map("enabled", true),
+            "phone_prefixes",                    Map("enabled", true),
+            "ssn_prefixes",                      Map("enabled", true),
+            "text_expansion_personal_information", Map("enabled", true, "pattern_max_length", 1),
+        ),
+    ),
 )
 
 global ConfigurationFile := A_ScriptDir . "\test_config.ini"
