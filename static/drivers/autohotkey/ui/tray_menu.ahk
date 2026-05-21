@@ -94,7 +94,12 @@ CreateSubMenusRecursiveCommonCode(MenuParent, Key, Val, CategoryPath) {
 MenuAddItem(MenuParent, FeatureCategoryPath, FeatureName) {
 	FullPath := FeatureCategoryPath "." FeatureName
 	MenuTitle := GetMenuTitleByPath(FullPath)
-	MenuParent.Add(MenuTitle, (*) => ToggleMenuVariableByPath(FullPath))
+	; Use the menu-dispatcher bypass (lib/menu_dispatcher.ahk) so an AHK
+	; native-dispatch drop is automatically recovered via the WM_COMMAND
+	; retry timer. Falls back to MenuParent.Add internally when the
+	; bypass cannot discover the item's Win32 ID (rare; same dispatch
+	; behavior as before in that case).
+	RegisterMenuItem(MenuParent, MenuTitle, (*) => ToggleMenuVariableByPath(FullPath))
 
 	Feature := GetFeatureByPath(FullPath)
 	if Feature.Enabled {
