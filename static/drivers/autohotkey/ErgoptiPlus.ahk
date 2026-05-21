@@ -113,6 +113,10 @@ SendMode("Event") ; Everything concerning hotstrings MUST use SendEvent and not 
 #Include lib/hotstrings/hotstring_engine.ahk
 #Include lib/hotstrings/hotstring_engine_v2.ahk
 #Include lib/toml/toml_loader.ahk
+#Include lib/toml/toml_loader_v2.ahk
+#Include lib/manifest_reader.ahk
+#Include lib/first_boot.ahk
+#Include lib/tap_hold/tap_hold_loader.ahk
 #Include lib/menu_manifest.ahk
 #Include lib/llm_defaults.ahk
 #Include lib/updater.ahk
@@ -587,6 +591,33 @@ ApplyTomlMetadataToFeatures("Rolls")
 ApplyTomlMetadataToFeatures("SFBsReduction")
 ApplyIndexTomlToDynamicHotstrings()
 ApplyLocaleDescriptions(I18nGetLocale())
+
+
+
+
+; ====================================================
+; ====================================================
+; ======= Scope C — additive v2 config wiring =======
+; ====================================================
+; ====================================================
+
+; Phase 1 of the sliced v2 cut-over: build the v2-shape Features Map in
+; parallel with the legacy ``Features`` global, so individual modules can
+; migrate their read sites to ``FeaturesV2[...]`` one PR at a time without
+; the driver going non-bootable. Writes (``SaveFullConfig``, tray-menu
+; toggles, onboarding) still flow through the v1 path until the very last
+; phase — at that point ``Features``, ``features_config.ahk``, and this
+; block disappear in one shot.
+;
+; ``EnsureUserConfigsExist`` is a no-op when the user already has a
+; ``config.toml`` (the common case during migration). ``ApplyConfigTomlV2``
+; on a v1-shaped file warns on every unknown section but applies nothing —
+; FeaturesV2 keeps the manifest defaults, which is the intended state
+; while no module reads from it yet.
+EnsureUserConfigsExist()
+global FeaturesV2 := ManifestBuildFeaturesMap()
+ApplyConfigTomlV2(_ConfigDir . "ahk\config.toml")
+global TapHold := LoadTapHoldToml(_ConfigDir . "ahk\tap_hold.toml")
 
 ; Append hotstring counts to section descriptions so the tray menu shows
 ; "(N)" next to each section item — mirrors Hammerspoon's per-section display.
