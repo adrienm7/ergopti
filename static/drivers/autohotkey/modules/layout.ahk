@@ -404,7 +404,7 @@ RemapKey(ScanCode, Character, AlternativeCharacter := "") {
 WrapTextIfSelected(Symbol, LeftSymbol, RightSymbol) {
 	Selection := ""
 	if (
-		isSet(UIA) and Features["Shortcuts"]["WrapTextIfSelected"].Enabled
+		isSet(UIA) and FeaturesV2["shortcuts"]["wrap_text_if_selected"]
 		and not WinActive("Code") ; Electron Apps like VSCode don't fully work with UIA
 	) {
 		try {

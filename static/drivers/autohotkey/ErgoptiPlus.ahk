@@ -944,14 +944,17 @@ try {
 ; single unified config file — no separate cross-driver config.toml.
 ApplyConfigTomlOverrides(ConfigurationFile)
 
-; Phase 2 of the sliced v2 cut-over — sync the user-customized v1 Layout
-; flags into FeaturesV2 so the migrated read sites (lib/layout/*, modules/
-; layout.ahk, modules/keylogger/keylogger_prefetch.ahk) observe the same
-; enabled/disabled state the user configured via the tray menu. Pure
-; derived view: writes still go through Features[X].Enabled + Reload, and
-; each Reload re-runs this mirror so divergence is impossible. See
-; lib/v1_v2_mirror.ahk for the per-section helpers and the cut-over plan.
+; Phase 2/3 of the sliced v2 cut-over — sync the user-customized v1
+; sections (Layout / Gestures / Shortcuts) into FeaturesV2 so the migrated
+; read sites observe the same enabled/disabled state the user configured
+; via the tray menu. Pure derived view: writes still go through
+; Features[X].Enabled + Reload, and each Reload re-runs these mirrors so
+; divergence is impossible. See lib/v1_v2_mirror.ahk for the per-section
+; helpers and the cut-over plan; each new phase adds one MirrorV1ToV2_<Section>
+; call here next to the others.
 MirrorV1ToV2_Layout()
+MirrorV1ToV2_Gestures()
+MirrorV1ToV2_Shortcuts()
 
 ; Bootstrap Features["Personal"] from personal_hotstrings.toml _meta.sections
 ; before applying TOML metadata, so the user's section toggles appear in the menu.

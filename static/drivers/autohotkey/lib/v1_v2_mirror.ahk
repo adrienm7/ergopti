@@ -89,3 +89,173 @@ MirrorV1ToV2_Layout() {
     try LoggerDebug("V1ToV2",
         "MirrorV1ToV2_Layout copied {1} entry(ies) v1 -> v2.", Copied)
 }
+
+
+
+
+; ==============================================================
+; ==============================================================
+; ======= 2/ Gestures =======
+; ==============================================================
+; ==============================================================
+
+; Single-flag mirror: ``Features["Gestures"]["Enabled"].Enabled`` ->
+; ``FeaturesV2["gestures"]["enabled"]``. The other Gestures keys (slot
+; assignments swipe_3_*, swipe_4_*, tap_3, tap_4) are not held in the
+; legacy v1 Features Map at all — they live in ``GestureAssignments``
+; (populated by ``modules/gestures.ahk`` from the [Gestures] TOML section
+; directly). So this mirror only carries the master toggle.
+MirrorV1ToV2_Gestures() {
+    global Features, FeaturesV2
+
+    if !IsSet(Features) or !IsSet(FeaturesV2) {
+        try LoggerWarn("V1ToV2",
+            "MirrorV1ToV2_Gestures skipped — Features or FeaturesV2 unset.")
+        return
+    }
+    if !Features.Has("Gestures") or !FeaturesV2.Has("gestures") {
+        try LoggerWarn("V1ToV2",
+            "MirrorV1ToV2_Gestures skipped — section missing in v1 or v2.")
+        return
+    }
+    if !Features["Gestures"].Has("Enabled") {
+        return
+    }
+
+    V1Val := Features["Gestures"]["Enabled"]
+    if !IsObject(V1Val) or !V1Val.HasOwnProp("Enabled") {
+        return
+    }
+    FeaturesV2["gestures"]["enabled"] := (V1Val.Enabled = true)
+    try LoggerDebug("V1ToV2", "MirrorV1ToV2_Gestures copied 1 entry v1 -> v2.")
+}
+
+
+
+
+; ==============================================================
+; ==============================================================
+; ======= 3/ Shortcuts =======
+; ==============================================================
+; ==============================================================
+
+; Mirrors the subset of v1 ``Features["Shortcuts"][X].(Enabled|Letter|Link|...)``
+; entries that the migrated read sites in modules/shortcuts.ahk and
+; modules/layout.ahk now consult through ``FeaturesV2["shortcuts"][snake][...]``.
+;
+; Plain-bool entries (v2 stores the raw bool, no enabled sub-key):
+;   WrapTextIfSelected, GetHexValue, MicrosoftBold, TitleCase, Uppercase,
+;   PasteWithoutFormatting, Save, SelectLine, SpotlightMouse,
+;   SurroundWithParentheses, TeleportMouse, CtrlJ, OpenDownloads, Move,
+;   Screen, ScreenInstant, WinCapsLock
+;
+; Modélisation α entries (v2 stores { enabled, <prop>... } as a Map):
+;   GPT (enabled + link)
+;   Search (enabled + search_engine + search_engine_url_query)
+;   TakeNote (enabled + dated_notes + destination_folder)
+;
+; INTENTIONALLY NOT migrated yet (kept on v1):
+;   - Sub-Maps (AltGrLAlt / AltGrCapsLock / LAltCapsLock / Personal): the
+;     ``RunFirstSimpleAction`` / ``HasAnyEnabled`` dispatchers in
+;     lib/dispatchers.ahk iterate v1-shaped ``{Cfg.Enabled}`` objects,
+;     and updating both shapes in one go is more risk than reward this
+;     phase. Will move with the dispatcher rewrite in a future phase.
+;   - Letter pickers (EGrave/ECirc/EAcute/AGrave): consumed by
+;     lib/layout/layout_ergopti.ahk via .Letter lookups; touches the
+;     base-layer registration so deferring.
+;   - tray_menu.ahk reads: the write path stays v1 until cut-over.
+MirrorV1ToV2_Shortcuts() {
+    global Features, FeaturesV2
+
+    if !IsSet(Features) or !IsSet(FeaturesV2) {
+        try LoggerWarn("V1ToV2",
+            "MirrorV1ToV2_Shortcuts skipped — Features or FeaturesV2 unset.")
+        return
+    }
+    if !Features.Has("Shortcuts") or !FeaturesV2.Has("shortcuts") {
+        try LoggerWarn("V1ToV2",
+            "MirrorV1ToV2_Shortcuts skipped — section missing in v1 or v2.")
+        return
+    }
+
+    BoolPairs := Map(
+        "WrapTextIfSelected",      "wrap_text_if_selected",
+        "GetHexValue",             "get_hex_value",
+        "MicrosoftBold",           "microsoft_bold",
+        "TitleCase",               "title_case",
+        "Uppercase",               "uppercase",
+        "PasteWithoutFormatting",  "paste_without_formatting",
+        "Save",                    "save",
+        "SelectLine",              "select_line",
+        "SpotlightMouse",          "spotlight_mouse",
+        "SurroundWithParentheses", "surround_with_parentheses",
+        "TeleportMouse",           "teleport_mouse",
+        "CtrlJ",                   "ctrl_j",
+        "OpenDownloads",           "open_downloads",
+        "Move",                    "move",
+        "Screen",                  "screen",
+        "ScreenInstant",           "screen_instant",
+        "WinCapsLock",             "win_caps_lock",
+    )
+
+    Copied := 0
+    for V1Id, V2Id in BoolPairs {
+        if !Features["Shortcuts"].Has(V1Id) {
+            continue
+        }
+        V1Val := Features["Shortcuts"][V1Id]
+        if !IsObject(V1Val) or !V1Val.HasOwnProp("Enabled") {
+            continue
+        }
+        FeaturesV2["shortcuts"][V2Id] := (V1Val.Enabled = true)
+        Copied += 1
+    }
+
+    ; Modélisation α — copy Enabled + named extra props into the v2 Map.
+    ; v2 shape: FeaturesV2["shortcuts"]["gpt"]["enabled"|"link"].
+    ; PropMap maps v2 snake_case key -> v1 PascalCase property name.
+    AlphaPairs := Map(
+        "GPT",      Map("enabled", "Enabled", "link", "Link"),
+        "Search",   Map("enabled", "Enabled",
+                        "search_engine", "SearchEngine",
+                        "search_engine_url_query", "SearchEngineURLQuery"),
+        "TakeNote", Map("enabled", "Enabled",
+                        "dated_notes", "DatedNotes",
+                        "destination_folder", "DestinationFolder"),
+    )
+    AlphaPairsV2 := Map(
+        "GPT",      "gpt",
+        "Search",   "search",
+        "TakeNote", "take_note",
+    )
+
+    for V1Id, PropMap in AlphaPairs {
+        if !Features["Shortcuts"].Has(V1Id) {
+            continue
+        }
+        V1Val := Features["Shortcuts"][V1Id]
+        if !IsObject(V1Val) {
+            continue
+        }
+        V2Id := AlphaPairsV2[V1Id]
+        if !FeaturesV2["shortcuts"].Has(V2Id) or !IsObject(FeaturesV2["shortcuts"][V2Id]) {
+            ; v2 entry expected to be a Map (modélisation α default = { enabled = ..., ... })
+            continue
+        }
+        for V2Key, V1Prop in PropMap {
+            if !V1Val.HasOwnProp(V1Prop) {
+                continue
+            }
+            PropVal := V1Val.%V1Prop%
+            if (V2Key == "enabled") {
+                FeaturesV2["shortcuts"][V2Id][V2Key] := (PropVal = true)
+            } else {
+                FeaturesV2["shortcuts"][V2Id][V2Key] := PropVal
+            }
+            Copied += 1
+        }
+    }
+
+    try LoggerDebug("V1ToV2",
+        "MirrorV1ToV2_Shortcuts copied {1} entry(ies) v1 -> v2.", Copied)
+}

@@ -97,20 +97,62 @@ global Features := Map(
     ),
 )
 
-; Mirror of the v1 Layout flags into the new v2-shape Map — populated in
-; production by MirrorV1ToV2_Layout() (Phase 2 of the sliced cut-over).
-; lib/layout/layout_shift_caps.ahk, lib/layout/layout_altgr.ahk and
-; modules/layout.ahk now read from FeaturesV2 instead of Features at the
-; HotIf/#HotIf gates. Tests don't fire those hotkeys, but the symbol still
-; needs to exist as a global so any test that does evaluate the gate (or a
-; future test_layout_v2_mirror.ahk fixture) doesn't trip on "variable not
-; assigned".
+; Mirror of the v1 sections that have been migrated to the new v2-shape Map.
+; Production populates this via MirrorV1ToV2_<Section>() at boot (see
+; lib/v1_v2_mirror.ahk). The migrated read sites (lib/layout/*, modules/
+; layout.ahk, modules/gestures.ahk, modules/shortcuts.ahk, modules/
+; keylogger/keylogger_prefetch.ahk) now hit FeaturesV2 instead of Features.
+; Tests don't fire those hotkeys but the symbol still needs to exist as a
+; global so a) the production lib/ files load cleanly and b) future
+; test_v2_mirror.ahk fixtures can pin the contract directly.
+;
+; Each section's keys must match what its MirrorV1ToV2_<Section>() helper
+; in lib/v1_v2_mirror.ahk writes — extend both together when a new feature
+; is added to the manifest.
 global FeaturesV2 := Map(
     "layout", Map(
         "ergopti_base",         true,
         "direct_access_digits", true,
         "ergopti_alt_gr",       true,
         "ergopti_plus",         false,
+    ),
+    "gestures", Map(
+        "enabled", false,
+    ),
+    "shortcuts", Map(
+        ; Plain bools (default = true|false in the manifest).
+        "wrap_text_if_selected",    true,
+        "get_hex_value",            true,
+        "microsoft_bold",           true,
+        "title_case",               true,
+        "uppercase",                true,
+        "paste_without_formatting", false,
+        "save",                     false,
+        "select_line",              true,
+        "spotlight_mouse",          true,
+        "surround_with_parentheses", true,
+        "teleport_mouse",           true,
+        "ctrl_j",                   false,
+        "open_downloads",           false,
+        "move",                     false,
+        "screen",                   false,
+        "screen_instant",           false,
+        "win_caps_lock",            false,
+        ; Modélisation α — Map per feature with { enabled, <extra props> }.
+        "gpt", Map(
+            "enabled", true,
+            "link",    "https://chatgpt.com/",
+        ),
+        "search", Map(
+            "enabled",                 true,
+            "search_engine",           "https://www.google.com",
+            "search_engine_url_query", "https://www.google.com/search?q=",
+        ),
+        "take_note", Map(
+            "enabled",            true,
+            "dated_notes",        false,
+            "destination_folder", "D:\\Bureau",
+        ),
     ),
 )
 

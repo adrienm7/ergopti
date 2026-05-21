@@ -56,14 +56,14 @@ LAltCapsLockShortcut() {
 ; =================================
 ; =================================
 
-if Features["Shortcuts"]["Save"].Enabled {
+if FeaturesV2["shortcuts"]["save"] {
     AddShortcut("^", "j", (*) => SendFinalResult("^s"))
 }
-if Features["Shortcuts"]["CtrlJ"].Enabled {
+if FeaturesV2["shortcuts"]["ctrl_j"] {
     AddShortcut("^", "s", (*) => SendFinalResult("^j"))
 }
 
-if Features["Shortcuts"]["MicrosoftBold"].Enabled {
+if FeaturesV2["shortcuts"]["microsoft_bold"] {
     ; Makes it possible to use the standard shortcuts instead of their translation in Microsoft apps
     AddShortcut(
         "^", "b",
@@ -71,7 +71,7 @@ if Features["Shortcuts"]["MicrosoftBold"].Enabled {
     )
 }
 
-if Features["Shortcuts"]["PasteWithoutFormatting"].Enabled {
+if FeaturesV2["shortcuts"]["paste_without_formatting"] {
     ; Ctrl + Shift + V — paste plain text everywhere except Excel, which keeps
     ; its native paste-special behaviour (re-assigning the standard combo there
     ; would break the user's expected workflow).
@@ -201,12 +201,12 @@ _RegisterAltGrShortcutsHotkeys()
 ; =================================
 ; =================================
 
-#HotIf Features["Shortcuts"]["WinCapsLock"].Enabled
+#HotIf FeaturesV2["shortcuts"]["win_caps_lock"]
 ; Win + "CapsLock" to toggle CapsLock
 #SC03A:: ToggleCapsLock()
 #HotIf
 
-if Features["Shortcuts"]["SelectLine"].Enabled {
+if FeaturesV2["shortcuts"]["select_line"] {
     ; Win + A (All)
     AddShortcut("#", "a", SelectLine)
 
@@ -215,17 +215,17 @@ if Features["Shortcuts"]["SelectLine"].Enabled {
     }
 }
 
-if Features["Shortcuts"]["Screen"].Enabled {
+if FeaturesV2["shortcuts"]["screen"] {
     ; Win + H (ScreensHot)
     AddShortcut("#", "h", (*) => SendFinalResult("#+s"))
 }
 
-if Features["Shortcuts"]["GPT"].Enabled {
+if FeaturesV2["shortcuts"]["gpt"]["enabled"] {
     ; Win + G (GPT)
-    AddShortcut("#", "g", (*) => Run(Features["Shortcuts"]["GPT"].Link))
+    AddShortcut("#", "g", (*) => Run(FeaturesV2["shortcuts"]["gpt"]["link"]))
 }
 
-if Features["Shortcuts"]["GetHexValue"].Enabled {
+if FeaturesV2["shortcuts"]["get_hex_value"] {
     ; Win + X (heX)
     AddShortcut("#", "x", GetHexValue)
 
@@ -239,13 +239,13 @@ if Features["Shortcuts"]["GetHexValue"].Enabled {
     }
 }
 
-if Features["Shortcuts"]["TakeNote"].Enabled {
+if FeaturesV2["shortcuts"]["take_note"]["enabled"] {
     ; Win + N (Note)
     AddShortcut("#", "n", TakeNote)
 
     TakeNote(*) {
         ; Determine the file name (with or without date)
-        if (Features["Shortcuts"]["TakeNote"].DatedNotes) {
+        if (FeaturesV2["shortcuts"]["take_note"]["dated_notes"]) {
             Date := FormatTime(, "dd_MM_yyyy")
             FileName := "Notes_" Date ".txt"
         } else {
@@ -253,7 +253,7 @@ if Features["Shortcuts"]["TakeNote"].Enabled {
         }
 
         ; Build the full file path
-        FilePath := Features["Shortcuts"]["TakeNote"].DestinationFolder "\" FileName
+        FilePath := FeaturesV2["shortcuts"]["take_note"]["destination_folder"] "\" FileName
 
         ; Create the file if it doesn't exist yet
         if not FileExist(FilePath) {
@@ -290,7 +290,7 @@ if Features["Shortcuts"]["TakeNote"].Enabled {
     }
 }
 
-if Features["Shortcuts"]["Move"].Enabled {
+if FeaturesV2["shortcuts"]["move"] {
     ; Win + M (Move)
     AddShortcut("#", "m", ToggleActivitySimulation)
 
@@ -419,11 +419,11 @@ if Features["Shortcuts"]["Move"].Enabled {
 
 }
 
-if Features["Shortcuts"]["SurroundWithParentheses"].Enabled {
+if FeaturesV2["shortcuts"]["surround_with_parentheses"] {
     AddShortcut("#", "o", (*) => SendFinalResult("{Home}({End}){Home}"))
 }
 
-if Features["Shortcuts"]["Search"].Enabled {
+if FeaturesV2["shortcuts"]["search"]["enabled"] {
     ; Win + S (Search)
     AddShortcut("#", "s", Search)
 
@@ -484,9 +484,9 @@ if Features["Shortcuts"]["Search"].Enabled {
             } else if (WebsitePath) {
                 Run("https://" . SelectedText)
             } else if (SelectedText == "") { ; If nothing was copied
-                Run(Features["Shortcuts"]["Search"].SearchEngine)
+                Run(FeaturesV2["shortcuts"]["search"]["search_engine"])
             } else {
-                Run(Features["Shortcuts"]["Search"].SearchEngineURLQuery . SelectedText)
+                Run(FeaturesV2["shortcuts"]["search"]["search_engine_url_query"] . SelectedText)
             }
         }
     }
@@ -557,7 +557,7 @@ if Features["Shortcuts"]["Search"].Enabled {
     }
 }
 
-if Features["Shortcuts"]["TitleCase"].Enabled {
+if FeaturesV2["shortcuts"]["title_case"] {
     ; Win + W (TitleCase)
     AddShortcut("#", "w", ConvertToTitleCase)
 
@@ -586,7 +586,7 @@ if Features["Shortcuts"]["TitleCase"].Enabled {
     }
 }
 
-if Features["Shortcuts"]["Uppercase"].Enabled {
+if FeaturesV2["shortcuts"]["uppercase"] {
     ; Win + U (Uppercase)
     AddShortcut("#", "u", ConvertToUppercase)
 
@@ -601,7 +601,7 @@ if Features["Shortcuts"]["Uppercase"].Enabled {
     }
 }
 
-if Features["Shortcuts"]["TeleportMouse"].Enabled {
+if FeaturesV2["shortcuts"]["teleport_mouse"] {
     ; Win + T (Téléport)
     AddShortcut("#", "t", TeleportMouse)
 
@@ -640,12 +640,12 @@ if Features["Shortcuts"]["TeleportMouse"].Enabled {
     }
 }
 
-if Features["Shortcuts"]["SpotlightMouse"].Enabled {
+if FeaturesV2["shortcuts"]["spotlight_mouse"] {
     ; Win + '
     AddShortcut("#", "'", (*) => (MouseGetPos(&Mx, &My), SpotlightMouseAt(Mx, My, 5000)))
 }
 
-#HotIf Features["Shortcuts"]["ScreenInstant"].Enabled
+#HotIf FeaturesV2["shortcuts"]["screen_instant"]
 ; SC029 (²/$ — key left of 1) — instant screenshot of the active window, saved to Pictures
 SC029:: {
     WinGetPos(&WX, &WY, &WW, &WH, "A")
@@ -859,7 +859,7 @@ SpotlightMouseAt(X, Y, DurationMs) {
     DllCall("gdiplus\GdiplusShutdown", "ptr", pToken)
 }
 
-if Features["Shortcuts"]["OpenDownloads"].Enabled {
+if FeaturesV2["shortcuts"]["open_downloads"] {
     ; Win + D (Downloads)
     AddShortcut("#", "d", OpenDownloads)
 
