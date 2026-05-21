@@ -10,7 +10,7 @@
 # to its ``init.lua``. ``git pull`` + reload Hammerspoon = picks up changes.
 #
 # Stock Hammerspoon (bundle id ``org.hammerspoon.Hammerspoon``) and the
-# production ErgoptiPlus.app (bundle id ``com.ergopti.app``, ships its own
+# production ErgoptiPlus.app (bundle id ``com.ergoptiplus.app``, ships its own
 # vendored Hammerspoon with an isolated ``MJConfigDir``) coexist by design —
 # they read entirely separate preferences and config directories. Only one
 # of the two should be the active menubar process at any time, because both

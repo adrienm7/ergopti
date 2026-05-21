@@ -74,7 +74,7 @@ GH_OWNER="${GH_OWNER:-Ergopti}"
 GH_REPO="${GH_REPO:-Ergopti}"
 
 # Bundle identifier for the embedded Hammerspoon. Picked so preferences land
-# in ~/Library/Preferences/com.ergopti.app.plist, isolated from stock HS.
+# in ~/Library/Preferences/com.ergoptiplus.app.plist, isolated from stock HS.
 BUNDLE_ID="com.ergoptiplus.app"
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -281,7 +281,7 @@ assemble_app() {
 	mv "$BUILD_DIR/Hammerspoon.app" "$APP_PATH/Contents/Frameworks/Hammerspoon.app"
 
 	# Rewrite the embedded Hammerspoon's bundle id so its NSUserDefaults land
-	# under com.ergopti.app — the launcher reads/writes MJConfigDir there.
+	# under com.ergoptiplus.app — the launcher reads/writes MJConfigDir there.
 	# Without this rewrite a stock Hammerspoon install on the same machine
 	# would share its preferences with our embedded instance and overwrite
 	# the config-dir override on every launch.
