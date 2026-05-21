@@ -88,6 +88,14 @@ OnError(ErgoptiGlobalErrorHandler)
 A_MenuMaskKey := "vkff" ; Change the masking key to the void key
 A_MaxHotkeysPerInterval := 150 ; Reduce messages saying too many hotkeys pressed in the interval
 
+; AHK silently DROPS new pseudo-threads (hotkey callbacks, tray-menu items,
+; OnMessage handlers, SetTimer callbacks) once A_MaxThreads concurrent
+; threads are already active. The default ceiling of 10 is easy to hit
+; with the keylogger's ~6 background timers + mouse/keyboard hooks. The
+; menu-dispatcher bypass in lib/menu_dispatcher.ahk also relies on a free
+; slot for its retry SetTimer, so the headroom matters even more there.
+A_MaxThreads := 64
+
 SetKeyDelay(0) ; No delay between key presses
 SendMode("Event") ; Everything concerning hotstrings MUST use SendEvent and not SendInput which is the default
 ; Otherwise, we can't have a hotstring triggering another hotstring, triggering another hotstring, etc.
@@ -118,6 +126,7 @@ SendMode("Event") ; Everything concerning hotstrings MUST use SendEvent and not 
 #Include lib/first_boot.ahk
 #Include lib/tap_hold/tap_hold_loader.ahk
 #Include lib/v1_v2_mirror.ahk
+#Include lib/menu_dispatcher.ahk
 #Include lib/menu_manifest.ahk
 #Include lib/llm_defaults.ahk
 #Include lib/updater.ahk
