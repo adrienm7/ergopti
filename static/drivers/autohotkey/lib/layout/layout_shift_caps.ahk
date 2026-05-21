@@ -149,7 +149,7 @@ RegisterCapsLockLayer() {
 	try LoggerStart("LayoutCaps", "Registering CapsLock layer hotkeys…")
 
 	; --- Magic key overlay (registered first, lowest precedence) ---
-	HotIf((*) => GetCapsLockCondition() and Features["MagicKey"]["Replace"].Enabled)
+	HotIf((*) => GetCapsLockCondition() and FeaturesV2["hotstrings"]["magic_key"]["replace"]["enabled"])
 	Hotkey("SC02E", ((*) => SendNewResult(ScriptInformation["MagicKey"])), "I2")
 
 	; --- Letters and symbols (registered last, highest precedence) ---

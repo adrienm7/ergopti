@@ -709,7 +709,7 @@ if Features.Has("DynamicHotstrings") {
     }
 }
 
-global SpaceAroundSymbols := Features["DistancesReduction"]["SpaceAroundSymbols"].Enabled ? " " : ""
+global SpaceAroundSymbols := FeaturesV2["hotstrings"]["distances_reduction"]["space_around_symbols"]["enabled"] ? " " : ""
 
 #Include ui/tray_menu.ahk
 
@@ -955,6 +955,7 @@ ApplyConfigTomlOverrides(ConfigurationFile)
 MirrorV1ToV2_Layout()
 MirrorV1ToV2_Gestures()
 MirrorV1ToV2_Shortcuts()
+MirrorV1ToV2_Hotstrings()
 
 ; Bootstrap Features["Personal"] from personal_hotstrings.toml _meta.sections
 ; before applying TOML metadata, so the user's section toggles appear in the menu.

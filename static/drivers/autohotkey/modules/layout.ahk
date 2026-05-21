@@ -495,7 +495,7 @@ if FeaturesV2["layout"]["ergopti_base"] {
 	)
 }
 
-if Features["MagicKey"]["Replace"].Enabled {
+if FeaturesV2["hotstrings"]["magic_key"]["replace"]["enabled"] {
 	RemapKey("SC02E", "j", ScriptInformation["MagicKey"])
 }
 
@@ -589,9 +589,9 @@ HashtagOrQuote() {
 ; registering its hotkeys AFTER Onboarding_Run() to keep SC138 native during
 ; first-run setup).
 _RegisterRollsAltGrHotkeys() {
-	HotIf((*) => Features["Rolls"]["ChevronEqual"].Enabled and IsRealAltGrPress())
+	HotIf((*) => FeaturesV2["hotstrings"]["rolls"]["chevron_equal"]["enabled"] and IsRealAltGrPress())
 	Hotkey("SC138 & SC012", _RollChevronEqualHandler, "I2")
-	HotIf((*) => Features["Rolls"]["HashtagQuote"].Enabled and IsRealAltGrPress())
+	HotIf((*) => FeaturesV2["hotstrings"]["rolls"]["hashtag_quote"]["enabled"] and IsRealAltGrPress())
 	Hotkey("SC138 & SC017", _RollHashtagQuoteHandler, "I2")
 	HotIf()
 }

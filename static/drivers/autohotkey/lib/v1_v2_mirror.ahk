@@ -310,3 +310,168 @@ MirrorV1ToV2_Shortcuts() {
     try LoggerDebug("V1ToV2",
         "MirrorV1ToV2_Shortcuts copied {1} entry(ies) v1 -> v2.", Copied)
 }
+
+
+
+
+; ==============================================================
+; ==============================================================
+; ======= 4/ Hotstrings (all 6 categories) =======
+; ==============================================================
+; ==============================================================
+
+; Mirrors every hotstring category from the legacy top-level v1 Maps
+; (Features["Autocorrection"], ["DistancesReduction"], ["SFBsReduction"],
+; ["Rolls"], ["MagicKey"], ["DynamicHotstrings"]) into the v2-shape nested
+; container at FeaturesV2["hotstrings"][<category>][<entry>]["enabled"].
+;
+; The v2 manifest uses modélisation α: each entry is a Map with at least
+; an "enabled" key and possibly extra props (time_activation_seconds,
+; pattern_max_length, …). The defaults come from the manifest itself —
+; the mirror only overwrites the .enabled flag from the user's v1 toggles.
+; Extra props (TimeActivationSeconds, etc.) stay on the v1 object because
+; LoadHotstringsSection in lib/toml/toml_loader.ahk still reads them via
+; ``.PropertyName`` access — that helper will move with a future phase.
+;
+; The v1 id -> v2 id mapping has a few non-trivial renames worth flagging:
+;   SFBsReduction.IÉ        -> sfbs_reduction.i_e_acute  (special chars folded)
+;   MagicKey.RepeatCorrections -> magic_key.repeat_corrections
+;   DynamicHotstrings.*     -> dynamic.*  (category renamed: "Hotstrings"
+;                              suffix is redundant inside [hotstrings.*])
+MirrorV1ToV2_Hotstrings() {
+    global Features, FeaturesV2
+
+    if !IsSet(Features) or !IsSet(FeaturesV2) {
+        try LoggerWarn("V1ToV2",
+            "MirrorV1ToV2_Hotstrings skipped — Features or FeaturesV2 unset.")
+        return
+    }
+    if !FeaturesV2.Has("hotstrings") {
+        try LoggerWarn("V1ToV2",
+            "MirrorV1ToV2_Hotstrings skipped — FeaturesV2['hotstrings'] missing.")
+        return
+    }
+
+    ; Per-category v1->v2 mapping. Outer key = v1 top-level Features key,
+    ; inner Map = { v2_category_name, entry_map(v1_id -> v2_id) }.
+    Categories := Map(
+        "Autocorrection", Map(
+            "_v2_cat", "autocorrection",
+            "TypographicApostrophe",     "typographic_apostrophe",
+            "Errors",                    "errors",
+            "SuffixesAChaining",         "suffixes_a_chaining",
+            "Accents",                   "accents",
+            "Caps",                      "caps",
+            "Names",                     "names",
+            "Minus",                     "minus",
+            "MinusApostrophe",           "minus_apostrophe",
+            "OU",                        "ou",
+            "MultiplePunctuationMarks",  "multiple_punctuation_marks",
+        ),
+        "DistancesReduction", Map(
+            "_v2_cat", "distances_reduction",
+            "QU",                  "qu",
+            "SuffixesA",           "suffixes_a",
+            "CommaJ",              "comma_j",
+            "CommaFarLetters",     "comma_far_letters",
+            "DeadKeyECircumflex",  "dead_key_e_circumflex",
+            "ECircumflexE",        "e_circumflex_e",
+            "SpaceAroundSymbols",  "space_around_symbols",
+        ),
+        "SFBsReduction", Map(
+            "_v2_cat", "sfbs_reduction",
+            "Comma",   "comma",
+            "ECirc",   "e_circ",
+            "EGrave",  "e_grave",
+            "BU",      "bu",
+            "IÉ",      "i_e_acute",
+        ),
+        "Rolls", Map(
+            "_v2_cat", "rolls",
+            "HC",                     "hc",
+            "SX",                     "sx",
+            "CX",                     "cx",
+            "EnglishNegation",        "english_negation",
+            "EZ",                     "ez",
+            "CT",                     "ct",
+            "CloseChevronTag",        "close_chevron_tag",
+            "ChevronLess",            "chevron_less",
+            "ChevronGreater",         "chevron_greater",
+            "ChevronEqual",           "chevron_equal",
+            "CommentOpen",            "comment_open",
+            "CommentClose",           "comment_close",
+            "Assign",                 "assign",
+            "NotEqual",               "not_equal",
+            "ParenQuote",             "paren_quote",
+            "BracketQuote",           "bracket_quote",
+            "HashtagParenthesis",     "hashtag_parenthesis",
+            "HashtagOpenBracket",     "hashtag_open_bracket",
+            "HashtagCloseBracket",    "hashtag_close_bracket",
+            "HashtagQuote",           "hashtag_quote",
+            "EqualString",            "equal_string",
+            "LeftArrow",              "left_arrow",
+            "AssignArrowEqualRight",  "assign_arrow_equal_right",
+            "AssignArrowEqualLeft",   "assign_arrow_equal_left",
+            "AssignArrowMinusRight",  "assign_arrow_minus_right",
+            "AssignArrowMinusLeft",   "assign_arrow_minus_left",
+        ),
+        "MagicKey", Map(
+            "_v2_cat", "magic_key",
+            "Replace",                    "replace",
+            "RepeatCorrections",          "repeat_corrections",
+            "TextExpansion",              "text_expansion",
+            "TextExpansionAuto",          "text_expansion_auto",
+            "TextExpansionEmojis",        "text_expansion_emojis",
+            "TextExpansionSymbols",       "text_expansion_symbols",
+            "TextExpansionSymbolsTypst",  "text_expansion_symbols_typst",
+        ),
+        "DynamicHotstrings", Map(
+            "_v2_cat", "dynamic",
+            "Date",                              "date",
+            "DateFr",                            "date_fr",
+            "DateLongFr",                        "date_long_fr",
+            "IbanPrefixes",                      "iban_prefixes",
+            "PhonePrefixes",                     "phone_prefixes",
+            "SsnPrefixes",                       "ssn_prefixes",
+            "TextExpansionPersonalInformation",  "text_expansion_personal_information",
+        ),
+    )
+
+    Copied := 0
+    for V1Cat, IdMap in Categories {
+        if !Features.Has(V1Cat) {
+            continue
+        }
+        V2Cat := IdMap["_v2_cat"]
+        if !FeaturesV2["hotstrings"].Has(V2Cat) or !IsObject(FeaturesV2["hotstrings"][V2Cat]) {
+            continue
+        }
+        for V1Id, V2Id in IdMap {
+            if (V1Id == "_v2_cat") {
+                continue
+            }
+            if !Features[V1Cat].Has(V1Id) {
+                continue
+            }
+            V1Val := Features[V1Cat][V1Id]
+            if !IsObject(V1Val) or !V1Val.HasOwnProp("Enabled") {
+                continue
+            }
+            if !FeaturesV2["hotstrings"][V2Cat].Has(V2Id)
+                or !IsObject(FeaturesV2["hotstrings"][V2Cat][V2Id]) {
+                ; v2 entry expected to be a Map; skip if shape mismatch.
+                continue
+            }
+            FeaturesV2["hotstrings"][V2Cat][V2Id]["enabled"] := (V1Val.Enabled = true)
+            ; Mirror PatternMaxLength too — only DynamicHotstrings'
+            ; TextExpansionPersonalInformation carries it in v1 today.
+            if V1Val.HasOwnProp("PatternMaxLength") {
+                FeaturesV2["hotstrings"][V2Cat][V2Id]["pattern_max_length"] := V1Val.PatternMaxLength
+            }
+            Copied += 1
+        }
+    }
+
+    try LoggerDebug("V1ToV2",
+        "MirrorV1ToV2_Hotstrings copied {1} entry(ies) v1 -> v2.", Copied)
+}
