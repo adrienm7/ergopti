@@ -132,3 +132,23 @@ npm run preview      # preview the production build locally
 ```
 
 Deploying to a specific host may require installing the matching SvelteKit adapter.
+
+## Hammerspoon driver — local dev (macOS)
+
+To iterate on the macOS driver from this clone without re-building the production app:
+
+1. Install stock [Hammerspoon](https://www.hammerspoon.org/) into `/Applications/Hammerspoon.app`.
+2. From the repo root, run once:
+
+```bash
+npm run install:hammerspoon
+# or directly: bash scripts/install-hammerspoon.sh
+```
+
+3. Launch Hammerspoon (menubar icon appears). The driver now boots from your local clone.
+
+After edits, press `Cmd+Ctrl+R` (the bootstrap binds it to `hs.reload()`) — or click "Reload Config" from the menubar.
+
+The installer is idempotent. Any pre-existing `~/.hammerspoon/init.lua` is backed up to `~/.hammerspoon/init.lua.backup.<timestamp>` before the new one is written; delete the new file and rename the backup to revert.
+
+**Coexistence with the production app**: stock Hammerspoon (`org.hammerspoon.Hammerspoon`, reads `~/.hammerspoon/`) and the bundled `ErgoptiPlus.app` (`com.ergopti.app`, reads its own `Contents/Resources/config/`) have isolated preferences and config directories. Launching one or the other selects which version of the driver runs — don't run both menubar icons at the same time (they would compete for the same OS-level event taps and hotkeys).
