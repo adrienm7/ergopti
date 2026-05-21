@@ -279,14 +279,14 @@ RegisterAltGrLayer() {
     ; driver's ghost SC138 prefix which arrives with LCtrl still held.
 
     ; --- ErgoptiPlus overrides (registered first, lowest precedence) ---
-    HotIf((*) => Features["Layout"]["ErgoptiPlus"].Enabled and IsRealAltGrPress())
+    HotIf((*) => FeaturesV2["layout"]["ergopti_plus"] and IsRealAltGrPress())
     for SC, _ in ALTGR_PLUS_OVERRIDES {
         Hotkey("SC138 & " . SC, AltGrShiftDispatch.Bind(SC, ALTGR_PLUS_OVERRIDES), "I2")
     }
 
     ; --- ErgoptiAltGr Number row + Ctrl+Alt Numpad mappings ---
-    HotIf((*) => Features["Layout"]["ErgoptiAltGr"].Enabled
-        and Features["Layout"]["ErgoptiBase"].Enabled
+    HotIf((*) => FeaturesV2["layout"]["ergopti_alt_gr"]
+        and FeaturesV2["layout"]["ergopti_base"]
         and IsRealAltGrPress())
     for SC, _ in ALTGR_NUMBER_ROW {
         Hotkey("SC138 & " . SC, AltGrShiftDispatch.Bind(SC, ALTGR_NUMBER_ROW), "I2")
@@ -296,7 +296,7 @@ RegisterAltGrLayer() {
     }
 
     ; --- ErgoptiAltGr base rows (registered last, highest precedence) ---
-    HotIf((*) => Features["Layout"]["ErgoptiAltGr"].Enabled and IsRealAltGrPress())
+    HotIf((*) => FeaturesV2["layout"]["ergopti_alt_gr"] and IsRealAltGrPress())
     for SC, _ in ALTGR_BASE_ROWS {
         Hotkey("SC138 & " . SC, AltGrShiftDispatch.Bind(SC, ALTGR_BASE_ROWS), "I2")
     }
