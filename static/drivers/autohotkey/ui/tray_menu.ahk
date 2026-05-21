@@ -348,7 +348,12 @@ ToggleGesturesEnabled() {
 ; « Raccourcis », « activées » for « Métriques », etc.
 AddCategoryToggleItem(menu, on_label, off_label, is_enabled, on_click) {
 	label := is_enabled ? on_label : off_label
-	menu.Insert("1&", label, on_click)
+	; Insert via the bypass helper so the category-level toggle gets the
+	; same WM_COMMAND retry coverage as the individual feature toggles
+	; below. Without this, clicks on the "Activer / Désactiver" row at
+	; the top of every submenu are still subject to AHK's native dispatch
+	; drop pattern.
+	RegisterMenuItemInsert(menu, "1&", label, on_click)
 	menu.Insert("2&")  ; separator
 }
 
