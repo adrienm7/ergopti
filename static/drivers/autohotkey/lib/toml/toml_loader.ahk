@@ -131,6 +131,30 @@ UnescapeTomlString(s) {
 LoadHotstringsSection(CategoryName, SectionName, FeatureConfig, ExtraOptions := Map()) {
     global ScriptInformation, _GENERATED_HOTSTRINGS, _StaticDir
 
+    ; Accept either shape transparently — Phase 5/7 of the sliced v2
+    ; cut-over migrated the if-gate reads to FeaturesV2["hotstrings"]
+    ; [<cat>][<entry>] (v2 Maps) but the LoadHotstringsSection / generated
+    ; fast-path readers below were authored against the v1 object shape
+    ; ({Enabled, TimeActivationSeconds, ...}). Convert a v2 Map to an
+    ; equivalent v1-shape object right at the boundary so the rest of
+    ; the function (and the codegen'd fast paths in
+    ; lib/hotstrings/hotstrings_generated.ahk) keeps reading
+    ; ``FeatureConfig.PropertyName`` without modification. The generator
+    ; itself stays unchanged.
+    if (IsObject(FeatureConfig) and Type(FeatureConfig) == "Map") {
+        _V1Compat := { Enabled: false }
+        if FeatureConfig.Has("enabled") {
+            _V1Compat.Enabled := FeatureConfig["enabled"]
+        }
+        if FeatureConfig.Has("time_activation_seconds") {
+            _V1Compat.TimeActivationSeconds := FeatureConfig["time_activation_seconds"]
+        }
+        if FeatureConfig.Has("pattern_max_length") {
+            _V1Compat.PatternMaxLength := FeatureConfig["pattern_max_length"]
+        }
+        FeatureConfig := _V1Compat
+    }
+
     ; Per-group delay gating — override the per-feature TimeActivationSeconds
     ; with the value resolved from the TOML metadata + user override file.
     ; This makes the gating identical across drivers without having to keep
