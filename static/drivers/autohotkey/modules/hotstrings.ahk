@@ -23,7 +23,7 @@
 ; ===================================================
 
 if FeaturesV2["hotstrings"]["distances_reduction"]["qu"]["enabled"] {
-	LoadHotstringsSection("distancesreduction", "qu", Features["DistancesReduction"]["QU"])
+	LoadHotstringsSection("distancesreduction", "qu", FeaturesV2["hotstrings"]["distances_reduction"]["qu"])
 }
 
 
@@ -82,7 +82,7 @@ if FeaturesV2["hotstrings"]["distances_reduction"]["dead_key_e_circumflex"]["ena
 }
 
 if FeaturesV2["hotstrings"]["distances_reduction"]["e_circumflex_e"]["enabled"] {
-	LoadHotstringsSection("distancesreduction", "ecircumflexe", Features["DistancesReduction"]["ECircumflexE"])
+	LoadHotstringsSection("distancesreduction", "ecircumflexe", FeaturesV2["hotstrings"]["distances_reduction"]["e_circumflex_e"])
 }
 
 
@@ -128,7 +128,7 @@ if FeaturesV2["hotstrings"]["distances_reduction"]["comma_far_letters"]["enabled
 ; =============================================
 
 if FeaturesV2["hotstrings"]["sfbs_reduction"]["comma"]["enabled"] {
-	LoadHotstringsSection("sfbsreduction", "comma", Features["SFBsReduction"]["Comma"])
+	LoadHotstringsSection("sfbsreduction", "comma", FeaturesV2["hotstrings"]["sfbs_reduction"]["comma"])
 }
 
 
@@ -137,7 +137,7 @@ if FeaturesV2["hotstrings"]["sfbs_reduction"]["comma"]["enabled"] {
 ; ==========================================
 
 if FeaturesV2["hotstrings"]["sfbs_reduction"]["e_circ"]["enabled"] {
-	LoadHotstringsSection("sfbsreduction", "ecirc", Features["SFBsReduction"]["ECirc"])
+	LoadHotstringsSection("sfbsreduction", "ecirc", FeaturesV2["hotstrings"]["sfbs_reduction"]["e_circ"])
 }
 
 
@@ -146,7 +146,7 @@ if FeaturesV2["hotstrings"]["sfbs_reduction"]["e_circ"]["enabled"] {
 ; ==========================================
 
 if FeaturesV2["hotstrings"]["sfbs_reduction"]["e_grave"]["enabled"] {
-	LoadHotstringsSection("sfbsreduction", "egrave", Features["SFBsReduction"]["EGrave"])
+	LoadHotstringsSection("sfbsreduction", "egrave", FeaturesV2["hotstrings"]["sfbs_reduction"]["e_grave"])
 }
 
 
@@ -211,20 +211,20 @@ if FeaturesV2["hotstrings"]["sfbs_reduction"]["i_e_acute"]["enabled"] {
 if FeaturesV2["hotstrings"]["rolls"]["close_chevron_tag"]["enabled"] {
 	; The original call used flags "*?P" — the "P" flag is lost via TOML
 	; extraction but the remaining "*?" still yields the same behavior here
-	LoadHotstringsSection("rolls", "closechevrontag", Features["Rolls"]["CloseChevronTag"])
+	LoadHotstringsSection("rolls", "closechevrontag", FeaturesV2["hotstrings"]["rolls"]["close_chevron_tag"])
 }
 
 ; === Middle row ===
 if FeaturesV2["hotstrings"]["rolls"]["ez"]["enabled"] {
-	LoadHotstringsSection("rolls", "ez", Features["Rolls"]["EZ"])
+	LoadHotstringsSection("rolls", "ez", FeaturesV2["hotstrings"]["rolls"]["ez"])
 }
 
 ; === Bottom row ===
 if FeaturesV2["hotstrings"]["rolls"]["comment_open"]["enabled"] {
-	LoadHotstringsSection("rolls", "commentopen", Features["Rolls"]["CommentOpen"])
+	LoadHotstringsSection("rolls", "commentopen", FeaturesV2["hotstrings"]["rolls"]["comment_open"])
 }
 if FeaturesV2["hotstrings"]["rolls"]["comment_close"]["enabled"] {
-	LoadHotstringsSection("rolls", "commentclose", Features["Rolls"]["CommentClose"])
+	LoadHotstringsSection("rolls", "commentclose", FeaturesV2["hotstrings"]["rolls"]["comment_close"])
 }
 
 
@@ -234,16 +234,16 @@ if FeaturesV2["hotstrings"]["rolls"]["comment_close"]["enabled"] {
 
 ; === Top row ===
 if FeaturesV2["hotstrings"]["rolls"]["hashtag_parenthesis"]["enabled"] {
-	LoadHotstringsSection("rolls", "hashtagparenthesis", Features["Rolls"]["HashtagParenthesis"])
+	LoadHotstringsSection("rolls", "hashtagparenthesis", FeaturesV2["hotstrings"]["rolls"]["hashtag_parenthesis"])
 }
 if FeaturesV2["hotstrings"]["rolls"]["hashtag_open_bracket"]["enabled"] {
-	LoadHotstringsSection("rolls", "hashtagopenbracket", Features["Rolls"]["HashtagOpenBracket"])
+	LoadHotstringsSection("rolls", "hashtagopenbracket", FeaturesV2["hotstrings"]["rolls"]["hashtag_open_bracket"])
 }
 if FeaturesV2["hotstrings"]["rolls"]["hashtag_close_bracket"]["enabled"] {
-	LoadHotstringsSection("rolls", "hashtagclosebracket", Features["Rolls"]["HashtagCloseBracket"])
+	LoadHotstringsSection("rolls", "hashtagclosebracket", FeaturesV2["hotstrings"]["rolls"]["hashtag_close_bracket"])
 }
 if FeaturesV2["hotstrings"]["rolls"]["hc"]["enabled"] {
-	LoadHotstringsSection("rolls", "hc", Features["Rolls"]["HC"])
+	LoadHotstringsSection("rolls", "hc", FeaturesV2["hotstrings"]["rolls"]["hc"])
 }
 if FeaturesV2["hotstrings"]["rolls"]["assign"]["enabled"] {
 	AssignOptions := Map("TimeActivationSeconds", HotstringsResolve("rolls", "Assign").Delay)
@@ -262,10 +262,10 @@ if FeaturesV2["hotstrings"]["rolls"]["not_equal"]["enabled"] {
 	CreateHotstring("*?", "!#", NotEqualReplacement, NotEqualOptions)
 }
 if FeaturesV2["hotstrings"]["rolls"]["sx"]["enabled"] {
-	LoadHotstringsSection("rolls", "sx", Features["Rolls"]["SX"])
+	LoadHotstringsSection("rolls", "sx", FeaturesV2["hotstrings"]["rolls"]["sx"])
 }
 if FeaturesV2["hotstrings"]["rolls"]["cx"]["enabled"] {
-	LoadHotstringsSection("rolls", "cx", Features["Rolls"]["CX"])
+	LoadHotstringsSection("rolls", "cx", FeaturesV2["hotstrings"]["rolls"]["cx"])
 }
 
 ; === Middle row ===
@@ -318,7 +318,7 @@ if FeaturesV2["hotstrings"]["rolls"]["assign_arrow_minus_left"]["enabled"] {
 	CreateHotstring("*?", "?+", Repl, Opts)
 }
 if FeaturesV2["hotstrings"]["rolls"]["ct"]["enabled"] {
-	LoadHotstringsSection("rolls", "ct", Features["Rolls"]["CT"])
+	LoadHotstringsSection("rolls", "ct", FeaturesV2["hotstrings"]["rolls"]["ct"])
 }
 
 
@@ -334,8 +334,7 @@ if FeaturesV2["hotstrings"]["rolls"]["ct"]["enabled"] {
 ; ===========================================================================
 
 if FeaturesV2["hotstrings"]["autocorrection"]["typographic_apostrophe"]["enabled"] {
-	LoadHotstringsSection("autocorrection", "typographicapostrophe", Features["Autocorrection"][
-		"TypographicApostrophe"])
+	LoadHotstringsSection("autocorrection", "typographicapostrophe", FeaturesV2["hotstrings"]["autocorrection"]["typographic_apostrophe"])
 
 	; Create all hotstrings y'a → y'a, y'b → y'b, etc.
 	; This prevents false positives like writing ['key'] ➜ ['key']
@@ -353,16 +352,15 @@ if FeaturesV2["hotstrings"]["autocorrection"]["typographic_apostrophe"]["enabled
 ; ============================================
 
 if FeaturesV2["hotstrings"]["autocorrection"]["errors"]["enabled"] {
-	LoadHotstringsSection("autocorrection", "errors", Features["Autocorrection"]["Errors"])
+	LoadHotstringsSection("autocorrection", "errors", FeaturesV2["hotstrings"]["autocorrection"]["errors"])
 }
 
 if FeaturesV2["hotstrings"]["autocorrection"]["ou"]["enabled"] {
-	LoadHotstringsSection("autocorrection", "ou", Features["Autocorrection"]["OU"])
+	LoadHotstringsSection("autocorrection", "ou", FeaturesV2["hotstrings"]["autocorrection"]["ou"])
 }
 
 if FeaturesV2["hotstrings"]["autocorrection"]["multiple_punctuation_marks"]["enabled"] {
-	LoadHotstringsSection("autocorrection", "multiplepunctuationmarks", Features["Autocorrection"][
-		"MultiplePunctuationMarks"])
+	LoadHotstringsSection("autocorrection", "multiplepunctuationmarks", FeaturesV2["hotstrings"]["autocorrection"]["multiple_punctuation_marks"])
 
 	; We can't use the TimeActivationSeconds here, as previous character = current character = "."
 	Hotstring(
@@ -374,7 +372,7 @@ if FeaturesV2["hotstrings"]["autocorrection"]["multiple_punctuation_marks"]["ena
 }
 
 if FeaturesV2["hotstrings"]["autocorrection"]["suffixes_a_chaining"]["enabled"] {
-	LoadHotstringsSection("autocorrection", "suffixesachaining", Features["Autocorrection"]["SuffixesAChaining"])
+	LoadHotstringsSection("autocorrection", "suffixesachaining", FeaturesV2["hotstrings"]["autocorrection"]["suffixes_a_chaining"])
 }
 
 
@@ -383,11 +381,11 @@ if FeaturesV2["hotstrings"]["autocorrection"]["suffixes_a_chaining"]["enabled"] 
 ; =============================================
 
 if FeaturesV2["hotstrings"]["autocorrection"]["minus"]["enabled"] {
-	LoadHotstringsSection("autocorrection", "minus", Features["Autocorrection"]["Minus"])
+	LoadHotstringsSection("autocorrection", "minus", FeaturesV2["hotstrings"]["autocorrection"]["minus"])
 }
 
 if FeaturesV2["hotstrings"]["autocorrection"]["minus_apostrophe"]["enabled"] {
-	LoadHotstringsSection("autocorrection", "minusapostrophe", Features["Autocorrection"]["MinusApostrophe"])
+	LoadHotstringsSection("autocorrection", "minusapostrophe", FeaturesV2["hotstrings"]["autocorrection"]["minus_apostrophe"])
 }
 
 
@@ -398,7 +396,7 @@ if FeaturesV2["hotstrings"]["autocorrection"]["minus_apostrophe"]["enabled"] {
 ; ==========================================
 
 if FeaturesV2["hotstrings"]["autocorrection"]["caps"]["enabled"] {
-	LoadHotstringsSection("autocorrection", "caps", Features["Autocorrection"]["Caps"])
+	LoadHotstringsSection("autocorrection", "caps", FeaturesV2["hotstrings"]["autocorrection"]["caps"])
 
 	; For these apps, we only capitalize them when used in context of apps, and not as English words
 	apps := ["excel", "teams", "word", "office"]
@@ -433,11 +431,11 @@ if FeaturesV2["hotstrings"]["autocorrection"]["caps"]["enabled"] {
 ; ===========================================
 
 if FeaturesV2["hotstrings"]["autocorrection"]["names"]["enabled"] {
-	LoadHotstringsSection("autocorrection", "names", Features["Autocorrection"]["Names"])
+	LoadHotstringsSection("autocorrection", "names", FeaturesV2["hotstrings"]["autocorrection"]["names"])
 }
 
 if FeaturesV2["hotstrings"]["autocorrection"]["accents"]["enabled"] {
-	LoadHotstringsSection("autocorrection", "accents", Features["Autocorrection"]["Accents"])
+	LoadHotstringsSection("autocorrection", "accents", FeaturesV2["hotstrings"]["autocorrection"]["accents"])
 }
 
 
@@ -453,7 +451,7 @@ if FeaturesV2["hotstrings"]["autocorrection"]["accents"]["enabled"] {
 ; ===================================
 
 if FeaturesV2["hotstrings"]["distances_reduction"]["suffixes_a"]["enabled"] {
-	LoadHotstringsSection("distancesreduction", "suffixesa", Features["DistancesReduction"]["SuffixesA"])
+	LoadHotstringsSection("distancesreduction", "suffixesa", FeaturesV2["hotstrings"]["distances_reduction"]["suffixes_a"])
 }
 
 
@@ -591,11 +589,11 @@ if FeaturesV2["hotstrings"]["dynamic"]["text_expansion_personal_information"]["e
 ; ===========================================
 
 if FeaturesV2["hotstrings"]["magic_key"]["text_expansion"]["enabled"] {
-	LoadHotstringsSection("magickey", "textexpansion", Features["MagicKey"]["TextExpansion"])
+	LoadHotstringsSection("magickey", "textexpansion", FeaturesV2["hotstrings"]["magic_key"]["text_expansion"])
 }
 
 if FeaturesV2["hotstrings"]["magic_key"]["text_expansion_auto"]["enabled"] {
-	LoadHotstringsSection("magickey", "textexpansionauto", Features["MagicKey"]["TextExpansionAuto"])
+	LoadHotstringsSection("magickey", "textexpansionauto", FeaturesV2["hotstrings"]["magic_key"]["text_expansion_auto"])
 }
 
 
@@ -604,7 +602,7 @@ if FeaturesV2["hotstrings"]["magic_key"]["text_expansion_auto"]["enabled"] {
 ; ==============================
 
 if FeaturesV2["hotstrings"]["magic_key"]["text_expansion_emojis"]["enabled"] {
-	LoadHotstringsSection("magickey", "textexpansionemojis", Features["MagicKey"]["TextExpansionEmojis"])
+	LoadHotstringsSection("magickey", "textexpansionemojis", FeaturesV2["hotstrings"]["magic_key"]["text_expansion_emojis"])
 }
 
 
@@ -613,11 +611,11 @@ if FeaturesV2["hotstrings"]["magic_key"]["text_expansion_emojis"]["enabled"] {
 ; ==============================
 
 if FeaturesV2["hotstrings"]["magic_key"]["text_expansion_symbols"]["enabled"] {
-	LoadHotstringsSection("magickey", "textexpansionsymbols", Features["MagicKey"]["TextExpansionSymbols"])
+	LoadHotstringsSection("magickey", "textexpansionsymbols", FeaturesV2["hotstrings"]["magic_key"]["text_expansion_symbols"])
 }
 
 if FeaturesV2["hotstrings"]["magic_key"]["text_expansion_symbols_typst"]["enabled"] {
-	LoadHotstringsSection("magickey", "textexpansionsymbolstypst", Features["MagicKey"]["TextExpansionSymbolsTypst"],
+	LoadHotstringsSection("magickey", "textexpansionsymbolstypst", FeaturesV2["hotstrings"]["magic_key"]["text_expansion_symbols_typst"],
 		Map("OnlyText", False))
 }
 
@@ -753,7 +751,7 @@ if Features.Has("DynamicHotstrings") {
 ; ★ becomes a repeat key. It will activate will the lowest priority of all hotstrings
 ; That means a letter will only be repeated if no hotstring defined above matches
 if FeaturesV2["hotstrings"]["magic_key"]["repeat_corrections"]["enabled"] {
-	LoadHotstringsSection("magickey", "repeatcorrections", Features["MagicKey"]["RepeatCorrections"])
+	LoadHotstringsSection("magickey", "repeatcorrections", FeaturesV2["hotstrings"]["magic_key"]["repeat_corrections"])
 }
 
 CreateHotstring("*", "clé" . ScriptInformation["MagicKey"], "🔑")
