@@ -62,48 +62,20 @@ global _HotstringRegistrar := 0
 global _SendHook := 0
 
 ; Boot-time resolution of whether AltGr needs the synthetic Up injection in
-; HotstringHandler. Auto-detected from the active OS keyboard layout: when
-; the user's driver remaps AltGr to VK_KANA (e.g. KbdEdit/MSKLC custom Kana
-; layout), SC138 produces VK_KANA instead of VK_RMENU. Caching the resolved
-; bool at boot — and re-resolving on WM_INPUTLANGCHANGE — lets the hot path
-; skip a Map lookup and a truthy test on every hotstring firing.
+; HotstringHandler — read from ``ScriptInformation["AltGrIsKanaRemap"]``
+; (manual TOML opt-in, default false). Caching the resolved bool at boot
+; lets the hot path skip both a Map lookup and a truthy test on every
+; hotstring firing.
+;
+; Auto-detection via ``MapVirtualKeyExW`` was tried previously but proved
+; unreliable: on some bépo HKLs the probe returns VK_LMENU instead of
+; VK_RMENU and wrongly forces the Kana branch, breaking every keystroke that
+; follows an AltGr-mapped key. A manual flag is dumb but correct.
 global _ALTGR_KANA_FIXUP := False
 
-; Win32 constants for MapVirtualKeyEx — see learn.microsoft.com/en-us/
-; windows/win32/api/winuser/nf-winuser-mapvirtualkeyexw.
-global _MAPVK_VSC_TO_VK_EX := 3
-global _VK_RMENU := 0xA5
-global _SC_ALTGR := 0x38   ; SC138 lower byte once stripped of E0.
-
-; Probe the active keyboard layout: does scancode 0x38 (the right half of
-; the SC138 prefix that AHK's combo hotkeys key off) map to VK_RMENU? On a
-; vanilla AltGr layout (Bépo, US-International, …) it always does, and the
-; OS injects a ghost LCtrl+RAlt prefix around AltGr-mapped keys. On custom
-; KbdEdit/MSKLC layouts that remap AltGr — to VK_KANA, VK_LMENU or any
-; other VK — there is no ghost to filter, and IsRealAltGrPress() must let
-; every SC138 press through. The discriminator is therefore "SC138 maps to
-; anything other than VK_RMENU" rather than a specific Kana check.
-;
-; GetKeyboardLayout(0) returns the calling thread’s HKL — for the AHK
-; script's main thread, that may differ from the foreground app's HKL after
-; a Win+Space switch. Resolve the foreground window's thread HKL instead so
-; the probe reflects the layout the user is actually typing under.
-DetectAltGrKanaRemap() {
-    HKL := GetForegroundKeyboardLayout()
-    if (HKL = 0) {
-        HKL := DllCall("GetKeyboardLayout", "UInt", 0, "Ptr")
-    }
-    VK := DllCall("MapVirtualKeyExW",
-        "UInt", _SC_ALTGR,
-        "UInt", _MAPVK_VSC_TO_VK_EX,
-        "Ptr", HKL,
-        "UInt")
-    return (VK != _VK_RMENU)
-}
-
 ; Returns the HKL of the foreground window's thread, or 0 if the call chain
-; fails. Used by both DetectAltGrKanaRemap (boot-time probe) and the layout-
-; change watcher in ErgoptiPlus.ahk so they observe the same value.
+; fails. Kept here (no longer used by the AltGr probe) for the layout-change
+; watcher in ErgoptiPlus.ahk that still needs to detect layout switches.
 GetForegroundKeyboardLayout() {
     HWND := DllCall("GetForegroundWindow", "Ptr")
     if (HWND = 0) {
@@ -118,7 +90,15 @@ GetForegroundKeyboardLayout() {
 
 HotstringEngineInit() {
     global _ALTGR_KANA_FIXUP
-    _ALTGR_KANA_FIXUP := DetectAltGrKanaRemap()
+    if !IsSet(ScriptInformation) or !ScriptInformation.Has("AltGrIsKanaRemap") {
+        _ALTGR_KANA_FIXUP := False
+        return
+    }
+    Val := ScriptInformation["AltGrIsKanaRemap"]
+    ; TOML values come back as native types or strings depending on parser;
+    ; treat any common truthy form as enabled.
+    _ALTGR_KANA_FIXUP := (Val == true or Val == 1 or Val == "1"
+        or Val == "true" or Val == "True")
 }
 
 ; =======================================

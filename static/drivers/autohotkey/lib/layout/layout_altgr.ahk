@@ -213,8 +213,11 @@ _BuildAltGrTables() {
 ;      Kana virtual key, which sends SC138 with no LCtrl/RAlt modifiers.
 ;      Physical RAlt is never down, so the gate must accept SC138 directly.
 ;
-; The discriminator is _ALTGR_KANA_FIXUP, auto-detected at boot (and on every
-; layout change) by DetectAltGrKanaRemap() in lib/hotstring_engine.ahk.
+; The discriminator is _ALTGR_KANA_FIXUP, read at boot from
+; ScriptInformation["AltGrIsKanaRemap"] (manual TOML opt-in, default false).
+; Auto-detection was tried via MapVirtualKeyExW but proved unreliable on some
+; bépo HKLs where the probe returned VK_LMENU instead of VK_RMENU and broke
+; ghost-SC138 filtering — a manual flag is dumb but correct.
 IsRealAltGrPress() {
     global _ALTGR_KANA_FIXUP, _OB_ALTGR_PASSTHROUGH
     ; While the onboarding wizard is on screen the user has not yet committed
