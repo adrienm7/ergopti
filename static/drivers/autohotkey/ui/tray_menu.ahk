@@ -288,7 +288,7 @@ BuildGesturesMenu() {
 		GestEnabled,
 		(*) => ToggleGesturesEnabled())
 
-	GMenu.Add(t("menu.gestures.auto_configure"),  (*) => GestureAutoConfigureAction())
+	RegisterMenuItem(GMenu, t("menu.gestures.auto_configure"),  (*) => GestureAutoConfigureAction())
 	; Single tutorial entry — combines the previous "Show instructions" and
 	; "Open touchpad settings" items into one popup with the tutorial text
 	; plus an in-panel button that opens Settings. The two-item flow forced
@@ -307,7 +307,7 @@ BuildGesturesMenu() {
 		CurrentAction := GestureAssignments.Has(Slot) ? GestureAssignments[Slot] : "none"
 		CurrentLabel  := GESTURE_ACTIONS.Has(CurrentAction) ? _GestureActionLabel(CurrentAction) : t("dialog.action_picker.disabled")
 		EntryLabel    := SlotLabel . " : " . CurrentLabel
-		GMenu.Add(EntryLabel, ((_s, _l) => (*) => ShowActionPicker(_l, GestureAssignments.Has(_s) ? GestureAssignments[_s] : "none", (Id) => SetGestureSlotAction(_s, Id)))(Slot, SlotLabel))
+		RegisterMenuItem(GMenu, EntryLabel, ((_s, _l) => (*) => ShowActionPicker(_l, GestureAssignments.Has(_s) ? GestureAssignments[_s] : "none", (Id) => SetGestureSlotAction(_s, Id)))(Slot, SlotLabel))
 		if !GestEnabled
 			GMenu.Disable(EntryLabel)
 	}
@@ -384,11 +384,15 @@ BuildMetricsMenu() {
 	typing_sc := t("menu.metrics.shortcut_prefix") . MS_GetDisplayLabel("typing")
 	apps_sc   := t("menu.metrics.shortcut_prefix") . MS_GetDisplayLabel("apps") . Chr(0x200B)
 
-	MetricsMenu.Add(typing_label, (*) => KLUI_ToggleTyping())
-	MetricsMenu.Add(typing_sc, (*) => MS_PromptShortcut("typing", KLUI_ToggleTyping))
+	; Route the Metrics typing/apps toggles through the menu-dispatcher
+	; bypass (lib/menu_dispatcher.ahk) so AHK's random callback drops are
+	; auto-recovered via the WM_COMMAND retry timer — these rows are
+	; clicked often enough that the drop is user-visible.
+	RegisterMenuItem(MetricsMenu, typing_label, (*) => KLUI_ToggleTyping())
+	RegisterMenuItem(MetricsMenu, typing_sc, (*) => MS_PromptShortcut("typing", KLUI_ToggleTyping))
 	MetricsMenu.Add() ; separator
-	MetricsMenu.Add(apps_label, (*) => KLUI_ToggleApps())
-	MetricsMenu.Add(apps_sc, (*) => MS_PromptShortcut("apps", KLUI_ToggleApps))
+	RegisterMenuItem(MetricsMenu, apps_label, (*) => KLUI_ToggleApps())
+	RegisterMenuItem(MetricsMenu, apps_sc, (*) => MS_PromptShortcut("apps", KLUI_ToggleApps))
 
 	MetricsMenu.Add()
 	privacy_header := MenuSectionTitle(t("menu.metrics.privacy_header"))
