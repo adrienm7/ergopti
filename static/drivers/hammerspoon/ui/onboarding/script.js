@@ -6,24 +6,17 @@
 // =======================================
 // =======================================
 
-// Ordered list of supported locales — kept in sync with lib/i18n.lua LOCALES table.
+// List of supported locales — injected by Lua via initData() before the
+// first render. Lua is the single source of truth (lib/i18n.LOCALES table,
+// sorted by lib/i18n.get_sorted_locales()), so the wizard, the macOS
+// menubar language submenu and the AHK tray menu agree on both the set
+// of supported locales and their display order — non-Latin script names
+// (Cyrillic, Hebrew, Arabic, Devanagari, CJK, Hangul) trail after the
+// Latin ones instead of intermixing alphabetically. A small inline
+// fallback below keeps step 1 usable if the injection ever fails.
 var LOCALES = [
-	{ code: "ar", flag: "🇸🇦", name: "العربية"    },
-	{ code: "cs", flag: "🇨🇿", name: "Čeština"    },
-	{ code: "de", flag: "🇩🇪", name: "Deutsch"    },
-	{ code: "en", flag: "🇬🇧", name: "English"    },
-	{ code: "es", flag: "🇪🇸", name: "Español"    },
-	{ code: "fr", flag: "🇫🇷", name: "Français"   },
-	{ code: "it", flag: "🇮🇹", name: "Italiano"   },
-	{ code: "ja", flag: "🇯🇵", name: "日本語"      },
-	{ code: "ko", flag: "🇰🇷", name: "한국어"      },
-	{ code: "nl", flag: "🇳🇱", name: "Nederlands"  },
-	{ code: "pl", flag: "🇵🇱", name: "Polski"     },
-	{ code: "pt", flag: "🇧🇷", name: "Português"  },
-	{ code: "ru", flag: "🇷🇺", name: "Русский"    },
-	{ code: "tr", flag: "🇹🇷", name: "Türkçe"     },
-	{ code: "uk", flag: "🇺🇦", name: "Українська"  },
-	{ code: "zh", flag: "🇨🇳", name: "中文"        },
+	{ code: "en", flag: "🇬🇧", name: "English"  },
+	{ code: "fr", flag: "🇫🇷", name: "Français" },
 ];
 
 // Default locale shown when no locale has been set yet
@@ -380,6 +373,12 @@ window.initData = function (data) {
 	if (data && data.locale) _selectedLocale = data.locale;
 	if (data && data.answers) _answers = Object.assign(_answers, data.answers);
 	if (data && data.default_config_dir) window.DEFAULT_CONFIG_DIR = data.default_config_dir;
+	// Locale list authored and sorted in lib/i18n.lua — override the
+	// inline fallback so step 1 lists every supported locale in the
+	// same order as the menubar language submenu.
+	if (data && Array.isArray(data.locales) && data.locales.length > 0) {
+		LOCALES = data.locales;
+	}
 	// System layout name (macOS) — used by step 3 to pre-select ù on
 	// AZERTY-flavoured layouts and ; otherwise. Lua resolves it via
 	// hs.keycodes.currentLayout().

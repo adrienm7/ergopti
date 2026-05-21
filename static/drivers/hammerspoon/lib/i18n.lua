@@ -189,16 +189,31 @@ function M.set_locale_no_reload(code)
 end
 
 
+--- Returns a shallow copy of LOCALES sorted alphabetically by name
+--- (case-insensitive). Acts as the single source of truth for display
+--- order across every surface that lists locales — the menubar language
+--- submenu, the onboarding wizard's step 1 list, etc. — so they all
+--- agree on row ordering regardless of the declaration order above.
+---
+--- Lua's ``string.lower`` only folds ASCII bytes, which is intentional
+--- here: it keeps non-Latin script names (Cyrillic, Hebrew, Arabic,
+--- Devanagari, CJK, Hangul) at the tail of the list per their natural
+--- UTF-8 byte order, instead of intermixing them with Latin names.
+--- @return table[] List of ``{code, flag, name}`` tables.
+function M.get_sorted_locales()
+	local sorted = {}
+	for _, loc in ipairs(LOCALES) do sorted[#sorted + 1] = loc end
+	table.sort(sorted, function(a, b) return a.name:lower() < b.name:lower() end)
+	return sorted
+end
+
 --- Returns a list of hs.menu-compatible item tables for a language selector.
 --- Each item has a title and an fn; the currently active locale gets a
 --- checked = true flag. Pass this list directly into an hs.menubar submenu.
 --- @return table[] List of menu item tables.
 function M.build_language_menu_items()
-	local sorted = {}
-	for _, loc in ipairs(LOCALES) do sorted[#sorted + 1] = loc end
-	table.sort(sorted, function(a, b) return a.name:lower() < b.name:lower() end)
 	local items = {}
-	for _, loc in ipairs(sorted) do
+	for _, loc in ipairs(M.get_sorted_locales()) do
 		local code = loc.code
 		items[#items + 1] = {
 			title   = loc.flag .. " " .. loc.name,
