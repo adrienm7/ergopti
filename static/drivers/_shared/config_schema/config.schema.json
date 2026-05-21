@@ -1,0 +1,271 @@
+{
+	"$schema": "https://json-schema.org/draft/2020-12/schema",
+	"$id": "https://ergopti.com/schema/config.schema.json",
+	"title": "Ergopti+ user configuration (v2)",
+	"description": "JSON Schema strict for the unified config.toml consumed by both the AHK and Hammerspoon drivers. Validated at boot — strict in dev (ERGOPTI_DEV=1), warn-only in prod.",
+	"type": "object",
+	"additionalProperties": false,
+	"required": ["script"],
+
+	"properties": {
+		"script":     { "$ref": "#/$defs/script" },
+		"hotstrings": { "$ref": "#/$defs/hotstrings" },
+		"llm":        { "$ref": "#/$defs/llm" },
+		"metrics":    { "$ref": "#/$defs/metrics" },
+		"shortcuts":  { "$ref": "#/$defs/shortcuts" },
+		"ahk":        { "$ref": "#/$defs/ahk_specific" },
+		"hs":         { "$ref": "#/$defs/hs_specific" }
+	},
+
+	"$defs": {
+
+		"feature_toggle": {
+			"description": "Universal feature toggle. ``enabled`` is required; ``time_activation_seconds`` is optional (omission = instant activation).",
+			"type": "object",
+			"additionalProperties": false,
+			"required": ["enabled"],
+			"properties": {
+				"enabled":                 { "type": "boolean" },
+				"time_activation_seconds": { "type": "number", "minimum": 0 }
+			}
+		},
+
+		"feature_group": {
+			"description": "A named group of feature toggles (e.g. hotstrings.autocorrection).",
+			"type": "object",
+			"additionalProperties": { "$ref": "#/$defs/feature_toggle" }
+		},
+
+		"script": {
+			"type": "object",
+			"additionalProperties": false,
+			"required": ["locale", "log_level"],
+			"properties": {
+				"locale": {
+					"type": "string",
+					"pattern": "^[a-z]{2}$",
+					"description": "ISO 639-1 two-letter language code."
+				},
+				"log_level": {
+					"enum": ["DEBUG", "TRACE", "DONE", "INFO", "START", "SUCCESS", "WARNING", "ERROR"]
+				},
+				"alt_gr_is_kana_remap": {
+					"oneOf": [
+						{ "type": "boolean" },
+						{ "const": "auto" }
+					]
+				}
+			}
+		},
+
+		"hotstrings": {
+			"type": "object",
+			"additionalProperties": false,
+			"properties": {
+				"trigger_char": { "type": "string", "minLength": 1, "maxLength": 4 },
+
+				"autocorrection":      { "$ref": "#/$defs/feature_group" },
+				"distances_reduction": { "$ref": "#/$defs/feature_group" },
+				"sfbs_reduction":      { "$ref": "#/$defs/feature_group" },
+				"rolls":               { "$ref": "#/$defs/feature_group" },
+				"magic_key":           { "$ref": "#/$defs/feature_group" },
+				"personal":            { "$ref": "#/$defs/feature_group" },
+
+				"dynamic": {
+					"type": "object",
+					"additionalProperties": false,
+					"properties": {
+						"date":          { "$ref": "#/$defs/feature_toggle" },
+						"date_fr":       { "$ref": "#/$defs/feature_toggle" },
+						"date_long_fr":  { "$ref": "#/$defs/feature_toggle" },
+						"iban_prefixes": { "$ref": "#/$defs/feature_toggle" },
+						"phone_prefixes":{ "$ref": "#/$defs/feature_toggle" },
+						"ssn_prefixes":  { "$ref": "#/$defs/feature_toggle" },
+						"text_expansion_personal_information": {
+							"allOf": [
+								{ "$ref": "#/$defs/feature_toggle" },
+								{
+									"type": "object",
+									"properties": {
+										"pattern_max_length": { "type": "integer", "minimum": 1, "maximum": 16 }
+									}
+								}
+							]
+						}
+					}
+				}
+			}
+		},
+
+		"llm": {
+			"type": "object",
+			"additionalProperties": false,
+			"required": ["enabled"],
+			"properties": {
+				"enabled": { "type": "boolean" },
+				"display": {
+					"type": "object",
+					"additionalProperties": false,
+					"properties": {
+						"pred_indent":     { "type": "integer" },
+						"show_info_bar":   { "type": "boolean" },
+						"streaming":       { "type": "boolean" },
+						"streaming_multi": { "type": "boolean" }
+					}
+				},
+				"generation": {
+					"type": "object",
+					"additionalProperties": false,
+					"properties": {
+						"context_length":  { "type": "integer", "minimum": 1 },
+						"min_words":       { "type": "integer", "minimum": 1 },
+						"max_words":       { "type": "integer", "minimum": 1 },
+						"temperature":     { "type": "number",  "minimum": 0, "maximum": 2 },
+						"auto_raise_temp": { "type": "boolean" },
+						"reset_on_nav":    { "type": "boolean" },
+						"sequential_mode": { "type": "boolean" }
+					}
+				},
+				"models": {
+					"type": "object",
+					"additionalProperties": true,
+					"required": ["selected"],
+					"properties": {
+						"selected":    { "type": "string", "minLength": 1 },
+						"ollama":      { "type": "string" },
+						"mlx":         { "type": "string" },
+						"user_models": { "type": "object" }
+					}
+				},
+				"profiles": {
+					"type": "object",
+					"additionalProperties": false,
+					"properties": {
+						"active":                 { "type": "string", "minLength": 1 },
+						"num_predictions":        { "type": "integer", "minimum": 1, "maximum": 32 },
+						"auto_profile_for_model": { "type": "boolean" },
+						"shortcuts":              { "type": "object" },
+						"user_profiles":          { "type": "object" }
+					}
+				},
+				"trigger": {
+					"type": "object",
+					"additionalProperties": false,
+					"properties": {
+						"debounce_ms":              { "type": "integer", "minimum": 0 },
+						"instant_on_word_end":      { "type": "boolean" },
+						"after_hotstring":          { "type": "boolean" },
+						"inline_autotype":          { "type": "boolean" },
+						"secure_filter_enabled":    { "type": "boolean" },
+						"url_bar_filter_enabled":   { "type": "boolean" },
+						"shortcut":                 { "type": "boolean" },
+						"disabled_apps":            { "type": "object" }
+					}
+				},
+				"navigation": {
+					"type": "object",
+					"additionalProperties": false,
+					"properties": {
+						"arrow_nav_enabled": { "type": "boolean" },
+						"val_modifiers": {
+							"type": "array",
+							"items": { "enum": ["alt", "ctrl", "shift", "cmd"] }
+						},
+						"nav_modifiers": { "type": "object" }
+					}
+				}
+			}
+		},
+
+		"metrics": {
+			"type": "object",
+			"additionalProperties": true,
+			"required": ["enabled"],
+			"properties": {
+				"enabled":                      { "type": "boolean" },
+				"private_filter_enabled":       { "type": "boolean" },
+				"secure_filter_enabled":        { "type": "boolean" },
+				"system_auth_filter_enabled":   { "type": "boolean" },
+				"encrypt":                      { "type": "boolean" },
+				"show_wpm_menubar":             { "type": "boolean" },
+				"wpm_menubar_colors":           { "type": "boolean" },
+
+				"menubar": { "type": "object" },
+				"float":   { "type": "object" },
+				"shortcuts": {
+					"type": "object",
+					"additionalProperties": false,
+					"properties": {
+						"apps":   { "type": ["boolean", "string"] },
+						"typing": { "type": ["boolean", "string"] }
+					}
+				},
+				"disabled_apps": {
+					"type": "object",
+					"properties": {
+						"list": { "type": "array", "items": { "type": "string" } }
+					}
+				}
+			}
+		},
+
+		"shortcuts": {
+			"type": "object",
+			"additionalProperties": true,
+			"properties": {
+				"enabled":     { "type": "boolean" },
+				"chatgpt_url": { "type": "string", "format": "uri" },
+				"keys":        { "type": "object" },
+				"script_control": {
+					"type": "object",
+					"additionalProperties": true,
+					"properties": {
+						"enabled":    { "type": "boolean" },
+						"backspace":  { "type": "string" },
+						"escape":     { "type": "string" },
+						"return_key": { "type": "string" }
+					}
+				}
+			}
+		},
+
+		"ahk_specific": {
+			"description": "Sections AHK-only. HS warns if present in its config.",
+			"type": "object",
+			"additionalProperties": false,
+			"properties": {
+				"layout": {
+					"type": "object",
+					"additionalProperties": false,
+					"properties": {
+						"ergopti_base":         { "type": "boolean" },
+						"direct_access_digits": { "type": "boolean" },
+						"ergopti_alt_gr":       { "type": "boolean" },
+						"ergopti_plus":         { "type": "boolean" }
+					}
+				},
+				"shortcuts":         { "type": "object", "additionalProperties": true },
+				"gestures":          { "type": "object", "additionalProperties": true },
+				"metrics":           { "type": "object", "additionalProperties": true }
+			}
+		},
+
+		"hs_specific": {
+			"description": "Sections HS-only. AHK warns if present in its config.",
+			"type": "object",
+			"additionalProperties": false,
+			"properties": {
+				"gestures": {
+					"type": "object",
+					"additionalProperties": true,
+					"properties": {
+						"modes":         { "type": "object" },
+						"sensitivities": { "type": "object" }
+					}
+				},
+				"hotstrings": { "type": "object", "additionalProperties": true },
+				"karabiner":  { "type": "object", "additionalProperties": true }
+			}
+		}
+	}
+}

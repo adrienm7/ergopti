@@ -1,0 +1,373 @@
+# config_schema/examples/hs_config.example.toml
+# Example Hammerspoon v2 configuration — target schema after the Scope C refactor.
+# Generated at first boot by the HS driver from _shared/features/manifest.toml.
+# The user edits this file freely; any unknown key triggers a warn at boot
+# (strict in dev mode via ERGOPTI_DEV=1).
+#
+# Conventions are identical to ahk_config.example.toml:
+#   - Universal sections: [script], [hotstrings], [llm], [metrics], [shortcuts]
+#     — IDENTICAL to the AHK config, same exact schema.
+#   - HS-only sections are prefixed [hs.*].
+#   - Tap-hold lives in hammerspoon/tap_hold.toml and is delegated to Karabiner.
+
+
+
+
+
+# =========================
+# =========================
+# ======= 1. Script =======
+# =========================
+# =========================
+
+[script]
+locale = "fr"
+log_level = "INFO"
+
+
+
+
+
+# =============================
+# =============================
+# ======= 2. Hotstrings =======
+# =============================
+# =============================
+
+[hotstrings]
+trigger_char = "★"
+
+
+
+# Identical to the [hotstrings.<group>.<feature>] sections of the AHK config.
+# See ahk_config.example.toml for the full list. Both drivers MUST validate
+# the same exact structure here.
+#
+# Minimal illustration:
+
+[hotstrings.autocorrection.accents]
+enabled = true
+time_activation_seconds = 0.5
+
+[hotstrings.distances_reduction.qu]
+enabled = true
+time_activation_seconds = 0.5
+
+[hotstrings.rolls.hc]
+enabled = true
+time_activation_seconds = 0.5
+
+[hotstrings.magic_key.replace]
+enabled = true
+
+[hotstrings.dynamic.date_fr]
+enabled = true
+
+[hotstrings.personal.autocorrection]
+enabled = true
+time_activation_seconds = 0.75
+
+
+
+
+
+# ======================
+# ======================
+# ======= 3. LLM =======
+# ======================
+# ======================
+
+[llm]
+enabled = false
+
+
+
+# =======================
+# ===== 3.1 Display =====
+# =======================
+
+[llm.display]
+pred_indent = -3
+show_info_bar = true
+streaming = true
+streaming_multi = true
+
+
+
+# ==========================
+# ===== 3.2 Generation =====
+# ==========================
+
+[llm.generation]
+context_length = 500
+min_words = 5
+max_words = 20
+temperature = 0.10
+auto_raise_temp = true
+reset_on_nav = true
+sequential_mode = false
+
+
+
+# ======================
+# ===== 3.3 Models =====
+# ======================
+
+[llm.models]
+selected = "mlx"          # "mlx" | "ollama"
+mlx = "Qwen3.5-2B"
+ollama = "gemma-4-E2B-it"
+
+[llm.models.user_models]
+# user-added entries here
+
+
+
+# ========================
+# ===== 3.4 Profiles =====
+# ========================
+
+[llm.profiles]
+active = "basic"
+num_predictions = 3
+
+[llm.profiles.shortcuts]
+# user-defined per-app profile shortcuts
+
+[llm.profiles.user_profiles]
+# user-defined prompt profiles
+
+
+
+# =======================
+# ===== 3.5 Trigger =====
+# =======================
+
+[llm.trigger]
+debounce_ms = 200
+instant_on_word_end = true
+after_hotstring = true
+secure_filter_enabled = true
+url_bar_filter_enabled = true
+shortcut = false
+
+[llm.trigger.disabled_apps]
+# user-disabled apps for LLM trigger
+
+
+
+# ==========================
+# ===== 3.6 Navigation =====
+# ==========================
+
+[llm.navigation]
+arrow_nav_enabled = false
+val_modifiers = ["alt"]
+
+[llm.navigation.nav_modifiers]
+# user-customized navigation modifiers
+
+
+
+
+
+# ============================
+# ============================
+# ======= 4. Metrics ========
+# ============================
+# ============================
+
+[metrics]
+enabled = true
+private_filter_enabled = true
+secure_filter_enabled = true
+system_auth_filter_enabled = true
+encrypt = false
+
+[metrics.menubar]
+show_wpm = false
+colors = true
+
+[metrics.float]
+show_wpm = true
+colors = true
+graph = true
+
+[metrics.shortcuts]
+apps = false
+typing = false
+
+[metrics.disabled_apps]
+list = []
+
+
+
+
+
+# ===============================
+# ===============================
+# ======= 5. Shortcuts ========
+# ===============================
+# ===============================
+
+[shortcuts]
+enabled = true
+chatgpt_url = "https://chat.openai.com"
+
+
+
+# ===========================
+# ===== 5.1 Key actions =====
+# ===========================
+
+[shortcuts.keys]
+at_hash = true
+cmd_shift_v = true
+cmd_star = true
+ctrl_a = true
+ctrl_d = true
+ctrl_e = true
+ctrl_g = true
+ctrl_h = true
+ctrl_i = true
+ctrl_l = true
+ctrl_m = true
+ctrl_o = true
+ctrl_p = true
+ctrl_period = true
+ctrl_quote = true
+ctrl_s = true
+ctrl_t = true
+ctrl_u = true
+ctrl_w = true
+ctrl_x = true
+layer_scroll = true
+
+
+
+# ==============================
+# ===== 5.2 Script control =====
+# ==============================
+
+[shortcuts.script_control]
+enabled = true
+backspace = "script_reload"
+escape = "script_quit"
+return_key = "open_metrics_typing"
+
+
+
+
+
+# ===================================
+# ===================================
+# ======= 6. HS-only sections =======
+# ===================================
+# ===================================
+
+
+
+# ===========================
+# ===== 6.1 hs.gestures =====
+# ===========================
+
+# Richer HS vocabulary (Mac trackpad — 2/3/4/5 fingers + diagonals).
+
+[hs.gestures]
+enabled = true
+space_wrap = true
+swipe_2_left = "arrow_up"
+swipe_2_right = "none"
+swipe_2_up = "none"
+swipe_2_down = "none"
+swipe_3_left = "word_prev"
+swipe_3_right = "word_next"
+swipe_3_up = "tab_prev"
+swipe_3_down = "tab_next"
+swipe_3_horiz = "words"
+swipe_4_left = "space_next"
+swipe_4_right = "space_prev"
+swipe_4_up = "mission_control"
+swipe_4_down = "app_expose"
+swipe_4_horiz = "spaces"
+swipe_5_left = "win_prev"
+swipe_5_right = "win_next"
+swipe_5_up = "doc_start"
+swipe_5_down = "doc_end"
+swipe_5_horiz = "windows"
+tap_2 = "none"
+tap_3 = "left_click_toggle"
+tap_4 = "app_window_previous"
+tap_5 = "none"
+
+
+
+# =================================
+# ===== 6.2 hs.gestures.modes =====
+# =================================
+
+# Per-direction mode: "x1" (fire once) or "incremental" (repeats on long swipe).
+
+[hs.gestures.modes]
+swipe_2_left = "x1"
+swipe_2_right = "x1"
+swipe_2_up = "x1"
+swipe_2_down = "x1"
+swipe_3_left = "incremental"
+swipe_3_right = "incremental"
+swipe_3_up = "incremental"
+swipe_3_down = "incremental"
+swipe_4_left = "x1"
+swipe_4_right = "x1"
+swipe_4_up = "x1"
+swipe_4_down = "x1"
+swipe_5_left = "incremental"
+swipe_5_right = "incremental"
+swipe_5_up = "x1"
+swipe_5_down = "x1"
+
+
+
+# =========================================
+# ===== 6.3 hs.gestures.sensitivities =====
+# =========================================
+
+# Per-direction activation sensitivity (centimetres of travel before firing).
+
+[hs.gestures.sensitivities]
+swipe_2_left = 3.5
+swipe_2_right = 3.5
+swipe_2_up = 3.5
+swipe_2_down = 3.5
+swipe_3_left = 3.5
+swipe_3_right = 3.5
+swipe_3_up = 3.5
+swipe_3_down = 3.5
+swipe_4_left = 3.5
+swipe_4_right = 3.5
+swipe_4_up = 3.5
+swipe_4_down = 3.5
+swipe_5_left = 3.5
+swipe_5_right = 3.5
+swipe_5_up = 3.5
+swipe_5_down = 3.5
+
+
+
+# ==================================
+# ===== 6.4 hs.hotstrings (UI) =====
+# ==================================
+
+[hs.hotstrings]
+expansion_delay = 0.75
+preview_ai_enabled = true
+preview_autocorrect_enabled = true
+preview_colored_tooltips = true
+preview_star_enabled = true
+
+[hs.hotstrings.editor]
+close_on_add = false
+
+[hs.hotstrings.editor.shortcut]
+key = "★"
+mods = ["ctrl"]
