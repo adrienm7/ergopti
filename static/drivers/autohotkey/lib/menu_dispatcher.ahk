@@ -151,6 +151,82 @@ _TrackedDispatch(ItemId, Callback, Args*) {
     Callback.Call(Args*)
 }
 
+; Variant for items added via ``Menu.Insert(BeforeItem, ItemName, Callback)``.
+; AHK's Insert places the new item BEFORE the position named in BeforeItem
+; (the "1&" / "2&" notation = 1-based position with literal trailing &) and
+; shifts everything else down. We do the same two-step placeholder + replace
+; dance, but use Insert for both steps so the position stays consistent.
+;
+; BeforeItem accepts AHK's standard syntax: "Nname" / "&n" / "Nn&" — see
+; AHK 2.0 Menu.Insert docs.
+RegisterMenuItemInsert(MenuObj, BeforeItem, ItemName, Callback) {
+    global _MenuDispatchCallbacks, _MenuDispatchLastFire
+
+    PlaceholderCb := (*) => ""
+    try {
+        MenuObj.Insert(BeforeItem, ItemName, PlaceholderCb)
+    } catch {
+        return 0
+    }
+
+    ; Find the just-inserted item via its name — Menu.Handle gives the
+    ; HMENU, then we walk positions and match against the item text. Less
+    ; clean than the Add helper's "tail of menu" assumption, but Insert
+    ; can land anywhere so we have no shortcut.
+    ItemId := _FindMenuItemIdByName(MenuObj, ItemName)
+    if (!ItemId) {
+        try MenuObj.Insert(BeforeItem, ItemName, Callback)
+        return 0
+    }
+
+    Tracked := _MakeTrackedCallback(ItemId, Callback)
+    ; Re-Add (same name) modifies the existing item's callback without
+    ; touching its position, matching the Add helper's behavior.
+    try MenuObj.Add(ItemName, Tracked)
+
+    _MenuDispatchCallbacks[ItemId] := Callback
+    _MenuDispatchLastFire[ItemId]  := 0
+    return 1
+}
+
+; Walk a Menu's items and return the Win32 ItemId of the entry whose
+; visible text matches ItemName. Returns 0 when nothing matches or
+; Menu.Handle is unavailable. Length-tolerant: GetMenuString tells us
+; how many chars to allocate via its return value when nBuffer is 0.
+_FindMenuItemIdByName(MenuObj, ItemName) {
+    try {
+        HMENU := MenuObj.Handle
+        if (!HMENU) {
+            return 0
+        }
+        Count := DllCall("GetMenuItemCount", "ptr", HMENU, "int")
+        Loop Count {
+            Pos := A_Index - 1
+            ; Probe the required buffer size — first call with nBuffer=0
+            ; returns the char count (no terminator).
+            Required := DllCall("GetMenuStringW", "ptr", HMENU, "uint", Pos,
+                "ptr", 0, "int", 0, "uint", 0x0400, "int")
+            if (Required <= 0) {
+                continue
+            }
+            Buf := Buffer((Required + 1) * 2, 0)
+            DllCall("GetMenuStringW", "ptr", HMENU, "uint", Pos,
+                "ptr", Buf, "int", Required + 1, "uint", 0x0400)
+            Text := StrGet(Buf, "UTF-16")
+            if (Text == ItemName) {
+                Id := DllCall("GetMenuItemID", "ptr", HMENU, "int", Pos, "uint")
+                if (Id and Id != 0xFFFFFFFF) {
+                    return Id
+                }
+            }
+        }
+    } catch {
+        ; Same fallback policy as RegisterMenuItem — bypass coverage
+        ; silently degrades to AHK's native dispatch.
+    }
+    return 0
+}
+
 
 
 
