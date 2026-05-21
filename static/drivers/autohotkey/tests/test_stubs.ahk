@@ -309,6 +309,12 @@ global FeaturesV2 := Map(
     ),
 )
 
+; Phase 7.3 — TapHold global is populated in production by
+; LoadTapHoldToml + MirrorV1ToV2_TapHold (see lib/v1_v2_mirror.ahk § 6).
+; Tests don't exercise tap-hold logic but the symbol must exist for the
+; mirror's existence check and any future test_tap_hold_mirror.ahk fixture.
+global TapHold := Map("keys", Map(), "layers", Map())
+
 global ConfigurationFile := A_ScriptDir . "\test_config.ini"
 global SpaceAroundSymbols := ""
 
