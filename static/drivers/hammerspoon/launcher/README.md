@@ -51,6 +51,6 @@ in source.
 ## Bundle id
 
 The embedded Hammerspoon's `CFBundleIdentifier` is rewritten to
-`com.ergopti.app` at bundle-assembly time. This isolates its preferences
+`com.ergoptiplus.app` at bundle-assembly time. This isolates its preferences
 from a stock Hammerspoon install the user may also be running, so the two
 never fight over `MJConfigDir`.
