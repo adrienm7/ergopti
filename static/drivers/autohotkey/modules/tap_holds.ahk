@@ -735,13 +735,13 @@ ActionLayer(action) {
         Features["TapHolds"]["LAlt"]["BackSpaceLayer"].Enabled
         or Features["TapHolds"]["LAlt"]["TabLayer"].Enabled
     ) and (
-        Features["Shortcuts"]["LAltCapsLock"]["BackSpace"].Enabled
-        or Features["Shortcuts"]["LAltCapsLock"]["CapsLock"].Enabled
-        or Features["Shortcuts"]["LAltCapsLock"]["CapsWord"].Enabled
-        or Features["Shortcuts"]["LAltCapsLock"]["CtrlBackSpace"].Enabled
-        or Features["Shortcuts"]["LAltCapsLock"]["CtrlDelete"].Enabled
-        or Features["Shortcuts"]["LAltCapsLock"]["Delete"].Enabled
-        or Features["Shortcuts"]["LAltCapsLock"]["OneShotShift"].Enabled
+        FeaturesV2["shortcuts"]["lalt_caps_lock"]["backspace"]
+        or FeaturesV2["shortcuts"]["lalt_caps_lock"]["caps_lock"]
+        or FeaturesV2["shortcuts"]["lalt_caps_lock"]["caps_word"]
+        or FeaturesV2["shortcuts"]["lalt_caps_lock"]["ctrl_backspace"]
+        or FeaturesV2["shortcuts"]["lalt_caps_lock"]["ctrl_delete"]
+        or FeaturesV2["shortcuts"]["lalt_caps_lock"]["delete"]
+        or FeaturesV2["shortcuts"]["lalt_caps_lock"]["one_shot_shift"]
     )
 )
 ; Overrides the "BackSpace" shortcut on the layer

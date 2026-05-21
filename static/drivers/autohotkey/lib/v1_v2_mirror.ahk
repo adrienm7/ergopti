@@ -154,12 +154,20 @@ MirrorV1ToV2_Gestures() {
 ;   Search (enabled + search_engine + search_engine_url_query)
 ;   TakeNote (enabled + dated_notes + destination_folder)
 ;
+; Sub-Map entries (10 per group, all bools) — migrated in Phase 4 so the
+; individual ``.Enabled`` reads in modules/shortcuts.ahk and
+; modules/tap_holds.ahk can consult ``FeaturesV2["shortcuts"][<group>][<key>]``
+; directly. The ``RunFirstSimpleAction`` / ``HasAnyEnabled`` dispatchers in
+; lib/dispatchers.ahk still iterate v1-shaped ``{Cfg.Enabled}`` objects, so
+; the dispatcher call sites (``RunFirstSimpleAction(Features["Shortcuts"]
+; ["LAltCapsLock"])`` and friends) keep passing v1 sub-Maps until those
+; helpers are widened or replaced. ``AltGrCapsLock`` has no individual
+; reads (only dispatcher calls) so we skip its mirror this phase.
+;   AltGrLAlt   — 10 entries, individually read in modules/shortcuts.ahk
+;   LAltCapsLock — 10 entries, individually read in modules/tap_holds.ahk
+;
 ; INTENTIONALLY NOT migrated yet (kept on v1):
-;   - Sub-Maps (AltGrLAlt / AltGrCapsLock / LAltCapsLock / Personal): the
-;     ``RunFirstSimpleAction`` / ``HasAnyEnabled`` dispatchers in
-;     lib/dispatchers.ahk iterate v1-shaped ``{Cfg.Enabled}`` objects,
-;     and updating both shapes in one go is more risk than reward this
-;     phase. Will move with the dispatcher rewrite in a future phase.
+;   - Personal sub-Map: boot-path dependency on RegisterPersonalFeature.
 ;   - Letter pickers (EGrave/ECirc/EAcute/AGrave): consumed by
 ;     lib/layout/layout_ergopti.ahk via .Letter lookups; touches the
 ;     base-layer registration so deferring.
@@ -252,6 +260,49 @@ MirrorV1ToV2_Shortcuts() {
             } else {
                 FeaturesV2["shortcuts"][V2Id][V2Key] := PropVal
             }
+            Copied += 1
+        }
+    }
+
+    ; Sub-Maps (Phase 4). Same snake_case key rename for every entry.
+    ; v1 path: Features["Shortcuts"]["AltGrLAlt"]["BackSpace"].Enabled
+    ; v2 path: FeaturesV2["shortcuts"]["alt_gr_lalt"]["backspace"]
+    SubKeyMap := Map(
+        "BackSpace",     "backspace",
+        "CapsLock",      "caps_lock",
+        "CapsWord",      "caps_word",
+        "CtrlBackSpace", "ctrl_backspace",
+        "CtrlDelete",    "ctrl_delete",
+        "Delete",        "delete",
+        "Enter",         "enter",
+        "Escape",        "escape",
+        "OneShotShift",  "one_shot_shift",
+        "Tab",           "tab",
+    )
+    SubMaps := Map(
+        "AltGrLAlt",    "alt_gr_lalt",
+        "LAltCapsLock", "lalt_caps_lock",
+    )
+    for V1Group, V2Group in SubMaps {
+        if !Features["Shortcuts"].Has(V1Group) {
+            continue
+        }
+        if !FeaturesV2["shortcuts"].Has(V2Group) or !IsObject(FeaturesV2["shortcuts"][V2Group]) {
+            continue
+        }
+        V1SubMap := Features["Shortcuts"][V1Group]
+        if !IsObject(V1SubMap) {
+            continue
+        }
+        for V1Key, V2Key in SubKeyMap {
+            if !V1SubMap.Has(V1Key) {
+                continue
+            }
+            V1Entry := V1SubMap[V1Key]
+            if !IsObject(V1Entry) or !V1Entry.HasOwnProp("Enabled") {
+                continue
+            }
+            FeaturesV2["shortcuts"][V2Group][V2Key] := (V1Entry.Enabled = true)
             Copied += 1
         }
     }

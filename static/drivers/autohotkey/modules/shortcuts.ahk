@@ -112,7 +112,7 @@ IsAltGrLAltEnabled() {
 ; returns — keeps SC138 a vanilla key until the wizard is done.
 
 AltGrLAltShortcut() {
-    if Features["Shortcuts"]["AltGrLAlt"]["BackSpace"].Enabled {
+    if FeaturesV2["shortcuts"]["alt_gr_lalt"]["backspace"] {
         OneShotShiftFix()
         if GetKeyState("Shift", "P") {
             ; "Shift" + "AltGr" + "LAlt" = Ctrl + BackSpace (Can't use Ctrl because of AltGr = Ctrl + Alt)
@@ -120,11 +120,11 @@ AltGrLAltShortcut() {
         } else {
             SendInput("{BackSpace}")
         }
-    } else if Features["Shortcuts"]["AltGrLAlt"]["CapsLock"].Enabled {
+    } else if FeaturesV2["shortcuts"]["alt_gr_lalt"]["caps_lock"] {
         ToggleCapsLock()
-    } else if Features["Shortcuts"]["AltGrLAlt"]["CapsWord"].Enabled {
+    } else if FeaturesV2["shortcuts"]["alt_gr_lalt"]["caps_word"] {
         ToggleCapsWord()
-    } else if Features["Shortcuts"]["AltGrLAlt"]["CtrlBackSpace"].Enabled {
+    } else if FeaturesV2["shortcuts"]["alt_gr_lalt"]["ctrl_backspace"] {
         OneShotShiftFix()
         if GetKeyState("Shift", "P") {
             ; "Shift" + "AltGr" + "LAlt" = BackSpace (Can't use Ctrl because of AltGr = Ctrl + Alt)
@@ -132,7 +132,7 @@ AltGrLAltShortcut() {
         } else {
             SendInput("^{BackSpace}")
         }
-    } else if Features["Shortcuts"]["AltGrLAlt"]["CtrlDelete"].Enabled {
+    } else if FeaturesV2["shortcuts"]["alt_gr_lalt"]["ctrl_delete"] {
         ; "Shift" + "AltGr" + "LAlt" = Delete (Can't use Ctrl because of AltGr = Ctrl + Alt)
         OneShotShiftFix()
         if GetKeyState("Shift", "P") {
@@ -140,7 +140,7 @@ AltGrLAltShortcut() {
         } else {
             SendInput("^{Delete}")
         }
-    } else if Features["Shortcuts"]["AltGrLAlt"]["Delete"].Enabled {
+    } else if FeaturesV2["shortcuts"]["alt_gr_lalt"]["delete"] {
         ; "Shift" + "AltGr" + "LAlt" = Ctrl + Delete (Can't use Ctrl because of AltGr = Ctrl + Alt)
         OneShotShiftFix()
         if GetKeyState("Shift", "P") {
@@ -148,13 +148,13 @@ AltGrLAltShortcut() {
         } else {
             SendInput("{Delete}")
         }
-    } else if Features["Shortcuts"]["AltGrLAlt"]["Enter"].Enabled {
+    } else if FeaturesV2["shortcuts"]["alt_gr_lalt"]["enter"] {
         SendInput("{Enter}")
-    } else if Features["Shortcuts"]["AltGrLAlt"]["Escape"].Enabled {
+    } else if FeaturesV2["shortcuts"]["alt_gr_lalt"]["escape"] {
         SendInput("{Escape}")
-    } else if Features["Shortcuts"]["AltGrLAlt"]["OneShotShift"].Enabled {
+    } else if FeaturesV2["shortcuts"]["alt_gr_lalt"]["one_shot_shift"] {
         OneShotShift()
-    } else if Features["Shortcuts"]["AltGrLAlt"]["Tab"].Enabled {
+    } else if FeaturesV2["shortcuts"]["alt_gr_lalt"]["tab"] {
         SendInput("{Tab}")
     }
 }
