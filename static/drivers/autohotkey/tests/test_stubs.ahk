@@ -97,6 +97,23 @@ global Features := Map(
     ),
 )
 
+; Mirror of the v1 Layout flags into the new v2-shape Map — populated in
+; production by MirrorV1ToV2_Layout() (Phase 2 of the sliced cut-over).
+; lib/layout/layout_shift_caps.ahk, lib/layout/layout_altgr.ahk and
+; modules/layout.ahk now read from FeaturesV2 instead of Features at the
+; HotIf/#HotIf gates. Tests don't fire those hotkeys, but the symbol still
+; needs to exist as a global so any test that does evaluate the gate (or a
+; future test_layout_v2_mirror.ahk fixture) doesn't trip on "variable not
+; assigned".
+global FeaturesV2 := Map(
+    "layout", Map(
+        "ergopti_base",         true,
+        "direct_access_digits", true,
+        "ergopti_alt_gr",       true,
+        "ergopti_plus",         false,
+    ),
+)
+
 global ConfigurationFile := A_ScriptDir . "\test_config.ini"
 global SpaceAroundSymbols := ""
 

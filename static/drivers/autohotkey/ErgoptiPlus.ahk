@@ -117,6 +117,7 @@ SendMode("Event") ; Everything concerning hotstrings MUST use SendEvent and not 
 #Include lib/manifest_reader.ahk
 #Include lib/first_boot.ahk
 #Include lib/tap_hold/tap_hold_loader.ahk
+#Include lib/v1_v2_mirror.ahk
 #Include lib/menu_manifest.ahk
 #Include lib/llm_defaults.ahk
 #Include lib/updater.ahk
@@ -942,6 +943,15 @@ try {
 ; (LogLevel, MagicKey, individual feature flags). All sections live in a
 ; single unified config file — no separate cross-driver config.toml.
 ApplyConfigTomlOverrides(ConfigurationFile)
+
+; Phase 2 of the sliced v2 cut-over — sync the user-customized v1 Layout
+; flags into FeaturesV2 so the migrated read sites (lib/layout/*, modules/
+; layout.ahk, modules/keylogger/keylogger_prefetch.ahk) observe the same
+; enabled/disabled state the user configured via the tray menu. Pure
+; derived view: writes still go through Features[X].Enabled + Reload, and
+; each Reload re-runs this mirror so divergence is impossible. See
+; lib/v1_v2_mirror.ahk for the per-section helpers and the cut-over plan.
+MirrorV1ToV2_Layout()
 
 ; Bootstrap Features["Personal"] from personal_hotstrings.toml _meta.sections
 ; before applying TOML metadata, so the user's section toggles appear in the menu.
