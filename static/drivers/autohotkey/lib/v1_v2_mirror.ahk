@@ -475,3 +475,125 @@ MirrorV1ToV2_Hotstrings() {
     try LoggerDebug("V1ToV2",
         "MirrorV1ToV2_Hotstrings copied {1} entry(ies) v1 -> v2.", Copied)
 }
+
+
+
+
+; ==============================================================
+; ==============================================================
+; ======= 5/ LLM =======
+; ==============================================================
+; ==============================================================
+
+; Mirrors the legacy flat ``[LLM]`` section in the user's v1 ``config.toml``
+; into the v2 nested ``FeaturesV2["llm"]`` Map. Unlike the other mirror
+; helpers, this one does NOT read from a top-level ``Features["LLM"]`` Map
+; (LLM never had one in v1) — it reads directly from ``_IniCache`` (the
+; raw TOML key/value cache populated by ``ParseTomlFile`` at boot). The
+; values are then placed at their v2 nested paths per the migration map
+; in ``_shared/features/_migration_v1_to_v2.md`` § 3.
+;
+; v1 key                        -> v2 path
+; enabled                       -> llm.enabled
+; model                         -> llm.models.ollama (+ llm.models.selected = "ollama")
+; profile_id                    -> llm.profiles.active
+; temperature                   -> llm.generation.temperature
+; n_predictions                 -> llm.profiles.num_predictions
+; min_words                     -> llm.generation.min_words
+; max_words                     -> llm.generation.max_words
+; debounce_ms                   -> llm.trigger.debounce_ms
+; ctx_chars                     -> llm.generation.context_length (renamed)
+; instant_on_word_end           -> llm.trigger.instant_on_word_end
+; auto_profile_for_model        -> llm.profiles.auto_profile_for_model
+; inline_autotype               -> llm.trigger.inline_autotype
+;
+; The ``onboarding_seen`` and ``app_profile_overrides`` v1 keys have no v2
+; manifest counterpart — they are runtime state, not declared features.
+; The tray-menu LLM init in ``ui/tray_menu.ahk`` still reads them via
+; ``IniCacheGet`` directly.
+MirrorV1ToV2_LLM() {
+    global _IniCache, FeaturesV2
+
+    if !IsSet(_IniCache) or !IsSet(FeaturesV2) {
+        try LoggerWarn("V1ToV2",
+            "MirrorV1ToV2_LLM skipped — _IniCache or FeaturesV2 unset.")
+        return
+    }
+    if !FeaturesV2.Has("llm") or !IsObject(FeaturesV2["llm"]) {
+        try LoggerWarn("V1ToV2",
+            "MirrorV1ToV2_LLM skipped — FeaturesV2['llm'] missing.")
+        return
+    }
+
+    Copied := 0
+
+    ; Direct mappings: read v1 key, place at its v2 path. Coercion is
+    ; done by ``_LlmCoerce<Bool|Num|Str>`` so the v2 Map ends up with
+    ; the same value types the downstream readers (LLM_Tray_Init) expect.
+    Direct := [
+        { v1: "enabled",                category: "",          v2: "enabled",                coerce: "bool" },
+        { v1: "temperature",            category: "generation", v2: "temperature",           coerce: "str"  },
+        { v1: "min_words",              category: "generation", v2: "min_words",             coerce: "int"  },
+        { v1: "max_words",              category: "generation", v2: "max_words",             coerce: "int"  },
+        { v1: "ctx_chars",              category: "generation", v2: "context_length",        coerce: "int"  },
+        { v1: "debounce_ms",            category: "trigger",    v2: "debounce_ms",           coerce: "int"  },
+        { v1: "instant_on_word_end",    category: "trigger",    v2: "instant_on_word_end",   coerce: "bool" },
+        { v1: "inline_autotype",        category: "trigger",    v2: "inline_autotype",       coerce: "bool" },
+        { v1: "profile_id",             category: "profiles",   v2: "active",                coerce: "str"  },
+        { v1: "n_predictions",          category: "profiles",   v2: "num_predictions",       coerce: "int"  },
+        { v1: "auto_profile_for_model", category: "profiles",   v2: "auto_profile_for_model", coerce: "bool" },
+    ]
+
+    for Entry in Direct {
+        Raw := IniCacheGet(_IniCache, "LLM", Entry.v1)
+        if (Raw == "_") {
+            continue  ; v1 key not present — keep manifest default in v2.
+        }
+        Coerced := _LlmCoerceValue(Raw, Entry.coerce)
+        if (Entry.category == "") {
+            FeaturesV2["llm"][Entry.v2] := Coerced
+        } else {
+            if !FeaturesV2["llm"].Has(Entry.category) or !IsObject(FeaturesV2["llm"][Entry.category]) {
+                continue
+            }
+            FeaturesV2["llm"][Entry.category][Entry.v2] := Coerced
+        }
+        Copied += 1
+    }
+
+    ; ``model`` lands under the per-backend slot in v2. We assume the
+    ; Ollama backend since that's the only one the v1 driver supports
+    ; today; also set ``models.selected = "ollama"`` so consumers know
+    ; which backend the model id belongs to.
+    ModelRaw := IniCacheGet(_IniCache, "LLM", "model")
+    if (ModelRaw != "_") {
+        if FeaturesV2["llm"].Has("models") and IsObject(FeaturesV2["llm"]["models"]) {
+            FeaturesV2["llm"]["models"]["ollama"]   := ModelRaw
+            FeaturesV2["llm"]["models"]["selected"] := "ollama"
+            Copied += 2
+        }
+    }
+
+    try LoggerDebug("V1ToV2",
+        "MirrorV1ToV2_LLM copied {1} entry(ies) v1 -> v2.", Copied)
+}
+
+; Coerce raw string values from _IniCache (which stores TOML-parsed
+; primitives but returns them as the cache's stored type) into the
+; concrete type expected by the v2 Map and its downstream readers.
+_LlmCoerceValue(Raw, Kind) {
+    switch Kind {
+        case "bool":
+            ; _IniCache returns AHK true/false for "true"/"false" TOML
+            ; literals but legacy callers also stored "1"/"0" strings.
+            if (Raw == true or Raw == 1 or Raw == "1" or Raw == "true") {
+                return true
+            }
+            return false
+        case "int":
+            return Integer(Raw)
+        case "str":
+            return String(Raw)
+    }
+    return Raw
+}
