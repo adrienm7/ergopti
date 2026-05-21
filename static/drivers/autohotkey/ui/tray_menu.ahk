@@ -65,8 +65,15 @@ CreateSubMenusRecursiveCommonCode(MenuParent, Key, Val, CategoryPath) {
 		; whose code identifier is intentionally English while the menu UI is
 		; French (Shortcuts.Personal → « Raccourcis personnels », …).
 		SubMenu := Menu()
-		MenuParent.Add(GetSubMenuLabel(FullPath, Key), SubMenu)
+		SubMenuLabel := GetSubMenuLabel(FullPath, Key)
+		MenuParent.Add(SubMenuLabel, SubMenu)
 		SubMenus[FullPath] := SubMenu
+		; Phase 7.5 (UX): grey out the submenu container when its master
+		; category gate is off so the user sees the whole sub-tree as
+		; inert at a glance instead of having to drill in.
+		if !IsCategoryGated(_MasterCategoryFor(CategoryPath)) {
+			try MenuParent.Disable(SubMenuLabel)
+		}
 		; Recursively create nested submenus
 		CreateSubMenusRecursive(SubMenu, Val, FullPath)
 	} else if IsObject(Val) and Val.HasOwnProp("Enabled") {
@@ -107,6 +114,44 @@ MenuAddItem(MenuParent, FeatureCategoryPath, FeatureName) {
 	} else {
 		MenuParent.Uncheck(MenuTitle)
 	}
+
+	; Phase 7.5 (UX): grey out the item when its master category gate is
+	; off. The toggle is still visible (so the user can see what would be
+	; available if they re-enabled the master) but clicking it does
+	; nothing — the v2 mirror gates the underlying behavior to false
+	; regardless of the per-feature .Enabled value.
+	if !IsCategoryGated(_MasterCategoryFor(FeatureCategoryPath)) {
+		try MenuParent.Disable(MenuTitle)
+	}
+}
+
+; Resolve the master-toggle category for a given feature path. Sub-Maps
+; under Shortcuts (AltGrLAlt / AltGrCapsLock / LAltCapsLock / Personal /
+; ScriptControl) inherit the Shortcuts gate; every hotstrings sub-category
+; (Autocorrection / DistancesReduction / SFBsReduction / Rolls / MagicKey /
+; DynamicHotstrings / Personal) inherits the Hotstrings gate; everything
+; else (Layout / TapHolds / ...) maps to its own first segment.
+_MasterCategoryFor(FeatureCategoryPath) {
+	First := StrSplit(FeatureCategoryPath, ".")[1]
+	; Hotstrings master gates all hotstring sub-trees regardless of their
+	; top-level Features key (which is the legacy v1 layout — v2 nests
+	; everything under [hotstrings.*]).
+	for HotsCat in ["Autocorrection", "DistancesReduction", "SFBsReduction",
+		"Rolls", "MagicKey", "DynamicHotstrings"] {
+		if (HotsCat == First) {
+			return "Hotstrings"
+		}
+	}
+	; ``Personal`` is overloaded — both Shortcuts.Personal and the
+	; hotstring Personal extension share the name. By position the
+	; tray-menu Personal MenuAddItem call comes from BuildPersonalSubmenu
+	; which is under the Hotstrings tree, so default Personal to
+	; Hotstrings here; Shortcuts.Personal items use the qualified path
+	; "Shortcuts.Personal" and First = "Shortcuts" instead.
+	if (First == "Personal") {
+		return "Hotstrings"
+	}
+	return First
 }
 
 ; Build a sub-submenu listing « Désactivé » + a-z, with the currently active
@@ -146,6 +191,12 @@ MenuAddLetterPicker(MenuParent, FeatureCategoryPath, FeatureName) {
 	MenuParent.Add(MenuTitle, LetterMenu)
 	if Feature.Enabled {
 		MenuParent.Check(MenuTitle)
+	}
+
+	; Phase 7.5 (UX): grey out the picker when its master category gate
+	; is off — same rationale as MenuAddItem above.
+	if !IsCategoryGated(_MasterCategoryFor(FeatureCategoryPath)) {
+		try MenuParent.Disable(MenuTitle)
 	}
 }
 
