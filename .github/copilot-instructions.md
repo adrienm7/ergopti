@@ -490,6 +490,8 @@ def parse_driver_config(file_path: str) -> Optional[dict]:
 
 - Maintain clean variable scoping.
 - Use `;` for comments and ensure the exact same spacing and banner rules apply to separate hotkey logic from UI/Tray logic.
+- **Source-file encoding gotcha** (discovered 2026-05-22 during the v2 config refactor — see [project_config_v2_refactor](../.claude/projects/d--Documents-GitHub-ergopti/memory/project_config_v2_refactor.md)): AHK v2 source files MUST be UTF-8 with BOM and CRLF line endings. A mismatch (LF-only, or LF appended into a CRLF file via `cat >>` from a POSIX shell) makes the parser silently abort mid-file — the test runner then registers only the first N tests with no error message in the headless harness. When creating or editing `.ahk` files: use the Edit tool (preserves encoding), not `cat >>`; non-ASCII characters in comments and string literals are accepted only when the file's encoding is clean. As a defensive convention, the v2 test suite stays ASCII-only and accesses non-ASCII glyphs via `Chr(0xNNNN)` (e.g. `Chr(0x2605)` for the magic key star) so encoding regressions cannot reintroduce the silent abort.
+- **String escapes in AHK v2**: inside a double-quoted string, the escape for a literal double quote is `` `" `` (backtick + quote), NOT `""` (doubled quote — that was AHK v1 syntax). The IDE flags `""` inside a string literal as an error: `Did you mean to use '\`"'?`.
 
 **Example:**
 
