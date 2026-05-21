@@ -280,15 +280,13 @@ if !FileExist(_PersonalTomlBootstrap)
 
 global ScriptInformation := Map(
     "MagicKey", "★",
-    ; Manual opt-in for AltGr-as-Kana / custom-remap layouts (KbdEdit, MSKLC).
-    ; Default false matches every vanilla AltGr layout (bépo, US-International,
-    ; AZERTY…) — IsRealAltGrPress() then gates on physical RAlt to filter the
-    ; OS-injected ghost SC138 prefix. Kana users flip this to true via TOML.
-    ; Auto-detection (formerly via MapVirtualKeyExW) was unreliable on some
-    ; bépo HKLs where the probe returned VK_LMENU instead of VK_RMENU and
-    ; wrongly forced the Kana branch, which made every ghost SC138 fire the
-    ; AltGr action on the next keystroke (e.g. typing `'a` produced `'<`).
-    "AltGrIsKanaRemap", False,
+    ; Manual override for the AltGr-as-Kana / custom-remap detection. Default
+    ; false here is overwritten by HotstringEngineInit() which auto-detects via
+    ; a reverse VK_RMENU→SC probe. The TOML value (under [Script]) wins when
+    ; explicitly set to "true" or "false"; "auto" (or absent) defers to the
+    ; probe. Kept as an escape hatch in case the probe ever misfires on an
+    ; exotic layout.
+    "AltGrIsKanaRemap", "auto",
     ; Configurable file paths — all derived from _ConfigDir set above.
     ; AHK-specific files (.ahk, AHK config.toml) go under ``ahk/`` so the
     ; folder can be safely shared with the Hammerspoon driver via cloud
@@ -398,12 +396,13 @@ ReadScriptConfig(Cache) {
     Raw := IniCacheGet(Cache, "Script", "MagicKey")
     if Raw != "_"
         ScriptInformation["MagicKey"] := Raw
-    ; AltGr-as-Kana opt-in: manual override for custom keyboard drivers (KbdEdit
-    ; / MSKLC) that remap SC138 to a non-RMENU VK. Default false (every standard
-    ; AltGr layout). Lives in [Script] so the user can set it once per machine.
+    ; AltGr-as-Kana manual override. Default "auto" defers to the reverse
+    ; VK_RMENU→SC probe in HotstringEngineInit(); "true" / "false" force the
+    ; respective mode. Lives in [Script] so the user can lock it once per
+    ; machine if auto-detection misfires on an exotic layout.
     RawKana := IniCacheGet(Cache, "Script", "AltGrIsKanaRemap")
     if RawKana != "_"
-        ScriptInformation["AltGrIsKanaRemap"] := (RawKana == "1" or RawKana == "true" or RawKana == "True")
+        ScriptInformation["AltGrIsKanaRemap"] := RawKana
     ; Restore the engine-level repeat-key toggle (defaults to enabled when absent)
     global HSE_RepeatEnabled
     RawRepeat := IniCacheGet(Cache, "Hotstrings", "RepeatKeyEnabled")
@@ -418,10 +417,11 @@ global _IniCache := ParseTomlFile(ConfigurationFile)
 ReadScriptConfig(_IniCache)
 I18nInit(_IniCache)
 
-; Auto-detect whether the active OS layout remaps AltGr to VK_KANA and cache
-; the resolved bool in _ALTGR_KANA_FIXUP. Must run before the first hotstring
-; fires. The layout-poll timer at the bottom of this file triggers a full
-; Reload() on layout switch, so this runs again automatically.
+; Resolve _ALTGR_KANA_FIXUP: TOML override (ScriptInformation["AltGrIsKanaRemap"])
+; wins when set; otherwise auto-detect via the reverse VK_RMENU→SC probe. Must
+; run before the first hotstring fires. The layout-poll timer at the bottom of
+; this file triggers a full Reload() on layout switch, so this re-runs and
+; adapts to the new layout automatically.
 HotstringEngineInit()
 
 ; Initialise the logger now that the ini cache is built and ScriptInformation
@@ -434,13 +434,17 @@ Updater_LoadCheckInterval()
 try Updater_StartBackgroundChecks()
 LoggerStart("ErgoptiPlus", "Booting ErgoptiPlus driver…")
 
-; Log the resolved Kana-remap flag so future regressions on exotic layouts
-; surface immediately. Source is ScriptInformation["AltGrIsKanaRemap"]
-; (manual TOML opt-in) — auto-detection was removed after a misdetection
-; on bépo HKLs broke ghost-SC138 filtering.
+; Log both the raw reverse-probe result (VK_RMENU → SC) and the resolved
+; Kana-remap flag so future regressions on exotic layouts surface immediately.
+; SC=0 means VK_RMENU is not mapped → Kana-like remap; non-zero means RAlt
+; exists on this layout → standard AltGr. The resolved flag also accounts for
+; any manual TOML override from [Script] AltGrIsKanaRemap.
+_DetectSC := DllCall("MapVirtualKeyExW",
+    "UInt", 0xA5, "UInt", 4,
+    "Ptr", GetForegroundKeyboardLayout(), "UInt")
 LoggerInfo("AltGrDetect",
-    "HKL=0x{1:X}, _ALTGR_KANA_FIXUP={2} (source: TOML).",
-    GetForegroundKeyboardLayout(),
+    "HKL=0x{1:X}, VK_RMENU→SC=0x{2:X}, _ALTGR_KANA_FIXUP={3}.",
+    GetForegroundKeyboardLayout(), _DetectSC,
     _ALTGR_KANA_FIXUP ? "true" : "false")
 
 ; Under this text is the configuration of the features, especially whether or not they are enabled.
@@ -2135,12 +2139,6 @@ ActivateKeyHistory(*) {
 ; AltGr+Enter quirk on some QWERTY layouts where pressing BackSpace alone
 ; would otherwise replay a stale AltGr+BackSpace event and reload the script.
 
-; Known limitation: suspending via the tray menu disables these combos as
-; well. Suspend(1) drops the SC138 / RAlt prefix from AHK's keyboard hook
-; once the 60+ non-exempt SC138 & xxx combos from layout_altgr.ahk get
-; suspended — and the #SuspendExempt directive does not survive that.
-; Workaround for the user: resume by clicking the tray menu entry again.
-
 ; The four script-management combos below are registered DYNAMICALLY at the
 ; end of the auto-execute section via _RegisterScriptAltGrHotkeys(). Defining
 ; them as static ``SC138 & X::`` blocks here would have AHK promote SC138 to a
@@ -2196,15 +2194,18 @@ _RegisterScriptAltGrHotkeys() {
     ; the bare ``IsRealAltGrPress`` reference fails with "Invalid callback
     ; function" — that helper takes no parameters. Wrap it in a varargs lambda
     ; so AHK can hand it the hotkey name without tripping the signature check.
+    ; "S" option = suspend-exempt: the script-management combos must keep
+    ; firing while AHK is suspended, otherwise the user cannot unsuspend the
+    ; script after pressing AltGr+Enter once (the pause toggle disables itself).
     HotIf((*) => IsRealAltGrPress())
-    Hotkey("RAlt & Enter",     _ScriptAltGrEnterHandler,     "I2")
-    Hotkey("SC138 & SC01C",    _ScriptAltGrEnterHandler,     "I2")
-    Hotkey("RAlt & BackSpace", _ScriptAltGrBackSpaceHandler, "I2")
-    Hotkey("SC138 & SC00E",    _ScriptAltGrBackSpaceHandler, "I2")
-    Hotkey("RAlt & Delete",    _ScriptAltGrDeleteHandler,    "I2")
-    Hotkey("SC138 & SC153",    _ScriptAltGrDeleteHandler,    "I2")
-    Hotkey("RAlt & Escape",    _ScriptAltGrEscapeHandler,    "I2")
-    Hotkey("SC138 & SC001",    _ScriptAltGrEscapeHandler,    "I2")
+    Hotkey("RAlt & Enter",     _ScriptAltGrEnterHandler,     "I2 S")
+    Hotkey("SC138 & SC01C",    _ScriptAltGrEnterHandler,     "I2 S")
+    Hotkey("RAlt & BackSpace", _ScriptAltGrBackSpaceHandler, "I2 S")
+    Hotkey("SC138 & SC00E",    _ScriptAltGrBackSpaceHandler, "I2 S")
+    Hotkey("RAlt & Delete",    _ScriptAltGrDeleteHandler,    "I2 S")
+    Hotkey("SC138 & SC153",    _ScriptAltGrDeleteHandler,    "I2 S")
+    Hotkey("RAlt & Escape",    _ScriptAltGrEscapeHandler,    "I2 S")
+    Hotkey("SC138 & SC001",    _ScriptAltGrEscapeHandler,    "I2 S")
     HotIf()
 }
 
