@@ -597,3 +597,206 @@ _LlmCoerceValue(Raw, Kind) {
     }
     return Raw
 }
+
+
+
+
+; ==============================================================
+; ==============================================================
+; ======= 6/ TapHolds (structural mirror v1 -> v2 TapHold) =======
+; ==============================================================
+; ==============================================================
+
+; Translates the legacy multi-variant v1 ``Features["TapHolds"]`` structure
+; into the new v2 single-action ``TapHold`` global (loaded from
+; ``tap_hold.toml`` by lib/tap_hold/tap_hold_loader.ahk). Unlike the other
+; mirror helpers, this is a **structural transform**, not a 1:1 key copy:
+;
+; - v1: each physical key (CapsLock / LAlt / AltGr / RCtrl / Space) carries
+;   ~10 mutually-exclusive sub-variants, each {Enabled: bool}. Only one
+;   variant should be Enabled at a time, and the variant name encodes both
+;   the tap action and the hold modifier together (e.g. "EnterCtrl" =
+;   tap_action=enter, hold_modifier=ctrl).
+; - v2: each physical key has a single ``tap_action`` + ``hold_modifier``
+;   (or ``hold_layer``) pair. The mirror scans the v1 variants, finds the
+;   enabled one, and writes the equivalent v2 shape.
+;
+; Flat v1 entries (LShiftCopy / LCtrlPaste / TabAlt) become their own
+; per-key v2 entries (left_shift / left_ctrl / tab).
+;
+; This mirror provides the FOUNDATION for a future migration of the ~70
+; ``Features["TapHolds"][...]`` read sites in modules/tap_holds.ahk to
+; consult ``TapHold`` instead. The read-site migration is deferred to a
+; separate phase because the v1 branching ("which variant is enabled?")
+; becomes a v2 switch on ``tap_action``, which is non-mechanical and
+; deserves dedicated review.
+MirrorV1ToV2_TapHold() {
+    global Features, TapHold
+
+    if !IsSet(Features) or !IsSet(TapHold) {
+        try LoggerWarn("V1ToV2",
+            "MirrorV1ToV2_TapHold skipped — Features or TapHold unset.")
+        return
+    }
+    if !Features.Has("TapHolds") {
+        try LoggerWarn("V1ToV2",
+            "MirrorV1ToV2_TapHold skipped — Features['TapHolds'] missing.")
+        return
+    }
+    if !TapHold.Has("keys") {
+        TapHold["keys"] := Map()
+    }
+
+    Copied := 0
+
+    ; ── Sub-Map keys: scan variants, pick the enabled one ──────────
+    ; Each entry maps a v1 key group + variant name to (v2 key id,
+    ; tap_action, hold_modifier|hold_layer). The "hold" column either
+    ; sets ``hold_modifier`` (a modifier key) or ``hold_layer`` (a
+    ; remap layer); never both.
+    ; Format: variant_name -> Map("tap", "<v2_action>", "hold_mod", "<mod>" | "hold_layer", "<layer>")
+    CapsLockVariants := Map(
+        "BackSpace",          Map("tap", "backspace",       "hold_mod", "ctrl"),
+        "BackSpaceCtrl",      Map("tap", "backspace",       "hold_mod", "ctrl"),
+        "CapsLockCtrl",       Map("tap", "caps_lock",       "hold_mod", "ctrl"),
+        "CapsWordCtrl",       Map("tap", "caps_word",       "hold_mod", "ctrl"),
+        "CtrlBackSpaceCtrl",  Map("tap", "ctrl_backspace",  "hold_mod", "ctrl"),
+        "CtrlDeleteCtrl",     Map("tap", "ctrl_delete",     "hold_mod", "ctrl"),
+        "DeleteCtrl",         Map("tap", "delete",          "hold_mod", "ctrl"),
+        "EnterCtrl",          Map("tap", "enter",           "hold_mod", "ctrl"),
+        "EscapeCtrl",         Map("tap", "escape",          "hold_mod", "ctrl"),
+        "OneShotShiftCtrl",   Map("tap", "one_shot_shift",  "hold_mod", "ctrl"),
+        "TabCtrl",            Map("tap", "tab",             "hold_mod", "ctrl"),
+    )
+    LAltVariants := Map(
+        "AltTabMonitor",   Map("tap", "alt_tab_monitor", "hold_mod", "alt"),
+        "BackSpace",       Map("tap", "backspace",       "hold_mod", "alt"),
+        "BackSpaceLayer",  Map("tap", "backspace",       "hold_layer", "nav"),
+        "OneShotShift",    Map("tap", "one_shot_shift",  "hold_mod", "alt"),
+        "TabLayer",        Map("tap", "tab",             "hold_layer", "nav"),
+    )
+    AltGrVariants := Map(
+        "BackSpace",      Map("tap", "backspace",      "hold_mod", "alt_gr"),
+        "CapsLock",       Map("tap", "caps_lock",      "hold_mod", "alt_gr"),
+        "CapsWord",       Map("tap", "caps_word",      "hold_mod", "alt_gr"),
+        "CtrlBackSpace",  Map("tap", "ctrl_backspace", "hold_mod", "alt_gr"),
+        "CtrlDelete",     Map("tap", "ctrl_delete",    "hold_mod", "alt_gr"),
+        "Delete",         Map("tap", "delete",         "hold_mod", "alt_gr"),
+        "Enter",          Map("tap", "enter",          "hold_mod", "alt_gr"),
+        "Escape",         Map("tap", "escape",         "hold_mod", "alt_gr"),
+        "OneShotShift",   Map("tap", "one_shot_shift", "hold_mod", "alt_gr"),
+        "Tab",            Map("tap", "tab",            "hold_mod", "alt_gr"),
+    )
+    RCtrlVariants := Map(
+        "BackSpace",     Map("tap", "backspace",      "hold_mod", "ctrl"),
+        "Tab",           Map("tap", "tab",            "hold_mod", "ctrl"),
+        "OneShotShift",  Map("tap", "one_shot_shift", "hold_mod", "ctrl"),
+    )
+    SpaceVariants := Map(
+        "Ctrl",   Map("tap", "space", "hold_mod", "ctrl"),
+        "Layer",  Map("tap", "space", "hold_layer", "nav"),
+        "Shift",  Map("tap", "space", "hold_mod", "shift"),
+    )
+
+    ; (v1 group name, v2 key id, variant table)
+    SubMapKeys := [
+        ["CapsLock", "caps_lock", CapsLockVariants],
+        ["LAlt",     "left_alt",  LAltVariants],
+        ["AltGr",    "alt_gr",    AltGrVariants],
+        ["RCtrl",    "right_ctrl", RCtrlVariants],
+        ["Space",    "space",     SpaceVariants],
+    ]
+
+    for Spec in SubMapKeys {
+        V1Group  := Spec[1]
+        V2KeyId  := Spec[2]
+        Variants := Spec[3]
+        if !Features["TapHolds"].Has(V1Group) {
+            continue
+        }
+        V1SubMap := Features["TapHolds"][V1Group]
+        if !IsObject(V1SubMap) {
+            continue
+        }
+        ; Find the enabled variant. If none, skip — v2 leaves the key
+        ; unconfigured (TapHoldIsConfigured returns false).
+        ChosenVariant := ""
+        for VarName, Mapping in Variants {
+            if !V1SubMap.Has(VarName) {
+                continue
+            }
+            VarEntry := V1SubMap[VarName]
+            if !IsObject(VarEntry) or !VarEntry.HasOwnProp("Enabled") {
+                continue
+            }
+            if (VarEntry.Enabled = true) {
+                ChosenVariant := VarName
+                break
+            }
+        }
+        if (ChosenVariant == "") {
+            ; No variant active for this key — leave TapHold["keys"] entry
+            ; absent so callers see "not configured".
+            continue
+        }
+        Mapping := Variants[ChosenVariant]
+        Entry := Map("tap_action", Mapping["tap"])
+        if Mapping.Has("hold_mod") {
+            Entry["hold_modifier"] := Mapping["hold_mod"]
+        } else if Mapping.Has("hold_layer") {
+            Entry["hold_layer"] := Mapping["hold_layer"]
+        }
+        ; Carry per-variant TimeActivationSeconds when present, otherwise
+        ; the per-key __Configuration default.
+        Tas := 0
+        if V1SubMap.Has(ChosenVariant)
+            and IsObject(V1SubMap[ChosenVariant])
+            and V1SubMap[ChosenVariant].HasOwnProp("TimeActivationSeconds") {
+            Tas := V1SubMap[ChosenVariant].TimeActivationSeconds
+        } else if V1SubMap.Has("__Configuration")
+            and IsObject(V1SubMap["__Configuration"])
+            and V1SubMap["__Configuration"].HasOwnProp("TimeActivationSeconds") {
+            Tas := V1SubMap["__Configuration"].TimeActivationSeconds
+        }
+        if (Tas > 0) {
+            Entry["time_activation_seconds"] := Tas
+        }
+        TapHold["keys"][V2KeyId] := Entry
+        Copied += 1
+    }
+
+    ; ── Flat keys: LShiftCopy / LCtrlPaste / TabAlt ────────────────
+    FlatKeys := [
+        ["LShiftCopy", "left_shift", "copy",             "shift"],
+        ["LCtrlPaste", "left_ctrl",  "paste",            "ctrl"],
+        ["TabAlt",     "tab",        "alt_tab_monitor",  "alt"],
+    ]
+    for Spec in FlatKeys {
+        V1Name   := Spec[1]
+        V2KeyId  := Spec[2]
+        TapAct   := Spec[3]
+        HoldMod  := Spec[4]
+        if !Features["TapHolds"].Has(V1Name) {
+            continue
+        }
+        Entry := Features["TapHolds"][V1Name]
+        if !IsObject(Entry) or !Entry.HasOwnProp("Enabled") {
+            continue
+        }
+        if !(Entry.Enabled = true) {
+            continue
+        }
+        V2Entry := Map(
+            "tap_action",    TapAct,
+            "hold_modifier", HoldMod,
+        )
+        if Entry.HasOwnProp("TimeActivationSeconds") {
+            V2Entry["time_activation_seconds"] := Entry.TimeActivationSeconds
+        }
+        TapHold["keys"][V2KeyId] := V2Entry
+        Copied += 1
+    }
+
+    try LoggerDebug("V1ToV2",
+        "MirrorV1ToV2_TapHold copied {1} key(s) v1 -> v2.", Copied)
+}
