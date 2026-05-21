@@ -27,10 +27,12 @@ body {
 	color: #333;
 	font-family: -apple-system, BlinkMacSystemFont, 'Helvetica Neue', sans-serif;
 	font-size: 14px;
-	/* Lock the outer page so the only scrollable region is whatever inner
-	   container chose to opt-in (.lang-list). Without this, a tall step
-	   pushed the .btns row below the fold and the user had to scroll the
-	   whole window to reach the Next button. */
+	/* Lock the outer page so the only scrollable region is each step's
+	   .step-body (and the .lang-list nested inside step 1). Without this,
+	   a tall step would push the .btns row below the fold and the user
+	   would have to scroll the whole window to reach the Next button — the
+	   step-body's internal scroll keeps .btns pinned at the natural bottom
+	   of every step. */
 	overflow: hidden;
 }
 
@@ -54,14 +56,28 @@ body {
 	display: flex;
 	flex-direction: column;
 	flex-grow: 1;
-	/* Allows .lang-list (flex-grow:1 inside) to actually shrink below its
-	   intrinsic content height so the scrollbar appears inside the list
+	/* Allows .step-body (flex-grow:1 inside) to actually shrink below its
+	   intrinsic content height so the scrollbar appears inside the body
 	   rather than on the outer window. */
 	min-height: 0;
 }
 
 .step.hidden {
 	display: none;
+}
+
+/* Scrollable region that holds every step's title + form controls.
+   Sized by the parent .step's free space; opts into vertical scroll when
+   its content exceeds that space (e.g. the metrics step with a long
+   description + warning + radio cards on a short window). The sibling
+   .btns row sits outside this region and stays pinned at the bottom of
+   the step regardless of how far the body is scrolled — see § 8. */
+.step-body {
+	display: flex;
+	flex-direction: column;
+	flex-grow: 1;
+	min-height: 0;
+	overflow-y: auto;
 }
 
 /* =============================== */

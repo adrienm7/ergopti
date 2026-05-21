@@ -20,9 +20,11 @@
 
 			<!-- Step 1 — Language -->
 			<div class="step" id="step-1">
-				<h1 id="s1-title">Ergopti — Setup</h1>
-				<p class="subtitle" id="s1-subtitle">Choose your language</p>
-				<div class="lang-list" id="lang-list"></div>
+				<div class="step-body">
+					<h1 id="s1-title">Ergopti — Setup</h1>
+					<p class="subtitle" id="s1-subtitle">Choose your language</p>
+					<div class="lang-list" id="lang-list"></div>
+				</div>
 				<div class="btns">
 					<button type="button" class="btn-next primary" id="s1-next">Next →</button>
 				</div>
@@ -30,13 +32,15 @@
 
 			<!-- Step config-dir — personal data folder (inserted between Step 1 and Step 2) -->
 			<div class="step hidden" id="step-config">
-				<h1 id="sc-title"></h1>
-				<p class="desc" id="sc-desc"></p>
-				<div class="field-group">
-					<input type="text" id="sc-input" placeholder="" />
-					<button type="button" id="sc-browse" class="secondary"></button>
+				<div class="step-body">
+					<h1 id="sc-title"></h1>
+					<p class="desc" id="sc-desc"></p>
+					<div class="field-group">
+						<input type="text" id="sc-input" placeholder="" />
+						<button type="button" id="sc-browse" class="secondary"></button>
+					</div>
+					<p class="hint" id="sc-hint"></p>
 				</div>
-				<p class="hint" id="sc-hint"></p>
 				<div class="btns">
 					<button type="button" class="btn-back secondary" id="sc-back"></button>
 					<button type="button" class="btn-next primary"  id="sc-next"></button>
@@ -45,21 +49,23 @@
 
 			<!-- Step 2 — Layout -->
 			<div class="step hidden" id="step-2">
-				<h1 id="s2-title"></h1>
-				<p class="desc" id="s2-desc"></p>
-				<!-- Layout preview: src is set from the Lua-injected
-				     layout_image_url. The element is hidden when no URL is
-				     available so an asset-less install still renders cleanly. -->
-				<img id="s2-preview" class="layout-preview" alt="" hidden />
-				<div class="radio-group">
-					<label class="radio-card" id="s2-yes-card">
-						<input type="radio" name="layout" value="yes" checked />
-						<span class="radio-label" id="s2-yes-label"></span>
-					</label>
-					<label class="radio-card" id="s2-no-card">
-						<input type="radio" name="layout" value="no" />
-						<span class="radio-label" id="s2-no-label"></span>
-					</label>
+				<div class="step-body">
+					<h1 id="s2-title"></h1>
+					<p class="desc" id="s2-desc"></p>
+					<!-- Layout preview: src is set from the Lua-injected
+					     layout_image_url. The element is hidden when no URL is
+					     available so an asset-less install still renders cleanly. -->
+					<img id="s2-preview" class="layout-preview" alt="" hidden />
+					<div class="radio-group">
+						<label class="radio-card" id="s2-yes-card">
+							<input type="radio" name="layout" value="yes" checked />
+							<span class="radio-label" id="s2-yes-label"></span>
+						</label>
+						<label class="radio-card" id="s2-no-card">
+							<input type="radio" name="layout" value="no" />
+							<span class="radio-label" id="s2-no-label"></span>
+						</label>
+					</div>
 				</div>
 				<div class="btns">
 					<button type="button" class="btn-back secondary" id="s2-back"></button>
@@ -69,28 +75,30 @@
 
 			<!-- Step 3 — Magic key -->
 			<div class="step hidden" id="step-3">
-				<h1 id="s3-title"></h1>
-				<p class="desc" id="s3-desc"></p>
-				<div class="radio-group">
-					<label class="radio-card" id="s3-blackstar-card">
-						<input type="radio" name="magickey" value="★" checked />
-						<span class="radio-label" id="s3-blackstar-label"></span>
-					</label>
-					<label class="radio-card" id="s3-ugrave-card">
-						<input type="radio" name="magickey" value="ù" />
-						<span class="radio-label" id="s3-ugrave-label"></span>
-					</label>
-					<label class="radio-card" id="s3-semicolon-card">
-						<input type="radio" name="magickey" value=";" />
-						<span class="radio-label" id="s3-semicolon-label"></span>
-					</label>
-					<label class="radio-card" id="s3-custom-card">
-						<input type="radio" name="magickey" value="__custom__" />
-						<span class="radio-label" id="s3-custom-label"></span>
-						<input type="text" id="s3-input" maxlength="3" value="*" />
-					</label>
+				<div class="step-body">
+					<h1 id="s3-title"></h1>
+					<p class="desc" id="s3-desc"></p>
+					<div class="radio-group">
+						<label class="radio-card" id="s3-blackstar-card">
+							<input type="radio" name="magickey" value="★" checked />
+							<span class="radio-label" id="s3-blackstar-label"></span>
+						</label>
+						<label class="radio-card" id="s3-ugrave-card">
+							<input type="radio" name="magickey" value="ù" />
+							<span class="radio-label" id="s3-ugrave-label"></span>
+						</label>
+						<label class="radio-card" id="s3-semicolon-card">
+							<input type="radio" name="magickey" value=";" />
+							<span class="radio-label" id="s3-semicolon-label"></span>
+						</label>
+						<label class="radio-card" id="s3-custom-card">
+							<input type="radio" name="magickey" value="__custom__" />
+							<span class="radio-label" id="s3-custom-label"></span>
+							<input type="text" id="s3-input" maxlength="3" value="*" />
+						</label>
+					</div>
+					<p class="hint" id="s3-hint"></p>
 				</div>
-				<p class="hint" id="s3-hint"></p>
 				<div class="btns">
 					<button type="button" class="btn-back secondary" id="s3-back"></button>
 					<button type="button" class="btn-next primary" id="s3-next"></button>
@@ -99,18 +107,20 @@
 
 			<!-- Step 4 — Metrics -->
 			<div class="step hidden" id="step-4">
-				<h1 id="s4-title"></h1>
-				<p class="desc" id="s4-desc"></p>
-				<p class="warning" id="s4-warning"></p>
-				<div class="radio-group">
-					<label class="radio-card" id="s4-yes-card">
-						<input type="radio" name="metrics" value="yes" />
-						<span class="radio-label" id="s4-yes-label"></span>
-					</label>
-					<label class="radio-card" id="s4-no-card">
-						<input type="radio" name="metrics" value="no" checked />
-						<span class="radio-label" id="s4-no-label"></span>
-					</label>
+				<div class="step-body">
+					<h1 id="s4-title"></h1>
+					<p class="desc" id="s4-desc"></p>
+					<p class="warning" id="s4-warning"></p>
+					<div class="radio-group">
+						<label class="radio-card" id="s4-yes-card">
+							<input type="radio" name="metrics" value="yes" />
+							<span class="radio-label" id="s4-yes-label"></span>
+						</label>
+						<label class="radio-card" id="s4-no-card">
+							<input type="radio" name="metrics" value="no" checked />
+							<span class="radio-label" id="s4-no-label"></span>
+						</label>
+					</div>
 				</div>
 				<div class="btns">
 					<button type="button" class="btn-back secondary" id="s4-back"></button>
@@ -120,22 +130,24 @@
 
 			<!-- Step 5 — Gestures -->
 			<div class="step hidden" id="step-5">
-				<h1 id="s5-title"></h1>
-				<p class="desc" id="s5-desc"></p>
-				<!-- Orange warning box mirroring the keylogger step. Tells the
-				     user that activating Ergopti gestures requires disabling
-				     certain macOS system gestures (otherwise 4-finger swipes
-				     etc. fire native shortcuts and never reach Hammerspoon). -->
-				<p class="warning" id="s5-warning"></p>
-				<div class="radio-group">
-					<label class="radio-card" id="s5-yes-card">
-						<input type="radio" name="gestures" value="yes" />
-						<span class="radio-label" id="s5-yes-label"></span>
-					</label>
-					<label class="radio-card" id="s5-no-card">
-						<input type="radio" name="gestures" value="no" checked />
-						<span class="radio-label" id="s5-no-label"></span>
-					</label>
+				<div class="step-body">
+					<h1 id="s5-title"></h1>
+					<p class="desc" id="s5-desc"></p>
+					<!-- Orange warning box mirroring the keylogger step. Tells the
+					     user that activating Ergopti gestures requires disabling
+					     certain macOS system gestures (otherwise 4-finger swipes
+					     etc. fire native shortcuts and never reach Hammerspoon). -->
+					<p class="warning" id="s5-warning"></p>
+					<div class="radio-group">
+						<label class="radio-card" id="s5-yes-card">
+							<input type="radio" name="gestures" value="yes" />
+							<span class="radio-label" id="s5-yes-label"></span>
+						</label>
+						<label class="radio-card" id="s5-no-card">
+							<input type="radio" name="gestures" value="no" checked />
+							<span class="radio-label" id="s5-no-label"></span>
+						</label>
+					</div>
 				</div>
 				<div class="btns">
 					<button type="button" class="btn-back secondary" id="s5-back"></button>
