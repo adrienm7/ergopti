@@ -965,6 +965,7 @@ MirrorV1ToV2_Layout()
 MirrorV1ToV2_Gestures()
 MirrorV1ToV2_Shortcuts()
 MirrorV1ToV2_Hotstrings()
+MirrorV1ToV2_LLM()
 
 ; Bootstrap Features["Personal"] from personal_hotstrings.toml _meta.sections
 ; before applying TOML metadata, so the user's section toggles appear in the menu.

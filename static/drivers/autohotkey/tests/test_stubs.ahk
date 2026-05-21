@@ -264,6 +264,49 @@ global FeaturesV2 := Map(
             "text_expansion_personal_information", Map("enabled", true, "pattern_max_length", 1),
         ),
     ),
+    ; Phase 6 — ui/tray_menu.ahk's LLM tray populator now reads from this
+    ; nested map (instead of IniCacheGet) and flattens it back into the
+    ; legacy _LlmSavedOpts shape that LLM_Tray_Init expects. Manifest
+    ; defaults match production; tests don't fire the LLM menu but the
+    ; symbols still need to exist as globals.
+    "llm", Map(
+        "enabled", false,
+        "display", Map(
+            "pred_indent",     0,
+            "show_info_bar",   true,
+            "streaming",       true,
+            "streaming_multi", true,
+        ),
+        "generation", Map(
+            "context_length",  500,
+            "min_words",       3,
+            "max_words",       15,
+            "temperature",     0.10,
+            "auto_raise_temp", true,
+            "reset_on_nav",    true,
+            "sequential_mode", false,
+        ),
+        "models", Map(
+            "selected", "ollama",
+            "ollama",   "qwen2.5:3b",
+        ),
+        "profiles", Map(
+            "active",                 "basic",
+            "num_predictions",        3,
+            "auto_profile_for_model", true,
+        ),
+        "trigger", Map(
+            "debounce_ms",          500,
+            "instant_on_word_end",  true,
+            "after_hotstring",      true,
+            "inline_autotype",      false,
+            "secure_filter_enabled", true,
+            "url_bar_filter_enabled", true,
+        ),
+        "navigation", Map(
+            "val_modifiers", ["alt"],
+        ),
+    ),
 )
 
 global ConfigurationFile := A_ScriptDir . "\test_config.ini"

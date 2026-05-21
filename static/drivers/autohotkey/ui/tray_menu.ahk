@@ -1116,37 +1116,31 @@ initMenu() {
 	}
 
 	; ── IA / LLM — sits right after Hotstrings, mirroring the Hammerspoon menu order ──
-	; Load persisted LLM settings from the shared config TOML cache.
+	; Build the LLM_Tray_Init payload by reading the v2 nested LLM map
+	; populated by MirrorV1ToV2_LLM at boot (see lib/v1_v2_mirror.ahk § 5
+	; for the v1-flat -> v2-nested mapping). The downstream LLM_Tray_Init
+	; still expects a flat ``saved_opts`` Map with the legacy key names,
+	; so we read from the nested v2 paths and flatten back here.
+	; ``onboarding_seen`` and ``app_profile_overrides`` keep their direct
+	; IniCacheGet reads — they are runtime state, not v2-declared features.
 	_LlmSavedOpts := Map()
-	_LlmRawEnabled := IniCacheGet(_IniCache, "LLM", "enabled")
-	if _LlmRawEnabled != "_"
-		_LlmSavedOpts["enabled"] := (_LlmRawEnabled == "1" || _LlmRawEnabled == "true")
-	for _LlmKey in ["model", "profile_id", "temperature"] {
-		_LlmRaw := IniCacheGet(_IniCache, "LLM", _LlmKey)
-		if _LlmRaw != "_"
-			_LlmSavedOpts[_LlmKey] := _LlmRaw
-	}
-	for _LlmKey in ["n_predictions", "min_words", "max_words", "debounce_ms", "ctx_chars"] {
-		_LlmRaw := IniCacheGet(_IniCache, "LLM", _LlmKey)
-		if _LlmRaw != "_"
-			_LlmSavedOpts[_LlmKey] := Integer(_LlmRaw)
-	}
-	_LlmRawInstant := IniCacheGet(_IniCache, "LLM", "instant_on_word_end")
-	if _LlmRawInstant != "_"
-		_LlmSavedOpts["instant_on_word_end"] := (_LlmRawInstant == "1" || _LlmRawInstant == "true")
-	; Profile auto-detection by model size (mirrors HS's
-	; get_recommended_profile_info path). Persist alongside instant_on_word_end
-	; so the user's toggle survives reloads.
-	_LlmRawAutoProfile := IniCacheGet(_IniCache, "LLM", "auto_profile_for_model")
-	if _LlmRawAutoProfile != "_"
-		_LlmSavedOpts["auto_profile_for_model"] := (_LlmRawAutoProfile == "1" || _LlmRawAutoProfile == "true")
-	; Inline auto-type mode — when ON, predictions are typed into the
-	; active app rather than shown in a tooltip.
-	_LlmRawInline := IniCacheGet(_IniCache, "LLM", "inline_autotype")
-	if _LlmRawInline != "_"
-		_LlmSavedOpts["inline_autotype"] := (_LlmRawInline == "1" || _LlmRawInline == "true")
-	; Per-app profile overrides — flat ``app=profile;app2=profile2`` so
-	; the TOML writer doesn't need to support nested tables.
+	_LlmSavedOpts["enabled"]                := FeaturesV2["llm"]["enabled"]
+	_LlmSavedOpts["model"]                  := FeaturesV2["llm"]["models"]["ollama"]
+	_LlmSavedOpts["profile_id"]             := FeaturesV2["llm"]["profiles"]["active"]
+	_LlmSavedOpts["temperature"]            := FeaturesV2["llm"]["generation"]["temperature"]
+	_LlmSavedOpts["n_predictions"]          := FeaturesV2["llm"]["profiles"]["num_predictions"]
+	_LlmSavedOpts["min_words"]              := FeaturesV2["llm"]["generation"]["min_words"]
+	_LlmSavedOpts["max_words"]              := FeaturesV2["llm"]["generation"]["max_words"]
+	_LlmSavedOpts["debounce_ms"]            := FeaturesV2["llm"]["trigger"]["debounce_ms"]
+	_LlmSavedOpts["ctx_chars"]              := FeaturesV2["llm"]["generation"]["context_length"]
+	_LlmSavedOpts["instant_on_word_end"]    := FeaturesV2["llm"]["trigger"]["instant_on_word_end"]
+	_LlmSavedOpts["auto_profile_for_model"] := FeaturesV2["llm"]["profiles"]["auto_profile_for_model"]
+	_LlmSavedOpts["inline_autotype"]        := FeaturesV2["llm"]["trigger"]["inline_autotype"]
+
+	; Per-app profile overrides — flat ``app=profile;app2=profile2``,
+	; stored as a runtime state string in v1 ``[LLM] app_profile_overrides``.
+	; The v2 manifest doesn't declare this; keep the direct IniCacheGet
+	; path so the tray-menu populator stays self-contained.
 	_LlmRawAppOverrides := IniCacheGet(_IniCache, "LLM", "app_profile_overrides")
 	if _LlmRawAppOverrides != "_" and _LlmRawAppOverrides != "" {
 		_LlmAppOverridesMap := Map()
