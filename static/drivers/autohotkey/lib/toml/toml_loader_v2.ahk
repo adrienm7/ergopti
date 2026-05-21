@@ -67,11 +67,21 @@ TomlCoerceValueV2(Raw) {
 ; ==============================================================
 ; ==============================================================
 
-; Apply the user's v2 ``config.toml`` onto the live Features Map. Returns the
-; number of overrides applied (mostly for diagnostics).
+; Apply the user's v2 ``config.toml`` onto the given v2-shaped Features Map.
+; Returns the number of overrides applied (mostly for diagnostics).
 ; Idempotent and resilient to a missing file (returns 0 silently).
-ApplyConfigTomlV2(FilePath) {
-	global Features
+;
+; The caller passes the target Map explicitly so this loader can never
+; accidentally clobber a v1-shaped global. The v1 PascalCase section names
+; (``Layout``, ``Shortcuts``, ``TapHolds``, ``Gestures``, ``LLM``,
+; ``Metrics``, ``Script``, ``Hotstrings``) coincidentally also exist as
+; top-level v1 ``Features`` Map keys; without the explicit parameter, the
+; loader would walk those v1 entries and overwrite the inner
+; ``{Enabled: True}`` object literals with plain booleans, breaking every
+; downstream ``.Enabled`` access (discovered the hard way during Phase 1
+; of the sliced cut-over). During the cut-over production passes
+; ``FeaturesV2``; tests pass their isolated Map fixture.
+ApplyConfigTomlV2(Features, FilePath) {
 	Applied := 0
 	if !FileExist(FilePath) {
 		try LoggerDebug("TomlLoaderV2", "v2 config.toml not found at '{1}' — skipping.", FilePath)

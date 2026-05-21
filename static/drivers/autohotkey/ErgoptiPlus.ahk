@@ -616,7 +616,7 @@ ApplyLocaleDescriptions(I18nGetLocale())
 ; while no module reads from it yet.
 EnsureUserConfigsExist()
 global FeaturesV2 := ManifestBuildFeaturesMap()
-ApplyConfigTomlV2(_ConfigDir . "ahk\config.toml")
+ApplyConfigTomlV2(FeaturesV2, _ConfigDir . "ahk\config.toml")
 global TapHold := LoadTapHoldToml(_ConfigDir . "ahk\tap_hold.toml")
 
 ; Append hotstring counts to section descriptions so the tray menu shows
