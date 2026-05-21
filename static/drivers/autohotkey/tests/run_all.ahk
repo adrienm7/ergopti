@@ -44,6 +44,8 @@ SetWorkingDir(A_ScriptDir)
 #Include ../lib/hotstrings/hotstring_engine.ahk
 #Include ../lib/hotstrings/hotstring_engine_v2.ahk
 #Include ../lib/toml/toml_loader.ahk
+#Include ../lib/toml/toml_loader_v2.ahk
+#Include ../lib/manifest_reader.ahk
 #Include ../lib/hotstrings/hotstrings_config.ahk
 #Include ../lib/hotstrings/personal_toml_editor.ahk
 #Include ../lib/dispatchers.ahk
@@ -77,6 +79,7 @@ NeutralizeDispatcherKeySends()
 #Include test_layout_tables.ahk
 #Include test_active_app_cache.ahk
 #Include test_config.ahk
+#Include test_features_manifest_v2.ahk
 #Include test_hotstrings_full.ahk
 
 ; Gestures module — included here because its pure logic (assignments, action

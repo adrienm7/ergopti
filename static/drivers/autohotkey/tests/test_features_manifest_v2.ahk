@@ -1,0 +1,504 @@
+﻿; static/drivers/autohotkey/tests/test_features_manifest_v2.ahk
+
+; ==============================================================================
+; MODULE: Features Manifest v2 Pipeline Tests
+; DESCRIPTION:
+; Validates the dormant v2 configuration pipeline ahead of the Scope C cut-over:
+;
+;     manifest.toml -> codegen -> features_manifest.ahk -> ManifestBuildFeaturesMap()
+;                                                                |
+;                                ApplyConfigTomlV2(user config) modifies Features
+;
+; The cut-over rewrites ~500-800 call sites against this pipeline, so we
+; lock its shape with assertions now. Every test in this file:
+;   1. Builds a fresh ``Features`` Map from the manifest.
+;   2. Optionally writes a temporary v2 ``config.toml`` and applies it.
+;   3. Asserts the resulting path/value matches what the migration document
+;      promises at ``_shared/features/_migration_v1_to_v2.md``.
+;
+; FEATURES & RATIONALE:
+; 1. Codegen guard: if the manifest hasn't been built, ``ManifestEnsureLoaded``
+;    returns false and the first test fails with a clear "run npm run build:manifest"
+;    message. No spooky cascading failures from missing globals.
+; 2. Isolation: every test saves the global ``Features``, replaces it with a
+;    fresh build, runs its assertions, then restores. This prevents the v1
+;    stub Map (declared in test_stubs.ahk) from leaking into other test files
+;    that may run later in the same process.
+; 3. The override tests write to ``A_Temp`` to avoid polluting the source tree
+;    or the user's real config directory.
+; 4. ASCII-only source: AHK v2 is strict about source encoding; non-ASCII
+;    characters in comments or string literals (em-dash, accented letters,
+;    Greek alpha) caused silent parse aborts mid-file during initial drafting.
+;    All comments and assertion messages use ASCII; non-ASCII identifiers
+;    that the manifest carries (e.g. the magic key glyph) are accessed via
+;    their codepoint in test assertions.
+; ==============================================================================
+
+
+
+
+; ==================================
+; ==================================
+; ======= 1/ Test fixtures =======
+; ==================================
+; ==================================
+
+; Save the global ``Features`` (v1 stub from test_stubs.ahk), replace it with a
+; fresh v2 build from the manifest. Returns the saved v1 Map so the caller can
+; restore it after assertions.
+_FMv2_BeginIsolated() {
+	global Features
+	OldFeatures := Features
+	Features := ManifestBuildFeaturesMap()
+	return OldFeatures
+}
+
+; Restore the v1 stub Features map saved by _FMv2_BeginIsolated.
+_FMv2_EndIsolated(OldFeatures) {
+	global Features
+	Features := OldFeatures
+}
+
+; Write the given content to ``A_Temp\ergopti_v2_test_<Tag>.toml`` and return
+; the absolute path. Tag distinguishes between concurrent fixture files
+; (one per test); the harness clears any stale copy first.
+_FMv2_WriteFixture(Tag, Content) {
+	Path := A_Temp . "\ergopti_v2_test_" . Tag . ".toml"
+	if FileExist(Path) {
+		FileDelete(Path)
+	}
+	FileAppend(Content, Path, "UTF-8")
+	return Path
+}
+
+
+
+
+; ==============================================
+; ==============================================
+; ======= 2/ Manifest sanity assertions =======
+; ==============================================
+; ==============================================
+
+TestFMv2_ManifestLoaded() {
+	AssertTrue(ManifestEnsureLoaded(),
+		"FEATURES_MANIFEST is not loaded -- run ``npm run build:manifest`` and rerun the test suite.")
+}
+Test("manifest_v2: codegen artifact is loaded", TestFMv2_ManifestLoaded)
+
+TestFMv2_ManifestVersion() {
+	AssertEqual("2.0.0", ManifestVersion())
+}
+Test("manifest_v2: version is 2.0.0", TestFMv2_ManifestVersion)
+
+TestFMv2_SectionOrder() {
+	Order := ManifestSectionOrder()
+	AssertEqual("Array", Type(Order))
+	AssertEqual(7, Order.Length)
+	AssertEqual("script", Order[1])
+	AssertEqual("hotstrings", Order[2])
+	AssertEqual("llm", Order[3])
+	AssertEqual("metrics", Order[4])
+	AssertEqual("shortcuts", Order[5])
+	AssertEqual("ahk", Order[6])
+	AssertEqual("hs", Order[7])
+}
+Test("manifest_v2: section_order matches v2 schema design", TestFMv2_SectionOrder)
+
+TestFMv2_FeaturesNotEmpty() {
+	ManifFeatures := ManifestFeatures()
+	AssertEqual("Array", Type(ManifFeatures))
+	AssertTrue(ManifFeatures.Length > 100,
+		"AHK manifest should contain >100 features (it contained " . ManifFeatures.Length . ").")
+}
+Test("manifest_v2: AHK manifest carries the platform's feature subset", TestFMv2_FeaturesNotEmpty)
+
+TestFMv2_NoHsFeaturesInAhkManifest() {
+	; Codegen must filter out HS-only entries from the AHK manifest. If any
+	; ``hs.<...>`` entry leaks through, ``ManifestBuildFeaturesMap`` would
+	; create useless ``Features["hs"][...]`` branches that confuse call sites.
+	ManifFeatures := ManifestFeatures()
+	for Entry in ManifFeatures {
+		Section := Entry["section"]
+		AssertFalse(StrLen(Section) >= 3 and SubStr(Section, 1, 3) == "hs.",
+			"AHK manifest should not carry HS-only features, found section: " . Section)
+		AssertFalse(Section == "hs",
+			"AHK manifest should not carry top-level hs entries, found section: " . Section)
+	}
+}
+Test("manifest_v2: codegen filters out hs.* features from the AHK manifest",
+	TestFMv2_NoHsFeaturesInAhkManifest)
+
+
+
+
+; ===================================================
+; ===================================================
+; ======= 3/ ManifestBuildFeaturesMap shape =======
+; ===================================================
+; ===================================================
+
+TestFMv2_BuildReturnsMap() {
+	Built := ManifestBuildFeaturesMap()
+	AssertEqual("Map", Type(Built))
+}
+Test("ManifestBuildFeaturesMap: returns a Map", TestFMv2_BuildReturnsMap)
+
+TestFMv2_BuildHasSectionOrder() {
+	Built := ManifestBuildFeaturesMap()
+	AssertTrue(Built.Has("section_order"))
+	AssertEqual("Array", Type(Built["section_order"]))
+	AssertEqual(7, Built["section_order"].Length)
+}
+Test("ManifestBuildFeaturesMap: exposes section_order from the manifest",
+	TestFMv2_BuildHasSectionOrder)
+
+TestFMv2_AhkPrefixStripped() {
+	; ahk.layout.ergopti_base in the manifest must land at Features[layout][ergopti_base]
+	; after the ahk. prefix strip. Call sites must NOT see Features[ahk].
+	Built := ManifestBuildFeaturesMap()
+	AssertFalse(Built.Has("ahk"),
+		"ahk prefix must be stripped at build time; found stray ahk branch.")
+	AssertTrue(Built.Has("layout"),
+		"Layout (ahk.layout in manifest) must land at Features[layout] after strip.")
+}
+Test("ManifestBuildFeaturesMap: ahk. prefix is stripped from section paths",
+	TestFMv2_AhkPrefixStripped)
+
+TestFMv2_LayoutDefaults() {
+	Built := ManifestBuildFeaturesMap()
+	AssertTrue(Built["layout"].Has("ergopti_base"))
+	AssertTrue(Built["layout"].Has("direct_access_digits"))
+	AssertTrue(Built["layout"].Has("ergopti_alt_gr"))
+	AssertTrue(Built["layout"].Has("ergopti_plus"))
+	AssertEqual(true, Built["layout"]["ergopti_base"])
+	AssertEqual(true, Built["layout"]["ergopti_plus"])
+}
+Test("ManifestBuildFeaturesMap: layout features are plain booleans (no .enabled wrapper)",
+	TestFMv2_LayoutDefaults)
+
+TestFMv2_HotstringsTriggerChar() {
+	Built := ManifestBuildFeaturesMap()
+	AssertTrue(Built.Has("hotstrings"))
+	AssertTrue(Built["hotstrings"].Has("trigger_char"))
+	AssertEqual(Chr(0x2605), Built["hotstrings"]["trigger_char"])
+}
+Test("ManifestBuildFeaturesMap: hotstrings.trigger_char default is the magic key glyph",
+	TestFMv2_HotstringsTriggerChar)
+
+TestFMv2_HotstringsAutocorrectionAccents() {
+	Built := ManifestBuildFeaturesMap()
+	AssertTrue(Built["hotstrings"]["autocorrection"].Has("accents"))
+	Entry := Built["hotstrings"]["autocorrection"]["accents"]
+	AssertEqual("Map", Type(Entry))
+	AssertTrue(Entry.Has("enabled"))
+	AssertTrue(Entry.Has("time_activation_seconds"))
+	AssertEqual(true, Entry["enabled"])
+	AssertEqual(0.5, Entry["time_activation_seconds"])
+}
+Test("ManifestBuildFeaturesMap: modelisation alpha keeps enabled + time_activation_seconds sub-keys",
+	TestFMv2_HotstringsAutocorrectionAccents)
+
+TestFMv2_HotstringsDistancesCommaJ() {
+	Built := ManifestBuildFeaturesMap()
+	Entry := Built["hotstrings"]["distances_reduction"]["comma_j"]
+	AssertEqual("Map", Type(Entry))
+	AssertEqual(true, Entry["enabled"])
+	AssertFalse(Entry.Has("time_activation_seconds"))
+}
+Test("ManifestBuildFeaturesMap: features without delay have no time_activation_seconds key",
+	TestFMv2_HotstringsDistancesCommaJ)
+
+TestFMv2_HotstringsSfbsIEAcute() {
+	Built := ManifestBuildFeaturesMap()
+	AssertTrue(Built["hotstrings"]["sfbs_reduction"].Has("i_e_acute"))
+}
+Test("ManifestBuildFeaturesMap: SFBs IE-acute is renamed to i_e_acute", TestFMv2_HotstringsSfbsIEAcute)
+
+TestFMv2_HotstringsDynamicGroup() {
+	Built := ManifestBuildFeaturesMap()
+	AssertTrue(Built["hotstrings"].Has("dynamic"))
+	AssertTrue(Built["hotstrings"]["dynamic"].Has("text_expansion_personal_information"))
+	Entry := Built["hotstrings"]["dynamic"]["text_expansion_personal_information"]
+	AssertEqual(1, Entry["pattern_max_length"])
+}
+Test("ManifestBuildFeaturesMap: hotstrings.dynamic carries pattern_max_length",
+	TestFMv2_HotstringsDynamicGroup)
+
+TestFMv2_LlmStructureSplit() {
+	Built := ManifestBuildFeaturesMap()
+	AssertTrue(Built["llm"].Has("display"))
+	AssertTrue(Built["llm"].Has("generation"))
+	AssertTrue(Built["llm"].Has("models"))
+	AssertTrue(Built["llm"].Has("profiles"))
+	AssertTrue(Built["llm"].Has("trigger"))
+	AssertTrue(Built["llm"].Has("navigation"))
+	AssertEqual(500, Built["llm"]["generation"]["context_length"])
+	AssertEqual(3, Built["llm"]["profiles"]["num_predictions"])
+	AssertEqual("basic", Built["llm"]["profiles"]["active"])
+	AssertEqual("ollama", Built["llm"]["models"]["selected"])
+	AssertEqual("qwen2.5:3b", Built["llm"]["models"]["ollama"])
+}
+Test("ManifestBuildFeaturesMap: llm is split into 6 sub-sections with the expected keys",
+	TestFMv2_LlmStructureSplit)
+
+TestFMv2_LlmDefaultPerPlatform() {
+	Built := ManifestBuildFeaturesMap()
+	AssertEqual("ollama", Built["llm"]["models"]["selected"])
+}
+Test("ManifestBuildFeaturesMap: default_per_platform resolves to the AHK value",
+	TestFMv2_LlmDefaultPerPlatform)
+
+TestFMv2_ShortcutsAccentedAGrave() {
+	Built := ManifestBuildFeaturesMap()
+	AssertTrue(Built["shortcuts"].Has("a_grave"))
+	Entry := Built["shortcuts"]["a_grave"]
+	AssertEqual("Map", Type(Entry))
+	AssertEqual(true, Entry["enabled"])
+	AssertEqual("v", Entry["letter"])
+}
+Test("ManifestBuildFeaturesMap: accented shortcuts carry enabled + letter sub-keys",
+	TestFMv2_ShortcutsAccentedAGrave)
+
+TestFMv2_ShortcutsTakeNote() {
+	Built := ManifestBuildFeaturesMap()
+	Entry := Built["shortcuts"]["take_note"]
+	AssertEqual("Map", Type(Entry))
+	AssertEqual(true, Entry["enabled"])
+	AssertEqual(false, Entry["dated_notes"])
+	AssertEqual("D:\Bureau", Entry["destination_folder"])
+}
+Test("ManifestBuildFeaturesMap: take_note shortcut carries dated_notes + destination_folder",
+	TestFMv2_ShortcutsTakeNote)
+
+TestFMv2_AhkShortcutsSubsections() {
+	Built := ManifestBuildFeaturesMap()
+	AssertTrue(Built["shortcuts"].Has("alt_gr_caps_lock"))
+	AssertTrue(Built["shortcuts"]["alt_gr_caps_lock"].Has("ctrl_delete"))
+	AssertEqual(true, Built["shortcuts"]["alt_gr_caps_lock"]["ctrl_delete"])
+	AssertEqual(false, Built["shortcuts"]["alt_gr_caps_lock"]["backspace"])
+	AssertEqual(false, Built["shortcuts"]["alt_gr_caps_lock"]["caps_lock"])
+}
+Test("ManifestBuildFeaturesMap: nested ahk.shortcuts.* sub-Maps preserve their defaults",
+	TestFMv2_AhkShortcutsSubsections)
+
+TestFMv2_GesturesStrippedFromAhk() {
+	Built := ManifestBuildFeaturesMap()
+	AssertTrue(Built.Has("gestures"))
+	AssertEqual(true, Built["gestures"]["enabled"])
+	AssertEqual("tab_close", Built["gestures"]["swipe_3_down"])
+	AssertEqual("left_click_toggle", Built["gestures"]["tap_3"])
+}
+Test("ManifestBuildFeaturesMap: ahk.gestures lands at Features[gestures] with action defaults",
+	TestFMv2_GesturesStrippedFromAhk)
+
+TestFMv2_NoTapHoldInFeatures() {
+	Built := ManifestBuildFeaturesMap()
+	AssertFalse(Built.Has("tap_hold"))
+}
+Test("ManifestBuildFeaturesMap: tap_hold is not a Features sub-tree in v2",
+	TestFMv2_NoTapHoldInFeatures)
+
+
+
+
+; ====================================================
+; ====================================================
+; ======= 4/ ApplyConfigTomlV2 override engine =======
+; ====================================================
+; ====================================================
+
+TestFMv2_ApplyNonexistentFileReturnsZero() {
+	OldFeatures := _FMv2_BeginIsolated()
+	try {
+		Applied := ApplyConfigTomlV2(A_Temp . "\nonexistent_ergopti_v2_test.toml")
+		AssertEqual(0, Applied)
+	}
+	_FMv2_EndIsolated(OldFeatures)
+}
+Test("ApplyConfigTomlV2: missing file silently returns 0", TestFMv2_ApplyNonexistentFileReturnsZero)
+
+TestFMv2_ApplyUniversalScriptOverride() {
+	global Features
+	OldFeatures := _FMv2_BeginIsolated()
+	try {
+		Path := _FMv2_WriteFixture("script_locale",
+			"[script]`r`nlocale = `"en`"`r`n")
+		Applied := ApplyConfigTomlV2(Path)
+		AssertEqual(1, Applied)
+		AssertEqual("en", Features["script"]["locale"])
+		FileDelete(Path)
+	}
+	_FMv2_EndIsolated(OldFeatures)
+}
+Test("ApplyConfigTomlV2: applies a [script] override", TestFMv2_ApplyUniversalScriptOverride)
+
+TestFMv2_ApplyAhkLayoutOverrideStripsPrefix() {
+	global Features
+	OldFeatures := _FMv2_BeginIsolated()
+	try {
+		Path := _FMv2_WriteFixture("ahk_layout",
+			"[ahk.layout]`r`nergopti_base = false`r`n")
+		Applied := ApplyConfigTomlV2(Path)
+		AssertEqual(1, Applied)
+		AssertEqual(false, Features["layout"]["ergopti_base"])
+		FileDelete(Path)
+	}
+	_FMv2_EndIsolated(OldFeatures)
+}
+Test("ApplyConfigTomlV2: [ahk.layout] strips prefix to Features[layout]",
+	TestFMv2_ApplyAhkLayoutOverrideStripsPrefix)
+
+TestFMv2_ApplyNestedSubSection() {
+	global Features
+	OldFeatures := _FMv2_BeginIsolated()
+	try {
+		Path := _FMv2_WriteFixture("autocorrection_accents",
+			"[hotstrings.autocorrection.accents]`r`n"
+			. "enabled = false`r`n"
+			. "time_activation_seconds = 1.25`r`n")
+		Applied := ApplyConfigTomlV2(Path)
+		AssertEqual(2, Applied)
+		Entry := Features["hotstrings"]["autocorrection"]["accents"]
+		AssertEqual(false, Entry["enabled"])
+		AssertEqual(1.25, Entry["time_activation_seconds"])
+		FileDelete(Path)
+	}
+	_FMv2_EndIsolated(OldFeatures)
+}
+Test("ApplyConfigTomlV2: applies a nested sub-section (modelisation alpha)",
+	TestFMv2_ApplyNestedSubSection)
+
+TestFMv2_ApplyHsSectionIsSilentlySkipped() {
+	OldFeatures := _FMv2_BeginIsolated()
+	try {
+		Path := _FMv2_WriteFixture("hs_section",
+			"[hs.gestures]`r`nswipe_2_left = `"arrow_down`"`r`n")
+		Applied := ApplyConfigTomlV2(Path)
+		AssertEqual(0, Applied)
+		FileDelete(Path)
+	}
+	_FMv2_EndIsolated(OldFeatures)
+}
+Test("ApplyConfigTomlV2: [hs.*] sections are silently skipped", TestFMv2_ApplyHsSectionIsSilentlySkipped)
+
+TestFMv2_ApplyUnknownSectionWarnsButDoesNotCrash() {
+	global Features
+	OldFeatures := _FMv2_BeginIsolated()
+	try {
+		Path := _FMv2_WriteFixture("unknown_section",
+			"[hotstrings.no_such_group]`r`n"
+			. "foo = true`r`n"
+			. "[script]`r`n"
+			. "locale = `"es`"`r`n")
+		Applied := ApplyConfigTomlV2(Path)
+		AssertEqual(1, Applied)
+		AssertEqual("es", Features["script"]["locale"])
+		FileDelete(Path)
+	}
+	_FMv2_EndIsolated(OldFeatures)
+}
+Test("ApplyConfigTomlV2: unknown sections warn but do not abort other overrides",
+	TestFMv2_ApplyUnknownSectionWarnsButDoesNotCrash)
+
+TestFMv2_ApplyArrayValue() {
+	global Features
+	OldFeatures := _FMv2_BeginIsolated()
+	try {
+		Path := _FMv2_WriteFixture("array_value",
+			"[llm.navigation]`r`nval_modifiers = [`"alt`", `"ctrl`"]`r`n")
+		Applied := ApplyConfigTomlV2(Path)
+		AssertEqual(1, Applied)
+		Arr := Features["llm"]["navigation"]["val_modifiers"]
+		AssertEqual("Array", Type(Arr))
+		AssertEqual(2, Arr.Length)
+		AssertEqual("alt", Arr[1])
+		AssertEqual("ctrl", Arr[2])
+		FileDelete(Path)
+	}
+	_FMv2_EndIsolated(OldFeatures)
+}
+Test("ApplyConfigTomlV2: coerces single-line array literals", TestFMv2_ApplyArrayValue)
+
+TestFMv2_ApplyEmptyFileNoChange() {
+	global Features
+	OldFeatures := _FMv2_BeginIsolated()
+	try {
+		Path := _FMv2_WriteFixture("empty", "")
+		Applied := ApplyConfigTomlV2(Path)
+		AssertEqual(0, Applied)
+		AssertEqual("fr", Features["script"]["locale"])
+		FileDelete(Path)
+	}
+	_FMv2_EndIsolated(OldFeatures)
+}
+Test("ApplyConfigTomlV2: empty file applies no overrides", TestFMv2_ApplyEmptyFileNoChange)
+
+TestFMv2_ApplyCommentsAndBlanksIgnored() {
+	global Features
+	OldFeatures := _FMv2_BeginIsolated()
+	try {
+		Path := _FMv2_WriteFixture("comments",
+			"# Top-level comment`r`n"
+			. "`r`n"
+			. "[script]`r`n"
+			. "# in-section comment`r`n"
+			. "locale = `"de`"`r`n"
+			. "`r`n"
+			. "# trailing comment`r`n")
+		Applied := ApplyConfigTomlV2(Path)
+		AssertEqual(1, Applied)
+		AssertEqual("de", Features["script"]["locale"])
+		FileDelete(Path)
+	}
+	_FMv2_EndIsolated(OldFeatures)
+}
+Test("ApplyConfigTomlV2: comments and blank lines are skipped",
+	TestFMv2_ApplyCommentsAndBlanksIgnored)
+
+
+
+
+; =====================================================
+; =====================================================
+; ======= 5/ TomlCoerceValueV2 primitive parser =======
+; =====================================================
+; =====================================================
+
+TestFMv2_CoerceArrayEmpty() {
+	Result := TomlCoerceValueV2("[]")
+	AssertEqual("Array", Type(Result))
+	AssertEqual(0, Result.Length)
+}
+Test("TomlCoerceValueV2: empty array literal decodes to empty Array",
+	TestFMv2_CoerceArrayEmpty)
+
+TestFMv2_CoerceArrayStrings() {
+	Result := TomlCoerceValueV2('["alt", "ctrl"]')
+	AssertEqual("Array", Type(Result))
+	AssertEqual(2, Result.Length)
+	AssertEqual("alt", Result[1])
+	AssertEqual("ctrl", Result[2])
+}
+Test("TomlCoerceValueV2: single-line string array decodes element-by-element",
+	TestFMv2_CoerceArrayStrings)
+
+TestFMv2_CoerceArrayBooleans() {
+	Result := TomlCoerceValueV2("[true, false, true]")
+	AssertEqual(3, Result.Length)
+	AssertEqual(true, Result[1])
+	AssertEqual(false, Result[2])
+	AssertEqual(true, Result[3])
+}
+Test("TomlCoerceValueV2: array of booleans is coerced per-element",
+	TestFMv2_CoerceArrayBooleans)
+
+TestFMv2_CoercePrimitivesDelegateToV1() {
+	AssertEqual(true, TomlCoerceValueV2("true"))
+	AssertEqual(false, TomlCoerceValueV2("false"))
+	AssertEqual(42, TomlCoerceValueV2("42"))
+	AssertEqual("hello", TomlCoerceValueV2('"hello"'))
+}
+Test("TomlCoerceValueV2: primitives are delegated to the v1 coercer",
+	TestFMv2_CoercePrimitivesDelegateToV1)
+
