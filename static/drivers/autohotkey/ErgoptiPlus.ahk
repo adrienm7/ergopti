@@ -1567,6 +1567,17 @@ SaveFullConfig() {
     }
     Updates.Push({ Section: "LLM", Key: "app_profile_overrides", Value: _AppOverridesStr })
 
+    ; [CategoryEnabled] — Phase 7.4 master gating state. Must be included
+    ; here or SaveFullConfig wipes the section on every canonicalization
+    ; (the writer rewrites the file from scratch from the Updates array),
+    ; causing the master toggle to never appear to persist.
+    global CategoryEnabled
+    if IsSet(CategoryEnabled) {
+        for _CatName, _CatBool in CategoryEnabled {
+            Updates.Push({ Section: "CategoryEnabled", Key: _CatName, Value: _CatBool })
+        }
+    }
+
     ; Strict schema: rewrite from scratch so stale/unknown sections and keys
     ; are removed on each full save
     if FileExist(ConfigurationFile) {
