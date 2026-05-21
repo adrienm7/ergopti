@@ -153,6 +153,33 @@ global FeaturesV2 := Map(
             "dated_notes",        false,
             "destination_folder", "D:\\Bureau",
         ),
+        ; Sub-Maps — 10 entries each (same key set as the v1 Maps).
+        ; Phase 4 migrated the individual reads in modules/shortcuts.ahk
+        ; (AltGrLAlt) and modules/tap_holds.ahk (LAltCapsLock).
+        "alt_gr_lalt", Map(
+            "backspace",      false,
+            "caps_lock",      false,
+            "caps_word",      false,
+            "ctrl_backspace", true,
+            "ctrl_delete",    false,
+            "delete",         false,
+            "enter",          false,
+            "escape",         false,
+            "one_shot_shift", false,
+            "tab",            false,
+        ),
+        "lalt_caps_lock", Map(
+            "backspace",      false,
+            "caps_lock",      false,
+            "caps_word",      true,
+            "ctrl_backspace", false,
+            "ctrl_delete",    false,
+            "delete",         false,
+            "enter",          false,
+            "escape",         false,
+            "one_shot_shift", false,
+            "tab",            false,
+        ),
     ),
 )
 
