@@ -19,6 +19,19 @@
 ;    GitHub Actions matchers and humans alike.
 ; 4. Assertions print the offending value alongside the expectation so a
 ;    CI failure log immediately shows what the regression looks like.
+;
+; KNOWN GOTCHA — SILENT MID-FILE PARSE ABORT:
+; AHK v2's parser silently stops registering top-level statements partway
+; through a test file when the file's encoding is inconsistent (e.g. LF
+; line endings appended via ``cat >>`` into a CRLF/BOM source). The runner
+; then plans ``1..N`` for only the first batch of ``Test()`` calls and
+; reports green — passing tests are real, missing ones are silently
+; dropped. If a new test_*.ahk file shows fewer registrations than its
+; ``Test(...)`` count, check the file with ``file <path>``; it must read
+; ``UTF-8 (with BOM) text, with CRLF line terminators``. Use the Edit
+; tool, not ``cat >>``, to extend test files. The v2 config-refactor
+; suite (test_features_manifest_v2.ahk) carries an ASCII-only convention
+; for the same reason.
 ; ==============================================================================
 
 

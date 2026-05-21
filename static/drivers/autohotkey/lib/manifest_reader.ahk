@@ -21,6 +21,15 @@
 ; 3. Dormant until cut-over: until ``features_config.ahk`` is replaced with a
 ;    call to ``ManifestBuildFeaturesMap``, this module is loaded but unused.
 ;    Adding it ahead of the cut-over keeps that PR small and reviewable.
+;
+; NOTE on AHK source encoding (discovered while writing the v2 test suite,
+; 2026-05-22): the generated ``features_manifest.ahk`` is emitted by
+; ``scripts/build-features-manifest.js`` with UTF-8 BOM + CRLF — both are
+; required. AHK v2 silently aborts mid-file parsing on encoding drift
+; (LF-only, missing BOM, or LF mixed into a CRLF file), which surfaces as
+; mysterious partial test registration with no error message. If the
+; manifest looks loaded but ``ManifestFeatures()`` returns a short array,
+; check the generated file's encoding before debugging the codegen logic.
 ; ==============================================================================
 
 ; Optional include — file is produced by ``npm run build:manifest`` and is
