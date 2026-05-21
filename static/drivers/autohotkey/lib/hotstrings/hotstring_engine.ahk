@@ -62,20 +62,20 @@ global _HotstringRegistrar := 0
 global _SendHook := 0
 
 ; Boot-time resolution of whether AltGr needs the synthetic Up injection in
-; HotstringHandler — read from ``ScriptInformation["AltGrIsKanaRemap"]``
-; (manual TOML opt-in, default false). Caching the resolved bool at boot
-; lets the hot path skip both a Map lookup and a truthy test on every
-; hotstring firing.
-;
-; Auto-detection via ``MapVirtualKeyExW`` was tried previously but proved
-; unreliable: on some bépo HKLs the probe returns VK_LMENU instead of
-; VK_RMENU and wrongly forces the Kana branch, breaking every keystroke that
-; follows an AltGr-mapped key. A manual flag is dumb but correct.
+; HotstringHandler — auto-detected via a reverse VK→SC probe, with a manual
+; TOML override (ScriptInformation["AltGrIsKanaRemap"]) that always wins.
+; Caching the resolved bool at boot lets the hot path skip a Map lookup and
+; a truthy test on every hotstring firing.
 global _ALTGR_KANA_FIXUP := False
 
+; Win32 constants for MapVirtualKeyEx — see learn.microsoft.com/en-us/
+; windows/win32/api/winuser/nf-winuser-mapvirtualkeyexw.
+global _MAPVK_VK_TO_VSC_EX := 4
+global _VK_RMENU := 0xA5
+
 ; Returns the HKL of the foreground window's thread, or 0 if the call chain
-; fails. Kept here (no longer used by the AltGr probe) for the layout-change
-; watcher in ErgoptiPlus.ahk that still needs to detect layout switches.
+; fails. Used by both DetectAltGrKanaRemap and the layout-change watcher in
+; ErgoptiPlus.ahk so both observe the same value.
 GetForegroundKeyboardLayout() {
     HWND := DllCall("GetForegroundWindow", "Ptr")
     if (HWND = 0) {
@@ -88,17 +88,59 @@ GetForegroundKeyboardLayout() {
     return DllCall("GetKeyboardLayout", "UInt", TID, "Ptr")
 }
 
+; Probe the active layout in REVERSE direction: does VK_RMENU have a scancode?
+;
+; On vanilla AltGr layouts (bépo, US-International, AZERTY, …) the RAlt key
+; is mapped to VK_RMENU, so MapVirtualKeyExW(VK_RMENU, VK_TO_VSC_EX) returns
+; the RAlt extended scancode (typically 0xE038). On custom KbdEdit/MSKLC
+; remaps where AltGr is reassigned to a different VK (VK_KANA, VK_OEM_8,
+; VK_LMENU, …), VK_RMENU has no scancode → the probe returns 0.
+;
+; The reverse direction proves more reliable than the SC→VK probe used in
+; earlier revisions: that one needed an E0-encoded scancode and behaved
+; inconsistently across bépo HKLs (returning VK_LMENU or 0 instead of
+; VK_RMENU), wrongly flagging bépo as a Kana layout.
+DetectAltGrKanaRemap() {
+    HKL := GetForegroundKeyboardLayout()
+    if (HKL = 0) {
+        HKL := DllCall("GetKeyboardLayout", "UInt", 0, "Ptr")
+    }
+    SC := DllCall("MapVirtualKeyExW",
+        "UInt", _VK_RMENU,
+        "UInt", _MAPVK_VK_TO_VSC_EX,
+        "Ptr", HKL,
+        "UInt")
+    return (SC == 0)
+}
+
+; Read the manual TOML override from ScriptInformation. Returns "" when the
+; key is missing or set to the sentinel "auto"; "true" / "false" when forced.
+_ReadKanaTomlOverride() {
+    if !IsSet(ScriptInformation) or !ScriptInformation.Has("AltGrIsKanaRemap") {
+        return ""
+    }
+    Val := ScriptInformation["AltGrIsKanaRemap"]
+    if (Val == true or Val == 1 or Val == "1" or Val == "true" or Val == "True") {
+        return "true"
+    }
+    if (Val == false or Val == 0 or Val == "0" or Val == "false" or Val == "False") {
+        return "false"
+    }
+    return ""  ; "auto" or unrecognised → defer to detection
+}
+
 HotstringEngineInit() {
     global _ALTGR_KANA_FIXUP
-    if !IsSet(ScriptInformation) or !ScriptInformation.Has("AltGrIsKanaRemap") {
+    Override := _ReadKanaTomlOverride()
+    if (Override == "true") {
+        _ALTGR_KANA_FIXUP := True
+        return
+    }
+    if (Override == "false") {
         _ALTGR_KANA_FIXUP := False
         return
     }
-    Val := ScriptInformation["AltGrIsKanaRemap"]
-    ; TOML values come back as native types or strings depending on parser;
-    ; treat any common truthy form as enabled.
-    _ALTGR_KANA_FIXUP := (Val == true or Val == 1 or Val == "1"
-        or Val == "true" or Val == "True")
+    _ALTGR_KANA_FIXUP := DetectAltGrKanaRemap()
 }
 
 ; =======================================
