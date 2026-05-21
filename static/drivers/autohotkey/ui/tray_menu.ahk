@@ -733,12 +733,13 @@ initMenu() {
 	; — when checked, click disables every shortcut; when unchecked, click
 	; re-enables every shortcut.
 	if SubMenus.Has("Shortcuts") {
-		ShortcutsAnyEnabled := HasAnyEnabled(Features["Shortcuts"])
+		; Master gate (Phase 7.4) — see comment in the Layout block below.
+		ShortcutsGated := IsCategoryGated("Shortcuts")
 		AddCategoryToggleItem(SubMenus["Shortcuts"],
 			t("menu.shortcuts.on"),
 			t("menu.shortcuts.off"),
-			ShortcutsAnyEnabled,
-			(*) => ToggleCategoryAllFeatures("Shortcuts", !ShortcutsAnyEnabled))
+			ShortcutsGated,
+			(*) => ToggleCategoryAllFeatures("Shortcuts", !ShortcutsGated))
 	}
 
 	; Insert the configurable keyboard shortcut groups just before the
@@ -811,19 +812,23 @@ initMenu() {
 	}
 
 	; ── 🌐 Disposition clavier — mirrors the HS layout submenu naming ──
+	; Master gate (Phase 7.4): the parent menu checkmark and the master
+	; toggle label both reflect IsCategoryGated, NOT a per-feature scan.
+	; A flipped gate keeps individual per-feature toggles intact but
+	; neutralises the whole category via the mirror in lib/v1_v2_mirror.ahk.
 	LayoutMenu := Menu()
-	LayoutAnyEnabled := HasAnyEnabled(Features["Layout"])
+	LayoutGated := IsCategoryGated("Layout")
 	AddCategoryToggleItem(LayoutMenu,
 		t("menu.layout.on"),
 		t("menu.layout.off"),
-		LayoutAnyEnabled,
-		(*) => ToggleCategoryAllFeatures("Layout", !LayoutAnyEnabled))
+		LayoutGated,
+		(*) => ToggleCategoryAllFeatures("Layout", !LayoutGated))
 	for FeatureName in Features["Layout"]["__Order"] {
 		MenuAddItem(LayoutMenu, "Layout", FeatureName)
 	}
 	LayoutMenuTitle := t("menu.layout.title")
 	A_TrayMenu.Add(LayoutMenuTitle, LayoutMenu)
-	if LayoutAnyEnabled {
+	if LayoutGated {
 		A_TrayMenu.Check(LayoutMenuTitle)
 	}
 
@@ -834,7 +839,11 @@ initMenu() {
 	;   3. "— Hotstrings communs —" header + common TOML groups + dynamic
 	;   4. Separator + "— Hotstrings personnels —" header + personal TOML(s) + extensions
 	HotstringsMenu := Menu()
-	HotstringsAllEnabled := IsCategoryAllEnabled(HotstringCategories)
+	; Master gate (Phase 7.4): IsCategoryAllEnabled returns the gated
+	; state (not a per-feature scan) so the master toggle and parent
+	; menu checkmark reflect the user's master choice rather than the
+	; aggregated state of every hotstring entry.
+	HotstringsAllEnabled := IsCategoryGated("Hotstrings")
 	AddCategoryToggleItem(HotstringsMenu,
 		t("menu.hotstrings.on"),
 		t("menu.hotstrings.off"),
@@ -1175,13 +1184,14 @@ initMenu() {
 	; ── Raccourcis and Tap-Holds — standalone, like HS Raccourcis and Karabiner ──
 	if SubMenus.Has("Shortcuts") {
 		A_TrayMenu.Add(GetCategoryTitle("Shortcuts"), SubMenus["Shortcuts"])
-		if ShortcutsAnyEnabled {
+		if ShortcutsGated {
 			A_TrayMenu.Check(GetCategoryTitle("Shortcuts"))
 		}
 	}
-	; TapHolds: prepend a global on/off toggle before adding to the tray
+	; TapHolds: prepend a global on/off toggle before adding to the tray.
+	; Master gate (Phase 7.4) — see comment in the Layout block above.
 	if SubMenus.Has("TapHolds") {
-		TapHoldsAllEnabled := IsCategoryAllEnabled(["TapHolds"])
+		TapHoldsAllEnabled := IsCategoryGated("TapHolds")
 		AddCategoryToggleItem(SubMenus["TapHolds"],
 			t("menu.tapholds.on"),
 			t("menu.tapholds.off"),

@@ -64,6 +64,13 @@ MirrorV1ToV2_Layout() {
         return
     }
 
+    ; Master category gate (Phase 7.4): when the user toggles the master
+    ; "Disposition" off in the tray menu, IsCategoryGated returns false
+    ; and every layout feature propagates as false here regardless of its
+    ; individual .Enabled state. Per-feature choices are preserved in v1
+    ; Features for when the user re-enables the master.
+    Gated := IsCategoryGated("Layout")
+
     Pairs := Map(
         "ErgoptiBase",        "ergopti_base",
         "DirectAccessDigits", "direct_access_digits",
@@ -82,7 +89,7 @@ MirrorV1ToV2_Layout() {
         if !IsObject(V1Val) or !V1Val.HasOwnProp("Enabled") {
             continue
         }
-        FeaturesV2["layout"][V2Id] := (V1Val.Enabled = true)
+        FeaturesV2["layout"][V2Id] := Gated and (V1Val.Enabled = true)
         Copied += 1
     }
 
@@ -186,6 +193,9 @@ MirrorV1ToV2_Shortcuts() {
         return
     }
 
+    ; Master category gate (Phase 7.4) — see MirrorV1ToV2_Layout.
+    Gated := IsCategoryGated("Shortcuts")
+
     BoolPairs := Map(
         "WrapTextIfSelected",      "wrap_text_if_selected",
         "GetHexValue",             "get_hex_value",
@@ -215,7 +225,7 @@ MirrorV1ToV2_Shortcuts() {
         if !IsObject(V1Val) or !V1Val.HasOwnProp("Enabled") {
             continue
         }
-        FeaturesV2["shortcuts"][V2Id] := (V1Val.Enabled = true)
+        FeaturesV2["shortcuts"][V2Id] := Gated and (V1Val.Enabled = true)
         Copied += 1
     }
 
@@ -256,7 +266,7 @@ MirrorV1ToV2_Shortcuts() {
             }
             PropVal := V1Val.%V1Prop%
             if (V2Key == "enabled") {
-                FeaturesV2["shortcuts"][V2Id][V2Key] := (PropVal = true)
+                FeaturesV2["shortcuts"][V2Id][V2Key] := Gated and (PropVal = true)
             } else {
                 FeaturesV2["shortcuts"][V2Id][V2Key] := PropVal
             }
@@ -302,7 +312,7 @@ MirrorV1ToV2_Shortcuts() {
             if !IsObject(V1Entry) or !V1Entry.HasOwnProp("Enabled") {
                 continue
             }
-            FeaturesV2["shortcuts"][V2Group][V2Key] := (V1Entry.Enabled = true)
+            FeaturesV2["shortcuts"][V2Group][V2Key] := Gated and (V1Entry.Enabled = true)
             Copied += 1
         }
     }
@@ -351,6 +361,9 @@ MirrorV1ToV2_Hotstrings() {
             "MirrorV1ToV2_Hotstrings skipped — FeaturesV2['hotstrings'] missing.")
         return
     }
+
+    ; Master category gate (Phase 7.4) — see MirrorV1ToV2_Layout.
+    Gated := IsCategoryGated("Hotstrings")
 
     ; Per-category v1->v2 mapping. Outer key = v1 top-level Features key,
     ; inner Map = { v2_category_name, entry_map(v1_id -> v2_id) }.
@@ -462,7 +475,7 @@ MirrorV1ToV2_Hotstrings() {
                 ; v2 entry expected to be a Map; skip if shape mismatch.
                 continue
             }
-            FeaturesV2["hotstrings"][V2Cat][V2Id]["enabled"] := (V1Val.Enabled = true)
+            FeaturesV2["hotstrings"][V2Cat][V2Id]["enabled"] := Gated and (V1Val.Enabled = true)
             ; Mirror PatternMaxLength too — only DynamicHotstrings'
             ; TextExpansionPersonalInformation carries it in v1 today.
             if V1Val.HasOwnProp("PatternMaxLength") {
@@ -645,6 +658,19 @@ MirrorV1ToV2_TapHold() {
     }
     if !TapHold.Has("keys") {
         TapHold["keys"] := Map()
+    }
+
+    ; Master category gate (Phase 7.4): when the user toggles "TapHolds"
+    ; master off, leave TapHold["keys"] empty so TapHoldIsConfigured
+    ; returns false for every key and the existing v1 read sites in
+    ; modules/tap_holds.ahk (still reading Features["TapHolds"]) keep
+    ; whatever per-feature .Enabled was, but the future v2 read path
+    ; via TapHold sees nothing armed. Once the v1 reads migrate to v2,
+    ; the master gate fully neutralises the category.
+    if !IsCategoryGated("TapHolds") {
+        try LoggerDebug("V1ToV2",
+            "MirrorV1ToV2_TapHold skipped — TapHolds master gate is off.")
+        return
     }
 
     Copied := 0

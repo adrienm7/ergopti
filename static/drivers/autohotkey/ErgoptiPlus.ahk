@@ -401,6 +401,49 @@ _TomlSection(Category) {
     return Category
 }
 
+; Category-level gating state (Phase 7.4 master-toggle refactor).
+;
+; The master toggle at the top of every category submenu ("Activer la
+; disposition" / "Désactiver les raccourcis" / ...) used to flip every
+; individual feature in the category to the same value, destroying the
+; user's per-feature choices on every master click. The new design
+; separates the master gate (this Map) from the per-feature .Enabled
+; flags: toggling the master flips ``CategoryEnabled[Category]`` only,
+; and the per-section mirrors in lib/v1_v2_mirror.ahk apply the gate
+; when populating FeaturesV2 — a disabled category propagates as all
+; v2 entries reading false at the HotIf level, but the underlying
+; ``Features[Category][X].Enabled`` per-feature choices are preserved
+; for when the user re-enables the master.
+;
+; Defaults all true so a fresh install (or a user who hasn't touched
+; the master) sees no behavior change. Loaded from the [CategoryEnabled]
+; section of config.toml; default-on when the section is absent.
+global CategoryEnabled := Map(
+    "Layout",     true,
+    "Shortcuts",  true,
+    "Hotstrings", true,
+    "TapHolds",   true,
+)
+
+ReadCategoryEnabled(Cache) {
+    global CategoryEnabled
+    for Category, _Default in CategoryEnabled {
+        Raw := IniCacheGet(Cache, "CategoryEnabled", Category)
+        if (Raw == "_") {
+            continue
+        }
+        CategoryEnabled[Category] := (Raw == true or Raw == 1 or Raw == "1" or Raw == "true")
+    }
+}
+
+; Returns true when the master gate for ``Category`` is on. Used by
+; the mirrors (to apply gating when populating FeaturesV2) and by the
+; tray-menu rendering (to label the master toggle and parent menu).
+IsCategoryGated(Category) {
+    global CategoryEnabled
+    return CategoryEnabled.Has(Category) ? CategoryEnabled[Category] : true
+}
+
 ReadScriptConfig(Cache) {
     ; MagicKey lives in [Hotstrings] in the TOML (alongside the hotstring modules)
     Raw := IniCacheGet(Cache, "Hotstrings", "MagicKey")
@@ -429,6 +472,7 @@ Onboarding_Run()
 
 global _IniCache := ParseTomlFile(ConfigurationFile)
 ReadScriptConfig(_IniCache)
+ReadCategoryEnabled(_IniCache)
 I18nInit(_IniCache)
 
 ; Resolve _ALTGR_KANA_FIXUP: TOML override (ScriptInformation["AltGrIsKanaRemap"])
@@ -1405,79 +1449,41 @@ ToggleAllHotstringsOn(*) {
 ToggleAllHotstringsOff(*) {
     ToggleAllHotstrings(0)
 }
+; Master Hotstrings gate — flips the category-level enabled flag without
+; touching individual hotstring entries. The per-category mirror in
+; lib/v1_v2_mirror.ahk applies the gate when populating FeaturesV2 so
+; every HotIf check evaluates false while the gate is off; per-feature
+; toggles stay preserved for when the user re-enables the master.
 ToggleAllHotstrings(Value) {
-    global Features, HotstringCategories
-    Updates := []
-    ; Toggle all hotstring categories including DynamicHotstrings and Personal
-    AllHotsCats := HotstringCategories.Clone()
-    for ExtraCat in ["DynamicHotstrings", "Personal"] {
-        Found := false
-        for C in AllHotsCats {
-            if C == ExtraCat {
-                Found := true
-                break
-            }
-        }
-        if !Found
-            AllHotsCats.Push(ExtraCat)
-    }
-    for Category in AllHotsCats {
-        if !Features.Has(Category) {
-            continue
-        }
-        TomlCat := _TomlSection(Category)
-        for FeatureName, Val in Features[Category] {
-            if FeatureName == "__Order" {
-                continue
-            }
-            if IsObject(Val) and Val.HasOwnProp("Enabled") {
-                Val.Enabled := Value
-                Updates.Push({ Section: TomlCat, Key: FeatureName, Value: Value })
-            }
-        }
-    }
-    TOML_BatchWrite(ConfigurationFile, Updates)
+    global CategoryEnabled, ConfigurationFile
+    Bool := (Value = true or Value = 1)
+    CategoryEnabled["Hotstrings"] := Bool
+    TOML_Write(Bool, ConfigurationFile, "CategoryEnabled", "Hotstrings")
     Reload
 }
 
-; Returns true when every leaf feature in the given category list is enabled.
-; Used by initMenu to decide the initial state of the per-submenu on/off toggle.
+; Returns true when the master gate for ``Categories[1]`` is on. Used
+; by initMenu to label the per-submenu master toggle and to drive the
+; parent-menu checkmark. Per-feature .Enabled flags are no longer
+; consulted here — the master gate is the single source of truth for
+; "is this category active" UX state.
 IsCategoryAllEnabled(Categories) {
-    global Features
-    for Category in Categories {
-        if !Features.Has(Category) {
-            continue
-        }
-        for FeatureName, Val in Features[Category] {
-            if FeatureName == "__Order" {
-                continue
-            }
-            if IsObject(Val) and Val.HasOwnProp("Enabled") and !Val.Enabled {
-                return false
-            }
-        }
+    if (Categories.Length == 0) {
+        return true
     }
-    return true
+    return IsCategoryGated(Categories[1])
 }
 
-; Toggle all leaf features of a single category to Value (true/false) and reload.
-; Mirrors ToggleAllHotstrings for non-hotstring categories (Shortcuts, TapHolds).
+; Master category gate — flips ``CategoryEnabled[Category]`` and reloads.
+; The mirror in lib/v1_v2_mirror.ahk for this category gates every
+; FeaturesV2 entry through this flag, so a flipped gate disables every
+; HotIf for the category without altering per-feature .Enabled values.
+; Used by tray-menu master toggles for Layout / Shortcuts / TapHolds.
 ToggleCategoryAllFeatures(Category, Value) {
-    global Features, ConfigurationFile
-    if !Features.Has(Category) {
-        return
-    }
-    Updates := []
-    for FeatureName, Val in Features[Category] {
-        if FeatureName == "__Order" {
-            continue
-        }
-        if IsObject(Val) and Val.HasOwnProp("Enabled") {
-            Val.Enabled := Value
-            Updates.Push({ Section: _TomlSection(Category), Key: FeatureName, Value: Value })
-        }
-    }
-    TOML_BatchWrite(ConfigurationFile, Updates)
+    global CategoryEnabled, ConfigurationFile
+    Bool := (Value = true or Value = 1)
+    CategoryEnabled[Category] := Bool
+    TOML_Write(Bool, ConfigurationFile, "CategoryEnabled", Category)
     Reload
 }
 
