@@ -280,6 +280,15 @@ if !FileExist(_PersonalTomlBootstrap)
 
 global ScriptInformation := Map(
     "MagicKey", "★",
+    ; Manual opt-in for AltGr-as-Kana / custom-remap layouts (KbdEdit, MSKLC).
+    ; Default false matches every vanilla AltGr layout (bépo, US-International,
+    ; AZERTY…) — IsRealAltGrPress() then gates on physical RAlt to filter the
+    ; OS-injected ghost SC138 prefix. Kana users flip this to true via TOML.
+    ; Auto-detection (formerly via MapVirtualKeyExW) was unreliable on some
+    ; bépo HKLs where the probe returned VK_LMENU instead of VK_RMENU and
+    ; wrongly forced the Kana branch, which made every ghost SC138 fire the
+    ; AltGr action on the next keystroke (e.g. typing `'a` produced `'<`).
+    "AltGrIsKanaRemap", False,
     ; Configurable file paths — all derived from _ConfigDir set above.
     ; AHK-specific files (.ahk, AHK config.toml) go under ``ahk/`` so the
     ; folder can be safely shared with the Hammerspoon driver via cloud
@@ -389,6 +398,12 @@ ReadScriptConfig(Cache) {
     Raw := IniCacheGet(Cache, "Script", "MagicKey")
     if Raw != "_"
         ScriptInformation["MagicKey"] := Raw
+    ; AltGr-as-Kana opt-in: manual override for custom keyboard drivers (KbdEdit
+    ; / MSKLC) that remap SC138 to a non-RMENU VK. Default false (every standard
+    ; AltGr layout). Lives in [Script] so the user can set it once per machine.
+    RawKana := IniCacheGet(Cache, "Script", "AltGrIsKanaRemap")
+    if RawKana != "_"
+        ScriptInformation["AltGrIsKanaRemap"] := (RawKana == "1" or RawKana == "true" or RawKana == "True")
     ; Restore the engine-level repeat-key toggle (defaults to enabled when absent)
     global HSE_RepeatEnabled
     RawRepeat := IniCacheGet(Cache, "Hotstrings", "RepeatKeyEnabled")
@@ -419,15 +434,13 @@ Updater_LoadCheckInterval()
 try Updater_StartBackgroundChecks()
 LoggerStart("ErgoptiPlus", "Booting ErgoptiPlus driver…")
 
-; Probe SC138 → VK directly so we can see what MapVirtualKeyExW actually
-; returns on this layout (VK_RMENU=0xA5, VK_KANA=0x15, anything else means
-; the heuristic needs adjustment).
-_DetectVK := DllCall("MapVirtualKeyExW",
-    "UInt", 0x38, "UInt", 3,
-    "Ptr", GetForegroundKeyboardLayout(), "UInt")
+; Log the resolved Kana-remap flag so future regressions on exotic layouts
+; surface immediately. Source is ScriptInformation["AltGrIsKanaRemap"]
+; (manual TOML opt-in) — auto-detection was removed after a misdetection
+; on bépo HKLs broke ghost-SC138 filtering.
 LoggerInfo("AltGrDetect",
-    "HKL=0x{1:X}, SC138→VK=0x{2:X}, _ALTGR_KANA_FIXUP={3}.",
-    GetForegroundKeyboardLayout(), _DetectVK,
+    "HKL=0x{1:X}, _ALTGR_KANA_FIXUP={2} (source: TOML).",
+    GetForegroundKeyboardLayout(),
     _ALTGR_KANA_FIXUP ? "true" : "false")
 
 ; Under this text is the configuration of the features, especially whether or not they are enabled.
