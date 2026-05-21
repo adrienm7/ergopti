@@ -1,0 +1,172 @@
+# _shared/tap_hold/defaults.toml
+# Canonical default values for the tap-hold configuration.
+#
+# Generation source only: at first boot, each driver renders this template into
+# its own ``config/ergopti_plus/<driver>/tap_hold.toml``. After that initial
+# generation, the per-driver file IS the complete config — there is no runtime
+# merge with this file, and the two drivers' configs may diverge freely.
+#
+# Consumers of the generated per-driver file:
+#   - AHK : ``modules/tap_holds.ahk`` arms the corresponding hotkeys.
+#   - HS  : ``modules/karabiner/generator.lua`` produces the Karabiner JSON.
+
+
+
+
+
+# =====================================
+# =====================================
+# ======= 1. Modifier-key holds =======
+# =====================================
+# =====================================
+
+# Each key may declare:
+#   - ``time_activation_seconds`` : tap (short) vs hold (long) threshold.
+#   - ``tap_action``   : action emitted on tap (string or null = native key).
+#   - ``hold_layer``   : layer activated on hold (ref to [tap_hold.layers.<name>]).
+#   - ``hold_modifier``: modifier emitted on hold (mutex with hold_layer).
+#
+# tap_action and hold_* are independent — a key may declare only one of them.
+
+
+
+# =========================
+# ===== 1.1 caps_lock =====
+# =========================
+
+[tap_hold.keys.caps_lock]
+time_activation_seconds = 0.35
+tap_action = "escape"
+hold_modifier = "ctrl"
+
+
+
+# ==========================
+# ===== 1.2 left_shift =====
+# ==========================
+
+[tap_hold.keys.left_shift]
+time_activation_seconds = 0.35
+tap_action = "one_shot_shift"
+hold_modifier = "shift"
+
+
+
+# =========================
+# ===== 1.3 left_ctrl =====
+# =========================
+
+[tap_hold.keys.left_ctrl]
+time_activation_seconds = 0.20
+tap_action = "paste"
+hold_modifier = "ctrl"
+
+
+
+# ========================
+# ===== 1.4 left_alt =====
+# ========================
+
+[tap_hold.keys.left_alt]
+time_activation_seconds = 0.20
+hold_layer = "nav_secondary"
+# no tap_action → bare tap emits alt
+
+
+
+# =====================
+# ===== 1.5 space =====
+# =====================
+
+[tap_hold.keys.space]
+time_activation_seconds = 0.15
+hold_layer = "nav"
+# bare tap emits space (default)
+
+
+
+# ==========================
+# ===== 1.6 right_ctrl =====
+# ==========================
+
+[tap_hold.keys.right_ctrl]
+time_activation_seconds = 0.20
+tap_action = "one_shot_shift"
+hold_modifier = "ctrl"
+
+
+
+# ======================
+# ===== 1.7 alt_gr =====
+# ======================
+
+[tap_hold.keys.alt_gr]
+time_activation_seconds = 0.20
+tap_action = "tab"
+hold_modifier = "alt_gr"
+
+
+
+# ===================
+# ===== 1.8 tab =====
+# ===================
+
+[tap_hold.keys.tab]
+time_activation_seconds = 0.20
+tap_action = "tab"
+hold_modifier = "alt"
+
+
+
+
+
+# =================================
+# =================================
+# ======= 2. Layer mappings =======
+# =================================
+# =================================
+
+# A layer is a local key remapping that is active as long as its triggering key
+# is held. Each mapping is source-key → action OR source-key → destination-key.
+
+
+
+# =============================
+# ===== 2.1 Layer ``nav`` =====
+# =============================
+
+# Primary navigation layer: arrows on HJKL plus quick editing actions.
+
+[tap_hold.layers.nav]
+description_key = "tap_hold.layer.nav"
+
+[tap_hold.layers.nav.mappings]
+h = "arrow_left"
+j = "arrow_down"
+k = "arrow_up"
+l = "arrow_right"
+backspace = "ctrl_backspace"
+delete = "ctrl_delete"
+u = "page_up"
+d = "page_down"
+g = "home"
+G = "end"
+
+
+
+# =======================================
+# ===== 2.2 Layer ``nav_secondary`` =====
+# =======================================
+
+# Secondary layer: word navigation and window management.
+
+[tap_hold.layers.nav_secondary]
+description_key = "tap_hold.layer.nav_secondary"
+
+[tap_hold.layers.nav_secondary.mappings]
+h = "word_prev"
+l = "word_next"
+j = "line_down"
+k = "line_up"
+backspace = "delete_word_back"
+delete = "delete_word_forward"
