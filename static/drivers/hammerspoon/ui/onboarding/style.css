@@ -71,13 +71,24 @@ body {
    its content exceeds that space (e.g. the metrics step with a long
    description + warning + radio cards on a short window). The sibling
    .btns row sits outside this region and stays pinned at the bottom of
-   the step regardless of how far the body is scrolled — see § 8. */
+   the step regardless of how far the body is scrolled — see § 8.
+
+   The negative margin-right + padding-right pair shifts the scrollbar
+   visually: it bleeds the step-body 14px past the wizard's 24px right
+   padding so the overlay scrollbar sits ~10px from the window edge
+   instead of being recessed by 24px, then reserves 12px of internal
+   right padding so text content keeps a clear gutter from the
+   scrollbar (otherwise the macOS overlay scrollbar covers the last
+   characters of every line, which looked broken in step 4). The .btns
+   and .step-bar siblings keep their original 24px alignment. */
 .step-body {
 	display: flex;
 	flex-direction: column;
 	flex-grow: 1;
+	margin-right: -14px;
 	min-height: 0;
 	overflow-y: auto;
+	padding-right: 12px;
 }
 
 /* =============================== */

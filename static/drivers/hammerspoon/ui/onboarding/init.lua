@@ -207,6 +207,11 @@ local function inject_init_data()
 		default_config_dir = default_config_dir,
 		system_layout      = system_layout,
 		layout_image_url   = _layout_image_url(),
+		-- Locale list rendered on step 1. Pulled from lib.i18n so the
+		-- wizard, the menubar language submenu and the AHK tray menu
+		-- all show identical ordering — non-Latin script names trail
+		-- after the Latin ones rather than intermixing alphabetically.
+		locales            = i18n.get_sorted_locales(),
 		answers = {
 			locale       = current_locale,
 			use_ergopti  = true,
