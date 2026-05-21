@@ -45,6 +45,7 @@ static/drivers/hammerspoon/paths.toml
 # under _generated/ so the auto-managed file does not clutter the source
 # tree alongside the actual driver modules.
 static/drivers/autohotkey/_generated/
+static/drivers/hammerspoon/_generated/
 
 # Auto-generated dashboard prefetch sidecar (per launch)
 static/drivers/_shared/ui/metrics_typing/prefetch.json

@@ -118,6 +118,29 @@ A `scripts/validate-config-schema.js` script runs validation on every `examples/
 
 A companion `scripts/audit-banner-alignment.js` enforces the CLAUDE.md banner-comment alignment in every `*.toml`. Run it manually with `--fix` to auto-correct, or in pre-commit without it to detect regressions.
 
+## Codegen pipeline
+
+`_shared/features/manifest.toml` is **not** parsed by the drivers directly. A Node script runs at build time:
+
+```
+npm run build:manifest
+```
+
+It calls [`scripts/build-features-manifest.js`](../../../../scripts/build-features-manifest.js), which:
+
+1. Pre-processes the manifest source — every `[[features.X.Y.Z]]` header is rewritten in memory to `[[entries]]` with a synthetic `path_prefix = "X.Y.Z"` field, so the TOML parser sees a single flat array-of-tables instead of nested AoTs (which TOML would otherwise interpret as sub-arrays of the parent entry).
+2. Flattens features, inherits `platforms` from ancestor sections when absent, resolves `default_per_platform` to the active platform.
+3. Validates entries (id pattern, exactly one of `default` / `default_per_platform`, `enum_values` required when `type = "enum"`).
+4. Emits six artifacts into the gitignored `_generated/` folders:
+   - `autohotkey/_generated/features_manifest.ahk` — AHK Map literal consumed at boot.
+   - `autohotkey/_generated/config_template.toml` — default user config copied at first boot.
+   - `autohotkey/_generated/tap_hold_template.toml` — pass-through copy of the shared defaults.
+   - `hammerspoon/_generated/features_manifest.lua` — Lua table consumed at boot.
+   - `hammerspoon/_generated/config_template.toml` — same purpose, HS-filtered.
+   - `hammerspoon/_generated/tap_hold_template.toml` — same as AHK.
+
+`_generated/` is gitignored on both driver sides; consumers must run `npm run build:manifest` after editing the manifest. CI runs it as a prebuild step.
+
 ## Initial generation at first boot
 
 If `config/ergopti_plus/<driver>/config.toml` does not exist at first boot:
