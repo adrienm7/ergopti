@@ -309,9 +309,10 @@ Test("ManifestBuildFeaturesMap: tap_hold is not a Features sub-tree in v2",
 ; ====================================================
 
 TestFMv2_ApplyNonexistentFileReturnsZero() {
+	global Features
 	OldFeatures := _FMv2_BeginIsolated()
 	try {
-		Applied := ApplyConfigTomlV2(A_Temp . "\nonexistent_ergopti_v2_test.toml")
+		Applied := ApplyConfigTomlV2(Features, A_Temp . "\nonexistent_ergopti_v2_test.toml")
 		AssertEqual(0, Applied)
 	}
 	_FMv2_EndIsolated(OldFeatures)
@@ -324,7 +325,7 @@ TestFMv2_ApplyUniversalScriptOverride() {
 	try {
 		Path := _FMv2_WriteFixture("script_locale",
 			"[script]`r`nlocale = `"en`"`r`n")
-		Applied := ApplyConfigTomlV2(Path)
+		Applied := ApplyConfigTomlV2(Features, Path)
 		AssertEqual(1, Applied)
 		AssertEqual("en", Features["script"]["locale"])
 		FileDelete(Path)
@@ -339,7 +340,7 @@ TestFMv2_ApplyAhkLayoutOverrideStripsPrefix() {
 	try {
 		Path := _FMv2_WriteFixture("ahk_layout",
 			"[ahk.layout]`r`nergopti_base = false`r`n")
-		Applied := ApplyConfigTomlV2(Path)
+		Applied := ApplyConfigTomlV2(Features, Path)
 		AssertEqual(1, Applied)
 		AssertEqual(false, Features["layout"]["ergopti_base"])
 		FileDelete(Path)
@@ -357,7 +358,7 @@ TestFMv2_ApplyNestedSubSection() {
 			"[hotstrings.autocorrection.accents]`r`n"
 			. "enabled = false`r`n"
 			. "time_activation_seconds = 1.25`r`n")
-		Applied := ApplyConfigTomlV2(Path)
+		Applied := ApplyConfigTomlV2(Features, Path)
 		AssertEqual(2, Applied)
 		Entry := Features["hotstrings"]["autocorrection"]["accents"]
 		AssertEqual(false, Entry["enabled"])
@@ -370,11 +371,12 @@ Test("ApplyConfigTomlV2: applies a nested sub-section (modelisation alpha)",
 	TestFMv2_ApplyNestedSubSection)
 
 TestFMv2_ApplyHsSectionIsSilentlySkipped() {
+	global Features
 	OldFeatures := _FMv2_BeginIsolated()
 	try {
 		Path := _FMv2_WriteFixture("hs_section",
 			"[hs.gestures]`r`nswipe_2_left = `"arrow_down`"`r`n")
-		Applied := ApplyConfigTomlV2(Path)
+		Applied := ApplyConfigTomlV2(Features, Path)
 		AssertEqual(0, Applied)
 		FileDelete(Path)
 	}
@@ -391,7 +393,7 @@ TestFMv2_ApplyUnknownSectionWarnsButDoesNotCrash() {
 			. "foo = true`r`n"
 			. "[script]`r`n"
 			. "locale = `"es`"`r`n")
-		Applied := ApplyConfigTomlV2(Path)
+		Applied := ApplyConfigTomlV2(Features, Path)
 		AssertEqual(1, Applied)
 		AssertEqual("es", Features["script"]["locale"])
 		FileDelete(Path)
@@ -407,7 +409,7 @@ TestFMv2_ApplyArrayValue() {
 	try {
 		Path := _FMv2_WriteFixture("array_value",
 			"[llm.navigation]`r`nval_modifiers = [`"alt`", `"ctrl`"]`r`n")
-		Applied := ApplyConfigTomlV2(Path)
+		Applied := ApplyConfigTomlV2(Features, Path)
 		AssertEqual(1, Applied)
 		Arr := Features["llm"]["navigation"]["val_modifiers"]
 		AssertEqual("Array", Type(Arr))
@@ -425,7 +427,7 @@ TestFMv2_ApplyEmptyFileNoChange() {
 	OldFeatures := _FMv2_BeginIsolated()
 	try {
 		Path := _FMv2_WriteFixture("empty", "")
-		Applied := ApplyConfigTomlV2(Path)
+		Applied := ApplyConfigTomlV2(Features, Path)
 		AssertEqual(0, Applied)
 		AssertEqual("fr", Features["script"]["locale"])
 		FileDelete(Path)
@@ -446,7 +448,7 @@ TestFMv2_ApplyCommentsAndBlanksIgnored() {
 			. "locale = `"de`"`r`n"
 			. "`r`n"
 			. "# trailing comment`r`n")
-		Applied := ApplyConfigTomlV2(Path)
+		Applied := ApplyConfigTomlV2(Features, Path)
 		AssertEqual(1, Applied)
 		AssertEqual("de", Features["script"]["locale"])
 		FileDelete(Path)
