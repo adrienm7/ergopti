@@ -315,6 +315,21 @@ global FeaturesV2 := Map(
 ; mirror's existence check and any future test_tap_hold_mirror.ahk fixture.
 global TapHold := Map("keys", Map(), "layers", Map())
 
+; Phase 7.4 — Master category gating state. Production initialises this
+; in ErgoptiPlus.ahk and reloads it from the [CategoryEnabled] TOML
+; section; tests don't toggle masters but the global must exist so the
+; per-section mirrors' ``IsCategoryGated`` calls return true.
+global CategoryEnabled := Map(
+    "Layout",     true,
+    "Shortcuts",  true,
+    "Hotstrings", true,
+    "TapHolds",   true,
+)
+IsCategoryGated(Category) {
+    global CategoryEnabled
+    return CategoryEnabled.Has(Category) ? CategoryEnabled[Category] : true
+}
+
 global ConfigurationFile := A_ScriptDir . "\test_config.ini"
 global SpaceAroundSymbols := ""
 
