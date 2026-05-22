@@ -205,13 +205,10 @@ MenuAddLetterPicker(MenuParent, FeatureCategoryPath, FeatureName) {
 
 ; Sets the remap target letter on a feature and enables it. Persists both
 ; flags via the v1->v2 path translator so the change survives reload, then
-; reloads to wire the new shortcut at the layer level.
+; reloads to wire the new shortcut at the layer level. The Reload runs
+; the boot pipeline which re-derives the v1 Features Map from FeaturesV2
+; via lib/v2_v1_mirror.ahk — no need to mutate v1 in-place.
 SetFeatureLetter(FullPath, Letter) {
-	Feature := GetFeatureByPath(FullPath)
-	; Mirror in v1 Features Map too — the menu still reads .Enabled/.Letter
-	; from there to render the checkmark and the title suffix at next boot.
-	Feature.Enabled := true
-	Feature.Letter := Letter
 	WriteV2Batch([
 		Map("v1_path", FullPath . ".Enabled", "value", true),
 		Map("v1_path", FullPath . ".Letter",  "value", Letter),
@@ -222,8 +219,6 @@ SetFeatureLetter(FullPath, Letter) {
 ; Disables a letter-picker feature without touching its Letter, so the
 ; previously-selected mapping is restored on the next picker selection.
 SetFeatureLetterOff(FullPath) {
-	Feature := GetFeatureByPath(FullPath)
-	Feature.Enabled := false
 	WriteV2Update(FullPath . ".Enabled", false)
 	Reload
 }
@@ -266,16 +261,14 @@ GetFeatureByPath(FullPath) {
 
 ToggleMenuVariableByPath(FullPath) {
 	Feature := GetFeatureByPath(FullPath)
-	CurrentFeatureActivation := Feature.Enabled ; Needs to be saved before turning off all shortcuts of the category
+	NewValue := !Feature.Enabled
 
 	; Find position of the last dot
 	pos := InStr(FullPath, ".", , -1)
 	if (pos) {
-		FeatureCategoryPath := SubStr(FullPath, 1, pos - 1)   ; everything left of the last dot
-		FeatureName := SubStr(FullPath, pos + 1)              ; everything right of the last dot
+		FeatureCategoryPath := SubStr(FullPath, 1, pos - 1)
 	} else {
 		FeatureCategoryPath := FullPath
-		FeatureName := ""
 	}
 
 	; Collect all mutations into a single batch so the on-disk write is atomic.
@@ -288,14 +281,11 @@ ToggleMenuVariableByPath(FullPath) {
 		; be Enabled at a time).
 		FeatureCategory := GetFeatureByPath(FeatureCategoryPath)
 		for ShortcutName in FeatureCategory {
-			Shortcut := FeatureCategory.Get(ShortcutName)
-			Shortcut.Enabled := False
 			Batch.Push(Map("v1_path", FeatureCategoryPath . "." . ShortcutName . ".Enabled",
 				"value", false))
 		}
 	}
-	Feature.Enabled := !CurrentFeatureActivation
-	Batch.Push(Map("v1_path", FullPath . ".Enabled", "value", Feature.Enabled))
+	Batch.Push(Map("v1_path", FullPath . ".Enabled", "value", NewValue))
 	WriteV2Batch(Batch)
 	Reload
 }
@@ -379,12 +369,9 @@ SetGestureSlotAction(Slot, ActionName) {
 
 ; Toggles the Gestures enabled state and reloads.
 ToggleGesturesEnabled() {
-	global Features, FeaturesV2
-	NewVal := !Features["Gestures"]["Enabled"].Enabled
-	Features["Gestures"]["Enabled"].Enabled := NewVal
-	if IsSet(FeaturesV2) and FeaturesV2.Has("gestures") {
-		FeaturesV2["gestures"]["enabled"] := NewVal
-	}
+	global FeaturesV2
+	NewVal := !(FeaturesV2.Has("gestures") and FeaturesV2["gestures"].Has("enabled")
+		and FeaturesV2["gestures"]["enabled"] = true)
 	WriteV2Update("Gestures.Enabled", NewVal)
 	Reload
 }
