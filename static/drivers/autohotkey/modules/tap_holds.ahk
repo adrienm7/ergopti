@@ -487,8 +487,7 @@ RAlt:: ; Necessary to work on layouts like QWERTY
     tap := KeyWait("RAlt", "T" . TapHoldDuration(TapHold, "alt_gr"))
     if (tap and (A_PriorKey == "RAlt" or A_PriorKey == "^")) {
         DisableCapsWord()
-        ; Dispatcher still iterates v1-shaped Map; widened in a later phase.
-        RunFirstAltGrTapHoldAction(Features["TapHolds"]["AltGr"])
+        AltGrTapHoldDispatchV2()
     }
 }
 
@@ -497,6 +496,42 @@ RAlt Up:: {
     UpdateLastSentCharacter("")
 }
 #HotIf
+
+; Dispatch the single v2 tap_action configured for "alt_gr". Each AltGr
+; variant carries the still-held AltGr modifier on its Send (``{Blind}``
+; prefix) and pairs the keystroke with an explicit UpdateLastSentCharacter
+; so the deadkey / hotstring chain downstream sees the correct previous
+; character marker.
+AltGrTapHoldDispatchV2() {
+    switch TapHoldTapAction(TapHold, "alt_gr") {
+        case "backspace":
+            SendEvent("{Blind}{BackSpace}")
+            UpdateLastSentCharacter("BackSpace")
+        case "caps_lock":
+            ToggleCapsLock()
+        case "caps_word":
+            ToggleCapsWord()
+        case "ctrl_backspace":
+            SendEvent("{Blind}^{BackSpace}")
+            UpdateLastSentCharacter("")
+        case "ctrl_delete":
+            SendEvent("{Blind}^{Delete}")
+            UpdateLastSentCharacter("")
+        case "delete":
+            SendEvent("{Blind}{Delete}")
+            UpdateLastSentCharacter("Delete")
+        case "enter":
+            SendEvent("{Blind}{Enter}")
+            UpdateLastSentCharacter("Enter")
+        case "escape":
+            SendEvent("{Escape}")
+        case "one_shot_shift":
+            OneShotShift()
+        case "tab":
+            SendEvent("{Blind}{Tab}")
+            UpdateLastSentCharacter("Tab")
+    }
+}
 
 ; ==============================
 ; ==============================

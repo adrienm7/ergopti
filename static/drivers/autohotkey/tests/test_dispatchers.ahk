@@ -3,8 +3,8 @@
 ; ==============================================================================
 ; MODULE: Dispatcher Tests
 ; DESCRIPTION:
-; Verifies the SIMPLE_ACTIONS / TAPHOLD_ALTGR_ACTIONS Maps and the
-; HasAnyEnabled / RunFirstSimpleAction / RunFirstAltGrTapHoldAction helpers.
+; Verifies the SIMPLE_ACTIONS Map and the HasAnyEnabled / RunFirstSimpleAction
+; helpers.
 ; ==============================================================================
 
 
@@ -39,12 +39,6 @@ TestDisp_SimpleAllCallable() {
 	_AssertAllCallable(SIMPLE_ACTIONS)
 }
 Test("SIMPLE_ACTIONS: every entry is callable", TestDisp_SimpleAllCallable)
-
-TestDisp_AltGrHasAll() {
-	_AssertHasAll(TAPHOLD_ALTGR_ACTIONS, ALL_TEN_ACTIONS)
-}
-Test("TAPHOLD_ALTGR_ACTIONS: contains all 10 canonical action names",
-	TestDisp_AltGrHasAll)
 
 
 
@@ -137,24 +131,6 @@ TestDisp_RunFirstSkipsConfig() {
 	AssertEqual("one_shot_shift", _Stub_SentText[1].kind)
 }
 Test("RunFirstSimpleAction: skips __Configuration", TestDisp_RunFirstSkipsConfig)
-
-
-
-
-; ==========================
-; RunFirstAltGrTapHoldAction
-; ==========================
-TestDisp_AltGrTapHoldOSS() {
-	ResetStubRecorders()
-	G := Map(
-		"OneShotShift", { Enabled: true },
-	)
-	AssertTrue(RunFirstAltGrTapHoldAction(G))
-	; OneShotShift stub records {kind: "one_shot_shift"}.
-	AssertEqual("one_shot_shift", _Stub_SentText[1].kind)
-}
-Test("RunFirstAltGrTapHoldAction: OneShotShift action fires the stub",
-	TestDisp_AltGrTapHoldOSS)
 
 
 
@@ -271,22 +247,3 @@ TestDisp_SkipsDisabledThenFiresEnabled() {
 }
 Test("RunFirstSimpleAction: skips disabled entries and fires first enabled one",
 	TestDisp_SkipsDisabledThenFiresEnabled)
-
-
-
-
-; ==========================
-; TAPHOLD_ALTGR_ACTIONS shape
-; ==========================
-TestDisp_AltGrAllCallable() {
-	_AssertAllCallable(TAPHOLD_ALTGR_ACTIONS)
-}
-Test("TAPHOLD_ALTGR_ACTIONS: every entry is callable", TestDisp_AltGrAllCallable)
-
-TestDisp_AltGrTabAction() {
-	ResetHotstringRecorders()
-	G := Map("Tab", { Enabled: true })
-	AssertTrue(RunFirstAltGrTapHoldAction(G))
-}
-Test("RunFirstAltGrTapHoldAction: Tab action returns true without crashing",
-	TestDisp_AltGrTabAction)
