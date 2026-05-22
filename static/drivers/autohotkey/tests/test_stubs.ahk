@@ -155,6 +155,12 @@ global FeaturesV2 := Map(
             "dated_notes",        false,
             "destination_folder", "D:\\Bureau",
         ),
+        ; Letter pickers (phase 11) — accented base-layer keys, configurable
+        ; target latin letter consumed by ErgoptiBaseMapping.
+        "e_grave",  Map("enabled", true, "letter", "z"),
+        "e_circ",   Map("enabled", true, "letter", "x"),
+        "e_acute",  Map("enabled", true, "letter", "c"),
+        "a_grave",  Map("enabled", true, "letter", "v"),
         ; Sub-Maps — 10 entries each (same key set as the v1 Maps).
         ; Phase 4 migrated the individual reads in modules/shortcuts.ahk
         ; (AltGrLAlt) and modules/tap_holds.ahk (LAltCapsLock); phase 10

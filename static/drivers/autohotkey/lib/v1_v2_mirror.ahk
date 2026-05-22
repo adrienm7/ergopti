@@ -174,9 +174,6 @@ MirrorV1ToV2_Gestures() {
 ;
 ; INTENTIONALLY NOT migrated yet (kept on v1):
 ;   - Personal sub-Map: boot-path dependency on RegisterPersonalFeature.
-;   - Letter pickers (EGrave/ECirc/EAcute/AGrave): consumed by
-;     lib/layout/layout_ergopti.ahk via .Letter lookups; touches the
-;     base-layer registration so deferring.
 ;   - tray_menu.ahk reads: the write path stays v1 until cut-over.
 MirrorV1ToV2_Shortcuts() {
     global Features, FeaturesV2
@@ -239,11 +236,22 @@ MirrorV1ToV2_Shortcuts() {
         "TakeNote", Map("enabled", "Enabled",
                         "dated_notes", "DatedNotes",
                         "destination_folder", "DestinationFolder"),
+        ; Letter pickers (phase 11) — accented base-layer keys whose target
+        ; latin letter is user-configurable via tray menu. Read by
+        ; lib/layout/layout_ergopti.ahk's ErgoptiBaseMapping at boot.
+        "EGrave",   Map("enabled", "Enabled", "letter", "Letter"),
+        "ECirc",    Map("enabled", "Enabled", "letter", "Letter"),
+        "EAcute",   Map("enabled", "Enabled", "letter", "Letter"),
+        "AGrave",   Map("enabled", "Enabled", "letter", "Letter"),
     )
     AlphaPairsV2 := Map(
         "GPT",      "gpt",
         "Search",   "search",
         "TakeNote", "take_note",
+        "EGrave",   "e_grave",
+        "ECirc",    "e_circ",
+        "EAcute",   "e_acute",
+        "AGrave",   "a_grave",
     )
 
     for V1Id, PropMap in AlphaPairs {
