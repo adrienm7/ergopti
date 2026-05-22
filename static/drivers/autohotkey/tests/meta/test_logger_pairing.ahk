@@ -75,7 +75,8 @@ _MetaCountPattern(Body, Pattern) {
 ; =====================================
 
 _MetaRunLoggerPairingTests() {
-	DriverRoot := StrReplace(A_ScriptDir, "\", "/") . "/../../"
+	SplitPath(A_ScriptDir, , &_DriverRootRaw)
+	DriverRoot := StrReplace(_DriverRootRaw, "\", "/") . "/"
 	Imbalanced := 0
 
 	for _, Sub in ["lib", "modules"] {
