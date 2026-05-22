@@ -17,6 +17,13 @@ SetWorkingDir(A_ScriptDir) ; Set the working directory where the script is locat
 ; message pump well-formed.
 global CapsWordEnabled := False
 global LayerEnabled := False
+; Load the manifest + path translator + builder first so features_config.ahk's
+; ``global Features := BuildLegacyFeaturesFromManifest()`` call has everything
+; it needs at parse time. None of these prerequisites reach the message loop
+; on their own — they're pure data and function definitions.
+#Include lib/manifest_reader.ahk
+#Include lib/v1_v2_path_translator.ahk
+#Include lib/legacy_features_builder.ahk
 #Include lib/features_config.ahk
 
 ; In compiled mode the .exe ships an embedded zip of every runtime asset
@@ -122,12 +129,14 @@ SendMode("Event") ; Everything concerning hotstrings MUST use SendEvent and not 
 #Include lib/hotstrings/hotstring_engine_v2.ahk
 #Include lib/toml/toml_loader.ahk
 #Include lib/toml/toml_loader_v2.ahk
-#Include lib/manifest_reader.ahk
+; manifest_reader.ahk + v1_v2_path_translator.ahk are loaded at the top of
+; the file (before features_config.ahk) so the legacy Features Map builder
+; can run at parse time. They're idempotent so re-listing them here would
+; cause AHK to complain about the same script being included twice.
 #Include lib/first_boot.ahk
 #Include lib/tap_hold/tap_hold_loader.ahk
 #Include lib/master_gates.ahk
 #Include lib/manifest_descriptions.ahk
-#Include lib/v1_v2_path_translator.ahk
 #Include lib/menu_dispatcher.ahk
 #Include lib/menu_manifest.ahk
 #Include lib/llm_defaults.ahk
