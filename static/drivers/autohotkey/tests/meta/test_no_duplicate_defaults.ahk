@@ -66,7 +66,7 @@ _MetaRunDuplicateDefaultsTests() {
 	; Trivial values that are always whitelisted
 	Whitelist := Map(
 		"0", true, "1", true, "true", true, "false", true,
-		"""""", true, "300", true, "100", true, "50", true
+		"`"`"", true, "300", true, "100", true, "50", true
 	)
 
 	; Map of "name=value" -> array of relative file paths

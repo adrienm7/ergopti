@@ -93,7 +93,7 @@ _MetaRunNoPascalCaseTomlTests() {
 				Key := Trim(SubStr(Line, 1, EqPos - 1))
 				; PascalCase: starts with uppercase ASCII letter
 				FirstChar := SubStr(Key, 1, 1)
-				if FirstChar >= "A" and FirstChar <= "Z" {
+				if StrCompare(FirstChar, "A") >= 0 and StrCompare(FirstChar, "Z") <= 0 {
 					Violations++
 					OutputDebug("WARN: PascalCase key '" . Key . "' in " . NormAbs . " line " . LineNum)
 				}
