@@ -1,7 +1,7 @@
-; static/drivers/autohotkey/tests/test_hotstring_engine_v2.ahk
+; static/drivers/autohotkey/tests/test_hotstring_engine_main.ahk
 
 ; ==============================================================================
-; MODULE: Hotstring Engine V2 Tests
+; MODULE: Hotstring Engine Main Tests
 ; DESCRIPTION:
 ; Pure-helper tests for the new hotstring engine. Covers buffer semantics
 ; (FeedChar / FeedBackspace / FeedReset / ApplyExpansion), the registry's
@@ -21,7 +21,7 @@
 ; ============================================
 ; ============================================
 
-HSEv2_TestReset() {
+HSE_TestReset() {
     HSE_RegistryClear()
     HSE_Suppress(false)
     ; HSE_Suppress(false) no longer wipes the buffer (HSE_DispatchMatch
@@ -41,17 +41,17 @@ HSEv2_TestReset() {
 ; ============================================
 ; ============================================
 
-TestHSEv2_FeedCharAppends() {
-    HSEv2_TestReset()
+TestHSE_FeedCharAppends() {
+    HSE_TestReset()
     HSE_FeedChar("c")
     HSE_FeedChar("a")
     HSE_FeedChar("t")
     AssertEqual("cat", HSE_Buffer)
 }
-Test("HSEv2 FeedChar appends to buffer", TestHSEv2_FeedCharAppends)
+Test("HSE FeedChar appends to buffer", TestHSE_FeedCharAppends)
 
-TestHSEv2_FeedSpaceKeptInBuffer() {
-    HSEv2_TestReset()
+TestHSE_FeedSpaceKeptInBuffer() {
+    HSE_TestReset()
     HSE_FeedChar("h")
     HSE_FeedChar("i")
     HSE_FeedChar(" ")
@@ -60,22 +60,22 @@ TestHSEv2_FeedSpaceKeptInBuffer() {
     AssertTrue(HSE_StartIsWordBoundary,
         "boundary flag stays true — it describes the LEFT of the buffer, which has not changed")
 }
-Test("HSEv2 word terminator stays in the buffer (no reset on space)",
-    TestHSEv2_FeedSpaceKeptInBuffer)
+Test("HSE word terminator stays in the buffer (no reset on space)",
+    TestHSE_FeedSpaceKeptInBuffer)
 
-TestHSEv2_FeedPunctuationKeptInBuffer() {
-    HSEv2_TestReset()
+TestHSE_FeedPunctuationKeptInBuffer() {
+    HSE_TestReset()
     HSE_FeedChar("h")
     HSE_FeedChar("i")
     HSE_FeedChar(".")
     AssertEqual("hi.", HSE_Buffer, "punctuation stays in the buffer like any other char")
     AssertTrue(HSE_StartIsWordBoundary)
 }
-Test("HSEv2 punctuation stays in the buffer (no reset on period)",
-    TestHSEv2_FeedPunctuationKeptInBuffer)
+Test("HSE punctuation stays in the buffer (no reset on period)",
+    TestHSE_FeedPunctuationKeptInBuffer)
 
-TestHSEv2_BackspaceChopsLastChar() {
-    HSEv2_TestReset()
+TestHSE_BackspaceChopsLastChar() {
+    HSE_TestReset()
     HSE_FeedChar("a")
     HSE_FeedChar("b")
     HSE_FeedChar("c")
@@ -84,22 +84,22 @@ TestHSEv2_BackspaceChopsLastChar() {
     HSE_FeedBackspace()
     AssertEqual("a", HSE_Buffer)
 }
-Test("HSEv2 backspace chops one char off the buffer",
-    TestHSEv2_BackspaceChopsLastChar)
+Test("HSE backspace chops one char off the buffer",
+    TestHSE_BackspaceChopsLastChar)
 
-TestHSEv2_BackspaceOnEmptyBufferFlipsBoundary() {
-    HSEv2_TestReset()
+TestHSE_BackspaceOnEmptyBufferFlipsBoundary() {
+    HSE_TestReset()
     AssertTrue(HSE_StartIsWordBoundary, "init flag is true")
     HSE_FeedBackspace()
     AssertEqual("", HSE_Buffer)
     AssertFalse(HSE_StartIsWordBoundary,
         "backspace on empty buffer flips boundary to false")
 }
-Test("HSEv2 backspace on empty buffer marks unknown context",
-    TestHSEv2_BackspaceOnEmptyBufferFlipsBoundary)
+Test("HSE backspace on empty buffer marks unknown context",
+    TestHSE_BackspaceOnEmptyBufferFlipsBoundary)
 
-TestHSEv2_FeedResetClearsBufferAndFlag() {
-    HSEv2_TestReset()
+TestHSE_FeedResetClearsBufferAndFlag() {
+    HSE_TestReset()
     HSE_FeedChar("x")
     HSE_FeedReset(false)
     AssertEqual("", HSE_Buffer)
@@ -107,11 +107,11 @@ TestHSEv2_FeedResetClearsBufferAndFlag() {
     HSE_FeedReset(true)
     AssertTrue(HSE_StartIsWordBoundary, "FeedReset(true) sets boundary true")
 }
-Test("HSEv2 FeedReset clears buffer and respects KnownTerminatorBefore",
-    TestHSEv2_FeedResetClearsBufferAndFlag)
+Test("HSE FeedReset clears buffer and respects KnownTerminatorBefore",
+    TestHSE_FeedResetClearsBufferAndFlag)
 
-TestHSEv2_BufferTrimmedAtMaxLength() {
-    HSEv2_TestReset()
+TestHSE_BufferTrimmedAtMaxLength() {
+    HSE_TestReset()
     Loop HSE_MAX_BUFFER_LEN + 5 {
         HSE_FeedChar("a")
     }
@@ -119,10 +119,10 @@ TestHSEv2_BufferTrimmedAtMaxLength() {
     AssertFalse(HSE_StartIsWordBoundary,
         "trimming flips boundary to false because old chars are now lost")
 }
-Test("HSEv2 buffer is trimmed at HSE_MAX_BUFFER_LEN", TestHSEv2_BufferTrimmedAtMaxLength)
+Test("HSE buffer is trimmed at HSE_MAX_BUFFER_LEN", TestHSE_BufferTrimmedAtMaxLength)
 
-TestHSEv2_SuppressShortCircuitsFeeds() {
-    HSEv2_TestReset()
+TestHSE_SuppressShortCircuitsFeeds() {
+    HSE_TestReset()
     HSE_FeedChar("x")  ; pre-burst buffer
     HSE_Suppress(true)
     HSE_FeedChar("a")
@@ -133,19 +133,19 @@ TestHSEv2_SuppressShortCircuitsFeeds() {
     AssertEqual("x", HSE_Buffer,
         "release preserves the buffer — HSE_DispatchMatch sets the post-expansion state itself")
 }
-Test("HSEv2 suppression short-circuits all feeds without wiping on release",
-    TestHSEv2_SuppressShortCircuitsFeeds)
+Test("HSE suppression short-circuits all feeds without wiping on release",
+    TestHSE_SuppressShortCircuitsFeeds)
 
-TestHSEv2_HardResetClearsBufferAndBoundary() {
-    HSEv2_TestReset()
+TestHSE_HardResetClearsBufferAndBoundary() {
+    HSE_TestReset()
     HSE_FeedChar("x")
     HSE_HardReset()
     AssertEqual("", HSE_Buffer, "HardReset wipes the buffer")
     AssertFalse(HSE_StartIsWordBoundary,
         "HardReset flips the boundary flag to false (unknown left-hand context)")
 }
-Test("HSEv2 HardReset clears the buffer and the boundary flag",
-    TestHSEv2_HardResetClearsBufferAndBoundary)
+Test("HSE HardReset clears the buffer and the boundary flag",
+    TestHSE_HardResetClearsBufferAndBoundary)
 
 
 
@@ -156,8 +156,8 @@ Test("HSEv2 HardReset clears the buffer and the boundary flag",
 ; ============================================
 ; ============================================
 
-TestHSEv2_RegisterBucketsByLastChar() {
-    HSEv2_TestReset()
+TestHSE_RegisterBucketsByLastChar() {
+    HSE_TestReset()
     HSE_Register("*", "abc", () => 0)
     HSE_Register("*", "xyz", () => 0)
     AssertTrue(HSE_RegistryByLastChar.Has("c"))
@@ -165,44 +165,44 @@ TestHSEv2_RegisterBucketsByLastChar() {
     AssertEqual(1, HSE_RegistryByLastChar["c"].Length)
     AssertEqual(1, HSE_RegistryByLastChar["z"].Length)
 }
-Test("HSEv2 registry buckets by trigger last char",
-    TestHSEv2_RegisterBucketsByLastChar)
+Test("HSE registry buckets by trigger last char",
+    TestHSE_RegisterBucketsByLastChar)
 
-TestHSEv2_RegisterCaseInsensitiveLowercasesBucket() {
-    HSEv2_TestReset()
+TestHSE_RegisterCaseInsensitiveLowercasesBucket() {
+    HSE_TestReset()
     HSE_Register("*", "abZ", () => 0)
     AssertTrue(HSE_RegistryByLastChar.Has("z"),
         "case-insensitive triggers bucket under lowercase last char")
     AssertFalse(HSE_RegistryByLastChar.Has("Z"))
 }
-Test("HSEv2 case-insensitive registration uses lowercase bucket",
-    TestHSEv2_RegisterCaseInsensitiveLowercasesBucket)
+Test("HSE case-insensitive registration uses lowercase bucket",
+    TestHSE_RegisterCaseInsensitiveLowercasesBucket)
 
-TestHSEv2_RegisterCaseSensitiveKeepsLiteralBucket() {
-    HSEv2_TestReset()
+TestHSE_RegisterCaseSensitiveKeepsLiteralBucket() {
+    HSE_TestReset()
     HSE_Register("*C", "abZ", () => 0)
     AssertTrue(HSE_RegistryByLastChar.Has("Z"),
         "case-sensitive triggers keep literal last char as bucket key")
 }
-Test("HSEv2 case-sensitive registration uses literal-case bucket",
-    TestHSEv2_RegisterCaseSensitiveKeepsLiteralBucket)
+Test("HSE case-sensitive registration uses literal-case bucket",
+    TestHSE_RegisterCaseSensitiveKeepsLiteralBucket)
 
-TestHSEv2_RegistryClearEmptiesIndex() {
-    HSEv2_TestReset()
+TestHSE_RegistryClearEmptiesIndex() {
+    HSE_TestReset()
     HSE_Register("*", "abc", () => 0)
     HSE_RegistryClear()
     AssertEqual(0, HSE_RegistryByLastChar.Count)
 }
-Test("HSEv2 RegistryClear empties the bucket map",
-    TestHSEv2_RegistryClearEmptiesIndex)
+Test("HSE RegistryClear empties the bucket map",
+    TestHSE_RegistryClearEmptiesIndex)
 
-TestHSEv2_RegisterIgnoresEmptyTrigger() {
-    HSEv2_TestReset()
+TestHSE_RegisterIgnoresEmptyTrigger() {
+    HSE_TestReset()
     HSE_Register("*", "", () => 0)
     AssertEqual(0, HSE_RegistryByLastChar.Count)
 }
-Test("HSEv2 Register ignores an empty trigger",
-    TestHSEv2_RegisterIgnoresEmptyTrigger)
+Test("HSE Register ignores an empty trigger",
+    TestHSE_RegisterIgnoresEmptyTrigger)
 
 
 
@@ -213,19 +213,19 @@ Test("HSEv2 Register ignores an empty trigger",
 ; ============================================
 ; ============================================
 
-TestHSEv2_MatchStarTriggerOnLastChar() {
-    HSEv2_TestReset()
+TestHSE_MatchStarTriggerOnLastChar() {
+    HSE_TestReset()
     HSE_Register("*", "ct", () => 0)
     HSE_FeedChar("c")
     Match := HSE_FeedChar("t")
     AssertTrue(Match != "", "star trigger fires on its last char")
     AssertEqual("ct", Match.Trigger)
 }
-Test("HSEv2 star trigger fires on the last char of its body",
-    TestHSEv2_MatchStarTriggerOnLastChar)
+Test("HSE star trigger fires on the last char of its body",
+    TestHSE_MatchStarTriggerOnLastChar)
 
-TestHSEv2_NonStarTriggerNeedsEndChar() {
-    HSEv2_TestReset()
+TestHSE_NonStarTriggerNeedsEndChar() {
+    HSE_TestReset()
     HSE_Register("", "btw", () => 0)
     HSE_FeedChar("b")
     HSE_FeedChar("t")
@@ -237,11 +237,11 @@ TestHSEv2_NonStarTriggerNeedsEndChar() {
         "non-star trigger fires when an end char follows the body")
     AssertEqual("btw", Match.Trigger)
 }
-Test("HSEv2 non-star trigger requires an end char to fire",
-    TestHSEv2_NonStarTriggerNeedsEndChar)
+Test("HSE non-star trigger requires an end char to fire",
+    TestHSE_NonStarTriggerNeedsEndChar)
 
-TestHSEv2_WordBoundaryRespectedAtBufferStart() {
-    HSEv2_TestReset()
+TestHSE_WordBoundaryRespectedAtBufferStart() {
+    HSE_TestReset()
     HSE_Register("*", "ui", () => 0)
     Match := HSE_FeedChar("u")
     AssertEqual("", Match, "single char does not yet match the trigger body")
@@ -250,11 +250,11 @@ TestHSEv2_WordBoundaryRespectedAtBufferStart() {
         "trigger fires at start of buffer when boundary flag is true")
     AssertEqual("ui", Match.Trigger)
 }
-Test("HSEv2 word-boundary check passes when buffer starts on a known boundary",
-    TestHSEv2_WordBoundaryRespectedAtBufferStart)
+Test("HSE word-boundary check passes when buffer starts on a known boundary",
+    TestHSE_WordBoundaryRespectedAtBufferStart)
 
-TestHSEv2_WordBoundaryFailsAfterBackspaceFromEmpty() {
-    HSEv2_TestReset()
+TestHSE_WordBoundaryFailsAfterBackspaceFromEmpty() {
+    HSE_TestReset()
     HSE_Register("*", "ui", () => 0)
     HSE_FeedBackspace() ; flips boundary flag false
     HSE_FeedChar("u")
@@ -262,11 +262,11 @@ TestHSEv2_WordBoundaryFailsAfterBackspaceFromEmpty() {
     AssertEqual("", Match,
         "trigger does not fire after backspace from empty buffer (oui+BS+UI case)")
 }
-Test("HSEv2 word-boundary check fails after backspace through empty buffer",
-    TestHSEv2_WordBoundaryFailsAfterBackspaceFromEmpty)
+Test("HSE word-boundary check fails after backspace through empty buffer",
+    TestHSE_WordBoundaryFailsAfterBackspaceFromEmpty)
 
-TestHSEv2_WordBoundaryPassesAfterArrowReset() {
-    HSEv2_TestReset()
+TestHSE_WordBoundaryPassesAfterArrowReset() {
+    HSE_TestReset()
     HSE_Register("*", "ui", () => 0)
     HSE_FeedReset(true) ; arrow / mouse click — next run starts fresh
     HSE_FeedChar("u")
@@ -276,11 +276,11 @@ TestHSEv2_WordBoundaryPassesAfterArrowReset() {
     AssertEqual("ui", Match.Trigger,
         "navigation reset sets word boundary — trigger fires immediately after")
 }
-Test("HSEv2 word-boundary passes after navigation reset",
-    TestHSEv2_WordBoundaryPassesAfterArrowReset)
+Test("HSE word-boundary passes after navigation reset",
+    TestHSE_WordBoundaryPassesAfterArrowReset)
 
-TestHSEv2_WordBoundaryFailsAfterCtrlX() {
-    HSEv2_TestReset()
+TestHSE_WordBoundaryFailsAfterCtrlX() {
+    HSE_TestReset()
     HSE_Register("*", "ui", () => 0)
     HSE_FeedReset(false) ; Ctrl+X / Ctrl+V / Ctrl+Z — unknown buffer content
     HSE_FeedChar("u")
@@ -288,11 +288,11 @@ TestHSEv2_WordBoundaryFailsAfterCtrlX() {
     AssertEqual("", Match,
         "cut/paste/undo reset clears the boundary flag — trigger stays silent")
 }
-Test("HSEv2 word-boundary check fails after cut/paste/undo reset",
-    TestHSEv2_WordBoundaryFailsAfterCtrlX)
+Test("HSE word-boundary check fails after cut/paste/undo reset",
+    TestHSE_WordBoundaryFailsAfterCtrlX)
 
-TestHSEv2_WordBoundaryHonouredMidBuffer() {
-    HSEv2_TestReset()
+TestHSE_WordBoundaryHonouredMidBuffer() {
+    HSE_TestReset()
     HSE_Register("*", "ui", () => 0)
     HSE_FeedChar("a") ; non-terminator before "ui" → mid-word
     HSE_FeedChar("u")
@@ -300,11 +300,11 @@ TestHSEv2_WordBoundaryHonouredMidBuffer() {
     AssertEqual("", Match,
         "trigger does not fire mid-word when InWord flag is false")
 }
-Test("HSEv2 word-boundary check fails mid-buffer when previous char is a letter",
-    TestHSEv2_WordBoundaryHonouredMidBuffer)
+Test("HSE word-boundary check fails mid-buffer when previous char is a letter",
+    TestHSE_WordBoundaryHonouredMidBuffer)
 
-TestHSEv2_InWordTriggerFiresAnywhere() {
-    HSEv2_TestReset()
+TestHSE_InWordTriggerFiresAnywhere() {
+    HSE_TestReset()
     HSE_Register("*?", "ui", () => 0)
     HSE_FeedChar("a")
     HSE_FeedChar("u")
@@ -312,11 +312,11 @@ TestHSEv2_InWordTriggerFiresAnywhere() {
     AssertTrue(Match != "",
         "InWord trigger ignores the boundary check and fires mid-word")
 }
-Test("HSEv2 InWord trigger ignores the word-boundary check",
-    TestHSEv2_InWordTriggerFiresAnywhere)
+Test("HSE InWord trigger ignores the word-boundary check",
+    TestHSE_InWordTriggerFiresAnywhere)
 
-TestHSEv2_ApostropheActsAsWordBoundaryStraight() {
-    HSEv2_TestReset()
+TestHSE_ApostropheActsAsWordBoundaryStraight() {
+    HSE_TestReset()
     ; Non-star, is_word=true trigger "ia" — only fires when a terminator is
     ; typed after AND the char preceding "i" is itself a word boundary.
     HSE_Register("", "ia", () => 0)
@@ -330,11 +330,11 @@ TestHSEv2_ApostropheActsAsWordBoundaryStraight() {
         "trigger fires after l'ia + space — ' is treated as a word boundary")
     AssertEqual("ia", Match.Trigger)
 }
-Test("HSEv2 ASCII apostrophe acts as word boundary (l'ia + space fires)",
-    TestHSEv2_ApostropheActsAsWordBoundaryStraight)
+Test("HSE ASCII apostrophe acts as word boundary (l'ia + space fires)",
+    TestHSE_ApostropheActsAsWordBoundaryStraight)
 
-TestHSEv2_ApostropheActsAsWordBoundaryTypographic() {
-    HSEv2_TestReset()
+TestHSE_ApostropheActsAsWordBoundaryTypographic() {
+    HSE_TestReset()
     HSE_Register("", "ia", () => 0)
     ; Same as above but with the typographic apostrophe (Chr 0x2019).
     HSE_FeedChar("l")
@@ -346,22 +346,22 @@ TestHSEv2_ApostropheActsAsWordBoundaryTypographic() {
         "trigger fires after l’ia + space — typographic apostrophe is a word boundary")
     AssertEqual("ia", Match.Trigger)
 }
-Test("HSEv2 typographic apostrophe acts as word boundary (l’ia + space fires)",
-    TestHSEv2_ApostropheActsAsWordBoundaryTypographic)
+Test("HSE typographic apostrophe acts as word boundary (l’ia + space fires)",
+    TestHSE_ApostropheActsAsWordBoundaryTypographic)
 
-TestHSEv2_CaseInsensitiveMatchesAnyCase() {
-    HSEv2_TestReset()
+TestHSE_CaseInsensitiveMatchesAnyCase() {
+    HSE_TestReset()
     HSE_Register("*", "ui", () => 0)
     HSE_FeedChar("U")
     Match := HSE_FeedChar("I")
     AssertTrue(Match != "",
         "case-insensitive trigger matches uppercased input")
 }
-Test("HSEv2 case-insensitive registration matches any case",
-    TestHSEv2_CaseInsensitiveMatchesAnyCase)
+Test("HSE case-insensitive registration matches any case",
+    TestHSE_CaseInsensitiveMatchesAnyCase)
 
-TestHSEv2_CaseSensitiveRejectsWrongCase() {
-    HSEv2_TestReset()
+TestHSE_CaseSensitiveRejectsWrongCase() {
+    HSE_TestReset()
     HSE_Register("*C", "UI", () => 0)
     HSE_FeedChar("u")
     Match := HSE_FeedChar("i")
@@ -373,11 +373,11 @@ TestHSEv2_CaseSensitiveRejectsWrongCase() {
     AssertTrue(Match != "",
         "case-sensitive trigger fires on the literal trigger casing")
 }
-Test("HSEv2 case-sensitive registration is strict on letter case",
-    TestHSEv2_CaseSensitiveRejectsWrongCase)
+Test("HSE case-sensitive registration is strict on letter case",
+    TestHSE_CaseSensitiveRejectsWrongCase)
 
-TestHSEv2_LongestMatchWins() {
-    HSEv2_TestReset()
+TestHSE_LongestMatchWins() {
+    HSE_TestReset()
     HSE_Register("*", "re", () => 0)
     HSE_Register("*", "fre", () => 0)
     HSE_FeedChar("f")
@@ -387,8 +387,8 @@ TestHSEv2_LongestMatchWins() {
     AssertEqual("fre", Match.Trigger,
         "longest matching trigger wins when several share a suffix")
 }
-Test("HSEv2 longest match wins when multiple triggers share a suffix",
-    TestHSEv2_LongestMatchWins)
+Test("HSE longest match wins when multiple triggers share a suffix",
+    TestHSE_LongestMatchWins)
 
 
 
@@ -399,8 +399,8 @@ Test("HSEv2 longest match wins when multiple triggers share a suffix",
 ; ============================================
 ; ============================================
 
-TestHSEv2_ApplyExpansionRewritesBufferTail() {
-    HSEv2_TestReset()
+TestHSE_ApplyExpansionRewritesBufferTail() {
+    HSE_TestReset()
     HSE_Register("*", "config★", () => 0)
     for Char in StrSplit("config★") {
         HSE_FeedChar(Char)
@@ -414,11 +414,11 @@ TestHSEv2_ApplyExpansionRewritesBufferTail() {
         "boundary flag describes what is LEFT of the buffer; nothing was prepended"
         . " so it stays on the same value it had pre-expansion (true)")
 }
-Test("HSEv2 ApplyExpansion replaces the trigger suffix with the replacement",
-    TestHSEv2_ApplyExpansionRewritesBufferTail)
+Test("HSE ApplyExpansion replaces the trigger suffix with the replacement",
+    TestHSE_ApplyExpansionRewritesBufferTail)
 
-TestHSEv2_ApplyExpansionWithEndCharKeepsTerminatorInBuffer() {
-    HSEv2_TestReset()
+TestHSE_ApplyExpansionWithEndCharKeepsTerminatorInBuffer() {
+    HSE_TestReset()
     HSE_Register("", "btw", () => 0)
     HSE_FeedChar("b")
     HSE_FeedChar("t")
@@ -431,11 +431,11 @@ TestHSEv2_ApplyExpansionWithEndCharKeepsTerminatorInBuffer() {
     AssertEqual("by the way ", HSE_Buffer,
         "post-expansion buffer mirrors what is on screen: replacement + re-emitted end char")
 }
-Test("HSEv2 ApplyExpansion keeps the trailing terminator in the buffer post-expansion",
-    TestHSEv2_ApplyExpansionWithEndCharKeepsTerminatorInBuffer)
+Test("HSE ApplyExpansion keeps the trailing terminator in the buffer post-expansion",
+    TestHSE_ApplyExpansionWithEndCharKeepsTerminatorInBuffer)
 
-TestHSEv2_ApplyExpansionAfterPrefixContext() {
-    HSEv2_TestReset()
+TestHSE_ApplyExpansionAfterPrefixContext() {
+    HSE_TestReset()
     HSE_Register("*", "ct★", () => 0)
     for Char in StrSplit("hello ct★") {
         HSE_FeedChar(Char)
@@ -446,11 +446,11 @@ TestHSEv2_ApplyExpansionAfterPrefixContext() {
     AssertEqual("hello what", HSE_Buffer,
         "expansion rewrites only the trigger tail, leaving the leading 'hello ' prefix in the buffer")
 }
-Test("HSEv2 ApplyExpansion preserves the buffer prefix to the left of the trigger",
-    TestHSEv2_ApplyExpansionAfterPrefixContext)
+Test("HSE ApplyExpansion preserves the buffer prefix to the left of the trigger",
+    TestHSE_ApplyExpansionAfterPrefixContext)
 
-TestHSEv2_PersonalCommaPrefixTriggerFires() {
-    HSEv2_TestReset()
+TestHSE_PersonalCommaPrefixTriggerFires() {
+    HSE_TestReset()
     ; Personal hotstring: typing « ,a » should fire to emit « ja ».
     ; Star flag (immediate fire on the « a »); the comma stays in the
     ; buffer instead of resetting it, otherwise the trigger could never
@@ -464,8 +464,8 @@ TestHSEv2_PersonalCommaPrefixTriggerFires() {
     AssertEqual(",a", HSE_LastMatch.Trigger)
     AssertEqual("", HSE_LastEndChar, "star match has no end char")
 }
-Test("HSEv2 personal ,a-style trigger fires when the comma stays in the buffer",
-    TestHSEv2_PersonalCommaPrefixTriggerFires)
+Test("HSE personal ,a-style trigger fires when the comma stays in the buffer",
+    TestHSE_PersonalCommaPrefixTriggerFires)
 
 
 
@@ -476,11 +476,11 @@ Test("HSEv2 personal ,a-style trigger fires when the comma stays in the buffer",
 ; ============================================
 ; ============================================
 
-TestHSEv2_ConfigStarFiresAfterCtrlAReset() {
+TestHSE_ConfigStarFiresAfterCtrlAReset() {
     ; Ctrl+A is a context-replacing keystroke handled at a higher layer by
     ; calling HSE_FeedReset(true). The next typed run should fire even
     ; though the buffer was non-empty before the Ctrl+A.
-    HSEv2_TestReset()
+    HSE_TestReset()
     HSE_Register("*", "config★", () => 0)
     for Char in StrSplit("lorem ipsum") {
         HSE_FeedChar(Char)
@@ -493,15 +493,15 @@ TestHSEv2_ConfigStarFiresAfterCtrlAReset() {
         "config★ fires after Ctrl+A even though the prior buffer had no terminator")
     AssertEqual("config★", HSE_LastMatch.Trigger)
 }
-Test("HSEv2 regression: config★ fires after Ctrl+A reset",
-    TestHSEv2_ConfigStarFiresAfterCtrlAReset)
+Test("HSE regression: config★ fires after Ctrl+A reset",
+    TestHSE_ConfigStarFiresAfterCtrlAReset)
 
-TestHSEv2_OuiBackspaceUiDoesNotFire() {
+TestHSE_OuiBackspaceUiDoesNotFire() {
     ; Reproduces the « oui + BS×3 + UI » case: triple backspace empties the
     ; buffer and flips the boundary flag false on the third invocation,
     ; signalling « we deleted into unknown context ». Retyping ui should
     ; therefore NOT fire the autocorrect trigger.
-    HSEv2_TestReset()
+    HSE_TestReset()
     HSE_Register("*", "ui", () => 0)
     for Char in StrSplit("oui") {
         HSE_FeedChar(Char)
@@ -515,15 +515,15 @@ TestHSEv2_OuiBackspaceUiDoesNotFire() {
     AssertEqual("", Match,
         "ui does not fire after backspacing past the buffer start")
 }
-Test("HSEv2 regression: ui does not fire after oui+BS+UI",
-    TestHSEv2_OuiBackspaceUiDoesNotFire)
+Test("HSE regression: ui does not fire after oui+BS+UI",
+    TestHSE_OuiBackspaceUiDoesNotFire)
 
-TestHSEv2_EndCharTriggerNotSuppressedByUnreachableStarTrigger() {
+TestHSE_EndCharTriggerNotSuppressedByUnreachableStarTrigger() {
     ; Regression: end-char trigger "ia" was incorrectly suppressed by star
     ; trigger "ia★" even when the typed end char was space, not the magic key.
     ; The suppression logic must only block the end-char match when the typed
     ; end char could itself continue toward the star trigger — space cannot.
-    HSEv2_TestReset()
+    HSE_TestReset()
     HSE_Register("", "ia", () => 0)        ; end-char trigger: ia + terminator
     HSE_Register("*", "ia★", () => 0)      ; star trigger: ia + magic key
     HSE_FeedChar("i")
@@ -534,13 +534,13 @@ TestHSEv2_EndCharTriggerNotSuppressedByUnreachableStarTrigger() {
     AssertEqual("ia", Match.Trigger,
         "end-char trigger ia is not suppressed by unrelated star trigger ia★")
 }
-Test("HSEv2 regression: ia + space fires end-char trigger despite ia★ star trigger",
-    TestHSEv2_EndCharTriggerNotSuppressedByUnreachableStarTrigger)
+Test("HSE regression: ia + space fires end-char trigger despite ia★ star trigger",
+    TestHSE_EndCharTriggerNotSuppressedByUnreachableStarTrigger)
 
-TestHSEv2_EndCharTriggerSuppressedWhenEndCharLeadsToStarTrigger() {
+TestHSE_EndCharTriggerSuppressedWhenEndCharLeadsToStarTrigger() {
     ; Companion to the regression above: when the end char IS the magic key,
     ; the star trigger ia★ should win over the end-char trigger ia.
-    HSEv2_TestReset()
+    HSE_TestReset()
     HSE_Register("", "ia", () => 0)
     HSE_Register("*", "ia★", () => 0)
     HSE_FeedChar("i")
@@ -551,5 +551,5 @@ TestHSEv2_EndCharTriggerSuppressedWhenEndCharLeadsToStarTrigger() {
     AssertEqual("ia★", Match.Trigger,
         "star trigger ia★ wins over end-char trigger ia when ★ is typed")
 }
-Test("HSEv2 end-char trigger is suppressed when the end char continues toward a star trigger",
-    TestHSEv2_EndCharTriggerSuppressedWhenEndCharLeadsToStarTrigger)
+Test("HSE end-char trigger is suppressed when the end char continues toward a star trigger",
+    TestHSE_EndCharTriggerSuppressedWhenEndCharLeadsToStarTrigger)

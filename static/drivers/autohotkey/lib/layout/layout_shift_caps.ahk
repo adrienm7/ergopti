@@ -127,7 +127,7 @@ LayerDispatch(SC, SymbolMap, *) {
 RegisterShiftLayer() {
 	_BuildShiftCapsTables()
 	try LoggerStart("LayoutShift", "Registering Shift layer hotkeys…")
-	HotIf((*) => FeaturesV2["layout"]["ergopti_base"])
+	HotIf((*) => Features["layout"]["ergopti_base"])
 	for SC, _ in SHIFTED_LETTERS {
 		Hotkey("+" . SC, LayerDispatch.Bind(SC, SHIFT_SYMBOLS), "I2")
 	}
@@ -149,11 +149,11 @@ RegisterCapsLockLayer() {
 	try LoggerStart("LayoutCaps", "Registering CapsLock layer hotkeys…")
 
 	; --- Magic key overlay (registered first, lowest precedence) ---
-	HotIf((*) => GetCapsLockCondition() and FeaturesV2["hotstrings"]["magic_key"]["replace"]["enabled"])
+	HotIf((*) => GetCapsLockCondition() and Features["hotstrings"]["magic_key"]["replace"]["enabled"])
 	Hotkey("SC02E", ((*) => SendNewResult(ScriptInformation["MagicKey"])), "I2")
 
 	; --- Letters and symbols (registered last, highest precedence) ---
-	HotIf((*) => GetCapsLockCondition() and FeaturesV2["layout"]["ergopti_base"])
+	HotIf((*) => GetCapsLockCondition() and Features["layout"]["ergopti_base"])
 	for SC, _ in SHIFTED_LETTERS {
 		Hotkey(SC, LayerDispatch.Bind(SC, CAPSLOCK_SYMBOLS), "I2")
 	}

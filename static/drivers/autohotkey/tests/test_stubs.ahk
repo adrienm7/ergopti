@@ -73,13 +73,13 @@ global ScriptInformation := Map(
 )
 
 ; v2 Features Map — canonical state container. Hydrated at boot from the
-; user's v2 config.toml by ApplyConfigTomlV2. All runtime reads go through
-; FeaturesV2 directly.
+; user's v2 config.toml by ApplyConfigToml. All runtime reads go through
+; Features directly.
 ;
 ; The fixture below mirrors the manifest defaults — extend it alongside
 ; any new feature added to static/drivers/_shared/features/manifest.toml
-; so existing tests don't break when a new HotIf reads FeaturesV2["…"].
-global FeaturesV2 := Map(
+; so existing tests don't break when a new HotIf reads Features["…"].
+global Features := Map(
     "layout", Map(
         "ergopti_base",         true,
         "direct_access_digits", true,
@@ -175,7 +175,7 @@ global FeaturesV2 := Map(
     ; at least an "enabled" key; the production loader pulls extra props
     ; (time_activation_seconds, pattern_max_length) from the manifest, but
     ; tests don't exercise those — the "enabled" key alone is enough to
-    ; satisfy the migrated `if FeaturesV2["hotstrings"][...][...]["enabled"]`
+    ; satisfy the migrated `if Features["hotstrings"][...][...]["enabled"]`
     ; gates without crashing.
     "hotstrings", Map(
         "distances_reduction", Map(

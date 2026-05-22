@@ -107,7 +107,7 @@ HotstringPrefixWatcherInit() {
 
 ; Mouse clicks move the cursor to a position we cannot observe — the
 ; InputHook never sees them. Register pass-through hotkeys on the three
-; primary buttons so HSEv2 can wipe its buffer and refuse to assume a
+; primary buttons so HSE can wipe its buffer and refuse to assume a
 ; word boundary on the new cursor's left. ``~`` keeps the click going
 ; through to the active window unchanged.
 _InstallMouseClickResetHooks() {
@@ -201,7 +201,7 @@ _ResolveFireHType(Spec) {
 PrefixWatcherSuppress(YesNo) {
     global _PrefixWatcherSuppressed, _PrefixBuffer
     _PrefixWatcherSuppressed := !!YesNo
-    ; Mirror the suppression into HSEv2 so its parallel buffer stays aligned
+    ; Mirror the suppression into HSE so its parallel buffer stays aligned
     ; with the prefix watcher during SendEvent bursts. HSE_Suppress only
     ; flips the flag — the HSE buffer is NOT wiped here; HSE_DispatchMatch
     ; already called HSE_ApplyExpansion before deferring this release,
@@ -456,11 +456,11 @@ _OnPrefixChar(IH, Char) {
         return
     }
     try {
-        ; Feed HSEv2 — when HSE_FeedChar reports a match, fire the
+        ; Feed HSE — when HSE_FeedChar reports a match, fire the
         ; expansion right here. HSE_LastEndChar is the authoritative end
         ; character: empty for star (immediate) triggers, the just-typed
         ; terminator for end-char-gated triggers. We can no longer derive
-        ; it from « is Char a terminator? » alone because the new HSEv2
+        ; it from « is Char a terminator? » alone because the new HSE
         ; keeps terminators in its buffer, which means a terminator may
         ; trigger a STAR match (e.g. a personal ``,a → ja`` rule fires
         ; on the « a », not on the comma).
@@ -609,7 +609,7 @@ _OnPrefixKeyDown(IH, VK, SC) {
             }
         }
 
-        ; Feed HSEv2 with the appropriate buffer mutation. Backspace
+        ; Feed HSE with the appropriate buffer mutation. Backspace
         ; decrements its buffer (preserving word context, the whole point
         ; of the rewrite); Tab/Enter/arrows/Escape/mouse-click all declare
         ; a word boundary — the cursor lands somewhere unknown but the next
@@ -746,7 +746,7 @@ KL_LogHotstringNearMiss(kind, trigger, replacement, h_type) {
 ; AFTER the last word-boundary char — here ``ia``. Looking up the full buffer
 ; means we miss every trigger whose context includes an in-word terminator
 ; (apostrophes for French contractions, punctuation, …) even though the
-; HSEv2 engine itself fires those triggers correctly via suffix matching.
+; HSE engine itself fires those triggers correctly via suffix matching.
 ;
 ; We slide a cursor across HSE_WORD_TERMINATORS to find the rightmost
 ; terminator in the buffer; everything to its right is the effective "word

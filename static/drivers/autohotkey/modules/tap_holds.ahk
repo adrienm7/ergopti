@@ -1,4 +1,4 @@
-﻿; static/drivers/autohotkey/modules/tap_holds.ahk
+; static/drivers/autohotkey/modules/tap_holds.ahk
 
 ; ==============================================================================
 ; MODULE: Tap-Holds, One-Shot Shift and Navigation Layer
@@ -790,13 +790,13 @@ ActionLayer(action) {
 #HotIf (LayerEnabled
     and TapHoldHoldLayer(TapHold, "left_alt") == "nav"
     and (
-        FeaturesV2["shortcuts"]["lalt_caps_lock"]["backspace"]
-        or FeaturesV2["shortcuts"]["lalt_caps_lock"]["caps_lock"]
-        or FeaturesV2["shortcuts"]["lalt_caps_lock"]["caps_word"]
-        or FeaturesV2["shortcuts"]["lalt_caps_lock"]["ctrl_backspace"]
-        or FeaturesV2["shortcuts"]["lalt_caps_lock"]["ctrl_delete"]
-        or FeaturesV2["shortcuts"]["lalt_caps_lock"]["delete"]
-        or FeaturesV2["shortcuts"]["lalt_caps_lock"]["one_shot_shift"]
+        Features["shortcuts"]["lalt_caps_lock"]["backspace"]
+        or Features["shortcuts"]["lalt_caps_lock"]["caps_lock"]
+        or Features["shortcuts"]["lalt_caps_lock"]["caps_word"]
+        or Features["shortcuts"]["lalt_caps_lock"]["ctrl_backspace"]
+        or Features["shortcuts"]["lalt_caps_lock"]["ctrl_delete"]
+        or Features["shortcuts"]["lalt_caps_lock"]["delete"]
+        or Features["shortcuts"]["lalt_caps_lock"]["one_shot_shift"]
     )
 )
 ; Overrides the "BackSpace" shortcut on the layer

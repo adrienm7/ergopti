@@ -1,4 +1,4 @@
-﻿; drivers/autohotkey/lib/toml_loader.ahk
+; drivers/autohotkey/lib/toml_loader.ahk
 
 ; ==============================================================================
 ; MODULE: TOML Loader
@@ -118,7 +118,7 @@ LoadHotstringsSection(CategoryName, SectionName, FeatureConfig, ExtraOptions := 
     global ScriptInformation, _GENERATED_HOTSTRINGS, _StaticDir
 
     ; Accept either shape transparently — Phase 5/7 of the sliced v2
-    ; cut-over migrated the if-gate reads to FeaturesV2["hotstrings"]
+    ; cut-over migrated the if-gate reads to Features["hotstrings"]
     ; [<cat>][<entry>] (v2 Maps) but the LoadHotstringsSection / generated
     ; fast-path readers below were authored against the v1 object shape
     ; ({Enabled, TimeActivationSeconds, ...}). Convert a v2 Map to an

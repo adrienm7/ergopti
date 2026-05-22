@@ -129,7 +129,7 @@ ManifestFeaturesForSection(SectionPath) {
 ; shapes since the rest of the driver works with the stripped form).
 ; Returns ``false`` when no entry matches; callers fall back to whatever
 ; default they had before (e.g. Features.Description).
-ManifestFindEntryByV2Path(V2Path) {
+ManifestFindEntryByPath(V2Path) {
 	if !ManifestEnsureLoaded() {
 		return false
 	}

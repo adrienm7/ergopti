@@ -1,21 +1,21 @@
-; lib/v1_v2_path_translator.ahk
+; lib/path_translator.ahk
 
 ; ==============================================================================
-; MODULE: V1 to V2 Path Translator
+; MODULE: Path Translator
 ; DESCRIPTION:
-; Converts the v1 PascalCase feature paths used by the tray menu
+; Converts legacy PascalCase feature paths used by the tray menu
 ; (``Features["Shortcuts"]["MicrosoftBold"]``, ``Features["Hotstrings.Autocorrection"]
-; ["Accents"]``) into the v2 snake_case nested paths persisted to ``config.toml``
+; ["Accents"]``) into the snake_case nested paths persisted to ``config.toml``
 ; (``[shortcuts] microsoft_bold = …`` / ``[hotstrings.autocorrection.accents]
 ; enabled = …``). Used by every tray write site so a click toggles the in-memory
-; ``FeaturesV2`` state AND emits the canonical v2 TOML key in one call.
+; ``Features`` state AND emits the canonical TOML key in one call.
 ;
 ; FEATURES & RATIONALE:
 ; 1. Single mapping table per feature category — easy to extend when a new
 ;    feature is added. Manifest-aligned: every key here matches a manifest
 ;    entry under ``static/drivers/_shared/features/manifest.toml``.
-; 2. ``TranslateV1ToV2(V1Path)`` returns a {section, key, v2_node, ...} struct
-;    so callers can write to TOML and mutate ``FeaturesV2`` in lock-step.
+; 2. ``TranslateLegacyPath(V1Path)`` returns a {section, key, v2_node, ...} struct
+;    so callers can write to TOML and mutate ``Features`` in lock-step.
 ; 3. Modélisation α support — entries like Shortcuts.GPT decompose into a v2
 ;    sub-table (``[shortcuts.gpt]`` with ``enabled`` and ``link``). The
 ;    translator returns the v2 sub-section path and the leaf key separately.
@@ -31,7 +31,7 @@
 ; ==============================================================
 
 ; Top-level v1 category -> v2 section path (without the ``ahk.`` prefix; the
-; ApplyConfigTomlV2 reader strips it for AHK-only sections).
+; ApplyConfigToml reader strips it for AHK-only sections).
 ;
 ; Hotstrings sub-categories land under ``[hotstrings.<cat>.<entry>]`` and
 ; emit ``enabled = bool`` as their leaf. Shortcuts sub-Maps land under
@@ -41,7 +41,7 @@
 ; (used as the section header when emitting individual features that don't
 ; further nest). Hotstrings sub-categories ("Autocorrection") use a
 ; per-category table below since their v2 path nests one more level.
-global _V1V2_TopCategoryMap := Map(
+global _LegacyTopCategoryMap := Map(
     "Layout",            "ahk.layout",
     "Gestures",          "ahk.gestures",
     "Shortcuts",         "shortcuts",
@@ -57,14 +57,14 @@ global _V1V2_TopCategoryMap := Map(
 ; Per-category leaf-key rename tables — v1 PascalCase id -> v2 snake_case id.
 ; Each table is consulted when translating a path like
 ; ``<TopCategory>.<EntryName>`` (no further nesting).
-global _V1V2_LayoutKeyMap := Map(
+global _LegacyLayoutKeyMap := Map(
     "ErgoptiBase",        "ergopti_base",
     "DirectAccessDigits", "direct_access_digits",
     "ErgoptiAltGr",       "ergopti_alt_gr",
     "ErgoptiPlus",        "ergopti_plus",
 )
 
-global _V1V2_ShortcutsBoolKeyMap := Map(
+global _LegacyShortcutsBoolKeyMap := Map(
     "WrapTextIfSelected",      "wrap_text_if_selected",
     "GetHexValue",             "get_hex_value",
     "MicrosoftBold",           "microsoft_bold",
@@ -86,7 +86,7 @@ global _V1V2_ShortcutsBoolKeyMap := Map(
 
 ; Modélisation α — v1 PascalCase id -> v2 snake_case id. These entries are
 ; Map sub-tables in v2 (e.g. ``[shortcuts.gpt] enabled = true; link = "…"``).
-global _V1V2_ShortcutsAlphaKeyMap := Map(
+global _LegacyShortcutsAlphaKeyMap := Map(
     "GPT",      "gpt",
     "Search",   "search",
     "TakeNote", "take_note",
@@ -97,7 +97,7 @@ global _V1V2_ShortcutsAlphaKeyMap := Map(
 )
 
 ; Modélisation α property rename — v1 PascalCase prop -> v2 snake_case key.
-global _V1V2_ShortcutsAlphaPropMap := Map(
+global _LegacyShortcutsAlphaPropMap := Map(
     "Enabled",              "enabled",
     "Link",                 "link",
     "Letter",               "letter",
@@ -110,12 +110,12 @@ global _V1V2_ShortcutsAlphaPropMap := Map(
 ; Sub-Map groups under Shortcuts (AltGrLAlt, AltGrCapsLock, LAltCapsLock) —
 ; each is a 10-key block of plain booleans, persisted at
 ; ``[ahk.shortcuts.<v2_group>]``.
-global _V1V2_ShortcutsSubMapGroupMap := Map(
+global _LegacyShortcutsSubMapGroupMap := Map(
     "AltGrCapsLock", "ahk.shortcuts.alt_gr_caps_lock",
     "AltGrLAlt",     "ahk.shortcuts.alt_gr_lalt",
     "LAltCapsLock",  "ahk.shortcuts.lalt_caps_lock",
 )
-global _V1V2_ShortcutsSubMapKeyMap := Map(
+global _LegacyShortcutsSubMapKeyMap := Map(
     "BackSpace",     "backspace",
     "CapsLock",      "caps_lock",
     "CapsWord",      "caps_word",
@@ -128,7 +128,7 @@ global _V1V2_ShortcutsSubMapKeyMap := Map(
     "Tab",           "tab",
 )
 
-global _V1V2_AutocorrectionKeyMap := Map(
+global _LegacyAutocorrectionKeyMap := Map(
     "TypographicApostrophe",     "typographic_apostrophe",
     "Errors",                    "errors",
     "SuffixesAChaining",         "suffixes_a_chaining",
@@ -141,7 +141,7 @@ global _V1V2_AutocorrectionKeyMap := Map(
     "MultiplePunctuationMarks",  "multiple_punctuation_marks",
 )
 
-global _V1V2_DistancesReductionKeyMap := Map(
+global _LegacyDistancesReductionKeyMap := Map(
     "QU",                  "qu",
     "SuffixesA",           "suffixes_a",
     "CommaJ",              "comma_j",
@@ -151,7 +151,7 @@ global _V1V2_DistancesReductionKeyMap := Map(
     "SpaceAroundSymbols",  "space_around_symbols",
 )
 
-global _V1V2_SFBsReductionKeyMap := Map(
+global _LegacySFBsReductionKeyMap := Map(
     "Comma",   "comma",
     "ECirc",   "e_circ",
     "EGrave",  "e_grave",
@@ -159,7 +159,7 @@ global _V1V2_SFBsReductionKeyMap := Map(
     "IÉ",      "i_e_acute",
 )
 
-global _V1V2_RollsKeyMap := Map(
+global _LegacyRollsKeyMap := Map(
     "HC",                     "hc",
     "SX",                     "sx",
     "CX",                     "cx",
@@ -188,7 +188,7 @@ global _V1V2_RollsKeyMap := Map(
     "AssignArrowMinusLeft",   "assign_arrow_minus_left",
 )
 
-global _V1V2_MagicKeyKeyMap := Map(
+global _LegacyMagicKeyKeyMap := Map(
     "Replace",                    "replace",
     "RepeatCorrections",          "repeat_corrections",
     "TextExpansion",              "text_expansion",
@@ -198,7 +198,7 @@ global _V1V2_MagicKeyKeyMap := Map(
     "TextExpansionSymbolsTypst",  "text_expansion_symbols_typst",
 )
 
-global _V1V2_DynamicHotstringsKeyMap := Map(
+global _LegacyDynamicHotstringsKeyMap := Map(
     "Date",                              "date",
     "DateFr",                            "date_fr",
     "DateLongFr",                        "date_long_fr",
@@ -229,30 +229,30 @@ _BuildInverseRenameMap(Forward) {
     return Out
 }
 
-global _V2V1_LayoutKeyMap                := _BuildInverseRenameMap(_V1V2_LayoutKeyMap)
-global _V2V1_ShortcutsBoolKeyMap         := _BuildInverseRenameMap(_V1V2_ShortcutsBoolKeyMap)
-global _V2V1_ShortcutsAlphaKeyMap        := _BuildInverseRenameMap(_V1V2_ShortcutsAlphaKeyMap)
-global _V2V1_ShortcutsSubMapGroupMap     := _BuildInverseRenameMap(_V1V2_ShortcutsSubMapGroupMap)
-global _V2V1_ShortcutsSubMapKeyMap       := _BuildInverseRenameMap(_V1V2_ShortcutsSubMapKeyMap)
-global _V2V1_AutocorrectionKeyMap        := _BuildInverseRenameMap(_V1V2_AutocorrectionKeyMap)
-global _V2V1_DistancesReductionKeyMap    := _BuildInverseRenameMap(_V1V2_DistancesReductionKeyMap)
-global _V2V1_SFBsReductionKeyMap         := _BuildInverseRenameMap(_V1V2_SFBsReductionKeyMap)
-global _V2V1_RollsKeyMap                 := _BuildInverseRenameMap(_V1V2_RollsKeyMap)
-global _V2V1_MagicKeyKeyMap              := _BuildInverseRenameMap(_V1V2_MagicKeyKeyMap)
-global _V2V1_DynamicHotstringsKeyMap     := _BuildInverseRenameMap(_V1V2_DynamicHotstringsKeyMap)
+global _ManifestToLegacyLayoutKeyMap                := _BuildInverseRenameMap(_LegacyLayoutKeyMap)
+global _ManifestToLegacyShortcutsBoolKeyMap         := _BuildInverseRenameMap(_LegacyShortcutsBoolKeyMap)
+global _ManifestToLegacyShortcutsAlphaKeyMap        := _BuildInverseRenameMap(_LegacyShortcutsAlphaKeyMap)
+global _ManifestToLegacyShortcutsSubMapGroupMap     := _BuildInverseRenameMap(_LegacyShortcutsSubMapGroupMap)
+global _ManifestToLegacyShortcutsSubMapKeyMap       := _BuildInverseRenameMap(_LegacyShortcutsSubMapKeyMap)
+global _ManifestToLegacyAutocorrectionKeyMap        := _BuildInverseRenameMap(_LegacyAutocorrectionKeyMap)
+global _ManifestToLegacyDistancesReductionKeyMap    := _BuildInverseRenameMap(_LegacyDistancesReductionKeyMap)
+global _ManifestToLegacySFBsReductionKeyMap         := _BuildInverseRenameMap(_LegacySFBsReductionKeyMap)
+global _ManifestToLegacyRollsKeyMap                 := _BuildInverseRenameMap(_LegacyRollsKeyMap)
+global _ManifestToLegacyMagicKeyKeyMap              := _BuildInverseRenameMap(_LegacyMagicKeyKeyMap)
+global _ManifestToLegacyDynamicHotstringsKeyMap     := _BuildInverseRenameMap(_LegacyDynamicHotstringsKeyMap)
 
 ; Translate a v1 dotted feature path (e.g. ``Layout.ErgoptiBase``,
 ; ``Shortcuts.MicrosoftBold``, ``Shortcuts.AltGrLAlt.BackSpace``) into the
 ; canonical v2 manifest path (``ahk.layout.ergopti_base``, ``shortcuts.microsoft_bold``,
 ; ``ahk.shortcuts.alt_gr_lalt.backspace``). Used by the menu builder to
 ; locate the corresponding manifest entry (for description_key resolution)
-; without going through the full TranslateV1ToV2 dispatcher which is
+; without going through the full TranslateLegacyPath dispatcher which is
 ; tailored for write ops.
 ;
 ; Returns "" when the v1 path has no manifest counterpart (e.g. TapHolds
 ; or runtime-discovered Personal entries).
-V1PathToV2ManifestPath(V1Path) {
-    Loc := TranslateV1ToV2(V1Path . ".Enabled")
+LegacyPathToManifestPath(V1Path) {
+    Loc := TranslateLegacyPath(V1Path . ".Enabled")
     if (Loc == false) {
         return ""
     }
@@ -274,12 +274,12 @@ V1PathToV2ManifestPath(V1Path) {
 ; Returns "" when the v2 path does not have a v1 counterpart in the rename
 ; tables (e.g. runtime-discovered Personal entries — those keep their
 ; lowercase id verbatim under ``Personal.<id>`` already).
-V2PathToV1Path(V2Path) {
-    global _V2V1_LayoutKeyMap, _V2V1_ShortcutsBoolKeyMap
-    global _V2V1_ShortcutsAlphaKeyMap, _V2V1_ShortcutsSubMapGroupMap
-    global _V2V1_ShortcutsSubMapKeyMap, _V2V1_AutocorrectionKeyMap
-    global _V2V1_DistancesReductionKeyMap, _V2V1_SFBsReductionKeyMap
-    global _V2V1_RollsKeyMap, _V2V1_MagicKeyKeyMap, _V2V1_DynamicHotstringsKeyMap
+ManifestPathToLegacyPath(V2Path) {
+    global _ManifestToLegacyLayoutKeyMap, _ManifestToLegacyShortcutsBoolKeyMap
+    global _ManifestToLegacyShortcutsAlphaKeyMap, _ManifestToLegacyShortcutsSubMapGroupMap
+    global _ManifestToLegacyShortcutsSubMapKeyMap, _ManifestToLegacyAutocorrectionKeyMap
+    global _ManifestToLegacyDistancesReductionKeyMap, _ManifestToLegacySFBsReductionKeyMap
+    global _ManifestToLegacyRollsKeyMap, _ManifestToLegacyMagicKeyKeyMap, _ManifestToLegacyDynamicHotstringsKeyMap
 
     Parts := StrSplit(V2Path, ".")
     if (Parts.Length < 2) {
@@ -302,8 +302,8 @@ V2PathToV1Path(V2Path) {
     Top := Parts[1]
 
     ; ── Layout ────────────────────────────────────────────────
-    if (Top == "layout" and Parts.Length == 2 and _V2V1_LayoutKeyMap.Has(Parts[2])) {
-        return "Layout." . _V2V1_LayoutKeyMap[Parts[2]]
+    if (Top == "layout" and Parts.Length == 2 and _ManifestToLegacyLayoutKeyMap.Has(Parts[2])) {
+        return "Layout." . _ManifestToLegacyLayoutKeyMap[Parts[2]]
     }
 
     ; ── Gestures master toggle ────────────────────────────────
@@ -314,27 +314,27 @@ V2PathToV1Path(V2Path) {
     ; ── Shortcuts ────────────────────────────────────────────
     if (Top == "shortcuts") {
         ; Plain bool: shortcuts.<id>
-        if (Parts.Length == 2 and _V2V1_ShortcutsBoolKeyMap.Has(Parts[2])) {
-            return "Shortcuts." . _V2V1_ShortcutsBoolKeyMap[Parts[2]]
+        if (Parts.Length == 2 and _ManifestToLegacyShortcutsBoolKeyMap.Has(Parts[2])) {
+            return "Shortcuts." . _ManifestToLegacyShortcutsBoolKeyMap[Parts[2]]
         }
         ; Modélisation α: shortcuts.<alpha> (legacy callbacks toggle .Enabled)
-        if (Parts.Length == 2 and _V2V1_ShortcutsAlphaKeyMap.Has(Parts[2])) {
-            return "Shortcuts." . _V2V1_ShortcutsAlphaKeyMap[Parts[2]]
+        if (Parts.Length == 2 and _ManifestToLegacyShortcutsAlphaKeyMap.Has(Parts[2])) {
+            return "Shortcuts." . _ManifestToLegacyShortcutsAlphaKeyMap[Parts[2]]
         }
         ; Sub-Map group: shortcuts.<group>.<key>.
-        ; ``_V2V1_ShortcutsSubMapGroupMap`` is the inverse of the forward
+        ; ``_ManifestToLegacyShortcutsSubMapGroupMap`` is the inverse of the forward
         ; rename map whose VALUES are full v2 section paths
         ; (``ahk.shortcuts.alt_gr_lalt`` etc.) — kept that way because
-        ; TranslateV1ToV2 emits them as TOML section headers verbatim.
+        ; TranslateLegacyPath emits them as TOML section headers verbatim.
         ; The inverse therefore keys on the full path; the bare group
         ; segment in ``Parts[2]`` doesn't match, so reconstruct the full
         ; section path for the lookup.
         if (Parts.Length == 3) {
             FullSection := "ahk.shortcuts." . Parts[2]
-            if (_V2V1_ShortcutsSubMapGroupMap.Has(FullSection)
-                and _V2V1_ShortcutsSubMapKeyMap.Has(Parts[3])) {
-                return "Shortcuts." . _V2V1_ShortcutsSubMapGroupMap[FullSection]
-                    . "." . _V2V1_ShortcutsSubMapKeyMap[Parts[3]]
+            if (_ManifestToLegacyShortcutsSubMapGroupMap.Has(FullSection)
+                and _ManifestToLegacyShortcutsSubMapKeyMap.Has(Parts[3])) {
+                return "Shortcuts." . _ManifestToLegacyShortcutsSubMapGroupMap[FullSection]
+                    . "." . _ManifestToLegacyShortcutsSubMapKeyMap[Parts[3]]
             }
         }
         return ""
@@ -346,23 +346,23 @@ V2PathToV1Path(V2Path) {
         V2Id  := Parts[3]
         switch V2Cat {
             case "autocorrection":
-                if _V2V1_AutocorrectionKeyMap.Has(V2Id)
-                    return "Autocorrection." . _V2V1_AutocorrectionKeyMap[V2Id]
+                if _ManifestToLegacyAutocorrectionKeyMap.Has(V2Id)
+                    return "Autocorrection." . _ManifestToLegacyAutocorrectionKeyMap[V2Id]
             case "distances_reduction":
-                if _V2V1_DistancesReductionKeyMap.Has(V2Id)
-                    return "DistancesReduction." . _V2V1_DistancesReductionKeyMap[V2Id]
+                if _ManifestToLegacyDistancesReductionKeyMap.Has(V2Id)
+                    return "DistancesReduction." . _ManifestToLegacyDistancesReductionKeyMap[V2Id]
             case "sfbs_reduction":
-                if _V2V1_SFBsReductionKeyMap.Has(V2Id)
-                    return "SFBsReduction." . _V2V1_SFBsReductionKeyMap[V2Id]
+                if _ManifestToLegacySFBsReductionKeyMap.Has(V2Id)
+                    return "SFBsReduction." . _ManifestToLegacySFBsReductionKeyMap[V2Id]
             case "rolls":
-                if _V2V1_RollsKeyMap.Has(V2Id)
-                    return "Rolls." . _V2V1_RollsKeyMap[V2Id]
+                if _ManifestToLegacyRollsKeyMap.Has(V2Id)
+                    return "Rolls." . _ManifestToLegacyRollsKeyMap[V2Id]
             case "magic_key":
-                if _V2V1_MagicKeyKeyMap.Has(V2Id)
-                    return "MagicKey." . _V2V1_MagicKeyKeyMap[V2Id]
+                if _ManifestToLegacyMagicKeyKeyMap.Has(V2Id)
+                    return "MagicKey." . _ManifestToLegacyMagicKeyKeyMap[V2Id]
             case "dynamic":
-                if _V2V1_DynamicHotstringsKeyMap.Has(V2Id)
-                    return "DynamicHotstrings." . _V2V1_DynamicHotstringsKeyMap[V2Id]
+                if _ManifestToLegacyDynamicHotstringsKeyMap.Has(V2Id)
+                    return "DynamicHotstrings." . _ManifestToLegacyDynamicHotstringsKeyMap[V2Id]
             case "personal":
                 ; Runtime-discovered — the v2 id IS the v1 PascalCase tail
                 ; lowercased; keep it verbatim. The menu walker handles
@@ -380,33 +380,33 @@ V2PathToV1Path(V2Path) {
 
 ; ==============================================================
 ; ==============================================================
-; ======= 2/ TranslateV1ToV2 =======
+; ======= 2/ TranslateLegacyPath =======
 ; ==============================================================
 ; ==============================================================
 
 ; Translate a dotted v1 path (as used by ``GetFeatureByPath`` in
-; ui/tray_menu.ahk) into the v2 location info needed to mutate FeaturesV2
+; ui/tray_menu.ahk) into the v2 location info needed to mutate Features
 ; and emit the canonical v2 TOML section.
 ;
 ; Returns a Map with:
 ;   "section"  -> v2 section header, e.g. "shortcuts" or "ahk.shortcuts.alt_gr_lalt"
 ;                  or "hotstrings.autocorrection.accents"
 ;   "key"      -> v2 leaf key, e.g. "microsoft_bold", "backspace", "enabled"
-;   "v2_node"  -> FeaturesV2 sub-Map containing the leaf (for in-memory mutation)
+;   "v2_node"  -> Features sub-Map containing the leaf (for in-memory mutation)
 ;   "is_alpha" -> true if the v2 entry is a Map (Modélisation α with .enabled
 ;                  sub-key); false if the leaf is a plain bool at section level.
 ;
 ; Returns ``false`` when the v1 path doesn't have a known v2 equivalent.
-TranslateV1ToV2(V1Path) {
-    global FeaturesV2
-    global _V1V2_TopCategoryMap, _V1V2_LayoutKeyMap
-    global _V1V2_ShortcutsBoolKeyMap, _V1V2_ShortcutsAlphaKeyMap
-    global _V1V2_ShortcutsSubMapGroupMap, _V1V2_ShortcutsSubMapKeyMap
-    global _V1V2_AutocorrectionKeyMap, _V1V2_DistancesReductionKeyMap
-    global _V1V2_SFBsReductionKeyMap, _V1V2_RollsKeyMap
-    global _V1V2_MagicKeyKeyMap, _V1V2_DynamicHotstringsKeyMap
+TranslateLegacyPath(V1Path) {
+    global Features
+    global _LegacyTopCategoryMap, _LegacyLayoutKeyMap
+    global _LegacyShortcutsBoolKeyMap, _LegacyShortcutsAlphaKeyMap
+    global _LegacyShortcutsSubMapGroupMap, _LegacyShortcutsSubMapKeyMap
+    global _LegacyAutocorrectionKeyMap, _LegacyDistancesReductionKeyMap
+    global _LegacySFBsReductionKeyMap, _LegacyRollsKeyMap
+    global _LegacyMagicKeyKeyMap, _LegacyDynamicHotstringsKeyMap
 
-    if !IsSet(FeaturesV2) {
+    if !IsSet(Features) {
         return false
     }
 
@@ -434,17 +434,17 @@ TranslateV1ToV2(V1Path) {
     ; ── Layout (flat) ─────────────────────────────────────────
     if (Top == "Layout") {
         V1Key := Parts[2]
-        if !_V1V2_LayoutKeyMap.Has(V1Key) {
+        if !_LegacyLayoutKeyMap.Has(V1Key) {
             return false
         }
-        V2Key := _V1V2_LayoutKeyMap[V1Key]
-        if !FeaturesV2.Has("layout") {
+        V2Key := _LegacyLayoutKeyMap[V1Key]
+        if !Features.Has("layout") {
             return false
         }
         return Map(
             "section", "ahk.layout",
             "key",     V2Key,
-            "v2_node", FeaturesV2["layout"],
+            "v2_node", Features["layout"],
             "is_alpha", false,
         )
     }
@@ -453,13 +453,13 @@ TranslateV1ToV2(V1Path) {
     if (Top == "Gestures") {
         V1Key := Parts[2]
         if (V1Key == "Enabled") {
-            if !FeaturesV2.Has("gestures") {
+            if !Features.Has("gestures") {
                 return false
             }
             return Map(
                 "section", "ahk.gestures",
                 "key",     "enabled",
-                "v2_node", FeaturesV2["gestures"],
+                "v2_node", Features["gestures"],
                 "is_alpha", false,
             )
         }
@@ -468,7 +468,7 @@ TranslateV1ToV2(V1Path) {
 
     ; ── Shortcuts (mix of plain bools, Modélisation α and sub-Maps) ──
     if (Top == "Shortcuts") {
-        if !FeaturesV2.Has("shortcuts") {
+        if !Features.Has("shortcuts") {
             return false
         }
         V1Key := Parts[2]
@@ -477,46 +477,46 @@ TranslateV1ToV2(V1Path) {
         ; RegisterPersonalFeature. Their ids are user-controlled so we
         ; preserve them verbatim under [ahk.shortcuts.personal].
         if (V1Key == "Personal" and Parts.Length >= 3) {
-            if !FeaturesV2["shortcuts"].Has("personal") or !IsObject(FeaturesV2["shortcuts"]["personal"]) {
-                FeaturesV2["shortcuts"]["personal"] := Map()
+            if !Features["shortcuts"].Has("personal") or !IsObject(Features["shortcuts"]["personal"]) {
+                Features["shortcuts"]["personal"] := Map()
             }
             UserName := Parts[3]
-            if !FeaturesV2["shortcuts"]["personal"].Has(UserName) {
-                FeaturesV2["shortcuts"]["personal"][UserName] := false
+            if !Features["shortcuts"]["personal"].Has(UserName) {
+                Features["shortcuts"]["personal"][UserName] := false
             }
             return Map(
                 "section", "ahk.shortcuts.personal",
                 "key",     UserName,
-                "v2_node", FeaturesV2["shortcuts"]["personal"],
+                "v2_node", Features["shortcuts"]["personal"],
                 "is_alpha", false,
             )
         }
 
         ; Sub-Map case: Shortcuts.<Group>.<Key>
-        if (Parts.Length == 3 and _V1V2_ShortcutsSubMapGroupMap.Has(V1Key)) {
-            V2Section := _V1V2_ShortcutsSubMapGroupMap[V1Key]
+        if (Parts.Length == 3 and _LegacyShortcutsSubMapGroupMap.Has(V1Key)) {
+            V2Section := _LegacyShortcutsSubMapGroupMap[V1Key]
             V1SubKey := Parts[3]
-            if !_V1V2_ShortcutsSubMapKeyMap.Has(V1SubKey) {
+            if !_LegacyShortcutsSubMapKeyMap.Has(V1SubKey) {
                 return false
             }
-            V2Key := _V1V2_ShortcutsSubMapKeyMap[V1SubKey]
-            ; Walk to FeaturesV2["shortcuts"][<v2_group>]
+            V2Key := _LegacyShortcutsSubMapKeyMap[V1SubKey]
+            ; Walk to Features["shortcuts"][<v2_group>]
             V2GroupKey := StrSplit(V2Section, ".")[3]   ; "alt_gr_caps_lock" / ...
-            if !FeaturesV2["shortcuts"].Has(V2GroupKey) {
+            if !Features["shortcuts"].Has(V2GroupKey) {
                 return false
             }
             return Map(
                 "section", V2Section,
                 "key",     V2Key,
-                "v2_node", FeaturesV2["shortcuts"][V2GroupKey],
+                "v2_node", Features["shortcuts"][V2GroupKey],
                 "is_alpha", false,
             )
         }
 
         ; Modélisation α case: Shortcuts.<Alpha>.<Prop> or Shortcuts.<Alpha>
-        if _V1V2_ShortcutsAlphaKeyMap.Has(V1Key) {
-            V2Sub := _V1V2_ShortcutsAlphaKeyMap[V1Key]
-            if !FeaturesV2["shortcuts"].Has(V2Sub) {
+        if _LegacyShortcutsAlphaKeyMap.Has(V1Key) {
+            V2Sub := _LegacyShortcutsAlphaKeyMap[V1Key]
+            if !Features["shortcuts"].Has(V2Sub) {
                 return false
             }
             ; Path is Shortcuts.<Alpha> alone — points at the .enabled flag
@@ -526,31 +526,31 @@ TranslateV1ToV2(V1Path) {
                 return Map(
                     "section", "shortcuts." V2Sub,
                     "key",     "enabled",
-                    "v2_node", FeaturesV2["shortcuts"][V2Sub],
+                    "v2_node", Features["shortcuts"][V2Sub],
                     "is_alpha", true,
                 )
             }
             ; Path is Shortcuts.<Alpha>.<Prop> — explicit property mutation.
             V1Prop := Parts[3]
-            if !_V1V2_ShortcutsAlphaPropMap.Has(V1Prop) {
+            if !_LegacyShortcutsAlphaPropMap.Has(V1Prop) {
                 return false
             }
-            V2Prop := _V1V2_ShortcutsAlphaPropMap[V1Prop]
+            V2Prop := _LegacyShortcutsAlphaPropMap[V1Prop]
             return Map(
                 "section", "shortcuts." V2Sub,
                 "key",     V2Prop,
-                "v2_node", FeaturesV2["shortcuts"][V2Sub],
+                "v2_node", Features["shortcuts"][V2Sub],
                 "is_alpha", true,
             )
         }
 
         ; Plain bool: Shortcuts.<V1Key>
-        if _V1V2_ShortcutsBoolKeyMap.Has(V1Key) {
-            V2Key := _V1V2_ShortcutsBoolKeyMap[V1Key]
+        if _LegacyShortcutsBoolKeyMap.Has(V1Key) {
+            V2Key := _LegacyShortcutsBoolKeyMap[V1Key]
             return Map(
                 "section", "shortcuts",
                 "key",     V2Key,
-                "v2_node", FeaturesV2["shortcuts"],
+                "v2_node", Features["shortcuts"],
                 "is_alpha", false,
             )
         }
@@ -559,7 +559,7 @@ TranslateV1ToV2(V1Path) {
     }
 
     ; ── Hotstrings categories ─────────────────────────────────
-    if !FeaturesV2.Has("hotstrings") {
+    if !Features.Has("hotstrings") {
         return false
     }
     V1Cat := Top
@@ -567,22 +567,22 @@ TranslateV1ToV2(V1Path) {
     V2Cat := false
     switch V1Cat {
         case "Autocorrection":
-            KeyMap := _V1V2_AutocorrectionKeyMap
+            KeyMap := _LegacyAutocorrectionKeyMap
             V2Cat := "autocorrection"
         case "DistancesReduction":
-            KeyMap := _V1V2_DistancesReductionKeyMap
+            KeyMap := _LegacyDistancesReductionKeyMap
             V2Cat := "distances_reduction"
         case "SFBsReduction":
-            KeyMap := _V1V2_SFBsReductionKeyMap
+            KeyMap := _LegacySFBsReductionKeyMap
             V2Cat := "sfbs_reduction"
         case "Rolls":
-            KeyMap := _V1V2_RollsKeyMap
+            KeyMap := _LegacyRollsKeyMap
             V2Cat := "rolls"
         case "MagicKey":
-            KeyMap := _V1V2_MagicKeyKeyMap
+            KeyMap := _LegacyMagicKeyKeyMap
             V2Cat := "magic_key"
         case "DynamicHotstrings":
-            KeyMap := _V1V2_DynamicHotstringsKeyMap
+            KeyMap := _LegacyDynamicHotstringsKeyMap
             V2Cat := "dynamic"
     }
     if (KeyMap != false) {
@@ -591,24 +591,24 @@ TranslateV1ToV2(V1Path) {
             return false
         }
         V2Id := KeyMap[V1Key]
-        if !FeaturesV2["hotstrings"].Has(V2Cat) {
+        if !Features["hotstrings"].Has(V2Cat) {
             return false
         }
-        if !FeaturesV2["hotstrings"][V2Cat].Has(V2Id) {
+        if !Features["hotstrings"][V2Cat].Has(V2Id) {
             return false
         }
         ; Each hotstring entry is a Map with .enabled — Modélisation α.
         return Map(
             "section", "hotstrings." V2Cat "." V2Id,
             "key",     "enabled",
-            "v2_node", FeaturesV2["hotstrings"][V2Cat][V2Id],
+            "v2_node", Features["hotstrings"][V2Cat][V2Id],
             "is_alpha", true,
         )
     }
 
     ; ── Personal (runtime-discovered hotstrings sections) ────
     if (V1Cat == "Personal") {
-        if !FeaturesV2["hotstrings"].Has("personal") {
+        if !Features["hotstrings"].Has("personal") {
             return false
         }
         ; The v1 PascalCase FeatKey is built by BootstrapPersonalFeatures
@@ -618,15 +618,15 @@ TranslateV1ToV2(V1Path) {
         ; needed for the translation.
         V1Key := Parts[2]
         V2Id := StrLower(V1Key)
-        if !FeaturesV2["hotstrings"]["personal"].Has(V2Id) {
+        if !Features["hotstrings"]["personal"].Has(V2Id) {
             ; Lazily seed the v2 personal entry so the first toggle on a
             ; runtime-discovered section can persist.
-            FeaturesV2["hotstrings"]["personal"][V2Id] := Map("enabled", true)
+            Features["hotstrings"]["personal"][V2Id] := Map("enabled", true)
         }
         return Map(
             "section", "hotstrings.personal." V2Id,
             "key",     "enabled",
-            "v2_node", FeaturesV2["hotstrings"]["personal"][V2Id],
+            "v2_node", Features["hotstrings"]["personal"][V2Id],
             "is_alpha", true,
         )
     }
@@ -639,29 +639,29 @@ TranslateV1ToV2(V1Path) {
 
 ; ==============================================================
 ; ==============================================================
-; ======= 3/ WriteV2Update / WriteV2BatchFromV1Paths =======
+; ======= 3/ WriteFeatureUpdate / WriteFeatureBatchFromV1Paths =======
 ; ==============================================================
 ; ==============================================================
 
-; Apply a single v1-path mutation to both the in-memory FeaturesV2 Map and
+; Apply a single v1-path mutation to both the in-memory Features Map and
 ; the on-disk config.toml. Returns true on success.
 ;
 ; ``V1Path``  — dotted v1 feature path (e.g. "Shortcuts.MicrosoftBold").
 ; ``Value``   — the new value (typically a bool, sometimes a string for
 ;                ``letter`` / ``link`` / etc.).
-WriteV2Update(V1Path, Value) {
+WriteFeatureUpdate(V1Path, Value) {
     global ConfigurationFile
     ; TapHolds — delegate to the dedicated writer (tap_hold.toml).
     if (StrLen(V1Path) >= 9 and SubStr(V1Path, 1, 9) == "TapHolds.") {
         return WriteTapHoldBatch([Map("v1_path", V1Path, "value", Value)]) > 0
     }
-    Loc := TranslateV1ToV2(V1Path)
+    Loc := TranslateLegacyPath(V1Path)
     if (Loc == false) {
         try LoggerWarn("V1V2Translator",
-            "WriteV2Update: no v2 equivalent for '{1}' — skipped.", V1Path)
+            "WriteFeatureUpdate: no v2 equivalent for '{1}' — skipped.", V1Path)
         return false
     }
-    ; Mutate FeaturesV2 in memory.
+    ; Mutate Features in memory.
     V2Node := Loc["v2_node"]
     K := Loc["key"]
     if (Type(V2Node) == "Map") {
@@ -674,7 +674,7 @@ WriteV2Update(V1Path, Value) {
     return true
 }
 
-; Read the runtime state of a feature from FeaturesV2 via the path translator.
+; Read the runtime state of a feature from Features via the path translator.
 ; Returns a Map keyed by v1 PascalCase property names (Enabled, Letter, Link,
 ; SearchEngine, DatedNotes, …) — only keys present in the v2 node are populated,
 ; so callers can use ``State.Has("Letter")`` exactly like the legacy
@@ -683,9 +683,9 @@ WriteV2Update(V1Path, Value) {
 ; Returns an empty Map when the v1 path has no v2 equivalent (e.g. TapHolds or
 ; runtime-discovered Personal entries). Callers must fall back to whatever
 ; default makes sense for that case.
-GetFeatureV2State(V1Path) {
+GetFeatureState(V1Path) {
     State := Map()
-    Loc := TranslateV1ToV2(V1Path . ".Enabled")
+    Loc := TranslateLegacyPath(V1Path . ".Enabled")
     if (Loc == false) {
         return State
     }
@@ -737,7 +737,7 @@ GetFeatureV2State(V1Path) {
 ;     doesn't have a 1:1 mapping from the per-variant toggles emitted by
 ;     the tray menu.
 ; Each entry is a Map("v1_path"=>"…", "value"=>…).
-WriteV2Batch(Entries) {
+WriteFeatureBatch(Entries) {
     global ConfigurationFile
     Updates := []
     TapHoldEntries := []
@@ -751,10 +751,10 @@ WriteV2Batch(Entries) {
             TapHoldEntries.Push(Entry)
             continue
         }
-        Loc := TranslateV1ToV2(V1Path)
+        Loc := TranslateLegacyPath(V1Path)
         if (Loc == false) {
             try LoggerWarn("V1V2Translator",
-                "WriteV2Batch: no v2 equivalent for '{1}' — skipped.", V1Path)
+                "WriteFeatureBatch: no v2 equivalent for '{1}' — skipped.", V1Path)
             continue
         }
         V2Node := Loc["v2_node"]

@@ -32,7 +32,7 @@ SetWorkingDir(A_ScriptDir)
 ; subsequent file registers its cases or invokes assertions inside lambdas.
 #Include test_framework.ahk
 
-; Stubs second — they define ScriptInformation, FeaturesV2, SendNewResult,
+; Stubs second — they define ScriptInformation, Features, SendNewResult,
 ; WrapTextIfSelected, DeadKey, ToggleCapsLock, etc., which lib/ files
 ; reference at definition (Bind) time or at call time during tests.
 #Include test_stubs.ahk
@@ -42,9 +42,9 @@ SetWorkingDir(A_ScriptDir)
 #Include ../lib/toml/toml_helpers.ahk
 #Include ../lib/active_app_cache.ahk
 #Include ../lib/hotstrings/hotstring_engine.ahk
-#Include ../lib/hotstrings/hotstring_engine_v2.ahk
+#Include ../lib/hotstrings/hotstring_engine_main.ahk
 #Include ../lib/toml/toml_loader.ahk
-#Include ../lib/toml/toml_loader_v2.ahk
+#Include ../lib/toml/toml_config_loader.ahk
 #Include ../lib/tap_hold/tap_hold_loader.ahk
 #Include ../lib/manifest_reader.ahk
 #Include ../lib/hotstrings/hotstrings_config.ahk
@@ -65,14 +65,14 @@ InstallHotstringHooks()
 ; ── Per-module test files (each registers Test() cases) ──
 #Include test_logger.ahk
 #Include test_hotstring_engine.ahk
-#Include test_hotstring_engine_v2.ahk
+#Include test_hotstring_engine_main.ahk
 #Include test_toml_loader.ahk
 #Include test_hotstrings_config.ahk
 #Include test_personal_toml_editor.ahk
 #Include test_layout_tables.ahk
 #Include test_active_app_cache.ahk
 #Include test_config.ahk
-#Include test_features_manifest_v2.ahk
+#Include test_features_manifest.ahk
 #Include test_hotstrings_full.ahk
 
 ; Gestures module — included here because its pure logic (assignments, action

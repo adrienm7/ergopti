@@ -13,9 +13,9 @@
 ;    layout.ahk's RemapKey calls AND in a duplicate table inside the
 ;    keylogger prefetch — drift was easy. Now there is exactly one
 ;    authoritative Map.
-; 2. Live FeaturesV2 lookup: keys whose output is user-configurable
+; 2. Live Features lookup: keys whose output is user-configurable
 ;    (è / ê / é / à) read their current value from
-;    FeaturesV2["shortcuts"][...]["letter"] at call time, so menu changes
+;    Features["shortcuts"][...]["letter"] at call time, so menu changes
 ;    take effect immediately without any extra wiring.
 ; 3. Dead-key entries kept separate: the diaeresis / circumflex keys
 ;    are bound through a custom Hotkey() call (DeadKey state machine),
@@ -35,24 +35,24 @@
 ; ============================================
 
 ; Reads the configurable target letter for an accented base-layer key from
-; ``FeaturesV2["shortcuts"][Key]["letter"]`` — falls back to ``Fallback``
+; ``Features["shortcuts"][Key]["letter"]`` — falls back to ``Fallback``
 ; when the v2 entry is unset or shape-mismatched. Kept as a named function
 ; rather than an inline arrow lambda so the closure semantics around the
-; ``FeaturesV2`` global are unambiguous (the arrow form silently captured
-; ``FeaturesV2`` from the enclosing function's local scope, which in some
+; ``Features`` global are unambiguous (the arrow form silently captured
+; ``Features`` from the enclosing function's local scope, which in some
 ; AHK v2 builds short-circuited the read and always returned the fallback).
 _ErgoptiLetterOr(Key, Fallback) {
-	global FeaturesV2
-	if !IsSet(FeaturesV2) {
+	global Features
+	if !IsSet(Features) {
 		return Fallback
 	}
-	if !FeaturesV2.Has("shortcuts") {
+	if !Features.Has("shortcuts") {
 		return Fallback
 	}
-	if !FeaturesV2["shortcuts"].Has(Key) {
+	if !Features["shortcuts"].Has(Key) {
 		return Fallback
 	}
-	Entry := FeaturesV2["shortcuts"][Key]
+	Entry := Features["shortcuts"][Key]
 	if !IsObject(Entry) {
 		return Fallback
 	}
@@ -66,7 +66,7 @@ _ErgoptiLetterOr(Key, Fallback) {
 ; Hex equivalents shown alongside for cross-reference with the
 ; ``RemapKey("SC0xx", …)`` calls that used to live in layout.ahk.
 ;
-; Values that read from FeaturesV2["shortcuts"][...]["letter"] are wrapped
+; Values that read from Features["shortcuts"][...]["letter"] are wrapped
 ; in a tiny object so layout.ahk can pick up the configurable Letter
 ; AND the historical fallback character that ``RemapKey`` keeps as the
 ; AlternativeCharacter argument. Plain strings are passed through.

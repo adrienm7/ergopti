@@ -1,13 +1,13 @@
-; drivers/autohotkey/lib/toml/toml_loader_v2.ahk
+; drivers/autohotkey/lib/toml/toml_config_loader.ahk
 
 ; ==============================================================================
-; MODULE: TOML Loader v2
+; MODULE: TOML Config Loader
 ; DESCRIPTION:
-; Reads the v2 user ``config.toml`` produced by the first-boot generator from
+; Reads the user ``config.toml`` produced by the first-boot generator from
 ; ``_shared/features/manifest.toml``. Distinct from the legacy ``toml_loader.ahk``
-; which only handles flat ``[script]``/``[features]`` overrides — v2 supports
-; arbitrarily nested sections (``[hotstrings.autocorrection.accents]``) and
-; simple array values (``val_modifiers = ["alt"]``).
+; which only handles flat ``[script]``/``[features]`` overrides — this loader
+; supports arbitrarily nested sections (``[hotstrings.autocorrection.accents]``)
+; and simple array values (``val_modifiers = ["alt"]``).
 ;
 ; FEATURES & RATIONALE:
 ; 1. Strips the ``ahk.`` prefix on section headers so a v2 source section like
@@ -32,10 +32,10 @@
 ; ==============================================================
 ; ==============================================================
 
-; Coerce a raw TOML literal to an AHK value. Extends the v1 ``TomlCoerceValue``
+; Coerce a raw TOML literal to an AHK value. Extends the base ``TomlCoerceValue``
 ; with single-line array support (``[a, b, c]``). Nested arrays and inline
 ; tables are intentionally NOT supported here — keep the user config simple.
-TomlCoerceValueV2(Raw) {
+TomlCoerceValueExt(Raw) {
 	Trimmed := Trim(Raw, " `t")
 
 	; Array literal — naive single-line split on commas. Acceptable because the
@@ -47,7 +47,7 @@ TomlCoerceValueV2(Raw) {
 		Result := []
 		if (Trim(Inner) != "") {
 			for Item in StrSplit(Inner, ",") {
-				Result.Push(TomlCoerceValueV2(Trim(Item, " `t")))
+				Result.Push(TomlCoerceValueExt(Trim(Item, " `t")))
 			}
 		}
 		return Result
@@ -80,14 +80,14 @@ TomlCoerceValueV2(Raw) {
 ; ``{Enabled: True}`` object literals with plain booleans, breaking every
 ; downstream ``.Enabled`` access (discovered the hard way during Phase 1
 ; of the sliced cut-over). During the cut-over production passes
-; ``FeaturesV2``; tests pass their isolated Map fixture.
-ApplyConfigTomlV2(Features, FilePath) {
+; ``Features``; tests pass their isolated Map fixture.
+ApplyConfigToml(Features, FilePath) {
 	Applied := 0
 	if !FileExist(FilePath) {
-		try LoggerDebug("TomlLoaderV2", "v2 config.toml not found at '{1}' — skipping.", FilePath)
+		try LoggerDebug("TomlConfigLoader", "v2 config.toml not found at '{1}' — skipping.", FilePath)
 		return Applied
 	}
-	try LoggerStart("TomlLoaderV2", "Applying v2 config from '{1}'…", FilePath)
+	try LoggerStart("TomlConfigLoader", "Applying v2 config from '{1}'…", FilePath)
 
 	CurrentSection := ""
 	SkippingForeign := false
@@ -132,10 +132,10 @@ ApplyConfigTomlV2(Features, FilePath) {
 		; contain reserved characters (rare in the manifest-generated config).
 		if RegExMatch(Line, "^`"([^`"\\]+)`"\s*=\s*(.+)$", &Match) {
 			Key := Match[1]
-			Value := TomlCoerceValueV2(Match[2])
+			Value := TomlCoerceValueExt(Match[2])
 		} else if RegExMatch(Line, "^([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.+)$", &Match) {
 			Key := Match[1]
-			Value := TomlCoerceValueV2(Match[2])
+			Value := TomlCoerceValueExt(Match[2])
 		} else {
 			continue
 		}
@@ -160,7 +160,7 @@ ApplyConfigTomlV2(Features, FilePath) {
 			}
 		}
 		if Failed {
-			try LoggerWarn("TomlLoaderV2",
+			try LoggerWarn("TomlConfigLoader",
 				"v2 override skipped — unknown section path '{1}'.", CurrentSection)
 			continue
 		}
@@ -173,18 +173,18 @@ ApplyConfigTomlV2(Features, FilePath) {
 			} else if IsObject(Node) {
 				Node.%Key% := Value
 			} else {
-				try LoggerWarn("TomlLoaderV2",
+				try LoggerWarn("TomlConfigLoader",
 					"v2 override skipped — '[{1}]' is not an object.", CurrentSection)
 				continue
 			}
 			Applied++
-			try LoggerDebug("TomlLoaderV2", "[{1}].{2} = {3}.", CurrentSection, Key, Value)
+			try LoggerDebug("TomlConfigLoader", "[{1}].{2} = {3}.", CurrentSection, Key, Value)
 		} catch as e {
-			try LoggerWarn("TomlLoaderV2",
+			try LoggerWarn("TomlConfigLoader",
 				"v2 override failed for [{1}].{2}: {3}.", CurrentSection, Key, e.Message)
 		}
 	}
 
-	try LoggerSuccess("TomlLoaderV2", "v2 config applied ({1} value(s)).", Applied)
+	try LoggerSuccess("TomlConfigLoader", "v2 config applied ({1} value(s)).", Applied)
 	return Applied
 }

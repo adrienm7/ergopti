@@ -1,4 +1,4 @@
-﻿; static/drivers/autohotkey/modules/shortcuts.ahk
+; static/drivers/autohotkey/modules/shortcuts.ahk
 
 ; ==============================================================================
 ; MODULE: Shortcuts
@@ -55,25 +55,25 @@ LAltCapsLockShortcut() {
     ; All ten possible actions are simple, no Shift inversion or modifier
     ; bracketing needed — inline v2 if/else cascade (action table is the
     ; SIMPLE_ACTIONS Map that used to live in lib/dispatchers.ahk).
-    if FeaturesV2["shortcuts"]["lalt_caps_lock"]["backspace"] {
+    if Features["shortcuts"]["lalt_caps_lock"]["backspace"] {
         SendEvent("{BackSpace}")
-    } else if FeaturesV2["shortcuts"]["lalt_caps_lock"]["caps_lock"] {
+    } else if Features["shortcuts"]["lalt_caps_lock"]["caps_lock"] {
         ToggleCapsLock()
-    } else if FeaturesV2["shortcuts"]["lalt_caps_lock"]["caps_word"] {
+    } else if Features["shortcuts"]["lalt_caps_lock"]["caps_word"] {
         ToggleCapsWord()
-    } else if FeaturesV2["shortcuts"]["lalt_caps_lock"]["ctrl_backspace"] {
+    } else if Features["shortcuts"]["lalt_caps_lock"]["ctrl_backspace"] {
         SendInput("^{BackSpace}")
-    } else if FeaturesV2["shortcuts"]["lalt_caps_lock"]["ctrl_delete"] {
+    } else if Features["shortcuts"]["lalt_caps_lock"]["ctrl_delete"] {
         SendInput("^{Delete}")
-    } else if FeaturesV2["shortcuts"]["lalt_caps_lock"]["delete"] {
+    } else if Features["shortcuts"]["lalt_caps_lock"]["delete"] {
         SendInput("{Delete}")
-    } else if FeaturesV2["shortcuts"]["lalt_caps_lock"]["enter"] {
+    } else if Features["shortcuts"]["lalt_caps_lock"]["enter"] {
         SendInput("{Enter}")
-    } else if FeaturesV2["shortcuts"]["lalt_caps_lock"]["escape"] {
+    } else if Features["shortcuts"]["lalt_caps_lock"]["escape"] {
         SendInput("{Escape}")
-    } else if FeaturesV2["shortcuts"]["lalt_caps_lock"]["one_shot_shift"] {
+    } else if Features["shortcuts"]["lalt_caps_lock"]["one_shot_shift"] {
         OneShotShift()
-    } else if FeaturesV2["shortcuts"]["lalt_caps_lock"]["tab"] {
+    } else if Features["shortcuts"]["lalt_caps_lock"]["tab"] {
         SendInput("{Tab}")
     }
 }
@@ -84,14 +84,14 @@ LAltCapsLockShortcut() {
 ; =================================
 ; =================================
 
-if FeaturesV2["shortcuts"]["save"] {
+if Features["shortcuts"]["save"] {
     AddShortcut("^", "j", (*) => SendFinalResult("^s"))
 }
-if FeaturesV2["shortcuts"]["ctrl_j"] {
+if Features["shortcuts"]["ctrl_j"] {
     AddShortcut("^", "s", (*) => SendFinalResult("^j"))
 }
 
-if FeaturesV2["shortcuts"]["microsoft_bold"] {
+if Features["shortcuts"]["microsoft_bold"] {
     ; Makes it possible to use the standard shortcuts instead of their translation in Microsoft apps
     AddShortcut(
         "^", "b",
@@ -99,7 +99,7 @@ if FeaturesV2["shortcuts"]["microsoft_bold"] {
     )
 }
 
-if FeaturesV2["shortcuts"]["paste_without_formatting"] {
+if Features["shortcuts"]["paste_without_formatting"] {
     ; Ctrl + Shift + V — paste plain text everywhere except Excel, which keeps
     ; its native paste-special behaviour (re-assigning the standard combo there
     ; would break the user's expected workflow).
@@ -122,18 +122,18 @@ if FeaturesV2["shortcuts"]["paste_without_formatting"] {
 ; ==================================
 
 ; Pre-computed at boot — evaluated once instead of 10 OR comparisons per key press.
-global _ALTGR_LALT_ENABLED := _AnyV2ShortcutEnabled("alt_gr_lalt")
+global _ALTGR_LALT_ENABLED := _AnyShortcutEnabled("alt_gr_lalt")
 
 ; Returns true when at least one entry in
-; ``FeaturesV2["shortcuts"][<group>]`` is a true bool. Used by the boot-time
+; ``Features["shortcuts"][<group>]`` is a true bool. Used by the boot-time
 ; ``_ALTGR_*_ENABLED`` gates so the multi-OR check happens once instead of
 ; on every key press routed through the gated combo.
-_AnyV2ShortcutEnabled(Group) {
-    global FeaturesV2
-    if !FeaturesV2.Has("shortcuts") or !FeaturesV2["shortcuts"].Has(Group) {
+_AnyShortcutEnabled(Group) {
+    global Features
+    if !Features.Has("shortcuts") or !Features["shortcuts"].Has(Group) {
         return false
     }
-    for _Key, Val in FeaturesV2["shortcuts"][Group] {
+    for _Key, Val in Features["shortcuts"][Group] {
         if (Val = true) {
             return true
         }
@@ -157,7 +157,7 @@ IsAltGrLAltEnabled() {
 ; returns — keeps SC138 a vanilla key until the wizard is done.
 
 AltGrLAltShortcut() {
-    if FeaturesV2["shortcuts"]["alt_gr_lalt"]["backspace"] {
+    if Features["shortcuts"]["alt_gr_lalt"]["backspace"] {
         OneShotShiftFix()
         if GetKeyState("Shift", "P") {
             ; "Shift" + "AltGr" + "LAlt" = Ctrl + BackSpace (Can't use Ctrl because of AltGr = Ctrl + Alt)
@@ -165,11 +165,11 @@ AltGrLAltShortcut() {
         } else {
             SendInput("{BackSpace}")
         }
-    } else if FeaturesV2["shortcuts"]["alt_gr_lalt"]["caps_lock"] {
+    } else if Features["shortcuts"]["alt_gr_lalt"]["caps_lock"] {
         ToggleCapsLock()
-    } else if FeaturesV2["shortcuts"]["alt_gr_lalt"]["caps_word"] {
+    } else if Features["shortcuts"]["alt_gr_lalt"]["caps_word"] {
         ToggleCapsWord()
-    } else if FeaturesV2["shortcuts"]["alt_gr_lalt"]["ctrl_backspace"] {
+    } else if Features["shortcuts"]["alt_gr_lalt"]["ctrl_backspace"] {
         OneShotShiftFix()
         if GetKeyState("Shift", "P") {
             ; "Shift" + "AltGr" + "LAlt" = BackSpace (Can't use Ctrl because of AltGr = Ctrl + Alt)
@@ -177,7 +177,7 @@ AltGrLAltShortcut() {
         } else {
             SendInput("^{BackSpace}")
         }
-    } else if FeaturesV2["shortcuts"]["alt_gr_lalt"]["ctrl_delete"] {
+    } else if Features["shortcuts"]["alt_gr_lalt"]["ctrl_delete"] {
         ; "Shift" + "AltGr" + "LAlt" = Delete (Can't use Ctrl because of AltGr = Ctrl + Alt)
         OneShotShiftFix()
         if GetKeyState("Shift", "P") {
@@ -185,7 +185,7 @@ AltGrLAltShortcut() {
         } else {
             SendInput("^{Delete}")
         }
-    } else if FeaturesV2["shortcuts"]["alt_gr_lalt"]["delete"] {
+    } else if Features["shortcuts"]["alt_gr_lalt"]["delete"] {
         ; "Shift" + "AltGr" + "LAlt" = Ctrl + Delete (Can't use Ctrl because of AltGr = Ctrl + Alt)
         OneShotShiftFix()
         if GetKeyState("Shift", "P") {
@@ -193,18 +193,18 @@ AltGrLAltShortcut() {
         } else {
             SendInput("{Delete}")
         }
-    } else if FeaturesV2["shortcuts"]["alt_gr_lalt"]["enter"] {
+    } else if Features["shortcuts"]["alt_gr_lalt"]["enter"] {
         SendInput("{Enter}")
-    } else if FeaturesV2["shortcuts"]["alt_gr_lalt"]["escape"] {
+    } else if Features["shortcuts"]["alt_gr_lalt"]["escape"] {
         SendInput("{Escape}")
-    } else if FeaturesV2["shortcuts"]["alt_gr_lalt"]["one_shot_shift"] {
+    } else if Features["shortcuts"]["alt_gr_lalt"]["one_shot_shift"] {
         OneShotShift()
-    } else if FeaturesV2["shortcuts"]["alt_gr_lalt"]["tab"] {
+    } else if Features["shortcuts"]["alt_gr_lalt"]["tab"] {
         SendInput("{Tab}")
     }
 }
 
-global _ALTGR_CAPSLOCK_ENABLED := _AnyV2ShortcutEnabled("alt_gr_caps_lock")
+global _ALTGR_CAPSLOCK_ENABLED := _AnyShortcutEnabled("alt_gr_caps_lock")
 
 ; Wrapper required: #HotIf re-evaluates its expression every time the hotkey
 ; is tested. If the global is read before auto-execute has assigned it, AHK
@@ -220,25 +220,25 @@ IsAltGrCapsLockEnabled() {
 AltGrCapsLockShortcut() {
     ; Inline v2 if/else cascade — same 10-action surface as LAltCapsLockShortcut
     ; but reads from the alt_gr_caps_lock sub-Map.
-    if FeaturesV2["shortcuts"]["alt_gr_caps_lock"]["backspace"] {
+    if Features["shortcuts"]["alt_gr_caps_lock"]["backspace"] {
         SendEvent("{BackSpace}")
-    } else if FeaturesV2["shortcuts"]["alt_gr_caps_lock"]["caps_lock"] {
+    } else if Features["shortcuts"]["alt_gr_caps_lock"]["caps_lock"] {
         ToggleCapsLock()
-    } else if FeaturesV2["shortcuts"]["alt_gr_caps_lock"]["caps_word"] {
+    } else if Features["shortcuts"]["alt_gr_caps_lock"]["caps_word"] {
         ToggleCapsWord()
-    } else if FeaturesV2["shortcuts"]["alt_gr_caps_lock"]["ctrl_backspace"] {
+    } else if Features["shortcuts"]["alt_gr_caps_lock"]["ctrl_backspace"] {
         SendInput("^{BackSpace}")
-    } else if FeaturesV2["shortcuts"]["alt_gr_caps_lock"]["ctrl_delete"] {
+    } else if Features["shortcuts"]["alt_gr_caps_lock"]["ctrl_delete"] {
         SendInput("^{Delete}")
-    } else if FeaturesV2["shortcuts"]["alt_gr_caps_lock"]["delete"] {
+    } else if Features["shortcuts"]["alt_gr_caps_lock"]["delete"] {
         SendInput("{Delete}")
-    } else if FeaturesV2["shortcuts"]["alt_gr_caps_lock"]["enter"] {
+    } else if Features["shortcuts"]["alt_gr_caps_lock"]["enter"] {
         SendInput("{Enter}")
-    } else if FeaturesV2["shortcuts"]["alt_gr_caps_lock"]["escape"] {
+    } else if Features["shortcuts"]["alt_gr_caps_lock"]["escape"] {
         SendInput("{Escape}")
-    } else if FeaturesV2["shortcuts"]["alt_gr_caps_lock"]["one_shot_shift"] {
+    } else if Features["shortcuts"]["alt_gr_caps_lock"]["one_shot_shift"] {
         OneShotShift()
-    } else if FeaturesV2["shortcuts"]["alt_gr_caps_lock"]["tab"] {
+    } else if Features["shortcuts"]["alt_gr_caps_lock"]["tab"] {
         SendInput("{Tab}")
     }
 }
@@ -268,12 +268,12 @@ _RegisterAltGrShortcutsHotkeys()
 ; =================================
 ; =================================
 
-#HotIf FeaturesV2["shortcuts"]["win_caps_lock"]
+#HotIf Features["shortcuts"]["win_caps_lock"]
 ; Win + "CapsLock" to toggle CapsLock
 #SC03A:: ToggleCapsLock()
 #HotIf
 
-if FeaturesV2["shortcuts"]["select_line"] {
+if Features["shortcuts"]["select_line"] {
     ; Win + A (All)
     AddShortcut("#", "a", SelectLine)
 
@@ -282,17 +282,17 @@ if FeaturesV2["shortcuts"]["select_line"] {
     }
 }
 
-if FeaturesV2["shortcuts"]["screen"] {
+if Features["shortcuts"]["screen"] {
     ; Win + H (ScreensHot)
     AddShortcut("#", "h", (*) => SendFinalResult("#+s"))
 }
 
-if FeaturesV2["shortcuts"]["gpt"]["enabled"] {
+if Features["shortcuts"]["gpt"]["enabled"] {
     ; Win + G (GPT)
-    AddShortcut("#", "g", (*) => Run(FeaturesV2["shortcuts"]["gpt"]["link"]))
+    AddShortcut("#", "g", (*) => Run(Features["shortcuts"]["gpt"]["link"]))
 }
 
-if FeaturesV2["shortcuts"]["get_hex_value"] {
+if Features["shortcuts"]["get_hex_value"] {
     ; Win + X (heX)
     AddShortcut("#", "x", GetHexValue)
 
@@ -306,13 +306,13 @@ if FeaturesV2["shortcuts"]["get_hex_value"] {
     }
 }
 
-if FeaturesV2["shortcuts"]["take_note"]["enabled"] {
+if Features["shortcuts"]["take_note"]["enabled"] {
     ; Win + N (Note)
     AddShortcut("#", "n", TakeNote)
 
     TakeNote(*) {
         ; Determine the file name (with or without date)
-        if (FeaturesV2["shortcuts"]["take_note"]["dated_notes"]) {
+        if (Features["shortcuts"]["take_note"]["dated_notes"]) {
             Date := FormatTime(, "dd_MM_yyyy")
             FileName := "Notes_" Date ".txt"
         } else {
@@ -320,7 +320,7 @@ if FeaturesV2["shortcuts"]["take_note"]["enabled"] {
         }
 
         ; Build the full file path
-        FilePath := FeaturesV2["shortcuts"]["take_note"]["destination_folder"] "\" FileName
+        FilePath := Features["shortcuts"]["take_note"]["destination_folder"] "\" FileName
 
         ; Create the file if it doesn't exist yet
         if not FileExist(FilePath) {
@@ -357,7 +357,7 @@ if FeaturesV2["shortcuts"]["take_note"]["enabled"] {
     }
 }
 
-if FeaturesV2["shortcuts"]["move"] {
+if Features["shortcuts"]["move"] {
     ; Win + M (Move)
     AddShortcut("#", "m", ToggleActivitySimulation)
 
@@ -486,11 +486,11 @@ if FeaturesV2["shortcuts"]["move"] {
 
 }
 
-if FeaturesV2["shortcuts"]["surround_with_parentheses"] {
+if Features["shortcuts"]["surround_with_parentheses"] {
     AddShortcut("#", "o", (*) => SendFinalResult("{Home}({End}){Home}"))
 }
 
-if FeaturesV2["shortcuts"]["search"]["enabled"] {
+if Features["shortcuts"]["search"]["enabled"] {
     ; Win + S (Search)
     AddShortcut("#", "s", Search)
 
@@ -551,9 +551,9 @@ if FeaturesV2["shortcuts"]["search"]["enabled"] {
             } else if (WebsitePath) {
                 Run("https://" . SelectedText)
             } else if (SelectedText == "") { ; If nothing was copied
-                Run(FeaturesV2["shortcuts"]["search"]["search_engine"])
+                Run(Features["shortcuts"]["search"]["search_engine"])
             } else {
-                Run(FeaturesV2["shortcuts"]["search"]["search_engine_url_query"] . SelectedText)
+                Run(Features["shortcuts"]["search"]["search_engine_url_query"] . SelectedText)
             }
         }
     }
@@ -624,7 +624,7 @@ if FeaturesV2["shortcuts"]["search"]["enabled"] {
     }
 }
 
-if FeaturesV2["shortcuts"]["title_case"] {
+if Features["shortcuts"]["title_case"] {
     ; Win + W (TitleCase)
     AddShortcut("#", "w", ConvertToTitleCase)
 
@@ -653,7 +653,7 @@ if FeaturesV2["shortcuts"]["title_case"] {
     }
 }
 
-if FeaturesV2["shortcuts"]["uppercase"] {
+if Features["shortcuts"]["uppercase"] {
     ; Win + U (Uppercase)
     AddShortcut("#", "u", ConvertToUppercase)
 
@@ -668,7 +668,7 @@ if FeaturesV2["shortcuts"]["uppercase"] {
     }
 }
 
-if FeaturesV2["shortcuts"]["teleport_mouse"] {
+if Features["shortcuts"]["teleport_mouse"] {
     ; Win + T (Téléport)
     AddShortcut("#", "t", TeleportMouse)
 
@@ -707,12 +707,12 @@ if FeaturesV2["shortcuts"]["teleport_mouse"] {
     }
 }
 
-if FeaturesV2["shortcuts"]["spotlight_mouse"] {
+if Features["shortcuts"]["spotlight_mouse"] {
     ; Win + '
     AddShortcut("#", "'", (*) => (MouseGetPos(&Mx, &My), SpotlightMouseAt(Mx, My, 5000)))
 }
 
-#HotIf FeaturesV2["shortcuts"]["screen_instant"]
+#HotIf Features["shortcuts"]["screen_instant"]
 ; SC029 (²/$ — key left of 1) — instant screenshot of the active window, saved to Pictures
 SC029:: {
     WinGetPos(&WX, &WY, &WW, &WH, "A")
@@ -926,7 +926,7 @@ SpotlightMouseAt(X, Y, DurationMs) {
     DllCall("gdiplus\GdiplusShutdown", "ptr", pToken)
 }
 
-if FeaturesV2["shortcuts"]["open_downloads"] {
+if Features["shortcuts"]["open_downloads"] {
     ; Win + D (Downloads)
     AddShortcut("#", "d", OpenDownloads)
 

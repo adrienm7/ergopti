@@ -30,7 +30,7 @@
 ; ``Test(...)`` count, check the file with ``file <path>``; it must read
 ; ``UTF-8 (with BOM) text, with CRLF line terminators``. Use the Edit
 ; tool, not ``cat >>``, to extend test files. The v2 config-refactor
-; suite (test_features_manifest_v2.ahk) carries an ASCII-only convention
+; suite (test_features_manifest.ahk) carries an ASCII-only convention
 ; for the same reason.
 ; ==============================================================================
 

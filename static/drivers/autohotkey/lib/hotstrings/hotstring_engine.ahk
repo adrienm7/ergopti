@@ -1,4 +1,4 @@
-﻿; drivers/autohotkey/lib/hotstring_engine.ahk
+; drivers/autohotkey/lib/hotstring_engine.ahk
 
 ; ==============================================================================
 ; MODULE: Hotstring Engine
@@ -149,7 +149,7 @@ HotstringEngineInit() {
 ; =======================================
 ; =======================================
 
-; Internal — registers a hotstring with HSEv2 (the production dispatcher
+; Internal — registers a hotstring with HSE (the production dispatcher
 ; since Session 2 of the migration). The test seam ``_HotstringRegistrar``
 ; still receives the registration for harnesses that want to record what
 ; was registered without firing real expansions; the AHK native engine is
@@ -164,15 +164,15 @@ _RegisterHotstring(TriggerSpec, Callback, Meta := unset) {
         Reg := _HotstringRegistrar
         Reg(TriggerSpec, Callback)
     }
-    _MirrorRegistrationToHSEv2(TriggerSpec, Callback, Meta?)
+    _MirrorRegistrationToHSE(TriggerSpec, Callback, Meta?)
 }
 
 ; Parse the AHK ``:flags:abbrev`` trigger spec and forward to HSE_Register.
-; Flag letters that HSEv2 understands (``*``, ``?``, ``C``) are passed
+; Flag letters that HSE understands (``*``, ``?``, ``C``) are passed
 ; through verbatim; the rest (``B0``, ``O`` — both irrelevant to matching)
-; are dropped. Abbreviations are registered as-is so the HSEv2 bucket
+; are dropped. Abbreviations are registered as-is so the HSE bucket
 ; index stays in lockstep with the upstream registration call.
-_MirrorRegistrationToHSEv2(TriggerSpec, Callback, Meta := unset) {
+_MirrorRegistrationToHSE(TriggerSpec, Callback, Meta := unset) {
     if !RegExMatch(TriggerSpec, "^:([^:]*):(.+)$", &Match) {
         return
     }

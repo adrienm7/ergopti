@@ -404,7 +404,7 @@ RemapKey(ScanCode, Character, AlternativeCharacter := "") {
 WrapTextIfSelected(Symbol, LeftSymbol, RightSymbol) {
 	Selection := ""
 	if (
-		isSet(UIA) and FeaturesV2["shortcuts"]["wrap_text_if_selected"]
+		isSet(UIA) and Features["shortcuts"]["wrap_text_if_selected"]
 		and not WinActive("Code") ; Electron Apps like VSCode don't fully work with UIA
 	) {
 		try {
@@ -434,7 +434,7 @@ WrapTextIfSelected(Symbol, LeftSymbol, RightSymbol) {
 ; ============================
 ; ============================
 
-#HotIf FeaturesV2["layout"]["direct_access_digits"]
+#HotIf Features["layout"]["direct_access_digits"]
 ; We need to use SendEvent for symbols, otherwise it may trigger and lock AltGr. This issue happens on AZERTY at least.
 ; For digits, it is better to remap with sending the down event instead of using the RemapKey function.
 ; Otherwise, there is a problem of digit password boxes that skips to the n+2 box instead of n+2 because two down key events are sent by key
@@ -469,7 +469,7 @@ SC00D:: SendNewResult("=")
 ; Cannot be HotIf because the remapping is done with Hotkey function and cannot be undone afterwards.
 ; The character mapping itself lives in lib/layout_ergopti.ahk so the
 ; keylogger heatmap can read the same source of truth without drifting.
-if FeaturesV2["layout"]["ergopti_base"] {
+if Features["layout"]["ergopti_base"] {
 	for sc_int, entry in ErgoptiBaseMapping() {
 		sc_str := Format("SC{:03X}", sc_int)
 		if (entry is String) {
@@ -495,7 +495,7 @@ if FeaturesV2["layout"]["ergopti_base"] {
 	)
 }
 
-if FeaturesV2["hotstrings"]["magic_key"]["replace"]["enabled"] {
+if Features["hotstrings"]["magic_key"]["replace"]["enabled"] {
 	RemapKey("SC02E", "j", ScriptInformation["MagicKey"])
 }
 
@@ -541,7 +541,7 @@ RegisterCapsLockLayer()
 ; AltGr/Kana behaviour during the first-run onboarding wizard.
 _RollChevronEqualHandler(*) {
 	if GetKeyState("Shift", "P") {
-		FeaturesV2["layout"]["ergopti_plus"] ? SendNewResult(" %") : SendNewResult("Œ")
+		Features["layout"]["ergopti_plus"] ? SendNewResult(" %") : SendNewResult("Œ")
 	} else {
 		AddRollEqual()
 	}
@@ -554,7 +554,7 @@ AddRollEqual() {
 	) {
 		SendNewResult("=")
 		UpdateLastSentCharacter("=")
-	} else if FeaturesV2["layout"]["ergopti_plus"] {
+	} else if Features["layout"]["ergopti_plus"] {
 		WrapTextIfSelected("%", "%", "%")
 	} else {
 		SendNewResult("œ")
@@ -589,9 +589,9 @@ HashtagOrQuote() {
 ; registering its hotkeys AFTER Onboarding_Run() to keep SC138 native during
 ; first-run setup).
 _RegisterRollsAltGrHotkeys() {
-	HotIf((*) => FeaturesV2["hotstrings"]["rolls"]["chevron_equal"]["enabled"] and IsRealAltGrPress())
+	HotIf((*) => Features["hotstrings"]["rolls"]["chevron_equal"]["enabled"] and IsRealAltGrPress())
 	Hotkey("SC138 & SC012", _RollChevronEqualHandler, "I2")
-	HotIf((*) => FeaturesV2["hotstrings"]["rolls"]["hashtag_quote"]["enabled"] and IsRealAltGrPress())
+	HotIf((*) => Features["hotstrings"]["rolls"]["hashtag_quote"]["enabled"] and IsRealAltGrPress())
 	Hotkey("SC138 & SC017", _RollHashtagQuoteHandler, "I2")
 	HotIf()
 }
@@ -614,14 +614,14 @@ RegisterAltGrLayer()
 ; ================================
 ; ================================
 
-#HotIf FeaturesV2["layout"]["ergopti_base"]
+#HotIf Features["layout"]["ergopti_base"]
 ^SC02F:: SendFinalResult("^v") ; Correct issue where Win + V paste doesn't work
 *^SC00C:: SendFinalResult("^{NumpadSub}") ; Zoom out with Ctrl + %
 *^SC00D:: SendFinalResult("^{NumpadAdd}") ; Zoom in with Ctrl + $
 #HotIf
 
 ; In Microsoft apps like Word or Excel, we can't use Numpad + to zoom
-#HotIf FeaturesV2["layout"]["ergopti_base"] and MicrosoftApps()
+#HotIf Features["layout"]["ergopti_base"] and MicrosoftApps()
 *^SC00C:: SendFinalResult("^{WheelDown}") ; Zoom out with (Shift +) Ctrl + %
 *^SC00D:: SendFinalResult("^{WheelUp}") ; Zoom in with (Shift +) Ctrl + $
 #HotIf

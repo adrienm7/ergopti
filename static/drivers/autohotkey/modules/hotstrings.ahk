@@ -22,8 +22,8 @@
 ; ===== 1.1) Q becomes QU if a vowel is after =====
 ; ===================================================
 
-if FeaturesV2["hotstrings"]["distances_reduction"]["qu"]["enabled"] {
-	LoadHotstringsSection("distancesreduction", "qu", FeaturesV2["hotstrings"]["distances_reduction"]["qu"])
+if Features["hotstrings"]["distances_reduction"]["qu"]["enabled"] {
+	LoadHotstringsSection("distancesreduction", "qu", Features["hotstrings"]["distances_reduction"]["qu"])
 }
 
 
@@ -31,7 +31,7 @@ if FeaturesV2["hotstrings"]["distances_reduction"]["qu"]["enabled"] {
 ; ===== 1.2) Ê acts like a deadkey =====
 ; ================================================
 
-if FeaturesV2["hotstrings"]["distances_reduction"]["dead_key_e_circumflex"]["enabled"] {
+if Features["hotstrings"]["distances_reduction"]["dead_key_e_circumflex"]["enabled"] {
 	DeadkeyMappingCircumflexModified := DeadkeyMappingCircumflex.Clone()
 	; Resolve the activation delay once at registration time — the Features
 	; object only carries Enabled, the actual delay lives in the TOML metadata.
@@ -81,8 +81,8 @@ if FeaturesV2["hotstrings"]["distances_reduction"]["dead_key_e_circumflex"]["ena
 	}
 }
 
-if FeaturesV2["hotstrings"]["distances_reduction"]["e_circumflex_e"]["enabled"] {
-	LoadHotstringsSection("distancesreduction", "ecircumflexe", FeaturesV2["hotstrings"]["distances_reduction"]["e_circumflex_e"])
+if Features["hotstrings"]["distances_reduction"]["e_circumflex_e"]["enabled"] {
+	LoadHotstringsSection("distancesreduction", "ecircumflexe", Features["hotstrings"]["distances_reduction"]["e_circumflex_e"])
 }
 
 
@@ -90,7 +90,7 @@ if FeaturesV2["hotstrings"]["distances_reduction"]["e_circumflex_e"]["enabled"] 
 ; ===== 1.3) Comma becomes a J with the vowels =====
 ; ========================================================
 
-if FeaturesV2["hotstrings"]["distances_reduction"]["comma_j"]["enabled"] {
+if Features["hotstrings"]["distances_reduction"]["comma_j"]["enabled"] {
 	CommaJOptions := Map("TimeActivationSeconds", HotstringsResolve("distancesreduction", "CommaJ").Delay)
 	CreateCaseSensitiveHotstrings("*?", ",à", "j", CommaJOptions)
 	CreateCaseSensitiveHotstrings("*?", ",a", "ja", CommaJOptions)
@@ -110,7 +110,7 @@ if FeaturesV2["hotstrings"]["distances_reduction"]["comma_j"]["enabled"] {
 ; ===== 1.4) Comma makes it possible to type letters that are hard to reach =====
 ; ============================================================================
 
-if FeaturesV2["hotstrings"]["distances_reduction"]["comma_far_letters"]["enabled"] {
+if Features["hotstrings"]["distances_reduction"]["comma_far_letters"]["enabled"] {
 	CommaFarOptions := Map("TimeActivationSeconds", HotstringsResolve("distancesreduction", "CommaFarLetters").Delay)
 	; === Top row ===
 	CreateCaseSensitiveHotstrings("*?", ",è", "z", CommaFarOptions)
@@ -127,8 +127,8 @@ if FeaturesV2["hotstrings"]["distances_reduction"]["comma_far_letters"]["enabled
 ; ===== 1.5) SFBs reduction with Comma =====
 ; =============================================
 
-if FeaturesV2["hotstrings"]["sfbs_reduction"]["comma"]["enabled"] {
-	LoadHotstringsSection("sfbsreduction", "comma", FeaturesV2["hotstrings"]["sfbs_reduction"]["comma"])
+if Features["hotstrings"]["sfbs_reduction"]["comma"]["enabled"] {
+	LoadHotstringsSection("sfbsreduction", "comma", Features["hotstrings"]["sfbs_reduction"]["comma"])
 }
 
 
@@ -136,8 +136,8 @@ if FeaturesV2["hotstrings"]["sfbs_reduction"]["comma"]["enabled"] {
 ; ===== 1.6) SFBs reduction with Ê =====
 ; ==========================================
 
-if FeaturesV2["hotstrings"]["sfbs_reduction"]["e_circ"]["enabled"] {
-	LoadHotstringsSection("sfbsreduction", "ecirc", FeaturesV2["hotstrings"]["sfbs_reduction"]["e_circ"])
+if Features["hotstrings"]["sfbs_reduction"]["e_circ"]["enabled"] {
+	LoadHotstringsSection("sfbsreduction", "ecirc", Features["hotstrings"]["sfbs_reduction"]["e_circ"])
 }
 
 
@@ -145,8 +145,8 @@ if FeaturesV2["hotstrings"]["sfbs_reduction"]["e_circ"]["enabled"] {
 ; ===== 1.7) SFBs reduction with È =====
 ; ==========================================
 
-if FeaturesV2["hotstrings"]["sfbs_reduction"]["e_grave"]["enabled"] {
-	LoadHotstringsSection("sfbsreduction", "egrave", FeaturesV2["hotstrings"]["sfbs_reduction"]["e_grave"])
+if Features["hotstrings"]["sfbs_reduction"]["e_grave"]["enabled"] {
+	LoadHotstringsSection("sfbsreduction", "egrave", Features["hotstrings"]["sfbs_reduction"]["e_grave"])
 }
 
 
@@ -154,7 +154,7 @@ if FeaturesV2["hotstrings"]["sfbs_reduction"]["e_grave"]["enabled"] {
 ; ===== 1.8) SFBs reduction with À =====
 ; ==========================================
 
-if FeaturesV2["hotstrings"]["sfbs_reduction"]["bu"]["enabled"] and FeaturesV2["hotstrings"]["magic_key"]["text_expansion"]["enabled"] {
+if Features["hotstrings"]["sfbs_reduction"]["bu"]["enabled"] and Features["hotstrings"]["magic_key"]["text_expansion"]["enabled"] {
 	; Those hotstrings must be defined before bu, otherwise they won't get activated
 	CreateCaseSensitiveHotstrings("*", "il a mà" . ScriptInformation["MagicKey"], "il a mis à jour")
 	CreateCaseSensitiveHotstrings("*", "la mà" . ScriptInformation["MagicKey"], "la mise à jour")
@@ -167,14 +167,14 @@ if FeaturesV2["hotstrings"]["sfbs_reduction"]["bu"]["enabled"] and FeaturesV2["h
 	CreateCaseSensitiveHotstrings("*", "pià" . ScriptInformation["MagicKey"], "pièce jointe")
 	CreateCaseSensitiveHotstrings("*", "tà" . ScriptInformation["MagicKey"], "toujours")
 }
-if FeaturesV2["hotstrings"]["sfbs_reduction"]["i_e_acute"]["enabled"] and FeaturesV2["hotstrings"]["sfbs_reduction"]["bu"]["enabled"] {
+if Features["hotstrings"]["sfbs_reduction"]["i_e_acute"]["enabled"] and Features["hotstrings"]["sfbs_reduction"]["bu"]["enabled"] {
 	CreateCaseSensitiveHotstrings(
 		; Fix éà★ ➜ ébu insteaf of iéé
 		"*?", "ié★", "ébu",
 		Map("TimeActivationSeconds", HotstringsResolve("sfbsreduction", "BU").Delay)
 	)
 }
-if FeaturesV2["hotstrings"]["sfbs_reduction"]["bu"]["enabled"] {
+if Features["hotstrings"]["sfbs_reduction"]["bu"]["enabled"] {
 	CreateCaseSensitiveHotstrings(
 		"*?", "à★", "bu",
 		Map("TimeActivationSeconds", HotstringsResolve("sfbsreduction", "BU").Delay)
@@ -184,7 +184,7 @@ if FeaturesV2["hotstrings"]["sfbs_reduction"]["bu"]["enabled"] {
 		Map("TimeActivationSeconds", HotstringsResolve("sfbsreduction", "BU").Delay)
 	)
 }
-if FeaturesV2["hotstrings"]["sfbs_reduction"]["i_e_acute"]["enabled"] {
+if Features["hotstrings"]["sfbs_reduction"]["i_e_acute"]["enabled"] {
 	CreateCaseSensitiveHotstrings(
 		"*?", "àé", "éi",
 		Map("TimeActivationSeconds", HotstringsResolve("sfbsreduction", "IÉ").Delay)
@@ -208,23 +208,23 @@ if FeaturesV2["hotstrings"]["sfbs_reduction"]["i_e_acute"]["enabled"] {
 ; ======================================
 
 ; === Top row ===
-if FeaturesV2["hotstrings"]["rolls"]["close_chevron_tag"]["enabled"] {
+if Features["hotstrings"]["rolls"]["close_chevron_tag"]["enabled"] {
 	; The original call used flags "*?P" — the "P" flag is lost via TOML
 	; extraction but the remaining "*?" still yields the same behavior here
-	LoadHotstringsSection("rolls", "closechevrontag", FeaturesV2["hotstrings"]["rolls"]["close_chevron_tag"])
+	LoadHotstringsSection("rolls", "closechevrontag", Features["hotstrings"]["rolls"]["close_chevron_tag"])
 }
 
 ; === Middle row ===
-if FeaturesV2["hotstrings"]["rolls"]["ez"]["enabled"] {
-	LoadHotstringsSection("rolls", "ez", FeaturesV2["hotstrings"]["rolls"]["ez"])
+if Features["hotstrings"]["rolls"]["ez"]["enabled"] {
+	LoadHotstringsSection("rolls", "ez", Features["hotstrings"]["rolls"]["ez"])
 }
 
 ; === Bottom row ===
-if FeaturesV2["hotstrings"]["rolls"]["comment_open"]["enabled"] {
-	LoadHotstringsSection("rolls", "commentopen", FeaturesV2["hotstrings"]["rolls"]["comment_open"])
+if Features["hotstrings"]["rolls"]["comment_open"]["enabled"] {
+	LoadHotstringsSection("rolls", "commentopen", Features["hotstrings"]["rolls"]["comment_open"])
 }
-if FeaturesV2["hotstrings"]["rolls"]["comment_close"]["enabled"] {
-	LoadHotstringsSection("rolls", "commentclose", FeaturesV2["hotstrings"]["rolls"]["comment_close"])
+if Features["hotstrings"]["rolls"]["comment_close"]["enabled"] {
+	LoadHotstringsSection("rolls", "commentclose", Features["hotstrings"]["rolls"]["comment_close"])
 }
 
 
@@ -233,19 +233,19 @@ if FeaturesV2["hotstrings"]["rolls"]["comment_close"]["enabled"] {
 ; =======================================
 
 ; === Top row ===
-if FeaturesV2["hotstrings"]["rolls"]["hashtag_parenthesis"]["enabled"] {
-	LoadHotstringsSection("rolls", "hashtagparenthesis", FeaturesV2["hotstrings"]["rolls"]["hashtag_parenthesis"])
+if Features["hotstrings"]["rolls"]["hashtag_parenthesis"]["enabled"] {
+	LoadHotstringsSection("rolls", "hashtagparenthesis", Features["hotstrings"]["rolls"]["hashtag_parenthesis"])
 }
-if FeaturesV2["hotstrings"]["rolls"]["hashtag_open_bracket"]["enabled"] {
-	LoadHotstringsSection("rolls", "hashtagopenbracket", FeaturesV2["hotstrings"]["rolls"]["hashtag_open_bracket"])
+if Features["hotstrings"]["rolls"]["hashtag_open_bracket"]["enabled"] {
+	LoadHotstringsSection("rolls", "hashtagopenbracket", Features["hotstrings"]["rolls"]["hashtag_open_bracket"])
 }
-if FeaturesV2["hotstrings"]["rolls"]["hashtag_close_bracket"]["enabled"] {
-	LoadHotstringsSection("rolls", "hashtagclosebracket", FeaturesV2["hotstrings"]["rolls"]["hashtag_close_bracket"])
+if Features["hotstrings"]["rolls"]["hashtag_close_bracket"]["enabled"] {
+	LoadHotstringsSection("rolls", "hashtagclosebracket", Features["hotstrings"]["rolls"]["hashtag_close_bracket"])
 }
-if FeaturesV2["hotstrings"]["rolls"]["hc"]["enabled"] {
-	LoadHotstringsSection("rolls", "hc", FeaturesV2["hotstrings"]["rolls"]["hc"])
+if Features["hotstrings"]["rolls"]["hc"]["enabled"] {
+	LoadHotstringsSection("rolls", "hc", Features["hotstrings"]["rolls"]["hc"])
 }
-if FeaturesV2["hotstrings"]["rolls"]["assign"]["enabled"] {
+if Features["hotstrings"]["rolls"]["assign"]["enabled"] {
 	AssignOptions := Map("TimeActivationSeconds", HotstringsResolve("rolls", "Assign").Delay)
 	AssignReplacement := SpaceAroundSymbols . ":=" . SpaceAroundSymbols
 	CreateHotstring("*?", " #ç", AssignReplacement, AssignOptions)
@@ -253,7 +253,7 @@ if FeaturesV2["hotstrings"]["rolls"]["assign"]["enabled"] {
 	CreateHotstring("*?", "#ç", AssignReplacement, AssignOptions)
 	CreateHotstring("*?", "#!", AssignReplacement, AssignOptions)
 }
-if FeaturesV2["hotstrings"]["rolls"]["not_equal"]["enabled"] {
+if Features["hotstrings"]["rolls"]["not_equal"]["enabled"] {
 	NotEqualOptions := Map("TimeActivationSeconds", HotstringsResolve("rolls", "NotEqual").Delay)
 	NotEqualReplacement := SpaceAroundSymbols . "!=" . SpaceAroundSymbols
 	CreateHotstring("*?", " ç#", NotEqualReplacement, NotEqualOptions)
@@ -261,21 +261,21 @@ if FeaturesV2["hotstrings"]["rolls"]["not_equal"]["enabled"] {
 	CreateHotstring("*?", "ç#", NotEqualReplacement, NotEqualOptions)
 	CreateHotstring("*?", "!#", NotEqualReplacement, NotEqualOptions)
 }
-if FeaturesV2["hotstrings"]["rolls"]["sx"]["enabled"] {
-	LoadHotstringsSection("rolls", "sx", FeaturesV2["hotstrings"]["rolls"]["sx"])
+if Features["hotstrings"]["rolls"]["sx"]["enabled"] {
+	LoadHotstringsSection("rolls", "sx", Features["hotstrings"]["rolls"]["sx"])
 }
-if FeaturesV2["hotstrings"]["rolls"]["cx"]["enabled"] {
-	LoadHotstringsSection("rolls", "cx", FeaturesV2["hotstrings"]["rolls"]["cx"])
+if Features["hotstrings"]["rolls"]["cx"]["enabled"] {
+	LoadHotstringsSection("rolls", "cx", Features["hotstrings"]["rolls"]["cx"])
 }
 
 ; === Middle row ===
-if FeaturesV2["hotstrings"]["rolls"]["equal_string"]["enabled"] {
+if Features["hotstrings"]["rolls"]["equal_string"]["enabled"] {
 	EqualStringOpts := Map("OnlyText", False, "TimeActivationSeconds", HotstringsResolve("rolls", "EqualString").Delay)
 	EqualStringRepl := SpaceAroundSymbols . "=" . SpaceAroundSymbols . "`"`"{Left}"
 	CreateHotstring("*?", " [)", EqualStringRepl, EqualStringOpts)
 	CreateHotstring("*?", "[)", EqualStringRepl, EqualStringOpts)
 }
-if FeaturesV2["hotstrings"]["rolls"]["english_negation"]["enabled"] {
+if Features["hotstrings"]["rolls"]["english_negation"]["enabled"] {
 	; Works identically whether TypographicApostrophe is on or off — the
 	; straight apostrophe is converted downstream when relevant.
 	CreateHotstring(
@@ -287,38 +287,38 @@ if FeaturesV2["hotstrings"]["rolls"]["english_negation"]["enabled"] {
 ; === Bottom row ===
 ; Each operator roll registers two triggers: one with a leading space (so the
 ; operator fires mid-sentence) and one without (start of expression / line).
-if FeaturesV2["hotstrings"]["rolls"]["left_arrow"]["enabled"] {
+if Features["hotstrings"]["rolls"]["left_arrow"]["enabled"] {
 	Opts := Map("TimeActivationSeconds", HotstringsResolve("rolls", "LeftArrow").Delay)
 	Repl := SpaceAroundSymbols . "➜" . SpaceAroundSymbols
 	CreateHotstring("*?", " =+", Repl, Opts)
 	CreateHotstring("*?", "=+", Repl, Opts)
 }
-if FeaturesV2["hotstrings"]["rolls"]["assign_arrow_equal_right"]["enabled"] {
+if Features["hotstrings"]["rolls"]["assign_arrow_equal_right"]["enabled"] {
 	Opts := Map("TimeActivationSeconds", HotstringsResolve("rolls", "AssignArrowEqualRight").Delay)
 	Repl := SpaceAroundSymbols . "=>" . SpaceAroundSymbols
 	CreateHotstring("*?", " $=", Repl, Opts)
 	CreateHotstring("*?", "$=", Repl, Opts)
 }
-if FeaturesV2["hotstrings"]["rolls"]["assign_arrow_equal_left"]["enabled"] {
+if Features["hotstrings"]["rolls"]["assign_arrow_equal_left"]["enabled"] {
 	Opts := Map("TimeActivationSeconds", HotstringsResolve("rolls", "AssignArrowEqualLeft").Delay)
 	Repl := SpaceAroundSymbols . "<=" . SpaceAroundSymbols
 	CreateHotstring("*?", " =$", Repl, Opts)
 	CreateHotstring("*?", "=$", Repl, Opts)
 }
-if FeaturesV2["hotstrings"]["rolls"]["assign_arrow_minus_right"]["enabled"] {
+if Features["hotstrings"]["rolls"]["assign_arrow_minus_right"]["enabled"] {
 	Opts := Map("TimeActivationSeconds", HotstringsResolve("rolls", "AssignArrowMinusRight").Delay)
 	Repl := SpaceAroundSymbols . "->" . SpaceAroundSymbols
 	CreateHotstring("*?", " +?", Repl, Opts)
 	CreateHotstring("*?", "+?", Repl, Opts)
 }
-if FeaturesV2["hotstrings"]["rolls"]["assign_arrow_minus_left"]["enabled"] {
+if Features["hotstrings"]["rolls"]["assign_arrow_minus_left"]["enabled"] {
 	Opts := Map("TimeActivationSeconds", HotstringsResolve("rolls", "AssignArrowMinusLeft").Delay)
 	Repl := SpaceAroundSymbols . "<-" . SpaceAroundSymbols
 	CreateHotstring("*?", " ?+", Repl, Opts)
 	CreateHotstring("*?", "?+", Repl, Opts)
 }
-if FeaturesV2["hotstrings"]["rolls"]["ct"]["enabled"] {
-	LoadHotstringsSection("rolls", "ct", FeaturesV2["hotstrings"]["rolls"]["ct"])
+if Features["hotstrings"]["rolls"]["ct"]["enabled"] {
+	LoadHotstringsSection("rolls", "ct", Features["hotstrings"]["rolls"]["ct"])
 }
 
 
@@ -333,8 +333,8 @@ if FeaturesV2["hotstrings"]["rolls"]["ct"]["enabled"] {
 ; ===== 3.1) Automatic conversion of apostrophe into a typographic one =====
 ; ===========================================================================
 
-if FeaturesV2["hotstrings"]["autocorrection"]["typographic_apostrophe"]["enabled"] {
-	LoadHotstringsSection("autocorrection", "typographicapostrophe", FeaturesV2["hotstrings"]["autocorrection"]["typographic_apostrophe"])
+if Features["hotstrings"]["autocorrection"]["typographic_apostrophe"]["enabled"] {
+	LoadHotstringsSection("autocorrection", "typographicapostrophe", Features["hotstrings"]["autocorrection"]["typographic_apostrophe"])
 
 	; Create all hotstrings y'a → y'a, y'b → y'b, etc.
 	; This prevents false positives like writing ['key'] ➜ ['key']
@@ -351,16 +351,16 @@ if FeaturesV2["hotstrings"]["autocorrection"]["typographic_apostrophe"]["enabled
 ; ===== 3.2) Errors autocorrection =====
 ; ============================================
 
-if FeaturesV2["hotstrings"]["autocorrection"]["errors"]["enabled"] {
-	LoadHotstringsSection("autocorrection", "errors", FeaturesV2["hotstrings"]["autocorrection"]["errors"])
+if Features["hotstrings"]["autocorrection"]["errors"]["enabled"] {
+	LoadHotstringsSection("autocorrection", "errors", Features["hotstrings"]["autocorrection"]["errors"])
 }
 
-if FeaturesV2["hotstrings"]["autocorrection"]["ou"]["enabled"] {
-	LoadHotstringsSection("autocorrection", "ou", FeaturesV2["hotstrings"]["autocorrection"]["ou"])
+if Features["hotstrings"]["autocorrection"]["ou"]["enabled"] {
+	LoadHotstringsSection("autocorrection", "ou", Features["hotstrings"]["autocorrection"]["ou"])
 }
 
-if FeaturesV2["hotstrings"]["autocorrection"]["multiple_punctuation_marks"]["enabled"] {
-	LoadHotstringsSection("autocorrection", "multiplepunctuationmarks", FeaturesV2["hotstrings"]["autocorrection"]["multiple_punctuation_marks"])
+if Features["hotstrings"]["autocorrection"]["multiple_punctuation_marks"]["enabled"] {
+	LoadHotstringsSection("autocorrection", "multiplepunctuationmarks", Features["hotstrings"]["autocorrection"]["multiple_punctuation_marks"])
 
 	; We can't use the TimeActivationSeconds here, as previous character = current character = "."
 	Hotstring(
@@ -371,8 +371,8 @@ if FeaturesV2["hotstrings"]["autocorrection"]["multiple_punctuation_marks"]["ena
 	)
 }
 
-if FeaturesV2["hotstrings"]["autocorrection"]["suffixes_a_chaining"]["enabled"] {
-	LoadHotstringsSection("autocorrection", "suffixesachaining", FeaturesV2["hotstrings"]["autocorrection"]["suffixes_a_chaining"])
+if Features["hotstrings"]["autocorrection"]["suffixes_a_chaining"]["enabled"] {
+	LoadHotstringsSection("autocorrection", "suffixesachaining", Features["hotstrings"]["autocorrection"]["suffixes_a_chaining"])
 }
 
 
@@ -380,12 +380,12 @@ if FeaturesV2["hotstrings"]["autocorrection"]["suffixes_a_chaining"]["enabled"] 
 ; ===== 3.3) Add minus sign automatically =====
 ; =============================================
 
-if FeaturesV2["hotstrings"]["autocorrection"]["minus"]["enabled"] {
-	LoadHotstringsSection("autocorrection", "minus", FeaturesV2["hotstrings"]["autocorrection"]["minus"])
+if Features["hotstrings"]["autocorrection"]["minus"]["enabled"] {
+	LoadHotstringsSection("autocorrection", "minus", Features["hotstrings"]["autocorrection"]["minus"])
 }
 
-if FeaturesV2["hotstrings"]["autocorrection"]["minus_apostrophe"]["enabled"] {
-	LoadHotstringsSection("autocorrection", "minusapostrophe", FeaturesV2["hotstrings"]["autocorrection"]["minus_apostrophe"])
+if Features["hotstrings"]["autocorrection"]["minus_apostrophe"]["enabled"] {
+	LoadHotstringsSection("autocorrection", "minusapostrophe", Features["hotstrings"]["autocorrection"]["minus_apostrophe"])
 }
 
 
@@ -395,8 +395,8 @@ if FeaturesV2["hotstrings"]["autocorrection"]["minus_apostrophe"]["enabled"] {
 ; ===== 3.4) Caps autocorrection =====
 ; ==========================================
 
-if FeaturesV2["hotstrings"]["autocorrection"]["caps"]["enabled"] {
-	LoadHotstringsSection("autocorrection", "caps", FeaturesV2["hotstrings"]["autocorrection"]["caps"])
+if Features["hotstrings"]["autocorrection"]["caps"]["enabled"] {
+	LoadHotstringsSection("autocorrection", "caps", Features["hotstrings"]["autocorrection"]["caps"])
 
 	; For these apps, we only capitalize them when used in context of apps, and not as English words
 	apps := ["excel", "teams", "word", "office"]
@@ -430,12 +430,12 @@ if FeaturesV2["hotstrings"]["autocorrection"]["caps"]["enabled"] {
 ; ===== 3.5) Accents autocorrection =====
 ; ===========================================
 
-if FeaturesV2["hotstrings"]["autocorrection"]["names"]["enabled"] {
-	LoadHotstringsSection("autocorrection", "names", FeaturesV2["hotstrings"]["autocorrection"]["names"])
+if Features["hotstrings"]["autocorrection"]["names"]["enabled"] {
+	LoadHotstringsSection("autocorrection", "names", Features["hotstrings"]["autocorrection"]["names"])
 }
 
-if FeaturesV2["hotstrings"]["autocorrection"]["accents"]["enabled"] {
-	LoadHotstringsSection("autocorrection", "accents", FeaturesV2["hotstrings"]["autocorrection"]["accents"])
+if Features["hotstrings"]["autocorrection"]["accents"]["enabled"] {
+	LoadHotstringsSection("autocorrection", "accents", Features["hotstrings"]["autocorrection"]["accents"])
 }
 
 
@@ -450,8 +450,8 @@ if FeaturesV2["hotstrings"]["autocorrection"]["accents"]["enabled"] {
 ; ===== 4.1) Suffixes with À =====
 ; ===================================
 
-if FeaturesV2["hotstrings"]["distances_reduction"]["suffixes_a"]["enabled"] {
-	LoadHotstringsSection("distancesreduction", "suffixesa", FeaturesV2["hotstrings"]["distances_reduction"]["suffixes_a"])
+if Features["hotstrings"]["distances_reduction"]["suffixes_a"]["enabled"] {
+	LoadHotstringsSection("distancesreduction", "suffixesa", Features["hotstrings"]["distances_reduction"]["suffixes_a"])
 }
 
 
@@ -459,7 +459,7 @@ if FeaturesV2["hotstrings"]["distances_reduction"]["suffixes_a"]["enabled"] {
 ; ===== 4.2) Personal information shortcuts with @ =====
 ; ==============================================================
 
-if FeaturesV2["hotstrings"]["dynamic"]["text_expansion_personal_information"]["enabled"] {
+if Features["hotstrings"]["dynamic"]["text_expansion_personal_information"]["enabled"] {
 	CreateHotstring("*", "@bic" . ScriptInformation["MagicKey"], PersonalInformation["BIC"], Map("FinalResult",
 		True))
 	CreateHotstring("*", "@cb" . ScriptInformation["MagicKey"], PersonalInformation["CreditCard"], Map(
@@ -490,7 +490,7 @@ if FeaturesV2["hotstrings"]["dynamic"]["text_expansion_personal_information"]["e
 	; Generate all possible combinations of letters between 1 and PatternMaxLength characters
 	GeneratePersonalInformationHotstrings(
 		PersonalInformationHotstrings,
-		FeaturesV2["hotstrings"]["dynamic"]["text_expansion_personal_information"]["pattern_max_length"]
+		Features["hotstrings"]["dynamic"]["text_expansion_personal_information"]["pattern_max_length"]
 	)
 
 	GeneratePersonalInformationHotstrings(hotstrings, maxLen) {
@@ -588,12 +588,12 @@ if FeaturesV2["hotstrings"]["dynamic"]["text_expansion_personal_information"]["e
 ; ===== 4.3) Text expansion with ★ =====
 ; ===========================================
 
-if FeaturesV2["hotstrings"]["magic_key"]["text_expansion"]["enabled"] {
-	LoadHotstringsSection("magickey", "textexpansion", FeaturesV2["hotstrings"]["magic_key"]["text_expansion"])
+if Features["hotstrings"]["magic_key"]["text_expansion"]["enabled"] {
+	LoadHotstringsSection("magickey", "textexpansion", Features["hotstrings"]["magic_key"]["text_expansion"])
 }
 
-if FeaturesV2["hotstrings"]["magic_key"]["text_expansion_auto"]["enabled"] {
-	LoadHotstringsSection("magickey", "textexpansionauto", FeaturesV2["hotstrings"]["magic_key"]["text_expansion_auto"])
+if Features["hotstrings"]["magic_key"]["text_expansion_auto"]["enabled"] {
+	LoadHotstringsSection("magickey", "textexpansionauto", Features["hotstrings"]["magic_key"]["text_expansion_auto"])
 }
 
 
@@ -601,8 +601,8 @@ if FeaturesV2["hotstrings"]["magic_key"]["text_expansion_auto"]["enabled"] {
 ; ===== 4.4) Emojis =====
 ; ==============================
 
-if FeaturesV2["hotstrings"]["magic_key"]["text_expansion_emojis"]["enabled"] {
-	LoadHotstringsSection("magickey", "textexpansionemojis", FeaturesV2["hotstrings"]["magic_key"]["text_expansion_emojis"])
+if Features["hotstrings"]["magic_key"]["text_expansion_emojis"]["enabled"] {
+	LoadHotstringsSection("magickey", "textexpansionemojis", Features["hotstrings"]["magic_key"]["text_expansion_emojis"])
 }
 
 
@@ -610,12 +610,12 @@ if FeaturesV2["hotstrings"]["magic_key"]["text_expansion_emojis"]["enabled"] {
 ; ===== 4.5) Symbols =====
 ; ==============================
 
-if FeaturesV2["hotstrings"]["magic_key"]["text_expansion_symbols"]["enabled"] {
-	LoadHotstringsSection("magickey", "textexpansionsymbols", FeaturesV2["hotstrings"]["magic_key"]["text_expansion_symbols"])
+if Features["hotstrings"]["magic_key"]["text_expansion_symbols"]["enabled"] {
+	LoadHotstringsSection("magickey", "textexpansionsymbols", Features["hotstrings"]["magic_key"]["text_expansion_symbols"])
 }
 
-if FeaturesV2["hotstrings"]["magic_key"]["text_expansion_symbols_typst"]["enabled"] {
-	LoadHotstringsSection("magickey", "textexpansionsymbolstypst", FeaturesV2["hotstrings"]["magic_key"]["text_expansion_symbols_typst"],
+if Features["hotstrings"]["magic_key"]["text_expansion_symbols_typst"]["enabled"] {
+	LoadHotstringsSection("magickey", "textexpansionsymbolstypst", Features["hotstrings"]["magic_key"]["text_expansion_symbols_typst"],
 		Map("OnlyText", False))
 }
 
@@ -646,7 +646,7 @@ SpacedPrefix(SpacedStr, RawCount) {
 ; @dt★, @td★, @date★ resolved at fire time — cannot be static TOML entries.
 ; "??" flag required: after a prior expansion the output lands immediately
 ; before the next "@", so the word boundary before "@" is a digit or letter —
-; not a terminator. Without "?", HSEv2 rejects the match and the shorter
+; not a terminator. Without "?", HSE rejects the match and the shorter
 ; "t★" (InWord=true) wins instead.
 _DateShortFr(*) {
 	return FormatTime(, "dd/MM/yyyy")
@@ -662,13 +662,13 @@ _DateIso(*) {
 	return FormatTime(, "yyyy_MM_dd")
 }
 MK := ScriptInformation["MagicKey"]
-if FeaturesV2["hotstrings"]["dynamic"]["date_fr"]["enabled"] {
+if Features["hotstrings"]["dynamic"]["date_fr"]["enabled"] {
 	CreateHotstring("*?", "@dt" . MK, _DateShortFr, Map("FinalResult", True))
 }
-if FeaturesV2["hotstrings"]["dynamic"]["date_long_fr"]["enabled"] {
+if Features["hotstrings"]["dynamic"]["date_long_fr"]["enabled"] {
 	CreateHotstring("*?", "@date" . MK, _DateLongFr, Map("FinalResult", True))
 }
-if FeaturesV2["hotstrings"]["dynamic"]["date"]["enabled"] {
+if Features["hotstrings"]["dynamic"]["date"]["enabled"] {
 	CreateHotstring("*?", "@td" . MK, _DateIso, Map("FinalResult", True))
 }
 
@@ -690,7 +690,7 @@ Iban   := PersonalInformation["IBAN"]               ; e.g. "FR00 0000 0000 0000 
 SsnRaw  := StrReplace(Ssn,  " ", "")
 IbanRaw := StrReplace(Iban, " ", "")
 
-if FeaturesV2["hotstrings"]["dynamic"]["phone_prefixes"]["enabled"] {
+if Features["hotstrings"]["dynamic"]["phone_prefixes"]["enabled"] {
 	; Mirrors HS: phone[1:2]+★, +33+phone[1:2], phone[1:4], +33+phone[2:4], phone[2:5], fphone[1:5]
 	MK := ScriptInformation["MagicKey"]
 	if StrLen(Phone) >= 2 {
@@ -709,7 +709,7 @@ if FeaturesV2["hotstrings"]["dynamic"]["phone_prefixes"]["enabled"] {
 	}
 }
 
-if FeaturesV2["hotstrings"]["dynamic"]["ssn_prefixes"]["enabled"] {
+if Features["hotstrings"]["dynamic"]["ssn_prefixes"]["enabled"] {
 	; No-space trigger → SSN without spaces; spaced trigger → SSN with spaces.
 	; Both use the first 5 raw digits as the distinguishing prefix.
 	if StrLen(SsnRaw) >= 5 {
@@ -722,7 +722,7 @@ if FeaturesV2["hotstrings"]["dynamic"]["ssn_prefixes"]["enabled"] {
 	}
 }
 
-if FeaturesV2["hotstrings"]["dynamic"]["iban_prefixes"]["enabled"] {
+if Features["hotstrings"]["dynamic"]["iban_prefixes"]["enabled"] {
 	; 6 raw chars (case-insensitive) → IBAN without spaces.
 	; 7 spaced chars (e.g. "FR76 XX") → IBAN with spaces.
 	; Both triggers fire at the 6th raw character typed.
@@ -746,8 +746,8 @@ if FeaturesV2["hotstrings"]["dynamic"]["iban_prefixes"]["enabled"] {
 
 ; ★ becomes a repeat key. It will activate will the lowest priority of all hotstrings
 ; That means a letter will only be repeated if no hotstring defined above matches
-if FeaturesV2["hotstrings"]["magic_key"]["repeat_corrections"]["enabled"] {
-	LoadHotstringsSection("magickey", "repeatcorrections", FeaturesV2["hotstrings"]["magic_key"]["repeat_corrections"])
+if Features["hotstrings"]["magic_key"]["repeat_corrections"]["enabled"] {
+	LoadHotstringsSection("magickey", "repeatcorrections", Features["hotstrings"]["magic_key"]["repeat_corrections"])
 }
 
 CreateHotstring("*", "clé" . ScriptInformation["MagicKey"], "🔑")
@@ -763,18 +763,18 @@ CreateHotstring("*", "clé" . ScriptInformation["MagicKey"], "🔑")
 
 ; Load every section declared in personal_hotstrings.toml (e.g. emailshortcuts,
 ; code, professionalvocabulary, autocorrection). Each section has its own
-; toggle in FeaturesV2["hotstrings"]["personal"] — disabled sections are
+; toggle in Features["hotstrings"]["personal"] — disabled sections are
 ; skipped silently.
 ;
 ; Order matters: AHK fires the LAST-registered hotstring that matches, so we
 ; must register longer / more-specific triggers AFTER shorter ones. Sections
 ; whose triggers start with a special prefix (@, ., :, etc.) are typically
 ; longer composites of plain triggers, so we load them LAST. We achieve this
-; by iterating the v2 Map in reverse — ApplyConfigTomlV2 preserves the
+; by iterating the v2 Map in reverse — ApplyConfigToml preserves the
 ; insertion order of the [hotstrings.personal.*] sections from the user's
 ; config.toml, so reversing here gives "load prominent sections last".
-if FeaturesV2.Has("hotstrings") and FeaturesV2["hotstrings"].Has("personal") {
-    _PersonalGroup := FeaturesV2["hotstrings"]["personal"]
+if Features.Has("hotstrings") and Features["hotstrings"].Has("personal") {
+    _PersonalGroup := Features["hotstrings"]["personal"]
     _PersonalKeys := []
     for _Key in _PersonalGroup {
         _PersonalKeys.Push(_Key)
