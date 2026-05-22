@@ -289,24 +289,33 @@ GetSubMenuLabel(FullPath, FallbackKey) {
 ;     suffix mirroring the legacy ``EnrichSectionDescriptionsWithCounts``
 ;     behaviour.
 GetMenuTitleByPath(FullPath) {
-	; Try the manifest first — single source of truth for declared features.
+	; Try the manifest+i18n first — single source of truth for declared
+	; features. When the locale JSON has no entry for the manifest
+	; description_key chain, fall through to Features.Description so user-
+	; defined Personal hotstring sections (whose descriptions live in
+	; their TOML's [_meta.sections] and are populated on Features at boot
+	; by ApplyTomlMetadataToFeatures) still render correctly.
 	V2Path := V1PathToV2ManifestPath(FullPath)
+	Entry := false
 	if (V2Path != "") {
 		Entry := ManifestFindEntryByV2Path(V2Path)
-		if (Entry != false) {
-			MenuTitle := MenuLabelFromManifestEntry(Entry)
-			MenuTitle := _ApplyMenuLabelDynamicSubstitutions(MenuTitle, FullPath)
+	}
+	if (Entry != false) {
+		Label := TryMenuLabelFromManifestEntry(Entry)
+		if (Label != "") {
+			Label := _ApplyMenuLabelDynamicSubstitutions(Label, FullPath)
 			if _ManifestEntryHasLetter(Entry) {
 				State := GetFeatureV2State(FullPath)
 				if (State.Has("Letter") and State["Letter"] != "") {
-					MenuTitle := MenuTitle StrUpper(State["Letter"])
+					Label := Label StrUpper(State["Letter"])
 				}
 			}
-			return MenuTitle
+			return Label
 		}
 	}
 
-	; Fall back to v1 Features.Description for features outside the manifest.
+	; Fall back to v1 Features.Description for features outside the manifest
+	; or that have no i18n entry (TapHolds variants, user Personal sections).
 	Feature := GetFeatureByPath(FullPath)
 	if !IsObject(Feature)
 		return FullPath
