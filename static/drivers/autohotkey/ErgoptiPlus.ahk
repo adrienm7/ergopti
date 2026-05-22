@@ -1334,10 +1334,6 @@ SaveFullConfig() {
 
     ; [hotstrings] root — MagicKey lives at hotstrings.trigger_char.
     Updates.Push({ Section: "hotstrings", Key: "trigger_char", Value: ScriptInformation["MagicKey"] })
-    global HSE_RepeatEnabled
-    if IsSet(HSE_RepeatEnabled) {
-        Updates.Push({ Section: "hotstrings", Key: "repeat_key_enabled", Value: HSE_RepeatEnabled })
-    }
 
     ; [ahk.shortcuts.script_control] — script management hotkey slots.
     if IsSet(ScriptShortcutAssignments) {
@@ -1394,11 +1390,11 @@ SaveFullConfig() {
     }
     Updates.Push({ Section: "llm", Key: "app_profile_overrides", Value: _AppOverridesStr })
 
-    ; [category_enabled] — master category gating state.
+    ; [ahk.category_enabled] — master category gating state.
     global CategoryEnabled
     if IsSet(CategoryEnabled) {
         for _CatName, _CatBool in CategoryEnabled {
-            Updates.Push({ Section: "category_enabled", Key: _CategoryEnabledKey(_CatName), Value: _CatBool })
+            Updates.Push({ Section: "ahk.category_enabled", Key: _CategoryEnabledKey(_CatName), Value: _CatBool })
         }
     }
 
