@@ -289,8 +289,21 @@ GetMenuTitleByPath(FullPath) {
 		}
 	}
 
+	; Personal shortcuts: description is stored in _PersonalShortcutsRegistry,
+	; not the manifest — resolve directly to avoid the Features v1 fallback.
+	Parts := StrSplit(FullPath, ".")
+	if (Parts.Length == 3 and Parts[1] == "Shortcuts" and Parts[2] == "Personal") {
+		global _PersonalShortcutsRegistry
+		Name := Parts[3]
+		if _PersonalShortcutsRegistry.Has(Name) {
+			Desc := _PersonalShortcutsRegistry[Name]
+			return (Desc != "") ? Desc : Name
+		}
+		return Name
+	}
+
 	; Fall back to v1 Features.Description for features outside the manifest
-	; or that have no i18n entry (TapHolds variants, user Personal sections).
+	; or that have no i18n entry (TapHolds variants).
 	Feature := GetFeatureByPath(FullPath)
 	if !IsObject(Feature)
 		return FullPath
@@ -1000,7 +1013,7 @@ global _SHORTCUTS_SUBMAP_V1V2 := Map(
 ;     ↳ Accents (4 letter pickers — EGrave/ECirc/EAcute/AGrave)
 ;     ↳ WrapTextIfSelected (plain bool toggle)
 ;     ↳ Modifier combos (3 sub-Maps × 10 plain bools each)
-;     ↳ (Personal — transitional, only when user has personal shortcuts)
+;     ↳ (Personal — only when user has personal shortcuts)
 ;
 ; The "Modifier combos" submenu must use the exact i18n label
 ; ``t("menu.shortcuts.group_modifiers")`` — initMenu's
@@ -1038,13 +1051,9 @@ _BuildShortcutsSubmenu() {
 	}
 	SubMenu.Add(t("menu.shortcuts.group_modifiers"), ModifiersMenu)
 
-	; ── Personal sub-Map (transitional) ──────────────────────
-	; RegisterPersonalFeature in ErgoptiPlus.ahk mutates
-	; ``Features["Shortcuts"]["Personal"]`` at runtime to hold user-defined
-	; personal shortcut toggles loaded from personal_shortcuts.ahk. Until
-	; that subsystem migrates to FeaturesV2 (next slice), keep reading the
-	; v1 Features Map here so a user with personal shortcuts still sees
-	; them in the Raccourcis menu.
+	; ── Personal shortcuts ───────────────────────────────────
+	; Appends a separator + nested submenu when personal_shortcuts.ahk has
+	; registered at least one toggle via RegisterPersonalFeature.
 	_AppendPersonalShortcutsSubmenuIfAny(SubMenu)
 
 	return SubMenu
@@ -1102,34 +1111,17 @@ _BuildTapHoldsSubmenu() {
 	return SubMenu
 }
 
-; Transitional: render the runtime-built Shortcuts.Personal sub-Map at
-; the bottom of the Raccourcis menu when it carries entries (separator
-; + nested submenu of per-name toggles). To be removed in the slice that
-; migrates RegisterPersonalFeature off the v1 Features Map.
+; Render the runtime-registered personal shortcuts at the bottom of the
+; Raccourcis menu when any have been declared by personal_shortcuts.ahk
+; (separator + nested submenu of per-name toggles). Reads from the
+; ``_PersonalShortcutsRegistry`` global populated by RegisterPersonalFeature
+; so no Features v1 Map access is required.
 _AppendPersonalShortcutsSubmenuIfAny(ShortcutsMenu) {
-	global Features
-	if !Features.Has("Shortcuts") {
+	global _PersonalShortcutsRegistry
+	if !_PersonalShortcutsRegistry.Has("__Order") {
 		return
 	}
-	Sc := Features["Shortcuts"]
-	if !Sc.Has("Personal") {
-		return
-	}
-	Personal := Sc["Personal"]
-	if !(IsObject(Personal) and Type(Personal) == "Map") {
-		return
-	}
-	; A Personal sub-Map with no user entries (only the __Order / __Label
-	; metadata keys) would render as an empty submenu — skip it to avoid
-	; visual noise. Iterating __Order gives just the user-registered names.
-	Names := []
-	if Personal.Has("__Order") {
-		for Item in Personal["__Order"] {
-			if (Item != "" and Item != "__Order" and Item != "__Label") {
-				Names.Push(Item)
-			}
-		}
-	}
+	Names := _PersonalShortcutsRegistry["__Order"]
 	if (Names.Length == 0) {
 		return
 	}
