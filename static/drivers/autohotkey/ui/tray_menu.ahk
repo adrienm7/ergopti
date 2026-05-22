@@ -108,8 +108,11 @@ MenuAddItem(MenuParent, FeatureCategoryPath, FeatureName) {
 	; behavior as before in that case).
 	RegisterMenuItem(MenuParent, MenuTitle, (*) => ToggleMenuVariableByPath(FullPath))
 
-	Feature := GetFeatureByPath(FullPath)
-	if Feature.Enabled {
+	; Read the runtime state from FeaturesV2 via the path translator —
+	; v1 Features Map is no longer the source of truth for .Enabled.
+	State := GetFeatureV2State(FullPath)
+	IsEnabled := State.Has("Enabled") and State["Enabled"]
+	if IsEnabled {
 		MenuParent.Check(MenuTitle)
 	} else {
 		MenuParent.Uncheck(MenuTitle)
@@ -118,8 +121,9 @@ MenuAddItem(MenuParent, FeatureCategoryPath, FeatureName) {
 	; Phase 7.5 (UX): grey out the item when its master category gate is
 	; off. The toggle is still visible (so the user can see what would be
 	; available if they re-enabled the master) but clicking it does
-	; nothing — the v2 mirror gates the underlying behavior to false
-	; regardless of the per-feature .Enabled value.
+	; nothing — ApplyMasterGatesToFeaturesV2 forces every feature in the
+	; category to false in FeaturesV2, so the HotIf evaluations all
+	; short-circuit regardless of the persisted per-feature state.
 	if !IsCategoryGated(_MasterCategoryFor(FeatureCategoryPath)) {
 		try MenuParent.Disable(MenuTitle)
 	}
@@ -163,15 +167,17 @@ _MasterCategoryFor(FeatureCategoryPath) {
 ; "<description><LETTER>" string built by GetMenuTitleByPath.
 MenuAddLetterPicker(MenuParent, FeatureCategoryPath, FeatureName) {
 	FullPath := FeatureCategoryPath "." FeatureName
-	Feature := GetFeatureByPath(FullPath)
 	MenuTitle := GetMenuTitleByPath(FullPath)
+	State := GetFeatureV2State(FullPath)
+	IsEnabled := State.Has("Enabled") and State["Enabled"]
+	CurrentLetter := State.Has("Letter") ? StrLower(State["Letter"]) : ""
 
 	LetterMenu := Menu()
 
 	; Entry that disables the remap without touching Letter
 	DisabledLabel := t("common.disabled")
 	RegisterMenuItem(LetterMenu, DisabledLabel, ((p) => (*) => SetFeatureLetterOff(p))(FullPath))
-	if !Feature.Enabled {
+	if !IsEnabled {
 		LetterMenu.Check(DisabledLabel)
 	}
 
@@ -180,19 +186,18 @@ MenuAddLetterPicker(MenuParent, FeatureCategoryPath, FeatureName) {
 	; 26 letters a-z, displayed uppercase for menu legibility.
 	; RegisterMenuItem (instead of LetterMenu.Add) installs the OnMessage
 	; dispatcher bypass so clicks survive the AHK 2.0 menu-callback drop.
-	CurrentLetter := Feature.HasOwnProp("Letter") ? StrLower(Feature.Letter) : ""
 	loop 26 {
 		L := Chr(Ord("a") + A_Index - 1)
 		UpperL := StrUpper(L)
 		RegisterMenuItem(LetterMenu, UpperL,
 			((p, l) => (*) => SetFeatureLetter(p, l))(FullPath, L))
-		if Feature.Enabled and CurrentLetter == L {
+		if IsEnabled and CurrentLetter == L {
 			LetterMenu.Check(UpperL)
 		}
 	}
 
 	MenuParent.Add(MenuTitle, LetterMenu)
-	if Feature.Enabled {
+	if IsEnabled {
 		MenuParent.Check(MenuTitle)
 	}
 
@@ -234,7 +239,11 @@ GetSubMenuLabel(FullPath, FallbackKey) {
 	return FallbackKey
 }
 
-; Retrieve a feature title by its path
+; Retrieve a feature title by its path. The static description (label text)
+; still comes from the legacy Features Map — populated at boot by
+; ApplyTomlMetadataToFeatures + ApplyLocaleDescriptions — but the live
+; ``Letter`` suffix appended for letter pickers is read from FeaturesV2 so
+; the title reflects the user's persisted choice immediately after a Reload.
 GetMenuTitleByPath(FullPath) {
 	Feature := GetFeatureByPath(FullPath)
 	if !IsObject(Feature)
@@ -242,8 +251,12 @@ GetMenuTitleByPath(FullPath) {
 
 	if Feature.HasOwnProp("Description") {
 		MenuTitle := Feature.Description
-		if Feature.HasOwnProp("Letter")
-			MenuTitle := MenuTitle StrUpper(Feature.Letter)
+		if Feature.HasOwnProp("Letter") {
+			State := GetFeatureV2State(FullPath)
+			if (State.Has("Letter") and State["Letter"] != "") {
+				MenuTitle := MenuTitle StrUpper(State["Letter"])
+			}
+		}
 		return MenuTitle
 	}
 	return FullPath
@@ -260,8 +273,9 @@ GetFeatureByPath(FullPath) {
 }
 
 ToggleMenuVariableByPath(FullPath) {
-	Feature := GetFeatureByPath(FullPath)
-	NewValue := !Feature.Enabled
+	State := GetFeatureV2State(FullPath)
+	CurrentEnabled := State.Has("Enabled") and State["Enabled"]
+	NewValue := !CurrentEnabled
 
 	; Find position of the last dot
 	pos := InStr(FullPath, ".", , -1)
@@ -278,7 +292,10 @@ ToggleMenuVariableByPath(FullPath) {
 	if (DotCount >= 2) {
 		; Set to False all shortcut possibilities — mutually-exclusive group
 		; (e.g. AltGrLAlt sub-Map: only one of BackSpace/CapsLock/... should
-		; be Enabled at a time).
+		; be Enabled at a time). Walking the v1 Features Map here is fine
+		; because the legacy structure still drives the menu shape; the
+		; per-shortcut writes themselves flow through WriteV2Batch and
+		; persist as v2 sections.
 		FeatureCategory := GetFeatureByPath(FeatureCategoryPath)
 		for ShortcutName in FeatureCategory {
 			Batch.Push(Map("v1_path", FeatureCategoryPath . "." . ShortcutName . ".Enabled",
