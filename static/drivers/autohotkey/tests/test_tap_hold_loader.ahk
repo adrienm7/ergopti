@@ -50,7 +50,7 @@ Test("LoadTapHoldToml: missing file returns empty scaffold", _TH_MissingFileRetu
 _TH_ParsesSingleKeyEntry() {
 	Path := _TH_Write(
 		"[tap_hold.keys.caps_lock]`r`n"
-		. "tap_action = ""enter""`r`n"
+		. "tap_action = `"enter`"`r`n"
 		. "time_activation_seconds = 0.35`r`n"
 	)
 	TH := LoadTapHoldToml(Path)
@@ -64,7 +64,7 @@ Test("LoadTapHoldToml: parses a single key entry", _TH_ParsesSingleKeyEntry)
 _TH_ParsesHoldModifier() {
 	Path := _TH_Write(
 		"[tap_hold.keys.left_ctrl]`r`n"
-		. "hold_modifier = ""ctrl""`r`n"
+		. "hold_modifier = `"ctrl`"`r`n"
 	)
 	TH := LoadTapHoldToml(Path)
 	_TH_Clean()
@@ -75,7 +75,7 @@ Test("LoadTapHoldToml: parses hold_modifier", _TH_ParsesHoldModifier)
 _TH_ParsesHoldLayer() {
 	Path := _TH_Write(
 		"[tap_hold.keys.space]`r`n"
-		. "hold_layer = ""nav""`r`n"
+		. "hold_layer = `"nav`"`r`n"
 	)
 	TH := LoadTapHoldToml(Path)
 	_TH_Clean()
@@ -86,9 +86,9 @@ Test("LoadTapHoldToml: parses hold_layer", _TH_ParsesHoldLayer)
 _TH_ParsesMultipleKeysIndependently() {
 	Path := _TH_Write(
 		"[tap_hold.keys.caps_lock]`r`n"
-		. "tap_action = ""backspace""`r`n"
+		. "tap_action = `"backspace`"`r`n"
 		. "[tap_hold.keys.right_ctrl]`r`n"
-		. "tap_action = ""tab""`r`n"
+		. "tap_action = `"tab`"`r`n"
 	)
 	TH := LoadTapHoldToml(Path)
 	_TH_Clean()
@@ -101,8 +101,8 @@ Test("LoadTapHoldToml: parses multiple keys independently", _TH_ParsesMultipleKe
 _TH_ParsesLayerMappingsBlock() {
 	Path := _TH_Write(
 		"[tap_hold.layers.nav.mappings]`r`n"
-		. "h = ""arrow_left""`r`n"
-		. "j = ""arrow_down""`r`n"
+		. "h = `"arrow_left`"`r`n"
+		. "j = `"arrow_down`"`r`n"
 	)
 	TH := LoadTapHoldToml(Path)
 	_TH_Clean()
@@ -115,9 +115,9 @@ Test("LoadTapHoldToml: parses layer mappings block", _TH_ParsesLayerMappingsBloc
 _TH_IgnoresUnrecognisedSectionHeaders() {
 	Path := _TH_Write(
 		"[some_other_section]`r`n"
-		. "foo = ""bar""`r`n"
+		. "foo = `"bar`"`r`n"
 		. "[tap_hold.keys.lalt]`r`n"
-		. "tap_action = ""one_shot_shift""`r`n"
+		. "tap_action = `"one_shot_shift`"`r`n"
 	)
 	TH := LoadTapHoldToml(Path)
 	_TH_Clean()
@@ -132,7 +132,7 @@ _TH_IgnoresBlankLinesAndComments() {
 		. "`r`n"
 		. "[tap_hold.keys.tab]`r`n"
 		. "; another comment`r`n"
-		. "tap_action = ""alt_tab_monitor""`r`n"
+		. "tap_action = `"alt_tab_monitor`"`r`n"
 	)
 	TH := LoadTapHoldToml(Path)
 	_TH_Clean()
