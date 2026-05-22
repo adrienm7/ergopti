@@ -458,34 +458,57 @@ ToggleMenuVariableByPath(FullPath) {
 	CurrentEnabled := _ResolveMenuItemEnabled(FullPath)
 	NewValue := !CurrentEnabled
 
-	; Find position of the last dot
-	pos := InStr(FullPath, ".", , -1)
-	if (pos) {
-		FeatureCategoryPath := SubStr(FullPath, 1, pos - 1)
-	} else {
-		FeatureCategoryPath := FullPath
-	}
-
-	; Collect all mutations into a single batch so the on-disk write is atomic.
+	; Mutually-exclusive groups (Shortcuts sub-Maps: AltGrLAlt, AltGrCapsLock,
+	; LAltCapsLock) require every sibling to be set to false in the same
+	; atomic batch so the on-disk write reflects the picked variant alone.
+	; ``_MutexSiblingPathsFor(FullPath)`` returns the sibling v1 paths for
+	; the cases that need it; TapHolds mutex resolution is handled inside
+	; ``WriteTapHoldBatch`` itself (last true wins per V1 key) so the writer
+	; doesn't need an enumeration here. Everything else returns an empty
+	; list — toggles are independent.
 	Batch := []
-	; Count dot levels in FullPath
-	DotCount := StrLen(FullPath) - StrLen(StrReplace(FullPath, ".", ""))
-	if (DotCount >= 2) {
-		; Set to False all shortcut possibilities — mutually-exclusive group
-		; (e.g. AltGrLAlt sub-Map: only one of BackSpace/CapsLock/... should
-		; be Enabled at a time). Walking the v1 Features Map here is fine
-		; because the legacy structure still drives the menu shape; the
-		; per-shortcut writes themselves flow through WriteV2Batch and
-		; persist as v2 sections.
-		FeatureCategory := GetFeatureByPath(FeatureCategoryPath)
-		for ShortcutName in FeatureCategory {
-			Batch.Push(Map("v1_path", FeatureCategoryPath . "." . ShortcutName . ".Enabled",
-				"value", false))
-		}
+	for SiblingPath in _MutexSiblingPathsFor(FullPath) {
+		Batch.Push(Map("v1_path", SiblingPath . ".Enabled", "value", false))
 	}
 	Batch.Push(Map("v1_path", FullPath . ".Enabled", "value", NewValue))
 	WriteV2Batch(Batch)
 	Reload
+}
+
+; Return the list of sibling v1 feature paths that must be force-set to false
+; when the user toggles ``FullPath`` to true. Empty list means no mutex
+; semantics — each toggle in the group is independent. This replaces the
+; previous ``GetFeatureByPath(FeatureCategoryPath)`` walk which mistakenly
+; iterated metadata keys (``__Order``, ``__Label``, ``__Configuration``)
+; emitting warning-noise WriteV2Batch updates, and incorrectly disabled
+; every Personal shortcut whenever the user toggled one.
+_MutexSiblingPathsFor(FullPath) {
+	global _V1V2_ShortcutsSubMapGroupMap, _V1V2_ShortcutsSubMapKeyMap
+	Parts := StrSplit(FullPath, ".")
+
+	; Shortcuts sub-Map groups (AltGrLAlt / AltGrCapsLock / LAltCapsLock):
+	; true mutex — only one variant can be active. Siblings come from the
+	; canonical rename table (the v2 schema is authoritative for which keys
+	; the group accepts).
+	if (Parts.Length == 3 and Parts[1] == "Shortcuts"
+		and _V1V2_ShortcutsSubMapGroupMap.Has(Parts[2])) {
+		Siblings := []
+		for V1Key, _V2Key in _V1V2_ShortcutsSubMapKeyMap {
+			if (V1Key != Parts[3]) {
+				Siblings.Push(Parts[1] . "." . Parts[2] . "." . V1Key)
+			}
+		}
+		return Siblings
+	}
+
+	; TapHolds variant toggles do not need a sibling-false batch: the v2
+	; schema condenses the mutually-exclusive variants into a single
+	; ``[tap_hold.keys.<id>]`` block, and ``WriteTapHoldBatch`` resolves
+	; which variant is active by picking the last true entry per V1 key.
+	; Sending just the single ``{variant: NewValue}`` entry is enough.
+	;
+	; Every other path is independent — return [].
+	return []
 }
 
 GetCategoryTitle(Category) {
