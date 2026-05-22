@@ -1453,17 +1453,23 @@ GestureToggleLeftClick() {
 
     ; Install a keyboard hook that releases the button on any key press
     GestureStartKeyboardWatcher()
+    ; Arm the RButton watcher dynamically — avoids installing the mouse hook
+    ; at load-time (which blocks on a headless CI runner with no hardware)
+    Hotkey("~RButton", GestureReleaseLeftClick, "On")
     LoggerInfo("gestures", "Left-click hold mode enabled.")
 }
 
 ; Releases the left mouse button if it is currently held by the toggle.
-GestureReleaseLeftClick() {
+GestureReleaseLeftClick(*) {
     global GestureLeftClickHeld, GestureRightClickHeld
 
     if (!GestureLeftClickHeld) {
         return
     }
 
+    ; Disarm the RButton watcher before releasing so the Hotkey() call does
+    ; not itself trigger another GestureReleaseLeftClick invocation
+    try Hotkey("~RButton", GestureReleaseLeftClick, "Off")
     LoggerDebug("gestures", "Disabling left-click hold mode…")
     Click("Left", "Up")
     GestureLeftClickHeld := False
@@ -1503,29 +1509,11 @@ GestureOnKeyDown(ih, vk, sc) {
     GestureReleaseRightClick()
 }
 
-; Wrapper required: #HotIf evaluates before globals are assigned at runtime
-IsGestureLeftClickHeld() {
-    global GestureLeftClickHeld
-    return IsSet(GestureLeftClickHeld) ? GestureLeftClickHeld : False
-}
-
-IsGestureRightClickHeld() {
-    global GestureRightClickHeld
-    return IsSet(GestureRightClickHeld) ? GestureRightClickHeld : False
-}
-
-; Also release on a physical click so the toggle hands control back.
-#HotIf IsGestureLeftClickHeld()
-~RButton:: {
-    GestureReleaseLeftClick()
-}
-#HotIf
-
-#HotIf IsGestureRightClickHeld()
-~LButton:: {
-    GestureReleaseRightClick()
-}
-#HotIf
+; NOTE: the ~RButton / ~LButton cross-release hotkeys are registered
+; dynamically via Hotkey() inside GestureToggleLeftClick / GestureToggleRightClick
+; rather than as static #HotIf blocks. Static mouse-button hotkeys install the
+; mouse hook at load-time, which blocks indefinitely on a headless CI runner
+; that has no physical mouse hardware attached.
 
 ; Activates or deactivates a right-button-held mode. Mirrors GestureToggleLeftClick.
 GestureToggleRightClick() {
@@ -1542,17 +1530,23 @@ GestureToggleRightClick() {
 
     ; Install a keyboard hook that releases the button on any key press
     GestureStartKeyboardWatcher()
+    ; Arm the LButton watcher dynamically — avoids installing the mouse hook
+    ; at load-time (which blocks on a headless CI runner with no hardware)
+    Hotkey("~LButton", GestureReleaseRightClick, "On")
     LoggerInfo("gestures", "Right-click hold mode enabled.")
 }
 
 ; Releases the right mouse button if it is currently held by the toggle.
-GestureReleaseRightClick() {
+GestureReleaseRightClick(*) {
     global GestureRightClickHeld, GestureLeftClickHeld
 
     if (!GestureRightClickHeld) {
         return
     }
 
+    ; Disarm the LButton watcher before releasing so the Hotkey() call does
+    ; not itself trigger another GestureReleaseRightClick invocation
+    try Hotkey("~LButton", GestureReleaseRightClick, "Off")
     LoggerDebug("gestures", "Disabling right-click hold mode…")
     Click("Right", "Up")
     GestureRightClickHeld := False
