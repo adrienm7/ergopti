@@ -39,6 +39,16 @@ jobs:
                   path: C:\AutoHotkey
                   key: ahk-v2.0.19-windows
 
+            - name: Set up Node.js
+              uses: actions/setup-node@v4
+              with:
+                  node-version: "lts/*"
+                  cache: "npm"
+
+            - name: Install Node dependencies
+              run: npm ci
+              shell: pwsh
+
             - name: Build features manifest
               run: node ./scripts/build-features-manifest.js
               shell: pwsh
