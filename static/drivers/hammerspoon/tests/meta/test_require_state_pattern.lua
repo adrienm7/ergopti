@@ -23,7 +23,7 @@ local function list_lua_files(dir)
 	local pipe = io.popen(cmd) ; if not pipe then return files end
 	for line in pipe:lines() do
 		line = line:gsub("\\", "/")
-		if line:match("%.lua$") and not line:match("/hs/_asm/") and not line:match("/tests/") then
+		if line:match("%.lua$") and not line:match("/vendor/hs_asm/") and not line:match("/tests/") then
 			files[#files + 1] = line
 		end
 	end

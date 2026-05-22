@@ -1,4 +1,4 @@
-; static/drivers/autohotkey/tests/test_stubs.ahk
+﻿; static/drivers/autohotkey/tests/test_stubs.ahk
 
 ; ==============================================================================
 ; MODULE: Test Stubs
@@ -425,6 +425,13 @@ UpdateLastSentCharacter(Character) {
 DeadKey(Mapping) {
     global _Stub_DeadKeyCalls
     _Stub_DeadKeyCalls.Push(Mapping)
+}
+
+; UpdateCapsLockLED lives in modules/shortcuts/capsword.ahk (not included).
+; nav_layer_helpers.ahk calls it after toggling LayerEnabled.
+UpdateCapsLockLED() {
+    global _Stub_SentText
+    _Stub_SentText.Push({ kind: "update_capslock_led" })
 }
 
 ; Toggle helpers consulted by tap-hold and shortcut dispatchers.

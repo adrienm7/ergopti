@@ -128,7 +128,7 @@ _I18nDetectSystemLocale() {
 _I18nLoadFile(FilePath) {
 	global _I18nCache, _I18nCacheLoaded, ScriptInformation
 
-	_I18nCache    := Map()
+	_I18nCache       := Map()
 	_I18nCacheLoaded := false
 
 	if !FileExist(FilePath) {
@@ -143,30 +143,19 @@ _I18nLoadFile(FilePath) {
 		return
 	}
 
-	; Minimal flat-JSON parser — mirrors the one in toml_loader.ahk.
-	; Extracts every "key": "value" pair; keys use dot notation.
 	MagicKey := IsSet(ScriptInformation) and ScriptInformation.Has("MagicKey")
 		? ScriptInformation["MagicKey"]
 		: "★"
 
-	Pos := 1
-	FileLen := StrLen(FileContent)
-	while Pos <= FileLen {
-		if !RegExMatch(FileContent, '`"([^`"]+)`"\s*:\s*`"((?:[^`"\\]|\\.)*)`"', &KVMatch, Pos)
-			break
-		RawKey := KVMatch[1]
-		RawVal := KVMatch[2]
-		; JSON unescape: \\, \", \n, \t, \r, \/
-		Val := StrReplace(RawVal, "\\", Chr(1))
-		Val := StrReplace(Val, '\"', "`"")
-		Val := StrReplace(Val, "\n", "`n")
-		Val := StrReplace(Val, "\t", "`t")
-		Val := StrReplace(Val, "\r", "`r")
-		Val := StrReplace(Val, "\/", "/")
-		Val := StrReplace(Val, Chr(1), "\")
-		Val := StrReplace(Val, "★", MagicKey)
-		_I18nCache[RawKey] := Val
-		Pos := KVMatch.Pos + KVMatch.Len
+	try {
+		Parsed := JsonParse(FileContent)
+	} catch as err {
+		try LoggerWarn("i18n", "JSON parse error in '{1}': {2}", FilePath, err.Message)
+		return
+	}
+
+	for Key, Val in Parsed {
+		_I18nCache[Key] := StrReplace(Val, "★", MagicKey)
 	}
 
 	_I18nCacheLoaded := true
@@ -178,9 +167,6 @@ _I18nLoadInto(Code, &Cache, &Loaded) {
 	if Loaded
 		return
 	FilePath := _I18nLocalePath(Code)
-	TempCache := Map()
-	TempLoaded := false
-	; Reuse _I18nLoadFile logic inline with a local cache target
 	global ScriptInformation
 	if !FileExist(FilePath) {
 		try LoggerWarn("i18n", "Fallback locale file not found: '{1}'.", FilePath)
@@ -196,21 +182,16 @@ _I18nLoadInto(Code, &Cache, &Loaded) {
 	}
 	MagicKey := IsSet(ScriptInformation) and ScriptInformation.Has("MagicKey")
 		? ScriptInformation["MagicKey"] : "★"
-	Pos := 1
-	FileLen := StrLen(FileContent)
-	while Pos <= FileLen {
-		if !RegExMatch(FileContent, '`"([^`"]+)`"\s*:\s*`"((?:[^`"\\]|\\.)*)`"', &KVMatch, Pos)
-			break
-		Val := StrReplace(KVMatch[2], "\\", Chr(1))
-		Val := StrReplace(Val, '\"', "`"")
-		Val := StrReplace(Val, "\n", "`n")
-		Val := StrReplace(Val, "\t", "`t")
-		Val := StrReplace(Val, "\r", "`r")
-		Val := StrReplace(Val, "\/", "/")
-		Val := StrReplace(Val, Chr(1), "\")
-		Val := StrReplace(Val, "★", MagicKey)
-		TempCache[KVMatch[1]] := Val
-		Pos := KVMatch.Pos + KVMatch.Len
+	try {
+		Parsed := JsonParse(FileContent)
+	} catch as err {
+		try LoggerWarn("i18n", "JSON parse error in fallback locale '{1}': {2}", Code, err.Message)
+		Loaded := false
+		return
+	}
+	TempCache := Map()
+	for Key, Val in Parsed {
+		TempCache[Key] := StrReplace(Val, "★", MagicKey)
 	}
 	Cache  := TempCache
 	Loaded := true

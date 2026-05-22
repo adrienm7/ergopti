@@ -24,7 +24,7 @@ local SRC_DIRS    = { "lib", "modules", "ui" }
 --- @return boolean
 local function is_target_file(path)
 	if not path:match("%.lua$") then return false end
-	if path:match("[/\\]hs[/\\]_asm[/\\]") then return false end
+	if path:match("[/\\]vendor[/\\]hs_asm[/\\]") then return false end
 	if path:match("[/\\]tests[/\\]") then return false end
 	return true
 end
