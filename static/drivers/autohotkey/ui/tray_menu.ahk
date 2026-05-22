@@ -272,12 +272,32 @@ GetSubMenuLabel(FullPath, FallbackKey) {
 	return FallbackKey
 }
 
-; Retrieve a feature title by its path. The static description (label text)
-; still comes from the legacy Features Map — populated at boot by
-; ApplyTomlMetadataToFeatures + ApplyLocaleDescriptions — but the live
-; ``Letter`` suffix appended for letter pickers is read from FeaturesV2 so
-; the title reflects the user's persisted choice immediately after a Reload.
+; Retrieve a feature title by its path. The label is sourced from the
+; canonical manifest entry's ``description_key`` (resolved against the
+; current i18n locale via ``MenuLabelFromManifestEntry``) whenever a
+; matching entry exists; falls back to the legacy ``Feature.Description``
+; populated on the v1 Features Map for non-manifest features (TapHolds,
+; runtime-discovered Personal sections). The live ``Letter`` suffix
+; appended for letter pickers is always read from FeaturesV2 so the
+; title reflects the user's persisted choice immediately after a Reload.
 GetMenuTitleByPath(FullPath) {
+	; Try the manifest first — single source of truth for declared features.
+	V2Path := V1PathToV2ManifestPath(FullPath)
+	if (V2Path != "") {
+		Entry := ManifestFindEntryByV2Path(V2Path)
+		if (Entry != false) {
+			MenuTitle := MenuLabelFromManifestEntry(Entry)
+			if _ManifestEntryHasLetter(Entry) {
+				State := GetFeatureV2State(FullPath)
+				if (State.Has("Letter") and State["Letter"] != "") {
+					MenuTitle := MenuTitle StrUpper(State["Letter"])
+				}
+			}
+			return MenuTitle
+		}
+	}
+
+	; Fall back to v1 Features.Description for features outside the manifest.
 	Feature := GetFeatureByPath(FullPath)
 	if !IsObject(Feature)
 		return FullPath
@@ -293,6 +313,16 @@ GetMenuTitleByPath(FullPath) {
 		return MenuTitle
 	}
 	return FullPath
+}
+
+; Detect whether a manifest entry declares a ``letter`` default — used to
+; decide whether to append the live letter suffix to the menu title.
+_ManifestEntryHasLetter(Entry) {
+	if !(IsObject(Entry) and Entry.Has("default")) {
+		return false
+	}
+	Def := Entry["default"]
+	return (Type(Def) == "Map" and Def.Has("letter"))
 }
 
 ; Retrieve a feature object by its path

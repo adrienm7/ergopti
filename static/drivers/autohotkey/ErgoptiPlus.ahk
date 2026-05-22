@@ -551,18 +551,16 @@ ReadPersonalInfoToml(ScriptInformation["PersonalInfoTomlPath"])
 
 ; Pull menu titles and submenu ordering from the per-category TOML files so
 ; that those hotstring files are the single source of truth for both the
-; hotstring payload and the feature descriptions shown in the tray menu.
-; Categories without a dedicated TOML (``Layout``, ``Shortcuts``, ``Gestures``,
-; and the flat DynamicHotstrings entries) get their descriptions from the locale
-; file via ``ApplyLocaleDescriptions``. ``TapHolds`` descriptions come from
-; ``tap_hold_config.ahk``.
+; hotstring payload and the per-section ``__Order`` shown in the tray menu.
+; Per-feature labels themselves come from the manifest's ``description_key``
+; resolved via i18n at render time (see lib/manifest_descriptions.ahk);
+; ``TapHolds`` descriptions come from ``tap_hold_config.ahk``.
 ApplyTomlMetadataToFeatures("Autocorrection")
 ApplyTomlMetadataToFeatures("DistancesReduction")
 ApplyTomlMetadataToFeatures("MagicKey")
 ApplyTomlMetadataToFeatures("Rolls")
 ApplyTomlMetadataToFeatures("SFBsReduction")
 ApplyIndexTomlToDynamicHotstrings()
-ApplyLocaleDescriptions(I18nGetLocale())
 
 
 
@@ -917,12 +915,14 @@ try {
 #InputLevel 0
 ; ``ApplyConfigTomlV2`` above hydrated ``FeaturesV2`` from the canonical
 ; v2 sections of the user's config.toml. The tray-menu builder still walks
-; the legacy ``Features`` Map for static structure (categories, __Order,
-; descriptions populated by ApplyTomlMetadataToFeatures + ApplyLocaleDescriptions
-; below), but every per-item .Enabled / .Letter / .Link read now goes
-; through ``GetFeatureV2State`` against FeaturesV2 — no reverse mirror needed.
-; ``ApplyMasterGatesToFeaturesV2`` short-circuits gated categories on the
-; v2 side so #HotIf evaluations all return false while the master is off.
+; the legacy ``Features`` Map for static structure (sub-Map keys, __Order
+; arrays populated by ApplyTomlMetadataToFeatures for hotstring categories),
+; but every per-item .Enabled / .Letter / .Link read now goes through
+; ``GetFeatureV2State`` against FeaturesV2 — no reverse mirror needed —
+; and every label flows through ``MenuLabelFromManifestEntry`` against
+; the manifest + i18n. ``ApplyMasterGatesToFeaturesV2`` short-circuits
+; gated categories on the v2 side so #HotIf evaluations all return false
+; while the master is off.
 ApplyMasterGatesToFeaturesV2()
 
 ; Bootstrap Features["Personal"] from personal_hotstrings.toml _meta.sections
