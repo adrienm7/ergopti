@@ -1022,7 +1022,9 @@ _IsCategoryManifestRendered(Category) {
 			return true
 		}
 	}
-	return (Category == "DynamicHotstrings" or Category == "Shortcuts")
+	return (Category == "DynamicHotstrings"
+		or Category == "Shortcuts"
+		or Category == "TapHolds")
 }
 
 InitSubMenus() {
@@ -1049,6 +1051,10 @@ InitSubMenus() {
 
 	; Shortcuts — Accents + WrapTextIfSelected + Modifier combos + transitional Personal.
 	SubMenus["Shortcuts"] := _BuildShortcutsSubmenu()
+
+	; TapHolds — direct iteration of ``_TapHoldsConfig`` (TapHolds entries
+	; live outside the manifest in tap_hold_config.ahk).
+	SubMenus["TapHolds"] := _BuildTapHoldsSubmenu()
 
 	; Remaining categories still rely on the Features Map for structure —
 	; __Order arrays with virtual headers (Shortcuts), sub-Maps
@@ -1175,6 +1181,59 @@ _BuildShortcutsSubmenu() {
 	; them in the Raccourcis menu.
 	_AppendPersonalShortcutsSubmenuIfAny(SubMenu)
 
+	return SubMenu
+}
+
+; Build the TapHolds submenu directly from ``_TapHoldsConfig``
+; (lib/tap_hold_config.ahk), bypassing CreateSubMenusRecursive and the
+; v1 Features iteration that walked the same Map by indirection.
+;
+; The render shape is dictated by ``_TapHoldsConfig["__Order"]``:
+;
+;   ☰ Tap-Hold
+;     ↳ CapsLock submenu (variant toggles BackSpace / CapsLockCtrl / …)
+;     ↳ LShiftCopy (flat toggle at top level)
+;     ↳ LCtrlPaste (flat toggle)
+;     ↳ LAlt submenu (variant toggles)
+;     ↳ Space submenu
+;     ↳ AltGr submenu
+;     ↳ RCtrl submenu
+;     ↳ TabAlt (flat toggle)
+;
+; Sub-Map keys (CapsLock/LAlt/AltGr/RCtrl/Space) carry variant Maps with
+; a ``__Configuration`` metadata key (skipped) and N variant entries.
+; Each variant has a v1 path ``TapHolds.<KeyId>.<Variant>``. Flat keys
+; have a single v1 path ``TapHolds.<KeyId>``. Labels (and check state)
+; both go through the existing MenuAddItem helper — no manifest lookup
+; happens for TapHolds (no entries in the manifest) so GetMenuTitleByPath
+; falls through to the Description carried on each ``_TapHoldsConfig``
+; entry. Sub-Map container labels stay as the raw v1 Key ("CapsLock",
+; "LAlt", …) because the legacy render had no ``__Label`` on these
+; sub-Maps — preserved verbatim.
+_BuildTapHoldsSubmenu() {
+	global _TapHoldsConfig
+	SubMenu := Menu()
+	if !_TapHoldsConfig.Has("__Order") {
+		return SubMenu
+	}
+	for Key in _TapHoldsConfig["__Order"] {
+		if !_TapHoldsConfig.Has(Key) {
+			continue
+		}
+		Val := _TapHoldsConfig[Key]
+		if (Type(Val) == "Map") {
+			KeyMenu := Menu()
+			for VariantName, _VariantObj in Val {
+				if (VariantName == "__Configuration" or VariantName == "__Order") {
+					continue
+				}
+				MenuAddItem(KeyMenu, "TapHolds." . Key, VariantName)
+			}
+			SubMenu.Add(Key, KeyMenu)
+		} else if (IsObject(Val) and Val.HasOwnProp("Enabled")) {
+			MenuAddItem(SubMenu, "TapHolds", Key)
+		}
+	}
 	return SubMenu
 }
 
