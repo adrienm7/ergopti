@@ -164,14 +164,13 @@ MirrorV1ToV2_Gestures() {
 ; Sub-Map entries (10 per group, all bools) — migrated in Phase 4 so the
 ; individual ``.Enabled`` reads in modules/shortcuts.ahk and
 ; modules/tap_holds.ahk can consult ``FeaturesV2["shortcuts"][<group>][<key>]``
-; directly. The ``RunFirstSimpleAction`` / ``HasAnyEnabled`` dispatchers in
-; lib/dispatchers.ahk still iterate v1-shaped ``{Cfg.Enabled}`` objects, so
-; the dispatcher call sites (``RunFirstSimpleAction(Features["Shortcuts"]
-; ["LAltCapsLock"])`` and friends) keep passing v1 sub-Maps until those
-; helpers are widened or replaced. ``AltGrCapsLock`` has no individual
-; reads (only dispatcher calls) so we skip its mirror this phase.
-;   AltGrLAlt   — 10 entries, individually read in modules/shortcuts.ahk
-;   LAltCapsLock — 10 entries, individually read in modules/tap_holds.ahk
+; directly. Phase 10 deleted the v1 ``RunFirstSimpleAction`` / ``HasAnyEnabled``
+; dispatchers (lib/dispatchers.ahk) by inlining each shortcut handler with a
+; v2 if/else cascade, so every sub-Map is now read individually through
+; ``FeaturesV2["shortcuts"][<group>][<key>]``.
+;   AltGrCapsLock — 10 entries, read by AltGrCapsLockShortcut
+;   AltGrLAlt     — 10 entries, read by AltGrLAltShortcut
+;   LAltCapsLock  — 10 entries, read by LAltCapsLockShortcut
 ;
 ; INTENTIONALLY NOT migrated yet (kept on v1):
 ;   - Personal sub-Map: boot-path dependency on RegisterPersonalFeature.
@@ -290,8 +289,9 @@ MirrorV1ToV2_Shortcuts() {
         "Tab",           "tab",
     )
     SubMaps := Map(
-        "AltGrLAlt",    "alt_gr_lalt",
-        "LAltCapsLock", "lalt_caps_lock",
+        "AltGrCapsLock", "alt_gr_caps_lock",
+        "AltGrLAlt",     "alt_gr_lalt",
+        "LAltCapsLock",  "lalt_caps_lock",
     )
     for V1Group, V2Group in SubMaps {
         if !Features["Shortcuts"].Has(V1Group) {

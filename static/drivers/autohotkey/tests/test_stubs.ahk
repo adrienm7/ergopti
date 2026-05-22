@@ -72,7 +72,9 @@ global ScriptInformation := Map(
     "LogLevel", "INFO",
 )
 
-; Empty Features Map so HasAnyEnabled / Features lookups have a target.
+; Features v1 Map kept for the slices that have not yet migrated (Personal,
+; letter pickers in layout_ergopti, Gestures master toggle in tray_menu).
+; New code reads from FeaturesV2 — see ManifestBuildFeaturesMap.
 global Features := Map(
     "Layout", Map(
         "ErgoptiBase", { Enabled: true },
@@ -155,7 +157,20 @@ global FeaturesV2 := Map(
         ),
         ; Sub-Maps — 10 entries each (same key set as the v1 Maps).
         ; Phase 4 migrated the individual reads in modules/shortcuts.ahk
-        ; (AltGrLAlt) and modules/tap_holds.ahk (LAltCapsLock).
+        ; (AltGrLAlt) and modules/tap_holds.ahk (LAltCapsLock); phase 10
+        ; added AltGrCapsLock when the dispatcher was inlined.
+        "alt_gr_caps_lock", Map(
+            "backspace",      false,
+            "caps_lock",      false,
+            "caps_word",      false,
+            "ctrl_backspace", false,
+            "ctrl_delete",    true,
+            "delete",         false,
+            "enter",          false,
+            "escape",         false,
+            "one_shot_shift", false,
+            "tab",            false,
+        ),
         "alt_gr_lalt", Map(
             "backspace",      false,
             "caps_lock",      false,
@@ -417,7 +432,7 @@ DeadKey(Mapping) {
     _Stub_DeadKeyCalls.Push(Mapping)
 }
 
-; Toggle helpers consulted by the SIMPLE_ACTIONS Map.
+; Toggle helpers consulted by tap-hold and shortcut dispatchers.
 ; Real implementations live in modules/tap_holds.ahk (not included by tests).
 ToggleCapsLock() {
     global _Stub_SentText
@@ -484,26 +499,6 @@ UninstallHotstringHooks() {
     global _HotstringRegistrar, _SendHook
     _HotstringRegistrar := 0
     _SendHook := 0
-}
-
-; The SIMPLE_ACTIONS dispatcher map contains raw SendInput / SendEvent calls
-; for keys like Tab, Enter, Escape, BackSpace, Delete, CtrlBackSpace,
-; CtrlDelete. These bypass _SendHook and would type real keystrokes into the
-; terminal that launched AHK64.exe — Tab in particular triggers shell
-; completion (e.g. ".android" on Windows). Replace those entries with stubs
-; that record into _Stub_SentText so tests still observe the action firing
-; without leaking keys to the OS. Must be called after dispatchers.ahk is
-; included.
-NeutralizeDispatcherKeySends() {
-    global SIMPLE_ACTIONS, _Stub_SentText
-    KeyNames := ["BackSpace", "CtrlBackSpace", "CtrlDelete", "Delete",
-        "Enter", "Escape", "Tab"]
-    for _, Name in KeyNames {
-        Key := Name
-        if SIMPLE_ACTIONS.Has(Key) {
-            SIMPLE_ACTIONS[Key] := ((K) => (*) => _Stub_SentText.Push({ kind: "simple_key", key: K }))(Key)
-        }
-    }
 }
 
 ; ── Active-app cache simulators — bypass GetActiveApp's WinGet* calls so the

@@ -22,10 +22,8 @@
 ;
 ; INTEGRATION:
 ; The two public toggles ``KLUI_ToggleTyping`` / ``KLUI_ToggleApps`` are
-; registered in lib/dispatchers.ahk SIMPLE_ACTIONS so any feature gate
-; (TapHolds, AltGr, personal shortcuts) can fire them. The tray menu in
-; ErgoptiPlus.ahk wires them as menu items + accepts a user-defined hotkey
-; via lib/metrics_shortcuts.ahk.
+; bound to user-configurable hotkeys via lib/metrics_shortcuts.ahk and
+; wired into the tray menu by ErgoptiPlus.ahk.
 ; ==============================================================================
 
 #Requires Autohotkey v2.0+

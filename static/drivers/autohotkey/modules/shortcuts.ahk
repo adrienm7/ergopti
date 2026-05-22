@@ -34,20 +34,48 @@ RetrieveScancode(Letter) {
 ; ===============================
 ; ===============================
 
-#HotIf (
-    ; We need to handle the shortcut differently when LAlt has been remapped
-    not Features["TapHolds"]["LAlt"]["BackSpace"].Enabled ; No need to add the shortcut here, as it is impossible to have this shortcut with a BackSpace key that fires immediately
-    and not Features["TapHolds"]["LAlt"]["BackSpaceLayer"].Enabled ; Here we directly change the result on the layer
-    and not Features["TapHolds"]["LAlt"]["TabLayer"].Enabled ; Here we directly change the result on the layer
-    and not Features["TapHolds"]["LAlt"]["OneShotShift"].Enabled ; Necessary to be able to use OneShotShift on LAlt
-)
+; LAlt v2 tap-hold variants intercept SC038, so the bare SC038 & SC03A
+; combo can only fire when LAlt remains a plain modifier (no tap-hold
+; configured for left_alt or only the OneShotShift variant which we
+; explicitly exclude here).
+_LAltKeepsBareModifierForCapsLockCombo() {
+    TapAct := TapHoldTapAction(TapHold, "left_alt")
+    if (TapAct == "")
+        return true  ; LAlt not configured for tap-hold → bare modifier
+    ; Block all configured tap-holds (each intercepts SC038 and would
+    ; eat the combo before AHK could test the LAlt+CapsLock chord).
+    return false
+}
+
+#HotIf _LAltKeepsBareModifierForCapsLockCombo()
 SC038 & SC03A:: LAltCapsLockShortcut()
 #HotIf
 
 LAltCapsLockShortcut() {
     ; All ten possible actions are simple, no Shift inversion or modifier
-    ; bracketing needed — delegate to the shared dispatcher.
-    RunFirstSimpleAction(Features["Shortcuts"]["LAltCapsLock"])
+    ; bracketing needed — inline v2 if/else cascade (action table is the
+    ; SIMPLE_ACTIONS Map that used to live in lib/dispatchers.ahk).
+    if FeaturesV2["shortcuts"]["lalt_caps_lock"]["backspace"] {
+        SendEvent("{BackSpace}")
+    } else if FeaturesV2["shortcuts"]["lalt_caps_lock"]["caps_lock"] {
+        ToggleCapsLock()
+    } else if FeaturesV2["shortcuts"]["lalt_caps_lock"]["caps_word"] {
+        ToggleCapsWord()
+    } else if FeaturesV2["shortcuts"]["lalt_caps_lock"]["ctrl_backspace"] {
+        SendInput("^{BackSpace}")
+    } else if FeaturesV2["shortcuts"]["lalt_caps_lock"]["ctrl_delete"] {
+        SendInput("^{Delete}")
+    } else if FeaturesV2["shortcuts"]["lalt_caps_lock"]["delete"] {
+        SendInput("{Delete}")
+    } else if FeaturesV2["shortcuts"]["lalt_caps_lock"]["enter"] {
+        SendInput("{Enter}")
+    } else if FeaturesV2["shortcuts"]["lalt_caps_lock"]["escape"] {
+        SendInput("{Escape}")
+    } else if FeaturesV2["shortcuts"]["lalt_caps_lock"]["one_shot_shift"] {
+        OneShotShift()
+    } else if FeaturesV2["shortcuts"]["lalt_caps_lock"]["tab"] {
+        SendInput("{Tab}")
+    }
 }
 
 ; =================================
@@ -94,7 +122,24 @@ if FeaturesV2["shortcuts"]["paste_without_formatting"] {
 ; ==================================
 
 ; Pre-computed at boot — evaluated once instead of 10 OR comparisons per key press.
-global _ALTGR_LALT_ENABLED := HasAnyEnabled(Features["Shortcuts"]["AltGrLAlt"])
+global _ALTGR_LALT_ENABLED := _AnyV2ShortcutEnabled("alt_gr_lalt")
+
+; Returns true when at least one entry in
+; ``FeaturesV2["shortcuts"][<group>]`` is a true bool. Used by the boot-time
+; ``_ALTGR_*_ENABLED`` gates so the multi-OR check happens once instead of
+; on every key press routed through the gated combo.
+_AnyV2ShortcutEnabled(Group) {
+    global FeaturesV2
+    if !FeaturesV2.Has("shortcuts") or !FeaturesV2["shortcuts"].Has(Group) {
+        return false
+    }
+    for _Key, Val in FeaturesV2["shortcuts"][Group] {
+        if (Val = true) {
+            return true
+        }
+    }
+    return false
+}
 
 ; Wrapper required: #HotIf re-evaluates its expression every time the hotkey
 ; is tested. If the global is read before auto-execute has assigned it, AHK
@@ -159,7 +204,7 @@ AltGrLAltShortcut() {
     }
 }
 
-global _ALTGR_CAPSLOCK_ENABLED := HasAnyEnabled(Features["Shortcuts"]["AltGrCapsLock"])
+global _ALTGR_CAPSLOCK_ENABLED := _AnyV2ShortcutEnabled("alt_gr_caps_lock")
 
 ; Wrapper required: #HotIf re-evaluates its expression every time the hotkey
 ; is tested. If the global is read before auto-execute has assigned it, AHK
@@ -173,7 +218,29 @@ IsAltGrCapsLockEnabled() {
 ; below) for the same prefix-key-at-parse-time reason as the SC038 combo above.
 
 AltGrCapsLockShortcut() {
-    RunFirstSimpleAction(Features["Shortcuts"]["AltGrCapsLock"])
+    ; Inline v2 if/else cascade — same 10-action surface as LAltCapsLockShortcut
+    ; but reads from the alt_gr_caps_lock sub-Map.
+    if FeaturesV2["shortcuts"]["alt_gr_caps_lock"]["backspace"] {
+        SendEvent("{BackSpace}")
+    } else if FeaturesV2["shortcuts"]["alt_gr_caps_lock"]["caps_lock"] {
+        ToggleCapsLock()
+    } else if FeaturesV2["shortcuts"]["alt_gr_caps_lock"]["caps_word"] {
+        ToggleCapsWord()
+    } else if FeaturesV2["shortcuts"]["alt_gr_caps_lock"]["ctrl_backspace"] {
+        SendInput("^{BackSpace}")
+    } else if FeaturesV2["shortcuts"]["alt_gr_caps_lock"]["ctrl_delete"] {
+        SendInput("^{Delete}")
+    } else if FeaturesV2["shortcuts"]["alt_gr_caps_lock"]["delete"] {
+        SendInput("{Delete}")
+    } else if FeaturesV2["shortcuts"]["alt_gr_caps_lock"]["enter"] {
+        SendInput("{Enter}")
+    } else if FeaturesV2["shortcuts"]["alt_gr_caps_lock"]["escape"] {
+        SendInput("{Escape}")
+    } else if FeaturesV2["shortcuts"]["alt_gr_caps_lock"]["one_shot_shift"] {
+        OneShotShift()
+    } else if FeaturesV2["shortcuts"]["alt_gr_caps_lock"]["tab"] {
+        SendInput("{Tab}")
+    }
 }
 
 ; Dynamic registration entry point — called once Onboarding_Run() has returned

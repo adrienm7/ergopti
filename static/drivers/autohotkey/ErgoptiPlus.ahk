@@ -144,7 +144,6 @@ SendMode("Event") ; Everything concerning hotstrings MUST use SendEvent and not 
 ; ``_GENERATED_HOTSTRINGS`` is undefined.
 #Include *i lib/hotstrings/hotstrings_generated.ahk
 #Include lib/hotstrings/personal_toml_editor.ahk
-#Include lib/dispatchers.ahk
 #Include lib/layout/layout_altgr.ahk
 #Include lib/layout/layout_shift_caps.ahk
 #Include lib/app_picker.ahk

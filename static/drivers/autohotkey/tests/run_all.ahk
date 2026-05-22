@@ -49,7 +49,6 @@ SetWorkingDir(A_ScriptDir)
 #Include ../lib/manifest_reader.ahk
 #Include ../lib/hotstrings/hotstrings_config.ahk
 #Include ../lib/hotstrings/personal_toml_editor.ahk
-#Include ../lib/dispatchers.ahk
 #Include ../lib/layout/layout_altgr.ahk
 #Include ../lib/layout/layout_shift_caps.ahk
 ; i18n is included here because gestures.ahk calls t() at the top level
@@ -63,12 +62,6 @@ SetWorkingDir(A_ScriptDir)
 ; UpdateLastSentCharacter (the hook only intercepts the lower-level emission).
 InstallHotstringHooks()
 
-; Neutralize SendInput/SendEvent inside SIMPLE_ACTIONS
-; so dispatcher tests for Tab/Enter/Escape/BackSpace/Delete don't type real
-; keystrokes into the terminal that launched the runner (Tab triggers shell
-; completion, e.g. ".android" on Windows).
-NeutralizeDispatcherKeySends()
-
 ; ── Per-module test files (each registers Test() cases) ──
 #Include test_logger.ahk
 #Include test_hotstring_engine.ahk
@@ -76,7 +69,6 @@ NeutralizeDispatcherKeySends()
 #Include test_toml_loader.ahk
 #Include test_hotstrings_config.ahk
 #Include test_personal_toml_editor.ahk
-#Include test_dispatchers.ahk
 #Include test_layout_tables.ahk
 #Include test_active_app_cache.ahk
 #Include test_config.ahk
