@@ -15,3 +15,7 @@ if [ -n "$STAGED" ]; then
         git add "$f"
     done
 fi
+
+# Lint coding conventions (warn-only — does not block commits yet).
+# Switch --warn-only to --fail-on-violations once the violation count reaches 0.
+node scripts/lint-conventions.js --warn-only || true
