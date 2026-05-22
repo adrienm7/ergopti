@@ -485,24 +485,24 @@ if Features["hotstrings"]["distances_reduction"]["suffixes_a"]["enabled"] {
 ; ======================================================
 
 if Features["hotstrings"]["dynamic"]["text_expansion_personal_information"]["enabled"] {
-	CreateHotstring("*", "@bic" . ScriptInformation["MagicKey"], PersonalInformation["BIC"], Map("FinalResult",
+	CreateHotstring("*", "@bic" . ScriptInformation["MagicKey"], PersonalInformation["bic"], Map("FinalResult",
 		True))
-	CreateHotstring("*", "@cb" . ScriptInformation["MagicKey"], PersonalInformation["CreditCard"], Map(
+	CreateHotstring("*", "@cb" . ScriptInformation["MagicKey"], PersonalInformation["credit_card"], Map(
 		"FinalResult",
 		True))
-	CreateHotstring("*", "@cc" . ScriptInformation["MagicKey"], PersonalInformation["CreditCard"], Map(
+	CreateHotstring("*", "@cc" . ScriptInformation["MagicKey"], PersonalInformation["credit_card"], Map(
 		"FinalResult",
 		True))
-	CreateHotstring("*", "@iban" . ScriptInformation["MagicKey"], PersonalInformation["IBAN"], Map("FinalResult",
+	CreateHotstring("*", "@iban" . ScriptInformation["MagicKey"], PersonalInformation["iban"], Map("FinalResult",
 		True))
-	CreateHotstring("*", "@rib" . ScriptInformation["MagicKey"], PersonalInformation["IBAN"], Map("FinalResult",
+	CreateHotstring("*", "@rib" . ScriptInformation["MagicKey"], PersonalInformation["iban"], Map("FinalResult",
 		True))
-	CreateHotstring("*", "@ss" . ScriptInformation["MagicKey"], PersonalInformation["SocialSecurityNumber"], Map(
+	CreateHotstring("*", "@ss" . ScriptInformation["MagicKey"], PersonalInformation["social_security_number"], Map(
 		"FinalResult", True))
-	CreateHotstring("*", "@tel" . ScriptInformation["MagicKey"], PersonalInformation["PhoneNumber"], Map(
+	CreateHotstring("*", "@tel" . ScriptInformation["MagicKey"], PersonalInformation["phone_number"], Map(
 		"FinalResult",
 		True))
-	CreateHotstring("*", "@tél" . ScriptInformation["MagicKey"], PersonalInformation["PhoneNumber"], Map(
+	CreateHotstring("*", "@tél" . ScriptInformation["MagicKey"], PersonalInformation["phone_number"], Map(
 		"FinalResult",
 		True))
 
@@ -715,10 +715,10 @@ if Features["hotstrings"]["dynamic"]["date"]["enabled"] {
 ; Registered once at startup from PersonalInformation — same logic as HS rules_engine.
 ; Each trigger auto-expands without end-char (*) and is case-sensitive (C).
 _DynFlags := ":*C:"
-Phone  := PersonalInformation["PhoneNumber"]        ; e.g. "0606060606"
-FPhone := PersonalInformation["PhoneNumberClean"]   ; e.g. "06 06 06 06 06"
-Ssn    := PersonalInformation["SocialSecurityNumber"] ; e.g. "1 99 99 99 999 999 99"
-Iban   := PersonalInformation["IBAN"]               ; e.g. "FR00 0000 0000 0000 0000 0000 000"
+Phone  := PersonalInformation["phone_number"]        ; e.g. "0606060606"
+FPhone := PersonalInformation["phone_number_clean"]   ; e.g. "06 06 06 06 06"
+Ssn    := PersonalInformation["social_security_number"] ; e.g. "1 99 99 99 999 999 99"
+Iban   := PersonalInformation["iban"]               ; e.g. "FR00 0000 0000 0000 0000 0000 000"
 
 ; Strip spaces for matching purposes (SSN / IBAN contain decorative spaces)
 SsnRaw  := StrReplace(Ssn,  " ", "")

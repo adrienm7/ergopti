@@ -509,36 +509,36 @@ LoggerInfo("AltGrDetect",
 
 ; It is best to modify those values by using the option in the script menu
 global PersonalInformation := Map(
-    "FirstName", "Prénom",
-    "LastName", "Nom",
-    "DateOfBirth", "01/01/2000",
-    "EmailAddress", "prenom.nom@mail.fr",
-    "WorkEmailAddress", "prenom.nom@mail.pro",
-    "PhoneNumber", "0606060606",
-    "PhoneNumberClean", "06 06 06 06 06",
-    "StreetAddress", "1 Rue de la Paix",
-    "City", "Paris",
-    "Country", "France",
-    "PostalCode", "75000",
-    "IBAN", "FR00 0000 0000 0000 0000 0000 000",
-    "BIC", "ABCDFRPP",
-    "CreditCard", "1234 5678 9012 3456",
-    "SocialSecurityNumber", "1 99 99 99 999 999 99",
+    "first_name", "Prénom",
+    "last_name", "Nom",
+    "date_of_birth", "01/01/2000",
+    "email_address", "prenom.nom@mail.fr",
+    "work_email_address", "prenom.nom@mail.pro",
+    "phone_number", "0606060606",
+    "phone_number_clean", "06 06 06 06 06",
+    "street_address", "1 Rue de la Paix",
+    "city", "Paris",
+    "country", "France",
+    "postal_code", "75000",
+    "iban", "FR00 0000 0000 0000 0000 0000 000",
+    "bic", "ABCDFRPP",
+    "credit_card", "1234 5678 9012 3456",
+    "social_security_number", "1 99 99 99 999 999 99",
 )
 global PersonalInformationLetters := Map(
-    "a", "StreetAddress",
-    "b", "BIC",
-    "c", "CreditCard",
-    "d", "DateOfBirth",
-    "e", "EmailAddress",
-    "f", "PhoneNumberClean",
-    "i", "IBAN",
-    "m", "EmailAddress",
-    "n", "LastName",
-    "p", "FirstName",
-    "s", "SocialSecurityNumber",
-    "t", "PhoneNumber",
-    "w", "WorkEmailAddress",
+    "a", "street_address",
+    "b", "bic",
+    "c", "credit_card",
+    "d", "date_of_birth",
+    "e", "email_address",
+    "f", "phone_number_clean",
+    "i", "iban",
+    "m", "email_address",
+    "n", "last_name",
+    "p", "first_name",
+    "s", "social_security_number",
+    "t", "phone_number",
+    "w", "work_email_address",
 )
 
 ; ======================================================================
@@ -565,10 +565,10 @@ global TapHold := LoadTapHoldToml(_ConfigDir . "ahk\tap_hold.toml")
 ; This must stay in sync with the registration code whenever prefix rules change.
 CountDynamicSection(SectionName) {
     global PersonalInformation
-    Phone := PersonalInformation["PhoneNumber"]
-    FPhone := PersonalInformation["PhoneNumberClean"]
-    Ssn := PersonalInformation["SocialSecurityNumber"]
-    Iban := PersonalInformation["IBAN"]
+    Phone := PersonalInformation["phone_number"]
+    FPhone := PersonalInformation["phone_number_clean"]
+    Ssn := PersonalInformation["social_security_number"]
+    Iban := PersonalInformation["iban"]
     SsnRaw := StrReplace(Ssn, " ", "")
     IbanRaw := StrReplace(Iban, " ", "")
 
