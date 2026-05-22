@@ -509,6 +509,62 @@ WriteV2Update(V1Path, Value) {
     return true
 }
 
+; Read the runtime state of a feature from FeaturesV2 via the path translator.
+; Returns a Map keyed by v1 PascalCase property names (Enabled, Letter, Link,
+; SearchEngine, DatedNotes, …) — only keys present in the v2 node are populated,
+; so callers can use ``State.Has("Letter")`` exactly like the legacy
+; ``Feature.HasOwnProp("Letter")`` check on the v1 Features Map.
+;
+; Returns an empty Map when the v1 path has no v2 equivalent (e.g. TapHolds or
+; runtime-discovered Personal entries). Callers must fall back to whatever
+; default makes sense for that case.
+GetFeatureV2State(V1Path) {
+    State := Map()
+    Loc := TranslateV1ToV2(V1Path . ".Enabled")
+    if (Loc == false) {
+        return State
+    }
+    V2Node := Loc["v2_node"]
+    if !IsObject(V2Node) {
+        return State
+    }
+
+    if Loc["is_alpha"] {
+        ; Modélisation α — v2 node is a Map with named keys.
+        if (V2Node.Has("enabled")) {
+            State["Enabled"] := (V2Node["enabled"] = true)
+        }
+        if (V2Node.Has("letter")) {
+            State["Letter"] := V2Node["letter"]
+        }
+        if (V2Node.Has("link")) {
+            State["Link"] := V2Node["link"]
+        }
+        if (V2Node.Has("search_engine")) {
+            State["SearchEngine"] := V2Node["search_engine"]
+        }
+        if (V2Node.Has("search_engine_url_query")) {
+            State["SearchEngineURLQuery"] := V2Node["search_engine_url_query"]
+        }
+        if (V2Node.Has("dated_notes")) {
+            State["DatedNotes"] := (V2Node["dated_notes"] = true)
+        }
+        if (V2Node.Has("destination_folder")) {
+            State["DestinationFolder"] := V2Node["destination_folder"]
+        }
+        if (V2Node.Has("pattern_max_length")) {
+            State["PatternMaxLength"] := V2Node["pattern_max_length"]
+        }
+    } else {
+        ; Plain bool or sub-Map leaf — Enabled is the value at the leaf key.
+        K := Loc["key"]
+        if (Type(V2Node) == "Map" and V2Node.Has(K)) {
+            State["Enabled"] := (V2Node[K] = true)
+        }
+    }
+    return State
+}
+
 ; Apply a batch of v1-path mutations atomically (single TOML_BatchWrite).
 ; Each entry is a Map("v1_path"=>"…", "value"=>…).
 WriteV2Batch(Entries) {
