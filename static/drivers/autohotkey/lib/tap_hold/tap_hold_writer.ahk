@@ -1,0 +1,358 @@
+; lib/tap_hold/tap_hold_writer.ahk
+
+; ==============================================================================
+; MODULE: Tap-Hold Writer
+; DESCRIPTION:
+; Persists user tray-menu choices for TapHolds variants to the v2
+; ``tap_hold.toml`` file. The v1 schema represents the (tap_action,
+; hold_modifier/hold_layer) tuple as a *variant name* under each physical
+; key (``"AltGr.Tab"`` = tap on Tab + hold on AltGr, etc.); the v2 schema
+; stores the resolved tuple directly under
+; ``[tap_hold.keys.<key_id>]``. This module bridges the two: it parses
+; the v1 path produced by ``ToggleMenuVariableByPath``, looks up the
+; matching v2 tuple, mutates the ``TapHold`` global, and rewrites the
+; canonical TOML file from scratch.
+;
+; FEATURES & RATIONALE:
+; 1. Single source of truth for variant ⇄ v2 tuples — the same tables
+;    used by the legacy MirrorV1ToV2_TapHold (deleted in slice 3) but
+;    surfaced as a runtime writer instead of a boot-time mirror.
+; 2. Mutually-exclusive groups: ToggleMenuVariableByPath pushes
+;    ``Enabled=false`` for every sibling variant and ``Enabled=NewValue``
+;    for the clicked one. The writer picks the (last) variant set to
+;    ``true`` per key as the active tuple; if no variant ends up true,
+;    the key is removed from TapHold["keys"] entirely.
+; 3. Flat keys (``LShiftCopy``, ``LCtrlPaste``, ``TabAlt``) are not
+;    sub-Maps in the v1 schema. They use ``Parts.Length == 2`` instead
+;    of ``Parts.Length == 3`` and have a hardcoded (tap, hold_mod)
+;    pair per id.
+; 4. Preserves per-key ``time_activation_seconds`` already in TapHold —
+;    the tray menu doesn't currently let the user customise it, but
+;    hand-editing tap_hold.toml is supported.
+; ==============================================================================
+
+
+
+
+; ==============================================================
+; ==============================================================
+; ======= 1/ Variant tables =======
+; ==============================================================
+; ==============================================================
+
+; v1 PascalCase TapHolds key id -> v2 snake_case key id.
+global _TH_V1KeyIdToV2 := Map(
+    "CapsLock",   "caps_lock",
+    "LAlt",       "left_alt",
+    "AltGr",      "alt_gr",
+    "RCtrl",      "right_ctrl",
+    "Space",      "space",
+    "LShiftCopy", "left_shift",
+    "LCtrlPaste", "left_ctrl",
+    "TabAlt",     "tab",
+)
+
+; Per-sub-Map variant tables. Each maps the v1 PascalCase variant name to
+; ``Map("tap" => v2_tap_action, "hold_mod" => v2_modifier)`` or
+; ``Map("tap" => ..., "hold_layer" => layer_id)``. A variant whose mapping
+; carries neither hold_mod nor hold_layer encodes a tap-only behaviour
+; (no modifier change on hold) — e.g. ``CapsLock.BackSpace`` is just a
+; remap to BackSpace, no Ctrl-on-hold.
+global _TH_CapsLockVariants := Map(
+    "BackSpace",          Map("tap", "backspace"),
+    "BackSpaceCtrl",      Map("tap", "backspace",       "hold_mod", "ctrl"),
+    "CapsLockCtrl",       Map("tap", "caps_lock",       "hold_mod", "ctrl"),
+    "CapsWordCtrl",       Map("tap", "caps_word",       "hold_mod", "ctrl"),
+    "CtrlBackSpaceCtrl",  Map("tap", "ctrl_backspace",  "hold_mod", "ctrl"),
+    "CtrlDeleteCtrl",     Map("tap", "ctrl_delete",     "hold_mod", "ctrl"),
+    "DeleteCtrl",         Map("tap", "delete",          "hold_mod", "ctrl"),
+    "EnterCtrl",          Map("tap", "enter",           "hold_mod", "ctrl"),
+    "EscapeCtrl",         Map("tap", "escape",          "hold_mod", "ctrl"),
+    "OneShotShiftCtrl",   Map("tap", "one_shot_shift",  "hold_mod", "ctrl"),
+    "TabCtrl",            Map("tap", "tab",             "hold_mod", "ctrl"),
+)
+global _TH_LAltVariants := Map(
+    "AltTabMonitor",  Map("tap", "alt_tab_monitor", "hold_mod", "alt"),
+    "BackSpace",      Map("tap", "backspace"),
+    "BackSpaceLayer", Map("tap", "backspace",       "hold_layer", "nav"),
+    "OneShotShift",   Map("tap", "one_shot_shift",  "hold_mod", "alt"),
+    "TabLayer",       Map("tap", "tab",             "hold_layer", "nav"),
+)
+global _TH_AltGrVariants := Map(
+    "BackSpace",      Map("tap", "backspace",      "hold_mod", "alt_gr"),
+    "CapsLock",       Map("tap", "caps_lock",      "hold_mod", "alt_gr"),
+    "CapsWord",       Map("tap", "caps_word",      "hold_mod", "alt_gr"),
+    "CtrlBackSpace",  Map("tap", "ctrl_backspace", "hold_mod", "alt_gr"),
+    "CtrlDelete",     Map("tap", "ctrl_delete",    "hold_mod", "alt_gr"),
+    "Delete",         Map("tap", "delete",         "hold_mod", "alt_gr"),
+    "Enter",          Map("tap", "enter",          "hold_mod", "alt_gr"),
+    "Escape",         Map("tap", "escape",         "hold_mod", "alt_gr"),
+    "OneShotShift",   Map("tap", "one_shot_shift", "hold_mod", "alt_gr"),
+    "Tab",            Map("tap", "tab",            "hold_mod", "alt_gr"),
+)
+global _TH_RCtrlVariants := Map(
+    "BackSpace",    Map("tap", "backspace",      "hold_mod", "ctrl"),
+    "Tab",          Map("tap", "tab",            "hold_mod", "ctrl"),
+    "OneShotShift", Map("tap", "one_shot_shift", "hold_mod", "ctrl"),
+)
+global _TH_SpaceVariants := Map(
+    "Ctrl",  Map("tap", "space", "hold_mod", "ctrl"),
+    "Layer", Map("tap", "space", "hold_layer", "nav"),
+    "Shift", Map("tap", "space", "hold_mod", "shift"),
+)
+
+; Flat keys — v1 path is ``TapHolds.<KeyId>`` (no variant). Each has a
+; single hardcoded (tap, hold_mod) pair.
+global _TH_FlatKeyTuples := Map(
+    "LShiftCopy", Map("tap", "copy",             "hold_mod", "shift"),
+    "LCtrlPaste", Map("tap", "paste",            "hold_mod", "ctrl"),
+    "TabAlt",     Map("tap", "alt_tab_monitor",  "hold_mod", "alt"),
+)
+
+
+
+
+; ==============================================================
+; ==============================================================
+; ======= 2/ Variants lookup =======
+; ==============================================================
+; ==============================================================
+
+; Resolve the variants table for a given v1 sub-Map key id. Returns ``false``
+; when the key is a flat entry (or unknown).
+_TH_VariantsForV1Key(V1KeyId) {
+    global _TH_CapsLockVariants, _TH_LAltVariants, _TH_AltGrVariants
+    global _TH_RCtrlVariants, _TH_SpaceVariants
+    switch V1KeyId {
+        case "CapsLock": return _TH_CapsLockVariants
+        case "LAlt":     return _TH_LAltVariants
+        case "AltGr":    return _TH_AltGrVariants
+        case "RCtrl":    return _TH_RCtrlVariants
+        case "Space":    return _TH_SpaceVariants
+    }
+    return false
+}
+
+
+
+
+; ==============================================================
+; ==============================================================
+; ======= 3/ Batch writer =======
+; ==============================================================
+; ==============================================================
+
+; Accept a sequence of ``Map("v1_path" => "TapHolds.<id>(.<variant>).Enabled",
+; "value" => bool)`` entries and apply them to TapHold + tap_hold.toml.
+; Returns the number of v2 key entries mutated.
+WriteTapHoldBatch(BatchEntries) {
+    global TapHold, _TH_V1KeyIdToV2, _TH_FlatKeyTuples
+
+    if !IsSet(TapHold) {
+        try LoggerWarn("TapHoldWriter", "TapHold global unset — skipping batch.")
+        return 0
+    }
+    if !TapHold.Has("keys") {
+        TapHold["keys"] := Map()
+    }
+
+    ; Group entries by V1 KeyId. For each key, track the per-variant value
+    ; (last write wins for a given variant). Flat keys use "" as variant.
+    PerKey := Map()
+    for Entry in BatchEntries {
+        Path := Entry["v1_path"]
+        Value := Entry["value"]
+        Parts := StrSplit(Path, ".")
+        if (Parts.Length >= 1 and Parts[Parts.Length] == "Enabled") {
+            Parts.Pop()
+        }
+        if (Parts.Length < 2 or Parts[1] != "TapHolds") {
+            continue
+        }
+        V1KeyId := Parts[2]
+        Variant := (Parts.Length >= 3) ? Parts[3] : ""
+        if !PerKey.Has(V1KeyId) {
+            PerKey[V1KeyId] := Map()
+        }
+        PerKey[V1KeyId][Variant] := (Value = true)
+    }
+
+    Mutated := 0
+    for V1KeyId, VariantValues in PerKey {
+        if !_TH_V1KeyIdToV2.Has(V1KeyId) {
+            try LoggerWarn("TapHoldWriter", "Unknown TapHolds key '{1}' — skipped.", V1KeyId)
+            continue
+        }
+        V2KeyId := _TH_V1KeyIdToV2[V1KeyId]
+
+        ; Find which variant ends up active. For flat keys, the only entry
+        ; is the empty-string variant; for sub-Map keys, scan for the
+        ; variant whose final value is true.
+        ActiveVariant := ""
+        for V, Val in VariantValues {
+            if Val {
+                ActiveVariant := V
+                ; Don't break — last true write wins (insertion order is
+                ; preserved per AHK v2 Map docs).
+            }
+        }
+
+        if (ActiveVariant == "") {
+            ; No variant active for this key — remove the entry entirely.
+            if TapHold["keys"].Has(V2KeyId) {
+                TapHold["keys"].Delete(V2KeyId)
+                Mutated++
+            }
+            continue
+        }
+
+        ; Resolve the v2 tuple for the active variant.
+        Tuple := _TH_ResolveTuple(V1KeyId, ActiveVariant)
+        if (Tuple == false) {
+            try LoggerWarn("TapHoldWriter",
+                "Unknown variant '{1}.{2}' — skipped.", V1KeyId, ActiveVariant)
+            continue
+        }
+
+        ; Build the new entry. Preserve TimeActivationSeconds from the
+        ; existing key entry when present.
+        NewEntry := Map("tap_action", Tuple["tap"])
+        if Tuple.Has("hold_mod") {
+            NewEntry["hold_modifier"] := Tuple["hold_mod"]
+        } else if Tuple.Has("hold_layer") {
+            NewEntry["hold_layer"] := Tuple["hold_layer"]
+        }
+        if (TapHold["keys"].Has(V2KeyId)
+            and IsObject(TapHold["keys"][V2KeyId])
+            and TapHold["keys"][V2KeyId].Has("time_activation_seconds")) {
+            NewEntry["time_activation_seconds"] := TapHold["keys"][V2KeyId]["time_activation_seconds"]
+        }
+        TapHold["keys"][V2KeyId] := NewEntry
+        Mutated++
+    }
+
+    if (Mutated > 0) {
+        _TH_WriteTapHoldToml()
+    }
+    return Mutated
+}
+
+; Resolve the (tap, hold_mod|hold_layer) tuple for a (V1KeyId, Variant)
+; pair. Flat keys ignore the Variant argument.
+_TH_ResolveTuple(V1KeyId, Variant) {
+    global _TH_FlatKeyTuples
+    if _TH_FlatKeyTuples.Has(V1KeyId) {
+        return _TH_FlatKeyTuples[V1KeyId]
+    }
+    Variants := _TH_VariantsForV1Key(V1KeyId)
+    if (Variants == false) {
+        return false
+    }
+    if !Variants.Has(Variant) {
+        return false
+    }
+    return Variants[Variant]
+}
+
+
+
+
+; ==============================================================
+; ==============================================================
+; ======= 4/ tap_hold.toml writer =======
+; ==============================================================
+; ==============================================================
+
+; Rewrite ``<config>/ahk/tap_hold.toml`` from scratch from the current
+; in-memory ``TapHold`` global. Preserves the ``layers`` block verbatim
+; so any user-customised layer mappings survive a key-section write.
+_TH_WriteTapHoldToml() {
+    global TapHold, _ConfigDir
+    if !IsSet(_ConfigDir) {
+        try LoggerWarn("TapHoldWriter", "_ConfigDir unset — cannot persist tap_hold.toml.")
+        return
+    }
+    Path := _ConfigDir . "ahk\tap_hold.toml"
+
+    Lines := []
+    Lines.Push("# Auto-generated by Ergopti+ tray-menu writes — hand edits stay safe outside")
+    Lines.Push("# the [tap_hold.keys.*] blocks (which get rewritten from scratch on every")
+    Lines.Push("# toggle). The [tap_hold.layers.*] sections are emitted verbatim from the")
+    Lines.Push("# in-memory state, so customisations made via direct editing round-trip.")
+    Lines.Push("")
+
+    ; Keys section.
+    if TapHold.Has("keys") {
+        for KeyId, Entry in TapHold["keys"] {
+            if !(IsObject(Entry) and Type(Entry) == "Map") {
+                continue
+            }
+            Lines.Push("[tap_hold.keys." . KeyId . "]")
+            for K, V in Entry {
+                Lines.Push(_TH_TomlFormatLine(K, V))
+            }
+            Lines.Push("")
+        }
+    }
+
+    ; Layers section — emitted verbatim.
+    if TapHold.Has("layers") {
+        for LayerId, LayerData in TapHold["layers"] {
+            if !(IsObject(LayerData) and Type(LayerData) == "Map") {
+                continue
+            }
+            Lines.Push("[tap_hold.layers." . LayerId . "]")
+            ; Top-level layer metadata (description_key etc.).
+            for K, V in LayerData {
+                if (K == "mappings") {
+                    continue  ; mappings emitted as a sub-section below
+                }
+                Lines.Push(_TH_TomlFormatLine(K, V))
+            }
+            Lines.Push("")
+            if LayerData.Has("mappings") and IsObject(LayerData["mappings"]) {
+                Lines.Push("[tap_hold.layers." . LayerId . ".mappings]")
+                for K, V in LayerData["mappings"] {
+                    Lines.Push(_TH_TomlFormatLine(K, V))
+                }
+                Lines.Push("")
+            }
+        }
+    }
+
+    Content := ""
+    for L in Lines {
+        Content .= L . "`r`n"
+    }
+
+    try {
+        if FileExist(Path) {
+            FileDelete(Path)
+        }
+        FileAppend(Content, Path, "UTF-8-RAW")
+        try LoggerDebug("TapHoldWriter", "tap_hold.toml rewritten ({1} key(s)).",
+            TapHold.Has("keys") ? TapHold["keys"].Count : 0)
+    } catch as Err {
+        try LoggerError("TapHoldWriter", "Could not write tap_hold.toml: {1}.", Err.Message)
+    }
+}
+
+; Format a single ``key = value`` line for tap_hold.toml. Handles strings
+; (quoted), booleans, and numbers; arrays and nested tables are not used
+; in this schema.
+_TH_TomlFormatLine(Key, Value) {
+    if (Value = true) {
+        return Key . " = true"
+    }
+    if (Value = false) {
+        return Key . " = false"
+    }
+    if (Type(Value) == "Integer" or Type(Value) == "Float") {
+        return Key . " = " . Value
+    }
+    ; String — quote, escape backslashes and quotes.
+    S := String(Value)
+    S := StrReplace(S, "\", "\\")
+    S := StrReplace(S, '"', '\"')
+    return Key . " = `"" . S . "`""
+}
