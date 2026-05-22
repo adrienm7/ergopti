@@ -1613,19 +1613,21 @@ GestureDispatch(slot) {
 ; Use the "Configurer automatiquement" button in the menu to set them via
 ; the registry, or assign them manually.
 
-; The '$' prefix forces AHK to use the low-level keyboard hook instead of
-; RegisterHotKey, which lets us intercept the shortcut even in console hosts
-; (PowerShell, cmd, WSL) that would otherwise swallow it before AHK sees it.
-$^#+F1:: GestureDispatch("tap_3")
-$^#+F2:: GestureDispatch("swipe_3_up")
-$^#+F3:: GestureDispatch("swipe_3_down")
-$^#+F4:: GestureDispatch("swipe_3_left")
-$^#+F5:: GestureDispatch("swipe_3_right")
-$^#+F6:: GestureDispatch("tap_4")
-$^#+F7:: GestureDispatch("swipe_4_up")
-$^#+F8:: GestureDispatch("swipe_4_down")
-$^#+F9:: GestureDispatch("swipe_4_left")
-$^#+F10:: GestureDispatch("swipe_4_right")
+; No '$' prefix here — ErgoptiPlus.ahk sets #InputLevel 2 before including
+; this module, which installs the low-level keyboard hook at the production
+; level. Adding '$' here would also force the hook in the headless test runner
+; (which includes this module without #InputLevel 2), causing a hang because
+; no physical keyboard device is available on a CI runner.
+^#+F1:: GestureDispatch("tap_3")
+^#+F2:: GestureDispatch("swipe_3_up")
+^#+F3:: GestureDispatch("swipe_3_down")
+^#+F4:: GestureDispatch("swipe_3_left")
+^#+F5:: GestureDispatch("swipe_3_right")
+^#+F6:: GestureDispatch("tap_4")
+^#+F7:: GestureDispatch("swipe_4_up")
+^#+F8:: GestureDispatch("swipe_4_down")
+^#+F9:: GestureDispatch("swipe_4_left")
+^#+F10:: GestureDispatch("swipe_4_right")
 
 
 
