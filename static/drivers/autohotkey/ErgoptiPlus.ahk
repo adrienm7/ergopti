@@ -1032,6 +1032,13 @@ if Features.Has("Personal") {
             Features["Personal"][FeatKey].Enabled := RawValue
         }
     }
+
+    ; Phase 12: now that Features["Personal"] is fully populated (bootstrap +
+    ; TOML metadata + INI overrides), mirror it into
+    ; FeaturesV2["hotstrings"]["personal"] so the migrated read sites in
+    ; modules/hotstrings.ahk and lib/hotstrings/personal_toml_editor.ahk
+    ; observe the same per-section toggle state.
+    MirrorV1ToV2_HotstringsPersonal()
 }
 
 ; Gestures module included here — before menu build — so GESTURE_SLOTS,

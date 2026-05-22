@@ -767,49 +767,35 @@ CreateHotstring("*", "clé" . ScriptInformation["MagicKey"], "🔑")
 
 ; Load every section declared in personal_hotstrings.toml (e.g. emailshortcuts,
 ; code, professionalvocabulary, autocorrection). Each section has its own
-; toggle in Features["Personal"] — disabled sections are skipped silently.
+; toggle in FeaturesV2["hotstrings"]["personal"] — disabled sections are
+; skipped silently.
 ;
 ; Order matters: AHK fires the LAST-registered hotstring that matches, so we
 ; must register longer / more-specific triggers AFTER shorter ones. Sections
 ; whose triggers start with a special prefix (@, ., :, etc.) are typically
 ; longer composites of plain triggers, so we load them LAST. We achieve this
-; by iterating sections_order in reverse — the user's preferred order in the
-; TOML places "emailshortcuts" first because it's the most prominent, but at
-; load time the prominent ones must come last so they win on collision.
-if Features.Has("Personal") {
-    PersonalKeys := []
-    if (Features["Personal"].Has("__Order")
-            and IsObject(Features["Personal"]["__Order"])
-            and Features["Personal"]["__Order"].Length > 0) {
-        ; Walk __Order in reverse so the first declared section is loaded last
-        ; (and therefore wins when its trigger is a prefix-collision of a
-        ; shorter trigger registered by an earlier section).
-        Idx := Features["Personal"]["__Order"].Length
-        while (Idx >= 1) {
-            Entry := Features["Personal"]["__Order"][Idx]
-            if (Entry != "-") {
-                PersonalKeys.Push(Entry)
-            }
-            Idx -= 1
-        }
-    } else {
-        for FeatKey in Features["Personal"] {
-            if FeatKey != "__Order" {
-                PersonalKeys.Push(FeatKey)
-            }
-        }
+; by iterating the v2 Map in reverse — MirrorV1ToV2_HotstringsPersonal
+; populates it in the user's preferred order (mirroring v1's __Order), so
+; reversing the iteration here gives us "load prominent sections last".
+if FeaturesV2.Has("hotstrings") and FeaturesV2["hotstrings"].Has("personal") {
+    _PersonalGroup := FeaturesV2["hotstrings"]["personal"]
+    _PersonalKeys := []
+    for _Key in _PersonalGroup {
+        _PersonalKeys.Push(_Key)
     }
-
-    for _, FeatKey in PersonalKeys {
-        if !Features["Personal"].Has(FeatKey) {
+    ; Reverse so the user's first-declared section (most prominent) loads
+    ; last — AHK fires the last registered hotstring on prefix collisions.
+    _Idx := _PersonalKeys.Length
+    while (_Idx >= 1) {
+        _SectionKey := _PersonalKeys[_Idx]
+        _Idx -= 1
+        _SectionCfg := _PersonalGroup[_SectionKey]
+        if !(IsObject(_SectionCfg) and _SectionCfg.Has("enabled") and _SectionCfg["enabled"]) {
             continue
         }
-        FeatObj := Features["Personal"][FeatKey]
-        if !(IsObject(FeatObj) and FeatObj.HasOwnProp("Enabled") and FeatObj.Enabled) {
-            continue
-        }
-        TomlSection := FeatObj.HasOwnProp("TomlSection") ? FeatObj.TomlSection : StrLower(FeatKey)
-        LoadHotstringsSection("personal", TomlSection, FeatObj)
+        ; Section key is already the lowercase TOML key (mirror preserves
+        ; .TomlSection naming verbatim) — pass it through unchanged.
+        LoadHotstringsSection("personal", _SectionKey, _SectionCfg)
     }
 }
 

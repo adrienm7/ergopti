@@ -502,6 +502,111 @@ MirrorV1ToV2_Hotstrings() {
 
 ; ==============================================================
 ; ==============================================================
+; ======= 4bis/ Hotstrings Personal (runtime-discovered) =======
+; ==============================================================
+; ==============================================================
+
+; Mirrors the dynamically-bootstrapped ``Features["Personal"]`` Map (populated
+; at boot by ``BootstrapPersonalFeatures`` from the user's personal_hotstrings
+; ``.toml`` ``[_meta.sections]`` block) into ``FeaturesV2["hotstrings"]["personal"]``.
+;
+; Unlike the other Hotstrings categories above, Personal's sub-keys are
+; USER-DEFINED at runtime — the manifest only ships a handful of common
+; defaults (autocorrection, code, email_shortcuts, …) but the user can name
+; their own sections anything. The mirror therefore iterates whatever the
+; v1 boot produced rather than walking a hard-coded id list.
+;
+; Key naming: v1 stores PascalCase keys ("Greetings", "EmailShortcuts") with
+; the original lowercase TOML key remembered on ``.TomlSection``. The v2
+; entry uses that lowercase TOML key directly so downstream consumers (the
+; ``LoadHotstringsSection("personal", <key>, …)`` call site in
+; modules/hotstrings.ahk) match the TOML file's section names as-is.
+;
+; Ordering: iterate ``Features["Personal"]["__Order"]`` when present so the
+; v2 Map's insertion order matches the user's intended ordering — the
+; consumer in modules/hotstrings.ahk reverse-iterates the v2 Map to load
+; prefix-collision-prone sections last (AHK fires the most recently
+; registered hotstring).
+MirrorV1ToV2_HotstringsPersonal() {
+    global Features, FeaturesV2
+
+    if !IsSet(Features) or !IsSet(FeaturesV2) {
+        try LoggerWarn("V1ToV2",
+            "MirrorV1ToV2_HotstringsPersonal skipped — Features or FeaturesV2 unset.")
+        return
+    }
+    if !Features.Has("Personal") {
+        ; No personal sections registered yet (no personal_hotstrings.toml or
+        ; bootstrap not yet run) — leave the v2 Map empty.
+        return
+    }
+    if !FeaturesV2.Has("hotstrings") or !FeaturesV2["hotstrings"].Has("personal") {
+        try LoggerWarn("V1ToV2",
+            "MirrorV1ToV2_HotstringsPersonal skipped — FeaturesV2['hotstrings']['personal'] missing.")
+        return
+    }
+
+    ; Master category gate — Personal shares the Hotstrings master toggle.
+    Gated := IsCategoryGated("Hotstrings")
+
+    ; Rebuild from scratch so removed/renamed user sections don't linger in
+    ; v2 from a previous boot. The manifest defaults are restored on the
+    ; next manifest rebuild (not done here — this is a pure mirror step).
+    FeaturesV2["hotstrings"]["personal"] := Map()
+
+    ; Determine iteration order: user's __Order if present, else
+    ; insertion order of the v1 Map.
+    Keys := []
+    if (Features["Personal"].Has("__Order")
+            and IsObject(Features["Personal"]["__Order"])) {
+        for _, FeatName in Features["Personal"]["__Order"] {
+            if (FeatName != "-") {
+                Keys.Push(FeatName)
+            }
+        }
+    } else {
+        for FeatKey in Features["Personal"] {
+            if (FeatKey != "__Order") {
+                Keys.Push(FeatKey)
+            }
+        }
+    }
+
+    Copied := 0
+    for _, FeatKey in Keys {
+        if !Features["Personal"].Has(FeatKey) {
+            continue
+        }
+        V1Val := Features["Personal"][FeatKey]
+        if !IsObject(V1Val) or !V1Val.HasOwnProp("Enabled") {
+            continue
+        }
+        ; v2 entry key = lowercase TOML section name (.TomlSection),
+        ; falling back to lowercased FeatKey for entries that pre-date
+        ; the .TomlSection convention.
+        V2Key := V1Val.HasOwnProp("TomlSection")
+            ? V1Val.TomlSection
+            : StrLower(FeatKey)
+        Entry := Map("enabled", Gated and (V1Val.Enabled = true))
+        if V1Val.HasOwnProp("TimeActivationSeconds") {
+            Entry["time_activation_seconds"] := V1Val.TimeActivationSeconds
+        }
+        if V1Val.HasOwnProp("Description") {
+            Entry["description"] := V1Val.Description
+        }
+        FeaturesV2["hotstrings"]["personal"][V2Key] := Entry
+        Copied += 1
+    }
+
+    try LoggerDebug("V1ToV2",
+        "MirrorV1ToV2_HotstringsPersonal copied {1} section(s) v1 -> v2.", Copied)
+}
+
+
+
+
+; ==============================================================
+; ==============================================================
 ; ======= 5/ LLM =======
 ; ==============================================================
 ; ==============================================================
