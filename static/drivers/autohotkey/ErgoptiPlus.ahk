@@ -698,7 +698,7 @@ global SpaceAroundSymbols := FeaturesV2["hotstrings"]["distances_reduction"]["sp
 ; registration time so previously-saved toggles survive across reloads even
 ; though personal_shortcuts.ahk is loaded after the global ReadConfiguration.
 RegisterPersonalFeature(Name, DefaultEnabled := false, Description := "") {
-    global Features, _IniCache
+    global Features, FeaturesV2
     if !Features.Has("Shortcuts") {
         return
     }
@@ -719,12 +719,14 @@ RegisterPersonalFeature(Name, DefaultEnabled := false, Description := "") {
     }
 
     if !Personal.Has(Name) {
-        ; Apply the persisted v2 TOML value if present, otherwise fall back to
-        ; the default. v2 location: [ahk.shortcuts.personal] <Name> = bool.
+        ; Read the persisted enabled state from FeaturesV2 (hydrated at boot
+        ; from [ahk.shortcuts.personal] in the user's v2 config.toml).
         Enabled := DefaultEnabled
-        RawValue := IniCacheGet(_IniCache, "ahk.shortcuts.personal", Name)
-        if RawValue != "_" {
-            Enabled := RawValue
+        if IsSet(FeaturesV2) and FeaturesV2.Has("shortcuts")
+            and FeaturesV2["shortcuts"].Has("personal")
+            and IsObject(FeaturesV2["shortcuts"]["personal"])
+            and FeaturesV2["shortcuts"]["personal"].Has(Name) {
+            Enabled := FeaturesV2["shortcuts"]["personal"][Name]
         }
         Personal[Name] := { Enabled: Enabled, Description: Description }
     }
@@ -2253,14 +2255,19 @@ _RegisterScriptAltGrHotkeys()
 ; Features["Personal"] is populated before InitSubMenus/initMenu run.
 ; TOML hotstrings are loaded here with maximum priority so they shadow any
 ; conflicting built-in entry (registered before the layout section below).
-if Features.Has("Personal") {
-    for SectionName, SectionConfig in Features["Personal"] {
-        if SectionName == "__Order" {
+if FeaturesV2.Has("hotstrings") and FeaturesV2["hotstrings"].Has("personal") {
+    for SectionName, SectionConfig in FeaturesV2["hotstrings"]["personal"] {
+        if !(IsObject(SectionConfig) and Type(SectionConfig) == "Map") {
             continue
         }
-        if IsObject(SectionConfig) and SectionConfig.HasOwnProp("Enabled") and SectionConfig.Enabled {
-            LoadHotstringsSection("personal", FoldAsciiLower(SectionName), SectionConfig)
+        if !(SectionConfig.Has("enabled") and SectionConfig["enabled"]) {
+            continue
         }
+        ; v2 Personal keys are already the lowercase TOML section names — no
+        ; FoldAsciiLower needed. LoadHotstringsSection accepts v2 Maps directly
+        ; (it converts internally to the v1-shape object the regex/fast paths
+        ; expect).
+        LoadHotstringsSection("personal", SectionName, SectionConfig)
     }
 }
 
