@@ -5,10 +5,10 @@
 ; calls to populate the extension's submenu in the Shortcuts tray entry.
 
 BuildExtMenu_ergopti_demo(ExtMenu, ExtName) {
-    ExtMenu.Add(t("ext.demo.open_demo_gui"), _ErgoptiDemo_OpenGui)
-    ExtMenu.Add(t("ext.demo.show_info"),     _ErgoptiDemo_ShowInfo)
+    RegisterMenuItem(ExtMenu, t("ext.demo.open_demo_gui"), _ErgoptiDemo_OpenGui)
+    RegisterMenuItem(ExtMenu, t("ext.demo.show_info"),     _ErgoptiDemo_ShowInfo)
     ExtMenu.Add()   ; separator
-    ExtMenu.Add(t("ext.demo.visit_docs"),    _ErgoptiDemo_VisitDocs)
+    RegisterMenuItem(ExtMenu, t("ext.demo.visit_docs"),    _ErgoptiDemo_VisitDocs)
 }
 
 _ErgoptiDemo_OpenGui(*) {

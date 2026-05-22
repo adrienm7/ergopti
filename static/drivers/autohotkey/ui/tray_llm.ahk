@@ -349,7 +349,7 @@ LLM_Tray_Build() {
 		; previous ``(*) => …`` lambda may have been swallowing exceptions
 		; silently — when the user clicked nothing ever fired and no log
 		; line was emitted.
-		_LLM_Tray_Menu.Add(t("menu.llm.warning_install_ollama"), _LLM_Tray_OnWarningInstallClick)
+		RegisterMenuItem(_LLM_Tray_Menu, t("menu.llm.warning_install_ollama"), _LLM_Tray_OnWarningInstallClick)
 	}
 
 	; Backend submenu
@@ -423,7 +423,7 @@ LLM_Tray_Build() {
 	_LLM_Tray_Menu.Add(t("menu.llm.nav_menu_title"), nav_menu)
 
 	_LLM_Tray_Menu.Add()  ; separator
-	_LLM_Tray_Menu.Add(t("menu.llm.about"), LLM_Tray_OnAbout)
+	RegisterMenuItem(_LLM_Tray_Menu, t("menu.llm.about"), LLM_Tray_OnAbout)
 
 	; Register in the system tray on first call only.
 	if !_LLM_Tray_InTray {
@@ -464,7 +464,7 @@ LLM_Tray_BuildBackendMenu() {
 		captured_id := backend_id
 		prefix := _backend_prefix.Has(backend_id) ? _backend_prefix[backend_id] : ""
 		label := prefix . t("menu.llm.backend_" backend_id "_suffix")
-		m.Add(label, (name, pos, menu) => LLM_Tray_SetBackend(captured_id))
+		RegisterMenuItem(m, label, (name, pos, menu) => LLM_Tray_SetBackend(captured_id))
 		if (backend_id == _LLM_Tray["backend"])
 			m.Check(label)
 	}
@@ -511,14 +511,14 @@ LLM_Tray_BuildModelMenu() {
 		m.Add(placeholder, (*) => 0)
 		m.Check(placeholder)
 		m.Add()
-		m.Add(t("menu.llm.add_model_entry"),     (*) => LLM_Tray_PromptAddModel())
-		m.Add(t("menu.llm.browse_models_entry"), (*) => LLM_ModelBrowser_Show())
+		RegisterMenuItem(m, t("menu.llm.add_model_entry"),     (*) => LLM_Tray_PromptAddModel())
+		RegisterMenuItem(m, t("menu.llm.browse_models_entry"), (*) => LLM_ModelBrowser_Show())
 		return m
 	}
 
 	; "Aucun modèle (Désactivé)" — first row of the HS menu.
 	no_label := t("menu.llm.no_model")
-	m.Add(no_label, _LLM_Tray_MakeSetModelHandler(""))
+	RegisterMenuItem(m, no_label, _LLM_Tray_MakeSetModelHandler(""))
 	if (active == "")
 		m.Check(no_label)
 
@@ -528,7 +528,7 @@ LLM_Tray_BuildModelMenu() {
 	default_tag := _LLM_DefaultFor("llm_model_ollama", "")
 	if (default_tag != "") {
 		def_label := StrReplace(t("menu.llm.backend_default_model"), "%s", default_tag)
-		m.Add(def_label, _LLM_Tray_MakeSetModelHandler(default_tag))
+		RegisterMenuItem(m, def_label, _LLM_Tray_MakeSetModelHandler(default_tag))
 		if (active == default_tag)
 			m.Check(def_label)
 	}
@@ -553,7 +553,7 @@ LLM_Tray_BuildModelMenu() {
 			m.Disable(no_models_label)
 		} else {
 			for tag in installed {
-				m.Add(tag, _LLM_Tray_MakeSetModelHandler(tag))
+				RegisterMenuItem(m, tag, _LLM_Tray_MakeSetModelHandler(tag))
 				if (tag == active)
 					m.Check(tag)
 			}
@@ -561,11 +561,11 @@ LLM_Tray_BuildModelMenu() {
 	}
 
 	m.Add()
-	m.Add(t("menu.llm.add_model_entry"),     (*) => LLM_Tray_PromptAddModel())
+	RegisterMenuItem(m, t("menu.llm.add_model_entry"),     (*) => LLM_Tray_PromptAddModel())
 	; Visual model browser — exposes the shared models.json catalogue with
 	; params / RAM / speed columns so the user can compare specs before
 	; picking. Mirrors the HS visual chooser in ui/menu/menu_llm/models_manager.
-	m.Add(t("menu.llm.browse_models_entry"), (*) => LLM_ModelBrowser_Show())
+	RegisterMenuItem(m, t("menu.llm.browse_models_entry"), (*) => LLM_ModelBrowser_Show())
 	return m
 }
 
@@ -701,16 +701,16 @@ _LLM_Tray_BuildPerModelSubmenu(name, model, ollama_url, active) {
 	sub := Menu()
 
 	select_label := t("menu.llm.select_model")
-	sub.Add(select_label, _LLM_Tray_MakeSetModelHandler(name))
+	RegisterMenuItem(sub, select_label, _LLM_Tray_MakeSetModelHandler(name))
 	if (name == active)
 		sub.Check(select_label)
 
 	if LLM_IsModelInstalled(name) {
 		del_label := t("menu.llm.delete_model_cache")
-		sub.Add(del_label, _LLM_Tray_MakeDeleteCacheHandler(name))
+		RegisterMenuItem(sub, del_label, _LLM_Tray_MakeDeleteCacheHandler(name))
 	} else {
 		dl_label := t("menu.llm.download_model")
-		sub.Add(dl_label, _LLM_Tray_MakeDownloadModelHandler(name))
+		RegisterMenuItem(sub, dl_label, _LLM_Tray_MakeDownloadModelHandler(name))
 	}
 
 	sub.Add()  ; separator
@@ -720,7 +720,7 @@ _LLM_Tray_BuildPerModelSubmenu(name, model, ollama_url, active) {
 	sub.Disable(backend_label)
 
 	source_label := StrReplace(t("menu.llm.model_source"), "%s", ollama_url)
-	sub.Add(source_label, _LLM_Tray_MakeOpenUrlHandler(ollama_url))
+	RegisterMenuItem(sub, source_label, _LLM_Tray_MakeOpenUrlHandler(ollama_url))
 
 	sub.Add()
 	specs_header := t("menu.llm.specs_header")
@@ -937,16 +937,16 @@ _LLM_Tray_BuildApiEntriesMenu() {
 				: (prov  != "") ? "  —  " . prov
 				: ""
 			label := name . suffix
-			m.Add(label, (name, pos, menu) => _LLM_Tray_SelectApiEntry(captured))
+			RegisterMenuItem(m, label, (name, pos, menu) => _LLM_Tray_SelectApiEntry(captured))
 			if (id == active_id)
 				m.Check(label)
 		}
 	}
 	m.Add()
-	m.Add(t("menu.llm.api_add_entry"),  (*) => _LLM_Tray_PromptApiEntry(""))
+	RegisterMenuItem(m, t("menu.llm.api_add_entry"),  (*) => _LLM_Tray_PromptApiEntry(""))
 	if (Type(entries) == "Array" and entries.Length > 0) {
-		m.Add(t("menu.llm.api_edit_entry"), (*) => _LLM_Tray_PromptApiEntry(_LLM_Tray["api_entry_id"]))
-		m.Add(t("menu.llm.api_remove_entry"), (*) => _LLM_Tray_RemoveActiveApiEntry())
+		RegisterMenuItem(m, t("menu.llm.api_edit_entry"), (*) => _LLM_Tray_PromptApiEntry(_LLM_Tray["api_entry_id"]))
+		RegisterMenuItem(m, t("menu.llm.api_remove_entry"), (*) => _LLM_Tray_RemoveActiveApiEntry())
 	}
 	return m
 }
@@ -1414,7 +1414,7 @@ LLM_Tray_BuildProfileMenu() {
 		base_label := LLM_Tray_GetProfileLabel(id)
 		hint := LLM_Tray_GetProfileHotkeyHint(id)
 		label := (hint != "") ? base_label . "  (" . hint . ")" : base_label
-		m.Add(label, (name, pos, menu) => LLM_Tray_SetProfile(captured_id))
+		RegisterMenuItem(m, label, (name, pos, menu) => LLM_Tray_SetProfile(captured_id))
 		if (id == _LLM_Tray["profile_id"])
 			m.Check(label)
 	}
@@ -1433,14 +1433,14 @@ LLM_Tray_BuildProfileMenu() {
 			base_plabel := p.Has("label") ? p["label"] : pid
 			hint := LLM_Tray_GetProfileHotkeyHint(pid)
 			plabel := (hint != "") ? base_plabel . "  (" . hint . ")" : base_plabel
-			m.Add(plabel, (name, pos, menu) => LLM_Tray_OnUserProfileClick(captured_p))
+			RegisterMenuItem(m, plabel, (name, pos, menu) => LLM_Tray_OnUserProfileClick(captured_p))
 			if (pid == _LLM_Tray["profile_id"])
 				m.Check(plabel)
 		}
 	}
 
 	m.Add()
-	m.Add(t("menu.profiles.create_profile"), (*) => LLM_Tray_PromptCreateProfile())
+	RegisterMenuItem(m, t("menu.profiles.create_profile"), (*) => LLM_Tray_PromptCreateProfile())
 
 	; "Clone active built-in" — exposes the built-in system prompt for
 	; editing without requiring the user to type it from scratch. The
@@ -1452,7 +1452,7 @@ LLM_Tray_BuildProfileMenu() {
 	is_builtin := (active_id == "raw" or active_id == "basic" or active_id == "advanced" or active_id == "batch_advanced")
 	if is_builtin {
 		clone_label := t("menu.profiles.clone_builtin")
-		m.Add(clone_label, (*) => LLM_Tray_CloneActiveBuiltinProfile())
+		RegisterMenuItem(m, clone_label, (*) => LLM_Tray_CloneActiveBuiltinProfile())
 	}
 
 	; Auto-detect toggle: when ON, switching model in the model submenu also
@@ -1461,7 +1461,7 @@ LLM_Tray_BuildProfileMenu() {
 	; profile each model should run with by default.
 	m.Add()
 	auto_label := t("menu.profiles.auto_detect")
-	m.Add(auto_label, (*) => _LLM_Tray_ToggleAutoProfile())
+	RegisterMenuItem(m, auto_label, (*) => _LLM_Tray_ToggleAutoProfile())
 	if _LLM_Tray["auto_profile_for_model"]
 		m.Check(auto_label)
 
@@ -1481,7 +1481,7 @@ _LLM_Tray_BuildPerAppProfileMenu() {
 	; "Override active app with the currently-selected profile". Lazy
 	; closure so WinGetProcessName fires when the user clicks, not when
 	; the menu is built.
-	sm.Add(t("menu.profiles.override_active_app_with_current"),
+	RegisterMenuItem(sm, t("menu.profiles.override_active_app_with_current"),
 		(*) => _LLM_Tray_AddOverrideForActiveApp())
 	if (overrides is Map and overrides.Count > 0) {
 		sm.Add()
@@ -1489,7 +1489,7 @@ _LLM_Tray_BuildPerAppProfileMenu() {
 		for app_name, profile_id in overrides {
 			captured_app := app_name
 			label := app_name . "  →  " . LLM_Tray_GetProfileLabel(profile_id)
-			sm.Add(label, (*) => _LLM_Tray_ClearOverrideFor(captured_app))
+			RegisterMenuItem(sm, label, (*) => _LLM_Tray_ClearOverrideFor(captured_app))
 		}
 	}
 	return sm
@@ -1545,7 +1545,7 @@ LLM_Tray_BuildNMenu() {
 	for n in LLM_TRAY_N_OPTIONS {
 		captured_n := n
 		label := StrReplace(StrReplace(t("menu.llm.prediction_count_label"), "%d", n), "%s", (n > 1 ? "s" : ""))
-		m.Add(label, (name, pos, menu) => LLM_Tray_SetN(captured_n))
+		RegisterMenuItem(m, label, (name, pos, menu) => LLM_Tray_SetN(captured_n))
 		if (n == _LLM_Tray["n_predictions"])
 			m.Check(label)
 	}
@@ -1570,11 +1570,11 @@ LLM_Tray_BuildTriggerMenu() {
 
 	; Trigger shortcut (fires prediction on demand)
 	sc_display := _LLM_Tray["trigger_shortcut"] != "" ? _LLM_Tray["trigger_shortcut"] : t("common.none")
-	m.Add(StrReplace(t("menu.llm.trigger_shortcut_label"), "%s", sc_display), (*) => LLM_Tray_PromptTriggerShortcut())
+	RegisterMenuItem(m, StrReplace(t("menu.llm.trigger_shortcut_label"), "%s", sc_display), (*) => LLM_Tray_PromptTriggerShortcut())
 
 	; Debounce — dialog like HS (free numeric input)
 	debounce_display := _LLM_Tray["debounce_ms"] . " ms"
-	m.Add(StrReplace(t("menu.llm.debounce_label"), "%s", debounce_display), (*) => LLM_Tray_PromptDebounce())
+	RegisterMenuItem(m, StrReplace(t("menu.llm.debounce_label"), "%s", debounce_display), (*) => LLM_Tray_PromptDebounce())
 	_LLM_MaybeAddReset(m,
 		_LLM_Tray["debounce_ms"],
 		_LLM_DefaultFor("llm_debounce_ms", 500),
@@ -1585,13 +1585,13 @@ LLM_Tray_BuildTriggerMenu() {
 
 	; Instant on word end
 	instant_label := t("menu.llm.instant_on_word_end")
-	m.Add(instant_label, LLM_Tray_OnInstantToggle)
+	RegisterMenuItem(m, instant_label, LLM_Tray_OnInstantToggle)
 	if _LLM_Tray["instant_on_word_end"]
 		m.Check(instant_label)
 
 	; After hotstring (suggest after a hotstring expansion finishes)
 	after_hs_label := t("menu.llm.after_hotstring")
-	m.Add(after_hs_label, (*) => LLM_Tray_ToggleBool("after_hotstring"))
+	RegisterMenuItem(m, after_hs_label, (*) => LLM_Tray_ToggleBool("after_hotstring"))
 	if _LLM_Tray["after_hotstring"]
 		m.Check(after_hs_label)
 
@@ -1599,13 +1599,13 @@ LLM_Tray_BuildTriggerMenu() {
 
 	; URL bar filter
 	url_label := t("menu.llm.disable_url_bars")
-	m.Add(url_label, (*) => LLM_Tray_ToggleBool("disable_url_bars"))
+	RegisterMenuItem(m, url_label, (*) => LLM_Tray_ToggleBool("disable_url_bars"))
 	if _LLM_Tray["disable_url_bars"]
 		m.Check(url_label)
 
 	; Password field filter
 	pwd_label := t("menu.llm.disable_password_fields")
-	m.Add(pwd_label, (*) => LLM_Tray_ToggleBool("disable_password_fields"))
+	RegisterMenuItem(m, pwd_label, (*) => LLM_Tray_ToggleBool("disable_password_fields"))
 	if _LLM_Tray["disable_password_fields"]
 		m.Check(pwd_label)
 
@@ -1615,7 +1615,7 @@ LLM_Tray_BuildTriggerMenu() {
 	excl_label := (n > 0)
 		? StrReplace(StrReplace(t("menu.llm.disabled_in_label"), "%d", n), "%s", (n > 1 ? "s" : ""))
 		: t("menu.llm.exclude_from_ai")
-	m.Add(excl_label, (*) => LLM_Tray_OpenAppPicker())
+	RegisterMenuItem(m, excl_label, (*) => LLM_Tray_OpenAppPicker())
 
 	return m
 }
@@ -1636,7 +1636,7 @@ LLM_Tray_BuildGenerationMenu() {
 
 	; Context length — dialog
 	ctx_display := _LLM_Tray["ctx_chars"]
-	m.Add(StrReplace(t("menu.llm.context_length_label"), "%s", ctx_display), (*) => LLM_Tray_PromptCtxChars())
+	RegisterMenuItem(m, StrReplace(t("menu.llm.context_length_label"), "%s", ctx_display), (*) => LLM_Tray_PromptCtxChars())
 	_LLM_MaybeAddReset(m,
 		_LLM_Tray["ctx_chars"],
 		_LLM_DefaultFor("llm_context_length", 500),
@@ -1645,7 +1645,7 @@ LLM_Tray_BuildGenerationMenu() {
 
 	; Reset on nav toggle
 	nav_label := t("menu.llm.reset_on_nav")
-	m.Add(nav_label, (*) => LLM_Tray_ToggleBool("reset_on_nav"))
+	RegisterMenuItem(m, nav_label, (*) => LLM_Tray_ToggleBool("reset_on_nav"))
 	if _LLM_Tray["reset_on_nav"]
 		m.Check(nav_label)
 
@@ -1653,7 +1653,7 @@ LLM_Tray_BuildGenerationMenu() {
 
 	; Min words — dialog
 	min_display := _LLM_Tray["min_words"]
-	m.Add(StrReplace(t("menu.llm.min_words_label"), "%s", min_display), (*) => LLM_Tray_PromptMinWords())
+	RegisterMenuItem(m, StrReplace(t("menu.llm.min_words_label"), "%s", min_display), (*) => LLM_Tray_PromptMinWords())
 	_LLM_MaybeAddReset(m,
 		_LLM_Tray["min_words"],
 		_LLM_DefaultFor("llm_min_words", 3),
@@ -1663,7 +1663,7 @@ LLM_Tray_BuildGenerationMenu() {
 	; Max words — dialog
 	max_val     := _LLM_Tray["max_words"]
 	max_display := (max_val == 0) ? t("menu.llm.unlimited") : max_val
-	m.Add(StrReplace(t("menu.llm.max_words_label"), "%s", max_display), (*) => LLM_Tray_PromptMaxWords())
+	RegisterMenuItem(m, StrReplace(t("menu.llm.max_words_label"), "%s", max_display), (*) => LLM_Tray_PromptMaxWords())
 	_LLM_MaybeAddReset(m,
 		_LLM_Tray["max_words"],
 		_LLM_DefaultFor("llm_max_words", 15),
@@ -1674,7 +1674,7 @@ LLM_Tray_BuildGenerationMenu() {
 
 	; Temperature — dialog
 	temp_display := _LLM_Tray["temperature"]
-	m.Add(StrReplace(t("menu.llm.temperature_label"), "%s", temp_display), (*) => LLM_Tray_PromptTemperature())
+	RegisterMenuItem(m, StrReplace(t("menu.llm.temperature_label"), "%s", temp_display), (*) => LLM_Tray_PromptTemperature())
 	; ``temperature`` is stored as a formatted string ("0.10"), so compare the
 	; canonical form of the default to avoid spurious resets when the JSON
 	; carries a numeric 0.1 vs the stored "0.10".
@@ -1687,7 +1687,7 @@ LLM_Tray_BuildGenerationMenu() {
 	; Auto-raise temperature
 	auto_raise_label := t("menu.llm.auto_raise_temp")
 	is_batch := (_LLM_Tray["n_predictions"] > 1)
-	m.Add(auto_raise_label, (*) => LLM_Tray_ToggleBool("auto_raise_temp"))
+	RegisterMenuItem(m, auto_raise_label, (*) => LLM_Tray_ToggleBool("auto_raise_temp"))
 	if _LLM_Tray["auto_raise_temp"]
 		m.Check(auto_raise_label)
 	if !is_batch
@@ -1713,7 +1713,7 @@ LLM_Tray_BuildDisplayMenu() {
 
 	; Info bar (shows model name and latency in the tooltip)
 	info_label := t("menu.llm.show_info_bar")
-	m.Add(info_label, (*) => LLM_Tray_ToggleBool("show_info_bar"))
+	RegisterMenuItem(m, info_label, (*) => LLM_Tray_ToggleBool("show_info_bar"))
 	if _LLM_Tray["show_info_bar"]
 		m.Check(info_label)
 
@@ -1723,7 +1723,7 @@ LLM_Tray_BuildDisplayMenu() {
 	; user keeps the option of bare Backspace / Ctrl+Z to roll back what
 	; was typed.
 	inline_label := t("menu.llm.inline_autotype")
-	m.Add(inline_label, (*) => LLM_Tray_ToggleBool("inline_autotype"))
+	RegisterMenuItem(m, inline_label, (*) => LLM_Tray_ToggleBool("inline_autotype"))
 	if _LLM_Tray["inline_autotype"]
 		m.Check(inline_label)
 
@@ -1731,7 +1731,7 @@ LLM_Tray_BuildDisplayMenu() {
 
 	; Streaming (token-by-token display)
 	streaming_label := t("menu.llm.show_streaming")
-	m.Add(streaming_label, (*) => LLM_Tray_ToggleBool("streaming"))
+	RegisterMenuItem(m, streaming_label, (*) => LLM_Tray_ToggleBool("streaming"))
 	if _LLM_Tray["streaming"]
 		m.Check(streaming_label)
 	; Streaming only meaningful when show-all-at-once (multi) is enabled
@@ -1740,7 +1740,7 @@ LLM_Tray_BuildDisplayMenu() {
 
 	; Show all predictions at once
 	all_at_once_label := t("menu.llm.show_all_at_once")
-	m.Add(all_at_once_label, (*) => LLM_Tray_ToggleBool("show_all_at_once"))
+	RegisterMenuItem(m, all_at_once_label, (*) => LLM_Tray_ToggleBool("show_all_at_once"))
 	if _LLM_Tray["show_all_at_once"]
 		m.Check(all_at_once_label)
 	if (n < 2)
@@ -1766,7 +1766,7 @@ LLM_Tray_BuildDisplayMenu() {
 		} else {
 			indent_label := lvl . " " . t("menu.llm.indent_spaces")
 		}
-		indent_menu.Add(indent_label, (name, pos, menu) => LLM_Tray_SetIndent(captured_lvl))
+		RegisterMenuItem(indent_menu, indent_label, (name, pos, menu) => LLM_Tray_SetIndent(captured_lvl))
 		if (lvl == _LLM_Tray["pred_indent"])
 			indent_menu.Check(indent_label)
 	}
@@ -1802,14 +1802,14 @@ LLM_Tray_BuildNavMenu() {
 
 	nav_display  := (_LLM_Tray["nav_modifiers"] != "") ? _LLM_Tray["nav_modifiers"] : t("menu.llm.arrows_only")
 	nav_item_lbl := t("menu.llm.nav_label") . " — " . nav_display
-	m.Add(nav_item_lbl, (*) => LLM_Tray_PromptNavModifiers())
+	RegisterMenuItem(m, nav_item_lbl, (*) => LLM_Tray_PromptNavModifiers())
 	if (n < 2)
 		m.Disable(nav_item_lbl)
 
 	val_display  := (_LLM_Tray["val_modifiers"] != "") ? _LLM_Tray["val_modifiers"] : t("menu.llm.digits_only")
 	val_key_range := (n == 10) ? "1-0" : "1-" . n
 	val_item_lbl := StrReplace(t("menu.llm.val_label"), "%s", val_key_range) . " — " . val_display
-	m.Add(val_item_lbl, (*) => LLM_Tray_PromptValModifiers())
+	RegisterMenuItem(m, val_item_lbl, (*) => LLM_Tray_PromptValModifiers())
 	if (n < 2)
 		m.Disable(val_item_lbl)
 
@@ -2105,7 +2105,7 @@ _LLM_MaybeAddReset(menu, current, default_val, on_click) {
 	if (current = default_val)
 		return
 	label := StrReplace(t("menu.llm.reset_label"), "%s", default_val)
-	menu.Add(label, (*) => on_click())
+	RegisterMenuItem(menu, label, (*) => on_click())
 }
 
 LLM_Tray_PromptDebounce() {
