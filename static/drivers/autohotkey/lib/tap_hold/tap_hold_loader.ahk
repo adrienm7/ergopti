@@ -147,3 +147,28 @@ TapHoldDuration(TapHold, KeyId) {
 	Entry := TapHold["keys"][KeyId]
 	return Entry.Has("time_activation_seconds") ? Entry["time_activation_seconds"] : 0.2
 }
+
+; Return the configured hold modifier for ``KeyId`` (e.g. "ctrl", "shift",
+; "alt", "alt_gr") or ``""`` if the variant doesn't activate a modifier on
+; hold (e.g. plain tap-only variants like CapsLock-BackSpace or LAlt-BackSpace
+; key-repeat where the held key simply repeats the tap action).
+TapHoldHoldModifier(TapHold, KeyId) {
+	if !(TapHold.Has("keys") and TapHold["keys"].Has(KeyId)) {
+		return ""
+	}
+	Entry := TapHold["keys"][KeyId]
+	return Entry.Has("hold_modifier") ? Entry["hold_modifier"] : ""
+}
+
+; Return the configured hold layer for ``KeyId`` (e.g. "nav") or ``""`` if
+; the variant doesn't activate a remap layer on hold. Used to distinguish
+; Layer-on-hold variants from modifier-on-hold variants (e.g. LAlt-BackSpace
+; vs LAlt-BackSpaceLayer share tap_action "backspace" but only the latter
+; arms the navigation layer).
+TapHoldHoldLayer(TapHold, KeyId) {
+	if !(TapHold.Has("keys") and TapHold["keys"].Has(KeyId)) {
+		return ""
+	}
+	Entry := TapHold["keys"][KeyId]
+	return Entry.Has("hold_layer") ? Entry["hold_layer"] : ""
+}

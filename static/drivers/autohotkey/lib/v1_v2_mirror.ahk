@@ -681,8 +681,12 @@ MirrorV1ToV2_TapHold() {
     ; sets ``hold_modifier`` (a modifier key) or ``hold_layer`` (a
     ; remap layer); never both.
     ; Format: variant_name -> Map("tap", "<v2_action>", "hold_mod", "<mod>" | "hold_layer", "<layer>")
+    ; "BackSpace" variant is intentionally tap-only — the v1 *SC03A hotkey
+    ; under this variant does NOT add Ctrl-on-hold (see modules/tap_holds.ahk
+    ; line 61). Distinguishing it from "BackSpaceCtrl" requires the absence
+    ; of a hold_modifier in v2.
     CapsLockVariants := Map(
-        "BackSpace",          Map("tap", "backspace",       "hold_mod", "ctrl"),
+        "BackSpace",          Map("tap", "backspace"),
         "BackSpaceCtrl",      Map("tap", "backspace",       "hold_mod", "ctrl"),
         "CapsLockCtrl",       Map("tap", "caps_lock",       "hold_mod", "ctrl"),
         "CapsWordCtrl",       Map("tap", "caps_word",       "hold_mod", "ctrl"),
@@ -694,9 +698,12 @@ MirrorV1ToV2_TapHold() {
         "OneShotShiftCtrl",   Map("tap", "one_shot_shift",  "hold_mod", "ctrl"),
         "TabCtrl",            Map("tap", "tab",             "hold_mod", "ctrl"),
     )
+    ; "BackSpace" variant is tap-only key-repeat — the v1 *SC038 handler
+    ; for this variant does NOT re-arm LAlt on hold (see modules/tap_holds.ahk
+    ; line 261). Distinguished from BackSpaceLayer by the absence of hold_layer.
     LAltVariants := Map(
         "AltTabMonitor",   Map("tap", "alt_tab_monitor", "hold_mod", "alt"),
-        "BackSpace",       Map("tap", "backspace",       "hold_mod", "alt"),
+        "BackSpace",       Map("tap", "backspace"),
         "BackSpaceLayer",  Map("tap", "backspace",       "hold_layer", "nav"),
         "OneShotShift",    Map("tap", "one_shot_shift",  "hold_mod", "alt"),
         "TabLayer",        Map("tap", "tab",             "hold_layer", "nav"),

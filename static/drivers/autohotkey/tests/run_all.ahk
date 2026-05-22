@@ -45,6 +45,7 @@ SetWorkingDir(A_ScriptDir)
 #Include ../lib/hotstrings/hotstring_engine_v2.ahk
 #Include ../lib/toml/toml_loader.ahk
 #Include ../lib/toml/toml_loader_v2.ahk
+#Include ../lib/tap_hold/tap_hold_loader.ahk
 #Include ../lib/manifest_reader.ahk
 #Include ../lib/hotstrings/hotstrings_config.ahk
 #Include ../lib/hotstrings/personal_toml_editor.ahk
