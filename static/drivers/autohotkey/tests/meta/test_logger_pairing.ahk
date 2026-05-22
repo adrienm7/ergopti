@@ -104,7 +104,9 @@ _MetaRunLoggerPairingTests() {
 		}
 	}
 
-	Test("meta logger pairing: scan complete (" . Imbalanced . " warnings)", () => {})
+	_MetaLoggerPairingResult() {
+	}
+	Test("meta logger pairing: scan complete (" . Imbalanced . " warnings)", _MetaLoggerPairingResult)
 }
 
 _MetaRunLoggerPairingTests()

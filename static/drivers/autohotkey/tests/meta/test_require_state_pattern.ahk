@@ -89,7 +89,9 @@ _MetaRunRequireStateTests() {
 		}
 	}
 
-	Test("meta require_state pattern: scan complete (" . Missing . " warnings)", () => {})
+	_MetaRequireStateResult() {
+	}
+	Test("meta require_state pattern: scan complete (" . Missing . " warnings)", _MetaRequireStateResult)
 }
 
 _MetaRunRequireStateTests()

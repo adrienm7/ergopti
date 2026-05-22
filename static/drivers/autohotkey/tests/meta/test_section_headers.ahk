@@ -90,9 +90,10 @@ _MetaRunSectionHeaderTests() {
 		}
 	}
 
-	Test("meta section headers: scanned " . TotalFiles . " files (" . TotalWarns . " warnings)", () => {
+	_MetaSectionHeaderResult() {
 		Assert(TotalFiles > 0, "no AHK source files scanned")
-	})
+	}
+	Test("meta section headers: scanned " . TotalFiles . " files (" . TotalWarns . " warnings)", _MetaSectionHeaderResult)
 }
 
 _MetaRunSectionHeaderTests()

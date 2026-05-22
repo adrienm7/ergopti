@@ -72,7 +72,7 @@ _MetaRunFileHeaderTests() {
 		for _, Abs in _MetaListAhkFiles(StrReplace(DriverRoot . Sub, "/", "\")) {
 			FileName := RegExReplace(Abs, ".*[/\\]")
 			AbsCopy := Abs
-			Test("file header: " . FileName, () => {
+			_MetaCheckFileHeader() {
 				Checked++
 				try {
 					Raw := FileRead(AbsCopy)
@@ -97,13 +97,15 @@ _MetaRunFileHeaderTests() {
 					Mismatches++
 					OutputDebug("WARN: header in " . Rel . " does not name itself: " . First)
 				}
-			})
+			}
+			Test("file header: " . FileName, _MetaCheckFileHeader)
 		}
 	}
 
-	Test("meta file headers: at least one file checked", () => {
+	_MetaFileHeadersAtLeastOne() {
 		Assert(Checked > 0, "no AHK source files were located — check SrcDirs")
-	})
+	}
+	Test("meta file headers: at least one file checked", _MetaFileHeadersAtLeastOne)
 }
 
 _MetaRunFileHeaderTests()
