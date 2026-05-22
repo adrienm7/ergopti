@@ -17,6 +17,10 @@ SetWorkingDir(A_ScriptDir) ; Set the working directory where the script is locat
 ; message pump well-formed.
 global CapsWordEnabled := False
 global LayerEnabled := False
+; Registry for runtime-registered personal shortcuts (personal_shortcuts.ahk).
+; Stores ordered names + per-name descriptions so the tray menu can render
+; them without consulting the legacy Features v1 Map.
+global _PersonalShortcutsRegistry := Map("__Order", [])
 ; Load the manifest + path translator + builder first so features_config.ahk's
 ; ``global Features := BuildLegacyFeaturesFromManifest()`` call has everything
 ; it needs at parse time. None of these prerequisites reach the message loop
@@ -663,68 +667,44 @@ global SpaceAroundSymbols := FeaturesV2["hotstrings"]["distances_reduction"]["sp
 ; collide with the built-in Shortcuts entries (EGrave, MicrosoftBold, …) and
 ; show up as a dedicated « Raccourcis personnels » sub-submenu inside
 ; « 🎯 Raccourcis ».
-; Their on/off state is persisted in the configuration INI under the
-; [Shortcuts.Personal] section. The persisted value is looked up at
-; registration time so previously-saved toggles survive across reloads even
-; though personal_shortcuts.ahk is loaded after the global ReadConfiguration.
+; Their on/off state is persisted in FeaturesV2 under the
+; [ahk.shortcuts.personal] section. The persisted value is already hydrated
+; in FeaturesV2 at boot, so toggling via the tray survives reloads without
+; any special lookup here — we only set the default on the very first boot.
 RegisterPersonalFeature(Name, DefaultEnabled := false, Description := "") {
-    global Features, FeaturesV2
-    if !Features.Has("Shortcuts") {
-        return
-    }
-    Sc := Features["Shortcuts"]
-    if !Sc.Has("__Order") {
-        Sc["__Order"] := []
-    }
+    global _PersonalShortcutsRegistry, FeaturesV2
 
-    ; Lazily create the Personal sub-Map and its own __Order on the first call.
-    if !Sc.Has("Personal") {
-        Sc["Personal"] := Map("__Order", [])
-        ; __Label drives GetSubMenuLabel — data-driven i18n key for this sub-Map
-        Sc["Personal"]["__Label"] := "menu.shortcuts.personal"
-    }
-    Personal := Sc["Personal"]
-    if !Personal.Has("__Order") {
-        Personal["__Order"] := []
-    }
+    ; Register the description for use by the tray menu's GetMenuTitleByPath.
+    if !_PersonalShortcutsRegistry.Has(Name) {
+        _PersonalShortcutsRegistry[Name] := Description
 
-    if !Personal.Has(Name) {
-        ; Read the persisted enabled state from FeaturesV2 (hydrated at boot
-        ; from [ahk.shortcuts.personal] in the user's v2 config.toml).
-        Enabled := DefaultEnabled
-        if IsSet(FeaturesV2) and FeaturesV2.Has("shortcuts")
-            and FeaturesV2["shortcuts"].Has("personal")
-            and IsObject(FeaturesV2["shortcuts"]["personal"])
-            and FeaturesV2["shortcuts"]["personal"].Has(Name) {
-            Enabled := FeaturesV2["shortcuts"]["personal"][Name]
+        ; Track insertion order so the submenu respects personal_shortcuts.ahk
+        ; declaration order across reloads.
+        Found := false
+        for Item in _PersonalShortcutsRegistry["__Order"] {
+            if Item == Name {
+                Found := true
+                break
+            }
         }
-        Personal[Name] := { Enabled: Enabled, Description: Description }
-    }
-
-    ; Append the feature to the Personal sub-Map order, avoiding duplicates
-    Found := false
-    for Item in Personal["__Order"] {
-        if Item == Name {
-            Found := true
-            break
+        if !Found {
+            _PersonalShortcutsRegistry["__Order"].Push(Name)
         }
     }
-    if !Found {
-        Personal["__Order"].Push(Name)
-    }
 
-    ; Hook the Personal sub-Map into the parent Shortcuts __Order once, with a
-    ; preceding separator so it visually breaks away from built-in entries.
-    HasPersonalEntry := false
-    for Item in Sc["__Order"] {
-        if Item == "Personal" {
-            HasPersonalEntry := true
-            break
+    ; Persist the initial enabled state into FeaturesV2 if no value is stored
+    ; yet. On subsequent reloads the user's persisted value already exists so
+    ; we never overwrite it with the code-level default.
+    if !(IsSet(FeaturesV2) and FeaturesV2.Has("shortcuts")
+        and FeaturesV2["shortcuts"].Has("personal")
+        and IsObject(FeaturesV2["shortcuts"]["personal"])
+        and FeaturesV2["shortcuts"]["personal"].Has(Name)) {
+        if IsSet(FeaturesV2) and FeaturesV2.Has("shortcuts") {
+            if !FeaturesV2["shortcuts"].Has("personal") {
+                FeaturesV2["shortcuts"]["personal"] := Map()
+            }
+            FeaturesV2["shortcuts"]["personal"][Name] := DefaultEnabled
         }
-    }
-    if !HasPersonalEntry {
-        Sc["__Order"].Push("-")
-        Sc["__Order"].Push("Personal")
     }
 }
 
