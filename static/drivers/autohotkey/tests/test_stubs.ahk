@@ -72,39 +72,9 @@ global ScriptInformation := Map(
     "LogLevel", "INFO",
 )
 
-; Features v1 Map kept for the slices that have not yet migrated (Personal,
-; letter pickers in layout_ergopti, Gestures master toggle in tray_menu).
-; New code reads from FeaturesV2 — see ManifestBuildFeaturesMap.
-global Features := Map(
-    "Layout", Map(
-        "ErgoptiBase", { Enabled: true },
-        "ErgoptiAltGr", { Enabled: true },
-        "ErgoptiPlus", { Enabled: false },
-    ),
-    "Shortcuts", Map(
-        "AltGrLAlt", Map(
-            "BackSpace", { Enabled: false },
-            "Tab", { Enabled: true },
-        ),
-        "AltGrCapsLock", Map(
-            "BackSpace", { Enabled: false },
-            "CapsLock", { Enabled: false },
-        ),
-    ),
-    "DistancesReduction", Map(
-        "SpaceAroundSymbols", { Enabled: false },
-    ),
-    "Gestures", Map(
-        "Enabled", { Enabled: true },
-    ),
-)
-
-; v2 Features Map — canonical state container in production. Hydrated at
-; boot from the user's v2 config.toml by ApplyConfigTomlV2 + a per-section
-; reverse mirror onto the legacy v1 Features Map (lib/v2_v1_mirror.ahk)
-; for the tray-menu builder. Migrated read sites (lib/layout/*, modules/
-; layout.ahk, modules/gestures.ahk, modules/shortcuts.ahk, modules/
-; keylogger/keylogger_prefetch.ahk) now hit FeaturesV2 directly.
+; v2 Features Map — canonical state container. Hydrated at boot from the
+; user's v2 config.toml by ApplyConfigTomlV2. All runtime reads go through
+; FeaturesV2 directly.
 ;
 ; The fixture below mirrors the manifest defaults — extend it alongside
 ; any new feature added to static/drivers/_shared/features/manifest.toml

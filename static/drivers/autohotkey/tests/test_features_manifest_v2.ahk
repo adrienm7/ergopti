@@ -7,11 +7,10 @@
 ;
 ;     manifest.toml -> codegen -> features_manifest.ahk -> ManifestBuildFeaturesMap()
 ;                                                                |
-;                                ApplyConfigTomlV2(user config) modifies Features
+;                                ApplyConfigTomlV2(user config) modifies FeaturesV2
 ;
-; The cut-over rewrites ~500-800 call sites against this pipeline, so we
-; lock its shape with assertions now. Every test in this file:
-;   1. Builds a fresh ``Features`` Map from the manifest.
+; Every test in this file:
+;   1. Builds a fresh ``FeaturesV2`` Map from the manifest.
 ;   2. Optionally writes a temporary v2 ``config.toml`` and applies it.
 ;   3. Asserts the resulting path/value matches what the migration document
 ;      promises at ``_shared/features/_migration_v1_to_v2.md``.
@@ -20,10 +19,8 @@
 ; 1. Codegen guard: if the manifest hasn't been built, ``ManifestEnsureLoaded``
 ;    returns false and the first test fails with a clear "run npm run build:manifest"
 ;    message. No spooky cascading failures from missing globals.
-; 2. Isolation: every test saves the global ``Features``, replaces it with a
-;    fresh build, runs its assertions, then restores. This prevents the v1
-;    stub Map (declared in test_stubs.ahk) from leaking into other test files
-;    that may run later in the same process.
+; 2. Isolation: every test saves the global ``FeaturesV2``, replaces it with a
+;    fresh build from the manifest, runs its assertions, then restores.
 ; 3. The override tests write to ``A_Temp`` to avoid polluting the source tree
 ;    or the user's real config directory.
 ; 4. ASCII-only source: AHK v2 is strict about source encoding; non-ASCII
@@ -43,20 +40,19 @@
 ; ==================================
 ; ==================================
 
-; Save the global ``Features`` (v1 stub from test_stubs.ahk), replace it with a
-; fresh v2 build from the manifest. Returns the saved v1 Map so the caller can
-; restore it after assertions.
+; Swap ``FeaturesV2`` for a fresh manifest build and return the old value so
+; the test can restore it afterward. Isolates each test from the shared stub.
 _FMv2_BeginIsolated() {
-	global Features
-	OldFeatures := Features
-	Features := ManifestBuildFeaturesMap()
-	return OldFeatures
+	global FeaturesV2
+	OldFeaturesV2 := FeaturesV2
+	FeaturesV2 := ManifestBuildFeaturesMap()
+	return OldFeaturesV2
 }
 
-; Restore the v1 stub Features map saved by _FMv2_BeginIsolated.
-_FMv2_EndIsolated(OldFeatures) {
-	global Features
-	Features := OldFeatures
+; Restore the FeaturesV2 saved by _FMv2_BeginIsolated.
+_FMv2_EndIsolated(OldFeaturesV2) {
+	global FeaturesV2
+	FeaturesV2 := OldFeaturesV2
 }
 
 ; Write the given content to ``A_Temp\ergopti_v2_test_<Tag>.toml`` and return
@@ -116,7 +112,7 @@ Test("manifest_v2: AHK manifest carries the platform's feature subset", TestFMv2
 TestFMv2_NoHsFeaturesInAhkManifest() {
 	; Codegen must filter out HS-only entries from the AHK manifest. If any
 	; ``hs.<...>`` entry leaks through, ``ManifestBuildFeaturesMap`` would
-	; create useless ``Features["hs"][...]`` branches that confuse call sites.
+	; create useless ``FeaturesV2["hs"][...]`` branches that confuse call sites.
 	ManifFeatures := ManifestFeatures()
 	for Entry in ManifFeatures {
 		Section := Entry["section"]
@@ -154,13 +150,13 @@ Test("ManifestBuildFeaturesMap: exposes section_order from the manifest",
 	TestFMv2_BuildHasSectionOrder)
 
 TestFMv2_AhkPrefixStripped() {
-	; ahk.layout.ergopti_base in the manifest must land at Features[layout][ergopti_base]
-	; after the ahk. prefix strip. Call sites must NOT see Features[ahk].
+	; ahk.layout.ergopti_base in the manifest must land at FeaturesV2[layout][ergopti_base]
+	; after the ahk. prefix strip. Call sites must NOT see FeaturesV2[ahk].
 	Built := ManifestBuildFeaturesMap()
 	AssertFalse(Built.Has("ahk"),
 		"ahk prefix must be stripped at build time; found stray ahk branch.")
 	AssertTrue(Built.Has("layout"),
-		"Layout (ahk.layout in manifest) must land at Features[layout] after strip.")
+		"Layout (ahk.layout in manifest) must land at FeaturesV2[layout] after strip.")
 }
 Test("ManifestBuildFeaturesMap: ahk. prefix is stripped from section paths",
 	TestFMv2_AhkPrefixStripped)
@@ -289,14 +285,14 @@ TestFMv2_GesturesStrippedFromAhk() {
 	AssertEqual("tab_close", Built["gestures"]["swipe_3_down"])
 	AssertEqual("left_click_toggle", Built["gestures"]["tap_3"])
 }
-Test("ManifestBuildFeaturesMap: ahk.gestures lands at Features[gestures] with action defaults",
+Test("ManifestBuildFeaturesMap: ahk.gestures lands at FeaturesV2[gestures] with action defaults",
 	TestFMv2_GesturesStrippedFromAhk)
 
 TestFMv2_NoTapHoldInFeatures() {
 	Built := ManifestBuildFeaturesMap()
 	AssertFalse(Built.Has("tap_hold"))
 }
-Test("ManifestBuildFeaturesMap: tap_hold is not a Features sub-tree in v2",
+Test("ManifestBuildFeaturesMap: tap_hold is not a FeaturesV2 sub-tree",
 	TestFMv2_NoTapHoldInFeatures)
 
 
@@ -309,136 +305,127 @@ Test("ManifestBuildFeaturesMap: tap_hold is not a Features sub-tree in v2",
 ; ====================================================
 
 TestFMv2_ApplyNonexistentFileReturnsZero() {
-	global Features
-	OldFeatures := _FMv2_BeginIsolated()
+	OldFeaturesV2 := _FMv2_BeginIsolated()
 	try {
-		Applied := ApplyConfigTomlV2(Features, A_Temp . "\nonexistent_ergopti_v2_test.toml")
+		Applied := ApplyConfigTomlV2(FeaturesV2, A_Temp . "\nonexistent_ergopti_v2_test.toml")
 		AssertEqual(0, Applied)
 	}
-	_FMv2_EndIsolated(OldFeatures)
+	_FMv2_EndIsolated(OldFeaturesV2)
 }
 Test("ApplyConfigTomlV2: missing file silently returns 0", TestFMv2_ApplyNonexistentFileReturnsZero)
 
 TestFMv2_ApplyUniversalScriptOverride() {
-	global Features
-	OldFeatures := _FMv2_BeginIsolated()
+	OldFeaturesV2 := _FMv2_BeginIsolated()
 	try {
 		Path := _FMv2_WriteFixture("script_locale",
 			"[script]`r`nlocale = `"en`"`r`n")
-		Applied := ApplyConfigTomlV2(Features, Path)
+		Applied := ApplyConfigTomlV2(FeaturesV2, Path)
 		AssertEqual(1, Applied)
-		AssertEqual("en", Features["script"]["locale"])
+		AssertEqual("en", FeaturesV2["script"]["locale"])
 		FileDelete(Path)
 	}
-	_FMv2_EndIsolated(OldFeatures)
+	_FMv2_EndIsolated(OldFeaturesV2)
 }
 Test("ApplyConfigTomlV2: applies a [script] override", TestFMv2_ApplyUniversalScriptOverride)
 
 TestFMv2_ApplyAhkLayoutOverrideStripsPrefix() {
-	global Features
-	OldFeatures := _FMv2_BeginIsolated()
+	OldFeaturesV2 := _FMv2_BeginIsolated()
 	try {
 		Path := _FMv2_WriteFixture("ahk_layout",
 			"[ahk.layout]`r`nergopti_base = false`r`n")
-		Applied := ApplyConfigTomlV2(Features, Path)
+		Applied := ApplyConfigTomlV2(FeaturesV2, Path)
 		AssertEqual(1, Applied)
-		AssertEqual(false, Features["layout"]["ergopti_base"])
+		AssertEqual(false, FeaturesV2["layout"]["ergopti_base"])
 		FileDelete(Path)
 	}
-	_FMv2_EndIsolated(OldFeatures)
+	_FMv2_EndIsolated(OldFeaturesV2)
 }
-Test("ApplyConfigTomlV2: [ahk.layout] strips prefix to Features[layout]",
+Test("ApplyConfigTomlV2: [ahk.layout] strips prefix to FeaturesV2[layout]",
 	TestFMv2_ApplyAhkLayoutOverrideStripsPrefix)
 
 TestFMv2_ApplyNestedSubSection() {
-	global Features
-	OldFeatures := _FMv2_BeginIsolated()
+	OldFeaturesV2 := _FMv2_BeginIsolated()
 	try {
 		Path := _FMv2_WriteFixture("autocorrection_accents",
 			"[hotstrings.autocorrection.accents]`r`n"
 			. "enabled = false`r`n"
 			. "time_activation_seconds = 1.25`r`n")
-		Applied := ApplyConfigTomlV2(Features, Path)
+		Applied := ApplyConfigTomlV2(FeaturesV2, Path)
 		AssertEqual(2, Applied)
-		Entry := Features["hotstrings"]["autocorrection"]["accents"]
+		Entry := FeaturesV2["hotstrings"]["autocorrection"]["accents"]
 		AssertEqual(false, Entry["enabled"])
 		AssertEqual(1.25, Entry["time_activation_seconds"])
 		FileDelete(Path)
 	}
-	_FMv2_EndIsolated(OldFeatures)
+	_FMv2_EndIsolated(OldFeaturesV2)
 }
 Test("ApplyConfigTomlV2: applies a nested sub-section (modelisation alpha)",
 	TestFMv2_ApplyNestedSubSection)
 
 TestFMv2_ApplyHsSectionIsSilentlySkipped() {
-	global Features
-	OldFeatures := _FMv2_BeginIsolated()
+	OldFeaturesV2 := _FMv2_BeginIsolated()
 	try {
 		Path := _FMv2_WriteFixture("hs_section",
 			"[hs.gestures]`r`nswipe_2_left = `"arrow_down`"`r`n")
-		Applied := ApplyConfigTomlV2(Features, Path)
+		Applied := ApplyConfigTomlV2(FeaturesV2, Path)
 		AssertEqual(0, Applied)
 		FileDelete(Path)
 	}
-	_FMv2_EndIsolated(OldFeatures)
+	_FMv2_EndIsolated(OldFeaturesV2)
 }
 Test("ApplyConfigTomlV2: [hs.*] sections are silently skipped", TestFMv2_ApplyHsSectionIsSilentlySkipped)
 
 TestFMv2_ApplyUnknownSectionWarnsButDoesNotCrash() {
-	global Features
-	OldFeatures := _FMv2_BeginIsolated()
+	OldFeaturesV2 := _FMv2_BeginIsolated()
 	try {
 		Path := _FMv2_WriteFixture("unknown_section",
 			"[hotstrings.no_such_group]`r`n"
 			. "foo = true`r`n"
 			. "[script]`r`n"
 			. "locale = `"es`"`r`n")
-		Applied := ApplyConfigTomlV2(Features, Path)
+		Applied := ApplyConfigTomlV2(FeaturesV2, Path)
 		AssertEqual(1, Applied)
-		AssertEqual("es", Features["script"]["locale"])
+		AssertEqual("es", FeaturesV2["script"]["locale"])
 		FileDelete(Path)
 	}
-	_FMv2_EndIsolated(OldFeatures)
+	_FMv2_EndIsolated(OldFeaturesV2)
 }
 Test("ApplyConfigTomlV2: unknown sections warn but do not abort other overrides",
 	TestFMv2_ApplyUnknownSectionWarnsButDoesNotCrash)
 
 TestFMv2_ApplyArrayValue() {
-	global Features
-	OldFeatures := _FMv2_BeginIsolated()
+	OldFeaturesV2 := _FMv2_BeginIsolated()
 	try {
 		Path := _FMv2_WriteFixture("array_value",
 			"[llm.navigation]`r`nval_modifiers = [`"alt`", `"ctrl`"]`r`n")
-		Applied := ApplyConfigTomlV2(Features, Path)
+		Applied := ApplyConfigTomlV2(FeaturesV2, Path)
 		AssertEqual(1, Applied)
-		Arr := Features["llm"]["navigation"]["val_modifiers"]
+		Arr := FeaturesV2["llm"]["navigation"]["val_modifiers"]
 		AssertEqual("Array", Type(Arr))
 		AssertEqual(2, Arr.Length)
 		AssertEqual("alt", Arr[1])
 		AssertEqual("ctrl", Arr[2])
 		FileDelete(Path)
 	}
-	_FMv2_EndIsolated(OldFeatures)
+	_FMv2_EndIsolated(OldFeaturesV2)
 }
 Test("ApplyConfigTomlV2: coerces single-line array literals", TestFMv2_ApplyArrayValue)
 
 TestFMv2_ApplyEmptyFileNoChange() {
-	global Features
-	OldFeatures := _FMv2_BeginIsolated()
+	OldFeaturesV2 := _FMv2_BeginIsolated()
 	try {
 		Path := _FMv2_WriteFixture("empty", "")
-		Applied := ApplyConfigTomlV2(Features, Path)
+		Applied := ApplyConfigTomlV2(FeaturesV2, Path)
 		AssertEqual(0, Applied)
-		AssertEqual("fr", Features["script"]["locale"])
+		AssertEqual("fr", FeaturesV2["script"]["locale"])
 		FileDelete(Path)
 	}
-	_FMv2_EndIsolated(OldFeatures)
+	_FMv2_EndIsolated(OldFeaturesV2)
 }
 Test("ApplyConfigTomlV2: empty file applies no overrides", TestFMv2_ApplyEmptyFileNoChange)
 
 TestFMv2_ApplyCommentsAndBlanksIgnored() {
-	global Features
-	OldFeatures := _FMv2_BeginIsolated()
+	OldFeaturesV2 := _FMv2_BeginIsolated()
 	try {
 		Path := _FMv2_WriteFixture("comments",
 			"# Top-level comment`r`n"
@@ -448,12 +435,12 @@ TestFMv2_ApplyCommentsAndBlanksIgnored() {
 			. "locale = `"de`"`r`n"
 			. "`r`n"
 			. "# trailing comment`r`n")
-		Applied := ApplyConfigTomlV2(Features, Path)
+		Applied := ApplyConfigTomlV2(FeaturesV2, Path)
 		AssertEqual(1, Applied)
-		AssertEqual("de", Features["script"]["locale"])
+		AssertEqual("de", FeaturesV2["script"]["locale"])
 		FileDelete(Path)
 	}
-	_FMv2_EndIsolated(OldFeatures)
+	_FMv2_EndIsolated(OldFeaturesV2)
 }
 Test("ApplyConfigTomlV2: comments and blank lines are skipped",
 	TestFMv2_ApplyCommentsAndBlanksIgnored)

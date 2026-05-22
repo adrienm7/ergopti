@@ -11,24 +11,16 @@ SetWorkingDir(A_ScriptDir) ; Set the working directory where the script is locat
 ; ``Bundle_Init()`` below shells out to PowerShell via ``RunWait`` (see
 ; ``lib/bundle.ahk``), and RunWait pumps messages. Any key pressed during the
 ; ~250ms unzip would otherwise trigger #HotIf evaluation on hotkeys like
-; ``#HotIf CapsWordEnabled``, ``#HotIf LayerEnabled`` or anything reading
-; ``Features["…"]…`` while those globals are still unset. Loading the
-; Features Map and the two layer-state booleans here keeps the very first
-; message pump well-formed.
+; ``#HotIf CapsWordEnabled`` or ``#HotIf LayerEnabled`` while those globals
+; are still unset — assigning them here keeps the very first message pump
+; well-formed.
 global CapsWordEnabled := False
 global LayerEnabled := False
 ; Registry for runtime-registered personal shortcuts (personal_shortcuts.ahk).
-; Stores ordered names + per-name descriptions so the tray menu can render
-; them without consulting the legacy Features v1 Map.
+; Stores ordered names + per-name descriptions so the tray menu can render them.
 global _PersonalShortcutsRegistry := Map("__Order", [])
-; Load the manifest + path translator + builder first so features_config.ahk's
-; ``global Features := BuildLegacyFeaturesFromManifest()`` call has everything
-; it needs at parse time. None of these prerequisites reach the message loop
-; on their own — they're pure data and function definitions.
 #Include lib/manifest_reader.ahk
 #Include lib/v1_v2_path_translator.ahk
-#Include lib/legacy_features_builder.ahk
-#Include lib/features_config.ahk
 
 ; In compiled mode the .exe ships an embedded zip of every runtime asset
 ; (hotstrings TOMLs, locales, icons, _shared tree, vendor DLLs). The bundle
@@ -127,16 +119,16 @@ SendMode("Event") ; Everything concerning hotstrings MUST use SendEvent and not 
 
 ; Core hotstring engine (send primitives, hotstring builders, text helpers)
 ; and TOML reader helpers (UnescapeTomlString, LoadHotstringsSection,
-; FoldAsciiLower, ApplyTomlMetadataToFeatures) extracted into dedicated
-; submodules so the main file stays focused on ErgoptiPlus-specific logic.
+; FoldAsciiLower) extracted into dedicated submodules so the main file
+; stays focused on ErgoptiPlus-specific logic.
 #Include lib/hotstrings/hotstring_engine.ahk
 #Include lib/hotstrings/hotstring_engine_v2.ahk
 #Include lib/toml/toml_loader.ahk
 #Include lib/toml/toml_loader_v2.ahk
 ; manifest_reader.ahk + v1_v2_path_translator.ahk are loaded at the top of
-; the file (before features_config.ahk) so the legacy Features Map builder
-; can run at parse time. They're idempotent so re-listing them here would
-; cause AHK to complain about the same script being included twice.
+; the file so FeaturesV2 / path-translation functions are available before
+; any #HotIf expression is evaluated. Re-listing them here would cause AHK
+; to complain about the same script being included twice.
 #Include lib/first_boot.ahk
 #Include lib/tap_hold/tap_hold_loader.ahk
 #Include lib/tap_hold/tap_hold_writer.ahk
@@ -504,14 +496,6 @@ LoggerInfo("AltGrDetect",
 ; [TapHolds]
 ; AltGr.Enabled=1
 
-; Features configuration (enabled flags, default parameters, submenu hierarchy)
-; extracted to its own submodule so the main file is not dominated by a 650-line
-; data literal. The actual #Include lives at the top of the file (before
-; Bundle_Init) so the Features Map exists before any #HotIf can be evaluated
-; during early message pumping. INI overrides are still applied by
-; ReadConfiguration() below, and TOML metadata is still injected by
-; ApplyTomlMetadataToFeatures() after that.
-
 ; It is best to modify those values by using the option in the script menu
 global PersonalInformation := Map(
     "FirstName", "Prénom",
@@ -550,12 +534,9 @@ global PersonalInformationLetters := Map(
 ; ======= 1.2) Variables update if there is a configuration file =======
 ; ======================================================================
 
-; v2 cut-over: the legacy ``ReadConfiguration(_IniCache)`` reader (which
-; walked the v1 Features Map and overlaid INI overrides from the now-
-; deleted PascalCase sections) is gone. FeaturesV2 below is hydrated
-; directly from the user's v2 config.toml, and the reverse mirror
-; (MirrorV2ToV1_All) populates the v1 Features Map back for menu
-; rendering so the rest of the boot path keeps working.
+; Configuration is hydrated from the user's v2 config.toml by
+; ApplyConfigTomlV2 below. The legacy INI-based ReadConfiguration path
+; and the v1 Features Map are gone.
 
 ; Materialise personal_info.toml from defaults if missing, so renaming or
 ; deleting the file simply triggers a fresh re-creation on the next launch
@@ -563,51 +544,10 @@ global PersonalInformationLetters := Map(
 EnsurePersonalInfoTomlFile(ScriptInformation["PersonalInfoTomlPath"])
 ReadPersonalInfoToml(ScriptInformation["PersonalInfoTomlPath"])
 
-; Pull menu titles and submenu ordering from the per-category TOML files so
-; that those hotstring files are the single source of truth for both the
-; hotstring payload and the per-section ``__Order`` shown in the tray menu.
-; Per-feature labels themselves come from the manifest's ``description_key``
-; resolved via i18n at render time (see lib/manifest_descriptions.ahk);
-; ``TapHolds`` descriptions come from ``tap_hold_config.ahk``.
-ApplyTomlMetadataToFeatures("Autocorrection")
-ApplyTomlMetadataToFeatures("DistancesReduction")
-ApplyTomlMetadataToFeatures("MagicKey")
-ApplyTomlMetadataToFeatures("Rolls")
-ApplyTomlMetadataToFeatures("SFBsReduction")
-ApplyIndexTomlToDynamicHotstrings()
-
-
-
-
-; ====================================================
-; ====================================================
-; ======= Scope C — additive v2 config wiring =======
-; ====================================================
-; ====================================================
-
-; Phase 1 of the sliced v2 cut-over: build the v2-shape Features Map in
-; parallel with the legacy ``Features`` global, so individual modules can
-; migrate their read sites to ``FeaturesV2[...]`` one PR at a time without
-; the driver going non-bootable. Writes (``SaveFullConfig``, tray-menu
-; toggles, onboarding) still flow through the v1 path until the very last
-; phase — at that point ``Features``, ``features_config.ahk``, and this
-; block disappear in one shot.
-;
-; ``EnsureUserConfigsExist`` is a no-op when the user already has a
-; ``config.toml`` (the common case during migration). ``ApplyConfigTomlV2``
-; on a v1-shaped file warns on every unknown section but applies nothing —
-; FeaturesV2 keeps the manifest defaults, which is the intended state
-; while no module reads from it yet.
 EnsureUserConfigsExist()
 global FeaturesV2 := ManifestBuildFeaturesMap()
 ApplyConfigTomlV2(FeaturesV2, _ConfigDir . "ahk\config.toml")
 global TapHold := LoadTapHoldToml(_ConfigDir . "ahk\tap_hold.toml")
-
-; The legacy ``EnrichSectionDescriptionsWithCounts`` boot-time loop that
-; appended " (N)" suffixes to Features v1 descriptions is gone — the
-; ``_ApplyMenuLabelDynamicSubstitutions`` helper in ui/tray_menu.ahk now
-; appends counts at render time directly on top of the manifest+i18n
-; label, so the Features Map is no longer mutated on this path.
 
 ; Count the exact number of hotstrings that will be generated for a DynamicHotstrings
 ; section — mirrors the same threshold logic used in hotstrings.ahk section 5.
@@ -621,10 +561,6 @@ CountDynamicSection(SectionName) {
     SsnRaw := StrReplace(Ssn, " ", "")
     IbanRaw := StrReplace(Iban, " ", "")
 
-    ; Accept both the legacy v1 PascalCase keys (Features["DynamicHotstrings"]
-    ; iteration) and the v2 snake_case keys (FeaturesV2["hotstrings"]["dynamic"]
-    ; iteration) so callers don't have to convert at the call site. Drop the
-    ; PascalCase cases at cut-over.
     switch SectionName {
         case "DateFr", "DateLongFr", "Date", "date_fr", "date_long_fr", "date":
             return 1
@@ -864,22 +800,9 @@ try {
 #Include *i _generated/personal_shortcuts.ahk
 #Include *i %A_LocalAppData%\Ergopti\_generated\personal_shortcuts.ahk
 #InputLevel 0
-; ``ApplyConfigTomlV2`` above hydrated ``FeaturesV2`` from the canonical
-; v2 sections of the user's config.toml. The tray-menu builder still walks
-; the legacy ``Features`` Map for static structure (sub-Map keys, __Order
-; arrays populated by ApplyTomlMetadataToFeatures for hotstring categories),
-; but every per-item .Enabled / .Letter / .Link read now goes through
-; ``GetFeatureV2State`` against FeaturesV2 — no reverse mirror needed —
-; and every label flows through ``MenuLabelFromManifestEntry`` against
-; the manifest + i18n. ``ApplyMasterGatesToFeaturesV2`` short-circuits
-; gated categories on the v2 side so #HotIf evaluations all return false
-; while the master is off.
+; Apply master gates: disabled category master → force every feature in that
+; category to false in FeaturesV2 so all #HotIf evaluations short-circuit.
 ApplyMasterGatesToFeaturesV2()
-
-; Personal hotstring sections are read straight from personal_hotstrings.toml
-; by the tray-menu builder (ReadPersonalToml + the section block in initMenu).
-; FeaturesV2["hotstrings"]["personal"] carries the user's per-section enabled
-; state — no Features["Personal"] population is needed anymore.
 
 ; Gestures module included here — before menu build — so GESTURE_SLOTS,
 ; GESTURE_ACTIONS and GESTURE_SLOT_LABELS exist when BuildGesturesMenu runs.
@@ -894,9 +817,6 @@ ReadKeyboardShortcutsConfig()
 
 ; Register configurable hotkeys for each Ctrl/Win/Alt slot that has a non-"none"
 ; assignment. All hotkeys call RunKeyboardShortcutAction with their slot id.
-; The Features["Shortcuts"] hard-coded behaviours (Win+A, Win+G, …) remain
-; active alongside these — the user disables individual Features items if they
-; prefer the configurable system exclusively.
 LoggerStart("KeyboardShortcuts", "Enregistrement des hotkeys configurables…")
 _KbBoundCount := 0
 for _KbSlot, _KbAction in KeyboardShortcutAssignments {
