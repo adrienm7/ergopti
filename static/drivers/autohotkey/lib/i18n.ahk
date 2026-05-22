@@ -251,7 +251,7 @@ t(Key) {
 I18nInit(Cache) {
 	global _I18nLocale, _I18nCacheLoaded
 	try LoggerTrace("i18n", "Initialising i18n…")
-	Raw := IniCacheGet(Cache, "Script", "Locale")
+	Raw := IniCacheGet(Cache, "script", "locale")
 	if Raw != "_" and Raw != "" {
 		NewLocale := Raw
 		; Validate against known locales
@@ -304,7 +304,7 @@ I18nSetLocale(Code) {
 	try LoggerStart("i18n", "Switching locale to '{1}'…", Code)
 	_I18nLocale      := Code
 	_I18nCacheLoaded := false
-	try TOML_BatchWrite(ConfigurationFile, [{ Section: "Script", Key: "Locale", Value: Code }])
+	try TOML_BatchWrite(ConfigurationFile, [{ Section: "script", Key: "locale", Value: Code }])
 	try LoggerSuccess("i18n", "Locale set to '{1}' — reloading script.", Code)
 	Reload
 }

@@ -204,18 +204,18 @@ MenuAddLetterPicker(MenuParent, FeatureCategoryPath, FeatureName) {
 }
 
 ; Sets the remap target letter on a feature and enables it. Persists both
-; flags via TOML_Write so the change survives reload, then reloads to wire
-; the new shortcut at the layer level.
+; flags via the v1->v2 path translator so the change survives reload, then
+; reloads to wire the new shortcut at the layer level.
 SetFeatureLetter(FullPath, Letter) {
 	Feature := GetFeatureByPath(FullPath)
-	pos := InStr(FullPath, ".", , -1)
-	FeatureCategoryPath := SubStr(FullPath, 1, pos - 1)
-	FeatureName := SubStr(FullPath, pos + 1)
-
+	; Mirror in v1 Features Map too — the menu still reads .Enabled/.Letter
+	; from there to render the checkmark and the title suffix at next boot.
 	Feature.Enabled := true
 	Feature.Letter := Letter
-	TOML_Write(true, ConfigurationFile, FeatureCategoryPath, FeatureName)
-	TOML_Write(Letter, ConfigurationFile, FeatureCategoryPath, FeatureName "_Letter")
+	WriteV2Batch([
+		Map("v1_path", FullPath . ".Enabled", "value", true),
+		Map("v1_path", FullPath . ".Letter",  "value", Letter),
+	])
 	Reload
 }
 
@@ -223,12 +223,8 @@ SetFeatureLetter(FullPath, Letter) {
 ; previously-selected mapping is restored on the next picker selection.
 SetFeatureLetterOff(FullPath) {
 	Feature := GetFeatureByPath(FullPath)
-	pos := InStr(FullPath, ".", , -1)
-	FeatureCategoryPath := SubStr(FullPath, 1, pos - 1)
-	FeatureName := SubStr(FullPath, pos + 1)
-
 	Feature.Enabled := false
-	TOML_Write(false, ConfigurationFile, FeatureCategoryPath, FeatureName)
+	WriteV2Update(FullPath . ".Enabled", false)
 	Reload
 }
 
@@ -282,19 +278,25 @@ ToggleMenuVariableByPath(FullPath) {
 		FeatureName := ""
 	}
 
+	; Collect all mutations into a single batch so the on-disk write is atomic.
+	Batch := []
 	; Count dot levels in FullPath
 	DotCount := StrLen(FullPath) - StrLen(StrReplace(FullPath, ".", ""))
 	if (DotCount >= 2) {
-		; Set to False all shortcut possibilities
+		; Set to False all shortcut possibilities — mutually-exclusive group
+		; (e.g. AltGrLAlt sub-Map: only one of BackSpace/CapsLock/... should
+		; be Enabled at a time).
 		FeatureCategory := GetFeatureByPath(FeatureCategoryPath)
 		for ShortcutName in FeatureCategory {
 			Shortcut := FeatureCategory.Get(ShortcutName)
 			Shortcut.Enabled := False
-			TOML_Write(Shortcut.Enabled, ConfigurationFile, FeatureCategoryPath, ShortcutName)
+			Batch.Push(Map("v1_path", FeatureCategoryPath . "." . ShortcutName . ".Enabled",
+				"value", false))
 		}
 	}
 	Feature.Enabled := !CurrentFeatureActivation
-	TOML_Write(Feature.Enabled, ConfigurationFile, FeatureCategoryPath, FeatureName)
+	Batch.Push(Map("v1_path", FullPath . ".Enabled", "value", Feature.Enabled))
+	WriteV2Batch(Batch)
 	Reload
 }
 
@@ -377,9 +379,13 @@ SetGestureSlotAction(Slot, ActionName) {
 
 ; Toggles the Gestures enabled state and reloads.
 ToggleGesturesEnabled() {
-	global Features, ConfigurationFile
-	Features["Gestures"]["Enabled"].Enabled := !Features["Gestures"]["Enabled"].Enabled
-	TOML_Write(Features["Gestures"]["Enabled"].Enabled, ConfigurationFile, "Gestures", "Enabled")
+	global Features, FeaturesV2
+	NewVal := !Features["Gestures"]["Enabled"].Enabled
+	Features["Gestures"]["Enabled"].Enabled := NewVal
+	if IsSet(FeaturesV2) and FeaturesV2.Has("gestures") {
+		FeaturesV2["gestures"]["enabled"] := NewVal
+	}
+	WriteV2Update("Gestures.Enabled", NewVal)
 	Reload
 }
 
@@ -1185,12 +1191,11 @@ initMenu() {
 
 	; ── IA / LLM — sits right after Hotstrings, mirroring the Hammerspoon menu order ──
 	; Build the LLM_Tray_Init payload by reading the v2 nested LLM map
-	; populated by MirrorV1ToV2_LLM at boot (see lib/v1_v2_mirror.ahk § 5
-	; for the v1-flat -> v2-nested mapping). The downstream LLM_Tray_Init
-	; still expects a flat ``saved_opts`` Map with the legacy key names,
-	; so we read from the nested v2 paths and flatten back here.
-	; ``onboarding_seen`` and ``app_profile_overrides`` keep their direct
-	; IniCacheGet reads — they are runtime state, not v2-declared features.
+	; (hydrated by ApplyConfigTomlV2 directly from the [llm.*] sections
+	; of the user's config.toml). LLM_Tray_Init still expects a flat
+	; ``saved_opts`` Map with the legacy key names, so we read from the
+	; nested v2 paths and flatten back here. ``onboarding_seen`` and
+	; ``app_profile_overrides`` are runtime state read separately below.
 	_LlmSavedOpts := Map()
 	_LlmSavedOpts["enabled"]                := FeaturesV2["llm"]["enabled"]
 	_LlmSavedOpts["model"]                  := FeaturesV2["llm"]["models"]["ollama"]
@@ -1205,11 +1210,15 @@ initMenu() {
 	_LlmSavedOpts["auto_profile_for_model"] := FeaturesV2["llm"]["profiles"]["auto_profile_for_model"]
 	_LlmSavedOpts["inline_autotype"]        := FeaturesV2["llm"]["trigger"]["inline_autotype"]
 
-	; Per-app profile overrides — flat ``app=profile;app2=profile2``,
-	; stored as a runtime state string in v1 ``[LLM] app_profile_overrides``.
-	; The v2 manifest doesn't declare this; keep the direct IniCacheGet
-	; path so the tray-menu populator stays self-contained.
-	_LlmRawAppOverrides := IniCacheGet(_IniCache, "LLM", "app_profile_overrides")
+	; Runtime state — onboarding_seen + per-app overrides — lives in [llm]
+	; alongside the manifest-declared keys. The v2 reader hydrates them onto
+	; FeaturesV2 when present; we read with IniCacheGet so missing keys fall
+	; back to the defaults baked into LLM_Tray_Init.
+	_LlmRawOnboarded := IniCacheGet(_IniCache, "llm", "onboarding_seen")
+	if (_LlmRawOnboarded != "_")
+		_LlmSavedOpts["onboarding_seen"] := (_LlmRawOnboarded = true or _LlmRawOnboarded == 1
+			or _LlmRawOnboarded == "1" or _LlmRawOnboarded == "true")
+	_LlmRawAppOverrides := IniCacheGet(_IniCache, "llm", "app_profile_overrides")
 	if _LlmRawAppOverrides != "_" and _LlmRawAppOverrides != "" {
 		_LlmAppOverridesMap := Map()
 		for _LlmAppPair in StrSplit(_LlmRawAppOverrides, ";") {

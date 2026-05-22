@@ -26,14 +26,14 @@
 global UPDATER_GH_OWNER  := "adrienm7"
 global UPDATER_GH_REPO   := "ergopti"
 global UPDATER_CHANNEL   := "main"    ; overwritten by Updater_LoadChannel()
-global UPDATER_INI_KEY   := "UpdateChannel"
-global UPDATER_INI_SECTION := "Updater"
+global UPDATER_INI_KEY   := "channel"
+global UPDATER_INI_SECTION := "ahk.updater"
 
 ; Background update-check interval. 0 means "never" (disabled). The default
 ; 24h cadence is a sensible balance between freshness and network restraint
 ; — most users do not want a release-day notification but appreciate hearing
 ; about a security fix within the same day. Honoured by ``Updater_StartBackgroundChecks``.
-global UPDATER_INI_INTERVAL_KEY    := "CheckIntervalSeconds"
+global UPDATER_INI_INTERVAL_KEY    := "check_interval_seconds"
 global UPDATER_DEFAULT_INTERVAL    := 86400
 global UPDATER_CHECK_INTERVAL      := UPDATER_DEFAULT_INTERVAL
 

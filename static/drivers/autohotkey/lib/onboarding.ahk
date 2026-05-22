@@ -512,10 +512,10 @@ _Onboarding_PreloadFromExistingConfig(ChosenDir) {
 
 	; Layout: any of the three Ergopti switches ON means the user previously
 	; enabled the Ergopti emulation. The wizard treats this as a single yes/no
-	; choice so a partial state (only ErgoptiAltGr on, etc.) still flips Yes.
-	LayoutBase  := IniCacheGet(Cache, "Layout", "ErgoptiBase")
-	LayoutAltGr := IniCacheGet(Cache, "Layout", "ErgoptiAltGr")
-	LayoutPlus  := IniCacheGet(Cache, "Layout", "ErgoptiPlus")
+	; choice so a partial state (only ergopti_alt_gr on, etc.) still flips Yes.
+	LayoutBase  := IniCacheGet(Cache, "ahk.layout", "ergopti_base")
+	LayoutAltGr := IniCacheGet(Cache, "ahk.layout", "ergopti_alt_gr")
+	LayoutPlus  := IniCacheGet(Cache, "ahk.layout", "ergopti_plus")
 	if (LayoutBase != "_" or LayoutAltGr != "_" or LayoutPlus != "_") {
 		_ob_layout := (StrLower(LayoutBase) == "true")
 			or (StrLower(LayoutAltGr) == "true")
@@ -524,18 +524,18 @@ _Onboarding_PreloadFromExistingConfig(ChosenDir) {
 
 	; Magic key: TOML strings come in with surrounding quotes already stripped
 	; by the parser, so the cache value is the raw character.
-	MagicKey := IniCacheGet(Cache, "Hotstrings", "MagicKey")
+	MagicKey := IniCacheGet(Cache, "hotstrings", "trigger_char")
 	if (MagicKey != "_" and MagicKey != "") {
 		_ob_magic_key := MagicKey
 	}
 
 	; Metrics + gestures: boolean flags. ParseTomlFile preserves TOML's
 	; literal "true"/"false" strings so a case-insensitive compare suffices.
-	MetricsEnabled := IniCacheGet(Cache, "Metrics", "metrics_enabled")
+	MetricsEnabled := IniCacheGet(Cache, "ahk.metrics", "metrics_enabled")
 	if (MetricsEnabled != "_") {
 		_ob_metrics := (StrLower(MetricsEnabled) == "true")
 	}
-	GesturesEnabled := IniCacheGet(Cache, "Gestures", "Enabled")
+	GesturesEnabled := IniCacheGet(Cache, "ahk.gestures", "enabled")
 	if (GesturesEnabled != "_") {
 		_ob_gestures := (StrLower(GesturesEnabled) == "true")
 	}
@@ -1177,22 +1177,23 @@ _Onboarding_Commit() {
 	}
 
 	updates := [
-		{ Section: "Script",     Key: "Locale",          Value: _ob_locale    },
-		{ Section: "Layout",     Key: "ErgoptiBase",     Value: _ob_layout    },
-		{ Section: "Layout",     Key: "ErgoptiAltGr",    Value: _ob_layout    },
-		{ Section: "Layout",     Key: "ErgoptiPlus",     Value: _ob_layout    },
-		{ Section: "Hotstrings", Key: "MagicKey",        Value: _ob_magic_key },
-		{ Section: "Metrics",    Key: "metrics_enabled", Value: _ob_metrics   },
-		{ Section: "Gestures",   Key: "Enabled",         Value: _ob_gestures  },
+		{ Section: "script",       Key: "locale",                   Value: _ob_locale    },
+		{ Section: "ahk.layout",   Key: "ergopti_base",             Value: _ob_layout    },
+		{ Section: "ahk.layout",   Key: "ergopti_alt_gr",           Value: _ob_layout    },
+		{ Section: "ahk.layout",   Key: "ergopti_plus",             Value: _ob_layout    },
+		{ Section: "hotstrings",   Key: "trigger_char",             Value: _ob_magic_key },
+		{ Section: "ahk.metrics",  Key: "metrics_enabled",          Value: _ob_metrics   },
+		{ Section: "ahk.gestures", Key: "enabled",                  Value: _ob_gestures  },
 	]
 
 	; Defer the Precision-Touchpad registry writes to the post-reload pass —
-	; the gestures module reads ``AutoConfigureOnNextStart`` after its globals
-	; are populated and runs the actual ``GestureAutoConfigureRegistry`` there.
-	; The flag is one-shot: the module clears it after a successful (or failed)
-	; attempt so subsequent reloads don't keep rewriting the same values.
+	; the gestures module reads ``auto_configure_on_next_start`` after its
+	; globals are populated and runs the actual ``GestureAutoConfigureRegistry``
+	; there. The flag is one-shot: the module clears it after a successful
+	; (or failed) attempt so subsequent reloads don't keep rewriting the
+	; same values.
 	if _ob_register_pending {
-		updates.Push({ Section: "Gestures", Key: "AutoConfigureOnNextStart", Value: true })
+		updates.Push({ Section: "ahk.gestures", Key: "auto_configure_on_next_start", Value: true })
 	}
 
 	TOML_BatchWrite(ConfigurationFile, updates)

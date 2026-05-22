@@ -126,6 +126,8 @@ SendMode("Event") ; Everything concerning hotstrings MUST use SendEvent and not 
 #Include lib/first_boot.ahk
 #Include lib/tap_hold/tap_hold_loader.ahk
 #Include lib/v1_v2_mirror.ahk
+#Include lib/v2_v1_mirror.ahk
+#Include lib/v1_v2_path_translator.ahk
 #Include lib/menu_dispatcher.ahk
 #Include lib/menu_manifest.ahk
 #Include lib/llm_defaults.ahk
@@ -427,7 +429,7 @@ global CategoryEnabled := Map(
 ReadCategoryEnabled(Cache) {
     global CategoryEnabled
     for Category, _Default in CategoryEnabled {
-        Raw := IniCacheGet(Cache, "CategoryEnabled", Category)
+        Raw := IniCacheGet(Cache, "category_enabled", _CategoryEnabledKeyV2(Category))
         if (Raw == "_") {
             continue
         }
@@ -444,27 +446,23 @@ IsCategoryGated(Category) {
 }
 
 ReadScriptConfig(Cache) {
-    ; MagicKey lives in [Hotstrings] in the TOML (alongside the hotstring modules)
-    Raw := IniCacheGet(Cache, "Hotstrings", "MagicKey")
-    if Raw != "_"
-        ScriptInformation["MagicKey"] := Raw
-    ; Backward-compat: also check the old [Script] location so existing configs still load
-    Raw := IniCacheGet(Cache, "Script", "MagicKey")
+    ; MagicKey lives in [hotstrings] trigger_char in the v2 TOML.
+    Raw := IniCacheGet(Cache, "hotstrings", "trigger_char")
     if Raw != "_"
         ScriptInformation["MagicKey"] := Raw
     ; AltGr-as-Kana manual override. Default "auto" defers to the reverse
     ; VK_RMENU→SC probe in HotstringEngineInit(); "true" / "false" force the
-    ; respective mode. Lives in [Script] so the user can lock it once per
+    ; respective mode. Lives in [script] so the user can lock it once per
     ; machine if auto-detection misfires on an exotic layout.
-    RawKana := IniCacheGet(Cache, "Script", "AltGrIsKanaRemap")
+    RawKana := IniCacheGet(Cache, "script", "alt_gr_is_kana_remap")
     if RawKana != "_"
         ScriptInformation["AltGrIsKanaRemap"] := RawKana
-    ; Restore the engine-level repeat-key toggle (defaults to enabled when absent)
+    ; Restore the engine-level repeat-key toggle (defaults to enabled when absent).
     global HSE_RepeatEnabled
-    RawRepeat := IniCacheGet(Cache, "Hotstrings", "RepeatKeyEnabled")
+    RawRepeat := IniCacheGet(Cache, "hotstrings", "repeat_key_enabled")
     if RawRepeat != "_"
         HSE_RepeatEnabled := (RawRepeat == "1" or RawRepeat == "true")
-    ; Paths are always derived from _ConfigDir at startup and are never persisted
+    ; Paths are always derived from _ConfigDir at startup and are never persisted.
 }
 
 Onboarding_Run()
@@ -559,71 +557,13 @@ global PersonalInformationLetters := Map(
 ; ======= 1.2) Variables update if there is a configuration file =======
 ; ======================================================================
 
-ReadConfiguration(Cache) {
-    ExtraProps := ["TimeActivationSeconds", "Letter", "PatternMaxLength",
-        "Link", "DestinationFolder", "DatedNotes", "SearchEngine", "SearchEngineURLQuery"]
+; v2 cut-over: the legacy ``ReadConfiguration(_IniCache)`` reader (which
+; walked the v1 Features Map and overlaid INI overrides from the now-
+; deleted PascalCase sections) is gone. FeaturesV2 below is hydrated
+; directly from the user's v2 config.toml, and the reverse mirror
+; (MirrorV2ToV1_All) populates the v1 Features Map back for menu
+; rendering so the rest of the boot path keeps working.
 
-    for Category, FeaturesMap in Features {
-        if !IsObject(FeaturesMap) or Type(FeaturesMap) != "Map"
-            continue
-        TomlCat := _TomlSection(Category)
-        for Feature, Value in FeaturesMap {
-            if Feature == "__Order"
-                continue
-            if Type(Value) == "Map" {
-                ; Sub-map: __Configuration props live directly in [TomlCat.Feature]
-                if Value.Has("__Configuration") {
-                    Cfg := Value["__Configuration"]
-                    for Prop in ExtraProps {
-                        if Cfg.HasOwnProp(Prop) {
-                            Raw := IniCacheGet(Cache, TomlCat "." Feature, Prop)
-                            if Raw != "_"
-                                Value["__Configuration"].%Prop% := Raw
-                        }
-                    }
-                }
-                ; Leaf sub-features are flattened in [TomlCat.Feature]
-                for SubFeature, SubValue in Value {
-                    if SubFeature == "__Order" or SubFeature == "__Configuration"
-                        continue
-                    if !IsObject(SubValue)
-                        continue
-                    EnabledRaw := IniCacheGet(Cache, TomlCat "." Feature, SubFeature)
-                    if EnabledRaw != "_"
-                        Features[Category][Feature][SubFeature].Enabled := EnabledRaw
-                    for Prop in ExtraProps {
-                        if SubValue.HasOwnProp(Prop) {
-                            Raw := IniCacheGet(Cache, TomlCat "." Feature, SubFeature "_" Prop)
-                            if Raw != "_"
-                                Features[Category][Feature][SubFeature].%Prop% := Raw
-                        }
-                    }
-                }
-            } else if IsObject(Value) {
-                ; Leaf feature: Enabled lives as FeatureName key in [TomlCat]
-                EnabledRaw := IniCacheGet(Cache, TomlCat, Feature)
-                if EnabledRaw != "_"
-                    Features[Category][Feature].Enabled := EnabledRaw
-                for Prop in ExtraProps {
-                    if Value.HasOwnProp(Prop) {
-                        Raw := IniCacheGet(Cache, TomlCat, Feature "_" Prop)
-                        if Raw != "_"
-                            Features[Category][Feature].%Prop% := Raw
-                    }
-                }
-            }
-        }
-    }
-}
-
-ReadConfiguration(_IniCache)
-; Migrate TextExpansionPersonalInformation from MagicKey to DynamicHotstrings:
-; remove the stale keys from [Hotstrings.MagicKey] so they stop reappearing
-; in the config file on every write.
-TOML_BatchWrite(ConfigurationFile, [
-    { Section: "Hotstrings.MagicKey", Key: "TextExpansionPersonalInformation",              Value: "_DELETE_" },
-    { Section: "Hotstrings.MagicKey", Key: "TextExpansionPersonalInformation_PatternMaxLength", Value: "_DELETE_" },
-])
 ; Materialise personal_info.toml from defaults if missing, so renaming or
 ; deleting the file simply triggers a fresh re-creation on the next launch
 ; (same guarantee EnsurePersonalShortcutsFile gives for personal_shortcuts.ahk).
@@ -801,9 +741,10 @@ RegisterPersonalFeature(Name, DefaultEnabled := false, Description := "") {
     }
 
     if !Personal.Has(Name) {
-        ; Apply the persisted INI value if present, otherwise fall back to the default
+        ; Apply the persisted v2 TOML value if present, otherwise fall back to
+        ; the default. v2 location: [ahk.shortcuts.personal] <Name> = bool.
         Enabled := DefaultEnabled
-        RawValue := IniCacheGet(_IniCache, "Shortcuts.Personal", Name . ".Enabled")
+        RawValue := IniCacheGet(_IniCache, "ahk.shortcuts.personal", Name)
         if RawValue != "_" {
             Enabled := RawValue
         }
@@ -993,56 +934,34 @@ try {
 #Include *i _generated/personal_shortcuts.ahk
 #Include *i %A_LocalAppData%\Ergopti\_generated\personal_shortcuts.ahk
 #InputLevel 0
-; Apply user overrides from ahk/config.toml on top of the INI-driven
-; configuration. The [script] and [features] sections are an optional "expert"
-; layer the user can edit by hand to override anything the menu exposes
-; (LogLevel, MagicKey, individual feature flags). All sections live in a
-; single unified config file — no separate cross-driver config.toml.
-ApplyConfigTomlOverrides(ConfigurationFile)
-
-; Phase 2/3 of the sliced v2 cut-over — sync the user-customized v1
-; sections (Layout / Gestures / Shortcuts) into FeaturesV2 so the migrated
-; read sites observe the same enabled/disabled state the user configured
-; via the tray menu. Pure derived view: writes still go through
-; Features[X].Enabled + Reload, and each Reload re-runs these mirrors so
-; divergence is impossible. See lib/v1_v2_mirror.ahk for the per-section
-; helpers and the cut-over plan; each new phase adds one MirrorV1ToV2_<Section>
-; call here next to the others.
-MirrorV1ToV2_Layout()
-MirrorV1ToV2_Gestures()
-MirrorV1ToV2_Shortcuts()
-MirrorV1ToV2_Hotstrings()
-MirrorV1ToV2_LLM()
-MirrorV1ToV2_TapHold()
+; v2 cut-over: ``ApplyConfigTomlOverrides`` (the legacy v1 [features]
+; dotted-path reader) and the v1 -> v2 forward mirror chain are no longer
+; needed. ``ApplyConfigTomlV2`` above hydrated ``FeaturesV2`` from the
+; canonical v2 sections; the reverse mirror below copies that state back
+; onto the v1 ``Features`` Map so the tray-menu builder (which still walks
+; v1 to render submenus and checkmarks) reflects the user's persisted
+; choices. The forward mirror module stays on disk as a reference until
+; the slice that deletes ``Features`` Map entirely lands.
+MirrorV2ToV1_Layout()
+MirrorV2ToV1_Gestures()
+MirrorV2ToV1_Shortcuts()
+MirrorV2ToV1_Hotstrings()
+ApplyMasterGatesToFeaturesV2()
 
 ; Bootstrap Features["Personal"] from personal_hotstrings.toml _meta.sections
 ; before applying TOML metadata, so the user's section toggles appear in the menu.
 BootstrapPersonalFeatures()
 if Features.Has("Personal") {
     ApplyTomlMetadataToFeatures("Personal")
-    ; Apply [Personal] INI overrides AFTER bootstrap — the generic
-    ; ReadConfiguration() ran before bootstrap so it had no Features.Personal
-    ; entries to write into. Without this, user-disabled sections always come
-    ; back enabled on reload.
-    for FeatKey, FeatVal in Features["Personal"] {
-        if FeatKey == "__Order" {
-            continue
-        }
-        if !(IsObject(FeatVal) and FeatVal.HasOwnProp("Enabled")) {
-            continue
-        }
-        RawValue := IniCacheGet(_IniCache, "Personal", FeatKey . ".Enabled")
-        if RawValue != "_" {
-            Features["Personal"][FeatKey].Enabled := RawValue
-        }
-    }
-
-    ; Phase 12: now that Features["Personal"] is fully populated (bootstrap +
-    ; TOML metadata + INI overrides), mirror it into
-    ; FeaturesV2["hotstrings"]["personal"] so the migrated read sites in
-    ; modules/hotstrings.ahk and lib/hotstrings/personal_toml_editor.ahk
-    ; observe the same per-section toggle state.
-    MirrorV1ToV2_HotstringsPersonal()
+    ; Personal hotstring sections are persisted at
+    ; [hotstrings.personal.<key>] in v2. The v2 reader has already populated
+    ; FeaturesV2["hotstrings"]["personal"] from the user's config.toml;
+    ; reverse-mirror it back onto Features["Personal"] so the menu renders
+    ; the right checkmarks. Runtime-discovered sections (added by the user
+    ; in personal_hotstrings.toml without a manifest counterpart) only appear
+    ; in v2 if they were previously persisted; otherwise the v1 default from
+    ; BootstrapPersonalFeatures wins until the user toggles the entry.
+    MirrorV2ToV1_HotstringsPersonal()
 }
 
 ; Gestures module included here — before menu build — so GESTURE_SLOTS,
@@ -1280,18 +1199,24 @@ MagicKeyEditor(*) {
     GuiToShow.Show("Center")
 }
 ModifyMagicKey(gui, NewValue) {
-    global ScriptInformation, ConfigurationFile
+    global ScriptInformation, FeaturesV2, ConfigurationFile
     ScriptInformation["MagicKey"] := NewValue
-    TOML_Write(NewValue, ConfigurationFile, "Hotstrings", "MagicKey")
+    if IsSet(FeaturesV2) and FeaturesV2.Has("hotstrings") {
+        FeaturesV2["hotstrings"]["trigger_char"] := NewValue
+    }
+    TOML_Write(NewValue, ConfigurationFile, "hotstrings", "trigger_char")
 
     gui.Destroy()
     Reload
 }
 
 ToggleRepeatKeyEnabled(*) {
-    global HSE_RepeatEnabled, ConfigurationFile
+    global HSE_RepeatEnabled, FeaturesV2, ConfigurationFile
     HSE_RepeatEnabled := !HSE_RepeatEnabled
-    TOML_Write(HSE_RepeatEnabled, ConfigurationFile, "Hotstrings", "RepeatKeyEnabled")
+    if IsSet(FeaturesV2) and FeaturesV2.Has("hotstrings") {
+        FeaturesV2["hotstrings"]["repeat_key_enabled"] := HSE_RepeatEnabled
+    }
+    TOML_Write(HSE_RepeatEnabled, ConfigurationFile, "hotstrings", "repeat_key_enabled")
     Reload
 }
 
@@ -1358,8 +1283,12 @@ GPTLinkEditor(*) {
     GuiToShow.Show("Center")
 }
 ModifyLink(gui, NewValue) {
+    global Features, FeaturesV2, ConfigurationFile
     Features["Shortcuts"]["GPT"].Link := NewValue
-    TOML_Write(NewValue, ConfigurationFile, "Shortcuts", "GPT_Link")
+    if IsSet(FeaturesV2) and FeaturesV2.Has("shortcuts") and FeaturesV2["shortcuts"].Has("gpt") {
+        FeaturesV2["shortcuts"]["gpt"]["link"] := NewValue
+    }
+    TOML_Write(NewValue, ConfigurationFile, "shortcuts.gpt", "link")
 
     gui.Destroy()
     Reload
@@ -1395,57 +1324,78 @@ ToggleAllFeaturesOn(*) {
 ToggleAllFeaturesOff(*) {
     ToggleAllFeatures(0)
 }
+; Walk every feature in ``FeaturesV2`` and force its ``enabled`` flag to
+; ``Value``. Collects all mutations into a single batch — writing them one
+; by one through TOML_Write does 50+ FileOpen/Write/Close round-trips and
+; produces a visible delay in the tray menu.
+;
+; Behavior:
+; - If Value == 0 : set every feature to false recursively (including
+;                   nested Modélisation α entries and sub-Map groups).
+; - If Value == 1 : set only first-level features to true; mutually-exclusive
+;                   nested choices (AltGr sub-Maps) stay at their existing
+;                   per-key state so a "Enable all" doesn't simultaneously
+;                   enable every variant of a one-of-N picker.
 ToggleAllFeatures(Value) {
-    ; Behavior:
-    ; - If Value == 0 : set everything to 0 recursively (including sub-sub-menus)
-    ; - If Value == 1 : set only first-level features (the defaults) to 1; do not enable nested choices
-    ; Collect all INI mutations into a single batch — writing them one by one
-    ; through TOML_Write does 50+ FileOpen/Write/Close round-trips and produces a
-    ; visible delay in the tray menu.
-    global Features
+    global FeaturesV2, ConfigurationFile
+    if !IsSet(FeaturesV2) {
+        return
+    }
+    Bool := (Value = true or Value = 1)
     Updates := []
 
-    ; Recursive setter used when Value == 0.
-    ; Section is the TOML section where this node's leaf children are flattened.
-    ; Pass an empty string for the root call; the function handles the top-level
-    ; category keys by using Key directly as the section name.
-    SetAllRecursive(Section, Items) {
-        for Key, Val in Items {
-            if Key == "__Order" or Key == "__Configuration" {
-                continue
-            }
-            ; Translate category names to TOML sections at the top level
-            TomlKey := (Section = "") ? _TomlSection(Key) : Key
-            ChildSection := (Section = "") ? TomlKey : Section "." Key
-            if Type(Val) == "Map" {
-                ; Sub-map: its leaf children are flattened in [ChildSection]
-                SetAllRecursive(ChildSection, Val)
-            } else if IsObject(Val) and Val.HasOwnProp("Enabled") {
-                ; Leaf: flatten into parent Section with Key as the TOML key
-                Val.Enabled := Value
-                Updates.Push({ Section: Section, Key: Key, Value: Value })
+    ; Recursive walker — for each Map encountered, either flip ``enabled``
+    ; if it carries one (Modélisation α) or descend into children.
+    EmitFlip(SectionPath, Node) {
+        if (Type(Node) != "Map") {
+            return
+        }
+        ; Modélisation α entry: { enabled = bool, … }
+        if Node.Has("enabled") and (Type(Node["enabled"]) != "Map") {
+            Node["enabled"] := Bool
+            Updates.Push({ Section: SectionPath, Key: "enabled", Value: Bool })
+            return
+        }
+        for K, V in Node {
+            if (Type(V) == "Map") {
+                EmitFlip(SectionPath . "." . K, V)
+            } else {
+                ; Plain bool leaf (e.g. [shortcuts] microsoft_bold = true).
+                Node[K] := Bool
+                Updates.Push({ Section: SectionPath, Key: K, Value: Bool })
             }
         }
     }
 
-    if (Value == 0) {
-        ; Disable everything recursively
-        SetAllRecursive("", Features)
-    } else {
-        ; Enable only first-level/default features (do not descend into nested choices)
-        for Category, Items in Features {
-            if Category == "__Order" {
+    if (!Bool) {
+        ; Disable everything recursively.
+        for TopKey, TopVal in FeaturesV2 {
+            if (Type(TopVal) != "Map") {
                 continue
             }
-            for FeatureName, Val in Items {
-                if FeatureName == "__Order" {
-                    continue
+            EmitFlip(TopKey, TopVal)
+        }
+    } else {
+        ; Enable only first-level/default features (do not descend into
+        ; sub-Map groups like alt_gr_lalt that hold mutually-exclusive picks).
+        for TopKey, TopVal in FeaturesV2 {
+            if (Type(TopVal) != "Map") {
+                continue
+            }
+            for K, V in TopVal {
+                if (Type(V) == "Map") {
+                    ; Modélisation α with .enabled — flip the leaf only,
+                    ; not the surrounding properties.
+                    if V.Has("enabled") and (Type(V["enabled"]) != "Map") {
+                        V["enabled"] := true
+                        Updates.Push({ Section: TopKey . "." . K, Key: "enabled", Value: true })
+                    }
+                    ; Sub-Map groups (alt_gr_*) without .enabled: skip — the
+                    ; user's prior single-pick stays in place.
+                } else {
+                    TopVal[K] := true
+                    Updates.Push({ Section: TopKey, Key: K, Value: true })
                 }
-                if IsObject(Val) and Val.HasOwnProp("Enabled") {
-                    Val.Enabled := Value
-                    Updates.Push({ Section: _TomlSection(Category), Key: FeatureName, Value: Value })
-                }
-                ; If Val is a Map without Enabled, we skip its children when enabling
             }
         }
     }
@@ -1468,7 +1418,7 @@ ToggleAllHotstrings(Value) {
     global CategoryEnabled, ConfigurationFile
     Bool := (Value = true or Value = 1)
     CategoryEnabled["Hotstrings"] := Bool
-    TOML_Write(Bool, ConfigurationFile, "CategoryEnabled", "Hotstrings")
+    TOML_Write(Bool, ConfigurationFile, "category_enabled", "hotstrings")
     Reload
 }
 
@@ -1493,8 +1443,22 @@ ToggleCategoryAllFeatures(Category, Value) {
     global CategoryEnabled, ConfigurationFile
     Bool := (Value = true or Value = 1)
     CategoryEnabled[Category] := Bool
-    TOML_Write(Bool, ConfigurationFile, "CategoryEnabled", Category)
+    ; v2 uses lowercase snake_case for the keys too (Layout -> layout, TapHolds -> tap_holds).
+    TOML_Write(Bool, ConfigurationFile, "category_enabled", _CategoryEnabledKeyV2(Category))
     Reload
+}
+
+; Map a v1 PascalCase category name to its snake_case v2 key, used as the
+; leaf id under [category_enabled]. Hotstrings keeps the same id either way.
+_CategoryEnabledKeyV2(Category) {
+    switch Category {
+        case "Layout":     return "layout"
+        case "Shortcuts":  return "shortcuts"
+        case "Hotstrings": return "hotstrings"
+        case "TapHolds":   return "tap_holds"
+        default:
+            return StrLower(Category)
+    }
 }
 
 ; Persist the complete in-memory state to the unified ahk/config.toml.
@@ -1503,107 +1467,97 @@ ToggleCategoryAllFeatures(Category, Value) {
 ; Sections and keys within sections are sorted alphabetically by the
 ; TOML_BatchWrite writer for stable, human-readable output.
 SaveFullConfig() {
-    global Features, FeaturesV2, ScriptInformation, ScriptShortcutAssignments
-    global GestureAssignments, ConfigurationFile, _TOML_STRICT_CANON_IN_PROGRESS
+    global FeaturesV2, ScriptInformation, ScriptShortcutAssignments
+    global GestureAssignments, KeyboardShortcutAssignments
+    global ConfigurationFile, _TOML_STRICT_CANON_IN_PROGRESS
     global PrevCanonState
     Updates := []
 
-    ; Collect all feature flags recursively — v1 walker emits PascalCase
-    ; sections ([Shortcuts], [Hotstrings.Autocorrection], ...) read by the
-    ; legacy ReadConfiguration path.
-    _CollectFeatureUpdates(Updates, "", Features)
-
-    ; Phase 14 cut-over (dual-write): in addition to the v1 sections above,
-    ; emit the parallel v2 sections ([shortcuts.e_grave] etc.) so the v2
-    ; reader ApplyConfigTomlV2 can hydrate FeaturesV2 from the same file
-    ; without going through the mirror. Both shapes coexist during the
-    ; transition; the v1 emission disappears once the v1 reader is deleted.
+    ; Emit every feature flag from the v2 Map. ``_CollectFeatureUpdatesV2``
+    ; walks the hierarchical FeaturesV2 (Map of Map of …) and produces one
+    ; v2 TOML section per nested key path.
     if IsSet(FeaturesV2) {
         _CollectFeatureUpdatesV2(Updates, "", FeaturesV2)
-        ; Schema marker — lets the boot path detect v2-shape configs and
-        ; eventually skip the v1 mirror entirely.
+        ; Schema marker — pinned to 2 so future migrations can recognise
+        ; the on-disk shape without sniffing section names.
         Updates.Push({ Section: "_meta", Key: "schema_version", Value: 2 })
     }
 
-    ; [Script] section — locale and other script-level settings
-    Updates.Push({ Section: "Script", Key: "Locale", Value: I18nGetLocale() })
+    ; [script] section — locale and other script-level settings.
+    Updates.Push({ Section: "script", Key: "locale", Value: I18nGetLocale() })
 
-    ; [Hotstrings] root — MagicKey lives here, paths are never persisted
-    Updates.Push({ Section: "Hotstrings", Key: "MagicKey", Value: ScriptInformation["MagicKey"] })
+    ; [hotstrings] root — MagicKey lives at hotstrings.trigger_char.
+    Updates.Push({ Section: "hotstrings", Key: "trigger_char", Value: ScriptInformation["MagicKey"] })
+    global HSE_RepeatEnabled
+    if IsSet(HSE_RepeatEnabled) {
+        Updates.Push({ Section: "hotstrings", Key: "repeat_key_enabled", Value: HSE_RepeatEnabled })
+    }
 
-    ; [Shortcuts.ScriptControl] section
+    ; [ahk.shortcuts.script_control] — script management hotkey slots.
     if IsSet(ScriptShortcutAssignments) {
         for Slot, Action in ScriptShortcutAssignments {
-            Updates.Push({ Section: "Shortcuts.ScriptControl", Key: Slot, Value: Action })
+            Updates.Push({ Section: "ahk.shortcuts.script_control", Key: Slot, Value: Action })
         }
     }
 
-    ; [Gestures] assignments (trackpad gesture slots)
+    ; [ahk.shortcuts.keyboard] — configurable Ctrl/Win/Alt hotkeys.
+    if IsSet(KeyboardShortcutAssignments) {
+        for Slot, Action in KeyboardShortcutAssignments {
+            Updates.Push({ Section: "ahk.shortcuts.keyboard", Key: Slot, Value: Action })
+        }
+    }
+
+    ; [ahk.gestures] — trackpad gesture slot assignments.
     if IsSet(GestureAssignments) {
         for Slot, Action in GestureAssignments {
-            Updates.Push({ Section: "Gestures", Key: Slot, Value: Action })
+            Updates.Push({ Section: "ahk.gestures", Key: Slot, Value: Action })
         }
     }
 
-    ; [Metrics] section — metrics shortcut bindings and privacy filters
+    ; [ahk.metrics] — keylogger feature settings + privacy filters.
     apps := []
     for proc, _ in MetricsFilters.disabled_apps
         apps.Push(proc)
-    Updates.Push({ Section: "Metrics", Key: "metrics_enabled", Value: MetricsShortcuts.enabled })
-    Updates.Push({ Section: "Metrics", Key: "metrics_shortcut_typing", Value: MetricsShortcuts.typing_str })
-    Updates.Push({ Section: "Metrics", Key: "metrics_shortcut_apps", Value: MetricsShortcuts.apps_str })
-    Updates.Push({ Section: "Metrics", Key: "metrics_show_wpm_menubar", Value: MetricsShortcuts.show_wpm_menubar })
-    Updates.Push({ Section: "Metrics", Key: "metrics_wpm_menubar_colors", Value: MetricsShortcuts.wpm_menubar_colors })
-    Updates.Push({ Section: "Metrics", Key: "metrics_filter_private_browsing", Value: MetricsFilters.private_browsing })
-    Updates.Push({ Section: "Metrics", Key: "metrics_filter_secure_field", Value: MetricsFilters.secure_field })
-    Updates.Push({ Section: "Metrics", Key: "metrics_filter_system_auth", Value: MetricsFilters.system_auth })
-    Updates.Push({ Section: "Metrics", Key: "metrics_disabled_apps", Value: apps })
+    Updates.Push({ Section: "ahk.metrics", Key: "metrics_enabled", Value: MetricsShortcuts.enabled })
+    Updates.Push({ Section: "ahk.metrics", Key: "metrics_shortcut_typing", Value: MetricsShortcuts.typing_str })
+    Updates.Push({ Section: "ahk.metrics", Key: "metrics_shortcut_apps", Value: MetricsShortcuts.apps_str })
+    Updates.Push({ Section: "ahk.metrics", Key: "metrics_show_wpm_menubar", Value: MetricsShortcuts.show_wpm_menubar })
+    Updates.Push({ Section: "ahk.metrics", Key: "metrics_wpm_menubar_colors", Value: MetricsShortcuts.wpm_menubar_colors })
+    Updates.Push({ Section: "ahk.metrics", Key: "metrics_filter_private_browsing", Value: MetricsFilters.private_browsing })
+    Updates.Push({ Section: "ahk.metrics", Key: "metrics_filter_secure_field", Value: MetricsFilters.secure_field })
+    Updates.Push({ Section: "ahk.metrics", Key: "metrics_filter_system_auth", Value: MetricsFilters.system_auth })
+    Updates.Push({ Section: "ahk.metrics", Key: "metrics_disabled_apps", Value: apps })
 
-    ; [Script] section — WPM widget position and display options
-    Updates.Push({ Section: "Script", Key: WPMWidgetConst.CFG_VISIBLE, Value: WPMWidget.visible ? "1" : "0" })
-    Updates.Push({ Section: "Script", Key: WPMWidgetConst.CFG_X,       Value: String(WPMWidget.pos_x) })
-    Updates.Push({ Section: "Script", Key: WPMWidgetConst.CFG_Y,       Value: String(WPMWidget.pos_y) })
-    Updates.Push({ Section: "Script", Key: WPMWidgetConst.CFG_COLORS,  Value: WPMWidget.use_colors ? "1" : "0" })
-    Updates.Push({ Section: "Script", Key: WPMWidgetConst.CFG_GRAPH,   Value: WPMWidget.show_graph  ? "1" : "0" })
+    ; [ahk.metrics] — WPM widget position and display options.
+    Updates.Push({ Section: "ahk.metrics", Key: WPMWidgetConst.CFG_VISIBLE, Value: WPMWidget.visible ? "1" : "0" })
+    Updates.Push({ Section: "ahk.metrics", Key: WPMWidgetConst.CFG_X,       Value: String(WPMWidget.pos_x) })
+    Updates.Push({ Section: "ahk.metrics", Key: WPMWidgetConst.CFG_Y,       Value: String(WPMWidget.pos_y) })
+    Updates.Push({ Section: "ahk.metrics", Key: WPMWidgetConst.CFG_COLORS,  Value: WPMWidget.use_colors ? "1" : "0" })
+    Updates.Push({ Section: "ahk.metrics", Key: WPMWidgetConst.CFG_GRAPH,   Value: WPMWidget.show_graph  ? "1" : "0" })
 
-    ; [LLM] section — IA feature settings
-    Updates.Push({ Section: "LLM", Key: "enabled",             Value: _LLM_Tray["enabled"] ? "1" : "0" })
-    Updates.Push({ Section: "LLM", Key: "model",               Value: _LLM_Tray["model"] })
-    Updates.Push({ Section: "LLM", Key: "profile_id",          Value: _LLM_Tray["profile_id"] })
-    Updates.Push({ Section: "LLM", Key: "n_predictions",       Value: String(_LLM_Tray["n_predictions"]) })
-    Updates.Push({ Section: "LLM", Key: "min_words",           Value: String(_LLM_Tray["min_words"]) })
-    Updates.Push({ Section: "LLM", Key: "max_words",           Value: String(_LLM_Tray["max_words"]) })
-    Updates.Push({ Section: "LLM", Key: "debounce_ms",         Value: String(_LLM_Tray["debounce_ms"]) })
-    Updates.Push({ Section: "LLM", Key: "ctx_chars",           Value: String(_LLM_Tray["ctx_chars"]) })
-    Updates.Push({ Section: "LLM", Key: "temperature",         Value: _LLM_Tray["temperature"] })
-    Updates.Push({ Section: "LLM", Key: "instant_on_word_end", Value: _LLM_Tray["instant_on_word_end"] ? "1" : "0" })
-    Updates.Push({ Section: "LLM", Key: "auto_profile_for_model", Value: _LLM_Tray["auto_profile_for_model"] ? "1" : "0" })
-    Updates.Push({ Section: "LLM", Key: "onboarding_seen", Value: _LLM_Tray["onboarding_seen"] ? "1" : "0" })
-    Updates.Push({ Section: "LLM", Key: "inline_autotype", Value: _LLM_Tray["inline_autotype"] ? "1" : "0" })
-    ; Per-app profile overrides — flat ``app=profile;app2=profile2`` so the
-    ; TOML writer doesn't need to support nested tables. The format keeps
-    ; the user's local config diffable.
+    ; [llm] section — runtime state (onboarding flag + per-app overrides).
+    ; The feature-shaped LLM settings (model / profile / generation / trigger /
+    ; navigation) are already emitted by the v2 walker above; we only add
+    ; the two runtime-only keys here.
+    Updates.Push({ Section: "llm", Key: "onboarding_seen", Value: _LLM_Tray["onboarding_seen"] ? "1" : "0" })
     _AppOverridesStr := ""
     for _AppName, _AppProfileId in _LLM_Tray["app_profile_overrides"] {
         if (_AppOverridesStr != "")
             _AppOverridesStr .= ";"
         _AppOverridesStr .= _AppName . "=" . _AppProfileId
     }
-    Updates.Push({ Section: "LLM", Key: "app_profile_overrides", Value: _AppOverridesStr })
+    Updates.Push({ Section: "llm", Key: "app_profile_overrides", Value: _AppOverridesStr })
 
-    ; [CategoryEnabled] — Phase 7.4 master gating state. Must be included
-    ; here or SaveFullConfig wipes the section on every canonicalization
-    ; (the writer rewrites the file from scratch from the Updates array),
-    ; causing the master toggle to never appear to persist.
+    ; [category_enabled] — master category gating state.
     global CategoryEnabled
     if IsSet(CategoryEnabled) {
         for _CatName, _CatBool in CategoryEnabled {
-            Updates.Push({ Section: "CategoryEnabled", Key: _CatName, Value: _CatBool })
+            Updates.Push({ Section: "category_enabled", Key: _CategoryEnabledKeyV2(_CatName), Value: _CatBool })
         }
     }
 
     ; Strict schema: rewrite from scratch so stale/unknown sections and keys
-    ; are removed on each full save
+    ; are removed on each full save.
     if FileExist(ConfigurationFile) {
         try FileDelete(ConfigurationFile)
     }
@@ -1613,52 +1567,6 @@ SaveFullConfig() {
     try TOML_BatchWrite(ConfigurationFile, Updates)
     finally _TOML_STRICT_CANON_IN_PROGRESS := PrevCanonState
     TOML_FormatViaScript(ConfigurationFile)
-}
-
-; Recursively walk the Features map to collect all persistable properties
-; into the Updates array. Leaf features are flattened into their parent section:
-;   [Rolls]  CT = true
-;   [TapHolds.CapsLock]  EnterCtrl = true
-; Extra props use FeatureName_Prop keys:
-;   [TapHolds.LAlt]  BackSpaceLayer_TimeActivationSeconds = 0.2
-; This mirrors how Hammerspoon groups modules into compact sections.
-_CollectFeatureUpdates(Updates, ParentPath, Node) {
-    ExtraProps := ["TimeActivationSeconds", "Letter", "PatternMaxLength",
-        "Link", "DestinationFolder", "DatedNotes", "SearchEngine", "SearchEngineURLQuery"]
-
-    for Key, Value in Node {
-        if Key == "__Order" or Key == "__Configuration" {
-            continue
-        }
-        ; Translate top-level category names to their TOML section (e.g. Autocorrection →
-        ; Hotstrings.Autocorrection). Sub-levels already carry the translated prefix.
-        TomlKey := (ParentPath == "") ? _TomlSection(Key) : Key
-        CurrentPath := (ParentPath == "") ? TomlKey : ParentPath "." Key
-
-        if Type(Value) == "Map" {
-            ; Sub-map: __Configuration props go directly into [CurrentPath], then recurse
-            if Value.Has("__Configuration") {
-                Cfg := Value["__Configuration"]
-                for Prop in ExtraProps {
-                    if Cfg.HasOwnProp(Prop) {
-                        Updates.Push({ Section: CurrentPath, Key: Prop, Value: Cfg.%Prop% })
-                    }
-                }
-            }
-            _CollectFeatureUpdates(Updates, CurrentPath, Value)
-        } else if IsObject(Value) {
-            ; Leaf feature: flatten into ParentPath section.
-            ; Enabled maps to the feature name key; other props use FeatureName_Prop.
-            if Value.HasOwnProp("Enabled") {
-                Updates.Push({ Section: ParentPath, Key: Key, Value: Value.Enabled })
-            }
-            for Prop in ExtraProps {
-                if Value.HasOwnProp(Prop) {
-                    Updates.Push({ Section: ParentPath, Key: Key "_" Prop, Value: Value.%Prop% })
-                }
-            }
-        }
-    }
 }
 
 ; V2 walker — recursively emit ``FeaturesV2`` (a hierarchical Map produced by
@@ -1704,12 +1612,13 @@ ReloadWithDefaultConfig(*) {
 }
 
 ; Read the user's per-slot action overrides from the config's
-; [Shortcuts.ScriptControl] section. Defaults stay in place when the key is absent or the action name is
-; unknown. Called once at boot from initMenu's preamble.
+; [ahk.shortcuts.script_control] section. Defaults stay in place when the
+; key is absent or the action name is unknown. Called once at boot from
+; initMenu's preamble.
 ReadScriptShortcutsConfig() {
     global ScriptShortcutAssignments, SCRIPT_SHORTCUT_SLOTS, _IniCache, GESTURE_ACTIONS
     for Slot in SCRIPT_SHORTCUT_SLOTS {
-        Value := IniCacheGet(_IniCache, "Shortcuts.ScriptControl", Slot)
+        Value := IniCacheGet(_IniCache, "ahk.shortcuts.script_control", Slot)
         if (Value != "_" and (Value == "none" or GESTURE_ACTIONS.Has(Value))) {
             ScriptShortcutAssignments[Slot] := Value
         }
@@ -1741,7 +1650,7 @@ RunScriptShortcutAction(Slot) {
 SetScriptShortcutAction(Slot, ActionName) {
     global ScriptShortcutAssignments, ConfigurationFile
     ScriptShortcutAssignments[Slot] := ActionName
-    TOML_Write(ActionName, ConfigurationFile, "Shortcuts.ScriptControl", Slot)
+    TOML_Write(ActionName, ConfigurationFile, "ahk.shortcuts.script_control", Slot)
     Reload
 }
 
@@ -1801,7 +1710,7 @@ _KeyboardSlotSendCode(SlotId) {
     return Mod . Suffix
 }
 
-; Read per-slot action overrides from [Shortcuts.Keyboard] in the config TOML.
+; Read per-slot action overrides from [ahk.shortcuts.keyboard] in the v2 config TOML.
 ReadKeyboardShortcutsConfig() {
     global KeyboardShortcutAssignments, KEYBOARD_SHORTCUT_DEFAULTS, _IniCache, GESTURE_ACTIONS
     LoggerStart("KeyboardShortcuts", "Chargement des raccourcis clavier configurables…")
@@ -1811,7 +1720,7 @@ ReadKeyboardShortcutsConfig() {
     ; Apply any user overrides persisted in the TOML
     OverrideCount := 0
     for Slot, _ in KEYBOARD_SHORTCUT_DEFAULTS {
-        Value := IniCacheGet(_IniCache, "Shortcuts.Keyboard", Slot)
+        Value := IniCacheGet(_IniCache, "ahk.shortcuts.keyboard", Slot)
         if (Value != "_" and (Value == "none" or GESTURE_ACTIONS.Has(Value))) {
             KeyboardShortcutAssignments[Slot] := Value
             OverrideCount++
@@ -1838,7 +1747,7 @@ RunKeyboardShortcutAction(SlotId) {
 SetKeyboardShortcutAction(SlotId, ActionName) {
     global KeyboardShortcutAssignments, ConfigurationFile
     KeyboardShortcutAssignments[SlotId] := ActionName
-    TOML_Write(ActionName, ConfigurationFile, "Shortcuts.Keyboard", SlotId)
+    TOML_Write(ActionName, ConfigurationFile, "ahk.shortcuts.keyboard", SlotId)
     Reload
 }
 
