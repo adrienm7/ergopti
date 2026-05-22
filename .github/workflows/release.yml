@@ -252,6 +252,20 @@ jobs:
               with:
                   python-version: "3.12"
 
+            - name: Set up Node.js
+              uses: actions/setup-node@v4
+              with:
+                  node-version: "20"
+                  cache: "npm"
+
+            - name: Install Node dependencies
+              run: npm ci
+              shell: bash
+
+            - name: Generate features manifest
+              run: npm run build:manifest
+              shell: bash
+
             - name: Regenerate hotstrings_generated.ahk
               run: python tools/compile_hotstrings.py
               shell: bash

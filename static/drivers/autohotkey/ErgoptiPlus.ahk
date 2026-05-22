@@ -556,6 +556,17 @@ EnsurePersonalInfoTomlFile(ScriptInformation["PersonalInfoTomlPath"])
 ReadPersonalInfoToml(ScriptInformation["PersonalInfoTomlPath"])
 
 EnsureUserConfigsExist()
+; Guard: the generated manifest must be present and loaded before we build
+; the Features Map. If it is missing (e.g. after a fresh clone or when the
+; codegen has not been run yet), ManifestBuildFeaturesMap returns an empty
+; Map and every downstream Features["llm"]["enabled"] access throws a
+; cryptic "Item has no value" error. Fail loudly here instead.
+if !ManifestEnsureLoaded() {
+	MsgBox("Erreur de démarrage : le fichier _generated/features_manifest.ahk est absent ou corrompu."
+		. "`n`nLancez ``npm run build:manifest`` depuis le répertoire du projet, puis relancez le script.",
+		"ErgoptiPlus — manifest manquant", "OK Iconx")
+	ExitApp(1)
+}
 global Features := ManifestBuildFeaturesMap()
 ApplyConfigToml(Features, _ConfigDir . "ahk\config.toml")
 global TapHold := LoadTapHoldToml(_ConfigDir . "ahk\tap_hold.toml")
