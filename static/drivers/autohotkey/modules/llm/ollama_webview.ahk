@@ -26,6 +26,7 @@
 
 
 
+
 ; ==========================================
 ; ==========================================
 ; ======= 1/ Module State =======
@@ -45,6 +46,7 @@ global _OllamaWV_Ready      := false   ; true once JS signals "ready"
 global _OllamaWV_Queue      := []      ; JS calls buffered before page ready
 global _OllamaWV_OnCancel   := unset
 global _OllamaWV_OnRetry    := unset
+
 
 
 
@@ -169,6 +171,7 @@ OllamaWV_IsAlive() {
 	try return WinExist("ahk_id " _OllamaWV_Gui.Hwnd) ? true : false
 	return false
 }
+
 
 
 
@@ -345,6 +348,7 @@ OllamaWV_I18nApplyScript(locale_code) {
 
 
 
+
 ; =============================================
 ; =============================================
 ; ======= 4/ JS Bridge =======
@@ -413,6 +417,7 @@ OllamaWV_OnWebMessage(sender, args) {
 			Run("cmd.exe")
 	}
 }
+
 
 
 

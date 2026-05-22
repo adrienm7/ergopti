@@ -39,6 +39,7 @@
 
 
 
+
 ; ===================================
 ; ===================================
 ; ======= 1/ Constants =======
@@ -54,6 +55,7 @@ class KLSensorConst {
 	static THERMAL_MODERATE := 40
 	static THERMAL_HIGH      := 80
 }
+
 
 
 
@@ -74,6 +76,7 @@ class KLSensors {
 	static prev_kernel := -1
 	static prev_user   := -1
 }
+
 
 
 
@@ -164,6 +167,7 @@ KL_Sensors_Tick() {
 
 	KL_LogSystemEvent("system_load", meta)
 }
+
 
 
 

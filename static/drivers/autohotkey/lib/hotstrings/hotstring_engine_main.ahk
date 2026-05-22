@@ -46,6 +46,10 @@
 ;    layered on top in a later phase.
 ; ==============================================================================
 
+
+
+
+
 ; ============================================
 ; ============================================
 ; ======= 1/ Constants =======
@@ -65,6 +69,9 @@ global HSE_MAX_BUFFER_LEN := 64
 ; next terminator — the engine must treat the char after an apostrophe
 ; as the start of a new word, exactly like after a space.
 global HSE_WORD_TERMINATORS := " `t`r`n.,;:?!'’"
+
+
+
 
 
 ; ============================================
@@ -139,6 +146,9 @@ global HSE_LastEndChar := ""
 global HSE_RepeatEnabled := true
 
 
+
+
+
 ; ============================================
 ; ============================================
 ; ======= 3/ Public registry API =======
@@ -205,6 +215,9 @@ HSE_RegistryClear() {
     HSE_StarPrefixSetCI := Map()   ; prefix → Map(nextChar → true), CI
     HSE_StarPrefixSetCS := Map()   ; prefix → Map(nextChar → true), CS
 }
+
+
+
 
 
 ; ============================================
@@ -412,6 +425,9 @@ HSE_TryRepeatKey(MagicKey) {
         FinalResult: false
     }
 }
+
+
+
 
 
 ; ============================================
@@ -631,6 +647,10 @@ _HSE_WordBoundaryAllows(Buf, Spec) {
     return HSE_StartIsWordBoundary
 }
 
+
+
+
+
 ; ============================================
 ; ============================================
 ; ======= 6/ Dispatch =======
@@ -724,6 +744,9 @@ HSE_DispatchMatch(Spec, EndChar) {
         SetTimer((*) => HSE_Suppress(false), -HSE_SUPPRESS_RELEASE_DELAY_MS)
     }
 }
+
+
+
 
 
 ; ============================================

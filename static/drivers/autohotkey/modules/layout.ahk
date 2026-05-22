@@ -11,6 +11,7 @@
 
 
 
+
 ; ======================================
 ; ======================================
 ; ======= 1/ DEAD KEY DEFINITIONS =======
@@ -295,6 +296,9 @@ global DeadkeyMappingCurrency := Map(
 )
 
 
+
+
+
 ; ============================
 ; ============================
 ; ======= 2/ UTILITIES =======
@@ -428,6 +432,9 @@ WrapTextIfSelected(Symbol, LeftSymbol, RightSymbol) {
 }
 
 
+
+
+
 ; ============================
 ; ============================
 ; ======= 3/ BASE LAYER =======
@@ -505,6 +512,9 @@ if Features["hotstrings"]["magic_key"]["replace"]["enabled"] {
 Hotkey("#SC02E", (*) => OpenPersonalEditor(), "I3")
 
 
+
+
+
 ; ==============================
 ; ==============================
 ; ======= 4/ SHIFT LAYER =======
@@ -513,6 +523,9 @@ Hotkey("#SC02E", (*) => OpenPersonalEditor(), "I3")
 
 ; Shift layer — bindings registered table-driven via lib/layout_shift_caps.ahk.
 RegisterShiftLayer()
+
+
+
 
 
 ; =================================
@@ -527,6 +540,9 @@ GetCapsLockCondition() {
 
 ; CapsLock layer — bindings registered table-driven via lib/layout_shift_caps.ahk.
 RegisterCapsLockLayer()
+
+
+
 
 
 ; =============================================
@@ -606,6 +622,9 @@ _RegisterRollsAltGrHotkeys() {
 ; ─────────────────────────────────────────────────────────────────────────────
 _RegisterRollsAltGrHotkeys()
 RegisterAltGrLayer()
+
+
+
 
 
 ; ================================

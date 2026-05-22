@@ -27,6 +27,7 @@
 
 
 
+
 ; ==============================================
 ; ==============================================
 ; ======= 1/ Constants and shared state =======
@@ -60,6 +61,7 @@ global _ActiveAppCache := {
 	IsNotepad: false,
 	IsMicrosoftOffice: false,
 }
+
 
 
 

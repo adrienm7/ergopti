@@ -44,6 +44,10 @@ _TestCallHotstring(Abbreviation, Replacement, EndChar, OnlyText := True, FinalRe
     _HotstringDispatch(Replacement, EndChar, BackSpaceSeq, PrevCharKey, OnlyText, FinalResult, TimeActivationSeconds)
 }
 
+
+
+
+
 ; ============================================
 ; ============================================
 ; ======= 1/ CreateHotstring — flag assembly =======
@@ -111,6 +115,10 @@ TestCH_CallbackIsObject() {
     AssertTrue(IsObject(_Stub_HotstringRegistrations[1].callback))
 }
 Test("CreateHotstring: callback is a callable Func", TestCH_CallbackIsObject)
+
+
+
+
 
 ; ============================================
 ; ============================================
@@ -196,6 +204,10 @@ TestCH_OptionsTimeActivationBlocks() {
 }
 Test("CreateHotstring: TimeActivationSeconds blocks expansion when expired",
     TestCH_OptionsTimeActivationBlocks)
+
+
+
+
 
 ; ============================================
 ; ============================================
@@ -484,6 +496,10 @@ TestE2E_HookInstalledNoRealRegistration() {
 Test("Hook integration: installed hook captures CreateHotstring instead of AHK builtin",
     TestE2E_HookInstalledNoRealRegistration)
 
+
+
+
+
 ; ============================================
 ; ============================================
 ; ======= 4/ HotstringHandler — branches =======
@@ -685,6 +701,10 @@ TestHH_EmptyReplacementStillThreeSends() {
 Test("HotstringHandler: empty replacement is still emitted as the second send",
     TestHH_EmptyReplacementStillThreeSends)
 
+
+
+
+
 ; ============================================
 ; ============================================
 ; ======= 5/ End-to-end CreateHotstring → callback → Handler =======
@@ -804,6 +824,10 @@ TestE2E_CaseSensitiveTitlecaseFires() {
 Test("End-to-end: CreateCaseSensitive titlecase callback sends titlecase replacement",
     TestE2E_CaseSensitiveTitlecaseFires)
 
+
+
+
+
 ; ============================================
 ; ============================================
 ; ======= 6/ ActivateHotstrings =======
@@ -836,6 +860,10 @@ TestAH_SecondSendIsBackspace() {
 Test("ActivateHotstrings: second send is {BackSpace} with OnlyText=false",
     TestAH_SecondSendIsBackspace)
 
+
+
+
+
 ; ============================================
 ; ============================================
 ; ======= 7/ Microsoft Office tagging =======
@@ -862,6 +890,10 @@ TestMS_NotepadIsNotOffice() {
 }
 Test("MicrosoftApps: Notepad is not classified as an Office app",
     TestMS_NotepadIsNotOffice)
+
+
+
+
 
 ; ============================================
 ; ============================================
@@ -949,6 +981,10 @@ TestHH_NotepadAbbrWithUnicode() {
 }
 Test("HotstringHandler: Notepad path with Unicode replacement preserves character",
     TestHH_NotepadAbbrWithUnicode)
+
+
+
+
 
 ; ============================================
 ; ============================================

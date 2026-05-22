@@ -34,6 +34,7 @@
 
 
 
+
 ; ==============================================================
 ; ==============================================================
 ; ======= 1/ Variant tables =======
@@ -112,6 +113,7 @@ global _TH_FlatKeyTuples := Map(
 
 
 
+
 ; ==============================================================
 ; ==============================================================
 ; ======= 2/ Variants lookup =======
@@ -132,6 +134,7 @@ _TH_VariantsForV1Key(V1KeyId) {
     }
     return false
 }
+
 
 
 
@@ -257,6 +260,7 @@ _TH_ResolveTuple(V1KeyId, Variant) {
 
 
 
+
 ; ==============================================================
 ; ==============================================================
 ; ======= 4/ Variant read-back =======
@@ -327,6 +331,7 @@ IsTapHoldVariantActive(V1Path) {
     ; Tap-only variant — the entry must not declare any hold side.
     return !Entry.Has("hold_modifier") and !Entry.Has("hold_layer")
 }
+
 
 
 

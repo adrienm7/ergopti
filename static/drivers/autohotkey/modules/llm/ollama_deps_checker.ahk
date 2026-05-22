@@ -31,6 +31,7 @@
 
 
 
+
 ; ==========================================
 ; ==========================================
 ; ======= 1/ State & Constants =======
@@ -49,6 +50,7 @@ global _LLM_Deps_OutPos         := 0            ; byte offset already consumed f
 ; window would leave a hidden powershell.exe downloading qwen2.5:3b
 ; in the background indefinitely.
 global _LLM_Deps_InstallerPid   := 0
+
 
 
 
@@ -94,6 +96,7 @@ LLM_Deps_GetFailureMessage() {
 	global _LLM_Deps_FailureMessage
 	return _LLM_Deps_FailureMessage
 }
+
 
 
 
@@ -200,6 +203,7 @@ LLM_Deps_DoCheck(default_model, on_ready, on_failed, show_ui) {
 	LoggerInfo("LLM", "Ollama not running — launching installer…")
 	LLM_Deps_RunInstaller(default_model, on_ready, on_failed)
 }
+
 
 
 

@@ -37,6 +37,7 @@
 
 
 
+
 ; ============================================
 ; ============================================
 ; ======= 1/ Constants and shared state =======
@@ -49,6 +50,7 @@ global TEST_REGISTRY := []
 ; Counters updated by RunTests.
 global TEST_PASS_COUNT := 0
 global TEST_FAIL_COUNT := 0
+
 
 
 
@@ -123,6 +125,7 @@ _DescribeValue(V) {
 		return "?"
 	}
 }
+
 
 
 

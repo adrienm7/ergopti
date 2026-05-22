@@ -47,6 +47,7 @@
 
 
 
+
 ; ===================================
 ; ===================================
 ; ======= 1/ Constants =======
@@ -91,6 +92,7 @@ class KLErgoConst {
 
 
 
+
 ; ===================================
 ; ===================================
 ; ======= 2/ Module state =======
@@ -127,6 +129,7 @@ class KLErgo {
 
 
 
+
 ; =============================================
 ; =============================================
 ; ======= 3/ Keystroke dispatcher =======
@@ -157,6 +160,7 @@ KL_Ergo_OnKeystroke(delay_ms, vk, is_bs := false) {
 
 
 
+
 ; ==========================================
 ; ==========================================
 ; ======= 4/ Hesitation detection =======
@@ -172,6 +176,7 @@ KL_Ergo_CheckHesitation(delay_ms, now, app) {
     KLErgo.last_hesitation := now
     KL_LogErgoEvent("hesitation", app, Map("delay_ms", delay_ms))
 }
+
 
 
 
@@ -226,6 +231,7 @@ KL_Ergo_UpdateBlock(delay_ms, now, app, is_bs) {
 
 
 
+
 ; =========================================
 ; =========================================
 ; ======= 6/ Flow window detection =======
@@ -270,6 +276,7 @@ KL_Ergo_CheckFlow(now, app) {
 
 
 
+
 ; ============================================
 ; ============================================
 ; ======= 7/ Backspace burst detection =======
@@ -282,6 +289,7 @@ KL_Ergo_CheckBsBurst(now) {
             Map("run_length", KLErgo.bs_run))
     }
 }
+
 
 
 
@@ -310,6 +318,7 @@ KL_Ergo_UpdatePinky(vk, now, app) {
         ))
     }
 }
+
 
 
 

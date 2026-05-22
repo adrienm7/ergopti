@@ -27,6 +27,10 @@
 
 #Requires Autohotkey v2.0+
 
+
+
+
+
 ; ===================================
 ; ===================================
 ; ======= 1/ Constants =======
@@ -42,6 +46,10 @@ class KLReadConst {
     ; without breaking a sweat.
     static MAX_NGRAM_ROWS := 50000
 }
+
+
+
+
 
 ; ===================================
 ; ===================================
@@ -67,6 +75,10 @@ KLR_LoadSchema(db) {
     schema := FileRead(schema_path, "UTF-8")
     return SQLite_Exec(db, schema)
 }
+
+
+
+
 
 ; =========================================
 ; =========================================
@@ -210,6 +222,10 @@ KLR_ApplyIncremental(db, md, log) {
     try FileAppend("[" . A_Now . "] KLR incremental: " . total_new . " new byte(s) exec'd`r`n", log, "UTF-8")
     return true
 }
+
+
+
+
 
 ; ===============================================
 ; ===============================================
@@ -493,6 +509,10 @@ KLR__SumHourlyMin5(db, manifest, where) {
         )
     }
 }
+
+
+
+
 
 ; =====================================
 ; =====================================

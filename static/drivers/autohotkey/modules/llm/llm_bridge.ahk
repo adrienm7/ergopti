@@ -21,6 +21,7 @@
 
 
 
+
 ; ==============================
 ; ==============================
 ; ======= 1/ Buffer State =======
@@ -29,6 +30,7 @@
 
 global _LLM_Bridge_Buffer := ""
 global _LLM_Bridge_Active := false
+
 
 
 
@@ -59,6 +61,7 @@ LLM_Bridge_Stop() {
 	LLM_Engine_SetEnabled(false)
 	LLM_Tooltip_Hide()
 }
+
 
 
 

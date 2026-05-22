@@ -11,11 +11,13 @@
 
 
 
+
 ; =====================================================
 ; =====================================================
 ; ======= 1/ REDUCTION OF DISTANCES AND SFBs =======
 ; =====================================================
 ; =====================================================
+
 
 
 ; ===================================================
@@ -25,6 +27,7 @@
 if Features["hotstrings"]["distances_reduction"]["qu"]["enabled"] {
 	LoadHotstringsSection("distancesreduction", "qu", Features["hotstrings"]["distances_reduction"]["qu"])
 }
+
 
 
 ; ================================================
@@ -86,6 +89,7 @@ if Features["hotstrings"]["distances_reduction"]["e_circumflex_e"]["enabled"] {
 }
 
 
+
 ; ========================================================
 ; ===== 1.3) Comma becomes a J with the vowels =====
 ; ========================================================
@@ -106,6 +110,7 @@ if Features["hotstrings"]["distances_reduction"]["comma_j"]["enabled"] {
 }
 
 
+
 ; ============================================================================
 ; ===== 1.4) Comma makes it possible to type letters that are hard to reach =====
 ; ============================================================================
@@ -123,6 +128,7 @@ if Features["hotstrings"]["distances_reduction"]["comma_far_letters"]["enabled"]
 }
 
 
+
 ; =============================================
 ; ===== 1.5) SFBs reduction with Comma =====
 ; =============================================
@@ -130,6 +136,7 @@ if Features["hotstrings"]["distances_reduction"]["comma_far_letters"]["enabled"]
 if Features["hotstrings"]["sfbs_reduction"]["comma"]["enabled"] {
 	LoadHotstringsSection("sfbsreduction", "comma", Features["hotstrings"]["sfbs_reduction"]["comma"])
 }
+
 
 
 ; ==========================================
@@ -141,6 +148,7 @@ if Features["hotstrings"]["sfbs_reduction"]["e_circ"]["enabled"] {
 }
 
 
+
 ; ==========================================
 ; ===== 1.7) SFBs reduction with È =====
 ; ==========================================
@@ -148,6 +156,7 @@ if Features["hotstrings"]["sfbs_reduction"]["e_circ"]["enabled"] {
 if Features["hotstrings"]["sfbs_reduction"]["e_grave"]["enabled"] {
 	LoadHotstringsSection("sfbsreduction", "egrave", Features["hotstrings"]["sfbs_reduction"]["e_grave"])
 }
+
 
 
 ; ==========================================
@@ -196,11 +205,15 @@ if Features["hotstrings"]["sfbs_reduction"]["i_e_acute"]["enabled"] {
 }
 
 
+
+
+
 ; ========================
 ; ========================
 ; ======= 2/ ROLLS =======
 ; ========================
 ; ========================
+
 
 
 ; ======================================
@@ -226,6 +239,7 @@ if Features["hotstrings"]["rolls"]["comment_open"]["enabled"] {
 if Features["hotstrings"]["rolls"]["comment_close"]["enabled"] {
 	LoadHotstringsSection("rolls", "commentclose", Features["hotstrings"]["rolls"]["comment_close"])
 }
+
 
 
 ; =======================================
@@ -322,11 +336,15 @@ if Features["hotstrings"]["rolls"]["ct"]["enabled"] {
 }
 
 
+
+
+
 ; ================================
 ; ================================
 ; ======= 3/ AUTOCORRECTION =======
 ; ================================
 ; ================================
+
 
 
 ; ===========================================================================
@@ -345,6 +363,7 @@ if Features["hotstrings"]["autocorrection"]["typographic_apostrophe"]["enabled"]
 		)
 	}
 }
+
 
 
 ; ============================================
@@ -376,6 +395,7 @@ if Features["hotstrings"]["autocorrection"]["suffixes_a_chaining"]["enabled"] {
 }
 
 
+
 ; =============================================
 ; ===== 3.3) Add minus sign automatically =====
 ; =============================================
@@ -387,7 +407,6 @@ if Features["hotstrings"]["autocorrection"]["minus"]["enabled"] {
 if Features["hotstrings"]["autocorrection"]["minus_apostrophe"]["enabled"] {
 	LoadHotstringsSection("autocorrection", "minusapostrophe", Features["hotstrings"]["autocorrection"]["minus_apostrophe"])
 }
-
 
 
 
@@ -426,6 +445,7 @@ if Features["hotstrings"]["autocorrection"]["caps"]["enabled"] {
 }
 
 
+
 ; ===========================================
 ; ===== 3.5) Accents autocorrection =====
 ; ===========================================
@@ -439,11 +459,15 @@ if Features["hotstrings"]["autocorrection"]["accents"]["enabled"] {
 }
 
 
+
+
+
 ; ================================
 ; ================================
 ; ======= 4/ TEXT EXPANSION =======
 ; ================================
 ; ================================
+
 
 
 ; ===================================
@@ -453,6 +477,7 @@ if Features["hotstrings"]["autocorrection"]["accents"]["enabled"] {
 if Features["hotstrings"]["distances_reduction"]["suffixes_a"]["enabled"] {
 	LoadHotstringsSection("distancesreduction", "suffixesa", Features["hotstrings"]["distances_reduction"]["suffixes_a"])
 }
+
 
 
 ; ==============================================================
@@ -584,6 +609,7 @@ if Features["hotstrings"]["dynamic"]["text_expansion_personal_information"]["ena
 }
 
 
+
 ; ===========================================
 ; ===== 4.3) Text expansion with ★ =====
 ; ===========================================
@@ -597,6 +623,7 @@ if Features["hotstrings"]["magic_key"]["text_expansion_auto"]["enabled"] {
 }
 
 
+
 ; ==============================
 ; ===== 4.4) Emojis =====
 ; ==============================
@@ -604,6 +631,7 @@ if Features["hotstrings"]["magic_key"]["text_expansion_auto"]["enabled"] {
 if Features["hotstrings"]["magic_key"]["text_expansion_emojis"]["enabled"] {
 	LoadHotstringsSection("magickey", "textexpansionemojis", Features["hotstrings"]["magic_key"]["text_expansion_emojis"])
 }
+
 
 
 ; ==============================
@@ -618,6 +646,9 @@ if Features["hotstrings"]["magic_key"]["text_expansion_symbols_typst"]["enabled"
 	LoadHotstringsSection("magickey", "textexpansionsymbolstypst", Features["hotstrings"]["magic_key"]["text_expansion_symbols_typst"],
 		Map("OnlyText", False))
 }
+
+
+
 
 
 ; =====================================
@@ -638,6 +669,8 @@ SpacedPrefix(SpacedStr, RawCount) {
 	}
 	return SpacedStr  ; Fallback — fewer raw chars than requested
 }
+
+
 
 ; =====================
 ; ===== 5.1) Date =====
@@ -671,6 +704,7 @@ if Features["hotstrings"]["dynamic"]["date_long_fr"]["enabled"] {
 if Features["hotstrings"]["dynamic"]["date"]["enabled"] {
 	CreateHotstring("*?", "@td" . MK, _DateIso, Map("FinalResult", True))
 }
+
 
 
 ; ===================================================
@@ -738,6 +772,7 @@ if Features["hotstrings"]["dynamic"]["iban_prefixes"]["enabled"] {
 }
 
 
+
 ; ==============================
 ; ===== 4.6) Repeat key =====
 ; ==============================
@@ -751,6 +786,7 @@ if Features["hotstrings"]["magic_key"]["repeat_corrections"]["enabled"] {
 }
 
 CreateHotstring("*", "clé" . ScriptInformation["MagicKey"], "🔑")
+
 
 
 

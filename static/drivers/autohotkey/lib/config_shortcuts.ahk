@@ -29,6 +29,10 @@
 
 #Requires Autohotkey v2.0+
 
+
+
+
+
 ; ===================================
 ; ===================================
 ; ======= 1/ Path resolution =======
@@ -50,6 +54,10 @@ CS_GetTomlPath() {
 ; ([Script], [Shortcuts.ScriptControl], [Gestures], feature sections …) are
 ; preserved verbatim by the section-aware writer below.
 global CS_SECTION := "ahk.metrics"
+
+
+
+
 
 ; ===================================
 ; ===================================
@@ -150,6 +158,10 @@ CS_Unescape(s) {
     s := StrReplace(s, "\r", "`r")
     return s
 }
+
+
+
+
 
 ; ===================================
 ; ===================================
@@ -263,6 +275,10 @@ CS_Join(arr, sep) {
         out .= (i = 1 ? "" : sep) . v
     return out
 }
+
+
+
+
 
 ; ============================================
 ; ============================================

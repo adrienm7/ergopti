@@ -1,5 +1,9 @@
 ; lib/bundle.ahk
 
+
+
+
+
 ; =============================================
 ; =============================================
 ; ======= 1/ Compiled Bundle Bootstrapper =====
@@ -34,7 +38,6 @@
 ; 4. No-op in dev mode: when A_IsCompiled is false, the module is a passive
 ;    no-op and ``_BundleDir`` is left empty — the dev workflow stays identical.
 ; ==============================================================================
-
 
 
 
@@ -74,7 +77,6 @@ global BUNDLE_CHANNEL := "__BUNDLE_CHANNEL__"
 ; must fall back to A_ScriptDir-derived paths), versioned LocalAppData path
 ; in compiled mode. Exposed as a global so every module can read it.
 global _BundleDir := ""
-
 
 
 
@@ -133,7 +135,6 @@ _Bundle_Unzip(ZipPath, DestDir) {
 	}
 	return ExitCode == 0
 }
-
 
 
 

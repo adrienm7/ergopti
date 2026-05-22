@@ -79,6 +79,9 @@ global _PREFIX_WATCHER_CATEGORIES := [
 ]
 
 
+
+
+
 ; ============================================================
 ; ============================================================
 ; ======= 1/ Public API =====================================
@@ -228,6 +231,9 @@ HotstringPrefixWatcherStop() {
     ; watcher mid-suggestion is functionally a dismissal, not a fire.
     _NotifySuggestionDismissed()
 }
+
+
+
 
 
 ; ============================================================
@@ -416,6 +422,9 @@ _AddTriggerToIndex(Trigger, Output, Category, Section) {
     ; Register exact trigger in the flat set for near-miss lookups
     _TriggerSet[StrLower(Trigger)] := Entry
 }
+
+
+
 
 
 ; ============================================================

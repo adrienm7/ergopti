@@ -27,6 +27,7 @@
 
 
 
+
 ; ===================================
 ; ===================================
 ; ======= 1/ Constants =======
@@ -59,6 +60,7 @@ class SQLiteConst {
 
 
 
+
 ; ============================================
 ; ============================================
 ; ======= 2/ String marshaling helpers =======
@@ -83,6 +85,7 @@ SQLite_Utf8ToStr(ptr) {
         return ""
     return StrGet(ptr, "UTF-8")
 }
+
 
 
 
@@ -128,6 +131,7 @@ SQLite_LastError(db) {
         "Ptr", db, "Ptr")
     return SQLite_Utf8ToStr(p)
 }
+
 
 
 
@@ -190,6 +194,7 @@ SQLite_Exec(db, sql) {
     }
     return true
 }
+
 
 
 
@@ -264,6 +269,7 @@ SQLite_Query(db, sql) {
     DllCall(SQLiteConst.DLL . "\sqlite3_finalize", "Ptr", pstmt)
     return out
 }
+
 
 
 

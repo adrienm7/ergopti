@@ -19,6 +19,7 @@
 
 
 
+
 ; ====================================
 ; ====================================
 ; ======= 1/ Profile Registry =======
@@ -78,6 +79,7 @@ LLM_GetActiveProfile(active_id, user_profiles := []) {
 
 
 
+
 ; ============================================
 ; ============================================
 ; ======= 2/ Prompt Resolution =======
@@ -122,6 +124,7 @@ LLM_ResolveSystemPrompt(profile, n, min_words, max_words, language := "en") {
 
 	return prompt
 }
+
 
 
 

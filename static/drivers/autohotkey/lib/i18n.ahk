@@ -22,6 +22,9 @@
 ; ==============================================================================
 
 
+
+
+
 ; ============================================
 ; ============================================
 ; ======= 1/ Constants and module state =======
@@ -66,6 +69,9 @@ global _I18nCacheEn := Map()
 global _I18nCacheEnLoaded := false
 global _I18nCacheFr := Map()
 global _I18nCacheFrLoaded := false
+
+
+
 
 
 ; =============================================
@@ -222,6 +228,9 @@ _I18nEnsureLoaded() {
 	if _I18nLocale != "fr" and !_I18nCacheFrLoaded
 		_I18nLoadInto("fr", &_I18nCacheFr, &_I18nCacheFrLoaded)
 }
+
+
+
 
 
 ; =========================================

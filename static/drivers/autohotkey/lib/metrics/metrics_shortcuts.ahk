@@ -26,6 +26,7 @@
 
 
 
+
 ; ===================================
 ; ===================================
 ; ======= 1/ Constants =======
@@ -42,6 +43,7 @@ global METRICS_MOD_MAP := Map(
     "win",    "#",
     "cmd",    "#"
 )
+
 
 
 
@@ -69,6 +71,7 @@ class MetricsShortcuts {
 
 
 
+
 ; ============================================
 ; ============================================
 ; ======= 3/ Path + INI helpers =======
@@ -86,6 +89,7 @@ MS_LoadFromIni() {
 MS_SaveToIni() {
     CS_Save()
 }
+
 
 
 
@@ -119,6 +123,7 @@ MS_ToAhkSyntax(human) {
         return mods . key
     return mods . "{" . key . "}"
 }
+
 
 
 
@@ -161,6 +166,7 @@ MS_ApplyAll(ToggleTypingFn, ToggleAppsFn) {
         MetricsShortcuts.apps_str,
         ToggleAppsFn)
 }
+
 
 
 

@@ -44,6 +44,7 @@
 
 
 
+
 ; ===================================
 ; ===================================
 ; ======= 1/ Constants =======
@@ -81,6 +82,7 @@ global KLW_VK_FINGER := Map(
 
 
 
+
 ; ===================================
 ; ===================================
 ; ======= 2/ Module state =======
@@ -98,6 +100,7 @@ class KLW {
     ; when no sub-key is present.
     static batch := Map()
 }
+
 
 
 
@@ -151,6 +154,7 @@ KLW_GC(tbl, k, default_map) {
         tbl[k] := default_map
     return tbl[k]
 }
+
 
 
 
@@ -276,6 +280,7 @@ KLW_BumpAppDay(date_str, app, field, value) {
 
 
 
+
 ; ====================================
 ; ====================================
 ; ======= 5/ Burst / Session =======
@@ -334,6 +339,7 @@ KLW_FinalizeSession(date_str, app, s) {
     if (r["durations"].Length < KLWConst.SESSION_DURATIONS_CAP)
         r["durations"].Push(s["total_ms"])
 }
+
 
 
 
@@ -934,6 +940,7 @@ KLW_WalkSystemEvent(entry) {
 
 
 
+
 ; ===========================================
 ; ===========================================
 ; ======= 8/ SQL emission helpers =======
@@ -965,6 +972,7 @@ KLW_SplitKey(k, n) {
     parts.Push(rest)
     return parts
 }
+
 
 
 
@@ -1164,6 +1172,7 @@ KLW_BuildBatchSql() {
     KLW_ResetBatch()
     return out
 }
+
 
 
 

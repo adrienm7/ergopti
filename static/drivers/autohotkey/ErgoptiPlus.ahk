@@ -2145,6 +2145,10 @@ HotstringPrefixWatcherInit()
 ; pinpoints which #Include above failed silently.
 LoggerSuccess("ErgoptiPlus", "Driver fully initialised — ready.")
 
+
+
+
+
 ; =========================================
 ; =========================================
 ; ======= 99/ Keyboard layout watch =======

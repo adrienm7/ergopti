@@ -52,6 +52,7 @@
 
 
 
+
 ; ===================================
 ; ===================================
 ; ======= 1/ Constants =======
@@ -98,6 +99,7 @@ global KLHOOK_MODIFIER_VKS := Map(
 
 
 
+
 ; ===================================
 ; ===================================
 ; ======= 2/ Module state =======
@@ -122,6 +124,7 @@ class KLWatch {
     static session_msg_handler := unset
     static power_msg_handler   := unset
 }
+
 
 
 
@@ -203,6 +206,7 @@ KL_Watchers_IdleTick() {
 
 
 
+
 ; =====================================
 ; =====================================
 ; ======= 4/ Shortcut detection =======
@@ -257,6 +261,7 @@ KL_Watchers_DetectShortcut(vk) {
 
 
 
+
 ; =================================
 ; =================================
 ; ======= 5/ System events =======
@@ -287,6 +292,7 @@ KL_Watchers_OnPowerBroadcast(wParam, lParam, msg, hwnd) {
         try KL_LogSystemEvent("wake")
     }
 }
+
 
 
 
