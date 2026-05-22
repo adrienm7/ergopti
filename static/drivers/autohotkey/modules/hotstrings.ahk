@@ -13,16 +13,16 @@
 
 
 ; =====================================================
-; =====================================================
+; ==================================================
 ; ======= 1/ REDUCTION OF DISTANCES AND SFBs =======
+; ==================================================
 ; =====================================================
-; =====================================================
 
 
 
-; ===================================================
+; =================================================
 ; ===== 1.1) Q becomes QU if a vowel is after =====
-; ===================================================
+; =================================================
 
 if Features["hotstrings"]["distances_reduction"]["qu"]["enabled"] {
 	LoadHotstringsSection("distancesreduction", "qu", Features["hotstrings"]["distances_reduction"]["qu"])
@@ -30,9 +30,9 @@ if Features["hotstrings"]["distances_reduction"]["qu"]["enabled"] {
 
 
 
-; ================================================
+; ======================================
 ; ===== 1.2) Ê acts like a deadkey =====
-; ================================================
+; ======================================
 
 if Features["hotstrings"]["distances_reduction"]["dead_key_e_circumflex"]["enabled"] {
 	DeadkeyMappingCircumflexModified := DeadkeyMappingCircumflex.Clone()
@@ -90,9 +90,9 @@ if Features["hotstrings"]["distances_reduction"]["e_circumflex_e"]["enabled"] {
 
 
 
-; ========================================================
+; ==================================================
 ; ===== 1.3) Comma becomes a J with the vowels =====
-; ========================================================
+; ==================================================
 
 if Features["hotstrings"]["distances_reduction"]["comma_j"]["enabled"] {
 	CommaJOptions := Map("TimeActivationSeconds", HotstringsResolve("distancesreduction", "CommaJ").Delay)
@@ -111,9 +111,9 @@ if Features["hotstrings"]["distances_reduction"]["comma_j"]["enabled"] {
 
 
 
-; ============================================================================
+; ===============================================================================
 ; ===== 1.4) Comma makes it possible to type letters that are hard to reach =====
-; ============================================================================
+; ===============================================================================
 
 if Features["hotstrings"]["distances_reduction"]["comma_far_letters"]["enabled"] {
 	CommaFarOptions := Map("TimeActivationSeconds", HotstringsResolve("distancesreduction", "CommaFarLetters").Delay)
@@ -129,9 +129,9 @@ if Features["hotstrings"]["distances_reduction"]["comma_far_letters"]["enabled"]
 
 
 
-; =============================================
+; ==========================================
 ; ===== 1.5) SFBs reduction with Comma =====
-; =============================================
+; ==========================================
 
 if Features["hotstrings"]["sfbs_reduction"]["comma"]["enabled"] {
 	LoadHotstringsSection("sfbsreduction", "comma", Features["hotstrings"]["sfbs_reduction"]["comma"])
@@ -139,9 +139,9 @@ if Features["hotstrings"]["sfbs_reduction"]["comma"]["enabled"] {
 
 
 
-; ==========================================
+; ======================================
 ; ===== 1.6) SFBs reduction with Ê =====
-; ==========================================
+; ======================================
 
 if Features["hotstrings"]["sfbs_reduction"]["e_circ"]["enabled"] {
 	LoadHotstringsSection("sfbsreduction", "ecirc", Features["hotstrings"]["sfbs_reduction"]["e_circ"])
@@ -149,9 +149,9 @@ if Features["hotstrings"]["sfbs_reduction"]["e_circ"]["enabled"] {
 
 
 
-; ==========================================
+; ======================================
 ; ===== 1.7) SFBs reduction with È =====
-; ==========================================
+; ======================================
 
 if Features["hotstrings"]["sfbs_reduction"]["e_grave"]["enabled"] {
 	LoadHotstringsSection("sfbsreduction", "egrave", Features["hotstrings"]["sfbs_reduction"]["e_grave"])
@@ -159,9 +159,9 @@ if Features["hotstrings"]["sfbs_reduction"]["e_grave"]["enabled"] {
 
 
 
-; ==========================================
+; ======================================
 ; ===== 1.8) SFBs reduction with À =====
-; ==========================================
+; ======================================
 
 if Features["hotstrings"]["sfbs_reduction"]["bu"]["enabled"] and Features["hotstrings"]["magic_key"]["text_expansion"]["enabled"] {
 	; Those hotstrings must be defined before bu, otherwise they won't get activated
@@ -216,9 +216,9 @@ if Features["hotstrings"]["sfbs_reduction"]["i_e_acute"]["enabled"] {
 
 
 
-; ======================================
+; ===================================
 ; ===== 2.1) Rolls on left hand =====
-; ======================================
+; ===================================
 
 ; === Top row ===
 if Features["hotstrings"]["rolls"]["close_chevron_tag"]["enabled"] {
@@ -242,9 +242,9 @@ if Features["hotstrings"]["rolls"]["comment_close"]["enabled"] {
 
 
 
-; =======================================
+; ====================================
 ; ===== 2.2) Rolls on right hand =====
-; =======================================
+; ====================================
 
 ; === Top row ===
 if Features["hotstrings"]["rolls"]["hashtag_parenthesis"]["enabled"] {
@@ -340,16 +340,16 @@ if Features["hotstrings"]["rolls"]["ct"]["enabled"] {
 
 
 ; ================================
-; ================================
+; =================================
 ; ======= 3/ AUTOCORRECTION =======
+; =================================
 ; ================================
-; ================================
 
 
 
-; ===========================================================================
+; ==========================================================================
 ; ===== 3.1) Automatic conversion of apostrophe into a typographic one =====
-; ===========================================================================
+; ==========================================================================
 
 if Features["hotstrings"]["autocorrection"]["typographic_apostrophe"]["enabled"] {
 	LoadHotstringsSection("autocorrection", "typographicapostrophe", Features["hotstrings"]["autocorrection"]["typographic_apostrophe"])
@@ -366,9 +366,9 @@ if Features["hotstrings"]["autocorrection"]["typographic_apostrophe"]["enabled"]
 
 
 
-; ============================================
+; ======================================
 ; ===== 3.2) Errors autocorrection =====
-; ============================================
+; ======================================
 
 if Features["hotstrings"]["autocorrection"]["errors"]["enabled"] {
 	LoadHotstringsSection("autocorrection", "errors", Features["hotstrings"]["autocorrection"]["errors"])
@@ -410,9 +410,9 @@ if Features["hotstrings"]["autocorrection"]["minus_apostrophe"]["enabled"] {
 
 
 
-; ==========================================
+; ====================================
 ; ===== 3.4) Caps autocorrection =====
-; ==========================================
+; ====================================
 
 if Features["hotstrings"]["autocorrection"]["caps"]["enabled"] {
 	LoadHotstringsSection("autocorrection", "caps", Features["hotstrings"]["autocorrection"]["caps"])
@@ -446,9 +446,9 @@ if Features["hotstrings"]["autocorrection"]["caps"]["enabled"] {
 
 
 
-; ===========================================
+; =======================================
 ; ===== 3.5) Accents autocorrection =====
-; ===========================================
+; =======================================
 
 if Features["hotstrings"]["autocorrection"]["names"]["enabled"] {
 	LoadHotstringsSection("autocorrection", "names", Features["hotstrings"]["autocorrection"]["names"])
@@ -463,16 +463,16 @@ if Features["hotstrings"]["autocorrection"]["accents"]["enabled"] {
 
 
 ; ================================
-; ================================
+; =================================
 ; ======= 4/ TEXT EXPANSION =======
+; =================================
 ; ================================
+
+
+
 ; ================================
-
-
-
-; ===================================
 ; ===== 4.1) Suffixes with À =====
-; ===================================
+; ================================
 
 if Features["hotstrings"]["distances_reduction"]["suffixes_a"]["enabled"] {
 	LoadHotstringsSection("distancesreduction", "suffixesa", Features["hotstrings"]["distances_reduction"]["suffixes_a"])
@@ -480,9 +480,9 @@ if Features["hotstrings"]["distances_reduction"]["suffixes_a"]["enabled"] {
 
 
 
-; ==============================================================
+; ======================================================
 ; ===== 4.2) Personal information shortcuts with @ =====
-; ==============================================================
+; ======================================================
 
 if Features["hotstrings"]["dynamic"]["text_expansion_personal_information"]["enabled"] {
 	CreateHotstring("*", "@bic" . ScriptInformation["MagicKey"], PersonalInformation["BIC"], Map("FinalResult",
@@ -610,9 +610,9 @@ if Features["hotstrings"]["dynamic"]["text_expansion_personal_information"]["ena
 
 
 
-; ===========================================
+; ======================================
 ; ===== 4.3) Text expansion with ★ =====
-; ===========================================
+; ======================================
 
 if Features["hotstrings"]["magic_key"]["text_expansion"]["enabled"] {
 	LoadHotstringsSection("magickey", "textexpansion", Features["hotstrings"]["magic_key"]["text_expansion"])
@@ -624,9 +624,9 @@ if Features["hotstrings"]["magic_key"]["text_expansion_auto"]["enabled"] {
 
 
 
-; ==============================
+; =======================
 ; ===== 4.4) Emojis =====
-; ==============================
+; =======================
 
 if Features["hotstrings"]["magic_key"]["text_expansion_emojis"]["enabled"] {
 	LoadHotstringsSection("magickey", "textexpansionemojis", Features["hotstrings"]["magic_key"]["text_expansion_emojis"])
@@ -634,9 +634,9 @@ if Features["hotstrings"]["magic_key"]["text_expansion_emojis"]["enabled"] {
 
 
 
-; ==============================
+; ========================
 ; ===== 4.5) Symbols =====
-; ==============================
+; ========================
 
 if Features["hotstrings"]["magic_key"]["text_expansion_symbols"]["enabled"] {
 	LoadHotstringsSection("magickey", "textexpansionsymbols", Features["hotstrings"]["magic_key"]["text_expansion_symbols"])
@@ -707,9 +707,9 @@ if Features["hotstrings"]["dynamic"]["date"]["enabled"] {
 
 
 
-; ===================================================
+; ==================================================
 ; ===== 5.2) Phone, SSN and IBAN prefix expand =====
-; ===================================================
+; ==================================================
 
 ; Prefix-based hotstrings derived from the user's personal data.
 ; Registered once at startup from PersonalInformation — same logic as HS rules_engine.
@@ -773,9 +773,9 @@ if Features["hotstrings"]["dynamic"]["iban_prefixes"]["enabled"] {
 
 
 
-; ==============================
+; ===========================
 ; ===== 4.6) Repeat key =====
-; ==============================
+; ===========================
 
 #InputLevel 1 ; Mandatory for this section to work, it needs to be below the inputlevel of the key remappings
 
@@ -792,9 +792,9 @@ CreateHotstring("*", "clé" . ScriptInformation["MagicKey"], "🔑")
 
 
 ; ===========================================
-; ===========================================
+; ======================================
 ; ======= 6/ Personal hotstrings =======
-; ===========================================
+; ======================================
 ; ===========================================
 
 ; Load every section declared in personal_hotstrings.toml (e.g. emailshortcuts,

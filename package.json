@@ -15,6 +15,10 @@
 		"lint:banners": "node ./scripts/audit-banner-alignment.js static/drivers/_shared",
 		"lint:conventions": "node ./scripts/lint-conventions.js --warn-only",
 		"lint:conventions:strict": "node ./scripts/lint-conventions.js --fail-on-violations",
+		"fix:banners": "node ./scripts/lint-conventions.js --fix-banners --warn-only",
+		"fix:spacing": "node ./scripts/lint-conventions.js --fix-spacing --warn-only",
+		"fix:unbalanced": "node ./scripts/lint-conventions.js --fix-unbalanced --warn-only",
+		"fix:all": "node ./scripts/lint-conventions.js --fix-banners --fix-unbalanced --fix-spacing --warn-only",
 		"install:hammerspoon": "bash ./scripts/install-hammerspoon.sh"
 	},
 	"type": "module",
