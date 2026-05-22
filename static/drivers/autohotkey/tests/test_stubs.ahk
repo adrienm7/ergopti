@@ -99,18 +99,16 @@ global Features := Map(
     ),
 )
 
-; Mirror of the v1 sections that have been migrated to the new v2-shape Map.
-; Production populates this via MirrorV1ToV2_<Section>() at boot (see
-; lib/v1_v2_mirror.ahk). The migrated read sites (lib/layout/*, modules/
+; v2 Features Map — canonical state container in production. Hydrated at
+; boot from the user's v2 config.toml by ApplyConfigTomlV2 + a per-section
+; reverse mirror onto the legacy v1 Features Map (lib/v2_v1_mirror.ahk)
+; for the tray-menu builder. Migrated read sites (lib/layout/*, modules/
 ; layout.ahk, modules/gestures.ahk, modules/shortcuts.ahk, modules/
-; keylogger/keylogger_prefetch.ahk) now hit FeaturesV2 instead of Features.
-; Tests don't fire those hotkeys but the symbol still needs to exist as a
-; global so a) the production lib/ files load cleanly and b) future
-; test_v2_mirror.ahk fixtures can pin the contract directly.
+; keylogger/keylogger_prefetch.ahk) now hit FeaturesV2 directly.
 ;
-; Each section's keys must match what its MirrorV1ToV2_<Section>() helper
-; in lib/v1_v2_mirror.ahk writes — extend both together when a new feature
-; is added to the manifest.
+; The fixture below mirrors the manifest defaults — extend it alongside
+; any new feature added to static/drivers/_shared/features/manifest.toml
+; so existing tests don't break when a new HotIf reads FeaturesV2["…"].
 global FeaturesV2 := Map(
     "layout", Map(
         "ergopti_base",         true,
@@ -284,11 +282,11 @@ global FeaturesV2 := Map(
             "ssn_prefixes",                      Map("enabled", true),
             "text_expansion_personal_information", Map("enabled", true, "pattern_max_length", 1),
         ),
-        ; Phase 12 — Personal sub-Map. In production this is populated
-        ; dynamically by MirrorV1ToV2_HotstringsPersonal from the user's
-        ; personal_hotstrings.toml [_meta.sections] block; tests pre-seed
-        ; a representative shape so the v2 read sites in modules/hotstrings.ahk
-        ; and lib/hotstrings/personal_toml_editor.ahk find a configured Map.
+        ; Personal sub-Map — in production this is populated from the user's
+        ; personal_hotstrings.toml [_meta.sections] block (via BootstrapPersonalFeatures
+        ; + the reverse mirror); tests pre-seed a representative shape so the
+        ; v2 read sites in modules/hotstrings.ahk and
+        ; lib/hotstrings/personal_toml_editor.ahk find a configured Map.
         "personal", Map(
             "autocorrection", Map("enabled", true, "time_activation_seconds", 0.75),
             "code",           Map("enabled", true, "time_activation_seconds", 0.75),
@@ -339,16 +337,16 @@ global FeaturesV2 := Map(
     ),
 )
 
-; Phase 7.3 — TapHold global is populated in production by
-; LoadTapHoldToml + MirrorV1ToV2_TapHold (see lib/v1_v2_mirror.ahk § 6).
-; Tests don't exercise tap-hold logic but the symbol must exist for the
-; mirror's existence check and any future test_tap_hold_mirror.ahk fixture.
+; TapHold global is populated in production by LoadTapHoldToml from the
+; user's tap_hold.toml. Tests don't exercise tap-hold logic but the symbol
+; must exist so the per-key TapHoldIsConfigured(KeyId) lookups return
+; cleanly.
 global TapHold := Map("keys", Map(), "layers", Map())
 
-; Phase 7.4 — Master category gating state. Production initialises this
-; in ErgoptiPlus.ahk and reloads it from the [CategoryEnabled] TOML
-; section; tests don't toggle masters but the global must exist so the
-; per-section mirrors' ``IsCategoryGated`` calls return true.
+; Master category gating state. Production initialises this in
+; ErgoptiPlus.ahk and reloads it from the [category_enabled] TOML
+; section; tests don't toggle masters but the global must exist so
+; ``IsCategoryGated`` calls return true.
 global CategoryEnabled := Map(
     "Layout",     true,
     "Shortcuts",  true,

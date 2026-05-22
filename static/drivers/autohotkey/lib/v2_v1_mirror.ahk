@@ -1,14 +1,14 @@
 ; lib/v2_v1_mirror.ahk
 
 ; ==============================================================================
-; MODULE: V2 to V1 Features reverse mirror (post cut-over)
+; MODULE: V2 to V1 Features reverse mirror
 ; DESCRIPTION:
-; Reverse of lib/v1_v2_mirror.ahk. Once the cut-over flips, ``FeaturesV2`` is
-; the canonical on-disk source: ``ApplyConfigTomlV2`` hydrates the v2 Map
-; from the user's ``config.toml``. The legacy ``Features`` Map still backs the
-; tray-menu rendering (``GetFeatureByPath``, ``MenuAddItem`` checkmark logic),
-; so this module pushes the v2 state back onto v1 once per boot so the menu
-; reflects the user's persisted choices.
+; ``FeaturesV2`` is the canonical on-disk source: ``ApplyConfigTomlV2``
+; hydrates the v2 Map from the user's ``config.toml``. The legacy
+; ``Features`` Map still backs the tray-menu rendering
+; (``GetFeatureByPath``, ``MenuAddItem`` checkmark logic), so this module
+; pushes the v2 state onto v1 once per boot so the menu reflects the
+; user's persisted choices.
 ;
 ; FEATURES & RATIONALE:
 ; 1. Single-direction sync v2 -> v1: writes flow v2 (tray-menu mutates
@@ -19,9 +19,9 @@
 ;    clicked, even when the master category gate is off. The gate is applied
 ;    separately by ``ApplyMasterGatesToFeaturesV2`` so #HotIf evaluations on
 ;    FeaturesV2 disable the behaviors without disturbing the menu state.
-; 3. Per-section helpers stay explicit so each migration phase has its own
-;    reviewable diff. Same naming convention as the forward mirror —
-;    ``MirrorV2ToV1_<Section>``.
+; 3. Per-section helpers stay explicit so each chunk has its own reviewable
+;    diff — ``MirrorV2ToV1_<Section>``. They will all disappear together when
+;    the v1 ``Features`` Map itself is finally retired (separate slice).
 ; ==============================================================================
 
 
@@ -122,8 +122,9 @@ MirrorV2ToV1_Gestures() {
 ; ==============================================================
 ; ==============================================================
 
-; Inverse of MirrorV1ToV2_Shortcuts — see that header for the full v1 <-> v2
-; mapping table. Plain-bool entries, Modélisation α entries (gpt/search/take_note
+; Mirrors every v2 Shortcuts entry onto its v1 Features["Shortcuts"]
+; counterpart so the tray-menu builder finds the right .Enabled value.
+; Covers plain-bool entries, Modélisation α entries (gpt/search/take_note
 ; + letter pickers e_grave/e_circ/e_acute/a_grave), and sub-Map groups
 ; (alt_gr_caps_lock / alt_gr_lalt / lalt_caps_lock).
 MirrorV2ToV1_Shortcuts() {
@@ -280,7 +281,7 @@ MirrorV2ToV1_Shortcuts() {
 ; ==============================================================
 ; ==============================================================
 
-; Inverse of MirrorV1ToV2_Hotstrings. v2 nests categories under
+; Mirrors every v2 hotstring category onto v1 Features. v2 nests them at
 ; FeaturesV2["hotstrings"][<cat>][<entry>]["enabled"]; v1 stores them as
 ; top-level Features[<v1_cat>][<v1_entry>].Enabled.
 MirrorV2ToV1_Hotstrings() {
