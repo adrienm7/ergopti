@@ -1,19 +1,25 @@
 --- modules/keylogger/log_manager.lua
 
 --- ==============================================================================
---- MODULE: Keylogger Log Manager (rewrite)
+--- MODULE: Keylogger Log Manager
 --- DESCRIPTION:
---- Handles all on-disk persistence for the keylogger. Implements the storage
---- model documented in static/drivers/KEYLOGGER_SPEC.md:
+--- Orchestrator for all on-disk persistence for the keylogger. Implements the
+--- storage model documented in static/drivers/KEYLOGGER_SPEC.md:
 ---
 ---     <config_dir>/metrics/by_device/<device_id>/device.json
 ---     <config_dir>/metrics/by_device/<device_id>/data.sql       (append-only SQL)
 ---     <config_dir>/metrics/by_device/<device_id>/today.log      (JSONL hot path)
 ---     <tmpdir>/ergopti_metrics/<device_id>/db.sqlite             (cache mirror)
 ---
---- The hot path (every keystroke) only touches `today.log`. A background
---- ingest timer drains the new JSONL lines into `data.sql` (the canonical
---- text source of truth) and the SQLite cache that serves the dashboard.
+--- The hot path (every keystroke) only touches `today.log` via the rotation
+--- submodule. A background ingest timer drains new JSONL lines into `data.sql`
+--- (canonical text source of truth) and the SQLite cache that serves the
+--- dashboard.
+---
+--- SUBMODULES:
+--- - sqlite_writer  — SQLite lifecycle, schema bootstrap, INSERT builders.
+--- - rotation       — today.log append, tail read, day rollover.
+--- - export         — App category lookup, device id, SQLite path/rev, foreign sync.
 ---
 --- FEATURES & RATIONALE:
 --- 1. Source of truth on disk is plain SQL text — Git-friendly out of the
@@ -29,13 +35,6 @@
 --- - lib.logger (project-wide logger).
 --- - hs.json, hs.sqlite3, hs.fs, hs.timer.
 --- - Canonical SQLite schema at static/drivers/_shared/schema/schema.sql.
----
---- SCOPE OF THIS REWRITE:
---- The full legacy aggregation pipeline (n-grams, bursts, sessions, ergonomic
---- streaks) is intentionally NOT yet ported. This iteration covers raw event
---- persistence + simple `agg_app_day` counters (chars / time_ms /
---- think_time_ms / app_time_ms / category). Subsequent sessions port the
---- richer aggregations on top of the same plumbing.
 --- ==============================================================================
 
 local M = {}
@@ -51,20 +50,21 @@ local Logger = require("lib.logger")
 local i18n   = require("lib.i18n")
 local LOG    = "keylogger.log_manager"
 
+local SqliteWriter = require("modules.keylogger.sqlite_writer")
+local Rotation     = require("modules.keylogger.rotation")
+local Export       = require("modules.keylogger.export")
 
 
 
--- ===============================
+
+-- ==============================
 --- ============================
 -- ======= 1/ Constants =======
 --- ============================
--- ===============================
+-- ==============================
 
 --- Background ingest tick period (KEYLOGGER_SPEC §4).
 local INGEST_TICK_SEC = 5
-
---- Maximum number of legacy-log lines processed in a single ingest cycle.
-local INGEST_BATCH_LINES = 5000
 
 --- Threshold separating "active typing" from "thinking pauses" — matches
 --- the historical THINK_PAUSE_THRESHOLD_MS (KEYLOGGER_SPEC §4).
@@ -129,34 +129,6 @@ local KC_TO_FINGER = {
 	[43]="l_mid",[44]="l_pinky",[45]="l_idx",[46]="l_idx",[47]="l_ring",
 }
 
---- macOS app category translations. Used by `M.get_native_app_category`
---- to populate `agg_app_day.category`. Kept minimal; the AHK port will
---- ship its own equivalent table for Windows process names.
-local MAC_CATEGORIES_FR = {
-	["Productivity"]      = i18n.get("app_category.productivity"),
-	["Social networking"] = i18n.get("app_category.social"),
-	["Games"]             = i18n.get("app_category.games"),
-	["Entertainment"]     = i18n.get("app_category.entertainment"),
-	["Utilities"]         = i18n.get("app_category.utility"),
-	["Education"]         = i18n.get("app_category.education"),
-	["Finance"]           = i18n.get("app_category.finance"),
-	["Business"]          = i18n.get("app_category.business"),
-	["Graphics design"]   = i18n.get("app_category.graphics_design"),
-	["Photography"]       = i18n.get("app_category.photography"),
-	["Video"]             = i18n.get("app_category.video"),
-	["Music"]             = i18n.get("app_category.music"),
-	["Medical"]           = i18n.get("app_category.medical"),
-	["Health fitness"]    = i18n.get("app_category.health"),
-	["Lifestyle"]         = i18n.get("app_category.lifestyle"),
-	["News"]              = i18n.get("app_category.news"),
-	["Weather"]           = i18n.get("app_category.weather"),
-	["Sports"]            = i18n.get("app_category.sports"),
-	["Travel"]            = i18n.get("app_category.travel"),
-	["Navigation"]        = i18n.get("app_category.navigation"),
-	["Reference"]         = i18n.get("app_category.reference"),
-	["Developer tools"]   = i18n.get("app_category.development"),
-}
-
 
 
 
@@ -176,20 +148,8 @@ local _device_obj = nil
 --- Resolved paths (filled by `_resolve_paths`).
 local _paths = {}
 
---- Open SQLite handle (created by `_open_db`).
-local _db = nil
-
 --- Background ingest timer.
 local _ingest_timer = nil
-
---- Per-device sequential id counter, persisted as `meta.next_event_id`.
-local _next_event_id = 1
-
---- Watermark of the today.log file consumed so far by the ingest tick.
---- Persisted as `meta.today_log_offset` so a crash mid-ingest does not
---- duplicate entries on the next boot.
-local _today_log_offset = 0
-local _today_log_date   = nil
 
 --- Whether `_uuid_v4` has seeded math.randomseed.
 local _uuid_seeded = false
@@ -280,16 +240,6 @@ local function _resolve_tmpdir()
 	return "/tmp/"
 end
 
---- Resolve the schema.sql path from the source-file location so it works
---- regardless of where metrics_dir points (config dir or repo dir).
---- This file lives at static/drivers/hammerspoon/modules/keylogger/,
---- so three levels up reaches static/drivers/ → _shared/schema/.
-local _SCHEMA_SQL_PATH = (function()
-	local src = debug.getinfo(1, "S").source:sub(2)
-	local dir = src:match("^(.*[/\\])")
-	return dir .. "../../../_shared/schema/schema.sql"
-end)()
-
 --- Compute every path the log manager touches once `device_id` is known.
 --- @param metrics_dir string The metrics root (CoreState.LOG_DIR).
 --- @param device_id   string The current device's UUID.
@@ -297,18 +247,17 @@ local function _resolve_paths(metrics_dir, device_id)
 	local md = metrics_dir
 	if not md:match("[/\\]$") then md = md .. "/" end
 
-	local by_dev = md .. "by_device/" .. device_id .. "/"
+	local by_dev  = md .. "by_device/" .. device_id .. "/"
 	local tmp_dir = _resolve_tmpdir() .. "ergopti_metrics/" .. device_id .. "/"
 
 	_paths = {
-		metrics_dir       = md,
-		by_device_dir     = by_dev,
-		device_json_path  = by_dev .. "device.json",
-		data_sql_path     = by_dev .. "data.sql",
-		today_log_path    = by_dev .. "today.log",
-		tmpdir_dir        = tmp_dir,
-		sqlite_path       = tmp_dir .. "db.sqlite",
-		schema_sql_path   = _SCHEMA_SQL_PATH,
+		metrics_dir      = md,
+		by_device_dir    = by_dev,
+		device_json_path = by_dev .. "device.json",
+		data_sql_path    = by_dev .. "data.sql",
+		today_log_path   = by_dev .. "today.log",
+		tmpdir_dir       = tmp_dir,
+		sqlite_path      = tmp_dir .. "db.sqlite",
 	}
 end
 
@@ -323,8 +272,8 @@ end
 
 --- Loads `device.json` for the current host. If the existing folder under
 --- by_device/ has a host_signature matching this machine, we reuse its
---- device_id; otherwise (fresh install or clone-from-other-device) we
---- generate a new UUID. KEYLOGGER_SPEC §16.1.
+--- device_id; otherwise (fresh install or clone) we generate a new UUID.
+--- KEYLOGGER_SPEC §16.1.
 --- @param metrics_dir string The metrics root.
 --- @return table The fully populated device object.
 local function _resolve_device(metrics_dir)
@@ -377,275 +326,9 @@ end
 
 
 
--- ===============================
--- ===============================
--- ======= 6/ SQLite Open =======
--- ===============================
--- ===============================
-
---- Read the canonical schema.sql.
-local function _read_schema_sql()
-	local fh, err = io.open(_paths.schema_sql_path, "r")
-	if not fh then
-		Logger.error(LOG, "Cannot open schema.sql at %s: %s.",
-			_paths.schema_sql_path, tostring(err))
-		return nil
-	end
-	local body = fh:read("*a"); fh:close()
-	return body
-end
-
---- Open db.sqlite in tmpdir, applying the schema when the file is fresh.
---- Restores the persisted offsets / counters.
---- @return boolean True on success, false on unrecoverable error.
-local function _open_db()
-	local existed = fs.attributes(_paths.sqlite_path) ~= nil
-	local db, err = sqlite3.open(_paths.sqlite_path)
-	if not db then
-		Logger.error(LOG, "Cannot open SQLite at %s: %s.",
-			_paths.sqlite_path, tostring(err))
-		return false
-	end
-
-	db:exec("PRAGMA journal_mode = DELETE;")
-	db:exec("PRAGMA synchronous = FULL;")
-	db:exec("PRAGMA encoding = \"UTF-8\";")
-
-	if not existed then
-		Logger.start(LOG, "Bootstrapping fresh db.sqlite at %s…", _paths.sqlite_path)
-		local schema = _read_schema_sql()
-		if not schema then
-			db:close()
-			return false
-		end
-		local rc = db:exec(schema)
-		if rc ~= sqlite3.OK then
-			Logger.error(LOG, "Schema apply failed: %s.", db:errmsg())
-			db:close()
-			return false
-		end
-		Logger.success(LOG, "Schema applied (version 1).")
-	end
-
-	_db = db
-
-	-- Keys we track ourselves (atop the schema-bootstrapped meta keys).
-	for _, kv in ipairs({
-		{ "next_event_id",     "1" },
-		{ "today_log_offset",  "0" },
-		{ "today_log_date",    "" },
-		{ "ngram_ctx_json",    "{}" },
-	}) do
-		_db:exec(string.format(
-			"INSERT OR IGNORE INTO meta (key, value) VALUES ('%s', '%s');",
-			kv[1], kv[2]))
-	end
-
-	-- Restore counters.
-	for r in _db:nrows("SELECT value FROM meta WHERE key='next_event_id'") do
-		_next_event_id = tonumber(r.value) or 1
-	end
-	for r in _db:nrows("SELECT value FROM meta WHERE key='today_log_offset'") do
-		_today_log_offset = tonumber(r.value) or 0
-	end
-	for r in _db:nrows("SELECT value FROM meta WHERE key='today_log_date'") do
-		_today_log_date = (type(r.value) == "string" and r.value ~= "") and r.value or nil
-	end
-	for r in _db:nrows("SELECT value FROM meta WHERE key='ngram_ctx_json'") do
-		local ok, decoded = pcall(json.decode, r.value or "{}")
-		if ok and type(decoded) == "table" then _ngram_ctx = decoded end
-	end
-
-	-- Make sure the device row is up to date (host signature might have
-	-- been updated, name renamed via UI, etc.).
-	local stmt = _db:prepare(
-		"INSERT OR REPLACE INTO devices "
-		.. "(device_id, name, os, os_version, host_signature, created_at, updated_at) "
-		.. "VALUES (?, ?, ?, ?, ?, ?, ?)")
-	if stmt then
-		stmt:bind_values(
-			_device_obj.device_id, _device_obj.name, _device_obj.os,
-			_device_obj.os_version or "", _device_obj.host_signature,
-			_device_obj.created_at, _now_ts())
-		stmt:step(); stmt:finalize()
-	end
-
-	return true
-end
-
-
-
-
--- =====================================
---- ===============================
--- ======= 7/ SQL Builders =======
---- ===============================
--- =====================================
-
---- Escape a Lua string for a SQL single-quoted literal. nil → SQL NULL.
-local function _sql_str(s)
-	if s == nil then return "NULL" end
-	if type(s) ~= "string" then s = tostring(s) end
-	return "'" .. s:gsub("'", "''") .. "'"
-end
-
---- Format a numeric / boolean for SQL.
-local function _sql_num(n)
-	if n == nil then return "NULL" end
-	if type(n) == "boolean" then return n and "1" or "0" end
-	return tostring(n)
-end
-
---- JSON-encode a Lua value compactly. nil → '{}'.
-local function _sql_json(v)
-	if v == nil then return "'{}'" end
-	local ok, encoded = pcall(json.encode, v)
-	if not ok then return "'{}'" end
-	return _sql_str(encoded)
-end
-
---- Allocate the next event id (per-device autoincrement).
-local function _alloc_event_id()
-	local id = _next_event_id
-	_next_event_id = _next_event_id + 1
-	return id
-end
-
-local _builders = {}
-
-function _builders.typing(e, id)
-	return string.format(
-		"INSERT OR IGNORE INTO events_typing (device_id, id, ts, date, app, title, url, field_role, layout, document_path, is_fullscreen, in_meeting, mouse_clicks, mouse_scrolls, mouse_distance_px, pause_before_ms, battery_level, audio_volume, wpm, text, rich_text, events_json) VALUES (%s, %d, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s);",
-		_sql_str(_device_id), id,
-		_sql_str(e.timestamp), _sql_str(e.timestamp:sub(1, 10)),
-		_sql_str(e.app or "Unknown"), _sql_str(e.title), _sql_str(e.url),
-		_sql_str(e.field_role), _sql_str(e.layout), _sql_str(e.document_path),
-		_sql_num(e.is_fullscreen), _sql_num(e.in_meeting),
-		_sql_num(e.mouse_clicks or 0), _sql_num(e.mouse_scrolls or 0),
-		_sql_num(e.mouse_distance_px or 0), _sql_num(e.pause_before_ms),
-		_sql_num(e.battery_level), _sql_num(e.audio_volume), _sql_num(e.wpm),
-		_sql_str(e.text or ""), _sql_str(e.rich_text), _sql_json(e.events))
-end
-
-function _builders.app_switch(e, id)
-	return string.format(
-		"INSERT OR IGNORE INTO events_app_switch (device_id, id, ts, date, prev_app, next_app, duration_ms) VALUES (%s, %d, %s, %s, %s, %s, %s);",
-		_sql_str(_device_id), id,
-		_sql_str(e.timestamp), _sql_str(e.timestamp:sub(1, 10)),
-		_sql_str(e.prev_app), _sql_str(e.next_app), _sql_num(e.duration_ms or 0))
-end
-
-function _builders.window_switch(e, id)
-	return string.format(
-		"INSERT OR IGNORE INTO events_window_switch (device_id, id, ts, date, app, prev_title, next_title, duration_ms) VALUES (%s, %d, %s, %s, %s, %s, %s, %s);",
-		_sql_str(_device_id), id,
-		_sql_str(e.timestamp), _sql_str(e.timestamp:sub(1, 10)),
-		_sql_str(e.app), _sql_str(e.prev_title), _sql_str(e.next_title),
-		_sql_num(e.duration_ms or 0))
-end
-
-function _builders.shortcut(e, id)
-	return string.format(
-		"INSERT OR IGNORE INTO events_shortcut (device_id, id, ts, date, app, key) VALUES (%s, %d, %s, %s, %s, %s);",
-		_sql_str(_device_id), id,
-		_sql_str(e.timestamp), _sql_str(e.timestamp:sub(1, 10)),
-		_sql_str(e.app), _sql_str(e.key))
-end
-
-function _builders.system(e, id)
-	local meta = {}
-	for k, v in pairs(e) do
-		if k ~= "type" and k ~= "timestamp" and k ~= "action" then
-			meta[k] = v
-		end
-	end
-	return string.format(
-		"INSERT OR IGNORE INTO events_system (device_id, id, ts, date, action, metadata_json) VALUES (%s, %d, %s, %s, %s, %s);",
-		_sql_str(_device_id), id,
-		_sql_str(e.timestamp), _sql_str(e.timestamp:sub(1, 10)),
-		_sql_str(e.action), _sql_json(meta))
-end
-
-function _builders.hotstring(e, id, kind)
-	return string.format(
-		"INSERT OR IGNORE INTO events_hotstring (device_id, id, ts, date, app, kind, trigger, replacement, h_type, net_saved_chars) VALUES (%s, %d, %s, %s, %s, %s, %s, %s, %s, %s);",
-		_sql_str(_device_id), id,
-		_sql_str(e.timestamp), _sql_str(e.timestamp:sub(1, 10)),
-		_sql_str(e.app or "Unknown"), _sql_str(kind),
-		_sql_str(e.trigger or ""), _sql_str(e.replacement or ""),
-		_sql_str(e.h_type), _sql_num(e.net_saved_chars))
-end
-
-function _builders.llm(e, id, kind)
-	return string.format(
-		"INSERT OR IGNORE INTO events_llm (device_id, id, ts, date, app, kind, context, predictions_json, prediction, all_predictions_json, chosen_index, deletes, deleted_text, net_saved_chars, count) VALUES (%s, %d, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s);",
-		_sql_str(_device_id), id,
-		_sql_str(e.timestamp), _sql_str(e.timestamp:sub(1, 10)),
-		_sql_str(e.app or "Unknown"), _sql_str(kind),
-		_sql_str(e.context),
-		(e.predictions and _sql_json(e.predictions) or "NULL"),
-		_sql_str(e.prediction),
-		(e.all_predictions and _sql_json(e.all_predictions) or "NULL"),
-		_sql_num(e.chosen_index), _sql_num(e.deletes),
-		_sql_str(e.deleted_text), _sql_num(e.net_saved_chars), _sql_num(e.count))
-end
-
-function _builders.session(e, id, kind)
-	return string.format(
-		"INSERT OR IGNORE INTO events_session (device_id, id, ts, date, kind, duration_ms) VALUES (%s, %d, %s, %s, %s, %s);",
-		_sql_str(_device_id), id,
-		_sql_str(e.timestamp), _sql_str(e.timestamp:sub(1, 10)),
-		_sql_str(kind), _sql_num(e.duration_ms))
-end
-
---- Translate a JSONL entry into 0+ INSERT statements (typed dispatch).
---- Returns the array of SQL strings (each ends with ';'). Unknown event
---- types are silently skipped — they will reappear next ingest if a
---- future schema knows how to handle them.
-local function _build_inserts(entry)
-	local t = entry.type
-	if t == "typing" then
-		return { _builders.typing(entry, _alloc_event_id()) }
-	elseif t == "app_switch" then
-		return { _builders.app_switch(entry, _alloc_event_id()) }
-	elseif t == "window_switch" then
-		return { _builders.window_switch(entry, _alloc_event_id()) }
-	elseif t == "shortcut" then
-		return { _builders.shortcut(entry, _alloc_event_id()) }
-	elseif t == "system_event" then
-		return { _builders.system(entry, _alloc_event_id()) }
-	elseif t == "hotstring" then
-		return { _builders.hotstring(entry, _alloc_event_id(), "fired") }
-	elseif t == "hotstring_suggested" then
-		return { _builders.hotstring(entry, _alloc_event_id(), "suggested") }
-	elseif t == "hotstring_dismissed" then
-		return { _builders.hotstring(entry, _alloc_event_id(), "dismissed") }
-	elseif t == "llm_generation" then
-		return { _builders.llm(entry, _alloc_event_id(), "generation") }
-	elseif t == "llm_suggested" then
-		return { _builders.llm(entry, _alloc_event_id(), "suggested") }
-	elseif t == "llm_dismissed" then
-		return { _builders.llm(entry, _alloc_event_id(), "dismissed") }
-	elseif t == "llm_accepted" then
-		return { _builders.llm(entry, _alloc_event_id(), "accepted") }
-	elseif t == "session_start" then
-		return { _builders.session(entry, _alloc_event_id(), "session_start") }
-	elseif t == "session_end" then
-		return { _builders.session(entry, _alloc_event_id(), "session_end") }
-	elseif t == "idle_start" then
-		return { _builders.session(entry, _alloc_event_id(), "idle_start") }
-	elseif t == "idle_end" then
-		return { _builders.session(entry, _alloc_event_id(), "idle_end") }
-	end
-	return {}
-end
-
-
-
-
 -- ============================================
 --- ====================================
--- ======= 8/ Aggregate Updates =======
+-- ======= 6/ Aggregate Updates =======
 --- ====================================
 -- ============================================
 
@@ -659,9 +342,8 @@ end
 --- `_ngram_ctx` (RAM, persisted to meta JSON on shutdown / day rollover).
 
 
-
 --- =================================
--- ===== 8.1) Aggregator state =====
+-- ===== 6.1) Aggregator state =====
 --- =================================
 
 --- Per-app n-gram + burst + session walking context. Persists across
@@ -669,25 +351,6 @@ end
 local _ngram_ctx = nil
 
 --- Per-tick batch of pending UPSERTs. Cleared after `_flush_agg_batches`.
---- Layout:
----   batch.app_day[date|app]                 = { chars=,pauses=,time_ms=, ... }
----   batch.ngram[table_name][date|app|tok]   = { c=,td=,cd=,e=,esrc={hs=,llm=,o=} }
----   batch.kc_ngram[date|app|kc]             = count
----   batch.sc_ngram[t][date|app|tok]         = count   (t=shortcut/sc_bg)
----   batch.kc_hold[date|app|kc]              = { sum,count,max,tap,hold }
----   batch.titles[date|app|title]            = { c,ms }
----   batch.hourly[date|app|hour]             = { c,e,em,es,e_buckets={} }
----   batch.hourly_min5[date|app|slot]        = { c,e,es,e_buckets={} }
----   batch.layouts[date|app|layout]          = count
----   batch.chars_class[date|app]             = { letter,digit,punct,space,other,first,last }
----   batch.errors[date|app]                  = { bs_total,cascade_count,cascade_max_len,recovery_sum_ms,recovery_count }
----   batch.ergo[date|app]                    = { same_finger_streak_max,same_hand_streak_max,auto_repeat_count }
----   batch.bursts[date|app]                  = { count_total,max_cpm,max_chars,length_buckets={},inter_count,inter_sum,inter_sumsq }
----   batch.sessions[date|app]                = { count_total,longest_ms,longest_chars,total_active_ms,durations={} }
----   batch.app_buckets[date|app|bucket_ms]   = { time_sum,credited,hs_in_t,hs_in_c,llm_in_t,llm_in_c }
----   batch.system_day[date]                  = { wifi_changes,space_switches,... }
----   batch.app_time[date|app]                = ms
----   batch.switches_to[date|from|to]         = count
 local _agg_batch = nil
 
 --- Reset / initialise the per-tick batch.
@@ -695,14 +358,14 @@ local function _reset_batch()
 	_agg_batch = {
 		app_day      = {},
 		ngram        = {
-			ngram_chars       = {},
-			ngram_bigrams     = {},
-			ngram_trigrams    = {},
-			ngram_quadgrams   = {},
-			ngram_pentagrams  = {},
-			ngram_hexagrams   = {},
-			ngram_heptagrams  = {},
-			ngram_words       = {},
+			ngram_chars        = {},
+			ngram_bigrams      = {},
+			ngram_trigrams     = {},
+			ngram_quadgrams    = {},
+			ngram_pentagrams   = {},
+			ngram_hexagrams    = {},
+			ngram_heptagrams   = {},
+			ngram_words        = {},
 			ngram_word_bigrams = {},
 		},
 		kc_ngram     = {},
@@ -727,7 +390,7 @@ end
 
 
 --- ========================
--- ===== 8.2) Helpers =====
+-- ===== 6.2) Helpers =====
 --- ========================
 
 --- Get-or-create a sub-table at `tbl[k]`, returning the populated default.
@@ -843,7 +506,7 @@ end
 
 
 --- ================================
--- ===== 8.3) Burst / Session =====
+-- ===== 6.3) Burst / Session =====
 --- ================================
 
 local function _finalize_burst(date_str, app, b)
@@ -887,7 +550,7 @@ end
 
 
 --- ==============================
--- ===== 8.4) Typing walker =====
+-- ===== 6.4) Typing walker =====
 --- ==============================
 
 --- Replays a typing entry's per-keystroke array and pushes every metric
@@ -1013,7 +676,6 @@ local function _walk_typing_entry(entry)
 						_bump_app_day(date_str, app, "hs_input_chars", 1)
 						if trigger_evt then
 							local bk_tsum = app_day_key
-							-- bucket aggregation by per-bucket key
 							for _, t in ipairs(UI_PAUSE_BUCKETS_MS) do
 								if trigger_evt.delay <= t then
 									local bkey = bk_tsum .. "\1" .. tostring(t)
@@ -1252,15 +914,13 @@ local function _walk_typing_entry(entry)
 	ctx.prev_word = prev_word
 	ctx.prev_sc   = prev_sc
 
-	-- agg_app_day category + the typing event also contributes to titles.ms
-	-- only if we had a clear duration — left for the app_switch path below.
-	_bump_app_day(date_str, app, "_category_seed", 0) -- ensure row exists for category UPSERT
+	_bump_app_day(date_str, app, "_category_seed", 0)
 end
 
 
 
 --- =============================================
--- ===== 8.5) Non-typing event aggregation =====
+-- ===== 6.5) Non-typing event aggregation =====
 --- =============================================
 
 --- agg_app_day.app_time_ms gets credited on app_switch.
@@ -1316,27 +976,24 @@ local function _walk_system_event(entry)
 	if action == "wifi_change" then s.wifi_changes = s.wifi_changes + 1
 	elseif action == "space_change" then s.space_switches = s.space_switches + 1
 	elseif action == "passive_period" then s.passive_count = s.passive_count + 1
-	elseif action == "lock" or action == "sleep" then
-		-- locked_ms / sleep_ms credited on the matching unlock/wake via duration_ms
 	elseif action == "unlock" then s.locked_ms = s.locked_ms + (entry.duration_ms or 0)
-	elseif action == "wake" then s.sleep_ms  = s.sleep_ms  + (entry.duration_ms or 0)
+	elseif action == "wake"   then s.sleep_ms  = s.sleep_ms  + (entry.duration_ms or 0)
 	end
 end
 
 
 
 --- ==================================
--- ===== 8.6) Batch flush to DB =====
+-- ===== 6.6) Batch flush to DB =====
 --- ==================================
 
---- One-shot UPSERT helper. `cols` is the column list, `pk_cols` lists the
---- PK columns, `add_cols` lists the columns added on conflict, `set_cols`
---- lists the ones simply replaced (max / coalesce semantics expressed via
---- the build-it-yourself update SQL).
+--- Execute a SQL statement against the open db; log on failure.
 local function _exec(sql)
-	local rc = _db:exec(sql)
+	local db = SqliteWriter.get_db()
+	if not db then return end
+	local rc = db:exec(sql)
 	if rc ~= sqlite3.OK then
-		Logger.error(LOG, "exec failed: %s — %s.", _db:errmsg() or "?", sql:sub(1, 200))
+		Logger.error(LOG, "exec failed: %s — %s.", db:errmsg() or "?", sql:sub(1, 200))
 	end
 end
 
@@ -1348,7 +1005,7 @@ local function _json_lit(tbl)
 	return "'" .. (s:gsub("'", "''")) .. "'"
 end
 
---- Sql escape.
+--- SQL single-quote escape.
 local function _sq(s)
 	return "'" .. tostring(s):gsub("'", "''") .. "'"
 end
@@ -1358,12 +1015,13 @@ local function _i(n)
 end
 
 local function _flush_agg_batches()
-	if not _db then return end
+	local db = SqliteWriter.get_db()
+	if not db then return end
 	local d = _sq(_device_id)
 
 	-- agg_app_day (counters + category).
 	for _, row in pairs(_agg_batch.app_day) do
-		local cat = M.get_native_app_category(row.app)
+		local cat = Export.get_native_app_category(row.app)
 		_exec(string.format(
 			"INSERT INTO agg_app_day (device_id, date, app, chars, pauses, time_ms, think_time_ms, hs_chars, llm_chars, hs_triggers, llm_triggers, hs_input_chars, llm_input_chars, category) "
 			.. "VALUES (%s,%s,%s,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%s) "
@@ -1389,7 +1047,7 @@ local function _flush_agg_batches()
 
 	-- agg_app_day app_time (separate UPSERT path).
 	for _, row in pairs(_agg_batch.app_time) do
-		local cat = M.get_native_app_category(row.app)
+		local cat = Export.get_native_app_category(row.app)
 		_exec(string.format(
 			"INSERT INTO agg_app_day (device_id, date, app, app_time_ms, category) VALUES (%s,%s,%s,%d,%s) "
 			.. "ON CONFLICT(device_id, date, app) DO UPDATE SET "
@@ -1418,7 +1076,6 @@ local function _flush_agg_batches()
 	-- N-grams (chars / bigrams / … / words / word_bigrams).
 	for tbl_name, tbl in pairs(_agg_batch.ngram) do
 		for key, item in pairs(tbl) do
-			-- key is "date\1app\1token"; split on \1
 			local s, e = key:find("\1")
 			local date_str = key:sub(1, s - 1)
 			local rest = key:sub(e + 1)
@@ -1629,80 +1286,23 @@ end
 
 
 
---- ========================================
--- ===== 8.7) Public dispatch helpers =====
---- ========================================
 
-local function _update_agg_typing(entry)
-	if not _db then return end
-	_walk_typing_entry(entry)
-end
+-- ==============================================================
+--- ==============================================================
+-- ======= 7/ Public log_* event entry points (delegates) =======
+--- ==============================================================
+-- ==============================================================
 
-local function _update_agg_app_time(entry)
-	if not _db then return end
-	_walk_app_switch(entry)
-end
-
-local function _update_agg_window_switch(entry)
-	if not _db then return end
-	_walk_window_switch(entry)
-end
-
-local function _update_agg_system_event(entry)
-	if not _db then return end
-	_walk_system_event(entry)
-end
-
-
-
-
--- =================================================
---- ==============================================
--- ======= 9/ today.log writer (hot path) =======
---- ==============================================
--- =================================================
-
---- Append a single event entry to today.log as a JSONL line. Hot path:
---- every keystroke ends up here. Never touches SQLite.
+--- Append a single event entry to today.log as a JSONL line.
+--- Delegates to Rotation.append_log (hot path — no SQLite).
 --- @param entry table The event entry. Must contain a `type` field.
 function M.append_log(entry)
-	if not _require_state("append_log") then return end
-	if type(entry) ~= "table" or type(entry.type) ~= "string" then
-		Logger.warn(LOG, "append_log: invalid entry — skipping.")
-		return
-	end
-	entry.timestamp = entry.timestamp or _now_ts()
-
-	local ok, str = pcall(json.encode, entry)
-	if not ok then
-		Logger.error(LOG, "JSON encode failed for type '%s': %s.",
-			tostring(entry.type), tostring(str))
-		return
-	end
-	str = str:gsub("\n", "")
-
-	local f, err = io.open(_paths.today_log_path, "a")
-	if not f then
-		Logger.error(LOG, "Cannot append to today.log at %s: %s.",
-			_paths.today_log_path, tostring(err))
-		return
-	end
-	f:write(str .. "\n"); f:close()
+	Rotation.append_log(entry)
 end
-
-
-
-
--- ===========================================
---- =========================================
--- ======= 10/ flush_buffer (typing) =======
---- =========================================
--- ===========================================
 
 --- Serialize the keystroke buffer accumulated in CoreState into a
 --- typing event and append it to today.log. Resets the per-flush
---- buffers afterwards. Mirrors the legacy behaviour at the entry-point
---- level so init.lua / shortcuts / etc. keep working unchanged.
+--- buffers afterwards.
 function M.flush_buffer()
 	if not _require_state("flush_buffer") then return end
 	if #_state.buffer_events == 0
@@ -1722,8 +1322,7 @@ function M.flush_buffer()
 	end
 	local wpm = total_time_ms > 0 and ((total_chars / 5) / (total_time_ms / 60000)) or 0
 
-	-- Build a rich-text representation (text + correction/autocomplete
-	-- markup) from rich_chunks. Same shape as the legacy implementation.
+	-- Build a rich-text representation from rich_chunks.
 	local rich_str, cur_type, cur_text = "", nil, ""
 	local function flush_chunk()
 		if not cur_type then return end
@@ -1778,23 +1377,9 @@ function M.flush_buffer()
 	_state.last_flush_time       = hs.timer.absoluteTime() / 1000000
 end
 
-
-
-
--- ============================================================
---- ===================================================
--- ======= 11/ Public log_* event entry points =======
---- ===================================================
--- ============================================================
-
 function M.log_app_switch(prev_app, next_app, duration_ms)
 	if not _require_state("log_app_switch") then return end
-	M.append_log({
-		type        = "app_switch",
-		prev_app    = prev_app,
-		next_app    = next_app,
-		duration_ms = duration_ms,
-	})
+	M.append_log({ type = "app_switch", prev_app = prev_app, next_app = next_app, duration_ms = duration_ms })
 end
 
 function M.log_system_event(event_type, metadata)
@@ -1810,339 +1395,115 @@ function M.log_shortcut(shortcut_key, app_name)
 	if not _require_state("log_shortcut") then return end
 	if type(shortcut_key) ~= "string" or shortcut_key == "" then return end
 	M.append_log({
-		type = "shortcut",
-		key  = shortcut_key,
+		type = "shortcut", key = shortcut_key,
 		app  = (type(app_name) == "string" and app_name ~= "") and app_name or "Unknown",
 	})
 end
 
 function M.log_modifier_press(keycode, app_name)
 	if not _require_state("log_modifier_press") then return end
-	M.append_log({
-		type    = "system_event",
-		action  = "modifier_press",
-		keycode = keycode,
-		app     = app_name,
-	})
+	M.append_log({ type = "system_event", action = "modifier_press", keycode = keycode, app = app_name })
 end
 
 function M.log_modifier_hold(keycode, app_name, hold_ms)
 	if not _require_state("log_modifier_hold") then return end
-	M.append_log({
-		type     = "system_event",
-		action   = "modifier_hold",
-		keycode  = keycode,
-		app      = app_name,
-		hold_ms  = hold_ms,
-	})
+	M.append_log({ type = "system_event", action = "modifier_hold", keycode = keycode, app = app_name, hold_ms = hold_ms })
 end
 
 function M.log_karabiner_press(keycode, app_name)
 	if not _require_state("log_karabiner_press") then return end
-	M.append_log({
-		type    = "system_event",
-		action  = "karabiner_press",
-		keycode = keycode,
-		app     = app_name,
-	})
+	M.append_log({ type = "system_event", action = "karabiner_press", keycode = keycode, app = app_name })
 end
 
 function M.log_karabiner_release(keycode, app_name, hold_ms)
 	if not _require_state("log_karabiner_release") then return end
-	M.append_log({
-		type    = "system_event",
-		action  = "karabiner_release",
-		keycode = keycode,
-		app     = app_name,
-		hold_ms = hold_ms,
-	})
+	M.append_log({ type = "system_event", action = "karabiner_release", keycode = keycode, app = app_name, hold_ms = hold_ms })
 end
 
 function M.log_passive_period(kind, duration_ms)
 	if not _require_state("log_passive_period") then return end
-	M.append_log({
-		type        = "system_event",
-		action      = "passive_period",
-		kind        = kind,
-		duration_ms = duration_ms,
-	})
+	M.append_log({ type = "system_event", action = "passive_period", kind = kind, duration_ms = duration_ms })
 end
 
 function M.tag_awake_focus(app_name, duration_ms)
 	if not _require_state("tag_awake_focus") then return end
-	M.append_log({
-		type        = "system_event",
-		action      = "awake_focus",
-		app         = app_name,
-		duration_ms = duration_ms,
-	})
+	M.append_log({ type = "system_event", action = "awake_focus", app = app_name, duration_ms = duration_ms })
 end
 
 function M.log_focus_first_key(app_name, latency_ms)
 	if not _require_state("log_focus_first_key") then return end
-	M.append_log({
-		type       = "system_event",
-		action     = "focus_first_key",
-		app        = app_name,
-		latency_ms = latency_ms,
-	})
+	M.append_log({ type = "system_event", action = "focus_first_key", app = app_name, latency_ms = latency_ms })
 end
 
---- Legacy entry point preserved so init.lua's `LogManager.increment_manifest_stat`
---- calls remain valid. The new format aggregates from the `events_*` tables
---- via SQLite; we just emit a logical record so the data is captured.
 function M.increment_manifest_stat(app_name, stat_key, amount)
 	if not _require_state("increment_manifest_stat") then return end
-	M.append_log({
-		type   = "system_event",
-		action = "manifest_increment",
-		app    = app_name,
-		stat   = stat_key,
-		amount = tonumber(amount) or 1,
-	})
+	M.append_log({ type = "system_event", action = "manifest_increment", app = app_name, stat = stat_key, amount = tonumber(amount) or 1 })
 end
 
 
 
 
--- ============================================
---- =========================================
--- ======= 12/ Miscellaneous Helpers =======
---- =========================================
--- ============================================
+-- =============================================================
+--- ============================================================
+-- ======= 8/ Export delegate accessors (thin wrappers) =======
+--- ============================================================
+-- =============================================================
 
---- Return the human-readable category for an app, looked up via macOS
---- LSApplicationCategoryType. Falls back to "Général" when the app is
---- not running or not categorized.
+--- Delegates to Export.get_native_app_category.
 function M.get_native_app_category(app_name)
-	if type(app_name) ~= "string" or app_name == "" then return i18n.get("metrics_apps.general_category") end
-	local app = hs.application.get(app_name)
-	if app then
-		local app_path = app:path()
-		if type(app_path) ~= "string" then return i18n.get("metrics_apps.general_category") end
-		local info = hs.application.infoForBundlePath(app_path)
-		if info and info.LSApplicationCategoryType then
-			local raw = info.LSApplicationCategoryType:gsub("public%.app%-category%.", "")
-			raw = raw:gsub("%-", " ")
-			local cap = raw:sub(1, 1):upper() .. raw:sub(2)
-			return MAC_CATEGORIES_FR[cap] or cap
-		end
-	end
-	return i18n.get("metrics_apps.general_category")
+	return Export.get_native_app_category(app_name)
 end
 
---- Returns a stable identifier for the current device, kept here so menu
---- modules can derive display names without reading device.json directly.
---- @return string The 8-char prefix of the device UUID, plus an ellipsis.
+--- Delegates to Export.get_device_short_id.
 function M.get_device_short_id()
-	if not _device_id then return "" end
-	return _device_id:sub(1, 8) .. "…"
+	return Export.get_device_short_id()
 end
 
--- ====================================================
---- =========================================
--- ======= 12.5/ Foreign device sync =======
---- =========================================
--- ====================================================
-
---- Scan `metrics/by_device/*` and apply any data.sql bytes that the local
---- db.sqlite has not yet ingested. Without this, the cross-device SUM in
---- sqlite_reader sees only the local device's events. KEYLOGGER_SPEC §16.
----
---- For each foreign device folder we:
----  1. Read `devices.imported_data_sql_size` (watermark of bytes already
----     applied locally; defaults to 0 on first sight).
----  2. Read everything from the foreign data.sql past that watermark.
----  3. Apply it inside a transaction. Statements are INSERT OR IGNORE so
----     re-applying is harmless if the watermark was clobbered.
----  4. Bump the watermark + ensure a `devices` row exists for the source.
---- Runs from the ingest tick (cheap when no foreign growth has happened
---- since last call) so OneDrive / Git / iCloud syncs surface in seconds.
-local function _sync_foreign_data_sql()
-	if not _db then return end
-	local md = _paths.metrics_dir
-	if not md or not fs.attributes(md) then return end
-	local by_root = md .. "by_device/"
-	if not fs.attributes(by_root) then return end
-
-	for entry in fs.dir(by_root) do
-		if entry ~= "." and entry ~= ".." and entry ~= _device_id then
-			local folder      = by_root .. entry .. "/"
-			local djpath      = folder .. "device.json"
-			local data_sql    = folder .. "data.sql"
-			local djattrs     = fs.attributes(djpath)
-			local sql_attrs   = fs.attributes(data_sql)
-			if djattrs and sql_attrs then
-				-- Load (or refresh) the foreign device row first so the
-				-- imported_data_sql_size column has somewhere to live.
-				local fh = io.open(djpath, "r")
-				if fh then
-					local raw = fh:read("*a"); fh:close()
-					local ok, obj = pcall(json.decode, raw)
-					if ok and type(obj) == "table"
-						and type(obj.device_id) == "string"
-						and obj.device_id == entry then
-						local stmt = _db:prepare(
-							"INSERT OR IGNORE INTO devices "
-							.. "(device_id, name, os, os_version, host_signature, created_at, updated_at) "
-							.. "VALUES (?, ?, ?, ?, ?, ?, ?)")
-						if stmt then
-							stmt:bind_values(obj.device_id, obj.name or "?",
-								obj.os or "?", obj.os_version or "",
-								obj.host_signature or "", obj.created_at or _now_ts(),
-								_now_ts())
-							stmt:step(); stmt:finalize()
-						end
-					end
-				end
-
-				-- Look up the watermark for this foreign device.
-				local watermark = 0
-				for r in _db:nrows(string.format(
-					"SELECT imported_data_sql_size FROM devices WHERE device_id='%s'",
-					entry:gsub("'", "''"))) do
-					watermark = tonumber(r.imported_data_sql_size) or 0
-				end
-
-				local sz = sql_attrs.size or 0
-				if sz > watermark then
-					local rfh = io.open(data_sql, "r")
-					if rfh then
-						rfh:seek("set", watermark)
-						local chunk = rfh:read("*a")
-						rfh:close()
-						if chunk and #chunk > 0 then
-							-- Wrap in a single transaction: every BEGIN/COMMIT
-							-- already inside `chunk` becomes a savepoint nested
-							-- inside ours, but sqlite is permissive — if it
-							-- chokes on nested BEGIN we rely on the inner
-							-- transactions. Easiest: just exec as-is.
-							local ok2, err = pcall(function()
-								local rc = _db:exec(chunk)
-								if rc ~= sqlite3.OK then
-									error("foreign exec failed: " .. (_db:errmsg() or "?"))
-								end
-							end)
-							if ok2 then
-								_db:exec(string.format(
-									"UPDATE devices SET imported_data_sql_size=%d, updated_at='%s' WHERE device_id='%s'",
-									sz, _now_ts():gsub("'", "''"), entry:gsub("'", "''")))
-								Logger.debug(LOG, "Foreign sync: applied %d byte(s) from device %s.",
-									sz - watermark, entry:sub(1, 8))
-							else
-								Logger.warn(LOG, "Foreign sync rolled back for %s: %s.",
-									entry:sub(1, 8), tostring(err))
-							end
-						end
-					end
-				end
-			end
-		end
-	end
-end
-
-
-
-
---- Absolute path to the SQLite cache. The UI bridges read it via the
---- `sqlite_reader` module — they never touch the legacy openssl pipeline.
---- @return string|nil Path, or nil if the log manager is not initialized.
+--- Delegates to Export.get_sqlite_path.
 function M.get_sqlite_path()
-	if not _paths or not _paths.sqlite_path then return nil end
-	return _paths.sqlite_path
+	return Export.get_sqlite_path()
 end
 
---- Snapshot of the current `meta.rev` value. The UI uses this as a cache
---- key — when rev advances, cached query results are invalidated.
---- @return integer Monotonic revision counter (0 if DB not open).
+--- Delegates to Export.get_db_rev.
 function M.get_db_rev()
-	if not _db then return 0 end
-	for r in _db:nrows("SELECT value FROM meta WHERE key='rev'") do
-		return tonumber(r.value) or 0
-	end
-	return 0
+	return Export.get_db_rev()
 end
 
 
 
 
--- ===============================
---- ===============================
--- ======= 13/ Ingest Tick =======
---- ===============================
--- ===============================
-
---- Read newly appended bytes of today.log past `_today_log_offset` and
---- return them as a list of { entry, raw } items, plus the post-read
---- offset. Stops after `INGEST_BATCH_LINES` entries to keep each tick
---- short.
-local function _read_new_today_log()
-	-- Day rollover: the offset from yesterday is meaningless; the legacy
-	-- file is renamed (or deleted) at midnight by the caller of M.day_rollover.
-	local today = _today()
-	if _today_log_date and _today_log_date ~= today then
-		Logger.info(LOG, "Day rollover detected (%s -> %s); resetting tail offset.",
-			_today_log_date, today)
-		_today_log_date = today
-		_today_log_offset = 0
-	end
-	if not _today_log_date then _today_log_date = today end
-
-	local attrs = fs.attributes(_paths.today_log_path)
-	if not attrs then return {} end
-	local size = attrs.size or 0
-	if size <= _today_log_offset then return {} end
-
-	local fh, err = io.open(_paths.today_log_path, "r")
-	if not fh then
-		Logger.warn(LOG, "Cannot open today.log %s: %s.",
-			_paths.today_log_path, tostring(err))
-		return {}
-	end
-	fh:seek("set", _today_log_offset)
-	local out, lines = {}, 0
-	while lines < INGEST_BATCH_LINES do
-		local line = fh:read("*l")
-		if not line then break end
-		local ok, entry = pcall(json.decode, line)
-		if ok and type(entry) == "table" and type(entry.type) == "string" then
-			table.insert(out, { entry = entry, raw = line })
-		end
-		lines = lines + 1
-	end
-	local new_offset = fh:seek("cur")
-	fh:close()
-	return out, new_offset
-end
+-- ========================================
+--- ===========================================
+-- ======= 9/ Ingest Tick Orchestrator =======
+--- ===========================================
+-- ========================================
 
 --- Run one ingest cycle: pull new today.log entries, append the SQL
 --- batch to data.sql, apply it to db.sqlite, update aggregate tables.
 function M.ingest_once()
-	if not _db then return end
-	-- Cheap-when-idle foreign sync first so cross-device aggregation stays
-	-- fresh. Pre-existing data.sql files unchanged since the last call cost
-	-- a single fs.attributes() check each.
-	pcall(_sync_foreign_data_sql)
-	local entries, new_offset = _read_new_today_log()
+	local db = SqliteWriter.get_db()
+	if not db then return end
+
+	-- Foreign sync first so cross-device aggregation stays fresh.
+	pcall(Export.sync_foreign_data_sql)
+
+	local entries, new_offset = Rotation.read_new_entries()
 	if #entries == 0 then return end
 
-	-- Build the SQL once, then write to data.sql AND apply to sqlite.
-	-- Builders allocate event ids as a side-effect; we capture the
-	-- result so both sinks see identical statements.
 	local statements = {}
 	for _, item in ipairs(entries) do
-		for _, sql in ipairs(_build_inserts(item.entry)) do
+		for _, sql in ipairs(SqliteWriter.build_inserts(item.entry)) do
 			table.insert(statements, sql)
 		end
 	end
 	if #statements == 0 then
-		_today_log_offset = new_offset
+		Rotation.set_offset(new_offset, Rotation.get_date())
 		return
 	end
 
 	local batch_text = string.format(
 		"\n-- === ingest batch %s (offset %d -> %d, %d entry(ies)) ===\nBEGIN TRANSACTION;\n%s\nCOMMIT;\n",
-		_now_ts(), _today_log_offset, new_offset, #entries,
+		_now_ts(), Rotation.get_offset(), new_offset, #entries,
 		table.concat(statements, "\n"))
 
 	local f, err = io.open(_paths.data_sql_path, "a")
@@ -2154,93 +1515,81 @@ function M.ingest_once()
 	f:write(batch_text); f:close()
 
 	local ok, exec_err = pcall(function()
-		_db:exec("BEGIN TRANSACTION;")
+		db:exec("BEGIN TRANSACTION;")
 		for _, sql in ipairs(statements) do
-			local rc = _db:exec(sql)
+			local rc = db:exec(sql)
 			if rc ~= sqlite3.OK then
-				error("exec failed: " .. (_db:errmsg() or "?"))
+				error("exec failed: " .. (db:errmsg() or "?"))
 			end
 		end
 		if not _agg_batch then _reset_batch() end
 		for _, item in ipairs(entries) do
 			local et = item.entry.type
 			if et == "typing" then
-				_update_agg_typing(item.entry)
+				_walk_typing_entry(item.entry)
 			elseif et == "app_switch" then
-				_update_agg_app_time(item.entry)
+				_walk_app_switch(item.entry)
 			elseif et == "window_switch" then
-				_update_agg_window_switch(item.entry)
+				_walk_window_switch(item.entry)
 			elseif et == "system_event" then
-				_update_agg_system_event(item.entry)
+				_walk_system_event(item.entry)
 			end
 		end
 		_flush_agg_batches()
-		_db:exec(string.format(
+		db:exec(string.format(
 			"UPDATE meta SET value='%d' WHERE key='today_log_offset';", new_offset))
-		_db:exec(string.format(
-			"UPDATE meta SET value='%s' WHERE key='today_log_date';", _today_log_date or ""))
-		_db:exec(string.format(
-			"UPDATE meta SET value='%d' WHERE key='next_event_id';", _next_event_id))
-		_db:exec("UPDATE meta SET value=CAST(CAST(value AS INTEGER)+1 AS TEXT) WHERE key='rev';")
-		-- Persist the n-gram walking context so a crash mid-tick does not
-		-- lose the partial cur_word / p1..p6 / current_burst / streak state.
+		db:exec(string.format(
+			"UPDATE meta SET value='%s' WHERE key='today_log_date';", Rotation.get_date() or ""))
+		SqliteWriter.persist_next_event_id()
+		db:exec("UPDATE meta SET value=CAST(CAST(value AS INTEGER)+1 AS TEXT) WHERE key='rev';")
+		-- Persist the n-gram walking context so a crash mid-tick does not lose
+		-- the partial cur_word / p1..p6 / current_burst / streak state.
 		local ok_enc, enc = pcall(json.encode, _ngram_ctx or {})
 		if ok_enc then
-			_db:exec(string.format(
+			db:exec(string.format(
 				"UPDATE meta SET value=%s WHERE key='ngram_ctx_json';",
 				_sq(enc)))
 		end
-		_db:exec("COMMIT;")
+		db:exec("COMMIT;")
 	end)
 	if not ok then
 		Logger.error(LOG, "Ingest batch rolled back: %s.", tostring(exec_err))
-		pcall(function() _db:exec("ROLLBACK;") end)
+		pcall(function() db:exec("ROLLBACK;") end)
 		return
 	end
 
-	_today_log_offset = new_offset
-	Logger.debug(LOG, "Ingest cycle: %d entry(ies), offset now %d.",
-		#entries, new_offset)
+	Rotation.set_offset(new_offset, Rotation.get_date())
+	Logger.debug(LOG, "Ingest cycle: %d entry(ies), offset now %d.", #entries, new_offset)
 end
 
---- Day rollover handler. Drains the remaining today.log into the new format,
---- then deletes today.log so it starts fresh tomorrow.
+--- Day rollover handler. Drains remaining today.log, then delegates to
+--- Rotation.rollover to reset the file and offset.
 function M.day_rollover()
 	if not _require_state("day_rollover") then return end
 	pcall(M.ingest_once)
-	-- Append a marker comment to data.sql so the file's history reads
-	-- well day-by-day.
-	local f = io.open(_paths.data_sql_path, "a")
-	if f then
-		f:write(string.format("\n-- === day rollover %s -> %s ===\n",
-			_today_log_date or "", _today()))
-		f:close()
-	end
-	pcall(os.remove, _paths.today_log_path)
-	_today_log_offset = 0
-	_today_log_date   = _today()
-	-- A new day starts every n-gram context fresh: yesterday's partial
-	-- word / streak / burst is meaningless at midnight.
+	Rotation.rollover(_paths.data_sql_path)
+	-- A new day starts every n-gram context fresh.
 	_ngram_ctx = {}
-	if _db then
-		_db:exec("UPDATE meta SET value='0' WHERE key='today_log_offset';")
-		_db:exec(string.format(
-			"UPDATE meta SET value='%s' WHERE key='today_log_date';", _today_log_date))
-		_db:exec("UPDATE meta SET value='{}' WHERE key='ngram_ctx_json';")
+	local db = SqliteWriter.get_db()
+	if db then
+		db:exec("UPDATE meta SET value='0' WHERE key='today_log_offset';")
+		db:exec(string.format(
+			"UPDATE meta SET value='%s' WHERE key='today_log_date';", Rotation.get_date() or ""))
+		db:exec("UPDATE meta SET value='{}' WHERE key='ngram_ctx_json';")
 	end
 end
 
 
 
 
--- ====================================
+-- ===============================
 --- =============================
--- ======= 14/ Lifecycle =======
+-- ======= 10/ Lifecycle =======
 --- =============================
--- ====================================
+-- ===============================
 
 --- Initialize the log manager. Resolves the device, opens the SQLite cache,
---- creates filesystem layout. Idempotent; calling twice is a warning.
+--- creates the filesystem layout. Idempotent; calling twice is a warning.
 --- @param core_state table The shared CoreState from modules/keylogger/init.lua.
 function M.init(core_state)
 	if _state then
@@ -2271,10 +1620,36 @@ function M.init(core_state)
 	-- Initialise per-tick batch dicts.
 	_reset_batch()
 
-	-- Open or create the SQLite cache.
-	if not _open_db() then
+	-- Initialise submodules.
+	SqliteWriter.init({ paths = _paths, device_obj = _device_obj, device_id = _device_id })
+	if not SqliteWriter.open_db() then
 		Logger.error(LOG, "Cannot open db.sqlite — log manager will only write JSONL.")
+	else
+		-- Restore the n-gram context from the persisted meta JSON.
+		local db = SqliteWriter.get_db()
+		if db then
+			for r in db:nrows("SELECT value FROM meta WHERE key='today_log_offset'") do
+				local offset_val = tonumber(r.value) or 0
+				for r2 in db:nrows("SELECT value FROM meta WHERE key='today_log_date'") do
+					local date_val = (type(r2.value) == "string" and r2.value ~= "") and r2.value or nil
+					Rotation.init({ paths = _paths, state = _state, today_log_offset = offset_val, today_log_date = date_val })
+					break
+				end
+				break
+			end
+			for r in db:nrows("SELECT value FROM meta WHERE key='ngram_ctx_json'") do
+				local ok, decoded = pcall(json.decode, r.value or "{}")
+				if ok and type(decoded) == "table" then _ngram_ctx = decoded end
+			end
+		end
 	end
+
+	-- Init rotation with defaults if the DB path above didn't fire.
+	if not Rotation.get_offset or Rotation.get_offset() == nil then
+		Rotation.init({ paths = _paths, state = _state })
+	end
+
+	Export.init({ paths = _paths, device_id = _device_id, get_db = SqliteWriter.get_db })
 
 	-- Bootstrap data.sql header on first run.
 	if not fs.attributes(_paths.data_sql_path) then
@@ -2293,10 +1668,6 @@ function M.init(core_state)
 		end
 	end
 
-	-- Mirror the keylogger CoreState fields the LLM bridge reads from.
-	-- The richer aggregation pipeline (n-grams etc.) is deferred — the
-	-- LLM falls back to its remote prediction path when the local
-	-- bigram cache is empty.
 	_state.today_idx = _state.today_idx or {}
 	_state.manifest  = _state.manifest  or {}
 
@@ -2317,11 +1688,8 @@ end
 function M.stop()
 	if _ingest_timer then _ingest_timer:stop(); _ingest_timer = nil end
 	pcall(M.ingest_once)
-	if _db then
-		pcall(function() _db:close() end)
-		_db = nil
-	end
-	Logger.debug(LOG, "Log manager stopped.")
+	SqliteWriter.close_db()
+	Logger.debug(LOG, "Log manager stopped")
 end
 
 
@@ -2329,28 +1697,20 @@ end
 
 -- ============================================================
 --- ============================================================
--- ======= 15/ Compatibility shims for the in-flight UI =======
+-- ======= 11/ Compatibility shims for the in-flight UI =======
 --- ============================================================
 -- ============================================================
 
---- The legacy UI references several helpers that have no equivalent in
---- the new model (encryption, raw-log replay, manifest snapshots). They
---- are stubbed here to no-ops so loading the UI does not crash; the
---- next session will rebuild the dashboards on top of SQLite directly.
+--- Legacy compatibility stubs — no-ops for callers that pre-date the
+--- new SQLite pipeline. Kept callable to prevent crashes in the UI.
 
-function M.aggregate_events(_events, _app_name, _date_str)
-	-- Real aggregation now lives in `_update_agg_*` and runs from the
-	-- ingest tick. Kept as a callable for backward compatibility.
-	return
-end
-
+function M.aggregate_events(_events, _app_name, _date_str) return end
 function M.save_today_index() end
 function M.save_manifest() end
 function M.merge_day_to_db(_date_str, _idx, _manifest) end
 function M.merge_day_to_db_async(_date_str, _idx, _manifest, on_done)
 	if type(on_done) == "function" then pcall(on_done, true) end
 end
-
 function M.rebuild_today_from_raw_log() return false end
 function M.rebuild_today_from_raw_log_async(on_done)
 	if type(on_done) == "function" then pcall(on_done, false) end
@@ -2359,14 +1719,7 @@ function M.rebuild_index_if_needed() end
 function M.rebuild_index_if_needed_async(on_done)
 	if type(on_done) == "function" then pcall(on_done, false) end
 end
-
-function M.get_mac_serial()
-	-- Old encryption helper. The new model has no encryption — return an
-	-- empty string so callers that do `:gsub(...)` on the result do not
-	-- crash. Encryption will be revisited if the UI needs cross-device
-	-- privacy guarantees in a later iteration.
-	return ""
-end
+function M.get_mac_serial() return "" end
 function M.process_files_async(_files, _is_encrypt, _password, _on_progress, on_complete)
 	if type(on_complete) == "function" then pcall(on_complete, false) end
 end

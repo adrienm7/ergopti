@@ -25,14 +25,17 @@ local M = {}
 
 local hs = hs
 
-local core_llm  = require("modules.llm")
-local Parser    = require("modules.llm.parser")
-local Logger    = require("lib.logger")
-local i18n      = require("lib.i18n")
-local Keycodes  = require("lib.keycodes")
-local tooltip   = require("ui.tooltip")
-local keylogger = require("modules.keylogger")
-local km_utils  = require("modules.keymap.utils")
+local core_llm         = require("modules.llm")
+local Parser           = require("modules.llm.parser")
+local WarmupController = require("modules.llm.warmup_controller")
+local PromptBuilder    = require("modules.llm.prompt_builder")
+local StreamingHandler = require("modules.llm.streaming_handler")
+local Logger           = require("lib.logger")
+local i18n             = require("lib.i18n")
+local Keycodes         = require("lib.keycodes")
+local tooltip          = require("ui.tooltip")
+local keylogger        = require("modules.keylogger")
+local km_utils         = require("modules.keymap.utils")
 
 local LOG    = "llm.prediction_engine"
 local _state = nil  -- Shared keymap core state; injected via M.init()
@@ -40,9 +43,10 @@ local _state = nil  -- Shared keymap core state; injected via M.init()
 
 
 
+
 -- ===================================
 --- ===================================
--- ======= 1/ Module Constants =======
+--- ======= 1/ Module Constants =======
 --- ===================================
 -- ===================================
 
@@ -54,30 +58,9 @@ local _state = nil  -- Shared keymap core state; injected via M.init()
 -- detect it without duplicating the constant.
 local KEYCODE_LLM_CHAIN = Keycodes.F16_LLM_CHAIN_SIGNAL
 
--- ── LLM request parameters ────────────────────────────────────────────────────
--- Token budget formula: max_tokens = max(MIN_MAX_TOKENS, effective_max_words * RATIO + OVERHEAD)
-
-local CONTEXT_TAIL_WORDS    = 5    -- Words from buffer tail forwarded as rolling LLM context
-local DEFAULT_MAX_TOKENS    = 150  -- Token budget when max_words is uncapped (= 0)
-local MIN_MAX_TOKENS        = 15   -- Hard floor on the token budget regardless of word settings
-local WORDS_TO_TOKENS_RATIO = 6    -- Conservative words→tokens multiplier for budget estimation
-local TOKEN_BUDGET_OVERHEAD = 10   -- Fixed overhead appended to the computed token budget
-
 -- ── Diversity / temperature ───────────────────────────────────────────────────
 
-local TEMP_DIVERSITY_CAP      = 1.0  -- Upper bound when auto_raise_temperature is active
-local TEMP_INCREMENT_PER_PRED = 0.1  -- Temperature step per extra prediction requested (+0.1 each)
--- Greedy threshold: if num_predictions == 1 and temperature is at or below this value,
--- force temperature → 0 (pure greedy). Avoids sampling noise with no diversity benefit.
-local GREEDY_TEMP_THRESHOLD   = 0.15
-
 -- ── Context truncation ───────────────────────────────────────────────────────
-
--- Dynamic context cap: limit the context forwarded to the LLM proportionally to the
--- max prediction length. Short predictions don't need 500 chars of history; reducing
--- the context shrinks the prefill token count and cuts TTFT proportionally.
-local CONTEXT_CHARS_PER_WORD = 40   -- Chars of context allocated per predicted output word
-local CONTEXT_MIN_CHARS      = 100  -- Hard floor: always keep at least this many chars
 
 -- ── UI / display parameters ───────────────────────────────────────────────────
 
@@ -104,14 +87,7 @@ local NGRAM_MAX_PREDS = 3  -- Maximum instant candidates to show before LLM resp
 
 -- ── Timing constants ──────────────────────────────────────────────────────────
 
-local STREAM_WATCHDOG_SEC = 12.0  -- Surface partial results after this many seconds of stream stall
 local CHAIN_FALLBACK_SEC  = 0.5   -- Fire chain LLM if the F16 signal is somehow missed
-
--- ── Failure detection ─────────────────────────────────────────────────────────
--- Track consecutive on_fail callbacks to surface a notification when failures are
--- persistent — e.g. the MLX server crashed or is still loading weights.
-
-local CONSECUTIVE_FAIL_WARN_THRESHOLD = 4  -- Notify after this many consecutive failures without a success
 
 -- ── URL-bar / app exclusion ───────────────────────────────────────────────────
 
@@ -143,9 +119,10 @@ local LLM_DEFAULTS = core_llm.DEFAULT_STATE
 
 
 
+
 -- ================================
 --- ================================
--- ======= 2/ Mutable State =======
+--- ======= 2/ Mutable State =======
 --- ================================
 -- ================================
 
@@ -172,11 +149,6 @@ local last_buffer_signature = nil
 -- debounce to detect ongoing corrections (shrinking buffer = user still deleting)
 local _last_request_buffer_len = 0
 
--- Consecutive on_fail callbacks without an intervening on_success.
--- Reset on every successful response; triggers a user notification when it reaches
--- CONSECUTIVE_FAIL_WARN_THRESHOLD (persistent failures → server issue or misconfiguration).
-local _consecutive_llm_failures = 0
-
 -- ── Timers ────────────────────────────────────────────────────────────────────
 
 -- Fires perform_check() after inactivity_debounce_sec of silence
@@ -185,38 +157,14 @@ local _inactivity_timer = nil
 -- Fallback: fires perform_check() if the F16 chain signal is somehow missed
 local _chain_trigger_timer = nil
 
--- Surfaces partial streaming results if the LLM stream stalls
-local _stream_watchdog_timer = nil
-
 -- True between an accepted prediction and the F16 chain trigger that follows it
 local chain_pending = false
-
--- ── Streaming timing instrumentation ─────────────────────────────────────────
--- Captures the round-trip latency at two granularities so the tooltip can
--- expose both per-prediction and chain-wide timing without ever blocking the
--- main loop:
---   * _request_sent_at_s     — set in perform_check() right before the backend
---                              call dispatches; used as the TTFT origin.
---   * _first_token_at_s      — set the first time on_partial_cb fires for the
---                              current request; nil while waiting on the model.
---   * _chain_first_request_at_s — first backend dispatch of the active chain
---                              of n predictions. Persists across chained
---                              perform_check() calls until M.reset_predictions
---                              clears the chain (i.e. the user typed something
---                              the chain could not absorb, or all variants
---                              were exhausted).
---   * _chain_last_token_at_s — refreshed on every accepted token so it always
---                              points at the most recent activity in the chain.
-local _request_sent_at_s        = nil
-local _first_token_at_s         = nil
-local _chain_first_request_at_s = nil
-local _chain_last_token_at_s    = nil
 
 -- ── Backend-aware request floor ──
 -- The user can debounce as low as they want from the menu, but the engine
 -- still enforces this minimum gap between two consecutive backend calls.
 -- The cap protects paid API providers from a fast typist's per-keystroke
--- bursts (one debounce = 50 ms × every char = token-burn galore), and
+-- bursts (one debounce = 50 ms x every char = token-burn galore), and
 -- doubles as an energy cap on local backends: back-to-back inference keeps
 -- the GPU spinning without giving the user a perceptibly snappier UI.
 -- The values live in ``_shared/llm/inference.json`` so the AHK twin
@@ -284,61 +232,16 @@ function M.set_preview_ai_color(color)
 end
 
 
---- ===========================
--- ===== 3.2) LLM Config =====
---- ===========================
 
---- Schedules a warmup attempt now and keeps retrying every WARMUP_RETRY_SEC seconds
---- until the backend reports ready. The first request often hits a server that is
---- still loading model weights (10-30 s for a 2B model) and returns -1; this
---- retry loop keeps re-priming until the model is actually loaded.
-local WARMUP_INITIAL_DELAY_SEC = 2
-local WARMUP_RETRY_SEC         = 5
-local function schedule_warmup_with_retry(reason)
-	-- Always re-resolve through core_llm.get_current_model so the warmup hits
-	-- the backend-specific id (e.g. 'gemma-4-e2b-it-mxfp4') and not the display
-	-- label ('gemma-4-E2B-it'); MLX server expects the exact id it was launched
-	-- with and stalls indefinitely on an unknown name
-	local resolved = core_llm.get_current_model()
-	if type(resolved) ~= "string" or resolved == "" then
-		Logger.debug(LOG, "%s: warmup skipped — backend model not resolved yet.", reason)
-		return
-	end
-	Logger.debug(LOG, "Scheduling warmup for '%s' in %.0fs (from %s).",
-		resolved, WARMUP_INITIAL_DELAY_SEC, reason)
-
-	local function try_warmup()
-		if not is_llm_enabled then
-			Logger.warn(LOG, "[WARMUP-LOOP] try_warmup early-return: is_llm_enabled=false — chain ends here.")
-			return
-		end
-		if core_llm.is_backend_ready and core_llm.is_backend_ready() then
-			Logger.warn(LOG, "[WARMUP-LOOP] try_warmup early-return: backend already ready — chain ends here.")
-			return
-		end
-		local current = core_llm.get_current_model()
-		if type(current) ~= "string" or current == "" then
-			Logger.warn(LOG, "[WARMUP-LOOP] try_warmup early-return: get_current_model returned %s — re-scheduling in %ds.",
-				tostring(current), WARMUP_RETRY_SEC)
-			-- IMPORTANT: do NOT silently terminate the retry chain when the model
-			-- is momentarily missing (typical during a backend swap). Re-schedule
-			-- so warmup eventually picks up once set_llm_model has run.
-			hs.timer.doAfter(WARMUP_RETRY_SEC, try_warmup)
-			return
-		end
-		Logger.warn(LOG, "[WARMUP-LOOP] Warmup attempt for '%s' (backend: %s).",
-			current, tostring(core_llm.get_backend()))
-		pcall(core_llm.warmup_model, current, core_llm.get_active_profile())
-		hs.timer.doAfter(WARMUP_RETRY_SEC, try_warmup)
-	end
-	hs.timer.doAfter(WARMUP_INITIAL_DELAY_SEC, try_warmup)
-end
+--- ===========================
+--- ===== 3.2) LLM Config =====
+--- ===========================
 
 function M.set_llm_enabled(enabled)
 	is_llm_enabled = (enabled == true)
 	Logger.info(LOG, "LLM %s.", is_llm_enabled and "enabled" or "disabled")
 	if not is_llm_enabled then M.reset(); return end
-	schedule_warmup_with_retry("set_llm_enabled")
+	WarmupController.schedule_warmup_with_retry("set_llm_enabled")
 end
 
 --- @return boolean
@@ -353,7 +256,7 @@ function M.set_llm_model(model_name)
 	-- Trigger a warmup only when LLM is already enabled (avoids spurious requests
 	-- during startup when set_llm_model fires before set_llm_enabled(true))
 	if is_llm_enabled then
-		schedule_warmup_with_retry("set_llm_model")
+		WarmupController.schedule_warmup_with_retry("set_llm_model")
 	end
 end
 
@@ -463,13 +366,9 @@ function M.set_llm_max_words(w)
 end
 
 
-
-
-
-
---- =====================================
---- ======= 3.3) Debounce / Timer =======
---- =====================================
+-- =====================================
+-- ===== 3.3) Debounce / Timer =========
+-- =====================================
 
 --- Rebuilds the inactivity timer with a new debounce interval.
 --- The old timer is stopped before the new one is created to avoid a double-fire race.
@@ -483,9 +382,10 @@ end
 
 
 
+
 -- ==================================
 --- ==================================
--- ======= 4/ Private Helpers =======
+--- ======= 4/ Private Helpers =======
 --- ==================================
 -- ==================================
 
@@ -530,44 +430,6 @@ local function format_validation_shortcut(mods)
 	return table.concat(mods, "+")
 end
 
---- Builds a deduplication key from a prediction's visual diff content.
---- Two predictions with identical keys are considered duplicates and merged during streaming.
---- The key is the concatenated diff text, whitespace-collapsed, with leading spaces stripped.
---- @param pred table A prediction object with optional .chunks (diff) and .nw (next words).
---- @return string A trimmed, whitespace-collapsed string key.
-local function build_dedup_key(pred)
-	local parts      = {}
-	local first_done = false
-	local last_char  = ""
-
-	local function clean_leading_spaces(s)
-		local str = tostring(s or "")
-		if not first_done and str ~= "" then
-			str = str:gsub("^%s+", "")
-			if str ~= "" then first_done = true end
-		end
-		return str
-	end
-
-	if type(pred.chunks) == "table" then
-		for _, chunk in ipairs(pred.chunks) do
-			local s = clean_leading_spaces(chunk.text)
-			if s ~= "" then table.insert(parts, s); last_char = s:sub(-1) end
-		end
-	end
-
-	local next_words = clean_leading_spaces(pred.nw)
-	if next_words ~= "" then
-		-- Insert a separator space when diff and next-words regions are adjacent non-space text
-		if last_char ~= "" and not last_char:match("%s") and not next_words:match("^%s") then
-			next_words = " " .. next_words
-		end
-		table.insert(parts, next_words)
-	end
-
-	return table.concat(parts):gsub("%s+", " "):gsub("^%s+", ""):gsub("%s+$", "")
-end
-
 --- Strips the em-dash suffix from a profile label for compact info-bar display.
 --- "Mon profil — texte long" → "Mon profil"
 --- @param label string|nil The raw profile label.
@@ -608,7 +470,7 @@ local function build_info_bar_text(model_name, elapsed_ms, backend, profile_name
 	local text = table.concat(pieces, " — ")
 
 	-- Note: elapsed_ms is intentionally NOT rendered here. tooltip_llm owns the
-	-- ⏱ timing zone and composes "Model · Profile — ⏱ TTFT [— TTLT]" so we
+	-- timing zone and composes "Model · Profile — TTFT [— TTLT]" so we
 	-- don't duplicate (and contradict) timing across two zones. The
 	-- elapsed_ms parameter is retained for backwards compatibility but its
 	-- value is discarded on purpose.
@@ -915,7 +777,6 @@ end
 ---   1. Validates preconditions: initialized, LLM enabled, not in an excluded app.
 ---   2. Syncs the dismiss delay into the tooltip engine BEFORE showing predictions,
 ---      so the auto-dismiss timer is created with the correct duration immediately.
----      This is the key fix for delay = 0 (infinite) not working previously.
 ---   3. Shows a loading indicator for immediate visual feedback.
 ---   4. Fires the async LLM request with streaming enabled.
 ---   5. Progressively renders predictions as they arrive, deduplicating on the fly.
@@ -934,7 +795,7 @@ function M.perform_check(force_trigger, profile_name)
 	-- Backend readiness gate: until the warmup has confirmed the model is loaded
 	-- and serving inference, dispatching a request would show the loading tooltip
 	-- against a server that simply cannot answer in time. Skip silently so the
-	-- user sees no spinner while the backend warms up
+	-- user sees no spinner while the backend warms up.
 	if type(core_llm.is_backend_ready) == "function" and not core_llm.is_backend_ready() then
 		Logger.debug(LOG, "Backend not ready yet — request skipped (model warming up).")
 		return
@@ -950,31 +811,24 @@ function M.perform_check(force_trigger, profile_name)
 	local dismiss_delay = (_state.DELAYS and _state.DELAYS.llm_prediction) or 0
 	tooltip.set_llm_timeout(dismiss_delay)
 
-	-- Build the tail: last CONTEXT_TAIL_WORDS words, used both for change detection and context
 	local buffer = _state.buffer
-	local words  = {}
-	for w in buffer:gmatch("%S+%s*") do table.insert(words, w) end
 
-	if #words == 0 and not force_trigger then
-		Logger.debug(LOG, "Empty buffer — LLM request skipped.")
-		return
-	end
+	-- Delegate prompt parameter building to PromptBuilder
+	local params, skip_reason, signature = PromptBuilder.build(buffer, {
+		temperature             = temperature,
+		max_words               = max_words,
+		min_words               = min_words,
+		num_predictions         = num_predictions,
+		auto_raise_temperature  = auto_raise_temperature,
+	}, last_buffer_signature, force_trigger)
 
-	local tail = table.concat(words, "", math.max(1, #words - (CONTEXT_TAIL_WORDS - 1)))
-	if #tail < 2 and not force_trigger then
-		Logger.debug(LOG, "Context too short (%d chars) — request skipped.", #tail)
-		return
-	end
-
-	-- Freshness guard: skip if the input hasn't changed since the last request
-	local signature = buffer .. "\n" .. tail
-	if not force_trigger and last_buffer_signature == signature then
-		Logger.debug(LOG, "Buffer unchanged — LLM request skipped (freshness).")
+	if not params then
+		Logger.debug(LOG, "%s — LLM request skipped.", skip_reason or "unknown reason")
 		return
 	end
 
 	-- Backend-aware request floor — re-arm the debounce timer for the
-	-- remaining gap instead of firing immediately. ``force_trigger`` (the
+	-- remaining gap instead of firing immediately. force_trigger (the
 	-- manual hotkey path) bypasses the floor because it is an explicit user
 	-- request, not a per-keystroke burst.
 	if not force_trigger then
@@ -1005,7 +859,7 @@ function M.perform_check(force_trigger, profile_name)
 		and build_info_bar_text(llm_display_name or core_llm.get_current_model(), nil, resolve_backend_label(), display_profile_now)
 		or nil
 
-	-- N-gram instant prediction (#4): show a local word-bigram candidate immediately
+	-- N-gram instant prediction: show a local word-bigram candidate immediately
 	-- (< 1 ms) while the async LLM request is in flight. It is a stream-placeholder so
 	-- it gets evicted cleanly when the first streaming token or final on_success arrives.
 	local ngram_preds = ngram_predict(buffer)
@@ -1019,48 +873,11 @@ function M.perform_check(force_trigger, profile_name)
 		)
 	end
 
-	-- Build request parameters
 	local model_to_use    = core_llm.get_current_model()
-	local req_temperature = temperature
-	local effective_max   = (max_words > 0 and max_words < min_words) and min_words or max_words
-	local max_tokens      = effective_max > 0
-		and math.max(MIN_MAX_TOKENS, math.floor(effective_max * WORDS_TO_TOKENS_RATIO + TOKEN_BUDGET_OVERHEAD))
-		or DEFAULT_MAX_TOKENS
-	local num_preds       = num_predictions
-
-	-- Optionally add +TEMP_INCREMENT_PER_PRED per extra prediction to encourage diversity.
-	-- Example: 3 predictions → +0.2 ; 5 predictions → +0.4.
-	-- Capped at TEMP_DIVERSITY_CAP; no change if temperature is already at or above the cap.
-	if auto_raise_temperature and num_preds > 1 then
-		local increment = (num_preds - 1) * TEMP_INCREMENT_PER_PRED
-		req_temperature = math.min(req_temperature + increment, TEMP_DIVERSITY_CAP)
-		Logger.debug(LOG, "Temperature raised to %.2f for %d predictions.", req_temperature, num_preds)
-	end
-
-	-- Greedy decoding for single prediction: with only one variant requested, sampling
-	-- adds noise without any diversity benefit — forcing temp=0 enables deterministic
-	-- greedy decoding and avoids the softmax+sample step on the backend.
-	if num_preds == 1 and not auto_raise_temperature and req_temperature <= GREEDY_TEMP_THRESHOLD then
-		req_temperature = 0
-		Logger.debug(LOG, "Single prediction: greedy decoding applied (temp → 0).")
-	end
-
-	-- Dynamic context cap: keep only enough history to predict max_words output tokens.
-	-- Short predictions don't benefit from long context; trimming the prefix cuts prefill
-	-- time and reduces TTFT proportionally without affecting prediction quality.
-	local context_buffer
-	if max_words > 0 then
-		local effective_context_chars = math.min(
-			#buffer,
-			math.max(CONTEXT_MIN_CHARS, max_words * CONTEXT_CHARS_PER_WORD)
-		)
-		context_buffer = buffer:sub(-effective_context_chars)
-	else
-		context_buffer = buffer
-	end
+	local num_preds       = params.num_preds
 
 	Logger.start(LOG, "LLM request — model: '%s' | temp: %.2f | %d pred(s) | max tokens: %d.",
-		tostring(model_to_use), req_temperature, num_preds, max_tokens)
+		tostring(model_to_use), params.req_temperature, num_preds, params.max_tokens)
 
 	-- Arm the backend-agnostic chain timing instrumentation. The tooltip
 	-- ignores subsequent calls within the same chain, so this is safe to call
@@ -1086,20 +903,6 @@ function M.perform_check(force_trigger, profile_name)
 	fetch_request_counter = fetch_request_counter + 1
 	local my_fetch_id     = fetch_request_counter
 
-	-- Watchdog: surface whatever partial results exist if streaming stalls too long
-	if _stream_watchdog_timer then _stream_watchdog_timer:stop() end
-	_stream_watchdog_timer = hs.timer.doAfter(STREAM_WATCHDOG_SEC, function()
-		if fetch_request_counter ~= my_fetch_id or not predictions_visible then return end
-		Logger.warn(LOG, "Watchdog triggered: stream stalled for %gs — surfacing partial results.", STREAM_WATCHDOG_SEC)
-		local val_shortcut = format_validation_shortcut(normalize_mods(validation_mods))
-		local info = show_info_bar
-			and build_info_bar_text(llm_display_name, nil, resolve_backend_label(), "Timeout partiel")
-			or nil
-		tooltip.show_predictions(pending_predictions, 1, is_ai_preview_enabled, info,
-			val_shortcut, prediction_indent, normalize_mods(navigation_mods),
-			tooltip.tint("ai_prediction"), nil, #pending_predictions)
-	end)
-
 	-- Shared noise gate used by both the streaming partial path and the final on_success
 	-- filter — keeps both in lockstep so no hallucination ever appears during streaming
 	-- that the final filter would later remove
@@ -1118,280 +921,79 @@ function M.perform_check(force_trigger, profile_name)
 			or (to_type:find(":", 1, true) ~= nil)
 	end
 
-	-- When streaming is enabled AND multi-streaming is on, parse each partial accumulation through
-	-- the full pipeline (so TAIL_CORRECTED/NEXT_WORDS labels are stripped), apply the same noise
-	-- filters as on_success, then display as a single orange block (nw color, no diff markup).
-	-- Diff coloring is applied only once the final result arrives via on_success.
-	-- When multi-streaming is off ("all at once" mode), the partial callback is suppressed entirely
-	-- so no tokens appear before the final batch — streaming and all-at-once are mutually exclusive.
-	local on_partial_cb = (is_streaming_enabled and is_streaming_multi_enabled) and function(partial_raw)
-		-- Discard if superseded by a newer request
-		if fetch_request_counter ~= my_fetch_id then return end
-		if type(partial_raw) ~= "string" or partial_raw:gsub("%s", "") == "" then return end
-		-- Strip any partial thinking block before attempting to parse
-		local stripped = Parser.strip_thinking(partial_raw)
-		if not stripped or stripped:gsub("%s", "") == "" then return end
-		-- Split on === to handle batch mode (all predictions in one prompt, separated by ===).
-		-- In single-prediction mode this returns one block; in batch mode each completed
-		-- block is a separate prediction. The last block is still streaming and may fail
-		-- to parse — that's fine, earlier complete blocks are shown immediately so the
-		-- user sees the tooltip fill line by line as each prediction is generated.
-		local raw_blocks = {}
-		for b in (stripped .. "==="):gmatch("(.-)===") do
-			local clean = b:gsub("^%s+", ""):gsub("%s+$", "")
-			if clean ~= "" then table.insert(raw_blocks, clean) end
-		end
-		if #raw_blocks == 0 then table.insert(raw_blocks, stripped) end
+	-- Mutable references for shared access between the engine and streaming callbacks
+	local pending_ref = { value = pending_predictions }
+	local visible_ref = { value = predictions_visible }
 
-		-- Parse each block; apply the same noise gate as on_success; build stream preds
-		local stream_preds = {}
-		for _, block_text in ipairs(raw_blocks) do
-			local ok_b, pred_b = pcall(Parser.process_prediction, buffer, tail, block_text)
-			if ok_b and pred_b and not is_noise_pred(pred_b.to_type) then
-				local display = (type(pred_b.nw) == "string" and pred_b.nw ~= "" and pred_b.nw)
-					or pred_b.to_type
-				if display and display:gsub("%s", "") ~= "" then
-					table.insert(stream_preds, {
-						to_type              = pred_b.to_type,
-						deletes              = pred_b.deletes,
-						chunks               = {},
-						nw                   = display,
-						has_corrections      = false,
-						disable_bold         = true,
-						_is_stream_placeholder = true,
-					})
-				end
-			end
-		end
-		if #stream_preds == 0 then return end
+	-- Keep local state in sync when the refs are updated by callbacks
+	local function sync_refs()
+		pending_predictions = pending_ref.value
+		predictions_visible = visible_ref.value
+	end
 
-		-- Preserve finalized predictions (non-placeholder) so earlier variants stay in
-		-- their slots while later ones are still streaming
-		local new_preds = {}
-		for _, p in ipairs(pending_predictions) do
-			if not p._is_stream_placeholder then
-				table.insert(new_preds, p)
-			end
-		end
-		-- Dedup stream preds against finalized and against each other so a duplicate
-		-- never appears as a separate slot (which would disappear at finalization)
-		local seen_to_type = {}
-		for _, fp in ipairs(new_preds) do
-			if fp.to_type and fp.to_type ~= "" then seen_to_type[fp.to_type] = true end
-		end
-		for _, sp in ipairs(stream_preds) do
-			local k = sp.to_type or ""
-			if k == "" or not seen_to_type[k] then
-				if k ~= "" then seen_to_type[k] = true end
-				table.insert(new_preds, sp)
-			end
-		end
-		pending_predictions = new_preds
-		predictions_visible = true
-		-- Keep cursor at its current position (or slot 1 at start); the streaming slot
-		-- is visible in its own slot but never forces the selection away from slot 1.
-		-- Always reserve num_preds slots with "…" for empty ones so the tooltip height
-		-- stays constant throughout generation instead of growing slot by slot.
-		local current = tooltip.get_current_index()
-		local display_idx = (current and math.min(math.max(1, current), #new_preds)) or 1
-		-- streaming_info_bar (no elapsed_ms yet) keeps the model label visible
-		-- while tokens arrive; on_success final will replace it with latency included
-		tooltip.show_predictions(
-			new_preds, display_idx, is_ai_preview_enabled, streaming_info_bar,
-			nil, prediction_indent, normalize_mods(navigation_mods),
-			tooltip.tint("ai_prediction"), "…", num_preds
-		)
+	-- Build the streaming callbacks via StreamingHandler
+	local on_partial_cb, on_success_cb, on_fail_cb = StreamingHandler.build_callbacks({
+		buffer                  = buffer,
+		tail                    = params.tail,
+		my_fetch_id             = my_fetch_id,
+		get_fetch_id            = function() return fetch_request_counter end,
+		is_streaming_enabled    = is_streaming_enabled,
+		is_streaming_multi_enabled = is_streaming_multi_enabled,
+		num_predictions         = num_preds,
+		show_info_bar           = show_info_bar,
+		streaming_info_bar      = streaming_info_bar,
+		prediction_indent       = prediction_indent,
+		validation_mods         = normalize_mods(validation_mods),
+		navigation_mods         = normalize_mods(navigation_mods),
+		model_to_use            = model_to_use,
+		llm_display_name        = llm_display_name,
+		profile_name            = profile_name,
+		build_info_bar_text     = build_info_bar_text,
+		resolve_backend_label   = resolve_backend_label,
+		is_noise_pred           = is_noise_pred,
+		reset_llm_dismiss_timer = reset_llm_dismiss_timer,
+		is_ai_preview_enabled   = is_ai_preview_enabled,
+		pending_predictions_ref = pending_ref,
+		predictions_visible_ref = visible_ref,
+	})
+
+	-- Wrap callbacks to keep local state in sync after each call
+	local function on_success(raw_predictions, elapsed_ms, is_final, is_batch_progressive)
+		on_success_cb(raw_predictions, elapsed_ms, is_final, is_batch_progressive)
+		sync_refs()
+	end
+	local function on_fail()
+		on_fail_cb()
+		sync_refs()
+	end
+	local on_partial = on_partial_cb and function(partial_raw)
+		on_partial_cb(partial_raw)
+		sync_refs()
 	end or nil
 
+	-- Arm the watchdog via StreamingHandler
+	StreamingHandler.arm_watchdog({
+		my_fetch_id             = my_fetch_id,
+		get_fetch_id            = function() return fetch_request_counter end,
+		pending_predictions_ref = pending_ref,
+		predictions_visible_ref = visible_ref,
+		validation_mods         = normalize_mods(validation_mods),
+		navigation_mods         = normalize_mods(navigation_mods),
+		show_info_bar           = show_info_bar,
+		llm_display_name        = llm_display_name,
+		prediction_indent       = prediction_indent,
+		is_ai_preview_enabled   = is_ai_preview_enabled,
+		build_info_bar_text     = build_info_bar_text,
+		resolve_backend_label   = resolve_backend_label,
+	})
+
 	core_llm.fetch_llm_prediction(
-		context_buffer, tail, model_to_use, req_temperature, max_tokens, num_preds,
-		function(raw_predictions, elapsed_ms, is_final, is_batch_progressive)
-			-- LLM responded — reset the persistent-failure counter regardless of content
-			_consecutive_llm_failures = 0
-
-			-- Suppress intermediate batches unless streaming_multi is on or this is a
-			-- batch progressive reveal (fetch_batch emits these for streaming=OFF mode so
-			-- each prediction appears complete one by one rather than all at once)
-			if not is_final and not is_streaming_multi_enabled and not is_batch_progressive then return end
-
-			-- Discard if a newer request superseded this one while we were waiting
-			if fetch_request_counter ~= my_fetch_id then
-				Logger.debug(LOG, "Stale LLM callback ignored (expected fetch_id=%d, current=%d).",
-					my_fetch_id, fetch_request_counter)
-				return
-			end
-
-			if is_final and _stream_watchdog_timer then
-				_stream_watchdog_timer:stop()
-				_stream_watchdog_timer = nil
-			end
-
-			local front    = hs.application.frontmostApplication()
-			local app_name = front and front:title() or nil
-			keylogger.log_llm(buffer, raw_predictions, app_name)
-
-			-- ── Filter: remove noise, invalid entries, and exact duplicates ──────
-			local valid_preds, seen_keys = {}, {}
-			for _, raw_pred in ipairs(raw_predictions) do
-				local pred = {}
-				for k, v in pairs(raw_pred) do pred[k] = v end
-
-				if pred.to_type then
-					local text = pred.to_type
-
-					if not is_noise_pred(text)
-						and tooltip.make_diff_styled(pred.chunks, pred.nw)
-					then
-						local key = build_dedup_key(pred)
-						if key == "" or not seen_keys[key] then
-							if key ~= "" then seen_keys[key] = true end
-							table.insert(valid_preds, pred)
-						end
-					end
-				end
-			end
-
-			-- ── Evict streaming placeholders left by on_partial_cb ────────────────
-			-- on_partial_cb inserts _is_stream_placeholder entries so finalized slots
-			-- are preserved across streaming calls. Finalized results (arriving here)
-			-- always supersede them, so they must be removed before the merge to prevent
-			-- ghost entries from accumulating and causing slot-count jumps at the end.
-			for i = #pending_predictions, 1, -1 do
-				if pending_predictions[i] and pending_predictions[i]._is_stream_placeholder then
-					table.remove(pending_predictions, i)
-				end
-			end
-
-			-- ── Streaming merge: blend new batch with what is already on screen ──
-			-- valid_preds leads (authoritative order from backend); pending_predictions
-			-- fills in only what the new batch has not yet superseded, so already-visible
-			-- slots stay occupied while remaining variants are still loading.
-			-- Skipped on the final batch so streaming placeholders are always fully replaced.
-			if not is_final and predictions_visible and #pending_predictions > 0 then
-				local merged, merged_keys = {}, {}
-				-- New batch first — defines order and replaces any streaming placeholders
-				for _, new_pred in ipairs(valid_preds) do
-					local k = build_dedup_key(new_pred)
-					if k == "" or not merged_keys[k] then
-						if k ~= "" then merged_keys[k] = true end
-						table.insert(merged, new_pred)
-					end
-				end
-				-- Append still-pending items not yet in this batch (avoids empty slots)
-				for _, existing in ipairs(pending_predictions) do
-					local k = build_dedup_key(existing)
-					if k == "" or not merged_keys[k] then
-						if k ~= "" then merged_keys[k] = true end
-						table.insert(merged, existing)
-					end
-				end
-				valid_preds = merged
-			end
-
-			if #valid_preds == 0 then
-				if is_final then
-					Logger.warn(LOG, "No valid predictions after filtering (final batch).")
-					if not predictions_visible then tooltip.hide() end
-				end
-				return
-			end
-
-			if is_final then
-				Logger.success(LOG, "%d prediction(s) received in %dms from '%s'.",
-					#valid_preds, elapsed_ms or 0, tostring(model_to_use))
-			else
-				Logger.debug(LOG, "Streaming — %d prediction(s) received (partial batch).", #valid_preds)
-			end
-
-			keylogger.log_llm_suggested(app_name, #valid_preds)
-
-			pending_predictions = valid_preds
-			predictions_visible = true
-
-			local active_profile  = core_llm.get_active_profile()
-			local display_profile = profile_name or (active_profile and active_profile.label)
-			local display_model   = llm_display_name or core_llm.get_current_model()
-			local info_bar_text   = show_info_bar
-				and build_info_bar_text(display_model, elapsed_ms, resolve_backend_label(), display_profile)
-				or nil
-
-			-- During streaming show a spinner in the loading slot to signal work in progress
-			local loading_text = nil
-			if not is_final and #valid_preds < num_predictions then
-				local spinner_frames = { "◐", "◓", "◑", "◒" }
-				local frame = spinner_frames[(math.floor(hs.timer.secondsSinceEpoch() * SPINNER_FPS) % #spinner_frames) + 1]
-				loading_text = string.format("%s Enrichissement… %d/%d", frame, #valid_preds, num_predictions)
-			end
-
-			local val_shortcut  = format_validation_shortcut(normalize_mods(validation_mods))
-			local nav_mods_norm = normalize_mods(navigation_mods)
-			-- Clamp selected index as the list grows during streaming
-			local selected_idx  = math.min(math.max(1, math.floor(tooltip.get_current_index() or 1)), #valid_preds)
-			local slot_count    = is_final and #valid_preds or num_predictions
-
-			tooltip.show_predictions(valid_preds, selected_idx, is_ai_preview_enabled, info_bar_text,
-				val_shortcut, prediction_indent, nav_mods_norm, tooltip.tint("ai_prediction"),
-				loading_text, slot_count)
-
-			-- Start the auto-dismiss countdown only once the full batch has arrived;
-			-- reset_llm_dismiss_timer() re-syncs the delay in case it changed mid-session.
-			-- Also publish the up-to-date TTLT so the user sees the full timing line as
-			-- soon as streaming concludes for the current chain link — the chain origin
-			-- itself stays anchored to the very first link until M.reset() fires.
-			if is_final then
-				reset_llm_dismiss_timer()
-				pcall(tooltip.mark_chain_complete)
-			end
-		end,
-		function()
-			if fetch_request_counter ~= my_fetch_id then return end
-
-			-- Track consecutive failures to detect persistent issues (e.g. server
-			-- crashed, still loading weights, or misconfigured endpoint)
-			_consecutive_llm_failures = _consecutive_llm_failures + 1
-			if _consecutive_llm_failures >= CONSECUTIVE_FAIL_WARN_THRESHOLD then
-				_consecutive_llm_failures = 0  -- Reset so the notification is not spammed
-				if core_llm.get_backend() == "mlx" then
-					Logger.warn(LOG, "Repeated MLX failures (%d consecutive) — server may be down or misconfigured.",
-						CONSECUTIVE_FAIL_WARN_THRESHOLD)
-					pcall(function()
-						hs.notify.new(nil, {
-							title            = i18n.get("notify.llm_mlx_failures_title"),
-							informativeText  = i18n.get("notify.llm_mlx_failures_body"),
-							alwaysPresent    = false,
-							autoWithdraw     = true,
-						}):send()
-					end)
-				end
-			end
-
-			if not predictions_visible then
-				-- Nothing on screen: dismiss the loading spinner entirely.
-				-- WARN (not ERROR) so the notify module does not pop a system notification on every
-				-- failure — LLM failures are expected during warm-up or model loading.
-				Logger.warn(LOG, "LLM request failed — loading indicator dismissed.")
-				tooltip.hide()
-			else
-				-- N-gram (or prior) predictions are already on screen — the spinner "…"
-				-- placeholder is still in the last slot. Remove it so the tooltip looks
-				-- finalized and start the auto-dismiss countdown.
-				Logger.warn(LOG, "LLM request failed — n-gram placeholder retained, loading text cleared.")
-				local val_shortcut  = format_validation_shortcut(normalize_mods(validation_mods))
-				local nav_mods_norm = normalize_mods(navigation_mods)
-				local selected_idx  = math.max(1, tooltip.get_current_index() or 1)
-				tooltip.show_predictions(
-					pending_predictions, selected_idx, is_ai_preview_enabled, nil,
-					val_shortcut, prediction_indent, nav_mods_norm,
-					tooltip.tint("ai_prediction"), nil, #pending_predictions
-				)
-				reset_llm_dismiss_timer()
-				-- Publish TTLT even on failure: the user still cares how long the
-				-- attempt took, especially during repeated backend stalls.
-				pcall(tooltip.mark_chain_complete)
-			end
-		end,
+		params.context_buffer, params.tail, model_to_use, params.req_temperature,
+		params.max_tokens, num_preds,
+		on_success,
+		on_fail,
 		sequential_mode, force_trigger, function() return fetch_request_counter end,
-		on_partial_cb
+		on_partial
 	)
 end
 
@@ -1416,11 +1018,11 @@ function M.reset()
 	last_buffer_signature      = nil
 	llm_request_counter        = llm_request_counter + 1
 	fetch_request_counter      = fetch_request_counter + 1
-	_consecutive_llm_failures  = 0
 
+	StreamingHandler.reset_failure_count()
 	tooltip.hide()
 	stop_inactivity_timer()
-	if _stream_watchdog_timer then _stream_watchdog_timer:stop() end
+	StreamingHandler.stop_watchdog()
 	-- Cancel any in-flight streaming curl task so it doesn't fire stale callbacks
 	if is_streaming_enabled then pcall(core_llm.cancel_streaming) end
 
@@ -1470,9 +1072,10 @@ end
 
 
 
+
 -- ============================
 --- =============================
--- ======= 6/ Public API =======
+--- ======= 6/ Public API =======
 --- =============================
 -- ============================
 
@@ -1485,6 +1088,18 @@ function M.init(core_state)
 		return
 	end
 	_state = core_state
+
+	-- Initialize submodules with their required dependencies
+	WarmupController.init({
+		core_llm        = core_llm,
+		get_llm_enabled = function() return is_llm_enabled end,
+	})
+	StreamingHandler.init({
+		core_llm  = core_llm,
+		tooltip   = tooltip,
+		keylogger = keylogger,
+	})
+
 	Logger.debug(LOG, "Prediction engine state injected (%d mapping(s)).", #(core_state.mappings or {}))
 end
 

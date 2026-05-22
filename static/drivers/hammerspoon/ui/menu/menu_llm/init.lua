@@ -23,6 +23,9 @@ local Models        = require("ui.menu.menu_llm.models_manager")
 local Profiles      = require("ui.menu.menu_llm.profiles_manager")
 local Settings      = require("ui.menu.menu_llm.settings_manager")
 local AppPickerLib  = require("lib.app_picker")
+local TempPanel     = require("ui.menu.menu_llm.temperature_panel")
+local StreamPanel   = require("ui.menu.menu_llm.streaming_panel")
+local WarmupCtrl    = require("ui.menu.menu_llm.warmup_controller")
 
 -- Deps checkers — kicked off on backend switch and on first menu activation
 -- so a fresh-out-of-the-box Mac auto-bootstraps the engine without any
@@ -1258,7 +1261,7 @@ function M.create(deps)
                     -- then ping the active one so the health indicator reflects
                     -- reality before the next prediction would fire.
                     if type(llm_mod.load_api_entries) == "function" then pcall(llm_mod.load_api_entries) end
-                    pcall(llm_mod.warmup_model, llm_mod.get_current_model())
+                    WarmupCtrl.warmup("api_backend_switch")
                     save_prefs()
                     update_menu()
                 end
@@ -1301,7 +1304,7 @@ function M.create(deps)
                     fn       = not paused and function()
                         api_remote.set_active_entry_id(e.id)
                         pcall_log("persist_api_entries(set_active)", llm_mod.persist_api_entries)
-                        pcall_log("warmup_model(set_active)", llm_mod.warmup_model, llm_mod.get_current_model())
+                        WarmupCtrl.warmup("api_set_active")
                         update_menu()
                     end or nil
                 })
@@ -1389,7 +1392,7 @@ function M.create(deps)
                                 function()
                                     -- Credentials accepted — NOW persist + warmup.
                                     pcall_log("persist_api_entries(add_entry_ok)", llm_mod.persist_api_entries)
-                                    pcall_log("warmup_model(add_entry_ok)", llm_mod.warmup_model, llm_mod.get_current_model())
+                                    WarmupCtrl.warmup("api_add_entry")
                                     pcall_log("notify(api_validated)", notifications.notify,
                                         i18n.get("menu.llm.api_validated_title"),
                                         string.format(i18n.get("menu.llm.api_validated_body"), new_entry.label),
@@ -1460,7 +1463,7 @@ function M.create(deps)
                     if ok_kc and TokenCrypto and active_entry.id then
                         pcall_log("TokenCrypto.delete", TokenCrypto.delete, active_entry.id)
                     end
-                    pcall_log("warmup_model(delete)", llm_mod.warmup_model, llm_mod.get_current_model())
+                    WarmupCtrl.warmup("api_delete_entry")
                     update_menu()
                 end or nil,
             })
@@ -1686,76 +1689,27 @@ function M.create(deps)
             table.insert(generation_menu, { title = string.format(i18n.get("menu.llm.reset_label"), def_w_disp), disabled = is_disabled or nil, fn = settings_mgr.reset_max_words })
         end
 
-        table.insert(generation_menu, { title = string.format(i18n.get("menu.llm.temperature_label"), tostring(state.llm_temperature)), disabled = is_disabled or nil, fn = settings_mgr.set_temperature })
-        if state.llm_temperature ~= llm_mod.DEFAULT_STATE.llm_temperature then
-            table.insert(generation_menu, { title = string.format(i18n.get("menu.llm.reset_label"), tostring(llm_mod.DEFAULT_STATE.llm_temperature)), disabled = is_disabled or nil, fn = settings_mgr.reset_temperature })
-        end
-        table.insert(generation_menu, {
-            title    = i18n.get("menu.llm.auto_raise_temp"),
-            checked  = state.llm_auto_raise_temp,
-            disabled = (is_disabled or (tonumber(state.llm_num_predictions) or llm_mod.DEFAULT_STATE.llm_num_predictions) < 2) or nil,
-            fn       = function()
-                state.llm_auto_raise_temp = not state.llm_auto_raise_temp
-                if keymap and type(keymap.set_llm_auto_raise_temp) == "function" then
-                    pcall(keymap.set_llm_auto_raise_temp, state.llm_auto_raise_temp)
-                end
-                save_prefs(); update_menu()
-            end
-        })
+        TempPanel.build({
+            state        = state,
+            keymap       = keymap,
+            is_disabled  = is_disabled,
+            save_prefs   = save_prefs,
+            update_menu  = update_menu,
+            settings_mgr = settings_mgr,
+        }, generation_menu)
 
         table.insert(main_menu, { title = i18n.get("menu.llm.generation_menu_title"), disabled = is_disabled or nil, menu = generation_menu })
 
 
         -- ===== Display submenu =====
 
-        local display_menu = {}
-
-        local num_preds_safe = tonumber(state.llm_num_predictions) or llm_mod.DEFAULT_STATE.llm_num_predictions
-        table.insert(display_menu, {
-            title    = i18n.get("menu.llm.indent_label"),
-            disabled = (is_disabled or num_preds_safe < 2) or nil,
-            menu     = settings_mgr.build_indent_menu()
-        })
-
-        table.insert(display_menu, {
-            title    = i18n.get("menu.llm.show_info_bar"),
-            checked  = state.llm_show_info_bar,
-            disabled = is_disabled or nil,
-            fn       = function()
-                state.llm_show_info_bar = not state.llm_show_info_bar
-                if keymap and type(keymap.set_llm_show_info_bar) == "function" then pcall(keymap.set_llm_show_info_bar, state.llm_show_info_bar) end
-                save_prefs(); update_menu()
-            end
-        })
-
-        -- Streaming flags are nil-safe: old configs without these keys default to false
-        local streaming_on       = (state.llm_streaming == true)
-        local streaming_multi_on = (state.llm_streaming_multi == true)  -- true = show predictions as they arrive (progressive/parallel)
-        local num_preds_multi    = tonumber(state.llm_num_predictions) or llm_mod.DEFAULT_STATE.llm_num_predictions
-        table.insert(display_menu, {
-            title    = i18n.get("menu.llm.show_streaming"),
-            checked  = streaming_on,
-            disabled = (is_disabled or not streaming_multi_on) or nil,
-            fn       = not is_disabled and function()
-                state.llm_streaming = not streaming_on
-                if keymap and type(keymap.set_llm_streaming) == "function" then
-                    pcall(keymap.set_llm_streaming, state.llm_streaming)
-                end
-                save_prefs(); update_menu()
-            end or nil,
-        })
-        table.insert(display_menu, {
-            -- Independent of token streaming; only irrelevant when num_predictions < 2
-            title    = i18n.get("menu.llm.show_all_at_once"),
-            checked  = not streaming_multi_on,
-            disabled = (is_disabled or num_preds_multi < 2) or nil,
-            fn       = (not is_disabled and num_preds_multi >= 2) and function()
-                state.llm_streaming_multi = not streaming_multi_on
-                if keymap and type(keymap.set_llm_streaming_multi) == "function" then
-                    pcall(keymap.set_llm_streaming_multi, state.llm_streaming_multi)
-                end
-                save_prefs(); update_menu()
-            end or nil,
+        local display_menu = StreamPanel.build({
+            state        = state,
+            keymap       = keymap,
+            is_disabled  = is_disabled,
+            save_prefs   = save_prefs,
+            update_menu  = update_menu,
+            settings_mgr = settings_mgr,
         })
 
         table.insert(main_menu, { title = i18n.get("menu.llm.display_menu_title"), disabled = is_disabled or nil, menu = display_menu })
