@@ -5,11 +5,15 @@ on:
         branches: [main, dev]
         paths:
             - "static/drivers/autohotkey/**"
+            - "static/drivers/_shared/features/manifest.toml"
+            - "scripts/build-features-manifest.js"
             - ".github/workflows/test_ahk.yml"
     pull_request:
         branches: [main, dev]
         paths:
             - "static/drivers/autohotkey/**"
+            - "static/drivers/_shared/features/manifest.toml"
+            - "scripts/build-features-manifest.js"
             - ".github/workflows/test_ahk.yml"
     workflow_dispatch:
 
@@ -34,6 +38,10 @@ jobs:
               with:
                   path: C:\AutoHotkey
                   key: ahk-v2.0.19-windows
+
+            - name: Build features manifest
+              run: node ./scripts/build-features-manifest.js
+              shell: pwsh
 
             - name: Download AutoHotkey v2 runtime
               if: steps.cache-ahk.outputs.cache-hit != 'true'
