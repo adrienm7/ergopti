@@ -321,11 +321,21 @@ V2PathToV1Path(V2Path) {
         if (Parts.Length == 2 and _V2V1_ShortcutsAlphaKeyMap.Has(Parts[2])) {
             return "Shortcuts." . _V2V1_ShortcutsAlphaKeyMap[Parts[2]]
         }
-        ; Sub-Map group: shortcuts.<group>.<key>
-        if (Parts.Length == 3 and _V2V1_ShortcutsSubMapGroupMap.Has(Parts[2])
-            and _V2V1_ShortcutsSubMapKeyMap.Has(Parts[3])) {
-            return "Shortcuts." . _V2V1_ShortcutsSubMapGroupMap[Parts[2]]
-                . "." . _V2V1_ShortcutsSubMapKeyMap[Parts[3]]
+        ; Sub-Map group: shortcuts.<group>.<key>.
+        ; ``_V2V1_ShortcutsSubMapGroupMap`` is the inverse of the forward
+        ; rename map whose VALUES are full v2 section paths
+        ; (``ahk.shortcuts.alt_gr_lalt`` etc.) — kept that way because
+        ; TranslateV1ToV2 emits them as TOML section headers verbatim.
+        ; The inverse therefore keys on the full path; the bare group
+        ; segment in ``Parts[2]`` doesn't match, so reconstruct the full
+        ; section path for the lookup.
+        if (Parts.Length == 3) {
+            FullSection := "ahk.shortcuts." . Parts[2]
+            if (_V2V1_ShortcutsSubMapGroupMap.Has(FullSection)
+                and _V2V1_ShortcutsSubMapKeyMap.Has(Parts[3])) {
+                return "Shortcuts." . _V2V1_ShortcutsSubMapGroupMap[FullSection]
+                    . "." . _V2V1_ShortcutsSubMapKeyMap[Parts[3]]
+            }
         }
         return ""
     }

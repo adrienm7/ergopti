@@ -1005,7 +1005,7 @@ _IsCategoryManifestRendered(Category) {
 			return true
 		}
 	}
-	return (Category == "DynamicHotstrings")
+	return (Category == "DynamicHotstrings" or Category == "Shortcuts")
 }
 
 InitSubMenus() {
@@ -1029,6 +1029,9 @@ InitSubMenus() {
 
 	; DynamicHotstrings — custom-ordered, with separator + injected editor.
 	SubMenus["DynamicHotstrings"] := _BuildDynamicHotstringsSubmenu()
+
+	; Shortcuts — Accents + WrapTextIfSelected + Modifier combos + transitional Personal.
+	SubMenus["Shortcuts"] := _BuildShortcutsSubmenu()
 
 	; Remaining categories still rely on the Features Map for structure —
 	; __Order arrays with virtual headers (Shortcuts), sub-Maps
@@ -1086,6 +1089,117 @@ _BuildDynamicHotstringsSubmenu() {
 		}
 	}
 	return SubMenu
+}
+
+; v1 group id -> v2 manifest section path for the three Shortcuts sub-Maps
+; (AltGrLAlt / AltGrCapsLock / LAltCapsLock). Each sub-Map renders as a
+; sub-submenu of 10 plain-bool toggles. The label of each sub-submenu in
+; the legacy render was the raw v1 key (e.g. "AltGrLAlt") because the
+; sub-Maps carried no ``__Label`` metadata — preserved verbatim here so
+; the manifest path is visually identical.
+global _SHORTCUTS_SUBMAP_V1V2 := Map(
+	"AltGrLAlt",     "ahk.shortcuts.alt_gr_lalt",
+	"AltGrCapsLock", "ahk.shortcuts.alt_gr_caps_lock",
+	"LAltCapsLock",  "ahk.shortcuts.lalt_caps_lock",
+)
+
+; Build the Shortcuts submenu directly from the manifest, mirroring the
+; curated layout the v1 ``__Order`` array used to drive via
+; CreateSubMenusRecursive:
+;
+;   ⌨️ Raccourcis
+;     ↳ Accents (4 letter pickers — EGrave/ECirc/EAcute/AGrave)
+;     ↳ WrapTextIfSelected (plain bool toggle)
+;     ↳ Modifier combos (3 sub-Maps × 10 plain bools each)
+;     ↳ (Personal — transitional, only when user has personal shortcuts)
+;
+; The "Modifier combos" submenu must use the exact i18n label
+; ``t("menu.shortcuts.group_modifiers")`` — initMenu's
+; InsertKeyboardShortcutGroups call uses it as the InsertBefore anchor
+; when splicing the Alt/Ctrl/Ctrl+Shift/Win shortcut groups into the
+; Shortcuts menu.
+_BuildShortcutsSubmenu() {
+	global _SHORTCUTS_SUBMAP_V1V2
+	SubMenu := Menu()
+
+	; ── Accents virtual group ────────────────────────────────
+	AccentsMenu := Menu()
+	for V1LetterId in ["EGrave", "ECirc", "EAcute", "AGrave"] {
+		MenuAddLetterPicker(AccentsMenu, "Shortcuts", V1LetterId)
+	}
+	SubMenu.Add(t("menu.shortcuts.group_accented"), AccentsMenu)
+
+	; ── WrapTextIfSelected (plain bool) ──────────────────────
+	WrapEntry := ManifestFindEntryByV2Path("shortcuts.wrap_text_if_selected")
+	if (WrapEntry != false) {
+		MenuAddItemFromManifest(SubMenu, WrapEntry, "Shortcuts")
+	} else {
+		try LoggerWarn("Menu",
+			"Shortcuts: no manifest entry for 'wrap_text_if_selected' — skipped.")
+	}
+
+	; ── Modifier combos virtual group ────────────────────────
+	ModifiersMenu := Menu()
+	for V1Group, V2Section in _SHORTCUTS_SUBMAP_V1V2 {
+		GroupSubmenu := Menu()
+		for Entry in ManifestFeaturesForSection(V2Section) {
+			MenuAddItemFromManifest(GroupSubmenu, Entry, "Shortcuts." . V1Group)
+		}
+		ModifiersMenu.Add(V1Group, GroupSubmenu)
+	}
+	SubMenu.Add(t("menu.shortcuts.group_modifiers"), ModifiersMenu)
+
+	; ── Personal sub-Map (transitional) ──────────────────────
+	; RegisterPersonalFeature in ErgoptiPlus.ahk mutates
+	; ``Features["Shortcuts"]["Personal"]`` at runtime to hold user-defined
+	; personal shortcut toggles loaded from personal_shortcuts.ahk. Until
+	; that subsystem migrates to FeaturesV2 (next slice), keep reading the
+	; v1 Features Map here so a user with personal shortcuts still sees
+	; them in the Raccourcis menu.
+	_AppendPersonalShortcutsSubmenuIfAny(SubMenu)
+
+	return SubMenu
+}
+
+; Transitional: render the runtime-built Shortcuts.Personal sub-Map at the
+; bottom of the Raccourcis menu when it carries entries. Replicates what
+; CreateSubMenusRecursive used to do for the Personal sub-Map (separator
+; + nested submenu of per-name toggles). To be removed in the slice that
+; migrates RegisterPersonalFeature off the v1 Features Map.
+_AppendPersonalShortcutsSubmenuIfAny(ShortcutsMenu) {
+	global Features
+	if !Features.Has("Shortcuts") {
+		return
+	}
+	Sc := Features["Shortcuts"]
+	if !Sc.Has("Personal") {
+		return
+	}
+	Personal := Sc["Personal"]
+	if !(IsObject(Personal) and Type(Personal) == "Map") {
+		return
+	}
+	; A Personal sub-Map with no user entries (only the __Order / __Label
+	; metadata keys) would render as an empty submenu — skip it to avoid
+	; visual noise. Iterating __Order gives just the user-registered names.
+	Names := []
+	if Personal.Has("__Order") {
+		for Item in Personal["__Order"] {
+			if (Item != "" and Item != "__Order" and Item != "__Label") {
+				Names.Push(Item)
+			}
+		}
+	}
+	if (Names.Length == 0) {
+		return
+	}
+
+	ShortcutsMenu.Add()  ; visual separator before the Personal block
+	PersonalMenu := Menu()
+	for Name in Names {
+		MenuAddItem(PersonalMenu, "Shortcuts.Personal", Name)
+	}
+	ShortcutsMenu.Add(t("menu.shortcuts.personal"), PersonalMenu)
 }
 
 initMenu() {
