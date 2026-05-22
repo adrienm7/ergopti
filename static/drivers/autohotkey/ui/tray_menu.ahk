@@ -974,6 +974,29 @@ global HotstringCategoriesErgopti := _HotstringGroups.ergopti
 global _FLAT_HOTSTRING_V1_CATS := ["Autocorrection", "DistancesReduction",
 	"SFBsReduction", "Rolls", "MagicKey"]
 
+; Custom render order for the ``DynamicHotstrings`` submenu — the manifest
+; doesn't yet model menu order or separators, so the curated UX layout is
+; pinned here as a sidecar. Each entry is either a v1 PascalCase feature id
+; or ``"-"`` (separator). When the manifest grows ``menu_order`` /
+; ``menu_separator`` metadata this constant can move into the codegen.
+global _DYNAMIC_HOTSTRINGS_ORDER := ["DateLongFr", "DateFr", "Date",
+	"PhonePrefixes", "SsnPrefixes", "IbanPrefixes", "-",
+	"TextExpansionPersonalInformation"]
+
+; Return true when ``Category`` is built by a dedicated manifest-driven
+; helper inside InitSubMenus (skipping the CreateSubMenusRecursive
+; fallback that still walks the legacy Features Map). Kept as a single
+; predicate so the "already rendered" guard has one definition.
+_IsCategoryManifestRendered(Category) {
+	global _FLAT_HOTSTRING_V1_CATS
+	for FlatCat in _FLAT_HOTSTRING_V1_CATS {
+		if (Category == FlatCat) {
+			return true
+		}
+	}
+	return (Category == "DynamicHotstrings")
+}
+
 InitSubMenus() {
 	global Features, SubMenus, _FLAT_HOTSTRING_V1_CATS, _V1V2_TopCategoryMap
 	SubMenus := Map()
@@ -993,22 +1016,18 @@ InitSubMenus() {
 		SubMenus[V1Cat] := SubMenu
 	}
 
+	; DynamicHotstrings — custom-ordered, with separator + injected editor.
+	SubMenus["DynamicHotstrings"] := _BuildDynamicHotstringsSubmenu()
+
 	; Remaining categories still rely on the Features Map for structure —
-	; __Order arrays with virtual headers (DynamicHotstrings, Shortcuts),
-	; sub-Maps (Shortcuts.AltGrLAlt, TapHolds.<Key>), or runtime entries
-	; (Personal). These will migrate in subsequent slices.
+	; __Order arrays with virtual headers (Shortcuts), sub-Maps
+	; (Shortcuts.AltGrLAlt, TapHolds.<Key>), or runtime entries (Personal).
+	; These will migrate in subsequent slices.
 	for Category, Items in Features {
 		if (Category == "Layout") {
 			continue
 		}
-		Already := false
-		for FlatCat in _FLAT_HOTSTRING_V1_CATS {
-			if (Category == FlatCat) {
-				Already := true
-				break
-			}
-		}
-		if Already {
+		if _IsCategoryManifestRendered(Category) {
 			continue
 		}
 		SubMenu := Menu()
@@ -1021,6 +1040,41 @@ InitSubMenus() {
 	; built directly inside initMenu's Hotstrings rendering block
 	; (search for ``PersonalMenu := Menu()``) so the InitSubMenus pass
 	; doesn't need to touch Features["Personal"] at all.
+}
+
+; Build the DynamicHotstrings submenu directly from the manifest, honouring
+; the curated render order in ``_DYNAMIC_HOTSTRINGS_ORDER`` and injecting
+; the personal-info editor entry right after the text-expansion item (the
+; same hardcoded injection ``CreateSubMenusRecursiveCommonCode`` still
+; performs for legacy categories — kept here so the manifest path is
+; visually identical to the v1 path it replaces).
+_BuildDynamicHotstringsSubmenu() {
+	global _V1V2_DynamicHotstringsKeyMap, _DYNAMIC_HOTSTRINGS_ORDER
+	SubMenu := Menu()
+	for V1Id in _DYNAMIC_HOTSTRINGS_ORDER {
+		if (V1Id == "-") {
+			SubMenu.Add()
+			continue
+		}
+		if !_V1V2_DynamicHotstringsKeyMap.Has(V1Id) {
+			try LoggerWarn("Menu",
+				"DynamicHotstrings: no v2 id for '{1}' — skipped.", V1Id)
+			continue
+		}
+		V2Id := _V1V2_DynamicHotstringsKeyMap[V1Id]
+		Entry := ManifestFindEntryByV2Path("hotstrings.dynamic." . V2Id)
+		if (Entry == false) {
+			try LoggerWarn("Menu",
+				"DynamicHotstrings: no manifest entry for '{1}' — skipped.", V1Id)
+			continue
+		}
+		MenuAddItemFromManifest(SubMenu, Entry, "DynamicHotstrings")
+		if (V1Id == "TextExpansionPersonalInformation") {
+			RegisterMenuItem(SubMenu,
+				t("menu.shortcuts.edit_personal_info"), PersonalInformationEditor)
+		}
+	}
+	return SubMenu
 }
 
 initMenu() {
