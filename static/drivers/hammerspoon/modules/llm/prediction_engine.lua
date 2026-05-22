@@ -26,16 +26,15 @@ local M = {}
 local hs = hs
 
 local core_llm         = require("modules.llm")
-local Parser           = require("modules.llm.parser")
 local WarmupController = require("modules.llm.warmup_controller")
 local PromptBuilder    = require("modules.llm.prompt_builder")
 local StreamingHandler = require("modules.llm.streaming_handler")
+local AppFilter        = require("modules.llm.app_filter")
 local Logger           = require("lib.logger")
 local i18n             = require("lib.i18n")
 local Keycodes         = require("lib.keycodes")
 local tooltip          = require("ui.tooltip")
 local keylogger        = require("modules.keylogger")
-local km_utils         = require("modules.keymap.utils")
 
 local LOG    = "llm.prediction_engine"
 local _state = nil  -- Shared keymap core state; injected via M.init()
@@ -44,11 +43,10 @@ local _state = nil  -- Shared keymap core state; injected via M.init()
 
 
 
--- ===================================
+
 --- ===================================
 --- ======= 1/ Module Constants =======
 --- ===================================
--- ===================================
 
 -- ── macOS key code ────────────────────────────────────────────────────────────
 
@@ -57,12 +55,6 @@ local _state = nil  -- Shared keymap core state; injected via M.init()
 -- F15 cannot accidentally fire an LLM chain. Exported so the keymap bridge can
 -- detect it without duplicating the constant.
 local KEYCODE_LLM_CHAIN = Keycodes.F16_LLM_CHAIN_SIGNAL
-
--- ── Diversity / temperature ───────────────────────────────────────────────────
-
--- ── Context truncation ───────────────────────────────────────────────────────
-
--- ── UI / display parameters ───────────────────────────────────────────────────
 
 local SPINNER_FPS = 6  -- Frames per second for the streaming progress spinner
 
@@ -78,40 +70,9 @@ local DEBOUNCE_SLOW_MULT = 0.5  -- Multiplier applied when WPM is below SLOW_TYP
 local DEBOUNCE_MIN_SEC   = 0.05
 local DEBOUNCE_MAX_SEC   = 0.6
 
--- ── N-gram instant prediction ─────────────────────────────────────────────────
--- Show a local word-bigram prediction immediately (< 1 ms) while the LLM warms up.
--- Replaced in-place when the LLM response arrives, so the user always sees something.
-
-local NGRAM_MIN_COUNT = 2  -- Ignore words seen only once (noise / typos)
-local NGRAM_MAX_PREDS = 3  -- Maximum instant candidates to show before LLM responds
-
 -- ── Timing constants ──────────────────────────────────────────────────────────
 
 local CHAIN_FALLBACK_SEC  = 0.5   -- Fire chain LLM if the F16 signal is somehow missed
-
--- ── URL-bar / app exclusion ───────────────────────────────────────────────────
-
--- AXSubrole assigned by macOS to URL text fields in Safari and other native browser controls.
-local AX_URL_SUBROLE = "AXURLField"
--- Lowercase substrings matched against AXIdentifier to detect Chrome/Brave/Opera omniboxes.
--- Edge does not reliably expose an identifier, so a parent-toolbar fallback is used instead.
-local URL_BAR_ID_PATTERNS = { "address", "urlfield", "location", "omnibox", "url" }
--- Bundle IDs of browsers for which an AXTextField inside an AXToolbar is always the URL bar.
--- Used as a fallback when AXSubrole and AXIdentifier checks both come up empty.
-local BROWSER_BUNDLE_IDS = {
-	["com.apple.Safari"]                = true,
-	["com.google.Chrome"]               = true,
-	["com.google.Chrome.canary"]        = true,
-	["com.microsoft.edgemac"]           = true,
-	["com.microsoft.edgemac.Dev"]       = true,
-	["com.microsoft.edgemac.Canary"]    = true,
-	["org.mozilla.firefox"]             = true,
-	["com.brave.Browser"]               = true,
-	["com.brave.Browser.nightly"]       = true,
-	["com.operasoftware.Opera"]         = true,
-	["com.vivaldi.Vivaldi"]             = true,
-	["company.thebrowser.Browser"]      = true,  -- Arc
-}
 
 -- Reference to the LLM engine defaults, used once at module load to seed Section 2
 local LLM_DEFAULTS = core_llm.DEFAULT_STATE
@@ -120,11 +81,10 @@ local LLM_DEFAULTS = core_llm.DEFAULT_STATE
 
 
 
--- ================================
+
 --- ================================
 --- ======= 2/ Mutable State =======
 --- ================================
--- ================================
 
 -- ── Prediction pipeline ───────────────────────────────────────────────────────
 
@@ -160,16 +120,9 @@ local _chain_trigger_timer = nil
 -- True between an accepted prediction and the F16 chain trigger that follows it
 local chain_pending = false
 
--- ── Backend-aware request floor ──
--- The user can debounce as low as they want from the menu, but the engine
--- still enforces this minimum gap between two consecutive backend calls.
--- The cap protects paid API providers from a fast typist's per-keystroke
--- bursts (one debounce = 50 ms x every char = token-burn galore), and
--- doubles as an energy cap on local backends: back-to-back inference keeps
--- the GPU spinning without giving the user a perceptibly snappier UI.
--- The values live in ``_shared/llm/inference.json`` so the AHK twin
--- (modules/llm/api_common.ahk) reads the same floor — a single source
--- of truth across drivers.
+-- Minimum gap between consecutive backend calls — protects paid APIs from per-keystroke
+-- bursts and caps energy on local backends. Sourced from _shared/llm/inference.json
+-- so the AHK twin (modules/llm/api_common.ahk) reads the same floor.
 local ApiCommon = require("modules.llm.api_common")
 local _last_request_at_s = 0
 
@@ -198,12 +151,8 @@ local url_bar_filter_enabled     = true  -- When false, predictions are allowed 
 local secure_field_filter_enabled = true  -- When false, predictions are allowed inside password/secure fields
 local auto_raise_temperature  = LLM_DEFAULTS.llm_auto_raise_temp
 local is_streaming_enabled       = LLM_DEFAULTS.llm_streaming
--- When true, partial prediction batches are shown as each sequential variant completes;
--- when false, the tooltip only appears once the final batch with all predictions is ready
-local is_streaming_multi_enabled = LLM_DEFAULTS.llm_streaming_multi
--- When true, the debounce is bypassed (delay = 0) when the buffer ends with whitespace,
--- meaning the user just completed a word and a suggestion can fire immediately
-local instant_on_word_end        = LLM_DEFAULTS.llm_instant_on_word_end
+local is_streaming_multi_enabled = LLM_DEFAULTS.llm_streaming_multi  -- Show each variant as it streams in
+local instant_on_word_end        = LLM_DEFAULTS.llm_instant_on_word_end  -- Bypass debounce at word boundaries
 
 
 
@@ -383,11 +332,10 @@ end
 
 
 
--- ==================================
+
 --- ==================================
 --- ======= 4/ Private Helpers =======
 --- ==================================
--- ==================================
 
 --- Guards functions that require _state. Logs an error and returns false if it is nil.
 --- @param func_name string Name of the calling function (for the error log).
@@ -439,14 +387,9 @@ local function trim_profile_label(label)
 	local clean = label:match("^%s*(.-)%s*$")
 	if clean == "" then return nil end
 	local head = clean:match("^(.-)%s*—")
-	-- Pick the head only if it has actual content (head:match("%S")). A bare
-	-- em-dash like "— foo" yields head = "" which previously fell through to
-	-- `clean` and re-introduced the dash; checking %S guards against that.
+	-- head:match("%S") guards against a bare "— foo" where head="" falling through to clean
 	local picked = (head and head:match("%S")) and head or clean
-	picked = picked:gsub("^%s+", ""):gsub("%s+$", "")
-	-- Also strip a stray trailing em-dash so concatenation downstream never
-	-- produces the user-reported "— (vide)" tail.
-	picked = picked:gsub("%s*—%s*$", "")
+	picked = picked:gsub("^%s+", ""):gsub("%s+$", ""):gsub("%s*—%s*$", "")
 	if picked == "" then return nil end
 	return picked
 end
@@ -465,17 +408,9 @@ local function build_info_bar_text(model_name, elapsed_ms, backend, profile_name
 	if type(backend) == "string" and backend ~= "" then pieces[#pieces + 1] = backend end
 	local short_profile = trim_profile_label(profile_name)
 	if short_profile and short_profile ~= "" then pieces[#pieces + 1] = short_profile end
-	-- Concat with em-dash separators in a single pass — guarantees no
-	-- trailing or doubled " — " regardless of which fields are present.
 	local text = table.concat(pieces, " — ")
-
-	-- Note: elapsed_ms is intentionally NOT rendered here. tooltip_llm owns the
-	-- timing zone and composes "Model · Profile — TTFT [— TTLT]" so we
-	-- don't duplicate (and contradict) timing across two zones. The
-	-- elapsed_ms parameter is retained for backwards compatibility but its
-	-- value is discarded on purpose.
+	-- elapsed_ms intentionally discarded — tooltip_llm owns the timing zone to avoid duplication
 	local _ = elapsed_ms
-
 	return text
 end
 
@@ -526,154 +461,6 @@ local function start_inactivity_timer(delay_override)
 		Logger.trace(LOG, "Inactivity timer started (adaptive: %.3fs).", delay)
 	end
 end
-
---- Returns the currently focused accessibility element, using the Hammerspoon-correct API.
---- hs.axuielement.focusedElement() does not exist — the canonical way is to query
---- AXFocusedUIElement from the application-level accessibility element.
---- @param front userdata The frontmost hs.application.
---- @return userdata|nil The focused AX element, or nil on failure.
-local function get_focused_element(front)
-	if not front then return nil end
-	local ok_ax, ax = pcall(hs.axuielement.applicationElementForPID, front:pid())
-	if not ok_ax or not ax then return nil end
-	local ok_fe, focused = pcall(function() return ax:attributeValue("AXFocusedUIElement") end)
-	return (ok_fe and focused) or nil
-end
-
---- Returns true when the currently focused accessibility element is a secure text field
---- (e.g. a password input). Works across all applications, not just browsers.
---- @param front userdata|nil The frontmost hs.application.
---- @return boolean True if a password/secure field has focus.
-local function is_secure_field_focused(front)
-	if not front then return false end
-	local focused = get_focused_element(front)
-	if not focused then return false end
-	local ok_role, role    = pcall(function() return focused:attributeValue("AXRole") end)
-	local ok_sub,  subrole = pcall(function() return focused:attributeValue("AXSubrole") end)
-	return (ok_role and role    == "AXSecureTextField")
-	    or (ok_sub  and subrole == "AXSecureTextField")
-end
-
---- Returns true when the currently focused accessibility element is a browser URL bar.
---- Prevents AI predictions from firing while the user is typing a URL or search query.
----
---- Detection strategy (three layers, each more expensive than the last):
----   1. AXSubrole == "AXURLField" — Safari and native WebKit controls; definitive.
----   2. AXIdentifier pattern match — Chrome, Brave, Opera; reliable when id is set.
----   3. Ancestor toolbar check — Edge, Firefox, Arc; no identifier exposed, but a
----      text field directly inside an AXToolbar in a known browser is always the URL bar.
----      Only attempted when the frontmost app is a known browser bundle ID.
----
---- @param front userdata|nil The frontmost hs.application (passed from the caller to
----              avoid a redundant frontmostApplication() call).
---- @return boolean True if a URL-bar-type element has input focus.
-local function is_url_bar_focused(front)
-	if not front then return false end
-	-- Only check known browsers — avoids expensive AX calls for non-browser apps
-	local bid = front:bundleID() or ""
-	if not BROWSER_BUNDLE_IDS[bid] then return false end
-
-	local focused = get_focused_element(front)
-	if not focused then return false end
-
-	-- Only text fields can be URL bars — skip everything else early
-	local ok_role, role = pcall(function() return focused:attributeValue("AXRole") end)
-	if not ok_role or role ~= "AXTextField" then return false end
-
-	-- Layer 1 — Safari / WebKit: AXSubrole is explicitly "AXURLField"
-	local ok_sub, subrole = pcall(function() return focused:attributeValue("AXSubrole") end)
-	if ok_sub and subrole == AX_URL_SUBROLE then return true end
-
-	-- Layer 2 — Chrome / Brave / Opera: AXIdentifier contains a recognisable pattern
-	local ok_id, identifier = pcall(function() return focused:attributeValue("AXIdentifier") end)
-	if ok_id and type(identifier) == "string" and identifier ~= "" then
-		local id_lower = identifier:lower()
-		for _, pattern in ipairs(URL_BAR_ID_PATTERNS) do
-			if id_lower:find(pattern, 1, true) then return true end
-		end
-	end
-
-	-- Layer 3 — Edge / Firefox / Arc: no usable identifier; check the parent hierarchy.
-	-- Walk up two levels: input may be directly in the toolbar (Firefox) or wrapped in
-	-- an AXGroup inside the toolbar (Chromium / Edge omnibox structure).
-	local ok_p, parent = pcall(function() return focused:attributeValue("AXParent") end)
-	if ok_p and parent then
-		local ok_pr, parent_role = pcall(function() return parent:attributeValue("AXRole") end)
-		if ok_pr and parent_role == "AXToolbar" then return true end
-		local ok_gp, grandparent = pcall(function() return parent:attributeValue("AXParent") end)
-		if ok_gp and grandparent then
-			local ok_gr, gp_role = pcall(function() return grandparent:attributeValue("AXRole") end)
-			if ok_gr and gp_role == "AXToolbar" then return true end
-		end
-	end
-
-	return false
-end
-
---- Returns the application that currently has keyboard focus.
---- Prefers the app owning the focused window because floating-panel launchers
---- (e.g. Raycast) accept keyboard input without becoming the macOS frontmost
---- application — using frontmostApplication() would return the previously
---- active app and incorrectly inherit its exclusion rules.
---- @return userdata|nil hs.application object, or nil on failure.
-local function get_focused_app()
-	-- focusedWindow() returns the window with keyboard focus regardless of
-	-- whether its parent app is the NSWorkspace frontmost application
-	local ok_fw, fw = pcall(hs.window.focusedWindow)
-	if ok_fw and fw then
-		local ok_app, app = pcall(function() return fw:application() end)
-		if ok_app and app then return app end
-	end
-	return hs.application.frontmostApplication()
-end
-
---- Returns true when LLM predictions should be suppressed for the current app.
---- Checks both the keymap global window ignore list and the bridge per-app exclusion list.
---- @return boolean True if the active window or app is on an exclusion list.
-local function is_blocked_for_current_app()
-	if not _state then return false end
-	if km_utils.is_ignored_window(_state.ignored_window_titles, _state.ignored_window_patterns) then
-		return true
-	end
-	-- Use the app that owns the focused window, not the macOS frontmost app
-	local front = get_focused_app()
-	-- Password/secure fields in any application
-	if secure_field_filter_enabled and is_secure_field_focused(front) then
-		Logger.debug(LOG, "Secure field focused — LLM request skipped.")
-		return true
-	end
-	-- URL bars (address fields) in browsers: skip when the filter is enabled
-	if url_bar_filter_enabled and is_url_bar_focused(front) then
-		Logger.debug(LOG, "URL bar focused — LLM request skipped.")
-		return true
-	end
-	if not front then return false end
-	local bid  = front:bundleID() or ""
-	local path = front:path() or ""
-	local name = (front:name() or ""):lower()
-
-	for _, app in ipairs(excluded_apps) do
-		local has_path = type(app.appPath) == "string" and app.appPath ~= ""
-		local has_bid  = type(app.bundleID) == "string" and app.bundleID ~= ""
-		local configured_name = type(app.name) == "string" and app.name:lower() or ""
-		local same_name = (not has_path and not has_bid and configured_name ~= ""
-			and (configured_name == name
-			or name:find(configured_name, 1, true)
-			or configured_name:find(name, 1, true)))
-		local path_match = has_path and (app.appPath == path)
-		local bid_match  = (not has_path and has_bid and app.bundleID == bid)
-
-		if path_match
-			or bid_match
-			or same_name
-		then
-			Logger.debug(LOG, "App excluded: '%s' — LLM request skipped.", front:name() or bid)
-			return true
-		end
-	end
-	return false
-end
-
 --- Cancels the inactivity timer without firing the LLM check.
 local function stop_inactivity_timer()
 	if _inactivity_timer then
@@ -690,85 +477,6 @@ end
 -- ======= 5/ LLM Prediction Pipeline =========
 -- ============================================
 -- ============================================
-
-
---- Returns instant next-word candidates from the keylogger's in-memory word-bigram
---- index, without any network call. Results are shown immediately while the LLM warms
---- up and replaced in-place when the real response arrives.
----
---- Strategy:
----   1. Extract the last complete word from the buffer (requires buffer to end with a
----      word separator — no prediction at mid-word since the partial word constrains the
----      result space better than bigrams do).
----   2. Scan every app's w_bg (word-bigram) table for entries of the form "lastword X".
----   3. Sort by frequency, deduplicate, cap at NGRAM_MAX_PREDS.
----
---- @param buffer string The current tracked context buffer.
---- @return table Array of placeholder prediction objects (same shape as LLM predictions).
-local function ngram_predict(buffer)
-	-- Only meaningful at word boundaries — mid-word completion is the LLM's job
-	if not buffer:match("%s$") then return {} end
-
-	-- Extract the last completed word (skip trailing whitespace)
-	local last_word = buffer:match("(%S+)%s+$")
-	if not last_word or last_word == "" then return {} end
-	last_word = last_word:lower()
-
-	local ok_idx, today_idx = pcall(keylogger.get_ngram_index)
-	if not ok_idx or type(today_idx) ~= "table" then return {} end
-
-	-- Aggregate counts across all apps — more data = better signal, and the
-	-- prediction engine already has the per-app LLM exclusion layer above
-	local counts = {}
-	local prefix = last_word .. " "
-	for _, app_idx in pairs(today_idx) do
-		local w_bg = type(app_idx) == "table" and app_idx.w_bg
-		if type(w_bg) == "table" then
-			for key, entry in pairs(w_bg) do
-				if key:sub(1, #prefix) == prefix and type(entry) == "table" then
-					local next_word = key:sub(#prefix + 1)
-					if next_word ~= "" then
-						counts[next_word] = (counts[next_word] or 0) + (entry.c or 0)
-					end
-				end
-			end
-		end
-	end
-
-	-- Collect candidates above the noise floor
-	local candidates = {}
-	for word, count in pairs(counts) do
-		if count >= NGRAM_MIN_COUNT then
-			table.insert(candidates, { word = word, count = count })
-		end
-	end
-	if #candidates == 0 then return {} end
-
-	table.sort(candidates, function(a, b) return a.count > b.count end)
-
-	local result = {}
-	local seen   = {}
-	for _, c in ipairs(candidates) do
-		if not seen[c.word] and #result < NGRAM_MAX_PREDS then
-			seen[c.word] = true
-			-- Prediction appends a space + word after the cursor (no deletions needed)
-			table.insert(result, {
-				to_type              = " " .. c.word,
-				deletes              = 0,
-				chunks               = {},
-				nw                   = c.word,
-				has_corrections      = false,
-				disable_bold         = true,
-				-- Treated as a stream-placeholder so on_partial_cb and on_success
-				-- both evict it cleanly when real LLM tokens arrive
-				_is_stream_placeholder = true,
-			})
-		end
-	end
-
-	Logger.debug(LOG, "N-gram instant prediction: %d candidate(s) for '%s'.", #result, last_word)
-	return result
-end
 
 
 --- Runs the full LLM prediction pipeline against the current buffer state.
@@ -800,14 +508,12 @@ function M.perform_check(force_trigger, profile_name)
 		Logger.debug(LOG, "Backend not ready yet — request skipped (model warming up).")
 		return
 	end
-	if is_blocked_for_current_app() then
+	if AppFilter.is_blocked(_state, excluded_apps, url_bar_filter_enabled, secure_field_filter_enabled) then
 		Logger.debug(LOG, "App excluded — LLM request skipped.")
 		return
 	end
 
-	-- Sync the dismiss delay NOW, before any show_predictions() call,
-	-- so the auto-dismiss timer is created with the correct value from the very first frame.
-	-- delay = 0 → tooltip_llm will not start any timer (infinite display).
+	-- Sync dismiss delay before the first show call so the timer is created with the correct duration
 	local dismiss_delay = (_state.DELAYS and _state.DELAYS.llm_prediction) or 0
 	tooltip.set_llm_timeout(dismiss_delay)
 
@@ -850,9 +556,7 @@ function M.perform_check(force_trigger, profile_name)
 	_last_request_buffer_len = #buffer
 	_last_request_at_s       = hs.timer.secondsSinceEpoch()
 
-	-- Pre-build a model/backend info bar for use during streaming and n-gram display.
-	-- elapsed_ms is omitted here (stream not yet complete); on_success will replace this
-	-- with the version that includes round-trip latency once the final batch arrives.
+	-- Pre-build the info bar for streaming frames; on_success replaces it with the latency-aware version
 	local active_profile_now   = core_llm.get_active_profile()
 	local display_profile_now  = profile_name or (active_profile_now and active_profile_now.label)
 	local streaming_info_bar   = show_info_bar
@@ -862,7 +566,7 @@ function M.perform_check(force_trigger, profile_name)
 	-- N-gram instant prediction: show a local word-bigram candidate immediately
 	-- (< 1 ms) while the async LLM request is in flight. It is a stream-placeholder so
 	-- it gets evicted cleanly when the first streaming token or final on_success arrives.
-	local ngram_preds = ngram_predict(buffer)
+	local ngram_preds = StreamingHandler.ngram_predict(buffer)
 	if #ngram_preds > 0 then
 		pending_predictions = ngram_preds
 		predictions_visible = true
@@ -879,33 +583,22 @@ function M.perform_check(force_trigger, profile_name)
 	Logger.start(LOG, "LLM request — model: '%s' | temp: %.2f | %d pred(s) | max tokens: %d.",
 		tostring(model_to_use), params.req_temperature, num_preds, params.max_tokens)
 
-	-- Arm the backend-agnostic chain timing instrumentation. The tooltip
-	-- ignores subsequent calls within the same chain, so this is safe to call
-	-- on every perform_check — the first one in a chain wins and TTLT spans
-	-- all subsequent links until M.reset() fires mark_chain_complete().
+	-- The tooltip ignores duplicate set_chain_start calls — the first in a chain wins
 	pcall(tooltip.set_chain_start, hs.timer.secondsSinceEpoch())
 
-	-- Loading indicator: only shown when nothing is already on screen (n-gram placeholder
-	-- or previous LLM predictions). Avoids the blank gap that the spinner creates —
-	-- existing content stays visible and is replaced in-place when new predictions arrive.
+	-- Only show the spinner when the screen is empty; otherwise mark existing predictions as
+	-- placeholders so on_partial_cb evicts them cleanly when new tokens arrive
 	if not predictions_visible then
 		tooltip.show_loading(i18n.get("llm.generating"), is_ai_preview_enabled, tooltip.tint("ai_loading"))
 	else
-		-- Mark any finalized predictions as placeholders so on_partial_cb evicts them
-		-- cleanly when streaming tokens start arriving, without needing to hide the tooltip.
-		for _, p in ipairs(pending_predictions) do
-			p._is_stream_placeholder = true
-		end
+		for _, p in ipairs(pending_predictions) do p._is_stream_placeholder = true end
 	end
 
-	-- Bump counters to discard any in-flight callbacks that are now stale
 	llm_request_counter   = llm_request_counter + 1
 	fetch_request_counter = fetch_request_counter + 1
 	local my_fetch_id     = fetch_request_counter
 
-	-- Shared noise gate used by both the streaming partial path and the final on_success
-	-- filter — keeps both in lockstep so no hallucination ever appears during streaming
-	-- that the final filter would later remove
+	-- Shared noise gate — must be consistent between partial and final paths
 	local function is_noise_pred(to_type)
 		if not to_type or to_type:gsub("[%s%.…]", "") == "" then return true end
 		local text_lower = to_type:lower()
@@ -1073,11 +766,10 @@ end
 
 
 
--- ============================
+
 --- =============================
 --- ======= 6/ Public API =======
 --- =============================
--- ============================
 
 --- Initializes the engine by injecting the shared keymap core state.
 --- Must be called exactly once before any other engine function.

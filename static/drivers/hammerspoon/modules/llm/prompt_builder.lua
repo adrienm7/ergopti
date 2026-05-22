@@ -62,11 +62,10 @@ local CONTEXT_MIN_CHARS      = 100  -- Hard floor: always keep at least this man
 
 
 
--- =============================================
+
 --- =============================================
 --- ======= 2/ Request Parameter Building =======
 --- =============================================
--- =============================================
 
 --- Extracts the tail context (last CONTEXT_TAIL_WORDS words) from the buffer.
 --- Returns both the word list and the concatenated tail string for use in the
