@@ -159,7 +159,20 @@ MenuAddItemWithLabel(MenuParent, V1Path, MenuTitle, MasterCategory) {
 ; ``.Enabled`` property for non-manifest features (TapHolds variants
 ; especially). Used everywhere the tray menu needs to know whether
 ; to draw a checkmark.
+;
+; TapHolds variants are not in the manifest (their v2 schema condenses
+; mutually-exclusive variant groups into a single resolved tuple), so the
+; FeaturesV2 lookup misses. The v1 Features Map cannot be used either:
+; ``Features["TapHolds"]`` is rebuilt from the static ``_TapHoldsConfig``
+; defaults on every Reload, so it always reflects the hardcoded default
+; variant rather than the user's persisted choice. The authoritative
+; source is the ``TapHold`` global, loaded from ``tap_hold.toml`` at boot;
+; ``IsTapHoldVariantActive`` derives the checkmark by comparing the
+; variant's (tap, hold) tuple against ``TapHold["keys"][V2KeyId]``.
 _ResolveMenuItemEnabled(V1Path) {
+	if (StrLen(V1Path) >= 9 and SubStr(V1Path, 1, 9) == "TapHolds.") {
+		return IsTapHoldVariantActive(V1Path)
+	}
 	State := GetFeatureV2State(V1Path)
 	if State.Has("Enabled") {
 		return (State["Enabled"] = true)
