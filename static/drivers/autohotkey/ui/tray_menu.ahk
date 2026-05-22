@@ -89,11 +89,11 @@ CreateSubMenusRecursiveCommonCode(MenuParent, Key, Val, CategoryPath) {
 		; Mirror HS personal_info module_placeholder: add an editor shortcut
 		; below the "Remplissage de formulaires" toggle
 		if (StrLower(Key) == "textexpansionpersonalinformation") {
-			MenuParent.Add(t("menu.shortcuts.edit_personal_info"), PersonalInformationEditor)
+			RegisterMenuItem(MenuParent, t("menu.shortcuts.edit_personal_info"), PersonalInformationEditor)
 		}
 		; Mirror HS ctrl_g pattern: inject the URL editor right below the GPT toggle
 		if (StrLower(Key) == "gpt") {
-			MenuParent.Add(t("menu.shortcuts.edit_gpt_link"), GPTLinkEditor)
+			RegisterMenuItem(MenuParent, t("menu.shortcuts.edit_gpt_link"), GPTLinkEditor)
 		}
 	}
 }
@@ -170,7 +170,7 @@ MenuAddLetterPicker(MenuParent, FeatureCategoryPath, FeatureName) {
 
 	; Entry that disables the remap without touching Letter
 	DisabledLabel := t("common.disabled")
-	LetterMenu.Add(DisabledLabel, ((p) => (*) => SetFeatureLetterOff(p))(FullPath))
+	RegisterMenuItem(LetterMenu, DisabledLabel, ((p) => (*) => SetFeatureLetterOff(p))(FullPath))
 	if !Feature.Enabled {
 		LetterMenu.Check(DisabledLabel)
 	}
@@ -348,7 +348,7 @@ BuildGesturesMenu() {
 	; plus an in-panel button that opens Settings. The two-item flow forced
 	; the user to bounce between menus to copy a shortcut and then go open
 	; Settings; one panel keeps the whole walkthrough in front of them.
-	GMenu.Add(t("menu.gestures.manual_tutorial"), (*) => GestureShowManualTutorialDialog())
+	RegisterMenuItem(GMenu, t("menu.gestures.manual_tutorial"), (*) => GestureShowManualTutorialDialog())
 
 	GMenu.Add()
 
@@ -454,17 +454,17 @@ BuildMetricsMenu() {
 	MetricsMenu.Disable(privacy_header)
 
 	private_label := t("menu.metrics.filter_private")
-	MetricsMenu.Add(private_label, ToggleFilterPrivate)
+	RegisterMenuItem(MetricsMenu, private_label, ToggleFilterPrivate)
 	if MetricsFilters.private_browsing
 		MetricsMenu.Check(private_label)
 
 	secure_label := t("menu.metrics.filter_secure")
-	MetricsMenu.Add(secure_label, ToggleFilterSecureField)
+	RegisterMenuItem(MetricsMenu, secure_label, ToggleFilterSecureField)
 	if MetricsFilters.secure_field
 		MetricsMenu.Check(secure_label)
 
 	sysauth_label := t("menu.metrics.filter_sysauth")
-	MetricsMenu.Add(sysauth_label, ToggleFilterSystemAuth)
+	RegisterMenuItem(MetricsMenu, sysauth_label, ToggleFilterSystemAuth)
 	if MetricsFilters.system_auth
 		MetricsMenu.Check(sysauth_label)
 
@@ -474,7 +474,7 @@ BuildMetricsMenu() {
 	excl_label := (n > 0)
 		? t("menu.metrics.disabled_in_prefix") . n . (n > 1 ? t("menu.metrics.disabled_in_suffix_p") : t("menu.metrics.disabled_in_suffix_s"))
 		: t("menu.metrics.exclude_apps")
-	MetricsMenu.Add(excl_label, OpenMetricsAppPicker)
+	RegisterMenuItem(MetricsMenu, excl_label, OpenMetricsAppPicker)
 
 	; ── Real-time WPM display ──────────────────────────────────────────────
 	MetricsMenu.Add()
@@ -487,12 +487,12 @@ BuildMetricsMenu() {
 	; Fat-arrow lambdas capture their enclosing locals by reference in AHK v2,
 	; so passing them directly is simpler and more reliable than IIFE patterns,
 	; which AHK does not support across line breaks.
-	MetricsMenu.Add(WpmMenubarLabel,       (*) => _ToggleWpmMenubar(MetricsMenu, WpmMenubarLabel, WpmMenubarColorsLabel))
-	MetricsMenu.Add(WpmMenubarColorsLabel, (*) => _ToggleWpmMenubarColors(MetricsMenu, WpmMenubarColorsLabel))
+	RegisterMenuItem(MetricsMenu, WpmMenubarLabel,       (*) => _ToggleWpmMenubar(MetricsMenu, WpmMenubarLabel, WpmMenubarColorsLabel))
+	RegisterMenuItem(MetricsMenu, WpmMenubarColorsLabel, (*) => _ToggleWpmMenubarColors(MetricsMenu, WpmMenubarColorsLabel))
 	MetricsMenu.Add()
-	MetricsMenu.Add(WpmWidgetLabel,        (*) => _ToggleWpmWidget(MetricsMenu, WpmWidgetLabel, WpmWidgetColorsLabel, WpmWidgetGraphLabel))
-	MetricsMenu.Add(WpmWidgetColorsLabel,  (*) => _ToggleWpmWidgetColors(MetricsMenu, WpmWidgetColorsLabel))
-	MetricsMenu.Add(WpmWidgetGraphLabel,   (*) => _ToggleWpmWidgetGraph(MetricsMenu, WpmWidgetGraphLabel))
+	RegisterMenuItem(MetricsMenu, WpmWidgetLabel,        (*) => _ToggleWpmWidget(MetricsMenu, WpmWidgetLabel, WpmWidgetColorsLabel, WpmWidgetGraphLabel))
+	RegisterMenuItem(MetricsMenu, WpmWidgetColorsLabel,  (*) => _ToggleWpmWidgetColors(MetricsMenu, WpmWidgetColorsLabel))
+	RegisterMenuItem(MetricsMenu, WpmWidgetGraphLabel,   (*) => _ToggleWpmWidgetGraph(MetricsMenu, WpmWidgetGraphLabel))
 
 	if MetricsShortcuts.show_wpm_menubar
 		MetricsMenu.Check(WpmMenubarLabel)
@@ -804,7 +804,7 @@ initMenu() {
 		InsertKeyboardShortcutGroups(SubMenus["Shortcuts"], t("menu.shortcuts.group_modifiers"))
 		SubMenus["Shortcuts"].Add(t("menu.shortcuts.script_shortcuts"), BuildScriptShortcutsMenu())
 		SubMenus["Shortcuts"].Add() ; Separator before edit personal shortcuts
-		SubMenus["Shortcuts"].Add(t("menu.global.edit_shortcuts"), OpenPersonalShortcuts)
+		RegisterMenuItem(SubMenus["Shortcuts"], t("menu.global.edit_shortcuts"), OpenPersonalShortcuts)
 
 		; Extensions shortcuts — one submenu per bundled extension that ships a
 		; shortcuts/menu.ahk. The script is run in a sandboxed #Include context
@@ -906,11 +906,11 @@ initMenu() {
 
 	; 1. Paramètres — mirrors HS "⚙️ Paramètres hotstrings" submenu
 	ParamsMenu := Menu()
-	ParamsMenu.Add(t("menu.hotstrings.delays_colors"),
+	RegisterMenuItem(ParamsMenu, t("menu.hotstrings.delays_colors"),
 		(*) => OpenHotstringsConfigWindow())
-	ParamsMenu.Add(t("menu.hotstrings.magic_key_prefix") . ScriptInformation["MagicKey"], MagicKeyEditor)
+	RegisterMenuItem(ParamsMenu, t("menu.hotstrings.magic_key_prefix") . ScriptInformation["MagicKey"], MagicKeyEditor)
 	RepeatToggleLabel := t("menu.hotstrings.repeat_key_toggle")
-	ParamsMenu.Add(RepeatToggleLabel, ToggleRepeatKeyEnabled)
+	RegisterMenuItem(ParamsMenu, RepeatToggleLabel, ToggleRepeatKeyEnabled)
 	if HSE_RepeatEnabled {
 		ParamsMenu.Check(RepeatToggleLabel)
 	}
@@ -1018,7 +1018,7 @@ initMenu() {
 	if Features.Has("Personal") {
 		; Build the unified personal submenu for personal_hotstrings.toml
 		PersonalMenu := Menu()
-		PersonalMenu.Add(t("menu.hotstrings.open_editor"), (*) => OpenPersonalEditor())
+		RegisterMenuItem(PersonalMenu, t("menu.hotstrings.open_editor"), (*) => OpenPersonalEditor())
 		; Shortcut item — not yet customisable from AHK (HS handles it on macOS)
 		_ShortcutLabel := t("menu.hotstrings.shortcut_prefix") . ScriptInformation["MagicKey"]
 		PersonalMenu.Add(_ShortcutLabel, (*) => NoAction())
@@ -1026,7 +1026,7 @@ initMenu() {
 		; Default section — submenu with "Aucune" + one item per TOML section
 		CurDefaultSec := _EditorPrefGet("DefaultSection", "")
 		DefaultSectionMenu := Menu()
-		DefaultSectionMenu.Add(t("menu.hotstrings.default_none"), (*) => _SetPersonalDefaultSection("", PersonalMenu, TomlData,
+		RegisterMenuItem(DefaultSectionMenu, t("menu.hotstrings.default_none"), (*) => _SetPersonalDefaultSection("", PersonalMenu, TomlData,
 			DefaultSectionMenu))
 		if (CurDefaultSec == "") {
 			DefaultSectionMenu.Check(t("menu.hotstrings.default_none"))
@@ -1038,7 +1038,7 @@ initMenu() {
 			}
 			SecData := TomlData["sections"][SecName]
 			SecLabel := SecData["description"]
-			DefaultSectionMenu.Add(SecLabel, _MakeSetDefaultSectionFn(SecName, PersonalMenu, TomlData,
+			RegisterMenuItem(DefaultSectionMenu, SecLabel, _MakeSetDefaultSectionFn(SecName, PersonalMenu, TomlData,
 				DefaultSectionMenu))
 			if (CurDefaultSec == SecName) {
 				DefaultSectionMenu.Check(SecLabel)
@@ -1051,7 +1051,7 @@ initMenu() {
 		_DefaultCatLabel := t("menu.hotstrings.default_category_prefix") . CurDefaultLabel
 		PersonalMenu.Add(_DefaultCatLabel, DefaultSectionMenu)
 		_CloseOnAddLabel := t("menu.hotstrings.close_on_add")
-		PersonalMenu.Add(_CloseOnAddLabel, (*) => _TogglePersonalCloseOnAdd(PersonalMenu))
+		RegisterMenuItem(PersonalMenu, _CloseOnAddLabel, (*) => _TogglePersonalCloseOnAdd(PersonalMenu))
 		if (_EditorPrefGet("CloseOnAdd", "1") == "1") {
 			PersonalMenu.Check(_CloseOnAddLabel)
 		}
@@ -1082,7 +1082,7 @@ initMenu() {
 			ExtCount += _ES["count"]
 		}
 		ExtMenu := Menu()
-		ExtMenu.Add(t("menu.hotstrings.open_file"), _MakeOpenFileFn(ExtPath))
+		RegisterMenuItem(ExtMenu, t("menu.hotstrings.open_file"), _MakeOpenFileFn(ExtPath))
 		if (ExtSections.Length > 0) {
 			ExtMenu.Add()
 			for _, _ES in ExtSections {
@@ -1269,9 +1269,9 @@ initMenu() {
 	; separator that closes the block), grouped with the other user-facing toggles
 	; rather than with the version / channel / language items.
 	GlobalActionsMenu := Menu()
-	GlobalActionsMenu.Add(t("menu.global.enable_all"),  ToggleAllFeaturesOn)
-	GlobalActionsMenu.Add(t("menu.global.disable_all"), ToggleAllFeaturesOff)
-	GlobalActionsMenu.Add(t("menu.global.reset_defaults"), ReloadWithDefaultConfig)
+	RegisterMenuItem(GlobalActionsMenu, t("menu.global.enable_all"),  ToggleAllFeaturesOn)
+	RegisterMenuItem(GlobalActionsMenu, t("menu.global.disable_all"), ToggleAllFeaturesOff)
+	RegisterMenuItem(GlobalActionsMenu, t("menu.global.reset_defaults"), ReloadWithDefaultConfig)
 	A_TrayMenu.Add(t("menu.global.title"), GlobalActionsMenu)
 
 	A_TrayMenu.Add() ; Single separator between feature submenus and configuration items
@@ -1290,7 +1290,7 @@ initMenu() {
 		AboutMenu.Add(VerLabel, (*) => NoAction())
 		AboutMenu.Disable(VerLabel)
 	} else {
-		AboutMenu.Add(VerLabel, Updater_OpenCurrentRelease)
+		RegisterMenuItem(AboutMenu, VerLabel, Updater_OpenCurrentRelease)
 	}
 	AboutMenu.Add() ; Separator
 	global UPDATER_CHANNEL, UPDATER_CHECK_INTERVAL, UPDATER_INTERVAL_PRESETS
@@ -1305,8 +1305,8 @@ initMenu() {
 		; Reduces vertical noise in the parent menu and groups the mutually-
 		; exclusive choice under a single header.
 		ChannelMenu := Menu()
-		ChannelMenu.Add(t("menu.about.channel_main"), (*) => Updater_SetChannel("main"))
-		ChannelMenu.Add(t("menu.about.channel_dev"),  (*) => Updater_SetChannel("dev"))
+		RegisterMenuItem(ChannelMenu, t("menu.about.channel_main"), (*) => Updater_SetChannel("main"))
+		RegisterMenuItem(ChannelMenu, t("menu.about.channel_dev"),  (*) => Updater_SetChannel("dev"))
 		ChannelMenu.Check((UPDATER_CHANNEL == "dev") ? t("menu.about.channel_dev") : t("menu.about.channel_main"))
 		AboutMenu.Add(t("menu.about.channel_menu"), ChannelMenu)
 
@@ -1317,7 +1317,7 @@ initMenu() {
 		CurrentLabel := ""
 		for Preset in UPDATER_INTERVAL_PRESETS {
 			Label := t("menu.about.frequency." . Preset.Code)
-			FreqMenu.Add(Label, _MakeFreqSetter(Preset.Seconds))
+			RegisterMenuItem(FreqMenu, Label, _MakeFreqSetter(Preset.Seconds))
 			if (Preset.Seconds == UPDATER_CHECK_INTERVAL)
 				CurrentLabel := Label
 		}
@@ -1330,16 +1330,16 @@ initMenu() {
 	; "release notes" to surface and update checks would be misleading. Skip
 	; both rows entirely in that case — what is hidden cannot confuse.
 	if !Updater_IsLocalSource() {
-		AboutMenu.Add(t("menu.about.check_for_updates"), Updater_CheckForUpdate)
-		AboutMenu.Add(t("menu.about.changelog"),         Updater_ShowChangelog)
+		RegisterMenuItem(AboutMenu, t("menu.about.check_for_updates"), Updater_CheckForUpdate)
+		RegisterMenuItem(AboutMenu, t("menu.about.changelog"),         Updater_ShowChangelog)
 		; "Install update" — visible only when the background poller has
 		; detected a new version (cache populated). One click opens the
 		; install prompt with release notes + the binary-swap button.
 		if IsSet(UPDATER_LATEST_RELEASE) and Type(UPDATER_LATEST_RELEASE) == "Object" {
-			AboutMenu.Add(t("menu.about.install_update"), Updater_ShowAvailableUpdate)
+			RegisterMenuItem(AboutMenu, t("menu.about.install_update"), Updater_ShowAvailableUpdate)
 		}
 	}
-	AboutMenu.Add(t("menu.about.open_releases_page"), (*) => Run(Updater_ReleasesPageUrl()))
+	RegisterMenuItem(AboutMenu, t("menu.about.open_releases_page"), (*) => Run(Updater_ReleasesPageUrl()))
 	A_TrayMenu.Add(t("menu.about.title"), AboutMenu)
 
 	; "Setup wizard" sits first — it is the only way to re-trigger onboarding
@@ -1348,30 +1348,30 @@ initMenu() {
 	; the user typically has: "where are my settings stored?"), and the
 	; language picker sits underneath the config folder rather than between
 	; the wizard and folder where it interrupted the natural reading flow.
-	A_TrayMenu.Add(t("menu.global.setup_wizard"), Onboarding_ShowFromMenu)
+	RegisterMenuItem(A_TrayMenu, t("menu.global.setup_wizard"), Onboarding_ShowFromMenu)
 
 	; ── Script management ──
 	global MenuSuspend
 	MenuSuspend := t("menu.global.suspend")
-	A_TrayMenu.Add(t("menu.global.config_folder"), FilePathsEditor)
+	RegisterMenuItem(A_TrayMenu, t("menu.global.config_folder"), FilePathsEditor)
 
 	LangMenu := Menu()
 	I18nBuildLanguageMenu(LangMenu)
 	A_TrayMenu.Add(t("menu.global.language"), LangMenu)
 	A_TrayMenu.Add() ; Separator before lifecycle actions
-	A_TrayMenu.Add(MenuSuspend, ToggleSuspend)
-	A_TrayMenu.Add(t("menu.global.reload"), ActivateReload)
-	A_TrayMenu.Add(t("menu.global.quit"), ActivateExitApp)
+	RegisterMenuItem(A_TrayMenu, MenuSuspend, ToggleSuspend)
+	RegisterMenuItem(A_TrayMenu, t("menu.global.reload"), ActivateReload)
+	RegisterMenuItem(A_TrayMenu, t("menu.global.quit"), ActivateExitApp)
 
 	; ── Debug tools — grouped in a submenu to keep the top-level menu tidy.
 	; Mirrors Hammerspoon's "⚠ Debug" entry (Console + log shortcuts);
 	; Window Spy / List Vars / Key History are AutoHotkey-specific particulars. ──
 	DebuggingMenu := Menu()
-	DebuggingMenu.Add(t("menu.debug.window_spy"),    WindowSpy)
-	DebuggingMenu.Add(t("menu.debug.list_vars"),     ActivateListVars)
-	DebuggingMenu.Add(t("menu.debug.key_history"),   ActivateKeyHistory)
-	DebuggingMenu.Add(t("menu.debug.open_logs"),     OpenLogsFolder)
-	DebuggingMenu.Add(t("menu.debug.open_today_log"), OpenTodayLog)
+	RegisterMenuItem(DebuggingMenu, t("menu.debug.window_spy"),    WindowSpy)
+	RegisterMenuItem(DebuggingMenu, t("menu.debug.list_vars"),     ActivateListVars)
+	RegisterMenuItem(DebuggingMenu, t("menu.debug.key_history"),   ActivateKeyHistory)
+	RegisterMenuItem(DebuggingMenu, t("menu.debug.open_logs"),     OpenLogsFolder)
+	RegisterMenuItem(DebuggingMenu, t("menu.debug.open_today_log"), OpenTodayLog)
 	A_TrayMenu.Add(t("menu.debug.title"), DebuggingMenu)
 }
 
