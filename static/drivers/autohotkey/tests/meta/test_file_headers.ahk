@@ -63,7 +63,10 @@ _MetaListAhkFiles(Dir) {
 ; =====================================
 
 _MetaRunFileHeaderTests() {
-	DriverRoot := StrReplace(A_ScriptDir, "\", "/") . "/../../"
+	; A_ScriptDir is set by run_all.ahk → tests/ (absolute, no ..)
+	; SplitPath strips the last component to reach autohotkey/
+	SplitPath(A_ScriptDir, , &_DriverRootRaw)
+	DriverRoot := StrReplace(_DriverRootRaw, "\", "/") . "/"
 	SrcDirs := ["lib", "modules"]
 	Checked := 0
 	Mismatches := 0

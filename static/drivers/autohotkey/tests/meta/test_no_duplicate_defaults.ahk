@@ -62,7 +62,8 @@ _MetaListAhkFilesDups(Dir) {
 ; =====================================
 
 _MetaRunDuplicateDefaultsTests() {
-	DriverRoot := StrReplace(A_ScriptDir, "\", "/") . "/../../"
+	SplitPath(A_ScriptDir, , &_DriverRootRaw)
+	DriverRoot := StrReplace(_DriverRootRaw, "\", "/") . "/"
 	; Trivial values that are always whitelisted
 	Whitelist := Map(
 		"0", true, "1", true, "true", true, "false", true,

@@ -64,7 +64,8 @@ _MetaListAhkFilesGuard(Dir) {
 ; =====================================
 
 _MetaRunRequireStateTests() {
-	DriverRoot := StrReplace(A_ScriptDir, "\", "/") . "/../../"
+	SplitPath(A_ScriptDir, , &_DriverRootRaw)
+	DriverRoot := StrReplace(_DriverRootRaw, "\", "/") . "/"
 	Missing := 0
 
 	for _, Abs in _MetaListAhkFilesGuard(StrReplace(DriverRoot . "modules", "/", "\")) {

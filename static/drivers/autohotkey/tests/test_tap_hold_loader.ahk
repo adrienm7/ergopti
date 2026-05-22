@@ -32,9 +32,13 @@ _TH_Write(Content) {
 }
 
 _TH_Clean() {
-	if FileExist(_TH_TmpPath()) {
-		FileDelete(_TH_TmpPath())
-	}
+	global _TomlFileCache
+	Path := _TH_TmpPath()
+	if FileExist(Path)
+		FileDelete(Path)
+	; Evict the cached content so the next test reads fresh from disk
+	if _TomlFileCache.Has(Path)
+		_TomlFileCache.Delete(Path)
 }
 
 _TH_MissingFileReturnsEmptyScaffold() {

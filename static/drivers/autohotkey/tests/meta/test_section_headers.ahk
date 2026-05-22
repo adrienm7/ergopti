@@ -61,7 +61,8 @@ _MetaListAhkFilesSection(Dir) {
 ; =====================================
 
 _MetaRunSectionHeaderTests() {
-	DriverRoot := StrReplace(A_ScriptDir, "\", "/") . "/../../"
+	SplitPath(A_ScriptDir, , &_DriverRootRaw)
+	DriverRoot := StrReplace(_DriverRootRaw, "\", "/") . "/"
 	TotalFiles := 0
 	TotalWarns := 0
 
