@@ -108,9 +108,10 @@ _MetaRunNoPascalCaseTomlTests() {
 		CheckDir(ConfigDir)
 	}
 
-	Test("meta no PascalCase in TOML: scan complete (" . Violations . " violations)", () => {
+	_MetaNoPascalCaseResult() {
 		Assert(Violations = 0, "Found " . Violations . " PascalCase key(s) in TOML config files — use snake_case")
-	})
+	}
+	Test("meta no PascalCase in TOML: scan complete (" . Violations . " violations)", _MetaNoPascalCaseResult)
 }
 
 _MetaRunNoPascalCaseTomlTests()

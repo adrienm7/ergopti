@@ -13,6 +13,7 @@
 
 
 
+
 ; ======================================
 ; ==================================
 ; ======= 1/ LoadTapHoldToml =======
@@ -36,16 +37,17 @@ _TH_Clean() {
 	}
 }
 
-Test("LoadTapHoldToml: missing file returns empty scaffold", () => {
+_TH_MissingFileReturnsEmptyScaffold() {
 	TH := LoadTapHoldToml(A_ScriptDir . "\does_not_exist_tap_hold.toml")
 	AssertEqual("Map", Type(TH))
 	AssertTrue(TH.Has("keys"))
 	AssertTrue(TH.Has("layers"))
 	AssertEqual(0, TH["keys"].Count)
 	AssertEqual(0, TH["layers"].Count)
-})
+}
+Test("LoadTapHoldToml: missing file returns empty scaffold", _TH_MissingFileReturnsEmptyScaffold)
 
-Test("LoadTapHoldToml: parses a single key entry", () => {
+_TH_ParsesSingleKeyEntry() {
 	Path := _TH_Write(
 		"[tap_hold.keys.caps_lock]`r`n"
 		. "tap_action = ""enter""`r`n"
@@ -56,9 +58,10 @@ Test("LoadTapHoldToml: parses a single key entry", () => {
 	AssertTrue(TH["keys"].Has("caps_lock"))
 	AssertEqual("enter", TH["keys"]["caps_lock"]["tap_action"])
 	AssertEqual(0.35, TH["keys"]["caps_lock"]["time_activation_seconds"])
-})
+}
+Test("LoadTapHoldToml: parses a single key entry", _TH_ParsesSingleKeyEntry)
 
-Test("LoadTapHoldToml: parses hold_modifier", () => {
+_TH_ParsesHoldModifier() {
 	Path := _TH_Write(
 		"[tap_hold.keys.left_ctrl]`r`n"
 		. "hold_modifier = ""ctrl""`r`n"
@@ -66,9 +69,10 @@ Test("LoadTapHoldToml: parses hold_modifier", () => {
 	TH := LoadTapHoldToml(Path)
 	_TH_Clean()
 	AssertEqual("ctrl", TH["keys"]["left_ctrl"]["hold_modifier"])
-})
+}
+Test("LoadTapHoldToml: parses hold_modifier", _TH_ParsesHoldModifier)
 
-Test("LoadTapHoldToml: parses hold_layer", () => {
+_TH_ParsesHoldLayer() {
 	Path := _TH_Write(
 		"[tap_hold.keys.space]`r`n"
 		. "hold_layer = ""nav""`r`n"
@@ -76,9 +80,10 @@ Test("LoadTapHoldToml: parses hold_layer", () => {
 	TH := LoadTapHoldToml(Path)
 	_TH_Clean()
 	AssertEqual("nav", TH["keys"]["space"]["hold_layer"])
-})
+}
+Test("LoadTapHoldToml: parses hold_layer", _TH_ParsesHoldLayer)
 
-Test("LoadTapHoldToml: parses multiple keys independently", () => {
+_TH_ParsesMultipleKeysIndependently() {
 	Path := _TH_Write(
 		"[tap_hold.keys.caps_lock]`r`n"
 		. "tap_action = ""backspace""`r`n"
@@ -90,9 +95,10 @@ Test("LoadTapHoldToml: parses multiple keys independently", () => {
 	AssertEqual(2, TH["keys"].Count)
 	AssertEqual("backspace", TH["keys"]["caps_lock"]["tap_action"])
 	AssertEqual("tab",       TH["keys"]["right_ctrl"]["tap_action"])
-})
+}
+Test("LoadTapHoldToml: parses multiple keys independently", _TH_ParsesMultipleKeysIndependently)
 
-Test("LoadTapHoldToml: parses layer mappings block", () => {
+_TH_ParsesLayerMappingsBlock() {
 	Path := _TH_Write(
 		"[tap_hold.layers.nav.mappings]`r`n"
 		. "h = ""arrow_left""`r`n"
@@ -103,9 +109,10 @@ Test("LoadTapHoldToml: parses layer mappings block", () => {
 	AssertTrue(TH["layers"].Has("nav"))
 	AssertEqual("arrow_left", TH["layers"]["nav"]["mappings"]["h"])
 	AssertEqual("arrow_down", TH["layers"]["nav"]["mappings"]["j"])
-})
+}
+Test("LoadTapHoldToml: parses layer mappings block", _TH_ParsesLayerMappingsBlock)
 
-Test("LoadTapHoldToml: ignores unrecognised section headers", () => {
+_TH_IgnoresUnrecognisedSectionHeaders() {
 	Path := _TH_Write(
 		"[some_other_section]`r`n"
 		. "foo = ""bar""`r`n"
@@ -116,9 +123,10 @@ Test("LoadTapHoldToml: ignores unrecognised section headers", () => {
 	_TH_Clean()
 	AssertEqual(1, TH["keys"].Count)
 	AssertFalse(TH["keys"].Has("some_other_section"))
-})
+}
+Test("LoadTapHoldToml: ignores unrecognised section headers", _TH_IgnoresUnrecognisedSectionHeaders)
 
-Test("LoadTapHoldToml: ignores blank lines and comments", () => {
+_TH_IgnoresBlankLinesAndComments() {
 	Path := _TH_Write(
 		"; This is a comment`r`n"
 		. "`r`n"
@@ -129,7 +137,9 @@ Test("LoadTapHoldToml: ignores blank lines and comments", () => {
 	TH := LoadTapHoldToml(Path)
 	_TH_Clean()
 	AssertEqual("alt_tab_monitor", TH["keys"]["tab"]["tap_action"])
-})
+}
+Test("LoadTapHoldToml: ignores blank lines and comments", _TH_IgnoresBlankLinesAndComments)
+
 
 
 
@@ -141,30 +151,36 @@ Test("LoadTapHoldToml: ignores blank lines and comments", () => {
 ; ======================================
 ; ==========================================
 
-Test("TapHoldIsConfigured: false when keys map is empty", () => {
+_TH_IsConfiguredFalseWhenEmpty() {
 	TH := Map("keys", Map(), "layers", Map())
 	AssertFalse(TapHoldIsConfigured(TH, "caps_lock"))
-})
+}
+Test("TapHoldIsConfigured: false when keys map is empty", _TH_IsConfiguredFalseWhenEmpty)
 
-Test("TapHoldIsConfigured: true when tap_action present", () => {
+_TH_IsConfiguredTrueWhenTapAction() {
 	TH := Map("keys", Map("caps_lock", Map("tap_action", "enter")), "layers", Map())
 	AssertTrue(TapHoldIsConfigured(TH, "caps_lock"))
-})
+}
+Test("TapHoldIsConfigured: true when tap_action present", _TH_IsConfiguredTrueWhenTapAction)
 
-Test("TapHoldIsConfigured: true when hold_modifier present", () => {
+_TH_IsConfiguredTrueWhenHoldModifier() {
 	TH := Map("keys", Map("lshift", Map("hold_modifier", "shift")), "layers", Map())
 	AssertTrue(TapHoldIsConfigured(TH, "lshift"))
-})
+}
+Test("TapHoldIsConfigured: true when hold_modifier present", _TH_IsConfiguredTrueWhenHoldModifier)
 
-Test("TapHoldIsConfigured: true when hold_layer present", () => {
+_TH_IsConfiguredTrueWhenHoldLayer() {
 	TH := Map("keys", Map("space", Map("hold_layer", "nav")), "layers", Map())
 	AssertTrue(TapHoldIsConfigured(TH, "space"))
-})
+}
+Test("TapHoldIsConfigured: true when hold_layer present", _TH_IsConfiguredTrueWhenHoldLayer)
 
-Test("TapHoldIsConfigured: false when entry exists but has none of the three keys", () => {
+_TH_IsConfiguredFalseWhenNoneOfThreeKeys() {
 	TH := Map("keys", Map("lalt", Map("time_activation_seconds", 0.2)), "layers", Map())
 	AssertFalse(TapHoldIsConfigured(TH, "lalt"))
-})
+}
+Test("TapHoldIsConfigured: false when entry exists but has none of the three keys", _TH_IsConfiguredFalseWhenNoneOfThreeKeys)
+
 
 
 
@@ -176,20 +192,24 @@ Test("TapHoldIsConfigured: false when entry exists but has none of the three key
 ; ===================================
 ; ========================================
 
-Test("TapHoldTapAction: returns empty string for unknown key", () => {
+_TH_TapActionEmptyForUnknownKey() {
 	TH := Map("keys", Map(), "layers", Map())
 	AssertEqual("", TapHoldTapAction(TH, "caps_lock"))
-})
+}
+Test("TapHoldTapAction: returns empty string for unknown key", _TH_TapActionEmptyForUnknownKey)
 
-Test("TapHoldTapAction: returns configured value", () => {
+_TH_TapActionReturnsConfiguredValue() {
 	TH := Map("keys", Map("caps_lock", Map("tap_action", "backspace")), "layers", Map())
 	AssertEqual("backspace", TapHoldTapAction(TH, "caps_lock"))
-})
+}
+Test("TapHoldTapAction: returns configured value", _TH_TapActionReturnsConfiguredValue)
 
-Test("TapHoldTapAction: returns empty string when tap_action key absent", () => {
+_TH_TapActionEmptyWhenKeyAbsent() {
 	TH := Map("keys", Map("lalt", Map("hold_layer", "nav")), "layers", Map())
 	AssertEqual("", TapHoldTapAction(TH, "lalt"))
-})
+}
+Test("TapHoldTapAction: returns empty string when tap_action key absent", _TH_TapActionEmptyWhenKeyAbsent)
+
 
 
 
@@ -201,20 +221,24 @@ Test("TapHoldTapAction: returns empty string when tap_action key absent", () => 
 ; ==================================
 ; ======================================
 
-Test("TapHoldDuration: returns 0.2 default for unknown key", () => {
+_TH_DurationDefaultForUnknownKey() {
 	TH := Map("keys", Map(), "layers", Map())
 	AssertEqual(0.2, TapHoldDuration(TH, "caps_lock"))
-})
+}
+Test("TapHoldDuration: returns 0.2 default for unknown key", _TH_DurationDefaultForUnknownKey)
 
-Test("TapHoldDuration: returns 0.2 default when time_activation_seconds absent", () => {
+_TH_DurationDefaultWhenAbsent() {
 	TH := Map("keys", Map("lalt", Map("tap_action", "backspace")), "layers", Map())
 	AssertEqual(0.2, TapHoldDuration(TH, "lalt"))
-})
+}
+Test("TapHoldDuration: returns 0.2 default when time_activation_seconds absent", _TH_DurationDefaultWhenAbsent)
 
-Test("TapHoldDuration: returns configured value", () => {
+_TH_DurationReturnsConfiguredValue() {
 	TH := Map("keys", Map("caps_lock", Map("time_activation_seconds", 0.35)), "layers", Map())
 	AssertEqual(0.35, TapHoldDuration(TH, "caps_lock"))
-})
+}
+Test("TapHoldDuration: returns configured value", _TH_DurationReturnsConfiguredValue)
+
 
 
 
@@ -226,20 +250,24 @@ Test("TapHoldDuration: returns configured value", () => {
 ; ======================================
 ; ==========================================
 
-Test("TapHoldHoldModifier: returns empty string for unknown key", () => {
+_TH_HoldModifierEmptyForUnknownKey() {
 	TH := Map("keys", Map(), "layers", Map())
 	AssertEqual("", TapHoldHoldModifier(TH, "lctrl"))
-})
+}
+Test("TapHoldHoldModifier: returns empty string for unknown key", _TH_HoldModifierEmptyForUnknownKey)
 
-Test("TapHoldHoldModifier: returns configured value", () => {
+_TH_HoldModifierReturnsConfiguredValue() {
 	TH := Map("keys", Map("lctrl", Map("hold_modifier", "ctrl")), "layers", Map())
 	AssertEqual("ctrl", TapHoldHoldModifier(TH, "lctrl"))
-})
+}
+Test("TapHoldHoldModifier: returns configured value", _TH_HoldModifierReturnsConfiguredValue)
 
-Test("TapHoldHoldModifier: returns empty string when hold_modifier absent", () => {
+_TH_HoldModifierEmptyWhenAbsent() {
 	TH := Map("keys", Map("lctrl", Map("tap_action", "tab")), "layers", Map())
 	AssertEqual("", TapHoldHoldModifier(TH, "lctrl"))
-})
+}
+Test("TapHoldHoldModifier: returns empty string when hold_modifier absent", _TH_HoldModifierEmptyWhenAbsent)
+
 
 
 
@@ -251,17 +279,20 @@ Test("TapHoldHoldModifier: returns empty string when hold_modifier absent", () =
 ; ===================================
 ; ========================================
 
-Test("TapHoldHoldLayer: returns empty string for unknown key", () => {
+_TH_HoldLayerEmptyForUnknownKey() {
 	TH := Map("keys", Map(), "layers", Map())
 	AssertEqual("", TapHoldHoldLayer(TH, "space"))
-})
+}
+Test("TapHoldHoldLayer: returns empty string for unknown key", _TH_HoldLayerEmptyForUnknownKey)
 
-Test("TapHoldHoldLayer: returns configured value", () => {
+_TH_HoldLayerReturnsConfiguredValue() {
 	TH := Map("keys", Map("space", Map("hold_layer", "nav")), "layers", Map())
 	AssertEqual("nav", TapHoldHoldLayer(TH, "space"))
-})
+}
+Test("TapHoldHoldLayer: returns configured value", _TH_HoldLayerReturnsConfiguredValue)
 
-Test("TapHoldHoldLayer: returns empty string when hold_layer absent", () => {
+_TH_HoldLayerEmptyWhenAbsent() {
 	TH := Map("keys", Map("lalt", Map("tap_action", "backspace")), "layers", Map())
 	AssertEqual("", TapHoldHoldLayer(TH, "lalt"))
-})
+}
+Test("TapHoldHoldLayer: returns empty string when hold_layer absent", _TH_HoldLayerEmptyWhenAbsent)

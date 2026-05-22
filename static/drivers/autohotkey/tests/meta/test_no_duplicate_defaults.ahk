@@ -123,7 +123,9 @@ _MetaRunDuplicateDefaultsTests() {
 		}
 	}
 
-	Test("meta duplicate defaults: scan complete (" . DupCount . " duplicates)", () => {})
+	_MetaDuplicateDefaultsResult() {
+	}
+	Test("meta duplicate defaults: scan complete (" . DupCount . " duplicates)", _MetaDuplicateDefaultsResult)
 }
 
 _MetaRunDuplicateDefaultsTests()
