@@ -32,6 +32,7 @@
 
 
 
+
 ; ==============================================================
 ; ==============================================================
 ; ======= 1/ Resolve description by manifest entry =======
@@ -107,6 +108,7 @@ TryMenuLabelFromDescriptionKey(DescKey, Path := "", V1Path := "") {
     }
     return Label
 }
+
 
 
 

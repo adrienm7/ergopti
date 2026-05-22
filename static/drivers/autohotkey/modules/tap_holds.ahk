@@ -8,6 +8,10 @@
 ; the full navigation layer (arrows, window management, volume…).
 ; ==============================================================================
 
+
+
+
+
 ; ==============================
 ; ==============================
 ; ======= 1/ Constants =======
@@ -35,6 +39,10 @@ global KEY_REPEAT_INTERVAL_MS := 100
 ; Timeout (s) for the OneShotShift InputHook: how long to wait for the next
 ; character before giving up and leaving the shift state active.
 global ONE_SHOT_SHIFT_TIMEOUT_SEC := 2
+
+
+
+
 
 ; ==============================
 ; ==============================
@@ -141,6 +149,10 @@ CapsLockShortcut(CtrlActivated) {
     SendEvent("{LCtrl Up}")
 }
 
+
+
+
+
 ; ==========================================
 ; ==========================================
 ; ======= 3/ LSHIFT AND LCTRL =======
@@ -188,6 +200,10 @@ CapsLockShortcut(CtrlActivated) {
     }
 }
 #HotIf
+
+
+
+
 
 ; ==============================
 ; ==============================
@@ -376,6 +392,10 @@ BackSpaceLogic() {
     return False
 }
 
+
+
+
+
 ; ==============================
 ; ==============================
 ; ======= 5/ SPACE =======
@@ -467,6 +487,10 @@ SC039 Up:: {
 }
 #HotIf
 
+
+
+
+
 ; ==============================
 ; ==============================
 ; ======= 6/ ALTGR =======
@@ -533,6 +557,10 @@ AltGrTapHoldDispatchV2() {
     }
 }
 
+
+
+
+
 ; ==============================
 ; ==============================
 ; ======= 7/ RCTRL =======
@@ -584,6 +612,10 @@ SC11D:: {
     SendEvent("{LShift Up}")
 }
 #HotIf
+
+
+
+
 
 ; ==============================
 ; ==============================
@@ -691,6 +723,10 @@ GetMonitorFromPoint(X, Y) {
     return 0 ; No monitor found
 }
 
+
+
+
+
 ; ========================================
 ; ========================================
 ; ======= 9/ ONE-SHOT SHIFT =======
@@ -758,6 +794,10 @@ ToggleCapsLock() {
         SetCapsLockState("On")
     }
 }
+
+
+
+
 
 ; ====================================
 ; ====================================

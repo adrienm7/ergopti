@@ -38,6 +38,7 @@
 
 
 
+
 ; ===================================
 ; ===================================
 ; ======= 1/ Constants =======
@@ -63,6 +64,7 @@ class KLRoiConst {
     ; Minimum days since last use to emit a halflife warning
     static HALFLIFE_WARN_DAYS   := 30
 }
+
 
 
 
@@ -95,6 +97,7 @@ class KLRoi {
 
 
 
+
 ; =========================================
 ; =========================================
 ; ======= 3/ Savings accumulation =======
@@ -120,6 +123,7 @@ KL_Roi_OnHotstring(trigger, net_saved) {
         ))
     }
 }
+
 
 
 
@@ -186,6 +190,7 @@ KL_Roi_ProcessWord(word) {
 
 
 
+
 ; ===================================================
 ; ===================================================
 ; ======= 5/ Trigger half-life check =======
@@ -214,6 +219,7 @@ KL_Roi_HalflifeTick() {
         }
     }
 }
+
 
 
 

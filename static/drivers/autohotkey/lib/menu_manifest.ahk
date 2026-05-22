@@ -1,5 +1,9 @@
 ; lib/menu_manifest.ahk
 
+
+
+
+
 ; =======================================
 ; =======================================
 ; ======= 1/ Menu Manifest Loader =======
@@ -27,6 +31,7 @@
 global _MM_FALLBACK_STANDARD  := ["DistancesReduction", "Autocorrection", "MagicKey"]
 global _MM_FALLBACK_ERGOPTI   := ["SFBsReduction", "Rolls"]
 global _MM_FALLBACK_DYNAMIC   := ["DynamicHotstrings"]
+
 
 
 ; =============================
@@ -65,6 +70,7 @@ _MM_LookupStringKey(ObjectLiteral, Key) {
 		return M[1]
 	return ""
 }
+
 
 
 ; ==============================

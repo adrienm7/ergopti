@@ -75,6 +75,7 @@
 
 
 
+
 ; ==============================================================
 ; ==============================================================
 ; ======= 1/ State =======
@@ -95,6 +96,7 @@ global _MenuDispatchLastFire := Map()
 ; dispatch latency, short enough that the user doesn't perceive the
 ; recovered click as laggy.
 global _MENU_RETRY_DELAY_MS := 150
+
 
 
 
@@ -258,6 +260,7 @@ _FindMenuItemIdByName(MenuObj, ItemName) {
 
 
 
+
 ; ==============================================================
 ; ==============================================================
 ; ======= 3/ OnMessage retry handler =======
@@ -314,6 +317,7 @@ _DispatchIfMissed(ItemId, ExpectedLastFire) {
             "Bypass dispatch for ItemId={1} threw: {2}.", ItemId, Err.Message)
     }
 }
+
 
 
 

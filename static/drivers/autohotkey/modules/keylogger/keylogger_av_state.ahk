@@ -40,6 +40,7 @@
 
 
 
+
 ; ===================================
 ; ===================================
 ; ======= 1/ Constants =======
@@ -75,6 +76,7 @@ class KLAVConst {
 
 
 
+
 ; ===================================
 ; ===================================
 ; ======= 2/ Module state =======
@@ -100,6 +102,7 @@ class KLAVState {
     static fast_fn          := unset
     static slow_fn          := unset
 }
+
 
 
 
@@ -179,6 +182,7 @@ KL_AV_GetMasterMuted() {
     vol := KL_AV_GetMasterVolume()
     return (vol <= 0.01) ? 1 : 0
 }
+
 
 
 
@@ -295,6 +299,7 @@ KL_AV_PollFocusMode() {
         KL_AppendLog(Map("type", "focus_mode_end", "app", Keylogger.session_app))
     }
 }
+
 
 
 

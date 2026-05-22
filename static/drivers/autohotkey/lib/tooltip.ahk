@@ -101,6 +101,10 @@ global _TOOLTIP_TIMEOUT_FLOOR_SEC := 0.05
 ; is skipped due to an unhandled exception or a missed timer callback.
 global _TOOLTIP_SAFETY_SEC := 3.0
 
+
+
+
+
 ; ============================================================
 ; ============================================================
 ; ======= 1/ Public API =====================================
@@ -266,6 +270,10 @@ TooltipHide() {
     _TooltipShownHwnds := []
     _TooltipShownBorderHwnds := []
 }
+
+
+
+
 
 ; ============================================================
 ; ============================================================

@@ -30,6 +30,10 @@
 
 #InputLevel 2
 
+
+
+
+
 ; ============================================
 ; ============================================
 ; ======= 1/ Constants & Configuration =======
@@ -1063,6 +1067,10 @@ global GestureLeftClickHeld  := False
 global GestureRightClickHeld := False
 global GestureKeyboardHook   := 0
 
+
+
+
+
 ; ===========================================
 ; ===========================================
 ; ======= 2/ Right-Click Hold Toggle =======
@@ -1548,6 +1556,10 @@ GestureReleaseRightClick() {
     LoggerInfo("gestures", "Right-click hold mode disabled.")
 }
 
+
+
+
+
 ; =====================================
 ; =====================================
 ; ======= 3/ Action Dispatching =======
@@ -1580,6 +1592,10 @@ GestureDispatch(slot) {
     LoggerInfo("gestures", "Gesture {1} dispatched successfully.", slot)
 }
 
+
+
+
+
 ; =============================================
 ; =============================================
 ; ======= 4/ Hotkey Bindings (Listeners) =======
@@ -1604,6 +1620,10 @@ $^#+F7:: GestureDispatch("swipe_4_up")
 $^#+F8:: GestureDispatch("swipe_4_down")
 $^#+F9:: GestureDispatch("swipe_4_left")
 $^#+F10:: GestureDispatch("swipe_4_right")
+
+
+
+
 
 ; ==========================================
 ; ==========================================

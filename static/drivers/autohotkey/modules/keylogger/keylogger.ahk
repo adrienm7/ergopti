@@ -62,6 +62,7 @@
 
 
 
+
 ; ===================================
 ; ===================================
 ; ======= 1/ Constants =======
@@ -76,6 +77,7 @@ class KeylogConst {
     static MIDNIGHT_CHECK_TICK_MS := 60000    ; Day rollover check cadence.
     static SCHEMA_VERSION         := 1
 }
+
 
 
 
@@ -143,6 +145,7 @@ class Keylogger {
     ; INSERT (the device_id never changes during a process lifetime).
     static _device_id_lit   := ""
 }
+
 
 
 
@@ -240,6 +243,7 @@ KL_CloseTodayFh() {
 
 
 
+
 ; =====================================
 ; =====================================
 ; ======= 4/ Path Resolution =======
@@ -279,6 +283,7 @@ KL_EnsureGitignore() {
          .  "today.log`n"
     FileAppend(body, Keylogger.gitignore_path, "UTF-8")
 }
+
 
 
 
@@ -396,6 +401,7 @@ KL_WriteDeviceJson(obj) {
 
 
 
+
 ; ===========================================
 ; ===========================================
 ; ======= 6/ State persistence =======
@@ -444,6 +450,7 @@ KL_SaveState() {
             e.Message)
     }
 }
+
 
 
 
@@ -572,6 +579,7 @@ KL_ComToMap(v) {
 
 
 
+
 ; ============================================
 ; ============================================
 ; ======= 8/ Hot path — append_log =======
@@ -615,6 +623,7 @@ KL_AppendLog(entry) {
     ; and a crash recovery would only lose a few hundred ms of in-flight events.
     ; The ingest tick does its own Flush before reading.
 }
+
 
 
 
@@ -680,6 +689,7 @@ KL_FlushBuffer() {
     Keylogger.mouse_distance   := 0
     Keylogger.last_flush_time  := A_TickCount
 }
+
 
 
 
@@ -861,6 +871,7 @@ KL_LogSession(kind, duration_ms := unset) {
         e["duration_ms"] := duration_ms
     KL_AppendLog(e)
 }
+
 
 
 
@@ -1110,6 +1121,7 @@ KL_BuildInsertMouseEvent(e, id) {
 
 
 
+
 ; ===============================
 ; ===============================
 ; ======= 12/ Ingest Tick =======
@@ -1267,6 +1279,7 @@ KL_MidnightCheck() {
 
 
 
+
 ; ============================================================
 ; ============================================================
 ; ======= 13/ Password field filter (UIA + heuristics) =======
@@ -1367,6 +1380,7 @@ KL_DetectPasswordFor(hwnd) {
 
 
 
+
 ; ============================================================
 ; ============================================================
 ; ======= 14/ Bootstrap data.sql =======
@@ -1383,6 +1397,7 @@ KL_BootstrapDataSql() {
         .  "PRAGMA foreign_keys = OFF;`n"
     FileAppend(header, Keylogger.data_sql_path, "UTF-8")
 }
+
 
 
 
@@ -1459,6 +1474,7 @@ KL_Stop() {
     KL_CloseTodayFh()
     Keylogger.initialized := false
 }
+
 
 
 

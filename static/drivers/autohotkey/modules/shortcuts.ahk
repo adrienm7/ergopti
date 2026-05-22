@@ -8,6 +8,10 @@
 ; RetrieveScancode utilities that resolve layout-aware scan codes at runtime.
 ; ==============================================================================
 
+
+
+
+
 ; ==============================
 ; ==============================
 ; ======= 1/ UTILITIES =======
@@ -27,6 +31,10 @@ RetrieveScancode(Letter) {
     }
     return Format("sc{:x}", GetKeySC(Letter))
 }
+
+
+
+
 
 ; ===============================
 ; ===============================
@@ -78,6 +86,10 @@ LAltCapsLockShortcut() {
     }
 }
 
+
+
+
+
 ; =================================
 ; =================================
 ; ======= 3/ CTRL SHORTCUTS =======
@@ -114,6 +126,10 @@ if Features["shortcuts"]["paste_without_formatting"] {
         }
     }
 }
+
+
+
+
 
 ; ==================================
 ; ==================================
@@ -261,6 +277,10 @@ _RegisterAltGrShortcutsHotkeys() {
 ; onboarding wizard has either been skipped (config exists) or completed and
 ; triggered a Reload. Registering now is therefore safe.
 _RegisterAltGrShortcutsHotkeys()
+
+
+
+
 
 ; =================================
 ; =================================
@@ -1020,6 +1040,9 @@ if Features["shortcuts"]["open_downloads"] {
         return Out
     }
 }
+
+
+
 
 
 ; ==============================

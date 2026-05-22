@@ -19,6 +19,7 @@
 
 
 
+
 ; =============================================
 ; =============================================
 ; ======= 1/ Generated registry =======
@@ -78,6 +79,9 @@ global _GENERATED_HOTSTRINGS := Map(
 	"magickey.textexpansionsymbols", _GenLoad_magickey_textexpansionsymbols,
 	"magickey.textexpansionsymbolstypst", _GenLoad_magickey_textexpansionsymbolstypst,
 )
+
+
+
 
 
 ; ===========================================

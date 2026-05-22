@@ -41,6 +41,7 @@
 
 
 
+
 ; ===================================
 ; ===================================
 ; ======= 1/ Constants =======
@@ -149,6 +150,7 @@ class KLAppCatConst {
 
 
 
+
 ; ===================================
 ; ===================================
 ; ======= 2/ Module state =======
@@ -161,6 +163,7 @@ class KLAppCat {
     static dirty       := false   ; new apps were seen and need a save
     static save_fn     := unset   ; bound timer ref for deferred save
 }
+
 
 
 
@@ -219,6 +222,7 @@ KL_AppCat_DeferredSave() {
 
 
 
+
 ; =========================================
 ; =========================================
 ; ======= 4/ Runtime lookup =======
@@ -253,6 +257,7 @@ KL_AppCat_Set(app_name, category) {
     KLAppCat.categories[key] := category
     KL_AppCat_Save()
 }
+
 
 
 

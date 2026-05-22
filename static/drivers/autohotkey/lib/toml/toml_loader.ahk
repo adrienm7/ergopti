@@ -42,6 +42,10 @@ global HotstringGroupConfig := Map()
 global _HOTSTRING_ENTRY_PATTERN :=
     'i)^"([^"\\]*(?:\\.[^"\\]*)*)"\s*=\s*\{\s*output\s*=\s*"([^"\\]*(?:\\.[^"\\]*)*)"\s*,\s*is_word\s*=\s*(true|false)\s*,\s*auto_expand\s*=\s*(true|false)\s*,\s*is_case_sensitive\s*=\s*(true|false)\s*,\s*final_result\s*=\s*(true|false)(?:\s*,\s*is_case_sensitive_strict\s*=\s*(true|false))?\s*\}'
 
+
+
+
+
 ; ========================================================
 ; ========================================================
 ; ======= 1/ TOML string and metadata load helpers =======

@@ -34,6 +34,7 @@
 
 
 
+
 ; ==================================
 ; ==================================
 ; ======= 1/ Test fixtures =======
@@ -66,6 +67,7 @@ _FM_WriteFixture(Tag, Content) {
 	FileAppend(Content, Path, "UTF-8")
 	return Path
 }
+
 
 
 
@@ -124,6 +126,7 @@ TestFMv2_NoHsFeaturesInAhkManifest() {
 }
 Test("manifest_v2: codegen filters out hs.* features from the AHK manifest",
 	TestFMv2_NoHsFeaturesInAhkManifest)
+
 
 
 
@@ -298,6 +301,7 @@ Test("ManifestBuildFeaturesMap: tap_hold is not a Features sub-tree",
 
 
 
+
 ; ====================================================
 ; ====================================================
 ; ======= 4/ ApplyConfigToml override engine =======
@@ -444,6 +448,7 @@ TestFMv2_ApplyCommentsAndBlanksIgnored() {
 }
 Test("ApplyConfigToml: comments and blank lines are skipped",
 	TestFMv2_ApplyCommentsAndBlanksIgnored)
+
 
 
 

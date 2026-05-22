@@ -23,6 +23,10 @@
 ;    override is visible to the lib code under test.
 ; ==============================================================================
 
+
+
+
+
 ; ============================================
 ; ============================================
 ; ======= 1/ Side-effect recorders =======
@@ -57,6 +61,10 @@ ResetHotstringRecorders() {
     ; trigger" guard. Clear it here so every callback invocation starts clean.
     HSE_LastMatch := ""
 }
+
+
+
+
 
 ; =====================================
 ; =====================================
@@ -383,6 +391,10 @@ global DeadkeyMappingGreek := Map()
 global DeadkeyMappingR := Map()
 global DeadkeyMappingCurrency := Map()
 
+
+
+
+
 ; ==================================
 ; ==================================
 ; ======= 3/ Function stubs =======
@@ -445,6 +457,10 @@ DisableCapsWord() {
 GetCapsLockCondition() {
     return false
 }
+
+
+
+
 
 ; ==========================================
 ; ==========================================

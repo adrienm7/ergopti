@@ -8,6 +8,10 @@
 ; persistence) without registering actual hotkeys.
 ; ==============================================================================
 
+
+
+
+
 ; ====================================
 ; ====================================
 ; ======= 1/ Configuration Tests =======
@@ -42,6 +46,10 @@ TestGestures_AllSlotsHaveShortcutLabels() {
     }
 }
 Test("Gestures: all slots have shortcut labels", TestGestures_AllSlotsHaveShortcutLabels)
+
+
+
+
 
 ; ==================================
 ; ==================================
@@ -97,6 +105,10 @@ TestGestures_RegistrySizeMatchesNames() {
 }
 Test("Gestures: action count matches GESTURE_ACTION_NAMES length", TestGestures_RegistrySizeMatchesNames)
 
+
+
+
+
 ; ===============================================
 ; ===============================================
 ; ======= 3/ Right-Click Hold State Machine =====
@@ -116,6 +128,10 @@ TestGestures_ReleaseRightClickSafeWhenIdle() {
 }
 Test("Gestures: GestureReleaseLeftClick is safe when already released",
     TestGestures_ReleaseRightClickSafeWhenIdle)
+
+
+
+
 
 ; ====================================
 ; ====================================
@@ -145,6 +161,10 @@ TestGestures_SlotCountMatchesExpected() {
     AssertEqual(10, GESTURE_SLOTS.Length, "expected 10 gesture slots")
 }
 Test("Gestures: slot count is 10", TestGestures_SlotCountMatchesExpected)
+
+
+
+
 
 ; =====================================================
 ; =====================================================
@@ -189,6 +209,10 @@ TestGestures_NextIndexFromZero() {
 }
 Test("Gestures: GestureNextIndex handles index=0 (active not in list)",
     TestGestures_NextIndexFromZero)
+
+
+
+
 
 ; ===========================================================
 ; ===========================================================

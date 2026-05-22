@@ -15,6 +15,7 @@
 
 
 
+
 ; ============================================
 ; ============================================
 ; ======= 1/ Helpers =======
@@ -31,6 +32,7 @@ HSE_TestReset() {
     HSE_HardReset()
     HSE_FeedReset(true)
 }
+
 
 
 
@@ -150,6 +152,7 @@ Test("HSE HardReset clears the buffer and the boundary flag",
 
 
 
+
 ; ============================================
 ; ============================================
 ; ======= 3/ Registry =======
@@ -203,6 +206,7 @@ TestHSE_RegisterIgnoresEmptyTrigger() {
 }
 Test("HSE Register ignores an empty trigger",
     TestHSE_RegisterIgnoresEmptyTrigger)
+
 
 
 
@@ -393,6 +397,7 @@ Test("HSE longest match wins when multiple triggers share a suffix",
 
 
 
+
 ; ============================================
 ; ============================================
 ; ======= 5/ Buffer update on expansion =======
@@ -466,6 +471,7 @@ TestHSE_PersonalCommaPrefixTriggerFires() {
 }
 Test("HSE personal ,a-style trigger fires when the comma stays in the buffer",
     TestHSE_PersonalCommaPrefixTriggerFires)
+
 
 
 

@@ -44,6 +44,7 @@ global LLM_MB_COL_STATUS    := 7
 
 
 
+
 ; ====================================
 ; ====================================
 ; ======= 1/ Public Entry Point ======
@@ -77,6 +78,7 @@ LLM_ModelBrowser_Show() {
 	_LLM_ModelBrowser_Gui.Show()
 	return _LLM_ModelBrowser_Gui
 }
+
 
 
 
@@ -281,6 +283,7 @@ _LLM_ModelBrowser_GetInstalledTags() {
 		return []
 	}
 }
+
 
 
 

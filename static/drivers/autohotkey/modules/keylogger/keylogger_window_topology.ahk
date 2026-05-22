@@ -42,6 +42,7 @@
 
 
 
+
 ; ===================================
 ; ===================================
 ; ======= 1/ Constants =======
@@ -66,6 +67,7 @@ class KLTopoConst {
     ; before we log it.
     static DEBOUNCE_TICKS      := 2
 }
+
 
 
 
@@ -98,6 +100,7 @@ class KLTopo {
     ; Lifecycle
     static tick_fn      := unset
 }
+
 
 
 
@@ -258,6 +261,7 @@ KL_Topo_CheckVirtualDesktop(new_hwnd) {
 
 
 
+
 ; ============================================
 ; ============================================
 ; ======= 4/ Monitor helpers =======
@@ -287,6 +291,7 @@ KL_Topo_MonitorIdx(cx, cy) {
     }
     return 1
 }
+
 
 
 

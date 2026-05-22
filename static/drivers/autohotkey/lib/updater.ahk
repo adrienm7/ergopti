@@ -18,7 +18,6 @@
 
 
 
-
 ; =====================================
 ; ===== 1.1) Constants & Defaults =====
 ; =====================================
@@ -68,7 +67,6 @@ global UPDATER_LATEST_RELEASE      := unset
 ; Background timer handle so ``Updater_SetCheckInterval`` can stop the previous
 ; timer before scheduling a new one with the freshly chosen cadence.
 global _UpdaterBackgroundFn        := unset
-
 
 
 
@@ -168,7 +166,6 @@ Updater_SetCheckInterval(Seconds) {
 
 
 
-
 ; ====================================
 ; ===== 1.3) Version helpers ==========
 ; ====================================
@@ -235,7 +232,6 @@ Updater_OpenCurrentRelease(*) {
 		try LoggerWarn("Updater", "Failed to open release URL: {1}.", e.Message)
 	}
 }
-
 
 
 
@@ -420,7 +416,6 @@ Updater_ParseBody(Json) {
 
 
 
-
 ; ====================================
 ; ===== 1.5) Menu actions =============
 ; ====================================
@@ -558,11 +553,14 @@ Updater_ShowChangelog(*) {
 
 
 
+
 ; =============================================================
 ; =============================================================
 ; ======= 2/ Self-update: asset parser, swap, background =======
 ; =============================================================
 ; =============================================================
+
+
 
 ; ====================================
 ; ===== 2.1) Asset URL parser ========
@@ -622,6 +620,7 @@ _Updater_FindAssetUrl(Json, AssetName) {
 		return ""
 	return U[1]
 }
+
 
 
 ; =========================================
@@ -714,6 +713,7 @@ Updater_BackgroundTick(*) {
 }
 
 
+
 ; =========================================
 ; ===== 2.3) "Update now" UI ============
 ; =========================================
@@ -792,6 +792,7 @@ Updater_ShowAvailableUpdate(*) {
 	}
 	Updater_ShowUpdatePrompt(Release)
 }
+
 
 
 ; =====================================================

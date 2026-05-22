@@ -36,6 +36,7 @@
 
 
 
+
 ; ===================================
 ; ===================================
 ; ======= 1/ Constants =======
@@ -51,6 +52,7 @@ class KLClipConst {
     ; that would reveal document length)
     static MAX_CHAR_COUNT          := 100000
 }
+
 
 
 
@@ -73,6 +75,7 @@ class KLClip {
     ; OnClipboardChange reference
     static clip_handler     := unset
 }
+
 
 
 
@@ -112,6 +115,7 @@ KL_Clip_OnChange(data_type) {
         "char_count",   char_count
     ))
 }
+
 
 
 
@@ -163,6 +167,7 @@ KL_Clip_OnPaste() {
         KLClip.paste_ticks := []
     }
 }
+
 
 
 

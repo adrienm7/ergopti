@@ -35,6 +35,7 @@
 
 
 
+
 ; ===================================
 ; ===================================
 ; ======= 1/ Constants =======
@@ -85,6 +86,7 @@ class WPMWidgetConst {
     ; Maximum WPM assumed for graph scale.
     static GRAPH_SCALE_MAX    := 120
 }
+
 
 
 
@@ -146,6 +148,7 @@ class WPMWidget {
     static _drag_win_x    := 0
     static _drag_win_y    := 0
 }
+
 
 
 
@@ -337,6 +340,7 @@ WPMWidget_ResolveGraphColor(has_hs, has_ai, has_ac, use_colors) {
 
 
 
+
 ; ==================================================
 ; ==================================================
 ; ======= 4/ Default position (bottom-right) =======
@@ -352,6 +356,7 @@ WPMWidget_DefaultPos(&out_x, &out_y) {
     out_x := wr - w - WPMWidgetConst.EDGE_MARGIN
     out_y := wb - h - WPMWidgetConst.EDGE_MARGIN
 }
+
 
 
 
@@ -571,6 +576,7 @@ WPMWidget_DragPoll() {
 
 
 
+
 ; ============================================
 ; ============================================
 ; ======= 6/ Show / Hide =======
@@ -635,6 +641,7 @@ WPMWidget_Toggle() {
         WPMWidget_Show()
     WPMWidget_SaveVisible()
 }
+
 
 
 
@@ -748,6 +755,7 @@ StrJoin(arr, sep) {
         out .= (i > 1 ? sep : "") . v
     return out
 }
+
 
 
 

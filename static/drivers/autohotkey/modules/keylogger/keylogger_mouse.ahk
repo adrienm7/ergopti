@@ -41,6 +41,7 @@
 
 
 
+
 ; ===================================
 ; ===================================
 ; ======= 1/ Constants =======
@@ -70,6 +71,7 @@ class KLMouseConst {
     ; log when the user nudges the mouse and immediately stops again.
     static PARK_MIN_MOVE_PX    := 32
 }
+
 
 
 
@@ -129,6 +131,7 @@ class KLMouse {
     static hk_wright         := unset
     static hk_wleft          := unset
 }
+
 
 
 
@@ -251,6 +254,7 @@ KL_Mouse_OnMUp(*) {
 
 
 
+
 ; ====================================
 ; ====================================
 ; ======= 4/ Scroll handlers =======
@@ -341,6 +345,7 @@ KL_Mouse_FlushScroll() {
 
 
 
+
 ; ====================================
 ; ====================================
 ; ======= 5/ Park / idle poll =======
@@ -416,6 +421,7 @@ KL_Mouse_ParkTick() {
 
 
 
+
 ; =====================================
 ; =====================================
 ; ======= 6/ Log helpers =======
@@ -445,6 +451,7 @@ KL_Mouse_LogDrag(button, x1, y1, x2, y2, dist_px, duration_ms) {
         "duration_ms", duration_ms
     ))
 }
+
 
 
 

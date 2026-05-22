@@ -33,6 +33,7 @@
 
 
 
+
 ; ===================================
 ; ===================================
 ; ======= 1/ Module state =======
@@ -56,6 +57,7 @@ class MetricsFilters {
 
 
 
+
 ; ============================================
 ; ============================================
 ; ======= 2/ INI load / save =======
@@ -72,6 +74,7 @@ MF_LoadFromIni() {
 MF_SaveToIni() {
     CS_Save()
 }
+
 
 
 
@@ -113,6 +116,7 @@ MF_RefreshFocus() {
     try MetricsFocusCache.class        := WinGetClass("ahk_id " . hwnd)
     MetricsFocusCache.last_at := A_TickCount
 }
+
 
 
 
@@ -192,6 +196,7 @@ MF_ShouldFilter() {
     }
     return false
 }
+
 
 
 
