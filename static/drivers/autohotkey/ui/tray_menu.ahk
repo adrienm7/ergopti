@@ -359,6 +359,17 @@ GetMenuTitleByPath(FullPath) {
 	Entry := false
 	if (V2Path != "") {
 		Entry := ManifestFindEntryByV2Path(V2Path)
+		; Letter pickers (Modélisation α with split schema) have no bare
+		; section entry — only ``<section>.enabled`` and ``<section>.letter``
+		; children, with the picker's description_key carried by ``.enabled``.
+		; Bare-α features (GPT, Search, TakeNote) DO have a bare section
+		; entry and resolve on the first lookup; only the split variant
+		; needs this fallback. Without it, GetMenuTitleByPath falls all the
+		; way through to the raw FullPath sentinel and the menu shows
+		; "Shortcuts.EGrave" / "Shortcuts.AGrave" / etc.
+		if (Entry == false) {
+			Entry := ManifestFindEntryByV2Path(V2Path . ".enabled")
+		}
 	}
 	if (Entry != false) {
 		Label := TryMenuLabelFromManifestEntry(Entry)
