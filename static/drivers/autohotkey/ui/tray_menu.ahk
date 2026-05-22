@@ -872,10 +872,11 @@ initMenu() {
 	}
 
 	; ── 🌐 Disposition clavier — mirrors the HS layout submenu naming ──
-	; Master gate (Phase 7.4): the parent menu checkmark and the master
-	; toggle label both reflect IsCategoryGated, NOT a per-feature scan.
-	; A flipped gate keeps individual per-feature toggles intact but
-	; neutralises the whole category via the mirror in lib/v1_v2_mirror.ahk.
+	; Master gate: the parent menu checkmark and the master toggle label
+	; both reflect IsCategoryGated, NOT a per-feature scan. A flipped
+	; gate keeps individual per-feature toggles intact on disk but
+	; neutralises the whole category via ApplyMasterGatesToFeaturesV2
+	; (lib/v2_v1_mirror.ahk).
 	LayoutMenu := Menu()
 	LayoutGated := IsCategoryGated("Layout")
 	AddCategoryToggleItem(LayoutMenu,

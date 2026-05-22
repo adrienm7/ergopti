@@ -125,7 +125,6 @@ SendMode("Event") ; Everything concerning hotstrings MUST use SendEvent and not 
 #Include lib/manifest_reader.ahk
 #Include lib/first_boot.ahk
 #Include lib/tap_hold/tap_hold_loader.ahk
-#Include lib/v1_v2_mirror.ahk
 #Include lib/v2_v1_mirror.ahk
 #Include lib/v1_v2_path_translator.ahk
 #Include lib/menu_dispatcher.ahk
@@ -410,11 +409,11 @@ _TomlSection(Category) {
 ; user's per-feature choices on every master click. The new design
 ; separates the master gate (this Map) from the per-feature .Enabled
 ; flags: toggling the master flips ``CategoryEnabled[Category]`` only,
-; and the per-section mirrors in lib/v1_v2_mirror.ahk apply the gate
-; when populating FeaturesV2 — a disabled category propagates as all
-; v2 entries reading false at the HotIf level, but the underlying
-; ``Features[Category][X].Enabled`` per-feature choices are preserved
-; for when the user re-enables the master.
+; and ``ApplyMasterGatesToFeaturesV2`` in lib/v2_v1_mirror.ahk forces
+; the corresponding FeaturesV2 entries to false at boot — a disabled
+; category propagates as all v2 entries reading false at the HotIf
+; level, but the underlying per-feature choices persisted on disk are
+; preserved for when the user re-enables the master.
 ;
 ; Defaults all true so a fresh install (or a user who hasn't touched
 ; the master) sees no behavior change. Loaded from the [CategoryEnabled]
@@ -934,14 +933,14 @@ try {
 #Include *i _generated/personal_shortcuts.ahk
 #Include *i %A_LocalAppData%\Ergopti\_generated\personal_shortcuts.ahk
 #InputLevel 0
-; v2 cut-over: ``ApplyConfigTomlOverrides`` (the legacy v1 [features]
-; dotted-path reader) and the v1 -> v2 forward mirror chain are no longer
-; needed. ``ApplyConfigTomlV2`` above hydrated ``FeaturesV2`` from the
-; canonical v2 sections; the reverse mirror below copies that state back
-; onto the v1 ``Features`` Map so the tray-menu builder (which still walks
-; v1 to render submenus and checkmarks) reflects the user's persisted
-; choices. The forward mirror module stays on disk as a reference until
-; the slice that deletes ``Features`` Map entirely lands.
+; ``ApplyConfigTomlV2`` above hydrated ``FeaturesV2`` from the canonical
+; v2 sections of the user's config.toml. The reverse mirror below copies
+; that state onto the v1 ``Features`` Map so the tray-menu builder (which
+; still walks v1 to render submenus and checkmarks) reflects the user's
+; persisted choices. ``ApplyMasterGatesToFeaturesV2`` then short-circuits
+; gated categories on the v2 side without disturbing the per-feature
+; choices held in the v1 Map (so the menu still shows them ticked when
+; the master gate flips back on).
 MirrorV2ToV1_Layout()
 MirrorV2ToV1_Gestures()
 MirrorV2ToV1_Shortcuts()
@@ -1410,10 +1409,10 @@ ToggleAllHotstringsOff(*) {
     ToggleAllHotstrings(0)
 }
 ; Master Hotstrings gate — flips the category-level enabled flag without
-; touching individual hotstring entries. The per-category mirror in
-; lib/v1_v2_mirror.ahk applies the gate when populating FeaturesV2 so
-; every HotIf check evaluates false while the gate is off; per-feature
-; toggles stay preserved for when the user re-enables the master.
+; touching individual hotstring entries. ApplyMasterGatesToFeaturesV2
+; (lib/v2_v1_mirror.ahk) applies the gate at boot so every HotIf check
+; evaluates false while the gate is off; per-feature toggles stay
+; preserved on disk for when the user re-enables the master.
 ToggleAllHotstrings(Value) {
     global CategoryEnabled, ConfigurationFile
     Bool := (Value = true or Value = 1)
@@ -1435,10 +1434,11 @@ IsCategoryAllEnabled(Categories) {
 }
 
 ; Master category gate — flips ``CategoryEnabled[Category]`` and reloads.
-; The mirror in lib/v1_v2_mirror.ahk for this category gates every
-; FeaturesV2 entry through this flag, so a flipped gate disables every
-; HotIf for the category without altering per-feature .Enabled values.
-; Used by tray-menu master toggles for Layout / Shortcuts / TapHolds.
+; ApplyMasterGatesToFeaturesV2 (lib/v2_v1_mirror.ahk) reads this flag at
+; boot and forces the corresponding FeaturesV2 entries to false, so a
+; flipped gate disables every HotIf for the category without altering
+; per-feature .Enabled values. Used by tray-menu master toggles for
+; Layout / Shortcuts / TapHolds.
 ToggleCategoryAllFeatures(Category, Value) {
     global CategoryEnabled, ConfigurationFile
     Bool := (Value = true or Value = 1)

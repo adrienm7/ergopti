@@ -774,9 +774,9 @@ CreateHotstring("*", "clé" . ScriptInformation["MagicKey"], "🔑")
 ; must register longer / more-specific triggers AFTER shorter ones. Sections
 ; whose triggers start with a special prefix (@, ., :, etc.) are typically
 ; longer composites of plain triggers, so we load them LAST. We achieve this
-; by iterating the v2 Map in reverse — MirrorV1ToV2_HotstringsPersonal
-; populates it in the user's preferred order (mirroring v1's __Order), so
-; reversing the iteration here gives us "load prominent sections last".
+; by iterating the v2 Map in reverse — ApplyConfigTomlV2 preserves the
+; insertion order of the [hotstrings.personal.*] sections from the user's
+; config.toml, so reversing here gives "load prominent sections last".
 if FeaturesV2.Has("hotstrings") and FeaturesV2["hotstrings"].Has("personal") {
     _PersonalGroup := FeaturesV2["hotstrings"]["personal"]
     _PersonalKeys := []
