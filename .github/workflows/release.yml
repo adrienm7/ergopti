@@ -212,21 +212,21 @@ jobs:
                   (cd static/drivers/macos/bundles && zip -r "../../../../build/macos/Ergopti_macOS.zip" "$bundle_name")
                   echo "Packaged keylayout: $bundle_name → Ergopti_macOS.zip"
 
-            - name: Upload macOS assets to release
+            - name: Rename appcast for upload
               shell: bash
-              env:
-                  GH_TOKEN: ${{ github.token }}
               run: |
-                  set -euo pipefail
-                  tag="${{ needs.prepare-release.outputs.tag }}"
-                  assets=(build/macos/ErgoptiPlus.app.zip)
-                  [ -f build/macos/Ergopti_macOS.zip           ] && assets+=(build/macos/Ergopti_macOS.zip)
-                  [ -f build/macos/_ErgoptiPlus.app.zip.sig    ] && assets+=(build/macos/_ErgoptiPlus.app.zip.sig)
-                  if [ -f build/macos/appcast-main.xml ]; then
-                      mv build/macos/appcast-main.xml build/macos/_appcast-main.xml
-                      assets+=(build/macos/_appcast-main.xml)
-                  fi
-                  gh release upload "$tag" "${assets[@]}" --clobber
+                  [ -f build/macos/appcast-main.xml ] && mv build/macos/appcast-main.xml build/macos/_appcast-main.xml || true
+
+            - name: Upload macOS artifacts
+              uses: actions/upload-artifact@v4
+              with:
+                  name: assets-macos
+                  retention-days: 1
+                  path: |
+                      build/macos/ErgoptiPlus.app.zip
+                      build/macos/Ergopti_macOS.zip
+                      build/macos/_ErgoptiPlus.app.zip.sig
+                      build/macos/_appcast-main.xml
 
 
 
@@ -304,32 +304,21 @@ jobs:
                   & $ahk2exe /in $in /out $out /base $runtime /icon $icon
                   if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
-            - name: Upload Windows EXE to release
+            - name: Rename Windows keyboard layout for upload
               shell: bash
-              env:
-                  GH_TOKEN: ${{ github.token }}
-              run: |
-                  gh release upload "${{ needs.prepare-release.outputs.tag }}" \
-                      static/drivers/autohotkey/ErgoptiPlus.exe \
-                      --clobber
-
-            - name: Upload Windows keyboard layout
-              shell: bash
-              env:
-                  GH_TOKEN: ${{ github.token }}
               run: |
                   set -euo pipefail
-                  tag="${{ needs.prepare-release.outputs.tag }}"
                   latest_kbd=$(ls static/drivers/windows/Ergopti_v*.exe | sort -V | tail -1)
-                  # Final asset name is just ``Ergopti.exe`` — this is the
-                  # bare keyboard-layout installer (no driver, no macros), so
-                  # it mirrors the macOS ``Ergopti.zip`` and stays clearly
-                  # distinct from the ``ErgoptiPlus.exe`` full-driver asset
-                  # that lives next to it on the release page.
                   cp "$latest_kbd" static/drivers/windows/Ergopti_windows.exe
-                  gh release upload "$tag" \
-                      static/drivers/windows/Ergopti_windows.exe \
-                      --clobber
+
+            - name: Upload Windows artifacts
+              uses: actions/upload-artifact@v4
+              with:
+                  name: assets-windows
+                  retention-days: 1
+                  path: |
+                      static/drivers/autohotkey/ErgoptiPlus.exe
+                      static/drivers/windows/Ergopti_windows.exe
 
 
 
@@ -361,16 +350,14 @@ jobs:
                   (cd static/drivers/linux && zip -r "../../../build/linux/Ergopti_xkb.zip" "$dir_name")
                   echo "Packaged XKB: $dir_name → Ergopti_xkb.zip"
 
-            - name: Upload Linux XKB and Kanata config to release
-              shell: bash
-              env:
-                  GH_TOKEN: ${{ github.token }}
-              run: |
-                  set -euo pipefail
-                  gh release upload "${{ needs.prepare-release.outputs.tag }}" \
-                      build/linux/Ergopti_xkb.zip \
-                      static/drivers/kanata/kanata.kbd \
-                      --clobber
+            - name: Upload Linux artifacts
+              uses: actions/upload-artifact@v4
+              with:
+                  name: assets-linux
+                  retention-days: 1
+                  path: |
+                      build/linux/Ergopti_xkb.zip
+                      static/drivers/kanata/kanata.kbd
 
 
 
@@ -392,6 +379,27 @@ jobs:
               uses: actions/checkout@v4
               with:
                   fetch-depth: 0
+
+            - name: Download all build artifacts
+              uses: actions/download-artifact@v4
+              with:
+                  path: release-assets
+                  merge-multiple: true
+
+            - name: Upload all assets to release (single atomic call)
+              shell: bash
+              env:
+                  GH_TOKEN: ${{ github.token }}
+              run: |
+                  set -euo pipefail
+                  tag="${{ needs.prepare-release.outputs.tag }}"
+                  # Collect every file that was staged by the build jobs.
+                  # upload-artifact flattens paths when merge-multiple is true,
+                  # so all assets sit directly under release-assets/.
+                  mapfile -t assets < <(find release-assets -type f)
+                  echo "Uploading ${#assets[@]} asset(s) to release $tag:"
+                  printf '  %s\n' "${assets[@]}"
+                  gh release upload "$tag" "${assets[@]}"
 
             # Build the changelog section. Delegates to tools/build_changelog.py
             # which aggregates every commit between the previous release tag
