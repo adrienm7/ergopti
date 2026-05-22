@@ -747,9 +747,8 @@ _SaveData(W, LV, StatusText) {
         return false
     }
     ; Read autocorrection TimeActivationSeconds from the v2 hotstrings.personal
-    ; sub-Map (phase 12 migration). The mirror populates this from
-    ; Features["Personal"]["Autocorrection"].TimeActivationSeconds on every
-    ; boot, so the value stays in sync with the tray-menu edits.
+    ; sub-Map — hydrated at boot from the [hotstrings.personal.autocorrection]
+    ; section of the user's config.toml by ApplyConfigTomlV2.
     FeatureConfig := { TimeActivationSeconds: 0 }
     if (IsSet(FeaturesV2)
         and FeaturesV2.Has("hotstrings")
