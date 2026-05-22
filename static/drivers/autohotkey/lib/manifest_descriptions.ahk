@@ -60,6 +60,33 @@ MenuLabelFromManifestEntry(Entry) {
 ; can be empty — when none of them resolves, the function returns the last
 ; segment of the path (or the key itself as a last-resort sentinel).
 MenuLabelFromDescriptionKey(DescKey, Path := "", V1Path := "") {
+    Label := TryMenuLabelFromDescriptionKey(DescKey, Path, V1Path)
+    if (Label != "") {
+        return Label
+    }
+    ; Last-resort fallback: the v2 path's tail segment, or the raw key.
+    if (Path != "") {
+        Parts := StrSplit(Path, ".")
+        return Parts[Parts.Length]
+    }
+    return DescKey
+}
+
+; Try to resolve a localised label and return ``""`` when no candidate key
+; matches an entry in the active i18n locale. Used by callers that want to
+; chain to a different fallback source (e.g. Features.Description for
+; user-defined personal hotstring sections) rather than show the raw key.
+TryMenuLabelFromManifestEntry(Entry) {
+    if !IsObject(Entry) {
+        return ""
+    }
+    DescKey := Entry.Has("description_key") ? Entry["description_key"] : ""
+    Path    := Entry.Has("path")            ? Entry["path"]            : ""
+    V1Path  := (Path == "") ? "" : V2PathToV1Path(Path)
+    return TryMenuLabelFromDescriptionKey(DescKey, Path, V1Path)
+}
+
+TryMenuLabelFromDescriptionKey(DescKey, Path := "", V1Path := "") {
     global ScriptInformation
 
     Candidates := _MenuLabelCandidateKeys(DescKey, Path, V1Path)
@@ -75,17 +102,7 @@ MenuLabelFromDescriptionKey(DescKey, Path := "", V1Path := "") {
         }
     }
 
-    if (Label == "") {
-        ; Last-resort fallback: the v2 path's tail segment, or the raw key.
-        if (Path != "") {
-            Parts := StrSplit(Path, ".")
-            Label := Parts[Parts.Length]
-        } else {
-            Label := DescKey
-        }
-    }
-
-    if (IsSet(ScriptInformation) and ScriptInformation.Has("MagicKey")) {
+    if (Label != "" and IsSet(ScriptInformation) and ScriptInformation.Has("MagicKey")) {
         Label := StrReplace(Label, "★", ScriptInformation["MagicKey"])
     }
     return Label
