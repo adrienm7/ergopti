@@ -13,91 +13,6 @@
 
 global SubMenus := Map()
 
-CreateSubMenusRecursive(MenuParent, Items, CategoryPath) {
-	global SubMenus
-
-	if GetFeatureByPath(CategoryPath).Has("__Order") {
-		; Virtual grouping: ">Label" opens a transient submenu (no Features
-		; counterpart needed) and "<" closes it. Lets us tidy long flat menus
-		; without changing feature paths consumed elsewhere.
-		MenuStack := [MenuParent]
-		for Feature in GetFeatureByPath(CategoryPath)["__Order"] {
-			CurrentMenu := MenuStack[MenuStack.Length]
-			if Feature == "-" {
-				CurrentMenu.Add() ; Empty line
-				continue
-			}
-			if (SubStr(Feature, 1, 1) == ">") {
-				GroupKey := Trim(SubStr(Feature, 2))
-				; If the key contains a dot it's an i18n key, otherwise literal label
-				GroupLabel := InStr(GroupKey, ".") ? t(GroupKey) : GroupKey
-				GroupMenu := Menu()
-				CurrentMenu.Add(GroupLabel, GroupMenu)
-				MenuStack.Push(GroupMenu)
-				continue
-			}
-			if (Feature == "<") {
-				if (MenuStack.Length > 1) {
-					MenuStack.Pop()
-				}
-				continue
-			}
-			Key := Feature
-			Val := GetFeatureByPath(CategoryPath)[Feature]
-			CreateSubMenusRecursiveCommonCode(CurrentMenu, Key, Val, CategoryPath)
-		}
-	} else {
-		for Key, Val in Items {
-			if Key == "__Configuration" {
-				continue
-			}
-			CreateSubMenusRecursiveCommonCode(MenuParent, Key, Val, CategoryPath)
-		}
-	}
-}
-
-CreateSubMenusRecursiveCommonCode(MenuParent, Key, Val, CategoryPath) {
-	FullPath := CategoryPath "." Key
-
-	if (Type(Val) == "Map") {
-		; Create submenu and store in SubMenus. The visible label defaults to
-		; the raw map key but can be overridden by GetSubMenuLabel for paths
-		; whose code identifier is intentionally English while the menu UI is
-		; French (Shortcuts.Personal → « Raccourcis personnels », …).
-		SubMenu := Menu()
-		SubMenuLabel := GetSubMenuLabel(FullPath, Key)
-		MenuParent.Add(SubMenuLabel, SubMenu)
-		SubMenus[FullPath] := SubMenu
-		; Phase 7.5 (UX): grey out the submenu container when its master
-		; category gate is off so the user sees the whole sub-tree as
-		; inert at a glance instead of having to drill in.
-		if !IsCategoryGated(_MasterCategoryFor(CategoryPath)) {
-			try MenuParent.Disable(SubMenuLabel)
-		}
-		; Recursively create nested submenus
-		CreateSubMenusRecursive(SubMenu, Val, FullPath)
-	} else if IsObject(Val) and Val.HasOwnProp("Enabled") {
-		; Features that carry a remap target letter (the EGrave/ECirc/EAcute/
-		; AGrave accent shortcuts) render as a letter-picker sub-submenu so
-		; the user can pick any of a-z directly from the tray instead of
-		; juggling a binary toggle plus a separate Gui editor.
-		if Val.HasOwnProp("Letter") {
-			MenuAddLetterPicker(MenuParent, CategoryPath, Key)
-		} else {
-			MenuAddItem(MenuParent, CategoryPath, Key)
-		}
-		; Mirror HS personal_info module_placeholder: add an editor shortcut
-		; below the "Remplissage de formulaires" toggle
-		if (StrLower(Key) == "textexpansionpersonalinformation") {
-			RegisterMenuItem(MenuParent, t("menu.shortcuts.edit_personal_info"), PersonalInformationEditor)
-		}
-		; Mirror HS ctrl_g pattern: inject the URL editor right below the GPT toggle
-		if (StrLower(Key) == "gpt") {
-			RegisterMenuItem(MenuParent, t("menu.shortcuts.edit_gpt_link"), GPTLinkEditor)
-		}
-	}
-}
-
 ; Add a clickable menu item driven entirely by a manifest feature entry —
 ; no Features v1 lookup. Used by the menu builder for categories that have
 ; been migrated to consume the manifest directly (Layout first).
@@ -319,17 +234,6 @@ SetFeatureLetter(FullPath, Letter) {
 SetFeatureLetterOff(FullPath) {
 	WriteV2Update(FullPath . ".Enabled", false)
 	Reload
-}
-
-; Resolve the visible label of a sub-Map menu entry. Defaults to the raw
-; FallbackKey (the map key as written in features_config.ahk). When the node
-; carries a "__Label" key its value is used as an i18n key — avoids hardcoding
-; every path here as the feature tree grows.
-GetSubMenuLabel(FullPath, FallbackKey) {
-	Node := GetFeatureByPath(FullPath)
-	if IsObject(Node) and Node.HasOwnProp("__Label")
-		return t(Node["__Label"])
-	return FallbackKey
 }
 
 ; Retrieve a feature title by its path. The label is sourced from the
@@ -994,11 +898,9 @@ global HotstringCategories     := _HotstringGroups.all
 global HotstringCategoriesStd  := _HotstringGroups.standard
 global HotstringCategoriesErgopti := _HotstringGroups.ergopti
 
-; v1 category names for the flat hotstring categories that ship without
-; an ``__Order`` override and that have a 1:1 mapping to a manifest
-; section. These are rendered directly from the manifest instead of
-; going through CreateSubMenusRecursive — the v1 Features Map is no
-; longer consulted for them.
+; v1 category names for the flat hotstring categories that have a 1:1
+; mapping to a manifest section — each rendered as a flat list of
+; toggles by InitSubMenus.
 global _FLAT_HOTSTRING_V1_CATS := ["Autocorrection", "DistancesReduction",
 	"SFBsReduction", "Rolls", "MagicKey"]
 
@@ -1011,30 +913,21 @@ global _DYNAMIC_HOTSTRINGS_ORDER := ["DateLongFr", "DateFr", "Date",
 	"PhonePrefixes", "SsnPrefixes", "IbanPrefixes", "-",
 	"TextExpansionPersonalInformation"]
 
-; Return true when ``Category`` is built by a dedicated manifest-driven
-; helper inside InitSubMenus (skipping the CreateSubMenusRecursive
-; fallback that still walks the legacy Features Map). Kept as a single
-; predicate so the "already rendered" guard has one definition.
-_IsCategoryManifestRendered(Category) {
-	global _FLAT_HOTSTRING_V1_CATS
-	for FlatCat in _FLAT_HOTSTRING_V1_CATS {
-		if (Category == FlatCat) {
-			return true
-		}
-	}
-	return (Category == "DynamicHotstrings"
-		or Category == "Shortcuts"
-		or Category == "TapHolds")
-}
-
+; Build every consumed SubMenus[X] entry explicitly. The legacy
+; ``for Category, Items in Features`` loop that fell back to
+; CreateSubMenusRecursive for any category not yet migrated is gone —
+; every consumer of SubMenus (the hotstring rendering block in
+; initMenu, the Shortcuts + TapHolds tray inserts) reads one of the
+; entries built here. Gestures has its own builder (BuildGesturesMenu)
+; called directly from initMenu and never touches SubMenus, so it is
+; intentionally absent. Layout is built straight into A_TrayMenu by
+; initMenu's manifest iteration and also doesn't need a SubMenus slot.
 InitSubMenus() {
-	global Features, SubMenus, _FLAT_HOTSTRING_V1_CATS, _V1V2_TopCategoryMap
+	global SubMenus, _FLAT_HOTSTRING_V1_CATS, _V1V2_TopCategoryMap
 	SubMenus := Map()
 
-	; Build the flat hotstring categories directly from the manifest.
-	; Order of menu items inside each submenu = manifest declaration order
-	; (preserved by the codegen emitter; matches the previous Features Map
-	; iteration order since Features was itself built from the manifest).
+	; Flat hotstring categories — order = manifest declaration order
+	; (preserved by the codegen emitter).
 	for V1Cat in _FLAT_HOTSTRING_V1_CATS {
 		SubMenu := Menu()
 		V2Section := _V1V2_TopCategoryMap.Has(V1Cat) ? _V1V2_TopCategoryMap[V1Cat] : ""
@@ -1055,36 +948,11 @@ InitSubMenus() {
 	; TapHolds — direct iteration of ``_TapHoldsConfig`` (TapHolds entries
 	; live outside the manifest in tap_hold_config.ahk).
 	SubMenus["TapHolds"] := _BuildTapHoldsSubmenu()
-
-	; Remaining categories still rely on the Features Map for structure —
-	; __Order arrays with virtual headers (Shortcuts), sub-Maps
-	; (Shortcuts.AltGrLAlt, TapHolds.<Key>), or runtime entries (Personal).
-	; These will migrate in subsequent slices.
-	for Category, Items in Features {
-		if (Category == "Layout") {
-			continue
-		}
-		if _IsCategoryManifestRendered(Category) {
-			continue
-		}
-		SubMenu := Menu()
-		SubMenus[Category] := SubMenu
-		CreateSubMenusRecursive(SubMenu, Items, Category)
-	}
-	; The legacy Personal sub-Map block — which used to build a
-	; SubMenus["Personal"] from CreateSubMenusRecursive — was never
-	; consumed (no reader anywhere). The personal hotstrings submenu is
-	; built directly inside initMenu's Hotstrings rendering block
-	; (search for ``PersonalMenu := Menu()``) so the InitSubMenus pass
-	; doesn't need to touch Features["Personal"] at all.
 }
 
 ; Build the DynamicHotstrings submenu directly from the manifest, honouring
 ; the curated render order in ``_DYNAMIC_HOTSTRINGS_ORDER`` and injecting
-; the personal-info editor entry right after the text-expansion item (the
-; same hardcoded injection ``CreateSubMenusRecursiveCommonCode`` still
-; performs for legacy categories — kept here so the manifest path is
-; visually identical to the v1 path it replaces).
+; the personal-info editor entry right after the text-expansion item.
 _BuildDynamicHotstringsSubmenu() {
 	global _V1V2_DynamicHotstringsKeyMap, _DYNAMIC_HOTSTRINGS_ORDER
 	SubMenu := Menu()
@@ -1126,9 +994,7 @@ global _SHORTCUTS_SUBMAP_V1V2 := Map(
 	"LAltCapsLock",  "ahk.shortcuts.lalt_caps_lock",
 )
 
-; Build the Shortcuts submenu directly from the manifest, mirroring the
-; curated layout the v1 ``__Order`` array used to drive via
-; CreateSubMenusRecursive:
+; Build the Shortcuts submenu directly from the manifest:
 ;
 ;   ⌨️ Raccourcis
 ;     ↳ Accents (4 letter pickers — EGrave/ECirc/EAcute/AGrave)
@@ -1185,8 +1051,7 @@ _BuildShortcutsSubmenu() {
 }
 
 ; Build the TapHolds submenu directly from ``_TapHoldsConfig``
-; (lib/tap_hold_config.ahk), bypassing CreateSubMenusRecursive and the
-; v1 Features iteration that walked the same Map by indirection.
+; (lib/tap_hold_config.ahk).
 ;
 ; The render shape is dictated by ``_TapHoldsConfig["__Order"]``:
 ;
@@ -1237,9 +1102,8 @@ _BuildTapHoldsSubmenu() {
 	return SubMenu
 }
 
-; Transitional: render the runtime-built Shortcuts.Personal sub-Map at the
-; bottom of the Raccourcis menu when it carries entries. Replicates what
-; CreateSubMenusRecursive used to do for the Personal sub-Map (separator
+; Transitional: render the runtime-built Shortcuts.Personal sub-Map at
+; the bottom of the Raccourcis menu when it carries entries (separator
 ; + nested submenu of per-name toggles). To be removed in the slice that
 ; migrates RegisterPersonalFeature off the v1 Features Map.
 _AppendPersonalShortcutsSubmenuIfAny(ShortcutsMenu) {
@@ -1308,7 +1172,7 @@ initMenu() {
 	}
 
 	; Insert the configurable keyboard shortcut groups just before the
-	; « Combinaison de modificateurs » group that CreateSubMenusRecursive already
+	; « Combinaison de modificateurs » group ``_BuildShortcutsSubmenu``
 	; added — keeping the modifier combos visually grouped together.
 	; Then append « Raccourcis de gestion du script » at the bottom.
 	if SubMenus.Has("Shortcuts") {

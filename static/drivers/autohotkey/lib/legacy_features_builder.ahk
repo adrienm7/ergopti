@@ -12,18 +12,23 @@
 ; structure that the tray builder still walks.
 ;
 ; FEATURES & RATIONALE:
-; 1. The runtime state on ``Features[X].Enabled / .Letter / ...`` is no
+; 1. Runtime state on ``Features[X].Enabled / .Letter / ...`` is no
 ;    longer consulted by the menu builder (slice 6 cut those reads over
 ;    to FeaturesV2 via GetFeatureV2State). The defaults emitted here are
-;    therefore only there to preserve the Map shape for legacy helpers
-;    that still walk the v1 tree (CreateSubMenusRecursive, the personal-
-;    feature register, ToggleMenuVariableByPath sub-Map iteration, etc.).
-;    Any deviation between these defaults and FeaturesV2's manifest
-;    defaults is harmless — only the structure matters.
-; 2. ``__Order`` arrays + ``__Label`` keys + the curated virtual-header
-;    entries (``>menu.shortcuts.group_modifiers`` etc.) are hardcoded
-;    here because the manifest doesn't yet model them. Migrating that
-;    metadata into the manifest is a future slice.
+;    only there to preserve the Map shape for the few helpers that still
+;    walk the v1 tree (the personal-feature register, the manifest-
+;    miss fallbacks inside GetMenuTitleByPath / _ResolveMenuItemEnabled
+;    for runtime Personal entries, RegisterPersonalFeature's mutation of
+;    Features["Shortcuts"]["Personal"]). Any deviation between these
+;    defaults and FeaturesV2's manifest defaults is harmless — only the
+;    structure matters.
+; 2. ``__Order`` arrays + ``__Label`` keys are hardcoded here because the
+;    manifest doesn't model them. The menu builder's manifest-driven
+;    helpers (``_BuildShortcutsSubmenu`` / ``_BuildTapHoldsSubmenu`` /
+;    ``_BuildDynamicHotstringsSubmenu``) carry the curated render order
+;    as their own sidecar constants now, so these ``__Order`` arrays are
+;    only retained for the runtime Personal sub-Map registration code
+;    that still consults them.
 ; 3. ``TapHolds`` is consumed verbatim from ``tap_hold_config.ahk``'s
 ;    ``_TapHoldsConfig`` literal — that subsystem isn't covered by the
 ;    manifest at all and keeps its own dedicated module.
