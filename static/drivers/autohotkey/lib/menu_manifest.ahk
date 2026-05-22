@@ -106,7 +106,8 @@ MenuManifest_LoadHotstringGroups() {
 	}
 
 	; ── Parse the whole manifest via the canonical JSON parser
-	local Root := ""
+	; Variables inside a function are local by default in AHK v2 — no keyword needed
+	Root := ""
 	try Root := JsonParse(FileContent)
 	if !(Root is Map) {
 		try LoggerWarn("MenuManifest", "manifest root is not a JSON object — using fallback lists.")
