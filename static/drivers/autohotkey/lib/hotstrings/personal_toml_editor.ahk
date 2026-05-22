@@ -472,19 +472,19 @@ ReloadPersonalSection(Data, SectionName, FeatureConfig) {
 ; ==========================================================
 ; ==========================================================
 
-; Keys under [PersonalEditor] in the main ini.
+; Keys under [ahk.personal_editor] in the v2 config TOML.
 _EditorPrefGet(Key, Default) {
     global ConfigurationFile
     if !IsSet(ConfigurationFile) or !FileExist(ConfigurationFile) {
         return Default
     }
-    Val := TOML_Read(ConfigurationFile, "PersonalEditor", Key, "_MISSING_")
+    Val := TOML_Read(ConfigurationFile, "ahk.personal_editor", Key, "_MISSING_")
     return (Val == "_MISSING_") ? Default : Val
 }
 _EditorPrefSet(Key, Value) {
     global ConfigurationFile
     if IsSet(ConfigurationFile) {
-        TOML_Write(Value, ConfigurationFile, "PersonalEditor", Key)
+        TOML_Write(Value, ConfigurationFile, "ahk.personal_editor", Key)
     }
 }
 

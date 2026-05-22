@@ -71,11 +71,11 @@ class WPMWidgetConst {
     static ALPHA_ACTIVE       := 220
     static ALPHA_IDLE         := 140
     ; Config key names written to config.toml under [Script].
-    static CFG_VISIBLE        := "WpmWidgetVisible"
-    static CFG_X              := "WpmWidgetX"
-    static CFG_Y              := "WpmWidgetY"
-    static CFG_COLORS         := "WpmWidgetColors"
-    static CFG_GRAPH          := "WpmWidgetGraph"
+    static CFG_VISIBLE        := "wpm_widget_visible"
+    static CFG_X              := "wpm_widget_x"
+    static CFG_Y              := "wpm_widget_y"
+    static CFG_COLORS         := "wpm_widget_colors"
+    static CFG_GRAPH          := "wpm_widget_graph"
     ; Minimum window for WPM calculation — avoids inflated values from short bursts (mirrors Hammerspoon).
     static WPM_MIN_DURATION_MS := 2000
     ; Ring buffer capacity for recent keystrokes.
@@ -760,11 +760,11 @@ StrJoin(arr, sep) {
 
 ; Called once at startup to restore position and visibility from config.
 WPMWidget_LoadConfig(Cache) {
-    raw_vis    := IniCacheGet(Cache, "Script", WPMWidgetConst.CFG_VISIBLE)
-    raw_x      := IniCacheGet(Cache, "Script", WPMWidgetConst.CFG_X)
-    raw_y      := IniCacheGet(Cache, "Script", WPMWidgetConst.CFG_Y)
-    raw_colors := IniCacheGet(Cache, "Script", WPMWidgetConst.CFG_COLORS)
-    raw_graph  := IniCacheGet(Cache, "Script", WPMWidgetConst.CFG_GRAPH)
+    raw_vis    := IniCacheGet(Cache, "ahk.metrics", WPMWidgetConst.CFG_VISIBLE)
+    raw_x      := IniCacheGet(Cache, "ahk.metrics", WPMWidgetConst.CFG_X)
+    raw_y      := IniCacheGet(Cache, "ahk.metrics", WPMWidgetConst.CFG_Y)
+    raw_colors := IniCacheGet(Cache, "ahk.metrics", WPMWidgetConst.CFG_COLORS)
+    raw_graph  := IniCacheGet(Cache, "ahk.metrics", WPMWidgetConst.CFG_GRAPH)
 
     if (raw_x != "_" && raw_x != "" && IsInteger(raw_x))
         WPMWidget.pos_x := Integer(raw_x)
@@ -786,21 +786,21 @@ WPMWidget_SaveVisible() {
     global ConfigurationFile
     val := WPMWidget.visible ? "1" : "0"
     try TOML_BatchWrite(ConfigurationFile,
-        [{ Section: "Script", Key: WPMWidgetConst.CFG_VISIBLE, Value: val }])
+        [{ Section: "ahk.metrics", Key: WPMWidgetConst.CFG_VISIBLE, Value: val }])
 }
 
 WPMWidget_SavePosition() {
     global ConfigurationFile
     try TOML_BatchWrite(ConfigurationFile, [
-        { Section: "Script", Key: WPMWidgetConst.CFG_X, Value: String(WPMWidget.pos_x) },
-        { Section: "Script", Key: WPMWidgetConst.CFG_Y, Value: String(WPMWidget.pos_y) },
+        { Section: "ahk.metrics", Key: WPMWidgetConst.CFG_X, Value: String(WPMWidget.pos_x) },
+        { Section: "ahk.metrics", Key: WPMWidgetConst.CFG_Y, Value: String(WPMWidget.pos_y) },
     ])
 }
 
 WPMWidget_SaveConfig() {
     global ConfigurationFile
     try TOML_BatchWrite(ConfigurationFile, [
-        { Section: "Script", Key: WPMWidgetConst.CFG_COLORS, Value: WPMWidget.use_colors ? "1" : "0" },
-        { Section: "Script", Key: WPMWidgetConst.CFG_GRAPH,  Value: WPMWidget.show_graph  ? "1" : "0" },
+        { Section: "ahk.metrics", Key: WPMWidgetConst.CFG_COLORS, Value: WPMWidget.use_colors ? "1" : "0" },
+        { Section: "ahk.metrics", Key: WPMWidgetConst.CFG_GRAPH,  Value: WPMWidget.show_graph  ? "1" : "0" },
     ])
 }

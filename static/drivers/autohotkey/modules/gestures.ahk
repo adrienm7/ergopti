@@ -656,9 +656,15 @@ GestureScreenshotInstant() {
 }
 
 GestureOpenConfiguredURL() {
-    global _IniCache
-    URL := IniCacheGet(_IniCache, "Shortcuts.Actions", "open_url")
-    if (URL = "_" or URL = "")
+    global FeaturesV2
+    URL := ""
+    if IsSet(FeaturesV2) and FeaturesV2.Has("shortcuts")
+        and FeaturesV2["shortcuts"].Has("gpt")
+        and IsObject(FeaturesV2["shortcuts"]["gpt"])
+        and FeaturesV2["shortcuts"]["gpt"].Has("link") {
+        URL := FeaturesV2["shortcuts"]["gpt"]["link"]
+    }
+    if (URL = "")
         URL := "https://chatgpt.com/"
     Run(URL)
 }
@@ -672,11 +678,18 @@ GesturePickColor() {
 }
 
 GestureTakeNote() {
-    global _IniCache
-    DatedRaw := IniCacheGet(_IniCache, "Shortcuts.Actions", "take_note_dated")
-    DatedNotes := (DatedRaw = "true")
-    FolderRaw := IniCacheGet(_IniCache, "Shortcuts.Actions", "take_note_folder")
-    DestFolder := (FolderRaw = "_" or FolderRaw = "") ? A_Desktop : FolderRaw
+    global FeaturesV2
+    DatedNotes := false
+    DestFolder := A_Desktop
+    if IsSet(FeaturesV2) and FeaturesV2.Has("shortcuts")
+        and FeaturesV2["shortcuts"].Has("take_note")
+        and IsObject(FeaturesV2["shortcuts"]["take_note"]) {
+        TN := FeaturesV2["shortcuts"]["take_note"]
+        if TN.Has("dated_notes")
+            DatedNotes := (TN["dated_notes"] = true)
+        if TN.Has("destination_folder") and TN["destination_folder"] != ""
+            DestFolder := TN["destination_folder"]
+    }
     FileName := DatedNotes
         ? "Notes_" . FormatTime(, "dd_MM_yyyy") . ".txt"
         : "Notes.txt"
@@ -721,13 +734,18 @@ GestureSimulateActivity() {
 }
 
 GestureSearchWeb() {
-    global _IniCache
-    EngineURL   := IniCacheGet(_IniCache, "Shortcuts.Actions", "search_web_engine")
-    EngineQuery := IniCacheGet(_IniCache, "Shortcuts.Actions", "search_web_query")
-    if (EngineURL = "_" or EngineURL = "")
-        EngineURL := "https://www.google.com"
-    if (EngineQuery = "_" or EngineQuery = "")
-        EngineQuery := "https://www.google.com/search?q="
+    global FeaturesV2
+    EngineURL   := "https://www.google.com"
+    EngineQuery := "https://www.google.com/search?q="
+    if IsSet(FeaturesV2) and FeaturesV2.Has("shortcuts")
+        and FeaturesV2["shortcuts"].Has("search")
+        and IsObject(FeaturesV2["shortcuts"]["search"]) {
+        S := FeaturesV2["shortcuts"]["search"]
+        if S.Has("search_engine") and S["search_engine"] != ""
+            EngineURL := S["search_engine"]
+        if S.Has("search_engine_url_query") and S["search_engine_url_query"] != ""
+            EngineQuery := S["search_engine_url_query"]
+    }
     SelectedText := Trim(GetSelection())
     if (SelectedText = "") {
         Run(EngineURL)
@@ -1593,24 +1611,24 @@ $^#+F10:: GestureDispatch("swipe_4_right")
 ; ==========================================
 ; ==========================================
 
-; Reads gesture assignments from the INI file.
+; Reads gesture assignments from the v2 [ahk.gestures] section.
 GesturesReadConfig() {
     global GestureAssignments, _IniCache
 
     for Slot in GESTURE_SLOTS {
-        Value := IniCacheGet(_IniCache, "Gestures", Slot)
+        Value := IniCacheGet(_IniCache, "ahk.gestures", Slot)
         if (Value != "_") {
             GestureAssignments[Slot] := Value
         }
     }
 }
 
-; Saves a single gesture assignment to the INI file.
+; Saves a single gesture assignment to the v2 [ahk.gestures] section.
 GestureSaveAssignment(slot, action) {
     global GestureAssignments, ConfigurationFile
 
     GestureAssignments[slot] := action
-    TOML_Write(action, ConfigurationFile, "Gestures", slot)
+    TOML_Write(action, ConfigurationFile, "ahk.gestures", slot)
 }
 
 ; Writes a single REG_DWORD value, logging and counting failures.
@@ -1801,9 +1819,9 @@ GesturesReadConfig()
 ; every subsequent reload (the tray menu's "Auto-configure" action stays the
 ; supported way to retry if something failed here).
 global _IniCache, ConfigurationFile
-RawAutoConfig := IniCacheGet(_IniCache, "Gestures", "AutoConfigureOnNextStart")
+RawAutoConfig := IniCacheGet(_IniCache, "ahk.gestures", "auto_configure_on_next_start")
 if (RawAutoConfig == "1" or RawAutoConfig == "true") {
-    LoggerStart("gestures", "Consuming AutoConfigureOnNextStart flag from onboarding…")
+    LoggerStart("gestures", "Consuming auto_configure_on_next_start flag from onboarding…")
 
     ; Clear the flag FIRST, before any blocking RunWait — the touchpad device
     ; restart inside GestureAutoConfigureRegistry can cause the AHK process to
@@ -1811,7 +1829,7 @@ if (RawAutoConfig == "1" or RawAutoConfig == "true") {
     ; after, that kill leaves the flag set and the auto-relaunched script loops
     ; forever, never reaching initMenu — user sees the default tray menu.
     try TOML_BatchWrite(ConfigurationFile,
-        [{ Section: "Gestures", Key: "AutoConfigureOnNextStart", Value: false }])
+        [{ Section: "ahk.gestures", Key: "auto_configure_on_next_start", Value: false }])
 
     ; Defer the actual registry + touchpad restart to a one-shot timer so the
     ; rest of auto-execute (notably initMenu in ErgoptiPlus.ahk) finishes

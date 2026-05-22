@@ -49,7 +49,7 @@ CS_GetTomlPath() {
 ; The single section we own inside config.toml. Other sections
 ; ([Script], [Shortcuts.ScriptControl], [Gestures], feature sections …) are
 ; preserved verbatim by the section-aware writer below.
-global CS_SECTION := "Metrics"
+global CS_SECTION := "ahk.metrics"
 
 ; ===================================
 ; ===================================
