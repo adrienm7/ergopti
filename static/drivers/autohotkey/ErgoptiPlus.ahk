@@ -707,10 +707,14 @@ CountDynamicSection(SectionName) {
     SsnRaw := StrReplace(Ssn, " ", "")
     IbanRaw := StrReplace(Iban, " ", "")
 
+    ; Accept both the legacy v1 PascalCase keys (Features["DynamicHotstrings"]
+    ; iteration) and the v2 snake_case keys (FeaturesV2["hotstrings"]["dynamic"]
+    ; iteration) so callers don't have to convert at the call site. Drop the
+    ; PascalCase cases at cut-over.
     switch SectionName {
-        case "DateFr", "DateLongFr", "Date":
+        case "DateFr", "DateLongFr", "Date", "date_fr", "date_long_fr", "date":
             return 1
-        case "PhonePrefixes":
+        case "PhonePrefixes", "phone_prefixes":
             N := 0
             if StrLen(Phone) >= 2
                 N += 2  ; phone[1:2]+★ and +33+phone[1:2]
@@ -721,10 +725,10 @@ CountDynamicSection(SectionName) {
             if StrLen(FPhone) >= 5
                 N += 1  ; fphone[1:5]
             return N
-        case "SsnPrefixes":
+        case "SsnPrefixes", "ssn_prefixes":
             ; No-space + spaced triggers — both fire when ssn_raw has >= 5 digits
             return StrLen(SsnRaw) >= 5 ? 2 : 0
-        case "IbanPrefixes":
+        case "IbanPrefixes", "iban_prefixes":
             ; 6 raw chars (no-space) and 7-char spaced trigger if iban_raw has >= 6 chars
             return StrLen(IbanRaw) >= 6 ? 2 : 0
         default:
