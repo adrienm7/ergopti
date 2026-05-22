@@ -1503,13 +1503,27 @@ ToggleCategoryAllFeatures(Category, Value) {
 ; Sections and keys within sections are sorted alphabetically by the
 ; TOML_BatchWrite writer for stable, human-readable output.
 SaveFullConfig() {
-    global Features, ScriptInformation, ScriptShortcutAssignments
+    global Features, FeaturesV2, ScriptInformation, ScriptShortcutAssignments
     global GestureAssignments, ConfigurationFile, _TOML_STRICT_CANON_IN_PROGRESS
     global PrevCanonState
     Updates := []
 
-    ; Collect all feature flags recursively
+    ; Collect all feature flags recursively — v1 walker emits PascalCase
+    ; sections ([Shortcuts], [Hotstrings.Autocorrection], ...) read by the
+    ; legacy ReadConfiguration path.
     _CollectFeatureUpdates(Updates, "", Features)
+
+    ; Phase 14 cut-over (dual-write): in addition to the v1 sections above,
+    ; emit the parallel v2 sections ([shortcuts.e_grave] etc.) so the v2
+    ; reader ApplyConfigTomlV2 can hydrate FeaturesV2 from the same file
+    ; without going through the mirror. Both shapes coexist during the
+    ; transition; the v1 emission disappears once the v1 reader is deleted.
+    if IsSet(FeaturesV2) {
+        _CollectFeatureUpdatesV2(Updates, "", FeaturesV2)
+        ; Schema marker — lets the boot path detect v2-shape configs and
+        ; eventually skip the v1 mirror entirely.
+        Updates.Push({ Section: "_meta", Key: "schema_version", Value: 2 })
+    }
 
     ; [Script] section — locale and other script-level settings
     Updates.Push({ Section: "Script", Key: "Locale", Value: I18nGetLocale() })
@@ -1643,6 +1657,40 @@ _CollectFeatureUpdates(Updates, ParentPath, Node) {
                     Updates.Push({ Section: ParentPath, Key: Key "_" Prop, Value: Value.%Prop% })
                 }
             }
+        }
+    }
+}
+
+; V2 walker — recursively emit ``FeaturesV2`` (a hierarchical Map produced by
+; ManifestBuildFeaturesMap and patched by the per-section mirrors) as TOML
+; sections in the v2 schema. Each level of Map nesting becomes a deeper
+; section path:
+;   FeaturesV2["shortcuts"]["microsoft_bold"] = true
+;       -> [shortcuts] microsoft_bold = true
+;   FeaturesV2["shortcuts"]["gpt"] = Map("enabled"=>true, "link"=>"…")
+;       -> [shortcuts.gpt] enabled = true; link = "…"
+;   FeaturesV2["hotstrings"]["autocorrection"]["accents"] = Map("enabled"=>true, …)
+;       -> [hotstrings.autocorrection.accents] enabled = true; …
+;
+; Arrays and scalars at the root of FeaturesV2 (e.g. ``section_order``) are
+; skipped — they're manifest metadata, not user-tunable config. The
+; ``ahk.`` prefix that distinguishes AHK-only sections in the manifest is
+; intentionally NOT re-emitted (the v2 reader ApplyConfigTomlV2 strips it
+; on input, so round-trip equivalence is preserved without it).
+_CollectFeatureUpdatesV2(Updates, SectionPath, Node) {
+    if (Type(Node) != "Map") {
+        return
+    }
+    for Key, Value in Node {
+        ; Skip manifest-only metadata at the top level (e.g. section_order array).
+        if (SectionPath == "" and Type(Value) != "Map") {
+            continue
+        }
+        Sub := (SectionPath == "") ? Key : SectionPath "." Key
+        if (Type(Value) == "Map") {
+            _CollectFeatureUpdatesV2(Updates, Sub, Value)
+        } else {
+            Updates.Push({ Section: SectionPath, Key: Key, Value: Value })
         }
     }
 }
