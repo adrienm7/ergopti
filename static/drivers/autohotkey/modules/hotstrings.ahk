@@ -661,17 +661,15 @@ _DateLongFr(*) {
 _DateIso(*) {
 	return FormatTime(, "yyyy_MM_dd")
 }
-if Features.Has("DynamicHotstrings") {
-	MK := ScriptInformation["MagicKey"]
-	if FeaturesV2["hotstrings"]["dynamic"]["date_fr"]["enabled"] {
-		CreateHotstring("*?", "@dt" . MK, _DateShortFr, Map("FinalResult", True))
-	}
-	if FeaturesV2["hotstrings"]["dynamic"]["date_long_fr"]["enabled"] {
-		CreateHotstring("*?", "@date" . MK, _DateLongFr, Map("FinalResult", True))
-	}
-	if FeaturesV2["hotstrings"]["dynamic"]["date"]["enabled"] {
-		CreateHotstring("*?", "@td" . MK, _DateIso, Map("FinalResult", True))
-	}
+MK := ScriptInformation["MagicKey"]
+if FeaturesV2["hotstrings"]["dynamic"]["date_fr"]["enabled"] {
+	CreateHotstring("*?", "@dt" . MK, _DateShortFr, Map("FinalResult", True))
+}
+if FeaturesV2["hotstrings"]["dynamic"]["date_long_fr"]["enabled"] {
+	CreateHotstring("*?", "@date" . MK, _DateLongFr, Map("FinalResult", True))
+}
+if FeaturesV2["hotstrings"]["dynamic"]["date"]["enabled"] {
+	CreateHotstring("*?", "@td" . MK, _DateIso, Map("FinalResult", True))
 }
 
 
@@ -682,61 +680,59 @@ if Features.Has("DynamicHotstrings") {
 ; Prefix-based hotstrings derived from the user's personal data.
 ; Registered once at startup from PersonalInformation — same logic as HS rules_engine.
 ; Each trigger auto-expands without end-char (*) and is case-sensitive (C).
-if Features.Has("DynamicHotstrings") {
-	_DynFlags := ":*C:"
-	Phone  := PersonalInformation["PhoneNumber"]        ; e.g. "0606060606"
-	FPhone := PersonalInformation["PhoneNumberClean"]   ; e.g. "06 06 06 06 06"
-	Ssn    := PersonalInformation["SocialSecurityNumber"] ; e.g. "1 99 99 99 999 999 99"
-	Iban   := PersonalInformation["IBAN"]               ; e.g. "FR00 0000 0000 0000 0000 0000 000"
+_DynFlags := ":*C:"
+Phone  := PersonalInformation["PhoneNumber"]        ; e.g. "0606060606"
+FPhone := PersonalInformation["PhoneNumberClean"]   ; e.g. "06 06 06 06 06"
+Ssn    := PersonalInformation["SocialSecurityNumber"] ; e.g. "1 99 99 99 999 999 99"
+Iban   := PersonalInformation["IBAN"]               ; e.g. "FR00 0000 0000 0000 0000 0000 000"
 
-	; Strip spaces for matching purposes (SSN / IBAN contain decorative spaces)
-	SsnRaw  := StrReplace(Ssn,  " ", "")
-	IbanRaw := StrReplace(Iban, " ", "")
+; Strip spaces for matching purposes (SSN / IBAN contain decorative spaces)
+SsnRaw  := StrReplace(Ssn,  " ", "")
+IbanRaw := StrReplace(Iban, " ", "")
 
-	if FeaturesV2["hotstrings"]["dynamic"]["phone_prefixes"]["enabled"] {
-		; Mirrors HS: phone[1:2]+★, +33+phone[1:2], phone[1:4], +33+phone[2:4], phone[2:5], fphone[1:5]
-		MK := ScriptInformation["MagicKey"]
-		if StrLen(Phone) >= 2 {
-			Hotstring(_DynFlags . SubStr(Phone, 1, 2) . MK, (*) => SendFinalResult(Phone))
-			Hotstring(_DynFlags . "+33" . SubStr(Phone, 1, 2), (*) => SendFinalResult("+33" . SubStr(Phone, 2)))
-		}
-		if StrLen(Phone) >= 4 {
-			Hotstring(_DynFlags . SubStr(Phone, 1, 4), (*) => SendFinalResult(Phone))
-			Hotstring(_DynFlags . "+33" . SubStr(Phone, 2, 3), (*) => SendFinalResult("+33" . SubStr(Phone, 2)))
-		}
-		if StrLen(Phone) >= 6 {
-			Hotstring(_DynFlags . SubStr(Phone, 2, 4), (*) => SendFinalResult(Phone))
-		}
-		if StrLen(FPhone) >= 5 {
-			Hotstring(_DynFlags . SubStr(FPhone, 1, 5), (*) => SendFinalResult(FPhone))
+if FeaturesV2["hotstrings"]["dynamic"]["phone_prefixes"]["enabled"] {
+	; Mirrors HS: phone[1:2]+★, +33+phone[1:2], phone[1:4], +33+phone[2:4], phone[2:5], fphone[1:5]
+	MK := ScriptInformation["MagicKey"]
+	if StrLen(Phone) >= 2 {
+		Hotstring(_DynFlags . SubStr(Phone, 1, 2) . MK, (*) => SendFinalResult(Phone))
+		Hotstring(_DynFlags . "+33" . SubStr(Phone, 1, 2), (*) => SendFinalResult("+33" . SubStr(Phone, 2)))
+	}
+	if StrLen(Phone) >= 4 {
+		Hotstring(_DynFlags . SubStr(Phone, 1, 4), (*) => SendFinalResult(Phone))
+		Hotstring(_DynFlags . "+33" . SubStr(Phone, 2, 3), (*) => SendFinalResult("+33" . SubStr(Phone, 2)))
+	}
+	if StrLen(Phone) >= 6 {
+		Hotstring(_DynFlags . SubStr(Phone, 2, 4), (*) => SendFinalResult(Phone))
+	}
+	if StrLen(FPhone) >= 5 {
+		Hotstring(_DynFlags . SubStr(FPhone, 1, 5), (*) => SendFinalResult(FPhone))
+	}
+}
+
+if FeaturesV2["hotstrings"]["dynamic"]["ssn_prefixes"]["enabled"] {
+	; No-space trigger → SSN without spaces; spaced trigger → SSN with spaces.
+	; Both use the first 5 raw digits as the distinguishing prefix.
+	if StrLen(SsnRaw) >= 5 {
+		SsnRawPrefix  := SubStr(SsnRaw, 1, 5)
+		SsnSpacedPfx  := SpacedPrefix(Ssn, 5)
+		Hotstring(_DynFlags . SsnRawPrefix,  (*) => SendFinalResult(SsnRaw))
+		if SsnSpacedPfx != SsnRawPrefix {
+			Hotstring(_DynFlags . SsnSpacedPfx, (*) => SendFinalResult(Ssn))
 		}
 	}
+}
 
-	if FeaturesV2["hotstrings"]["dynamic"]["ssn_prefixes"]["enabled"] {
-		; No-space trigger → SSN without spaces; spaced trigger → SSN with spaces.
-		; Both use the first 5 raw digits as the distinguishing prefix.
-		if StrLen(SsnRaw) >= 5 {
-			SsnRawPrefix  := SubStr(SsnRaw, 1, 5)
-			SsnSpacedPfx  := SpacedPrefix(Ssn, 5)
-			Hotstring(_DynFlags . SsnRawPrefix,  (*) => SendFinalResult(SsnRaw))
-			if SsnSpacedPfx != SsnRawPrefix {
-				Hotstring(_DynFlags . SsnSpacedPfx, (*) => SendFinalResult(Ssn))
-			}
-		}
-	}
-
-	if FeaturesV2["hotstrings"]["dynamic"]["iban_prefixes"]["enabled"] {
-		; 6 raw chars (case-insensitive) → IBAN without spaces.
-		; 7 spaced chars (e.g. "FR76 XX") → IBAN with spaces.
-		; Both triggers fire at the 6th raw character typed.
-		_DynFlagsCI := ":*:"  ; No C flag = case-insensitive for letter prefix
-		if StrLen(IbanRaw) >= 6 {
-			IbanRawPrefix    := SubStr(IbanRaw, 1, 6)
-			IbanSpacedPfx    := SpacedPrefix(Iban, 6)
-			Hotstring(_DynFlagsCI . IbanRawPrefix,  (*) => SendFinalResult(StrReplace(Iban, " ", "")))
-			if IbanSpacedPfx != IbanRawPrefix {
-				Hotstring(_DynFlagsCI . IbanSpacedPfx, (*) => SendFinalResult(Iban))
-			}
+if FeaturesV2["hotstrings"]["dynamic"]["iban_prefixes"]["enabled"] {
+	; 6 raw chars (case-insensitive) → IBAN without spaces.
+	; 7 spaced chars (e.g. "FR76 XX") → IBAN with spaces.
+	; Both triggers fire at the 6th raw character typed.
+	_DynFlagsCI := ":*:"  ; No C flag = case-insensitive for letter prefix
+	if StrLen(IbanRaw) >= 6 {
+		IbanRawPrefix    := SubStr(IbanRaw, 1, 6)
+		IbanSpacedPfx    := SpacedPrefix(Iban, 6)
+		Hotstring(_DynFlagsCI . IbanRawPrefix,  (*) => SendFinalResult(StrReplace(Iban, " ", "")))
+		if IbanSpacedPfx != IbanRawPrefix {
+			Hotstring(_DynFlagsCI . IbanSpacedPfx, (*) => SendFinalResult(Iban))
 		}
 	}
 }
