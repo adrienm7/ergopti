@@ -1,4 +1,4 @@
-; Last modified on 2026-04-23 at 00:00 (UTC+2)
+﻿; Last modified on 2026-04-23 at 00:00 (UTC+2)
 #Requires Autohotkey v2.0+
 #SingleInstance Force ; Ensure that only one instance of the script can run at once
 SetWorkingDir(A_ScriptDir) ; Set the working directory where the script is located
@@ -116,6 +116,10 @@ SendMode("Event") ; Everything concerning hotstrings MUST use SendEvent and not 
 ; Active-app cache must come before hotstring_engine.ahk because both
 ; ``HotstringHandler`` and ``MicrosoftApps`` consult ``GetActiveApp``.
 #Include lib/active_app_cache.ahk
+#Include lib/window_utils.ahk
+#Include lib/string_utils.ahk
+#Include lib/spotlight.ahk
+#Include lib/nav_layer_helpers.ahk
 
 ; Core hotstring engine (send primitives, hotstring builders, text helpers)
 ; and TOML reader helpers (UnescapeTomlString, LoadHotstringsSection,
@@ -139,7 +143,8 @@ SendMode("Event") ; Everything concerning hotstrings MUST use SendEvent and not 
 #Include lib/menu_manifest.ahk
 #Include lib/llm_defaults.ahk
 #Include lib/updater.ahk
-; i18n module — must come after toml_loader.ahk (TOML_BatchWrite) and logger.ahk
+#Include lib/json.ahk
+; i18n module — must come after toml_loader.ahk (TOML_BatchWrite), logger.ahk, and json.ahk
 #Include lib/i18n.ahk
 #Include lib/onboarding.ahk
 #Include lib/hotstrings/hotstrings_config.ahk
@@ -190,7 +195,6 @@ SendMode("Event") ; Everything concerning hotstrings MUST use SendEvent and not 
 #Include modules/llm/api_token_crypto.ahk
 #Include modules/llm/api_ollama.ahk
 #Include modules/llm/api_remote.ahk
-#Include lib/json.ahk
 #Include modules/llm/models.ahk
 ; LLM_GetSharedPath is now available — load the cross-platform defaults before
 ; prediction_engine.ahk and tray_llm.ahk initialise their state maps.
@@ -241,9 +245,15 @@ global _TOML_STRICT_CANON_IN_PROGRESS := false
 
 ; Read path overrides from paths.toml — same file format as Hammerspoon.
 ; Auto-generated with defaults if absent.
-; In compiled mode the file lives in the bundle dir (LocalAppData\Ergopti\bundle\)
-; so it never pollutes the folder the .exe was launched from (Downloads, Desktop…).
-global _PathsFile := (A_IsCompiled and _BundleDir != "") ? _BundleDir . "\paths.toml" : A_ScriptDir . "\paths.toml"
+; In compiled mode the file lives in %APPDATA%\Ergopti\ — a stable location that
+; persists across updates. The bundle dir (LocalAppData\Ergopti\bundle\) is wiped
+; and re-extracted on every version change, so storing paths.toml there caused
+; ConfigDirPath overrides to be lost on every update, which triggered the
+; onboarding wizard again even for existing users. The dev-mode fallback keeps
+; using A_ScriptDir\paths.toml as before.
+global _PathsFile := A_IsCompiled
+    ? (A_AppData . "\Ergopti\paths.toml")
+    : (A_ScriptDir . "\paths.toml")
 global _PathsOverrides := ReadPathsToml(_PathsFile)
 
 ; ConfigDirPath is the single relocatable folder that holds all personal files.
@@ -594,7 +604,14 @@ CountDynamicSection(SectionName) {
 ; appends the count from CountDynamicSection. Pure runtime resolution,
 ; no boot-time Features mutation.
 
-global SpaceAroundSymbols := Features["hotstrings"]["distances_reduction"]["space_around_symbols"]["enabled"] ? " " : ""
+; Safe nested read — the manifest normally provides the default Map("enabled", true), but a
+; stale or missing _generated/features_manifest.ahk would leave the key absent and crash here
+_SpaceAroundSymbolsNode := (Features.Has("hotstrings")
+	and Features["hotstrings"].Has("distances_reduction")
+	and Features["hotstrings"]["distances_reduction"].Has("space_around_symbols"))
+	? Features["hotstrings"]["distances_reduction"]["space_around_symbols"]
+	: Map()
+global SpaceAroundSymbols := (_SpaceAroundSymbolsNode.Has("enabled") and _SpaceAroundSymbolsNode["enabled"]) ? " " : ""
 
 #Include ui/tray_menu.ahk
 
@@ -1919,6 +1936,9 @@ FilePathsEditor(*) {
             return
 
         ; Persist the new config dir into paths.toml
+        ; Ensure the parent folder exists — in compiled mode _PathsFile lives in
+        ; %APPDATA%\Ergopti\ which may not have been created yet on this machine.
+        try DirCreate(SubStr(_PathsFile, 1, InStr(_PathsFile, "\", , -1) - 1))
         try {
             f := FileOpen(_PathsFile, "w", "UTF-8")
             if f {

@@ -849,16 +849,11 @@ ToggleMetricsEnabled() {
 	Reload
 }
 
-; Runs the auto-configure and shows the result to the user.
+; Runs the auto-configure — success is already indicated by the green status label in the UI,
+; so only failures surface a blocking dialog (the user must know something went wrong).
 GestureAutoConfigureAction() {
 	Success := GestureAutoConfigureRegistry()
-	if (Success) {
-		MsgBox(
-			t("dialog.gestures.auto_configure_success"),
-			t("dialog.gestures.auto_configure_title"),
-			"Iconi"
-		)
-	} else {
+	if (!Success) {
 		MsgBox(
 			t("dialog.gestures.auto_configure_error"),
 			t("dialog.gestures.auto_configure_error_title"),

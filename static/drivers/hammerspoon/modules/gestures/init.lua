@@ -19,7 +19,7 @@ local notifications = require("lib.notifications")
 local Logger        = require("lib.logger")
 local LOG           = "gestures"
 
-local ok_td, touchdevice = pcall(require, "hs._asm.undocumented.touchdevice")
+local ok_td, touchdevice = pcall(require, "vendor.hs_asm.undocumented.touchdevice")
 if not ok_td then touchdevice = nil end
 
 local Engine    = require("modules.gestures.engine")

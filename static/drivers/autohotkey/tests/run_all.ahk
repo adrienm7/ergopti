@@ -1,4 +1,4 @@
-; static/drivers/autohotkey/tests/run_all.ahk
+﻿; static/drivers/autohotkey/tests/run_all.ahk
 
 ; ==============================================================================
 ; MODULE: Test Runner Entry Point
@@ -41,6 +41,9 @@ SetWorkingDir(A_ScriptDir)
 #Include ../lib/logger.ahk
 #Include ../lib/toml/toml_helpers.ahk
 #Include ../lib/active_app_cache.ahk
+#Include ../lib/window_utils.ahk
+#Include ../lib/string_utils.ahk
+#Include ../lib/nav_layer_helpers.ahk
 #Include ../lib/hotstrings/hotstring_engine.ahk
 #Include ../lib/hotstrings/hotstring_engine_main.ahk
 #Include ../lib/toml/toml_loader.ahk
@@ -51,6 +54,8 @@ SetWorkingDir(A_ScriptDir)
 #Include ../lib/hotstrings/personal_toml_editor.ahk
 #Include ../lib/layout/layout_altgr.ahk
 #Include ../lib/layout/layout_shift_caps.ahk
+; json.ahk must precede i18n.ahk — _I18nLoadFile now delegates to JsonParse.
+#Include ../lib/json.ahk
 ; i18n is included here because gestures.ahk calls t() at the top level
 ; when building GESTURE_SLOT_LABELS; without this the process blocks on
 ; an AHK runtime-error MsgBox and the CI job times out.
@@ -74,12 +79,26 @@ InstallHotstringHooks()
 #Include test_config.ahk
 #Include test_features_manifest.ahk
 #Include test_hotstrings_full.ahk
+#Include test_tap_hold_loader.ahk
+#Include test_i18n.ahk
+#Include test_window_utils.ahk
+#Include test_string_utils.ahk
+#Include test_nav_layer_helpers.ahk
 
 ; Gestures module — included here because its pure logic (assignments, action
 ; registry, dispatch) is testable. The hotkeys it registers are harmless since
 ; RunTests() calls ExitApp immediately after completion.
 #Include ../modules/gestures.ahk
 #Include test_gestures.ahk
+
+; ── Meta tests (codebase hygiene, no production includes needed) ──
+#Include meta/test_file_headers.ahk
+#Include meta/test_section_headers.ahk
+#Include meta/test_logger_pairing.ahk
+#Include meta/test_no_duplicate_defaults.ahk
+#Include meta/test_require_state_pattern.ahk
+#Include meta/test_no_coauthor_in_commits.ahk
+#Include meta/test_no_pascal_case_in_toml.ahk
 
 ; Drive everything. RunTests prints a TAP-style report to stdout and exits
 ; with the appropriate code — control never returns from this call.
