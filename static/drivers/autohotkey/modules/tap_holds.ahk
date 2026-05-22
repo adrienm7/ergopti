@@ -44,8 +44,8 @@ global ONE_SHOT_SHIFT_TIMEOUT_SEC := 2
 
 ; Fix for using the LAltCapsLockShortcut with LAlt remapped to OneShotShift and CapsLock not remapped
 #HotIf (
-    Features["TapHolds"]["LAlt"]["OneShotShift"].Enabled
-    and not Features["TapHolds"]["CapsLock"]["BackSpace"].Enabled
+    TapHoldTapAction(TapHold, "left_alt") == "one_shot_shift"
+    and not _CapsLockIsPlainBackspace()
     and not CapsLockRemappedCondition()
     and not LayerEnabled
 )
@@ -58,7 +58,7 @@ SC03A:: {
 }
 #HotIf
 
-#HotIf Features["TapHolds"]["CapsLock"]["BackSpace"].Enabled and not LayerEnabled
+#HotIf _CapsLockIsPlainBackspace() and not LayerEnabled
 *SC03A:: {
     if (GetKeyState("SC038", "P")) {
         LAltCapsLockShortcut()
@@ -69,19 +69,18 @@ SC03A:: {
 }
 #HotIf
 
+; "BackSpace" variant: tap_action="backspace" without any hold modifier
+; (the v1 *SC03A handler is a plain BackSpace, no Ctrl-on-hold dance).
+_CapsLockIsPlainBackspace() {
+    return TapHoldTapAction(TapHold, "caps_lock") == "backspace"
+        and TapHoldHoldModifier(TapHold, "caps_lock") == ""
+}
+
+; Returns true when the CapsLock tap-hold has Ctrl on hold — i.e. one of
+; the v1 *Ctrl variants (BackSpaceCtrl, CapsLockCtrl, EnterCtrl, …) is
+; active. Drives the *SC03A handler that pre-arms LCtrl Down on press.
 CapsLockRemappedCondition() {
-    return (
-        Features["TapHolds"]["CapsLock"]["BackSpaceCtrl"].Enabled
-        or Features["TapHolds"]["CapsLock"]["CapsLockCtrl"].Enabled
-        or Features["TapHolds"]["CapsLock"]["CapsWordCtrl"].Enabled
-        or Features["TapHolds"]["CapsLock"]["CtrlBackSpaceCtrl"].Enabled
-        or Features["TapHolds"]["CapsLock"]["CtrlDeleteCtrl"].Enabled
-        or Features["TapHolds"]["CapsLock"]["DeleteCtrl"].Enabled
-        or Features["TapHolds"]["CapsLock"]["EnterCtrl"].Enabled
-        or Features["TapHolds"]["CapsLock"]["EscapeCtrl"].Enabled
-        or Features["TapHolds"]["CapsLock"]["OneShotShiftCtrl"].Enabled
-        or Features["TapHolds"]["CapsLock"]["TabCtrl"].Enabled
-    )
+    return TapHoldHoldModifier(TapHold, "caps_lock") == "ctrl"
 }
 
 #HotIf CapsLockRemappedCondition() and not LayerEnabled
@@ -98,7 +97,7 @@ CapsLockRemappedCondition() {
     }
 
     SendEvent("{LCtrl Down}")
-    tap := KeyWait("CapsLock", "T" . Features["TapHolds"]["CapsLock"]["__Configuration"].TimeActivationSeconds)
+    tap := KeyWait("CapsLock", "T" . TapHoldDuration(TapHold, "caps_lock"))
     if (tap and A_PriorKey == "LControl") {
         SendEvent("{LCtrl Up}")
         CapsLockShortcut(CtrlActivated)
@@ -112,27 +111,31 @@ CapsLockShortcut(CtrlActivated) {
         SendEvent("{LCtrl Down}")
     }
 
-    if Features["TapHolds"]["CapsLock"]["BackSpaceCtrl"].Enabled {
-        SendEvent("{Blind}{BackSpace}")
-    } else if Features["TapHolds"]["CapsLock"]["CapsLockCtrl"].Enabled {
-        ToggleCapsLock()
-    } else if Features["TapHolds"]["CapsLock"]["CapsWordCtrl"].Enabled {
-        ToggleCapsWord()
-    } else if Features["TapHolds"]["CapsLock"]["CtrlBackSpaceCtrl"].Enabled {
-        SendInput("^{BackSpace}")
-    } else if Features["TapHolds"]["CapsLock"]["CtrlDeleteCtrl"].Enabled {
-        SendInput("^{Delete}")
-    } else if Features["TapHolds"]["CapsLock"]["DeleteCtrl"].Enabled {
-        SendEvent("{Blind}{Delete}")
-    } else if Features["TapHolds"]["CapsLock"]["EnterCtrl"].Enabled {
-        SendEvent("{Blind}{Enter}")
-        DisableCapsWord()
-    } else if Features["TapHolds"]["CapsLock"]["EscapeCtrl"].Enabled {
-        SendEvent("{Blind}{Escape}")
-    } else if Features["TapHolds"]["CapsLock"]["OneShotShiftCtrl"].Enabled {
-        OneShotShift()
-    } else if Features["TapHolds"]["CapsLock"]["TabCtrl"].Enabled {
-        SendEvent("{Blind}{Tab}")
+    ; Dispatch on the v2 tap_action — only reachable when hold_modifier
+    ; is "ctrl" (otherwise CapsLockRemappedCondition gates us out before
+    ; we get here).
+    switch TapHoldTapAction(TapHold, "caps_lock") {
+        case "backspace":
+            SendEvent("{Blind}{BackSpace}")
+        case "caps_lock":
+            ToggleCapsLock()
+        case "caps_word":
+            ToggleCapsWord()
+        case "ctrl_backspace":
+            SendInput("^{BackSpace}")
+        case "ctrl_delete":
+            SendInput("^{Delete}")
+        case "delete":
+            SendEvent("{Blind}{Delete}")
+        case "enter":
+            SendEvent("{Blind}{Enter}")
+            DisableCapsWord()
+        case "escape":
+            SendEvent("{Blind}{Escape}")
+        case "one_shot_shift":
+            OneShotShift()
+        case "tab":
+            SendEvent("{Blind}{Tab}")
     }
 
     SendEvent("{LCtrl Up}")
@@ -144,14 +147,14 @@ CapsLockShortcut(CtrlActivated) {
 ; ==========================================
 ; ==========================================
 
-#HotIf Features["TapHolds"]["LShiftCopy"].Enabled and not LayerEnabled
+#HotIf TapHoldTapAction(TapHold, "left_shift") == "copy" and not LayerEnabled
 ; Tap-hold on "LShift" : Ctrl + C on tap, Shift on hold
 ~$SC02A::
 {
     TimeBefore := A_TickCount
     KeyWait("SC02A")
     TimeAfter := A_TickCount
-    tap := ((TimeAfter - TimeBefore) <= Features["TapHolds"]["LShiftCopy"].TimeActivationSeconds * 1000)
+    tap := ((TimeAfter - TimeBefore) <= TapHoldDuration(TapHold, "left_shift") * 1000)
     if (
         tap
         and (TimeAfter - TimeBefore) >= TapMinDurationMs()
@@ -162,7 +165,7 @@ CapsLockShortcut(CtrlActivated) {
 }
 #HotIf
 
-#HotIf Features["TapHolds"]["LCtrlPaste"].Enabled and not LayerEnabled
+#HotIf TapHoldTapAction(TapHold, "left_ctrl") == "paste" and not LayerEnabled
 ; This bug seems resolved now:
 ; « ~ must not be used here, otherwise [AltGr] [AltGr] … [AltGr], which is supposed to give Tab multiple times, will suddenly block and keep LCtrl activated »
 
@@ -173,7 +176,7 @@ CapsLockShortcut(CtrlActivated) {
     TimeBefore := A_TickCount
     KeyWait("SC01D")
     TimeAfter := A_TickCount
-    tap := ((TimeAfter - TimeBefore) <= Features["TapHolds"]["LCtrlPaste"].TimeActivationSeconds * 1000)
+    tap := ((TimeAfter - TimeBefore) <= TapHoldDuration(TapHold, "left_ctrl") * 1000)
     if (
         tap
         and (TimeAfter - TimeBefore) >= TapMinDurationMs()
@@ -192,7 +195,23 @@ CapsLockShortcut(CtrlActivated) {
 ; ==============================
 ; ==============================
 
-#HotIf Features["TapHolds"]["LAlt"]["OneShotShift"].Enabled and not LayerEnabled
+; LAlt v2 variants share two tap-actions and a hold-layer slot:
+;   OneShotShift  -> tap=one_shot_shift, hold_mod=alt
+;   TabLayer      -> tap=tab,            hold_layer=nav
+;   AltTabMonitor -> tap=alt_tab_monitor, hold_mod=alt
+;   BackSpace     -> tap=backspace       (key-repeat, no hold)
+;   BackSpaceLayer-> tap=backspace,      hold_layer=nav
+; The two backspace variants are distinguished by hold_layer presence.
+_LAltIsPlainBackspace() {
+    return TapHoldTapAction(TapHold, "left_alt") == "backspace"
+        and TapHoldHoldLayer(TapHold, "left_alt") == ""
+}
+_LAltIsBackspaceLayer() {
+    return TapHoldTapAction(TapHold, "left_alt") == "backspace"
+        and TapHoldHoldLayer(TapHold, "left_alt") == "nav"
+}
+
+#HotIf TapHoldTapAction(TapHold, "left_alt") == "one_shot_shift" and not LayerEnabled
 ; Tap-hold on "LAlt" : OneShotShift on tap, Shift on hold
 SC038:: {
     if (
@@ -213,7 +232,7 @@ SC038:: {
 }
 #HotIf
 
-#HotIf Features["TapHolds"]["LAlt"]["TabLayer"].Enabled and not LayerEnabled
+#HotIf TapHoldTapAction(TapHold, "left_alt") == "tab" and not LayerEnabled
 ; Tap-hold on "LAlt" : Tab on tap, Layer on hold
 SC038::
 {
@@ -225,14 +244,14 @@ SC038::
 
     Now := A_TickCount
     CharacterSentTime := LastSentCharacterKeyTime.Has("LAlt") ? LastSentCharacterKeyTime["LAlt"] : Now
-    tap := (Now - CharacterSentTime <= Features["TapHolds"]["LAlt"]["TabLayer"].TimeActivationSeconds * 1000)
+    tap := (Now - CharacterSentTime <= TapHoldDuration(TapHold, "left_alt") * 1000)
     if tap {
         SendEvent("{Tab}")
     }
 }
 
 SC02A & SC038:: SendInput("+{Tab}") ; On "LShift"
-if Features["TapHolds"]["RCtrl"]["OneShotShift"].Enabled {
+if TapHoldTapAction(TapHold, "right_ctrl") == "one_shot_shift" {
     SC11D & SC038:: {
         OneShotShiftFix()
         SendInput("+{Tab}")
@@ -242,12 +261,12 @@ if Features["TapHolds"]["RCtrl"]["OneShotShift"].Enabled {
 !SC038:: SendInput("!{Tab}")
 #HotIf
 
-#HotIf Features["TapHolds"]["LAlt"]["AltTabMonitor"].Enabled and not LayerEnabled
+#HotIf TapHoldTapAction(TapHold, "left_alt") == "alt_tab_monitor" and not LayerEnabled
 ; Tap-hold on "LAlt" : AltTabMonitor on tap, Alt on hold
 SC038::
 {
     Send("{LAlt Down}")
-    tap := KeyWait("SC038", "T" . Features["TapHolds"]["LAlt"]["AltTabMonitor"].TimeActivationSeconds)
+    tap := KeyWait("SC038", "T" . TapHoldDuration(TapHold, "left_alt"))
     if tap {
         Send("{LAlt Up}")
         AltTabMonitor()
@@ -258,7 +277,7 @@ SC038::
 }
 #HotIf
 
-#HotIf Features["TapHolds"]["LAlt"]["BackSpace"].Enabled and not LayerEnabled
+#HotIf _LAltIsPlainBackspace() and not LayerEnabled
 ; "LAlt" becomes BackSpace, and Delete on Shift
 *SC038::
 {
@@ -275,7 +294,7 @@ SC038::
 }
 #HotIf
 
-#HotIf Features["TapHolds"]["LAlt"]["BackSpaceLayer"].Enabled and not LayerEnabled
+#HotIf _LAltIsBackspaceLayer() and not LayerEnabled
 ; Tap-hold on "LAlt" : BackSpace on tap, Layer on hold
 *SC038::
 {
@@ -287,7 +306,7 @@ SC038::
 
     Now := A_TickCount
     CharacterSentTime := LastSentCharacterKeyTime.Has("LAlt") ? LastSentCharacterKeyTime["LAlt"] : Now
-    tap := (Now - CharacterSentTime <= Features["TapHolds"]["LAlt"]["BackSpaceLayer"].TimeActivationSeconds * 1000)
+    tap := (Now - CharacterSentTime <= TapHoldDuration(TapHold, "left_alt") * 1000)
 
     if (
         tap
@@ -304,6 +323,8 @@ SC038::
 #HotIf
 
 BackSpaceLogic() {
+    RCtrlIsOneShotShift := TapHoldTapAction(TapHold, "right_ctrl") == "one_shot_shift"
+
     if (
         GetKeyState("SC01D", "P")
         and GetKeyState("Shift", "P")
@@ -313,7 +334,7 @@ BackSpaceLogic() {
         return True
     } else if (
         GetKeyState("SC11D", "P")
-        and not Features["TapHolds"]["RCtrl"]["OneShotShift"].Enabled
+        and not RCtrlIsOneShotShift
         and GetKeyState("Shift", "P")
     ) {
         ; "RCtrl" when it stays RCtrl and Shift
@@ -321,7 +342,7 @@ BackSpaceLogic() {
         return True
     } else if (
         GetKeyState("SC01D", "P")
-        and Features["TapHolds"]["RCtrl"]["OneShotShift"].Enabled
+        and RCtrlIsOneShotShift
         and GetKeyState("SC11D", "P")
     ) {
         ; "LCtrl" and Shift on "RCtrl"
@@ -329,7 +350,7 @@ BackSpaceLogic() {
         SendInput("^{Right}^{BackSpace}") ; = ^Delete, but we cannot simply use Delete, as it would do Ctrl + Alt + Delete and Windows would interpret it
         return True
     } else if (
-        Features["TapHolds"]["RCtrl"]["OneShotShift"].Enabled
+        RCtrlIsOneShotShift
         and GetKeyState("SC11D", "P")
     ) {
         ; Shift on "RCtrl"
@@ -345,7 +366,7 @@ BackSpaceLogic() {
         SendInput("^{BackSpace}")
         return True
     } else if (
-        not Features["TapHolds"]["RCtrl"]["OneShotShift"].Enabled
+        not RCtrlIsOneShotShift
         and GetKeyState("SC11D", "P")
     ) {
         ; "RCtrl" when it stays RCtrl
@@ -366,8 +387,8 @@ BackSpaceLogic() {
 ; double-space when the next key is also Space). On timeout it delegates to
 ; HoldFn, which is responsible for activating the held modifier and blocking
 ; until SC039 is released. Returns true when the timeout (hold) branch fired.
-SpaceTapHold(FeatureKey, HoldFn) {
-    TimeoutSec := Features["TapHolds"]["Space"][FeatureKey].TimeActivationSeconds
+SpaceTapHold(HoldFn) {
+    TimeoutSec := TapHoldDuration(TapHold, "space")
     ih := InputHook("L1 T" . TimeoutSec)
     ih.Start()
     ih.Wait()
@@ -403,28 +424,28 @@ _SpaceHoldShift() {
     SendEvent("{LShift Up}")
 }
 
-#HotIf Features["TapHolds"]["Space"]["Ctrl"].Enabled and not LayerEnabled
+#HotIf TapHoldHoldModifier(TapHold, "space") == "ctrl" and not LayerEnabled
 ; Tap-hold on "Space" : Space on tap, Ctrl on hold
-SC039:: SpaceTapHold("Ctrl", _SpaceHoldCtrl)
+SC039:: SpaceTapHold(_SpaceHoldCtrl)
 SC039 Up:: {
     if (
         A_PriorHotkey == "SC039"
         and not CapsWordEnabled
-        and A_TimeSinceThisHotkey <= Features["TapHolds"]["Space"]["Ctrl"].TimeActivationSeconds
+        and A_TimeSinceThisHotkey <= TapHoldDuration(TapHold, "space")
     ) {
         SendEvent("{Space}")
     }
 }
 #HotIf
 
-#HotIf Features["TapHolds"]["Space"]["Layer"].Enabled and not LayerEnabled
+#HotIf TapHoldHoldLayer(TapHold, "space") == "nav" and not LayerEnabled
 ; Tap-hold on "Space" : Space on tap, Layer on hold
-SC039:: SpaceTapHold("Layer", _SpaceHoldLayer)
+SC039:: SpaceTapHold(_SpaceHoldLayer)
 SC039 Up:: {
     if (
         A_PriorHotkey == "SC039"
         and not CapsWordEnabled
-        and A_TimeSinceThisHotkey <= Features["TapHolds"]["Space"]["Layer"].TimeActivationSeconds
+        and A_TimeSinceThisHotkey <= TapHoldDuration(TapHold, "space")
     ) {
         SendEvent("{Space}")
         UpdateLastSentCharacter(" ")
@@ -432,14 +453,14 @@ SC039 Up:: {
 }
 #HotIf
 
-#HotIf Features["TapHolds"]["Space"]["Shift"].Enabled and not LayerEnabled
+#HotIf TapHoldHoldModifier(TapHold, "space") == "shift" and not LayerEnabled
 ; Tap-hold on "Space" : Space on tap, Shift on hold
-SC039:: SpaceTapHold("Shift", _SpaceHoldShift)
+SC039:: SpaceTapHold(_SpaceHoldShift)
 SC039 Up:: {
     if (
         A_PriorHotkey == "SC039"
         and not CapsWordEnabled
-        and A_TimeSinceThisHotkey <= Features["TapHolds"]["Space"]["Shift"].TimeActivationSeconds
+        and A_TimeSinceThisHotkey <= TapHoldDuration(TapHold, "space")
     ) {
         SendEvent("{Space}")
     }
@@ -458,14 +479,15 @@ SC039 Up:: {
 ; ``not IsOnboardingActive()`` so the wizard's Edit fields (and anything else
 ; the user types while the first-run wizard is up) receive AltGr characters
 ; from the OS instead of the tap-hold consuming them.
-#HotIf not LayerEnabled and not IsOnboardingActive() and HasAnyEnabled(Features["TapHolds"]["AltGr"])
+#HotIf not LayerEnabled and not IsOnboardingActive() and TapHoldIsConfigured(TapHold, "alt_gr")
 ; Tap-hold on "AltGr"
 SC01D & ~SC138:: ; LControl & RAlt is the only way to make it fire on tap directly
 RAlt:: ; Necessary to work on layouts like QWERTY
 {
-    tap := KeyWait("RAlt", "T" . Features["TapHolds"]["AltGr"]["__Configuration"].TimeActivationSeconds)
+    tap := KeyWait("RAlt", "T" . TapHoldDuration(TapHold, "alt_gr"))
     if (tap and (A_PriorKey == "RAlt" or A_PriorKey == "^")) {
         DisableCapsWord()
+        ; Dispatcher still iterates v1-shaped Map; widened in a later phase.
         RunFirstAltGrTapHoldAction(Features["TapHolds"]["AltGr"])
     }
 }
@@ -482,13 +504,13 @@ RAlt Up:: {
 ; ==============================
 ; ==============================
 
-#HotIf Features["TapHolds"]["RCtrl"]["BackSpace"].Enabled and not LayerEnabled
+#HotIf TapHoldTapAction(TapHold, "right_ctrl") == "backspace" and not LayerEnabled
 ; RCtrl becomes BackSpace, and Delete on Shift
 SC11D::
 {
     if GetKeyState("LShift", "P") {
         SendInput("{Delete}")
-    } else if Features["TapHolds"]["LAlt"]["OneShotShift"].Enabled and GetKeyState("SC038", "P") {
+    } else if TapHoldTapAction(TapHold, "left_alt") == "one_shot_shift" and GetKeyState("SC038", "P") {
         OneShotShiftFix()
         SendInput("{Right}{BackSpace}") ; = Delete, but we cannot simply use Delete, as it would do Ctrl + Alt + Delete and Windows would interpret it
     } else {
@@ -502,10 +524,10 @@ SC11D::
 }
 #HotIf
 
-#HotIf Features["TapHolds"]["RCtrl"]["Tab"].Enabled and not LayerEnabled
+#HotIf TapHoldTapAction(TapHold, "right_ctrl") == "tab" and not LayerEnabled
 ; Tap-hold on "RCtrl" : Tab on tap, Ctrl on hold
 ~SC11D:: {
-    tap := KeyWait("RControl", "T" . Features["TapHolds"]["RCtrl"]["Tab"].TimeActivationSeconds)
+    tap := KeyWait("RControl", "T" . TapHoldDuration(TapHold, "right_ctrl"))
     if (tap and A_PriorKey == "RControl") {
         SendEvent("{RCtrl Up}")
         SendEvent("{Tab}") ; To be able to trigger hotstrings with a Tab ending character
@@ -518,7 +540,7 @@ SC11D::
 #SC11D:: SendEvent("#{Tab}") ; SendInput doesn't work in that case
 #HotIf
 
-#HotIf Features["TapHolds"]["RCtrl"]["OneShotShift"].Enabled and not LayerEnabled
+#HotIf TapHoldTapAction(TapHold, "right_ctrl") == "one_shot_shift" and not LayerEnabled
 ; Tap-hold on "RCtrl" : OneShotShift on tap, Shift on hold
 SC11D:: {
     OneShotShift()
@@ -534,15 +556,15 @@ SC11D:: {
 ; ==============================
 ; ==============================
 
-#HotIf Features["TapHolds"]["TabAlt"].Enabled and not LayerEnabled
+#HotIf TapHoldTapAction(TapHold, "tab") == "alt_tab_monitor" and not LayerEnabled
 ; Tap-hold on "Tab": Alt + Tab on tap, Alt on hold
 SC00F::LAlt
 SC00F::
 {
     SendInput("{LAlt Down}")
-    tap := KeyWait("SC00F", "T" . Features["TapHolds"]["TabAlt"].TimeActivationSeconds)
+    tap := KeyWait("SC00F", "T" . TapHoldDuration(TapHold, "tab"))
     if tap {
-        if Features["TapHolds"]["LAlt"]["TabLayer"].Enabled and GetKeyState("SC038", "P") {
+        if TapHoldTapAction(TapHold, "left_alt") == "tab" and GetKeyState("SC038", "P") {
             SendInput("!{Tab}")
         } else {
             SendInput("{LAlt Up}")
@@ -731,10 +753,8 @@ ActionLayer(action) {
 
 ; Fix to get the CapsWord shortcut working when pressing "LAlt" activates the layer
 #HotIf (LayerEnabled
+    and TapHoldHoldLayer(TapHold, "left_alt") == "nav"
     and (
-        Features["TapHolds"]["LAlt"]["BackSpaceLayer"].Enabled
-        or Features["TapHolds"]["LAlt"]["TabLayer"].Enabled
-    ) and (
         FeaturesV2["shortcuts"]["lalt_caps_lock"]["backspace"]
         or FeaturesV2["shortcuts"]["lalt_caps_lock"]["caps_lock"]
         or FeaturesV2["shortcuts"]["lalt_caps_lock"]["caps_word"]
@@ -752,7 +772,7 @@ SC03A:: {
 
 ; Fix when LAlt triggers the layer
 #HotIf (
-    Features["TapHolds"]["LAlt"]["BackSpaceLayer"].Enabled
+    _LAltIsBackspaceLayer()
     and LayerEnabled
 )
 SC038:: SendInput("{LAlt Up}") ; Necessary to do this, otherwise multicursor triger in VSCode when scrolling in the layer and then leaving it
@@ -760,7 +780,7 @@ SC038:: SendInput("{LAlt Up}") ; Necessary to do this, otherwise multicursor tri
 
 ; Fix when Space triggers the layer
 #HotIf (
-    Features["TapHolds"]["Space"]["Layer"].Enabled
+    TapHoldHoldLayer(TapHold, "space") == "nav"
     and LayerEnabled
 )
 SC039:: return ; Necessary to do this, otherwise Space keeps being sent while it is held to get the layer
