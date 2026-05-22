@@ -284,6 +284,15 @@ global FeaturesV2 := Map(
             "ssn_prefixes",                      Map("enabled", true),
             "text_expansion_personal_information", Map("enabled", true, "pattern_max_length", 1),
         ),
+        ; Phase 12 — Personal sub-Map. In production this is populated
+        ; dynamically by MirrorV1ToV2_HotstringsPersonal from the user's
+        ; personal_hotstrings.toml [_meta.sections] block; tests pre-seed
+        ; a representative shape so the v2 read sites in modules/hotstrings.ahk
+        ; and lib/hotstrings/personal_toml_editor.ahk find a configured Map.
+        "personal", Map(
+            "autocorrection", Map("enabled", true, "time_activation_seconds", 0.75),
+            "code",           Map("enabled", true, "time_activation_seconds", 0.75),
+        ),
     ),
     ; Phase 6 — ui/tray_menu.ahk's LLM tray populator now reads from this
     ; nested map (instead of IniCacheGet) and flattens it back into the

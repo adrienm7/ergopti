@@ -746,9 +746,16 @@ _SaveData(W, LV, StatusText) {
         StatusText.Value := t("editor.hotstrings.err_write")
         return false
     }
+    ; Read autocorrection TimeActivationSeconds from the v2 hotstrings.personal
+    ; sub-Map (phase 12 migration). The mirror populates this from
+    ; Features["Personal"]["Autocorrection"].TimeActivationSeconds on every
+    ; boot, so the value stays in sync with the tray-menu edits.
     FeatureConfig := { TimeActivationSeconds: 0 }
-    if IsSet(Features) and Features.Has("Personal") and Features["Personal"].Has("Autocorrection") {
-        FeatureConfig := Features["Personal"]["Autocorrection"]
+    if (IsSet(FeaturesV2)
+        and FeaturesV2.Has("hotstrings")
+        and FeaturesV2["hotstrings"].Has("personal")
+        and FeaturesV2["hotstrings"]["personal"].Has("autocorrection")) {
+        FeatureConfig := FeaturesV2["hotstrings"]["personal"]["autocorrection"]
     }
     ReloadPersonalSection(_PersonalEditorData, _PersonalEditorSection, FeatureConfig)
     _PopulateList(LV, _PersonalEditorData, _PersonalEditorSection)
