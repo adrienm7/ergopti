@@ -330,12 +330,12 @@ GetCategoryTitle(Category) {
 ; ===================================
 
 BuildGesturesMenu() {
-	global Features, GestureAssignments, GESTURE_SLOTS, GESTURE_ACTIONS, GESTURE_SLOT_LABELS
+	global FeaturesV2, GestureAssignments, GESTURE_SLOTS, GESTURE_ACTIONS, GESTURE_SLOT_LABELS
 
 	GMenu := Menu()
 
 	; Canonical category toggle — inserted at position 1 with separator at 2.
-	GestEnabled := Features["Gestures"]["Enabled"].Enabled
+	GestEnabled := FeaturesV2["gestures"]["enabled"]
 	AddCategoryToggleItem(GMenu,
 		t("menu.gestures.on"),
 		t("menu.gestures.off"),
@@ -923,10 +923,11 @@ initMenu() {
 		StdTotal += CountTomlHotstrings(_CCat)
 	}
 	DynTotalStd := 0
-	for _DSec in Features["DynamicHotstrings"]["__Order"] {
-		if (_DSec != "-" and Features["DynamicHotstrings"].Has(_DSec)
-		and Features["DynamicHotstrings"][_DSec].Enabled) {
-			DynTotalStd += CountDynamicSection(_DSec)
+	if FeaturesV2.Has("hotstrings") and FeaturesV2["hotstrings"].Has("dynamic") {
+		for _DKey, _DCfg in FeaturesV2["hotstrings"]["dynamic"] {
+			if (IsObject(_DCfg) and _DCfg.Has("enabled") and _DCfg["enabled"]) {
+				DynTotalStd += CountDynamicSection(_DKey)
+			}
 		}
 	}
 	StdTotal += DynTotalStd
@@ -941,13 +942,13 @@ initMenu() {
 		}
 	}
 	; Dynamic hotstrings — date insertion and future rule-based expansions.
-	if Features.Has("DynamicHotstrings") and SubMenus.Has("DynamicHotstrings") {
+	if FeaturesV2.Has("hotstrings") and FeaturesV2["hotstrings"].Has("dynamic")
+		and SubMenus.Has("DynamicHotstrings") {
 		DynMenu := SubMenus["DynamicHotstrings"]
 		DynTotal := 0
-		for _DSec in Features["DynamicHotstrings"]["__Order"] {
-			if (_DSec != "-" and Features["DynamicHotstrings"].Has(_DSec)
-			and Features["DynamicHotstrings"][_DSec].Enabled) {
-				DynTotal += CountDynamicSection(_DSec)
+		for _DKey, _DCfg in FeaturesV2["hotstrings"]["dynamic"] {
+			if (IsObject(_DCfg) and _DCfg.Has("enabled") and _DCfg["enabled"]) {
+				DynTotal += CountDynamicSection(_DKey)
 			}
 		}
 		DynTitle := GetCategoryTitle("DynamicHotstrings")
@@ -1261,7 +1262,7 @@ initMenu() {
 	; ── Gestes — custom submenu mirroring Hammerspoon's gesture picker ──
 	GesturesMenu := BuildGesturesMenu()
 	A_TrayMenu.Add(GetCategoryTitle("Gestures"), GesturesMenu)
-	if Features["Gestures"]["Enabled"].Enabled {
+	if FeaturesV2["gestures"]["enabled"] {
 		A_TrayMenu.Check(GetCategoryTitle("Gestures"))
 	}
 

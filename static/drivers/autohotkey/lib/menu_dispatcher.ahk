@@ -42,6 +42,34 @@
 ; DEPENDENCIES: ``A_MaxThreads`` should already be bumped well above the
 ; default 10 in ErgoptiPlus.ahk so the retry SetTimer can actually find a
 ; free slot to run on (otherwise the bypass itself would get dropped).
+;
+; ─────────────────────────────────────────────────────────────────────────────
+; WHEN TO USE WHICH
+; ─────────────────────────────────────────────────────────────────────────────
+;
+; Use ``RegisterMenuItem(Menu, Label, Callback)`` for EVERY menu item that
+; carries a real user-actionable callback. The dispatcher drop bug is silent
+; and intermittent, so even items that "feel safe to lose a click on" should
+; go through the wrapper — the cost is one Map entry per item, the upside is
+; "no clicks ever vanish."
+;
+; Keep raw ``Menu.Add(...)`` for the three cases where the drop has no
+; observable effect:
+;
+;   1. **Separator** — ``Menu.Add()`` with no args. No callback at all.
+;   2. **Container submenu** — ``Menu.Add("Title", SubMenu)`` where SubMenu
+;      is a Menu object. Clicking just opens the child; nothing to dispatch.
+;   3. **Display-only header** — ``Menu.Add(Label, (*) => 0)`` or
+;      ``(*) => NoAction()``. Decorative label, usually immediately followed
+;      by ``Menu.Disable(Label)`` so the user can't click it anyway.
+;
+; Quick decision: "does this Add carry a user-visible action behind it?"
+; Yes → ``RegisterMenuItem``. No → raw ``Menu.Add`` is fine.
+;
+; The day AHK 2.0 fixes its dispatcher drop, ``RegisterMenuItem`` can be
+; aliased to a thin pass-through to ``Menu.Add`` and the whole bypass
+; (callbacks Map + OnMessage handler + SetTimer retry) can be deleted
+; without changing a single call site.
 ; ==============================================================================
 
 
