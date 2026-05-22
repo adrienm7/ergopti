@@ -404,14 +404,31 @@ GetMenuTitleByPath(FullPath) {
 	return FullPath
 }
 
-; Detect whether a manifest entry declares a ``letter`` default — used to
-; decide whether to append the live letter suffix to the menu title.
+; Detect whether a manifest entry corresponds to a letter-remap feature —
+; used to decide whether to append the live letter suffix to the menu
+; title. Two schemas to recognise:
+;
+;   - Bare-α (default is a Map carrying the ``letter`` key directly).
+;   - Split-α / letter pickers (the entry IS the section's ``.enabled``
+;     child, and the letter lives in a sibling ``.letter`` entry). The
+;     resolver retrieves the sibling via ``ManifestFindEntryByV2Path``
+;     keyed on ``<section>.letter``; if it exists this is a letter
+;     picker and the suffix should be appended.
 _ManifestEntryHasLetter(Entry) {
 	if !(IsObject(Entry) and Entry.Has("default")) {
 		return false
 	}
 	Def := Entry["default"]
-	return (Type(Def) == "Map" and Def.Has("letter"))
+	if (Type(Def) == "Map" and Def.Has("letter")) {
+		return true
+	}
+	if (Entry.Has("section") and Entry["section"] != "") {
+		Sibling := ManifestFindEntryByV2Path(Entry["section"] . ".letter")
+		if (Sibling != false) {
+			return true
+		}
+	}
+	return false
 }
 
 ; Apply runtime substitutions to a menu label fresh out of i18n. Handles
