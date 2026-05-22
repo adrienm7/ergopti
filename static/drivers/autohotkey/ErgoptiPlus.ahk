@@ -828,6 +828,11 @@ try {
 ; litters its own folder (Downloads, Desktop, etc.) with generated files.
 #Include *i _generated/personal_shortcuts.ahk
 #Include *i %A_LocalAppData%\Ergopti\_generated\personal_shortcuts.ahk
+; Reset the include working directory to the script root so subsequent
+; relative #Include paths resolve correctly. The two lines above may have
+; changed it to _generated/ (AHK shifts the context on any successful
+; directory-relative include, which breaks the next bare path include).
+#Include %A_ScriptDir%
 #InputLevel 0
 ; Apply master gates: disabled category master → force every feature in that
 ; category to false in Features so all #HotIf evaluations short-circuit.
