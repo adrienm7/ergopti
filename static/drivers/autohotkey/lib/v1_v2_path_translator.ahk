@@ -601,19 +601,13 @@ TranslateV1ToV2(V1Path) {
         if !FeaturesV2["hotstrings"].Has("personal") {
             return false
         }
-        ; V1Key is the PascalCase section name; the v2 key is the lowercase
-        ; TOML section name. Try .TomlSection from the Features v1 entry
-        ; first; fall back to lowercased PascalCase.
-        global Features
+        ; The v1 PascalCase FeatKey is built by BootstrapPersonalFeatures
+        ; from the TOML section key as ``capitalize_first_letter(section)``,
+        ; so ``StrLower(FeatKey)`` is guaranteed to round-trip back to the
+        ; original TOML section name (== v2 id). No Features v1 lookup
+        ; needed for the translation.
         V1Key := Parts[2]
         V2Id := StrLower(V1Key)
-        if IsSet(Features) and Features.Has("Personal")
-            and Features["Personal"].Has(V1Key) {
-            V1Val := Features["Personal"][V1Key]
-            if IsObject(V1Val) and V1Val.HasOwnProp("TomlSection") {
-                V2Id := V1Val.TomlSection
-            }
-        }
         if !FeaturesV2["hotstrings"]["personal"].Has(V2Id) {
             ; Lazily seed the v2 personal entry so the first toggle on a
             ; runtime-discovered section can persist.

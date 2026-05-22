@@ -891,13 +891,12 @@ InitSubMenus() {
 		SubMenus[Category] := SubMenu ; Only top-level category stored
 		CreateSubMenusRecursive(SubMenu, Items, Category)
 	}
-	; Personal is defined in personal_shortcuts.ahk (not in the static Features map),
-	; so it must be wired separately after the loop — only when the user's file loaded it.
-	if Features.Has("Personal") {
-		PersonalSubMenu := Menu()
-		SubMenus["Personal"] := PersonalSubMenu
-		CreateSubMenusRecursive(PersonalSubMenu, Features["Personal"], "Personal")
-	}
+	; The legacy Personal sub-Map block — which used to build a
+	; SubMenus["Personal"] from CreateSubMenusRecursive — was never
+	; consumed (no reader anywhere). The personal hotstrings submenu is
+	; built directly inside initMenu's Hotstrings rendering block
+	; (search for ``PersonalMenu := Menu()``) so the InitSubMenus pass
+	; doesn't need to touch Features["Personal"] at all.
 }
 
 initMenu() {
