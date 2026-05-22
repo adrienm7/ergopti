@@ -44,6 +44,7 @@ jobs:
         runs-on: ubuntu-latest
         outputs:
             tag:        ${{ steps.meta.outputs.tag }}
+            title:      ${{ steps.meta.outputs.title }}
             version:    ${{ steps.meta.outputs.version }}
             prerelease: ${{ steps.meta.outputs.prerelease }}
             ref:        ${{ steps.meta.outputs.ref }}
@@ -108,28 +109,26 @@ jobs:
                   echo "ref=$ref"               >> "$GITHUB_OUTPUT"
                   echo "Resolved tag=$tag title='$title' version=$version prerelease=$prerelease ref=$ref"
 
-            - name: Ensure release exists
-              if: ${{ github.event_name != 'release' }}
+            - name: Create git tag (push events only)
+              # For push-to-dev runs we need to plant the tag in the repo so
+              # ``gh release create --target $ref`` has something to point at.
+              # release: events already have a tag; workflow_dispatch targets
+              # an existing tag supplied by the caller.
+              if: ${{ github.event_name == 'push' }}
               shell: bash
               env:
                   GH_TOKEN: ${{ github.token }}
               run: |
                   set -euo pipefail
                   tag="${{ steps.meta.outputs.tag }}"
-                  prerelease="${{ steps.meta.outputs.prerelease }}"
                   ref="${{ steps.meta.outputs.ref }}"
-                  if gh release view "$tag" >/dev/null 2>&1; then
-                      echo "Release '$tag' already exists — skipping creation."
-                      exit 0
+                  if git ls-remote --tags origin "refs/tags/$tag" | grep -q "$tag"; then
+                      echo "Tag '$tag' already exists on remote — skipping."
+                  else
+                      git tag "$tag" "$ref"
+                      git push origin "$tag"
+                      echo "Tag '$tag' pushed."
                   fi
-                  echo "Creating release '$tag' (prerelease=$prerelease)…"
-                  flags=()
-                  [ "$prerelease" = "true" ] && flags+=("--prerelease")
-                  gh release create "$tag" \
-                      --target "$ref" \
-                      --title "${{ steps.meta.outputs.title }}" \
-                      --notes "Build in progress — assets will appear in a few minutes." \
-                      "${flags[@]}"
 
 
 
@@ -386,20 +385,45 @@ jobs:
                   path: release-assets
                   merge-multiple: true
 
-            - name: Upload all assets to release (single atomic call)
+            - name: Create release and upload all assets atomically
+              # The release is created here — after all three build jobs have
+              # succeeded — so it is never in a half-baked state. GitHub's
+              # immutable-release policy means an asset cannot be replaced once
+              # uploaded; by creating the release only once and uploading
+              # everything in a single call we avoid any conflict.
               shell: bash
               env:
                   GH_TOKEN: ${{ github.token }}
               run: |
                   set -euo pipefail
                   tag="${{ needs.prepare-release.outputs.tag }}"
-                  # Collect every file that was staged by the build jobs.
-                  # upload-artifact flattens paths when merge-multiple is true,
-                  # so all assets sit directly under release-assets/.
+                  prerelease="${{ needs.prepare-release.outputs.prerelease }}"
+                  ref="${{ needs.prepare-release.outputs.ref }}"
+                  title="${{ needs.prepare-release.outputs.title }}"
+
                   mapfile -t assets < <(find release-assets -type f)
-                  echo "Uploading ${#assets[@]} asset(s) to release $tag:"
+                  echo "Assets to attach (${#assets[@]}):"
                   printf '  %s\n' "${assets[@]}"
-                  gh release upload "$tag" "${assets[@]}"
+
+                  flags=()
+                  [ "$prerelease" = "true" ] && flags+=("--prerelease")
+
+                  if [ "${{ github.event_name }}" = "release" ]; then
+                      # release: event — GitHub already created the release via
+                      # release-please; we only need to attach the assets.
+                      echo "Event is 'release' — uploading assets to existing release '$tag'."
+                      gh release upload "$tag" "${assets[@]}"
+                  else
+                      # push / workflow_dispatch — create fresh release with all
+                      # assets in one atomic call (gh release create accepts files).
+                      echo "Creating release '$tag' with ${#assets[@]} asset(s)…"
+                      gh release create "$tag" \
+                          --target "$ref" \
+                          --title "$title" \
+                          --notes "Changelog will appear below — updating now." \
+                          "${flags[@]}" \
+                          "${assets[@]}"
+                  fi
 
             # Build the changelog section. Delegates to tools/build_changelog.py
             # which aggregates every commit between the previous release tag
@@ -508,9 +532,9 @@ jobs:
 # ==================================================================
 # ==================================================================
 
-# When any build job fails, the release that ``prepare-release`` created
-# is half-baked: tag exists, body is empty or incomplete, assets may be
-# missing. Leaving it on GitHub causes two problems:
+# When finalize-release fails mid-way, the release it created may be
+# incomplete: tag exists but body is wrong or assets are missing.
+# Leaving it on GitHub causes two problems:
 #
 # 1. Users browsing releases see a broken entry.
 # 2. The NEXT run's changelog uses this broken tag as the "previous"
