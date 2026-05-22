@@ -16,6 +16,5 @@ if [ -n "$STAGED" ]; then
     done
 fi
 
-# Lint coding conventions (warn-only — does not block commits yet).
-# Switch --warn-only to --fail-on-violations once the violation count reaches 0.
-node scripts/lint-conventions.js --warn-only || true
+# Lint coding conventions — blocks commit on any violation.
+node scripts/lint-conventions.js --fail-on-violations

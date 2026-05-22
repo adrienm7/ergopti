@@ -150,7 +150,7 @@ delete = "ctrl_delete"
 u = "page_up"
 d = "page_down"
 g = "home"
-G = "end"
+shift_g = "end"
 
 
 
