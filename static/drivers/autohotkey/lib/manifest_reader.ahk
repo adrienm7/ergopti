@@ -106,6 +106,24 @@ ManifestFeatures() {
 	return FEATURES_MANIFEST["features"]
 }
 
+; Return the manifest entries whose ``section`` exactly matches ``SectionPath``
+; — e.g. ``"ahk.layout"`` returns the four Layout features in their declared
+; order. The array order in the source manifest is preserved by the codegen
+; emitter, so callers can use this directly as the render order.
+ManifestFeaturesForSection(SectionPath) {
+	Out := []
+	if !ManifestEnsureLoaded() {
+		return Out
+	}
+	global FEATURES_MANIFEST
+	for Entry in FEATURES_MANIFEST["features"] {
+		if (Entry["section"] == SectionPath) {
+			Out.Push(Entry)
+		}
+	}
+	return Out
+}
+
 
 
 
