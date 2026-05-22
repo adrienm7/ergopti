@@ -196,7 +196,11 @@ platforms = ["ahk", "hs"]
 [sections.ahk]
 description_key = "menu.ahk"
 platforms = ["ahk"]
-subsections = ["layout", "shortcuts", "gestures", "metrics"]
+subsections = ["category_enabled", "layout", "shortcuts", "gestures", "metrics"]
+
+[sections.ahk.category_enabled]
+description_key = "menu.ahk.category_enabled"
+platforms = ["ahk"]
 
 [sections.ahk.layout]
 description_key = "menu.layout"
@@ -205,7 +209,7 @@ platforms = ["ahk"]
 [sections.ahk.shortcuts]
 description_key = "menu.ahk.shortcuts"
 platforms = ["ahk"]
-subsections = ["alt_gr_caps_lock", "alt_gr_lalt", "lalt_caps_lock", "personal", "script_control"]
+subsections = ["alt_gr_caps_lock", "alt_gr_lalt", "keyboard", "lalt_caps_lock", "personal", "script_control"]
 
 [sections.ahk.shortcuts.alt_gr_caps_lock]
 description_key = "menu.ahk.shortcuts.alt_gr_caps_lock"
@@ -213,6 +217,10 @@ platforms = ["ahk"]
 
 [sections.ahk.shortcuts.alt_gr_lalt]
 description_key = "menu.ahk.shortcuts.alt_gr_lalt"
+platforms = ["ahk"]
+
+[sections.ahk.shortcuts.keyboard]
+description_key = "menu.ahk.shortcuts.keyboard"
 platforms = ["ahk"]
 
 [sections.ahk.shortcuts.lalt_caps_lock]
@@ -311,6 +319,13 @@ id = "trigger_char"
 default = "★"
 type = "string"
 description_key = "menu.hotstrings.trigger_char"
+
+[[features.hotstrings]]
+id = "repeat_key_enabled"
+default = true
+type = "boolean"
+description_key = "menu.hotstrings.repeat_key_enabled"
+platforms = ["ahk"]
 
 
 
@@ -767,6 +782,20 @@ id = "enabled"
 default = false
 type = "boolean"
 description_key = "menu.llm.enabled"
+
+[[features.llm]]
+id = "onboarding_seen"
+default = false
+type = "boolean"
+description_key = "menu.llm.onboarding_seen"
+platforms = ["ahk"]
+
+[[features.llm]]
+id = "app_profile_overrides"
+default = ""
+type = "string"
+description_key = "menu.llm.app_profile_overrides"
+platforms = ["ahk"]
 
 
 
@@ -1602,6 +1631,102 @@ description_key = "menu.ahk.shortcuts.script_control.script_altgr_escape"
 
 
 
+# ==========================================
+# ===== 4.8b ahk.shortcuts.keyboard ========
+# ==========================================
+
+[[features.ahk.shortcuts.keyboard]]
+id = "ctrl_b"
+default = "microsoft_bold"
+type = "action"
+description_key = "menu.ahk.shortcuts.keyboard.ctrl_b"
+
+[[features.ahk.shortcuts.keyboard]]
+id = "ctrl_shift_v"
+default = "paste_plain"
+type = "action"
+description_key = "menu.ahk.shortcuts.keyboard.ctrl_shift_v"
+
+[[features.ahk.shortcuts.keyboard]]
+id = "win_a"
+default = "select_line"
+type = "action"
+description_key = "menu.ahk.shortcuts.keyboard.win_a"
+
+[[features.ahk.shortcuts.keyboard]]
+id = "win_d"
+default = "open_hotstrings_editor"
+type = "action"
+description_key = "menu.ahk.shortcuts.keyboard.win_d"
+
+[[features.ahk.shortcuts.keyboard]]
+id = "win_g"
+default = "open_url"
+type = "action"
+description_key = "menu.ahk.shortcuts.keyboard.win_g"
+
+[[features.ahk.shortcuts.keyboard]]
+id = "win_h"
+default = "screen_capture"
+type = "action"
+description_key = "menu.ahk.shortcuts.keyboard.win_h"
+
+[[features.ahk.shortcuts.keyboard]]
+id = "win_m"
+default = "activity_simulation"
+type = "action"
+description_key = "menu.ahk.shortcuts.keyboard.win_m"
+
+[[features.ahk.shortcuts.keyboard]]
+id = "win_n"
+default = "take_note"
+type = "action"
+description_key = "menu.ahk.shortcuts.keyboard.win_n"
+
+[[features.ahk.shortcuts.keyboard]]
+id = "win_o"
+default = "surround_parens"
+type = "action"
+description_key = "menu.ahk.shortcuts.keyboard.win_o"
+
+[[features.ahk.shortcuts.keyboard]]
+id = "win_s"
+default = "search_web"
+type = "action"
+description_key = "menu.ahk.shortcuts.keyboard.win_s"
+
+[[features.ahk.shortcuts.keyboard]]
+id = "win_sc029"
+default = "screen_capture_instant"
+type = "action"
+description_key = "menu.ahk.shortcuts.keyboard.win_sc029"
+
+[[features.ahk.shortcuts.keyboard]]
+id = "win_t"
+default = "teleport_mouse"
+type = "action"
+description_key = "menu.ahk.shortcuts.keyboard.win_t"
+
+[[features.ahk.shortcuts.keyboard]]
+id = "win_u"
+default = "uppercase_selection"
+type = "action"
+description_key = "menu.ahk.shortcuts.keyboard.win_u"
+
+[[features.ahk.shortcuts.keyboard]]
+id = "win_w"
+default = "titlecase_selection"
+type = "action"
+description_key = "menu.ahk.shortcuts.keyboard.win_w"
+
+[[features.ahk.shortcuts.keyboard]]
+id = "win_x"
+default = "pick_color"
+type = "action"
+description_key = "menu.ahk.shortcuts.keyboard.win_x"
+
+
+
 # ===========================
 # ===== 4.9 ahk.metrics =====
 # ===========================
@@ -1611,6 +1736,114 @@ id = "filter_private_browsing"
 default = true
 type = "boolean"
 description_key = "menu.ahk.metrics.filter_private_browsing"
+
+[[features.ahk.metrics]]
+id = "metrics_enabled"
+default = true
+type = "boolean"
+description_key = "menu.ahk.metrics.metrics_enabled"
+
+[[features.ahk.metrics]]
+id = "metrics_shortcut_typing"
+default = ""
+type = "string"
+description_key = "menu.ahk.metrics.metrics_shortcut_typing"
+
+[[features.ahk.metrics]]
+id = "metrics_shortcut_apps"
+default = ""
+type = "string"
+description_key = "menu.ahk.metrics.metrics_shortcut_apps"
+
+[[features.ahk.metrics]]
+id = "metrics_show_wpm_menubar"
+default = false
+type = "boolean"
+description_key = "menu.ahk.metrics.metrics_show_wpm_menubar"
+
+[[features.ahk.metrics]]
+id = "metrics_wpm_menubar_colors"
+default = false
+type = "boolean"
+description_key = "menu.ahk.metrics.metrics_wpm_menubar_colors"
+
+[[features.ahk.metrics]]
+id = "metrics_filter_secure_field"
+default = true
+type = "boolean"
+description_key = "menu.ahk.metrics.metrics_filter_secure_field"
+
+[[features.ahk.metrics]]
+id = "metrics_filter_system_auth"
+default = true
+type = "boolean"
+description_key = "menu.ahk.metrics.metrics_filter_system_auth"
+
+[[features.ahk.metrics]]
+id = "metrics_disabled_apps"
+default = []
+type = "array"
+description_key = "menu.ahk.metrics.metrics_disabled_apps"
+
+[[features.ahk.metrics]]
+id = "wpm_widget_visible"
+default = false
+type = "boolean"
+description_key = "menu.ahk.metrics.wpm_widget_visible"
+
+[[features.ahk.metrics]]
+id = "wpm_widget_x"
+default = -1
+type = "number"
+description_key = "menu.ahk.metrics.wpm_widget_x"
+
+[[features.ahk.metrics]]
+id = "wpm_widget_y"
+default = -1
+type = "number"
+description_key = "menu.ahk.metrics.wpm_widget_y"
+
+[[features.ahk.metrics]]
+id = "wpm_widget_colors"
+default = false
+type = "boolean"
+description_key = "menu.ahk.metrics.wpm_widget_colors"
+
+[[features.ahk.metrics]]
+id = "wpm_widget_graph"
+default = false
+type = "boolean"
+description_key = "menu.ahk.metrics.wpm_widget_graph"
+
+
+
+# =====================================
+# ===== 4.10 ahk.category_enabled =====
+# =====================================
+
+[[features.ahk.category_enabled]]
+id = "hotstrings"
+default = true
+type = "boolean"
+description_key = "menu.ahk.category_enabled.hotstrings"
+
+[[features.ahk.category_enabled]]
+id = "layout"
+default = true
+type = "boolean"
+description_key = "menu.ahk.category_enabled.layout"
+
+[[features.ahk.category_enabled]]
+id = "shortcuts"
+default = true
+type = "boolean"
+description_key = "menu.ahk.category_enabled.shortcuts"
+
+[[features.ahk.category_enabled]]
+id = "tap_holds"
+default = true
+type = "boolean"
+description_key = "menu.ahk.category_enabled.tap_holds"
 
 
 
