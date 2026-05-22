@@ -47,17 +47,22 @@ MenuLabelFromManifestEntry(Entry) {
     }
     DescKey := Entry.Has("description_key") ? Entry["description_key"] : ""
     Path    := Entry.Has("path")            ? Entry["path"]            : ""
-    return MenuLabelFromDescriptionKey(DescKey, Path)
+    ; The legacy locale JSON files key features by the folded v1 PascalCase
+    ; path (``dynamichotstrings.datefr``) — pass it explicitly so the
+    ; candidate generator can emit that variant too. V1Path may be empty
+    ; when the v2 path doesn't map to a v1 equivalent.
+    V1Path := (Path == "") ? "" : V2PathToV1Path(Path)
+    return MenuLabelFromDescriptionKey(DescKey, Path, V1Path)
 }
 
-; Resolve a localised label given the manifest ``description_key`` and the
-; canonical v2 ``path``. Either argument can be empty — when both fail to
-; resolve, the function returns the last segment of the path (or the key
-; itself as a last-resort sentinel).
-MenuLabelFromDescriptionKey(DescKey, Path := "") {
+; Resolve a localised label given the manifest ``description_key``, the
+; canonical v2 ``path``, and the legacy v1 PascalCase path. Each argument
+; can be empty — when none of them resolves, the function returns the last
+; segment of the path (or the key itself as a last-resort sentinel).
+MenuLabelFromDescriptionKey(DescKey, Path := "", V1Path := "") {
     global ScriptInformation
 
-    Candidates := _MenuLabelCandidateKeys(DescKey, Path)
+    Candidates := _MenuLabelCandidateKeys(DescKey, Path, V1Path)
     Label := ""
     for Cand in Candidates {
         if (Cand == "") {
@@ -96,15 +101,15 @@ MenuLabelFromDescriptionKey(DescKey, Path := "") {
 ; ==============================================================
 
 ; Build the ordered list of i18n keys to try, derived from the manifest
-; description_key and the canonical v2 path. The legacy locale JSON files
-; use a different convention from the manifest:
+; description_key, the canonical v2 path, and the legacy v1 PascalCase
+; path. The legacy locale JSON files use a folded-PascalCase convention:
 ;   manifest:   ``menu.layout.ergopti_base``
 ;   locale:     ``layout.ergoptibase``
-;   manifest:   ``menu.hotstrings.autocorrection.accents``
-;   locale:     ``autocorrection.accents``
-; so the candidate chain progressively peels and folds the path until one
-; format matches.
-_MenuLabelCandidateKeys(DescKey, Path) {
+;   manifest:   ``menu.hotstrings.dynamic.date_fr``
+;   locale:     ``dynamichotstrings.datefr``  (v1 category merged + folded)
+; so the candidate chain produces all four formats (manifest, v2, v2 +
+; folding, v1 + folding) and the first hit wins.
+_MenuLabelCandidateKeys(DescKey, Path, V1Path := "") {
     Out := []
     if (DescKey != "") {
         Out.Push(DescKey)
@@ -139,6 +144,15 @@ _MenuLabelCandidateKeys(DescKey, Path) {
             Out.Push(Trimmed)
         }
         Out.Push(_StripUnderscores(Trimmed))
+    }
+
+    ; The legacy v1 PascalCase path folded to lowercase no-underscore is
+    ; how the existing locale JSON entries are keyed for most features:
+    ;   ``Layout.ErgoptiBase``  -> ``layout.ergoptibase``
+    ;   ``DynamicHotstrings.DateFr`` -> ``dynamichotstrings.datefr``
+    ;   ``Shortcuts.AltGrLAlt.BackSpace`` -> ``shortcuts.altgrlalt.backspace``
+    if (V1Path != "") {
+        Out.Push(StrLower(StrReplace(V1Path, "_", "")))
     }
 
     return Out

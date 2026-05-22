@@ -280,6 +280,14 @@ GetSubMenuLabel(FullPath, FallbackKey) {
 ; runtime-discovered Personal sections). The live ``Letter`` suffix
 ; appended for letter pickers is always read from FeaturesV2 so the
 ; title reflects the user's persisted choice immediately after a Reload.
+;
+; Two runtime substitutions are layered on top of the i18n value so the
+; menu reflects live data:
+;   - ``{date}`` placeholders in DynamicHotstrings entries are replaced
+;     with the current date in the per-feature format.
+;   - Hotstring categories with a non-zero entry count get a ``" (N)"``
+;     suffix mirroring the legacy ``EnrichSectionDescriptionsWithCounts``
+;     behaviour.
 GetMenuTitleByPath(FullPath) {
 	; Try the manifest first — single source of truth for declared features.
 	V2Path := V1PathToV2ManifestPath(FullPath)
@@ -287,6 +295,7 @@ GetMenuTitleByPath(FullPath) {
 		Entry := ManifestFindEntryByV2Path(V2Path)
 		if (Entry != false) {
 			MenuTitle := MenuLabelFromManifestEntry(Entry)
+			MenuTitle := _ApplyMenuLabelDynamicSubstitutions(MenuTitle, FullPath)
 			if _ManifestEntryHasLetter(Entry) {
 				State := GetFeatureV2State(FullPath)
 				if (State.Has("Letter") and State["Letter"] != "") {
@@ -323,6 +332,48 @@ _ManifestEntryHasLetter(Entry) {
 	}
 	Def := Entry["default"]
 	return (Type(Def) == "Map" and Def.Has("letter"))
+}
+
+; Apply runtime substitutions to a menu label fresh out of i18n. Handles
+; the DynamicHotstrings ``{date}`` placeholders and appends a ``" (N)"``
+; suffix to hotstring category entries that have a non-zero count.
+_ApplyMenuLabelDynamicSubstitutions(Label, V1Path) {
+	; {date} substitution for the three DynamicHotstrings date entries.
+	if (InStr(Label, "{date}")) {
+		switch V1Path {
+			case "DynamicHotstrings.DateFr":
+				Label := StrReplace(Label, "{date}", FormatTime(, "dd/MM/yyyy"))
+			case "DynamicHotstrings.DateLongFr":
+				_Days   := ["dimanche", "lundi", "mardi", "mercredi", "jeudi", "vendredi", "samedi"]
+				_Months := ["janvier", "février", "mars", "avril", "mai", "juin",
+				            "juillet", "août", "septembre", "octobre", "novembre", "décembre"]
+				_Long := _Days[A_WDay] . " " . FormatTime(, "d") . " " . _Months[FormatTime(, "M") + 0] . " " . FormatTime(, "yyyy")
+				Label := StrReplace(Label, "{date}", _Long)
+			case "DynamicHotstrings.Date":
+				Label := StrReplace(Label, "{date}", FormatTime(, "yyyy_MM_dd"))
+		}
+	}
+	; Append hotstring entry counts for the TOML-backed categories and the
+	; DynamicHotstrings entries (PhonePrefixes, SsnPrefixes, …). The v1
+	; PascalCase category is the CategoryName argument CountTomlSection
+	; expects; section name is the FoldAsciiLower of the v1 feature id
+	; (``Errors`` -> ``errors``, ``IÉ`` -> ``ie``).
+	Parts := StrSplit(V1Path, ".")
+	if (Parts.Length == 2) {
+		switch Parts[1] {
+			case "Autocorrection", "DistancesReduction", "MagicKey", "Rolls", "SFBsReduction":
+				N := CountTomlSection(Parts[1], FoldAsciiLower(Parts[2]))
+				if (N > 0) {
+					Label := Label . " (" . N . ")"
+				}
+			case "DynamicHotstrings":
+				N := CountDynamicSection(Parts[2])
+				if (N > 0) {
+					Label := Label . " (" . N . ")"
+				}
+		}
+	}
+	return Label
 }
 
 ; Retrieve a feature object by its path

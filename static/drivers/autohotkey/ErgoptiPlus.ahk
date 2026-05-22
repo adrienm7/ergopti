@@ -589,28 +589,11 @@ global FeaturesV2 := ManifestBuildFeaturesMap()
 ApplyConfigTomlV2(FeaturesV2, _ConfigDir . "ahk\config.toml")
 global TapHold := LoadTapHoldToml(_ConfigDir . "ahk\tap_hold.toml")
 
-; Append hotstring counts to section descriptions so the tray menu shows
-; "(N)" next to each section item — mirrors Hammerspoon's per-section display.
-EnrichSectionDescriptionsWithCounts(Category) {
-    global Features
-    if !Features.Has(Category) {
-        return
-    }
-    for FeatKey, FeatVal in Features[Category] {
-        if (FeatKey == "__Order" or !IsObject(FeatVal) or Type(FeatVal) == "Map") {
-            continue
-        }
-        ; TOML section name is the lowercase/accent-folded version of the AHK feature key
-        TomlSection := FoldAsciiLower(FeatKey)
-        N := CountTomlSection(Category, TomlSection)
-        if (N > 0 and FeatVal.HasOwnProp("Description") and FeatVal.Description != "") {
-            FeatVal.Description := FeatVal.Description . " (" . N . ")"
-        }
-    }
-}
-for _Cat in ["Autocorrection", "DistancesReduction", "MagicKey", "Rolls", "SFBsReduction"] {
-    EnrichSectionDescriptionsWithCounts(_Cat)
-}
+; The legacy ``EnrichSectionDescriptionsWithCounts`` boot-time loop that
+; appended " (N)" suffixes to Features v1 descriptions is gone — the
+; ``_ApplyMenuLabelDynamicSubstitutions`` helper in ui/tray_menu.ahk now
+; appends counts at render time directly on top of the manifest+i18n
+; label, so the Features Map is no longer mutated on this path.
 
 ; Count the exact number of hotstrings that will be generated for a DynamicHotstrings
 ; section — mirrors the same threshold logic used in hotstrings.ahk section 5.
@@ -653,34 +636,12 @@ CountDynamicSection(SectionName) {
     }
 }
 
-; Replace the static date placeholder in DynamicHotstrings descriptions with today's
-; actual date and real hotstring counts so the tray menu always reflects live data.
-if Features.Has("DynamicHotstrings") {
-    MK := ScriptInformation["MagicKey"]
-    for _DynKey, _DynVal in Features["DynamicHotstrings"] {
-        if (_DynKey == "__Order" or !IsObject(_DynVal) or Type(_DynVal) == "Map") {
-            continue
-        }
-        N := CountDynamicSection(_DynKey)
-        CountSuffix := N > 0 ? " (" . N . ")" : ""
-        switch _DynKey {
-            case "DateFr":
-                _DynVal.Description := StrReplace(StrReplace(t("dynamichotstrings.datefr"), "★", MK), "{date}", FormatTime(, "dd/MM/yyyy")) . CountSuffix
-            case "DateLongFr":
-                _DynDays   := ["dimanche", "lundi", "mardi", "mercredi", "jeudi", "vendredi", "samedi"]
-                _DynMonths := ["janvier", "février", "mars", "avril", "mai", "juin",
-                               "juillet", "août", "septembre", "octobre", "novembre", "décembre"]
-                _DynLongDate := _DynDays[A_WDay] . " " . FormatTime(, "d") . " " . _DynMonths[FormatTime(, "M") + 0] . " " . FormatTime(, "yyyy")
-                _DynVal.Description := StrReplace(StrReplace(t("dynamichotstrings.datelongfr"), "★", MK), "{date}", _DynLongDate) . CountSuffix
-            case "Date":
-                _DynVal.Description := StrReplace(StrReplace(t("dynamichotstrings.date"), "★", MK), "{date}", FormatTime(, "yyyy_MM_dd")) . CountSuffix
-            default:
-                if (_DynVal.HasOwnProp("Description") and _DynVal.Description != "" and N > 0) {
-                    _DynVal.Description := _DynVal.Description . CountSuffix
-                }
-        }
-    }
-}
+; The legacy ``Features["DynamicHotstrings"]`` mutation block that injected
+; the current date and " (N)" suffix into Features v1 descriptions is gone
+; — ``_ApplyMenuLabelDynamicSubstitutions`` in ui/tray_menu.ahk replaces
+; the ``{date}`` placeholders in the i18n value at render time and
+; appends the count from CountDynamicSection. Pure runtime resolution,
+; no boot-time Features mutation.
 
 global SpaceAroundSymbols := FeaturesV2["hotstrings"]["distances_reduction"]["space_around_symbols"]["enabled"] ? " " : ""
 
